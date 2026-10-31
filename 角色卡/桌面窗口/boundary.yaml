@@ -198,6 +198,10 @@ entries:
   - kind: file
     path: test/桌面应用/replay-safe-retry.test.ts
     purpose: 主进程侧测试：仅 replay-safe 同 turn 安全重试——重试失败/终态/短报、不重复 settled/handback、取消优先（P3，session/interface）
+  # --- Delta-SE-1（2026-10-31，团队计划 §4.5；闸门 2）：test/桌面应用/ 新增 1 个精确测试文件（shell-escalation），逐文件授权 ---
+  - kind: file
+    path: test/桌面应用/shell-escalation.test.ts
+    purpose: 主进程侧测试——升级卡 presenter/三选项/超时/replay、卡片仲裁与暂停 IPC
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

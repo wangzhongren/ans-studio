@@ -10,6 +10,9 @@
  */
 
 import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
+import type { ShellEscalationAction } from "../lib/platform.ts";
+
+export type { ShellEscalationAction } from "../lib/platform.ts";
 
 export type JudgeGroup = "approval" | "decision";
 
@@ -32,6 +35,12 @@ export function judgeGroupLabel(
 
 function str(value: unknown): string {
   return typeof value === "string" && value !== "" ? value : "";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function stringList(value: unknown): string[] {
@@ -418,6 +427,344 @@ export function shellJudgeResultView(
       hardDenyOverride: hardDeny,
       toolCallId: str(record.toolCallId),
     },
+  };
+}
+
+// —————— shell 判拒升级卡视图（2026-10-31 判拒升级方案 v1.3 §7.1/§7.3）——————
+// 渲染侧只把主进程给出的判拒事实转写为卡面视图；`necessity` 是**角色提供的不可信文本**，
+// 只在独立区块原样展示并附应用生成的 `necessityNote`，绝不作为标题/选项来源。
+
+const SHELL_ESCALATION_ACTIONS: readonly ShellEscalationAction[] = [
+  "allow-once",
+  "allow-session",
+  "deny",
+];
+
+/** `shell:confirm-request` 载荷是否为升级卡（C1 冻结：`kind:"escalation"`）。 */
+export function isShellEscalationPayload(payload: unknown): boolean {
+  return asRecord(payload).kind === "escalation";
+}
+
+/** 卡族路由：缺省（旧主进程无 `kind`）按既有审批卡处理。 */
+export function shellConfirmKind(
+  payload: unknown,
+): "approval" | "escalation" {
+  return isShellEscalationPayload(payload) ? "escalation" : "approval";
+}
+
+export interface ShellEscalationActionView {
+  action: ShellEscalationAction;
+  label: string;
+}
+
+/** 升级卡「脚本上下文」中的单个脚本（判拒时 judge 所依据的有界内容；全部为不可信数据）。 */
+export interface ShellEscalationScriptView {
+  /** React key（仅展示用；path/label 与序号组合）。 */
+  key: string;
+  /** 脚本路径；内联代码无 path 时用 label。 */
+  path: string;
+  label: string;
+  /** 「脚本：{path}」整行（A3 `ui.confirm.escalation.contextPath`）。 */
+  pathLine: string;
+  sha256: string;
+  /** 「sha256：{sha}」整行（A3 `ui.confirm.escalation.contextSha`）。 */
+  shaLine: string;
+  /** 有界内容（原样展示，React 转义）。 */
+  content: string;
+  bytes: number;
+  /** false = 不在请求角色写区内（judge 需重点核对）。 */
+  inWriteArea?: boolean;
+  /** inWriteArea===false 时的警示文案（既有 i18n key；不硬编码）。 */
+  outsideWriteWarning: string;
+}
+
+/** 升级卡「脚本上下文」区块视图（`approvalContext`；缺失/非法 ⇒ null，旧卡兼容）。 */
+export interface ShellEscalationContextView {
+  header: string;
+  /** 「说明：{note}」整行（无 note ⇒ 空串）。 */
+  noteLine: string;
+  /** 「npm 脚本：{name}」整行（无 npm 脚本 ⇒ 空串）。 */
+  npmScriptLine: string;
+  scripts: ShellEscalationScriptView[];
+}
+
+export interface ShellEscalationView {
+  title: string;
+  intro: string;
+  judgeHeader: string;
+  /** judge 判拒理由（原文；空串 = 未报告）。 */
+  judgeReason: string;
+  /** 「判断理由：…」整行（空串 = 未报告）。 */
+  judgeReasonLine: string;
+  judgeCustomerMessage: string;
+  /** 替代方案整句（空串 = 未报告）。 */
+  judgeAlternative: string;
+  necessityHeader: string;
+  /** 角色提供的必要性说明（不可信文本，原样展示）。 */
+  necessity: string;
+  /** 「由角色提供，未经验证」固定标注（应用生成 / A3 i18n）。 */
+  necessityNote: string;
+  /** 「客户手批 ≠ judge 放行」固定声明（应用生成 / A3 i18n）。 */
+  customerNotJudgeNote: string;
+  command: string;
+  argvLines: string[];
+  cwd: string;
+  /** 判拒时的有界脚本上下文（缺失/空/非法 ⇒ null：不渲染区块，旧卡兼容）。 */
+  approvalContext: ShellEscalationContextView | null;
+  actions: ShellEscalationActionView[];
+  note: string;
+  pauseLabel: string;
+  expiredHint: string;
+  requestId: string;
+}
+
+function escalationActionViews(
+  record: Record<string, unknown>,
+  locale: Locale,
+): ShellEscalationActionView[] {
+  const requested = stringList(record.actions).filter(
+    (item): item is ShellEscalationAction =>
+      item === "allow-once" || item === "allow-session" || item === "deny",
+  );
+  const selected =
+    requested.length > 0
+      ? SHELL_ESCALATION_ACTIONS.filter((action) => requested.indexOf(action) >= 0)
+      : SHELL_ESCALATION_ACTIONS.slice();
+  return selected.map((action) => ({
+    action,
+    label: translate(
+      locale,
+      action === "allow-once"
+        ? "ui.confirm.escalation.allowOnce"
+        : action === "allow-session"
+          ? "ui.confirm.escalation.allowSession"
+          : "ui.confirm.escalation.reject",
+    ),
+  }));
+}
+
+/** inWriteArea===false 的警示文案：复用既有「不在可写范围内」key（A3 未新增专用 key）。 */
+const WRITE_BOUNDARY_WARNING_KEY: MessageKey =
+  "main.customerInput.writePreauthorization.reason.boundary";
+
+/**
+ * `approvalContext` → 脚本上下文视图（E2 返工 R1；方案 §4.3/§7.1）。
+ * 只读卡载荷、不做任何风险判定；内容/路径/标签均视为不可信数据原样展示。
+ * 缺失、非对象、或没有任何可展示内容 ⇒ null（不渲染区块，旧卡兼容）。
+ */
+function escalationContextView(
+  record: Record<string, unknown>,
+  locale: Locale,
+): ShellEscalationContextView | null {
+  const raw = record.approvalContext;
+  if (!raw || typeof raw !== "object") return null;
+  const context = raw as Record<string, unknown>;
+  const note = str(context.note);
+  const npmScriptName = str(context.npmScriptName);
+  const rawScripts = Array.isArray(context.scripts) ? context.scripts : [];
+  const scripts: ShellEscalationScriptView[] = [];
+  for (let index = 0; index < rawScripts.length; index += 1) {
+    const item = rawScripts[index];
+    if (!item || typeof item !== "object") continue;
+    const script = item as Record<string, unknown>;
+    const pathValue = str(script.path);
+    const label = str(script.label);
+    const displayPath = pathValue || label;
+    const sha256 = str(script.sha256);
+    // 最少要有可标识的路径/标签与 sha256，否则不作为脚本条目展示（不编造）。
+    if (!displayPath || !sha256) continue;
+    const content = typeof script.content === "string" ? script.content : "";
+    const bytes =
+      typeof script.bytes === "number" &&
+      Number.isFinite(script.bytes) &&
+      script.bytes >= 0
+        ? script.bytes
+        : 0;
+    const inWriteArea =
+      typeof script.inWriteArea === "boolean" ? script.inWriteArea : undefined;
+    scripts.push({
+      key: displayPath + ":" + index,
+      path: displayPath,
+      label,
+      pathLine: translate(locale, "ui.confirm.escalation.contextPath", {
+        path: displayPath,
+      }),
+      sha256,
+      shaLine: translate(locale, "ui.confirm.escalation.contextSha", {
+        sha: sha256,
+      }),
+      content,
+      bytes,
+      ...(inWriteArea !== undefined ? { inWriteArea } : {}),
+      outsideWriteWarning:
+        inWriteArea === false
+          ? translate(locale, WRITE_BOUNDARY_WARNING_KEY)
+          : "",
+    });
+  }
+  if (!note && !npmScriptName && scripts.length === 0) return null;
+  return {
+    header: translate(locale, "ui.confirm.escalation.contextHeader"),
+    noteLine: note
+      ? translate(locale, "ui.confirm.escalation.contextNote", { note })
+      : "",
+    npmScriptLine: npmScriptName
+      ? translate(locale, "ui.confirm.escalation.contextNpmScript", {
+          name: npmScriptName,
+        })
+      : "",
+    scripts,
+  };
+}
+
+/**
+ * 升级卡视图（非升级卡载荷 ⇒ null）。所有字段取自主进程卡载荷（C1 冻结的
+ * `ShellEscalationIpcCard`）；旧/缺省字段如实降级（argvLines 缺失时用 argv、
+ * necessityNote/customerNotJudgeNote 缺失时用 A3 固定文案——不改变语义）。
+ */
+export function shellEscalationView(
+  payload: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): ShellEscalationView | null {
+  if (!isShellEscalationPayload(payload)) return null;
+  const record = asRecord(payload);
+  const alt = asRecord(record.judgeAlternative);
+  const altValue = str(alt.value);
+  const altText = altValue
+    ? str(alt.rationale)
+      ? translate(locale, "ui.judge.alternativeWithRationale", {
+          value: altValue,
+          rationale: str(alt.rationale),
+        })
+      : translate(locale, "ui.judge.alternative", { value: altValue })
+    : "";
+  const argvLines = stringList(record.argvLines);
+  const judgeReason = str(record.judgeReason);
+  return {
+    title: translate(locale, "ui.confirm.escalation.title"),
+    intro: translate(locale, "ui.confirm.escalation.intro"),
+    judgeHeader: translate(locale, "ui.confirm.escalation.judgeHeader"),
+    judgeReason,
+    judgeReasonLine: judgeReason
+      ? translate(locale, "ui.judge.reasonLine", { reason: judgeReason })
+      : "",
+    judgeCustomerMessage: str(record.judgeCustomerMessage),
+    judgeAlternative: altText,
+    necessityHeader: translate(locale, "ui.confirm.escalation.necessityHeader"),
+    necessity: str(record.necessity),
+    necessityNote:
+      str(record.necessityNote) ||
+      translate(locale, "ui.confirm.escalation.necessityNote"),
+    customerNotJudgeNote:
+      str(record.customerNotJudgeNote) ||
+      translate(locale, "ui.confirm.escalation.customerNotJudge"),
+    command: str(record.command),
+    argvLines: argvLines.length > 0 ? argvLines : stringList(record.argv),
+    cwd: str(record.cwd),
+    approvalContext: escalationContextView(record, locale),
+    actions: escalationActionViews(record, locale),
+    note: translate(locale, "ui.confirm.escalation.note"),
+    pauseLabel: translate(locale, "ui.confirm.escalation.pauseSession"),
+    expiredHint: translate(locale, "ui.confirm.escalation.expired"),
+    requestId: str(record.requestId),
+  };
+}
+
+/** 升级卡回包载荷（`{kind:"escalation", id, action}`；preload 方法只接受这三个动作）。 */
+export function shellEscalationResponsePayload(
+  id: string,
+  action: ShellEscalationAction,
+): { kind: "escalation"; id: string; action: ShellEscalationAction } {
+  return { kind: "escalation", id, action };
+}
+
+export interface ShellEscalationResponseOutcome {
+  /** true = 收起卡片；false = 保留卡片（升级卡按现有 shell 卡口径收起）。 */
+  close: boolean;
+  /** true = 主进程回执该申请已失效（未获允许）。 */
+  expired: boolean;
+  /** 如实提示（空串 = 不提示）。 */
+  hint: string;
+}
+
+/** 升级卡回包 → 收起/提示（未知/过期/非法动作由主进程按 expired 回执，绝不放行）。 */
+export function shellEscalationResponseOutcome(
+  res: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): ShellEscalationResponseOutcome {
+  const record = asRecord(res);
+  if (record.ok === true) return { close: true, expired: false, hint: "" };
+  if (record.expired === true) {
+    return {
+      close: true,
+      expired: true,
+      hint: translate(locale, "ui.confirm.escalation.expired"),
+    };
+  }
+  return {
+    close: true,
+    expired: false,
+    hint: translate(locale, "ui.confirm.failedShell"),
+  };
+}
+
+// —————— 「本次运行暂停自动审批」视图（shell-only；2026-10-31 §4.6/§6.5(e)）——————
+// 暂停是应用运行期临时覆盖：不写偏好、不影响治理 approval 组；旧主进程无
+// `setShellJudgePaused` ⇒ 能力禁用（available:false），绝不显示假暂停态。
+
+export interface JudgePauseSnapshotLike {
+  available?: boolean;
+  paused?: boolean;
+  busy?: boolean;
+  justPaused?: boolean;
+  failed?: boolean;
+  error?: string;
+}
+
+export interface JudgePauseStateView {
+  available: boolean;
+  paused: boolean;
+  busy: boolean;
+  justPaused: boolean;
+  failed: boolean;
+  /** "none" = 当前版本无暂停能力（按钮禁用并给出说明）。 */
+  action: "pause" | "resume" | "none";
+  error: string;
+}
+
+export function judgePauseState(
+  snapshot: JudgePauseSnapshotLike | null | undefined,
+): JudgePauseStateView {
+  const available = snapshot?.available === true;
+  const paused = available && snapshot?.paused === true;
+  const busy = available && snapshot?.busy === true;
+  return {
+    available,
+    paused,
+    busy,
+    justPaused: paused && snapshot?.justPaused === true,
+    failed: available && snapshot?.failed === true,
+    action: !available ? "none" : paused ? "resume" : "pause",
+    error: typeof snapshot?.error === "string" ? snapshot.error : "",
+  };
+}
+
+/** 暂停/恢复回包的自洽化：ok:true 且带布尔 paused ⇒ 采信主进程；其余保持/采用主进程报告的当前值并如实报错。 */
+export function judgePauseReplyResult(
+  previousPaused: boolean,
+  res: unknown,
+): { ok: boolean; paused: boolean; error: string } {
+  const record = asRecord(res);
+  if (record.ok === true && typeof record.paused === "boolean") {
+    return { ok: true, paused: record.paused, error: "" };
+  }
+  return {
+    ok: false,
+    paused:
+      typeof record.paused === "boolean"
+        ? record.paused
+        : previousPaused === true,
+    error: str(record.error),
   };
 }
 

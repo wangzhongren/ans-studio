@@ -218,7 +218,12 @@ contextBridge.exposeInMainWorld("desktop", {
    * 订阅「shell 命令确认请求」（M-1，2026-10-12）：三层闸 (a) 层为**应用内确认卡**（不再用原生对话框）。
    * 主进程推 `{id, command, summary, reasonPlain, reasonRaw, argvLines, cwd}`——`command` 为**逐字原文**；
    * `summary`/`reasonPlain` 已由主进程翻成**人话**（内部行话不外露）；`reasonRaw`/`argvLines`/`cwd` 供
-   * 折叠「详情」核查。渲染侧**只呈现、不判定**。返回取消订阅函数。
+   * 折叠「详情」核查。渲染侧**只呈现、不判定**。
+   * **2026-10-31（判拒升级方案 v1.3 §7.2）**：同一通道同时承载升级卡——payload 增可选
+   * `kind:"approval"|"escalation"`（缺省按审批卡兼容）；升级卡另带
+   * `requestId/roleId/projectRoot/runtime/argv/argvLines/judgeReason/judgeCustomerMessage/judgeAlternative/
+   * necessity/approvalContext/expiresAt/actions`（命令/argv/cwd/judge 事实取自判拒记录；necessity 为
+   * **角色提供、未经验证**的不可信文本，渲染侧须独立区块展示并标注）。返回取消订阅函数。
    */
   onShellConfirm: (cb) => {
     const listener = (_event, payload) => cb(payload);
@@ -237,13 +242,34 @@ contextBridge.exposeInMainWorld("desktop", {
     }),
 
   /**
+   * 回传升级卡决定（2026-10-31 判拒升级方案 v1.3 §7.2）：`{id, action}`，`action` 恰为
+   * `"allow-once" | "allow-session" | "deny"`（**没有**「允许所有/前缀」/第四决定项；暂停页脚动作
+   * 不是决定项，须另行调用 `setShellJudgePaused`）。主进程按 `kind:"escalation"` 路由到升级卡核；
+   * 未知/过期 id、重复回包、非法动作 → `{ok:false, expired:true}`（**不放行**）。**不暴露任何 Node 能力。**
+   */
+  shellEscalationRespond: (input) =>
+    ipcRenderer.invoke("shell:confirm-response", {
+      kind: "escalation",
+      id: input && typeof input.id === "string" ? input.id : "",
+      action: typeof (input && input.action) === "string" ? input.action : "",
+    }),
+
+  /**
    * 「替我审」开关（2026-10-17 PM 评审 §6.6，方法名钉死）：主进程是权威状态（默认 false、重载复位）。
-   * `getShellJudgeState()` 返回 `{version:1, ok, enabled?, error?}`；`setShellJudgeEnabled(enabled)` 仅提交意图，
-   * **以主进程返回为准**（失败不改状态，渲染侧不得显示假开启态）。**不暴露任何 Node/fs/process 能力。**
+   * `getShellJudgeState()` 返回 `{version:1, ok, enabled?, available?, paused?, error?}`；
+   * `setShellJudgeEnabled(enabled)` 仅提交意图，**以主进程返回为准**（失败不改状态，渲染侧不得显示
+   * 假开启态）。**不暴露任何 Node/fs/process 能力。**
    */
   getShellJudgeState: () => ipcRenderer.invoke("shell:judge-get"),
   setShellJudgeEnabled: (enabled) => ipcRenderer.invoke("shell:judge-set", { enabled: enabled === true }),
-  /** 订阅开关状态（开关变化 / 重载复位 / 初次加载后推送）；载荷 `{version:1, enabled}`。返回取消订阅函数。 */
+  /**
+   * **「本次运行暂停自动审批」**（2026-10-31 判拒升级方案 v1.3 §7.2）：`setShellJudgePaused(true|false)`——
+   * 只影响 **shell** 操作者通道（有效值 = 持久化开关 && !paused），**不改持久化开关、不影响治理 approval 组**；
+   * 应用运行期内跨窗口重开保留、重启清零。回报 `{version:1, ok, paused, error?}`；非法输入不改状态。
+   * 暂停页脚动作**不是**升级卡第四决定项（不触发 allow/deny）。**不暴露任何 Node 能力。**
+   */
+  setShellJudgePaused: (paused) => ipcRenderer.invoke("shell:judge-pause", { paused: paused === true }),
+  /** 订阅开关/暂停状态（开关变化 / 暂停 / 重载后初次推送）；载荷 `{version:1, enabled, paused?}`。返回取消订阅函数。 */
   onShellJudgeState: (cb) => {
     const listener = (_event, payload) => cb(payload);
     ipcRenderer.on("shell:judge-state", listener);

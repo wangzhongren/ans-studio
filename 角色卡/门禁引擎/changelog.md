@@ -1,5 +1,9 @@
 # 门禁引擎 变更记录
 
+## 2026-10-31 — 边界漂移校正 B-1：权威 `boundary.md` 补列 `src/service/gate/shell-rules.ts`（闸门 2 后人事执行）
+
+依据团队计划 `docs/scheduling/2026-10-31_team-plan_shell-deny-customer-escalation.md`（575 行，SHA-256 `4d52bdf4309b23c14065cd6893301cd43971a25726bacdd7338e1c987fc40203`）§4.5 B-1，及闸门 2 确认记录 `docs/communication/2026-10-31_intent_shell-deny-customer-escalation.md`「闸门 2 记录（2026-10-31）」（客户原话「确认闸门 2：参与角色、写集与 3 项边界变更」）。`boundary.yaml` 第 24–26 行原已登记该单文件条目（用途：shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认）），权威 `boundary.md` Section 1 此前漏列，属既有 Markdown/YAML 漂移；本次按计划 §4.5 原文在 `boundary.md` Section 1 表内（`src/service/gate/resolve-write.ts` 之后、`src/common/门禁引擎/` 目录条目之前）补入一行精确单文件条目，类型/路径/用途与 YAML 对应条目一致。**职责不变、不扩权限**：仅把 YAML 已存在的同一条目对齐到权威 md；不新增角色、不改角色 id/显示名/角色卡正文、不改其他路径；未写代码/测试、未改业务文件、未 commit/push、未启动应用。
+
 ## 2026-10-29 — 工作流维护者化（v4.1）：六卡文本、convener dispatch delta、shell 写目标守卫
 
 方案 v2.1 §4/§6（客户闸门 1/2 已过；Q1 A/Q2 A 已确认）。`governance-roles.ts`：六张内置卡按拓扑 v4.1 重写（幕僚五步链/产品意图/策划名单+架构/人事 D3+写卡/运营接交付+派发+验收/质检回报发起方）；convener 能力位 `dispatchTask:true`（已批准权限 delta，目标矩阵由应用 M6/M7 执行）；worker 卡模板要点并入人事卡。新增 `shell-write-guard.ts`（确定性写目标判定 + 注入 `checkWrite` 闭包：显式写目标越界/禁写前缀直拒；不透明执行 opaque）与 `classify-shell.ts::isOpaqueShellExecution`（node 脚本/解释器脚本/npm run/构建工具 opaque；Q2 A 的 node --test/npm test/install 保持普通审批）。测试：新增 `test/门禁引擎/shell-write-guard.test.ts`（7），`view-image-cards` 保持绿；套件 261 计（260 过/1 skip）。详见 `docs/scheduling/2026-10-29_change-workflow-maintainers-hiring.md`。

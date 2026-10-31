@@ -9,5 +9,9 @@
 // 形状（与编排 `ClassifyShellFn` 逐字可注入，无需适配器）：
 //   classifyShell(argv: string[], rules: ShellRules): ShellClass
 //   defaultShellRules(): ShellRules
+//   matchRoutineShellCommand(argv: string[]): { id: string } | undefined
+//     —— 例行命令确定性白名单谓词（2026-10-31，方案 v1.3 §5.3）：分类器与写守卫的**唯一实现**；
+//        编排/委托策略（`routine-shell-policy`）经本出口消费同一函数引用，不复制形状判定。
+//        命中 id 稳定（`allow:routine:<id>`）；委托策略只接受原委托三 id（npm-test / npm-run-typecheck / node-test）。
 
-export { classifyShell, defaultShellRules } from "../../common/门禁引擎/classify-shell.ts";
+export { classifyShell, defaultShellRules, matchRoutineShellCommand } from "../../common/门禁引擎/classify-shell.ts";

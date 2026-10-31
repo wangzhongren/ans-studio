@@ -33,8 +33,13 @@ export const SHELL_JUDGE_INTERNAL_JARGON = [
   "(c)",
 ] as const;
 
-/** `deny` 的标准出路句（2026-10-18 双开关后统一为「替我审批」；PM 评审 §8.4）。 */
-export const SHELL_JUDGE_EXIT_LINE = "如需执行，请关闭「替我审批」后重试。";
+/**
+ * `deny` 的标准出路句（2026-10-31 升级方案 v1.3 §4.6：判拒后可对**这条精确命令**申请客户确认，
+ * 保留「关闭『替我审批』后重试」兜底）。保留「关闭」「替我审批」「重试」三词——既有
+ * `containsExitLine` 判据与 judge 自拟文本（旧/新表述）继续兼容。
+ */
+export const SHELL_JUDGE_EXIT_LINE =
+  "如确属推进必需，可调用 request_shell_escalation 对这条精确命令申请客户确认（每会话一次）；或关闭「替我审批」后重试。";
 
 const REDACTED = "[已脱敏]";
 
@@ -119,6 +124,8 @@ export function normalizeShellJudgeVerdict(input: unknown): ShellJudgeVerdict | 
 }
 
 function containsExitLine(text: string): boolean {
+  // 兼容旧表述（「如需执行，请关闭『替我审批』后重试。」）与新表述（含 request_shell_escalation
+  // 的升级出路）：两者都含「关闭」「替我审批」「重试」三词，故判据逐字不变。
   return text.includes("关闭") && text.includes("替我审批") && text.includes("重试");
 }
 

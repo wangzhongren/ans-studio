@@ -3106,3 +3106,211 @@ img.view-image-preview {
 .chat-cta {
   margin-top: 12px;
 }
+
+/* —— 判拒升级卡（2026-10-31 判拒升级方案 v1.3 §4.6/§7.1；同一 sc-* 卡族）——
+   命令原文/argv/cwd 复用 sc-command/sc-details；必要性独立区块并标注不可信；
+   页脚「暂停本次运行自动审批」为 shell-only 次要动作（不是第四决定项）。 */
+.sc-overlay.is-escalation .sc-card {
+  width: min(680px, calc(100vw - 48px));
+}
+.sc-intro {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-2);
+}
+.se-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+}
+.se-section[hidden] {
+  display: none;
+}
+.se-section-title {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.se-necessity {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+.se-necessity-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--warning);
+}
+.se-necessity-text {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+  font: 12px/1.6 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* —— 升级卡「脚本上下文」区块（E2 R1；judge 判拒时所依据；内容为不可信数据）—— */
+.se-context {
+  border-color: var(--border-strong);
+}
+.se-context-note,
+.se-context-npm-script,
+.se-context-path,
+.se-context-label,
+.se-context-sha,
+.se-context-warning {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.se-context-note {
+  color: var(--text-3);
+}
+.se-context-npm-script {
+  color: var(--text-2);
+}
+.se-context-path {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.se-context-label {
+  color: var(--text-3);
+}
+.se-context-sha {
+  color: var(--text-3);
+  font: 11px/1.5 var(--font-mono);
+  word-break: break-all;
+}
+.se-context-warning {
+  color: var(--warning);
+}
+.se-context-script {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.se-context-script:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+.se-context-content {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--background);
+  color: var(--foreground);
+  font: 12px/1.55 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.se-customer-note {
+  color: var(--text-2);
+}
+.se-actions {
+  flex-wrap: wrap;
+}
+.se-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.se-paused-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.se-paused-badge {
+  font-size: 11.5px;
+  color: var(--warning);
+}
+.se-pause {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.se-pause:hover:not(:disabled) {
+  color: var(--foreground);
+}
+.se-pause:disabled {
+  color: var(--text-3);
+  opacity: 0.6;
+  text-decoration: none;
+  cursor: default;
+}
+.se-pause-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.se-pause-note.is-done {
+  color: var(--text-2);
+}
+.se-pause-note.is-error {
+  color: var(--danger);
+}
+/* —— 判拒结果行的「本次运行暂停自动审批」控制（shell-only；§4.6）—— */
+.sj-pause {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.sj-pause-btn,
+.sj-pause-resume {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sj-pause-btn:hover:not(:disabled),
+.sj-pause-resume:hover:not(:disabled) {
+  color: var(--foreground);
+}
+.sj-pause-btn:disabled,
+.sj-pause-resume:disabled {
+  opacity: 0.6;
+  text-decoration: none;
+  cursor: default;
+}
+.sj-pause-badge {
+  font-size: 10.5px;
+  color: var(--warning);
+}
+.sj-pause-note {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.sj-pause-note.is-done {
+  color: var(--text-2);
+}
+.sj-pause-note.is-error {
+  color: var(--danger);
+}

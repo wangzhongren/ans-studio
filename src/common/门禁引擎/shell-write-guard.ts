@@ -14,7 +14,7 @@
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import path from "node:path";
-import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode } from "./classify-shell.ts";
+import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchRoutineShellCommand } from "./classify-shell.ts";
 import { checkVersionedDocWrite, protectedVersionedPathsSync, versionedDocExists, versionedDocOverwriteDecision } from "./versioned-doc-guard.ts";
 import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../编排/mechanical-rejection.ts";
 
@@ -533,6 +533,11 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
     if (program === "find" && args.some((arg) => arg === "-exec" || arg === "-execdir" || arg === "-ok" || arg === "-okdir")) {
       return { kind: "deny", reason: "find -exec/-execdir/-ok 会执行任意命令，硬拒", targets: [] };
     }
+    // 2026-10-31（方案 v1.3 §5.3）：例行命令确定性白名单——与分类器**共用同一纯函数引用**，
+    // 位于程序名解析后、`node --test`/npm 脚本分支**之前**：命中 ⇒ pass（不进脚本审查）。
+    // 否则下面的脚本分支会先返回 script，把 (c) 的确定性放行抢先吃掉（"只改 classify 不会产生 0 卡"的关键陷阱）。
+    // 不命中的形态（npm install / 任意脚本名 / 裸 tsc / 越界或带 flag 的 node --test…）照旧进入脚本审查。
+    if (matchRoutineShellCommand(argv) !== undefined) return { kind: "pass" };
     // 2026-10-29（R2）：`node --test <file...>` 运行测试文件 ⇒ 脚本审查（内容随上下文提供）。
     if (program === "node" && args.some((arg) => arg === "--test" || arg === "--test-only")) {
       return {

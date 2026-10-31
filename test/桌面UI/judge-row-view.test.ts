@@ -8,6 +8,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   ShellJudgeRowCard,
+  resetJudgePauseForTests,
+  setJudgePauseSnapshot,
   splitJudgeTitle,
 } from "../../app/renderer/src/chat/judge-row-view.ts";
 import { shellJudgeResultView } from "../../app/renderer/src/chat/judge.ts";
@@ -135,6 +137,8 @@ test("deny：ShieldX/红色徽标/理由 chip/retry 与详情行仍在，默认�
   assert.equal(visibleText(html).includes("替代方案：rm -rf dist"), true);
   assert.equal(visibleText(html).includes("该命令会删除项目源码，风险过高。"), true);
   assert.equal(visibleText(html).includes("关闭「替我审批」后重试"), true);
+  // AC-19（2026-10-31）：详情行渲染新出路措辞（上面的旧子串断言保留）。
+  assert.equal(visibleText(html).includes("可让角色申请客户确认"), true);
   assert.equal(html.includes("sj-tier-badge"), false);
   assert.match(html, /<details class="sj-details">/);
   assert.equal(html.includes("<details class=\"sj-details\" open"), false);
@@ -178,4 +182,43 @@ test("替代方案多行按列表渲染；客户说明独立 callout", () => {
   );
   assert.match(html, /class="sj-list"><li>npm run test:unit<\/li><li>npm run lint<\/li><\/ul>/);
   assert.match(html, /class="sj-callout"/);
+});
+
+// 2026-10-31（判拒升级方案 §4.6/§6.5(e)）：判拒结果行的「本次运行暂停自动审批」控件。
+test("暂停控件：旧桥缺省 ⇒ 判拒行禁用并说明；allow 行无暂停控件", () => {
+  assert.ok(deny);
+  assert.ok(allow);
+  if (!deny || !allow) return;
+  resetJudgePauseForTests();
+  const denyHtml = render(deny);
+  assert.match(denyHtml, /class="sj-pause"/);
+  assert.match(denyHtml, /class="sj-pause-btn" disabled=""/);
+  assert.equal(visibleText(denyHtml).includes("本次运行暂停自动审批"), true);
+  assert.equal(visibleText(denyHtml).includes("当前版本不支持自动判断，保持手动"), true);
+  const allowHtml = render(allow);
+  assert.equal(allowHtml.includes("sj-pause"), false);
+  resetJudgePauseForTests();
+});
+
+test("暂停控件：可暂停按钮 / 已暂停徽标与恢复 / 失败错误行（不改既有详情结构）", () => {
+  assert.ok(deny);
+  if (!deny) return;
+  resetJudgePauseForTests();
+  setJudgePauseSnapshot({ available: true });
+  const idle = render(deny);
+  assert.match(idle, /class="sj-pause-btn"/);
+  assert.equal(visibleText(idle).includes("本次运行暂停自动审批"), true);
+  assert.match(idle, /<details class="sj-details">/);
+
+  setJudgePauseSnapshot({ paused: true, justPaused: true });
+  const paused = render(deny);
+  assert.match(paused, /class="sj-pause-badge"/);
+  assert.equal(visibleText(paused).includes("本次运行已暂停自动审批"), true);
+  assert.equal(visibleText(paused).includes("恢复自动审批"), true);
+  assert.equal(visibleText(paused).includes("已暂停本次运行的 shell 自动审批"), true);
+
+  setJudgePauseSnapshot({ paused: false, justPaused: false, failed: true, error: "通道异常" });
+  const failed = render(deny);
+  assert.match(failed, /class="sj-pause-note is-error">通道异常/);
+  resetJudgePauseForTests();
 });

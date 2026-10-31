@@ -18,6 +18,8 @@ import { app, BrowserWindow, ipcMain, Menu } from "electron";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(HERE, "..", "..", "..", "app");
+// D2：产品代码根（src/** 的 Service/Pipeline 公开出口导入源；与被导入项目 REPO_ROOT 解耦）。
+const REPO_CODE_ROOT = path.resolve(APP_DIR, "..");
 const REPO_ROOT = process.env.ANS_E2E_PROJECT || path.resolve(HERE, "..", "..", "..");
 const OUTDIR = process.env.ANS_E2E_OUTDIR || fs.mkdtempSync(path.join(os.tmpdir(), "ans-e2e-"));
 // 看门狗修复（2026-10-12）：OUTDIR 由调用方指定时必须**先建目录**——否则收尾 report.txt 写入抛 ENOENT
@@ -64,6 +66,29 @@ const hardCheck = (name, value) => { if (value !== true) hardChecks.push(name); 
 // 非法回包不受理在 e2e 现场可见）。不经真实模型工具，直接以通道推请求（与桌面接线同形）。
 let createCustomerInputChannel = null;
 let customerChannel = null;
+// D2（2026-10-31 shell 判拒客户升级，T3）：真实桌面呈现端/暂停状态机/闸装配——全部导入产品真件，
+// 不复制任何判定。审批卡与升级卡呈现端**每窗口**在 registerIpc 内重建（与 app/main.ts 同形）；
+// 暂停状态为**模块级**（跨窗口重开保留、重启清零、不写偏好——与 app/main.ts 的 shellSessionPaused 同口径）。
+let createShellEscalationPresenter = null;
+let isShellEscalationResponse = null;
+let createShellConfirmPresenter = null;
+let createConfirmCardSlot = null;
+let createDesktopOperatorChannel = null;
+let createShellSessionPauseState = null;
+let createShellEscalationSession = null;
+let assembleProjectShellGate = null;
+let assembleOperatorShellGate = null;
+let assembleReadonlyShellGate = null;
+let classifyShellFn = null;
+let defaultShellRulesFn = null;
+let createMemoryAuditSinkFn = null;
+let shellConfirmPresenter = null; // 每窗口审批卡呈现端（registerIpc 重建）
+let shellEscalationPresenter = null; // 每窗口升级卡呈现端（registerIpc 重建）
+let shellSessionPaused = null; // app/desktop/interface.ts 的 createShellSessionPauseState() 实例（模块级）
+// D2 证据：真实 `shell:confirm-response` 通道收到的原始回包 / 真实呈现端推达记录（线上断言用）；
+// 均为 harness 侧记录，不改变任何产品行为。
+const escalationResponseInputs = [];
+const shellCardPushes = [];
 // D-1（2026-10-12）：会话记录恢复——主进程侧只读解析（与 app/main.ts 同形）。
 let readRoleSessionHistory = null;
 // B-1：Markdown 链接外开的调用记录（替身；**不真开系统浏览器**）。
@@ -236,10 +261,24 @@ function registerIpc() {
   registerHandler("runtime-config:get", (_e, input) => desktop.getRuntimeConfig(input && input.runtime));
   registerHandler("runtime-config:save", (_e, input) => desktop.saveRuntimeConfig(input));
   // Phase 5A：与 app/main.ts 同步的双开关通道（旧/新渲染器启动时都会读取；缺失会让启动流程报错）。
-  registerHandler("shell:judge-get", () => desktop.getShellJudgeState());
+  // D2（2026-10-31 判拒升级）：主进程**真实暂停态**（模块级 shellSessionPaused，与 app/main.ts 同一状态机实例）——
+  // 读取/推送/写入均含 `paused`；不写偏好、不改持久化开关；shell-only（治理 approval 组不读它）。
+  const shellJudgePushPayload = () => ({ ...desktop.getShellJudgeState(), available: true, paused: shellSessionPaused.isPaused() });
+  registerHandler("shell:judge-get", (event) => {
+    if (event.sender !== win.webContents) return { version: 1, ok: false, error: "请求来源无效。" };
+    return { ...desktop.getShellJudgeState(), paused: shellSessionPaused.isPaused() };
+  });
+  registerHandler("shell:judge-pause", (event, input) => {
+    if (event.sender !== win.webContents) {
+      return { version: 1, ok: false, paused: shellSessionPaused.isPaused(), error: "请求来源无效。" };
+    }
+    const result = shellSessionPaused.set(input);
+    if (result.ok === true && !win.isDestroyed()) win.webContents.send("shell:judge-state", shellJudgePushPayload());
+    return result;
+  });
   registerHandler("shell:judge-set", async (_e, input) => {
     const result = await desktop.setShellJudgeEnabled(input);
-    if (result.ok === true && !win.isDestroyed()) win.webContents.send("shell:judge-state", { ...desktop.getShellJudgeState(), available: true });
+    if (result.ok === true && !win.isDestroyed()) win.webContents.send("shell:judge-state", shellJudgePushPayload());
     return result;
   });
   registerHandler("decision:judge-get", () => desktop.getDecisionJudgeState());
@@ -265,9 +304,38 @@ function registerIpc() {
   registerHandler("session:operator-response", (_e, input) =>
     customerChannel.respond(input && typeof input === "object" ? input : {}),
   );
-  // M-1：shell 确认卡回包通道（e2e 镜像**生产形态**：本 harness 无 shell presenter ⇒ 无挂起请求，
-  // 一律如实回 `expired`——P-1 探针据此断言「Esc=不放行、卡片转**已失效**终态」）。
-  registerHandler("shell:confirm-response", () => ({ ok: false, expired: true, error: "e2e：无挂起请求（镜像生产通道形态）" }));
+  // M-1：shell 确认卡回包通道。D2（2026-10-31 判拒升级）起本 harness 与 app/main.ts **同形**：
+  // 每窗口创建共享呈现槽与两个**真实**呈现端（审批卡 `createShellConfirmPresenter`、升级卡
+  // `createShellEscalationPresenter`）；`shell:confirm-response` 按 `isShellEscalationResponse`
+  // 路由到对应真件（旧 `{id, allow}` 逐字兼容，未知 id 由真件回 `{ok:false, expired:true}`——
+  // P-1 探针的「Esc = 不放行、卡片转**已失效**终态」判据不变）。
+  const shellCardSlot = createConfirmCardSlot();
+  shellConfirmPresenter = createShellConfirmPresenter({
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
+    present: (request) => {
+      shellCardPushes.push({ kind: "approval", id: request.id, at: Date.now() });
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现 shell 确认请求");
+      win.webContents.send("shell:confirm-request", request);
+    },
+    slot: shellCardSlot,
+  });
+  shellEscalationPresenter = createShellEscalationPresenter({
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
+    present: (request) => {
+      shellCardPushes.push({ kind: "escalation", id: request.id, at: Date.now() });
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现 shell 升级请求");
+      win.webContents.send("shell:confirm-request", request);
+    },
+    slot: shellCardSlot,
+    operatorId: "e2e-operator",
+  });
+  win.on("closed", () => shellConfirmPresenter.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
+  win.on("closed", () => shellEscalationPresenter.rejectAllPending("窗口已关闭，未获允许（fail-closed）"));
+  registerHandler("shell:confirm-response", (_e, input) => {
+    escalationResponseInputs.push(input);
+    if (isShellEscalationResponse(input)) return shellEscalationPresenter.respond(input);
+    return shellConfirmPresenter.respond(input);
+  });
   registerHandler("pi-config:get", () => desktop.getPiConfig());
   registerHandler("pi-config:save", (_e, input) => desktop.savePiConfig(input));
   // 自绘标题栏的窗口控制（与 app/main.ts 同形，e2e 镜像真实应用；守卫见 run() 步骤 0）。
@@ -1790,6 +1858,815 @@ async function run() {
   repairCheck("MAC_CLOSE_REOPEN_LOADS_WITHOUT_DUPLICATE_HANDLERS", await wc().executeJavaScript("!!document.getElementById('inp-message') && !!window.desktop"));
   repairCheck("MAC_CLOSE_REOPEN_NO_AUTO_SEND", repairSendRequests.length === sendsBeforeCrash);
 
+  // —————— D2（2026-10-31，T3）：shell 判拒客户升级——真实 Electron 场景证据（P1/P4/P5/P7/P8/G1）——————
+  // 证据层级（如实，详见 D2 报告）：
+  // · 升级卡呈现 / 三选项 / 回包 / 单槽 / 暂停：真实 Electron 主进程 + 真实 preload + 真实渲染 +
+  //   真实 app/desktop 呈现端（createShellEscalationPresenter / createShellConfirmPresenter / 共享槽）
+  //   与真实 `shell:confirm-*` / `shell:judge-*` IPC 通道（不是渲染桩件；未改任何产品代码）。
+  // · 白名单 0 judge / 只读档 / 审计 JSONL：harness 进程内以**真实 Service/Pipeline 公开出口**装配真实闸
+  //   + 真实默认文件审计 sink（临时项目）；判断/客户决定为受控替身（离线，不触网、不启真实模型）。
+  //   该证据层级 = “真实闸代码 + harness 驱动”，非真实模型会话（缺口如实写入 D2 报告）。
+  // D2 截图：先请求一次全量重绘（窗口遮挡/静止时 capturePage 可能取到旧合成帧——本轮实测 30/32/34/35
+  // 曾出现旧帧），再等一拍后截取；只影响证据新鲜度，不改任何断言。
+  const shotFresh = async (name) => {
+    // 强制取当前帧：窗口被遮挡时 capturePage 可能返回旧合成帧（D2/D2b 实测）。截图前把测试窗口
+    // 置顶并重绘一次，拍完恢复原置顶状态；不改尺寸/缩放，不改断言。
+    let raised = false;
+    try {
+      if (!win.isDestroyed()) {
+        win.setAlwaysOnTop(true, "screen-saver");
+        win.show();
+        win.moveTop();
+        raised = true;
+      }
+    } catch { /* 置顶不可用：退回普通截图 */ }
+    try { wc().invalidate(); } catch { /* 旧 Electron 无 invalidate：退回普通截图 */ }
+    await sleep(500);
+    const captured = await shot(name);
+    if (raised) {
+      try { if (!win.isDestroyed()) win.setAlwaysOnTop(false); } catch { /* 恢复失败不影响截图内容 */ }
+    }
+    return captured;
+  };
+  await ensurePiRuntime();
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
+  await sleep(600);
+  const seViewProject = await wc().executeJavaScript("window.__ansRenderer.state.projectRoot");
+  const seViewRuntime = await wc().executeJavaScript("window.__ansRenderer.state.runtime");
+  log("SE_VIEW_PROJECT=" + seViewProject + " SE_VIEW_RUNTIME=" + seViewRuntime);
+  repairCheck("SE_VIEW_ON_REPO_PROJECT", seViewProject === REPO_ROOT);
+
+  // ① judge 判拒结果行（真实 IPC `shell:judge-result`）——暂停入口①：可用按钮。
+  const judgeRowPayload = (id, toolCallId) => ({
+    version: 1,
+    id,
+    toolCallId,
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    at: new Date().toISOString(),
+    verdict: "deny",
+    engine: "pi",
+    reasonCode: "model-deny",
+    operator: "judge:pi",
+    command: "node -e \"console.log('e2e judge row')\"",
+    summary: "运行 node 检查（D2 夹具）",
+    policy: "project",
+    tier: "review",
+    reason: "该命令可能修改工作区",
+    customerMessage: "自动代理未放行该命令。",
+    alternative: { kind: "command", value: "npm run typecheck" },
+    evidence: ["test/示例.test.ts"],
+  });
+  wc().send("shell:judge-result", judgeRowPayload("e2e-judge-row-1", "e2e-judge-call-1"));
+  const judgeRowPauseState = "(() => { const b=document.querySelector('#chat .sj-pause-btn'); return !!b && b.disabled === false; })()";
+  await waitRepair(judgeRowPauseState);
+  repairCheck("SE_JUDGE_ROW_PAUSE_AVAILABLE", await wc().executeJavaScript(judgeRowPauseState));
+  log("SHOT_32_JUDGE_ROW_PAUSE=" + (await shotFresh("32-judge-deny-pause-button.png")));
+  // AC-19（E2 返工，D2b）：判拒结果行详情展开 → retryHint 新措辞 + 「关闭『替我审批』后重试」兜底。
+  await wc().executeJavaScript("(() => { const rows=[...document.querySelectorAll('#chat .sj-details')]; if (rows.length > 0) rows[rows.length - 1].open = true; })()");
+  await sleep(250);
+  const retryHintInfo = await wc().executeJavaScript("(() => { const rows=[...document.querySelectorAll('#chat .sj-details')]; const d=rows[rows.length-1]; const hint=document.querySelector('#chat .sj-exit'); return { open: !!d && d.open === true, hint: hint ? hint.textContent : null }; })()");
+  log("SE_RETRY_HINT=" + JSON.stringify(retryHintInfo));
+  repairCheck("SE_JUDGE_RETRY_HINT_NEW_WORDING", retryHintInfo.open === true && (retryHintInfo.hint || "").includes("可让角色申请客户确认") && (retryHintInfo.hint || "").includes("关闭「替我审批」后重试"));
+  log("SHOT_40_JUDGE_RETRY_HINT=" + (await shotFresh("40-judge-retry-hint.png")));
+  await wc().executeJavaScript("[...document.querySelectorAll('#chat .sj-details')].forEach((d) => { d.open = false; })");
+  await sleep(150);
+
+  // ② 升级卡真实呈现（真实 presenter → 真实 `shell:confirm-request` → 真实渲染）。
+  const seCommand = "node -e 'process.stdout.write(\"e2e-escalation-verbatim\")' --tag='two words'";
+  const seNecessity = "需要它验证构建产物（这是角色自述，可能不准确）【D2 哨兵】";
+  // E2 返工 R1（D2b）：判拒脚本上下文样例（approvalContext）。内容/哈希按真实字节计算；
+  // inWriteArea:false ⇒ 渲染侧必须显示「不在可写范围内」警示。仅加到专用卡上，既有卡保持无上下文
+  //（旧卡兼容的证据：截图 30/31 无 #se-context 区块）。
+  const seContextContent = "console.log('e2e-context-sentinel');\n";
+  const seContextSample = {
+    scriptPaths: ["scripts/e2e-context.mjs"],
+    scripts: [
+      {
+        path: "scripts/e2e-context.mjs",
+        label: "e2e-context.mjs",
+        content: seContextContent,
+        bytes: 37,
+        sha256: "623e2d876a7e6a361e1929eb074ef355099ea9f1841856dca66e6b153e70bb21",
+        inWriteArea: false,
+      },
+    ],
+    npmScriptName: "e2e-context-check",
+    note: "有界内容（≤16KiB；D2b 夹具）",
+  };
+  const seRequest = (n, over = {}) => ({
+    version: 1,
+    requestId: "req-e2e-" + n,
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    command: seCommand,
+    argv: ["node", "-e", "process.stdout.write(\"e2e-escalation-verbatim\")", "--tag=two words"],
+    cwd: seViewProject,
+    judgeReason: "该命令会改写工作区文件，存在风险。",
+    judgeCustomerMessage: "自动代理未放行该命令，请由你决定。",
+    judgeAlternative: { kind: "command", value: "npm run typecheck", rationale: "更安全的等价检查" },
+    necessity: seNecessity,
+    expiresAt: new Date(Date.now() + 120000).toISOString(),
+    ...over,
+  });
+  const seCardVisibleExpr = "(() => { const el=document.getElementById('shell-escalation'); return !!el && el.hidden === false && !!el.querySelector('.sc-card'); })()";
+  const sePresent = async (n, over) => {
+    const request = seRequest(n, over);
+    const decision = shellEscalationPresenter.present(request); // 不 await：挂起等客户点击
+    await waitRepair(seCardVisibleExpr);
+    return { request, decision };
+  };
+  const seCardInfo = () => wc().executeJavaScript(`(() => {
+    const overlay = document.getElementById('shell-escalation');
+    const card = overlay ? overlay.querySelector('.sc-card') : null;
+    const text = (id) => { const el = document.getElementById(id); return el ? el.textContent : null; };
+    const approval = document.getElementById('shell-confirm');
+    return {
+      visible: !!card && overlay.hidden === false,
+      id: card ? card.getAttribute('data-request-id') : null,
+      kind: card ? card.getAttribute('data-kind') : null,
+      command: text('se-command'),
+      judgeReason: text('se-judge-reason'),
+      judgeCustomer: text('se-judge-customer'),
+      judgeAlternative: text('se-judge-alternative'),
+      necessityVisible: !!document.getElementById('se-necessity') && document.getElementById('se-necessity').hidden === false,
+      necessityNote: text('se-necessity-note'),
+      necessityText: text('se-necessity-text'),
+      customerNote: text('se-customer-note'),
+      once: text('se-allow-once'),
+      session: text('se-allow-session'),
+      reject: text('se-reject'),
+      hasThree: !!document.getElementById('se-allow-once') && !!document.getElementById('se-allow-session') && !!document.getElementById('se-reject'),
+      focusReject: document.activeElement === document.getElementById('se-reject'),
+      approvalVisible: !!approval && approval.hidden === false && !!approval.querySelector('.sc-card'),
+    };
+  })()`);
+  const seWire = () => escalationResponseInputs[escalationResponseInputs.length - 1];
+  const seCardGoneExpr = "(() => { const el=document.getElementById('shell-escalation'); return !el || el.hidden === true || !el.querySelector('.sc-card'); })()";
+
+  const se1 = await sePresent(1);
+  const se1Info = await seCardInfo();
+  log("SE_CARD_ID=" + se1Info.id);  repairCheck("SE_CARD_VISIBLE", se1Info.visible === true && se1Info.kind === "escalation");
+  repairCheck("SE_CARD_COMMAND_VERBATIM", se1Info.command === seCommand);
+  repairCheck("SE_CARD_JUDGE_REASON", (se1Info.judgeReason || "").includes("该命令会改写工作区文件"));
+  repairCheck("SE_CARD_JUDGE_CUSTOMER", (se1Info.judgeCustomer || "").includes("请由你决定"));
+  repairCheck("SE_CARD_JUDGE_ALTERNATIVE", (se1Info.judgeAlternative || "").includes("npm run typecheck") && (se1Info.judgeAlternative || "").includes("更安全的等价检查"));
+  repairCheck("SE_CARD_NECESSITY_ISOLATED", se1Info.necessityVisible === true && (se1Info.necessityNote || "").trim() === "由角色提供，未经验证" && (se1Info.necessityText || "").trim() === seNecessity);
+  repairCheck("SE_CARD_CUSTOMER_NOT_JUDGE", (se1Info.customerNote || "").includes("客户手批 ≠ judge 放行"));
+  repairCheck("SE_CARD_THREE_ACTIONS", se1Info.hasThree === true && se1Info.once === "允许一次" && se1Info.session === "本会话允许该精确命令" && se1Info.reject === "拒绝");
+  await waitRepair("document.activeElement === document.getElementById('se-reject')");
+  repairCheck("SE_CARD_DEFAULT_FOCUS_REJECT", await wc().executeJavaScript("document.activeElement === document.getElementById('se-reject')"));
+  log("SHOT_30_ESCALATION=" + (await shotFresh("30-escalation-card.png")));
+  await wc().executeJavaScript("(() => { const d=document.getElementById('se-details'); if (d) d.open = true; })()");
+  await sleep(200);
+  const seDetails = await wc().executeJavaScript("(() => ({ open: document.getElementById('se-details').open === true, cwd: (document.getElementById('se-cwd')||{}).textContent||'', argv: (document.getElementById('se-argv')||{}).textContent||'' }))()");
+  repairCheck("SE_CARD_DETAILS_CWD", seDetails.open === true && seDetails.cwd === seViewProject);
+  repairCheck("SE_CARD_DETAILS_ARGV", seDetails.argv.includes("--tag=two words"));
+  log("SHOT_31_ESCALATION_DETAILS=" + (await shotFresh("31-escalation-card-details.png")));
+
+  // ③ 三选项回包（真实 preload → 真实 `shell:confirm-response` → 真实 presenter 结算）。
+  await wc().executeJavaScript("document.getElementById('se-allow-once').click()");
+  const se1Decision = await withTimeout(se1.decision, 5000, "se-1-allow-once");
+  repairCheck("SE_ALLOW_ONCE_DECISION", !!se1Decision && se1Decision.action === "allow-once" && se1Decision.operatorId === "e2e-operator");
+  repairCheck("SE_ALLOW_ONCE_WIRE", !!seWire() && seWire().kind === "escalation" && seWire().id === se1Info.id && seWire().action === "allow-once");
+  repairCheck("SE_CARD_CLOSES_ON_DECISION", await waitRepair(seCardGoneExpr));
+
+  const se2 = await sePresent(2);
+  const se2Info = await seCardInfo();
+  await wc().executeJavaScript("document.getElementById('se-allow-session').click()");
+  const se2Decision = await withTimeout(se2.decision, 5000, "se-2-allow-session");
+  repairCheck("SE_ALLOW_SESSION_DECISION", !!se2Decision && se2Decision.action === "allow-session" && se2Decision.operatorId === "e2e-operator");
+  repairCheck("SE_ALLOW_SESSION_WIRE", !!seWire() && seWire().kind === "escalation" && seWire().id === se2Info.id && seWire().action === "allow-session");
+  await waitRepair(seCardGoneExpr);
+
+  const se3 = await sePresent(3);
+  const se3Info = await seCardInfo();
+  await wc().executeJavaScript("document.getElementById('se-reject').click()");
+  const se3Decision = await withTimeout(se3.decision, 5000, "se-3-deny");
+  repairCheck("SE_DENY_BUTTON_DECISION", !!se3Decision && se3Decision.action === "deny");
+  repairCheck("SE_DENY_BUTTON_WIRE", !!seWire() && seWire().kind === "escalation" && seWire().id === se3Info.id && seWire().action === "deny");
+  await waitRepair(seCardGoneExpr);
+
+  const se4 = await sePresent(4);
+  const se4Info = await seCardInfo();
+  await wc().executeJavaScript("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  const se4Decision = await withTimeout(se4.decision, 5000, "se-4-esc-deny");
+  repairCheck("SE_ESC_DENY_DECISION", !!se4Decision && se4Decision.action === "deny");
+  repairCheck("SE_ESC_DENY_WIRE", !!seWire() && seWire().kind === "escalation" && seWire().id === se4Info.id && seWire().action === "deny");
+  await waitRepair(seCardGoneExpr);
+
+  // ④ 未知 / 重复 / 非法动作 —— 真件一律按失效结算（不放行；无第二次授权）。
+  const duplicateReply = await wc().executeJavaScript("window.desktop.shellEscalationRespond({ id: " + JSON.stringify(se1Info.id) + ", action: 'allow-once' })");
+  repairCheck("SE_DUPLICATE_ID_EXPIRED", !!duplicateReply && duplicateReply.ok === false && duplicateReply.expired === true);
+  const unknownReply = await wc().executeJavaScript("window.desktop.shellEscalationRespond({ id: 'se-does-not-exist', action: 'deny' })");
+  repairCheck("SE_UNKNOWN_ID_EXPIRED", !!unknownReply && unknownReply.ok === false && unknownReply.expired === true);
+  repairCheck("SE_NO_PENDING_AFTER_FORGERIES", shellEscalationPresenter.pendingCount() === 0);
+
+  const se5 = await sePresent(5);
+  const se5Info = await seCardInfo();
+  const illegalReply = await wc().executeJavaScript("window.desktop.shellEscalationRespond({ id: " + JSON.stringify(se5Info.id) + ", action: 'allow-all' })");
+  const se5Decision = await withTimeout(se5.decision, 5000, "se-5-illegal");
+  repairCheck("SE_ILLEGAL_ACTION_EXPIRED", !!illegalReply && illegalReply.ok === false && illegalReply.expired === true && !!se5Decision && se5Decision.action === "expired");
+  // 真件 onExpired 推送（`session:operator-expired`）→ 界面收起 + 如实「已失效」提示，不呈现为已允许。
+  await waitRepair(seCardGoneExpr);
+  repairCheck("SE_EXPIRED_UI_HINT", await wc().executeJavaScript("(() => { const hint=document.getElementById('composer-hint'); const el=document.getElementById('shell-escalation'); const gone = !el || el.hidden === true || !el.querySelector('.sc-card'); return gone && !!hint && hint.textContent.includes('此升级申请已失效'); })()"));
+  await waitRepair(seCardGoneExpr);
+
+  // ⑤ 真实超时（清理兜底 400ms）：挂起卡默认拒绝 + onExpired 推送 → 界面收起并提示（不放行）。
+  const shortPresenter = createShellEscalationPresenter({
+    present: (request) => {
+      shellCardPushes.push({ kind: "escalation", id: request.id, at: Date.now() });
+      if (!win.isDestroyed()) win.webContents.send("shell:confirm-request", request);
+    },
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
+    operatorId: "e2e-operator",
+    cleanupAfterMs: 400,
+    env: {},
+  });
+  const timeoutDecision = shortPresenter.present(seRequest(6, { command: "npm run lint --fix", argv: ["npm", "run", "lint", "--fix"] }));
+  await waitRepair(seCardVisibleExpr);
+  const timeoutOutcome = await withTimeout(timeoutDecision, 5000, "se-6-timeout");
+  repairCheck("SE_TIMEOUT_DEFAULT_DENY", !!timeoutOutcome && timeoutOutcome.action === "expired");
+  await waitRepair(seCardGoneExpr);
+  repairCheck("SE_TIMEOUT_UI_EXPIRED", await wc().executeJavaScript("(() => { const hint=document.getElementById('composer-hint'); const el=document.getElementById('shell-escalation'); const gone = !el || el.hidden === true || !el.querySelector('.sc-card'); return gone && !!hint && hint.textContent.includes('失效'); })()"));
+
+  // ⑤b（E2 返工 R1，D2b）：升级卡「脚本上下文」区块（approvalContext）——路径/sha256/有界内容/说明/
+  // npm 脚本/写区外警示；无 approvalContext 的旧卡**不渲染**该区块（旧卡兼容）。
+  const se10 = await sePresent(10, { approvalContext: seContextSample });
+  const se10Info = await seCardInfo();
+  const seContextDump = await wc().executeJavaScript(`(() => {
+    const block = document.getElementById('se-context');
+    const pick = (sel) => { const el = block ? block.querySelector(sel) : null; return el ? el.textContent : null; };
+    const content = block ? block.querySelector('.se-context-content') : null;
+    return {
+      visible: !!block,
+      header: block ? (block.querySelector('.se-section-title') || {}).textContent : null,
+      note: pick('#se-context-note'),
+      npm: pick('#se-context-npm-script'),
+      path: pick('.se-context-path'),
+      label: pick('.se-context-label'),
+      sha: pick('.se-context-sha'),
+      warning: pick('.se-context-warning'),
+      content: content ? content.textContent : null,
+      bytes: content ? content.getAttribute('data-bytes') : null,
+    };
+  })()`);
+  log("SE_CONTEXT_BLOCK=" + JSON.stringify(seContextDump));
+  repairCheck("SE_CONTEXT_BLOCK_VISIBLE", se10Info.visible === true && seContextDump.visible === true);
+  repairCheck("SE_CONTEXT_BLOCK_HEADER", (seContextDump.header || "").includes("脚本上下文（judge 判拒时所依据）"));
+  repairCheck("SE_CONTEXT_BLOCK_NOTE", (seContextDump.note || "").includes("说明：") && (seContextDump.note || "").includes("有界内容"));
+  repairCheck("SE_CONTEXT_BLOCK_NPM", (seContextDump.npm || "").includes("npm 脚本：e2e-context-check"));
+  repairCheck("SE_CONTEXT_BLOCK_PATH", (seContextDump.path || "").includes("脚本：scripts/e2e-context.mjs"));
+  repairCheck("SE_CONTEXT_BLOCK_SHA", (seContextDump.sha || "").includes("sha256：" + seContextSample.scripts[0].sha256));
+  repairCheck("SE_CONTEXT_BLOCK_CONTENT", (seContextDump.content || "") === seContextSample.scripts[0].content && seContextDump.bytes === String(seContextSample.scripts[0].bytes));
+  repairCheck("SE_CONTEXT_BLOCK_WRITE_WARNING", (seContextDump.warning || "").includes("不在可写范围内"));
+  log("SHOT_39_ESCALATION_CONTEXT=" + (await shotFresh("39-escalation-script-context.png")));
+  await wc().executeJavaScript("document.getElementById('se-reject').click()");
+  await withTimeout(se10.decision, 5000, "se-10-deny");
+  await waitRepair(seCardGoneExpr);
+  const se11 = await sePresent(11);
+  const noContextInfo = await wc().executeJavaScript("(() => { const card=document.querySelector('#shell-escalation .sc-card'); return { visible: !!card, context: !!document.getElementById('se-context') }; })()");
+  repairCheck("SE_CONTEXT_ABSENT_FOR_OLD_CARD", noContextInfo.visible === true && noContextInfo.context === false);
+  await wc().executeJavaScript("document.getElementById('se-reject').click()");
+  await withTimeout(se11.decision, 5000, "se-11-deny");
+  await waitRepair(seCardGoneExpr);
+
+  // ⑥ 卡片仲裁（渲染单槽 + 真实呈现端共享槽）。
+  const se7 = await sePresent(7);
+  const se7Info = await seCardInfo();
+  const approvalPayload = {
+    kind: "approval",
+    id: "sc-slot-approval-e2e",
+    command: "ls -la",
+    summary: "列出目录",
+    reasonPlain: "D2 仲裁夹具",
+    reasonRaw: null,
+    argvLines: ["[0] \"ls\"", "[1] \"-la\""],
+    cwd: seViewProject,
+    tier: null,
+    policy: "project",
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+  };
+  win.webContents.send("shell:confirm-request", approvalPayload);
+  await sleep(300);
+  const slotState = await wc().executeJavaScript("(() => { const se=document.getElementById('shell-escalation'); const sc=document.getElementById('shell-confirm'); return { seVisible: !!se && se.hidden===false && !!se.querySelector('.sc-card'), scVisible: !!sc && sc.hidden===false && !!sc.querySelector('.sc-card'), card: window.__ansRenderer.state.shellConfirm }; })()");
+  repairCheck("SE_SLOT_ESCALATION_NOT_OVERRIDDEN", slotState.seVisible === true && slotState.scVisible === false && !!slotState.card && slotState.card.id === se7Info.id);
+  log("SHOT_37_SLOT_ARBITRATION=" + (await shotFresh("37-escalation-slot-arbitration.png")));
+  await wc().executeJavaScript("document.getElementById('se-reject').click()");
+  await withTimeout(se7.decision, 5000, "se-7-deny");
+  await waitRepair(seCardGoneExpr);
+  win.webContents.send("shell:confirm-request", approvalPayload); // 生产 main 在槽位释放后重推等待中的审批卡
+  await waitRepair("(() => { const sc=document.getElementById('shell-confirm'); return !!sc && sc.hidden === false && !!sc.querySelector('.sc-card'); })()");
+  const afterSlot = await wc().executeJavaScript("(() => { const se=document.getElementById('shell-escalation'); const sc=document.getElementById('shell-confirm'); return { seVisible: !!se && se.hidden===false && !!se.querySelector('.sc-card'), scVisible: !!sc && sc.hidden===false && !!sc.querySelector('.sc-card') }; })()");
+  repairCheck("SE_SLOT_APPROVAL_AFTER_ESCALATION", afterSlot.seVisible === false && afterSlot.scVisible === true);
+  await wc().executeJavaScript("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))");
+  await waitRepair("(() => { const sc=document.getElementById('shell-confirm'); return !sc || sc.hidden === true || !sc.querySelector('.sc-card'); })()");
+  repairCheck("SE_SLOT_APPROVAL_ESC_EXPIRED", await wc().executeJavaScript("(() => { const sc=document.getElementById('shell-confirm'); return !sc || sc.hidden === true || !sc.querySelector('.sc-card'); })()"));
+
+  // ⑥b 真实呈现端仲裁：审批卡待答时升级申请返回 **pending**（E2 返工 R2；不是 expired/deny、不排队、
+  // 不推达）；审批卡照常作答。注：D2 首轮此处为 `unavailable`，E2 改契约后断言同步为 pending（判据不弱化：
+  // 同时断言不是默认拒绝、且无升级卡推达）。
+  const arbPrompt = { command: "ls -la", argv: ["ls", "-la"], cwd: seViewProject, toolCallId: "e2e-approval-arb" };
+  const arbDisplay = { command: "ls -la", argv: ["ls", "-la"], argvLines: ["[0] \"ls\"", "[1] \"-la\""], cwd: seViewProject, text: "ls -la" };
+  const approvalDecision = shellConfirmPresenter.presenter.present(arbPrompt, arbDisplay, {
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    signal: new AbortController().signal,
+  });
+  await waitRepair("(() => { const sc=document.getElementById('shell-confirm'); return !!sc && sc.hidden === false && !!sc.querySelector('.sc-card'); })()");
+  log("SHOT_38_APPROVAL_CONTRAST=" + (await shotFresh("38-approval-card-contrast.png")));
+  const escalationPushesBefore = shellCardPushes.filter((p) => p.kind === "escalation").length;
+  const blockedEscalation = await withTimeout(shellEscalationPresenter.present(seRequest(8)), 3000, "se-8-blocked");
+  repairCheck("SE_APPROVAL_PENDING_BLOCKS_ESCALATION", !!blockedEscalation && blockedEscalation.action === "pending" && String(blockedEscalation.reason || "").includes("请稍后再申请"));
+  repairCheck("SE_APPROVAL_PENDING_NOT_REJECTION", !!blockedEscalation && blockedEscalation.action === "pending" && blockedEscalation.action !== "expired" && blockedEscalation.action !== "unavailable" && blockedEscalation.action !== "deny");
+  repairCheck("SE_APPROVAL_PENDING_NO_ESCALATION_PUSH", shellCardPushes.filter((p) => p.kind === "escalation").length === escalationPushesBefore);
+  await wc().executeJavaScript("document.getElementById('sc-allow').click()");
+  const approvalAllowed = await withTimeout(approvalDecision, 5000, "approval-arb");
+  repairCheck("SE_APPROVAL_ANSWERED_ALLOW", !!approvalAllowed && approvalAllowed.allow === true);
+  await sleep(200);
+
+  // ⑥c（E2 返工 R2，D2b）：审批卡待答的真实 registry 申请 → state=pending（不消耗额度/不写审计/保持
+  // recorded）；解除审批卡后**再次申请** → presenter 再次调用、真实升级卡呈现（含脚本上下文）、allow-once 成功。
+  const pendingArgv = ["node", "scripts/e2e-pending-check.mjs"];
+  const pendingCommand = pendingArgv.join(" ");
+  const pendingRegistryAudit = createMemoryAuditSinkFn();
+  let pendingPresenterCalls = 0;
+  const pendingRegistry = createShellEscalationSession({
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    present: (card, signal) => {
+      pendingPresenterCalls += 1;
+      return shellEscalationPresenter.present(card, signal);
+    },
+    now: () => new Date(),
+    presentTimeoutMs: 5000,
+    env: {},
+  });
+  pendingRegistry.bindAudit(pendingRegistryAudit);
+  pendingRegistry.recordReview(
+    {
+      command: pendingCommand,
+      argv: pendingArgv,
+      cwd: seViewProject,
+      toolCallId: "e2e-pending-review",
+      entry: "run_shell",
+      approvalContext: seContextSample,
+    },
+    {
+      result: { allow: false, reason: "judge 判拒（D2b 替身）", by: "operator:judge:pi" },
+      conclusion: "deny",
+      branch: "c-review→a-deny",
+      judge: { engine: "pi", verdict: "deny", reasonCode: "model-deny", reason: "该命令可能改写工作区（D2b 替身）" },
+    },
+  );
+  const pendingApprovalPrompt = { command: "ls -la", argv: ["ls", "-la"], cwd: seViewProject, toolCallId: "e2e-pending-approval" };
+  const pendingApprovalDisplay = { command: "ls -la", argv: ["ls", "-la"], argvLines: ["[0] \"ls\"", "[1] \"-la\""], cwd: seViewProject, text: "ls -la" };
+  const pendingApproval = shellConfirmPresenter.presenter.present(pendingApprovalPrompt, pendingApprovalDisplay, {
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    signal: new AbortController().signal,
+  });
+  await waitRepair("(() => { const sc=document.getElementById('shell-confirm'); return !!sc && sc.hidden === false && !!sc.querySelector('.sc-card'); })()");
+  const pushesBeforePending = shellCardPushes.filter((p) => p.kind === "escalation").length;
+  const pendingReceipt = await withTimeout(pendingRegistry.request({ command: pendingCommand, argv: pendingArgv }), 5000, "pending-first");
+  log("SE_PENDING_RECEIPT=" + JSON.stringify(pendingReceipt));
+  repairCheck("SE_PENDING_RECEIPT", !!pendingReceipt && pendingReceipt.ok === false && pendingReceipt.state === "pending" && String(pendingReceipt.message || "").includes("当前有 pending shell 确认卡"));
+  repairCheck("SE_PENDING_NOT_EXPIRED_OR_DENIED", !!pendingReceipt && pendingReceipt.state !== "expired" && pendingReceipt.state !== "denied" && !String(pendingReceipt.message || "").includes("未获客户允许"));
+  repairCheck("SE_PENDING_NO_CARD_NO_AUDIT", shellCardPushes.filter((p) => p.kind === "escalation").length === pushesBeforePending && pendingRegistryAudit.records.length === 0);
+  repairCheck("SE_PENDING_PRESENTER_CALLED_ONCE", pendingPresenterCalls === 1);
+  await wc().executeJavaScript("document.getElementById('sc-allow').click()");
+  const pendingApprovalOutcome = await withTimeout(pendingApproval, 5000, "pending-approval");
+  repairCheck("SE_PENDING_APPROVAL_RELEASED", !!pendingApprovalOutcome && pendingApprovalOutcome.allow === true);
+  const pendingSecondRequest = pendingRegistry.request({ command: pendingCommand, argv: pendingArgv });
+  await waitRepair(seCardVisibleExpr);
+  const pendingCardRequestId = await wc().executeJavaScript("(() => { const card=window.__ansRenderer.state.shellConfirm; return card && card.payload ? card.payload.requestId : null; })()");
+  const pendingCardContextVisible = await wc().executeJavaScript("(() => { const block=document.getElementById('se-context'); return !!block && !!block.querySelector('.se-context-content'); })()");
+  log("SHOT_41_ESCALATION_PENDING_THEN_ALLOW=" + (await shotFresh("41-escalation-pending-then-allow.png")));
+  await wc().executeJavaScript("document.getElementById('se-allow-once').click()");
+  const pendingSecondReceipt = await withTimeout(pendingSecondRequest, 5000, "pending-second");
+  log("SE_PENDING_SECOND_RECEIPT=" + JSON.stringify(pendingSecondReceipt));
+  repairCheck("SE_PENDING_RETRY_ALLOW_ONCE", !!pendingSecondReceipt && pendingSecondReceipt.ok === true && pendingSecondReceipt.state === "granted-once" && String(pendingSecondReceipt.message || "").includes("仅此一次"));
+  repairCheck("SE_PENDING_PRESENTER_CALLED_TWICE", pendingPresenterCalls === 2);
+  repairCheck("SE_PENDING_CARD_CARRIES_CONTEXT", pendingCardContextVisible === true);
+  const pendingDecisionRecords = pendingRegistryAudit.records.filter((record) => record.event === "escalation-decision");
+  repairCheck(
+    "SE_PENDING_AUDIT_ONLY_ON_ALLOW",
+    pendingRegistryAudit.records.length === 1 &&
+      pendingDecisionRecords.length === 1 &&
+      pendingDecisionRecords[0].branch === "escalation:granted-once" &&
+      !!pendingDecisionRecords[0].escalation &&
+      pendingDecisionRecords[0].escalation.action === "allow-once" &&
+      pendingDecisionRecords[0].escalation.requestId === pendingCardRequestId,
+  );
+  await waitRepair(seCardGoneExpr);
+
+  // ⑦ 暂停（真实 preload → `shell:judge-pause` → 模块级状态机 → `shell:judge-state` 推送/读取）。
+  const sePreferencesFile = path.join(OUTDIR, "userData", "ans", "preferences.json");
+  const pauseBefore = await wc().executeJavaScript("window.desktop.getShellJudgeState()");
+  const decisionBefore = await wc().executeJavaScript("window.desktop.getDecisionJudgeState()");
+  repairCheck("SE_PAUSE_INITIAL_FALSE", !!pauseBefore && pauseBefore.paused === false);
+  const pauseReply = await wc().executeJavaScript("window.desktop.setShellJudgePaused(true)");
+  repairCheck("SE_PAUSE_SET_OK", !!pauseReply && pauseReply.ok === true && pauseReply.paused === true);
+  const pauseAfter = await wc().executeJavaScript("window.desktop.getShellJudgeState()");
+  const decisionAfter = await wc().executeJavaScript("window.desktop.getDecisionJudgeState()");
+  repairCheck("SE_PAUSE_GET_STATE", !!pauseAfter && pauseAfter.paused === true && pauseAfter.enabled === (pauseBefore && pauseBefore.enabled));
+  repairCheck("SE_PAUSE_DECISION_SWITCH_UNCHANGED", !!decisionAfter && !!decisionBefore && decisionAfter.enabled === decisionBefore.enabled && decisionAfter.available === decisionBefore.available);
+  repairCheck("SE_PAUSE_NO_PREFERENCE_FILE", !fs.existsSync(sePreferencesFile));
+  // 真实 shell 操作者通道（app/desktop 真件）：暂停 ⇒ 新的需判断请求走客户确认卡（judge 不被调用）；
+  // 恢复 ⇒ 回到开关值（judge 路径）。isEnabled 组合与 app/main.ts 逐字同义。
+  const pauseJudgeCalls = { value: 0 };
+  const pausePresenterCalls = [];
+  const pauseChannel = createDesktopOperatorChannel({
+    presenter: { present: async (_prompt, display) => { pausePresenterCalls.push(display.command); return { allow: true }; } },
+    operatorId: "e2e-pause",
+    timeoutMs: 5000,
+    env: {},
+    judge: { isEnabled: () => true && shellSessionPaused.isPaused() === false },
+  });
+  const pausePrompt = { command: "mysterytool-e2e --pause", argv: ["mysterytool-e2e", "--pause"], cwd: seViewProject, toolCallId: "e2e-pause-1" };
+  const pauseMeta = {
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    signal: new AbortController().signal,
+    judge: async () => { pauseJudgeCalls.value += 1; return { verdict: "allow", reasonCode: "ok", reason: "允许（D2 替身）" }; },
+  };
+  const pausedOutcome = await pauseChannel(pausePrompt, pauseMeta);
+  repairCheck("SE_PAUSE_SHELL_REQUEST_GOES_TO_CUSTOMER", !!pausedOutcome && pausedOutcome.outcome === "allow" && pausePresenterCalls.length === 1 && pauseJudgeCalls.value === 0);  // 可见行为：暂停期间治理代批结果行仍可正常呈现（治理 approval 组开关逻辑不受暂停影响；开关逻辑本身由
+  // app/main.ts 代码事实 + C1/D1 单测钉住）。
+  wc().send("session:operator-judge", {
+    group: "approval",
+    cardKind: "proposal",
+    engine: "pi",
+    selected: ["accept"],
+    reason: "D2 暂停期间治理代批可见性夹具",
+    id: "e2e-governance-judge-1",
+    roleId: "桌面窗口",
+    projectRoot: seViewProject,
+    runtime: seViewRuntime,
+    at: new Date().toISOString(),
+  });
+  const governanceRowExpr = "(() => { const rows=[...document.querySelectorAll('#chat .sys-text')]; return rows.some((r)=>r.textContent.includes('D2 暂停期间治理代批可见性夹具')); })()";
+  await waitRepair(governanceRowExpr);
+  repairCheck("SE_PAUSE_GOVERNANCE_ROW_VISIBLE", await wc().executeJavaScript(governanceRowExpr));
+
+  // 暂停态的判拒结果行 UI：徽标 + 恢复按钮（入口①的暂停后形态）。
+  const judgeRowPausedExpr = "(() => { const badge=document.querySelector('#chat .sj-pause-badge'); const resume=document.querySelector('#chat .sj-pause-resume'); return !!badge && badge.textContent.includes('本次运行已暂停自动审批') && !!resume && resume.disabled === false; })()";
+  await waitRepair(judgeRowPausedExpr);
+  repairCheck("SE_PAUSE_JUDGE_ROW_BADGE", await wc().executeJavaScript(judgeRowPausedExpr));
+  log("SHOT_35_JUDGE_ROW_PAUSED=" + (await shotFresh("35-judge-row-paused.png")));
+
+  // 暂停态的升级卡页脚（入口②）：暂停徽标 + 恢复；页脚动作不是第四决定项。
+  const se9 = await sePresent(9);
+  const pausedFooter = await wc().executeJavaScript("(() => { const b=document.getElementById('se-paused-badge'); const r=document.getElementById('se-resume'); const p=document.getElementById('se-pause'); return { badge: !!b && b.textContent.includes('本次运行已暂停自动审批'), resume: !!r && r.disabled === false, pauseBtn: !!p, three: !!document.getElementById('se-allow-once') && !!document.getElementById('se-allow-session') && !!document.getElementById('se-reject') }; })()");
+  repairCheck("SE_PAUSE_FOOTER_BADGE_RESUME", pausedFooter.badge === true && pausedFooter.resume === true && pausedFooter.pauseBtn === false && pausedFooter.three === true);
+  log("SHOT_34_ESCALATION_PAUSED_FOOTER=" + (await shotFresh("34-escalation-paused-footer.png")));
+  await wc().executeJavaScript("document.getElementById('se-reject').click()");
+  await withTimeout(se9.decision, 5000, "se-9-deny");
+  await waitRepair(seCardGoneExpr);
+
+  // 暂停的状态归属（代码事实，与 app/main.ts 逐字一致）：模块级单例 / shell-only / 治理组只读全局开关 /
+  // 暂停 handler 不写偏好。
+  const mainSrc = fs.readFileSync(path.join(REPO_CODE_ROOT, "app", "main.ts"), "utf8");
+  repairCheck("SE_PAUSE_SOURCE_MODULE_LEVEL", mainSrc.includes("const shellSessionPaused = createShellSessionPauseState();"));
+  repairCheck("SE_PAUSE_SOURCE_SHELL_CHANNEL_ONLY", mainSrc.includes("isEnabled: () => shellJudgeSwitch.isEnabled() && !shellSessionPaused.isPaused()"));
+  repairCheck("SE_PAUSE_SOURCE_GOVERNANCE_GROUP_UNCHANGED", mainSrc.includes('isGroupEnabled: (group) => (group === "approval" ? shellJudgeSwitch.isEnabled() : decisionJudgeSwitch.isEnabled())'));
+  const pauseHandlerSrc = mainSrc.slice(mainSrc.indexOf('"shell:judge-pause"'), mainSrc.indexOf('"shell:judge-set"'));
+  repairCheck("SE_PAUSE_SOURCE_NO_PREFERENCE_WRITE", pauseHandlerSrc.length > 0 && !/preferences/i.test(pauseHandlerSrc));
+
+  // ⑧ 窗口重开（同一应用运行）：暂停**保留**（模块级状态；窗口侧呈现端重建）。
+  {
+    const seOldWindow = win;
+    const seClosed = new Promise((resolve) => seOldWindow.once("closed", resolve));
+    seOldWindow.close();
+    await seClosed;
+    win = new BrowserWindow({
+      width: 1360,
+      height: 860,
+      show: true,
+      frame: false,
+      webPreferences: { preload: path.join(APP_DIR, "preload.cjs"), contextIsolation: true, nodeIntegration: false, sandbox: false },
+    });
+    registerIpc();
+    await win.loadFile(RENDERER_ENTRY);
+    await waitRepair("window.__ansRenderer && window.__ansRenderer.state.sessionOpenRoleId === '桌面窗口'");
+  }
+  const reopenPauseState = await wc().executeJavaScript("window.desktop.getShellJudgeState()");
+  repairCheck("SE_PAUSE_PRESERVED_ACROSS_WINDOW_REOPEN", !!reopenPauseState && reopenPauseState.paused === true);
+  await ensurePiRuntime();
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
+  await sleep(600);
+  const seReopenProject = await wc().executeJavaScript("window.__ansRenderer.state.projectRoot");
+  const seReopenRuntime = await wc().executeJavaScript("window.__ansRenderer.state.runtime");
+  wc().send("shell:judge-result", {
+    ...judgeRowPayload("e2e-judge-row-2", "e2e-judge-call-2"),
+    projectRoot: seReopenProject,
+    runtime: seReopenRuntime,
+  });
+  await waitRepair(judgeRowPausedExpr);
+  repairCheck("SE_PAUSE_ROW_AFTER_REOPEN", await wc().executeJavaScript(judgeRowPausedExpr));
+  log("SHOT_36_PAUSED_AFTER_REOPEN=" + (await shotFresh("36-paused-after-window-reopen.png")));
+  // 恢复（真实 preload → 主进程状态机 → 推送）：回到持久化开关值。
+  await wc().executeJavaScript("(() => { const b=document.querySelector('#chat .sj-pause-resume'); if (b) b.click(); })()");
+  await waitRepair("(() => { const b=document.querySelector('#chat .sj-pause-btn'); return !!b && b.disabled === false; })()");
+  const resumeState = await wc().executeJavaScript("window.desktop.getShellJudgeState()");
+  repairCheck("SE_RESUME_VIA_UI", !!resumeState && resumeState.paused === false);
+  repairCheck("SE_RESUME_PERSISTENT_SWITCH_UNCHANGED", !!resumeState && resumeState.enabled === (pauseBefore && pauseBefore.enabled));
+  // 恢复即回到开关值：同一真实通道在未暂停时走 judge 路径（不再弹客户卡）。
+  const resumeJudgeCalls = { value: 0 };
+  const resumePresenterCalls = [];
+  const resumeChannel = createDesktopOperatorChannel({
+    presenter: { present: async (_prompt, display) => { resumePresenterCalls.push(display.command); return { allow: false }; } },
+    operatorId: "e2e-resume",
+    timeoutMs: 5000,
+    env: {},
+    judge: { isEnabled: () => shellSessionPaused.isPaused() === false },
+    emitJudgeResult: () => {},
+  });
+  const resumedOutcome = await resumeChannel(pausePrompt, {
+    ...pauseMeta,
+    judge: async () => { resumeJudgeCalls.value += 1; return { verdict: "allow", reasonCode: "ok", reason: "恢复后允许（D2 替身）" }; },
+  });
+  repairCheck("SE_RESUME_SHELL_REQUEST_RETURNS_TO_SWITCH", !!resumedOutcome && resumedOutcome.outcome === "allow" && resumeJudgeCalls.value === 1 && resumePresenterCalls.length === 0);
+
+  // ⑨ 重启清零（第二次独立 Electron 进程 = 模块重新初始化；同一次运行的 paused 不持久化、偏好未写）。
+  const restartProbePath = path.join(OUTDIR, "restart-pause-probe.mjs");
+  fs.writeFileSync(
+    restartProbePath,
+    [
+      'import path from "node:path";',
+      'import { pathToFileURL } from "node:url";',
+      'import { app } from "electron";',
+      'app.setPath("userData", ' + JSON.stringify(path.join(OUTDIR, "userData-restart-probe")) + ');',
+      "app.whenReady().then(async () => {",
+      "  try {",
+      "    const mod = await import(pathToFileURL(" + JSON.stringify(path.join(REPO_CODE_ROOT, "app", "desktop", "interface.ts")) + ").href);",
+      "    const pause = mod.createShellSessionPauseState();",
+      "    const initial = pause.isPaused();",
+      '    console.log("RESTART_PAUSED_INITIAL=" + initial);',
+      '    console.log("RESTART_SET_RESULT=" + JSON.stringify(pause.set({ paused: true })));',
+      "    app.exit(initial === false ? 0 : 4);",
+      "  } catch (error) {",
+      '    console.log("RESTART_ERROR=" + (error && error.stack ? error.stack : String(error)));',
+      "    app.exit(2);",
+      "  }",
+      "});",
+      "",
+    ].join("\n"),
+  );
+  const { spawnSync } = await import("node:child_process");
+  const restartProbe = spawnSync(process.execPath, [restartProbePath], { encoding: "utf8", timeout: 60000 });
+  const restartOut = String(restartProbe.stdout || "") + String(restartProbe.stderr || "");
+  log("SE_RESTART_PROBE=" + JSON.stringify({ status: restartProbe.status, tail: restartOut.split(/\r?\n/).filter(Boolean).slice(-8) }));
+  repairCheck("SE_RESTART_PAUSED_CLEARED", restartProbe.status === 0 && /RESTART_PAUSED_INITIAL=false/.test(restartOut));
+  repairCheck("SE_RESTART_PREFERENCES_UNTOUCHED", !fs.existsSync(sePreferencesFile));
+
+  // ⑩ 白名单 0 judge（真实 classifier + 真实装配；判断通道计数替身 = 0）+ 只读档裁定 A + 审计 JSONL 样例。
+  const gateProjectRoot = path.join(OUTDIR, "gate-fixture-project");
+  fs.mkdirSync(path.join(gateProjectRoot, "角色卡", "X"), { recursive: true });
+  fs.mkdirSync(path.join(gateProjectRoot, "src"), { recursive: true });
+  fs.writeFileSync(path.join(gateProjectRoot, "角色卡", "X", "role-card.md"), "# X\n\nD2 闸夹具角色。\n");
+  fs.writeFileSync(path.join(gateProjectRoot, "src", "x.ts"), "export const x = 1;\n");
+  fs.writeFileSync(
+    path.join(gateProjectRoot, "角色卡", "X", "boundary.yaml"),
+    [
+      "role: X",
+      "entries:",
+      "  - kind: file",
+      "    path: src/x.ts",
+      "    purpose: D2 夹具",
+      "  - kind: conditional-directory",
+      "    path: docs/audit/",
+      "    condition: shell-gate",
+      "    root: project",
+      "    purpose: shell 闸审计留痕",
+      "",
+    ].join("\n"),
+  );
+  const gateProject = {
+    projectRoot: gateProjectRoot,
+    skillRoot: gateProjectRoot,
+    roles: { X: { card: "角色卡/X/role-card.md", boundary: "角色卡/X/boundary.yaml" } },
+    builtInRoles: ["su"],
+    governanceBoundary: { path: "角色卡/X/boundary.yaml", acceptance: { accepted: true, source: "e2e:d2-fixture" } },
+  };
+  const gateReq = (argv, extra) => ({ command: argv.join(" "), argv, cwd: gateProjectRoot, toolCallId: "e2e-" + argv.join("-"), ...(extra || {}) });
+  const whitelistForms = [
+    ["npm", "test"],
+    ["npm", "run", "test"],
+    ["npm", "run", "typecheck"],
+    ["npm", "run", "lint"],
+    ["npm", "run", "check"],
+    ["node", "--test"],
+    ["node", "--test", "test/x.test.ts"],
+    ["tsc", "--noEmit"],
+    ["npm", "ci"],
+  ];
+  const shellPushesBeforeWhitelist = shellCardPushes.length;
+  // 项目角色三层链（advisory）：判断会话 adapter 一旦被创建即抛错——白名单必须永不触达它。
+  let projectJudgeSessionAttempts = 0;
+  let projectOperatorCalls = 0;
+  const projectSink = createMemoryAuditSinkFn();
+  const projectGate = await assembleProjectShellGate({
+    project: gateProject,
+    operatorChannel: async () => { projectOperatorCalls += 1; return { outcome: "deny", operatorId: "judge:pi", reason: "D2 替身判拒" }; },
+    classifyShell: classifyShellFn,
+    rules: defaultShellRulesFn(),
+    timeoutMs: 5000,
+    env: {},
+    auditSink: projectSink,
+    sessionDeps: { createAdapter: () => { projectJudgeSessionAttempts += 1; throw new Error("白名单不得触达判断会话"); } },
+  });
+  const projectWhitelistResults = [];
+  for (const argv of whitelistForms) projectWhitelistResults.push((await projectGate(gateReq(argv))).allow);
+  repairCheck(
+    "SE_WHITELIST_ZERO_JUDGE_PROJECT_TIER",
+    projectWhitelistResults.every((value) => value === true) && projectOperatorCalls === 0 && projectJudgeSessionAttempts === 0,
+  );
+  repairCheck(
+    "SE_WHITELIST_AUDIT_C_ALLOW",
+    projectSink.records.filter((record) => record.branch === "c-allow").length === whitelistForms.length &&
+      projectSink.records.every((record) => record.judge === undefined && record.customerGrant === undefined),
+  );
+  const installDenied = await projectGate(gateReq(["npm", "install", "lodash"]));
+  repairCheck("SE_WHITELIST_NON_MATCH_STILL_REVIEWED", installDenied.allow === false && projectOperatorCalls === 1);
+  // 内置治理角色审批档（operatorOnly）：同一组形态同样 c-allow、0 judge。
+  let builtinOperatorCalls = 0;
+  const builtinSink = createMemoryAuditSinkFn();
+  const builtinGate = await assembleOperatorShellGate({
+    project: gateProject,
+    operatorChannel: async () => { builtinOperatorCalls += 1; return { outcome: "deny", operatorId: "judge:pi", reason: "D2 替身判拒" }; },
+    classifyShell: classifyShellFn,
+    rules: defaultShellRulesFn(),
+    timeoutMs: 5000,
+    env: {},
+    auditSink: builtinSink,
+  });
+  const builtinWhitelistResults = [];
+  for (const argv of whitelistForms) builtinWhitelistResults.push((await builtinGate(gateReq(argv))).allow);
+  repairCheck(
+    "SE_WHITELIST_ZERO_JUDGE_BUILTIN_TIER",
+    builtinWhitelistResults.every((value) => value === true) && builtinOperatorCalls === 0 && builtinSink.records.every((record) => record.branch === "c-allow"),
+  );
+  // 只读档裁定 A：例行白名单形态 ⇒ readonly-deny（不调 operator、不弹卡）；非 routine 的 c-allow 仍放行。
+  const readonlySink = createMemoryAuditSinkFn();
+  const readonlyGate = await assembleReadonlyShellGate({
+    project: gateProject,
+    classifyShell: classifyShellFn,
+    rules: defaultShellRulesFn(),
+    timeoutMs: 5000,
+    env: {},
+    auditSink: readonlySink,
+  });
+  let readonlyAllDenied = true;
+  let readonlyBranches = true;
+  let readonlyTiers = true;
+  for (const argv of [
+    ["npm", "test"],
+    ["npm", "run", "typecheck"],
+    ["node", "--test"],
+    ["tsc", "--noEmit"],
+    ["npm", "ci"],
+  ]) {
+    const result = await readonlyGate(gateReq(argv));
+    const record = readonlySink.records[readonlySink.records.length - 1];
+    readonlyAllDenied = readonlyAllDenied && result.allow === false;
+    readonlyBranches = readonlyBranches && !!record && record.branch === "readonly-deny";
+    readonlyTiers = readonlyTiers && result.allow === false && /\(c\) 判为 (review|risky)/.test(result.reason || "");
+  }
+  const readonlyLs = await readonlyGate(gateReq(["ls", "-la"]));
+  repairCheck("SE_READONLY_A_ROUTINE_DENY_MATRIX", readonlyAllDenied === true && readonlyBranches === true && readonlyTiers === true);
+  repairCheck("SE_READONLY_NON_ROUTINE_C_ALLOW", readonlyLs.allow === true && readonlySink.records[readonlySink.records.length - 1].branch === "c-allow");
+
+  // 审计 JSONL 样例（真实默认文件审计 sink；落临时项目 docs/audit/shell-gate.jsonl）：
+  // 同一真实审批档闸 + 真实升级 registry + 默认文件 sink；判断/客户决定为受控替身。
+  const escalationCards = [];
+  const auditRegistry = createShellEscalationSession({
+    roleId: "X",
+    projectRoot: gateProjectRoot,
+    runtime: "pi",
+    present: async (card) => { escalationCards.push(card); return { action: "allow-once", operatorId: "cust-e2e" }; },
+    now: () => new Date(),
+    presentTimeoutMs: 5000,
+    env: {},
+  });
+  const auditOutcomes = [
+    { outcome: "allow", operatorId: "judge:pi", judge: { engine: "pi", verdict: "allow", reasonCode: "ok", reason: "例行验证命令（D2 替身）" } },
+    { outcome: "allow", operatorId: "e2e-manual" },
+    { outcome: "deny", operatorId: "judge:pi", reason: "判拒（D2 替身）", judge: { engine: "pi", verdict: "deny", reasonCode: "model-deny", reason: "该命令可能破坏工作区（D2 替身）", customerMessage: "自动代理未放行该命令。" } },
+  ];
+  let auditOutcomeIndex = 0;
+  const auditOperator = async () => auditOutcomes[Math.min(auditOutcomeIndex, auditOutcomes.length - 1)];
+  const auditGate = await assembleOperatorShellGate({
+    project: gateProject,
+    operatorChannel: async () => {
+      const outcome = await auditOperator();
+      auditOutcomeIndex += 1;
+      return outcome;
+    },
+    classifyShell: classifyShellFn,
+    rules: defaultShellRulesFn(),
+    timeoutMs: 5000,
+    env: {},
+    onReviewed: (req, outcome) => auditRegistry.recordReview(req, outcome),
+    takeGrant: (req, context) => auditRegistry.takeGrant(req, context),
+    onAuditSinkCreated: (sink) => auditRegistry.bindAudit(sink),
+  });
+  const auditWhitelist = await auditGate(gateReq(["npm", "test"]));
+  const auditJudgeAllow = await auditGate(gateReq(["mysterytool-e2e", "--judge-allow"]));
+  const auditManual = await auditGate(gateReq(["mysterytool-e2e", "--manual"]));
+  const auditEscalateArgv = ["mysterytool-e2e", "--escalate"];
+  const auditEscalateDenied = await auditGate(gateReq(auditEscalateArgv));
+  const auditEscalateReceipt = await auditRegistry.request({ command: auditEscalateArgv.join(" "), argv: auditEscalateArgv });
+  const auditEscalateGranted = await auditGate(gateReq(auditEscalateArgv));
+  const auditPath = path.join(gateProjectRoot, "docs", "audit", "shell-gate.jsonl");
+  const auditText = fs.existsSync(auditPath) ? fs.readFileSync(auditPath, "utf8") : "";
+  const auditRecords = auditText.trim() === "" ? [] : auditText.trim().split("\n").map((line) => JSON.parse(line));
+  const auditReviews = auditRecords.filter((record) => record.event === undefined || record.event === "review");
+  const auditDecisions = auditRecords.filter((record) => record.event === "escalation-decision");
+  const auditJudgeAllowRecord = auditReviews.find((record) => record.judge && record.judge.verdict === "allow" && !record.customerGrant);
+  const auditJudgeDenyRecord = auditReviews.find((record) => record.judge && record.judge.verdict === "deny");
+  const auditManualRecord = auditReviews.find((record) => record.command === "mysterytool-e2e --manual");
+  const auditGrantRecord = auditReviews.find((record) => record.customerGrant !== undefined);
+  const auditDecisionRecord = auditDecisions[0];
+  const grantRequestId = escalationCards[0] ? escalationCards[0].requestId : "";
+  log("SE_AUDIT_SAMPLE=" + JSON.stringify({
+    path: auditPath,
+    records: auditRecords.length,
+    reviews: auditReviews.length,
+    decisions: auditDecisions.length,
+    branches: [...new Set(auditRecords.map((record) => record.branch))],
+  }));
+  repairCheck(
+    "SE_AUDIT_FOUR_CATEGORIES",
+    auditWhitelist.allow === true &&
+      auditJudgeAllow.allow === true &&
+      auditManual.allow === true &&
+      auditEscalateDenied.allow === false &&
+      auditEscalateReceipt.ok === true &&
+      auditEscalateGranted.allow === true &&
+      !!auditJudgeAllowRecord &&
+      !!auditJudgeDenyRecord &&
+      !!auditManualRecord &&
+      !!auditGrantRecord &&
+      !!auditDecisionRecord,
+  );
+  repairCheck(
+    "SE_AUDIT_JUDGE_ALLOW_SHAPE",
+    !!auditJudgeAllowRecord &&
+      /operator:judge:pi$/.test(auditJudgeAllowRecord.by) &&
+      auditJudgeAllowRecord.customerGrant === undefined &&
+      auditJudgeAllowRecord.conditions.includes("shell-gate"),
+  );
+  repairCheck(
+    "SE_AUDIT_MANUAL_SHAPE",
+    !!auditManualRecord &&
+      auditManualRecord.judge === undefined &&
+      auditManualRecord.customerGrant === undefined &&
+      String(auditManualRecord.branch).endsWith("→a-allow") &&
+      /operator:e2e-manual$/.test(auditManualRecord.by),
+  );
+  repairCheck(
+    "SE_AUDIT_CUSTOMER_GRANT_SHAPE",
+    !!auditGrantRecord &&
+      auditGrantRecord.judge === undefined &&
+      auditGrantRecord.customerGrant.scope === "once" &&
+      auditGrantRecord.customerGrant.requestId === grantRequestId &&
+      auditGrantRecord.customerGrant.operatorId === "cust-e2e" &&
+      auditGrantRecord.branch === "customer-escalation:allow-once" &&
+      new RegExp("^customer:cust-e2e（grant:" + grantRequestId + "）$").test(auditGrantRecord.by),
+  );
+  repairCheck(
+    "SE_AUDIT_ESCALATION_DECISION_SHAPE",
+    !!auditDecisionRecord &&
+      auditDecisionRecord.branch === "escalation:granted-once" &&
+      auditDecisionRecord.conclusion === "allow" &&
+      auditDecisionRecord.execution === "未执行" &&
+      JSON.stringify(auditDecisionRecord.conditions) === JSON.stringify(["shell-gate"]) &&
+      auditDecisionRecord.escalation.requestId === grantRequestId &&
+      auditDecisionRecord.escalation.action === "allow-once" &&
+      auditDecisionRecord.escalation.roleId === "X",
+  );
+  repairCheck("SE_AUDIT_NO_CREDENTIAL_PATTERN", !/ANTHROPIC_AUTH_TOKEN|sk-[A-Za-z0-9]/.test(auditText));
+  repairCheck("SE_AUDIT_APPEND_ONLY_LINES", auditText.trim().split("\n").length === auditRecords.length && auditRecords.every((record) => typeof record.timestamp === "string" && typeof record.command === "string"));
+  // 白名单 0 卡：真实闸调用全程无 `shell:confirm-request` 推达；界面此刻无任何 shell 卡（与审计配合）。
+  repairCheck("SE_WHITELIST_NO_CARD_PUSHED", shellCardPushes.length === shellPushesBeforeWhitelist);
+  await wc().executeJavaScript("window.__ansRenderer.selectRole('桌面窗口')");
+  await sleep(400);
+  repairCheck(
+    "SE_WHITELIST_NO_SHELL_CARD_VISIBLE",
+    await wc().executeJavaScript("(() => { const se=document.getElementById('shell-escalation'); const sc=document.getElementById('shell-confirm'); const visible=(el)=>!!el && el.hidden===false && !!el.querySelector('.sc-card'); return !visible(se) && !visible(sc); })()"),
+  );
+  log("SHOT_33_WHITELIST_NO_CARD=" + (await shotFresh("33-whitelist-no-card.png")));
+
+
   // —————— D 批：治理机器撤除（真实主进程最小检查）——————
   // 真实 `createDesktopInterface` + OUTDIR 临时项目：listProject 只枚举角色，不再自动推进/派发；
   // 目标项目零写入（不建 flow/账本/验收记录）。
@@ -1873,9 +2750,36 @@ async function run() {
 app.whenReady().then(async () => {
   // 去掉默认菜单栏（与 app/main.ts 同形；守卫断言它「不在」）。
   Menu.setApplicationMenu(null);
+  // D2：临时 userData（真实运行证据的隔离基线——不碰客户真实配置；暂停「不写偏好」以此目录为据）。
+  fs.mkdirSync(path.join(OUTDIR, "userData"), { recursive: true });
+  app.setPath("userData", path.join(OUTDIR, "userData"));
   try {
     const mod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "interface.ts")).href);
     createDesktopInterface = mod.createDesktopInterface;
+    // D2（2026-10-31 判拒升级）：暂停状态机（与 app/main.ts 同一产品实现；模块级单例语义由 harness 持有）。
+    createShellSessionPauseState = mod.createShellSessionPauseState;
+    shellSessionPaused = createShellSessionPauseState();
+    // D2：真实呈现端与共享呈现槽（与 app/main.ts 同形；本 harness 不复制任何判定）。
+    const seMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "shell-escalation.ts")).href);
+    createShellEscalationPresenter = seMod.createShellEscalationPresenter;
+    isShellEscalationResponse = seMod.isShellEscalationResponse;
+    const cardMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "confirm-card.ts")).href);
+    createConfirmCardSlot = cardMod.createConfirmCardSlot;
+    const ocMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "operator-channel.ts")).href);
+    createShellConfirmPresenter = ocMod.createShellConfirmPresenter;
+    createDesktopOperatorChannel = ocMod.createDesktopOperatorChannel;
+    // D2：闸/白名单/只读档/审计——真实 Service/Pipeline 公开出口（harness 驱动；断验层级见 D2 报告）。
+    const armingMod = await import(pathToFileURL(path.join(REPO_CODE_ROOT, "src", "pipeline", "orchestration", "shell-arming.ts")).href);
+    assembleProjectShellGate = armingMod.assembleProjectShellGate;
+    assembleOperatorShellGate = armingMod.assembleOperatorShellGate;
+    assembleReadonlyShellGate = armingMod.assembleReadonlyShellGate;
+    const rulesMod = await import(pathToFileURL(path.join(REPO_CODE_ROOT, "src", "service", "gate", "shell-rules.ts")).href);
+    classifyShellFn = rulesMod.classifyShell;
+    defaultShellRulesFn = rulesMod.defaultShellRules;
+    const auditMod = await import(pathToFileURL(path.join(REPO_CODE_ROOT, "src", "common", "编排", "shell-audit.ts")).href);
+    createMemoryAuditSinkFn = auditMod.createMemoryAuditSink;
+    const escMod = await import(pathToFileURL(path.join(REPO_CODE_ROOT, "src", "common", "编排", "shell-escalation.ts")).href);
+    createShellEscalationSession = escMod.createShellEscalationSession;
     // demo 适配器（用于注入缝：顶掉真实 pi 工厂，令 e2e 离线可跑）。
     const chatMod = await import(pathToFileURL(path.join(APP_DIR, "desktop", "chat-adapter.ts")).href);
     createChatDemoAdapter = chatMod.createChatDemoAdapter;
@@ -1934,7 +2838,8 @@ app.whenReady().then(async () => {
     try { fs.writeFileSync(path.join(OUTDIR, "report.txt"), report.join("\n") + "\nWATCHDOG_TIMEOUT=1\n"); } catch {}
     app.exit(0);
   // Phase 5A：整机自检覆盖的步骤增加（双端/新语义），90s 会截断合法运行；保留有界看门狗 180s。
-  }, 180000);
+  // D2（2026-10-31）：新增升级卡/仲裁/暂停/窗口重开/重启探针/闸与审计证据段，180s 余量不足——有界扩至 300s。
+  }, 300000);
 
   win.webContents.once("did-finish-load", async () => {
     try {

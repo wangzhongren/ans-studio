@@ -287,7 +287,9 @@ test("防循环：同一命令连续 deny 达上限后不再调用模型 ⇒ 按
     const third = await chain.gate(REQUEST("cap-3"));
     assert.equal(fake.seen.binds, 2, "达到上限后不得再调用模型");
     assertManualDenied(third, chain, {
-      reason: "同类命令连续被拒，已达重试上限，无法完成自动审查，已拒绝；请重试，如持续失败请关闭「替我审批」后手动确认。",
+      // 2026-10-31 方案 v1.3 §4.6/AC-19：retry-capped 的出路改为「可申请客户确认 + 关闭开关兜底」
+      // （i18n `main.operator.manualDenyAdvice.retryCapped`，C1 接入）；逐字断言，不弱化。
+      reason: "同类命令连续被拒，已达重试上限，无法完成自动审查，已拒绝；如确属推进必需，可调用 request_shell_escalation 对这条精确命令申请客户确认（每会话一次）；或关闭「替我审批」后重试。",
       reasonCode: "retry-capped",
       engine: "claude",
       tier: "risky",

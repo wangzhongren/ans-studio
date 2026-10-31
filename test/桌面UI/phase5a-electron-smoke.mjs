@@ -292,6 +292,86 @@ app.whenReady().then(async () => {
     await js(`document.getElementById('tab-decisions').click()`);
     await sleep(250);
     check("过期申请进入历史", await js(`(() => { const h=document.getElementById('decision-center-history'); return !!h && h.textContent.includes('E 过期历史') && h.textContent.includes('已失效'); })()`));
+
+    // 2026-10-31（判拒升级方案 v1.3 §4.6/§7.1/§7.2）：升级卡视图——同一 shell:confirm-request
+    // 通道、kind:"escalation"；三按钮/命令原文/必要性标注/客户手批声明；旧 preload 缺
+    // setShellJudgePaused/shellEscalationRespond ⇒ 暂停与回传能力禁用并如实说明（不假造）。
+    await push('shell:confirm-request', {
+      version: 1,
+      kind: 'escalation',
+      id: 'se-smoke-1',
+      requestId: 'req-smoke-1',
+      roleId: 'chief',
+      projectRoot: ROOT,
+      runtime: 'claude',
+      command: 'npm install left-pad',
+      argv: ['npm', 'install', 'left-pad'],
+      argvLines: ['"npm"', '"install"', '"left-pad"'],
+      cwd: ROOT,
+      judgeReason: '安装新依赖',
+      judgeCustomerMessage: '该命令会安装新依赖。',
+      judgeAlternative: { kind: 'command', value: 'npm ci', rationale: '按锁文件安装' },
+      necessity: '发布前需要该依赖',
+      necessityNote: '由角色提供，未经验证',
+      customerNotJudgeNote: '客户手批 ≠ judge 放行。',
+      // E2 R1（2026-10-31）：判拒时 judge 所依据的脚本上下文（不可信数据，原样转义展示）。
+      approvalContext: {
+        npmScriptName: 'test',
+        note: 'E2E 脚本上下文',
+        scripts: [
+          {
+            path: 'scripts/run.js',
+            label: 'run.js',
+            content: 'console.log(1)',
+            bytes: 14,
+            sha256: 'a'.repeat(64),
+            inWriteArea: false,
+          },
+        ],
+      },
+      actions: ['allow-once', 'allow-session', 'deny'],
+    });
+    check("升级卡：三按钮/命令原文/必要性标注/客户手批声明", await js(`(() => {
+      const o=document.getElementById('shell-escalation'); if(!o||o.hidden) return false;
+      const cmd=document.getElementById('se-command');
+      const note=document.getElementById('se-necessity-note');
+      const customer=document.getElementById('se-customer-note');
+      const necessity=document.getElementById('se-necessity-text');
+      return !!cmd && cmd.textContent==='npm install left-pad'
+        && !!document.getElementById('se-allow-once') && !!document.getElementById('se-allow-session') && !!document.getElementById('se-reject')
+        && !!note && note.textContent.includes('由角色提供')
+        && !!customer && customer.textContent.includes('客户手批 ≠ judge 放行')
+        && !!necessity && necessity.textContent.includes('发布前需要该依赖');
+    })()`));
+    check("升级卡：脚本上下文（路径/sha256/内容/写区外警示/说明/npm 脚本）", await js(`(() => {
+      const s=document.getElementById('se-context'); if(!s) return false;
+      const text=s.textContent||'';
+      const content=s.querySelector('.se-context-content');
+      return text.includes('脚本上下文')
+        && text.includes('脚本：scripts/run.js')
+        && text.includes('sha256：'+'a'.repeat(64))
+        && text.includes('说明：E2E 脚本上下文')
+        && text.includes('npm 脚本：test')
+        && text.includes('不在可写范围内')
+        && !!content && content.textContent==='console.log(1)';
+    })()`));
+    check("升级卡：旧 preload 缺 setShellJudgePaused ⇒ 暂停动作禁用并说明", await js(`(() => {
+      const b=document.getElementById('se-pause');
+      return !!b && b.disabled && (document.getElementById('shell-escalation')||{textContent:''}).textContent.includes('当前版本不支持自动判断');
+    })()`));
+    await js(`document.getElementById('se-reject').click()`);
+    await sleep(160);
+    check("升级卡：旧桥缺 shellEscalationRespond ⇒ 如实提示通道未接、不收起假放行", await js(`(() => {
+      const o=document.getElementById('shell-escalation');
+      const hint=document.getElementById('composer-hint');
+      return !!o && !o.hidden && !!hint && hint.textContent.includes('按 fail-closed 不放行');
+    })()`));
+    await push('session:operator-expired', { id: 'se-smoke-1', roleId: 'chief', projectRoot: ROOT, runtime: 'claude', reason: 'E2E 升级卡过期' });
+    check("升级卡：失效回执收起并如实提示原因", await js(`(() => {
+      const o=document.getElementById('shell-escalation');
+      const hint=document.getElementById('composer-hint');
+      return !!o && o.hidden && !!hint && hint.textContent.includes('E2E 升级卡过期');
+    })()`));
     await js(`document.getElementById('tab-work').click()`);
     await sleep(150);
 

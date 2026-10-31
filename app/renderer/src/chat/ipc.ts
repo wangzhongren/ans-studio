@@ -19,6 +19,8 @@ import { reportRendererDiagnostic } from "@/chat/diagnostics";
 import type { DesktopBridge } from "@/lib/platform";
 import { useChatStore } from "@/chat/chat-store";
 import { setJudgeResultSink, noteShellId, useConfirmStore, installGovernanceModelWatch } from "@/stores/confirm-store";
+import { installJudgePauseBridge } from "@/chat/judge-row-view";
+import { shellConfirmKind } from "@/chat/judge";
 import { useUiStore, type RuntimeId } from "@/stores/ui-store";
 import { useSettingsStore, invalidatePendingSaves } from "@/stores/settings-store";
 import { useReportStore } from "@/stores/report-store";
@@ -253,10 +255,18 @@ function handleShellConfirm(payload: unknown): void {
   if (decision.target === "drop" || !decision.runtime) return;
   // 异引擎缓存也要记住 shell 身份：切回后失效回执只写 hint、不再有当前卡（C2）。
   noteShellId(asRecord(payload).id);
-  viewCache.recordShellConfirm(view.projectRoot, decision.runtime, payload);
-  if (decision.target === "current") {
-    useConfirmStore.getState().receiveShell(payload);
+  if (decision.target === "cache") {
+    viewCache.recordShellConfirm(view.projectRoot, decision.runtime, payload);
+    return;
   }
+  // 单槽呈现（2026-10-31 判据 §7.2）：升级卡排他、审批卡由主进程等待——
+  // 已呈现另一卡族时不写入缓存、不覆盖当前卡（主进程仲裁后会重推/拒绝升级申请）。
+  const current = useConfirmStore.getState().shellConfirm;
+  if (current && shellConfirmKind(current.payload) !== shellConfirmKind(payload)) {
+    return;
+  }
+  viewCache.recordShellConfirm(view.projectRoot, decision.runtime, payload);
+  useConfirmStore.getState().receiveShell(payload);
 }
 
 function handleRecoveryConfirm(payload: unknown): void {
@@ -463,6 +473,9 @@ export function installChatRuntime(): void {
   // 判断结果行经 sink 先进每引擎缓存（4B：切回旧引擎按到达序重放）。
   setJudgeResultSink(handleJudgeResult);
   useConfirmStore.getState().initJudgeSwitches();
+  // 2026-10-31（判拒升级方案 §4.6）：暂停/恢复通道（shell-only）——探测能力、订阅推送、
+  // 读取初始 paused；旧 preload 缺 `setShellJudgePaused` ⇒ 按钮禁用并给出说明。
+  installJudgePauseBridge(bridge);
   installGovernanceModelWatch();
 
   // 当前视图的卡被回答/失效/收起时，同步清掉该引擎缓存里的同一张卡（切回不复活）。

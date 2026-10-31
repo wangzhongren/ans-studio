@@ -10,6 +10,7 @@
 | 单文件 | `src/service/boundary/resolve-boundary.ts` | 双来源边界解析（含项目覆盖） |
 | 单文件 | `src/service/role/resolve-role.ts` | 双来源角色解析 |
 | 单文件 | `src/service/gate/resolve-write.ts` | 路径判定 |
+| 单文件 | `src/service/gate/shell-rules.ts` | shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认） |
 | 目录（私有） | `src/common/门禁引擎/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/门禁引擎/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/门禁引擎/feature-map.md` | 功能导航 |

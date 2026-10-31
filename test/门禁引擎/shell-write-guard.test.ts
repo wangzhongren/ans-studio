@@ -7,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { evaluateShellWriteTargets, type ShellWriteGuardInput } from "../../src/common/门禁引擎/shell-write-guard.ts";
+import { classifyShellDetailed, defaultShellRules, matchRoutineShellCommand } from "../../src/common/门禁引擎/classify-shell.ts";
 
 const ROOT = "/proj";
 
@@ -81,17 +82,20 @@ test("逃逸防御：绝对路径越界 / `..` 逃出项目根 ⇒ deny；项目
   assert.equal(insideAbs.decision.kind, "pass");
 });
 
-test("脚本审查（v2.3/R2）：解释器脚本/npm run/node --test/npm test/install/构建工具 ⇒ script（携带内容）；只读命令 pass", () => {
+test("脚本审查（v2.3/R2）：解释器脚本/npm run（非例行）/npm install/构建工具 ⇒ script（携带内容）；只读命令 pass", () => {
   for (const argv of [
     ["node", "docs/scheduling/copy-to-root.mjs"],
     ["python3", "tool.py"],
     ["node", "-m", "pkg"],
     ["npm", "run", "build"],
-    ["node", "--test"],
-    ["node", "--test", "test/a.test.ts"],
-    ["npm", "test"],
+    ["npm", "run", "test:unit"],
     ["npm", "install"],
-    ["npm", "ci"],
+    ["npm", "test", "--", "--ci"],
+    ["npm", "ci", "--ignore-scripts"],
+    ["node", "--test", "../outside.test.ts"],
+    ["node", "--test", "--import", "src/setup.ts"],
+    ["tsc"],
+    ["tsc", "-p", "tsconfig.json"],
     ["npx", "some-cli"],
     ["make"],
     ["cargo", "build"],
@@ -104,6 +108,34 @@ test("脚本审查（v2.3/R2）：解释器脚本/npm run/node --test/npm test/i
   for (const argv of [["cat", "README.md"], ["git", "status"], ["ls", "-la"]]) {
     const result = guard(argv);
     assert.equal(result.decision.kind, "pass", `${argv.join(" ")} 应 pass（只读）`);
+  }
+});
+
+// 2026-10-31（方案 v1.3 §5.3 关键陷阱）：例行命令在写守卫**必须**返回 pass——否则 `node --test`/npm
+// 脚本分支先返回 script，把 (c) 的确定性放行抢先吃掉（0 卡不成立）。谓词与分类器是**同一函数引用**（AC-12）。
+test("例行命令确定性白名单（§5.1/§5.3）：命中 ⇒ pass（不进脚本审查），且与分类器同一谓词", () => {
+  const rules = defaultShellRules();
+  const ROUTINE: ReadonlyArray<{ argv: string[]; id: string }> = [
+    { argv: ["npm", "test"], id: "npm-test" },
+    { argv: ["npm", "run", "test"], id: "npm-run-test" },
+    { argv: ["npm", "run", "typecheck"], id: "npm-run-typecheck" },
+    { argv: ["npm", "run", "lint"], id: "npm-run-lint" },
+    { argv: ["npm", "run", "check"], id: "npm-run-check" },
+    { argv: ["node", "--test"], id: "node-test" },
+    { argv: ["node", "--test", "test/a.test.ts"], id: "node-test" },
+    { argv: ["node", "--test", "test/门禁引擎/classify-shell.test.ts"], id: "node-test" },
+    { argv: ["tsc", "--noEmit"], id: "tsc-noemit" },
+    { argv: ["npm", "ci"], id: "npm-ci" },
+  ];
+  for (const { argv, id } of ROUTINE) {
+    assert.deepEqual(matchRoutineShellCommand([...argv]), { id }, `谓词应命中：${argv.join(" ")}`);
+    const result = guard(argv);
+    assert.equal(result.decision.kind, "pass", `${argv.join(" ")} 应 pass（(c) 已确定性放行，不得抢判 script）`);
+    assert.deepEqual(result.calls, [], `${argv.join(" ")} 无显式写目标，不调用 checkWrite`);
+    // AC-12 第 3 点：同一 argv 在分类器得 allow:routine:<id>、在写守卫得 pass。
+    const detail = classifyShellDetailed([...argv], rules);
+    assert.equal(detail.decision, "allow", `分类器应 allow：${argv.join(" ")}`);
+    assert.equal(detail.ruleId, `allow:routine:${id}`, `分类器 ruleId 应稳定：${argv.join(" ")}`);
   }
 });
 

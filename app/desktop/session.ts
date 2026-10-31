@@ -142,7 +142,7 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest } from "../../src/model/runtime.ts";
 import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinEvidenceRoots, loadCriteria, parseEvidenceMeta, readArtifact, validateEvidencePath, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
@@ -557,6 +557,9 @@ export interface SessionManagerDeps {
       /** **旧只读档（客户裁定 2026-10-12）**：类型保留以兼容其他调用方/测试；**桌面自 2026-10-17 起不再注入**
        *  （全部内置治理角色改走审批档）。与 `shellOperatorOnly` 同时出现 ⇒ 编排不 arm（互斥守卫）。 */
       shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
+      /** **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：本层按每会话包装后透传；
+       *  缺省 ⇒ 不传 ⇒ 编排不创建 registry、`request_shell_escalation` 不注册。 */
+      shellEscalationPresenter?: ShellEscalationPresentFn;
     },
     deps: { createAdapter: RuntimeAdapterFactory },
   ) => Promise<RoleSessionHandle>;
@@ -667,6 +670,13 @@ export interface SessionManagerDeps {
    * 项目角色永不漂移；缺省 ⇒ 内置治理角色也不 arm（能力缺席 = fail-closed）。
    */
   shellArming?: DesktopShellArming;
+  /**
+   * **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：应用级 presenter（主进程每窗口
+   * `createShellEscalationPresenter` 构造）；本层按**每会话**包装——并入会话生命周期（`lifetime`：会话
+   * 终止/重建/dispose）与当前轮（`turn`：轮次停止/中止）信号后透传，使挂起升级卡即时失效（默认拒绝，
+   * fail-closed）。缺省 ⇒ 不注入 ⇒ 编排不创建 registry、`request_shell_escalation` 不注册。
+   */
+  shellEscalationPresenter?: ShellEscalationPresentFn;
   /**
    * **客户交互通道**（A-1/A-3/A-5）——`request_confirmation` / `request_choice` 的呈现与裁决回传。
    * **缺省 ⇒ 不注入** ⇒ 编排侧该会话进入确认制所需的前提不存在（两工具不注册、gate 旧语义）——
@@ -2618,6 +2628,20 @@ export class SessionManager {
     // 走三层链（内置治理角色不自审）。缺省 ⇒ 编排对「规则集未注入」一律拒绝（fail-closed，绝不放宽）。
     const shellArming = role.builtIn === true ? undefined : this.deps.shellArming;
 
+    // 2026-10-31（shell 判拒升级方案 v1.3 §4.6/§6.4）：**升级卡呈现端**——应用级 presenter（每窗口一个）+
+    // **每会话信号包装**：并入会话生命周期（dispose/重建）与当前轮（stop/abort）中止信号，
+    // 会话终止/重建/轮次中止时挂起升级卡即时失效（默认拒绝，fail-closed；方案 §9 不变量 1/AC-06）。
+    // 缺省 ⇒ 不传 ⇒ 编排不创建 registry、升级工具不注册（能力缺席 = fail-closed）。
+    const escalationPresenter = this.deps.shellEscalationPresenter;
+    const shellEscalationPresenter: ShellEscalationPresentFn | undefined =
+      escalationPresenter === undefined
+        ? undefined
+        : (request: ShellEscalationCardRequest, signal?: AbortSignal) => {
+            const parts: AbortSignal[] = [interactionState.lifetime.signal, interactionState.turn.signal];
+            if (signal !== undefined) parts.push(signal);
+            return escalationPresenter(request, AbortSignal.any(parts));
+          };
+
     // **内置治理角色审批档（客户裁定 2026-10-17；2026-10-19 新规则「所有角色都有 shell 权限，包括读写，
     // 以及任何需要命令的权限，只不过都要提交审批」扩至全部内置治理角色）**：**全部 `role.builtIn === true`
     // 的会话**（single 的 su 与 trio 五人）把 **(c) 实件 + (a) 通道**（均与项目角色同一份 deps 引用——单一
@@ -2788,6 +2812,8 @@ export class SessionManager {
           // `role.builtIn === true` 且 (c)+(a) 同备时给出；缺件不传 ⇒ 不 arm（fail-closed，绝不放宽）。
           ...(shellOperatorOnly ? { shellOperatorOnly } : {}),
           // **旧只读档（`shellReadonly`）桌面不再注入**：内置治理角色统一走上方审批档，两档并存编排互斥拒绝。
+          // 2026-10-31（判拒升级方案 v1.3 §6.4）：升级卡 presenter（每会话信号包装；缺省不传）。
+          ...(shellEscalationPresenter ? { shellEscalationPresenter } : {}),
         },
         { createAdapter },
       );

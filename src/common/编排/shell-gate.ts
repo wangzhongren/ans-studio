@@ -76,6 +76,7 @@ import type {
   OperatorOutcome,
   OperatorChannelFn,
   ShellJudgeAudit,
+  ShellGrant,
 } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { ShellClass, ShellRules } from "../../model/decision.ts";
@@ -182,6 +183,9 @@ export type PmAskFn = (
 
 export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
 import { matchesDelegatedRoutineCheck, type RoutineShellPolicy } from "./routine-shell-policy.ts";
+// 2026-10-31 客户裁定 A（只读档不适用例行白名单）：分类器只回裸串时（生产桌面经 Service 出口注入的
+// `classifyShell` 四态封装不带 ruleId），用**同一个**冻结谓词判定 routine 命中——单一实现，不复制第二份。
+import { matchRoutineShellCommand } from "../../service/gate/shell-rules.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 // **确定性前置封堵**（客户 2026-10-19：「grep/长内联命令 这个应该让判断AI 做好封堵」）：
 // 在 (c) 分类、模型判断与客户通道**之前**拒绝长内联命令与无界递归搜索（不调模型、不弹卡）。
@@ -314,6 +318,26 @@ export function escalateBranch(bBranch: string, aBranch: string): string {
   return `${bBranch}→${aBranch}`;
 }
 
+// —— 客户升级授权放行分支（2026-10-31 shell 判拒升级方案 v1.3 §7.1）——
+/** 客户允许一次（allow-once）→ 本次放行；独立分支，不与 `a-*` 串链。 */
+export const BRANCH_CUSTOMER_ESCALATION_ALLOW_ONCE = "customer-escalation:allow-once";
+/** 客户本会话允许（allow-session）→ 本次放行；独立分支，不与 `a-*` 串链。 */
+export const BRANCH_CUSTOMER_ESCALATION_ALLOW_SESSION = "customer-escalation:allow-session";
+/** 脚本上下文在判拒后变化/不可读 ⇒ 授权作废、拒绝（方案 §4.4/AC-07 的稳定分支）。 */
+export const BRANCH_CUSTOMER_ESCALATION_STALE = "customer-escalation:stale-context";
+
+/**
+ * 审核结束的回调产物（`onReviewed`；与审计同址、最终判定后调用）。
+ * `reviewedReq` 的语义：script 分支以**带 `approvalContext` 的有效请求**回调（供判拒记录展示与
+ * sha256 时效校验），非 script 用原请求——由闸在回调处自行选择，调用方按 `req` 记录即可。
+ */
+export interface ShellGateReviewedOutcome {
+  result: ShellReviewResult;
+  conclusion: "allow" | "deny" | "timeout" | "error";
+  branch: string;
+  judge?: ShellJudgeAudit;
+}
+
 export interface CreateShellGateOptions {
   /** 仅诊断上下文，不参与分类授权。 */
   projectRoot?: string;
@@ -391,6 +415,25 @@ export interface CreateShellGateOptions {
    * 返回 ok:false ⇒ fail-closed 拒绝（不弹卡、不交 judge）；缺省不传 ⇒ 无上下文（旧行为）。
    */
   approvalContextLoader?: (req: ShellGateRequest) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
+  /**
+   * **2026-10-31 判拒升级（方案 v1.3 §6.3）**：审核结束回调（**最终判定后、与审计同址**）。
+   * 只做记录/清理（编排 `shell-escalation` 的 `recordReview`），**不改变判定**；
+   * script 分支以带 `approvalContext` 的有效请求回调，非 script 用原请求。缺省不传 = 旧行为逐字不变。
+   */
+  onReviewed?: (req: ShellGateRequest, outcome: ShellGateReviewedOutcome) => void;
+  /**
+   * **2026-10-31 判拒升级**：客户升级授权检查/消费（精确位置见 §6.3/§4.1）——
+   * 非 script：classify 后且 `detail.decision` 为 `review`/`risky`（**非 deny、非 allow**）时调用；
+   * script：script 分支内 c=deny 检查与 `approvalContextLoader` 重载成功之后调用。
+   * 返回 `"stale"` ⇒ 脚本上下文变化/不可读，拒绝且授权作废。**`readonlyOnly === true` 时构造期抛错**
+   * （只读档不得被陈旧授权越过 `readonly-deny`）。缺省不传 = 无授权消费（旧行为逐字不变）。
+   */
+  takeGrant?: (req: ShellGateRequest, context?: ShellApprovalContext) => ShellGrant | "stale" | undefined;
+  /**
+   * **2026-10-31 判拒升级**：闸创建/取得审计 sink 后回调（供升级 registry **共享同一 sink**、
+   * 同一 `shell-gate` 条件、同一 append-only 文件）。缺省不传 = 旧行为。
+   */
+  onAuditSinkCreated?: (sink: ShellAuditSink) => void;
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -403,6 +446,10 @@ interface ReviewOutcome {
    * `OperatorOutcome.allow/deny.judge` 时出现（`manual` 后客户手批**不带**本字段）。
    */
   judge?: ShellJudgeAudit;
+  /** 2026-10-31：本次放行来自客户升级授权（仅授权放行时出现；审计写 `customerGrant`，不写 `judge`）。 */
+  customerGrant?: ShellGrant;
+  /** 2026-10-31：`onReviewed` 使用的请求（script 分支带 `approvalContext`；非 script 即原请求）。 */
+  reviewedReq?: ShellGateRequest;
 }
 
 /** 内部：(b) 的输出——终结（放行/拒绝）或升级到 (a)。 */
@@ -440,6 +487,11 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   if (opts.advisoryRuleset === true && typeof opts.operatorChannel !== "function") {
     throw new Error("shell 闸配置错误：advisoryRuleset 必须提供 operatorChannel，拒绝装配");
   }
+  // 6) 只读档不得注入 takeGrant（2026-10-31 升级方案 §6.3/N7）：只读档只映射 (c) 白名单，
+  //    陈旧客户授权不得越过 `readonly-deny`/`script:readonly-deny`。调用点亦跳过（双保险）。
+  if (opts.readonlyOnly === true && typeof opts.takeGrant === "function") {
+    throw new Error("shell 闸配置错误：readonlyOnly 不得注入 takeGrant（避免授权越过只读拒绝），拒绝装配");
+  }
 
   const log = createDiagnosticLogger({ component: "orchestration.shell-gate", projectRoot: opts.projectRoot ?? opts.routineShellPolicy?.projectRoot });
   const env = opts.env ?? process.env;
@@ -447,6 +499,15 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   const pmTimeoutMs = opts.pmTimeoutMs ?? timeoutMs;
   const operatorTimeoutMs = opts.operatorTimeoutMs ?? timeoutMs;
   const now = opts.now ?? (() => new Date());
+
+  // 2026-10-31（方案 §6.3）：审计 sink 共享回调（升级 registry 绑定同一 sink）。回调异常不影响判定。
+  if (typeof opts.onAuditSinkCreated === "function") {
+    try {
+      opts.onAuditSinkCreated(opts.audit);
+    } catch (err) {
+      process.stderr.write(`shell 闸审计 sink 共享回调失败（不影响判定）：${reasonOf(err)}\n`);
+    }
+  }
 
   // **F-6-2（2026-10-16 客户批准）：审计失败提示去重 + 如实话术**。同一 gate 实例内按 reason 去重——
   // 首个完整打印一次；相同 reason 的重复只累计、不再逐条打印；reason 变化后再报一次；恢复落盘后
@@ -457,6 +518,20 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   // 规则集来源：包装为可 await 的加载器（加载失败由 decide 捕获 → 拒绝）。
   const loadRules = async (): Promise<ShellRules> =>
     typeof opts.rules === "function" ? await (opts.rules as () => ShellRules | Promise<ShellRules>)() : opts.rules;
+
+  /**
+   * 授权检查的防御包装：注入方异常不得翻转判定方向（继续既有链，绝不因异常而放行）；
+   * 如实 stderr（不静默）。返回 `"stale"` 由调用方转拒绝并作废授权。
+   */
+  function takeGrantSafely(req: ShellGateRequest, context?: ShellApprovalContext): ShellGrant | "stale" | undefined {
+    if (typeof opts.takeGrant !== "function") return undefined;
+    try {
+      return opts.takeGrant(req, context);
+    } catch (err) {
+      process.stderr.write(`shell 客户升级授权检查异常（按无授权继续既有链）：${reasonOf(err)}\n`);
+      return undefined;
+    }
+  }
 
   async function decide(req: ShellGateRequest): Promise<ReviewOutcome> {
     // 退路 2：分类函数缺失 → 能力缺席即拒绝（不注册 run_shell 的等价物在此层也兜住）。
@@ -586,6 +661,46 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           detail.reason ?? `命中 c 硬拒规则（${by}）`,
         );
       }
+      // —— 客户升级授权（2026-10-31 方案 v1.3 §4.1/§6.3；script 分支）——
+      // **精确顺序**：c=deny 检查之后、既有委托/审批链之前。先经 `approvalContextLoader` 重载审查上下文
+      // （script 类授权消费必须与判拒时比对 sha256），再查授权。仅 `review`/`risky` 才查（c=allow 不消费；
+      // c=deny 已在上方终结）。`readonlyOnly === true` 已在此块开头返回（构造期亦禁止注入 takeGrant）。
+      const mayTakeGrant =
+        (detail.decision === "review" || detail.decision === "risky") &&
+        typeof opts.takeGrant === "function";
+      let contextualReq = req;
+      if (typeof opts.approvalContextLoader === "function") {
+        let loaded: Awaited<ReturnType<NonNullable<typeof opts.approvalContextLoader>>>;
+        try {
+          loaded = await opts.approvalContextLoader(req);
+        } catch (err) {
+          // 脚本不可读/加载失败：若存在客户授权，按 `stale` 作废并拒绝（方案 §4.4：客户批准的是旧内容）。
+          const revoked = mayTakeGrant ? takeGrantSafely(req, undefined) : undefined;
+          if (revoked === "stale") return staleOutcome(byTagged);
+          if (revoked !== undefined) return grantOutcome(revoked);
+          return denyOutcome(
+            BRANCH_SCRIPT_CONTEXT_FAILED,
+            byTagged,
+            `不透明执行审查上下文加载失败：${reasonOf(err)}（fail-closed）`,
+          );
+        }
+        if (loaded.ok !== true) {
+          const revoked = mayTakeGrant ? takeGrantSafely(req, undefined) : undefined;
+          if (revoked === "stale") return staleOutcome(byTagged);
+          if (revoked !== undefined) return grantOutcome(revoked);
+          return denyOutcome(
+            BRANCH_SCRIPT_CONTEXT_FAILED,
+            byTagged,
+            `不透明执行审查上下文不可用：${loaded.reason}（fail-closed）`,
+          );
+        }
+        contextualReq = { ...req, approvalContext: loaded.context };
+      }
+      if (mayTakeGrant) {
+        const granted = takeGrantSafely(contextualReq, contextualReq.approvalContext);
+        if (granted === "stale") return staleOutcome(byTagged);
+        if (granted !== undefined) return grantOutcome(granted);
+      }
       // 宿主显式委托的常规检查（仅精确匹配策略清单）仍可免审批——策略是客户/宿主授权事实。
       if (matchesDelegatedRoutineCheck(req.argv, req.cwd, opts.routineShellPolicy)) {
         log.record("shell.routine.delegated", { toolCallId: req.toolCallId, authorizationSource: opts.routineShellPolicy?.authorizationSource });
@@ -602,30 +717,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           "不透明执行类需要审批上下文审查，但操作者/判断通道未接入，拒绝（fail-closed）。",
         );
       }
-      // 2026-10-29（客户 Q1/Q2 口径修正）：不强制客户本人——开关开启时由判断 agent 审查（含脚本内容），
-      // 关闭时由客户卡确认；脚本内容不可用/超限/越界 ⇒ fail-closed 拒绝（不弹卡、不交 judge）。
-      let contextualReq = req;
-      if (typeof opts.approvalContextLoader === "function") {
-        let loaded: Awaited<ReturnType<NonNullable<typeof opts.approvalContextLoader>>>;
-        try {
-          loaded = await opts.approvalContextLoader(req);
-        } catch (err) {
-          return denyOutcome(
-            BRANCH_SCRIPT_CONTEXT_FAILED,
-            byTagged,
-            `不透明执行审查上下文加载失败：${reasonOf(err)}（fail-closed）`,
-          );
-        }
-        if (loaded.ok !== true) {
-          return denyOutcome(
-            BRANCH_SCRIPT_CONTEXT_FAILED,
-            byTagged,
-            `不透明执行审查上下文不可用：${loaded.reason}（fail-closed）`,
-          );
-        }
-        contextualReq = { ...req, approvalContext: loaded.context };
-      }
-      return await runA(contextualReq, {
+      const scriptOutcome = await runA(contextualReq, {
         bBranch: BRANCH_SCRIPT_REVIEW,
         bAttr: byTagged,
         why:
@@ -633,14 +725,59 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           "请依据命令行/argv 与提供的脚本内容核对是否越出角色写区、是否破坏性/越权；" +
           "开关开启时由判断 agent 决定，关闭时由客户本人确认。",
       });
+      return { ...scriptOutcome, reviewedReq: contextualReq };
     }
     if (detail.decision === "allow") {
+      // 2026-10-31 客户裁定 A（澄清记录 `docs/planning/2026-10-31_clarification_shell-escalation-readonly.md`）：
+      // **只读档不适用例行命令白名单**。命中 `allow:routine:<id>` 的 c=allow 在只读档下按 (c) review 档的
+      // 只读策略拒绝（不放行、不消费授权；其余只读行为与文案不变；不新增分支常量、`by` 后缀不变）。
+      // 判定来源：(1) 分类器明细 `ruleId`（`classifyShellDetailed` 注入路径）；
+      //           (2) 分类器只回裸串时（生产桌面经 Service 出口注入的四态封装），用**同一个**冻结谓词
+      //               `matchRoutineShellCommand`（Service 公开出口，同一函数引用）按 argv 形状判定。
+      if (opts.readonlyOnly === true) {
+        const routineRuleId =
+          typeof detail.ruleId === "string"
+            ? detail.ruleId.startsWith("allow:routine:") ? detail.ruleId : undefined
+            : (() => {
+                const routine = matchRoutineShellCommand(argv);
+                return routine === undefined ? undefined : `allow:routine:${routine.id}`;
+              })();
+        if (routineRuleId !== undefined) {
+          // 澄清记录 S2/S5：**既有 reason 模板逐字保留**，档位按 A2 之前的分类——
+          // `node --test` / `tsc --noEmit` 为 review；`npm test` / `npm run 例行脚本` / `npm ci` 为 risky。
+          const tier = /:(?:node-test|tsc-noemit)$/.test(routineRuleId) ? "review" : "risky";
+          return {
+            result: {
+              allow: false,
+              reason:
+                `su 只读档：本会话仅允许只读白名单命令；该命令未命中白名单（(c) 判为 ${tier}），` +
+                `按 su 只读策略拒绝执行——这是策略拒绝，不是环境故障。`,
+              by: byTagged,
+            },
+            conclusion: "deny",
+            branch: BRANCH_READONLY_DENY,
+          };
+        }
+      }
       // 命中 c 白名单 → 直接放行（**不产出 token**；审核与 spawn 同址于 execute，票据已废，§7.1 第 3 条）。
       return {
         result: { allow: true, by: byTagged },
         conclusion: "allow",
         branch: BRANCH_C_ALLOW,
       };
+    }
+    // —— 客户升级授权（2026-10-31 方案 v1.3 §4.1/§6.3；非 script 分支）——
+    // **仅当 `detail.decision` 为 `review`/`risky`（非 deny、非 allow）时查授权**：
+    // c=allow 不消费（上方已返回）；c=deny 不消费/不放行（下方 advisory/审批档的 `c-deny→a-*` 与
+    // 硬拒终结保持现状）。只读档不得注入/调用 takeGrant（构造期守卫 + 此处跳过，双保险）。
+    if (
+      (detail.decision === "review" || detail.decision === "risky") &&
+      opts.readonlyOnly !== true &&
+      typeof opts.takeGrant === "function"
+    ) {
+      const granted = takeGrantSafely(req, undefined);
+      if (granted === "stale") return staleOutcome(byTagged);
+      if (granted !== undefined) return grantOutcome(granted);
     }
     // —— advisory 规则集（客户 2026-10-18）：(c) 只快速放行，**不拒绝任何请求** ——
     // risky/review/deny 一律跳过 (b)、直接交 (a)；规则判定与命中原因作为 reason 交判断 agent 参考。
@@ -909,6 +1046,20 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     // 审计留痕（§7.6）：放行/拒绝都记；含所需字段与声明的条件。审计失败**不翻转**判定
     //（判定已完成且确定），但如实上报到 stderr，绝不静默。
     log.record("shell.review.end", { toolCallId: req.toolCallId, decision: outcome.conclusion, reasonCode: outcome.branch });
+    // 2026-10-31（方案 v1.3 §6.3）：审核结束回调（**最终判定后、与审计同址**）——只做记录/清理，
+    // 不改变判定；script 分支用带 approvalContext 的有效请求回调。回调异常不影响判定（如实 stderr）。
+    if (typeof opts.onReviewed === "function") {
+      try {
+        opts.onReviewed(outcome.reviewedReq ?? req, {
+          result: outcome.result,
+          conclusion: outcome.conclusion,
+          branch: outcome.branch,
+          ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
+        });
+      } catch (err) {
+        process.stderr.write(`shell 闸审核结束回调异常（不影响判定）：${reasonOf(err)}\n`);
+      }
+    }
     await audit(req, outcome, now());
     // 2026-10-29（§6.5）：最终放行后、spawn 之前拍快照（执行后由 run_shell 调 postAudit 对比）。
     if (outcome.result.allow === true && typeof opts.snapshotBefore === "function") {
@@ -935,8 +1086,22 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       by: outcome.result.by,
       conditions: [SHELL_GATE_CONDITION], // 声明 shell-gate（门禁按此放行 docs/audit/）
       execution: "未执行", // 审核发生在执行之前；exit code 由 Pi 适配器执行后另记
+      // 审核入口（2026-10-31 加法；缺省按 run_shell 兼容旧调用）。
+      entry: req.entry ?? "run_shell",
       // 判断 agent（「替我审」）自己做出的 allow/deny 才写；manual 后客户手批不带本字段。
       ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
+      // 2026-10-31：客户升级授权放行的 review 记录（**不得**与 judge 同时出现；by 以 customer: 开头）。
+      ...(outcome.customerGrant !== undefined
+        ? {
+            customerGrant: {
+              requestId: outcome.customerGrant.requestId,
+              scope: outcome.customerGrant.scope,
+              ...(outcome.customerGrant.operatorId !== undefined
+                ? { operatorId: outcome.customerGrant.operatorId }
+                : {}),
+            },
+          }
+        : {}),
     };
     try {
       const res = await opts.audit.append(record);
@@ -1026,6 +1191,12 @@ export interface ShellGateBuildDeps {
   snapshotBefore?: (req: ShellGateRequest) => Promise<void> | void;
   /** 不透明执行审查上下文加载器（见 `CreateShellGateOptions.approvalContextLoader`）。 */
   approvalContextLoader?: (req: ShellGateRequest) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
+  /** 审核结束回调（见 `CreateShellGateOptions.onReviewed`；2026-10-31 判拒升级）。 */
+  onReviewed?: (req: ShellGateRequest, outcome: ShellGateReviewedOutcome) => void;
+  /** 客户升级授权检查/消费（见 `CreateShellGateOptions.takeGrant`；readonlyOnly 下不得注入）。 */
+  takeGrant?: (req: ShellGateRequest, context?: ShellApprovalContext) => ShellGrant | "stale" | undefined;
+  /** 审计 sink 共享回调（见 `CreateShellGateOptions.onAuditSinkCreated`）。 */
+  onAuditSinkCreated?: (sink: ShellAuditSink) => void;
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -1068,6 +1239,9 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     ...(deps.writeGuard !== undefined ? { writeGuard: deps.writeGuard } : {}),
     ...(deps.snapshotBefore !== undefined ? { snapshotBefore: deps.snapshotBefore } : {}),
     ...(deps.approvalContextLoader !== undefined ? { approvalContextLoader: deps.approvalContextLoader } : {}),
+    ...(deps.onReviewed !== undefined ? { onReviewed: deps.onReviewed } : {}),
+    ...(deps.takeGrant !== undefined ? { takeGrant: deps.takeGrant } : {}),
+    ...(deps.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: deps.onAuditSinkCreated } : {}),
   });
 }
 
@@ -1093,6 +1267,38 @@ function denyOutcome(branch: string, by: string, reason: string, judge?: ShellJu
     conclusion: "deny",
     branch,
     ...(judge !== undefined ? { judge } : {}),
+  };
+}
+
+/**
+ * 2026-10-31（方案 v1.3 §6.3/§7.1）：客户升级授权放行的结论。
+ * `by = customer:<operatorId>（grant:<requestId>）`（无 operatorId 时如实用「未知操作者」）；
+ * 分支独立为 `customer-escalation:allow-once|allow-session`（不与 `a-*` 串链）；
+ * 审计写 `customerGrant`、**不写** `judge`（客户授权 ≠ judge 放行）。
+ */
+function grantOutcome(grant: ShellGrant): ReviewOutcome {
+  const operator = grant.operatorId !== undefined && grant.operatorId !== "" ? grant.operatorId : "未知操作者";
+  return {
+    result: { allow: true, by: `customer:${operator}（grant:${grant.requestId}）`, grant },
+    conclusion: "allow",
+    branch:
+      grant.scope === "once" ? BRANCH_CUSTOMER_ESCALATION_ALLOW_ONCE : BRANCH_CUSTOMER_ESCALATION_ALLOW_SESSION,
+    customerGrant: grant,
+  };
+}
+
+/** 脚本上下文在判拒后变化/不可读：授权作废并拒绝（方案 §4.4/AC-07；记录转终态由 registry 负责）。 */
+function staleOutcome(byTagged: string): ReviewOutcome {
+  return {
+    result: {
+      allow: false,
+      reason:
+        "客户升级授权已失效：脚本上下文在判拒后发生变化或不可读（customer-escalation:stale-context）。" +
+        "授权已作废，本会话不再受理同一命令的申请；命令未执行。",
+      by: `${byTagged} → customer-escalation:stale-context`,
+    },
+    conclusion: "deny",
+    branch: BRANCH_CUSTOMER_ESCALATION_STALE,
   };
 }
 

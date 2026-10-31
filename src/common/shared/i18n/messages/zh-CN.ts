@@ -386,6 +386,30 @@ export const zhCN = {
     "图片类型不支持：{type}——只支持 png / jpeg / webp / gif。",
   "ui.confirm.imageTooLarge": "图片过大（> {mb}MB）——请压缩后再发。",
 
+  // ---- 升级卡：shell 判拒后的客户确认（方案 2026-10-31 §4.6/§7.3；A3 key 契约）----
+  "ui.confirm.escalation.title": "客户确认：是否放行被 judge 判拒的 shell 命令",
+  "ui.confirm.escalation.intro":
+    "自动代理未放行这条命令，角色申请由你亲自决定。决定只对这一条精确命令（同 cwd、同参数）生效，不会扩展到其它命令。",
+  "ui.confirm.escalation.judgeHeader": "── judge 判拒说明 ──",
+  "ui.confirm.escalation.necessityHeader": "── 角色必要性说明 ──",
+  "ui.confirm.escalation.necessityNote": "由角色提供，未经验证",
+  // 脚本上下文摘要（E2 R1；judge 判拒时所依据的有界上下文）
+  "ui.confirm.escalation.contextHeader": "脚本上下文（judge 判拒时所依据）",
+  "ui.confirm.escalation.contextPath": "脚本：{path}",
+  "ui.confirm.escalation.contextNpmScript": "npm 脚本：{name}",
+  "ui.confirm.escalation.contextSha": "sha256：{sha}",
+  "ui.confirm.escalation.contextNote": "说明：{note}",
+  "ui.confirm.escalation.allowOnce": "允许一次",
+  "ui.confirm.escalation.allowSession": "本会话允许该精确命令",
+  "ui.confirm.escalation.reject": "拒绝",
+  "ui.confirm.escalation.note":
+    "无答复、超时或关闭窗口 = 拒绝；同一命令每会话只能申请一次。授权仅对该精确命令（同 cwd、同参数）有效，不跨角色、不跨项目，会话结束或应用重启后失效。",
+  "ui.confirm.escalation.expired":
+    "此升级申请已失效（超时或窗口已关闭），未获允许，命令未执行；本会话不再受理同一命令的申请。",
+  "ui.confirm.escalation.customerNotJudge":
+    "客户手批 ≠ judge 放行：本次由你亲自决定，不改变判断代理对该命令的判拒结论，也不会由自动代理代批。",
+  "ui.confirm.escalation.pauseSession": "暂停本次运行自动审批",
+
   // ---- 设置面板（shell/SettingsPanel.tsx + chat/runtime-config.ts）----
   "ui.settings.placeholderSet": "已设置，留空则不修改",
   "ui.settings.hide": "隐藏",
@@ -957,7 +981,7 @@ export const zhCN = {
   "ui.judge.hardDenyLabel": "deny 档 · judge 放行",
   "ui.judge.engineText": "判断引擎：{engine}",
   "ui.judge.closeAndRetry":
-    "可关闭「替我审批」后重试（改为手动确认），或按替代方案调整命令。",
+    "可让角色申请客户确认（允许一次 / 本会话允许该命令 / 拒绝），或关闭「替我审批」后重试（改为手动确认）。",
   "ui.judge.headline.acceptProposal": "接受提案（{selected}）",
   "ui.judge.headline.acceptance": "验收通过（{selected}）",
   "ui.judge.headline.appointment": "任命 {selected}",
@@ -982,6 +1006,12 @@ export const zhCN = {
   "ui.judge.recovery.rebuildNote": "重建该角色会话（保留 ANS 回放）；目标正忙时不会执行。",
   "ui.judge.recovery.redeliver": "重新投递",
   "ui.judge.recovery.redeliverNote": "触发该角色投递队列立即重试。",
+  // 暂停本次运行自动审批（shell-only；重启清零、不写偏好；方案 2026-10-31 §4.6）
+  "ui.judge.pauseSession": "本次运行暂停自动审批",
+  "ui.judge.pauseSessionDone":
+    "已暂停本次运行的 shell 自动审批（不影响提案/任命/验收的替我决策）：新的 shell 请求将逐条由你确认；重启后清零并回到持久化开关值。",
+  "ui.judge.pausedBadge": "本次运行已暂停自动审批（重启后清零、回到持久化开关值）",
+  "ui.judge.resume": "恢复自动审批",
 
   // ---- 渲染层 store（stores/*.ts）----
   "ui.drawerStore.noSourceRole": "无法确定来源角色，暂不能列出来源文档。",
@@ -1606,6 +1636,8 @@ export const zhCN = {
   "main.operator.manualDenyAdvice.aborted": "本轮已中止，命令未执行；如仍需执行请重新发起。",
   "main.operator.manualDenyAdvice.switchOff": "请关闭「替我审批」后手动确认。",
   "main.operator.manualDenyAdvice.retry": "请重试，如持续失败请关闭「替我审批」后手动确认。",
+  "main.operator.manualDenyAdvice.retryCapped":
+    "如确属推进必需，可调用 request_shell_escalation 对这条精确命令申请客户确认（每会话一次）；或关闭「替我审批」后重试。",
   "main.operator.judgeResultDeliveryFailed":
     "审查结果投达失败，无法在聊天中显示判断结论，已拒绝；{detail}。",
   "main.operator.judgeRowFailedManual":
@@ -1621,7 +1653,8 @@ export const zhCN = {
   "main.operator.judgeExplainToCustomer": "请向客户说明：{message}",
   "main.operator.judgeReasonLine": "原因：{reason}",
   "main.operator.judgeAlternative": "替代方案（{kind}）：{value}",
-  "main.operator.judgeWayOut": "出路：如需执行，请关闭「替我审批」后重试。",
+  "main.operator.judgeWayOut":
+    "出路：如确属推进必需，可调用 request_shell_escalation 对这条精确命令申请客户确认（每会话一次）；或关闭「替我审批」后重试。",
   "main.operator.judgeWillRun": "它会在项目里执行：{word}",
   "main.operator.shellReview.title": "受治理 shell 审核 · 操作者确认（第三闸 a）",
   "main.operator.shellReview.intro": "这是一条需要在执行前由你**亲自确认**的 shell 命令（pm 模型审读拿不准/不可用，故升级到你）。",
@@ -1647,6 +1680,24 @@ export const zhCN = {
   "main.operator.expiredStopped": "本轮已结束、停止或会话已重建，旧 shell 确认失效。",
   "main.operator.judgeTimeoutError": "判断超时（{ms}ms）：未在时限内得到判断结论。",
   "main.operator.confirmTimeoutError": "操作者确认超时（{ms}ms）：未在时限内得到操作者选择。",
+
+  // ---- 客户升级申请（request_shell_escalation 回执；方案 2026-10-31 §4.3/§7.3）----
+  "main.operator.escalation.appliedOnce":
+    "客户已允许这一次：仅此一次，请原样重试该命令（同 cwd、同参数）；执行一次后授权失效。",
+  "main.operator.escalation.appliedSession":
+    "客户已允许本会话执行该精确命令：同 cwd、同参数的该命令在本会话内可直接执行；会话结束或应用重启后失效。",
+  "main.operator.escalation.denied":
+    "客户拒绝了本次申请：未获允许，命令未执行；本会话不再受理同一命令的申请。",
+  "main.operator.escalation.expired":
+    "升级申请超时或确认通道不可用，按未获客户允许处理（fail-closed），命令未执行；本会话不再受理同一命令的申请。",
+  "main.operator.escalation.ineligible":
+    "没有可申请的判拒记录：仅判断代理主动判拒（非硬拒档）或 retry-capped 的精确命令可申请客户确认。",
+  "main.operator.escalation.pending":
+    "当前已有待答复的升级申请或 shell 确认卡，请稍后再申请（不排队）。",
+  "main.operator.escalation.capped":
+    "本角色会话的升级申请次数已达上限，不再受理新的申请。",
+  "main.operator.escalation.invalid":
+    "申请无效：只能对已记录判拒的精确命令（run_shell 入口，参数与判拒原文一致）发起申请。",
 
   // ---- 判断原因（customer-input.ts / judge-reason.ts）----
   "main.customerInput.judgeDecisionHead": "judge 代批 · 代决策：接受提案（accept）",

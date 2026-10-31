@@ -16,6 +16,31 @@ export interface DesktopWindowControls {
   onMaximizedChanged: (callback: (maximized: boolean) => void) => () => void;
 }
 
+/** 「替我审批」shell 开关状态载荷（`shell:judge-get` / `shell:judge-state`；2026-10-31 加法 `paused`）。 */
+export interface ShellJudgeState {
+  version: 1;
+  ok?: boolean;
+  enabled?: boolean;
+  available?: boolean;
+  /**
+   * 「本次运行暂停自动审批」（2026-10-31 判拒升级方案 §4.6/§7.2）：shell-only、应用运行期、
+   * 不写偏好、不影响治理 approval 组。旧主进程缺省该字段 ⇒ 渲染侧视为能力/状态未报告，不假造。
+   */
+  paused?: boolean;
+  error?: string;
+}
+
+/** 暂停/恢复回执（`shell:judge-pause`）；`ok:false` 时 `paused` 仍为当前真实状态。 */
+export interface ShellJudgePauseReply {
+  version: 1;
+  ok: boolean;
+  paused: boolean;
+  error?: string;
+}
+
+/** 升级卡三选一动作（C1 冻结；渲染侧不能增删或伪造）。 */
+export type ShellEscalationAction = "allow-once" | "allow-session" | "deny";
+
 /** preload 暴露面的本阶段子集；方法逐个探测，不假定整体存在。 */
 export interface DesktopBridge {
   minimizeWindow?: DesktopWindowControls["minimizeWindow"];
@@ -88,11 +113,25 @@ export interface DesktopBridge {
   // —— Phase 3B 确认卡与双开关（定义/实现属桌面窗口；这里只按名消费）——
   onShellConfirm?: (callback: (payload: unknown) => void) => () => void;
   shellConfirmRespond?: (input: unknown) => Promise<unknown>;
+  /**
+   * 升级卡回包（`{kind:"escalation", id, action}`；2026-10-31 判拒升级方案 §7.2）。
+   * 旧主进程/preload 缺省该方法 ⇒ 升级能力禁用并给出说明，绝不假造回执。
+   */
+  shellEscalationRespond?: (input: {
+    kind?: "escalation";
+    id: string;
+    action: ShellEscalationAction | string;
+  }) => Promise<unknown>;
   onRecoveryConfirm?: (callback: (payload: unknown) => void) => () => void;
   recoveryConfirmRespond?: (input: unknown) => Promise<unknown>;
-  getShellJudgeState?: () => Promise<unknown>;
+  getShellJudgeState?: () => Promise<ShellJudgeState>;
   setShellJudgeEnabled?: (enabled: boolean) => Promise<unknown>;
-  onShellJudgeState?: (callback: (payload: unknown) => void) => () => void;
+  /**
+   * 「本次运行暂停自动审批」（`{paused:boolean}` → `{version:1, ok, paused, error?}`）。
+   * 旧主进程/preload 缺省该方法 ⇒ 能力禁用并给出说明（不显示假暂停态）。
+   */
+  setShellJudgePaused?: (paused: boolean) => Promise<unknown>;
+  onShellJudgeState?: (callback: (payload: ShellJudgeState) => void) => () => void;
   onShellJudgeResult?: (callback: (payload: unknown) => void) => () => void;
   getDecisionJudgeState?: () => Promise<unknown>;
   setDecisionJudgeEnabled?: (enabled: boolean) => Promise<unknown>;

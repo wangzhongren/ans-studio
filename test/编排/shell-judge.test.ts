@@ -36,6 +36,7 @@ import {
   redactJudgeText,
   SHELL_JUDGE_EXIT_LINE,
   synthesizeCustomerMessage,
+  withSynthesizedExitLine,
 } from "../../src/common/编排/shell-judge-verdict.ts";
 import {
   buildShellJudgePrompt,
@@ -747,9 +748,21 @@ test("buildShellJudgePrompt：只放本次数据，不复述历史；turnText �
   assert.doesNotMatch(text, /历史/);
 });
 
-test("客户出路句：双开关后统一指「替我审批」（不再写「替我审」）", () => {
-  assert.equal(SHELL_JUDGE_EXIT_LINE, "如需执行，请关闭「替我审批」后重试。");
+test("客户出路句：判拒后可申请客户确认，保留「关闭替我审批」兜底（旧/新表述兼容）", () => {
+  // 2026-10-31（shell 判拒升级方案 v1.3 §4.6）：出路升级为「对这条精确命令申请客户确认」，
+  // 同时保留「关闭『替我审批』后重试」兜底；三个兼容词必须仍在。
+  assert.equal(
+    SHELL_JUDGE_EXIT_LINE,
+    "如确属推进必需，可调用 request_shell_escalation 对这条精确命令申请客户确认（每会话一次）；或关闭「替我审批」后重试。",
+  );
+  for (const token of ["关闭", "替我审批", "重试", "request_shell_escalation", "每会话一次"]) {
+    assert.ok(SHELL_JUDGE_EXIT_LINE.includes(token), `出路句应含「${token}」`);
+  }
   const synthesized = synthesizeCustomerMessage({ verdict: "deny", reason: "当前不必要" });
   assert.ok(synthesized.includes(SHELL_JUDGE_EXIT_LINE));
   assert.ok(synthesized.includes("替我审批"));
+  // containsExitLine 兼容旧表述与新表述：已含出路（任一形态）时**不重复追加**。
+  const oldExit = "如需执行，请关闭「替我审批」后重试。";
+  assert.equal(withSynthesizedExitLine(oldExit), oldExit, "旧表述仍被识别为已含出路");
+  assert.equal(withSynthesizedExitLine(SHELL_JUDGE_EXIT_LINE), SHELL_JUDGE_EXIT_LINE, "新表述不重复追加");
 });

@@ -1,5 +1,5 @@
 /**
- * 确认卡族（Phase 3B）：shell 命令确认 / su 命令审批 / 恢复确认。
+ * 确认卡族（Phase 3B）：shell 命令确认 / su 命令审批 / 恢复确认 / 判拒升级卡。
  *
  * fail-closed 纪律（沿旧渲染器与 UIUX 规范 §10.8）：
  * - 命令/证据逐字 `<pre>`（无 HTML 注入口）；默认焦点在「拒绝 / 取消」；
@@ -7,20 +7,30 @@
  * - 等待不设限、零忙碌动效；本轮 settled 或失效回执后收起旧卡，不保留全禁用「已失效」卡；
  * - 恢复卡失效/通道异常原地定格（动作禁用、如实提示），绝不呈现为已执行。
  *
- * 元素常驻 DOM（`hidden` 切换）以保持 `#shell-confirm/#recovery-confirm/#rc-details` 契约。
+ * 2026-10-31（判拒升级方案 v1.3 §4.6/§7.1/§7.2）：同一 `shell:confirm-request` 通道新增
+ * **升级卡**（`kind:"escalation"`）——命令原文、argv、cwd、judge 判拒说明、角色必要性
+ * （不可信文本，独立区块 + 固定标注）与三选一动作（允许一次 / 本会话允许该精确命令 / 拒绝）。
+ * 单槽呈现：升级卡排他；审批卡由主进程等待（渲染侧按 kind 路由，互不覆盖）。页脚
+ * 「暂停本次运行自动审批」只触发 shell-only 暂停，**不是第四决定项**。
+ *
+ * 元素常驻 DOM（`hidden` 切换）以保持 `#shell-confirm/#shell-escalation/#recovery-confirm/#rc-details` 契约。
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 import { ChevronRight, ShieldAlert, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/chat/chat-store";
 import {
+  judgePauseState,
   recoveryActionView,
   recoveryTimeText,
+  shellConfirmKind,
   shellConfirmTitle,
+  shellEscalationView,
   suApprovalTierLabel,
 } from "@/chat/judge";
+import { requestJudgePause, useJudgePauseSnapshot } from "@/chat/judge-row-view";
 import { governanceView } from "@/chat/role-view";
 import type { ConfirmCardRecord } from "@/chat/confirm-logic";
 import { useConfirmStore } from "@/stores/confirm-store";
@@ -62,14 +72,12 @@ function recoveryRoleName(roleId: string, locale: Locale): string {
   return gov ? gov.name : role.roleId;
 }
 
-function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
-  const t = useT();
-  const locale = useLocaleState((s) => s.locale);
-  const respond = useConfirmStore((s) => s.respondShell);
-  const denyRef = useRef<HTMLButtonElement>(null);
-  const lastId = useRef<string>("");
-  const restoreRef = useRef<HTMLElement | null>(null);
-
+function useCardFocus(
+  card: ConfirmCardRecord | null,
+  denyRef: RefObject<HTMLButtonElement | null>,
+  lastId: MutableRefObject<string>,
+  restoreRef: MutableRefObject<HTMLElement | null>,
+): void {
   useEffect(() => {
     if (card && card.id !== lastId.current) {
       if (!lastId.current && document.activeElement instanceof HTMLElement) {
@@ -84,7 +92,17 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
       restoreRef.current = null;
       if (previous && previous.isConnected) previous.focus({ preventScroll: true });
     }
-  }, [card]);
+  }, [card, denyRef, lastId, restoreRef]);
+}
+
+function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
+  const respond = useConfirmStore((s) => s.respondShell);
+  const denyRef = useRef<HTMLButtonElement>(null);
+  const lastId = useRef<string>("");
+  const restoreRef = useRef<HTMLElement | null>(null);
+  useCardFocus(card, denyRef, lastId, restoreRef);
 
   const payload = card ? asRecord(card.payload) : {};
   const suApproval = payload.policy === "su-approval";
@@ -242,6 +260,261 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
   );
 }
 
+/**
+ * 判拒升级卡（2026-10-31 判拒升级方案 v1.3 §4.6/§7.1/§7.2）。
+ *
+ * 卡面事实全部取自主进程载荷：命令**逐字原文**（判拒记录，不取模型本次输入）、argv 行、
+ * cwd、judge 判拒理由/客户说明/替代方案；角色的 `necessity` 是不可信文本——单独区块
+ * 原样展示，并显示应用生成的「由角色提供，未经验证」标注，绝不作为标题/选项来源。
+ * 三选一动作固定；关闭（×）/Esc = 拒绝（fail-closed）。页脚暂停只是 shell-only 的
+ * 临时覆盖（不是第四决定项）。
+ */
+function ShellEscalationCard({ card }: { card: ConfirmCardRecord | null }) {
+  const t = useT();
+  const locale = useLocaleState((s) => s.locale);
+  const respond = useConfirmStore((s) => s.respondEscalation);
+  const pauseSnapshot = useJudgePauseSnapshot();
+  const pause = judgePauseState(pauseSnapshot);
+  const denyRef = useRef<HTMLButtonElement>(null);
+  const lastId = useRef<string>("");
+  const restoreRef = useRef<HTMLElement | null>(null);
+  useCardFocus(card, denyRef, lastId, restoreRef);
+
+  const view = card ? shellEscalationView(card.payload, locale) : null;
+  const busy = card?.busy === true;
+  const judgeReported =
+    !!view &&
+    (view.judgeReasonLine !== "" ||
+      view.judgeAlternative !== "" ||
+      view.judgeCustomerMessage !== "");
+  const pauseError = pauseSnapshot.error || t("ui.judge.toggleFailed");
+
+  return (
+    <div
+      id="shell-escalation"
+      className="sc-overlay is-escalation"
+      hidden={!card}
+    >
+      {card && view ? (
+        <div
+          className="sc-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="se-title"
+          data-request-id={card.id}
+          data-kind="escalation"
+        >
+          <div className="sc-head">
+            <div className="flex min-w-0 items-center gap-2">
+              <ShieldAlert
+                size={20}
+                strokeWidth={1.75}
+                className="text-warning"
+                aria-hidden="true"
+              />
+              <span id="se-title" className="sc-title">
+                {view.title}
+              </span>
+            </div>
+            <button
+              id="se-close"
+              type="button"
+              className="sc-close"
+              title={t("ui.confirm.closeNoApprove")}
+              aria-label={t("ui.confirm.closeNoApprove")}
+              disabled={busy}
+              onClick={() => void respond("deny")}
+            >
+              <X size={14} strokeWidth={1.5} aria-hidden="true" />
+            </button>
+          </div>
+
+          <p id="se-intro" className="sc-intro">
+            {view.intro}
+          </p>
+
+          <pre id="se-command" className="sc-command">
+            {view.command}
+          </pre>
+
+          <div id="se-judge" className="se-section" hidden={!judgeReported}>
+            <p className="se-section-title">{view.judgeHeader}</p>
+            <p id="se-judge-reason" className="sc-reason" hidden={view.judgeReasonLine === ""}>
+              {view.judgeReasonLine}
+            </p>
+            <p id="se-judge-alternative" className="sc-reason" hidden={view.judgeAlternative === ""}>
+              {view.judgeAlternative}
+            </p>
+            <p id="se-judge-customer" className="sc-reason" hidden={view.judgeCustomerMessage === ""}>
+              {view.judgeCustomerMessage}
+            </p>
+          </div>
+
+          {/* 脚本上下文摘要（E2 R1；judge 判拒时所依据的有界内容）：全部为不可信数据，
+              路径/sha256/内容原样转义展示；无 approvalContext 的旧卡不渲染本区块。 */}
+          {view.approvalContext ? (
+            <section id="se-context" className="se-section se-context">
+              <p className="se-section-title">{view.approvalContext.header}</p>
+              {view.approvalContext.noteLine ? (
+                <p id="se-context-note" className="se-context-note">
+                  {view.approvalContext.noteLine}
+                </p>
+              ) : null}
+              {view.approvalContext.npmScriptLine ? (
+                <p id="se-context-npm-script" className="se-context-npm-script">
+                  {view.approvalContext.npmScriptLine}
+                </p>
+              ) : null}
+              {view.approvalContext.scripts.map((script) => (
+                <div
+                  className="se-context-script"
+                  key={script.key}
+                  data-sha256={script.sha256}
+                  data-bytes={script.bytes}
+                >
+                  <p className="se-context-path">{script.pathLine}</p>
+                  {script.label && script.label !== script.path ? (
+                    <p className="se-context-label">{script.label}</p>
+                  ) : null}
+                  <p className="se-context-sha">{script.shaLine}</p>
+                  {script.outsideWriteWarning ? (
+                    <p className="se-context-warning">
+                      {script.outsideWriteWarning}
+                    </p>
+                  ) : null}
+                  <pre className="se-context-content" data-bytes={script.bytes}>
+                    {script.content}
+                  </pre>
+                </div>
+              ))}
+            </section>
+          ) : null}
+
+          <div id="se-necessity" className="se-section se-necessity" hidden={view.necessity === ""}>
+            <p className="se-section-title">{view.necessityHeader}</p>
+            <p id="se-necessity-note" className="se-necessity-note">
+              {view.necessityNote}
+            </p>
+            <pre id="se-necessity-text" className="se-necessity-text">
+              {view.necessity}
+            </pre>
+          </div>
+
+          <details id="se-details" className="sc-details" key={card.id}>
+            <summary>
+              <span>{t("ui.confirm.detailsArgv")}</span>
+              <ChevronRight
+                size={12}
+                strokeWidth={1.5}
+                aria-hidden="true"
+                className="disclosure-chevron"
+              />
+            </summary>
+            <div className="sc-details-body">
+              <p className="sc-kv">{t("ui.confirm.cwd")}</p>
+              <p id="se-cwd" className="sc-mono sc-wrap">
+                {view.cwd}
+              </p>
+              <p className="sc-kv">{t("ui.confirm.argv")}</p>
+              <pre id="se-argv" className="sc-mono">
+                {view.argvLines.join("\n")}
+              </pre>
+            </div>
+          </details>
+
+          <p id="se-customer-note" className="sc-hint se-customer-note">
+            {view.customerNotJudgeNote}
+          </p>
+
+          <div className="sc-actions se-actions">
+            {view.actions.map((action) =>
+              action.action === "deny" ? (
+                <Button
+                  key={action.action}
+                  id="se-reject"
+                  ref={denyRef}
+                  variant="outline"
+                  className="confirm-default-focus min-w-[88px]"
+                  disabled={busy}
+                  onClick={() => void respond("deny")}
+                >
+                  {action.label}
+                </Button>
+              ) : (
+                <Button
+                  key={action.action}
+                  id={"se-" + action.action}
+                  variant="outline"
+                  className="min-w-[88px]"
+                  disabled={busy}
+                  onClick={() => void respond(action.action)}
+                >
+                  {action.label}
+                </Button>
+              ),
+            )}
+          </div>
+
+          <p id="se-note" className="sc-hint">
+            {view.note}
+          </p>
+
+          <div className="se-footer">
+            {pause.action === "pause" ? (
+              <button
+                id="se-pause"
+                type="button"
+                className="se-pause"
+                title={view.pauseLabel}
+                disabled={pause.busy}
+                onClick={() => void requestJudgePause(true)}
+              >
+                {view.pauseLabel}
+              </button>
+            ) : pause.action === "resume" ? (
+              <span className="se-paused-line">
+                <span id="se-paused-badge" className="se-paused-badge">
+                  {t("ui.judge.pausedBadge")}
+                </span>
+                <button
+                  id="se-resume"
+                  type="button"
+                  className="se-pause"
+                  disabled={pause.busy}
+                  onClick={() => void requestJudgePause(false)}
+                >
+                  {t("ui.judge.resume")}
+                </button>
+              </span>
+            ) : (
+              <button
+                id="se-pause"
+                type="button"
+                className="se-pause"
+                title={t("ui.judge.bridgeMissing")}
+                disabled
+              >
+                {view.pauseLabel}
+              </button>
+            )}
+            {pause.action === "none" ? (
+              <span className="se-pause-note">{t("ui.judge.bridgeMissing")}</span>
+            ) : null}
+            {pause.justPaused ? (
+              <span className="se-pause-note is-done">
+                {t("ui.judge.pauseSessionDone")}
+              </span>
+            ) : null}
+            {pause.failed ? (
+              <span className="se-pause-note is-error">{pauseError}</span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
@@ -250,22 +523,7 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
   const denyRef = useRef<HTMLButtonElement>(null);
   const lastId = useRef<string>("");
   const restoreRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (card && card.id !== lastId.current) {
-      if (!lastId.current && document.activeElement instanceof HTMLElement) {
-        restoreRef.current = document.activeElement;
-      }
-      lastId.current = card.id;
-      denyRef.current?.focus();
-    }
-    if (!card) {
-      lastId.current = "";
-      const previous = restoreRef.current;
-      restoreRef.current = null;
-      if (previous && previous.isConnected) previous.focus({ preventScroll: true });
-    }
-  }, [card]);
+  useCardFocus(card, denyRef, lastId, restoreRef);
 
   const payload = card ? asRecord(card.payload) : {};
   const action = asString(payload.action);
@@ -402,13 +660,21 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
 }
 
 export function ConfirmCard() {
-  const shellConfirm = useConfirmStore((s) => s.shellConfirm);
+  const shellCard = useConfirmStore((s) => s.shellConfirm);
   const recoveryConfirm = useConfirmStore((s) => s.recoveryConfirm);
   const respondShell = useConfirmStore((s) => s.respondShell);
+  const respondEscalation = useConfirmStore((s) => s.respondEscalation);
   const respondRecovery = useConfirmStore((s) => s.respondRecovery);
 
+  // 单槽呈现：升级卡排他；审批卡由主进程等待（store 按 kind 守卫，渲染按 kind 路由）。
+  const escalationCard =
+    shellCard && shellConfirmKind(shellCard.payload) === "escalation"
+      ? shellCard
+      : null;
+  const approvalCard = escalationCard ? null : shellCard;
+
   useEffect(() => {
-    if (!shellConfirm && !recoveryConfirm) return;
+    if (!shellCard && !recoveryConfirm) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         // 两卡同开时 Esc 先答上层（recovery）；两者 Esc 都 = 否决（fail-closed）。
@@ -417,7 +683,12 @@ export function ConfirmCard() {
           void respondRecovery(false);
           return;
         }
-        if (shellConfirm) {
+        if (escalationCard) {
+          event.preventDefault();
+          void respondEscalation("deny");
+          return;
+        }
+        if (approvalCard) {
           event.preventDefault();
           void respondShell(false);
         }
@@ -425,7 +696,11 @@ export function ConfirmCard() {
       }
       if (event.key !== "Tab") return;
       const overlay = document.getElementById(
-        recoveryConfirm ? "recovery-confirm" : "shell-confirm",
+        recoveryConfirm
+          ? "recovery-confirm"
+          : escalationCard
+            ? "shell-escalation"
+            : "shell-confirm",
       );
       const card = overlay?.querySelector<HTMLElement>(".sc-card") || null;
       if (!card) return;
@@ -446,11 +721,20 @@ export function ConfirmCard() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [shellConfirm, recoveryConfirm, respondShell, respondRecovery]);
+  }, [
+    shellCard,
+    escalationCard,
+    approvalCard,
+    recoveryConfirm,
+    respondShell,
+    respondEscalation,
+    respondRecovery,
+  ]);
 
   return (
     <>
-      <ShellConfirmCard card={shellConfirm} />
+      <ShellConfirmCard card={approvalCard} />
+      <ShellEscalationCard card={escalationCard} />
       <RecoveryConfirmCard card={recoveryConfirm} />
     </>
   );

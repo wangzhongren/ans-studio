@@ -102,7 +102,7 @@ function projectEntry(path: string, kind: BoundaryEntry["kind"], purpose: string
  * 拒绝或需确认；拒绝/超时/不可用不放行。
  */
 const SHELL_APPROVAL_CARD_LINE =
-  "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界：Section 1 边界内的写入是预授权，直接用 `write_file` / `edit_file`（不逐次 `request_confirmation`），边界外与治理敏感写入仍按本卡与既有规则拒绝或需确认。拒绝、超时、通道不可用一律不放行。";
+  "shell 审批档——只读白名单直接执行，其余（含读写与任意命令）逐条提交客户/判断 agent 审批；审批不改变你的职责与写边界：Section 1 边界内的写入是预授权，直接用 `write_file` / `edit_file`（不逐次 `request_confirmation`），边界外与治理敏感写入仍按本卡与既有规则拒绝或需确认。拒绝、超时、通道不可用一律不放行。判拒后可申请客户确认（每会话一次）。";
 
 /**
  * 写入预授权总则（客户 2026-10-25 新规则，原文：「写自己角色权限内的路径，直接放行。」；

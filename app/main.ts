@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from "electron";
 
-import { createDesktopInterface, createShellJudgeSwitch, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
+import { createDesktopInterface, createShellJudgeSwitch, createShellSessionPauseState, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
 // P2（2026-10-30）：网络状态监听——主进程 `net.isOnline` 权威 + powerMonitor 提示；状态经 IPC 推渲染层，
 // 同时经 Interface 传入 SessionManager（离线队列保留）与运行时（请求 deadline 暂停/恢复）。
 // 纯逻辑在 `desktop/network-monitor.ts`（可注入 probe/clock；本文件只接 Electron 事件与 IPC）。
@@ -59,6 +59,11 @@ import type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./des
 // `recovery:confirm-request` 推给渲染侧（桌面UI 已落树消费面）、回包经 `recovery:confirm-response` 受理；
 // **恰 allow:true 才是执行请求**；关窗 `rejectAllPending` = 未获执行（fail-closed）。**等待不设限**（裁定 4）。
 import { createRecoveryConfirmPresenter } from "./desktop/recovery-channel.ts";
+// 2026-10-31（shell 判拒客户升级方案 v1.3 §6.1/§7.2）：升级卡呈现端与共享呈现槽——与 shell 审批卡
+// **同一 `shell:confirm-*` 通道**（新卡片类型 `kind:"escalation"`）；升级卡排他、审批卡等待的正常仲裁由
+// `confirm-card.ts` 的共享槽实现，本文件只按窗口装配并路由回包。
+import { createConfirmCardSlot } from "./desktop/confirm-card.ts";
+import { createShellEscalationPresenter, isShellEscalationResponse } from "./desktop/shell-escalation.ts";
 // 运行时历史：Pipeline 按 project/role/runtime 读 ANS 回放，转换为界面行。
 // 只有 Pi 无 ANS 回放时保留旧 JSONL 展示 fallback；历史不证明模型上下文恢复。
 import { RUNTIME_KINDS, type RuntimeKind } from "../src/common/shared/runtime-shared.ts";
@@ -85,6 +90,15 @@ let preferencesPath: string | undefined;
 // 2026-10-29 客户缺陷修复：两个判断开关的启动持久值（whenReady 读盘后填充；缺省均关闭）。
 // 渲染重载（`loadInterface`）**不再复位**——主进程内存中的当前值跨重载保持；只有新启动从这里取初值。
 let initialJudgeSwitches: JudgeSwitchesPreference = DEFAULT_JUDGE_SWITCHES;
+/**
+ * 「本次运行暂停自动审批」（2026-10-31 shell 判拒升级方案 v1.3 §4.6/§6.5(e)/§7.2）。
+ *
+ * **状态本体在模块级**：同一次应用运行内**跨窗口重开保留**（macOS `activate` 重建窗口时仍是同一实例）；
+ * 应用重启时模块重新初始化 ⇒ **清零**并回到持久化开关值。**不写偏好、不持久化**。
+ * **只作用于 shell 操作者通道**（有效 `isEnabled = shellJudgeSwitch.isEnabled() && !paused`）：
+ * 不改持久化开关值、**不影响治理 approval 组**（客户交互通道的判断组仍只看全局开关）。
+ */
+const shellSessionPaused = createShellSessionPauseState();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 5B：唯一生产入口 = Vite 构建产物 `renderer/dist/index.html`（PM §17.1）。
@@ -333,7 +347,13 @@ function registerIpc(win: BrowserWindow): void {
   // —————— Phase 5A（PM §17.3）：入口解析 + dev server 一次性回退 ——————
   // 每窗口状态：dev 失败一次后本窗口不再等待 dev server；重启应用重新允许。
   const pushShellJudgeState = (): void => {
-    if (!win.isDestroyed()) win.webContents.send("shell:judge-state", { ...shellJudgeSwitch.get(), available: true });
+    if (!win.isDestroyed())
+      win.webContents.send("shell:judge-state", {
+        ...shellJudgeSwitch.get(),
+        available: true,
+        // 2026-10-31（判拒升级方案 §7.2）：可选加法——shell-only 的「本次运行暂停」状态。
+        paused: shellSessionPaused.isPaused(),
+      });
   };
   const pushDecisionJudgeState = (): void => {
     if (!win.isDestroyed()) win.webContents.send("decision:judge-state", { ...decisionJudgeSwitch.get(), available: true });
@@ -558,33 +578,81 @@ function registerIpc(win: BrowserWindow): void {
   // 数据面（命令逐字原文 + 人话摘要/原因 + 折叠详情）经 `shell:confirm-request` 推给渲染侧；客户决定经
   // `shell:confirm-response` 回传（**恰 allow:true 才放行**；Esc/关闭/超时 → 不放行）。
   // fail-closed：窗口已关时推达抛错 ⇒ 通道归 unavailable（绝不当「没人问就放行」）；关窗 ⇒ 全部挂起不放行。
+  // 2026-10-31（判拒升级方案 v1.3 §7.2）：**每窗口**共享呈现槽——shell 审批卡与升级卡跨类型仲裁：
+  // 升级卡排他（待答时新审批卡在主进程等待、不推达渲染），有审批卡待答时升级申请直接拒绝（不排队）。
+  // 恢复卡不配置该槽（「等待客户不设限」语义逐字不变）。
+  const shellCardSlot = createConfirmCardSlot();
   const shellConfirm = createShellConfirmPresenter({
     onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
     present: (request) => {
       if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现 shell 确认请求");
       win.webContents.send("shell:confirm-request", request);
     },
+    slot: shellCardSlot,
   });
   win.on("closed", () => shellConfirm.rejectAllPending("窗口已关闭，未获放行（fail-closed）"));
+  // 2026-10-31（判拒升级方案 v1.3 §6.1/§7.2）：升级卡呈现端——同一 `shell:confirm-request` 通道、
+  // `kind:"escalation"`；客户三选一由渲染侧经 `shellEscalationRespond` 回包（main 的
+  // `shell:confirm-response` 按 kind/action 路由）。**升级卡不调用 judge、不读「替我决策」**。
+  const shellEscalation = createShellEscalationPresenter({
+    onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
+    present: (request) => {
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现 shell 升级请求");
+      win.webContents.send("shell:confirm-request", request);
+    },
+    slot: shellCardSlot,
+    operatorId: desktopOperatorId(),
+  });
+  win.on("closed", () => shellEscalation.rejectAllPending("窗口已关闭，未获允许（fail-closed）"));
 
   // F-4-opt1（2026-10-16 客户批准）：窗口重新获得焦点/重新显示（最小化还原、被遮挡后回到前台）时**幂等重推**
   // 未决确认卡——若某次推达在渲染侧丢失，操作者一回到窗口即可再收到（复用既有幂等重推，与
   // `app:recovery-ready` 同款；只重推**仍挂起**的项——过期/已决项绝无放行语义，重推不改变任何判定）。
-  win.on("focus", () => { shellConfirm.replayPending(); });
-  win.on("show", () => { shellConfirm.replayPending(); });
+  win.on("focus", () => { shellConfirm.replayPending(); shellEscalation.replayPending(); });
+  win.on("show", () => { shellConfirm.replayPending(); shellEscalation.replayPending(); });
   registerHandler("app:recovery-ready", (event) => {
     if (event.sender !== win.webContents) return { ok: false };
     customerChannel.replayPending();
     shellConfirm.replayPending();
+    shellEscalation.replayPending();
     return { ok: true };
   });
-  registerHandler("shell:confirm-response", (_e, input) => shellConfirm.respond(input));
+  // 2026-10-31（判拒升级方案 v1.3 §7.2）：`shell:confirm-response` 同时承载两类回包——
+  // `kind:"escalation"` ⇒ 升级卡 `{id, action}`；`kind:"approval"` 或缺省 ⇒ 既有审批卡 `{id, allow}`
+  // （**逐字兼容旧渲染**：无 kind 但有 action 字段的回包按升级处理；否则走既有审批）。
+  registerHandler("shell:confirm-response", (_e, input) => {
+    if (isShellEscalationResponse(input)) return shellEscalation.respond(input);
+    return shellConfirm.respond(input);
+  });
   // —————— 「替我审」IPC（2026-10-17；PM 评审 §6.6，通道名钉死） ——————
   // 两个 handler 内**各自**校验 `event.sender === win.webContents`（不依赖通用 registrar）。
   // `shell:judge-state/result` 为**主→渲染**推送，无入站 handler。
   registerHandler("shell:judge-get", (event) => {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) return { version: 1, ok: false, error: "请求来源无效。" };
-    return desktop.getShellJudgeState();
+    // 2026-10-31（判拒升级方案 §7.2）：读取接口附加 shell-only 的「本次运行暂停」真实状态。
+    return { ...desktop.getShellJudgeState(), paused: shellSessionPaused.isPaused() };
+  });
+  // 2026-10-31（判拒升级方案 v1.3 §4.6/§6.5(e)/§7.2）：**「本次运行暂停自动审批」**——
+  // 独立状态（模块级 `shellSessionPaused`），**只影响 shell 操作者通道**的 `isEnabled()`：
+  // 不写偏好、不改持久化开关、不影响治理 approval 组；sender 校验沿用既有 `shell:judge-*` 模式。
+  registerHandler("shell:judge-pause", (event, input) => {
+    if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
+      shellJudgeLog.record("shell-judge.pause.rejected", { reason: "sender-mismatch" });
+      return { version: 1, ok: false, paused: shellSessionPaused.isPaused(), error: "请求来源无效。" };
+    }
+    const result = shellSessionPaused.set(input);
+    if (result.ok === true) {
+      shellJudgeLog.record("shell-judge.paused", {
+        paused: result.paused,
+        source: "renderer",
+        at: new Date().toISOString(),
+      });
+      // 只影响之后新到的 shell 请求；推送让渲染侧以主进程状态为准。
+      pushShellJudgeState();
+    } else {
+      shellJudgeLog.record("shell-judge.pause.rejected", { reason: result.error ?? "invalid-request" });
+    }
+    return result;
   });
   registerHandler("shell:judge-set", async (event, input) => {
     if (!isShellJudgeIpcSender(event.sender, win.webContents)) {
@@ -643,7 +711,10 @@ function registerIpc(win: BrowserWindow): void {
   const shellOperatorChannel =
     shellArming !== undefined
       ? buildDesktopOperatorChannel(shellConfirm.presenter, {
-          isEnabled: () => shellJudgeSwitch.isEnabled(),
+          // 2026-10-31（判拒升级方案 §4.6）：**有效值 = 持久化开关 && !本次运行暂停**。
+          // 暂停是 shell-only 的临时覆盖：不动持久化开关，也不影响治理 approval 组（后者在
+          // `customerChannel` 的 `isGroupEnabled` 里仍只读 `shellJudgeSwitch`）。
+          isEnabled: () => shellJudgeSwitch.isEnabled() && !shellSessionPaused.isPaused(),
           // 推达失败**必须抛错**：allow 的结果行是放行条件（通道据此降级 manual/row-failed）。
           emitJudgeResult: (payload) => {
             if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现判断结果");
@@ -701,7 +772,9 @@ function registerIpc(win: BrowserWindow): void {
       const merge = (m: Map<string, number>): void => { for (const [rid, n] of m) byRole.set(rid, (byRole.get(rid) ?? 0) + n); };
       merge(customerChannel.pendingRoles());
       merge(shellConfirm.pendingRoles());
-      return { total: customerChannel.pendingCount() + shellConfirm.pendingCount(), byRole };
+      // 2026-10-31（判拒升级）：等待客户答复的升级卡同样计入「正确等待」排除面。
+      merge(shellEscalation.pendingRoles());
+      return { total: customerChannel.pendingCount() + shellConfirm.pendingCount() + shellEscalation.pendingCount(), byRole };
     },
     // B-1：Markdown 链接外开——**校验在 Interface 层**（仅 http/https），此处只接系统浏览器（表现层）。
     // §17.12：同一窗口内与导航兜底共用去重闸，避免渲染侧与主进程双重外开。
@@ -719,6 +792,9 @@ function registerIpc(win: BrowserWindow): void {
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件（与 (a) 同处接线、同判据——两件同备才 arm）。
     // 同一份对象也供全部内置治理角色审批档（session.ts 对 `role.builtIn === true` 经 `shellOperatorOnly` 复用——单一来源，两档不漂移）。
     shellArming,
+    // 2026-10-31（判拒升级方案 v1.3 §6.4）：升级卡呈现端——SessionManager 每会话包装（life/turn 中止）后
+    // 交给 `openRoleSession.shellEscalationPresenter`；缺省 ⇒ 升级工具不注册。
+    shellEscalationPresenter: shellEscalation.present,
     // K-2：选图（**渲染进程不碰文件**）——系统文件选择器 + 读文件；字节交 Interface **按真实内容**校验
     // （类型嗅探/≤5MB 都在 interface 层；此处只读不判）。取消 → null（如实回 `cancelled`）。
     pickImageFileFn: async () => {

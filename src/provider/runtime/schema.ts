@@ -62,6 +62,46 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "request_shell_escalation") {
+    // 2026-10-31 客户确认方案 v1.3 §4.3/§6.3（运行时核心 A1）：判拒后的客户确认申请。
+    // 参数只有 command + 可选 necessity；argv 由工具层既有 splitCommand 生成，**模型不提供 argv**；
+    // schema 不暴露任何授权字段（授权只由应用在客户卡回包后创建）。注入才注册（注册条件在 tools.ts）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description:
+              "The exact shell command (same spelling and arguments as the denied run_shell call) for which you ask the customer to approve. Only a command that was just denied by the judge (or manual/retry-capped) is eligible. The application derives argv from this string — do not provide argv.",
+          },
+          necessity: {
+            type: "string",
+            maxLength: 500,
+            description:
+              "Optional one-line reason why this exact command is necessary (UTF-8 at most 1 KB and 500 characters). Shown to the customer as untrusted text provided by the role; over-long values are rejected, never truncated.",
+          },
+        },
+        required: ["command"],
+        additionalProperties: false,
+      },
+      description:
+        "对一条**刚被判断 agent 判拒**（或 manual/retry-capped）的精确命令申请客户确认——" +
+        "**只发起申请：不执行命令、不写盘、不创建/消费授权**。" +
+        "应用会向客户显示确认卡（命令原文、cwd、judge 判拒理由/替代方案、你提供的必要性说明并标注「由角色提供、未经验证」），" +
+        "选项只有「允许一次 / 本会话允许该精确命令 / 拒绝」；无答复或通道不可用默认拒绝。客户是唯一决定者，**申请≠批准**。" +
+        "**同一命令每角色会话最多申请一次**；角色会话申请总数有上限（默认 5 次），已有待答申请时新申请会被直接拒绝（不排队）。" +
+        "只有 `run_shell` 的 judge 判拒可申请；硬拒/确定性封堵/写目标守卫拒绝/只读档/后台启动判拒不可申请，" +
+        "工具会如实拒绝且不弹卡。本工具**不接受 argv**（应用按 command 拆分），也**没有任何授权字段**——" +
+        "不要声称已获批准。按回执如实行动：允许一次时原样重试该命令（仅此一次）；本会话允许时该精确命令可直接执行；" +
+        "拒绝/超时则未获客户允许、本会话不再受理同一命令的申请。",
+      promptGuidelines: [
+        "仅在 run_shell 被 judge 判拒（或 manual/retry-capped）后、且这条精确命令确属推进任务必要时调用；同一命令每会话最多一次。",
+        "申请≠批准：客户是唯一决定者，无答复默认拒绝；不要伪造或假设客户同意，也不要在入参里提供 argv 或任何授权字段。",
+        "按回执如实行动：allow-once 原样重试一次；allow-session 本会话该精确命令可直接执行；deny/expired 不得再申请同一命令。",
+      ],
+    };
+  }
   if (name === "list_background_tasks") {
     // 2026-10-22 B1：只读列出当前会话保留的任务摘要；不猜测已过期任务。显示规则 none。
     return {

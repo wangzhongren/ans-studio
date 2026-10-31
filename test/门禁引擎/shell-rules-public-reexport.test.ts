@@ -10,16 +10,29 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // 公开出口（被测）
-import { classifyShell, defaultShellRules } from "../../src/service/gate/shell-rules.ts";
+import { classifyShell, defaultShellRules, matchRoutineShellCommand } from "../../src/service/gate/shell-rules.ts";
 // 私有源（同源性对照）
 import * as priv from "../../src/common/门禁引擎/classify-shell.ts";
 import type { ShellClass } from "../../src/model/decision.ts";
 
 const FOUR_STATES: ShellClass[] = ["allow", "deny", "risky", "review"];
 
-test("公开再导出与私有源同源：两符号均为同一函数引用（逐字转出，非复制实现）", () => {
+test("公开再导出与私有源同源：三符号均为同一函数引用（逐字转出，非复制实现）", () => {
   assert.equal(classifyShell, priv.classifyShell, "classifyShell 必须是同一函数引用（再导出）");
   assert.equal(defaultShellRules, priv.defaultShellRules, "defaultShellRules 必须是同一函数引用（再导出）");
+  // 2026-10-31（方案 v1.3 §5.3）：例行白名单谓词经 Service 公开出口再导出——B1 委托策略的合法导入源。
+  assert.equal(
+    matchRoutineShellCommand,
+    priv.matchRoutineShellCommand,
+    "matchRoutineShellCommand 必须是同一函数引用（再导出，不复制实现/不另立规则集）",
+  );
+});
+
+test("公开出口可用冒烟：matchRoutineShellCommand 经公开入口命中 §5.1 精确形态", () => {
+  assert.deepEqual(matchRoutineShellCommand(["npm", "test"]), { id: "npm-test" });
+  assert.deepEqual(matchRoutineShellCommand(["npm", "run", "typecheck"]), { id: "npm-run-typecheck" });
+  assert.deepEqual(matchRoutineShellCommand(["node", "--test", "test/a.test.ts"]), { id: "node-test" });
+  assert.equal(matchRoutineShellCommand(["npm", "install"]), undefined);
 });
 
 test("公开入口可用冒烟：classifyShell(argv, defaultShellRules()) 恒返回四态之一，且样本覆盖多种判定", () => {

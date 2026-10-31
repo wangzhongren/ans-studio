@@ -20,13 +20,19 @@ import path from "node:path";
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
 import type { ShellGate } from "../../src/provider/pi/session.ts";
+import type { ShellApprovalContext, ShellGrant } from "../../src/model/runtime.ts";
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
+import { classifyShell as classifyShellBare, defaultShellRules } from "../../src/service/gate/shell-rules.ts";
 import { selectAdapterFactory, type AdapterFactoryBuilder } from "../../src/pipeline/orchestration/run-role.ts";
 import {
   createShellGate,
   buildShellGate,
   BRANCH_C_ALLOW,
   BRANCH_C_DENY,
+  BRANCH_CUSTOMER_ESCALATION_ALLOW_ONCE,
+  BRANCH_CUSTOMER_ESCALATION_ALLOW_SESSION,
+  BRANCH_CUSTOMER_ESCALATION_STALE,
+  BRANCH_READONLY_DENY,
   BRANCH_REVIEW_NO_BA,
   BRANCH_RULESET_LOAD_FAILED,
   BRANCH_NO_CLASSIFIER,
@@ -533,4 +539,403 @@ test("注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 
   selectAdapterFactory("pi", PID_PROJECT, { createAdapter: () => ({} as never), piFactory: probe });
   assert.ok(called);
   assert.equal(received, undefined);
+});
+
+// —————————————————————— 2026-10-31 客户升级授权（五路径顺序；方案 v1.3 §4.1/§6.3） ——————————————————————
+//
+// 覆盖：script 分支（c=deny 不消费 / 上下文重载后消费 / stale）、advisory、operatorOnly、三层链、
+// readonly（构造期守卫 + 调用点跳过）、c=allow 不消费；授权放行的审计形状（customerGrant、无 judge）。
+
+const GRANT_ONCE: ShellGrant = { scope: "once", requestId: "req-1", operatorId: "cust-1" };
+const GRANT_SESSION: ShellGrant = { scope: "session", requestId: "req-2", operatorId: "cust-2" };
+const SCRIPT_CONTEXT: ShellApprovalContext = {
+  scripts: [{ label: "脚本", content: "x", bytes: 1, sha256: "a".repeat(64) }],
+  scriptPaths: ["scripts/x.mjs"],
+  note: "有界上下文",
+};
+
+/** 构造一个带 takeGrant spy 的闸。 */
+function escalationGate(opts: {
+  classify: ClassifyShellFn;
+  grant?: ShellGrant | "stale";
+  operator?: import("../../src/provider/pi/session.ts").OperatorChannelFn;
+  rules?: ShellRules;
+  advisoryRuleset?: boolean;
+  operatorOnly?: boolean;
+  approveDeny?: boolean;
+  writeGuard?: (req: { argv: string[]; cwd: string }) => { kind: "pass" } | { kind: "script"; reason: string } | { kind: "deny"; reason: string; targets: string[] };
+  loader?: () => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
+  onReviewed?: (req: { command: string; approvalContext?: ShellApprovalContext }, outcome: unknown) => void;
+}) {
+  const audit = createMemoryAuditSink();
+  const grantCalls: Array<{ req: unknown; context?: ShellApprovalContext }> = [];
+  const gate = createShellGate({
+    classifyShell: opts.classify,
+    rules: opts.rules ?? RULES,
+    rulesId: RULES_ID,
+    audit,
+    ...(opts.operator !== undefined ? { operatorChannel: opts.operator } : {}),
+    ...(opts.advisoryRuleset === true ? { advisoryRuleset: true } : {}),
+    ...(opts.operatorOnly === true ? { operatorOnly: true, approveDeny: opts.approveDeny === true } : {}),
+    ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
+    ...(opts.loader !== undefined ? { approvalContextLoader: opts.loader } : {}),
+    ...(opts.onReviewed !== undefined ? { onReviewed: opts.onReviewed } : {}),
+    ...(opts.grant !== undefined
+      ? {
+          takeGrant: (req, context) => {
+            grantCalls.push({ req, ...(context !== undefined ? { context } : {}) });
+            return opts.grant;
+          },
+        }
+      : {}),
+  });
+  return { gate, audit, grantCalls };
+}
+
+const allowOperator: import("../../src/provider/pi/session.ts").OperatorChannelFn = () => ({
+  outcome: "allow",
+  operatorId: "cust-op",
+});
+const denyOperator: import("../../src/provider/pi/session.ts").OperatorChannelFn = () => ({
+  outcome: "deny",
+  operatorId: "cust-op",
+});
+
+test("授权顺序（script）：c=deny 硬拒不调用/不消费 takeGrant（授权不得越过硬地板）", async () => {
+  const { gate, audit, grantCalls } = escalationGate({
+    classify: () => "deny",
+    grant: GRANT_ONCE,
+    operator: allowOperator,
+    writeGuard: () => ({ kind: "script", reason: "脚本" }),
+  });
+  const r = await gate({ ...REQ, command: "sh -c evil", argv: ["sh", "-c", "evil"] });
+  assert.equal(r.allow, false);
+  assert.equal(grantCalls.length, 0, "c=deny 不消费授权");
+  assert.equal(audit.records[0].branch, BRANCH_C_DENY);
+});
+
+test("授权顺序（script）：上下文重载成功后才查授权 → 授权放行（customer-escalation:allow-once，审计 customerGrant 无 judge）", async () => {
+  const { gate, audit, grantCalls } = escalationGate({
+    classify: () => "review",
+    grant: GRANT_ONCE,
+    operator: denyOperator, // 若走了既有审批链会被拒；授权应在其之前放行。
+    writeGuard: () => ({ kind: "script", reason: "脚本" }),
+    loader: async () => ({ ok: true, context: SCRIPT_CONTEXT }),
+  });
+  const r = await gate({ command: "node scripts/x.mjs", argv: ["node", "scripts/x.mjs"], cwd: "/proj", toolCallId: "tc-script-grant" });
+  assert.equal(r.allow, true);
+  if (!r.allow) return;
+  assert.deepEqual(r.grant, GRANT_ONCE);
+  assert.equal(r.by, "customer:cust-1（grant:req-1）");
+  assert.equal(grantCalls.length, 1);
+  assert.deepEqual(grantCalls[0]!.context, SCRIPT_CONTEXT, "script 授权消费必须以重载后的上下文比对 sha256");
+  const rec = audit.records[0]!;
+  assert.equal(rec.branch, BRANCH_CUSTOMER_ESCALATION_ALLOW_ONCE);
+  assert.deepEqual(rec.customerGrant, { requestId: "req-1", scope: "once", operatorId: "cust-1" });
+  assert.equal(rec.judge, undefined, "客户授权放行不写 judge");
+  assert.match(rec.by, /^customer:cust-1（grant:req-1）$/);
+  assert.equal(rec.entry, "run_shell");
+});
+
+test("授权顺序（script）：上下文不可读 + takeGrant 返回 stale ⇒ customer-escalation:stale-context 拒绝", async () => {
+  const { gate, audit, grantCalls } = escalationGate({
+    classify: () => "review",
+    grant: "stale",
+    operator: allowOperator,
+    writeGuard: () => ({ kind: "script", reason: "脚本" }),
+    loader: async () => ({ ok: false, reason: "脚本不可读" }),
+  });
+  const r = await gate({ command: "node scripts/x.mjs", argv: ["node", "scripts/x.mjs"], cwd: "/proj", toolCallId: "tc-stale" });
+  assert.equal(r.allow, false);
+  if (r.allow) return;
+  assert.match(r.reason, /stale-context/);
+  assert.equal(grantCalls.length, 1, "加载失败时仍检查授权（以 stale 作废）");
+  assert.equal(audit.records[0].branch, BRANCH_CUSTOMER_ESCALATION_STALE);
+});
+
+test("授权顺序（script）：c=allow 分类不消费授权（也不走授权分支）", async () => {
+  const { gate, grantCalls } = escalationGate({
+    classify: () => "allow",
+    grant: GRANT_ONCE,
+    operator: allowOperator,
+    writeGuard: () => ({ kind: "script", reason: "脚本" }),
+    loader: async () => ({ ok: true, context: SCRIPT_CONTEXT }),
+  });
+  const r = await gate({ command: "node scripts/x.mjs", argv: ["node", "scripts/x.mjs"], cwd: "/proj", toolCallId: "tc-script-allow" });
+  assert.equal(r.allow, true);
+  assert.equal(grantCalls.length, 0, "c=allow 不消费一次性授权");
+});
+
+test("授权顺序（非 script）：c=allow 不消费一次性授权（授权保留给目标命令）", async () => {
+  const { gate, audit, grantCalls } = escalationGate({
+    classify: (argv) => (argv[0] === "ls" ? "allow" : "review"),
+    grant: GRANT_ONCE,
+    operator: denyOperator,
+  });
+  const r = await gate({ command: "ls", argv: ["ls"], cwd: "/proj", toolCallId: "tc-c-allow" });
+  assert.equal(r.allow, true);
+  assert.equal(audit.records[0].branch, BRANCH_C_ALLOW);
+  assert.equal(grantCalls.length, 0, "c=allow 不消费授权");
+  // 目标命令（review）随后消费一次性授权。
+  const target = { command: "npm run build", argv: ["npm", "run", "build"], cwd: "/proj", toolCallId: "tc-target" };
+  const r2 = await gate(target);
+  assert.equal(r2.allow, true);
+  if (r2.allow) assert.equal(r2.grant?.scope, "once");
+  assert.equal(grantCalls.length, 1);
+});
+
+test("授权顺序（advisory）：review + 匹配 grant → 授权放行（allow-session），不调 operator", async () => {
+  let operatorCalls = 0;
+  const { gate, audit, grantCalls } = escalationGate({
+    classify: () => "review",
+    grant: GRANT_SESSION,
+    advisoryRuleset: true,
+    operator: () => {
+      operatorCalls += 1;
+      return { outcome: "deny" };
+    },
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, true);
+  if (r.allow) assert.equal(r.grant?.scope, "session");
+  assert.equal(grantCalls.length, 1);
+  assert.equal(operatorCalls, 0, "授权在既有审批链之前放行");
+  assert.equal(audit.records[0].branch, BRANCH_CUSTOMER_ESCALATION_ALLOW_SESSION);
+});
+
+test("授权顺序（advisory）：c=deny 不消费/不放行——仍按现状交 (a)，分支 c-deny→a-*", async () => {
+  let operatorCalls = 0;
+  const { gate, audit, grantCalls } = escalationGate({
+    classify: () => "deny",
+    grant: GRANT_ONCE,
+    advisoryRuleset: true,
+    operator: () => {
+      operatorCalls += 1;
+      return { outcome: "deny" };
+    },
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, false);
+  assert.equal(grantCalls.length, 0, "advisory 非 script 的 c=deny 不消费授权");
+  assert.equal(operatorCalls, 1, "advisory 的 c=deny 仍交 (a)（本方案不新增终结）");
+  assert.equal(audit.records[0].branch, "c-deny→a-deny");
+});
+
+test("授权顺序（operatorOnly）：risky + grant → 授权放行；c=deny（approveDeny）不消费", async () => {
+  const risky = escalationGate({ classify: () => "risky", grant: GRANT_ONCE, operatorOnly: true, approveDeny: true, operator: denyOperator });
+  const r1 = await risky.gate(REQ);
+  assert.equal(r1.allow, true);
+  assert.equal(risky.grantCalls.length, 1);
+  assert.equal(risky.audit.records[0].branch, BRANCH_CUSTOMER_ESCALATION_ALLOW_ONCE);
+
+  const deny = escalationGate({ classify: () => "deny", grant: GRANT_ONCE, operatorOnly: true, approveDeny: true, operator: allowOperator });
+  const r2 = await deny.gate(REQ);
+  assert.equal(r2.allow, true, "approveDeny 下 c=deny 由客户审批放行（现状）");
+  assert.equal(deny.grantCalls.length, 0, "c=deny 不消费授权");
+  assert.equal(deny.audit.records[0].branch, "c-deny→a-allow");
+});
+
+test("授权顺序（三层链）：review + grant → 授权放行且不调 pm/operator；c=deny 不消费", async () => {
+  let pmCalls = 0;
+  let operatorCalls = 0;
+  // 三层链的 pmAsk 不在 escalationGate 参数内；此处直连 createShellGate 构造（含 pmAsk spy）。
+  const chainGate = createShellGate({
+    classifyShell: () => "review",
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit: createMemoryAuditSink(),
+    pmAsk: () => {
+      pmCalls += 1;
+      return '{"verdict":"allow"}';
+    },
+    operatorChannel: () => {
+      operatorCalls += 1;
+      return { outcome: "allow" };
+    },
+    takeGrant: () => GRANT_ONCE,
+  });
+  const r = await chainGate(REQ);
+  assert.equal(r.allow, true, "review + grant → 授权放行");
+  assert.equal(pmCalls, 0, "授权在 (b) 之前放行（不调 pm）");
+  assert.equal(operatorCalls, 0);
+
+  let denyGrantCalls = 0;
+  const denyAudit = createMemoryAuditSink();
+  const denyChain = createShellGate({
+    classifyShell: () => "deny",
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit: denyAudit,
+    takeGrant: () => {
+      denyGrantCalls += 1;
+      return GRANT_ONCE;
+    },
+  });
+  const r2 = await denyChain(REQ);
+  assert.equal(r2.allow, false);
+  assert.equal(denyGrantCalls, 0, "非 advisory 的 c=deny 硬拒不消费授权");
+  assert.equal(denyAudit.records.length, 1);
+});
+
+test("授权顺序（readonly）：readonlyOnly + takeGrant ⇒ 构造期抛错（只读拒绝不得被陈旧授权越过）", () => {
+  assert.throws(
+    () =>
+      createShellGate({
+        classifyShell: () => "allow",
+        rules: RULES,
+        audit: createMemoryAuditSink(),
+        readonlyOnly: true,
+        takeGrant: () => GRANT_ONCE,
+      }),
+    /readonlyOnly 不得注入 takeGrant/,
+  );
+});
+
+test("onReviewed：script 分支以带 approvalContext 的请求回调；非 script 用原请求", async () => {
+  const seen: Array<{ command: string; hasContext: boolean }> = [];
+  const gate = createShellGate({
+    classifyShell: () => "review",
+    rules: RULES,
+    // load 规则集抛错会导致判定在 classify 之前结束；这里正常。
+    audit: createMemoryAuditSink(),
+    operatorChannel: denyOperator,
+    writeGuard: () => ({ kind: "script", reason: "脚本" }),
+    approvalContextLoader: async () => ({ ok: true, context: SCRIPT_CONTEXT }),
+    onReviewed: (req) => seen.push({ command: req.command, hasContext: req.approvalContext !== undefined }),
+  });
+  await gate({ command: "node scripts/x.mjs", argv: ["node", "scripts/x.mjs"], cwd: "/proj", toolCallId: "t1" });
+  assert.deepEqual(seen, [{ command: "node scripts/x.mjs", hasContext: true }]);
+
+  const seen2: Array<{ command: string; hasContext: boolean }> = [];
+  const plain = createShellGate({
+    classifyShell: () => "review",
+    rules: RULES,
+    audit: createMemoryAuditSink(),
+    operatorChannel: denyOperator,
+    onReviewed: (req) => seen2.push({ command: req.command, hasContext: req.approvalContext !== undefined }),
+  });
+  await plain(REQ);
+  assert.deepEqual(seen2, [{ command: REQ.command, hasContext: false }]);
+});
+
+test("onReviewed 抛错不影响判定（只做记录/清理，判定已完成且确定）", async () => {
+  const gate = createShellGate({
+    classifyShell: () => "allow",
+    rules: RULES,
+    audit: createMemoryAuditSink(),
+    onReviewed: () => {
+      throw new Error("回调崩溃");
+    },
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, true, "回调异常不翻转判定");
+});
+
+// —————————————— 2026-10-31 客户裁定 A：只读档不适用例行命令白名单 ——————————————
+//
+// 澄清记录：`docs/planning/2026-10-31_clarification_shell-escalation-readonly.md`（不重开闸门 1）。
+// 既有 `test/编排/shell-readonly.test.ts` 的 2 项断言原样保留、不放宽；本组测试固定增量语义：
+// 例行白名单命中在只读档 ⇒ allow=false / branch readonly-deny / **既有 reason 模板逐字保留**
+// （`node --test`、`tsc --noEmit` 按 review 档；`npm test`、`npm run 例行脚本`、`npm ci` 按 risky 档）；
+// 非 routine 的 c-allow 仍放行；非只读档 c-allow（含 allow:routine:*）行为不变；只读档不注入 takeGrant。
+
+test("readonly 裁定 A：例行白名单命中（分类器明细 ruleId）在只读档 readonly-deny，reason 模板与档位按 A2 之前", async () => {
+  for (const [ruleId, tier] of [
+    ["allow:routine:npm-test", "risky"],
+    ["allow:routine:npm-run-typecheck", "risky"],
+    ["allow:routine:node-test", "review"],
+    ["allow:routine:tsc-noemit", "review"],
+    ["allow:routine:npm-ci", "risky"],
+  ] as const) {
+    const audit = createMemoryAuditSink();
+    const gate = createShellGate({
+      classifyShell: () => ({ decision: "allow", ruleId }),
+      rules: RULES,
+      rulesId: RULES_ID,
+      audit,
+      readonlyOnly: true,
+    });
+    const r = await gate(REQ);
+    assert.equal(r.allow, false, `${ruleId} 在只读档不得放行`);
+    if (!r.allow) {
+      // 澄清记录 S2/S5：既有模板逐字保留（唯一变量是档位，按 A2 之前的分类）。
+      assert.equal(
+        r.reason,
+        `su 只读档：本会话仅允许只读白名单命令；该命令未命中白名单（(c) 判为 ${tier}），` +
+          "按 su 只读策略拒绝执行——这是策略拒绝，不是环境故障。",
+      );
+      assert.match(r.by, /（su 只读档）/, "不新增分支常量、by 后缀不变");
+    }
+    assert.equal(audit.records[0].branch, BRANCH_READONLY_DENY);
+    assert.equal(audit.records[0].conclusion, "deny");
+  }
+  // 非例行白名单的 c=allow（带其它 ruleId）在只读档仍照常放行。
+  const allowed = createShellGate({
+    classifyShell: () => ({ decision: "allow", ruleId: "read:git-status" }),
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit: createMemoryAuditSink(),
+    readonlyOnly: true,
+  });
+  const ok = await allowed(REQ);
+  assert.equal(ok.allow, true, "非 routine 的 c-allow 不受本过滤影响");
+});
+
+test("readonly 裁定 A：裸串分类器（生产四态封装不带 ruleId）⇒ 同一冻结谓词兜底；非 routine c-allow 仍放行", async () => {
+  const audit = createMemoryAuditSink();
+  const gate = createShellGate({
+    classifyShell: classifyShellBare, // Service 出口的四态封装：只回裸串，不带 ruleId（生产桌面同名注入）
+    rules: defaultShellRules(),
+    audit,
+    readonlyOnly: true,
+  });
+  const routineCases: Array<[string[], "review" | "risky"]> = [
+    [["npm", "test"], "risky"],
+    [["npm", "run", "test"], "risky"],
+    [["npm", "run", "typecheck"], "risky"],
+    [["npm", "run", "lint"], "risky"],
+    [["npm", "run", "check"], "risky"],
+    [["npm", "ci"], "risky"],
+    [["tsc", "--noEmit"], "review"],
+    [["node", "--test"], "review"],
+  ];
+  for (const [argv, tier] of routineCases) {
+    const r = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `ro-${argv.join("-")}` });
+    assert.equal(r.allow, false, `${argv.join(" ")} 在只读档不得放行（routine 白名单不适用）`);
+    if (!r.allow) {
+      assert.match(r.reason, new RegExp(`（\\(c\\) 判为 ${tier}）`), "reason 档位按 A2 之前的分类");
+      assert.match(r.reason, /su 只读档/);
+    }
+  }
+  for (const argv of [["ls", "-la"], ["git", "status"], ["node", "--version"]]) {
+    const r = await gate({ command: argv.join(" "), argv, cwd: "/proj", toolCallId: `ro-ok-${argv.join("-")}` });
+    assert.equal(r.allow, true, `${argv.join(" ")}（非 routine c-allow）在只读档仍放行`);
+  }
+  // 审计分支：前 8 条 readonly-deny、后 3 条 c-allow。
+  assert.deepEqual(
+    audit.records.map((record) => record.branch),
+    [
+      ...Array.from({ length: routineCases.length }, () => BRANCH_READONLY_DENY),
+      BRANCH_C_ALLOW,
+      BRANCH_C_ALLOW,
+      BRANCH_C_ALLOW,
+    ],
+  );
+});
+
+test("readonly 裁定 A：非只读档的 c-allow（含 allow:routine:*）行为不变，且不消费升级授权", async () => {
+  let takeGrantCalls = 0;
+  const gate = createShellGate({
+    classifyShell: () => ({ decision: "allow", ruleId: "allow:routine:npm-test" }),
+    rules: RULES,
+    rulesId: RULES_ID,
+    audit: createMemoryAuditSink(),
+    takeGrant: () => {
+      takeGrantCalls += 1;
+      return GRANT_ONCE;
+    },
+  });
+  const r = await gate(REQ);
+  assert.equal(r.allow, true, "非只读档的 c=allow 照常放行（A2 白名单对所有角色生效）");
+  assert.equal(takeGrantCalls, 0, "c=allow 不消费授权");
 });

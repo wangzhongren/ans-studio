@@ -16,7 +16,7 @@
 
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { ShellJudgeAudit, WriteGate } from "../../model/runtime.ts";
+import type { ShellEscalationAction, ShellJudgeAudit, WriteGate } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
@@ -66,6 +66,31 @@ export interface ShellJudgeAuditRecord extends ShellJudgeAudit {
   label?: "deny 档 · judge 放行";
 }
 
+/**
+ * 审计事件类型（2026-10-31 shell 判拒升级方案 v1.3 §7.1 契约加法；向后兼容）：
+ * - `"review"`（缺省）＝既有 shell 审核记录；
+ * - `"escalation-decision"`＝升级申请决定记录（允许/拒绝/超时都写；与 review **同一个 sink、同一文件**）。
+ */
+export type ShellAuditEvent = "review" | "escalation-decision";
+
+/** 客户升级授权放行（review 记录字段；与 `judge` 互斥——客户授权不写 `judge`）。 */
+export interface ShellAuditCustomerGrant {
+  requestId: string;
+  scope: "once" | "session";
+  operatorId?: string;
+}
+
+/**
+ * 升级申请决定（仅 `event:"escalation-decision"` 记录）。
+ * `action` 为决定/结果：客户三选一（`allow-once`/`allow-session`/`deny`），
+ * 超时/通道不可用则为 `expired`/`unavailable`（无客户动作，如实记录，不伪装成 deny）。
+ */
+export interface ShellAuditEscalation {
+  requestId: string;
+  action: ShellEscalationAction | "expired" | "unavailable";
+  roleId: string;
+}
+
 export interface ShellAuditRecord {
   timestamp: string;
   toolCallId: string;
@@ -78,6 +103,14 @@ export interface ShellAuditRecord {
   conditions: string[];
   execution: number | "未执行";
   judge?: ShellJudgeAuditRecord;
+  /** 事件类型（可选加法；缺省＝`"review"`，旧读者忽略）。 */
+  event?: ShellAuditEvent;
+  /** 本 review 放行来自客户升级授权（仅授权放行的 review 记录；**不得**与 `judge` 同时出现）。 */
+  customerGrant?: ShellAuditCustomerGrant;
+  /** 升级申请决定（仅 `escalation-decision` 记录）。 */
+  escalation?: ShellAuditEscalation;
+  /** 审核入口（可选加法；缺省按 `run_shell` 兼容旧调用）。授权键/审计可辨。 */
+  entry?: "run_shell" | "start_background_task";
 }
 
 /** 审计落盘结果；false 时 reason 说明为何未落盘（如条件缺失被门禁拒绝）。 */

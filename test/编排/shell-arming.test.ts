@@ -28,7 +28,7 @@ import type {
   WriteGate,
 } from "../../src/provider/pi/session.ts";
 import { openRoleSession, type AdapterCapabilities, type RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import { assembleProjectShellGate, assembleReadonlyShellGate } from "../../src/pipeline/orchestration/shell-arming.ts";
+import { assembleOperatorShellGate, assembleProjectShellGate, assembleReadonlyShellGate } from "../../src/pipeline/orchestration/shell-arming.ts";
 import { createFakeRuntimeAdapter } from "../../src/provider/pi/session.ts";
 import { classifyShell, defaultShellRules } from "../../src/common/门禁引擎/classify-shell.ts";
 import { builtInBoundarySection } from "../../src/common/门禁引擎/boundary-core.ts";
@@ -512,6 +512,47 @@ test("F-6-T7（su 只读档同接线）：未接受快照在收尾落盘后同�
     assert.equal(r2.allow, true);
     assert.ok(fs.existsSync(auditPath), "只读档审计同接线自愈落盘");
     assert.equal(fs.readFileSync(auditPath, "utf8").trim().split("\n").length, 1);
+  } finally {
+    cleanup(project);
+  }
+});
+
+// —————————————— 2026-10-31 判拒升级：装配层透传（onReviewed / onAuditSinkCreated） ——————————————
+
+test("升级注入点透传：assembleProjectShellGate/OperatorShellGate 把 onReviewed/onAuditSinkCreated 接到闸（共享 sink）", async () => {
+  const project = makeTempProject();
+  try {
+    const auditSink: ShellAuditSink = { async append() { return { ok: true }; } };
+    const sinks: ShellAuditSink[] = [];
+    const branches: string[] = [];
+    const projectGate = await assembleProjectShellGate({
+      project,
+      operatorChannel: () => ({ outcome: "deny", operatorId: "op" }),
+      classifyShell: () => "review",
+      rules: RULES,
+      auditSink,
+      sessionDeps: { createAdapter: (g: WriteGate) => createFakeRuntimeAdapter({ gate: g, script: [] }) },
+      onAuditSinkCreated: (sink) => sinks.push(sink),
+      onReviewed: (_req, outcome) => branches.push(outcome.branch),
+    });
+    const r1 = await projectGate(req("mysterytool --flag", ["mysterytool", "--flag"]));
+    assert.equal(r1.allow, false);
+    assert.equal(sinks.length, 1, "sink 回调恰好一次");
+    assert.equal(sinks[0], auditSink, "升级 registry 与闸共享同一审计 sink");
+    assert.deepEqual(branches, ["c-review→a-deny"]);
+
+    const operatorBranches: string[] = [];
+    const operatorGate = await assembleOperatorShellGate({
+      project,
+      operatorChannel: () => ({ outcome: "deny", operatorId: "op" }),
+      classifyShell: () => "risky",
+      rules: RULES,
+      auditSink,
+      onReviewed: (_req, outcome) => operatorBranches.push(outcome.branch),
+    });
+    const r2 = await operatorGate(req("rm tmp.txt", ["rm", "tmp.txt"]));
+    assert.equal(r2.allow, false);
+    assert.deepEqual(operatorBranches, ["c-risky→a-deny"], "审批档同样回调 onReviewed");
   } finally {
     cleanup(project);
   }
