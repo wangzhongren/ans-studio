@@ -559,7 +559,10 @@ async function run() {
   // 会话头按钮守卫（2026-10-16 v3 后重锚）：会话头只允许**已批准的**钮——引擎只读入口 + 图标簇
   // （#runtime-select / #tab-work / #tab-card，与桌面UI renderer.test.ts 同口径）；旧的单功能钮
   // （Pi 设置 / 停止 / 状态 pill——#btn-pi-settings/#btn-stop/#session-state）绝不回归。
-  log("CHAT_HEAD_ONLY_APPROVED_BUTTONS=" + (await wc().executeJavaScript("(() => { const ok=['runtime-select','tab-work','tab-card','tab-decisions','tab-tasks']; return [...document.querySelectorAll('.chat-head button')].every(b=>ok.includes(b.id)) && !document.querySelector('.chat-head #btn-pi-settings, .chat-head #btn-stop, .chat-head #session-state'); })()")));
+  // 2026-10-31（run-change 触发）：会话头新增**已批准**的「契约变更 · 重开 run」入口（#run-change）——
+  // 只在有 pinned run 时可用；此处项目无 pinned run ⇒ 应存在但禁用（禁用原因见 title）。
+  log("CHAT_HEAD_ONLY_APPROVED_BUTTONS=" + (await wc().executeJavaScript("(() => { const ok=['runtime-select','tab-work','tab-card','tab-decisions','tab-tasks','run-change']; return [...document.querySelectorAll('.chat-head button')].every(b=>ok.includes(b.id)) && !document.querySelector('.chat-head #btn-pi-settings, .chat-head #btn-stop, .chat-head #session-state'); })()")));
+  log("RUN_CHANGE_ENTRY_PRESENT=" + hardCheck("RUN_CHANGE_ENTRY_PRESENT", await wc().executeJavaScript("(() => { const b=document.getElementById('run-change'); return !!b && (b.textContent||'').includes('契约变更') && b.disabled === true && (b.title||'').length > 0; })()")));
   await wc().executeJavaScript("window.__ansRenderer.onRoleState({ roleId: '桌面窗口', busy: false, summaries: [], queue: [], running: null })");
   await sleep(150);
   log("STOP_HIDDEN_WHEN_IDLE=" + (await wc().executeJavaScript("document.getElementById('btn-halt').hidden === true")));

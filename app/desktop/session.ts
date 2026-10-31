@@ -82,7 +82,7 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
-import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
+import { applyRunChange, buildRunChangeCard, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 import { appendRoleLog, formatRoleActivityText, readRoleLog } from "../../src/common/编排/role-log.ts";
 import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalRejection, rejectionMapSnapshot, technicalRejectionCode, type MechanicalRejection } from "../../src/common/编排/mechanical-rejection.ts";
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
@@ -248,6 +248,23 @@ export interface SessionOpenRequest {
   roleId: string;
   runtime: RuntimeKind;
 }
+
+/**
+ * 2026-10-31（run-change 触发）：active run 的只读摘要（`activeRunViews` 返回；UI「契约变更 · 重开 run」
+ * 入口据此启用/禁用并显示原因）。字段全部来自 manifest，不读正文、不伪装 pinned。
+ */
+export interface ActiveRunView {
+  runId: string;
+  flowId: string;
+  state: "draft" | "pinned";
+  pinnedAt?: string;
+  rosterVersion?: number;
+  roles?: string[];
+  documents: Array<{ kind: string; path: string; sha256?: string }>;
+}
+
+/** run-change 三模式的**类型**再导出（形状唯一来源仍是 `run-manifest.ts`；界面/conftest 不复制形状）。 */
+export type { RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 
 /**
  * 生效配置来源与接受状态（供界面**如实呈现**；界面只读此结构、不另作判定）。
@@ -1125,6 +1142,12 @@ export class SessionManager {
    * 派发」；在途窗口去重防重投，送达后放行以保返工回路可用——语义在 change 文档写明。
    */
   private readonly activeDispatchKeys = new Set<string>();
+  /**
+   * 2026-10-31（run-change 触发缺陷）：**自动**呈现 run-change 卡的去重键（`projectRoot\0runId`）。
+   * 同一 pinned run 只自动弹一次——客户已决定/已呈现后，后续冻结冲突只回结构化拒绝（走显式入口），
+   * 不刷屏、不重复替客户要决定。显式入口（会话头按钮/IPC）不受此集合限制。
+   */
+  private readonly runChangeAutoPrompted = new Set<string>();
   /** 「队列受阻」（枚举不到目标）只如实提示**一次**（避免每次触发刷同一行）。 */
   private readonly suDeliveryBlockedNoted = new Set<string>();
   /**
@@ -1870,7 +1893,8 @@ export class SessionManager {
   /**
    * 2026-10-30（方案 v3 §3.1）：应用发起 run-change 卡（复用 decision，不新增 cardKind）。
    * 只由 app 发行；客户/judge 选择 continue-frozen/stop-and-restart/stop（或 approve/reject/cancel 回退）。
-   * 本方法选择有客户卡通道的统筹/提案会话呈现；无 pinned run / 无会话 / 无通道 ⇒ fail-closed。
+   * 2026-10-31（触发缺陷）：会话选择顺序扩展为 convener → rapporteur → chief（均需有客户卡通道）；
+   * 无 pinned run / 无可呈现会话 / 无通道 ⇒ fail-closed（调用方回 `run-change-required` 结构化拒绝）。
    */
   async requestRunChangeDecision(input: {
     projectRoot: string;
@@ -1881,6 +1905,7 @@ export class SessionManager {
   }): Promise<
     | {
         ok: true;
+        runId: string;
         outcome: Promise<CustomerInputOutcome>;
         first: Promise<{ kind: "presented" } | { kind: "outcome"; outcome: CustomerInputOutcome }>;
       }
@@ -1891,16 +1916,19 @@ export class SessionManager {
     if (active.manifest === null || active.manifest.state !== "pinned") {
       return { ok: false, error: "当前 flow 没有 pinned run，不能发起 run-change" };
     }
-    const preferred = [this.handbackOwnerRoleId(input.projectRoot), "rapporteur"];
+    const preferred = [this.handbackOwnerRoleId(input.projectRoot), "rapporteur", this.chiefTaskRoleIdOf(input.projectRoot)]
+      .filter((id): id is string => id !== null && id !== "");
     let selectedEntry: LiveSession | undefined;
+    let bestRank = Number.POSITIVE_INFINITY;
     for (const [key, entry] of this.sessions) {
       if (!key.startsWith(`${input.projectRoot} `)) continue;
       if (entry.projectRoot !== input.projectRoot) continue;
       if (entry.requirementChangeCard === undefined) continue;
       if (selectedEntry === undefined) selectedEntry = entry;
-      if (preferred.includes(entry.roleId)) {
+      const rank = preferred.indexOf(entry.roleId);
+      if (rank >= 0 && rank < bestRank) {
+        bestRank = rank;
         selectedEntry = entry;
-        if (entry.roleId === preferred[0]) break;
       }
     }
     if (selectedEntry === undefined || selectedEntry.requirementChangeCard === undefined) {
@@ -1977,7 +2005,197 @@ export class SessionManager {
       kind: "outcome",
       outcome: { outcome: "unavailable", reason: error instanceof Error ? error.message : String(error) },
     }));
-    return { ok: true, outcome, first };
+    return { ok: true, runId: active.manifest.runId, outcome, first };
+  }
+
+  /**
+   * 2026-10-31（run-change 触发缺陷）：当前项目的 active run（draft/pinned）只读摘要——供桌面
+   * 「契约变更 · 重开 run」入口判断是否可用（无 pinned run 时禁用并给原因）。
+   * 只读 manifest；不读正文、不改状态、不伪装 pinned。
+   */
+  async activeRunViews(projectRoot: string): Promise<{ ok: true; runs: ActiveRunView[] } | { ok: false; error: string }> {
+    const listed = await listRunManifestsResult(projectRoot);
+    if (!listed.ok) return { ok: false, error: listed.reason };
+    return {
+      ok: true,
+      runs: listed.manifests
+        .filter((manifest) => manifest.state === "draft" || manifest.state === "pinned")
+        .map((manifest) => ({
+          runId: manifest.runId,
+          flowId: manifest.flowId,
+          state: manifest.state === "pinned" ? "pinned" : "draft",
+          ...(manifest.pinnedAt !== undefined ? { pinnedAt: manifest.pinnedAt } : {}),
+          ...(manifest.rosterVersion !== undefined ? { rosterVersion: manifest.rosterVersion } : {}),
+          ...(manifest.roles !== undefined ? { roles: [...manifest.roles] } : {}),
+          documents: pinnedDocsSummary(manifest),
+        })),
+    };
+  }
+
+  /**
+   * 2026-10-31（run-change 触发）：**派发被冻结事实拒绝**且可识别为「新版本契约依赖」时，先尝试
+   * 呈现 run-change 三模式卡（最佳努力、同一 run 只自动弹一次），再回 `run-change-required` 三段式。
+   * 识别不出/不确定 ⇒ undefined（调用方保留既有 `run-role-missing`/`module-*` 拒绝——宁可不弹）。
+   */
+  private async runChangeRejectionForDispatch(input: {
+    projectRoot: string;
+    flowId: string | undefined;
+    fromRoleId: string;
+    runManifest: RunManifest | undefined;
+    pinnedRoster: RosterLoadResult | undefined;
+    code: string;
+    targetRoleId: string;
+    moduleId: string | undefined;
+  }): Promise<MechanicalRejection | undefined> {
+    const manifest = input.runManifest;
+    if (manifest === undefined || manifest.state !== "pinned") return undefined;
+    if (input.flowId === undefined) return undefined;
+    const detail = await this.dispatchFrozenConflictDetail({ ...input, flowId: input.flowId, runManifest: manifest });
+    if (detail === undefined) return undefined;
+    const newer = await findNewerContractDocs(input.projectRoot, manifest);
+    if (newer.length === 0) return undefined; // 磁盘上没有更新版本契约 ⇒ 不弹（走既有拒绝）
+    const offered = await this.offerRunChangeOnFrozenContract({
+      projectRoot: input.projectRoot,
+      flowId: input.flowId,
+      manifest,
+      newer,
+      reason: `派发被冻结基线拒绝：${detail.reason}`,
+      missing: detail.missing,
+      ...(input.fromRoleId === this.handbackOwnerRoleId(input.projectRoot) ? { requestedBy: "convener" as const } : {}),
+    });
+    return offered.rejection;
+  }
+
+  /** 冻结冲突的**可核对事实**（只有「新名单包含目标角色/模块，而 pin 的名单不含」才返回）。 */
+  private async dispatchFrozenConflictDetail(input: {
+    projectRoot: string;
+    flowId: string;
+    runManifest: RunManifest | undefined;
+    pinnedRoster: RosterLoadResult | undefined;
+    code: string;
+    targetRoleId: string;
+    moduleId: string | undefined;
+  }): Promise<{ missing: string; reason: string } | undefined> {
+    if (input.code !== "run-role-missing" && input.code !== "module-missing" && input.code !== "module-not-owned") return undefined;
+    if (input.pinnedRoster === undefined || input.pinnedRoster.ok !== true) return undefined;
+    const latest = await loadLatestRoster({ projectRoot: input.projectRoot, flowId: input.flowId });
+    if (!latest.ok) return undefined;
+    const pinnedVersion = input.runManifest?.rosterVersion ?? input.pinnedRoster.version;
+    if (!(latest.version > pinnedVersion)) return undefined;
+    const pinned = input.pinnedRoster.roster;
+    if (input.code === "run-role-missing") {
+      const latestHas = latest.roster.roles.some((role) => role.id === input.targetRoleId);
+      const pinnedHas = pinned.roles.some((role) => role.id === input.targetRoleId);
+      if (!latestHas || pinnedHas) return undefined;
+      return {
+        missing: `目标角色 ${input.targetRoleId} 在当前 run 冻结的角色集内（roster v${latest.version} 新增；pin v${pinnedVersion}）`,
+        reason: `目标角色 ${input.targetRoleId} 属于更新版本名单（roster v${latest.version}），不在当前 run 冻结的 pin 角色集（v${pinnedVersion}）内`,
+      };
+    }
+    const moduleId = input.moduleId ?? "";
+    if (moduleId === "") return undefined;
+    if (input.code === "module-missing") {
+      const latestHas = latest.roster.modules.some((module) => module.id === moduleId);
+      const pinnedHas = pinned.modules.some((module) => module.id === moduleId);
+      if (!latestHas || pinnedHas) return undefined;
+      return {
+        missing: `模块 ${moduleId} 在当前 run 冻结的 pin 名单内（roster v${latest.version} 新增；pin v${pinnedVersion}）`,
+        reason: `模块 ${moduleId} 属于更新版本名单（roster v${latest.version}），不在当前 run 冻结的 pin 名单（v${pinnedVersion}）内`,
+      };
+    }
+    const latestOwner = latest.roster.roles.find((role) => role.modules.includes(moduleId))?.id;
+    const pinnedOwner = pinned.roles.find((role) => role.modules.includes(moduleId))?.id;
+    if (latestOwner !== input.targetRoleId || pinnedOwner === input.targetRoleId) return undefined;
+    return {
+      missing: `模块 ${moduleId} 在 pin 名单中归 ${input.targetRoleId}（roster v${latest.version} 改派；pin v${pinnedVersion} 归 ${pinnedOwner ?? "未绑定"}）`,
+      reason: `模块 ${moduleId} 在更新版本名单（roster v${latest.version}）中归 ${input.targetRoleId}，但当前 run 冻结的 pin 名单（v${pinnedVersion}）归 ${pinnedOwner ?? "未绑定"}`,
+    };
+  }
+
+  /**
+   * 冻结 run 上出现**比 pin 更新的提案卡**时的识别（`cardKind=proposal`）：提案卡意味着要对新版本
+   * 提案作答，而冻结语义规定 active run 不激活新版本 ⇒ 先尝试 run-change 卡，本提案卡以
+   * `run-change-required` 三段式拒发（`notPresented`，不冒充客户拒绝）。
+   * 无 pinned run / 提案版本不高于 pin ⇒ undefined（零行为变化）。
+   */
+  private async proposalCardFrozenRejection(
+    projectRoot: string,
+    request: CustomerInputRequest,
+    metadata: CustomerInputMetadata | undefined,
+  ): Promise<{ rejection: MechanicalRejection; presented: boolean } | undefined> {
+    if (request.cardKind !== "proposal") return undefined;
+    const flowId = request.flowId ?? metadata?.flowId;
+    if (typeof flowId !== "string" || flowId.trim() === "") return undefined;
+    const active = await findActiveRun(projectRoot, flowId);
+    if (!active.ok || active.manifest === null || active.manifest.state !== "pinned") return undefined;
+    const newer = await findNewerContractDocs(projectRoot, active.manifest);
+    const proposalDoc = newer.find((doc) => doc.kind === "proposal");
+    if (proposalDoc === undefined) return undefined;
+    return this.offerRunChangeOnFrozenContract({
+      projectRoot,
+      flowId,
+      manifest: active.manifest,
+      newer,
+      reason: `提案卡引用了比 pin 更新的提案（${proposalDoc.path}，v${proposalDoc.version} > pin v${proposalDoc.pinnedVersion ?? "?"}）；当前 run 已冻结，新版本不激活`,
+      missing: `当前 run 冻结基线内的提案版本（磁盘 ${proposalDoc.path} v${proposalDoc.version} > pin v${proposalDoc.pinnedVersion ?? "?"}）`,
+      requestedBy: "planner",
+    });
+  }
+
+  /**
+   * 2026-10-31：呈现 run-change 卡（同一 run 自动仅一次）+ 组装 `run-change-required` 三段式。
+   * 冻结语义不变——调用方仍拒绝原操作；客户决定后按 continue-frozen / stop-and-restart / stop 继续。
+   */
+  private async offerRunChangeOnFrozenContract(input: {
+    projectRoot: string;
+    flowId: string;
+    manifest: RunManifest;
+    newer: NewerContractDoc[];
+    reason: string;
+    /** 三段式 missing 用（「拒绝：缺少 …」通顺的名词短语）；缺省回退 reason。 */
+    missing?: string;
+    requestedBy?: "convener" | "planner" | "product";
+  }): Promise<{ rejection: MechanicalRejection; presented: boolean }> {
+    const key = `${input.projectRoot}\u0000${input.manifest.runId}`;
+    const proposedDocs: Record<string, string> = {};
+    for (const doc of input.newer) proposedDocs[doc.kind] = doc.path;
+    let presented = false;
+    if (!this.runChangeAutoPrompted.has(key)) {
+      this.runChangeAutoPrompted.add(key);
+      const started = await this.requestRunChangeDecision({
+        projectRoot: input.projectRoot,
+        flowId: input.flowId,
+        ...(input.requestedBy !== undefined ? { requestedBy: input.requestedBy } : {}),
+        reason: input.reason,
+        ...(Object.keys(proposedDocs).length > 0 ? { proposed: { documents: proposedDocs, schemas: {} } } : {}),
+      });
+      if (!started.ok) {
+        // 没有可呈现会话 ⇒ 不占用「已自动提示」名额：打开统筹/提案/幕僚会话后，下次冻结冲突仍可自动弹。
+        this.runChangeAutoPrompted.delete(key);
+      } else {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<{ kind: "timeout" }>((resolve) => {
+          timer = setTimeout(() => resolve({ kind: "timeout" }), 1500);
+        });
+        const first = await Promise.race([started.first, timeout]);
+        if (timer !== undefined) clearTimeout(timer);
+        presented = first.kind === "presented" || (first.kind === "outcome" && first.outcome.outcome === "answered");
+      }
+    }
+    const pinnedRosterPath = input.manifest.documents.roster !== null && input.manifest.documents.roster !== undefined
+      ? input.manifest.documents.roster.path
+      : undefined;
+    const docs = [
+      ...input.newer.map((doc) => doc.path),
+      ...(pinnedRosterPath !== undefined ? [pinnedRosterPath] : []),
+    ].slice(0, 5);
+    const rejection = makeMechanicalRejection("run-change-required", [input.missing ?? input.reason], {
+      action: presented
+        ? "应用已向客户呈现 run-change 卡（继续冻结 / 停止并重开 run / 停止）；由客户选择模式，决定后按新模式继续。"
+        : "客户可在会话头点击「契约变更 · 重开 run」发起 run-change（继续冻结 / 停止并重开 run / 停止）；若无可呈现会话，先打开统筹/提案/幕僚会话再重试。",
+      docs,
+    });
+    return { rejection, presented };
   }
 
   /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
@@ -2305,6 +2523,10 @@ export class SessionManager {
     // 项目根/发起角色/引擎补入后透传。**提交申请 ≠ 批准**：审批由客户/判断 agent 在 decision 卡上完成，
     // 主理不审批、只在批准后执行意图变更。
     const canInitiateRequirementChange = governanceFunction === "proposal" || governanceFunction === "schedule";
+    // 2026-10-31（run-change 触发）：应用自有的 run-change 卡可经统筹/提案/幕僚任一在场的客户卡通道呈现
+    // （会话选择顺序 convener → rapporteur → chief）。这只扩大**应用内**的发卡呈现面，不新增模型工具：
+    // `request_requirement_change` 仍只注入 proposal/schedule（上面 canInitiateRequirementChange 未变）。
+    const canPresentAppRunChange = canInitiateRequirementChange || governanceFunction === "chief";
     const requestRequirementChange: RequestRequirementChangeFn | undefined =
       canInitiateRequirementChange && this.deps.requestRequirementChange !== undefined
         ? (input: RequestRequirementChangeInput) =>
@@ -2610,10 +2832,10 @@ export class SessionManager {
       skillPaths,
       ...(shellJudge !== undefined ? { shellJudge } : {}),
       ...(governanceJudge !== undefined ? { governanceJudge } : {}),
-      // 需求变更审批卡通道（2026-10-26 客户纠正）：仅统筹/提案会话构造——绑定本会话客户卡上下文
-      // （roleId/signal/judge/turnText）与 `onPresented`；decision 卡结构与角色门仍由共享
-      // `validateDecisionCardRequest` 单一来源校验（统筹/提案均在其白名单内）。
-      ...(customerInput !== undefined && canInitiateRequirementChange
+      // 需求变更审批卡通道（2026-10-26 客户纠正；2026-10-31 run-change 触发扩展）：绑定本会话客户卡上下文
+      // （roleId/signal/judge/turnText）与 `onPresented`；`application:true` 的 run-change 卡不借用角色发行槽位，
+      // 但呈现面按治理会话收口（统筹/提案/幕僚），其他角色/项目角色不构造该通道。
+      ...(customerInput !== undefined && canPresentAppRunChange
         ? {
             requirementChangeCard: async (
               request: CustomerInputRequest,
@@ -3655,6 +3877,20 @@ export class SessionManager {
     // 2026-10-29（Q6 A）：验收卡的最小链事实由应用补充（产品意图/名单/D3/质检报告）。
     if (request.cardKind === "acceptance") {
       metadata = await this.enrichAcceptanceJudgeContext(projectRoot, request, metadata);
+    }
+    // 2026-10-31（run-change 触发）：冻结 run 上出现比 pin 更新的提案卡 ⇒ 先尝试 run-change 卡，
+    // 本提案卡以 run-change-required 三段式拒发（未呈现；不冒充客户拒绝、不改冻结语义）。
+    if (request.cardKind === "proposal") {
+      const frozen = await this.proposalCardFrozenRejection(projectRoot, request, metadata);
+      if (frozen !== undefined) {
+        const formatted = formatMechanicalRejection(frozen.rejection);
+        this.appendRoleActivity(projectRoot, sourceRoleId, {
+          kind: "request.rejected",
+          summary: shortenSummary(`run-change-required：${frozen.rejection.missing.join("；")}`, 200),
+          status: "not-presented",
+        });
+        return { outcome: "declined", notPresented: true, reason: formatted };
+      }
     }
     const requestId = requestIdOverride ?? this.requestIdFor(projectRoot, sourceRoleId, request, metadata);
     const options = request.kind === "choice"
@@ -5933,6 +6169,21 @@ ${formatted}` };
           : targetRole !== undefined,
     });
     if (!preflight.ok) {
+      // 2026-10-31（run-change 触发）：冻结基线拒绝且可识别为「新版本契约依赖」⇒ 先尝试呈现 run-change
+      // 三模式卡，再回 `run-change-required`；识别不出 ⇒ 保留既有 code/文案（旧行为兼容）。
+      const runChangeRejection = await this.runChangeRejectionForDispatch({
+        projectRoot,
+        flowId: dispatchFlowId,
+        fromRoleId,
+        runManifest,
+        pinnedRoster: runRoster,
+        code: preflight.code,
+        targetRoleId,
+        moduleId: requestedModuleId,
+      });
+      if (runChangeRejection !== undefined) {
+        return fail(preflight.message, preflight.message, runChangeRejection);
+      }
       return fail(`派发未受理：${preflight.message}`, preflight.message, preflight.rejection);
     }
     // R9：旧版/已记录版本化文档被外部修改（shell/手动）⇒ 拒绝派发（fail-closed）。

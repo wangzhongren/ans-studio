@@ -812,6 +812,9 @@ function registerIpc(win: BrowserWindow): void {
     if (result.ok && input.projectRoot === recoveryProjectRoot) { recoveryRoleId = input.roleId; recoveryRuntime = input.runtime; }
     return result;
   });
+  // 2026-10-31（run-change 触发缺陷）：显式入口「契约变更 · 重开 run」——把应用自有 run-change 三模式卡
+  // 经统筹/提案/幕僚会话的客户卡通道呈现（无 pinned run/无可呈现会话 ⇒ 如实失败；不代选模式）。
+  registerHandler("run:change-request", (_e, input) => desktop.requestRunChange(input));
   registerHandler("session:send", (_e, input: Parameters<DesktopInterface["sendSession"]>[0]) => desktop.sendSession(input));
   registerHandler("session:stop", (_e, input) => desktop.stopSession(input));
   // P1-1（2026-10-13 客户裁定）：撤回未投递排队消息——Interface 如实回报（仅在队列中的客户消息可撤），主进程只透传。

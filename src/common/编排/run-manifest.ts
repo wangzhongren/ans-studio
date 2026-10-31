@@ -800,3 +800,64 @@ export function renderRunQuickref(manifest: RunManifest): string {
   ];
   return lines.join("\n");
 }
+
+/** 磁盘上比 pinned manifest 更新的同类契约文档（run-change 触发/展示共用的只读事实）。 */
+export interface NewerContractDoc {
+  kind: RunDocKind;
+  /** 项目相对路径（磁盘上的新版本；不表示已生效）。 */
+  path: string;
+  /** 新版本号（来自文件名 -vN，严格大于 pinned 版本才会返回）。 */
+  version: number;
+  /** manifest 钉住的旧版本路径（可能带 #锚点）。 */
+  pinnedPath?: string;
+  /** manifest 钉住的旧版本号（文件名解析）。 */
+  pinnedVersion?: number;
+}
+
+function docVersionFromPath(refPath: string | undefined): number | undefined {
+  if (refPath === undefined) return undefined;
+  const match = /-v(\d+)\.md(?:#.*)?$/.exec(refPath);
+  if (match === null) return undefined;
+  const version = Number(match[1]);
+  return Number.isInteger(version) && version > 0 ? version : undefined;
+}
+
+/**
+ * 2026-10-31（run-change 触发）：只读扫描 `docs/product|proposals|contracts`，返回**版本号严格更大**
+ * 且路径不同的同类 vN 契约文档（intent/proposal/modules/roster/architecture/assets）。
+ * - 只提供事实，**不激活**新版本、不改 manifest、不宣称新版本已生效（§3.1「可写不激活」）。
+ * - topology 的机器源是 roster 正文块；其新旧由 roster 条目体现，本函数不单列。
+ * - 非 pinned / 解析不出旧版本号 / 磁盘无更新版本 ⇒ 不返回该项（宁缺勿猜）。
+ */
+export async function findNewerContractDocs(projectRoot: string, manifest: RunManifest): Promise<NewerContractDoc[]> {
+  if (manifest.state !== "pinned") return [];
+  const flowId = manifest.flowId;
+  const escaped = flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const dirs: Record<string, string[]> = {
+    product: await readdirSafe(path.join(projectRoot, "docs", "product")),
+    proposals: await readdirSafe(path.join(projectRoot, "docs", "proposals")),
+    contracts: await readdirSafe(path.join(projectRoot, "docs", "contracts")),
+  };
+  const scans: Array<{ kind: RunDocKind; dir: "product" | "proposals" | "contracts"; dirRel: string; regex: RegExp }> = [
+    { kind: "intent", dir: "product", dirRel: "docs/product", regex: new RegExp(`^${escaped}-intent-v(\\d+)\\.md$`) },
+    { kind: "proposal", dir: "proposals", dirRel: "docs/proposals", regex: new RegExp(`^${escaped}-proposal-v(\\d+)\\.md$`) },
+    { kind: "modules", dir: "proposals", dirRel: "docs/proposals", regex: new RegExp(`^${escaped}-modules-v(\\d+)\\.md$`) },
+    { kind: "roster", dir: "proposals", dirRel: "docs/proposals", regex: new RegExp(`^${escaped}-roster-v(\\d+)\\.md$`) },
+    { kind: "architecture", dir: "contracts", dirRel: "docs/contracts", regex: new RegExp(`^${escaped}-architecture-v(\\d+)\\.md$`) },
+    { kind: "assets", dir: "contracts", dirRel: "docs/contracts", regex: new RegExp(`^${escaped}-assets-v(\\d+)\\.md$`) },
+  ];
+  const out: NewerContractDoc[] = [];
+  for (const scan of scans) {
+    const latest = latestVersioned(dirs[scan.dir] ?? [], scan.regex);
+    if (latest === undefined) continue;
+    const pinnedRef = manifest.documents[scan.kind];
+    const pinnedPath = pinnedRef !== null && pinnedRef !== undefined ? pinnedRef.path : undefined;
+    const pinnedVersion = docVersionFromPath(pinnedPath);
+    if (pinnedVersion === undefined) continue;
+    const path = `${scan.dirRel}/${latest.name}`;
+    if (latest.version <= pinnedVersion) continue;
+    if (pinnedPath !== undefined && pinnedPath.split("#")[0] === path) continue;
+    out.push({ kind: scan.kind, path, version: latest.version, ...(pinnedPath !== undefined ? { pinnedPath } : {}), pinnedVersion });
+  }
+  return out;
+}
