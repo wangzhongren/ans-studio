@@ -17,6 +17,9 @@ events:
   - date: "2026-10-31"
     kind: updated
     summary: PR #28 合并（c3957d0，含 run-change 接线 b7cc275）；annotated tag v1.8.3 已打并推送；release-policy/workflow/打包测试切到 v1.8.3
+  - date: "2026-10-31"
+    kind: released
+    summary: CI（run 41193159501）三平台 build + release job 全过；v1.8.3 正式发布，12 资产与 SHA256 已回填
 ---
 
 # v1.8.3 发布准备
@@ -42,7 +45,7 @@ events:
 ## 本轮改动文件
 
 - `package.json`、`package-lock.json`：仅版本字段 1.8.2 → 1.8.3。
-- `README.md`、`README.en.md` 发布区：当前版本 v1.8.3（2026-10-31 发布）；下载/校验链接指向 v1.8.3 资产；SHA256 待回填；要点补充 run-change 接线说明；发布记录链接指向本文件。
+- `README.md`、`README.en.md` 发布区：当前版本 v1.8.3（2026-10-31 发布）；下载/校验链接指向 v1.8.3 资产；SHA256 已回填（见 README 表与 Release）；要点补充 run-change 接线说明；发布记录链接指向本文件。
 - 本文件。
 - 未改（留给下一轮）：`release-policy.mjs`、`release-policy.d.mts`、`.github/workflows/release.yml`、`test/装配/release-packaging.test.ts`。
 
@@ -65,10 +68,12 @@ events:
 - `test/装配/release-packaging.test.ts`：`SOURCE_REF`/`SOURCE_SHA` 断言切到 v1.8.3；历史批次用例保留。
 - `.github/workflows/release.yml`：source_ref 默认、并发组、`gh release` 引用、标题与 notes → v1.8.3；`publish` 默认 false。
 
-## CI、资产与 SHA（待回填）
+## CI、资产与 SHA（已回填）
 
-- 三平台 CI run：**待触发/待回填**；不编造 run id。
-- 资产：`ANS-Studio-1.8.3-mac-arm64.zip`、`-mac-x64.zip`、`-win-x64.zip` + `SHA256SUMS-*` + `release-provenance.json` + `overlay.patch`；发布后回填。
+- **CI**：run 41193159501 三平台 build + release job 全部 success；draft 12 资产齐备，release job 已执行 `sha256sum -c` 校验。
+- **发布**：`v1.8.3` 已去 draft 正式发布：https://github.com/wangzhongren/ans-studio/releases/tag/v1.8.3
+- 资产：`ANS-Studio-1.8.3-mac-arm64.zip`、`-mac-x64.zip`、`-win-x64.zip` + `SHA256SUMS-*` + `release-provenance.json` + `overlay.patch`。
+- 资产 SHA256：mac-arm64 `c926bf6f…0419162`；mac-x64 `6ad45bf0…cd9dda5`；win-x64 `793ed571…1096f1c`；overlay.patch `3ab3fd6c…3257f30`（与本地预演一致）；release-provenance.json `f11e3e64…4ffb2df`（完整值见 README 表与 Release）。
 - 未签名、未公证。
 
 ## 证据边界
