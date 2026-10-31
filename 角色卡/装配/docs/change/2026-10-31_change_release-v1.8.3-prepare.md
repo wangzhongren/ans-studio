@@ -14,6 +14,9 @@ events:
   - date: "2026-10-31"
     kind: verified
     summary: 本地预检 npm run typecheck 0、npm run typecheck:renderer 0、装配测试 87/87 通过
+  - date: "2026-10-31"
+    kind: updated
+    summary: PR #28 合并（c3957d0，含 run-change 接线 b7cc275）；annotated tag v1.8.3 已打并推送；release-policy/workflow/打包测试切到 v1.8.3
 ---
 
 # v1.8.3 发布准备
@@ -24,8 +27,8 @@ events:
 
 - 版本 1.8.2 → **1.8.3**（patch）。`package.json` 与 `package-lock.json` 仅根两处版本字段，依赖与锁结构零变动。
 - 发布源（冻结源）：**`b7cc275`**（`feat(desktop): wire run-change triggers and entry`，修复 `docs/communication/2026-10-31_intent_run-change-unwired.md` 记录的缺陷；独立验收 pass：`docs/acceptance/2026-10-31_wave3-run-change-wiring-acceptance-report-v1.md`，101 行 `a949b1a4…`）。
-- annotated tag **`v1.8.3`**：待打；指向 PR 合并提交，SHA 在下一轮填入。
-- 发布准备提交：**待填**。
+- annotated tag **`v1.8.3`**：已打并推送，指向 PR #28 合并提交 **`c3957d00d19f5a177aeaa2950df394274231b25b`**。
+- 发布准备提交：**`510b2ab`**（`chore(release): prepare v1.8.3`，PR #28）；流水线切换提交：`ci(release): point pipeline at v1.8.3`（本轮）。
 
 ## 本轮变化（相对 v1.8.2）
 

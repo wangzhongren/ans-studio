@@ -1,6 +1,9 @@
-export const SOURCE_REF = 'v1.8.2';
-export const SOURCE_SHA = '1064ad8748c8d5a987bb378190a3ca2e47f932c7';
-// v1.8.2 overlay：冻结源 tag v1.8.2 已含全部产品/测试代码（D3 选中集记账修复：仅 appointment 卡写角色集，
+export const SOURCE_REF = 'v1.8.3';
+export const SOURCE_SHA = 'c3957d00d19f5a177aeaa2950df394274231b25b';
+// v1.8.3 overlay：冻结源 tag v1.8.3 已含全部产品/测试代码（run-change 契约变更通道接线：会话头显式入口、
+// 两类保守自动触发、run-change-required 三段式；冻结三模式由客户选择）；白名单保持基础集与历史保留条目，
+// 未列名 app//src/ 仍 fail-closed。
+// v1.8.2 overlay（历史）：冻结源 tag v1.8.2 已含全部产品/测试代码（D3 选中集记账修复：仅 appointment 卡写角色集，
 // 决策/确认/验收卡选项不再被当作项目角色；读侧只认 D3 裁决、历史污染自动忽略）；白名单保持基础集与
 // 历史保留条目，未列名 app//src/ 仍 fail-closed。
 // v1.8.2 发布阻断修复（tag v1.8.2 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：
