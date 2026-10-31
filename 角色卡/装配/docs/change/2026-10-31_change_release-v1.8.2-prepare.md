@@ -23,6 +23,9 @@ events:
   - date: "2026-10-31"
     kind: updated
     summary: 测试清理修复 ff58dd4 合入 main；release-policy 白名单加入 4 个精确测试文件、打包测试增批次用例；重跑 CI 待触发
+  - date: "2026-10-31"
+    kind: released
+    summary: 重跑 CI（run 41174348027）三平台 build + release job 全过；v1.8.2 正式发布，12 资产与 SHA256 已回填
 ---
 
 # v1.8.2 发布准备
@@ -67,10 +70,11 @@ events:
 - `test/装配/release-packaging.test.ts`：`SOURCE_REF`/`SOURCE_SHA` 断言切到 v1.8.2；v1.8.0 历史批次用例保留。
 - `.github/workflows/release.yml`：source_ref 默认、并发组、`gh release` 引用、标题与 notes → v1.8.2；`publish` 默认 false。
 
-## CI、资产与 SHA（待回填）
+## CI、资产与 SHA（已回填）
 
-- 三平台 CI run：首轮 **run 41172893105 失败**（macOS arm64 新增测试清理竞态 `ENOTEMPTY`；Windows/macOS x64 通过）；测试稳定性修复后经 release-policy overlay 白名单（精确测试文件路径）重跑。重跑结果与资产**待回填**；不编造 run id。
-- 资产：`ANS-Studio-1.8.2-mac-arm64.zip`、`-mac-x64.zip`、`-win-x64.zip` + `SHA256SUMS-*` + `release-provenance.json` + `overlay.patch`；发布后回填。
+- **CI**：首轮 run 41172893105 失败（macOS arm64 新增测试清理竞态 `ENOTEMPTY`；Windows/macOS x64 通过）；测试稳定性修复 `ff58dd4` 经 overlay 白名单（4 个精确测试文件）重跑 **run 41174348027：三平台 build + release job 全部 success**；draft 12 资产齐备，release job 已执行 `sha256sum -c` 校验。
+- **发布**：`v1.8.2` 已去 draft 正式发布：https://github.com/wangzhongren/ans-studio/releases/tag/v1.8.2
+- 资产 SHA256：mac-arm64 `3277eae1…c3d30`；mac-x64 `4234f938…70cb2`；win-x64 `804ba3b9…becb0`；overlay.patch `a20c9379…21046`（与本地预演一致）；release-provenance.json `04852288…f37fb`（完整值见 README 表与 Release）。
 - 未签名、未公证。
 
 ## 证据边界
