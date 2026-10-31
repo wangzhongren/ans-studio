@@ -255,16 +255,17 @@ export interface ShellJudgeResultPayload {
 }
 
 /**
- * 桌面通道的审计扩展（契约家 `ShellJudgeAudit` 未含本字段；同编排 `ShellJudgeAuditWithLabel` 先例，
- * **不改 `src/model/runtime.ts`**）。
+ * 桌面通道的审计扩展（**兼容别名**）。
  *
  * 2026-10-19 客户裁定：判断 agent 是唯一审查者——`manual` / `row-failed` 一律按拒绝处理。此时 `judge`
  * 审计字段的 `verdict` 记**通道最终处置** `deny`，`modelVerdict` 保留模型原始事实（`manual` / `allow`），
  * 本标记明确「这不是模型主动 deny」；审计/诊断据此可辨，原 `reasonCode` 也原样保留。
+ *
+ * 2026-10-31（shell 判拒升级方案 v1.3 §7.1）：`modelVerdict`/`manualAsDeny` 已**并入共享契约**
+ * `ShellJudgeAudit`（运行时核心 A1 的加法）；本类型保留为**兼容别名**（既有导入方 `test/测试/` 等仍可用），
+ * 不得再承载共享契约之外的字段。
  */
-export interface ShellJudgeAuditWithManual extends ShellJudgeAudit {
-  manualAsDeny?: true;
-}
+export type ShellJudgeAuditWithManual = ShellJudgeAudit;
 
 /** 人对一次 shell 确认的选择。 */
 export interface OperatorDecision {
@@ -290,11 +291,25 @@ export type DesktopOperatorChannelFn = (prompt: OperatorPrompt, metadata?: Deskt
 export interface OperatorPresenter {
   /** 把一次确认请求摆给人看，解析为人的选择；通道不可用/抛错 → 由 channel 归为 fail-closed。 */
   present(prompt: OperatorPrompt, display: ShellCommandDisplay, metadata?: DesktopOperatorMetadata): Promise<OperatorDecision>;
+  /**
+   * **可选**：共享呈现槽仲裁（2026-10-31 升级方案 §7.2）——真正推达前等待槽位（升级卡排他）。
+   * `false` = 等待上限/中止 ⇒ 通道按 `unavailable` fail-closed；**等待期间不启动确认超时**。
+   * 缺省（既有 presenter/测试）⇒ 不等待、行为逐字不变。
+   */
+  waitForSlot?(signal?: AbortSignal, timeoutMs?: number): Promise<boolean>;
 }
 
 /** 逐项呈现一行参数：JSON 转义（引号仅为界定符，便于无歧义核对空格/引号）。 */
 function argvLine(index: number, arg: string): string {
   return `[${index}] ${JSON.stringify(arg)}`;
+}
+
+/**
+ * 规范化 argv → 逐项呈现行（与确认卡/升级卡同一呈现口径；**单一实现**——`describeShellCommand`
+ * 与升级卡数据面 `shell-escalation.ts` 共用）。
+ */
+export function renderArgvLines(argv: readonly string[]): string[] {
+  return argv.map((arg, index) => argvLine(index, arg));
 }
 
 /**
@@ -306,7 +321,7 @@ export function describeShellCommand(prompt: OperatorPrompt): ShellCommandDispla
   const argv = normalizeArgv(prompt.argv);
   const cwd = typeof prompt.cwd === "string" ? prompt.cwd : "";
   const reason = typeof prompt.reason === "string" && prompt.reason !== "" ? prompt.reason : undefined;
-  const argvLines = argv.map((a, i) => argvLine(i, a));
+  const argvLines = renderArgvLines(argv);
   const approvalContext = prompt.approvalContext;
   const text = renderConfirmText(command, argvLines, cwd, reason, approvalContext);
   return {
@@ -431,6 +446,27 @@ export function createDesktopOperatorChannel(opts: CreateOperatorChannelOptions)
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
         return { outcome: "unavailable", reason: mainT("main.operator.channelUnavailable") };
+      }
+      // 2026-10-31（判拒升级方案 v1.3 §7.2）：升级卡**排他**——真正推达前等待共享呈现槽。
+      // **等待期间不启动**操作者确认超时（超时从实际推达开始计时）；等待上限/中止 ⇒ unavailable（fail-closed）。
+      // 未配置 `waitForSlot` 的 presenter（既有测试/其它调用方）⇒ 不等待，行为逐字不变。
+      if (opts.presenter.waitForSlot !== undefined) {
+        const waitSignal = displayMetadata?.signal ?? metadata?.signal;
+        let granted = false;
+        try {
+          granted = await opts.presenter.waitForSlot(waitSignal, timeoutMs);
+        } catch {
+          granted = false; // 等待抛错 = 槽位不可用（fail-closed）
+        }
+        if (!granted) {
+          return {
+            outcome: "unavailable",
+            reason:
+              metadata?.signal.aborted === true
+                ? mainT("main.operator.channelErrorRejected", { detail: mainT("main.operator.expiredStopped") })
+                : mainT("main.operator.timeoutRejected", { ms: timeoutMs }),
+          };
+        }
       }
       let decision: OperatorDecision;
       try {
@@ -693,6 +729,10 @@ function manualDenyAdvice(reasonCode: string): string {
     case "unsupported-engine":
     case "context-missing":
       return mainT("main.operator.manualDenyAdvice.switchOff");
+    case "retry-capped":
+      // 2026-10-31（判拒升级方案 v1.3 §4.6/AC-19）：retry-capped 不再只写「请重试」——
+      // 给出「可申请客户确认」的新出路，并保留「关闭『替我审批』后重试」兜底（文案单一来源 = A3 i18n）。
+      return mainT("main.operator.manualDenyAdvice.retryCapped");
     default:
       return mainT("main.operator.manualDenyAdvice.retry");
   }
@@ -828,6 +868,11 @@ export function plainReasonFor(reason: unknown, roleDisplayName?: string): strin
 
 /** 确认卡的**数据面**（主进程 → 渲染侧；只呈现，不含任何判定）。 */
 export interface ShellConfirmRequest {
+  /**
+   * 卡族类型（2026-10-31 升级方案 v1.3 §7.2，加法）：审批卡恒 `"approval"`；升级卡走同一
+   * `shell:confirm-request` 通道并带 `kind:"escalation"`（见 `shell-escalation.ts`）。旧渲染忽略此字段。
+   */
+  kind?: "approval";
   id: string;
   roleId?: string;
   projectRoot?: string;
@@ -865,6 +910,7 @@ export function buildShellConfirmRequest(
   const reasonRaw = typeof display.reason === "string" && display.reason !== "" ? display.reason : null;
   const tier = parseSuApprovalTier(reasonRaw);
   return {
+    kind: "approval",
     id,
     command: display.command,
     summary: shellIntentSummary(display.command),
@@ -889,6 +935,12 @@ export interface CreateShellConfirmPresenterOptions {
   cleanupAfterMs?: number;
   /** 可注入环境（读取超时 env；缺省 `process.env`）。 */
   env?: Record<string, string | undefined>;
+  /**
+   * **共享呈现槽**（2026-10-31 升级方案 v1.3 §7.2）：与本窗口升级卡呈现端使用**同一实例**——
+   * 升级卡待答时审批卡在真正推达前等待（`waitForSlot`），有审批卡待答时升级申请直接拒绝。
+   * 缺省 ⇒ 不参与仲裁（既有测试/调用方行为逐字不变；恢复卡不配置）。
+   */
+  slot?: import("./confirm-card.ts").ConfirmCardSlot;
 }
 
 /** 应用内确认卡的**呈现端**（挂在主进程；渲染侧只渲染，不判定）。 */
@@ -922,6 +974,8 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
     component: "desktop.shell-confirm",
     present: opts.present,
     expiredResponse: mainT("shared.common.shellConfirmationExpired"),
+    // 2026-10-31（升级方案 v1.3 §7.2）：配置共享槽 ⇒ 与升级卡跨类型仲裁；缺省 ⇒ 既有语义不变。
+    ...(opts.slot !== undefined ? { slot: { arbitrate: opts.slot, kind: "approval" as const } } : {}),
     onExpired: (payload) => {
       opts.onExpired?.({
         id: payload.id,
@@ -972,6 +1026,14 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
         // 恰 allow:true 才放行；其余（含缺字段/非布尔/失效）= 拒绝。
         return { allow: allowed };
       },
+      // 2026-10-31（升级方案 v1.3 §7.2）：审批卡在**真正推达前**等待共享槽（升级卡排他）。
+      // 仅配置 `slot` 时暴露——既有调用方/测试没有该方法，通道不等待（行为逐字不变）。
+      ...(opts.slot !== undefined
+        ? {
+            waitForSlot: (signal?: AbortSignal, timeoutMs?: number): Promise<boolean> =>
+              core.waitForSlot(signal, timeoutMs),
+          }
+        : {}),
     },
     respond: core.respond,
     rejectAllPending: core.rejectAllPending,
@@ -1034,6 +1096,12 @@ function readConfirmTimeoutMs(env: Record<string, string | undefined>): number {
     DEFAULT_OPERATOR_CONFIRM_TIMEOUT_MS
   );
 }
+
+/**
+ * 公开读取入口（2026-10-31 判拒升级）：升级卡（`shell-escalation.ts`）与本通道**同一取值链**，
+ * 单一实现留在本模块；升级卡 cleanupAfterMs 同用「确认超时 + 5000」口径（方案 §6.4 复用既有超时链）。
+ */
+export { readConfirmTimeoutMs };
 
 /** 解析一个正整数毫秒值；缺失/空白/非数字/非正值 ⇒ undefined（沿链回退）。 */
 function readPositiveMs(raw: string | undefined): number | undefined {

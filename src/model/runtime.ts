@@ -188,6 +188,12 @@ export interface ShellReviewRequest {
   argv: string[];
   cwd: string;
   toolCallId: string;
+  /**
+   * 审核入口（2026-10-31 shell 判拒升级方案 v1.3 §4.2/§6.3，加法）。`run_shell`＝前台执行；
+   * `start_background_task`＝会话级后台启动。升级授权键包含本字段：v1 **只有 `run_shell` 可申请**
+   * 客户升级，后台入口的判拒不写入/不清除前台记录、也不消费前台授权。缺省按 `run_shell` 兼容旧调用。
+   */
+  entry?: "run_shell" | "start_background_task";
   /** 应用补充的脚本内容审查上下文（由编排 shell-approval-context 读取；有界）。 */
   approvalContext?: ShellApprovalContext;
   /**
@@ -216,9 +222,85 @@ export type ShellPostAuditFn = (
   outcome: ShellExecutionOutcome,
 ) => ShellPostAuditResult | Promise<ShellPostAuditResult>;
 
-export type ShellReviewResult = { allow: true; by: string } | { allow: false; reason: string; by: string };
+/**
+ * 单次 shell 审核结果。允许分支的可选 `grant`（2026-10-31 升级方案 v1.3 §6.3 加法）表示**本次放行来自
+ * 客户升级授权**（由应用在客户卡回包后创建）；工具结果据此附「客户已允许一次/本会话」说明。
+ * 不改变 allow 语义：仍是唯一放行判据；缺省 ⇒ 旧行为逐字不变。
+ */
+export type ShellReviewResult =
+  | { allow: true; by: string; grant?: ShellGrant }
+  | { allow: false; reason: string; by: string };
 
 export type ShellGate = (req: ShellReviewRequest) => Promise<ShellReviewResult>;
+
+// —————————————— shell 判拒后的客户升级通道（2026-10-31 方案 v1.3 §6.3；中立契约） ——————————————
+//
+// 分层：本模块只定义中立形状（模型层不依赖桌面/Node）。判拒台账、资格、状态机、授权存储与审计由编排实现
+// （`src/common/编排/shell-escalation.ts`）；卡片呈现与 IPC 由桌面窗口实现（IPC 信封另带 `kind:"escalation"`，
+// 不属于本模型契约）。角色只能**申请**；授权只由应用在客户卡回包后创建；judge 不参与升级决定、
+// 「替我决策」不接入。v1 只允许 `run_shell` 入口。
+
+/** 客户对升级申请的三选一决定（**没有**「允许所有」「按前缀允许」）。 */
+export type ShellEscalationAction = "allow-once" | "allow-session" | "deny";
+
+/**
+ * 客户决定（含通道失败/超时的默认拒绝）；`operatorId` 由应用按回包填充。
+ *
+ * E2 返工 R2（2026-10-31 契约加法）：增第三支 `{ action: "pending"; reason? }`——呈现端在**已有待答
+ * shell 卡（审批/升级）**时返回 pending；registry 据此**不消耗申请权/额度、保持 recorded、可稍后再申请**。
+ * 它不是默认拒绝、也不是客户做出的决定（不得据此放行或写客户决定审计）。
+ */
+export type ShellEscalationDecision =
+  | { action: ShellEscalationAction; operatorId?: string }
+  | { action: "expired" | "unavailable"; reason?: string }
+  | { action: "pending"; reason?: string };
+
+/** 升级卡请求（主进程 → 呈现端）。所有事实取自判拒记录，不取模型本次输入。 */
+export interface ShellEscalationCardRequest {
+  version: 1;
+  /** 应用生成；卡与回包按 id 绑定（未知/过期 id 不放行）。 */
+  requestId: string;
+  roleId: string;
+  projectRoot: string;
+  runtime: RuntimeKind;
+  /** 判拒时的逐字原文（**不是**模型本次输入）。 */
+  command: string;
+  /** 规范化 argv（`splitCommand` + 既有 normalizeArgv 同源）。 */
+  argv: string[];
+  cwd: string;
+  judgeReason?: string;
+  judgeCustomerMessage?: string;
+  judgeAlternative?: ShellJudgeAlternative;
+  /** 角色提供的一句话必要性（≤1KB / 500 字符；**不可信数据**，不得作为标题/选项来源）。 */
+  necessity?: string;
+  /** 判拒时 judge 看到的同一份有界脚本上下文（如有；消费授权时据此比对 sha256）。 */
+  approvalContext?: ShellApprovalContext;
+  expiresAt?: string;
+}
+
+/** 卡片呈现函数（主进程注入）。超时/通道不可用/推达失败必须解析为 `expired`/`unavailable`，不得默认放行。 */
+export type ShellEscalationPresentFn = (
+  request: ShellEscalationCardRequest,
+  signal?: AbortSignal,
+) => Promise<ShellEscalationDecision>;
+
+/**
+ * 升级申请能力（`GovernedToolsOptions.shellEscalation`；**注入才注册**）。
+ * `argv` 由工具层既有 `splitCommand` 生成——模型不提供 argv，也不得提供任何授权字段。
+ * 回执 `{ok, message, state?}` 由编排 registry 生成、工具原样转达；`ok` 只表示「申请已被处理」，
+ * 即使 `allow-once` 也不表示命令已执行（角色须原样重试）。
+ */
+export type ShellEscalationFn = (
+  input: { command: string; argv: string[]; necessity?: string },
+  signal?: AbortSignal,
+) => Promise<{ ok: boolean; message: string; state?: string }>;
+
+/** 客户升级授权（只由应用在卡片回包后创建；角色不可自报）。 */
+export interface ShellGrant {
+  scope: "once" | "session";
+  requestId: string;
+  operatorId?: string;
+}
 
 export interface OperatorPrompt {
   command: string;
@@ -1364,6 +1446,13 @@ export interface ShellJudgeAudit {
   tier?: ShellJudgeTier;
   /** 客户 D1：judge `allow` 放行了 su `deny` 档——审计/聊天行标「deny 档 · judge 放行」。 */
   hardDenyOverride?: true;
+  /**
+   * 2026-10-31（shell 判拒升级方案 v1.3 §7.1 契约加法，向后兼容）：`manual`（含
+   * `reasonCode === "retry-capped"`）/ `row-failed` 被通道按拒绝处理时置位——`verdict` 记通道最终处置
+   * `deny`，`modelVerdict` 保留模型原始事实；用于升级资格判断与审计区分（这不是模型主动判拒）。
+   * 客户手批/客户升级授权都不写本字段。
+   */
+  manualAsDeny?: true;
 }
 
 /**
@@ -1976,6 +2065,13 @@ export interface GovernedToolsOptions {
    * 仅随 `shellGate` 一起注入；缺省 ⇒ 不审计（旧行为逐字不变）。
    */
   shellPostAudit?: ShellPostAuditFn;
+  /**
+   * 2026-10-31（shell 判拒升级方案 v1.3 §6.3）：`request_shell_escalation` 工具能力。
+   * **注入才注册，且只在 shell 已 arm（同时注入 `shellGate`）时注册**；未注入 ⇒ 工具不存在
+   * （能力缺席 = 最强 fail-closed）。处理器只发起申请：不执行命令、不写盘、不创建/消费授权；
+   * 资格/去重/限流/卡片/授权由编排 registry 实现。`RuntimeSessionOptions` 继承本字段（编排注入）。
+   */
+  shellEscalation?: ShellEscalationFn;
   /**
    * 2026-10-29（v2.13）：属主 write_file/edit_file 成功后的版本登记入口（guard 锁内追加/回退）。
    * 缺省 ⇒ 不登记（旧行为）；注入端由编排提供。

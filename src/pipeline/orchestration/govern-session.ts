@@ -82,6 +82,21 @@ export {
 } from "../../common/编排/governance-judge.ts";
 export type { CreateGovernanceJudgeOptions } from "../../common/编排/governance-judge.ts";
 
+// ── 2026-10-31：shell 判拒升级（编排 registry）的 Pipeline 公共出口 ─────────────────────────
+// 桌面窗口按既有模式消费：升级卡 presenter 由桌面实现并交给 `openRoleSession.shellEscalationPresenter`
+// （形状单一来源＝`model/runtime.ts` 的 `ShellEscalationPresentFn`）；此处薄再导出 registry 工厂与类型
+// （供桌面/测试按需构造替身或读取回执形状），**不新增 pipeline 单文件、不改变任何既有行为**。
+export { createShellEscalationSession, shellEscalationDisabled } from "../../common/编排/shell-escalation.ts";
+export type {
+  ShellEscalationRecord,
+  ShellEscalationReceipt,
+  ShellEscalationReviewedOutcome,
+  ShellEscalationRuntimeOptions,
+  ShellEscalationSession,
+  ShellEscalationSessionConfig,
+  ShellEscalationState,
+} from "../../common/编排/shell-escalation.ts";
+
 /** 角色目录名（与 `listProject` 口径一致：项目角色的目录 `角色卡/<id>/`）。 */
 const ROLE_CARD_DIR = "角色卡";
 

@@ -22,7 +22,7 @@ import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../s
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
 // （`SessionEventEnvelope`，B-2）——**类型从编排/本角色只读导入、不复制形状**。
-import type { WriteGate, RuntimeAdapter, ShellGate, CustomerInputFn, CustomerInputOutcome, DispatchTaskFn, PromptImage, PromptOptions, ViewImageFn, NetworkState } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, CustomerInputFn, CustomerInputOutcome, DispatchTaskFn, PromptImage, PromptOptions, ViewImageFn, NetworkState, ShellEscalationPresentFn } from "../../src/model/runtime.ts";
 // 2026-10-25 独立复核请求（`独立复核请求（已撤除）`）：能力回执/载荷形状唯一来源＝契约家 `model/runtime.ts`
 // （只读导入，不复制形状）；flowId 形状同样复用运行时核心导出的 slug 常量（不另写正则）。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
@@ -204,6 +204,13 @@ export interface ShellJudgeStateReply {
    * 渲染侧只在**明确 false** 时禁用并显示「当前版本不支持自动判断」，**不得显示假开启态**。
    */
   available?: boolean;
+  /**
+   * **「本次运行暂停自动审批」状态**（2026-10-31 shell 判拒升级方案 v1.3 §4.6/§6.5(e)/§7.2，加法）。
+   * 主进程**模块级**临时覆盖：同一次应用运行内跨窗口重开保留、应用重启清零；不写偏好、不持久化。
+   * **只作用于 shell 操作者通道**的 `isEnabled()`（有效值 = 持久化开关 && !paused），不改持久化开关值、
+   * **不影响治理 approval 组**（治理卡判断组仍只看全局开关）。缺省/false = 未暂停。
+   */
+  paused?: boolean;
 }
 
 /** 主进程权威的开关状态机（纯内存；由 main.ts 创建并与通道/Interface 共享**同一实例**）。 */
@@ -232,6 +239,54 @@ export function createShellJudgeSwitch(initialEnabled = false): ShellJudgeSwitch
     },
     reset() {
       enabled = false;
+    },
+  };
+}
+
+/**
+ * 「本次运行暂停自动审批」的**应答形状**（`shell:judge-pause`，2026-10-31 方案 v1.3 §7.2）。
+ * `ok:false` 时 `paused` 仍为**当前**真实状态（非法输入不改状态）。
+ */
+export interface ShellJudgePauseReply {
+  version: 1;
+  ok: boolean;
+  paused: boolean;
+  error?: string;
+}
+
+/**
+ * **「本次运行暂停自动审批」状态机**（2026-10-31 shell 判拒升级方案 v1.3 §4.6/§6.5(e)/§7.2）。
+ *
+ * 语义（客户确认口径）：应用运行期**临时覆盖**——
+ * · 状态本体由 `app/main.ts` **模块级**持有（`createShellSessionPauseState()` 的实例），同一次应用运行内
+ *   **跨窗口重开保留**；应用重启时模块重新初始化 ⇒ **清零**并回到持久化开关值；
+ * · **不写偏好、不持久化**；**只被 shell 操作者通道**读取（有效值 = 持久化开关 && !paused）；
+ * · **不影响治理 approval 组**（`customer-input` 的判断组仍只看全局开关）——本状态机不参与该组。
+ *
+ * 校验形状与 `shell:judge-set` 同级：只接受 `{paused:boolean}`、无额外字段；**失败不改状态**。
+ */
+export interface ShellSessionPauseState {
+  isPaused(): boolean;
+  set(input: unknown): ShellJudgePauseReply;
+  /** 显式复位为未暂停（测试/显式重置；窗口重开不调用——状态跨窗口保留即由此实例保证）。 */
+  reset(): void;
+}
+
+/** 构造暂停状态机（main.ts 模块级单例；跨窗口重开共享同一实例，重启清零）。 */
+export function createShellSessionPauseState(initialPaused = false): ShellSessionPauseState {
+  let paused = initialPaused === true;
+  return {
+    isPaused: () => paused,
+    set(input: unknown): ShellJudgePauseReply {
+      const record = input !== null && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : undefined;
+      if (record === undefined) return { version: 1, ok: false, paused, error: mainT("main.interface.toggleInvalid") };
+      if (typeof record.paused !== "boolean") return { version: 1, ok: false, paused, error: mainT("main.interface.toggleNotBoolean") };
+      if (Object.keys(record).some((key) => key !== "paused")) return { version: 1, ok: false, paused, error: mainT("main.interface.toggleUnknownField") };
+      paused = record.paused;
+      return { version: 1, ok: true, paused };
+    },
+    reset() {
+      paused = false;
     },
   };
 }
@@ -337,6 +392,9 @@ export interface DesktopDeps {
       shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
       /** **旧只读档（旧路径，类型保留兼容）**：桌面自 2026-10-17 起不再注入（内置治理角色统一改走审批档）。 */
       shellReadonly?: Omit<AssembleReadonlyShellGateOptions, "project">;
+      /** **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：`SessionManager` 每会话包装
+       *  （并入会话生命周期/当前轮中止信号）后透传；缺省 ⇒ 不传 ⇒ 升级工具不注册。 */
+      shellEscalationPresenter?: ShellEscalationPresentFn;
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
   ) => Promise<RoleSessionHandle>;
@@ -415,6 +473,13 @@ export interface DesktopDeps {
    * （客户裁定 2026-10-17、2026-10-19 新规则——单一来源，两边永不漂移）。**测试/e2e 可注入替身（桩件）**。
    */
   shellArming?: DesktopShellArming;
+  /**
+   * **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.1/§6.4）：主进程每窗口构造
+   * `createShellEscalationPresenter` 后注入；`SessionManager` 按**每会话**包装（并入会话生命周期与当前轮
+   * 中止信号）交给 `openRoleSession.shellEscalationPresenter`。缺省 ⇒ 不注入 ⇒ `request_shell_escalation`
+   * 不注册（能力缺席 = 最强 fail-closed）。**测试/e2e 可注入替身**。
+   */
+  shellEscalationPresenter?: ShellEscalationPresentFn;
   /**
    * 外部浏览器打开（B-1，2026-10-12）：Markdown 链接**外开**（渲染进程不碰 Node——一切经本层）。
    * 由主进程用 electron `shell.openExternal` 注入；**仅 http/https** 在 Interface 层校验
@@ -1812,6 +1877,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     shellOperatorChannel: deps.shellOperatorChannel,
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件——与 (a) 同处透传（仅项目角色消费；见 session.ts）。
     shellArming: deps.shellArming,
+    // 2026-10-31（判拒升级方案 v1.3 §6.4）：升级卡呈现端——SessionManager 每会话包装后交 openRoleSession；
+    // 缺省 ⇒ 不注入（升级工具不注册）。
+    shellEscalationPresenter: deps.shellEscalationPresenter,
     // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
     // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
     customerInput: deps.customerInput,

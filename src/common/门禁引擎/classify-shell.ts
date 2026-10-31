@@ -296,6 +296,69 @@ function matchReadOnly(args: string[], program: string, rules: ShellReadOnlyRule
   return null;
 }
 
+// —————————————— 例行命令确定性白名单（2026-10-31，方案 v1.3 §5.1/§5.3/§5.4）——————————————
+//
+// **唯一实现**：分类器（本文件 `classifyShellDetailed`）与 shell 写目标守卫
+// （`shell-write-guard.ts::evaluateShellWriteTargets`）**共用本函数**；Service 公开出口
+// `src/service/gate/shell-rules.ts` 只逐字再导出（同一函数引用），编排/委托策略经该出口消费。
+// 不得复制实现或另立第二份白名单（方案 §9 不变量 3 / §13.3）。
+//
+// 只放宽**精确 argv 形态**（§5.1）：任何多余参数、flag、`--`、通配、越界路径都不命中，落回既有链
+// （review/risky → judge 或客户卡），fail-closed 不变。本函数**无 IO、不依赖 ShellRules**
+// （§5.4：白名单不进规则集数据——写守卫拿不到规则集，避免扩大装配面）。
+//
+// 命中 id 是冻结契约：分类器 ruleId 为 `allow:routine:<id>`；B1 的委托策略（`routine-shell-policy`）
+// 只接受原委托清单三 id（`npm-test` / `npm-run-typecheck` / `node-test`）。**不得改名**。
+
+/** `npm run <script>` 固定脚本名（§5.1）：任意其它脚本名不放行（`build`/`start`/自定义仍走既有链）。 */
+const ROUTINE_NPM_RUN_SCRIPTS: ReadonlySet<string> = new Set(["test", "typecheck", "lint", "check"]);
+
+/** `node --test <path>` 的路径段字符集：Unicode 字母/数字与 `._@+-`（中文测试目录合法）；空白/元字符/引号/反斜杠一律不命中。 */
+const ROUTINE_TEST_PATH_SEGMENT = /^[\p{L}\p{N}._@+-]+$/u;
+
+/** 测试文件后缀（§5.1）：`*.test.{js,ts,mjs,cjs,mts,cts}`（大小写敏感，fail-closed）。 */
+const ROUTINE_TEST_FILE = /\.test\.(?:js|ts|mjs|cjs|mts|cts)$/;
+
+/** `node --test` 的单个路径：必须在 `test/` 下、匹配测试后缀、无 flag、无 `..`、无空白/元字符。 */
+function isRoutineNodeTestPath(p: string): boolean {
+  if (p === "" || p.startsWith("-")) return false;
+  // 项目相对路径，字面以 `test/` 开头（`./test/…`、绝对路径、`TEST/…` 均不命中）。
+  if (!p.startsWith("test/")) return false;
+  const segments = p.split("/");
+  if (segments.length < 2) return false;
+  for (const seg of segments) {
+    if (seg === "." || seg === "..") return false; // 无 `..`（逃逸）与空段/当前段
+    if (!ROUTINE_TEST_PATH_SEGMENT.test(seg)) return false; // 无空白/元字符
+  }
+  return ROUTINE_TEST_FILE.test(p);
+}
+
+/**
+ * 例行命令确定性白名单谓词（方案 v1.3 §5.1 精确形态；唯一实现）。
+ * 命中返回稳定 id；未命中返回 undefined（调用方落回既有链，fail-closed 不变）。
+ * 纯函数：无 IO、无副作用、不依赖规则集。
+ */
+export function matchRoutineShellCommand(argv: string[]): { id: string } | undefined {
+  if (!Array.isArray(argv)) return undefined;
+  if (!argv.every((a) => typeof a === "string")) return undefined;
+  if (argv.length === 2) {
+    const prog = argv[0];
+    const second = argv[1];
+    if (prog === "npm" && second === "test") return { id: "npm-test" };
+    if (prog === "npm" && second === "ci") return { id: "npm-ci" };
+    if (prog === "tsc" && second === "--noEmit") return { id: "tsc-noemit" };
+  }
+  if (argv.length === 3 && argv[0] === "npm" && argv[1] === "run") {
+    const script = argv[2]!;
+    if (ROUTINE_NPM_RUN_SCRIPTS.has(script)) return { id: `npm-run-${script}` };
+  }
+  if (argv[0] === "node" && argv[1] === "--test") {
+    // 裸 `node --test`（cwd=项目根的默认发现）或受限测试路径；任何 flag/越界/畸形路径都不命中。
+    if (argv.slice(2).every(isRoutineNodeTestPath)) return { id: "node-test" };
+  }
+  return undefined;
+}
+
 // rg 的带值选项仅用于跳过参数值（例如 -e --pre 是模式），不是新的安全白名单。
 // D3 只识别显式 --pre；隐藏配置、其他间接执行能力沿用已接受的风险取舍。
 const RG_VALUE_OPTIONS = new Set([
@@ -436,6 +499,19 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
         }
       }
     }
+  }
+
+  // 6.5) 例行命令确定性白名单（2026-10-31，方案 v1.3 §5.1/§5.3）——**唯一纯函数**，写守卫共用同一引用。
+  //    位置契约（§5.3）：硬拒（第 5 步）与记号检查（第 6 步）**之后** ⇒ 硬地板/自定义记号仍握绝对优先（P7/AC-16）；
+  //    risky（第 7 步）**之前** ⇒ 注入更严格的 risky 规则也不能覆盖本确定性白名单（§8.3 第 11 点，客户已接受）。
+  //    未命中的形态（npm install / 任意脚本名 / 裸 tsc / 越界或带 flag 的 node --test…）继续走既有链。
+  const routine = matchRoutineShellCommand(args);
+  if (routine !== undefined) {
+    return {
+      decision: "allow",
+      reason: `命中例行命令确定性白名单：${routine.id}`,
+      ruleId: `allow:routine:${routine.id}`,
+    };
   }
 
   // 7) risky 程序（危险但有正当用途）→ "risky"（§14.2：交 (b) pm 审读；(b) 判放行后**仍须**过 (a) 客户）。

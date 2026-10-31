@@ -48,6 +48,45 @@ const D_RETAINED_KEYS = [
   "main.viewImage.queued",
 ] as const;
 
+/**
+ * shell 判拒后的客户升级通道 key 契约（方案 2026-10-31 §7.3，A3 冻结）。
+ * C1/C2 只消费本清单；新增/改名须回到项目管理并显式更新本断言与分区计数。
+ */
+const SHELL_ESCALATION_KEYS = [
+  "main.operator.escalation.appliedOnce",
+  "main.operator.escalation.appliedSession",
+  "main.operator.escalation.denied",
+  "main.operator.escalation.expired",
+  "main.operator.escalation.ineligible",
+  "main.operator.escalation.pending",
+  "main.operator.escalation.capped",
+  "main.operator.escalation.invalid",
+  "main.operator.manualDenyAdvice.retryCapped",
+  "main.operator.judgeWayOut",
+  "ui.judge.closeAndRetry",
+  "ui.confirm.escalation.title",
+  "ui.confirm.escalation.intro",
+  "ui.confirm.escalation.judgeHeader",
+  "ui.confirm.escalation.necessityHeader",
+  "ui.confirm.escalation.necessityNote",
+  "ui.confirm.escalation.contextHeader",
+  "ui.confirm.escalation.contextPath",
+  "ui.confirm.escalation.contextNpmScript",
+  "ui.confirm.escalation.contextSha",
+  "ui.confirm.escalation.contextNote",
+  "ui.confirm.escalation.allowOnce",
+  "ui.confirm.escalation.allowSession",
+  "ui.confirm.escalation.reject",
+  "ui.confirm.escalation.note",
+  "ui.confirm.escalation.expired",
+  "ui.confirm.escalation.customerNotJudge",
+  "ui.confirm.escalation.pauseSession",
+  "ui.judge.pauseSession",
+  "ui.judge.pauseSessionDone",
+  "ui.judge.pausedBadge",
+  "ui.judge.resume",
+] as const satisfies readonly MessageKey[];
+
 function templateTexts(template: unknown): string[] {
   if (typeof template === "string") return [template];
   if (template !== null && typeof template === "object") return Object.values(template).filter((v): v is string => typeof v === "string");
@@ -59,7 +98,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 886 / main 550 / shared 62 / preferences 3，总计 1501", () => {
+test("key 分区计数：ui 907 / main 559 / shared 62 / preferences 3，总计 1531", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -67,8 +106,8 @@ test("key 分区计数：ui 886 / main 550 / shared 62 / preferences 3，总计 
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 886, main: 550, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1501);
+  assert.deepEqual(prefixes, { ui: 907, main: 559, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1531);
 });
 
 test("key parity：zh-CN 与 en-US 全集一致（顺序无关）", () => {
@@ -101,4 +140,26 @@ test("关键 key 清单：B0 与 D 保留能力 key 全部存在且中英成对"
   }
   assert.equal(translate("zh-CN", "main.window.title"), zhCN["main.window.title"]);
   assert.equal(translate("en-US", "main.window.title"), enUS["main.window.title"]);
+});
+
+test("shell 升级 key 契约：§7.3 清单中英成对且回执保留兜底子串", () => {
+  for (const key of SHELL_ESCALATION_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+  }
+  // 改写后的回执必须保留「关闭」「替我审批」「重试」三词（方案 §4.6 / V1 AC-19）。
+  for (const text of [zhCN["main.operator.judgeWayOut"], zhCN["ui.judge.closeAndRetry"], zhCN["main.operator.manualDenyAdvice.retryCapped"]]) {
+    for (const word of ["关闭", "替我审批", "重试"]) {
+      assert.ok(text.includes(word), `改写文案缺少「${word}」：${text}`);
+    }
+  }
+  // judge 判拒与 retry-capped 回执给出「申请客户确认」新出路（不再只写重试）。
+  assert.ok(zhCN["main.operator.judgeWayOut"].includes("request_shell_escalation"));
+  assert.ok(zhCN["main.operator.manualDenyAdvice.retryCapped"].includes("request_shell_escalation"));
+  // 升级卡三选项、不可信标注与「客户手批 ≠ judge 放行」声明（方案 §4.3/§7.1）。
+  assert.equal(zhCN["ui.confirm.escalation.allowOnce"], "允许一次");
+  assert.equal(zhCN["ui.confirm.escalation.allowSession"], "本会话允许该精确命令");
+  assert.equal(zhCN["ui.confirm.escalation.reject"], "拒绝");
+  assert.ok(zhCN["ui.confirm.escalation.customerNotJudge"].includes("客户手批 ≠ judge 放行"));
+  assert.ok(zhCN["ui.confirm.escalation.necessityNote"].includes("由角色提供，未经验证"));
 });

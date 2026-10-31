@@ -459,7 +459,11 @@ test("su 审批档（**真正接通**核查）：真实 openRoleSession + 真实
     assert.equal(curlDenied.allow, false, "客户拒绝 ⇒ 拒绝（fail-closed）");
     assert.equal(prompts.length, 2);
     // (c)=review 同样交客户审批（不是只读档式的直接拒）。
-    const nodeTest = await gate!({ command: "node --test", argv: ["node", "--test"], cwd: root, toolCallId: "call-nt" });
+    // 2026-10-31（A2 §5.4/P7 影响同步，C1 逐条列明）：裸 `node --test` 已被 (c) 确定性白名单放行为
+    // `c-allow`（0 卡、0 judge，**所有角色**含内置治理角色）——不再是 review 样本；`node --test ../outside.test.ts`
+    // 会被写目标守卫按越界脚本拒（也不出卡）。改用**不命中**白名单的 `tsc -p tsconfig.json`（review、写守卫不拦），
+    // 保留「review ⇒ 出卡交客户审批」断言。
+    const nodeTest = await gate!({ command: "tsc -p tsconfig.json", argv: ["tsc", "-p", "tsconfig.json"], cwd: root, toolCallId: "call-nt" });
     assert.equal(prompts.length, 3, "review ⇒ 同样出卡交客户审批");
     assert.equal(nodeTest.allow, false, "当前桩件答案为拒绝 ⇒ 不执行");
     await mgr.stop();
@@ -1088,9 +1092,12 @@ test("F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时�
 test("F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起的 shell 确认卡；replayPending 只推仍挂起者", async () => {
   const mainSrc = fs.readFileSync(path.join(APP_DIR, "main.ts"), "utf8");
   // D 批：恢复确认卡已撤除；shell 确认卡的幂等重推保持。
-  assert.ok(/win\.on\("focus", \(\) => \{ shellConfirm\.replayPending\(\); \}\)/.test(mainSrc), "focus ⇒ 幂等重推挂起 shell 卡（渲染侧丢推的兜底）");
-  assert.ok(/win\.on\("show", \(\) => \{ shellConfirm\.replayPending\(\); \}\)/.test(mainSrc), "show ⇒ 幂等重推挂起 shell 卡");
+  // 2026-10-31（判拒升级方案 v1.3 §7.2 影响同步，C1 逐条列明）：同一 focus/show 还重推挂起的**升级卡**
+  // （同一 `shell:confirm-request` 通道；只重推仍挂起者、不改变判定）——断言相应扩展，既有 shell 卡重推不变。
+  assert.ok(/win\.on\("focus", \(\) => \{ shellConfirm\.replayPending\(\); shellEscalation\.replayPending\(\); \}\)/.test(mainSrc), "focus ⇒ 幂等重推挂起的 shell 卡与升级卡（渲染侧丢推的兜底）");
+  assert.ok(/win\.on\("show", \(\) => \{ shellConfirm\.replayPending\(\); shellEscalation\.replayPending\(\); \}\)/.test(mainSrc), "show ⇒ 幂等重推挂起的 shell 卡与升级卡");
   assert.ok(mainSrc.includes("shellConfirm.replayPending()"), "复用既有幂等重推入口");
+  assert.ok(mainSrc.includes("shellEscalation.replayPending()"), "升级卡复用同一幂等重推口径");
   assert.equal(mainSrc.includes("recoveryConfirm"), false, "D 批恢复确认卡接线不得复活");
 
   // 行为面：只重推**仍挂起**的项；已决项绝不复活（重推不改判定）。
@@ -1451,6 +1458,41 @@ test("替我审·manual（context-too-large/budget/timeout）⇒ presenter 零�
     assert.equal(audit?.reasonCode, c.reasonCode, `${c.reasonCode}: 审计保留原 reasonCode`);
     assert.equal(audit?.manualAsDeny, true, `${c.reasonCode}: 带 manualAsDeny 标记`);
   }
+});
+
+// 2026-10-31（shell 判拒升级方案 v1.3 §4.6/AC-18/AC-19）：`manual/retry-capped` 仍按拒绝处理（不弹卡、
+// 不产生 manual 结果行），但**判拒事实可申请**：审计带 `manualAsDeny`/`modelVerdict:"manual"`/原 reasonCode；
+// 回执出路改为「可申请客户确认 + 关闭开关兜底」（i18n `main.operator.manualDenyAdvice.retryCapped`，A3 冻结）。
+test("替我审·manual/retry-capped ⇒ 仍拒绝不弹卡；审计保留 manual 事实；回执给出申请客户确认的新出路", async () => {
+  let presented = 0;
+  let emitted = 0;
+  const ch = createDesktopOperatorChannel({
+    presenter: { async present() { presented += 1; return { allow: true }; } },
+    operatorId: "alice",
+    judge: { isEnabled: () => true },
+    emitJudgeResult: () => {
+      emitted += 1;
+      throw new Error("retry-capped 不该发结果行");
+    },
+  });
+  const res = await ch(
+    req("node -e x", ["node", "-e", "x"]),
+    judgeMetadata({ runtime: "claude", judge: judgeStub({ verdict: "manual", reasonCode: "retry-capped", reason: "同类命令连续被拒，已达重试上限" }) }),
+  );
+  assert.equal(presented, 0, "retry-capped 仍按拒绝处理——不弹客户确认卡（2026-10-19 裁定不变）");
+  assert.equal(emitted, 0, "manual 不产生结果行");
+  assert.equal(res.outcome, "deny", "按拒绝处理");
+  assert.equal((res as { operatorId?: string }).operatorId, "judge:claude", "归因 judge:<engine>");
+  const reason = (res as { reason?: string }).reason ?? "";
+  assert.ok(reason.includes("request_shell_escalation"), "回执给出「可调用 request_shell_escalation 申请客户确认」的新出路");
+  assert.ok(reason.includes("关闭「替我审批」后重试"), "保留「关闭『替我审批』后重试」兜底");
+  assert.ok(reason.includes("每会话一次"), "说明每会话一次（防止反复打扰）");
+  assert.equal(reason.includes("已转你手动确认"), false, "不再说「已转你手动确认」");
+  const audit = (res as { judge?: ShellJudgeAuditWithManual }).judge;
+  assert.equal(audit?.verdict, "deny", "通道最终处置是拒绝");
+  assert.equal(audit?.modelVerdict, "manual", "保留模型原始事实 manual（不伪装成模型主动 deny）");
+  assert.equal(audit?.reasonCode, "retry-capped", "审计保留 retry-capped 原因码（资格判断依据）");
+  assert.equal(audit?.manualAsDeny, true, "带 manualAsDeny 标记（可申请事实随判拒审计传出）");
 });
 
 test("替我审·manual ⇒ deny 诊断保留原 reasonCode 与 manual 事实（不写模型主动 allow/deny 的 decision 诊断）", async () => {

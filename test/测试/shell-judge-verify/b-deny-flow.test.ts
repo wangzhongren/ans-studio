@@ -59,7 +59,12 @@ test("judge deny + 替代方案：0 卡、结果行、请求角色收到原因+�
     assert.match(result.reason, /请向客户说明：这一步没有必要/);
     assert.match(result.reason, /原因：全量测试会修改共享数据/);
     assert.match(result.reason, /替代方案（command）：npm run test:unit/);
-    assert.match(result.reason, /出路：如需执行，请关闭「替我审批」后重试。/);
+    // 2026-10-31 方案 v1.3 §4.6/AC-19：判拒出路升级为「可申请客户确认 + 关闭开关兜底」；
+    // 逐字断言新全文（仍保留「关闭」「替我审批」「重试」三词的兜底语义，不放宽）。
+    assert.match(
+      result.reason,
+      /出路：如确属推进必需，可调用 request_shell_escalation 对这条精确命令申请客户确认（每会话一次）；或关闭「替我审批」后重试。/,
+    );
 
     assert.equal(chain.rows.length, 1);
     const row = chain.rows[0]!;

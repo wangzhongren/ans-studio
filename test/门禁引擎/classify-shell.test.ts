@@ -416,6 +416,24 @@ test("risky：包管理 npm run / npm install / npx → risky；npm ls（只读�
   assert.equal(classifyShell(["npm", "ls"], rules), "allow");
 });
 
+// 2026-10-31（方案 v1.3 §5.1/§5.4）：例行命令确定性白名单 × 包管理分档。
+// 既有行为变化：`npm test`/`npm ci` 原为 risky:pkg-run（过 b 且必过 a），现为 c 级确定性 allow；
+// `npm install`（含带包）与 `npm run build`（任意其它脚本名）**仍 risky**，不放宽。
+test("例行白名单（§5.4）：npm test / npm ci → allow；npm install / npm run build 仍 risky", () => {
+  const npmTest = classifyShellDetailed(["npm", "test"], rules);
+  assert.equal(npmTest.decision, "allow");
+  assert.equal(npmTest.ruleId, "allow:routine:npm-test");
+  const npmCi = classifyShellDetailed(["npm", "ci"], rules);
+  assert.equal(npmCi.decision, "allow");
+  assert.equal(npmCi.ruleId, "allow:routine:npm-ci");
+  // 未命中形态维持原判（负例，不得被白名单波及）。
+  assert.equal(classifyShell(["npm", "install"], rules), "risky");
+  assert.equal(classifyShell(["npm", "install", "chalk"], rules), "risky");
+  assert.equal(classifyShell(["npm", "run", "build"], rules), "risky");
+  assert.equal(classifyShell(["npm", "ci", "--ignore-scripts"], rules), "risky");
+  assert.equal(classifyShell(["npm", "test", "--", "--ci"], rules), "risky");
+});
+
 test("risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky（正当写盘，程序名可见）", () => {
   for (const argv of [
     ["cp", "a.txt", "b.txt"],

@@ -28,7 +28,7 @@
 // 跨角色待办（见 change 文档）；未获注入时闸一律拒绝（fail-closed，绝不因缺件而放宽）。
 
 import type { ProjectConfig } from "../../model/role.ts";
-import type { RuntimeKind, RuntimeAdapter, ShellGate, WriteGate, OperatorChannelFn } from "../../model/runtime.ts";
+import type { RuntimeKind, RuntimeAdapter, ShellGate, WriteGate, OperatorChannelFn, ShellGrant } from "../../model/runtime.ts";
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import { listProject, resolveRole } from "../../service/role/resolve-role.ts";
 import {
@@ -39,6 +39,7 @@ import {
   buildShellGate,
   type ClassifyShellFn,
   type ShellRules,
+  type ShellGateReviewedOutcome,
 } from "../../common/编排/shell-gate.ts";
 import type { ShellAuditSink } from "../../common/编排/shell-audit.ts";
 import type { ShellWriteGuardDecision } from "../../common/门禁引擎/shell-write-guard.ts";
@@ -68,7 +69,22 @@ const NO_AUDIT_BOUNDARY: BoundarySection1 = {
   acceptance: { accepted: false, source: "" },
 };
 
-export interface AssembleShellGateOptions {
+/**
+ * 2026-10-31（shell 判拒升级方案 v1.3 §6.1/§6.3）：闸的三个升级注入点，由 `run-role` 的
+ * **每会话** `shellEscalation` registry 提供（roleId 由闭包绑定）：
+ * - `onReviewed`：审核结束回调（记录/清理，不改变判定）；
+ * - `takeGrant`：客户升级授权检查/消费（返回 `"stale"` ⇒ 拒绝且授权作废）；
+ * - `onAuditSinkCreated`：闸创建/取得审计 sink 后回调（与升级 registry 共享同一 sink）。
+ * **只读档（`assembleReadonlyShellGate`）不提供本组注入**——只读拒绝不得被陈旧授权越过。
+ * 全部缺省 = 旧行为逐字不变。
+ */
+export interface ShellEscalationWiring {
+  onReviewed?: (req: Parameters<ShellGate>[0], outcome: ShellGateReviewedOutcome) => void;
+  takeGrant?: (req: Parameters<ShellGate>[0], context?: ShellApprovalContext) => ShellGrant | "stale" | undefined;
+  onAuditSinkCreated?: (sink: ShellAuditSink) => void;
+}
+
+export interface AssembleShellGateOptions extends ShellEscalationWiring {
   /** 目标项目（配置单一来源在装配/前端）。 */
   project: ProjectConfig;
   runtime?: RuntimeKind;
@@ -180,6 +196,10 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
     ...(opts.snapshotBefore !== undefined ? { snapshotBefore: opts.snapshotBefore } : {}),
     ...(opts.approvalContextLoader !== undefined ? { approvalContextLoader: opts.approvalContextLoader } : {}),
+    // 2026-10-31 判拒升级：升级注入点透传到闸（缺省不传 = 旧行为逐字不变）。
+    ...(opts.onReviewed !== undefined ? { onReviewed: opts.onReviewed } : {}),
+    ...(opts.takeGrant !== undefined ? { takeGrant: opts.takeGrant } : {}),
+    ...(opts.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: opts.onAuditSinkCreated } : {}),
     // 项目角色三层链默认 advisory（客户 2026-10-18）：规则只放行，不拒绝；拒绝交 (a)。
     advisoryRuleset: opts.advisoryRuleset ?? true,
   });
@@ -280,7 +300,7 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
  * 客户审批不得被模型审读或委托常规检查绕过；type 层面即接不上。
  * `operatorChannel` **必填**（无通道即不 arm；`shell-gate.ts` 构造期亦有守卫）。
  */
-export interface AssembleOperatorShellGateOptions {
+export interface AssembleOperatorShellGateOptions extends ShellEscalationWiring {
   /** 目标项目（配置单一来源在装配/前端）。 */
   project: ProjectConfig;
   /** (a) 客户确认通道（**必填**；桌面确认卡 / 测试桩）。批准才执行；拒绝/超时/不可用 = 拒绝。 */
@@ -365,6 +385,10 @@ export async function assembleOperatorShellGate(
     ...(opts.writeGuard !== undefined ? { writeGuard: opts.writeGuard } : {}),
     ...(opts.snapshotBefore !== undefined ? { snapshotBefore: opts.snapshotBefore } : {}),
     ...(opts.approvalContextLoader !== undefined ? { approvalContextLoader: opts.approvalContextLoader } : {}),
+    // 2026-10-31 判拒升级：升级注入点透传到闸（缺省不传 = 旧行为逐字不变）。
+    ...(opts.onReviewed !== undefined ? { onReviewed: opts.onReviewed } : {}),
+    ...(opts.takeGrant !== undefined ? { takeGrant: opts.takeGrant } : {}),
+    ...(opts.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: opts.onAuditSinkCreated } : {}),
   });
 }
 

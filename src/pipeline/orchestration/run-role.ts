@@ -127,6 +127,8 @@ import type {
   ShellJudgeToolOptions,
   GovernanceJudgeContext,
   GovernanceJudgeToolOptions,
+  ShellEscalationFn,
+  ShellEscalationPresentFn,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../model/runtime.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
@@ -139,7 +141,15 @@ import {
   type AssembleReadonlyShellGateOptions,
   type AssembleOperatorShellGateOptions,
   type RoutineShellPolicy,
+  type ShellEscalationWiring,
 } from "./shell-arming.ts";
+// 2026-10-31（shell 判拒升级方案 v1.3 §6.1）：每会话升级 registry（判拒台账/资格/状态机/授权/审计）。
+import {
+  createShellEscalationSession,
+  shellEscalationDisabled,
+  type ShellEscalationRuntimeOptions,
+  type ShellEscalationSession,
+} from "../../common/编排/shell-escalation.ts";
 import { formatEvent } from "../../common/编排/output.ts";
 import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIntent, type HandbackEvent, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
@@ -259,6 +269,14 @@ export interface AdapterCapabilities {
   /** 2026-10-29（§6.5）：run_shell 执行后写审计（与 shellGate 同注入；缺省不审计）。 */
   shellPostAudit?: ShellPostAuditFn;
   shellVerdict?: ShellVerdictFn;
+  /**
+   * 2026-10-31（shell 判拒升级方案 v1.3 §6.1/§6.4）：`request_shell_escalation` 工具能力
+   * （运行时核心 `GovernedToolsOptions.shellEscalation` 同名能力位）。**只在 shell 已 arm
+   * （`shellGate` 注入）且升级通道未关闭（`ANS_SHELL_ESCALATION_DISABLED !== "1"`）时**由
+   * `openRoleSession` 注入；未注入 ⇒ 工具不注册（能力缺席 = 最强 fail-closed）。
+   * 工具只发起申请：不执行命令、不写盘、不创建/消费授权（授权只由客户卡回包后由编排 registry 创建）。
+   */
+  shellEscalation?: ShellEscalationFn;
   roleStatus?: RoleStatusFn;
   contractCheck?: ContractCheckFn;
   evidenceCheck?: EvidenceCheckFn;
@@ -647,6 +665,22 @@ export async function openRoleSession(
      * `pm-reviewer` 注入；一般调用方不传。
      */
     shellVerdict?: ShellVerdictFn;
+    /**
+     * **2026-10-31（shell 判拒升级方案 v1.3 §4/§6）升级卡的呈现函数（由桌面窗口 C1 提供）**：
+     * 给出 ⇒ 本会话构造 `shellEscalation` registry，并把 `onReviewed`/`takeGrant`/`onAuditSinkCreated`
+     * 交给已 arm 的 shell 闸、把 `request` 作为 `request_shell_escalation` 工具能力交给适配器。
+     * 卡内容只取自判拒记录（命令原文/argv/cwd/judge 理由/替代方案/上下文），角色只提供 ≤1KB 必要性。
+     * 未给出 / `ANS_SHELL_ESCALATION_DISABLED=1` ⇒ 不创建 registry、工具不注册、`takeGrant` 不注入
+     * （fail-closed；回滚开关见方案 §13.2）。presenter 的失败/超时**必须**解析为
+     * `expired`/`unavailable`（默认拒绝），绝不默认放行。
+     */
+    shellEscalationPresenter?: ShellEscalationPresentFn;
+    /**
+     * 升级通道的可注入运行选项（时钟/环境/呈现超时/会话申请上限/requestId 生成；测试与装配用）。
+     * 生产缺省即可。`env` 同时用于 `ANS_SHELL_ESCALATION_DISABLED` 判定（缺省取 `shellArming.env`，
+     * 再缺省 `process.env`）。
+     */
+    shellEscalationOptions?: ShellEscalationRuntimeOptions;
     /**
      * **图片查看能力（`view_image`「注入才注册」，2026-10-26 客户要求；两轮附件设计）**：前端（桌面）
      * 提供的实现——工具读取项目内图片并调用本能力，把图片排队为**同一角色下一轮用户提示的图片附件**
@@ -1266,6 +1300,30 @@ export async function openRoleSession(
   //   · `shell: "none"` / `"readonly"` → **仅为旧数据/兼容保留**（新注册项不得再用）；`none` 即使
   //     调用方误传选项也拒绝并记诊断，`readonly` 仍可走只读档（更严，不放宽）；
   //   · 项目角色（cap undefined）→ 既有三层链/只读路径**逐字不变**。
+  // 2026-10-31（shell 判拒升级方案 v1.3 §6.1）：每会话构造升级 registry（roleId/projectRoot 由闭包
+  // 绑定；presenter 由调用方传 `shellEscalationPresenter`）。**回滚开关**：`ANS_SHELL_ESCALATION_DISABLED=1`
+  // 或未提供 presenter ⇒ 不创建 registry；后续不注入 `takeGrant`、不注册 `request_shell_escalation`
+  // （既有授权全部失效，fail-closed；方案 §13.2/AC-30）。
+  const escalationEnv = input.shellEscalationOptions?.env ?? input.shellArming?.env ?? process.env;
+  const shellEscalationSession: ShellEscalationSession | undefined =
+    typeof input.shellEscalationPresenter === "function" && !shellEscalationDisabled(escalationEnv)
+      ? createShellEscalationSession({
+          roleId: setup.role.id,
+          runtime: input.runtime ?? "pi",
+          projectRoot: input.project.projectRoot,
+          present: input.shellEscalationPresenter,
+          ...(input.shellEscalationOptions ?? {}),
+        })
+      : undefined;
+  const escalationWiring: ShellEscalationWiring =
+    shellEscalationSession !== undefined
+      ? {
+          onReviewed: (req, outcome) => shellEscalationSession.recordReview(req, outcome),
+          takeGrant: (req, context) => shellEscalationSession.takeGrant(req, context),
+          onAuditSinkCreated: (sink) => shellEscalationSession.bindAudit(sink),
+        }
+      : {};
+
   let shellGate: ShellGate | undefined;
   if (input.shellOperatorOnly !== undefined) {
     if (input.shellReadonly !== undefined) {
@@ -1277,7 +1335,7 @@ export async function openRoleSession(
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
-        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader });
+        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, ...escalationWiring, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader });
       } catch (err) {
         log.error("shell.arming.failed", err);
         shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
@@ -1289,6 +1347,7 @@ export async function openRoleSession(
       log.record("shell.readonly.rejected", { outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
+        // **只读档不注入升级注入点**（尤其 `takeGrant`）：陈旧授权不得越过 `readonly-deny`。
         shellGate = await assembleReadonlyShellGate({ project: input.project, ...input.shellReadonly });
       } catch (err) {
         log.error("shell.arming.failed", err);
@@ -1302,6 +1361,7 @@ export async function openRoleSession(
         operatorChannel: input.shellOperatorChannel,
         sessionDeps: { ...deps, createAdapter: deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions) },
         ...(input.shellArming ?? {}),
+        ...escalationWiring,
         runtime: input.runtime,
         ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
         writeGuard: shellWriteGuard,
@@ -1348,6 +1408,11 @@ export async function openRoleSession(
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(shellGate !== undefined ? { shellPostAudit: shellPostAudit.auditAfter } : {}),
+    // 2026-10-31（判拒升级）：`request_shell_escalation` 工具能力——只在 shell 已 arm 且 registry 已创建时
+    // 注入（运行时核心「注入才注册」；未注入 ⇒ 工具不存在，fail-closed）。工具只发起申请，不执行命令。
+    ...(shellGate !== undefined && shellEscalationSession !== undefined
+      ? { shellEscalation: shellEscalationSession.request }
+      : {}),
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
@@ -1637,6 +1702,8 @@ export async function openRoleSession(
     async dispose(): Promise<void> {
       if (disposed) return;
       disposed = true;
+      // 2026-10-31（判拒升级）：会话结束/重建 ⇒ 清空判拒台账与授权（fail-closed；方案 §4.4/§9）。
+      shellEscalationSession?.dispose();
       for (const unsubscribe of [...persistenceSubscriptions]) unsubscribe();
       taskReports.clear();
       completedTurns.clear();
@@ -2297,6 +2364,9 @@ export function createRuntimeAdapterFactory(
     // Service 侧二者互斥（同时给出 ⇒ 抛配置错误）。
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
+    // 2026-10-31（判拒升级）：`request_shell_escalation` 工具能力（运行时核心同名能力位；工具只在
+    // shell 已 arm 且本能力注入时注册）。`undefined` ⇒ 工具不注册（能力缺席 = 最强 fail-closed）。
+    shellEscalation: capabilities?.shellEscalation ?? options.shellEscalation,
     // 2026-10-29（方案 v2.1 §6.5）：执行后写审计钩子（能力面/选项同源透传；缺省不审计）。
     ...(capabilities?.shellPostAudit !== undefined || options.shellPostAudit !== undefined
       ? { shellPostAudit: capabilities?.shellPostAudit ?? options.shellPostAudit }

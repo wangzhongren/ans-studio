@@ -394,6 +394,30 @@ export const enUS = {
     "Unsupported image type: {type} — only png / jpeg / webp / gif are supported.",
   "ui.confirm.imageTooLarge": "Image too large (> {mb}MB) — compress it and try again.",
 
+  // ---- Escalation card: customer confirmation after a judge denial (plan 2026-10-31 §4.6/§7.3; A3 key contract) ----
+  "ui.confirm.escalation.title": "Customer confirmation: allow this judge-denied shell command?",
+  "ui.confirm.escalation.intro":
+    "The automatic agent did not approve this command, and the role asks you to decide personally. Your decision applies only to this exact command (same cwd, same arguments) and does not extend to any other command.",
+  "ui.confirm.escalation.judgeHeader": "── Judge denial details ──",
+  "ui.confirm.escalation.necessityHeader": "── Role's necessity statement ──",
+  "ui.confirm.escalation.necessityNote": "Provided by the role; not verified",
+  // Script context summary (E2 R1; the bounded context the judge relied on when denying)
+  "ui.confirm.escalation.contextHeader": "Script context (what the judge relied on when denying)",
+  "ui.confirm.escalation.contextPath": "Script: {path}",
+  "ui.confirm.escalation.contextNpmScript": "npm script: {name}",
+  "ui.confirm.escalation.contextSha": "sha256: {sha}",
+  "ui.confirm.escalation.contextNote": "Note: {note}",
+  "ui.confirm.escalation.allowOnce": "Allow once",
+  "ui.confirm.escalation.allowSession": "Allow this exact command for this session",
+  "ui.confirm.escalation.reject": "Reject",
+  "ui.confirm.escalation.note":
+    "No answer, timeout, or closing the window = reject; each command can be requested only once per session. A grant applies only to this exact command (same cwd, same arguments) — not across roles or projects — and ends when the session ends or the app restarts.",
+  "ui.confirm.escalation.expired":
+    "This escalation request has expired (timeout or window closed); no approval was given and the command was not executed; this session will not accept another request for the same command.",
+  "ui.confirm.escalation.customerNotJudge":
+    "Customer approval ≠ judge approval: this decision is yours alone; it does not overturn the judge's denial of this command and is never auto-approved by the automatic agent.",
+  "ui.confirm.escalation.pauseSession": "Pause auto-approval for this run",
+
   "ui.settings.placeholderSet": "Already set; leave empty to keep unchanged",
   "ui.settings.hide": "Hide",
   "ui.settings.show": "Show",
@@ -1044,7 +1068,7 @@ export const enUS = {
   "ui.judge.hardDenyLabel": "deny tier · judge approved",
   "ui.judge.engineText": "Judge engine: {engine}",
   "ui.judge.closeAndRetry":
-    "Turn off “Approve for me” and retry (manual confirmation), or adjust the command per the alternative.",
+    "The role may request customer confirmation (allow once / allow this command for the session / reject), or turn off “Approve for me” and retry (manual confirmation).",
   "ui.judge.headline.acceptProposal": "Accept proposal ({selected})",
   "ui.judge.headline.acceptance": "Acceptance passed ({selected})",
   "ui.judge.headline.appointment": "Appoint {selected}",
@@ -1073,6 +1097,13 @@ export const enUS = {
   "ui.judge.recovery.redeliver": "Redeliver",
   "ui.judge.recovery.redeliverNote":
     "Triggers an immediate retry of this role's delivery queue.",
+  // Pause auto-approval for this run (shell-only; resets on restart, not persisted; plan 2026-10-31 §4.6)
+  "ui.judge.pauseSession": "Pause auto-approval for this run",
+  "ui.judge.pauseSessionDone":
+    "Shell auto-approval is paused for this run (it does not affect “Decide for me” for proposals/appointments/acceptance): new shell requests will be confirmed by you one by one; this resets on restart to the persisted switch value.",
+  "ui.judge.pausedBadge":
+    "Auto-approval paused for this run (resets on restart to the persisted switch value)",
+  "ui.judge.resume": "Resume auto-approval",
 
   "ui.drawerStore.noSourceRole":
     "Cannot determine the source role; cannot list source documents right now.",
@@ -1815,6 +1846,8 @@ export const enUS = {
     "Turn off “Approve for me” and confirm manually.",
   "main.operator.manualDenyAdvice.retry":
     "Retry; if it keeps failing, turn off “Approve for me” and confirm manually.",
+  "main.operator.manualDenyAdvice.retryCapped":
+    "If truly necessary to proceed, call request_shell_escalation to request customer confirmation for this exact command (once per session); or turn off “Approve for me” and retry.",
   "main.operator.judgeResultDeliveryFailed":
     "Could not deliver the review result, so the judge conclusion cannot be shown in the chat; denied. {detail}.",
   "main.operator.judgeRowFailedManual":
@@ -1833,7 +1866,7 @@ export const enUS = {
   "main.operator.judgeReasonLine": "Reason: {reason}",
   "main.operator.judgeAlternative": "Alternative ({kind}): {value}",
   "main.operator.judgeWayOut":
-    "Way out: to execute it, turn off “Approve for me” and retry.",
+    "Way out: if truly necessary to proceed, call request_shell_escalation to request customer confirmation for this exact command (once per session); or turn off “Approve for me” and retry.",
   "main.operator.judgeWillRun": "It will run in the project: {word}",
   "main.operator.shellReview.title": "Governed shell review · operator confirmation (third gate a)",
   "main.operator.shellReview.intro": "This shell command must be **personally confirmed** by you before execution (the pm model review was unsure or unavailable, so it escalated to you).",
@@ -1870,6 +1903,24 @@ export const enUS = {
     "Judging timed out ({ms}ms): no judge conclusion within the time limit.",
   "main.operator.confirmTimeoutError":
     "Operator confirmation timed out ({ms}ms): no operator choice within the time limit.",
+
+  // ---- Customer escalation requests (request_shell_escalation receipts; plan 2026-10-31 §4.3/§7.3) ----
+  "main.operator.escalation.appliedOnce":
+    "The customer allowed this once: one time only — retry the exact same command (same cwd, same arguments); the grant is consumed after that call.",
+  "main.operator.escalation.appliedSession":
+    "The customer allowed this exact command for this session: with the same cwd and arguments it may run directly for the rest of this session; the grant ends when the session ends or the app restarts.",
+  "main.operator.escalation.denied":
+    "The customer rejected this request: no approval, the command was not executed; this session will not accept another request for the same command.",
+  "main.operator.escalation.expired":
+    "The escalation request timed out or the confirmation channel was unavailable; treated as not allowed (fail-closed) and the command was not executed; this session will not accept another request for the same command.",
+  "main.operator.escalation.ineligible":
+    "No applicable denial record: only an exact command that the judge actively denied (outside the hard-deny class) or one rejected with retry-capped can request customer confirmation.",
+  "main.operator.escalation.pending":
+    "An escalation request or shell confirmation card is already awaiting an answer; try again later (requests are not queued).",
+  "main.operator.escalation.capped":
+    "This role session has reached the escalation request limit; no further requests will be accepted.",
+  "main.operator.escalation.invalid":
+    "Invalid request: only an exact command with a recorded judge denial can be requested (run_shell entry; arguments must match the recorded denial).",
 
   "main.customerInput.judgeDecisionHead":
     "judge delegation · decision: accept proposal (accept)",

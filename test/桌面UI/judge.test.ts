@@ -64,6 +64,8 @@ test("shell 判断结果：allow/deny 视图逐字；manual 不产生结果行",
   assert.ok(deny!.lines.includes("替代方案：rm -rf dist（只清理构建产物）"));
   assert.ok(deny!.lines.includes("该命令会删除项目源码，风险过高。"));
   assert.ok(deny!.retryHint.includes("关闭「替我审批」后重试"));
+  // AC-19（2026-10-31）：新出路措辞（上面的旧子串兜底断言保留）。
+  assert.ok(deny!.retryHint.includes("可让角色申请客户确认"));
 
   assert.equal(shellJudgeResultView({ verdict: "manual", reasonCode: "timeout" }), null);
   assert.equal(shellJudgeResultView({}), null);

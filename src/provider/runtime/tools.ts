@@ -11,6 +11,7 @@ import type {
   ShellPostAuditFn,
   ShellExecutionOutcome,
   ShellReviewResult,
+  ShellEscalationFn,
   CustomerInputFn,
   CustomerInputRequest,
   CustomerInputOutcome,
@@ -90,6 +91,12 @@ export const SHELL_TOOL_NAME = "run_shell";
 
 /** start_background_task 工具名（2026-10-22 后台任务 B1；会话级后台启动，复用 run_shell 审核链）。 */
 export const START_BACKGROUND_TASK_TOOL_NAME = "start_background_task";
+/** request_shell_escalation 工具名（2026-10-31 shell 判拒升级方案 v1.3；注入才注册，且 shell 必须已 arm）。 */
+export const REQUEST_SHELL_ESCALATION_TOOL_NAME = "request_shell_escalation";
+
+/** 角色必要性说明上限（方案 §4.3：UTF-8 ≤ 1KB / 500 字符；工具层超限拒绝、不截断）。 */
+const SHELL_ESCALATION_NECESSITY_MAX_CHARS = 500;
+const SHELL_ESCALATION_NECESSITY_MAX_BYTES = 1024;
 /** list_background_tasks 工具名（B1；只读列出当前会话保留的后台任务）。 */
 export const LIST_BACKGROUND_TASKS_TOOL_NAME = "list_background_tasks";
 /** read_background_task 工具名（B1；读取任务状态与 stdout/stderr 尾部）。 */
@@ -1068,6 +1075,74 @@ function runShell(argv: string[], cwd: string, env: Record<string, string>, sign
   });
 }
 
+/** 授权放行结果说明（`ShellReviewResult.grant`；2026-10-31 升级方案 v1.3 §6.3/§7.1）。无 grant ⇒ 空串。 */
+function shellGrantNote(review: ShellReviewResult): string {
+  if (review.allow !== true || review.grant === undefined) return "";
+  const { grant } = review;
+  const operator = grant.operatorId !== undefined && grant.operatorId !== "" ? `；operator ${grant.operatorId}` : "";
+  return grant.scope === "once"
+    ? `\n说明：本次放行来自客户升级授权——客户已允许一次（allow-once；requestId ${grant.requestId}${operator}）。该授权已用于本次调用，同一命令下次回到正常审核。`
+    : `\n说明：本次放行来自客户升级授权——客户已允许本会话执行该精确命令（allow-session；requestId ${grant.requestId}${operator}）。`;
+}
+
+/**
+ * request_shell_escalation：对一条**刚被判断 agent 判拒**（或 `manual/retry-capped`）的精确命令申请客户确认
+ * （2026-10-31 客户确认方案 v1.3 §4.3/§6.3）。
+ *
+ * **只申请、不执行命令、不写盘、不创建/消费授权**：资格判定（只读已记录审核结果）、每命令每会话一次、
+ * 会话上限、卡片仲裁、客户决定与授权存储全部由编排 registry 实现；本层只校验参数形状、用本文件唯一
+ * `splitCommand` 生成 `argv`（模型不提供 argv，也不接受任何授权字段），并原样转达回执（不伪造批准）。
+ */
+function makeRequestShellEscalationTool(fn: ShellEscalationFn): ExecutableTool {
+  const name = REQUEST_SHELL_ESCALATION_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const command = coreToolTarget("core-command-v1", call.args);
+      if (command === undefined || command.trim() === "") {
+        return { ok: false, message: `${name}: 缺少 command 参数，无法申请客户确认（未执行任何命令）` };
+      }
+      const split = splitCommand(command);
+      if (split.argv.length === 0) return { ok: false, message: `${name}: command 为空，无命令可申请（未执行任何命令）` };
+      const rawNecessity = call.args["necessity"];
+      if (rawNecessity !== undefined && rawNecessity !== null && typeof rawNecessity !== "string") {
+        return { ok: false, message: `${name}: necessity 参数非法（须为字符串；可省略）——未提交申请` };
+      }
+      const necessity = typeof rawNecessity === "string" && rawNecessity.trim() !== "" ? rawNecessity : undefined;
+      if (necessity !== undefined) {
+        const chars = Array.from(necessity).length;
+        const bytes = new TextEncoder().encode(necessity).length;
+        if (chars > SHELL_ESCALATION_NECESSITY_MAX_CHARS || bytes > SHELL_ESCALATION_NECESSITY_MAX_BYTES) {
+          return {
+            ok: false,
+            message:
+              `${name}: necessity 超过上限（当前 ${chars} 字符 / ${bytes} 字节；上限 ${SHELL_ESCALATION_NECESSITY_MAX_CHARS} 字符且 ${SHELL_ESCALATION_NECESSITY_MAX_BYTES} 字节）` +
+              `——超限拒绝、不截断；未提交申请`,
+          };
+        }
+      }
+      let result: { ok: boolean; message: string; state?: string };
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => {
+            if (call.signal?.aborted) throw new Error("会话已中止");
+            return fn({ command, argv: split.argv, ...(necessity !== undefined ? { necessity } : {}) }, call.signal);
+          }),
+          call.signal,
+          `${name} 升级申请`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}: 申请未完成（${reasonOf(err)}）——**未获客户允许**，命令未执行；不要假设已批准。` };
+      }
+      // 回执原样转达；契约外回执按「未获明确结果」处理，绝不写成已批准（fail-closed）。
+      if (result === null || typeof result !== "object" || typeof result.ok !== "boolean" || typeof result.message !== "string") {
+        return { ok: false, message: `${name}: 应用未返回明确结果（回执缺失或非法）——按**未获客户允许**处理；不要假设已批准。` };
+      }
+      return { ok: result.ok, message: result.message };
+    },
+  };
+}
+
 /**
  * run_shell：命令级闸工具（设计 §7.2）。顺序**必须**是：
  *   取 command → `splitCommand` → **F-7 执行层守卫**（未加引号的操作符/展开 token → 直接以明确文案拒绝，
@@ -1096,7 +1171,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       const auditNote = async (outcome: ShellExecutionOutcome): Promise<{ note: string; violated: boolean }> => {
         if (shellPostAudit === undefined) return { note: "", violated: false };
         try {
-          const result = await shellPostAudit({ command, argv, cwd, toolCallId }, outcome);
+          const result = await shellPostAudit({ command, argv, cwd, toolCallId, entry: "run_shell" }, outcome);
           if (result.violations.length === 0) return { note: "", violated: false };
           const shown = result.violations.slice(0, 8).map((v) => `${v.change}:${v.path}`).join("、");
           const more = result.violations.length > 8 ? ` 等 ${result.violations.length} 项` : "";
@@ -1126,7 +1201,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       gate?.begin();
       diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
       try {
-        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "run_shell" }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
       } catch (err) {
         diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
         // 审核抛错 / 超时 → **绝不 spawn**（fail-closed；超时 = 拒绝，§7.5.2）。
@@ -1143,6 +1218,10 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
         const by = denied !== undefined ? `，审者：${denied.by}` : "";
         return { ok: false, message: `${name} 未执行：审核拒绝（${why}${by}）` };
       }
+
+      // 客户升级授权放行说明（2026-10-31 方案 v1.3 §6.3）：只按 `ShellReviewResult.grant` 如实附注；
+      // 无 grant ⇒ 空串，既有结果文案逐字不变。
+      const grantNote = shellGrantNote(review);
 
       // —— 恰好 allow:true：构造**剥离凭据后**的 env（§7.9），随后**才**启动子进程 ——
       //     观测（F-1-d）：`shell.exec.start` 携带**生效**的时限值，供观测与测试快速断言解析链（不必真等分钟级）。
@@ -1170,12 +1249,12 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
             stdoutTruncated: outcome.stdoutTruncated === true,
             stderrTruncated: outcome.stderrTruncated === true,
           },
-          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note,
+          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note + grantNote,
         };
       }
       if (outcome.error !== undefined) {
         const audited = await auditNote({ error: outcome.error, ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
-        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
+        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note + grantNote, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
       }
       const code = outcome.code;
       const audited = await auditNote({ ...(code !== undefined ? { exitCode: code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
@@ -1184,7 +1263,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
         execution: { ...(code !== undefined ? {exitCode:code} : {}), ...(outcome.signal ? {signal:outcome.signal} : {}), stdout:outcome.stdout, stderr:outcome.stderr, stdoutTruncated:outcome.stdoutTruncated === true, stderrTruncated:outcome.stderrTruncated === true },
         message:
           `${name} 已执行：${command}（exit ${code ?? "?"}${outcome.signal ? `，signal ${outcome.signal}` : ""}）\n` +
-          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note,
+          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note + grantNote,
       };
     },
   };
@@ -1284,7 +1363,7 @@ function makeStartBackgroundTaskTool(
       gate?.begin();
       diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
       try {
-        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "start_background_task" }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
       } catch (err) {
         diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
         return { ok: false, message: `${name} 未启动：审核未通过（${reasonOf(err)}）——未执行任何进程` };
@@ -1301,12 +1380,15 @@ function makeStartBackgroundTaskTool(
       }
 
       // —— 恰好 allow:true：与 run_shell 同源的凭据剥离环境 + 会话 shellCwd；管理器的 start 是唯一 spawn 入口。——
+      // 客户升级授权说明同 run_shell 口径；v1 升级只允许 `run_shell` 入口（后台判拒不入可申请台账、
+      // 不消费前台授权），此处只按类型契约如实附注 `review.grant`（正常不会出现）。
+      const grantNote = shellGrantNote(review);
       const env = buildShellEnv(process.env, extraCredentialEnvVars);
       const started = await manager.start({ command, argv, cwd, env });
       if (!started.ok) {
         // 审核通过后才发现并发已满（并行竞态）：同样零 spawn，并如实记录 limit。
         if (started.reason === "limit") diagnostics?.record("background.limit", { reasonCode: "concurrency-limit", count: manager.runningCount });
-        return { ok: false, message: `${name} 未启动：${started.message}` };
+        return { ok: false, message: `${name} 未启动：${started.message}` + grantNote };
       }
       const task = started.task;
       diagnostics?.record("background.start", { turnId, toolCallId, toolName: name, pid: task.pid, state: task.state });
@@ -1319,7 +1401,7 @@ function makeStartBackgroundTaskTool(
         message:
           `${name}：已启动任务 ${task.taskId}（pid ${task.pid ?? "?"}，${stateText}）。` +
           `任务只属于当前会话、不跨重启，日志只在内存；可用 list_background_tasks / read_background_task / stop_background_task 管理。` +
-          `轮次结束或停止本轮**不会**终止它；只有 stop_background_task 或关闭会话才会清理。`,
+          `轮次结束或停止本轮**不会**终止它；只有 stop_background_task 或关闭会话才会清理。` + grantNote,
       };
     },
   };
@@ -3015,6 +3097,14 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     const execMs =
       options?.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
     tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.shellPostAudit));
+
+    // 结构性保证（2026-10-31 升级方案 v1.3 §6.4，「注入才注册」）：`request_shell_escalation`
+    // **只在 shell 已 arm（注入了 ShellGate）且注入了 `shellEscalation` 能力时**注册；能力缺席 ⇒
+    // 工具压根不在集合里（fail-closed），模型无法请求。判断会话不经过本函数，天然不可见。
+    const shellEscalation = options?.shellEscalation;
+    if (shellEscalation !== undefined) {
+      tools.push(makeRequestShellEscalationTool(shellEscalation));
+    }
 
     // 结构性保证（B1，同 run_shell 判据）：**只有 ShellGate 与后台任务管理器同时注入时**四工具才一起注册。
     // 判断会话不经过本函数（走 buildShellJudgeTools / buildGovernanceJudgeTools），因此天然不可见。

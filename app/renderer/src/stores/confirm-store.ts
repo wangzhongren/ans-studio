@@ -8,7 +8,7 @@
 
 import { create } from "zustand";
 import { getDesktopBridge } from "@/lib/platform";
-import type { DesktopBridge } from "@/lib/platform";
+import type { DesktopBridge, ShellEscalationAction } from "@/lib/platform";
 import { useChatStore } from "@/chat/chat-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useLocaleStore, translate, type Locale } from "@/i18n";
@@ -28,6 +28,9 @@ import {
   JUDGE_GROUP_DECISION,
   judgeBridgeAvailable,
   judgeWarningStep,
+  shellConfirmKind,
+  shellEscalationResponseOutcome,
+  shellEscalationResponsePayload,
   shellJudgeToggleResult,
   type JudgeGroup,
 } from "@/chat/judge";
@@ -50,6 +53,8 @@ interface ConfirmStore {
 
   receiveShell: (payload: unknown) => void;
   respondShell: (allow: boolean) => Promise<void>;
+  /** 升级卡三选一（`{kind:"escalation", id, action}`；旧桥缺省 ⇒ 如实提示、不假造回执）。 */
+  respondEscalation: (action: ShellEscalationAction) => Promise<void>;
   expireShell: (id: unknown, reason?: unknown) => void;
   closeStaleShell: (envelope: unknown) => void;
   /** 仅测试驱动/演示注入用：本地收起（不发 IPC、不代表放行）。 */
@@ -215,14 +220,25 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
 
   receiveShell: (payload) => {
     if (!payloadMatchesView(payload, viewIdentity())) return;
+    const kind = shellConfirmKind(payload);
+    const current = get().shellConfirm;
+    if (current) {
+      const currentKind = shellConfirmKind(current.payload);
+      // 单槽呈现（2026-10-31 判据 §7.2）：升级卡排他——升级卡待答时，新到的审批卡
+      // 由主进程等待并稍后重推，渲染侧不覆盖当前卡；反之主进程已拒绝升级申请，
+      // 迟到的升级卡不得覆盖客户正在核对的审批卡。同类新卡才进入既有替换语义。
+      if (kind !== currentKind) return;
+    }
     noteShellId(asCardRecord(payload).id);
-    const next = receiveCard(get().shellConfirm, payload);
+    const next = receiveCard(current, payload);
     if (next) set({ shellConfirm: next });
   },
 
   respondShell: async (allow) => {
     const cur = get().shellConfirm;
     if (!cur || cur.busy) return;
+    // 升级卡只接受三选一动作；布尔回包绝不结算升级卡（按 kind 路由）。
+    if (shellConfirmKind(cur.payload) === "escalation") return;
     set({ shellConfirm: startResponding(cur) });
     const bridge = getDesktopBridge();
     let res: unknown = null;
@@ -241,6 +257,35 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
     if (outcome.hint) useChatStore.getState().setHint(outcome.hint);
   },
 
+  respondEscalation: async (action) => {
+    const cur = get().shellConfirm;
+    if (!cur || cur.busy) return;
+    if (shellConfirmKind(cur.payload) !== "escalation") return;
+    const bridge = getDesktopBridge();
+    if (!bridge?.shellEscalationRespond) {
+      // 旧主进程/preload 缺暂停与升级通道：如实提示能力缺席，保留卡片（不回传、不假造）。
+      useChatStore
+        .getState()
+        .setHint(translate(currentLocale(), "ui.confirm.failedShell"));
+      return;
+    }
+    set({ shellConfirm: startResponding(cur) });
+    let res: unknown = null;
+    try {
+      res = await bridge.shellEscalationRespond(
+        shellEscalationResponsePayload(cur.id, action),
+      );
+    } catch {
+      res = null;
+    }
+    const outcome = shellEscalationResponseOutcome(res, currentLocale());
+    const current = get().shellConfirm;
+    if (!current || current.id !== cur.id) return;
+    if (outcome.close) set({ shellConfirm: null });
+    else set({ shellConfirm: { ...current, busy: false } });
+    if (outcome.hint) useChatStore.getState().setHint(outcome.hint);
+  },
+
   expireShell: (id, reason) => {
     const current = get().shellConfirm;
     const key = typeof id === "string" ? id : "";
@@ -248,6 +293,8 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
     const wasShell = isCurrent || (key !== "" && knownShellIds.has(key));
     if (key !== "") knownShellIds.delete(key);
     if (!wasShell) return;
+    const escalation = isCurrent && current !== null &&
+      shellConfirmKind(current.payload) === "escalation";
     if (isCurrent) set({ shellConfirm: null });
     // 收起后原因仍可见/可追溯（重放时当前卡可能已不在；C2 重锚语义）。
     useChatStore
@@ -255,7 +302,12 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
       .setHint(
         typeof reason === "string" && reason !== ""
           ? reason
-          : translate(currentLocale(), "ui.confirm.expiredShell"),
+          : translate(
+              currentLocale(),
+              escalation
+                ? "ui.confirm.escalation.expired"
+                : "ui.confirm.expiredShell",
+            ),
       );
   },
 
