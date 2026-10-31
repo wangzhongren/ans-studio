@@ -176,7 +176,8 @@ test("写侧卡种收口（2026-10-31）：decision 裁决写 selectedOptionIds�
     assert.equal(appointmentResolved.selectedOptionIds, undefined, "appointment 角色集不重复写审计字段");
   } finally {
     await mgr.stop(null);
-    await fs.rm(root, { recursive: true, force: true });
+    // 2026-10-31（CI 稳定性）：清理统一带重试，避免 macOS 上后台写入与递归删除竞态（ENOTEMPTY）。
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 

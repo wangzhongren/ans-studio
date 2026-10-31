@@ -352,7 +352,8 @@ test("request 事件卡种/选中选项（2026-10-31）：合法字段可读；�
     const bad = await readTaskState(root);
     assert.equal(bad.errors.length, 3, JSON.stringify(bad.errors));
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    // 2026-10-31（CI 稳定性）：清理统一带重试，避免 macOS 上后台写入与递归删除竞态（ENOTEMPTY）。
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 

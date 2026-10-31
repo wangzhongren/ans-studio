@@ -299,7 +299,9 @@ test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pi
     }
   } finally {
     await h.mgr.stop(null);
-    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+    // 2026-10-31（CI 稳定性，macOS arm64）：stop 不等待后台投递链落盘；先让出一拍再带重试删除。
+    await tick(50);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 

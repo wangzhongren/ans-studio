@@ -492,9 +492,13 @@ test("D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不
       assert.match(toQa.message ?? "", /名单|D3/);
     } finally {
       await h.mgr.stop(null);
+      // 2026-10-31（CI 稳定性，macOS arm64）：stop 只释放会话句柄，不等待 `void drainQueue(...)`
+      // 的后台投递链（含 `task.delivered` 账本写入）。先让出一拍再删除，避免 rm 扫描后新文件落盘
+      // 导致 ENOTEMPTY；配合外层带重试的 fs.rm。
+      await tick(50);
     }
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
@@ -520,9 +524,10 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
       assert.equal(handoff.ok, true, handoff.message ?? "");
     } finally {
       await hNew.mgr.stop(null);
+      await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
     }
   } finally {
-    await fs.rm(rootNew, { recursive: true, force: true });
+    await fs.rm(rootNew, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 
   // B2：只有无 cardKind、无 roster 戳的裁决 ⇒ 不构成 D3（不得以 flow 匹配或 targetRoleIds 存在为接受条件）。
@@ -546,9 +551,10 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
       assert.match(handoff.message ?? "", /D3/);
     } finally {
       await hLegacy.mgr.stop(null);
+      await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
     }
   } finally {
-    await fs.rm(rootLegacy, { recursive: true, force: true });
+    await fs.rm(rootLegacy, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });
 
