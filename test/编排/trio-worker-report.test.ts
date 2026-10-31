@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { ProjectConfig } from "../../src/model/role.ts";
+import type { CustomerInputFn, CustomerInputRequest } from "../../src/model/runtime.ts";
 import type { RoleSession, RuntimeAdapter, SessionEvent, WriteGate } from "../../src/provider/pi/session.ts";
 import {
   openRoleSession,
@@ -204,4 +205,53 @@ test("v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/�
 
   assert.equal(governanceCapabilitiesOf("convener")!.dispatchTask, true, "v4.1：运营拥有 dispatch 能力（作用域由前置校验执行）");
   assert.equal(governanceCapabilitiesOf("nominator")!.dispatchTask, false);
+});
+
+test("卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡", () => {
+  const convener = governanceRoleOf("convener")!.cardText;
+  const chief = governanceRoleOf("chief")!.cardText;
+  const verifier = governanceRoleOf("verifier")!.cardText;
+  assert.match(convener, /可发起验收＝用 `dispatch_task` 派质检（verifier）执行核对/, "运营卡必须写明验收由 dispatch 质检发起");
+  assert.match(convener, /验收卡（acceptance）由质检发起/, "运营卡必须写明 acceptance 卡由质检发起");
+  assert.match(convener, /不得发 acceptance 卡/, "运营卡必须写明自己不得发 acceptance 卡");
+  assert.match(convener, /不得代客户验收/, "既有纪律保留：运营不得代客户验收");
+  assert.match(chief, /最终验收：由质检（verifier）发起验收卡/, "幕僚卡必须写明最终验收卡由质检发起");
+  assert.match(chief, /不要要求运营（convener）提交验收卡/, "幕僚卡必须禁止要求运营提交验收卡");
+  assert.match(chief, /让运营 dispatch 质检/, "幕僚卡必须给出需要验收时的调度路线");
+  assert.match(verifier, /request_choice\(cardKind=acceptance/, "质检卡原有 acceptance 发起句不得受影响");
+});
+
+test("cardKind 越权拒绝：convener 发 acceptance ⇒ 不弹卡，文案指出由质检发起并给出改派办法", async () => {
+  const project = trioProject();
+  try {
+    let rawCalls = 0;
+    const raw: CustomerInputFn = () => {
+      rawCalls += 1;
+      return { outcome: "answered", value: { selected: ["accept"] } };
+    };
+    const stub = stubAdapter();
+    const handle = await openRoleSession(
+      { roleId: "convener", project, customerInput: raw },
+      { createAdapter: stub.createAdapter },
+    );
+    const request: CustomerInputRequest = {
+      kind: "choice",
+      title: "验收核对",
+      cardKind: "acceptance",
+      flowId: "focus",
+      options: [{ id: "accept", label: "通过" }, { id: "reject", label: "不通过" }],
+    };
+    const outcome = await stub.caps()!.customerInput!(request, { flowId: "focus", cardKind: "acceptance" });
+    assert.equal(outcome?.outcome, "declined", "越权 cardKind 必须 fail-closed");
+    const reason = outcome?.outcome === "declined" ? outcome.reason ?? "" : "";
+    assert.match(reason, /治理角色 convener 不允许 cardKind=acceptance/);
+    assert.match(reason, /该类卡由质检 verifier 发起/, "文案必须说明该卡种由谁发起");
+    assert.match(reason, /允许：decision/, "既有白名单提示保留");
+    assert.match(reason, /请改为 dispatch_task 给 verifier 执行验收，或请幕僚调度质检/, "文案必须给出可操作的改派路线");
+    assert.match(reason, /本次未向客户发卡、未写任何记录/, "文案必须说明未发卡、未写记录");
+    assert.equal(rawCalls, 0, "未向客户发卡（fail-closed）");
+    await handle.dispose();
+  } finally {
+    cleanup(project);
+  }
 });
