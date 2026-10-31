@@ -257,6 +257,52 @@ test("run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任
   }
 });
 
+test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-d3-cardkind-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    await d3(root); // legacy 兼容：无 cardKind，带 appointment 专属 roster 戳
+    // 新格式 decision 卡：选项 qa 与真实角色同名，且（模拟污染）带 targetRoleIds。
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:02.000Z", kind: "request.created", requestId: "req-decision", flowId: "focus",
+      cardKind: "decision", sourceRoleId: "convener", title: "浏览器验收方式",
+      options: [{ id: "qa", label: "qa" }, { id: "customer-local", label: "客户本机浏览器" }],
+    });
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:03.000Z", kind: "request.resolved", requestId: "req-decision",
+      decisionId: "decision-req-decision", cardKind: "decision", targetRoleIds: ["qa"], by: "judge", choice: "qa",
+    });
+    // 旧格式（无 cardKind、无 roster 戳）历史污染：customer-local 被写进 targetRoleIds。
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:04.000Z", kind: "request.created", requestId: "req-legacy-decision", flowId: "focus",
+      sourceRoleId: "convener", title: "旧决策卡", options: [{ id: "customer-local", label: "客户本机浏览器" }],
+    });
+    await appendTaskEvent(root, {
+      v: 1, at: "2026-10-30T00:00:05.000Z", kind: "request.resolved", requestId: "req-legacy-decision",
+      decisionId: "decision-req-legacy", targetRoleIds: ["customer-local"], by: "judge", choice: "customer-local",
+    });
+
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+    assert.equal(handoff.ok, true, handoff.message ?? "");
+    const state = await readTaskState(root);
+    const handoffRecord = [...state.records.values()].find((record) => record.created?.to === "convener")!;
+    assert.equal(handoffRecord.created!.runState, "pinned");
+    const manifest = await readRunManifest(root, handoffRecord.created!.runId!);
+    assert.equal(manifest.ok, true);
+    if (manifest.ok) {
+      assert.equal(manifest.manifest.state, "pinned");
+      assert.equal(manifest.manifest.d3?.decisionId, "decision-req-d3", "pin 用真实 appointment 裁决");
+      assert.deepEqual(manifest.manifest.d3?.targetRoleIds, ["implementer"], "decision 选项（含同名 qa）不得顶替 D3");
+    }
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
 test("run-pin：缺 D3 时 pin 失败，handoff 不建任务、不投递（draft 不伪造 pinned）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-missing-"));
   const h = harness(root);

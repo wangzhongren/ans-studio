@@ -306,6 +306,56 @@ test("task.closed.by 放宽到 chief/convener；request.resolved 名单 version/
   }
 });
 
+test("request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行", async () => {
+  const root = await tempRoot();
+  try {
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-10-31T00:00:00.000Z",
+      kind: "request.created",
+      requestId: "req-d",
+      flowId: "focus",
+      cardKind: "decision",
+      sourceRoleId: "convener",
+      title: "浏览器验收方式",
+      options: [{ id: "customer-local", label: "客户本机浏览器" }],
+    });
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-10-31T00:00:01.000Z",
+      kind: "request.resolved",
+      requestId: "req-d",
+      decisionId: "decision-req-d",
+      cardKind: "decision",
+      selectedOptionIds: ["customer-local"],
+      by: "judge",
+      choice: "customer-local",
+    });
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
+    const created = state.events.find((event) => event.kind === "request.created");
+    assert.equal(created?.kind === "request.created" ? created.cardKind : undefined, "decision");
+    const resolved = state.events.find((event) => event.kind === "request.resolved");
+    assert.equal(resolved?.kind === "request.resolved" ? resolved.cardKind : undefined, "decision");
+    assert.deepEqual(resolved?.kind === "request.resolved" ? resolved.selectedOptionIds : undefined, ["customer-local"]);
+
+    // 非法卡种 / 非数组 / 空字符串 id → 坏行（跳过但不阻塞合法行）。
+    await fs.writeFile(
+      path.join(root, TASKS_STATE_REL),
+      [
+        JSON.stringify({ v: 1, at: "2026-10-31T00:00:02.000Z", kind: "request.created", requestId: "r-bad-card", cardKind: "bogus", sourceRoleId: "convener", title: "x", options: [] }),
+        JSON.stringify({ v: 1, at: "2026-10-31T00:00:03.000Z", kind: "request.resolved", requestId: "r-bad-selected", selectedOptionIds: "customer-local", by: "judge", choice: "x" }),
+        JSON.stringify({ v: 1, at: "2026-10-31T00:00:04.000Z", kind: "request.resolved", requestId: "r-bad-selected-2", selectedOptionIds: [""], by: "judge", choice: "x" }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    const bad = await readTaskState(root);
+    assert.equal(bad.errors.length, 3, JSON.stringify(bad.errors));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝", async () => {
   const withRun = replayTaskEvents([
     created("t-run", "实现", { runId: "run-20261030-focus-abcdef12", runState: "pinned", runStage: "stage-1" }),

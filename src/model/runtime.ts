@@ -685,6 +685,11 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
   kind: "request.created";
   requestId: string;
   flowId?: string;
+  /**
+   * 2026-10-31（D3 卡种收口）：卡片种类。应用从 `request.cardKind` 原样落账（与既有事件字段同口径），
+   * 不信任模型/判断 agent 自报。可选、向后兼容——旧事件无此字段。
+   */
+  cardKind?: GovernanceCardKind;
   intentId?: string;
   taskId?: string;
   sourceRoleId: string;
@@ -706,7 +711,22 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
   kind: "request.resolved";
   requestId: string;
   decisionId?: string;
+  /**
+   * 2026-10-31（D3 卡种收口）：**仅 appointment（D3 招人）卡**的选中角色 id。
+   * 其他 choice 卡的选中项写入 `selectedOptionIds`（仅审计，不得当作角色集）。
+   * 旧事件可能无 `cardKind` 却写入了任意 choice 卡的选项（历史污染）；D3 读侧只接受
+   * appointment 卡或带 `rosterVersion`/`rosterSha256` 戳的 legacy 记录。
+   */
   targetRoleIds?: string[];
+  /**
+   * 2026-10-31：该裁决来自哪种卡。应用从 `request.cardKind` 原样落账，不信任模型/判断 agent 自报。
+   * 可选、向后兼容——旧事件无此字段。
+   */
+  cardKind?: GovernanceCardKind;
+  /**
+   * 2026-10-31：非 appointment 的 choice 卡选中选项 id（仅供审计；不得被任何角色集消费）。
+   */
+  selectedOptionIds?: string[];
   intentId?: string;
   taskId?: string;
   /**
