@@ -17,6 +17,9 @@ events:
   - date: "2026-10-31"
     kind: updated
     summary: PR #26 合并（72454c7）；annotated tag v1.8.1 已打并推送；release-policy/workflow/打包测试切到 v1.8.1
+  - date: "2026-10-31"
+    kind: released
+    summary: CI #1（run 41154318292）三平台 build + release job 全过；v1.8.1 正式发布，12 资产与 SHA256 已回填
 ---
 
 # v1.8.1 发布准备
@@ -68,10 +71,11 @@ events:
 - `.github/workflows/release.yml`：workflow_dispatch `source_ref` 默认、并发组、`gh release view/create/upload/edit`、标题与 notes 全部 → v1.8.1；未签名沿用 `CSC_IDENTITY_AUTO_DISCOVERY: 'false'`；`publish` 默认仍为 false（draft）。
 - 上述切换已随本轮提交完成（tag v1.8.1 = `72454c7`）；prepare 预演（overlayPaths/actualTree/overlayPatchSha256）以 CI 构建产生的 provenance 为准，随发布回填。
 
-## CI、资产与 SHA（待回填）
+## CI、资产与 SHA（已回填）
 
-- 三平台 CI run：**待触发/待回填**；不编造 run id。
-- 资产：`ANS-Studio-1.8.1-mac-arm64.zip`、`ANS-Studio-1.8.1-mac-x64.zip`、`ANS-Studio-1.8.1-win-x64.zip`，以及各平台 `SHA256SUMS-*.txt`、`SHA256SUMS-overlay.txt`、`release-provenance.json`、`overlay.patch`；SHA256 在构建完成前未知，**未预填**，发布后由 Release 校验文件回填/核对。
+- **CI（run 41154318292）**：macOS arm64 / macOS x64 / Windows x64 三个 build job 与 release job 全部 success；draft 12 资产齐备；release job 已执行 `sha256sum -c` 校验。
+- **发布**：`v1.8.1` 已去 draft 正式发布：https://github.com/wangzhongren/ans-studio/releases/tag/v1.8.1
+- 资产 SHA256：mac-arm64 `3a44726a…e11a0`；mac-x64 `51791528…5e528`；win-x64 `9bf510bd…15022d`；overlay.patch `71d69c17…075cc`（与本地预演一致）；release-provenance.json `21d69ad3…ca95a`（完整值见 README 表与 Release）。
 - 三平台运行包**未签名、未公证**（同 v1.8.0 形态）。
 
 ## 证据边界
