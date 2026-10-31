@@ -113,5 +113,5 @@
 - 客户授权原话「搞好之后提交到github，暂时不发行」；独立验收 E2b 通过（35/35）后由沟通执行。
 - **提交**（分支 `feat/flow-improvements-wave1`，基线 HEAD `9f670fb`）：`3a49427` 实施与测试（52 文件）；`f80822d` 治理与记录（31 文件）；提交后工作树干净。
 - **推送**：`origin/feat/flow-improvements-wave1` 已推送；**PR #29** 已创建（base main）：https://github.com/wangzhongren/ans-studio/pull/29
-- **合并**：自动合并被权限分类器拦截（Unrequested Commit in a Connected App）；待客户确认后由客户在 GitHub 合并，或授权沟通重试。
+- **合并**：首次自动合并被权限分类器拦截，已如实留档；客户明确指示「把 PR #29 合并到 main」（2026-11-01）后重试成功——merge commit **`b7586ced8b222f7fc67c851649d549976adacad6`**，main 已包含 `3a49427`（实施与测试）、`f80822d`（治理与记录）、`eb77fad`（提交记录）。
 - **不发行**：无 tag、无版本号变更、无发布包；`release-policy.mjs` 保持 `v1.8.3`。
