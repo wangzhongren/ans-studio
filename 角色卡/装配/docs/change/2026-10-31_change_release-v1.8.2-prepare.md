@@ -14,18 +14,21 @@ events:
   - date: "2026-10-31"
     kind: verified
     summary: 本地预检 npm run typecheck 0、npm run typecheck:renderer 0、装配测试 86/86 通过
+  - date: "2026-10-31"
+    kind: updated
+    summary: PR #27 合并（1064ad8，含 D3 修复 a6d87a7）；annotated tag v1.8.2 已打并推送；release-policy/workflow/打包测试切到 v1.8.2
 ---
 
 # v1.8.2 发布准备
 
-客户决定发布 **1.8.2** 补丁版、**未签名 ZIP**（同 v1.8.1 形态）。本轮准备发布源、版本标识与发布说明；发布流水线切换在 tag 确定后的后续提交完成。本记录随发布进展更新；最终 CI/资产/SHA 在完成后填入。
+客户决定发布 **1.8.2** 补丁版、**未签名 ZIP**（同 v1.8.1 形态）。本轮准备发布源、版本标识与发布说明；发布流水线切换在 tag 确定后的后续提交完成（`ci(release): point pipeline at v1.8.2`）。本记录随发布进展更新；最终 CI/资产/SHA 在完成后填入。
 
 ## 版本与冻结源
 
 - 版本 1.8.1 → **1.8.2**（patch）。`package.json` 与 `package-lock.json` 仅根两处版本字段，依赖与锁结构零变动。
 - 发布源（冻结源）：**`a6d87a7`**（`fix(desktop): scope D3 role selection to appointment cards`，修复 `docs/communication/2026-10-31_intent_d3-decision-option-collision.md` 记录的缺陷；含 v1.8.1 tag `72454c7` 之后的该修复提交）。
-- annotated tag **`v1.8.2`**：待打；指向 `release/v1.8.2-prepare` 的 PR 合并提交，SHA 在下一轮填入。
-- 发布准备提交：**待填**（本轮改动提交后回填）。
+- annotated tag **`v1.8.2`**：已打并推送，指向 PR #27 合并提交 **`1064ad8748c8d5a987bb378190a3ca2e47f932c7`**。
+- 发布准备提交：**`71a4eb4`**（`chore(release): prepare v1.8.2`，PR #27）；流水线切换提交：`ci(release): point pipeline at v1.8.2`（本轮）。
 
 ## 本轮变化（相对 v1.8.1）
 

@@ -1,6 +1,9 @@
-export const SOURCE_REF = 'v1.8.1';
-export const SOURCE_SHA = '72454c77a930f0231ea58ca8235043b03fe117b3';
-// v1.8.1 overlay：冻结源 tag v1.8.1 已含全部产品/测试代码（第二波可靠性：§5A 意图入口契约对角色可见、
+export const SOURCE_REF = 'v1.8.2';
+export const SOURCE_SHA = '1064ad8748c8d5a987bb378190a3ca2e47f932c7';
+// v1.8.2 overlay：冻结源 tag v1.8.2 已含全部产品/测试代码（D3 选中集记账修复：仅 appointment 卡写角色集，
+// 决策/确认/验收卡选项不再被当作项目角色；读侧只认 D3 裁决、历史污染自动忽略）；白名单保持基础集与
+// 历史保留条目，未列名 app//src/ 仍 fail-closed。
+// v1.8.1 overlay（历史）：冻结源 tag v1.8.1 已含全部产品/测试代码（第二波可靠性：§5A 意图入口契约对角色可见、
 // P0 投递/会话收尾不变量与停止解楔、P1 请求级超时与 SDK api_retry 诊断、P2 网络状态监听、P3 仅 replay-safe
 // 同回合重试、验收卡归属三段式指引、view_image 每轮图片预算移除）；白名单保持基础集与历史保留条目，
 // 未列名 app//src/ 仍 fail-closed。
