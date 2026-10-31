@@ -1,6 +1,10 @@
-export const SOURCE_REF = 'v1.8.0';
-export const SOURCE_SHA = '6211e08b7481c1346022fe2c36d47759dee3384f';
-// v1.8.0 overlay：冻结源 tag v1.8.0 已含全部产品/测试代码（内建角色最小系统与五步雇佣链、模块/名单/拓扑 v2
+export const SOURCE_REF = 'v1.8.1';
+export const SOURCE_SHA = '72454c77a930f0231ea58ca8235043b03fe117b3';
+// v1.8.1 overlay：冻结源 tag v1.8.1 已含全部产品/测试代码（第二波可靠性：§5A 意图入口契约对角色可见、
+// P0 投递/会话收尾不变量与停止解楔、P1 请求级超时与 SDK api_retry 诊断、P2 网络状态监听、P3 仅 replay-safe
+// 同回合重试、验收卡归属三段式指引、view_image 每轮图片预算移除）；白名单保持基础集与历史保留条目，
+// 未列名 app//src/ 仍 fail-closed。
+// v1.8.0 overlay（历史）：冻结源 tag v1.8.0 已含全部产品/测试代码（内建角色最小系统与五步雇佣链、模块/名单/拓扑 v2
 // 与 roster v3、run 冻结、机械拒绝三段式与 contract_check、证据自洽校验与 evidence_check、桌面缺陷修复）；
 // 白名单保持基础集与历史保留条目，未列名 app//src/ 仍 fail-closed。
 // v1.8.0 发布阻断修复（tag v1.8.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：

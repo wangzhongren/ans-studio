@@ -14,18 +14,21 @@ events:
   - date: "2026-10-31"
     kind: verified
     summary: 本地预检 npm run typecheck 0、npm run typecheck:renderer 0、装配测试 86/86 通过
+  - date: "2026-10-31"
+    kind: updated
+    summary: PR #26 合并（72454c7）；annotated tag v1.8.1 已打并推送；release-policy/workflow/打包测试切到 v1.8.1
 ---
 
 # v1.8.1 发布准备
 
-客户决定发布 **1.8.1**、**未签名 ZIP**（同 v1.8.0 形态）。本轮只准备发布源、版本标识与发布说明；`release-policy`、`.github/workflows/release.yml` 与 `test/装配/release-packaging.test.ts` 等发布流水线切换要等 tag 确定后由下一轮更新。本记录随发布进展更新；最终 tag/SHA/CI/资产在完成后填入。
+客户决定发布 **1.8.1**、**未签名 ZIP**（同 v1.8.0 形态）。本轮准备发布源、版本标识与发布说明；`release-policy`、`.github/workflows/release.yml` 与 `test/装配/release-packaging.test.ts` 的流水线切换在 tag 确定后的后续提交完成（`ci(release): point pipeline at v1.8.1`）。本记录随发布进展更新；最终 CI/资产/SHA 在完成后填入。
 
 ## 版本与冻结源
 
 - 版本 1.8.0 → **1.8.1**（patch）。`package.json` 与 `package-lock.json` 仅根两处版本字段，依赖与锁结构零变动。
 - 发布源（冻结源）：**`888cd86`**（`fix(governance): make card-kind rejections actionable and clarify acceptance-card ownership`，即 v1.8.0 之后第二波可靠性改进的收尾提交；自 v1.8.0 tag `6211e08` 起 27 个提交，含 §5A/P0/P1/P2/P3、图片预算移除与该收尾修复）。
-- annotated tag **`v1.8.1`**：待打；指向 `release/v1.8.1-prepare` 的 PR 合并提交，SHA 在下一轮填入。
-- 发布准备提交：**待填**（本轮改动提交后回填）。
+- annotated tag **`v1.8.1`**：已打并推送，指向 PR #26 合并提交 **`72454c77a930f0231ea58ca8235043b03fe117b3`**。
+- 发布准备提交：**`2b413cb`**（`chore(release): prepare v1.8.1`，PR #26）；流水线切换提交：`ci(release): point pipeline at v1.8.1`（本轮）。
 
 ## 本轮变化（相对 v1.8.0）
 
@@ -63,7 +66,7 @@ events:
 - `src/common/装配/release-policy.d.mts`：字面量与 `.mjs` 同步。
 - `test/装配/release-packaging.test.ts`：`SOURCE_REF`/`SOURCE_SHA` 断言切到 v1.8.1 与对应 SHA；v1.8.0 批次用例保留为历史；断言不放宽。
 - `.github/workflows/release.yml`：workflow_dispatch `source_ref` 默认、并发组、`gh release view/create/upload/edit`、标题与 notes 全部 → v1.8.1；未签名沿用 `CSC_IDENTITY_AUTO_DISCOVERY: 'false'`；`publish` 默认仍为 false（draft）。
-- 下一轮完成上述切换并打 annotated tag v1.8.1 后，运行 prepare 预演并记录 overlayPaths/actualTree/overlayPatchSha256。
+- 上述切换已随本轮提交完成（tag v1.8.1 = `72454c7`）；prepare 预演（overlayPaths/actualTree/overlayPatchSha256）以 CI 构建产生的 provenance 为准，随发布回填。
 
 ## CI、资产与 SHA（待回填）
 
