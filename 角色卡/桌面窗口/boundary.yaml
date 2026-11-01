@@ -202,6 +202,10 @@ entries:
   - kind: file
     path: test/桌面应用/shell-escalation.test.ts
     purpose: 主进程侧测试——升级卡 presenter/三选项/超时/replay、卡片仲裁与暂停 IPC
+  # --- Delta-AEP-1（2026-11-01，团队计划 §4.5；闸门 2）：test/桌面应用/ 新增 1 个精确测试文件（acceptance-proposal-path），逐文件授权 ---
+  - kind: file
+    path: test/桌面应用/acceptance-proposal-path.test.ts
+    purpose: 主进程侧测试——验收 judgeContext 的 proposalPath 派生（pinned manifest 优先/最新 `-proposal-vN`/缺失 fail-closed/别名不选/不可读不回退）
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

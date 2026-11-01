@@ -42,3 +42,14 @@
 - 阶段：G2 → H1/V1/B0 → A1/A2/A3（并行）→ B1 → C1 → C2 → D1 → D2 → E1 → E2 → E3；契约先行（A1/A2/A3 冻结）、共享文件单写者；`test/桌面应用/e2e/` 不得新建脚本（仅扩展 `main.mjs`）。
 - 发布：按方案建议新小版本、不用 overlay；本任务不写 `release-policy.mjs`/`package.json`/workflow；发布另行授权。
 - 下一步：交沟通向客户确认闸门 2；实施授权另行；实施前标准由内置独立验收写 `docs/acceptance/shell-escalation-criteria-v1.md`。本上下文待续接，不自行向客户确认或扩大授权。
+
+## 2026-11-01
+
+- 已写团队计划 `docs/scheduling/2026-11-01_team-plan_acceptance-evidence-path.md`（任务 `2026-11-01-acceptance-evidence-path`，flowId `acceptance-evidence-path`，T2；**431 行 / SHA-256 `94f80cff3e16edce43887eb42433a2f4e925b3bb9a13d416d7d8cc88e441e0e3`**）。基线 HEAD `eb77fad`（方案标注；main `a187d59` 含 PR #29 合并 `b7586ce`，目标文件内容与 HEAD 一致）；写计划前工作树仅 3 份未跟踪管理文档；无 `.ans/project.json`。
+- 输入：闸门 0/1 记录 `docs/communication/2026-11-01_intent_acceptance-evidence-path.md`（61 行 / `47b9b707…`；闸门 0 快照 53 行 / `e97b978b…`）；客户确认方案 P1.2 **396 行 / `355cbf1c…`**；复核记录 **124 行 / `25bc602e…`**（完整复核 F1–F11 + 窄复核 F1–F4/N1，无阻断项）；客户闸门 1 原话「确认闸门 1 修复方案（T2，含方法 A 验证授权）」。
+- 五维结论：**不变 + 改边界（1 项精确条目）**。角色：桌面窗口（`app/desktop/session.ts` + 新增 `test/桌面应用/acceptance-proposal-path.test.ts`）、编排（`src/common/编排/governance-judge-facts.ts` + 新增 `test/编排/governance-judge-facts.test.ts` + 更新 `test/编排/acceptance-judge-minimal.test.ts`）、测试（B0/D1/D2 真实方法 A 回归）、人事（B-1 边界条目）、内置验收（V1/E2）、统筹；装配/项目管理（shared）默认不参与。
+- **与方案 §7 角色标签的不一致（已在计划 §10.3 记录）**：§7 把三个测试都归「测试」、把 `intent-entry-contract.ts` 归「运行时核心/编排共享」；按实际 Section 1，`test/桌面应用/` 归桌面窗口逐文件、`test/编排/` 归编排、`src/common/shared/` 归项目管理。计划按实际边界分配；写集 5 文件不变。
+- 边界变更 B-1：桌面窗口 `boundary.md`+`boundary.yaml` 新增 `test/桌面应用/acceptance-proposal-path.test.ts` 精确条目（闸门 2 后人事执行）；其余 4 文件在既有目录授权内。
+- 阶段：G2 → H1/V1/B0 → A1/A2（并行）→ D1（跨模块回归）→ D2（真实试跑方法 A：别名移出/还原 + 新 request.resolved/judge.evidence）→ E1 → E2 → E3。AC-8 只以方法 A 为充分证据；方法 B 仅补充；不关闭「替我决策」取证。
+- 发布/提交：不 commit/push、不发行；提交/推送另行授权；不写发布/构建面。
+- 下一步：交沟通闸门 2；实施授权另行；V1 由内置验收写 `docs/acceptance/acceptance-evidence-path-criteria-v1.md`。本上下文待续接，不自行向客户确认或扩大授权。
