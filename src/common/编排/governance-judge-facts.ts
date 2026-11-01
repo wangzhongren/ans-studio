@@ -156,6 +156,10 @@ export function buildGovernanceJudgeFacts(input: {
 /**
  * 规范物证要求（评审 §5.4；2026-10-22 治理分工第 1/3/5 项）：
  * - 返回**必须可读**的物证路径与「是否有必需物证缺失」；
+ * - 本函数**不扫盘、不做版本选择**：实际版本路径由 app（验收 judgeContext）传入；
+ *   `expectedProposal`/`expectedQualityReport` 只是 flowId 存在时的**约定缺失文案**，与
+ *   `mechanical-rejection`/`workflow-preconditions`/`governance-judge-prompt` 同一命名
+ *   （部分位置用 `-proposal-v1.md` 示例、部分用 `-proposal-vN.md` 正则），不表示该版本存在；
  * - `missingPaths` 是缺失物证的**约定路径**（客户可读；flowId 缺失时退化为文字，不编造路径）；
  * - 第 1 项：任命材料以请求携带的 `recommendedRoleIds` 为唯一来源（D 批撤除团队计划）；
  * - 第 3 项（2026-10-29 方案 v2.1 / Q6 A）：acceptance 只要求**提案**与**质检报告**
@@ -178,7 +182,7 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
   const report = pick(artifacts.acceptanceReportPath);
   const flowId = typeof request.flowId === "string" && request.flowId.trim() !== "" ? request.flowId.trim() : undefined;
   // 约定路径（flowId 缺失 ⇒ 文字，不编造路径）。
-  const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-v1.md` : "提案";
+  const expectedProposal = flowId !== undefined ? `docs/proposals/${flowId}-proposal-v1.md` : "提案";
   const expectedQualityReport = flowId !== undefined ? `docs/quality/${flowId}-report-v1.md` : "质检报告";
 
   switch (request.cardKind) {

@@ -3739,6 +3739,14 @@ export class SessionManager {
     if (typeof flowId !== "string" || flowId.trim() === "") return metadata; // 无 flowId：上游已 fail-closed
     const activeRun = await findActiveRun(projectRoot, flowId);
     const pinnedRun = activeRun.ok && activeRun.manifest !== null && activeRun.manifest.state === "pinned" ? activeRun.manifest : undefined;
+    // 2026-11-01（acceptance-evidence-path，方案 P1.2 §2.2/§3.1）：验收判断的提案物证路径。
+    // pinned run 以 manifest `documents.proposal.path`（trim 后非空）为唯一路径；pinned 但无 proposal ⇒ 缺失，不回退扫描。
+    // 无 pin 复用共享解析 `readIntentEntryFacts` 取最新 `docs/proposals/<flowId>-proposal-vN.md`（别名不参与）；不另写扫描。
+    const pinnedProposalPath = pinnedRun?.documents.proposal?.path?.trim();
+    const proposalRel =
+      pinnedRun !== undefined
+        ? (pinnedProposalPath !== undefined && pinnedProposalPath !== "" ? pinnedProposalPath : undefined)
+        : (await readIntentEntryFacts({ projectRoot, flowId })).proposalPath;
     const intentRel = pinnedRun?.documents.intent?.path ?? `docs/product/${flowId}-intent-v1.md`;
     const reportRel = `docs/quality/${flowId}-report-v1.md`;
     const readText = async (rel: string): Promise<string | undefined> => {
@@ -3880,7 +3888,8 @@ export class SessionManager {
         : {}),
       artifacts: {
         ...(baseContext?.artifacts ?? {}),
-        proposalPath: `docs/proposals/${flowId}-v1.md`,
+        // 显式覆盖继承的旧值；`proposalRel === undefined` 时也不得保留旧值（证据包按缺失 fail-closed）。
+        proposalPath: proposalRel,
         acceptanceReportPath: reportRel,
       },
     };
