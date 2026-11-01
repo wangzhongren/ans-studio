@@ -119,4 +119,5 @@
 - 客户授权原话「把这轮修复提交并推送到 GitHub（不发行）」；E2b 通过（8/8）后由沟通执行。
 - **提交**（分支 `feat/flow-improvements-wave1`，基线 `eb77fad`）：`fa3b8f9` 实施与测试（5 文件）；`b4dd6bd` 治理与记录（20 文件）；提交后工作树干净。
 - **推送**：`origin/feat/flow-improvements-wave1` 已更新；**PR #30** 已创建（base main）：https://github.com/wangzhongren/ans-studio/pull/30
+- **合并**：客户指示「把 PR #30 合并到 main」（2026-11-01），已合并：merge commit **`da962b6fabd3b54889f9e1ec0b9079902d00eefc`**（main 已包含 `fa3b8f9`/`b4dd6bd`/`c80f494`）。
 - **不发行**：无 tag、无版本号变更、无发布包；`release-policy.mjs` 保持 `v1.8.3`。
