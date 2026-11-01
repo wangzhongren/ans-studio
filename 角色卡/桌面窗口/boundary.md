@@ -70,6 +70,7 @@
 | 单文件 | `test/桌面应用/network-monitor.test.ts` | 主进程侧测试：网络监听——net.isOnline/5s 采样、powerMonitor suspend/resume/lock/unlock、1s 稳定窗口与连续 2 次离线判定、离线 fail-fast/安全暂停/恢复重试窗口/锁屏≠离线（P2，main/interface/session） |
 | 单文件 | `test/桌面应用/replay-safe-retry.test.ts` | 主进程侧测试：仅 replay-safe 同 turn 安全重试——重试失败/终态/短报、不重复 settled/handback、取消优先（P3，session/interface） |
 | 单文件 | `test/桌面应用/shell-escalation.test.ts` | 主进程侧测试——升级卡 presenter/三选项/超时/replay、卡片仲裁与暂停 IPC |
+| 单文件 | `test/桌面应用/acceptance-proposal-path.test.ts` | 主进程侧测试——验收 judgeContext 的 proposalPath 派生（pinned manifest 优先/最新 `-proposal-vN`/缺失 fail-closed/别名不选/不可读不回退） |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |

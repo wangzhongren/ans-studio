@@ -128,6 +128,11 @@ test("物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）", (
   });
   assert.equal(missingArtifact.verdict, "manual");
   assert.equal(missingArtifact.reasonCode, "artifact-missing");
+  // 2026-11-01（acceptance-evidence-path AC-3/AC-4）：缺 proposal 的文案指向约定路径
+  // `docs/proposals/<flowId>-proposal-v1.md`，不得再出现旧错误约定 `docs/proposals/<flowId>-v1.md`。
+  const missingReason = missingArtifact.reason ?? "";
+  assert.match(missingReason, /docs\/proposals\/focus-proposal-v1\.md/);
+  assert.ok(!missingReason.includes("focus-v1.md"), missingReason);
 
   const notRead = evaluateGovernanceJudgeVerdict({
     request: request(),
