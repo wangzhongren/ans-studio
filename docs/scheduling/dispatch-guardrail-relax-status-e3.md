@@ -49,8 +49,19 @@
 5. **§7.3 迁移表漏列 `i-full-chain`**：已在 E1 §6.1 与 E2 报告中披露；D1-fix 为测试-only 迁移，不构成产品缺陷。
 6. **未启用 task_ops**：本记录不伪造机器状态/凭证；证据以文件哈希与原始输出为准。
 
-## 四、记录状态
+## 四、提交记录（客户已授权提交；不含推送/合并/发布）
 
-- 本文件为 E3 状态记录（R4 关闭后的重冻版），已写盘；未改团队计划确认版（482 行 / `4ebd41fa…`）、V1、E1 或任何产品/测试文件。
-- 提交执行与 commit 哈希由统筹在本记录/memo 追加或另笔仅文档提交记录；推送/合并/发布未授权、未执行。
-- 未接触客户；未改产品代码/测试/角色卡/边界。
+| 提交 | 哈希 | 内容 |
+| --- | --- | --- |
+| Commit 1 | `2e16164d65aae0dd450998f6e17da01d4979c9ca` | 13 个产品/测试候选路径（A1 5 + B1 7 + D1-fix 1）；`feat(dispatch): 派发受理只保留授权矩阵，状态检查降级为 advisory` |
+| Commit 2 | `d863a21f7e04c2935c4ec99ce1ee1cae566cd49e` | 本任务治理/记录 81 文件：方案/复核/团队计划/V1/E1/E3/E2 报告/沟通记录/策划与调度与验收 memo/H1 boundary+changelog/A1、B1、B0、D1、D2 记录与证据；`docs(dispatch-guardrail-relax): ...` |
+| Commit 3 | 见最终回执 | 仅文档：记录 Commit 1/2 哈希与临时证据排除（本文件 + 调度 memo） |
+
+- **临时证据排除（不进入提交）**：D2 evidence 中的 `e2e-pi.env`（sentinel token 夹具，非真实凭据）与 Electron `userData/`、`userData-restart-probe/` 临时缓存已从 worktree 移到本地临时快照 `C:\Users\51054\AppData\Local\Temp\dispatch-guardrail-relax-D2-transient-2026-11-02`；D2 的权威证据（report.txt、日志、截图、fixtures）已提交。未使用 `git add -A`；未 stage `.claude/`、`demos/`、其他任务或无关 untracked。
+- **提交后核对**：`git status --porcelain -- src app test` 为空；staged 为空；无未提交任务文件（临时证据已移出 worktree）。
+- **未推送/合并/发布**：以上提交只在本 worktree 分支 `feat/flow-improvements-wave1`；未 push、未 merge、未 release。
+
+## 五、记录状态
+
+- 本文件为 E3 状态记录（R4 关闭后的重冻版 + 提交记录），已写盘；未改团队计划确认版（482 行 / `4ebd41fa…`）、V1、E1 或任何产品/测试文件。
+- 推送/合并/发布未授权、未执行；未接触客户；未改产品代码/测试/角色卡/边界。
