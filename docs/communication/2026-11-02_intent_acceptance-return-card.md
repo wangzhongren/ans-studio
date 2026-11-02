@@ -149,3 +149,10 @@
 - **Commit 2**：`1667b0284c593a913c4a02a78bbc82e24807fe20` — 45 个治理/记录/证据路径，+8061/−1。
 - **PR #32**：https://github.com/wangzhongren/ans-studio/pull/32（OPEN，base `main`，head `feat/acceptance-return-card`，mergeStateStatus CLEAN，未合并）。
 - **状态**：工作树干净；未合并、未发布、未打 tag；CI 尚未报告检查结果。
+
+## 合并授权记录（2026-11-02）
+
+- **客户授权**：原话「你顺便把pr 合并了把」。
+- **对象**：PR #32（base `main`，head `feat/acceptance-return-card`；含 Commit 1 `1081430c…`、Commit 2 `1667b028…`、记录 `223752a` 及本次合并授权记录提交）。
+- **范围**：合并 PR #32 到 main；不发布、不打 tag、不删除分支。
+- **授权状态**：已授权合并；未授权发布。
