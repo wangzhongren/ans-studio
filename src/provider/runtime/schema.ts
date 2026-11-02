@@ -1,5 +1,14 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import {
+  PROJECT_NOTE_BLOCKER_TEXT_MAX,
+  PROJECT_NOTE_KEY_MAX,
+  PROJECT_NOTE_NEXT_STEP_TEXT_MAX,
+  PROJECT_NOTE_REFS_MAX,
+  VERSION_DECISION_ACTIONS,
+  VERSION_DECISION_REASON_MAX,
+  VERSION_DECISION_REFS_MAX,
+} from "../../model/project-state.ts";
 /** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
 export interface ToolDescription {
   parameters: Record<string, unknown>;
@@ -1228,6 +1237,151 @@ export function describeTool(name: string): ToolDescription {
         "申请≠批准：需求变更审批卡由应用在登记成功后自动经发起方会话呈现（decision 卡；策划角色（Rapporteur）或运营均可发起，发起方不得自批、不得再调用 `request_choice` 重复发卡；「替我决策」开启时判断 agent 按推荐项决定，未开启时客户手选）；产品不审批，只在批准后执行意图变更；不要把新授权写进提案卡。",
         "按回执的 code/message 如实转达；`dispatched` 只表示已提交、不代表通过；非 dispatched 时不要宣称已提交或已获批准。",
       ],
+    };
+  }
+  if (name === "project_state") {
+    // 2026-11-02（全局任务状态 A0；只读，注入才注册）：与 UI `project-state:get` 同一 builder 的文本摘要投影。
+    // 文案纪律：只读/按角色裁剪/有界 8 KiB 截断如实/坏行不阻塞/非验收证据/不写盘。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Optional flow id (slug) to filter the read-only snapshot",
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+      description:
+        "**只读**全局任务状态摘要（幕僚/内置治理角色工具，注入才存在）：当前 focus flow/run/阶段、未收口任务计数、" +
+        "阻塞/卡点、版本/证据指针与下一步。数据与 UI 项目状态区来自**同一派生结果**——本工具不重算、不写第二份状态；" +
+        "按调用角色裁剪：幕僚完整，其他内置治理角色只看到自己的任务与 focus 聚合，项目 worker 无本工具。" +
+        "**纯读：不写账本/manifest/文档、不缓存、不改任何任务/run 状态或写权**；坏行/坏 manifest 进 errors 并返回可读部分，" +
+        "不抛、不阻塞。文本输出有界（≤8 KiB），超限截断并如实标注 `truncated`；**本工具输出不是验收证据，查询不构成放行**。",
+      promptGuidelines: [
+        "派发/收口/巡检前先读 project_state，对齐当前 focus、未收口任务、阻塞与下一步；机器事实以应用为准。",
+        "project_state 只读摘要：不要据此写盘，也不要把它当验收/批准证据；逐任务动作仍在任务中心/既有工具。",
+      ],
+    };
+  }
+  if (name === "project_note") {
+    // 2026-11-02（全局任务状态 A0；仅幕僚注入）：受控备注（focus/blocker/next-step），append-only 写账本事件。
+    // 文案纪律：不改机器事实/不是批准或验收证据/不写文档不派发/超限拒绝不截断/不存在的 flow 拒绝。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          op: {
+            type: "string",
+            enum: ["set-focus", "blocker", "next-step"],
+            description:
+              "set-focus = set/clear the current focus; blocker = mark/resolve a named blockage; next-step = set the next step",
+          },
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "set-focus: target flow id (slug); may be omitted only with cleared:true",
+          },
+          runId: { type: "string", description: "set-focus: optional run id that must belong to flowId" },
+          note: {
+            type: "string",
+            maxLength: PROJECT_NOTE_BLOCKER_TEXT_MAX,
+            description: `set-focus: optional short note (≤${PROJECT_NOTE_BLOCKER_TEXT_MAX} characters)`,
+          },
+          cleared: { type: "boolean", description: "set-focus: true clears focus (no automatic derivation afterwards)" },
+          noteKey: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            maxLength: PROJECT_NOTE_KEY_MAX,
+            description: "blocker: required stable slug (≤64); next-step: optional, defaults to next-step",
+          },
+          text: {
+            type: "string",
+            minLength: 1,
+            maxLength: PROJECT_NOTE_NEXT_STEP_TEXT_MAX,
+            description:
+              `blocker ≤${PROJECT_NOTE_BLOCKER_TEXT_MAX} / next-step ≤${PROJECT_NOTE_NEXT_STEP_TEXT_MAX} characters; over-long values are rejected, never truncated`,
+          },
+          active: { type: "boolean", description: "blocker/next-step: true = active, false = resolved" },
+          refs: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: PROJECT_NOTE_REFS_MAX,
+            description: `Optional references (≤${PROJECT_NOTE_REFS_MAX} project-relative paths or task ids)`,
+          },
+        },
+        required: ["op"],
+        additionalProperties: false,
+      },
+      description:
+        "幕僚**受控备注**（只注入 trio chief，注入才存在）：设置/清除 focus（`set-focus`）、标记/解除阻塞（`blocker`）、" +
+        "设置下一步（`next-step`）。应用校验后 append-only 写 `project.focus`/`project.note` 账本事件，重启可按当前账本重建。" +
+        "**备注不是机器事实、不是客户批准、不是验收证据**：它不能改变任务 status/closed、run state/pin、manifest 或文档；" +
+        "**不写文档、不派发角色、不创建任务**，也不能代替客户闸门/需求变更/验收。" +
+        "不存在的 flow、超长文本（blocker ≤500 / next-step ≤1000 字符）、非法 noteKey 与超过 5 项的 refs 一律拒绝、不截断。",
+      promptGuidelines: [
+        "用 project_note 管理 focus/阻塞/下一步；不要用新建 flowId 或直接改账本绕过卡点（机器事实以应用为准）。",
+        "备注只是备注：不改任务/run/文档，也不是批准或验收证据；范围/验收/授权变化走对应客户闸门。",
+      ],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "request_version_decision") {
+    // 2026-11-02（版本决策 A0；仅幕僚注入）：发起 application-owned decision 卡；申请≠批准、路线≠内容批准。
+    // 文案纪律：只发起、不执行/不写文档不派发/不创建任务；pinned→run-change；新版本开发关闭旧 flow 全部活动 run。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: {
+            type: "string",
+            pattern: GOVERNANCE_SLUG_PATTERN,
+            description: "Focus flow id (slug) for the route decision",
+          },
+          runId: {
+            type: "string",
+            description:
+              "Optional current run id (decision context only; required when the flow has multiple active runs). It does NOT limit the closing scope of new-version-development",
+          },
+          action: {
+            type: "string",
+            enum: [...VERSION_DECISION_ACTIONS],
+            description:
+              "Your proposed route: version-modify = new -vN+1 in the same flow/run (the app only records target versions); " +
+              "new-version-development = new flow + draft run replacing the entire old flow",
+          },
+          reason: {
+            type: "string",
+            minLength: 1,
+            maxLength: VERSION_DECISION_REASON_MAX,
+            description: `Why you propose this route (≤${VERSION_DECISION_REASON_MAX} characters); over-long values are rejected, never truncated`,
+          },
+          refs: {
+            type: "array",
+            items: { type: "string" },
+            maxItems: VERSION_DECISION_REFS_MAX,
+            description: `Optional references (≤${VERSION_DECISION_REFS_MAX} project-relative paths or task/request ids)`,
+          },
+        },
+        required: ["flowId", "action", "reason"],
+        additionalProperties: false,
+      },
+      description:
+        "幕僚**发起版本决策**（只注入 trio chief，注入才存在）：针对非 pinned 的 focus flow 提出「版本修改」或「新版本开发」。" +
+        "**申请≠批准**：应用校验后发 application-owned `decision` 卡，由客户或「替我决策」判断 agent 决定；判断 agent 代批时必须如实标注。" +
+        "**路线≠内容批准**：这不是验收卡，不是客户批准，也不能替代需求变更/客户闸门；新版本文档与验收仍按既有规则推进。" +
+        "**pinned run 不走版本决策**——请走既有 run-change（契约变更 · 重开 run）。" +
+        "选择「新版本开发」时，应用会新建 flow 与 draft run，并**关闭旧 flow 的全部活动 run（不只当前 run）**；旧产物保留，旧未决申请作废，旧未收口任务不自动关闭。" +
+        "应用只执行机器部分：**不写文档、不派发角色、不创建任务**；后续由幕僚按结果自行派发。",
+      promptGuidelines: [
+        "卡在版本/引用/验收证据循环时，用 request_version_decision 提议「版本修改」或「新版本开发」；你只提议，不代选、不承诺批准。",
+        "pinned run 不要调用本工具——走既有 run-change；新版本开发会关闭旧 flow 的全部活动 run，卡面会说明。",
+        "申请≠批准、路线≠内容批准：按回执如实行动；应用不写文档、不派发角色、不创建任务。",
+      ],
+      executionMode: "sequential",
     };
   }
   if (!["write_file", "edit_file", "read_file"].includes(name)) throw new Error(`未知 ANS 工具：${name}`);

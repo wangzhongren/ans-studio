@@ -61,6 +61,7 @@ const calls = {
   reportRetries: [],
   receiptQueries: [],
   historyRetries: [],
+  projectState: [],
   judge: { shellGet: 0, decisionGet: 0, decisionSet: [] },
 };
 report.calls = calls;
@@ -144,6 +145,54 @@ function listing(projectRoot = ROOT) {
   };
 }
 
+function projectStateView(projectRoot) {
+  return {
+    schema: "project-state/v1",
+    generatedAt: "2026-11-02T00:00:00.000Z",
+    projectRoot,
+    focus: {
+      flowId: "smoke-flow",
+      runId: "smoke-run",
+      runState: "draft",
+      stage: "build",
+      selectedBy: "chief",
+      updatedAt: "2026-11-02T00:00:00.000Z",
+      stale: false,
+    },
+    flows: [
+      {
+        flowId: "smoke-flow",
+        sources: ["run", "task"],
+        runs: [{ runId: "smoke-run", state: "draft", active: true }],
+        taskCounts: { unclosed: 1, blocked: 0, failed: 0 },
+        lastActivityAt: "2026-11-02T00:00:00.000Z",
+      },
+    ],
+    tasks: [],
+    blockers: [],
+    versions: [],
+    evidence: [],
+    notes: [],
+    nextStep: {
+      text: "continue with acceptance",
+      source: "chief",
+      at: "2026-11-02T00:00:00.000Z",
+    },
+    errors: [],
+    truncated: false,
+    counts: {
+      unclosed: 1,
+      supersededUnclosed: 0,
+      activeUnclosed: 1,
+      blocked: 0,
+      failed: 0,
+      pendingRequests: 0,
+      flows: 1,
+      tasks: 0,
+    },
+  };
+}
+
 function runtimeConfig(runtime) {
   if (state.configReadsEnabled) calls.configReads.push(runtime);
   if (state.failConfig.has(runtime)) throw new Error("离线配置读取失败");
@@ -168,6 +217,10 @@ function runtimeConfig(runtime) {
 ipcMain.handle("app:recovery-state", () => ({}));
 ipcMain.handle("app:recovery-ready", () => ({ ok: true }));
 ipcMain.handle("app:list-project", (_e, input) => listing(input?.projectRoot || ROOT));
+ipcMain.handle("project-state:get", (_e, input) => {
+  calls.projectState.push(input);
+  return projectStateView(input?.projectRoot || ROOT);
+});
 ipcMain.handle("session:open", (_e, input) => {
   calls.opens.push(input);
   return { ok: true, resumed: true, contextSource: "resumed", runtime: input.runtime, projectRoot: input.projectRoot };
@@ -608,6 +661,38 @@ app.whenReady().then(async () => {
     } else {
       check("card queue subview entry absent (no queue preview)", true);
     }
+
+    // —————— 11b. 项目状态区（project-state/v1，A4：只读/同源/刷新） ——————
+    const projectStateBefore = calls.projectState.length;
+    await js(`document.getElementById('tab-tasks').click()`);
+    await waitFor(`document.querySelector('.project-state .ps-focus') !== null`, 4000);
+    await sleep(120);
+    const projectStateCalls = calls.projectState.length;
+    check(
+      "project state section renders focus and badges",
+      await js(`(()=>{const s=document.querySelector('.project-state');if(!s)return false;const f=s.querySelector('.ps-focus');const badges=[...s.querySelectorAll('.ps-badge')];const details=s.querySelector('.ps-details');return !!f&&f.textContent.includes('smoke-flow')&&f.textContent.includes('smoke-run')&&badges.length===4&&badges[0].textContent.includes('1 个未收口')&&!!details&&details.open===false;})()`),
+    );
+    check(
+      "project state IPC called once on open",
+      projectStateCalls === projectStateBefore + 1,
+      { before: projectStateBefore, after: projectStateCalls },
+    );
+    check(
+      "project state read-only: only refresh button",
+      await js(`(()=>{const s=document.querySelector('.project-state');return s.querySelectorAll('button').length===1&&!!s.querySelector('.ps-refresh');})()`),
+    );
+    check(
+      "project state exposes no write bridge",
+      !("closeTask" in calls) && !("terminateRoleRun" in calls) && !("redispatchTask" in calls) && !("projectNote" in calls),
+    );
+    await shot("phase4b-project-state");
+    await js(`document.querySelector('.ps-refresh').click()`);
+    await sleep(160);
+    check(
+      "project state refresh calls IPC once more",
+      calls.projectState.length === projectStateCalls + 1,
+      calls.projectState.slice(-3),
+    );
     await js(`document.getElementById('drawer-close').click()`);
     await sleep(80);
 

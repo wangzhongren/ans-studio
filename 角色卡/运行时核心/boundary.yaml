@@ -5,6 +5,10 @@ entries:
   - kind: file
     path: src/model/runtime.ts
     purpose: 中立运行时类型与能力契约
+  # --- Delta-GTS-1（2026-11-02，团队计划 §4.5；闸门 2）：新增 1 个共享 Model 文件（project-state），逐文件授权 ---
+  - kind: file
+    path: src/model/project-state.ts
+    purpose: 全局任务状态/版本决策的共享 Model 类型（`ProjectStateView`/`VersionDecisionCard`/`VersionDecisionRequest/Result`；无 I/O）
   - kind: file
     path: src/service/runtime/session.ts
     purpose: 运行时选择、公共工具装配与提供方接入入口

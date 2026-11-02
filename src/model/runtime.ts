@@ -3,6 +3,18 @@
 import type { ResolvedRole } from "./role.ts";
 import type { WriteDecision } from "./decision.ts";
 import type { PinEntry } from "./boundary.ts";
+import type {
+  ProjectNoteInput,
+  ProjectNoteResult,
+  ProjectStateQuery,
+  ProjectStateToolResult,
+  VERSION_DECISION_SCHEMA,
+  VersionDecisionAction,
+  VersionDecisionDecidedBy,
+  VersionDecisionRequest,
+  VersionDecisionResult,
+  VersionDecisionStatus,
+} from "./project-state.ts";
 import type { RuntimeKind } from "../common/shared/runtime-shared.ts";
 import type { createDiagnosticLogger } from "../common/shared/diagnostics.ts";
 export type { RuntimeKind } from "../common/shared/runtime-shared.ts";
@@ -832,11 +844,17 @@ export interface RequestNotifiedEvent extends TaskStateEventBase {
   event: "created" | "presented" | "resolved";
 }
 
+/**
+ * 未决申请作废原因（2026-11-02 加法扩展；读侧未校验 reason 的历史行为保持兼容）：
+ * `restart`＝重启恢复；`superseded`＝新版本开发取代旧 flow；`initiator-aborted`＝发起轮次中止。
+ */
+export type RequestOrphanedReason = "restart" | "superseded" | "initiator-aborted";
+
 /** `request.orphaned`（C-08）：重启时未决申请；原 tool call 已不存在，不自动执行原动作。 */
 export interface RequestOrphanedEvent extends TaskStateEventBase {
   kind: "request.orphaned";
   requestId: string;
-  reason: "restart";
+  reason: RequestOrphanedReason;
 }
 
 export interface ApprovalCreatedEvent extends TaskStateEventBase {
@@ -867,6 +885,63 @@ export interface ApprovalExpiredEvent extends TaskStateEventBase {
   reason: "restart" | "timeout" | "unavailable";
 }
 
+// —————————————— 全局任务状态/版本决策账本事件（2026-11-02；加法扩展，形状单一来源＝本模块） ——————————————
+//
+// 只加事件 kind/可选字段，不改既有事件形状；`TaskRecord`/`taskStatusOf` 不消费新事件（A1 重放跳过）。
+// 视图/卡/请求/结果类型在 `./project-state.ts`（单向依赖：本模块 type-import 其枚举/常量，反向禁止）。
+
+/** 幕僚/应用设置或清除当前 focus（不是机器事实；不改 run 状态/manifest）。 */
+export interface ProjectFocusEvent extends TaskStateEventBase {
+  kind: "project.focus";
+  flowId?: string;
+  runId?: string;
+  note?: string;
+  roleId: "chief" | "application";
+  /** 仅 `roleId:"application"`（新版本开发执行后的自动切换）携带。 */
+  sourceDecisionId?: string;
+  /** true＝清除 focus（视图 `selectedBy:"none"`，不再自动派生）。 */
+  cleared?: boolean;
+}
+
+/** 幕僚受控备注（阻塞/下一步）；按 `noteKey` 最新 active 生效。 */
+export interface ProjectNoteEvent extends TaskStateEventBase {
+  kind: "project.note";
+  noteKey: string;
+  noteKind: "blocker" | "next-step";
+  text: string;
+  refs?: string[];
+  active: boolean;
+  roleId: "chief";
+}
+
+/** 版本决策执行审计（append-only；同一 decisionId 取最新；不是内容/验收批准）。 */
+export interface VersionDecisionEvent extends TaskStateEventBase {
+  kind: "version.decision";
+  schema: typeof VERSION_DECISION_SCHEMA;
+  decisionId: string;
+  requestId: string;
+  /** 该 run/flow 的版本决策请求序号（含拒绝/中止；仅展示/审计）。 */
+  attempt: number;
+  flowId: string;
+  runId?: string;
+  action: VersionDecisionAction;
+  recommendedBy: "chief";
+  recommendedAction: VersionDecisionAction;
+  decidedBy: VersionDecisionDecidedBy;
+  operatorId?: string;
+  reason: string;
+  status: VersionDecisionStatus;
+  oldFlowId?: string;
+  oldRunId?: string;
+  newFlowId?: string;
+  newRunId?: string;
+  targetVersions?: Record<string, number>;
+  closedRunIds?: string[];
+  orphanedRequestIds?: string[];
+  supersededTaskIds?: string[];
+  message?: string;
+}
+
 /** `.ans/state/tasks.jsonl` 的单行事件联合（append-only；每行一个事件）。 */
 export type TaskStateEvent =
   | TaskCreatedEvent
@@ -882,7 +957,10 @@ export type TaskStateEvent =
   | RequestOrphanedEvent
   | ApprovalCreatedEvent
   | ApprovalResolvedEvent
-  | ApprovalExpiredEvent;
+  | ApprovalExpiredEvent
+  | ProjectFocusEvent
+  | ProjectNoteEvent
+  | VersionDecisionEvent;
 
 /** 每角色运行日志条目（B-04；字段白名单，写入侧脱敏/截断）。 */
 export interface RoleLogEntry {
@@ -1267,6 +1345,41 @@ export interface RequestRequirementChangeResult {
 
 /** `request_requirement_change` 注入能力（意图校验/去重/派发/账本/系统行由应用实现；未注入 ⇒ 工具不注册）。 */
 export type RequestRequirementChangeFn = (input: RequestRequirementChangeInput) => Promise<RequestRequirementChangeResult>;
+
+// —————————————— 全局任务状态 / 版本决策能力（2026-11-02；注入才注册） ——————————————
+
+/**
+ * `project_state` 只读能力（注入才注册）：返回文本摘要投影（A1 生成，≤8 KiB）；
+ * 工具层按 `PROJECT_STATE_TOOL_MAX_BYTES` 再做硬截断防御。纯读、零写入——不写账本/manifest/文档，
+ * 不改变任务状态/run 状态/验收/写权。未注入 ⇒ 工具不存在（结构性 fail-closed）。
+ * 注入面由编排/桌面注入端决定：全部内置治理角色（chief 完整、其余按会话角色裁剪），项目 worker 不注入。
+ */
+export type ProjectStateFn = (
+  query: ProjectStateQuery,
+  metadata?: ReportHandbackMetadata,
+) => ProjectStateToolResult | Promise<ProjectStateToolResult>;
+
+/**
+ * `project_note` 受控备注能力（注入才注册；只给 trio chief）：
+ * 应用校验后 append-only 写 `project.focus`/`project.note`。备注**不是机器事实、不是批准/验收证据**；
+ * 不改变任务 status/closed、run state/pin、manifest 或文档。未注入 ⇒ 工具不注册。
+ */
+export type ProjectNoteFn = (
+  input: ProjectNoteInput,
+  metadata?: ReportHandbackMetadata,
+) => ProjectNoteResult | Promise<ProjectNoteResult>;
+
+/**
+ * `request_version_decision` 版本决策申请能力（注入才注册；只给 trio chief）。
+ * 幕僚只提议；应用发 application-owned decision 卡，由客户或「替我决策」判断 agent 决定；
+ * 执行只做机器部分（记录路线/目标版本；新版本开发新建 flow/run、关闭旧 flow 全部活动 run、orphan 旧申请），
+ * **不写文档、不派角色、不创建任务**。`signal`（第二位置参数，沿 `ShellEscalationFn` 先例）用于
+ * 发起轮次中止 → `request.orphaned(reason:"initiator-aborted")`，不执行。未注入 ⇒ 工具不注册。
+ */
+export type RequestVersionDecisionFn = (
+  input: VersionDecisionRequest,
+  signal?: AbortSignal,
+) => Promise<VersionDecisionResult>;
 
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
@@ -2139,6 +2252,25 @@ export interface GovernedToolsOptions {
    * 不要把新授权写进提案卡；`proposedIntentPatch` 只是建议，不替客户改意图。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
+  /**
+   * 2026-11-02（全局任务状态，A0）：`project_state` 只读视图能力。**注入才注册**——
+   * 未注入 ⇒ 工具不存在（结构性 fail-closed）。注入面由编排/桌面注入端决定：全部内置治理角色
+   * （chief 完整、其余按会话角色裁剪），项目 worker 不注入。纯读、零写入；不改变任何写权/判定链。
+   */
+  projectState?: ProjectStateFn;
+  /**
+   * 2026-11-02（全局任务状态，A0）：`project_note` 受控备注能力。**只给 trio chief 注入**；
+   * 未注入 ⇒ 工具不注册。备注 append-only 写账本事件，不是机器事实、不是批准/验收证据；
+   * 不改变任务状态/run 状态/manifest/文档。
+   */
+  projectNote?: ProjectNoteFn;
+  /**
+   * 2026-11-02（版本决策，A0）：`request_version_decision` 能力。**只给 trio chief 注入**；
+   * 未注入 ⇒ 工具不注册。申请≠批准：应用发 application-owned decision 卡，客户/判断 agent 决定；
+   * 应用只执行机器部分，不写文档/不派角色/不创建任务。`signal` 为发起轮次中止信号
+   * （`request.orphaned(reason:"initiator-aborted")`，不执行）。
+   */
+  requestVersionDecision?: RequestVersionDecisionFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

@@ -1,0 +1,78 @@
+=== B0 baseline snapshot (global-task-state) ===
+recorded_at: 2026-11-02T18:57:55+08:00
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1
+
+--- git rev-parse HEAD ---
+0a123109a6b10e9b60fd1aee5f08f861455c48de
+--- git branch --show-current ---
+feat/acceptance-return-card
+--- git status --short ---
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.yaml"
+?? docs/communication/2026-11-02_intent_global-task-state.md
+?? docs/planning/2026-11-02_design_global-task-state-version-authority.md
+?? docs/planning/2026-11-02_review_global-task-state-version-authority.md
+?? docs/scheduling/2026-11-02_team-plan_global-task-state.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-02_global-task-state-B0-baseline-evidence/"
+--- git status --porcelain -- src app test ---
+(end src/app/test status; empty means no changes)
+--- git diff --cached --name-only ---
+(end staged; empty means none)
+
+--- node / npm ---
+v24.22.1
+11.19.1
+--- OS / shell ---
+MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+SHELL=/bin/bash.exe
+--- node_modules ---
+node_modules EXISTS
+electron package version: 44.7.0
+electron binary: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\flow-improvements-wave1\node_modules\electron\dist\electron.exe
+--- E2E harness files ---
+EXISTS: test/桌面UI/phase4b-electron-smoke.mjs (1209 lines)
+EXISTS: test/桌面应用/e2e/main.mjs (2859 lines)
+--- planned new test files (expected absent at B0) ---
+ABSENT: test/编排/project-state.test.ts
+ABSENT: test/编排/version-decision.test.ts
+ABSENT: test/桌面应用/project-state.test.ts
+ABSENT: test/桌面应用/version-decision.test.ts
+ABSENT: test/桌面UI/project-state.test.ts
+--- renderer dist entry (ignored build artifact) ---
+EXISTS app/renderer/dist/index.html
+833b1034467e5629d422806962e8bede587f458a195883cf624586ef34dbc006 *app/renderer/dist/index.html
+drwxr-xr-x 1 51054 197609       0 Nov  2 16:35 .
+drwxr-xr-x 1 51054 197609       0 Nov  2 16:35 ..
+-rw-r--r-- 1 51054 197609   55057 Nov  2 16:35 ans-studio-ans-icon-DOpmqMAU.png
+-rw-r--r-- 1 51054 197609  150740 Nov  2 16:35 index-76pNUf-s.css
+-rw-r--r-- 1 51054 197609 1300357 Nov  2 16:35 index-HVgRWhIZ.js
+--- this worktree electron processes ---
+(end; empty means none from this worktree)
+--- frozen / related inputs (lines / sha256 / path) ---
+477	06d29aaf940b9b66062420a9926c9c1764b0aaf12757f785383ce5c0d6359d62	docs/scheduling/2026-11-02_team-plan_global-task-state.md
+MISSING	-	docs/acceptance/global-task-state-criteria-v1.md
+1283	369f666acb76ac88fe30854d84b2f08f3148a55c9ff53958185310ef5c3af910	docs/planning/2026-11-02_design_global-task-state-version-authority.md
+148	22128e59904ab8de10ede64f7acc478069c752198fc3b87c043f5dab4434c5a8	docs/planning/2026-11-02_review_global-task-state-version-authority.md
+123	fa42148eeb56509a0ff9967270b98198d80c08764414b0ec43f44f87ed5cbfad	docs/communication/2026-11-02_intent_global-task-state.md
+--- package.json scripts ---
+{
+  "start": "node bin/ans.js",
+  "doctor": "node bin/ans.js doctor",
+  "demo": "node bin/ans.js role run 编排 --task T-1",
+  "app": "electron app/main.ts",
+  "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
+  "typecheck": "tsc --noEmit",
+  "typecheck:renderer": "tsc -p app/renderer/tsconfig.json",
+  "dev:renderer": "vite --config vite.config.ts",
+  "build:renderer": "vite build --config vite.config.ts",
+  "preview:renderer": "vite preview --config vite.config.ts",
+  "package": "electron-builder --config electron-builder.yml",
+  "package:local": "npm run build:renderer && electron-builder --config electron-builder.yml --publish never -c.directories.output=release-output/local",
+  "verify:local": "node test/装配/verify-local-package.mjs",
+  "release:prepare": "node src/common/装配/release-prepare.mjs",
+  "release:verify": "node src/common/装配/release-verify.mjs"
+}

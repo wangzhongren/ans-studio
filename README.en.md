@@ -130,7 +130,7 @@ flowchart TD
 
 #### Task and request state (machine contract)
 
-`.ans/state/tasks.jsonl` is the new system's **single machine state**: application-only, append-only, one event per line; roles cannot write it. Event shapes have a single source in `TaskStateEvent` and include task events (`task.created` / `task.delivered` / `task.reported` / `task.closed` / `task.redispatch` / `delegation.changed`) and request/approval events (`request.created` / `request.presented` / `request.resolved` / `request.notified` / `request.orphaned`, `approval.created` / `approval.resolved` / `approval.expired`).
+`.ans/state/tasks.jsonl` is the new system's **single machine state**: application-only, append-only, one event per line; roles cannot write it. Event shapes have a single source in `TaskStateEvent` and include task events (`task.created` / `task.delivered` / `task.reported` / `task.closed` / `task.redispatch` / `delegation.changed`) and request/approval events (`request.created` / `request.presented` / `request.resolved` / `request.notified` / `request.orphaned`, `approval.created` / `approval.resolved` / `approval.expired`), plus global project-state/version-decision events (`project.focus` / `project.note` / `version.decision` — workflow focus, controlled notes, and version-decision execution audit).
 
 ```json
 {

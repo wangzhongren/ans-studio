@@ -1,0 +1,27 @@
+=== renderer dist after rerun build (recorded_at: 2026-11-02T20:26:06+08:00) ===
+c6078edff986f8cbdff6b56f184e7ac2812b8292fb5f3aac7beca8e7d1c8087f *app/renderer/dist/index.html
+ff88e313c9c6a41fa94f5e34b9e1798169ea7ffece2404e5c9fc6474f788d32c *app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png
+a341b86ea1d596a7bf3a8c63a726af443bde20b1f1ead807dfff529966a90b51 *app/renderer/dist/assets/index-HVZOxqQQ.js
+523c311667d0936fe3658dc298578173daebf92ce8fcf4fe207639fd66642498 *app/renderer/dist/assets/index-haa4j9RY.css
+--- sizes ---
+app/renderer/dist:
+total 9
+drwxr-xr-x 1 51054 197609   0 Nov  2 20:25 .
+drwxr-xr-x 1 51054 197609   0 Oct 30 10:50 ..
+drwxr-xr-x 1 51054 197609   0 Nov  2 20:25 assets
+-rw-r--r-- 1 51054 197609 597 Nov  2 20:25 index.html
+
+app/renderer/dist/assets:
+total 1508
+drwxr-xr-x 1 51054 197609       0 Nov  2 20:25 .
+drwxr-xr-x 1 51054 197609       0 Nov  2 20:25 ..
+-rw-r--r-- 1 51054 197609   55057 Nov  2 20:25 ans-studio-ans-icon-DOpmqMAU.png
+-rw-r--r-- 1 51054 197609 1325286 Nov  2 20:25 index-HVZOxqQQ.js
+-rw-r--r-- 1 51054 197609  152847 Nov  2 20:25 index-haa4j9RY.css
+--- ignored? ---
+.gitignore:9:app/renderer/dist/	app/renderer/dist/index.html
+--- tracked dist files ---
+0
+--- token scan in dist (counts) ---
+acceptance-rework: 0
+rework-pending: 1

@@ -130,7 +130,7 @@ flowchart TD
 
 #### 任务与申请状态（机器契约）
 
-`.ans/state/tasks.jsonl` 是新系统**唯一机器状态**：应用独占、append-only、每行一个事件；角色不可写。事件形状以 `TaskStateEvent` 为单一来源，包含任务事件（`task.created` / `task.delivered` / `task.reported` / `task.closed` / `task.redispatch` / `delegation.changed`）与申请/审批事件（`request.created` / `request.presented` / `request.resolved` / `request.notified` / `request.orphaned`、`approval.created` / `approval.resolved` / `approval.expired`）。
+`.ans/state/tasks.jsonl` 是新系统**唯一机器状态**：应用独占、append-only、每行一个事件；角色不可写。事件形状以 `TaskStateEvent` 为单一来源，包含任务事件（`task.created` / `task.delivered` / `task.reported` / `task.closed` / `task.redispatch` / `delegation.changed`）与申请/审批事件（`request.created` / `request.presented` / `request.resolved` / `request.notified` / `request.orphaned`、`approval.created` / `approval.resolved` / `approval.expired`），以及全局项目状态/版本决策事件（`project.focus` / `project.note` / `version.decision`，分别为工作流焦点、受控备注与版本决策执行审计）。
 
 ```json
 {

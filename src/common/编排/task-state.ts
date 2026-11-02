@@ -25,6 +25,16 @@ import type {
   TaskStateEvent,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_CARD_GROUP } from "../../model/runtime.ts";
+import {
+  PROJECT_NOTE_BLOCKER_TEXT_MAX,
+  PROJECT_NOTE_KEY_MAX,
+  PROJECT_NOTE_NEXT_STEP_TEXT_MAX,
+  PROJECT_NOTE_REFS_MAX,
+  VERSION_DECISION_ACTIONS,
+  VERSION_DECISION_REASON_MAX,
+  VERSION_DECISION_SCHEMA,
+} from "../../model/project-state.ts";
+import { isRunId } from "./run-manifest.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 /** 项目相对路径（POSIX 形式，便于跨平台展示与测试）。 */
@@ -41,6 +51,8 @@ const TASK_EVENT_KINDS = new Set([
   // C 批：申请/决策/审批事件（C-03）；与任务事件同文件、append-only。
   "request.created", "request.presented", "request.resolved", "request.notified", "request.orphaned",
   "approval.created", "approval.resolved", "approval.expired",
+  // 2026-11-02（全局任务状态/版本决策）：幕僚备注与路线审计；TaskRecord 不消费。
+  "project.focus", "project.note", "version.decision",
 ]);
 const REPORT_STATUSES: readonly TaskReportStatus[] = ["done", "blocked", "failed"];
 const CLOSED_OUTCOMES: readonly TaskClosedOutcome[] = ["accepted", "rework", "rejected"];
@@ -57,6 +69,34 @@ function isTaskSlug(value: unknown): boolean {
  */
 function isGovernanceCardKind(value: unknown): boolean {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, value);
+}
+
+/** 2026-11-02：`project.note.refs`/版本决策 refs 的项目相对引用（路径或任务/申请 id）。 */
+function isProjectRelativeRef(value: unknown): value is string {
+  if (typeof value !== "string" || value.trim() === "") return false;
+  if (value.startsWith("/") || value.includes("\\") || /^[a-zA-Z]:[\\/]/.test(value)) return false;
+  return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+
+/** 非空字符串数组（可选上限）；用于版本决策审计 id 列表。 */
+function isNonEmptyStringArray(value: unknown, max?: number): value is string[] {
+  return Array.isArray(value) &&
+    (max === undefined || value.length <= max) &&
+    value.every((item) => typeof item === "string" && item.trim() !== "");
+}
+
+function isVersionDecisionAction(value: unknown): boolean {
+  return typeof value === "string" && (VERSION_DECISION_ACTIONS as readonly string[]).includes(value);
+}
+
+/** 版本决策 targetVersions：kind → 正整数目标版本（有界键数；只做形状校验）。 */
+function isTargetVersions(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > 32) return false;
+  return entries.every(([key, version]) =>
+    key.trim() !== "" && typeof version === "number" && Number.isInteger(version) && version >= 1,
+  );
 }
 
 export interface TaskStateReadError {
@@ -284,6 +324,12 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
   }
   if (kind.startsWith("request.")) {
     if (typeof rec["requestId"] !== "string" || rec["requestId"] === "") return { ok: false, message: "request 事件缺 requestId" };
+    // 2026-11-02（A0-3）：reason 给出时必须是冻结三值之一；缺失按旧行兼容（历史写侧始终写 reason）。
+    if (kind === "request.orphaned" && rec["reason"] !== undefined) {
+      if (rec["reason"] !== "restart" && rec["reason"] !== "superseded" && rec["reason"] !== "initiator-aborted") {
+        return { ok: false, message: "request.orphaned.reason 非法" };
+      }
+    }
     if (kind === "request.created") {
       if (typeof rec["sourceRoleId"] !== "string" || rec["sourceRoleId"] === "") return { ok: false, message: "request.created 缺 sourceRoleId" };
       if (typeof rec["title"] !== "string" || rec["title"] === "") return { ok: false, message: "request.created 缺 title" };
@@ -327,6 +373,124 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     if (kind === "approval.created") {
       if (rec["approvalKind"] !== "shell" && rec["approvalKind"] !== "appointment-write") return { ok: false, message: "approval.created.approvalKind 非法" };
       if (typeof rec["sourceRoleId"] !== "string" || rec["sourceRoleId"] === "") return { ok: false, message: "approval.created 缺 sourceRoleId" };
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "project.focus") {
+    if (rec["roleId"] !== "chief" && rec["roleId"] !== "application") {
+      return { ok: false, message: "project.focus.roleId 非法" };
+    }
+    if (rec["cleared"] !== undefined && typeof rec["cleared"] !== "boolean") {
+      return { ok: false, message: "project.focus.cleared 非法" };
+    }
+    const cleared = rec["cleared"] === true;
+    if (rec["flowId"] !== undefined && !isTaskSlug(rec["flowId"])) {
+      return { ok: false, message: "project.focus.flowId 非法" };
+    }
+    if (!cleared && rec["flowId"] === undefined) {
+      return { ok: false, message: "project.focus 缺 flowId" };
+    }
+    if (rec["runId"] !== undefined && !isRunId(rec["runId"])) {
+      return { ok: false, message: "project.focus.runId 非法" };
+    }
+    if (rec["note"] !== undefined) {
+      if (typeof rec["note"] !== "string" || Array.from(rec["note"]).length > PROJECT_NOTE_BLOCKER_TEXT_MAX) {
+        return { ok: false, message: "project.focus.note 非法" };
+      }
+    }
+    if (rec["sourceDecisionId"] !== undefined) {
+      if (typeof rec["sourceDecisionId"] !== "string" || rec["sourceDecisionId"].trim() === "") {
+        return { ok: false, message: "project.focus.sourceDecisionId 非法" };
+      }
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "project.note") {
+    if (rec["roleId"] !== "chief") return { ok: false, message: "project.note.roleId 必须为 chief" };
+    if (typeof rec["noteKey"] !== "string" || !isTaskSlug(rec["noteKey"]) || rec["noteKey"].length > PROJECT_NOTE_KEY_MAX) {
+      return { ok: false, message: "project.note.noteKey 非法" };
+    }
+    if (rec["noteKind"] !== "blocker" && rec["noteKind"] !== "next-step") {
+      return { ok: false, message: "project.note.noteKind 非法" };
+    }
+    if (typeof rec["text"] !== "string" || rec["text"].trim() === "") {
+      return { ok: false, message: "project.note 缺 text" };
+    }
+    const textMax = rec["noteKind"] === "blocker" ? PROJECT_NOTE_BLOCKER_TEXT_MAX : PROJECT_NOTE_NEXT_STEP_TEXT_MAX;
+    if (Array.from(rec["text"]).length > textMax) {
+      return { ok: false, message: "project.note.text 超过上限" };
+    }
+    if (typeof rec["active"] !== "boolean") return { ok: false, message: "project.note.active 非法" };
+    if (rec["refs"] !== undefined) {
+      const refs = rec["refs"];
+      if (!Array.isArray(refs) || refs.length > PROJECT_NOTE_REFS_MAX || !refs.every(isProjectRelativeRef)) {
+        return { ok: false, message: "project.note.refs 非法" };
+      }
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "version.decision") {
+    if (rec["schema"] !== VERSION_DECISION_SCHEMA) return { ok: false, message: "version.decision.schema 非法" };
+    const decisionId = rec["decisionId"];
+    const requestId = rec["requestId"];
+    const flowId = rec["flowId"];
+    const reason = rec["reason"];
+    if (typeof decisionId !== "string" || decisionId.trim() === "") {
+      return { ok: false, message: "version.decision 缺 decisionId" };
+    }
+    if (typeof requestId !== "string" || requestId.trim() === "") {
+      return { ok: false, message: "version.decision 缺 requestId" };
+    }
+    if (typeof flowId !== "string" || flowId.trim() === "") {
+      return { ok: false, message: "version.decision 缺 flowId" };
+    }
+    if (typeof reason !== "string" || reason.trim() === "") {
+      return { ok: false, message: "version.decision 缺 reason" };
+    }
+    if (!isTaskSlug(flowId)) return { ok: false, message: "version.decision.flowId 非法" };
+    if (Array.from(reason).length > VERSION_DECISION_REASON_MAX) {
+      return { ok: false, message: "version.decision.reason 超过上限" };
+    }
+    if (typeof rec["attempt"] !== "number" || !Number.isInteger(rec["attempt"]) || rec["attempt"] < 1) {
+      return { ok: false, message: "version.decision.attempt 非法" };
+    }
+    if (!isVersionDecisionAction(rec["action"])) return { ok: false, message: "version.decision.action 非法" };
+    if (rec["recommendedBy"] !== "chief") return { ok: false, message: "version.decision.recommendedBy 非法" };
+    if (!isVersionDecisionAction(rec["recommendedAction"])) {
+      return { ok: false, message: "version.decision.recommendedAction 非法" };
+    }
+    if (rec["decidedBy"] !== "customer" && rec["decidedBy"] !== "judge") {
+      return { ok: false, message: "version.decision.decidedBy 非法" };
+    }
+    if (rec["operatorId"] !== undefined && (typeof rec["operatorId"] !== "string" || rec["operatorId"].trim() === "")) {
+      return { ok: false, message: "version.decision.operatorId 非法" };
+    }
+    if (rec["status"] !== "executing" && rec["status"] !== "executed" && rec["status"] !== "failed" && rec["status"] !== "uncertain") {
+      return { ok: false, message: "version.decision.status 非法" };
+    }
+    if (rec["oldFlowId"] !== undefined && !isTaskSlug(rec["oldFlowId"])) {
+      return { ok: false, message: "version.decision.oldFlowId 非法" };
+    }
+    for (const field of ["oldRunId", "newRunId"] as const) {
+      if (rec[field] !== undefined && !isRunId(rec[field])) {
+        return { ok: false, message: `version.decision.${field} 非法` };
+      }
+    }
+    if (rec["newFlowId"] !== undefined && !isTaskSlug(rec["newFlowId"])) {
+      return { ok: false, message: "version.decision.newFlowId 非法" };
+    }
+    if (rec["targetVersions"] !== undefined && !isTargetVersions(rec["targetVersions"])) {
+      return { ok: false, message: "version.decision.targetVersions 非法" };
+    }
+    for (const field of ["closedRunIds", "orphanedRequestIds", "supersededTaskIds"] as const) {
+      if (rec[field] !== undefined && !isNonEmptyStringArray(rec[field])) {
+        return { ok: false, message: `version.decision.${field} 非法` };
+      }
+    }
+    if (rec["message"] !== undefined) {
+      if (typeof rec["message"] !== "string" || Array.from(rec["message"]).length > PROJECT_NOTE_BLOCKER_TEXT_MAX) {
+        return { ok: false, message: "version.decision.message 非法" };
+      }
     }
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
@@ -429,7 +593,11 @@ export function replayTaskEvents(events: readonly TaskStateEvent[], errors: Task
   let line = 0;
   for (const event of events) {
     line += 1;
-    const taskId = event.kind === "delegation.changed" || event.kind.startsWith("request.") || event.kind.startsWith("approval.")
+    const taskId = event.kind === "delegation.changed" ||
+      event.kind.startsWith("request.") ||
+      event.kind.startsWith("approval.") ||
+      event.kind.startsWith("project.") ||
+      event.kind === "version.decision"
       ? undefined
       : (event as { taskId?: string }).taskId;
     if (taskId === undefined) continue;

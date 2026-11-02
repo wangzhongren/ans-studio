@@ -933,6 +933,11 @@ function registerIpc(win: BrowserWindow): void {
     if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
     return desktop.listTasks(input);
   });
+  // 2026-11-02（全局任务状态）：只读完整视图；不提供 note/version 写桥（写路径只经幕僚工具能力）。
+  registerHandler("project-state:get", (event, input) => {
+    if (event.sender !== win.webContents) return desktop.getProjectState({ projectRoot: "" });
+    return desktop.getProjectState(input);
+  });
   registerHandler("tasks:restore", (event, input) => {
     if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
     return desktop.restoreTasks(input);

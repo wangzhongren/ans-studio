@@ -93,6 +93,9 @@ import type {
   DispatchTaskFn,
   DispatchTaskPayload,
   RequestRequirementChangeFn,
+  ProjectStateFn,
+  ProjectNoteFn,
+  RequestVersionDecisionFn,
   ViewImageFn,
   RoleStatusFn,
   ContractCheckFn,
@@ -265,6 +268,15 @@ export interface AdapterCapabilities {
    * 提案卡不得承载未批准的新授权，也不得删除需求绕过。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
+  /**
+   * 2026-11-02（全局任务状态，A1）：`project_state` 只读能力（注入了才注册）。
+   * 注入面：全部内置治理角色（chief 完整、其余按会话角色裁剪；含旧 su 只读）；项目 worker 不注入。
+   */
+  projectState?: ProjectStateFn;
+  /** 2026-11-02：`project_note` 受控备注能力；**只给 trio chief** 注入，未注入 ⇒ 工具不注册。 */
+  projectNote?: ProjectNoteFn;
+  /** 2026-11-02：`request_version_decision` 能力；**只给 trio chief** 注入，未注入 ⇒ 工具不注册。 */
+  requestVersionDecision?: RequestVersionDecisionFn;
   shellGate?: ShellGate;
   /** 2026-10-29（§6.5）：run_shell 执行后写审计（与 shellGate 同注入；缺省不审计）。 */
   shellPostAudit?: ShellPostAuditFn;
@@ -567,6 +579,15 @@ export async function openRoleSession(
      * 也不代表意图已变更**。
      */
     requestRequirementChange?: RequestRequirementChangeFn;
+    /**
+     * 2026-11-02（全局任务状态，A1）：`project_state` 只读能力（注入才注册）。
+     * **只对内置治理角色（含旧 su）转交**；项目角色即便调用方误给也不注入。纯读、零写入。
+     */
+    projectState?: ProjectStateFn;
+    /** 2026-11-02：`project_note` 受控备注能力；**只对 trio chief 转交**。 */
+    projectNote?: ProjectNoteFn;
+    /** 2026-11-02：`request_version_decision` 能力；**只对 trio chief 转交**。 */
+    requestVersionDecision?: RequestVersionDecisionFn;
     /**
      * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
      * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
@@ -1279,6 +1300,12 @@ export async function openRoleSession(
   const terminateRoleRun = trioSpec?.id === "chief" ? input.terminateRoleRun : undefined;
   const redispatchTask = trioSpec?.id === "chief" ? input.redispatchTask : undefined;
 
+  // 2026-11-02（全局任务状态/版本决策）：project_state 给全部内置治理角色（含旧 su）只读；
+  // project_note / request_version_decision 只给 trio chief。未注入 ⇒ 工具不注册（fail-closed）。
+  const projectState = builtInGovernance ? input.projectState : undefined;
+  const projectNote = trioSpec?.id === "chief" ? input.projectNote : undefined;
+  const requestVersionDecision = trioSpec?.id === "chief" ? input.requestVersionDecision : undefined;
+
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
   const installSkill = cap?.installSkill === true ? input.installSkill : undefined;
@@ -1392,6 +1419,9 @@ export async function openRoleSession(
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
     ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
+    ...(projectState !== undefined ? { projectState } : {}),
+    ...(projectNote !== undefined ? { projectNote } : {}),
+    ...(requestVersionDecision !== undefined ? { requestVersionDecision } : {}),
     // D 批：验收产物汇报能力已撤除（不注入 reportArtifact）；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
     // 不调用、不写盘/flow、不伪造接受或决定。
@@ -2335,6 +2365,10 @@ export function createRuntimeAdapterFactory(
     // （能力缺席 = 最强 fail-closed）。本层纯透传——意图校验/去重/
     // 派发/账本由能力实现；**提交申请 ≠ 客户批准 ≠ 意图已变更**。
     requestRequirementChange: capabilities?.requestRequirementChange,
+    // 2026-11-02（全局任务状态/版本决策）：能力位逐字同名透传；undefined ⇒ 工具不注册。
+    projectState: capabilities?.projectState,
+    projectNote: capabilities?.projectNote,
+    requestVersionDecision: capabilities?.requestVersionDecision,
     // G-2/R1-R2：看护三能力并入适配器选项——**契约字段名** `roleStatus` / `sessionTail` /
     // `proposeRecovery`（运行时核心 `GovernedToolsOptions` 同名能力位，形状同源 `model/runtime.ts`）；
     // `undefined` ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed，同 dispatch_task 先例）。

@@ -1,0 +1,25 @@
+=== renderer dist after build (ignored artifact; candidate-built entry) ===
+recorded_at: 2026-11-02T20:10:17+08:00
+b0af18785303987fbfe60e981b8db4906c1a1d2d5795e9aa74b1f3da2f96f5e1 *app/renderer/dist/index.html
+ff88e313c9c6a41fa94f5e34b9e1798169ea7ffece2404e5c9fc6474f788d32c *app/renderer/dist/assets/ans-studio-ans-icon-DOpmqMAU.png
+20fb9c7520ef04c8eff21fe7e951eb066398c11185fefa6e475485e56a293732 *app/renderer/dist/assets/index-DnW7hhIg.js
+523c311667d0936fe3658dc298578173daebf92ce8fcf4fe207639fd66642498 *app/renderer/dist/assets/index-haa4j9RY.css
+--- sizes ---
+app/renderer/dist:
+total 9
+drwxr-xr-x 1 51054 197609   0 Nov  2 20:10 .
+drwxr-xr-x 1 51054 197609   0 Oct 30 10:50 ..
+drwxr-xr-x 1 51054 197609   0 Nov  2 20:10 assets
+-rw-r--r-- 1 51054 197609 597 Nov  2 20:10 index.html
+
+app/renderer/dist/assets:
+total 1508
+drwxr-xr-x 1 51054 197609       0 Nov  2 20:10 .
+drwxr-xr-x 1 51054 197609       0 Nov  2 20:10 ..
+-rw-r--r-- 1 51054 197609   55057 Nov  2 20:10 ans-studio-ans-icon-DOpmqMAU.png
+-rw-r--r-- 1 51054 197609 1325289 Nov  2 20:10 index-DnW7hhIg.js
+-rw-r--r-- 1 51054 197609  152847 Nov  2 20:10 index-haa4j9RY.css
+--- ignored? ---
+.gitignore:9:app/renderer/dist/	app/renderer/dist/index.html
+--- tracked dist files ---
+0

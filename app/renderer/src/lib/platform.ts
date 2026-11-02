@@ -8,6 +8,23 @@
  * 属「桌面窗口」角色的 api-spec）。其余通道按 Phase 3/4 逐步接入。
  */
 
+import { PROJECT_STATE_SCHEMA } from "../../../../src/model/project-state.ts";
+import type {
+  ProjectStateBlockerKind,
+  ProjectStateBlockerSource,
+  ProjectStateDocKind,
+  ProjectStateEvidenceKind,
+  ProjectStateEvidenceStatus,
+  ProjectStateFocusSelectedBy,
+  ProjectStateNextStepSource,
+  ProjectStateRunState,
+  ProjectStateTaskRunState,
+  ProjectStateView,
+} from "../../../../src/model/project-state.ts";
+import type { MessageKey, Translator } from "../i18n/index.ts";
+
+export type { ProjectStateView } from "../../../../src/model/project-state.ts";
+
 export interface DesktopWindowControls {
   minimizeWindow: () => Promise<unknown>;
   toggleMaximize: () => Promise<unknown>;
@@ -80,6 +97,12 @@ export interface DesktopBridge {
 
   // —— 流程状态只读（2026-10-25；定义/实现属桌面窗口，此处只按名消费）——
   getFlowStatus?: (projectRoot: string) => Promise<unknown>;
+  /**
+   * 全局任务状态只读（2026-11-02，project-state/v1）：preload `getProjectState({projectRoot})`
+   * → IPC `project-state:get` → 始终返回 `ProjectStateView`（非法/空 root 返回空视图 + errors，不抛）。
+   * 面板只消费此入口；不在渲染层扫描文件或重新派生。
+   */
+  getProjectState?: (input: { projectRoot: string }) => Promise<unknown>;
   onSessionEvent?: (callback: (payload: unknown) => void) => () => void;
   onRoleState?: (callback: (payload: unknown) => void) => () => void;
   requestRoleStates?: () => Promise<{ ok: boolean }>;
@@ -253,4 +276,315 @@ export function subscribeMaximized(
   } catch {
     return () => undefined;
   }
+}
+
+// —————————————— 全局任务状态：纯解析/视图（project-state/v1，A4） ——————————————
+// 这些函数只读入参，不访问 window/document/fs，不聚合、不重算、不排序；渲染层不实现
+// 第二套 `taskStatusOf`。桥访问只发生在 getDesktopBridge()/panel 的调用点（函数内）。
+
+export interface ProjectStateBadgeView {
+  key: "unclosed" | "blocked" | "failed" | "pendingRequests";
+  text: string;
+}
+
+export interface ProjectStateSummaryView {
+  focusLine: string;
+  selectedBy: ProjectStateFocusSelectedBy;
+  stale: boolean;
+  pinned: boolean;
+  readOnlyLabel: string;
+  badges: ProjectStateBadgeView[];
+}
+
+export interface ProjectStateRunRow {
+  runId: string;
+  label: string;
+  active: boolean;
+}
+
+export interface ProjectStateFlowRow {
+  flowId: string;
+  runsText: string;
+  superseded: boolean;
+  runs: ProjectStateRunRow[];
+}
+
+export interface ProjectStateRow {
+  id: string;
+  primary: string;
+  secondary?: string;
+}
+
+export interface ProjectStateDetailsView {
+  flows: ProjectStateFlowRow[];
+  tasks: ProjectStateRow[];
+  blockers: ProjectStateRow[];
+  versions: ProjectStateRow[];
+  evidence: ProjectStateRow[];
+  nextStep: { text: string; source: string } | null;
+  errors: string[];
+  truncated: boolean;
+}
+
+const RUN_STATE_KEYS: Record<ProjectStateRunState, MessageKey> = {
+  draft: "ui.run.state.draft",
+  pinned: "ui.run.state.pinned",
+  closed: "ui.run.state.closed",
+  cancelled: "ui.run.state.cancelled",
+};
+
+const FOCUS_RUN_STATE_KEYS: Record<ProjectStateTaskRunState, MessageKey> = {
+  draft: "ui.run.state.draft",
+  pinned: "ui.run.state.pinned",
+  legacy: "ui.run.state.legacy",
+};
+
+const BLOCKER_KIND_KEYS: Record<ProjectStateBlockerKind, MessageKey> = {
+  "task-blocked": "ui.projectState.blocker.kind.taskBlocked",
+  "task-failed": "ui.projectState.blocker.kind.taskFailed",
+  "request-pending": "ui.projectState.blocker.kind.requestPending",
+  "rework-pending": "ui.projectState.blocker.kind.acceptanceRework",
+  "redispatch-exhausted": "ui.projectState.blocker.kind.redispatchExhausted",
+  "version-drift": "ui.projectState.blocker.kind.versionDrift",
+  "reference-invalid": "ui.projectState.blocker.kind.referenceInvalid",
+  "run-ambiguous": "ui.projectState.blocker.kind.runAmbiguous",
+  "focus-stale": "ui.projectState.blocker.kind.focusStale",
+  "chief-note": "ui.projectState.blocker.kind.chiefNote",
+};
+
+const BLOCKER_SOURCE_KEYS: Record<ProjectStateBlockerSource, MessageKey> = {
+  app: "ui.projectState.blocker.source.app",
+  chief: "ui.projectState.blocker.source.chief",
+};
+
+const DOC_KIND_KEYS: Record<ProjectStateDocKind, MessageKey> = {
+  intent: "ui.projectState.version.docKind.intent",
+  proposal: "ui.projectState.version.docKind.proposal",
+  modules: "ui.projectState.version.docKind.modules",
+  roster: "ui.projectState.version.docKind.roster",
+  topology: "ui.projectState.version.docKind.topology",
+  architecture: "ui.projectState.version.docKind.architecture",
+  assets: "ui.projectState.version.docKind.assets",
+};
+
+const EVIDENCE_KIND_KEYS: Record<ProjectStateEvidenceKind, MessageKey> = {
+  "acceptance-card": "ui.projectState.evidence.kind.acceptanceCard",
+  "verifier-report": "ui.projectState.evidence.kind.verifierReport",
+  "task-evidence": "ui.projectState.evidence.kind.taskEvidence",
+};
+
+const EVIDENCE_STATUS_KEYS: Record<ProjectStateEvidenceStatus, MessageKey> = {
+  present: "ui.projectState.evidence.status.present",
+  missing: "ui.projectState.evidence.status.missing",
+};
+
+const NEXT_STEP_SOURCE_KEYS: Record<ProjectStateNextStepSource, MessageKey> = {
+  chief: "ui.projectState.nextStep.source.chief",
+  derived: "ui.projectState.nextStep.source.derived",
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function labelOf<K extends string>(
+  map: Record<K, MessageKey>,
+  value: K,
+  t: Translator,
+): string {
+  const key: MessageKey | undefined = map[value];
+  return t(key ?? "shared.common.unknown");
+}
+
+/**
+ * 仅校验 `project-state/v1` 的 schema 与顶层形状；非法返回 null（不补默认值、不算计数）。
+ * 元素内部字段由 A1/A2 的 builder 保证；渲染层不做二次派生。
+ */
+export function asProjectStateView(value: unknown): ProjectStateView | null {
+  if (!isRecord(value)) return null;
+  if (value.schema !== PROJECT_STATE_SCHEMA) return null;
+  if (typeof value.generatedAt !== "string" || typeof value.projectRoot !== "string") return null;
+  if (typeof value.truncated !== "boolean") return null;
+  const focus = value.focus;
+  if (!isRecord(focus)) return null;
+  const selectedBy = focus.selectedBy;
+  if (
+    selectedBy !== "chief" &&
+    selectedBy !== "application" &&
+    selectedBy !== "derived" &&
+    selectedBy !== "none"
+  ) {
+    return null;
+  }
+  const counts = value.counts;
+  if (!isRecord(counts)) return null;
+  for (const key of [
+    "unclosed",
+    "supersededUnclosed",
+    "activeUnclosed",
+    "blocked",
+    "failed",
+    "pendingRequests",
+    "flows",
+    "tasks",
+  ] as const) {
+    if (!isFiniteNumber(counts[key])) return null;
+  }
+  for (const key of ["flows", "tasks", "blockers", "versions", "evidence", "notes", "errors"] as const) {
+    if (!Array.isArray(value[key])) return null;
+  }
+  return value as unknown as ProjectStateView;
+}
+
+function focusLineOf(focus: ProjectStateView["focus"], t: Translator): string {
+  if (focus.selectedBy === "none" || !focus.flowId) {
+    return t("ui.projectState.focus.none");
+  }
+  const runStateKey: MessageKey | undefined = focus.runState
+    ? FOCUS_RUN_STATE_KEYS[focus.runState]
+    : undefined;
+  const parts: string[] = [
+    t("ui.projectState.focus.label"),
+    `${focus.flowId} / ${focus.runId ?? t("shared.common.none")} / ${t(runStateKey ?? "shared.common.unknown")}`,
+    focus.stage ?? t("ui.projectState.focus.stageUndefined"),
+    t("ui.projectState.focus.updatedAt", {
+      time: focus.updatedAt ?? t("shared.common.unknown"),
+    }),
+  ];
+  if (focus.selectedBy === "derived") parts.push(t("ui.projectState.focus.derived"));
+  if (focus.selectedBy === "application") parts.push(t("ui.projectState.focus.application"));
+  if (focus.stale === true) parts.push(t("ui.projectState.focus.stale"));
+  return parts.join(" · ");
+}
+
+/** 顶部常显区：focus 一行 + 徽标。计数只读 `state.counts.*`，不本地派生。 */
+export function projectStateSummaryView(
+  state: ProjectStateView,
+  t: Translator,
+): ProjectStateSummaryView {
+  return {
+    focusLine: focusLineOf(state.focus, t),
+    selectedBy: state.focus.selectedBy,
+    stale: state.focus.stale === true,
+    pinned: state.focus.runState === "pinned",
+    readOnlyLabel: t("ui.projectState.readOnly"),
+    badges: [
+      {
+        key: "unclosed",
+        text: t("ui.taskCenter.unclosed", { count: state.counts.unclosed }),
+      },
+      {
+        key: "blocked",
+        text: t("ui.projectState.badge.blocked", { count: state.counts.blocked }),
+      },
+      {
+        key: "failed",
+        text: t("ui.projectState.badge.failed", { count: state.counts.failed }),
+      },
+      {
+        key: "pendingRequests",
+        text: t("ui.projectState.badge.pendingRequests", {
+          count: state.counts.pendingRequests,
+        }),
+      },
+    ],
+  };
+}
+
+/** 展开区：按 payload 顺序映射为已翻译行；只做格式化，不做过滤/聚合/排序。 */
+export function projectStateDetailsView(
+  state: ProjectStateView,
+  t: Translator,
+): ProjectStateDetailsView {
+  const flows: ProjectStateFlowRow[] = state.flows.map((flow) => {
+    const runs: ProjectStateRunRow[] = flow.runs.map((run) => ({
+      runId: run.runId,
+      label: labelOf(RUN_STATE_KEYS, run.state, t),
+      active: run.active === true,
+    }));
+    const parts = [t("ui.projectState.flow.runs", { count: runs.length })];
+    if (flow.supersededBy) {
+      parts.push(`${t("ui.projectState.flow.superseded")} ${flow.supersededBy}`);
+    }
+    return {
+      flowId: flow.flowId,
+      runsText: parts.join(" · "),
+      superseded: Boolean(flow.supersededBy),
+      runs,
+    };
+  });
+
+  const tasks: ProjectStateRow[] = state.flows.map((flow) => ({
+    id: flow.flowId,
+    primary: flow.flowId,
+    secondary: t("ui.projectState.flow.taskCounts", {
+      unclosed: flow.taskCounts.unclosed,
+      blocked: flow.taskCounts.blocked,
+      failed: flow.taskCounts.failed,
+    }),
+  }));
+
+  const blockers: ProjectStateRow[] = state.blockers.map((blocker) => ({
+    id: blocker.id,
+    primary: labelOf(BLOCKER_KIND_KEYS, blocker.kind, t),
+    secondary: [blocker.summary, labelOf(BLOCKER_SOURCE_KEYS, blocker.source, t)]
+      .filter((part) => part.length > 0)
+      .join(" · "),
+  }));
+
+  const versions: ProjectStateRow[] = state.versions.map((version) => {
+    const latest = version.latest
+      ? t("ui.projectState.version.latest", { version: version.latest.version })
+      : t("ui.projectState.version.missing");
+    const pinned = version.pinned
+      ? t("ui.projectState.version.pinned", {
+          version: version.pinned.version ?? t("shared.common.unknown"),
+        })
+      : t("shared.common.none");
+    const parts = [latest, pinned];
+    if (version.newerThanPinned) parts.push(t("ui.projectState.version.newerThanPinned"));
+    if (version.referenceIssue) parts.push(version.referenceIssue);
+    return {
+      id: `${version.flowId}:${version.docKind}`,
+      primary: `${version.flowId} · ${labelOf(DOC_KIND_KEYS, version.docKind, t)}`,
+      secondary: parts.join(" · "),
+    };
+  });
+
+  const evidence: ProjectStateRow[] = state.evidence.map((item) => ({
+    id: `${item.flowId}:${item.kind}:${item.ref}`,
+    primary: `${labelOf(EVIDENCE_KIND_KEYS, item.kind, t)} · ${item.ref}`,
+    secondary: [labelOf(EVIDENCE_STATUS_KEYS, item.status, t), item.summary ?? ""]
+      .filter((part) => part.length > 0)
+      .join(" · "),
+  }));
+
+  const nextStep = state.nextStep
+    ? {
+        text: state.nextStep.text,
+        source: labelOf(NEXT_STEP_SOURCE_KEYS, state.nextStep.source, t),
+      }
+    : null;
+
+  const errors = state.errors.map((error) => {
+    const location = error.file
+      ? ` (${error.file}${typeof error.line === "number" ? `:${error.line}` : ""})`
+      : "";
+    return `${error.source}: ${error.message}${location}`;
+  });
+
+  return {
+    flows,
+    tasks,
+    blockers,
+    versions,
+    evidence,
+    nextStep,
+    errors,
+    truncated: state.truncated === true,
+  };
 }

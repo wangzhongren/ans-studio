@@ -398,3 +398,101 @@ test("R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allow
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+// ————————————————— 2026-11-02（全局任务状态/版本决策）：新事件加法 —————————————————
+
+test("P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变", async () => {
+  const root = await tempRoot();
+  try {
+    await appendTaskEvent(root, created("t-open", "实现"));
+    const at = (iso: string) => () => new Date(iso);
+    await appendTaskEvent(root, taskEvent("project.focus", {
+      flowId: "focus",
+      runId: "run-20261030-focus-abcdef12",
+      roleId: "chief",
+      note: "当前 focus",
+    }, at("2026-11-02T00:00:00.000Z")));
+    await appendTaskEvent(root, taskEvent("project.note", {
+      noteKey: "blocker-1",
+      noteKind: "blocker",
+      text: "验收卡被退回",
+      active: true,
+      roleId: "chief",
+    }, at("2026-11-02T00:00:01.000Z")));
+    await appendTaskEvent(root, taskEvent("version.decision", {
+      schema: "version-decision/v1",
+      decisionId: "decision-v1",
+      requestId: "version-decision-run-20261030-focus-abcdef12-m1abc-1234abcd",
+      attempt: 1,
+      flowId: "focus",
+      runId: "run-20261030-focus-abcdef12",
+      action: "version-modify",
+      recommendedBy: "chief",
+      recommendedAction: "version-modify",
+      decidedBy: "customer",
+      reason: "修引用",
+      status: "executed",
+      oldFlowId: "focus",
+      targetVersions: { proposal: 2 },
+    }, at("2026-11-02T00:00:02.000Z")));
+
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
+    assert.equal(state.events.length, 4);
+    assert.equal(state.records.size, 1);
+    assert.equal(taskStatusOf(state.records.get("t-open")!), "created");
+    assert.equal(state.unclosed.length, 1);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞", async () => {
+  const root = await tempRoot();
+  try {
+    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const base = { v: 1, at: "2026-11-02T00:00:00.000Z" };
+    const lines = [
+      { ...base, kind: "request.orphaned", requestId: "r1", reason: "restart" },
+      { ...base, kind: "request.orphaned", requestId: "r2", reason: "superseded" },
+      { ...base, kind: "request.orphaned", requestId: "r3", reason: "initiator-aborted" },
+      { ...base, kind: "request.orphaned", requestId: "r4", reason: "bogus" },
+      { ...base, kind: "project.focus", roleId: "chief" },
+      { ...base, kind: "project.note", roleId: "chief", noteKey: "b", noteKind: "blocker", text: "x".repeat(501), active: true },
+      { ...base, kind: "version.decision", schema: "version-decision/v1", decisionId: "d", requestId: "q", attempt: 1, flowId: "focus", action: "bogus", recommendedBy: "chief", recommendedAction: "version-modify", decidedBy: "customer", reason: "x", status: "executed" },
+    ];
+    await fs.writeFile(file, lines.map((line) => JSON.stringify(line)).join("\n") + "\n", "utf8");
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 4, JSON.stringify(state.errors));
+    assert.equal(state.events.filter((event) => event.kind === "request.orphaned").length, 3);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）", async () => {
+  const root = await tempRoot();
+  try {
+    await appendTaskEvent(root, created("t-old", "实现"));
+    await appendTaskEvent(root, taskEvent("project.focus", { flowId: "focus", roleId: "chief" }));
+    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
+    const OLD_KINDS = new Set([
+      "task.created", "task.delivered", "task.reported", "task.closed", "task.redispatch", "delegation.changed",
+      "request.created", "request.presented", "request.resolved", "request.notified", "request.orphaned",
+      "approval.created", "approval.resolved", "approval.expired",
+    ]);
+    const raw = await fs.readFile(file, "utf8");
+    const oldBad = raw.split(/\r?\n/).filter((line) => line.trim() !== "").filter((line) => {
+      const event = JSON.parse(line) as { kind?: unknown };
+      return typeof event.kind !== "string" || !OLD_KINDS.has(event.kind);
+    });
+    assert.equal(oldBad.length, 1, "旧白名单只把新 kind 记坏行");
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0);
+    assert.equal(state.events.some((event) => event.kind === "project.focus"), true);
+    assert.equal(state.records.has("t-old"), true);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

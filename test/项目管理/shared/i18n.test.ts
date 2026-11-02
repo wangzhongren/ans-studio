@@ -108,6 +108,114 @@ const ACCEPTANCE_RETURN_CARD_KEYS = [
   "ui.decisionDialog.reportPath",
 ] as const satisfies readonly MessageKey[];
 
+/**
+ * 全局任务状态与版本决策 97 个 key（2026-11-02 global-task-state；P1 审核 §六 冻结）。
+ * 62 `ui.projectState.*` + 18 `ui.versionDecision.*` + 17 `main.versionDecision.*`。
+ * A3 只按本清单实施；新增/改名须回到项目管理并同步更新本断言与分区计数。
+ */
+const GLOBAL_TASK_STATE_KEYS = [
+  // ui.projectState.*（62）
+  "ui.projectState.title",
+  "ui.projectState.refresh",
+  "ui.projectState.readOnly",
+  "ui.projectState.empty",
+  "ui.projectState.loadError",
+  "ui.projectState.unavailable",
+  "ui.projectState.schemaUnsupported",
+  "ui.projectState.truncated",
+  "ui.projectState.errors",
+  "ui.projectState.pinnedHint",
+  "ui.projectState.focus.label",
+  "ui.projectState.focus.none",
+  "ui.projectState.focus.stale",
+  "ui.projectState.focus.derived",
+  "ui.projectState.focus.application",
+  "ui.projectState.focus.stageUndefined",
+  "ui.projectState.focus.updatedAt",
+  "ui.projectState.badge.unclosed",
+  "ui.projectState.badge.blocked",
+  "ui.projectState.badge.failed",
+  "ui.projectState.badge.pendingRequests",
+  "ui.projectState.section.flows",
+  "ui.projectState.section.tasks",
+  "ui.projectState.section.blockers",
+  "ui.projectState.section.versions",
+  "ui.projectState.section.evidence",
+  "ui.projectState.section.nextStep",
+  "ui.projectState.flow.superseded",
+  "ui.projectState.flow.taskCounts",
+  "ui.projectState.flow.runs",
+  "ui.projectState.blocker.kind.taskBlocked",
+  "ui.projectState.blocker.kind.taskFailed",
+  "ui.projectState.blocker.kind.requestPending",
+  "ui.projectState.blocker.kind.acceptanceRework",
+  "ui.projectState.blocker.kind.redispatchExhausted",
+  "ui.projectState.blocker.kind.versionDrift",
+  "ui.projectState.blocker.kind.referenceInvalid",
+  "ui.projectState.blocker.kind.runAmbiguous",
+  "ui.projectState.blocker.kind.focusStale",
+  "ui.projectState.blocker.kind.chiefNote",
+  "ui.projectState.blocker.source.app",
+  "ui.projectState.blocker.source.chief",
+  "ui.projectState.evidence.kind.acceptanceCard",
+  "ui.projectState.evidence.kind.verifierReport",
+  "ui.projectState.evidence.kind.taskEvidence",
+  "ui.projectState.evidence.status.present",
+  "ui.projectState.evidence.status.missing",
+  "ui.projectState.version.latest",
+  "ui.projectState.version.pinned",
+  "ui.projectState.version.newerThanPinned",
+  "ui.projectState.version.missing",
+  "ui.projectState.version.docKind.intent",
+  "ui.projectState.version.docKind.proposal",
+  "ui.projectState.version.docKind.modules",
+  "ui.projectState.version.docKind.roster",
+  "ui.projectState.version.docKind.topology",
+  "ui.projectState.version.docKind.architecture",
+  "ui.projectState.version.docKind.assets",
+  "ui.projectState.nextStep.source.chief",
+  "ui.projectState.nextStep.source.derived",
+  "ui.projectState.note.kind.blocker",
+  "ui.projectState.note.kind.nextStep",
+  // ui.versionDecision.*（18）
+  "ui.versionDecision.title",
+  "ui.versionDecision.question",
+  "ui.versionDecision.option.versionModify",
+  "ui.versionDecision.option.newVersionDevelopment",
+  "ui.versionDecision.disclaimer",
+  "ui.versionDecision.fact.header",
+  "ui.versionDecision.fact.unclosed",
+  "ui.versionDecision.fact.blockedFailed",
+  "ui.versionDecision.fact.pendingRequests",
+  "ui.versionDecision.fact.acceptanceReworks",
+  "ui.versionDecision.fact.latestVsPinned",
+  "ui.versionDecision.fact.previousDecisions",
+  "ui.versionDecision.decidedBy.customer",
+  "ui.versionDecision.decidedBy.judge",
+  "ui.versionDecision.status.executing",
+  "ui.versionDecision.status.executed",
+  "ui.versionDecision.status.failed",
+  "ui.versionDecision.status.uncertain",
+  // main.versionDecision.*（17）
+  "main.versionDecision.presented",
+  "main.versionDecision.notifiedResolved",
+  "main.versionDecision.executed.versionModify",
+  "main.versionDecision.executed.newVersion",
+  "main.versionDecision.declined",
+  "main.versionDecision.unavailable",
+  "main.versionDecision.aborted",
+  "main.versionDecision.partialFailed",
+  "main.versionDecision.uncertain",
+  "main.versionDecision.error.versionDecisionInvalid",
+  "main.versionDecision.error.flowNotFound",
+  "main.versionDecision.error.runAmbiguous",
+  "main.versionDecision.error.runChangeRequired",
+  "main.versionDecision.error.decisionPending",
+  "main.versionDecision.error.channelUnavailable",
+  "main.versionDecision.error.executionFailed",
+  "main.versionDecision.error.executionUncertain",
+] as const satisfies readonly MessageKey[];
+
 function templateTexts(template: unknown): string[] {
   if (typeof template === "string") return [template];
   if (template !== null && typeof template === "object") return Object.values(template).filter((v): v is string => typeof v === "string");
@@ -129,7 +237,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 921 / main 559 / shared 62 / preferences 3，总计 1545", () => {
+test("key 分区计数：ui 1001 / main 576 / shared 62 / preferences 3，总计 1642", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -137,8 +245,8 @@ test("key 分区计数：ui 921 / main 559 / shared 62 / preferences 3，总计 
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 921, main: 559, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1545);
+  assert.deepEqual(prefixes, { ui: 1001, main: 576, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1642);
 });
 
 test("验收回交卡 key 契约：14 key 中英成对、精确文案与占位符一致", () => {
@@ -196,6 +304,60 @@ test("验收回交卡 key 契约：14 key 中英成对、精确文案与占位�
     translate("en-US", "ui.decisionDialog.reportPath", { path: "docs/quality/flow-a-report-v1.md" }),
     "Report path: docs/quality/flow-a-report-v1.md",
   );
+});
+
+test("全局任务状态/版本决策 key 契约：97 key 中英成对、分组数量、占位符一致", () => {
+  assert.equal(GLOBAL_TASK_STATE_KEYS.length, 97);
+  const families = {
+    projectState: GLOBAL_TASK_STATE_KEYS.filter((key) => key.startsWith("ui.projectState.")).length,
+    uiVersionDecision: GLOBAL_TASK_STATE_KEYS.filter((key) => key.startsWith("ui.versionDecision.")).length,
+    mainVersionDecision: GLOBAL_TASK_STATE_KEYS.filter((key) => key.startsWith("main.versionDecision.")).length,
+  };
+  assert.deepEqual(families, { projectState: 62, uiVersionDecision: 18, mainVersionDecision: 17 });
+  for (const key of GLOBAL_TASK_STATE_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), placeholdersOf(enUS[key]), `占位符不一致：${key}`);
+    assert.deepEqual(templateTexts(enUS[key]).filter((text) => HAN.test(text)), [], `en-US 含中文：${key}`);
+  }
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.unclosed"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.blocked"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.failed"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.pendingRequests"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.errors"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.flow.runs"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.flow.taskCounts"]), ["blocked", "failed", "unclosed"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.focus.updatedAt"]), ["time"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.version.latest"]), ["version"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.version.pinned"]), ["version"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.versionDecision.title"]), ["flowId"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.versionDecision.fact.blockedFailed"]), ["blocked", "failed"]);
+  assert.deepEqual(placeholdersOf(zhCN["main.versionDecision.executed.versionModify"]), ["flowId", "targets"]);
+  assert.deepEqual(placeholdersOf(zhCN["main.versionDecision.executed.newVersion"]), ["newFlowId", "newRunId", "oldFlowId"]);
+});
+
+test("全局任务状态复用既有 key：run 状态/通用短词/任务中心计数不新建别名", () => {
+  const reused = [
+    "ui.run.state.draft",
+    "ui.run.state.pinned",
+    "ui.run.state.closed",
+    "ui.run.state.cancelled",
+    "ui.run.state.legacy",
+    "shared.common.failed",
+    "shared.common.completed",
+    "shared.common.truncated",
+    "ui.taskCenter.unclosed",
+    "ui.governance.status.blocked",
+    "ui.work.reportStatus.blocked",
+  ];
+  for (const key of reused) {
+    assert.ok(key in zhCN, `zh-CN 缺复用 key ${key}`);
+    assert.ok(key in enUS, `en-US 缺复用 key ${key}`);
+  }
+  const keys = Object.keys(zhCN);
+  for (const forbidden of ["ui.projectState.runState.", "ui.projectState.taskStatus.", "ui.projectState.common."]) {
+    assert.deepEqual(keys.filter((key) => key.startsWith(forbidden)), [], `不得新建别名：${forbidden}`);
+  }
 });
 
 test("key parity：zh-CN 与 en-US 全集一致（顺序无关）", () => {

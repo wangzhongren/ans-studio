@@ -1,0 +1,13 @@
+=== write-set scope check (team plan §4.1/§4.3) ===
+--- expected paths missing/unchanged (should be empty; all expected active) ---
+--- candidate paths not in declared write set (should be empty) ---
+--- expected count / actual count ---
+32
+32
+
+=== package/scripts/config changes (should be empty) ===
+(end)
+
+=== e2e script status (only allowed A4 fixture M expected) ===
+ M test/桌面UI/phase4b-electron-smoke.mjs
+(end)
