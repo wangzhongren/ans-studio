@@ -77,6 +77,14 @@ export function findRole(roles: RoleView[], roleId: string | null): RoleView | n
   return roles.find((role) => role.roleId === roleId) || null;
 }
 
+/**
+ * 内置质检（独立验收）角色身份：只认内置治理身份，不按角色 id 字符串/报告文本/状态猜测。
+ * 项目角色即使 id 恰好为 verifier、或仅有 governanceFunction 而无 builtIn，均返回 false。
+ */
+export function isVerificationRole(role: RoleView | null | undefined): boolean {
+  return role?.builtIn === true && role.governanceFunction === "verification";
+}
+
 export function roleDisplayName(
   role: RoleView | null | undefined,
   locale: Locale = DEFAULT_LOCALE,

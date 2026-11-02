@@ -35,7 +35,25 @@ export interface DecisionView {
   destructive: boolean;
   /** 内容是否足以作答（缺标题/选项/请求体为 false）。 */
   answerable: boolean;
+  /** 验收决定卡（`request.cardKind === "acceptance"`）；普通卡 false。 */
+  acceptance: boolean;
+  /** 验收报告显示视图；仅验收卡且 payload 合法时非 null（本地防御读取结果，不是共享 Model）。 */
+  acceptanceReport: AcceptanceReportView | null;
 }
+
+/**
+ * 渲染侧验收报告视图：`payload.acceptanceReport` 经防御读取后的展示值。
+ * 只用于渲染，不进入报告快照/任务账本/持久化，不新增共享类型。
+ */
+export interface AcceptanceReportView {
+  version: 1;
+  path: string;
+  text: string;
+  redacted: boolean;
+  truncated: boolean;
+}
+
+const ACCEPTANCE_REPORT_MAX_BYTES = 16384;
 
 const DECISION_KINDS = new Set(["proposal", "appointment", "acceptance", "intent-confirm", "decision"]);
 
@@ -43,6 +61,34 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+/**
+ * 防御读取验收报告展示载荷：version=1、text 为字符串、redacted/truncated 为布尔、
+ * path 为字符串、UTF-8 字节数 <= 16384；任一不合法返回 null（不抛、不猜、不二次截断）。
+ */
+function readAcceptanceReport(payload: unknown): AcceptanceReportView | null {
+  const raw = asRecord(asRecord(payload).acceptanceReport);
+  if (raw.version !== 1) return null;
+  const body = asRecord(raw.text);
+  if (typeof body.text !== "string") return null;
+  if (typeof body.redacted !== "boolean") return null;
+  if (typeof body.truncated !== "boolean") return null;
+  if (typeof raw.path !== "string") return null;
+  if (new TextEncoder().encode(body.text).byteLength > ACCEPTANCE_REPORT_MAX_BYTES) return null;
+  return {
+    version: 1,
+    path: raw.path,
+    text: body.text,
+    redacted: body.redacted,
+    truncated: body.truncated,
+  };
+}
+
+/** preview 去重判据：仅统一换行/去首尾空白后完全相等才视为重复（不做空白压缩）。 */
+export function sameDisplayText(left: string, right: string): boolean {
+  const normalize = (value: string) => value.replace(/\r\n?/g, "\n").trim();
+  return normalize(left) === normalize(right);
 }
 
 function text(value: unknown): string {
@@ -108,6 +154,8 @@ export function decisionView(payload: unknown, locale: Locale = DEFAULT_LOCALE):
     : [];
   const recommended = options.filter((option) => option.recommended);
   const title = text(request.title) || translate(locale, "ui.decisionDialog.titleFallback");
+  const cardKind = decisionCardKind(payload);
+  const acceptance = cardKind === "acceptance";
   return {
     id: text(asRecord(payload).id),
     sourceRoleId: decisionSourceRoleId(payload),
@@ -116,7 +164,9 @@ export function decisionView(payload: unknown, locale: Locale = DEFAULT_LOCALE):
     question: text(request.question),
     preview: text(request.preview),
     detail: text(request.detail),
-    cardKind: decisionCardKind(payload),
+    cardKind,
+    acceptance,
+    acceptanceReport: acceptance ? readAcceptanceReport(payload) : null,
     paths: stringList(request.paths),
     options,
     multiple: request.multiple === true,

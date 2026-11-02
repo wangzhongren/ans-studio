@@ -1,6 +1,7 @@
-import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../src/model/runtime.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
 import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
 import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
+import { createToolDisplayContext } from "../../src/common/runtime-core/tool-display.ts";
 import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult, NetworkGate, NetworkState } from "../../src/model/runtime.ts";
 // app/desktop/session.ts
 // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
@@ -175,7 +176,7 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（model/runtime.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
-import type { DesktopCustomerInputFn } from "./customer-input.ts";
+import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn } from "./customer-input.ts";
 // 2026-10-26 view_image：工具读取的图片 → 下一轮同角色后台提示（投递经既有投递机）。契约形状
 // （`ViewImageFn`/`ViewImageInput`）只读导入契约家；桌面本地只保留投递工厂与提示文本。
 import { createViewImageDelivery } from "./view-image.ts";
@@ -2640,7 +2641,7 @@ export class SessionManager {
     // 在调用当刻从活会话条目读取（会话已销毁 ⇒ 缺省，通道不判断）；`metadata` 由调用方原样透传。
     const buildCustomerInputContext = (
       request: CustomerInputRequest,
-      extras?: { onPresented?: () => void },
+      extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1 },
     ): Parameters<DesktopCustomerInputFn>[1] => {
       const mirrorRoleId = mirrorRoleIdFor(request);
       const live = this.sessions.get(key);
@@ -2659,6 +2660,7 @@ export class SessionManager {
         // resolveWrite 的 skill 根（同一份 ProjectConfig）。缺省 ⇒ 通道不做预授权判定。
         ...(writeBoundary !== undefined ? { writeBoundary, skillRoot: project.skillRoot } : {}),
         ...(extras?.onPresented !== undefined ? { onPresented: extras.onPresented } : {}),
+        ...(extras?.acceptanceReport !== undefined ? { acceptanceReport: extras.acceptanceReport } : {}),
       };
     };
     let handle: RoleSessionHandle;
@@ -3656,9 +3658,34 @@ export class SessionManager {
     projectRoot: string,
     request: CustomerInputRequest,
     metadata: CustomerInputMetadata | undefined,
-  ): Promise<CustomerInputMetadata | undefined> {
+    sourceRoleId: string,
+  ): Promise<{ metadata: CustomerInputMetadata | undefined; display?: AcceptanceReportDisplayV1 }> {
     const flowId = request.flowId ?? metadata?.flowId;
-    if (typeof flowId !== "string" || flowId.trim() === "") return metadata; // 无 flowId：上游已 fail-closed
+    if (typeof flowId !== "string" || flowId.trim() === "") return { metadata }; // 无 flowId：沿用既有早退；不构造/不读取/不显示
+    // 2026-11-02 acceptance-return-card（P1-ARC-04/N1）：构造 docs/quality 路径前先做本地 slug 校验；
+    // 非法非空 flowId 不构造/不读取任何项目路径，返回 fail-closed judgeContext。
+    if (!new RegExp(GOVERNANCE_SLUG_PATTERN).test(flowId)) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: sourceRoleId }).record(
+        "acceptance.card.report.display",
+        { ok: false, reasonCode: "flow-id-invalid" },
+      );
+      return {
+        metadata: {
+          ...(metadata ?? {}),
+          judgeContext: {
+            flowId,
+            facts: {
+              governanceModel: "trio",
+              flowId,
+              ledgerErrors: 0,
+              unresolvedClarificationCount: 0,
+              latestDecisionKinds: [],
+            },
+            unavailableReason: "验收最小链事实缺失：质检报告（flowId 不合法，未读取报告）",
+          },
+        },
+      };
+    }
     const activeRun = await findActiveRun(projectRoot, flowId);
     const pinnedRun = activeRun.ok && activeRun.manifest !== null && activeRun.manifest.state === "pinned" ? activeRun.manifest : undefined;
     // 2026-11-01（acceptance-evidence-path，方案 P1.2 §2.2/§3.1）：验收判断的提案物证路径。
@@ -3697,6 +3724,33 @@ export class SessionManager {
           : undefined;
     const reportText = await readText(reportRel);
     const reportOk = reportText !== undefined && reportText.trim() !== "";
+    // 2026-11-02 acceptance-return-card（C2/C3）：复用上面已有读取，只做 16 KiB 安全投影；
+    // 投影失败/报告缺失只省略 display，不影响卡片呈现与判断。诊断只记白名单元数据，不记正文/凭据。
+    const displayDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: sourceRoleId });
+    let display: AcceptanceReportDisplayV1 | undefined;
+    if (reportOk && reportText !== undefined) {
+      try {
+        const credentialEnvNames = [
+          ...(this.deps.runtimeOptions?.extraCredentialEnvVars ?? []),
+          ...(this.deps.runtimeOptions?.apiKeyEnvVar ? [this.deps.runtimeOptions.apiKeyEnvVar] : []),
+        ];
+        const text = createToolDisplayContext({ credentialEnvNames }).protectText(reportText, 16384);
+        display = { version: 1, path: reportRel, text };
+        displayDiagnostic.record("acceptance.card.report.display", {
+          ok: true,
+          path: reportRel,
+          bytes: Buffer.byteLength(reportText, "utf8"),
+          state: text.truncated
+            ? (text.redacted ? "truncated+redacted" : "truncated")
+            : (text.redacted ? "redacted" : "plain"),
+        });
+      } catch {
+        display = undefined;
+        displayDiagnostic.record("acceptance.card.report.display", { ok: false, path: reportRel, reasonCode: "projection-failed" });
+      }
+    } else {
+      displayDiagnostic.record("acceptance.card.report.display", { ok: false, path: reportRel, reasonCode: "report-missing" });
+    }
     // 最新 D3（appointment 裁决）及 decisionId。
     const state = await this.readTasks(projectRoot);
     const requestFlows = new Map<string, string | undefined>();
@@ -3815,7 +3869,10 @@ export class SessionManager {
         acceptanceReportPath: reportRel,
       },
     };
-    return { ...(metadata ?? {}), judgeContext };
+    return {
+      metadata: { ...(metadata ?? {}), judgeContext },
+      ...(display !== undefined ? { display } : {}),
+    };
   }
 
   /**
@@ -3828,12 +3885,16 @@ export class SessionManager {
     request: CustomerInputRequest,
     metadata: CustomerInputMetadata | undefined,
     raw: (request: CustomerInputRequest, context: Parameters<DesktopCustomerInputFn>[1], metadata?: CustomerInputMetadata) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined,
-    buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void }) => Parameters<DesktopCustomerInputFn>[1],
+    buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1 }) => Parameters<DesktopCustomerInputFn>[1],
     requestIdOverride?: string,
   ): Promise<CustomerInputOutcome | null | undefined> {
     // 2026-10-29（Q6 A）：验收卡的最小链事实由应用补充（产品意图/名单/D3/质检报告）。
+    // 2026-11-02 acceptance-return-card（C2）：同一次读取的 16 KiB 安全投影随 ctx 送渲染层。
+    let acceptanceReport: AcceptanceReportDisplayV1 | undefined;
     if (request.cardKind === "acceptance") {
-      metadata = await this.enrichAcceptanceJudgeContext(projectRoot, request, metadata);
+      const enriched = await this.enrichAcceptanceJudgeContext(projectRoot, request, metadata, sourceRoleId);
+      metadata = enriched.metadata;
+      acceptanceReport = enriched.display;
     }
     // 2026-10-31（run-change 触发）：冻结 run 上出现比 pin 更新的提案卡 ⇒ 先尝试 run-change 卡，
     // 本提案卡以 run-change-required 三段式拒发（未呈现；不冒充客户拒绝、不改冻结语义）。
@@ -3904,6 +3965,7 @@ export class SessionManager {
     };
     const context = buildContext(request, {
       onPresented: () => { void markPresented("customer"); },
+      ...(acceptanceReport !== undefined ? { acceptanceReport } : {}),
     });
     let out: CustomerInputOutcome | null | undefined;
     try {

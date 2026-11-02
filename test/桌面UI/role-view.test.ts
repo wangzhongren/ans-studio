@@ -9,6 +9,7 @@ import {
   flattenRoles,
   governanceView,
   groupRoles,
+  isVerificationRole,
   roleDisplayName,
   roleSubtitle,
 } from "../../app/renderer/src/chat/role-view.ts";
@@ -104,4 +105,30 @@ test("组名去空白；职责原文保留；缺组不推权限（只按列出�
   assert.equal(groups[0].label, "项目组");
   assert.equal(groups[0].roles[0].groupDuty, "组员");
   assert.equal(flattenRoles([]).length, 0);
+});
+
+test("独立验收判据：只认内置质检身份；项目角色/缺字段/不可解析不标记", () => {
+  assert.equal(
+    isVerificationRole(role({ roleId: "verifier", builtIn: true, governanceFunction: "verification" })),
+    true,
+  );
+  // 项目角色即使 id 叫 verifier 也不标记。
+  assert.equal(
+    isVerificationRole(role({ roleId: "verifier", builtIn: false, governanceFunction: "verification" })),
+    false,
+  );
+  assert.equal(isVerificationRole(role({ roleId: "verifier" })), false);
+  assert.equal(isVerificationRole(role({ roleId: "verifier", builtIn: true })), false);
+  assert.equal(
+    isVerificationRole(role({ roleId: "verifier", builtIn: true, governanceFunction: "chief" })),
+    false,
+  );
+  assert.equal(
+    isVerificationRole(role({ roleId: "verifier", governanceFunction: "verification" })),
+    false,
+  );
+  // 角色列表未加载/找不到角色 => 普通卡。
+  assert.equal(isVerificationRole(findRole([], "verifier")), false);
+  assert.equal(isVerificationRole(null), false);
+  assert.equal(isVerificationRole(undefined), false);
 });

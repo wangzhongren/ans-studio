@@ -639,6 +639,23 @@
 .delivery-report {
   min-width: 0;
 }
+/* 独立验收报告（交付批）：没有 .msg-handback 外层，必须单独覆盖；普通交付段类名不变。 */
+.delivery-report.is-acceptance {
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-control);
+  padding-left: 10px;
+}
+.delivery-report.is-acceptance.is-blocked {
+  border-left-color: var(--danger);
+}
+.delivery-report.is-acceptance.is-blocked .report-top {
+  background: var(--danger-bg);
+}
+.acceptance-evidence {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .delivery-report .msg-handback,
 .delivery-report .msg-handback .report-top {
   border-radius: var(--radius-control);
@@ -891,7 +908,8 @@
   .report-complete-body,
   .hb-complete-summary,
   .hb-summary,
-  .hb-evidence {
+  .hb-evidence,
+  .acceptance-evidence {
     min-width: 0;
     overflow-wrap: anywhere;
   }

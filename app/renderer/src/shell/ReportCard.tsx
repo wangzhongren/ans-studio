@@ -9,7 +9,8 @@
 import { useEffect } from "react";
 import { renderMarkdown } from "@/chat/markdown";
 import { useChatStore } from "@/chat/chat-store";
-import { findRole, roleDisplayName } from "@/chat/role-view";
+import { findRole, isVerificationRole, roleDisplayName } from "@/chat/role-view";
+import type { RoleView } from "@/chat/types";
 import { runtimeLabel } from "@/chat/runtime-config";
 import {
   asReportRecord,
@@ -42,6 +43,11 @@ function markdownHtml(text: string): { __html: string } {
   return { __html: renderMarkdown(text) };
 }
 
+/** 验收报告身份：由两处报告位置（回交行/交付批）统一计算后传入 ReportBody，不二次判定。 */
+function reportAcceptance(report: unknown, roles: RoleView[]): boolean {
+  return isVerificationRole(findRole(roles, asReportText(reportSourceRecord(report).roleId)));
+}
+
 function SourceDocumentButton({ roleId }: { roleId: string }) {
   const t = useT();
   return (
@@ -70,6 +76,8 @@ export interface ReportBodyProps {
   /** 事件内联的初始保存状态（无 reportId 的 live 报告只作展示，不查询）。 */
   initialPersistence?: unknown;
   scope?: ReportScope;
+  /** 验收展示判定（由 ReportCard/DeliveryCard 统一计算后传入；本组件不二次判定）。 */
+  acceptance?: boolean;
 }
 
 export function ReportBody({
@@ -80,6 +88,7 @@ export function ReportBody({
   onDetailsToggle,
   initialPersistence,
   scope,
+  acceptance,
 }: ReportBodyProps) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
@@ -104,6 +113,7 @@ export function ReportBody({
     locale,
   );
   const folded = preview.length < Array.from(full).length;
+  const isAcceptance = acceptance === true;
   const sourceRoleId = asReportText(source.roleId);
   const sourceName = sourceRoleId
     ? roleDisplayName(findRole(roles, sourceRoleId), locale) || sourceRoleId
@@ -131,14 +141,19 @@ export function ReportBody({
 
   return (
     <>
-      <div className="report-top">
+      <div className={"report-top" + (isAcceptance ? " is-acceptance" : "")}>
         <div className="report-eyebrow">
           {t("ui.reportCard.sourceLine", {
             sourceName,
             origin: reportOriginLabel(reportRecord.origin, locale),
           })}
         </div>
-        <h2 className="report-title">{t("ui.reportCard.title")}</h2>
+        <h2 className="report-title">
+          {isAcceptance ? t("ui.reportCard.acceptanceTitle") : t("ui.reportCard.title")}
+        </h2>
+        {isAcceptance ? (
+          <span className="report-acceptance-badge">{t("ui.reportCard.acceptanceBadge")}</span>
+        ) : null}
         <div className="hb-head">
           <strong>{reportDeclaration(report, locale)}</strong>
         </div>
@@ -156,14 +171,38 @@ export function ReportBody({
             : t("ui.reportCard.turnNotProvided")}
         </p>
       </div>
-      <div className="report-body">
-        <div className="excerpt-label">{t("ui.reportCard.excerptLabel")}</div>
-        <div className="hb-summary card-md" dangerouslySetInnerHTML={markdownHtml(preview)} />
+      <div className={"report-body" + (isAcceptance ? " is-acceptance" : "")}>
+        <div className="excerpt-label">
+          {isAcceptance ? t("ui.reportCard.acceptanceReportLabel") : t("ui.reportCard.excerptLabel")}
+        </div>
+        <div
+          className="hb-summary card-md"
+          dangerouslySetInnerHTML={markdownHtml(isAcceptance ? full : preview)}
+        />
         <p className="projection-flags">
-          {[flags, folded ? t("ui.reportCard.folded") : ""]
+          {[flags, !isAcceptance && folded ? t("ui.reportCard.folded") : ""]
             .filter(Boolean)
             .join(locale === "zh-CN" ? "；" : "; ")}
         </p>
+        {isAcceptance ? (
+          <div className="acceptance-evidence">
+            <div className="excerpt-label">
+              {t("ui.reportCard.evidenceCount", { count: evidence.length })}
+            </div>
+            <ul className="hb-evidence">
+              {evidence.length === 0 ? (
+                <li>{t("ui.reportCard.noEvidence")}</li>
+              ) : (
+                evidence.map((item, index) => (
+                  <li key={index}>
+                    {asReportText(item.text)}
+                    <small className="projection-flags">{textFlags(item, locale)}</small>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        ) : null}
         <dl className="report-facts">
           {includeSave ? (
             <div>
@@ -195,43 +234,57 @@ export function ReportBody({
             </div>
           ) : null}
           <div>
-            <dt>{t("ui.reportCard.independentAcceptance")}</dt>
-            <dd>{t("ui.reportCard.notConfirmed")}</dd>
+            <dt>
+              {isAcceptance
+                ? t("ui.reportCard.acceptanceDecision")
+                : t("ui.reportCard.independentAcceptance")}
+            </dt>
+            <dd>
+              {isAcceptance
+                ? t("ui.reportCard.acceptanceDecisionPending")
+                : t("ui.reportCard.notConfirmed")}
+            </dd>
           </div>
         </dl>
-        <p className="report-disclaimer">{t("ui.reportCard.disclaimer")}</p>
+        <p className="report-disclaimer">
+          {isAcceptance
+            ? t("ui.reportCard.acceptanceDisclaimer")
+            : t("ui.reportCard.disclaimer")}
+        </p>
         <div className="report-actions">
           {sourceRoleId ? <SourceDocumentButton roleId={sourceRoleId} /> : null}
-          <details
-            className="report-complete"
-            open={detailsOpen === true}
-            onToggle={(event) => {
-              const next = event.currentTarget.open;
-              if (next === (detailsOpen === true)) return;
-              onDetailsToggle?.(next);
-            }}
-          >
-            <summary>{t("ui.reportCard.viewFull")}</summary>
-            <div className="report-complete-body">
-              <div
-                className="hb-complete-summary card-md"
-                dangerouslySetInnerHTML={markdownHtml(full)}
-              />
-              <p className="projection-flags">{flags}</p>
-              <ul className="hb-evidence">
-                {evidence.length === 0 ? (
-                  <li>{t("ui.reportCard.noEvidence")}</li>
-                ) : (
-                  evidence.map((item, index) => (
-                    <li key={index}>
-                      {asReportText(item.text)}
-                      <small className="projection-flags">{textFlags(item, locale)}</small>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          </details>
+          {isAcceptance ? null : (
+            <details
+              className="report-complete"
+              open={detailsOpen === true}
+              onToggle={(event) => {
+                const next = event.currentTarget.open;
+                if (next === (detailsOpen === true)) return;
+                onDetailsToggle?.(next);
+              }}
+            >
+              <summary>{t("ui.reportCard.viewFull")}</summary>
+              <div className="report-complete-body">
+                <div
+                  className="hb-complete-summary card-md"
+                  dangerouslySetInnerHTML={markdownHtml(full)}
+                />
+                <p className="projection-flags">{flags}</p>
+                <ul className="hb-evidence">
+                  {evidence.length === 0 ? (
+                    <li>{t("ui.reportCard.noEvidence")}</li>
+                  ) : (
+                    evidence.map((item, index) => (
+                      <li key={index}>
+                        {asReportText(item.text)}
+                        <small className="projection-flags">{textFlags(item, locale)}</small>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            </details>
+          )}
         </div>
       </div>
     </>
@@ -254,10 +307,15 @@ export function ReportCard({
   onDetailsToggle,
 }: ReportCardProps) {
   const scope = (data.scope || null) as ReportScope | null;
+  const roles = useChatStore((s) => s.roles);
+  const supported = reportVersionSupported(report);
+  const acceptance = supported && reportAcceptance(report, roles);
   return (
     <div
       className={
-        "msg-handback" + (asReportRecord(report).status !== "completed" ? " is-blocked" : "")
+        "msg-handback" +
+        (asReportRecord(report).status !== "completed" ? " is-blocked" : "") +
+        (acceptance ? " is-acceptance" : "")
       }
     >
       <ReportBody
@@ -268,6 +326,7 @@ export function ReportCard({
         onDetailsToggle={onDetailsToggle}
         initialPersistence={data.persistence}
         scope={scope || undefined}
+        acceptance={acceptance}
       />
     </div>
   );
@@ -282,6 +341,7 @@ export interface DeliveryCardProps {
 export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
+  const roles = useChatStore((s) => s.roles);
   const entries = useReportStore((s) => s.entries);
   const provenance = asReportRecord(data.provenance);
   const presentation = asReportRecord(data.presentation);
@@ -366,18 +426,31 @@ export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
         ) : null}
         {entry?.error ? <p className="persistence-error">{entry.error}</p> : null}
       </div>
-      {reports.map((report, index) => (
-        <section className="delivery-report" key={index}>
-          <ReportBody
-            report={report}
-            roleId={
-              asReportText(asReportRecord(asReportRecord(report).source).roleId) || roleId
+      {reports.map((report, index) => {
+        const supported = reportVersionSupported(report);
+        const acceptance = supported && reportAcceptance(report, roles);
+        const blocked = acceptance && asReportRecord(report).status !== "completed";
+        return (
+          <section
+            className={
+              "delivery-report" +
+              (acceptance ? " is-acceptance" : "") +
+              (blocked ? " is-blocked" : "")
             }
-            includeSave={false}
-            scope={scope || undefined}
-          />
-        </section>
-      ))}
+            key={index}
+          >
+            <ReportBody
+              report={report}
+              roleId={
+                asReportText(asReportRecord(asReportRecord(report).source).roleId) || roleId
+              }
+              includeSave={false}
+              scope={scope || undefined}
+              acceptance={acceptance}
+            />
+          </section>
+        );
+      })}
       <details className="safe-input-copy">
         <summary>{t("shared.common.safeCopyTitle")}</summary>
         <p className="projection-flags">{safeCopyFlags(projection, locale)}</p>

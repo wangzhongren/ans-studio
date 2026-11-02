@@ -41,3 +41,17 @@ test("主题令牌值：surface 为抬升面、radius-card 复用主题圆角", 
   assert.match(css, /--surface:\s*#1e2328;/);
   assert.match(css, /--radius-card:\s*var\(--radius\);/);
 });
+
+test("验收/危险样式令牌已定义（A3 新增样式只引用既有令牌）", () => {
+  for (const name of [
+    "--info",
+    "--info-bg",
+    "--info-border",
+    "--danger",
+    "--danger-bg",
+    "--danger-border",
+    "--warning-border",
+  ]) {
+    assert.ok(defined.has(name), `缺令牌 ${name}`);
+  }
+});

@@ -2268,6 +2268,45 @@ img.view-image-preview {
   border-color: var(--danger-border);
   border-left: 3px solid var(--danger);
 }
+/* 独立验收报告（回交行）：冷色身份；blocked 危险色优先（写在验收冷色之后）。 */
+.msg-handback.is-acceptance {
+  border-color: var(--info-border);
+  border-left: 3px solid var(--info);
+}
+.msg-handback.is-acceptance.is-blocked {
+  border-color: var(--danger-border);
+  border-left: 3px solid var(--danger);
+}
+.report-top.is-acceptance {
+  background: var(--info-bg);
+}
+.msg-handback.is-acceptance.is-blocked .report-top {
+  background: var(--danger-bg);
+}
+.report-acceptance-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--info-border);
+  border-radius: var(--radius-micro);
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.report-body.is-acceptance .hb-summary {
+  max-height: 60vh;
+  overflow: auto;
+}
+.report-body.is-acceptance .hb-evidence {
+  max-height: 40vh;
+  overflow: auto;
+}
+.acceptance-evidence {
+  min-width: 0;
+}
 .report-top {
   padding: 12px 14px;
   background: var(--success-bg);
