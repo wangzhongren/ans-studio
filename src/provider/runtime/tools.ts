@@ -45,7 +45,20 @@ import type {
   RoleActivityLogFn, RoleActivityLogPayload, TaskSideEffect,
   TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
   ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef,
+  ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn,
 } from "../../model/runtime.ts";
+import {
+  PROJECT_NOTE_BLOCKER_TEXT_MAX,
+  PROJECT_NOTE_NEXT_STEP_DEFAULT_KEY,
+  PROJECT_NOTE_NEXT_STEP_TEXT_MAX,
+  PROJECT_NOTE_REFS_MAX,
+  PROJECT_STATE_TOOL_MAX_BYTES,
+  VERSION_DECISION_ACTIONS,
+  VERSION_DECISION_ERROR_CODES,
+  VERSION_DECISION_REASON_MAX,
+  VERSION_DECISION_REFS_MAX,
+} from "../../model/project-state.ts";
+import type { ProjectNoteInput, ProjectNoteOp, ProjectStateQuery, VersionDecisionRequest } from "../../model/project-state.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
@@ -159,6 +172,15 @@ export const UNINSTALL_MCP_TOOL_NAME = "uninstall_mcp";
 
 /** request_requirement_change 工具名（2026-10-26；报告员提交需求变更审批（提案/统筹 decision 卡）——申请≠批准，发起方不得自批）。 */
 export const REQUEST_REQUIREMENT_CHANGE_TOOL_NAME = "request_requirement_change";
+
+/** project_state 工具名（2026-11-02；全局任务状态只读摘要——与 UI 同一 builder，注入才注册）。 */
+export const PROJECT_STATE_TOOL_NAME = "project_state";
+
+/** project_note 工具名（2026-11-02；幕僚受控备注（focus/blocker/next-step），append-only，注入才注册）。 */
+export const PROJECT_NOTE_TOOL_NAME = "project_note";
+
+/** request_version_decision 工具名（2026-11-02；幕僚版本决策申请——申请≠批准，注入才注册）。 */
+export const REQUEST_VERSION_DECISION_TOOL_NAME = "request_version_decision";
 
 
 /** view_image 工具名（2026-10-26；读取项目内图片并按运行时策略交付——同轮附图优先 / 下一轮附件回退；注入才注册）。 */
@@ -1653,6 +1675,16 @@ function abortedToolResult(name: string, viewImageDelivery?: ViewImageDeliveryMo
   if (name === STOP_BACKGROUND_TASK_TOOL_NAME) {
     return { ok: false, message: `${name}：停止**未获明确结果**（原因：本轮已中止）——**不要当它已停止**；请重试或用 list_background_tasks 查看当前状态。` };
   }
+  // 2026-11-02 全局任务状态/版本决策：中止时**不假设已读/已写/已提交**（零副作用面如实）。
+  if (name === PROJECT_STATE_TOOL_NAME) {
+    return { ok: false, message: `${name}：项目状态读取**未完成**（原因：会话已中止）——没有拿到快照就**不要推断项目状态**。` };
+  }
+  if (name === PROJECT_NOTE_TOOL_NAME) {
+    return { ok: false, message: `${name}：备注**未写入**（原因：会话已中止）——不要假设已生效；如实告知客户。` };
+  }
+  if (name === REQUEST_VERSION_DECISION_TOOL_NAME) {
+    return { ok: false, message: `${name}：发起轮次已中止——未发卡、未执行；不要假设已提交或已获批准。` };
+  }
   return { ok: false, message: `${name}：会话已中止，未执行` };
 }
 
@@ -3060,6 +3092,309 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
   };
 }
 
+// —————————————— 全局任务状态 / 版本决策工具（2026-11-02，A0；注入才注册） ——————————————
+//
+// 三工具均沿 `dispatch_task`/`role_status` 的「注入才注册」先例：能力缺席 ⇒ 工具不存在（最强 fail-closed）；
+// 本层不硬编码角色 id（注入面由编排/桌面注入端决定：`project_state` 给全部内置治理角色，chief 完整、
+// 其余裁剪；`project_note`/`request_version_decision` 仅 trio chief；项目 worker 不注入）。
+// 纪律：`project_state` 纯读；`project_note` 只提交受控备注（不改机器事实）；`request_version_decision`
+// 只发起申请（**申请≠批准、路线≠内容批准**；不写文档、不派角色、不创建任务、不执行）。
+
+const PROJECT_STATE_ARG_KEYS: ReadonlySet<string> = new Set(["flowId"]);
+const PROJECT_STATE_TRUNCATED_MARKER = "\n[truncated：项目状态输出超过 8 KiB 上限，已按 UTF-8 字节截断]";
+
+/** `project_note` 的严格 op 参数面（未知参数/与 op 不符的参数在触达能力前拒绝）。 */
+const PROJECT_NOTE_OP_ARG_KEYS: Readonly<Record<ProjectNoteOp, ReadonlySet<string>>> = {
+  "set-focus": new Set(["op", "flowId", "runId", "note", "cleared"]),
+  blocker: new Set(["op", "noteKey", "text", "active", "refs"]),
+  "next-step": new Set(["op", "noteKey", "text", "active", "refs"]),
+};
+
+const REQUEST_VERSION_DECISION_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "runId", "action", "reason", "refs"]);
+const VERSION_DECISION_ACTION_SET: ReadonlySet<string> = new Set(VERSION_DECISION_ACTIONS);
+const VERSION_DECISION_ERROR_CODE_SET: ReadonlySet<string> = new Set(VERSION_DECISION_ERROR_CODES);
+
+/** 必填有界文本：非空、字符数 ≤ maxChars；超限拒绝（不截断）。 */
+function boundedTextArg(
+  args: Record<string, unknown>,
+  key: string,
+  maxChars: number,
+  toolName: string,
+): { ok: true; value: string } | { ok: false; result: ToolResult } {
+  const raw = args[key];
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { ok: false, result: governanceArgumentError(toolName, `缺少 ${key} 参数（须为非空字符串）`) };
+  }
+  const chars = Array.from(raw).length;
+  if (chars > maxChars) {
+    return { ok: false, result: governanceArgumentError(toolName, `${key} 超过上限（当前 ${chars} 字符；上限 ${maxChars}）——超限拒绝、不截断`) };
+  }
+  return { ok: true, value: raw };
+}
+
+/** 可选非空字符串（给出但非法 ⇒ 拒绝；缺席 ⇒ undefined）。 */
+function optionalNonEmptyStringArg(
+  args: Record<string, unknown>,
+  key: string,
+  toolName: string,
+): { ok: true; value?: string } | { ok: false; result: ToolResult } {
+  const raw = args[key];
+  if (raw === undefined || raw === null) return { ok: true };
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { ok: false, result: governanceArgumentError(toolName, `${key} 参数非法（须为非空字符串）`) };
+  }
+  return { ok: true, value: raw };
+}
+
+/** refs：≤maxItems 项非空字符串；空数组视作未提供。 */
+function projectRefsArg(
+  args: Record<string, unknown>,
+  key: string,
+  maxItems: number,
+  toolName: string,
+): { ok: true; value?: string[] } | { ok: false; result: ToolResult } {
+  const raw = args[key];
+  if (raw === undefined || raw === null) return { ok: true };
+  if (!Array.isArray(raw)) {
+    return { ok: false, result: governanceArgumentError(toolName, `${key} 参数非法（须为字符串数组，≤${maxItems} 项）`) };
+  }
+  if (raw.length > maxItems) {
+    return { ok: false, result: governanceArgumentError(toolName, `${key} 超过上限（${raw.length} 项；上限 ${maxItems}）——超限拒绝`) };
+  }
+  const refs: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string" || item.trim() === "") {
+      return { ok: false, result: governanceArgumentError(toolName, `${key} 参数非法（每项须为非空字符串）`) };
+    }
+    refs.push(item);
+  }
+  return { ok: true, value: refs.length > 0 ? refs : undefined };
+}
+
+/**
+ * project_state：全局任务状态**只读**摘要（与 UI `project-state:get` 同一 builder 的文本投影）。
+ * 本层只做查询形状校验（仅可选 flowId）、截断防御（≤8 KiB）与如实转达；数据源失败不编造状态。
+ */
+function makeProjectStateTool(
+  fn: ProjectStateFn,
+  currentTurnId?: () => string | undefined,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+): ExecutableTool {
+  const name = PROJECT_STATE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, PROJECT_STATE_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      const query: ProjectStateQuery = { ...(flowId.value !== undefined ? { flowId: flowId.value } : {}) };
+      const turnId = currentTurnId?.();
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => {
+            if (call.signal?.aborted) throw new Error("会话已中止");
+            return turnId === undefined ? fn(query) : fn(query, handbackMetadata(turnId, scope));
+          }),
+          call.signal,
+          `${name} 读取项目状态`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：项目状态读取**未完成**（原因：${reasonOf(err)}）——没有拿到快照就**不要推断项目状态**；如实告知客户。` };
+      }
+      const receipt = watchdogResultOf(result);
+      if (receipt === undefined) return { ok: false, message: `${name}：数据源未返回明确结果（回执缺失或非法）——**不要据此判断任何状态**。` };
+      if (!receipt.ok) return { ok: false, message: watchdogFailureMessage(name, receipt.message) };
+      if (typeof receipt.text !== "string" || receipt.text === "") {
+        return { ok: false, message: `${name}：数据源未返回文本（结果不明）——**不要据此判断任何状态**。` };
+      }
+      const text = receipt.text;
+      if (Buffer.byteLength(text, "utf8") <= PROJECT_STATE_TOOL_MAX_BYTES) return { ok: true, message: text };
+      const capped = truncateUtf8(text, PROJECT_STATE_TOOL_MAX_BYTES - Buffer.byteLength(PROJECT_STATE_TRUNCATED_MARKER, "utf8"));
+      return { ok: true, message: `${capped.text}${PROJECT_STATE_TRUNCATED_MARKER}` };
+    },
+  };
+}
+
+/**
+ * project_note：幕僚**受控备注**（set-focus / blocker / next-step）。本层做严格参数形状与长度校验，
+ * 再调注入能力（应用校验 flow 存在性并 append-only 写事件）。备注**不是机器事实、不是批准/验收证据**；
+ * 本工具不改任务 status/closed、run state/pin、manifest 或文档。
+ */
+function makeProjectNoteTool(
+  fn: ProjectNoteFn,
+  currentTurnId?: () => string | undefined,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+): ExecutableTool {
+  const name = PROJECT_NOTE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const opRaw = call.args["op"];
+      if (opRaw !== "set-focus" && opRaw !== "blocker" && opRaw !== "next-step") {
+        return governanceArgumentError(name, 'op 参数非法（应为 "set-focus" / "blocker" / "next-step" 之一）');
+      }
+      const op: ProjectNoteOp = opRaw;
+      const allowed = PROJECT_NOTE_OP_ARG_KEYS[op];
+      for (const key of Object.keys(call.args)) {
+        if (!allowed.has(key)) return governanceArgumentError(name, `op=${op} 不接受参数 ${key}`);
+      }
+
+      let input: ProjectNoteInput;
+      if (op === "set-focus") {
+        const clearedRaw = call.args["cleared"];
+        if (clearedRaw !== undefined && clearedRaw !== null && typeof clearedRaw !== "boolean") {
+          return governanceArgumentError(name, "cleared 参数非法（应为布尔值）");
+        }
+        const cleared = clearedRaw === true;
+        const flowId = readGovernanceSlugArg(call.args, "flowId", name);
+        if (!flowId.ok) return flowId.result;
+        if (!cleared && flowId.value === undefined) {
+          return governanceArgumentError(name, "set-focus 需要 flowId（或 cleared:true 清除 focus）");
+        }
+        const runId = optionalNonEmptyStringArg(call.args, "runId", name);
+        if (!runId.ok) return runId.result;
+        const noteRaw = call.args["note"];
+        if (noteRaw !== undefined && noteRaw !== null && typeof noteRaw !== "string") {
+          return governanceArgumentError(name, "note 参数非法（应为字符串）");
+        }
+        if (typeof noteRaw === "string" && Array.from(noteRaw).length > PROJECT_NOTE_BLOCKER_TEXT_MAX) {
+          return governanceArgumentError(
+            name,
+            `note 超过上限（当前 ${Array.from(noteRaw).length} 字符；上限 ${PROJECT_NOTE_BLOCKER_TEXT_MAX}）——超限拒绝、不截断`,
+          );
+        }
+        input = {
+          op,
+          ...(flowId.value !== undefined ? { flowId: flowId.value } : {}),
+          ...(runId.value !== undefined ? { runId: runId.value } : {}),
+          ...(typeof noteRaw === "string" ? { note: noteRaw } : {}),
+          ...(cleared ? { cleared: true } : {}),
+        };
+      } else if (op === "blocker") {
+        const noteKey = readGovernanceSlugArg(call.args, "noteKey", name);
+        if (!noteKey.ok) return noteKey.result;
+        if (noteKey.value === undefined) return governanceArgumentError(name, "blocker 需要 noteKey（slug，≤64 字符）");
+        const text = boundedTextArg(call.args, "text", PROJECT_NOTE_BLOCKER_TEXT_MAX, name);
+        if (!text.ok) return text.result;
+        const activeRaw = call.args["active"];
+        if (typeof activeRaw !== "boolean") return governanceArgumentError(name, "blocker 需要布尔参数 active（true 生效 / false 解除）");
+        const refs = projectRefsArg(call.args, "refs", PROJECT_NOTE_REFS_MAX, name);
+        if (!refs.ok) return refs.result;
+        input = {
+          op,
+          noteKey: noteKey.value,
+          text: text.value,
+          active: activeRaw,
+          ...(refs.value !== undefined ? { refs: refs.value } : {}),
+        };
+      } else {
+        const noteKey = readGovernanceSlugArg(call.args, "noteKey", name);
+        if (!noteKey.ok) return noteKey.result;
+        const text = boundedTextArg(call.args, "text", PROJECT_NOTE_NEXT_STEP_TEXT_MAX, name);
+        if (!text.ok) return text.result;
+        const activeRaw = call.args["active"];
+        if (typeof activeRaw !== "boolean") return governanceArgumentError(name, "next-step 需要布尔参数 active（true 生效 / false 解除）");
+        const refs = projectRefsArg(call.args, "refs", PROJECT_NOTE_REFS_MAX, name);
+        if (!refs.ok) return refs.result;
+        input = {
+          op,
+          noteKey: noteKey.value ?? PROJECT_NOTE_NEXT_STEP_DEFAULT_KEY,
+          text: text.value,
+          active: activeRaw,
+          ...(refs.value !== undefined ? { refs: refs.value } : {}),
+        };
+      }
+
+      const turnId = currentTurnId?.();
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => {
+            if (call.signal?.aborted) throw new Error("会话已中止");
+            return turnId === undefined ? fn(input) : fn(input, handbackMetadata(turnId, scope));
+          }),
+          call.signal,
+          `${name} 写入备注`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：备注**未写入**（原因：${reasonOf(err)}）——不要假设已生效；如实告知客户。` };
+      }
+      if (result === null || typeof result !== "object") {
+        return { ok: false, message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未写入**处理；不要假设已生效。` };
+      }
+      const record = result as Record<string, unknown>;
+      if (typeof record["ok"] !== "boolean" || typeof record["message"] !== "string" || record["message"].trim() === "") {
+        return { ok: false, message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未写入**处理；不要假设已生效。` };
+      }
+      return { ok: record["ok"], message: record["message"] };
+    },
+  };
+}
+
+/**
+ * request_version_decision：幕僚**发起版本决策**（version-modify / new-version-development）。
+ * **只发起申请**：应用校验后发 application-owned decision 卡，客户或「替我决策」判断 agent 决定；
+ * 申请≠批准、路线≠内容批准。`signal` 走第二位置参数（发起轮次中止 ⇒ 不执行、orphan），
+ * 调用前先查 aborted；回执只原样转达 `ok/code/message`，失败不伪装成功。
+ */
+function makeRequestVersionDecisionTool(fn: RequestVersionDecisionFn): ExecutableTool {
+  const name = REQUEST_VERSION_DECISION_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, REQUEST_VERSION_DECISION_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const flowId = readGovernanceSlugArg(call.args, "flowId", name);
+      if (!flowId.ok) return flowId.result;
+      if (flowId.value === undefined) return governanceArgumentError(name, "缺少 flowId 参数（须为治理 slug）");
+      const runId = optionalNonEmptyStringArg(call.args, "runId", name);
+      if (!runId.ok) return runId.result;
+      const actionRaw = call.args["action"];
+      if (typeof actionRaw !== "string" || !VERSION_DECISION_ACTION_SET.has(actionRaw)) {
+        return governanceArgumentError(name, `action 参数非法（应为 ${VERSION_DECISION_ACTIONS.join(" / ")} 之一）`);
+      }
+      const reason = boundedTextArg(call.args, "reason", VERSION_DECISION_REASON_MAX, name);
+      if (!reason.ok) return reason.result;
+      const refs = projectRefsArg(call.args, "refs", VERSION_DECISION_REFS_MAX, name);
+      if (!refs.ok) return refs.result;
+
+      const input: VersionDecisionRequest = {
+        flowId: flowId.value,
+        ...(runId.value !== undefined ? { runId: runId.value } : {}),
+        action: actionRaw as VersionDecisionRequest["action"],
+        reason: reason.value,
+        ...(refs.value !== undefined ? { refs: refs.value } : {}),
+      };
+
+      // PM A0-6：调用前先查发起轮次是否已中止——不发卡、不调能力、不执行。
+      if (call.signal?.aborted) {
+        return { ok: false, message: `${name}：发起轮次已中止——未发卡、未执行；不要假设已提交或已获批准。` };
+      }
+
+      let result: unknown;
+      try {
+        result = await raceAbort(Promise.resolve().then(() => fn(input, call.signal)), call.signal, `${name} 申请版本决策`);
+      } catch (err) {
+        return { ok: false, message: `${name}：版本决策申请**未完成**（原因：${reasonOf(err)}）——未发卡/未执行；不要假设已获批准或已提交。` };
+      }
+      if (result === null || typeof result !== "object") {
+        return { ok: false, message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未提交**处理；不要假设已获批准。` };
+      }
+      const record = result as Record<string, unknown>;
+      if (typeof record["ok"] !== "boolean" || typeof record["message"] !== "string" || record["message"].trim() === "") {
+        return { ok: false, message: `${name}：应用未返回明确结果（回执缺失或非法）——按**未提交**处理；不要假设已获批准。` };
+      }
+      const code = record["code"];
+      if (code !== undefined && (typeof code !== "string" || !VERSION_DECISION_ERROR_CODE_SET.has(code))) {
+        return { ok: false, message: `${name}：应用回执错误码不在冻结集合内（契约外回执）——按**未提交**处理；不要假设已获批准。` };
+      }
+      return { ok: record["ok"], message: record["message"] };
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -3225,6 +3560,22 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 只在批准后执行意图变更。
   const requestRequirementChange = options?.requestRequirementChange;
   if (requestRequirementChange !== undefined) tools.push(makeRequestRequirementChangeTool(requestRequirementChange));
+  // 结构性保证（2026-11-02 全局任务状态/版本决策，A0）：三能力各自「注入才注册」；
+  // 未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。本层不硬编码角色 id——注入面由编排/桌面
+  // 注入端决定：project_state 给全部内置治理角色（chief 完整、其余裁剪），project_note/
+  // request_version_decision 仅 trio chief，项目 worker 不注入。
+  const projectState = options?.projectState;
+  if (projectState !== undefined) {
+    tools.push(makeProjectStateTool(projectState, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const projectNote = options?.projectNote;
+  if (projectNote !== undefined) {
+    tools.push(makeProjectNoteTool(projectNote, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const requestVersionDecision = options?.requestVersionDecision;
+  if (requestVersionDecision !== undefined) {
+    tools.push(makeRequestVersionDecisionTool(requestVersionDecision));
+  }
   // 结构性保证（2026-10-27 验收标准产物汇报，沿既有先例）：**未注入能力时
   // `产物汇报` 不存在**。只给质检（内置 verifier）——由调用方（编排/桌面注入端）决定注入；
   // 未注入 ⇒ 模型无法请求（能力缺席 = 最强 fail-closed）。工具只转交载荷并如实转达回执：不写盘、

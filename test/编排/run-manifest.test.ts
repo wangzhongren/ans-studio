@@ -9,8 +9,10 @@ import path from "node:path";
 
 import {
   RUN_PENDING_FLOW_ID,
+  closeRun,
   ensureDraftRun,
   findActiveRun,
+  listRunManifestsResult,
   runManifestPath,
   validateRunManifest,
   verifyPinnedRun,
@@ -139,5 +141,56 @@ test("P2.4：静态 quickref 由 manifest 生成，逐项与 manifest 文档/has
       assert.equal(text.includes(ref.path), true, `quickref 缺文档路径：${ref.path}`);
       if (ref.sha256 !== undefined) assert.equal(text.includes(ref.sha256), true, `quickref 缺 hash：${kind}`);
     }
+  }
+});
+
+// ————————————————— 2026-11-02（R4）：closeRun supersede / 多 draft —————————————————
+
+test("R4：closeRun 记录 supersede closeReason/幂等；多 draft 逐个关闭；listRunManifestsResult 语义不变", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-manifest-close-"));
+  try {
+    const first: RunManifest = { ...draft("focus"), runId: "run-20261030-focus-11111111", createdAt: "2026-10-30T00:00:00.000Z", updatedAt: "2026-10-30T00:00:00.000Z" };
+    const second: RunManifest = { ...draft("focus"), runId: "run-20261030-focus-22222222", createdAt: "2026-10-30T00:01:00.000Z", updatedAt: "2026-10-30T00:01:00.000Z" };
+    assert.equal((await writeRunManifest(root, first)).ok, true);
+    assert.equal((await writeRunManifest(root, second)).ok, true);
+    const reason = "superseded-by:focus-next/run-20261030-focus-next-33333333";
+    const closedFirst = await closeRun(root, first.runId, "closed", reason);
+    assert.equal(closedFirst.ok, true);
+    if (closedFirst.ok) {
+      assert.equal(closedFirst.manifest.state, "closed");
+      assert.equal(closedFirst.manifest.closeReason, reason);
+      assert.ok(closedFirst.manifest.closedAt !== undefined);
+    }
+    const idempotent = await closeRun(root, first.runId, "closed", reason);
+    assert.equal(idempotent.ok, true);
+    if (idempotent.ok) assert.equal(idempotent.manifest.closedAt, closedFirst.ok ? closedFirst.manifest.closedAt : undefined);
+    const closedSecond = await closeRun(root, second.runId, "cancelled", reason);
+    assert.equal(closedSecond.ok, true);
+    const listed = await listRunManifestsResult(root);
+    assert.equal(listed.ok, true);
+    if (listed.ok) {
+      assert.equal(listed.manifests.length, 2);
+      assert.deepEqual(listed.manifests.map((manifest) => manifest.state).sort(), ["cancelled", "closed"]);
+    }
+    const active = await findActiveRun(root, "focus");
+    assert.equal(active.ok, true);
+    if (active.ok) assert.equal(active.manifest, null);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("R1：listRunManifestsResult 保持 all-or-nothing（坏 manifest 整体失败；run-manifest.ts 零改动）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-manifest-listed-"));
+  try {
+    assert.equal((await writeRunManifest(root, draft("focus"))).ok, true);
+    const badId = "run-20261030-broken-abcdef12";
+    await fs.mkdir(path.dirname(runManifestPath(root, badId)), { recursive: true });
+    await fs.writeFile(runManifestPath(root, badId), "{not-json\n", "utf8");
+    const listed = await listRunManifestsResult(root);
+    assert.equal(listed.ok, false);
+    if (!listed.ok) assert.equal(listed.code, "run-manifest-invalid");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });

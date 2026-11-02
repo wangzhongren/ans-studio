@@ -15,7 +15,8 @@ import {
   governanceCardGroup,
 } from "../../src/model/runtime.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
-import { validateDecisionCardRequest } from "../../src/common/编排/decision-card.ts";
+import { DECISION_CARD_ALLOWED_ROLES, validateDecisionCardRequest } from "../../src/common/编排/decision-card.ts";
+import { buildVersionDecisionCard, versionDecisionCardToRequest } from "../../src/common/编排/version-decision.ts";
 import type { CustomerInputRequest } from "../../src/model/runtime.ts";
 
 function schemaEnum(tool: string, prop: string): unknown[] {
@@ -77,4 +78,51 @@ test("decision 结构校验：应用自有卡放行；角色卡仅 convener/rapp
   });
   assert.equal(twoRecommended.ok, false);
   if (!twoRecommended.ok) assert.equal(twoRecommended.reasonCode, "recommended-count");
+});
+
+test("版本决策卡：application-owned decision 通过校验；两选项恰一 recommended；角色上限不变", () => {
+  const card = buildVersionDecisionCard({
+    requestId: "version-decision-run-20261030-focus-abcdef12-m1abc-1234abcd",
+    flowId: "focus",
+    action: "new-version-development",
+    reason: "验收证据循环",
+    facts: {
+      flowId: "focus",
+      unclosedCount: 2,
+      blockedCount: 1,
+      failedCount: 0,
+      pendingRequestCount: 1,
+      acceptanceRejectedCount: 1,
+      priorVersionDecisionCount: 0,
+      latestDocs: [],
+      newerThanPinned: [],
+    },
+    labels: {
+      title: "版本决策：focus",
+      question: "当前 flow focus 卡在验收证据循环。",
+      disclaimer: "若选择新版本开发，应用将关闭旧 flow 的全部活动 run；这是路线选择，不是内容批准，也不是验收。",
+      optionVersionModify: "版本修改",
+      optionNewVersionDevelopment: "新版本开发",
+    },
+  });
+  assert.equal(card.options.length, 2);
+  assert.equal(card.options.filter((option) => option.recommended === true).length, 1);
+  assert.equal(card.options.find((option) => option.recommended === true)?.id, "new-version-development");
+  assert.match(card.question, /全部活动 run/);
+  assert.match(card.question, /不是内容批准/);
+
+  const request = versionDecisionCardToRequest(card);
+  assert.equal(request.kind, "choice");
+  assert.equal(request.cardKind, "decision");
+  assert.equal(request.application, true);
+  assert.equal(request.sourceRoleId, "application");
+  assert.equal(request.flowId, "focus");
+  const validated = validateDecisionCardRequest({ request, roleId: "verifier", governanceModel: "trio" });
+  assert.equal(validated.ok, true);
+  if (validated.ok) assert.equal(validated.recommendedOptionId, "new-version-development");
+
+  const unowned = { ...request, application: undefined, sourceRoleId: undefined };
+  const chiefCannotIssue = validateDecisionCardRequest({ request: unowned, roleId: "chief", governanceModel: "trio" });
+  assert.equal(chiefCannotIssue.ok, false);
+  assert.deepEqual([...DECISION_CARD_ALLOWED_ROLES], ["convener", "rapporteur"]);
 });

@@ -44,6 +44,8 @@ contextBridge.exposeInMainWorld("desktop", {
   listProject: (projectRoot) => ipcRenderer.invoke("app:list-project", { projectRoot }),
   // 2026-10-31（run-change 触发）：显式入口「契约变更 · 重开 run」的 smoke 桩通道。
   requestRunChange: (input) => ipcRenderer.invoke("run:change-request", input),
+  // 2026-11-02（A4）：项目状态只读区（project-state/v1）的 smoke 桩通道。
+  getProjectState: (input) => ipcRenderer.invoke("project-state:get", input),
   openSession: (input) => ipcRenderer.invoke("session:open", input),
   openExternal: (url) =>
     ipcRenderer.invoke("app:open-external", { url: String(url == null ? "" : url) }),

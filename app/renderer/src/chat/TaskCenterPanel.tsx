@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ListChecks, RefreshCw } from "lucide-react";
+import { ProjectStatePanel } from "@/chat/ProjectStatePanel";
 import { useChatStore } from "@/chat/chat-store";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import {
@@ -197,6 +198,7 @@ export function TaskCenterPanel() {
 
   return (
     <div className="task-center">
+      <ProjectStatePanel />
       <div className="tc-tools">
         <span className="tc-title">
           <ListChecks size={14} strokeWidth={1.5} aria-hidden="true" />

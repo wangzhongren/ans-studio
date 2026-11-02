@@ -15,7 +15,7 @@ import type { WriteGate } from "../../src/model/runtime.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { DispatchTaskFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn } from "../../src/model/runtime.ts";
+import type { DispatchTaskFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn } from "../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -50,6 +50,9 @@ interface Caps {
   roleActivityLog?: RoleActivityLogFn;
   terminateRoleRun?: TerminateRoleRunFn;
   redispatchTask?: RedispatchTaskFn;
+  projectState?: ProjectStateFn;
+  projectNote?: ProjectNoteFn;
+  requestVersionDecision?: RequestVersionDecisionFn;
 }
 
 test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 dispatch；项目角色零注入", async () => {
@@ -84,13 +87,22 @@ test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 disp
     assert.equal(typeof caps.chief.roleActivityLog, "function");
     assert.equal(typeof caps.chief.terminateRoleRun, "function", "chief 获得 terminate_role_run");
     assert.equal(typeof caps.chief.redispatchTask, "function", "chief 获得 redispatch_task");
+    assert.equal(typeof caps.chief.projectState, "function", "chief 获得只读 project_state");
+    assert.equal(typeof caps.chief.projectNote, "function", "chief 获得 project_note");
+    assert.equal(typeof caps.chief.requestVersionDecision, "function", "chief 获得 request_version_decision");
     assert.equal(typeof caps.convener.dispatchTask, "function", "v4.1：运营是项目运营者，拥有 dispatch_task（目标矩阵由前置校验执行）");
+    assert.equal(typeof caps.convener.projectState, "function", "内置治理角色获得只读 project_state");
+    assert.equal(caps.convener.projectNote, undefined, "project_note 只给幕僚");
+    assert.equal(caps.convener.requestVersionDecision, undefined, "request_version_decision 只给幕僚");
     assert.equal(caps.convener.roleStatus, undefined, "运营仍无 role_status");
     assert.equal(caps.convener.sessionTail, undefined, "运营仍无 session_tail");
     assert.equal(caps.convener.roleActivityLog, undefined, "role_activity_log 只给幕僚");
     assert.equal(caps.convener.terminateRoleRun, undefined, "终止动作只给幕僚");
     assert.equal(caps.convener.redispatchTask, undefined, "重派动作只给幕僚");
     assert.equal(caps.worker.dispatchTask, undefined);
+    assert.equal(caps.worker.projectState, undefined, "项目 worker 不获得 project_state");
+    assert.equal(caps.worker.projectNote, undefined);
+    assert.equal(caps.worker.requestVersionDecision, undefined);
     assert.equal(caps.worker.roleStatus, undefined);
     assert.equal(caps.worker.sessionTail, undefined);
     assert.equal(caps.worker.roleActivityLog, undefined);
@@ -160,4 +172,31 @@ test("工具注册面：幕僚注入 role_activity_log/terminate_role_run/redisp
   assert.equal(without.has("role_activity_log"), false);
   assert.equal(without.has("terminate_role_run"), false);
   assert.equal(without.has("redispatch_task"), false);
+});
+
+test("工具注册面（2026-11-02）：project_state/project_note/request_version_decision 注入才注册", () => {
+  const gate = (() => ({ allowed: false, reason: "test", allowedByRoot: {} })) as unknown as WriteGate;
+  const names = (options: Record<string, unknown>) => new Set(buildGovernedTools(gate, options as never).map((tool) => tool.name));
+  const none = names({ roleId: "chief", runtime: "demo" });
+  assert.equal(none.has("project_state"), false);
+  assert.equal(none.has("project_note"), false);
+  assert.equal(none.has("request_version_decision"), false);
+  const all = names({
+    roleId: "chief",
+    runtime: "demo",
+    projectState: async () => ({ ok: true, text: "state" }),
+    projectNote: async () => ({ ok: true, message: "noted" }),
+    requestVersionDecision: async () => ({ ok: false, message: "未提交" }),
+  });
+  assert.equal(all.has("project_state"), true);
+  assert.equal(all.has("project_note"), true);
+  assert.equal(all.has("request_version_decision"), true);
+  const readOnly = names({
+    roleId: "convener",
+    runtime: "demo",
+    projectState: async () => ({ ok: true, text: "state" }),
+  });
+  assert.equal(readOnly.has("project_state"), true);
+  assert.equal(readOnly.has("project_note"), false);
+  assert.equal(readOnly.has("request_version_decision"), false);
 });

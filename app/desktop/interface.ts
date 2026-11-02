@@ -51,6 +51,8 @@ export type { GovernanceRecordState, GovernanceRecordStatus } from "./project.ts
 import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
 import { loadEffectiveConfig as realLoadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
 import { SessionManager, type ActiveRunView, type RunChangeMode, type SessionOpenRequest, type SessionTarget, type SessionMessageMetadata, type SessionManagerDeps, type OpenResult, type SendResult, type StopResult, type WithdrawResult, type SessionEventEnvelope, type BackgroundTasksListReply, type BackgroundTaskReadInput, type BackgroundTaskReadReply, type BackgroundTaskStopInput, type BackgroundTaskStopReply, type TaskListView, type TaskRestoreReport, type TerminateRoleRunInput, type TerminateRoleRunResult, type RedispatchTaskInput, type RedispatchTaskResult, type CloseTaskInput, type CloseTaskResult } from "./session.ts";
+// 2026-11-02（全局任务状态）：UI 只读入口的视图形状（A0 单源）。
+import { PROJECT_STATE_SCHEMA, type ProjectStateView } from "../../src/model/project-state.ts";
 // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件的形状与构造（**只读转出**——形状 `Omit` 自编排
 // `AssembleShellGateOptions`，见 operator-channel.ts；本层不另立第二份）。
 import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-channel.ts";
@@ -725,6 +727,11 @@ export interface DesktopInterface {
   // —————— B 批（2026-10-28）：任务/短报/运行日志/终止重派数据面（只读或应用独占动作；不新增客户裁决卡）——————
   /** 任务列表（`tasks.jsonl` 重放；只读；坏行数如实）。 */
   listTasks(input: { projectRoot: string }): Promise<TaskListView>;
+  /**
+   * 2026-11-02（全局任务状态）：`project-state:get` 只读完整视图（UI 与工具同一 builder）。
+   * 入参非法/空 root 返回空视图 + `errors[]`，不抛；不提供任何写桥（note/version 只经幕僚工具能力）。
+   */
+  getProjectState(input: { projectRoot: string }): Promise<ProjectStateView>;
   /** 重启恢复：未投递任务重新入队（不伪造成功）；已投递/已报告未收口只展示。 */
   restoreTasks(input: { projectRoot: string }): Promise<TaskRestoreReport>;
   /** 幕僚运行日志只读（脱敏/项目相对路径；其他角色不可经此读取）。 */
@@ -779,6 +786,34 @@ export interface DesktopInterface {
    */
   startWatchdog(): void;
   stopWatchdog(): void;
+}
+
+/** 2026-11-02：`project-state:get` 的空视图（非法/空 root 或读取失败时也返回 ProjectStateView，不抛）。 */
+function emptyProjectStateView(projectRoot: string, message: string): ProjectStateView {
+  return {
+    schema: PROJECT_STATE_SCHEMA,
+    generatedAt: new Date().toISOString(),
+    projectRoot,
+    focus: { selectedBy: "none" },
+    flows: [],
+    tasks: [],
+    blockers: [],
+    versions: [],
+    evidence: [],
+    notes: [],
+    errors: [{ source: "tasks", message }],
+    truncated: false,
+    counts: {
+      unclosed: 0,
+      supersededUnclosed: 0,
+      activeUnclosed: 0,
+      blocked: 0,
+      failed: 0,
+      pendingRequests: 0,
+      flows: 0,
+      tasks: 0,
+    },
+  };
 }
 
 export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
@@ -2413,6 +2448,15 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
       if (projectRoot === "") return { projectRoot: "", tasks: [], errors: 0, unclosed: 0 };
       return manager.listTasks(projectRoot);
+    },
+    async getProjectState(input): Promise<ProjectStateView> {
+      const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot.trim() : "";
+      if (projectRoot === "") return emptyProjectStateView("", mainT("main.interface.missingProjectRoot"));
+      try {
+        return await manager.projectStateView(projectRoot, { full: true });
+      } catch (error) {
+        return emptyProjectStateView(projectRoot, mainT("ui.projectState.loadError", { detail: error instanceof Error ? error.message : String(error) }));
+      }
     },
     async restoreTasks(input): Promise<TaskRestoreReport> {
       const projectRoot = input && typeof input.projectRoot === "string" ? input.projectRoot : "";
