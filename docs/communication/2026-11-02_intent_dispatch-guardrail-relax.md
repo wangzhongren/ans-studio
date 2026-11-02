@@ -136,3 +136,10 @@
 - **执行**：分支 `feat/flow-improvements-wave1` 已推送（`c80f494..f609679`）；**PR #31** 已创建：https://github.com/wangzhongren/ans-studio/pull/31（base `main`，head `feat/flow-improvements-wave1`）。
 - **范围**：仅推送与创建 PR；未合并、未发布。CI 尚未报告检查结果；auto-fix 未启用。
 - **授权状态**：已推送并创建 PR；未授权合并/发布。
+
+## 合并授权记录（2026-11-02）
+
+- **客户授权**：原话「授权合并 PR #31 到 main；不发布。」
+- **对象**：PR #31（base `main`，head `feat/flow-improvements-wave1`；合并前 HEAD 含本记录提交）。
+- **范围**：合并 PR #31 到 main；不发布、不打 tag、不删除分支。
+- **授权状态**：已授权合并；未授权发布。
