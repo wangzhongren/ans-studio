@@ -73,6 +73,7 @@
 | 单文件 | `test/桌面应用/acceptance-proposal-path.test.ts` | 主进程侧测试——验收 judgeContext 的 proposalPath 派生（pinned manifest 优先/最新 `-proposal-vN`/缺失 fail-closed/别名不选/不可读不回退） |
 | 单文件 | `test/桌面应用/run-change-trigger.test.ts` | 派发受理后不再自动弹 run-change——受理 + advisory、客户卡请求数为 0、显式入口/提案卡路径保留 |
 | 单文件 | `test/桌面应用/run-change-entry.test.ts` | 源码钉更新——移除 `runChangeRejectionForDispatch` 钉，保留 `proposalCardFrozenRejection`、`requestRunChangeDecision`、显式入口与 `run-change-required` 码表钉 |
+| 单文件 | `test/桌面应用/acceptance-return-card.test.ts` | 主进程侧测试——SessionManager 级验收回交卡展示载荷：正常/>16 KiB 截断/空缺失/不可读/无 flowId/非法 flowId/旧 payload；断言 `ctx.acceptanceReport`/presenter payload 与 fail-closed（session/customer-input） |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |

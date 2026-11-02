@@ -1,0 +1,29 @@
+timestamp: 2026-11-02T15:58:28+08:00
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1
+branch: feat/flow-improvements-wave1
+HEAD: 5a35908ce70a0f007e22808bbc3b6f9378f0c7c9
+node: v24.22.1
+npm: 11.19.1
+os: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+--- status: A4 target paths ---
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-return-card.test.ts"
+--- status: src app test (may include concurrent roles) ---
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+ M app/renderer/src/chat/decision-dialog.ts
+ M app/renderer/src/chat/role-view.ts
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M "test/\346\241\214\351\235\242UI/decision-dialog.test.ts"
+ M "test/\346\241\214\351\235\242UI/role-view.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-return-card.test.ts"
+--- before sha256 (proposal baseline, working tree at proposal time) ---
+session.ts 491bf24f8fa2201454524093e863ae7d01f50c2fde2f0aad612aab288b6b5030
+customer-input.ts 0cd2513d56361682a582744632deb87936529aed23efc7ca00e5255f487e58f5
+--- HEAD blobs ---
+0fd043a7627c9be031bc2f83ead1f2b11af96443
+4870b6e949ca23264ea12263e3884db0fe600ca0
+--- cached ---

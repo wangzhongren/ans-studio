@@ -37,6 +37,7 @@ import type {
   CustomerInputFn,
   CustomerInputMetadata,
   CustomerInputOption,
+  DisplayTextV1,
   GovernanceCardKind,
   GovernanceJudgeAudit,
   GovernanceJudgeFn,
@@ -92,6 +93,18 @@ import {
 } from "./governance-advance.ts";
 export type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./governance-advance.ts";
 
+/**
+ * 验收决定卡的应用私有展示载荷（2026-11-02 acceptance-return-card，C2）。
+ * 仅随既有 `session:operator-request` IPC 走；不写盘、不进 `task.created`/报告快照/任务账本。
+ */
+export interface AcceptanceReportDisplayV1 {
+  version: 1;
+  /** 固定约定路径 `docs/quality/<flowId>-report-v1.md`；仅展示/追溯，不是读取指令。 */
+  path: string;
+  /** 主进程已完成 `protectText(reportText, 16384)` 的安全投影；渲染层不得二次改写语义。 */
+  text: DisplayTextV1;
+}
+
 /** 推给渲染侧的交互请求载荷（IPC `session:operator-request` 的形状，主→渲）。 */
 export interface OperatorRequestPayload {
   /** 本次请求的关联 id（主进程生成；回包凭它解挂——沿用 per-window pending Map 模式）。 */
@@ -119,6 +132,8 @@ export interface OperatorRequestPayload {
    * **判断期间客户关闭开关（switch-off）**这一例外（客户已选择手动）时附在原卡上。
    */
   judgeNotice?: string;
+  /** 仅 acceptance 卡；应用私有、仅展示、不持久化（2026-11-02 acceptance-return-card C2）。 */
+  acceptanceReport?: AcceptanceReportDisplayV1;
 }
 
 /**
@@ -547,6 +562,8 @@ export type DesktopCustomerInputFn = (
     mirrorRoleId?: string;
     /** 治理模型（`SessionManager.open` 定格）：判断门只认 `"trio"`；single/su 不代批（§3.2）。 */
     governanceModel?: "single" | "trio";
+    /** 验收决定卡的应用私有展示载荷（仅 acceptance 卡；不进入 metadata/账本）。 */
+    acceptanceReport?: AcceptanceReportDisplayV1;
     /** 每会话判断闭包（编排 `createGovernanceJudge`；与 shell judge 同一份 runtimeOptions/createAdapter）。 */
     governanceJudge?: GovernanceJudgeFn;
     /** 当前轮投递给该角色的文本（≤4KB；判断 agent 的 `turnText` 输入）。缺省不猜。 */
@@ -1773,6 +1790,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (ctx.projectRoot !== undefined) payload.projectRoot = ctx.projectRoot;
       if (typeof metadata?.turnId === "string" && metadata.turnId !== "") payload.turnId = metadata.turnId;
       if (typeof metadata?.toolCallId === "string" && metadata.toolCallId !== "") payload.toolCallId = metadata.toolCallId;
+      if (ctx?.acceptanceReport !== undefined) payload.acceptanceReport = ctx.acceptanceReport;
       const signals = [metadata?.signal, ctx.sessionSignal].filter((signal): signal is AbortSignal => signal !== undefined);
       const projectKey = projectKeyOf(ctx);
       const entry: ChannelEntry = {

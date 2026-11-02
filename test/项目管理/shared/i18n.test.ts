@@ -87,10 +87,41 @@ const SHELL_ESCALATION_KEYS = [
   "ui.judge.resume",
 ] as const satisfies readonly MessageKey[];
 
+/**
+ * 验收回交卡 14 个 `ui.*` key（方案 2026-11-02 §4.4；A1 冻结）。
+ * A3 只消费本清单；新增/改名须回到项目管理并显式更新本断言与分区计数。
+ */
+const ACCEPTANCE_RETURN_CARD_KEYS = [
+  "ui.reportCard.acceptanceTitle",
+  "ui.reportCard.acceptanceBadge",
+  "ui.reportCard.acceptanceReportLabel",
+  "ui.reportCard.evidenceCount",
+  "ui.reportCard.acceptanceDecision",
+  "ui.reportCard.acceptanceDecisionPending",
+  "ui.reportCard.acceptanceDisclaimer",
+  "ui.decisionDialog.acceptanceKind",
+  "ui.decisionDialog.acceptanceReportTitle",
+  "ui.decisionDialog.acceptanceReportFallback",
+  "ui.decisionDialog.acceptanceReportMissing",
+  "ui.decisionDialog.acceptanceReportTruncated",
+  "ui.decisionDialog.acceptancePreviewLabel",
+  "ui.decisionDialog.reportPath",
+] as const satisfies readonly MessageKey[];
+
 function templateTexts(template: unknown): string[] {
   if (typeof template === "string") return [template];
   if (template !== null && typeof template === "object") return Object.values(template).filter((v): v is string => typeof v === "string");
   return [];
+}
+
+function placeholdersOf(template: unknown): string[] {
+  const names = new Set<string>();
+  for (const text of templateTexts(template)) {
+    for (const match of text.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)) {
+      names.add(match[1]!);
+    }
+  }
+  return [...names].sort();
 }
 
 test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
@@ -98,7 +129,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 907 / main 559 / shared 62 / preferences 3，总计 1531", () => {
+test("key 分区计数：ui 921 / main 559 / shared 62 / preferences 3，总计 1545", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -106,8 +137,65 @@ test("key 分区计数：ui 907 / main 559 / shared 62 / preferences 3，总计 
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 907, main: 559, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1531);
+  assert.deepEqual(prefixes, { ui: 921, main: 559, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1545);
+});
+
+test("验收回交卡 key 契约：14 key 中英成对、精确文案与占位符一致", () => {
+  const expected: Record<string, { zh: string; en: string }> = {
+    "ui.reportCard.acceptanceTitle": { zh: "独立验收报告", en: "Independent acceptance report" },
+    "ui.reportCard.acceptanceBadge": { zh: "独立验收", en: "Independent acceptance" },
+    "ui.reportCard.acceptanceReportLabel": { zh: "验收报告原文", en: "Acceptance report text" },
+    "ui.reportCard.evidenceCount": { zh: "证据（{count} 条）", en: "Evidence ({count})" },
+    "ui.reportCard.acceptanceDecision": { zh: "验收决定（如适用）", en: "Acceptance decision (if applicable)" },
+    "ui.reportCard.acceptanceDecisionPending": {
+      zh: "若本次为验收任务，由客户在验收决定卡作出；报告本身不构成通过。",
+      en: "If this is an acceptance task, the customer decides on the acceptance card; this report alone is not an approval.",
+    },
+    "ui.reportCard.acceptanceDisclaimer": {
+      zh: "以上为质检提交的报告原文；如本次为验收任务，是否验收通过以验收决定卡为准。",
+      en: "This is the verifier's report; if this is an acceptance task, approval is decided on the acceptance card.",
+    },
+    "ui.decisionDialog.acceptanceKind": { zh: "独立验收决定", en: "Independent acceptance decision" },
+    "ui.decisionDialog.acceptanceReportTitle": { zh: "验收报告原文", en: "Acceptance report" },
+    "ui.decisionDialog.acceptanceReportFallback": {
+      zh: "未能读取验收报告原文；验收卡说明仍可见。",
+      en: "The acceptance report text could not be read; the card preview remains visible.",
+    },
+    "ui.decisionDialog.acceptanceReportMissing": {
+      zh: "未提供验收报告原文。",
+      en: "No acceptance report text is available.",
+    },
+    "ui.decisionDialog.acceptanceReportTruncated": {
+      zh: "报告原文超出显示预算，已截断。",
+      en: "The report text exceeds the display budget and is truncated.",
+    },
+    "ui.decisionDialog.acceptancePreviewLabel": { zh: "验收卡说明", en: "Card preview" },
+    "ui.decisionDialog.reportPath": { zh: "报告路径：{path}", en: "Report path: {path}" },
+  };
+  for (const key of ACCEPTANCE_RETURN_CARD_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.equal(zhCN[key], expected[key]!.zh, `zh-CN 文案不一致：${key}`);
+    assert.equal(enUS[key], expected[key]!.en, `en-US 文案不一致：${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), placeholdersOf(enUS[key]), `占位符不一致：${key}`);
+  }
+  assert.deepEqual(placeholdersOf(zhCN["ui.reportCard.evidenceCount"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.decisionDialog.reportPath"]), ["path"]);
+  for (const key of ACCEPTANCE_RETURN_CARD_KEYS) {
+    if (key === "ui.reportCard.evidenceCount" || key === "ui.decisionDialog.reportPath") continue;
+    assert.deepEqual(placeholdersOf(zhCN[key]), [], `不应有占位符：${key}`);
+  }
+  assert.equal(translate("zh-CN", "ui.reportCard.evidenceCount", { count: 3 }), "证据（3 条）");
+  assert.equal(translate("en-US", "ui.reportCard.evidenceCount", { count: 3 }), "Evidence (3)");
+  assert.equal(
+    translate("zh-CN", "ui.decisionDialog.reportPath", { path: "docs/quality/flow-a-report-v1.md" }),
+    "报告路径：docs/quality/flow-a-report-v1.md",
+  );
+  assert.equal(
+    translate("en-US", "ui.decisionDialog.reportPath", { path: "docs/quality/flow-a-report-v1.md" }),
+    "Report path: docs/quality/flow-a-report-v1.md",
+  );
 });
 
 test("key parity：zh-CN 与 en-US 全集一致（顺序无关）", () => {

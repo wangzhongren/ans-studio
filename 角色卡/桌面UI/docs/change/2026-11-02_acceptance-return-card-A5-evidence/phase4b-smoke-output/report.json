@@ -1,0 +1,46 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\flow-improvements-wave1\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "smoke completed without exception",
+      "value": false,
+      "detail": "Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error."
+    }
+  ],
+  "calls": {
+    "opens": [],
+    "histories": [],
+    "configReads": [
+      "claude"
+    ],
+    "operatorResponses": [],
+    "reacceptPreview": [],
+    "reaccept": [],
+    "establishPreview": [],
+    "establish": [],
+    "migratePreview": [],
+    "migrate": [],
+    "reportQueries": [],
+    "reportRetries": [],
+    "receiptQueries": [],
+    "historyRetries": [],
+    "judge": {
+      "shellGet": 1,
+      "decisionGet": 1,
+      "decisionSet": []
+    }
+  },
+  "console": [
+    {
+      "level": "error",
+      "message": "Uncaught TypeError: Cannot read properties of null (reading 'textContent')"
+    },
+    {
+      "level": "smoke",
+      "message": "Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error.\n    at node:electron/js2c/renderer_init:1:16535\n    at IpcRendererInternal.<anonymous> (node:electron/js2c/renderer_init:1:11407)\n    at IpcRendererInternal.emit (node:events:514:28)\n    at Object.onMessage (node:electron/js2c/renderer_init:1:10648)"
+    }
+  ],
+  "csp": [],
+  "screenshots": [],
+  "failures": 1
+}

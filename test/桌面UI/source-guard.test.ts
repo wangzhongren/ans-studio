@@ -237,3 +237,29 @@ test("配置与依赖：markdown-it 由 npm 提供且版本 15.0.3；渲染器�
     );
   }
 });
+
+test("验收报告卡：全文只经 Markdown 管线；普通分支保留 report-complete 折叠", () => {
+  const card = read(join(RENDERER, "shell", "ReportCard.tsx"));
+  assert.match(card, /markdownHtml\(isAcceptance \? full : preview\)/);
+  assert.match(card, /isAcceptance \? null : \(/);
+  assert.match(card, /!isAcceptance && folded \? t\("ui\.reportCard\.folded"\)/);
+  assert.match(card, /className="report-complete"/);
+  assert.match(card, /ui\.reportCard\.acceptanceTitle/);
+  assert.match(card, /ui\.reportCard\.acceptanceBadge/);
+  assert.match(card, /className="acceptance-evidence"/);
+  assert.match(card, /ui\.reportCard\.evidenceCount/);
+});
+
+test("P1-ARC-01/02：外层验收类以 reportVersionSupported 门控；交付批 is-blocked 仅验收段", () => {
+  const card = read(join(RENDERER, "shell", "ReportCard.tsx"));
+  assert.equal((card.match(/const supported = reportVersionSupported\(report\);/g) || []).length, 3); // ReportBody 早退 + 两处外层门控
+  assert.equal(
+    (card.match(/const acceptance = supported && reportAcceptance\(report, roles\);/g) || []).length,
+    2,
+  );
+  assert.match(card, /const blocked = acceptance && asReportRecord\(report\)\.status !== "completed";/);
+  assert.equal((card.match(/\(acceptance \? " is-acceptance" : ""\)/g) || []).length, 2);
+  // 普通交付段仍以 "delivery-report" 为基类，没有无条件 is-blocked。
+  assert.match(card, /"delivery-report" \+/);
+  assert.equal(/"delivery-report" \+ \(asReportRecord\(report\)\.status/.test(card), false);
+});

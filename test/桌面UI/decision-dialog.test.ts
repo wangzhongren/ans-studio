@@ -11,8 +11,26 @@ import {
   nextDecisionId,
   orderedDecisionIds,
   pendingMoreCount,
+  sameDisplayText,
   shouldOpenDecision,
 } from "../../app/renderer/src/chat/decision-dialog.ts";
+
+const ACCEPTANCE_REQUEST = {
+  kind: "choice",
+  title: "验收决定",
+  cardKind: "acceptance",
+  options: [
+    { id: "accept", label: "通过" },
+    { id: "rework", label: "返工", recommended: true },
+  ],
+} as const;
+
+const acceptanceReport = (text = "# 验收报告\n\n正文", extra: Record<string, unknown> = {}) => ({
+  version: 1,
+  path: "docs/quality/flow-a-report-v1.md",
+  text: { text, redacted: true, truncated: false },
+  ...extra,
+});
 
 function payload(over: Record<string, unknown> = {}, request: Record<string, unknown> = {}) {
   return {
@@ -100,4 +118,118 @@ test("E-05：输入中仅高风险打断；已有卡仅更高优先级高风险�
   assert.equal(shouldOpenDecision({ activePriority: 2, bestPriority: 1, suppressed: false }), false, "审批不能替换 decision");
   assert.equal(shouldOpenDecision({ activePriority: 3, bestPriority: 0, suppressed: false }), true, "高风险可打断");
   assert.equal(shouldOpenDecision({ activePriority: 0, bestPriority: 0, suppressed: false }), false, "同级高风险 FIFO，不替换");
+});
+
+test("验收卡：acceptance 标志与合法报告视图；选项/推荐/可作答性/优先级不变", () => {
+  const view = decisionView(
+    payload({ id: "acc-1", acceptanceReport: acceptanceReport() }, { ...ACCEPTANCE_REQUEST, preview: "验收卡说明" }),
+  );
+  assert.equal(view.acceptance, true);
+  assert.deepEqual(view.acceptanceReport, {
+    version: 1,
+    path: "docs/quality/flow-a-report-v1.md",
+    text: "# 验收报告\n\n正文",
+    redacted: true,
+    truncated: false,
+  });
+  assert.equal(view.kind, "choice");
+  assert.deepEqual(view.options.map((option) => option.id), ["accept", "rework"]);
+  assert.equal(view.recommendedId, "rework");
+  assert.equal(view.answerable, true);
+  assert.equal(view.priority, 2);
+  assert.equal(view.highRisk, false);
+  assert.equal(view.destructive, false);
+  assert.equal(view.preview, "验收卡说明");
+
+  const high = decisionView(
+    payload({ risk: "high", acceptanceReport: acceptanceReport() }, ACCEPTANCE_REQUEST),
+  );
+  assert.equal(high.acceptance, true);
+  assert.equal(high.priority, 0);
+  assert.equal(high.highRisk, true);
+  assert.equal(high.destructive, true);
+});
+
+test("非验收卡不消费 acceptanceReport；验收卡缺失报告时保持可作答", () => {
+  const ordinary = decisionView(
+    payload(
+      { acceptanceReport: acceptanceReport() },
+      { kind: "choice", cardKind: "decision", options: [{ id: "a", label: "A" }] },
+    ),
+  );
+  assert.equal(ordinary.acceptance, false);
+  assert.equal(ordinary.acceptanceReport, null);
+
+  const missing = decisionView(payload({}, ACCEPTANCE_REQUEST));
+  assert.equal(missing.acceptance, true);
+  assert.equal(missing.acceptanceReport, null);
+  assert.equal(missing.answerable, true);
+});
+
+test("验收报告防御读取：版本/字段类型/路径不合法一律 null，不抛错", () => {
+  const cases: unknown[] = [
+    undefined,
+    null,
+    { version: 2, path: "docs/quality/flow-a-report-v1.md", text: { text: "x", redacted: false, truncated: false } },
+    { version: 1, path: "docs/quality/flow-a-report-v1.md" },
+    { version: 1, path: "docs/quality/flow-a-report-v1.md", text: { text: 1, redacted: false, truncated: false } },
+    { version: 1, path: "docs/quality/flow-a-report-v1.md", text: { text: "x", redacted: "no", truncated: false } },
+    { version: 1, path: "docs/quality/flow-a-report-v1.md", text: { text: "x", redacted: false, truncated: 1 } },
+    { version: 1, path: 1, text: { text: "x", redacted: false, truncated: false } },
+  ];
+  for (const value of cases) {
+    const view = decisionView(payload({ acceptanceReport: value }, ACCEPTANCE_REQUEST));
+    assert.equal(view.acceptance, true);
+    assert.equal(view.acceptanceReport, null);
+    assert.equal(view.answerable, true);
+  }
+  // path 允许空串（UI 据此不显示路径行）。
+  const emptyPath = decisionView(
+    payload(
+      { acceptanceReport: { version: 1, path: "", text: { text: "x", redacted: false, truncated: false } } },
+      ACCEPTANCE_REQUEST,
+    ),
+  );
+  assert.equal(emptyPath.acceptanceReport?.path, "");
+});
+
+test("验收报告 UTF-8 上限 16384 字节：单字节/多字节边界", () => {
+  const atLimit = decisionView(
+    payload(
+      { acceptanceReport: acceptanceReport("a".repeat(16384)) },
+      ACCEPTANCE_REQUEST,
+    ),
+  );
+  assert.equal(atLimit.acceptanceReport?.text.length, 16384);
+
+  const overLimit = decisionView(
+    payload(
+      { acceptanceReport: acceptanceReport("a".repeat(16385)) },
+      ACCEPTANCE_REQUEST,
+    ),
+  );
+  assert.equal(overLimit.acceptanceReport, null);
+
+  // "汉" = 3 UTF-8 字节：5461 字 = 16383 字节（接受），5462 字 = 16386 字节（拒绝）。
+  assert.equal(new TextEncoder().encode("汉".repeat(5461)).byteLength, 16383);
+  assert.equal(
+    decisionView(
+      payload({ acceptanceReport: acceptanceReport("汉".repeat(5461)) }, ACCEPTANCE_REQUEST),
+    ).acceptanceReport?.text.length,
+    5461,
+  );
+  assert.equal(
+    decisionView(
+      payload({ acceptanceReport: acceptanceReport("汉".repeat(5462)) }, ACCEPTANCE_REQUEST),
+    ).acceptanceReport,
+    null,
+  );
+});
+
+test("preview 去重判据：仅统一换行/去首尾空白后完全相等", () => {
+  assert.equal(sameDisplayText("a\r\nb\n", "a\nb"), true);
+  assert.equal(sameDisplayText("  a  ", "a"), true);
+  assert.equal(sameDisplayText("", "   "), true);
+  assert.equal(sameDisplayText("a\n\nb", "a\nb"), false);
+  assert.equal(sameDisplayText("a", "b"), false);
 });

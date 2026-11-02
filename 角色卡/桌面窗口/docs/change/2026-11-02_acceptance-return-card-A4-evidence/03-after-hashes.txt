@@ -1,0 +1,39 @@
+timestamp: 2026-11-02T15:59:28+08:00
+HEAD: 5a35908ce70a0f007e22808bbc3b6f9378f0c7c9
+--- after: git hash-object + sha256sum ---
+app/desktop/session.ts
+blob: 10eb2ce55c10845a05ab02b1c08e7e82bd1b78f6
+73b1f70e0e567c59b6d7f6c684f62a55c3997f624da360b34ef065f605a4c4ce *app/desktop/session.ts
+app/desktop/customer-input.ts
+blob: 847ed040f30e510d5fb60dd08201e8ec5ac5033a
+059f080eb66758ced158c40fccac80f2202b35187b601ddc0ba28c6b07679d2d *app/desktop/customer-input.ts
+test/桌面应用/acceptance-return-card.test.ts
+blob: 6037d807dda104c0ab00a7009f9fe5a5b01a8fb1
+0c008cc574563a0a60a6f48b392b471b3464e8b6bf6426adc8123749fd62e9b4 *test/桌面应用/acceptance-return-card.test.ts
+--- diff: A4 target paths ---
+ app/desktop/customer-input.ts | 18 ++++++++++
+ app/desktop/session.ts        | 78 ++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 88 insertions(+), 8 deletions(-)
+--- diff names: A4 target paths ---
+app/desktop/customer-input.ts
+app/desktop/session.ts
+--- status: A4 target paths ---
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-return-card.test.ts"
+--- status: src app test (concurrent roles visible separately) ---
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+ M app/renderer/src/chat/DecisionDialog.tsx
+ M app/renderer/src/chat/decision-dialog.ts
+ M app/renderer/src/chat/role-view.ts
+ M app/renderer/src/shell/ReportCard.tsx
+ M app/renderer/src/shell/phase4b.css
+ M app/renderer/src/shell/shell.css
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M "test/\346\241\214\351\235\242UI/decision-dialog.test.ts"
+ M "test/\346\241\214\351\235\242UI/role-view.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/acceptance-return-card.test.ts"
+--- cached ---

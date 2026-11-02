@@ -368,8 +368,8 @@ app.whenReady().then(async () => {
     // —————— 1. trio 五角色 / 状态行 ——————
     await load("trio");
     check(
-      "five-role listing shows governance model trio and verifier",
-      await js(`(()=>{const t=document.getElementById('role-tree');return t.querySelector('[data-role-id="verifier"]')!==null&&document.getElementById('governance-status').textContent.includes('治理模型：三权 · 五角色');})()`),
+      "five-role listing shows trio model and verifier",
+      await js(`(()=>{const t=document.getElementById('role-tree');return !!t&&t.querySelector('[data-role-id="verifier"]')!==null&&window.__ansRenderer.state.governanceModel==='trio';})()`),
     );
 
     // —————— 2. 排队聚合 / queuedDebug ——————
@@ -388,7 +388,7 @@ app.whenReady().then(async () => {
     await push("session:operator-queued", queued("smoke-q2", "排队二"));
     check(
       "queued aggregate unique on primary with count and queuedDebug",
-      await js(`(()=>{const pane=document.querySelector('#chat .chat-pane[data-role-id="liaison"]');const rows=pane.querySelectorAll('.op-queue-aggregate');return rows.length===1&&rows[0].textContent.includes('还有 2 个决定等待前一个决定')&&!rows[0].querySelector('button')&&rows[0].tabIndex<0&&window.__ansRenderer.queuedDebug().join(',')==='smoke-q1,smoke-q2';})()`),
+      await js(`(()=>{const pane=document.querySelector('#chat .chat-pane[data-role-id="liaison"]');const rows=pane.querySelectorAll('.op-queue-aggregate');return rows.length===1&&rows[0].querySelector('.sys-text')?.textContent==='2'&&!rows[0].querySelector('button')&&rows[0].tabIndex<0&&window.__ansRenderer.queuedDebug().join(',')==='smoke-q1,smoke-q2';})()`),
     );
     await js(`await window.__ansRenderer.selectRuntime('codex')`);
     await js(`await window.__ansRenderer.selectRuntime('pi')`);
@@ -400,7 +400,7 @@ app.whenReady().then(async () => {
     await push("session:operator-queued", queued("smoke-q3", "重推"));
     check(
       "main process repush rebuilds aggregate with new count only",
-      await js(`(()=>{const a=document.querySelector('#chat .chat-pane[data-role-id="liaison"] .op-queue-aggregate');return !!a&&a.textContent.includes('还有 1 个决定等待前一个决定')&&!a.textContent.includes('2 个')&&window.__ansRenderer.queuedDebug().join(',')==='smoke-q3';})()`),
+      await js(`(()=>{const a=document.querySelector('#chat .chat-pane[data-role-id="liaison"] .op-queue-aggregate');return !!a&&a.querySelector('.sys-text')?.textContent==='1'&&window.__ansRenderer.queuedDebug().join(',')==='smoke-q3';})()`),
     );
     await push("session:operator-expired", { id: "smoke-q3", roleId: "rapporteur", projectRoot: ROOT, runtime: "pi", reason: "离线清理" });
     check(
@@ -408,7 +408,7 @@ app.whenReady().then(async () => {
       await js(`!document.querySelector('#chat .op-queue-aggregate')&&window.__ansRenderer.queuedDebug().length===0`),
     );
 
-    // —————— 3. 镜像 / 只答一次 / 双面冻结 ——————
+    // —————— 3. operator 请求：独立决定对话框 + 聊天系统通知（旧镜像卡已由 E 批替换） ——————
     const mirrorPayload = {
       id: "smoke-mirror-1",
       roleId: "rapporteur",
@@ -418,29 +418,21 @@ app.whenReady().then(async () => {
       request: { kind: "confirm", title: "镜像提案", cardKind: "proposal", flowId: "flow-m", summary: "提案 v1" },
     };
     await push("session:operator-request", mirrorPayload);
+    await waitFor(`document.querySelector('#decision-dialog[data-request-id="smoke-mirror-1"]')`);
+    check(
+      "operator request opens one decision dialog and a chat notice without operable card",
+      await js(`(()=>{const d=document.querySelector('#decision-dialog[data-request-id="smoke-mirror-1"]');const n=document.querySelector('.sys-operator-note[data-operator-id="smoke-mirror-1"]');return !!d&&d.textContent.includes('镜像提案')&&!!n&&n.textContent.includes('镜像提案')&&n.textContent.includes('待处理')&&!document.querySelector('#chat [data-request-id="smoke-mirror-1"] button');})()`),
+    );
     const beforeResponses = calls.operatorResponses.length;
-    check(
-      "mirror card renders on liaison with badge/source and same id",
-      await js(`(()=>{const c=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="smoke-mirror-1"]');return !!c&&c.classList.contains('is-mirror')&&c.dataset.surfaceRoleId==='liaison'&&c.querySelector('.op-mirror-badge').textContent==='镜像 · 主入口'&&c.querySelector('.op-gov-badge').textContent==='治理决定 · 客户最终批准'&&c.querySelector('.op-mirror-source').textContent.includes('来自 提案')&&c.querySelectorAll('.op-actions button').length===2;})()`),
-    );
-    await js(`document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="smoke-mirror-1"] .op-confirm').click()`);
+    await js(`document.querySelector('#decision-dialog[data-request-id="smoke-mirror-1"] .dd-confirm').click()`);
     await sleep(120);
-    check("mirror answer responds exactly once", calls.operatorResponses.length === beforeResponses + 1, calls.operatorResponses.slice(-1));
+    check("dialog answer responds exactly once", calls.operatorResponses.length === beforeResponses + 1, calls.operatorResponses.slice(-1));
     check(
-      "answered mirror face freezes with final note",
-      await js(`(()=>{const m=document.querySelector('#chat .chat-pane[data-role-id="liaison"] [data-request-id="smoke-mirror-1"]');return [...m.querySelectorAll('.op-actions button')].every(b=>b.disabled&&b.hidden)&&m.querySelector('.op-note').textContent==='已确认。';})()`),
+      "answered chat notice reflects decided without operable card",
+      await js(`(()=>{const n=document.querySelector('.sys-operator-note[data-operator-id="smoke-mirror-1"]');return !!n&&n.textContent.includes('已处理')&&!n.querySelector('button');})()`),
     );
-    await select("rapporteur");
-    check(
-      "source face kept and frozen, no mirror label",
-      await js(`(()=>{const s=document.querySelector('#chat .chat-pane[data-role-id="rapporteur"] [data-request-id="smoke-mirror-1"]');return !!s&&!s.classList.contains('is-mirror')&&[...s.querySelectorAll('.op-actions button')].every(b=>b.disabled&&b.hidden)&&s.querySelector('.op-note').textContent==='已确认。'&&!s.querySelector('.op-mirror-source');})()`),
-    );
-    const afterFirst = calls.operatorResponses.length;
-    await js(`document.querySelector('#chat .chat-pane[data-role-id="rapporteur"] [data-request-id="smoke-mirror-1"] .op-confirm').click()`);
-    await sleep(60);
-    check("second face cannot answer again", calls.operatorResponses.length === afterFirst);
 
-    // —————— 4. 排队卡防御：不提供可操作按钮 ——————
+    // —————— 4. 排队卡防御：聊天流只显示系统通知，不提供可操作按钮 ——————
     await select("liaison");
     await push("session:operator-request", {
       id: "smoke-queued-card",
@@ -451,79 +443,16 @@ app.whenReady().then(async () => {
       request: { kind: "confirm", title: "排队中的决定" },
     });
     check(
-      "queued payload card shows waiting note and no operable actions",
-      await js(`(()=>{const c=document.querySelector('[data-request-id="smoke-queued-card"]');return !!c&&c.querySelector('.op-queued').textContent==='等待前一个决定'&&c.querySelector('.op-actions').hidden;})()`),
+      "queued payload shows chat notice and no operable chat card",
+      await js(`(()=>{const n=document.querySelector('.sys-operator-note[data-operator-id="smoke-queued-card"]');const p=window.__ansRenderer.state.pendingOperator['smoke-queued-card'];return !!n&&n.textContent.includes('排队中的决定')&&n.textContent.includes('待处理')&&!document.querySelector('#chat [data-request-id="smoke-queued-card"] button')&&!!p&&p.queued===true;})()`),
     );
+    if (await js(`!!document.querySelector('#decision-dialog')`)) {
+      await js(`document.querySelector('#decision-dialog .dd-later')?.click()`);
+      await sleep(80);
+    }
 
-    // —————— 5. 治理记录：pin-mismatch 预览/取消/确认 ——————
-    await load("pin-mismatch", "/phase4b-gov");
-    check(
-      "pin-mismatch status row and empty state offer reaccept",
-      await js(`(()=>{const s=document.getElementById('governance-status'),e=document.querySelector('#chat .chat-empty');return !s.hidden&&s.textContent.includes('治理记录与盘上边界不一致')&&s.querySelector('[data-governance-reaccept]').textContent==='检查并重新接受'&&!!e&&e.textContent.includes('检查并重新接受')&&e.textContent.includes('也可在终端核对 git 历史后再处理。');})()`),
-    );
-    await js(`document.querySelector('#governance-status [data-governance-reaccept]').click()`);
-    await sleep(150);
-    check(
-      "reaccept preview is unique non-modal with zero-write fields",
-      await js(`(()=>{const p=document.getElementById('governance-preview');return !!p&&!p.hidden&&document.querySelectorAll('#governance-preview').length===1&&p.className==='governance-preview'&&!document.querySelector('#governance-preview [role="dialog"]')&&p.textContent.includes('重新接受治理边界（预览）')&&p.textContent.includes('将重算这 9 条 pin')&&p.textContent.includes('不修改任何边界文件内容')&&!!p.querySelector('[data-governance-reaccept]:not([disabled])');})()`),
-    );
-    check("preview IPC carries only project root", calls.reacceptPreview.length === 1 && JSON.stringify(calls.reacceptPreview[0]) === JSON.stringify({ projectRoot: "/phase4b-gov" }), calls.reacceptPreview[0]);
-    await js(`document.querySelector('#governance-preview [data-governance-cancel]').click()`);
-    await sleep(80);
-    check("cancel performs zero write and hides preview", calls.reaccept.length === 0 && (await js(`document.getElementById('governance-preview').hidden`)));
-    check(
-      "cancel returns focus to the preview invoker",
-      await js(`document.activeElement===document.querySelector('#governance-status [data-governance-reaccept]')`),
-    );
-    await js(`document.querySelector('#governance-status [data-governance-reaccept]').click()`);
-    await sleep(120);
-    await js(`document.querySelector('#governance-preview [data-governance-reaccept]').click()`);
-    await sleep(150);
-    check("confirm calls reaccept once with digest", calls.reaccept.length === 1 && calls.reaccept[0].confirm === true && calls.reaccept[0].previewDigest === PREVIEW_DIGEST, calls.reaccept[0]);
-    check(
-      "reaccept success text visible and no contradictory hint",
-      await js(`document.getElementById('governance-preview').textContent.includes('项目已恢复可用')&&document.getElementById('composer-hint').textContent===''`),
-    );
-
-    // —————— 6. 建立治理记录：模型选择 / 零写入取消 ——————
-    await load("missing");
-    check(
-      "missing record status offers establish",
-      await js(`(()=>{const s=document.getElementById('governance-status');return !s.hidden&&s.textContent.includes('尚无治理记录')&&!!s.querySelector('[data-governance-establish]');})()`),
-    );
-    await js(`document.querySelector('#governance-status [data-governance-establish]').click()`);
-    await sleep(120);
-    check(
-      "establish preview declares boundaries and defaults single",
-      await js(`(()=>{const p=document.getElementById('governance-preview');const single=p.querySelector('input[value="single"]');return !!p&&p.textContent.includes('建立治理记录（预览）')&&p.textContent.includes('不扩大任何角色写边界、不修改任何角色边界文件内容。')&&!!single&&single.checked;})()`),
-    );
-    await js(`document.querySelector('#governance-preview input[value="trio"]').click()`);
-    await sleep(120);
-    check(
-      "explicit trio choice re-previews with chosen model",
-      calls.establishPreview.length === 2 && calls.establishPreview[1].governanceModel === "trio",
-      calls.establishPreview.map((item) => item.governanceModel),
-    );
-    await js(`document.querySelector('#governance-preview [data-governance-cancel]').click()`);
-    await sleep(80);
-    check("establish cancel performs zero write", calls.establish.length === 0);
-
-    // —————— 7. 迁移入口 not-available 如实 ——————
-    await load("single");
-    check(
-      "single model shows migration bar and status line",
-      await js(`document.getElementById('governance-status').textContent.includes('治理模型：旧模型（su）')&&!!document.getElementById('governance-migration')`),
-    );
-    await js(`document.querySelector('#governance-migration [data-governance-migrate]').click()`);
-    await sleep(150);
-    check(
-      "migration preview not-available is honest with zero write",
-      calls.migratePreview.length === 1 &&
-        calls.migrate.length === 0 &&
-        (await js(`(()=>{const p=document.getElementById('governance-preview');return !!p&&p.textContent.includes('未接线')&&!p.textContent.includes('已升级');})()`)),
-    );
-    await js(`document.querySelector('#governance-preview [data-governance-cancel]').click()`);
-    await sleep(80);
+    // —————— 5–7. 治理记录 UI（pin-mismatch / establish / migrate）：该 UI 已随 commit 98d3fe2 移除，
+    //   当前无 #governance-status/#governance-preview DOM；原检查不适用，删除并记录于 A5 baseline-fix 记录。
 
     // —————— 8. 报告全文 / persistence 重试同卡 ——————
     await load("trio");
@@ -803,12 +732,12 @@ app.whenReady().then(async () => {
       "replayAnchorDebug returns indices and card sits between request and conclusion",
       await js(`(()=>{const a=window.__ansRenderer.replayAnchorDebug('P').find(x=>x.anchorKey===${JSON.stringify(anchored[0].anchorKey)});const m=window.__ansRenderer.rowModelDebug('P');const op=m.operators.find(x=>x.requestId==='anchor-request');return !!a&&a.requestIndex!==null&&a.conclusionIndex!==null&&m.operators.length===1&&op.index===a.requestIndex+1&&op.index<a.conclusionIndex;})()`),
     );
-    await js(`document.querySelector('[data-request-id="anchor-request"] .op-deny').click()`);
-    await sleep(80);
-    await js(`window.__smokeAnchorCard=document.querySelector('[data-request-id="anchor-request"]')`);
+    await js(`document.querySelector('#decision-dialog[data-request-id="anchor-request"] .dd-reject').click()`);
+    await sleep(120);
+    await js(`window.__smokeAnchorCard=document.querySelector('.sys-operator-note[data-operator-id="anchor-request"]')`);
     check(
-      "denied anchored card kept in place and frozen",
-      await js(`(()=>{const c=document.querySelector('[data-request-id="anchor-request"]');return !!c&&c.querySelector('.op-confirm').hidden&&c.querySelector('.op-note').textContent.includes('不同意');})()`),
+      "denied anchored notice kept in place without operable card",
+      await js(`(()=>{const c=document.querySelector('.sys-operator-note[data-operator-id="anchor-request"]');return !!c&&c.textContent.includes('已处理')&&!c.querySelector('button');})()`),
     );
     // 最小复现：已答卡锚点键在 full rebuild 后仍生效（卡不落尾、DOM 复用、结论索引右移）。
     await push("session:history", {
@@ -820,7 +749,7 @@ app.whenReady().then(async () => {
     await sleep(140);
     check(
       "decided anchored card survives full rebuild between request and conclusion",
-      await js(`(()=>{const a=window.__ansRenderer.replayAnchorDebug('P').find(x=>x.anchorKey===${JSON.stringify(anchored[0].anchorKey)});const m=window.__ansRenderer.rowModelDebug('P');const op=m.operators.find(x=>x.requestId==='anchor-request');const c=document.querySelector('[data-request-id="anchor-request"]');return !!a&&!!op&&c===window.__smokeAnchorCard&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1&&c.querySelector('.op-confirm').hidden&&c.querySelector('.op-note').textContent.includes('不同意');})()`),
+      await js(`(()=>{const a=window.__ansRenderer.replayAnchorDebug('P').find(x=>x.anchorKey===${JSON.stringify(anchored[0].anchorKey)});const m=window.__ansRenderer.rowModelDebug('P');const op=m.operators.find(x=>x.requestId==='anchor-request');const c=document.querySelector('.sys-operator-note[data-operator-id="anchor-request"]');return !!a&&!!op&&c===window.__smokeAnchorCard&&op.index===a.requestIndex+1&&a.conclusionIndex===op.index+1;})()`),
     );
 
     // —————— 15. 截图与 960/200% 几何 ——————
@@ -879,14 +808,17 @@ app.whenReady().then(async () => {
     // 200%：头部换行、左树可见可滚动、缺配提示/治理状态换行；树/报告/治理预览截图。
     wc.setZoomFactor(2);
     await sleep(300);
-    const containerMetrics = await js(`(()=>{const selectors=['#chat','.chat-head','.head-inner','#right-body','.runtime-config-notice','.governance-status','#role-tree','.col-mid','.session-notice','.composer'];const rows=selectors.map(sel=>{const e=document.querySelector(sel);return {sel,hidden:e?e.hidden:null,sw:e?e.scrollWidth:null,cw:e?e.clientWidth:null,display:e?getComputedStyle(e).display:null};});const mid=document.querySelector('.col-mid');const mr=mid?mid.getBoundingClientRect():null;const midOffenders=mr?[...mid.querySelectorAll('*')].filter(e=>{const r=e.getBoundingClientRect();return r.width>1&&r.height>1&&r.right>mr.right+1;}).slice(0,8).map(e=>({cls:String(e.className).slice(0,60),tag:e.tagName,right:Math.round(e.getBoundingClientRect().right)})):[];const chat=document.getElementById('chat');const rect=chat.getBoundingClientRect();const offenders=[...chat.querySelectorAll('*')].filter(e=>{if(e.closest('details:not([open])'))return false;const r=e.getBoundingClientRect();return r.width>1&&r.height>1&&(r.right>rect.right+1||e.scrollWidth>e.clientWidth+1);}).slice(0,8).map(e=>({cls:String(e.className).slice(0,60),tag:e.tagName,right:Math.round(e.getBoundingClientRect().right),sw:e.scrollWidth,cw:e.clientWidth}));return {rows,offenders,midOffenders,chatRight:Math.round(rect.right),docSW:document.documentElement.scrollWidth,innerWidth};})()`);
+    const containerMetrics = await js(`(()=>{const selectors=['#chat','.chat-head','.head-inner','#right-body','#runtime-config-notice','#role-tree','.col-mid','.session-notice','.composer'];const rows=selectors.map(sel=>{const e=document.querySelector(sel);return {sel,hidden:e?e.hidden:null,sw:e?e.scrollWidth:null,cw:e?e.clientWidth:null,display:e?getComputedStyle(e).display:null};});const mid=document.querySelector('.col-mid');const mr=mid?mid.getBoundingClientRect():null;const midOffenders=mr?[...mid.querySelectorAll('*')].filter(e=>{const r=e.getBoundingClientRect();return r.width>1&&r.height>1&&r.right>mr.right+1;}).slice(0,8).map(e=>({cls:String(e.className).slice(0,60),tag:e.tagName,right:Math.round(e.getBoundingClientRect().right)})):[];const chat=document.getElementById('chat');const rect=chat.getBoundingClientRect();const offenders=[...chat.querySelectorAll('*')].filter(e=>{if(e.closest('details:not([open])'))return false;const r=e.getBoundingClientRect();return r.width>1&&r.height>1&&(r.right>rect.right+1||e.scrollWidth>e.clientWidth+1);}).slice(0,8).map(e=>({cls:String(e.className).slice(0,60),tag:e.tagName,right:Math.round(e.getBoundingClientRect().right),sw:e.scrollWidth,cw:e.clientWidth}));return {rows,offenders,midOffenders,chatRight:Math.round(rect.right),docSW:document.documentElement.scrollWidth,innerWidth};})()`);
     check(
       "200% containers no horizontal overflow",
       containerMetrics.rows.every((row) => row.sw === null || row.sw <= row.cw + 1) && containerMetrics.docSW <= containerMetrics.innerWidth,
       containerMetrics,
     );
     check("200% header wraps", await js(`getComputedStyle(document.querySelector('.head-inner')).flexWrap==='wrap'`));
-    const noticeState = await js(`(()=>{const n=document.querySelector('.runtime-config-notice'),m=document.getElementById('runtime-config-message'),b=document.getElementById('runtime-config-settings');if(!n||n.hidden)return {visible:false,text:m?m.textContent:''};const nr=n.getBoundingClientRect(),br=b?b.getBoundingClientRect():null;return {visible:true,text:m.textContent,msgSW:m.scrollWidth,msgCW:m.clientWidth,msgSH:m.scrollHeight,msgCH:m.clientHeight,wrap:getComputedStyle(n).flexWrap,noticeTop:Math.round(nr.top),noticeBottom:Math.round(nr.bottom),buttonBottom:br?Math.round(br.bottom):null,innerHeight,btnInside:b?b.getBoundingClientRect().right<=innerWidth+0.5:null};})()`);
+    // 触发当前引擎缺配读取，使 200% 缺配条处于可见态（保留原换行检查意图）。
+    await js(`await window.__ansRenderer.loadPiConfig()`);
+    await sleep(200);
+    const noticeState = await js(`(()=>{const n=document.getElementById('runtime-config-notice'),m=document.getElementById('runtime-config-message'),b=document.getElementById('runtime-config-settings');if(!n||n.hidden)return {visible:false,text:m?m.textContent:''};const nr=n.getBoundingClientRect(),br=b?b.getBoundingClientRect():null;return {visible:true,text:m.textContent,msgSW:m.scrollWidth,msgCW:m.clientWidth,msgSH:m.scrollHeight,msgCH:m.clientHeight,wrap:getComputedStyle(n).flexWrap,noticeTop:Math.round(nr.top),noticeBottom:Math.round(nr.bottom),buttonBottom:br?Math.round(br.bottom):null,innerHeight,btnInside:b?b.getBoundingClientRect().right<=innerWidth+0.5:null};})()`);
     check(
       "200% config notice full text wrapped without clipping",
       noticeState.visible === true &&
@@ -931,24 +863,334 @@ app.whenReady().then(async () => {
     await sleep(120);
     await shot("phase4b-200pct-report-details");
 
-    // 治理预览在 200%：面板可见、内部无横向溢出；取消回焦仍成立。
-    await load("pin-mismatch", "/phase4b-gov2");
-    await js(`document.querySelector('#governance-status [data-governance-reaccept]').click()`);
-    await sleep(200);
-    await js(`document.getElementById('governance-preview').scrollIntoView({block:'start'})`);
-    await sleep(120);
-    check(
-      "200% governance preview visible and fits without horizontal overflow",
-      await js(`(()=>{const p=document.getElementById('governance-preview'),r=p.getBoundingClientRect();const inner=['.gp-body','.gp-file'].map(sel=>{const e=p.querySelector(sel);return !e||e.scrollWidth<=e.clientWidth+1;});return !p.hidden&&r.height>0&&r.top<innerHeight&&r.bottom>0&&p.scrollWidth<=p.clientWidth+1&&r.right<=innerWidth+0.5&&inner.every(Boolean);})()`),
-    );
-    await shot("phase4b-200pct-governance-preview");
-    await js(`document.querySelector('#governance-preview [data-governance-cancel]').click()`);
-    await sleep(100);
-    check(
-      "200% cancel closes preview and returns focus to invoker",
-      await js(`document.getElementById('governance-preview').hidden&&document.activeElement===document.querySelector('#governance-status [data-governance-reaccept]')`),
-    );
+    // 200% 治理预览检查：治理 UI 已随 commit 98d3fe2 移除，不适用（见 A5 baseline-fix 记录）。
     wc.setZoomFactor(1);
+
+    // —————— 11. A5 验收报告卡/决定卡 E2E（最小追加；自包含） ——————
+    await load("trio");
+    await js(`await window.__ansRenderer.selectRuntime("pi")`);
+    // 清掉可能遗留的决策弹窗（只延后，不代答）。
+    for (let i = 0; i < 5; i += 1) {
+      if (!(await js(`!!document.querySelector('#decision-dialog')`))) break;
+      await js(`document.querySelector('#decision-dialog .dd-later')?.click()`);
+      await sleep(80);
+    }
+    await select("verifier");
+
+    const acceptFull = "A5-ACCEPT-PREFIX-MARKER " + "验收报告原文🙂。".repeat(60) + "\nA5-ACCEPT-TAIL-MARKER";
+    const acceptEvidence = [
+      { text: "验收证据一", redacted: true, truncated: false },
+      { text: "验收证据二", redacted: false, truncated: true },
+    ];
+    const verifierReport = {
+      version: 1,
+      reportId: "smoke-accept-report",
+      source: { roleId: "verifier", runtime: "pi", turnId: "accept-turn" },
+      taskId: null,
+      origin: "submitted-report",
+      status: "completed",
+      summary: { text: acceptFull, redacted: false, truncated: false },
+      evidence: acceptEvidence,
+      evidenceOmitted: 2,
+      at: "2026-11-02T00:00:00Z",
+    };
+    await push("session:events", [{
+      projectRoot: ROOT,
+      roleId: "verifier",
+      runtime: "pi",
+      event: {
+        kind: "handback",
+        report: verifierReport,
+        reportPersistence: { state: "saved", reportId: "smoke-accept-report", retryAvailable: false },
+        summary: "验收报告",
+      },
+    }]);
+    await waitFor(`!!document.querySelector('#chat .chat-pane[data-role-id="verifier"] .msg-handback.is-acceptance')`);
+    check("A5 verifier handback: identity/full text/evidence/no fold", await js(`(()=>{
+      const c=[...document.querySelectorAll('#chat .chat-pane[data-role-id="verifier"] .msg-handback')].find(x=>x.textContent.includes('A5-ACCEPT-TAIL-MARKER'));
+      if(!c) return false;
+      const ev=c.querySelectorAll('.acceptance-evidence .hb-evidence li');
+      return c.classList.contains('is-acceptance')&&
+        c.querySelector('.report-title').textContent==='独立验收报告'&&
+        c.querySelector('.report-acceptance-badge').textContent==='独立验收'&&
+        c.querySelector('.report-top').classList.contains('is-acceptance')&&
+        c.querySelector('.report-body').classList.contains('is-acceptance')&&
+        c.querySelector('.hb-summary').textContent.includes('A5-ACCEPT-TAIL-MARKER')&&
+        !c.querySelector('.report-complete')&&
+        ev.length===2&&
+        c.querySelector('.acceptance-evidence').textContent.includes('验收证据一')&&
+        c.querySelector('.acceptance-evidence').textContent.includes('验收证据二')&&
+        c.querySelector('.acceptance-evidence').textContent.includes('已净化')&&
+        c.querySelector('.acceptance-evidence').textContent.includes('已截断')&&
+        c.querySelector('.projection-flags').textContent.includes('另有 2 条证据因预算省略')&&
+        c.querySelector('.report-facts').textContent.includes('验收决定（如适用）')&&
+        c.querySelector('.report-facts').textContent.includes('报告本身不构成通过')&&
+        c.querySelector('.report-disclaimer').textContent.includes('如本次为验收任务')&&
+        !c.textContent.includes('已验收通过')&&!c.textContent.includes('验收已通过')&&!c.textContent.includes('通过验收')&&
+        c.querySelector('.report-actions .report-source-button')!==null;
+    })()`));
+    check("A5 verifier handback cold color", await js(`(()=>{
+      const c=[...document.querySelectorAll('#chat .chat-pane[data-role-id="verifier"] .msg-handback')].find(x=>x.textContent.includes('A5-ACCEPT-TAIL-MARKER'));
+      if(!c) return false;
+      const s=getComputedStyle(c);
+      return s.borderLeftWidth==='3px'&&s.borderLeftColor==='rgb(134, 197, 227)';
+    })()`));
+    await shot("a5-acceptance-handback");
+
+    const blockedReport = {
+      ...verifierReport,
+      reportId: "smoke-accept-blocked",
+      status: "blocked",
+      summary: { text: "BLOCKED-A5-ACCEPT-MARKER " + "受阻报告。".repeat(60), redacted: false, truncated: false },
+    };
+    await push("session:events", [{
+      projectRoot: ROOT,
+      roleId: "verifier",
+      runtime: "pi",
+      event: {
+        kind: "handback",
+        report: blockedReport,
+        reportPersistence: { state: "saved", reportId: "smoke-accept-blocked", retryAvailable: false },
+        summary: "受阻验收报告",
+      },
+    }]);
+    check("A5 verifier blocked: identity kept + danger color priority", await js(`(()=>{
+      const c=[...document.querySelectorAll('#chat .chat-pane[data-role-id="verifier"] .msg-handback')].find(x=>x.textContent.includes('BLOCKED-A5-ACCEPT-MARKER'));
+      if(!c) return false;
+      const s=getComputedStyle(c);
+      return c.classList.contains('is-acceptance')&&c.classList.contains('is-blocked')&&
+        c.querySelector('.report-title').textContent==='独立验收报告'&&
+        s.borderLeftColor==='rgb(201, 122, 109)'&&
+        getComputedStyle(c.querySelector('.report-top')).backgroundColor==='rgb(46, 34, 32)';
+    })()`));
+
+    const unsupportedReport = {
+      version: 2,
+      reportId: "smoke-accept-unsupported",
+      source: { roleId: "verifier", runtime: "pi", turnId: "accept-unsupported" },
+      taskId: null,
+      origin: "submitted-report",
+      status: "completed",
+      summary: { text: "UNSUPPORTED-A5-ACCEPT-MARKER", redacted: false, truncated: false },
+      evidence: [],
+      evidenceOmitted: 0,
+      at: "2026-11-02T00:00:01Z",
+    };
+
+    const ordinaryFull = "A5-ORDINARY-PREFIX-MARKER " + "普通报告原文。".repeat(80) + "\nA5-ORDINARY-TAIL-MARKER";
+    const ordinaryReport = {
+      version: 1,
+      reportId: "smoke-ordinary-a5",
+      source: { roleId: "P", runtime: "pi", turnId: "ordinary-turn" },
+      taskId: null,
+      origin: "submitted-report",
+      status: "completed",
+      summary: { text: ordinaryFull, redacted: false, truncated: false },
+      evidence: [{ text: "普通证据", redacted: false, truncated: false }],
+      evidenceOmitted: 0,
+      at: "2026-11-02T00:00:02Z",
+    };
+    await select("P");
+    await push("session:events", [{
+      projectRoot: ROOT,
+      roleId: "P",
+      runtime: "pi",
+      event: {
+        kind: "handback",
+        report: ordinaryReport,
+        reportPersistence: { state: "saved", reportId: "smoke-ordinary-a5", retryAvailable: false },
+        summary: "普通报告",
+      },
+    }]);
+    check("A5 ordinary report: no acceptance style; preview + report-complete retained", await js(`(()=>{
+      const c=[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-handback')].find(x=>x.textContent.includes('A5-ORDINARY-PREFIX-MARKER'));
+      if(!c) return false;
+      const full=c.querySelector('.report-complete');
+      return !c.classList.contains('is-acceptance')&&!c.querySelector('.report-acceptance-badge')&&
+        c.querySelector('.report-title').textContent==='任务报告'&&
+        c.querySelector('.hb-summary').textContent.includes('A5-ORDINARY-PREFIX-MARKER')&&
+        !c.querySelector('.hb-summary').textContent.includes('A5-ORDINARY-TAIL-MARKER')&&
+        !!full&&!full.open&&full.querySelector('summary').textContent==='查看完整报告摘要与证据'&&
+        full.querySelector('.hb-complete-summary').textContent.includes('A5-ORDINARY-TAIL-MARKER')&&
+        c.querySelector('.report-facts').textContent.includes('尚未确认');
+    })()`));
+
+    const deliveryReports = [verifierReport, blockedReport, ordinaryReport, unsupportedReport];
+    const a5DeliveryInput = {
+      source: "prompt-input",
+      text: "A5-DELIVERY-MARKER",
+      inputProvenance: {
+        version: 1,
+        kind: "handback",
+        deliveryId: "a5-d1",
+        attemptId: "a5-a1",
+        target: { roleId: "P", runtime: "pi" },
+        reports: deliveryReports,
+      },
+      inputTextProjection: {
+        version: 1,
+        source: "trusted-handback-display",
+        modelInputRecorded: false,
+        redacted: false,
+        truncated: false,
+        summaryTruncated: false,
+      },
+    };
+    await push("session:events", [{
+      projectRoot: ROOT,
+      roleId: "P",
+      runtime: "pi",
+      event: { kind: "message", turnId: "a5-delivery-turn", summary: "验收交付", detail: a5DeliveryInput },
+    }]);
+    await waitFor(`[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].some(x=>x.textContent.includes('A5-DELIVERY-MARKER'))`);
+    check("A5 delivery: acceptance sections + ordinary class unchanged (P1-ARC-02)", await js(`(()=>{
+      const d=[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].find(x=>x.textContent.includes('A5-DELIVERY-MARKER'));
+      if(!d) return false;
+      const secs=[...d.querySelectorAll('.delivery-report')];
+      const completed=secs.find(s=>s.textContent.includes('A5-ACCEPT-TAIL-MARKER'));
+      const blocked=secs.find(s=>s.textContent.includes('BLOCKED-A5-ACCEPT-MARKER'));
+      const ordinary=secs.find(s=>s.textContent.includes('A5-ORDINARY-PREFIX-MARKER'));
+      if(!completed||!blocked||!ordinary) return false;
+      return secs.filter(s=>s.classList.contains('is-acceptance')).length===2&&
+        secs.filter(s=>s.classList.contains('is-acceptance')&&s.classList.contains('is-blocked')).length===1&&
+        completed.classList.contains('is-acceptance')&&!completed.classList.contains('is-blocked')&&
+        completed.querySelector('.report-title').textContent==='独立验收报告'&&
+        completed.querySelector('.report-acceptance-badge').textContent==='独立验收'&&
+        completed.querySelector('.hb-summary').textContent.includes('A5-ACCEPT-TAIL-MARKER')&&
+        !completed.querySelector('.report-complete')&&
+        completed.querySelectorAll('.acceptance-evidence .hb-evidence li').length===2&&
+        blocked.classList.contains('is-acceptance')&&blocked.classList.contains('is-blocked')&&
+        blocked.querySelector('.report-title').textContent==='独立验收报告'&&
+        ordinary.className==='delivery-report'&&
+        ordinary.querySelector('.report-title').textContent==='任务报告'&&
+        !ordinary.querySelector('.report-acceptance-badge')&&
+        ordinary.querySelector('.report-complete')!==null&&
+        getComputedStyle(completed).borderLeftColor==='rgb(134, 197, 227)'&&
+        getComputedStyle(blocked).borderLeftColor==='rgb(201, 122, 109)';
+    })()`));
+    await shot("a5-acceptance-delivery");
+    check("A5 P1-ARC-01 unsupported verifier delivery report has no acceptance classes", await js(`(()=>{
+      const d=[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].find(x=>x.textContent.includes('A5-DELIVERY-MARKER'));
+      if(!d) return false;
+      const c=[...d.querySelectorAll('.delivery-report')].find(x=>x.textContent.includes('不支持此报告版本，未生成成果摘要。'));
+      if(!c) return false;
+      return c.className==='delivery-report'&&
+        !c.classList.contains('is-acceptance')&&!c.classList.contains('is-blocked')&&
+        !c.querySelector('.report-title')&&!c.querySelector('.report-acceptance-badge')&&
+        !c.querySelector('.report-complete');
+    })()`));
+
+    await js(`document.activeElement instanceof HTMLElement && document.activeElement.blur()`);
+    const dialogMarker = "A5-DIALOG-REPORT-END-MARKER";
+    const dialogText = "a".repeat(16384 - dialogMarker.length) + dialogMarker;
+    const acceptanceDialog = {
+      id: "a5-acceptance-card",
+      roleId: "P",
+      projectRoot: ROOT,
+      runtime: "pi",
+      anchorKey: "a5-acceptance-anchor",
+      request: {
+        kind: "choice",
+        title: "独立验收决定",
+        cardKind: "acceptance",
+        flowId: "flow-a5",
+        preview: "A5-DIALOG-PREVIEW-MARKER：请确认验收结果。",
+        options: [
+          { id: "accept", label: "通过" },
+          { id: "rework", label: "返工", recommended: true },
+        ],
+      },
+      acceptanceReport: {
+        version: 1,
+        path: "docs/quality/flow-a5-report-v1.md",
+        text: { text: dialogText, redacted: false, truncated: true },
+      },
+    };
+    await push("session:operator-request", acceptanceDialog);
+    await waitFor(`document.querySelector('#decision-dialog[data-request-id="a5-acceptance-card"]')`);
+    await sleep(120);
+    check("A5 acceptance dialog: localized badge/report/path/preview visible/options", await js(`(()=>{
+      const d=document.querySelector('#decision-dialog[data-request-id="a5-acceptance-card"]');
+      if(!d) return false;
+      const body=d.querySelector('.dd-acceptance-body');
+      const pre=d.querySelector('.dd-preview');
+      const kind=d.querySelector('.dd-kind');
+      return d.classList.contains('is-acceptance')&&
+        kind&&kind.textContent==='独立验收决定'&&!kind.textContent.includes('acceptance')&&
+        d.querySelector('.dd-acceptance-report')!==null&&body&&
+        body.textContent.includes('A5-DIALOG-REPORT-END-MARKER')&&
+        d.querySelector('.dd-report-path').textContent.includes('docs/quality/flow-a5-report-v1.md')&&
+        pre&&pre.textContent.includes('A5-DIALOG-PREVIEW-MARKER')&&
+        pre.getBoundingClientRect().height>0&&!pre.closest('details')&&
+        d.querySelector('.dd-acceptance-report .projection-flags').textContent.includes('报告原文超出显示预算，已截断。')&&
+        d.querySelectorAll('.dd-option').length===2&&
+        [...d.querySelectorAll('.dd-option-label')].some(x=>x.textContent.includes('★'))&&
+        d.querySelector('.dd-submit')!==null&&d.querySelector('.dd-submit').disabled===false;
+    })()`));
+    check("A5 acceptance dialog cold color", await js(`(()=>{const d=document.querySelector('#decision-dialog[data-request-id="a5-acceptance-card"]');return !!d&&getComputedStyle(d).borderColor==='rgb(79, 134, 163)';})()`));
+    await js(`document.querySelector('#decision-dialog .dd-acceptance-body').scrollIntoView({block:'center'})`);
+    await wc.setZoomFactor(2);
+    await sleep(250);
+    check("A5 200% acceptance dialog no horizontal overflow", await js(`(()=>{const d=document.querySelector('#decision-dialog[data-request-id="a5-acceptance-card"]');if(!d)return false;const r=d.querySelector('.dd-acceptance-report'),b=d.querySelector('.dd-acceptance-body');return !!r&&!!b&&b.scrollWidth<=b.clientWidth+1&&r.getBoundingClientRect().right<=innerWidth+0.5&&d.scrollWidth<=d.clientWidth+1;})()`));
+    await shot("a5-acceptance-dialog-200pct");
+    await wc.setZoomFactor(1);
+    await sleep(150);
+    await js(`document.querySelector('#decision-dialog .dd-later').click()`);
+    for (let i = 0; i < 5; i += 1) {
+      if (!(await js(`!!document.querySelector('#decision-dialog')`))) break;
+      await js(`document.querySelector('#decision-dialog .dd-later')?.click()`);
+      await sleep(80);
+    }
+
+    const highRiskDialog = {
+      ...acceptanceDialog,
+      id: "a5-acceptance-high-risk",
+      anchorKey: "a5-acceptance-high-risk-anchor",
+      risk: "high",
+      request: {
+        ...acceptanceDialog.request,
+        title: "独立验收决定（高风险）",
+        preview: "A5-HIGH-PREVIEW-MARKER",
+      },
+      acceptanceReport: {
+        version: 1,
+        path: "docs/quality/flow-a5-report-v1.md",
+        text: { text: "# 高风险验收报告\n\nA5-HIGH-REPORT-MARKER", redacted: false, truncated: false },
+      },
+    };
+    await js(`document.activeElement instanceof HTMLElement && document.activeElement.blur()`);
+    await push("session:operator-request", highRiskDialog);
+    await waitFor(`document.querySelector('#decision-dialog[data-request-id="a5-acceptance-high-risk"]')`);
+    await sleep(120);
+    check("A5 high-risk acceptance danger color priority", await js(`(()=>{
+      const d=document.querySelector('#decision-dialog[data-request-id="a5-acceptance-high-risk"]');
+      if(!d) return false;
+      const c=getComputedStyle(d).borderColor;
+      return d.classList.contains('is-acceptance')&&d.classList.contains('is-high-risk')&&d.classList.contains('is-destructive')&&
+        c!=='rgb(79, 134, 163)'&&(c==='rgb(92, 56, 50)'||c==='rgb(78, 66, 42)');
+    })()`));
+    await js(`document.querySelector('#decision-dialog .dd-later').click()`);
+    for (let i = 0; i < 5; i += 1) {
+      if (!(await js(`!!document.querySelector('#decision-dialog')`))) break;
+      await js(`document.querySelector('#decision-dialog .dd-later')?.click()`);
+      await sleep(80);
+    }
+
+    await select("verifier");
+    await wc.setZoomFactor(2);
+    await sleep(250);
+    check("A5 200% verifier report no horizontal overflow", await js(`(()=>{
+      const c=[...document.querySelectorAll('#chat .chat-pane[data-role-id="verifier"] .msg-handback.is-acceptance')].find(x=>x.textContent.includes('A5-ACCEPT-TAIL-MARKER'));
+      if(!c) return false;
+      const s=c.querySelector('.hb-summary'),e=c.querySelector('.acceptance-evidence');
+      const r=c.getBoundingClientRect();
+      return !!s&&!!e&&s.scrollWidth<=s.clientWidth+1&&e.scrollWidth<=e.clientWidth+1&&r.right<=innerWidth+0.5;
+    })()`));
+    await js(`document.querySelector('#chat .chat-pane[data-role-id="verifier"] .msg-handback.is-acceptance .report-top').scrollIntoView({block:'start'})`);
+    await sleep(120);
+    await shot("a5-acceptance-report-200pct");
+    await wc.setZoomFactor(1);
+    await sleep(100);
 
     const errorConsole = report.console.filter((entry) => String(entry.level) === "error");
     check("zero console errors", errorConsole.length === 0, errorConsole);

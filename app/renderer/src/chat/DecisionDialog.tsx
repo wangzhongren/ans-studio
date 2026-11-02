@@ -14,7 +14,8 @@ import { AlertTriangle, ShieldCheck, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/chat/chat-store";
-import { decisionView, pendingMoreCount, type DecisionOptionView } from "@/chat/decision-dialog";
+import { decisionView, pendingMoreCount, sameDisplayText, type DecisionOptionView } from "@/chat/decision-dialog";
+import { renderMarkdown } from "@/chat/markdown";
 import { operatorFinalNote } from "@/chat/operator-view";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { useConfirmStore } from "@/stores/confirm-store";
@@ -23,6 +24,10 @@ import { translate, useLocaleState, useT } from "@/i18n";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function markdownHtml(text: string): { __html: string } {
+  return { __html: renderMarkdown(text) };
 }
 
 function optionLabel(option: DecisionOptionView): string {
@@ -109,6 +114,21 @@ export function DecisionDialog() {
 
   if (shellBlocking || !activeId || !view || !payload) return null;
 
+  const acceptanceReport = view.acceptanceReport;
+  const previewDuplicate =
+    view.acceptance &&
+    acceptanceReport !== null &&
+    sameDisplayText(view.preview, acceptanceReport.text);
+  const showPreview = view.preview !== "" && !previewDuplicate;
+  const acceptanceFlags = acceptanceReport
+    ? [
+        acceptanceReport.truncated ? t("ui.decisionDialog.acceptanceReportTruncated") : "",
+        acceptanceReport.redacted ? t("shared.common.redacted") : "",
+      ]
+        .filter(Boolean)
+        .join(locale === "zh-CN" ? "；" : "; ")
+    : "";
+
   const toggle = (id: string) => {
     if (view.multiple) {
       setSelected((current) =>
@@ -171,6 +191,7 @@ export function DecisionDialog() {
         ref={dialogRef}
         className={
           "decision-dialog" +
+          (view.acceptance ? " is-acceptance" : "") +
           (view.highRisk ? " is-high-risk" : "") +
           (view.destructive ? " is-destructive" : "")
         }
@@ -188,8 +209,11 @@ export function DecisionDialog() {
               {view.title}
             </span>
             {view.cardKind ? (
-              <Badge variant="outline" className="dd-kind">
-                {view.cardKind}
+              <Badge
+                variant="outline"
+                className={"dd-kind" + (view.acceptance ? " is-acceptance" : "")}
+              >
+                {view.acceptance ? t("ui.decisionDialog.acceptanceKind") : view.cardKind}
               </Badge>
             ) : null}
             {view.destructive ? (
@@ -224,8 +248,43 @@ export function DecisionDialog() {
         </p>
         {view.judgeNotice ? <p className="dd-judge">{view.judgeNotice}</p> : null}
 
-        {view.preview ? (
-          <pre className="dd-preview">{view.preview}</pre>
+        {showPreview ? (
+          view.acceptance ? (
+            <div className="dd-acceptance-preview">
+              <div className="excerpt-label">{t("ui.decisionDialog.acceptancePreviewLabel")}</div>
+              <pre className="dd-preview">{view.preview}</pre>
+            </div>
+          ) : (
+            <pre className="dd-preview">{view.preview}</pre>
+          )
+        ) : null}
+        {view.acceptance ? (
+          <section
+            className="dd-acceptance-report"
+            aria-label={t("ui.decisionDialog.acceptanceReportTitle")}
+          >
+            <h3 className="dd-acceptance-title">{t("ui.decisionDialog.acceptanceReportTitle")}</h3>
+            {acceptanceReport && acceptanceReport.path !== "" ? (
+              <p className="dd-report-path">
+                {t("ui.decisionDialog.reportPath", { path: acceptanceReport.path })}
+              </p>
+            ) : null}
+            {acceptanceReport ? (
+              <>
+                <div
+                  className="dd-acceptance-body card-md"
+                  dangerouslySetInnerHTML={markdownHtml(acceptanceReport.text)}
+                />
+                {acceptanceFlags ? <p className="projection-flags">{acceptanceFlags}</p> : null}
+              </>
+            ) : (
+              <p className="dd-acceptance-missing">
+                {view.preview
+                  ? t("ui.decisionDialog.acceptanceReportFallback")
+                  : t("ui.decisionDialog.acceptanceReportMissing")}
+              </p>
+            )}
+          </section>
         ) : null}
         {view.detail ? <p className="dd-detail">{view.detail}</p> : null}
         {view.question ? <p className="dd-question">{view.question}</p> : null}

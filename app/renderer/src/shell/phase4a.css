@@ -1620,6 +1620,42 @@
 .dd-actions button:disabled { opacity: .55; cursor: not-allowed; }
 .dd-actions button:focus-visible, .dd-option:focus-within { outline: 2px solid var(--ring); outline-offset: 1px; }
 .dd-more { margin: 0; color: var(--text-3); font-size: 11px; text-align: right; }
+/* 独立验收决定卡：冷色身份；高风险/破坏性危险色优先（必须写在 .is-acceptance 之后）。 */
+.decision-dialog.is-acceptance { border-color: var(--info-border); }
+.decision-dialog.is-acceptance.is-high-risk { border-color: var(--danger-border); }
+.decision-dialog.is-acceptance.is-destructive { border-color: var(--warning-border); }
+.dd-kind.is-acceptance { border-color: var(--info-border); color: var(--info); background: var(--info-bg); }
+.dd-acceptance-preview { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dd-acceptance-report {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--info-border);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-micro);
+  background: var(--selected);
+}
+.dd-acceptance-title { margin: 0; color: var(--text-3); font-size: 11px; font-weight: 600; }
+.dd-acceptance-body {
+  min-width: 0;
+  max-width: 100%;
+  max-height: 46vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.dd-report-path {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+.dd-acceptance-missing { margin: 0; color: var(--text-3); font-size: 11.5px; }
 
 .decision-center, .task-center { display: flex; flex-direction: column; gap: 12px; padding: 10px 12px 18px; }
 .dc-tools, .tc-tools, .role-log-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1729,6 +1765,12 @@
 @media (max-width: 480px) {
   .dc-item { grid-template-columns: auto minmax(0, 1fr); }
   .dc-source, .dc-result, .dc-open { grid-column: 2; justify-self: start; }
+  .dd-acceptance-report,
+  .dd-acceptance-body {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 
 .composer-trust-hint { flex-basis: 100%; font-size: 10px; color: var(--text-3); line-height: 1.35; }
