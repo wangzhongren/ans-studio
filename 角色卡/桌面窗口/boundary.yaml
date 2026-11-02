@@ -214,6 +214,10 @@ entries:
   - kind: file
     path: test/桌面应用/run-change-entry.test.ts
     purpose: 源码钉更新——移除 `runChangeRejectionForDispatch` 钉，保留 `proposalCardFrozenRejection`、`requestRunChangeDecision`、显式入口与 `run-change-required` 码表钉
+  # --- Delta-ARC-1（2026-11-02，团队计划 §4.5；闸门 2）：test/桌面应用/ 新增 1 个精确测试文件（acceptance-return-card），逐文件授权 ---
+  - kind: file
+    path: test/桌面应用/acceptance-return-card.test.ts
+    purpose: 主进程侧测试——SessionManager 级验收回交卡展示载荷：正常/>16 KiB 截断/空缺失/不可读/无 flowId/非法 flowId/旧 payload；断言 `ctx.acceptanceReport`/presenter payload 与 fail-closed（session/customer-input）
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

@@ -1,0 +1,146 @@
+A3 候选哈希与工作树状态（桌面UI，2026-11-02）
+HEAD=5a35908ce70a0f007e22808bbc3b6f9378f0c7c9
+branch=feat/flow-improvements-wave1
+captured_at=2026-11-02T16:01+08:00
+
+== before（A3 编辑前）==
+app/renderer/src/shell/ReportCard.tsx
+  git=571dad4b7f1d2f62eb7d3ddce3b1f4112520bc27
+  sha256=c29a2ef7d4e59066a85ccb3b625af94c7ba15448dd2f4f7e697c83e875ec24ed
+  lines=388
+app/renderer/src/chat/DecisionDialog.tsx
+  git=2f5e12f914ca48dd5b6eb9ed744e8a0b8069cd54
+  sha256=b41e9ced4cb71f623baa2a3baf413442ae9cc254e779e618845eee03f62f860a
+  lines=332
+app/renderer/src/shell/shell.css
+  git=b2877760cf41bcb674a6b3bb0524395d794cb78a
+  sha256=60d2aa36688f2f9cd7bdc3bb2459104437766b20be93d350ec877a1d3da7d870
+  lines=3316
+app/renderer/src/shell/phase4a.css
+  git=84cb0ad0308257789e25a812c95d592653d0ce35
+  sha256=ebbf326cc0e98b2de3da06f94c2cd80aecc682ec9a2b8d997159ff6e23d376fc
+  lines=1734
+app/renderer/src/shell/phase4b.css
+  git=b6143190a66f36ba22228752de3fbde98ea2f86a
+  sha256=13bbddc8c9267436ddae62b4cb15deae019ff1714c5ab61d0d4016d8503cdf18
+  lines=1070
+test/桌面UI/dialog-a11y.test.ts
+  git=078db9e53b23787dc0f9bd4eee3762aeeedd2b50
+  sha256=409fbe835098bc938324f5ea3547f5d59bb2112aab7853a47b9a6b2926fbe2a4
+  lines=52
+test/桌面UI/source-guard.test.ts
+  git=1a1253e54a253c1fbebf7ea0e368432339ae9f7a
+  sha256=f3ee74119529df386e29d9af5215ec309426743007aaecdae540255fb2483f39
+  lines=239
+test/桌面UI/theme-tokens.test.ts
+  git=a618a288715ef933707f49756bad82631103d309
+  sha256=f97f4b92c21c1e90918140007beb296ad72d8afc4bce89e0d8a312613bc95f5f
+  lines=43
+test/桌面UI/report-view.test.ts（只读回归，未改）
+  git=93e8e88fbef0fae0bca18574028d583f3eccf3c4
+  sha256=c4842b734596fa9f9adb0abb78a6be421887b5ef72dca779d2916b2ac6c46d3b
+  lines=178
+
+== after（A3 实施后）==
+app/renderer/src/shell/ReportCard.tsx
+  git=1ca05b64faef4d1b532ada2788262d6bc751018f
+  sha256=787db0208bc370c0c3f5d61348010c21fa413a9f3b84be7cbce48a04e6956285
+  lines=461
+app/renderer/src/chat/DecisionDialog.tsx
+  git=1301ca0f3594a7f079d7fbaf352ec2473632f749
+  sha256=f7969e3f1e2f112a3d7b8ec9964ddaa258460f489251a3aafaa22a514e4e4355
+  lines=391
+app/renderer/src/shell/shell.css
+  git=d5c469fc7964ffcc45c05d2240704b7079d64f24
+  sha256=12bf211c4a1a18e63c64e11d14956101ecf892efc74a0ea7eeff23d7806d6fb9
+  lines=3355
+app/renderer/src/shell/phase4a.css
+  git=7c6ebdf1b72dd96571337f6b8cd118e2e3de1232
+  sha256=79fe070362c38ae3e0009a9d5fa8b6f50becaa1278eabdbc3ef9568b22b20cae
+  lines=1776
+app/renderer/src/shell/phase4b.css
+  git=87cceeaa7c9acce96ad2a600e55828043a4defc9
+  sha256=0c05f4d4dc0ab743ba2916a75209fb3fa07dd60fb034ba418d2ab36fcc00fc60
+  lines=1088
+test/桌面UI/dialog-a11y.test.ts
+  git=4c3be9bf59b3e5b46562d2d140c6d48ff69b95bf
+  sha256=7ac0d1c1f71e06d5c8cab65ba6f95db80f02c430bdfacfb937e5d2966d29ff35
+  lines=74
+test/桌面UI/source-guard.test.ts
+  git=b2ed60fa0c4d923acedd97eebac20e9a197b4f2f
+  sha256=52cbc7a178183900301683f8853dac279e461edb2d38e32703d519ed750f4d67
+  lines=265
+test/桌面UI/theme-tokens.test.ts
+  git=4aedc3a474019ca400c66ead7e821933e36291f0
+  sha256=79a4fe443333e8d363ea5965ed0d05e3ed89dcbc9abdb7eca669b3fb699a8a1f
+  lines=57
+test/桌面UI/report-view.test.ts（只读回归，未改）
+  git=93e8e88fbef0fae0bca18574028d583f3eccf3c4
+  sha256=c4842b734596fa9f9adb0abb78a6be421887b5ef72dca779d2916b2ac6c46d3b
+  lines=178
+
+== A2 冻结复核（未改）==
+app/renderer/src/chat/role-view.ts sha256=05a2225c50b21b4c752564053d1b5947597c4cb4d3b497b93f7e40fd21465843 lines=159
+app/renderer/src/chat/decision-dialog.ts sha256=c62d44b4e34308255ed8217539a4ec3f238429512cfd556c223f7f6c3b4d1679 lines=231
+
+== our diff stat（仅 A3 写集内 8 个产品/测试文件）==
+ app/renderer/src/chat/DecisionDialog.tsx |  69 +++++++-
+ app/renderer/src/shell/ReportCard.tsx    | 177 ++++++++++++++++++-----
+ app/renderer/src/shell/phase4a.css       |  42 +++++
+ app/renderer/src/shell/phase4b.css       |  20 ++-
+ app/renderer/src/shell/shell.css         |  39 +++++
+ test/桌面UI/dialog-a11y.test.ts          |  22 +++
+ test/桌面UI/source-guard.test.ts         |  26 +++
+ test/桌面UI/theme-tokens.test.ts         |  14 ++
+ 8 files changed, 349 insertions(+), 58 deletions(-)
+
+== git diff --cached --name-only ==
+(empty)
+
+== git status --porcelain（快照；含其他角色并行改动，不属本候选）==
+ M app/desktop/customer-input.ts              # A4 并行（桌面窗口），非本角色
+ M app/desktop/session.ts                     # A4 并行（桌面窗口），非本角色
+ M app/renderer/src/chat/DecisionDialog.tsx   # 本候选
+ M app/renderer/src/chat/decision-dialog.ts   # A2 冻结，本上下文未改
+ M app/renderer/src/chat/role-view.ts         # A2 冻结，本上下文未改
+ M app/renderer/src/shell/ReportCard.tsx      # 本候选
+ M app/renderer/src/shell/phase4a.css         # 本候选
+ M app/renderer/src/shell/phase4b.css         # 本候选
+ M app/renderer/src/shell/shell.css           # 本候选
+ M docs/communication/2026-11-02_intent_acceptance-return-card.md
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M docs/scheduling/memo.md
+ M src/common/shared/i18n/messages/en-US.ts   # A1 冻结（项目管理），非本角色
+ M src/common/shared/i18n/messages/zh-CN.ts   # A1 冻结（项目管理），非本角色
+ M test/桌面UI/decision-dialog.test.ts        # A2 冻结，本上下文未改
+ M test/桌面UI/dialog-a11y.test.ts            # 本候选
+ M test/桌面UI/role-view.test.ts              # A2 冻结，本上下文未改
+ M test/桌面UI/source-guard.test.ts           # 本候选
+ M test/桌面UI/theme-tokens.test.ts           # 本候选
+ M test/项目管理/shared/i18n.test.ts          # A1 冻结（项目管理），非本角色
+ M 角色卡/桌面UI/api-spec.md                  # 本角色记录（A3 展示契约）
+ M 角色卡/桌面UI/memo.md                      # 本角色记录（A3 状态）
+ M 角色卡/桌面窗口/boundary.md                # B-1 治理（人事），非本角色
+ M 角色卡/桌面窗口/boundary.yaml              # B-1 治理（人事），非本角色
+ M 角色卡/桌面窗口/changelog.md               # B-1 治理（人事），非本角色
+?? docs/acceptance/acceptance-return-card-criteria-v1.md
+?? docs/planning/2026-11-02_design_acceptance-return-card.md
+?? docs/planning/2026-11-02_review_acceptance-return-card.md
+?? docs/scheduling/2026-11-02_team-plan_acceptance-return-card.md
+?? test/桌面应用/acceptance-return-card.test.ts   # A4 并行（桌面窗口），非本角色
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A2-evidence/
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A2-implementation.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A3-evidence/
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A3-implementation.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-implementation-proposal.md
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-A4-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-A4-implementation.md
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-implementation-proposal.md
+?? 角色卡/测试/docs/change/2026-11-02_acceptance-return-card-B0-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-11-02_acceptance-return-card-B0-baseline.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-A1-implementation.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-P1-review.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-i18n-implementation-proposal.md
+
+说明：本上下文未写 A5/E2E、A2 两个源码、app/desktop、src、i18n、其他角色测试、角色卡/边界或治理 docs；A1/A4 并行改动与既有治理记录不纳入本候选。

@@ -1,0 +1,94 @@
+A5 候选哈希与工作树状态（桌面UI，2026-11-02）
+HEAD=5a35908ce70a0f007e22808bbc3b6f9378f0c7c9
+branch=feat/flow-improvements-wave1
+captured_at=2026-11-02T16:13+08:00
+
+== before（A5 编辑前，HEAD 版本）==
+test/桌面UI/phase4b-electron-smoke.mjs
+  git=565499b29a00e9643fda186b0639b368eec77172
+  sha256=6a30fd39f6d1fa1fa433a5ed674335b898f3f3640974359919f4b9cedb05f7c4
+  lines=967
+
+== after（A5 实施后）==
+test/桌面UI/phase4b-electron-smoke.mjs
+  git=91f5ccced5e6c0feedb1b85948134c66359ca0d2
+  sha256=b3dd05a91fb45b9d9e0cf1dd7dcf70b257ef1ebcdeddcbb3e1cc3ee22c1e347e
+  lines=1293
+
+== our diff stat（仅 A5 写集）==
+ test/桌面UI/phase4b-electron-smoke.mjs | 326 +++++++++++++++++++++
+ 1 file changed, 326 insertions(+)
+
+== git diff --cached --name-only ==
+(empty)
+
+== 官方 harness 可运行性 ==
+phase4b official run（最终 harness）：
+  CHECK smoke completed without exception=false
+  "Error: Script failed to execute, this normally means an error was thrown."
+  PHASE4B_SMOKE FAIL 1 checks / 1 failures C:\tmp\a5-phase4b
+  原因：首个既有检查读取 document.getElementById('governance-status').textContent；该治理 UI 已在
+        commit 98d3fe2 "feat(batch-D2): remove governance UI and desktop exposure" 移除，当前
+        app/renderer/src 无 #governance-status 生产者（只有遗留 CSS）。属 harness 基线过期，
+        失败发生在 A5 追加块之前，与本块无关。
+uiux-v2 default run（条件备用）：
+  AssertionError: role geometry 1360 false；另有多条未注册 IPC handler（session:role-states/
+  network:get-state/preferences:get/background-tasks:list）。属该 harness 当前基线问题，未改。
+临时 debug 副本（已删除，非官方 E2E_PASS）：
+  复制最终 phase4b，替换首检查并跳过已过期治理/旧段（if(false)），仅运行 A5 块：
+  15 checks / 15 true / 0 failures（含 A5 回交行、交付批、P1-ARC-01 负例、决定卡、200%）。
+  该运行只用于验证 A5 选择器/夹具，不作为官方 smoke 通过证据；D1 需在 harness 基线修复后重跑。
+
+== git status --porcelain（快照；含其他角色并行/既有改动）==
+ M app/desktop/customer-input.ts              # A4 冻结（桌面窗口），非本角色
+ M app/desktop/session.ts                     # A4 冻结（桌面窗口），非本角色
+ M app/renderer/src/chat/DecisionDialog.tsx   # A3 冻结，本上下文未改
+ M app/renderer/src/chat/decision-dialog.ts   # A2 冻结，本上下文未改
+ M app/renderer/src/chat/role-view.ts         # A2 冻结，本上下文未改
+ M app/renderer/src/shell/ReportCard.tsx      # A3 冻结，本上下文未改
+ M app/renderer/src/shell/phase4a.css         # A3 冻结，本上下文未改
+ M app/renderer/src/shell/phase4b.css         # A3 冻结，本上下文未改
+ M app/renderer/src/shell/shell.css           # A3 冻结，本上下文未改
+ M docs/communication/2026-11-02_intent_acceptance-return-card.md
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M docs/scheduling/memo.md
+ M src/common/shared/i18n/messages/en-US.ts   # A1 冻结（项目管理），非本角色
+ M src/common/shared/i18n/messages/zh-CN.ts   # A1 冻结（项目管理），非本角色
+ M test/桌面UI/decision-dialog.test.ts        # A2 冻结，本上下文未改
+ M test/桌面UI/dialog-a11y.test.ts            # A3 冻结，本上下文未改
+ M test/桌面UI/phase4b-electron-smoke.mjs     # 本候选（A5）
+ M test/桌面UI/role-view.test.ts              # A2 冻结，本上下文未改
+ M test/桌面UI/source-guard.test.ts           # A3 冻结，本上下文未改
+ M test/桌面UI/theme-tokens.test.ts           # A3 冻结，本上下文未改
+ M test/项目管理/shared/i18n.test.ts          # A1 冻结（项目管理），非本角色
+ M 角色卡/桌面UI/api-spec.md                  # 本角色记录（A3）
+ M 角色卡/桌面UI/memo.md                      # 本角色记录（A5 状态）
+ M 角色卡/桌面窗口/boundary.md                # B-1 治理（人事），非本角色
+ M 角色卡/桌面窗口/boundary.yaml              # B-1 治理（人事），非本角色
+ M 角色卡/桌面窗口/changelog.md               # B-1 治理（人事），非本角色
+?? docs/acceptance/acceptance-return-card-criteria-v1.md
+?? docs/planning/2026-11-02_design_acceptance-return-card.md
+?? docs/planning/2026-11-02_review_acceptance-return-card.md
+?? docs/scheduling/2026-11-02_team-plan_acceptance-return-card.md
+?? test/桌面应用/acceptance-return-card.test.ts   # A4 冻结（桌面窗口），非本角色
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A2-evidence/
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A2-implementation.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A3-evidence/
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A3-implementation.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A5-evidence/
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A5-implementation.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-implementation-proposal.md
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-A4-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-A4-implementation.md
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-implementation-proposal.md
+?? 角色卡/测试/docs/change/2026-11-02_acceptance-return-card-B0-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-11-02_acceptance-return-card-B0-baseline.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-A1-implementation.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-P1-review.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-i18n-implementation-proposal.md
+
+== 清理核对 ==
+test/桌面UI/phase4b-smoke-preload.cjs：无 diff（临时调试注入已还原）。
+test/桌面UI/phase4b-a5-debug.mjs：不存在（临时副本已删除）。
+本上下文未改 app/**、src/**、E2E 其他文件、A2/A3 产品文件、A4/其他角色/治理/角色卡边界。

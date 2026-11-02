@@ -19,13 +19,23 @@
 | `chat/events.ts` | SessionEvent/历史 → 行描述（user/assistant/tool/injected/operator/handback/turn-terminal/system-notice/reasoning）；reasoning 只读投影形 `detail.reasoning`，坏件 fail-closed |
 | `chat/reasoning.ts` | 推理折叠行纯逻辑：投影载体提取、R2 文案（`reasoningLabel`）与固定说明常量、piece 指纹/合并、确定性插入位置；`ChatRow` 只消费行数据与常量 |
 | `chat/report-view.ts` | 报告/交付 facts、persistence 文案、安全显示副本 flags |
-| `chat/role-view.ts` | 治理职能显示名：`proposal → Draft / 提案`、`nomination → Crew / 组队`、`schedule → Steward / 统筹`；`liaison → 主理 / Lead`、`verification → 验收 / Proof` 不变 |
+| `chat/role-view.ts` | 治理职能显示名：`proposal → Draft / 提案`、`nomination → Crew / 组队`、`schedule → Steward / 统筹`；`liaison → 主理 / Lead`、`verification → 验收 / Proof` 不变；`isVerificationRole`（内置质检判据：`builtIn === true && governanceFunction === "verification"`，不按 id/文本猜测） |
+| `chat/decision-dialog.ts` | 决定卡纯视图/优先级/待办；`DecisionView.acceptance`/`acceptanceReport` 与本地 `AcceptanceReportView` 防御读取（`version === 1`、`text.text` 字符串、`redacted`/`truncated` 布尔、`path` 字符串、UTF-8 ≤16384，非法→`null`）；`sameDisplayText` 为 preview 去重判据（仅统一换行/去首尾空白后完全相等） |
 | `chat/operator-view.ts` | operator 镜像面、`pendingKindFor`（待选择/等待你确认）、治理卡文案 |
 | `chat/governance-view.ts` | 治理记录 missing/invalid/pin-mismatch/reaccept 文案与动作谓词 |
 | `chat/chat-store.ts` | 行模型/pane 版本/历史回放/阅读锚点/队列与状态；`window.__ansRenderer` 的数据源 |
 | `test-driver.ts` | `window.__ansRenderer` 21 个方法/状态字段（e2e 唯一驱动面） |
 | `shell/*` + `stores/*` | App/标题栏/左树/会话头/输入区/抽屉/设置/治理面板/work-overview；`lib/platform.ts` 是 `window.desktop` 唯一入口 |
 | `i18n/index.ts` + `i18n/locale-store.ts` | 渲染层 i18n facade（只再导出 shared 单一实现；`useLocaleState`/`useT`/`languageOptions`）与 locale store（`zh-CN`/`en-US`、localStorage 镜像、preferences IPC 校正/广播、失败回滚）。详见下节。 |
+
+### 独立验收展示（2026-11-02 A3，implemented-unverified）
+
+- 判定：`chat/role-view.ts::isVerificationRole` 只认 `builtIn === true && governanceFunction === "verification"`；`ReportCard`/`DeliveryCard` 各自用同一 `reportAcceptance(report, roles)` 计算一次并传入 `ReportBody`（不二次判定）；两处外层类与验收展示均以 `reportVersionSupported(report)` 门控（P1-ARC-01）。
+- `ReportBody`：验收时 `.report-top`/`.report-body` 加 `is-acceptance`，标题 `ui.reportCard.acceptanceTitle`，徽标 `.report-acceptance-badge`，正文完整 `summary.text`、`.acceptance-evidence` 列出全部 evidence、无 `.report-complete`；普通分支保持原 `reportPreview` + `.report-complete`。
+- 交付批：`.delivery-report.is-acceptance`；`is-blocked` 只在验收段且 `status !== "completed"`（普通交付段类名不变，P1-ARC-02）。
+- `DecisionDialog`：`.decision-dialog.is-acceptance`、`.dd-kind.is-acceptance`（`ui.decisionDialog.acceptanceKind`）、`.dd-acceptance-report`（标题/`aria-label`）、`.dd-report-path`（O2）、`.dd-acceptance-body`（仅 `markdownHtml` 安全渲染）、`.dd-acceptance-missing`；`request.preview` 仍在 `.dd-preview` 纯文本显示，验收时加 `ui.decisionDialog.acceptancePreviewLabel` 并置于原文上方，规范化完全重复时去重。
+- CSS：`shell.css`/`phase4b.css`/`phase4a.css` 使用 `--info*` 冷色与 `--danger*`/`--warning-border` 危险色优先；`.decision-dialog.is-acceptance.is-high-risk`/`.is-destructive` 写在 `.is-acceptance` 之后；窄屏/200% 由 `.dd-acceptance-body`/`.acceptance-evidence` 限高/换行。
+- 证据：`docs/change/2026-11-02_acceptance-return-card-A3-implementation.md`。
 
 ### appointment 文案（2026-10-22 治理拆分，现行）
 

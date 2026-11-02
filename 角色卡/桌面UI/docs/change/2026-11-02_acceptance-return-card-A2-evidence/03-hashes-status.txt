@@ -1,0 +1,83 @@
+A2 候选哈希与工作树状态（桌面UI，2026-11-02）
+HEAD=5a35908ce70a0f007e22808bbc3b6f9378f0c7c9
+branch=feat/flow-improvements-wave1
+captured_at=2026-11-02T15:56+08:00
+
+== before（编辑前，HEAD 工作树）==
+app/renderer/src/chat/role-view.ts
+  git=e0925eda7188fa549e903c3323a3f3e40c9279a1
+  sha256=830a760f0809ddef133337729b1fd25fce9733b895264a87ff5f95f4f1408896
+  lines=151
+app/renderer/src/chat/decision-dialog.ts
+  git=f3352f142120a9da790a21cc433e712deb00620e
+  sha256=00e1f088dd738750e8181877403fc578a14a00f5fb5aa65aa0302f6c3e65c23e
+  lines=181
+test/桌面UI/role-view.test.ts
+  git=99071b1b70e65fc768b0c3c4d7fca0808be0f6e8
+  sha256=e2cd6dc6ffef8150844c2f6baef937784fd06a3a1f93731e31fc70d9c25e3c94
+  lines=107
+test/桌面UI/decision-dialog.test.ts
+  git=b7e2391de88010f7f62c5b6c9310d0b2c2b81445
+  sha256=c40b611144645de139b8bc9c101df450fa5ccd74c4c8978df0c1c3b42a20dd63
+  lines=103
+
+== after（A2 实施后）==
+app/renderer/src/chat/role-view.ts
+  git=b8789c0990765263b6dc6b0c8d102a81f3e199e9
+  sha256=05a2225c50b21b4c752564053d1b5947597c4cb4d3b497b93f7e40fd21465843
+  lines=159
+app/renderer/src/chat/decision-dialog.ts
+  git=1548f1d452ce84b2796687afe974e4280f2730fc
+  sha256=c62d44b4e34308255ed8217539a4ec3f238429512cfd556c223f7f6c3b4d1679
+  lines=231
+test/桌面UI/role-view.test.ts
+  git=cb0fb324feb561ce33d923bef52b263a765b9b52
+  sha256=a8f853e4b72ead394fa2d54837b02c2a8c58165378c0418cea5f6d7fcac2f5ff
+  lines=134
+test/桌面UI/decision-dialog.test.ts
+  git=22049da0c6b8e67aef4680c6ca54de029a3c8ab7
+  sha256=50c7797220c2de27f457ac1678fe84c6c63948f429ac3e142282add38a72e062
+  lines=235
+
+== our diff stat（仅 A2 写集内的 4 个产品/测试文件）==
+ app/renderer/src/chat/decision-dialog.ts           |  52 +++++++-
+ app/renderer/src/chat/role-view.ts                 |   8 ++
+ test/桌面UI/decision-dialog.test.ts                | 132 +++++++++++++++++++++
+ test/桌面UI/role-view.test.ts                      |  27 +++++
+ 4 files changed, 218 insertions(+), 1 deletion(-)
+
+== git diff --cached --name-only ==
+(empty)
+
+== git status --porcelain（快照；包含其他角色并行改动，不属本候选）==
+ M app/desktop/customer-input.ts            # A4 并行（桌面窗口），非本角色改动
+ M app/desktop/session.ts                   # A4 并行（桌面窗口），非本角色改动
+ M app/renderer/src/chat/decision-dialog.ts # 本候选
+ M app/renderer/src/chat/role-view.ts       # 本候选
+ M src/common/shared/i18n/messages/en-US.ts # A1 并行（项目管理），非本角色改动
+ M src/common/shared/i18n/messages/zh-CN.ts # A1 并行（项目管理），非本角色改动
+ M test/桌面UI/decision-dialog.test.ts      # 本候选
+ M test/桌面UI/role-view.test.ts            # 本候选
+ M test/项目管理/shared/i18n.test.ts        # A1 并行（项目管理），非本角色改动
+ M 角色卡/桌面UI/memo.md                    # 本角色记录（A2 状态追加）
+ M docs/communication/2026-11-02_intent_acceptance-return-card.md
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M docs/scheduling/memo.md
+ M 角色卡/桌面窗口/boundary.md
+ M 角色卡/桌面窗口/boundary.yaml
+ M 角色卡/桌面窗口/changelog.md
+?? docs/acceptance/acceptance-return-card-criteria-v1.md
+?? docs/planning/2026-11-02_design_acceptance-return-card.md
+?? docs/planning/2026-11-02_review_acceptance-return-card.md
+?? docs/scheduling/2026-11-02_team-plan_acceptance-return-card.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-implementation-proposal.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A2-implementation.md
+?? 角色卡/桌面UI/docs/change/2026-11-02_acceptance-return-card-A2-evidence/
+?? 角色卡/桌面窗口/docs/change/2026-11-02_acceptance-return-card-implementation-proposal.md
+?? 角色卡/测试/docs/change/2026-11-02_acceptance-return-card-B0-baseline-evidence/
+?? 角色卡/测试/docs/change/2026-11-02_acceptance-return-card-B0-baseline.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-P1-review.md
+?? 角色卡/项目管理/docs/change/2026-11-02_acceptance-return-card-i18n-implementation-proposal.md
+
+说明：A1/A4 的并行改动与既有管理/治理记录不纳入本候选；本上下文未写 A3/A5、CSS、E2E、app/desktop、src、i18n、其他角色测试、角色卡/边界或治理 docs。

@@ -1,0 +1,134 @@
+=== B0 baseline snapshot ===
+recorded_at: 2026-11-02T15:34:16+08:00
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1
+
+--- git rev-parse HEAD ---
+5a35908ce70a0f007e22808bbc3b6f9378f0c7c9
+--- git branch --show-current ---
+feat/flow-improvements-wave1
+--- git status --short ---
+ M docs/communication/2026-11-02_intent_acceptance-return-card.md
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M docs/scheduling/memo.md
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+?? docs/acceptance/acceptance-return-card-criteria-v1.md
+?? docs/planning/2026-11-02_design_acceptance-return-card.md
+?? docs/planning/2026-11-02_review_acceptance-return-card.md
+?? docs/scheduling/2026-11-02_team-plan_acceptance-return-card.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-02_acceptance-return-card-B0-baseline-evidence/"
+--- git status --porcelain -- src app test ---
+--- (end src/app/test status; empty means no changes) ---
+--- git diff --cached --name-only ---
+--- (end staged; empty means none) ---
+
+--- task config ---
+MISSING .ans/project.json
+
+--- H1 files ---
+EXISTS	93 lines	sha256=4756558e521fdd27fb82bc9a4064174bb41656724ba2604d5ef63e519b3f0e23	角色卡/桌面窗口/boundary.md
+EXISTS	251 lines	sha256=ea766230846d85d08a3a800e844e9aa94deeaca70abcaa77c5c6ebdc7bd74157	角色卡/桌面窗口/boundary.yaml
+EXISTS	199 lines	sha256=6b6b9bc850ebe9ca224f0b8808ec18ea26456abf67f6f0594eef2aad15534626	角色卡/桌面窗口/changelog.md
+--- B-1 entry matches ---
+角色卡/桌面窗口/boundary.md:76:| 单文件 | `test/桌面应用/acceptance-return-card.test.ts` | 主进程侧测试——SessionManager 级验收回交卡展示载荷：正常/>16 KiB 截断/�
+角色卡/桌面窗口/boundary.yaml:219:    path: test/桌面应用/acceptance-return-card.test.ts
+角色卡/桌面窗口/changelog.md:3:- 2026-11-02：**边界新增 B-1：`test/桌面应用/acceptance-return-card.test.ts` 精确条目（闸门 2 后人事执行；md+yaml 同步）**。依据团�
+
+--- frozen inputs (lines / sha256 / path) ---
+429	05a94dd054ac408e7a33c29f37cb130aa1de2675547af564abc46ef146bfe9b6	docs/scheduling/2026-11-02_team-plan_acceptance-return-card.md
+926	f0cb94655b3d8ec50196fee7167b2267d59f4213c1f018dc0e32068eb689996b	docs/acceptance/acceptance-return-card-criteria-v1.md
+873	51057be9bc38575b86711d2c3d98120b7a42f4d75bbb7ece4c75f32796c0f2b2	docs/planning/2026-11-02_design_acceptance-return-card.md
+143	6f8f8121ba73f95b2f816e4d7a462912b1d7e6698249ecd958e10a79fc54772f	docs/planning/2026-11-02_review_acceptance-return-card.md
+137	654e432b5ba27ae73fddfd7bf2e7c598b5bc1b880986e8018e0d12f2ede3098b	docs/communication/2026-11-02_intent_acceptance-return-card.md
+
+--- node / npm ---
+node: v24.22.1
+npm: 11.19.1
+--- OS / shell ---
+MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+SHELL=/bin/bash.exe
+--- node_modules ---
+node_modules EXISTS
+electron package version: 44.7.0
+electron binary: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\flow-improvements-wave1\node_modules\electron\dist\electron.exe
+node_modules/electron/dist/electron.exe EXISTS
+
+--- E2E harness files ---
+EXISTS: test/桌面应用/e2e/main.mjs (2859 lines)
+EXISTS: test/桌面应用/e2e/uiux-v2.mjs (1554 lines)
+EXISTS: test/桌面UI/phase4b-electron-smoke.mjs (967 lines)
+MISSING: test/桌面应用/acceptance-return-card.test.ts
+
+--- running electron processes (machine-wide) ---
+
+
+ProcessId       : 34404
+ParentProcessId : 28936
+CreationDate    : 2026/10/30 22:06:20
+ExecutablePath  : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\network-monitor\node_modules\electron\dist\e
+                  lectron.exe
+CommandLine     : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\network-monitor\node_modules\electron\dist\e
+                  lectron.exe test/����UI/phase5a-electron-smoke.mjs
+
+ProcessId       : 11492
+ParentProcessId : 34404
+CreationDate    : 2026/10/30 22:36:44
+ExecutablePath  : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\network-monitor\node_modules\electron\dist\e
+                  lectron.exe
+CommandLine     : "C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\network-monitor\node_modules\electron\dist\
+                  electron.exe" --type=gpu-process --user-data-dir="C:\Users\51054\AppData\Roaming\Electron" --gpu-pref
+                  erences=WAAAAAAAAADgAAAEAAAAAAAAAAAAAGAAQAAAAAAAAAADAAAAAAAAADgAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAA
+                  AAAKAAAAAAAAAAoAAAAAAAAAAgAAAAAAAAAEAAAAAIAAAABAAAAAAAAAAgAAAAAAAAACAAAAAAAAAA= --field-trial-handle=
+                  2064,i,1478434737491179692,7232640854124908051,262144 --enable-features=AllowWindowCaptureExclusionIn
+                  RemoteSessions,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetw
+                  orkAccessChecks,NetworkServiceSandbox,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInst
+                  anceGetProcessCreation --variations-seed-version --pseudonymization-salt-handle=2092,i,74691285504676
+                  30020,14260269256189129166,4 --trace-process-track-uuid=3190708988185955192 --mojo-platform-channel-h
+                  andle=2076 /prefetch:2
+
+ProcessId       : 41000
+ParentProcessId : 34404
+CreationDate    : 2026/10/30 22:36:44
+ExecutablePath  : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\network-monitor\node_modules\electron\dist\e
+                  lectron.exe
+CommandLine     : "C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\network-monitor\node_modules\electron\dist\
+                  electron.exe" --type=utility --utility-sub-type=network.mojom.NetworkService --lang=zh-CN --service-s
+                  andbox-type=none --user-data-dir="C:\Users\51054\AppData\Roaming\Electron" --field-trial-handle=2064,
+                  i,1478434737491179692,7232640854124908051,262144 --enable-features=AllowWindowCaptureExclusionInRemot
+                  eSessions,PdfUseShowSaveFilePicker --disable-features=DropInputEventsWhilePaintHolding,LocalNetworkAc
+                  cessChecks,NetworkServiceSandbox,ScreenAIOCREnabled,SpareRendererForSitePerProcess,TraceSiteInstanceG
+                  etProcessCreation --variations-seed-version --pseudonymization-salt-handle=2092,i,7469128550467630020
+                  ,14260269256189129166,4 --trace-process-track-uuid=3190708989122997041 --mojo-platform-channel-handle
+                  =2200 /prefetch:11
+
+
+
+--- this worktree app running? ---
+electron_from_this_worktree_count: 0
+
+--- package.json scripts ---
+{
+  "start": "node bin/ans.js",
+  "doctor": "node bin/ans.js doctor",
+  "demo": "node bin/ans.js role run 编排 --task T-1",
+  "app": "electron app/main.ts",
+  "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
+  "typecheck": "tsc --noEmit",
+  "typecheck:renderer": "tsc -p app/renderer/tsconfig.json",
+  "dev:renderer": "vite --config vite.config.ts",
+  "build:renderer": "vite build --config vite.config.ts",
+  "preview:renderer": "vite preview --config vite.config.ts",
+  "package": "electron-builder --config electron-builder.yml",
+  "package:local": "npm run build:renderer && electron-builder --config electron-builder.yml --publish never -c.directories.output=release-output/local",
+  "verify:local": "node test/装配/verify-local-package.mjs",
+  "release:prepare": "node src/common/装配/release-prepare.mjs",
+  "release:verify": "node src/common/装配/release-verify.mjs"
+}
+--- vite outDir / gitignore ---
+48:    // outDir 相对 root → app/renderer/dist。
+49:    outDir: "dist",
+9:app/renderer/dist/
+--- app/renderer/dist tracked by git? ---
+0
