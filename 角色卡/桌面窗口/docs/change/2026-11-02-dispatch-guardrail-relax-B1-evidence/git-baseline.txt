@@ -1,0 +1,75 @@
+HEAD: c80f4944c3421554fcbd35f8570cedd3e2119a0a
+TREE: 689a49580fd7e79a0bfae1be343597b793967f71
+STATUS:
+ M app/desktop/session.ts
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M docs/scheduling/memo.md
+ M "src/common/\347\274\226\346\216\222/mechanical-rejection.ts"
+ M "src/common/\347\274\226\346\216\222/workflow-preconditions.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/chain-enforcement.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/rejection-copy.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-entry.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-trigger.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-pin.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/star-routing.test.ts"
+ M "test/\347\274\226\346\216\222/workflow-preconditions.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/memo.md"
+?? docs/acceptance/dispatch-guardrail-relax-criteria-v1.md
+?? docs/communication/2026-11-02_intent_dispatch-guardrail-relax.md
+?? docs/planning/2026-11-02_design_dispatch-guardrail-relax.md
+?? docs/planning/2026-11-02_review_dispatch-guardrail-relax.md
+?? docs/scheduling/2026-11-02_team-plan_dispatch-guardrail-relax.md
+?? "src/common/\347\274\226\346\216\222/dispatch-advisories.ts"
+?? "test/\347\274\226\346\216\222/dispatch-advisories.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-02-dispatch-guardrail-relax-B1-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-02_dispatch-guardrail-relax-B1-implementation-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-02_dispatch-guardrail-relax-B1-implementation.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-02-dispatch-guardrail-relax-B0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-02_dispatch-guardrail-relax-B0-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-02_dispatch-guardrail-relax-A1-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-02_dispatch-guardrail-relax-A1-implementation-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-02_dispatch-guardrail-relax-A1-implementation.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-02_dispatch-guardrail-relax-P1-review.md"
+PORCELAIN src app test:
+ M app/desktop/session.ts
+ M "src/common/\347\274\226\346\216\222/mechanical-rejection.ts"
+ M "src/common/\347\274\226\346\216\222/workflow-preconditions.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/chain-enforcement.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/rejection-copy.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-entry.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-trigger.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-pin.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/star-routing.test.ts"
+ M "test/\347\274\226\346\216\222/workflow-preconditions.test.ts"
+?? "src/common/\347\274\226\346\216\222/dispatch-advisories.ts"
+?? "test/\347\274\226\346\216\222/dispatch-advisories.test.ts"
+CACHED:
+DIFF NAME-ONLY:
+warning: in the working copy of 'src/common/编排/workflow-preconditions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it
+app/desktop/session.ts
+docs/communication/memo.md
+docs/planning/memo.md
+docs/scheduling/memo.md
+"src/common/\347\274\226\346\216\222/mechanical-rejection.ts"
+"src/common/\347\274\226\346\216\222/workflow-preconditions.ts"
+"test/\346\241\214\351\235\242\345\272\224\347\224\250/chain-enforcement.test.ts"
+"test/\346\241\214\351\235\242\345\272\224\347\224\250/rejection-copy.test.ts"
+"test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-entry.test.ts"
+"test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-trigger.test.ts"
+"test/\346\241\214\351\235\242\345\272\224\347\224\250/run-pin.test.ts"
+"test/\346\241\214\351\235\242\345\272\224\347\224\250/star-routing.test.ts"
+"test/\347\274\226\346\216\222/workflow-preconditions.test.ts"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/memo.md"
+DELETED:
+warning: in the working copy of 'src/common/编排/workflow-preconditions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it

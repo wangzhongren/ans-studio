@@ -1,0 +1,9 @@
+CMD=npm run typecheck
+FINAL_CANDIDATE=yes
+START=2026-11-02T04:52:11Z
+
+> ans-cli@1.8.3 typecheck
+> tsc --noEmit
+
+EXIT_CODE=0
+END=2026-11-02T04:52:13Z

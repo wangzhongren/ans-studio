@@ -1,0 +1,30 @@
+✔ 人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集（judgeContext.recommendedRoleIds） (25.3254ms)
+✔ §5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed (26.2373ms)
+✔ 招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道 (9.3001ms)
+✔ convener 发招人卡 ⇒ 被拒（不能发 appointment；只由人事发起） (5.4683ms)
+✔ appointment-write 目录校验：boundary 目录在名单授权目录内 ⇒ 发卡；越名单目录 ⇒ notPresented (19.4858ms)
+✔ BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针 (8.7059ms)
+✔ BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed (9.5479ms)
+✔ 模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots 为名下模块目录并集 (16.2213ms)
+✔ BUG-3：appointment-write 缺 targetRoleId ⇒ 结构校验拒绝，不触碰客户、无 judgeContext (5.0673ms)
+✔ append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed (28.5243ms)
+✔ 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放 (5.2493ms)
+✔ 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行 (0.6594ms)
+✔ 副作用分类：缺填/非法⇒unknown；应用只升不降 (0.9419ms)
+✔ 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计） (5.2405ms)
+✔ 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务 (10.8023ms)
+✔ 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实 (0.5519ms)
+✔ task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读 (7.2002ms)
+✔ task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex） (13.7173ms)
+✔ request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行 (7.2933ms)
+✔ task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝 (3.1711ms)
+✔ R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放 (3.2041ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 547.5015
+EXIT_CODE=0

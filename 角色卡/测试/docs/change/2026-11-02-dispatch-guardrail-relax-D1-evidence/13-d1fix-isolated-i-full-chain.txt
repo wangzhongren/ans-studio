@@ -1,0 +1,79 @@
+CMD=node --test --test-concurrency=1 test/测试/governance-e2e-auto/i-full-chain.test.ts (3 runs)
+START=2026-11-02T04:45:28Z
+===== RUN 1 =====
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (149.5303ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (361.1236ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2051.123
+RUN1_EXIT=0
+===== RUN 2 =====
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (138.9772ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (356.2616ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2016.7862
+RUN2_EXIT=0
+===== RUN 3 =====
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (149.0481ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (361.8257ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2023.6919
+RUN3_EXIT=0
+END=2026-11-02T04:45:34Z
+===== FINAL CANDIDATE (file sha256 b5d5c6c8411d71797479a452d611bb91a3b62146df6e05f54e0929f7e8545e6b) =====
+CMD=node --test --test-concurrency=1 test/测试/governance-e2e-auto/i-full-chain.test.ts (3 runs)
+START=2026-11-02T04:51:41Z
+===== FINAL RUN 1 =====
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (144.7745ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (356.4004ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1996.4028
+FINAL_RUN1_EXIT=0
+===== FINAL RUN 2 =====
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (138.1939ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (364.1347ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1988.0001
+FINAL_RUN2_EXIT=0
+===== FINAL RUN 3 =====
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (140.2723ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (361.5603ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2028.1096
+FINAL_RUN3_EXIT=0
+END=2026-11-02T04:51:47Z

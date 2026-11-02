@@ -1,0 +1,113 @@
+CMD=node --test --test-concurrency=1 test/测试/background-tasks-entry/background-entry.test.ts (5 runs)
+START=2026-11-02T04:57:10Z
+===== RUN 1 =====
+✔ B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源） (716.9522ms)
+✔ F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell） (3.206ms)
+✔ F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具 (3.6015ms)
+✔ F9：governanceJudge 判断会话（Service 装配）不含四后台工具 (1.8646ms)
+✔ F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务 (1141.1816ms)
+✔ F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务 (6.056ms)
+✔ F6：未知任务号经真实入口 read/stop 均明确「未知任务」 (5.6379ms)
+✔ S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符 (197.9381ms)
+✔ B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程） (676.3213ms)
+✔ S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务 (612.8108ms)
+✔ F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动 (641.4809ms)
+✔ F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止 (2525.0153ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6772.0256
+RUN1_EXIT=0
+===== RUN 2 =====
+✔ B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源） (730.2749ms)
+✔ F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell） (3.8165ms)
+✔ F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具 (3.3512ms)
+✔ F9：governanceJudge 判断会话（Service 装配）不含四后台工具 (2.5014ms)
+✔ F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务 (1105.8336ms)
+✔ F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务 (5.9324ms)
+✔ F6：未知任务号经真实入口 read/stop 均明确「未知任务」 (5.2899ms)
+✔ S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符 (66.3233ms)
+✔ B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程） (691.6253ms)
+✔ S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务 (624.7478ms)
+✔ F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动 (630.8011ms)
+✔ F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止 (2538.8047ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6614.5021
+RUN2_EXIT=0
+===== RUN 3 =====
+✔ B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源） (743.1627ms)
+✔ F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell） (4.0868ms)
+✔ F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具 (4.1275ms)
+✔ F9：governanceJudge 判断会话（Service 装配）不含四后台工具 (2.3117ms)
+✔ F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务 (1077.8475ms)
+✔ F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务 (6.0277ms)
+✔ F6：未知任务号经真实入口 read/stop 均明确「未知任务」 (5.5848ms)
+✔ S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符 (115.8363ms)
+✔ B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程） (726.0021ms)
+✔ S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务 (655.5779ms)
+✔ F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动 (612.3271ms)
+✔ F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止 (2521.4377ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6704.2882
+RUN3_EXIT=0
+===== RUN 4 =====
+✔ B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源） (722.2028ms)
+✔ F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell） (3.4479ms)
+✔ F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具 (3.8485ms)
+✔ F9：governanceJudge 判断会话（Service 装配）不含四后台工具 (1.8389ms)
+✔ F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务 (1046.41ms)
+✔ F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务 (7.5132ms)
+✔ F6：未知任务号经真实入口 read/stop 均明确「未知任务」 (6.2714ms)
+✔ S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符 (97.2014ms)
+✔ B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程） (687.4506ms)
+✔ S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务 (630.9915ms)
+✔ F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动 (621.7478ms)
+✔ F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止 (2531.2958ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6595.2908
+RUN4_EXIT=0
+===== RUN 5 =====
+✔ B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源） (766.5549ms)
+✔ F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell） (3.6745ms)
+✔ F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具 (4.1588ms)
+✔ F9：governanceJudge 判断会话（Service 装配）不含四后台工具 (2.4251ms)
+✔ F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务 (1188.9447ms)
+✔ F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务 (5.7873ms)
+✔ F6：未知任务号经真实入口 read/stop 均明确「未知任务」 (5.7438ms)
+✔ S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符 (64.5881ms)
+✔ B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程） (667.612ms)
+✔ S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务 (651.3442ms)
+✔ F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动 (624.9712ms)
+✔ F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止 (2535.5706ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6753.1526
+RUN5_EXIT=0
+END=2026-11-02T04:57:44Z

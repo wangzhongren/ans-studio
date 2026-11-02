@@ -1129,3 +1129,33 @@ openRoleSession(input: {
 - `npm run typecheck` → **exit 0**（桌面属主并发补齐 `SessionManagerDeps.reportArtifact` 后全仓零错；
   本批编排文件始终零类型错误）。
 - 未做：桌面应用侧校验/收口实现与注入、真实 Electron/模型端到端、跨角色 e2e、独立验收、commit/push。
+
+### A1：派发硬授权 + advisory 纯逻辑（2026-11-02，dispatch-guardrail-relax）
+
+**公开契约（`src/common/编排/workflow-preconditions.ts`）**：
+
+```ts
+type DispatchAuthorizationInput = Pick<
+  DispatchPreflightInput,
+  "fromRoleId" | "targetRoleId" | "targetBuiltIn" | "chiefRoleId" | "convenerRoleId"
+> & { targetExists: boolean };
+
+type DispatchAuthorizationFailure = { ok: false; code: string; message: string; rejection: MechanicalRejection };
+type DispatchAuthorizationResult = { ok: true } | DispatchAuthorizationFailure;
+type DispatchPreflightResult = { ok: true; advisories: DispatchAdvisory[] } | DispatchAuthorizationFailure;
+
+function evaluateDispatchAuthorization(input: DispatchAuthorizationInput): DispatchAuthorizationResult;
+function evaluateDispatchPreflight(input: DispatchPreflightInput): DispatchPreflightResult;
+```
+
+- `DispatchPreflightInput`：`targetExists?: boolean`（复合输入兼容窗口，窄输入必填；私有唯一 `resolveTargetExists = targetExists ?? targetCardFound`，fail-closed；B1 必须显式传 boolean）、`chiefRoleId: string | null`、可选 `runFacts?`/`versionedDocBaselineViolations?`/`run.modules?`；`targetCardFound` 保留为兼容字段。
+- 硬授权顺序：自派 → 来源（幕僚/运营）→ 幕僚目标类型/显式 allowlist（product/rapporteur/nominator/convener/verifier）→ 运营目标类型/`targetExists`。幕僚→未知非内置走 `chief-to-project-forbidden`（类型优先）；幕僚→`su`/其它非 allowlist 内置走 `target-card-missing`；运营→不存在项目 worker 走 `target-card-missing`。
+- `evaluateDispatchPreflight` 保留为唯一复合入口，内部复用 `evaluateDispatchAuthorization` 后调用 `collectDispatchAdvisories`；无第二份授权判定。
+
+**advisory（`src/common/编排/dispatch-advisories.ts`）**：
+
+- `DispatchAdvisoryCode`（23 个）与 `DispatchAdvisory { code; message }`；`collectDispatchAdvisories(input: DispatchPreflightInput): DispatchAdvisory[]`。
+- 纯函数、不读盘/写盘、永不 `ok:false`；链级只报首个未满足项；latest 用于链级，run 专属 `run-role-missing`/`module-missing` 用 `run.roles`/`run.modules`（pinned）；`run.roles`/`run.modules === undefined` 按无事实处理（不产 code、不锚定该 pinned run）；legacy 仅 advisory 事实；`run-pin-failed` + `run-pin-required` 可组合且顺序固定；全部 code 只由本模块产出。
+- 调用方（B1）顺序：硬授权 → 事实收集 → run 只读/记账（含 handoff pin）→ `verifyVersionedDocBaselines` → collector → `task.created` → 投递/回执。
+
+**证据（2026-11-02，win32 / Node v24.22.1）**：`test/编排/{workflow-preconditions,dispatch-advisories}.test.ts` **34/34**；补充 `test/编排/{task-state,appointment-roster}.test.ts` **21/21**；`npm run typecheck` exit 0；候选树 `a593ddcb4ae60f468d1a5919722a4fa23ee9b71e`。见[实施记录](docs/change/2026-11-02_dispatch-guardrail-relax-A1-implementation.md)。

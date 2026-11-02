@@ -1,0 +1,16 @@
+CMD=node --test --test-concurrency=1 $(find test/测试/governance-e2e-auto -name '*.test.ts')
+FILE_COUNT=1
+FINAL_CANDIDATE=yes
+START=2026-11-02T04:52:09Z
+✔ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (159.6913ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (362.1928ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2062.8394
+EXIT_CODE=0
+END=2026-11-02T04:52:11Z

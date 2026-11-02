@@ -1,0 +1,96 @@
+CMD=node --test --test-concurrency=1 test/测试/governance-e2e-auto/i-full-chain.test.ts (3 runs)
+START=2026-11-02T04:41:57Z
+===== RUN 1 =====
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (142.8071ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (367.7729ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2034.5536
+
+✖ failing tests:
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:131:1
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (142.8071ms)
+  AssertionError [ERR_ASSERTION]: 未接交付 ⇒ 运营派实现任务被拒
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:176:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+RUN1_EXIT=1
+===== RUN 2 =====
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (135.1521ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (364.2911ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2009.8052
+
+✖ failing tests:
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:131:1
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (135.1521ms)
+  AssertionError [ERR_ASSERTION]: 未接交付 ⇒ 运营派实现任务被拒
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:176:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+RUN2_EXIT=1
+===== RUN 3 =====
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (143.9238ms)
+✔ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (352.7751ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2034.8206
+
+✖ failing tests:
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:131:1
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (143.9238ms)
+  AssertionError [ERR_ASSERTION]: 未接交付 ⇒ 运营派实现任务被拒
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:176:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+RUN3_EXIT=1
+END=2026-11-02T04:42:03Z

@@ -1,0 +1,42 @@
+# A1 candidate identity
+HEAD=c80f4944c3421554fcbd35f8570cedd3e2119a0a
+HEAD_TREE=689a49580fd7e79a0bfae1be343597b793967f71
+BRANCH=feat/flow-improvements-wave1
+DATE=2026-11-02T04:15:17Z
+
+# git status --porcelain -- src test
+ M "src/common/\347\274\226\346\216\222/mechanical-rejection.ts"
+ M "src/common/\347\274\226\346\216\222/workflow-preconditions.ts"
+ M "test/\347\274\226\346\216\222/workflow-preconditions.test.ts"
+?? "src/common/\347\274\226\346\216\222/dispatch-advisories.ts"
+?? "test/\347\274\226\346\216\222/dispatch-advisories.test.ts"
+
+# git diff --name-only -- src test
+"src/common/\347\274\226\346\216\222/mechanical-rejection.ts"
+"src/common/\347\274\226\346\216\222/workflow-preconditions.ts"
+"test/\347\274\226\346\216\222/workflow-preconditions.test.ts"
+
+# untracked under src/test
+"src/common/\347\274\226\346\216\222/dispatch-advisories.ts"
+"test/\347\274\226\346\216\222/dispatch-advisories.test.ts"
+
+# file identity (path | pre_blob | pre_sha256 | post_blob | post_sha256)
+src/common/编排/workflow-preconditions.ts | d5376f285fa96deedfb4d0fc632244070693652b | 68cc4f1260bb02d3dfc7bd4d388c7b1d5699729b51bb4b7f52c894320f2d639a | 83a6c7ebfc5b3fe9094f3a67df5704bfdfd05be5 | 9dfb55638324b6657fd7dc3928e7c7430215848dd9ee6c7d78a21de86ba1249f
+src/common/编排/dispatch-advisories.ts | - | - | 211e70467ddb7c3557d3c4a0562e7a431c01f7cf | 0781cd3db1201a724feb9ece4837aef4d23c043fa12e202cd01f0dd8d1e30d6f
+src/common/编排/mechanical-rejection.ts | cf75a7194707d7f02a42275fae39b1b5b34c135e | 51963abdeb086b45497a476ecfb541658f012012428934e02eeea91dc72f2281 | 270d0c016c4c5069cd34a8154dfcf20c8938a542 | 1e1e65736d99d371dbf13bbc18d9d88a048d17ac7fd6475ee508cca623750a62
+test/编排/workflow-preconditions.test.ts | cfde02b76781066e4b24a78f2184ecc7b1ebd268 | bda2e95b15c7e413750b4f95db217dc59f35e9c982a1fcc60629f9628db15975 | e1a7683eebc9f4f35d318921dd1d1a6725c0e14f | bec8c36109dc4cb1ad823f2dd363ff8aa8aae9e96276287733b5989c8cef066b
+test/编排/dispatch-advisories.test.ts | - | - | 8744a22cdba803394d2636236d3fac17263c88bf | 72a3ad0cf9ee87d3cd0cecc7c96847463de7c1288103f016e7d433df0620c7e5
+
+# candidate tree (HEAD tree + A1 src/test changes, temp index; does not touch real index)
+CANDIDATE_TREE=a593ddcb4ae60f468d1a5919722a4fa23ee9b71e
+
+# git diff --cached --name-only (real index)
+
+# write-set check (UTF-8, core.quotepath=false)
+ M src/common/编排/mechanical-rejection.ts
+ M src/common/编排/workflow-preconditions.ts
+ M test/编排/workflow-preconditions.test.ts
+?? src/common/编排/dispatch-advisories.ts
+?? test/编排/dispatch-advisories.test.ts
+PRODUCT_CHANGED_COUNT=5
+ALLOWED_ONLY=yes (5 paths; 2 modified source + 1 modified test + 2 new)

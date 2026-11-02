@@ -1,0 +1,51 @@
+CMD=node --test --test-concurrency=1 test/编排/workflow-preconditions.test.ts test/编排/task-state.test.ts test/编排/appointment-roster.test.ts
+START=2026-11-02T03:28:31Z
+✔ 人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集（judgeContext.recommendedRoleIds） (25.2164ms)
+✔ §5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed (34.3661ms)
+✔ 招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道 (8.3412ms)
+✔ convener 发招人卡 ⇒ 被拒（不能发 appointment；只由人事发起） (5.1962ms)
+✔ appointment-write 目录校验：boundary 目录在名单授权目录内 ⇒ 发卡；越名单目录 ⇒ notPresented (19.067ms)
+✔ BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针 (8.6454ms)
+✔ BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed (10.3047ms)
+✔ 模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots 为名下模块目录并集 (19.9085ms)
+✔ BUG-3：appointment-write 缺 targetRoleId ⇒ 结构校验拒绝，不触碰客户、无 judgeContext (5.1433ms)
+✔ append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed (30.6276ms)
+✔ 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放 (12.591ms)
+✔ 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行 (0.6602ms)
+✔ 副作用分类：缺填/非法⇒unknown；应用只升不降 (0.8735ms)
+✔ 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计） (5.0207ms)
+✔ 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务 (13.3241ms)
+✔ 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实 (0.4394ms)
+✔ task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读 (25.0878ms)
+✔ task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex） (19.8998ms)
+✔ request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行 (25.7965ms)
+✔ task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝 (8.7428ms)
+✔ R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放 (8.8011ms)
+✔ 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验 (4.1016ms)
+✔ 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集） (1.5906ms)
+✔ 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑 (10.7861ms)
+✔ 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错 (20.2115ms)
+✔ 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错 (50.5248ms)
+✔ 版本格式：引用必须带 -vN.md；非版本化路径拒绝 (0.7881ms)
+✔ D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项） (0.3673ms)
+✔ 派发矩阵 M1–M8：幕僚按序（意图/名单/交付）、运营作用域、拒绝 code 明确 (0.6074ms)
+✔ 派发矩阵：幕僚可派产品/质检（无链式前置）；自派/未知来源拒绝 (0.1187ms)
+✔ 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜 (0.1746ms)
+✔ 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ flow-required (0.1025ms)
+✔ 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例 (3.7492ms)
+✔ env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引） (1.5095ms)
+✔ 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例） (5.7789ms)
+✔ envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由 (1.6456ms)
+✔ 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出 (0.6923ms)
+✔ 2026-10-30（3.1）：run 条件必填——交付需 draft/pinned run；实现/验收需 pinned 且目标在 manifest.roles (0.1947ms)
+✔ R2（P1.3）：legacy run 只读——实现/验收 preflight 明确拒绝 run-legacy-readonly (0.1201ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 854.9347
+EXIT_CODE=0
+END=2026-11-02T03:28:32Z

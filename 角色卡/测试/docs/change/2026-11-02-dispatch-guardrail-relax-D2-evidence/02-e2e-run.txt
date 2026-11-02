@@ -1,0 +1,190 @@
+CMD=ANS_E2E_OUTDIR=<D2 evidence dir> node_modules/.bin/electron test/桌面应用/e2e/main.mjs
+CWD=/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1
+START=2026-11-02T05:05:26Z
+
+[42368:1102/130527.317:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: 拒绝访问。 (0x5)
+[42368:1102/130527.322:ERROR:net\disk_cache\disk_cache.cc:290] Unable to create cache
+[42368:1102/130527.322:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+[42368:1102/130527.330:ERROR:net\disk_cache\cache_util_win.cc:25] Unable to move the cache: 拒绝访问。 (0x5)
+[42368:1102/130527.332:ERROR:net\disk_cache\disk_cache.cc:290] Unable to create cache
+[42368:1102/130527.332:ERROR:gpu\ipc\host\gpu_disk_cache.cc:737] Gpu Cache Creation failed: -2
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'session:send': Error: 修复探针：发送异常原文
+    at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/e2e/main.mjs:217:32
+    at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1/app/desktop/diagnostics.ts:19:30
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:119988)
+    at Session.emit (node:events:514:28)
+(electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+Error occurred in handler for 'background-tasks:list': Error: No handler registered for 'background-tasks:list'
+    at Session.<anonymous> (node:electron/js2c/browser_init:1:120085)
+    at Session.emit (node:events:514:28)
+EXIT_CODE=0
+END=2026-11-02T05:06:45Z
+DURATION_SECONDS=79

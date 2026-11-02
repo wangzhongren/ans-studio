@@ -1,0 +1,100 @@
+RECORDED_AT=2026-11-02T04:45:07Z
+PHASE=before D1-fix edit
+FILE=test/测试/governance-e2e-auto/i-full-chain.test.ts
+LINES=226
+BLOB=daceef63488a771c3cd94295e293c5b235b83c4f
+SHA256=41c6013beaee7e9bd96f4c338a68c9fc6f6d1ab531b565c662d2df019627230f
+---- after D1-fix edit ----
+RECORDED_AT=2026-11-02T04:45:23Z
+PHASE=after D1-fix edit
+LINES=229
+BLOB=be3808d62439359cf19cfa7b3976c01818e2dae7
+SHA256=64fd7ddad4004e837f4e618165daacc74a1c4978464abbf264e4cf7602630696
+CMD=git diff -U3 -- test/测试/governance-e2e-auto/i-full-chain.test.ts
+diff --git "a/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts" "b/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+index daceef6..be3808d 100644
+--- "a/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
++++ "b/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+@@ -5,7 +5,7 @@
+ //   · 六角色注册表（chief → product → rapporteur → nominator → convener → verifier）+ 项目角色枚举；
+ //   · 幕僚按序派发（链首产品）→ 任务落 `.ans/state/tasks.jsonl` → 投递目标；
+ //   · 不产生 flow/gate/ledger 文件（治理机器已撤除）；
+-//   · 运营拥有 dispatch（v4.1）但未接交付时派 worker 被拒（M6）。
++//   · 运营拥有 dispatch（v4.1）；未接交付时派 worker 受理 + handoff-missing advisory，任务行 +1（不阻断）。
+ //
+ // 使用真实 SessionManager/routeDispatch + 假 openRoleSession（不启动模型、不触网）。
+ 
+@@ -168,13 +168,16 @@ test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tas
+     assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
+     assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), true);
+ 
+-    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 派 worker 被拒（M6）。
++    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 受理 + handoff-missing advisory，任务行 +1（不阻断）。
+     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+     await tick(30);
+     assert.equal(typeof h.caps.convener, "function", "v4.1：convener 注入 dispatch_task");
+     const convenerDispatch = (await h.caps.convener!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
+-    assert.equal(convenerDispatch.ok, false, "未接交付 ⇒ 运营派实现任务被拒");
+-    assert.match(convenerDispatch.message ?? "", /交付/);
++    assert.equal(convenerDispatch.ok, true, convenerDispatch.message ?? "");
++    assert.match(convenerDispatch.message ?? "", /尚未收到幕僚的交付任务/, "回执应含 handoff-missing advisory 文案");
++    assert.match(convenerDispatch.message ?? "", /状态提示（未阻断）/);
++    await waitUntilTaskState(root, (snapshot) => snapshot.records.size >= 2);
++    assert.equal((await readTaskState(root)).records.size, 2, "未接交付也受理并建任务（原 1 + 新 1）");
+   } finally {
+     await h.mgr.stop(null);
+     await fs.rm(root, { recursive: true, force: true });
+EXIT_CODE=0
+---- after cleanup-retry edit (final) ----
+RECORDED_AT=2026-11-02T04:51:37Z
+PHASE=final D1-fix candidate
+LINES=229
+BLOB=8707ec529f57bd26bfad3b245cf09f069ff7b3a1
+SHA256=b5d5c6c8411d71797479a452d611bb91a3b62146df6e05f54e0929f7e8545e6b
+CMD=git diff -U3 -- test/测试/governance-e2e-auto/i-full-chain.test.ts
+diff --git "a/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts" "b/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+index daceef6..8707ec5 100644
+--- "a/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
++++ "b/test/\346\265\213\350\257\225/governance-e2e-auto/i-full-chain.test.ts"
+@@ -5,7 +5,7 @@
+ //   · 六角色注册表（chief → product → rapporteur → nominator → convener → verifier）+ 项目角色枚举；
+ //   · 幕僚按序派发（链首产品）→ 任务落 `.ans/state/tasks.jsonl` → 投递目标；
+ //   · 不产生 flow/gate/ledger 文件（治理机器已撤除）；
+-//   · 运营拥有 dispatch（v4.1）但未接交付时派 worker 被拒（M6）。
++//   · 运营拥有 dispatch（v4.1）；未接交付时派 worker 受理 + handoff-missing advisory，任务行 +1（不阻断）。
+ //
+ // 使用真实 SessionManager/routeDispatch + 假 openRoleSession（不启动模型、不触网）。
+ 
+@@ -168,16 +168,19 @@ test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tas
+     assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
+     assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), true);
+ 
+-    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 派 worker 被拒（M6）。
++    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 受理 + handoff-missing advisory，任务行 +1（不阻断）。
+     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+     await tick(30);
+     assert.equal(typeof h.caps.convener, "function", "v4.1：convener 注入 dispatch_task");
+     const convenerDispatch = (await h.caps.convener!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
+-    assert.equal(convenerDispatch.ok, false, "未接交付 ⇒ 运营派实现任务被拒");
+-    assert.match(convenerDispatch.message ?? "", /交付/);
++    assert.equal(convenerDispatch.ok, true, convenerDispatch.message ?? "");
++    assert.match(convenerDispatch.message ?? "", /尚未收到幕僚的交付任务/, "回执应含 handoff-missing advisory 文案");
++    assert.match(convenerDispatch.message ?? "", /状态提示（未阻断）/);
++    await waitUntilTaskState(root, (snapshot) => snapshot.records.size >= 2);
++    assert.equal((await readTaskState(root)).records.size, 2, "未接交付也受理并建任务（原 1 + 新 1）");
+   } finally {
+     await h.mgr.stop(null);
+-    await fs.rm(root, { recursive: true, force: true });
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+   }
+ });
+ 
+@@ -221,6 +224,6 @@ test("F 终态收口：幕僚调度验收（review 任务→质检回交→工
+     assert.equal((h.sent.verifier ?? []).filter((text) => !text.includes("任务编号")).length, 0, "无自动验收派发到质检");
+   } finally {
+     await h.mgr.stop(null);
+-    await fs.rm(root, { recursive: true, force: true });
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+   }
+ });
+EXIT_CODE=0

@@ -1,0 +1,8 @@
+CMD=node -e <symlink probe in os.tmpdir>
+START=2026-11-02T03:35:20Z
+SYMLINK_OK=false
+code=EPERM errno=-4048 syscall=symlink
+message=EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-b0-symlink-probe-opRv1M\target.txt' -> 'C:\Users\51054\AppData\Local\Temp\ans-b0-symlink-probe-opRv1M\link.txt'
+temp_cleaned=true
+EXIT_CODE=0
+END=2026-11-02T03:35:20Z

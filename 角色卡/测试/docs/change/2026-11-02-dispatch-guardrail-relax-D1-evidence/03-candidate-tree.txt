@@ -1,0 +1,10 @@
+RECORDED_AT=2026-11-02T04:34:26Z
+METHOD=temp index from HEAD + A1 five files + B1 eight files; git write-tree
+TEMP_INDEX=/c/Users/51054/AppData/Local/Temp/ans-d1-index.RaHATw
+warning: in the working copy of 'src/common/编排/workflow-preconditions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/common/编排/dispatch-advisories.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/dispatch-advisories.test.ts', LF will be replaced by CRLF the next time Git touches it
+CANDIDATE_TREE=f5aea50f145609f7e31d73a1a61f869ef143ce36
+CANDIDATE_TREE_COMMIT_SHA=1c48fd280d83e25f94d3865c64173c404925d59f
+EXIT_CODE=0

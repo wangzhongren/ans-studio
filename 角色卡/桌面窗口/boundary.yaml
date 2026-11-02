@@ -206,6 +206,14 @@ entries:
   - kind: file
     path: test/桌面应用/acceptance-proposal-path.test.ts
     purpose: 主进程侧测试——验收 judgeContext 的 proposalPath 派生（pinned manifest 优先/最新 `-proposal-vN`/缺失 fail-closed/别名不选/不可读不回退）
+  # --- Delta-DGR-1（2026-11-02，团队计划 §4.6；闸门 2）：test/桌面应用/ 补登 1 个既有精确测试文件（run-change-trigger），逐文件授权 ---
+  - kind: file
+    path: test/桌面应用/run-change-trigger.test.ts
+    purpose: 派发受理后不再自动弹 run-change——受理 + advisory、客户卡请求数为 0、显式入口/提案卡路径保留
+  # --- Delta-DGR-2（2026-11-02，团队计划 §4.6；闸门 2）：test/桌面应用/ 补登 1 个既有精确测试文件（run-change-entry），逐文件授权 ---
+  - kind: file
+    path: test/桌面应用/run-change-entry.test.ts
+    purpose: 源码钉更新——移除 `runChangeRejectionForDispatch` 钉，保留 `proposalCardFrozenRejection`、`requestRunChangeDecision`、显式入口与 `run-change-required` 码表钉
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航
