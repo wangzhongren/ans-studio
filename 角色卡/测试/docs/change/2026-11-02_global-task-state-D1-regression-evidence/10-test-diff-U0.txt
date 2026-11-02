@@ -1,0 +1,546 @@
+diff --git "a/test/\346\241\214\351\235\242UI/phase4b-electron-smoke.mjs" "b/test/\346\241\214\351\235\242UI/phase4b-electron-smoke.mjs"
+index 580745d..c71528f 100644
+--- "a/test/\346\241\214\351\235\242UI/phase4b-electron-smoke.mjs"
++++ "b/test/\346\241\214\351\235\242UI/phase4b-electron-smoke.mjs"
+@@ -63,0 +64 @@ const calls = {
++  projectState: [],
+@@ -146,0 +148,48 @@ function listing(projectRoot = ROOT) {
++function projectStateView(projectRoot) {
++  return {
++    schema: "project-state/v1",
++    generatedAt: "2026-11-02T00:00:00.000Z",
++    projectRoot,
++    focus: {
++      flowId: "smoke-flow",
++      runId: "smoke-run",
++      runState: "draft",
++      stage: "build",
++      selectedBy: "chief",
++      updatedAt: "2026-11-02T00:00:00.000Z",
++      stale: false,
++    },
++    flows: [
++      {
++        flowId: "smoke-flow",
++        sources: ["run", "task"],
++        runs: [{ runId: "smoke-run", state: "draft", active: true }],
++        taskCounts: { unclosed: 1, blocked: 0, failed: 0 },
++        lastActivityAt: "2026-11-02T00:00:00.000Z",
++      },
++    ],
++    tasks: [],
++    blockers: [],
++    versions: [],
++    evidence: [],
++    notes: [],
++    nextStep: {
++      text: "continue with acceptance",
++      source: "chief",
++      at: "2026-11-02T00:00:00.000Z",
++    },
++    errors: [],
++    truncated: false,
++    counts: {
++      unclosed: 1,
++      supersededUnclosed: 0,
++      activeUnclosed: 1,
++      blocked: 0,
++      failed: 0,
++      pendingRequests: 0,
++      flows: 1,
++      tasks: 0,
++    },
++  };
++}
++
+@@ -170,0 +220,4 @@ ipcMain.handle("app:list-project", (_e, input) => listing(input?.projectRoot ||
++ipcMain.handle("project-state:get", (_e, input) => {
++  calls.projectState.push(input);
++  return projectStateView(input?.projectRoot || ROOT);
++});
+@@ -610,0 +664,32 @@ app.whenReady().then(async () => {
++
++    // —————— 11b. 项目状态区（project-state/v1，A4：只读/同源/刷新） ——————
++    const projectStateBefore = calls.projectState.length;
++    await js(`document.getElementById('tab-tasks').click()`);
++    await waitFor(`document.querySelector('.project-state .ps-focus') !== null`, 4000);
++    await sleep(120);
++    const projectStateCalls = calls.projectState.length;
++    check(
++      "project state section renders focus and badges",
++      await js(`(()=>{const s=document.querySelector('.project-state');if(!s)return false;const f=s.querySelector('.ps-focus');const badges=[...s.querySelectorAll('.ps-badge')];const details=s.querySelector('.ps-details');return !!f&&f.textContent.includes('smoke-flow')&&f.textContent.includes('smoke-run')&&badges.length===4&&badges[0].textContent.includes('1 个未收口')&&!!details&&details.open===false;})()`),
++    );
++    check(
++      "project state IPC called once on open",
++      projectStateCalls === projectStateBefore + 1,
++      { before: projectStateBefore, after: projectStateCalls },
++    );
++    check(
++      "project state read-only: only refresh button",
++      await js(`(()=>{const s=document.querySelector('.project-state');return s.querySelectorAll('button').length===1&&!!s.querySelector('.ps-refresh');})()`),
++    );
++    check(
++      "project state exposes no write bridge",
++      !("closeTask" in calls) && !("terminateRoleRun" in calls) && !("redispatchTask" in calls) && !("projectNote" in calls),
++    );
++    await shot("phase4b-project-state");
++    await js(`document.querySelector('.ps-refresh').click()`);
++    await sleep(160);
++    check(
++      "project state refresh calls IPC once more",
++      calls.projectState.length === projectStateCalls + 1,
++      calls.projectState.slice(-3),
++    );
+diff --git "a/test/\346\241\214\351\235\242UI/phase4b-smoke-preload.cjs" "b/test/\346\241\214\351\235\242UI/phase4b-smoke-preload.cjs"
+index 4a6ecab..cca75d9 100644
+--- "a/test/\346\241\214\351\235\242UI/phase4b-smoke-preload.cjs"
++++ "b/test/\346\241\214\351\235\242UI/phase4b-smoke-preload.cjs"
+@@ -46,0 +47,2 @@ contextBridge.exposeInMainWorld("desktop", {
++  // 2026-11-02（A4）：项目状态只读区（project-state/v1）的 smoke 桩通道。
++  getProjectState: (input) => ipcRenderer.invoke("project-state:get", input),
+diff --git "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts" "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
+index 0c04252..3f323a0 100644
+--- "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
++++ "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
+@@ -18 +18 @@ import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-rol
+-import type { DispatchTaskFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn } from "../../src/model/runtime.ts";
++import type { DispatchTaskFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn } from "../../src/model/runtime.ts";
+@@ -52,0 +53,3 @@ interface Caps {
++  projectState?: ProjectStateFn;
++  projectNote?: ProjectNoteFn;
++  requestVersionDecision?: RequestVersionDecisionFn;
+@@ -86,0 +90,3 @@ test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 disp
++    assert.equal(typeof caps.chief.projectState, "function", "chief 获得只读 project_state");
++    assert.equal(typeof caps.chief.projectNote, "function", "chief 获得 project_note");
++    assert.equal(typeof caps.chief.requestVersionDecision, "function", "chief 获得 request_version_decision");
+@@ -87,0 +94,3 @@ test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 disp
++    assert.equal(typeof caps.convener.projectState, "function", "内置治理角色获得只读 project_state");
++    assert.equal(caps.convener.projectNote, undefined, "project_note 只给幕僚");
++    assert.equal(caps.convener.requestVersionDecision, undefined, "request_version_decision 只给幕僚");
+@@ -93,0 +103,3 @@ test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 disp
++    assert.equal(caps.worker.projectState, undefined, "项目 worker 不获得 project_state");
++    assert.equal(caps.worker.projectNote, undefined);
++    assert.equal(caps.worker.requestVersionDecision, undefined);
+@@ -163,0 +176,27 @@ test("工具注册面：幕僚注入 role_activity_log/terminate_role_run/redisp
++
++test("工具注册面（2026-11-02）：project_state/project_note/request_version_decision 注入才注册", () => {
++  const gate = (() => ({ allowed: false, reason: "test", allowedByRoot: {} })) as unknown as WriteGate;
++  const names = (options: Record<string, unknown>) => new Set(buildGovernedTools(gate, options as never).map((tool) => tool.name));
++  const none = names({ roleId: "chief", runtime: "demo" });
++  assert.equal(none.has("project_state"), false);
++  assert.equal(none.has("project_note"), false);
++  assert.equal(none.has("request_version_decision"), false);
++  const all = names({
++    roleId: "chief",
++    runtime: "demo",
++    projectState: async () => ({ ok: true, text: "state" }),
++    projectNote: async () => ({ ok: true, message: "noted" }),
++    requestVersionDecision: async () => ({ ok: false, message: "未提交" }),
++  });
++  assert.equal(all.has("project_state"), true);
++  assert.equal(all.has("project_note"), true);
++  assert.equal(all.has("request_version_decision"), true);
++  const readOnly = names({
++    roleId: "convener",
++    runtime: "demo",
++    projectState: async () => ({ ok: true, text: "state" }),
++  });
++  assert.equal(readOnly.has("project_state"), true);
++  assert.equal(readOnly.has("project_note"), false);
++  assert.equal(readOnly.has("request_version_decision"), false);
++});
+diff --git "a/test/\347\274\226\346\216\222/decision-card.test.ts" "b/test/\347\274\226\346\216\222/decision-card.test.ts"
+index c87624c..3c88892 100644
+--- "a/test/\347\274\226\346\216\222/decision-card.test.ts"
++++ "b/test/\347\274\226\346\216\222/decision-card.test.ts"
+@@ -18 +18,2 @@ import { describeTool } from "../../src/provider/runtime/schema.ts";
+-import { validateDecisionCardRequest } from "../../src/common/编排/decision-card.ts";
++import { DECISION_CARD_ALLOWED_ROLES, validateDecisionCardRequest } from "../../src/common/编排/decision-card.ts";
++import { buildVersionDecisionCard, versionDecisionCardToRequest } from "../../src/common/编排/version-decision.ts";
+@@ -80,0 +82,47 @@ test("decision 结构校验：应用自有卡放行；角色卡仅 convener/rapp
++
++test("版本决策卡：application-owned decision 通过校验；两选项恰一 recommended；角色上限不变", () => {
++  const card = buildVersionDecisionCard({
++    requestId: "version-decision-run-20261030-focus-abcdef12-m1abc-1234abcd",
++    flowId: "focus",
++    action: "new-version-development",
++    reason: "验收证据循环",
++    facts: {
++      flowId: "focus",
++      unclosedCount: 2,
++      blockedCount: 1,
++      failedCount: 0,
++      pendingRequestCount: 1,
++      acceptanceRejectedCount: 1,
++      priorVersionDecisionCount: 0,
++      latestDocs: [],
++      newerThanPinned: [],
++    },
++    labels: {
++      title: "版本决策：focus",
++      question: "当前 flow focus 卡在验收证据循环。",
++      disclaimer: "若选择新版本开发，应用将关闭旧 flow 的全部活动 run；这是路线选择，不是内容批准，也不是验收。",
++      optionVersionModify: "版本修改",
++      optionNewVersionDevelopment: "新版本开发",
++    },
++  });
++  assert.equal(card.options.length, 2);
++  assert.equal(card.options.filter((option) => option.recommended === true).length, 1);
++  assert.equal(card.options.find((option) => option.recommended === true)?.id, "new-version-development");
++  assert.match(card.question, /全部活动 run/);
++  assert.match(card.question, /不是内容批准/);
++
++  const request = versionDecisionCardToRequest(card);
++  assert.equal(request.kind, "choice");
++  assert.equal(request.cardKind, "decision");
++  assert.equal(request.application, true);
++  assert.equal(request.sourceRoleId, "application");
++  assert.equal(request.flowId, "focus");
++  const validated = validateDecisionCardRequest({ request, roleId: "verifier", governanceModel: "trio" });
++  assert.equal(validated.ok, true);
++  if (validated.ok) assert.equal(validated.recommendedOptionId, "new-version-development");
++
++  const unowned = { ...request, application: undefined, sourceRoleId: undefined };
++  const chiefCannotIssue = validateDecisionCardRequest({ request: unowned, roleId: "chief", governanceModel: "trio" });
++  assert.equal(chiefCannotIssue.ok, false);
++  assert.deepEqual([...DECISION_CARD_ALLOWED_ROLES], ["convener", "rapporteur"]);
++});
+diff --git "a/test/\347\274\226\346\216\222/run-manifest.test.ts" "b/test/\347\274\226\346\216\222/run-manifest.test.ts"
+index 09bd408..9c32130 100644
+--- "a/test/\347\274\226\346\216\222/run-manifest.test.ts"
++++ "b/test/\347\274\226\346\216\222/run-manifest.test.ts"
+@@ -11,0 +12 @@ import {
++  closeRun,
+@@ -13,0 +15 @@ import {
++  listRunManifestsResult,
+@@ -143,0 +146,51 @@ test("P2.4：静态 quickref 由 manifest 生成，逐项与 manifest 文档/has
++
++// ————————————————— 2026-11-02（R4）：closeRun supersede / 多 draft —————————————————
++
++test("R4：closeRun 记录 supersede closeReason/幂等；多 draft 逐个关闭；listRunManifestsResult 语义不变", async () => {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-manifest-close-"));
++  try {
++    const first: RunManifest = { ...draft("focus"), runId: "run-20261030-focus-11111111", createdAt: "2026-10-30T00:00:00.000Z", updatedAt: "2026-10-30T00:00:00.000Z" };
++    const second: RunManifest = { ...draft("focus"), runId: "run-20261030-focus-22222222", createdAt: "2026-10-30T00:01:00.000Z", updatedAt: "2026-10-30T00:01:00.000Z" };
++    assert.equal((await writeRunManifest(root, first)).ok, true);
++    assert.equal((await writeRunManifest(root, second)).ok, true);
++    const reason = "superseded-by:focus-next/run-20261030-focus-next-33333333";
++    const closedFirst = await closeRun(root, first.runId, "closed", reason);
++    assert.equal(closedFirst.ok, true);
++    if (closedFirst.ok) {
++      assert.equal(closedFirst.manifest.state, "closed");
++      assert.equal(closedFirst.manifest.closeReason, reason);
++      assert.ok(closedFirst.manifest.closedAt !== undefined);
++    }
++    const idempotent = await closeRun(root, first.runId, "closed", reason);
++    assert.equal(idempotent.ok, true);
++    if (idempotent.ok) assert.equal(idempotent.manifest.closedAt, closedFirst.ok ? closedFirst.manifest.closedAt : undefined);
++    const closedSecond = await closeRun(root, second.runId, "cancelled", reason);
++    assert.equal(closedSecond.ok, true);
++    const listed = await listRunManifestsResult(root);
++    assert.equal(listed.ok, true);
++    if (listed.ok) {
++      assert.equal(listed.manifests.length, 2);
++      assert.deepEqual(listed.manifests.map((manifest) => manifest.state).sort(), ["cancelled", "closed"]);
++    }
++    const active = await findActiveRun(root, "focus");
++    assert.equal(active.ok, true);
++    if (active.ok) assert.equal(active.manifest, null);
++  } finally {
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
++
++test("R1：listRunManifestsResult 保持 all-or-nothing（坏 manifest 整体失败；run-manifest.ts 零改动）", async () => {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-manifest-listed-"));
++  try {
++    assert.equal((await writeRunManifest(root, draft("focus"))).ok, true);
++    const badId = "run-20261030-broken-abcdef12";
++    await fs.mkdir(path.dirname(runManifestPath(root, badId)), { recursive: true });
++    await fs.writeFile(runManifestPath(root, badId), "{not-json\n", "utf8");
++    const listed = await listRunManifestsResult(root);
++    assert.equal(listed.ok, false);
++    if (!listed.ok) assert.equal(listed.code, "run-manifest-invalid");
++  } finally {
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
+diff --git "a/test/\347\274\226\346\216\222/task-state.test.ts" "b/test/\347\274\226\346\216\222/task-state.test.ts"
+index 3ca015c..5a894e8 100644
+--- "a/test/\347\274\226\346\216\222/task-state.test.ts"
++++ "b/test/\347\274\226\346\216\222/task-state.test.ts"
+@@ -400,0 +401,98 @@ test("R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allow
++
++// ————————————————— 2026-11-02（全局任务状态/版本决策）：新事件加法 —————————————————
++
++test("P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变", async () => {
++  const root = await tempRoot();
++  try {
++    await appendTaskEvent(root, created("t-open", "实现"));
++    const at = (iso: string) => () => new Date(iso);
++    await appendTaskEvent(root, taskEvent("project.focus", {
++      flowId: "focus",
++      runId: "run-20261030-focus-abcdef12",
++      roleId: "chief",
++      note: "当前 focus",
++    }, at("2026-11-02T00:00:00.000Z")));
++    await appendTaskEvent(root, taskEvent("project.note", {
++      noteKey: "blocker-1",
++      noteKind: "blocker",
++      text: "验收卡被退回",
++      active: true,
++      roleId: "chief",
++    }, at("2026-11-02T00:00:01.000Z")));
++    await appendTaskEvent(root, taskEvent("version.decision", {
++      schema: "version-decision/v1",
++      decisionId: "decision-v1",
++      requestId: "version-decision-run-20261030-focus-abcdef12-m1abc-1234abcd",
++      attempt: 1,
++      flowId: "focus",
++      runId: "run-20261030-focus-abcdef12",
++      action: "version-modify",
++      recommendedBy: "chief",
++      recommendedAction: "version-modify",
++      decidedBy: "customer",
++      reason: "修引用",
++      status: "executed",
++      oldFlowId: "focus",
++      targetVersions: { proposal: 2 },
++    }, at("2026-11-02T00:00:02.000Z")));
++
++    const state = await readTaskState(root);
++    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
++    assert.equal(state.events.length, 4);
++    assert.equal(state.records.size, 1);
++    assert.equal(taskStatusOf(state.records.get("t-open")!), "created");
++    assert.equal(state.unclosed.length, 1);
++  } finally {
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
++
++test("P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞", async () => {
++  const root = await tempRoot();
++  try {
++    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
++    await fs.mkdir(path.dirname(file), { recursive: true });
++    const base = { v: 1, at: "2026-11-02T00:00:00.000Z" };
++    const lines = [
++      { ...base, kind: "request.orphaned", requestId: "r1", reason: "restart" },
++      { ...base, kind: "request.orphaned", requestId: "r2", reason: "superseded" },
++      { ...base, kind: "request.orphaned", requestId: "r3", reason: "initiator-aborted" },
++      { ...base, kind: "request.orphaned", requestId: "r4", reason: "bogus" },
++      { ...base, kind: "project.focus", roleId: "chief" },
++      { ...base, kind: "project.note", roleId: "chief", noteKey: "b", noteKind: "blocker", text: "x".repeat(501), active: true },
++      { ...base, kind: "version.decision", schema: "version-decision/v1", decisionId: "d", requestId: "q", attempt: 1, flowId: "focus", action: "bogus", recommendedBy: "chief", recommendedAction: "version-modify", decidedBy: "customer", reason: "x", status: "executed" },
++    ];
++    await fs.writeFile(file, lines.map((line) => JSON.stringify(line)).join("\n") + "\n", "utf8");
++    const state = await readTaskState(root);
++    assert.equal(state.errors.length, 4, JSON.stringify(state.errors));
++    assert.equal(state.events.filter((event) => event.kind === "request.orphaned").length, 3);
++  } finally {
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
++
++test("P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）", async () => {
++  const root = await tempRoot();
++  try {
++    await appendTaskEvent(root, created("t-old", "实现"));
++    await appendTaskEvent(root, taskEvent("project.focus", { flowId: "focus", roleId: "chief" }));
++    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
++    const OLD_KINDS = new Set([
++      "task.created", "task.delivered", "task.reported", "task.closed", "task.redispatch", "delegation.changed",
++      "request.created", "request.presented", "request.resolved", "request.notified", "request.orphaned",
++      "approval.created", "approval.resolved", "approval.expired",
++    ]);
++    const raw = await fs.readFile(file, "utf8");
++    const oldBad = raw.split(/\r?\n/).filter((line) => line.trim() !== "").filter((line) => {
++      const event = JSON.parse(line) as { kind?: unknown };
++      return typeof event.kind !== "string" || !OLD_KINDS.has(event.kind);
++    });
++    assert.equal(oldBad.length, 1, "旧白名单只把新 kind 记坏行");
++    const state = await readTaskState(root);
++    assert.equal(state.errors.length, 0);
++    assert.equal(state.events.some((event) => event.kind === "project.focus"), true);
++    assert.equal(state.records.has("t-old"), true);
++  } finally {
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
+diff --git "a/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts" "b/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+index e6e9911..86b8855 100644
+--- "a/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
++++ "b/test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+@@ -110,0 +111,108 @@ const ACCEPTANCE_RETURN_CARD_KEYS = [
++/**
++ * 全局任务状态与版本决策 97 个 key（2026-11-02 global-task-state；P1 审核 §六 冻结）。
++ * 62 `ui.projectState.*` + 18 `ui.versionDecision.*` + 17 `main.versionDecision.*`。
++ * A3 只按本清单实施；新增/改名须回到项目管理并同步更新本断言与分区计数。
++ */
++const GLOBAL_TASK_STATE_KEYS = [
++  // ui.projectState.*（62）
++  "ui.projectState.title",
++  "ui.projectState.refresh",
++  "ui.projectState.readOnly",
++  "ui.projectState.empty",
++  "ui.projectState.loadError",
++  "ui.projectState.unavailable",
++  "ui.projectState.schemaUnsupported",
++  "ui.projectState.truncated",
++  "ui.projectState.errors",
++  "ui.projectState.pinnedHint",
++  "ui.projectState.focus.label",
++  "ui.projectState.focus.none",
++  "ui.projectState.focus.stale",
++  "ui.projectState.focus.derived",
++  "ui.projectState.focus.application",
++  "ui.projectState.focus.stageUndefined",
++  "ui.projectState.focus.updatedAt",
++  "ui.projectState.badge.unclosed",
++  "ui.projectState.badge.blocked",
++  "ui.projectState.badge.failed",
++  "ui.projectState.badge.pendingRequests",
++  "ui.projectState.section.flows",
++  "ui.projectState.section.tasks",
++  "ui.projectState.section.blockers",
++  "ui.projectState.section.versions",
++  "ui.projectState.section.evidence",
++  "ui.projectState.section.nextStep",
++  "ui.projectState.flow.superseded",
++  "ui.projectState.flow.taskCounts",
++  "ui.projectState.flow.runs",
++  "ui.projectState.blocker.kind.taskBlocked",
++  "ui.projectState.blocker.kind.taskFailed",
++  "ui.projectState.blocker.kind.requestPending",
++  "ui.projectState.blocker.kind.acceptanceRework",
++  "ui.projectState.blocker.kind.redispatchExhausted",
++  "ui.projectState.blocker.kind.versionDrift",
++  "ui.projectState.blocker.kind.referenceInvalid",
++  "ui.projectState.blocker.kind.runAmbiguous",
++  "ui.projectState.blocker.kind.focusStale",
++  "ui.projectState.blocker.kind.chiefNote",
++  "ui.projectState.blocker.source.app",
++  "ui.projectState.blocker.source.chief",
++  "ui.projectState.evidence.kind.acceptanceCard",
++  "ui.projectState.evidence.kind.verifierReport",
++  "ui.projectState.evidence.kind.taskEvidence",
++  "ui.projectState.evidence.status.present",
++  "ui.projectState.evidence.status.missing",
++  "ui.projectState.version.latest",
++  "ui.projectState.version.pinned",
++  "ui.projectState.version.newerThanPinned",
++  "ui.projectState.version.missing",
++  "ui.projectState.version.docKind.intent",
++  "ui.projectState.version.docKind.proposal",
++  "ui.projectState.version.docKind.modules",
++  "ui.projectState.version.docKind.roster",
++  "ui.projectState.version.docKind.topology",
++  "ui.projectState.version.docKind.architecture",
++  "ui.projectState.version.docKind.assets",
++  "ui.projectState.nextStep.source.chief",
++  "ui.projectState.nextStep.source.derived",
++  "ui.projectState.note.kind.blocker",
++  "ui.projectState.note.kind.nextStep",
++  // ui.versionDecision.*（18）
++  "ui.versionDecision.title",
++  "ui.versionDecision.question",
++  "ui.versionDecision.option.versionModify",
++  "ui.versionDecision.option.newVersionDevelopment",
++  "ui.versionDecision.disclaimer",
++  "ui.versionDecision.fact.header",
++  "ui.versionDecision.fact.unclosed",
++  "ui.versionDecision.fact.blockedFailed",
++  "ui.versionDecision.fact.pendingRequests",
++  "ui.versionDecision.fact.acceptanceReworks",
++  "ui.versionDecision.fact.latestVsPinned",
++  "ui.versionDecision.fact.previousDecisions",
++  "ui.versionDecision.decidedBy.customer",
++  "ui.versionDecision.decidedBy.judge",
++  "ui.versionDecision.status.executing",
++  "ui.versionDecision.status.executed",
++  "ui.versionDecision.status.failed",
++  "ui.versionDecision.status.uncertain",
++  // main.versionDecision.*（17）
++  "main.versionDecision.presented",
++  "main.versionDecision.notifiedResolved",
++  "main.versionDecision.executed.versionModify",
++  "main.versionDecision.executed.newVersion",
++  "main.versionDecision.declined",
++  "main.versionDecision.unavailable",
++  "main.versionDecision.aborted",
++  "main.versionDecision.partialFailed",
++  "main.versionDecision.uncertain",
++  "main.versionDecision.error.versionDecisionInvalid",
++  "main.versionDecision.error.flowNotFound",
++  "main.versionDecision.error.runAmbiguous",
++  "main.versionDecision.error.runChangeRequired",
++  "main.versionDecision.error.decisionPending",
++  "main.versionDecision.error.channelUnavailable",
++  "main.versionDecision.error.executionFailed",
++  "main.versionDecision.error.executionUncertain",
++] as const satisfies readonly MessageKey[];
++
+@@ -132 +240 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
+-test("key 分区计数：ui 921 / main 559 / shared 62 / preferences 3，总计 1545", () => {
++test("key 分区计数：ui 1001 / main 576 / shared 62 / preferences 3，总计 1642", () => {
+@@ -140,2 +248,2 @@ test("key 分区计数：ui 921 / main 559 / shared 62 / preferences 3，总计
+-  assert.deepEqual(prefixes, { ui: 921, main: 559, shared: 62, preferences: 3 });
+-  assert.equal(keys.length, 1545);
++  assert.deepEqual(prefixes, { ui: 1001, main: 576, shared: 62, preferences: 3 });
++  assert.equal(keys.length, 1642);
+@@ -200,0 +309,54 @@ test("验收回交卡 key 契约：14 key 中英成对、精确文案与占位
++test("全局任务状态/版本决策 key 契约：97 key 中英成对、分组数量、占位符一致", () => {
++  assert.equal(GLOBAL_TASK_STATE_KEYS.length, 97);
++  const families = {
++    projectState: GLOBAL_TASK_STATE_KEYS.filter((key) => key.startsWith("ui.projectState.")).length,
++    uiVersionDecision: GLOBAL_TASK_STATE_KEYS.filter((key) => key.startsWith("ui.versionDecision.")).length,
++    mainVersionDecision: GLOBAL_TASK_STATE_KEYS.filter((key) => key.startsWith("main.versionDecision.")).length,
++  };
++  assert.deepEqual(families, { projectState: 62, uiVersionDecision: 18, mainVersionDecision: 17 });
++  for (const key of GLOBAL_TASK_STATE_KEYS) {
++    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
++    assert.ok(key in enUS, `en-US 缺 ${key}`);
++    assert.deepEqual(placeholdersOf(zhCN[key]), placeholdersOf(enUS[key]), `占位符不一致：${key}`);
++    assert.deepEqual(templateTexts(enUS[key]).filter((text) => HAN.test(text)), [], `en-US 含中文：${key}`);
++  }
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.unclosed"]), ["count"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.blocked"]), ["count"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.failed"]), ["count"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.badge.pendingRequests"]), ["count"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.errors"]), ["count"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.flow.runs"]), ["count"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.flow.taskCounts"]), ["blocked", "failed", "unclosed"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.focus.updatedAt"]), ["time"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.version.latest"]), ["version"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.projectState.version.pinned"]), ["version"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.versionDecision.title"]), ["flowId"]);
++  assert.deepEqual(placeholdersOf(zhCN["ui.versionDecision.fact.blockedFailed"]), ["blocked", "failed"]);
++  assert.deepEqual(placeholdersOf(zhCN["main.versionDecision.executed.versionModify"]), ["flowId", "targets"]);
++  assert.deepEqual(placeholdersOf(zhCN["main.versionDecision.executed.newVersion"]), ["newFlowId", "newRunId", "oldFlowId"]);
++});
++
++test("全局任务状态复用既有 key：run 状态/通用短词/任务中心计数不新建别名", () => {
++  const reused = [
++    "ui.run.state.draft",
++    "ui.run.state.pinned",
++    "ui.run.state.closed",
++    "ui.run.state.cancelled",
++    "ui.run.state.legacy",
++    "shared.common.failed",
++    "shared.common.completed",
++    "shared.common.truncated",
++    "ui.taskCenter.unclosed",
++    "ui.governance.status.blocked",
++    "ui.work.reportStatus.blocked",
++  ];
++  for (const key of reused) {
++    assert.ok(key in zhCN, `zh-CN 缺复用 key ${key}`);
++    assert.ok(key in enUS, `en-US 缺复用 key ${key}`);
++  }
++  const keys = Object.keys(zhCN);
++  for (const forbidden of ["ui.projectState.runState.", "ui.projectState.taskStatus.", "ui.projectState.common."]) {
++    assert.deepEqual(keys.filter((key) => key.startsWith(forbidden)), [], `不得新建别名：${forbidden}`);
++  }
++});
++

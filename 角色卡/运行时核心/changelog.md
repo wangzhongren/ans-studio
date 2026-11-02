@@ -1,5 +1,9 @@
 # 运行时核心变更记录
 
+## 2026-11-02 — 边界变更 B-1：新增共享 Model 单文件 `src/model/project-state.ts`（闸门 2 后人事执行）
+
+依据团队计划 `docs/scheduling/2026-11-02_team-plan_global-task-state.md` §4.5 B-1 与闸门 2 确认（客户原话「确认闸门 2：团队计划含 B-1/B-2；按该计划与 P1.1 实施；不含提交/推送/发布。」），在权威 `boundary.md` Section 1 与 `boundary.yaml` 同步新增 1 个单文件条目：`src/model/project-state.ts`（用途：全局任务状态/版本决策的共享 Model 类型（`ProjectStateView`/`VersionDecisionCard`/`VersionDecisionRequest/Result`；无 I/O）；两处用途文字逐字一致；yaml 条目附 Delta-GTS-1 注释）。**冻结说明**：本任务名单内仅此 1 个文件；该文件补入时尚不存在（由后续实施 A0 批次在 H1 后创建），本次未写代码/测试、未改其他路径、不新增角色、不改角色 id/显示名/职责描述。**校验**：`boundary.md` 与 `boundary.yaml` 均 16 条（原 15 + 1；11 file + 4 directory → 12 file + 4 directory），路径/kind 顺序一一对应、无重复，新增条目的 kind/path/purpose 完全相同；改动仅 `boundary.md`（SHA-256 `01ac2f9fabb7683a3576b544412aa6315aaf1d7f9b3a95d79d09d8b75a055d40` → `fe66eae23bced83f6faee1ffb3688d9678b43f57ccdaad385019944f91085a40`）与 `boundary.yaml`（SHA-256 `0d09c597b4ae9f6f395cd1264eaa2096b58d1c72dbe1625460ea9ed15b93964b` → `836766a1a9d7e907648390e7a812f7d56a9e400af278790cfb8e75ffcfb773ac`）与本记录。执行角色：ANS 人事（内置管理角色，H1）。未 commit/push、未启动应用。
+
 ## 2026-10-29 — 工作流维护者化（v4.1）契约与工具面
 
 方案 v2.1 §5.4/§6.5/§8。`src/model/runtime.ts`：`TaskCreatedEvent.from` 放宽为 chief/convener、增 `stepId`；`TaskClosedEvent.by` 同放宽；`RequestResolvedEvent` 增 `rosterVersion/rosterSha256`；`CustomerInputMetadata` 增名单字段、`CustomerInputOutcome` 增 `decisionId`；`ShellReviewRequest`/`OperatorPrompt` 增 `manualOnly`；新增 `ShellExecutionOutcome`/`ShellPostAuditFn` 与 `GovernedToolsOptions.shellPostAudit`；`GovernanceJudgeFacts` 增验收最小链事实字段。`src/provider/runtime/tools.ts`：`request_choice` 回执携带应用生成的 `decisionId`（D3 凭据）；`run_shell` 执行后调用写审计钩子（越界写如实附加、不静默）。`schema.ts`：dispatch_task 描述更新为 v4.1 派发矩阵。测试：runtime-core 新增 decisionId 回执 1 例，套件绿（仅既有 symlink 环境性红）。详见 `docs/scheduling/2026-10-29_change-workflow-maintainers-hiring.md`。

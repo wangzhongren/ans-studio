@@ -7,6 +7,7 @@
 | 类型 | 可操作路径 | 用途 |
 | --- | --- | --- |
 | 单文件 | `src/model/runtime.ts` | 中立运行时类型与能力契约 |
+| 单文件 | `src/model/project-state.ts` | 全局任务状态/版本决策的共享 Model 类型（`ProjectStateView`/`VersionDecisionCard`/`VersionDecisionRequest/Result`；无 I/O） |
 | 单文件 | `src/service/runtime/session.ts` | 运行时选择、公共工具装配与提供方接入入口 |
 | 单文件 | `src/provider/runtime/tools.ts` | 公共受治理工具执行 |
 | 单文件 | `src/provider/runtime/schema.ts` | 公共工具 schema 与描述 |

@@ -1,0 +1,22 @@
+=== candidate delta vs first D1 run (old 00-candidate-identity) ===
+current count: 32
+
+--- changed files (old hash -> new hash) ---
+app/renderer/src/lib/platform.ts
+  old blob ee6f7aadb964fd6aa09c7fcb86c8cde5efb02cc2 sha256 b7c2c7a2ec47aea787b404b8467459e5b907aa9bf356e11ed0dd1a54d7eec4b1
+  new blob 29069f196d91eb61ce2c7c11492695c249ad44f0 sha256 604a0aef17628ac335d5a9e428695a2ba565aeae5d1e60774d3b426360e7d7fe
+src/common/编排/project-state.ts
+  old blob 04996efd7bf6a2ef9dfc8d88a94095d07d975041 sha256 6f9e64679f657529111f1b0ac8ff636be4f95788991144f91230d94b88756f80
+  new blob eeb58f89d65e8d31b83f1bc8270d91fe65a745a8 sha256 a082f0d220a859d430f421c1225dd9384ade66e3cf5f723bfe8cac652007b6f8
+src/model/project-state.ts
+  old blob 2121845eda284930c120472f5f12d9372a5e2412 sha256 8e5a9145120e6778711bd721f1ebc494f49ba04c2d63095b265bbcc1e74d4945
+  new blob 7b8d5ea65ce0486b4496267123f9e933c04dbe17 sha256 61d7793276bf389770673001dd416e8821a0943faa983e6e80eacf386bf3103a
+test/桌面UI/project-state.test.ts
+  old blob 59c2c388d9fa760c1f8ce1aeeea55332b9c90db4 sha256 e47ea39ba851b871df30d9f7f977aeb1489c518ed430b6295695476ab8353124
+  new blob fda47ca16f756a25d696ad68369bf754a0334e37 sha256 d0b6d244c17a0159ca92e1682104ee9e0cb94ec692b356ed01c1bd586adeb743
+test/编排/project-state.test.ts
+  old blob cdeabaf8d1dde915919b2f06ea0addcddba6a07d sha256 d73812315fb8827b14afdea9278928f2d982b7bf67be81f1c92e3264ad75a770
+  new blob 51edae38a644abe8df925c6080323859e9917e15 sha256 ba996417a6be036c66c7d55e9b806e0ee7093c07a724a0c2b26507d43928e266
+
+--- added/removed paths ---
+(end)

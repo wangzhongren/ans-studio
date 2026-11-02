@@ -1,0 +1,22 @@
+=== diff stat ===
+ .../phase4b-electron-smoke.mjs"                    |  85 +++++++++++
+ .../phase4b-smoke-preload.cjs"                     |   2 +
+ .../chief-workflow.test.ts"                        |  41 ++++-
+ .../decision-card.test.ts"                         |  50 +++++-
+ .../\347\274\226\346\216\222/run-manifest.test.ts" |  53 +++++++
+ "test/\347\274\226\346\216\222/task-state.test.ts" |  98 ++++++++++++
+ .../shared/i18n.test.ts"                           | 168 ++++++++++++++++++++-
+ 7 files changed, 492 insertions(+), 5 deletions(-)
+
+=== removed lines (all) ===
+-import type { DispatchTaskFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn } from "../../src/model/runtime.ts";
+-import { validateDecisionCardRequest } from "../../src/common/编排/decision-card.ts";
+-test("key 分区计数：ui 921 / main 559 / shared 62 / preferences 3，总计 1545", () => {
+-  assert.deepEqual(prefixes, { ui: 921, main: 559, shared: 62, preferences: 3 });
+-  assert.equal(keys.length, 1545);
+
+=== added skip/todo markers (should be empty) ===
+(none)
+
+=== deleted test files ===
+(end; empty = none)

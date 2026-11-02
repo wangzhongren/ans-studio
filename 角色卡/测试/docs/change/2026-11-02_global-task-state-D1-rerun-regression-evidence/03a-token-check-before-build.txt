@@ -1,0 +1,15 @@
+=== token check before rebuild (recorded 2026-11-02T20:25:53+08:00) ===
+--- src/app source (excluding dist) ---
+(no hits)
+--- renderer dist (pre-rebuild, old candidate build) ---
+(no hits)
+--- new token sanity ---
+src/common/编排/project-state.ts:13://   · rework-pending 只按机器事实（acceptance request reject；可选 task.closed(outcome="rework")）；
+src/common/编排/project-state.ts:73:// PM 2026-11-02 裁决（D-04）：blocker kind 固定为 `rework-pending`（A0 类型已同步）。
+src/common/编排/project-state.ts:75:  "task-blocked", "task-failed", "request-pending", "rework-pending", "redispatch-exhausted",
+src/common/编排/project-state.ts:666:  // rework-pending：只按机器事实（acceptance request reject + 可选 task.closed(rework)）。
+src/common/编排/project-state.ts:688:      id: `rework-pending:${flowId}`,
+src/common/编排/project-state.ts:689:      kind: "rework-pending",
+src/model/project-state.ts:61: * 阻塞/卡点种类（恰好十个；`rework-pending` 只表示验收返工待办信号，不是验收结论，
+src/model/project-state.ts:68:  | "rework-pending"
+app/renderer/src/lib/platform.ts:346:  "rework-pending": "ui.projectState.blocker.kind.acceptanceRework",
