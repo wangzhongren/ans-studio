@@ -39,7 +39,7 @@ test("三段式：missing/action/owner/docs/retryable 齐备；客户人话不�
   assert.equal(human.includes("module-not-owned"), false, "客户卡只人话，不出现技术 code");
 });
 
-test("BUG-4：target-card-missing 列出 D3 选中缺卡 id，不写“运营目标角色卡不存在”", () => {
+test("BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因", () => {
   const roster: ProjectRoster = {
     schema: "project-roster/v3",
     flowId: "focus",
@@ -51,10 +51,11 @@ test("BUG-4：target-card-missing 列出 D3 选中缺卡 id，不写“运营目
     modules: [{ id: "impl-core", name: "实现", purpose: "实现", paths: ["src/"], path: "src/", category: "core", publicContract: "src/", architectureSource: "docs/contracts/focus-architecture-v1.md" }],
     roles: [{ id: "implementer", displayName: "实现者", purpose: "实现", capability: "TS", modules: ["impl-core"] }],
   };
-  const input: DispatchPreflightInput = {
+  const advisoryInput: DispatchPreflightInput = {
     fromRoleId: "chief",
     targetRoleId: "convener",
     targetBuiltIn: true,
+    targetExists: true,
     chiefRoleId: "chief",
     convenerRoleId: "convener",
     flowId: "focus",
@@ -68,14 +69,35 @@ test("BUG-4：target-card-missing 列出 D3 选中缺卡 id，不写“运营目
     targetCardFound: false,
     missingSelectedCardIds: ["render-dev", "test-dev"],
   };
-  const result = evaluateDispatchPreflight(input);
-  assert.equal(result.ok, false);
-  if (result.ok) return;
-  assert.equal(result.code, "target-card-missing");
-  assert.equal(result.rejection.owner, "nominator");
-  assert.match(result.rejection.missing.join("；"), /render-dev/);
-  assert.match(result.rejection.missing.join("；"), /test-dev/);
-  assert.equal(formatMechanicalRejection(result.rejection).includes("运营目标角色卡不存在"), false);
+  const advisoryResult = evaluateDispatchPreflight(advisoryInput);
+  assert.equal(advisoryResult.ok, true, "D3 缺卡不再机械拒绝");
+  if (!advisoryResult.ok) return;
+  const advisory = advisoryResult.advisories.find((item) => item.code === "d3-selected-cards-incomplete");
+  assert.ok(advisory, "D3 缺卡 advisory");
+  assert.match(advisory!.message, /render-dev/);
+  assert.match(advisory!.message, /test-dev/);
+
+  const hardInput: DispatchPreflightInput = {
+    ...advisoryInput,
+    fromRoleId: "convener",
+    targetRoleId: "implementer",
+    targetBuiltIn: false,
+    targetExists: false,
+    d3Selected: [],
+    missingSelectedCardIds: [],
+    targetCardFound: false,
+    handoffFound: true,
+    run: { state: "pinned", runId: "run-20261030-focus-abcdef12" },
+  };
+  const hardResult = evaluateDispatchPreflight(hardInput);
+  assert.equal(hardResult.ok, false);
+  if (hardResult.ok) return;
+  assert.equal(hardResult.code, "target-card-missing");
+  assert.equal(hardResult.rejection.owner, "nominator");
+  const full = formatMechanicalRejection(hardResult.rejection);
+  assert.match(full, /角色卡|边界/);
+  assert.match(full, /拼写|角色 id|id/);
+  assert.equal(full.includes("运营目标角色卡不存在"), false);
 });
 
 test("BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试）", () => {
@@ -124,6 +146,15 @@ test("code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shel
     "shell-write-outside",
     "versioned-doc-overwrite",
   ]) assert.equal(codes.has(code), true, `缺映射：${code}`);
+  for (const advisoryOnly of [
+    "d3-selected-cards-incomplete",
+    "run-ledger-unavailable",
+    "run-pin-failed",
+    "run-document-hash-mismatch",
+    "run-pinned-roster-invalid",
+  ]) {
+    assert.equal(codes.has(advisoryOnly), false, `${advisoryOnly} 是 advisory，不进机械拒绝 map`);
+  }
   assert.ok(rejectionMapSnapshot().every((item) => item.code !== "" && typeof item.owner === "string"));
 });
 

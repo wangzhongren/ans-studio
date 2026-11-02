@@ -13,7 +13,7 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
-import { ensureDraftRun, findActiveRun, pinRun, prepareRunPin, readRunManifest } from "../../src/common/编排/run-manifest.ts";
+import { ensureDraftRun, findActiveRun, pinRun, prepareRunPin, readRunManifest, runManifestPath } from "../../src/common/编排/run-manifest.ts";
 import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -97,6 +97,14 @@ async function writeProject(root: string, opts: { withAssets?: boolean } = {}): 
   await write("角色卡/qa/role-card.md", "# 测试\n");
   await write("角色卡/qa/boundary.yaml", "role: qa\nentries: []\n");
   await recordVersionedDocBaselines({ projectRoot: root, recordedBy: "app:test" });
+}
+
+async function pinFocusRun(root: string): Promise<string> {
+  const draft = await ensureDraftRun(root, "focus");
+  if (!draft.ok) assert.fail(draft.reason);
+  const pinned = await pinRun(root, draft.manifest.runId, { d3: { decisionId: "decision-x", targetRoleIds: ["implementer"] } });
+  if (!pinned.ok) assert.fail(pinned.reason);
+  return pinned.manifest.runId;
 }
 
 function listing(root: string): ProjectListing {
@@ -305,7 +313,7 @@ test("D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pi
   }
 });
 
-test("run-pin：缺 D3 时 pin 失败，handoff 不建任务、不投递（draft 不伪造 pinned）", async () => {
+test("run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-missing-"));
   const h = harness(root);
   try {
@@ -314,13 +322,21 @@ test("run-pin：缺 D3 时 pin 失败，handoff 不建任务、不投递（draft
     await tick(30);
     const before = (await readTaskState(root)).records.size;
     const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-    assert.equal(handoff.ok, false);
-    assert.match(handoff.message ?? "", /run pin|D3/);
+    assert.equal(handoff.ok, true, handoff.message ?? "");
+    assert.match(handoff.message ?? "", /状态提示（未阻断）/);
+    assert.match(handoff.message ?? "", /pin/);
+    const message = handoff.message ?? "";
+    assert.ok(message.indexOf("pin 尝试失败") < message.indexOf("仍为 draft/未 pin"), "run-pin-failed 在 run-pin-required 之前");
     const after = await readTaskState(root);
-    assert.equal(after.records.size, before, "pin 失败在 task.created 之前，不产生交接任务");
+    assert.equal(after.records.size, before + 1, "pin 失败仍创建交接任务");
+    const created = [...after.records.values()].find((record) => record.created?.to === "convener")!.created!;
+    assert.equal(created.stepId, "project-handoff");
+    assert.equal(created.runState, "draft", "可锚定已有 draft");
+    assert.match(created.runId ?? "", /^run-/);
+    assert.equal(created.flowId, "focus");
     const active = await findActiveRun(root, "focus");
     assert.equal(active.ok, true);
-    if (active.ok) assert.notEqual(active.manifest?.state, "pinned");
+    if (active.ok) assert.notEqual(active.manifest?.state, "pinned", "draft 不伪造 pinned");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -528,21 +544,26 @@ test("contract_check session：pinned run/角色写区/legacy 明示（只读）
   }
 });
 
-test("F2：版本化文档基线违规的真实派发回执带 versioned-doc-baseline-violation 三段式", async () => {
+test("F2：版本化文档基线违规受理 + advisory；基线/文档未被改写", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-baseline-reject-"));
   const h = harness(root);
   try {
     await writeProject(root);
-    await fs.appendFile(path.join(root, "docs/product/focus-intent-v1.md"), "\n# 外部篡改\n", "utf8");
+    const intentPath = path.join(root, "docs/product/focus-intent-v1.md");
+    await fs.appendFile(intentPath, "\n# 外部篡改\n", "utf8");
+    const intentHash = createHash("sha256").update(await fs.readFile(intentPath)).digest("hex");
+    const versionsPath = path.join(root, ".ans/state/versions.jsonl");
+    const versionsHash = createHash("sha256").update(await fs.readFile(versionsPath)).digest("hex");
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await tick(30);
     const before = (await readTaskState(root)).records.size;
     const receipt = (await h.caps.chief!({ roleId: "product", task: "写产品意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-    assert.equal(receipt.ok, false);
-    assert.match(receipt.message ?? "", /版本化文档基线校验失败/);
-    assert.match(receipt.message ?? "", /谁来做：app/);
-    assert.match(receipt.message ?? "", /技术 code：versioned-doc-baseline-violation/);
-    assert.equal((await readTaskState(root)).records.size, before, "基线拒绝不创建任务");
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /基线|只读|版本化/);
+    assert.equal((await readTaskState(root)).records.size, before + 1, "基线漂移仍受理并建任务");
+    assert.equal(createHash("sha256").update(await fs.readFile(intentPath)).digest("hex"), intentHash, "文档未被改写");
+    assert.equal(createHash("sha256").update(await fs.readFile(versionsPath)).digest("hex"), versionsHash, "基线记录未被改写");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
@@ -634,6 +655,174 @@ test("§5A contract_check：四角色按裁剪输出意图入口契约与当前�
     assert.match(inconsistent, /意图入口解析：intent-ambiguous/);
     assert.match(inconsistent, /一致性=no/);
     assert.doesNotMatch(inconsistent, /意图入口事实：intentId=/);
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-no-flow-"));
+  const h = harness(root);
+  try {
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only" })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /run 记录不可用|run/);
+    const state = await readTaskState(root);
+    const created = [...state.records.values()].find((record) => record.created?.to === "convener")!.created!;
+    assert.equal(created.stepId, "project-handoff");
+    assert.equal(created.flowId, undefined);
+    assert.equal(created.runId, undefined);
+    assert.equal(created.runState, undefined);
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-ledger-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+    await fs.writeFile(path.join(root, ".ans/runs"), "not a directory\n", "utf8");
+    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /run 记录不可用/);
+    const state = await readTaskState(root);
+    const created = [...state.records.values()].find((record) => record.created?.to === "convener")!.created!;
+    assert.equal(created.stepId, "project-handoff");
+    assert.equal(created.flowId, undefined);
+    assert.equal(created.runId, undefined);
+    assert.equal(created.runState, undefined);
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-hash-drift-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    const runId = await pinFocusRun(root);
+    const manifestPath = runManifestPath(root, runId);
+    const manifestBefore = await fs.readFile(manifestPath, "utf8");
+    await fs.appendFile(path.join(root, "docs/product/focus-intent-v1.md"), "\n# 漂移\n", "utf8");
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现哈希漂移", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /哈希|hash|不锚定/);
+    const created = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现哈希漂移"))!.created!;
+    assert.equal(created.flowId, undefined, "不锚定失效 pinned");
+    assert.equal(created.runId, undefined);
+    assert.equal(created.runState, undefined);
+    assert.equal(await fs.readFile(manifestPath, "utf8"), manifestBefore, "manifest 未被改写");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-roster-invalid-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    const runId = await pinFocusRun(root);
+    const manifestPath = runManifestPath(root, runId);
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    const badRosterPath = "docs/proposals/focus-roster-bad.md";
+    const badRosterText = "not a roster\n";
+    await fs.writeFile(path.join(root, badRosterPath), badRosterText, "utf8");
+    const badSha = createHash("sha256").update(Buffer.from(badRosterText, "utf8")).digest("hex");
+    manifest["documents"] = { ...(manifest["documents"] as Record<string, unknown>), roster: { path: badRosterPath, sha256: badSha } };
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+    const manifestBefore = await fs.readFile(manifestPath, "utf8");
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现 roster 失败", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /roster|名单/);
+    assert.doesNotMatch(receipt.message ?? "", /不在 pinned run 的模块集/, "roster 失败不混写模块覆盖 advisory");
+    const created = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现 roster 失败"))!.created!;
+    assert.equal(created.flowId, undefined);
+    assert.equal(created.runId, undefined);
+    assert.equal(created.runState, undefined);
+    assert.equal(await fs.readFile(manifestPath, "utf8"), manifestBefore, "manifest 未被改写");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-legacy-flow-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-10-29T00:00:00.000Z",
+      kind: "task.created",
+      taskId: "t-legacy-flow",
+      flowId: "focus",
+      from: "chief",
+      to: "product",
+      text: "旧 legacy 任务",
+      sideEffect: "docs",
+      idempotencyKey: "legacy-flow",
+    }, { allowLegacyRun: true });
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现 legacy flow", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /legacy|历史/);
+    const state = await readTaskState(root);
+    const created = [...state.records.values()].find((record) => record.created?.text.includes("实现 legacy flow"))!.created!;
+    assert.equal(created.flowId, "focus");
+    assert.equal(created.runState, "draft", "legacy 仅 advisory，锚点用本地 draft");
+    assert.match(created.runId ?? "", /^run-/);
+    assert.ok(state.records.has("t-legacy-flow"), "旧 legacy 记录可读");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-pin-roles-undefined-"));
+  const h = harness(root);
+  try {
+    await writeProject(root);
+    const runId = await pinFocusRun(root);
+    const manifestPath = runManifestPath(root, runId);
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Record<string, unknown>;
+    delete manifest["roles"];
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+    const manifestBefore = await fs.readFile(manifestPath, "utf8");
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(30);
+    const receipt = (await h.caps.convener!({ roleId: "implementer", task: "实现 roles 未声明", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.doesNotMatch(receipt.message ?? "", /run-role-missing|不在 pinned run 的角色集/, "roles undefined 视为无事实");
+    const created = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现 roles 未声明"))!.created!;
+    assert.equal(created.flowId, undefined, "无法证明覆盖，不锚定");
+    assert.equal(created.runId, undefined);
+    assert.equal(created.runState, undefined);
+    assert.equal(await fs.readFile(manifestPath, "utf8"), manifestBefore, "manifest 未被改写");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });

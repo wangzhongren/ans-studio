@@ -5,7 +5,7 @@
 //   · 六角色注册表（chief → product → rapporteur → nominator → convener → verifier）+ 项目角色枚举；
 //   · 幕僚按序派发（链首产品）→ 任务落 `.ans/state/tasks.jsonl` → 投递目标；
 //   · 不产生 flow/gate/ledger 文件（治理机器已撤除）；
-//   · 运营拥有 dispatch（v4.1）但未接交付时派 worker 被拒（M6）。
+//   · 运营拥有 dispatch（v4.1）；未接交付时派 worker 受理 + handoff-missing advisory，任务行 +1（不阻断）。
 //
 // 使用真实 SessionManager/routeDispatch + 假 openRoleSession（不启动模型、不触网）。
 
@@ -168,16 +168,19 @@ test("最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tas
     assert.equal(await fs.stat(path.join(root, ".ans", "governance", "ledger.jsonl")).then(() => true, () => false), false);
     assert.equal(await fs.stat(path.join(root, ".ans", "state", "tasks.jsonl")).then(() => true, () => false), true);
 
-    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 派 worker 被拒（M6）。
+    // 运营拥有 dispatch（v4.1）但未接交付（无 project-handoff）⇒ 受理 + handoff-missing advisory，任务行 +1（不阻断）。
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
     await tick(30);
     assert.equal(typeof h.caps.convener, "function", "v4.1：convener 注入 dispatch_task");
     const convenerDispatch = (await h.caps.convener!({ roleId: "worker", task: "实现切片", sideEffect: "code" })) as DispatchReceipt;
-    assert.equal(convenerDispatch.ok, false, "未接交付 ⇒ 运营派实现任务被拒");
-    assert.match(convenerDispatch.message ?? "", /交付/);
+    assert.equal(convenerDispatch.ok, true, convenerDispatch.message ?? "");
+    assert.match(convenerDispatch.message ?? "", /尚未收到幕僚的交付任务/, "回执应含 handoff-missing advisory 文案");
+    assert.match(convenerDispatch.message ?? "", /状态提示（未阻断）/);
+    await waitUntilTaskState(root, (snapshot) => snapshot.records.size >= 2);
+    assert.equal((await readTaskState(root)).records.size, 2, "未接交付也受理并建任务（原 1 + 新 1）");
   } finally {
     await h.mgr.stop(null);
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -221,6 +224,6 @@ test("F 终态收口：幕僚调度验收（review 任务→质检回交→工�
     assert.equal((h.sent.verifier ?? []).filter((text) => !text.includes("任务编号")).length, 0, "无自动验收派发到质检");
   } finally {
     await h.mgr.stop(null);
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });

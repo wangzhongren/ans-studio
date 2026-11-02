@@ -14,6 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  evaluateDispatchAuthorization,
   evaluateDispatchPreflight,
   loadLatestRoster,
   parseProjectModules,
@@ -476,6 +477,7 @@ function preflight(overrides: Partial<DispatchPreflightInput>): DispatchPrefligh
     fromRoleId: "chief",
     targetRoleId: "product",
     targetBuiltIn: true,
+    targetExists: true,
     chiefRoleId: "chief",
     convenerRoleId: "convener",
     flowId: "focus",
@@ -492,20 +494,20 @@ function preflight(overrides: Partial<DispatchPreflightInput>): DispatchPrefligh
   };
 }
 
-test("派发矩阵 M1–M8：幕僚按序（意图/名单/交付）、运营作用域、拒绝 code 明确", () => {
-  // M1 幕僚→策划：缺意图 → 拒；有意图 → 放。
+test("派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝", () => {
+  // M1 幕僚→策划：缺意图 → 受理 + intent-missing。
   const noIntent = evaluateDispatchPreflight(preflight({ targetRoleId: "rapporteur", intent: { found: false, candidates: 0 } }));
-  assert.equal(noIntent.ok, false);
-  if (!noIntent.ok) assert.equal(noIntent.code, "intent-missing");
+  assert.equal(noIntent.ok, true);
+  if (noIntent.ok) assert.ok(noIntent.advisories.some((a) => a.code === "intent-missing"));
   assert.equal(evaluateDispatchPreflight(preflight({ targetRoleId: "rapporteur" })).ok, true);
 
-  // M2 幕僚→人事：缺方案 → 拒；缺/非法名单 → 拒；齐备 → 放。
+  // M2 幕僚→人事：缺方案/名单/模块 → 受理 + advisory。
   const noProposal = evaluateDispatchPreflight(preflight({ targetRoleId: "nominator", proposalFound: false }));
-  assert.equal(noProposal.ok, false);
-  if (!noProposal.ok) assert.equal(noProposal.code, "proposal-missing");
+  assert.equal(noProposal.ok, true);
+  if (noProposal.ok) assert.ok(noProposal.advisories.some((a) => a.code === "proposal-missing"));
   const noRoster = evaluateDispatchPreflight(preflight({ targetRoleId: "nominator", roster: { ok: false, code: "roster-missing", reason: "无" } }));
-  assert.equal(noRoster.ok, false);
-  if (!noRoster.ok) assert.equal(noRoster.code, "roster-missing");
+  assert.equal(noRoster.ok, true);
+  if (noRoster.ok) assert.ok(noRoster.advisories.some((a) => a.code === "roster-missing"));
   const noModulesRoster: ProjectRoster = { ...VALID_ROSTER, modules: [] };
   const noModules = evaluateDispatchPreflight(
     preflight({
@@ -513,42 +515,44 @@ test("派发矩阵 M1–M8：幕僚按序（意图/名单/交付）、运营作�
       roster: { ok: true, roster: noModulesRoster, path: "docs/proposals/focus-roster-v1.md", version: 1, sha256: "b".repeat(64) },
     }),
   );
-  assert.equal(noModules.ok, false);
-  if (!noModules.ok) assert.equal(noModules.code, "roster-modules-missing");
+  assert.equal(noModules.ok, true);
+  if (noModules.ok) assert.ok(noModules.advisories.some((a) => a.code === "roster-modules-missing"));
   assert.equal(evaluateDispatchPreflight(preflight({ targetRoleId: "nominator" })).ok, true);
 
-  // M5 幕僚→运营：无 D3 → 拒；D3 选中缺卡 → 拒；齐备 → 放。
+  // M5 幕僚→运营：无 D3 / D3 缺卡 → 受理 + advisory。
   const noD3 = evaluateDispatchPreflight(preflight({ targetRoleId: "convener" }));
-  assert.equal(noD3.ok, false);
-  if (!noD3.ok) assert.equal(noD3.code, "d3-missing");
+  assert.equal(noD3.ok, true);
+  if (noD3.ok) assert.ok(noD3.advisories.some((a) => a.code === "d3-missing"));
   const noCards = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], targetCardFound: false, missingSelectedCardIds: ["implementer"] }));
-  assert.equal(noCards.ok, false);
-  if (!noCards.ok) {
-    assert.equal(noCards.code, "target-card-missing");
-    assert.match(noCards.message, /D3 选中的项目角色卡未齐备/);
-    assert.match(noCards.message, /implementer/);
-    assert.match(noCards.message, /内置角色/);
+  assert.equal(noCards.ok, true);
+  if (noCards.ok) {
+    const cards = noCards.advisories.find((a) => a.code === "d3-selected-cards-incomplete");
+    assert.ok(cards);
+    assert.match(cards.message, /implementer/);
+    assert.match(cards.message, /内置角色/);
   }
   assert.equal(evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"] })).ok, true);
 
-  // M8 幕僚→项目 worker：一律拒。
+  // M8 幕僚→项目 worker：硬拒。
   const chiefToWorker = evaluateDispatchPreflight(preflight({ targetRoleId: "implementer", targetBuiltIn: false }));
   assert.equal(chiefToWorker.ok, false);
   if (!chiefToWorker.ok) assert.equal(chiefToWorker.code, "chief-to-project-forbidden");
 
-  // 运营作用域：未接交付 → 拒；名单外 → 拒；名单内缺卡 → 拒；名单内 + 有卡 → 放；质检（有交付）→ 放。
+  // 运营作用域：未接交付/名单外 → 受理 + advisory；目标不存在 → 硬拒。
   const convener = (overrides: Partial<DispatchPreflightInput>) =>
     evaluateDispatchPreflight(preflight({ fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, ...overrides }));
   const noHandoff = convener({ handoffFound: false });
-  assert.equal(noHandoff.ok, false);
-  if (!noHandoff.ok) assert.equal(noHandoff.code, "handoff-missing");
+  assert.equal(noHandoff.ok, true);
+  if (noHandoff.ok) assert.ok(noHandoff.advisories.some((a) => a.code === "handoff-missing"));
   const notNominated = convener({ handoffFound: true, d3Selected: [] });
-  assert.equal(notNominated.ok, false);
-  if (!notNominated.ok) assert.equal(notNominated.code, "target-not-nominated");
-  const cardMissing = convener({ handoffFound: true, d3Selected: ["implementer"], targetCardFound: false });
+  assert.equal(notNominated.ok, true);
+  if (notNominated.ok) assert.ok(notNominated.advisories.some((a) => a.code === "target-not-nominated"));
+  const cardMissing = convener({ handoffFound: true, d3Selected: ["implementer"], targetCardFound: false, targetExists: false });
   assert.equal(cardMissing.ok, false);
   if (!cardMissing.ok) assert.equal(cardMissing.code, "target-card-missing");
-  assert.equal(convener({ handoffFound: true, d3Selected: ["implementer"], targetCardFound: true }).ok, true);
+  const accepted = convener({ handoffFound: true, d3Selected: ["implementer"], targetCardFound: true });
+  assert.equal(accepted.ok, true);
+  if (accepted.ok) assert.deepEqual(accepted.advisories, []);
   assert.equal(
     evaluateDispatchPreflight(preflight({ fromRoleId: "convener", targetRoleId: "verifier", handoffFound: true })).ok,
     true,
@@ -559,7 +563,7 @@ test("派发矩阵 M1–M8：幕僚按序（意图/名单/交付）、运营作�
   if (!forbiddenBuiltIn.ok) assert.equal(forbiddenBuiltIn.code, "convener-target-forbidden");
 });
 
-test("派发矩阵：幕僚可派产品/质检（无链式前置）；自派/未知来源拒绝", () => {
+test("派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝", () => {
   assert.equal(evaluateDispatchPreflight(preflight({ targetRoleId: "product" })).ok, true);
   assert.equal(evaluateDispatchPreflight(preflight({ targetRoleId: "verifier" })).ok, true);
   const self = evaluateDispatchPreflight(preflight({ fromRoleId: "chief", targetRoleId: "chief" }));
@@ -568,6 +572,22 @@ test("派发矩阵：幕僚可派产品/质检（无链式前置）；自派/未
   const unknown = evaluateDispatchPreflight(preflight({ fromRoleId: "rapporteur", targetRoleId: "product" }));
   assert.equal(unknown.ok, false);
   if (!unknown.ok) assert.equal(unknown.code, "unknown-source");
+  const su = evaluateDispatchPreflight(preflight({ targetRoleId: "su", targetBuiltIn: true }));
+  assert.equal(su.ok, false);
+  if (!su.ok) assert.equal(su.code, "target-card-missing");
+  const liaison = evaluateDispatchPreflight(preflight({ targetRoleId: "liaison", targetBuiltIn: false }));
+  assert.equal(liaison.ok, false);
+  if (!liaison.ok) assert.equal(liaison.code, "chief-to-project-forbidden");
+  const syntheticUnknownBuiltIn = evaluateDispatchAuthorization({
+    fromRoleId: "chief",
+    targetRoleId: "future-built-in",
+    targetBuiltIn: true,
+    targetExists: true,
+    chiefRoleId: "chief",
+    convenerRoleId: "convener",
+  });
+  assert.equal(syntheticUnknownBuiltIn.ok, false);
+  if (!syntheticUnknownBuiltIn.ok) assert.equal(syntheticUnknownBuiltIn.code, "target-card-missing");
 });
 
 test("报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜", () => {
@@ -577,12 +597,12 @@ test("报告路由（M9）：任务绑定报告按 task.created.from 回创建�
   assert.equal(reportTargetForTaskCreator({ creator: "convener", chiefRoleId: "chief", convenerRoleId: null }), null);
 });
 
-test("链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ flow-required", () => {
+test("链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required", () => {
   const chiefNoFlow = evaluateDispatchPreflight(
-    preflight({ targetRoleId: "convener", d3Selected: ["implementer"], flowId: undefined as never }),
+    preflight({ targetRoleId: "convener", d3Selected: ["implementer"], flowId: undefined }),
   );
-  assert.equal(chiefNoFlow.ok, false);
-  if (!chiefNoFlow.ok) assert.equal(chiefNoFlow.code, "flow-required");
+  assert.equal(chiefNoFlow.ok, true);
+  if (chiefNoFlow.ok) assert.ok(chiefNoFlow.advisories.some((a) => a.code === "flow-required"));
   const convenerNoFlow = evaluateDispatchPreflight(
     preflight({
       fromRoleId: "convener",
@@ -590,11 +610,11 @@ test("链式派发必须带 flowId（Q9）：交付运营/运营派实现或验�
       targetBuiltIn: false,
       handoffFound: true,
       d3Selected: ["implementer"],
-      flowId: undefined as never,
+      flowId: undefined,
     }),
   );
-  assert.equal(convenerNoFlow.ok, false);
-  if (!convenerNoFlow.ok) assert.equal(convenerNoFlow.code, "flow-required");
+  assert.equal(convenerNoFlow.ok, true);
+  if (convenerNoFlow.ok) assert.ok(convenerNoFlow.advisories.some((a) => a.code === "flow-required"));
 });
 
 test("模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例", () => {
@@ -833,34 +853,120 @@ test("固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示�
   }
 });
 
-test("2026-10-30（3.1）：run 条件必填——交付需 draft/pinned run；实现/验收需 pinned 且目标在 manifest.roles", () => {
-  const noRun = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], run: undefined }));
-  assert.equal(noRun.ok, false);
-  if (!noRun.ok) assert.equal(noRun.code, "run-missing");
+test("2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory", () => {
+  const noRun = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], run: undefined, runFacts: { ledgerUnavailable: true } }));
+  assert.equal(noRun.ok, true);
+  if (noRun.ok) assert.ok(noRun.advisories.some((a) => a.code === "run-ledger-unavailable"));
   const draftHandoff = evaluateDispatchPreflight(preflight({ targetRoleId: "convener", d3Selected: ["implementer"], run: { state: "draft", runId: "run-20261030-focus-draft" } }));
   assert.equal(draftHandoff.ok, true, "交付前 preflight 允许 draft；会话层在 task.created 前 pin");
+  if (draftHandoff.ok) assert.ok(draftHandoff.advisories.some((a) => a.code === "run-pin-required"));
   const implDraft = evaluateDispatchPreflight(preflight({
     fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, handoffFound: true,
+    d3Selected: ["implementer"],
     run: { state: "draft", runId: "run-20261030-focus-draft", roles: ["implementer"] },
   }));
-  assert.equal(implDraft.ok, false);
-  if (!implDraft.ok) assert.equal(implDraft.code, "run-pin-required");
+  assert.equal(implDraft.ok, true);
+  if (implDraft.ok) assert.ok(implDraft.advisories.some((a) => a.code === "run-pin-required"));
   const roleMissing = evaluateDispatchPreflight(preflight({
     fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, handoffFound: true,
+    d3Selected: ["implementer"],
     run: { state: "pinned", runId: "run-20261030-focus-pinned", roles: ["qa"] },
   }));
-  assert.equal(roleMissing.ok, false);
-  if (!roleMissing.ok) assert.equal(roleMissing.code, "run-role-missing");
+  assert.equal(roleMissing.ok, true);
+  if (roleMissing.ok) assert.ok(roleMissing.advisories.some((a) => a.code === "run-role-missing"));
+  // R2 组合：pin 失败且 run 仍 draft → 两个 code 同时存在，顺序固定。
+  const pinFailed = evaluateDispatchPreflight(preflight({
+    targetRoleId: "convener", d3Selected: ["implementer"],
+    run: { state: "draft", runId: "run-20261030-focus-draft" },
+    runFacts: { pinFailed: true },
+  }));
+  assert.equal(pinFailed.ok, true);
+  if (pinFailed.ok) {
+    const codes = pinFailed.advisories.map((a) => a.code);
+    assert.ok(codes.includes("run-pin-failed"));
+    assert.ok(codes.includes("run-pin-required"));
+    assert.ok(codes.indexOf("run-pin-failed") < codes.indexOf("run-pin-required"));
+  }
 });
 
-test("R2（P1.3）：legacy run 只读——实现/验收 preflight 明确拒绝 run-legacy-readonly", () => {
+test("R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory", () => {
   const legacy = evaluateDispatchPreflight(preflight({
     fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, handoffFound: true,
     d3Selected: ["implementer"], run: { state: "legacy" },
   }));
-  assert.equal(legacy.ok, false);
-  if (!legacy.ok) {
-    assert.equal(legacy.code, "run-legacy-readonly");
-    assert.match(legacy.message, /legacy|只读/);
+  assert.equal(legacy.ok, true);
+  if (legacy.ok) {
+    assert.ok(legacy.advisories.some((a) => a.code === "run-legacy-readonly"));
+    assert.equal(legacy.advisories.some((a) => a.code === "run-pin-required"), false);
   }
+});
+
+test("targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填", () => {
+  const missing = evaluateDispatchPreflight(preflight({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false,
+    targetExists: undefined, targetCardFound: false, handoffFound: true, d3Selected: ["implementer"],
+  }));
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.code, "target-card-missing");
+  const present = evaluateDispatchPreflight(preflight({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false,
+    targetExists: undefined, targetCardFound: true, handoffFound: true, d3Selected: ["implementer"],
+  }));
+  assert.equal(present.ok, true);
+  const explicitFalse = evaluateDispatchAuthorization({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false,
+    targetExists: false, chiefRoleId: "chief", convenerRoleId: "convener",
+  });
+  assert.equal(explicitFalse.ok, false);
+  if (!explicitFalse.ok) assert.equal(explicitFalse.code, "target-card-missing");
+  const explicitTrue = evaluateDispatchAuthorization({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false,
+    targetExists: true, chiefRoleId: "chief", convenerRoleId: "convener",
+  });
+  assert.equal(explicitTrue.ok, true);
+  const convenerWithNullChief = evaluateDispatchAuthorization({
+    fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false,
+    targetExists: true, chiefRoleId: null, convenerRoleId: "convener",
+  });
+  assert.equal(convenerWithNullChief.ok, true);
+});
+
+test("evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）", () => {
+  const base = {
+    fromRoleId: "chief",
+    targetRoleId: "product",
+    targetBuiltIn: true,
+    targetExists: true,
+    chiefRoleId: "chief",
+    convenerRoleId: "convener",
+  } as const;
+  const self = evaluateDispatchAuthorization({ ...base, targetRoleId: "chief" });
+  assert.equal(self.ok, false);
+  if (!self.ok) assert.equal(self.code, "self-dispatch");
+  const unknown = evaluateDispatchAuthorization({ ...base, fromRoleId: "rapporteur" });
+  assert.equal(unknown.ok, false);
+  if (!unknown.ok) assert.equal(unknown.code, "unknown-source");
+  const chiefToWorker = evaluateDispatchAuthorization({ ...base, targetRoleId: "implementer", targetBuiltIn: false });
+  assert.equal(chiefToWorker.ok, false);
+  if (!chiefToWorker.ok) assert.equal(chiefToWorker.code, "chief-to-project-forbidden");
+  const chiefToSu = evaluateDispatchAuthorization({ ...base, targetRoleId: "su" });
+  assert.equal(chiefToSu.ok, false);
+  if (!chiefToSu.ok) assert.equal(chiefToSu.code, "target-card-missing");
+  const convenerToProduct = evaluateDispatchAuthorization({ ...base, fromRoleId: "convener", targetRoleId: "product" });
+  assert.equal(convenerToProduct.ok, false);
+  if (!convenerToProduct.ok) assert.equal(convenerToProduct.code, "convener-target-forbidden");
+  const convenerToChief = evaluateDispatchAuthorization({ ...base, fromRoleId: "convener", targetRoleId: "chief" });
+  assert.equal(convenerToChief.ok, false);
+  if (!convenerToChief.ok) assert.equal(convenerToChief.code, "convener-target-forbidden");
+  const convenerMissingWorker = evaluateDispatchAuthorization({
+    ...base, fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, targetExists: false,
+  });
+  assert.equal(convenerMissingWorker.ok, false);
+  if (!convenerMissingWorker.ok) assert.equal(convenerMissingWorker.code, "target-card-missing");
+  const convenerExistingWorker = evaluateDispatchAuthorization({
+    ...base, fromRoleId: "convener", targetRoleId: "implementer", targetBuiltIn: false, targetExists: true,
+  });
+  assert.equal(convenerExistingWorker.ok, true);
+  const convenerVerifier = evaluateDispatchAuthorization({ ...base, fromRoleId: "convener", targetRoleId: "verifier" });
+  assert.equal(convenerVerifier.ok, true);
 });

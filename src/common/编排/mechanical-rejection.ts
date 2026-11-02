@@ -54,7 +54,13 @@ const RULES: Record<string, RejectionRule> = {
   "roster-modules-drift": { owner: "rapporteur", action: "以 modules-vN 为权威重出 roster modules[] 快照。", retryable: true, docs: [MODULES_DOC, ROSTER_DOC] },
   "roster-module-owner-invalid": { owner: "rapporteur", action: "修正模块属主：env/entry 只能归 env-bootstrap，一模块一属主。", retryable: true, docs: [ROSTER_DOC] },
   "env-bootstrap-missing": { owner: "rapporteur", action: "补 env-bootstrap 与 env-resources/entry-index，或在名单写 omitted:true + 理由并移除 env/entry 模块。", retryable: true, docs: [ROSTER_DOC] },
-  "target-card-missing": { owner: "nominator", action: "按 D3 选中集合逐角色写卡；缺卡 id 见 missing，不要改写名单绕过。", retryable: true, docs: ["角色卡/<id>/role-card.md", "角色卡/<id>/boundary.yaml"] },
+  "target-card-missing": {
+    owner: "nominator",
+    action:
+      "先确认目标 id 拼写与类型：幕僚只能派产品/策划/人事/运营/质检，运营只能派真实存在的项目 worker 或质检；若目标是项目 worker 且角色卡/边界尚未就绪，请人事按 D3 完成写卡后重试。不要改写名单绕过。",
+    retryable: true,
+    docs: ["角色卡/<id>/role-card.md", "角色卡/<id>/boundary.yaml"],
+  },
   "target-not-nominated": { owner: "nominator", action: "先取得 D3 选中/重走 D3；未选中角色不得写卡或派实现。", retryable: true, docs: [ROSTER_DOC] },
   "module-required": { owner: "convener", action: "派实现任务必须带 moduleId；模块必须属于目标角色。", retryable: true, docs: [MODULES_DOC] },
   "module-missing": { owner: "rapporteur", action: "把该模块加入 modules-vN 并绑定属主后重试。", retryable: true, docs: [MODULES_DOC] },

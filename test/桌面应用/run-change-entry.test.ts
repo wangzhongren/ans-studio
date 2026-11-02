@@ -208,8 +208,8 @@ test("跨层源码钉：main handler / preload 桥 / platform 类型 / ChatHeade
   assert.ok(iface.includes("manager.requestRunChangeDecision("), "Interface 调 SessionManager.requestRunChangeDecision");
   assert.ok(iface.includes("activeRunViews("), "listProject 使用 active run 摘要");
   const session = read("app/desktop/session.ts");
-  assert.ok(session.includes("this.requestRunChangeDecision({"), "SessionManager 内部有真实调用方（自动触发/显式入口）");
-  assert.ok(session.includes("runChangeRejectionForDispatch"), "派发冻结冲突先尝试 run-change 卡");
+  assert.ok(session.includes("this.requestRunChangeDecision({"), "SessionManager 内部有真实调用方（显式入口）");
+  assert.doesNotMatch(session, /\brunChangeRejectionForDispatch\s*\(/, "派发不再自动触发 run-change（源码无调用）");
   assert.ok(session.includes("proposalCardFrozenRejection"), "提案卡冻结冲突先尝试 run-change 卡");
   const rejection = read("src/common/编排/mechanical-rejection.ts");
   assert.ok(rejection.includes('"run-change-required"'), "机械拒绝新增 run-change-required");

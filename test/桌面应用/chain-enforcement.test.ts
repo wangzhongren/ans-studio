@@ -26,7 +26,9 @@ import type {
   CustomerInputRequest,
   DispatchReceipt,
   DispatchTaskFn,
+  EvidenceCheckFn,
 } from "../../src/model/runtime.ts";
+import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 async function settle(h: { streams: Record<string, OrchestrationEvent[]> }, ...roles: string[]): Promise<void> {
@@ -42,6 +44,19 @@ async function waitUntil(check: () => boolean, timeoutMs = 3000): Promise<void> 
     if (Date.now() - start > timeoutMs) throw new Error("等待超时");
     await tick(10);
   }
+}
+
+async function readDiagnostics(directory: string): Promise<string> {
+  let names: string[] = [];
+  try {
+    names = await fs.readdir(directory);
+  } catch {
+    return "";
+  }
+  const texts = await Promise.all(
+    names.filter((name) => name.endsWith(".jsonl")).map((name) => fs.readFile(path.join(directory, name), "utf8")),
+  );
+  return texts.join("\n");
 }
 
 const ROSTER_TEXT = [
@@ -60,6 +75,7 @@ const ROSTER_TEXT = [
   "    capability: TypeScript",
   "    modules:",
   "      - impl-core",
+  "      - impl-file",
   "  - id: qa",
   "    displayName: 测试",
   "    purpose: 质量核对",
@@ -73,6 +89,13 @@ const ROSTER_TEXT = [
   "    path: src/",
     "    category: core",
   "    publicContract: src/index.ts",
+  "    architectureSource: docs/contracts/focus-architecture-v1.md",
+  "  - id: impl-file",
+  "    name: 构建脚本",
+  "    purpose: 构建",
+  "    path: scripts/build.mjs",
+    "    category: core",
+  "    publicContract: scripts/build.mjs",
   "    architectureSource: docs/contracts/focus-architecture-v1.md",
   "  - id: qa-suite",
   "    name: 测试",
@@ -90,12 +113,15 @@ const ROSTER_TEXT = [
   "  - id: impl-core",
   "    path: src/",
   "    roleId: implementer",
+  "  - id: impl-file",
+  "    path: scripts/build.mjs",
+  "    roleId: implementer",
   "  - id: qa-suite",
   "    path: test/",
   "    roleId: qa",
   "roles:",
   "  - id: implementer",
-  "    modules: [impl-core]",
+  "    modules: [impl-core, impl-file]",
   "  - id: qa",
   "    modules: [qa-suite]",
   "management: [convener, implementer, qa]",
@@ -132,7 +158,7 @@ async function writeProjectFiles(root: string): Promise<void> {
   await recordVersionedDocBaselines({ projectRoot: root, recordedBy: "app:test" });
 }
 
-function listing(root: string): ProjectListing {
+function listing(root: string, verifierBoundaryPath = "test/"): ProjectListing {
   const builtIn = (roleId: string, fn: NonNullable<ProjectListing["roles"][number]["governanceFunction"]>): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: "",
@@ -142,6 +168,12 @@ function listing(root: string): ProjectListing {
     builtIn: true,
     governanceFunction: fn,
   });
+  const verifier = builtIn("verifier", "verification");
+  verifier.boundary = {
+    entries: [{ root: "project", path: verifierBoundaryPath, kind: "directory", purpose: "evidence" }],
+    boundarySource: `<built-in:verifier:${verifierBoundaryPath}>`,
+    acceptance: { accepted: false, source: "" },
+  };
   const worker = (roleId: string): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: `角色卡/${roleId}/role-card.md`,
@@ -161,7 +193,7 @@ function listing(root: string): ProjectListing {
       builtIn("rapporteur", "proposal"),
       builtIn("nominator", "nomination"),
       builtIn("convener", "schedule"),
-      builtIn("verifier", "verification"),
+      verifier,
       worker("implementer"),
       worker("qa"),
     ],
@@ -178,19 +210,22 @@ interface Harness {
   sent: Record<string, string[]>;
   caps: Record<string, DispatchTaskFn | undefined>;
   customerInputs: Record<string, CustomerInputFn | undefined>;
+  evidenceChecks: Record<string, EvidenceCheckFn | undefined>;
   sendOptions: Record<string, RoleSessionSendOptions[]>;
 }
 
-function harness(root: string): Harness {
+function harness(root: string, options: { verifierBoundaryPath?: string } = {}): Harness {
   const streams: Record<string, OrchestrationEvent[]> = {};
   const sent: Record<string, string[]> = {};
   const caps: Record<string, DispatchTaskFn | undefined> = {};
   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
+  const evidenceChecks: Record<string, EvidenceCheckFn | undefined> = {};
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
       customerInputs[input.roleId] = (input as { customerInput?: CustomerInputFn }).customerInput;
+      evidenceChecks[input.roleId] = (input as { evidenceCheck?: EvidenceCheckFn }).evidenceCheck;
       const handle: RoleSessionHandle = {
         async send(text, options) {
           (sent[input.roleId] ??= []).push(text);
@@ -224,12 +259,12 @@ function harness(root: string): Harness {
       throw new Error("no demo");
     },
     buildProjectConfig,
-    getListing: (r) => (r === root ? listing(root) : undefined),
+    getListing: (r) => (r === root ? listing(root, options.verifierBoundaryPath) : undefined),
     emitEvent: () => {},
     // 客户通道桩（本文件只验证应用层前置；通道本身不参与判定）。
     customerInput: async () => ({ outcome: "declined", operatorId: "test-channel" }),
   });
-  return { mgr, streams, sent, caps, customerInputs, sendOptions };
+  return { mgr, streams, sent, caps, customerInputs, evidenceChecks, sendOptions };
 }
 
 async function d3Fixture(root: string, selected: string[], rosterVersion = 1): Promise<void> {
@@ -302,8 +337,10 @@ async function choiceResolution(
   });
 }
 
-test("M1/M2：幕僚跳步被拒（意图/名单缺失），拒绝在 task.created 之前；补齐后受理", async () => {
+test("M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-m1-"));
+  const diagnosticsDir = path.join(root, ".diag");
+  configureDiagnostics({ directory: diagnosticsDir });
   try {
     await fs.mkdir(path.join(root, "docs"), { recursive: true });
     const h = harness(root);
@@ -311,48 +348,69 @@ test("M1/M2：幕僚跳步被拒（意图/名单缺失），拒绝在 task.creat
       await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
       await tick(20);
       const dispatch = h.caps.chief!;
-      // M1 缺意图 → 拒，无任务行。
+      // M1 缺意图 → 受理 + advisory；任务行 +1。
       const noIntent = (await dispatch({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(noIntent.ok, false);
+      assert.equal(noIntent.ok, true, noIntent.message ?? "");
+      assert.match(noIntent.message ?? "", /已受理/);
+      assert.match(noIntent.message ?? "", /状态提示（未阻断）/);
       assert.match(noIntent.message ?? "", /意图/);
-      assert.equal((await readTaskState(root)).records.size, 0, "拒绝不产生 task.created");
-
-      // 补意图 → 受理（from=chief、flowId 落盘）。
-      await writeProjectFiles(root);
-      const toRapporteur = (await dispatch({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(toRapporteur.ok, true, toRapporteur.message ?? "");
       const state1 = await readTaskState(root);
-      assert.equal(state1.records.size, 1);
-      const created = [...state1.records.values()][0]!.created!;
-      assert.equal(created.from, "chief");
-      assert.equal(created.to, "rapporteur");
-      assert.equal(created.flowId, "focus");
+      assert.equal(state1.records.size, 1, "状态缺失也受理并建任务");
+      const first = [...state1.records.values()][0]!.created!;
+      assert.equal(first.from, "chief");
+      assert.equal(first.to, "rapporteur");
+      assert.equal(first.flowId, "focus");
+      assert.equal(first.runState, "draft", "有 flowId 时 draft 锚点");
+      await flushDiagnostics();
+      const diagnosticText = await readDiagnostics(diagnosticsDir);
+      assert.ok(diagnosticText.includes("tasks.dispatch.advisory"), "诊断记录 advisory");
+      assert.ok(diagnosticText.includes("intent-missing"), "reasonCode=intent-missing");
 
-      // M2：缺方案/名单时派人事被拒（先删名单再试）。
+      // 同文复派被幂等抑制：不新增任务行。
+      const duplicate = (await dispatch({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(duplicate.ok, true);
+      assert.match(duplicate.message ?? "", /同一任务已存在|重复派发已抑制/);
+      assert.equal((await readTaskState(root)).records.size, 1, "同文复派不建新行");
+
+      // 补齐后改用新文本 → 受理。
+      await writeProjectFiles(root);
+      const toRapporteur = (await dispatch({ roleId: "rapporteur", task: "出方案与名单（补齐后）", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(toRapporteur.ok, true, toRapporteur.message ?? "");
+      assert.equal((await readTaskState(root)).records.size, 2);
+
+      // M2：缺名单 → 受理 + roster-missing advisory；同文复派幂等抑制。
       await fs.rm(path.join(root, "docs/proposals/focus-roster-v1.md"));
       const noRoster = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(noRoster.ok, false);
+      assert.equal(noRoster.ok, true, noRoster.message ?? "");
       assert.match(noRoster.message ?? "", /名单/);
-      assert.equal((await readTaskState(root)).records.size, 1, "拒绝仍不产生新任务行");
-      // 恢复名单 → 受理。
+      assert.equal((await readTaskState(root)).records.size, 3, "缺名单也受理");
+      const noRosterDuplicate = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(noRosterDuplicate.ok, true);
+      assert.match(noRosterDuplicate.message ?? "", /同一任务已存在|重复派发已抑制/);
+      assert.equal((await readTaskState(root)).records.size, 3);
+      // 恢复名单 → 新文本受理。
       await fs.writeFile(path.join(root, "docs/proposals/focus-roster-v1.md"), ROSTER_TEXT, "utf8");
-      const toNominator = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      const toNominator = (await dispatch({ roleId: "nominator", task: "按名单招人（补齐后）", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
       assert.equal(toNominator.ok, true, toNominator.message ?? "");
+      assert.equal((await readTaskState(root)).records.size, 4);
 
-      // R9：已记录版本化文档被外部修改（shell/手动）⇒ 基线校验拒绝派发。
+      // R9：基线篡改 → 受理 + versioned-doc-baseline-violation advisory（不再拒发）。
       await fs.writeFile(path.join(root, "docs/product/focus-intent-v1.md"), "# 外部篡改\n", "utf8");
       const tampered = (await dispatch({ roleId: "rapporteur", task: "出方案 v2", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(tampered.ok, false);
+      assert.equal(tampered.ok, true, tampered.message ?? "");
+      assert.match(tampered.message ?? "", /状态提示（未阻断）/);
       assert.match(tampered.message ?? "", /基线|只读|版本化/);
+      assert.equal((await readTaskState(root)).records.size, 5);
     } finally {
       await h.mgr.stop(null);
     }
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await disposeDiagnostics();
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
-test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运营派实现/质检需已接交付且目标在名单内", async () => {
+test("M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-m5-"));
   try {
     await writeProjectFiles(root);
@@ -371,6 +429,7 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
       assert.equal(handoffCreated.from, "chief");
       assert.equal(handoffCreated.stepId, "project-handoff");
       assert.equal(handoffCreated.flowId, "focus");
+      assert.equal(handoffCreated.runState, "pinned", "handoff pin 成功");
 
       // 运营会话：接交付后派名单内 worker 受理（from=convener）。
       await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
@@ -387,8 +446,8 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
       assert.equal(workerTask.moduleDirectory, "src/", "任务模块目录以名单为准落盘");
       assert.deepEqual(workerTask.modulePaths, ["src/"], "普通模块 modulePaths 为单元素数组");
 
-      // R2/R3：目标不拥有任务模块 ⇒ 拒绝（不产生任务行）。
-      const beforeWrongModule = (await readTaskState(root)).records.size;
+      // R2/R3：越界 modulePaths → 受理 + advisory；任务模块字段仍取名单模块。
+      const beforeWrongPaths = (await readTaskState(root)).records.size;
       const wrongPaths = (await convenerDispatch({
         roleId: "implementer",
         task: "实现番茄钟（越界路径）",
@@ -397,8 +456,16 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
         moduleId: "impl-core",
         modulePaths: ["other/"],
       })) as DispatchReceipt;
-      assert.equal(wrongPaths.ok, false);
+      assert.equal(wrongPaths.ok, true, wrongPaths.message ?? "");
+      assert.match(wrongPaths.message ?? "", /状态提示（未阻断）/);
       assert.match(wrongPaths.message ?? "", /modulePaths|不属于模块/);
+      assert.equal((await readTaskState(root)).records.size, beforeWrongPaths + 1);
+      const wrongPathsTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("越界路径"))!.created!;
+      assert.equal(wrongPathsTask.moduleId, "impl-core");
+      assert.equal(wrongPathsTask.moduleDirectory, "src/");
+      assert.deepEqual(wrongPathsTask.modulePaths, ["src/"]);
+
+      // 非属主模块 → 受理 + module-not-owned；不写模块字段。
       const wrongModule = (await convenerDispatch({
         roleId: "implementer",
         task: "实现测试套件",
@@ -406,25 +473,54 @@ test("M5/M6/M7 + 交付标记：幕僚交付运营需 D3 选中角色卡；运�
         flowId: "focus",
         moduleId: "qa-suite",
       })) as DispatchReceipt;
-      assert.equal(wrongModule.ok, false);
+      assert.equal(wrongModule.ok, true, wrongModule.message ?? "");
       assert.match(wrongModule.message ?? "", /模块|属主/);
-      assert.equal((await readTaskState(root)).records.size, beforeWrongModule, "模块不归属目标时不创建任务");
-      // 运营 → 质检（验收核对，带模块）受理；运营 → 产品（内置非质检）被拒。
+      const wrongModuleTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现测试套件"))!.created!;
+      assert.equal(wrongModuleTask.moduleId, undefined);
+      assert.equal(wrongModuleTask.moduleDirectory, undefined);
+      assert.equal(wrongModuleTask.modulePaths, undefined);
+
+      // verifier 带非属主模块：受理，任务仍写 moduleId/modulePaths（不要求属主）。
       const toVerifier = (await convenerDispatch({ roleId: "verifier", task: "验收核对", sideEffect: "read-only", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
       assert.equal(toVerifier.ok, true, toVerifier.message ?? "");
+      const verifierTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.to === "verifier")!.created!;
+      assert.equal(verifierTask.moduleId, "impl-core");
+      assert.deepEqual(verifierTask.modulePaths, ["src/"]);
+      assert.equal(verifierTask.moduleDirectory, "src/");
+
+      // 文件型模块：不写 moduleDirectory，任务行可读回。
+      const toFile = (await convenerDispatch({ roleId: "implementer", task: "构建脚本", sideEffect: "code", flowId: "focus", moduleId: "impl-file" })) as DispatchReceipt;
+      assert.equal(toFile.ok, true, toFile.message ?? "");
+      const fileTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("构建脚本"))!.created!;
+      assert.equal(fileTask.moduleId, "impl-file");
+      assert.deepEqual(fileTask.modulePaths, ["scripts/build.mjs"]);
+      assert.equal(fileTask.moduleDirectory, undefined);
+
+      // 运营 → 产品（内置非质检）仍硬拒。
       const toProduct = (await convenerDispatch({ roleId: "product", task: "写意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
       assert.equal(toProduct.ok, false);
       assert.match(toProduct.message ?? "", /运营|项目 worker|质检/);
 
-      // 名单外目标（qa 未在 D3 选中）被拒。
+      // 名单外目标（qa 未在 D3 选中）：受理 + target-not-nominated advisory。
+      const beforeQa = (await readTaskState(root)).records.size;
       const toQa = (await convenerDispatch({ roleId: "qa", task: "测试", sideEffect: "code", flowId: "focus", moduleId: "qa-suite" })) as DispatchReceipt;
-      assert.equal(toQa.ok, false);
-      assert.match(toQa.message ?? "", /名单|D3/);
+      assert.equal(toQa.ok, true, toQa.message ?? "");
+      assert.match(toQa.message ?? "", /D3|选中/);
+      assert.equal((await readTaskState(root)).records.size, beforeQa + 1);
+      const qaTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("测试") && record.created?.to === "qa")!.created!;
+      assert.equal(qaTask.moduleId, "qa-suite");
+
+      // 实现目标未带 moduleId：受理 + module-required advisory、无模块字段。
+      const noModule = (await convenerDispatch({ roleId: "implementer", task: "无模块实现", sideEffect: "code", flowId: "focus" })) as DispatchReceipt;
+      assert.equal(noModule.ok, true, noModule.message ?? "");
+      assert.match(noModule.message ?? "", /moduleId|模块/);
+      const noModuleTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("无模块实现"))!.created!;
+      assert.equal(noModuleTask.moduleId, undefined);
     } finally {
       await h.mgr.stop(null);
     }
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -488,8 +584,8 @@ test("D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不
       assert.equal(toImplementer.ok, true, toImplementer.message ?? "");
       // 决策选项 qa 与真实角色同名：若 D3 被污染，这里会被放行；收口后必须拒绝。
       const toQa = (await h.caps.convener!({ roleId: "qa", task: "测试套件", sideEffect: "code", flowId: "focus", moduleId: "qa-suite" })) as DispatchReceipt;
-      assert.equal(toQa.ok, false, "decision 选项不得顶替 D3 角色集");
-      assert.match(toQa.message ?? "", /名单|D3/);
+      assert.equal(toQa.ok, true, toQa.message ?? "");
+      assert.match(toQa.message ?? "", /D3|选中/, "decision 选项不得顶替 D3 角色集（qa 不在 D3）");
     } finally {
       await h.mgr.stop(null);
       // 2026-10-31（CI 稳定性，macOS arm64）：stop 只释放会话句柄，不等待 `void drainQueue(...)`
@@ -547,8 +643,9 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
       await hLegacy.mgr.open({ projectRoot: rootLegacy, roleId: "chief", runtime: "demo" });
       await tick(20);
       const handoff = (await hLegacy.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, false);
-      assert.match(handoff.message ?? "", /D3/);
+      assert.equal(handoff.ok, true, handoff.message ?? "");
+      assert.match(handoff.message ?? "", /D3|选中/);
+      assert.match(handoff.message ?? "", /状态提示（未阻断）/);
     } finally {
       await hLegacy.mgr.stop(null);
       await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
@@ -754,5 +851,186 @@ test("F4：质检报告按任务创建者路由——运营发起回运营；幕
     }
   } finally {
     await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed", async () => {
+  const diagnosticsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-r3-diag-"));
+  configureDiagnostics({ directory: diagnosticsDir });
+  const criteriaText = [
+    "# 验收标准",
+    "",
+    "```ans-criteria",
+    "schema: ans-criteria/v1",
+    "flowId: focus",
+    "version: 1",
+    "status: final",
+    "criteria:",
+    "  - id: AC-1",
+    "    priority: P1",
+    "    title: 模块证据",
+    "```",
+    "",
+  ].join("\n");
+  const criteriaRef = {
+    path: "docs/acceptance/focus-criteria-v1.md",
+    sha256: createHash("sha256").update(Buffer.from(criteriaText, "utf8")).digest("hex"),
+    version: 1,
+  };
+  const appendCreated = async (
+    root: string,
+    input: { taskId: string; from: "chief" | "convener"; to: string; text: string; moduleId: string; modulePaths: string[] },
+  ): Promise<void> => {
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-11-02T00:00:00.000Z",
+      kind: "task.created",
+      taskId: input.taskId,
+      from: input.from,
+      to: input.to,
+      text: input.text,
+      sideEffect: "read-only",
+      idempotencyKey: `r3-${input.taskId}`,
+      moduleId: input.moduleId,
+      modulePaths: input.modulePaths,
+    } as never);
+  };
+  const prepareRoot = async (): Promise<string> => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-r3-"));
+    await writeProjectFiles(root);
+    await fs.mkdir(path.join(root, "docs/acceptance"), { recursive: true });
+    await fs.writeFile(path.join(root, "docs/acceptance/focus-criteria-v1.md"), criteriaText, "utf8");
+    await fs.mkdir(path.join(root, "src"), { recursive: true });
+    await fs.writeFile(path.join(root, "src/evidence.txt"), "module evidence\n", "utf8");
+    await fs.mkdir(path.join(root, "test"), { recursive: true });
+    await fs.writeFile(path.join(root, "test/evidence.txt"), "qa evidence\n", "utf8");
+    await fs.mkdir(path.join(root, "scripts/generated"), { recursive: true });
+    await fs.writeFile(path.join(root, "scripts/generated/report.txt"), "drift evidence\n", "utf8");
+    await fs.mkdir(path.join(root, "outside/r3"), { recursive: true });
+    await fs.writeFile(path.join(root, "outside/r3/evidence.txt"), "outside evidence\n", "utf8");
+    await fs.mkdir(path.join(root, "docs/quality"), { recursive: true });
+    await fs.writeFile(path.join(root, "docs/outside.txt"), "outside\n", "utf8");
+    return root;
+  };
+  const check = async (
+    root: string,
+    roleId: string,
+    artifact: string,
+    options: { verifierBoundaryPath?: string } = {},
+  ): Promise<{ manager: SessionManager; result: Record<string, unknown> }> => {
+    const h = harness(root, options);
+    await h.mgr.open({ projectRoot: root, roleId, runtime: "demo" });
+    await tick(20);
+    const fn = h.evidenceChecks[roleId];
+    assert.equal(typeof fn, "function", `evidenceCheck 注入 ${roleId}`);
+    const raw = await fn!({ criteriaRef, artifact });
+    return { manager: h.mgr, result: JSON.parse(String(raw)) as Record<string, unknown> };
+  };
+
+  const rootA = await prepareRoot();
+  try {
+    await appendCreated(rootA, {
+      taskId: "t-r3-chief-verifier",
+      from: "chief",
+      to: "verifier",
+      text: "chief 验收",
+      moduleId: "impl-core",
+      modulePaths: ["src/"],
+    });
+    await appendCreated(rootA, {
+      taskId: "t-r3-bad-creator",
+      from: "chief",
+      to: "implementer",
+      text: "chief 派 worker",
+      moduleId: "impl-core",
+      modulePaths: ["outside/r3/"],
+    });
+    // chief→verifier 无 flow 正例：任务 modulePaths 贡献证据根。
+    const chiefVerifier = await check(rootA, "verifier", "src/evidence.txt");
+    try {
+      assert.equal(chiefVerifier.result["ok"], true, JSON.stringify(chiefVerifier.result));
+    } finally {
+      await chiefVerifier.manager.stop(null);
+    }
+    // creator 不匹配负例：implementer 的 chief 来源任务不贡献 root。
+    const badCreator = await check(rootA, "implementer", "outside/r3/evidence.txt");
+    try {
+      assert.equal(badCreator.result["ok"], false, JSON.stringify(badCreator.result));
+      assert.equal(badCreator.result["code"], "evidence-scope-denied");
+    } finally {
+      await badCreator.manager.stop(null);
+    }
+    // roster 漂移：移除最新 roster 后，无 flow verifier 任务仍以 modulePaths 贡献根。
+    await appendCreated(rootA, {
+      taskId: "t-r3-drift",
+      from: "convener",
+      to: "verifier",
+      text: "convener 验收",
+      moduleId: "impl-file",
+      modulePaths: ["scripts/generated/"],
+    });
+    await fs.rm(path.join(rootA, "docs/proposals/focus-roster-v1.md"));
+    const drift = await check(rootA, "verifier", "scripts/generated/report.txt");
+    try {
+      assert.equal(drift.result["ok"], true, JSON.stringify(drift.result));
+    } finally {
+      await drift.manager.stop(null);
+    }
+  } finally {
+    await fs.rm(rootA, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+
+  // 边界兜底：无任务 modulePaths，但角色边界 test/ 位于 roster 模块 test/ 内 → 接受并记录来源。
+  const rootC = await prepareRoot();
+  try {
+    await appendTaskEvent(rootC, {
+      v: 1,
+      at: "2026-11-02T00:00:00.000Z",
+      kind: "task.created",
+      taskId: "t-r3-boundary",
+      from: "chief",
+      to: "verifier",
+      text: "无模块验收",
+      sideEffect: "read-only",
+      idempotencyKey: "r3-boundary",
+    } as never);
+    const boundary = await check(rootC, "verifier", "test/evidence.txt");
+    try {
+      assert.equal(boundary.result["ok"], true, JSON.stringify(boundary.result));
+    } finally {
+      await boundary.manager.stop(null);
+    }
+    await flushDiagnostics();
+    const diagnosticsText = await readDiagnostics(diagnosticsDir);
+    assert.ok(diagnosticsText.includes("evidence.scope.boundary-fallback"), "边界兜底记录来源");
+  } finally {
+    await fs.rm(rootC, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+
+  // 无根 fail-closed：verifier 边界 docs/ 不在 roster 模块内，且任务无 modulePaths。
+  const rootD = await prepareRoot();
+  try {
+    await appendTaskEvent(rootD, {
+      v: 1,
+      at: "2026-11-02T00:00:00.000Z",
+      kind: "task.created",
+      taskId: "t-r3-noroot",
+      from: "chief",
+      to: "verifier",
+      text: "无根验收",
+      sideEffect: "read-only",
+      idempotencyKey: "r3-noroot",
+    } as never);
+    const noRoot = await check(rootD, "verifier", "docs/outside.txt", { verifierBoundaryPath: "docs/" });
+    try {
+      assert.equal(noRoot.result["ok"], false, JSON.stringify(noRoot.result));
+      assert.equal(noRoot.result["code"], "evidence-scope-denied");
+    } finally {
+      await noRoot.manager.stop(null);
+    }
+  } finally {
+    await disposeDiagnostics();
+    await fs.rm(rootD, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    await fs.rm(diagnosticsDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
