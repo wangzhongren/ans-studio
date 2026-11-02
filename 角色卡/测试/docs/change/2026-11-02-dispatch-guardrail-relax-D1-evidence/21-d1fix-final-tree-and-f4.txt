@@ -1,0 +1,56 @@
+RECORDED_AT=2026-11-02T05:03:06Z
+METHOD=temp index from HEAD + A1 five + B1 eight + i-full-chain; git write-tree
+warning: in the working copy of 'src/common/编排/workflow-preconditions.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/common/编排/dispatch-advisories.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/dispatch-advisories.test.ts', LF will be replaced by CRLF the next time Git touches it
+CANDIDATE_TREE=79962115b301f9e2b7c6c0d19af8844335b1fef5
+c78a402942deb12591b1799e7680bf9f1b6bdcc1
+TREE_EXIT_CODE=0
+---- F4 recheck on final candidate ----
+CMD=git diff --quiet HEAD -- src/pipeline/orchestration/run-role.ts; echo EXIT
+RUN_ROLE_DIFF_EXIT=0
+CMD=git hash-object app/desktop/session.ts src/pipeline/orchestration/run-role.ts
+0fd043a7627c9be031bc2f83ead1f2b11af96443
+8cb9d580c39a1ed38c787e2a8c7b02a30fe77358
+CMD=git diff -U0 -- app/desktop/session.ts | awk overlap scan 4200-4750
+ok: @@ -92 +92 @@ import {
+ok: @@ -95,0 +96 @@ import {
+ok: @@ -98,0 +100 @@ import {
+ok: @@ -2045,80 +2046,0 @@ export class SessionManager {
+ok: @@ -6086 +6008,2 @@ ${formatted}` };
+ok: @@ -6127,3 +6050 @@ ${formatted}` };
+ok: @@ -6133,0 +6055 @@ ${formatted}` };
+ok: @@ -6135,2 +6057,10 @@ ${formatted}` };
+ok: @@ -6145,0 +6076,2 @@ ${formatted}` };
+ok: @@ -6147,3 +6079,2 @@ ${formatted}` };
+ok: @@ -6153,3 +6084,2 @@ ${formatted}` };
+ok: @@ -6158 +6088 @@ ${formatted}` };
+ok: @@ -6161 +6091,4 @@ ${formatted}` };
+ok: @@ -6163,2 +6095,0 @@ ${formatted}` };
+ok: @@ -6166 +6097 @@ ${formatted}` };
+ok: @@ -6169,2 +6100,12 @@ ${formatted}` };
+ok: @@ -6172,3 +6113,33 @@ ${formatted}` };
+ok: @@ -6176,2 +6146,0 @@ ${formatted}` };
+ok: @@ -6180 +6149,22 @@ ${formatted}` };
+ok: @@ -6183,0 +6174 @@ ${formatted}` };
+ok: @@ -6190,7 +6181,2 @@ ${formatted}` };
+ok: @@ -6201,4 +6187,4 @@ ${formatted}` };
+ok: @@ -6206,37 +6191,0 @@ ${formatted}` };
+ok: @@ -6244,32 +6193,15 @@ ${formatted}` };
+ok: @@ -6278,4 +6210,8 @@ ${formatted}` };
+ok: @@ -6283,2 +6219,6 @@ ${formatted}` };
+ok: @@ -6285,0 +6226,4 @@ ${formatted}` };
+ok: @@ -6296 +6240 @@ ${formatted}` };
+ok: @@ -6298 +6242,7 @@ ${formatted}` };
+ok: @@ -6301 +6251 @@ ${formatted}` };
+ok: @@ -6303,3 +6253,3 @@ ${formatted}` };
+ok: @@ -6392,0 +6343,14 @@ ${formatted}` };
+ok: @@ -6400 +6364,3 @@ ${formatted}` };
+ok: @@ -6403,0 +6370,8 @@ ${formatted}` };
+ok: @@ -7059,2 +7033,4 @@ ${formatted}` };
+ok: @@ -7064,0 +7041,29 @@ ${formatted}` };
+ok: @@ -7068 +7073,6 @@ ${formatted}` };
+ok: @@ -7074,2 +7084,2 @@ ${formatted}` };
+ok: @@ -7083,8 +7093,23 @@ ${formatted}` };
+END

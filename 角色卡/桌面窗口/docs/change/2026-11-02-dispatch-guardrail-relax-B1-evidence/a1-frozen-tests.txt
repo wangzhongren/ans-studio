@@ -1,0 +1,42 @@
+✔ 幕僚链：flow/intent/proposal/roster/modules/env/d3/cards 正负例 (1.5565ms)
+✔ 运营链：handoff/module-required/missing/not-owned/path/nominated 正负例 (0.3264ms)
+✔ 独立 run advisory：legacy/pin/roles/ledger/hash/roster 正负例 (0.1878ms)
+✔ 链顺序：每个链只报首个未满足项 (0.1187ms)
+✔ 独立追加：链级 advisory 与 run 级 advisory 可同时存在 (0.084ms)
+✔ R2 组合：pinFailed + draft 同时产 run-pin-failed 与 run-pin-required，顺序固定 (0.067ms)
+✔ legacy：run.state=legacy 仅产 run-legacy-readonly，不产 run-pin-required (0.0513ms)
+✔ latest/pinned 分离：链级用 latest，run 专属用 run.roles/run.modules (0.1117ms)
+✔ verifier 例外：模块存在即不要求属主，无 target-not-nominated/run-role-missing (0.1127ms)
+✔ 模块路径等价性：反斜杠/绝对路径/../通配/目录与文件尾斜杠 (0.1703ms)
+✔ 独立 run advisory 顺序固定；链级 module-missing 已产出时不重复 run 专属同 code (0.5125ms)
+✔ verifier run 专属模块覆盖：pinned modules 不含 moduleId 时产 module-missing (0.0603ms)
+✔ convener→chief：collector 不产状态提示（授权拒绝由硬矩阵覆盖） (0.0548ms)
+✔ 空 advisory 与永不返回拒绝 (0.0498ms)
+✔ 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验 (4.5628ms)
+✔ 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集） (1.6706ms)
+✔ 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑 (13.6386ms)
+✔ 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错 (23.6977ms)
+✔ 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错 (39.8828ms)
+✔ 版本格式：引用必须带 -vN.md；非版本化路径拒绝 (1.6138ms)
+✔ D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项） (0.4391ms)
+✔ 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝 (0.743ms)
+✔ 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝 (0.1438ms)
+✔ 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜 (0.1593ms)
+✔ 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required (0.1088ms)
+✔ 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例 (3.2465ms)
+✔ env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引） (1.9625ms)
+✔ 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例） (5.7371ms)
+✔ envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由 (1.6485ms)
+✔ 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出 (0.7592ms)
+✔ 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory (0.2469ms)
+✔ R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory (0.0755ms)
+✔ targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填 (0.0909ms)
+✔ evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性） (0.0858ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 332.5761

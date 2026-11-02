@@ -1,0 +1,67 @@
+# E3 状态记录：派发护栏只保留「谁能给谁派发」（dispatch-guardrail-relax）
+
+- **任务 ID / flowId**：`2026-11-02-dispatch-guardrail-relax` / `dispatch-guardrail-relax`
+- **记录角色**：ANS 统筹调度（Scheduler，技能内置管理角色，独立上下文）
+- **日期**：2026-11-02
+- **性质**：闸门 2 确认后的 **E3 放行/回报状态记录**；不是团队计划修订、不是验收结论、不是提交/推送/发布授权。
+- **团队计划确认版（保持不变）**：`docs/scheduling/2026-11-02_team-plan_dispatch-guardrail-relax.md` **482 行 / SHA-256 `4ebd41fa9d68d7aca0e0847479b819965b367a87af58111128c4500f77ed074d`**（闸门 2 确认对象）。本状态记录**不修改**该文件，不改变其语义/写集/阶段/边界；确认版哈希继续有效。
+- **验收标准**：`docs/acceptance/dispatch-guardrail-relax-criteria-v1.md` 814 行 / `63c441aa30bf895be8eadc9b9c4326edd5c202189bce32ee927b20c785a29ca3`（V1，未改）。
+- **E1 变更包**：`docs/scheduling/dispatch-guardrail-relax-change-v1.md`（提交版；R4 关闭后更新）。
+- **E2 独立验收报告**：`docs/acceptance/dispatch-guardrail-relax-report-v1.md` **323 行 / `e4dfbbb4b23f2ffda0a5e01e6a86651692320d809a6458a882879f3f536a1454`**（R4 关闭后更新；结论仍为通过）。
+- **方案版本映射**：语义基线 877 行 / `54da5d31…` ↔ R4 编辑性更正版 884 行 / `fa5902edce310f7960c88ac396f3ae940ca595eba079197ed5179b07410ab446`（仅 §13 变化，语义等价）。
+
+---
+
+## 一、E2 结论与候选匹配
+
+- **总体结论：通过**。AC-1–AC-8 全部 `pass`；R1 调用协议、R2 锚点、R3 `evidenceScopeRoots`、F4 只读核对满足；**R4 已由策划作者完成编辑性更正并关闭**（方案 §13 引用当前复核记录 150 行 / `aa702f6b…` 并如实写 F4 + R1–R3；只改 §13，不改语义/AC/写集/档位）；未启动取证子上下文。
+- **候选**：产品/测试候选树 `79962115b301f9e2b7c6c0d19af8844335b1fef5`；HEAD `c80f4944c3421554fcbd35f8570cedd3e2119a0a`；13 路径（A1 5 + B1 7 + D1-fix 1）；与 E1/D2 一致；`git status --porcelain -- src app test` 13 路径、无写集外改动。
+- **证据复用**：E2 使用的 B0/A1/B1/D1/D2 证据与 E1 变更包一致；V1 未改；候选/输入/依赖/命令未变。
+- **E2 报告不是提交授权**：验收通过只表示当前候选满足 V1；不授权 commit/push/merge/release。
+
+## 二、阶段放行
+
+| 节点 | 阶段 | 状态 |
+| --- | --- | --- |
+| G2 | 闸门 2 角色指派/写集/边界/档位/顺序/验收安排/证据口径 | 已确认 |
+| IA | 客户实施授权 | 已给（不含提交/推送/发布） |
+| H1 | 边界变更（B-1/B-2） | 已落地（md/yaml 一致） |
+| V1 | 实施前验收标准 | 已冻结 |
+| B0 | 测试基线 | 已完成 |
+| P1 | 实现提案审核（含两轮修订） | 已完成，`recommend approval` |
+| A1 | 编排纯逻辑 | 已完成（implemented-unverified，契约冻结） |
+| B1 | 桌面接线 | 已完成（implemented-unverified） |
+| D1 / D1-fix | 跨角色回归 / 迁移遗漏修复 | 已完成；新增确定性失败 0、新 skip 0 |
+| D2 | 真实 Electron E2E | 已完成；`E2E_PASS=true` |
+| E1 | 变更包 | 已写盘 |
+| E2 | 独立验收 | **通过（当前候选）** |
+| E3 | 放行/回报 | **本记录：放行当前阶段，交沟通回报** |
+
+- **放行范围**：仅表示当前候选（`79962115…`）满足 V1；阶段依赖可按团队计划释放。
+- **未放行/未授权**：提交、推送、合并、发布；未接触客户；未改代码/测试/角色卡/边界/方案。
+
+## 三、未关闭事项与后续
+
+1. **R4 已关闭**：方案 §13 已由策划作者编辑性更正——引用当前复核记录 150 行 / `aa702f6b…`，并如实写 F4 部分采纳未关闭 + R1–R3 一致性；只改 §13，不改 Q1–Q5/AC/写集/范围/风险档位/任何已确认语义。版本映射：语义基线 877 行 / `54da5d31…` ↔ 当前版 884 行 / `fa5902ed…`；E2 报告已更新为 323 行 / `e4dfbbb4…`，结论仍为通过。
+2. **提交已获客户授权（不含推送/合并/发布）**：统筹按分组提交执行——Commit 1 为 13 个产品/测试候选路径；Commit 2 为本任务治理/记录（方案/复核/团队计划/V1/E1/E3/E2/沟通记录/角色记录与证据、H1 boundary/changelog、B0/A1/B1/D1/D2 记录与证据）。只 stage 明确任务路径，不 `git add -A`，排除 `.claude/`、`demos/`、其他任务文档与无关 untracked。提交后如需记录 commit 哈希，可再做一笔仅文档的小提交（仍在治理/记录授权内）。**推送/合并/发布仍未授权、未执行。**
+3. **F4/O7**：`redispatch_task` 未改，留 O7 后续独立变更（须重开闸门 0/1）。
+4. **O1/O5/O7 未实施；O2–O4/O6 未做**；`planDispatchDelivery` 拒投保留。
+5. **§7.3 迁移表漏列 `i-full-chain`**：已在 E1 §6.1 与 E2 报告中披露；D1-fix 为测试-only 迁移，不构成产品缺陷。
+6. **未启用 task_ops**：本记录不伪造机器状态/凭证；证据以文件哈希与原始输出为准。
+
+## 四、提交记录（客户已授权提交；不含推送/合并/发布）
+
+| 提交 | 哈希 | 内容 |
+| --- | --- | --- |
+| Commit 1 | `2e16164d65aae0dd450998f6e17da01d4979c9ca` | 13 个产品/测试候选路径（A1 5 + B1 7 + D1-fix 1）；`feat(dispatch): 派发受理只保留授权矩阵，状态检查降级为 advisory` |
+| Commit 2 | `d863a21f7e04c2935c4ec99ce1ee1cae566cd49e` | 本任务治理/记录 81 文件：方案/复核/团队计划/V1/E1/E3/E2 报告/沟通记录/策划与调度与验收 memo/H1 boundary+changelog/A1、B1、B0、D1、D2 记录与证据；`docs(dispatch-guardrail-relax): ...` |
+| Commit 3 | 见最终回执 | 仅文档：记录 Commit 1/2 哈希与临时证据排除（本文件 + 调度 memo） |
+
+- **临时证据排除（不进入提交）**：D2 evidence 中的 `e2e-pi.env`（sentinel token 夹具，非真实凭据）与 Electron `userData/`、`userData-restart-probe/` 临时缓存已从 worktree 移到本地临时快照 `C:\Users\51054\AppData\Local\Temp\dispatch-guardrail-relax-D2-transient-2026-11-02`；D2 的权威证据（report.txt、日志、截图、fixtures）已提交。未使用 `git add -A`；未 stage `.claude/`、`demos/`、其他任务或无关 untracked。
+- **提交后核对**：`git status --porcelain -- src app test` 为空；staged 为空；无未提交任务文件（临时证据已移出 worktree）。
+- **未推送/合并/发布**：以上提交只在本 worktree 分支 `feat/flow-improvements-wave1`；未 push、未 merge、未 release。
+
+## 五、记录状态
+
+- 本文件为 E3 状态记录（R4 关闭后的重冻版 + 提交记录），已写盘；未改团队计划确认版（482 行 / `4ebd41fa…`）、V1、E1 或任何产品/测试文件。
+- 推送/合并/发布未授权、未执行；未接触客户；未改产品代码/测试/角色卡/边界。

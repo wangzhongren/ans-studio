@@ -89,13 +89,15 @@ import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalR
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
 import {
   ENV_BOOTSTRAP_ROLE_ID,
-  evaluateDispatchPreflight,
+  evaluateDispatchAuthorization,
   loadLatestRoster,
   reportTargetForTaskCreator,
   rosterRoleIds,
+  type DispatchPreflightInput,
   type ProjectRoster,
   type RosterLoadResult,
 } from "../../src/common/编排/workflow-preconditions.ts";
+import { collectDispatchAdvisories, type DispatchAdvisory } from "../../src/common/编排/dispatch-advisories.ts";
 import { verifyVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 
 /**
@@ -2039,86 +2041,6 @@ export class SessionManager {
           ...(manifest.roles !== undefined ? { roles: [...manifest.roles] } : {}),
           documents: pinnedDocsSummary(manifest),
         })),
-    };
-  }
-
-  /**
-   * 2026-10-31（run-change 触发）：**派发被冻结事实拒绝**且可识别为「新版本契约依赖」时，先尝试
-   * 呈现 run-change 三模式卡（最佳努力、同一 run 只自动弹一次），再回 `run-change-required` 三段式。
-   * 识别不出/不确定 ⇒ undefined（调用方保留既有 `run-role-missing`/`module-*` 拒绝——宁可不弹）。
-   */
-  private async runChangeRejectionForDispatch(input: {
-    projectRoot: string;
-    flowId: string | undefined;
-    fromRoleId: string;
-    runManifest: RunManifest | undefined;
-    pinnedRoster: RosterLoadResult | undefined;
-    code: string;
-    targetRoleId: string;
-    moduleId: string | undefined;
-  }): Promise<MechanicalRejection | undefined> {
-    const manifest = input.runManifest;
-    if (manifest === undefined || manifest.state !== "pinned") return undefined;
-    if (input.flowId === undefined) return undefined;
-    const detail = await this.dispatchFrozenConflictDetail({ ...input, flowId: input.flowId, runManifest: manifest });
-    if (detail === undefined) return undefined;
-    const newer = await findNewerContractDocs(input.projectRoot, manifest);
-    if (newer.length === 0) return undefined; // 磁盘上没有更新版本契约 ⇒ 不弹（走既有拒绝）
-    const offered = await this.offerRunChangeOnFrozenContract({
-      projectRoot: input.projectRoot,
-      flowId: input.flowId,
-      manifest,
-      newer,
-      reason: `派发被冻结基线拒绝：${detail.reason}`,
-      missing: detail.missing,
-      ...(input.fromRoleId === this.handbackOwnerRoleId(input.projectRoot) ? { requestedBy: "convener" as const } : {}),
-    });
-    return offered.rejection;
-  }
-
-  /** 冻结冲突的**可核对事实**（只有「新名单包含目标角色/模块，而 pin 的名单不含」才返回）。 */
-  private async dispatchFrozenConflictDetail(input: {
-    projectRoot: string;
-    flowId: string;
-    runManifest: RunManifest | undefined;
-    pinnedRoster: RosterLoadResult | undefined;
-    code: string;
-    targetRoleId: string;
-    moduleId: string | undefined;
-  }): Promise<{ missing: string; reason: string } | undefined> {
-    if (input.code !== "run-role-missing" && input.code !== "module-missing" && input.code !== "module-not-owned") return undefined;
-    if (input.pinnedRoster === undefined || input.pinnedRoster.ok !== true) return undefined;
-    const latest = await loadLatestRoster({ projectRoot: input.projectRoot, flowId: input.flowId });
-    if (!latest.ok) return undefined;
-    const pinnedVersion = input.runManifest?.rosterVersion ?? input.pinnedRoster.version;
-    if (!(latest.version > pinnedVersion)) return undefined;
-    const pinned = input.pinnedRoster.roster;
-    if (input.code === "run-role-missing") {
-      const latestHas = latest.roster.roles.some((role) => role.id === input.targetRoleId);
-      const pinnedHas = pinned.roles.some((role) => role.id === input.targetRoleId);
-      if (!latestHas || pinnedHas) return undefined;
-      return {
-        missing: `目标角色 ${input.targetRoleId} 在当前 run 冻结的角色集内（roster v${latest.version} 新增；pin v${pinnedVersion}）`,
-        reason: `目标角色 ${input.targetRoleId} 属于更新版本名单（roster v${latest.version}），不在当前 run 冻结的 pin 角色集（v${pinnedVersion}）内`,
-      };
-    }
-    const moduleId = input.moduleId ?? "";
-    if (moduleId === "") return undefined;
-    if (input.code === "module-missing") {
-      const latestHas = latest.roster.modules.some((module) => module.id === moduleId);
-      const pinnedHas = pinned.modules.some((module) => module.id === moduleId);
-      if (!latestHas || pinnedHas) return undefined;
-      return {
-        missing: `模块 ${moduleId} 在当前 run 冻结的 pin 名单内（roster v${latest.version} 新增；pin v${pinnedVersion}）`,
-        reason: `模块 ${moduleId} 属于更新版本名单（roster v${latest.version}），不在当前 run 冻结的 pin 名单（v${pinnedVersion}）内`,
-      };
-    }
-    const latestOwner = latest.roster.roles.find((role) => role.modules.includes(moduleId))?.id;
-    const pinnedOwner = pinned.roles.find((role) => role.modules.includes(moduleId))?.id;
-    if (latestOwner !== input.targetRoleId || pinnedOwner === input.targetRoleId) return undefined;
-    return {
-      missing: `模块 ${moduleId} 在 pin 名单中归 ${input.targetRoleId}（roster v${latest.version} 改派；pin v${pinnedVersion} 归 ${pinnedOwner ?? "未绑定"}）`,
-      reason: `模块 ${moduleId} 在更新版本名单（roster v${latest.version}）中归 ${input.targetRoleId}，但当前 run 冻结的 pin 名单（v${pinnedVersion}）归 ${pinnedOwner ?? "未绑定"}`,
     };
   }
 
@@ -6083,7 +6005,8 @@ ${formatted}` };
       return { ok: false, message };
     };
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
-    if (targetRoleId === fromRoleId || (chiefRoleId !== null && targetRoleId === chiefRoleId)) {
+    // P1-R-05：会话层只拦自派；「target=幕僚且来源非幕僚」交给硬授权矩阵（convener-target-forbidden）。
+    if (targetRoleId === fromRoleId) {
       return fail("派发未受理：不能派发给幕僚自己。", "派发未受理：不能派发给幕僚自己——未投递。");
     }
     const reason = d && typeof d.reason === "string" ? d.reason : undefined;
@@ -6124,16 +6047,23 @@ ${formatted}` };
       };
     }
 
-    // —— 2026-10-29（方案 v2.1 §5.1，F10）：M1–M8 机械前置必须发生在 newTaskId / task.created **之前** ——
-    // 拒绝不产生任务行、不打开目标会话（chain-enforcement 负例断言 tasks.jsonl 行数不变）。
-    // 先刷一次角色枚举：写卡/D3 后同轮派发要能看到新角色（与界面 listProject 同一缓存）。
+    // —— B1/R1：目标事实 + 硬授权（必须在任何 run 账本写入之前）——
     await this.refreshListingNow(projectRoot);
     const listingForPreflight = this.deps.getListing(projectRoot);
     const targetRole = listingForPreflight?.roles.find((role) => role.roleId === targetRoleId);
     const targetBuiltIn = targetRole?.builtIn === true || isBuiltInGovernanceRoleId(targetRoleId);
+    const targetExists = targetRole !== undefined || isBuiltInGovernanceRoleId(targetRoleId);
     const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
-    if (chiefRoleId === null) {
-      return fail("派发未受理：未枚举到幕僚角色，无法建立任务。", "派发未受理：未枚举到幕僚角色。");
+    const authorization = evaluateDispatchAuthorization({
+      fromRoleId,
+      targetRoleId,
+      targetBuiltIn,
+      targetExists,
+      chiefRoleId,
+      convenerRoleId,
+    });
+    if (!authorization.ok) {
+      return fail(authorization.message, authorization.message, authorization.rejection);
     }
     const chainFacts = await this.chainDispatchFacts(projectRoot, d?.flowId);
     const dispatchFlowId = d?.flowId ?? chainFacts.flowId;
@@ -6143,146 +6073,160 @@ ${formatted}` };
     const hasLegacyFlowTask = dispatchFlowId !== undefined && [...state.records.values()].some(
       (record) => record.created?.flowId === dispatchFlowId && record.created.runId === undefined,
     );
+    // —— B1/R2：run 只读/记账 best-effort；失败只记 runFacts，不阻断派发 ——
+    const runFacts: NonNullable<DispatchPreflightInput["runFacts"]> = {};
     let runManifest: RunManifest | undefined;
-    let runState: "draft" | "pinned" | "legacy" | undefined;
-    let runRoster = chainFacts.roster;
-    let d3Selected = chainFacts.d3Selected;
+    let runState: "draft" | "pinned" | undefined;
+    let pinnedRoster: ProjectRoster | undefined;
     if (runFlowId !== undefined) {
       const active = await findActiveRun(projectRoot, runFlowId);
       if (!active.ok) {
-        return fail(`派发未受理：run 状态读取失败（${active.reason}）；未创建任务、未投递。`, "派发未受理：run 状态读取失败。");
-      }
-      if (active.manifest !== null) {
+        runFacts.ledgerUnavailable = true;
+      } else if (active.manifest !== null) {
         runManifest = active.manifest;
         runState = active.manifest.state === "pinned" ? "pinned" : "draft";
-      } else if (handoffDispatch || targetRoleId === "product" || targetRoleId === "rapporteur" || targetRoleId === "nominator") {
+      } else {
         const draft = await ensureDraftRun(projectRoot, runFlowId, new Date(this.now()));
         if (!draft.ok) {
-          return fail(`派发未受理：draft run 创建失败（${draft.reason}）；未创建任务、未投递。`, "派发未受理：draft run 创建失败。");
+          runFacts.ledgerUnavailable = true;
+        } else {
+          runManifest = draft.manifest;
+          runState = "draft";
         }
-        runManifest = draft.manifest;
-        runState = "draft";
       }
-      if (runManifest !== undefined && runManifest.state === "pinned") {
+      if (runManifest !== undefined && runState === "pinned") {
         const verified = await verifyPinnedRun(projectRoot, runManifest);
         if (!verified.ok || verified.violations.length > 0) {
-          const detail = verified.ok ? verified.violations.slice(0, 3).join("；") : verified.reason;
-          return fail(`派发未受理：pinned run 文档 hash 校验失败（${detail}）；未创建任务、未投递。`, "派发未受理：pinned run 文档 hash 校验失败。");
+          runFacts.documentHashMismatch = true;
+          runManifest = undefined;
+          runState = undefined;
+        } else {
+          const pinnedRosterResult = await loadPinnedRoster(projectRoot, runManifest);
+          if (!pinnedRosterResult.ok) {
+            runFacts.pinnedRosterInvalid = true;
+            runManifest = undefined;
+            runState = undefined;
+          } else {
+            pinnedRoster = pinnedRosterResult.roster;
+          }
         }
-        const pinnedRoster = await loadPinnedRoster(projectRoot, runManifest);
-        if (!pinnedRoster.ok) {
-          return fail(`派发未受理：pinned run 文档校验失败（${pinnedRoster.reason}）；未创建任务、未投递。`, "派发未受理：pinned run 文档校验失败。");
-        }
-        runRoster = pinnedRoster;
-        d3Selected = runManifest.d3?.targetRoleIds ?? d3Selected;
       }
-    }
-    const preflight = evaluateDispatchPreflight({
-      fromRoleId,
-      targetRoleId,
-      targetBuiltIn,
-      chiefRoleId,
-      convenerRoleId,
-      ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
-      intent: chainFacts.intent,
-      proposalFound: chainFacts.proposalFound,
-      architectureFound: chainFacts.architectureFound,
-      ...(runRoster !== undefined ? { roster: runRoster } : {}),
-      d3Selected,
-      ...(runManifest !== undefined && runState !== undefined
-        ? { run: { state: runState, runId: runManifest.runId, ...(runManifest.roles !== undefined ? { roles: runManifest.roles } : {}) } }
-        : hasLegacyFlowTask
-          ? { run: { state: "legacy" as const } }
-          : {}),
-      ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
-      ...(requestedModulePaths !== undefined && requestedModulePaths.length > 0 ? { modulePaths: requestedModulePaths } : {}),
-      handoffFound: chainFacts.handoffFound,
-      ...(chainFacts.missingSelectedCardIds.length > 0 ? { missingSelectedCardIds: chainFacts.missingSelectedCardIds } : {}),
-      targetCardFound:
-        convenerRoleId !== null && targetRoleId === convenerRoleId
-          ? chainFacts.selectedCardsFound
-          : targetRole !== undefined,
-    });
-    if (!preflight.ok) {
-      // 2026-10-31（run-change 触发）：冻结基线拒绝且可识别为「新版本契约依赖」⇒ 先尝试呈现 run-change
-      // 三模式卡，再回 `run-change-required`；识别不出 ⇒ 保留既有 code/文案（旧行为兼容）。
-      const runChangeRejection = await this.runChangeRejectionForDispatch({
-        projectRoot,
-        flowId: dispatchFlowId,
-        fromRoleId,
-        runManifest,
-        pinnedRoster: runRoster,
-        code: preflight.code,
-        targetRoleId,
-        moduleId: requestedModuleId,
-      });
-      if (runChangeRejection !== undefined) {
-        return fail(preflight.message, preflight.message, runChangeRejection);
-      }
-      return fail(`派发未受理：${preflight.message}`, preflight.message, preflight.rejection);
-    }
-    // R9：旧版/已记录版本化文档被外部修改（shell/手动）⇒ 拒绝派发（fail-closed）。
-    const baselineViolations = await verifyVersionedDocBaselines({ projectRoot });
-    if (baselineViolations.length > 0) {
-      const detail = baselineViolations
-        .slice(0, 3)
-        .map((violation) => `${violation.path}（${violation.reason === "missing" ? "缺失" : "被修改"}）`)
-        .join("、");
-      const rejection = makeMechanicalRejection(
-        "versioned-doc-baseline-violation",
-        baselineViolations.slice(0, 5).map((violation) => `${violation.path}（${violation.reason === "missing" ? "缺失" : "被修改"}）`),
-        { docs: baselineViolations.slice(0, 5).map((violation) => violation.path), owner: "app" },
-      );
-      return fail(
-        `派发未受理：版本化文档基线校验失败：${detail}${baselineViolations.length > 3 ? " 等" : ""}；` +
-          "旧版只读，请从版本记录恢复或新建下一版本后重试。",
-        "派发未受理：版本化文档基线校验失败（旧版只读）。",
-        rejection,
-      );
     }
 
+    // —— handoff 尽力 pin（R2）；失败只记 runFacts，任务照常创建 ——
     if (handoffDispatch) {
-      if (runManifest === undefined || dispatchFlowId === undefined) {
-        return fail("派发未受理：交付运营缺少 runId（应用应在 M1 前生成 draft run）；未创建任务、未投递。", "派发未受理：缺少 runId。");
-      }
-      if (runManifest.state === "pinned") {
-        const verified = await verifyPinnedRun(projectRoot, runManifest);
-        if (!verified.ok || verified.violations.length > 0) {
-          const detail = verified.ok ? verified.violations.slice(0, 3).join("；") : verified.reason;
-          return fail(`派发未受理：pinned run 文档 hash 校验失败（${detail}）；未创建交接任务、未投递。`, "派发未受理：pinned run 文档 hash 校验失败。");
-        }
-      } else {
+      if (runManifest === undefined) {
+        if (!runFacts.documentHashMismatch && !runFacts.pinnedRosterInvalid) runFacts.ledgerUnavailable = true;
+      } else if (runManifest.state !== "pinned") {
         const pinned = await pinRun(projectRoot, runManifest.runId, {
           ...(chainFacts.d3DecisionId !== undefined && chainFacts.d3Selected.length > 0
             ? { d3: { decisionId: chainFacts.d3DecisionId, targetRoleIds: [...chainFacts.d3Selected] } }
             : {}),
         });
         if (!pinned.ok) {
-          return fail(`派发未受理：run pin 失败（${pinned.reason}）；未创建交接任务、未投递。`, "派发未受理：run pin 失败（交付前必须先冻结契约）。");
+          runFacts.pinFailed = true;
+        } else {
+          runManifest = pinned.manifest;
+          runState = "pinned";
+          const verifiedAfterPin = await verifyPinnedRun(projectRoot, pinned.manifest);
+          if (!verifiedAfterPin.ok || verifiedAfterPin.violations.length > 0) {
+            runFacts.documentHashMismatch = true;
+            runManifest = undefined;
+            runState = undefined;
+          } else {
+            const pinnedRosterResult = await loadPinnedRoster(projectRoot, pinned.manifest);
+            if (!pinnedRosterResult.ok) {
+              runFacts.pinnedRosterInvalid = true;
+              runManifest = undefined;
+              runState = undefined;
+            } else {
+              pinnedRoster = pinnedRosterResult.roster;
+            }
+          }
         }
-        runManifest = pinned.manifest;
-        runState = "pinned";
-        const pinnedRoster = await loadPinnedRoster(projectRoot, pinned.manifest);
-        if (!pinnedRoster.ok) {
-          return fail(`派发未受理：pinned run 文档校验失败（${pinnedRoster.reason}）；未创建交接任务、未投递。`, "派发未受理：pinned run 文档校验失败。");
-        }
-        const verifiedAfterPin = await verifyPinnedRun(projectRoot, pinned.manifest);
-        if (!verifiedAfterPin.ok || verifiedAfterPin.violations.length > 0) {
-          const detail = verifiedAfterPin.ok ? verifiedAfterPin.violations.slice(0, 3).join("；") : verifiedAfterPin.reason;
-          return fail(`派发未受理：pin 后 run 文档校验失败（${detail}）；未创建交接任务、未投递。`, "派发未受理：pin 后 run 文档校验失败。");
-        }
-        runRoster = pinnedRoster;
-        d3Selected = pinned.manifest.d3?.targetRoleIds ?? d3Selected;
       }
     }
+
+    // R9：版本化文档基线漂移改为 advisory（A1 collector 唯一产出），不阻断派发。
+    const baselineViolations = await verifyVersionedDocBaselines({ projectRoot });
+
+    // —— B1/P1 §5.4：advisory 只由 A1 collector 产出；B1 只收集事实 ——
+    const targetCardFound =
+      convenerRoleId !== null && targetRoleId === convenerRoleId
+        ? chainFacts.selectedCardsFound
+        : targetRole !== undefined;
+    const advisoryRun = hasLegacyFlowTask
+      ? { state: "legacy" as const }
+      : runManifest !== undefined && runState !== undefined
+        ? {
+            state: runState,
+            runId: runManifest.runId,
+            ...(runManifest.roles !== undefined ? { roles: runManifest.roles } : {}),
+            ...(runState === "pinned" && pinnedRoster !== undefined
+              ? { modules: pinnedRoster.modules.map((module) => module.id) }
+              : {}),
+          }
+        : undefined;
+    const advisories = collectDispatchAdvisories({
+      fromRoleId,
+      targetRoleId,
+      targetBuiltIn,
+      targetExists,
+      chiefRoleId,
+      convenerRoleId,
+      ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
+      intent: chainFacts.intent,
+      proposalFound: chainFacts.proposalFound,
+      architectureFound: chainFacts.architectureFound,
+      ...(chainFacts.roster !== undefined ? { roster: chainFacts.roster } : {}),
+      d3Selected: chainFacts.d3Selected,
+      ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
+      ...(requestedModulePaths !== undefined && requestedModulePaths.length > 0 ? { modulePaths: requestedModulePaths } : {}),
+      handoffFound: chainFacts.handoffFound,
+      ...(chainFacts.missingSelectedCardIds.length > 0 ? { missingSelectedCardIds: chainFacts.missingSelectedCardIds } : {}),
+      targetCardFound,
+      ...(advisoryRun !== undefined ? { run: advisoryRun } : {}),
+      ...(Object.keys(runFacts).length > 0 ? { runFacts } : {}),
+      ...(baselineViolations.length > 0 ? { versionedDocBaselineViolations: baselineViolations.map((violation) => violation.path) } : {}),
+    });
+
+    // —— R2 锚点：draft 直接锚定；pinned 仅在 verify+roster+目标/模块覆盖时锚定 ——
+    let anchorState: "draft" | "pinned" | undefined;
+    let anchorRunId: string | undefined;
+    let anchorRunStage: string | undefined;
+    let anchorFlowId: string | undefined;
+    if (runManifest !== undefined && runState !== undefined) {
+      const targetCovered = targetBuiltIn || (runManifest.roles !== undefined && runManifest.roles.includes(targetRoleId));
+      const moduleCovered =
+        requestedModuleId === undefined ||
+        (pinnedRoster !== undefined && pinnedRoster.modules.some((module) => module.id === requestedModuleId));
+      if (runState === "draft" || (targetCovered && moduleCovered)) {
+        anchorState = runState;
+        anchorRunId = runManifest.runId;
+        anchorRunStage = runManifest.stage?.current;
+        anchorFlowId = chainFacts.flowId;
+      }
+    }
+
+    // —— 模块字段：适用名单=锚定 pinned roster，否则最新 roster（§5.3.3）——
+    const applicableRoster =
+      anchorState === "pinned" && pinnedRoster !== undefined
+        ? pinnedRoster
+        : chainFacts.roster !== undefined && chainFacts.roster.ok === true
+          ? chainFacts.roster.roster
+          : undefined;
+    const taskModule =
+      requestedModuleId !== undefined && applicableRoster !== undefined
+        ? applicableRoster.modules.find((module) => module.id === requestedModuleId)
+        : undefined;
+    const moduleOwnerId =
+      taskModule !== undefined && applicableRoster !== undefined
+        ? applicableRoster.roles.find((role) => role.modules.includes(taskModule.id))?.id
+        : undefined;
+    const writeModule =
+      taskModule !== undefined && (targetBuiltIn || targetRoleId === "verifier" || moduleOwnerId === targetRoleId);
     const taskId = newTaskId(new Date(this.now()));
     const createdAt = new Date(this.now());
-    // 2026-10-29（v2.6/R2）：任务模块以**名单模块**为准落盘（模型自报目录仅用于核对，不落盘）。
-    const rosterForModule = runRoster !== undefined && runRoster.ok === true ? runRoster.roster : undefined;
-    const taskModule =
-      requestedModuleId !== undefined && rosterForModule !== undefined
-        ? rosterForModule.modules.find((module) => module.id === requestedModuleId)
-        : undefined;
     // 交付任务固定 stepId=project-handoff（M6/M7 的机械前置依据）；其余任务可带模型声明的 stepId。
     const dispatchStepId =
       fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId
@@ -6293,16 +6237,22 @@ ${formatted}` };
     const created = taskEvent("task.created", {
       taskId,
       from: fromRoleId === convenerRoleId ? "convener" : "chief",
-      ...(chainFacts.flowId !== undefined ? { flowId: chainFacts.flowId } : {}),
+      ...(anchorState !== undefined && anchorFlowId !== undefined ? { flowId: anchorFlowId } : {}),
       ...(dispatchStepId !== undefined ? { stepId: dispatchStepId } : {}),
-      ...(taskModule !== undefined ? { moduleId: taskModule.id, moduleDirectory: taskModule.path, modulePaths: [...taskModule.paths] } : {}),
+      ...(writeModule && taskModule !== undefined
+        ? {
+            moduleId: taskModule.id,
+            ...(taskModule.path.endsWith("/") ? { moduleDirectory: taskModule.path } : {}),
+            modulePaths: [...taskModule.paths],
+          }
+        : {}),
       to: targetRoleId,
       text: task,
-      ...(runManifest !== undefined && runState !== undefined
+      ...(anchorState !== undefined && anchorRunId !== undefined
         ? {
-            runId: runManifest.runId,
-            runState,
-            ...(runManifest.stage?.current !== undefined ? { runStage: runManifest.stage.current } : {}),
+            runId: anchorRunId,
+            runState: anchorState,
+            ...(anchorRunStage !== undefined ? { runStage: anchorRunStage } : {}),
           }
         : {}),
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),
@@ -6390,6 +6340,20 @@ ${formatted}` };
     }
     void this.drainQueue(projectRoot, targetRoleId, deliveryRuntime);
     const openNote = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime)) ? "" : mainT("main.session.sessionWillAutoOpen");
+    const advisorySummary = this.dispatchAdvisorySummary(advisories);
+    if (advisories.length > 0) {
+      const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: targetRoleId });
+      for (const advisory of advisories) {
+        diagnostic.record("tasks.dispatch.advisory", {
+          sourceRoleId: fromRoleId,
+          targetRoleId,
+          reasonCode: advisory.code,
+          phase: "dispatch",
+          mode: "authorization-only",
+        });
+      }
+      this.emitDeliveryNote(projectRoot, runtime, fromRoleId, fromRoleId, `状态提示（未阻断）：${advisorySummary}`);
+    }
     return {
       ok: true,
       message:
@@ -6397,8 +6361,18 @@ ${formatted}` };
           to: this.roleDisplayName(projectRoot, targetRoleId),
           openNote,
           from: this.roleDisplayName(projectRoot, fromRoleId),
-        }) + `任务编号：#${taskId}（sideEffect=${sideEffect}；受理 ≠ 完成）。`,
+        }) +
+        `任务编号：#${taskId}（sideEffect=${sideEffect}；受理 ≠ 完成）。` +
+        (advisories.length > 0 ? `状态提示（未阻断）：${advisorySummary}` : ""),
     };
+  }
+
+  /** B1：advisory 摘要（最多 3 条 + 其余计数）；只用人话，技术 code 只进诊断。 */
+  private dispatchAdvisorySummary(advisories: readonly DispatchAdvisory[]): string {
+    const shown = advisories.slice(0, 3);
+    const more = advisories.length - shown.length;
+    const numbered = shown.map((advisory, index) => `${index + 1}. ${advisory.message}`).join("；");
+    return `${numbered}${more > 0 ? `；另有 ${more} 项，见诊断记录` : ""}`;
   }
 
   // —————————————— G-2（2026-10-16 客户批准）：看护数据面 / 系统投递 / 恢复执行桥 ——————————————
@@ -7056,23 +7030,59 @@ ${formatted}` };
   }
 
   /**
-   * F2（3.4 rework）：调用角色的模块证据范围——pinned/latest roster 中该角色的模块 paths，
-   * 加上当前 run 指派给该角色的任务的 modulePaths（治理/验收角色被派发模块任务时同样有界）。
+   * F2（3.4 rework）+ R3（dispatch-guardrail-relax）：调用角色的模块证据范围。
+   * 优先级：① 任务自身 modulePaths（有 flow 按 flow/run；无 flow 按 to/creator/moduleId 兼容匹配）
+   * → ② 适用 roster 模块根（pinned 仅在锚定且可读时，否则 latest）→ ③ 角色边界根仅空集兜底且限定在
+   * roster 模块路径内并记录来源；都没有 → []（调用方 evidence-scope-denied fail-closed）。
    */
   private async evidenceScopeRoots(projectRoot: string, flowId: string, run: RunManifest | undefined, roleId: string): Promise<string[]> {
     const roots = new Set<string>();
     if (roleId === "") return [];
+    let listing = this.deps.getListing(projectRoot);
+    if (listing === undefined) {
+      await this.refreshListingNow(projectRoot);
+      listing = this.deps.getListing(projectRoot);
+    }
+    const role = listing?.roles.find((item) => item.roleId === roleId);
+    const verifier = roleId === "verifier";
+    const builtIn = role?.builtIn === true || isBuiltInGovernanceRoleId(roleId);
+    const creatorAllowed: ReadonlySet<"chief" | "convener"> =
+      verifier ? new Set(["chief", "convener"]) : builtIn ? new Set(["chief"]) : new Set(["convener"]);
+    const roleKindKnown = verifier || builtIn || role !== undefined;
+
+    const state = await this.readTasks(projectRoot);
+    for (const record of state.records.values()) {
+      const created = record.created;
+      if (created === undefined || created.to !== roleId) continue;
+      if (created.flowId !== undefined) {
+        if (created.flowId !== flowId) continue;
+        if (run !== undefined && created.runId !== run.runId) continue;
+      } else {
+        // P1-R-04-R1：无 flow 锚点任务按 to + creator + moduleId 兼容匹配；不以当前 roster 为门槛。
+        if (!roleKindKnown || created.moduleId === undefined || !creatorAllowed.has(created.from)) continue;
+      }
+      for (const raw of created.modulePaths ?? []) {
+        const normalized = validateEvidencePath(raw);
+        if (normalized.ok) roots.add(normalized.path);
+      }
+    }
+
     let roster: ProjectRoster | undefined;
     if (run !== undefined && run.state === "pinned") {
       const pinned = await loadPinnedRoster(projectRoot, run);
-      if (pinned.ok) roster = pinned.roster;
+      if (pinned.ok) {
+        roster = pinned.roster;
+      } else {
+        const latest = await loadLatestRoster({ projectRoot, flowId });
+        if (latest.ok) roster = latest.roster;
+      }
     } else {
       const latest = await loadLatestRoster({ projectRoot, flowId });
       if (latest.ok) roster = latest.roster;
     }
     if (roster !== undefined) {
-      const role = roster.roles.find((item) => item.id === roleId);
-      for (const moduleId of role?.modules ?? []) {
+      const roleInRoster = roster.roles.find((item) => item.id === roleId);
+      for (const moduleId of roleInRoster?.modules ?? []) {
         const module = roster.modules.find((item) => item.id === moduleId);
         for (const raw of module?.paths ?? []) {
           const normalized = validateEvidencePath(raw);
@@ -7080,14 +7090,29 @@ ${formatted}` };
         }
       }
     }
-    const state = await this.readTasks(projectRoot);
-    for (const record of state.records.values()) {
-      const created = record.created;
-      if (created === undefined || created.to !== roleId || created.flowId !== flowId) continue;
-      if (run !== undefined && created.runId !== run.runId) continue;
-      for (const raw of created.modulePaths ?? []) {
-        const normalized = validateEvidencePath(raw);
-        if (normalized.ok) roots.add(normalized.path);
+
+    if (roots.size === 0 && roster !== undefined) {
+      const directoryModules = roster.modules
+        .flatMap((module) => module.paths)
+        .map((raw) => raw.trim().replace(/\\/g, "/"))
+        .filter((raw) => raw.endsWith("/"))
+        .map((raw) => raw.replace(/\/+$/, ""));
+      const boundaryRoots: string[] = [];
+      for (const entry of role?.boundary.entries ?? []) {
+        if (entry.root !== "project") continue;
+        if (entry.kind !== "directory" && entry.kind !== "conditional-directory") continue;
+        const normalized = validateEvidencePath(entry.path);
+        if (!normalized.ok) continue;
+        const dir = normalized.path;
+        const withinModule = directoryModules.some((moduleDir) => dir === moduleDir || dir.startsWith(`${moduleDir}/`));
+        if (withinModule) boundaryRoots.push(dir);
+      }
+      for (const boundaryRoot of boundaryRoots) roots.add(boundaryRoot);
+      if (boundaryRoots.length > 0) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).record(
+          "evidence.scope.boundary-fallback",
+          { sourceRoleId: roleId, count: boundaryRoots.length },
+        );
       }
     }
     return [...roots].sort();

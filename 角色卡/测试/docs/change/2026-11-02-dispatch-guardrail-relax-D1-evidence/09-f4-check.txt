@@ -1,0 +1,170 @@
+RECORDED_AT=2026-11-02T04:36:36Z
+CMD=git diff --name-only -- src/pipeline/orchestration/run-role.ts
+CMD=git diff --quiet HEAD -- src/pipeline/orchestration/run-role.ts; echo EXIT
+RUN_ROLE_DIFF_EXIT=0
+CMD=git hash-object src/pipeline/orchestration/run-role.ts
+8cb9d580c39a1ed38c787e2a8c7b02a30fe77358
+CMD=git rev-parse HEAD:src/pipeline/orchestration/run-role.ts
+8cb9d580c39a1ed38c787e2a8c7b02a30fe77358
+CMD=git diff -U0 -- app/desktop/session.ts | grep '^@@'
+@@ -92 +92 @@ import {
+@@ -95,0 +96 @@ import {
+@@ -98,0 +100 @@ import {
+@@ -2045,80 +2046,0 @@ export class SessionManager {
+@@ -6086 +6008,2 @@ ${formatted}` };
+@@ -6127,3 +6050 @@ ${formatted}` };
+@@ -6133,0 +6055 @@ ${formatted}` };
+@@ -6135,2 +6057,10 @@ ${formatted}` };
+@@ -6145,0 +6076,2 @@ ${formatted}` };
+@@ -6147,3 +6079,2 @@ ${formatted}` };
+@@ -6153,3 +6084,2 @@ ${formatted}` };
+@@ -6158 +6088 @@ ${formatted}` };
+@@ -6161 +6091,4 @@ ${formatted}` };
+@@ -6163,2 +6095,0 @@ ${formatted}` };
+@@ -6166 +6097 @@ ${formatted}` };
+@@ -6169,2 +6100,12 @@ ${formatted}` };
+@@ -6172,3 +6113,33 @@ ${formatted}` };
+@@ -6176,2 +6146,0 @@ ${formatted}` };
+@@ -6180 +6149,22 @@ ${formatted}` };
+@@ -6183,0 +6174 @@ ${formatted}` };
+@@ -6190,7 +6181,2 @@ ${formatted}` };
+@@ -6201,4 +6187,4 @@ ${formatted}` };
+@@ -6206,37 +6191,0 @@ ${formatted}` };
+@@ -6244,32 +6193,15 @@ ${formatted}` };
+@@ -6278,4 +6210,8 @@ ${formatted}` };
+@@ -6283,2 +6219,6 @@ ${formatted}` };
+@@ -6285,0 +6226,4 @@ ${formatted}` };
+@@ -6296 +6240 @@ ${formatted}` };
+@@ -6298 +6242,7 @@ ${formatted}` };
+@@ -6301 +6251 @@ ${formatted}` };
+@@ -6303,3 +6253,3 @@ ${formatted}` };
+@@ -6392,0 +6343,14 @@ ${formatted}` };
+@@ -6400 +6364,3 @@ ${formatted}` };
+@@ -6403,0 +6370,8 @@ ${formatted}` };
+@@ -7059,2 +7033,4 @@ ${formatted}` };
+@@ -7064,0 +7041,29 @@ ${formatted}` };
+@@ -7068 +7073,6 @@ ${formatted}` };
+@@ -7074,2 +7084,2 @@ ${formatted}` };
+@@ -7083,8 +7093,23 @@ ${formatted}` };
+CMD=grep -n 'private async redispatchTask\|chooseRedispatchTarget' app/desktop/session.ts
+Binary file app/desktop/session.ts matches
+END
+EXIT_CODE=0
+---- appended ----
+NOTE=app/desktop/session.ts contains a NUL byte; use grep -a
+CMD=grep -a -n -E 'private async redispatchTask|chooseRedispatchTarget' app/desktop/session.ts
+4246:  private chooseRedispatchTarget(projectRoot: string, currentRoleId: string, attempts: number): string {
+4435:    const to = requestedTarget ?? this.chooseRedispatchTarget(projectRoot, created.to, attempts);
+CMD=awk hunk-range scan for overlap with 4300-4699
+ok: @@ -92 +92 @@ import {
+ok: @@ -95,0 +96 @@ import {
+ok: @@ -98,0 +100 @@ import {
+ok: @@ -2045,80 +2046,0 @@ export class SessionManager {
+ok: @@ -6086 +6008,2 @@ ${formatted}` };
+ok: @@ -6127,3 +6050 @@ ${formatted}` };
+ok: @@ -6133,0 +6055 @@ ${formatted}` };
+ok: @@ -6135,2 +6057,10 @@ ${formatted}` };
+ok: @@ -6145,0 +6076,2 @@ ${formatted}` };
+ok: @@ -6147,3 +6079,2 @@ ${formatted}` };
+ok: @@ -6153,3 +6084,2 @@ ${formatted}` };
+ok: @@ -6158 +6088 @@ ${formatted}` };
+ok: @@ -6161 +6091,4 @@ ${formatted}` };
+ok: @@ -6163,2 +6095,0 @@ ${formatted}` };
+ok: @@ -6166 +6097 @@ ${formatted}` };
+ok: @@ -6169,2 +6100,12 @@ ${formatted}` };
+ok: @@ -6172,3 +6113,33 @@ ${formatted}` };
+ok: @@ -6176,2 +6146,0 @@ ${formatted}` };
+ok: @@ -6180 +6149,22 @@ ${formatted}` };
+ok: @@ -6183,0 +6174 @@ ${formatted}` };
+ok: @@ -6190,7 +6181,2 @@ ${formatted}` };
+ok: @@ -6201,4 +6187,4 @@ ${formatted}` };
+ok: @@ -6206,37 +6191,0 @@ ${formatted}` };
+ok: @@ -6244,32 +6193,15 @@ ${formatted}` };
+ok: @@ -6278,4 +6210,8 @@ ${formatted}` };
+ok: @@ -6283,2 +6219,6 @@ ${formatted}` };
+ok: @@ -6285,0 +6226,4 @@ ${formatted}` };
+ok: @@ -6296 +6240 @@ ${formatted}` };
+ok: @@ -6298 +6242,7 @@ ${formatted}` };
+ok: @@ -6301 +6251 @@ ${formatted}` };
+ok: @@ -6303,3 +6253,3 @@ ${formatted}` };
+ok: @@ -6392,0 +6343,14 @@ ${formatted}` };
+ok: @@ -6400 +6364,3 @@ ${formatted}` };
+ok: @@ -6403,0 +6370,8 @@ ${formatted}` };
+ok: @@ -7059,2 +7033,4 @@ ${formatted}` };
+ok: @@ -7064,0 +7041,29 @@ ${formatted}` };
+ok: @@ -7068 +7073,6 @@ ${formatted}` };
+ok: @@ -7074,2 +7084,2 @@ ${formatted}` };
+ok: @@ -7083,8 +7093,23 @@ ${formatted}` };
+END_APPEND
+EXIT_CODE=0
+---- appended 2 ----
+CMD=grep -a -n 'redispatch' app/desktop/session.ts
+84:import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
+2496:    const redispatchTaskCapability: RedispatchTaskFn | undefined =
+2498:        ? async (payload) => this.redispatchTask({
+2719:          ...(redispatchTaskCapability ? { redispatchTask: redispatchTaskCapability } : {}),
+4398:  async redispatchTask(input: RedispatchTaskInput): Promise<RedispatchTaskResult> {
+4410:    const attempts = redispatchCountOf(state, root);
+4412:    const redispatchMax = Number.isFinite(maxRaw) && maxRaw > 0 ? Math.floor(maxRaw) : 2;
+4413:    if (attempts >= redispatchMax) {
+4427:        reasons: [`同链已重派 ${attempts} 次（上限 ${redispatchMax}）；已提交升级卡（继续/重派/换人/终止，唯一推荐）`],
+4458:        kind: "task.redispatch.blocked",
+4470:        kind: "task.redispatch.fresh-session-failed",
+4484:    const newId = redispatchTaskId(record.taskId, attempts + 1);
+4493:      note: "stuck-terminated:redispatch",
+4497:    const redispatchEvent = taskEvent("task.redispatch", {
+4522:    if (!(await this.appendTaskState(projectRoot, redispatchEvent)) || !(await this.appendTaskState(projectRoot, newCreated))) {
+4559:    this.appendRoleActivity(projectRoot, "chief", { kind: "task.redispatch", summary: `重派任务 #${record.taskId} → #${newId}（${to}；safe）`, taskId: newId, status: "safe" });
+4640:          { id: "redispatch", label: "再重派一次（同角色 fresh 会话）" },
+4672:        ? (outcome.value.selected ?? []).find((id) => ["continue", "redispatch", "replace", "terminate"].includes(id))
+4695:      } else if (selected === "continue" || selected === "redispatch" || selected === "replace") {
+4696:        // C 批（协调者放行前置）：continue/redispatch/replace 不自动执行第二条危险路径，但**必须定义并
+4700:          redispatch: "自动重派上限已到，不再自动重派；请人工核对部分产物后新建/重派任务（可先终止原任务）。",
+6032:    // `idempotencyKey`（重派走 redispatchTask，不重复本路径）。
+6337:    const card = taskCardOf(state.records.get(taskId) ?? { taskId, created, reports: [], redispatches: [] });
+CMD=grep -a -n 'redispatch_task' src/pipeline/orchestration/run-role.ts
+END_APPEND2
+EXIT_CODE=0
+---- appended 3 ----
+CMD=awk hunk-range scan for overlap with 4200-4750 (covers chooseRedispatchTarget :4246 and redispatchTask :4398)
+ok: @@ -92 +92 @@ import {
+ok: @@ -95,0 +96 @@ import {
+ok: @@ -98,0 +100 @@ import {
+ok: @@ -2045,80 +2046,0 @@ export class SessionManager {
+ok: @@ -6086 +6008,2 @@ ${formatted}` };
+ok: @@ -6127,3 +6050 @@ ${formatted}` };
+ok: @@ -6133,0 +6055 @@ ${formatted}` };
+ok: @@ -6135,2 +6057,10 @@ ${formatted}` };
+ok: @@ -6145,0 +6076,2 @@ ${formatted}` };
+ok: @@ -6147,3 +6079,2 @@ ${formatted}` };
+ok: @@ -6153,3 +6084,2 @@ ${formatted}` };
+ok: @@ -6158 +6088 @@ ${formatted}` };
+ok: @@ -6161 +6091,4 @@ ${formatted}` };
+ok: @@ -6163,2 +6095,0 @@ ${formatted}` };
+ok: @@ -6166 +6097 @@ ${formatted}` };
+ok: @@ -6169,2 +6100,12 @@ ${formatted}` };
+ok: @@ -6172,3 +6113,33 @@ ${formatted}` };
+ok: @@ -6176,2 +6146,0 @@ ${formatted}` };
+ok: @@ -6180 +6149,22 @@ ${formatted}` };
+ok: @@ -6183,0 +6174 @@ ${formatted}` };
+ok: @@ -6190,7 +6181,2 @@ ${formatted}` };
+ok: @@ -6201,4 +6187,4 @@ ${formatted}` };
+ok: @@ -6206,37 +6191,0 @@ ${formatted}` };
+ok: @@ -6244,32 +6193,15 @@ ${formatted}` };
+ok: @@ -6278,4 +6210,8 @@ ${formatted}` };
+ok: @@ -6283,2 +6219,6 @@ ${formatted}` };
+ok: @@ -6285,0 +6226,4 @@ ${formatted}` };
+ok: @@ -6296 +6240 @@ ${formatted}` };
+ok: @@ -6298 +6242,7 @@ ${formatted}` };
+ok: @@ -6301 +6251 @@ ${formatted}` };
+ok: @@ -6303,3 +6253,3 @@ ${formatted}` };
+ok: @@ -6392,0 +6343,14 @@ ${formatted}` };
+ok: @@ -6400 +6364,3 @@ ${formatted}` };
+ok: @@ -6403,0 +6370,8 @@ ${formatted}` };
+ok: @@ -7059,2 +7033,4 @@ ${formatted}` };
+ok: @@ -7064,0 +7041,29 @@ ${formatted}` };
+ok: @@ -7068 +7073,6 @@ ${formatted}` };
+ok: @@ -7074,2 +7084,2 @@ ${formatted}` };
+ok: @@ -7083,8 +7093,23 @@ ${formatted}` };
+END_APPEND3
+EXIT_CODE=0

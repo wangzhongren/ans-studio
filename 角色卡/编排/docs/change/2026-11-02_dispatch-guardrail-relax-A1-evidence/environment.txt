@@ -1,0 +1,7 @@
+DATE_UTC=2026-11-02T04:15:55Z
+NODE=v24.22.1
+NPM=11.19.1
+GIT=git version 2.55.0.windows.5
+PWD=/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/flow-improvements-wave1
+OS=MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+SHELL=/bin/bash.exe

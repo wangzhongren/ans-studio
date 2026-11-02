@@ -1,0 +1,26 @@
+RECORDED_AT=2026-11-02T03:36:01Z (post-test re-run; same HEAD/status as B0 start)
+CMD=git rev-parse --abbrev-ref HEAD
+feat/flow-improvements-wave1
+CMD=git rev-parse HEAD
+c80f4944c3421554fcbd35f8570cedd3e2119a0a
+CMD=git rev-parse HEAD^{tree}
+689a49580fd7e79a0bfae1be343597b793967f71
+CMD=git status --short
+ M docs/communication/memo.md
+ M docs/planning/memo.md
+ M docs/scheduling/memo.md
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+?? docs/acceptance/dispatch-guardrail-relax-criteria-v1.md
+?? docs/communication/2026-11-02_intent_dispatch-guardrail-relax.md
+?? docs/planning/2026-11-02_design_dispatch-guardrail-relax.md
+?? docs/planning/2026-11-02_review_dispatch-guardrail-relax.md
+?? docs/scheduling/2026-11-02_team-plan_dispatch-guardrail-relax.md
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-02-dispatch-guardrail-relax-B0-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-02_dispatch-guardrail-relax-B0-baseline.md"
+CMD=git status --porcelain -- src app test
+STATUS_SRC_APP_TEST_EXIT=0
+CMD=git diff --cached --name-only
+END
+EXIT_CODE=0

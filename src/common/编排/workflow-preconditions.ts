@@ -16,6 +16,10 @@ import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { makeMechanicalRejection, type MechanicalRejection } from "./mechanical-rejection.ts";
+import { collectDispatchAdvisories } from "./dispatch-advisories.ts";
+import type { DispatchAdvisory } from "./dispatch-advisories.ts";
+
+export type { DispatchAdvisory, DispatchAdvisoryCode } from "./dispatch-advisories.ts";
 
 /** 名单 schema 标识（client 2026-10-29 方案 §5.2；v2.6 模块先行升级为 v2）。 */
 export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
@@ -1134,7 +1138,14 @@ export type DispatchPreflightInput = {
   fromRoleId: string;
   targetRoleId: string;
   targetBuiltIn: boolean;
-  chiefRoleId: string;
+  /**
+   * 目标真实存在（硬授权事实）。
+   * 会话层计算：内置 id 由注册表判定；项目 worker 以 listing 枚举为准。
+   * 仅旧调用方可省略；省略时由 `evaluateDispatchPreflight` 用私有 `resolveTargetExists`
+   * 按 `targetCardFound` 兼容解析（fail-closed）。桌面 B1 必须显式传入。
+   */
+  targetExists?: boolean;
+  chiefRoleId: string | null;
   convenerRoleId: string | null;
   /** 派发载荷显式 flowId（Q9：链式步骤必须带；缺省仅当唯一候选时可容忍，由调用方解析后传入）。 */
   flowId?: string;
@@ -1152,23 +1163,66 @@ export type DispatchPreflightInput = {
   modulePaths?: string[];
   /** 幕僚→运营的交付任务存在（stepId=project-handoff；M6/M7）。 */
   handoffFound: boolean;
-  /** 目标项目角色卡/边界存在（M5/M6）。 */
+  /** 目标项目角色卡/边界存在（M5/M6；硬授权不再使用，保留为兼容字段）。 */
   targetCardFound: boolean;
-  /** 幕僚→运营时 D3 选中但尚未枚举到角色卡的项目角色（用于明确拒绝文案）。 */
+  /** 幕僚→运营时 D3 选中但尚未枚举到角色卡的项目角色（用于明确 advisory 文案）。 */
   missingSelectedCardIds?: string[];
-  /** 2026-10-30（方案 v3 §3.1）：run 锚点事实（应用读取 manifest；legacy 无 manifest 显式标记）。 */
-  run?: { state: "draft" | "pinned" | "legacy"; runId?: string; roles?: readonly string[] };
+  /**
+   * run 事实。
+   * - `state`：draft/pinned 来自 runManifest；`legacy` 是**仅 advisory 事实**——会话层在
+   *   `hasLegacyFlowTask === true` 时传 `{state:"legacy"}`，即使本次 `ensureDraftRun` 成功；
+   *   任务锚点仍用本地 draft，绝不把 `legacy` 当锚点。
+   * - `roles`：pinned manifest 的角色集；未定义时**不**产出 `run-role-missing`（不伪造）。
+   * - `modules`：pinned manifest 的模块 id（仅会话层传，用于 run 专属 `module-missing`；
+   *   不得用 latest roster 冒充）。
+   */
+  run?: {
+    state: "draft" | "pinned" | "legacy";
+    runId?: string;
+    roles?: readonly string[];
+    modules?: readonly string[];
+  };
+  /**
+   * 会话层观察到的 run 事实（R2；纯逻辑不读盘、不推断）。
+   * 仅会话层传入；旧调用方省略。全部可选；缺省视为「无该事实」。
+   */
+  runFacts?: {
+    /** run 读取/草案创建失败，或 handoff 无 runManifest/flowId。 */
+    ledgerUnavailable?: boolean;
+    /** handoff pin 尝试失败（run 保持 draft/缺失）；run 仍 draft 时与 run-pin-required 同时产出。 */
+    pinFailed?: boolean;
+    /** verifyPinnedRun 发现文档哈希不一致。 */
+    documentHashMismatch?: boolean;
+    /** loadPinnedRoster 读取/校验失败。 */
+    pinnedRosterInvalid?: boolean;
+  };
+  /** 会话层事实：verifyVersionedDocBaselines 的违规路径；非空即 advisory。 */
+  versionedDocBaselineViolations?: string[];
 };
 
+export type DispatchAuthorizationInput = Pick<
+  DispatchPreflightInput,
+  "fromRoleId" | "targetRoleId" | "targetBuiltIn" | "chiefRoleId" | "convenerRoleId"
+> & { targetExists: boolean };
+
+export type DispatchAuthorizationFailure = {
+  ok: false;
+  code: string;
+  message: string;
+  rejection: MechanicalRejection;
+};
+
+export type DispatchAuthorizationResult = { ok: true } | DispatchAuthorizationFailure;
+
 export type DispatchPreflightResult =
-  | { ok: true }
-  | { ok: false; code: string; message: string; rejection: MechanicalRejection };
+  | { ok: true; advisories: DispatchAdvisory[] }
+  | DispatchAuthorizationFailure;
 
 function reject(
   code: string,
   message: string,
   extra: { missing?: string[]; docs?: string[]; owner?: MechanicalRejection["owner"] } = {},
-): DispatchPreflightResult {
+): DispatchAuthorizationFailure {
   return {
     ok: false,
     code,
@@ -1180,195 +1234,84 @@ function reject(
   };
 }
 
+/** 幕僚可派发的内置目标 allowlist（显式；不依赖门禁引擎注册表）。 */
+const CHIEF_DISPATCHABLE_BUILT_INS: ReadonlySet<string> = new Set([
+  "product",
+  "rapporteur",
+  "nominator",
+  "convener",
+  "verifier",
+]);
+
 /**
- * 五步链派发前置（M1–M8；**必须在创建 task.created 之前调用**，F10）。
- * 只判定应用已计算的事实；不读盘、不写盘。拒绝文案含「下一步」。
+ * `targetExists` 的唯一解析点（兼容窗口）：显式值优先，否则回退旧 `targetCardFound`；fail-closed。
+ * 只供复合入口使用；窄步骤 `evaluateDispatchAuthorization` 不解析、只接收显式 boolean。
  */
-export function evaluateDispatchPreflight(input: DispatchPreflightInput): DispatchPreflightResult {
-  const { fromRoleId, targetRoleId, targetBuiltIn } = input;
+function resolveTargetExists(input: Pick<DispatchPreflightInput, "targetExists" | "targetCardFound">): boolean {
+  return input.targetExists ?? input.targetCardFound ?? false;
+}
+
+/**
+ * 硬授权唯一谓词：只判定「谁能给谁派发、目标是否真实存在」。
+ * 不读盘、不写盘、不接收任何状态/run/名单/模块事实。
+ */
+export function evaluateDispatchAuthorization(input: DispatchAuthorizationInput): DispatchAuthorizationResult {
+  const { fromRoleId, targetRoleId, targetBuiltIn, targetExists, chiefRoleId, convenerRoleId } = input;
   if (fromRoleId === targetRoleId) return reject("self-dispatch", "派发未受理：不能派发给自己。");
 
-  if (fromRoleId === input.chiefRoleId) {
+  if (fromRoleId !== chiefRoleId && fromRoleId !== convenerRoleId) {
+    return reject("unknown-source", "派发未受理：只有幕僚或运营可以在 trio 模型下派发任务。");
+  }
+
+  if (fromRoleId === chiefRoleId) {
     if (!targetBuiltIn) {
       return reject(
         "chief-to-project-forbidden",
         "派发未受理：实现任务请交运营（convener）派发给项目 worker；幕僚不直接给项目 worker 派实现任务。",
       );
     }
-    if (targetRoleId === "rapporteur") {
-      // 先判 flowId：缺省只允许「唯一候选意图文档」由调用方解析后传入；0/多份 ⇒ flow-required。
-      if (input.flowId === undefined) {
-        return reject(
-          "flow-required",
-          "派发未受理：派策划必须携带 flowId（或仅有一份 docs/product/*-intent-v*.md 时可唯一推断；0/多份拒绝）。",
-        );
-      }
-      if (input.intent.found !== true) {
-        return reject(
-          "intent-missing",
-          `派发未受理：缺少产品意图文档（docs/product/<flowId>-intent-v1.md，flowId=${input.flowId}）。` +
-            "请先派产品出意图文档，再派策划。",
-        );
-      }
-      return { ok: true };
-    }
-    if (targetRoleId === "nominator") {
-      if (input.flowId === undefined) {
-        return reject("flow-required", "派发未受理：派人事必须携带 flowId（用于定位最新名单）。");
-      }
-      if (input.proposalFound !== true || input.architectureFound !== true) {
-        return reject(
-          "proposal-missing",
-          "派发未受理：缺少策划方案（docs/proposals/<flowId>-proposal-v1.md）或项目架构（docs/contracts/<flowId>-architecture-v1.md）。" +
-            "请先派策划产出方案、名单与架构。",
-        );
-      }
-      if (input.roster === undefined || input.roster.ok !== true) {
-        return reject(
-          "roster-missing",
-          `派发未受理：最新人员名单缺失或非法（${input.roster !== undefined && input.roster.ok === false ? input.roster.reason : "未读取"}）。` +
-            "请先让策划出合法名单（docs/proposals/<flowId>-roster-vN.md）。",
-        );
-      }
-      // 2026-10-29（客户追加口径）：先写模块，再把模块安排给人；没有模块/绑定不完整不得招人。
-      if (input.roster.roster.modules.length === 0) {
-        return reject(
-          "roster-modules-missing",
-          "派发未受理：最新名单缺模块清单（每模块 name/purpose/directory/roleId，一模块一个文件夹、一模块一属主、目录不重叠/不嵌套，角色可多模块）。" +
-            "请让策划出 v2 名单补齐模块→角色绑定后再招人。",
-        );
-      }
-      const hasEnvBootstrap = input.roster.roster.roles.some((role) => role.id === ENV_BOOTSTRAP_ROLE_ID);
-      if (!hasEnvBootstrap && input.roster.roster.envBootstrap?.omitted !== true) {
-        return reject(
-          "env-bootstrap-missing",
-          `派发未受理：名单缺标准角色 ${ENV_BOOTSTRAP_ROLE_ID}（环境装配，默认必带：package.json/scripts/构建配置 + 项目入口）；` +
-            "小项目省略须在名单写明 envBootstrapOmittedReason。请让策划补齐后再招人。",
-        );
-      }
-      return { ok: true };
-    }
-    if (targetRoleId === "convener") {
-      if (input.flowId === undefined) {
-        return reject("flow-required", "派发未受理：交付运营必须携带 flowId（用于定位最新 D3 与名单）。");
-      }
-      if (input.run === undefined || input.run.runId === undefined) {
-        return reject("run-missing", "派发未受理：交付运营缺少 runId（应用应在 M1 前生成 draft run）。");
-      }
-      if (input.d3Selected.length === 0) {
-        return reject(
-          "d3-missing",
-          "派发未受理：尚无 D3（招人决定）选中的角色。请先让策划出名单、人事发 D3 并写卡，再把项目交付运营。",
-        );
-      }
-      if (input.targetCardFound !== true) {
-        const missing = (input.missingSelectedCardIds ?? []).filter((id) => id !== "");
-        return reject(
-          "target-card-missing",
-          `派发未受理：D3 选中的项目角色卡未齐备${missing.length > 0 ? `（缺：${missing.join("、")}）` : ""}；` +
-            "请先完成人事写卡，再交付运营（运营/convener 是内置角色，不需要也不允许写运营角色卡）。",
-          {
-            missing: missing.length > 0
-              ? [`D3 选中角色 ${missing.join("、")} 的角色卡未齐备`]
-              : ["D3 选中角色的角色卡未齐备"],
-          },
-        );
-      }
-      return { ok: true };
-    }
-    // 产品、质检（验收调度）等其余内置目标：无链式前置。
-    return { ok: true };
-  }
-
-  if (input.convenerRoleId !== null && fromRoleId === input.convenerRoleId) {
-    if (targetBuiltIn && targetRoleId !== "verifier") {
+    if (!CHIEF_DISPATCHABLE_BUILT_INS.has(targetRoleId)) {
       return reject(
-        "convener-target-forbidden",
-        "派发未受理：运营只能给项目 worker（实现）或质检（验收核对）派发；不得派产品/策划/人事/幕僚。",
+        "target-card-missing",
+        `派发未受理：目标角色 ${targetRoleId} 不是可派发的内置角色（幕僚可派产品/策划/人事/运营/质检）；请确认目标 id 是否拼写正确。`,
       );
-    }
-    if (input.run?.state === "legacy") {
-      return reject(
-        "run-legacy-readonly",
-        "派发未受理：该 flow 只有历史 legacy 任务（无 run manifest），legacy 只读，不能继续实现/验收；请先创建新 run 并在 handoff 前 pin。",
-      );
-    }
-    if (input.handoffFound !== true) {
-      return reject(
-        "handoff-missing",
-        "派发未受理：尚未收到幕僚的交付任务（stepId=project-handoff）。请让幕僚先把项目交付运营。",
-      );
-    }
-    if (input.run === undefined || input.run.runId === undefined) {
-      return reject("run-missing", "派发未受理：实现/验收任务缺少 runId（run 内项目任务必须绑定 pinned run）。");
-    }
-    if (input.run.state !== "pinned") {
-      return reject("run-pin-required", `派发未受理：run ${input.run.runId} 未 pinned；实现/验收只能使用 frozen 契约。`);
-    }
-    if (!targetBuiltIn && input.run.roles !== undefined && !input.run.roles.includes(targetRoleId)) {
-      return reject("run-role-missing", `派发未受理：目标 ${targetRoleId} 不在 run ${input.run.runId} 的项目角色集合内。`);
-    }
-    if (input.flowId === undefined) {
-      return reject("flow-required", "派发未受理：实现/验收任务必须携带 flowId（用于定位 D3 名单与交付记录）。");
-    }
-    // 2026-10-29（v2.6/R2）：模块归属机械校验——实现任务必须带 moduleId，且目标角色拥有该模块；
-    // 目录以名单模块为准（模型自报目录不一致 ⇒ 拒）。验收任务（verifier）可引用任一已绑定模块。
-    const roster = input.roster !== undefined && input.roster.ok === true ? input.roster.roster : undefined;
-    const moduleId = typeof input.moduleId === "string" ? input.moduleId.trim() : "";
-    if (targetRoleId === "verifier") {
-      if (moduleId !== "") {
-        if (roster === undefined) return reject("roster-missing", "派发未受理：缺少最新名单，无法核对验收模块。");
-        const module = roster.modules.find((entry) => entry.id === moduleId);
-        if (module === undefined) return reject("module-missing", `派发未受理：模块 ${moduleId} 不在最新名单内。`);
-      }
-      return { ok: true };
-    }
-    if (moduleId === "") {
-      return reject("module-required", "派发未受理：实现任务必须携带 moduleId（目标必须拥有该模块；一模块一属主）。");
-    }
-    if (roster === undefined) {
-      return reject("roster-missing", "派发未受理：缺少最新名单，无法核对模块归属。");
-    }
-    const module = roster.modules.find((entry) => entry.id === moduleId);
-    if (module === undefined) {
-      return reject("module-missing", `派发未受理：模块 ${moduleId} 不在最新名单内。`);
-    }
-    const moduleOwner = roster.roles.find((role) => role.modules.includes(module.id));
-    if (moduleOwner?.id !== targetRoleId) {
-      return reject(
-        "module-not-owned",
-        `派发未受理：目标 ${targetRoleId} 不拥有模块 ${moduleId}（属主=${moduleOwner?.id ?? "未绑定"}）；目标必须拥有该模块。`,
-      );
-    }
-    if (input.modulePaths !== undefined) {
-      const allowedPaths = module.paths;
-      for (const rawPath of input.modulePaths) {
-        const normalized = normalizeModulePath(rawPath);
-        if (normalized === undefined) {
-          return reject("module-path-invalid", `派发未受理：modulePaths 含非法路径 ${String(rawPath)}。`);
-        }
-        const within = allowedPaths.some((allowed) => {
-          if (allowed.endsWith("/")) return normalized.path === allowed.slice(0, -1) || normalized.path.startsWith(allowed);
-          return normalized.path === allowed;
-        });
-        if (!within) {
-          return reject("module-path-outside", `派发未受理：modulePaths 中的 ${normalized.path} 不属于模块 ${module.id}（允许：${allowedPaths.join("、")}）。`);
-        }
-      }
-    }
-    if (!input.d3Selected.includes(targetRoleId)) {
-      return reject(
-        "target-not-nominated",
-        `派发未受理：目标 ${targetRoleId} 不在最新 D3 选中的角色名单内（名单外角色不可派实现）。`,
-      );
-    }
-    if (input.targetCardFound !== true) {
-      return reject("target-card-missing", `派发未受理：目标 ${targetRoleId} 的角色卡不存在（未上线）。`);
     }
     return { ok: true };
   }
 
-  return reject("unknown-source", "派发未受理：只有幕僚或运营可以在 trio 模型下派发任务。");
+  // 来源=运营（`chiefRoleId === null` 时也能到达这里）
+  if (targetBuiltIn && targetRoleId !== "verifier") {
+    return reject(
+      "convener-target-forbidden",
+      "派发未受理：运营只能给项目 worker（实现）或质检（验收核对）派发；不得派产品/策划/人事/幕僚。",
+    );
+  }
+  if (targetBuiltIn) return { ok: true };
+  if (!targetExists) {
+    return reject(
+      "target-card-missing",
+      `派发未受理：目标角色不存在/未枚举到（${targetRoleId}）；可能是角色卡或边界未就绪、id 拼写错误，或本次角色枚举不可用。` +
+        "请先确认目标 id 是否正确、是否为真实存在的项目角色；若目标是项目 worker 且尚未写卡，请人事按 D3 完成写卡后重试。",
+    );
+  }
+  return { ok: true };
+}
+
+/**
+ * 复合入口：硬授权 + advisory。保留为单一复合公开入口；内部复用 `evaluateDispatchAuthorization`，
+ * 通过后调用 `collectDispatchAdvisories`。不读盘、不写盘。
+ */
+export function evaluateDispatchPreflight(input: DispatchPreflightInput): DispatchPreflightResult {
+  const authorization = evaluateDispatchAuthorization({
+    fromRoleId: input.fromRoleId,
+    targetRoleId: input.targetRoleId,
+    targetBuiltIn: input.targetBuiltIn,
+    targetExists: resolveTargetExists(input),
+    chiefRoleId: input.chiefRoleId,
+    convenerRoleId: input.convenerRoleId,
+  });
+  if (!authorization.ok) return authorization;
+  return { ok: true, advisories: collectDispatchAdvisories(input) };
 }
 
 // —————————————————————— 报告路由（M9） ——————————————————————

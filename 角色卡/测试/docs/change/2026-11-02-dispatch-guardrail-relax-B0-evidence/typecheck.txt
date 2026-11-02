@@ -1,0 +1,7 @@
+START=2026-11-02T03:28:24Z
+
+> ans-cli@1.8.3 typecheck
+> tsc --noEmit
+
+EXIT_CODE=0
+END=2026-11-02T03:28:27Z

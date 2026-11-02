@@ -16,7 +16,7 @@ import { createHash } from "node:crypto";
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
-import { appendTaskEvent } from "../../src/common/编排/task-state.ts";
+import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
 import { findActiveRun, pinRun, readRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -239,12 +239,51 @@ function runChangeCards(requests: CustomerInputRequest[]): CustomerInputRequest[
   return requests.filter((request) => request.cardKind === "decision" && (request as { application?: boolean }).application === true);
 }
 
+test("派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-no-auto-"));
+  const h = harness(root, {
+    answer: () => {
+      assert.fail("派发不应自动呈现客户卡");
+    },
+  });
+  try {
+    const oldRunId = await setupPinnedRun(root, h);
+    await writeProjectV2(root);
+    await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(20);
+    const before = (await readTaskState(root)).records.size;
+    const receipt = (await h.caps.convener!({
+      roleId: "audio-dev",
+      task: "实现音频模块",
+      sideEffect: "code",
+      flowId: FLOW,
+      moduleId: "audio-core",
+    })) as DispatchReceipt;
+    assert.equal(receipt.ok, true, receipt.message ?? "");
+    assert.match(receipt.message ?? "", /状态提示（未阻断）/);
+    assert.match(receipt.message ?? "", /run-role-missing|角色集|pinned run/);
+    assert.equal((await readTaskState(root)).records.size, before + 1, "受理并建任务");
+    assert.equal(runChangeCards(h.customerRequests).length, 0, "不再自动呈现 run-change 卡");
+    assert.equal(h.customerRequests.length, 0, "客户卡请求数为 0");
+    const active = await findActiveRun(root, FLOW);
+    assert.equal(active.ok, true);
+    if (active.ok) {
+      assert.equal(active.manifest?.runId, oldRunId);
+      assert.equal(active.manifest?.state, "pinned", "旧 run 未被改写");
+      assert.equal(active.manifest?.runChange, undefined);
+    }
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
 for (const mode of ["continue-frozen", "stop-and-restart", "stop"] as const) {
-  test(`真实触发（${mode}）：pinned run + 新版本契约 → 派发被冻结拒绝并呈现 run-change 卡`, async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), `ans-run-change-trigger-${mode}-`));
+  test(`显式入口（${mode}）：requestRunChangeDecision 三模式落账不变`, async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), `ans-run-change-explicit-${mode}-`));
     const h = harness(root, {
       answer: (request) => {
-        assert.equal(request.cardKind, "decision", "自动触发只呈现 decision 卡（run-change）");
+        assert.equal(request.cardKind, "decision", "显式入口呈现 decision 卡（run-change）");
         assert.equal((request as { application?: boolean }).application, true);
         const choice = request as Extract<CustomerInputRequest, { kind: "choice" }>;
         assert.deepEqual(choice.options.map((option) => option.id), ["continue-frozen", "stop-and-restart", "stop"], "三模式选项");
@@ -256,25 +295,14 @@ for (const mode of ["continue-frozen", "stop-and-restart", "stop"] as const) {
       await writeProjectV2(root);
       assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
       await tick(20);
-
-      // 真实派发：目标 audio-dev 只存在于 v2 名单；冻结基线（v1）拒绝。
-      const receipt = (await h.caps.convener!({
-        roleId: "audio-dev",
-        task: "实现音频模块",
-        sideEffect: "code",
-        flowId: FLOW,
-        moduleId: "audio-core",
-      })) as DispatchReceipt;
-      assert.equal(receipt.ok, false, "冻结语义不变：派发仍被拒绝");
-      const receiptMessage = receipt.message ?? "";
-      assert.match(receiptMessage, /run-change-required/);
-      assert.match(receiptMessage, /谁来做：app/);
-      assert.match(receiptMessage, /继续冻结|停止并重开|run-change/, "拒绝文案带出 run-change 三模式指引");
-
+      const started = await h.mgr.requestRunChangeDecision({ projectRoot: root, flowId: FLOW, requestedBy: "convener", reason: "客户要求变更" });
+      assert.equal(started.ok, true, started.ok ? "" : started.error);
+      if (!started.ok) return;
+      const outcome = await started.outcome;
+      assert.equal(outcome.outcome, "answered");
       const cards = runChangeCards(h.customerRequests);
-      assert.equal(cards.length, 1, "应用真实呈现了一张 run-change 卡");
+      assert.equal(cards.length, 1, "显式入口真实呈现 run-change 卡");
       const card = cards[0] as Extract<CustomerInputRequest, { kind: "choice" }>;
-      assert.equal(card.kind, "choice");
       assert.equal(card.flowId, FLOW);
       assert.equal((card as { sourceRoleId?: string }).sourceRoleId, "application");
 
@@ -303,21 +331,6 @@ for (const mode of ["continue-frozen", "stop-and-restart", "stop"] as const) {
         assert.equal(active.ok, true);
         if (active.ok) assert.equal(active.manifest, null, "stop 不产生新 run");
       }
-
-      // 同一 run 的第二次冻结冲突：不再自动弹卡（只回结构化拒绝），不刷屏。
-      // （stop-and-restart 后 active run 已是 draft，走 run-pin-required；stop 后无 run，走 run-missing。）
-      if (mode === "continue-frozen") {
-        const again = (await h.caps.convener!({
-          roleId: "audio-dev",
-          task: "实现音频模块",
-          sideEffect: "code",
-          flowId: FLOW,
-          moduleId: "audio-core",
-        })) as DispatchReceipt;
-        assert.equal(again.ok, false);
-        assert.match(again.message ?? "", /run-change-required/);
-        assert.equal(runChangeCards(h.customerRequests).length, 1, "同一 run 只自动呈现一次");
-      }
     } finally {
       await h.mgr.stop(null);
       await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
@@ -335,14 +348,11 @@ test("stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢�
     await writeProjectV2(root);
     assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
     await tick(20);
-    const rejected = (await h.caps.convener!({
-      roleId: "audio-dev",
-      task: "实现音频模块",
-      sideEffect: "code",
-      flowId: FLOW,
-      moduleId: "audio-core",
-    })) as DispatchReceipt;
-    assert.equal(rejected.ok, false);
+    const started = await h.mgr.requestRunChangeDecision({ projectRoot: root, flowId: FLOW, requestedBy: "convener", reason: "客户要求变更" });
+    assert.equal(started.ok, true, started.ok ? "" : started.error);
+    if (!started.ok) return;
+    const outcome = await started.outcome;
+    assert.equal(outcome.outcome, "answered");
     const oldManifest = await waitForManifest(root, oldRunId, (value) => value.runChange?.mode === "stop-and-restart");
     const newRunId = oldManifest.runChange!.newRunId!;
 
@@ -377,7 +387,7 @@ test("stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢�
   }
 });
 
-test("无会话兜底：没有可呈现的客户卡会话 ⇒ 仅回 run-change-required 三段式（不弹卡）", async () => {
+test("显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-no-session-"));
   const h = harness(root, { withCustomerInput: false });
   try {
@@ -385,22 +395,10 @@ test("无会话兜底：没有可呈现的客户卡会话 ⇒ 仅回 run-change-
     await writeProjectV2(root);
     assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
     await tick(20);
-    const receipt = (await h.caps.convener!({
-      roleId: "audio-dev",
-      task: "实现音频模块",
-      sideEffect: "code",
-      flowId: FLOW,
-      moduleId: "audio-core",
-    })) as DispatchReceipt;
-    assert.equal(receipt.ok, false);
+    const started = await h.mgr.requestRunChangeDecision({ projectRoot: root, flowId: FLOW, requestedBy: "convener", reason: "客户要求变更" });
+    assert.equal(started.ok, false, "没有可呈现会话 ⇒ 如实失败（不伪造成功）");
+    if (!started.ok) assert.match(started.error ?? "", /会话|呈现|客户/);
     assert.equal(h.customerRequests.length, 0, "没有通道 ⇒ 不呈现任何卡");
-    const message = receipt.message ?? "";
-    assert.match(message, /run-change-required/);
-    assert.match(message, /拒绝：缺少/);
-    assert.match(message, /下一步：/);
-    assert.match(message, /谁来做：app/);
-    assert.match(message, /契约变更 · 重开 run/, "兜底指引包含显式入口");
-    assert.match(message, /修正后可原样重试/);
     // 旧 run 不被改动。
     const active = await findActiveRun(root, FLOW);
     assert.equal(active.ok, true);
@@ -414,7 +412,7 @@ test("无会话兜底：没有可呈现的客户卡会话 ⇒ 仅回 run-change-
   }
 });
 
-test("宁可不弹：目标角色不在最新名单（非新版本契约冲突）⇒ 保留 run-role-missing 旧码，不呈现 run-change", async () => {
+test("宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-no-fire-"));
   const h = harness(root, {
     answer: () => ({ outcome: "answered", value: { selected: ["stop"] }, decisionId: "decision-should-not-happen", operatorId: "customer" }),
@@ -424,6 +422,7 @@ test("宁可不弹：目标角色不在最新名单（非新版本契约冲突�
     await writeProjectV2(root);
     assert.equal((await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
     await tick(20);
+    const before = (await readTaskState(root)).records.size;
     const receipt = (await h.caps.convener!({
       roleId: "ghost-dev",
       task: "实现幽灵模块",
@@ -432,9 +431,10 @@ test("宁可不弹：目标角色不在最新名单（非新版本契约冲突�
       moduleId: "ghost-core",
     })) as DispatchReceipt;
     assert.equal(receipt.ok, false);
-    assert.match(receipt.message ?? "", /run-role-missing/);
-    assert.equal((receipt.message ?? "").includes("run-change-required"), false, "识别不出新版本依赖 ⇒ 不弹 run-change");
+    assert.match(receipt.message ?? "", /target-card-missing|不存在|未枚举/);
+    assert.equal((receipt.message ?? "").includes("run-change-required"), false, "硬拒不触发 run-change");
     assert.equal(h.customerRequests.length, 0, "没有误弹客户卡");
+    assert.equal((await readTaskState(root)).records.size, before, "硬拒无任务行");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
