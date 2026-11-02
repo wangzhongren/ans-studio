@@ -141,3 +141,11 @@
 - **范围**：19 个产品/测试候选路径 + 本任务治理/记录；按「产品/测试」与「治理/记录」分组提交；推送新分支并创建 PR；**不合并、不发布、不打 tag**。
 - **对象**：候选树 `9c744add87d02bc98e143e605c94a3a7f4434588`；E2 通过报告 316 行 / `06bccf71…`；E3 放行 63 行 / `4d36a761…`。
 - **下一步**：统筹执行分组提交、推送与 PR 创建并回报 commit 哈希/分支/PR URL；合并/发布仍未授权。
+
+## PR 记录（2026-11-02）
+
+- **分支**：`feat/acceptance-return-card`（从 `5a35908` 新建，已推送并跟踪 origin）。
+- **Commit 1**：`1081430c2b38675ad62e2ff46f85d2ce62cc5c73` — 19 个产品/测试路径（11 产品 + 7 修改测试 + 1 新增测试），+1605/−187。
+- **Commit 2**：`1667b0284c593a913c4a02a78bbc82e24807fe20` — 45 个治理/记录/证据路径，+8061/−1。
+- **PR #32**：https://github.com/wangzhongren/ans-studio/pull/32（OPEN，base `main`，head `feat/acceptance-return-card`，mergeStateStatus CLEAN，未合并）。
+- **状态**：工作树干净；未合并、未发布、未打 tag；CI 尚未报告检查结果。
