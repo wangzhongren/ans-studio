@@ -1,6 +1,8 @@
-export const SOURCE_REF = 'v1.8.3';
-export const SOURCE_SHA = 'c3957d00d19f5a177aeaa2950df394274231b25b';
-// v1.8.3 overlay：冻结源 tag v1.8.3 已含全部产品/测试代码（run-change 契约变更通道接线：会话头显式入口、
+export const SOURCE_REF = 'v1.8.4';
+export const SOURCE_SHA = '0982b0046be3a2e5bde8a8ab13422f0c07f2c2f1';
+// v1.8.4 overlay：冻结源 tag v1.8.4 已含全部产品/测试代码（全局任务状态与幕僚版本决策权、验收报告卡
+// 特殊显示与原文直出、派发护栏放松）；白名单保持基础集与历史保留条目，未列名 app//src/ 仍 fail-closed。
+// v1.8.3 overlay（历史）：冻结源 tag v1.8.3 已含全部产品/测试代码（run-change 契约变更通道接线：会话头显式入口、
 // 两类保守自动触发、run-change-required 三段式；冻结三模式由客户选择）；白名单保持基础集与历史保留条目，
 // 未列名 app//src/ 仍 fail-closed。
 // v1.8.2 overlay（历史）：冻结源 tag v1.8.2 已含全部产品/测试代码（D3 选中集记账修复：仅 appointment 卡写角色集，

@@ -14,6 +14,9 @@ events:
   - date: "2026-11-03"
     kind: verified
     summary: 本地预检 npm run typecheck 0、npm run typecheck:renderer 0、装配测试 87/87 通过
+  - date: "2026-11-03"
+    kind: updated
+    summary: PR #34 合并（0982b00，含 prepare c513c27）；annotated tag v1.8.4 已打并推送；release-policy/workflow/打包测试切到 v1.8.4
 ---
 
 # v1.8.4 发布准备
@@ -27,8 +30,8 @@ events:
   - PR #31 派发护栏放松（`2e16164`，合并 `5a35908`）：派发受理只保留角色授权矩阵，状态检查降级为 advisory；
   - PR #32 验收报告卡特殊显示与原文直出（`1081430`，合并 `0a12310`）；
   - PR #33 全局任务状态与幕僚版本决策权（`728c4e1`/`27162ca`）。
-- annotated tag **`v1.8.4`**：待打；指向 PR 合并提交，SHA 在下一轮填入。
-- 发布准备提交：**待填**。流水线切换提交：**待填**。
+- annotated tag **`v1.8.4`**：已打并推送，指向 PR #34 合并提交 **`0982b0046be3a2e5bde8a8ab13422f0c07f2c2f1`**（包含上述冻结源与 prepare 提交）。
+- 发布准备提交：**`c513c27`**（`chore(release): prepare v1.8.4`，PR #34）；流水线切换提交：`ci(release): point pipeline at v1.8.4`（本轮）。
 
 ## 本轮变化（相对 v1.8.3）
 
