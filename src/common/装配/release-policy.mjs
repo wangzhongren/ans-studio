@@ -2,6 +2,9 @@ export const SOURCE_REF = 'v1.8.4';
 export const SOURCE_SHA = '0982b0046be3a2e5bde8a8ab13422f0c07f2c2f1';
 // v1.8.4 overlay：冻结源 tag v1.8.4 已含全部产品/测试代码（全局任务状态与幕僚版本决策权、验收报告卡
 // 特殊显示与原文直出、派发护栏放松）；白名单保持基础集与历史保留条目，未列名 app//src/ 仍 fail-closed。
+// v1.8.4 发布阻断修复（tag 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：
+//   · 测试 1 条：test/桌面应用/version-decision.test.ts——关闭失败用例在 macOS 上仅 chmod 文件不阻止
+//     temp+rename，补 run 目录只读，使部分失败路径在 POSIX/Windows 一致；断言未放宽。
 // v1.8.3 overlay（历史）：冻结源 tag v1.8.3 已含全部产品/测试代码（run-change 契约变更通道接线：会话头显式入口、
 // 两类保守自动触发、run-change-required 三段式；冻结三模式由客户选择）；白名单保持基础集与历史保留条目，
 // 未列名 app//src/ 仍 fail-closed。
@@ -55,6 +58,7 @@ export const SOURCE_SHA = '0982b0046be3a2e5bde8a8ab13422f0c07f2c2f1';
 // fail-closed 不变：未列名的 app//src/ 变更仍使 prepare 明确失败；
 // 未列名的 test/ 文件仍静默落 excluded、不随构建树（机制同前：经评审文件必须显式入列）。
 const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
+  'test/桌面应用/version-decision.test.ts',
   'test/桌面应用/chain-enforcement.test.ts',
   'test/桌面应用/run-pin.test.ts',
   'test/桌面应用/application-line.test.ts',

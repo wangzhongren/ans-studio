@@ -644,9 +644,12 @@ test("关闭阶段失败（部分失败）：停止关闭其余 run，failed 如
     assert.equal((await writeRunManifest(root, manifestA)).ok, true);
     assert.equal((await writeRunManifest(root, manifestB)).ok, true);
     const manifestBPath = path.join(root, ".ans", "runs", runB, "manifest.json");
+    const manifestBDir = path.dirname(manifestBPath);
     const { manager, caps } = makeManager(root, {
       answer: async () => {
+        // closeRun 以临时文件 + rename 落盘；只读文件在 macOS 仍可被 rename 覆盖，目录只读才能让关闭确定性失败。
         await fs.chmod(manifestBPath, 0o444);
+        await fs.chmod(manifestBDir, 0o555);
         return { outcome: "answered", value: { selected: ["new-version-development"] }, operatorId: "customer" };
       },
     });
@@ -670,6 +673,7 @@ test("关闭阶段失败（部分失败）：停止关闭其余 run，failed 如
       assert.equal(storedA.ok && storedA.manifest.state, "closed");
       assert.equal(storedB.ok && storedB.manifest.state, "draft");
     } finally {
+      await fs.chmod(manifestBDir, 0o755).catch(() => undefined);
       await fs.chmod(manifestBPath, 0o666).catch(() => undefined);
       await manager.stop(null);
     }
