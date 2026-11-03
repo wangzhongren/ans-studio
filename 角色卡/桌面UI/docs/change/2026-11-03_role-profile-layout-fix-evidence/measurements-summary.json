@@ -1,0 +1,991 @@
+{
+  "generatedAt": "2026-11-03T13:01:42.351Z",
+  "before": {
+    "console": [],
+    "errors": [],
+    "runs": [
+      {
+        "label": "1360x860:closed",
+        "kind": "closed",
+        "screenshot": "1360x860-closed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "0px",
+          "contentWidth": 1112
+        },
+        "headInner": {
+          "clientWidth": 900,
+          "scrollWidth": 900,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 733.71875,
+          "right": 1254,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 1112,
+          "scrollWidth": 1112
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "tab-card",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1360x860:open-card",
+        "kind": "open-card",
+        "screenshot": "1360x860-open-card.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "424px",
+          "contentWidth": 688
+        },
+        "headInner": {
+          "clientWidth": 624,
+          "scrollWidth": 624,
+          "height": 57.1875,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 91.71875,
+          "height": 57.1875
+        },
+        "actions": {
+          "left": 383.71875,
+          "right": 904,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 936,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 688,
+          "scrollWidth": 688
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1360x860:open-work",
+        "kind": "open-work",
+        "screenshot": "1360x860-open-work.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "424px",
+          "contentWidth": 688
+        },
+        "headInner": {
+          "clientWidth": 624,
+          "scrollWidth": 624,
+          "height": 57.1875,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 91.71875,
+          "height": 57.1875
+        },
+        "actions": {
+          "left": 383.71875,
+          "right": 904,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 936,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 688,
+          "scrollWidth": 688
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1360x860:reclosed",
+        "kind": "reclosed",
+        "screenshot": "1360x860-reclosed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "0px",
+          "contentWidth": 1112
+        },
+        "headInner": {
+          "clientWidth": 900,
+          "scrollWidth": 900,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 733.71875,
+          "right": 1254,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 1112,
+          "scrollWidth": 1112
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:closed",
+        "kind": "closed",
+        "screenshot": "1200x800-closed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "0px",
+          "contentWidth": 952
+        },
+        "headInner": {
+          "clientWidth": 888,
+          "scrollWidth": 888,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 647.71875,
+          "right": 1168,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 952,
+          "scrollWidth": 952
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "tab-card",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:open-card",
+        "kind": "open-card",
+        "screenshot": "1200x800-open-card.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "424px",
+          "contentWidth": 528
+        },
+        "headInner": {
+          "clientWidth": 464,
+          "scrollWidth": 532,
+          "height": 208.359375,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 0,
+          "height": 208.359375
+        },
+        "actions": {
+          "left": 292,
+          "right": 812.28125,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 776,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 528,
+          "scrollWidth": 564
+        },
+        "overlaps": {
+          "actionsPastHeadInner": true,
+          "actionsPastColMidContentRight": true,
+          "actionsUnderDrawer": true,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": true
+        },
+        "hitTestTabCard": "drawer",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:open-work",
+        "kind": "open-work",
+        "screenshot": "1200x800-open-work.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "424px",
+          "contentWidth": 528
+        },
+        "headInner": {
+          "clientWidth": 464,
+          "scrollWidth": 532,
+          "height": 208.359375,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 0,
+          "height": 208.359375
+        },
+        "actions": {
+          "left": 292,
+          "right": 812.28125,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 776,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 528,
+          "scrollWidth": 564
+        },
+        "overlaps": {
+          "actionsPastHeadInner": true,
+          "actionsPastColMidContentRight": true,
+          "actionsUnderDrawer": true,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": true
+        },
+        "hitTestTabCard": "drawer",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:reclosed",
+        "kind": "reclosed",
+        "screenshot": "1200x800-reclosed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "0px",
+          "contentWidth": 952
+        },
+        "headInner": {
+          "clientWidth": 888,
+          "scrollWidth": 888,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 647.71875,
+          "right": 1168,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 952,
+          "scrollWidth": 952
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      }
+    ]
+  },
+  "after": {
+    "console": [],
+    "errors": [],
+    "runs": [
+      {
+        "label": "1360x860:closed",
+        "kind": "closed",
+        "screenshot": "1360x860-closed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "0px",
+          "contentWidth": 1112
+        },
+        "headInner": {
+          "clientWidth": 900,
+          "scrollWidth": 900,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 733.71875,
+          "right": 1254,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 1112,
+          "scrollWidth": 1112
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "tab-card",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1360x860:open-card",
+        "kind": "open-card",
+        "screenshot": "1360x860-open-card.png",
+        "headerScreenshot": "1360x860-open-card-header.png",
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "424px",
+          "contentWidth": 688
+        },
+        "headInner": {
+          "clientWidth": 624,
+          "scrollWidth": 624,
+          "height": 78.390625,
+          "flexWrap": "wrap"
+        },
+        "identity": {
+          "width": 624,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 280,
+          "right": 904,
+          "width": 624,
+          "height": 32,
+          "flexWrap": "wrap"
+        },
+        "drawer": {
+          "left": 936,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 688,
+          "scrollWidth": 688
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": true,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1360x860:open-work",
+        "kind": "open-work",
+        "screenshot": "1360x860-open-work.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "424px",
+          "contentWidth": 688
+        },
+        "headInner": {
+          "clientWidth": 624,
+          "scrollWidth": 624,
+          "height": 78.390625,
+          "flexWrap": "wrap"
+        },
+        "identity": {
+          "width": 624,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 280,
+          "right": 904,
+          "width": 624,
+          "height": 32,
+          "flexWrap": "wrap"
+        },
+        "drawer": {
+          "left": 936,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 688,
+          "scrollWidth": 688
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": true,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1360x860:reclosed",
+        "kind": "reclosed",
+        "screenshot": "1360x860-reclosed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1360,
+          "innerHeight": 860,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 1112,
+          "paddingRight": "0px",
+          "contentWidth": 1112
+        },
+        "headInner": {
+          "clientWidth": 900,
+          "scrollWidth": 900,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 733.71875,
+          "right": 1254,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 1112,
+          "scrollWidth": 1112
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1360,
+          "scrollWidth": 1360
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:closed",
+        "kind": "closed",
+        "screenshot": "1200x800-closed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "0px",
+          "contentWidth": 952
+        },
+        "headInner": {
+          "clientWidth": 888,
+          "scrollWidth": 888,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 647.71875,
+          "right": 1168,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 952,
+          "scrollWidth": 952
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "tab-card",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:open-card",
+        "kind": "open-card",
+        "screenshot": "1200x800-open-card.png",
+        "headerScreenshot": "1200x800-open-card-header.png",
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "424px",
+          "contentWidth": 528
+        },
+        "headInner": {
+          "clientWidth": 464,
+          "scrollWidth": 464,
+          "height": 112.390625,
+          "flexWrap": "wrap"
+        },
+        "identity": {
+          "width": 464,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 280,
+          "right": 744,
+          "width": 464,
+          "height": 66,
+          "flexWrap": "wrap"
+        },
+        "drawer": {
+          "left": 776,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 528,
+          "scrollWidth": 528
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": true,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:open-work",
+        "kind": "open-work",
+        "screenshot": "1200x800-open-work.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "424px",
+          "contentWidth": 528
+        },
+        "headInner": {
+          "clientWidth": 464,
+          "scrollWidth": 464,
+          "height": 112.390625,
+          "flexWrap": "wrap"
+        },
+        "identity": {
+          "width": 464,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 280,
+          "right": 744,
+          "width": 464,
+          "height": 66,
+          "flexWrap": "wrap"
+        },
+        "drawer": {
+          "left": 776,
+          "width": 424,
+          "open": "true"
+        },
+        "sessionHead": {
+          "clientWidth": 528,
+          "scrollWidth": 528
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": true,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      },
+      {
+        "label": "1200x800:reclosed",
+        "kind": "reclosed",
+        "screenshot": "1200x800-reclosed.png",
+        "headerScreenshot": null,
+        "viewport": {
+          "innerWidth": 1200,
+          "innerHeight": 800,
+          "dpr": 1
+        },
+        "media": {
+          "max680": false,
+          "max1100": false,
+          "min1200": true
+        },
+        "colMid": {
+          "width": 952,
+          "paddingRight": "0px",
+          "contentWidth": 952
+        },
+        "headInner": {
+          "clientWidth": 888,
+          "scrollWidth": 888,
+          "height": 40.390625,
+          "flexWrap": "nowrap"
+        },
+        "identity": {
+          "width": 132,
+          "height": 40.390625
+        },
+        "actions": {
+          "left": 647.71875,
+          "right": 1168,
+          "width": 520.28125,
+          "height": 32,
+          "flexWrap": "nowrap"
+        },
+        "drawer": {
+          "left": 0,
+          "width": 0,
+          "open": "false"
+        },
+        "sessionHead": {
+          "clientWidth": 952,
+          "scrollWidth": 952
+        },
+        "overlaps": {
+          "actionsPastHeadInner": false,
+          "actionsPastColMidContentRight": false,
+          "actionsUnderDrawer": false,
+          "identityOverlapsActions": false,
+          "tabCardHitDrawer": false
+        },
+        "hitTestTabCard": "drawer-backdrop",
+        "document": {
+          "clientWidth": 1200,
+          "scrollWidth": 1200
+        },
+        "console": null,
+        "errors": null
+      }
+    ]
+  }
+}

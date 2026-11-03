@@ -1,0 +1,235 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\role-profile-layout-fix\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "DEFAULT_RUNTIME_IS_CLAUDE_WITHOUT_RECOVERY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_EXPLICIT_RUNTIME_WINS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "RECOVERY_OPEN_USES_EXPLICIT_RUNTIME",
+      "value": true,
+      "detail": [
+        {
+          "projectRoot": "/phase4a-project",
+          "roleId": "A",
+          "runtime": "pi"
+        }
+      ]
+    },
+    {
+      "name": "PI_HISTORY_REAL_FROM_SESSION",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_CODEX_REAL_SESSION_TARGET",
+      "value": true,
+      "detail": {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      }
+    },
+    {
+      "name": "SWITCH_CODEX_SHOWS_ONLY_CODEX_VIEW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_DOES_NOT_STOP_BACKGROUND",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "FOREIGN_RUNTIME_CACHE_ONLY_AND_STALE_PROJECT_DROPPED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_CLAUDE_REAL_HISTORY_AND_DRAFT_ISOLATED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_BACK_PI_RESTORES_HISTORY_EVENT_QUEUE_AND_DRAFT",
+      "value": true,
+      "detail": {
+        "chat": "AApi 引擎历史行\nAAPi 实时消息\nAAPi 后台消息\n进行中正在处理当前请求客户消息第 1 位客户排队消息客户消息撤回第 2 位派发任务派发 · 来自 B第 3 位交付报告交付 · 来自 B正在工作",
+        "draft": "Pi 草稿",
+        "busy": true
+      }
+    },
+    {
+      "name": "CROSS_ENGINE_DRAFT_CODEX_RETAINED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CROSS_ENGINE_DRAFT_CLAUDE_RETAINED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCHING_STATE_ARIA_BUSY_AND_SINGLE_SUBMIT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCHING_IGNORES_REPEAT_MENU",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SWITCH_BACK_CLAUDE_AFTER_DEFERRED_OPEN",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "OWN_ENGINE_SHELL_CARD_VISIBLE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "C2_SAME_CAUSE_EXPIRED_SHELL_CLOSES_WITH_REASON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "SMOKE_ABORTED",
+      "value": false,
+      "detail": "Error: Script failed to execute, this normally means an error was thrown. Check the renderer console for the error.\n    at node:electron/js2c/renderer_init:1:16535\n    at IpcRendererInternal.<anonymous> (node:electron/js2c/renderer_init:1:11407)\n    at IpcRendererInternal.emit (node:events:514:28)\n    at Object.onMessage (node:electron/js2c/renderer_init:1:10648)"
+    }
+  ],
+  "calls": {
+    "opens": [
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      }
+    ],
+    "histories": [
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4a-project",
+        "roleId": "A",
+        "runtime": "pi"
+      }
+    ],
+    "stops": [],
+    "configReads": [
+      "pi",
+      "codex",
+      "claude",
+      "pi",
+      "codex",
+      "claude",
+      "codex",
+      "claude",
+      "pi"
+    ],
+    "configSaves": [],
+    "docReads": [],
+    "external": [],
+    "withdraws": [],
+    "sends": [],
+    "windows": []
+  },
+  "console": [
+    {
+      "level": "error",
+      "message": "Uncaught TypeError: Cannot read properties of null (reading 'hidden')"
+    }
+  ],
+  "csp": [],
+  "screenshots": [
+    "1360-engine-claude.png",
+    "1360-switching.png"
+  ],
+  "failures": 1
+}
