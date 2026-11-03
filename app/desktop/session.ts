@@ -131,6 +131,7 @@ import { docsForFlow, formatMechanicalRejection, humanRejection, makeMechanicalR
 // B 批：终止/重派安全判定（单一来源；桌面只提供终止事实/执行动作）。
 import { evaluateRedispatchSafety, type RedispatchSafetyDecision } from "../../src/common/编排/watchdog.ts";
 import {
+  contractSchemaText,
   ENV_BOOTSTRAP_ROLE_ID,
   evaluateDispatchAuthorization,
   loadLatestRoster,
@@ -8091,8 +8092,11 @@ ${formatted}` };
 
   /**
    * 2026-10-30（3.2）：`contract_check` 只读契约速查。不写盘、不放行；只返回调用角色可见信息。
+   * 2026-11-03（contract schema query）：`topic` 模式**第一句早退**到静态 schema 文本——
+   * 早退前不读 listing/run、不写盘；legacy 路径逐字不变。
    */
   private async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput): Promise<string> {
+    if (input.topic !== undefined) return contractSchemaText(input.topic);
     let listing = this.deps.getListing(projectRoot);
     if (!listing) await this.refreshListingNow(projectRoot);
     listing = this.deps.getListing(projectRoot);

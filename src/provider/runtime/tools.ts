@@ -59,7 +59,7 @@ import {
   VERSION_DECISION_REFS_MAX,
 } from "../../model/project-state.ts";
 import type { ProjectNoteInput, ProjectNoteOp, ProjectStateQuery, VersionDecisionRequest } from "../../model/project-state.ts";
-import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
@@ -2424,6 +2424,22 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
       if (requestedRole !== undefined && requestedRole !== "" && scope?.roleId !== undefined && requestedRole !== scope.roleId) {
         return { ok: false, message: `${name}：只允许查询本角色（${scope.roleId}）的契约；未返回任何其他角色信息。` };
       }
+      // topic 模式：读原始参数值（readStringArg 会吞掉非字符串，导致 topic:123 静默走 legacy，违反 AC-6）。
+      // null/undefined/空串/仅空白串视为缺省（legacy）；非字符串与未知值拒绝且不调用数据源（AC-5/AC-6/AC-16）。
+      const topicRaw = call.args["topic"];
+      let topic: ContractCheckInput["topic"];
+      if (topicRaw !== undefined && topicRaw !== null) {
+        if (typeof topicRaw !== "string") {
+          return { ok: false, message: `${name}：topic 参数非法（应为字符串：${CONTRACT_SCHEMA_TOPICS.join("|")}）。` };
+        }
+        const trimmed = topicRaw.trim();
+        if (trimmed !== "") {
+          if (!(CONTRACT_SCHEMA_TOPICS as readonly string[]).includes(trimmed)) {
+            return { ok: false, message: `${name}：未知 topic=${JSON.stringify(trimmed.slice(0, 40))}；可用 topic：${CONTRACT_SCHEMA_TOPICS.join("|")}（只读 schema 查询）。` };
+          }
+          topic = trimmed as ContractCheckInput["topic"];
+        }
+      }
       const taskKindRaw = readStringArg(call.args, ["taskKind", "task_kind"]);
       const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell"
         ? taskKindRaw
@@ -2434,6 +2450,7 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
         ...(scope?.roleId !== undefined && scope.roleId !== "" ? { roleId: scope.roleId } : requestedRole !== undefined && requestedRole !== "" ? { roleId: requestedRole } : {}),
         ...(taskKind !== undefined ? { taskKind } : {}),
         ...(moduleId !== undefined && moduleId.trim() !== "" ? { moduleId: moduleId.trim() } : {}),
+        ...(topic !== undefined ? { topic } : {}),
       };
       let text: string | null | undefined | void;
       try {
@@ -2453,7 +2470,9 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
       if (typeof text !== "string" || text.trim() === "") {
         return { ok: false, message: `${name}：数据源未返回契约摘要（结果不明）——不要据此猜测。` };
       }
-      const marker = "\n…（已截断，完整规则见 run manifest）";
+      const marker = input.topic !== undefined
+        ? "\n…（已截断）"
+        : "\n…（已截断，完整规则见 run manifest）";
       return {
         ok: true,
         message: Buffer.byteLength(text, "utf8") <= CONTRACT_CHECK_MAX_BYTES

@@ -18,6 +18,7 @@ import { parse as parseYaml } from "yaml";
 import { makeMechanicalRejection, type MechanicalRejection } from "./mechanical-rejection.ts";
 import { collectDispatchAdvisories } from "./dispatch-advisories.ts";
 import type { DispatchAdvisory } from "./dispatch-advisories.ts";
+import type { ContractSchemaTopic } from "../../model/runtime.ts";
 
 export type { DispatchAdvisory, DispatchAdvisoryCode } from "./dispatch-advisories.ts";
 
@@ -27,6 +28,154 @@ export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
 export const PROJECT_MODULES_SCHEMA = "project-modules/v2" as const;
 export const PROJECT_TOPOLOGY_SCHEMA = "project-topology/v2" as const;
 export const PROJECT_PROPOSAL_SCHEMA = "project-proposal/v2" as const;
+
+// 2026-11-03（contract_check topic）：本文件的 schema 文本/示例（`contractSchemaText` 与
+// `PROJECT_*_SCHEMA_EXAMPLE`）必须与解析规则、错误文案同步修改；改校验/文案时同步更新上述常量与文本。
+
+/** `topic=topology` 的最小合法示例（roster 示例直接引用，避免第二份副本）。 */
+export const PROJECT_TOPOLOGY_SCHEMA_EXAMPLE = [
+  `schema: ${PROJECT_TOPOLOGY_SCHEMA}`,
+  "modules:",
+  "  - id: core",
+  "    path: src/",
+  "    roleId: implementer",
+  "roles:",
+  "  - id: implementer",
+  "    modules: [core]",
+  "management: [convener, implementer]",
+].join("\n");
+
+/** `topic=modules` 的最小合法示例（只含 frontmatter）。 */
+export const PROJECT_MODULES_SCHEMA_EXAMPLE = [
+  "---",
+  `schema: ${PROJECT_MODULES_SCHEMA}`,
+  "flowId: demo",
+  "version: 1",
+  "modules:",
+  "  - id: core",
+  "    name: 核心",
+  "    purpose: 核心逻辑与公开接口",
+  "    category: core",
+  "    path: src/",
+  "    publicContract: internal（核心约定）",
+  "    architectureSource: docs/contracts/demo-architecture-v1.md",
+  "---",
+].join("\n");
+
+/** `topic=roster` 的最小合法示例（topology 块直接引用 topology 示例）。 */
+export const PROJECT_ROSTER_SCHEMA_EXAMPLE = [
+  "---",
+  `schema: ${PROJECT_ROSTER_SCHEMA}`,
+  "flowId: demo",
+  "version: 1",
+  "intent: docs/product/demo-intent-v1.md",
+  "proposal: docs/proposals/demo-proposal-v1.md",
+  "architecture: docs/contracts/demo-architecture-v1.md",
+  "envBootstrap:",
+  "  omitted: true",
+  "  omissionReason: <小项目省略理由；默认项目不要照抄>",
+  "modules:",
+  "  - id: core",
+  "    name: 核心",
+  "    purpose: 核心逻辑与公开接口",
+  "    category: core",
+  "    path: src/",
+  "    publicContract: internal（核心约定）",
+  "    architectureSource: docs/contracts/demo-architecture-v1.md",
+  "roles:",
+  "  - id: implementer",
+  "    displayName: 实现者",
+  "    purpose: 核心实现",
+  "    capability: TS",
+  "    modules: [core]",
+  "---",
+  "## 人员+模块拓扑图",
+  "```topology",
+  PROJECT_TOPOLOGY_SCHEMA_EXAMPLE,
+  "```",
+].join("\n");
+
+const CONTRACT_MODULES_SCHEMA_TEXT = [
+  "contract_check topic=modules（只读 schema；查询不构成放行/授权）",
+  "（仅 schema 与示例；不含 run/写区；其余参数被忽略）",
+  `文档：docs/proposals/<flowId>-modules-vN.md（唯一权威源；schema 必须恰为 ${PROJECT_MODULES_SCHEMA}）`,
+  "加载校验：文件名 -vN 的 N 必须 = frontmatter version；flowId 与派发一致；roster 加载要求存在最新本文件且 parseProjectModules(flowId) 通过。",
+  "frontmatter 顶层（必填；值不可为 null）：",
+  `- schema: 字面量 ${PROJECT_MODULES_SCHEMA}`,
+  "- flowId: 非空 string（与派发一致）",
+  "- version: 正整数（与文件名 -vN 的 N 一致）",
+  "- modules: 数组 1–12 项",
+  "modules[] 每项（必填键；值不可为 null）：",
+  "- id: string；小写 slug ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$（2–64 字符；不含首/尾连字符）；唯一",
+  "- name: string；非空（trim 后）",
+  "- purpose: string；非空（兼容别名 responsibility）",
+  "- category: string；小写 slug ^[a-z0-9][a-z0-9-]{0,31}$（1–32 字符；实现正则不区分大小写）；env/entry 为保留类别，名单中只能由 env-bootstrap 拥有（本条由名单解析强制）",
+  "- path: string；普通模块只写本项；项目相对；尾 / = 目录，否则 = 文件；禁绝对/盘符/通配 *?[]{}! /空段/./..",
+  "- paths: string[]；1–20 项（单值按 1 项）；仅 env-resources/entry-index 可多路径（名单解析强制）；与 path 同时给出时 paths[0] 必须等于 path（兼容写法，不建议同时写）",
+  `- publicContract: string；非空（trim 后）；不能写 YAML 布尔 true/false；例 "internal（核心约定）" 或 docs/contracts/<flowId>-contract-v1.md`,
+  `- architectureSource: string；非空（trim 后）；写作约定为项目相对路径（如 docs/contracts/<flowId>-architecture-v1.md）；解析器只校验非空，不校验路径形状`,
+  "约束：模块路径之间不得相同或包含（同父文件与目录合法）；不得落在治理写区（.ans/、角色卡/、docs/intents|product|proposals|contracts|scheduling|quality|verification|skills|mcp|audit/ 等）。",
+  "最小合法示例（flowId=demo；写入时把 demo 替换为实际 flowId）：",
+  PROJECT_MODULES_SCHEMA_EXAMPLE,
+].join("\n");
+
+const CONTRACT_ROSTER_SCHEMA_TEXT = [
+  "contract_check topic=roster（只读 schema；查询不构成放行/授权）",
+  "（仅 schema 与示例；不含 run/写区；其余参数被忽略）",
+  `文档：docs/proposals/<flowId>-roster-vN.md（schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
+  "frontmatter 顶层（必填项的值不可为 null；可选项见下）：",
+  `- schema: 字面量 ${PROJECT_ROSTER_SCHEMA}`,
+  "- flowId: 非空 string（与派发一致）；version: 正整数（=文件名 -vN 的 N）",
+  "- intent: docs/product/<flowId>-intent-vM.md；proposal: docs/proposals/<flowId>-proposal-vM.md；architecture: docs/contracts/<flowId>-architecture-vM.md（均完整路径，M≥1）",
+  "- modulesDoc: 可选；docs/proposals/<flowId>-modules-vM.md",
+  `- envBootstrap: 对象（omitted:boolean），可省略；未写/omitted:false 时须含 env-bootstrap + env-resources(env)/entry-index(entry)（角色存在性由招人前置校验）；{omitted:true, omissionReason:"<非空理由>"} 时不得含 env-bootstrap 或 env/entry 模块；勿写旧扁平字段。`,
+  "- modules: 数组 1–12；每项同 topic=modules，另须每模块恰一属主",
+  "- roles: 数组 1–12；每项：",
+  "  - id: 小写 slug（同模块 id）；唯一；不得为内置 id（chief/product/rapporteur/nominator/convener/verifier/su/liaison）",
+  "  - displayName/purpose/capability: 非空 string",
+  "  - modules: 非空 string[]；引用已定义模块 id；角色内不重复",
+  "绑定：roles[].modules[] 唯一来源；每模块恰一属主、每角色至少一模块；env/entry 只能归 env-bootstrap。",
+  "正文：必须有「人员+模块拓扑图」章节含 ```topology 块（见 topic=topology），与 frontmatter modules/roles 一致。",
+  "加载校验（硬拒绝；解析器之外）：",
+  "- 最新 roster 必须存在/可读（roster-missing）；文件名 vN 必须 = frontmatter version（roster-version-invalid）。",
+  "- 必须存在最新 modules 文档（roster-modules-doc-missing）；其 vN=version 且 parseProjectModules(flowId) 通过（roster-modules-doc-invalid）。",
+  "- roster modules[] 必须与最新 modules 文档逐项一致（roster-modules-drift）；modulesDoc 若写必须指向最新（roster-reference-stale）。",
+  "- intent/proposal/architecture 必须存在、非空（roster-reference-missing）且为各自最新版（roster-reference-stale）。",
+  "- proposal 必须 schema: project-proposal/v2 且正文含名单的 intent 路径（roster-reference-invalid/inconsistent）；architecture 正文必须含名单的 proposal 路径（roster-reference-inconsistent）。",
+  "最小示例（flowId=demo；省略 env-bootstrap 仅为最小形状）：",
+  "警告：示例只保证解析器通过；加载还需满足上方引用/模块清单/版本链校验。",
+  "警告：默认项目不要照抄省略块；须含 env-bootstrap（或写真实省略理由）。",
+  "警告：占位 omissionReason 必须替换，不得原样提交。",
+  PROJECT_ROSTER_SCHEMA_EXAMPLE,
+].join("\n");
+
+const CONTRACT_TOPOLOGY_SCHEMA_TEXT = [
+  "contract_check topic=topology（只读 schema；查询不构成放行/授权）",
+  "（仅 schema 与示例；不含 run/写区；其余参数被忽略）",
+  `位置：roster 正文「人员+模块拓扑图」章节内的 \`\`\`topology YAML 块（唯一机器可读格式；schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}）。`,
+  "块顶层（必填；值不可为 null）：",
+  `- schema: 字面量 ${PROJECT_TOPOLOGY_SCHEMA}`,
+  "- modules: 数组；每项：id（非空 string）、path 或 paths（string 或 string[]，至少 1 项；项目相对；尾 / = 目录）、roleId（非空 string）；拓扑节点不要求 category",
+  "- roles: 数组；每项：id（非空 string）、modules（非空 string[]）",
+  "- management: 扁平字符串数组；必须含 convener 与全部项目角色 id；不要写 management.roles 或 mapping",
+  "一致性：modules 的 id/路径集合/属主必须与 roster frontmatter modules[] 及 roles[].modules[] 完全一致；roles 的 id/modules 集合也必须一致；modules 与 roles 的数量也必须一致。",
+  "最小合法示例（与 topic=roster 示例的绑定一致）：",
+  "```topology",
+  PROJECT_TOPOLOGY_SCHEMA_EXAMPLE,
+  "```",
+].join("\n");
+
+const CONTRACT_SCHEMA_TEXTS: Record<ContractSchemaTopic, string> = {
+  modules: CONTRACT_MODULES_SCHEMA_TEXT,
+  roster: CONTRACT_ROSTER_SCHEMA_TEXT,
+  topology: CONTRACT_TOPOLOGY_SCHEMA_TEXT,
+};
+
+/** `contract_check({topic})` 的只读 schema 文本：纯静态内容，不读盘、不混 run 摘要。 */
+export function contractSchemaText(topic: ContractSchemaTopic): string {
+  return CONTRACT_SCHEMA_TEXTS[topic];
+}
+
 /** 2026-10-29（客户采纳）：标准固定角色「环境装配」；默认必带（小项目省略须写明理由）。 */
 export const ENV_BOOTSTRAP_ROLE_ID = "env-bootstrap" as const;
 const ENV_MODULE_PATTERNS: readonly RegExp[] = [
@@ -187,6 +336,18 @@ function rosterError(code: RosterParseError["code"], reason: string): RosterPars
   return { ok: false, code, reason };
 }
 
+/** 错误文案的「收到」类型描述（不回显字符串内容；boolean 按 `boolean: true|false` 回显）。 */
+function describeContractValue(value: unknown): string {
+  if (value === undefined) return "未提供";
+  if (value === null) return "null";
+  if (typeof value === "string") return value.trim() === "" ? "string（空）" : "string";
+  if (typeof value === "boolean") return `boolean: ${value}`;
+  if (typeof value === "number") return `number: ${value}`;
+  if (Array.isArray(value)) return `array(${value.length})`;
+  if (typeof value === "object") return "object（mapping）";
+  return typeof value;
+}
+
 /** 目录归一化：项目相对、posix、以 `/` 结尾；拒绝绝对路径/`..`/通配/空段。 */
 function normalizeRosterDirectory(raw: unknown): string | undefined {
   if (typeof raw !== "string") return undefined;
@@ -325,7 +486,7 @@ function validateRosterTopology(
     return {
       ok: false,
       code: "roster-topology-mismatch",
-      reason: `拓扑图 schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}；旧 v1 请按 v2 重出拓扑图（schema: project-topology/v2；modules[].path 或 paths[] + category，management.roles 含 convener 与全部项目角色），不做静默归一化。`,
+      reason: `拓扑图 schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}；旧 v1 请按 v2 重出拓扑图（modules[] 每项 id/path 或 paths[]/roleId；roles[] 每项 id/modules[]；management 为扁平数组，含 convener 与全部项目角色 id），不做静默归一化。`,
     };
   }
   if (!Array.isArray(doc.modules) || !Array.isArray(doc.roles)) {
@@ -338,14 +499,14 @@ function validateRosterTopology(
       ? [managementRaw]
       : [];
   if (!management.includes("convener")) {
-    return { ok: false, code: "roster-topology-mismatch", reason: "拓扑图 management 必须含 convener（运营管理项目角色）。" };
+    return { ok: false, code: "roster-topology-mismatch", reason: `拓扑图 management 的写作格式是扁平字符串数组（如 management: [convener, <全部项目角色 id>]），且必须含 convener；收到 ${describeContractValue(managementRaw)}（mapping → object（mapping），数组 → array(N)）；解析器兼容单个字符串（不推荐），不接受 management.roles 这种 mapping。` };
   }
   for (const role of roles) {
     if (!management.includes(role.id)) {
       return {
         ok: false,
         code: "roster-topology-mismatch",
-        reason: `拓扑图 management 缺项目角色 ${role.id}（运营对项目角色的管理关系不完整）。`,
+        reason: `拓扑图 management 缺项目角色 ${role.id}（运营对项目角色的管理关系不完整）；management 是扁平字符串数组，须含 convener 与全部项目角色 id。`,
       };
     }
   }
@@ -565,10 +726,24 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
     }
     if (moduleIds.has(id)) return rosterError("roster-module-id-invalid", `模块 id 重复：${id}`);
     moduleIds.add(id);
-    if (name === "" || purpose === "" || publicContract === "" || architectureSource === "") {
+    const prefix = `名单模块第 ${index + 1} 项（id=${id}）的`;
+    const purposeReceived = module.purpose !== undefined && module.purpose !== null ? module.purpose : module.responsibility;
+    if (name === "") {
+      return rosterError("roster-module-fields-missing", `${prefix} name 必须是非空字符串（收到 ${describeContractValue(module.name)}）。`);
+    }
+    if (purpose === "") {
+      return rosterError("roster-module-fields-missing", `${prefix} purpose 必须是非空字符串（收到 ${describeContractValue(purposeReceived)}）。`);
+    }
+    if (publicContract === "") {
       return rosterError(
         "roster-module-fields-missing",
-        `模块 ${id} 缺 name/purpose/publicContract/architectureSource（均须非空）。`,
+        `${prefix} publicContract 必须是非空字符串（收到 ${describeContractValue(module.publicContract)}）；不能写 YAML 布尔 true/false。`,
+      );
+    }
+    if (architectureSource === "") {
+      return rosterError(
+        "roster-module-fields-missing",
+        `${prefix} architectureSource 必须是非空字符串（收到 ${describeContractValue(module.architectureSource)}）；应为项目相对路径（如 docs/contracts/<flowId>-architecture-v1.md）。`,
       );
     }
     if (module.path !== undefined && module.paths !== undefined) {
@@ -788,8 +963,27 @@ export function parseProjectModules(
     }
     if (ids.has(id)) return { ok: false, code: "modules-doc-id", reason: `模块清单 id 重复：${id}` };
     ids.add(id);
-    if (name === "" || purpose === "" || publicContract === "" || architectureSource === "") {
-      return { ok: false, code: "modules-doc-fields", reason: `模块清单 ${id} 缺 name/purpose/publicContract/architectureSource。` };
+    const prefix = `模块清单第 ${index + 1} 项（id=${id}）的`;
+    const purposeReceived = module.purpose !== undefined && module.purpose !== null ? module.purpose : module.responsibility;
+    if (name === "") {
+      return { ok: false, code: "modules-doc-fields", reason: `${prefix} name 必须是非空字符串（收到 ${describeContractValue(module.name)}）。` };
+    }
+    if (purpose === "") {
+      return { ok: false, code: "modules-doc-fields", reason: `${prefix} purpose 必须是非空字符串（收到 ${describeContractValue(purposeReceived)}）。` };
+    }
+    if (publicContract === "") {
+      return {
+        ok: false,
+        code: "modules-doc-fields",
+        reason: `${prefix} publicContract 必须是非空字符串（收到 ${describeContractValue(module.publicContract)}）；不能写 YAML 布尔 true/false。`,
+      };
+    }
+    if (architectureSource === "") {
+      return {
+        ok: false,
+        code: "modules-doc-fields",
+        reason: `${prefix} architectureSource 必须是非空字符串（收到 ${describeContractValue(module.architectureSource)}）；应为项目相对路径（如 docs/contracts/<flowId>-architecture-v1.md）。`,
+      };
     }
     if (module.path !== undefined && module.paths !== undefined) {
       const single = normalizeModulePath(module.path)?.path;
