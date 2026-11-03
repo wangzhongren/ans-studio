@@ -222,3 +222,23 @@
 - **范围**：当前候选 32 个产品/测试文件（30 `src/app/test` + README 2）+ 本任务治理/记录/证据（H1 6 个边界文件、P1 审核、B0/D1/D1 重跑记录与证据、方案 P1.3/复核/团队计划/V1.1/E1/E2/E3、沟通记录、各 memo）。
 - **不含**：合并、发布、打 tag、删除分支；不含其它项目/其它任务改动。
 - **执行方式**：从 HEAD `0a12310` 新建分支 `feat/global-task-state`；按「产品/测试」与「治理/记录」分组提交；推送并创建 PR（base `main`）；PR 创建后回报链接与提交哈希。
+
+## 提交/推送/PR 结果（2026-11-02）
+
+- **分支**：`feat/global-task-state`（从 `0a12310` 新建，已推送并跟踪 origin）。
+- **Commit 1（产品/测试）**：`728c4e1dcb26fa0943d83eb5a2171953b94618a5` — `feat(global-task-state): 全局任务状态与幕僚版本决策权`；32 files changed, +7784/−22。
+- **Commit 2（治理/记录/证据）**：`27162ca` — `docs(global-task-state): 治理、记录、证据与边界登记`；51 files changed, +11029/−0。
+- **PR #33**：https://github.com/wangzhongren/ans-studio/pull/33（base `main`，head `feat/global-task-state`）。
+- **状态**：工作树干净（仅忽略的 `*.log`/截图产物）；**未合并、未发布、未打 tag**；未启用自动合并。
+
+## 合并授权记录（2026-11-02）
+
+- **客户授权**：原话「PR 也合并一下把」。
+- **对象**：PR #33（base `main`，head `feat/global-task-state`；Commit 1 `728c4e1…`、Commit 2 `27162ca`）。
+- **范围**：合并到 main；不发布、不打 tag、不删除分支、不启用自动合并。merge 方式按仓库既有惯例（merge commit）。
+
+## 合并结果（2026-11-02）
+
+- **PR #33 状态**：**MERGED**（`gh pr view` 实测），mergedAt `2026-11-02T12:57:02Z`，merge commit `05d9414a43562cd0e701e0017ebf093aa858df71`。
+- **main 已包含**：Commit 1 `728c4e1…`（产品/测试 32 文件）与 Commit 2 `27162ca`（治理/记录/证据 51 文件）。
+- **未做**：未发布、未打 tag、未删除分支、未启用自动合并。
