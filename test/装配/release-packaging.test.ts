@@ -7,11 +7,11 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.8.4');
-  assert.equal(SOURCE_SHA, '0982b0046be3a2e5bde8a8ab13422f0c07f2c2f1');
+  assert.equal(SOURCE_REF, 'v1.9.0');
+  assert.equal(SOURCE_SHA, '1fb2d634ef1b337775cbb48ed566412b0339c0b0');
 });
 
-test('release overlay selects the v1.8.4 packaging surface', () => {
+test('release overlay selects the v1.9.0 packaging surface', () => {
   const result = selectOverlay(['.github/workflows/release.yml',
     'src/common/装配/release-policy.mjs', 'src/common/装配/release-policy.d.mts',
     'test/装配/release-packaging.test.ts', 'package.json', 'package-lock.json', 'README.md']);
@@ -31,8 +31,8 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.5.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.5.0 已含全部产品代码）。
-// v1.3.0 曾按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
+// v1.9.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.9.0 已含全部产品/测试代码）。
+// v1.5.0 曾同样重置；v1.3.0 按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
 // test/桌面应用/session-rebuild-race.test.ts）均已随冻结源吸收、整批移除，回到 fail-closed/excluded。
 // 未列名 test/ 文件（test/runtime-core/**、test/codex-adapter/** 等）一律 excluded、不随构建树分发。
 // 本用例锁死 test/ 排除面总边界。
@@ -79,12 +79,11 @@ test('release overlay returns v1.4.0 overlay-2 entries to fail-closed or exclude
     'test/桌面应用/runtime-resolution.test.ts']);
 });
 
-// v1.5.0 overlay 追加（三平台 CI 前置修复）：1 项产品修复 + 6 项测试/夹具，按精确路径入选、不开目录；
-// 同目录未列名 test/ 仍 excluded，未列名 src/ 仍 fail-closed。断言不放宽。
-test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact path', () => {
-  const result = selectOverlay(['package.json',
-    'src/common/codex-adapter/reasoning-catalog.ts',
-    'test/codex-adapter/reasoning-catalog.test.ts',
+// v1.5.0 overlay 追加（三平台 CI 前置修复）已随 v1.9.0 冻结源吸收、整批移出白名单：生产修复回到 src/
+// fail-closed，7 个测试/夹具与同目录未列名 test/ 文件落 excluded、不随构建树；断言不放宽。
+test('release overlay returns v1.5.0 fix entries to fail-closed or excluded', () => {
+  assert.throws(() => selectOverlay(['src/common/codex-adapter/reasoning-catalog.ts']), /Unreviewed production overlay/);
+  const result = selectOverlay(['test/codex-adapter/reasoning-catalog.test.ts',
     'test/codex-adapter/fixtures.ts',
     'test/桌面UI/source-guard.test.ts',
     'test/runtime-core/file-write-safety.test.ts',
@@ -96,80 +95,76 @@ test('release overlay includes exactly the reviewed v1.5.0 fix batch by exact pa
     'test/runtime-core/abort-quarantine.test.ts',
     'test/测试/g5-reasoning-verify/d-codex.test.ts',
     'test/测试/governance-e2e-auto/d-dispatch-listing.test.ts']);
-  assert.deepEqual(result.selected, ['package.json',
-    'src/common/codex-adapter/reasoning-catalog.ts',
-    'test/codex-adapter/reasoning-catalog.test.ts',
+  assert.deepEqual(result.selected, []);
+  assert.deepEqual(result.excluded, ['test/codex-adapter/reasoning-catalog.test.ts',
     'test/codex-adapter/fixtures.ts',
     'test/桌面UI/source-guard.test.ts',
     'test/runtime-core/file-write-safety.test.ts',
     'test/测试/g5-reasoning-verify/helpers.ts',
     'test/测试/g5-reasoning-verify/compatibility-loopback.test.ts',
-    'test/测试/governance-e2e-auto/c-appointment-timing.test.ts']);
-  assert.deepEqual(result.excluded, ['test/codex-adapter/judge-mode.test.ts',
+    'test/测试/governance-e2e-auto/c-appointment-timing.test.ts',
+    'test/codex-adapter/judge-mode.test.ts',
     'test/桌面UI/anchor-view.test.ts',
     'test/runtime-core/abort-quarantine.test.ts',
     'test/测试/g5-reasoning-verify/d-codex.test.ts',
     'test/测试/governance-e2e-auto/d-dispatch-listing.test.ts']);
-  assert.throws(() => selectOverlay(['src/common/codex-adapter/config.ts']), /Unreviewed production overlay/);
 });
 
-// v1.7.0 发布阻断修复（tag v1.7.0 不可移动，经评审走显式 overlay）：2 项产品修复 + 3 项测试修复按精确路径入选；
-// 同目录未列名 test/ 仍 excluded，未列名 src/ 仍 fail-closed。断言不放宽。
-test('release overlay includes exactly the reviewed v1.7.0 blocking-fix batch by exact path', () => {
-  const result = selectOverlay(['package.json',
-    'src/common/shared/diagnostics.ts',
-    'test/桌面应用/interface.test.ts',
+// v1.7.0 发布阻断修复（tag v1.7.0 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、
+// 整批移出白名单：生产修复回到 src/ fail-closed，3 个测试修复与同目录未列名 test/ 文件落 excluded；
+// 断言不放宽。
+test('release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded', () => {
+  assert.throws(() => selectOverlay(['src/common/shared/diagnostics.ts']), /Unreviewed production overlay/);
+  const result = selectOverlay(['test/桌面应用/interface.test.ts',
     'test/桌面应用/project-document.test.ts',
     'test/桌面应用/acceptance-dispatch.test.ts',
     'test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
-  assert.deepEqual(result.selected, ['package.json',
-    'src/common/shared/diagnostics.ts',
-    'test/桌面应用/interface.test.ts',
+  assert.deepEqual(result.selected, []);
+  assert.deepEqual(result.excluded, ['test/桌面应用/interface.test.ts',
     'test/桌面应用/project-document.test.ts',
-    'test/桌面应用/acceptance-dispatch.test.ts']);
-  assert.deepEqual(result.excluded, ['test/桌面应用/runtime-resolution.test.ts',
+    'test/桌面应用/acceptance-dispatch.test.ts',
+    'test/桌面应用/runtime-resolution.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.throws(() => selectOverlay(['src/common/编排/flow-service.ts']), /Unreviewed production overlay/);
 });
 
-// v1.8.0 发布阻断修复（tag v1.8.0 不可移动，经评审走显式 overlay）：1 项产品修复 + 4 项测试修复按精确路径入选；
-// 同目录未列名 test/ 仍 excluded，未列名 app//src/ 仍 fail-closed。断言不放宽。
-test('release overlay includes exactly the reviewed v1.8.0 blocking-fix batch by exact path', () => {
-  const result = selectOverlay(['package.json',
-    'app/desktop/session.ts',
-    'test/桌面应用/role-log.test.ts',
+// v1.8.0 发布阻断修复（tag v1.8.0 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、
+// 整批移出白名单：生产修复回到 app//src/ fail-closed，4 个测试修复与同目录未列名 test/ 文件落 excluded；
+// 断言不放宽。
+test('release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded', () => {
+  assert.throws(() => selectOverlay(['app/desktop/session.ts']), /Unreviewed production overlay/);
+  const result = selectOverlay(['test/桌面应用/role-log.test.ts',
     'test/测试/lightweight-permission-repairs.test.ts',
     'test/测试/t1-pipeline-integration.test.ts',
     'test/编排/workflow-preconditions.test.ts',
     'test/测试/governance-e2e-auto/i-full-chain.test.ts',
     'test/桌面应用/stuck-redispatch.test.ts']);
-  assert.deepEqual(result.selected, ['package.json',
-    'app/desktop/session.ts',
-    'test/桌面应用/role-log.test.ts',
+  assert.deepEqual(result.selected, []);
+  assert.deepEqual(result.excluded, ['test/桌面应用/role-log.test.ts',
     'test/测试/lightweight-permission-repairs.test.ts',
     'test/测试/t1-pipeline-integration.test.ts',
     'test/编排/workflow-preconditions.test.ts',
-    'test/测试/governance-e2e-auto/i-full-chain.test.ts']);
-  assert.deepEqual(result.excluded, ['test/桌面应用/stuck-redispatch.test.ts']);
+    'test/测试/governance-e2e-auto/i-full-chain.test.ts',
+    'test/桌面应用/stuck-redispatch.test.ts']);
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
 });
 
-// v1.8.2 发布阻断修复（tag v1.8.2 不可移动，经评审走显式 overlay）：4 个测试文件的清理竞态按精确路径入选；
-// 同目录未列名 test/ 仍 excluded，未列名 app//src/ 仍 fail-closed。断言不放宽。
-test('release overlay includes exactly the reviewed v1.8.2 test-cleanup batch by exact path', () => {
-  const result = selectOverlay(['package.json',
-    'test/桌面应用/chain-enforcement.test.ts',
+// v1.8.2 发布阻断修复（tag v1.8.2 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、
+// 整批移出白名单：4 个测试文件的清理竞态修复与同目录未列名 test/ 文件落 excluded；app//src/ 未列名仍
+// fail-closed。断言不放宽。
+test('release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded', () => {
+  const result = selectOverlay(['test/桌面应用/chain-enforcement.test.ts',
     'test/桌面应用/run-pin.test.ts',
     'test/桌面应用/application-line.test.ts',
     'test/编排/task-state.test.ts',
     'test/桌面应用/watchdog-reuse.test.ts']);
-  assert.deepEqual(result.selected, ['package.json',
-    'test/桌面应用/chain-enforcement.test.ts',
+  assert.deepEqual(result.selected, []);
+  assert.deepEqual(result.excluded, ['test/桌面应用/chain-enforcement.test.ts',
     'test/桌面应用/run-pin.test.ts',
     'test/桌面应用/application-line.test.ts',
-    'test/编排/task-state.test.ts']);
-  assert.deepEqual(result.excluded, ['test/桌面应用/watchdog-reuse.test.ts']);
+    'test/编排/task-state.test.ts',
+    'test/桌面应用/watchdog-reuse.test.ts']);
   assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
 });
 
