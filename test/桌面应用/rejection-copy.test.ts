@@ -206,6 +206,23 @@ test("contract_check 输出超长由工具层截断到 4KB 内", async () => {
   }
 });
 
+test("contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02）", async () => {
+  const gate = (() => ({ allowed: true })) as unknown as WriteGate;
+  const tool = buildGovernedTools(gate, {
+    roleId: "render-dev",
+    contractCheck: () => "x".repeat(10_000),
+  }).find((item) => item.name === "contract_check");
+  assert.ok(tool);
+  if (!tool) return;
+  const result = await tool.handler({ args: { topic: "roster" } } as never);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.ok(Buffer.byteLength(result.message, "utf8") <= 4096);
+    assert.ok(result.message.includes("\n…（已截断）"), "topic 专用截断标记");
+    assert.equal(result.message.includes("run manifest"), false, "不得落到 legacy 截断标记");
+  }
+});
+
 test("contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07）", async () => {
   const gate = (() => ({ allowed: true })) as unknown as WriteGate;
   const seen: unknown[] = [];

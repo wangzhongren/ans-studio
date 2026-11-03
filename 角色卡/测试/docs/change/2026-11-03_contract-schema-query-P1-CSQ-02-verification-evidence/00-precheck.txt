@@ -1,0 +1,41 @@
+== 时点 ==
+2026-11-03 13:02:17 +0800
+
+== HEAD / 分支 ==
+55a4916b7f600e588ea73b244002a7a7740ce7dc
+feat/contract-schema-query
+
+== git status --porcelain ==
+ M docs/communication/2026-11-03_intent_contract-schema-query.md
+ M docs/communication/memo.md
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/rejection-copy.test.ts"
+?? docs/communication/2026-11-03_intent_customer-authorization-plane.md
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-03_contract-schema-query-P1-CSQ-02.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-03_contract-schema-query-P1-CSQ-02-verification-evidence/"
+
+== staged ==
+(空即无暂存)
+
+== git diff --numstat（测试文件） ==
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it
+17	0	"test/\346\241\214\351\235\242\345\272\224\347\224\250/rejection-copy.test.ts"
+
+== hunk 数（-U0） ==
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it
+1
+
+== 基线 HEAD 版本哈希 ==
+71388f9f734309074a8e6bd8a3c5a14853def4309a656b2878274e9c65d3cb91 *-
+
+== 工作区版本哈希 / blob / 行数 ==
+c272f843f60be3798f3232939c55de3a6d62229d11a328bcdb55406605cc2792 *test/桌面应用/rejection-copy.test.ts
+6b8da27c7fa944c1486cd51b94c62e94b9e3e6e1
+427 test/桌面应用/rejection-copy.test.ts
+
+== diff --stat ==
+warning: in the working copy of 'docs/communication/2026-11-03_intent_contract-schema-query.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/rejection-copy.test.ts', LF will be replaced by CRLF the next time Git touches it
+ .../2026-11-03_intent_contract-schema-query.md          |  7 +++++++
+ docs/communication/memo.md                              |  1 +
+ .../rejection-copy.test.ts"                             | 17 +++++++++++++++++
+ 3 files changed, 25 insertions(+)
