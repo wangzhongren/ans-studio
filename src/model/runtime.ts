@@ -238,10 +238,24 @@ export type ShellPostAuditFn = (
  * 单次 shell 审核结果。允许分支的可选 `grant`（2026-10-31 升级方案 v1.3 §6.3 加法）表示**本次放行来自
  * 客户升级授权**（由应用在客户卡回包后创建）；工具结果据此附「客户已允许一次/本会话」说明。
  * 不改变 allow 语义：仍是唯一放行判据；缺省 ⇒ 旧行为逐字不变。
+ *
+ * 2026-11-03（客户授权平面 A1 加法）：两分支可选 `directive` 表示本次结果来自客户事先记录的审批指令；
+ * 与 `grant` 并列、互斥来源（审计写 `directive` 不写 `judge`/`customerGrant`）。`scope` 的值即账本
+ * `until`。缺省 ⇒ 旧行为逐字不变。
  */
 export type ShellReviewResult =
-  | { allow: true; by: string; grant?: ShellGrant }
-  | { allow: false; reason: string; by: string };
+  | {
+      allow: true;
+      by: string;
+      grant?: ShellGrant;
+      directive?: { id: string; scope: "once" | "session" | "forever" };
+    }
+  | {
+      allow: false;
+      reason: string;
+      by: string;
+      directive?: { id: string; scope: "once" | "session" | "forever" };
+    };
 
 export type ShellGate = (req: ShellReviewRequest) => Promise<ShellReviewResult>;
 
@@ -532,6 +546,11 @@ export type CustomerInputOutcome =
        */
       decisionId?: string;
       /**
+       * 2026-11-03（客户授权平面 A1 加法）：仅**决策指令**导致的 `answered` 结算出现；`operatorId` 由
+       * 应用写 `directive:<id>`。`scope` 不入本字段（W-2 冻结为 `{id, action}`）。
+       */
+      directive?: { id: string; action: "select-recommended" | "select-option" | "reject" };
+      /**
        * 判断 agent 代批的审计归因（2026-10-18 双开关评审 §6.1/§四）：只有 `approve` 结算时才出现；
        * 客户手批不带本字段（仍是 `decisionEvidence.kind:"customer-input"`）。`declined`/`unavailable` 不加。
        */
@@ -542,6 +561,11 @@ export type CustomerInputOutcome =
       operatorId?: string;
       reason?: string;
       decisionId?: string;
+      /**
+       * 2026-11-03（客户授权平面 A1 加法）：仅**决策指令**导致的 `declined` 结算出现；
+       * `operatorId` 由应用写 `directive:<id>`。`unavailable` 分支不加。
+       */
+      directive?: { id: string; action: "select-recommended" | "select-option" | "reject" };
       /**
        * 卡片**从未呈现给客户**（2026-10-22 无效治理卡守卫设计 §4.6）：应用在触达客户通道之前
        * 拒绝发卡（如治理角色缺 `flowId`/`cardKind`）时置位。可选、向后兼容——既有 `declined`
@@ -829,8 +853,14 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
    */
   rosterVersion?: number;
   rosterSha256?: string;
-  by: "judge" | "customer";
+  /**
+   * 2026-11-03（客户授权平面 Q9 A）：`"directive"` 表示客户事先记录的决策指令导致的结果
+   * （**不是**客户本人点击，也不是 judge 代批）。旧事件无该值仍可读。
+   */
+  by: "judge" | "customer" | "directive";
   operatorId?: string;
+  /** 仅 `by === "directive"` 时由应用写入 `d-<seq>`；旧事件无该字段仍可读。 */
+  directiveId?: string;
   choice: string;
   reason?: string;
   judge?: GovernanceJudgeAudit;
@@ -929,6 +959,11 @@ export interface VersionDecisionEvent extends TaskStateEventBase {
   recommendedAction: VersionDecisionAction;
   decidedBy: VersionDecisionDecidedBy;
   operatorId?: string;
+  /**
+   * 2026-11-03（客户授权平面 Q9 A）：仅 `decidedBy === "directive"` 时由应用写入 `d-<seq>`；
+   * 旧事件无该字段仍可读。
+   */
+  directiveId?: string;
   reason: string;
   status: VersionDecisionStatus;
   oldFlowId?: string;

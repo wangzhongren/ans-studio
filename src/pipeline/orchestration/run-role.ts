@@ -145,7 +145,10 @@ import {
   type AssembleOperatorShellGateOptions,
   type RoutineShellPolicy,
   type ShellEscalationWiring,
+  type ShellDirectiveWiring,
 } from "./shell-arming.ts";
+// 2026-11-03（客户授权平面 B1）：Pipeline 公共句柄（类型只读；运行期实例由桌面/测试注入）。
+import type { CustomerDirectiveRuntime } from "./customer-directive.ts";
 // 2026-10-31（shell 判拒升级方案 v1.3 §6.1）：每会话升级 registry（判拒台账/资格/状态机/授权/审计）。
 import {
   createShellEscalationSession,
@@ -702,6 +705,13 @@ export async function openRoleSession(
      * 再缺省 `process.env`）。
      */
     shellEscalationOptions?: ShellEscalationRuntimeOptions;
+    /**
+     * **2026-11-03（客户授权平面 B1）**：每项目客户指令运行时（Pipeline 公共句柄）。
+     * 给出 ⇒ 在 shell 已 arm 且**非只读档**时把 `takeDirective` 注入闸（项目三层链与审批档）；
+     * 只读档不注入（只读拒绝不得被客户指令越过）。未给出（CLI/旧调用方）⇒ 不注入、行为逐字不变。
+     * 桌面 C1 用同一实例喂 `Interface.sendSession` 与 `openRoleSession`/`govern-session`。
+     */
+    customerDirective?: CustomerDirectiveRuntime;
     /**
      * **图片查看能力（`view_image`「注入才注册」，2026-10-26 客户要求；两轮附件设计）**：前端（桌面）
      * 提供的实现——工具读取项目内图片并调用本能力，把图片排队为**同一角色下一轮用户提示的图片附件**
@@ -1351,6 +1361,13 @@ export async function openRoleSession(
         }
       : {};
 
+  // 2026-11-03（客户授权平面 B1）：审批指令消费者只在调用方注入 `customerDirective` 时接线；
+  // 只读档（`shellReadonly`）**不注入**（结构上也不在只读选项面）；CLI 不传 ⇒ 空对象、行为逐字不变。
+  const directiveWiring: ShellDirectiveWiring =
+    input.customerDirective !== undefined
+      ? { takeDirective: (req, intent) => input.customerDirective!.takeDirective(req, intent) }
+      : {};
+
   let shellGate: ShellGate | undefined;
   if (input.shellOperatorOnly !== undefined) {
     if (input.shellReadonly !== undefined) {
@@ -1362,7 +1379,7 @@ export async function openRoleSession(
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
-        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, ...escalationWiring, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader });
+        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, ...escalationWiring, ...directiveWiring, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader });
       } catch (err) {
         log.error("shell.arming.failed", err);
         shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
@@ -1389,6 +1406,7 @@ export async function openRoleSession(
         sessionDeps: { ...deps, createAdapter: deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions) },
         ...(input.shellArming ?? {}),
         ...escalationWiring,
+        ...directiveWiring,
         runtime: input.runtime,
         ...(input.routineShellPolicy !== undefined ? { routineShellPolicy: input.routineShellPolicy } : {}),
         writeGuard: shellWriteGuard,

@@ -12,7 +12,6 @@
 // `.ans/state/**` 是应用独占的运行数据（非仓库候选）；旧 gate/flow/ledger 不读本文件。
 
 import { createHash, randomUUID } from "node:crypto";
-import { promises as fs } from "node:fs";
 import path from "node:path";
 import type {
   TaskClosedOutcome,
@@ -34,16 +33,26 @@ import {
   VERSION_DECISION_REASON_MAX,
   VERSION_DECISION_SCHEMA,
 } from "../../model/project-state.ts";
+import { CUSTOMER_DIRECTIVE_ID_PATTERN } from "../../model/directive.ts";
+import {
+  DEFAULT_JSONL_MAX_BYTES,
+  DEFAULT_JSONL_ROTATIONS,
+  appendJsonlLine,
+  readJsonlLedger,
+} from "../shared/jsonl-ledger.ts";
 import { isRunId } from "./run-manifest.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 
 /** 项目相对路径（POSIX 形式，便于跨平台展示与测试）。 */
 export const TASKS_STATE_REL = ".ans/state/tasks.jsonl";
-/** 默认单文件上限与保留份数（B-03「轮转」；env 可调）。 */
+/** 默认单文件上限与保留份数（B-03「轮转」；env 可调；默认值单一来源 = A2 `jsonl-ledger`）。 */
 export const TASKS_MAX_BYTES_ENV = "ANS_TASKS_MAX_BYTES";
 export const TASKS_ROTATIONS_ENV = "ANS_TASKS_ROTATIONS";
-export const DEFAULT_TASKS_MAX_BYTES = 5 * 1024 * 1024;
-export const DEFAULT_TASKS_ROTATIONS = 3;
+export const DEFAULT_TASKS_MAX_BYTES = DEFAULT_JSONL_MAX_BYTES;
+export const DEFAULT_TASKS_ROTATIONS = DEFAULT_JSONL_ROTATIONS;
+
+/** 指令 id 形状（单一来源 = A1 常量；不复制字面量）。 */
+const CUSTOMER_DIRECTIVE_ID_RE = new RegExp(CUSTOMER_DIRECTIVE_ID_PATTERN);
 
 const SIDE_EFFECTS: readonly TaskSideEffect[] = ["read-only", "docs", "code", "external", "destructive", "unknown"];
 const TASK_EVENT_KINDS = new Set([
@@ -222,47 +231,14 @@ export function redispatchTaskId(retryOf: string, attempt: number): string {
   return `${retryOf}-r${Math.max(1, Math.floor(attempt))}`;
 }
 
-// —————————————— 追加（轮转 + 原子行） ——————————————
+// —————————————— 追加（轮转 + 原子行；A2 共享辅助） ——————————————
 
 type AppendResult = { ok: true; path: string } | { ok: false; message: string; code?: string };
 
-function jsonLine(event: TaskStateEvent): string {
-  return `${JSON.stringify(event)}\n`;
-}
-
-async function rotateIfNeeded(file: string, incomingBytes: number, maxBytes: number, rotations: number): Promise<void> {
-  let size = 0;
-  try {
-    size = (await fs.stat(file)).size;
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
-    throw err;
-  }
-  if (size + incomingBytes <= maxBytes) return;
-  // 旧 → 新依次后移；最老的越界份删除。
-  for (let i = rotations; i >= 1; i -= 1) {
-    const from = i === 1 ? file : `${file}.${i - 1}`;
-    const to = `${file}.${i}`;
-    try {
-      await fs.rename(from, to);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code !== "ENOENT") throw err;
-    }
-  }
-  try {
-    await fs.unlink(`${file}.${rotations + 1}`);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-  }
-}
-
-/** 每文件追加串行链（同进程内不交错；跨进程行仍为单次 appendFile）。 */
-const appendChains = new Map<string, Promise<unknown>>();
-
 /**
  * 追加一个任务事件。写失败**不抛**：返回 `{ok:false,message}`，调用方如实回执/记日志。
- * 轮转在追加前按文件当刻大小判定；行内 JSON 不含换行（`JSON.stringify` 保证）。
+ * 轮转/串行链/原子追加**全部**走 A2 `src/common/shared/jsonl-ledger.ts`（B1 等价迁移；行为逐字不变）；
+ * env 解析与诊断留在此处。
  */
 export function appendTaskEvent(
   projectRoot: string,
@@ -276,40 +252,24 @@ export function appendTaskEvent(
       return Promise.resolve({ ok: false, code: "run-required", message: "task.created.run-required：新建项目任务必须带 runId 与 runState（legacy 仅历史重放允许）" });
     }
   }
+  const { maxBytes, rotations } = limits();
   const file = tasksStatePath(projectRoot);
-  const line = jsonLine(event);
-  const previous = appendChains.get(file) ?? Promise.resolve();
-  const next = previous.then(async (): Promise<AppendResult> => {
-    try {
-      await fs.mkdir(path.dirname(file), { recursive: true });
-      const { maxBytes, rotations } = limits();
-      await rotateIfNeeded(file, Buffer.byteLength(line, "utf8"), maxBytes, rotations);
-      await fs.appendFile(file, line, { encoding: "utf8", flag: "a" });
-      return { ok: true, path: file };
-    } catch (err) {
-      createDiagnosticLogger({ component: "orchestration.task-state", projectRoot }).error("tasks.append.failed", err, { taskId: (event as { taskId?: string }).taskId });
-      return { ok: false, message: err instanceof Error ? err.message : String(err) };
-    }
+  return appendJsonlLine(file, JSON.stringify(event), { maxBytes, rotations }).then((result) => {
+    if (result.ok) return { ok: true, path: file };
+    createDiagnosticLogger({ component: "orchestration.task-state", projectRoot }).error(
+      "tasks.append.failed",
+      result.cause ?? new Error(result.message),
+      { taskId: (event as { taskId?: string }).taskId },
+    );
+    return {
+      ok: false,
+      message: result.message,
+      ...(result.code !== undefined ? { code: result.code } : {}),
+    };
   });
-  const settled = next.then(() => undefined, () => undefined);
-  appendChains.set(file, settled);
-  void settled.finally(() => {
-    if (appendChains.get(file) === settled) appendChains.delete(file);
-  });
-  return next;
 }
 
 // —————————————— 读取 / 重放 ——————————————
-
-async function readFileLines(file: string): Promise<{ lines: string[]; dir: string } | undefined> {
-  try {
-    const raw = await fs.readFile(file, "utf8");
-    return { lines: raw.split(/\r?\n/), dir: path.dirname(file) };
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw err;
-  }
-}
 
 function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { ok: false; message: string } {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return { ok: false, message: "不是对象" };
@@ -340,7 +300,18 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       }
     }
     if (kind === "request.resolved") {
-      if (rec["by"] !== "judge" && rec["by"] !== "customer") return { ok: false, message: "request.resolved.by 非法" };
+      // 2026-11-03（客户授权平面 Q9 A）：`"directive"` 表示客户事先记录的决策指令导致的结果；
+      // `directiveId` 可选，给出时必须匹配 A1 `CUSTOMER_DIRECTIVE_ID_PATTERN`，且 `by==="directive"` 时必填。
+      const by = rec["by"];
+      if (by !== "judge" && by !== "customer" && by !== "directive") return { ok: false, message: "request.resolved.by 非法" };
+      if (rec["directiveId"] !== undefined) {
+        const directiveId = rec["directiveId"];
+        if (typeof directiveId !== "string" || !CUSTOMER_DIRECTIVE_ID_RE.test(directiveId)) {
+          return { ok: false, message: "request.resolved.directiveId 非法" };
+        }
+      } else if (by === "directive") {
+        return { ok: false, message: "request.resolved.by=directive 缺 directiveId" };
+      }
       if (typeof rec["choice"] !== "string") return { ok: false, message: "request.resolved 缺 choice" };
       // 2026-10-31（D3 卡种收口）：可选卡种；给出时必须在治理卡种白名单内（缺失 = 旧记录，兼容）。
       if (rec["cardKind"] !== undefined && !isGovernanceCardKind(rec["cardKind"])) {
@@ -459,8 +430,17 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     if (!isVersionDecisionAction(rec["recommendedAction"])) {
       return { ok: false, message: "version.decision.recommendedAction 非法" };
     }
-    if (rec["decidedBy"] !== "customer" && rec["decidedBy"] !== "judge") {
+    // 2026-11-03（客户授权平面 Q9 A）：`decidedBy:"directive"` + 可选 `directiveId`（规则同 request.resolved）。
+    if (rec["decidedBy"] !== "customer" && rec["decidedBy"] !== "judge" && rec["decidedBy"] !== "directive") {
       return { ok: false, message: "version.decision.decidedBy 非法" };
+    }
+    if (rec["directiveId"] !== undefined) {
+      const directiveId = rec["directiveId"];
+      if (typeof directiveId !== "string" || !CUSTOMER_DIRECTIVE_ID_RE.test(directiveId)) {
+        return { ok: false, message: "version.decision.directiveId 非法" };
+      }
+    } else if (rec["decidedBy"] === "directive") {
+      return { ok: false, message: "version.decision.decidedBy=directive 缺 directiveId" };
     }
     if (rec["operatorId"] !== undefined && (typeof rec["operatorId"] !== "string" || rec["operatorId"].trim() === "")) {
       return { ok: false, message: "version.decision.operatorId 非法" };
@@ -649,53 +629,24 @@ export function replayTaskEvents(events: readonly TaskStateEvent[], errors: Task
 
 /**
  * 读取并重放：轮转文件按 `.N`（旧）→ 当前（新）顺序读；坏行跳过并记录。
- * 坏行/读失败**不阻塞启动**；读文件异常（非 ENOENT）以空结果 + 错误返回，不抛给调用方。
+ * 读取/坏行/文件级失败**不阻塞启动**；读文件异常（非 ENOENT）以空结果 + 错误返回，不抛给调用方。
+ * 轮转/旧→新/坏行计数**全部**走 A2 `jsonl-ledger`（B1 等价迁移；诊断 `tasks.read.partial` 留在此处）。
  */
 export async function readTaskState(projectRoot: string): Promise<TaskStateReadResult> {
-  const file = tasksStatePath(projectRoot);
   const { rotations } = limits();
-  const files: string[] = [];
-  for (let i = rotations; i >= 1; i -= 1) {
-    try {
-      await fs.access(`${file}.${i}`);
-      files.push(`${file}.${i}`);
-    } catch { /* 不存在 */ }
-  }
-  files.push(file);
-  const events: TaskStateEvent[] = [];
-  const errors: TaskStateReadError[] = [];
-  for (const source of files) {
-    let lines: string[];
-    try {
-      const read = await readFileLines(source);
-      if (read === undefined) continue;
-      lines = read.lines;
-    } catch (err) {
-      errors.push({ file: path.basename(source), line: 0, message: err instanceof Error ? err.message : String(err) });
-      continue;
-    }
-    lines.forEach((raw, index) => {
-      if (raw.trim() === "") return;
-      let value: unknown;
-      try {
-        value = JSON.parse(raw);
-      } catch (err) {
-        errors.push({ file: path.basename(source), line: index + 1, message: `JSON 坏行：${err instanceof Error ? err.message : String(err)}` });
-        return;
-      }
-      const checked = validateEvent(value);
-      if (!checked.ok) {
-        errors.push({ file: path.basename(source), line: index + 1, message: checked.message });
-        return;
-      }
-      events.push(checked.event);
-    });
-  }
-  const replay = replayTaskEvents(events, errors);
+  const read = await readJsonlLedger<TaskStateEvent>(
+    tasksStatePath(projectRoot),
+    (raw) => {
+      const checked = validateEvent(JSON.parse(raw));
+      return checked.ok ? { ok: true, value: checked.event } : { ok: false, message: checked.message };
+    },
+    { rotations },
+  );
+  const replay = replayTaskEvents(read.values, read.errors);
   if (replay.errors.length > 0) {
     createDiagnosticLogger({ component: "orchestration.task-state", projectRoot }).record("tasks.read.partial", { count: replay.errors.length });
   }
-  return { ...replay, files: files.map((f) => path.basename(f)) };
+  return { ...replay, files: [...read.files] };
 }
 
 // —————————————— 查询辅助 ——————————————

@@ -9,6 +9,16 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
+// 客户授权平面（C1，2026-11-03）：`directive:state` 由**主进程先行**推送（did-finish-load/list-project/
+// recovery-ready）。preload 加载即缓存**最后一条**，`onDirectiveState` 注册时同步回放——渲染侧首帧即可拿到
+// `directivesEnabled` 能力位，不在未知能力位下抑制气泡。不暴露任何 Node 能力。
+let lastDirectiveState = null;
+if (typeof ipcRenderer.on === "function") {
+  ipcRenderer.on("directive:state", (_event, payload) => {
+    lastDirectiveState = payload;
+  });
+}
+
 contextBridge.exposeInMainWorld("desktop", {
   reportDiagnostic: (input) => ipcRenderer.invoke("app:renderer-diagnostic", input),
   getRecoveryState: () => ipcRenderer.invoke("app:recovery-state"),
@@ -64,6 +74,72 @@ contextBridge.exposeInMainWorld("desktop", {
    *  主进程按**真实字节重校验**（嗅探 + ≤5MB）后才送模型；渲染侧声明值不可信。 */
   sendSession: (text, images, target, metadata) =>
     ipcRenderer.invoke("session:send", { text, images: Array.isArray(images) ? images : [], target, metadata }),
+
+  // —— 客户授权平面（C1，2026-11-03）：五个白名单方法（只经 invoke/on；不暴露 Node 能力）——
+  /**
+   * 订阅指令确认请求（主→渲）：载荷 `{version:1, request:{id,target,rawText,projectRoot,roleId,runtime?,
+   * prefill,highRisk:{reasons},confirmable,decisionGroupEnabled}}`。**逐字段按 C1 冻结名消费**
+   * （`confirmable`，不是 `canConfirm`）；返回取消订阅函数。
+   */
+  onDirectiveConfirmRequest: (cb) => {
+    const listener = (_event, payload) => cb(payload);
+    ipcRenderer.on("directive:confirm-request", listener);
+    return () => ipcRenderer.removeListener("directive:confirm-request", listener);
+  },
+  /**
+   * 回传指令确认结果（渲→主 invoke）：`{id, decision:"confirm"|"cancel", values?}`；
+   * 主进程按提交快照复核（target/高危/`decisionGroupEnabled` 快照），回报 `{ok,error?,expired?}`。
+   * 非法/过期 id ⇒ `{ok:false,expired:true}`（不落账、不投递）。
+   */
+  directiveConfirmRespond: (input) =>
+    ipcRenderer.invoke("directive:confirm-response", {
+      id: input && typeof input.id === "string" ? input.id : "",
+      decision: input && input.decision === "cancel" ? "cancel" : "confirm",
+      ...(input && input.values !== undefined ? { values: input.values } : {}),
+    }),
+  /**
+   * 读取指令面板双视图（渲→主 invoke）：入参 `{projectRoot?}`（缺省=当前项目授权来源；
+   * 传入值只做一致性校验）。成功 `{version:1,ok:true,directivesEnabled:true,projectRoot,
+   * approval:DirectiveListView,decision:DirectiveListView,ledgerErrors}`；失败 `{ok:false,error}`。
+   * **不新增跨 target 字段、不跨项目聚合**。
+   */
+  listDirectives: (input) =>
+    ipcRenderer.invoke("directive:list", {
+      ...(input && typeof input.projectRoot === "string" ? { projectRoot: input.projectRoot } : {}),
+    }),
+  /**
+   * 撤销一条指令（渲→主 invoke；面板/输入同一服务路径）：`{id,target,projectRoot?,roleId?,runtime?}`。
+   * `roleId/runtime` 只作**显示目标**（系统行投递），**不是授权依据**；成功 `{ok:true,id,target}`，
+   * 失败 `{ok:false,error}`（不存在/已消费/已撤销/已失效/跨 target 如实回错）。
+   */
+  revokeDirective: (input) =>
+    ipcRenderer.invoke("directive:revoke", {
+      id: input && typeof input.id === "string" ? input.id : "",
+      target: input && (input.target === "approval" || input.target === "decision") ? input.target : "",
+      ...(input && typeof input.projectRoot === "string" ? { projectRoot: input.projectRoot } : {}),
+      ...(input && typeof input.roleId === "string" ? { roleId: input.roleId } : {}),
+      ...(input && typeof input.runtime === "string" ? { runtime: input.runtime } : {}),
+    }),
+  /**
+   * 订阅能力位/双视图状态（主→渲）：载荷与 `directive:list` 成功视图同形（`directivesEnabled:true`）。
+   * **注册时先同步回放 preload 缓存的最后一条**，再订阅后续推送；返回取消订阅函数。
+   */
+  onDirectiveState: (cb) => {
+    if (lastDirectiveState !== null) {
+      try {
+        cb(lastDirectiveState);
+      } catch {
+        /* 渲染侧回调异常不外溢到 preload。 */
+      }
+    }
+    if (typeof ipcRenderer.on !== "function") return () => {};
+    const listener = (_event, payload) => {
+      lastDirectiveState = payload;
+      cb(payload);
+    };
+    ipcRenderer.on("directive:state", listener);
+    return () => ipcRenderer.removeListener("directive:state", listener);
+  },
 
   /** 关闭会话（B-2 **定向**）：传角色 id 只关该角色（历史留在界面上）；不传/null 关全部（换项目/退出）。 */
   stopSession: (roleId) => {

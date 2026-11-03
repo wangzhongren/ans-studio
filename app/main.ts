@@ -13,6 +13,7 @@
 import path from "node:path";
 import os from "node:os";
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from "electron";
@@ -48,6 +49,9 @@ import {
 // 客户交互通道（A-5，2026-10-12）：su 的 request_confirmation / request_choice 经它摆到聊天流里的交互卡
 // 并取回客户裁决（per-window pending Map + **按请求快照校验回包**——渲染进程输入不可信）。
 import { createCustomerInputChannel, type AutoReworkCallbackInfo } from "./desktop/customer-input.ts";
+// 客户授权平面（C1，2026-11-03）：主进程侧指令控制器——每项目 B1 Pipeline 公共句柄、确认面板、
+// 指令 IPC 与 `directivesEnabled` 能力位；系统行复用既有 delivery-note（A3 文案）。
+import { createDirectiveInputController } from "./desktop/directive-input.ts";
 // 边界内写入预授权（2026-10-25 客户新规则「写自己角色权限内的路径，直接放行」）：判定纯逻辑在
 // write-preauthorization.ts（边界唯一来源 = 门禁 resolveWrite）；本文件只接线——通道在呈现卡片/调用
 // 判断之前求值，accept/reject 直接结算并落一条可见系统行（既有 delivery-note 事件行）。
@@ -99,6 +103,11 @@ let initialJudgeSwitches: JudgeSwitchesPreference = DEFAULT_JUDGE_SWITCHES;
  * 不改持久化开关值、**不影响治理 approval 组**（客户交互通道的判断组仍只看全局开关）。
  */
 const shellSessionPaused = createShellSessionPauseState();
+/**
+ * 客户授权平面（C1，P1-CAP-14）：**应用运行级** `sessionId`——模块初始化生成一次（whenReady 前），
+ * 同一运行内所有项目/窗口共用；项目切换**不重置**；进程重启生成新值，使 `session` 指令按 B1 状态机失效。
+ */
+const directiveSessionId = randomUUID();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // 5B：唯一生产入口 = Vite 构建产物 `renderer/dist/index.html`（PM §17.1）。
@@ -522,6 +531,56 @@ function registerIpc(win: BrowserWindow): void {
     roleStateDebouncer.dispose();
   });
 
+  // —————— 客户授权平面（C1，2026-11-03）：指令控制器、IPC 推送与能力位 handshake ——————
+  //
+  // 会话/账本/高危/once 全部在 B1 Pipeline（`createCustomerDirectiveRuntime`，唯一实现）；本处只接线：
+  //   · 每项目一个懒创建运行时（项目切换取消未决面板、不销毁旧运行时；切回同一运行内 session 指令仍有效）；
+  //   · `directive:confirm-request` 主→渲推送；`directive:confirm-response`/`list`/`revoke` 渲→主 invoke；
+  //   · `directive:state` 主→渲能力位/双视图推送（did-finish-load、list-project 成功、recovery-ready）；
+  //   · 回执/生效/冲突说明一律走既有 `emitEvent` 的 `delivery-note` 系统行（A3 key，不含原文、不进模型）。
+  const directiveLog = createDiagnosticLogger({ component: "desktop.directive" });
+  const emitDirectiveNote = (note: {
+    roleId: string;
+    projectRoot?: string;
+    runtime?: RuntimeKind;
+    summary: string;
+  }): void => {
+    if (win.isDestroyed()) throw new Error("窗口已关闭，无法投递指令系统行");
+    const projectRoot = note.projectRoot ?? recoveryProjectRoot ?? "";
+    if (projectRoot === "" || note.roleId === "") throw new Error("缺少项目/角色，无法投递指令系统行");
+    emitEvent({
+      roleId: note.roleId,
+      projectRoot,
+      runtime: note.runtime ?? recoveryRuntime,
+      event: { kind: "message", summary: note.summary, detail: { source: "delivery-note" } },
+    });
+  };
+  const directiveInput = createDirectiveInputController({
+    sessionId: directiveSessionId,
+    present: (payload) => {
+      if (win.isDestroyed()) throw new Error("窗口已关闭，无法呈现指令确认");
+      win.webContents.send("directive:confirm-request", payload);
+    },
+    emitNotice: emitDirectiveNote,
+  });
+  /** 能力位/双视图推送（`directive:list` 成功视图同形；无当前项目 ⇒ 空视图 + `directivesEnabled:true`）。 */
+  const pushDirectiveState = async (): Promise<void> => {
+    if (win.isDestroyed()) return;
+    let payload;
+    try {
+      payload = await directiveInput.state();
+    } catch (error) {
+      directiveLog.error("directive.state.failed", error);
+      return;
+    }
+    if (payload === undefined || win.isDestroyed()) return;
+    win.webContents.send("directive:state", payload);
+  };
+  // P1-CAP-07（主进程先行 handshake）：页面加载完成即推 `directive:state`（重载再次触发；preload 缓存
+  // 最后一条并在 `onDirectiveState` 注册时同步回放）。注册时若页面已加载完（如重开窗口后立即注册）补推。
+  win.webContents.on("did-finish-load", () => { void pushDirectiveState(); });
+  if (win.webContents.getURL() !== "") void pushDirectiveState();
+
   // 客户交互通道（A-5）：请求经 `session:operator-request` 推给渲染侧渲染成交互卡；客户决定经
   // `session:operator-response` 回传、在通道内**按请求快照校验**后解挂。**挂在窗口作用域**（每窗口一套）。
   //
@@ -570,9 +629,20 @@ function registerIpc(win: BrowserWindow): void {
         mainDiagnostic.error("governance-judge.progress.failed", error, { requestId: payload.requestId, cardKind: payload.cardKind });
       }
     },
+    // 客户授权平面（C1）：decision 指令消费者——只经控制器读 B1 target-scoped facts/应用；
+    // 可见结果行投达失败必须抛错（B1 据此不消费、回落客户卡）；冲突/不匹配说明失败只记诊断。
+    directive: {
+      decisionFacts: (projectRoot) => directiveInput.decisionFacts(projectRoot),
+      applyDecisionDirective: (projectRoot, card, hooks) =>
+        directiveInput.applyDecisionDirective(projectRoot, card, hooks),
+      emitResult: (note) => emitDirectiveNote(note),
+      emitNotice: (note) => emitDirectiveNote(note),
+    },
   });
   // 窗口关掉：所有挂起请求归「未获同意」（fail-closed）——不留悬案、更不放行。
   win.on("closed", () => customerChannel.rejectAllPending("窗口已关闭，未获同意（fail-closed）"));
+  // 客户授权平面（C1）：关窗取消未决指令面板（B1 presenter 收到 cancel ⇒ 不落账/不投递）。
+  win.on("closed", () => directiveInput.cancelAll("窗口已关闭，未获确认（fail-closed）"));
 
   // M-1（2026-10-12 客户裁定「这个太丑了」）：shell 确认卡的**呈现端**——不再用原生消息框。
   // 数据面（命令逐字原文 + 人话摘要/原因 + 折叠详情）经 `shell:confirm-request` 推给渲染侧；客户决定经
@@ -610,11 +680,16 @@ function registerIpc(win: BrowserWindow): void {
   // `app:recovery-ready` 同款；只重推**仍挂起**的项——过期/已决项绝无放行语义，重推不改变任何判定）。
   win.on("focus", () => { shellConfirm.replayPending(); shellEscalation.replayPending(); });
   win.on("show", () => { shellConfirm.replayPending(); shellEscalation.replayPending(); });
+  // 客户授权平面（C1）：focus/show 幂等重推仍挂起的指令确认面板（同一 requestId；不改变任何判定）。
+  win.on("focus", () => directiveInput.replayPending());
+  win.on("show", () => directiveInput.replayPending());
   registerHandler("app:recovery-ready", (event) => {
     if (event.sender !== win.webContents) return { ok: false };
     customerChannel.replayPending();
     shellConfirm.replayPending();
     shellEscalation.replayPending();
+    directiveInput.replayPending();
+    void pushDirectiveState();
     return { ok: true };
   });
   // 2026-10-31（判拒升级方案 v1.3 §7.2）：`shell:confirm-response` 同时承载两类回包——
@@ -789,6 +864,8 @@ function registerIpc(win: BrowserWindow): void {
     shellJudgeSwitch,
     // 「替我决策」（2026-10-18）：**同一实例**的第二套开关——与 approval 互不影响。
     decisionJudgeSwitch,
+    // 客户授权平面（C1）：命中 `@审批`/`@决策` 的提交只经该控制器（命中不回退普通聊天）。
+    directiveInput,
     // I-1 补丁（2026-10-12 客户重发授权）：(c) 规则集实件（与 (a) 同处接线、同判据——两件同备才 arm）。
     // 同一份对象也供全部内置治理角色审批档（session.ts 对 `role.builtIn === true` 经 `shellOperatorOnly` 复用——单一来源，两档不漂移）。
     shellArming,
@@ -878,6 +955,10 @@ function registerIpc(win: BrowserWindow): void {
     const res = await desktop.listProject(input);
     if (recoveryProjectRoot !== res.projectRoot) recoveryRoleId = null;
     recoveryProjectRoot = res.projectRoot;
+    // 客户授权平面（C1）：项目授权来源更新——项目变化时取消旧项目未决面板（不销毁旧运行时），
+    // 并以新项目的账本视图重推 `directive:state`（能力位恒 true）。
+    directiveInput.setCurrentProject(res.projectRoot);
+    void pushDirectiveState();
     const roles = Array.isArray(res && res.roles) ? res.roles.map((r) => r.roleId) : [];
     void pushSessionHistories(win, res.projectRoot, roles, desktop);
     return res;
@@ -892,6 +973,20 @@ function registerIpc(win: BrowserWindow): void {
   // 经统筹/提案/幕僚会话的客户卡通道呈现（无 pinned run/无可呈现会话 ⇒ 如实失败；不代选模式）。
   registerHandler("run:change-request", (_e, input) => desktop.requestRunChange(input));
   registerHandler("session:send", (_e, input: Parameters<DesktopInterface["sendSession"]>[0]) => desktop.sendSession(input));
+  // —————— 客户授权平面（C1，2026-11-03）：渲→主 invoke 三通道（sender 校验同既有模式）——————
+  // `directive:confirm-request`/`directive:state` 只做主→渲推送，无入站 handler。
+  registerHandler("directive:confirm-response", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。", expired: true };
+    return directiveInput.respond(input);
+  });
+  registerHandler("directive:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return directiveInput.list(input);
+  });
+  registerHandler("directive:revoke", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, error: "请求来源无效。" };
+    return directiveInput.revoke(input);
+  });
   registerHandler("session:stop", (_e, input) => desktop.stopSession(input));
   // P1-1（2026-10-13 客户裁定）：撤回未投递排队消息——Interface 如实回报（仅在队列中的客户消息可撤），主进程只透传。
   registerHandler("session:withdraw", (_e, input: { roleId: string; id: string }) => desktop.withdrawQueued(input));

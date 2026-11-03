@@ -21,6 +21,7 @@ import { ChevronRight, ShieldAlert, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/chat/chat-store";
+import { getDesktopBridge } from "@/lib/platform";
 import {
   judgePauseState,
   recoveryActionView,
@@ -34,6 +35,15 @@ import { requestJudgePause, useJudgePauseSnapshot } from "@/chat/judge-row-view"
 import { governanceView } from "@/chat/role-view";
 import type { ConfirmCardRecord } from "@/chat/confirm-logic";
 import { useConfirmStore } from "@/stores/confirm-store";
+import {
+  cardDirectiveTarget,
+  cardEntryFor,
+  DIRECTIVE_APPROVAL_MARKER,
+  DIRECTIVE_DECISION_MARKER,
+  isDirectiveOverlayOpen,
+  useDirectiveStore,
+} from "@/stores/directive-store";
+import { useUiStore } from "@/stores/ui-store";
 import { translate, useLocaleState, useT } from "@/i18n";
 import type { Locale } from "@/i18n";
 
@@ -93,6 +103,167 @@ function useCardFocus(
       if (previous && previous.isConnected) previous.focus({ preventScroll: true });
     }
   }, [card, denyRef, lastId, restoreRef]);
+}
+
+/**
+ * AC-22（W-1=A）：三张 shell 卡页脚的折叠指令入口。
+ *
+ * - target 只取卡载荷 `{projectRoot,roleId,runtime}`；缺失/非法/跨项目/跨引擎 ⇒ 严格 fail-closed
+ *   （入口禁用或提交拒绝；不调用 sendSession、不画气泡、不落账、不回退当前选择）；
+ * - 输入只接受 A1 共享解析器命中的 `@审批`/`@决策`；未命中/能力位 false ⇒ 行内错误、不发送；
+ * - 提交走与 Composer 相同的 `bridge.sendSession`，不回传 shell/recovery 应答；
+ * - Esc 只折叠输入区（由 ConfirmCard 的 document 陷阱协调），展开时 `overlayOpen` 让位给指令弹层。
+ */
+function CardDirectiveEntry({
+  prefix,
+  card,
+  payload,
+}: {
+  prefix: string;
+  card: ConfirmCardRecord;
+  payload: Record<string, unknown>;
+}) {
+  const t = useT();
+  const entry = useDirectiveStore((state) => cardEntryFor(state.cardEntries, card.id));
+  const directivesEnabled = useDirectiveStore((state) => state.directivesEnabled);
+  const capabilityAvailable = useDirectiveStore((state) => state.capabilityAvailable);
+  const projectRoot = useChatStore((state) => state.projectRoot);
+  const runtime = useUiStore((state) => state.runtime);
+  const setExpanded = useDirectiveStore((state) => state.setCardEntryExpanded);
+  const setText = useDirectiveStore((state) => state.setCardEntryText);
+  const collapse = useDirectiveStore((state) => state.collapseCardEntry);
+  const openPanel = useDirectiveStore((state) => state.openPanel);
+  const submitFromCardEntry = useDirectiveStore((state) => state.submitFromCardEntry);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const bridge = getDesktopBridge();
+  const target = cardDirectiveTarget(payload, { projectRoot, runtime });
+  const allowEntry = directivesEnabled && target.ok;
+  const disabledReason = !capabilityAvailable
+    ? t("ui.directive.error.capabilityUnavailable")
+    : !target.ok
+      ? t("ui.directive.cardEntry.error.invalidTarget")
+      : "";
+  const canSubmit =
+    allowEntry &&
+    entry.expanded &&
+    !!bridge?.sendSession &&
+    entry.text.trim() !== "" &&
+    !entry.submitting;
+  const statusText =
+    entry.status.text ||
+    (entry.status.key
+      ? t(entry.status.key, {
+          approvalMarker: DIRECTIVE_APPROVAL_MARKER,
+          decisionMarker: DIRECTIVE_DECISION_MARKER,
+        })
+      : "");
+  const shownStatus = statusText || (!allowEntry ? disabledReason : "");
+  const markerParams = {
+    approvalMarker: DIRECTIVE_APPROVAL_MARKER,
+    decisionMarker: DIRECTIVE_DECISION_MARKER,
+  };
+
+  const submit = () => {
+    if (!canSubmit) return;
+    void submitFromCardEntry({
+      cardId: card.id,
+      rawText: entry.text,
+      payload,
+      view: { projectRoot, runtime },
+      sendSession: bridge?.sendSession,
+    });
+  };
+
+  return (
+    <div className="sc-directive-entry-wrap">
+      <button
+        id={prefix + "-directive-entry"}
+        type="button"
+        className="sc-directive-entry"
+        aria-expanded={entry.expanded}
+        title={allowEntry ? t("ui.directive.cardEntry.entryLabel") : disabledReason}
+        disabled={!allowEntry}
+        onClick={() => {
+          if (entry.expanded) {
+            collapse(card.id);
+            return;
+          }
+          setExpanded(card.id, true);
+          requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+        }}
+      >
+        {entry.expanded
+          ? t("ui.directive.cardEntry.collapse")
+          : t("ui.directive.cardEntry.expand")}
+      </button>
+      {entry.expanded ? (
+        <div className="sc-directive-entry-body">
+          <textarea
+            id={prefix + "-directive-input"}
+            ref={inputRef}
+            className="sc-directive-input"
+            rows={2}
+            value={entry.text}
+            placeholder={t("ui.directive.cardEntry.inputPlaceholder", markerParams)}
+            aria-label={t("ui.directive.cardEntry.inputPlaceholder", markerParams)}
+            spellCheck={false}
+            onChange={(event) => setText(card.id, event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                collapse(card.id);
+                return;
+              }
+              if (event.key !== "Enter" || event.shiftKey) return;
+              if (event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              submit();
+            }}
+          />
+          <div className="sc-directive-entry-actions">
+            <button
+              id={prefix + "-directive-submit"}
+              type="button"
+              className="sc-directive-action is-primary"
+              disabled={!canSubmit}
+              onClick={submit}
+            >
+              {t("ui.directive.cardEntry.submit")}
+            </button>
+            <button
+              id={prefix + "-directive-panel-open"}
+              type="button"
+              className="sc-directive-action"
+              disabled={!allowEntry}
+              onClick={() => openPanel()}
+            >
+              {t("ui.directive.cardEntry.openPanel")}
+            </button>
+            <button
+              id={prefix + "-directive-cancel"}
+              type="button"
+              className="sc-directive-action"
+              onClick={() => collapse(card.id)}
+            >
+              {t("ui.directive.cardEntry.cancel")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {shownStatus ? (
+        <p
+          id={prefix + "-directive-status"}
+          className="sc-directive-status"
+          role="status"
+          aria-live="polite"
+        >
+          {shownStatus}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
@@ -254,6 +425,8 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
             {suApproval ? " " : ""}
             {t("ui.confirm.shellDenyNote")}
           </p>
+
+          <CardDirectiveEntry prefix="sc" card={card} payload={payload} />
         </div>
       ) : null}
     </div>
@@ -459,6 +632,12 @@ function ShellEscalationCard({ card }: { card: ConfirmCardRecord | null }) {
             {view.note}
           </p>
 
+          <CardDirectiveEntry
+            prefix="se"
+            card={card}
+            payload={asRecord(card.payload)}
+          />
+
           <div className="se-footer">
             {pause.action === "pause" ? (
               <button
@@ -653,6 +832,8 @@ function RecoveryConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
           <p id="rc-hint" className="sc-hint">
             {expired ? card?.expiredReason : t("ui.confirm.recoveryNote")}
           </p>
+
+          <CardDirectiveEntry prefix="rc" card={card} payload={payload} />
         </div>
       ) : null}
     </div>
@@ -665,6 +846,14 @@ export function ConfirmCard() {
   const respondShell = useConfirmStore((s) => s.respondShell);
   const respondEscalation = useConfirmStore((s) => s.respondEscalation);
   const respondRecovery = useConfirmStore((s) => s.respondRecovery);
+  const directiveOverlayOpen = useDirectiveStore((s) => isDirectiveOverlayOpen(s));
+  const expandedCardEntryId = useDirectiveStore((s) => {
+    for (const [id, entry] of Object.entries(s.cardEntries)) {
+      if (entry.expanded) return id;
+    }
+    return "";
+  });
+  const collapseCardEntry = useDirectiveStore((s) => s.collapseCardEntry);
 
   // 单槽呈现：升级卡排他；审批卡由主进程等待（store 按 kind 守卫，渲染按 kind 路由）。
   const escalationCard =
@@ -676,7 +865,18 @@ export function ConfirmCard() {
   useEffect(() => {
     if (!shellCard && !recoveryConfirm) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      // 指令确认对话框（z 90）/面板（z 95）打开时，本卡的 Tab/Esc 陷阱让位。
+      if (directiveOverlayOpen) return;
       if (event.key === "Escape") {
+        // 卡内指令输入区展开时，Esc 只折叠输入区，不回答 shell 卡（fail-closed 语义保持）。
+        const visibleCardIds = [shellCard?.id, recoveryConfirm?.id].filter(
+          (id): id is string => typeof id === "string" && id !== "",
+        );
+        if (expandedCardEntryId && visibleCardIds.includes(expandedCardEntryId)) {
+          event.preventDefault();
+          collapseCardEntry(expandedCardEntryId);
+          return;
+        }
         // 两卡同开时 Esc 先答上层（recovery）；两者 Esc 都 = 否决（fail-closed）。
         if (recoveryConfirm) {
           event.preventDefault();
@@ -729,6 +929,9 @@ export function ConfirmCard() {
     respondShell,
     respondEscalation,
     respondRecovery,
+    directiveOverlayOpen,
+    expandedCardEntryId,
+    collapseCardEntry,
   ]);
 
   return (

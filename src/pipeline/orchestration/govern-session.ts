@@ -52,6 +52,7 @@ import type {
   BackgroundTaskStopResult,
 } from "../../model/runtime.ts";
 import { openRoleSession, isFailedSettlement, type RoleSessionDeps, type RoleSessionHandle, type RoleSessionSendOptions } from "./run-role.ts";
+import type { CustomerDirectiveRuntime } from "./customer-directive.ts";
 import { listProject, resolveGovernanceRole, resolveRole } from "../../service/role/resolve-role.ts";
 import {
   LEGACY_SU_PREAUTHORIZED_DIRS,
@@ -152,6 +153,12 @@ export interface GovernSessionInput {
    * ——本引擎即 su 治理会话引擎，重 pin 是其固有职责。创世态为 **no-op**（首次 pin 只在客户确认时写）。
    */
   autoRepin?: boolean;
+  /**
+   * **2026-11-03（客户授权平面 B1）**：每项目客户指令运行时（Pipeline 公共句柄）。
+   * 原样透传给 `openRoleSession`；只有 shell 已 arm 且非只读档时才注入 `takeDirective`。
+   * 未给出（CLI）⇒ 不注入、行为逐字不变。
+   */
+  customerDirective?: CustomerDirectiveRuntime;
 }
 
 /** 治理会话句柄（**唯一引擎**的产物；两前端只驱动它，不各自实现装配）。 */
@@ -238,6 +245,7 @@ export async function openGovernanceSession(
       scope: effectiveScope,
       customerInput: input.customerInput,
       autoRepin: input.autoRepin,
+      ...(input.customerDirective !== undefined ? { customerDirective: input.customerDirective } : {}),
     },
     deps,
   );

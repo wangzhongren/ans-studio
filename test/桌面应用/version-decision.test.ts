@@ -271,6 +271,48 @@ test("版本修改（客户）：application-owned 卡、targetVersions、execut
   }
 });
 
+test("版本修改（客户指令 Q9 A）：request.resolved.by=directive + directiveId；version.decision 三值归属", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-vd-directive-"));
+  try {
+    const runId = "run-20261102-focus-dddddddd";
+    assert.equal((await writeRunManifest(root, manifest("focus", runId))).ok, true);
+    const { manager, caps, requests } = makeManager(root, {
+      answer: () => ({
+        outcome: "answered",
+        value: { selected: ["version-modify"] },
+        operatorId: "directive:d-9",
+        directive: { id: "d-9", action: "select-option" },
+      }),
+    });
+    try {
+      await openChief(manager, root);
+      const result = await decisionFn(caps)({ flowId: "focus", action: "version-modify", reason: "按客户指令修改" });
+      assert.equal(result.ok, true, result.message);
+      assert.equal(requests.length, 1);
+      const events = (await readTaskState(root)).events;
+      const resolved = events.find((event) => event.kind === "request.resolved");
+      assert.equal(resolved?.kind, "request.resolved");
+      if (resolved?.kind === "request.resolved") {
+        assert.equal(resolved.by, "directive", "客户指令不是客户本人点击、也不是 judge");
+        assert.equal(resolved.directiveId, "d-9");
+        assert.equal(resolved.operatorId, "directive:d-9");
+      }
+      const executed = events.find((event) => event.kind === "version.decision" && event.status === "executed");
+      assert.equal(executed?.kind, "version.decision");
+      if (executed?.kind === "version.decision") {
+        assert.equal(executed.decidedBy, "directive");
+        assert.equal(executed.directiveId, "d-9");
+        assert.equal(executed.operatorId, "directive:d-9");
+      }
+      assert.equal(events.some((event) => event.kind === "request.presented"), false, "W-6：不伪造 presented");
+    } finally {
+      await manager.stop(null);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
 test("新版本开发（judge 代批）：新 flow/run；旧 flow 全部活动 run 关闭；orphan 旧申请；旧任务不自动关闭", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-vd-newflow-"));
   try {

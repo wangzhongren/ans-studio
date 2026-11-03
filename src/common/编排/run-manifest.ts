@@ -24,6 +24,8 @@ import {
   parseProjectRoster,
   type RosterLoadResult,
 } from "./workflow-preconditions.ts";
+import { CUSTOMER_DIRECTIVE_ID_PATTERN } from "../../model/directive.ts";
+import type { VersionDecisionDecidedBy } from "../../model/project-state.ts";
 
 export const RUN_SCHEMA = "ans-run/v1" as const;
 export const RUN_INTENT_SCHEMA = "project-intent/v1" as const;
@@ -84,7 +86,10 @@ export interface RunChangeRecord {
   decisionId: string;
   requestId?: string;
   mode: RunChangeMode;
-  decidedBy: "customer" | "judge";
+  /** 2026-11-03（客户授权平面 Q9 A）：加 `"directive"`（客户事先记录的决策指令代选/拒绝）。 */
+  decidedBy: VersionDecisionDecidedBy;
+  /** 仅 `decidedBy === "directive"` 时由应用写入 `d-<seq>`；旧读者忽略。 */
+  directiveId?: string;
   decidedAt: string;
   oldRunId: string;
   newRunId?: string;
@@ -616,10 +621,28 @@ export function mapRunChangeAnswer(input: { choice?: unknown; selected?: unknown
 export async function applyRunChange(
   projectRoot: string,
   manifest: RunManifest,
-  input: { decisionId: string; requestId?: string; mode: RunChangeMode; decidedBy: "customer" | "judge"; decidedAt?: string; newHashes?: Record<string, string> },
+  input: {
+    decisionId: string;
+    requestId?: string;
+    mode: RunChangeMode;
+    decidedBy: VersionDecisionDecidedBy;
+    /** 仅 `decidedBy === "directive"` 时必填；形状单一来源 = A1 `CUSTOMER_DIRECTIVE_ID_PATTERN`。 */
+    directiveId?: string;
+    decidedAt?: string;
+    newHashes?: Record<string, string>;
+  },
 ): Promise<RunManifestResult<{ manifest: RunManifest; mode: RunChangeMode; newRunRequired: boolean }>> {
   if (input.mode !== "continue-frozen" && input.mode !== "stop-and-restart" && input.mode !== "stop") {
     return { ok: false, code: "run-change-invalid", reason: `run-change mode 非法：${String(input.mode)}` };
+  }
+  if (input.decidedBy !== "customer" && input.decidedBy !== "judge" && input.decidedBy !== "directive") {
+    return { ok: false, code: "run-change-invalid", reason: `run-change decidedBy 非法：${String(input.decidedBy)}` };
+  }
+  if (input.directiveId !== undefined && !new RegExp(CUSTOMER_DIRECTIVE_ID_PATTERN).test(input.directiveId)) {
+    return { ok: false, code: "run-change-invalid", reason: `run-change directiveId 非法：${input.directiveId}` };
+  }
+  if (input.decidedBy === "directive" && input.directiveId === undefined) {
+    return { ok: false, code: "run-change-invalid", reason: "run-change decidedBy=directive 缺 directiveId" };
   }
   const now = input.decidedAt ?? new Date().toISOString();
   const oldHashes: Record<string, string> = {};
@@ -633,6 +656,7 @@ export async function applyRunChange(
       ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
       mode: input.mode,
       decidedBy: input.decidedBy,
+      ...(input.directiveId !== undefined ? { directiveId: input.directiveId } : {}),
       decidedAt: now,
       oldRunId: manifest.runId,
       oldHashes,
@@ -655,6 +679,7 @@ export async function applyRunChange(
     ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
     mode: input.mode,
     decidedBy: input.decidedBy,
+    ...(input.directiveId !== undefined ? { directiveId: input.directiveId } : {}),
     decidedAt: now,
     oldRunId: manifest.runId,
     ...(newRunId !== undefined ? { newRunId } : {}),

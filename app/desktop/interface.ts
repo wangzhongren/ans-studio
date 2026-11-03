@@ -63,6 +63,10 @@ import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions
 // 客户确认制交互（A-5）：桌面侧的客户通道形状（带角色上下文）——本层只透传，实现在 `customer-input.ts`。
 // 判断代批结果行的结构化载荷与人话摘要（2026-10-18 双开关评审 §8.1/§9.3）同源，不在这里另写一份。
 import { judgeResultSummary, type DesktopCustomerInputFn, type OperatorJudgeResultPayload } from "./customer-input.ts";
+// 客户授权平面（C1，2026-11-03）：主进程侧指令控制器（main.ts 构造并注入）与 Q9 归属唯一解析。
+import { directiveIdFromOperatorId, directiveSubmitErrorMessage, type DirectiveInputController } from "./directive-input.ts";
+// 客户指令标记的**唯一**解析器（A1 冻结；纯函数、零副作用）。
+import { parseDirectiveMarker } from "../../src/model/directive-marker.ts";
 // 治理下一步（2026-10-18 客户修正）：客户决定成功后的**后台派发**。推导/文案纯逻辑在 governance-advance.ts；
 // 本层负责打开目标治理角色会话、投递**唯一一条**任务，并把成功/失败经既有 delivery-note 系统行如实落流。
 import { governanceFlowStatePath } from "./governance-advance.ts";
@@ -497,6 +501,12 @@ export interface DesktopDeps {
    */
   customerInput?: DesktopCustomerInputFn;
   /**
+   * **客户授权平面控制器（C1，2026-11-03）**：main.ts 用应用运行级 `sessionId` 构造后注入（presenter/系统行
+   * 由主进程接线）。`sendSession` 命中 `@审批`/`@决策` 时只调用它——**绝不**回退 `manager.send`/普通聊天；
+   * 缺省 ⇒ 命中标记 fail-closed（`ui.directive.error.capabilityUnavailable`）。
+   */
+  directiveInput?: DirectiveInputController;
+  /**
    * 系统图片选择器（K-2）：由主进程注入（electron dialog + fs 读——**渲染进程不碰文件**）。
    * 返回 `{name, dataBase64}` 或 `null`（用户取消）；抛错 → 本层归为如实失败。测试/e2e 注入替身。
    */
@@ -833,6 +843,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 「替我决策」（2026-10-18 双开关评审 §3.3/§8.2）：同形第二套开关（互不影响）与治理判断闭包工厂。
   const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.decision === true);
   const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
+  // 客户授权平面（C1）：main.ts 构造的控制器；缺省 ⇒ 命中标记 fail-closed（不回退普通聊天）。
+  const directiveInput = deps.directiveInput;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
   const getPiConfigFn = deps.getPiConfigFn ?? realGetPiConfig;
   const savePiConfigFn = deps.savePiConfigFn ?? realSavePiConfig;
@@ -881,6 +893,38 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const documentReader = createProjectDocumentReader();
   let importedProjectRoot: string | undefined;
   let importSequence = 0;
+
+  /**
+   * 卡内入口/Composer 的 target 校验（C1 P1-CAP-15c，fail-closed）：
+   * `projectRoot`/`roleId` 必填且 `projectRoot` === 当前项目授权来源（`listProject` 成功值），
+   * `roleId` 在该项目 `ProjectListing.roles` 内，`runtime` 若提供须为有效 `RuntimeKind`。
+   * 缺失/非法/跨项目 ⇒ 不落账、不投递、无回执，且**不回退**普通聊天/当前选择。
+   */
+  const resolveDirectiveTarget = (
+    target: SessionTarget | undefined,
+  ): { ok: true; projectRoot: string; roleId: string; runtime?: RuntimeKind } | { ok: false; error: string } => {
+    const invalid = { ok: false as const, error: mainT("ui.directive.cardEntry.error.invalidTarget") };
+    if (
+      target === undefined ||
+      typeof target.projectRoot !== "string" ||
+      target.projectRoot.trim() === "" ||
+      typeof target.roleId !== "string" ||
+      target.roleId.trim() === ""
+    ) {
+      return invalid;
+    }
+    const projectRoot = target.projectRoot;
+    if (importedProjectRoot === undefined || projectRoot !== importedProjectRoot) return invalid;
+    const listing = listingCache.get(projectRoot);
+    if (listing === undefined || !listing.roles.some((role) => role.roleId === target.roleId)) return invalid;
+    if (target.runtime !== undefined && !isRuntimeKind(target.runtime)) return invalid;
+    return {
+      ok: true,
+      projectRoot,
+      roleId: target.roleId,
+      ...(target.runtime !== undefined ? { runtime: target.runtime } : {}),
+    };
+  };
 
   /** 某角色是否为主入口角色（据门禁引擎给的 `primaryRoleId`，**不硬编码 "su"**）。 */
   const isPrimaryRole = (projectRoot: string, roleId: string): boolean => listingCache.get(projectRoot)?.primaryRoleId === roleId;
@@ -1402,13 +1446,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       outcome.outcome === "answered" && Array.isArray(outcome.value.selected)
         ? [...outcome.value.selected]
         : [];
-    // 判断代批如实归因：`judge:<engine>` 或 outcome.judge 审计出现 ⇒ `judge`；其余按客户（含旧通道）。
-    const source: "customer" | "judge" =
-      outcome.outcome === "answered" &&
-      (outcome.judge !== undefined ||
-        (typeof outcome.operatorId === "string" && outcome.operatorId.startsWith("judge:")))
-        ? "judge"
-        : "customer";
+    // 判断代批如实归因：`judge:<engine>` 或 outcome.judge 审计出现 ⇒ `judge`；`directive:<id>` ⇒ `directive`
+    // （Q9 A，2026-11-03：不是客户本人点击，也不是 judge）；其余按客户（含旧通道）。
+    const directiveId =
+      outcome.outcome !== "unavailable" ? directiveIdFromOperatorId(outcome.operatorId) : undefined;
+    const source: "customer" | "judge" | "directive" =
+      directiveId !== undefined
+        ? "directive"
+        : outcome.outcome === "answered" &&
+            (outcome.judge !== undefined ||
+              (typeof outcome.operatorId === "string" && outcome.operatorId.startsWith("judge:")))
+          ? "judge"
+          : "customer";
     const approved = outcome.outcome === "answered" && selected.includes("approve");
     const rejected = outcome.outcome === "answered" && selected.includes("reject");
     const reason =
@@ -2338,10 +2387,44 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
     async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult> {
       const text = input && typeof input.text === "string" ? input.text : "";
+      const rawImages = input && Array.isArray(input.images) ? input.images : [];
+      // —— 客户授权平面（C1，2026-11-03）：**先**解析标记（纯函数、零副作用），早于图片校验/manager.send。——
+      // 命中：带图 ⇒ 直接拒绝（不解码、不投递、不落账）；无图 ⇒ 只调用指令控制器（绝不 manager.send/handle.send），
+      // 不产生角色轮次、不写 lastUserText/inputAccepted/turnId/outcome/sessionCurrent、不发 session:events。
+      // 未命中：以下既有图片重校验与 manager.send 路径**逐字不变**。
+      const marker = parseDirectiveMarker(text);
+      if (marker !== undefined) {
+        if (directiveInput === undefined) {
+          return { ok: false, error: mainT("ui.directive.error.capabilityUnavailable") };
+        }
+        if (rawImages.length > 0) {
+          return { ok: false, error: mainT("main.directive.error.imageNotSupported") };
+        }
+        const target = resolveDirectiveTarget(input?.target);
+        if (!target.ok) return { ok: false, error: target.error };
+        // 提交当刻快照（Q7 A / P1-CAP-04）：面板打开期间客户改开关**不改变**本次提交；下一次提交重新取。
+        const decisionGroupEnabled = decisionJudgeSwitch.isEnabled();
+        const result = await directiveInput.submitFromInput({
+          rawText: text,
+          target: marker.target,
+          projectRoot: target.projectRoot,
+          roleId: target.roleId,
+          ...(target.runtime !== undefined ? { runtime: target.runtime } : {}),
+          ...(input?.metadata?.clientMessageId !== undefined ? { clientMessageId: input.metadata.clientMessageId } : {}),
+          decisionGroupEnabled,
+        });
+        if (!result.ok) {
+          return {
+            ok: false,
+            error: directiveSubmitErrorMessage(result.error),
+            ...(result.directiveCancelled === true ? { directiveCancelled: true as const } : {}),
+          };
+        }
+        return { ok: true, directive: { id: result.id, target: result.target } };
+      }
       // —— P0-1：**主进程重校验**（渲染侧报的图一律不可信；以真实字节为准——K-2 同一口径）——
       // 逐张：严格 base64 解码 → 魔数嗅探定类型（声明 mime 不作数）→ ≤5MB；**全过才放行**，
       // 任一张不合格 ⇒ 整条拒发（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
-      const rawImages = input && Array.isArray(input.images) ? input.images : [];
       if (rawImages.length === 0) {
         return manager.send(text, undefined, input?.target, input?.metadata);
       }

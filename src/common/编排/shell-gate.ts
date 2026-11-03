@@ -326,6 +326,32 @@ export const BRANCH_CUSTOMER_ESCALATION_ALLOW_SESSION = "customer-escalation:all
 /** 脚本上下文在判拒后变化/不可读 ⇒ 授权作废、拒绝（方案 §4.4/AC-07 的稳定分支）。 */
 export const BRANCH_CUSTOMER_ESCALATION_STALE = "customer-escalation:stale-context";
 
+// —— 客户审批指令放行/拒绝（2026-11-03 客户授权平面 B1）——
+/** 命中客户事先记录的审批指令（allow）→ 放行；独立分支。 */
+export const BRANCH_DIRECTIVE_ALLOW = "directive:allow";
+/** 命中客户事先记录的审批指令（deny）→ 拒绝（先于 c=allow/script）。 */
+export const BRANCH_DIRECTIVE_DENY = "directive:deny";
+
+/**
+ * 审批指令消费者返回值（形状与 B1 Pipeline `ApprovalDirectiveDecision` 结构一致；
+ * `scope` 的值即账本 `until`）。shell-gate 不 import Pipeline/Service，只消费注入回调。
+ */
+export interface ShellDirectiveDecision {
+  action: "allow" | "deny";
+  id: string;
+  scope: "once" | "session" | "forever";
+}
+
+/**
+ * `takeDirective` 注入点：只读 `approval` 指令；未匹配/消费失败 ⇒ `undefined`（回落既有路径）。
+ * 可选 `intent` 是 B1 gate 内部的消费阶段提示（`"deny"` 预检 / `"allow"` 应用），
+ * 不改变 Pipeline 公共句柄 `takeDirective(req)` 的冻结形状；省略时按公共语义（先 deny 后 allow）。
+ */
+export type TakeDirectiveFn = (
+  req: ShellGateRequest,
+  intent?: "allow" | "deny",
+) => Promise<ShellDirectiveDecision | undefined> | ShellDirectiveDecision | undefined;
+
 /**
  * 审核结束的回调产物（`onReviewed`；与审计同址、最终判定后调用）。
  * `reviewedReq` 的语义：script 分支以**带 `approvalContext` 的有效请求**回调（供判拒记录展示与
@@ -336,6 +362,8 @@ export interface ShellGateReviewedOutcome {
   conclusion: "allow" | "deny" | "timeout" | "error";
   branch: string;
   judge?: ShellJudgeAudit;
+  /** 2026-11-03：本次结果来自客户审批指令时给出（与 `judge` 互斥；形状同 `ShellReviewResult.directive`）。 */
+  directive?: { id: string; scope: "once" | "session" | "forever" };
 }
 
 export interface CreateShellGateOptions {
@@ -430,6 +458,13 @@ export interface CreateShellGateOptions {
    */
   takeGrant?: (req: ShellGateRequest, context?: ShellApprovalContext) => ShellGrant | "stale" | undefined;
   /**
+   * **2026-11-03 客户授权平面（B1）**：客户审批指令消费者（由 Pipeline 注入）。
+   * 只在**非只读档**注入/调用；`once` 的 durable 消费由回调内部完成（失败 ⇒ undefined ⇒ 回落既有路径）。
+   * `readonlyOnly === true` 时构造期抛错（只读档不得被客户指令越过 `readonly-deny`）。
+   * 缺省不传 = 旧行为逐字不变。
+   */
+  takeDirective?: TakeDirectiveFn;
+  /**
    * **2026-10-31 判拒升级**：闸创建/取得审计 sink 后回调（供升级 registry **共享同一 sink**、
    * 同一 `shell-gate` 条件、同一 append-only 文件）。缺省不传 = 旧行为。
    */
@@ -448,6 +483,8 @@ interface ReviewOutcome {
   judge?: ShellJudgeAudit;
   /** 2026-10-31：本次放行来自客户升级授权（仅授权放行时出现；审计写 `customerGrant`，不写 `judge`）。 */
   customerGrant?: ShellGrant;
+  /** 2026-11-03：本次结果来自客户事先记录的审批指令（审计写 `directive`，不写 `judge`/`customerGrant`）。 */
+  directive?: ShellDirectiveDecision;
   /** 2026-10-31：`onReviewed` 使用的请求（script 分支带 `approvalContext`；非 script 即原请求）。 */
   reviewedReq?: ShellGateRequest;
 }
@@ -492,6 +529,11 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   if (opts.readonlyOnly === true && typeof opts.takeGrant === "function") {
     throw new Error("shell 闸配置错误：readonlyOnly 不得注入 takeGrant（避免授权越过只读拒绝），拒绝装配");
   }
+  // 7) 只读档不得注入 takeDirective（2026-11-03 客户授权平面 B1 §4）：同 takeGrant 方向，
+  //    客户指令不得越过 `readonly-deny`。调用点亦跳过（双保险）。
+  if (opts.readonlyOnly === true && typeof opts.takeDirective === "function") {
+    throw new Error("shell 闸配置错误：readonlyOnly 不得注入 takeDirective（避免授权越过只读拒绝），拒绝装配");
+  }
 
   const log = createDiagnosticLogger({ component: "orchestration.shell-gate", projectRoot: opts.projectRoot ?? opts.routineShellPolicy?.projectRoot });
   const env = opts.env ?? process.env;
@@ -529,6 +571,23 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       return opts.takeGrant(req, context);
     } catch (err) {
       process.stderr.write(`shell 客户升级授权检查异常（按无授权继续既有链）：${reasonOf(err)}\n`);
+      return undefined;
+    }
+  }
+
+  /**
+   * 审批指令检查的防御包装（2026-11-03 B1）：注入方异常不得翻转判定方向（继续既有链，绝不因异常放行）；
+   * 如实 stderr。`once` 的 durable 消费在 Pipeline 回调内部完成；失败/未匹配 ⇒ undefined。
+   */
+  async function takeDirectiveSafely(
+    req: ShellGateRequest,
+    intent: "allow" | "deny",
+  ): Promise<ShellDirectiveDecision | undefined> {
+    if (typeof opts.takeDirective !== "function") return undefined;
+    try {
+      return await Promise.resolve(opts.takeDirective(req, intent));
+    } catch (err) {
+      process.stderr.write(`shell 客户审批指令检查异常（按无指令继续既有链）：${reasonOf(err)}\n`);
       return undefined;
     }
   }
@@ -641,6 +700,20 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           : opts.advisoryRuleset === true
             ? `${by}（advisory 规则）`
             : by;
+
+    // —— 客户审批指令（2026-11-03 B1）：**deny 最先**（安全方向，减少授权）——
+    // 位置：preblock/write-guard/classify 之后，c=deny/c=allow/script 之前（B1 提案 §4 第 4 步）。
+    //   · 命中 deny ⇒ 拒绝（`by:"directive:<id>"`；审计 `directive:{id,scope}`）；
+    //   · `once` deny 由 Pipeline 回调在返回前 durable 消费；`session`/`forever` 不改变账本状态；
+    //   · 指令 allow 在 deny 侧不返回/不消费（c=allow/script 不得消费 allow 指令）。
+    //   · readonlyOnly 不注入（构造期守卫；此处双保险），preblock/write-guard 已在更早步骤终结。
+    if (opts.readonlyOnly !== true && typeof opts.takeDirective === "function") {
+      const directive = await takeDirectiveSafely(req, "deny");
+      if (directive !== undefined && directive.action === "deny") {
+        log.record("shell.directive.denied", { toolCallId: req.toolCallId, directiveId: directive.id });
+        return directiveOutcome("deny", directive);
+      }
+    }
 
     // 映射（§7.5）。
     // —— 脚本/不可静态解析的写命令（客户 Q1/Q2 修正）：开关开 → judge 审查内容；关 → 客户卡；只读档拒绝 ——
@@ -778,6 +851,21 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       const granted = takeGrantSafely(req, undefined);
       if (granted === "stale") return staleOutcome(byTagged);
       if (granted !== undefined) return grantOutcome(granted);
+    }
+    // —— 客户审批指令 allow（2026-11-03 B1）：**既有 takeGrant 先、指令补足** ——
+    // 只覆盖“本来需要审批”的 review/risky 区间；c=allow 已在上方直放（不消费 allow 指令）、
+    // c=deny/script 不进入本块（script 已在 script 分支处理，allow 指令不适用）。
+    // 若并发出现匹配的 deny（deny 预检之后写入），此处按 deny 处理，不放行。
+    if (
+      (detail.decision === "review" || detail.decision === "risky") &&
+      opts.readonlyOnly !== true &&
+      typeof opts.takeDirective === "function"
+    ) {
+      const directive = await takeDirectiveSafely(req, "allow");
+      if (directive !== undefined) {
+        log.record("shell.directive.applied", { toolCallId: req.toolCallId, directiveId: directive.id, action: directive.action });
+        return directiveOutcome(directive.action, directive);
+      }
     }
     // —— advisory 规则集（客户 2026-10-18）：(c) 只快速放行，**不拒绝任何请求** ——
     // risky/review/deny 一律跳过 (b)、直接交 (a)；规则判定与命中原因作为 reason 交判断 agent 参考。
@@ -1055,6 +1143,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           conclusion: outcome.conclusion,
           branch: outcome.branch,
           ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
+          ...(outcome.directive !== undefined ? { directive: { id: outcome.directive.id, scope: outcome.directive.scope } } : {}),
         });
       } catch (err) {
         process.stderr.write(`shell 闸审核结束回调异常（不影响判定）：${reasonOf(err)}\n`);
@@ -1101,6 +1190,10 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
                 : {}),
             },
           }
+        : {}),
+      // 2026-11-03（客户授权平面 B1）：客户审批指令 allow/deny（与 judge/customerGrant 互斥；by=directive:<id>）。
+      ...(outcome.directive !== undefined
+        ? { directive: { id: outcome.directive.id, scope: outcome.directive.scope } }
         : {}),
     };
     try {
@@ -1195,6 +1288,8 @@ export interface ShellGateBuildDeps {
   onReviewed?: (req: ShellGateRequest, outcome: ShellGateReviewedOutcome) => void;
   /** 客户升级授权检查/消费（见 `CreateShellGateOptions.takeGrant`；readonlyOnly 下不得注入）。 */
   takeGrant?: (req: ShellGateRequest, context?: ShellApprovalContext) => ShellGrant | "stale" | undefined;
+  /** 客户审批指令消费者（见 `CreateShellGateOptions.takeDirective`；readonlyOnly 下不得注入）。 */
+  takeDirective?: TakeDirectiveFn;
   /** 审计 sink 共享回调（见 `CreateShellGateOptions.onAuditSinkCreated`）。 */
   onAuditSinkCreated?: (sink: ShellAuditSink) => void;
 }
@@ -1241,6 +1336,7 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     ...(deps.approvalContextLoader !== undefined ? { approvalContextLoader: deps.approvalContextLoader } : {}),
     ...(deps.onReviewed !== undefined ? { onReviewed: deps.onReviewed } : {}),
     ...(deps.takeGrant !== undefined ? { takeGrant: deps.takeGrant } : {}),
+    ...(deps.takeDirective !== undefined ? { takeDirective: deps.takeDirective } : {}),
     ...(deps.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: deps.onAuditSinkCreated } : {}),
   });
 }
@@ -1284,6 +1380,34 @@ function grantOutcome(grant: ShellGrant): ReviewOutcome {
     branch:
       grant.scope === "once" ? BRANCH_CUSTOMER_ESCALATION_ALLOW_ONCE : BRANCH_CUSTOMER_ESCALATION_ALLOW_SESSION,
     customerGrant: grant,
+  };
+}
+
+/**
+ * 2026-11-03（客户授权平面 B1）：客户审批指令 allow/deny 的结论。
+ * `by = directive:<id>`（不是 judge、不是 customer grant）；审计写 `directive:{id,scope}`，
+ * **不写** `judge`/`customerGrant`（三者互斥）。
+ */
+function directiveOutcome(action: "allow" | "deny", directive: ShellDirectiveDecision): ReviewOutcome {
+  const directiveAudit = { id: directive.id, scope: directive.scope };
+  if (action === "allow") {
+    return {
+      result: { allow: true, by: `directive:${directive.id}`, directive: directiveAudit },
+      conclusion: "allow",
+      branch: BRANCH_DIRECTIVE_ALLOW,
+      directive,
+    };
+  }
+  return {
+    result: {
+      allow: false,
+      reason: `客户审批指令 #${directive.id} 拒绝此命令（${directive.scope}）`,
+      by: `directive:${directive.id}`,
+      directive: directiveAudit,
+    },
+    conclusion: "deny",
+    branch: BRANCH_DIRECTIVE_DENY,
+    directive,
   };
 }
 

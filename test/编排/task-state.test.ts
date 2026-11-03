@@ -29,6 +29,7 @@ import {
   taskStatusOf,
   type TaskRecord,
 } from "../../src/common/编排/task-state.ts";
+import type { TaskStateEvent } from "../../src/model/runtime.ts";
 
 async function tempRoot(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "ans-task-state-"));
@@ -492,6 +493,67 @@ test("P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC
     assert.equal(state.errors.length, 0);
     assert.equal(state.events.some((event) => event.kind === "project.focus"), true);
     assert.equal(state.records.has("t-old"), true);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+// ————————————————— 2026-11-03（客户授权平面 Q9 A）：directive 归属 —————————————————
+
+test("Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）", async () => {
+  const root = await tempRoot();
+  try {
+    const base = { v: 1 as const, at: "2026-11-03T00:00:00.000Z" };
+    const versionDecision = (overrides: Record<string, unknown>): TaskStateEvent => ({
+      ...base,
+      kind: "version.decision",
+      schema: "version-decision/v1",
+      decisionId: "decision-directive",
+      requestId: "version-decision-run-20261103-focus-aaaaaaaa-m1abc-22222222",
+      attempt: 1,
+      flowId: "focus",
+      action: "version-modify",
+      recommendedBy: "chief",
+      recommendedAction: "version-modify",
+      reason: "客户指令",
+      status: "executed",
+      ...overrides,
+    } as unknown as TaskStateEvent);
+    await appendTaskEvent(root, {
+      ...base,
+      kind: "request.resolved",
+      requestId: "r-directive",
+      by: "directive",
+      directiveId: "d-1",
+      choice: "confirm",
+    });
+    await appendTaskEvent(root, versionDecision({ decidedBy: "directive", directiveId: "d-2" }));
+    await appendTaskEvent(root, {
+      ...base,
+      kind: "request.resolved",
+      requestId: "r-customer-old",
+      by: "customer",
+      choice: "confirm",
+    });
+    const good = await readTaskState(root);
+    assert.equal(good.errors.length, 0, JSON.stringify(good.errors));
+    const resolved = good.events.find((event) => event.kind === "request.resolved" && event.requestId === "r-directive");
+    assert.equal(resolved?.kind === "request.resolved" ? resolved.directiveId : undefined, "d-1");
+    const version = good.events.find((event) => event.kind === "version.decision");
+    assert.equal(version?.kind === "version.decision" ? version.directiveId : undefined, "d-2");
+
+    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
+    const badLines = [
+      { ...base, kind: "request.resolved", requestId: "r-bad-1", by: "directive", choice: "x" },
+      { ...base, kind: "request.resolved", requestId: "r-bad-2", by: "directive", directiveId: "d-01", choice: "x" },
+      versionDecision({ decisionId: "decision-bad-1", decidedBy: "directive" }),
+      versionDecision({ decisionId: "decision-bad-2", decidedBy: "directive", directiveId: "d-0" }),
+    ];
+    await fs.appendFile(file, badLines.map((line) => JSON.stringify(line)).join("\n") + "\n", "utf8");
+    const bad = await readTaskState(root);
+    assert.equal(bad.errors.length, 4, JSON.stringify(bad.errors));
+    assert.equal(bad.events.filter((event) => event.kind === "request.resolved").length, 2, "合法 directive/customer 行仍可读");
+    assert.equal(bad.records.size, 0);
   } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }

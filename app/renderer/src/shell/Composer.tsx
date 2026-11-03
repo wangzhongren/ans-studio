@@ -11,13 +11,16 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Scale, ShieldCheck, Square, X } from "lucide-react";
+import { ArrowUp, ImagePlus, Scale, ScrollText, ShieldCheck, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getDesktopBridge } from "@/lib/platform";
 import { reportRendererDiagnostic } from "@/chat/diagnostics";
-import { useChatStore } from "@/chat/chat-store";
+import { getRowModel, useChatStore } from "@/chat/chat-store";
+import { DirectiveDialog } from "@/chat/directive-dialog";
+import { DirectivePanel } from "@/chat/directive-panel";
 import { findRole, roleDisplayName } from "@/chat/role-view";
+import { parseDirectiveMarker } from "../../../../src/model/directive-marker.ts";
 import {
   attachmentTitle,
   clientImageProblem,
@@ -31,6 +34,7 @@ import {
   type JudgeGroup,
 } from "@/chat/judge";
 import { useConfirmStore } from "@/stores/confirm-store";
+import { useDirectiveStore } from "@/stores/directive-store";
 import { RUNTIME_OPTIONS, useUiStore } from "@/stores/ui-store";
 import { useLocaleState, useT } from "@/i18n";
 
@@ -95,6 +99,32 @@ function releaseAttachments(list: Attachment[]): void {
 
 let attachSeq = 0;
 
+/**
+ * 能力位未知窗口的兜底：主进程仍按指令拦截（`res.directive`）时，移除刚画的乐观用户气泡。
+ * 只在 `directivesEnabled` 尚未确认的极窄竞态下发生；不适用于常规指令发送（已抑制）。
+ */
+function removeOptimisticUserMessage(roleId: string, text: string): void {
+  const model = getRowModel(roleId);
+  if (!model) return;
+  for (let index = model.rows.length - 1; index >= 0; index -= 1) {
+    const row = model.rows[index]!;
+    if (row.kind !== "user") continue;
+    const data =
+      row.data && typeof row.data === "object"
+        ? (row.data as Record<string, unknown>)
+        : {};
+    if (data.text !== text) continue;
+    model.rows.splice(index, 1);
+    useChatStore.setState((state) => ({
+      paneVersions: {
+        ...state.paneVersions,
+        [roleId]: (state.paneVersions[roleId] || 0) + 1,
+      },
+    }));
+    return;
+  }
+}
+
 export function Composer() {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
@@ -118,6 +148,11 @@ export function Composer() {
   const appendSystemRow = useChatStore((s) => s.appendSystemRow);
   const setHint = useChatStore((s) => s.setHint);
   const setRoleError = useChatStore((s) => s.setRoleError);
+  const directivesEnabled = useDirectiveStore((s) => s.directivesEnabled);
+  const directiveCapabilityAvailable = useDirectiveStore(
+    (s) => s.capabilityAvailable,
+  );
+  const openDirectivePanel = useDirectiveStore((s) => s.openPanel);
 
   const judge = useConfirmStore((s) => s.judge);
   const warning = useConfirmStore((s) => s.warning);
@@ -133,6 +168,9 @@ export function Composer() {
   const busy = !!selectedRoleId && roleBusy[selectedRoleId] === true;
   const bridge = getDesktopBridge();
   const canSend = sessionOpen && !!projectRoot;
+  const directivePanelTitle = directiveCapabilityAvailable
+    ? t("ui.directive.panel.title")
+    : t("ui.directive.error.capabilityUnavailable");
 
   const singleDisabled = governanceModel === "single";
   const approvalView = judgeToggleView(
@@ -259,6 +297,14 @@ export function Composer() {
       }
     }
     const rawDraft = el.value;
+    // 客户授权平面（C2）：共享解析器只用于回显抑制；能力位必须已由主进程 handshake/初始读确认，
+    // 未知能力位下不抑制（旧主进程/超时按普通发送）。不判 target、不解析正文。
+    let suppressUserBubble = false;
+    if (parseDirectiveMarker(rawDraft) !== undefined) {
+      await useDirectiveStore.getState().ensureInitialRead(projectRoot);
+      suppressUserBubble =
+        useDirectiveStore.getState().directivesEnabled === true;
+    }
     const sent = attachmentsRef.current.slice();
     const images = sent.map((attachment) => ({
       type: "image",
@@ -279,7 +325,9 @@ export function Composer() {
     grow();
     setStatus("");
     setHint("");
-    appendLocalUser(roleId, displayText, clientMessageId);
+    if (!suppressUserBubble) {
+      appendLocalUser(roleId, displayText, clientMessageId);
+    }
     let res: Record<string, unknown> = {};
     try {
       res = resultRecord(
@@ -291,6 +339,79 @@ export function Composer() {
         errorType: "send",
         errorMessage: String(error),
       });
+    }
+    const directiveInfo = resultRecord(res.directive);
+    if (typeof directiveInfo.id === "string" && directiveInfo.id !== "") {
+      // 已落账：不画用户气泡、不标角色错误/失效会话、不追加“已记录”系统行（C1 负责回执）。
+      // 能力位未知窗口下曾画过乐观气泡 ⇒ 按 clientMessageId 的本地行移除（不伪造回执）。
+      if (!suppressUserBubble) {
+        removeOptimisticUserMessage(roleId, displayText);
+      }
+      releaseAttachments(sent);
+      setStatus("");
+      setHint("");
+      void useDirectiveStore.getState().refresh();
+      return;
+    }
+    if (res.directiveCancelled === true) {
+      // 取消/关窗：复用“未接受 ⇒ 恢复草稿”路径；本轮没有角色轮次，不标错误/不失效会话。
+      const reason =
+        typeof res.error === "string" && res.error !== ""
+          ? res.error
+          : t("ui.directive.error.cancelled");
+      const stillHere =
+        useUiStore.getState().selectedRoleId === roleId &&
+        useUiStore.getState().runtime === runtime &&
+        useChatStore.getState().projectRoot === projectRoot;
+      if (stillHere && el.value === "") {
+        el.value = rawDraft;
+        draftFor(sendKey).text = rawDraft;
+        applyAttachments(sent);
+        grow();
+      } else if (!stillHere) {
+        const draft = draftFor(sendKey);
+        if (draft.text === "") {
+          draft.text = rawDraft;
+          draft.attachments = sent;
+        }
+      }
+      setStatus(reason);
+      setHint(reason);
+      return;
+    }
+    if (
+      suppressUserBubble &&
+      (res.ok !== false || res.inputAccepted === true) &&
+      !useChatStore.getState().hasClientAck(clientMessageId)
+    ) {
+      // 主进程未按指令拦截（能力位竞态/旧主进程）⇒ 按普通消息补画气泡，继续既有结果处理。
+      appendLocalUser(roleId, displayText, clientMessageId);
+    }
+    if (res.ok === false && suppressUserBubble && res.inputAccepted !== true) {
+      // 指令提交失败：恢复原文/附件，如实显示 C1 错误；不画气泡、不标角色错误、不失效会话。
+      const reason =
+        typeof res.error === "string" && res.error !== ""
+          ? res.error
+          : t("ui.directive.error.writeFailed");
+      const stillHere =
+        useUiStore.getState().selectedRoleId === roleId &&
+        useUiStore.getState().runtime === runtime &&
+        useChatStore.getState().projectRoot === projectRoot;
+      if (stillHere && el.value === "") {
+        el.value = rawDraft;
+        draftFor(sendKey).text = rawDraft;
+        applyAttachments(sent);
+        grow();
+      } else if (!stillHere) {
+        const draft = draftFor(sendKey);
+        if (draft.text === "") {
+          draft.text = rawDraft;
+          draft.attachments = sent;
+        }
+      }
+      setStatus(reason);
+      setHint(reason);
+      return;
     }
     if (res.ok === false) {
       const reason =
@@ -699,6 +820,18 @@ export function Composer() {
             <ImagePlus size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
 
+          <button
+            id="btn-directive-panel"
+            className="cap-icon"
+            type="button"
+            title={directivePanelTitle}
+            aria-label={t("ui.directive.panel.title")}
+            disabled={!directivesEnabled}
+            onClick={() => openDirectivePanel()}
+          >
+            <ScrollText size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+
           <div
             className="composer-trust"
             role="group"
@@ -870,6 +1003,9 @@ export function Composer() {
           {t("ui.composer.writeBoundaryNote")}
         </span>
       </div>
+
+      <DirectiveDialog />
+      <DirectivePanel roleId={selectedRoleId} runtime={runtime} />
     </div>
   );
 }

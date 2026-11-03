@@ -87,8 +87,11 @@ export type ProjectStateErrorSource = "tasks" | "run-manifest" | "docs" | "roste
 
 /** 版本决策执行状态机（append-only；同一 decisionId 取最新）。 */
 export type VersionDecisionStatus = "executing" | "executed" | "failed" | "uncertain";
-/** 版本决策决定者：客户本人 / 「替我决策」判断 agent 代批。 */
-export type VersionDecisionDecidedBy = "customer" | "judge";
+/**
+ * 版本决策决定者：客户本人 / 「替我决策」判断 agent 代批 / 客户事先记录的决策指令
+ * （2026-11-03 客户授权平面 Q9 A 加法；`"directive"` 不是客户本人点击，也不是 judge 代批）。
+ */
+export type VersionDecisionDecidedBy = "customer" | "judge" | "directive";
 /** 版本决策稳定错误码（恰 11 项；A1/A2 不得另造同义码）。 */
 export const VERSION_DECISION_ERROR_CODES = [
   "version-decision-invalid",
