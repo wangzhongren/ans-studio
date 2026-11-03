@@ -5,7 +5,7 @@ title: v1.9.0 发布准备：契约 schema 查询、客户授权平面与角色�
 created: "2026-11-03"
 updated: "2026-11-03"
 timezone: Asia/Shanghai
-status: preparing
+status: released
 related: []
 events:
   - date: "2026-11-03"
@@ -20,11 +20,14 @@ events:
   - date: "2026-11-03"
     kind: verified
     summary: pipeline 钉版本轮完成并本地验证——node --test 装配 87/87、npm run typecheck 0
+  - date: "2026-11-03"
+    kind: released
+    summary: CI（run 41651962764）三平台 build + release job 全过；v1.9.0 正式发布，12 资产与 SHA256 已回填
 ---
 
 # v1.9.0 发布准备
 
-客户已授权发布 **1.9.0 版（功能版）**（同前几轮形态：未签名 ZIP）。发布准备（版本标识、README 发布说明与本记录）已随 PR #43 合并（`1fb2d63`），annotated tag `v1.9.0` 已打并推送。本轮完成流水线钉版：发布策略与声明、打包测试、release workflow 切到 v1.9.0。发布 workflow 触发与发布在后续轮次完成。
+客户已授权发布 **1.9.0 版（功能版）**（同前几轮形态：未签名 ZIP）。发布准备（版本标识、README 发布说明与本记录）已随 PR #43 合并（`1fb2d63`），annotated tag `v1.9.0` 已打并推送。本轮完成流水线钉版：发布策略与声明、打包测试、release workflow 切到 v1.9.0。发布 workflow 已触发并通过（run 41651962764），`v1.9.0` 已正式发布；CI、资产与 SHA 见下文「CI、资产与 SHA（已回填）」。
 
 ## 版本与冻结源
 
@@ -89,6 +92,15 @@ events:
 - `release-policy.d.mts`：`SOURCE_REF`/`SOURCE_SHA` 字面量同步。
 - `test/装配/release-packaging.test.ts`：`SOURCE_REF`/`SOURCE_SHA` 断言切到 v1.9.0；v1.5.0/v1.7.0/v1.8.0/v1.8.2 四个历史批次用例改写为 fail-closed/excluded 断言（生产文件 `assert.throws(/Unreviewed production overlay/)`、测试/夹具路径精确 excluded、`selected` 为空），不删除用例、不放宽为恒真断言。
 - `.github/workflows/release.yml`：source_ref 默认、并发组、`gh release` 引用、标题 `ANS Studio 1.9.0` 与 notes 切到 v1.9.0；`publish` 默认保持 `false`。
+
+## CI、资产与 SHA（已回填）
+
+- **CI**：run **41651962764** 四个 job 全部 success（build macos-15 arm64、build macos-15-intel x64、build windows-2025 x64、release）：https://github.com/wangzhongren/ans-studio/actions/runs/41651962764
+- **发布**：`v1.9.0` 已正式发布（`isDraft=false`）：https://github.com/wangzhongren/ans-studio/releases/tag/v1.9.0
+- 资产（12 项）：`ANS-Studio-1.9.0-mac-arm64.zip`、`ANS-Studio-1.9.0-mac-x64.zip`、`ANS-Studio-1.9.0-win-x64.zip` + 三个 manifest（`manifest-darwin-arm64.json`、`manifest-darwin-x64.json`、`manifest-win32-x64.json`）+ `SHA256SUMS-*`（3 平台 + overlay）+ `release-provenance.json` + `overlay.patch`；release job 已对全部 `SHA256SUMS-*.txt` 执行 `sha256sum -c` 校验。
+- 资产 SHA256：mac-arm64 `e8f0d2b3f5490e24d50615e8e06fda6c4ac5833a03cc8c834cd4656cba870f59`；mac-x64 `5d057dabbaea56ffda7a0e72225998f06f7fa12ebcaeb8be8dfc3101a3112ee4`；win-x64 `a7a81cc063aa41270d06f87bc9a666dfe51967c10c17c7a1a70d6d3ad14b3cde`；overlay.patch `283e026744e3b960a03c38d2191203f168935b3b878078913b6976b3504fe1dc`；release-provenance.json `d62395b006d5cd86d95d075851283f56833bafaf009406e20c714b1747f743a0`。
+- provenance 绑定：`sourceRef=v1.9.0`、`sourceSha=1fb2d634ef1b337775cbb48ed566412b0339c0b0`、`overlaySha=9467b12be2c968356b83e892b5bad7be9da33e41`；overlayPaths 为 `.github/workflows/release.yml`、`src/common/装配/release-policy.d.mts`、`src/common/装配/release-policy.mjs`、`test/装配/release-packaging.test.ts`。
+- 未签名、未公证。
 
 ## 证据边界
 
