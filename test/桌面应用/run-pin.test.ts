@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
-import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
+import { PROJECT_MODULES_SCHEMA, PROJECT_ROSTER_SCHEMA, PROJECT_TOPOLOGY_SCHEMA, parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
 import { ensureDraftRun, findActiveRun, pinRun, prepareRunPin, readRunManifest, runManifestPath } from "../../src/common/编排/run-manifest.ts";
 import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
@@ -538,6 +538,65 @@ test("contract_check session：pinned run/角色写区/legacy 明示（只读）
     const other = await check!({ roleId: "qa" });
     assert.equal(typeof other, "string", "工具层会裁剪到调用角色；session 数据源按 caller 裁剪");
     assert.match(other!, /角色：implementer/);
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-contract-schema-topic-"));
+  const h = harness(root);
+  try {
+    // 不写任何项目文件、不建 run：topic 早退不应依赖 listing/run 读取。
+    await h.mgr.open({ projectRoot: root, roleId: "implementer", runtime: "demo" });
+    await tick(30);
+    const check = h.contractChecks.implementer;
+    assert.equal(typeof check, "function");
+    if (!check) return;
+    const expected: Array<["modules" | "roster" | "topology", string]> = [
+      ["modules", PROJECT_MODULES_SCHEMA],
+      ["roster", PROJECT_ROSTER_SCHEMA],
+      ["topology", PROJECT_TOPOLOGY_SCHEMA],
+    ];
+    for (const [topic, schema] of expected) {
+      const text = await check({ topic });
+      assert.equal(typeof text, "string", topic);
+      if (typeof text !== "string") continue;
+      assert.ok(text.includes(`contract_check topic=${topic}`), `${topic} 头部`);
+      assert.ok(text.includes(schema), `${topic} schema 标识 ${schema}`);
+      assert.ok(Buffer.byteLength(text, "utf8") <= 4096, `${topic} ≤4096 B`);
+      for (const line of text.split(/\r?\n/)) {
+        assert.doesNotMatch(line, /^run：/, `${topic} 无 run 行`);
+        assert.doesNotMatch(line, /^taskKind .*必填/, `${topic} 无 taskKind 必填行`);
+        assert.doesNotMatch(line, /^可写边界：/, `${topic} 无写区行`);
+      }
+    }
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-contract-schema-coexist-"));
+  const h = harness(root);
+  try {
+    await h.mgr.open({ projectRoot: root, roleId: "implementer", runtime: "demo" });
+    await tick(30);
+    const check = h.contractChecks.implementer;
+    assert.equal(typeof check, "function");
+    if (!check) return;
+    const plain = await check({ topic: "roster" });
+    const coexisting = await check({ topic: "roster", flowId: "focus", taskKind: "dispatch" });
+    assert.equal(typeof plain, "string");
+    assert.equal(coexisting, plain, "topic 优先：flowId/taskKind 被忽略");
+    if (typeof coexisting !== "string") return;
+    for (const line of coexisting.split(/\r?\n/)) {
+      assert.doesNotMatch(line, /^run：/);
+      assert.doesNotMatch(line, /^taskKind .*必填/);
+      assert.doesNotMatch(line, /^可写边界：/);
+    }
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });

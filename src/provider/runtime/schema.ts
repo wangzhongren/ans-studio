@@ -1,5 +1,5 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
 import {
   PROJECT_NOTE_BLOCKER_TEXT_MAX,
   PROJECT_NOTE_KEY_MAX,
@@ -636,16 +636,20 @@ export function describeTool(name: string): ToolDescription {
           roleId: { type: "string", description: "Optional role id; only the caller's own role is visible" },
           taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell"], description: "Optional task kind for required schema/fields" },
           moduleId: { type: "string", description: "Optional module id for path/write-root detail" },
+          topic: { type: "string", enum: [...CONTRACT_SCHEMA_TOPICS], description: "Optional schema topic; returns that document's field table and minimal valid YAML example (read-only; no run summary)" },
         },
         additionalProperties: true,
       },
       description:
         "**只读契约速查**（3.2）：返回当前 run pin/latest、七类文档路径+hash、调用角色的模块/写区/禁止路径、" +
         "所选 taskKind 的必填 schema/字段与常见拒绝 code→下一步。**纯读**：不写盘、不改变权限、不代替门禁；" +
-        "查询不构成放行。无 manifest 的 legacy 会明示“未冻结”。输出有界（≤4KB），只含调用角色可见信息。",
+        "查询不构成放行。无 manifest 的 legacy 会明示“未冻结”。输出有界（≤4KB），只含调用角色可见信息。" +
+        "传 `topic`（modules|roster|topology）时，只返回该文档的**字段表 + 最小合法 YAML 示例**（静态 schema；不读 run、不含写区摘要；可与 taskKind/flowId/moduleId 同时给出，topic 优先，后三者被忽略）。",
       promptGuidelines: [
         "遇到机械拒绝先读 code/missing/action/owner/docs；完整规则再调用 contract_check，不要靠猜或改名单绕过。",
         "contract_check 只读速查，不是批准/授权；不得把查询结果当作放行依据。",
+        "写模块清单/名单/拓扑前，先用 `topic` 查字段表与最小合法 YAML 示例；`publicContract` 必须是非空字符串（不能写 true/false），topology 的 `management` 是含 convener 与全部项目角色的扁平数组。",
+        "`topic` 只读 schema，不是批准/授权；不要因查询成功就认为文档已通过校验。",
       ],
     };
   }

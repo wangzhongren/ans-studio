@@ -14,11 +14,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  contractSchemaText,
   evaluateDispatchAuthorization,
   evaluateDispatchPreflight,
   loadLatestRoster,
   parseProjectModules,
   parseProjectRoster,
+  PROJECT_MODULES_SCHEMA,
+  PROJECT_MODULES_SCHEMA_EXAMPLE,
+  PROJECT_ROSTER_SCHEMA,
+  PROJECT_ROSTER_SCHEMA_EXAMPLE,
+  PROJECT_TOPOLOGY_SCHEMA,
+  PROJECT_TOPOLOGY_SCHEMA_EXAMPLE,
   reportTargetForTaskCreator,
   rosterDirectoriesFor,
   rosterRoleIds,
@@ -969,4 +976,330 @@ test("evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营
   assert.equal(convenerExistingWorker.ok, true);
   const convenerVerifier = evaluateDispatchAuthorization({ ...base, fromRoleId: "convener", targetRoleId: "verifier" });
   assert.equal(convenerVerifier.ok, true);
+});
+
+// —————————————————————— contractSchemaText / 示例 / 逐字段错误（2026-11-03） ——————————————————————
+
+function replaceModuleField(text: string, field: string, line: string | undefined): string {
+  const lines = text.split("\n");
+  const index = lines.findIndex((candidate) => candidate.startsWith(`    ${field}: `));
+  assert.ok(index >= 0, `模块字段行缺失：${field}`);
+  if (line === undefined) lines.splice(index, 1);
+  else lines[index] = `    ${line}`;
+  return lines.join("\n");
+}
+
+const FIELD_VALUES: Array<{ label: string; line: string | undefined; received: string }> = [
+  { label: "missing", line: undefined, received: "未提供" },
+  { label: "null", line: "null", received: "null" },
+  { label: "empty", line: '""', received: "string（空）" },
+  { label: "boolean", line: "false", received: "boolean: false" },
+  { label: "number", line: "42", received: "number: 42" },
+  { label: "array", line: "[]", received: "array(0)" },
+  { label: "object", line: "{}", received: "object（mapping）" },
+];
+
+test("AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源", () => {
+  const modules = parseProjectModules(PROJECT_MODULES_SCHEMA_EXAMPLE, "demo");
+  assert.equal(modules.ok, true, modules.ok ? "" : modules.reason);
+  const roster = parseProjectRoster(PROJECT_ROSTER_SCHEMA_EXAMPLE, "demo");
+  assert.equal(roster.ok, true, roster.ok ? "" : roster.reason);
+  if (modules.ok && roster.ok) {
+    assert.equal(modules.doc.schema, PROJECT_MODULES_SCHEMA);
+    assert.equal(roster.roster.schema, PROJECT_ROSTER_SCHEMA);
+    assert.deepEqual(modules.doc.modules, roster.roster.modules);
+  }
+  assert.equal(PROJECT_ROSTER_SCHEMA_EXAMPLE.includes(PROJECT_TOPOLOGY_SCHEMA_EXAMPLE), true);
+  assert.equal(contractSchemaText("modules").includes(PROJECT_MODULES_SCHEMA_EXAMPLE), true);
+  assert.equal(contractSchemaText("roster").includes(PROJECT_ROSTER_SCHEMA_EXAMPLE), true);
+  assert.equal(contractSchemaText("topology").includes(PROJECT_TOPOLOGY_SCHEMA_EXAMPLE), true);
+});
+
+test("AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId", () => {
+  const texts = {
+    modules: contractSchemaText("modules"),
+    roster: contractSchemaText("roster"),
+    topology: contractSchemaText("topology"),
+  };
+  for (const [topic, text] of Object.entries(texts)) {
+    assert.ok(Buffer.byteLength(text, "utf8") <= 4096, `${topic} schema 文本必须 ≤4096 B`);
+    const lines = text.split("\n");
+    assert.equal(lines[0], `contract_check topic=${topic}（只读 schema；查询不构成放行/授权）`);
+    assert.equal(lines[1], "（仅 schema 与示例；不含 run/写区；其余参数被忽略）");
+    assert.equal(text.includes("taskKind"), false, `${topic} 全文不得含字面 taskKind`);
+    assert.equal(lines[1]!.includes("flowId"), false);
+    assert.equal(lines[1]!.includes("moduleId"), false);
+  }
+  assert.ok(Buffer.byteLength(texts.roster, "utf8") <= 3900, "roster schema 文本必须 ≤3900 B");
+  assert.match(texts.modules, /modules\[\] 每项/);
+  assert.match(texts.roster, /加载校验（硬拒绝；解析器之外）/);
+  assert.match(texts.topology, /块顶层/);
+  assert.ok(texts.modules.includes("<flowId>"));
+  assert.ok(texts.roster.includes("<flowId>"));
+});
+
+test("AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行", () => {
+  const cases = [
+    {
+      topic: "modules" as const,
+      constant: PROJECT_MODULES_SCHEMA,
+      expected: [
+        `文档：docs/proposals/<flowId>-modules-vN.md（唯一权威源；schema 必须恰为 ${PROJECT_MODULES_SCHEMA}）`,
+        `- schema: 字面量 ${PROJECT_MODULES_SCHEMA}`,
+        `schema: ${PROJECT_MODULES_SCHEMA}`,
+      ],
+    },
+    {
+      topic: "roster" as const,
+      constant: PROJECT_ROSTER_SCHEMA,
+      expected: [
+        `文档：docs/proposals/<flowId>-roster-vN.md（schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
+        `- schema: 字面量 ${PROJECT_ROSTER_SCHEMA}`,
+        `schema: ${PROJECT_ROSTER_SCHEMA}`,
+      ],
+    },
+    {
+      topic: "topology" as const,
+      constant: PROJECT_TOPOLOGY_SCHEMA,
+      expected: [
+        `位置：roster 正文「人员+模块拓扑图」章节内的 \`\`\`topology YAML 块（唯一机器可读格式；schema 必须恰为 ${PROJECT_TOPOLOGY_SCHEMA}）。`,
+        `- schema: 字面量 ${PROJECT_TOPOLOGY_SCHEMA}`,
+        `schema: ${PROJECT_TOPOLOGY_SCHEMA}`,
+      ],
+    },
+  ];
+  for (const item of cases) {
+    const lines = contractSchemaText(item.topic).split("\n").filter((line) => line.includes(item.constant));
+    assert.deepEqual(lines, item.expected, item.topic);
+  }
+});
+
+test("AC-18：roster schema 文本含三条警告与占位 omissionReason", () => {
+  const roster = contractSchemaText("roster");
+  assert.match(roster, /警告：示例只保证解析器通过/);
+  assert.match(roster, /警告：默认项目不要照抄省略块/);
+  assert.match(roster, /警告：占位 omissionReason 必须替换，不得原样提交/);
+  assert.match(roster, /omissionReason: <小项目省略理由；默认项目不要照抄>/);
+});
+
+test("AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义", () => {
+  const fields = ["name", "purpose", "publicContract", "architectureSource"] as const;
+  for (const field of fields) {
+    for (const value of FIELD_VALUES) {
+      if (field === "purpose" && value.label === "null") continue;
+      const text = replaceModuleField(
+        PROJECT_ROSTER_SCHEMA_EXAMPLE,
+        field,
+        value.line === undefined ? undefined : `${field}: ${value.line}`,
+      );
+      const parsed = parseProjectRoster(text, "demo");
+      assert.equal(parsed.ok, false, `${field}/${value.label} 必须被拒绝`);
+      if (!parsed.ok) {
+        assert.equal(parsed.code, "roster-module-fields-missing", `${field}/${value.label}`);
+        assert.match(parsed.reason, new RegExp(`名单模块第 1 项（id=core）的 ${field} 必须是非空字符串`));
+        assert.ok(parsed.reason.includes(value.received), `${field}/${value.label}: ${parsed.reason}`);
+      }
+    }
+  }
+  const purposeNull = parseProjectRoster(replaceModuleField(PROJECT_ROSTER_SCHEMA_EXAMPLE, "purpose", "purpose: null"), "demo");
+  assert.equal(purposeNull.ok, false);
+  if (!purposeNull.ok) {
+    assert.equal(purposeNull.code, "roster-module-fields-missing");
+    assert.ok(purposeNull.reason.includes("未提供"), purposeNull.reason);
+  }
+  const alias = parseProjectRoster(replaceModuleField(PROJECT_ROSTER_SCHEMA_EXAMPLE, "purpose", "responsibility: 兼容职责"), "demo");
+  assert.equal(alias.ok, true, alias.ok ? "" : alias.reason);
+  const purposeTrue = parseProjectRoster(replaceModuleField(PROJECT_ROSTER_SCHEMA_EXAMPLE, "purpose", "purpose: true"), "demo");
+  assert.equal(purposeTrue.ok, false);
+  if (!purposeTrue.ok) {
+    assert.equal(purposeTrue.code, "roster-module-fields-missing");
+    assert.match(purposeTrue.reason, /purpose 必须是非空字符串（收到 boolean: true）/);
+  }
+  const emptyWithAlias = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("    purpose: 核心逻辑与公开接口", '    purpose: ""\n    responsibility: 有效职责'),
+    "demo",
+  );
+  assert.equal(emptyWithAlias.ok, false);
+  if (!emptyWithAlias.ok) {
+    assert.equal(emptyWithAlias.code, "roster-module-fields-missing");
+    assert.match(emptyWithAlias.reason, /string（空）/);
+  }
+});
+
+test("AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义", () => {
+  const fields = ["name", "purpose", "publicContract", "architectureSource"] as const;
+  for (const field of fields) {
+    for (const value of FIELD_VALUES) {
+      if (field === "purpose" && value.label === "null") continue;
+      const text = replaceModuleField(
+        PROJECT_MODULES_SCHEMA_EXAMPLE,
+        field,
+        value.line === undefined ? undefined : `${field}: ${value.line}`,
+      );
+      const parsed = parseProjectModules(text, "demo");
+      assert.equal(parsed.ok, false, `${field}/${value.label} 必须被拒绝`);
+      if (!parsed.ok) {
+        assert.equal(parsed.code, "modules-doc-fields", `${field}/${value.label}`);
+        assert.match(parsed.reason, new RegExp(`模块清单第 1 项（id=core）的 ${field} 必须是非空字符串`));
+        assert.ok(parsed.reason.includes(value.received), `${field}/${value.label}: ${parsed.reason}`);
+      }
+    }
+  }
+  const purposeNull = parseProjectModules(replaceModuleField(PROJECT_MODULES_SCHEMA_EXAMPLE, "purpose", "purpose: null"), "demo");
+  assert.equal(purposeNull.ok, false);
+  if (!purposeNull.ok) {
+    assert.equal(purposeNull.code, "modules-doc-fields");
+    assert.ok(purposeNull.reason.includes("未提供"), purposeNull.reason);
+  }
+  const alias = parseProjectModules(replaceModuleField(PROJECT_MODULES_SCHEMA_EXAMPLE, "purpose", "responsibility: 兼容职责"), "demo");
+  assert.equal(alias.ok, true, alias.ok ? "" : alias.reason);
+  const purposeTrue = parseProjectModules(replaceModuleField(PROJECT_MODULES_SCHEMA_EXAMPLE, "purpose", "purpose: true"), "demo");
+  assert.equal(purposeTrue.ok, false);
+  if (!purposeTrue.ok) {
+    assert.equal(purposeTrue.code, "modules-doc-fields");
+    assert.match(purposeTrue.reason, /purpose 必须是非空字符串（收到 boolean: true）/);
+  }
+  const emptyWithAlias = parseProjectModules(
+    PROJECT_MODULES_SCHEMA_EXAMPLE.replace("    purpose: 核心逻辑与公开接口", '    purpose: ""\n    responsibility: 有效职责'),
+    "demo",
+  );
+  assert.equal(emptyWithAlias.ok, false);
+  if (!emptyWithAlias.ok) {
+    assert.equal(emptyWithAlias.code, "modules-doc-fields");
+    assert.match(emptyWithAlias.reason, /string（空）/);
+  }
+});
+
+test("AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示", () => {
+  const mapping = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("management: [convener, implementer]", "management:\n  roles: [convener, implementer]"),
+    "demo",
+  );
+  assert.equal(mapping.ok, false);
+  if (!mapping.ok) {
+    assert.equal(mapping.code, "roster-topology-mismatch");
+    for (const token of ["写作格式", "扁平字符串数组", "management.roles", "object（mapping）"]) {
+      assert.ok(mapping.reason.includes(token), `${token}: ${mapping.reason}`);
+    }
+  }
+  const missingRole = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("management: [convener, implementer]", "management: [convener]"),
+    "demo",
+  );
+  assert.equal(missingRole.ok, false);
+  if (!missingRole.ok) {
+    assert.equal(missingRole.code, "roster-topology-mismatch");
+    assert.match(missingRole.reason, /缺项目角色 implementer/);
+    assert.ok(missingRole.reason.includes("扁平"));
+  }
+  const extraId = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("management: [convener, implementer]", "management: [convener, implementer, extra]"),
+    "demo",
+  );
+  assert.equal(extraId.ok, true, extraId.ok ? "" : extraId.reason);
+  const nonString = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("management: [convener, implementer]", "management: [convener, implementer, 5]"),
+    "demo",
+  );
+  assert.equal(nonString.ok, true, nonString.ok ? "" : nonString.reason);
+  const empty = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("management: [convener, implementer]", 'management: ""'),
+    "demo",
+  );
+  assert.equal(empty.ok, false);
+  if (!empty.ok) {
+    assert.equal(empty.code, "roster-topology-mismatch");
+    assert.match(empty.reason, /string（空）/);
+  }
+  const v1 = parseProjectRoster(
+    PROJECT_ROSTER_SCHEMA_EXAMPLE.replace(`schema: ${PROJECT_TOPOLOGY_SCHEMA}`, "schema: project-topology/v1"),
+    "demo",
+  );
+  assert.equal(v1.ok, false);
+  if (!v1.ok) {
+    assert.equal(v1.code, "roster-topology-mismatch");
+    assert.ok(v1.reason.includes("扁平数组"));
+    assert.ok(v1.reason.includes("roleId"));
+    assert.equal(v1.reason.includes("management.roles 含 convener"), false);
+  }
+});
+
+async function writeDemoProject(root: string): Promise<void> {
+  for (const dir of ["docs/product", "docs/proposals", "docs/contracts"]) {
+    await fs.mkdir(path.join(root, dir), { recursive: true });
+  }
+  await fs.writeFile(path.join(root, "docs/product/demo-intent-v1.md"), "# 意图\n", "utf8");
+  await fs.writeFile(
+    path.join(root, "docs/proposals/demo-proposal-v1.md"),
+    "---\nschema: project-proposal/v2\nflowId: demo\nversion: 1\nintent: docs/product/demo-intent-v1.md\n---\n# 提案\n",
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(root, "docs/contracts/demo-architecture-v1.md"),
+    "# 架构\n\nproposal: docs/proposals/demo-proposal-v1.md\n",
+    "utf8",
+  );
+  await fs.writeFile(path.join(root, "docs/proposals/demo-modules-v1.md"), PROJECT_MODULES_SCHEMA_EXAMPLE, "utf8");
+  await fs.writeFile(path.join(root, "docs/proposals/demo-roster-v1.md"), PROJECT_ROSTER_SCHEMA_EXAMPLE, "utf8");
+}
+
+test("AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例", async () => {
+  const roots: string[] = [];
+  const makeRoot = async (mutate?: (root: string) => Promise<void>): Promise<string> => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-schema-demo-"));
+    roots.push(root);
+    await writeDemoProject(root);
+    if (mutate !== undefined) await mutate(root);
+    return root;
+  };
+  try {
+    const okRoot = await makeRoot();
+    const ok = await loadLatestRoster({ projectRoot: okRoot, flowId: "demo" });
+    assert.equal(ok.ok, true, ok.ok ? "" : ok.reason);
+
+    const driftRoot = await makeRoot(async (root) => {
+      await fs.writeFile(
+        path.join(root, "docs/proposals/demo-roster-v1.md"),
+        PROJECT_ROSTER_SCHEMA_EXAMPLE.replace("purpose: 核心逻辑与公开接口", "purpose: 漂移职责"),
+        "utf8",
+      );
+    });
+    const drift = await loadLatestRoster({ projectRoot: driftRoot, flowId: "demo" });
+    assert.equal(drift.ok, false);
+    if (!drift.ok) assert.equal(drift.code, "roster-modules-drift", drift.reason);
+
+    const staleRoot = await makeRoot(async (root) => {
+      await fs.writeFile(path.join(root, "docs/product/demo-intent-v2.md"), "# 意图 v2\n", "utf8");
+    });
+    const stale = await loadLatestRoster({ projectRoot: staleRoot, flowId: "demo" });
+    assert.equal(stale.ok, false);
+    if (!stale.ok) assert.equal(stale.code, "roster-reference-stale", stale.reason);
+
+    const inconsistentRoot = await makeRoot(async (root) => {
+      await fs.writeFile(
+        path.join(root, "docs/proposals/demo-proposal-v1.md"),
+        "---\nschema: project-proposal/v2\nflowId: demo\nversion: 1\n---\n# 提案（漏引用）\n",
+        "utf8",
+      );
+    });
+    const inconsistent = await loadLatestRoster({ projectRoot: inconsistentRoot, flowId: "demo" });
+    assert.equal(inconsistent.ok, false);
+    if (!inconsistent.ok) assert.equal(inconsistent.code, "roster-reference-inconsistent", inconsistent.reason);
+
+    const missingRoot = await makeRoot(async (root) => {
+      await fs.rm(path.join(root, "docs/product/demo-intent-v1.md"));
+    });
+    const missing = await loadLatestRoster({ projectRoot: missingRoot, flowId: "demo" });
+    assert.equal(missing.ok, false);
+    if (!missing.ok) assert.equal(missing.code, "roster-reference-missing", missing.reason);
+
+    const noModulesRoot = await makeRoot(async (root) => {
+      await fs.rm(path.join(root, "docs/proposals/demo-modules-v1.md"));
+    });
+    const noModules = await loadLatestRoster({ projectRoot: noModulesRoot, flowId: "demo" });
+    assert.equal(noModules.ok, false);
+    if (!noModules.ok) assert.equal(noModules.code, "roster-modules-doc-missing", noModules.reason);
+  } finally {
+    for (const root of roots) await fs.rm(root, { recursive: true, force: true });
+  }
 });

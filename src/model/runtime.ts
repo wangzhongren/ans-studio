@@ -1135,12 +1135,18 @@ export type RoleStatusFn = (
   metadata?: ReportHandbackMetadata,
 ) => WatchdogToolResult | null | undefined | void | Promise<WatchdogToolResult | null | undefined | void>;
 
+/** `contract_check` 只读 schema 主题（方案 P1.3 §3.1）：枚举与 `ContractCheckInput.topic` 同源；工具层/会话层/描述只读引用。 */
+export const CONTRACT_SCHEMA_TOPICS = ["modules", "roster", "topology"] as const;
+export type ContractSchemaTopic = (typeof CONTRACT_SCHEMA_TOPICS)[number];
+
 /** `contract_check` 只读查询（2026-10-30 / 方案 v3 §3.2）。 */
 export interface ContractCheckInput {
   flowId?: string;
   roleId?: string;
   taskKind?: "dispatch" | "appointment" | "write" | "acceptance" | "shell";
   moduleId?: string;
+  /** 只读 schema 主题；给出时只返回该文档的字段表与最小合法 YAML 示例（不混入 run 摘要）。 */
+  topic?: ContractSchemaTopic;
 }
 export type ContractCheckFn = (
   input: ContractCheckInput,

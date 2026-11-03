@@ -10,8 +10,17 @@ import {
   makeMechanicalRejection,
   rejectionMapSnapshot,
 } from "../../src/common/编排/mechanical-rejection.ts";
-import { evaluateDispatchPreflight, type DispatchPreflightInput, type ProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
+import {
+  contractSchemaText,
+  evaluateDispatchPreflight,
+  PROJECT_MODULES_SCHEMA,
+  PROJECT_ROSTER_SCHEMA,
+  PROJECT_TOPOLOGY_SCHEMA,
+  type DispatchPreflightInput,
+  type ProjectRoster,
+} from "../../src/common/编排/workflow-preconditions.ts";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+import { describeTool } from "../../src/provider/runtime/schema.ts";
 import { evaluateGovernanceJudgeVerdict, normalizeGovernanceJudgeVerdict } from "../../src/common/编排/governance-judge-verdict.ts";
 import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
 import { resolveWrite } from "../../src/service/gate/resolve-write.ts";
@@ -195,6 +204,139 @@ test("contract_check 输出超长由工具层截断到 4KB 内", async () => {
     assert.ok(Buffer.byteLength(result.message, "utf8") <= 4096);
     assert.match(result.message, /已截断/);
   }
+});
+
+test("contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07）", async () => {
+  const gate = (() => ({ allowed: true })) as unknown as WriteGate;
+  const seen: unknown[] = [];
+  const tool = buildGovernedTools(gate, {
+    roleId: "render-dev",
+    runtime: "demo",
+    contractCheck: async (input) => {
+      seen.push(input);
+      return input.topic !== undefined ? contractSchemaText(input.topic) : "run：pinned";
+    },
+  }).find((item) => item.name === "contract_check");
+  assert.ok(tool);
+  if (!tool) return;
+  const expected: Array<["modules" | "roster" | "topology", string]> = [
+    ["modules", PROJECT_MODULES_SCHEMA],
+    ["roster", PROJECT_ROSTER_SCHEMA],
+    ["topology", PROJECT_TOPOLOGY_SCHEMA],
+  ];
+  for (const [topic, schema] of expected) {
+    const result = await tool.handler({ args: { topic } } as never);
+    assert.equal(result.ok, true, topic);
+    if (!result.ok) continue;
+    assert.deepEqual(seen[seen.length - 1], { roleId: "render-dev", topic }, `${topic} 透传到数据源`);
+    assert.ok(Buffer.byteLength(result.message, "utf8") <= 4096, `${topic} ≤4096 B`);
+    assert.ok(result.message.includes(`contract_check topic=${topic}`), `${topic} 头部`);
+    assert.ok(result.message.includes(schema), `${topic} schema 标识 ${schema}`);
+    assert.equal(result.message.includes("taskKind"), false, `${topic} 不含 taskKind 字样`);
+  }
+  assert.equal(seen.length, 3);
+});
+
+test("contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6）", async () => {
+  const gate = (() => ({ allowed: true })) as unknown as WriteGate;
+  let calls = 0;
+  const tool = buildGovernedTools(gate, {
+    roleId: "render-dev",
+    runtime: "demo",
+    contractCheck: async () => {
+      calls += 1;
+      return "run：pinned";
+    },
+  }).find((item) => item.name === "contract_check");
+  assert.ok(tool);
+  if (!tool) return;
+  const unknown = await tool.handler({ args: { topic: "foo" } } as never);
+  assert.equal(unknown.ok, false);
+  if (!unknown.ok) assert.match(unknown.message, /modules\|roster\|topology/);
+  const nonString = await tool.handler({ args: { topic: 123 } } as never);
+  assert.equal(nonString.ok, false);
+  if (!nonString.ok) assert.match(nonString.message, /应为字符串/);
+  for (const value of [true, ["modules"], { topic: "modules" }]) {
+    const rejected = await tool.handler({ args: { topic: value } } as never);
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.message, /应为字符串/);
+  }
+  assert.equal(calls, 0, "未知/非字符串不得调用数据源");
+});
+
+test("contract_check topic：null/空串/空白串走 legacy（AC-16）", async () => {
+  const gate = (() => ({ allowed: true })) as unknown as WriteGate;
+  let seenInput: unknown;
+  const tool = buildGovernedTools(gate, {
+    roleId: "render-dev",
+    runtime: "demo",
+    contractCheck: async (input) => {
+      seenInput = input;
+      return "run：pinned\r\n文档：focus-roster-v1.md";
+    },
+  }).find((item) => item.name === "contract_check");
+  assert.ok(tool);
+  if (!tool) return;
+  for (const topic of [null, "", "   "]) {
+    seenInput = undefined;
+    const result = await tool.handler({ args: { topic } } as never);
+    assert.equal(result.ok, true);
+    if (result.ok) assert.match(result.message, /run：pinned/);
+    assert.deepEqual(seenInput, { roleId: "render-dev" }, "空/空白/null 不构造 topic");
+  }
+});
+
+test("contract_check topic：角色隔离先于 topic（AC-7）", async () => {
+  const gate = (() => ({ allowed: true })) as unknown as WriteGate;
+  let calls = 0;
+  const tool = buildGovernedTools(gate, {
+    roleId: "render-dev",
+    runtime: "demo",
+    contractCheck: async () => {
+      calls += 1;
+      return "run：pinned";
+    },
+  }).find((item) => item.name === "contract_check");
+  assert.ok(tool);
+  if (!tool) return;
+  const other = await tool.handler({ args: { topic: "roster", roleId: "other" } } as never);
+  assert.equal(other.ok, false);
+  if (!other.ok) assert.match(other.message, /只允许查询本角色/);
+  assert.equal(calls, 0, "隔离应在 topic 校验/数据源之前");
+});
+
+test("contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8）", async () => {
+  const gate = (() => ({ allowed: true })) as unknown as WriteGate;
+  let seenInput: unknown;
+  const tool = buildGovernedTools(gate, {
+    roleId: "render-dev",
+    runtime: "demo",
+    contractCheck: async (input) => {
+      seenInput = input;
+      return input.topic !== undefined ? contractSchemaText(input.topic) : "run：pinned";
+    },
+  }).find((item) => item.name === "contract_check");
+  assert.ok(tool);
+  if (!tool) return;
+  const result = await tool.handler({ args: { topic: "roster", flowId: "focus", taskKind: "dispatch" } } as never);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(seenInput, { flowId: "focus", roleId: "render-dev", taskKind: "dispatch", topic: "roster" });
+  assert.match(result.message, /contract_check topic=roster/);
+  for (const line of result.message.split(/\r?\n/)) {
+    assert.doesNotMatch(line, /^run：/);
+    assert.doesNotMatch(line, /^taskKind .*必填/);
+    assert.doesNotMatch(line, /^可写边界：/);
+  }
+  assert.equal(result.message.includes("taskKind"), false);
+});
+
+test("contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9）", () => {
+  const description = describeTool("contract_check");
+  const properties = description.parameters.properties as Record<string, { enum?: string[] }>;
+  assert.deepEqual(properties.topic?.enum, ["modules", "roster", "topology"]);
+  const required = (description.parameters.required ?? []) as string[];
+  assert.equal(required.includes("topic"), false);
 });
 
 test("旧 code 别名可读：canonical code + legacyCode 保留", async () => {
