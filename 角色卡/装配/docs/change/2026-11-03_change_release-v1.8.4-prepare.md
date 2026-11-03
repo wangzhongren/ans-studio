@@ -5,7 +5,7 @@ title: v1.8.4 发布准备：全局任务状态、验收卡与派发护栏
 created: "2026-11-03"
 updated: "2026-11-03"
 timezone: Asia/Shanghai
-status: preparing
+status: released
 related: []
 events:
   - date: "2026-11-03"
@@ -20,6 +20,9 @@ events:
   - date: "2026-11-03"
     kind: updated
     summary: 发布 run 41560850155 在 macOS arm64/x64 Regression tests 失败（version-decision 关闭失败用例）；按先例走显式 overlay：测试改为 run 目录只读并加入 v1.8.4 白名单，重跑发布
+  - date: "2026-11-03"
+    kind: released
+    summary: CI（run 41562587488）三平台 build + release job 全过；v1.8.4 正式发布，12 资产与 SHA256 已回填
 ---
 
 # v1.8.4 发布准备
@@ -77,7 +80,15 @@ events:
 
 - 失败 run 41560850155：Windows x64 build 通过；macOS arm64/x64 均在 `Regression tests` 失败于 `test/桌面应用/version-decision.test.ts`「关闭阶段失败（部分失败）」——仅 `chmod` 文件在 macOS 不阻止 `closeRun` 的临时文件+rename，runB 实际关闭成功，`result.ok` 为 true。
 - 修复（按 v1.8.0/v1.8.2 先例，tag 不可移动，显式 overlay；精确路径、单文件不开目录、断言未放宽）：测试在关闭前同时把 run 目录设为只读并在 finally 恢复；`release-policy.mjs` 白名单加入 `test/桌面应用/version-decision.test.ts`。
-- 本地复跑：`version-decision.test.ts` 12/12、装配 87/87、typecheck 0；重跑三平台发布后填结果。
+- 本地复跑：`version-decision.test.ts` 12/12、装配 87/87、typecheck 0；重跑 run 41562587488 三平台 build + release job 全过。
+
+## CI、资产与 SHA（已回填）
+
+- **CI**：run 41562587488 三平台 build + release job 全部 success；draft 12 资产齐备，release job 已执行 `sha256sum -c` 校验。
+- **发布**：`v1.8.4` 已去 draft 正式发布：https://github.com/wangzhongren/ans-studio/releases/tag/v1.8.4
+- 资产：`ANS-Studio-1.8.4-mac-arm64.zip`、`-mac-x64.zip`、`-win-x64.zip` + 三个 manifest + `SHA256SUMS-*`（3 平台 + overlay）+ `release-provenance.json` + `overlay.patch`。
+- 资产 SHA256：mac-arm64 `a1f43d97779c39e68cb217468d3f2a1930d641d036eee8c54aac585ec4626e61`；mac-x64 `6a90bc497028008f47de9c1a90045aaf5ec8eecd18072141328b49d056ca2e0f`；win-x64 `ddd5b2551070c521802206a6d1dd3510f82321cf21fcf6b4665c6d9ad2e423c1`；overlay.patch `b4b17c6bd726c440268db406e0a14b311c869f22f4a5077881d976e824a09e2f`；release-provenance.json `f7723bfe5f777042fc49f87bf4d4a15c767a1773aeae65604c41b75acc9b22ab`。
+- 未签名、未公证。
 
 ## 证据边界
 

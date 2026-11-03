@@ -201,9 +201,15 @@ Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boun
 下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.8.4-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。
 
 <details>
-<summary>v1.8.4 SHA256（发布后回填）</summary>
+<summary>v1.8.4 SHA256 与来源核验</summary>
 
-v1.8.4 的 SHA256 在构建完成前无法确定，本表不预填：v1.8.4 发布后由 Release 的 `SHA256SUMS-darwin-arm64.txt`、`SHA256SUMS-darwin-x64.txt`、`SHA256SUMS-win32-x64.txt` 与 `SHA256SUMS-overlay.txt` 回填/核对。
+| 产物 | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.8.4-mac-arm64.zip` | `a1f43d97779c39e68cb217468d3f2a1930d641d036eee8c54aac585ec4626e61` |
+| `ANS-Studio-1.8.4-mac-x64.zip` | `6a90bc497028008f47de9c1a90045aaf5ec8eecd18072141328b49d056ca2e0f` |
+| `ANS-Studio-1.8.4-win-x64.zip` | `ddd5b2551070c521802206a6d1dd3510f82321cf21fcf6b4665c6d9ad2e423c1` |
+| `overlay.patch` | `b4b17c6bd726c440268db406e0a14b311c869f22f4a5077881d976e824a09e2f` |
+| `release-provenance.json` | `f7723bfe5f777042fc49f87bf4d4a15c767a1773aeae65604c41b75acc9b22ab` |
 
 [SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.4/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.4/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.8.4/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-11-03_change_release-v1.8.4-prepare.md)。
 
