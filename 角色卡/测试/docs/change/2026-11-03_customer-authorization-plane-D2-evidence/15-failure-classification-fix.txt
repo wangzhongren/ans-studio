@@ -1,0 +1,64 @@
+D2-fix T3 failure / skip classification (current candidate)
+generated: 2026-11-03T11:08:47.219Z
+
+ℹ tests 3624
+ℹ pass 3597
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 260914.9915
+
+--- FAILING TESTS (9) ---
+✖ native symlink and storage runtime mismatch fail before SDK query
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary
+✖ store validate callback rejects directory symlink before Pi parse or new native write
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+✖ D3 linked workspace root remains usable; linked target itself is not replaced
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected
+✖ store: native validation stays lazy and native symlink is rejected before effects
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托
+
+file:line
+test at test/claude-adapter/session.test.ts:639
+test at test/codex-adapter/session.test.ts:351
+test at test/pi-adapter/injected-runtime.test.ts:185
+test at test/pi-adapter/injected-runtime.test.ts:193
+test at test/runtime-core/file-write-safety.test.ts:97
+test at test/runtime-core/session-store.test.ts:46
+test at test/runtime-core/session-store.test.ts:58
+test at test/测试/g4-skill-verify/b-render-double-check.test.ts:182
+test at test/编排/shell-authorized-routine.test.ts:184
+
+--- SKIPPED (18) ---
+﹣ owned native process group cleanup kills a wrapper and child that ignore SIGTERM
+﹣ 会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」
+﹣ D3 write and edit preserve existing ordinary modes and strip special bits
+﹣ D3 handler under strict umask retains existing mode and keeps new files private
+﹣ D3 chmod failure reaches the handler without committing file or mode
+﹣ D3 sync failure reaches the handler without committing file or mode
+﹣ D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute
+﹣ D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives
+﹣ D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking
+﹣ D3 AC6: real write/edit preserve regular modes and new files use safe creation
+﹣ D3 AC6: strict umask in isolated child cannot strip old executable mode
+﹣ D3 AC7: chmod/fsync failure and abort do not commit or leave a temp
+﹣ unreadable（权限）：文件不可读 → status=unreadable、actual=null
+﹣ D3 finalMode 应用普通权限位，未传时保持既有安全创建行为
+﹣ D3 严格 umask 下 finalMode 不丢执行位（独立子进程）
+﹣ D3 chmod 失败不提交内容或权限，并清理临时文件
+﹣ D3 sync 失败不提交内容或权限，并清理临时文件
+﹣ D3 chmod 完成后中止仍保留原文件及权限
+
+--- COMPARISON WITH D1/B0 ---
+baseline_failures: 9
+new_failures: 0
+missing_baseline_failures: 0
+baseline_skips: 18
+new_skips: 0
+missing_baseline_skips: 0
+
+NEW DETERMINISTIC FAILURES: 0
+NEW SKIPS: 0
+Excluded file: test/pi-adapter/write-sequencing.test.ts (same as B0/D1; not run).

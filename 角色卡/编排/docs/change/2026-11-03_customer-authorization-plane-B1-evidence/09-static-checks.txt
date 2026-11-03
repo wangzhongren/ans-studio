@@ -1,0 +1,94 @@
+B1 静态检查（2026-11-03）
+====================================
+
+1) 无第二份轮转/追加实现（task-state 已迁移；Provider 只用 A2）
+-------------------------------------------------------------
+task-state.ts: 只 import/调用 appendJsonlLine/readJsonlLedger（无本地 rotateIfNeeded/appendChains）。
+provider/directive/impl/file-store.ts: 只调用 appendJsonlLine/readJsonlLedger。
+rotateIfNeeded/appendChains 仅存在于 src/common/shared/jsonl-ledger.ts（A2 冻结）。
+（原始 grep 见本文件末「原始输出」）
+
+2) DecisionHooks 唯一钩子名（无 deliver 绑定）
+--------------------------------------------
+grep "deliver:|.deliver(" src/pipeline/orchestration/customer-directive.ts src/service/directive src/provider/directive
+→ NO_DELIVER_BINDING（仅注释里出现“无 deliver 别名”）。
+
+3) takeDirective 注入点（readonly 不注入）
+-----------------------------------------
+shell-gate.ts:
+  - CreateShellGateOptions.takeDirective?: TakeDirectiveFn
+  - ShellGateBuildDeps.takeDirective?: TakeDirectiveFn（buildShellGate 透传）
+  - 构造期守卫：readonlyOnly === true && takeDirective ⇒ throw「readonlyOnly 不得注入 takeDirective」
+  - decide(): classify 后先 takeDirectiveSafely(req,"deny")；review/risky 且既有 takeGrant 未命中后 takeDirectiveSafely(req,"allow")
+shell-arming.ts:
+  - ShellDirectiveWiring.takeDirective（独立于 ShellEscalationWiring）
+  - AssembleShellGateOptions / AssembleOperatorShellGateOptions extends ShellDirectiveWiring
+  - AssembleReadonlyShellGateOptions 无该字段（type-only @ts-expect-error 测试）
+  - assembleProjectShellGate / assembleOperatorShellGate 透传；assembleReadonlyShellGate 不传
+run-role.ts:
+  - openRoleSession input.customerDirective?: CustomerDirectiveRuntime
+  - directiveWiring 仅在 customerDirective 给出时构造；只在 operatorOnly / 项目三层链装配时展开；
+    只读档分支不展开（结构上也不提供）。
+govern-session.ts: 原样透传给 openRoleSession。
+
+4) decisionGroupEnabled 必填（无默认）
+------------------------------------
+SubmitFromInput.decisionGroupEnabled: boolean（必填）；DirectivePresenterRequest.decisionGroupEnabled；
+validateSubmitInput 运行时校验布尔；Service DirectiveCreateRequest.decisionGroupEnabled 必填并校验；
+高危谓词调用使用同一快照。测试含 @ts-expect-error 缺字段负例。
+
+5) B1 未改 app/**
+---------------
+git status --porcelain -- app → 空（0 条）。
+
+6) 常量单一来源
+--------------
+src 中 `.ans/state/customer-directives.jsonl` 只出现在：
+  - src/model/directive.ts:21（A1 常量 CUSTOMER_DIRECTIVES_REL）
+  - src/provider/directive/impl/file-store.ts:33（注释）
+无字面量复制；Provider/Service/Pipeline/run-manifest/task-state 均 import A1 常量/模式。
+
+7) Q9 校验/映射点
+----------------
+task-state.ts:
+  - request.resolved.by ∈ judge/customer/directive；directiveId 可选、必须匹配 A1 模式；by=directive 必填。
+  - version.decision.decidedBy ∈ customer/judge/directive；directiveId 同上。
+version-decision.ts:
+  - VersionDecisionAnswerInput.by / 计划 decidedBy / ResolvedWithoutExecution.decidedBy 用 VersionDecisionDecidedBy；
+  - 窄重载保留旧二值调用方；宽签名接受 directive。
+run-manifest.ts:
+  - RunChangeRecord.decidedBy: VersionDecisionDecidedBy + directiveId?；
+  - applyRunChange 输入同；decidedBy=directive 必须 directiveId；directiveId 模式用 A1 常量校验。
+
+8) 测试/断言纪律
+---------------
+未改断言以保绿；未新增 skip；新增测试均为确定性断言；既有 1 项 Windows EPERM 与 B0 同名同因。
+
+—— 原始输出 ——
+1) grep appendChains/rotateIfNeeded/appendJsonlLine/readJsonlLedger：
+src/common/编排/task-state.ts:40  appendJsonlLine,
+src/common/编排/task-state.ts:41  readJsonlLedger,
+src/common/编排/task-state.ts:257 return appendJsonlLine(file, JSON.stringify(event), { maxBytes, rotations })
+src/common/编排/task-state.ts:637 const read = await readJsonlLedger<TaskStateEvent>(
+src/provider/directive/impl/file-store.ts:17 appendJsonlLine,
+src/provider/directive/impl/file-store.ts:18 readJsonlLedger,
+src/provider/directive/impl/file-store.ts:58 await appendJsonlLine(file, line, limits)
+src/provider/directive/impl/file-store.ts:68 await readJsonlLedger<string>(
+src/common/shared/jsonl-ledger.ts:89 rotateIfNeeded（唯一实现）
+src/common/shared/jsonl-ledger.ts:117 appendChains（唯一实现）
+src/common/shared/jsonl-ledger.ts:123 appendJsonlLine
+src/common/shared/jsonl-ledger.ts:168 readJsonlLedger
+
+2) grep deliver:
+src/pipeline/orchestration/customer-directive.ts:117 注释「唯一可见行钩子（无 `deliver` 别名…）」
+（无绑定/调用）
+
+3) grep app: 空。
+
+4) grep customer-directives.jsonl:
+src/model/directive.ts:21
+src/provider/directive/impl/file-store.ts:33（注释）
+
+5) grep decisionGroupEnabled（节选）:
+src/pipeline/orchestration/customer-directive.ts:61,401,508,524,552
+src/service/directive/impl/directive-service.ts:231-232,534

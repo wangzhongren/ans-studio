@@ -1,0 +1,12 @@
+# 证据文件 SHA-256（相对证据目录）
+c6d2777980fc783ab53a4bdd596b23e1056949ef5cb60fc85575473b64fba59d  01-before-state.txt
+e2e75d915947f1c63ac60d8a8abda3325e7696836fc8df9fe78d107c06b95ada  02-guard-test-before.log
+e9ee8da14b4f43fff16b88fdd17cfd227e2b2bb7e9b6ba06aea1a1e6c1ae2910  03-i18n-test-before.log
+e17ebaf2ca2e2134a619c4b40009d5c284eb44cc4e16f4f2a01d8d79843b6057  04-allowlist.diff
+6dd7610ca1249e6b464a960d54cc475be0cec3bc6d30eb0a98abc90ffa4fcfab  05-after-state.txt
+83310ad33b8a75fe21c4f7f42bc6cb37838efa7aa144a075fe06317f03c8bc6a  06-guard-test-after.log
+e4827032724d2f0b4986301443af010255b542071075b0a8507e5fc5a15d0344  07-i18n-test-after.log
+
+# allowlist SHA-256
+7058da44715383a2314246edd0ee2b291a0c563b1e281ec4dbb1f4dcaf10b630  test/项目管理/shared/i18n-guard-allowlist.ts（写前）
+f31c0b07c639c5bcb83ebe9780e1b6c155eca4eef62b341fc00b4a1a54d2180a  test/项目管理/shared/i18n-guard-allowlist.ts（写后）

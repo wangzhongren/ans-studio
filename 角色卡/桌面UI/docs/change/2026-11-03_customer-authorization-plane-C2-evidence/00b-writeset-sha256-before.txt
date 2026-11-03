@@ -1,0 +1,7 @@
+fd81eedf41245ab71d65d2b05da1e7b466f0125aea857c85c7bce5d4733c3f79 *app/renderer/src/shell/Composer.tsx
+51fc14bf8f3ce697a9733806202fede127c4fe02807198e97def89654e6b410f *app/renderer/src/chat/ipc.ts
+cd2dcbcd49da860c626d68e68c96e09185da260338fb33d8093b59e98a4f0b9f *app/renderer/src/shell/ConfirmCard.tsx
+5c9a2d1ae606b1d308c6d45f4d8ceaa21c270614fb6cd23e09e4c983284c8e53 *app/renderer/src/shell/shell.css
+3de365a7f4c5892632fa502e499d4181b78db5a8c71e4fca2d7d6b2c77e17f18 *test/桌面UI/phase3b-electron-smoke.mjs
+bd6fdba15954da3e6c689d9fe8028d421e4e59200909a2c1f3a42f6b6bf409eb *test/桌面UI/phase4b-electron-smoke.mjs
+c68b74836f02e0285a6304d0054cbe2ed8f42ecc93cc8cdc176506e76cf0c62d *test/桌面UI/phase5a-electron-smoke.mjs

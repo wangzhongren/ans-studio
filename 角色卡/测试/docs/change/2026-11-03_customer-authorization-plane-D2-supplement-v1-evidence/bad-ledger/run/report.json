@@ -1,0 +1,270 @@
+{
+  "probe": "customer-authorization-plane-d2-supplement",
+  "phase": "bad-ledger",
+  "startedAt": "2026-11-03T11:35:28.301Z",
+  "repo": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane",
+  "out": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\run",
+  "userData": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\userData",
+  "project": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\project",
+  "rendererEntry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\app\\renderer\\dist\\index.html",
+  "preload": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\app\\preload.cjs",
+  "head": "4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0",
+  "windowSize": [
+    1360,
+    860
+  ],
+  "sessionId": "supplement-bad-ledger-1793705728301",
+  "checks": [
+    {
+      "name": "B_LEDGER_PRESENT",
+      "value": true,
+      "detail": {
+        "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\project\\.ans\\state\\customer-directives.jsonl",
+        "lines": 2,
+        "bytes": 76
+      }
+    },
+    {
+      "name": "MOUNT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CHAT_PANE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "COMPOSER_READY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DIRECTIVE_CAPABILITY_ON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "B_PANEL_OPEN",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "B_PANEL_LEDGER_ERRORS",
+      "value": true,
+      "detail": {
+        "text": "指令账本不可用（3 条坏行）；客户指令未生效。"
+      }
+    },
+    {
+      "name": "B_LEDGER_ERRORS_TEXT",
+      "value": true,
+      "detail": {
+        "errorText": "指令账本不可用（3 条坏行）；客户指令未生效。",
+        "errorCount": 3
+      }
+    },
+    {
+      "name": "B_NO_ACTIVE_ROWS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "B_NO_FAKE_RECEIPT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "B_LIST_LEDGER_ERRORS",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "ledgerErrors": 3
+      }
+    },
+    {
+      "name": "B_CHAT_INPUT_SENT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "B_CHAT_USER_BUBBLE",
+      "value": true,
+      "detail": {
+        "rows": [
+          "你好\n"
+        ]
+      }
+    },
+    {
+      "name": "B_CHAT_NORMAL_PATH",
+      "value": true,
+      "detail": {
+        "ok": false,
+        "error": "会话尚未开启（点击左侧角色即可开启）。"
+      }
+    },
+    {
+      "name": "B_CHAT_NO_RECEIPT",
+      "value": true,
+      "detail": {
+        "notes": []
+      }
+    },
+    {
+      "name": "B_DECISION_CARD_PRESENTED",
+      "value": true,
+      "detail": {
+        "pushed": 1
+      }
+    },
+    {
+      "name": "B_DECISION_NOT_AUTO_SELECTED",
+      "value": true,
+      "detail": {
+        "outcome": "answered",
+        "value": {
+          "selected": [
+            "alpha"
+          ]
+        },
+        "operatorId": "d2s-probe-operator"
+      }
+    },
+    {
+      "name": "B_LEDGER_UNCHANGED_BY_CONSUMERS",
+      "value": true,
+      "detail": {
+        "before": {
+          "lines": 2,
+          "bytes": 76
+        },
+        "after": {
+          "lines": 2,
+          "bytes": 76
+        }
+      }
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_CSP_VIOLATIONS",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "B1-panel-ledger-errors.png",
+      "bytes": 81887
+    },
+    {
+      "name": "B2-ordinary-chat-after-bad-ledger.png",
+      "bytes": 59902
+    },
+    {
+      "name": "B3-decision-card-normal-path.png",
+      "bytes": 77527
+    }
+  ],
+  "console": [],
+  "csp": [],
+  "sends": [
+    {
+      "text": "你好",
+      "target": {
+        "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\project",
+        "roleId": "A",
+        "runtime": "claude"
+      },
+      "res": {
+        "ok": false,
+        "error": "会话尚未开启（点击左侧角色即可开启）。"
+      }
+    }
+  ],
+  "notes": [],
+  "directiveLists": [
+    {
+      "version": 1,
+      "ok": true,
+      "directivesEnabled": true,
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\project",
+      "approval": {
+        "active": [],
+        "consumed": [],
+        "revoked": [
+          {
+            "id": "d-1",
+            "seq": 1,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm run build",
+                "cwd": "角色卡/测试/docs/change/2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence/bad-ledger/project"
+              }
+            },
+            "scope": {},
+            "until": "forever",
+            "status": "revoked",
+            "rawText": "@审批 允许 shell \"npm run build\" forever",
+            "createdAt": "2026-11-03T09:00:00.000Z",
+            "revokedAt": "2026-11-03T09:00:01.000Z",
+            "consumer": "shell-gate"
+          },
+          {
+            "id": "d-3",
+            "seq": 3,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm run test",
+                "cwd": "角色卡/测试/docs/change/2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence/bad-ledger/project"
+              }
+            },
+            "scope": {},
+            "until": "forever",
+            "status": "revoked",
+            "rawText": "@审批 允许 shell \"npm run test\" forever",
+            "createdAt": "2026-11-03T09:00:02.000Z",
+            "revokedAt": "2026-11-03T09:00:03.000Z",
+            "consumer": "shell-gate"
+          }
+        ],
+        "expired": []
+      },
+      "decision": {
+        "active": [],
+        "consumed": [],
+        "revoked": [],
+        "expired": []
+      },
+      "ledgerErrors": 3
+    }
+  ],
+  "ledger": {
+    "exists": true,
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger\\project\\.ans\\state\\customer-directives.jsonl",
+    "bytes": 76,
+    "lines": 2,
+    "events": [
+      {
+        "parseError": "not-json-at-all"
+      },
+      {
+        "kind": "directive.created",
+        "id": "d-3",
+        "seq": 5
+      }
+    ]
+  },
+  "failures": 0,
+  "finishedAt": "2026-11-03T11:35:32.557Z"
+}

@@ -1,0 +1,145 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "MOUNT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "FIVE_DIRECTIVE_METHODS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DIRECTIVE_STATE_APPLIED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ENTRY_COLLAPSED_DENY_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ENTRY_EXPANDED_INPUT_FOCUS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ENTRY_ESC_COLLAPSES_ONLY",
+      "value": true,
+      "detail": {
+        "shellResponses": 0
+      }
+    },
+    {
+      "name": "ENTRY_SUBMIT_ENABLED",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "ENTRY_SEND_CARD_TARGET_ONLY",
+      "value": true,
+      "detail": {
+        "sends": 1,
+        "shellResponses": 0,
+        "target": {
+          "projectRoot": "/c2-probe-project",
+          "roleId": "A",
+          "runtime": "claude"
+        }
+      }
+    },
+    {
+      "name": "CONFIRM_DIALOG_OPEN",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CONFIRM_DIALOG_CONTENT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CONFIRM_ENABLED_AFTER_ACK",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CONFIRM_POSTS_FROZEN_VALUES",
+      "value": true,
+      "detail": {
+        "id": "req-c2-probe",
+        "decision": "confirm",
+        "values": {
+          "action": {
+            "kind": "allow",
+            "resource": {
+              "type": "shell",
+              "command": "npm test",
+              "cwd": "/c2-probe-project"
+            }
+          },
+          "scope": {},
+          "until": "once",
+          "acknowledged": true
+        }
+      }
+    },
+    {
+      "name": "SHELL_CARD_STILL_PENDING_AFTER_CONFIRM",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PANEL_OPEN",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PANEL_BADGE_AND_ROW",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PANEL_REVOKE_USES_ROW_DATA",
+      "value": true,
+      "detail": {
+        "id": "d-1",
+        "target": "approval",
+        "projectRoot": "/c2-probe-project"
+      }
+    },
+    {
+      "name": "PANEL_CLOSES_SHELL_STILL_PENDING",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "PROJECT_SWITCH_CLEARS_OVERLAYS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_CSP_VIOLATIONS",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "screenshots": [
+    "01-shell-card-entry.png",
+    "02-confirm-dialog-high-risk.png",
+    "03-directive-panel.png"
+  ],
+  "failures": 0,
+  "console": [],
+  "csp": [],
+  "finished": true,
+  "at": "2026-11-03T08:24:38.221Z"
+}

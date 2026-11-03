@@ -1,0 +1,68 @@
+{
+  "exists": true,
+  "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project\\.ans\\state\\customer-directives.jsonl",
+  "bytes": 1434,
+  "lines": 4,
+  "events": [
+    {
+      "version": 1,
+      "kind": "directive.created",
+      "id": "d-1",
+      "seq": 1,
+      "target": "approval",
+      "action": {
+        "kind": "allow",
+        "resource": {
+          "type": "shell",
+          "command": "npm install",
+          "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project"
+        }
+      },
+      "scope": {},
+      "until": "session",
+      "rawText": "@审批 允许 shell \"npm install\" until=session",
+      "sessionId": "supplement-restart-create-1793705707201",
+      "createdAt": "2026-11-03T11:35:09.848Z",
+      "createdBy": "customer",
+      "source": "desktop-input"
+    },
+    {
+      "version": 1,
+      "kind": "directive.created",
+      "id": "d-2",
+      "seq": 2,
+      "target": "approval",
+      "action": {
+        "kind": "allow",
+        "resource": {
+          "type": "shell",
+          "command": "npm test",
+          "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project"
+        }
+      },
+      "scope": {},
+      "until": "once",
+      "rawText": "@审批 允许 shell \"npm test\" once",
+      "sessionId": "supplement-restart-create-1793705707201",
+      "createdAt": "2026-11-03T11:35:10.277Z",
+      "createdBy": "customer",
+      "source": "desktop-input"
+    },
+    {
+      "version": 1,
+      "kind": "directive.expired",
+      "id": "d-1",
+      "seq": 3,
+      "at": "2026-11-03T11:35:16.503Z",
+      "reason": "app-restart"
+    },
+    {
+      "version": 1,
+      "kind": "directive.expired",
+      "id": "d-2",
+      "seq": 4,
+      "at": "2026-11-03T11:35:16.504Z",
+      "reason": "unused-once"
+    }
+  ]
+}

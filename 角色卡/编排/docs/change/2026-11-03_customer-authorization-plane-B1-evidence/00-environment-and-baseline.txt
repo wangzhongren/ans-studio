@@ -1,0 +1,63 @@
+B1 实施环境与写前基线（2026-11-03）
+====================================
+
+cwd: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+Node: v24.22.1
+npm: 11.19.1
+OS: Windows 11 Pro 10.0.26300（MINGW64/Git Bash）
+HEAD: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+node_modules: present
+
+git status --porcelain -- src app test（B1 开始前）:
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M src/model/project-state.ts
+ M src/model/runtime.ts
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? src/common/shared/jsonl-ledger.ts
+?? src/model/directive-marker.ts
+?? src/model/directive.ts
+?? test/runtime-core/directive-contract.test.ts
+?? test/runtime-core/directive-marker.test.ts
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/jsonl-ledger.test.ts"
+
+git diff --cached --name-only: （空，无暂存）
+
+A1/A2/A3 冻结候选哈希（B1 开始前记录；B1 不修改）
+------------------------------------------------
+A1:
+src/model/directive-marker.ts
+  git hash-object c0978df25b9431b5cec0b08a110ef19045900619
+  sha256 7e522722b93a8815430b9c77e949ca5c1543683ecced8f23b8c29c8b584351c0
+src/model/directive.ts
+  git hash-object 056fe6bb3f95f269514d5de4ec903d71031b9f82
+  sha256 2172bdecd3648da3d1f4bd8c1b177db8b687b1e8ac2b07119c787c44bd652699
+src/model/runtime.ts
+  git hash-object b92891873eb9623f828b4dd17731469db0558c53
+  sha256 911c617920e11bd2b61c851c9f39817fea4a4c59cfeab3366b640082bc4004c5
+src/model/project-state.ts
+  git hash-object 0c4582e2cc87cf5cac8975ba879f8ffd5b10ce49
+  sha256 7075d76b266699ae394062720534b277d9873f722ffe8144d86c1a07bafaa430
+test/runtime-core/directive-marker.test.ts
+  git hash-object 8d506c8125909f0f66f26946b660003f538264d8
+  sha256 d3d28fe9df246d5eb19d096a053ab4707c00c9824b2f00e388b928009af7658e
+test/runtime-core/directive-contract.test.ts
+  git hash-object 4be84c2ada93578f25f359a259535ea678dc96c4
+  sha256 f7f4db3071b11f23f6c1554dad7be73167708127cd120fc94d7f4b5e0c060e2f
+A2:
+src/common/shared/jsonl-ledger.ts
+  git hash-object 223d32c6e46bac41200406546e33e86767ac0d82
+  sha256 c9fd3066f1985c1b8ae850ab9b67845dcf320e7f38779de4121687cdcdd62e5f
+test/项目管理/shared/jsonl-ledger.test.ts
+  git hash-object f879ebb5944bc255295c263b30c8479c39a6c63b
+  sha256 3aa6154db2cd353b4ad924803113d3861cfb01fcba77acbd8050dc02972bbb8e
+A3:
+src/common/shared/i18n/messages/zh-CN.ts
+  git hash-object 7511b17bcd71b1e3a598f3fb864ba4c6ea0ea351
+  sha256 6dafeb5983fac78336063e669aaba44434eabeae06c6c6a511f537d7eb3c3b6a
+src/common/shared/i18n/messages/en-US.ts
+  git hash-object b4d352513b4db535a1de8501efa883c63b255026
+  sha256 8c0d15bd40d5bdbb629a75511dfb1b1fe284b1e7d8d8de86e3cea7e24c876602
+test/项目管理/shared/i18n.test.ts
+  git hash-object 1de9f5a37e71454110384a3f74eed729bccd36c6
+  sha256 62b04e8c42bf1548606e9412c981e42baca073324980e76d23c6eff220e1a80a

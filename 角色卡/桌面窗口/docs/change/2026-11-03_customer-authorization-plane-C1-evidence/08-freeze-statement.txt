@@ -1,0 +1,93 @@
+C1 冻结声明（客户授权平面，2026-11-03）
+Task: 2026-11-03-customer-authorization-plane / flowId customer-authorization-plane / T3
+Role: 桌面窗口（C1）
+Baseline: HEAD 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+Status: implemented-unverified
+
+本声明冻结 C1 对 C2 及后续节点的外部契约。C1 是 source of truth；C2 只按下列名称/载荷消费，
+不得保留候选名（`enabled`/`canConfirm`/`directiveRespond` 已无效）。任何字段/通道变更须回 C1
+重跑受影响证据（typecheck + 目标测试 + 桌面套件 + 源码钉）。
+
+1) IPC 通道（五条；方向固定）
+- `directive:confirm-request`（主→渲）
+  载荷 `{version:1, request:{id,target:"approval"|"decision",rawText,projectRoot,roleId,runtime?,
+  prefill:{action,scope:{flowId?},until:"once"|"session"|"forever",unrecognized:string[]},
+  highRisk:{reasons:string[]},confirmable:boolean,decisionGroupEnabled:boolean}}`
+- `directive:confirm-response`（渲→主 invoke）
+  入参 `{id,decision:"confirm"|"cancel",values?:{action,scope,until,acknowledged?:true}}`
+  回包 `{ok:boolean,error?:string,expired?:boolean}`
+- `directive:list`（渲→主 invoke）
+  入参 `{projectRoot?}`；成功
+  `{version:1,ok:true,directivesEnabled:true,projectRoot,approval:DirectiveListView,
+  decision:DirectiveListView,ledgerErrors:number}`；失败 `{ok:false,error}`
+- `directive:revoke`（渲→主 invoke）
+  入参 `{id,target:"approval"|"decision",projectRoot?,roleId?,runtime?}`
+  成功 `{ok:true,id,target}`；失败 `{ok:false,error}`
+- `directive:state`（主→渲）
+  `{version:1,directivesEnabled:true,projectRoot,approval:DirectiveListView,
+  decision:DirectiveListView,ledgerErrors:number}`（与 `directive:list` 成功视图同形）
+- `DirectiveListView` 冻结为 B1 形状 `{active,consumed,revoked,expired}`。
+- `directive:list`/`directive:state` 不新增跨 target 字段、不跨项目聚合；面板是唯一跨 target 读点。
+
+2) preload 白名单（五方法；只经 invoke/on，不暴露 Node 能力）
+- `onDirectiveConfirmRequest(cb)`
+- `directiveConfirmRespond(input)`
+- `listDirectives(input)`
+- `revokeDirective(input)`
+- `onDirectiveState(cb)`：注册时**同步回放** preload 缓存的最后一条 `directive:state`，再订阅后续推送。
+- 三处冻结名：`directivesEnabled`、`confirmable`、`directiveConfirmRespond`。
+
+3) `directivesEnabled` handshake（P1-CAP-07，主进程先行）
+- `main.ts` 在 `did-finish-load` 推 `directive:state`（重载再次触发）；`app:list-project` 成功与
+  `app:recovery-ready` 亦重推；注册时页面已加载完则立即补推。
+- 基础能力位恒 `true`；不实施 O9，无 env `false` 分支。
+- C2 首帧默认 `false`；收到状态后按该位执行；未收到前不得抑制气泡。
+
+4) `SendResult` 加法（app/desktop/session.ts）
+- `directive?: {id:string,target:"approval"|"decision"}`：命中标记且落账/撤销成功；本次不产生角色轮次
+  （不设置 `turnId`/`inputAccepted`/`outcome`/`sessionCurrent`）。
+- `directiveCancelled?: true`：仅取消/关窗，`{ok:false,error,directiveCancelled:true}`。
+- 未命中标记的普通消息路径逐字不变（图片重校验/manager.send/metadata/队列/ACK 不变）。
+
+5) `CustomerInputOutcome.directive` 消费形状（A1 冻结；C1 只消费，不复制定义）
+- `directive?: {id:string, action:"select-recommended"|"select-option"|"reject"}`，仅决策指令的
+  `answered`/`declined` 结算出现；`operatorId:"directive:<id>"`；`unavailable` 分支不加。
+- `request.presented.to` 不扩展（W-6，仍仅 `customer|judge`）；指令归属只写
+  `request.resolved.by:"directive"` + `directiveId`（Q9 A）。
+
+6) decision 消费者规则（app/desktop/customer-input.ts）
+- 只处理 `cardKind==="decision"`，在 `tryAutoSelectDecision` **之前**进入；其他卡种零变化。
+- 新增内部状态 `directing`：占住一项目一卡槽位，不呈现、不计入
+  `pendingCount`/`pendingRoles`/`judgingCount`。
+- 唯一规则来源 = B1 `applyDecisionDirective`：卡内唯一推荐代选；选项 id/规范化 label/前缀唯一匹配；
+  拒绝按 `scope.flowId`；0/多匹配不应用；冲突不消费。
+- 冲突/不匹配：不消费任何一条、**绕过 `tryAutoSelectDecision`**、呈现客户卡，并投一条既有
+  `delivery-note` 系统行（A3 `main.directive.decision.conflict`/`main.directive.decision.notMatched`）。
+- 可见结果行 = B1 `DecisionHooks.emitResult`（唯一钩子，无 `deliver` 别名）；必须先于 durable
+  `once` 消费；抛错/拒绝/无钩子 ⇒ 不消费、不应用、回落。
+- 无适用指令 ⇒ 回落既有路径（默认推荐仍可用，AC-15）；有适用指令但未应用 ⇒ 直接呈现客户卡，
+  不借默认推荐代选。
+- `once` durable 消费失败 ⇒ 回落客户卡，不产生 outcome/审计。
+
+7) 提交快照与应用运行级 sessionId
+- `decisionGroupEnabled` = `sendSession` 命中当刻 `decisionJudgeSwitch.isEnabled()` 的快照；
+  同一值传 B1 `SubmitFromInput.decisionGroupEnabled`、存 C1 pending、用于回包高危复算；
+  面板打开期间开关变化**不改变**本次提交；下一次提交重新取快照。
+- `sessionId` = `app/main.ts` 模块初始化时 `randomUUID()` 生成一次；同一运行内所有项目/窗口共用；
+  项目切换不重置；进程重启生成新值，使 `session` 指令按 B1 状态机失效。
+
+8) 输入式撤销（B1 交接口径）
+- `@审批 撤销 #d-N` / `@决策 撤销 #d-N`：C1 在确认后调用 `runtime.revoke(id,target)`；
+  `submitFromInput` 只创建。目标必须存在、同 target、`active`；已消费/已撤销/已失效/跨 target
+  直接如实回错。撤销只减少授权，不做高危二次确认；成功后回执
+  `main.directive.receipt.*Revoked` 并刷新列表。
+
+9) 生命周期
+- 关窗 `cancelAll`；项目切换 `cancelProject`/`setCurrentProject`（只取消未决面板，不销毁旧项目运行时）；
+  切回同一运行内 `session` 指令仍有效；`focus`/`show`/`app:recovery-ready` 用同一 `requestId` 重推。
+- 指令面板独立 pending：不占 `shellCardSlot`、不进客户卡一项目一卡队列、不计入看护挂起数。
+
+10) 变更控制
+- 本冻结自 C1 完成后生效；C2 只按此消费。任何变更回 C1 重跑
+  `npm run typecheck` + `test/桌面应用/directive-input.test.ts` + `directive-decision.test.ts`
+  + 受影响既有测试 + 桌面套件，并更新本证据目录。

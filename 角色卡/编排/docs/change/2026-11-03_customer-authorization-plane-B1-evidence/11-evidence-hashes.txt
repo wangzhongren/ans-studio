@@ -1,0 +1,25 @@
+B1 证据文件行数与 SHA-256（2026-11-03；生成于最后）
+====================================
+（本文件 11-evidence-hashes.txt 不自我哈希。）
+
+| 文件 | 行数 | SHA-256 |
+| --- | --- | --- |
+| 00-environment-and-baseline.txt | 63 | fa71126d981f41a24f206aae36c4351203c47608d74885ea12b3ee7df6d04353 |
+| 01-typecheck-before.log | 6 | d4266ccbce256c9f1af09e15d0d3e4bc07c283e2aa86e8712d29151aa9d7a038 |
+| 02-tests-orchestration-before.log | 1268 | 0f2516967d5e58a67f7d43bcaf8c8b91995cd07a01cc6dcb2bc9cd5b9eeff0a8 |
+| 03-tests-orchestration-after.log | 1313 | 71e9751f7c2b52a9e29b282f260b8850bc30a622cedd39575662b671b8da0421 |
+| 04-typecheck-after.log | 4 | 6cb3d175ee0a31dac80b6ff8d1a5b025763ae2ec377ecc510bdc894c3bcd3892 |
+| 05-candidate-hashes.txt | 105 | 04898a67cd7207f61e8dddd034159b128e33365ffa164968e71869f1a87cdcdc |
+| 06-git-status-short.txt | 96 | fbe879d0ba12c7bfe3975376902f61762de04a3a672cecd37405aef7ae5aa7f9 |
+| 07-failure-classification.txt | 50 | 4f9ef48b138fac8428c8c4481ddb375bb8c74d3adbdc4c1d638e0957c8ce9a41 |
+| 08-affected-cross-layer-tests.log | 77 | 88c514bd50981253c26488322077ccc6e4c74c6ecd0247bb754b08c327e436bc |
+| 09-static-checks.txt | 94 | 27209c6d1d19e8cb06673d9d7edfc3ee39ee51817664f55f97b9fd4d61d5ed53 |
+| 10-freeze-statement.txt | 70 | 8e2d9c7648d2313a4c7e9ed1b717855c98525eca7e245375e0ee7e2edc67e49a |
+
+实施记录与角色文档（非证据目录）
+--------------------------------
+| 文件 | 行数 | SHA-256 |
+| --- | --- | --- |
+| 角色卡/编排/docs/change/2026-11-03_customer-authorization-plane-B1-implementation.md | 172 | db0ecf35f4ef500158ac02d915918ab05a156f2153f3b4e400e787ef8f48e7b5 |
+| 角色卡/编排/api-spec.md | 1173 | 960a468b6a629ce53acb60d1b7fdc4a381df496183454231210851c154d270a1 |
+| 角色卡/编排/memo.md | 140 | 1c5f604085c3d73d6073a62b7dee6873ed8b4cebd9a84883772ad83e80e667a6 |

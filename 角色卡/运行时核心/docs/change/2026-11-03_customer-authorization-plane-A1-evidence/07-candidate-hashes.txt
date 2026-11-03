@@ -1,0 +1,26 @@
+captured_at: 2026-11-03T14:55:20+08:00
+baseline_head: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+path: src/model/directive-marker.ts
+  git hash-object: c0978df25b9431b5cec0b08a110ef19045900619
+  sha256: 7e522722b93a8815430b9c77e949ca5c1543683ecced8f23b8c29c8b584351c0
+  lines: 59
+path: src/model/directive.ts
+  git hash-object: 056fe6bb3f95f269514d5de4ec903d71031b9f82
+  sha256: 2172bdecd3648da3d1f4bd8c1b177db8b687b1e8ac2b07119c787c44bd652699
+  lines: 276
+path: src/model/runtime.ts
+  git hash-object: b92891873eb9623f828b4dd17731469db0558c53
+  sha256: 911c617920e11bd2b61c851c9f39817fea4a4c59cfeab3366b640082bc4004c5
+  lines: 2769
+path: src/model/project-state.ts
+  git hash-object: 0c4582e2cc87cf5cac8975ba879f8ffd5b10ce49
+  sha256: 7075d76b266699ae394062720534b277d9873f722ffe8144d86c1a07bafaa430
+  lines: 420
+path: test/runtime-core/directive-marker.test.ts
+  git hash-object: 8d506c8125909f0f66f26946b660003f538264d8
+  sha256: d3d28fe9df246d5eb19d096a053ab4707c00c9824b2f00e388b928009af7658e
+  lines: 132
+path: test/runtime-core/directive-contract.test.ts
+  git hash-object: 4be84c2ada93578f25f359a259535ea678dc96c4
+  sha256: f7f4db3071b11f23f6c1554dad7be73167708127cd120fc94d7f4b5e0c060e2f
+  lines: 643

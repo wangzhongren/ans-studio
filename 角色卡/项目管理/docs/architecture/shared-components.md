@@ -118,7 +118,24 @@
 
 ---
 
+## 组件 10：共享 JSONL 账本辅助（`jsonl-ledger`）
+
+2026-11-03，依据客户授权平面任务（`2026-11-03-customer-authorization-plane`，团队计划 §3/§4.3、P1 提案 A2、P1 审核 `recommend approval`）。A2 只提供共享辅助与等价契约，**不迁移** `task-state.ts`（迁移属编排 B1 同变更）；A2/A3 完成即**冻结**，B1/C1/C2 只消费。
+
+| 字段 | 说明 |
+| --- | --- |
+| **名称与用途** | 跨角色共享 **JSONL 账本辅助**：追加一行、按大小轮转、旧→新读取、坏行与忽略行计数。解决的问题：`.ans/state/tasks.jsonl`（`task-state.ts`）与新的 `.ans/state/customer-directives.jsonl`（directive Provider）都需要同一套轮转/原子追加/坏行回放；若不抽取，会产生第二份轮转/追加实现并漂移。本组件是**单一实现**，不承担业务判定/重放/诊断。 |
+| **代码与公共入口** | 代码：`src/common/shared/jsonl-ledger.ts`。导出：`appendJsonlLine(file, jsonText, limits?)`、`readJsonlLedger(file, parse, limits?)`、`jsonlSegmentFiles(file, rotations?)`；常量 `DEFAULT_JSONL_MAX_BYTES`（5 MiB）、`DEFAULT_JSONL_ROTATIONS`（3）；类型 `JsonlLedgerLimits`、`JsonlAppendResult`、`JsonlParseResult<T>`、`JsonlReadError`、`JsonlReadResult<T>`。 |
+| **属主与消费方** | **属主/维护者：项目管理**。**消费方**：**编排** `src/common/编排/task-state.ts`（B1 同一变更迁移调用点，行为逐字不变；等价回归在 `test/编排/`）与 `src/provider/directive/`（B1 指令账本）。**均为只读导入**，不得复制第二份轮转/原子追加实现。**渲染侧不得导入**（含 Node API）。 |
+| **契约与示例** | **追加**：先递归建目录；当前大小 + 本次行字节数 > `maxBytes` 时**在追加前**轮转；`appendFile` UTF-8 `flag:"a"`；按**绝对路径**维护进程内串行 Promise 链（同文件不交错、不同账本互不阻塞、链尾清理）；失败**不抛**，返回 `{ok:false,message,code?,cause?}`；`jsonText` 含裸 `\r`/`\n` ⇒ `{ok:false,code:"multiline"}`。**轮转**：`.N` 最旧、`.1` 最新；`i=N..1` 依次 rename——`i=1` 当前→`.1`，`i>1` `.i-1`→`.i`；`ENOENT` 容忍；`unlink(file.N+1)` 仅作越界份防御性清理。**读取**：`.N`→…→`.1`→当前（旧→新）；跳过空行；坏 JSON/parser 拒绝 ⇒ `errors` + `badLines++`；parser 返回 `ignore` ⇒ `ignoredLines++`；文件级读失败（非 ENOENT）⇒ `errors`（`line=0`）后继续；`ENOENT` 跳过；`files` 为参与读取的段名（basename；当前文件恒在列，轮转段仅存在者入列）。**limits**：`maxBytes`/`rotations` 由调用方传入，env 解析（如 `ANS_TASKS_MAX_BYTES`/`ANS_TASKS_ROTATIONS`）留在消费方；路径（`TASKS_STATE_REL`/`CUSTOMER_DIRECTIVES_REL`）由消费方各自定义。示例：<br>`await appendJsonlLine(abs, JSON.stringify(event), { maxBytes, rotations });`<br>`const { values, errors, badLines, ignoredLines } = await readJsonlLedger(abs, (raw) => parseEvent(raw), { rotations });`<br>**边界（不做）**：不校验事件 schema/重放、不记诊断、不读 env、不硬编码 `.ans` 路径、不做业务判定。 |
+| **测试与变更影响** | 测试：`test/项目管理/shared/jsonl-ledger.test.ts`（16 例）：追加（建目录/单行精确/多行保序/32 路并发无交错/失败不抛）、轮转（恰好等于上限不轮转、跨阈值轮转、当前→`.1`/`.1` 最新/`.N` 最旧、越界份 `.N+1` 清理、`rotations=1`、20 路并发+轮转保留份数内旧→新有序）、读取（不存在/空文件/仅轮转段/尾随换行/空行/CRLF/`.N→…→.1→当前`/`files` 语义）、坏行（坏 JSON、parser 拒绝、`ignore`、文件级读失败 `line=0`、basename+行号）、路径参数化（两路径独立串行/轮转）、limits 参数化、multiline 防御、段文件清单。**变更影响**：B1 迁移 `task-state.ts` 后，其 `test/编排/` 的 task-state 等价回归必须通过；共享行为变更会使 `task-state` 与 directive Provider 两个消费方的既有证据失效，须回项目管理重跑 A2 证据并安排消费者重测。依据：[P1 提案](../change/2026-11-03_customer-authorization-plane-P1-proposal.md)、[A2 实施记录](../change/2026-11-03_customer-authorization-plane-A2-implementation.md)、[实现报告](../../api-spec.md)。 |
+
+---
+
 ## 变更（本文件）
+
+- 2026-11-03：登记 **组件 10 `jsonl-ledger`**（共享 JSONL 账本辅助，A2 冻结）。由项目管理按客户授权平面团队计划 §3/§4.3 与 P1 提案 A2 建立：新增 `src/common/shared/jsonl-ledger.ts`（追加/按大小轮转/旧→新读取/坏行与忽略行计数/按绝对路径串行链/limits 与路径参数化；纯 Node、渲染侧不得导入）与 `test/项目管理/shared/jsonl-ledger.test.ts`（16 例）。**A2 不迁移** `src/common/编排/task-state.ts`（B1 同变更迁移，行为逐字不变）；`task-state` 等价回归由 B1 在 `test/编排/` 执行。本组 11 文件 / 175 tests / 170 pass / 0 fail / 5 skipped（2026-11-03 本机 Node v24.22.1；`npm run typecheck` 0 错）。未改 `app/**`、`src/model/**`、`src/common/编排/**`、其他角色资料；未 commit/push。详见[A2 实施记录](../change/2026-11-03_customer-authorization-plane-A2-implementation.md)。
+
 
 - 2026-10-27：组件 7 `diagnostics` 落盘白名单增列 **`mimeType`/`bytes`**（`view_image` 审计事实；运行时核心反馈二者此前被白名单丢弃，实际只落 path/ok/mode/reasonCode/turnId）。新增**字段级校验**：`mimeType` 仅接受标准 MIME token（拒绝 data URL/base64/带参数/控制字符），`bytes` 仅接受有限非负整数；图片内容（base64/`data:` URL）仍不入白名单。交付方式 `mode`（delivery）已在白名单，无需变更。测试 `test/项目管理/shared/diagnostics.test.ts` **9→10**（新增 view_image 字段落盘与泄漏防护例）；本组 210/205/0/5；`npm run typecheck` 0 错。未改运行时/适配器/桌面/门禁代码，未 commit。
 

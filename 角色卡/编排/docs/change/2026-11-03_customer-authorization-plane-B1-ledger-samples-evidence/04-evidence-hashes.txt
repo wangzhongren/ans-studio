@@ -1,0 +1,27 @@
+# B1 ledger samples evidence hashes
+# generated: 2026-11-03T19:28:05+08:00
+# cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+# command: (cd evidence && find . -type f ! -name '04-evidence-hashes.txt' -print | sort | xargs sha256sum)
+
+fdd5d9bb199ee6d6d5e9ef016219d15f4d794a6ad91a7fdaa2a00642bc9f3e88 *./00-environment.txt
+67637a0829017a6d6729881972bcc56ce91651471d6abc0c6d4509140c6d62ec *./00b-candidate-identity-before.log
+25f3f972b6e0f205ea553bf71a2e9b88b864fcb904e08c8a4df7a0b7a7cd5ac8 *./00b-candidate-identity-before.txt
+4afb0fffd32425f1f80a84f4ee00f41e1ad87f0ed307dc3234637f75932e8b4f *./01-generate-ledger-samples.mjs
+9b38a28e39b4aa9d801d8c7f23ce0fe48f245ea4ed80e1428b5051f4c935023f *./01-generate-log.txt
+fbf56b487d1774c5b3b558a9d87beebdf7dbe65c0825c732e08685ab6ae30dbf *./02-ledger-sample/project/.ans/state/customer-directives.jsonl
+d88320c771e00fd595a61de9d18584dacab88cb65d49d606ef40d954598501a3 *./02-replay-ledgers.mjs
+f1c1c08f49960f4e0372c98ed0bdbde8829828204dad73d11964cbd248a28909 *./02-replay-log.txt
+0dec859a2127cef1887c6c1a724bfcf85712dd2441eac59895c9fbfba41d14c8 *./03-bad-rotation-sample/project/.ans/state/customer-directives.jsonl
+60a8042ffcdc43c19b09f8952f972d3d74ff0d04469e1d64f170faaa0f12d3da *./03-bad-rotation-sample/project/.ans/state/customer-directives.jsonl.1
+faa2e8a065dfc767a26c550b1431d31e65b2a5b38fe3cd01756d579cb389fe0a *./03-bad-rotation-sample/project/.ans/state/customer-directives.jsonl.2
+55b2d379058c2eb44980c5ed3ef36cfed80472f2f8861d3ecac7a30b7a1e7019 *./03-candidate-identity-after.log
+d7dd2dd84ca921174396e34efaa3ba9d53a583785ccff83822d7d87b79b78488 *./03-candidate-identity-after.txt
+05a61c6dcc4caac693524a339c01a68353cc83a4ada891e4a642f5a30cd37982 *./05-run-summary.txt
+b2e39bd3602b75c5ec50be06244647988adef0e2b037706bb7f7fb5af7163639 *./run-ledger-samples.sh
+5de2f7ccb6942656201b01a5a542ce5a0f2cf6a3803b5e11b4b22693cdad7831 *./verify-candidates.mjs
+
+# ledger line counts / sizes
+  11 4133 /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/角色卡/编排/docs/change/2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence/02-ledger-sample/project/.ans/state/customer-directives.jsonl
+  1 611 /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/角色卡/编排/docs/change/2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence/03-bad-rotation-sample/project/.ans/state/customer-directives.jsonl
+ 1 41 /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/角色卡/编排/docs/change/2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence/03-bad-rotation-sample/project/.ans/state/customer-directives.jsonl.1
+  1 155 /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/角色卡/编排/docs/change/2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence/03-bad-rotation-sample/project/.ans/state/customer-directives.jsonl.2

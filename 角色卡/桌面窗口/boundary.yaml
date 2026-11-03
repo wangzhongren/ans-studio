@@ -225,6 +225,13 @@ entries:
   - kind: file
     path: test/桌面应用/version-decision.test.ts
     purpose: 主进程侧测试——发卡/决定/拒绝/超时/中止/重试/新版本开发/恢复
+  # --- Delta-CAP-4（2026-11-03，团队计划 §4.5；闸门 2）：test/桌面应用/ 新增 2 个精确测试文件（directive-input、directive-decision），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/directive-input.test.ts
+    purpose: 主进程侧测试——识别拦截/指令 IPC/面板通道/重推/关窗取消/高危复核/面板共存
+  - kind: file
+    path: test/桌面应用/directive-decision.test.ts
+    purpose: 主进程侧测试——decision 消费者确定性规则/冲突与不匹配绕过默认推荐/Q9 归属读者
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

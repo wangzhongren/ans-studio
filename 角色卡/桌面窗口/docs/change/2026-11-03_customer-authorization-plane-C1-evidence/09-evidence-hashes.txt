@@ -1,0 +1,14 @@
+9	0d56792e42646b6935af03097ef7e11fb8f27c3b9f1e650d0016026301d62ed1	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/00-environment-and-baseline.txt
+4	6cb3d175ee0a31dac80b6ff8d1a5b025763ae2ec377ecc510bdc894c3bcd3892	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/01-typecheck.log
+30	f5ae5f91e1bafce86ffdcb6e96a472690cbd2dbb866159b2b7d128f094dc350c	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/02-tests-target.log
+34	e5fa113f4373cbb85ecb1f94a1e44e310223fb063add90831be54bddaf44f2b6	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/03-tests-affected-existing.log
+543	5d874971c8ee73a0c3f10ecca6b18063e798a3d4e2c583ff319482f04bcce480	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/03-tests-desktop-all.log
+51	0e3d98d5b1ccf8d7f813269073071579b51ce97e0fd3e114e5153606b9f7826c	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/04-git-status-short.txt
+24	6854316a82486a47d88fb74f215601a98ceda8f6b98d53d68d0be7b8985ecf37	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/05-candidate-hashes.txt
+24	50917ce8a696e35e6c0ea690f35bc01abf24da037e6688ed402280f45735f894	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/06-a1-a2-a3-b1-hashes.txt
+19	57da9eae0bd1a9bda0f348a53af2c35adc619edeb9d06a1760d5e1ba65bb46dc	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/07-static-checks.txt
+93	e78fa3cb5c7b30b38504bfb32111b09ff6dbe41e36134725876d9d42b0891e16	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-evidence/08-freeze-statement.txt
+208	966cba43dff59d127c86602981da6ee170e6447ab4a4b8df6f0dfbee469fefc6	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-implementation.md
+541	6f1c23642efd7d6be3c09a7f235ac6886aefcefda77fb39fef11b8a08d3daf47	角色卡/桌面窗口/api-spec.md
+128	406fad36d51aa772867463067d921a74447cc84054f15a260eef978b81e385bf	角色卡/桌面窗口/memo.md
+# 09-evidence-hashes.txt 自身不纳入（自引用）；本文件最后生成。

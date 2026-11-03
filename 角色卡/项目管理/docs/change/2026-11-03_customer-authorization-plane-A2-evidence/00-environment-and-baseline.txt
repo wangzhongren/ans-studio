@@ -1,0 +1,20 @@
+node: v24.22.1
+npm: 11.19.1
+os: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+shell: 5.3.15(2)-release
+worktree: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+head: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+collected_at: 2026-11-03T14:53:43+0800
+baseline_status_src_app_test_at_node_start: empty (observed before implementation)
+current_status_src_app_test:
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M src/model/project-state.ts
+ M src/model/runtime.ts
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? src/common/shared/jsonl-ledger.ts
+?? src/model/directive-marker.ts
+?? src/model/directive.ts
+?? test/runtime-core/directive-contract.test.ts
+?? test/runtime-core/directive-marker.test.ts
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/jsonl-ledger.test.ts"

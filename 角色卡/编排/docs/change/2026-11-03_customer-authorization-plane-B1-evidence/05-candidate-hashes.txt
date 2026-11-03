@@ -1,0 +1,105 @@
+B1 候选哈希（2026-11-03；工作区）
+====================================
+说明：`git hash-object` = 工作区候选 blob；`sha256` = `sha256sum` 工作区字节；
+`HEAD blob` = 修改前（HEAD `4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0`）的 blob 哈希；新文件为 ABSENT。
+行数为 `wc -l`。
+
+新增
+----
+src/provider/directive/abstract/directive-store.ts
+  lines 38  git hash-object 16d2252421c60f028b5687558ba13602d55eed53
+  sha256 b083464aeeea60f1277c2b3dfb05571f6b4d4514ef6d7142236d3bd99253bea4
+  HEAD blob ABSENT
+src/provider/directive/impl/file-store.ts
+  lines 80  git hash-object 3760b1e9d4e04a1b0e901a67ccfeff713342859d
+  sha256 4317b0617581e1c68e53e829ead7bf0f8ff0d6107d75971ff27dc9d5fa7b5325
+  HEAD blob ABSENT
+src/provider/directive/public/directive-store.ts
+  lines 13  git hash-object f4d8e61c51a831068b5f8fd12d68a773017c92dd
+  sha256 46d0396aa838b0d51b31b5a5a2d602eb7b2a7756e74267771c20836f69133bb4
+  HEAD blob ABSENT
+src/service/directive/abstract/directive-service.ts
+  lines 111  git hash-object 4ab939ff8a56f65af0c10d4174f7239239613706
+  sha256 f10ae8cfc127b7c7f8f09423e162561b9739946e4d99a7ccbcbfe3841ea61364
+  HEAD blob ABSENT
+src/service/directive/impl/directive-service.ts
+  lines 700  git hash-object 0946afaaa7ad92f9c864399ca055b92bbe11efd0
+  sha256 e7e183bd767679b43a14eef2f8a1c50d7fe7b7b0b53217ff6ece06b24425a661
+  HEAD blob ABSENT
+src/service/directive/public/directive-service.ts
+  lines 15  git hash-object b7df6f622b07493778402c9642ea5bd125308547
+  sha256 e80a407c3f9b555f771ac98defabce9471376c69117b3f32123527839d8cebed
+  HEAD blob ABSENT
+src/pipeline/orchestration/customer-directive.ts
+  lines 705  git hash-object 9202cec3eb3a7aec724ba825706a470b7fdaa522
+  sha256 601cf960932a841282cc187008fd68b8f8e3e64a336db1d99c5ddd4b7321aeb8
+  HEAD blob ABSENT
+test/编排/customer-directive.test.ts
+  lines 1181  git hash-object 40d0c2c8d368871d0f3fadd248122c35115a7465
+  sha256 70da2871cf0ad5cce91b2852217908852b955bc188ea993a1a7e014b3b9b0889
+  HEAD blob ABSENT
+test/编排/customer-directive-gate.test.ts
+  lines 497  git hash-object 793d5d86cc3cf594cf1af514ace10bf60dfe2247
+  sha256 446df4101efeb388542994410c201cbd6257c05278790be3b99262c3959131ed
+  HEAD blob ABSENT
+
+修改
+----
+src/common/编排/task-state.ts
+  lines 790  git hash-object ff22aebcab8fc99775f51b864d09b90105626339
+  sha256 39f178d99f341c873dbadbca4eb8ad94a0b557775173405e5921bbb4db85d672
+  HEAD blob b28ba7e1317ab5aab33f2c3e53b54c20104fa9c2
+src/common/编排/version-decision.ts
+  lines 512  git hash-object c9d8482bd73be66e0f937c9d0e42dfc47a3529dc
+  sha256 21505daab1e97e5687867b140d221fbbaa8aa1c964ca889be7c6323854d3b007
+  HEAD blob 9fe716ad41c43c153ce6da464f2382b072c54bc8
+src/common/编排/run-manifest.ts
+  lines 888  git hash-object 26d7df1c21c11f4ecc7a464e3d11fccc8dcec63c
+  sha256 2a397ef4c80c7c9d33054128159f866cfb160e9c72183f7d1cdc1aad5f996f97
+  HEAD blob 81e0e03e516b930a882045c5ea9b90602663b844
+src/common/编排/shell-gate.ts
+  lines 1478  git hash-object cc6487d1d620b76ee648c4347ba1083908b2f93c
+  sha256 f3a6e74b2302d8e67a9031693b869e4b69e90449b26abbd6eab1be18d2c5496f
+  HEAD blob 1b184445ae2cb27bd364077a8bc057d5e81c7e58
+src/common/编排/shell-audit.ts
+  lines 238  git hash-object 98f28dd204ad37015a374728673301fb96ef8d06
+  sha256 cbeccbba670a39865e742d5bd7244ee0f2061099752b56c8070bf33fd7d05acd
+  HEAD blob d814c07b1f51e74144325f3f3352ba381c4d07e9
+src/pipeline/orchestration/run-role.ts
+  lines 2491  git hash-object b7d3e1445a2b24f2b94d1efa455ed9f71ed4a146
+  sha256 fae1c81f5ac8a97fd1c60db296d7cfe1a02653e1ab1c77283d84472da951fda6
+  HEAD blob c31d676e8496f067ab321bf9f879c90b6adb21e6
+src/pipeline/orchestration/govern-session.ts
+  lines 528  git hash-object ed2df874d26e4ac39572aa75c215abe3025f2dbd
+  sha256 07f583998cce5398156a022e65dbaa3242b5a9d178e38f97799fcbb055ecb769
+  HEAD blob 48b06e61218806efebc3507eba99e89a77cec589
+src/pipeline/orchestration/shell-arming.ts
+  lines 463  git hash-object 6a4b48cb3357840ef47bb4dfde484f9a20871d49
+  sha256 e53d6716fafbaf8c98c32f04716a412d1ed407a4eea698b0b28b6ec08c70e7a1
+  HEAD blob c38930436869afc71411671bb4721d526945cf6b
+test/编排/task-state.test.ts
+  lines 560  git hash-object 4d810681637d48c0516eb132758234ee84e33f0a
+  sha256 cf586ef094dd2a2ab2b0fcf8032498ec9f2dd72dd84d35bb949f5039226200d6
+  HEAD blob 5a894e8ec3e92a31e42e1b7fb8e65498797e894a
+test/编排/version-decision.test.ts
+  lines 455  git hash-object a2b02c71f9f871c338aa2839d88a29a2d2c85b17
+  sha256 878cec0ae9b8fcc2e615f10c211ded5ee5fa659e3834aa593d1d1b8da7453251
+  HEAD blob 2702ea869156832bfae588c03a5ff73654eb9133
+test/编排/run-manifest.test.ts
+  lines 251  git hash-object 863427bf96053f8b8eb977c44057d5374bdd46d9
+  sha256 e11e6bf81f384f507355065a9aa9847381a4c04f21b0fe4671053f2576319754
+  HEAD blob 9c32130a3a12fd34c28b02918b75353183ef7293
+
+A1/A2/A3 冻结件（B1 未修改；写前=写后，见 00 基线）
+------------------------------------------------
+src/model/directive-marker.ts c0978df25b9431b5cec0b08a110ef19045900619
+src/model/directive.ts 056fe6bb3f95f269514d5de4ec903d71031b9f82
+src/model/runtime.ts b92891873eb9623f828b4dd17731469db0558c53
+src/model/project-state.ts 0c4582e2cc87cf5cac8975ba879f8ffd5b10ce49
+test/runtime-core/directive-marker.test.ts 8d506c8125909f0f66f26946b660003f538264d8
+test/runtime-core/directive-contract.test.ts 4be84c2ada93578f25f359a259535ea678dc96c4
+src/common/shared/jsonl-ledger.ts 223d32c6e46bac41200406546e33e86767ac0d82
+test/项目管理/shared/jsonl-ledger.test.ts f879ebb5944bc255295c263b30c8479c39a6c63b
+src/common/shared/i18n/messages/zh-CN.ts 7511b17bcd71b1e3a598f3fb864ba4c6ea0ea351
+src/common/shared/i18n/messages/en-US.ts b4d352513b4db535a1de8501efa883c63b255026
+test/项目管理/shared/i18n.test.ts 1de9f5a37e71454110384a3f74eed729bccd36c6

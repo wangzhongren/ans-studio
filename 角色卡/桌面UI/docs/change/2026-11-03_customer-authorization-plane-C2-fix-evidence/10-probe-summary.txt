@@ -1,0 +1,8 @@
+report.failures: 0
+checks: 64 value=true: 64 value=false: 0
+screenshots: 16
+console: 0 csp: 0
+windowSize: 1360x860
+head: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+ledger.events: 9 bytes: 3356
+S5_PANEL_REVOKE_RECEIPT: {"name":"S5_PANEL_REVOKE_RECEIPT","value":true,"detail":{"clicked":true,"receipt":"已撤销审批指令 #d-1","last":"已撤销审批指令 #d-1","notes":["已记录审批指令 #d-1","已记录审批指令 #d-2","已记录决策指令 #d-3","客户指令 #d-3 已代选推荐项 方案 A（客户指令，不是客户本人点击）","已记录决策指令 #d-4","决策指令冲突（d-3、d-4）：未代选；已改为由客户在卡上选择。","已撤销决策指令 #d-3","已撤销决策指令 #d-4","已记录决策指令 #d-7","决策指令 #d-7 未匹配到唯一选项：未代选；已改为由客户在卡上选择。","已撤销审批指令 #d-1"]}}

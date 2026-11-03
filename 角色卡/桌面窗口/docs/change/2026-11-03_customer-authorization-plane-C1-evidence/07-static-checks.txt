@@ -1,0 +1,19 @@
+== app/renderer changes (expect empty) ==
+== C1 app changes ==
+ M app/desktop/customer-input.ts
+ M app/desktop/interface.ts
+ M app/desktop/requirement-change.ts
+ M app/desktop/session.ts
+ M app/main.ts
+ M app/preload.cjs
+?? app/desktop/directive-input.ts
+== C1 test/桌面应用 changes ==
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/version-decision.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/directive-decision.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/directive-input.test.ts"
+== skip/todo in new tests (expect none) ==
+none (grep exit 1)
+== package.json / lock changes (expect empty) ==
+== directive-input.ts 不占 shell 卡槽 / 客户卡队列 ==
+0

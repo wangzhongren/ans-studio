@@ -1,0 +1,74 @@
+=== B0 baseline snapshot (customer-authorization-plane) ===
+recorded_at: 2026-11-03T13:33:03+0800
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+--- git rev-parse HEAD ---
+4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+--- git branch --show-current ---
+feat/customer-authorization-plane
+--- git status --porcelain -- src app test ---
+(end src/app/test status; empty means no changes)
+--- git status --short (full) ---
+ M docs/scheduling/memo.md
+?? docs/communication/2026-11-03_intent_customer-authorization-plane.md
+?? docs/planning/2026-11-03_design_customer-authorization-plane.md
+?? docs/planning/2026-11-03_review_customer-authorization-plane.md
+?? docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md
+--- git diff --stat ---
+ docs/scheduling/memo.md | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+--- git diff --cached --name-only ---
+(end staged; empty means none)
+
+--- node / npm ---
+Node: v24.22.1
+npm: 11.19.1
+--- OS / shell ---
+MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+SHELL=/bin/bash.exe
+
+--- dependency state (pre-install) ---
+node_modules: ABSENT
+package-lock.json: EXISTS (316123 bytes)
+
+--- input documents ---
+653	37e6bd0dcf63a29fde654ded9a1425272692b95483bab5c276cbdd16f4122fe3	docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md
+1199	7875ad6afd0331b658b99028bb3674096feede674165d56a6f3ac2fd1b74c229	docs/planning/2026-11-03_design_customer-authorization-plane.md
+132	d258844527c382aeb1b575f9f0401a87422d557acc94fe2ea181924c6b5aa1b3	docs/planning/2026-11-03_review_customer-authorization-plane.md
+120	e0b89c2645f7119241ca8d88b4c60f84ea782b6ba79b361a6e0b19d1ee85374f	docs/communication/2026-11-03_intent_customer-authorization-plane.md
+
+--- affected suite file counts (top-level *.test.ts) ---
+test/runtime-core: 37
+test/编排: 55
+test/桌面应用: 53
+test/桌面UI: 51
+test/项目管理/shared: 10
+
+--- full test inventory ---
+existing *.test.ts total: 394
+excluding write-sequencing.test.ts: 393
+excluded file exists: test/pi-adapter/write-sequencing.test.ts
+
+--- Electron / e2e facts (pre-install) ---
+node_modules/electron: ABSENT (node_modules not installed yet)
+node_modules/electron/dist/electron.exe: ABSENT (pre-install)
+test/桌面应用/e2e/main.mjs: EXISTS (2859 lines)
+app/renderer/dist/index.html: ABSENT (pre-build)
+
+--- package.json scripts ---
+{
+  "start": "node bin/ans.js",
+  "doctor": "node bin/ans.js doctor",
+  "demo": "node bin/ans.js role run 编排 --task T-1",
+  "app": "electron app/main.ts",
+  "test:assembly": "node --test \"test/装配/**/*.test.ts\"",
+  "typecheck": "tsc --noEmit",
+  "typecheck:renderer": "tsc -p app/renderer/tsconfig.json",
+  "dev:renderer": "vite --config vite.config.ts",
+  "build:renderer": "vite build --config vite.config.ts",
+  "preview:renderer": "vite preview --config vite.config.ts",
+  "package": "electron-builder --config electron-builder.yml",
+  "package:local": "npm run build:renderer && electron-builder --config electron-builder.yml --publish never -c.directories.output=release-output/local",
+  "verify:local": "node test/装配/verify-local-package.mjs",
+  "release:prepare": "node src/common/装配/release-prepare.mjs",
+  "release:verify": "node src/common/装配/release-verify.mjs"
+}

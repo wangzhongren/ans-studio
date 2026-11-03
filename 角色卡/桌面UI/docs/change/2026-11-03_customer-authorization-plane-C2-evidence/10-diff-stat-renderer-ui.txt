@@ -1,0 +1,5 @@
+ app/renderer/src/chat/ipc.ts           |  45 ++++
+ app/renderer/src/shell/Composer.tsx    | 142 ++++++++++++-
+ app/renderer/src/shell/ConfirmCard.tsx | 203 ++++++++++++++++++
+ app/renderer/src/shell/shell.css       | 376 +++++++++++++++++++++++++++++++++
+ 4 files changed, 763 insertions(+), 3 deletions(-)

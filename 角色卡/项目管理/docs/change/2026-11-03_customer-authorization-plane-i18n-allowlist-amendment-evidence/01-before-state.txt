@@ -1,0 +1,28 @@
+任务：2026-11-03-customer-authorization-plane — i18n allowlist 闸门 2 增补（W-5 A）
+采集时间（UTC）：2026-11-03T08:31:13Z
+worktree：C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+基线 HEAD：4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+Node：v24.22.1
+
+allowlist 写前（test/项目管理/shared/i18n-guard-allowlist.ts）：
+- 行数：91
+- SHA-256：7058da44715383a2314246edd0ee2b291a0c563b1e281ec4dbb1f4dcaf10b630
+- 实际条目数：20（头部历史注释「当前保留 22 条」为既有陈旧计数，不在本次写权范围，未改动）
+
+输入文档哈希：
+de5c9d36f6a781475700104f2d6bceb54c00ad46f43456e45024870d5aad7b06 角色卡/项目管理/role-card.md
+6f75bee458e672e8b4be78b17e4910ee13ba8f50057ce26e30cee012fba45d5c 角色卡/项目管理/boundary.md
+7058da44715383a2314246edd0ee2b291a0c563b1e281ec4dbb1f4dcaf10b630 test/项目管理/shared/i18n-guard-allowlist.ts（写前）
+91e8d14323628e9a8d16721f6b059258eb6e6aa312fe8b1d1e16125ca7c6c7b6 test/项目管理/shared/i18n-guard.test.ts
+502fe5b4c828b8c76da0d0f1ff94083886f9931eeb56250ebe789a59cf8f8956 test/项目管理/shared/i18n-guard-scanner.ts
+62b04e8c42bf1548606e9412c981e42baca073324980e76d23c6eff220e1a80a test/项目管理/shared/i18n.test.ts（写前）
+914868d83015e331b412fda9a6c86040fc20a6f1e5dbc22b75c706728d6f4caa app/desktop/directive-input.ts（写前）
+ecac818c705b97203aa6b711c34934be0bc324f21f9e24ed949ebf915ecd56b8 docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md（664 行，含 §十三）
+3faef8eec59425816f2794b6b2397af19ae57211a48e76488280b300c87d878c 角色卡/项目管理/docs/change/2026-11-03_customer-authorization-plane-P1-review.md（397 行）
+31d3064a99739b61e452321d3c73ba43429db419ea490f877cdb48a97cefbd32 docs/communication/2026-11-03_intent_customer-authorization-plane.md（199 行，含「i18n 守卫裁决记录」W-5 A）
+
+版本引用说明：任务输入引用的沟通记录为 174 行 / 80b9170d…；磁盘当前为 199 行 / 31d3064a…，其中第 194–199 行为 W-5 A 裁决记录（追加晚于该引用），裁决内容一致。
+
+写前测试（原始输出见 02/03）：
+- i18n-guard：退出码 1；tests 6 / pass 5 / fail 1；scanned=136 allowlisted=20 violations=1；唯一失败 `app/desktop/directive-input.ts:324:10 撤销`。
+- i18n：退出码 0；tests 11 / pass 11 / fail 0。

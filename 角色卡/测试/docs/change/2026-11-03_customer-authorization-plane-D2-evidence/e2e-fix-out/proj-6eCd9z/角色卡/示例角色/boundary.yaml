@@ -1,0 +1,4 @@
+entries:
+  - kind: file
+    path: src/x.ts
+    purpose: t

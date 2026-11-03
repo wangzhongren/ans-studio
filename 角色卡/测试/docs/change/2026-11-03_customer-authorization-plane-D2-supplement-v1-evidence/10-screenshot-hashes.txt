@@ -1,0 +1,23 @@
+# D2-supplement screenshot inventory
+# generated: 2026-11-03T11:35:51.726Z
+# columns: status	path(bytes relative)	bytes	dimensions	sha256
+# count: 16
+# expected window: 1360x860 (BrowserWindow useContentSize)
+# non-1360x860: 0
+
+OK	bad-ledger/run/B1-panel-ledger-errors.png	81887	1360x860	47b50c71dde44d691fb64b66983413dfd22e7a4f5196e687c88a7587e69224ee
+OK	bad-ledger/run/B2-ordinary-chat-after-bad-ledger.png	59902	1360x860	4bcd0c2c3fa6712cb818005690dc53a43e0925b9ef2adbc88fdf02ee4656351d
+OK	bad-ledger/run/B3-decision-card-normal-path.png	77527	1360x860	2d23bca6af66094bf94ed4ae88c15249fd098e14b51f101c14a4fdb13902f939
+OK	main/S0-initial-chat.png	63213	1360x860	5759371e56159b1149cb65b83dec3a0d04fa084737db524d842764ad07b30c2e
+OK	main/S1a-near-miss-approval-clerk.png	61353	1360x860	cd2a0684ab026aefaabae167f4644cae4b1f8217c801326b49f4023cab884f7b
+OK	main/S1b-mid-body-marker.png	67018	1360x860	18b87a135376915613cef20e34c417adef89257a142fd34b62435cbb348ade9f
+OK	main/S1c-fullwidth-marker.png	73920	1360x860	31bb1edd65f814010fbe32f1a6545455b227965abc732020b870cf6f2669f632
+OK	main/S1d-boundary-marker.png	76323	1360x860	42ea4deaba6b68cddf482a224d13ea25ffbb1a6667e4a815263f6aa3faaade9d
+OK	main/S1e-hit-dialog-open-no-bubble.png	82710	1360x860	d66ecfa512cc39490b9a33a4709568b15c0dd0f481fc495d595945ec63b4e0f1
+OK	main/S2-empty-body-panel.png	82910	1360x860	1b82e0c4d217cce61c1996a416df97d3fd076b1f700dbfcf31034f5137179a99
+OK	main/S3a-image-attached.png	76139	1360x860	d35d1f26f59e41482f49c867b00493d21a3dfe893fb45822fcbef0cb257a4435
+OK	main/S3b-image-directive-rejected.png	78856	1360x860	3a42aba037c3c7d31e068276027d91f0bffffa46df88b8d27d2ee5d964ac765d
+OK	main/S4a-exact-example-actual-behavior.png	83190	1360x860	3d7e4da59bceee283e53ef8ab91791e90a7dc9a2eb01a62cf27e05bcf4f9720a
+OK	main/S4b-unrecognized-fragments-panel.png	85027	1360x860	d9034d554bd2cbd7e7e274cb63cd4db65639ee112936fc4fa778341931926ac6
+OK	restart/run1/R1-panel-before-restart-active.png	83107	1360x860	8961eaf955dfa3ca83637c15abc739a1b2ec84f1fae0ab24d7207383e8ad61f9
+OK	restart/run2/R2-panel-after-restart-expired.png	79767	1360x860	e87996ea7ae8ac17b7345eb0480d8350e84d7d75563c8c3f52aa175fbf8cc5b9

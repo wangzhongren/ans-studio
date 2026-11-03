@@ -1,0 +1,50 @@
+B1 失败分类与计数（2026-11-03）
+====================================
+
+命令
+----
+基线（写前）：node --test --test-concurrency=1 "test/编排/*.test.ts"
+结果：694 tests / 693 pass / 1 fail / 0 skipped / 0 todo，exit 1
+失败：test/编排/shell-authorized-routine.test.ts:184
+  「node test 外指符号链接路径不获委托；项目内测试路径获委托」
+  EPERM: operation not permitted, symlink（Windows 环境既有失败，B0 基线同项）
+
+B1 后：node --test --test-concurrency=1 "test/编排/*.test.ts"
+结果：737 tests / 736 pass / 1 fail / 0 skipped / 0 todo，exit 1
+失败：同一项 shell-authorized-routine.test.ts:184 EPERM（既有 Windows 环境失败）
+差异：+43 tests / +43 pass / 0 新增确定性失败 / 0 新增 skip。
+
+新增 43 例构成
+--------------
+- test/编排/customer-directive.test.ts：29 例（Provider/Service/Pipeline/task-state 等价/Q9 回调/类型锁）
+- test/编排/customer-directive-gate.test.ts：11 例（审批顺序矩阵/审计/接线）
+- test/编排/task-state.test.ts：+1 例（Q9 directive + directiveId）
+- test/编排/version-decision.test.ts：+1 例（Q9 directive 映射/collect）
+- test/编排/run-manifest.test.ts：+1 例（Q9 applyRunChange directive + directiveId）
+
+Typecheck
+---------
+写前：npm run typecheck → exit 1，唯一错误：
+  src/common/编排/version-decision.ts(435,7): error TS2322:
+  Type '"customer" | "directive" | "judge"' is not assignable to type '"customer" | "judge"'.
+B1 后：npm run typecheck → exit 0（无输出）。
+说明：B1 在 version-decision.ts 中为旧二值调用方保留窄重载（`VersionDecisionAnswerInputNarrow`
+→ `VersionDecisionAnswerPlanNarrow`），使 C1 更新前的 app/desktop/session.ts 仍按二值编译；
+C1 把 `decidedBy` 扩为三值后自动选择宽签名，`decidedBy:"directive"` 进入映射。
+B1 未修改 app/**。
+
+诚实披露（工具瞬时崩溃，非类型错误）：在 task-state 的等价返回值调整后的一次 typecheck 运行
+出现 TS-go checker 内部 panic（exit 2；栈在 microsoft/typescript-go internal/checker/getConditionalType，
+无 TS 诊断输出）。随后**原命令复跑 exit 0**；本文件与 04 记录的是复跑成功结果。该崩溃不可稳定复现，
+未改任何类型以绕过（B1 代码在崩溃前后逐字一致）。
+
+受影响跨层/上游测试（只读复跑，非 B1 主责）
+------------------------------------------
+node --test --test-concurrency=1
+  test/runtime-core/directive-marker.test.ts
+  test/runtime-core/directive-contract.test.ts
+  test/项目管理/shared/jsonl-ledger.test.ts
+  test/项目管理/shared/i18n.test.ts
+  test/桌面应用/run-change.test.ts
+  test/桌面应用/version-decision.test.ts
+结果：69 tests / 69 pass / 0 fail / 0 skipped（exit 0）。

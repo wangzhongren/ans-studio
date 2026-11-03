@@ -1,0 +1,35 @@
+captured_at: 2026-11-03T14:55:42+08:00
+=== marker imports / require / node: (expect none)
+NONE
+=== directive.ts import lines (expect 3: marker type, runtime type, runtime value)
+12:import type { DirectiveMarkerTarget } from "./directive-marker.ts";
+13:import type { GovernanceFlowId } from "./runtime.ts";
+15:import { GOVERNANCE_SLUG_PATTERN } from "./runtime.ts";
+=== directive.ts import sources
+12:import type { DirectiveMarkerTarget } from "./directive-marker.ts";
+13:import type { GovernanceFlowId } from "./runtime.ts";
+15:import { GOVERNANCE_SLUG_PATTERN } from "./runtime.ts";
+=== runtime.ts / project-state.ts must not define CUSTOMER_DIRECTIVE_* (expect none)
+NONE
+=== only one parseDirectiveMarker implementation
+src/model/directive-marker.ts:34:export function parseDirectiveMarker(text: string): DirectiveMarkerHit | undefined {
+test/runtime-core/directive-marker.test.ts:131:  assert.match(source, /export function parseDirectiveMarker/);
+=== runtime.ts must not import directive model (expect none)
+NONE
+=== project-state.ts must not import runtime.ts (expect none)
+NONE
+=== by unions: RequestResolvedEvent includes directive; only ApprovalResolvedEvent stays customer|judge (out of scope)
+860:  by: "judge" | "customer" | "directive";
+905:  by: "judge" | "customer";
+--- ApprovalResolvedEvent context (must stay narrow)
+  kind: "approval.resolved";
+  approvalId: string;
+  by: "judge" | "customer";
+  operatorId?: string;
+=== Q9 fields present
+863:  directiveId?: string;
+966:  directiveId?: string;
+=== GOVERNANCE_SLUG_PATTERN single definition in Model
+src/model/runtime.ts:390:export const GOVERNANCE_SLUG_PATTERN = "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$";
+=== no @边界 string literal marker in directive.ts
+NONE

@@ -1,0 +1,11 @@
+allowlist 写后（test/项目管理/shared/i18n-guard-allowlist.ts）：
+- 行数：93（+2）
+- SHA-256：f31c0b07c639c5bcb83ebe9780e1b6c155eca4eef62b341fc00b4a1a54d2180a
+- 条目数：21（20 → 21）
+- diff：2 insertions(+), 0 deletions(-)（见 04-allowlist.diff）
+- 新增位置：`app/desktop/chat-adapter.ts` 之后、`app/desktop/interface.ts` 之前（字典序）
+- 未改其他条目/文件。产品 `app/desktop/directive-input.ts` 写后 SHA-256 仍为 914868d83015e331b412fda9a6c86040fc20a6f1e5dbc22b75c706728d6f4caa；`test/项目管理/shared/i18n.test.ts` 仍为 62b04e8c42bf1548606e9412c981e42baca073324980e76d23c6eff220e1a80a（均未改动）。
+
+写后测试（原始输出见 06/07）：
+- i18n-guard：退出码 0；tests 6 / pass 6 / fail 0；scanned=136 allowlisted=21 violations=0。
+- i18n：退出码 0；tests 11 / pass 11 / fail 0；key 分区计数 ui 1090 / main 591 / shared 62 / preferences 3，总计 1746（与写前一致）。

@@ -1,0 +1,22 @@
+# D2-supplement environment (test role)
+# recorded: 2026-11-03T19:28:27+08:00
+# timezone: Asia/Shanghai (+08:00)
+# worktree: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane
+# HEAD: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+# branch: feat/customer-authorization-plane
+# node: v24.22.1
+# npm: 11.19.1
+# electron: v44.7.0 (node_modules/electron/dist/electron.exe)
+# OS: Windows 11 Pro 10.0.26300
+# shell: Git Bash / MINGW64 (bash 5.3.15(2)-release)
+# DEBUG=<unset>
+# ANS_DEBUG=<unset>
+# ELECTRON_ENABLE_LOGGING=<unset>
+# window: BrowserWindow useContentSize 1360x860, frame:false
+# screenshots: PNG stills only; no screen recording
+# candidate before: 78abac830377007ccb2b27b72c460a197cfafe0ae8d541fbac8f6026bd0d7bfe (54/54, unexpected 0, missing 0, mismatch 0; see 01-candidate-identity-before.txt)
+# candidate frozen reference: 角色卡/测试/docs/change/2026-11-03_customer-authorization-plane-D2-evidence/09-candidate-identity-fix.txt
+#   sha256 49cfc38d6ee6eaa4fab4b69b9a368e40acb19517d645b5314c57e481041a307a / 134 lines
+# build: app/renderer/dist produced by `npm run build:renderer` (ignored, non-candidate)
+# scenario data root: 角色卡/测试/docs/change/2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence/
+# temporary userData/projects live under this evidence directory only; no customer data is used.

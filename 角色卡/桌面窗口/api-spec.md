@@ -512,3 +512,30 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
 - 失败如实：审批卡通道不可用/未呈现 ⇒ `unavailable`（或卡校验拒发时 `rejected`）+ 票据 `failed`，message 明说「未提交独立审批」；票据写失败（呈现前）⇒ `rejected`、零卡。**不向主理投原始申请任务、不写 `customer.decision`/治理账本、不改变任何写权**。
 - 零回归：`requestClarification`（仍仅提案）与 `viewImage`（全部角色）注入矩阵/语义不变；其他内置角色/项目角色的 decision 卡仍拒发。`app/main.ts`/`preload.cjs` 无需改。
 - 证据（实施后）：`test/桌面应用/acceptance-dispatch.test.ts` 9 例（校验矩阵、审批卡形状/通道、批准→主理执行任务、reject 回执、卡拒发、幂等含已批准、通道不可用重试、忙时入队、统筹发起 + 注入矩阵）；`test/桌面应用/operator-wiring.test.ts` 2 例（统筹/提案角色白名单与结构校验、真实通道呈现 + `onPresented`）；见本批变更/修复记录。
+
+## 客户授权平面（customer directive，2026-11-03 C1）
+
+**C1 冻结；C2 只按此消费。** 完整冻结声明见
+`docs/change/2026-11-03_customer-authorization-plane-C1-implementation.md` 与
+`docs/change/2026-11-03_customer-authorization-plane-C1-evidence/08-freeze-statement.txt`。
+
+| IPC 通道 | 方向 | 冻结载荷/回包 |
+| --- | --- | --- |
+| `directive:confirm-request` | 主→渲 | `{version:1, request:{id,target:"approval"\|"decision",rawText,projectRoot,roleId,runtime?,prefill:{action,scope,until,unrecognized},highRisk:{reasons},confirmable,decisionGroupEnabled}}` |
+| `directive:confirm-response` | 渲→主 invoke | `{id,decision:"confirm"\|"cancel",values?:{action,scope,until,acknowledged?}}` → `{ok,error?,expired?}` |
+| `directive:list` | 渲→主 invoke | `{projectRoot?}` → `{version:1,ok:true,directivesEnabled:true,projectRoot,approval,decision,ledgerErrors}` 或 `{ok:false,error}` |
+| `directive:revoke` | 渲→主 invoke | `{id,target,projectRoot?,roleId?,runtime?}` → `{ok:true,id,target}` 或 `{ok:false,error}` |
+| `directive:state` | 主→渲 | 与 `directive:list` 成功视图同形（`version:1`/`directivesEnabled:true`） |
+
+- `DirectiveListView` = B1 冻结 `{active,consumed,revoked,expired}`；`directive:list`/`state` 不新增跨 target 字段、不跨项目聚合。
+- preload 白名单：`onDirectiveConfirmRequest(cb)`、`directiveConfirmRespond(input)`、`listDirectives(input)`、
+  `revokeDirective(input)`、`onDirectiveState(cb)`（注册时同步回放 `directive:state` 缓存；不暴露 Node 能力）。
+- 命中 `@审批`/`@决策`：`sendSession` 先解析标记，命中绝不 `manager.send`/`handle.send`；带图拒绝；target 取卡载荷
+  `{projectRoot,roleId,runtime}`，缺失/非法/跨项目 fail-closed。未命中路径逐字不变。
+- `SendResult.directive?: {id,target}` / `directiveCancelled?: true`；决策消费者 `operatorId:"directive:<id>"` +
+  `CustomerInputOutcome.directive:{id,action}`；`request.presented.to` 不扩展（W-6）。
+- 输入式撤销 `撤销 #d-<seq>`：确认后调 `runtime.revoke(id,target)`（`submitFromInput` 只创建）；面板撤销同一服务路径。
+- 应用运行级 `sessionId`：`app/main.ts` 启动生成一次，项目切换不重置；`directive:state` 在 `did-finish-load` /
+  `app:list-project` 成功 / `app:recovery-ready` 主进程先行推送；关窗 `cancelAll`、项目切换取消未决面板。
+- 实现/证据：`app/desktop/directive-input.ts`、`test/桌面应用/directive-input.test.ts`、`directive-decision.test.ts`；
+  目标 22/22、受影响 26/26、桌面 522/522、`npm run typecheck` exit 0（`implemented-unverified`）。

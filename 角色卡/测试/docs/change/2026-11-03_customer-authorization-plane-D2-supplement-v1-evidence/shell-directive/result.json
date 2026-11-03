@@ -1,0 +1,426 @@
+{
+  "mode": "directive",
+  "startedAt": "2026-11-03T11:31:29.045Z",
+  "repo": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane",
+  "root": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive",
+  "project": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+  "sessionId": "supplement-shell-session-1793705489045",
+  "checks": [
+    {
+      "name": "SUBMIT_OK",
+      "value": true,
+      "detail": {
+        "ok": true,
+        "id": "d-1",
+        "target": "approval"
+      }
+    },
+    {
+      "name": "SUBMIT_PREFILL",
+      "value": true,
+      "detail": {
+        "action": {
+          "kind": "allow",
+          "resource": {
+            "type": "shell",
+            "command": "npm install",
+            "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project"
+          }
+        },
+        "scope": {},
+        "until": "once",
+        "unrecognized": []
+      }
+    },
+    {
+      "name": "FACTS_ACTIVE_AFTER_CREATE",
+      "value": true,
+      "detail": {
+        "ledgerErrors": 0,
+        "active": [
+          {
+            "id": "d-1",
+            "seq": 1,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm install",
+                "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project"
+              }
+            },
+            "scope": {},
+            "until": "once"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HARD_FLOOR_DENIES",
+      "value": true,
+      "detail": {
+        "allow": false,
+        "reason": "命中 c 硬拒规则（ruleset:supplement-ruleset）",
+        "by": "ruleset:supplement-ruleset"
+      }
+    },
+    {
+      "name": "HARD_FLOOR_DOES_NOT_CONSUME",
+      "value": true,
+      "detail": {
+        "ledgerErrors": 0,
+        "active": [
+          {
+            "id": "d-1",
+            "seq": 1,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm install",
+                "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project"
+              }
+            },
+            "scope": {},
+            "until": "once"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DIRECTIVE_ALLOW_ONCE",
+      "value": true,
+      "detail": {
+        "allow": true,
+        "by": "directive:d-1",
+        "directive": {
+          "id": "d-1",
+          "scope": "once"
+        }
+      }
+    },
+    {
+      "name": "ONCE_CONSUMED",
+      "value": true,
+      "detail": {
+        "ledgerErrors": 0,
+        "active": []
+      }
+    },
+    {
+      "name": "LIST_CONSUMED",
+      "value": true,
+      "detail": {
+        "consumed": [
+          "d-1"
+        ]
+      }
+    },
+    {
+      "name": "SECOND_CALL_FALLS_BACK_TO_NORMAL_CHAIN",
+      "value": true,
+      "detail": {
+        "allow": true,
+        "by": "pm:无会话 → operator:supplement-operator"
+      }
+    },
+    {
+      "name": "LEDGER_CREATED_AND_CONSUMED_ONCE",
+      "value": true,
+      "detail": {
+        "consumedEvents": [
+          {
+            "version": 1,
+            "kind": "directive.consumed",
+            "id": "d-1",
+            "seq": 2,
+            "at": "2026-11-03T11:31:29.145Z",
+            "via": {
+              "toolCallId": "supplement-directive-1"
+            }
+          }
+        ],
+        "events": [
+          {
+            "kind": "directive.created",
+            "id": "d-1",
+            "seq": 1,
+            "until": "once"
+          },
+          {
+            "kind": "directive.consumed",
+            "id": "d-1",
+            "seq": 2,
+            "via": {
+              "toolCallId": "supplement-directive-1"
+            },
+            "at": "2026-11-03T11:31:29.145Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AUDIT_FILE_EXISTS",
+      "value": true,
+      "detail": {
+        "lines": 3,
+        "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project\\docs\\audit\\shell-gate.jsonl"
+      }
+    },
+    {
+      "name": "AUDIT_HARD_FLOOR_RECORD",
+      "value": true,
+      "detail": {
+        "timestamp": "2026-11-03T11:31:29.143Z",
+        "toolCallId": "supplement-hardfloor-1",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "conclusion": "deny",
+        "branch": "c-deny",
+        "by": "ruleset:supplement-ruleset",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell"
+      }
+    },
+    {
+      "name": "AUDIT_DIRECTIVE_RECORD",
+      "value": true,
+      "detail": {
+        "timestamp": "2026-11-03T11:31:29.146Z",
+        "toolCallId": "supplement-directive-1",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "conclusion": "allow",
+        "branch": "directive:allow",
+        "by": "directive:d-1",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell",
+        "directive": {
+          "id": "d-1",
+          "scope": "once"
+        }
+      }
+    },
+    {
+      "name": "AUDIT_FALLBACK_RECORD",
+      "value": true,
+      "detail": {
+        "timestamp": "2026-11-03T11:31:29.147Z",
+        "toolCallId": "supplement-fallback-2",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "conclusion": "allow",
+        "branch": "b-unavailable→a-allow",
+        "by": "pm:无会话 → operator:supplement-operator",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell"
+      }
+    },
+    {
+      "name": "NO_FAILURES",
+      "value": true,
+      "detail": {
+        "failures": 0
+      }
+    }
+  ],
+  "runtime": {
+    "submitText": "@审批 允许 shell \"npm install\" once",
+    "submitted": {
+      "ok": true,
+      "id": "d-1",
+      "target": "approval"
+    },
+    "factsBefore": {
+      "ledgerErrors": 0,
+      "active": [
+        {
+          "id": "d-1",
+          "seq": 1,
+          "target": "approval",
+          "action": {
+            "kind": "allow",
+            "resource": {
+              "type": "shell",
+              "command": "npm install",
+              "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project"
+            }
+          },
+          "scope": {},
+          "until": "once"
+        }
+      ]
+    }
+  },
+  "gateCalls": [
+    {
+      "call": "hard-floor",
+      "req": {
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "toolCallId": "supplement-hardfloor-1"
+      },
+      "result": {
+        "allow": false,
+        "reason": "命中 c 硬拒规则（ruleset:supplement-ruleset）",
+        "by": "ruleset:supplement-ruleset"
+      }
+    },
+    {
+      "call": "directive-allow",
+      "req": {
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "toolCallId": "supplement-directive-1"
+      },
+      "result": {
+        "allow": true,
+        "by": "directive:d-1",
+        "directive": {
+          "id": "d-1",
+          "scope": "once"
+        }
+      },
+      "operatorCalls": 0
+    },
+    {
+      "call": "normal-chain-fallback",
+      "req": {
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "toolCallId": "supplement-fallback-2"
+      },
+      "result": {
+        "allow": true,
+        "by": "pm:无会话 → operator:supplement-operator"
+      },
+      "operatorCalls": 1
+    }
+  ],
+  "audit": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project\\docs\\audit\\shell-gate.jsonl",
+    "exists": true,
+    "bytes": 1573,
+    "lines": 3,
+    "records": [
+      {
+        "timestamp": "2026-11-03T11:31:29.143Z",
+        "toolCallId": "supplement-hardfloor-1",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "conclusion": "deny",
+        "branch": "c-deny",
+        "by": "ruleset:supplement-ruleset",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell"
+      },
+      {
+        "timestamp": "2026-11-03T11:31:29.146Z",
+        "toolCallId": "supplement-directive-1",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "conclusion": "allow",
+        "branch": "directive:allow",
+        "by": "directive:d-1",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell",
+        "directive": {
+          "id": "d-1",
+          "scope": "once"
+        }
+      },
+      {
+        "timestamp": "2026-11-03T11:31:29.147Z",
+        "toolCallId": "supplement-fallback-2",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project",
+        "conclusion": "allow",
+        "branch": "b-unavailable→a-allow",
+        "by": "pm:无会话 → operator:supplement-operator",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell"
+      }
+    ]
+  },
+  "ledger": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\shell-directive\\project\\.ans\\state\\customer-directives.jsonl",
+    "exists": true,
+    "bytes": 745,
+    "lines": 2,
+    "events": [
+      {
+        "kind": "directive.created",
+        "id": "d-1",
+        "seq": 1,
+        "until": "once"
+      },
+      {
+        "kind": "directive.consumed",
+        "id": "d-1",
+        "seq": 2,
+        "via": {
+          "toolCallId": "supplement-directive-1"
+        },
+        "at": "2026-11-03T11:31:29.145Z"
+      }
+    ]
+  },
+  "failures": 0,
+  "finishedAt": "2026-11-03T11:31:29.156Z"
+}

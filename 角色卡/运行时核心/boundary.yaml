@@ -9,6 +9,13 @@ entries:
   - kind: file
     path: src/model/project-state.ts
     purpose: 全局任务状态/版本决策的共享 Model 类型（`ProjectStateView`/`VersionDecisionCard`/`VersionDecisionRequest/Result`；无 I/O）
+  # --- Delta-CAP-1（2026-11-03，团队计划 §4.5；闸门 2）：新增 2 个共享 Model 文件（directive-marker、directive），逐文件授权 ---
+  - kind: file
+    path: src/model/directive-marker.ts
+    purpose: 客户指令标记纯解析器（零依赖，主进程与渲染侧共享）
+  - kind: file
+    path: src/model/directive.ts
+    purpose: 客户指令事件/视图/高危谓词共享 Model 类型
   - kind: file
     path: src/service/runtime/session.ts
     purpose: 运行时选择、公共工具装配与提供方接入入口

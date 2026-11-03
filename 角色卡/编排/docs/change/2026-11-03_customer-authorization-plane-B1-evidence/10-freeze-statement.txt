@@ -1,0 +1,70 @@
+B1-customer-directive-freeze v1
+================================
+baseline HEAD: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+status: implemented-unverified（未验收、未 commit/push）
+
+冻结对象与形状
+-------------
+Pipeline 公共句柄（src/pipeline/orchestration/customer-directive.ts）：
+  createCustomerDirectiveRuntime(opts: { projectRoot; sessionId; present: DirectivePresenter; now?; store? })
+    → CustomerDirectiveRuntime
+  CustomerDirectiveRuntime:
+    submitFromInput(input: SubmitFromInput) → Promise<SubmitResult>
+    approvalFacts() → ApprovalDirectiveSnapshot（只含 approval；ledgerErrors>0 ⇒ active=[]）
+    decisionFacts() → DecisionDirectiveSnapshot（只含 decision；同上）
+    takeDirective(req: ShellReviewRequest, intent?: "allow"|"deny") → Promise<ApprovalDirectiveDecision | undefined>
+    applyDecisionDirective(card: DecisionCardFacts, hooks?: DecisionHooks) → Promise<DecisionApplyResult | undefined>
+    revoke(id, target) → Promise<RevokeResult>
+    list() → Promise<DirectiveListResult>
+  SubmitFromInput.decisionGroupEnabled: boolean（必填、无默认）
+  DecisionHooks.emitResult 为唯一可见行钩子（无 deliver 别名）；抛错/拒绝/无钩子 ⇒ 不消费、不应用、返回 undefined。
+  DecisionApplyResult = selected | rejected | conflict | no-match（conflict/no-match 不消费任何指令）。
+  DirectiveErrorCode = cancelled | presenter-unavailable | invalid-input | high-risk-unacknowledged |
+    ledger-write-failed | ledger-unavailable | not-found | target-mismatch | already-consumed |
+    already-revoked | expired。
+  DirectiveStore.append(line): Promise<void>（durable 后 resolve；失败 reject；relPath 必须 === CUSTOMER_DIRECTIVES_REL）。
+
+takeDirective 语义（冻结）
+-------------------------
+  · 只读 approval target；精确匹配 normalizeCommandText(req.command) 与 resource.cwd（同目录比较）。
+  · 未匹配/ledgerErrors>0/消费失败 ⇒ undefined（回落既有路径），绝不重复使用 once。
+  · once 在返回前 durable consume；session/forever 只返回、不写非状态事件。
+  · 公共一参调用：先 deny 后 allow。可选 intent 仅为 B1 shell gate 内部消费阶段提示
+    （"deny" 预检 / "allow" 应用），不改变 C1 可见的一参调用语义。
+
+shell 闸（src/common/编排/shell-gate.ts）
+----------------------------------------
+  · CreateShellGateOptions.takeDirective?: TakeDirectiveFn；readonlyOnly === true 时构造期抛错。
+  · 顺序：preblock → write-guard → classify → 指令 deny → c=deny → c=allow → script →
+    既有 takeGrant → 指令 allow → 既有 advisory/operatorOnly/三层链。
+  · 审计 ShellAuditRecord.directive?: { id, scope }；by = "directive:<id>"；
+    ShellReviewResult.directive?: { id, scope }；ShellGateReviewedOutcome.directive?: { id, scope }。
+  · 与 judge/customerGrant 互斥；directive 分支不写 judge/customerGrant。
+  · 分支常量：BRANCH_DIRECTIVE_ALLOW="directive:allow" / BRANCH_DIRECTIVE_DENY="directive:deny"。
+
+Q9 A（审计归属）
+---------------
+  · RequestResolvedEvent.by: "judge" | "customer" | "directive"；directiveId?（by=directive 必填，A1 模式校验）。
+  · VersionDecisionEvent.decidedBy: VersionDecisionDecidedBy（含 "directive"）；directiveId?（同上）。
+  · VersionDecisionAnswerInput/Plan/ResolvedWithoutExecution 使用 VersionDecisionDecidedBy；
+    保留窄重载给 C1 更新前的旧二值调用方（运行期实现相同）。
+  · RunChangeRecord.decidedBy: VersionDecisionDecidedBy；directiveId?；applyRunChange 校验
+    decidedBy=directive 必填 directiveId，模式 = A1 CUSTOMER_DIRECTIVE_ID_PATTERN。
+
+常量单一来源
+-----------
+  CUSTOMER_DIRECTIVES_REL / CUSTOMER_DIRECTIVE_ID_PATTERN / 五个字段上限 = src/model/directive.ts（A1）；
+  Provider/Service/Pipeline/task-state/run-manifest 只 import，不复制字面量。
+  轮转/原子追加/旧→新读取/坏行 = src/common/shared/jsonl-ledger.ts（A2）；不写第二份实现。
+
+命令与结果
+---------
+  node --test --test-concurrency=1 "test/编排/*.test.ts"
+    B1 前 694/693/1/0（既有 Windows EPERM）→ B1 后 737/736/1/0（同一 EPERM；新增确定性失败 0、新增 skip 0）。
+  npm run typecheck：B1 前 exit 1（唯一 version-decision.ts:435）→ B1 后 exit 0。
+  受影响跨层复跑 69/69 pass。
+
+消费规则
+-------
+C1/C2 只按上述冻结形状消费；任何形状/枚举/常量/谓词/顺序变化须回编排（B1）重跑受影响证据并更新本声明。
+本声明不是验收结论；B1 状态 implemented-unverified。

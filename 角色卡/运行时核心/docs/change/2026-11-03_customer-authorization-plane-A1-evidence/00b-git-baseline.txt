@@ -1,0 +1,26 @@
+4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+ M docs/acceptance/memo.md
+ M docs/scheduling/memo.md
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/changelog.md"
+?? docs/acceptance/customer-authorization-plane-criteria-v1.md
+?? docs/communication/2026-11-03_intent_customer-authorization-plane.md
+?? docs/planning/2026-11-03_design_customer-authorization-plane.md
+?? docs/planning/2026-11-03_review_customer-authorization-plane.md
+?? docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-03_customer-authorization-plane-B0-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-03_customer-authorization-plane-B0-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-11-03_customer-authorization-plane-A1-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-P1-review.md"

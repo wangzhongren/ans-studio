@@ -1,0 +1,10 @@
+role: X
+entries:
+  - kind: file
+    path: src/x.ts
+    purpose: D2 夹具
+  - kind: conditional-directory
+    path: docs/audit/
+    condition: shell-gate
+    root: project
+    purpose: shell 闸审计留痕

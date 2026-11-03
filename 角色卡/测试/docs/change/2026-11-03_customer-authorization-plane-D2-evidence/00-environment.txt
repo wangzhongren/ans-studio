@@ -1,0 +1,16 @@
+D2 real-run environment (captured 2026-11-03T18:02:52+08:00)
+timezone:    +0800
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+node: v24.22.1
+npm: 11.19.1
+electron: 
+v44.7.0
+git: git version 2.55.0.windows.5
+bash: 5.3.15(2)-release
+uname: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+os: 
+Microsoft Windows [°æ±¾ 10.0.26300.9711]
+branch: feat/customer-authorization-plane
+head: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+electron_binary: -rwxr-xr-x 1 51054 197609 246302208 Jan  1  1980 node_modules/electron/dist/electron.exe
+renderer_dist: -rw-r--r-- 1 51054 197609 597 Nov  3 16:46 app/renderer/dist/index.html
