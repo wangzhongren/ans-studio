@@ -1,0 +1,8 @@
+=== Electron runnability facts (D1; not launched per V1) (recorded_at: 2026-11-03T12:28:47+08:00) ===
+electron package version: 44.7.0
+electron binary path: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\flow-improvements-wave1\node_modules\electron\dist\electron.exe
+electron.exe EXISTS
+renderer dist index.html EXISTS (ignored artifact)
+c6078edff986f8cbdff6b56f184e7ac2812b8292fb5f3aac7beca8e7d1c8087f *app/renderer/dist/index.html
+this worktree electron processes: 0
+NOT launched: no app start, no E2E, no screenshots/recording.

@@ -1,0 +1,19 @@
+=== diff stat (test) ===
+ .../rejection-copy.test.ts"                        | 144 ++++++++-
+ .../run-pin.test.ts"                               |  61 +++-
+ .../trio-worker-report.test.ts"                    |   4 +
+ .../workflow-preconditions.test.ts"                | 333 +++++++++++++++++++++
+ 4 files changed, 540 insertions(+), 2 deletions(-)
+
+=== removed lines (all, excluding file headers) ===
+-import { evaluateDispatchPreflight, type DispatchPreflightInput, type ProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
+-import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
+
+=== added skip/todo markers (should be empty) ===
+(none)
+
+=== deleted test files ===
+(end; empty = none)
+
+=== README / i18n / package status (should be empty) ===
+(end)
