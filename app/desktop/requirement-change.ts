@@ -241,12 +241,15 @@ export function isPendingRequirementChangeStatus(status: unknown): status is "re
   return status === "requested" || status === "dispatched" || status === "approved";
 }
 
-/** 独立审批结果（客户/判断 agent 在 decision 卡上的结算；应用审计，不是治理账本条目）。 */
+/** 独立审批结果（客户/判断 agent/客户指令在 decision 卡上的结算；应用审计，不是治理账本条目）。 */
 export interface RequirementChangeApprovalRecord {
   /** `no-decision`＝卡片被取消/超时/通道不可用（未获明确审批，不是客户拒绝）。 */
   outcome: "approved" | "rejected" | "no-decision";
-  /** `judge`＝「替我决策」判断 agent 代批（默认推荐项）；`customer`＝客户在卡上选择。 */
-  source: "customer" | "judge";
+  /**
+   * `judge`＝「替我决策」判断 agent 代批（默认推荐项）；`directive`＝客户事先记录的 `@决策` 指令代选
+   * （Q9 A，2026-11-03；**不是客户本人点击**）；`customer`＝客户在卡上选择。
+   */
+  source: "customer" | "judge" | "directive";
   /** 卡上实际选中的选项 id（未作答为空数组）。 */
   selected: string[];
   operatorId: string | null;
@@ -312,8 +315,9 @@ export function requirementChangeDetailText(text: unknown, max = 500): string {
   return chars.length <= max ? value : `${chars.slice(0, max - 1).join("")}…`;
 }
 
-/** 审批来源的人话（`{source}` 参数；判断代批必须如实标注，不伪装客户本人）。 */
-export function requirementChangeApprovalSourceText(source: "customer" | "judge"): string {
+/** 审批来源的人话（`{source}` 参数；判断代批/客户指令代选必须如实标注，不伪装客户本人）。 */
+export function requirementChangeApprovalSourceText(source: "customer" | "judge" | "directive"): string {
+  if (source === "directive") return mainT("ui.versionDecision.decidedBy.directive");
   return source === "judge" ? "判断 agent（「替我决策」）代批 · 默认推荐项" : "客户在 decision 卡上选择";
 }
 
@@ -384,7 +388,7 @@ export function buildRequirementChangeLeadExecutionTaskText(input: {
   impact?: string;
   proposedIntentPatch?: string;
   ticketRelPath: string;
-  approvalSource: "customer" | "judge";
+  approvalSource: "customer" | "judge" | "directive";
   approvedAt: string;
 }): string {
   const header = mainT("main.requirementChange.leadExecuteTask", {
@@ -413,6 +417,6 @@ export function buildRequirementChangeLeadExecutionTaskText(input: {
     "- 不得自行批准 / 拒绝 / 代选需求变更，也不得再发 intent-confirm 充当需求变更审批（审批已在 decision 卡完成）。",
     "- 不得把新授权写进提案卡，不得让 Draft 以提案卡替代需求变更审批。",
     "- 不得通过删除、改写、拆分需求绕过 gate 0。",
-    "- 不得声称客户本人点击批准；判断 agent 代批必须如实标注「judge 代批」。",
+    "- 不得声称客户本人点击批准；判断 agent 代批或客户指令（@决策）代选必须如实标注，不得伪装客户本人。",
   ].join("\n");
 }

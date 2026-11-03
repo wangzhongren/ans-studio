@@ -76,6 +76,8 @@
 | 单文件 | `test/桌面应用/acceptance-return-card.test.ts` | 主进程侧测试——SessionManager 级验收回交卡展示载荷：正常/>16 KiB 截断/空缺失/不可读/无 flowId/非法 flowId/旧 payload；断言 `ctx.acceptanceReport`/presenter payload 与 fail-closed（session/customer-input） |
 | 单文件 | `test/桌面应用/project-state.test.ts` | 主进程侧测试——全局状态 IPC/裁剪/备注/零写入 |
 | 单文件 | `test/桌面应用/version-decision.test.ts` | 主进程侧测试——发卡/决定/拒绝/超时/中止/重试/新版本开发/恢复 |
+| 单文件 | `test/桌面应用/directive-input.test.ts` | 主进程侧测试——识别拦截/指令 IPC/面板通道/重推/关窗取消/高危复核/面板共存 |
+| 单文件 | `test/桌面应用/directive-decision.test.ts` | 主进程侧测试——decision 消费者确定性规则/冲突与不匹配绕过默认推荐/Q9 归属读者 |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |

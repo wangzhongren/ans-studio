@@ -81,6 +81,15 @@ export interface ShellAuditCustomerGrant {
 }
 
 /**
+ * 客户审批指令放行/拒绝（2026-11-03 客户授权平面 B1 加法；与 `judge`/`customerGrant` 并列互斥）。
+ * `id` 为账本 `d-<seq>`；`scope` 即账本 `until`。只在本次结果来自客户事先记录的审批指令时出现。
+ */
+export interface ShellAuditDirective {
+  id: string;
+  scope: "once" | "session" | "forever";
+}
+
+/**
  * 升级申请决定（仅 `event:"escalation-decision"` 记录）。
  * `action` 为决定/结果：客户三选一（`allow-once`/`allow-session`/`deny`），
  * 超时/通道不可用则为 `expired`/`unavailable`（无客户动作，如实记录，不伪装成 deny）。
@@ -107,6 +116,8 @@ export interface ShellAuditRecord {
   event?: ShellAuditEvent;
   /** 本 review 放行来自客户升级授权（仅授权放行的 review 记录；**不得**与 `judge` 同时出现）。 */
   customerGrant?: ShellAuditCustomerGrant;
+  /** 本结果来自客户事先记录的审批指令（仅指令 allow/deny；**不得**与 `judge`/`customerGrant` 同时出现）。 */
+  directive?: ShellAuditDirective;
   /** 升级申请决定（仅 `escalation-decision` 记录）。 */
   escalation?: ShellAuditEscalation;
   /** 审核入口（可选加法；缺省按 `run_shell` 兼容旧调用）。授权键/审计可辨。 */

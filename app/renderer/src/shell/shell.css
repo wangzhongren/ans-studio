@@ -3504,3 +3504,379 @@ img.view-image-preview {
   color: var(--primary);
   border-color: var(--primary);
 }
+
+/* —————— 客户授权平面 C2（2026-11-03）：指令确认对话框 / 指令面板 / 卡内入口 ——————
+   z-index：shell 卡 60、决策对话框 80、指令确认对话框 90、指令面板 95。
+   只追加样式，不改既有 .sc-overlay/.sc-card 规则；颜色只引既有令牌。 */
+.directive-dialog-overlay,
+.directive-panel-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--backdrop-strong);
+}
+.directive-dialog-overlay {
+  z-index: 90;
+}
+.directive-panel-overlay {
+  z-index: 95;
+}
+.directive-dialog-card,
+.directive-panel-card {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--background);
+  box-shadow: var(--shadow-card);
+  overflow-wrap: anywhere;
+}
+.directive-dialog-card {
+  width: min(560px, calc(100vw - 32px));
+}
+.directive-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.directive-dialog-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.directive-dialog-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-micro);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.directive-dialog-close:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+.directive-dialog-close:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.directive-field-label {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.directive-raw-text {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.directive-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+.directive-field {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  font-size: 12px;
+}
+.directive-field dt {
+  flex: 0 0 72px;
+  color: var(--text-3);
+}
+.directive-field dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.directive-field-detail {
+  color: var(--text-2);
+}
+.directive-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.directive-note.is-warning {
+  color: var(--warning);
+}
+.directive-note.is-error {
+  color: var(--danger);
+}
+.directive-high-risk {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-micro);
+  background: var(--warning-bg);
+}
+.directive-high-risk-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning);
+}
+.directive-high-risk-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  color: var(--text);
+}
+.directive-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.directive-ack input {
+  margin-top: 2px;
+}
+.directive-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+.directive-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.directive-section-title {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.directive-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.directive-group-title {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.directive-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.directive-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: var(--selected);
+}
+.directive-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.directive-row-id {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.directive-row-status {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--text-2);
+}
+.directive-row[data-status="active"] .directive-row-status {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.directive-row-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.directive-row-field {
+  display: inline-flex;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+}
+.directive-row-label {
+  color: var(--text-3);
+}
+.directive-row-value,
+.directive-row-hint {
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.directive-row-note,
+.directive-row-meta {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+}
+.directive-row-revoke {
+  align-self: flex-end;
+  padding: 2px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 11px;
+  cursor: pointer;
+}
+.directive-row-revoke:hover {
+  background: var(--hover);
+}
+.directive-row-revoke:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.directive-empty {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.directive-shell-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-micro);
+  background: var(--warning-bg);
+}
+.directive-shell-badge-text {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--warning);
+}
+.directive-shell-badge-note {
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+.sc-directive-entry-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.sc-directive-entry {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sc-directive-entry:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+.sc-directive-entry:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.sc-directive-entry:focus-visible,
+.sc-directive-action:focus-visible,
+.sc-directive-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.sc-directive-entry-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sc-directive-input {
+  width: 100%;
+  min-height: 48px;
+  resize: vertical;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-micro);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sc-directive-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sc-directive-action {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-micro);
+  background: transparent;
+  color: var(--text-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.sc-directive-action:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
+.sc-directive-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.sc-directive-action.is-primary {
+  border-color: var(--border-strong);
+  color: var(--foreground);
+}
+.sc-directive-status {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}

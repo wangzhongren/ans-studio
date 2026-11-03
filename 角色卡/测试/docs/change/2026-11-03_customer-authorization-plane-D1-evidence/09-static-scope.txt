@@ -1,0 +1,96 @@
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+date: 2026-11-03T17:05:01+0800
+HEAD: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+branch: feat/customer-authorization-plane
+
+--- git diff --cached --name-only ---
+
+--- git status --porcelain -- package.json package-lock.json tsconfig.json vite.config.ts electron-builder.yml ---
+
+--- git check-ignore -v app/renderer/dist/index.html ---
+.gitignore:9:app/renderer/dist/	app/renderer/dist/index.html
+
+--- git ls-files app/renderer/dist (should be empty) ---
+
+--- git status --porcelain -- src app test (full) ---
+ M app/desktop/customer-input.ts
+ M app/desktop/interface.ts
+ M app/desktop/requirement-change.ts
+ M app/desktop/session.ts
+ M app/main.ts
+ M app/preload.cjs
+ M app/renderer/src/chat/ipc.ts
+ M app/renderer/src/shell/Composer.tsx
+ M app/renderer/src/shell/ConfirmCard.tsx
+ M app/renderer/src/shell/shell.css
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M "src/common/\347\274\226\346\216\222/run-manifest.ts"
+ M "src/common/\347\274\226\346\216\222/shell-audit.ts"
+ M "src/common/\347\274\226\346\216\222/shell-gate.ts"
+ M "src/common/\347\274\226\346\216\222/task-state.ts"
+ M "src/common/\347\274\226\346\216\222/version-decision.ts"
+ M src/model/project-state.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/pipeline/orchestration/shell-arming.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/version-decision.test.ts"
+ M "test/\347\274\226\346\216\222/run-manifest.test.ts"
+ M "test/\347\274\226\346\216\222/task-state.test.ts"
+ M "test/\347\274\226\346\216\222/version-decision.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n-guard-allowlist.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+?? app/desktop/directive-input.ts
+?? app/renderer/src/chat/directive-dialog.tsx
+?? app/renderer/src/chat/directive-panel.tsx
+?? app/renderer/src/stores/directive-store.ts
+?? src/common/shared/jsonl-ledger.ts
+?? src/model/directive-marker.ts
+?? src/model/directive.ts
+?? src/pipeline/orchestration/customer-directive.ts
+?? src/provider/directive/
+?? src/service/directive/
+?? test/runtime-core/directive-contract.test.ts
+?? test/runtime-core/directive-marker.test.ts
+?? "test/\346\241\214\351\235\242UI/directive-dialog.test.ts"
+?? "test/\346\241\214\351\235\242UI/directive-panel.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/directive-decision.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/directive-input.test.ts"
+?? "test/\346\265\213\350\257\225/customer-authorization-plane-integration.test.ts"
+?? "test/\347\274\226\346\216\222/customer-directive-gate.test.ts"
+?? "test/\347\274\226\346\216\222/customer-directive.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/jsonl-ledger.test.ts"
+
+--- git diff --stat -- src app test (tracked modifications only) ---
+ app/desktop/customer-input.ts                      | 216 +++++++++++-
+ app/desktop/interface.ts                           |  99 +++++-
+ app/desktop/requirement-change.ts                  |  18 +-
+ app/desktop/session.ts                             |  45 ++-
+ app/main.ts                                        |  95 ++++++
+ app/preload.cjs                                    |  76 +++++
+ app/renderer/src/chat/ipc.ts                       |  45 +++
+ app/renderer/src/shell/Composer.tsx                | 142 +++++++-
+ app/renderer/src/shell/ConfirmCard.tsx             | 203 +++++++++++
+ app/renderer/src/shell/shell.css                   | 376 +++++++++++++++++++++
+ src/common/shared/i18n/messages/en-US.ts           | 116 +++++++
+ src/common/shared/i18n/messages/zh-CN.ts           | 116 +++++++
+ .../\347\274\226\346\216\222/run-manifest.ts"      |  29 +-
+ .../\347\274\226\346\216\222/shell-audit.ts"       |  11 +
+ .../common/\347\274\226\346\216\222/shell-gate.ts" | 124 +++++++
+ .../common/\347\274\226\346\216\222/task-state.ts" | 175 ++++------
+ .../\347\274\226\346\216\222/version-decision.ts"  |  25 +-
+ src/model/project-state.ts                         |   7 +-
+ src/model/runtime.ts                               |  41 ++-
+ src/pipeline/orchestration/govern-session.ts       |   8 +
+ src/pipeline/orchestration/run-role.ts             |  20 +-
+ src/pipeline/orchestration/shell-arming.ts         |  18 +-
+ .../run-change.test.ts"                            |  48 +++
+ .../version-decision.test.ts"                      |  42 +++
+ .../\347\274\226\346\216\222/run-manifest.test.ts" |  55 +++
+ "test/\347\274\226\346\216\222/task-state.test.ts" |  62 ++++
+ .../version-decision.test.ts"                      |  35 ++
+ .../shared/i18n-guard-allowlist.ts"                |   2 +
+ .../shared/i18n.test.ts"                           | 219 +++++++++++-
+ 29 files changed, 2305 insertions(+), 163 deletions(-)

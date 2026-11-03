@@ -1,0 +1,34 @@
+=== Post-run verification (customer-authorization-plane B0) ===
+recorded_at: 2026-11-03T13:44:54+0800
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+--- git rev-parse HEAD ---
+4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+--- git status --porcelain -- src app test ---
+(empty; product/test trees unchanged before and after B0)
+--- git diff --cached --name-only ---
+(empty; nothing staged)
+--- git status --short (full) ---
+ M docs/acceptance/memo.md
+ M docs/scheduling/memo.md
+?? docs/acceptance/customer-authorization-plane-criteria-v1.md
+?? docs/communication/2026-11-03_intent_customer-authorization-plane.md
+?? docs/planning/2026-11-03_design_customer-authorization-plane.md
+?? docs/planning/2026-11-03_review_customer-authorization-plane.md
+?? docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md
+?? 角色卡/测试/docs/change/2026-11-03_customer-authorization-plane-B0-baseline-evidence/
+note: docs/acceptance/memo.md modification and docs/acceptance/customer-authorization-plane-criteria-v1.md
+  appeared while B0 was running (V1 produced in parallel by the internal acceptance role). They are
+  outside the test role write set and were NOT written by this role. docs/scheduling/memo.md was
+  already modified before B0 started. No product/test file changed.
+--- package-lock.json / package.json ---
+git status --porcelain -- package-lock.json package.json: (empty)
+package-lock.json sha256: 6236ef2374c47e9c7e942083e8c0abe4ff39caece84fcc9303a7c1cd51d1fe91
+package.json sha256: 39558d6ae13c991ca017b84443b6ea8d6b5684e238b075bdfa79530f115bcb01
+node_modules is ignored and not staged.
+--- evidence directory ---
+15 files: 00-baseline.txt, 01-npm-ci.log, 02-npm-run-typecheck.log,
+03-npm-run-typecheck-renderer.log, 04-npm-run-build-renderer.log,
+05a-suite-runtime-core.log, 05b-suite-orchestration.log, 05c-suite-desktop-app.log,
+05d-suite-desktop-ui.log, 05e-suite-project-shared.log, 06-full-t3-file-list.txt,
+06-full-t3.log, 06-run-t3.sh, 07-failure-classification.txt, 08-electron-facts.txt
+(09-post-run-verification.txt is this file.)

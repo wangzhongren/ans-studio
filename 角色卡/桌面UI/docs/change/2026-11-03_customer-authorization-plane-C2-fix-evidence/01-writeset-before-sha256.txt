@@ -1,0 +1,4 @@
+5096ba6961615edd4c3caa8083f3f274510851c34a17d852876dbd28cf82e844 *app/renderer/src/stores/directive-store.ts
+c96f6cd245a25e5b655258738a47942ad3fd01ea4dd71cdf33ba5eea016bdc4f *app/renderer/src/chat/directive-panel.tsx
+0a19060b49fcb33e2198e5cff81604dece660acdb9b7dc47f75cec4e6439d7b6 *app/renderer/src/shell/Composer.tsx
+6ab90d2238043655d8ea19eaa443f30ba162fa662b95117ad0d13ded8def1e0a *test/桌面UI/directive-panel.test.ts

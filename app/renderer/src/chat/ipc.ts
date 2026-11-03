@@ -37,6 +37,9 @@ import {
   type RuntimeViewPort,
 } from "@/chat/runtime-view";
 import { isRuntimeId } from "@/chat/runtime-config";
+import { useDirectiveStore, type DirectiveBridge } from "@/stores/directive-store";
+
+export type { DirectiveBridge } from "@/stores/directive-store";
 
 let installed = false;
 
@@ -53,6 +56,32 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : {};
+}
+
+/**
+ * 客户授权平面（C2）：C1 冻结的五个 preload 白名单方法。
+ *
+ * `DirectiveBridge` 类型由 `stores/directive-store.ts` 定义并在本文件重导出；
+ * 这里用 `unknown` + 结构断言把 `DesktopBridge` 窄化到该接口（不写 `any`、
+ * 不弱化既有 `DesktopBridge`）。任一方法缺失（旧 preload / 旧主进程）⇒ 返回 null，
+ * 能力禁用并如实说明。
+ */
+const DIRECTIVE_BRIDGE_METHODS = [
+  "onDirectiveConfirmRequest",
+  "directiveConfirmRespond",
+  "listDirectives",
+  "revokeDirective",
+  "onDirectiveState",
+] as const;
+
+/** 结构断言：五个方法必须同时存在且为函数；否则返回 null（能力禁用）。 */
+export function directiveBridgeOf(value: unknown): DirectiveBridge | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  for (const method of DIRECTIVE_BRIDGE_METHODS) {
+    if (typeof record[method] !== "function") return null;
+  }
+  return record as unknown as DirectiveBridge;
 }
 
 function viewIdentity(): { projectRoot: string | null; runtime: string } {
@@ -388,6 +417,8 @@ function onProjectChanged(nextRoot: string | null, previousRoot: string | null):
     useUiStore.getState().setDrawerOpen(false);
     useConfirmStore.getState().dismissShell();
     useConfirmStore.getState().dismissRecovery();
+    // 客户授权平面（C2）：项目切换清空旧项目列表/未决确认/卡内入口；C1 侧同步取消未决面板。
+    useDirectiveStore.getState().clearProject(previousRoot, nextRoot);
   } finally {
     switching = false;
   }
@@ -428,6 +459,20 @@ export function installChatRuntime(): void {
   const bridge = getDesktopBridge();
   if (!bridge) return;
   installed = true;
+
+  // 客户授权平面（C2）：能力位先行 handshake 由主进程推送、preload 缓存并在订阅时同步回放；
+  // 旧 preload 缺任一方法 ⇒ capabilityAvailable=false，回显不抑制、面板/卡内入口禁用说明。
+  useDirectiveStore.getState().setProjectRoot(useChatStore.getState().projectRoot);
+  const directiveBridge = directiveBridgeOf(bridge);
+  useDirectiveStore.getState().attachBridge(directiveBridge);
+  if (directiveBridge) {
+    directiveBridge.onDirectiveState((payload) => {
+      useDirectiveStore.getState().applyState(payload);
+    });
+    directiveBridge.onDirectiveConfirmRequest((payload) => {
+      useDirectiveStore.getState().receiveConfirmRequest(payload);
+    });
+  }
 
   // 渲染侧未捕获错误 → 诊断（字段名在桌面窗口白名单内）；不改变错误行为。
   window.addEventListener("error", (event) => {

@@ -1,0 +1,252 @@
+{
+  "probe": "customer-authorization-plane-d2-supplement",
+  "phase": "restart-verify",
+  "startedAt": "2026-11-03T11:35:15.770Z",
+  "repo": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane",
+  "out": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\run2",
+  "userData": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\userData",
+  "project": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project",
+  "rendererEntry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\app\\renderer\\dist\\index.html",
+  "preload": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\app\\preload.cjs",
+  "head": "4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0",
+  "windowSize": [
+    1360,
+    860
+  ],
+  "sessionId": "supplement-restart-verify-1793705715771",
+  "checks": [
+    {
+      "name": "MOUNT",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "CHAT_PANE",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "COMPOSER_READY",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "DIRECTIVE_CAPABILITY_ON",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "R2_LEDGER_PRESENT",
+      "value": true,
+      "detail": {
+        "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project\\.ans\\state\\customer-directives.jsonl",
+        "lines": 4
+      }
+    },
+    {
+      "name": "R2_TWO_CREATED",
+      "value": true,
+      "detail": {
+        "createdIds": [
+          "d-1",
+          "d-2"
+        ]
+      }
+    },
+    {
+      "name": "R2_PANEL_OPEN",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "R2_PANEL_EXPIRED_ROWS",
+      "value": true,
+      "detail": {
+        "sessionId": "d-1",
+        "onceId": "d-2"
+      }
+    },
+    {
+      "name": "R2_PANEL_STATUS_TEXT",
+      "value": true,
+      "detail": {
+        "a": "d-1已失效动作允许范围本项目（所有角色）资源shell 命令：npm install期限本会话消费者：shell-gated-1 · 创建于 2026-11-03T11:35:09.848Z",
+        "b": "d-2已失效动作允许范围本项目（所有角色）资源shell 命令：npm test期限一次性 · 未使用，已失效消费者：shell-gated-2 · 创建于 2026-11-03T11:35:10.277Z"
+      }
+    },
+    {
+      "name": "R2_NO_ACTIVE_ROWS",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "R2_LIST_EXPIRED",
+      "value": true,
+      "detail": {
+        "active": [],
+        "expired": [
+          "d-1",
+          "d-2"
+        ],
+        "ledgerErrors": 0
+      }
+    },
+    {
+      "name": "R2_LEDGER_EXPIRED_REASONS",
+      "value": true,
+      "detail": [
+        {
+          "version": 1,
+          "kind": "directive.expired",
+          "id": "d-1",
+          "seq": 3,
+          "at": "2026-11-03T11:35:16.503Z",
+          "reason": "app-restart"
+        },
+        {
+          "version": 1,
+          "kind": "directive.expired",
+          "id": "d-2",
+          "seq": 4,
+          "at": "2026-11-03T11:35:16.504Z",
+          "reason": "unused-once"
+        }
+      ]
+    },
+    {
+      "name": "R2_NO_FAKE_RECEIPT",
+      "value": true,
+      "detail": {
+        "notes": []
+      }
+    },
+    {
+      "name": "NO_CONSOLE_ERRORS",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "NO_CSP_VIOLATIONS",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "R2-panel-after-restart-expired.png",
+      "bytes": 79767
+    }
+  ],
+  "console": [],
+  "csp": [],
+  "sends": [],
+  "notes": [],
+  "directiveLists": [
+    {
+      "version": 1,
+      "ok": true,
+      "directivesEnabled": true,
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project",
+      "approval": {
+        "active": [],
+        "consumed": [],
+        "revoked": [],
+        "expired": [
+          {
+            "id": "d-1",
+            "seq": 1,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm install",
+                "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project"
+              }
+            },
+            "scope": {},
+            "until": "session",
+            "status": "expired",
+            "rawText": "@审批 允许 shell \"npm install\" until=session",
+            "createdAt": "2026-11-03T11:35:09.848Z",
+            "expiredAt": "2026-11-03T11:35:16.503Z",
+            "expiredReason": "app-restart",
+            "consumer": "shell-gate"
+          },
+          {
+            "id": "d-2",
+            "seq": 2,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm test",
+                "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project"
+              }
+            },
+            "scope": {},
+            "until": "once",
+            "status": "expired",
+            "rawText": "@审批 允许 shell \"npm test\" once",
+            "createdAt": "2026-11-03T11:35:10.277Z",
+            "expiredAt": "2026-11-03T11:35:16.504Z",
+            "expiredReason": "unused-once",
+            "consumer": "shell-gate"
+          }
+        ]
+      },
+      "decision": {
+        "active": [],
+        "consumed": [],
+        "revoked": [],
+        "expired": []
+      },
+      "ledgerErrors": 0
+    }
+  ],
+  "ledger": {
+    "exists": true,
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\restart\\project\\.ans\\state\\customer-directives.jsonl",
+    "bytes": 1434,
+    "lines": 4,
+    "events": [
+      {
+        "kind": "directive.created",
+        "id": "d-1",
+        "seq": 1,
+        "target": "approval",
+        "until": "session",
+        "sessionId": "supplement-restart-create-1793705707201"
+      },
+      {
+        "kind": "directive.created",
+        "id": "d-2",
+        "seq": 2,
+        "target": "approval",
+        "until": "once",
+        "sessionId": "supplement-restart-create-1793705707201"
+      },
+      {
+        "kind": "directive.expired",
+        "id": "d-1",
+        "seq": 3,
+        "reason": "app-restart",
+        "at": "2026-11-03T11:35:16.503Z"
+      },
+      {
+        "kind": "directive.expired",
+        "id": "d-2",
+        "seq": 4,
+        "reason": "unused-once",
+        "at": "2026-11-03T11:35:16.504Z"
+      }
+    ]
+  },
+  "failures": 0,
+  "ids": {
+    "sessionId": "d-1",
+    "onceId": "d-2"
+  },
+  "finishedAt": "2026-11-03T11:35:18.714Z"
+}

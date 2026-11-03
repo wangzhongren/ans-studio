@@ -9,10 +9,12 @@ import path from "node:path";
 
 import {
   RUN_PENDING_FLOW_ID,
+  applyRunChange,
   closeRun,
   ensureDraftRun,
   findActiveRun,
   listRunManifestsResult,
+  readRunManifest,
   runManifestPath,
   validateRunManifest,
   verifyPinnedRun,
@@ -190,6 +192,59 @@ test("R1：listRunManifestsResult 保持 all-or-nothing（坏 manifest 整体失
     const listed = await listRunManifestsResult(root);
     assert.equal(listed.ok, false);
     if (!listed.ok) assert.equal(listed.code, "run-manifest-invalid");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+// ————————————————— 2026-11-03（客户授权平面 Q9 A）：decidedBy:"directive" + directiveId —————————————————
+
+test("Q9 A：applyRunChange 接受 directive + directiveId 并写入 manifest；缺/非法 id 拒绝", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-manifest-directive-"));
+  try {
+    const base = pinned();
+    assert.equal((await writeRunManifest(root, base)).ok, true);
+    const applied = await applyRunChange(root, base, {
+      decisionId: "decision-directive-1",
+      mode: "continue-frozen",
+      decidedBy: "directive",
+      directiveId: "d-7",
+      decidedAt: "2026-11-03T00:00:00.000Z",
+    });
+    assert.equal(applied.ok, true, JSON.stringify(applied));
+    const read = await readRunManifest(root, base.runId);
+    assert.equal(read.ok, true);
+    if (read.ok) {
+      assert.equal(read.manifest.runChange?.decidedBy, "directive");
+      assert.equal(read.manifest.runChange?.directiveId, "d-7");
+    }
+
+    const missing = await applyRunChange(root, base, {
+      decisionId: "decision-directive-2",
+      mode: "continue-frozen",
+      decidedBy: "directive",
+    });
+    assert.equal(missing.ok, false);
+    if (!missing.ok) {
+      assert.equal(missing.code, "run-change-invalid");
+      assert.match(missing.reason, /directiveId/);
+    }
+    const bad = await applyRunChange(root, base, {
+      decisionId: "decision-directive-3",
+      mode: "continue-frozen",
+      decidedBy: "directive",
+      directiveId: "d-01",
+    });
+    assert.equal(bad.ok, false);
+    if (!bad.ok) assert.equal(bad.code, "run-change-invalid");
+
+    const legacy = await applyRunChange(root, base, {
+      decisionId: "decision-customer-1",
+      mode: "continue-frozen",
+      decidedBy: "customer",
+    });
+    assert.equal(legacy.ok, true, "旧二值调用不变");
+    if (legacy.ok) assert.equal(legacy.manifest.runChange?.directiveId, undefined);
   } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }

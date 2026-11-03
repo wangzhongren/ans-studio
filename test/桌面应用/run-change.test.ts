@@ -174,3 +174,51 @@ test("session run-change：convener 通道呈现 app 卡；客户选择 stop-and
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("session run-change：客户指令归属（Q9 A）——decidedBy=directive + directiveId", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-directive-"));
+  const customerInput: CustomerInputFn = async () => ({
+    outcome: "answered",
+    value: { selected: ["continue-frozen"] },
+    decisionId: "decision-session-run-change-directive",
+    operatorId: "directive:d-7",
+    directive: { id: "d-7", action: "select-option" },
+  });
+  const mgr = new SessionManager({
+    openRoleSession: async () => {
+      const handle: RoleSessionHandle = {
+        async send() {},
+        events() {
+          return { [Symbol.asyncIterator]() { return { async next(): Promise<IteratorResult<OrchestrationEvent>> { await tick(20); return { value: undefined as unknown as OrchestrationEvent, done: true }; } }; } };
+        },
+        async dispose() {},
+      };
+      return handle;
+    },
+    createPiAdapterFactory: () => { throw new Error("no pi"); },
+    createDemoAdapter: () => { throw new Error("no demo"); },
+    buildProjectConfig,
+    getListing: (r) => (r === root ? listing(root) : undefined),
+    emitEvent: () => {},
+    customerInput,
+  });
+  try {
+    const base = pinnedManifest();
+    await writeRunManifest(root, base);
+    await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await tick(30);
+    const started = await mgr.requestRunChangeDecision({ projectRoot: root, flowId: "focus", requestedBy: "convener" });
+    assert.equal(started.ok, true, started.ok ? "" : started.error);
+    if (!started.ok) return;
+    assert.equal((await started.outcome).outcome, "answered");
+    const stored = await readRunManifest(root, base.runId);
+    assert.equal(stored.ok, true);
+    if (stored.ok) {
+      assert.equal(stored.manifest.runChange?.decidedBy, "directive", "客户指令不是客户本人点击、也不是 judge");
+      assert.equal(stored.manifest.runChange?.directiveId, "d-7");
+    }
+  } finally {
+    await mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

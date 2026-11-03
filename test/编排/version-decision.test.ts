@@ -282,6 +282,41 @@ test("mapVersionDecisionAnswer（R2）：timeout/unavailable/resolved、aborted/
   );
 });
 
+test("Q9 A（2026-11-03）：mapVersionDecisionAnswer 接受 directive；collectResolvedWithoutExecution 保留 directive", () => {
+  assert.deepEqual(
+    mapVersionDecisionAnswer({ outcome: "answered", selected: ["version-modify"], by: "directive" }),
+    { kind: "execute", action: "version-modify", decidedBy: "directive", selectedOptionIds: ["version-modify"] },
+    "C1 三值后走宽重载，decidedBy 保留 directive",
+  );
+  assert.deepEqual(
+    mapVersionDecisionAnswer({ outcome: "declined", by: "directive", reason: "客户指令拒绝" }),
+    { kind: "resolve-declined", choice: "declined", reason: "客户指令拒绝", by: "directive" },
+  );
+  const events: TaskStateEvent[] = [
+    taskEvent("request.created", {
+      requestId: "version-decision-run-20261103-focus-aaaaaaaa-m1abc-33333333",
+      flowId: "focus",
+      cardKind: "decision",
+      sourceRoleId: "application",
+      title: "版本决策",
+      options: [{ id: "version-modify", label: "版本修改" }, { id: "new-version-development", label: "新版本开发" }],
+    }),
+    taskEvent("request.resolved", {
+      requestId: "version-decision-run-20261103-focus-aaaaaaaa-m1abc-33333333",
+      decisionId: "decision-directive-1",
+      cardKind: "decision",
+      selectedOptionIds: ["version-modify"],
+      by: "directive",
+      directiveId: "d-3",
+      choice: "version-modify",
+    }),
+  ];
+  const found = collectResolvedWithoutExecution(events);
+  assert.equal(found.length, 1);
+  assert.equal(found[0]!.decidedBy, "directive");
+  assert.equal(found[0]!.action, "version-modify");
+});
+
 test("collectResolvedWithoutExecution（R3/F5）：排除 orphaned/已有 decision/invalid-selection；failed 不误判", () => {
   const events: TaskStateEvent[] = [
     taskEvent("request.created", {

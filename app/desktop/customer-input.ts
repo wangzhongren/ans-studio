@@ -46,6 +46,13 @@ import type {
   GovernanceJudgeRequest,
   RuntimeKind,
 } from "../../src/model/runtime.ts";
+// 客户授权平面 decision 消费者（C1，2026-11-03）：只经 B1 Pipeline 公共出口（类型只读；实现在主进程控制器）。
+import type {
+  DecisionApplyResult,
+  DecisionCardFacts,
+  DecisionHooks,
+} from "../../src/pipeline/orchestration/customer-directive.ts";
+import type { DecisionDirectiveSnapshot } from "../../src/model/directive.ts";
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 // 边界内写入预授权（2026-10-25 客户新规则）：判定纯逻辑在 `write-preauthorization.ts`（本通道只在
 // **呈现卡片/调用判断之前**执行其结果）。边界判定唯一来源仍是门禁引擎 resolveWrite——本模块不做第二套。
@@ -429,6 +436,31 @@ export interface AutoReworkCallbackInfo {
   at: string;
 }
 
+/** 客户指令 decision 消费者的可见系统行（既有 delivery-note；不含原文）。 */
+export interface DirectiveDecisionNotice {
+  roleId: string;
+  projectRoot?: string;
+  runtime?: RuntimeKind;
+  summary: string;
+}
+
+/**
+ * decision 指令消费者（C1 冻结）：只处理 `cardKind==="decision"`。`applyDecisionDirective` 是 B1 公共句柄
+ * 的 target-scoped 入口；本通道**不复制**消费/冲突/once 逻辑。
+ * `emitResult` 是可见结果行的唯一钩子（抛错 ⇒ applyDecisionDirective 不消费、返回 undefined ⇒ 回落客户卡）；
+ * `emitNotice` 只用于冲突/不匹配说明（投达失败只记诊断，不影响卡片呈现/不消费）。
+ */
+export interface DirectiveDecisionConsumerOptions {
+  decisionFacts(projectRoot: string): DecisionDirectiveSnapshot | undefined;
+  applyDecisionDirective(
+    projectRoot: string,
+    card: DecisionCardFacts,
+    hooks: DecisionHooks,
+  ): Promise<DecisionApplyResult | undefined>;
+  emitResult(notice: DirectiveDecisionNotice): void;
+  emitNotice(notice: DirectiveDecisionNotice): void;
+}
+
 export interface CreateCustomerInputChannelOptions {
   onExpired?: (payload: OperatorExpiredPayload) => void;
   /**
@@ -474,6 +506,12 @@ export interface CreateCustomerInputChannelOptions {
    * 结果行是代批的可见性条件；主进程推 IPC `session:operator-judge`。
    */
   emitJudgeResult?: (payload: OperatorJudgeResultPayload) => void;
+  /**
+   * **客户指令 decision 消费者（C1，2026-11-03）**：缺省 ⇒ 不消费指令（旧行为逐字不变）。
+   * 只在 `cardKind==="decision"` 且 `presentEntryNow()` 的 `tryAutoSelectDecision` **之前**进入；
+   * 冲突/不匹配绕过默认推荐并呈现客户卡（说明经 `emitNotice` 系统行）。
+   */
+  directive?: DirectiveDecisionConsumerOptions;
   /**
    * **验收卡 judge auto-rework 回调**（2026-10-23 验收返工路由方案 v1 §5.3.1；Q7 A）：
    * 只在 `cardKind==="acceptance"` 的 judge deny/manual **成功结算为 declined 之后**回调，且 allowlist：
@@ -645,11 +683,13 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     resolve: (outcome: CustomerInputOutcome) => void;
     /**
      * `queued` → `judging`（判断 agent 正在看卡；**不是**在等客户）→ `active`（卡片已呈现）/`done`。
-     * 只有 `active` 进 `pending`；`judging` 占住一项目一卡，但**不点亮**「等待你确认」。
+     * 只有 `active` 进 `pending`；`judging`/`directing` 占住一项目一卡，但**不点亮**「等待你确认」。
      * `triaging`（2026-10-25 验收分诊）：验收请求正被前闸求值/已被分诊卡替换——不呈现原卡、
      * 不进 pending，但**占住一项目一卡槽位**。
+     * `directing`（2026-11-03 客户授权平面）：decision 指令消费者正在求值/等待 durable 消费——
+     * 不呈现、不计入 `pendingCount`/`pendingRoles`/`judgingCount`，但占住一项目一卡槽位。
      */
-    state: "active" | "queued" | "judging" | "triaging" | "done";
+    state: "active" | "queued" | "judging" | "triaging" | "directing" | "done";
     /** 同一请求只判断一次（§4.2）：进入 `judging` 即定格；`replay`/`drain` 永不再次判断。 */
     judged?: boolean;
     /**
@@ -681,6 +721,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     expiredNotified?: boolean;
     /** 验收分诊前闸是否已求值（同一请求只过闸一次；`replay`/`drain` 永不重判——同 `judged`）。 */
     triageEvaluated?: boolean;
+    /** decision 指令消费者是否已求值（同一请求只进入一次；回落客户卡后不再重复消费）。 */
+    directiveEvaluated?: boolean;
     /** 应用自有卡（分诊卡）：作答后的处置与被它拦住/挂靠的验收请求。 */
     appCard?: AppCardState;
   }
@@ -705,6 +747,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    * 但**占住一项目一卡槽位**（分诊卡或被拦验收卡同一时刻只有一张可见卡）。中止/关窗时一并结算。
    */
   const triagingHolds = new Map<string, ChannelEntry>();
+  /** decision 指令求值中的卡（不呈现、不计入 pending/judging；占住一项目一卡，关窗/中止时一并结算）。 */
+  const directingHolds = new Map<string, ChannelEntry>();
   const diagnostic = createDiagnosticLogger({ component: "desktop.customer-input" });
 
   const projectKeyOf = (ctx: { projectRoot?: string } | undefined): string =>
@@ -819,10 +863,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    * **`notifyNextStep`/`drainProject` 恰一次**（§4.3）：代批成功与客户手批走同一条结算路径，
    * 下一步的 `advanceGovernanceFlow`/`dispatch.accepted(app)` 语义逐字不变。
    */
-  const settleEntry = (entry: ChannelEntry, outcome: CustomerInputOutcome, from: "active" | "judging"): void => {
+  const settleEntry = (entry: ChannelEntry, outcome: CustomerInputOutcome, from: "active" | "judging" | "directing"): void => {
     if (entry.state !== from) return;
     if (from === "active") pending.delete(entry.payload.id);
-    else judging.delete(entry.payload.id);
+    else if (from === "judging") judging.delete(entry.payload.id);
+    else directingHolds.delete(entry.payload.id);
     if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
     entry.state = "done";
     // 2026-10-20 真机：排队请求被判断 agent 直接代批/自动退回（从未 presenter 呈现）⇒ 界面必须删掉
@@ -885,6 +930,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         outcome: "answered",
         value: outcome.value,
         operatorId: resolved,
+        ...(outcome.directive !== undefined ? { directive: outcome.directive } : {}),
         ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
       };
     }
@@ -892,6 +938,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       outcome: "declined",
       operatorId: resolved,
       ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+      ...(outcome.directive !== undefined ? { directive: outcome.directive } : {}),
       ...(outcome.notPresented === true ? { notPresented: true as const } : {}),
     };
   };
@@ -1485,8 +1532,156 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     return true;
   };
 
+  /** 选项 label（可见结果行使用；缺失回退 optionId，不伪造）。 */
+  const optionLabel = (options: readonly CustomerInputOption[], optionId: string | undefined): string => {
+    if (optionId === undefined) return "";
+    return options.find((option) => option.id === optionId)?.label ?? optionId;
+  };
+
+  /**
+   * decision 指令消费者（C1，2026-11-03；规则/once 语义由 B1 `applyDecisionDirective` 冻结）：
+   *  - 只在 `cardKind==="decision"` 且注入 directive 消费者时进入，位于 `tryAutoSelectDecision` 之前；
+   *  - 冲突/0/多匹配：不消费任何一条，**绕过默认推荐**，直接呈现客户卡，并投一条既有 delivery-note 说明；
+   *  - selected/rejected：`once` 已由 B1 在**可见结果行之后** durable 消费；结算 answered/declined，
+   *    `operatorId:"directive:<id>"` + A1 `directive:{id,action}`；
+   *  - 无指令 / 账本坏行 / 可见行投达失败 / once durable 失败（B1 返回 undefined）⇒ 回落既有路径；
+   *  - 不写 `request.presented`（W-6）；不产生 judge 审计、不调用模型。
+   */
+  const tryApplyDirectiveDecision = (entry: ChannelEntry): boolean => {
+    if (entry.directiveEvaluated === true || entry.state !== "queued") return false;
+    if (cardKindOf(entry) !== DECISION_CARD_KIND) return false;
+    if (opts.directive === undefined) return false;
+    const request = entry.request;
+    if (request.kind !== "choice") return false;
+    const projectRoot = entry.ctx.projectRoot;
+    if (typeof projectRoot !== "string" || projectRoot === "") return false;
+    if (entry.signals.some((signal) => signal.aborted)) return false;
+    const flowId = entry.decisionCard?.flowId ?? entry.metadata?.flowId ?? request.flowId;
+    const card: DecisionCardFacts = {
+      cardKind: "decision",
+      requestId: entry.payload.id,
+      ...(typeof flowId === "string" && flowId !== "" ? { flowId } : {}),
+      options: request.options.map((option) => ({
+        id: option.id,
+        label: option.label,
+        ...(option.recommended === true ? { recommended: true as const } : {}),
+      })),
+    };
+    const runtime = entry.ctx.runtime ?? entry.metadata?.runtime;
+    const noticeBase = {
+      roleId: entry.payload.roleId,
+      projectRoot,
+      ...(runtime !== undefined ? { runtime } : {}),
+    };
+    const scopeText = (): string =>
+      card.flowId !== undefined
+        ? mainT("ui.directive.dialog.scope.flow", { flowId: card.flowId })
+        : mainT("ui.directive.dialog.scope.project");
+    entry.directiveEvaluated = true;
+    entry.state = "directing";
+    activeByProject.set(entry.projectKey, entry.payload.id);
+    directingHolds.set(entry.payload.id, entry);
+    const directiveLog = createDiagnosticLogger({
+      component: "desktop.directive-decision",
+      projectRoot,
+      roleId: entry.payload.roleId,
+    });
+    void (async () => {
+      let result: DecisionApplyResult | undefined;
+      try {
+        result = await opts.directive!.applyDecisionDirective(projectRoot, card, {
+          emitResult: async (visible) => {
+            const summary =
+              visible.kind === "selected"
+                ? mainT("main.directive.applied.decisionRecommended", {
+                    id: visible.directiveId,
+                    option: optionLabel(request.options, visible.optionId),
+                  })
+                : mainT("main.directive.applied.decisionDeclined", {
+                    id: visible.directiveId,
+                    scope: scopeText(),
+                  });
+            // 抛错必须冒泡给 B1：可见行是 durable 消费的条件（B1 冻结语义）。
+            opts.directive!.emitResult({ ...noticeBase, summary });
+          },
+        });
+      } catch (error) {
+        directiveLog.error("directive.decision.apply.failed", error, { requestId: entry.payload.id });
+        result = undefined;
+      }
+      if (entry.state !== "directing") return; // 中止/关窗/已结算：丢弃结果（不应用）
+      directingHolds.delete(entry.payload.id);
+      if (result === undefined) {
+        // 无指令 / 账本坏行 / 可见行投达失败 / once durable 失败 ⇒ 回落。
+        // 有**适用**指令却未应用（可见行/durable 失败）⇒ 直接呈现客户卡（不借默认推荐代选）；
+        // 无适用指令（含坏账本按无指令）⇒ 走既有路径（默认推荐仍可用，AC-15 不变）。
+        const hadApplicable = (() => {
+          try {
+            const facts = opts.directive!.decisionFacts(projectRoot);
+            if (facts === undefined || facts.ledgerErrors > 0) return false;
+            return facts.active.some(
+              (fact) =>
+                fact.target === "decision" &&
+                (fact.scope.flowId === undefined ||
+                  (card.flowId !== undefined && fact.scope.flowId === card.flowId)),
+            );
+          } catch {
+            return false;
+          }
+        })();
+        entry.state = "queued";
+        if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
+        if (hadApplicable) presentNow(entry);
+        else presentEntryNow(entry);
+        return;
+      }
+      if (result.kind === "conflict" || result.kind === "no-match") {
+        // 不消费任何一条；绕过 tryAutoSelectDecision，直接呈现客户卡 + 一条既有系统行说明。
+        try {
+          const summary =
+            result.kind === "conflict"
+              ? mainT("main.directive.decision.conflict", { ids: result.ids.join("、") })
+              : mainT("main.directive.decision.notMatched", { id: result.ids.join("、") });
+          opts.directive!.emitNotice({ ...noticeBase, summary });
+        } catch (error) {
+          directiveLog.error("directive.decision.notice.failed", error, { requestId: entry.payload.id });
+        }
+        entry.state = "queued";
+        if (activeByProject.get(entry.projectKey) === entry.payload.id) activeByProject.delete(entry.projectKey);
+        presentNow(entry);
+        return;
+      }
+      if (result.kind === "selected") {
+        settleEntry(
+          entry,
+          {
+            outcome: "answered",
+            value: { selected: [result.optionId] },
+            operatorId: `directive:${result.id}`,
+            directive: { id: result.id, action: result.action },
+          },
+          "directing",
+        );
+        return;
+      }
+      settleEntry(
+        entry,
+        {
+          outcome: "declined",
+          operatorId: `directive:${result.id}`,
+          reason: mainT("main.directive.applied.decisionDeclined", { id: result.id, scope: scopeText() }),
+          directive: { id: result.id, action: "reject" },
+        },
+        "directing",
+      );
+    })();
+    return true;
+  };
+
   /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
   const presentEntryNow = (entry: ChannelEntry): void => {
+    // 客户指令消费者优先（C1）：命中即不进入默认推荐/客户卡；未命中/冲突/失败按 B1 冻结规则回落。
+    if (tryApplyDirectiveDecision(entry)) return;
     // decision 卡先尝试「替我决策」确定性默认；未代选 ⇒ 原卡照旧呈现给客户。
     if (tryAutoSelectDecision(entry)) return;
     const plan = planJudge(entry);
@@ -1820,13 +2015,14 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
             }
           : {}),
       };
-      /** 取消（轮次停止 / 会话重建）：active/judging/triaging ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
+      /** 取消（轮次停止 / 会话重建）：active/judging/triaging/directing ⇒ 结算并放行下一张；queued ⇒ 出队结算（从不呈现）。 */
       const cancel = () => {
         if (entry.state === "done") return;
         const wasOccupying =
-          entry.state === "active" || entry.state === "judging" || entry.state === "triaging";
+          entry.state === "active" || entry.state === "judging" || entry.state === "triaging" || entry.state === "directing";
         if (entry.state === "active") pending.delete(id);
         else if (entry.state === "judging") judging.delete(id);
+        else if (entry.state === "directing") directingHolds.delete(id);
         else if (entry.state === "triaging") {
           triagingHolds.delete(id);
           // 只摘除挂靠：分诊卡保留（客户再作答时只执行处置，无活请求可结算——不伪造客户决定）。
@@ -1940,6 +2136,14 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       heldEntry.resolve({ outcome: "declined", operatorId, reason });
     }
     triagingHolds.clear();
+    for (const heldEntry of directingHolds.values()) {
+      if (heldEntry.state === "done") continue;
+      heldEntry.state = "done";
+      notifyExpired(heldEntry, reason);
+      heldEntry.cleanup();
+      heldEntry.resolve({ outcome: "declined", operatorId, reason });
+    }
+    directingHolds.clear();
     for (const entry of [...pending.values(), ...judging.values(), ...[...waiting.values()].flat()]) {
       if (entry.state === "done") continue;
       if (entry.appCard !== undefined) entry.appCard.held.splice(0);

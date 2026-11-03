@@ -40,6 +40,7 @@ import {
   type ClassifyShellFn,
   type ShellRules,
   type ShellGateReviewedOutcome,
+  type TakeDirectiveFn,
 } from "../../common/编排/shell-gate.ts";
 import type { ShellAuditSink } from "../../common/编排/shell-audit.ts";
 import type { ShellWriteGuardDecision } from "../../common/门禁引擎/shell-write-guard.ts";
@@ -84,7 +85,16 @@ export interface ShellEscalationWiring {
   onAuditSinkCreated?: (sink: ShellAuditSink) => void;
 }
 
-export interface AssembleShellGateOptions extends ShellEscalationWiring {
+/**
+ * 2026-11-03（客户授权平面 B1）：客户审批指令消费者注入点。
+ * **独立于 `ShellEscalationWiring`**；只加在项目三层链与审批档选项面上；**只读档不提供**
+ * （只读拒绝不得被客户指令越过；`shell-gate` 构造期亦守卫）。缺省 = 旧行为逐字不变。
+ */
+export interface ShellDirectiveWiring {
+  takeDirective?: TakeDirectiveFn;
+}
+
+export interface AssembleShellGateOptions extends ShellEscalationWiring, ShellDirectiveWiring {
   /** 目标项目（配置单一来源在装配/前端）。 */
   project: ProjectConfig;
   runtime?: RuntimeKind;
@@ -199,6 +209,8 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     // 2026-10-31 判拒升级：升级注入点透传到闸（缺省不传 = 旧行为逐字不变）。
     ...(opts.onReviewed !== undefined ? { onReviewed: opts.onReviewed } : {}),
     ...(opts.takeGrant !== undefined ? { takeGrant: opts.takeGrant } : {}),
+    // 2026-11-03 客户授权平面（B1）：审批指令消费者（缺省不传 = 旧行为逐字不变）。
+    ...(opts.takeDirective !== undefined ? { takeDirective: opts.takeDirective } : {}),
     ...(opts.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: opts.onAuditSinkCreated } : {}),
     // 项目角色三层链默认 advisory（客户 2026-10-18）：规则只放行，不拒绝；拒绝交 (a)。
     advisoryRuleset: opts.advisoryRuleset ?? true,
@@ -300,7 +312,7 @@ export async function assembleReadonlyShellGate(opts: AssembleReadonlyShellGateO
  * 客户审批不得被模型审读或委托常规检查绕过；type 层面即接不上。
  * `operatorChannel` **必填**（无通道即不 arm；`shell-gate.ts` 构造期亦有守卫）。
  */
-export interface AssembleOperatorShellGateOptions extends ShellEscalationWiring {
+export interface AssembleOperatorShellGateOptions extends ShellEscalationWiring, ShellDirectiveWiring {
   /** 目标项目（配置单一来源在装配/前端）。 */
   project: ProjectConfig;
   /** (a) 客户确认通道（**必填**；桌面确认卡 / 测试桩）。批准才执行；拒绝/超时/不可用 = 拒绝。 */
@@ -388,6 +400,8 @@ export async function assembleOperatorShellGate(
     // 2026-10-31 判拒升级：升级注入点透传到闸（缺省不传 = 旧行为逐字不变）。
     ...(opts.onReviewed !== undefined ? { onReviewed: opts.onReviewed } : {}),
     ...(opts.takeGrant !== undefined ? { takeGrant: opts.takeGrant } : {}),
+    // 2026-11-03 客户授权平面（B1）：审批指令消费者（缺省不传 = 旧行为逐字不变）。
+    ...(opts.takeDirective !== undefined ? { takeDirective: opts.takeDirective } : {}),
     ...(opts.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: opts.onAuditSinkCreated } : {}),
   });
 }

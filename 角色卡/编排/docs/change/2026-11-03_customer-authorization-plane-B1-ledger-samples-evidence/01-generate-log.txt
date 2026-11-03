@@ -1,0 +1,40 @@
+command: node 01-generate-ledger-samples.mjs
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+startedAt: 2026-11-03T19:28:03+08:00
+CHECK PASS main: created id d-1
+CHECK PASS main: decision target created (d-2)
+CHECK PASS main: approval once consumed by takeDirective
+CHECK PASS main: approval session revoked
+CHECK PASS main: ledger has 11 events {"actual":11}
+CHECK PASS main: all four event kinds present {"kinds":["directive.created","directive.created","directive.created","directive.created","directive.consumed","directive.revoked","directive.created","directive.created","directive.expired","directive.expired","directive.expired"]}
+CHECK PASS main: created rows > = 2 distinct targets
+CHECK PASS main: expired reasons include app-restart and unused-once
+CHECK PASS main: every event version===1
+CHECK PASS main: seq strictly monotonic 1..11
+CHECK PASS main: created id === d-<seq>
+CHECK PASS main: created events carry sessionId
+CHECK PASS main: highRisk sample present (forever + switch-off-project-recommended)
+SUMMARY main ledger: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane\角色卡\编排\docs\change\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\02-ledger-sample\project\.ans\state\customer-directives.jsonl
+SUMMARY main lines: 11 bytes: 4133
+SUMMARY main layout: [{"name":"customer-directives.jsonl","bytes":4133}]
+CHECK PASS bad/rotation: created d-1
+CHECK PASS bad/rotation: created d-3 in current file
+CHECK PASS bad/rotation: three segment files exist {"layout":[{"name":"customer-directives.jsonl","bytes":611},{"name":"customer-directives.jsonl.1","bytes":41},{"name":"customer-directives.jsonl.2","bytes":155}]}
+CHECK PASS bad/rotation: .2 oldest = unknown-kind line
+CHECK PASS bad/rotation: .1 = bad JSON line
+CHECK PASS bad/rotation: current = valid created d-3
+SUMMARY bad/rotation ledger: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane\角色卡\编排\docs\change\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\03-bad-rotation-sample\project\.ans\state\customer-directives.jsonl
+SUMMARY bad/rotation layout: [{"name":"customer-directives.jsonl","bytes":611},{"name":"customer-directives.jsonl.1","bytes":41},{"name":"customer-directives.jsonl.2","bytes":155}]
+SUMMARY segment customer-directives.jsonl: bytes=611 lines=1
+  {"version":1,"kind":"directive.created","id":"d-3","seq":3,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm run build","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\03-bad-rotation-sample\\project"}},"scope":{},"until":"session","rawText":"@审批 允许 shell \"npm run build\" session","sessionId":"b1-bad-rotation-session-A","createdAt":"2026-11-03T12:00:13.000Z","createdBy":"customer","source":"desktop-input"}
+SUMMARY segment customer-directives.jsonl.1: bytes=41 lines=1
+  {"version":1,"kind":"directive.created",
+SUMMARY segment customer-directives.jsonl.2: bytes=155 lines=1
+  {"version":1,"kind":"directive.future","id":"d-500","seq":500,"at":"2026-11-03T12:00:30.000Z","note":"unknown-kind evidence line (future additive event)"}
+SUMMARY generation startedAt=2026-11-03T11:28:03.626Z finishedAt=2026-11-03T11:28:03.700Z
+SUMMARY checks=19 passed=19 failed=0
+SUMMARY repo=C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane
+SUMMARY node=v24.22.1 platform=win32 arch=x64
+SUMMARY ledgerRel=.ans/state/customer-directives.jsonl
+finishedAt: 2026-11-03T19:28:03+08:00
+exit code: 0

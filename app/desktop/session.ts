@@ -122,6 +122,7 @@ import {
   type ProjectStateToolResult,
   type ProjectStateView,
   type VersionDecisionErrorCode,
+  type VersionDecisionDecidedBy,
   type VersionDecisionFacts,
   type VersionDecisionRequest,
   type VersionDecisionResult,
@@ -191,6 +192,8 @@ import { classifyProcessOutcome, pickLatestSessionFile, sessionsDirFor } from ".
 // （编排 `common/编排/watchdog.ts` 同名转发）。
 import { formatDurationMs, type WatchdogObservation, type WatchdogProjectSnapshot } from "./watchdog.ts";
 import { mainT } from "./i18n.ts";
+// 客户授权平面 Q9 A（2026-11-03）：`operatorId:"directive:<id>"` 的唯一解析（不信任其他字段）。
+import { directiveIdFromOperatorId } from "./directive-input.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
 import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent } from "../../src/model/runtime.ts";
 import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinEvidenceRoots, loadCriteria, parseEvidenceMeta, readArtifact, validateEvidencePath, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
@@ -388,6 +391,16 @@ export interface SendResult {
    * 重建前后至多投递一次；真实客户消息不走此判据（同文重复发送仍是两个意图）。
    */
   duplicate?: true;
+  /**
+   * **客户授权平面（C1，2026-11-03）**：命中 `@审批`/`@决策` 标记且落账成功——本次不产生角色轮次
+   * （`turnId`/`inputAccepted`/`outcome`/`sessionCurrent` 均不设置）。`id` 为账本 `d-<seq>`。
+   */
+  directive?: { id: string; target: "approval" | "decision" };
+  /**
+   * **仅取消/关窗**：`{ok:false,error,directiveCancelled:true}`——Composer 据此恢复草稿；
+   * 未落账、未投递、无「已记录」回执。
+   */
+  directiveCancelled?: true;
 }
 
 export interface StopResult {
@@ -2071,11 +2084,20 @@ export class SessionManager {
           /* 新文档不可读：不伪造 hash；apply 记录只带可读者。 */
         }
       }
+      // Q9 A（2026-11-03）：三值归属——`directive:<id>` 先于 judge/customer；指令 id 只从 operatorId 解析。
+      const runChangeDirectiveId = directiveIdFromOperatorId(settled.operatorId);
+      const runChangeDecidedBy: VersionDecisionDecidedBy =
+        runChangeDirectiveId !== undefined
+          ? "directive"
+          : settled.operatorId !== undefined && settled.operatorId.startsWith("judge:")
+            ? "judge"
+            : "customer";
       const applied = await applyRunChange(input.projectRoot, active.manifest!, {
         decisionId: settled.decisionId ?? `decision-${requestId}`,
         requestId,
         mode,
-        decidedBy: settled.operatorId !== undefined && settled.operatorId.startsWith("judge:") ? "judge" : "customer",
+        decidedBy: runChangeDecidedBy,
+        ...(runChangeDirectiveId !== undefined ? { directiveId: runChangeDirectiveId } : {}),
         ...(Object.keys(newHashes).length > 0 ? { newHashes } : {}),
       });
       if (!applied.ok) {
@@ -4163,14 +4185,20 @@ export class SessionManager {
       return abortedOutcome;
     }
     const answeredOut = out !== null && out !== undefined && out.outcome === "answered" ? out : undefined;
-    const judged = answeredOut !== undefined && (answeredOut.judge !== undefined || (typeof answeredOut.operatorId === "string" && answeredOut.operatorId.startsWith("judge:")));
+    const operatorId = out !== null && out !== undefined && "operatorId" in out && typeof out.operatorId === "string" ? out.operatorId : undefined;
+    // Q9 A（2026-11-03）：指令归属只从 `operatorId:"directive:<id>"` 解析；不伪造 `request.presented.to`
+    // （W-6：presented 仍仅 customer/judge；指令代选/拒绝在呈现之前完成）。
+    const directiveId = directiveIdFromOperatorId(operatorId);
+    const judged =
+      directiveId === undefined &&
+      answeredOut !== undefined &&
+      (answeredOut.judge !== undefined || (typeof operatorId === "string" && operatorId.startsWith("judge:")));
     if (judged && !presented && answeredOut !== undefined) await markPresented("judge");
     else if (presentedWrite !== null) await presentedWrite;
     const choice = answeredOut !== undefined
       ? (answeredOut.value.confirmed === true ? "confirmed" : answeredOut.value.confirmed === false ? "denied" : (answeredOut.value.selected ?? []).join(",") || "answered")
       : out?.outcome ?? "unavailable";
     const selected = answeredOut?.value.selected ?? [];
-    const operatorId = out !== null && out !== undefined && "operatorId" in out && typeof out.operatorId === "string" ? out.operatorId : undefined;
     // 2026-10-29（方案 v2.1 §5.4/M4/M11）：裁决 id 回填给工具回执（appointment-write 的凭据）；
     // 招人卡同时记录**当前最新名单**的版本与 hash（应用计算，模型不可自报）。
     const decisionId = answeredOut !== undefined ? `decision-${requestId}` : undefined;
@@ -4195,7 +4223,8 @@ export class SessionManager {
       ...(selected.length > 0 && request.cardKind !== "appointment" ? { selectedOptionIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
-      by: judged ? "judge" : "customer",
+      by: directiveId !== undefined ? "directive" : judged ? "judge" : "customer",
+      ...(directiveId !== undefined ? { directiveId } : {}),
       ...(operatorId !== undefined ? { operatorId } : {}),
       choice,
       ...(out?.outcome === "declined" && out.reason !== undefined ? { reason: shortenSummary(out.reason, 200) } : {}),
@@ -4467,7 +4496,8 @@ export class SessionManager {
     };
   }
 
-  private decidedByText(decidedBy: "customer" | "judge"): string {
+  private decidedByText(decidedBy: VersionDecisionDecidedBy): string {
+    if (decidedBy === "directive") return mainT("ui.versionDecision.decidedBy.directive");
     return decidedBy === "judge" ? mainT("ui.versionDecision.decidedBy.judge") : mainT("ui.versionDecision.decidedBy.customer");
   }
 
@@ -4655,9 +4685,11 @@ export class SessionManager {
         if (signal?.aborted) return fail("initiator-aborted", mainT("main.versionDecision.aborted"));
         const answeredOutcome = outcome !== null && outcome !== undefined && outcome.outcome === "answered" ? outcome : undefined;
         const operatorId = outcome !== null && outcome !== undefined && "operatorId" in outcome && typeof outcome.operatorId === "string" ? outcome.operatorId : undefined;
+        // Q9 A（2026-11-03）：指令归属只从 `operatorId:"directive:<id>"` 解析（先于 judge/customer）。
+        const directiveId = directiveIdFromOperatorId(operatorId);
         const judged = (answeredOutcome !== undefined && answeredOutcome.judge !== undefined) ||
           (typeof operatorId === "string" && operatorId.startsWith("judge:"));
-        const decidedBy: "customer" | "judge" = judged ? "judge" : "customer";
+        const decidedBy: VersionDecisionDecidedBy = directiveId !== undefined ? "directive" : judged ? "judge" : "customer";
         const answerOutcome: "answered" | "declined" | "unavailable" =
           answeredOutcome !== undefined ? "answered" : outcome !== null && outcome !== undefined && outcome.outcome === "declined" ? "declined" : "unavailable";
         const answerPlan = mapVersionDecisionAnswer({
@@ -4689,6 +4721,7 @@ export class SessionManager {
           recommendedBy: "chief",
           recommendedAction: req.action,
           decidedBy: answerPlan.decidedBy,
+          ...(directiveId !== undefined ? { directiveId } : {}),
           ...(operatorId !== undefined ? { operatorId } : {}),
           reason: req.reason,
           oldFlowId: req.flowId,

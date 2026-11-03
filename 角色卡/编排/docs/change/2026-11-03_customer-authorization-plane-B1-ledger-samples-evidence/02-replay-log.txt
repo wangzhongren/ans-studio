@@ -1,0 +1,81 @@
+command: node 02-replay-ledgers.mjs
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+startedAt: 2026-11-03T19:28:03+08:00
+================================================================================
+MAIN SAMPLE REPLAY
+ledger: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane\角色卡\编排\docs\change\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\02-ledger-sample\project\.ans\state\customer-directives.jsonl
+ledgerRel: .ans/state/customer-directives.jsonl
+main.provider.files=["customer-directives.jsonl"]
+main.provider.lines=11
+main.provider.errors=0
+main.provider.line: {"version":1,"kind":"directive.created","id":"d-1","seq":1,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm install","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"until":"once","rawText":"@审批 允许 shell \"npm install\" once","sessionId":"b1-ledger-sample-session-A","createdAt":"2026-11-03T12:00:00.000Z","createdBy":"customer","source":"desktop-input"}
+main.provider.line: {"version":1,"kind":"directive.created","id":"d-2","seq":2,"target":"decision","action":{"kind":"select-recommended"},"scope":{},"until":"session","rawText":"@决策 选推荐项 until=session","highRisk":{"reasons":["switch-off-project-recommended"],"acknowledged":true,"acknowledgedAt":"2026-11-03T12:00:01.000Z"},"sessionId":"b1-ledger-sample-session-A","createdAt":"2026-11-03T12:00:01.000Z","createdBy":"customer","source":"desktop-input"}
+main.provider.line: {"version":1,"kind":"directive.created","id":"d-3","seq":3,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm test","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"until":"session","rawText":"@审批 允许 shell \"npm test\" session","sessionId":"b1-ledger-sample-session-A","createdAt":"2026-11-03T12:00:02.000Z","createdBy":"customer","source":"desktop-input"}
+main.provider.line: {"version":1,"kind":"directive.created","id":"d-4","seq":4,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm run build","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"until":"forever","rawText":"@审批 允许 shell \"npm run build\" forever","highRisk":{"reasons":["forever"],"acknowledged":true,"acknowledgedAt":"2026-11-03T12:00:03.000Z"},"sessionId":"b1-ledger-sample-session-A","createdAt":"2026-11-03T12:00:03.000Z","createdBy":"customer","source":"desktop-input"}
+main.provider.line: {"version":1,"kind":"directive.consumed","id":"d-1","seq":5,"at":"2026-11-03T12:00:04.000Z","via":{"toolCallId":"sample-tool-1"}}
+main.provider.line: {"version":1,"kind":"directive.revoked","id":"d-3","seq":6,"at":"2026-11-03T12:00:05.000Z","by":"customer"}
+main.provider.line: {"version":1,"kind":"directive.created","id":"d-7","seq":7,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm run lint","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"until":"session","rawText":"@审批 允许 shell \"npm run lint\" session","sessionId":"b1-ledger-sample-session-A","createdAt":"2026-11-03T12:00:06.000Z","createdBy":"customer","source":"desktop-input"}
+main.provider.line: {"version":1,"kind":"directive.created","id":"d-8","seq":8,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm run format","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"until":"once","rawText":"@审批 允许 shell \"npm run format\" once","sessionId":"b1-ledger-sample-session-A","createdAt":"2026-11-03T12:00:07.000Z","createdBy":"customer","source":"desktop-input"}
+main.provider.line: {"version":1,"kind":"directive.expired","id":"d-2","seq":9,"at":"2026-11-03T12:00:08.000Z","reason":"app-restart"}
+main.provider.line: {"version":1,"kind":"directive.expired","id":"d-7","seq":10,"at":"2026-11-03T12:00:09.000Z","reason":"app-restart"}
+main.provider.line: {"version":1,"kind":"directive.expired","id":"d-8","seq":11,"at":"2026-11-03T12:00:10.000Z","reason":"unused-once"}
+main.list.ok=true
+main.list.ledgerErrors=0
+main.list.approval.active: {"id":"d-4","seq":4,"target":"approval","status":"active","until":"forever","action":{"kind":"allow","resource":{"type":"shell","command":"npm run build","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"createdAt":"2026-11-03T12:00:03.000Z","highRisk":{"reasons":["forever"],"acknowledged":true},"consumer":"shell-gate"}
+main.list.approval.consumed: {"id":"d-1","seq":1,"target":"approval","status":"consumed","until":"once","action":{"kind":"allow","resource":{"type":"shell","command":"npm install","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"createdAt":"2026-11-03T12:00:00.000Z","consumedAt":"2026-11-03T12:00:04.000Z","consumer":"shell-gate"}
+main.list.approval.revoked: {"id":"d-3","seq":3,"target":"approval","status":"revoked","until":"session","action":{"kind":"allow","resource":{"type":"shell","command":"npm test","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"createdAt":"2026-11-03T12:00:02.000Z","revokedAt":"2026-11-03T12:00:05.000Z","consumer":"shell-gate"}
+main.list.approval.expired: {"id":"d-7","seq":7,"target":"approval","status":"expired","until":"session","action":{"kind":"allow","resource":{"type":"shell","command":"npm run lint","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"createdAt":"2026-11-03T12:00:06.000Z","expiredAt":"2026-11-03T12:00:09.000Z","expiredReason":"app-restart","consumer":"shell-gate"}
+main.list.approval.expired: {"id":"d-8","seq":8,"target":"approval","status":"expired","until":"once","action":{"kind":"allow","resource":{"type":"shell","command":"npm run format","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"createdAt":"2026-11-03T12:00:07.000Z","expiredAt":"2026-11-03T12:00:10.000Z","expiredReason":"unused-once","consumer":"shell-gate"}
+main.list.decision.expired: {"id":"d-2","seq":2,"target":"decision","status":"expired","until":"session","action":{"kind":"select-recommended"},"scope":{},"createdAt":"2026-11-03T12:00:01.000Z","expiredAt":"2026-11-03T12:00:08.000Z","expiredReason":"app-restart","highRisk":{"reasons":["switch-off-project-recommended"],"acknowledged":true},"consumer":"decision-card"}
+main.approvalFacts={"ledgerErrors":0,"active":[{"id":"d-4","seq":4,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm run build","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\02-ledger-sample\\project"}},"scope":{},"until":"forever"}]}
+main.decisionFacts={"ledgerErrors":0,"active":[]}
+main.takeDirective("npm install")=undefined // consumed once should not match
+CHECK PASS main: takeDirective npm install -> undefined {"command":"npm install"}
+main.takeDirective("npm test")=undefined // revoked session should not match
+CHECK PASS main: takeDirective npm test -> undefined {"command":"npm test"}
+main.takeDirective("npm run lint")=undefined // expired app-restart should not match
+CHECK PASS main: takeDirective npm run lint -> undefined {"command":"npm run lint"}
+main.takeDirective("npm run format")=undefined // expired unused-once should not match
+CHECK PASS main: takeDirective npm run format -> undefined {"command":"npm run format"}
+main.takeDirective("npm run build") #1={"action":"allow","id":"d-4","scope":"forever"}
+main.takeDirective("npm run build") #2={"action":"allow","id":"d-4","scope":"forever"}
+CHECK PASS main: forever directive reusable twice
+CHECK PASS main: 6 views parsed (one per created directive; 11 ledger events) {"actual":6}
+CHECK PASS main: d-1 consumed
+CHECK PASS main: d-2 expired app-restart (decision/session)
+CHECK PASS main: d-3 revoked
+CHECK PASS main: d-4 active forever
+CHECK PASS main: d-7 expired app-restart
+CHECK PASS main: d-8 expired unused-once
+CHECK PASS main: approvalFacts only d-4 active
+CHECK PASS main: decisionFacts empty (d-2 expired)
+================================================================================
+BAD-LINE + ROTATION SAMPLE REPLAY
+ledger: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane\角色卡\编排\docs\change\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\03-bad-rotation-sample\project\.ans\state\customer-directives.jsonl
+bad.provider.files=["customer-directives.jsonl.2","customer-directives.jsonl.1","customer-directives.jsonl"]
+bad.provider.lines=2
+bad.provider.errors=1
+bad.provider.line: {"version":1,"kind":"directive.future","id":"d-500","seq":500,"at":"2026-11-03T12:00:30.000Z","note":"unknown-kind evidence line (future additive event)"}
+bad.provider.line: {"version":1,"kind":"directive.created","id":"d-3","seq":3,"target":"approval","action":{"kind":"allow","resource":{"type":"shell","command":"npm run build","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\03-bad-rotation-sample\\project"}},"scope":{},"until":"session","rawText":"@审批 允许 shell \"npm run build\" session","sessionId":"b1-bad-rotation-session-A","createdAt":"2026-11-03T12:00:13.000Z","createdBy":"customer","source":"desktop-input"}
+bad.reader.files=["customer-directives.jsonl.2","customer-directives.jsonl.1","customer-directives.jsonl"]
+bad.reader.values=1
+bad.reader.badLines=1
+bad.reader.ignoredLines=1
+bad.reader.errors=[{"file":"customer-directives.jsonl.1","line":1,"message":"JSON 坏行：Expected double-quoted property name in JSON at position 40 (line 1 column 41)"}]
+CHECK PASS bad: old→new file order is .2, .1, current {"files":["customer-directives.jsonl.2","customer-directives.jsonl.1","customer-directives.jsonl"]}
+CHECK PASS bad: badLines === 1 (bad JSON line) {"badLines":1}
+CHECK PASS bad: ignoredLines === 1 (unknown kind) {"ignoredLines":1}
+CHECK PASS bad: one file-level/parse error recorded {"errors":[{"file":"customer-directives.jsonl.1","line":1,"message":"JSON 坏行：Expected double-quoted property name in JSON at position 40 (line 1 column 41)"}]}
+CHECK PASS bad: valid current-segment event remains readable
+bad.list.ok=true
+bad.list.ledgerErrors=1
+bad.list.approval.active: {"id":"d-3","seq":3,"target":"approval","status":"active","until":"session","action":{"kind":"allow","resource":{"type":"shell","command":"npm run build","cwd":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\编排\\docs\\change\\2026-11-03_customer-authorization-plane-B1-ledger-samples-evidence\\03-bad-rotation-sample\\project"}},"scope":{},"createdAt":"2026-11-03T12:00:13.000Z","consumer":"shell-gate"}
+bad.approvalFacts={"ledgerErrors":1,"active":[]}
+bad.takeDirective("npm run build")=undefined
+CHECK PASS bad: consumer treats ledgerErrors>0 as no directive
+CHECK PASS bad: panel list still ok:true + ledgerErrors (does not fake empty)
+CHECK PASS bad: parseable created view remains visible (d-3 active)
+SUMMARY replay startedAt=2026-11-03T11:28:03.772Z finishedAt=2026-11-03T11:28:03.818Z
+SUMMARY checks=22 passed=22 failed=0
+finishedAt: 2026-11-03T19:28:03+08:00
+exit code: 0

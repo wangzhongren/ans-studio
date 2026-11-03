@@ -1,0 +1,96 @@
+ M docs/acceptance/memo.md
+ M docs/scheduling/memo.md
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M "src/common/\347\274\226\346\216\222/run-manifest.ts"
+ M "src/common/\347\274\226\346\216\222/shell-audit.ts"
+ M "src/common/\347\274\226\346\216\222/shell-gate.ts"
+ M "src/common/\347\274\226\346\216\222/task-state.ts"
+ M "src/common/\347\274\226\346\216\222/version-decision.ts"
+ M src/model/project-state.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/govern-session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/pipeline/orchestration/shell-arming.ts
+ M "test/\347\274\226\346\216\222/run-manifest.test.ts"
+ M "test/\347\274\226\346\216\222/task-state.test.ts"
+ M "test/\347\274\226\346\216\222/version-decision.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.yaml"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/changelog.md"
+ M "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+ M "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/architecture/shared-components.md"
+?? docs/acceptance/customer-authorization-plane-criteria-v1.md
+?? docs/communication/2026-11-03_intent_customer-authorization-plane.md
+?? docs/planning/2026-11-03_design_customer-authorization-plane.md
+?? docs/planning/2026-11-03_review_customer-authorization-plane.md
+?? docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md
+?? src/common/shared/jsonl-ledger.ts
+?? src/model/directive-marker.ts
+?? src/model/directive.ts
+?? src/pipeline/orchestration/customer-directive.ts
+?? src/provider/directive/
+?? src/service/directive/
+?? test/runtime-core/directive-contract.test.ts
+?? test/runtime-core/directive-marker.test.ts
+?? "test/\347\274\226\346\216\222/customer-directive-gate.test.ts"
+?? "test/\347\274\226\346\216\222/customer-directive.test.ts"
+?? "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/jsonl-ledger.test.ts"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-03_customer-authorization-plane-B0-baseline-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-03_customer-authorization-plane-B0-baseline.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-03_customer-authorization-plane-B1-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-03_customer-authorization-plane-B1-implementation.md"
+?? "\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-11-03_customer-authorization-plane-A1-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-11-03_customer-authorization-plane-A1-implementation.md"
+?? "\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-A2-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-A2-implementation.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-A3-evidence/"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-A3-implementation.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-P1-proposal.md"
+?? "\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/change/2026-11-03_customer-authorization-plane-P1-review.md"
+docs/acceptance/memo.md
+docs/scheduling/memo.md
+src/common/shared/i18n/messages/en-US.ts
+src/common/shared/i18n/messages/zh-CN.ts
+"src/common/\347\274\226\346\216\222/run-manifest.ts"
+"src/common/\347\274\226\346\216\222/shell-audit.ts"
+"src/common/\347\274\226\346\216\222/shell-gate.ts"
+"src/common/\347\274\226\346\216\222/task-state.ts"
+"src/common/\347\274\226\346\216\222/version-decision.ts"
+src/model/project-state.ts
+src/model/runtime.ts
+src/pipeline/orchestration/govern-session.ts
+src/pipeline/orchestration/run-role.ts
+src/pipeline/orchestration/shell-arming.ts
+"test/\347\274\226\346\216\222/run-manifest.test.ts"
+"test/\347\274\226\346\216\222/task-state.test.ts"
+"test/\347\274\226\346\216\222/version-decision.test.ts"
+"test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/i18n.test.ts"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.md"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/boundary.yaml"
+"\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/changelog.md"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/api-spec.md"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.md"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/boundary.yaml"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/changelog.md"
+"\350\247\222\350\211\262\345\215\241/\347\274\226\346\216\222/memo.md"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/api-spec.md"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.md"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/boundary.yaml"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/changelog.md"
+"\350\247\222\350\211\262\345\215\241/\350\277\220\350\241\214\346\227\266\346\240\270\345\277\203/memo.md"
+"\350\247\222\350\211\262\345\215\241/\351\241\271\347\233\256\347\256\241\347\220\206/docs/architecture/shared-components.md"

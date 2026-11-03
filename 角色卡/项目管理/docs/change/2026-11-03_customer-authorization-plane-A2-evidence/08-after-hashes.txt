@@ -1,0 +1,7 @@
+file | git hash-object | sha256 | bytes | lines
+src/common/shared/jsonl-ledger.ts | 223d32c6e46bac41200406546e33e86767ac0d82 | c9fd3066f1985c1b8ae850ab9b67845dcf320e7f38779de4121687cdcdd62e5f | 9010 | 229
+test/项目管理/shared/jsonl-ledger.test.ts | f879ebb5944bc255295c263b30c8479c39a6c63b | 3aa6154db2cd353b4ad924803113d3861cfb01fcba77acbd8050dc02972bbb8e | 14361 | 343
+src/common/shared/i18n/messages/zh-CN.ts | 7511b17bcd71b1e3a598f3fb864ba4c6ea0ea351 | 6dafeb5983fac78336063e669aaba44434eabeae06c6c6a511f537d7eb3c3b6a | 168874 | 2188
+src/common/shared/i18n/messages/en-US.ts | b4d352513b4db535a1de8501efa883c63b255026 | 8c0d15bd40d5bdbb629a75511dfb1b1fe284b1e7d8d8de86e3cea7e24c876602 | 181019 | 2456
+test/项目管理/shared/i18n.test.ts | 1de9f5a37e71454110384a3f74eed729bccd36c6 | 62b04e8c42bf1548606e9412c981e42baca073324980e76d23c6eff220e1a80a | 29741 | 618
+角色卡/项目管理/docs/architecture/shared-components.md | 2d460d5031d000d9cebb75bc8aeb64c80f99d741 | dd33fdf7805e1ca08c60cf62b804b4f20b6dd7d5c9d4632431706bbaeeca6339 | 49025 | 216

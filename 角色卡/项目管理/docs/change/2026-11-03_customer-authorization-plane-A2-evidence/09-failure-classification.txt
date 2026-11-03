@@ -1,0 +1,4 @@
+full typecheck errors are outside the A2/A3 write set when non-zero.
+expected concurrent source: uncommitted A1 files (src/model/runtime.ts, src/model/project-state.ts, src/model/directive*.ts, test/runtime-core/directive-*.test.ts) and their consumers to be updated by B1.
+A2 acceptance signal: 05-typecheck-scoped-a2a3.log exit_code 0 and no errors in A2/A3 files.
+deterministic new failures in A2 test file: 0; new skips: 0.

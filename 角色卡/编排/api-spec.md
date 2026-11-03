@@ -1159,3 +1159,15 @@ function evaluateDispatchPreflight(input: DispatchPreflightInput): DispatchPrefl
 - 调用方（B1）顺序：硬授权 → 事实收集 → run 只读/记账（含 handoff pin）→ `verifyVersionedDocBaselines` → collector → `task.created` → 投递/回执。
 
 **证据（2026-11-02，win32 / Node v24.22.1）**：`test/编排/{workflow-preconditions,dispatch-advisories}.test.ts` **34/34**；补充 `test/编排/{task-state,appointment-roster}.test.ts` **21/21**；`npm run typecheck` exit 0；候选树 `a593ddcb4ae60f468d1a5919722a4fa23ee9b71e`。见[实施记录](docs/change/2026-11-02_dispatch-guardrail-relax-A1-implementation.md)。
+
+## 2026-11-03 客户授权平面 B1：客户指令 Pipeline 公共句柄（冻结 v1）
+
+`src/pipeline/orchestration/customer-directive.ts`（B-2 新单文件；C1/C2 只读消费，B1 冻结）：
+
+- `createCustomerDirectiveRuntime({projectRoot,sessionId,present,now?,store?}) => CustomerDirectiveRuntime`。
+- `submitFromInput(SubmitFromInput) => Promise<SubmitResult>`；`approvalFacts()/decisionFacts()` target-scoped 快照（`ledgerErrors>0 ⇒ active=[]`）；`takeDirective(req,intent?)`；`applyDecisionDirective(card,hooks?)`（`DecisionHooks.emitResult` 唯一可见行钩子；抛错/拒绝/无钩子 ⇒ 不消费、返回 undefined）；`revoke(id,target)`；`list()`。
+- `SubmitFromInput.decisionGroupEnabled: boolean` 必填；`DecisionApplyResult = selected|rejected|conflict|no-match`；`DirectiveErrorCode` 见类型；`DirectiveStore.relPath` 必须 = A1 `CUSTOMER_DIRECTIVES_REL`。
+- 账本 `.ans/state/customer-directives.jsonl`（A1 常量）；Provider/Service 在 `src/provider/directive/`、`src/service/directive/`；轮转/串行追加/旧→新读取/坏行复用 A2 `jsonl-ledger`（不写第二份）。
+- shell 闸：`CreateShellGateOptions.takeDirective?`（readonly 构造期拒绝）；顺序 preblock→write-guard→classify→**指令 deny**→c=deny→c=allow→script→takeGrant→**指令 allow**→既有链；审计 `directive:{id,scope}`、`by:"directive:<id>"`（与 judge/customerGrant 互斥）。
+- Q9：`request.resolved.by`/`version.decision.decidedBy`/run manifest `decidedBy` 加 `"directive"` + `directiveId`。
+- 状态 `implemented-unverified`；证据见 [B1 实施记录](docs/change/2026-11-03_customer-authorization-plane-B1-implementation.md) 与 `docs/change/2026-11-03_customer-authorization-plane-B1-evidence/`。冻结声明 `10-freeze-statement.txt`。

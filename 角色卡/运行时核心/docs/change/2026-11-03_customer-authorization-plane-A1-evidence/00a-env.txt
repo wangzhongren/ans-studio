@@ -1,0 +1,5 @@
+v24.22.1
+11.19.1
+MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+2026-11-03T14:50:19+08:00
+/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane

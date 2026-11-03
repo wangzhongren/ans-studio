@@ -1,0 +1,12 @@
+ledger exists: true
+ledger bytes: 3344
+events: 9
+seq=1	kind=directive.created	id=d-1	target=approval	until=once	action=allow	scope={}	resource=shell:npm install	highRisk=-	sessionId=d2-probe-1793702679098	createdBy=customer
+seq=2	kind=directive.created	id=d-2	target=approval	until=forever	action=allow	scope={}	resource=shell:npm install	highRisk=["forever"],ack=true	sessionId=d2-probe-1793702679098	createdBy=customer
+seq=3	kind=directive.created	id=d-3	target=decision	until=session	action=select-recommended	scope={}	resource=-	highRisk=["switch-off-project-recommended"],ack=true	sessionId=d2-probe-1793702679098	createdBy=customer
+seq=4	kind=directive.created	id=d-4	target=decision	until=session	action=select-option:方案 B	scope={"flowId":"focus"}	resource=-	highRisk=-	sessionId=d2-probe-1793702679098	createdBy=customer
+seq=5	kind=directive.revoked	id=d-3	by=customer
+seq=6	kind=directive.revoked	id=d-4	by=customer
+seq=7	kind=directive.created	id=d-7	target=decision	until=session	action=select-option:不存在的选项	scope={"flowId":"focus"}	resource=-	highRisk=-	sessionId=d2-probe-1793702679098	createdBy=customer
+seq=8	kind=directive.revoked	id=d-1	by=customer
+seq=9	kind=directive.created	id=d-9	target=approval	until=once	action=allow	scope={}	resource=shell:npm install	highRisk=-	sessionId=d2-probe-1793702679098	createdBy=customer

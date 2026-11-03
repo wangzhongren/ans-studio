@@ -1,0 +1,16 @@
+C2 fix revoke receipt — observed command exit codes (2026-11-03, Asia/Shanghai)
+Worktree: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+HEAD: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+
+node --test --test-concurrency=1 "test/桌面UI/*.test.ts"            (before fix)  EXIT 0   401/401 pass
+node --test --test-concurrency=1 "test/桌面UI/*.test.ts"            (after fix)   EXIT 0   402/402 pass
+npm run typecheck                                                                 EXIT 0
+npm run typecheck:renderer                                                        EXIT 0
+npm run build:renderer                                                            EXIT 0   built in 337ms
+node --test --test-concurrency=1 "test/项目管理/shared/i18n-guard.test.ts"         EXIT 0   6/6 pass
+ANS_D2_HEAD=4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0 \
+  ANS_D2_PROBE_OUT=.../2026-11-03_customer-authorization-plane-C2-fix-evidence/probe-run \
+  ./node_modules/.bin/electron test/测试/customer-authorization-plane-d2-probe.mjs EXIT 0
+  → D2_PROBE_DONE failures=0 checks=64 screenshots=16
+
+Raw outputs: 02-tests-ui-before.log, 03-tests-ui-after.log, 04a/04b, 05, 06-d2-probe.log, 12-i18n-guard.log.

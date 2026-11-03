@@ -1,0 +1,85 @@
+D1 T3 failure / skip classification (from final 04-full-t3.log)
+generated: 2026-11-03T17:05:31+0800
+
+ℹ tests 3623
+ℹ pass 3596
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 18
+ℹ todo 0
+ℹ duration_ms 262218.1807
+
+--- FAILING TESTS (9) ---
+✖ native symlink and storage runtime mismatch fail before SDK query (2.5836ms)
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (17.846ms)
+✖ store validate callback rejects directory symlink before Pi parse or new native write (10.8905ms)
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (7.4689ms)
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (5.7868ms)
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (2.9952ms)
+✖ store: native validation stays lazy and native symlink is rejected before effects (3.0236ms)
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (3.1614ms)
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (1.7556ms)
+✖ failing tests:
+test at test\claude-adapter\session.test.ts:639:1
+✖ native symlink and storage runtime mismatch fail before SDK query (2.5836ms)
+test at test\codex-adapter\session.test.ts:351:1
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (17.846ms)
+test at test\pi-adapter\injected-runtime.test.ts:185:1
+✖ store validate callback rejects directory symlink before Pi parse or new native write (10.8905ms)
+test at test\pi-adapter\injected-runtime.test.ts:193:1
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (7.4689ms)
+test at test\runtime-core\file-write-safety.test.ts:97:1
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (5.7868ms)
+test at test\runtime-core\session-store.test.ts:46:1
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (2.9952ms)
+test at test\runtime-core\session-store.test.ts:58:1
+✖ store: native validation stays lazy and native symlink is rejected before effects (3.0236ms)
+test at test\测试\g4-skill-verify\b-render-double-check.test.ts:182:1
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (3.1614ms)
+test at test\编排\shell-authorized-routine.test.ts:184:1
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (1.7556ms)
+
+--- SKIPPED (18) ---
+﹣ owned native process group cleanup kills a wrapper and child that ignore SIGTERM (0.0916ms) # SKIP
+﹣ 会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」 (0.227ms) # chmod 语义在 Windows 不适用
+﹣ D3 write and edit preserve existing ordinary modes and strip special bits (0.0987ms) # SKIP
+﹣ D3 handler under strict umask retains existing mode and keeps new files private (0.049ms) # SKIP
+﹣ D3 chmod failure reaches the handler without committing file or mode (0.064ms) # SKIP
+﹣ D3 sync failure reaches the handler without committing file or mode (0.0427ms) # SKIP
+﹣ D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute (0.0664ms) # SKIP
+﹣ D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives (0.0474ms) # SKIP
+﹣ D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking (0.0347ms) # SKIP
+﹣ D3 AC6: real write/edit preserve regular modes and new files use safe creation (0.0319ms) # SKIP
+﹣ D3 AC6: strict umask in isolated child cannot strip old executable mode (0.0406ms) # SKIP
+﹣ D3 AC7: chmod/fsync failure and abort do not commit or leave a temp (0.0723ms) # SKIP
+﹣ unreadable（权限）：文件不可读 → status=unreadable、actual=null (0.0748ms) # SKIP
+﹣ D3 finalMode 应用普通权限位，未传时保持既有安全创建行为 (0.0687ms) # SKIP
+﹣ D3 严格 umask 下 finalMode 不丢执行位（独立子进程） (0.0209ms) # SKIP
+﹣ D3 chmod 失败不提交内容或权限，并清理临时文件 (0.0142ms) # SKIP
+﹣ D3 sync 失败不提交内容或权限，并清理临时文件 (0.0121ms) # SKIP
+﹣ D3 chmod 完成后中止仍保留原文件及权限 (0.0153ms) # SKIP
+
+--- CLASSIFICATION ---
+1  test/claude-adapter/session.test.ts:639           既有 Windows symlink EPERM
+2  test/codex-adapter/session.test.ts:351            既有 Windows symlink EPERM
+3  test/pi-adapter/injected-runtime.test.ts:185      既有 Windows symlink EPERM
+4  test/pi-adapter/injected-runtime.test.ts:193      既有 Windows symlink EPERM
+5  test/runtime-core/file-write-safety.test.ts:97    既有 Windows symlink EPERM
+6  test/runtime-core/session-store.test.ts:46        既有 Windows symlink EPERM
+7  test/runtime-core/session-store.test.ts:58        既有 Windows symlink EPERM
+8  test/测试/g4-skill-verify/b-render-double-check.test.ts:182  既有 Windows symlink EPERM
+9  test/编排/shell-authorized-routine.test.ts:184    既有 Windows symlink EPERM
+
+The 9 failing file:line + test names are identical to B0 07-failure-classification.txt.
+All 18 skips are the pre-existing platform skips:
+  codex-adapter/session 1; pi-adapter/session-persistence 1; 门禁引擎/pin-evidence 1;
+  runtime-core/file-write-safety 4; 测试/lightweight-permission-repairs 6;
+  项目管理/shared/atomic-write 5.
+
+NEW DETERMINISTIC FAILURES: 0
+NEW SKIPS: 0
+
+Excluded file: test/pi-adapter/write-sequencing.test.ts
+Reason: repository-known pre-existing hang (historical record: 39+ minutes with no progress,
+CPU ~2339s); exclusion follows B0 baseline record and docs/acceptance/acceptance-rework-routing-criteria-v1.md
+lines 98/162/604. Not run in D1; behavior unverified. Excluded by '! -name write-sequencing.test.ts'.

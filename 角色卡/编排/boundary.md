@@ -11,6 +11,9 @@
 | 单文件 | `src/pipeline/orchestration/govern-session.ts` | 治理 bootstrap 会话的编排 |
 | 单文件 | `src/pipeline/orchestration/shell-arming.ts` | shell 闸装配（I-1 三层链 + su 只读档） |
 | 单文件 | `src/pipeline/orchestration/flow-state.ts` | 流程状态 YAML 契约的 Pipeline 公共出口（桌面自动验收门消费；实现同源于 src/common/编排/flow-state.ts） |
+| 单文件 | `src/pipeline/orchestration/customer-directive.ts` | 客户指令运行时 Pipeline 公共句柄：解析→面板请求→落账；facts/consume/revoke |
+| 目录（私有） | `src/provider/directive/` | 客户指令账本 Provider（本任务新建的模块私有根；不是整层目录授权） |
+| 目录（私有） | `src/service/directive/` | 客户指令 Service：状态机/ID/target 过滤/快照（本任务新建的模块私有根；不是整层目录授权） |
 | 目录（私有） | `src/common/编排/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/编排/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/编排/feature-map.md` | 功能导航 |

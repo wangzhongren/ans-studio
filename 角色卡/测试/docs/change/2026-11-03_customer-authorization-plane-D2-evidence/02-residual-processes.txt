@@ -1,0 +1,12 @@
+=== tasklist electron.exe (2026-11-03T18:02:53+08:00)
+
+映像名称                       PID 会话名              会话#       内存使用 
+========================= ======== ================ =========== ============
+electron.exe                 34404 Console                    2     57,684 K
+electron.exe                 11492 Console                    2     60,552 K
+electron.exe                 41000 Console                    2     39,904 K
+
+=== PID 35700 (dispatch-mentioned residue)
+信息: 没有运行的任务匹配指定标准。
+
+note: B0 baseline recorded PIDs 11492/34404/41000 as network-monitor worktree processes (unrelated to this worktree); PID 35700 was terminated by dispatch before D2. D2 uses a fresh userData directory under this evidence dir.

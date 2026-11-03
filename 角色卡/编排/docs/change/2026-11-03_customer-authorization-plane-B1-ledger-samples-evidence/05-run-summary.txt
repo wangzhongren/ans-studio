@@ -1,0 +1,11 @@
+started: generatedAt: 2026-11-03T19:28:02+08:00
+candidate-before-exit: 0
+generate-exit: 0
+replay-exit: 0
+candidate-after-exit: 0
+generation-start: startedAt: 2026-11-03T19:28:03+08:00
+generation-end: finishedAt: 2026-11-03T19:28:03+08:00
+generation-checks: SUMMARY checks=19 passed=19 failed=0
+replay-checks: SUMMARY checks=22 passed=22 failed=0
+candidate-before-summary: RESULT candidates=54 expected=54 unexpected=0 missing=0 mismatch=0
+candidate-after-summary: RESULT candidates=54 expected=54 unexpected=0 missing=0 mismatch=0

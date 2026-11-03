@@ -1,0 +1,15 @@
+D1 input document versions (read-only)
+generated: 2026-11-03T17:06:12+0800
+columns: lines  sha256  path
+
+675	4545d3a5f3c94cc8476bba1197a17e3d6c3028850acd9dd2ae0ccaea0a75f671	docs/scheduling/2026-11-03_team-plan_customer-authorization-plane.md
+1171	51ac0f5041e67c6dbda6fc9406103379be64530316dbcb2c268c89254b9e0069	docs/acceptance/customer-authorization-plane-criteria-v1.md
+397	3faef8eec59425816f2794b6b2397af19ae57211a48e76488280b300c87d878c	角色卡/项目管理/docs/change/2026-11-03_customer-authorization-plane-P1-review.md
+239	f1c54f09b0e630e4b18378fdae1083b0158eb22538a20552d920dea8fe265441	角色卡/测试/docs/change/2026-11-03_customer-authorization-plane-B0-baseline.md
+165	b659c14f7139ec53d2fdb4a062d3a069ada615fba05bf7f8a0bd0b60d6bf9ebd	角色卡/运行时核心/docs/change/2026-11-03_customer-authorization-plane-A1-implementation.md
+88	c6fa3d2cc6f518d77c995c56fd38d1eb9eb628c428d72de5e71d6b487d186447	角色卡/项目管理/docs/change/2026-11-03_customer-authorization-plane-A2-implementation.md
+135	51dcf2fdc0ce9a90e9ab59c89e66a8e2223e482d6ae3f4b7babff589ccaa2367	角色卡/项目管理/docs/change/2026-11-03_customer-authorization-plane-A3-implementation.md
+172	db0ecf35f4ef500158ac02d915918ab05a156f2153f3b4e400e787ef8f48e7b5	角色卡/编排/docs/change/2026-11-03_customer-authorization-plane-B1-implementation.md
+208	966cba43dff59d127c86602981da6ee170e6447ab4a4b8df6f0dfbee469fefc6	角色卡/桌面窗口/docs/change/2026-11-03_customer-authorization-plane-C1-implementation.md
+176	dc8bcca40631985a32cfe7e7a4b9b50323c4bc4580e18432779e78b8ab1481ba	角色卡/桌面UI/docs/change/2026-11-03_customer-authorization-plane-C2-implementation.md
+91	a92aa7da7c2ccf95d2f931d8e7172445ca4e943b302f13703c78787dc16c3ca2	角色卡/项目管理/docs/change/2026-11-03_customer-authorization-plane-i18n-allowlist-amendment.md

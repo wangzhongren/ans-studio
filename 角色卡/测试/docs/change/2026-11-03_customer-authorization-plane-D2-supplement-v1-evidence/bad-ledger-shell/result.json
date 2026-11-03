@@ -1,0 +1,240 @@
+{
+  "mode": "bad-ledger",
+  "startedAt": "2026-11-03T11:32:02.034Z",
+  "repo": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane",
+  "root": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell",
+  "project": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project",
+  "sessionId": "supplement-bad-ledger-session-1793705522034",
+  "checks": [
+    {
+      "name": "SEEDED_LEDGER_PRESENT",
+      "value": true,
+      "detail": {
+        "ledger": {
+          "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl",
+          "lines": 2,
+          "bytes": 76
+        },
+        "segments": [
+          {
+            "file": "customer-directives.jsonl.2",
+            "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl.2",
+            "exists": true,
+            "bytes": 701
+          },
+          {
+            "file": "customer-directives.jsonl.1",
+            "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl.1",
+            "exists": true,
+            "bytes": 750
+          },
+          {
+            "file": "customer-directives.jsonl",
+            "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl",
+            "exists": true,
+            "bytes": 76
+          }
+        ]
+      }
+    },
+    {
+      "name": "CONSUMER_SEES_LEDGER_ERRORS",
+      "value": true,
+      "detail": {
+        "ledgerErrors": 3,
+        "active": 0
+      }
+    },
+    {
+      "name": "NO_ACTIVE_DIRECTIVES",
+      "value": true,
+      "detail": {
+        "approvalActive": 0,
+        "decisionActive": 0
+      }
+    },
+    {
+      "name": "SHELL_MAIN_PATH_UNAFFECTED",
+      "value": true,
+      "detail": {
+        "allow": true,
+        "by": "pm:无会话 → operator:supplement-operator"
+      }
+    },
+    {
+      "name": "LEDGER_NOT_MUTATED",
+      "value": true,
+      "detail": {
+        "before": 76,
+        "after": 76
+      }
+    },
+    {
+      "name": "AUDIT_NO_DIRECTIVE_FIELD",
+      "value": true,
+      "detail": {
+        "timestamp": "2026-11-03T11:32:02.161Z",
+        "toolCallId": "supplement-bad-ledger-1",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project",
+        "conclusion": "allow",
+        "branch": "b-unavailable→a-allow",
+        "by": "pm:无会话 → operator:supplement-operator",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell"
+      }
+    },
+    {
+      "name": "NO_FAILURES",
+      "value": true,
+      "detail": {
+        "failures": 0
+      }
+    }
+  ],
+  "runtime": {
+    "listReply": {
+      "ok": true,
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project",
+      "approval": {
+        "active": [],
+        "consumed": [],
+        "revoked": [
+          {
+            "id": "d-1",
+            "seq": 1,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm run build",
+                "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project"
+              }
+            },
+            "scope": {},
+            "until": "forever",
+            "status": "revoked",
+            "rawText": "@审批 允许 shell \"npm run build\" forever",
+            "createdAt": "2026-11-03T09:00:00.000Z",
+            "revokedAt": "2026-11-03T09:00:01.000Z",
+            "consumer": "shell-gate"
+          },
+          {
+            "id": "d-3",
+            "seq": 3,
+            "target": "approval",
+            "action": {
+              "kind": "allow",
+              "resource": {
+                "type": "shell",
+                "command": "npm run test",
+                "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project"
+              }
+            },
+            "scope": {},
+            "until": "forever",
+            "status": "revoked",
+            "rawText": "@审批 允许 shell \"npm run test\" forever",
+            "createdAt": "2026-11-03T09:00:02.000Z",
+            "revokedAt": "2026-11-03T09:00:03.000Z",
+            "consumer": "shell-gate"
+          }
+        ],
+        "expired": []
+      },
+      "decision": {
+        "active": [],
+        "consumed": [],
+        "revoked": [],
+        "expired": []
+      },
+      "ledgerErrors": 3
+    }
+  },
+  "gateCalls": [
+    {
+      "call": "bad-ledger-normal-chain",
+      "req": {
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project",
+        "toolCallId": "supplement-bad-ledger-1"
+      },
+      "result": {
+        "allow": true,
+        "by": "pm:无会话 → operator:supplement-operator"
+      },
+      "operatorCalls": 1
+    }
+  ],
+  "audit": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\docs\\audit\\shell-gate.jsonl",
+    "exists": true,
+    "bytes": 539,
+    "records": [
+      {
+        "timestamp": "2026-11-03T11:32:02.161Z",
+        "toolCallId": "supplement-bad-ledger-1",
+        "command": "npm install",
+        "argv": [
+          "npm",
+          "install"
+        ],
+        "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project",
+        "conclusion": "allow",
+        "branch": "b-unavailable→a-allow",
+        "by": "pm:无会话 → operator:supplement-operator",
+        "conditions": [
+          "shell-gate"
+        ],
+        "execution": "未执行",
+        "entry": "run_shell"
+      }
+    ]
+  },
+  "ledger": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl",
+    "lines": 2,
+    "bytes": 76
+  },
+  "failures": 0,
+  "seeded": {
+    "ledger": {
+      "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl",
+      "lines": 2,
+      "bytes": 76
+    },
+    "segments": [
+      {
+        "file": "customer-directives.jsonl.2",
+        "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl.2",
+        "exists": true,
+        "bytes": 701
+      },
+      {
+        "file": "customer-directives.jsonl.1",
+        "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl.1",
+        "exists": true,
+        "bytes": 750
+      },
+      {
+        "file": "customer-directives.jsonl",
+        "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\customer-authorization-plane\\角色卡\\测试\\docs\\change\\2026-11-03_customer-authorization-plane-D2-supplement-v1-evidence\\bad-ledger-shell\\project\\.ans\\state\\customer-directives.jsonl",
+        "exists": true,
+        "bytes": 76
+      }
+    ]
+  },
+  "finishedAt": "2026-11-03T11:32:02.173Z"
+}

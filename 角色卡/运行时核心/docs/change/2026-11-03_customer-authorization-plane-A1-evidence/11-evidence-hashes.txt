@@ -1,0 +1,22 @@
+00a-env.txt | 5 | 224 | 1195b57f6c8a7f7e41889c47905d6a38e0f405b18e496298bcce264c527c9cc5
+00b-git-baseline.txt | 26 | 2691 | 2d73510924614a2d4192fc06a6f1c6f4267eed0031b4d41f7c146bc976c04a33
+00c-hashes-before.txt | 6 | 319 | 6d8137af0b42c64949d9ccb683bcc18ec48968befdaf6891b7b0625f9c1ad902
+03-targeted-tests.log | 40 | 2776 | db0cd99b3462bc0a6bd300800e3d029e5a0f55c5345c7b252b6c1edcbb3de87b
+04-runtime-core-suite.log | 375 | 38930 | b86488967cdf407bc2426645889dd8e3dafc9fa14f43b47b9af52af8ae0124f0
+05-npm-run-typecheck.log | 13 | 489 | 62306f8d5f92e18b5eb9821e0846c8ea8437cf5c5370fb7c646a3d72e1ef300b
+06-scoped-typecheck.log | 5 | 656 | 8b6e1354125e7bf68c715e37c9d020dbf94d462e53cc965cbf16560b5abec0ae
+07-candidate-hashes.txt | 26 | 1208 | 377d3f0eb7f9ef76b40d1046876c6dbea8bc285b9b685817ac56b6b5ed149945
+08-git-status.txt | 87 | 6545 | ac318284ebcd177245241a40d6f56d1f090ced999c307b09d4956f93fcd7d52c
+09-static-checks.txt | 35 | 1729 | e8dad15e1091d79b5cf624f22dfad47f78926b8e4886a952ff9700f2bbbb0f6a
+10-freeze-statement.txt | 1 | 1937 | dd8fe34e04d3c8effb7b9fa1183479009fce3fef076ca2b3c98be528d75156cb
+captured_at: 2026-11-03T14:57:37+08:00
+format: name | lines | bytes | sha256
+run-candidate-hashes.sh | 24 | 932 | d3df7fc05af7e842e7c17eb13ecf8be98cb417afdbb15221bb18cff06fc69161
+run-evidence-hashes.sh | 26 | 948 | c2f4957a9aa374a302df8338d82034c9db338ddcc1d24304e9001acf454595a0
+run-git-status.sh | 35 | 1559 | 6f5dc1111ade274067065db26610aa0a048c944a81517b85272e7cd7eb90532f
+run-runtime-core.sh | 21 | 791 | 882aa8d37f9519f17acb2245add70ff75464c1cb1ff23c38952011ac52fa88c2
+run-scoped-typecheck.sh | 20 | 1666 | 82ca78a557432dc7a91c86ecaad36f726a3679d608511f6607d986e32efcd31e
+run-static-checks.sh | 35 | 2084 | 47c2dc6e427f6d3a9bdb7e69a53a53f8b8bad3d4cd5e0e34011d80b3aa4cc80a
+run-targeted-tests.sh | 19 | 832 | b30e8a4cc5205f7242d44b288c9fdf0c705623edc77d4728389bfc8c535a656b
+run-typecheck.sh | 21 | 704 | 10b0a833708bc6b7d283c30e6c95c626c495fabd60a7c4090f4dd1e2673f4962
+self_sha256_excluding_this_line: d4b4e9aa7febe79546ece0b74f6a294c27700ea5f715aaf42847aa5272a2f663

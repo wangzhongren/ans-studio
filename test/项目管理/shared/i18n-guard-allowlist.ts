@@ -33,6 +33,8 @@
 export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   // 演示运行时 agent-facing `systemPrompt`（demo 演示提示词，不面向客户）——classification §4。
   "app/desktop/chat-adapter.ts",
+  // 输入解析关键字「撤销」，非用户可见 UI；展示文案已 key 化——classification §4。
+  "app/desktop/directive-input.ts",
   // 角色卡/团队计划 schema 词汇（组别/写集/依赖…）、`new/changed/existing` 输入别名、
   // 写卡校验正则、发给 Convener 的任务正文（`userVisibleIssue` 已走 mainT）——classification §4/§6。
   // TODO(B3/PM)：`{label}`（`Crew / 组队`、`Steward / 统筹`）仍是中文参数，被拼进用户可见的

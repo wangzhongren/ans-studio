@@ -590,3 +590,34 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 - 渲染层**不导入** `runtime-shared.ts`（顶层 `node:os`/`node:path`）；本地只静态引用同一 key，不复制目录/翻译实现。B4 不新增/修改 shared key。
 - 200% 短视口（`@media (max-height: 480px)`）：`#pi-panel` 自身纵向滚动、`.pi-save-bar` `position:sticky;bottom:0`、`.pi-scroll` 解除内层滚动；`#pi-save` 在 480×310 CSS 下中心可命中（I9 P6）。960×620 不命中该媒体查询，原 flex/static 布局不变。
 - 测试：`test/桌面UI/runtime-config.test.ts` 新增 zh/en demo 与品牌名断言、中性映射/key 映射/未知回退、读取视图解析；`test/桌面UI/source-guard.test.ts` 守卫「不导入 runtime-shared / 无 demo 中文字面量」。旧 zh 断言逐字保留。
+
+## 客户授权平面 C2 渲染侧契约增量（2026-11-03，implemented-unverified）
+
+- 任务：`2026-11-03-customer-authorization-plane` / C2。消费 C1 冻结五通道与五 preload 方法；不实现 IPC、不判 target、不重算高危、不新增依赖。
+
+### 新增/修改模块（`app/renderer/src/`）
+
+- **新增** `stores/directive-store.ts`：`DirectiveBridge` 类型（五方法；`chat/ipc.ts` 重导出并在该文件内做结构断言） + zustand store + 纯视图函数。导出：
+  - 类型：`DirectiveTarget/Until/Status/Consumer/Runtime`、`DirectiveScopeView`、`DirectiveResourceView`、`DirectiveActionView`、`DirectiveItemView`、`DirectiveListView`、`DirectiveConfirmRequestView`、`DirectiveStateView`、`DirectiveCardEntry`、`DirectiveDialogView`、`DirectiveRowView`。
+  - 窄化：`asDirectiveAction/asDirectiveScope/asDirectiveListView/asDirectiveConfirmRequest/asDirectiveStateView/asDirectiveListReply`；`cardDirectiveTarget(payload, {projectRoot,runtime})` 严格 fail-closed。
+  - 视图：`directiveDialogView`、`directiveConfirmValues`、`directiveRevokeTarget`、`directiveRowView`、`groupDirectiveList`、`statusLabelKey`、`consumerLabelKey`、`untilLabelKey`、`untilHintKey`、`directiveTargetTitleKey`、`cardEntryFor`。
+  - 常量：`DIRECTIVE_APPROVAL_MARKER`/`DIRECTIVE_DECISION_MARKER`（A1 标记值按数据渲染）、`DIRECTIVE_INITIAL_READ_TIMEOUT_MS=750`、`DIRECTIVE_RUNTIMES`、`isDirectiveRuntime`、`isDirectiveOverlayOpen`。
+  - store 字段：`capabilityAvailable/directivesEnabled/projectRoot/pending/dialogAcknowledged/approval/decision/ledgerErrors/listLoaded/initialReadDone/busy/errorKey/errorText/panelOpen/cardEntries`；动作 `attachBridge/setProjectRoot/applyState/receiveConfirmRequest/setDialogAcknowledged/respondConfirm/refresh/ensureInitialRead/revoke/clearProject/openPanel/closePanel/setCardEntryExpanded/setCardEntryText/collapseCardEntry/submitFromCardEntry`。
+- **新增** `chat/directive-dialog.tsx`：`DirectiveDialog`（portal → body，z-index 90）。原始 `directive:confirm-request` 只读呈现；高危原因只显示不重算；`confirmable:false`/高危未勾选时确认禁用；确认回包 `directiveConfirmRespond({id,decision:"confirm",values})`，取消/Esc/× = `decision:"cancel"`；capture Esc/Tab 自陷并 `stopImmediatePropagation`；面板打开时让位。DOM：`#directive-dialog`、`#directive-dialog-title`、`#directive-dialog-close`、`#directive-raw-text`、`#directive-scope/-resource/-until/-scope-note/-resource-note`、`#directive-switch-state`、`#directive-unrecognized`、`#directive-high-risk`、`#directive-highrisk-ack`、`#directive-not-confirmable`、`#directive-dialog-error`、`#directive-confirm`、`#directive-cancel`（默认焦点）。
+- **新增** `chat/directive-panel.tsx`：`DirectivePanel`（portal，z-index 95）。两个逻辑面板 `#directive-panel-approval`/`#directive-panel-decision`；`active` 与历史组（consumed→revoked→expired）；行 `#directive-row-<id>`、`#directive-meta-<id>`、active 撤销 `#directive-revoke-<id>`；顶部 shell/recovery 待答徽标 `#directive-panel-shell-badge`；`#directive-panel-ledger-errors`、`#directive-panel-error`、`#directive-panel-close`。行字段/状态/consumer 全部来自冻结 `directive:list/state`；不占 `shellCardSlot`、不进一项目一卡队列、不改 `pendingCount/pendingRoles/judgingCount`。
+- **修改** `chat/ipc.ts`：`directiveBridgeOf(unknown)` 五方法结构断言；`installChatRuntime` 设置项目根、`attachBridge`、订阅 `onDirectiveState`/`onDirectiveConfirmRequest`；项目切换调用 `clearProject(previousRoot,nextRoot)`。五通道消费齐全（两订阅 + `listDirectives`/`revokeDirective`/`directiveConfirmRespond` 由 store 调用）。`lib/platform.ts` 未改。
+- **修改** `shell/Composer.tsx`：发送前对 `el.value` 原文调用共享 `parseDirectiveMarker`；仅 `directivesEnabled===true` 时抑制乐观用户气泡（`ensureInitialRead(projectRoot)` 有界 750ms/失败按 false 普通发送）；`res.directive` 成功不画气泡/不标角色错误/不失效会话；`directiveCancelled` 恢复草稿；能力位未知竞态下若主进程仍拦截，按文本移除刚画的乐观行；控件行新增 `#btn-directive-panel`（能力位 false 禁用并给 A3 说明）；挂载 `DirectiveDialog`/`DirectivePanel`。
+- **修改** `shell/ConfirmCard.tsx`：三张 `.sc-overlay` 页脚 `CardDirectiveEntry`（`sc`/`se`/`rc`）：`#<p>-directive-entry`（默认折叠）、`#<p>-directive-input`、`#<p>-directive-submit`、`#<p>-directive-panel-open`、`#<p>-directive-cancel`、`#<p>-directive-status`。target 只取卡载荷 `{projectRoot,roleId,runtime}` 且必须匹配当前项目/引擎；缺失/非法/跨项目/跨引擎 ⇒ 入口禁用或提交拒绝，不调用 `sendSession`、不画气泡、不落账、不回退当前选择。输入只接受 A1 命中；提交走同一 `bridge.sendSession`；不调用 shell/recovery 应答；Esc 只折叠输入区；`directive-store.overlayOpen` 时 document Tab/Esc 陷阱让位。
+- **修改** `shell/shell.css`：追加 `.directive-dialog-overlay{position:fixed;inset:0;z-index:90}`、`.directive-panel-overlay{...z-index:95}`、卡片/字段/高危/行/卡内入口样式；既有 `.sc-overlay` 仍 z-index 60，未改既有规则。
+
+### 消费的 C1 冻结契约（只读）
+
+`directive:confirm-request` / `directive:confirm-response` / `directive:list` / `directive:revoke` / `directive:state`；preload `onDirectiveConfirmRequest` / `directiveConfirmRespond` / `listDirectives` / `revokeDirective` / `onDirectiveState`；字段名 `directivesEnabled`/`confirmable`/`directiveConfirmRespond`；`DirectiveListView {active,consumed,revoked,expired}`；`SendResult.directive`/`directiveCancelled`。旧 preload 缺任一方法 ⇒ `capabilityAvailable=false`、`directivesEnabled=false`，普通聊天逐字不变。
+
+### i18n
+
+只消费 A3 冻结 key：`ui.directive.panel.*`、`ui.directive.dialog.*`、`ui.directive.highRisk.*`、`ui.directive.error.*`、`ui.directive.cardEntry.*`（14）、`main.directive.receipt.noConsumerSuffix`（domain/path 注明“仅记录、暂无消费者”）、既有 `ui.composer.*` 错误前缀。无 hardcoded 用户可见中英文；A3 标记值按数据传入 `{approvalMarker}`/`{decisionMarker}`。
+
+### 测试与证据
+
+`test/桌面UI/directive-dialog.test.ts`（14）与 `directive-panel.test.ts`（13）：冻结载荷窄化、视图字段/high-risk 映射、撤销识别、回包 values、列表分组/状态/consumer、store handshake/初始读/确认/撤销/项目切换/卡内入口 fail-closed、DOM/源码守卫（z-index/三入口/不调用 shell 应答/target 只取卡载荷）。C2 证据：`docs/change/2026-11-03_customer-authorization-plane-C2-implementation.md` 与 `…-C2-evidence/`。

@@ -27,6 +27,7 @@ import type {
   VersionDecisionAction,
   VersionDecisionCard,
   VersionDecisionCardOption,
+  VersionDecisionDecidedBy,
   VersionDecisionFacts,
   VersionDecisionRequest,
 } from "../../model/project-state.ts";
@@ -245,14 +246,30 @@ export type VersionDecisionAnswerOutcome = "answered" | "declined" | "timeout" |
 
 export interface VersionDecisionAnswerInput {
   outcome: VersionDecisionAnswerOutcome;
-  /** 通道实际裁决人；answered/declined/unavailable 应给出。 */
-  by?: "customer" | "judge";
+  /** 通道实际裁决人；answered/declined/unavailable 应给出。2026-11-03 Q9 A：加 `"directive"`。 */
+  by?: VersionDecisionDecidedBy;
   selected?: readonly unknown[];
   choice?: unknown;
   reason?: string;
 }
 
 export type VersionDecisionAnswerPlan =
+  | { kind: "execute"; action: VersionDecisionAction; decidedBy: VersionDecisionDecidedBy; selectedOptionIds: [VersionDecisionAction] }
+  | { kind: "resolve-declined"; choice: "declined"; reason?: string; by?: VersionDecisionDecidedBy }
+  | { kind: "resolve-unavailable"; choice: "unavailable"; reason?: string; by?: VersionDecisionDecidedBy }
+  | { kind: "orphan"; reason: "initiator-aborted" }
+  | { kind: "late"; reason: "late-answer" };
+
+/**
+ * 兼容窄重载（2026-11-03 Q9 A）：旧调用方（`app/desktop/session.ts` 在 C1 更新前）的 `decidedBy`
+ * 静态上仍是 `"customer" | "judge"`；命中窄重载时返回值也收窄为同二值，避免把 `"directive"` 泄漏给
+ * 尚未按三值处理的旧读者（AC-15）。C1 把变量扩为三值后自动选择宽签名；运行期实现完全相同。
+ */
+export type VersionDecisionAnswerInputNarrow = Omit<VersionDecisionAnswerInput, "by"> & {
+  by?: "customer" | "judge";
+};
+
+export type VersionDecisionAnswerPlanNarrow =
   | { kind: "execute"; action: VersionDecisionAction; decidedBy: "customer" | "judge"; selectedOptionIds: [VersionDecisionAction] }
   | { kind: "resolve-declined"; choice: "declined"; reason?: string; by?: "customer" | "judge" }
   | { kind: "resolve-unavailable"; choice: "unavailable"; reason?: string; by?: "customer" | "judge" }
@@ -267,6 +284,8 @@ export type VersionDecisionAnswerPlan =
  * · late（已中止/orphaned 后）→ 仅诊断，不写 resolved、不执行；
  * · 非法/未知/多选/缺 by → 归一化 resolved declined + reason:"invalid-selection"（零执行）。
  */
+export function mapVersionDecisionAnswer(input: VersionDecisionAnswerInputNarrow): VersionDecisionAnswerPlanNarrow;
+export function mapVersionDecisionAnswer(input: VersionDecisionAnswerInput): VersionDecisionAnswerPlan;
 export function mapVersionDecisionAnswer(input: VersionDecisionAnswerInput): VersionDecisionAnswerPlan {
   if (input.outcome === "late") return { kind: "late", reason: "late-answer" };
   if (input.outcome === "aborted") return { kind: "orphan", reason: "initiator-aborted" };
@@ -398,7 +417,7 @@ export interface ResolvedWithoutExecution {
   requestId: string;
   decisionId: string;
   action: VersionDecisionAction;
-  decidedBy: "customer" | "judge";
+  decidedBy: VersionDecisionDecidedBy;
   flowId?: string;
 }
 

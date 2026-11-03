@@ -1,0 +1,191 @@
+=== T3 failure classification (customer-authorization-plane B0) ===
+source_log: 06-full-t3.log
+command: node --test --test-concurrency=1 $(find test -name '*.test.ts' ! -name 'write-sequencing.test.ts' | sort)
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+start: 2026-11-03T13:39:01+0800
+end: 2026-11-03T13:43:28+0800
+exit_code: 1
+counts: tests 3479 / pass 3452 / fail 9 / cancelled 0 / skipped 18 / todo 0
+duration_ms: 267120.7702
+
+--- FAILURES: 9 (all pre-existing Windows symlink EPERM environment failures) ---
+#   file:line                                                      test name                                                                                   error
+1   test/claude-adapter/session.test.ts:639                        native symlink and storage runtime mismatch fail before SDK query                           EPERM errno -4048, syscall symlink (async fs/promises)
+2   test/codex-adapter/session.test.ts:351                         native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary   EPERM errno -4048, syscall symlink (async)
+3   test/pi-adapter/injected-runtime.test.ts:185                   store validate callback rejects directory symlink before Pi parse or new native write      EPERM errno -4048, syscall symlink (async)
+4   test/pi-adapter/injected-runtime.test.ts:193                   Pi storage refuses file symlink and role/runtime mismatch without touching other storage   EPERM errno -4048, syscall symlink (async)
+5   test/runtime-core/file-write-safety.test.ts:97                 D3 linked workspace root remains usable; linked target itself is not replaced              EPERM errno -4048, syscall symlink (async)
+6   test/runtime-core/session-store.test.ts:46                     store: traversal, mismatched scope and symlinked runtime directories rejected              EPERM errno -4048, syscall symlink (async)
+7   test/runtime-core/session-store.test.ts:58                     store: native validation stays lazy and native symlink is rejected before effects          EPERM errno -4048, syscall symlink (async)
+8   test/测试/g4-skill-verify/b-render-double-check.test.ts:182    读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛               EPERM errno -4048, symlinkSync (node:fs:1937, sync)
+9   test/编排/shell-authorized-routine.test.ts:184                 node test外指符号链接路径不获委托；项目内测试路径获委托                                    EPERM errno -4048, symlinkSync (node:fs:1937, sync)
+
+classification: all 9 are PRE-EXISTING Windows symlink EPERM environment failures.
+evidence: identical file:line + test names as the historical baseline recorded in
+  角色卡/测试/docs/change/2026-11-03_contract-schema-query-B0-baseline.md §八 (9 items),
+  and in docs/acceptance/acceptance-rework-routing-criteria-v1.md:165 ("最近基线 9 项").
+new deterministic failures attributed to this task: 0
+
+--- SKIPPED: 18 (all pre-existing platform skips) ---
+file group                                                        count  tests
+test/runtime-core/file-write-safety.test.ts                       4      D3 write/edit ordinary modes; strict-umask mode privacy; chmod failure; sync failure
+test/测试/lightweight-permission-repairs.test.ts                   6      D3 AC3/5, AC4, AC5, AC6 (x2), AC7
+test/项目管理/shared/atomic-write.test.ts                          5      D3 finalMode normal bits; strict umask executable bit; chmod failure; sync failure; abort after chmod
+test/codex-adapter/session.test.ts                                1      owned native process group cleanup kills a wrapper and child that ignore SIGTERM
+test/pi-adapter/session-persistence.test.ts                       1      会话目录不可写：明确抛错（...# chmod 语义在 Windows 不适用
+test/门禁引擎/pin-evidence.test.ts                                 1      unreadable（权限）：文件不可读 → status=unreadable、actual=null
+total                                                             18
+
+classification: all 18 skips are pre-existing platform skips; same set/count as the
+  historical baseline (18). new skips attributed to this task: 0
+
+--- EXCLUSION ---
+test/pi-adapter/write-sequencing.test.ts: EXISTS but NOT run.
+reason: repository-known hang (historical record: 39+ minutes no progress, CPU ~2339s);
+  exclusion carried forward from docs/acceptance/acceptance-rework-routing-criteria-v1.md:98/162/604
+  and the team plan §6.3/§7.2. Not counted as pass; behavior not verified in B0.
+command exclusion: ! -name 'write-sequencing.test.ts'
+
+--- APPENDIX: raw failing-tests block from 06-full-t3.log (lines 4437-4578) ---
+✖ failing tests:
+
+test at test\claude-adapter\session.test.ts:639:1
+✖ native symlink and storage runtime mismatch fail before SDK query (3.0208ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-claude-test-p9i0ry' -> 'C:\Users\51054\AppData\Local\Temp\ans-claude-test-p9i0ry\.ans\sessions\claude-fixture\claude\native'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/claude-adapter/session.test.ts:643:3
+      at async fixture (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/claude-adapter/session.test.ts:99:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-claude-test-p9i0ry',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-claude-test-p9i0ry\\.ans\\sessions\\claude-fixture\\claude\\native'
+  }
+
+test at test\codex-adapter\session.test.ts:351:1
+✖ native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary (16.186ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-codex-tests-9GBooS' -> 'C:\Users\51054\AppData\Local\Temp\ans-codex-tests-Bm5v5o\.ans\sessions\codex-fixture\codex\native'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/codex-adapter/session.test.ts:369:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-codex-tests-9GBooS',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-codex-tests-Bm5v5o\\.ans\\sessions\\codex-fixture\\codex\\native'
+  }
+
+test at test\pi-adapter\injected-runtime.test.ts:185:1
+✖ store validate callback rejects directory symlink before Pi parse or new native write (12.1949ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\p1-injection-jq4khE\outside' -> 'C:\Users\51054\AppData\Local\Temp\p1-injection-jq4khE\.ans\sessions\Pi适配器\pi\native'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/pi-adapter/injected-runtime.test.ts:188:71
+      at async temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/pi-adapter/injected-runtime.test.ts:22:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-jq4khE\\outside',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-jq4khE\\.ans\\sessions\\Pi适配器\\pi\\native'
+  }
+
+test at test\pi-adapter\injected-runtime.test.ts:193:1
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (8.7962ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\p1-injection-3TwvwZ\outside.jsonl' -> 'C:\Users\51054\AppData\Local\Temp\p1-injection-3TwvwZ\.ans\sessions\Pi适配器\pi\native\link.jsonl'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/pi-adapter/injected-runtime.test.ts:195:78
+      at async temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/pi-adapter/injected-runtime.test.ts:22:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-3TwvwZ\\outside.jsonl',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-3TwvwZ\\.ans\\sessions\\Pi适配器\\pi\\native\\link.jsonl'
+  }
+
+test at test\runtime-core\file-write-safety.test.ts:97:1
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (6.9499ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-core-d3-xhmyW9\actual\nested\file.txt' -> 'C:\Users\51054\AppData\Local\Temp\ans-core-d3-xhmyW9\actual\link.txt'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/runtime-core/file-write-safety.test.ts:105:5
+      at async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/runtime-core/file-write-safety.test.ts:19:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/runtime-core/file-write-safety.test.ts:98:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-xhmyW9\\actual\\nested\\file.txt',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-xhmyW9\\actual\\link.txt'
+  }
+
+test at test\runtime-core\session-store.test.ts:46:1
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (2.2898ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-store-LctfEd' -> 'C:\Users\51054\AppData\Local\Temp\ans-store-BsiHPX\.ans\sessions\role\codex'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/runtime-core/session-store.test.ts:51:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-LctfEd',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-BsiHPX\\.ans\\sessions\\role\\codex'
+  }
+
+test at test\runtime-core\session-store.test.ts:58:1
+✖ store: native validation stays lazy and native symlink is rejected before effects (3.9687ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-store-iSmlzr' -> 'C:\Users\51054\AppData\Local\Temp\ans-store-eN8am2\.ans\sessions\core\codex\native'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/runtime-core/session-store.test.ts:63:56)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-iSmlzr',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-eN8am2\\.ans\\sessions\\core\\codex\\native'
+  }
+
+test at test\测试\g4-skill-verify\b-render-double-check.test.ts:182:1
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (6.4924ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\g4-outside-E7Isl7' -> 'C:\Users\51054\AppData\Local\Temp\g4-render-E8Eru1\docs\skills\link'
+      at Object.symlinkSync (node:fs:1937:11)
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:197:10
+      at temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:24:5)
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:183:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\g4-outside-E7Isl7',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\g4-render-E8Eru1\\docs\\skills\\link'
+  }
+
+test at test\编排\shell-authorized-routine.test.ts:184:1
+✖ node test外指符号链接路径不获委托；项目内测试路径获委托 (1.958ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-routine-outside-kDWcLE\outside.test.ts' -> 'C:\Users\51054\AppData\Local\Temp\ans-routine-paths-arGCH8\test\external.test.ts'
+      at Object.symlinkSync (node:fs:1937:11)
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane/test/%E7%BC%96%E6%8E%92/shell-authorized-routine.test.ts:191:8)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-routine-outside-kDWcLE\\outside.test.ts',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-routine-paths-arGCH8\\test\\external.test.ts'
+  }

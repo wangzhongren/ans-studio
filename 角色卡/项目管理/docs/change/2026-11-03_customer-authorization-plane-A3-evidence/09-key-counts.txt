@@ -1,0 +1,17 @@
+command: node --input-type=module -e <count script>
+{
+  "total": 1746,
+  "prefixes": {
+    "ui": 1090,
+    "main": 591,
+    "shared": 62,
+    "preferences": 3
+  },
+  "directiveKeys": 104,
+  "uiDirective": 88,
+  "mainDirective": 15,
+  "cardEntry": 14,
+  "enTotal": 1746,
+  "parity": true
+}
+exit_code: 0

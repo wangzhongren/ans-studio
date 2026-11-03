@@ -1,0 +1,13 @@
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/customer-authorization-plane
+date: 2026-11-03T17:04:43+0800
+timezone: Asia/Shanghai (system local, +08:00)
+node: v24.22.1
+npm: 11.19.1
+os: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+shell: 5.3.15(2)-release (/usr/bin/bash)
+branch: feat/customer-authorization-plane
+HEAD: 4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+electron package: 44.7.0
+electron binary: present
+dist present: yes
+node_modules present: yes

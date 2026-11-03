@@ -1,0 +1,24 @@
+812	914868d83015e331b412fda9a6c86040fc20a6f1e5dbc22b75c706728d6f4caa	app/desktop/directive-input.ts
+2719	6c3108e394acd9802b5445618b798d5865e55a0d5b5c0c07c585765aca547955	app/desktop/interface.ts
+8827	7650676a91b426e8312e5bf4f24482f705c627eee7b045d559c58f12edbb0885	app/desktop/session.ts
+2271	7cd7d8f844bab5dbd85ca9e3f79cde561741dfb988a60a0e2ce47c3577936c50	app/desktop/customer-input.ts
+422	d0bb3ba7f467f89de79a8b492d84e308610392578ef74243ad19ac3fbbcc8787	app/desktop/requirement-change.ts
+1222	c62da4560690d57ca043f2e75b14a011799ebdb844d762cf42c7dfcbea1c16d8	app/main.ts
+495	684c0d96ab2bf870ac980c36147778f28e105d9c4a902738aa8349206cefabb0	app/preload.cjs
+720	ffb3210e9ec575101b7669917cf489940520f7a7776da07cbdba53d83a6bb924	test/桌面应用/directive-input.test.ts
+351	1206365325c436a2fb88f27266a6b472543f0d92ac6fa60e2f33a2bdd5174478	test/桌面应用/directive-decision.test.ts
+224	3487dd55957b86dc1b47da87d00ebfd026f6de3bdd5f88e525c345086e1a60b9	test/桌面应用/run-change.test.ts
+796	52fcd189386ba832807027e7d1c2858f3b9d3622937b5ddc68fd9c88a578fdb2	test/桌面应用/version-decision.test.ts
+
+--- git hash-object (same order) ---
+9ef61de1d63c54525a7fa1d0aa818cbab9cc8fcc app/desktop/directive-input.ts
+4114f9b228aea5c741c63fd9e0448ea8f4914c36 app/desktop/interface.ts
+706c0fe022c8e710fd3a8e0ae867b73df2d2dc4b app/desktop/session.ts
+2c29c737bdf9f5135ce26d4e77064e62a8fb799a app/desktop/customer-input.ts
+8e4df19d81e3fd4bd24b07032a190f45cc37949a app/desktop/requirement-change.ts
+d6272b555aeaf0a706860421f7fca53e428ffac9 app/main.ts
+6bfcb03be8c1f12e62519b5218d2867f208ec2e7 app/preload.cjs
+2fc15f483fd9ec85be725a2d8c2e4bc8527b766c test/桌面应用/directive-input.test.ts
+b8c603d7acc1b1e2db69fdebd2f18c74db7e52fa test/桌面应用/directive-decision.test.ts
+3b5a8d4a9aa58b9589ca0b85bee5a349a4976544 test/桌面应用/run-change.test.ts
+c38801caa12c993b64b84de4da1f76a9a6c28348 test/桌面应用/version-decision.test.ts

@@ -1,0 +1,33 @@
+D2 directive-plane probe environment (captured 2026-11-03T18:45:00+08:00)
+timezone:        +0800 (Asia/Shanghai)
+cwd:             C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\customer-authorization-plane
+node:            v24.22.1
+npm:             11.19.1
+electron:        v44.7.0 (node_modules/electron 44.7.0)
+git:             git version 2.55.0.windows.5
+bash:            5.3.15(2)-release
+os:              Windows 11 Pro 10.0.26300 (MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64)
+branch:          feat/customer-authorization-plane
+head:            4c3a6e40b469a9fbe8be0dcf96ff4199221b96a0
+
+command:         ANS_D2_PROBE_OUT=<probe-run-2> ./node_modules/.bin/electron test/测试/customer-authorization-plane-d2-probe.mjs
+probe script:    test/测试/customer-authorization-plane-d2-probe.mjs
+probe sha256:    a7913e87dfb08e7662b231ebb63af8c35e7d1b396c9e9664bbd45bf267a41427
+preload:         app/preload.cjs (real product preload; read-only in D2)
+preload sha256:  684c0d96ab2bf870ac980c36147778f28e105d9c4a902738aa8349206cefabb0
+renderer entry:  app/renderer/dist/index.html (build:renderer output; ignored build artifact, not a candidate)
+renderer sha256: eb38faaac329b9fa72ac05e1421cd1e0eacaab79895caf6d50fe54aa24a2aee9
+window:          BrowserWindow content size 1360 x 860 (useContentSize, frame:false)
+userData:        probe-run-2/userData (fresh, created by the probe; never C2 probe-run/userData)
+fixture project: probe-run-2/project (generated; not a customer project)
+second project:  probe-run-2/project-2 (project-switch fixture)
+debug env:       DEBUG=<unset> ANS_DEBUG=<unset> ELECTRON_ENABLE_LOGGING=<unset> (DEBUG overlay closed)
+screenshots:     16 PNG stills (no screen recording produced or required)
+probe result:    64 checks / 63 true / 1 false; report.failures=1; exit_code=1 (see §6 of the D2 record)
+report sha256:   f4a95fab1b6afb561b11b89bb4a9015345b031f2d0a9a546cf1c77ef21cc89b2
+ledger sha256:   765b8b10fbe74a9869d54012a0d289c6fa58528655718991edc6d379c68fac4a
+probe log sha256: ba50baa30c8a20eadc583da379642e088659e6e6bbbc89d794e9db1c23f6353b
+
+note: The existing Electron E2E was NOT re-run in D2 (dispatch instruction). Its evidence is
+      e2e-out/report.txt (E2E_PASS=true, E2E_FAILURES= empty, E2E_DONE=1) and 05-e2e-run.log
+      (exit_code 0, elapsed_seconds 87), captured at 2026-11-03T18:03:36+08:00 on the same HEAD.
