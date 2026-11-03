@@ -1,0 +1,9 @@
+=== write-set scope check (D1; team plan §4.3 test write set / 10 files) ===
+--- expected paths missing/unchanged (should be empty) ---
+--- candidate paths not in declared write set (should be empty) ---
+--- counts (expected / actual) ---
+10
+10
+
+=== package/config changes (should be empty) ===
+(end)

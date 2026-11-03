@@ -1,0 +1,16 @@
+=== evidence inventory (contract-schema-query B0) ===
+recorded_at: 2026-11-03T12:05:47+08:00
+note: this file (09-inventory.txt) is not listed in itself; its own SHA-256 is recorded in the B0 record.
+
+lines	bytes	sha256	path
+75	3620	45c863a85711b993b04d1f1df26958e1f67fb4a4defba7109da6f1d7926aeee0	00-baseline.txt
+9	233	cbec81706703aa5a1ec0babd185acaacdeacac7d8b655644a59bce39ec63fcc1	01-npm-run-typecheck.log
+9	272	0aa2dbf9db725f6c2c36bef605809c5c40688062badd758603c448a69f1104ef	02-npm-run-typecheck-renderer.log
+39	3319	a276ee6a8c4f2d3b578323ba7e2626914f4cb3eae7830db902c10637efe78b6a	03-suite-orchestration.log
+41	3284	f8ffc4849208eb46df1bf0cc14de5d3b863983cf17afe70514ff34b1041bd27f	04-suite-desktop-app.log
+31	2332	f4658450a52c7914703713d09aad77ae63e43908c106bfb92baa6e161f8dd95a	05-suite-gate-engine.log
+393	16684	a57ec953b345c2a2ded73b3c7337bc0477be32de95b0f56167841a731f9a15ce	06-full-t3-file-list.txt
+4564	511128	5c2dcd7f7b774914ee750e5b2ad71478ea1d02fead0ea0df44cf4630571a9400	06-full-t3.log
+188	13626	05e657b9a2ad5cda639d17636f5b358f8ad96df6183e9594231c2b5117275623	07-failure-classification.txt
+27	1299	6012764b0ee074338323f8d7a5163c322deee22d9806e93d53c2fe27bb3f42de	08-post-run-verification.log
+1	122	ba4ec6b0529635cb24dce397b1de2d048c567cd1e63a7cf3f26116d87453ae89	09a-v1-observation.txt

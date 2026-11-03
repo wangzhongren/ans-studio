@@ -1,0 +1,1 @@
+725	110018449f43440a841785aa73b6d1be7d0ae60ca4d6b4bcf7b3636723d2768d	docs/acceptance/contract-schema-query-criteria-v1.md

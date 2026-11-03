@@ -1,0 +1,19 @@
+=== evidence inventory (contract-schema-query D1) ===
+recorded_at: 2026-11-03T12:34:11+08:00
+note: this file (11-inventory.txt) is not listed in itself; its own SHA-256 is recorded in the D1 record.
+
+lines	bytes	sha256	path
+96	7914	d43afb48a53c0c8ab4dfd1fda2dfeb489b850adc6cbfb1b1e31007be9e34343a	00-candidate-identity.txt
+9	233	50e58e9844137d16e1ae6f7489f4f26197403962c93a1fe6930c4ee88e0d35ee	01-npm-run-typecheck.log
+9	272	0f10fac152a7d88cf0a294317abe6488ee7d289d94dc32da52c115b7b7a3a22c	02-npm-run-typecheck-renderer.log
+47	4212	2d951a13e6f2fbc5862f7aa02dd9dcc565ca0069a6ede80b5c87c75053eaf719	03-suite-orchestration.log
+49	4138	4c84b2afc677baaffed37525eaab3566dde09feb897598c9bc4bc5686c20e1c9	04-suite-desktop-app.log
+31	2332	452436ebda25cac1eac5d4cab22a90b87a48bf565e5350f7b0199229795d9eca	05-suite-gate-engine.log
+8	542	348d1f32a297907a610526702d108dc800ffdb8b3fd567b17aba4a120ac0e3c2	06-electron-facts.txt
+393	16684	a57ec953b345c2a2ded73b3c7337bc0477be32de95b0f56167841a731f9a15ce	07-full-t3-file-list.txt
+4580	512872	e59a4dc9ae61343ec571a60d3a509eab96e8be50229641b6807f7644d54efc22	07-full-t3.log
+190	13397	7c43fae74a9210dc7396d36f2b605ecb1d4ba7aebd6f0693e558ddbe8ae3f1e6	08-failure-classification.txt
+32	1534	9c3cdca56886bb227a4e05b0865e6ef1ffc3e111a4ca6086bfc01771b5319575	09-post-run-verification.log
+567	28471	95597dbc1001ae7664eb292554fcae5b4601bd971a296d59abda2323e51411f2	10-test-diff-U0.txt
+19	805	828e1508361479151f0848acc24810c6e10384a4b37cb291b62cbc196730c92d	10b-test-diff-summary.txt
+9	302	b92ddb5034fb6a078722a22a096a9b00d45c9a4f604b19d2d6f3d3863117cddf	12-scope-check.txt
