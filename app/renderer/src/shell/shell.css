@@ -451,6 +451,10 @@
   display: flex;
   flex-direction: column;
   background: var(--background);
+  /* 容器查询基准：抽屉在 ≥1200px 以 padding-right 推挤中列后，视口不变而中列内容宽度变小；
+     会话头的紧凑/换行需跟随中列实际可用宽度（见 phase4b.css 的 @container col-mid）。 */
+  container-type: inline-size;
+  container-name: col-mid;
   --gutter: max(32px, calc((100% - var(--content-max)) / 2));
 }
 .session-head {

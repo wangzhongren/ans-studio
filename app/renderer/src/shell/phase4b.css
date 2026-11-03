@@ -928,6 +928,31 @@
   }
 }
 
+/* 抽屉推挤（≥1200px 视口不变、中列内容宽度不足）：头部换行跟随中列容器宽度。
+   与上方 ≤680px 视口档同一套紧凑规则；仅在抽屉打开时生效，关闭态像素行为不变。 */
+@media (min-width: 1200px) {
+  @container col-mid (max-width: 728px) {
+    .app.drawer-open .chat-head .head-inner {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      row-gap: 6px;
+    }
+    .app.drawer-open .chat-head .session-identity {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+    .app.drawer-open .chat-head .session-actions {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+    .app.drawer-open .chat-head .engine-trigger {
+      max-width: 100%;
+    }
+  }
+}
+
 /* 200% 更窄档（960×620 物理 / 480×310 CSS）：压缩头部与提示条，给内容列留可读高度。 */
 @media (max-width: 480px) {
   .col-mid .session-head {
