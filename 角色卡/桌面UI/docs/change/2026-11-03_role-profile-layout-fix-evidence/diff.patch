@@ -1,0 +1,49 @@
+diff -ruN C:/Users/51054/AppData/Local/Temp/ans-rpl-baseline-40d94eb/app/renderer/src/shell/phase4b.css app/renderer/src/shell/phase4b.css
+--- C:/Users/51054/AppData/Local/Temp/ans-rpl-baseline-40d94eb/app/renderer/src/shell/phase4b.css	2026-11-03 19:47:32.000000000 +0800
++++ app/renderer/src/shell/phase4b.css	2026-11-03 21:00:30.007352100 +0800
+@@ -928,6 +928,31 @@
+   }
+ }
+ 
++/* 抽屉推挤（≥1200px 视口不变、中列内容宽度不足）：头部换行跟随中列容器宽度。
++   与上方 ≤680px 视口档同一套紧凑规则；仅在抽屉打开时生效，关闭态像素行为不变。 */
++@media (min-width: 1200px) {
++  @container col-mid (max-width: 728px) {
++    .app.drawer-open .chat-head .head-inner {
++      flex-wrap: wrap;
++      justify-content: flex-start;
++      row-gap: 6px;
++    }
++    .app.drawer-open .chat-head .session-identity {
++      flex: 1 1 100%;
++      min-width: 0;
++    }
++    .app.drawer-open .chat-head .session-actions {
++      flex: 1 1 100%;
++      flex-wrap: wrap;
++      justify-content: flex-end;
++      min-width: 0;
++    }
++    .app.drawer-open .chat-head .engine-trigger {
++      max-width: 100%;
++    }
++  }
++}
++
+ /* 200% 更窄档（960×620 物理 / 480×310 CSS）：压缩头部与提示条，给内容列留可读高度。 */
+ @media (max-width: 480px) {
+   .col-mid .session-head {
+diff -ruN C:/Users/51054/AppData/Local/Temp/ans-rpl-baseline-40d94eb/app/renderer/src/shell/shell.css app/renderer/src/shell/shell.css
+--- C:/Users/51054/AppData/Local/Temp/ans-rpl-baseline-40d94eb/app/renderer/src/shell/shell.css	2026-11-03 19:47:32.000000000 +0800
++++ app/renderer/src/shell/shell.css	2026-11-03 21:00:29.992318700 +0800
+@@ -451,6 +451,10 @@
+   display: flex;
+   flex-direction: column;
+   background: var(--background);
++  /* 容器查询基准：抽屉在 ≥1200px 以 padding-right 推挤中列后，视口不变而中列内容宽度变小；
++     会话头的紧凑/换行需跟随中列实际可用宽度（见 phase4b.css 的 @container col-mid）。 */
++  container-type: inline-size;
++  container-name: col-mid;
+   --gutter: max(32px, calc((100% - var(--content-max)) / 2));
+ }
+ .session-head {

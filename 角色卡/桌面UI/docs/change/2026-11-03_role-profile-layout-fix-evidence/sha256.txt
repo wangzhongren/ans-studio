@@ -1,0 +1,7 @@
+6954e3c02f6b0288b0ce561e6314a255dc4b327e0880f1bbcec5ffa878d00c32 *app/renderer/src/shell/shell.css
+97508bc3e46e7f022e1e425b558f679d41f66e1b6b9f4c96eac0460563ee8a98 *app/renderer/src/shell/phase4b.css
+a188012d0e0feaedc767de9f348afd03c8f8d26543119750d0236d3c0c3760d8 *C:/Users/51054/AppData/Local/Temp/ans-rpl-baseline-40d94eb/app/renderer/src/shell/shell.css
+0c05f4d4dc0ab743ba2916a75209fb3fa07dd60fb034ba418d2ab36fcc00fc60 *C:/Users/51054/AppData/Local/Temp/ans-rpl-baseline-40d94eb/app/renderer/src/shell/phase4b.css
+024d50491e3f0f98873e67ea1b3c48bc5ea46db4b7cc1610e5fc7f662484b2af *角色卡/桌面UI/docs/change/2026-11-03_role-profile-layout-fix-evidence/probe-layout.mjs
+012edf6e2301b00efab90f43bc08b35019ce09c73667a0f6b2653b350eccf076 *角色卡/桌面UI/docs/change/2026-11-03_role-profile-layout-fix-evidence/diff.patch
+ad55e3706e8d5b348d9045f16bfe0ce202dd6241019674f444ef46f54d0bd6c5 *角色卡/桌面UI/docs/change/2026-11-03_fix_role-profile-layout.md
