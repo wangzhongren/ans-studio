@@ -5,7 +5,7 @@ on:
       source_ref:
         description: Frozen application source tag
         required: true
-        default: v1.8.3
+        default: v1.8.4
       publish:
         description: Publish draft after all native gates pass
         type: boolean
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-v1.8.3
+  group: release-v1.8.4
   cancel-in-progress: false
 jobs:
   build:
@@ -127,10 +127,10 @@ jobs:
           cd release-assets
           test "$(find . -name '*.zip' | wc -l)" -eq 3
           for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
-          if gh release view v1.8.3 --json isDraft --jq '.isDraft' > draft-state.txt; then
+          if gh release view v1.8.4 --json isDraft --jq '.isDraft' > draft-state.txt; then
             test "$(cat draft-state.txt)" = true
           else
-            gh release create v1.8.3 --verify-tag --draft --title 'ANS Studio 1.8.3' --notes '基于固定 v1.8.3 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本补丁接通 run-change 契约变更通道：会话头新增「契约变更 · 重开 run」显式入口；pin 后出现更高版本契约且被引用/派发冲突时应用自动呈现 run-change 决策卡（继续冻结 / 停止并重启新 run / 停止，由客户选择、不自动代选）；冻结冲突的拒绝回执带 run-change-required 三段式指引。冻结语义本身不变。其余能力与 v1.8.2 相同（含 D3 选中集记账修复与 v1.8.1 全部能力）。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+            gh release create v1.8.4 --verify-tag --draft --title 'ANS Studio 1.8.4' --notes '基于固定 v1.8.4 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本版新增：全局任务状态与幕僚版本决策权——幕僚可只读查看跨 flow 的当前 focus/阶段/未收口任务/阻塞/版本与证据指针/下一步，可写受控备注（project.focus / project.note），并可提议「版本修改」或「新版本开发」；应用发 application-owned decision 卡，由客户或「替我决策」判定，应用只执行机器部分（新 flow/run、关闭旧 flow 全部活动 run、orphan 旧申请、切换 focus），不写文档、不派角色、不创建任务，pinned run 仍走 run-change。另含验收报告卡特殊显示与原文直出、派发护栏放松（只保留角色授权矩阵，状态检查降级为 advisory）。其余能力与 v1.8.3 相同（含 run-change 契约变更通道、D3 记账修复与 v1.8.1 全部能力）。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
           fi
-          gh release upload v1.8.3 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
-          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.8.3 --draft=false; fi
+          gh release upload v1.8.4 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
+          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.8.4 --draft=false; fi
