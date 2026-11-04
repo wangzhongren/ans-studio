@@ -201,9 +201,17 @@ Current public version: **v1.9.2** (released 2026-11-04). The bundle ships with 
 Verify SHA256 before launching: on macOS, run `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt` in the download directory (use `SHA256SUMS-darwin-x64.txt` for Intel); on Windows PowerShell, run `Get-FileHash .\ANS-Studio-1.9.2-win-x64.zip -Algorithm SHA256` and compare it with `SHA256SUMS-win32-x64.txt`.
 
 <details>
-<summary>v1.9.2 SHA256 (filled in after release)</summary>
+<summary>v1.9.2 SHA256 (filled in)</summary>
 
-v1.9.2 SHA256 values cannot be known before the build; this table is intentionally not pre-filled. After release, use the Release's `SHA256SUMS-darwin-arm64.txt`, `SHA256SUMS-darwin-x64.txt`, `SHA256SUMS-win32-x64.txt`, and `SHA256SUMS-overlay.txt` to verify.
+The values below match the Release's `SHA256SUMS-darwin-arm64.txt`, `SHA256SUMS-darwin-x64.txt`, `SHA256SUMS-win32-x64.txt`, and `SHA256SUMS-overlay.txt` verbatim (backfilled after the 2026-11-04 release):
+
+| File | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.9.2-mac-arm64.zip` | `fabe55a62848fdab25be0759e4c6cf0ade71aaa392c7cbe9c1ec2313f79c6322` |
+| `ANS-Studio-1.9.2-mac-x64.zip` | `9039b9ba241622d2a060e2b69654ae6d11e94fb88fa50f04577289a51e6293ff` |
+| `ANS-Studio-1.9.2-win-x64.zip` | `b1bc3c3d52a757799a53d1ef9ba6d9804b4bcc6256ae37553a59f8d91cab7df4` |
+| `overlay.patch` | `b5cf42415fa1a69ea9e525594c73f34c3bc878e78aa2e989fc1eac99c879c0a9` |
+| `release-provenance.json` | `fbc3453aa50038fa2f54624d5fc032c0d38731c8a6c37948ac143baf39303592` |
 
 [SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.9.2/SHA256SUMS-overlay.txt), [release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.9.2/release-provenance.json), and [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.9.2/overlay.patch) record the frozen source and packaging adaptations; see [this release record](角色卡/装配/docs/change/2026-11-04_change_release-v1.9.2-prepare.md) for provenance verification.
 

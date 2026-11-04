@@ -5,7 +5,7 @@ title: v1.9.2 发布准备：输入区按钮精简与幕僚回复去折叠
 created: "2026-11-04"
 updated: "2026-11-04"
 timezone: Asia/Shanghai
-status: implemented-unverified
+status: released
 related: []
 events:
   - date: "2026-11-04"
@@ -20,6 +20,12 @@ events:
   - date: "2026-11-04"
     kind: verified
     summary: pipeline 钉版本轮完成并本地验证——node --test 装配 88/88、npm run typecheck 0
+  - date: "2026-11-04"
+    kind: verified
+    summary: 发布 run 41782510931 三平台 build 与 release job 全 success；Release v1.9.2 已创建并上传 12 资产（公开、非草稿、非预发布）
+  - date: "2026-11-04"
+    kind: updated
+    summary: README 中英 SHA256 表回填（5 项）；本记录 status→released
 ---
 
 # v1.9.2 发布准备
@@ -84,5 +90,17 @@ T3 全量口径与排除方式：按验收标准以 `node --test --test-concurre
 
 ## 证据边界
 
-- 本轮只做版本字段、README 发布说明与本记录，并运行本地 `typecheck`、`typecheck:renderer`、装配测试与完整 T3 串行回归；未运行 `build:renderer`、未做 prepare 预演，未触发 CI，未打 tag。
-- 两项修复的产品验证证据沿用（不重跑），见上文各自实施记录；完整回归与三平台构建由发布 workflow 作为独立门执行。
+- prepare 轮只做版本字段、README 发布说明与本记录，并运行本地 `typecheck`、`typecheck:renderer`、装配测试与完整 T3 串行回归；pipeline 轮只改发布策略/声明、打包测试、release workflow 与本记录，并运行本地装配测试与 `typecheck`。两轮均未运行 `build:renderer`、未做 prepare 预演，未在本地触发 CI。
+- 两项修复的产品验证证据沿用（不重跑），见上文各自实施记录；完整回归与三平台构建由发布 workflow 作为独立门执行，结果见下节。
+
+## CI、资产与 SHA（已回填）
+
+- **发布 run**：`41782510931`（https://github.com/wangzhongren/ans-studio/actions/runs/41782510931），conclusion success；三个 build job（macos-15 arm64 / macos-15-intel x64 / windows-2025 x64）与 release job 全 success。备注：`gh run watch` 两次因 GitHub API 网络 EOF 中断，随后以单次状态查询确认 run success；run、tag 与产物不受影响。
+- **Release**：https://github.com/wangzhongren/ans-studio/releases/tag/v1.9.2（公开、非草稿、非预发布）。
+- **资产（12）**：`ANS-Studio-1.9.2-{mac-arm64,mac-x64,win-x64}.zip`、`manifest-{darwin-arm64,darwin-x64,win32-x64}.json`、`SHA256SUMS-{darwin-arm64,darwin-x64,win32-x64,overlay}.txt`、`release-provenance.json`、`overlay.patch`。
+- **SHA256（与 Release SHA256SUMS 逐字一致，README 已回填）**：
+  - mac-arm64 zip `fabe55a62848fdab25be0759e4c6cf0ade71aaa392c7cbe9c1ec2313f79c6322`；
+  - mac-x64 zip `9039b9ba241622d2a060e2b69654ae6d11e94fb88fa50f04577289a51e6293ff`；
+  - win-x64 zip `b1bc3c3d52a757799a53d1ef9ba6d9804b4bcc6256ae37553a59f8d91cab7df4`；
+  - overlay.patch `b5cf42415fa1a69ea9e525594c73f34c3bc878e78aa2e989fc1eac99c879c0a9`；
+  - release-provenance.json `fbc3453aa50038fa2f54624d5fc032c0d38731c8a6c37948ac143baf39303592`。
