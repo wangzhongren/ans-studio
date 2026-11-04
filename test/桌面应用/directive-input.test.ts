@@ -24,6 +24,8 @@ import {
 } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { CUSTOMER_DIRECTIVES_REL } from "../../src/model/directive.ts";
+import type { DirectiveInterpretFn, DirectiveInterpretRequest } from "../../src/model/directive.ts";
+import type { CreateDirectiveInterpreterOptions } from "../../src/pipeline/orchestration/govern-session.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -31,6 +33,14 @@ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitFor(predicate: () => boolean, timeoutMs = 4_000): Promise<void> {
+  const started = Date.now();
+  while (!predicate()) {
+    if (Date.now() - started > timeoutMs) throw new Error("waitFor 超时");
+    await tick(10);
+  }
+}
 
 function tempDir(prefix: string): { dir: string; cleanup: () => void } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -43,13 +53,18 @@ interface ControllerHarness {
   notices: DirectiveNote[];
 }
 
-function makeController(root: string, sessionId = "session-c1-test"): ControllerHarness {
+function makeController(
+  root: string,
+  sessionId = "session-c1-test",
+  options: { interpret?: DirectiveInterpretFn } = {},
+): ControllerHarness {
   const confirmRequests: DirectiveConfirmRequestPayload[] = [];
   const notices: DirectiveNote[] = [];
   const controller = createDirectiveInputController({
     sessionId,
     present: (payload) => confirmRequests.push(payload),
     emitNotice: (note) => notices.push(note),
+    ...(options.interpret !== undefined ? { interpret: options.interpret } : {}),
   });
   controller.setCurrentProject(root);
   return { controller, confirmRequests, notices };
@@ -439,7 +454,12 @@ function listing(root: string): ProjectListing {
   };
 }
 
-function interfaceHarness(root: string, controller: DirectiveInputController, decisionEnabled: boolean) {
+function interfaceHarness(
+  root: string,
+  controller: DirectiveInputController,
+  decisionEnabled: boolean,
+  extra: { createDirectiveInterpreterFn?: (opts: CreateDirectiveInterpreterOptions) => DirectiveInterpretFn } = {},
+) {
   const handles: Record<string, FakeHandle> = { A: fakeHandle(), B: fakeHandle() };
   const events: unknown[] = [];
   const decisionSwitch = createShellJudgeSwitch(decisionEnabled);
@@ -454,6 +474,7 @@ function interfaceHarness(root: string, controller: DirectiveInputController, de
     runtimeStatePath: path.join(root, "runtime-selection.json"),
     decisionJudgeSwitch: decisionSwitch,
     directiveInput: controller,
+    ...extra,
   });
   return { desktop, handles, events, decisionSwitch };
 }
@@ -629,6 +650,201 @@ test("sendSession：未注入指令控制器时命中标记 fail-closed（不回
     assert.equal(handle.sendCalls.length, 0, "能力缺席也不得回退普通聊天");
   } finally {
     await desktop.stopSession();
+    t.cleanup();
+  }
+});
+
+// ————————————————— 5b. 自然语言解释（2026-11-04 客户直修） —————————————————
+
+test("控制器：自然语言解释成功 ⇒ 面板预填 AI 解释；解释器收到 target/正文/原文/项目/角色/引擎；确认后落账", async () => {
+  const t = tempDir("ans-c1-nl-");
+  try {
+    const calls: DirectiveInterpretRequest[] = [];
+    const interpret: DirectiveInterpretFn = async (req) => {
+      calls.push(req);
+      return {
+        ok: true,
+        candidate: {
+          action: { kind: "allow", resource: { type: "shell", command: "npm install", cwd: "D:/不被采信的目录" } },
+          until: "session",
+          confidence: 0.9,
+        },
+        confidence: 0.9,
+      };
+    };
+    const h = makeController(t.dir, "session-c1-nl", { interpret });
+    const pending = h.controller.submitFromInput(approvalInput(t.dir, "@审批 让 npm install 跑一次"));
+    await waitFor(() => h.confirmRequests.length === 1);
+
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0], {
+      target: "approval",
+      body: "让 npm install 跑一次",
+      rawText: "@审批 让 npm install 跑一次",
+      projectRoot: t.dir,
+      roleId: "A",
+      runtime: "demo",
+    });
+    assert.deepEqual(ledgerEvents(t.dir), [], "确认前绝不落账");
+    const request = h.confirmRequests[0]!;
+    const action = request.request.prefill.action as { resource?: { type?: string; command?: string; cwd?: string } };
+    assert.equal(request.request.confirmable, true);
+    assert.equal(action.resource?.type, "shell");
+    assert.equal(action.resource?.command, "npm install");
+    assert.equal(action.resource?.cwd, t.dir, "cwd 恒为项目根");
+    assert.equal(request.request.prefill.until, "session");
+    assert.deepEqual(request.request.prefill.unrecognized, []);
+
+    assert.equal((await confirm(h, prefillValues(request))).ok, true);
+    const result = await pending;
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    assert.match(result.id, /^d-[1-9][0-9]*$/);
+    const events = ledgerEvents(t.dir);
+    assert.equal(events.length, 1);
+    assert.equal((events[0] as { action?: { resource?: { command?: string } } }).action?.resource?.command, "npm install");
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("控制器：解释失败 ⇒ 回退现有面板（confirmable=false、未识别片段）；伪造确认也不落账", async () => {
+  const t = tempDir("ans-c1-nl-fail-");
+  try {
+    const h = makeController(t.dir, "session-c1-nl-fail", {
+      interpret: async () => ({ ok: false, reasonCode: "low-confidence" }),
+    });
+    const pending = h.controller.submitFromInput(approvalInput(t.dir, "@审批 让 npm install 跑一次"));
+    await waitFor(() => h.confirmRequests.length === 1);
+    const request = h.confirmRequests[0]!;
+    assert.equal(request.request.confirmable, false, "解释失败 ⇒ 面板确认禁用");
+    assert.ok(request.request.prefill.unrecognized.includes("让 npm install 跑一次"));
+
+    // 正常 UI 下确认键禁用；即便渲染侧伪造确认，B1 Service 也拒绝空命令（不落账）。
+    assert.equal((await confirm(h, prefillValues(request))).ok, true);
+    const result = await pending;
+    assert.equal(result.ok, false);
+    assert.deepEqual(ledgerEvents(t.dir), []);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("控制器：撤销快路径不调用解释器；确认后 durable revoked", async () => {
+  const t = tempDir("ans-c1-nl-revoke-");
+  try {
+    let calls = 0;
+    const h = makeController(t.dir, "session-c1-nl-revoke", {
+      interpret: async () => {
+        calls += 1;
+        return { ok: false, reasonCode: "unavailable" };
+      },
+    });
+    const created = h.controller.submitFromInput(approvalInput(t.dir, '@审批 允许 shell "echo rev" until=session'));
+    await waitFor(() => h.confirmRequests.length === 1);
+    assert.equal((await confirm(h, prefillValues(h.confirmRequests[0]!))).ok, true);
+    const createdResult = await created;
+    assert.equal(createdResult.ok, true);
+    if (!createdResult.ok) return;
+    assert.equal(calls, 0, "结构化创建不调用解释器");
+
+    const revoking = h.controller.submitFromInput(approvalInput(t.dir, `@审批 撤销 #${createdResult.id}`));
+    await waitFor(() => h.confirmRequests.length === 2);
+    assert.equal(calls, 0, "撤销快路径不调用解释器");
+    const revokeRequest = h.confirmRequests[1]!;
+    assert.equal(revokeRequest.request.confirmable, true);
+    assert.equal((await h.controller.respond({ id: revokeRequest.request.id, decision: "confirm" })).ok, true);
+    const revoked = await revoking;
+    assert.equal(revoked.ok, true);
+    const statuses = ledgerEvents(t.dir).map((event) => event.kind);
+    assert.deepEqual(statuses, ["directive.created", "directive.revoked"]);
+  } finally {
+    t.cleanup();
+  }
+});
+
+test("sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账", async () => {
+  const t = tempDir("ans-c1-nl-wiring-");
+  let env: ReturnType<typeof interfaceHarness> | undefined;
+  try {
+    const seen: Array<{ opts: CreateDirectiveInterpreterOptions; req: DirectiveInterpretRequest }> = [];
+    const h = makeController(t.dir, "session-c1-nl-wiring", {
+      interpret: (request) =>
+        env === undefined
+          ? Promise.resolve({ ok: false as const, reasonCode: "unavailable" as const })
+          : env.desktop.interpretDirective(request),
+    });
+    env = interfaceHarness(t.dir, h.controller, false, {
+      createDirectiveInterpreterFn: (opts) => async (req) => {
+        seen.push({ opts, req });
+        return {
+          ok: true,
+          candidate: { action: { kind: "allow", resource: { type: "shell", command: "npm install" } }, until: "session", confidence: 0.9 },
+          confidence: 0.9,
+        };
+      },
+    });
+    await env.desktop.listProject({ projectRoot: t.dir });
+
+    const pending = env.desktop.sendSession({
+      text: "@审批 让 npm install 跑一次",
+      target: { projectRoot: t.dir, roleId: "A", runtime: "claude" },
+    });
+    await waitFor(() => h.confirmRequests.length === 1);
+    assert.equal(seen.length, 1, "解释器经 SessionManager 构造（同一套 runtimeOptions/adapter 工厂）");
+    assert.equal(seen[0]!.req.target, "approval");
+    assert.equal(seen[0]!.req.body, "让 npm install 跑一次");
+    assert.equal(seen[0]!.opts.runtime, "claude");
+    assert.equal(seen[0]!.opts.project.projectRoot, t.dir);
+    const request = h.confirmRequests[0]!;
+    assert.equal(request.request.confirmable, true);
+    assert.equal((request.request.prefill.action as { resource?: { command?: string } }).resource?.command, "npm install");
+
+    assert.equal((await confirm(h, prefillValues(request))).ok, true);
+    const result = await pending;
+    assert.equal(result.ok, true);
+    assert.equal(ledgerEvents(t.dir).length, 1);
+    assert.equal(env.handles.A.sendCalls.length, 0, "命中标记绝不回退普通聊天");
+  } finally {
+    if (env !== undefined) await envCleanup(env);
+    t.cleanup();
+  }
+});
+
+test("sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂", async () => {
+  const t = tempDir("ans-c1-nl-demo-");
+  let env: ReturnType<typeof interfaceHarness> | undefined;
+  try {
+    let factoryCalls = 0;
+    const h = makeController(t.dir, "session-c1-nl-demo", {
+      interpret: (request) =>
+        env === undefined
+          ? Promise.resolve({ ok: false as const, reasonCode: "unavailable" as const })
+          : env.desktop.interpretDirective(request),
+    });
+    env = interfaceHarness(t.dir, h.controller, false, {
+      createDirectiveInterpreterFn: () => {
+        factoryCalls += 1;
+        return async () => ({ ok: false, reasonCode: "unavailable" });
+      },
+    });
+    await env.desktop.listProject({ projectRoot: t.dir });
+    const pending = env.desktop.sendSession({
+      text: "@审批 让 npm install 跑一次",
+      target: { projectRoot: t.dir, roleId: "A", runtime: "demo" },
+    });
+    await waitFor(() => h.confirmRequests.length === 1);
+    assert.equal(factoryCalls, 0, "demo 不支持解释 ⇒ 不构造解释器");
+    const request = h.confirmRequests[0]!;
+    assert.equal(request.request.confirmable, false);
+    assert.ok(request.request.prefill.unrecognized.includes("让 npm install 跑一次"));
+    assert.equal((await h.controller.respond({ id: request.request.id, decision: "cancel" })).ok, true);
+    const result = await pending;
+    assert.equal(result.ok, false);
+    assert.equal(result.directiveCancelled, true);
+    assert.deepEqual(ledgerEvents(t.dir), []);
+  } finally {
+    if (env !== undefined) await envCleanup(env);
     t.cleanup();
   }
 });

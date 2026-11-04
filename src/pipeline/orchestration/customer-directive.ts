@@ -18,7 +18,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  CUSTOMER_DIRECTIVE_COMMAND_MAX_BYTES,
+  CUSTOMER_DIRECTIVE_HOST_MAX_LENGTH,
+  CUSTOMER_DIRECTIVE_PATH_MAX_BYTES,
   CUSTOMER_DIRECTIVE_RAW_TEXT_MAX_BYTES,
+  CUSTOMER_DIRECTIVE_SELECTOR_MAX_BYTES,
   directiveHighRiskReasons,
   type ApprovalAction,
   type ApprovalDirectiveSnapshot,
@@ -27,11 +31,15 @@ import {
   type CustomerDirectiveView,
   type DecisionAction,
   type DecisionDirectiveSnapshot,
-  type DirectiveScope,
   type DirectiveHighRiskReason,
+  type DirectiveInterpretFn,
+  type DirectiveInterpretResult,
+  type DirectiveScope,
 } from "../../model/directive.ts";
 import { parseDirectiveMarker } from "../../model/directive-marker.ts";
-import type { RuntimeKind, ShellReviewRequest } from "../../model/runtime.ts";
+// 低置信阈值单一来源（编排解释器驱动导出；本层只读消费，不复制字面量）。
+import { DIRECTIVE_INTERPRET_MIN_CONFIDENCE } from "../../common/编排/directive-interpreter.ts";
+import { GOVERNANCE_SLUG_PATTERN, type RuntimeKind, type ShellReviewRequest } from "../../model/runtime.ts";
 import {
   createDirectiveFileStore,
   type DirectiveStore,
@@ -174,6 +182,12 @@ export interface CreateCustomerDirectiveRuntimeOptions {
   /** 本次应用运行 id（C1 主进程启动生成；项目切换不重置；重启失效）。 */
   sessionId: string;
   present: DirectivePresenter;
+  /**
+   * 自然语言解释器（判断 AI 纯理解模式；2026-11-04 客户直修）。缺省 ⇒ 只走既有确定性解析。
+   * 给出时仅在确定性解析**不可确认**、正文非空且不是撤销时调用；解释成功且严格校验通过才用于预填面板。
+   * 失败/不可用/低置信/非法形状一律回退既有行为（原文 + 未识别片段、确认禁用）——**绝不猜、绝不落账**。
+   */
+  interpretDirective?: DirectiveInterpretFn;
   now?: () => Date;
   /** 测试注入缝；生产走 Provider 默认实现（C1 不消费）。 */
   store?: DirectiveStore;
@@ -221,6 +235,8 @@ interface DirectivePrefill {
   unrecognized: string[];
   /** 关键字段是否足以确认（空命令/空选择器/未识别片段 ⇒ false；面板据此禁用确认）。 */
   confirmable: boolean;
+  /** 非空 = 预填来自判断 AI 的解释（只作诊断/测试；不进账本、不进冻结面板载荷）。 */
+  interpreted?: { confidence: number; notes?: string };
 }
 
 const FLOW_TOKEN_RE = /(?:^|\s)flow=([a-z0-9][a-z0-9-]*[a-z0-9])(?=\s|$)/;
@@ -361,6 +377,103 @@ function buildDecisionPrefill(body: string, projectRoot: string): DirectivePrefi
 
 function buildPrefill(target: CustomerDirectiveTarget, body: string, projectRoot: string): DirectivePrefill {
   return target === "approval" ? buildApprovalPrefill(body, projectRoot) : buildDecisionPrefill(body, projectRoot);
+}
+
+// —————————————————————— 自然语言解释预填（2026-11-04 客户直修） ——————————————————————
+//
+// 解释器交回的是**未采信的模型 JSON**：这里按 B1 Service 的同一组字段约束做保守规范化（形状/枚举/长度），
+// 非法/越界一律返回 undefined ⇒ 调用方保留确定性解析结果（面板原文 + 未识别片段、确认禁用）。
+// 最终落账校验仍在 B1 Service（validateCreateInput）——本函数只是「解释结果能否摆上确认面板」的预填门槛，
+// 不是第二份账本校验；Service 仍可拒绝任何它认为非法的确认值（fail-closed）。
+const INTERPRET_UNTIL_VALUES: readonly CustomerDirectiveUntil[] = ["once", "session", "forever"];
+// 与 Service 的 DOMAIN_RE 同形（主机名小写、无 scheme/端口/路径；* / *. 为通配）。
+const INTERPRET_DOMAIN_RE = /^(?:\*|(\*\.[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)|([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?))$/;
+const INTERPRET_ABSOLUTE_PATH_RE = /^(?:[A-Za-z]:[\\/]|\/|\\\\)/;
+
+function interpretByteLength(value: string): number {
+  return Buffer.byteLength(value, "utf8");
+}
+
+/** 与桌面撤销快路径同一前缀口径：`撤销 …` 永不交自然语言解释器（防止把撤销理解成授权）。 */
+function isRevokeBodyText(body: string): boolean {
+  return /^撤销(?:\s|#|$)/.test(body);
+}
+
+function buildInterpretedPrefill(
+  target: CustomerDirectiveTarget,
+  candidate: unknown,
+  projectRoot: string,
+): DirectivePrefill | undefined {
+  if (!isRecord(candidate)) return undefined;
+  const until = candidate["until"];
+  if (typeof until !== "string" || !(INTERPRET_UNTIL_VALUES as readonly string[]).includes(until)) return undefined;
+  const actionRaw = candidate["action"];
+  if (!isRecord(actionRaw)) return undefined;
+  const kind = actionRaw["kind"];
+
+  if (target === "approval") {
+    if (kind !== "allow" && kind !== "deny") return undefined;
+    const resourceRaw = actionRaw["resource"];
+    if (!isRecord(resourceRaw)) return undefined;
+    const type = resourceRaw["type"];
+    let resource: ApprovalAction["resource"];
+    if (type === "shell") {
+      const command = typeof resourceRaw["command"] === "string" ? resourceRaw["command"].trim() : "";
+      if (command === "" || command.includes("\u0000")) return undefined;
+      if (interpretByteLength(command) > CUSTOMER_DIRECTIVE_COMMAND_MAX_BYTES) return undefined;
+      // cwd 恒为项目根：与确定性解析/Service 校验同口径；不信任模型给的目录。
+      resource = { type: "shell", command, cwd: projectRoot };
+    } else if (type === "domain") {
+      const host = typeof resourceRaw["host"] === "string" ? resourceRaw["host"].trim().toLowerCase() : "";
+      if (host === "" || host.includes("\u0000") || host.length > CUSTOMER_DIRECTIVE_HOST_MAX_LENGTH) return undefined;
+      if (!INTERPRET_DOMAIN_RE.test(host)) return undefined;
+      resource = { type: "domain", host, wildcard: host === "*" || host.startsWith("*.") };
+    } else if (type === "path") {
+      const pathValue = typeof resourceRaw["path"] === "string" ? resourceRaw["path"].trim() : "";
+      if (pathValue === "" || pathValue.includes("\u0000")) return undefined;
+      if (interpretByteLength(pathValue) > CUSTOMER_DIRECTIVE_PATH_MAX_BYTES) return undefined;
+      if (!INTERPRET_ABSOLUTE_PATH_RE.test(pathValue)) return undefined;
+      if (pathValue.split(/[\\/]+/).some((segment) => segment === "..")) return undefined;
+      resource = { type: "path", path: pathValue };
+    } else {
+      return undefined;
+    }
+    return {
+      action: { kind, resource },
+      scope: {},
+      until: until as CustomerDirectiveUntil,
+      unrecognized: [],
+      confirmable: true,
+    };
+  }
+
+  if (kind !== "select-recommended" && kind !== "select-option" && kind !== "reject") return undefined;
+  let action: DecisionAction;
+  if (kind === "select-option") {
+    const selector = typeof actionRaw["selector"] === "string" ? actionRaw["selector"].trim() : "";
+    if (selector === "" || selector.includes("\u0000") || /[\r\n]/.test(selector)) return undefined;
+    if (interpretByteLength(selector) > CUSTOMER_DIRECTIVE_SELECTOR_MAX_BYTES) return undefined;
+    action = { kind: "select-option", selector };
+  } else {
+    action = { kind };
+  }
+  const scopeRaw = candidate["scope"];
+  let scope: DirectiveScope = {};
+  if (scopeRaw !== undefined) {
+    if (!isRecord(scopeRaw)) return undefined;
+    const flowId = scopeRaw["flowId"];
+    if (flowId !== undefined) {
+      if (typeof flowId !== "string" || !new RegExp(GOVERNANCE_SLUG_PATTERN).test(flowId)) return undefined;
+      scope = { flowId };
+    }
+  }
+  return {
+    action,
+    scope,
+    until: until as CustomerDirectiveUntil,
+    unrecognized: [],
+    confirmable: true,
+  };
 }
 
 function previewHighRisk(
@@ -504,7 +617,41 @@ export function createCustomerDirectiveRuntime(
     if (marker === undefined || marker.target !== input.target) {
       return { ok: false, error: "invalid-input", message: "标记与 target 不一致" };
     }
-    const prefill = buildPrefill(input.target, marker.body, input.projectRoot);
+    let prefill = buildPrefill(input.target, marker.body, input.projectRoot);
+    // 自然语言（2026-11-04 客户直修）：确定性解析得到可确认的结构化解释 ⇒ 沿用（向后兼容）；
+    // 否则交对应判断 AI 做纯理解，成功且严格校验通过才用其预填；失败/低置信/非法形状一律保留确定性结果
+    // （面板原文 + 未识别片段、确认禁用）。撤销正文永不交解释器（撤销只减少授权，走既有快路径）。
+    const structured = prefill.confirmable && prefill.unrecognized.length === 0;
+    if (!structured && opts.interpretDirective !== undefined && marker.body.trim() !== "" && !isRevokeBodyText(marker.body)) {
+      let interpretation: DirectiveInterpretResult | undefined;
+      try {
+        interpretation = await opts.interpretDirective({
+          target: input.target,
+          body: marker.body,
+          rawText: input.rawText,
+          projectRoot: input.projectRoot,
+          roleId: input.roleId,
+          ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
+        });
+      } catch (error) {
+        // 注入实现抛错也按不可用处理（fail-closed；绝不猜、绝不落账）。
+        interpretation = {
+          ok: false,
+          reasonCode: "unavailable",
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
+      if (interpretation.ok && interpretation.confidence >= DIRECTIVE_INTERPRET_MIN_CONFIDENCE) {
+        const interpreted = buildInterpretedPrefill(input.target, interpretation.candidate, input.projectRoot);
+        if (interpreted !== undefined) {
+          interpreted.interpreted = {
+            confidence: interpretation.confidence,
+            ...(interpretation.notes !== undefined ? { notes: interpretation.notes } : {}),
+          };
+          prefill = interpreted;
+        }
+      }
+    }
     const previewReasons = previewHighRisk(input.target, prefill, input.projectRoot, input.decisionGroupEnabled);
     const request: DirectivePresenterRequest = {
       requestId: `directive-${randomUUID()}`,

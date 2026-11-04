@@ -69,6 +69,14 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
+import {
+  createDirectiveInterpreter as realCreateDirectiveInterpreter,
+  DIRECTIVE_INTERPRET_SUPPORTED_RUNTIMES,
+} from "../../src/pipeline/orchestration/govern-session.ts";
+import type {
+  DirectiveInterpretRequest,
+  DirectiveInterpretResult,
+} from "../../src/model/directive.ts";
 // F-5-opt1（2026-10-16 客户批准）：确认制会话重建后写权清零的**模型可见注记文案**——**单一来源在编排**
 // （`run-role.ts` 的 `RoleSessionHandle.queueModelNotice` 配套文案）；本层只读导入、绝不各写一份。
 import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchestration/run-role.ts";
@@ -661,6 +669,12 @@ export interface SessionManagerDeps {
     runtimeOptions?: RuntimeAdapterFactoryOptions;
     createAdapter: RuntimeAdapterFactory;
   }) => GovernanceJudgeFn;
+  /**
+   * **客户授权平面自然语言解释器工厂**（2026-11-04 客户直修）：缺省经编排 Pipeline 公共出口
+   * `govern-session.ts::createDirectiveInterpreter`（桌面不直接导入私有 `common/编排/`）。
+   * 与两个 judge 同一套 runtimeOptions/adapter 工厂；缺省真实实现，测试可注入桩件。
+   */
+  createDirectiveInterpreter?: typeof realCreateDirectiveInterpreter;
   prepareRuntimeProfile?: (runtime: RuntimeKind) => Promise<void>;
   createPiAdapterFactory: (
     project: ProjectConfig,
@@ -1859,6 +1873,72 @@ export class SessionManager {
     diagnostic.record("session.open.end", { ok: result.ok });
     if (!result.ok) diagnostic.error("session.open.failed", new Error(result.error || "会话开启失败"));
     return result;
+  }
+
+  /**
+   * 客户授权平面（2026-11-04 客户直修）：`@审批`/`@决策` 自然语言的**判断 AI 纯理解**入口。
+   *
+   * 只构造一次性只读解释会话（与「替我审批」/「替我决策」两个 judge 同一套 `runtimeOptions`/adapter
+   * 工厂），不打开角色会话、不写聊天/账本、不改变任何权限；失败一律 `{ok:false}`（调用方回退现有面板）。
+   * 引擎：请求显式 runtime > 该角色活会话引擎 > 本项目最近治理引擎；demo/未知 ⇒ unsupported-engine。
+   */
+  async interpretDirective(request: DirectiveInterpretRequest): Promise<DirectiveInterpretResult> {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session.directive-interpreter" });
+    if (request === null || typeof request !== "object") {
+      return { ok: false, reasonCode: "context-missing", reason: "解释请求形状非法。" };
+    }
+    if (request.target !== "approval" && request.target !== "decision") {
+      return { ok: false, reasonCode: "context-missing", reason: "解释请求缺少合法 target。" };
+    }
+    if (typeof request.body !== "string" || request.body.trim() === "") {
+      return { ok: false, reasonCode: "context-missing", reason: "解释请求缺少正文。" };
+    }
+    const projectRoot = typeof request.projectRoot === "string" ? request.projectRoot.trim() : "";
+    if (projectRoot === "") {
+      return { ok: false, reasonCode: "context-missing", reason: "解释请求缺少项目根。" };
+    }
+    const explicitRuntime: RuntimeKind | undefined =
+      typeof request.runtime === "string" && (RUNTIME_KINDS as readonly string[]).includes(request.runtime)
+        ? (request.runtime as RuntimeKind)
+        : undefined;
+    const roleId = typeof request.roleId === "string" ? request.roleId : "";
+    const runtime = explicitRuntime ?? this.findLiveRuntime(projectRoot, roleId) ?? this.lastGovernanceRuntime.get(projectRoot);
+    if (runtime === undefined) {
+      return { ok: false, reasonCode: "unavailable", reason: "没有可用的请求会话引擎，保持手动确认。" };
+    }
+    if (!DIRECTIVE_INTERPRET_SUPPORTED_RUNTIMES.has(runtime)) {
+      return { ok: false, reasonCode: "unsupported-engine", reason: `当前引擎（${runtime}）不支持自动理解，保持手动确认。` };
+    }
+    const listing = this.deps.getListing(projectRoot);
+    if (listing === undefined) {
+      return { ok: false, reasonCode: "context-missing", reason: "项目尚未枚举（角色清单不可用），保持手动确认。" };
+    }
+    try {
+      const { project } = await buildEffectiveProjectConfig(listing, {
+        buildProjectConfig: this.deps.buildProjectConfig,
+        loadEffectiveConfig: this.loadEffectiveConfig,
+      });
+      await this.deps.prepareRuntimeProfile?.(runtime);
+      const runtimeOptions = this.deps.runtimeOptions;
+      const adapterOptions = {
+        ...runtimeOptions,
+        ...(this.deps.shellGate !== undefined ? { shellGate: this.deps.shellGate } : {}),
+      };
+      const createAdapter = this.deps.createRuntimeAdapterFactory !== undefined
+        ? this.deps.createRuntimeAdapterFactory(project, runtime, adapterOptions)
+        : createRuntimeAdapterFactory(project, runtime, adapterOptions);
+      const createInterpreter = this.deps.createDirectiveInterpreter ?? realCreateDirectiveInterpreter;
+      const interpreter = createInterpreter({
+        project,
+        runtime,
+        ...(runtimeOptions !== undefined ? { runtimeOptions } : {}),
+        createAdapter,
+      });
+      return await interpreter({ ...request, projectRoot, roleId: roleId !== "" ? roleId : request.roleId, runtime });
+    } catch (error) {
+      diagnostic.error("directive-interpret.failed", error, { target: request.target, runtime });
+      return { ok: false, reasonCode: "unavailable", reason: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   /**

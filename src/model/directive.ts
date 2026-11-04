@@ -10,7 +10,7 @@
 // rawText 只存账本/面板，不打印到诊断、不进入模型上下文。
 
 import type { DirectiveMarkerTarget } from "./directive-marker.ts";
-import type { GovernanceFlowId } from "./runtime.ts";
+import type { GovernanceFlowId, RuntimeKind } from "./runtime.ts";
 // flowId 校验唯一来源（runtime.ts 的治理 slug 规则）；本文件不复制字面量。
 import { GOVERNANCE_SLUG_PATTERN } from "./runtime.ts";
 
@@ -60,6 +60,46 @@ export type DecisionAction =
   | { kind: "select-recommended" }
   | { kind: "select-option"; selector: string }
   | { kind: "reject" };
+
+/**
+ * 自然语言指令的解释请求（target=approval 用替我审批的判断 AI；target=decision 用替我决策的判断 AI）。
+ * 判断器只做**纯理解**：不执行、不写盘、不落账；解释结果只作确认面板预填，客户确认后才经 B1 落账。
+ */
+export interface DirectiveInterpretRequest {
+  target: CustomerDirectiveTarget;
+  /** 标记后的正文（trim 后；可跨行）。 */
+  body: string;
+  /** 提交原文（含标记；与 B1 账本同一份，不截断）。 */
+  rawText: string;
+  projectRoot: string;
+  roleId: string;
+  /** 请求会话引擎（判断跟随请求会话，不跨引擎）；缺省 ⇒ 由宿主按活会话/默认引擎解析。 */
+  runtime?: RuntimeKind;
+}
+
+/** 解释失败原因（稳定码；全部 fail-closed，词表只用于诊断/测试，不面向客户）。 */
+export type DirectiveInterpretFailureCode =
+  | "context-missing"
+  | "unsupported-engine"
+  | "aborted"
+  | "timeout"
+  | "unavailable"
+  | "parse-failed"
+  | "low-confidence";
+
+/**
+ * 解释结果：成功时 `candidate` 是判断 AI 交回的**未采信原始 JSON**（由编排预填构造器按 target
+ * 严格校验/规范化；非法形状一律回落现有行为，绝不猜）。`confidence` 为模型自报 0..1。
+ */
+export type DirectiveInterpretResult =
+  | { ok: true; candidate: unknown; confidence: number; notes?: string }
+  | { ok: false; reasonCode: DirectiveInterpretFailureCode; reason?: string };
+
+/** 判断器函数；契约上**不抛错**（所有失败归 `ok:false`），超时由驱动自身 fail-closed。 */
+export type DirectiveInterpretFn = (
+  request: DirectiveInterpretRequest,
+  signal?: AbortSignal,
+) => Promise<DirectiveInterpretResult>;
 
 /** 落账时保存的高危确认记录（`reasons` 为稳定 reason 码，面板文案由 i18n 映射）。 */
 export interface DirectiveHighRiskRecord {

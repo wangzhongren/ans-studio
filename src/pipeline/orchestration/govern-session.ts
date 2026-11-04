@@ -83,6 +83,16 @@ export {
 } from "../../common/编排/governance-judge.ts";
 export type { CreateGovernanceJudgeOptions } from "../../common/编排/governance-judge.ts";
 
+// ── 2026-11-04：`@审批`/`@决策` 自然语言解释器（判断 AI 纯理解模式）的 Pipeline 公共出口 ─────────────
+// 与上方两个 judge 同一纪律：桌面只依赖 Pipeline 公共出口，不直接导入 `common/编排/` 私有模块；
+// 薄再导出，不改变 `openGovernanceSession` 任何既有行为。解释器只预填确认面板，不落账、不放行。
+export {
+  createDirectiveInterpreter,
+  DIRECTIVE_INTERPRET_MIN_CONFIDENCE,
+  DIRECTIVE_INTERPRET_SUPPORTED_RUNTIMES,
+} from "../../common/编排/directive-interpreter.ts";
+export type { CreateDirectiveInterpreterOptions } from "../../common/编排/directive-interpreter.ts";
+
 // ── 2026-10-31：shell 判拒升级（编排 registry）的 Pipeline 公共出口 ─────────────────────────
 // 桌面窗口按既有模式消费：升级卡 presenter 由桌面实现并交给 `openRoleSession.shellEscalationPresenter`
 // （形状单一来源＝`model/runtime.ts` 的 `ShellEscalationPresentFn`）；此处薄再导出 registry 工厂与类型
