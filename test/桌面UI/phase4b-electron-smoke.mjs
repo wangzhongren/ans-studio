@@ -593,6 +593,54 @@ app.whenReady().then(async () => {
       expiredDelivery,
     );
 
+
+    // —————— 9b. 客户直修（2026-11-04）：幕僚回复不再折叠 ——————
+    const unfoldTurn = "unfold-reply-turn";
+    const unfoldTask = "UNFOLD-TASK-MARKER 任务请求原文保持折叠";
+    const unfoldReply = "UNFOLD-REPLY-MARKER 幕僚回复直接显示";
+    const unfoldDelivery = {
+      source: "prompt-input",
+      text: "UNFOLD-SAFE-COPY-MARKER",
+      inputProvenance: { version: 1, kind: "handback", deliveryId: "unfold-d1", attemptId: "unfold-a1", target: { roleId: "P", runtime: "pi" }, reports: [] },
+      inputTextProjection: { version: 1, source: "trusted-handback-display", modelInputRecorded: false, redacted: false, truncated: false, summaryTruncated: false },
+    };
+    await push("session:events", [
+      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "message", turnId: unfoldTurn, summary: "用户输入", detail: { source: "prompt-input", text: unfoldTask } } },
+      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "message", turnId: unfoldTurn, summary: "交付投递", detail: unfoldDelivery } },
+      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "message", turnId: unfoldTurn, summary: unfoldReply } },
+      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "settled", turnId: unfoldTurn, summary: "会话结束", detail: { outcome: "completed" } } },
+    ]);
+    await sleep(140);
+    check("unfold: settled delivery turn keeps assistant reply direct with no reply-original fold", await js(`(()=>{
+      const pane=document.querySelector("#chat .chat-pane")||document;
+      const reply=[...pane.querySelectorAll(".msg-assistant")].find((x)=>x.textContent.includes("UNFOLD-REPLY-MARKER"));
+      const summaries=[...pane.querySelectorAll("details > summary")].map((x)=>x.textContent);
+      return !!reply&&reply.closest("details")===null&&pane.querySelectorAll("details.reply-original").length===0&&!summaries.some((text)=>text.includes("本轮交付处理回复原文")||text.includes("本轮角色回复原文"));
+    })()`));
+    check("unfold: task-request fold unchanged for the same reported turn", await js(`(()=>{
+      const pane=document.querySelector("#chat .chat-pane")||document;
+      const req=[...pane.querySelectorAll("details.task-request")].find((x)=>x.textContent.includes("UNFOLD-TASK-MARKER"));
+      return !!req&&req.open===false&&req.querySelector(":scope > summary").textContent==="任务请求原文"&&req.textContent.includes("UNFOLD-TASK-MARKER");
+    })()`));
+    await push("session:history", {
+      projectRoot: ROOT,
+      roleId: "P",
+      runtime: "pi",
+      rows: [
+        { kind: "user", turnId: unfoldTurn, text: unfoldTask },
+        { kind: "user", turnId: unfoldTurn, text: "UNFOLD-SAFE-COPY-MARKER", inputProvenance: unfoldDelivery.inputProvenance, inputTextProjection: unfoldDelivery.inputTextProjection },
+        { kind: "assistant", turnId: unfoldTurn, text: unfoldReply },
+      ],
+    });
+    await sleep(160);
+    check("unfold: replay history keeps assistant direct and task-request folded", await js(`(()=>{
+      const pane=document.querySelector("#chat .chat-pane")||document;
+      const reply=[...pane.querySelectorAll(".msg-assistant")].find((x)=>x.textContent.includes("UNFOLD-REPLY-MARKER"));
+      const req=[...pane.querySelectorAll("details.task-request")].find((x)=>x.textContent.includes("UNFOLD-TASK-MARKER"));
+      return !!reply&&reply.closest("details")===null&&pane.querySelectorAll("details.reply-original").length===0&&!!req&&req.open===false&&req.querySelector(":scope > summary").textContent==="任务请求原文";
+    })()`));
+    await shot("unfold-reply-direct");
+
     // —————— 10. 菜单配置状态与读取守卫 ——————
     await js(`await window.__ansRenderer.selectRuntime('claude')`);
     await sleep(120);

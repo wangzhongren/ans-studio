@@ -449,6 +449,7 @@ export function safeCopyText(
 }
 
 // —————— 报告折叠（task-request / reply-original）——————
+// 2026-11-04 客户直修：assistant 回复不再生成 reply-original；label 常量按 i18n 管理边界保留。
 
 export function taskRequestLabel(locale: Locale = DEFAULT_LOCALE): string {
   return translate(locale, "ui.reportView.taskRequestLabel");

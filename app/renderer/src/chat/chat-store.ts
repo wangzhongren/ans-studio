@@ -132,7 +132,7 @@ const settledTurnsByRole = new Map<string, Set<string>>();
 const judgeResultIds = new Set<string>();
 // 回放锚点表（每角色一份；history 重放时登记，operator 卡据此落回发生位置）。
 const anchorsByRole = new Map<string, AnchorTable>();
-// 已收到结构化报告/交付的轮次（turnId → 是否接收方），用于 task-request/reply-original 折叠。
+// 已收到结构化报告/交付的轮次（turnId → 是否接收方；当前仅用于 user 行 task-request 折叠）。
 const reportedTurnsByRole = new Map<string, Map<string, { receiver: boolean }>>();
 // 历史报告身份（去重：同 reportId+来源只呈现一次）；full 重建时重置。
 const historyReportIds = new Map<string, Set<string>>();
@@ -489,14 +489,14 @@ export function setFoldOpen(roleId: string, row: ChatRow, open: boolean): void {
 }
 
 /**
- * 已报告轮次的折叠标记：assistant 行在 settled（或回放行）后折成 reply-original；
- * user 行（非注入）折成 task-request。绝不折叠报告/卡/工具行。
+ * 已报告轮次的折叠标记：仅 user 行（非注入）折成 task-request。
+ * 客户直修（2026-11-04）：assistant（幕僚）回复不再折叠，settled/回放一律直接原文显示；
+ * reply-original 仅保留给历史数据兼容渲染（不再生成）。绝不折叠报告/卡/工具行。
  */
 function applyFoldToRow(row: ChatRow, roleId: string): boolean {
   const reported = reportedTurnsByRole.get(roleId);
   if (!reported || !row.turnId) return false;
-  const info = reported.get(row.turnId);
-  if (!info) return false;
+  if (!reported.has(row.turnId)) return false;
   const data = asDict(row.data);
   if (data.fold === "task-request" || data.fold === "reply-original") return false;
   if (row.kind === "user") {
@@ -504,19 +504,6 @@ function applyFoldToRow(row: ChatRow, roleId: string): boolean {
       ...data,
       fold: "task-request",
       foldLabel: translate(currentLocale(), "ui.reportView.taskRequestLabel"),
-      foldOpen: foldOpenSet(roleId).has(foldIdentity(row)),
-    };
-    return true;
-  }
-  if (row.kind === "assistant") {
-    const settled = row.replay === true || settledTurnsByRole.get(roleId)?.has(row.turnId) === true;
-    if (!settled) return false;
-    row.data = {
-      ...data,
-      fold: "reply-original",
-      foldLabel: info.receiver
-        ? translate(currentLocale(), "ui.reportView.deliveryReplyLabel")
-        : translate(currentLocale(), "ui.reportView.replyOriginalLabel"),
       foldOpen: foldOpenSet(roleId).has(foldIdentity(row)),
     };
     return true;
@@ -1387,7 +1374,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     const row = model.rows.find((candidate) => candidate.id === rowId);
     if (!row) return;
     if (key === "fold") {
-      // task-request / reply-original 的开合（跨 full 重建保持；卸载重挂同状态）。
+      // task-request 折叠的开合（reply-original 仅历史数据兼容渲染；跨 full 重建保持）。
       setFoldOpen(roleId, row, open === true);
       set({ paneVersions: bumpVersions(get().paneVersions, [roleId]) });
       return;

@@ -270,3 +270,18 @@ test("P1-ARC-01/02：外层验收类以 reportVersionSupported 门控；交付�
   assert.match(card, /"delivery-report" \+/);
   assert.equal(/"delivery-report" \+ \(asReportRecord\(report\)\.status/.test(card), false);
 });
+
+test("客户直修 2026-11-04：assistant 回复不再生成 reply-original；task-request 保留；i18n 边界不删", () => {
+  const store = codeOnly(read(join(RENDERER, "chat", "chat-store.ts")));
+  assert.equal(/fold:\s*"reply-original"/.test(store), false, "chat-store 不得再生成 reply-original 折叠");
+  assert.equal(/fold:\s*"task-request"/.test(store), true, "user 行 task-request 折叠必须保留");
+  for (const file of ["zh-CN.ts", "en-US.ts"]) {
+    const messages = read(join(ROOT, "src", "common", "shared", "i18n", "messages", file));
+    assert.ok(messages.includes(`"ui.reportView.replyOriginalLabel"`), file + " 必须保留 replyOriginalLabel key");
+    assert.ok(messages.includes(`"ui.reportView.deliveryReplyLabel"`), file + " 必须保留 deliveryReplyLabel key");
+    assert.ok(messages.includes(`"ui.reportView.taskRequestLabel"`), file + " 必须保留 taskRequestLabel key");
+  }
+  const row = codeOnly(read(join(RENDERER, "chat", "ChatRow.tsx")));
+  assert.ok(row.includes(`fold !== "task-request" && fold !== "reply-original"`), "ChatRow 必须保留历史 reply-original 渲染兼容");
+});
+
