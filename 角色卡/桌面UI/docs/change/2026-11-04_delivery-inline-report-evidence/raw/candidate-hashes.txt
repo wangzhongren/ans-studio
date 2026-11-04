@@ -1,0 +1,18 @@
+app/renderer/src/shell/ReportCard.tsx
+  sha256 5f4ae76cfb2f4de74ee797175ae70ac4ff3e0c1e922e4b7b4d2def6e452166ae
+  git-hash-object b4dc589e16b05d4d59a3f209db8e84906389ecf9
+app/renderer/src/shell/phase4b.css
+  sha256 d0ec50f99d80026be68fef599c325ee868a35d8584343b74cb2308e0489a940c
+  git-hash-object 81dc78efecf765e1d49c09c0ac8473509779d062
+test/桌面UI/phase4b-electron-smoke.mjs
+  sha256 e84ef409b82136eb096a1d1891cd507049a61fdc97aa73f45710cece059e47f8
+  git-hash-object 8545bc8ae782c68538752499d4d8ba2bbc68c71e
+test/桌面UI/source-guard.test.ts
+  sha256 480564e15c49762911d8981533a23843b0f7685b2804b344d6e3ce66f7a33e9b
+  git-hash-object e40b4ca448881a412edad2599e83daa2207b2e01
+角色卡/桌面UI/docs/change/2026-11-04_delivery-inline-report-evidence/probe-delivery-inline.mjs
+  sha256 ae7a67401f8cb212fa72d58cacc2918a29b0cd3da32ea7a5df3cc9ed13fc1b82
+  git-hash-object 0eded475e4626b8a2ccbbf28e3b4d629a8dfa0ed
+角色卡/桌面UI/docs/change/2026-11-04_delivery-inline-report-implementation.md
+  sha256 ee54f265d677d2db2669b7bcc7c0712bb6daa9527939fd7a0cd062b07a004b14
+  git-hash-object 2495d60b642dcdfc2ac4b9148b0b931f8c8e0d3c

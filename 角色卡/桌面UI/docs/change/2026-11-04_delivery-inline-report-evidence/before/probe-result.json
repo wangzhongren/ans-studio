@@ -1,0 +1,84 @@
+{
+  "phase": "before",
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\delivery-inline-report-fix\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "delivery card rendered",
+      "value": true,
+      "detail": {
+        "topLevelParagraph": "交付 · 本批 1 份（不表示全部收齐）",
+        "receiptPresent": false,
+        "receiptOpen": null,
+        "receiptSummary": null,
+        "batchTitleInReceipt": null,
+        "reportSummaryText": "PROBE-DELIVERY-PREFIX-MARKER 交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告\n",
+        "reportSummaryLength": 181,
+        "hasPrefixInSummary": true,
+        "hasTailInSummary": false,
+        "reportCompletePresent": true,
+        "reportCompleteOpen": false,
+        "reportCompleteHasTail": true,
+        "reportEvidencePresent": false,
+        "reportEvidenceOpen": null,
+        "reportEvidenceSummary": null,
+        "reportEvidenceHasItem": null,
+        "reportEvidenceItemFlags": null,
+        "deliveryReportFlags": "已净化 · 已截断；部分证据显示已截断；摘要已折叠，完整可用显示副本见下方",
+        "excerptLabel": "报告原文摘录",
+        "batchFactColumns": 3,
+        "batchFactLabels": [
+          "接收历史",
+          "目标输入记录",
+          "目标轮次结果"
+        ],
+        "retryButtonText": "重试保存历史",
+        "statusRole": true,
+        "statusInsideReceipt": false,
+        "safeCopyPresent": true,
+        "safeCopyOpen": false,
+        "reportSections": 1
+      }
+    },
+    {
+      "name": "before: batch title is the card-leading paragraph",
+      "value": true,
+      "detail": "交付 · 本批 1 份（不表示全部收齐）"
+    },
+    {
+      "name": "before: default body is preview only (tail hidden)",
+      "value": true,
+      "detail": {
+        "length": 181,
+        "tail": false
+      }
+    },
+    {
+      "name": "before: full text only inside closed report-complete fold",
+      "value": true,
+      "detail": {
+        "present": true,
+        "open": false,
+        "tail": true
+      }
+    },
+    {
+      "name": "before: no receipt details (facts are primary)",
+      "value": true,
+      "detail": {
+        "receipt": false,
+        "columns": 3
+      }
+    },
+    {
+      "name": "zero console errors",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "failures": 0,
+  "screenshots": [
+    "delivery-default-before.png",
+    "delivery-report-bottom-before.png"
+  ]
+}

@@ -1,0 +1,345 @@
+--- "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/delivery-inline-report-fix/\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-11-04_delivery-inline-report-evidence/raw/baseline/ReportCard.tsx"	2026-11-04 10:37:27.757243000 +0800
++++ app/renderer/src/shell/ReportCard.tsx	2026-11-04 10:38:32.919076300 +0800
+@@ -78,6 +78,8 @@
+   scope?: ReportScope;
+   /** 验收展示判定（由 ReportCard/DeliveryCard 统一计算后传入；本组件不二次判定）。 */
+   acceptance?: boolean;
++  /** 交付行内联全文：默认直接展示报告原文（不再只在折叠里给全文）。 */
++  inlineFull?: boolean;
+ }
+ 
+ export function ReportBody({
+@@ -89,6 +91,7 @@
+   initialPersistence,
+   scope,
+   acceptance,
++  inlineFull,
+ }: ReportBodyProps) {
+   const t = useT();
+   const locale = useLocaleState((s) => s.locale);
+@@ -114,6 +117,8 @@
+   );
+   const folded = preview.length < Array.from(full).length;
+   const isAcceptance = acceptance === true;
++  const inline = inlineFull === true;
++  const showFull = isAcceptance || inline;
+   const sourceRoleId = asReportText(source.roleId);
+   const sourceName = sourceRoleId
+     ? roleDisplayName(findRole(roles, sourceRoleId), locale) || sourceRoleId
+@@ -172,15 +177,17 @@
+         </p>
+       </div>
+       <div className={"report-body" + (isAcceptance ? " is-acceptance" : "")}>
+-        <div className="excerpt-label">
+-          {isAcceptance ? t("ui.reportCard.acceptanceReportLabel") : t("ui.reportCard.excerptLabel")}
+-        </div>
++        {isAcceptance || !inline ? (
++          <div className="excerpt-label">
++            {isAcceptance ? t("ui.reportCard.acceptanceReportLabel") : t("ui.reportCard.excerptLabel")}
++          </div>
++        ) : null}
+         <div
+           className="hb-summary card-md"
+-          dangerouslySetInnerHTML={markdownHtml(isAcceptance ? full : preview)}
++          dangerouslySetInnerHTML={markdownHtml(showFull ? full : preview)}
+         />
+         <p className="projection-flags">
+-          {[flags, !isAcceptance && folded ? t("ui.reportCard.folded") : ""]
++          {[flags, !showFull && folded ? t("ui.reportCard.folded") : ""]
+             .filter(Boolean)
+             .join(locale === "zh-CN" ? "；" : "; ")}
+         </p>
+@@ -203,6 +210,23 @@
+             </ul>
+           </div>
+         ) : null}
++        {!isAcceptance && inline ? (
++          <details className="report-evidence">
++            <summary>{t("ui.reportCard.evidenceCount", { count: evidence.length })}</summary>
++            <ul className="hb-evidence">
++              {evidence.length === 0 ? (
++                <li>{t("ui.reportCard.noEvidence")}</li>
++              ) : (
++                evidence.map((item, index) => (
++                  <li key={index}>
++                    {asReportText(item.text)}
++                    <small className="projection-flags">{textFlags(item, locale)}</small>
++                  </li>
++                ))
++              )}
++            </ul>
++          </details>
++        ) : null}
+         <dl className="report-facts">
+           {includeSave ? (
+             <div>
+@@ -253,7 +277,7 @@
+         </p>
+         <div className="report-actions">
+           {sourceRoleId ? <SourceDocumentButton roleId={sourceRoleId} /> : null}
+-          {isAcceptance ? null : (
++          {showFull ? null : (
+             <details
+               className="report-complete"
+               open={detailsOpen === true}
+@@ -389,43 +413,6 @@
+ 
+   return (
+     <div className={"msg msg-injected msg-delivery" + (replay ? " is-replay" : "")}>
+-      <p>{deliveryBatchTitle(reports.length, locale)}</p>
+-      <div className="persistence-state" role="status" aria-live="polite">
+-        <dl className="report-facts delivery-batch-facts">
+-          <div>
+-            <dt>{t("ui.reportCard.receiptHistory")}</dt>
+-            <dd className="persistence-message" tabIndex={-1}>
+-              {historyLabel}
+-            </dd>
+-          </div>
+-          <div>
+-            <dt>{t("ui.reportCard.targetInput")}</dt>
+-            <dd>{facts.input}</dd>
+-          </div>
+-          <div>
+-            <dt>{t("ui.reportCard.targetTurn")}</dt>
+-            <dd>{facts.outcome}</dd>
+-          </div>
+-        </dl>
+-        {retry ? (
+-          <button
+-            type="button"
+-            className="btn btn-ghost btn-mini persistence-retry"
+-            disabled={pending}
+-            onClick={() => {
+-              if (scope && attemptId) {
+-                void useReportStore.getState().retryHistory(scope, attemptId);
+-              }
+-            }}
+-          >
+-            {retryLabel(true, locale)}
+-          </button>
+-        ) : null}
+-        {effective.history === "failed" || (view.kind === "err" && retry) ? (
+-          <p className="muted small">{retryNoteText(locale)}</p>
+-        ) : null}
+-        {entry?.error ? <p className="persistence-error">{entry.error}</p> : null}
+-      </div>
+       {reports.map((report, index) => {
+         const supported = reportVersionSupported(report);
+         const acceptance = supported && reportAcceptance(report, roles);
+@@ -447,10 +434,54 @@
+               includeSave={false}
+               scope={scope || undefined}
+               acceptance={acceptance}
++              inlineFull
+             />
+           </section>
+         );
+       })}
++      <details className="delivery-receipt">
++        <summary>
++          <span>{t("ui.reportCard.receiptHistory")}</span>
++          <span className="delivery-receipt-note">{historyLabel}</span>
++        </summary>
++        <div className="persistence-state" role="status" aria-live="polite">
++          <p className="delivery-batch-title">{deliveryBatchTitle(reports.length, locale)}</p>
++          <dl className="report-facts delivery-batch-facts">
++            <div>
++              <dt>{t("ui.reportCard.receiptHistory")}</dt>
++              <dd className="persistence-message" tabIndex={-1}>
++                {historyLabel}
++              </dd>
++            </div>
++            <div>
++              <dt>{t("ui.reportCard.targetInput")}</dt>
++              <dd>{facts.input}</dd>
++            </div>
++            <div>
++              <dt>{t("ui.reportCard.targetTurn")}</dt>
++              <dd>{facts.outcome}</dd>
++            </div>
++          </dl>
++          {retry ? (
++            <button
++              type="button"
++              className="btn btn-ghost btn-mini persistence-retry"
++              disabled={pending}
++              onClick={() => {
++                if (scope && attemptId) {
++                  void useReportStore.getState().retryHistory(scope, attemptId);
++                }
++              }}
++            >
++              {retryLabel(true, locale)}
++            </button>
++          ) : null}
++          {effective.history === "failed" || (view.kind === "err" && retry) ? (
++            <p className="muted small">{retryNoteText(locale)}</p>
++          ) : null}
++          {entry?.error ? <p className="persistence-error">{entry.error}</p> : null}
++        </div>
++      </details>
+       <details className="safe-input-copy">
+         <summary>{t("shared.common.safeCopyTitle")}</summary>
+         <p className="projection-flags">{safeCopyFlags(projection, locale)}</p>
+--- "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/delivery-inline-report-fix/\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-11-04_delivery-inline-report-evidence/raw/baseline/phase4b.css"	2026-11-04 10:37:27.772261600 +0800
++++ app/renderer/src/shell/phase4b.css	2026-11-04 10:38:32.920080600 +0800
+@@ -516,7 +516,8 @@
+ .hb-complete-summary,
+ .hb-summary,
+ .hb-evidence,
+-.hb-evidence li {
++.hb-evidence li,
++.report-evidence {
+   min-width: 0;
+   max-width: 100%;
+   overflow-wrap: anywhere;
+@@ -602,14 +603,38 @@
+   flex-direction: column;
+   gap: 8px;
+ }
+-.msg-delivery > p {
+-  margin: 0;
+-  color: var(--foreground);
+-  font-size: 12.5px;
+-  font-weight: 600;
++/* 交付回执（批次数量/接收历史/目标输入/目标轮次/重试）收进卡片尾部默认折叠区；
++   正文是直接阅读面，回执降为附注。 */
++.delivery-receipt {
++  border: 1px solid var(--border);
++  border-radius: var(--radius-control);
++  background: var(--card);
++}
++.delivery-receipt > summary {
++  display: flex;
++  align-items: baseline;
++  flex-wrap: wrap;
++  gap: 8px;
++  min-height: 32px;
++  padding: 6px 10px;
++  color: var(--text-2);
++  font-size: 11.5px;
++  cursor: pointer;
++}
++.delivery-receipt-note {
++  margin-left: auto;
++  color: var(--text-3);
++  font-size: 11px;
++  overflow-wrap: anywhere;
++}
++.delivery-receipt > .persistence-state {
++  padding: 0 10px 10px;
+ }
+-.msg-delivery > .persistence-state {
+-  padding: 0;
++.delivery-batch-title {
++  margin: 0;
++  color: var(--text-3);
++  font-size: 11px;
++  font-weight: 400;
+ }
+ .report-facts.delivery-batch-facts {
+   display: grid;
+@@ -656,6 +681,23 @@
+   max-width: 100%;
+   overflow-wrap: anywhere;
+ }
++/* 交付行普通报告：正文内联后，证据保留为只含证据的小折叠（summary 用既有计数文案）。 */
++.report-evidence {
++  border: 1px solid var(--border);
++  border-radius: var(--radius-control);
++  background: var(--card);
++}
++.report-evidence > summary {
++  min-height: 32px;
++  padding: 6px 10px;
++  color: var(--text-2);
++  font-size: 11.5px;
++  cursor: pointer;
++}
++.report-evidence .hb-evidence {
++  margin: 0;
++  padding: 0 10px 8px 26px;
++}
+ .delivery-report .msg-handback,
+ .delivery-report .msg-handback .report-top {
+   border-radius: var(--radius-control);
+--- "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/delivery-inline-report-fix/\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-11-04_delivery-inline-report-evidence/raw/baseline/phase4b-electron-smoke.mjs"	2026-11-04 10:37:27.786530100 +0800
++++ "test/\346\241\214\351\235\242UI/phase4b-electron-smoke.mjs"	2026-11-04 10:38:32.920080600 +0800
+@@ -548,11 +548,12 @@
+     );
+ 
+     // —————— 9. 交付批次事实 / 安全副本 / 历史重试 / 过期 ——————
++    const receivedFull = "DELIVERY-INLINE-PREFIX-MARKER " + "交付内联正文。".repeat(40) + "\nDELIVERY-INLINE-TAIL-MARKER";
+     const received = {
+       ...snapshot,
+       reportId: "smoke-received",
+       source: { roleId: "P", runtime: "pi", turnId: "received-turn" },
+-      summary: { text: "收到的安全摘要", redacted: false, truncated: false },
++      summary: { text: receivedFull, redacted: false, truncated: false },
+     };
+     state.receipt = { version: 1, deliveryId: "d1", attemptId: "a1", turnId: "delivery-turn", inputSaved: true, history: "failed", outcome: "completed", retryHistoryAvailable: true };
+     state.receiptState = "known";
+@@ -570,10 +571,10 @@
+     }]);
+     await sleep(150);
+     check(
+-      "delivery batch shows receipt facts and safe copy flags",
+-      await js(`(()=>{const c=document.querySelector('.msg-delivery');if(!c)return false;const p=c.querySelector(':scope > .persistence-state');return c.textContent.includes('交付 · 本批 1 份（不表示全部收齐）')&&p.querySelectorAll('.delivery-batch-facts dt').length===3&&p.textContent.includes('接收历史')&&p.textContent.includes('目标输入记录')&&p.textContent.includes('目标轮次结果')&&c.querySelector('.safe-input-copy').textContent.includes('此处未记录完整模型输入')&&c.querySelector('.safe-input-copy').textContent.includes('已净化')&&c.querySelector('.safe-input-copy').textContent.includes('显示副本已截断')&&!c.querySelector('.safe-input-copy').open;})()`),
++      "delivery shows inline full report by default with demoted receipt facts and safe copy flags",
++      await js(`(()=>{const c=document.querySelector('.msg-delivery');if(!c)return false;const receipt=c.querySelector('.delivery-receipt');const p=receipt&&receipt.querySelector('.persistence-state');const body=c.querySelector('.delivery-report .hb-summary');const evidence=c.querySelector('.delivery-report .report-evidence');return !!receipt&&!receipt.open&&!c.querySelector(':scope > p')&&receipt.querySelector('.delivery-batch-title').textContent==='交付 · 本批 1 份（不表示全部收齐）'&&receipt.querySelector('summary').textContent.includes('接收历史')&&!!receipt.querySelector('.persistence-state[role="status"][aria-live="polite"]')&&p.querySelectorAll('.delivery-batch-facts dt').length===3&&p.textContent.includes('接收历史')&&p.textContent.includes('目标输入记录')&&p.textContent.includes('目标轮次结果')&&!!body&&body.textContent.includes('DELIVERY-INLINE-PREFIX-MARKER')&&body.textContent.includes('DELIVERY-INLINE-TAIL-MARKER')&&!c.querySelector('.delivery-report .report-complete')&&!c.querySelector('.delivery-report .excerpt-label')&&!!evidence&&evidence.textContent.includes('证据（1 条）')&&c.querySelector('.safe-input-copy').textContent.includes('此处未记录完整模型输入')&&c.querySelector('.safe-input-copy').textContent.includes('已净化')&&c.querySelector('.safe-input-copy').textContent.includes('显示副本已截断')&&!c.querySelector('.safe-input-copy').open;})()`),
+     );
+-    await js(`window.__smokeDelivery=document.querySelector('.msg-delivery');document.querySelector('.msg-delivery .persistence-retry').click()`);
++    await js(`window.__smokeDelivery=document.querySelector('.msg-delivery');document.querySelector('.msg-delivery .delivery-receipt').open=true;document.querySelector('.msg-delivery .persistence-retry').click()`);
+     await sleep(120);
+     check("delivery history retry calls channel once", calls.historyRetries.length === 1, calls.historyRetries[0]);
+     check(
+@@ -1128,7 +1129,7 @@
+       event: { kind: "message", turnId: "a5-delivery-turn", summary: "验收交付", detail: a5DeliveryInput },
+     }]);
+     await waitFor(`[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].some(x=>x.textContent.includes('A5-DELIVERY-MARKER'))`);
+-    check("A5 delivery: acceptance sections + ordinary class unchanged (P1-ARC-02)", await js(`(()=>{
++    check("A5 delivery: acceptance sections + ordinary inline full text (P1-ARC-02)", await js(`(()=>{
+       const d=[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].find(x=>x.textContent.includes('A5-DELIVERY-MARKER'));
+       if(!d) return false;
+       const secs=[...d.querySelectorAll('.delivery-report')];
+@@ -1149,7 +1150,9 @@
+         ordinary.className==='delivery-report'&&
+         ordinary.querySelector('.report-title').textContent==='任务报告'&&
+         !ordinary.querySelector('.report-acceptance-badge')&&
+-        ordinary.querySelector('.report-complete')!==null&&
++        ordinary.querySelector('.hb-summary').textContent.includes('A5-ORDINARY-TAIL-MARKER')&&
++        ordinary.querySelector('.report-complete')===null&&
++        ordinary.querySelector('.report-evidence')!==null&&
+         getComputedStyle(completed).borderLeftColor==='rgb(134, 197, 227)'&&
+         getComputedStyle(blocked).borderLeftColor==='rgb(201, 122, 109)';
+     })()`));
+--- "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/delivery-inline-report-fix/\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242UI/docs/change/2026-11-04_delivery-inline-report-evidence/raw/baseline/source-guard.test.ts"	2026-11-04 10:37:27.801183900 +0800
++++ "test/\346\241\214\351\235\242UI/source-guard.test.ts"	2026-11-04 10:38:32.921081000 +0800
+@@ -238,16 +238,23 @@
+   }
+ });
+ 
+-test("验收报告卡：全文只经 Markdown 管线；普通分支保留 report-complete 折叠", () => {
++test("报告卡：全文只经 Markdown 管线；交付行内联全文，普通 handback 保留 preview+report-complete", () => {
+   const card = read(join(RENDERER, "shell", "ReportCard.tsx"));
+-  assert.match(card, /markdownHtml\(isAcceptance \? full : preview\)/);
+-  assert.match(card, /isAcceptance \? null : \(/);
+-  assert.match(card, /!isAcceptance && folded \? t\("ui\.reportCard\.folded"\)/);
++  // 交付行（inlineFull）与验收报告直接展示 full；普通 handback（不传 inlineFull）仍是 preview。
++  assert.match(card, /const inline = inlineFull === true;/);
++  assert.match(card, /const showFull = isAcceptance \|\| inline;/);
++  assert.match(card, /markdownHtml\(showFull \? full : preview\)/);
++  assert.match(card, /!showFull && folded \? t\("ui\.reportCard\.folded"\)/);
++  // 只有 DeliveryCard 的 ReportBody 使用 inlineFull；handback 的 ReportCard 不使用。
++  assert.equal((card.match(/inlineFull\s*\n\s*\/>/g) || []).length, 1);
+   assert.match(card, /className="report-complete"/);
++  // report-complete 只在非全文（普通 handback）分支渲染。
++  assert.match(card, /showFull \? null : \(/);
+   assert.match(card, /ui\.reportCard\.acceptanceTitle/);
+   assert.match(card, /ui\.reportCard\.acceptanceBadge/);
+   assert.match(card, /className="acceptance-evidence"/);
+   assert.match(card, /ui\.reportCard\.evidenceCount/);
++  assert.match(card, /className="report-evidence"/);
+ });
+ 
+ test("P1-ARC-01/02：外层验收类以 reportVersionSupported 门控；交付批 is-blocked 仅验收段", () => {
