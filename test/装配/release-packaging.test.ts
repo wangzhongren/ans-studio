@@ -7,11 +7,11 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.9.0');
-  assert.equal(SOURCE_SHA, '1fb2d634ef1b337775cbb48ed566412b0339c0b0');
+  assert.equal(SOURCE_REF, 'v1.9.1');
+  assert.equal(SOURCE_SHA, '3efee86f7645e2a0bbee3aefd0de5db60dffb900');
 });
 
-test('release overlay selects the v1.9.0 packaging surface', () => {
+test('release overlay selects the v1.9.1 packaging surface', () => {
   const result = selectOverlay(['.github/workflows/release.yml',
     'src/common/装配/release-policy.mjs', 'src/common/装配/release-policy.d.mts',
     'test/装配/release-packaging.test.ts', 'package.json', 'package-lock.json', 'README.md']);
@@ -31,8 +31,8 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.9.0：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.9.0 已含全部产品/测试代码）。
-// v1.5.0 曾同样重置；v1.3.0 按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
+// v1.9.1：白名单**保持基础集**（打包/版本/发布面——冻结源 tag v1.9.1 已含全部产品/测试代码）。
+// v1.9.0 曾重置为基础集；v1.5.0 曾同样重置；v1.3.0 按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
 // test/桌面应用/session-rebuild-race.test.ts）均已随冻结源吸收、整批移除，回到 fail-closed/excluded。
 // 未列名 test/ 文件（test/runtime-core/**、test/codex-adapter/** 等）一律 excluded、不随构建树分发。
 // 本用例锁死 test/ 排除面总边界。

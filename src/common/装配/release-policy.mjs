@@ -1,11 +1,14 @@
-export const SOURCE_REF = 'v1.9.0';
-export const SOURCE_SHA = '1fb2d634ef1b337775cbb48ed566412b0339c0b0';
-// v1.9.0 overlay：冻结源 tag v1.9.0 已含全部产品/测试代码（contract_check 只读 schema 查询与逐字段错误诊断、
-// 客户授权平面（@审批/@决策 与客户指令账本 customer.directives.jsonl）、角色资料抽屉布局修复）；
-// 白名单**重置为基础集**（files＝package.json、package-lock.json、.github/workflows/release.yml；
-// dirs＝src/common/装配/、test/装配/），**无产品/测试 overlay 条目**。
+export const SOURCE_REF = 'v1.9.1';
+export const SOURCE_SHA = '3efee86f7645e2a0bbee3aefd0de5db60dffb900';
+// v1.9.1 overlay：冻结源 tag v1.9.1 已含全部产品/测试代码（交付行默认内联报告正文；自动决策「无法核对」
+// 原卡转客户确认与同指纹拒绝去重）；白名单**保持基础集**（files＝package.json、package-lock.json、
+// .github/workflows/release.yml；dirs＝src/common/装配/、test/装配/），**无产品/测试 overlay 条目**。
+// 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
+// 历史（v1.9.0 overlay）：冻结源 tag v1.9.0 已含全部产品/测试代码（contract_check 只读 schema 查询与逐字段
+// 错误诊断、客户授权平面（@审批/@决策 与客户指令账本 customer.directives.jsonl）、角色资料抽屉布局修复）；
+// 当时白名单重置为基础集、无产品/测试 overlay 条目。
 // v1.8.4 发布阻断修复条目及更早的 v1.8.0/v1.8.2/v1.7.0/v1.6.0/v1.5.0 精确条目均已随 v1.9.0 冻结源吸收，
-// 整批移出活动白名单。以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
+// 整批移出活动白名单。
 // 历史（v1.8.4 overlay）：冻结源 tag v1.8.4 已含全部产品/测试代码（全局任务状态与幕僚版本决策权、验收报告卡
 // 特殊显示与原文直出、派发护栏放松）；当时白名单为基础集与历史保留条目。
 // 历史（v1.8.4 发布阻断修复）：tag v1.8.4 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、
