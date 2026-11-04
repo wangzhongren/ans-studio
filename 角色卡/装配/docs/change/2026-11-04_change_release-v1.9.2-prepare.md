@@ -13,7 +13,13 @@ events:
     summary: 客户决定发布 1.9.2 版（补丁版）；版本 1.9.1→1.9.2；README 当前版本/下载表/要点 → v1.9.2
   - date: "2026-11-04"
     kind: verified
-    summary: 本地预检 npm run typecheck 0、typecheck:renderer 0、装配测试 88/88 通过；完整 T3 串行回归结果见下表
+    summary: 本地预检 npm run typecheck 0、typecheck:renderer 0、装配测试 88/88 通过；完整 T3 串行回归 3636 tests / 3609 pass / 9 fail（仅既有 Windows symlink EPERM）/ 18 skip（既有平台基线）
+  - date: "2026-11-04"
+    kind: updated
+    summary: PR #54 合并（1eba711，含 prepare f2a34f1）；annotated tag v1.9.2 已打并推送（tag 对象 a63b67f，指向 1eba711）
+  - date: "2026-11-04"
+    kind: verified
+    summary: pipeline 钉版本轮完成并本地验证——node --test 装配 88/88、npm run typecheck 0
 ---
 
 # v1.9.2 发布准备
@@ -26,8 +32,8 @@ events:
 - 发布源（冻结源）：`origin/main` 当前 **`70ebb3e29023b7570b6d5216e0567adddce34881`**（`Merge pull request #53 from wangzhongren/release/v1.9.1-assets`），包含自 v1.9.1 以来的两项 UI 修复：
   - PR #51 `fix/composer-buttons`（提交 `28b41e85a6640db2407ab7d434ad63986639ba5d`，文档 `911939fce814d0881b7f11654971fa76d35e1bac`，合并 `4ce987cd64614f900bf121067d0f4ef0639a9412`）：输入区按钮精简——移除发送按钮（Enter 发送保留），停止本轮改为纯图标按钮；
   - PR #52 `fix/unfold-reply`（提交 `645c2222c54d4d2e7b438b648830c7b42f79de72`，文档 `a335dfbafb7ac2cc0ea8e004667af492f4d43870`，合并 `add6559bc59f6cca5da26f6cc9005bd7947d19a0`）：幕僚回复去折叠——settled 与回放均原文直显，task-request 折叠保留。
-- prepare PR 合并提交与 annotated tag **`v1.9.2`** 的 SHA：**待下一轮回填**（本轮不打 tag、不触发 workflow）。
-- 发布准备提交：`chore(release): prepare v1.9.2`（本轮，PR 待创建）；流水线切换与发布记录在后续轮次完成。
+- prepare PR #54 合并提交 **`1eba7118b46cc9a279c42351a8511e3c9fcc12b7`**（含 prepare 提交 `f2a34f1976a9d182ceb3d8e5a41e395b56e803dc`）；annotated tag **`v1.9.2`**（tag 对象 **`a63b67f7a172bff83b10802b0365ed2ffa21fb5f`**）已打并推送，指向 `1eba711`，此后不可移动。
+- 发布准备提交：**`f2a34f1`**（`chore(release): prepare v1.9.2`，PR #54）；流水线切换提交：`ci(release): point pipeline at v1.9.2`（本轮）。
 
 ## 本轮变化（相对 v1.9.1）
 
@@ -40,7 +46,7 @@ events:
 - `package.json`、`package-lock.json`：仅版本字段 1.9.1 → 1.9.2。
 - `README.md`、`README.en.md` 发布区：当前版本 v1.9.2（2026-11-04 发布）；下载/校验链接指向 v1.9.2 资产；SHA256 表按先例留待发布后回填（中文「发布后回填」、英文 "filled in after release"，不预填、不虚构）；要点补充上述两项内容；发布记录链接指向本文件。
 - 本文件。
-- 未改（留给下一轮）：`release-policy.mjs`、`release-policy.d.mts`、`.github/workflows/release.yml`、`test/装配/release-packaging.test.ts`。
+- 流水线钉版（本轮）：`.github/workflows/release.yml`、`src/common/装配/release-policy.mjs`、`src/common/装配/release-policy.d.mts`、`test/装配/release-packaging.test.ts`。
 
 ## 本地预检
 
@@ -55,9 +61,21 @@ events:
 
 T3 全量口径与排除方式：按验收标准以 `node --test --test-concurrency=1` 串行覆盖全部 405 个测试文件，排除已知挂起 `test/pi-adapter/write-sequencing.test.ts`（文档化挂起项，不得静默跳过）。本机以字面目录 glob 分片（10 个目录）加 `test/pi-adapter/` 除该文件外的 39 个显式文件清单传入同一命令（替代 `$(find ...)` 运行时替换的等价写法），文件集合与排除口径不变、可复现。
 
-失败分类说明：9 项失败全部为既有 Windows symlink `EPERM`（`fs.symlinkSync` 在 Windows 无符号链接权限时失败，与最近基线 9 项名单一致；涉及 native/Pi 存储 symlink 校验、D3 链接工作区、读取器对抗用例与 shell-authorized-routine 外指链接用例）；18 项 skip 为既有平台条件跳过（与基线约 18 项一致）。**新增确定性失败 0、新增 skip 0**，满足进入 PR/tag 的门槛。装配测试中的 `release-packaging.test.ts` 仍断言当前流水线的 `SOURCE_REF='v1.9.1'`（下一轮切换），本轮如常通过，无预期失败；未删除测试、未放宽断言。
+失败分类说明：9 项失败全部为既有 Windows symlink `EPERM`（`fs.symlinkSync` 在 Windows 无符号链接权限时失败，与最近基线 9 项名单一致；涉及 native/Pi 存储 symlink 校验、D3 链接工作区、读取器对抗用例与 shell-authorized-routine 外指链接用例）；18 项 skip 为既有平台条件跳过（与基线约 18 项一致）。**新增确定性失败 0、新增 skip 0**，满足进入 PR/tag 的门槛。装配测试中的 `release-packaging.test.ts` 在 prepare 轮仍断言当时流水线的 `SOURCE_REF='v1.9.1'`（pipeline 轮切换，见下），prepare 轮如常通过，无预期失败；未删除测试、未放宽断言。
 
-## 发布配方（下一轮）
+## 流水线钉版（本轮，基于 tag v1.9.2 / 1eba711）
+
+2026-11-04，Node v24.22.1 / npm 11.19.1，工作树 `release/v1.9.2-pipeline`（基于 `1eba711` 加本轮改动）。
+
+| 命令 | 退出码 | 结果 |
+| --- | --- | --- |
+| `node --test "test/装配/**/*.test.ts"` | 0 | 88 tests / 88 pass / 0 fail / 0 skip |
+| `npm run typecheck` | 0 | `ans-cli@1.9.2`，`tsc --noEmit` 无诊断 |
+| `grep -n "1\.9\.1" .github/workflows/release.yml` | 0（1 行匹配） | 仅命中发布 notes 中按要求保留的对照句「其余能力与 v1.9.1 相同」；source_ref 默认、并发组、`gh release view/create/upload/edit` 引用均已切到 v1.9.2，无其他 v1.9.1 字面量 |
+
+说明：发布 notes 按发布说明需要保留「其余能力与 v1.9.1 相同」对照句，因此该 grep 仅命中 notes 一行；source_ref 默认、并发组与全部 `gh release` 引用等管线字段均无 v1.9.1 字面量。`release-policy.mjs` 的 `SOURCE_REF`/`SOURCE_SHA`、声明字面量与打包测试均随本轮切到 v1.9.2；overlay 重置为基础集（无产品/测试条目；v1.9.1 阻断修复的 i18n allowlist 条目随冻结源吸收、归档为「历史」注释）。`release-policy.d.mts` 字面量同步；打包测试中 v1.9.1 阻断修复用例按先例改为「已随冻结源吸收、回到 excluded」，断言不放宽。
+
+## 发布配方（本轮实际做法）
 
 - `release-policy.mjs`：`SOURCE_REF='v1.9.2'`、`SOURCE_SHA=<tag 合并提交 SHA>`；overlay 重置为基础集（无产品/测试条目；v1.9.1 阻断修复的 i18n allowlist 条目随冻结源吸收，归档为「历史」注释）。fail-closed/excluded 机制不变。
 - `release-policy.d.mts`：`SOURCE_REF`/`SOURCE_SHA` 字面量同步。
