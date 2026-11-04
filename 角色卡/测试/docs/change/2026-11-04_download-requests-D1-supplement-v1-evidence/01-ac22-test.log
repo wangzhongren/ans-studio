@@ -1,0 +1,11 @@
+✔ AC-22（裁定 A）：决策卡在前 → 下载卡 waiting → 决策卡作答后下载卡呈现 → 各自结算 (30.0019ms)
+✔ AC-22（裁定 A）反向：下载卡在前 → 决策卡 waiting → 下载卡作答后决策卡呈现并各自结算 (13.666ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 281.7108
+EXIT=0 ELAPSED=1s

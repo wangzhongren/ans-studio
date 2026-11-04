@@ -1,0 +1,11 @@
+=== D1-supplement v1 opening state ===
+2026-11-04T21:20:02+0800
+/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/download-requests
+=== git rev-parse HEAD ===
+cb3dd23fbebeba40627369da1adddd76322ee070
+=== git branch --show-current ===
+feat/download-requests
+=== git status --porcelain -- src app test ===
+ M test/测试/download-requests-electron-probe.mjs
+?? test/测试/download-requests-ac22.test.ts
+=== git diff --cached --name-only ===

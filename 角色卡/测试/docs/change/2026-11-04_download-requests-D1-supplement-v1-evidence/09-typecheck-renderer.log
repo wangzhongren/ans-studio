@@ -1,0 +1,5 @@
+
+> ans-cli@1.9.2 typecheck:renderer
+> tsc -p app/renderer/tsconfig.json
+
+EXIT=0 ELAPSED=0s

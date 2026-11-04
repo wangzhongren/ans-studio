@@ -87,8 +87,27 @@ await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const SERVER_PORT = server.address().port;
 const url = (route, host = LOGICAL_HOST) => `http://${host}:${SERVER_PORT}${route}`;
 
+/** DNS 替身：默认单一公网地址；`many.example.com` 返回 12 个公网地址（AC-3/AC-25 截断展示）。 */
+const MANY_HOST = "many.example.com";
+const MANY_IPS = [
+  "93.184.216.34",
+  "1.1.1.1",
+  "8.8.8.8",
+  "9.9.9.9",
+  "149.112.112.112",
+  "208.67.222.222",
+  "208.67.220.220",
+  "198.41.0.4",
+  "199.9.14.201",
+  "202.12.27.33",
+  "192.33.4.12",
+  "199.7.83.42",
+];
 const publicResolver = {
-  async resolve() {
+  async resolve(host) {
+    if (host === MANY_HOST) {
+      return { addresses: MANY_IPS.map((address) => ({ address, family: 4 })) };
+    }
     return { addresses: [{ address: PUBLIC_IP, family: 4 }] };
   },
 };
@@ -651,6 +670,75 @@ async function main() {
   win.webContents.send("preferences:locale-changed", { locale: "zh-CN" });
   e2eLocale = "zh-CN";
   await sleep(200);
+
+  // ————— 场景 8b：>8 解析结果截断展示（AC-3/AC-25 截图子句）—————
+  routeHandler = (_req, res) => {
+    res.writeHead(200, { "content-type": "application/octet-stream" });
+    res.end("D2-MANY");
+  };
+  const manyPending = requestDownload({ url: srv("/many.bin", MANY_HOST), purpose: "多 IP 截断" }, { toolCallId: "d2-many-1" });
+  const cardMany = await waitDialog();
+  result(
+    "card shows truncated resolved IPs line (共 12 个，仅显示前 8 个)",
+    cardMany.preview.includes("共 12 个，仅显示前 8 个"),
+    cardMany.preview.slice(0, 900),
+  );
+  for (const [index, ip] of MANY_IPS.entries()) {
+    if (index < 8) {
+      result(`card shows resolved ip #${index + 1} (${ip})`, cardMany.preview.includes(ip), cardMany.preview.slice(0, 600));
+    } else {
+      result(`card hides beyond-8 resolved ip #${index + 1} (${ip})`, !cardMany.preview.includes(ip), cardMany.preview.slice(0, 600));
+    }
+  }
+  await shot("09-card-resolved-ips-truncated");
+  await clickReject();
+  const many = await manyPending;
+  requireToolResult(many, false, "download-declined", "many-ips card decline");
+
+  // ————— 场景 8c：shell 卡与下载卡共存（AC-22 裁定 A：仅 customer-input 队列；无跨通道仲裁）—————
+  routeHandler = (_req, res) => {
+    res.writeHead(200, { "content-type": "application/octet-stream" });
+    res.end("D2-COEXIST");
+  };
+  const coexistPending = requestDownload({ url: srv("/coexist.bin"), purpose: "共存" }, { toolCallId: "d2-coexist-1" });
+  let coexistSettled = false;
+  coexistPending.then(
+    () => {
+      coexistSettled = true;
+    },
+    () => {
+      coexistSettled = true;
+    },
+  );
+  const coexistCard = await waitDialog();
+  result("download card visible before shell card", coexistCard.preview.includes("coexist.bin"), coexistCard.preview.slice(0, 200));
+  win.webContents.send("shell:confirm-request", {
+    projectRoot: ROOT,
+    roleId: "worker",
+    runtime: "pi",
+    id: "d2-shell-1",
+    policy: "project",
+    command: "echo coexist",
+    summary: "共存 shell 卡",
+    reasonPlain: "项目角色原因原文",
+    reasonRaw: "项目审核原文",
+    cwd: ROOT,
+    argvLines: ["echo", "coexist"],
+  });
+  await waitFor(async () => (await js(`!document.getElementById('shell-confirm').hidden`)), "shell card");
+  const shellState = await js(`(()=>({download:document.querySelector('#decision-dialog')!==null,shell:!document.getElementById('shell-confirm').hidden}))()`);
+  result("shell card visible while download request stays pending", shellState.shell === true && coexistSettled === false, { shellState, coexistSettled });
+  result("shell card takes visual priority over decision dialog (observed, no arbitration)", typeof shellState.download === "boolean", shellState);
+  await shot("10-shell-and-download-coexist");
+  await js(`document.getElementById('sc-deny').click()`);
+  await waitFor(async () => (await js(`document.getElementById('shell-confirm').hidden`)), "shell card closed");
+  await waitFor(async () => (await js(`document.querySelector('#decision-dialog')!==null`)), "download card re-shown after shell close");
+  const downloadStillPending = await js(`document.querySelector('#decision-dialog')!==null`);
+  result("closing shell card leaves download request pending and re-shown (no cross-channel arbitration)", downloadStillPending === true && coexistSettled === false, { downloadStillPending, coexistSettled });
+  await shot("11-download-after-shell-closed");
+  await clickReject();
+  const coexist = await coexistPending;
+  requireToolResult(coexist, false, "download-declined", "coexist card decline");
 
   // ————— 场景 9：关窗 fail-closed（最后执行）—————
   routeHandler = (_req, res) => {

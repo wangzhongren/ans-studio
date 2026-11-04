@@ -24,7 +24,7 @@
 - 加固重跑期间（约 21:00–21:02），其它角色在本工作区并发写入：`src/provider/download/impl/file-sink.ts`（mtime 21:01:24）、`src/provider/download/impl/node-http.ts`（21:02:04）、`test/编排/download-provider.test.ts`（21:02:15）、`test/编排/download-pipeline.test.ts`。按 D2 规则，该次运行**不可认证**，其截图/日志不作为候选证据。该次运行观测到 77 PASS / 0 FAIL / 9 SHOT（含新增 12-IP 场景），但因混合树不得引用。
 - 已处置：探针恢复为 HEAD 版本（`test/测试/download-requests-electron-probe.mjs` 与 HEAD 一致）；加固补丁保存为 `11-hardening-probe.patch`；该次运行产物隔离在 `10-contaminated-run/`（仅透明保留，不参与判定）。
 - **证据损失（如实披露）**：该次重跑覆写了 Git 忽略的原证据 `probe.log` 与 8 张截图，原始字节不可恢复。原证据哈希仍记录在恢复自 HEAD 的 `report.json`（SHA-256 `668f0ca4ba9badb6b34c48d3f2bd4ea13be64e29c0bf4024e22e2dc0332a169b`）、本报告 §5 与 E2 的已核验记录中；`10-contaminated-run/` 中的图片是污染运行产物，哈希与 §5 不符，**不得引用**。
-- 加固补丁建议在 B1 补证提交、工作区干净后于 D1-supplement/复判阶段重跑；届时以新运行结果替换本报告 §4/§5 与索引。
+- 加固补丁建议在 B1 补证提交、工作区干净后于 D1-supplement/复判阶段重跑；届时以新运行结果替换本报告 §4/§5 与索引。（**已完成，见 §9**）
 
 ## 1. 前置核对（开工 20:29:44）
 
@@ -140,4 +140,29 @@
 | `10-contaminated-run/`（9 PNG + probe.log） | 不进索引语义 | - | **污染运行产物，仅透明保留，不得引用**（§0.2） |
 | `11-hardening-probe.patch` | 见 `19-evidence-index.sha256` | 64 | >8 IP 截断场景加固补丁（未认证，待干净树重跑） |
 
-索引文件 `19-evidence-index.sha256` 为**更正后重新生成**：覆盖当前存在的全部证据文件（含隔离目录与加固补丁）与本报告；原 HEAD 索引曾引用已丢失的 `probe.log`/截图字节，无法再按原样校验。索引自身不入索引；其哈希见交付报告。
+索引文件 `19-evidence-index.sha256` 为**更正后重新生成**：覆盖当前存在的全部证据文件（含隔离目录、加固补丁与 §9 加固重跑目录）与本报告；原 HEAD 索引曾引用已丢失的 `probe.log`/截图字节，无法再按原样校验。索引自身不入索引；其哈希见交付报告。
+
+## 9. 加固重跑（E2 补证，2026-11-04 21:11）
+
+- 触发：E2 `docs/acceptance/download-requests-report-v1.md` §3.5 / AC-3 / AC-25 的可选加固建议。
+- 执行：在 HEAD `cb3dd23` 干净树（开工 `src app test` 空）上，将已提交补丁 `11-hardening-probe.patch` 应用于 `test/测试/download-requests-electron-probe.mjs`（`git apply --check` / `git apply` exit 0；仅测试装配），并追加 AC-22 共存场景；输出到**新目录** `hardened-run-20261104-2111/`，**未覆盖**既有证据。
+- 结果：**SCENARIOS PASS=82 / FAIL=0 / SHOTS=11**，exit 0，看门狗未触发；Electron 44.7.0 / Node 24.21.0 / Chrome 152.0.7977.130；窗口 1360×860；无录屏、未加载 DEBUG 覆盖层。
+- **AC-3/AC-25 截断（场景 8b）**：测试解析器 `many.example.com` 返回 12 个公网 IP；断言卡片显示前 8 个 IP + 「共 12 个，仅显示前 8 个」，后 4 个不显示；截图 `09-card-resolved-ips-truncated.png`（`93a62608085891bed6e309b9d5f6fe394103a1cb0004b4752e5c6094a3750d7d`）。该状态现已有真实运行截图证据。
+- **AC-22 共存（场景 8c）**：下载卡先呈现；推入 shell 确认卡后 shell 卡可见、下载请求保持未结算（`coexistSettled=false`）；shell 卡拒绝后下载卡重新呈现并等待自身作答；无跨通道仲裁。截图 `10-shell-and-download-coexist.png`（`20446a1fe1e753d580a973553347750fc6a314771835ea51f8cd6d8999e46fbb`）、`11-download-after-shell-closed.png`（`4e7877638237cdabc0ea61126996226f14be2e490c543b0fcf684d10f5ac5cb5`）。观测：shell 卡打开时决策对话框不与其同屏（视觉优先级），但下载请求不因此被结算/取消。
+- 关窗 fail-closed（场景 9）仍通过：`download-aborted`，无完成事件。
+- 证据（`hardened-run-20261104-2111/`）：`report.json`（812 行，`9d89ad7d5b335f27b22ea8f7eb7e4f9ebd410114804fce0a06c132e27a044d2a`）、`probe.log`（112 行，`4e922869f5d63d7804f655b976b3f2e814c839ab08e0bad70d5b0a5b1d96facf`）、11 张截图（哈希见下表）。本次运行绑定 HEAD `cb3dd23` + 加固探针工作区改动（测试装配，未提交）。
+- 说明：§0.2 所记的污染重跑与证据损失保留为历史；本节为**干净树**上的重跑，作为 AC-3/AC-25 与 AC-22 的补充证据（不替换 §4/§5 的受认证历史运行记录）。
+
+| 截图（hardened-run） | SHA-256 |
+| --- | --- |
+| `01-download-card-customer.png` | `0647c941ba5f19410844928432b9d39328a8621da3cbc6202a42b0a2c11b87bf` |
+| `02-download-completed-customer.png` | `2114d6e89eec01076e846506aa776d81d27f65fadf22c1ae23408ed6c7fa2692` |
+| `03-download-card-declined.png` | `8fd52c41a27e59004f4e7f9404e1b165d9a56dc3f05216c6260cac00f6ac834c` |
+| `04-judge-result-row.png` | `be96ad0310142d372ef60b397c5df4491feb2851cbdb85f7973fea231f2b7046` |
+| `05-judge-manual-customer-card.png` | `9d97154155f95627237bdd876103fa59c2ec4855503080efe3cc06e8c8d0a278` |
+| `06-directive-panel-consumers.png` | `338b9db7615a0aa1bbc272b5f6c8aefda53e021ca06d56e373f2b614bc87501c` |
+| `07-redirect-re-request-card.png` | `5e6e91001502d8fbbb24967138ab9d940e3796e5dfa02788db62afb3e452db11` |
+| `08-card-english.png` | `d552639cafabe387535619ada7044711113a103913797a5b67da62ecbae31f69` |
+| `09-card-resolved-ips-truncated.png` | `93a62608085891bed6e309b9d5f6fe394103a1cb0004b4752e5c6094a3750d7d` |
+| `10-shell-and-download-coexist.png` | `20446a1fe1e753d580a973553347750fc6a314771835ea51f8cd6d8999e46fbb` |
+| `11-download-after-shell-closed.png` | `4e7877638237cdabc0ea61126996226f14be2e490c543b0fcf684d10f5ac5cb5` |
