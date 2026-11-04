@@ -18,6 +18,11 @@
 //   · 2026-10-26：新增 `app/desktop/requirement-change.ts`（需求变更申请的载荷二次校验 detail、
 //     票据 error/主理任务正文；用户可见回执/系统行已入共享目录 `main.requirementChange.*`；
 //     classification §4，非用户可见 UI）——当前保留 **22** 条。
+//   · 2026-11-05（trunk-amendment-model C3b / T1 返工 D3）：新增 `app/desktop/version-change.ts`
+//     （D1 版本变更接线。中文只出现在：① import specifier 中既有中文目录名 `编排`/`门禁引擎`
+//     的机器路径；② 三提交能力 submitVersionChange/submitRefactor/requestStableWrite 的
+//     tool-result `message`——交角色 agent 的工具回执，非客户 UI 文案；用户可见文本只经
+//     `mainT`/C3 key。classification §4，非用户可见 UI）——当前保留 **23** 条。
 // 规则：
 //   · **新增条目必须写明理由**；只允许「明确不翻译」的文件（classification §4/§5）。
 //   · B1–B4 每完成一批就从本清单移除对应文件；守卫测试会拒绝
@@ -68,6 +73,14 @@ export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   // 工具输出、诊断兜底、agent-facing `{action}`（PM 分类 #7）、账本 `[协调]` 前缀；
   // 用户可见文本已 key 化——classification §4。
   "app/desktop/session.ts",
+  // D1 版本变更/冻结/stable-write/重构桌面接线。中文只出现在两类机器文本，均非客户 UI 文案：
+  // ① import specifier 中既有中文目录名的机器路径——`编排`（`../../src/common/编排/`，
+  //    锚点 :25:51/:26:54）与 `门禁引擎`（`../../src/common/门禁引擎/`，:31:26/:32:67）；
+  // ② 三提交能力（submitVersionChange/submitRefactor/requestStableWrite）的 tool-result `message`
+  //    （:1166/:1208/:1221/:1251/:1267/:1277/:1287 等）——交角色 agent 的工具回执，不是客户可见
+  //    UI 文案（同 `requirement-change.ts` 先例）；用户可见文本只经共享 i18n `mainT`/C3 key——
+  //    classification §4。D3/T1 返工锚点：`version-change.ts:25:51 编排`。
+  "app/desktop/version-change.ts",
   // `view_image` 桌面投递能力：下一轮用户提示的 agent-facing 图片提示文本（`buildViewImagePrompt`，
   // 发给模型，不是 UI 文案）与 `ViewImageFn` 投递失败/非法载荷回执（tool output，交工具层转达模型）；
   // 用户可见排队/失败回执与附件标签已入共享目录（`main.viewImage.*` / `ui.viewImage.attachmentLabel`，

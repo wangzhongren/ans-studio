@@ -38,6 +38,7 @@ import {
 } from "@/chat/runtime-view";
 import { isRuntimeId } from "@/chat/runtime-config";
 import { useDirectiveStore, type DirectiveBridge } from "@/stores/directive-store";
+import { useVersionChangeStore } from "@/stores/version-change-store";
 
 export type { DirectiveBridge } from "@/stores/directive-store";
 
@@ -419,6 +420,9 @@ function onProjectChanged(nextRoot: string | null, previousRoot: string | null):
     useConfirmStore.getState().dismissRecovery();
     // 客户授权平面（C2）：项目切换清空旧项目列表/未决确认/卡内入口；C1 侧同步取消未决面板。
     useDirectiveStore.getState().clearProject(previousRoot, nextRoot);
+    // 2026-11-04 trunk-amendment-model U1：版本变更/主干面板只消费单一 `trunk:state` 推送，
+    // 切项目必须清空旧项目快照，避免串项目显示。
+    useVersionChangeStore.getState().reset();
   } finally {
     switching = false;
   }
@@ -473,6 +477,12 @@ export function installChatRuntime(): void {
       useDirectiveStore.getState().receiveConfirmRequest(payload);
     });
   }
+
+  // 2026-11-04 trunk-amendment-model U1：`trunk:state` 是版本变更/主干面板的**单一状态源**。
+  // preload 注册时同步回放最后一条；旧 preload 缺该方法 ⇒ 面板入口禁用并给原因（不轮询）。
+  bridge.onTrunkState?.((payload) => {
+    useVersionChangeStore.getState().receiveTrunkState(payload);
+  });
 
   // 渲染侧未捕获错误 → 诊断（字段名在桌面窗口白名单内）；不改变错误行为。
   window.addEventListener("error", (event) => {

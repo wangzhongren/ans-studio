@@ -26,7 +26,7 @@ import { createNetworkMonitor } from "./desktop/network-monitor.ts";
 import type { NetworkState } from "../src/model/runtime.ts";
 // i18n B0（2026-10-23）：主进程 translator（窗口/对话框/启动错误框）与应用级语言偏好
 // （`<userData>/ans/preferences.json`，只写 userData；不写项目 `.ans`/`.env`）。
-import { createMainI18n, desktopTexts } from "./desktop/i18n.ts";
+import { createMainI18n, desktopTexts, mainT } from "./desktop/i18n.ts";
 import { DEFAULT_JUDGE_SWITCHES, preferencesFilePath, readPreferences, type JudgeSwitchesPreference } from "./desktop/preferences.ts";
 // 运行时配置：开发使用仓库 `.env`，安装包使用 userData/.env，启动载入 `process.env`（补 Electron 缺失的 `--env-file`）；
 // 面板经 IPC 读写同一 `.env`。**`.env` 的读写全仓唯一**在共享模块 `src/common/shared/env-file.ts`
@@ -848,6 +848,10 @@ function registerIpc(win: BrowserWindow): void {
     },
     // 客户交互通道（A-5）：仅内置治理角色（su）会话消费（见 session.ts 的注入判据）。
     customerInput: customerChannel.customerInput,
+    // 2026-11-04 trunk-amendment-model D1：`trunk:state` 单一状态源推送（主→渲；事件去抖在 Interface）。
+    emitTrunkState: (payload) => {
+      if (!win.isDestroyed()) win.webContents.send("trunk:state", payload);
+    },
     // G-2/W1：三通道（su 交互卡 / shell 卡 / 恢复卡）按角色挂起数**合并视图**——看护静默谓词与
     // 「正确等待不报」排除用（缺省 ⇒ 恒 0「无待确认」；本应用内恒提供）。
     watchdogPendingSnapshot: () => {
@@ -895,6 +899,17 @@ function registerIpc(win: BrowserWindow): void {
     },
   });
   iface = desktop;
+  // 2026-11-04 trunk-amendment-model D1：`trunk:state` 推送助手（项目导入/会话打开时主动推一次；
+  // 事件驱动的去抖推送在 Interface 内）。失败只诊断，不阻塞导入/开会话。
+  const pushTrunkState = (projectRoot: string): void => {
+    if (projectRoot.trim() === "") return;
+    void desktop
+      .getTrunkState({ projectRoot })
+      .then((reply) => {
+        if (reply.ok && !win.isDestroyed()) win.webContents.send("trunk:state", reply.payload);
+      })
+      .catch((error) => mainDiagnostic.error("trunk-state.push.failed", error));
+  };
   // P2：monitor 在 Interface 就绪后启动（首采样定初始状态；离线时经 applyNetworkState 立即生效）。
   desktopRef = desktop;
   const onPowerSuspend = (): void => networkMonitor.notePower("suspend");
@@ -963,6 +978,8 @@ function registerIpc(win: BrowserWindow): void {
     const res = await desktop.listProject(input);
     if (recoveryProjectRoot !== res.projectRoot) recoveryRoleId = null;
     recoveryProjectRoot = res.projectRoot;
+    // 2026-11-04 trunk-amendment-model D1：项目导入即推一次 `trunk:state`（单状态源）。
+    pushTrunkState(res.projectRoot);
     // 客户授权平面（C1）：项目授权来源更新——项目变化时取消旧项目未决面板（不销毁旧运行时），
     // 并以新项目的账本视图重推 `directive:state`（能力位恒 true）。
     directiveInput.setCurrentProject(res.projectRoot);
@@ -975,11 +992,59 @@ function registerIpc(win: BrowserWindow): void {
   registerHandler("session:open", async (_e, input) => {
     const result = await desktop.openSession(input);
     if (result.ok && input.projectRoot === recoveryProjectRoot) { recoveryRoleId = input.roleId; recoveryRuntime = input.runtime; }
+    if (result.ok) pushTrunkState(input.projectRoot);
     return result;
   });
   // 2026-10-31（run-change 触发缺陷）：显式入口「契约变更 · 重开 run」——把应用自有 run-change 三模式卡
   // 经统筹/提案/幕僚会话的客户卡通道呈现（无 pinned run/无可呈现会话 ⇒ 如实失败；不代选模式）。
   registerHandler("run:change-request", (_e, input) => desktop.requestRunChange(input));
+  // —————— 2026-11-04 trunk-amendment-model D1：版本变更/冻结/stable/重构/trunk IPC ——————
+  // 渲→主只读 + 受控确认；**无** `version-change:submit`/`refactor:request`/`stable-write:request`
+  // （F10/F17）。客户批准/拒绝只经 `session:operator-response`（请求快照校验）。
+  registerHandler("version-change:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.listVersionChanges(input);
+  });
+  registerHandler("version-change:present", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.presentVersionChange(input);
+  });
+  registerHandler("stable-write:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.listStableWrites(input);
+  });
+  registerHandler("refactor:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.listRefactorRequests(input);
+  });
+  registerHandler("doc-freeze:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.listDocFreezes(input);
+  });
+  registerHandler("trunk:list", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.listTrunks(input);
+  });
+  registerHandler("trunk:upgrade-request", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.requestTrunkUpgrade(input);
+  });
+  registerHandler("trunk:upgrade-confirm", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.confirmTrunkUpgrade(input);
+  });
+  registerHandler("trunk:refreeze-request", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.requestTrunkRefreeze(input);
+  });
+  registerHandler("trunk:abandon-upgrade", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.abandonTrunkUpgrade(input);
+  });
+  registerHandler("trunk:recover-request", (event, input) => {
+    if (event.sender !== win.webContents) return { ok: false, code: "invalid-sender", error: mainT("main.operator.channelUnavailable") };
+    return desktop.requestTrunkRecover(input);
+  });
   registerHandler("session:send", (_e, input: Parameters<DesktopInterface["sendSession"]>[0]) => desktop.sendSession(input));
   // —————— 客户授权平面（C1，2026-11-03）：渲→主 invoke 三通道（sender 校验同既有模式）——————
   // `directive:confirm-request`/`directive:state` 只做主→渲推送，无入站 handler。

@@ -1,0 +1,45 @@
+{
+  "at": "2026-11-04T18:59:31.536Z",
+  "locale": "zh-CN",
+  "scenario": "item-card",
+  "checks": [
+    {
+      "name": "detail 逐项卡组装成功（item-apply/keep/cancel + ack）",
+      "ok": true
+    },
+    {
+      "name": "逐项卡显示 item 选择与必选 acknowledgment",
+      "ok": true,
+      "detail": {
+        "title": "修正案 · it-1（1/2）",
+        "source": "来源：运营",
+        "preview": "docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72\n批准 = 提交/冻结门槛；逐项确认才是内容门槛。",
+        "options": [
+          "放行执行",
+          "拒绝 ★",
+          "取消"
+        ],
+        "acks": [
+          {
+            "checked": false,
+            "label": "边界扩大：角色卡/impl/boundary.yaml"
+          }
+        ],
+        "hasConfirm": false,
+        "hasSubmit": true
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "07-amendment-item-card",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2-item\\07-amendment-item-card.png",
+      "sha256": "1461380afed3d90ada7270b3b2f25d3f4c82f89a5f0f0e30849b094fe089d892",
+      "bytes": 84283,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ]
+}

@@ -17,6 +17,14 @@
 | 单文件 | `src/pipeline/orchestration/download-request.ts` | 下载申请 Pipeline 公共句柄：预授权匹配、卡片呈现、审批结算、执行编排、审计、并发限制 |
 | 目录（私有） | `src/provider/download/` | 下载执行 Provider：Node http/https 流式下载、DNS 钉扎、重定向、超时/上限、文件 sink（本任务新建的模块私有根；不是整层目录授权） |
 | 目录（私有） | `src/service/download/` | 下载 Service：URL/IP/文件名/重定向/配置策略（本任务新建的模块私有根；不是整层目录授权） |
+| 单文件 | `src/pipeline/orchestration/trunk-runtime.ts` | 主干/修订 Pipeline 公共句柄：按钮→草案→校验→逐项卡→应用/解冻/重新冻结/恢复编排；不写项目文档、不派角色 |
+| 目录（私有） | `src/provider/trunk/` | trunk 存储 Provider：manifest/amendment/journal/history 原子读写、坏件容错（本任务新建的模块私有根；不是整层目录授权） |
+| 目录（私有） | `src/service/trunk/` | trunk Service：派生/verify/drift/修订校验/哈希定格/扩大检测/目标选择/提交对账/恢复（本任务新建的模块私有根；不是整层目录授权） |
+| 目录（私有） | `src/provider/version-change/` | R9 baseline 扩展/一致性、VCA/refactor 存储、`doc-freezes` 派生缓存、原子写/坏件容错（本任务新建的模块私有根；不是整层目录授权） |
+| 目录（私有） | `src/service/version-change/` | VCA 状态机/发起角色/目标校验/冻结服务/迁移/bootstrap/targets↔items/批准哈希重验/refactor 校验（本任务新建的模块私有根；不是整层目录授权） |
+| 单文件 | `src/pipeline/orchestration/version-change-runtime.ts` | VCA 提交/发卡/批准/拒绝/执行外壳；bootstrap |
+| 单文件 | `src/pipeline/orchestration/refactor-runtime.ts` | 重构申请记录/校验/应用调度层管理；机械写集 |
+| 单文件 | `src/pipeline/orchestration/stable-write-runtime.ts` | stable 文件写入 Pipeline 公共句柄：workflow 轻量确认卡、appointment-write 钩子、一次性许可、写入校验、mini re-pin |
 | 目录（私有） | `src/common/编排/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/编排/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/编排/feature-map.md` | 功能导航 |

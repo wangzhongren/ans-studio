@@ -8,6 +8,7 @@
 // 纪律：pin fail-closed；hash/schema/roster/D3 不一致拒绝；legacy 无 manifest 由调用方标 legacy，不伪造 pinned。
 
 import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
@@ -26,6 +27,16 @@ import {
 } from "./workflow-preconditions.ts";
 import { CUSTOMER_DIRECTIVE_ID_PATTERN } from "../../model/directive.ts";
 import type { VersionDecisionDecidedBy } from "../../model/project-state.ts";
+import type { DocFreezeRecord } from "../../model/version-change.ts";
+import {
+  appendDocFreezeRecords,
+  isVersionedDocPath,
+  refreshVersionedDocFreezeSnapshot,
+  versionedDocFreezeState,
+  versionedDocOverwriteDecision,
+  VERSION_BASELINE_REL,
+  VERSION_INITIALIZED_REL,
+} from "../门禁引擎/versioned-doc-guard.ts";
 
 export const RUN_SCHEMA = "ans-run/v1" as const;
 export const RUN_INTENT_SCHEMA = "project-intent/v1" as const;
@@ -57,6 +68,19 @@ export interface RunFlowRef extends RunDocRef {
   version: number;
 }
 
+/**
+ * 2026-11-04（trunk-amendment S3；P1 §3.7）：同 runId 的 re-pin 追加记录（幂等；保留
+ * `createdAt`/`runId`/`flowId`；旧读者忽略未知字段）。
+ */
+export interface RunRepinRecord {
+  schema: "run-repin/v1";
+  at: string;
+  /** VCA（upgrade/detail）或 bootstrap applicationId。 */
+  applicationId: string;
+  decisionId?: string;
+  targets: Array<{ kind: RunDocKind | "teamPlan" | "flow"; path: string; sha256: string }>;
+}
+
 export interface RunManifest {
   schema: typeof RUN_SCHEMA;
   runId: string;
@@ -79,6 +103,8 @@ export interface RunManifest {
   stage?: { current: string; planVersion: number; flowVersion?: number };
   roles?: string[];
   runChange?: RunChangeRecord;
+  /** 2026-11-04（S3）：re-pin 追加记录（同 runId；旧读者忽略）。 */
+  repins?: RunRepinRecord[];
 }
 
 export interface RunChangeRecord {
@@ -111,6 +137,8 @@ export type RunManifestErrorCode =
   | "run-pin-d3-missing"
   | "run-pin-roster-invalid"
   | "run-pin-active-conflict"
+  /** 2026-11-04（S3/C14）：pin/re-pin 目标未冻结（bootstrap 首次 handoff 例外）。 */
+  | "versioned-doc-not-frozen"
   | "run-change-invalid";
 
 export type RunManifestResult<T> = ({ ok: true } & T) | { ok: false; code: RunManifestErrorCode; reason: string };
@@ -352,6 +380,62 @@ export interface RunPinFacts {
   d3?: { decisionId: string; targetRoleIds: string[] };
 }
 
+// —————————————— 2026-11-04（S3）：pin/re-pin 冻结校验（P1 §3.7；C14/C15） ——————————————
+
+/** 首次 handoff 判据：R9 baseline 与 marker 均不存在（此后一律要求已冻结）。 */
+function freezeRegistryUninitialized(projectRoot: string): boolean {
+  return (
+    !existsSync(path.join(projectRoot, VERSION_BASELINE_REL)) &&
+    !existsSync(path.join(projectRoot, VERSION_INITIALIZED_REL))
+  );
+}
+
+/** pin/re-pin 涉及的版本化文档引用（去 `#fragment`；execution 不纳入 guard，C15）。 */
+function versionedRefsOfDocs(documents: RunManifest["documents"]): Array<{ path: string; sha256: string }> {
+  const out = new Map<string, string>();
+  for (const ref of Object.values(documents)) {
+    if (ref === null || ref === undefined || ref.sha256 === undefined) continue;
+    const rel = ref.path.split("#")[0]!;
+    if (!isVersionedDocPath(rel)) continue;
+    out.set(rel, ref.sha256);
+  }
+  return [...out.entries()].map(([rel, sha256]) => ({ path: rel, sha256 }));
+}
+
+/** 首次 handoff pin bootstrap 的合成 applicationId（与 C2c 常量同值；不冒充客户）。 */
+const HANDOFF_PIN_BOOTSTRAP_APPLICATION_ID = "bootstrap-handoff-pin";
+
+/** baseline 是否已有冻结/迁移标记记录（只读存在性判定；迁移完成/曾 bootstrap 的判据）。 */
+async function baselineHasFreezeRecords(projectRoot: string): Promise<boolean> {
+  try {
+    const text = await readFile(path.join(projectRoot, VERSION_BASELINE_REL), "utf8");
+    return text.includes('"event":"frozen"') || text.includes('"event":"draft-marker"');
+  } catch {
+    return false;
+  }
+}
+
+/** pin/re-pin 目标必须已冻结（unknown/corrupt/draft ⇒ fail-closed）。 */
+async function checkVersionedRefsFrozen(
+  projectRoot: string,
+  refs: ReadonlyArray<{ path: string; sha256: string }>,
+  operation: "pin" | "repin",
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  // 同步判定只读 C2b 已安装快照；pin/re-pin 前由 C2b 从 R9 baseline 刷新。
+  // 迁移语义（F29）：baseline 中**尚无任何冻结/迁移标记记录** ⇒ legacy 迁移前（既有文档默认
+  // 冻结，migration-required）；一旦出现冻结记录（C2c 迁移/首次 handoff bootstrap）⇒ 按 ready
+  // 严格判定，未冻结目标 ⇒ draft ⇒ `versioned-doc-not-frozen` fail-closed。baseline corrupt ⇒
+  // 快照 corrupt ⇒ 判定 fail-closed（不自动重建）。
+  const freezeRecordsPresent = await baselineHasFreezeRecords(projectRoot);
+  await refreshVersionedDocFreezeSnapshot(projectRoot, { migrationCompleted: freezeRecordsPresent });
+  for (const ref of refs) {
+    const frozen = versionedDocFreezeState(projectRoot, ref.path, true);
+    const decision = versionedDocOverwriteDecision({ relPath: ref.path, exists: true, frozen, operation });
+    if (!decision.allowed) return { ok: false, reason: decision.reason };
+  }
+  return { ok: true };
+}
+
 /**
  * 组装并校验 pin 所需七类文档 + execution（teamPlan/flow 可选 null）+ schemas + D3 + roles。
  * 只读项目文档；不写 manifest（由 pinRun 写）。
@@ -440,6 +524,12 @@ export async function prepareRunPin(
     if (ref !== null && ref.sha256 === undefined) {
       return { ok: false, code: "run-pin-document-missing", reason: `pin 文档 hash 计算失败：${kind}` };
     }
+  }
+  // 2026-11-04（S3）：pin 只引用已冻结的版本化文档；首次 handoff（注册表未初始化）由 pinRun
+  // 先写 handoff-pin-bootstrap 冻结，prepare 只做预检（不写盘）。
+  if (!freezeRegistryUninitialized(projectRoot)) {
+    const frozen = await checkVersionedRefsFrozen(projectRoot, versionedRefsOfDocs(docs), "pin");
+    if (!frozen.ok) return { ok: false, code: "versioned-doc-not-frozen", reason: frozen.reason };
   }
   const teamPlanRel = `docs/scheduling/${flowId}-team-v1.md`;
   const teamPlanSha = await sha256File(projectRoot, teamPlanRel);
@@ -535,6 +625,39 @@ async function pinRunUnsafe(projectRoot: string, runId: string, facts: RunPinFac
   if (active.manifest !== null && active.manifest.runId !== runId && active.manifest.state === "pinned") {
     return { ok: false, code: "run-pin-active-conflict", reason: `flow ${current.manifest.flowId} 已有 active pinned run ${active.manifest.runId}。` };
   }
+  // 2026-11-04（S3/F30）：首次 handoff pin 在写 manifest 前先写 `handoff-pin-bootstrap` 冻结记录
+  // （只此一处 bootstrap 写入；origin application，不冒充客户），随后刷新 C2b 同步快照并执行
+  // 严格 frozen 校验。任何一步失败都不写 run manifest（指针不变）。
+  const freezeRefs = versionedRefsOfDocs(prepared.pinned.documents);
+  if (freezeRegistryUninitialized(projectRoot)) {
+    if (freezeRefs.length > 0) {
+      const frozenAt = new Date().toISOString();
+      const appended = await appendDocFreezeRecords(
+        freezeRefs.map((ref) => ({
+          projectRoot,
+          relPath: ref.path,
+          sha256: ref.sha256,
+          freeze: {
+            schema: "doc-freeze/v1",
+            applicationId: HANDOFF_PIN_BOOTSTRAP_APPLICATION_ID,
+            reason: "handoff-pin-bootstrap",
+            origin: "application",
+            frozenAt,
+          } satisfies DocFreezeRecord,
+        })),
+      );
+      if (!appended.ok) {
+        return {
+          ok: false,
+          code: appended.reason === "frozen-conflict" ? "versioned-doc-not-frozen" : "run-pin-document-missing",
+          reason: `handoff-pin-bootstrap 冻结失败：${appended.reason}${appended.path !== undefined ? `（${appended.path}）` : ""}`,
+        };
+      }
+    }
+    await refreshVersionedDocFreezeSnapshot(projectRoot);
+  }
+  const frozenCheck = await checkVersionedRefsFrozen(projectRoot, freezeRefs, "pin");
+  if (!frozenCheck.ok) return { ok: false, code: "versioned-doc-not-frozen", reason: frozenCheck.reason };
   const now = new Date().toISOString();
   const manifest: RunManifest = {
     ...prepared.pinned,
@@ -546,6 +669,120 @@ async function pinRunUnsafe(projectRoot: string, runId: string, facts: RunPinFac
   };
   const written = await writeRunManifest(projectRoot, manifest);
   return written.ok ? { ok: true, manifest: written.manifest, alreadyPinned: false } : written;
+}
+
+// —————————————— 2026-11-04（S3）：re-pin（同 runId；P1 §3.7） ——————————————
+
+export interface RunRepinInput {
+  targets: RunRepinRecord["targets"];
+  applicationId: string;
+  decisionId?: string;
+  at?: string;
+}
+
+const REPIN_DOC_KINDS: readonly RunDocKind[] = [
+  "intent",
+  "proposal",
+  "modules",
+  "roster",
+  "topology",
+  "architecture",
+  "assets",
+];
+
+/**
+ * 同 runId 的 pinned manifest re-pin：目标必须已冻结（`operation:"repin"`；execution 不纳入
+ * guard，C15）；内容 hash 以磁盘字节重算；保留 `createdAt`/`runId`/`flowId`；追加 `repins`；
+ * 幂等（目标 refs 已一致 ⇒ `alreadyApplied:true`，不重复追加）。失败不改 manifest。
+ */
+export async function repinPinnedRun(
+  projectRoot: string,
+  runId: string,
+  input: RunRepinInput,
+): Promise<RunManifestResult<{ manifest: RunManifest; alreadyApplied: boolean }>> {
+  if (!Array.isArray(input.targets) || input.targets.length === 0) {
+    return { ok: false, code: "run-manifest-invalid", reason: "re-pin 至少需要一个 target。" };
+  }
+  if (typeof input.applicationId !== "string" || input.applicationId.trim() === "") {
+    return { ok: false, code: "run-manifest-invalid", reason: "re-pin 缺少 applicationId。" };
+  }
+  const current = await readRunManifest(projectRoot, runId);
+  if (!current.ok) return current;
+  const manifest = current.manifest;
+  if (manifest.state !== "pinned") {
+    return { ok: false, code: "run-state-invalid", reason: `run ${runId} 未 pinned，不能 re-pin。` };
+  }
+  for (const target of input.targets) {
+    if (target.kind !== "teamPlan" && target.kind !== "flow" && !REPIN_DOC_KINDS.includes(target.kind)) {
+      return { ok: false, code: "run-manifest-invalid", reason: `re-pin target kind 非法：${String(target.kind)}` };
+    }
+    if (typeof target.path !== "string" || target.path.trim() === "" || !/^[0-9a-f]{64}$/i.test(target.sha256)) {
+      return { ok: false, code: "run-manifest-invalid", reason: `re-pin target 形状非法：${String(target.path)}` };
+    }
+  }
+  // 版本化 target 必须已冻结；execution（teamPlan/flow）不纳入 guard（C15）。
+  const versionedRefs = input.targets
+    .filter((target) => target.kind !== "teamPlan" && target.kind !== "flow")
+    .map((target) => ({ path: target.path.split("#")[0]!, sha256: target.sha256 }))
+    .filter((ref) => isVersionedDocPath(ref.path));
+  const frozen = await checkVersionedRefsFrozen(projectRoot, versionedRefs, "repin");
+  if (!frozen.ok) return { ok: false, code: "versioned-doc-not-frozen", reason: frozen.reason };
+  // 内容匹配为主：以磁盘字节重算（不信任自报 hash）。
+  for (const target of input.targets) {
+    const rel = target.path.split("#")[0]!;
+    const actual = await sha256File(projectRoot, rel);
+    if (actual === undefined) {
+      return { ok: false, code: "run-pin-document-missing", reason: `re-pin 目标文件缺失：${target.path}` };
+    }
+    if (actual.toLowerCase() !== target.sha256.toLowerCase()) {
+      return { ok: false, code: "run-pin-hash-mismatch", reason: `re-pin 目标 hash 不符：${target.path}` };
+    }
+  }
+  let changed = false;
+  const documents = { ...manifest.documents };
+  let teamPlan = manifest.execution.teamPlan;
+  let flow = manifest.execution.flow;
+  for (const target of input.targets) {
+    if (target.kind === "teamPlan") {
+      if (teamPlan !== null && teamPlan.path === target.path && teamPlan.sha256 === target.sha256) continue;
+      teamPlan = { path: target.path, sha256: target.sha256 };
+      changed = true;
+      continue;
+    }
+    if (target.kind === "flow") {
+      if (flow !== null && flow.path === target.path && flow.sha256 === target.sha256) continue;
+      if (flow === null) {
+        return { ok: false, code: "run-manifest-invalid", reason: "flow 未 pin：re-pin 不能建立新的 flow 引用。" };
+      }
+      flow = { ...flow, path: target.path, sha256: target.sha256 };
+      changed = true;
+      continue;
+    }
+    const existing = documents[target.kind];
+    if (existing !== null && existing !== undefined && existing.path === target.path && existing.sha256 === target.sha256) {
+      continue;
+    }
+    documents[target.kind] = { ...(existing ?? {}), path: target.path, sha256: target.sha256 };
+    changed = true;
+  }
+  if (!changed) return { ok: true, manifest, alreadyApplied: true };
+  const at = input.at ?? new Date().toISOString();
+  const repin: RunRepinRecord = {
+    schema: "run-repin/v1",
+    at,
+    applicationId: input.applicationId,
+    ...(input.decisionId !== undefined ? { decisionId: input.decisionId } : {}),
+    targets: input.targets.map((target) => ({ kind: target.kind, path: target.path, sha256: target.sha256 })),
+  };
+  const next: RunManifest = {
+    ...manifest,
+    documents,
+    execution: { teamPlan, flow },
+    updatedAt: at,
+    repins: [...(manifest.repins ?? []), repin],
+  };
+  const written = await writeRunManifest(projectRoot, next);
+  return written.ok ? { ok: true, manifest: written.manifest, alreadyApplied: false } : written;
 }
 
 export async function closeRun(

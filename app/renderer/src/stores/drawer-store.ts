@@ -31,7 +31,7 @@ function currentLocale(): Locale {
   return useLocaleStore.getState().locale;
 }
 
-export type DrawerTab = "card" | "work" | "pi" | "document" | "decisions" | "tasks" | null;
+export type DrawerTab = "card" | "work" | "pi" | "document" | "decisions" | "tasks" | "trunk-version" | null;
 
 export interface ReadingState {
   sections: Record<string, boolean>;
@@ -191,6 +191,7 @@ export function restoreDrawerFocus(fallbackId: string): void {
 export function fallbackTabId(tab: DrawerTab): string {
   if (tab === "pi") return "tab-pi";
   if (tab === "work") return "tab-work";
+  if (tab === "trunk-version") return "version-change";
   return "tab-card";
 }
 

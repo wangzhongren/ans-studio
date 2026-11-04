@@ -8,6 +8,11 @@
 //   · 副作用分类（幕僚声明 + 应用强制**只升不降**；缺填/非法 ⇒ unknown）；
 //   · 幂等键/任务 id/任务卡/状态派生。
 //
+// 2026-11-04（trunk-amendment-model C2a）：新增 `trunk.state`/`trunk.amendment`/`version.change`/
+// `doc.freeze`/`refactor.request`/`stable.write.*` 六类账本事件（17 → 27 kind）的读侧逐 kind 校验；
+// 枚举/状态分区/归属常量全部消费 C1 Model（`model/trunk.ts`/`model/version-change.ts`/
+// `model/runtime.ts`），不复制字面量、不另造同义枚举；旧事件/旧账本照常可读。
+//
 // 纪律：本模块不执行任务、不投递、不判定验收；`task.closed` 只由幕僚动作写入。
 // `.ans/state/**` 是应用独占的运行数据（非仓库候选）；旧 gate/flow/ledger 不读本文件。
 
@@ -23,7 +28,54 @@ import type {
   TaskSideEffect,
   TaskStateEvent,
 } from "../../model/runtime.ts";
-import { GOVERNANCE_CARD_GROUP } from "../../model/runtime.ts";
+import {
+  GOVERNANCE_CARD_KINDS,
+  STABLE_WRITE_APPLICATION_EVENT_KINDS,
+  STABLE_WRITE_CUSTOMER_EVENT_KINDS,
+  STABLE_WRITE_EVENT_KINDS,
+} from "../../model/runtime.ts";
+// 2026-11-04（trunk-amendment-model C2a）：新账本事件的枚举/常量单一来源 = C1 Model；
+// 本模块只消费、不复制字面量、不另造同义枚举（C1 冻结记录 §3.1/§3.2）。
+import type { VersionChangeKind } from "../../model/version-change.ts";
+import {
+  AMENDMENT_ID_PATTERN,
+  DETAIL_AMENDMENT_TARGET_KINDS,
+  DOC_FREEZE_APPLICATION_REASONS,
+  DOC_FREEZE_CUSTOMER_REASONS,
+  DOC_FREEZE_REASONS,
+  DOC_FREEZE_SCHEMA,
+  REFACTOR_FORBIDDEN_KINDS,
+  REFACTOR_MANAGED_BY,
+  REFACTOR_REASON_MAX,
+  REFACTOR_REQUEST_ID_PATTERN,
+  REFACTOR_REQUEST_SCHEMA,
+  REFACTOR_REQUEST_STATUSES,
+  REFACTOR_REQUESTED_BY,
+  STABLE_WRITE_REQUEST_ID_PATTERN,
+  STABLE_WRITE_SCHEMA,
+  STABLE_WRITE_STATUSES,
+  VERSION_CHANGE_APPLICATION_STATUSES,
+  VERSION_CHANGE_CUSTOMER_STATUSES,
+  VERSION_CHANGE_ID_PATTERN,
+  VERSION_CHANGE_INITIATOR_BY_KIND,
+  VERSION_CHANGE_KINDS,
+  VERSION_CHANGE_SCHEMA,
+  VERSION_CHANGE_TARGET_ACTIONS,
+} from "../../model/version-change.ts";
+import {
+  TRUNK_AMENDMENT_APPLY_STATES,
+  TRUNK_AMENDMENT_LEGACY_ITEM_KINDS,
+  TRUNK_AMENDMENT_LEGACY_STATUSES,
+  TRUNK_AMENDMENT_STATUSES,
+  TRUNK_AMENDMENT_VCA_ITEM_KINDS,
+  TRUNK_SOURCES,
+  TRUNK_STABLE_FILE_KINDS,
+  TRUNK_STATE_APPLICATION_OPS,
+  TRUNK_STATE_CUSTOMER_OPS,
+  TRUNK_STATE_LEGACY_OPS,
+  TRUNK_STATE_OPS,
+  TRUNK_VERSION_MIN,
+} from "../../model/trunk.ts";
 import {
   PROJECT_NOTE_BLOCKER_TEXT_MAX,
   PROJECT_NOTE_KEY_MAX,
@@ -62,10 +114,22 @@ const TASK_EVENT_KINDS = new Set([
   "approval.created", "approval.resolved", "approval.expired",
   // 2026-11-02（全局任务状态/版本决策）：幕僚备注与路线审计；TaskRecord 不消费。
   "project.focus", "project.note", "version.decision",
+  // 2026-11-04（trunk-amendment-model C2a）：C1 冻结的六类账本事件（17 → 27 类）；
+  // 形状/常量单一来源 = `model/runtime.ts` + `model/trunk.ts` + `model/version-change.ts`。
+  "trunk.state", "trunk.amendment", "version.change", "doc.freeze", "refactor.request",
+  ...STABLE_WRITE_EVENT_KINDS,
 ]);
 const REPORT_STATUSES: readonly TaskReportStatus[] = ["done", "blocked", "failed"];
 const CLOSED_OUTCOMES: readonly TaskClosedOutcome[] = ["accepted", "rework", "rejected"];
 const REDISPATCH_SAFETIES: readonly TaskRedispatchSafety[] = ["safe", "unsafe", "needs-review"];
+
+/** sha256 小写 hex（应用计算；发起者不自报）。 */
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+/** C1 id 形状（单一来源 = `model/version-change.ts` 常量；不复制字面量）。 */
+const VERSION_CHANGE_ID_RE = new RegExp(VERSION_CHANGE_ID_PATTERN);
+const REFACTOR_REQUEST_ID_RE = new RegExp(REFACTOR_REQUEST_ID_PATTERN);
+const STABLE_WRITE_REQUEST_ID_RE = new RegExp(STABLE_WRITE_REQUEST_ID_PATTERN);
+const AMENDMENT_ID_RE = new RegExp(AMENDMENT_ID_PATTERN);
 
 /** 治理步骤/流程 slug 校验（2026-10-29，F3）：小写 slug、不含首/尾连字符；仅供事件字段形态校验。 */
 function isTaskSlug(value: unknown): boolean {
@@ -74,10 +138,11 @@ function isTaskSlug(value: unknown): boolean {
 
 /**
  * 2026-10-31（D3 卡种收口）：`request.*.cardKind` 字段白名单校验——
- * 唯一来源 = `model/runtime.ts` 的 `GOVERNANCE_CARD_GROUP` 键集（不另写第二张映射表）。
+ * 唯一来源 = `model/runtime.ts` 的 `GOVERNANCE_CARD_KINDS` 白名单（C1b：判断分组键集 +
+ * app-owned `stable-write`；不另写第二张映射表；白名单不表达权限）。
  */
 function isGovernanceCardKind(value: unknown): boolean {
-  return typeof value === "string" && Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, value);
+  return typeof value === "string" && (GOVERNANCE_CARD_KINDS as readonly string[]).includes(value);
 }
 
 /** 2026-11-02：`project.note.refs`/版本决策 refs 的项目相对引用（路径或任务/申请 id）。 */
@@ -106,6 +171,53 @@ function isTargetVersions(value: unknown): boolean {
   return entries.every(([key, version]) =>
     key.trim() !== "" && typeof version === "number" && Number.isInteger(version) && version >= 1,
   );
+}
+
+// —————————————— 2026-11-04（trunk-amendment-model C2a）：新账本事件形状辅助 ——————————————
+//
+// 纪律：值域/枚举**只消费** C1 Model 常量（`model/trunk.ts`/`model/version-change.ts`/
+// `model/runtime.ts`），本模块不复制字面量、不另造同义枚举；这里只有通用形状辅助。
+
+/** C1 常量集成员判断（值域单一来源 = Model）。 */
+function isOneOf(values: readonly string[], value: unknown): boolean {
+  return typeof value === "string" && (values as readonly string[]).includes(value);
+}
+
+function isNonEmptyTrimmedString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1;
+}
+
+function isSha256Hex(value: unknown): value is string {
+  return typeof value === "string" && SHA256_HEX_RE.test(value);
+}
+
+/** 可选审计时间戳（F14）：仅给出时校验 ISO 形状，不要求必填。 */
+function isIsoTimestampString(value: unknown): boolean {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+/** 项目相对路径（POSIX；允许目录尾 `/`；拒绝绝对路径/盘符/反斜杠/`.`/`..`）。 */
+function isProjectRelativePath(value: unknown): value is string {
+  if (typeof value !== "string" || value.trim() === "") return false;
+  if (value.startsWith("/") || value.includes("\\") || /^[a-zA-Z]:/.test(value)) return false;
+  return value.split("/").every((segment) => segment !== "." && segment !== "..");
+}
+
+/** 有界数组 + 元素判定（上限防坏行膨胀；默认元素为非空字符串）。 */
+function isBoundedArray(
+  value: unknown,
+  max: number,
+  check: (item: unknown) => boolean = isNonEmptyTrimmedString,
+): boolean {
+  return Array.isArray(value) && value.length <= max && value.every(check);
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 export interface TaskStateReadError {
@@ -474,6 +586,315 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     }
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
+  // —————————————— 2026-11-04（trunk-amendment-model C2a）：trunk/VCA/冻结/重构/stable 事件 ——————————————
+  if (kind === "trunk.state") {
+    const op = rec["op"];
+    const legacyOp = isOneOf(TRUNK_STATE_LEGACY_OPS, op);
+    if (!legacyOp && !isOneOf(TRUNK_STATE_OPS, op)) return { ok: false, message: "trunk.state.op 非法" };
+    // 旧账本读兼容：`drift`/`unfrozen-expired` 仅旧读（新代码不得写）；不要求新归属字段。
+    if (legacyOp) return { ok: true, event: rec as unknown as TaskStateEvent };
+    const trunkVersion = rec["trunkVersion"];
+    if (typeof trunkVersion !== "number" || !Number.isInteger(trunkVersion) || trunkVersion < TRUNK_VERSION_MIN) {
+      return { ok: false, message: "trunk.state.trunkVersion 必须是正整数" };
+    }
+    if (rec["previousTrunkVersion"] !== undefined && !isPositiveInteger(rec["previousTrunkVersion"])) {
+      return { ok: false, message: "trunk.state.previousTrunkVersion 非法" };
+    }
+    // mini re-pin 不升 trunkVersion：给出事件前版本时必须与 trunkVersion 一致（AC-34）。
+    if (op === "stable-repinned" && rec["previousTrunkVersion"] !== undefined && rec["previousTrunkVersion"] !== trunkVersion) {
+      return { ok: false, message: "trunk.state.stable-repinned 不得升 trunkVersion" };
+    }
+    const customerOp = isOneOf(TRUNK_STATE_CUSTOMER_OPS, op);
+    const applicationOp = isOneOf(TRUNK_STATE_APPLICATION_OPS, op);
+    if (!customerOp && !applicationOp) return { ok: false, message: "trunk.state.op 归属未定义" };
+    const origin = rec["origin"];
+    if (origin !== "customer" && origin !== "application") return { ok: false, message: "trunk.state.origin 非法" };
+    if (customerOp) {
+      if (origin !== "customer") return { ok: false, message: "trunk.state 客户 op 必须 origin customer" };
+      if (rec["decidedBy"] !== "customer") return { ok: false, message: "trunk.state 客户 op 必须 decidedBy customer" };
+    } else {
+      if (origin !== "application") return { ok: false, message: "trunk.state 应用 op 必须 origin application" };
+      if (rec["decidedBy"] !== undefined) return { ok: false, message: "trunk.state 应用 op 不得带 decidedBy" };
+    }
+    if (rec["source"] !== undefined && !isOneOf(TRUNK_SOURCES, rec["source"])) {
+      return { ok: false, message: "trunk.state.source 非法" };
+    }
+    if (rec["highRisk"] !== undefined) {
+      const highRisk = rec["highRisk"];
+      if (!isPlainRecord(highRisk) || highRisk["acknowledged"] !== true) {
+        return { ok: false, message: "trunk.state.highRisk 非法（acknowledged 只允许 true）" };
+      }
+      if (highRisk["items"] !== undefined && !isBoundedArray(highRisk["items"], 64)) {
+        return { ok: false, message: "trunk.state.highRisk.items 非法" };
+      }
+    }
+    if (rec["scope"] !== undefined && !isBoundedArray(rec["scope"], 64)) {
+      return { ok: false, message: "trunk.state.scope 非法" };
+    }
+    if (rec["runId"] !== undefined && rec["runId"] !== null && !isRunId(rec["runId"])) {
+      return { ok: false, message: "trunk.state.runId 非法" };
+    }
+    if (rec["flowId"] !== undefined && !isTaskSlug(rec["flowId"])) {
+      return { ok: false, message: "trunk.state.flowId 非法" };
+    }
+    for (const field of ["decisionId", "confirmationId", "amendmentId", "journalId", "reason", "message", "channel"] as const) {
+      if (rec[field] !== undefined && !isNonEmptyTrimmedString(rec[field])) {
+        return { ok: false, message: `trunk.state.${field} 非法` };
+      }
+    }
+    if (op === "stable-repinned") {
+      if (!isNonEmptyTrimmedString(rec["path"])) return { ok: false, message: "trunk.state.stable-repinned 缺 path" };
+      const oldSha = rec["oldSha"];
+      // `oldSha` 允许空串（此前无该文件快照；正常续接为 64 位小写 hex）。
+      if (typeof oldSha !== "string" || (oldSha !== "" && !isSha256Hex(oldSha))) {
+        return { ok: false, message: "trunk.state.stable-repinned.oldSha 非法" };
+      }
+      if (!isSha256Hex(rec["newSha"])) return { ok: false, message: "trunk.state.stable-repinned.newSha 非法" };
+      // 绑定客户确认：decisionId / confirmationId 至少一个（AC-34）。
+      if (!isNonEmptyTrimmedString(rec["confirmationId"]) && !isNonEmptyTrimmedString(rec["decisionId"])) {
+        return { ok: false, message: "trunk.state.stable-repinned 缺 confirmationId/decisionId" };
+      }
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "trunk.amendment") {
+    const status = rec["status"];
+    const legacyStatus = isOneOf(TRUNK_AMENDMENT_LEGACY_STATUSES, status);
+    if (!legacyStatus && !isOneOf(TRUNK_AMENDMENT_STATUSES, status)) {
+      return { ok: false, message: "trunk.amendment.status 非法" };
+    }
+    const amendmentId = rec["amendmentId"];
+    if (typeof amendmentId !== "string" || amendmentId.trim() === "") {
+      return { ok: false, message: "trunk.amendment 缺 amendmentId" };
+    }
+    // 新事件 id 必须是 C1 形状；旧状态（proposed/confirmed/cancelled）只要求非空（旧账本读兼容）。
+    if (!legacyStatus && !AMENDMENT_ID_RE.test(amendmentId)) {
+      return { ok: false, message: "trunk.amendment.amendmentId 非法" };
+    }
+    if (!isTaskSlug(rec["flowId"])) return { ok: false, message: "trunk.amendment.flowId 非法" };
+    if (rec["applyState"] !== undefined && !isOneOf(TRUNK_AMENDMENT_APPLY_STATES, rec["applyState"])) {
+      return { ok: false, message: "trunk.amendment.applyState 非法" };
+    }
+    if (rec["itemKind"] !== undefined &&
+        !isOneOf(TRUNK_AMENDMENT_VCA_ITEM_KINDS, rec["itemKind"]) &&
+        !isOneOf(TRUNK_AMENDMENT_LEGACY_ITEM_KINDS, rec["itemKind"])) {
+      return { ok: false, message: "trunk.amendment.itemKind 非法" };
+    }
+    if (rec["itemResult"] !== undefined && !isNonEmptyTrimmedString(rec["itemResult"])) {
+      return { ok: false, message: "trunk.amendment.itemResult 非法" };
+    }
+    if (rec["decidedBy"] !== undefined && rec["decidedBy"] !== "customer") {
+      return { ok: false, message: "trunk.amendment.decidedBy 非法" };
+    }
+    for (const field of ["applicationId", "decisionId", "journalId", "itemId", "message"] as const) {
+      if (rec[field] !== undefined && !isNonEmptyTrimmedString(rec[field])) {
+        return { ok: false, message: `trunk.amendment.${field} 非法` };
+      }
+    }
+    if (rec["resultTrunkVersion"] !== undefined && !isPositiveInteger(rec["resultTrunkVersion"])) {
+      return { ok: false, message: "trunk.amendment.resultTrunkVersion 非法" };
+    }
+    if (!legacyStatus) {
+      if (rec["origin"] !== "customer" && rec["origin"] !== "application") {
+        return { ok: false, message: "trunk.amendment.origin 非法" };
+      }
+      // 客户批准/拒绝 ⇒ customer + decisionId（AC-31）；提交/应用动作由应用写、decidedBy 缺省。
+      if ((status === "approved" || status === "rejected") &&
+          (rec["decidedBy"] !== "customer" || !isNonEmptyTrimmedString(rec["decisionId"]))) {
+        return { ok: false, message: "trunk.amendment 客户决定事件必须 decidedBy customer 且带 decisionId" };
+      }
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "version.change") {
+    if (rec["schema"] !== VERSION_CHANGE_SCHEMA) return { ok: false, message: "version.change.schema 非法" };
+    const applicationId = rec["applicationId"];
+    if (typeof applicationId !== "string" || !VERSION_CHANGE_ID_RE.test(applicationId)) {
+      return { ok: false, message: "version.change.applicationId 非法" };
+    }
+    const vcKind = rec["vcKind"];
+    if (!isOneOf(VERSION_CHANGE_KINDS, vcKind)) return { ok: false, message: "version.change.vcKind 非法" };
+    if (rec["initiatorRoleId"] !== VERSION_CHANGE_INITIATOR_BY_KIND[vcKind as VersionChangeKind]) {
+      return { ok: false, message: "version.change.initiatorRoleId 与 vcKind 不匹配" };
+    }
+    if (!isTaskSlug(rec["flowId"])) return { ok: false, message: "version.change.flowId 非法" };
+    const status = rec["status"];
+    const customerStatus = isOneOf(VERSION_CHANGE_CUSTOMER_STATUSES, status);
+    const applicationStatus = isOneOf(VERSION_CHANGE_APPLICATION_STATUSES, status);
+    // `draft` 不是账本事件状态（C1 注释；仅记录内存在）。
+    if (!customerStatus && !applicationStatus) {
+      return { ok: false, message: "version.change.status 非法（draft 不是账本事件状态）" };
+    }
+    const origin = rec["origin"];
+    if (origin !== "customer" && origin !== "application") return { ok: false, message: "version.change.origin 非法" };
+    if (rec["decidedBy"] !== undefined && rec["decidedBy"] !== "customer") {
+      return { ok: false, message: "version.change.decidedBy 非法" };
+    }
+    if (customerStatus) {
+      // approved/rejected：客户决定（origin/decidedBy customer + decisionId）。
+      if (origin !== "customer" || rec["decidedBy"] !== "customer" || !isNonEmptyTrimmedString(rec["decisionId"])) {
+        return { ok: false, message: "version.change 客户决定事件必须 origin/decidedBy customer 且带 decisionId" };
+      }
+    } else if (origin !== "application" || rec["decidedBy"] !== undefined) {
+      // submitted/applied/superseded：应用动作（不冒充客户；applied/superseded 可携 decisionId 供审计）。
+      return { ok: false, message: "version.change 应用事件必须 origin application 且无 decidedBy" };
+    }
+    if (rec["baseTrunkVersion"] !== undefined && !isPositiveInteger(rec["baseTrunkVersion"])) {
+      return { ok: false, message: "version.change.baseTrunkVersion 非法" };
+    }
+    if (rec["bootstrap"] !== undefined && typeof rec["bootstrap"] !== "boolean") {
+      return { ok: false, message: "version.change.bootstrap 非法" };
+    }
+    if (rec["targets"] !== undefined) {
+      const targets = rec["targets"];
+      if (!Array.isArray(targets) || targets.length > 32) return { ok: false, message: "version.change.targets 非法" };
+      for (const target of targets) {
+        if (!isPlainRecord(target)) return { ok: false, message: "version.change.targets 非法" };
+        // contract/roster/execution 的并集 = detail 允许集合（upgrade 为其子集；逐项合法性由业务层判定）。
+        if (!isOneOf(DETAIL_AMENDMENT_TARGET_KINDS, target["kind"])) {
+          return { ok: false, message: "version.change.targets.kind 非法" };
+        }
+        if (!isProjectRelativePath(target["path"])) return { ok: false, message: "version.change.targets.path 非法" };
+        if (!isOneOf(VERSION_CHANGE_TARGET_ACTIONS, target["action"])) {
+          return { ok: false, message: "version.change.targets.action 非法" };
+        }
+        if (target["toSha256"] !== undefined && !isSha256Hex(target["toSha256"])) {
+          return { ok: false, message: "version.change.targets.toSha256 非法" };
+        }
+        if (target["roleId"] !== undefined && !isNonEmptyTrimmedString(target["roleId"])) {
+          return { ok: false, message: "version.change.targets.roleId 非法" };
+        }
+      }
+    }
+    for (const field of ["journalId", "message"] as const) {
+      if (rec[field] !== undefined && !isNonEmptyTrimmedString(rec[field])) {
+        return { ok: false, message: `version.change.${field} 非法` };
+      }
+    }
+    if (rec["resultTrunkVersion"] !== undefined && !isPositiveInteger(rec["resultTrunkVersion"])) {
+      return { ok: false, message: "version.change.resultTrunkVersion 非法" };
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "doc.freeze") {
+    if (rec["schema"] !== DOC_FREEZE_SCHEMA) return { ok: false, message: "doc.freeze.schema 非法" };
+    if (!isProjectRelativePath(rec["path"])) return { ok: false, message: "doc.freeze.path 非法" };
+    if (!isPositiveInteger(rec["version"])) return { ok: false, message: "doc.freeze.version 必须是正整数" };
+    if (!isSha256Hex(rec["sha256"])) return { ok: false, message: "doc.freeze.sha256 必须是 64 位小写 hex" };
+    if (!isNonEmptyTrimmedString(rec["applicationId"])) return { ok: false, message: "doc.freeze 缺 applicationId" };
+    const reason = rec["reason"];
+    // `migrated-draft` 不是 freeze reason（C1 `DOC_MIGRATION_MARKS`；不写 doc.freeze）。
+    if (!isOneOf(DOC_FREEZE_REASONS, reason)) return { ok: false, message: "doc.freeze.reason 非法" };
+    const customerReason = isOneOf(DOC_FREEZE_CUSTOMER_REASONS, reason);
+    const applicationReason = isOneOf(DOC_FREEZE_APPLICATION_REASONS, reason);
+    if (!customerReason && !applicationReason) return { ok: false, message: "doc.freeze.reason 归属未定义" };
+    const origin = rec["origin"];
+    if (origin !== "customer" && origin !== "application") return { ok: false, message: "doc.freeze.origin 非法" };
+    if (customerReason) {
+      if (origin !== "customer" || rec["decidedBy"] !== "customer") {
+        return { ok: false, message: "doc.freeze 客户确认类 reason 必须 origin/decidedBy customer" };
+      }
+    } else if (origin !== "application" || rec["decidedBy"] !== undefined) {
+      // 提交/迁移/bootstrap：application，不冒充客户（F35）。
+      return { ok: false, message: "doc.freeze 应用类 reason 必须 origin application 且无 decidedBy" };
+    }
+    for (const field of ["decisionId", "actorRoleId"] as const) {
+      if (rec[field] !== undefined && !isNonEmptyTrimmedString(rec[field])) {
+        return { ok: false, message: `doc.freeze.${field} 非法` };
+      }
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind === "refactor.request") {
+    if (rec["schema"] !== REFACTOR_REQUEST_SCHEMA) return { ok: false, message: "refactor.request.schema 非法" };
+    const requestId = rec["requestId"];
+    if (typeof requestId !== "string" || !REFACTOR_REQUEST_ID_RE.test(requestId)) {
+      return { ok: false, message: "refactor.request.requestId 非法" };
+    }
+    if (!isTaskSlug(rec["flowId"])) return { ok: false, message: "refactor.request.flowId 非法" };
+    if (rec["initiatedBy"] !== REFACTOR_REQUESTED_BY) return { ok: false, message: "refactor.request.initiatedBy 必须为 convener" };
+    if (!isNonEmptyTrimmedString(rec["title"])) return { ok: false, message: "refactor.request 缺 title" };
+    const reason = rec["reason"];
+    if (typeof reason !== "string" || reason.trim() === "" || Array.from(reason).length > REFACTOR_REASON_MAX) {
+      return { ok: false, message: "refactor.request.reason 非法" };
+    }
+    if (!isOneOf(REFACTOR_REQUEST_STATUSES, rec["status"])) return { ok: false, message: "refactor.request.status 非法" };
+    if (rec["managedBy"] !== REFACTOR_MANAGED_BY) {
+      return { ok: false, message: "refactor.request.managedBy 必须为 application-scheduler" };
+    }
+    // 重构不是客户决定：不得带 decidedBy/批准卡字段（F31）。
+    if (rec["decidedBy"] !== undefined) return { ok: false, message: "refactor.request 不得带 decidedBy" };
+    const scope = rec["scope"];
+    if (!isPlainRecord(scope)) return { ok: false, message: "refactor.request.scope 非法" };
+    if (!isBoundedArray(scope["modules"], 64)) return { ok: false, message: "refactor.request.scope.modules 非法" };
+    if (!isBoundedArray(scope["paths"], 64, isProjectRelativePath)) return { ok: false, message: "refactor.request.scope.paths 非法" };
+    if (!isBoundedArray(scope["roles"], 64)) return { ok: false, message: "refactor.request.scope.roles 非法" };
+    const enforcement = rec["enforcement"];
+    if (!isPlainRecord(enforcement)) return { ok: false, message: "refactor.request.enforcement 非法" };
+    if (!isBoundedArray(enforcement["writeSet"], 64, isProjectRelativePath)) {
+      return { ok: false, message: "refactor.request.enforcement.writeSet 非法" };
+    }
+    const forbiddenKinds = enforcement["forbiddenKinds"];
+    if (!isBoundedArray(forbiddenKinds, REFACTOR_FORBIDDEN_KINDS.length, (item) => isOneOf(REFACTOR_FORBIDDEN_KINDS, item))) {
+      return { ok: false, message: "refactor.request.enforcement.forbiddenKinds 非法" };
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
+  if (kind.startsWith("stable.write.")) {
+    if (rec["schema"] !== STABLE_WRITE_SCHEMA) return { ok: false, message: "stable.write.schema 非法" };
+    const requestId = rec["requestId"];
+    if (typeof requestId !== "string" || !STABLE_WRITE_REQUEST_ID_RE.test(requestId)) {
+      return { ok: false, message: "stable.write.requestId 非法" };
+    }
+    if (!isNonEmptyTrimmedString(rec["roleId"])) return { ok: false, message: "stable.write 缺 roleId" };
+    if (!isProjectRelativePath(rec["path"])) return { ok: false, message: "stable.write.path 非法" };
+    if (!isOneOf(TRUNK_STABLE_FILE_KINDS, rec["stableKind"])) return { ok: false, message: "stable.write.stableKind 非法" };
+    // `baseSha256 === ""` = 写入前文件不存在（C1 约定）；否则须为 64 位小写 hex。
+    const baseSha256 = rec["baseSha256"];
+    if (typeof baseSha256 !== "string" || (baseSha256 !== "" && !isSha256Hex(baseSha256))) {
+      return { ok: false, message: "stable.write.baseSha256 非法" };
+    }
+    if (!isSha256Hex(rec["targetSha256"])) return { ok: false, message: "stable.write.targetSha256 非法" };
+    // `status` 与 kind 后缀同义冗余；C2a 归属判定以 `kind` 为准（C1 注释）。
+    if (!isOneOf(STABLE_WRITE_STATUSES, rec["status"])) return { ok: false, message: "stable.write.status 非法" };
+    const origin = rec["origin"];
+    if (origin !== "customer" && origin !== "application") return { ok: false, message: "stable.write.origin 非法" };
+    if (rec["decidedBy"] !== undefined && rec["decidedBy"] !== "customer") {
+      return { ok: false, message: "stable.write.decidedBy 非法" };
+    }
+    if (isOneOf(STABLE_WRITE_CUSTOMER_EVENT_KINDS, kind)) {
+      if (origin !== "customer" || rec["decidedBy"] !== "customer") {
+        return { ok: false, message: "stable.write 客户决定事件必须 origin/decidedBy customer" };
+      }
+      if (!isNonEmptyTrimmedString(rec["decisionId"]) && !isNonEmptyTrimmedString(rec["confirmationId"])) {
+        return { ok: false, message: "stable.write 客户决定事件缺 decisionId/confirmationId" };
+      }
+    } else if (isOneOf(STABLE_WRITE_APPLICATION_EVENT_KINDS, kind)) {
+      // requested/written/failed：应用动作（written 是应用动作，不记 customer）。
+      if (origin !== "application" || rec["decidedBy"] !== undefined) {
+        return { ok: false, message: "stable.write 应用事件必须 origin application 且无 decidedBy" };
+      }
+    } else {
+      return { ok: false, message: "stable.write.kind 归属未定义" };
+    }
+    // F14：approvedAt/expiresAt/consumedAt 为 C1 可选字段——给出时校验形状，不要求必填。
+    for (const field of ["approvedAt", "expiresAt", "consumedAt"] as const) {
+      if (rec[field] !== undefined && !isIsoTimestampString(rec[field])) {
+        return { ok: false, message: `stable.write.${field} 非法` };
+      }
+    }
+    for (const field of ["decisionId", "confirmationId"] as const) {
+      if (rec[field] !== undefined && !isNonEmptyTrimmedString(rec[field])) {
+        return { ok: false, message: `stable.write.${field} 非法` };
+      }
+    }
+    for (const field of ["reason", "message"] as const) {
+      if (rec[field] !== undefined && typeof rec[field] !== "string") {
+        return { ok: false, message: `stable.write.${field} 非法` };
+      }
+    }
+    return { ok: true, event: rec as unknown as TaskStateEvent };
+  }
   if (typeof rec["taskId"] !== "string" || rec["taskId"] === "") return { ok: false, message: "缺 taskId" };
   if (kind === "task.created") {
     // 2026-10-29（方案 v2.1 §5.4，F2）：创建者受控放宽到 chief / convener（运营派发实现任务）。
@@ -577,7 +998,14 @@ export function replayTaskEvents(events: readonly TaskStateEvent[], errors: Task
       event.kind.startsWith("request.") ||
       event.kind.startsWith("approval.") ||
       event.kind.startsWith("project.") ||
-      event.kind === "version.decision"
+      event.kind.startsWith("stable.write.") ||
+      event.kind === "version.decision" ||
+      // 2026-11-04（C2a）：trunk/VCA/冻结/重构事件同样不是任务事件（TaskRecord 语义不变）。
+      event.kind === "trunk.state" ||
+      event.kind === "trunk.amendment" ||
+      event.kind === "version.change" ||
+      event.kind === "doc.freeze" ||
+      event.kind === "refactor.request"
       ? undefined
       : (event as { taskId?: string }).taskId;
     if (taskId === undefined) continue;

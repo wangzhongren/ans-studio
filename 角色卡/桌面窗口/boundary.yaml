@@ -239,6 +239,14 @@ entries:
   - kind: file
     path: test/桌面应用/download-decision.test.ts
     purpose: 主进程侧测试——项目角色 judge 可达/manual 转客户卡/unavailableReason 防御/开关/single/指纹去重/无 request_confirmation
+  # --- Delta-TA-4（2026-11-04，团队计划 §4.5 B-4；闸门 2）：test/桌面应用/ 新增 1 个精确测试文件（trunk），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/trunk.test.ts
+    purpose: 主进程侧测试——trunk IPC/状态快照/客户卡通道/acknowledgments 结算/客户主权排除/修订在途抑制/apply 对账/重启/通知
+  # --- Delta-TA-10（2026-11-04，P1.5 增量 §4.2 B-10；闸门 2 增补 G2a）：test/桌面应用/ 新增 1 个精确测试文件（version-change），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/version-change.test.ts
+    purpose: 主进程侧测试——VCA/冻结/迁移/bootstrap/重构/客户主权/IPC/面板/重启
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

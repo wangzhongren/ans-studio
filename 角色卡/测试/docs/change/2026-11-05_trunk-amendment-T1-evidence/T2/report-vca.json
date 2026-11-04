@@ -1,0 +1,39 @@
+{
+  "at": "2026-11-04T18:59:33.725Z",
+  "locale": "zh-CN",
+  "scenario": "vca-card",
+  "checks": [
+    {
+      "name": "VCA 卡组装成功",
+      "ok": true
+    },
+    {
+      "name": "VCA 卡显示 kind/发起者/target/hash/语义说明",
+      "ok": true,
+      "detail": {
+        "title": "修正案 · demo",
+        "source": "来源：运营",
+        "preview": "发起者：rapporteur\n流程：demo\ndocs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72\n摘要：补充合同交付细节\n批准 = 提交/冻结门槛；逐项确认才是内容门槛。",
+        "options": [
+          "放行执行",
+          "拒绝 ★"
+        ],
+        "acks": [],
+        "hasConfirm": false,
+        "hasSubmit": true
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "08-vca-approval-card",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2-vca\\08-vca-approval-card.png",
+      "sha256": "baabfdde0534474d5867f3404c8d2fed240c87400a2db796c620e79d10f92bab",
+      "bytes": 83885,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ]
+}

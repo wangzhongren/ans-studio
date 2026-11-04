@@ -1,5 +1,12 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, REFACTOR_SCOPE_ITEMS_MAX, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX } from "../../model/runtime.ts";
+import {
+  AMENDMENT_ID_PATTERN,
+  REFACTOR_REASON_MAX,
+  VERSION_CHANGE_KINDS,
+  VERSION_CHANGE_SUMMARY_MAX,
+  VERSION_CHANGE_TARGET_ACTIONS,
+} from "../../model/version-change.ts";
 import {
   PROJECT_NOTE_BLOCKER_TEXT_MAX,
   PROJECT_NOTE_KEY_MAX,
@@ -1438,6 +1445,174 @@ export function describeTool(name: string): ToolDescription {
         "卡在版本/引用/验收证据循环时，用 request_version_decision 提议「版本修改」或「新版本开发」；你只提议，不代选、不承诺批准。",
         "pinned run 不要调用本工具——走既有 run-change；新版本开发会关闭旧 flow 的全部活动 run，卡面会说明。",
         "申请≠批准、路线≠内容批准：按回执如实行动；应用不写文档、不派发角色、不创建任务。",
+      ],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "submit_version_change") {
+    // Batch 3.5（C1d）：VCA 提交能力（注入才注册）；只提交、不批准/不发卡/不写文档。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            enum: [...VERSION_CHANGE_KINDS],
+            description:
+              "VCA kind: version-upgrade (product only; contract/roster targets; freezes/re-pins after customer approval) " +
+              "or detail-amendment (rapporteur only; contract/roster/execution targets; item-by-item confirmation after approval)",
+          },
+          flowId: { type: "string", pattern: GOVERNANCE_SLUG_PATTERN, description: "Focus flow id (governance slug)" },
+          summary: {
+            type: "string",
+            minLength: 1,
+            maxLength: VERSION_CHANGE_SUMMARY_MAX,
+            description: `Customer-facing summary (≤${VERSION_CHANGE_SUMMARY_MAX} characters; over-long values are rejected, never truncated)`,
+          },
+          targets: {
+            type: "array",
+            minItems: 1,
+            maxItems: VCA_SUBMISSION_TARGETS_MAX,
+            description:
+              `Declared targets (≤${VCA_SUBMISSION_TARGETS_MAX}). workflow/boundary/product-intent are NOT VCA targets ` +
+              "(workflow/boundary use stable-write confirmation; product-intent uses gate 0/1). Hashes are computed by the app, never self-reported.",
+            items: {
+              type: "object",
+              properties: {
+                kind: {
+                  type: "string",
+                  enum: ["contract", "roster", "execution"],
+                  description: "Target kind; version-upgrade allows contract/roster only, detail-amendment also allows execution",
+                },
+                path: {
+                  type: "string",
+                  minLength: 1,
+                  maxLength: VCA_SUBMISSION_PATH_MAX_CHARS,
+                  description: "Project-relative target path (POSIX; no NUL)",
+                },
+                action: { type: "string", enum: [...VERSION_CHANGE_TARGET_ACTIONS], description: "add = new versioned doc; modify = existing draft doc" },
+                from: { type: "string", description: "Optional previous version/path reference for an add/modify (audit only)" },
+                roleId: { type: "string", description: "Optional target role id (only where the service schema requires it)" },
+              },
+              required: ["kind", "path", "action"],
+              additionalProperties: false,
+            },
+          },
+          amendmentId: {
+            type: "string",
+            pattern: AMENDMENT_ID_PATTERN,
+            description: "Required for detail-amendment: amendment id (am-<n>)",
+          },
+          amendmentDocPath: {
+            type: "string",
+            minLength: 1,
+            maxLength: VCA_SUBMISSION_PATH_MAX_CHARS,
+            description: "Required for detail-amendment: project-relative amendment document path",
+          },
+          bootstrap: {
+            type: "boolean",
+            description: "Optional: submit with baseTrunk=null + bootstrap when no trunk exists yet (service validates)",
+          },
+        },
+        required: ["kind", "flowId", "summary", "targets"],
+        additionalProperties: false,
+      },
+      description:
+        "提交**版本变更申请（VCA）**——只提交，绝不批准、绝不发客户卡、绝不写文档。`version-upgrade` 仅 product、`detail-amendment` 仅 rapporteur（按会话角色门控，其他角色/客户直接拒绝）。" +
+        "应用校验发起角色/目标写区/kind 范围/baseTrunk/targets↔items 后把记录置为 `submitted`，再由客户经治理会话决策卡批准或拒绝；**申请≠批准**。" +
+        "targets 的哈希由应用计算（不接受自报）；workflow/boundary 不在 VCA 内（分别走 stable-write 确认与 appointment-write）。" +
+        "成功回执 `{ok:true, applicationId, status:\"submitted\"}`；失败回执 `{ok:false, errorCode:\"<vca-*>\", message?}`；工具不重试、不伪造成功。",
+      promptGuidelines: [
+        "用 submit_version_change 提交 VCA；你只能提交，不能批准/代选，也不要在正文里声称已获批准。",
+        "version-upgrade 只能由 product 提交（contract/roster）；detail-amendment 只能由 rapporteur 提交（contract/roster/execution）。",
+        "workflow/boundary 不是 VCA target：workflow 走 request_stable_write 的客户确认卡，role-card/boundary 走 appointment-write。",
+        "按回执如实行动：submitted 只表示已提交；批准后还有冻结/re-pin 或逐项确认。",
+      ],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "submit_refactor") {
+    // Batch 3.5（C1d）：轻量重构提交（仅 convener；无客户卡、不产生 trunk 版本）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", pattern: GOVERNANCE_SLUG_PATTERN, description: "Focus flow id (governance slug)" },
+          title: { type: "string", minLength: 1, maxLength: REFACTOR_REASON_MAX, description: `Short title (≤${REFACTOR_REASON_MAX} characters)` },
+          reason: {
+            type: "string",
+            minLength: 1,
+            maxLength: REFACTOR_REASON_MAX,
+            description: `Why this refactor is needed (≤${REFACTOR_REASON_MAX} characters; over-long values are rejected, never truncated)`,
+          },
+          scope: {
+            type: "object",
+            properties: {
+              modules: {
+                type: "array",
+                maxItems: REFACTOR_SCOPE_ITEMS_MAX,
+                items: { type: "string", minLength: 1 },
+                description: "Module roots touched (project-relative)",
+              },
+              paths: {
+                type: "array",
+                maxItems: REFACTOR_SCOPE_ITEMS_MAX,
+                items: { type: "string", minLength: 1 },
+                description: "Concrete file paths touched (project-relative; versioned docs/stable/boundary/team-plan/flow are rejected)",
+              },
+              roles: {
+                type: "array",
+                maxItems: REFACTOR_SCOPE_ITEMS_MAX,
+                items: { type: "string", minLength: 1 },
+                description: "Role ids involved (audit/early warning; enforcement is mechanical via WriteGate)",
+              },
+            },
+            required: ["modules", "paths", "roles"],
+            additionalProperties: false,
+          },
+        },
+        required: ["flowId", "title", "reason", "scope"],
+        additionalProperties: false,
+      },
+      description:
+        "提交**轻量重构申请**（refactor.request）——仅 convener 会话可提交；应用调度层机械管理，**不产生 trunk 版本、无客户卡**。" +
+        "工具只提交申请：不派发任务、不写代码、不改变任何写权；scope 只作 early warning，版本化文档/边界/stable/团队计划/flow 会被应用拒绝并回 VCA/stable 指引。" +
+        "成功回执 `{ok:true, requestId:\"rf-<n>\", status:\"requested\"}`；失败回执 `{ok:false, errorCode:\"<refactor-*>\", message?}`；不重试、不伪造成功。",
+      promptGuidelines: [
+        "只有 convener 会话能提交重构；客户侧没有重构入口，也不存在客户批准卡。",
+        "scope 只申报模块代码目录；不要包含版本化文档、边界、stable 文件、团队计划或 flow——越界会被拒绝。",
+        "提交后由应用调度层机械管理；不要自行派发任务或开始改代码，等应用承接结果。",
+      ],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "request_stable_write") {
+    // Batch 3.5（C1d）：workflow stable 写入请求（仅 convener；客户确认卡在应用侧）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          content: {
+            type: "string",
+            minLength: 1,
+            maxLength: STABLE_WRITE_CONTENT_MAX_CHARS,
+            description:
+              `Complete proposed content for docs/workflow.md (≤${STABLE_WRITE_CONTENT_MAX_CHARS} characters). ` +
+              "The app computes base/target sha256 and shows the diff; over-long values are rejected, never truncated",
+          },
+        },
+        required: ["content"],
+        additionalProperties: false,
+      },
+      description:
+        "提交 **docs/workflow.md 写入请求**——仅 convener 会话可提交。应用生成轻量 `stable-write` 客户确认卡（展示 diff/base-hash/target-hash）；" +
+        "客户批准后才会生成一次性许可并由写门禁执行写入 + mini re-pin；拒绝则不写。**本工具不签发许可、不批准、不直接写文件、不写账本**。" +
+        "role-card/boundary 仍走既有 appointment-write，不在本工具范围。" +
+        "成功回执 `{ok:true, requestId:\"sw-<n>\", status:\"requested\"}`；失败回执 `{ok:false, errorCode:\"<stable-write-*>\", message?}`；不重试、不伪造成功。",
+      promptGuidelines: [
+        "改 docs/workflow.md 用 request_stable_write 提交完整新内容；不要用 write_file/edit_file 直接写 workflow（无客户确认会被门禁拒绝）。",
+        "提交 ≠ 已写入：等待客户 stable-write 确认卡批准后由应用写入门禁执行；不要假设已批准或已落盘。",
+        "role-card/boundary 不走本工具——继续用 request_confirmation 的 appointment-write。",
       ],
       executionMode: "sequential",
     };

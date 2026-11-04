@@ -45,6 +45,37 @@ entries:
   - kind: directory
     path: src/service/download/
     purpose: 下载 Service：URL/IP/文件名/重定向/配置策略（本任务新建的模块私有根；不是整层目录授权）
+  # --- Delta-TA-2（2026-11-04，团队计划 §4.5 B-2；闸门 2）：新增 1 个 Pipeline 公共句柄单文件（trunk-runtime），逐文件授权 ---
+  - kind: file
+    path: src/pipeline/orchestration/trunk-runtime.ts
+    purpose: 主干/修订 Pipeline 公共句柄：按钮→草案→校验→逐项卡→应用/解冻/重新冻结/恢复编排；不写项目文档、不派角色
+  # --- Delta-TA-3（2026-11-04，团队计划 §4.5 B-3；闸门 2）：新增 2 个有界模块目录（trunk Provider/Service）；仅 trunk 模块私有根，不是整层目录授权 ---
+  - kind: directory
+    path: src/provider/trunk/
+    purpose: trunk 存储 Provider：manifest/amendment/journal/history 原子读写、坏件容错（本任务新建的模块私有根；不是整层目录授权）
+  - kind: directory
+    path: src/service/trunk/
+    purpose: trunk Service：派生/verify/drift/修订校验/哈希定格/扩大检测/目标选择/提交对账/恢复（本任务新建的模块私有根；不是整层目录授权）
+  # --- Delta-TA-6（2026-11-04，P1.5 增量 §4.2 B-6；闸门 2 增补 G2a）：新增 1 个有界模块目录（version-change Provider）；仅 version-change 模块私有根，不是整层目录授权 ---
+  - kind: directory
+    path: src/provider/version-change/
+    purpose: R9 baseline 扩展/一致性、VCA/refactor 存储、`doc-freezes` 派生缓存、原子写/坏件容错（本任务新建的模块私有根；不是整层目录授权）
+  # --- Delta-TA-7（2026-11-04，P1.5 增量 §4.2 B-7；闸门 2 增补 G2a）：新增 1 个有界模块目录（version-change Service）；仅 version-change 模块私有根，不是整层目录授权 ---
+  - kind: directory
+    path: src/service/version-change/
+    purpose: VCA 状态机/发起角色/目标校验/冻结服务/迁移/bootstrap/targets↔items/批准哈希重验/refactor 校验（本任务新建的模块私有根；不是整层目录授权）
+  # --- Delta-TA-8（2026-11-04，P1.5 增量 §4.2 B-8；闸门 2 增补 G2a）：新增 1 个 Pipeline 单文件（version-change-runtime），逐文件授权 ---
+  - kind: file
+    path: src/pipeline/orchestration/version-change-runtime.ts
+    purpose: VCA 提交/发卡/批准/拒绝/执行外壳；bootstrap
+  # --- Delta-TA-9（2026-11-04，P1.5 增量 §4.2 B-9；闸门 2 增补 G2a）：新增 1 个 Pipeline 单文件（refactor-runtime），逐文件授权 ---
+  - kind: file
+    path: src/pipeline/orchestration/refactor-runtime.ts
+    purpose: 重构申请记录/校验/应用调度层管理；机械写集
+  # --- Delta-TA-11（2026-11-04，闸门 2 增补 G2a/B-11，P1.6）：新增 1 个 Pipeline 公共句柄单文件（stable-write-runtime），逐文件授权 ---
+  - kind: file
+    path: src/pipeline/orchestration/stable-write-runtime.ts
+    purpose: stable 文件写入 Pipeline 公共句柄：workflow 轻量确认卡、appointment-write 钩子、一次性许可、写入校验、mini re-pin
   - kind: directory
     path: src/common/编排/
     purpose: 本角色私有辅助代码

@@ -1774,3 +1774,49 @@
 }
 
 .composer-trust-hint { flex-basis: 100%; font-size: 10px; color: var(--text-3); line-height: 1.35; }
+
+/* 2026-11-04 trunk-amendment-model U1：版本变更/主干/重构面板（只追加；复用既有令牌） */
+.trunk-panels { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+.vc-segments { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.vc-segment { border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--surface); color: var(--text-2); font-size: 11px; padding: 3px 10px; cursor: pointer; }
+.vc-segment:hover { background: var(--selected); }
+.vc-segment.is-active { border-color: var(--primary); color: var(--primary); }
+.vc-panel-body { min-width: 0; }
+.vc-panel { display: flex; flex-direction: column; gap: 12px; }
+.vc-section { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--surface); padding: 10px; }
+.vc-heading { margin: 0; font-size: 11.5px; font-weight: 600; color: var(--text); }
+.vc-version { margin: 0; font-size: 12px; color: var(--text); }
+.vc-row { border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--selected); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.vc-row-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vc-kind { font-size: 10.5px; color: var(--primary); border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; }
+.vc-status { font-size: 10px; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; }
+.vc-line { margin: 0; font-size: 11px; color: var(--text-2); overflow-wrap: anywhere; }
+.vc-note { margin: 0; font-size: 10.5px; color: var(--text-3); overflow-wrap: anywhere; }
+.vc-mono { font-family: var(--font-mono, monospace); font-size: 10.5px; }
+.vc-wrap { overflow-wrap: anywhere; white-space: normal; }
+.vc-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.vc-list-item { display: flex; flex-direction: column; gap: 2px; padding: 5px 6px; border: 1px solid var(--border); border-radius: var(--radius-micro); background: var(--surface); }
+.vc-group { display: flex; flex-direction: column; gap: 3px; }
+.vc-empty { margin: 0; color: var(--text-3); font-size: 11px; }
+.vc-error { margin: 0; color: var(--danger); font-size: 11px; }
+.vc-banner { margin: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-micro); font-size: 11px; background: var(--selected); color: var(--text-2); }
+.vc-banner.is-warn { border-color: var(--warning-border); color: var(--warning); }
+.vc-banner.is-error { border-color: var(--danger-border); color: var(--danger); }
+.vc-guidance { margin: 0; font-size: 10.5px; color: var(--text-3); line-height: 1.45; }
+.vc-row-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.vc-action { border: 1px solid var(--border-strong); border-radius: var(--radius-micro); background: var(--surface); color: var(--text); font-size: 10.5px; padding: 3px 8px; cursor: pointer; }
+.vc-action:hover:not(:disabled) { background: var(--selected); }
+.vc-action:disabled { opacity: .55; cursor: not-allowed; }
+.vc-feedback { margin: 0; font-size: 10.5px; color: var(--info); }
+.vc-feedback.is-error { color: var(--danger); }
+.vc-preview { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--warning-border); border-radius: var(--radius-micro); background: var(--selected); padding: 8px; }
+.vc-upgrade-form { display: flex; flex-direction: column; gap: 6px; }
+.vc-field { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--text-2); }
+.vc-field input, #trunk-upgrade-reason { border: 1px solid var(--border-strong); border-radius: var(--radius-micro); background: var(--surface); color: var(--text); font-size: 11px; padding: 4px 6px; }
+.vc-radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+.vc-radio, .vc-check { display: inline-flex; align-items: flex-start; gap: 5px; font-size: 10.5px; color: var(--text-2); }
+.vc-check { line-height: 1.4; }
+.vc-issues { gap: 3px; }
+.dd-acks { display: flex; flex-direction: column; gap: 5px; padding: 8px; border: 1px solid var(--warning-border); border-radius: var(--radius-micro); background: var(--selected); }
+.dd-ack { display: inline-flex; align-items: flex-start; gap: 6px; font-size: 11px; color: var(--text-2); }
+.dd-ack-label { line-height: 1.4; overflow-wrap: anywhere; }

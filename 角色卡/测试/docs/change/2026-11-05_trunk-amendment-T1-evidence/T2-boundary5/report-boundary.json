@@ -1,0 +1,123 @@
+{
+  "at": "2026-11-04T18:42:04.615Z",
+  "locale": "zh-CN",
+  "scenario": "boundary-stable",
+  "checks": [
+    {
+      "name": "S7：boundary 预览扩大检测（条目逐条）",
+      "ok": true,
+      "detail": {
+        "expanded": true,
+        "expansions": [
+          "project:src",
+          "project:test"
+        ]
+      }
+    },
+    {
+      "name": "D2：扩大风险横幅 + required acknowledgments",
+      "ok": true,
+      "detail": {
+        "expanded": true,
+        "unparseable": false,
+        "expansions": [
+          "project:src",
+          "project:test"
+        ],
+        "acknowledgments": [
+          {
+            "id": "boundary-expansion-0",
+            "label": "project:src",
+            "required": true
+          },
+          {
+            "id": "boundary-expansion-1",
+            "label": "project:test",
+            "required": true
+          }
+        ],
+        "banner": "边界 — 比计划授权目录更宽:\n- project:src\n- project:test"
+      }
+    },
+    {
+      "name": "D2：收窄/无变化 ⇒ 无横幅",
+      "ok": false,
+      "detail": {
+        "expanded": true,
+        "expansions": [
+          "project:src"
+        ]
+      }
+    },
+    {
+      "name": "D2：不可解析预览 ⇒ fail-closed（unparseable，不呈现卡）",
+      "ok": true,
+      "detail": {
+        "expanded": true,
+        "expansions": [
+          "to-yaml-invalid:YAML 语法错误：Flow sequence in block collection must be sufficiently indented and end with a ] at line 1, column 14:\n\nnot-a-yaml: [\n             ^\n"
+        ]
+      }
+    },
+    {
+      "name": "边界确认卡：横幅/逐条扩大项/必选勾选可见",
+      "ok": true,
+      "detail": {
+        "title": "边界写入确认",
+        "source": "来源：运营",
+        "preview": "边界 — 比计划授权目录更宽:\n- project:src\n- project:test\n\n角色卡/impl/boundary.yaml\nrole: impl\nentries:\n  - kind: directory\n    path: src/\n    purpose: impl\n  - kind: directory\n    path: test/\n    purpose: expanded",
+        "options": [],
+        "acks": [
+          {
+            "checked": false,
+            "label": "project:src"
+          },
+          {
+            "checked": false,
+            "label": "project:test"
+          }
+        ],
+        "hasConfirm": true,
+        "hasSubmit": false
+      }
+    },
+    {
+      "name": "AC-13：未勾选必选项 ⇒ 确认按钮禁用（不签发许可）",
+      "ok": true,
+      "detail": {
+        "disabled": true,
+        "text": "确认"
+      }
+    },
+    {
+      "name": "AC-13：confirm 回执携带 required acknowledgments（供 session 签发许可）",
+      "ok": false,
+      "detail": {
+        "acknowledgments": [],
+        "required": [
+          "boundary-expansion-0",
+          "boundary-expansion-1"
+        ],
+        "outcome": {
+          "outcome": "answered",
+          "value": {
+            "confirmed": true
+          },
+          "operatorId": "customer"
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "10-boundary-expansion-card",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2-boundary5\\10-boundary-expansion-card.png",
+      "sha256": "d54823c4edc592975171ba767bb7d682335cda72aaf0d3c390916764c47e0cc8",
+      "bytes": 87305,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ]
+}

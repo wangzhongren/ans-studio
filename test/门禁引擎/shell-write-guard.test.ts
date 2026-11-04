@@ -5,6 +5,9 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 import { evaluateShellWriteTargets, type ShellWriteGuardInput } from "../../src/common/门禁引擎/shell-write-guard.ts";
 import { classifyShellDetailed, defaultShellRules, matchRoutineShellCommand } from "../../src/common/门禁引擎/classify-shell.ts";
@@ -255,4 +258,84 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
   assert.equal(guard(["tar", "-tf", "x.tar"]).decision.kind, "pass");
   assert.equal(guard(["git", "status"]).decision.kind, "pass");
   assert.equal(guard(["find", "src", "-name", "*.ts"]).decision.kind, "pass");
+});
+
+// —————————————— 2026-11-04 C2b：冻结注入 / stable 目标拒绝 ——————————————
+
+test("C2b 冻结注入：frozen 拒绝 / draft 允许 / unknown fail-closed；缺省保留旧「存在即拒」", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-shell-freeze-"));
+  try {
+    fs.mkdirSync(path.join(root, "docs", "proposals"), { recursive: true });
+    fs.writeFileSync(path.join(root, "docs/proposals/focus-proposal-v1.md"), "# v1\n", "utf8");
+    const run = (argv: string[], freezeStateOf?: (rel: string) => "frozen" | "draft" | "unknown") =>
+      evaluateShellWriteTargets({
+        argv,
+        cwd: root,
+        projectRoot: root,
+        skillRoot: root,
+        boundary: { entries: [], boundarySource: "<test>", acceptance: { accepted: false, source: "" } },
+        forbiddenPrefixes: [],
+        checkWrite: () => ({ allowed: true }),
+        ...(freezeStateOf !== undefined ? { freezeStateOf } : {}),
+      });
+    const existing = "docs/proposals/focus-proposal-v1.md";
+    const next = "docs/proposals/focus-proposal-v2.md";
+    // frozen ⇒ deny（覆盖/删除）；draft ⇒ allow。
+    assert.equal(run(["cp", "src/a", existing], () => "frozen").kind, "deny");
+    assert.equal(run(["rm", existing], () => "frozen").kind, "deny");
+    assert.equal(run(["cp", "src/a", existing], () => "draft").kind, "pass");
+    assert.equal(run(["rm", existing], () => "draft").kind, "pass");
+    // unknown ⇒ fail-closed（既有与新建都拒绝，C10）。
+    assert.equal(run(["cp", "src/a", existing], () => "unknown").kind, "deny");
+    assert.equal(run(["cp", "src/a", next], () => "unknown").kind, "deny");
+    // 新建 vN+1：draft/缺省 ⇒ allow。
+    assert.equal(run(["cp", "src/a", next], () => "draft").kind, "pass");
+    assert.equal(run(["cp", "src/a", next]).kind, "pass");
+    // 缺省注入：既有 ⇒ 旧保护 deny。
+    assert.equal(run(["cp", "src/a", existing]).kind, "deny");
+    // mv：源 draft + 目标新路径 ⇒ pass；目标为 frozen 既有文档 ⇒ deny。
+    assert.equal(run(["mv", existing, next], () => "draft").kind, "pass");
+    fs.writeFileSync(path.join(root, "docs/proposals/focus-proposal-v2.md"), "# v2\n", "utf8");
+    assert.equal(run(["mv", existing, next], (rel) => (rel === next ? "frozen" : "draft")).kind, "deny");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("C2b shell 写 stable 一律拒绝（C7）；opaque 提及 stable 也拒绝；注入许可不放行", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-shell-stable-"));
+  try {
+    fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+    fs.mkdirSync(path.join(root, "角色卡", "designer"), { recursive: true });
+    const run = (argv: string[], extras: Partial<ShellWriteGuardInput> = {}) =>
+      evaluateShellWriteTargets({
+        argv,
+        cwd: root,
+        projectRoot: root,
+        skillRoot: root,
+        boundary: { entries: [], boundarySource: "<test>", acceptance: { accepted: false, source: "" } },
+        forbiddenPrefixes: [],
+        checkWrite: () => ({ allowed: true }),
+        ...extras,
+      });
+    const workflow = run(["cp", "src/a", "docs/workflow.md"]);
+    assert.equal(workflow.kind, "deny");
+    if (workflow.kind === "deny") {
+      assert.equal(workflow.code, "stable-write-permit-missing");
+      assert.match(workflow.reason, /stable/);
+    }
+    const card = run(["touch", "角色卡/designer/role-card.md"]);
+    assert.equal(card.kind, "deny");
+    const boundary = run(["tee", "角色卡/designer/boundary.yaml"]);
+    assert.equal(boundary.kind, "deny");
+    // opaque 命令文本提及 stable ⇒ deny（无内容 hash，不得走脚本审查后放行）。
+    const opaque = run(["node", "script.js", "docs/workflow.md"]);
+    assert.equal(opaque.kind, "deny");
+    if (opaque.kind === "deny") assert.equal(opaque.code, "stable-write-permit-missing");
+    // shell 无法提供内容 hash：即使注入 stablePermitOf 也不放行。
+    const withPermit = run(["cp", "src/a", "docs/workflow.md"], { stablePermitOf: () => ({ permitId: "permit-1" }) as never });
+    assert.equal(withPermit.kind, "deny");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

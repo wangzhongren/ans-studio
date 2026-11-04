@@ -58,6 +58,27 @@ export interface ShellJudgePauseReply {
 /** 升级卡三选一动作（C1 冻结；渲染侧不能增删或伪造）。 */
 export type ShellEscalationAction = "allow-once" | "allow-session" | "deny";
 
+/**
+ * 渲→主 `session:operator-response` 的决定载荷（D3 冻结形状；2026-11-05 U2/D4 加法）。
+ * - confirm：`confirmed:false`（拒绝）**不要求/不带** `acknowledged`；正向确认在请求声明
+ *   `acknowledgments[].required` 时必须携带**恰覆盖** required id 的字符串数组（缺失/多余/非数组
+ *   由主进程拒收，pending 保留）。未声明 required ⇒ 旧 payload 零变化。
+ * - choice：`acknowledged` 沿用 C1/F1 语义（required 恰覆盖）；`cancelled:true` 不带。
+ * 渲染进程输入不可信：主进程按请求快照校验后才结算。
+ */
+export type OperatorDecisionPayload =
+  | {
+      kind: "confirm";
+      confirmed: boolean;
+      acknowledged?: string[];
+    }
+  | {
+      kind: "choice";
+      selected?: string[];
+      cancelled?: boolean;
+      acknowledged?: string[];
+    };
+
 /** preload 暴露面的本阶段子集；方法逐个探测，不假定整体存在。 */
 export interface DesktopBridge {
   minimizeWindow?: DesktopWindowControls["minimizeWindow"];
@@ -115,6 +136,10 @@ export interface DesktopBridge {
   onOperatorRequest?: (callback: (payload: unknown) => void) => () => void;
   onOperatorExpired?: (callback: (payload: unknown) => void) => () => void;
   onOperatorQueued?: (callback: (payload: unknown) => void) => () => void;
+  /**
+   * 回传客户决定（`session:operator-response`）。载荷形状见 `OperatorDecisionPayload`
+   * （D3 冻结；2026-11-05 U2/D4 为 confirm 变体加法 `acknowledged?: string[]`）。
+   */
   operatorRespond?: (input: unknown) => Promise<unknown>;
   pickImage?: () => Promise<unknown>;
   attachImage?: (input: unknown) => Promise<unknown>;
@@ -176,6 +201,52 @@ export interface DesktopBridge {
   retryDeliveryHistorySave?: (input: unknown) => Promise<unknown>;
   onReportPersistenceUpdated?: (callback: (payload: unknown) => void) => () => void;
   onDeliveryHistoryUpdated?: (callback: (payload: unknown) => void) => () => void;
+
+  // —— 2026-11-04 trunk-amendment-model D1：版本变更/冻结/stable/重构/trunk（只读 + 受控确认）——
+  // 按 D1 冻结 IPC 表声明（app/preload.cjs）；**无** `version-change:submit` / `refactor:request` /
+  // `stable-write:request` 渲→主通道（F10/F17：提交只经发起角色能力工具；客户批准/拒绝只经
+  // `operatorRespond`）。渲染侧逐方法探测，缺失即禁用并给原因。
+  listVersionChanges?: (input: { projectRoot: string }) => Promise<unknown>;
+  /** 对 submitted VCA 重发批准卡（幂等；无客户卡通道 ⇒ pending，不伪造批准）。 */
+  presentVersionChange?: (input: {
+    projectRoot: string;
+    applicationId: string;
+  }) => Promise<unknown>;
+  /** stable 确认/续接记录（无 drift 字段；只读）。 */
+  listStableWrites?: (input: { projectRoot: string; limit?: number }) => Promise<unknown>;
+  /** 重构审计（客户只读；提交只经 convener 能力工具）。 */
+  listRefactorRequests?: (input: { projectRoot: string }) => Promise<unknown>;
+  /** 冻结清单只读 + 派生缓存健康（权威在应用；渲染不重建/不解冻）。 */
+  listDocFreezes?: (input: { projectRoot: string; limit?: number }) => Promise<unknown>;
+  /** 当前 trunk manifest 摘要（历史未由 S2 暴露，不虚构）。 */
+  listTrunks?: (input: { projectRoot: string }) => Promise<unknown>;
+  /** 主干升级预览（**仅 emergency / recovery**；常规内容变更由主进程拒绝）。 */
+  requestTrunkUpgrade?: (input: {
+    projectRoot: string;
+    reason: "emergency" | "recovery";
+    scope?: string[];
+  }) => Promise<unknown>;
+  /** 主干升级**客户 UI 二次确认**：同一 previewId、一次性/过期拒绝；非 VCA/stable 批准捷径。 */
+  confirmTrunkUpgrade?: (input: {
+    projectRoot: string;
+    previewId: string;
+    acknowledged: boolean;
+  }) => Promise<unknown>;
+  /** 重新冻结（S2 无 API ⇒ 结构化不可用；U1 不虚构动作）。 */
+  requestTrunkRefreeze?: (input: { projectRoot: string }) => Promise<unknown>;
+  /** 放弃进行中的主干升级（S2 无 API ⇒ 结构化不可用；U1 不虚构清理）。 */
+  abandonTrunkUpgrade?: (input: { projectRoot: string }) => Promise<unknown>;
+  /** 客户确认的受控恢复（reason 必填；`acknowledged:true` 才执行）。 */
+  requestTrunkRecover?: (input: {
+    projectRoot: string;
+    reason: string;
+    acknowledged: boolean;
+  }) => Promise<unknown>;
+  /**
+   * 订阅 `trunk:state`（主→渲；**单一状态源**，不设 `version-change:state` 等第二源）：
+   * preload 注册时同步回放缓存最后一条；返回取消订阅函数。
+   */
+  onTrunkState?: (callback: (payload: unknown) => void) => () => void;
 
   // —— i18n 应用级语言偏好（定义/实现属桌面窗口；这里只按名消费）——
   // 权威文件为 <userData>/ans/preferences.json；本地镜像仅用于首屏快速读取。

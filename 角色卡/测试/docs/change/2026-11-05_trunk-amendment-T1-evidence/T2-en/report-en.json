@@ -1,0 +1,23 @@
+{
+  "at": "2026-11-04T18:59:26.300Z",
+  "locale": "en-US",
+  "checks": [
+    {
+      "name": "en-US 面板展示版本变更文案",
+      "ok": true,
+      "detail": "PendingDetail amendmentSubmittedInitiator: rapporteurFlow: demodoc /propo al /demo-propo al-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72Summary: 补充合同交付细节Approval i  the  ubmi ion/freeze gate; item confirmation  are the content gate.Handle in Deci ion Re end cardHi toryVer ion upgradeAppliedInitiator: productFlow: demodoc /propo al /demo-propo al-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72Summary: 产品版本升级：契约 v2Approval i  the final content confirmation; approved target  are frozen and the trunk  witche .Deci ion: deci ion-op-1 · 2026-11-05T00:30:00.000ZRe ulting trunk: t2Frozen document Frozendoc /propo al /demo-propo al-v1.md "
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "09-version-change-panel-en",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2-en\\09-version-change-panel-en.png",
+      "sha256": "d9770bf1c4e55539e173b9d388387dcd67ae6c128c6bb0542a98059fd321a168",
+      "bytes": 157362,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ]
+}

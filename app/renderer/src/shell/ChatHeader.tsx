@@ -8,7 +8,7 @@
  *   「打开 X 设置」为上下文入口（键盘可聚焦，不遮聊天、不抢焦点）。
  */
 
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { findRole, roleDisplayName } from "@/chat/role-view";
 import { useChatStore } from "@/chat/chat-store";
@@ -17,7 +17,8 @@ import {
   backgroundRunningCount,
   loadBackgroundTasks,
 } from "@/chat/background-tasks";
-import { pinnedRunsOf, runChangeButtonView, runChangeReplyMessage } from "@/chat/run-change-view";
+import { versionChangeEntryView } from "@/chat/version-change-view";
+import { trunkUpgradeEntryView } from "@/chat/trunk-view";
 import { getDesktopBridge } from "@/lib/platform";
 import {
   badgeText,
@@ -42,6 +43,7 @@ import {
 import { useSettingsStore } from "@/stores/settings-store";
 import { useBackgroundTasksStore } from "@/stores/background-tasks-store";
 import { useUiStore } from "@/stores/ui-store";
+import { useVersionChangeStore } from "@/stores/version-change-store";
 import { EngineSelect } from "@/shell/EngineSelect";
 import { useLocaleState, useT } from "@/i18n";
 import "@/shell/phase4b.css";
@@ -58,12 +60,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const drawerTab = useDrawerStore((s) => s.tab);
   const roles = useChatStore((s) => s.roles);
   const projectRoot = useChatStore((s) => s.projectRoot);
-  const activeRuns = useChatStore((s) => s.activeRuns);
-  const activeRunsError = useChatStore((s) => s.activeRunsError);
-  const loadProject = useChatStore((s) => s.loadProject);
-  // 2026-10-31（run-change 触发）：显式入口的忙碌/结果行（不新增第二套状态源；按钮可用性只看主进程事实）。
-  const [runChangeBusy, setRunChangeBusy] = useState(false);
-  const [runChangeNotice, setRunChangeNotice] = useState("");
   const paneMeta = useChatStore((s) => s.paneMeta);
   const roleMeta = useChatStore((s) => s.roleMeta);
   const roleBusy = useChatStore((s) => s.roleBusy);
@@ -147,33 +143,43 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
         ? workAriaParts.join(" · ")
         : t("ui.chatHeader.tabWork") + " · " + workAriaParts.join(" · ");
 
-  // 2026-10-31（run-change 触发）：显式入口「契约变更 · 重开 run」——无 pinned run/桥缺省 ⇒ 禁用并给原因。
+  // 2026-11-04 trunk-amendment-model U1：客户侧不再有「重构」/`#run-change`；会话头只留
+  // 「版本变更」与收窄的「主干升级」（仅紧急/恢复）。可用性只读 D1 单一状态源 `trunk:state`；
+  // 桥缺省/快照错误 ⇒ 禁用并给原因（不本地推导、不轮询）。
   const bridge = getDesktopBridge();
-  const runChangeView = runChangeButtonView(
+  const trunkState = useVersionChangeStore((s) => s.trunkState);
+  const trunkStateError = useVersionChangeStore((s) => s.trunkStateError);
+  const pendingVcaCount = trunkState?.pendingVersionChanges.count ?? 0;
+  const versionChangeView = versionChangeEntryView(
     {
-      bridgeAvailable: typeof bridge?.requestRunChange === "function",
-      runs: activeRuns,
-      runsError: activeRunsError,
+      bridgeAvailable:
+        typeof bridge?.listVersionChanges === "function" &&
+        typeof bridge?.onTrunkState === "function",
+      snapshot: trunkState,
+      snapshotError: trunkStateError,
     },
     locale,
   );
-  const pinnedRuns = pinnedRunsOf(activeRuns);
-  const requestRunChange = async () => {
-    if (!projectRoot || typeof bridge?.requestRunChange !== "function") return;
-    setRunChangeBusy(true);
-    try {
-      const reply = await bridge.requestRunChange({
-        projectRoot,
-        ...(pinnedRuns.length === 1 ? { flowId: pinnedRuns[0]!.flowId } : {}),
-      });
-      setRunChangeNotice(runChangeReplyMessage(reply, locale));
-      // 决策可能改变 run 状态（stop-and-restart ⇒ 新 draft run）——重读列出事实，不猜。
-      await loadProject(projectRoot, false);
-    } catch (error) {
-      setRunChangeNotice(runChangeReplyMessage({ ok: false, error: String(error) }, locale));
-    } finally {
-      setRunChangeBusy(false);
-    }
+  const trunkUpgradeView = trunkUpgradeEntryView(
+    {
+      bridgeAvailable: typeof bridge?.requestTrunkUpgrade === "function",
+      snapshot: trunkState,
+      snapshotError: trunkStateError,
+    },
+    locale,
+  );
+  /** 打开「主干与版本变更」抽屉并切到指定分段；已在该抽屉时只切分段（不误关）。 */
+  const openTrunkPanel = (
+    segment: "version-change" | "trunk",
+    event: MouseEvent<HTMLButtonElement>,
+    focusUpgrade = false,
+  ) => {
+    setDrawerInvoker(event.currentTarget);
+    if (focusUpgrade) useVersionChangeStore.getState().requestUpgradeFocus();
+    else useVersionChangeStore.getState().setSegment(segment);
+    const current = useDrawerStore.getState();
+    if (useUiStore.getState().drawerOpen && current.tab === "trunk-version") return;
+    useDrawerStore.getState().openTab("trunk-version");
   };
 
   const openWork = (event: MouseEvent<HTMLButtonElement>) => {
@@ -258,18 +264,33 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
               ) : null}
             </Button>
             <Button
-              id="run-change"
+              id="version-change"
               variant="ghost"
               size="sm"
-              disabled={!runChangeView.visible || !runChangeView.enabled || runChangeBusy || !projectRoot}
-              title={runChangeView.title}
-              aria-label={runChangeView.title}
-              aria-disabled={!runChangeView.enabled || runChangeBusy || !projectRoot}
-              onClick={() => {
-                void requestRunChange();
-              }}
+              disabled={!versionChangeView.enabled || !projectRoot}
+              title={versionChangeView.title}
+              aria-label={versionChangeView.title}
+              aria-disabled={!versionChangeView.enabled || !projectRoot}
+              onClick={(event) => openTrunkPanel("version-change", event)}
             >
-              {runChangeView.label}
+              {versionChangeView.label}
+              {pendingVcaCount > 0 ? (
+                <span className="tab-badge" aria-hidden="true">
+                  {badgeText(pendingVcaCount)}
+                </span>
+              ) : null}
+            </Button>
+            <Button
+              id="trunk-upgrade"
+              variant="ghost"
+              size="sm"
+              disabled={!trunkUpgradeView.enabled || !projectRoot}
+              title={trunkUpgradeView.title}
+              aria-label={trunkUpgradeView.title}
+              aria-disabled={!trunkUpgradeView.enabled || !projectRoot}
+              onClick={(event) => openTrunkPanel("trunk", event, true)}
+            >
+              {trunkUpgradeView.label}
             </Button>
             <Button
               id="tab-decisions"
@@ -320,16 +341,6 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
           </div>
         </div>
       </header>
-
-      <div
-        id="run-change-notice"
-        className="runtime-config-notice"
-        role="status"
-        aria-live="polite"
-        hidden={runChangeNotice === ""}
-      >
-        <span>{runChangeNotice}</span>
-      </div>
 
       <div
         id="runtime-config-notice"

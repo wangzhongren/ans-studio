@@ -96,6 +96,11 @@ import { isRuntimeKind, getRuntimeConfig, saveRuntimeConfig, applyRuntimeConfig,
 import { persistProjectRuntime, readPersistedProjectRuntime, type RuntimeResolution, type RuntimeResolutionRequest } from "./runtime-resolution.ts";
 import { getSessionHistory, type SessionHistoryView } from "./runtime-history.ts";
 import type { RuntimeKind } from "../../src/model/runtime.ts";
+import type {
+  RequestStableWriteFn,
+  SubmitRefactorFn,
+  SubmitVersionChangeFn,
+} from "../../src/model/runtime.ts";
 // 2026-10-20 僵尸步骤自检：跨运行时检查 owner 是否有队列/在途投递（runtime 的单一来源）。
 
 // i18n B0（2026-10-23，任务 2026-10-23-i18n）：应用级语言偏好与主进程 translator。
@@ -104,6 +109,25 @@ import { isLocale, type Locale } from "../../src/common/shared/i18n/index.ts";
 import { createMainI18n, mainT, type MainI18n } from "./i18n.ts";
 import { refreshRecoveryPage } from "./diagnostics.ts";
 import { createPreferencesService, type JudgeSwitchesPreference, type PreferencesDiagnostic, type PreferencesView } from "./preferences.ts";
+// 2026-11-04 trunk-amendment-model D1：版本变更/冻结/stable/重构/trunk 的桌面栈与只读投影。
+// 栈只做组合（S1 存储 + S2 Service + S4 四句柄），不写 `.ans`、不做冻结/许可/trunk 判定。
+import type { StableWritePermit } from "../../src/model/version-change.ts";
+import {
+  createVersionChangeStack,
+  summarizeRefactor,
+  summarizeStableWrite,
+  summarizeVersionChange,
+  VERSION_CHANGE_FORBIDDEN_IPC_CHANNELS,
+  type CacheHealth,
+  type DocFreezeListView,
+  type RefactorSummary,
+  type StableWriteSummary,
+  type TrunkOperationResult,
+  type TrunkUpgradeRequestResult,
+  type VcaSummary,
+  type VersionChangeStack,
+} from "./version-change.ts";
+import type { TrunkListEntry, TrunkStatePayloadV1 } from "./trunk.ts";
 
 export interface RoleView {
   readonly group?: string;
@@ -179,6 +203,58 @@ export type RunChangeRequestReply =
       mode?: RunChangeMode;
     }
   | { ok: false; error: string };
+
+// ————————————————— 2026-11-04 trunk-amendment-model D1：IPC 回执（U1 只消费这些名字） —————————————————
+//
+// 纪律（PM 复审 F10/F11/F17）：**无** `version-change:submit` / `refactor:request` / `stable-write:request`
+// 渲→主通道；客户批准/拒绝只经既有 `session:operator-response`；`trunk:upgrade-confirm` 只对**同一
+// previewId** 的紧急/恢复二次确认（一次性/过期拒绝），不是 VCA/stable 的批准捷径。
+
+export type VersionChangeListReply =
+  | { ok: true; items: VcaSummary[] }
+  | { ok: false; code: string; error: string };
+
+export type VersionChangePresentReply =
+  | {
+      ok: true;
+      /** `presented` = 卡已呈现但尚未结算（IPC 不等久；客户作答后事件/面板更新）。 */
+      status: "presented" | "answered" | "declined" | "pending";
+      applicationId: string;
+      /** 客户作答后 VCA 记录的新状态（submitted/approved/rejected/applied 等）。 */
+      recordStatus?: string;
+      /** detail-amendment 批准后需逐项确认（true = 走逐项卡）。 */
+      needsItems?: boolean;
+      resultTrunkVersion?: number;
+      /** `pending` 的原因码（如 `vca-channel-unavailable`；VCA 保持 submitted 可重试）。 */
+      code?: string;
+    }
+  | { ok: false; code: string; error: string };
+
+export type StableWriteListReply =
+  | { ok: true; items: StableWriteSummary[] }
+  | { ok: false; code: string; error: string };
+
+export type RefactorListReply =
+  | { ok: true; items: RefactorSummary[] }
+  | { ok: false; code: string; error: string };
+
+export type DocFreezeListReply =
+  | ({ ok: true; freezes: DocFreezeListView["freezes"]; cacheHealth: CacheHealth })
+  | { ok: false; code: string; error: string; freezes: []; cacheHealth: CacheHealth };
+
+export type TrunkStateReply =
+  | { ok: true; payload: TrunkStatePayloadV1 }
+  | { ok: false; code: string; error: string };
+
+export type TrunkListReply =
+  | {
+      ok: true;
+      trunks: TrunkListEntry[];
+      /** Batch 3.5 / S5 `history()`：已归档版本号（升序）+ 当前版本；不虚构归档内容。 */
+      history: { versions: number[]; currentTrunkVersion: number | null };
+      historyError?: string;
+    }
+  | { ok: false; code: string; error: string };
 
 /** 选图结果（K-2）：`image.dataBase64` 供渲染侧预览；`cancelled` 表示用户取消（**不是失败**）。 */export interface PickImageResult {
   ok: boolean;
@@ -406,6 +482,13 @@ export interface DesktopDeps {
       /** **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：`SessionManager` 每会话包装
        *  （并入会话生命周期/当前轮中止信号）后透传；缺省 ⇒ 不传 ⇒ 升级工具不注册。 */
       shellEscalationPresenter?: ShellEscalationPresentFn;
+      /** **stable 写入一次性许可**（2026-11-04 trunk-amendment-model D1/F16）：run-role gate 的同步候选
+       *  permit（C2b 已安装许可快照仍为唯一权威）；缺省 ⇒ 编排保留既有确认制路径。 */
+      stablePermitOf?: (relPath: string) => StableWritePermit | undefined;
+      /** Batch 3.5 / C1d：三提交能力（run-role 按会话角色门控后转交适配器；只提交不批准）。 */
+      submitVersionChange?: SubmitVersionChangeFn;
+      submitRefactor?: SubmitRefactorFn;
+      requestStableWrite?: RequestStableWriteFn;
     },
     deps: { createAdapter: (gate: WriteGate) => RuntimeAdapter },
   ) => Promise<RoleSessionHandle>;
@@ -621,6 +704,17 @@ export interface DesktopDeps {
    * 项目 ∪ 有会话语/队列的项目。
    */
   watchdogOptions?: { now?: () => number; config?: Partial<WatchdogConfig> };
+  /**
+   * **版本变更/冻结/stable/重构/trunk 栈工厂**（2026-11-04 trunk-amendment-model D1）：
+   * 缺省 = `app/desktop/version-change.ts::createVersionChangeStack`（S1+S2+S4 组合）；
+   * 测试可注入桩件。每项目一份，**只读投影 + 卡/许可接线**，不写 `.ans`。
+   */
+  createVersionChangeStackFn?: typeof createVersionChangeStack;
+  /**
+   * **`trunk:state` 推送**（D1 唯一状态源；主→渲）：接口在栈事件/项目导入/操作后调用；
+   * 缺省 ⇒ 无推送（测试/CLI 路径）。载荷由 `VersionChangeStack.trunkState()` 组装。
+   */
+  emitTrunkState?: (payload: TrunkStatePayloadV1) => void;
 }
 
 export interface DesktopInterface {
@@ -639,6 +733,31 @@ export interface DesktopInterface {
    * 无 pinned run / 无可呈现会话 ⇒ `{ok:false,error}`；**不自动替客户选模式**、不改 manifest 之外的状态。
    */
   requestRunChange(input: unknown): Promise<RunChangeRequestReply>;
+  // —— 2026-11-04 trunk-amendment-model D1：版本变更/冻结/stable/重构/trunk IPC（只读 + 受控确认） ——
+  /** 待批/历史 VCA 只读摘要（有界；不改状态、不代选）。 */
+  listVersionChanges(input: { projectRoot: string }): Promise<VersionChangeListReply>;
+  /** 对 `submitted` VCA 重新发批准卡（无通道 ⇒ `pending`；不改 VCA 状态、不伪造批准）。 */
+  presentVersionChange(input: { projectRoot: string; applicationId: string }): Promise<VersionChangePresentReply>;
+  /** stable 确认/续接记录（**无 drift 字段**；expired/失败许可只外显，不复算/不复用）。 */
+  listStableWrites(input: { projectRoot: string; limit?: number }): Promise<StableWriteListReply>;
+  /** 重构审计（客户只读；无批准卡；提交只经 convener 能力工具）。 */
+  listRefactorRequests(input: { projectRoot: string }): Promise<RefactorListReply>;
+  /** 冻结清单只读 + 派生缓存健康（权威 = R9 baseline；桌面不重建/不解冻）。 */
+  listDocFreezes(input: { projectRoot: string; limit?: number }): Promise<DocFreezeListReply>;
+  /** `trunk:state` 单一状态源载荷（主进程推送用；U1 不本地统计）。 */
+  getTrunkState(input: { projectRoot: string }): Promise<TrunkStateReply>;
+  /** trunk manifest 当前摘要（P1.3 保留；历史未由 S2 暴露，不虚构）。 */
+  listTrunks(input: { projectRoot: string }): Promise<TrunkListReply>;
+  /** 主干升级预览（**仅紧急/恢复**；常规内容变更拒绝并提示 stable-write/VCA）。 */
+  requestTrunkUpgrade(input: unknown): Promise<TrunkUpgradeRequestResult>;
+  /** 主干升级**客户 UI 二次确认**（同一 previewId；一次性/过期拒绝；非 VCA/stable 批准捷径）。 */
+  confirmTrunkUpgrade(input: unknown): Promise<TrunkOperationResult>;
+  /** 重新冻结（S2 未提供 API ⇒ 结构化不可用；不虚构动作）。 */
+  requestTrunkRefreeze(input: unknown): Promise<TrunkOperationResult>;
+  /** 放弃进行中的主干升级（S2 未提供 API ⇒ 结构化不可用；不虚构清理）。 */
+  abandonTrunkUpgrade(input: unknown): Promise<TrunkOperationResult>;
+  /** 客户确认的受控恢复（tN+1；reason 必填；`acknowledged:true` 才执行）。 */
+  requestTrunkRecover(input: unknown): Promise<TrunkOperationResult>;
   /**
    * **「替我审」开关读取**（PM 评审 §6.6）：主进程权威；启动初值来自持久化偏好（缺省 false），
    * 跨渲染重载保持。返回 `{version:1, ok:true, enabled}`。只读，不改变任何会话或请求状态。
@@ -1956,6 +2075,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 能力注入：缺省用本层实现；测试/宿主可整体替换（签名与 SessionManagerDeps 同形，项目根/发起角色/引擎由会话补入）。
   const requestRequirementChangeCapability = deps.requestRequirementChange ?? requestRequirementChangeForProject;
 
+  // 2026-11-04 trunk-amendment-model D1：每项目版本变更/冻结/stable/重构/trunk 栈。
+  // 栈需要 SessionManager 的卡通道方法，故先给 SessionManager 一个**晚绑定** getter，
+  // manager 构造完成后再接真实 `stackFor`（不提前创建、不循环依赖）。
+  const versionChangeStacks = new Map<string, VersionChangeStack>();
+  let stackForRef: (projectRoot: string) => VersionChangeStack | undefined = () => undefined;
+
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
     createPiAdapterFactory: createPiAdapterFactoryFn,
@@ -2001,6 +2126,9 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // 客户交互通道（A-5）：su 的 request_confirmation/request_choice 经它摆到界面并取回裁决
     // （仅内置治理角色会话消费；缺省未接 ⇒ 不注入 ⇒ 无确认制——绝不悄悄放行）。
     customerInput: deps.customerInput,
+    // 2026-11-04 trunk-amendment-model D1：每项目栈（晚绑定；栈提供 stablePermitOf/completeWrite/
+    // appointment-write 钩子与只读查询；会话层不做冻结/许可判定）。
+    getVersionChangeStack: (projectRoot) => stackForRef(projectRoot),
     // 2026-10-26 需求变更申请（request_requirement_change）：应用侧能力（SessionManager 仅对统筹/提案
     // 会话注入；其他内置治理角色、项目角色不注入；编排再按治理职能收口）。
     // **申请 ≠ 批准**：应用经发起方会话客户卡通道呈现 decision 审批卡（客户/判断 agent 审批）；
@@ -2021,6 +2149,96 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       listingCache.set(fresh.projectRoot, fresh);
     },
   });
+
+  // —————— 2026-11-04 trunk-amendment-model D1：每项目栈 + `trunk:state` 推送（单一状态源） ——————
+  //
+  // 纪律：只保留 `trunk:state` 一条主→渲推送（不设 `version-change:state`/`stable-write:state`/
+  // `refactor:state`）；面板打开时经 `*-list` 拉明细。推送经事件去抖（同项目 ≥150ms 一次）。
+  const createVersionChangeStackFn = deps.createVersionChangeStackFn ?? createVersionChangeStack;
+  const trunkStateTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const stackFor = (projectRoot: string): VersionChangeStack => {
+    const existing = versionChangeStacks.get(projectRoot);
+    if (existing !== undefined) return existing;
+    const nowMs = deps.watchdogOptions?.now;
+    const stack = createVersionChangeStackFn({
+      projectRoot,
+      ...(nowMs !== undefined ? { now: () => new Date(nowMs()) } : {}),
+      notify: (message) => manager.noteVersionChange(projectRoot, message),
+      presentVersionChangeCard: (record) => manager.presentVersionChangeCard({ projectRoot, record }),
+      presentAmendmentItemCard: (input) => manager.presentAmendmentItemCard({ projectRoot, ...input }),
+      presentStableWriteCard: (record, preview) => manager.presentStableWriteCard({ projectRoot, record, preview }),
+      onEvent: () => scheduleTrunkStatePush(projectRoot),
+    });
+    versionChangeStacks.set(projectRoot, stack);
+    return stack;
+  };
+  stackForRef = (projectRoot) => stackFor(projectRoot);
+  const pushTrunkState = async (projectRoot: string): Promise<void> => {
+    if (deps.emitTrunkState === undefined) return;
+    try {
+      deps.emitTrunkState(await stackFor(projectRoot).trunkState());
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.version-change", projectRoot }).error("trunk-state.push.failed", error);
+    }
+  };
+  const scheduleTrunkStatePush = (projectRoot: string): void => {
+    if (deps.emitTrunkState === undefined) return;
+    const existing = trunkStateTimers.get(projectRoot);
+    if (existing !== undefined) clearTimeout(existing);
+    trunkStateTimers.set(
+      projectRoot,
+      setTimeout(() => {
+        trunkStateTimers.delete(projectRoot);
+        void pushTrunkState(projectRoot);
+      }, 150),
+    );
+  };
+  /** 版本变更类 IPC 的项目根校验：仅当前导入项目（未导入时允许——单测直用 Interface）。 */
+  const versionChangeRoot = (input: unknown): { ok: true; projectRoot: string } | { ok: false; error: string } => {
+    const value = input !== null && typeof input === "object" && !Array.isArray(input) ? (input as Record<string, unknown>) : {};
+    const projectRoot = typeof value.projectRoot === "string" ? value.projectRoot.trim() : "";
+    if (projectRoot === "") return { ok: false, error: mainT("main.interface.missingProjectRoot") };
+    if (importedProjectRoot !== undefined && projectRoot !== importedProjectRoot) {
+      return { ok: false, error: mainT("ui.directive.cardEntry.error.invalidTarget") };
+    }
+    return { ok: true, projectRoot };
+  };
+  /**
+   * detail-amendment 批准后的逐项确认闭环（S4 `runAmendmentItems` → `applyAmendmentItems`）：
+   * 仅在 `version-change:present` 返回 `needsItems:true` 后后台驱动（不阻塞 IPC 回执）；
+   * 每张卡客户本人作答；取消 ⇒ 保持 approved、不改 trunk；失败只诊断（面板/事件如实）。
+   */
+  const runDetailItems = async (projectRoot: string, applicationId: string): Promise<void> => {
+    try {
+      const stack = stackFor(projectRoot);
+      const items = await stack.runAmendmentItems(applicationId);
+      if (!items.ok) {
+        createDiagnosticLogger({ component: "desktop.version-change", projectRoot }).error(
+          "version-change.items.failed",
+          new Error(items.message ?? items.code),
+          { applicationId },
+        );
+        return;
+      }
+      if (items.cancelled) return;
+      const decisions = items.decisions;
+      const decisionId = decisions.at(-1)?.decisionId ?? `decision-${applicationId}-items`;
+      const applied = await stack.applyAmendmentItems(applicationId, { decisionId, decisions });
+      if (!applied.ok) {
+        createDiagnosticLogger({ component: "desktop.version-change", projectRoot }).error(
+          "version-change.items.apply.failed",
+          new Error(applied.message ?? applied.code),
+          { applicationId },
+        );
+      }
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.version-change", projectRoot }).error(
+        "version-change.items.exception",
+        error,
+        { applicationId },
+      );
+    }
+  };
 
   // —————— 2026-10-20 客户要求：重启后任务自动续跑（持久队列重投）＋ 僵尸步骤自检（兜底提示） ——————
   //
@@ -2310,6 +2528,261 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       if (outcome.outcome === "declined") return { ok: true, status: "declined", runId: started.runId, flowId };
       return { ok: false, error: mainT("main.runChange.requestFailed", { detail: outcome.reason ?? outcome.outcome }) };
+    },
+
+    // —————————————— 2026-11-04 trunk-amendment-model D1：版本变更/冻结/stable/重构/trunk ——————————————
+    async listVersionChanges(input): Promise<VersionChangeListReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      try {
+        const stack = stackFor(root.projectRoot);
+        await stack.ensureInitialized();
+        const records = await stack.listVersionChanges();
+        const items = records
+          .slice()
+          .sort((a, b) => (a.at === b.at ? (a.applicationId < b.applicationId ? 1 : -1) : a.at < b.at ? 1 : -1))
+          .slice(0, 200)
+          .map(summarizeVersionChange);
+        return { ok: true, items };
+      } catch (error) {
+        return { ok: false, code: "vca-invalid", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async presentVersionChange(input): Promise<VersionChangePresentReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { applicationId?: unknown };
+      const applicationId = typeof value.applicationId === "string" ? value.applicationId.trim() : "";
+      if (applicationId === "") return { ok: false, code: "vca-invalid", error: mainT("main.interface.missingProjectRoot") };
+      const started = stackFor(root.projectRoot).presentVersionChange(applicationId);
+      started.catch((error) => {
+        createDiagnosticLogger({ component: "desktop.version-change", projectRoot: root.projectRoot }).error(
+          "version-change.present.failed",
+          error,
+          { applicationId },
+        );
+      });
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<{ kind: "timeout" }>((resolve) => {
+        timer = setTimeout(() => resolve({ kind: "timeout" }), 1500);
+      });
+      const first = await Promise.race([
+        started.then((result) => ({ kind: "result" as const, result })),
+        timeout,
+      ]);
+      if (timer !== undefined) clearTimeout(timer);
+      if (first.kind === "timeout") return { ok: true, status: "presented", applicationId };
+      const result = first.result;
+      if (!result.ok) {
+        if (result.code === "vca-channel-unavailable") {
+          return { ok: true, status: "pending", applicationId, code: result.code };
+        }
+        return { ok: false, code: result.code, error: result.message ?? result.code };
+      }
+      if (result.needsItems) void runDetailItems(root.projectRoot, applicationId);
+      return {
+        ok: true,
+        status: "answered",
+        applicationId,
+        recordStatus: result.record.status,
+        needsItems: result.needsItems,
+        ...(result.resultTrunkVersion !== undefined ? { resultTrunkVersion: result.resultTrunkVersion } : {}),
+      };
+    },
+
+    async listStableWrites(input): Promise<StableWriteListReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { limit?: unknown };
+      const limit = typeof value.limit === "number" && Number.isFinite(value.limit) ? Math.max(1, Math.min(500, Math.floor(value.limit))) : 100;
+      try {
+        const stack = stackFor(root.projectRoot);
+        await stack.ensureInitialized();
+        const records = await stack.listStableWrites();
+        const items = records
+          .slice()
+          .sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? 1 : -1))
+          .slice(0, limit)
+          .map(summarizeStableWrite);
+        return { ok: true, items };
+      } catch (error) {
+        return { ok: false, code: "stable-write-invalid", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async listRefactorRequests(input): Promise<RefactorListReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      try {
+        const stack = stackFor(root.projectRoot);
+        await stack.ensureInitialized();
+        const records = await stack.listRefactorRequests();
+        return {
+          ok: true,
+          items: records
+            .slice()
+            .sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? 1 : -1))
+            .slice(0, 200)
+            .map(summarizeRefactor),
+        };
+      } catch (error) {
+        return { ok: false, code: "refactor-invalid", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async listDocFreezes(input): Promise<DocFreezeListReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) {
+        return { ok: false, code: "invalid-project", error: root.error, freezes: [], cacheHealth: "corrupt-failclosed" };
+      }
+      const value = input as { limit?: unknown };
+      const limit = typeof value.limit === "number" && Number.isFinite(value.limit) ? Math.max(1, Math.min(500, Math.floor(value.limit))) : 100;
+      try {
+        const result = await stackFor(root.projectRoot).listDocFreezes(limit);
+        return result.ok
+          ? { ok: true, freezes: result.freezes, cacheHealth: result.cacheHealth }
+          : {
+              ok: false,
+              code: result.code ?? "doc-freeze-registry-unavailable",
+              error: result.message ?? result.code ?? "doc-freeze registry unavailable",
+              freezes: [],
+              cacheHealth: result.cacheHealth,
+            };
+      } catch (error) {
+        return {
+          ok: false,
+          code: "doc-freeze-registry-unavailable",
+          error: error instanceof Error ? error.message : String(error),
+          freezes: [],
+          cacheHealth: "corrupt-failclosed",
+        };
+      }
+    },
+
+    async getTrunkState(input): Promise<TrunkStateReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      try {
+        return { ok: true, payload: await stackFor(root.projectRoot).trunkState() };
+      } catch (error) {
+        return { ok: false, code: "trunk-unavailable", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async listTrunks(input): Promise<TrunkListReply> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      try {
+        const stack = stackFor(root.projectRoot);
+        const [result, history] = await Promise.all([stack.trunkList(), stack.history()]);
+        if (!result.ok) {
+          return { ok: false, code: "trunk-unavailable", error: result.error ?? "trunk-unavailable" };
+        }
+        return {
+          ok: true,
+          trunks: result.trunks,
+          history: history.ok
+            ? { versions: history.versions, currentTrunkVersion: history.currentTrunkVersion }
+            : { versions: [], currentTrunkVersion: null },
+          ...(history.ok ? {} : { historyError: history.error ?? "trunk-unavailable" }),
+        };
+      } catch (error) {
+        return { ok: false, code: "trunk-unavailable", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async requestTrunkUpgrade(input): Promise<TrunkUpgradeRequestResult> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { reason?: unknown; scope?: unknown };
+      const reason = value.reason === "emergency" || value.reason === "recovery" ? value.reason : undefined;
+      if (reason === undefined) {
+        return { ok: false, code: "trunk-apply-failed", error: mainT("ui.trunk.emergencyOnly") };
+      }
+      const scope = Array.isArray(value.scope)
+        ? value.scope.filter((item): item is string => typeof item === "string")
+        : undefined;
+      try {
+        return await stackFor(root.projectRoot).requestTrunkUpgrade({
+          reason,
+          ...(scope !== undefined ? { scope } : {}),
+        });
+      } catch (error) {
+        return { ok: false, code: "trunk-apply-failed", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async confirmTrunkUpgrade(input): Promise<TrunkOperationResult> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { previewId?: unknown; acknowledged?: unknown };
+      const previewId = typeof value.previewId === "string" ? value.previewId.trim() : "";
+      if (previewId === "") {
+        return { ok: false, code: "trunk-high-risk-unacknowledged", error: mainT("main.customerInput.noPendingRequest") };
+      }
+      try {
+        return await stackFor(root.projectRoot).confirmTrunkUpgrade({
+          previewId,
+          acknowledged: value.acknowledged === true,
+        });
+      } catch (error) {
+        return { ok: false, code: "trunk-apply-failed", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async requestTrunkRefreeze(input): Promise<TrunkOperationResult> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { reason?: unknown; acknowledged?: unknown };
+      const reason = typeof value.reason === "string" ? value.reason.trim() : "";
+      if (reason === "") {
+        return { ok: false, code: "trunk-apply-failed", error: mainT("ui.trunk.upgrade.reason") };
+      }
+      try {
+        return await stackFor(root.projectRoot).refreeze({
+          reason,
+          acknowledged: value.acknowledged === true,
+        });
+      } catch (error) {
+        return { ok: false, code: "trunk-apply-failed", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async abandonTrunkUpgrade(input): Promise<TrunkOperationResult> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { reason?: unknown; acknowledged?: unknown };
+      const reason = typeof value.reason === "string" ? value.reason.trim() : "";
+      if (reason === "") {
+        return { ok: false, code: "trunk-apply-failed", error: mainT("ui.trunk.upgrade.reason") };
+      }
+      try {
+        return await stackFor(root.projectRoot).abandonUpgrade({
+          reason,
+          acknowledged: value.acknowledged === true,
+        });
+      } catch (error) {
+        return { ok: false, code: "trunk-apply-failed", error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+
+    async requestTrunkRecover(input): Promise<TrunkOperationResult> {
+      const root = versionChangeRoot(input);
+      if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const value = input as { reason?: unknown; acknowledged?: unknown };
+      const reason = typeof value.reason === "string" ? value.reason.trim() : "";
+      if (reason === "") {
+        return { ok: false, code: "trunk-recovery-invalid", error: mainT("ui.trunk.upgrade.reason") };
+      }
+      try {
+        return await stackFor(root.projectRoot).recoverTrunk({
+          reason,
+          acknowledged: value.acknowledged === true,
+        });
+      } catch (error) {
+        return { ok: false, code: "trunk-recovery-invalid", error: error instanceof Error ? error.message : String(error) };
+      }
     },
 
     getShellJudgeState(): ShellJudgeStateReply & { ok: true; enabled: boolean } {

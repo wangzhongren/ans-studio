@@ -1,0 +1,32 @@
+{
+  "at": "2026-11-04T18:59:41.305Z",
+  "locale": "zh-CN",
+  "scenario": "ac17",
+  "checks": [
+    {
+      "name": "AC-17：VCA 在途系统行可见且含 vc-1",
+      "ok": true,
+      "detail": "\n    治理会话工作台AGENT WORKSPACEprojectC:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2-ac17\\project工作空间主入口运运营排期权 · 不拥有最终批准权Pi空闲内置角色：随应用发布，无角色目录切换项目设置1 个角色运营会话继续使用现有上下文PiPi已配置Codex配置未知Claude配置未知工作概览版本变更1主干升级决策任务角色资料打开 Pi 设置[主干与版本变更] 版本变更 · vc-1 (待确认) — 提交在发起角色会话中经能力工具完成；本面板只显示状态与入口说明。托管申请由角色直接提交、应用裁决，幕僚只收系统通知；裁决/审批在独立对话框/待办面板；开关开启时判断代批不弹窗。替我审批审批替我决策决策运营 / PiEnter 发送，Shift + Enter 换行自动代理只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。提案快捷路径（accept-quick）默认不代批；旧治理模型的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。知道了Enter 发送，Shift+Enter 换行；发送失败会如实提示。实际写入导入项目，角色边界外的写入会被拒绝。运营 "
+    },
+    {
+      "name": "AC-17：未自动弹 run-change 决策卡",
+      "ok": true
+    },
+    {
+      "name": "AC-17：显式低层入口保留（版本变更/主干升级）",
+      "ok": true
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "11-ac17-vca-in-flight-system-line",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2-ac17\\11-ac17-vca-in-flight-system-line.png",
+      "sha256": "93cdc78e09f9bbad16885af57bf0d05fb2307108ac03f1532ab90b2a71f3d1db",
+      "bytes": 56362,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ]
+}

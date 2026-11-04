@@ -2,11 +2,14 @@
 import { coreToolTarget, utf8Prefix } from "../../common/runtime-core/tool-display.ts";
 import { createEventQueue } from "../../common/runtime-core/event-queue.ts";
 import { resolveProjectList } from "../../common/runtime-core/list-dir.ts";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFile, realpath, stat, unlink } from "node:fs/promises";
 import { extname, isAbsolute, relative, resolve } from "node:path";
 import type {
   WriteGate,
+  WriteGateContext,
+  WriteGateOperation,
   ShellGate,
   ShellPostAuditFn,
   ShellExecutionOutcome,
@@ -46,6 +49,9 @@ import type {
   TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
   ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef,
   ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn,
+  SubmitVersionChangeFn, SubmitRefactorFn, RequestStableWriteFn,
+  SubmitVersionChangeInput, SubmitRefactorInput, RequestStableWriteInput,
+  VersionChangeTargetSubmission,
 } from "../../model/runtime.ts";
 import {
   DOWNLOAD_ERROR_CODES,
@@ -70,7 +76,33 @@ import {
   VERSION_DECISION_REFS_MAX,
 } from "../../model/project-state.ts";
 import type { ProjectNoteInput, ProjectNoteOp, ProjectStateQuery, VersionDecisionRequest } from "../../model/project-state.ts";
-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN } from "../../model/runtime.ts";
+import {
+  CONTRACT_SCHEMA_TOPICS,
+  GOVERNANCE_SLUG_PATTERN,
+  REFACTOR_SCOPE_ITEMS_MAX,
+  STABLE_WRITE_CONTENT_MAX_CHARS,
+  VCA_SUBMISSION_PATH_MAX_CHARS,
+  VCA_SUBMISSION_TARGETS_MAX,
+} from "../../model/runtime.ts";
+import {
+  AMENDMENT_ID_PATTERN,
+  REFACTOR_ERROR_CODES,
+  REFACTOR_REQUESTED_BY,
+  REFACTOR_REQUEST_ID_PATTERN,
+  REFACTOR_REQUEST_STATUSES,
+  REFACTOR_REASON_MAX,
+  STABLE_WRITE_ERROR_CODES,
+  STABLE_WRITE_REQUEST_ID_PATTERN,
+  STABLE_WRITE_STATUSES,
+  VERSION_CHANGE_ERROR_CODES,
+  VERSION_CHANGE_ID_PATTERN,
+  VERSION_CHANGE_INITIATOR_BY_KIND,
+  VERSION_CHANGE_KINDS,
+  VERSION_CHANGE_STATUSES,
+  VERSION_CHANGE_SUMMARY_MAX,
+  VERSION_CHANGE_TARGET_ACTIONS,
+} from "../../model/version-change.ts";
+import type { RefactorRequestScope, VersionChangeKind } from "../../model/version-change.ts";
 import type { WriteDecision } from "../../model/decision.ts";
 import type { DiagnosticLog } from "../../model/runtime.ts";
 import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
@@ -324,19 +356,27 @@ function readGovernanceCardArgs(args: Record<string, unknown>, toolName: string,
 /**
  * 写类工具的公共前置：解析 abs → 调 gate（唯一治理判定点）。
  * gate 抛错或拒绝都在**任何文件系统副作用之前**返回。
+ * `context`（F6）为可选内容上下文：首次调用不传；写前复核传最终字节 sha256。
  */
 type Prologue =
   | { proceed: true; abs: string | undefined }
   | { proceed: false; result: ToolResult };
 
-function govern(gate: WriteGate, name: string, path: string, writeRoot: string | undefined): Prologue {
+function govern(
+  gate: WriteGate,
+  name: string,
+  path: string,
+  writeRoot: string | undefined,
+  context?: WriteGateContext,
+): Prologue {
   // 解析为绝对路径（纯词法，不碰文件系统），把 abs 传给 gate；写入也用同一个 abs。
   // writeRoot 未配置时沿用原样 path 传给 gate（保持既有判定语义），且后续不落盘。
   const resolved = writeRoot !== undefined ? resolveWriteAbs(path, writeRoot) : path;
 
   let decision: WriteDecision;
   try {
-    decision = gate(resolved);
+    // 首次（无上下文）真正以单参数调用，保持旧 gate/arguments 语义逐字不变。
+    decision = context === undefined ? gate(resolved) : gate(resolved, context);
   } catch (err) {
     // gate 抛错 —— 此时尚未触碰文件系统（无 mkdir / 无 open）→ fail-closed，不写。
     return { proceed: false, result: { ok: false, message: `${name} 门禁判定异常，未写入：${path}（${reasonOf(err)}）` } };
@@ -390,6 +430,11 @@ function rejectInvalidBoundaryWrite(
   };
 }
 
+/** 写前最终字节 sha256（hex；F6 内容上下文；只读、无副作用）。 */
+function sha256Hex(data: Buffer): string {
+  return createHash("sha256").update(data).digest("hex");
+}
+
 /** 落盘前守卫 + mkdir + 二次复核 + 原子写；任一步失败返回可读错误（可能已建目录但未写文件）。 */
 async function writeGuarded(
   gate: WriteGate,
@@ -399,6 +444,7 @@ async function writeGuarded(
   writeRoot: string,
   data: Buffer,
   opts: { createParent: boolean },
+  operation: WriteGateOperation,
   signal?: AbortSignal,
   onWrite?: (abs: string) => boolean | void | Promise<boolean | void>,
 ): Promise<ToolResult> {
@@ -420,7 +466,11 @@ async function writeGuarded(
   }
 
   // 3) mkdir 后复用同一个门禁重新判定（角色/真实目标授权仍由 gate 负责）。
-  const reauthorized = govern(gate, name, abs, writeRoot);
+  //    F6：本次为写前复核，携带最终字节 sha256 与操作类型；首次调用（无上下文）语义不变。
+  const reauthorized = govern(gate, name, abs, writeRoot, {
+    contentSha256: sha256Hex(data),
+    operation,
+  });
   if (!reauthorized.proceed) {
     return { ok: false, message: `${name} 写入前复核未通过：${reauthorized.result.message}（未写入目标文件；可能已创建父目录）` };
   }
@@ -474,7 +524,7 @@ function makeWriteFileTool(gate: WriteGate, writeRoot: string | undefined, onWri
         return { ok: true, message: `${name} 已获准（写入）：${path}（本次构造未配置 writeRoot，已判定但未落盘）` };
       }
       if (call.signal?.aborted) return { ok: false, message: `${name}：会话已中止，未写入` };
-      return writeGuarded(gate, name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, call.signal, onWrite);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, Buffer.from(content, "utf8"), { createParent: true }, "write", call.signal, onWrite);
     },
   };
 }
@@ -540,7 +590,7 @@ function makeEditFileTool(gate: WriteGate, writeRoot: string | undefined, onWrit
       if (invalidBoundary !== undefined) return invalidBoundary;
       const data = Buffer.from((decoded.bom ? "\uFEFF" : "") + next, "utf8");
 
-      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, call.signal, onWrite);
+      return writeGuarded(gate, name, path, pre.abs, writeRoot, data, { createParent: false }, "edit", call.signal, onWrite);
     },
   };
 }
@@ -3630,6 +3680,509 @@ function makeRequestVersionDecisionTool(fn: RequestVersionDecisionFn): Executabl
   };
 }
 
+// —————————————— Batch 3.5 提交能力工具（C1d；注入才注册、只提交不批准） ——————————————
+//
+// 客户主权：三工具只把请求交给注入能力（S5 编排 / D1b 桌面）；批准/拒绝/许可/发卡全在客户卡与
+// 应用侧。工具层只做**参数形状校验 + 角色门控 + 恰好一次调用 + 如实转达结构化回执**；不重试、
+// 不伪造成功、不写账本/项目文件、不改变任何写权。角色 id 从 `scope.roleId` 取（模型不可自报）。
+
+/** 工具名（注入对应能力才注册；能力缺席 = 最强 fail-closed）。 */
+export const SUBMIT_VERSION_CHANGE_TOOL_NAME = "submit_version_change";
+export const SUBMIT_REFACTOR_TOOL_NAME = "submit_refactor";
+export const REQUEST_STABLE_WRITE_TOOL_NAME = "request_stable_write";
+
+const SUBMIT_VERSION_CHANGE_ARG_KEYS: ReadonlySet<string> = new Set([
+  "kind",
+  "flowId",
+  "summary",
+  "targets",
+  "amendmentId",
+  "amendmentDocPath",
+  "bootstrap",
+]);
+const VERSION_CHANGE_TARGET_ARG_KEYS: ReadonlySet<string> = new Set(["kind", "path", "action", "from", "roleId"]);
+const SUBMIT_REFACTOR_ARG_KEYS: ReadonlySet<string> = new Set(["flowId", "title", "reason", "scope"]);
+const REFACTOR_SCOPE_ARG_KEYS: ReadonlySet<string> = new Set(["modules", "paths", "roles"]);
+const REQUEST_STABLE_WRITE_ARG_KEYS: ReadonlySet<string> = new Set(["content"]);
+
+const VERSION_CHANGE_KIND_SET: ReadonlySet<string> = new Set(VERSION_CHANGE_KINDS);
+const VERSION_CHANGE_TARGET_ACTION_SET: ReadonlySet<string> = new Set(VERSION_CHANGE_TARGET_ACTIONS);
+const VERSION_CHANGE_ERROR_CODE_SET: ReadonlySet<string> = new Set(VERSION_CHANGE_ERROR_CODES);
+const REFACTOR_ERROR_CODE_SET: ReadonlySet<string> = new Set(REFACTOR_ERROR_CODES);
+const STABLE_WRITE_ERROR_CODE_SET: ReadonlySet<string> = new Set(STABLE_WRITE_ERROR_CODES);
+const VERSION_CHANGE_STATUS_SET: ReadonlySet<string> = new Set(VERSION_CHANGE_STATUSES);
+const REFACTOR_STATUS_SET: ReadonlySet<string> = new Set(REFACTOR_REQUEST_STATUSES);
+const STABLE_WRITE_STATUS_SET: ReadonlySet<string> = new Set(STABLE_WRITE_STATUSES);
+const VERSION_CHANGE_ID_RE = new RegExp(VERSION_CHANGE_ID_PATTERN);
+const REFACTOR_REQUEST_ID_RE = new RegExp(REFACTOR_REQUEST_ID_PATTERN);
+const STABLE_WRITE_REQUEST_ID_RE = new RegExp(STABLE_WRITE_REQUEST_ID_PATTERN);
+const AMENDMENT_ID_RE = new RegExp(AMENDMENT_ID_PATTERN);
+
+type SubmissionRead<T> = { ok: true; value: T } | { ok: false; result: ToolResult };
+
+function submissionArgumentError(name: string, code: string, detail: string): ToolResult {
+  return {
+    ok: false,
+    message: `${name}: ${detail} [技术 code：${code}]——未提交；请更正后重试（不要猜测参数）`,
+  };
+}
+
+/** 严格参数面（未知参数在触达能力前拒绝，并带冻结 code）。 */
+function unknownSubmissionArg(
+  args: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+  name: string,
+  code: string,
+): ToolResult | undefined {
+  for (const key of Object.keys(args)) {
+    if (!allowed.has(key)) {
+      return submissionArgumentError(name, code, `未知参数 ${key}（本工具不接受该参数）`);
+    }
+  }
+  return undefined;
+}
+
+function submissionRoleError(
+  name: string,
+  code: string,
+  roleId: string | undefined,
+  expected: string,
+  guide: string,
+): ToolResult {
+  const actual = roleId === undefined || roleId.trim() === "" ? "（未注入）" : roleId;
+  return {
+    ok: false,
+    message: `${name}: 当前角色 ${actual} 不能提交该请求（仅 ${expected}）[技术 code：${code}]——未提交；${guide}`,
+  };
+}
+
+/** 可选有界文本（给出但非法 ⇒ 拒绝；缺席 ⇒ undefined；不截断）。 */
+function optionalSubmissionText(
+  args: Record<string, unknown>,
+  key: string,
+  name: string,
+  code: string,
+  maxChars: number,
+): SubmissionRead<string | undefined> {
+  const raw = args[key];
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (typeof raw !== "string" || raw.trim() === "" || raw.includes("\u0000")) {
+    return { ok: false, result: submissionArgumentError(name, code, `${key} 参数非法（须为非空字符串；可省略）`) };
+  }
+  const chars = Array.from(raw).length;
+  if (chars > maxChars) {
+    return { ok: false, result: submissionArgumentError(name, code, `${key} 超过上限（当前 ${chars} 字符；上限 ${maxChars}）——超限拒绝、不截断`) };
+  }
+  return { ok: true, value: raw };
+}
+
+/** 必填有界文本（非空、≤maxChars；超限拒绝、不截断），错误带冻结 code。 */
+function requiredSubmissionText(
+  args: Record<string, unknown>,
+  key: string,
+  maxChars: number,
+  name: string,
+  code: string,
+): SubmissionRead<string> {
+  const raw = args[key];
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { ok: false, result: submissionArgumentError(name, code, `缺少 ${key} 参数（须为非空字符串）`) };
+  }
+  const chars = Array.from(raw).length;
+  if (chars > maxChars) {
+    return { ok: false, result: submissionArgumentError(name, code, `${key} 超过上限（当前 ${chars} 字符；上限 ${maxChars}）——超限拒绝、不截断`) };
+  }
+  return { ok: true, value: raw };
+}
+
+/** 必填治理 slug（匹配 `GOVERNANCE_SLUG_PATTERN`），错误带冻结 code。 */
+function requiredSubmissionSlug(
+  args: Record<string, unknown>,
+  key: string,
+  name: string,
+  code: string,
+): SubmissionRead<string> {
+  const raw = args[key];
+  if (typeof raw !== "string" || !GOVERNANCE_SLUG.test(raw)) {
+    return {
+      ok: false,
+      result: submissionArgumentError(name, code, `缺少或非法的 ${key} 参数（须匹配 ${GOVERNANCE_SLUG_PATTERN}）`),
+    };
+  }
+  return { ok: true, value: raw };
+}
+
+/** VCA targets：结构/类型/上界校验；语义（允许 kind、写区、targets↔items）归 C2c Service。 */
+function readVersionChangeTargets(
+  args: Record<string, unknown>,
+  name: string,
+): SubmissionRead<VersionChangeTargetSubmission[]> {
+  const raw = args["targets"];
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return { ok: false, result: submissionArgumentError(name, "vca-invalid", "targets 参数非法（须为非空数组）") };
+  }
+  if (raw.length > VCA_SUBMISSION_TARGETS_MAX) {
+    return {
+      ok: false,
+      result: submissionArgumentError(name, "vca-invalid", `targets 超过上限（${raw.length} 项；上限 ${VCA_SUBMISSION_TARGETS_MAX}）——超限拒绝`),
+    };
+  }
+  const targets: VersionChangeTargetSubmission[] = [];
+  for (let index = 0; index < raw.length; index += 1) {
+    const item = raw[index];
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      return { ok: false, result: submissionArgumentError(name, "vca-invalid", `targets[${index}] 须为对象`) };
+    }
+    const record = item as Record<string, unknown>;
+    for (const key of Object.keys(record)) {
+      if (!VERSION_CHANGE_TARGET_ARG_KEYS.has(key)) {
+        return { ok: false, result: submissionArgumentError(name, "vca-invalid", `targets[${index}] 未知参数 ${key}`) };
+      }
+    }
+    const kind = record["kind"];
+    if (typeof kind !== "string" || kind.trim() === "") {
+      return { ok: false, result: submissionArgumentError(name, "vca-invalid", `targets[${index}].kind 须为非空字符串`) };
+    }
+    const path = record["path"];
+    if (
+      typeof path !== "string" ||
+      path.trim() === "" ||
+      path.includes("\u0000") ||
+      Array.from(path).length > VCA_SUBMISSION_PATH_MAX_CHARS
+    ) {
+      return {
+        ok: false,
+        result: submissionArgumentError(
+          name,
+          "vca-invalid",
+          `targets[${index}].path 非法（须为非空字符串、不含 NUL、≤${VCA_SUBMISSION_PATH_MAX_CHARS} 字符）`,
+        ),
+      };
+    }
+    const action = record["action"];
+    if (typeof action !== "string" || !VERSION_CHANGE_TARGET_ACTION_SET.has(action)) {
+      return {
+        ok: false,
+        result: submissionArgumentError(name, "vca-invalid", `targets[${index}].action 非法（应为 ${VERSION_CHANGE_TARGET_ACTIONS.join(" / ")} 之一）`),
+      };
+    }
+    const from = record["from"];
+    if (from !== undefined && (typeof from !== "string" || from.trim() === "")) {
+      return { ok: false, result: submissionArgumentError(name, "vca-invalid", `targets[${index}].from 非法（须为非空字符串；可省略）`) };
+    }
+    const targetRoleId = record["roleId"];
+    if (targetRoleId !== undefined && (typeof targetRoleId !== "string" || targetRoleId.trim() === "")) {
+      return { ok: false, result: submissionArgumentError(name, "vca-invalid", `targets[${index}].roleId 非法（须为非空字符串；可省略）`) };
+    }
+    targets.push({
+      kind,
+      path,
+      action: action as VersionChangeTargetSubmission["action"],
+      ...(from !== undefined ? { from: from as string } : {}),
+      ...(targetRoleId !== undefined ? { roleId: targetRoleId as string } : {}),
+    });
+  }
+  return { ok: true, value: targets };
+}
+
+/** refactor scope：三组字符串数组 + 项数上界；路径/越界语义归 C2c `validateRefactorSubmit`。 */
+function readRefactorScope(args: Record<string, unknown>, name: string): SubmissionRead<RefactorRequestScope> {
+  const raw = args["scope"];
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, result: submissionArgumentError(name, "refactor-invalid", "scope 参数非法（须为对象：modules/paths/roles）") };
+  }
+  const record = raw as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    if (!REFACTOR_SCOPE_ARG_KEYS.has(key)) {
+      return { ok: false, result: submissionArgumentError(name, "refactor-invalid", `scope 未知参数 ${key}`) };
+    }
+  }
+  const scope: RefactorRequestScope = { modules: [], paths: [], roles: [] };
+  for (const key of ["modules", "paths", "roles"] as const) {
+    const list = record[key];
+    if (!Array.isArray(list)) {
+      return { ok: false, result: submissionArgumentError(name, "refactor-invalid", `scope.${key} 须为字符串数组`) };
+    }
+    if (list.length > REFACTOR_SCOPE_ITEMS_MAX) {
+      return {
+        ok: false,
+        result: submissionArgumentError(name, "refactor-invalid", `scope.${key} 超过上限（${list.length} 项；上限 ${REFACTOR_SCOPE_ITEMS_MAX}）——超限拒绝`),
+      };
+    }
+    for (const entry of list) {
+      if (typeof entry !== "string" || entry.trim() === "") {
+        return { ok: false, result: submissionArgumentError(name, "refactor-invalid", `scope.${key} 每项须为非空字符串`) };
+      }
+      scope[key].push(entry);
+    }
+  }
+  return { ok: true, value: scope };
+}
+
+/** 结构化回执运行时复核（契约外 ⇒ fail-closed，绝不伪装成功/批准）。 */
+interface SubmissionReceiptSpec {
+  name: string;
+  idKey: "applicationId" | "requestId";
+  idPattern: RegExp;
+  okStatus: string;
+  statusSet: ReadonlySet<string>;
+  errorCodeSet: ReadonlySet<string>;
+  successHint: string;
+}
+
+function submissionReceiptMessage(value: unknown, spec: SubmissionReceiptSpec): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${spec.name}：应用未返回明确结果（回执缺失或非法）——按**未提交**处理；不要假设已提交或已获批准。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Record<string, unknown>;
+  const ok = receipt["ok"];
+  if (typeof ok !== "boolean") return contractExternal();
+  const message = receipt["message"];
+  if (message !== undefined && typeof message !== "string") return contractExternal();
+  const errorCode = receipt["errorCode"];
+  if (ok) {
+    const id = receipt[spec.idKey];
+    const status = receipt["status"];
+    if (typeof id !== "string" || !spec.idPattern.test(id)) return contractExternal();
+    if (typeof status !== "string" || status !== spec.okStatus) return contractExternal();
+    if (errorCode !== undefined) return contractExternal();
+    return {
+      ok: true,
+      message: `${spec.name}：已提交 ${spec.idKey}=${id}，status=${status}。${spec.successHint}`,
+    };
+  }
+  if (errorCode !== undefined && (typeof errorCode !== "string" || !spec.errorCodeSet.has(errorCode))) {
+    return contractExternal();
+  }
+  const status = receipt["status"];
+  if (status !== undefined && (typeof status !== "string" || !spec.statusSet.has(status))) {
+    return contractExternal();
+  }
+  const detail = message !== undefined && message.trim() !== "" ? message : "应用拒绝或未能提交";
+  const suffix = errorCode !== undefined && !detail.includes(errorCode) ? ` [技术 code：${errorCode}]` : "";
+  return {
+    ok: false,
+    message: `${spec.name}：未提交——${detail}${suffix}；申请≠批准，不要假设已获批准。`,
+  };
+}
+
+/** 恰好调用一次注入能力；中止/异常如实返回未提交（不重试、不伪造）。 */
+async function invokeSubmissionCapability(
+  name: string,
+  signal: AbortSignal | undefined,
+  invoke: () => Promise<unknown>,
+): Promise<{ ok: true; value: unknown } | { ok: false; result: ToolResult }> {
+  if (signal?.aborted) {
+    return {
+      ok: false,
+      result: { ok: false, message: `${name}：发起轮次已中止——未提交；不要假设已提交或已获批准。` },
+    };
+  }
+  try {
+    return { ok: true, value: await raceAbort(Promise.resolve().then(invoke), signal, `${name} 提交`) };
+  } catch (err) {
+    return {
+      ok: false,
+      result: { ok: false, message: `${name}：提交**未完成**（原因：${reasonOf(err)}）——不要假设已提交或已获批准。` },
+    };
+  }
+}
+
+const VCA_RECEIPT_SPEC: SubmissionReceiptSpec = {
+  name: SUBMIT_VERSION_CHANGE_TOOL_NAME,
+  idKey: "applicationId",
+  idPattern: VERSION_CHANGE_ID_RE,
+  okStatus: "submitted",
+  statusSet: VERSION_CHANGE_STATUS_SET,
+  errorCodeSet: VERSION_CHANGE_ERROR_CODE_SET,
+  successHint: "申请≠批准：批准/拒绝由客户卡决定；不要视为已批准，也不要重复提交。",
+};
+
+const REFACTOR_RECEIPT_SPEC: SubmissionReceiptSpec = {
+  name: SUBMIT_REFACTOR_TOOL_NAME,
+  idKey: "requestId",
+  idPattern: REFACTOR_REQUEST_ID_RE,
+  okStatus: "requested",
+  statusSet: REFACTOR_STATUS_SET,
+  errorCodeSet: REFACTOR_ERROR_CODE_SET,
+  successHint: "应用调度层机械管理；本工具不派发任务、不写代码、不产生 trunk 版本。",
+};
+
+const STABLE_WRITE_RECEIPT_SPEC: SubmissionReceiptSpec = {
+  name: REQUEST_STABLE_WRITE_TOOL_NAME,
+  idKey: "requestId",
+  idPattern: STABLE_WRITE_REQUEST_ID_RE,
+  okStatus: "requested",
+  statusSet: STABLE_WRITE_STATUS_SET,
+  errorCodeSet: STABLE_WRITE_ERROR_CODE_SET,
+  successHint: "等待客户 stable-write 确认；尚未生成许可、尚未写入。",
+};
+
+/**
+ * submit_version_change：product/rapporteur 提交 VCA（version-upgrade=product、detail-amendment=rapporteur）。
+ * **只提交**：能力负责 create+submit；工具绝不批准/发卡/写文档。回执 `{ok, applicationId, status, errorCode?}`。
+ */
+function makeSubmitVersionChangeTool(
+  fn: SubmitVersionChangeFn,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+): ExecutableTool {
+  const name = SUBMIT_VERSION_CHANGE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownSubmissionArg(call.args, SUBMIT_VERSION_CHANGE_ARG_KEYS, name, "vca-invalid");
+      if (unknown !== undefined) return unknown;
+      const kindRaw = call.args["kind"];
+      if (typeof kindRaw !== "string" || !VERSION_CHANGE_KIND_SET.has(kindRaw)) {
+        return submissionArgumentError(name, "vca-invalid", `kind 参数非法（应为 ${VERSION_CHANGE_KINDS.join(" / ")} 之一）`);
+      }
+      const kind = kindRaw as VersionChangeKind;
+      const flowId = requiredSubmissionSlug(call.args, "flowId", name, "vca-invalid");
+      if (!flowId.ok) return flowId.result;
+      const summary = requiredSubmissionText(call.args, "summary", VERSION_CHANGE_SUMMARY_MAX, name, "vca-invalid");
+      if (!summary.ok) return summary.result;
+      const targets = readVersionChangeTargets(call.args, name);
+      if (!targets.ok) return targets.result;
+      const amendmentId = optionalSubmissionText(call.args, "amendmentId", name, "vca-invalid", 64);
+      if (!amendmentId.ok) return amendmentId.result;
+      if (amendmentId.value !== undefined && !AMENDMENT_ID_RE.test(amendmentId.value)) {
+        return submissionArgumentError(name, "vca-invalid", `amendmentId 非法（须匹配 ${AMENDMENT_ID_PATTERN}）`);
+      }
+      const amendmentDocPath = optionalSubmissionText(
+        call.args,
+        "amendmentDocPath",
+        name,
+        "vca-invalid",
+        VCA_SUBMISSION_PATH_MAX_CHARS,
+      );
+      if (!amendmentDocPath.ok) return amendmentDocPath.result;
+      const bootstrapRaw = call.args["bootstrap"];
+      if (bootstrapRaw !== undefined && typeof bootstrapRaw !== "boolean") {
+        return submissionArgumentError(name, "vca-invalid", "bootstrap 参数非法（须为布尔值；可省略）");
+      }
+
+      const expectedRole = VERSION_CHANGE_INITIATOR_BY_KIND[kind];
+      if (scope?.roleId !== expectedRole) {
+        return submissionRoleError(
+          name,
+          "vca-role-not-allowed",
+          scope?.roleId,
+          expectedRole,
+          expectedRole === "product"
+            ? "版本升级只能由 product 提交；其他角色/客户请走对应通道。"
+            : "修正案只能由 rapporteur 提交；其他角色/客户请走对应通道。",
+        );
+      }
+
+      const input: SubmitVersionChangeInput = {
+        kind,
+        initiatorRoleId: expectedRole,
+        flowId: flowId.value,
+        summary: summary.value,
+        targets: targets.value,
+        ...(amendmentId.value !== undefined ? { amendmentId: amendmentId.value } : {}),
+        ...(amendmentDocPath.value !== undefined ? { amendmentDocPath: amendmentDocPath.value } : {}),
+        ...(bootstrapRaw !== undefined ? { bootstrap: bootstrapRaw } : {}),
+      };
+      const invoked = await invokeSubmissionCapability(name, call.signal, () => fn(input, call.signal));
+      if (!invoked.ok) return invoked.result;
+      return submissionReceiptMessage(invoked.value, VCA_RECEIPT_SPEC);
+    },
+  };
+}
+
+/**
+ * submit_refactor：**仅 convener** 提交轻量重构申请（refactor.request）。
+ * 应用调度层机械管理；工具不派发/不写代码/无客户卡/不产生 trunk 版本。
+ */
+function makeSubmitRefactorTool(
+  fn: SubmitRefactorFn,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+): ExecutableTool {
+  const name = SUBMIT_REFACTOR_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownSubmissionArg(call.args, SUBMIT_REFACTOR_ARG_KEYS, name, "refactor-invalid");
+      if (unknown !== undefined) return unknown;
+      const flowId = requiredSubmissionSlug(call.args, "flowId", name, "refactor-invalid");
+      if (!flowId.ok) return flowId.result;
+      const title = requiredSubmissionText(call.args, "title", REFACTOR_REASON_MAX, name, "refactor-invalid");
+      if (!title.ok) return title.result;
+      const reason = requiredSubmissionText(call.args, "reason", REFACTOR_REASON_MAX, name, "refactor-invalid");
+      if (!reason.ok) return reason.result;
+      const refactorScope = readRefactorScope(call.args, name);
+      if (!refactorScope.ok) return refactorScope.result;
+
+      if (scope?.roleId !== REFACTOR_REQUESTED_BY) {
+        return submissionRoleError(
+          name,
+          "refactor-role-not-allowed",
+          scope?.roleId,
+          REFACTOR_REQUESTED_BY,
+          "重构只能由 convener 会话提交；客户侧无重构入口、无客户卡。",
+        );
+      }
+
+      const input: SubmitRefactorInput = {
+        roleId: REFACTOR_REQUESTED_BY,
+        flowId: flowId.value,
+        title: title.value,
+        reason: reason.value,
+        scope: refactorScope.value,
+      };
+      const invoked = await invokeSubmissionCapability(name, call.signal, () => fn(input, call.signal));
+      if (!invoked.ok) return invoked.result;
+      return submissionReceiptMessage(invoked.value, REFACTOR_RECEIPT_SPEC);
+    },
+  };
+}
+
+/**
+ * request_stable_write：**仅 convener** 提交 `docs/workflow.md` 写入请求（等待 stable-write 客户确认卡）。
+ * 工具不签发许可、不批准、不直接写入；role-card/boundary 仍走 appointment-write。
+ */
+function makeRequestStableWriteTool(
+  fn: RequestStableWriteFn,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+): ExecutableTool {
+  const name = REQUEST_STABLE_WRITE_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownSubmissionArg(call.args, REQUEST_STABLE_WRITE_ARG_KEYS, name, "stable-write-invalid");
+      if (unknown !== undefined) return unknown;
+      const content = call.args["content"];
+      if (typeof content !== "string" || content === "" || content.includes("\u0000")) {
+        return submissionArgumentError(name, "stable-write-invalid", "content 参数非法（须为非空字符串，不含 NUL）");
+      }
+      const chars = Array.from(content).length;
+      if (chars > STABLE_WRITE_CONTENT_MAX_CHARS) {
+        return submissionArgumentError(
+          name,
+          "stable-write-invalid",
+          `content 超过上限（当前 ${chars} 字符；上限 ${STABLE_WRITE_CONTENT_MAX_CHARS}）——超限拒绝、不截断`,
+        );
+      }
+      if (scope?.roleId !== REFACTOR_REQUESTED_BY) {
+        return submissionRoleError(
+          name,
+          "stable-write-invalid",
+          scope?.roleId,
+          REFACTOR_REQUESTED_BY,
+          "workflow stable 写入只能由 convener 提交；role-card/boundary 走 appointment-write。",
+        );
+      }
+      const input: RequestStableWriteInput = { roleId: REFACTOR_REQUESTED_BY, kind: "workflow", content };
+      const invoked = await invokeSubmissionCapability(name, call.signal, () => fn(input, call.signal));
+      if (!invoked.ok) return invoked.result;
+      return submissionReceiptMessage(invoked.value, STABLE_WRITE_RECEIPT_SPEC);
+    },
+  };
+}
+
 /**
  * 构造受治理工具集：
  * - 写入类 write_file / edit_file（先 gate，获准且配置了 writeRoot 时落盘）；
@@ -3817,6 +4370,20 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const requestVersionDecision = options?.requestVersionDecision;
   if (requestVersionDecision !== undefined) {
     tools.push(makeRequestVersionDecisionTool(requestVersionDecision));
+  }
+  // Batch 3.5（C1d）：三提交能力各自「注入才注册」（能力缺席 = 最强 fail-closed）；
+  // 角色门控在 handler 内按 `scope.roleId` 执行（product/rapporteur/convener），模型不可自报身份。
+  const submitVersionChange = options?.submitVersionChange;
+  if (submitVersionChange !== undefined) {
+    tools.push(makeSubmitVersionChangeTool(submitVersionChange, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const submitRefactor = options?.submitRefactor;
+  if (submitRefactor !== undefined) {
+    tools.push(makeSubmitRefactorTool(submitRefactor, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  const requestStableWrite = options?.requestStableWrite;
+  if (requestStableWrite !== undefined) {
+    tools.push(makeRequestStableWriteTool(requestStableWrite, { roleId: options?.roleId, runtime: options?.runtime }));
   }
   // 结构性保证（2026-10-27 验收标准产物汇报，沿既有先例）：**未注入能力时
   // `产物汇报` 不存在**。只给质检（内置 verifier）——由调用方（编排/桌面注入端）决定注入；

@@ -6,7 +6,7 @@
 //      chief→docs/intents）；convener 不再有 dispatch/role_status/session_tail；liaison 职能已删除。
 //   2. 运行时工具面不再注册已撤除的 flow/gate/账本/分诊/交接工具。
 //   3. judge facts 只来自任务/申请上下文（旧账本快照参数被忽略）。
-//   4. 生产源码不再出现 D-04 撤除残留标识（排除构建产物）。
+//   4. 生产源码不再出现 D-04 撤除残留标识（排除构建产物；P1.6 工件类别词面按 D04_ALLOWLIST 逐行精确豁免）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -150,16 +150,110 @@ function* filesUnder(dir: string): Generator<string> {
   }
 }
 
-test("D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）", () => {
+// D-04 语义 allowlist（Batch 3.5，2026-11-05 照会 `docs/communication/2026-11-05_gate_closure_batch-3.5.md`，
+// SHA-256 `43220baf…` 授权“按实际含义 allowlist 或修正测试，不得一刀切放宽”）：
+// D 批撤除的是 flow/team-plan **机器**（模块、工具、账本、schema）；trunk-amendment P1.6 把 `team-plan`/`flow`
+// 作为**工件类别**（VCA target kind、重构禁区、execution 路径映射）合法使用，属新 feature 语义，不是旧入口残留。
+// 豁免精度必须同时满足：文件全等 + 词面全等 + 整行锚点（^…$）匹配；allowlist 条目未命中任何真实词面亦失败（防腐烂）。
+interface D04AllowlistEntry {
+  readonly file: string; // repo 相对 POSIX 路径
+  readonly token: string; // D04_RESIDUE 实际命中的词面
+  readonly line: RegExp; // 必须匹配 trim 后的整行才算豁免
+  readonly reason: string;
+}
+
+const D04_ALLOWLIST: readonly D04AllowlistEntry[] = Object.freeze([
+  {
+    file: "src/model/version-change.ts",
+    token: "team-plan",
+    line: /^export type RefactorForbiddenKind = "versioned-doc" \| "boundary" \| "stable" \| "team-plan" \| "flow";$/,
+    reason:
+      "P1.6 §4.8/AC-7（F40）：team-plan 是重构禁区枚举 RefactorForbiddenKind 的工件类别值（不新增角色/不恢复旧机器）",
+  },
+  {
+    file: "src/model/version-change.ts",
+    token: "team-plan",
+    line: /^"team-plan",$/,
+    reason: "P1.6 §4.8/AC-7（F40）：REFACTOR_FORBIDDEN_KINDS 冻结数组中的同一工件类别值",
+  },
+  {
+    file: "src/pipeline/orchestration/version-change-runtime.ts",
+    token: "docs/flows/",
+    line: /^if \(pathRel\.startsWith\("docs\/flows\/"\)\) return "flow";$/,
+    reason:
+      "P1.6 §4.7/AC-29（F39）：execution 工件 docs/flows/<flowId>.yaml（若存在）→ kind flow 的 VCA target 映射",
+  },
+  {
+    file: "src/service/version-change/impl/refactor-validate.ts",
+    token: "team-plan",
+    line: /^kind: "team-plan",$/,
+    reason: "P1.6 §4.8/AC-7：重构 scope 含 docs/scheduling/ 时的拒绝分类 kind=team-plan（early warning，机械保证在 WriteGate）",
+  },
+  {
+    file: "src/service/version-change/impl/refactor-validate.ts",
+    token: "team-plan",
+    line: /^message: `重构不能改团队计划（kind=team-plan）：\$\{rel\}；请提交版本变更申请（detail-amendment execution）`,$/,
+    reason: "P1.6 §4.8/AC-7：上述拒绝分类的客户可见说明文案（kind=team-plan）",
+  },
+  {
+    file: "src/service/version-change/impl/targets-items.ts",
+    token: "docs/flows/",
+    line: /^\/\/   （docs\/scheduling\/、docs\/flows\/）；$/,
+    reason:
+      "P1.6 §4.4/§4.7（F39/AC-29）：execution 工件作者写区注释（convener：docs/scheduling/、docs/flows/）",
+  },
+  {
+    file: "src/common/shared/i18n/messages/en-US.ts",
+    token: "team-plan",
+    line: /^\/\/ `ui\.trunk\.\*` \(22\) is a C3 in-directory key-family extension \(not listed in the team-plan increment §4\.1 C3 row\); disclosed in E1\.$/,
+    reason:
+      "Batch 3.5 注释引用本批次 increment 团队计划 docs/scheduling/2026-11-04_team-plan_trunk-amendment-model-P1.5-increment.md（C3 i18n 冻结行），非旧机器残留",
+  },
+  {
+    file: "src/provider/runtime/schema.ts",
+    token: "team-plan",
+    line: /^description: "Concrete file paths touched \(project-relative; versioned docs\/stable\/boundary\/team-plan\/flow are rejected\)",$/,
+    reason:
+      "P1.6 §4.8/AC-7（F40，C1d）：submit_refactor 的 scope.paths 参数描述列出重构被拒绝的工件类别（team-plan/flow 属 execution 工件，重构不得触碰；机械保证在 WriteGate）",
+  },
+]);
+
+function collectD04Hits(): { hits: string[]; unusedAllowlist: string[] } {
   const hits: string[] = [];
+  const used = new Set<number>();
+  const pattern = new RegExp(D04_RESIDUE.source, "g");
   for (const dir of [join(ROOT, "src"), join(ROOT, "app")]) {
     for (const file of filesUnder(dir)) {
       const text = readFileSync(file, "utf8");
-      const match = D04_RESIDUE.exec(text);
-      if (match !== null) hits.push(`${relative(ROOT, file)}: ${match[0]}`);
+      const rel = relative(ROOT, file).split("\\").join("/");
+      // 逐出现扫描（原实现每文件只报首个命中；allowlist 后必须逐项核对，避免首个命中豁免遮蔽同文件后续真实残留）。
+      for (const match of text.matchAll(pattern)) {
+        const index = match.index ?? 0;
+        const lineStart = text.lastIndexOf("\n", index - 1) + 1;
+        const nextNewline = text.indexOf("\n", index);
+        const lineText = text.slice(lineStart, nextNewline === -1 ? text.length : nextNewline).trim();
+        const lineNo = text.slice(0, index).split("\n").length;
+        const allowedBy = D04_ALLOWLIST.findIndex(
+          (entry) => entry.file === rel && entry.token === match[0] && entry.line.test(lineText),
+        );
+        if (allowedBy === -1) {
+          hits.push(`${rel}:${lineNo}: ${match[0]} @ ${lineText}`);
+        } else {
+          used.add(allowedBy);
+        }
+      }
     }
   }
+  const unusedAllowlist = D04_ALLOWLIST.filter((_, index) => !used.has(index)).map(
+    (entry) => `${entry.file}: ${entry.token}`,
+  );
+  return { hits, unusedAllowlist };
+}
+
+test("D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）", () => {
+  const { hits, unusedAllowlist } = collectD04Hits();
   assert.deepEqual(hits, [], "D-04 撤除残留");
+  assert.deepEqual(unusedAllowlist, [], "D-04 语义 allowlist 存在 stale 条目（未命中任何真实词面，需复核）");
 });
 
 const QUALITY_BASELINE_RESIDUE = /ENGINEERING_QUALITY_BASELINE|ENGINEERING_QUALITY_STAGE_REQUIREMENTS|工程质量基线/;

@@ -61,7 +61,15 @@ import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write
 import { loadLatestRoster, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
-import { registerVersionedDocAfterWrite, versionedDocExists, versionedDocOverwriteDecision } from "../../common/门禁引擎/versioned-doc-guard.ts";
+import {
+  registerVersionedDocAfterWrite,
+  stableWriteDecision,
+  stableWritePathOf,
+  versionedDocExists,
+  versionedDocFreezeState,
+  versionedDocOverwriteDecision,
+} from "../../common/门禁引擎/versioned-doc-guard.ts";
+import type { StableWritePermit } from "../../model/version-change.ts";
 import { resolveRole } from "../../service/role/resolve-role.ts";
 import { resolveBoundary, validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
 import {
@@ -97,6 +105,9 @@ import type {
   ProjectNoteFn,
   RequestVersionDecisionFn,
   ViewImageFn,
+  SubmitVersionChangeFn,
+  SubmitRefactorFn,
+  RequestStableWriteFn,
   RoleStatusFn,
   ContractCheckFn,
   EvidenceCheckFn,
@@ -288,6 +299,15 @@ export interface AdapterCapabilities {
   projectNote?: ProjectNoteFn;
   /** 2026-11-02：`request_version_decision` 能力；**只给 trio chief** 注入，未注入 ⇒ 工具不注册。 */
   requestVersionDecision?: RequestVersionDecisionFn;
+  /**
+   * Batch 3.5（C1d/S5）：三提交能力——`openRoleSession` 按角色门控后转交适配器（注入才注册）：
+   * · `submitVersionChange`：仅 product（version-upgrade）/ rapporteur（detail-amendment）；
+   * · `submitRefactor` / `requestStableWrite`：仅 convener。
+   * 工具只提交、绝不批准/发卡/签发许可（客户主权）。
+   */
+  submitVersionChange?: SubmitVersionChangeFn;
+  submitRefactor?: SubmitRefactorFn;
+  requestStableWrite?: RequestStableWriteFn;
   shellGate?: ShellGate;
   /** 2026-10-29（§6.5）：run_shell 执行后写审计（与 shellGate 同注入；缺省不审计）。 */
   shellPostAudit?: ShellPostAuditFn;
@@ -565,6 +585,13 @@ export async function openRoleSession(
      */
     customerInput?: CustomerInputFn;
     /**
+     * 2026-11-04（trunk-amendment S3；P1 §2.6-34/F16）：stable 文件（workflow/role-card/boundary）
+     * 写入的一次性许可查询（**同步**）。由宿主在许可签发/消费后安装到 C2b 同步许可快照，并在此
+     * 注入同一查询（`stableWriteDecision` 内部仍要求 permit 与已安装快照逐字段一致）。缺省 ⇒
+     * stable 写入被 `stable-write-permit-missing` 拒绝（fail-closed；不存在第二份许可 Map）。
+     */
+    stablePermitOf?: (relPath: string) => StableWritePermit | undefined;
+    /**
      * **自动收尾 + 自动重 pin（§13.3 经 A-4 扩为含首次）**：每轮会话 settle 后自动调用
      * `repinIfBootstrapped`——创世态 = 首次收尾（写 `.ans` + 治理边界文档 + manifest；无可 pin 之物则
      * 零副作用）；非创世态 = 重扫并更新 `.ans` 的 pin + manifest。缺省：**内置治理角色（su）会话为
@@ -604,6 +631,15 @@ export async function openRoleSession(
     projectNote?: ProjectNoteFn;
     /** 2026-11-02：`request_version_decision` 能力；**只对 trio chief 转交**。 */
     requestVersionDecision?: RequestVersionDecisionFn;
+    /**
+     * Batch 3.5（S5）：三提交能力（由 D1b 注入 S4/S2 实现）。`openRoleSession` 按**会话角色**
+     * 门控后转交适配器：product/rapporteur → `submitVersionChange`；convener → `submitRefactor` +
+     * `requestStableWrite`；其他角色（含客户/幕僚/项目角色）一律不注入（工具不注册）。
+     * 工具只提交请求；批准/许可/客户卡仍在应用侧（客户本人）。
+     */
+    submitVersionChange?: SubmitVersionChangeFn;
+    submitRefactor?: SubmitRefactorFn;
+    requestStableWrite?: RequestStableWriteFn;
     /**
      * **G-2 看护自查能力（R1；`role_status`「注入才注册」）**：前端提供的实现（主进程读同源快照＋
      * 诊断尾部 → 结构化文本）。**只对治理角色会话（su）转交**（判据同 `dispatchTask`）；形状单一来源
@@ -846,7 +882,7 @@ export async function openRoleSession(
   // D 批：门禁/账本撤除；仅保留 `forbiddenWritePaths`（应用治理记录/其他治理角色资料）硬拒绝，
   // 其余写入交给 `resolveWrite` 的写区/预授权判定。
   // 2026-10-29（v2.8 R6）：版本化文档只读——任何通道覆盖既有 -vN.md 一律 deny（不进审批）。
-  const gate: WriteGate = (p) => {
+  const gate: WriteGate = (p, context) => {
     const rel = projectRelativeLexical(p, input.project.projectRoot);
     if (trioSpec !== undefined) {
       const forbidden = forbiddenWriteDecision(trioSpec, rel);
@@ -855,14 +891,56 @@ export async function openRoleSession(
         return forbidden;
       }
     }
-    if (rel !== undefined && versionedDocExists(input.project.projectRoot, rel)) {
-      const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
-      if (!guarded.allowed) {
-        log.record("governance.write.versioned-doc-denied", { path: rel });
-        return { allowed: false, reason: guarded.reason, allowedByRoot: { skill: [], project: [] } };
+    if (rel !== undefined) {
+      // 2026-11-04（trunk-amendment S3/F13/F16/F33）：
+      // · stable 文件（workflow/role-card/boundary）⇒ 一次性许可判定 `stableWriteDecision`
+      //   （消费 WriteGateContext.contentSha256；无内容 hash/shell ⇒ 拒绝；denied 直接返回其
+      //   `writeDecision`，allowed 继续 baseGate 取 matchedEntry）；
+      // · 版本化文档 ⇒ `versionedDocFreezeState` + `versionedDocOverwriteDecision`
+      //   （frozen 拒绝覆盖、draft 允许、unknown/corrupt fail-closed；operation 取上下文）。
+      const stable = stableWritePathOf(rel);
+      // 2026-11-04（S3）/ 2026-11-05（S6 修复）：stable 一次性许可判定。
+      // · 注入 `stablePermitOf`（stable-write 集成 + C2b 许可快照已接）⇒ 正常会话**一律**严格判定
+      //   （真实 write/edit 带 contentSha256；裸探测/无内容 hash 亦拒绝——shell/opaque 不得绕过）；
+      // · **创世 bootstrap 会话**（`project.genesisBootstrap`）是运营授权的初始治理产物写入路径
+      //   （尚无项目边界/appointment-write），回到既有 baseGate/边界路径；切回后不再带该标记 ⇒ 严格；
+      // · 未注入（B-11 未接）⇒ 保留既有 appointment-write 确认制路径（客户确认发行的 writeSet 仍由
+      //   baseGate 把关；不新增无确认直写）。
+      const genesisBootstrapSession = input.project.genesisBootstrap !== undefined;
+      if (stable !== undefined && input.stablePermitOf !== undefined && !genesisBootstrapSession) {
+        const permit = input.stablePermitOf(rel);
+        const decision = stableWriteDecision({
+          projectRoot: input.project.projectRoot,
+          relPath: rel,
+          sha256: context?.contentSha256 ?? "",
+          ...(permit !== undefined ? { permit } : {}),
+        });
+        if (!decision.allowed) {
+          log.record("governance.write.stable-write-denied", { path: rel, code: decision.code });
+          return decision.writeDecision;
+        }
+      } else {
+        const exists = versionedDocExists(input.project.projectRoot, rel);
+        const frozen = versionedDocFreezeState(input.project.projectRoot, rel, exists);
+        const guarded = versionedDocOverwriteDecision({
+          relPath: rel,
+          exists,
+          frozen,
+          operation: context?.operation ?? "write",
+        });
+        if (!guarded.allowed) {
+          log.record("governance.write.versioned-doc-denied", { path: rel, code: guarded.code });
+          return {
+            allowed: false,
+            reason: guarded.reason,
+            allowedByRoot: { skill: [], project: [] },
+            code: guarded.code,
+            rejection: guarded.rejection,
+          };
+        }
       }
     }
-    return baseGate(p);
+    return baseGate(p, context);
   };
 
   // 客户通道包装（A-3）：客户确认后，把「已预览且校验在边界内的具体路径」发行进 writeSet。
@@ -1247,6 +1325,15 @@ export async function openRoleSession(
       conditions,
       forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
       checkWrite: shellCheckWrite,
+      // 2026-11-04（S3/F33）：显式目标统一走同一同步冻结判定（快照唯一实现归 C2b）；
+      // shell/opaque 无内容 hash ⇒ stable 目标一律拒绝（C7），不新增 shell stable 写入路径。
+      freezeStateOf: (rel) =>
+        versionedDocFreezeState(
+          input.project.projectRoot,
+          rel,
+          versionedDocExists(input.project.projectRoot, rel),
+        ),
+      ...(input.stablePermitOf !== undefined ? { stablePermitOf: input.stablePermitOf } : {}),
     });
   // 执行后写审计（仅在 shell 已 arm 时挂到 run_shell；缺省无副作用）。
   // 2026-10-29（客户 Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文（有界脚本内容）；
@@ -1261,6 +1348,10 @@ export async function openRoleSession(
     projectRoot: input.project.projectRoot,
     forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
     checkWrite: shellCheckWrite,
+    // 2026-11-04（S3/F33）：执行后审计注入同一同步冻结查询（draft 不误报 / frozen 与
+    // unknown 越界 fail-closed；C2b 快照唯一实现）。
+    freezeStateOf: (rel, exists) =>
+      versionedDocFreezeState(input.project.projectRoot, rel, exists),
     // 2026-10-29（v2.4 P6）：显式声明的额外监视根（skillRoot）纳入执行后审计；不是项目外兜底。
     extraRoots:
       typeof input.project.skillRoot === "string" && input.project.skillRoot !== "" &&
@@ -1438,6 +1529,14 @@ export async function openRoleSession(
       ? input.requestRequirementChange
       : undefined;
 
+  // Batch 3.5（S5）：三提交能力的角色门控——模型自报角色不可信（会话角色 id 由解析结果给出）。
+  // product/rapporteur → submit_version_change（工具内再按 kind 限定唯一发起角色）；
+  // convener → submit_refactor + request_stable_write；其他角色一律不注入。
+  const submitVersionChange =
+    setup.role.id === "product" || setup.role.id === "rapporteur" ? input.submitVersionChange : undefined;
+  const submitRefactor = setup.role.id === "convener" ? input.submitRefactor : undefined;
+  const requestStableWrite = setup.role.id === "convener" ? input.requestStableWrite : undefined;
+
   const capabilities: AdapterCapabilities = {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
@@ -1469,6 +1568,9 @@ export async function openRoleSession(
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
     ...(installMcp !== undefined ? { installMcp } : {}),
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
+    ...(submitVersionChange !== undefined ? { submitVersionChange } : {}),
+    ...(submitRefactor !== undefined ? { submitRefactor } : {}),
+    ...(requestStableWrite !== undefined ? { requestStableWrite } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(shellGate !== undefined ? { shellPostAudit: shellPostAudit.auditAfter } : {}),
     // 2026-10-31（判拒升级）：`request_shell_escalation` 工具能力——只在 shell 已 arm 且 registry 已创建时
@@ -2136,8 +2238,14 @@ const TRIO_CARD_ORIGINATORS: ReadonlyMap<GovernanceCardKind, readonly Governance
  * 越权卡种的可操作改派提示（文案，不是权限；权限仍只由 `TRIO_CARD_KINDS` 决定）。
  * 2026-10-31 真机：运营被执行官要求「重新提交验收」，按指示发 acceptance 被结构性拒绝；
  * 旧文案只说「不允许」，没说该类卡该谁发起、下一步该怎么改派。
+ *
+ * 2026-11-04（trunk-amendment C2c / PM 复审 §4.5 F2）：stable 写入确认卡为应用自有卡种
+ * `stable-write`（不进 `GOVERNANCE_CARD_GROUP`，永不判断/代选）。`GovernanceCardKind` 的
+ * 联合成员由 C1b 追加；本表先落 route hint（运行时键已就位，类型上以可选键兼容，
+ * C1b 加入联合后无需再改本文件）。
  */
-const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> = {
+const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> &
+  Readonly<Partial<Record<"stable-write", string>>> = {
   acceptance: "请改为 dispatch_task 给 verifier 执行验收，或请幕僚调度质检",
   appointment: "请改为请幕僚调度人事（nominator）发起招人决定卡",
   "appointment-write": "请改为请幕僚调度人事（nominator）发起写卡审批",
@@ -2145,6 +2253,7 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> = {
   proposal: "请改为请幕僚调度策划（rapporteur）发起提案卡",
   decision: "请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡",
   "intent-confirm": "请改为请幕僚（chief）发起需求确认卡",
+  "stable-write": "stable 写入确认卡由应用自有通道（stable-write-runtime）发起；不得用 request_choice/request_confirmation 发 stable 写入确认卡",
 };
 
 /**
@@ -2394,6 +2503,10 @@ export function createRuntimeAdapterFactory(
     // 类型/大小校验在工具层，能力侧只负责排队并如实回执；不改变任何写权。
     viewImage: capabilities?.viewImage,
     dispatchTask: capabilities?.dispatchTask,
+    // Batch 3.5（C1d/S5）：三提交能力位（注入才注册；角色门控在 openRoleSession）。
+    submitVersionChange: capabilities?.submitVersionChange,
+    submitRefactor: capabilities?.submitRefactor,
+    requestStableWrite: capabilities?.requestStableWrite,
     // 2026-10-26 需求变更申请（request_requirement_change）：运行时核心 `GovernedToolsOptions` 同名
     // 能力位（形状同源 `model/runtime.ts` `RequestRequirementChangeFn`）；`undefined` ⇒ 工具不注册
     // （能力缺席 = 最强 fail-closed）。本层纯透传——意图校验/去重/

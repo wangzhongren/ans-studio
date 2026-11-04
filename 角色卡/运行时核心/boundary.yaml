@@ -20,6 +20,14 @@ entries:
   - kind: file
     path: src/model/download.ts
     purpose: 下载申请/结果/错误码/判断事实共享 Model 类型与常量；无 I/O
+  # --- Delta-TA-1（2026-11-04，团队计划 §4.5 B-1；闸门 2）：新增 1 个共享 Model 单文件（trunk），逐文件授权 ---
+  - kind: file
+    path: src/model/trunk.ts
+    purpose: trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1 的共享类型/常量/状态枚举/错误码；无 I/O
+  # --- Delta-TA-5（2026-11-04，P1.5 增量 §4.2 B-5；闸门 2 增补 G2a）：新增 1 个共享 Model 单文件（version-change），逐文件授权 ---
+  - kind: file
+    path: src/model/version-change.ts
+    purpose: VCA/doc-freeze/refactor-request 共享类型/状态/错误码；无 I/O
   - kind: file
     path: src/service/runtime/session.ts
     purpose: 运行时选择、公共工具装配与提供方接入入口

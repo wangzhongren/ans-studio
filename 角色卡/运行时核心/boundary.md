@@ -11,6 +11,8 @@
 | 单文件 | `src/model/directive-marker.ts` | 客户指令标记纯解析器（零依赖，主进程与渲染侧共享） |
 | 单文件 | `src/model/directive.ts` | 客户指令事件/视图/高危谓词共享 Model 类型 |
 | 单文件 | `src/model/download.ts` | 下载申请/结果/错误码/判断事实共享 Model 类型与常量；无 I/O |
+| 单文件 | `src/model/trunk.ts` | trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1 的共享类型/常量/状态枚举/错误码；无 I/O |
+| 单文件 | `src/model/version-change.ts` | VCA/doc-freeze/refactor-request 共享类型/状态/错误码；无 I/O |
 | 单文件 | `src/service/runtime/session.ts` | 运行时选择、公共工具装配与提供方接入入口 |
 | 单文件 | `src/provider/runtime/tools.ts` | 公共受治理工具执行 |
 | 单文件 | `src/provider/runtime/schema.ts` | 公共工具 schema 与描述 |

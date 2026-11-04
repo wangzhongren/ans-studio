@@ -716,7 +716,7 @@ function buildBlockers(input: {
         kind: "run-ambiguous",
         flowId: input.focus.flowId,
         summary: derivation.conflict !== undefined
-          ? `flow ${input.focus.flowId} 存在多个 pinned run；需要先走 run-change/人工核对`
+          ? `flow ${input.focus.flowId} 存在多个 pinned run；需要先走「版本变更申请」/「主干升级」或人工核对`
           : `flow ${input.focus.flowId} 有多个活动 run；版本决策需指定 runId`,
         source: "app",
       });
