@@ -219,3 +219,13 @@ test('release collection accepts three bound native results and rejects tamperin
     assert.notEqual(run().status,0);
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+// v1.9.1 发布阻断修复（tag v1.9.1 不可移动，经评审走显式 overlay）：仅精确列入 i18n-guard allowlist
+// 文件本身；同目录其它测试文件仍 excluded，app/ 未列名仍 fail-closed。断言不放宽。
+test('release overlay includes only the exact v1.9.1 blocker-fix allowlist file', () => {
+  const result = selectOverlay(['test/项目管理/shared/i18n-guard-allowlist.ts',
+    'test/项目管理/shared/i18n.test.ts']);
+  assert.deepEqual(result.selected, ['test/项目管理/shared/i18n-guard-allowlist.ts']);
+  assert.deepEqual(result.excluded, ['test/项目管理/shared/i18n.test.ts']);
+  assert.throws(() => selectOverlay(['app/desktop/customer-input.ts']), /Unreviewed production overlay/);
+});

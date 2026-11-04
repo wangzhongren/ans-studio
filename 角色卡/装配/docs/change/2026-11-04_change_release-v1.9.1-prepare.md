@@ -87,3 +87,12 @@ events:
 
 - prepare 轮只做版本字段、README 发布说明与本记录，并运行本地 `typecheck` 与装配测试；pipeline 轮只改发布策略/声明、打包测试、release workflow 与本记录，并运行本地装配测试与 `typecheck`。两轮均未运行全量测试、`typecheck:renderer`、`build:renderer`、prepare 预演，未触发 CI，未移动既有 tag，未发布。
 - 两项修复的产品验证证据沿用（不重跑）：`delivery-inline-report` 的 typecheck 0 / build 0 / UI 402/402 / phase4b smoke 69/69 / 探针 before 6/6、after 14/14（见 `角色卡/桌面UI/docs/change/2026-11-04_delivery-inline-report-implementation.md`）；`auto-decision-escalate` 的证据见 `角色卡/桌面窗口/docs/change/2026-11-04_change_auto-decision-escalate.md` 与 `角色卡/编排/docs/change/2026-11-04_change_auto-decision-escalate.md`。完整回归与三平台构建由发布 workflow 作为独立门执行。
+
+## 发布阻断修复（2026-11-04；tag v1.9.1 不移动）
+
+- **失败**：workflow run `41766839758`（headSha `1e3268b`）三平台 build job 均在 `Regression tests` 退出 1，`release` job 跳过——未创建 Release、无资产。唯一失败用例：`test/项目管理/shared/i18n-guard.test.ts:63` 硬编码守卫命中 `app/desktop/customer-input.ts:98:63 编排`（PR #47 引入的 import specifier 含技能路径「编排」，classification §4 机器路径；该文件不在 i18n-guard allowlist）。
+- **修复（按 v1.8.x 发布阻断先例；精确路径、单文件不开目录、断言不放宽）**：
+  - `test/项目管理/shared/i18n-guard-allowlist.ts`：按字典序补 `app/desktop/customer-input.ts` + 理由注释（机器路径，非用户可见 UI；守卫本身不变）；
+  - `src/common/装配/release-policy.mjs`：`files` 精确加入 `test/项目管理/shared/i18n-guard-allowlist.ts`（单文件不开目录），注释按阻断修复格式；
+  - `test/装配/release-packaging.test.ts`：新增精确入选 / 同目录 excluded / 未列名 fail-closed 断言。
+- **本地预检**：`node --test test/项目管理/shared/i18n-guard.test.ts`（0 违规）、`node --test "test/装配/**/*.test.ts"`、`npm run typecheck`——结果见下（以实测为准）。重新 dispatch 后的三平台门禁为准。
