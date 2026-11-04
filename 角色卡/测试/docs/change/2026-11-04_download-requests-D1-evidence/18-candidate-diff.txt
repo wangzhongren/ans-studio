@@ -1,0 +1,12 @@
+=== git diff --name-only -- src app test (tracked working tree; expect empty) ===
+=== git diff --name-only (whole repo, informational; other roles' governance docs) ===
+docs/planning/memo.md
+角色卡/桌面窗口/boundary.md
+角色卡/桌面窗口/boundary.yaml
+角色卡/桌面窗口/changelog.md
+角色卡/编排/boundary.md
+角色卡/编排/boundary.yaml
+角色卡/编排/changelog.md
+角色卡/运行时核心/boundary.md
+角色卡/运行时核心/boundary.yaml
+角色卡/运行时核心/changelog.md
