@@ -12,6 +12,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createDesktopInterface, type DesktopInterface } from "../../app/desktop/interface.ts";
+import { createCustomerInputChannel, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { readRunManifest, writeRunManifest, type RunManifest } from "../../src/common/编排/run-manifest.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -215,4 +216,77 @@ test("跨层源码钉：main handler / preload 桥 / platform 类型 / ChatHeade
   assert.ok(rejection.includes('"run-change-required"'), "机械拒绝新增 run-change-required");
   const finder = read("src/common/编排/run-manifest.ts");
   assert.ok(finder.includes("export async function findNewerContractDocs"), "run-manifest 提供更新版本契约事实（单一来源）");
+});
+
+test("requestRunChange（真实客户卡通道 + 替我决策开启）：三模式卡呈现客户、不代选；客户作答后按 customer 落账", async () => {
+  const t = tempDir("ans-run-entry-autoselect-");
+  try {
+    const manifest = pinnedManifest("focus");
+    assert.equal((await writeRunManifest(t.dir, manifest)).ok, true);
+    const pushed: OperatorRequestPayload[] = [];
+    const judgeRows: OperatorJudgeResultPayload[] = [];
+    let seq = 0;
+    const channel = createCustomerInputChannel({
+      presenter: (payload) => pushed.push(payload),
+      operatorId: "tester",
+      nextId: () => `op-${++seq}`,
+      judge: {
+        isGroupEnabled: () => true,
+        fn: async (request) => ({
+          verdict: "approve",
+          group: "decision",
+          cardKind: "decision",
+          engine: request.runtime,
+          reasonCode: "recommended-default",
+          selected: ["continue-frozen"],
+          durationMs: 1,
+        }),
+      },
+      emitJudgeResult: (row) => judgeRows.push(row),
+    });
+    const desktop = createDesktopInterface({
+      pickDirectory: async () => null,
+      emitEvent: () => {},
+      listProjectFn: async () => listing(t.dir),
+      buildProjectConfigFn: buildProjectConfig,
+      openRoleSessionFn: async () => handle(),
+      customerInput: channel.customerInput,
+      envFilePath: path.join(t.dir, ".env"),
+      piConfigEnv: {},
+      runtimeStatePath: path.join(t.dir, "runtime-selection.json"),
+    });
+    assert.equal((await desktop.listProject({ projectRoot: t.dir })).projectRoot, t.dir);
+    const opened = await desktop.openSession({ projectRoot: t.dir, roleId: "convener", runtime: "demo" });
+    assert.equal(opened.ok, true, opened.ok ? "" : opened.error ?? "");
+    await tick(30);
+    const reply = await desktop.requestRunChange({ projectRoot: t.dir });
+    assert.equal(reply.ok, true, reply.ok ? "" : reply.error);
+    if (reply.ok) {
+      assert.equal(reply.status, "presented", "卡呈现给客户（不代选、不自动结算）");
+      assert.equal(reply.runId, manifest.runId);
+      assert.equal(reply.flowId, "focus");
+    }
+    assert.equal(pushed.length, 1, "run-change 卡真实进入客户卡通道并呈现");
+    assert.equal(judgeRows.length, 0, "不得产生 judge 代批结果行");
+    const request = pushed[0]!.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+    assert.equal((request as { application?: boolean }).application, true);
+    assert.deepEqual(request.options.map((option) => option.id), ["continue-frozen", "stop-and-restart", "stop"]);
+    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["stop-and-restart"] } }).ok, true);
+    const end = Date.now() + 3000;
+    let stored: Awaited<ReturnType<typeof readRunManifest>> | undefined;
+    while (Date.now() < end) {
+      stored = await readRunManifest(t.dir, manifest.runId);
+      if (stored.ok && stored.manifest.runChange?.mode !== undefined) break;
+      await tick(20);
+    }
+    assert.equal(stored?.ok, true);
+    if (stored?.ok) {
+      assert.equal(stored.manifest.runChange?.mode, "stop-and-restart");
+      assert.equal(stored.manifest.runChange?.decidedBy, "customer", "客户本人作答，不是 judge");
+      assert.equal(stored.manifest.state, "closed");
+    }
+    await desktop.stopSession();
+  } finally {
+    t.cleanup();
+  }
 });
