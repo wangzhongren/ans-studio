@@ -30,6 +30,9 @@
 //   · **时限：G-1 起无**——卡片可**无限期**待答；唯一的"消失"= **应用关闭/重启**（未决请求随窗口清空），
 //     重启后对旧 id 的回包按**失效终态**受理（`expired:true`，文案如实指向"重启/关闭"而非超时）。
 
+// 自动拒绝去重用的卡内容哈希（2026-11-04 客户直修）：进程内指纹，不写盘、不进账本。
+import { createHash } from "node:crypto";
+
 // 契约三型（请求/裁决/原始通道）的**唯一来源**（§4 冻结契约家）：只读导入、原样转出——**不逐字镜像**。
 import type {
   CustomerInputRequest,
@@ -90,6 +93,9 @@ import { interactionAnchorKey } from "./request-anchor.ts";
 import { mainT } from "./i18n.ts";
 // 判断回落 reason 的人话映射（2026-10-18 客户反馈：read-denied 丢具体路径/原因）：与 shell 通道**同解**的小件。
 import { readDeniedHumanReason, stripTrailingSentencePunct } from "./judge-reason.ts";
+// 「无法核对」类机械码的**单一来源**（2026-11-04 客户直修；编排角色维护，本模块只读消费）：
+// 这些 manual 结果不得自动拒绝，必须原卡转客户确认（judge 的 fail-closed 方向不变）。
+import { isUnverifiableRejectionCode } from "../../src/common/编排/mechanical-rejection.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 // 治理下一步推导（2026-10-18 客户修正）：纯逻辑在 governance-advance.ts；本模块**只**在客户决定
 // 成功结算后回调，由主进程决定是否后台派发——本模块不打开会话、不发模型消息、不做任何批准。
@@ -659,6 +665,30 @@ export function formatJudgeTimeoutMs(timeoutMs: number): string {
 }
 
 /**
+ * 自动拒绝去重用的**卡指纹**（2026-11-04 客户直修）：角色反复重发同一张卡时，只要
+ * kind/title/question/options/preview/flowId/cardKind/sourceRoleId/application 相同 ⇒ 同一指纹。
+ * 只用于去重，不进入账本/呈现；字符串有界（16KiB/项）防大卡拖慢哈希。
+ */
+function cardFingerprint(request: CustomerInputRequest): string {
+  const bounded = (value: unknown): string => (typeof value === "string" ? value.slice(0, 16_384) : "");
+  const shape = {
+    kind: request.kind,
+    title: bounded(request.title),
+    question: request.kind === "choice" ? bounded(request.question) : "",
+    multiple: request.kind === "choice" && request.multiple === true,
+    preview: bounded(request.preview),
+    options: request.kind === "choice"
+      ? request.options.map((option) => [bounded(option.id), bounded(option.label), bounded(option.description), option.recommended === true])
+      : [],
+    flowId: bounded(request.flowId),
+    cardKind: bounded(request.cardKind),
+    sourceRoleId: bounded(request.sourceRoleId),
+    application: request.application === true,
+  };
+  return createHash("sha256").update(JSON.stringify(shape)).digest("hex");
+}
+
+/**
  * 装配桌面客户交互通道。产出：`customerInput`（给编排）+ `respond`（回包受理）+ `rejectAllPending`（窗关清帐）。
  * 「恰好明确作答才算 answered」是本模块的**唯一保证**；其余一切路径都是 `declined`/`unavailable`。
  */
@@ -750,6 +780,19 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   /** decision 指令求值中的卡（不呈现、不计入 pending/judging；占住一项目一卡，关窗/中止时一并结算）。 */
   const directingHolds = new Map<string, ChannelEntry>();
   const diagnostic = createDiagnosticLogger({ component: "desktop.customer-input" });
+  /**
+   * 自动拒绝去重（2026-11-04 客户直修）：同一卡指纹只允许自动拒绝一次；之后同指纹一律
+   * 原卡升级客户确认（不重复轰炸）。键 = 项目 + 内容指纹；进程内会话级（不写盘、不进账本）。
+   */
+  const autoRejectedCards = new Set<string>();
+  const autoRejectKey = (entry: ChannelEntry): string => `${entry.projectKey}\u0000${cardFingerprint(entry.request)}`;
+  /** 记录一次自动拒绝；返回 false = 该指纹此前已自动拒绝过 ⇒ 本次必须升级客户。 */
+  const markAutoRejected = (entry: ChannelEntry): boolean => {
+    const key = autoRejectKey(entry);
+    if (autoRejectedCards.has(key)) return false;
+    autoRejectedCards.add(key);
+    return true;
+  };
 
   const projectKeyOf = (ctx: { projectRoot?: string } | undefined): string =>
     typeof ctx?.projectRoot === "string" && ctx.projectRoot !== "" ? ctx.projectRoot : "";
@@ -1207,8 +1250,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   };
 
   /**
-   * 判断回落的人话提示（2026-10-19 总原则后**仅 switch-off 例外**使用：判断期间客户关闭开关，
-   * 客户已选择手动 → 原卡 + 本提示）。其余 manual/deny 自动退回重做，不再呈现客户卡。
+   * 判断回落的人话提示（**仅 switch-off 例外**使用：判断期间客户关闭开关，客户已选择手动 → 原卡 + 本提示）。
+   * 其余 manual/deny 自动退回重做；「无法核对」类 manual 与同指纹重复自动拒绝走 `judgeEscalationNotice`
+   * 升级客户（2026-11-04 客户直修），不经过本函数。
    */
   const judgeManualNotice = (group: GovernanceJudgeGroup, reasonCode: string, reason?: string): string => {
     const label = group === "approval" ? mainT("ui.judge.mode.approval") : mainT("ui.judge.mode.decision");
@@ -1217,13 +1261,58 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   };
 
   /**
+   * 「无法核对 / 重复拒绝」升级客户卡的人话说明（2026-11-04 客户直修）。
+   * 复用既有 `main.customerInput.judgeNotDelegated` 模板：
+   *   「自动代理未代批（{label}）：{reason}；已转你手动确认。」
+   * reason 用 `judgeReworkHumanReason(outcome)`（驱动给出的具体原因会以括注保留，
+   * 如「规范物证缺失（规范物证缺失：docs/proposals/…（判断无法核对）…）」）。
+   * 说明：共享文案目录 `src/common/shared/i18n/**` 属项目管理角色，本轮不新增 key；
+   * 卡面已说明「无法核对的原因 + 已转你手动确认」。如需逐字「自动判断无法核对」措辞，
+   * 另立项目管理补键任务（见变更记录披露）。
+   */
+  const judgeEscalationNotice = (group: GovernanceJudgeGroup, outcome: GovernanceJudgeOutcome): string => {
+    const label = group === "approval" ? mainT("ui.judge.mode.approval") : mainT("ui.judge.mode.decision");
+    return mainT("main.customerInput.judgeNotDelegated", {
+      label,
+      reason: stripTrailingSentencePunct(judgeReworkHumanReason(outcome)),
+    });
+  };
+
+  /**
+   * 升级客户（2026-11-04 客户直修）：**不自动拒绝**——原卡原样呈现 + `judgeNotice` 说明原因。
+   * 不写客户决定、不发 approve 结果行、不触发验收返工路由（没有发生拒绝）。
+   * trigger = "unverifiable"（无法核对类 manual）/ "duplicate-rejection"（同指纹重复）。
+   * 调用方负责状态守卫（settle 路径要求 state==="judging"；ledger 预检路径为 queued）。
+   */
+  const escalateJudgeOutcomeToCustomer = (
+    entry: ChannelEntry,
+    group: GovernanceJudgeGroup,
+    outcome: GovernanceJudgeOutcome,
+    trigger: "unverifiable" | "duplicate-rejection",
+  ): void => {
+    judging.delete(entry.payload.id);
+    entry.payload.judgeNotice = judgeEscalationNotice(group, outcome);
+    diagnostic.record("governance-judge.escalated", {
+      requestId: entry.payload.id,
+      reasonCode: outcome.reasonCode,
+      decision: trigger === "unverifiable" ? "present-to-customer-unverifiable" : "present-to-customer-duplicate",
+      outcome: "manual",
+      eventKind: trigger,
+    });
+    presentNow(entry);
+  };
+
+  /**
    * 结算判断结果：
    *  · `approve`：先发结果行，再走同一 `settleEntry`（answered，judge 审计）；
    *  · `deny`（仅 approval 组；2026-10-19 客户要求「判断 agent 拒绝 + 退回发起角色重做」）：**不呈现客户卡、
    *    不发 approve 结果行、不写客户决定账本**，直接以 `declined` 结算（带具体原因）——发起角色的
    *    `request_confirmation` 会收到该原因并重做；decision 组/开关关闭/分组不符防御性回落 manual；
+   *    同卡指纹的自动拒绝只发生一次，重复 ⇒ 原卡升级客户（2026-11-04 客户直修，仅去重）。
    *  · `manual`（判断已运行但未能代批）：按客户 2026-10-19 总原则同样**自动退回重做**
-   *    （declined + 可操作原因，不呈现客户卡）；仅 `switch-off`（判断期间关闭开关）例外呈现原卡+提示，
+   *    （declined + 可操作原因，不呈现客户卡）；例外：`switch-off`（判断期间关闭开关）呈现原卡+提示；
+   *    **「无法核对」类机械码（`isUnverifiableRejectionCode`）不自动拒绝**，原卡 + 说明转客户确认
+   *    （2026-11-04 客户直修；judge 的 fail-closed 方向不变，绝不新增自动放行）；同卡指纹重复 ⇒ 升级客户；
    *    `aborted` 走既有取消/丢弃语义。
    */
   const settleJudgeOutcome = (entry: ChannelEntry, plan: JudgePlan, rawOutcome: GovernanceJudgeOutcome): void => {
@@ -1241,6 +1330,12 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         outcome = manualOutcome(plan, "group-mismatch", mainT("main.customerInput.groupMismatch"));
       } else {
         if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
+        // 2026-11-04 客户直修：同卡指纹的自动拒绝只发生一次；重复 ⇒ 原卡升级客户（不重复轰炸）。
+        // deny 分支不做「无法核对」升级：approval 写卡的既有退回重做语义保持不变。
+        if (!markAutoRejected(entry)) {
+          escalateJudgeOutcomeToCustomer(entry, group, outcome, "duplicate-rejection");
+          return;
+        }
         const reason = judgeReworkReasonText(group, outcome, "deny");
         diagnostic.record("governance-judge.deny", {
           requestId: entry.payload.id,
@@ -1361,8 +1456,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     }
     // manual（判断已运行但未能代批）：按客户 2026-10-19 总原则「我勾选了替我决策就不用我来管了」——
     // **不再呈现客户卡**；以 declined + 可操作原因退回发起角色重做。不写客户决定账本、不发结果行。
-    // 例外只有：
+    // 例外：
     //  · switch-off（判断期间客户关闭对应开关）⇒ 客户已选择手动，呈现原卡 + judgeNotice；
+    //  · 无法核对类机械码（2026-11-04 客户直修）⇒ 原卡 + 原因说明升级客户（不自动拒绝、绝不自动放行）；
+    //  · 同卡指纹此前已自动拒绝过（同直修）⇒ 原卡升级客户，不重复轰炸；
     //  · aborted（本轮已中止）⇒ 既有取消/丢弃语义（不结算、不呈现）。
     if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
     if (outcome.reasonCode === "aborted") return; // 取消监听会按既有语义结算 unavailable
@@ -1376,6 +1473,16 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       judging.delete(entry.payload.id);
       entry.payload.judgeNotice = judgeManualNotice(group, outcome.reasonCode, outcome.reason);
       presentNow(entry);
+      return;
+    }
+    // 2026-11-04 客户直修：无法核对类 manual 不得自动拒绝——原卡转客户确认（附原因）。
+    if (isUnverifiableRejectionCode(outcome.reasonCode)) {
+      escalateJudgeOutcomeToCustomer(entry, plan.group, outcome, "unverifiable");
+      return;
+    }
+    // 同一卡指纹的自动拒绝只发生一次：重复 ⇒ 升级客户，不再重复轰炸。
+    if (!markAutoRejected(entry)) {
+      escalateJudgeOutcomeToCustomer(entry, plan.group, outcome, "duplicate-rejection");
       return;
     }
     const reworkReason = judgeReworkReasonText(group, outcome, "manual");
@@ -1689,10 +1796,18 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       presentNow(entry);
       return;
     }
-    // 应用事实不可用（账本不可读/计算失败）：不调用模型、**不呈现客户卡**——按客户 2026-10-19 总原则
-    // 自动退回重做（基础设施类原因也要可操作），fail-closed 且绝不伪造 approve。
+    // 应用事实不可用（账本不可读/计算失败）：不调用模型——按客户 2026-10-19 总原则自动退回重做
+    // （基础设施类原因也要可操作），fail-closed 且绝不伪造 approve；**首次不呈现客户卡**，
+    // 2026-11-04 客户直修起同卡指纹重复改为原卡呈现客户（见下方去重）。
     if (entry.metadata?.judgeContext?.unavailableReason !== undefined) {
       const unavailableReason = entry.metadata.judgeContext.unavailableReason;
+      // 2026-11-04 客户直修：同一卡指纹的自动拒绝只发生一次；重复 ⇒ 原卡呈现客户。
+      // （此时 entry.state 为 queued：escalate 不删 judging、presentNow 会把 queued→active。）
+      if (!markAutoRejected(entry)) {
+        const noticeOutcome = manualOutcome(plan, "ledger-unavailable", unavailableReason);
+        escalateJudgeOutcomeToCustomer(entry, plan.group, noticeOutcome, "duplicate-rejection");
+        return;
+      }
       const detail = stripTrailingSentencePunct(unavailableReason.trim());
       const label = plan.group === "approval" ? mainT("main.customerInput.autoApprovalLabel") : mainT("main.customerInput.autoDecisionLabel");
       const unavailableHuman = judgeHumanReason("ledger-unavailable");

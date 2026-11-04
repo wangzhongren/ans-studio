@@ -117,6 +117,53 @@ const RULES: Record<string, RejectionRule> = {
   "asset-missing": { owner: "rapporteur", action: "补齐 assets 需求/清单或按 Gate 规则处理。", retryable: true },
 };
 
+/**
+ * 「无法核对」类机械/核对码（2026-11-04 客户直修：自动决策升级）。
+ *
+ * 语义：判断所需的物证/验收标准缺失、不可读或互相不一致 ⇒ 判断无法核对事实；
+ * 这不是「判断结论为不合格」。桌面自动决策对这些 manual 结果必须原样呈现客户卡
+ * （附原因），不得自动拒绝退回；judge 的 fail-closed 方向不变（无物证绝不 approve）。
+ *
+ * 单一来源：核对类机械码与 RULES 同目录维护；新增 criteria/evidence 类 code 时同步加入。
+ * 另含证据包（governance-judge-evidence）的 fail-closed reasonCode（context-missing/
+ * evidence-packet-*、evidence-conflict、evidence-hash-mismatch），同属「无法核对」。
+ */
+const UNVERIFIABLE_REJECTION_CODES: ReadonlySet<string> = new Set([
+  // 物证
+  "artifact-missing",
+  "artifact-not-read",
+  // 验收标准（ans-criteria/v1）
+  "criteria-missing",
+  "criteria-format-missing",
+  "criteria-format-ambiguous",
+  "criteria-parse-failed",
+  "criteria-schema-invalid",
+  "criteria-version-mismatch",
+  "criteria-version-unresolved",
+  "criteria-ref-mismatch",
+  "criteria-status-draft",
+  "criteria-id-invalid",
+  "criteria-priority-invalid",
+  "criteria-duplicate-ac",
+  "criteria-too-many",
+  "criteria-empty",
+  "criteria-mismatch",
+  // 证据自洽（sidecar/路径）
+  "evidence-mismatch",
+  "evidence-path-invalid",
+  // 证据包 fail-closed 码（同一「无法核对」语义）
+  "context-missing",
+  "evidence-packet-missing",
+  "evidence-packet-overflow",
+  "evidence-conflict",
+  "evidence-hash-mismatch",
+]);
+
+/** 该 code 是否属于「无法核对」——桌面自动决策必须转客户确认，不得自动拒绝。 */
+export function isUnverifiableRejectionCode(code: string): boolean {
+  return UNVERIFIABLE_REJECTION_CODES.has(canonicalRejectionCode(code));
+}
+
 /** 旧 code → 新 code 兼容别名（原 code 写入 legacyCode）。 */
 export const LEGACY_CODE_ALIASES: Record<string, string> = {
   M2_ROSTER_INVALID: "roster-missing",
