@@ -355,7 +355,7 @@ export const enUS = {
   "ui.confirm.unknownRole": "(unidentified)",
   "ui.confirm.matchedReason": "Match reason: {reason}",
   "ui.confirm.reviewOriginal": "Review text (internal wording, for verification only): {reason}",
-  "ui.confirm.suApprovalBadge": "su approval",
+  "ui.confirm.suApprovalBadge": "Governance approval",
   "ui.confirm.closeNoApprove": "Close (no approval)",
   "ui.confirm.detailsArgv": "Details (argv / cwd)",
   "ui.confirm.cwd": "Working directory (cwd)",
@@ -492,7 +492,7 @@ export const enUS = {
   "ui.governance.establishing": "Creating governance record…",
   "ui.governance.upgrading": "Upgrading…",
   "ui.governance.confirmUpgrade": "Confirm upgrade",
-  "ui.governance.model.single": "Legacy model (su)",
+  "ui.governance.model.single": "Legacy model",
   "ui.governance.model.trio": "Trio · five roles",
   "ui.governance.modelShort.trio": "Trio",
   "ui.governance.status.awaitingCustomer": "Awaiting customer decision",
@@ -579,7 +579,7 @@ export const enUS = {
   "ui.governance.trioArtifactsHint":
     "Trio artifacts detected (docs/proposals / docs/nominations / docs/flows); trio is recommended. Please choose explicitly.",
   "ui.governance.legacyModelHint":
-    "This project uses the legacy governance model (su). It can be upgraded to trio.",
+    "This project uses the legacy governance model. It can be upgraded to trio.",
   "ui.governance.migrationLabel": "View diff / upgrade",
   "ui.governance.migrationPending": "Upgrade entry pending in a later version",
   "ui.governance.migrationOpenTitle":
@@ -1005,7 +1005,7 @@ export const enUS = {
   "ui.judge.roleName.chief": "Chief of Staff",
   "ui.judge.roleName.product": "Product",
   "ui.judge.roleName.verifier": "QA",
-  "ui.judge.titleSu": "SU command approval",
+  "ui.judge.titleSu": "Governance command approval",
   "ui.judge.titleShell": "shell command request",
   "ui.judge.tier.risky": "Risky command (risky)",
   "ui.judge.tier.review": "Not auto-classified (review)",
@@ -1058,7 +1058,7 @@ export const enUS = {
   "ui.judge.scopeNote":
     "The automatic agent only reads project code/documents/role cards (excluding .env, keys/credentials, the .ans ledger/sessions, audit logs, and anything outside the project); it does not write files or run commands. It only acts for you on “accept/appoint/confirm/accept”, and never rejects for you, requests changes, or ticks under-evidenced candidates. When uncertain, lacking evidence, read failures, engine unavailable, timeout, or parse failure occur, it falls back to card-by-card handling for that switch and you decide.",
   "ui.judge.quickPathNote":
-    "The proposal quick path (accept-quick) is not delegated by default; governance direction cards under the legacy model (single/su) are still confirmed card by card; under single, write confirmations are still manual.",
+    "The proposal quick path (accept-quick) is not delegated by default; governance direction cards under the legacy model are still confirmed card by card; under single, write confirmations are still manual.",
   "ui.judge.costNote":
     "Each delegated decision makes one model call (tokens/latency); result rows and the audit trail are marked “judge delegation · approve/decide”; misjudgments are possible and it can be turned off anytime.",
   "ui.judge.toggleFailed":
@@ -1263,7 +1263,7 @@ export const enUS = {
   "main.session.dispatchUnknownTargetShort":
     "Dispatch not accepted: role {roleId} is not in this project — **not delivered** (not silent).",
   "main.session.dispatchBuiltinTarget":
-    "Dispatch not accepted: {roleId} is a built-in governance role (neither the trio nor su can receive dispatches) — dispatch targets must be project roles.",
+    "Dispatch not accepted: {roleId} is a built-in governance role — dispatch targets must be project roles.",
   "main.session.dispatchBuiltinTargetShort":
     "Dispatch not accepted: {roleId} is a built-in governance role — **not delivered** (not silent).",
   "main.session.dispatchGateDenied": "Dispatch rejected by the governance gate: {message}",
@@ -1831,7 +1831,7 @@ export const enUS = {
   "main.confirm.expiredStopped":
     "This turn was stopped or the session was rebuilt; the old confirmation is no longer valid.",
   "main.recovery.expired":
-    "This recovery confirmation has expired (app closed or session rebuilt) and was **not executed** — su may propose again.",
+    "This recovery confirmation has expired (app closed or session rebuilt) and was **not executed** — the built-in governance role may propose again.",
   "main.operator.channelUnavailable":
     "Operator confirmation channel is not configured (no presenter); execution denied (fail-closed)",
   "main.operator.timeoutRejected":

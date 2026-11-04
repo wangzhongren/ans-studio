@@ -105,7 +105,7 @@ test("handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发�
   assert.match(r.message, /派发 ≠ 授权/, "成功文案应重申「派发 ≠ 授权」");
   assert.match(r.message, /已接受边界内执行已授权任务/);
   assert.match(r.message, /普通操作无需逐次确认/);
-  assert.match(r.message, /扩张边界、治理写集仍由 su 请求客户确认/);
+  assert.match(r.message, /扩张边界、治理写集仍由内置治理角色请求客户确认/);
   assert.match(r.message, /已路由（排队第 1 位）/);
 });
 
@@ -184,7 +184,7 @@ test("describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带�
   assert.match(text, /派发 ≠ 授权|派发≠授权/, "必须写死「派发 ≠ 授权」");
   assert.match(text, /已接受边界.*已授权任务/);
   assert.match(text, /普通操作无需逐次确认/);
-  assert.match(text, /扩张边界、治理写集仍由 su 请求客户确认/);
+  assert.match(text, /扩张边界、治理写集仍由内置治理角色请求客户确认/);
   assert.match(text, /自足/, "应要求任务文本自足");
   assert.match(text, /看不到你的上下文/, "应说明对方看不到上下文（自足的原因）");
   assert.match(text, /返工/, "应写返工语义");

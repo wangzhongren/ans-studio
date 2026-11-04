@@ -239,7 +239,7 @@ async function precheck(
       ok: false,
       status: "nothing-to-pin",
       message:
-        "无可 pin 的边界文件（su 尚未写出角色 boundary.yaml 与项目治理边界文档）——拒绝写出 .ans（fail-closed）",
+        "无可 pin 的边界文件（治理角色尚未写出角色 boundary.yaml 与项目治理边界文档）——拒绝写出 .ans（fail-closed）",
       roleIds,
     };
   }
@@ -1678,9 +1678,9 @@ function renderManifest(args: {
   const lines: string[] = [];
   lines.push("# Bootstrap 留痕（创世 finalize）", "");
   lines.push(
-    "> 本文件由**代码**在 su 的治理会话 settle **之后**生成（su 不会算 hash，故 pin 只能事后算）。",
-    "> **pin 每轮 su settle 后自动刷新**（§13.3）：本文件钉的是「**本轮结束时的边界面**」——",
-    "> 对**外部**（非经 su 会话）的边界改动，**下一次 su settle 会吸收进 pin**（tamper 检测窗口 = 到下次 settle 为止）。",
+    "> 本文件由**代码**在治理会话 settle **之后**生成（治理角色不会算 hash，故 pin 只能事后算）。",
+    "> **pin 每轮治理会话 settle 后自动刷新**（§13.3）：本文件钉的是「**本轮结束时的边界面**」——",
+    "> 对**外部**（非经治理会话）的边界改动，**下一次治理会话 settle 会吸收进 pin**（tamper 检测窗口 = 到下次 settle 为止）。",
     "",
   );
   lines.push(`- 生成时间：${args.at}`);

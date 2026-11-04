@@ -270,7 +270,7 @@ test("CLI 提示：su 审批档不再写「(b) 未定」；非审批档维持既
     toolCallId: "t",
     reason: renderSuApprovalReason("risky", "命中危险程序规则：rm"),
   });
-  assert.match(su, /su 审批档：客户逐条批准，不走 \(b\) 审读/);
+  assert.match(su, /治理审批档：客户逐条批准，不走 \(b\) 审读/);
   assert.equal(su.includes("(b) 未定"), false);
 
   const project = formatOperatorPrompt({ command: "x", argv: ["x"], cwd: "/proj", toolCallId: "t", reason: "pm 拿不准" });
