@@ -201,8 +201,15 @@ function snapshot(): AnsRendererStateSnapshot {
 }
 
 function sendDisabled(): boolean {
-  const el = document.getElementById("btn-send");
-  return !(el instanceof HTMLButtonElement) || el.disabled;
+  // 2026-11-04 客户直修：发送按钮移除后，发送入口为 Enter；禁用事实改由会话/项目状态决定
+  // （等价 Composer 的 canSend = sessionOpen && projectRoot），保持驱动契约不变。
+  const ui = useUiStore.getState();
+  const chat = useChatStore.getState();
+  return !(
+    ui.selectedRoleId &&
+    chat.sessionOpenRoleId === ui.selectedRoleId &&
+    !!chat.projectRoot
+  );
 }
 
 function judgeView(group: "approval" | "decision"): JudgeDriverView {

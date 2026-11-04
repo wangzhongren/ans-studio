@@ -1,0 +1,335 @@
+{
+  "phase": "before",
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\composer-buttons-fix\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "before idle: send button present and enabled",
+      "value": true,
+      "detail": {
+        "hasSend": true,
+        "visible": true,
+        "disabled": false
+      }
+    },
+    {
+      "name": "before idle: halt hidden",
+      "value": true,
+      "detail": {
+        "hidden": true,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "svg": true,
+        "tabIndex": 0
+      }
+    },
+    {
+      "name": "before idle: halt text is 停止本轮",
+      "value": true,
+      "detail": "停止本轮"
+    },
+    {
+      "name": "before: composer keeps attach/directive/toggles/scope/keyboard",
+      "value": true,
+      "detail": {
+        "attach": true,
+        "directive": true,
+        "toggles": 2,
+        "scope": true,
+        "keyboard": true
+      }
+    },
+    {
+      "name": "before: keyboard hint keeps Enter and Shift + Enter",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "before: Enter sends and clears input",
+      "value": true,
+      "detail": {
+        "text": "探针 Enter 发送",
+        "target": {
+          "projectRoot": "/probe-composer-project",
+          "roleId": "P",
+          "runtime": "pi"
+        }
+      }
+    },
+    {
+      "name": "before 1360 idle: no horizontal overflow",
+      "value": true,
+      "detail": 0
+    },
+    {
+      "name": "before 1200 idle: no overflow, no control overlap",
+      "value": true,
+      "detail": {
+        "overflowX": 0,
+        "overlaps": []
+      }
+    },
+    {
+      "name": "before busy 1200: halt visible with text",
+      "value": true,
+      "detail": {
+        "hidden": false,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 991,
+          "y": 790.203125,
+          "w": 92,
+          "h": 28,
+          "right": 1083,
+          "bottom": 818.203125
+        },
+        "svg": true,
+        "tabIndex": 0
+      }
+    },
+    {
+      "name": "before busy 1200: send remains visible",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "before 1200 busy: no overflow, no control overlap",
+      "value": true,
+      "detail": {
+        "overflowX": 0,
+        "overlaps": []
+      }
+    },
+    {
+      "name": "before 1360 busy: no overflow, no control overlap",
+      "value": true,
+      "detail": {
+        "overflowX": 0,
+        "overlaps": []
+      }
+    },
+    {
+      "name": "before busy: halt click aborts exact target",
+      "value": true,
+      "detail": {
+        "projectRoot": "/probe-composer-project",
+        "roleId": "P",
+        "runtime": "pi"
+      }
+    },
+    {
+      "name": "before busy: stop request row shown",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "before idle after stop: halt hidden again",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "before: zero console errors",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "failures": 0,
+  "screenshots": [
+    "composer-idle-1360-before.png",
+    "composer-idle-1200-before.png",
+    "composer-busy-1200-before.png",
+    "composer-busy-1360-before.png"
+  ],
+  "facts": {
+    "idleInitial": {
+      "hasSend": true,
+      "sendVisible": true,
+      "sendDisabled": false,
+      "halt": {
+        "hidden": true,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "svg": true,
+        "tabIndex": 0
+      },
+      "attach": true,
+      "directive": true,
+      "toggles": 2,
+      "scope": true,
+      "keyboard": true,
+      "actionsVisible": [
+        "btn-send"
+      ],
+      "overlaps": [],
+      "overflowX": 0,
+      "capsuleRight": 1254,
+      "viewport": 1360,
+      "haltInsideCapsule": true
+    },
+    "idle1360": {
+      "hasSend": true,
+      "sendVisible": true,
+      "sendDisabled": false,
+      "halt": {
+        "hidden": true,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "svg": true,
+        "tabIndex": 0
+      },
+      "attach": true,
+      "directive": true,
+      "toggles": 2,
+      "scope": true,
+      "keyboard": true,
+      "actionsVisible": [
+        "btn-send"
+      ],
+      "overlaps": [],
+      "overflowX": 0,
+      "capsuleRight": 1254,
+      "viewport": 1360,
+      "haltInsideCapsule": true
+    },
+    "idle1200": {
+      "hasSend": true,
+      "sendVisible": true,
+      "sendDisabled": false,
+      "halt": {
+        "hidden": true,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "w": 0,
+          "h": 0,
+          "right": 0,
+          "bottom": 0
+        },
+        "svg": true,
+        "tabIndex": 0
+      },
+      "attach": true,
+      "directive": true,
+      "toggles": 2,
+      "scope": true,
+      "keyboard": true,
+      "actionsVisible": [
+        "btn-send"
+      ],
+      "overlaps": [],
+      "overflowX": 0,
+      "capsuleRight": 1168,
+      "viewport": 1200,
+      "haltInsideCapsule": true
+    },
+    "busy1200": {
+      "hasSend": true,
+      "sendVisible": true,
+      "sendDisabled": false,
+      "halt": {
+        "hidden": false,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 991,
+          "y": 790.203125,
+          "w": 92,
+          "h": 28,
+          "right": 1083,
+          "bottom": 818.203125
+        },
+        "svg": true,
+        "tabIndex": 0
+      },
+      "attach": true,
+      "directive": true,
+      "toggles": 2,
+      "scope": true,
+      "keyboard": true,
+      "actionsVisible": [
+        "btn-halt",
+        "btn-send"
+      ],
+      "overlaps": [],
+      "overflowX": 0,
+      "capsuleRight": 1168,
+      "viewport": 1200,
+      "haltInsideCapsule": true
+    },
+    "busy1360": {
+      "hasSend": true,
+      "sendVisible": true,
+      "sendDisabled": false,
+      "halt": {
+        "hidden": false,
+        "text": "停止本轮",
+        "aria": "停止当前轮次",
+        "title": "停止当前轮次",
+        "disabled": false,
+        "rect": {
+          "x": 1077,
+          "y": 790.203125,
+          "w": 92,
+          "h": 28,
+          "right": 1169,
+          "bottom": 818.203125
+        },
+        "svg": true,
+        "tabIndex": 0
+      },
+      "attach": true,
+      "directive": true,
+      "toggles": 2,
+      "scope": true,
+      "keyboard": true,
+      "actionsVisible": [
+        "btn-halt",
+        "btn-send"
+      ],
+      "overlaps": [],
+      "overflowX": 0,
+      "capsuleRight": 1254,
+      "viewport": 1360,
+      "haltInsideCapsule": true
+    }
+  }
+}

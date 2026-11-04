@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ImagePlus, Scale, ScrollText, ShieldCheck, Square, X } from "lucide-react";
+import { ImagePlus, Scale, ScrollText, ShieldCheck, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getDesktopBridge } from "@/lib/platform";
@@ -927,39 +927,16 @@ export function Composer() {
             <Button
               id="btn-halt"
               variant="destructive"
-              size="sm"
+              size="icon-sm"
               className="danger-ghost"
               type="button"
               hidden={!busy}
               disabled={halting}
-              title={t("ui.composer.stopTitle")}
-              aria-label={t("ui.composer.stopTitle")}
+              title={t("shared.common.stopTurn")}
+              aria-label={t("shared.common.stopTurn")}
               onClick={() => void halt()}
             >
-              <Square size={12} strokeWidth={1.5} aria-hidden="true" />
-              {t("shared.common.stopTurn")}
-            </Button>
-            <Button
-              id="btn-send"
-              size="sm"
-              type="button"
-              disabled={!canSend}
-              className={
-                canSend
-                  ? undefined
-                  : "disabled:bg-secondary disabled:text-text-2 disabled:opacity-100"
-              }
-              title={
-                canSend
-                  ? t("ui.composer.sendWithEnter")
-                  : t("ui.composer.sessionNotOpen")
-              }
-              aria-label={t("ui.composer.ariaSend")}
-              aria-describedby="composer-demo-status"
-              onClick={() => void send()}
-            >
-              {t("ui.composer.send")}
-              <ArrowUp size={14} strokeWidth={1.5} aria-hidden="true" />
+              <Square size={14} strokeWidth={1.5} aria-hidden="true" />
             </Button>
           </div>
           </div>

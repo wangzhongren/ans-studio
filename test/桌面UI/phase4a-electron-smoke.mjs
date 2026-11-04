@@ -700,7 +700,7 @@ app.whenReady().then(async () => {
   await sleep(220);
 
   // 成功发送只清当前引擎草稿。
-  await js(`document.getElementById('btn-send').click()`);
+  await js(`(()=>{const i=document.getElementById("inp-message");i.focus();i.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));})()`);
   await sleep(160);
   check(
     "SEND_TARGET_CURRENT_RUNTIME_AND_CLEARS_ONLY_OWN_DRAFT",

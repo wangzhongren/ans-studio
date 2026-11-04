@@ -1,0 +1,822 @@
+{
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\composer-buttons-fix\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "five-role listing shows trio model and verifier",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "queued aggregate unique on primary with count and queuedDebug",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "runtime switch does not revive old queued aggregate",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "main process repush rebuilds aggregate with new count only",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "expired queued id removes aggregate",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "operator request opens one decision dialog and a chat notice without operable card",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "dialog answer responds exactly once",
+      "value": true,
+      "detail": [
+        {
+          "id": "smoke-mirror-1",
+          "decision": {
+            "kind": "confirm",
+            "confirmed": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "answered chat notice reflects decided without operable card",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "queued payload shows chat notice and no operable chat card",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "report card shows layered facts flags evidence and source button",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "report retry calls save channel once",
+      "value": true,
+      "detail": {
+        "version": 1,
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi",
+        "reportId": "smoke-report"
+      }
+    },
+    {
+      "name": "report save updates same card in place without retry",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "delivery shows inline full report by default with demoted receipt facts and safe copy flags",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "delivery history retry calls channel once",
+      "value": true,
+      "detail": {
+        "version": 1,
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi",
+        "attemptId": "a1"
+      }
+    },
+    {
+      "name": "delivery history save updates same card",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "expired material removes retry and states invalid honestly",
+      "value": true,
+      "detail": {
+        "message": "可补存的会话材料已失效，无法在此补存。",
+        "retry": false
+      }
+    },
+    {
+      "name": "menu shows configured/missing status text for all engines",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "cached menu reopen performs no extra config reads",
+      "value": true,
+      "detail": {
+        "before": 5,
+        "afterMenu": 5,
+        "now": 5
+      }
+    },
+    {
+      "name": "engine switch reads config exactly once",
+      "value": true,
+      "detail": [
+        "pi",
+        "claude",
+        "pi"
+      ]
+    },
+    {
+      "name": "failed config read shows unknown not missing",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "work queue subview title opens",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "top tab to card clears queue subview and keeps drawer",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "top tab to work shows work overview not queue",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "card queue subview then work tab shows work overview",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "project state section renders focus and badges",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "project state IPC called once on open",
+      "value": true,
+      "detail": {
+        "before": 0,
+        "after": 1
+      }
+    },
+    {
+      "name": "project state read-only: only refresh button",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "project state exposes no write bridge",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "project state refresh calls IPC once more",
+      "value": true,
+      "detail": [
+        {
+          "projectRoot": "/phase4b-project"
+        },
+        {
+          "projectRoot": "/phase4b-project"
+        }
+      ]
+    },
+    {
+      "name": "trio decision enable shows one-time warning",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "single switch disables decision and drops stale warning line",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "trio restores decision availability without stale warning",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "decision re-enable after single round shows warning once again",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "judge result row present in its own engine",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "foreign engine judge result not shown in current view",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "switching to codex replays its own judge result",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "switching back to pi replays pi judge result once without leakage",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "expired shell collapses with reason visible in its own runtime (C2 re-anchored)",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "replayAnchorDebug returns indices and card sits between request and conclusion",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "denied anchored notice kept in place without operable card",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "decided anchored card survives full rebuild between request and conclusion",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "five-role tree rows do not overlap at 1360",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "960 no horizontal overflow",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "five-role tree rows do not overlap at 960",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "report facts label/value separated at 1360",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "report facts label/value separated at 960",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "960 report facts labels visible inside chat viewport",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% containers no horizontal overflow",
+      "value": true,
+      "detail": {
+        "rows": [
+          {
+            "sel": "#chat",
+            "hidden": false,
+            "sw": 212,
+            "cw": 212,
+            "display": "flex"
+          },
+          {
+            "sel": ".chat-head",
+            "hidden": false,
+            "sw": 222,
+            "cw": 222,
+            "display": "flex"
+          },
+          {
+            "sel": ".head-inner",
+            "hidden": false,
+            "sw": 198,
+            "cw": 198,
+            "display": "flex"
+          },
+          {
+            "sel": "#right-body",
+            "hidden": false,
+            "sw": 0,
+            "cw": 0,
+            "display": "flex"
+          },
+          {
+            "sel": "#runtime-config-notice",
+            "hidden": false,
+            "sw": 222,
+            "cw": 222,
+            "display": "flex"
+          },
+          {
+            "sel": "#role-tree",
+            "hidden": false,
+            "sw": 217,
+            "cw": 217,
+            "display": "flex"
+          },
+          {
+            "sel": ".col-mid",
+            "hidden": false,
+            "sw": 222,
+            "cw": 222,
+            "display": "flex"
+          },
+          {
+            "sel": ".session-notice",
+            "hidden": false,
+            "sw": 222,
+            "cw": 222,
+            "display": "flex"
+          },
+          {
+            "sel": ".composer",
+            "hidden": false,
+            "sw": 222,
+            "cw": 222,
+            "display": "block"
+          }
+        ],
+        "offenders": [],
+        "midOffenders": [],
+        "chatRight": 470,
+        "docSW": 480,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% header wraps",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% config notice full text wrapped without clipping",
+      "value": true,
+      "detail": {
+        "visible": true,
+        "text": "Pi 配置不完整，缺：ANTHROPIC_AUTH_TOKEN、ANS_PI_MODEL。请补齐后保存。",
+        "msgSW": 198,
+        "msgCW": 198,
+        "msgSH": 55,
+        "msgCH": 55,
+        "wrap": "wrap",
+        "noticeTop": 179,
+        "noticeBottom": 276,
+        "buttonBottom": 275,
+        "innerHeight": 310,
+        "btnInside": true
+      }
+    },
+    {
+      "name": "200% five-role tree rows do not overlap",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% tree visible on screen and scrollable to last role",
+      "value": true,
+      "detail": {
+        "treeCH": 615,
+        "treeSH": 615,
+        "leftSH": 902,
+        "leftCH": 274,
+        "firstVisible": true,
+        "lastVisible": true,
+        "count": 6
+      }
+    },
+    {
+      "name": "200% tree visible rows intersect the screen",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "200% report details nodes stay within width",
+      "value": true,
+      "detail": {
+        "nodes": [
+          {
+            "sel": ".msg-handback",
+            "sw": 196,
+            "cw": 196
+          },
+          {
+            "sel": ".report-complete-body",
+            "sw": 166,
+            "cw": 166
+          },
+          {
+            "sel": ".hb-complete-summary",
+            "sw": 136,
+            "cw": 136
+          },
+          {
+            "sel": ".hb-evidence",
+            "sw": 146,
+            "cw": 146
+          }
+        ],
+        "cardRight": 458,
+        "chatSW": 212,
+        "chatCW": 212,
+        "innerWidth": 480
+      }
+    },
+    {
+      "name": "200% report card visible on screen",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 verifier handback: identity/full text/evidence/no fold",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 verifier handback cold color",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 verifier blocked: identity kept + danger color priority",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 ordinary report: no acceptance style; preview + report-complete retained",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 delivery: acceptance sections + ordinary inline full text (P1-ARC-02)",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 P1-ARC-01 unsupported verifier delivery report has no acceptance classes",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 acceptance dialog: localized badge/report/path/preview visible/options",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 acceptance dialog cold color",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 200% acceptance dialog no horizontal overflow",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 high-risk acceptance danger color priority",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "A5 200% verifier report no horizontal overflow",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "zero console errors",
+      "value": true,
+      "detail": []
+    },
+    {
+      "name": "csp meta strict and zero inline scripts",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "zero csp violations",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "calls": {
+    "opens": [
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "verifier",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "verifier",
+        "runtime": "pi"
+      }
+    ],
+    "histories": [
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "claude"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "codex"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "liaison",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "verifier",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi"
+      },
+      {
+        "projectRoot": "/phase4b-project",
+        "roleId": "verifier",
+        "runtime": "pi"
+      }
+    ],
+    "configReads": [
+      "claude",
+      "pi",
+      "codex",
+      "pi",
+      "claude",
+      "pi",
+      "pi",
+      "codex",
+      "claude",
+      "pi",
+      "codex",
+      "pi",
+      "codex",
+      "pi",
+      "pi"
+    ],
+    "operatorResponses": [
+      {
+        "id": "smoke-mirror-1",
+        "decision": {
+          "kind": "confirm",
+          "confirmed": true
+        }
+      },
+      {
+        "id": "anchor-request",
+        "decision": {
+          "kind": "confirm",
+          "confirmed": false
+        }
+      }
+    ],
+    "reacceptPreview": [],
+    "reaccept": [],
+    "establishPreview": [],
+    "establish": [],
+    "migratePreview": [],
+    "migrate": [],
+    "reportQueries": [],
+    "reportRetries": [
+      {
+        "version": 1,
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi",
+        "reportId": "smoke-report"
+      }
+    ],
+    "receiptQueries": [
+      {
+        "version": 1,
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi",
+        "attemptId": "a1"
+      },
+      {
+        "version": 1,
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi",
+        "attemptId": "a5-a1"
+      }
+    ],
+    "historyRetries": [
+      {
+        "version": 1,
+        "projectRoot": "/phase4b-project",
+        "roleId": "P",
+        "runtime": "pi",
+        "attemptId": "a1"
+      }
+    ],
+    "projectState": [
+      {
+        "projectRoot": "/phase4b-project"
+      },
+      {
+        "projectRoot": "/phase4b-project"
+      }
+    ],
+    "judge": {
+      "shellGet": 1,
+      "decisionGet": 1,
+      "decisionSet": [
+        true,
+        false,
+        true,
+        false
+      ]
+    }
+  },
+  "console": [],
+  "csp": [],
+  "screenshots": [
+    "phase4b-project-state.png",
+    "phase4b-1360.png",
+    "phase4b-960.png",
+    "phase4b-960-five-role-tree.png",
+    "phase4b-1360-report.png",
+    "phase4b-960-report.png",
+    "phase4b-200pct.png",
+    "phase4b-200pct-five-role-tree.png",
+    "phase4b-200pct-report.png",
+    "phase4b-200pct-report-details.png",
+    "a5-acceptance-handback.png",
+    "a5-acceptance-delivery.png",
+    "a5-acceptance-dialog-200pct.png",
+    "a5-acceptance-report-200pct.png"
+  ],
+  "failures": 0
+}

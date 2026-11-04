@@ -515,7 +515,7 @@ app.whenReady().then(async () => {
   state.recoveryResponse = "ok";
 
   // —————— 7. 发送 ack / 失败恢复 ——————
-  await js(`document.getElementById('inp-message').value='冒烟发送';document.getElementById('btn-send').click()`);
+  await js(`(()=>{const i=document.getElementById("inp-message");i.value="冒烟发送";i.focus();i.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));})()`);
   await sleep(160);
   const sent = calls.sends.at(-1);
   check(
@@ -529,7 +529,7 @@ app.whenReady().then(async () => {
     sent && { target: sent.target, clientMessageId: sent.metadata.clientMessageId },
   );
   state.sendMode = "fail";
-  await js(`document.getElementById('inp-message').value='拒发保留';document.getElementById('btn-send').click()`);
+  await js(`(()=>{const i=document.getElementById("inp-message");i.value="拒发保留";i.focus();i.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));})()`);
   await sleep(160);
   check(
     "SEND_FAILURE_RESTORES_DRAFT_AND_SAYS_SO",
