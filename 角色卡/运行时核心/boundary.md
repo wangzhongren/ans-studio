@@ -10,6 +10,7 @@
 | 单文件 | `src/model/project-state.ts` | 全局任务状态/版本决策的共享 Model 类型（`ProjectStateView`/`VersionDecisionCard`/`VersionDecisionRequest/Result`；无 I/O） |
 | 单文件 | `src/model/directive-marker.ts` | 客户指令标记纯解析器（零依赖，主进程与渲染侧共享） |
 | 单文件 | `src/model/directive.ts` | 客户指令事件/视图/高危谓词共享 Model 类型 |
+| 单文件 | `src/model/download.ts` | 下载申请/结果/错误码/判断事实共享 Model 类型与常量；无 I/O |
 | 单文件 | `src/service/runtime/session.ts` | 运行时选择、公共工具装配与提供方接入入口 |
 | 单文件 | `src/provider/runtime/tools.ts` | 公共受治理工具执行 |
 | 单文件 | `src/provider/runtime/schema.ts` | 公共工具 schema 与描述 |

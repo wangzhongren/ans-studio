@@ -16,6 +16,10 @@ entries:
   - kind: file
     path: src/model/directive.ts
     purpose: 客户指令事件/视图/高危谓词共享 Model 类型
+  # --- Delta-DR-1（2026-11-04，团队计划 §4.5 B-1；闸门 2）：新增 1 个共享 Model 单文件（download），逐文件授权 ---
+  - kind: file
+    path: src/model/download.ts
+    purpose: 下载申请/结果/错误码/判断事实共享 Model 类型与常量；无 I/O
   - kind: file
     path: src/service/runtime/session.ts
     purpose: 运行时选择、公共工具装配与提供方接入入口

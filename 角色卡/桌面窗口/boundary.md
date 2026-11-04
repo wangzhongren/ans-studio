@@ -78,6 +78,8 @@
 | 单文件 | `test/桌面应用/version-decision.test.ts` | 主进程侧测试——发卡/决定/拒绝/超时/中止/重试/新版本开发/恢复 |
 | 单文件 | `test/桌面应用/directive-input.test.ts` | 主进程侧测试——识别拦截/指令 IPC/面板通道/重推/关窗取消/高危复核/面板共存 |
 | 单文件 | `test/桌面应用/directive-decision.test.ts` | 主进程侧测试——decision 消费者确定性规则/冲突与不匹配绕过默认推荐/Q9 归属读者 |
+| 单文件 | `test/桌面应用/download-request.test.ts` | 主进程侧测试——能力注入/卡片字段/生命周期/项目根/并发/中止/审计归属 |
+| 单文件 | `test/桌面应用/download-decision.test.ts` | 主进程侧测试——项目角色 judge 可达/manual 转客户卡/unavailableReason 防御/开关/single/指纹去重/无 request_confirmation |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |
