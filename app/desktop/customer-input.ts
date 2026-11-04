@@ -17,6 +17,10 @@
 // `ANS_GOVERNANCE_JUDGE_TIMEOUT_MS` 覆盖）负责；本模块的通道层防御超时 = driver 超时 + 15s 余量
 // （缺省 **135s**），用 `AbortSignal.timeout` 实现（**不引入 self 计时器**，卡片等待语义逐字不变）。
 // **shell judge 的通道超时不变（15s）**，两套互不影响。
+// —— 2026-11-04 客户决定（治理写卡客户主权）——
+// `appointment-write`（治理写卡）永不进入判断器：无论「替我审批」开关状态，一律原卡呈现客户本人；
+// 判断器既不代批、也不得拒绝（「与现有角色卡声明冲突」类直接拒绝不会再发生）。
+// 其余确认卡（shell 等）的判断/自动审批行为逐字不变；无通道仍 fail-closed。
 //
 // —— 本模块不做任何判定（硬约束：不得出现第二份判定实现）——
 // 「确认后哪些路径可写」的**发行**在编排（`common/编排/confirmed-writes.ts`）；「写不写」在 gate 与文件工具。
@@ -326,6 +330,21 @@ function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest)
     RUN_CHANGE_MODE_OPTION_IDS.every((id) => offered.has(id)) ||
     VERSION_DECISION_OPTION_IDS.every((id) => offered.has(id))
   );
+}
+
+/**
+ * 治理写卡（appointment-write）＝**客户主权卡**（2026-11-04 客户直修）。
+ *
+ * 客户要求：治理写卡必须由客户本人确认；判断器既不许代批，也不许把卡拒掉（含
+ * 「与现有角色卡声明冲突」类直接拒绝）。因此 `cardKind === "appointment-write"` 的确认卡
+ * **永不进入判断器**（`planJudge` 排除）、不产生 judge 结果行/审计，也不进入任何自动代选/
+ * 自动结算路径；无论「替我审批」开关状态，一律原卡呈现客户本人。
+ * 原则与 decision 卡「应用卡不代选」同向：权限/边界类治理写卡 = 客户主权。
+ */
+const GOVERNANCE_WRITE_CARD_KIND = "appointment-write" as const;
+
+function isGovernanceWriteCardKind(kind: GovernanceCardKind | undefined): boolean {
+  return kind === GOVERNANCE_WRITE_CARD_KIND;
 }
 
 /** 发卡前校验结论：allow＝可呈现/可代选；ignore＝非 decision 卡（零行为变化）；reject＝拒发卡。 */
@@ -1194,6 +1213,11 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (judgeContext === undefined) return undefined;
     const cardKind = entry.request.cardKind ?? entry.metadata?.cardKind;
     if (cardKind === undefined) return undefined;
+    // 2026-11-04 客户直修（治理写卡客户主权）：appointment-write 确认卡**永不进入判断器**——
+    // 无论「替我审批」(approval 组) 开关状态、判断事实是否齐全/可核对，一律原卡呈现客户本人；
+    // 判断器对这类卡既不代批、也不得拒绝（「与现有角色卡声明冲突」类直接拒绝不会再发生）。
+    // 原则：权限/边界类治理写卡 = 客户主权，与 decision 卡「应用卡不代选」同向。
+    if (isGovernanceWriteCardKind(cardKind)) return undefined;
     // decision 卡（2026-10-26）：只做**确定性**默认推荐（「替我决策」开启时），绝不调用模型做选择题。
     // 未代选（开关关闭/结果行异常）⇒ 原卡交客户手动选择；不进入模型 judge，也不产生 judge 退回。
     if (cardKind === DECISION_CARD_KIND) return undefined;
@@ -1314,6 +1338,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /**
    * 升级客户（2026-11-04 客户直修）：**不自动拒绝**——原卡原样呈现 + `judgeNotice` 说明原因。
+   * 治理写卡（appointment-write）永不进入判断器（`planJudge` 排除、`settleJudgeOutcome` 顶部防御），
+   * 因此本函数对其不可达——「与现有角色卡声明冲突」类拒绝不会再发生。
    * 不写客户决定、不发 approve 结果行、不触发验收返工路由（没有发生拒绝）。
    * trigger = "unverifiable"（无法核对类 manual）/ "duplicate-rejection"（同指纹重复）。
    * 调用方负责状态守卫（settle 路径要求 state==="judging"；ledger 预检路径为 queued）。
@@ -1350,6 +1376,17 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    *    `aborted` 走既有取消/丢弃语义。
    */
   const settleJudgeOutcome = (entry: ChannelEntry, plan: JudgePlan, rawOutcome: GovernanceJudgeOutcome): void => {
+    // 2026-11-04 客户直修（治理写卡客户主权）：防御——appointment-write 永不判断。
+    // planJudge 已排除，不会生成 JudgePlan；若未来出现第二入口误入，一律丢弃判断结果、
+    // 原卡呈现客户，绝不代批/代拒。
+    if (isGovernanceWriteCardKind(plan.cardKind)) {
+      if (entry.state === "judging") {
+        judging.delete(entry.payload.id);
+        presentNow(entry);
+      }
+      return;
+    }
+
     const { group, cardKind } = plan;
     let outcome = rawOutcome;
     if (judgeVerdictOf(outcome) === "deny") {
@@ -1617,6 +1654,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const tryAutoSelectDecision = (entry: ChannelEntry): boolean => {
     const decision = entry.decisionCard;
     if (decision === undefined) return false;
+    // 2026-11-04 客户直修：治理写卡（appointment-write）是客户主权卡，一律排除任何确定性代选
+    //（结构上它不携带 decisionCard；此防线防未来接线变化）。
+    if (isGovernanceWriteCardKind(cardKindOf(entry))) return false;
     // 2026-11-04 客户直修：应用自有的 run-change / 版本决策卡一律原卡呈现客户，确定性代选不得拦截。
     if (isApplicationDecisionReservedForCustomer(entry.request)) return false;
     if (entry.ctx.governanceModel !== "trio") return false; // single/su 不代批（与判断门同口径）
