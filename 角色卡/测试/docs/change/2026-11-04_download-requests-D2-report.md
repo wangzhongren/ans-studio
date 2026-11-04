@@ -1,0 +1,121 @@
+# D2 报告：真实 Electron 探针与截图（2026-11-04）
+
+**风险档位：T3｜判定依据：团队计划 §6.4；V1 `docs/acceptance/download-requests-criteria-v1.md` §4.6；B0 v3 Electron 事实；C1/C2 实施记录｜选定检查：真实 Electron 窗口 + 真实 preload/渲染器 + 真实 customer-input 通道/SessionManager + 真实 B1 下载 Pipeline/Provider（本地 HTTP 服务与 presenter 回包为替身）；8 张截图 + 63 项现场断言；候选逐文件 hash-object/sha256 + diff/status｜复用证据：T3 不重跑（D1 于同一代码候选 `1d7560f` 记录 417 文件 / 3761 / 3734 / 9 / 18；本 D2 HEAD `691846b` 相对 `1d7560f` 仅新增 D1 测试与证据提交，产品代码相同）｜消费者重测结论：D1 六组 + T3 已覆盖；D2 现场验证 UI/通道/判断/预授权/审计链路｜全量回归：已执行（D1，见 §6）**
+
+- 任务 ID：`2026-11-04-download-requests`
+- 节点：D2（真实 Electron 探针与截图）
+- 角色：测试（独立工作上下文）
+- 日期：2026-11-04
+- 工作区：`C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\download-requests`
+- 状态：**`implemented-unverified`**（D2 只报告，不判验收；E2 独立判定）
+- 纪律：只新增 `test/测试/download-requests-electron-probe.mjs` 与 `角色卡/测试/docs/change/` 证据；不改产品源码、其他角色测试/文档、`test/桌面应用/e2e/`、boundary/changelog、`docs/scheduling|acceptance|communication`；不 commit/push；不启动子代理。
+
+## 1. 前置核对（开工 20:29:44）
+
+| 项 | 期望 | 实测 | 结论 |
+| --- | --- | --- | --- |
+| 工作目录 | `...\.claude\worktrees\download-requests` | 同 | 一致 |
+| HEAD | `691846b6ded34d339ee2b95bc443d547a6febebf` | `691846b6ded34d339ee2b95bc443d547a6febebf` | 一致 |
+| 分支 | `feat/download-requests` | `feat/download-requests` | 一致 |
+| `git status --porcelain -- src app test`（开工） | 空 | 空 | 一致 |
+| `git diff --cached --name-only` | 空 | 空 | 一致 |
+
+## 2. Electron 二进制
+
+| 项 | 值 |
+| --- | --- |
+| 声明/安装包 | `electron` `44.7.0`（`package.json` / `node_modules/electron/package.json`） |
+| 二进制 | `node_modules/electron/dist/electron.exe` **已存在**（246,302,208 字节；`path.txt` = `electron.exe`）——开工前已由协作方安装 |
+| 安装命令 | `npx --no-install install-electron` → **exit 0，1s**（幂等，无需重新下载） |
+| 运行时版本 | `electron --version` → `v44.7.0`；探针内 `process.versions`：Electron 44.7.0 / Node 24.21.0 / Chrome 152.0.7977.130 |
+| 依赖完整性 | `package.json` SHA-256 `51b63e73…b91400d`、`package-lock.json` `d6ee156e…8b7685`（未变化，未修改 manifest/lock） |
+
+## 3. 探针
+
+- 文件：`test/测试/download-requests-electron-probe.mjs`（新增，唯一产品/测试区写入）。
+- 架构：Electron 主进程创建真实 `BrowserWindow`（1360×860，`show:true`，真实 `app/preload.cjs` + 真实 `app/renderer/dist/index.html`）；真实 `createCustomerInputChannel`（presenter 推 `session:operator-request`，`session:operator-response` 直连 `channel.respond`）+ 真实 `SessionManager`（`withRequestLifecycle` 写 `request.*`）+ 真实 B1 `createDownloadRequestRuntimeForTest` + 真实 Provider（Node http 传输、文件 sink、`downloads.jsonl`、G8 A epoch 文件）+ 真实 customer-directive 账本/`takeDownloadDirective`；仅**本地 HTTP 服务端**（`lookupOverride` 把物理连接钉到 127.0.0.1，逻辑主机保持 `download.test`/`other.test`，产品策略不改）、presenter 客户端回包、judge 脚本、directive 确认面板回包为替身。不启动真实模型、不触外网、无测试专用生产缝。
+- 运行命令：`ANS_D2_OUTDIR=<本证据目录> node_modules/.bin/electron test/测试/download-requests-electron-probe.mjs`
+- 结果：**SCENARIOS PASS=63 / FAIL=0 / SHOTS=8**；exit 0；看门狗 180s 未触发。
+
+## 4. 场景与结果（V1 §4.6）
+
+| # | 场景 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| 1 | 真实窗口下载确认卡字段：角色/用途/URL/主机/已解析 IP/截断标记/mechanical 三项/文件名/上限/重定向策略 | **PASS**（标题「下载文件申请」、kind `download`、11 项字段逐项断言） | 截图 `01-download-card-customer.png` |
+| 2 | 客户批准 → 执行完成、文件落盘、完成回执（含路径/gitignore 提示） | **PASS**（`download/report.pdf` 内容一致；`request.created/presented/resolved` + `downloads.jsonl` by customer+requestId） | 截图 `02-download-completed-customer.png` |
+| 3 | 客户拒绝 → `download-declined`、不落盘 | **PASS** | 截图 `03-download-card-declined.png` |
+| 4 | 开关开 + judge approve → 不弹客户卡、judge 结果行、`presented.to:"judge"`、`downloads.jsonl` by judge（含 engine/reasonCode） | **PASS**（结果行显示「judge 代批 · 代审批」「已代批 · 流程 download」） | 截图 `04-judge-result-row.png` |
+| 5 | judge manual → 原卡转客户、附 judgeNotice、`resolved.by` customer | **PASS**（notice 原文「自动代理未代批（代审批）：无法判断；已转你手动确认。」） | 截图 `05-judge-manual-customer-card.png` |
+| 6 | 预授权 allow（session）→ 零客户卡、by directive+directiveId、无 requestId、无 `request.*` | **PASS**（账本与 tasks 负例断言） | `probe.log` |
+| 7 | 预授权 once 第二次回审批 | **PASS**（首次 directive；第二次客户卡 → 确认） | `probe.log` |
+| 8 | 预授权 deny 优先 | **PASS**（`download-denied-by-directive`，无客户卡） | `probe.log` |
+| 9 | G8 A 旧指令不授权 + 面板标注 | **PASS**（旧 domain 卡片路径；面板「不作用于下载（早于下载功能启用）」；新指令「消费者：下载」） | 截图 `06-directive-panel-consumers.png` |
+| 10 | 跨域重定向错误 → `download-redirect-cross-host`、不落盘、失败提示 | **PASS**（提示含跨域原因与重新申请指引） | `probe.log` |
+| 11 | 跨域后对目标重新申请 → 客户批准 → 成功落盘 | **PASS** | 截图 `07-redirect-re-request-card.png` |
+| 12 | 大小超限（env 16B）→ `download-too-large`、占位/临时清理（无 big/.part）、失败提示 | **PASS** | `probe.log` |
+| 13 | 语言切换（AC-19）：en-US 卡片标题/字段/按钮全英文 | **PASS**（`Download request` / `Requesting role` / `Confirm` / `Reject`） | 截图 `08-card-english.png` |
+| 14 | 关窗 fail-closed：卡片未决时销毁窗口 + session stop → `download-aborted`，审计无完成事件 | **PASS**（ledger 49→50，failed=download-aborted，无 completed） | `probe.log` |
+| 15 | 归属如实：customer / judge / directive 三路径 | **PASS**（见 #2/#4/#6 审计断言） | `probe.log` |
+
+**未在 D2 探针执行（如实记录，不伪造）**：
+
+| 场景 | 原因 | 已由其他证据覆盖 |
+| --- | --- | --- |
+| `session/forever` 可重复（除 session 外的 forever 重复性） | D2 现场只执行 session 与 once；forever 语义已在 B1 单元/集成覆盖 | `test/编排/customer-directive.test.ts`、D1 集成第 1/2 场景 |
+| 超时清理（D2 现场未触发传输超时） | 探针已覆盖超限清理；超时清理在 D1 集成与 Provider 测试中覆盖 | D1 集成「大小超限与超时」、`test/编排/download-provider.test.ts` |
+| `unavailableReason` 通道防御 | D2 现场以 judge manual 路径覆盖「不可核对转客户卡」；`unavailableReason` 专项防御由 C1/D1 单测覆盖 | `test/桌面应用/download-decision.test.ts`、D1 集成第 9 场景 |
+
+## 5. 截图元数据（8 张，无录屏；窗口 1360×860；未加载 DEBUG 覆盖层）
+
+| 文件 | SHA-256 | 字节 | 说明 |
+| --- | --- | --- | --- |
+| `01-download-card-customer.png` | `8bbd555a60fe2d44a66fec771ea036cce307c869c64d5a12a5fff26003733891` | 90,306 | 客户下载卡（字段齐全） |
+| `02-download-completed-customer.png` | `9cd3e98dee352f1d09b12913e69bad4e6c7151701f5f4ab05f9d1bfcca69e8c3` | 65,495 | 完成回执 |
+| `03-download-card-declined.png` | `e0961c3fcdd3f5d731406f924a997f008a28035fc06bac7c58ffaf95e897e930` | 102,401 | 拒绝前卡片 |
+| `04-judge-result-row.png` | `6aeef1ee02b366c18ada5d1cd2894a71a6ff1db374735cce0a02c629daed61b4` | 83,520 | judge 结果行 |
+| `05-judge-manual-customer-card.png` | `1b45c31bbd50a76527a6630aa5a8f5f4716bfa835cea9a25542d3b2a04cdb9d7` | 106,504 | manual 转客户卡 + judgeNotice |
+| `06-directive-panel-consumers.png` | `8e5f5e9eff9b167c8ad78a1afb5443c336cf797d83b340d5bf362066da79d636` | 90,992 | 指令面板消费者标注 |
+| `07-redirect-re-request-card.png` | `7ab800d3fc7b91ef93f63196856bee44aa4e9352f1b0aac25623ae6e6896eeaa` | 108,075 | 跨域后重新申请卡片 |
+| `08-card-english.png` | `1b0f4f307e3163d681a35a34828bf84921ba33bd369daca08ad830df9bba0860` | 128,943 | en-US 卡片与按钮 |
+
+截图哈希与报告（`report.json`）内记录一致；拍摄方式：探针内 `win.webContents.capturePage()` → PNG；窗口内容尺寸 1360×860。
+
+## 6. 候选与回归
+
+- 候选口径：`f394cfb..HEAD`（`691846b`）已提交 `src app test` 改动 **83 文件**（44 A / 39 M，无删除/重命名）+ 本任务新增探针 **1 文件** = **84 文件**；逐文件 `git hash-object` + `sha256sum` 见 `09-hash-object.txt` / `09-sha256.txt` / 合并 `09-candidate-hashes.txt`（84 行）。
+- 工作区：`git diff --name-only -- src app test` 空；`git status --porcelain -- src app test` 仅 `?? test/测试/download-requests-electron-probe.mjs`；`git diff --cached --name-only` 空；未 commit/push（HEAD 仍 `691846b`）。
+- T3：本 D2 不重跑；D1 在 `1d7560f`（与 `691846b` 产品代码相同的候选）记录 **417 文件 / 3761 tests / 3734 pass / 9 fail（全部既有 Windows symlink EPERM）/ 18 skip / 0 cancelled / 0 todo**，新增确定性失败 0、新增 skip 0。D2 只新增探针脚本与证据，不改变产品/测试执行语义。
+- 静态门（D1 记录）：`typecheck` 0 / `typecheck:renderer` 0 / `build:renderer` 0。
+
+## 7. 限制与风险
+
+1. 探针以本地 HTTP 服务 + Provider `lookupOverride` 测试缝替代公网；真实 Provider 的 Node http/文件 sink/账本/epoch 仍为产品实现（与 D1 同）。judge 结果为脚本化替身；真实模型调用不在 D2 范围。
+2. 工具调用链路由探针直接调用会话的 `requestDownload` 能力（与 C1 注入同形），不经过真实模型的工具选择；AC-1/AC-4 的「模型可调用」由 A1 工具注册测试与 D1 集成覆盖。
+3. 探针开发期间有多次调试运行；最终证据为一次完整干净运行（63/63 PASS，无 watchdog/异常）。调试日志不纳入证据。
+4. H1 治理文件与 `docs/planning/memo.md` 仍为未提交修改（预期、非本角色、未触碰）；`src app test` 仅本任务探针文件。
+5. 本报告不判验收（`implemented-unverified`）；AC-3/4/6/14/22/25/27/28 的最终判定归 E2，D2 只提供现场证据。
+
+## 8. 证据索引（SHA-256 / 行数）
+
+| 文件 | SHA-256 | 行数 | 说明 |
+| --- | --- | --- | --- |
+| `00-opening-state.log` | `4cbe3b01190f406ba7084e4b3639d73515cd550c016d892ee0301cce6bc4f528` | 9 | 开工状态 |
+| `01-electron-install.log` | `45a2b7dfe0da537847edadce0b3cd14b0fa4e9173896838e1a036ab6fe25c03f` | 12 | Electron 版本/路径/安装 |
+| `01-lockfile-hashes.txt` | `27e5677bc200c1e17a8ca98e8eb9427cac859f4d208ffab7539d4db80f01cf1d` | 2 | manifest/lock 未变 |
+| `probe.log` | `c65df3ab412e36250d15d247c82bc182fcaa20654c0b988a99c38ad0bf1e4f7e` | 88 | 探针原始输出（63 PASS/0 FAIL/8 SHOT） |
+| `report.json` | `668f0ca4ba9badb6b34c48d3f2bd4ea13be64e29c0bf4024e22e2dc0332a169b` | 656 | 结构化检查/截图/notice |
+| 截图 8 张 | 见 §5 | - | PNG |
+| `09-candidate-committed.txt` | `9d4116a273be25200cf69631ba109f35554cfa2c9a014e2100c6a12ec5c5a70a` | 84 | 已提交候选 name-status（83 文件） |
+| `09-candidate-worktree.txt` | `001c1ab8d3b74b59e593b641c17117ac2483e6e69fc8e7fdb69653b958edc9bc` | 2 | 新增探针 |
+| `09-candidate-diff.txt` | `d64c9195d1461f3a65b1956eac41ce44469054eec2f8ed431393d84c42d5b3b1` | 1 | `src app test` diff 空 |
+| `09-candidate-files.txt` | `3a4611fa6cdb2b331ab1951ebd794e7580199a1a1388116b9c05c398f7b1bb7d` | 84 | 候选清单 |
+| `09-hash-object.txt` | `02628f204668a610be583bf218f4ad64a2f5a5dd7faa74f26371b8a92515dcf8` | 84 | git hash-object |
+| `09-sha256.txt` | `3807f7b6cec1f198a95f02bf3acf0ba6b301eed96ca3403d1c3bf53d3f8c35c2` | 84 | sha256sum |
+| `09-candidate-hashes.txt` | `b895562adfb96b0d42379b2516e0b2de0624eef31cb49e27c625c2871602b6a5` | 84 | 合并清单 |
+| `project/.ans/state/downloads.jsonl` | `40e6c43138265308378ad8c864b9f48fcece4b7c2482d4db12cff24bdb74047a` | 50 | 真实下载账本（现场运行） |
+| `project/.ans/state/tasks.jsonl` | `ad1e4bd98a7d5a85d2653751f9abb428f43192f0a2abd327c7a8cc3afc492623` | 65 | `request.*` 审计（现场运行） |
+| `project/.ans/state/customer-directives.jsonl` | `40f8f856247dd5314e196b77aecfc18ce09cb71fba8f7ee008dff03ce8f16d2a` | 6 | 指令账本（现场运行） |
+| `project/.ans/state/download-consumer.json` | `c7328ad7f3c4d393dd069c399e03a6b978a782ec2e5f938d18b1f9910a243ca0` | 1 | G8 A epoch（现场运行） |
+| `project/download/*`（8 个成功文件） | 见 `19-evidence-index.sha256` | - | 现场落盘 |
+
+索引文件 `19-evidence-index.sha256` 递归收录上述全部证据文件与本报告（索引自身不入索引；其哈希见交付报告）。

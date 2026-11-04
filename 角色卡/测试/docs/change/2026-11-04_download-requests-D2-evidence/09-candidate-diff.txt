@@ -1,0 +1,1 @@
+=== git diff --name-only -- src app test (expect empty) ===
