@@ -108,7 +108,7 @@ export function formatOperatorPrompt(prompt: OperatorPrompt): string {
   const suApproval =
     typeof prompt.reason === "string" && prompt.reason.startsWith(`${SU_APPROVAL_REASON_PREFIX}[`);
   const modeLine = suApproval
-    ? "(su 审批档：客户逐条批准，不走 (b) 审读)"
+    ? "(治理审批档：客户逐条批准，不走 (b) 审读)"
     : "(b) 未定，(a) 请操作者确认";
   return (
     `\n—— shell 命令审核（${modeLine}）——\n` +

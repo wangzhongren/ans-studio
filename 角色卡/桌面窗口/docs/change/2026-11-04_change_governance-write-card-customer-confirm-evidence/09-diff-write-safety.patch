@@ -1,0 +1,225 @@
+--- "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/download-requests/test/\346\241\214\351\235\242\345\272\224\347\224\250/write-safety.test.ts"	2026-11-04 15:55:25.804453100 +0800
++++ "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/governance-write-customer-confirm/test/\346\241\214\351\235\242\345\272\224\347\224\250/write-safety.test.ts"	2026-11-04 17:53:01.952367500 +0800
+@@ -9,9 +9,9 @@
+ import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+ import { describeTool } from "../../src/provider/runtime/schema.ts";
+ import { validateBoundaryYamlText } from "../../src/service/boundary/resolve-boundary.ts";
+-import { appendTaskEvent, taskEvent } from "../../src/common/编排/task-state.ts";
++import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
+ import { SessionManager } from "../../app/desktop/session.ts";
+-import { createCustomerInputChannel, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
++import { createCustomerInputChannel, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+ import { buildProjectConfig } from "../../app/desktop/project.ts";
+ import { validateAppointmentWritePreview } from "../../src/pipeline/orchestration/run-role.ts";
+ import type { CustomerInputFn, CustomerInputRequest } from "../../src/model/runtime.ts";
+@@ -304,3 +304,210 @@
+   const legacyReq: CustomerInputRequest = { ...builtInReq, flowId: "flow-a" };
+   assert.equal(validateAppointmentWritePreview({ request: legacyReq, metadata: { cardKind: "appointment-write" } as never, declaredPaths: legacyReq.paths! }), undefined, "旧 flow 路径不新增门槛");
+ });
++
++// ———————————————— 2026-11-04 客户直修：治理写卡（appointment-write）＝客户主权（会话级真实链路） ————————————————
++
++test("治理写卡客户主权（会话级 a）：替我审批开启 ⇒ 真实 SessionManager 呈现客户、judge 0 调用/0 结果行、approval.resolved by=customer", async () => {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-gov-write-sovereign-"));
++  const { decisionId } = await seedD3(root, { taskId: "t-gov-write" });
++  const pushed: OperatorRequestPayload[] = [];
++  const judgeRows: OperatorJudgeResultPayload[] = [];
++  let judgeCalls = 0;
++  let seq = 0;
++  const channel = createCustomerInputChannel({
++    presenter: (request) => pushed.push(request),
++    operatorId: "tester",
++    nextId: () => `op-${++seq}`,
++    judge: {
++      isGroupEnabled: () => true,
++      fn: async (request) => {
++        judgeCalls += 1;
++        return {
++          verdict: "approve",
++          group: request.group,
++          cardKind: request.cardKind,
++          engine: request.runtime,
++          reasonCode: "sufficient",
++          value: { confirmed: true },
++        };
++      },
++    },
++    emitJudgeResult: (payload) => judgeRows.push(payload),
++  });
++  const capabilities: Record<string, { customerInput?: CustomerInputFn }> = {};
++  const mgr = new SessionManager({
++    openRoleSession: async (input) => {
++      capabilities[input.roleId] = input as { customerInput?: CustomerInputFn };
++      return sessionHandle();
++    },
++    createPiAdapterFactory: () => { throw new Error("no pi"); },
++    createDemoAdapter: () => { throw new Error("no demo"); },
++    buildProjectConfig,
++    getListing: (r) => (r === root ? appointmentListing(root) : undefined),
++    emitEvent: () => {},
++    customerInput: channel.customerInput,
++  });
++  try {
++    assert.equal((await mgr.open({ projectRoot: root, roleId: "nominator", runtime: "demo" })).ok, true);
++    await tick(20);
++    const input = capabilities.nominator!.customerInput!;
++    const request: CustomerInputRequest = {
++      kind: "confirm",
++      title: "写角色卡 worker",
++      cardKind: "appointment-write",
++      paths: ["角色卡/worker/role-card.md"],
++      preview: "## 角色卡/worker/role-card.md\n# worker\n",
++    };
++    let settled = false;
++    const pending = input(request, {
++      cardKind: "appointment-write",
++      targetRoleId: "worker",
++      decisionId,
++      taskId: "t-gov-write",
++      toolCallId: "call-1",
++      turnId: "turn-1",
++      judgeContext: {
++        flowId: "focus",
++        facts: {
++          governanceModel: "trio",
++          flowId: "focus",
++          ledgerErrors: 0,
++          unresolvedClarificationCount: 0,
++          latestDecisionKinds: [],
++          appointmentTargetRoleIds: ["worker"],
++        },
++      },
++    } as never);
++    Promise.resolve(pending).then(() => {
++      settled = true;
++    });
++    await tick(50);
++    assert.equal(pushed.length, 1, "写卡呈现客户");
++    assert.equal(judgeCalls, 0, "判断器 0 调用（开关开启也一样）");
++    assert.equal(judgeRows.length, 0, "0 judge 结果行");
++    assert.equal(settled, false, "客户作答前不结算");
++    const before = await readTaskState(root);
++    assert.equal(before.events.filter((event) => event.kind === "approval.resolved").length, 0, "无自动拒绝/自动结算事件");
++    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
++    const outcome = await pending;
++    assert.equal(outcome?.outcome, "answered");
++    assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester", "客户本人确认");
++    assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined, "无 judge 审计字段");
++    await tick(20);
++    const state = await readTaskState(root);
++    const approvals = state.events.filter((event) => event.kind === "approval.resolved");
++    assert.equal(approvals.length, 1, "客户确认后恰一条 approval.resolved");
++    const approval = approvals[0]!;
++    if (approval.kind === "approval.resolved") {
++      assert.equal(approval.by, "customer");
++      assert.equal(approval.operatorId, "tester");
++      assert.equal(approval.decision, "confirmed");
++      assert.equal(approval.judge, undefined);
++    }
++    const resolved = state.events.filter((event) => event.kind === "request.resolved" && event.cardKind === "appointment-write");
++    assert.equal(resolved.length, 1, "恰一条写卡 request.resolved");
++    const writeResolved = resolved[0]!;
++    if (writeResolved.kind === "request.resolved") {
++      assert.equal(writeResolved.by, "customer");
++      assert.equal(writeResolved.choice, "confirmed");
++      assert.equal(writeResolved.judge, undefined);
++    }
++  } finally {
++    await mgr.stop(null);
++    await tick(50);
++    channel.rejectAllPending("cleanup");
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
++  }
++});
++
++test("治理写卡客户主权（会话级 b）：替审批关闭 ⇒ 呈现客户；客户拒绝落 approval.resolved by=customer", async () => {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-gov-write-decline-"));
++  const { decisionId } = await seedD3(root, { taskId: "t-gov-write-decline" });
++  const pushed: OperatorRequestPayload[] = [];
++  const judgeRows: OperatorJudgeResultPayload[] = [];
++  let judgeCalls = 0;
++  let seq = 0;
++  const channel = createCustomerInputChannel({
++    presenter: (request) => pushed.push(request),
++    operatorId: "tester",
++    nextId: () => `op-${++seq}`,
++    judge: {
++      isGroupEnabled: () => false,
++      fn: async () => {
++        judgeCalls += 1;
++        throw new Error("开关关闭不应判断");
++      },
++    },
++    emitJudgeResult: (payload) => judgeRows.push(payload),
++  });
++  const capabilities: Record<string, { customerInput?: CustomerInputFn }> = {};
++  const mgr = new SessionManager({
++    openRoleSession: async (input) => {
++      capabilities[input.roleId] = input as { customerInput?: CustomerInputFn };
++      return sessionHandle();
++    },
++    createPiAdapterFactory: () => { throw new Error("no pi"); },
++    createDemoAdapter: () => { throw new Error("no demo"); },
++    buildProjectConfig,
++    getListing: (r) => (r === root ? appointmentListing(root) : undefined),
++    emitEvent: () => {},
++    customerInput: channel.customerInput,
++  });
++  try {
++    assert.equal((await mgr.open({ projectRoot: root, roleId: "nominator", runtime: "demo" })).ok, true);
++    await tick(20);
++    const input = capabilities.nominator!.customerInput!;
++    const pending = input(
++      {
++        kind: "confirm",
++        title: "写角色卡 worker（关闭开关）",
++        cardKind: "appointment-write",
++        paths: ["角色卡/worker/role-card.md"],
++        preview: "## 角色卡/worker/role-card.md\n# worker\n",
++      },
++      {
++        cardKind: "appointment-write",
++        targetRoleId: "worker",
++        decisionId,
++        taskId: "t-gov-write-decline",
++        toolCallId: "call-2",
++        turnId: "turn-2",
++        judgeContext: {
++          flowId: "focus",
++          facts: {
++            governanceModel: "trio",
++            flowId: "focus",
++            ledgerErrors: 0,
++            unresolvedClarificationCount: 0,
++            latestDecisionKinds: [],
++            appointmentTargetRoleIds: ["worker"],
++          },
++        },
++      } as never,
++    );
++    await tick(50);
++    assert.equal(pushed.length, 1, "写卡呈现客户");
++    assert.equal(judgeCalls, 0, "开关关闭不判断");
++    assert.equal(judgeRows.length, 0);
++    assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "confirm", confirmed: false } }).ok, true);
++    const outcome = await pending;
++    assert.equal(outcome?.outcome, "declined");
++    assert.equal(outcome?.outcome === "declined" ? outcome.operatorId : undefined, "tester");
++    await tick(20);
++    const state = await readTaskState(root);
++    const approvals = state.events.filter((event) => event.kind === "approval.resolved");
++    assert.equal(approvals.length, 1);
++    const approval = approvals[0]!;
++    if (approval.kind === "approval.resolved") {
++      assert.equal(approval.by, "customer");
++      assert.equal(approval.operatorId, "tester");
++      assert.equal(approval.decision, "declined");
++      assert.equal(approval.judge, undefined);
++    }
++  } finally {
++    await mgr.stop(null);
++    await tick(50);
++    channel.rejectAllPending("cleanup");
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
++  }
++});

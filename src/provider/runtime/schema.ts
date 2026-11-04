@@ -253,7 +253,7 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Optional for ordinary project roles and single/su (legacy calls). The six built-in governance roles " +
+              "Optional for ordinary project roles and the legacy single-role governance model (legacy calls). The six built-in governance roles " +
               "(chief / product / rapporteur / nominator / convener / verifier) MUST always provide an attribution key (flowId | intentId | taskId) + cardKind together; " +
               "the call is rejected by the application if either is missing, and NO card is shown to the customer — fix and resend",
           },
@@ -266,7 +266,7 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             enum: ["appointment-write"],
             description:
-              "Optional for ordinary project roles and single/su (legacy calls). The six built-in governance roles " +
+              "Optional for ordinary project roles and the legacy single-role governance model (legacy calls). The six built-in governance roles " +
               "(chief / product / rapporteur / nominator / convener / verifier) MUST always provide an attribution key (flowId | intentId | taskId) + cardKind together; " +
               "a missing or out-of-role kind is rejected by the application and NO card is shown to the customer — fix and resend. " +
               "Kind semantics: `appointment-write` = write confirmation for role cards / boundaries after the customer's appointment " +
@@ -283,9 +283,9 @@ export function describeTool(name: string): ToolDescription {
         "（角色卡、边界、共享目录与治理写集——如 flows、账本等——的写盘，以及新建/扩张角色边界、治理写集等须客户拍板的变更）；" +
         "**它不是边界内普通写盘的前置步骤**：目标路径在你的角色边界（Section 1 白名单）内时，write_file / edit_file **直接写**即可，" +
         "**不需要**逐次调用本工具。治理敏感写盘把将写出的路径列入 preview，客户返回 `confirmed:true` 后系统才为这些路径发行写盘许可。" +
-        "**治理写盘的预授权例外（仅内置治理角色 su）**：`docs/su/**`（su 自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）、`docs/skills/**`（su 给角色安装的技能文档）与 `docs/mcp/**`（su 给角色安装的 MCP 声明文档）的写盘许可**已预置**——" +
+        "**治理写盘的预授权例外（仅内置治理角色）**：`docs/su/**`（内置治理角色自己的工作笔记）、`docs/contracts/**`（跨角色契约文档）、`docs/skills/**`（内置治理角色给其他角色安装的技能文档）与 `docs/mcp/**`（内置治理角色给其他角色安装的 MCP 声明文档）的写盘许可**已预置**——" +
         "写入这四棵目录树**无需逐次确认**、直接写即可（开会话与重建后均生效）；四棵树之外的**治理敏感写盘**仍按既有规则逐条确认（角色边界内的普通写盘不在此列）。" +
-        "真正新建或扩张角色边界、治理写集时，须由 su 把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
+        "真正新建或扩张角色边界、治理写集时，须由内置治理角色把变更呈给客户确认（角色卡全文与边界摘要放进 preview），" +
         "仅当返回「客户已确认」时才落盘。未获同意（拒绝/超时/通道不可用）→ **不要写盘**，如实告知客户，不得假设同意。" +
         "**preview 必须列出将要写出的具体路径**（项目内相对路径，如 `角色卡/示例/role-card.md`）——写盘许可依 preview 所列路径发行；" +
         "**未列出的路径不会获得许可，写入会被门禁拒绝**。" +
@@ -297,14 +297,14 @@ export function describeTool(name: string): ToolDescription {
         "（cardKind 仅 `appointment-write`；通用写卡已删除；且须属于该角色允许的卡种）；" +
         "`appointment-write` 指客户**任命**（appointment）后的角色卡/边界写入确认——由 Crew 按任命名单逐路径发起；旧流程的「提名后写卡」为 legacy。" +
         "缺失任一项会被应用拒绝且**不会向客户发卡**——工具回执为「卡片未发出」，请补齐后重新调用。" +
-        "普通项目角色与 single/su 的 `flowId`/`stepId`/`cardKind` 仍为可选；" +
+        "普通项目角色与旧治理模型（single）的 `flowId`/`stepId`/`cardKind` 仍为可选；" +
         "这些字段只用于卡片显示与账本分类，**字段本身不构成任何授权**——治理门禁只认应用签发的客户决定。",
       promptGuidelines: [
         "边界（Section 1 白名单）内的写入是预授权：write_file / edit_file **直接写**，**不需要**本工具逐次确认；" +
           "本工具用于**治理敏感写入**（角色卡 / 边界 / 共享目录 / 治理写集如 flows、账本等）或**需要客户决定的动作**——" +
           "把将写出的路径逐条列入 preview，客户返回 `confirmed:true` 后系统才会为这些路径发行写盘许可；对话里的口头同意不是凭据。" +
-          "**治理写盘的预授权例外（仅内置治理角色 su）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的治理敏感写盘仍按既有规则逐条确认。" +
-          "新建或扩张角色边界、治理写集须由 su 经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
+          "**治理写盘的预授权例外（仅内置治理角色）**：`docs/su/**`、`docs/contracts/**`、`docs/skills/**` 与 `docs/mcp/**` 的写盘许可已预置——写这四棵目录树无需逐次确认、直接写即可（开会话与重建后均生效）；四棵树之外的治理敏感写盘仍按既有规则逐条确认。" +
+          "新建或扩张角色边界、治理写集须由内置治理角色经 request_confirmation 取得客户的**明确同意**。未获该变更同意 → 不执行治理变更，不得假设同意。",
         "**内置治理角色**（chief / product / rapporteur / nominator / convener / verifier）每次调用 request_confirmation 都必须同时携带归属键（`flowId` | `intentId` | `taskId` 至少一个）与 `cardKind`；" +
           "缺失任一项会被应用拒绝且不会向客户发卡——不要省略、不要猜测；收到「卡片未发出」回执时补齐后重新调用。",
         "新建角色或扩张角色边界时：先把**角色卡全文 + 边界摘要**放进 request_confirmation 的 preview 请客户预览，同意后才写入治理变更。",
@@ -452,7 +452,7 @@ export function describeTool(name: string): ToolDescription {
         "向客户请求选择（单选或多选勾选）并**挂起等待其回应**（前端渲染成交互卡）。" +
         "返回客户已选中的选项 id。**未获明确选择（拒绝/超时/通道不可用）→ 不要据此写盘，也不得擅自代选**；如实告知客户。" +
         "若 preview 里展示将要写出的内容，**必须列出具体路径**（相对项目根、含目录）——但注意：" +
-        "**选择≠写盘同意**或扩张写权。已接受项目边界内的已授权任务无需重复确认；真正新建或扩张角色边界、治理写集仍由 su 请求客户确认，仅 confirmed:true 才执行该治理变更。" +
+        "**选择≠写盘同意**或扩张写权。已接受项目边界内的已授权任务无需重复确认；真正新建或扩张角色边界、治理写集仍由内置治理角色请求客户确认，仅 confirmed:true 才执行该治理变更。" +
         "治理会话可附可选 `flowId`/`intentId`/`taskId`/`stepId`/`cardKind`（cardKind 仅 `proposal` / `appointment` / `acceptance` / `intent-confirm` / `decision`；" +
         "`appointment` 为**任命**卡——由 Convener 依客户确认的团队计划发起、任命 Crew，旧流程的「提名」卡为 legacy；" +
         "卡种须属于该角色允许的卡种，由应用校验）；" +
@@ -465,7 +465,7 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "需要客户在若干选项中做选择时用 request_choice；未获明确回答 → 不要据此写盘，也不得假设客户的选择。",
         "`cardKind=appointment` 是**任命**卡：由 Convener 依客户确认的团队计划发起；Crew 收到客户任命后才按名单写卡（appointment-write），不自行任命、不自行选角色。",
-        "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由 su 经 request_confirmation 请求确认。",
+        "request_choice 的回答**不构成写盘同意**或扩张写权；已接受边界内的已授权任务无需重复确认，新建或扩张角色边界、治理写集仍由内置治理角色经 request_confirmation 请求确认。",
         "`cardKind=decision` 直接调用仅限运营（材料性选择）；需求变更审批卡由应用在 `request_requirement_change` 成功后自动呈现，发起方不要重复发卡；卡内必须恰有一个 `recommended: true` 推荐项；" +
           "开启「替我决策」时判断 agent 默认选推荐项；decision 卡不等于验收/客户批准，不触发门禁/验收，且没有 `pass` 选项（不适用）。",
       ],
@@ -501,7 +501,7 @@ export function describeTool(name: string): ToolDescription {
         additionalProperties: true,
       },
       description:
-        "向编排交回本轮任务报告（**回交给 su 汇总**，前端渲染成回交卡）。" +
+        "向编排交回本轮任务报告（**回交给编排汇总**，前端渲染成回交卡）。" +
         "**本轮任务完成——或你确认无法完成——时，必须先调用本工具交回报告**：`summary` 用一句话写清" +
         "**改了什么 / 产出了什么**，`evidence` 逐条给关键证据（产物路径 / 变更 / 测试结论）。" +
         "**不得只在正文里说而不交报告**。本工具**不写盘、不做治理判定、不改变任何写盘权限**——" +
@@ -566,7 +566,7 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             pattern: GOVERNANCE_SLUG_PATTERN,
             description:
-              "Optional governance flow id (slug). Governance roles must dispatch with flowId (+ stepId for task dispatch; Lead-to-Steward coordination may omit stepId); legacy su calls may omit both (old behavior)",
+              "Optional governance flow id (slug). Governance roles must dispatch with flowId (+ stepId for task dispatch; Lead-to-Steward coordination may omit stepId); legacy single-model calls may omit both (old behavior)",
           },
           stepId: {
             type: "string",
@@ -593,7 +593,7 @@ export function describeTool(name: string): ToolDescription {
       description:
         "向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。" +
         "**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的" +
-        "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由 su 请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
+        "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
         "写清要做什么、依据哪份文档、完成标准（治理派发带 `flowId`；产品向 Steward 协调时可省 `stepId`）；**返工**时把要求与证据一并写进任务文本。" +
         "多角色/跨角色协作时**先落盘再派发**：先把冻结契约落盘到 `docs/contracts/<name>-v<N>.md`" +
         "（写盘许可已预置、直接写即可），工作流落盘到 `docs/workflow.md`（写盘经确认制：把路径列入规划确认的 preview），**再**派发任务。" +
@@ -604,11 +604,11 @@ export function describeTool(name: string): ToolDescription {
         "B 批星形任务（2026-10-29 拓扑 v4.1）：**幕僚**按序派产品/策划/人事/运营（一次一步，机械前置由应用校验），并可派质检做验收核对；**运营**可派项目 worker（限 D3 选中名单）与质检。项目 worker 的报告按任务创建者路由（运营派 → 运营；幕僚派 → 幕僚）。任务落 `tasks.jsonl`，不使用 flow 步骤语义。" +
         "产品向 Steward 派发属**内部协调**，**不是客户批准**；Steward/项目角色仍按自己的已接受边界与门禁执行。" +
         "本工具**不写盘、不做治理判定、不改变任何角色的写权**。" +
-        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**产品向 Steward 协调时带 `flowId`、`stepId` 可省**；旧 su 调用可缺席＝旧行为——" +
+        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**产品向 Steward 协调时带 `flowId`、`stepId` 可省**；旧治理模型调用可缺席＝旧行为——" +
         "**字段本身不构成任何授权**，派发范围门只认应用签发的客户决定与已任命名单。",
       promptGuidelines: [
         "派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；" +
-          "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由 su 请求客户确认。",
+          "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。",
         "产品（Lead/Liaison）可向 Steward（`convener`）派发任务做**内部协调**——**不是客户批准**，也不代表 Steward 已同意；" +
           "Steward/项目角色仍按自己的边界与门禁执行。**不要**把这条理解为可向任意内置治理角色派发。",
         "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；" +

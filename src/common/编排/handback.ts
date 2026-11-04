@@ -371,7 +371,7 @@ export function planDispatchDelivery(
     return {
       action: "reject",
       message: `派发未受理：引用的契约 ${missingContract} 不存在——未投递。`,
-      systemRow: `派发未受理：引用的契约 ${missingContract} 不存在——**未投递**（不静默；su 修正后重派）。`,
+      systemRow: `派发未受理：引用的契约 ${missingContract} 不存在——**未投递**（不静默；派发主人修正后重派）。`,
     };
   }
   return { action: "deliver", text: renderDispatchPrompt(req, { ...opts, references, workflowMissing }) };
@@ -484,7 +484,7 @@ export function formatDispatchReceipt(opts: {
   return (
     `已受理：任务将投递给角色 ${opts.targetRoleId} 的会话` +
     (opts.sessionOpen ? "" : "（其会话未开——将自动开启）") +
-    `；投递结果/失败会在其聊天流与 su 的聊天流如实显示（受理≠已完成）。`
+    `；投递结果/失败会在其聊天流与派发者的聊天流如实显示（受理≠已完成）。`
   );
 }
 

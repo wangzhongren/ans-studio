@@ -348,7 +348,7 @@ export const zhCN = {
   "ui.confirm.unknownRole": "(未标识)",
   "ui.confirm.matchedReason": "命中原因：{reason}",
   "ui.confirm.reviewOriginal": "审核原文（内部用语，仅供核查）：{reason}",
-  "ui.confirm.suApprovalBadge": "su 审批",
+  "ui.confirm.suApprovalBadge": "治理审批",
   "ui.confirm.closeNoApprove": "关闭（不放行）",
   "ui.confirm.detailsArgv": "详情（argv / cwd）",
   "ui.confirm.cwd": "工作目录（cwd）",
@@ -480,7 +480,7 @@ export const zhCN = {
   "ui.governance.establishing": "正在建立治理记录…",
   "ui.governance.upgrading": "正在升级…",
   "ui.governance.confirmUpgrade": "确认升级",
-  "ui.governance.model.single": "旧模型（su）",
+  "ui.governance.model.single": "旧模型",
   "ui.governance.model.trio": "三权 · 五角色",
   "ui.governance.modelShort.trio": "三权",
   "ui.governance.status.awaitingCustomer": "等待客户决定",
@@ -551,7 +551,7 @@ export const zhCN = {
     "当前桌面窗口未接线治理模型选择；本版不能按所选模型建立，按钮已禁用。",
   "ui.governance.trioArtifactsHint":
     "检测到三权产物（docs/proposals / docs/nominations / docs/flows），建议选择 trio；请由你点选。",
-  "ui.governance.legacyModelHint": "本项目使用旧治理模型（su）。可升级为三权模型。",
+  "ui.governance.legacyModelHint": "本项目使用旧治理模型。可升级为三权模型。",
   "ui.governance.migrationLabel": "查看差异 / 升级",
   "ui.governance.migrationPending": "升级入口待本版后续",
   "ui.governance.migrationOpenTitle":
@@ -924,7 +924,7 @@ export const zhCN = {
   "ui.judge.roleName.chief": "幕僚",
   "ui.judge.roleName.product": "产品",
   "ui.judge.roleName.verifier": "质检",
-  "ui.judge.titleSu": "SU 命令审批",
+  "ui.judge.titleSu": "治理命令审批",
   "ui.judge.titleShell": "shell 命令请求",
   "ui.judge.tier.risky": "风险命令（risky）",
   "ui.judge.tier.review": "未自动判定（review）",
@@ -972,7 +972,7 @@ export const zhCN = {
   "ui.judge.scopeNote":
     "自动代理只读项目内代码/文档/角色卡（不含 .env、密钥/凭据、.ans 账本/会话、审计日志与项目外），不写文件、不执行命令；只代你「接受/任命/确认/验收」，不会代你拒绝、要求修改或勾选证据不足的候选；不确定、缺证据、读取失败、引擎不可用、超时或解析失败会按所属开关回落逐张卡，由你决定。",
   "ui.judge.quickPathNote":
-    "提案快捷路径（accept-quick）默认不代批；旧治理模型（single/su）的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。",
+    "提案快捷路径（accept-quick）默认不代批；旧治理模型的治理方向卡仍逐张确认；single 下写盘确认仍逐张手动。",
   "ui.judge.costNote":
     "每次代批会产生一次模型调用（token/延迟）；结果行与审计会标明「judge 代批 · 代审批/代决策」；可能误判，可随时关闭。",
   "ui.judge.toggleFailed": "未能确认自动判断开关（通道异常）；保持原状态。",
@@ -1141,7 +1141,7 @@ export const zhCN = {
   "main.session.dispatchUnknownTargetShort":
     "派发未受理：角色 {roleId} 不在本项目——**未投递**（不静默）。",
   "main.session.dispatchBuiltinTarget":
-    "派发未受理：{roleId} 是内置治理角色（trio 三人与 su 均不可被派发）——派发对象应是项目角色。",
+    "派发未受理：{roleId} 是内置治理角色——派发对象应是项目角色。",
   "main.session.dispatchBuiltinTargetShort":
     "派发未受理：{roleId} 是内置治理角色——**未投递**（不静默）。",
   "main.session.dispatchGateDenied": "派发被治理门禁拒绝：{message}",
@@ -1627,7 +1627,7 @@ export const zhCN = {
   // ---- 确认卡/恢复通道（confirm-card.ts / recovery-channel.ts / operator-channel.ts）----
   "main.confirm.expiredTimeout": "确认已超时，旧确认失效。",
   "main.confirm.expiredStopped": "本轮已停止或会话已重建，旧确认失效。",
-  "main.recovery.expired": "此恢复确认已失效（应用关闭或会话已重建），**未获执行**——可让 su 重新提议。",
+  "main.recovery.expired": "此恢复确认已失效（应用关闭或会话已重建），**未获执行**——可让内置治理角色重新提议。",
   "main.operator.channelUnavailable":
     "操作者确认通道未配置（无 presenter），拒绝执行（fail-closed）",
   "main.operator.timeoutRejected": "操作者确认超时（>{ms}ms），拒绝执行（fail-closed）",

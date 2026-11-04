@@ -2251,7 +2251,7 @@ export function validateAppointmentWritePreview(args: {
     if (targetRoleId.includes("/") || targetRoleId.includes("\\") || targetRoleId === "." || targetRoleId === "..") {
       problems.push(`targetRoleId 非法：${targetRoleId}`);
     } else if (isBuiltInGovernanceRoleId(targetRoleId)) {
-      problems.push(`targetRoleId=${targetRoleId} 是内置治理角色/su，appointment-write 只能写项目角色`);
+      problems.push(`targetRoleId=${targetRoleId} 是内置治理角色，appointment-write 只能写项目角色`);
     }
   }
   const prefix = targetRoleId !== "" ? `角色卡/${targetRoleId}/` : "";

@@ -300,7 +300,7 @@ app.whenReady().then(async () => {
   await push("shell:confirm-request", suPayload("su-deny", "deny"));
   check(
     "SU_DENY_TIER_DISCLOSURE",
-    await js(`(()=>{const t=document.getElementById('sc-title').textContent,s=document.getElementById('sc-summary').textContent,r=document.getElementById('sc-reason').textContent,h=document.getElementById('sc-hint').textContent;return t==='SU 命令审批'&&s.includes('硬拒类（deny）')&&r.includes('逐条客户批准')&&r.includes('命中原因：命中硬拒程序规则：reshell')&&h.includes('批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界')&&document.activeElement===document.getElementById('sc-deny')&&!document.body.textContent.includes('不再询问');})()`),
+    await js(`(()=>{const t=document.getElementById('sc-title').textContent,s=document.getElementById('sc-summary').textContent,r=document.getElementById('sc-reason').textContent,h=document.getElementById('sc-hint').textContent;return t==='治理命令审批'&&s.includes('硬拒类（deny）')&&r.includes('逐条客户批准')&&r.includes('命中原因：命中硬拒程序规则：reshell')&&h.includes('批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界')&&document.activeElement===document.getElementById('sc-deny')&&!document.body.textContent.includes('不再询问');})()`),
   );
   check(
     "SU_WARNING_AMBER_SUMMARY_BOLD",

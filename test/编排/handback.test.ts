@@ -596,7 +596,7 @@ test("formatDispatchReceipt（L-1）：目标忙 → 明写入队与位置（受
   assert.match(idleClosed, /受理≠已完成/);
   const idleOpen = formatDispatchReceipt({ targetRoleId: "编排", sessionOpen: true });
   assert.ok(!idleOpen.includes("未开"), "会话已开 → 不带「未开/自动开启」提示");
-  assert.ok(idleOpen.includes("投递结果/失败会在其聊天流与 su 的聊天流如实显示"), "如实外推渠道不变");
+  assert.ok(idleOpen.includes("投递结果/失败会在其聊天流与派发者的聊天流如实显示"), "如实外推渠道不变");
 });
 
 test("L-1（到达序，假件驱动）：两条派发经同一目标队列 → 位置 1、2；出队按到达序", () => {

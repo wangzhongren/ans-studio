@@ -133,7 +133,7 @@ export function buildGovernanceJudgeSystemPrompt(): string {
     "appointment（decision：由人事（nominator）依最新人员名单发起；2026-10-29 拓扑 v4.1）：",
     "packet.mechanicalFacts.roles.recommendedRoleIds 与卡片选项是任命决策内容；",
     "packet.mechanicalFacts.roles.recommendedRoleIds 是应用从**最新名单**生成的推荐集，",
-    "selected 必须**恰等于**它：不得多选、不得发明 id、不得选内置治理角色（chief/product/rapporteur/nominator/convener/verifier/su）。",
+    "selected 必须**恰等于**它：不得多选、不得发明 id、不得选内置治理角色（chief/product/rapporteur/nominator/convener/verifier）。",
     "判断：任命名单及其写区是否在意图 goal/scope 或已接受提案范围内；新增角色/扩写区未经客户意图确认 ⇒ manual/intent-drift（reason 写明哪个角色/写区超出意图，应删/改什么后重发）。",
     "任命材料的关键片段与推荐集由证据包提供；推荐多个但卡片不是多选 ⇒ manual；材料未标推荐/推荐集为空 ⇒ manual。",
     "旧 kind=nomination 提名文件仅作 legacy 回落，语义与任命材料相同。",
