@@ -1,0 +1,7 @@
+=== T3 supplement post-run check (21:30:21) ===
+=== git rev-parse HEAD ===
+cb3dd23fbebeba40627369da1adddd76322ee070
+=== git status --porcelain -- src app test (expect only task test/测试 writes) ===
+ M test/测试/download-requests-electron-probe.mjs
+?? test/测试/download-requests-ac22.test.ts
+=== git diff --cached --name-only (expect empty) ===

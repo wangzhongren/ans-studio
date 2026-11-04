@@ -1139,6 +1139,166 @@ test("task-state 迁移等价：默认常量 = A2；append/read/轮转/坏行/�
   }
 });
 
+// —————————————————————— 下载预授权（B1 2026-11-04 download-requests） ——————————————————————
+
+import type {
+  DownloadConsumerEpochState,
+  DownloadConsumerEpochStore,
+} from "../../src/provider/download/public/download-provider.ts";
+
+function fakeEpochStore(state: DownloadConsumerEpochState): DownloadConsumerEpochStore {
+  return {
+    async ensure() { return state; },
+    async read() { return state; },
+  };
+}
+
+function domainValues(
+  kind: "allow" | "deny",
+  host: string,
+  until: "once" | "session" | "forever" = "session",
+): DirectiveConfirmationValues {
+  return {
+    action: { kind, resource: { type: "domain", host, wildcard: host === "*" || host.startsWith("*.") } },
+    scope: {},
+    until,
+  };
+}
+
+function downloadRuntime(options: {
+  store: DirectiveStore;
+  presenter: DirectivePresenter;
+  epoch: DownloadConsumerEpochState;
+}): CustomerDirectiveRuntime {
+  return createCustomerDirectiveRuntime({
+    projectRoot: "/proj",
+    sessionId: "session-A",
+    present: options.presenter,
+    now: NOW,
+    store: options.store,
+    downloadEpochStore: fakeEpochStore(options.epoch),
+  });
+}
+
+async function submitDomain(
+  runtime: CustomerDirectiveRuntime,
+  rawText = "@审批 允许联网 domain=example.com",
+): Promise<SubmitResult> {
+  return runtime.submitFromInput({
+    rawText,
+    target: "approval",
+    projectRoot: "/proj",
+    roleId: "worker",
+    clientMessageId: `dl-${Math.random().toString(16).slice(2)}`,
+    decisionGroupEnabled: true,
+  });
+}
+
+test("takeDownloadDirective：epoch 门槛/精确 host/归一/once 消费/deny 优先/通配", async () => {
+  const store = memoryStore();
+  const runtime = downloadRuntime({
+    store,
+    presenter: queuePresenter([
+      domainValues("allow", "example.com", "session"),
+      domainValues("allow", "once.example.com", "once"),
+      domainValues("allow", "deny.example.com", "session"),
+      domainValues("deny", "deny.example.com", "session"),
+      { ...domainValues("allow", "*.wild.example.com", "session"), acknowledged: true },
+    ]),
+    epoch: { state: "ready", enabledAt: "2026-11-02T00:00:00.000Z", appVersion: "test" },
+  });
+  assert.equal((await submitDomain(runtime)).ok, true);
+  assert.equal((await submitDomain(runtime, "@审批 允许联网 domain=once.example.com")).ok, true);
+  assert.equal((await submitDomain(runtime, "@审批 允许联网 domain=deny.example.com")).ok, true);
+  assert.equal((await submitDomain(runtime, "@审批 拒绝联网 domain=deny.example.com")).ok, true);
+  assert.equal((await submitDomain(runtime, "@审批 允许联网 domain=*.wild.example.com")).ok, true);
+
+  const enabledAt = "2026-11-02T00:00:00.000Z";
+  assert.equal((await runtime.takeDownloadDirective({ host: "example.com", enabledAt }))?.action, "allow");
+  assert.equal((await runtime.takeDownloadDirective({ host: "EXAMPLE.com.", enabledAt }))?.action, "allow");
+  assert.equal(await runtime.takeDownloadDirective({ host: "sub.example.com", enabledAt }), undefined);
+  assert.equal(await runtime.takeDownloadDirective({ host: "example.com", enabledAt: "2026-11-04T00:00:00.000Z" }), undefined);
+
+  // once 消费一次；第二次回到审批（undefined）。
+  const firstOnce = await runtime.takeDownloadDirective({ host: "once.example.com", enabledAt });
+  assert.equal(firstOnce?.action, "allow");
+  assert.equal(firstOnce?.scope, "once");
+  assert.equal(await runtime.takeDownloadDirective({ host: "once.example.com", enabledAt }), undefined);
+
+  // deny 优先。
+  const denied = await runtime.takeDownloadDirective({ host: "deny.example.com", enabledAt });
+  assert.equal(denied?.action, "deny");
+
+  // 严格子域（不含 apex）。
+  assert.equal((await runtime.takeDownloadDirective({ host: "a.wild.example.com", enabledAt }))?.action, "allow");
+  assert.equal(await runtime.takeDownloadDirective({ host: "wild.example.com", enabledAt }), undefined);
+
+  // `*` 匹配任意主机（独立运行时，避免与精确 host 用例互相干扰）。
+  const anyRuntime = downloadRuntime({
+    store: memoryStore(),
+    presenter: queuePresenter([{ ...domainValues("allow", "*", "session"), acknowledged: true }]),
+    epoch: { state: "ready", enabledAt: "2026-11-02T00:00:00.000Z", appVersion: "test" },
+  });
+  assert.equal((await submitDomain(anyRuntime, "@审批 允许联网 domain=*")).ok, true);
+  assert.equal((await anyRuntime.takeDownloadDirective({ host: "any.other.test", enabledAt }))?.action, "allow");
+});
+
+test("list()：G8 A epoch 投影——旧 domain ⇒ consumer:none；新 domain ⇒ download；path 不变", async () => {
+  const store = memoryStore();
+  const runtime = downloadRuntime({
+    store,
+    presenter: queuePresenter([
+      domainValues("allow", "example.com", "session"),
+      { action: { kind: "allow", resource: { type: "path", path: "/tmp/x" } }, scope: {}, until: "session" },
+    ]),
+    epoch: { state: "ready", enabledAt: "2026-11-04T00:00:00.000Z", appVersion: "test" },
+  });
+  assert.equal((await submitDomain(runtime)).ok, true);
+  assert.equal((await submitDomain(runtime, "@审批 允许外部目录 path=/tmp/x")).ok, true);
+  const listed = await runtime.list();
+  assert.equal(listed.ok, true);
+  if (!listed.ok) return;
+  const domain = listed.approval.active.find((view) => view.action.kind === "allow" && view.action.resource.type === "domain");
+  const pathView = listed.approval.active.find((view) => view.action.kind === "allow" && view.action.resource.type === "path");
+  assert.equal(domain?.consumer, "none", "epoch 之后的旧指令投影为 none");
+  assert.equal(pathView?.consumer, "none");
+
+  // 新 epoch（早于创建时间）⇒ domain 保持 download。
+  const fresh = downloadRuntime({
+    store: memoryStore(store.lines),
+    presenter: queuePresenter([]),
+    epoch: { state: "ready", enabledAt: "2026-11-02T00:00:00.000Z", appVersion: "test" },
+  });
+  const freshListed = await fresh.list();
+  assert.equal(freshListed.ok, true);
+  if (!freshListed.ok) return;
+  const freshDomain = freshListed.approval.active.find((view) => view.action.kind === "allow" && view.action.resource.type === "domain");
+  assert.equal(freshDomain?.consumer, "download");
+});
+
+test("consumerOf：domain 创建时基线为 download（Service 视图）；系统 boot 事件自动 acceptance", () => {
+  const service = createDirectiveService({
+    projectRoot: "/proj",
+    sessionId: "s",
+    store: memoryStore(),
+    now: NOW,
+  });
+  return service.ready().then(async () => {
+    const created = await service.create({
+      target: "approval",
+      action: { kind: "allow", resource: { type: "domain", host: "example.com", wildcard: false } },
+      scope: {},
+      until: "session",
+      rawText: "@审批 允许联网 domain=example.com",
+      projectRoot: "/proj",
+      decisionGroupEnabled: true,
+    });
+    assert.equal(created.ok, true);
+    const listed = service.list();
+    assert.equal(listed.approval.active[0]?.consumer, "download");
+  });
+});
+
 // —————————————————————— C1 双向可赋值（type-only；由 typecheck 验证） ——————————————————————
 
 /** type-only 形状锁：C1 可按 B1 冻结类型赋值；缺 `decisionGroupEnabled` 必须编译失败。 */

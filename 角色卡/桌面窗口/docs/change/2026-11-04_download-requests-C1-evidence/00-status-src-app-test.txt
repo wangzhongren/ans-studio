@@ -1,0 +1,8 @@
+ M app/desktop/customer-input.ts
+ M app/desktop/directive-input.ts
+ M app/desktop/interface.ts
+ M app/desktop/session.ts
+ M app/main.ts
+?? app/desktop/download-request.ts
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/download-decision.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/download-request.test.ts"

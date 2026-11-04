@@ -1,0 +1,21 @@
+runtime-core 合并基线（f0adb49）复跑
+命令: node --test --test-concurrency=1 "test/runtime-core/**/*.test.ts"
+exit: 1
+files: 41
+tests: 323
+pass: 316
+fail: 3（与 B0 v3 / B0 v2 逐名一致，均为既有 Windows symlink EPERM / errno -4048 / syscall symlink）
+cancelled: 0
+skipped: 4（不变）
+todo: 0
+duration_ms: 32782.516
+新增确定性失败: 0
+新增非 EPERM 失败: 0
+新增 skip: 0
+
+失败用例（3/3 既有）:
+1. test/runtime-core/file-write-safety.test.ts:97 — D3 linked workspace root remains usable; linked target itself is not replaced
+2. test/runtime-core/session-store.test.ts:46 — store: traversal, mismatched scope and symlinked runtime directories rejected
+3. test/runtime-core/session-store.test.ts:58 — store: native validation stays lazy and native symlink is rejected before effects
+
+原始输出（本地保留；*.log 被 .gitignore 忽略）：2026-11-04_download_requests-A1-evidence/12-runtime-core-merged.log

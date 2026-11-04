@@ -219,6 +219,10 @@ export function requiredArtifactPaths(request: GovernanceJudgeRequest): {
       // 2026-10-26 客户 decision 卡（材料性选择）：与提案/任命/验收独立——不要求任何规范物证；
       // 判断只需卡内选项（含唯一推荐项）。绝不能落 default 的 `missing:true`（那会把合法卡误判 manual）。
       return { paths: [], missing: false };
+    case "download":
+      // 2026-11-04 下载申请（W-6）：判断只依据 request.download 与 turnText，不要求任何固定物证。
+      // 缺此分支会落 default `missing:true`，经 verdict 把合法 approve 压成 artifact-missing manual。
+      return { paths: [], missing: false };
     default:
       return { paths: [], missing: true };
   }

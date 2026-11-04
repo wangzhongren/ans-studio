@@ -1,0 +1,4 @@
+src/provider/download/impl/file-sink.ts
+src/provider/download/impl/node-http.ts
+"test/\347\274\226\346\216\222/download-pipeline.test.ts"
+"test/\347\274\226\346\216\222/download-provider.test.ts"

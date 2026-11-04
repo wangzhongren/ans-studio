@@ -1,0 +1,4 @@
+src/provider/download/impl/file-sink.ts
+src/provider/download/impl/node-http.ts
+test/编排/download-provider.test.ts
+test/编排/download-pipeline.test.ts

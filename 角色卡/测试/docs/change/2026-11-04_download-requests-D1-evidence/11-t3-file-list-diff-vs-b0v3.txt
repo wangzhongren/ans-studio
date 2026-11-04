@@ -1,0 +1,12 @@
+110d109
+< test/桌面UI/download-card.test.ts
+166,167d164
+< test/桌面应用/download-decision.test.ts
+< test/桌面应用/download-request.test.ts
+215d211
+< test/测试/download-requests-integration.test.ts
+316,317d311
+< test/编排/download-judge.test.ts
+< test/编排/download-pipeline.test.ts
+319d312
+< test/编排/download-provider.test.ts

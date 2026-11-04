@@ -1,0 +1,4 @@
+ src/provider/download/impl/node-http.ts            |  15 +-
+ .../customer-directive.test.ts"                    | 160 +++++++++++++++++++++
+ .../unverifiable-rejection.test.ts"                |   3 +
+ 3 files changed, 175 insertions(+), 3 deletions(-)

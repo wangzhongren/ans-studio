@@ -34,6 +34,17 @@ entries:
   - kind: directory
     path: src/service/directive/
     purpose: 客户指令 Service：状态机/ID/target 过滤/快照（本任务新建的模块私有根；不是整层目录授权）
+  # --- Delta-DR-2（2026-11-04，团队计划 §4.5 B-2；闸门 2）：新增 1 个 Pipeline 公共句柄单文件（download-request），逐文件授权 ---
+  - kind: file
+    path: src/pipeline/orchestration/download-request.ts
+    purpose: 下载申请 Pipeline 公共句柄：预授权匹配、卡片呈现、审批结算、执行编排、审计、并发限制
+  # --- Delta-DR-3（2026-11-04，团队计划 §4.5 B-3；闸门 2）：新增 2 个有界模块目录（download Provider/Service）；仅下载模块私有根，不是整层目录授权 ---
+  - kind: directory
+    path: src/provider/download/
+    purpose: 下载执行 Provider：Node http/https 流式下载、DNS 钉扎、重定向、超时/上限、文件 sink（本任务新建的模块私有根；不是整层目录授权）
+  - kind: directory
+    path: src/service/download/
+    purpose: 下载 Service：URL/IP/文件名/重定向/配置策略（本任务新建的模块私有根；不是整层目录授权）
   - kind: directory
     path: src/common/编排/
     purpose: 本角色私有辅助代码

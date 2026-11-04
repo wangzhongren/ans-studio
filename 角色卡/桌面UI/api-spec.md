@@ -621,3 +621,27 @@ work、card、pi、document复用424模态抽屉。仅导航/会话业务面iner
 ### 测试与证据
 
 `test/桌面UI/directive-dialog.test.ts`（14）与 `directive-panel.test.ts`（13）：冻结载荷窄化、视图字段/high-risk 映射、撤销识别、回包 values、列表分组/状态/consumer、store handshake/初始读/确认/撤销/项目切换/卡内入口 fail-closed、DOM/源码守卫（z-index/三入口/不调用 shell 应答/target 只取卡载荷）。C2 证据：`docs/change/2026-11-03_customer-authorization-plane-C2-implementation.md` 与 `…-C2-evidence/`。
+
+## 下载文件申请 C2 渲染侧契约增量（2026-11-04，implemented-unverified）
+
+- 任务：`2026-11-04-download-requests` / C2。消费 A2 37 key（main 35 + ui 2）、B1 `list()` 形状 A（旧 domain ⇒ `consumer:"none"`、新 domain ⇒ `"download"`）、C1 下载卡形状（`kind:"confirm"`、`cardKind:"download"`、`title/preview/detail/judgeNotice` 由 `mainT` + A2 key 组装）；不实现 IPC、不判 URL/路径、不调用判断器、不读 `.ans`、不比较时间/epoch。
+
+### 修改模块（`app/renderer/src/`）
+
+- `chat/judge.ts`：`governanceJudgeResultView()` 新增 `cardKind === "download"` 分支——`headline` 复用既有 `ui.judge.headline.autoApproved`；`groupLabel`/`badge` 沿用 `judgeGroupLabel()`（A2 复用 `ui.judge.mode.approval`）；`kindClass` 保持 `generic`。不新增 key、不把协议 token `download` 拼进用户可见行；其它未知卡种仍走 `autoApprovedWithKind`。
+- `stores/directive-store.ts`：
+  - `DirectiveConsumer` 增加 `"download"`；`asDirectiveConsumer()` 白名单接受 `value === "download"`（否则整条 domain 指令被严格解析静默丢弃）。
+  - `CONSUMER_KEYS.download = "ui.directive.panel.consumer.download"`；`consumerLabelKey("download")` 返回该 key。
+  - `directiveRowView()` 经 `consumerKeyOf(item)` 做纯展示映射：`consumer:"none"` + domain ⇒ `ui.directive.panel.consumer.downloadLegacyOff`（G8 A 旧指令）；`consumer:"download"` ⇒ `ui.directive.panel.consumer.download`；`none` + path ⇒ `ui.directive.panel.consumer.none`；其它消费者不变。**不比较 `createdAt`、不读 `.ans/state/download-consumer.json`、不计算 `enabledAt`**。
+  - `resourceView()`：domain 不再附加 `main.directive.receipt.noConsumerSuffix`（下载消费者已上线，方案 §7.3）；path 保留该 note。
+- 未改（静态实测无需改）：`chat/decision-dialog.ts`（`DECISION_KINDS` 无 download ⇒ 优先级 3；非 choice ⇒ confirm；`answerable=true`）、`chat/decision-card.ts`（仅认 `cardKind:"decision"`）、`DecisionDialog.tsx`/`ConfirmCard.tsx`/`ChatRow.tsx`/样式。
+
+### 消费的冻结契约（只读）
+
+- A2：`ui.directive.panel.consumer.download`、`ui.directive.panel.consumer.downloadLegacyOff`；judge 复用 `ui.judge.mode.approval`/`ui.judge.headline.autoApproved`；`downloadStartsNow` **不存在、不消费**；`main.*` 35 key 由 C1 生成，C2 不消费。
+- B1：`CustomerDirectiveRuntime.list()` 形状 A——旧 domain ⇒ `consumer:"none"`，新 domain ⇒ `"download"`；C1 原样透传 `directive:list`/`directive:state`。
+- C1：下载卡 `kind:"confirm"`、`cardKind:"download"`；`metadata.judgeContext`/`judgeNotice` 由 C1 组装；渲染侧只做文本呈现（`preview` `<pre>` 保留换行）。
+
+### 测试与证据
+
+新增 `test/桌面UI/download-card.test.ts`（3 例：judge download 标签 zh/en 与无 raw token；consumer 严格解析/旧 domain/path/shell/decision 映射；confirm 卡字段逐字保留与 `decisionCardView` 非 decision）；更新 `test/桌面UI/directive-dialog.test.ts`（domain `resourceNoteKey:null`，path 保留）。C2 证据：`docs/change/2026-11-04_download-requests-C2-implementation.md` 与 `…-C2-evidence/`。状态 `implemented-unverified`：`typecheck:renderer` exit 0；`build:renderer` exit 0；`test/桌面UI` 55 文件 / 408/408/0/0（B0 v3 54/405/405/0/0，+3）；i18n-guard `scanned=137 allowlisted=22 violations=0`。

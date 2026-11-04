@@ -1,0 +1,14 @@
+静态检查（2026-11-04）
+命令: npm run typecheck
+exit: 1
+原始输出:
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+src/pipeline/orchestration/run-role.ts(2125,7): error TS2741: Property 'download' is missing in type '{ acceptance: string; appointment: string; "appointment-write": string; proposal: string; decision: string; "intent-confirm": string; }' but required in type 'Readonly<Record<GovernanceCardKind, string>>'.
+
+判定:
+- 唯一错误位于 B1 写集 src/pipeline/orchestration/run-role.ts:2125（CARD_KIND_ROUTE_HINTS 穷尽 Record 缺 download 键）。
+- 按闸门 2 写集增补记录 §二与 P1 复审 F6 R1：A1 不改该文件；B1 开工第一动作补 download 键并更新 test/编排/decision-card.test.ts 键集断言；随后 A1 在合并树上重跑 npm run typecheck（exit 0）并记录最终冻结证据。
+- 无其它错误；A1 写集内类型检查通过。
+
+原始输出（本地保留）：2026-11-04_download-requests-A1-evidence/02-typecheck.log

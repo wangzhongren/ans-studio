@@ -1,0 +1,10 @@
+B1 契约冻结声明（2026-11-04 download-requests）
+
+- Provider/Service 公共出口与 abstract 类型；生产工厂无 resolver/provider/地址放行/TLS 关闭 seam；createDownloadRequestRuntimeForTest 仅测试装配。
+- DownloadRequestRuntime：ready()/consumerEpoch()/download()/dispose()；每会话一份。
+- DownloadRunInput（url/filename?/purpose/toolCallId?/turnId?/signal?/attribution?；无 downloadId/requestId）。
+- DownloadApprovalRequest：downloadId/roleId/runtime?/toolCallId?/turnId?/factsAvailable/governanceFacts/downloadFacts/attribution/policy/signal?。
+- DownloadApprovalPresenter.present(request, hooks)；onPresented({requestId}) 为 requestId 主来源；DownloadApprovalOutcome.requestId? 仅兼容。
+- DownloadRunResult：成功 path/bytes/sha256/finalUrl/approval/message；失败 code/message/httpStatus?/detail?/redirectTo?/approval?。
+- takeDownloadDirective({host,enabledAt,toolCallId?}) 与 CustomerDirectiveRuntime.list() epoch 投影。
+- consumerOf("download")；W-6/W-7；错误码/owner/UNVERIFIABLE；downloads.jsonl/download-consumer.json 形状；每项目执行并发 <=2；预授权路径零 request.*。

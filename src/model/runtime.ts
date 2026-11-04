@@ -15,6 +15,7 @@ import type {
   VersionDecisionResult,
   VersionDecisionStatus,
 } from "./project-state.ts";
+import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
 import type { RuntimeKind } from "../common/shared/runtime-shared.ts";
 import type { createDiagnosticLogger } from "../common/shared/diagnostics.ts";
 export type { RuntimeKind } from "../common/shared/runtime-shared.ts";
@@ -419,8 +420,14 @@ export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance"
  */
 export type GovernanceConfirmCardKind = "appointment-write";
 
-/** 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。 */
-export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCardKind;
+/**
+ * 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。
+ * `"download"`（2026-11-04 下载申请）是**应用自有 confirm 种**：只由 `request_download`
+ * 能力路径构造，**不是** `request_confirmation` 可发卡种——`GovernanceConfirmCardKind`
+ * 仍只有 `appointment-write`，`CONFIRM_CARD_KINDS` 字面量不动；工具层拒绝以
+ * `cardKind:"download"` 调用 `request_confirmation`（结构测试 AC-23）。
+ */
+export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCardKind | "download";
 
 // —————————————— 治理卡判断 agent 分组（「替我审批」/「替我决策」）单一来源 ——————————————
 //
@@ -445,6 +452,9 @@ export type GovernanceJudgeGroup = "approval" | "decision";
  */
 export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
   "appointment-write": "approval",
+  // 2026-11-04 下载申请：应用自有 confirm 种，归 approval 组（「替我审批」开关）；
+  // 不是 `request_confirmation` 卡种。任务账本的 cardKind 白名单直接来自本表键集。
+  download: "approval",
   proposal: "decision",
   appointment: "decision",
   acceptance: "decision",
@@ -1799,6 +1809,8 @@ export interface GovernanceJudgeRequest {
   recommendedRoleIds?: string[];
   /** 有界治理事实快照（账本不可读/错误 ⇒ 禁止 approve）。 */
   facts: GovernanceJudgeFacts;
+  /** 下载卡请求级事实（仅 `cardKind==="download"` 填充；其他卡种不携带）。 */
+  download?: DownloadJudgeFacts;
   at: string;
 }
 
@@ -1901,6 +1913,12 @@ export interface GovernanceJudgeContext {
   };
   recommendedRoleIds?: string[];
   facts: GovernanceJudgeFacts;
+  /**
+   * 下载卡请求级事实（仅 `cardKind==="download"`）。计算点＝应用自有的下载卡构造
+   * （`app/desktop/download-request.ts`，C1/W-3），不是 `run-role.ts::governedInput`；
+   * 桌面 `planJudge` 原样并入 `GovernanceJudgeRequest.download`（W-4）。
+   */
+  download?: DownloadJudgeFacts;
   /** 事实计算失败/账本不可读；出现即禁止 approve。 */
   unavailableReason?: string;
 }
@@ -2241,6 +2259,13 @@ export interface GovernedToolsOptions {
   shellExecTimeoutMs?: number;
   customerInput?: CustomerInputFn;
   customerInputTimeoutMs?: number;
+  /**
+   * 2026-11-04 下载申请（`request_download`）：**注入才注册**——未注入 ⇒ 工具不存在
+   * （能力缺席 = 最强 fail-closed）。形状单一来源＝`model/download.ts`（`RequestDownloadFn`）。
+   * CLI/判断会话不注入（判断会话只走 judge 工具集，结构性无本工具）；普通角色与内置治理角色
+   * 由桌面注入。能力实现负责安全检查/预授权/审批/执行/审计；本层只做参数形状校验并如实转达。
+   */
+  requestDownload?: RequestDownloadFn;
   interactionGate?: InteractionGate;
   reportHandback?: ReportHandbackFn;
   dispatchTask?: DispatchTaskFn;

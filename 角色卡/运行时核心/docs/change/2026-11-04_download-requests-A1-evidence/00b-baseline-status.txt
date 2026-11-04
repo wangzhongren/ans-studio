@@ -1,0 +1,9 @@
+A1 开工基线（2026-11-04）
+HEAD: c2f163087aaf11616e5be01f80d305bf6f25af57
+status --porcelain -- src app test（开工时）:
+ M src/common/shared/i18n/messages/en-US.ts
+ M src/common/shared/i18n/messages/zh-CN.ts
+ M test/项目管理/shared/i18n.test.ts
+说明：上述 3 文件为 A2（项目管理）并行授权写入（团队计划 §5.2 允许 A1/A2 并行、写集不相交）；A1 写集未被触碰。
+目标路径 src/model/download.ts 开工时不存在。
+写前基线（sha256）：runtime.ts 911c6179…；directive.ts b04aac32…；tools.ts 2d2f8b10…；schema.ts 0cb1f6f4…；session.ts e36ffc22…

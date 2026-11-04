@@ -1,0 +1,657 @@
+{
+  "electron": "44.7.0",
+  "chrome": "152.0.7977.130",
+  "node": "24.21.0",
+  "head": null,
+  "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\project",
+  "window": {
+    "width": 1360,
+    "height": 860
+  },
+  "checks": [
+    {
+      "name": "card title 下载文件申请",
+      "ok": true,
+      "detail": "下载文件申请"
+    },
+    {
+      "name": "card kind badge download",
+      "ok": true,
+      "detail": "download"
+    },
+    {
+      "name": "card field: 申请角色：worker",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 用途：下载周报",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: http://download.test:51062/report.pdf",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: download.test",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 93.184.216.34",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: report.pdf",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 100 MB",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 仅同域",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 协议校验",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 主机校验",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "card field: 解析 IP 校验",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：下载周报\nURL：http://download.test:51062/report.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：report.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请\n协议校验：通过（http）\n主机校验：公网地址\n解析 IP 校验：全部为公网地址"
+    },
+    {
+      "name": "tool result ok: customer approve",
+      "ok": true
+    },
+    {
+      "name": "downloaded file content",
+      "ok": true
+    },
+    {
+      "name": "audit: customer decided with requestId",
+      "ok": true,
+      "detail": [
+        {
+          "version": 1,
+          "kind": "download.decided",
+          "downloadId": "dl-d2c4bbe0-1d30-4b50-9f1a-33747152e7a8",
+          "requestId": "req-ea9b843434815eda",
+          "by": "customer",
+          "presented": true,
+          "at": "2026-11-04T12:40:25.954Z"
+        }
+      ]
+    },
+    {
+      "name": "audit: request.created/presented/resolved (customer)",
+      "ok": true,
+      "detail": {
+        "created1": {
+          "v": 1,
+          "at": "2026-11-04T12:40:25.874Z",
+          "kind": "request.created",
+          "requestId": "req-ea9b843434815eda",
+          "cardKind": "download",
+          "sourceRoleId": "worker",
+          "title": "下载文件申请",
+          "options": []
+        },
+        "presented1": {
+          "v": 1,
+          "at": "2026-11-04T12:40:25.877Z",
+          "kind": "request.presented",
+          "requestId": "req-ea9b843434815eda",
+          "to": "customer"
+        },
+        "resolved1": {
+          "v": 1,
+          "at": "2026-11-04T12:40:25.953Z",
+          "kind": "request.resolved",
+          "requestId": "req-ea9b843434815eda",
+          "decisionId": "decision-req-ea9b843434815eda",
+          "cardKind": "download",
+          "by": "customer",
+          "operatorId": "d2-customer",
+          "choice": "confirmed"
+        }
+      }
+    },
+    {
+      "name": "decline card shown",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：拒绝示例\nURL：http://download.test:51062/declined.pdf\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：declined.pdf（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；"
+    },
+    {
+      "name": "tool result fail: customer decline",
+      "ok": true,
+      "detail": {
+        "code": "download-declined"
+      }
+    },
+    {
+      "name": "declined leaves no file",
+      "ok": true,
+      "detail": [
+        "report.pdf"
+      ]
+    },
+    {
+      "name": "tool result ok: judge approve",
+      "ok": true
+    },
+    {
+      "name": "judge approve shows no customer dialog",
+      "ok": true
+    },
+    {
+      "name": "judge result row visible with judge attribution",
+      "ok": true,
+      "detail": "judge 代批 · 代审批自动代理流程：download已代批 · 流程 download判断引擎：demo · operator:judge:demo · 20:40自动代批 ≠ 客户手批：本结论由自动代理按治理开关给出，客户保留最终决定权。详情（判断理由 / 选中项 / 证据）流程：downloadtoolCallId：d2-judge-1requestId：op-3"
+    },
+    {
+      "name": "audit: judge presented/resolved by judge",
+      "ok": true,
+      "detail": [
+        {
+          "v": 1,
+          "at": "2026-11-04T12:40:26.115Z",
+          "kind": "request.resolved",
+          "requestId": "req-ec7a134e48a88044",
+          "decisionId": "decision-req-ec7a134e48a88044",
+          "cardKind": "download",
+          "by": "judge",
+          "operatorId": "judge:demo",
+          "choice": "confirmed",
+          "judge": {
+            "group": "approval",
+            "cardKind": "download",
+            "engine": "demo",
+            "reasonCode": "sufficient",
+            "confirmed": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "audit: downloads.jsonl by judge",
+      "ok": true,
+      "detail": [
+        {
+          "version": 1,
+          "kind": "download.decided",
+          "downloadId": "dl-d4b78149-279e-4572-b36a-51be631ffe5b",
+          "requestId": "req-ce2ebc7c9926be5d",
+          "by": "customer",
+          "presented": true,
+          "at": "2026-11-04T12:40:26.110Z"
+        },
+        {
+          "version": 1,
+          "kind": "download.decided",
+          "downloadId": "dl-4d9bad70-0ac8-44bc-a36f-bc6f27cee6d4",
+          "requestId": "req-ec7a134e48a88044",
+          "by": "judge",
+          "presented": true,
+          "judge": {
+            "engine": "demo",
+            "reasonCode": "sufficient"
+          },
+          "at": "2026-11-04T12:40:26.115Z"
+        }
+      ]
+    },
+    {
+      "name": "manual card carries judgeNotice",
+      "ok": true,
+      "detail": "自动代理未代批（代审批）：无法判断；已转你手动确认。"
+    },
+    {
+      "name": "tool result ok: manual fallback approve",
+      "ok": true
+    },
+    {
+      "name": "manual fallback resolved by customer",
+      "ok": true,
+      "detail": [
+        {
+          "v": 1,
+          "at": "2026-11-04T12:40:26.231Z",
+          "kind": "request.resolved",
+          "requestId": "req-eca6cf1da91219d6",
+          "decisionId": "decision-req-eca6cf1da91219d6",
+          "cardKind": "download",
+          "by": "customer",
+          "operatorId": "d2-customer",
+          "choice": "confirmed"
+        }
+      ]
+    },
+    {
+      "name": "directive submit: @审批 允许联网 domain=legacy.example.com until=session",
+      "ok": true
+    },
+    {
+      "name": "directive submit: @审批 允许联网 domain=preauth.example.com until=session",
+      "ok": true
+    },
+    {
+      "name": "directive submit: @审批 允许联网 domain=once.example.com until=once",
+      "ok": true
+    },
+    {
+      "name": "directive submit: @审批 拒绝联网 domain=deny.example.com until=session",
+      "ok": true
+    },
+    {
+      "name": "directive submit: @审批 允许联网 domain=deny.example.com until=session",
+      "ok": true
+    },
+    {
+      "name": "tool result ok: preauth allow",
+      "ok": true
+    },
+    {
+      "name": "preauth allow shows no customer dialog",
+      "ok": true
+    },
+    {
+      "name": "audit: preauth by directive (no requestId)",
+      "ok": true,
+      "detail": [
+        {
+          "version": 1,
+          "kind": "download.decided",
+          "downloadId": "dl-1dea1757-f6f4-4b3a-b638-2d47aab85001",
+          "requestId": "req-eca6cf1da91219d6",
+          "by": "customer",
+          "presented": true,
+          "at": "2026-11-04T12:40:26.232Z"
+        },
+        {
+          "version": 1,
+          "kind": "download.decided",
+          "downloadId": "dl-560e982c-f0cd-471f-83c4-e920f36d9077",
+          "by": "directive",
+          "directiveId": "d-2",
+          "presented": false,
+          "at": "2026-11-04T12:40:26.248Z"
+        }
+      ]
+    },
+    {
+      "name": "audit: preauth path has zero request.*",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "panel: new directive shows consumer 下载",
+      "ok": true,
+      "detail": "指令面板审批指令生效中d-1生效中动作允许范围本项目（所有角色）资源域名：legacy.example.com期限本会话 · 应用重启后失效不作用于下载（早于下载功能启用）d-1 · 创建于 2026-11-03T12:40:26.241Z撤销d-2生效中动作允许范围本项目（所有角色）资源域名：preauth.example.com期限本会话 · 应用重启后失效消费者：下载d-2 · 创建于 2026-11-04T12:45:26.241Z撤销d-3生效中动作允许范围本项目（所有角色）资源域名：once.example.com期限一次性消费者：下载d-3 · 创建于 2026-11-04T12:45:26.241Z撤销d-4生效中动作拒绝范围本项目（所有角色）资源域名：deny.example.com期限本会话 · 应用重启后失效消费者：下载d-4 · 创建于 2026-11-04T12:"
+    },
+    {
+      "name": "panel: legacy directive marked not applying to downloads",
+      "ok": true,
+      "detail": "指令面板审批指令生效中d-1生效中动作允许范围本项目（所有角色）资源域名：legacy.example.com期限本会话 · 应用重启后失效不作用于下载（早于下载功能启用）d-1 · 创建于 2026-11-03T12:40:26.241Z撤销d-2生效中动作允许范围本项目（所有角色）资源域名：preauth.example.com期限本会话 · 应用重启后失效消费者：下载d-2 · 创建于 2026-11-04T12:45:26.241Z撤销d-3生效中动作允许范围本项目（所有角色）资源域名：once.example.com期限一次性消费者：下载d-3 · 创建于 2026-11-04T12:45:26.241Z撤销d-4生效中动作拒绝范围本项目（所有角色）资源域名：deny.example.com期限本会话 · 应用重启后失效消费者：下载d-4 · 创建于 2026-11-04T12:"
+    },
+    {
+      "name": "tool result ok: once first",
+      "ok": true
+    },
+    {
+      "name": "once second time returns to approval",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：once 第二次\nURL：http://once.example.com:51062/once2.bin\n主机：once.example.com:51062\n已解析 IP：93.184.216.34\n预期文件名：once2.bin（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同"
+    },
+    {
+      "name": "tool result ok: once second approved by customer",
+      "ok": true
+    },
+    {
+      "name": "tool result fail: deny priority",
+      "ok": true,
+      "detail": {
+        "code": "download-denied-by-directive"
+      }
+    },
+    {
+      "name": "deny shows no customer dialog",
+      "ok": true
+    },
+    {
+      "name": "legacy directive does not authorize (customer card)",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：旧指令\nURL：http://legacy.example.com:51062/legacy.bin\n主机：legacy.example.com:51062\n已解析 IP：93.184.216.34\n预期文件名：legacy.bin（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅"
+    },
+    {
+      "name": "tool result fail: legacy card decline",
+      "ok": true,
+      "detail": {
+        "code": "download-declined"
+      }
+    },
+    {
+      "name": "redirect request card shown before execution",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：跨域\nURL：http://download.test:51062/jump.bin\n主机：download.test:51062\n已解析 IP：93.184.216.34\n预期文件名：jump.bin（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要"
+    },
+    {
+      "name": "tool result fail: cross-host redirect",
+      "ok": true,
+      "detail": {
+        "code": "download-redirect-cross-host"
+      }
+    },
+    {
+      "name": "cross-host redirect leaves no file",
+      "ok": true,
+      "detail": [
+        "judge.pdf",
+        "manual.pdf",
+        "once1.bin",
+        "once2.bin",
+        "preauth.bin",
+        "report.pdf"
+      ]
+    },
+    {
+      "name": "redirect failure notice names cross-host reason",
+      "ok": true,
+      "detail": [
+        "未下载（技术 code：download-denied-by-directive）：客户审批指令 #d-4 拒绝了此下载。",
+        "未下载（技术 code：download-declined）：审批未通过（客户拒绝或判断拒绝）。",
+        "未下载（技术 code：download-redirect-cross-host）：服务器重定向到其他主机（http://other.test:51062/final.bin）；未跟随，请对最终地址重新申请。"
+      ]
+    },
+    {
+      "name": "re-request card shown for target host",
+      "ok": true,
+      "detail": "申请角色：worker\n用途：重新申请\nURL：http://other.test:51062/final.bin\n主机：other.test:51062\n已解析 IP：93.184.216.34\n预期文件名：final.bin（可能被服务器的 Content-Disposition 覆盖）\n大小策略：≤ 100 MB（实际大小未知，直至收到响应）\n重定向策略：仅同域跟随；跨域重定向将中止并要求重"
+    },
+    {
+      "name": "tool result ok: re-request success",
+      "ok": true
+    },
+    {
+      "name": "re-request downloaded file",
+      "ok": true
+    },
+    {
+      "name": "tool result fail: size limit",
+      "ok": true,
+      "detail": {
+        "code": "download-too-large"
+      }
+    },
+    {
+      "name": "size limit cleans placeholder/temp (no big.bin/.part)",
+      "ok": true,
+      "detail": [
+        "final.bin",
+        "judge.pdf",
+        "manual.pdf",
+        "once1.bin",
+        "once2.bin",
+        "preauth.bin",
+        "report.pdf"
+      ]
+    },
+    {
+      "name": "too-large failure notice shown",
+      "ok": true,
+      "detail": [
+        "已下载「other.test:51062」→ download/final.bin（8 字节，sha256 7585baed50d981a14f05dd2517e4a0f97635bdeddd92d5efb82308915eb2a704）；审批来源：客户。",
+        "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+        "未下载（技术 code：download-too-large）：文件超过大小上限（100 MB）。"
+      ]
+    },
+    {
+      "name": "i18n: English card title",
+      "ok": true,
+      "detail": "Download request"
+    },
+    {
+      "name": "i18n: English card fields",
+      "ok": true,
+      "detail": "Requesting role: worker\nPurpose: weekly report\nURL: http://download.test:51062/i18n.bin\nHost: download.test:51062\nResolved IPs: 93.184.216.34\nExpected filename: i18n.bin (the server's Content-Disposition may override it)\nSize policy: ≤ 100 MB (actual size is unknown until the response arrives)\nRedirect policy: same-host redirects only; a cross-host redirect stops the download and requires a new re"
+    },
+    {
+      "name": "i18n: English action buttons",
+      "ok": true,
+      "detail": {
+        "confirm": "Confirm",
+        "reject": "Reject"
+      }
+    },
+    {
+      "name": "tool result ok: i18n card approve",
+      "ok": true
+    },
+    {
+      "name": "tool result fail: close window fail-closed",
+      "ok": true,
+      "detail": {
+        "code": "download-aborted"
+      }
+    },
+    {
+      "name": "close window: audit recorded failure without success",
+      "ok": true,
+      "detail": {
+        "ledgerBeforeClose": 49,
+        "ledgerAfterClose": 50
+      }
+    },
+    {
+      "name": "close window: no completed event for aborted download",
+      "ok": true,
+      "detail": [
+        {
+          "version": 1,
+          "kind": "download.failed",
+          "attemptId": "dl-a-186c5b48-e8db-4ce3-8502-6cae4bf1bfa1",
+          "code": "download-too-large",
+          "httpStatus": 200,
+          "bytesWritten": 0,
+          "detail": "stream 100",
+          "at": "2026-11-04T12:40:26.968Z"
+        },
+        {
+          "version": 1,
+          "kind": "download.failed",
+          "attemptId": "dl-a-fd4e6df0-c201-4130-b911-653b1998458a",
+          "code": "download-aborted",
+          "bytesWritten": 0,
+          "detail": "presenter aborted",
+          "at": "2026-11-04T12:40:27.640Z"
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "shots": [
+    {
+      "name": "01-download-card-customer",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\01-download-card-customer.png",
+      "sha256": "8bbd555a60fe2d44a66fec771ea036cce307c869c64d5a12a5fff26003733891",
+      "bytes": 90306,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "02-download-completed-customer",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\02-download-completed-customer.png",
+      "sha256": "9cd3e98dee352f1d09b12913e69bad4e6c7151701f5f4ab05f9d1bfcca69e8c3",
+      "bytes": 65495,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "03-download-card-declined",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\03-download-card-declined.png",
+      "sha256": "e0961c3fcdd3f5d731406f924a997f008a28035fc06bac7c58ffaf95e897e930",
+      "bytes": 102401,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "04-judge-result-row",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\04-judge-result-row.png",
+      "sha256": "6aeef1ee02b366c18ada5d1cd2894a71a6ff1db374735cce0a02c629daed61b4",
+      "bytes": 83520,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "05-judge-manual-customer-card",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\05-judge-manual-customer-card.png",
+      "sha256": "1b45c31bbd50a76527a6630aa5a8f5f4716bfa835cea9a25542d3b2a04cdb9d7",
+      "bytes": 106504,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "06-directive-panel-consumers",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\06-directive-panel-consumers.png",
+      "sha256": "8e5f5e9eff9b167c8ad78a1afb5443c336cf797d83b340d5bf362066da79d636",
+      "bytes": 90992,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "07-redirect-re-request-card",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\07-redirect-re-request-card.png",
+      "sha256": "7ab800d3fc7b91ef93f63196856bee44aa4e9352f1b0aac25623ae6e6896eeaa",
+      "bytes": 108075,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "08-card-english",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\download-requests\\角色卡\\测试\\docs\\change\\2026-11-04_download-requests-D2-evidence\\08-card-english.png",
+      "sha256": "1b0f4f307e3163d681a35a34828bf84921ba33bd369daca08ad830df9bba0860",
+      "bytes": 128943,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ],
+  "notices": [
+    "已下载「download.test:51062」→ download/report.pdf（19 字节，sha256 e12e275e0ad39f0bb7a5718fa7a2feb0e592a78bef8767c656ecc34909c28d2e）；审批来源：客户。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "未下载（技术 code：download-declined）：审批未通过（客户拒绝或判断拒绝）。",
+    "已下载「download.test:51062」→ download/judge.pdf（19 字节，sha256 e12e275e0ad39f0bb7a5718fa7a2feb0e592a78bef8767c656ecc34909c28d2e）；审批来源：判断 agent。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "已下载「download.test:51062」→ download/manual.pdf（19 字节，sha256 e12e275e0ad39f0bb7a5718fa7a2feb0e592a78bef8767c656ecc34909c28d2e）；审批来源：客户。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "已下载「preauth.example.com:51062」→ download/preauth.bin（19 字节，sha256 e12e275e0ad39f0bb7a5718fa7a2feb0e592a78bef8767c656ecc34909c28d2e）；审批来源：审批指令 #d-2。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "已下载「once.example.com:51062」→ download/once1.bin（19 字节，sha256 e12e275e0ad39f0bb7a5718fa7a2feb0e592a78bef8767c656ecc34909c28d2e）；审批来源：审批指令 #d-3。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "已下载「once.example.com:51062」→ download/once2.bin（19 字节，sha256 e12e275e0ad39f0bb7a5718fa7a2feb0e592a78bef8767c656ecc34909c28d2e）；审批来源：客户。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "未下载（技术 code：download-denied-by-directive）：客户审批指令 #d-4 拒绝了此下载。",
+    "未下载（技术 code：download-declined）：审批未通过（客户拒绝或判断拒绝）。",
+    "未下载（技术 code：download-redirect-cross-host）：服务器重定向到其他主机（http://other.test:51062/final.bin）；未跟随，请对最终地址重新申请。",
+    "已下载「other.test:51062」→ download/final.bin（8 字节，sha256 7585baed50d981a14f05dd2517e4a0f97635bdeddd92d5efb82308915eb2a704）；审批来源：客户。",
+    "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+    "未下载（技术 code：download-too-large）：文件超过大小上限（100 MB）。",
+    "Downloaded “download.test:51062” → download/i18n.bin (7 bytes, sha256 972db26ce942330bd19ab50210782851851386d61d9fe3e734ebab57fae90a4e); approval source: customer.",
+    "To ignore downloaded files, add download/ to .gitignore yourself.",
+    "未下载（技术 code：download-aborted）：本轮已中止或应用已关闭，下载已取消。"
+  ],
+  "responsesFromRenderer": [
+    {
+      "id": "op-1",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "op-2",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": false
+      }
+    },
+    {
+      "id": "op-4",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "op-5",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "op-6",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": false
+      }
+    },
+    {
+      "id": "op-7",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "op-8",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "op-9",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    },
+    {
+      "id": "op-10",
+      "decision": {
+        "kind": "confirm",
+        "confirmed": true
+      }
+    }
+  ]
+}

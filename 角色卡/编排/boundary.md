@@ -14,6 +14,9 @@
 | 单文件 | `src/pipeline/orchestration/customer-directive.ts` | 客户指令运行时 Pipeline 公共句柄：解析→面板请求→落账；facts/consume/revoke |
 | 目录（私有） | `src/provider/directive/` | 客户指令账本 Provider（本任务新建的模块私有根；不是整层目录授权） |
 | 目录（私有） | `src/service/directive/` | 客户指令 Service：状态机/ID/target 过滤/快照（本任务新建的模块私有根；不是整层目录授权） |
+| 单文件 | `src/pipeline/orchestration/download-request.ts` | 下载申请 Pipeline 公共句柄：预授权匹配、卡片呈现、审批结算、执行编排、审计、并发限制 |
+| 目录（私有） | `src/provider/download/` | 下载执行 Provider：Node http/https 流式下载、DNS 钉扎、重定向、超时/上限、文件 sink（本任务新建的模块私有根；不是整层目录授权） |
+| 目录（私有） | `src/service/download/` | 下载 Service：URL/IP/文件名/重定向/配置策略（本任务新建的模块私有根；不是整层目录授权） |
 | 目录（私有） | `src/common/编排/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/编排/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/编排/feature-map.md` | 功能导航 |

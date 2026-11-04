@@ -883,6 +883,10 @@ export function governanceJudgeResultView(
             tail: "",
           })
       : translate(locale, "ui.judge.headline.writeNotReported");
+  } else if (cardKind === "download") {
+    // 下载卡（GOVERNANCE_CARD_GROUP: approval）：复用既有「已代批」文案，
+    // 不把协议 token "download" 拼进用户可见行（A2 未新增专用 headline key）。
+    headline = translate(locale, "ui.judge.headline.autoApproved");
   } else {
     headline = cardKind
       ? translate(locale, "ui.judge.headline.autoApprovedWithKind", { cardKind })

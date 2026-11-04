@@ -457,6 +457,9 @@ export function judgeResultSummary(
       flow
     );
   }
+  if (payload.cardKind === "download") {
+    return mainT("ui.judge.headline.autoApproved") + " · " + mainT("ui.judge.mode.approval") + " · " + mainT("main.download.card.title") + flow;
+  }
   if (payload.cardKind === "proposal") return mainT("main.customerInput.judgeDecisionHead") + flow;
   if (payload.cardKind === "acceptance") return mainT("main.customerInput.judgeAcceptanceHead") + flow;
   if (payload.cardKind === "appointment") {
@@ -665,6 +668,11 @@ export type DesktopCustomerInputFn = (
     governanceJudge?: GovernanceJudgeFn;
     /** 当前轮投递给该角色的文本（≤4KB；判断 agent 的 `turnText` 输入）。缺省不猜。 */
     turnText?: string;
+    /**
+     * 下载卡事实不可用时的客户提示（2026-11-04 download-requests C1/W-3）：
+     * 只用于「省略 judgeContext、直接客户卡」场景；其他卡种/调用方不传 ⇒ 零行为变化。
+     */
+    judgeNotice?: string;
     /**
      * **本会话的 Section 1 边界快照（含接受证据）**（2026-10-25 客户新规则；`SessionManager.open`
      * 按门禁同一解析源给出）。仅用于写盘确认的边界预授权判定；缺省 ⇒ 不判定（旧行为逐字不变）。
@@ -1267,6 +1275,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (judgeContext.forbiddenPaths !== undefined) request.forbiddenPaths = judgeContext.forbiddenPaths;
     if (judgeContext.artifacts !== undefined) request.artifacts = judgeContext.artifacts;
     if (judgeContext.recommendedRoleIds !== undefined) request.recommendedRoleIds = judgeContext.recommendedRoleIds;
+    // W-4（2026-11-04 下载申请）：仅下载卡把请求级 `download` 事实原样并入判断请求；
+    // 其他卡种不携带（即使 judgeContext 被意外注入该字段）。
+    if (cardKind === "download" && judgeContext.download !== undefined) request.download = judgeContext.download;
     return { fn, request, group, cardKind, timeoutMs: judgeTimeoutMs };
   };
 
@@ -1534,6 +1545,14 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     //  · aborted（本轮已中止）⇒ 既有取消/丢弃语义（不结算、不呈现）。
     if (entry.state !== "judging") return; // 已中止/已结算：丢弃结果
     if (outcome.reasonCode === "aborted") return; // 取消监听会按既有语义结算 unavailable
+    // 2026-11-04 下载申请（方案 §4.2/AC-6/AC-28）：下载卡的**任何 manual** 都不自动拒绝/自动退回，
+    // 原卡 + judgeNotice 转客户确认。放在 switch-off / 无法核对 / 指纹去重之前，覆盖
+    // timeout/parse-failed/row-failed/switch-off/ledger-unavailable/download-facts-missing 等全部 manual。
+    // deny 分支在上面已按 approval 组既有语义处理（本分支只接 manual）；aborted 已早退。
+    if (plan.cardKind === "download") {
+      escalateJudgeOutcomeToCustomer(entry, plan.group, outcome, "unverifiable");
+      return;
+    }
     if (outcome.reasonCode === "switch-off") {
       diagnostic.record("governance-judge.manual", {
         requestId: entry.payload.id,
@@ -1880,6 +1899,13 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     // 2026-11-04 客户直修起同卡指纹重复改为原卡呈现客户（见下方去重）。
     if (entry.metadata?.judgeContext?.unavailableReason !== undefined) {
       const unavailableReason = entry.metadata.judgeContext.unavailableReason;
+      // 2026-11-04 下载申请（AC-28 防御）：下载卡收到 `unavailableReason` 时一律原卡转客户确认，
+      // 不 auto-rework、不 markAutoRejected、不写客户决定；预授权未被消耗（B1 在 presenter 前不消费）。
+      if (plan.cardKind === "download") {
+        const noticeOutcome = manualOutcome(plan, "ledger-unavailable", unavailableReason);
+        escalateJudgeOutcomeToCustomer(entry, plan.group, noticeOutcome, "unverifiable");
+        return;
+      }
       // 2026-11-04 客户直修：同一卡指纹的自动拒绝只发生一次；重复 ⇒ 原卡呈现客户。
       // （此时 entry.state 为 queued：escalate 不删 judging、presentNow 会把 queued→active。）
       if (!markAutoRejected(entry)) {
@@ -2060,6 +2086,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     if (opts.presenter === undefined) return undefined; // 保留既有「未接线 → unavailable」语义
     if (opts.writePreauthorization === undefined) return undefined;
     if (req.kind !== "confirm") return undefined;
+    // 2026-11-04 下载申请：下载卡虽为 confirm，但**绝不**能被边界写入预授权误判为 accept/reject
+    // （即使卡面/元数据被注入 paths）；下载审批只走下载能力 + 判断/客户通道。
+    if (req.cardKind === "download") return undefined;
     const boundary = ctx.writeBoundary;
     const projectRoot = ctx.projectRoot;
     const skillRoot = ctx.skillRoot;
@@ -2179,6 +2208,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (ctx.projectRoot !== undefined) payload.projectRoot = ctx.projectRoot;
       if (typeof metadata?.turnId === "string" && metadata.turnId !== "") payload.turnId = metadata.turnId;
       if (typeof metadata?.toolCallId === "string" && metadata.toolCallId !== "") payload.toolCallId = metadata.toolCallId;
+      if (typeof ctx?.judgeNotice === "string" && ctx.judgeNotice !== "") payload.judgeNotice = ctx.judgeNotice;
       if (ctx?.acceptanceReport !== undefined) payload.acceptanceReport = ctx.acceptanceReport;
       const signals = [metadata?.signal, ctx.sessionSignal].filter((signal): signal is AbortSignal => signal !== undefined);
       const projectKey = projectKeyOf(ctx);

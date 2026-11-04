@@ -1,0 +1,20 @@
+runtime-core 全目录（node --test --test-concurrency=1 "test/runtime-core/**/*.test.ts"）
+exit: 1
+files: 41（B0 v2：39；新增 download-contract.test.ts / download-tool.test.ts）
+tests: 323 (B0 v2: 309; +14)
+pass: 316 (B0 v2: 302; +14)
+fail: 3（与 B0 v2 逐名一致，均为既有 Windows symlink EPERM / errno -4048 / syscall symlink）
+cancelled: 0
+skipped: 4（与 B0 v2 相同；源码内平台条件）
+todo: 0
+duration_ms: 30581.7397
+新增确定性失败: 0
+新增非 EPERM 失败: 0
+新增 skip: 0
+
+失败用例（3/3 既有）:
+1. test/runtime-core/file-write-safety.test.ts:97 — D3 linked workspace root remains usable; linked target itself is not replaced
+2. test/runtime-core/session-store.test.ts:46 — store: traversal, mismatched scope and symlinked runtime directories rejected
+3. test/runtime-core/session-store.test.ts:58 — store: native validation stays lazy and native symlink is rejected before effects
+
+原始输出（本地保留，*.log 被 .gitignore 忽略）：2026-11-04_download-requests-A1-evidence/01-runtime-core.log

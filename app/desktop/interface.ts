@@ -37,6 +37,8 @@ import { openRoleSession as realOpenRoleSession, createPiAdapterFactory as realC
 // I2/C1（2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览/建立机制。**只**经编排的 Pipeline 公共出口
 // （`govern-session.ts` 薄再导出）使用——**不得**直接导入 `src/common/编排/finalize.ts`（跨角色私有 common）。
 import { createShellJudge as realCreateShellJudge, createGovernanceJudge as realCreateGovernanceJudge, createDirectiveInterpreter as realCreateDirectiveInterpreter } from "../../src/pipeline/orchestration/govern-session.ts";
+import { createDownloadRequestRuntime as realCreateDownloadRequestRuntime } from "../../src/pipeline/orchestration/download-request.ts";
+import type { RequestDownloadFn } from "../../src/model/download.ts";
 import type { DirectiveInterpretRequest, DirectiveInterpretResult } from "../../src/model/directive.ts";
 import { intentArtifactPath } from "../../src/common/编排/governance-judge-intent.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
@@ -372,6 +374,8 @@ export interface DesktopDeps {
       scope?: undefined;
       /** 客户确认制交互通道（A-1/A-3）：仅内置治理角色（su）会话注入（见 session.ts）。 */
       customerInput?: CustomerInputFn;
+      /** 下载申请能力（2026-11-04 download-requests W-1）：每会话能力；未注入 ⇒ 工具不注册。 */
+      requestDownload?: RequestDownloadFn;
       /** 派发任务能力（H-1）：仅内置治理角色（su）会话注入（见 session.ts::routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
       /** 需求变更申请能力（2026-10-26 request_requirement_change）：仅统筹/提案会话注入（见 session.ts）。 */
@@ -423,6 +427,13 @@ export interface DesktopDeps {
    * `govern-session.ts::createGovernanceJudge`（桌面不直接导入私有 `common/编排/`）。测试可注入桩件。
    */
   createGovernanceJudgeFn?: typeof realCreateGovernanceJudge;
+  /**
+   * **下载运行时工厂**（2026-11-04 download-requests C1/F2）：缺省经编排 Pipeline 公共出口
+   * `download-request.ts::createDownloadRequestRuntime`；测试可注入桩件。每会话一份。
+   */
+  createDownloadRuntimeFn?: typeof realCreateDownloadRequestRuntime;
+  /** G8 A epoch 所需应用版本（`app/main.ts` 传 `app.getVersion()`）；缺失 ⇒ 下载能力不注入（fail-closed）。 */
+  downloadAppVersion?: string;
   /**
    * **客户授权平面自然语言解释器工厂**（2026-11-04 客户直修）：缺省经编排 Pipeline 公共出口
    * `govern-session.ts::createDirectiveInterpreter`（桌面不直接导入私有 `common/编排/`）。测试可注入桩件。
@@ -854,6 +865,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 「替我决策」（2026-10-18 双开关评审 §3.3/§8.2）：同形第二套开关（互不影响）与治理判断闭包工厂。
   const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.decision === true);
   const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
+  // 2026-11-04 下载申请（C1/F2）：B1 每会话运行时工厂（缺省真实实现；测试可注入桩件）。
+  const createDownloadRuntimeFn = deps.createDownloadRuntimeFn ?? realCreateDownloadRequestRuntime;
   // 客户授权平面（2026-11-04 客户直修）：自然语言解释器工厂（与两个 judge 同一套 runtimeOptions/adapter）。
   const createDirectiveInterpreterFn = deps.createDirectiveInterpreterFn ?? realCreateDirectiveInterpreter;
   // 客户授权平面（C1）：main.ts 构造的控制器；缺省 ⇒ 命中标记 fail-closed（不回退普通聊天）。
@@ -1955,6 +1968,12 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     createShellJudge: createShellJudgeFn,
     // 「替我决策」（2026-10-18 双开关评审 §8.2）：每会话治理判断闭包工厂（仅 trio + 通道已接时构造）。
     createGovernanceJudge: createGovernanceJudgeFn,
+    // 2026-11-04 下载申请（C1/F2/R3）：每会话下载运行时 + G8 appVersion + 预授权窄访问器
+    // （访问器复用既有 directiveInput 的同一 CustomerDirectiveRuntime；缺省 ⇒ 下载能力不注入）。
+    createDownloadRuntime: createDownloadRuntimeFn,
+    downloadAppVersion: deps.downloadAppVersion,
+    getDownloadDirectiveConsumer: (projectRoot) =>
+      deps.directiveInput?.downloadDirectiveConsumer(projectRoot)?.takeDownloadDirective,
     // 客户授权平面（2026-11-04 客户直修）：自然语言解释器工厂（按请求项目/引擎即时构造；失败 fail-closed）。
     createDirectiveInterpreter: createDirectiveInterpreterFn,
     prepareRuntimeProfile: async (runtime) => {

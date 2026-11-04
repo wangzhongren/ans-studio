@@ -1,0 +1,5 @@
+role: worker
+entries:
+  - kind: file
+    path: src/worker.ts
+    purpose: D2 fixture

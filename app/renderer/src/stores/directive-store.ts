@@ -36,7 +36,7 @@ export interface DirectiveBridge {
 export type DirectiveTarget = "approval" | "decision";
 export type DirectiveUntil = "once" | "session" | "forever";
 export type DirectiveStatus = "active" | "consumed" | "revoked" | "expired";
-export type DirectiveConsumer = "shell-gate" | "decision-card" | "none";
+export type DirectiveConsumer = "shell-gate" | "decision-card" | "download" | "none";
 export type DirectiveRuntime = "pi" | "codex" | "claude";
 
 /** A1 标记常量按数据渲染（i18n 模板占位符 `{approvalMarker}`/`{decisionMarker}`）。 */
@@ -218,6 +218,7 @@ function asDirectiveStatus(value: unknown): DirectiveStatus | null {
 function asDirectiveConsumer(value: unknown): DirectiveConsumer | null {
   return value === "shell-gate" ||
     value === "decision-card" ||
+    value === "download" ||
     value === "none"
     ? value
     : null;
@@ -340,6 +341,7 @@ const STATUS_KEYS: Record<DirectiveStatus, MessageKey> = {
 const CONSUMER_KEYS: Record<DirectiveConsumer, MessageKey> = {
   "shell-gate": "ui.directive.panel.consumer.shellGate",
   "decision-card": "ui.directive.panel.consumer.decisionCard",
+  download: "ui.directive.panel.consumer.download",
   none: "ui.directive.panel.consumer.none",
 };
 
@@ -420,11 +422,11 @@ function resourceView(
     };
   }
   if (resource.type === "domain") {
+    // 下载消费者已上线（方案 §7.3）：domain 资源的「暂无消费者」旧文案不再适用。
     return {
       key: "ui.directive.dialog.resource.domain",
       params: { host: resource.host },
-      // Q5 A：domain/path 只记录、当前版本无消费者；用 A3 冻结的如实状态文案。
-      noteKey: "main.directive.receipt.noConsumerSuffix",
+      noteKey: null,
     };
   }
   return {
@@ -571,6 +573,22 @@ export interface DirectiveRowView {
   canRevoke: boolean;
 }
 
+/**
+ * consumer 列文案：只消费主进程冻结的 `consumer` 值，不在渲染侧比较时间/读取 epoch。
+ * G8 A 形状 A（B1 `list()` 投影）：旧 domain ⇒ `consumer:"none"`，新 domain ⇒ `"download"`；
+ * 因此 `none + domain` 显示「不作用于下载」标注，`download` 显示「消费者：下载」。
+ */
+function consumerKeyOf(item: DirectiveItemView): MessageKey {
+  if (
+    item.consumer === "none" &&
+    (item.action.kind === "allow" || item.action.kind === "deny") &&
+    item.action.resource.type === "domain"
+  ) {
+    return "ui.directive.panel.consumer.downloadLegacyOff";
+  }
+  return consumerLabelKey(item.consumer);
+}
+
 export function directiveRowView(item: DirectiveItemView): DirectiveRowView {
   const scope = scopeView(item.target, item.scope);
   const resource = resourceView(item.action);
@@ -585,7 +603,7 @@ export function directiveRowView(item: DirectiveItemView): DirectiveRowView {
     untilKey: untilLabelKey(item.until),
     untilHintKey: untilHintKey(item.until, item.status),
     statusKey: statusLabelKey(item.status),
-    consumerKey: consumerLabelKey(item.consumer),
+    consumerKey: consumerKeyOf(item),
     canRevoke: item.status === "active",
   };
 }

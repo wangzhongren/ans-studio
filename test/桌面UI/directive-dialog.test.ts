@@ -128,7 +128,7 @@ test("决策视图：flow 范围 / select-option 详情 / 「替我决策」开�
   assert.equal(view.decisionGroupEnabled, true);
 });
 
-test("domain/path 资源如实标注「仅记录、暂无消费者」；decision 无 flow 用 allFlows", () => {
+test("domain 不再标注「暂无消费者」（下载消费者已上线）；path 仍如实标注；decision 无 flow 用 allFlows", () => {
   const domain = directiveDialogView(
     parsed({
       prefill: {
@@ -144,7 +144,7 @@ test("domain/path 资源如实标注「仅记录、暂无消费者」；decision
   );
   assert.equal(domain.resourceKey, "ui.directive.dialog.resource.domain");
   assert.deepEqual(domain.resourceParams, { host: "*.example.com" });
-  assert.equal(domain.resourceNoteKey, "main.directive.receipt.noConsumerSuffix");
+  assert.equal(domain.resourceNoteKey, null);
   assert.equal(domain.actionKey, "ui.directive.dialog.action.reject");
 
   const path = directiveDialogView(

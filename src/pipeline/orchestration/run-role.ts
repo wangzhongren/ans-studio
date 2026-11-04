@@ -190,6 +190,7 @@ import { readIntentEntryFacts, resolveIntentEntryReference } from "../../common/
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
 // 与 resolveWrite 同源取值规则，不从门禁引擎私有 common 另行导入/复制。
 import { absRel, compareKey, isAbsoluteAny, isUnderOrEqual, normalizeLexical } from "../../common/shared/path-primitives.ts";
+import type { RequestDownloadFn } from "../../model/download.ts";
 
 /**
  * **适配器能力面**：编排构造、随 `deps.createAdapter(gate, capabilities)` 交给适配器工厂——
@@ -271,6 +272,13 @@ export interface AdapterCapabilities {
    * 提案卡不得承载未批准的新授权，也不得删除需求绕过。
    */
   requestRequirementChange?: RequestRequirementChangeFn;
+  /**
+   * 2026-11-04 下载申请（`request_download`「注入才注册」；方案 P1.1 §3.1.1 W-1）。
+   * 与 `customerInput` 独立的能力位：未注入 ⇒ 工具不注册（能力缺席 = 最强 fail-closed）；
+   * CLI 与判断会话结构性不注入。桌面 C1 把下载能力实现交给本字段，本层纯透传。
+   * 形状单一来源＝`model/download.ts`（`RequestDownloadFn`）。
+   */
+  requestDownload?: RequestDownloadFn;
   /**
    * 2026-11-02（全局任务状态，A1）：`project_state` 只读能力（注入了才注册）。
    * 注入面：全部内置治理角色（chief 完整、其余按会话角色裁剪；含旧 su 只读）；项目 worker 不注入。
@@ -582,6 +590,11 @@ export async function openRoleSession(
      * 也不代表意图已变更**。
      */
     requestRequirementChange?: RequestRequirementChangeFn;
+    /**
+     * 2026-11-04 下载申请能力（`request_download`「注入才注册」）：C1 桌面提供实现；
+     * 未给出（CLI/旧调用方）⇒ 字段缺席、工具不注册、行为逐字不变。本层纯透传。
+     */
+    requestDownload?: RequestDownloadFn;
     /**
      * 2026-11-02（全局任务状态，A1）：`project_state` 只读能力（注入才注册）。
      * **只对内置治理角色（含旧 su）转交**；项目角色即便调用方误给也不注入。纯读、零写入。
@@ -1437,6 +1450,8 @@ export async function openRoleSession(
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
     ...(requestRequirementChange !== undefined ? { requestRequirementChange } : {}),
+    // 2026-11-04 下载申请：纯透传；未注入 ⇒ 字段缺席、工具不注册。
+    ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
     ...(projectState !== undefined ? { projectState } : {}),
     ...(projectNote !== undefined ? { projectNote } : {}),
     ...(requestVersionDecision !== undefined ? { requestVersionDecision } : {}),
@@ -2126,6 +2141,7 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> = {
   acceptance: "请改为 dispatch_task 给 verifier 执行验收，或请幕僚调度质检",
   appointment: "请改为请幕僚调度人事（nominator）发起招人决定卡",
   "appointment-write": "请改为请幕僚调度人事（nominator）发起写卡审批",
+  download: "下载卡只由 request_download 工具经应用通道发起；不得用 request_confirmation/request_choice 发下载卡",
   proposal: "请改为请幕僚调度策划（rapporteur）发起提案卡",
   decision: "请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡",
   "intent-confirm": "请改为请幕僚（chief）发起需求确认卡",
@@ -2383,6 +2399,8 @@ export function createRuntimeAdapterFactory(
     // （能力缺席 = 最强 fail-closed）。本层纯透传——意图校验/去重/
     // 派发/账本由能力实现；**提交申请 ≠ 客户批准 ≠ 意图已变更**。
     requestRequirementChange: capabilities?.requestRequirementChange,
+    // 2026-11-04 下载申请：能力位逐字透传；undefined ⇒ 工具不注册（同 requestRequirementChange 先例）。
+    requestDownload: capabilities?.requestDownload,
     // 2026-11-02（全局任务状态/版本决策）：能力位逐字同名透传；undefined ⇒ 工具不注册。
     projectState: capabilities?.projectState,
     projectNote: capabilities?.projectNote,
