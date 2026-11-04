@@ -1,0 +1,141 @@
+{
+  "phase": "before",
+  "checks": [
+    {
+      "name": "live delivery turn rendered",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": "reply-original",
+        "assistantDirectVisible": false,
+        "replyOriginalCount": 1,
+        "replyOriginalLabels": [
+          "本轮交付处理回复原文（展开）"
+        ],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）",
+          "本轮交付处理回复原文（展开）"
+        ]
+      }
+    },
+    {
+      "name": "before: settled delivery turn folds assistant reply",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": "reply-original",
+        "assistantDirectVisible": false,
+        "replyOriginalCount": 1,
+        "replyOriginalLabels": [
+          "本轮交付处理回复原文（展开）"
+        ],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）",
+          "本轮交付处理回复原文（展开）"
+        ]
+      }
+    },
+    {
+      "name": "task-request fold unchanged",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": "reply-original",
+        "assistantDirectVisible": false,
+        "replyOriginalCount": 1,
+        "replyOriginalLabels": [
+          "本轮交付处理回复原文（展开）"
+        ],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）",
+          "本轮交付处理回复原文（展开）"
+        ]
+      }
+    },
+    {
+      "name": "delivery card itself not folded",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": "reply-original",
+        "assistantDirectVisible": false,
+        "replyOriginalCount": 1,
+        "replyOriginalLabels": [
+          "本轮交付处理回复原文（展开）"
+        ],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）",
+          "本轮交付处理回复原文（展开）"
+        ]
+      }
+    },
+    {
+      "name": "before replay: cold delivery turn still folds assistant reply",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": "reply-original",
+        "assistantDirectVisible": false,
+        "replyOriginalCount": 1,
+        "replyOriginalLabels": [
+          "本轮交付处理回复原文（展开）"
+        ],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史未确认",
+          "交接内容（安全显示副本）",
+          "本轮交付处理回复原文（展开）"
+        ]
+      }
+    },
+    {
+      "name": "zero console errors",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "failures": 0,
+  "screenshots": [
+    "unfold-reply-before.png",
+    "task-request-unchanged-before.png"
+  ]
+}
