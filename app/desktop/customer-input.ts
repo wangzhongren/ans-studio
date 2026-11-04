@@ -294,6 +294,40 @@ export interface OperatorJudgeResultPayload {
 /** decision 卡种（`GovernanceChoiceCardKind` 的 2026-10-26 成员）。 */
 export const DECISION_CARD_KIND = "decision" as const;
 
+/**
+ * 应用自有、必须由**客户本人**作答的 decision 卡（2026-11-04 客户直修）：
+ *   · run-change 三模式卡（`continue-frozen` / `stop-and-restart` / `stop`，来源
+ *     `src/common/编排/run-manifest.ts` 的 `buildRunChangeCard` / `RunChangeMode`）；
+ *   · 版本决策卡（`version-modify` / `new-version-development`，来源
+ *     `src/common/编排/version-decision.ts` 的 `versionDecisionCardToRequest` /
+ *     `src/model/project-state.ts` 的 `VERSION_DECISION_ACTIONS`）。
+ *
+ * 客户原话：「现在点击会被替我决策给拦住啊」「新建版本，修改版本，这个必须弹出客户确认。
+ * 不能自动替我待批。」——这两类卡是应用发行、代表客户本人的决定，**永不**进入
+ * `tryAutoSelectDecision` 的确定性默认代选；必须原卡呈现、由客户亲手选择。
+ *
+ * 判据说明：`payload.schema`/`payload.requestId` 只存在于卡结构的 `payload`，不随
+ * `card.request` 进入客户卡通道（`session.ts` 的 `requestRunChangeDecision` 只传
+ * `card.request`；`versionDecisionCardToRequest` 只返回 request），拦截点不可得；
+ * `application:true` 单独使用又会误伤同样由应用发行、但按既有约定仍可被「替我决策」
+ * 代选的卡（`app/desktop/session.ts` 的 `escalateStuckTask` 任务升级卡），故按
+ * 「应用标志 + 两类卡的冻结选项词汇」识别。选项 id 与界面语言无关；测试用真实构造器
+ * 产物钉住本判据（`test/桌面应用/decision-service.test.ts`）。
+ */
+const RUN_CHANGE_MODE_OPTION_IDS: readonly string[] = ["continue-frozen", "stop-and-restart", "stop"];
+const VERSION_DECISION_OPTION_IDS: readonly string[] = ["version-modify", "new-version-development"];
+
+function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
+  if (request.kind !== "choice") return false;
+  if ((request as { cardKind?: unknown }).cardKind !== DECISION_CARD_KIND) return false;
+  if ((request as { application?: unknown }).application !== true) return false;
+  const offered = new Set(request.options.map((option) => option.id));
+  return (
+    RUN_CHANGE_MODE_OPTION_IDS.every((id) => offered.has(id)) ||
+    VERSION_DECISION_OPTION_IDS.every((id) => offered.has(id))
+  );
+}
+
 /** 发卡前校验结论：allow＝可呈现/可代选；ignore＝非 decision 卡（零行为变化）；reject＝拒发卡。 */
 export type DecisionCardGateRejectReason =
   | DecisionCardRejectReason
@@ -1576,10 +1610,15 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    *
    * 任一条件不满足/异常（开关关闭、无推荐项、结果行通道缺失/投达失败、运行时缺失等）⇒ 返回 false，
    * 由既有客户卡路径（`presentNow`）交客户决定——**绝不擅自代选**，也不把异常伪装成 approve。
+   *
+   * **例外（2026-11-04 客户直修）**：应用自有的 run-change 三模式卡与版本决策卡必须由客户本人选择，
+   * 即使本开关开启也**永不**在这里代选（判据见 `isApplicationDecisionReservedForCustomer`）。
    */
   const tryAutoSelectDecision = (entry: ChannelEntry): boolean => {
     const decision = entry.decisionCard;
     if (decision === undefined) return false;
+    // 2026-11-04 客户直修：应用自有的 run-change / 版本决策卡一律原卡呈现客户，确定性代选不得拦截。
+    if (isApplicationDecisionReservedForCustomer(entry.request)) return false;
     if (entry.ctx.governanceModel !== "trio") return false; // single/su 不代批（与判断门同口径）
     if (opts.judge?.isGroupEnabled("decision") !== true) return false;
     if (entry.signals.some((signal) => signal.aborted)) return false;

@@ -10,13 +10,14 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 import { SessionManager } from "../../app/desktop/session.ts";
+import { createCustomerInputChannel, type DesktopCustomerInputFn, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
 import { readRunManifest, writeRunManifest, type RunManifest } from "../../src/common/编排/run-manifest.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { CustomerInputFn, CustomerInputOutcome, CustomerInputRequest, ProjectNoteFn, ProjectStateFn, RequestVersionDecisionFn } from "../../src/model/runtime.ts";
+import type { CustomerInputOutcome, CustomerInputRequest, ProjectNoteFn, ProjectStateFn, RequestVersionDecisionFn } from "../../src/model/runtime.ts";
 import type { VersionDecisionRequest, VersionDecisionResult } from "../../src/model/project-state.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -89,13 +90,15 @@ interface Caps { projectState?: ProjectStateFn; projectNote?: ProjectNoteFn; req
 
 function makeManager(root: string, options: {
   answer?: (request: CustomerInputRequest) => CustomerInputOutcome | Promise<CustomerInputOutcome>;
-  customerInput?: boolean;
+  customerInput?: boolean | DesktopCustomerInputFn;
 } = {}): { manager: SessionManager; caps: Record<string, Caps>; requests: CustomerInputRequest[]; messages: string[] } {
   const caps: Record<string, Caps> = {};
   const requests: CustomerInputRequest[] = [];
   const messages: string[] = [];
-  const customerInput: CustomerInputFn = async (request) => {
+  const injectedCustomerInput = typeof options.customerInput === "function" ? options.customerInput : undefined;
+  const customerInput: DesktopCustomerInputFn = async (request, ctx, metadata) => {
     requests.push(request);
+    if (injectedCustomerInput !== undefined) return injectedCustomerInput(request, ctx, metadata);
     return options.answer?.(request) ?? { outcome: "declined", operatorId: "customer" };
   };
   const manager = new SessionManager({
@@ -787,6 +790,165 @@ test("requestId/pending 结构化匹配：一个 runId 是另一个前缀时互�
       if (executed?.kind === "version.decision") assert.equal(executed.attempt, 1);
       const longAudit = events.filter((event) => event.kind === "version.decision" && event.requestId === longRequestId);
       assert.equal(longAudit.length, 0);
+    } finally {
+      await manager.stop(null);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+// ———————————————— 2026-11-04 客户直修：版本决策卡不被「替我决策」代选（真实通道） ————————————————
+//
+// 客户原话：「新建版本，修改版本，这个必须弹出客户确认。不能自动替我待批。」
+// 真实 createCustomerInputChannel + 开关开启：卡必须呈现客户、零 judge 结果行；
+// 客户作答后按既有 mapVersionDecisionAnswer / planVersionDecisionExecution 语义执行。
+
+function realJudgeChannel(): { channel: ReturnType<typeof createCustomerInputChannel>; pushed: OperatorRequestPayload[]; judgeRows: OperatorJudgeResultPayload[] } {
+  const pushed: OperatorRequestPayload[] = [];
+  const judgeRows: OperatorJudgeResultPayload[] = [];
+  let seq = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    nextId: () => `op-${++seq}`,
+    judge: {
+      isGroupEnabled: () => true,
+      fn: async (request) => ({
+        verdict: "approve",
+        group: "decision",
+        cardKind: "decision",
+        engine: request.runtime,
+        reasonCode: "recommended-default",
+        selected: ["version-modify"],
+        durationMs: 1,
+      }),
+    },
+    emitJudgeResult: (row) => judgeRows.push(row),
+  });
+  return { channel, pushed, judgeRows };
+}
+
+async function waitForPushed(pushed: OperatorRequestPayload[]): Promise<void> {
+  const end = Date.now() + 3000;
+  while (pushed.length === 0 && Date.now() < end) await tick(20);
+}
+
+test("2026-11-04 直修：版本修改卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按 customer 执行", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-vd-real-modify-"));
+  try {
+    const runId = "run-20261104-focus-abcdef12";
+    assert.equal((await writeRunManifest(root, manifest("focus", runId))).ok, true);
+    await fs.mkdir(path.join(root, "docs", "product"), { recursive: true });
+    await fs.mkdir(path.join(root, "docs", "proposals"), { recursive: true });
+    await fs.writeFile(path.join(root, "docs", "product", "focus-intent-v1.md"), "# intent\n", "utf8");
+    await fs.writeFile(path.join(root, "docs", "proposals", "focus-proposal-v2.md"), "# proposal\n", "utf8");
+    const { channel, pushed, judgeRows } = realJudgeChannel();
+    const { manager, caps } = makeManager(root, { customerInput: channel.customerInput });
+    try {
+      await openChief(manager, root);
+      const deciding = decisionFn(caps)({ flowId: "focus", action: "version-modify", reason: "客户直修回归" });
+      await waitForPushed(pushed);
+      assert.equal(pushed.length, 1, "版本修改卡必须呈现客户");
+      assert.equal(judgeRows.length, 0, "不得产生 judge 代批结果行");
+      const request = pushed[0]!.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+      assert.equal((request as { application?: boolean }).application, true);
+      assert.deepEqual(request.options.map((option) => option.id), ["version-modify", "new-version-development"]);
+      assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["version-modify"] } }).ok, true);
+      const result = await deciding;
+      assert.equal(result.ok, true, result.message);
+      assert.equal(result.action, "version-modify");
+      const events = (await readTaskState(root)).events;
+      const resolved = events.find((event) => event.kind === "request.resolved");
+      assert.equal(resolved?.kind, "request.resolved");
+      if (resolved?.kind === "request.resolved") {
+        assert.equal(resolved.by, "customer", "客户本人选择，不是 judge");
+        assert.deepEqual(resolved.selectedOptionIds, ["version-modify"]);
+      }
+      const executed = events.find((event) => event.kind === "version.decision" && event.status === "executed");
+      assert.equal(executed?.kind, "version.decision");
+      if (executed?.kind === "version.decision") {
+        assert.equal(executed.decidedBy, "customer");
+        assert.equal(executed.operatorId, "tester");
+        assert.equal(executed.action, "version-modify");
+      }
+    } finally {
+      await manager.stop(null);
+    }
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("2026-11-04 直修：新建版本开发卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按既有语义执行", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-vd-real-newflow-"));
+  try {
+    const runA = "run-20261104-focus-aaaaaaaa";
+    const runB = "run-20261104-focus-bbbbbbbb";
+    assert.equal((await writeRunManifest(root, manifest("focus", runA))).ok, true);
+    assert.equal((await writeRunManifest(root, manifest("focus", runB))).ok, true);
+    await fs.mkdir(path.join(root, "docs", "proposals"), { recursive: true });
+    const oldDoc = path.join(root, "docs", "proposals", "focus-proposal-v1.md");
+    await fs.writeFile(oldDoc, "# old\n", "utf8");
+    const oldDocHash = await sha(oldDoc);
+    await append(root, taskEvent("task.created", {
+      taskId: "t-old2",
+      from: "chief",
+      to: "worker",
+      text: "old unclosed task",
+      sideEffect: "read-only",
+      idempotencyKey: "k-old2",
+      flowId: "focus",
+      runId: runA,
+      runState: "draft",
+    }));
+    await append(root, taskEvent("task.delivered", { taskId: "t-old2", to: "worker" }));
+    await append(root, taskEvent("task.reported", { taskId: "t-old2", from: "worker", status: "blocked", summary: "old blocked" }));
+    await append(root, taskEvent("request.created", {
+      requestId: "req-old2-pending",
+      flowId: "focus",
+      cardKind: "proposal",
+      sourceRoleId: "rapporteur",
+      title: "旧提案卡",
+      options: [{ id: "approve", label: "通过" }, { id: "reject", label: "退回" }],
+    }));
+    const { channel, pushed, judgeRows } = realJudgeChannel();
+    const { manager, caps, messages } = makeManager(root, { customerInput: channel.customerInput });
+    try {
+      await openChief(manager, root);
+      const deciding = decisionFn(caps)({ flowId: "focus", runId: runA, action: "new-version-development", reason: "干净重开" });
+      await waitForPushed(pushed);
+      assert.equal(pushed.length, 1, "新建版本开发卡必须呈现客户");
+      assert.equal(judgeRows.length, 0, "不得产生 judge 代批结果行");
+      const request = pushed[0]!.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+      assert.deepEqual(
+        request.options.filter((option) => option.recommended === true).map((option) => option.id),
+        ["new-version-development"],
+        "推荐项仍是幕僚行动作（仅供参考，必须由客户决定）",
+      );
+      assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["new-version-development"] } }).ok, true);
+      const result = await deciding;
+      assert.equal(result.ok, true, result.message);
+      assert.equal(result.newFlowId, "focus-next");
+      assert.match(result.newRunId ?? "", /^run-/);
+      assert.deepEqual([...(result.closedRunIds ?? [])].sort(), [runA, runB].sort());
+      for (const runId of [runA, runB]) {
+        const stored = await readRunManifest(root, runId);
+        assert.equal(stored.ok, true);
+        if (stored.ok) assert.equal(stored.manifest.state, "closed");
+      }
+      const events = (await readTaskState(root)).events;
+      const executed = events.find((event) => event.kind === "version.decision" && event.status === "executed");
+      assert.equal(executed?.kind, "version.decision");
+      if (executed?.kind === "version.decision") {
+        assert.equal(executed.decidedBy, "customer");
+        assert.equal(executed.operatorId, "tester");
+        assert.equal(executed.action, "new-version-development");
+      }
+      const resolved = events.find((event) => event.kind === "request.resolved");
+      if (resolved?.kind === "request.resolved") assert.equal(resolved.by, "customer");
+      assert.equal(await sha(oldDoc), oldDocHash, "旧产物保留");
+      assert.match(messageText(messages), /focus-next/);
     } finally {
       await manager.stop(null);
     }

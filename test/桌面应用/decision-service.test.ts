@@ -2,6 +2,7 @@
 // C 批（2026-10-28）：应用申请/决策服务——两开关独立、decision 唯一推荐 deterministic 代选/回落；
 // 应用自有 decision 卡不扩大角色允许集；judge 审计不伪装客户。
 // 2026-11-04 客户直修：judge「无法核对」类 manual 不自动拒绝（原卡转客户确认）；同卡指纹自动拒绝只发生一次。
+// 2026-11-04 客户直修（run-change/版本决策）：开启「替我决策」时这两类应用自有 decision 卡仍必须呈现客户，不代选。
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -10,6 +11,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { createCustomerInputChannel, evaluateDecisionCardRequest, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+import { buildRunChangeCard } from "../../src/common/编排/run-manifest.ts";
+import { buildVersionDecisionCard, versionDecisionCardToRequest } from "../../src/common/编排/version-decision.ts";
 import type {
   CustomerInputMetadata,
   CustomerInputRequest,
@@ -273,5 +276,166 @@ test("④ 升级审计：不可核对升级恰记一条 escalated，且不记 ma
   } finally {
     await disposeDiagnostics();
     await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+// ———————————————— 2026-11-04 客户直修：应用自有 decision 卡不被「替我决策」代选 ————————————————
+//
+// 客户原话：「现在点击会被替我决策给拦住啊」（run-change 三模式卡被代选为继续冻结）、
+// 「新建版本，修改版本，这个必须弹出客户确认。不能自动替我待批。」（版本决策卡）。
+// 判据（app/desktop/customer-input.ts::isApplicationDecisionReservedForCustomer）：
+// application:true + cardKind:"decision" + run-change/版本决策的冻结选项词汇。
+
+function runChangeRequest(): CustomerInputRequest {
+  return buildRunChangeCard({
+    runId: "run-20261104-focus-abcdef12",
+    flowId: "focus",
+    requestId: "run-change-run-20261104-focus-abcdef12",
+    current: { state: "pinned", documents: {}, schemas: {} },
+  }).request;
+}
+
+function versionDecisionRequest(action: "version-modify" | "new-version-development"): CustomerInputRequest {
+  const card = buildVersionDecisionCard({
+    requestId: `version-decision-run-20261104-focus-abcdef12-${action}`,
+    flowId: "focus",
+    action,
+    reason: "客户直修回归",
+    facts: {
+      flowId: "focus",
+      unclosedCount: 0,
+      blockedCount: 0,
+      failedCount: 0,
+      pendingRequestCount: 0,
+      acceptanceRejectedCount: 0,
+      priorVersionDecisionCount: 0,
+      latestDocs: [],
+      newerThanPinned: [],
+    },
+    labels: {
+      title: "版本决策",
+      question: "请选择版本路线",
+      disclaimer: "本卡不是内容批准",
+      optionVersionModify: "修改版本",
+      optionNewVersionDevelopment: "新建版本开发",
+    },
+  });
+  return versionDecisionCardToRequest(card);
+}
+
+/** 角色（convener）发行的普通 decision 卡（非 application）；共享校验允许的发卡角色。 */
+function roleDecisionRequest(): CustomerInputRequest {
+  return {
+    kind: "choice",
+    title: "材料性选择",
+    cardKind: "decision",
+    sourceRoleId: "convener",
+    flowId: "focus",
+    options: [
+      { id: "alpha", label: "方案 A" },
+      { id: "beta", label: "方案 B", recommended: true },
+    ],
+  };
+}
+
+const convenerCtx = { ...ctx, roleId: "convener" };
+
+test("2026-11-04 直修 (a)：替我决策开启 ⇒ run-change 卡呈现客户、作答前不结算、无 judge 代批", async () => {
+  const h = channelHarness(true);
+  let settled = false;
+  const pending = h.channel.customerInput(runChangeRequest(), ctx);
+  Promise.resolve(pending).then(() => {
+    settled = true;
+  });
+  await tick();
+  assert.equal(h.pushed.length, 1, "run-change 卡必须原卡呈现客户");
+  assert.equal(h.results.length, 0, "不得产生 judge 代批结果行/审计");
+  assert.equal(settled, false, "客户作答前不得结算");
+  assert.equal(h.judgeCalls(), 0, "decision 卡不经模型 judge（更不得自动代批）");
+  const card = h.pushed[0]!.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+  assert.equal((card as { cardKind?: string }).cardKind, "decision");
+  assert.equal((card as { application?: boolean }).application, true);
+  assert.deepEqual(card.options.map((option) => option.id), ["continue-frozen", "stop-and-restart", "stop"]);
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["stop-and-restart"] } }).ok, true);
+  const outcome = await pending;
+  assert.equal(outcome?.outcome, "answered");
+  assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["stop-and-restart"]);
+  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester", "客户本人作答（通道 operator），不是 judge");
+  assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
+});
+
+test("2026-11-04 直修 (b)：run-change 三模式分别由客户选择后原样结算", async () => {
+  for (const mode of ["continue-frozen", "stop-and-restart", "stop"] as const) {
+    const h = channelHarness(true);
+    const pending = h.channel.customerInput(runChangeRequest(), ctx);
+    await tick();
+    assert.equal(h.pushed.length, 1, `${mode}: 原卡呈现`);
+    assert.equal(h.results.length, 0, `${mode}: 无 judge 代批结果行`);
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: [mode] } }).ok, true);
+    const outcome = await pending;
+    assert.equal(outcome?.outcome, "answered");
+    assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, [mode]);
+    assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester");
+    assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
+  }
+});
+
+test("2026-11-04 直修 (b)：版本决策两动作均呈现客户、不代选；客户选择后原样交回", async () => {
+  for (const action of ["version-modify", "new-version-development"] as const) {
+    const h = channelHarness(true);
+    let settled = false;
+    const pending = h.channel.customerInput(versionDecisionRequest(action), ctx);
+    Promise.resolve(pending).then(() => {
+      settled = true;
+    });
+    await tick();
+    assert.equal(h.pushed.length, 1, `${action}: 版本决策卡必须呈现客户`);
+    assert.equal(h.results.length, 0, `${action}: 无 judge 代批结果行`);
+    assert.equal(settled, false, `${action}: 客户作答前不得结算`);
+    const card = h.pushed[0]!.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+    assert.deepEqual(card.options.map((option) => option.id), ["version-modify", "new-version-development"]);
+    assert.deepEqual(
+      card.options.filter((option) => option.recommended === true).map((option) => option.id),
+      [action],
+      "推荐项仍是幕僚行动作（仅供参考，必须由客户决定）",
+    );
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: [action] } }).ok, true);
+    const outcome = await pending;
+    assert.equal(outcome?.outcome, "answered");
+    assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, [action]);
+    assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester");
+    assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
+  }
+});
+
+test("2026-11-04 直修 (c)：非 application 的普通 decision 卡在开关开启时仍被确定性代选（回归守护）", async () => {
+  const h = channelHarness(true);
+  const outcome = await h.channel.customerInput(roleDecisionRequest(), convenerCtx);
+  assert.equal(h.pushed.length, 0, "普通 decision 卡仍代批成功、不呈现客户卡");
+  assert.equal(h.results.length, 1, "仍产生一条 judge 结果行");
+  assert.equal(h.results[0]!.group, "decision");
+  assert.equal(h.results[0]!.cardKind, "decision");
+  assert.deepEqual(h.results[0]!.selected, ["beta"]);
+  assert.equal(outcome?.outcome, "answered");
+  assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["beta"]);
+  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "judge:demo");
+  assert.equal(outcome?.outcome === "answered" ? outcome.judge?.group : undefined, "decision");
+});
+
+test("2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为与现状一致（原卡呈现、客户手选、无 judge）", async () => {
+  for (const request of [runChangeRequest(), versionDecisionRequest("version-modify")]) {
+    const h = channelHarness(false);
+    const pending = h.channel.customerInput(request, ctx);
+    await tick();
+    assert.equal(h.pushed.length, 1);
+    assert.equal(h.results.length, 0);
+    const card = h.pushed[0]!.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+    const pick = card.options[0]!.id;
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: [pick] } }).ok, true);
+    const outcome = await pending;
+    assert.equal(outcome?.outcome, "answered");
+    assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, [pick]);
+    assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester");
+    assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
   }
 });
