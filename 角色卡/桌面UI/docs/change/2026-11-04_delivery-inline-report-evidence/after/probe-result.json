@@ -1,0 +1,138 @@
+{
+  "phase": "after",
+  "entry": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\delivery-inline-report-fix\\app\\renderer\\dist\\index.html",
+  "checks": [
+    {
+      "name": "delivery card rendered",
+      "value": true,
+      "detail": {
+        "topLevelParagraph": null,
+        "receiptPresent": true,
+        "receiptOpen": false,
+        "receiptSummary": "接收历史本次接收历史未保存；执行状态以上方实际结果为准。",
+        "batchTitleInReceipt": "交付 · 本批 1 份（不表示全部收齐）",
+        "reportSummaryText": "PROBE-DELIVERY-PREFIX-MARKER 交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。交付报告正文段落，客户应无需展开即可阅读。\nPROBE-DELIVERY-TAIL-MARKER\n",
+        "reportSummaryLength": 561,
+        "hasPrefixInSummary": true,
+        "hasTailInSummary": true,
+        "reportCompletePresent": false,
+        "reportCompleteOpen": null,
+        "reportCompleteHasTail": null,
+        "reportEvidencePresent": true,
+        "reportEvidenceOpen": false,
+        "reportEvidenceSummary": "证据（1 条）",
+        "reportEvidenceHasItem": true,
+        "reportEvidenceItemFlags": true,
+        "deliveryReportFlags": "已净化 · 已截断；部分证据显示已截断",
+        "excerptLabel": null,
+        "batchFactColumns": 3,
+        "batchFactLabels": [
+          "接收历史",
+          "目标输入记录",
+          "目标轮次结果"
+        ],
+        "retryButtonText": "重试保存历史",
+        "statusRole": true,
+        "statusInsideReceipt": true,
+        "safeCopyPresent": true,
+        "safeCopyOpen": false,
+        "reportSections": 1
+      }
+    },
+    {
+      "name": "after: no card-leading batch title paragraph",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "after: receipt details present and collapsed at card tail",
+      "value": true,
+      "detail": {
+        "receipt": true,
+        "open": false
+      }
+    },
+    {
+      "name": "after: batch title demoted inside receipt details",
+      "value": true,
+      "detail": {
+        "title": "交付 · 本批 1 份（不表示全部收齐）",
+        "summary": "接收历史本次接收历史未保存；执行状态以上方实际结果为准。"
+      }
+    },
+    {
+      "name": "after: report body contains full text by default (no click)",
+      "value": true,
+      "detail": {
+        "length": 561,
+        "tail": true
+      }
+    },
+    {
+      "name": "after: no report-complete fold inside delivery report",
+      "value": true,
+      "detail": false
+    },
+    {
+      "name": "after: no misleading excerpt label on inline full text",
+      "value": true,
+      "detail": null
+    },
+    {
+      "name": "after: evidence fold kept with existing count label",
+      "value": true,
+      "detail": {
+        "summary": "证据（1 条）",
+        "item": true,
+        "flags": true
+      }
+    },
+    {
+      "name": "after: projection flags (redacted/truncated) preserved on body",
+      "value": true,
+      "detail": "已净化 · 已截断；部分证据显示已截断"
+    },
+    {
+      "name": "after: three-column delivery facts retained",
+      "value": true,
+      "detail": [
+        "接收历史",
+        "目标输入记录",
+        "目标轮次结果"
+      ]
+    },
+    {
+      "name": "after: retry button retained",
+      "value": true,
+      "detail": "重试保存历史"
+    },
+    {
+      "name": "after: aria-live status role retained inside receipt",
+      "value": true,
+      "detail": {
+        "role": true,
+        "insideReceipt": true
+      }
+    },
+    {
+      "name": "after: safe input copy retained and closed by default",
+      "value": true,
+      "detail": {
+        "present": true,
+        "open": false
+      }
+    },
+    {
+      "name": "zero console errors",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "failures": 0,
+  "screenshots": [
+    "delivery-default-after.png",
+    "delivery-report-bottom-after.png",
+    "delivery-receipt-open-after.png"
+  ]
+}

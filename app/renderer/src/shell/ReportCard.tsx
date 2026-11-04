@@ -78,6 +78,8 @@ export interface ReportBodyProps {
   scope?: ReportScope;
   /** 验收展示判定（由 ReportCard/DeliveryCard 统一计算后传入；本组件不二次判定）。 */
   acceptance?: boolean;
+  /** 交付行内联全文：默认直接展示报告原文（不再只在折叠里给全文）。 */
+  inlineFull?: boolean;
 }
 
 export function ReportBody({
@@ -89,6 +91,7 @@ export function ReportBody({
   initialPersistence,
   scope,
   acceptance,
+  inlineFull,
 }: ReportBodyProps) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
@@ -114,6 +117,8 @@ export function ReportBody({
   );
   const folded = preview.length < Array.from(full).length;
   const isAcceptance = acceptance === true;
+  const inline = inlineFull === true;
+  const showFull = isAcceptance || inline;
   const sourceRoleId = asReportText(source.roleId);
   const sourceName = sourceRoleId
     ? roleDisplayName(findRole(roles, sourceRoleId), locale) || sourceRoleId
@@ -172,15 +177,17 @@ export function ReportBody({
         </p>
       </div>
       <div className={"report-body" + (isAcceptance ? " is-acceptance" : "")}>
-        <div className="excerpt-label">
-          {isAcceptance ? t("ui.reportCard.acceptanceReportLabel") : t("ui.reportCard.excerptLabel")}
-        </div>
+        {isAcceptance || !inline ? (
+          <div className="excerpt-label">
+            {isAcceptance ? t("ui.reportCard.acceptanceReportLabel") : t("ui.reportCard.excerptLabel")}
+          </div>
+        ) : null}
         <div
           className="hb-summary card-md"
-          dangerouslySetInnerHTML={markdownHtml(isAcceptance ? full : preview)}
+          dangerouslySetInnerHTML={markdownHtml(showFull ? full : preview)}
         />
         <p className="projection-flags">
-          {[flags, !isAcceptance && folded ? t("ui.reportCard.folded") : ""]
+          {[flags, !showFull && folded ? t("ui.reportCard.folded") : ""]
             .filter(Boolean)
             .join(locale === "zh-CN" ? "；" : "; ")}
         </p>
@@ -202,6 +209,23 @@ export function ReportBody({
               )}
             </ul>
           </div>
+        ) : null}
+        {!isAcceptance && inline ? (
+          <details className="report-evidence">
+            <summary>{t("ui.reportCard.evidenceCount", { count: evidence.length })}</summary>
+            <ul className="hb-evidence">
+              {evidence.length === 0 ? (
+                <li>{t("ui.reportCard.noEvidence")}</li>
+              ) : (
+                evidence.map((item, index) => (
+                  <li key={index}>
+                    {asReportText(item.text)}
+                    <small className="projection-flags">{textFlags(item, locale)}</small>
+                  </li>
+                ))
+              )}
+            </ul>
+          </details>
         ) : null}
         <dl className="report-facts">
           {includeSave ? (
@@ -253,7 +277,7 @@ export function ReportBody({
         </p>
         <div className="report-actions">
           {sourceRoleId ? <SourceDocumentButton roleId={sourceRoleId} /> : null}
-          {isAcceptance ? null : (
+          {showFull ? null : (
             <details
               className="report-complete"
               open={detailsOpen === true}
@@ -389,43 +413,6 @@ export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
 
   return (
     <div className={"msg msg-injected msg-delivery" + (replay ? " is-replay" : "")}>
-      <p>{deliveryBatchTitle(reports.length, locale)}</p>
-      <div className="persistence-state" role="status" aria-live="polite">
-        <dl className="report-facts delivery-batch-facts">
-          <div>
-            <dt>{t("ui.reportCard.receiptHistory")}</dt>
-            <dd className="persistence-message" tabIndex={-1}>
-              {historyLabel}
-            </dd>
-          </div>
-          <div>
-            <dt>{t("ui.reportCard.targetInput")}</dt>
-            <dd>{facts.input}</dd>
-          </div>
-          <div>
-            <dt>{t("ui.reportCard.targetTurn")}</dt>
-            <dd>{facts.outcome}</dd>
-          </div>
-        </dl>
-        {retry ? (
-          <button
-            type="button"
-            className="btn btn-ghost btn-mini persistence-retry"
-            disabled={pending}
-            onClick={() => {
-              if (scope && attemptId) {
-                void useReportStore.getState().retryHistory(scope, attemptId);
-              }
-            }}
-          >
-            {retryLabel(true, locale)}
-          </button>
-        ) : null}
-        {effective.history === "failed" || (view.kind === "err" && retry) ? (
-          <p className="muted small">{retryNoteText(locale)}</p>
-        ) : null}
-        {entry?.error ? <p className="persistence-error">{entry.error}</p> : null}
-      </div>
       {reports.map((report, index) => {
         const supported = reportVersionSupported(report);
         const acceptance = supported && reportAcceptance(report, roles);
@@ -447,10 +434,54 @@ export function DeliveryCard({ data, roleId, replay }: DeliveryCardProps) {
               includeSave={false}
               scope={scope || undefined}
               acceptance={acceptance}
+              inlineFull
             />
           </section>
         );
       })}
+      <details className="delivery-receipt">
+        <summary>
+          <span>{t("ui.reportCard.receiptHistory")}</span>
+          <span className="delivery-receipt-note">{historyLabel}</span>
+        </summary>
+        <div className="persistence-state" role="status" aria-live="polite">
+          <p className="delivery-batch-title">{deliveryBatchTitle(reports.length, locale)}</p>
+          <dl className="report-facts delivery-batch-facts">
+            <div>
+              <dt>{t("ui.reportCard.receiptHistory")}</dt>
+              <dd className="persistence-message" tabIndex={-1}>
+                {historyLabel}
+              </dd>
+            </div>
+            <div>
+              <dt>{t("ui.reportCard.targetInput")}</dt>
+              <dd>{facts.input}</dd>
+            </div>
+            <div>
+              <dt>{t("ui.reportCard.targetTurn")}</dt>
+              <dd>{facts.outcome}</dd>
+            </div>
+          </dl>
+          {retry ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-mini persistence-retry"
+              disabled={pending}
+              onClick={() => {
+                if (scope && attemptId) {
+                  void useReportStore.getState().retryHistory(scope, attemptId);
+                }
+              }}
+            >
+              {retryLabel(true, locale)}
+            </button>
+          ) : null}
+          {effective.history === "failed" || (view.kind === "err" && retry) ? (
+            <p className="muted small">{retryNoteText(locale)}</p>
+          ) : null}
+          {entry?.error ? <p className="persistence-error">{entry.error}</p> : null}
+        </div>
+      </details>
       <details className="safe-input-copy">
         <summary>{t("shared.common.safeCopyTitle")}</summary>
         <p className="projection-flags">{safeCopyFlags(projection, locale)}</p>

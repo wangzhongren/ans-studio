@@ -548,11 +548,12 @@ app.whenReady().then(async () => {
     );
 
     // —————— 9. 交付批次事实 / 安全副本 / 历史重试 / 过期 ——————
+    const receivedFull = "DELIVERY-INLINE-PREFIX-MARKER " + "交付内联正文。".repeat(40) + "\nDELIVERY-INLINE-TAIL-MARKER";
     const received = {
       ...snapshot,
       reportId: "smoke-received",
       source: { roleId: "P", runtime: "pi", turnId: "received-turn" },
-      summary: { text: "收到的安全摘要", redacted: false, truncated: false },
+      summary: { text: receivedFull, redacted: false, truncated: false },
     };
     state.receipt = { version: 1, deliveryId: "d1", attemptId: "a1", turnId: "delivery-turn", inputSaved: true, history: "failed", outcome: "completed", retryHistoryAvailable: true };
     state.receiptState = "known";
@@ -570,10 +571,10 @@ app.whenReady().then(async () => {
     }]);
     await sleep(150);
     check(
-      "delivery batch shows receipt facts and safe copy flags",
-      await js(`(()=>{const c=document.querySelector('.msg-delivery');if(!c)return false;const p=c.querySelector(':scope > .persistence-state');return c.textContent.includes('交付 · 本批 1 份（不表示全部收齐）')&&p.querySelectorAll('.delivery-batch-facts dt').length===3&&p.textContent.includes('接收历史')&&p.textContent.includes('目标输入记录')&&p.textContent.includes('目标轮次结果')&&c.querySelector('.safe-input-copy').textContent.includes('此处未记录完整模型输入')&&c.querySelector('.safe-input-copy').textContent.includes('已净化')&&c.querySelector('.safe-input-copy').textContent.includes('显示副本已截断')&&!c.querySelector('.safe-input-copy').open;})()`),
+      "delivery shows inline full report by default with demoted receipt facts and safe copy flags",
+      await js(`(()=>{const c=document.querySelector('.msg-delivery');if(!c)return false;const receipt=c.querySelector('.delivery-receipt');const p=receipt&&receipt.querySelector('.persistence-state');const body=c.querySelector('.delivery-report .hb-summary');const evidence=c.querySelector('.delivery-report .report-evidence');return !!receipt&&!receipt.open&&!c.querySelector(':scope > p')&&receipt.querySelector('.delivery-batch-title').textContent==='交付 · 本批 1 份（不表示全部收齐）'&&receipt.querySelector('summary').textContent.includes('接收历史')&&!!receipt.querySelector('.persistence-state[role="status"][aria-live="polite"]')&&p.querySelectorAll('.delivery-batch-facts dt').length===3&&p.textContent.includes('接收历史')&&p.textContent.includes('目标输入记录')&&p.textContent.includes('目标轮次结果')&&!!body&&body.textContent.includes('DELIVERY-INLINE-PREFIX-MARKER')&&body.textContent.includes('DELIVERY-INLINE-TAIL-MARKER')&&!c.querySelector('.delivery-report .report-complete')&&!c.querySelector('.delivery-report .excerpt-label')&&!!evidence&&evidence.textContent.includes('证据（1 条）')&&c.querySelector('.safe-input-copy').textContent.includes('此处未记录完整模型输入')&&c.querySelector('.safe-input-copy').textContent.includes('已净化')&&c.querySelector('.safe-input-copy').textContent.includes('显示副本已截断')&&!c.querySelector('.safe-input-copy').open;})()`),
     );
-    await js(`window.__smokeDelivery=document.querySelector('.msg-delivery');document.querySelector('.msg-delivery .persistence-retry').click()`);
+    await js(`window.__smokeDelivery=document.querySelector('.msg-delivery');document.querySelector('.msg-delivery .delivery-receipt').open=true;document.querySelector('.msg-delivery .persistence-retry').click()`);
     await sleep(120);
     check("delivery history retry calls channel once", calls.historyRetries.length === 1, calls.historyRetries[0]);
     check(
@@ -1128,7 +1129,7 @@ app.whenReady().then(async () => {
       event: { kind: "message", turnId: "a5-delivery-turn", summary: "验收交付", detail: a5DeliveryInput },
     }]);
     await waitFor(`[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].some(x=>x.textContent.includes('A5-DELIVERY-MARKER'))`);
-    check("A5 delivery: acceptance sections + ordinary class unchanged (P1-ARC-02)", await js(`(()=>{
+    check("A5 delivery: acceptance sections + ordinary inline full text (P1-ARC-02)", await js(`(()=>{
       const d=[...document.querySelectorAll('#chat .chat-pane[data-role-id="P"] .msg-delivery')].find(x=>x.textContent.includes('A5-DELIVERY-MARKER'));
       if(!d) return false;
       const secs=[...d.querySelectorAll('.delivery-report')];
@@ -1149,7 +1150,9 @@ app.whenReady().then(async () => {
         ordinary.className==='delivery-report'&&
         ordinary.querySelector('.report-title').textContent==='任务报告'&&
         !ordinary.querySelector('.report-acceptance-badge')&&
-        ordinary.querySelector('.report-complete')!==null&&
+        ordinary.querySelector('.hb-summary').textContent.includes('A5-ORDINARY-TAIL-MARKER')&&
+        ordinary.querySelector('.report-complete')===null&&
+        ordinary.querySelector('.report-evidence')!==null&&
         getComputedStyle(completed).borderLeftColor==='rgb(134, 197, 227)'&&
         getComputedStyle(blocked).borderLeftColor==='rgb(201, 122, 109)';
     })()`));
