@@ -38,6 +38,7 @@ import {
   type CustomerDirectiveUntil,
   type DecisionAction,
   type DecisionDirectiveSnapshot,
+  type DirectiveInterpretFn,
   type DirectiveScope,
 } from "../../src/model/directive.ts";
 import { GOVERNANCE_SLUG_PATTERN, type RuntimeKind } from "../../src/model/runtime.ts";
@@ -162,6 +163,12 @@ export interface CreateDirectiveInputControllerOptions {
   emitNotice: (note: DirectiveNote) => void;
   /** 测试注入缝；生产走 B1 公共工厂。 */
   createRuntime?: (options: CreateCustomerDirectiveRuntimeOptions) => CustomerDirectiveRuntime;
+  /**
+   * 自然语言解释器（判断 AI 纯理解；2026-11-04 客户直修）。缺省 ⇒ 只走既有确定性解析。
+   * 给出时由 B1 在确定性解析不可确认时调用；解释只预填确认面板，落账仍须客户确认；
+   * 失败/不可用/低置信一律回退既有行为（绝不猜、绝不自动落账）。
+   */
+  interpret?: DirectiveInterpretFn;
   now?: () => Date;
 }
 
@@ -442,6 +449,7 @@ export function createDirectiveInputController(
         projectRoot,
         sessionId: opts.sessionId,
         present: presenterFor(projectRoot),
+        ...(opts.interpret !== undefined ? { interpretDirective: opts.interpret } : {}),
         ...(opts.now !== undefined ? { now: opts.now } : {}),
       });
       runtimes.set(projectRoot, runtime);

@@ -36,7 +36,8 @@ import { listProject as realListProject } from "../../src/service/role/resolve-r
 import { openRoleSession as realOpenRoleSession, createPiAdapterFactory as realCreatePiAdapterFactory, createRuntimeAdapterFactory as realCreateRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions } from "../../src/pipeline/orchestration/run-role.ts";
 // I2/C1（2026-10-17 PM 评审 §四.2/§4.6）：建立治理记录的预览/建立机制。**只**经编排的 Pipeline 公共出口
 // （`govern-session.ts` 薄再导出）使用——**不得**直接导入 `src/common/编排/finalize.ts`（跨角色私有 common）。
-import { createShellJudge as realCreateShellJudge, createGovernanceJudge as realCreateGovernanceJudge } from "../../src/pipeline/orchestration/govern-session.ts";
+import { createShellJudge as realCreateShellJudge, createGovernanceJudge as realCreateGovernanceJudge, createDirectiveInterpreter as realCreateDirectiveInterpreter } from "../../src/pipeline/orchestration/govern-session.ts";
+import type { DirectiveInterpretRequest, DirectiveInterpretResult } from "../../src/model/directive.ts";
 import { intentArtifactPath } from "../../src/common/编排/governance-judge-intent.ts";
 // 只读 pin 证据检查：**唯一实现**在门禁引擎私有模块，只经 Service 公开出口消费（跨角色边界纪律）。
 // 2026-10-20：内置治理角色判定同样经该 Service 公开出口（看护自动中止按角色映射开关用；不复制 id 列表）。
@@ -423,6 +424,11 @@ export interface DesktopDeps {
    */
   createGovernanceJudgeFn?: typeof realCreateGovernanceJudge;
   /**
+   * **客户授权平面自然语言解释器工厂**（2026-11-04 客户直修）：缺省经编排 Pipeline 公共出口
+   * `govern-session.ts::createDirectiveInterpreter`（桌面不直接导入私有 `common/编排/`）。测试可注入桩件。
+   */
+  createDirectiveInterpreterFn?: typeof realCreateDirectiveInterpreter;
+  /**
    * **「替我决策」开关状态机（主进程权威）**：与 approval 同形、**互不影响**；main.ts 创建**同一实例**
    * 并传给客户交互通道与 Interface。缺省自建（按 `initialJudgeSwitches.decision`）；跨渲染重载保持，
    * 启动初值来自应用偏好（2026-10-29 客户缺陷修复）。
@@ -660,6 +666,11 @@ export interface DesktopInterface {
    */
   sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult>;
   /**
+   * **客户授权平面自然语言解释入口**（2026-11-04 客户直修；主进程内部使用，不挂 IPC）：
+   * 只做判断 AI 纯理解/预填，不落账、不放行；失败返回 `{ok:false}`（控制器回退现有面板）。
+   */
+  interpretDirective(request: DirectiveInterpretRequest): Promise<DirectiveInterpretResult>;
+  /**
    * **应用代客户推进治理流程（2026-10-18 客户修正；同日真机修正为四角色闭环）**：客户决定成功后
    * （`governance:next-step` 回调），在**后台**打开目标治理角色（Nominator/Convener）会话并投递**唯一一条**任务——
    * `proposal accept` → **先** Convener 写 `docs/removed/<flowId>.yaml`（唯一机器状态，首步提名）；应用**有界轮询**
@@ -843,6 +854,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   // 「替我决策」（2026-10-18 双开关评审 §3.3/§8.2）：同形第二套开关（互不影响）与治理判断闭包工厂。
   const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.decision === true);
   const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
+  // 客户授权平面（2026-11-04 客户直修）：自然语言解释器工厂（与两个 judge 同一套 runtimeOptions/adapter）。
+  const createDirectiveInterpreterFn = deps.createDirectiveInterpreterFn ?? realCreateDirectiveInterpreter;
   // 客户授权平面（C1）：main.ts 构造的控制器；缺省 ⇒ 命中标记 fail-closed（不回退普通聊天）。
   const directiveInput = deps.directiveInput;
   // Pi 配置面板：函数与目标路径均可注入（**测试/e2e 必须注入临时 `.env`**，绝不碰真实仓库根 `.env`）。
@@ -1942,6 +1955,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     createShellJudge: createShellJudgeFn,
     // 「替我决策」（2026-10-18 双开关评审 §8.2）：每会话治理判断闭包工厂（仅 trio + 通道已接时构造）。
     createGovernanceJudge: createGovernanceJudgeFn,
+    // 客户授权平面（2026-11-04 客户直修）：自然语言解释器工厂（按请求项目/引擎即时构造；失败 fail-closed）。
+    createDirectiveInterpreter: createDirectiveInterpreterFn,
     prepareRuntimeProfile: async (runtime) => {
       if (!pendingProfiles.has(runtime)) return;
       if (runtime === "pi" && manager.hasBusyRuntime("pi")) throw new Error(mainT("main.interface.piBusy"));
@@ -2374,6 +2389,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         });
       }
     },
+
+    /** 客户授权平面（2026-11-04 客户直修）：自然语言解释入口（主进程内部使用，不挂 IPC）。 */
+    interpretDirective: (request: DirectiveInterpretRequest): Promise<DirectiveInterpretResult> =>
+      manager.interpretDirective(request),
 
     async openSession(input): Promise<OpenResult> {
       if (!input || typeof input.projectRoot !== "string" || typeof input.roleId !== "string" || !isRuntimeKind(input.runtime)) return { ok: false, error: mainT("main.interface.sessionRequestInvalid") };

@@ -562,6 +562,12 @@ function registerIpc(win: BrowserWindow): void {
       win.webContents.send("directive:confirm-request", payload);
     },
     emitNotice: emitDirectiveNote,
+    // 自然语言（2026-11-04 客户直修）：判断 AI 只做纯理解/预填，不落账、不放行；
+    // 失败/不可用/低置信一律回退现有行为（面板原文 + 未识别片段、确认禁用）。
+    // desktop 在下方创建（desktopRef 句柄）；未就绪 ⇒ 解释不可用（fail-closed 回退）。
+    interpret: (request) =>
+      desktopRef?.interpretDirective(request) ??
+      Promise.resolve({ ok: false as const, reasonCode: "unavailable" as const, reason: "接口尚未就绪" }),
   });
   /** 能力位/双视图推送（`directive:list` 成功视图同形；无当前项目 ⇒ 空视图 + `directivesEnabled:true`）。 */
   const pushDirectiveState = async (): Promise<void> => {
