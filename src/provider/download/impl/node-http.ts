@@ -131,6 +131,7 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
     outer.signal.addEventListener("abort", onOuterAbort, { once: true });
 
     let settled = false;
+    let failureStarted = false;
     let requestRef: ClientRequest | undefined;
     let responseRef: IncomingMessage | undefined;
     let sink: DownloadSink | undefined;
@@ -156,7 +157,8 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
       };
 
       const fail = (code: DownloadErrorCode, detail?: string, redirectTo?: string): void => {
-        if (settled) return;
+        if (settled || failureStarted) return;
+        failureStarted = true;
         try {
           responseRef?.destroy();
         } catch {
@@ -324,7 +326,14 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
             /* 审计失败不影响下载 */
           }
 
-          if (settled || hopController.signal.aborted) return;
+          if (settled || hopController.signal.aborted) {
+            try {
+              await sink.abort();
+            } catch {
+              /* 清理尽力而为 */
+            }
+            return;
+          }
           const hash = createHash("sha256");
           idleTimer = setTimeout(() => hopController.abort("idle"), request.limits.idleTimeoutMs);
           const resetIdle = (): void => {
@@ -352,7 +361,7 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
             );
           });
           res.once("end", () => {
-            if (settled) return;
+            if (settled || failureStarted) return;
             void sink!
               .commit()
               .then((committed) => {

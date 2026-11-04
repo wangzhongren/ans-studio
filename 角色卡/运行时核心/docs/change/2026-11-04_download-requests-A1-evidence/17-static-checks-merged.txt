@@ -1,0 +1,13 @@
+静态门（合并基线 f0adb49，2026-11-04）
+命令: npm run typecheck
+exit: 0
+原始输出:
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+（无错误输出）
+
+判定:
+- B1 已补 F6 一行（src/pipeline/orchestration/run-role.ts CARD_KIND_ROUTE_HINTS.download，约 :2144）并更新 test/编排/decision-card.test.ts 键集断言；repo-wide typecheck 在合并基线通过。
+- A1 写集（5 产品 + 2 测试 + session.ts 0 行）在此基线上编译通过；A1 下载段在合并后完整保留。
+
+原始输出（本地保留）：2026-11-04_download_requests-A1-evidence/13-typecheck-merged.log

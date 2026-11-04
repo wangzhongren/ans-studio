@@ -27,6 +27,7 @@ test("「无法核对」类 code：必须升级客户确认，不得自动拒绝
     "evidence-conflict",
     "evidence-hash-mismatch",
     "context-missing",
+    "download-facts-missing",
   ];
   for (const code of unverifiable) {
     assert.equal(
@@ -48,6 +49,8 @@ test("非「无法核对」类 code：维持既有行为，不被本次直修误
     "model-manual",
     "switch-off",
     "not-recommended",
+    "download-declined",
+    "download-unsafe-url",
     "",
     "unknown-code-xyz",
   ];

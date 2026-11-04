@@ -1,0 +1,3 @@
+src/provider/download/impl/node-http.ts
+"test/\347\274\226\346\216\222/customer-directive.test.ts"
+"test/\347\274\226\346\216\222/unverifiable-rejection.test.ts"

@@ -1,0 +1,8 @@
+ M src/provider/download/impl/node-http.ts
+ M "test/\347\274\226\346\216\222/customer-directive.test.ts"
+ M "test/\347\274\226\346\216\222/unverifiable-rejection.test.ts"
+?? "test/\347\274\226\346\216\222/download-judge.test.ts"
+?? "test/\347\274\226\346\216\222/download-pipeline.test.ts"
+?? "test/\347\274\226\346\216\222/download-provider.test.ts"
+?? "test/\347\274\226\346\216\222/fixtures/download-tls/valid-key.pem"
+?? "test/\347\274\226\346\216\222/fixtures/download-tls/valid.pem"

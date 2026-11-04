@@ -1,0 +1,7 @@
+环境（2026-11-04，A1 运行时核心）
+HEAD: c2f163087aaf11616e5be01f80d305bf6f25af57
+分支: feat/download-requests
+Node: v24.22.1
+npm: 11.19.1
+OS: MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys
+Shell: Git Bash (/bin/bash.exe)

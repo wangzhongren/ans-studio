@@ -94,3 +94,15 @@ O1 迁移后共享全目录首次回归109项中108通过，runtime枚举一致�
 - zh 逐字映射：837 exact / 337 composed-all / 4 composed-partial / 12 no-literal-trace（均为源码多段拼接，见证据）。
 - 未做：消费方迁移、allowlist 收紧、B4 形状、布局/切换/重启/真实 Electron、独立验收；不声称完整 i18n 验收。详见 [B1–B4 变更记录](docs/change/2026-10-23_change_i18n-b1-b4-keys.md)。
 
+## i18n A2：下载申请 key 契约（2026-11-04，`implemented-unverified`）
+
+依据 A2 Revision 2 提案（461 行 / `fe474a934520e117f41b08192f9701462efe253dbda0b76b18bc31884b80065f`）、P1 最终复审（611 行 / `98373dfada8b46759a96ff95096cd00523808de305e2ec7832d89e901adb734d`，`recommend approval`）与闸门 2 写集增补/V1 确认（32 行 / `000022cd6b18d9d6e084ff3e6d792f246ce70c5a8e577c1a67bfa85055270310`）。**最终合并基线**：HEAD `f0adb49058dd126b2b249cfa703993f65092f99b`（`3c88fae` A1/A2/B1 candidates + merge `origin/main` `f4c24ea`；PR #59 运行期文本去 su 中性化，不改变本 key 契约）。本批只加共享消息目录与 `test/项目管理/shared/i18n.test.ts` 契约；未改消费方、未改共享组件/allowlist/`jsonl-ledger`。
+
+- **37 key** = `main.*` 35（`main.download.card.*` 13、`main.download.notice.*` 5、`main.download.error.*` 17）+ `ui.*` 2（`ui.directive.panel.consumer.download` / `downloadLegacyOff`）。
+- 计数：`ui 1092 / main 626 / shared 62 / preferences 3 = 1783`。
+- 契约要点：mechanical 仅 `scheme/publicHost/publicIps` 三项（`credentialsAbsent`/`filenameSafe` 留在 B1 facts/审计，不设 key）；`main.download.notice.completed` 无 `finalUrl`（final URL 仅在 agent-facing 工具回执）；`main.download.notice.gitignoreHint` 保留（G1 A）；不提供 `ui.directive.panel.consumer.downloadStartsNow`（G8 B 未选）；复用 `ui.judge.mode.approval`/`ui.judge.headline.autoApproved`/`ui.request.toCustomer`/`ui.request.toJudge`/`ui.directive.panel.until.*`。
+- 测试：`node --test --test-concurrency=1 "test/项目管理/shared/**/*.test.ts"`（合并基线 f0adb49）→ **11 文件 / 176 tests / 171 pass / 0 fail / 5 skipped**（exit 0；B0 v3 176/171/0/5，+0 新增失败/skip）；聚焦 i18n+guard → **18/18/0/0**，`[i18n-guard] scanned=136 allowlisted=22 violations=0`。
+- 静态门（合并基线 f0adb49）：`npm run typecheck` → **exit 0**；先前未合并基线时的 F6 `run-role.ts` 依赖已解除。
+- 候选哈希（`git hash-object` / `sha256sum`，合并基线 f0adb49；PR #59 只改 zh/en 值、不改 key 契约）：`zh-CN.ts` `c64dfe1f…` / `2e341376…`（2231 行）；`en-US.ts` `6d55039d…` / `9e3803f7…`（2499 行）；`i18n.test.ts` `d9cbb3d5…` / `551ab060…`（832 行）。
+- 状态 `implemented-unverified`：未验收、未 commit/push；详见 [A2 实施记录](docs/change/2026-11-04_download-requests-A2-implementation.md)。
+

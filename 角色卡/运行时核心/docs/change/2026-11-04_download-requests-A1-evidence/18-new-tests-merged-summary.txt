@@ -1,0 +1,8 @@
+新增测试定向（合并基线 f0adb49）
+命令: node --test --test-concurrency=1 test/runtime-core/download-contract.test.ts test/runtime-core/download-tool.test.ts
+exit: 0
+tests: 14 / pass: 14 / fail: 0 / cancelled: 0 / skipped: 0 / todo: 0
+duration_ms: 258.5779
+结论: 合并后新增测试仍全绿（14/14），无回归。
+
+原始输出（本地保留）：2026-11-04_download_requests-A1-evidence/14-new-tests-merged.log

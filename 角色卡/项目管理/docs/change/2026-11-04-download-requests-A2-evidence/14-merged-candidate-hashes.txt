@@ -1,0 +1,6 @@
+c64dfe1fbff6752a8e533cb01800d9ea64b31b81
+6d55039d6287d99bce0d1b30bf17f82fcf72aa14
+d9cbb3d5113f568112f1dfd71199fac89696c185
+2e3413767a2d7593ff4fd5ed0b533bf00a7eb9f8f8ffbceacb9b0384f2ebeac5 *src/common/shared/i18n/messages/zh-CN.ts
+9e3803f711ebe632a238eb2f3cb48f14764441ab7aa308cbe7b993bf5635b1fa *src/common/shared/i18n/messages/en-US.ts
+551ab06032b9b20a538926230b9d4d1892ed6f683a98e0935fc5be180c27b36b *test/项目管理/shared/i18n.test.ts

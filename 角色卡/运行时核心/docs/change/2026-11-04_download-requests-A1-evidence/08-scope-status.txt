@@ -1,0 +1,16 @@
+A1 收尾 scope（2026-11-04）
+status --porcelain -- src app test:
+ M src/common/shared/i18n/messages/en-US.ts        （A2 并行，非 A1）
+ M src/common/shared/i18n/messages/zh-CN.ts        （A2 并行，非 A1）
+ M src/model/directive.ts                          （A1）
+ M src/model/runtime.ts                            （A1）
+ M src/provider/runtime/schema.ts                  （A1）
+ M src/provider/runtime/tools.ts                   （A1）
+ M test/项目管理/shared/i18n.test.ts                （A2 并行，非 A1）
+?? src/model/download.ts                           （A1 新增）
+?? test/runtime-core/download-contract.test.ts      （A1 新增）
+?? test/runtime-core/download-tool.test.ts          （A1 新增）
+
+diff --name-only -- src app test: 同上去掉未跟踪项。
+git diff --cached --name-only: 空（未暂存）。
+未写：src/pipeline/**、src/common/**（A2 i18n 除外，非本角色）、app/**、其他角色测试/文档、角色卡/边界/YAML/changelog、docs/{planning,scheduling,acceptance,communication}。

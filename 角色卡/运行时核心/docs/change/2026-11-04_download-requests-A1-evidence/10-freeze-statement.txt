@@ -1,0 +1,19 @@
+A1-download-request-model freeze v1
+| baseline HEAD: c2f163087aaf11616e5be01f80d305bf6f25af57
+| files:
+|   src/model/download.ts 3a14bf049843b2765212367b0e72c9aaf9a71fc8 3dbdcb52f80569323633d45f7cadb19b934638bbef0b4b797ebb9a7160c7d278
+|   src/model/runtime.ts a3545bedf84c4abfc74cace914d4ed6a126f4246 13459b987b1d4e5c3ae40749f1ca1b0456a262e183b9ceb3278b1ad0520f0344
+|   src/model/directive.ts 3636bca8b3332a287a322cb22197edeac14d37fa 5c522c44522257e222781dbeea66a0065d2f1239acde317b5138c923f960e688
+|   src/provider/runtime/tools.ts 9cf198cb421226d222657f63edbb9a17fa21ac74 5d64eb7bf278e4012ce886419e16128dad45f3f0c09235f7f9c30b9a5acdd85b
+|   src/provider/runtime/schema.ts 858a29caf83a257eca905382b4dadd4d0af46a48 cfdc9ef75989ed3917e458a6fe66968941df4e4b98f2caab5377182e23c5d0e2
+|   src/service/runtime/session.ts 003d15928ff27b9427cef00ed30541ebe9395426 e36ffc226cc95ba7d25fd643b1c182c2e0694ef55f36d0b6b6a74ccd284d4d60（unchanged）
+|   test/runtime-core/download-contract.test.ts eefe8e3f869df81f778ffe560f842bbd360e6018 b16b7163aea63fe8f820d9afa163cfeb11ab338b537587adf1bce7612bd62bc9
+|   test/runtime-core/download-tool.test.ts 8252ace7f8542fdc08188e65b451313b339bb905 71d34c67e7ad1f4281312ebdffa4b5255cafa7e7a739e82355131ae223a1bcc9
+| commands:
+|   node --test --test-concurrency=1 "test/runtime-core/**/*.test.ts" → exit 1；41 files / 323 tests / 316 pass / 3 fail（既有 EPERM 逐名）/ 4 skip
+|   node --test --test-concurrency=1 test/runtime-core/download-contract.test.ts test/runtime-core/download-tool.test.ts → exit 0；14/14
+|   npm run typecheck → exit 1；唯一红点 src/pipeline/orchestration/run-role.ts:2125（B1 写集；F6 R1）
+| compile-unblock: src/pipeline/orchestration/run-role.ts（待 B1 补 download 键；本冻结声明附最终重跑结果前不宣称 typecheck 通过）
+| surface: DownloadErrorCode(17)/DownloadRequestInput/DownloadRequestResult(判别联合)/DownloadJudgeFacts/RequestDownloadFn/常量；GovernanceCardKind+"download"；GOVERNANCE_CARD_GROUP.download=approval；GovernedToolsOptions.requestDownload；GovernanceJudgeContext/Request.download；CustomerDirectiveView.consumer+"download"；request_download schema/注册/形状校验/回执复核
+| status: implemented-unverified
+| change rule: 任何形状变化回运行时核心重跑 A1 并使其消费方证据失效；最终 typecheck 冻结证据待 B1 补 run-role.ts 一行后在合并树重跑
