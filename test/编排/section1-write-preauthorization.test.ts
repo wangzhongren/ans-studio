@@ -3,7 +3,7 @@
 //
 //   角色会话在**没有任务级 writeSet 收窄**时，初始可写集覆盖该角色 Section 1 白名单：
 //     · 内置治理五角色（trio）：无任务 scope 时按注册表 Section 1 预授权（含精确文件条目，如
-//       Convener 的 `docs/workflow.md`，它不在旧 `preauthorizedDirs` 目录清单内）；
+//       Convener 的 `docs/workflow.md`；2026-11-04 客户决定起该精确文件同时列入其 `preauthorizedDirs`）；
 //       有任务 scope 时保留既有 `preauthorizedDirs` 子集（不并入 Section 1）；
 //     · 项目角色：`scope === undefined`（桌面聊天形态）时按自己的边界条目预授权；
 //     · 旧 su（single）：卡未声明该规则——保留 2026-10-16 四棵预授权目录与 A-3 确认制（另有测试钉死）。
@@ -219,7 +219,7 @@ test("任务 writeSet 收窄：writeSet 内放行；边界内但不在 writeSet 
 
 // —————————————— ③ 运营：Section 1 docs/scheduling/ 预授权生效 ——————————————
 
-test("运营（Convener）无任务收窄：docs/scheduling/ 直接放行；他人写集/禁写路径/旧 workflow 仍拒", async () => {
+test("运营（Convener）无任务收窄：docs/scheduling/ 与 docs/workflow.md 直接放行；他人写集/禁写路径仍拒", async () => {
   await withRoot(async (root) => {
     const project = trioProject(root, "convener");
     const captured: Captured = {};
@@ -233,7 +233,8 @@ test("运营（Convener）无任务收窄：docs/scheduling/ 直接放行；他�
       assert.equal(calls.n, 0, "预授权写入不发起客户确认");
       assert.equal(captured.gate!("docs/scheduling/plan.md").allowed, true, "docs/scheduling/ 是 Section 1 预授权");
       assert.equal(captured.gate!("docs/governance/convener/notes.md").allowed, true, "治理工作记录目录同口径");
-      assert.equal(captured.gate!("docs/workflow.md").allowed, false, "D 批旧精确文件 docs/workflow.md 不再在 Section 1");
+      assert.equal(captured.gate!("docs/workflow.md").allowed, true, "2026-11-04 客户决定：docs/workflow.md 为 Section 1 精确文件预授权（工作流先行）");
+      assert.equal(captured.gate!("docs/workflow.md.bak").allowed, false, "精确文件条目只覆盖该文件本身（不覆盖相邻文件）");
       const ans = captured.gate!(".ans/project.json");
       assert.equal(ans.allowed, false);
       assert.match((ans as { reason: string }).reason, /只能由应用写/);
@@ -263,6 +264,35 @@ test("有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条�
       assert.equal(roleCard.allowed, false, "有任务 writeSet 时不并入 Section 1（不扩大）");
       assert.match((roleCard as { reason: string }).reason, /不在任务 writeSet 内（F4）/);
       assert.equal(captured.gate!("docs/scheduling/plan.md").allowed, false, "他人写区照拒");
+    } finally {
+      await handle.dispose();
+    }
+  });
+});
+
+test("运营有任务 writeSet 时：docs/workflow.md 仍按既有 preauthorizedDirs 直接放行；他人写区仍拒", async () => {
+  await withRoot(async (root) => {
+    const project = trioProject(root, "convener");
+    const captured: Captured = {};
+    const handle = await openRoleSession(
+      {
+        roleId: "convener",
+        project,
+        scope: { writeSet: ["docs/scheduling/plan.md"], conditions: [] },
+        autoRepin: false,
+      },
+      { createAdapter: capturingFactory(captured) },
+    );
+    try {
+      assert.equal(captured.gate!("docs/scheduling/plan.md").allowed, true, "任务 writeSet 内路径放行");
+      assert.equal(
+        captured.gate!("docs/workflow.md").allowed,
+        true,
+        "docs/workflow.md 在预授权目录子集内（有任务 writeSet 时也生效，2026-11-04 客户决定）",
+      );
+      const other = captured.gate!("docs/proposals/flow-a-v1.md");
+      assert.equal(other.allowed, false, "他人写区照拒");
+      assert.match((other as { reason: string }).reason, /该路径属.*写区/, "按边界拒绝并给出归属提示");
     } finally {
       await handle.dispose();
     }
