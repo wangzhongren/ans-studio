@@ -516,7 +516,8 @@
 .hb-complete-summary,
 .hb-summary,
 .hb-evidence,
-.hb-evidence li {
+.hb-evidence li,
+.report-evidence {
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -602,14 +603,38 @@
   flex-direction: column;
   gap: 8px;
 }
-.msg-delivery > p {
-  margin: 0;
-  color: var(--foreground);
-  font-size: 12.5px;
-  font-weight: 600;
+/* 交付回执（批次数量/接收历史/目标输入/目标轮次/重试）收进卡片尾部默认折叠区；
+   正文是直接阅读面，回执降为附注。 */
+.delivery-receipt {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
 }
-.msg-delivery > .persistence-state {
-  padding: 0;
+.delivery-receipt > summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.delivery-receipt-note {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.delivery-receipt > .persistence-state {
+  padding: 0 10px 10px;
+}
+.delivery-batch-title {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 400;
 }
 .report-facts.delivery-batch-facts {
   display: grid;
@@ -655,6 +680,23 @@
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+/* 交付行普通报告：正文内联后，证据保留为只含证据的小折叠（summary 用既有计数文案）。 */
+.report-evidence {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+}
+.report-evidence > summary {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.report-evidence .hb-evidence {
+  margin: 0;
+  padding: 0 10px 8px 26px;
 }
 .delivery-report .msg-handback,
 .delivery-report .msg-handback .report-top {

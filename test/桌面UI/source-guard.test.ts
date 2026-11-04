@@ -238,16 +238,23 @@ test("配置与依赖：markdown-it 由 npm 提供且版本 15.0.3；渲染器�
   }
 });
 
-test("验收报告卡：全文只经 Markdown 管线；普通分支保留 report-complete 折叠", () => {
+test("报告卡：全文只经 Markdown 管线；交付行内联全文，普通 handback 保留 preview+report-complete", () => {
   const card = read(join(RENDERER, "shell", "ReportCard.tsx"));
-  assert.match(card, /markdownHtml\(isAcceptance \? full : preview\)/);
-  assert.match(card, /isAcceptance \? null : \(/);
-  assert.match(card, /!isAcceptance && folded \? t\("ui\.reportCard\.folded"\)/);
+  // 交付行（inlineFull）与验收报告直接展示 full；普通 handback（不传 inlineFull）仍是 preview。
+  assert.match(card, /const inline = inlineFull === true;/);
+  assert.match(card, /const showFull = isAcceptance \|\| inline;/);
+  assert.match(card, /markdownHtml\(showFull \? full : preview\)/);
+  assert.match(card, /!showFull && folded \? t\("ui\.reportCard\.folded"\)/);
+  // 只有 DeliveryCard 的 ReportBody 使用 inlineFull；handback 的 ReportCard 不使用。
+  assert.equal((card.match(/inlineFull\s*\n\s*\/>/g) || []).length, 1);
   assert.match(card, /className="report-complete"/);
+  // report-complete 只在非全文（普通 handback）分支渲染。
+  assert.match(card, /showFull \? null : \(/);
   assert.match(card, /ui\.reportCard\.acceptanceTitle/);
   assert.match(card, /ui\.reportCard\.acceptanceBadge/);
   assert.match(card, /className="acceptance-evidence"/);
   assert.match(card, /ui\.reportCard\.evidenceCount/);
+  assert.match(card, /className="report-evidence"/);
 });
 
 test("P1-ARC-01/02：外层验收类以 reportVersionSupported 门控；交付批 is-blocked 仅验收段", () => {
