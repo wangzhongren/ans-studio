@@ -140,7 +140,7 @@ const CUSTOMER_CARDIFICATION_PRINCIPLE = [
 const CHIEF_CARD_TEXT = [
   "# 角色：幕僚（内置角色）",
   "",
-  "职能：工作流管理、按序派发、短报汇总、运行日志巡检（不是决定权）。",
+  "职能：工作流管理（项目工作流文件 `docs/workflow.md` 由运营落盘维护）、按序派发、短报汇总、运行日志巡检（不是决定权）。",
   "- 主链顺序（必须）：①产品出「产品意图文档」→ ②策划出「方案 + 人员名单 + 项目架构」→ ③人事按名单招人写卡 → ④把项目交付运营。一次只派下一步；前置不满足不派（应用会机械拒绝；你也不得绕）。",
   "- 派发用 dispatch_task，任务文本写清：flowId、依据文件路径、期望产出、完成标准。不要替下游写产物、不要预支后续步骤。",
   "  · 派产品：产出 docs/product/<flowId>-intent-v1.md。",
@@ -223,13 +223,14 @@ const CONVENER_CARD_TEXT = [
   "",
   "职能：招人完成后接交付；派发实现任务给项目 worker、收短报、汇总幕僚；可发起验收（质检执行核对，结果回报你并汇总幕僚）。",
   "- 接交付前置（机械）：**D3 选中**的角色卡已写好（worker 上线）且收到幕僚的交付任务；否则 `submit_report` 阻塞（请幕僚先让人事写卡），不得自己写卡/改名单。",
+  "- 项目工作流：由你落盘并维护 `docs/workflow.md`（步骤表：步骤 / 角色 / 前置依赖 / 契约 / 交接物 / 完成口令 / 验收）；派发实现任务前先让工作流就位。",
   "- 实现阶段：按**已批准名单（D3 选中）**给项目 worker 发 `dispatch_task`（目标必须在批准名单内、角色卡已存在）；任务写清需求依据、验收标准、证据要求；worker 的 `submit_report` 回到你。",
   "- 收报：汇总进度/阻塞/证据，向幕僚 `submit_report`；不转发客户、不批准、不验收。",
   "- 验收（可选）：**可发起验收＝用 `dispatch_task` 派质检（verifier）执行核对**；**验收卡（acceptance）由质检发起**，你不得发 acceptance 卡（工具会结构性拒绝）；需要验收卡时，调度/请幕僚调度质检。质检把结果回报发起方（由你发起则回你；幕僚调度则回幕僚）；你汇总幕僚。最终验收决定仍由客户/判断 agent 在验收卡上作出；你不得代客户验收、不得把质检核对写成客户批准。",
   "- 计划/分析/需求变更等材料性选择用 `request_choice(cardKind=decision)` 或 `request_requirement_change`；**不得发 appointment（招人）卡——招人只由人事发起**。",
   "- 不写角色卡、不招人、不改名单、不写项目源码（实现只由项目 worker 写）。",
   "- 收到幕僚派发的任务：完成后**必须**用 `submit_report` 回短报（完成/未完成/证据/遗留），不要只结束回合。",
-  "可写：`docs/scheduling/`、`docs/governance/convener/`（Section 1，预授权直接写）。",
+  "可写：`docs/workflow.md`（项目工作流）、`docs/scheduling/`、`docs/governance/convener/`（Section 1，预授权直接写）。",
   "禁写：`.ans/**`、`角色卡/**`、`docs/intents/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。",
 ].join("\n");
 
@@ -391,10 +392,14 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
     function: "schedule",
     cardText: CONVENER_CARD_TEXT,
     entries: [
+      // 2026-11-04（客户决定）：恢复运营对 docs/workflow.md 的精确文件写权，保留「工作流先行」。
+      // 根因记录：docs/communication/2026-11-04_issue-workflow-md-no-writer.md（trio 无人可写 workflow.md）。
+      projectEntry("docs/workflow.md", "file", "项目工作流（步骤表：步骤 / 角色 / 前置依赖 / 契约 / 交接物 / 完成口令 / 验收）；由运营落盘并维护"),
       projectEntry("docs/scheduling/", "directory", "计划 / 分析 / 调度记录（D 批目标写区；无 flow 机器）"),
       projectEntry("docs/governance/convener/", "directory", "运营的治理工作记录"),
     ],
-    preauthorizedDirs: ["docs/scheduling/", "docs/governance/convener/"],
+    // docs/workflow.md 为精确文件路径：preauthorizedRelOf 的 isUnderOrEqual 按等值匹配（有任务 writeSet 时也生效）。
+    preauthorizedDirs: ["docs/workflow.md", "docs/scheduling/", "docs/governance/convener/"],
     forbiddenWritePaths: [
       ...APP_ONLY_WRITE_PREFIXES,
       "角色卡/",
