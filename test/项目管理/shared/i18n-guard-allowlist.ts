@@ -33,6 +33,9 @@
 export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   // 演示运行时 agent-facing `systemPrompt`（demo 演示提示词，不面向客户）——classification §4。
   "app/desktop/chat-adapter.ts",
+  // `mechanical-rejection` 的技能路径「编排」出现在 import specifier（机器路径，非用户可见 UI）；
+  // 展示文本已 key 化——classification §4。
+  "app/desktop/customer-input.ts",
   // 输入解析关键字「撤销」，非用户可见 UI；展示文案已 key 化——classification §4。
   "app/desktop/directive-input.ts",
   // 角色卡/团队计划 schema 词汇（组别/写集/依赖…）、`new/changed/existing` 输入别名、

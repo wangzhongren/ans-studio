@@ -1,8 +1,11 @@
 export const SOURCE_REF = 'v1.9.1';
 export const SOURCE_SHA = '3efee86f7645e2a0bbee3aefd0de5db60dffb900';
 // v1.9.1 overlay：冻结源 tag v1.9.1 已含全部产品/测试代码（交付行默认内联报告正文；自动决策「无法核对」
-// 原卡转客户确认与同指纹拒绝去重）；白名单**保持基础集**（files＝package.json、package-lock.json、
-// .github/workflows/release.yml；dirs＝src/common/装配/、test/装配/），**无产品/测试 overlay 条目**。
+// 原卡转客户确认与同指纹拒绝去重）；白名单为基础集（files＝package.json、package-lock.json、
+// .github/workflows/release.yml；dirs＝src/common/装配/、test/装配/）+ 1 条发布阻断修复条目（见下）。
+// v1.9.1 发布阻断修复（tag v1.9.1 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽）：
+//   · 测试 1 条：test/项目管理/shared/i18n-guard-allowlist.ts——为 app/desktop/customer-input.ts 补 allowlist
+//     条目（import specifier 含技能路径「编排」，classification §4 机器路径）；守卫本身与断言未放宽。
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.0 overlay）：冻结源 tag v1.9.0 已含全部产品/测试代码（contract_check 只读 schema 查询与逐字段
 // 错误诊断、客户授权平面（@审批/@决策 与客户指令账本 customer.directives.jsonl）、角色资料抽屉布局修复）；
@@ -61,7 +64,8 @@ export const SOURCE_SHA = '3efee86f7645e2a0bbee3aefd0de5db60dffb900';
 //     test/测试/governance-e2e-auto/c-appointment-timing.test.ts（Windows 时序可见性修复）。
 // fail-closed 不变：未列名的 app//src/ 变更仍使 prepare 明确失败；
 // 未列名的 test/ 文件仍静默落 excluded、不随构建树（机制同前：经评审文件必须显式入列）。
-const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml']);
+const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
+  'test/项目管理/shared/i18n-guard-allowlist.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];
