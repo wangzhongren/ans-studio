@@ -1,0 +1,7 @@
+   995 app/renderer/src/chat/judge.ts
+  1098 app/renderer/src/stores/directive-store.ts
+   231 app/renderer/src/chat/decision-dialog.ts
+    82 app/renderer/src/chat/decision-card.ts
+   210 test/桌面UI/download-card.test.ts
+   396 test/桌面UI/directive-dialog.test.ts
+  3012 total

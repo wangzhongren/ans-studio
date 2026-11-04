@@ -1,0 +1,6 @@
+7c36040fba2dba8f5a091e60a73fcf3996c9e56530e81f34b787533e11af9d51 *app/renderer/src/chat/judge.ts
+fde4d42234b1924e5683a0c6c0bd9980c441f85c87848e4e3635ed04ec2e8fac *app/renderer/src/stores/directive-store.ts
+c62d44b4e34308255ed8217539a4ec3f238429512cfd556c223f7f6c3b4d1679 *app/renderer/src/chat/decision-dialog.ts
+6ff3f120b5efcf4bfca8e299d7fbee5df4a4d85bbca8e8458736c85c00f11753 *app/renderer/src/chat/decision-card.ts
+b2afaac90e8072de5db7fbddcaaa98a4c87652ad73abc29ea922040b8b84e23a *test/桌面UI/download-card.test.ts
+3b89841ba15d845925d922c2dd9413e2d034f0437aca305bea175ba27fc7a5c0 *test/桌面UI/directive-dialog.test.ts
