@@ -10,11 +10,13 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import http from "node:http";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import type { AddressInfo } from "node:net";
 
 import { createNodeDownloadTransport, type NodeDownloadTransportOptions } from "../../src/provider/download/impl/node-http.ts";
@@ -26,6 +28,7 @@ import { filenameFromContentDisposition, sanitizeFilename } from "../../src/serv
 import { checkUrl, isSameHostForRedirect } from "../../src/service/download/impl/url-policy.ts";
 
 const FIXTURES = path.join(process.cwd(), "test", "编排", "fixtures", "download-tls");
+const execFileAsync = promisify(execFile);
 const PINNED_LOCALHOST: PinnedAddress[] = [{ address: "127.0.0.1", family: 4 }];
 
 async function withProject<T>(fn: (projectRoot: string) => Promise<T>): Promise<T> {
@@ -448,5 +451,99 @@ test("epoch store：missing→ensure 创建 ready；不可读不重写；同一�
     const state = await store.ensure("9.9.9");
     assert.equal(state.state, "unreadable");
     assert.deepEqual(await fs.readFile(file), before);
+  });
+});
+
+test("AC-12 故障注入：rename 失败 ⇒ download-write-failed；清理 temp/占位，既有同名文件字节不变", async () => {
+  await withProject(async (projectRoot) => {
+    await fs.mkdir(path.join(projectRoot, "download"), { recursive: true });
+    await fs.writeFile(path.join(projectRoot, "download", "file.bin"), "OLD-BYTES");
+    const server = await startServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/octet-stream" });
+      res.end("NEW-BYTES");
+    });
+    try {
+      const transport = createNodeDownloadTransport({
+        fileSinkHooks: {
+          rename: async () => {
+            const error = new Error("injected rename failure");
+            (error as NodeJS.ErrnoException).code = "EIO";
+            throw error;
+          },
+        },
+      });
+      const result = await transport.execute(makeRequest(projectRoot, server.baseUrl));
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.code, "download-write-failed");
+      assert.deepEqual(await listDownloadDir(projectRoot), ["file.bin"]);
+      assert.equal((await readDownload(projectRoot, "file.bin")).toString(), "OLD-BYTES");
+      const dirEntries = await fs.readdir(path.join(projectRoot, "download"));
+      assert.equal(dirEntries.some((name) => name.endsWith(".part")), false);
+      assert.equal(dirEntries.some((name) => name.includes("(1)")), false);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test("AC-12 故障注入：写盘失败 ⇒ download-write-failed；无 .part/占位/半成品", async () => {
+  await withProject(async (projectRoot) => {
+    const server = await startServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/octet-stream" });
+      res.end("BODY");
+    });
+    try {
+      const transport = createNodeDownloadTransport({
+        fileSinkHooks: {
+          beforeWrite: () => {
+            const error = new Error("injected write failure");
+            (error as NodeJS.ErrnoException).code = "EIO";
+            throw error;
+          },
+        },
+      });
+      const result = await transport.execute(makeRequest(projectRoot, server.baseUrl));
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.code, "download-write-failed");
+      assert.deepEqual(await listDownloadDir(projectRoot), []);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+test("AC-13：download 为 Windows junction ⇒ download-write-failed，不跟随/不写目标目录", async (t) => {
+  await withProject(async (projectRoot) => {
+    const target = await fs.mkdtemp(path.join(os.tmpdir(), "ans-download-junction-target-"));
+    const link = path.join(projectRoot, "download");
+    let usedJunction = true;
+    let setupError: unknown;
+    try {
+      await execFileAsync("cmd", ["/c", "mklink", "/J", link, target]);
+    } catch (error) {
+      usedJunction = false;
+      setupError = error;
+      // 环境无法创建 junction 时，用普通文件占位（同样证明「download 不是目录 ⇒ 拒绝」）；
+      // 证据中如实披露 junction 不可用，不把它当作 junction 通过。
+      await fs.writeFile(link, "not-a-directory");
+    }
+    const server = await startServer((_req, res) => { res.writeHead(200); res.end("SHOULD-NOT-WRITE"); });
+    try {
+      if (usedJunction) {
+        const stat = await fs.lstat(link);
+        assert.equal(stat.isSymbolicLink(), true, "junction 应被 lstat 识别为链接");
+      } else {
+        t.diagnostic(`junction 不可用（fallback 普通文件）: ${setupError instanceof Error ? setupError.message : String(setupError)}`);
+      }
+      const transport = createNodeDownloadTransport();
+      const result = await transport.execute(makeRequest(projectRoot, server.baseUrl));
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.code, "download-write-failed");
+      assert.deepEqual(await fs.readdir(target), [], "不得跟随链接写入目标目录");
+      if (usedJunction) assert.equal((await fs.lstat(link)).isSymbolicLink(), true, "junction 未被替换");
+    } finally {
+      await server.close();
+      await fs.rm(target, { recursive: true, force: true });
+    }
   });
 });

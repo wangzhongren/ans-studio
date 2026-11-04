@@ -36,7 +36,14 @@ import {
   type DownloadApprovalRequest,
   type DownloadRunResult,
 } from "../../src/pipeline/orchestration/download-request.ts";
-import type { TakeDownloadDirectiveFn } from "../../src/pipeline/orchestration/customer-directive.ts";
+import {
+  createCustomerDirectiveRuntime,
+  type CustomerDirectiveRuntime,
+  type DirectivePresenter,
+  type DirectiveStore,
+  type TakeDownloadDirectiveFn,
+} from "../../src/pipeline/orchestration/customer-directive.ts";
+import { CUSTOMER_DIRECTIVES_REL } from "../../src/model/directive.ts";
 import { makeMechanicalRejection } from "../../src/common/编排/mechanical-rejection.ts";
 import { DOWNLOAD_ERROR_CODES } from "../../src/model/download.ts";
 
@@ -513,4 +520,93 @@ test("judge approve：approval 归属 judge、审计 decided.judge 保留 engine
     assert.equal(decided.by, "judge");
     assert.equal(decided.judge?.reasonCode, "sufficient");
   }
+});
+
+test("AC-14：forever/session 预授权两次下载均命中（无卡片/无消费）；downloads.jsonl 两条/各 by directive+directiveId", async () => {
+  const lines: string[] = [];
+  const directiveStore: DirectiveStore = {
+    relPath: CUSTOMER_DIRECTIVES_REL,
+    async append(line) { lines.push(line); },
+    async replay() { return { lines: [...lines], errors: 0, files: ["customer-directives.jsonl"] }; },
+  };
+  const directivePresenter: DirectivePresenter = {
+    async present(request) {
+      const forever = request.rawText.includes("forever.example.com");
+      return {
+        decision: "confirm",
+        values: {
+          action: { kind: "allow", resource: { type: "domain", host: forever ? "forever.example.com" : "session.example.com", wildcard: false } },
+          scope: {},
+          until: forever ? "forever" : "session",
+          acknowledged: true,
+        },
+      };
+    },
+  };
+  const directives: CustomerDirectiveRuntime = createCustomerDirectiveRuntime({
+    projectRoot: "/proj",
+    sessionId: "session-A",
+    present: directivePresenter,
+    now: () => new Date("2026-11-04T00:00:00.000Z"),
+    store: directiveStore,
+    downloadEpochStore: {
+      async read() { return { state: "ready", enabledAt: "2026-11-03T00:00:00.000Z", appVersion: "test" }; },
+      async ensure() { return { state: "ready", enabledAt: "2026-11-03T00:00:00.000Z", appVersion: "test" }; },
+    },
+  });
+  for (const [rawText, host] of [
+    ["@审批 允许联网 domain=forever.example.com forever", "forever.example.com"],
+    ["@审批 允许联网 domain=session.example.com session", "session.example.com"],
+  ]) {
+    const submitted = await directives.submitFromInput({
+      rawText: rawText!,
+      target: "approval",
+      projectRoot: "/proj",
+      roleId: "X",
+      decisionGroupEnabled: true,
+    });
+    assert.equal(submitted.ok, true, `${host}: ${JSON.stringify(submitted)}`);
+  }
+
+  const harness = makeHarness({
+    epoch: { state: "ready", enabledAt: "2026-11-03T00:00:00.000Z", appVersion: "test" },
+    takeDownloadDirective: directives.takeDownloadDirective.bind(directives),
+  });
+  const results: DownloadRunResult[] = [];
+  for (const url of [
+    "https://forever.example.com/a",
+    "https://forever.example.com/b",
+    "https://session.example.com/a",
+    "https://session.example.com/b",
+  ]) {
+    results.push(await harness.runtime.download({ url, purpose: "预授权两次下载" }));
+  }
+  for (const result of results) {
+    assert.equal(result.ok, true, JSON.stringify(result));
+    if (result.ok) {
+      assert.equal(result.approval.kind, "directive");
+      assert.match(result.approval.directiveId ?? "", /^d-/);
+      assert.equal(result.requestId, undefined);
+    }
+  }
+  assert.equal(harness.presenterCalls.length, 0, "预授权命中不调 presenter");
+  assert.equal(harness.transportCalls.length, 4);
+  const decided = harness.events.filter((event) => event.kind === "download.decided");
+  assert.equal(decided.length, 4);
+  for (const event of decided) {
+    if (event.kind !== "download.decided") continue;
+    assert.equal(event.by, "directive");
+    assert.equal(event.presented, false);
+    assert.equal(event.requestId, undefined);
+    assert.match(event.directiveId ?? "", /^d-/);
+  }
+  const ids = new Set(decided.map((event) => event.kind === "download.decided" ? event.directiveId : undefined));
+  assert.equal(ids.size, 2, "forever/session 各一条指令");
+  assert.equal(harness.events.filter((event) => event.kind === "download.completed").length, 4);
+  assert.equal(harness.events.some((event) => event.kind === "download.failed"), false);
+
+  // forever/session 均未被消费：再次查询仍命中同一 forever 指令。
+  const again = await directives.takeDownloadDirective({ host: "forever.example.com", enabledAt: "2026-11-03T00:00:00.000Z" });
+  assert.equal(again?.action, "allow");
+  assert.equal(again?.scope, "forever");
 });

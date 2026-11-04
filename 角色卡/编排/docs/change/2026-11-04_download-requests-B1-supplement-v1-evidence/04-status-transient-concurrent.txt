@@ -1,0 +1,5 @@
+ M src/provider/download/impl/file-sink.ts
+ M src/provider/download/impl/node-http.ts
+ M "test/\346\265\213\350\257\225/download-requests-electron-probe.mjs"
+ M "test/\347\274\226\346\216\222/download-pipeline.test.ts"
+ M "test/\347\274\226\346\216\222/download-provider.test.ts"

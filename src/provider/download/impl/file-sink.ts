@@ -22,6 +22,14 @@ import { DownloadProviderError } from "../abstract/download-provider.ts";
 
 const PLACEHOLDER_LIMIT = 10_000;
 
+/** 仅测试装配的故障注入钩子（生产公共工厂不暴露；上层不得使用）。 */
+export interface DownloadSinkHooks {
+  /** 替换 rename（抛错模拟 rename 失败）。 */
+  rename?: (from: string, to: string) => Promise<void>;
+  /** 写入前钩子（抛错模拟写盘失败；收到本次 chunk）。 */
+  beforeWrite?: (chunk: Buffer) => void | Promise<void>;
+}
+
 export interface DownloadSink {
   /** 实际最终文件名（含重名后缀）。 */
   readonly fileName: string;
@@ -131,7 +139,11 @@ async function recheckFinalTarget(full: string, projectRoot: string, realRoot: s
  * 创建 sink：先目录守卫 → 占位（wx，不覆盖）→ 同目录 `.part`（wx）。
  * 调用方必须 `commit()` 或 `abort()`；失败时 sink 自身尽力清理。
  */
-export async function createDownloadSink(projectRoot: string, requestedFileName: string): Promise<DownloadSink> {
+export async function createDownloadSink(
+  projectRoot: string,
+  requestedFileName: string,
+  hooks?: DownloadSinkHooks,
+): Promise<DownloadSink> {
   assertSingleFileName(requestedFileName);
   const { downloadDir, realRoot, realDownload } = await ensureDownloadDir(projectRoot);
   const placeholder = await createPlaceholder(downloadDir, requestedFileName);
@@ -179,6 +191,7 @@ export async function createDownloadSink(projectRoot: string, requestedFileName:
     async write(chunk: Buffer): Promise<void> {
       if (finished) throw new DownloadProviderError("download-write-failed", "sink-finished");
       try {
+        if (hooks?.beforeWrite !== undefined) await hooks.beforeWrite(chunk);
         await handle!.write(chunk);
       } catch (error) {
         throw writeError(error);
@@ -193,7 +206,8 @@ export async function createDownloadSink(projectRoot: string, requestedFileName:
         await handle!.sync();
         await handle!.close();
         closed = true;
-        await renameReplacingExisting(tempPath, placeholder.full);
+        if (hooks?.rename !== undefined) await hooks.rename(tempPath, placeholder.full);
+        else await renameReplacingExisting(tempPath, placeholder.full);
       } catch (error) {
         await cleanup();
         throw writeError(error);

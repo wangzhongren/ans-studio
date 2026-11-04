@@ -22,7 +22,7 @@ import {
   type TransportRequest,
   type TransportResult,
 } from "../abstract/download-provider.ts";
-import { createDownloadSink, type DownloadSink } from "./file-sink.ts";
+import { createDownloadSink, type DownloadSink, type DownloadSinkHooks } from "./file-sink.ts";
 
 /** 测试装配选项（生产工厂不暴露）。 */
 export interface NodeDownloadTransportOptions {
@@ -36,6 +36,8 @@ export interface NodeDownloadTransportOptions {
   agent?: http.Agent | false;
   /** 测试时钟（durationMs）。 */
   now?: () => number;
+  /** 仅测试：file sink 故障注入（rename/写盘失败）；生产工厂不暴露。 */
+  fileSinkHooks?: DownloadSinkHooks;
 }
 
 const USER_AGENT = "ANS-Download/1";
@@ -314,7 +316,7 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
           }
           if (settled || hopController.signal.aborted) return;
           try {
-            sink = await createDownloadSink(request.projectRoot, plan.fileName);
+            sink = await createDownloadSink(request.projectRoot, plan.fileName, options.fileSinkHooks);
           } catch (error) {
             const code = error instanceof DownloadProviderError ? error.code : "download-write-failed";
             discardAndFail(code, error instanceof DownloadProviderError ? error.detail : "sink-create-failed");
@@ -335,6 +337,7 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
             return;
           }
           const hash = createHash("sha256");
+          let pendingWrite: Promise<void> | undefined;
           idleTimer = setTimeout(() => hopController.abort("idle"), request.limits.idleTimeoutMs);
           const resetIdle = (): void => {
             if (idleTimer !== undefined) clearTimeout(idleTimer);
@@ -350,11 +353,15 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
             bytesWritten += chunk.length;
             hash.update(chunk);
             res.pause();
-            void sink!.write(chunk).then(
+            const writeTask = sink!.write(chunk);
+            pendingWrite = writeTask;
+            void writeTask.then(
               () => {
+                if (pendingWrite === writeTask) pendingWrite = undefined;
                 if (!settled) res.resume();
               },
               (error: unknown) => {
+                if (pendingWrite === writeTask) pendingWrite = undefined;
                 const code = error instanceof DownloadProviderError ? error.code : "download-write-failed";
                 fail(code, error instanceof DownloadProviderError ? error.detail : "sink-write-failed");
               },
@@ -362,9 +369,15 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
           });
           res.once("end", () => {
             if (settled || failureStarted) return;
-            void sink!
-              .commit()
-              .then((committed) => {
+            void (async () => {
+              try {
+                if (pendingWrite !== undefined) await pendingWrite;
+              } catch {
+                return; // 写盘失败由 data 处理器统一 fail/清理
+              }
+              if (settled || failureStarted) return;
+              try {
+                const committed = await sink!.commit();
                 settle({
                   kind: "success",
                   result: {
@@ -378,11 +391,11 @@ export function createNodeDownloadTransport(options: NodeDownloadTransportOption
                     durationMs: Math.max(0, now() - startedAt),
                   },
                 });
-              })
-              .catch((error: unknown) => {
+              } catch (error) {
                 const code = error instanceof DownloadProviderError ? error.code : "download-write-failed";
                 fail(code, error instanceof DownloadProviderError ? error.detail : "sink-commit-failed");
-              });
+              }
+            })();
           });
           res.once("error", (error: unknown) => {
             const mapped = hopController.signal.aborted ? mapAbortReason(hopController.signal.reason) : mapNetworkError(error);

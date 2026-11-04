@@ -1,0 +1,4 @@
+24bd9294b73b72688a54fe837f30224b3381071b9852dda144920472bd0000ea  src/provider/download/impl/file-sink.ts
+a4074481dda97250a728c5c85156a2c7fb51111dbf119cc6e8f7a181faaafa07  src/provider/download/impl/node-http.ts
+4e2bf68210e3d9647d77ea9f276339f142d52e279cf77ce86c7d9e5076aad557  test/编排/download-provider.test.ts
+07b9e53940d19aa35690094c80673c00d7bd4ab81539398ce8dcbb849eafaaf5  test/编排/download-pipeline.test.ts

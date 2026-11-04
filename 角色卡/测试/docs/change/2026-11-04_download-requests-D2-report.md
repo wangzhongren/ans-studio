@@ -1,6 +1,6 @@
 # D2 报告：真实 Electron 探针与截图（2026-11-04）
 
-**风险档位：T3｜判定依据：团队计划 §6.4；V1 `docs/acceptance/download-requests-criteria-v1.md` §4.6；B0 v3 Electron 事实；C1/C2 实施记录｜选定检查：真实 Electron 窗口 + 真实 preload/渲染器 + 真实 customer-input 通道/SessionManager + 真实 B1 下载 Pipeline/Provider（本地 HTTP 服务与 presenter 回包为替身）；8 张截图 + 63 项现场断言；候选逐文件 hash-object/sha256 + diff/status｜复用证据：T3 不重跑（D1 于同一代码候选 `1d7560f` 记录 417 文件 / 3761 / 3734 / 9 / 18；本 D2 HEAD `691846b` 相对 `1d7560f` 仅新增 D1 测试与证据提交，产品代码相同）｜消费者重测结论：D1 六组 + T3 已覆盖；D2 现场验证 UI/通道/判断/预授权/审计链路｜全量回归：已执行（D1，见 §6）**
+**风险档位：T3｜判定依据：团队计划 §6.4；V1 `docs/acceptance/download-requests-criteria-v1.md` §4.6；B0 v3 Electron 事实；C1/C2 实施记录｜选定检查：真实 Electron 窗口 + 真实 preload/渲染器 + 真实 customer-input 通道/SessionManager + 真实 B1 下载 Pipeline/Provider（本地 HTTP 服务与 presenter 回包为替身）；8 张截图 + 63 项现场断言；候选逐文件 hash-object/sha256 + diff/status｜复用证据：T3 不重跑（D1 于同一代码候选 `1d7560f` 记录 417 文件 / 3761 / 3734 / 9 / 18；本 D2 HEAD `691846b` 相对 `1d7560f` 仅新增 D1 测试与证据提交，产品代码相同）｜消费者重测结论：D1 六组 + T3 已覆盖；D2 现场验证 UI/通道/判断/预授权/审计链路｜全量回归：已执行（D1，见 §6）｜更正记录与污染披露见 §0**
 
 - 任务 ID：`2026-11-04-download-requests`
 - 节点：D2（真实 Electron 探针与截图）
@@ -9,6 +9,22 @@
 - 工作区：`C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\download-requests`
 - 状态：**`implemented-unverified`**（D2 只报告，不判验收；E2 独立判定）
 - 纪律：只新增 `test/测试/download-requests-electron-probe.mjs` 与 `角色卡/测试/docs/change/` 证据；不改产品源码、其他角色测试/文档、`test/桌面应用/e2e/`、boundary/changelog、`docs/scheduling|acceptance|communication`；不 commit/push；不启动子代理。
+
+## 0. 更正记录与污染披露（E2 §3.5 后续）
+
+### 0.1 更正
+
+- E2 报告 `docs/acceptance/download-requests-report-v1.md` §3.5 指出：原 D2 报告 §4 行 1 把「截断标记」列为「11 项字段逐项断言」的一部分，但 `probe.log`/`report.json` 中 `resolvedIpsTruncated` 出现 **0 次**——属**过度陈述**。
+- 本次更正：§4 行 1 改为逐项列出实际断言的 11 个字段（角色/用途/URL/主机/单一解析 IP/文件名/上限/重定向策略/协议校验/主机校验/解析 IP 校验），并明确**未断言** `resolvedIpsTruncated`/`resolvedIpsTotal`；该截断状态在本候选的真实运行证据中仍仅由单测（`test/桌面应用/download-request.test.ts`「共 12 个，仅显示前 2 个」）覆盖。
+- 原报告（121 行 / SHA-256 `288ddc19ba11972505a91da391dfd51cab5b6613bbd2d1b2a7c692fa4e40c761`）保留为历史；本文件为更正版。
+
+### 0.2 可选加固尝试与并发污染（不可作为候选证据）
+
+- 为补 >8 IP 截断展示，探针曾增加测试解析器（`many.example.com` 返回 12 个公网 IP）与第 8b 场景（断言「共 12 个，仅显示前 8 个」、前 8 显示/后 4 不显示并截图）。
+- 加固重跑期间（约 21:00–21:02），其它角色在本工作区并发写入：`src/provider/download/impl/file-sink.ts`（mtime 21:01:24）、`src/provider/download/impl/node-http.ts`（21:02:04）、`test/编排/download-provider.test.ts`（21:02:15）、`test/编排/download-pipeline.test.ts`。按 D2 规则，该次运行**不可认证**，其截图/日志不作为候选证据。该次运行观测到 77 PASS / 0 FAIL / 9 SHOT（含新增 12-IP 场景），但因混合树不得引用。
+- 已处置：探针恢复为 HEAD 版本（`test/测试/download-requests-electron-probe.mjs` 与 HEAD 一致）；加固补丁保存为 `11-hardening-probe.patch`；该次运行产物隔离在 `10-contaminated-run/`（仅透明保留，不参与判定）。
+- **证据损失（如实披露）**：该次重跑覆写了 Git 忽略的原证据 `probe.log` 与 8 张截图，原始字节不可恢复。原证据哈希仍记录在恢复自 HEAD 的 `report.json`（SHA-256 `668f0ca4ba9badb6b34c48d3f2bd4ea13be64e29c0bf4024e22e2dc0332a169b`）、本报告 §5 与 E2 的已核验记录中；`10-contaminated-run/` 中的图片是污染运行产物，哈希与 §5 不符，**不得引用**。
+- 加固补丁建议在 B1 补证提交、工作区干净后于 D1-supplement/复判阶段重跑；届时以新运行结果替换本报告 §4/§5 与索引。
 
 ## 1. 前置核对（开工 20:29:44）
 
@@ -41,7 +57,7 @@
 
 | # | 场景 | 结果 | 证据 |
 | --- | --- | --- | --- |
-| 1 | 真实窗口下载确认卡字段：角色/用途/URL/主机/已解析 IP/截断标记/mechanical 三项/文件名/上限/重定向策略 | **PASS**（标题「下载文件申请」、kind `download`、11 项字段逐项断言） | 截图 `01-download-card-customer.png` |
+| 1 | 真实窗口下载确认卡字段：角色/用途/URL/主机/已解析 IP（单一）/mechanical 三项/文件名/上限/重定向策略 | **PASS**（标题「下载文件申请」、kind `download`；逐项断言：申请角色、用途、URL、主机、单一解析 IP、文件名、大小策略、重定向策略、协议校验、主机校验、解析 IP 校验——共 11 项；**未断言** `resolvedIpsTruncated`/`resolvedIpsTotal`，该状态仅单测覆盖，见 §0.1） | 截图 `01-download-card-customer.png`（原图字节已丢失，见 §0.2） |
 | 2 | 客户批准 → 执行完成、文件落盘、完成回执（含路径/gitignore 提示） | **PASS**（`download/report.pdf` 内容一致；`request.created/presented/resolved` + `downloads.jsonl` by customer+requestId） | 截图 `02-download-completed-customer.png` |
 | 3 | 客户拒绝 → `download-declined`、不落盘 | **PASS** | 截图 `03-download-card-declined.png` |
 | 4 | 开关开 + judge approve → 不弹客户卡、judge 结果行、`presented.to:"judge"`、`downloads.jsonl` by judge（含 engine/reasonCode） | **PASS**（结果行显示「judge 代批 · 代审批」「已代批 · 流程 download」） | 截图 `04-judge-result-row.png` |
@@ -64,6 +80,7 @@
 | `session/forever` 可重复（除 session 外的 forever 重复性） | D2 现场只执行 session 与 once；forever 语义已在 B1 单元/集成覆盖 | `test/编排/customer-directive.test.ts`、D1 集成第 1/2 场景 |
 | 超时清理（D2 现场未触发传输超时） | 探针已覆盖超限清理；超时清理在 D1 集成与 Provider 测试中覆盖 | D1 集成「大小超限与超时」、`test/编排/download-provider.test.ts` |
 | `unavailableReason` 通道防御 | D2 现场以 judge manual 路径覆盖「不可核对转客户卡」；`unavailableReason` 专项防御由 C1/D1 单测覆盖 | `test/桌面应用/download-decision.test.ts`、D1 集成第 9 场景 |
+| >8 个解析结果的 `resolvedIpsTruncated/Total` 展示 | 受认证的 D2 运行只有单一 IP；该状态由单测覆盖。补截图尝试因并发污染不可认证（见 §0.2），加固补丁待干净树重跑 | `test/桌面应用/download-request.test.ts`（「共 12 个，仅显示前 2 个」） |
 
 ## 5. 截图元数据（8 张，无录屏；窗口 1360×860；未加载 DEBUG 覆盖层）
 
@@ -78,12 +95,15 @@
 | `07-redirect-re-request-card.png` | `7ab800d3fc7b91ef93f63196856bee44aa4e9352f1b0aac25623ae6e6896eeaa` | 108,075 | 跨域后重新申请卡片 |
 | `08-card-english.png` | `1b0f4f307e3163d681a35a34828bf84921ba33bd369daca08ad830df9bba0860` | 128,943 | en-US 卡片与按钮 |
 
-截图哈希与报告（`report.json`）内记录一致；拍摄方式：探针内 `win.webContents.capturePage()` → PNG；窗口内容尺寸 1360×860。
+截图哈希与报告（`report.json`）内记录一致（该一致性由 E2 在原件存在时核验）；拍摄方式：探针内 `win.webContents.capturePage()` → PNG；窗口内容尺寸 1360×860。
+
+> **证据可用性**：上述 8 张原始截图的字节已在 2026-11-04 21:00–21:02 的加固重跑中被覆写且不可恢复（见 §0.2）；上表哈希为原运行的历史记录（与恢复自 HEAD 的 `report.json` 一致），`10-contaminated-run/` 中的同名图片不属于本表、不得引用。
 
 ## 6. 候选与回归
 
 - 候选口径：`f394cfb..HEAD`（`691846b`）已提交 `src app test` 改动 **83 文件**（44 A / 39 M，无删除/重命名）+ 本任务新增探针 **1 文件** = **84 文件**；逐文件 `git hash-object` + `sha256sum` 见 `09-hash-object.txt` / `09-sha256.txt` / 合并 `09-candidate-hashes.txt`（84 行）。
-- 工作区：`git diff --name-only -- src app test` 空；`git status --porcelain -- src app test` 仅 `?? test/测试/download-requests-electron-probe.mjs`；`git diff --cached --name-only` 空；未 commit/push（HEAD 仍 `691846b`）。
+- 工作区（受认证运行时）：`git diff --name-only -- src app test` 空；`git status --porcelain -- src app test` 仅 `?? test/测试/download-requests-electron-probe.mjs`；`git diff --cached --name-only` 空；未 commit/push（HEAD 仍 `691846b`）。
+- 更正期间（E2 后）工作区出现 B1 补证的在途修改（非本任务、非本候选，见 §0.2/§7.4）；本任务探针已恢复为 HEAD 版本。
 - T3：本 D2 不重跑；D1 在 `1d7560f`（与 `691846b` 产品代码相同的候选）记录 **417 文件 / 3761 tests / 3734 pass / 9 fail（全部既有 Windows symlink EPERM）/ 18 skip / 0 cancelled / 0 todo**，新增确定性失败 0、新增 skip 0。D2 只新增探针脚本与证据，不改变产品/测试执行语义。
 - 静态门（D1 记录）：`typecheck` 0 / `typecheck:renderer` 0 / `build:renderer` 0。
 
@@ -91,8 +111,8 @@
 
 1. 探针以本地 HTTP 服务 + Provider `lookupOverride` 测试缝替代公网；真实 Provider 的 Node http/文件 sink/账本/epoch 仍为产品实现（与 D1 同）。judge 结果为脚本化替身；真实模型调用不在 D2 范围。
 2. 工具调用链路由探针直接调用会话的 `requestDownload` 能力（与 C1 注入同形），不经过真实模型的工具选择；AC-1/AC-4 的「模型可调用」由 A1 工具注册测试与 D1 集成覆盖。
-3. 探针开发期间有多次调试运行；最终证据为一次完整干净运行（63/63 PASS，无 watchdog/异常）。调试日志不纳入证据。
-4. H1 治理文件与 `docs/planning/memo.md` 仍为未提交修改（预期、非本角色、未触碰）；`src app test` 仅本任务探针文件。
+3. 探针开发期间有多次调试运行；受认证证据为一次完整干净运行（63/63 PASS，无 watchdog/异常）。其原始 `probe.log`/截图字节在后续加固重跑中被覆写且不可恢复（§0.2）；加固重跑因并发写入不可认证，相关产物已隔离。
+4. H1 治理文件与 `docs/planning/memo.md` 仍为未提交修改（预期、非本角色、未触碰）；更正期间工作区另出现 B1 补证的在途修改（`src/provider/download/impl/file-sink.ts`、`node-http.ts`、`test/编排/download-provider.test.ts`、`download-pipeline.test.ts`），非本任务、不属本候选（§0.2）。
 5. 本报告不判验收（`implemented-unverified`）；AC-3/4/6/14/22/25/27/28 的最终判定归 E2，D2 只提供现场证据。
 
 ## 8. 证据索引（SHA-256 / 行数）
@@ -102,9 +122,9 @@
 | `00-opening-state.log` | `4cbe3b01190f406ba7084e4b3639d73515cd550c016d892ee0301cce6bc4f528` | 9 | 开工状态 |
 | `01-electron-install.log` | `45a2b7dfe0da537847edadce0b3cd14b0fa4e9173896838e1a036ab6fe25c03f` | 12 | Electron 版本/路径/安装 |
 | `01-lockfile-hashes.txt` | `27e5677bc200c1e17a8ca98e8eb9427cac859f4d208ffab7539d4db80f01cf1d` | 2 | manifest/lock 未变 |
-| `probe.log` | `c65df3ab412e36250d15d247c82bc182fcaa20654c0b988a99c38ad0bf1e4f7e` | 88 | 探针原始输出（63 PASS/0 FAIL/8 SHOT） |
-| `report.json` | `668f0ca4ba9badb6b34c48d3f2bd4ea13be64e29c0bf4024e22e2dc0332a169b` | 656 | 结构化检查/截图/notice |
-| 截图 8 张 | 见 §5 | - | PNG |
+| `probe.log` | `c65df3ab412e36250d15d247c82bc182fcaa20654c0b988a99c38ad0bf1e4f7e` | 88 | 受认证运行原始输出（63 PASS/0 FAIL/8 SHOT）；**字节已丢失（§0.2）** |
+| `report.json` | `668f0ca4ba9badb6b34c48d3f2bd4ea13be64e29c0bf4024e22e2dc0332a169b` | 656 | 结构化检查/截图/notice（已从 HEAD 恢复，哈希一致） |
+| 截图 8 张 | 见 §5 | - | PNG；**字节已丢失（§0.2）** |
 | `09-candidate-committed.txt` | `9d4116a273be25200cf69631ba109f35554cfa2c9a014e2100c6a12ec5c5a70a` | 84 | 已提交候选 name-status（83 文件） |
 | `09-candidate-worktree.txt` | `001c1ab8d3b74b59e593b641c17117ac2483e6e69fc8e7fdb69653b958edc9bc` | 2 | 新增探针 |
 | `09-candidate-diff.txt` | `d64c9195d1461f3a65b1956eac41ce44469054eec2f8ed431393d84c42d5b3b1` | 1 | `src app test` diff 空 |
@@ -116,6 +136,8 @@
 | `project/.ans/state/tasks.jsonl` | `ad1e4bd98a7d5a85d2653751f9abb428f43192f0a2abd327c7a8cc3afc492623` | 65 | `request.*` 审计（现场运行） |
 | `project/.ans/state/customer-directives.jsonl` | `40f8f856247dd5314e196b77aecfc18ce09cb71fba8f7ee008dff03ce8f16d2a` | 6 | 指令账本（现场运行） |
 | `project/.ans/state/download-consumer.json` | `c7328ad7f3c4d393dd069c399e03a6b978a782ec2e5f938d18b1f9910a243ca0` | 1 | G8 A epoch（现场运行） |
-| `project/download/*`（8 个成功文件） | 见 `19-evidence-index.sha256` | - | 现场落盘 |
+| `project/download/*`（8 个成功文件） | 见 `19-evidence-index.sha256` | - | 现场落盘（已从 HEAD 恢复） |
+| `10-contaminated-run/`（9 PNG + probe.log） | 不进索引语义 | - | **污染运行产物，仅透明保留，不得引用**（§0.2） |
+| `11-hardening-probe.patch` | 见 `19-evidence-index.sha256` | 64 | >8 IP 截断场景加固补丁（未认证，待干净树重跑） |
 
-索引文件 `19-evidence-index.sha256` 递归收录上述全部证据文件与本报告（索引自身不入索引；其哈希见交付报告）。
+索引文件 `19-evidence-index.sha256` 为**更正后重新生成**：覆盖当前存在的全部证据文件（含隔离目录与加固补丁）与本报告；原 HEAD 索引曾引用已丢失的 `probe.log`/截图字节，无法再按原样校验。索引自身不入索引；其哈希见交付报告。

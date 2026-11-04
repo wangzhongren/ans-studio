@@ -151,3 +151,12 @@ events:
 - **F10**：归属键由 C1 经 `DownloadRunInput.attribution` 提供；B1 合成 `"download"` 且 `flowIdIsSynthetic`；合成值不写 `request.*`（B1 不写）。
 - **测试夹具**：TLS 私钥/证书仅测试用；`download-tls` 目录内 CA key 仅供本地测试，不用于生产。
 - **残余**：Windows 上真实符号链接测试按环境可能 EPERM（B0 既有）；本 B1 未新增 skip/确定性失败。
+
+## 9. 补证 v1（E2 反馈，2026-11-04）
+
+E2 报告（`docs/acceptance/download-requests-report-v1.md` 192 行 / `8f356057…`）§3.1–3.3 要求补 AC-12/13/14 执行证据。已新增 [`2026-11-04_download-requests-B1-supplement-v1.md`](2026-11-04_download-requests-B1-supplement-v1.md) 与 `...-B1-supplement-v1-evidence/`：
+- AC-12：rename/写盘失败注入（仅 impl 测试工厂 `fileSinkHooks`；生产公共工厂无 seam）——`download-write-failed`、无 `.part`/占位、既有同名文件字节不变；
+- AC-13：Windows junction `cmd /c mklink /J` 真实路径——`download-write-failed`、目标目录未写入、junction 未被替换；
+- AC-14：真实 `CustomerDirectiveRuntime` 的 `forever`/`session` domain 指令同一 host 各下载两次均命中（无卡片/无消费），`downloads.jsonl` 4 条 `by:"directive"`（两个 directiveId）。
+- 补证后：`npm run typecheck` exit 0；编排套件 **64 文件 / 803 tests / 802 pass / 1 fail / 0 skip**；四个下载测试 43/43；新增确定性失败 0、新增 skip 0。本记录 §4 的 799 数字为补证前快照；以补证记录为准。
+- **候选哈希**：本补证修改的 `file-sink.ts`/`node-http.ts` 以 supplement 的 `05-candidate-hashes.txt` 为准（本记录 §7 的对应条目为补证前快照）。
