@@ -349,6 +349,55 @@ const DIRECTIVE_KEYS = [
   "ui.versionDecision.decidedBy.directive",
 ] as const satisfies readonly MessageKey[];
 
+/**
+ * 下载申请 A2 key 契约（2026-11-04 download-requests；Revision 2 冻结）：
+ * 37 key = main 35（card 13 + notice 5 + error 17）+ ui 2。
+ * C1/C2 只按本清单消费；新增/改名须回到项目管理并显式更新本断言与分区计数。
+ */
+const DOWNLOAD_KEYS = [
+  // main.download.card.*（13）
+  "main.download.card.title",
+  "main.download.card.role",
+  "main.download.card.purpose",
+  "main.download.card.url",
+  "main.download.card.host",
+  "main.download.card.resolvedIps",
+  "main.download.card.resolvedIpsTruncated",
+  "main.download.card.filename",
+  "main.download.card.sizePolicy",
+  "main.download.card.redirectPolicy",
+  "main.download.card.mechanical.scheme",
+  "main.download.card.mechanical.publicHost",
+  "main.download.card.mechanical.publicIps",
+  // main.download.notice.*（5）
+  "main.download.notice.completed",
+  "main.download.notice.failed",
+  "main.download.notice.directiveAllowed",
+  "main.download.notice.directiveSource",
+  "main.download.notice.gitignoreHint",
+  // main.download.error.*（17）
+  "main.download.error.invalidArguments",
+  "main.download.error.unsafeUrl",
+  "main.download.error.dnsFailed",
+  "main.download.error.deniedByDirective",
+  "main.download.error.declined",
+  "main.download.error.unavailable",
+  "main.download.error.factsMissing",
+  "main.download.error.rebindingDetected",
+  "main.download.error.redirectCrossHost",
+  "main.download.error.httpError",
+  "main.download.error.tooLarge",
+  "main.download.error.unsupportedEncoding",
+  "main.download.error.timeout",
+  "main.download.error.networkError",
+  "main.download.error.writeFailed",
+  "main.download.error.busy",
+  "main.download.error.aborted",
+  // ui.directive.panel.consumer.*（2）
+  "ui.directive.panel.consumer.download",
+  "ui.directive.panel.consumer.downloadLegacyOff",
+] as const satisfies readonly MessageKey[];
+
 function templateTexts(template: unknown): string[] {
   if (typeof template === "string") return [template];
   if (template !== null && typeof template === "object") return Object.values(template).filter((v): v is string => typeof v === "string");
@@ -370,7 +419,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 1090 / main 591 / shared 62 / preferences 3，总计 1746", () => {
+test("key 分区计数：ui 1092 / main 626 / shared 62 / preferences 3，总计 1783", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -378,8 +427,173 @@ test("key 分区计数：ui 1090 / main 591 / shared 62 / preferences 3，总计
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 1090, main: 591, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1746);
+  assert.deepEqual(prefixes, { ui: 1092, main: 626, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1783);
+});
+
+test("下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han", () => {
+  assert.equal(DOWNLOAD_KEYS.length, 37);
+  assert.equal(new Set(DOWNLOAD_KEYS).size, 37, "DOWNLOAD_KEYS 存在重复 key");
+  const families = {
+    card: DOWNLOAD_KEYS.filter((key) => key.startsWith("main.download.card.")).length,
+    notice: DOWNLOAD_KEYS.filter((key) => key.startsWith("main.download.notice.")).length,
+    error: DOWNLOAD_KEYS.filter((key) => key.startsWith("main.download.error.")).length,
+    uiConsumer: DOWNLOAD_KEYS.filter((key) => key.startsWith("ui.directive.panel.consumer.download")).length,
+  };
+  assert.deepEqual(families, { card: 13, notice: 5, error: 17, uiConsumer: 2 });
+
+  for (const key of DOWNLOAD_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), placeholdersOf(enUS[key]), `占位符不一致：${key}`);
+    assert.deepEqual(templateTexts(enUS[key]).filter((text) => HAN.test(text)), [], `en-US 含中文：${key}`);
+  }
+
+  // 逐字冻结（37 项；与 A2 Revision 2 提案 §3.1 一致）。
+  const expected: Record<string, { zh: string; en: string }> = {
+    "main.download.card.title": { zh: "下载文件申请", en: "Download request" },
+    "main.download.card.role": { zh: "申请角色：{role}", en: "Requesting role: {role}" },
+    "main.download.card.purpose": { zh: "用途：{purpose}", en: "Purpose: {purpose}" },
+    "main.download.card.url": { zh: "URL：{url}", en: "URL: {url}" },
+    "main.download.card.host": { zh: "主机：{host}", en: "Host: {host}" },
+    "main.download.card.resolvedIps": { zh: "已解析 IP：{ips}", en: "Resolved IPs: {ips}" },
+    "main.download.card.resolvedIpsTruncated": {
+      zh: "（共 {total} 个，仅显示前 {shown} 个）",
+      en: "(showing the first {shown} of {total})",
+    },
+    "main.download.card.filename": {
+      zh: "预期文件名：{filename}（可能被服务器的 Content-Disposition 覆盖）",
+      en: "Expected filename: {filename} (the server's Content-Disposition may override it)",
+    },
+    "main.download.card.sizePolicy": {
+      zh: "大小策略：≤ {maxMb} MB（实际大小未知，直至收到响应）",
+      en: "Size policy: ≤ {maxMb} MB (actual size is unknown until the response arrives)",
+    },
+    "main.download.card.redirectPolicy": {
+      zh: "重定向策略：仅同域跟随；跨域重定向将中止并要求重新申请",
+      en: "Redirect policy: same-host redirects only; a cross-host redirect stops the download and requires a new request",
+    },
+    "main.download.card.mechanical.scheme": { zh: "协议校验：通过（{scheme}）", en: "Scheme check: passed ({scheme})" },
+    "main.download.card.mechanical.publicHost": { zh: "主机校验：公网地址", en: "Host check: public address" },
+    "main.download.card.mechanical.publicIps": { zh: "解析 IP 校验：全部为公网地址", en: "Resolved IP check: all public addresses" },
+    "main.download.notice.completed": {
+      zh: "已下载「{host}」→ {path}（{bytes} 字节，sha256 {sha}）；审批来源：{source}。",
+      en: "Downloaded “{host}” → {path} ({bytes} bytes, sha256 {sha}); approval source: {source}.",
+    },
+    "main.download.notice.failed": {
+      zh: "未下载（技术 code：{code}）：{reason}",
+      en: "Not downloaded (technical code: {code}): {reason}",
+    },
+    "main.download.notice.directiveAllowed": {
+      zh: "客户审批指令 #{id} 已允许此下载（domain={host}，until={until}）。",
+      en: "Approval directive #{id} allowed this download (domain={host}, until={until}).",
+    },
+    "main.download.notice.directiveSource": { zh: "审批指令 #{id}", en: "Approval directive #{id}" },
+    "main.download.notice.gitignoreHint": {
+      zh: "如需忽略已下载文件，请自行将 download/ 加入 .gitignore。",
+      en: "To ignore downloaded files, add download/ to .gitignore yourself.",
+    },
+    "main.download.error.invalidArguments": {
+      zh: "下载申请参数不合法；未发卡、未联网。",
+      en: "The download request arguments are invalid; no card was issued and no network request was made.",
+    },
+    "main.download.error.unsafeUrl": { zh: "目标地址不安全：{detail}", en: "The target URL is unsafe: {detail}" },
+    "main.download.error.dnsFailed": { zh: "域名解析失败：{host}", en: "DNS resolution failed: {host}" },
+    "main.download.error.deniedByDirective": {
+      zh: "客户审批指令 #{id} 拒绝了此下载。",
+      en: "Approval directive #{id} denied this download.",
+    },
+    "main.download.error.declined": {
+      zh: "审批未通过（客户拒绝或判断拒绝）。",
+      en: "The download was not approved (declined by the customer or the judge).",
+    },
+    "main.download.error.unavailable": {
+      zh: "审批通道不可用，未能取得审批。",
+      en: "The approval channel is unavailable; no approval was obtained.",
+    },
+    "main.download.error.factsMissing": {
+      zh: "判断器无法核对申请事实，已转客户确认。",
+      en: "The judge could not verify the request facts; the request was escalated to the customer.",
+    },
+    "main.download.error.rebindingDetected": {
+      zh: "下载连接地址与校验结果不一致（疑似 DNS rebinding），已中止且未写入文件。",
+      en: "The connection address did not match the verified addresses (possible DNS rebinding); the download was aborted and nothing was written.",
+    },
+    "main.download.error.redirectCrossHost": {
+      zh: "服务器重定向到其他主机（{target}）；未跟随，请对最终地址重新申请。",
+      en: "The server redirected to another host ({target}); it was not followed. Request again for the final URL.",
+    },
+    "main.download.error.httpError": {
+      zh: "服务器返回了不支持的响应：{detail}",
+      en: "The server returned an unsupported response: {detail}",
+    },
+    "main.download.error.tooLarge": { zh: "文件超过大小上限（{maxMb} MB）。", en: "The file exceeds the size limit ({maxMb} MB)." },
+    "main.download.error.unsupportedEncoding": {
+      zh: "服务器使用了不支持的内容编码：{encoding}",
+      en: "The server used an unsupported content encoding: {encoding}",
+    },
+    "main.download.error.timeout": { zh: "下载超时（连接、空闲或总时限）。", en: "The download timed out (connect, idle, or total limit)." },
+    "main.download.error.networkError": {
+      zh: "网络连接失败（连接重置或 TLS 校验失败）。",
+      en: "The network connection failed (connection reset or TLS verification failure).",
+    },
+    "main.download.error.writeFailed": {
+      zh: "写入 download/ 失败，下载未完成。",
+      en: "Writing to download/ failed; the download did not complete.",
+    },
+    "main.download.error.busy": { zh: "同时执行的下载已达上限，请稍后重试。", en: "Too many downloads are running at once; try again later." },
+    "main.download.error.aborted": {
+      zh: "本轮已中止或应用已关闭，下载已取消。",
+      en: "The turn was aborted or the app closed; the download was cancelled.",
+    },
+    "ui.directive.panel.consumer.download": { zh: "消费者：下载", en: "Consumer: download" },
+    "ui.directive.panel.consumer.downloadLegacyOff": {
+      zh: "不作用于下载（早于下载功能启用）",
+      en: "Does not apply to downloads (created before download support was enabled)",
+    },
+  };
+  for (const key of DOWNLOAD_KEYS) {
+    assert.equal(zhCN[key], expected[key]!.zh, `zh-CN 文案不一致：${key}`);
+    assert.equal(enUS[key], expected[key]!.en, `en-US 文案不一致：${key}`);
+  }
+
+  // 关键占位符/删除/复用断言。
+  assert.deepEqual(placeholdersOf(zhCN["main.download.notice.completed"]), ["bytes", "host", "path", "sha", "source"]);
+  assert.deepEqual(placeholdersOf(zhCN["main.download.card.resolvedIpsTruncated"]), ["shown", "total"]);
+  assert.equal(
+    Object.keys(zhCN).filter((key) => key === "ui.directive.panel.consumer.downloadStartsNow").length,
+    0,
+    "downloadStartsNow 必须不存在（G8 B 未选）",
+  );
+  assert.deepEqual(
+    Object.keys(zhCN)
+      .filter((key) => key.startsWith("main.download.card.mechanical."))
+      .sort(),
+    [
+      "main.download.card.mechanical.publicHost",
+      "main.download.card.mechanical.publicIps",
+      "main.download.card.mechanical.scheme",
+    ],
+    "mechanical 只允许三项（scheme/publicHost/publicIps）",
+  );
+  for (const key of [
+    "ui.judge.mode.approval",
+    "ui.judge.headline.autoApproved",
+    "ui.request.toCustomer",
+    "ui.request.toJudge",
+    "ui.directive.panel.consumer.none",
+    "ui.directive.panel.until.once",
+    "ui.directive.panel.until.session",
+    "ui.directive.panel.until.forever",
+  ] as const) {
+    assert.ok(key in zhCN, `zh-CN 缺复用 key ${key}`);
+    assert.ok(key in enUS, `en-US 缺复用 key ${key}`);
+  }
+  assert.deepEqual(
+    Object.keys(zhCN).filter((key) => key.startsWith("ui.download.")),
+    [],
+    "不得新增 ui.download.* 重复 key",
+  );
 });
 
 test("验收回交卡 key 契约：14 key 中英成对、精确文案与占位符一致", () => {

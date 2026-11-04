@@ -1,0 +1,2 @@
+subjectAltName=DNS:wrong.example
+basicConstraints=CA:FALSE

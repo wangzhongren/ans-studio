@@ -45,6 +45,10 @@ import {
   type DirectiveStore,
 } from "../../provider/directive/public/directive-store.ts";
 import {
+  createDownloadConsumerEpochStore,
+  type DownloadConsumerEpochStore,
+} from "../../provider/download/public/download-provider.ts";
+import {
   createDirectiveService,
   type DirectiveErrorCode,
   type DirectiveListView,
@@ -114,6 +118,19 @@ export interface ApprovalDirectiveDecision {
   scope: CustomerDirectiveUntil;
 }
 
+/**
+ * 下载预授权查询（G8 A）：`enabledAt` **必填**、杜绝调用方绕过 epoch 门槛；
+ * `host` 必须已按下载 Service 同一归一化（小写/去尾点/punycode）。
+ */
+export interface DownloadDirectiveQuery {
+  host: string;
+  /** 项目 epoch（ISO 毫秒）。 */
+  enabledAt: string;
+  toolCallId?: string;
+}
+export type TakeDownloadDirectiveFn =
+  (query: DownloadDirectiveQuery) => Promise<ApprovalDirectiveDecision | undefined>;
+
 /** decision 消费者入参（C1 从卡载荷构造；只处理 `cardKind==="decision"`）。 */
 export interface DecisionCardFacts {
   cardKind: "decision";
@@ -172,6 +189,13 @@ export interface CustomerDirectiveRuntime {
     req: ShellReviewRequest,
     intent?: ApprovalDirectiveIntent,
   ): Promise<ApprovalDirectiveDecision | undefined>;
+  /**
+   * 下载预授权消费者（2026-11-04 download-requests B1）。只读**同一回放快照**
+   * （`service.list()`，含 `createdAt`；`ledgerErrors>0 ⇒ undefined`），deny 优先、allow 补足、
+   * `once` 返回前 durable 消费（失败 ⇒ undefined 回落普通审批，绝不重复消费）；G8 A
+   * `createdAt > enabledAt`（同毫秒保守排除）。**不抛业务错误**。
+   */
+  takeDownloadDirective(query: DownloadDirectiveQuery): Promise<ApprovalDirectiveDecision | undefined>;
   applyDecisionDirective(card: DecisionCardFacts, hooks?: DecisionHooks): Promise<DecisionApplyResult | undefined>;
   revoke(id: string, target: CustomerDirectiveTarget): Promise<RevokeResult>;
   list(): Promise<DirectiveListResult>;
@@ -191,6 +215,11 @@ export interface CreateCustomerDirectiveRuntimeOptions {
   now?: () => Date;
   /** 测试注入缝；生产走 Provider 默认实现（C1 不消费）。 */
   store?: DirectiveStore;
+  /**
+   * G8 A epoch 只读源（`list()` 旧指令投影用；测试注入缝）。缺省按 projectRoot 构造；
+   * **只读，不创建**（创建归 download-request.ts 的 ready()/consumerEpoch()）。
+   */
+  downloadEpochStore?: DownloadConsumerEpochStore;
 }
 
 const UNTIL_VALUES: readonly CustomerDirectiveUntil[] = ["once", "session", "forever"];
@@ -572,6 +601,23 @@ function decisionPreference(fact: { until: CustomerDirectiveUntil; seq: number }
   return standing * 1_000_000 - fact.seq;
 }
 
+/** 域名指令匹配：`*` 任意；`*.example.com` 严格子域（不含 apex）；否则精确 host。 */
+function matchesDirectiveDomain(recordHost: string, wildcard: boolean, queryHost: string): boolean {
+  if (wildcard) {
+    if (recordHost === "*") return true;
+    if (recordHost.startsWith("*.")) {
+      const suffix = recordHost.slice(1);
+      return queryHost.endsWith(suffix) && queryHost.length > suffix.length;
+    }
+    return false;
+  }
+  return recordHost === queryHost;
+}
+
+function normalizeQueryHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\.+$/g, "");
+}
+
 export function createCustomerDirectiveRuntime(
   opts: CreateCustomerDirectiveRuntimeOptions,
 ): CustomerDirectiveRuntime {
@@ -585,6 +631,7 @@ export function createCustomerDirectiveRuntime(
     throw new Error("客户指令运行时：presenter 必须实现 present()");
   }
   const store = opts.store ?? createDirectiveFileStore(opts.projectRoot);
+  const downloadEpochStore = opts.downloadEpochStore ?? createDownloadConsumerEpochStore(opts.projectRoot);
   const service: DirectiveService = createDirectiveService({
     projectRoot: opts.projectRoot,
     sessionId: opts.sessionId,
@@ -763,6 +810,62 @@ export function createCustomerDirectiveRuntime(
     }
   }
 
+  async function takeDownloadDirective(
+    query: DownloadDirectiveQuery,
+  ): Promise<ApprovalDirectiveDecision | undefined> {
+    try {
+      if (
+        query === null ||
+        typeof query !== "object" ||
+        typeof query.host !== "string" ||
+        query.host.trim() === "" ||
+        typeof query.enabledAt !== "string"
+      ) {
+        return undefined;
+      }
+      const enabledAtMs = Date.parse(query.enabledAt);
+      if (Number.isNaN(enabledAtMs)) return undefined;
+      const host = normalizeQueryHost(query.host);
+      if (host === "") return undefined;
+      await service.ready();
+      if (service.getLoadError() !== undefined) return undefined;
+      const listed = service.list();
+      if (listed.ledgerErrors > 0) return undefined;
+      const matching = listed.approval.active.filter((view) => {
+        if (view.target !== "approval") return false;
+        const action = view.action as ApprovalAction;
+        if (action.kind !== "allow" && action.kind !== "deny") return false;
+        if (action.resource.type !== "domain") return false;
+        const createdAtMs = Date.parse(view.createdAt);
+        if (Number.isNaN(createdAtMs) || createdAtMs <= enabledAtMs) return false;
+        return matchesDirectiveDomain(action.resource.host, action.resource.wildcard, host);
+      });
+      const denyMatches = matching.filter((view) => (view.action as ApprovalAction).kind === "deny");
+      const allowMatches = matching.filter((view) => (view.action as ApprovalAction).kind === "allow");
+      const candidates = denyMatches.length > 0 ? denyMatches : allowMatches;
+      if (candidates.length === 0) return undefined;
+      const chosen = [...candidates].sort((a, b) => {
+        const standing = (view: CustomerDirectiveView): number => (view.until === "once" ? 1 : 0);
+        return standing(a) - standing(b) || b.seq - a.seq;
+      })[0]!;
+      if (chosen.until === "once") {
+        const consumed = await service.consume(
+          chosen.id,
+          query.toolCallId !== undefined ? { toolCallId: query.toolCallId } : {},
+        );
+        if (!consumed.ok) return undefined; // 消费失败 ⇒ 回落普通审批，绝不重复使用
+      }
+      const action = chosen.action as ApprovalAction;
+      return {
+        action: action.kind === "deny" ? "deny" : "allow",
+        id: chosen.id,
+        scope: chosen.until,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
   async function applyDecisionDirective(
     card: DecisionCardFacts,
     hooks?: DecisionHooks,
@@ -828,10 +931,36 @@ export function createCustomerDirectiveRuntime(
       await service.ready();
       if (service.getLoadError() !== undefined) return { ok: false, error: "ledger-unavailable" };
       const listed = service.list();
+      // F3：G8 A epoch-aware 面板投影（只读 epoch；缺失/不可读 ⇒ 全部 domain 视为旧指令）。
+      // consumerOf 仍是创建时基线；这里只改返回值副本，不改 Service 内存视图/账本。
+      let enabledAtMs: number | undefined;
+      try {
+        const epochState = await downloadEpochStore.read();
+        if (epochState.state === "ready") {
+          const parsed = Date.parse(epochState.enabledAt);
+          if (!Number.isNaN(parsed)) enabledAtMs = parsed;
+        }
+      } catch {
+        enabledAtMs = undefined;
+      }
+      const projectView = (view: CustomerDirectiveView): CustomerDirectiveView => {
+        if (view.target !== "approval") return view;
+        const action = view.action as ApprovalAction;
+        if ((action.kind !== "allow" && action.kind !== "deny") || action.resource.type !== "domain") return view;
+        if (enabledAtMs === undefined) return { ...view, consumer: "none" };
+        const createdAtMs = Date.parse(view.createdAt);
+        if (Number.isNaN(createdAtMs) || createdAtMs <= enabledAtMs) return { ...view, consumer: "none" };
+        return view;
+      };
       return {
         ok: true,
         projectRoot: opts.projectRoot,
-        approval: listed.approval,
+        approval: {
+          active: listed.approval.active.map(projectView),
+          consumed: listed.approval.consumed.map(projectView),
+          revoked: listed.approval.revoked.map(projectView),
+          expired: listed.approval.expired.map(projectView),
+        },
         decision: listed.decision,
         ledgerErrors: listed.ledgerErrors,
       };
@@ -845,6 +974,7 @@ export function createCustomerDirectiveRuntime(
     approvalFacts: () => service.approvalFacts(),
     decisionFacts: () => service.decisionFacts(),
     takeDirective,
+    takeDownloadDirective,
     applyDecisionDirective,
     revoke,
     list,

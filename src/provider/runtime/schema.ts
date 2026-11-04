@@ -9,6 +9,11 @@ import {
   VERSION_DECISION_REASON_MAX,
   VERSION_DECISION_REFS_MAX,
 } from "../../model/project-state.ts";
+import {
+  DOWNLOAD_FILENAME_MAX_CHARS,
+  DOWNLOAD_PURPOSE_MAX_BYTES,
+  DOWNLOAD_URL_MAX_BYTES,
+} from "../../model/download.ts";
 /** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
 export interface ToolDescription {
   parameters: Record<string, unknown>;
@@ -315,6 +320,54 @@ export function describeTool(name: string): ToolDescription {
           "锚点后紧跟该路径的非空正文/代码（直到下一条路径锚点或 preview 末尾），**写入内容须与这里的正文一致、范围不得超出所预览的内容**。" +
           "**缺失任一路径的逐路径正文/结构时，系统会在呈现前拒绝该卡、工具返回失败并要求补全——不会先给客户看半张卡**；" +
           "请一次把卡组完整（逐路径正文齐全后再调用），不要靠反复试错。",
+      ],
+      executionMode: "sequential",
+    };
+  }
+  if (name === "request_download") {
+    // 2026-11-04 下载申请（download-requests）：注入才注册（注册条件在 tools.ts）。
+    // 本工具只提交申请并如实转达结果；安全检查/预授权/审批/执行/审计在注入能力与下层。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            minLength: 1,
+            maxLength: DOWNLOAD_URL_MAX_BYTES,
+            description:
+              "http(s) URL only; must not contain userinfo (user:pass@); host required; at most 2048 UTF-8 bytes (tool-enforced)",
+          },
+          filename: {
+            type: "string",
+            maxLength: DOWNLOAD_FILENAME_MAX_CHARS,
+            description:
+              "Optional filename suggestion (no NUL, path separators or control characters). It may be overridden by the server Content-Disposition or the URL basename",
+          },
+          purpose: {
+            type: "string",
+            minLength: 1,
+            maxLength: DOWNLOAD_PURPOSE_MAX_BYTES,
+            description:
+              "Why this download is needed; shown to the customer and the approval judge (at most 1024 UTF-8 bytes)",
+          },
+        },
+        required: ["url", "purpose"],
+        additionalProperties: false,
+      },
+      description:
+        "提交一次**下载文件申请**并等待审批/执行（**不会静默联网**）。应用先做确定性安全检查（仅 http/https、拒绝凭据与内网地址），" +
+        "再按客户的 `@审批` 预授权、「替我审批」判断或客户确认卡决定；批准后由应用下载到当前项目的 `download/` 目录。" +
+        "参数：`url`（http/https、不含 user:pass@、≤2048 字节）、`purpose`（为什么需要，必填、≤1024 字节）、" +
+        "`filename`（可选文件名建议，≤128 字符，不含 NUL/路径分隔符/控制字符，可能被服务器 Content-Disposition 覆盖）。" +
+        "成功回执含项目相对路径 `download/<文件名>`、字节数、sha256、最终 URL 与审批来源；失败一律 `ok:false` + 稳定 `download-*` code，**不自动重试**。" +
+        "跨域重定向会以 `download-redirect-cross-host` 返回最终 URL——请对新 URL **重新调用本工具**走完整审批，" +
+        "不要自行用 `run_shell` 的 curl/wget 绕过审批。" +
+        "本工具不返回文件内容、不写 `download/` 之外的目录；不要用 `request_confirmation` 伪造下载卡。",
+      promptGuidelines: [
+        "需要外部文件时用 `request_download` 提交申请；URL 只能 http/https 且不含凭据；用 `purpose` 说清用途。申请≠批准，不得假设已获同意。",
+        "失败按回执的稳定 code 处理：跨域重定向需对新 URL 重新申请；不自动重试，也不要用 shell 下载绕过审批。",
+        "成功以 `ok:true` 且回执含路径/字节数/sha256 为准；本工具不返回文件内容，落盘只发生在项目 `download/`。",
       ],
       executionMode: "sequential",
     };

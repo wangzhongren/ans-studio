@@ -4,6 +4,8 @@
 // 所有高频拒绝点只从这里取 owner/action/retryable/文案；业务点提供 code 与具体 missing/docs。
 // 客户卡只用人话（humanRejection）；技术 code 由系统行/模型回执携带。
 
+import type { DownloadErrorCode } from "../../model/download.ts";
+
 export type RejectionOwner =
   | "chief"
   | "product"
@@ -12,7 +14,9 @@ export type RejectionOwner =
   | "convener"
   | "verifier"
   | "customer"
-  | "app";
+  | "app"
+  /** 2026-11-04 下载申请：发起申请的角色/环境可修正（方案 §3.3，复核 F4）。 */
+  | "requester";
 
 export interface MechanicalRejection {
   code: string;
@@ -38,6 +42,100 @@ const PLAN_DOC = "docs/proposals/<flowId>-proposal-v1.md";
 const MODULES_DOC = "docs/proposals/<flowId>-modules-vN.md";
 const ROSTER_DOC = "docs/proposals/<flowId>-roster-vN.md";
 const INTENT_DOC = "docs/product/<flowId>-intent-vN.md";
+
+/**
+ * 下载错误码规则（2026-11-04 download-requests B1）。以 `Record<DownloadErrorCode,...>` 强制
+ * 穷尽（A1 Model 的 `DownloadErrorCode` 是单一来源；新增 code 必须同时在此登记）。
+ * owner 口径（方案 §3.3）：请求方/环境可修正 ⇒ `requester`；应用接线/执行器缺陷 ⇒ `app`；
+ * 只有客户能给出的新授权 ⇒ `customer`。
+ */
+const DOWNLOAD_RULES: Record<DownloadErrorCode, RejectionRule> = {
+  "download-invalid-arguments": {
+    owner: "requester",
+    action: "按参数约束改正 url/filename/purpose 后重新调用 request_download；不要猜测参数。",
+    retryable: true,
+  },
+  "download-unsafe-url": {
+    owner: "requester",
+    action: "改用公网 http/https 地址；不得含凭据、本机/私网/保留地址。",
+    retryable: true,
+  },
+  "download-dns-failed": {
+    owner: "requester",
+    action: "稍后重试或改用可解析的公网域名。",
+    retryable: true,
+  },
+  "download-denied-by-directive": {
+    owner: "customer",
+    action: "客户已用审批指令拒绝该域名；需要新授权请由客户新建/修改指令。",
+    retryable: true,
+  },
+  "download-declined": {
+    owner: "requester",
+    action: "需要新的审批；不要自行用 shell 的 curl/wget 绕过审批。",
+    retryable: true,
+  },
+  "download-unavailable": {
+    owner: "app",
+    action: "客户/判断通道不可用；检查窗口/判断配置后重试。",
+    retryable: true,
+  },
+  "download-facts-missing": {
+    owner: "app",
+    action: "判断所需下载事实缺失；应用接线修复后重试（桌面应转客户卡）。",
+    retryable: true,
+  },
+  "download-rebinding-detected": {
+    owner: "app",
+    action: "安全事件：连接地址与校验集合不一致；应用记录诊断并告知客户。",
+    retryable: false,
+  },
+  "download-redirect-cross-host": {
+    owner: "requester",
+    action: "对最终 URL 重新调用 request_download 走完整审批/预授权。",
+    retryable: true,
+  },
+  "download-http-error": {
+    owner: "requester",
+    action: "检查 URL/权限/服务器状态后重新申请。",
+    retryable: true,
+  },
+  "download-too-large": {
+    owner: "requester",
+    action: "换更小文件，或由部署方调整下载上限。",
+    retryable: false,
+  },
+  "download-unsupported-encoding": {
+    owner: "app",
+    action: "服务器返回非 identity 内容编码；稍后重试或反馈。",
+    retryable: true,
+  },
+  "download-timeout": {
+    owner: "requester",
+    action: "网络超时；重新申请（无自动重试）。",
+    retryable: true,
+  },
+  "download-network-error": {
+    owner: "requester",
+    action: "检查网络/TLS 后重新申请。",
+    retryable: true,
+  },
+  "download-write-failed": {
+    owner: "app",
+    action: "检查 download/ 目录状态（符号链接/权限）后重试。",
+    retryable: true,
+  },
+  "download-busy": {
+    owner: "app",
+    action: "等待当前下载完成后重新申请（每项目并发上限 2）。",
+    retryable: true,
+  },
+  "download-aborted": {
+    owner: "app",
+    action: "轮次中止；重新申请。",
+    retryable: true,
+  },
+};
 
 const RULES: Record<string, RejectionRule> = {
   "run-missing": { owner: "app", action: "由应用在 M1 前生成 draft run，并在 handoff 前 pin；不要手写 manifest。", retryable: true },
@@ -115,6 +213,8 @@ const RULES: Record<string, RejectionRule> = {
   "artifact-missing": { owner: "verifier", action: "补齐规范物证/证据后重新提交验收。", retryable: true },
   "artifact-not-read": { owner: "verifier", action: "先读取规范物证再判断；补齐读取证据后重新提交。", retryable: true },
   "asset-missing": { owner: "rapporteur", action: "补齐 assets 需求/清单或按 Gate 规则处理。", retryable: true },
+  // 2026-11-04 download-requests B1：下载错误码规则（类型级穷尽）。
+  ...DOWNLOAD_RULES,
 };
 
 /**
@@ -157,6 +257,8 @@ const UNVERIFIABLE_REJECTION_CODES: ReadonlySet<string> = new Set([
   "evidence-packet-overflow",
   "evidence-conflict",
   "evidence-hash-mismatch",
+  // 2026-11-04 下载判断：事实缺失/不可读 ⇒ 桌面转客户卡（方案 §4.2/F12）
+  "download-facts-missing",
 ]);
 
 /** 该 code 是否属于「无法核对」——桌面自动决策必须转客户确认，不得自动拒绝。 */

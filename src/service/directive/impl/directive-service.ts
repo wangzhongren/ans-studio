@@ -246,9 +246,12 @@ function validateCreateInput(
 
 function consumerOf(target: CustomerDirectiveTarget, action: ApprovalAction | DecisionAction): CustomerDirectiveView["consumer"] {
   if (target === "decision") return "decision-card";
-  return action.kind === "allow" || action.kind === "deny"
-    ? action.resource.type === "shell" ? "shell-gate" : "none"
-    : "none";
+  if (action.kind !== "allow" && action.kind !== "deny") return "none";
+  if (action.resource.type === "shell") return "shell-gate";
+  // 2026-11-04（download-requests B1）：domain 指令由下载预授权消费者消费；path 仍无消费者。
+  // 面板的 G8 A epoch 投影在 Pipeline `list()` 中另行处理（旧 domain ⇒ none）。
+  if (action.resource.type === "domain") return "download";
+  return "none";
 }
 
 function toPublicView(view: ActiveView): CustomerDirectiveView {

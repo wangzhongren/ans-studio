@@ -24,13 +24,14 @@ function schemaEnum(tool: string, prop: string): unknown[] {
   return (schema.parameters.properties as Record<string, { enum?: unknown[] }>)[prop]?.enum ?? [];
 }
 
-test("D 卡种分组：decision 组保留五种 choice；approval 组仅 appointment-write", () => {
+test("D 卡种分组：decision 组保留五种 choice；approval 组为 appointment-write 与 download", () => {
   assert.equal(governanceCardGroup("proposal"), "decision");
   assert.equal(governanceCardGroup("appointment"), "decision");
   assert.equal(governanceCardGroup("acceptance"), "decision");
   assert.equal(governanceCardGroup("intent-confirm"), "decision");
   assert.equal(governanceCardGroup("decision"), "decision");
   assert.equal(governanceCardGroup("appointment-write"), "approval");
+  assert.equal(governanceCardGroup("download"), "approval");
   assert.equal(governanceCardGroup("write" as never), undefined);
   assert.equal(governanceCardGroup("schedule-write" as never), undefined);
   assert.deepEqual(Object.keys(GOVERNANCE_CARD_GROUP).sort(), [
@@ -38,6 +39,7 @@ test("D 卡种分组：decision 组保留五种 choice；approval 组仅 appoint
     "appointment",
     "appointment-write",
     "decision",
+    "download",
     "intent-confirm",
     "proposal",
   ]);

@@ -154,7 +154,8 @@ export type DirectiveEventV1 =
 
 /**
  * 消费者/面板读取的指令视图（回放派生；不是账本事件）。
- * `consumer:"none"` 表示 domain/path 等当前无消费者（Q5 A）。
+ * `consumer:"none"` 表示 path 等当前无消费者（Q5 A）；domain 自 2026-11-04 起由
+ * 下载消费者消费（B1 `consumerOf` 返回 `"download"`，下载预授权匹配用）。
  */
 export interface CustomerDirectiveView {
   id: string;
@@ -171,7 +172,7 @@ export interface CustomerDirectiveView {
   expiredAt?: string;
   expiredReason?: string;
   highRisk?: { reasons: string[]; acknowledged: true };
-  consumer: "shell-gate" | "decision-card" | "none";
+  consumer: "shell-gate" | "decision-card" | "download" | "none";
 }
 
 /**

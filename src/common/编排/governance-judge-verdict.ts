@@ -123,6 +123,8 @@ const SAFE_MANUAL_REASON_CODES: ReadonlySet<string> = new Set([
   "intent-missing",
   "intent-ambiguous",
   "intent-unconfirmed",
+  // 2026-11-04 下载申请：判断事实缺失/不可读 ⇒ manual 原因码保留（桌面转客户卡）。
+  "download-facts-missing",
 ]);
 
 const DEFAULT_MANUAL_REASON = "判断无法完成；请补齐判断所需证据或缩小范围后重新提交。";
@@ -537,8 +539,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     case "appointment-write": {
       if (verdict.confirmed !== true) {
         return manualOutcome(args, "not-recommended", "写盘卡未给出 confirmed:true；请修正后重新提交。");
-      }
-      if (request.card.kind !== "confirm") {
+      }      if (request.card.kind !== "confirm") {
         return manualOutcome(args, "path-unverified", "写盘卡形状非法；请修正后重新提交。");
       }
       const paths = uniquePaths(Array.isArray(request.paths) ? request.paths : []);
@@ -606,6 +607,19 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
       }
       break;
     }
+    case "download": {
+      // 2026-11-04 下载申请（F4，闸门 2 写集增补）：应用自有 confirm 种，approval 组正向代批。
+      // 判断只依据 request.download 与 turnText；approve 要求 confirm 形状 + confirmed:true，
+      // 不要求 selected/pathDecisions（下载不是写盘卡）。缺此分支会落 default group-mismatch，
+      // 把合法 approve 压成 manual（AC-5/AC-24）。
+      if (verdict.confirmed !== true) {
+        return manualOutcome(args, "not-recommended", "下载卡未给出 confirmed:true；请修正后重新提交。");
+      }
+      if (request.card.kind !== "confirm") {
+        return manualOutcome(args, "insufficient-evidence", "下载卡形状非法（必须是 confirm 卡）；请修正后重新提交。");
+      }
+      break;
+    }
     default:
       return manualOutcome(args, "group-mismatch", "未知治理卡种；请修正后重新提交。");
   }
@@ -644,9 +658,12 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
   }
 
   // 只有真正的写盘确认卡才返回 confirmed:true；proposal/appointment/acceptance/intent-confirm 返回 selected。
-  const isConfirm = request.cardKind === "appointment-write";
-  const paths = isConfirm ? uniquePaths(Array.isArray(request.paths) ? request.paths : []) : [];
-  const pathDecisions = isConfirm
+  // 2026-11-04 下载卡是应用自有 confirm 种：也返回 confirmed:true，但**不**带 paths/pathDecisions。
+  const isWriteConfirm = request.cardKind === "appointment-write";
+  const isDownloadConfirm = request.cardKind === "download";
+  const isConfirm = isWriteConfirm || isDownloadConfirm;
+  const paths = isWriteConfirm ? uniquePaths(Array.isArray(request.paths) ? request.paths : []) : [];
+  const pathDecisions = isWriteConfirm
     ? (verdict.pathDecisions ?? []).map((decision) => {
         const decisionReason = decision.reason !== undefined ? redactJudgeText(decision.reason) : undefined;
         return {
@@ -668,7 +685,7 @@ export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerd
     value: isConfirm
       ? { confirmed: true }
       : { selected: [...(verdict.selected ?? [])] },
-    ...(isConfirm ? { paths } : {}),
+    ...(isWriteConfirm ? { paths } : {}),
     ...(pathDecisions !== undefined ? { pathDecisions } : {}),
     evidence,
     ...(args.durationMs !== undefined ? { durationMs: args.durationMs } : {}),

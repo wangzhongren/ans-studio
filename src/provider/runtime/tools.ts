@@ -48,6 +48,17 @@ import type {
   ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn,
 } from "../../model/runtime.ts";
 import {
+  DOWNLOAD_ERROR_CODES,
+  DOWNLOAD_FILENAME_MAX_CHARS,
+  DOWNLOAD_PURPOSE_MAX_BYTES,
+  DOWNLOAD_URL_MAX_BYTES,
+  type DownloadApprovalSource,
+  type DownloadRequestInput,
+  type DownloadRequestMetadata,
+  type DownloadRequestResult,
+  type RequestDownloadFn,
+} from "../../model/download.ts";
+import {
   PROJECT_NOTE_BLOCKER_TEXT_MAX,
   PROJECT_NOTE_NEXT_STEP_DEFAULT_KEY,
   PROJECT_NOTE_NEXT_STEP_TEXT_MAX,
@@ -122,6 +133,9 @@ export const REQUEST_CONFIRMATION_TOOL_NAME = "request_confirmation";
 
 /** request_choice 工具名（设计 A-1；交互工具族之一：请求客户勾选/单选，options）。 */
 export const REQUEST_CHOICE_TOOL_NAME = "request_choice";
+
+/** request_download 工具名（2026-11-04 下载申请；注入 `requestDownload` 能力才注册）。 */
+export const REQUEST_DOWNLOAD_TOOL_NAME = "request_download";
 
 /** submit_report 工具名（设计 C-1；交报告——角色完成时回交 su 汇总）。 */
 export const SUBMIT_REPORT_TOOL_NAME = "submit_report";
@@ -1657,6 +1671,10 @@ function abortedToolResult(name: string, viewImageDelivery?: ViewImageDeliveryMo
   if (name === REQUEST_REQUIREMENT_CHANGE_TOOL_NAME) {
     return { ok: false, message: `${name}：需求变更申请**未获结果**（原因：会话已中止）——**不要当已提交/已获批准**；如实告知客户。` };
   }
+  // 下载申请（2026-11-04）：中止时**不假设已下载/未下载**（可能已落盘、可能已清理）。
+  if (name === REQUEST_DOWNLOAD_TOOL_NAME) {
+    return { ok: false, message: `${name}：本轮已中止，下载申请**未获最终结果**——不要假设已下载或未下载；以应用审计/系统行为为准。` };
+  }
   // 图片查看（2026-10-26；2026-10-27 同轮设计）：中止时不谎称「已提供/未提供」。
   // 文案按当前交付方式分支：next-turn 保持「排队未获确认；下一轮以系统为准」原意；
   // tool-result 不得声称排队或下一轮附件，只如实说交付未获确认。
@@ -1858,6 +1876,204 @@ function makeRequestConfirmationTool(
         };
       }
       return notConsented(name, "客户明确未同意（选择了「否」）");
+    },
+  };
+}
+
+// —————————————— 下载申请（2026-11-04 download-requests；request_download） ——————————————
+//
+// 角色提交结构化下载申请；应用先做确定性安全检查与 `@审批` 预授权匹配，未命中才进入
+// 判断器/客户确认卡；批准后由应用下载到项目 `download/`。本层只做**参数形状校验**
+// （非法 ⇒ 未发卡、未联网、不落盘）并**如实转达**注入能力的回执；安全检查/审批/执行/
+// 审计全部在能力与下层——本工具不联网、不写盘、不做治理判定、不改变任何写权。
+// 未注入能力 ⇒ 工具不注册（能力缺席 = 最强 fail-closed）；判断会话/CLI 结构性不可见。
+// `projectRoot` 不经工具参数：下载根由注入能力的闭包绑定，模型不能指定根/子目录。
+
+const REQUEST_DOWNLOAD_ARG_KEYS: ReadonlySet<string> = new Set(["url", "filename", "purpose"]);
+const DOWNLOAD_ERROR_CODE_SET: ReadonlySet<string> = new Set(DOWNLOAD_ERROR_CODES);
+const DOWNLOAD_SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/** 下载参数形状错误：在触达能力前拒绝；明确「未发卡、未联网」。 */
+function downloadArgumentError(name: string, detail: string): ToolResult {
+  return {
+    ok: false,
+    message: `${name}: ${detail}——未发卡、未联网，请更正后重试（不要猜测参数） [技术 code：download-invalid-arguments]`,
+  };
+}
+
+type DownloadInputResult = { ok: true; value: DownloadRequestInput } | { ok: false; result: ToolResult };
+
+/**
+ * 读取并校验 `request_download` 的三参数（只做形状）：
+ * - `url`：非空、UTF-8 ≤2048 字节、可被 `new URL` 解析、仅 http/https、host 非空、无 userinfo；
+ * - `purpose`：非空、UTF-8 ≤1024 字节；
+ * - `filename`（可选）：字符串、Unicode 码点 ≤128、不含 NUL/控制字符/路径分隔符；纯空白视作未提供。
+ * 更深 URL/IP/文件名净化在能力与下层（B1）；未知参数一律拒绝。
+ */
+function readDownloadInput(args: Record<string, unknown>, name: string): DownloadInputResult {
+  for (const key of Object.keys(args)) {
+    if (!REQUEST_DOWNLOAD_ARG_KEYS.has(key)) {
+      return { ok: false, result: downloadArgumentError(name, `未知参数 ${key}`) };
+    }
+  }
+  const urlRaw = args["url"];
+  if (typeof urlRaw !== "string" || urlRaw.trim() === "") {
+    return { ok: false, result: downloadArgumentError(name, "缺少或非法的 url 参数（须为非空字符串）") };
+  }
+  const url = urlRaw.trim();
+  if (Buffer.byteLength(url, "utf8") > DOWNLOAD_URL_MAX_BYTES) {
+    return { ok: false, result: downloadArgumentError(name, `url 超过 ${DOWNLOAD_URL_MAX_BYTES} 字节（有界文本）`) };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, result: downloadArgumentError(name, "url 不能被解析为合法 URL") };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { ok: false, result: downloadArgumentError(name, "url 协议只允许 http/https") };
+  }
+  if (parsed.hostname === "") {
+    return { ok: false, result: downloadArgumentError(name, "url 主机不能为空") };
+  }
+  if (parsed.username !== "" || parsed.password !== "") {
+    return { ok: false, result: downloadArgumentError(name, "url 不得包含 userinfo（user:pass@）") };
+  }
+  const purposeRaw = args["purpose"];
+  if (typeof purposeRaw !== "string" || purposeRaw.trim() === "") {
+    return { ok: false, result: downloadArgumentError(name, "缺少或非法的 purpose 参数（须为非空字符串）") };
+  }
+  const purpose = purposeRaw.trim();
+  if (Buffer.byteLength(purpose, "utf8") > DOWNLOAD_PURPOSE_MAX_BYTES) {
+    return { ok: false, result: downloadArgumentError(name, `purpose 超过 ${DOWNLOAD_PURPOSE_MAX_BYTES} 字节（有界文本）`) };
+  }
+  const filenameRaw = args["filename"];
+  let filename: string | undefined;
+  if (filenameRaw !== undefined && filenameRaw !== null) {
+    if (typeof filenameRaw !== "string") {
+      return { ok: false, result: downloadArgumentError(name, "filename 参数非法（须为字符串；可省略）") };
+    }
+    if (filenameRaw.trim() !== "") {
+      if (Array.from(filenameRaw).length > DOWNLOAD_FILENAME_MAX_CHARS) {
+        return { ok: false, result: downloadArgumentError(name, `filename 超过 ${DOWNLOAD_FILENAME_MAX_CHARS} 字符（有界文本）`) };
+      }
+      if (/[\u0000-\u001F\u007F]/.test(filenameRaw)) {
+        return { ok: false, result: downloadArgumentError(name, "filename 不得包含 NUL/控制字符") };
+      }
+      if (filenameRaw.includes("/") || filenameRaw.includes("\\")) {
+        return { ok: false, result: downloadArgumentError(name, "filename 不得包含路径分隔符（/ 或 \\）") };
+      }
+      filename = filenameRaw;
+    }
+  }
+  return {
+    ok: true,
+    value: { url, purpose, ...(filename !== undefined ? { filename } : {}) },
+  };
+}
+
+/** 成功回执的 `path` 必须是项目相对的单个文件名：`download/<name>`（无目录段/穿越/绝对路径）。 */
+function isProjectDownloadPath(value: unknown): value is string {
+  if (typeof value !== "string" || !value.startsWith("download/")) return false;
+  const name = value.slice("download/".length);
+  return (
+    name !== "" &&
+    name !== "." &&
+    name !== ".." &&
+    !name.includes("/") &&
+    !name.includes("\\") &&
+    !name.includes("\u0000")
+  );
+}
+
+/** 审批来源三形状（归属如实；未知形状按契约外 fail-closed）。 */
+function isDownloadApprovalSource(value: unknown): value is DownloadApprovalSource {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  if (record["by"] === "customer") return true;
+  if (record["by"] === "judge") {
+    return typeof record["engine"] === "string" && (record["model"] === undefined || typeof record["model"] === "string");
+  }
+  if (record["by"] === "directive") {
+    return typeof record["directiveId"] === "string" && record["directiveId"].trim() !== "";
+  }
+  return false;
+}
+
+/**
+ * 回执 → 工具结果：**按判别联合做运行时复核**并如实转达。
+ * 成功只在 `ok:true` 且路径/字节/sha256/最终 URL/审批来源齐全时返回 `{ok:true,message}`；
+ * 失败必须带属于 `DOWNLOAD_ERROR_CODES` 的 code（消息缺 code 时追加）；
+ * 契约外回执（缺字段/坏形状/未知 code）一律 fail-closed——**绝不伪装成功**。
+ */
+function downloadReceiptMessage(name: string, value: unknown): ToolResult {
+  const contractExternal = (): ToolResult => ({
+    ok: false,
+    message: `${name}：应用未返回明确结果（回执缺失或非法）——**不要当已下载**；以应用审计/系统行为为准，如实告知客户。`,
+  });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return contractExternal();
+  const receipt = value as Partial<DownloadRequestResult> & Record<string, unknown>;
+  if (typeof receipt.message !== "string" || receipt.message.trim() === "") return contractExternal();
+  if (receipt.ok === true) {
+    const path = receipt.path;
+    const bytes = receipt.bytes;
+    const sha256 = receipt.sha256;
+    const finalUrl = receipt.finalUrl;
+    if (
+      !isProjectDownloadPath(path) ||
+      typeof bytes !== "number" ||
+      !Number.isSafeInteger(bytes) ||
+      bytes < 0 ||
+      typeof sha256 !== "string" ||
+      !DOWNLOAD_SHA256_HEX.test(sha256) ||
+      typeof finalUrl !== "string" ||
+      finalUrl.trim() === "" ||
+      !isDownloadApprovalSource(receipt.approval)
+    ) {
+      return contractExternal();
+    }
+    return { ok: true, message: receipt.message };
+  }
+  if (receipt.ok === false) {
+    const code = receipt.code;
+    if (typeof code !== "string" || !DOWNLOAD_ERROR_CODE_SET.has(code)) return contractExternal();
+    const message = receipt.message.includes(code) ? receipt.message : `${receipt.message} [技术 code：${code}]`;
+    return { ok: false, message };
+  }
+  return contractExternal();
+}
+
+/** `request_download` 工具：形状校验 → 调注入能力一次 → 如实转达（不重试、不伪造成功）。 */
+function makeRequestDownloadTool(
+  fn: RequestDownloadFn,
+  scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">,
+  currentTurnId?: () => string | undefined,
+): ExecutableTool {
+  const name = REQUEST_DOWNLOAD_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const parsed = readDownloadInput(call.args, name);
+      if (!parsed.ok) return parsed.result;
+      const turnId = currentTurnId?.();
+      const metadata: DownloadRequestMetadata = {
+        ...(call.signal ? { signal: call.signal } : {}),
+        ...(scope?.roleId !== undefined ? { roleId: scope.roleId } : {}),
+        ...(scope?.runtime !== undefined ? { runtime: scope.runtime } : {}),
+        ...(turnId !== undefined ? { turnId } : {}),
+        ...(call.toolCallId !== undefined ? { toolCallId: call.toolCallId } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await fn(parsed.value, metadata);
+      } catch {
+        // 不携带原始异常文本（避免 URL/路径/凭据进入模型消息）；语义固定为「未下载、未产生文件」。
+        return {
+          ok: false,
+          message: `${name}：未下载（下载能力异常，未产生文件）。下一步：稍后重试或反馈。谁来做：应用（app）。[技术 code：download-unavailable]`,
+        };
+      }
+      return downloadReceiptMessage(name, result);
     },
   };
 }
@@ -3483,6 +3699,13 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     const inputMs = options?.customerInputTimeoutMs ?? readOptionalTimeoutMs(process.env, CUSTOMER_INPUT_TIMEOUT_ENV);
     tools.push(makeRequestConfirmationTool(customerInput, inputMs, options?.interactionGate, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
     tools.push(makeRequestChoiceTool(customerInput, inputMs, options?.interactionGate, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+
+  // 结构性保证（2026-11-04 下载申请，沿 customerInput 先例）：**未注入 requestDownload 能力时
+  // `request_download` 不存在**（能力缺席 = 最强 fail-closed）；判断会话不经过本函数，天然不可见。
+  const requestDownload = options?.requestDownload;
+  if (requestDownload !== undefined) {
+    tools.push(makeRequestDownloadTool(requestDownload, { roleId: options?.roleId, runtime: options?.runtime }, options?.currentTurnId));
   }
 
   // 结构性保证（设计 C-1，同 run_shell / customerInput 先例）：**未注入回交能力时 `submit_report` 不存在**。
