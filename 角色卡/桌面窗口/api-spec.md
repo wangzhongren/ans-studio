@@ -539,3 +539,51 @@ A4 legacy provenance窄修：protected工具t.statusSource/target.source分别�
   `app:list-project` 成功 / `app:recovery-ready` 主进程先行推送；关窗 `cancelAll`、项目切换取消未决面板。
 - 实现/证据：`app/desktop/directive-input.ts`、`test/桌面应用/directive-input.test.ts`、`directive-decision.test.ts`；
   目标 22/22、受影响 26/26、桌面 522/522、`npm run typecheck` exit 0（`implemented-unverified`）。
+
+## 下载文件申请能力（`request_download` 注入，2026-11-04 download-requests C1）
+
+**不是 IPC/preload 通道**：复用既有 `session:operator-request` / `session:operator-response` /
+`session:operator-judge`（`app/preload.cjs` **零改动、无新 IPC**）。C1 冻结；C2/D1 只按此消费。
+完整冻结声明见 `docs/change/2026-11-04_download_requests-C1-implementation.md` §6。
+
+| 能力位（`SessionManagerDeps` / `openRoleSession` 入参） | 注入判据 | 实现 |
+| --- | --- | --- |
+| `requestDownload?: RequestDownloadFn`（A1 Model 契约，只读导入） | `createDownloadRuntime` + `downloadAppVersion` + **窗口级** `deps.customerInput` + `getDownloadDirectiveConsumer(projectRoot)` 四者齐备；缺一 ⇒ 不注入（`request_download` 工具结构性不存在，fail-closed）。全部非判断会话（项目角色与内置治理角色）适用；判断会话/CLI 不经该路径 | `session.ts::open()` 每会话 `createDownloadRequestRuntime({projectRoot,roleId,runtime,appVersion,present,takeDownloadDirective})` + `download-request.ts::createRequestDownloadCapability` |
+
+- **不变量**：项目角色 `customerInput` 仍为 undefined（无 `request_confirmation`/`request_choice`）；
+  W-2 仅在下载可用时为其扩 judge 闭包（`governanceModel==="trio"` 且 `createGovernanceJudge` 存在）。
+- **卡片（C2 渲染依据）**：`kind:"confirm"`、`cardKind:"download"`；`title`/`preview` 逐行全部 `mainT` + A2 冻结 key
+  （申请角色、用途、完整 URL、host:port、resolvedIps 前 8 + 截断标记、文件名、大小策略、重定向策略、mechanical
+  三项 scheme/publicHost/publicIps）；`detail` 省略；`flowId` 仅真实归属；`metadata = {cardKind,roleId,runtime,turnId?,toolCallId?,flowId?,intentId?,taskId?,judgeContext?}`。
+- **judgeContext（W-3）**：仅 `factsAvailable===true` 且事实齐备时设置，字段**原样**来自 B1
+  （`facts`=governanceFacts、`download`=downloadFacts、`flowId/intentId?/toolCallId?/turnId?`）；**不含 `unavailableReason`**；
+  `factsAvailable:false` ⇒ 省略整个 judgeContext + `judgeNotice`（`main.download.error.factsMissing`）直接客户卡；
+  `flowIdIsSynthetic===true` 的合成 `"download"` 不写 `request.flowId`/`metadata.flowId`。
+- **W-4 判断透传**：`planJudge` 仅对 `cardKind==="download"` 且 `judgeContext.download` 存在时
+  `request.download = judgeContext.download`（原样引用，不重算/不裁剪）；其他卡种不携带。
+- **manual/deny/unavailableReason（AC-6/AC-21/AC-28）**：下载卡**任何 manual** ⇒ 原卡 + `judgeNotice` 转客户
+  （不 auto-rework、不自动拒绝）；judge deny ⇒ `by:"judge"` 且 `request.presented.to:"judge"`（下载归属修正）；
+  通道收到 `unavailableReason` 的下载卡 ⇒ 客户卡 + notice（不 `markAutoRejected`/不 `settleActive(declined)`）。
+- **写预授权排除**：`preauthorizeWrite` 对 `cardKind==="download"` 恒 `undefined`——即使卡面/元数据被注入
+  `paths`/`writeBoundary` 也不得被写边界代批/代拒；下载审批只走下载能力 + 判断/客户通道。
+- **运行时生命周期**：每会话一份 B1 运行时；`downloadId` 由 B1 生成（C1 只消费，不生成/不传入）；
+  `disposeEntry` 中 `await entry.downloadRuntime?.dispose()`（幂等，中止在途下载、释放项目执行槽；失败只记诊断，不阻断释放）；
+  信号 = 调用 `metadata.signal`（含轮次中止）+ 会话 lifetime，经 B1 `present` 请求透传；关窗沿既有
+  `rejectAllPending` + `disposeEntry` abort fail-closed。**无每项目运行时缓存、无 Interface 级 dispose**。
+- **指令面板（F3 形状 A）**：`directive:list`/`directive:state` 原样透传 B1 `CustomerDirectiveRuntime.list()`
+  的 epoch-aware 视图（旧 domain `consumer:"none"`、新 domain `"download"`）；C1 不判 epoch、不读
+  `download-consumer.json`、不消费 `downloadStartsNow`。**F13**：`DirectiveInputController.downloadDirectiveConsumer(projectRoot)`
+  为只读窄访问器，返回**同一** `CustomerDirectiveRuntime.takeDownloadDirective`（不新建第二运行时/账本；跨项目 ⇒ undefined）。
+- **回执（best-effort 系统行，经既有 `emitDeliveryNote`）**：成功 = `main.download.notice.completed`
+  （host/path/bytes/sha/source，**无 finalUrl**）+ G1 A `main.download.notice.gitignoreHint`（仅成功路径，不自动改 `.gitignore`）；
+  预授权成功以 completed 的「审批来源：审批指令 #id」（`directiveSource`）标注；失败 = `main.download.notice.failed` +
+  `main.download.error.*`（客户系统行只显示 reason+code）；投递失败只记诊断，**绝不翻转已完成下载结果**。
+- **G7/G8**：下载属 approval 组，复用持久化「替我审批」开关；`shell:judge-pause` 只暂停 shell（C1 不读暂停）；
+  `appVersion`（`app/main.ts` 的 `app.getVersion()`）仅供 B1 G8 epoch 元数据，不是授权依据。
+- **零回归**：PR #57 指令解释器、PR #58 `isApplicationDecisionReservedForCustomer`/`tryAutoSelectDecision`、
+  PR #60 治理写卡（appointment-write 永不进判断器）均未改动；`test/桌面应用/**` 55 文件/546 → 57 文件/562 全绿。
+- **实现/证据（2026-11-04，`implemented-unverified`）**：`app/desktop/download-request.ts`（新）、`session.ts`、
+  `customer-input.ts`、`interface.ts`、`directive-input.ts`（F13 窄访问器）、`app/main.ts`（appVersion）；
+  `test/桌面应用/download-request.test.ts` 8 例 + `download-decision.test.ts` 8 例；`npm run typecheck` exit 0；
+  桌面套件 57 文件 / 562 tests / 562 pass / 0 fail / 0 skip；`[i18n-guard] scanned=137 allowlisted=22 violations=0`；
+  证据 `docs/change/2026-11-04_download_requests-C1-evidence/`（`INDEX.sha256` 16 项 / `581d1dcb…`）。

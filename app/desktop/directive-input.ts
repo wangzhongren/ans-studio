@@ -29,6 +29,7 @@ import {
   type DirectivePresenterRequest,
   type SubmitFromInput,
   type SubmitResult,
+  type TakeDownloadDirectiveFn,
 } from "../../src/pipeline/orchestration/customer-directive.ts";
 import {
   CUSTOMER_DIRECTIVE_ID_PATTERN,
@@ -152,6 +153,12 @@ export interface DirectiveInputController extends DirectiveDecisionConsumer {
   replayPending(): number;
   cancelAll(reason: string): void;
   cancelProject(projectRoot: string): void;
+  /**
+   * **下载预授权消费者窄访问器**（2026-11-04 download-requests C1/R3；闸门 2 写集增补 F13）：
+   * 返回**同一项目既有 `CustomerDirectiveRuntime`** 的 `takeDownloadDirective`（不新建第二运行时/账本、
+   * 不复制消费/once/冲突逻辑）；无当前项目/跨项目 ⇒ undefined（fail-closed）。
+   */
+  downloadDirectiveConsumer(projectRoot: string): { takeDownloadDirective: TakeDownloadDirectiveFn } | undefined;
 }
 
 export interface CreateDirectiveInputControllerOptions {
@@ -815,6 +822,12 @@ export function createDirectiveInputController(
     applyDecisionDirective: async (projectRoot, card, hooks) => {
       if (currentProjectRoot === undefined || projectRoot !== currentProjectRoot) return undefined;
       return runtimeFor(projectRoot).applyDecisionDirective(card, hooks);
+    },
+    downloadDirectiveConsumer: (projectRoot) => {
+      if (currentProjectRoot === undefined || projectRoot !== currentProjectRoot) return undefined;
+      // 复用 `runtimeFor` 的同一项目运行时/账本；只暴露下载预授权一个方法。
+      const runtime = runtimeFor(projectRoot);
+      return { takeDownloadDirective: runtime.takeDownloadDirective.bind(runtime) };
     },
   };
 }

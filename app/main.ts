@@ -811,6 +811,8 @@ function registerIpc(win: BrowserWindow): void {
     // P2（2026-10-30）：网络状态门经运行时选项透传（Service → Provider → 适配器 deadline 暂停/恢复）；
     // 同一实例经 Interface 交给 SessionManager（离线队列保留、恢复继续）。
     runtimeOptions: { networkGate: networkMonitor.gate },
+    // 2026-11-04 下载申请（C1）：G8 A epoch 记录所需应用版本（仅元数据，不是授权依据）。
+    downloadAppVersion: app.getVersion(),
     // i18n B0（2026-10-23）：应用级语言偏好文件与共享 translator（同一实例贯穿窗口/对话框/错误文案）。
     // 偏好只写 userData；不写项目 `.ans`/`.env`/治理账本。
     preferencesPath,

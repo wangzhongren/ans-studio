@@ -1,0 +1,23 @@
+i18n-guard 修复前观测（2026-11-04，download-requests C1 收尾上下文）
+=====================================================================
+
+首次运行：
+  node --test test/项目管理/shared/i18n-guard.test.ts
+结果：exit 1；违规 1 项（扫描器只报每文件首个命中）：
+  app/desktop/download-request.ts:248:29 未下载
+
+原因：`createRequestDownloadCapability` 的 catch 兜底回执硬编码中文文案
+（“request_download：未下载（下载能力异常…）…”，含“未下载/下载能力异常/下一步/谁来做”等中文）。
+该文件为 C1 新增（`app/desktop/**` 在守卫扫描范围），B0 allowlist 无此文件。
+
+修复（仅 C1 写集 `app/desktop/download-request.ts`，最小改动）：兜底回执改用 A2 冻结 key 组装：
+  mainT("main.download.notice.failed", {
+    code: "download-unavailable",
+    reason: mainT("main.download.error.unavailable"),
+  })
+未新增任何 i18n key、未改 allowlist、未改 `src/**`。
+
+修复后重跑（原始日志见同目录 `04-i18n-guard.log`）：
+  6 tests / 6 pass / 0 fail / 0 skip；exit 0；
+  [i18n-guard] scanned=137 allowlisted=22 violations=0
+  （scanned 136→137 为新增 `app/desktop/download-request.ts` 进入扫描面；allowlisted 22 不变）

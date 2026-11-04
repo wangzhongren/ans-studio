@@ -77,6 +77,16 @@ import type {
   DirectiveInterpretRequest,
   DirectiveInterpretResult,
 } from "../../src/model/directive.ts";
+// 2026-11-04 下载申请（download-requests C1）：A1 能力契约 + B1 每会话运行时/卡片 presenter 冻结形状。
+import type { RequestDownloadFn } from "../../src/model/download.ts";import type {
+  DownloadApprovalOutcome,
+  DownloadApprovalPresenter,
+  DownloadApprovalRequest,
+  DownloadRequestOptions,
+  DownloadRequestRuntime,
+} from "../../src/pipeline/orchestration/download-request.ts";
+import type { TakeDownloadDirectiveFn } from "../../src/pipeline/orchestration/customer-directive.ts";
+import { buildDownloadCardRequest, createRequestDownloadCapability, toDownloadApprovalOutcome } from "./download-request.ts";
 // F-5-opt1（2026-10-16 客户批准）：确认制会话重建后写权清零的**模型可见注记文案**——**单一来源在编排**
 // （`run-role.ts` 的 `RoleSessionHandle.queueModelNotice` 配套文案）；本层只读导入、绝不各写一份。
 import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchestration/run-role.ts";
@@ -583,6 +593,8 @@ export interface SessionManagerDeps {
       scope?: undefined;
       /** **客户确认制交互通道**（A-1/A-3）：仅内置治理角色（su）会话注入（见 SessionManager.open）。 */
       customerInput?: CustomerInputFn;
+      /** **下载申请能力**（2026-11-04 download-requests W-1）：每会话注入；未注入 ⇒ `request_download` 不注册。 */
+      requestDownload?: RequestDownloadFn;
       /** **派发任务能力**（H-1）：仅内置治理角色（su）会话注入（见 SessionManager.open 与 routeDispatch）。 */
       dispatchTask?: DispatchTaskFn;
       /**
@@ -669,6 +681,20 @@ export interface SessionManagerDeps {
     runtimeOptions?: RuntimeAdapterFactoryOptions;
     createAdapter: RuntimeAdapterFactory;
   }) => GovernanceJudgeFn;
+  /**
+   * **下载运行时工厂**（2026-11-04 download-requests C1/F2）：B1 冻结的每会话运行时
+   * `createDownloadRequestRuntime(options)`；缺省由 Interface 注入真实实现，测试可注入桩件。
+   * 每会话一份（绑定 roleId/runtime/present/takeDownloadDirective/appVersion）；不按项目缓存。
+   */
+  createDownloadRuntime?: (options: DownloadRequestOptions) => DownloadRequestRuntime;
+  /** G8 A epoch 所需应用版本（`app/main.ts` 传 `app.getVersion()`）；缺失 ⇒ 不注入下载能力（fail-closed）。 */
+  downloadAppVersion?: string;
+  /**
+   * **下载预授权消费者读取**（R3/F13）：由 Interface 从既有 `directiveInput` 的窄访问器取得
+   * （同一项目 `CustomerDirectiveRuntime.takeDownloadDirective`，不新建第二运行时/账本）。
+   * 缺省/返回 undefined ⇒ 不注入下载能力（fail-closed）。
+   */
+  getDownloadDirectiveConsumer?: (projectRoot: string) => TakeDownloadDirectiveFn | undefined;
   /**
    * **客户授权平面自然语言解释器工厂**（2026-11-04 客户直修）：缺省经编排 Pipeline 公共出口
    * `govern-session.ts::createDirectiveInterpreter`（桌面不直接导入私有 `common/编排/`）。
@@ -928,6 +954,11 @@ interface LiveSession {
    * 会话 dispose 即清；缺失 ⇒ 通道按「判断能力缺席」回落原卡（fail-closed，绝不代批）。
    */
   governanceJudge?: GovernanceJudgeFn;
+  /**
+   * **每会话下载运行时**（2026-11-04 download-requests C1/F2）：`open()` 创建，
+   * `disposeEntry` 中 `await dispose()` 中止在途下载并释放执行槽；缺省 ⇒ 本会话无下载能力。
+   */
+  downloadRuntime?: DownloadRequestRuntime;
   /**
    * **需求变更审批卡通道**（2026-10-26 客户纠正）：仅**统筹（schedule）/提案（proposal）**会话构造，
    * 绑定本会话的客户卡上下文（roleId/signal/治理模型/判断闭包）与 `onPresented`。应用能力
@@ -1631,6 +1662,20 @@ export class SessionManager {
     entry.governanceJudge = undefined;
     entry.interactionState.lifetime.abort();
     entry.interactionState.turn.abort();
+    // 2026-11-04 下载申请（F2/R2）：会话结束 await B1 每会话运行时 dispose（幂等；中止在途下载、
+    // 释放本项目执行槽）。失败只记诊断，不阻断会话释放。
+    if (entry.downloadRuntime !== undefined) {
+      const downloadRuntime = entry.downloadRuntime;
+      entry.downloadRuntime = undefined;
+      try {
+        await downloadRuntime.dispose();
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: entry.projectRoot, roleId: entry.roleId }).error(
+          "download.runtime.dispose.failed",
+          error,
+        );
+      }
+    }
     try {
       await entry.handle.dispose();
       return null;
@@ -2817,8 +2862,16 @@ export class SessionManager {
     // 客户交互通道时构造（single/su 与 Liaison 不注入——不判断、不产生模型调用）。用**同一份**
     // `runtimeOptions` 与 `createAdapter`（判断跟随请求会话引擎，不跨引擎）。构造失败 ⇒ 不注入
     // （能力缺席，通道回落原卡——fail-closed）。闭包随会话条目销毁一并清除。
+    // 2026-11-04（download-requests W-2）：下载能力可用的**项目角色**也要构造 judge 闭包（下载卡可到
+    // 判断器），但**不改变** `customerInput` 注入判据——项目角色仍无 request_confirmation/request_choice。
+    const takeDownloadDirective = this.deps.getDownloadDirectiveConsumer?.(req.projectRoot);
+    const downloadCapable =
+      this.deps.createDownloadRuntime !== undefined &&
+      this.deps.downloadAppVersion !== undefined &&
+      this.deps.customerInput !== undefined &&
+      takeDownloadDirective !== undefined;
     let governanceJudge: GovernanceJudgeFn | undefined;
-    if (governanceModel === "trio" && customerInput !== undefined && this.deps.createGovernanceJudge !== undefined) {
+    if (governanceModel === "trio" && (customerInput !== undefined || downloadCapable) && this.deps.createGovernanceJudge !== undefined) {
       try {
         governanceJudge = this.deps.createGovernanceJudge({
           project,
@@ -2835,7 +2888,7 @@ export class SessionManager {
     // 在调用当刻从活会话条目读取（会话已销毁 ⇒ 缺省，通道不判断）；`metadata` 由调用方原样透传。
     const buildCustomerInputContext = (
       request: CustomerInputRequest,
-      extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1 },
+      extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1; judgeNotice?: string },
     ): Parameters<DesktopCustomerInputFn>[1] => {
       const mirrorRoleId = mirrorRoleIdFor(request);
       const live = this.sessions.get(key);
@@ -2855,8 +2908,88 @@ export class SessionManager {
         ...(writeBoundary !== undefined ? { writeBoundary, skillRoot: project.skillRoot } : {}),
         ...(extras?.onPresented !== undefined ? { onPresented: extras.onPresented } : {}),
         ...(extras?.acceptanceReport !== undefined ? { acceptanceReport: extras.acceptanceReport } : {}),
+        ...(extras?.judgeNotice !== undefined ? { judgeNotice: extras.judgeNotice } : {}),
       };
     };
+    // 2026-11-04 下载申请（download-requests C1/F2）：每会话一份 B1 运行时；presenter 复用窗口级
+    // 原始客户通道 + `withRequestLifecycle`（request.* 只在卡片路径），`downloadId` 由 B1 生成。
+    let downloadRuntime: DownloadRequestRuntime | undefined;
+    let requestDownload: RequestDownloadFn | undefined;
+    if (downloadCapable && this.deps.customerInput !== undefined && takeDownloadDirective !== undefined) {
+      const windowCustomerInput = this.deps.customerInput;
+      const manager = this;
+      const presenter: DownloadApprovalPresenter = {
+        async present(downloadRequest: DownloadApprovalRequest, hooks): Promise<DownloadApprovalOutcome> {
+          const card = buildDownloadCardRequest(downloadRequest);
+          const requestId = manager.requestIdFor(req.projectRoot, req.roleId, card.request, card.metadata);
+          let presentedNotified = false;
+          const notifyPresented = (): void => {
+            if (presentedNotified) return;
+            presentedNotified = true;
+            try {
+              hooks.onPresented({ requestId });
+            } catch (error) {
+              createDiagnosticLogger({ component: "desktop.download", projectRoot: req.projectRoot, roleId: req.roleId }).error(
+                "download.presented-callback.failed",
+                error,
+              );
+            }
+          };
+          const signals: AbortSignal[] = [];
+          if (downloadRequest.signal !== undefined) signals.push(downloadRequest.signal);
+          signals.push(interactionState.lifetime.signal);
+          const signal = AbortSignal.any(signals);
+          let outcome: CustomerInputOutcome | null | undefined;
+          try {
+            outcome = await manager.withRequestLifecycle(
+              req.projectRoot,
+              req.roleId,
+              card.request,
+              card.metadata,
+              (request, context, metadata) => windowCustomerInput(request, context, metadata),
+              (request, extras) => buildCustomerInputContext(request, extras),
+              requestId,
+              {
+                signal,
+                ...(card.judgeNotice !== undefined ? { judgeNotice: card.judgeNotice } : {}),
+                onPresented: notifyPresented,
+              },
+            );
+          } catch (error) {
+            createDiagnosticLogger({ component: "desktop.download", projectRoot: req.projectRoot, roleId: req.roleId }).error(
+              "download.card.failed",
+              error,
+            );
+            return { decision: "unavailable", reason: "download-card-failed" };
+          }
+          return toDownloadApprovalOutcome(outcome);
+        },
+      };
+      try {
+        downloadRuntime = this.deps.createDownloadRuntime!({
+          projectRoot: req.projectRoot,
+          roleId: req.roleId,
+          runtime: req.runtime,
+          appVersion: this.deps.downloadAppVersion!,
+          present: presenter,
+          takeDownloadDirective,
+        });
+        requestDownload = createRequestDownloadCapability({
+          runtime: downloadRuntime,
+          runtimeKind: req.runtime,
+          roleId: req.roleId,
+          lifetimeSignal: interactionState.lifetime.signal,
+          emitNotice: (summary) => this.emitDeliveryNote(req.projectRoot, req.runtime, req.roleId, req.roleId, summary),
+        });
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).error(
+          "download.runtime.failed",
+          error,
+        );
+        downloadRuntime = undefined;
+        requestDownload = undefined;
+      }
+    }
     let handle: RoleSessionHandle;
     try {
       // scope 传 undefined：聊天无预先任务，授权上界 = 角色边界本身（门禁引擎据此不做 F4 收窄）。
@@ -2897,6 +3030,8 @@ export class SessionManager {
                   ),
               }
             : {}),
+          // 2026-11-04 下载申请（W-1）：每会话能力；未注入 ⇒ 编排/运行时核心不注册 `request_download`。
+          ...(requestDownload ? { requestDownload } : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
           ...(dispatchTask ? { dispatchTask } : {}),
           // 2026-10-26 view_image：全部角色会话注入（目标已定格＝本会话）；编排原样转交运行时核心。
@@ -2981,6 +3116,7 @@ export class SessionManager {
       skillPaths,
       ...(shellJudge !== undefined ? { shellJudge } : {}),
       ...(governanceJudge !== undefined ? { governanceJudge } : {}),
+      ...(downloadRuntime !== undefined ? { downloadRuntime } : {}),
       // 需求变更审批卡通道（2026-10-26 客户纠正；2026-10-31 run-change 触发扩展）：绑定本会话客户卡上下文
       // （roleId/signal/judge/turnText）与 `onPresented`；`application:true` 的 run-change 卡不借用角色发行槽位，
       // 但呈现面按治理会话收口（统筹/提案/幕僚），其他角色/项目角色不构造该通道。
@@ -4089,9 +4225,16 @@ export class SessionManager {
     request: CustomerInputRequest,
     metadata: CustomerInputMetadata | undefined,
     raw: (request: CustomerInputRequest, context: Parameters<DesktopCustomerInputFn>[1], metadata?: CustomerInputMetadata) => Promise<CustomerInputOutcome | null | undefined> | CustomerInputOutcome | null | undefined,
-    buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1 }) => Parameters<DesktopCustomerInputFn>[1],
+    buildContext: (request: CustomerInputRequest, extras?: { onPresented?: () => void; acceptanceReport?: AcceptanceReportDisplayV1; judgeNotice?: string }) => Parameters<DesktopCustomerInputFn>[1],
     requestIdOverride?: string,
-    lifecycle?: { notify?: "default" | "resolved-only" | "none"; signal?: AbortSignal },
+    lifecycle?: {
+      notify?: "default" | "resolved-only" | "none";
+      signal?: AbortSignal;
+      /** 下载卡事实不可用时附在客户卡上的提示（其他卡种不传）。 */
+      judgeNotice?: string;
+      /** 卡片实际呈现（客户或 judge）后回调一次（下载 presenter 用它上报 requestId）。 */
+      onPresented?: () => void;
+    },
   ): Promise<CustomerInputOutcome | null | undefined> {
     // 2026-10-29（Q6 A）：验收卡的最小链事实由应用补充（产品意图/名单/D3/质检报告）。
     // 2026-11-02 acceptance-return-card（C2）：同一次读取的 16 KiB 安全投影随 ctx 送渲染层。
@@ -4184,6 +4327,16 @@ export class SessionManager {
       : Promise.resolve();
     let presented = false;
     let presentedWrite: Promise<void> | null = null;
+    let presentedNotified = false;
+    const notifyPresented = (): void => {
+      if (presentedNotified) return;
+      presentedNotified = true;
+      try {
+        lifecycle?.onPresented?.();
+      } catch {
+        // 呈现回调只服务审计/下载 presenter 的 requestId 上报；异常不得影响已完成的呈现/结算。
+      }
+    };
     const markPresented = (to: "customer" | "judge"): Promise<void> => {
       if (aborted) return Promise.resolve();
       if (presentedWrite !== null) return presentedWrite;
@@ -4192,8 +4345,12 @@ export class SessionManager {
       return presentedWrite;
     };
     const context = buildContext(request, {
-      onPresented: () => { void markPresented("customer"); },
+      onPresented: () => {
+        void markPresented("customer");
+        notifyPresented();
+      },
       ...(acceptanceReport !== undefined ? { acceptanceReport } : {}),
+      ...(lifecycle?.judgeNotice !== undefined ? { judgeNotice: lifecycle.judgeNotice } : {}),
     });
     const abortedOutcome: CustomerInputOutcome = {
       outcome: "declined",
@@ -4269,12 +4426,20 @@ export class SessionManager {
     // Q9 A（2026-11-03）：指令归属只从 `operatorId:"directive:<id>"` 解析；不伪造 `request.presented.to`
     // （W-6：presented 仍仅 customer/judge；指令代选/拒绝在呈现之前完成）。
     const directiveId = directiveIdFromOperatorId(operatorId);
+    const judgeOrigin =
+      directiveId === undefined && typeof operatorId === "string" && operatorId.startsWith("judge:");
     const judged =
       directiveId === undefined &&
       answeredOut !== undefined &&
-      (answeredOut.judge !== undefined || (typeof operatorId === "string" && operatorId.startsWith("judge:")));
-    if (judged && !presented && answeredOut !== undefined) await markPresented("judge");
-    else if (presentedWrite !== null) await presentedWrite;
+      (answeredOut.judge !== undefined || judgeOrigin);
+    // 2026-11-04 下载申请（AC-21）：下载卡的 judge **deny** 也是 judge 归属（declined 路径原先只认
+    // answered，会误写成 customer 且不记 presented）。限定 cardKind==="download"，其他卡种行为不变。
+    const downloadJudge = request.cardKind === "download" && judgeOrigin;
+    const resolvedByJudge = judged || downloadJudge;
+    if (resolvedByJudge && !presented && (answeredOut !== undefined || downloadJudge)) {
+      await markPresented("judge");
+      notifyPresented();
+    } else if (presentedWrite !== null) await presentedWrite;
     const choice = answeredOut !== undefined
       ? (answeredOut.value.confirmed === true ? "confirmed" : answeredOut.value.confirmed === false ? "denied" : (answeredOut.value.selected ?? []).join(",") || "answered")
       : out?.outcome ?? "unavailable";
@@ -4303,7 +4468,7 @@ export class SessionManager {
       ...(selected.length > 0 && request.cardKind !== "appointment" ? { selectedOptionIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
-      by: directiveId !== undefined ? "directive" : judged ? "judge" : "customer",
+      by: directiveId !== undefined ? "directive" : resolvedByJudge ? "judge" : "customer",
       ...(directiveId !== undefined ? { directiveId } : {}),
       ...(operatorId !== undefined ? { operatorId } : {}),
       choice,
@@ -4320,7 +4485,7 @@ export class SessionManager {
         ...(judged && answeredOut?.judge !== undefined ? { judge: answeredOut.judge } : {}),
       }, () => new Date(this.now())));
     }
-    if (notifyResolved) await this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", judged ? `判断代批：${choice}` : choice);
+    if (notifyResolved) await this.notifyRequest(projectRoot, requestId, sourceRoleId, request.title, "resolved", resolvedByJudge ? `判断代批：${choice}` : choice);
     return out;
   }
 
