@@ -1,0 +1,126 @@
+{
+  "phase": "after",
+  "checks": [
+    {
+      "name": "live delivery turn rendered",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": null,
+        "assistantDirectVisible": true,
+        "replyOriginalCount": 0,
+        "replyOriginalLabels": [],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）"
+        ]
+      }
+    },
+    {
+      "name": "after: assistant reply displayed directly",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": null,
+        "assistantDirectVisible": true,
+        "replyOriginalCount": 0,
+        "replyOriginalLabels": [],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）"
+        ]
+      }
+    },
+    {
+      "name": "task-request fold unchanged",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": null,
+        "assistantDirectVisible": true,
+        "replyOriginalCount": 0,
+        "replyOriginalLabels": [],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）"
+        ]
+      }
+    },
+    {
+      "name": "delivery card itself not folded",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": null,
+        "assistantDirectVisible": true,
+        "replyOriginalCount": 0,
+        "replyOriginalLabels": [],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史已保存",
+          "交接内容（安全显示副本）"
+        ]
+      }
+    },
+    {
+      "name": "after replay: cold delivery turn keeps assistant direct and task-request unchanged",
+      "value": true,
+      "detail": {
+        "assistantFound": true,
+        "assistantInsideFold": null,
+        "assistantDirectVisible": true,
+        "replyOriginalCount": 0,
+        "replyOriginalLabels": [],
+        "taskRequestCount": 1,
+        "taskRequestOpen": false,
+        "taskRequestSummary": "任务请求原文",
+        "taskRequestHasText": true,
+        "deliveryCardPresent": true,
+        "deliveryInsideFold": null,
+        "summaries": [
+          "任务请求原文",
+          "接收历史未确认",
+          "交接内容（安全显示副本）"
+        ]
+      }
+    },
+    {
+      "name": "zero console errors",
+      "value": true,
+      "detail": []
+    }
+  ],
+  "console": [],
+  "failures": 0,
+  "screenshots": [
+    "unfold-reply-after.png",
+    "task-request-unchanged-after.png"
+  ]
+}

@@ -1,0 +1,213 @@
+--- a/app/renderer/src/chat/chat-store.ts
++++ b/app/renderer/src/chat/chat-store.ts
+@@ -132,7 +132,7 @@
+ const judgeResultIds = new Set<string>();
+ // 回放锚点表（每角色一份；history 重放时登记，operator 卡据此落回发生位置）。
+ const anchorsByRole = new Map<string, AnchorTable>();
+-// 已收到结构化报告/交付的轮次（turnId → 是否接收方），用于 task-request/reply-original 折叠。
++// 已收到结构化报告/交付的轮次（turnId → 是否接收方；当前仅用于 user 行 task-request 折叠）。
+ const reportedTurnsByRole = new Map<string, Map<string, { receiver: boolean }>>();
+ // 历史报告身份（去重：同 reportId+来源只呈现一次）；full 重建时重置。
+ const historyReportIds = new Map<string, Set<string>>();
+@@ -489,14 +489,14 @@
+ }
+ 
+ /**
+- * 已报告轮次的折叠标记：assistant 行在 settled（或回放行）后折成 reply-original；
+- * user 行（非注入）折成 task-request。绝不折叠报告/卡/工具行。
++ * 已报告轮次的折叠标记：仅 user 行（非注入）折成 task-request。
++ * 客户直修（2026-11-04）：assistant（幕僚）回复不再折叠，settled/回放一律直接原文显示；
++ * reply-original 仅保留给历史数据兼容渲染（不再生成）。绝不折叠报告/卡/工具行。
+  */
+ function applyFoldToRow(row: ChatRow, roleId: string): boolean {
+   const reported = reportedTurnsByRole.get(roleId);
+   if (!reported || !row.turnId) return false;
+-  const info = reported.get(row.turnId);
+-  if (!info) return false;
++  if (!reported.has(row.turnId)) return false;
+   const data = asDict(row.data);
+   if (data.fold === "task-request" || data.fold === "reply-original") return false;
+   if (row.kind === "user") {
+@@ -504,19 +504,6 @@
+       ...data,
+       fold: "task-request",
+       foldLabel: translate(currentLocale(), "ui.reportView.taskRequestLabel"),
+-      foldOpen: foldOpenSet(roleId).has(foldIdentity(row)),
+-    };
+-    return true;
+-  }
+-  if (row.kind === "assistant") {
+-    const settled = row.replay === true || settledTurnsByRole.get(roleId)?.has(row.turnId) === true;
+-    if (!settled) return false;
+-    row.data = {
+-      ...data,
+-      fold: "reply-original",
+-      foldLabel: info.receiver
+-        ? translate(currentLocale(), "ui.reportView.deliveryReplyLabel")
+-        : translate(currentLocale(), "ui.reportView.replyOriginalLabel"),
+       foldOpen: foldOpenSet(roleId).has(foldIdentity(row)),
+     };
+     return true;
+@@ -1387,7 +1374,7 @@
+     const row = model.rows.find((candidate) => candidate.id === rowId);
+     if (!row) return;
+     if (key === "fold") {
+-      // task-request / reply-original 的开合（跨 full 重建保持；卸载重挂同状态）。
++      // task-request 折叠的开合（reply-original 仅历史数据兼容渲染；跨 full 重建保持）。
+       setFoldOpen(roleId, row, open === true);
+       set({ paneVersions: bumpVersions(get().paneVersions, [roleId]) });
+       return;
+--- a/app/renderer/src/chat/ChatRow.tsx
++++ b/app/renderer/src/chat/ChatRow.tsx
+@@ -6,7 +6,7 @@
+  * 用户/模型文本统一经 `chat/markdown` 的受控渲染（html:false、链接白名单、图片原文）。
+  *
+  * 4B：治理卡元信息/镜像/排队、排队聚合行、报告全文/持久化/交付回执、
+- * task-request/reply-original 折叠。不改变虚拟窗口/行高口径。
++ * task-request 折叠（reply-original 仅历史数据兼容渲染）。不改变虚拟窗口/行高口径。
+  */
+ 
+ import { type SyntheticEvent, memo, type ReactNode, useEffect, useId, useState } from "react";
+@@ -121,7 +121,10 @@
+   return <Info size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
+ }
+ 
+-/** task-request / reply-original 折叠（同一行内容不复制；展开状态跨重建保持）。 */
++/**
++ * 折叠容器（同一行内容不复制；展开状态跨重建保持）。
++ * task-request 为当前唯一由 store 生成的折叠；reply-original 仅保留历史数据兼容渲染。
++ */
+ function Folded({ row, roleId, children }: { row: ChatRow; roleId: string; children: ReactNode }) {
+   const t = useT();
+   const locale = useLocaleState((s) => s.locale);
+--- a/app/renderer/src/chat/report-view.ts
++++ b/app/renderer/src/chat/report-view.ts
+@@ -449,6 +449,7 @@
+ }
+ 
+ // —————— 报告折叠（task-request / reply-original）——————
++// 2026-11-04 客户直修：assistant 回复不再生成 reply-original；label 常量按 i18n 管理边界保留。
+ 
+ export function taskRequestLabel(locale: Locale = DEFAULT_LOCALE): string {
+   return translate(locale, "ui.reportView.taskRequestLabel");
+--- a/test/桌面UI/phase4b-electron-smoke.mjs
++++ b/test/桌面UI/phase4b-electron-smoke.mjs
+@@ -593,6 +593,54 @@
+       expiredDelivery,
+     );
+ 
++
++    // —————— 9b. 客户直修（2026-11-04）：幕僚回复不再折叠 ——————
++    const unfoldTurn = "unfold-reply-turn";
++    const unfoldTask = "UNFOLD-TASK-MARKER 任务请求原文保持折叠";
++    const unfoldReply = "UNFOLD-REPLY-MARKER 幕僚回复直接显示";
++    const unfoldDelivery = {
++      source: "prompt-input",
++      text: "UNFOLD-SAFE-COPY-MARKER",
++      inputProvenance: { version: 1, kind: "handback", deliveryId: "unfold-d1", attemptId: "unfold-a1", target: { roleId: "P", runtime: "pi" }, reports: [] },
++      inputTextProjection: { version: 1, source: "trusted-handback-display", modelInputRecorded: false, redacted: false, truncated: false, summaryTruncated: false },
++    };
++    await push("session:events", [
++      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "message", turnId: unfoldTurn, summary: "用户输入", detail: { source: "prompt-input", text: unfoldTask } } },
++      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "message", turnId: unfoldTurn, summary: "交付投递", detail: unfoldDelivery } },
++      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "message", turnId: unfoldTurn, summary: unfoldReply } },
++      { projectRoot: ROOT, roleId: "P", runtime: "pi", event: { kind: "settled", turnId: unfoldTurn, summary: "会话结束", detail: { outcome: "completed" } } },
++    ]);
++    await sleep(140);
++    check("unfold: settled delivery turn keeps assistant reply direct with no reply-original fold", await js(`(()=>{
++      const pane=document.querySelector("#chat .chat-pane")||document;
++      const reply=[...pane.querySelectorAll(".msg-assistant")].find((x)=>x.textContent.includes("UNFOLD-REPLY-MARKER"));
++      const summaries=[...pane.querySelectorAll("details > summary")].map((x)=>x.textContent);
++      return !!reply&&reply.closest("details")===null&&pane.querySelectorAll("details.reply-original").length===0&&!summaries.some((text)=>text.includes("本轮交付处理回复原文")||text.includes("本轮角色回复原文"));
++    })()`));
++    check("unfold: task-request fold unchanged for the same reported turn", await js(`(()=>{
++      const pane=document.querySelector("#chat .chat-pane")||document;
++      const req=[...pane.querySelectorAll("details.task-request")].find((x)=>x.textContent.includes("UNFOLD-TASK-MARKER"));
++      return !!req&&req.open===false&&req.querySelector(":scope > summary").textContent==="任务请求原文"&&req.textContent.includes("UNFOLD-TASK-MARKER");
++    })()`));
++    await push("session:history", {
++      projectRoot: ROOT,
++      roleId: "P",
++      runtime: "pi",
++      rows: [
++        { kind: "user", turnId: unfoldTurn, text: unfoldTask },
++        { kind: "user", turnId: unfoldTurn, text: "UNFOLD-SAFE-COPY-MARKER", inputProvenance: unfoldDelivery.inputProvenance, inputTextProjection: unfoldDelivery.inputTextProjection },
++        { kind: "assistant", turnId: unfoldTurn, text: unfoldReply },
++      ],
++    });
++    await sleep(160);
++    check("unfold: replay history keeps assistant direct and task-request folded", await js(`(()=>{
++      const pane=document.querySelector("#chat .chat-pane")||document;
++      const reply=[...pane.querySelectorAll(".msg-assistant")].find((x)=>x.textContent.includes("UNFOLD-REPLY-MARKER"));
++      const req=[...pane.querySelectorAll("details.task-request")].find((x)=>x.textContent.includes("UNFOLD-TASK-MARKER"));
++      return !!reply&&reply.closest("details")===null&&pane.querySelectorAll("details.reply-original").length===0&&!!req&&req.open===false&&req.querySelector(":scope > summary").textContent==="任务请求原文";
++    })()`));
++    await shot("unfold-reply-direct");
++
+     // —————— 10. 菜单配置状态与读取守卫 ——————
+     await js(`await window.__ansRenderer.selectRuntime('claude')`);
+     await sleep(120);
+--- a/test/桌面应用/e2e/uiux-v2.mjs
++++ b/test/桌面应用/e2e/uiux-v2.mjs
+@@ -418,9 +418,9 @@
+  await check('V2 report status unknown association redaction truncation omission and save facts remain visible',`(()=>{let c=document.querySelector('.msg-handback'),d=c.querySelector('.report-complete');return c.textContent.includes('报告声明：已完成')&&c.querySelector('.hb-meta').textContent.includes('任务关联未知')&&c.querySelector('.projection-flags').textContent.includes('已截断')&&c.querySelector('.projection-flags').textContent.includes('净化')&&c.querySelector('.projection-flags').textContent.includes('预算省略')&&c.querySelector('.report-facts').textContent.includes('尚未确认')&&c.querySelector('.report-disclaimer').textContent.includes('不等于独立验收通过')&&c.querySelector('.persistence-message').textContent==='报告已保存'&&!d.open})()`);
+  await check('V2 report declaration alone cannot fold an active assistant message',`document.querySelectorAll('.reply-original').length===0&&document.querySelector('.msg-assistant').textContent.trim()==='本轮角色回复原文。不得删除改写，模型原文保留。'&&!document.querySelector('.msg-assistant.is-streaming')`);
+  await push('session:events',[{...scope,event:{kind:'settled',turnId:'visual-task',summary:'会话结束',detail:{outcome:'completed'}}}]);
+- await check('V2 true settled folds only the exact report turn assistant original in place',`document.querySelectorAll('.reply-original').length===1&&!document.querySelector('.reply-original').open&&document.querySelector('.reply-original > summary').textContent==='本轮角色回复原文（展开）'&&document.querySelector('.reply-original .msg-assistant').textContent.includes('不得删除改写')&&!document.querySelector('.reply-original .sys,.reply-original .tool-records,.reply-original .op-request')`);
++ await check("V2 true settled keeps exact report turn assistant reply direct without fold",`document.querySelectorAll(".reply-original").length===0&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("不得删除改写")&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].every(x=>!x.closest("details"))`);
+  await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-task',summary:'同实际turn后到原回复'}},{...scope,event:{kind:'message',turnId:'unrelated-chat',summary:'未关联报告的聊天回复'}}]);
+- await check('V2 late exact turn reply follows settled rule and other turns remain ordinary',`document.querySelectorAll('.reply-original').length===2&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes('未关联报告的聊天回复')&&!x.closest('.reply-original'))`);
++ await check("V2 late exact turn reply stays direct like other turns",`document.querySelectorAll(".reply-original").length===0&&[...document.querySelectorAll(".msg-assistant")].filter(x=>x.textContent.includes("同实际turn后到原回复")||x.textContent.includes("未关联报告的聊天回复")).length===2&&[...document.querySelectorAll(".msg-assistant")].every(x=>!x.closest("details"))`);
+  await check('V2 task request folds only by exact structured report actual turn without reordering ordinary chat',`document.querySelectorAll('.task-request').length===1&&!document.querySelector('.task-request').open&&document.querySelector('.task-request').textContent.includes(${JSON.stringify(request)})&&[...document.querySelectorAll('.msg-user')].some(x=>x.textContent.trim()==='普通聊天不折叠也不制造报告'&&!x.closest('.task-request'))`);
+  await js(`document.querySelector('.report-complete').open=true;document.querySelector('.task-request').open=true;window.__visualComplete=document.querySelector('.report-complete');document.getElementById('inp-message').value='V2保留客户草稿'`);
+  await push('report-persistence-updated',{version:1,scope,change:{kind:'report-save',reportId:report.reportId,state:{state:'saved',reportId:report.reportId,retryAvailable:false}}});
+@@ -476,9 +476,9 @@
+   await js(`document.getElementById('sidebar-expand').click()`);await pause(80);
+   await check('V2 sidebar expanded restored '+width,`!document.querySelector('.app').classList.contains('is-sidebar-collapsed')&&document.getElementById('sidebar-expand').hidden&&!document.getElementById('sidebar-collapse').hidden&&Math.abs(document.querySelector('.chat-pane').getBoundingClientRect().width-${width===960?664:900})<2&&Math.abs(document.querySelector('.chat-head').getBoundingClientRect().top-${before.head})<1&&Math.abs(document.querySelector('.composer').getBoundingClientRect().top-${before.composer})<1&&document.documentElement.scrollWidth<=innerWidth`);
+   await js(`document.querySelector('.app').style.transition='';document.querySelector('.col-left').style.transition='';document.querySelectorAll('.sidebar-toggle').forEach(x=>x.style.transition='')`);}
+- await js(`document.querySelector('.reply-original').open=true`);
++ await js(`document.querySelector(".task-request").open=true`);
+  await push('session:history',{...scope,rows:[{kind:'user',turnId:'visual-task',text:request},{kind:'assistant',eventKind:'message',turnId:'visual-task',text:'本轮角色回复原文。不得删除改写，模型原文保留。'},{kind:'assistant',eventKind:'message',turnId:'visual-task',text:'可靠cold报告关联原文 [REDACTED]',textProjection:{text:'可靠cold报告关联原文 [REDACTED]',redacted:true,truncated:true}},{kind:'assistant',eventKind:'message',text:'legacy无turn原文保留展开'},{kind:'assistant',eventKind:'message',turnId:'ordinary-other',text:'其它turn无报告原文保留展开'}],reports:[report]});await pause(50);
+- await check('V2 cold exact report turn folds neutral original only and preserves explicit expansion',`[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('可靠cold报告关联原文')&&!x.open&&x.querySelector('summary .projection-flags').textContent.includes('已截断'))&&[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('不得删除改写')&&x.open)&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes('legacy无turn')&&!x.closest('.reply-original'))&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.includes('其它turn无报告')&&!x.closest('.reply-original'))`);
++ await check("V2 cold replay keeps task request expansion and all assistant originals direct",`document.querySelectorAll(".reply-original").length===0&&[...document.querySelectorAll(".task-request")].some(x=>x.textContent.includes("明确任务请求原文")&&x.open)&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("可靠cold报告关联原文 [REDACTED]")&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("legacy无turn")&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("其它turn无报告")&&!x.closest("details"))`);
+  const received={...report,reportId:'visual-received',source:{roleId:'B',runtime:'pi',turnId:'received-source'},summary:{text:'收到的真实安全摘要。'+('原文不生成新结论。'.repeat(40))+'received-tail',redacted:false,truncated:false}};
+  const receipt={version:1,deliveryId:'visual-delivery',attemptId:'visual-attempt',turnId:'visual-target',inputSaved:true,providerMayHaveStarted:true,history:'saved',outcome:'completed',retryHistoryAvailable:false,retryDeliveryAllowed:false};flowReceipts[receipt.attemptId]=receipt;
+  const delivery={source:'prompt-input',text:'安全交接显示副本',inputProvenance:{version:1,kind:'handback',deliveryId:receipt.deliveryId,attemptId:receipt.attemptId,target:{roleId:'A',runtime:'pi'},reports:[received]},inputTextProjection:{version:1,source:'trusted-handback-display',modelInputRecorded:false,redacted:false,truncated:false,summaryTruncated:false}};
+@@ -504,12 +504,12 @@
+  await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-target',summary:'接收轮流式解说原文'}},{...scope,event:{kind:'message',turnId:'other-chat',summary:'无关普通聊天'}}]);await pause(40);
+  await check('SV13 distinct receiver turn streaming stays expanded',`[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='接收轮流式解说原文'&&!x.closest('.reply-original'))`);
+  await push('session:events',[{...scope,event:{kind:'settled',turnId:'visual-target',summary:'接收轮结束',detail:{outcome:'completed'}}}]);await pause(60);
+- await check('SV13 true settled receiver folds only exact assistant original',`[...document.querySelectorAll('.reply-original')].some(x=>x.querySelector('summary').textContent==='本轮交付处理回复原文（展开）'&&x.textContent.includes('接收轮流式解说原文')&&!x.open)&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='无关普通聊天'&&!x.closest('.reply-original'))&&!document.querySelector('.msg-delivery').closest('.reply-original')`);
+- await js(`let x=[...document.querySelectorAll('.reply-original')].find(x=>x.textContent.includes('接收轮流式解说原文'));x.open=true`);
++ await check("SV13 true settled receiver keeps exact assistant original direct",`document.querySelectorAll(".reply-original").length===0&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.trim()==="接收轮流式解说原文"&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.trim()==="无关普通聊天"&&!x.closest("details"))&&!document.querySelector(".msg-delivery").closest("details")`);
++ // 2026-11-04 客户直修：接收轮回复不再折叠，无需预置展开状态。
+  await push('session:events',[{...scope,event:{kind:'message',turnId:'visual-target',summary:'接收轮后到原文'}}]);await pause(40);
+- await check('SV13 later receiver text folds preserving explicit expansion',`[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('接收轮后到原文')&&!x.open)&&[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('接收轮流式解说原文')&&x.open)`);
++ await check("SV13 later receiver text stays direct as well",`document.querySelectorAll(".reply-original").length===0&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("接收轮后到原文")&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("接收轮流式解说原文")&&!x.closest("details"))`);
+  await push('session:history',{...scope,rows:[{kind:'user',turnId:'visual-target',text:'安全交接显示副本',inputProvenance:delivery.inputProvenance,inputTextProjection:delivery.inputTextProjection},{kind:'assistant',turnId:'visual-target',text:'接收轮流式解说原文'},{kind:'assistant',turnId:'visual-target',text:'冷记录安全副本',textProjection:{redacted:true,truncated:true}},{kind:'assistant',turnId:'other-chat',text:'无关普通聊天'},{kind:'assistant',text:'legacy无turn'}],reports:[]});await pause(80);
+- await check('SV13 cold receiver keeps neutral label flags expansion and unrelated legacy text',`[...document.querySelectorAll('.reply-original')].some(x=>x.querySelector('summary').textContent.includes('本轮交付处理回复原文（展开）')&&x.textContent.includes('冷记录安全副本')&&!x.open&&x.querySelector('summary .projection-flags').textContent.includes('已截断'))&&[...document.querySelectorAll('.reply-original')].some(x=>x.textContent.includes('接收轮流式解说原文')&&x.open)&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='无关普通聊天'&&!x.closest('.reply-original'))&&[...document.querySelectorAll('.msg-assistant')].some(x=>x.textContent.trim()==='legacy无turn'&&!x.closest('.reply-original'))`);
++ await check("SV13 cold receiver keeps all assistant originals direct",`document.querySelectorAll(".reply-original").length===0&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("冷记录安全副本")&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.includes("接收轮流式解说原文")&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.trim()==="无关普通聊天"&&!x.closest("details"))&&[...document.querySelectorAll(".msg-assistant")].some(x=>x.textContent.trim()==="legacy无turn"&&!x.closest("details"))`);
+ 
+  const orderRoot=ROOT+'/cold-report-order';await js(`await window.__ansRenderer.loadProject(${JSON.stringify(orderRoot)});await window.__ansRenderer.selectRole('A')`);
+  const orderScope={projectRoot:orderRoot,roleId:'A',runtime:'pi'};
+--- a/test/桌面UI/source-guard.test.ts
++++ b/test/桌面UI/source-guard.test.ts
+@@ -271,3 +271,18 @@
+   assert.equal(/"delivery-report" \+ \(asReportRecord\(report\)\.status/.test(card), false);
+ });
+ 
++test("客户直修 2026-11-04：assistant 回复不再生成 reply-original；task-request 保留；i18n 边界不删", () => {
++  const store = codeOnly(read(join(RENDERER, "chat", "chat-store.ts")));
++  assert.equal(/fold:\s*"reply-original"/.test(store), false, "chat-store 不得再生成 reply-original 折叠");
++  assert.equal(/fold:\s*"task-request"/.test(store), true, "user 行 task-request 折叠必须保留");
++  for (const file of ["zh-CN.ts", "en-US.ts"]) {
++    const messages = read(join(ROOT, "src", "common", "shared", "i18n", "messages", file));
++    assert.ok(messages.includes(`"ui.reportView.replyOriginalLabel"`), file + " 必须保留 replyOriginalLabel key");
++    assert.ok(messages.includes(`"ui.reportView.deliveryReplyLabel"`), file + " 必须保留 deliveryReplyLabel key");
++    assert.ok(messages.includes(`"ui.reportView.taskRequestLabel"`), file + " 必须保留 taskRequestLabel key");
++  }
++  const row = codeOnly(read(join(RENDERER, "chat", "ChatRow.tsx")));
++  assert.ok(row.includes(`fold !== "task-request" && fold !== "reply-original"`), "ChatRow 必须保留历史 reply-original 渲染兼容");
++});
++
++

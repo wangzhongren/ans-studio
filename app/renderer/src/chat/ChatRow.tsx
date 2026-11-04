@@ -6,7 +6,7 @@
  * 用户/模型文本统一经 `chat/markdown` 的受控渲染（html:false、链接白名单、图片原文）。
  *
  * 4B：治理卡元信息/镜像/排队、排队聚合行、报告全文/持久化/交付回执、
- * task-request/reply-original 折叠。不改变虚拟窗口/行高口径。
+ * task-request 折叠（reply-original 仅历史数据兼容渲染）。不改变虚拟窗口/行高口径。
  */
 
 import { type SyntheticEvent, memo, type ReactNode, useEffect, useId, useState } from "react";
@@ -121,7 +121,10 @@ function SystemIcon({ cls }: { cls: string }) {
   return <Info size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
 }
 
-/** task-request / reply-original 折叠（同一行内容不复制；展开状态跨重建保持）。 */
+/**
+ * 折叠容器（同一行内容不复制；展开状态跨重建保持）。
+ * task-request 为当前唯一由 store 生成的折叠；reply-original 仅保留历史数据兼容渲染。
+ */
 function Folded({ row, roleId, children }: { row: ChatRow; roleId: string; children: ReactNode }) {
   const t = useT();
   const locale = useLocaleState((s) => s.locale);
