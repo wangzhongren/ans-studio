@@ -5,7 +5,7 @@ on:
       source_ref:
         description: Frozen application source tag
         required: true
-        default: v1.9.0
+        default: v1.9.1
       publish:
         description: Publish draft after all native gates pass
         type: boolean
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-v1.9.0
+  group: release-v1.9.1
   cancel-in-progress: false
 jobs:
   build:
@@ -127,10 +127,10 @@ jobs:
           cd release-assets
           test "$(find . -name '*.zip' | wc -l)" -eq 3
           for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
-          if gh release view v1.9.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
+          if gh release view v1.9.1 --json isDraft --jq '.isDraft' > draft-state.txt; then
             test "$(cat draft-state.txt)" = true
           else
-            gh release create v1.9.0 --verify-tag --draft --title 'ANS Studio 1.9.0' --notes '基于固定 v1.9.0 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本版新增：contract_check 只读 schema 查询与逐字段错误诊断——topic=modules|roster|topology 直接返回字段表与最小合法 YAML 示例，topic 模式不读盘，校验错误逐字段报出实际收到的类型；客户授权平面——@审批/@决策 标记经应用级确认面板与回执处理，新增 customer.directives.jsonl 客户指令账本（approval/decision 双 target、once/session/forever 期限与撤销），shell 审批与 decision 卡两个消费者接线，审计归属扩展 directive/directiveId；角色资料抽屉布局修复——中列容器查询，抽屉打开时按容器宽度复用紧凑头部规则，关闭态像素不变。其余能力与 v1.8.4 相同（含全局任务状态与幕僚版本决策权、验收报告卡与派发护栏、run-change 契约变更通道、D3 记账修复与 v1.8.1 全部能力）。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+            gh release create v1.9.1 --verify-tag --draft --title 'ANS Studio 1.9.1' --notes '基于固定 v1.9.1 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本版新增：交付行默认内联报告正文——交付卡直接展示报告全文（不点击、不折叠），批次标题与三列回执收进卡片尾部默认折叠的「接收历史」，证据、安全副本与回执语义保留；自动决策「无法核对」升级客户——自动判断无法核对提案等条件时不再自动拒绝，原卡连同原因转客户确认，同卡指纹的自动拒绝只发生一次，可核对卡判定不变。其余能力与 v1.9.0 相同（含 contract_check 只读 schema 查询与逐字段错误诊断、客户授权平面、角色资料抽屉布局修复、全局任务状态与幕僚版本决策权、验收报告卡与派发护栏、run-change 契约变更通道、D3 记账修复与 v1.8.1 全部能力）。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
           fi
-          gh release upload v1.9.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
-          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.9.0 --draft=false; fi
+          gh release upload v1.9.1 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
+          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.9.1 --draft=false; fi
