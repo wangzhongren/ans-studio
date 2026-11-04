@@ -439,3 +439,175 @@ test("2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为
     assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
   }
 });
+
+// ———————————————— 2026-11-04 客户直修：治理写卡（appointment-write）＝客户主权 ————————————————
+
+function appointmentWriteRequest(): CustomerInputRequest {
+  return {
+    kind: "confirm",
+    title: "写角色卡 worker",
+    cardKind: "appointment-write",
+    flowId: "focus",
+    paths: ["角色卡/worker/role-card.md"],
+    preview: "## 角色卡/worker/role-card.md\n# worker\n",
+  };
+}
+
+const writeCtx = { roleId: "nominator", projectRoot: "/p", runtime: "demo" as const, governanceModel: "trio" as const };
+const writeMetadata: CustomerInputMetadata = {
+  cardKind: "appointment-write",
+  flowId: "focus",
+  judgeContext: {
+    flowId: "focus",
+    facts: {
+      governanceModel: "trio",
+      flowId: "focus",
+      ledgerErrors: 0,
+      unresolvedClarificationCount: 0,
+      latestDecisionKinds: [],
+      appointmentTargetRoleIds: ["worker"],
+    },
+  },
+};
+
+test("2026-11-04 直修 (a)：替我审批开启 + appointment-write ⇒ 呈现客户、judge 0 调用、0 结果行、无 judge 审计", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ans-appointment-write-sovereign-"));
+  configureDiagnostics({ directory });
+  try {
+    const h = channelHarness(true, {
+      judge: (request) => ({
+        verdict: "approve",
+        group: request.group,
+        cardKind: request.cardKind,
+        engine: request.runtime,
+        reasonCode: "sufficient",
+        reason: "可写",
+        value: { confirmed: true },
+      }),
+    });
+    let settled = false;
+    const pending = h.channel.customerInput(appointmentWriteRequest(), writeCtx, writeMetadata);
+    Promise.resolve(pending).then(() => {
+      settled = true;
+    });
+    await tick();
+    assert.equal(h.pushed.length, 1, "写卡必须原卡呈现客户");
+    assert.equal(h.judgeCalls(), 0, "appointment-write 永不调用判断器（即使开关开启）");
+    assert.equal(h.results.length, 0, "不得产生 judge 结果行");
+    assert.equal(settled, false, "客户作答前卡保持挂起");
+    assert.equal(h.channel.judgingCount(), 0, "不进入判断中状态");
+    await flushDiagnostics();
+    const files = (await fs.readdir(directory)).filter((name) => name.startsWith("ans-diagnostics-") && name.endsWith(".jsonl"));
+    const rows = files.flatMap((name) =>
+      readFileSync(path.join(directory, name), "utf8")
+        .trim()
+        .split("\n")
+        .filter((line) => line.trim() !== "")
+        .map((line) => JSON.parse(line) as Record<string, unknown>),
+    );
+    assert.equal(
+      rows.filter((row) => typeof row.event === "string" && row.event.startsWith("governance-judge.")).length,
+      0,
+      "不写任何 judge 审计事件",
+    );
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+    const outcome = await pending;
+    assert.equal(outcome?.outcome, "answered");
+    assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester", "客户本人确认（通道 operator）");
+    assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined, "无 judge 审计字段");
+  } finally {
+    await disposeDiagnostics();
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("2026-11-04 直修 (b)：替审批关闭 + appointment-write ⇒ 呈现客户；客户拒绝语义不变", async () => {
+  const h = channelHarness(false);
+  const pending = h.channel.customerInput(appointmentWriteRequest(), writeCtx, writeMetadata);
+  await tick();
+  assert.equal(h.pushed.length, 1, "写卡呈现客户");
+  assert.equal(h.judgeCalls(), 0, "不调用判断器");
+  assert.equal(h.results.length, 0);
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "confirm", confirmed: false } }).ok, true);
+  const outcome = await pending;
+  assert.equal(outcome?.outcome, "declined");
+  assert.equal(outcome?.outcome === "declined" ? outcome.operatorId : undefined, "tester");
+  assert.match(outcome?.outcome === "declined" ? outcome.reason ?? "" : "", /客户不同意/);
+  assert.equal(outcome?.outcome === "declined" ? outcome.notPresented : undefined, undefined, "客户已看到卡并拒绝");
+});
+
+test("2026-11-04 直修 (c)：普通 confirm 卡在开关开启时行为不变（呈现客户、不调 judge）", async () => {
+  const h = channelHarness(true);
+  const pending = h.channel.customerInput({ kind: "confirm", title: "继续执行？" }, writeCtx);
+  await tick();
+  assert.equal(h.pushed.length, 1, "普通确认卡照旧呈现客户");
+  assert.equal(h.judgeCalls(), 0, "无 cardKind 的普通卡不判断");
+  assert.equal(h.results.length, 0);
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+  const outcome = await pending;
+  assert.equal(outcome?.outcome, "answered");
+  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester");
+});
+
+test("2026-11-04 直修 (d)：无 presenter ⇒ appointment-write 与治理卡均 unavailable（fail-closed 不变）", async () => {
+  let judgeCalls = 0;
+  const channel = createCustomerInputChannel({
+    operatorId: "tester",
+    judge: {
+      isGroupEnabled: () => true,
+      fn: async () => {
+        judgeCalls += 1;
+        throw new Error("不应调用判断器");
+      },
+    },
+  });
+  const write = await channel.customerInput(appointmentWriteRequest(), writeCtx, writeMetadata);
+  assert.equal(write?.outcome, "unavailable");
+  const proposal = await channel.customerInput(proposalRequest(), proposalCtx, proposalMetadata);
+  assert.equal(proposal?.outcome, "unavailable");
+  assert.equal(judgeCalls, 0);
+});
+
+test("2026-11-04 直修 (e)：判断器异常与 ledger-unavailable 分支对写卡不再可达——仍原卡呈现客户", async () => {
+  const throwing = channelHarness(true, {
+    judge: () => {
+      throw new Error("judge unavailable");
+    },
+  });
+  let settled = false;
+  const pending = throwing.channel.customerInput(appointmentWriteRequest(), writeCtx, writeMetadata);
+  Promise.resolve(pending).then(() => {
+    settled = true;
+  });
+  await tick();
+  assert.equal(throwing.pushed.length, 1, "判断器异常也不改变写卡呈现");
+  assert.equal(throwing.judgeCalls(), 0, "写卡不调用判断器");
+  assert.equal(throwing.results.length, 0);
+  assert.equal(settled, false);
+  assert.equal(throwing.channel.respond({ id: throwing.pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+  assert.equal((await pending)?.outcome, "answered");
+
+  const ledger = channelHarness(true);
+  const metadata: CustomerInputMetadata = {
+    ...writeMetadata,
+    judgeContext: {
+      ...writeMetadata.judgeContext!,
+      unavailableReason: "账本损坏：无法读取治理事实",
+    },
+  };
+  let ledgerSettled = false;
+  const ledgerPending = ledger.channel.customerInput(appointmentWriteRequest(), writeCtx, metadata);
+  Promise.resolve(ledgerPending).then(() => {
+    ledgerSettled = true;
+  });
+  await tick();
+  assert.equal(ledger.pushed.length, 1, "账本不可用也呈现客户");
+  assert.equal(ledger.judgeCalls(), 0);
+  assert.equal(ledger.results.length, 0);
+  assert.equal(ledgerSettled, false);
+  assert.equal(ledger.channel.respond({ id: ledger.pushed[0]!.id, decision: { kind: "confirm", confirmed: true } }).ok, true);
+  const ledgerOutcome = await ledgerPending;
+  assert.equal(ledgerOutcome?.outcome, "answered");
+  assert.equal(ledgerOutcome?.outcome === "answered" ? ledgerOutcome.operatorId : undefined, "tester");
+});
+
