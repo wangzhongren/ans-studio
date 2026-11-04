@@ -201,9 +201,17 @@ Wang, Zhongren. 2026. *Role-First Software Governance: Asymmetric Authority Boun
 下载后先核对 SHA256：macOS 在下载目录执行 `shasum -a 256 -c SHA256SUMS-darwin-arm64.txt`（Intel 用 `SHA256SUMS-darwin-x64.txt`）；Windows PowerShell 执行 `Get-FileHash .\ANS-Studio-1.9.1-win-x64.zip -Algorithm SHA256`，与 `SHA256SUMS-win32-x64.txt` 对照。
 
 <details>
-<summary>v1.9.1 SHA256（发布后回填）</summary>
+<summary>v1.9.1 SHA256（已回填）</summary>
 
-v1.9.1 的 SHA256 在构建完成前无法确定，本表不预填：v1.9.1 发布后由 Release 的 `SHA256SUMS-darwin-arm64.txt`、`SHA256SUMS-darwin-x64.txt`、`SHA256SUMS-win32-x64.txt` 与 `SHA256SUMS-overlay.txt` 回填/核对。
+以下与 Release 的 `SHA256SUMS-darwin-arm64.txt`、`SHA256SUMS-darwin-x64.txt`、`SHA256SUMS-win32-x64.txt` 与 `SHA256SUMS-overlay.txt` 逐字一致（2026-11-04 发布后回填）：
+
+| 文件 | SHA256 |
+| --- | --- |
+| `ANS-Studio-1.9.1-mac-arm64.zip` | `8e8094b5839b5be03d097925e4ae8c77baa1327a50bdae7b6c3be64a3e539d94` |
+| `ANS-Studio-1.9.1-mac-x64.zip` | `1a32895abdb539d4558dae5b8bbe334cc87b5e420ed47fa0ca618eda2f0da3c8` |
+| `ANS-Studio-1.9.1-win-x64.zip` | `8618a083791a351ec6420ab77a27271c310b10f671b9042c6e1d67c04c031dc7` |
+| `overlay.patch` | `f6337cde2aa77db54a4b121143731ecf426e7f043c09c3d116233d44103126fd` |
+| `release-provenance.json` | `541f33bd1d4b8aac7efff23a7f948cf2b925b4b4ebb0bc7b3148b3a9c083e81d` |
 
 [SHA256SUMS-overlay.txt](https://github.com/wangzhongren/ans-studio/releases/download/v1.9.1/SHA256SUMS-overlay.txt)、[release-provenance.json](https://github.com/wangzhongren/ans-studio/releases/download/v1.9.1/release-provenance.json) 与 [overlay.patch](https://github.com/wangzhongren/ans-studio/releases/download/v1.9.1/overlay.patch) 记录固定源码与打包适配，来源核验见[本次发布记录](角色卡/装配/docs/change/2026-11-04_change_release-v1.9.1-prepare.md)。
 

@@ -5,7 +5,7 @@ title: v1.9.1 发布准备：交付原文直出与自动决策转客户修复
 created: "2026-11-04"
 updated: "2026-11-04"
 timezone: Asia/Shanghai
-status: preparing
+status: released
 related: []
 events:
   - date: "2026-11-04"
@@ -20,6 +20,18 @@ events:
   - date: "2026-11-04"
     kind: verified
     summary: pipeline 钉版本轮完成并本地验证——node --test 装配 87/87、npm run typecheck 0
+  - date: "2026-11-04"
+    kind: failed
+    summary: 首次发布 run 41766839758 三平台 Regression tests 失败（i18n 守卫命中 customer-input.ts import 路径「编排」）；未发布、tag 未移动
+  - date: "2026-11-04"
+    kind: verified
+    summary: 发布阻断修复 PR #50（1b5394f）——i18n allowlist 精确条目 + release-policy overlay + 打包断言；本地守卫 6/6、装配 88/88、typecheck 0
+  - date: "2026-11-04"
+    kind: verified
+    summary: 重新发布 run 41768675803 三平台 build 与 release job 全 success；Release v1.9.1 已创建并上传 12 资产
+  - date: "2026-11-04"
+    kind: updated
+    summary: README 中英 SHA256 表回填（5 项）；本记录 status→released
 ---
 
 # v1.9.1 发布准备
@@ -96,3 +108,16 @@ events:
   - `src/common/装配/release-policy.mjs`：`files` 精确加入 `test/项目管理/shared/i18n-guard-allowlist.ts`（单文件不开目录），注释按阻断修复格式；
   - `test/装配/release-packaging.test.ts`：新增精确入选 / 同目录 excluded / 未列名 fail-closed 断言。
 - **本地预检**：`node --test test/项目管理/shared/i18n-guard.test.ts`（0 违规）、`node --test "test/装配/**/*.test.ts"`、`npm run typecheck`——结果见下（以实测为准）。重新 dispatch 后的三平台门禁为准。
+
+## CI、资产与 SHA（已回填）
+
+- **发布 run**：`41768675803`（https://github.com/wangzhongren/ans-studio/actions/runs/41768675803），conclusion success；三个 build job（macos-15 arm64 / macos-15-intel x64 / windows-2025 x64）与 release job 全 success。
+- **Release**：https://github.com/wangzhongren/ans-studio/releases/tag/v1.9.1（公开、非草稿、非预发布）。
+- **资产（12）**：`ANS-Studio-1.9.1-{mac-arm64,mac-x64,win-x64}.zip`、`manifest-{darwin-arm64,darwin-x64,win32-x64}.json`、`SHA256SUMS-{darwin-arm64,darwin-x64,win32-x64,overlay}.txt`、`release-provenance.json`、`overlay.patch`。
+- **SHA256（与 Release SHA256SUMS 逐字一致，README 已回填）**：
+  - mac-arm64 zip `8e8094b5839b5be03d097925e4ae8c77baa1327a50bdae7b6c3be64a3e539d94`；
+  - mac-x64 zip `1a32895abdb539d4558dae5b8bbe334cc87b5e420ed47fa0ca618eda2f0da3c8`；
+  - win-x64 zip `8618a083791a351ec6420ab77a27271c310b10f671b9042c6e1d67c04c031dc7`；
+  - overlay.patch `f6337cde2aa77db54a4b121143731ecf426e7f043c09c3d116233d44103126fd`；
+  - release-provenance.json `541f33bd1d4b8aac7efff23a7f948cf2b925b4b4ebb0bc7b3148b3a9c083e81d`。
+- **说明**：首次发布 run `41766839758` 因 i18n 守卫失败未发布（见上节「发布阻断修复」）；tag `v1.9.1` 自始至终未移动。UI 修复 PR #51（输入区按钮精简）与 #52（幕僚回复去折叠）在 v1.9.1 冻结源之后合并，属下一补丁版。
