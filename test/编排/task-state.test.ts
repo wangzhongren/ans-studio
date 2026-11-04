@@ -558,3 +558,37 @@ test("Q9 A：request.resolved/version.decision 接受 directive + directiveId；
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
+
+test("S3/C1b：cardKind=\"stable-write\"（app-owned 白名单）记账通过；未知卡种仍坏行", async () => {
+  const root = await tempRoot();
+  try {
+    await appendTaskEvent(root, {
+      v: 1,
+      at: "2026-11-04T00:00:00.000Z",
+      kind: "request.created",
+      requestId: "req-sw",
+      cardKind: "stable-write",
+      sourceRoleId: "application",
+      title: "stable 写入确认",
+      options: [
+        { id: "approve-stable-write", label: "批准" },
+        { id: "reject-stable-write", label: "拒绝", recommended: true },
+      ],
+    });
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, 0, JSON.stringify(state.errors));
+    const created = state.events.find((event) => event.kind === "request.created");
+    assert.equal(created?.kind === "request.created" ? created.cardKind : undefined, "stable-write");
+
+    // 未知卡种仍拒绝（坏行，不阻塞）
+    await fs.writeFile(
+      path.join(root, TASKS_STATE_REL),
+      `${JSON.stringify({ v: 1, at: "2026-11-04T00:00:01.000Z", kind: "request.created", requestId: "req-bad", cardKind: "bogus", sourceRoleId: "application", title: "x", options: [] })}\n`,
+      "utf8",
+    );
+    const bad = await readTaskState(root);
+    assert.equal(bad.errors.length, 1, JSON.stringify(bad.errors));
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+});

@@ -14,13 +14,29 @@ import {
   ensureDraftRun,
   findActiveRun,
   listRunManifestsResult,
+  pinRun,
+  prepareRunPin,
   readRunManifest,
+  repinPinnedRun,
   runManifestPath,
   validateRunManifest,
   verifyPinnedRun,
   writeRunManifest,
   type RunManifest,
 } from "../../src/common/编排/run-manifest.ts";
+import {
+  appendDocFreezeRecords,
+  recordVersionedDocBaselines,
+  refreshVersionedDocFreezeSnapshot,
+  versionedDocFreezeState,
+} from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import {
+  AT2,
+  PATHS,
+  createTrunkProject,
+  sha256,
+  writeProjectFile,
+} from "./fixtures/trunk-project.ts";
 
 function draft(flowId = "focus"): RunManifest {
   const at = "2026-10-30T00:00:00.000Z";
@@ -247,5 +263,171 @@ test("Q9 A：applyRunChange 接受 directive + directiveId 并写入 manifest；
     if (legacy.ok) assert.equal(legacy.manifest.runChange?.directiveId, undefined);
   } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+// —————————————— 2026-11-04（trunk-amendment S3）：pin/re-pin 冻结校验 ——————————————
+
+test("S3：首次 handoff pin 先写 handoff-pin-bootstrap 冻结再 pin；repin 追加 repins/幂等/未冻结拒绝", async () => {
+  const project = await createTrunkProject({ withRun: false, freezeKeys: [] });
+  try {
+    const draft = await ensureDraftRun(project.root, "demo");
+    assert.equal(draft.ok, true);
+    if (!draft.ok) return;
+    const facts = { d3: { decisionId: "dec-pin", targetRoleIds: ["impl"] } };
+    const pinned = await pinRun(project.root, draft.manifest.runId, facts);
+    assert.equal(pinned.ok, true, pinned.ok ? "" : pinned.reason);
+    if (!pinned.ok) return;
+    assert.equal(pinned.manifest.state, "pinned");
+    const baseline = await fs.readFile(path.join(project.root, ".ans/state/versions.jsonl"), "utf8");
+    assert.match(baseline, /"reason":"handoff-pin-bootstrap"/);
+    assert.match(baseline, /"applicationId":"bootstrap-handoff-pin"/);
+    assert.equal(versionedDocFreezeState(project.root, PATHS.proposal, true), "frozen");
+
+    const again = await pinRun(project.root, draft.manifest.runId, facts);
+    assert.equal(again.ok, true);
+    if (again.ok) assert.equal(again.alreadyPinned, true);
+
+    // re-pin：v2 先冻结 → 同 runId 更新 refs + repins（保留 createdAt/runId/flowId；幂等）
+    const v2 = "docs/proposals/demo-proposal-v2.md";
+    const v2sha = await writeProjectFile(project.root, v2, "---\nschema: project-proposal/v2\n---\n# proposal v2\n");
+    const at = "2026-11-04T12:30:00.000Z";
+    const frozen = await appendDocFreezeRecords([
+      {
+        projectRoot: project.root,
+        relPath: v2,
+        sha256: v2sha,
+        freeze: {
+          schema: "doc-freeze/v1",
+          applicationId: "vc-1",
+          reason: "detail-item-applied",
+          origin: "customer",
+          decidedBy: "customer",
+          decisionId: "dec-vca",
+          frozenAt: at,
+        },
+      },
+    ]);
+    assert.equal(frozen.ok, true);
+    const repinned = await repinPinnedRun(project.root, draft.manifest.runId, {
+      targets: [{ kind: "proposal", path: v2, sha256: v2sha }],
+      applicationId: "vc-1",
+      decisionId: "dec-vca",
+      at,
+    });
+    assert.equal(repinned.ok, true, repinned.ok ? "" : repinned.reason);
+    if (!repinned.ok) return;
+    assert.equal(repinned.alreadyApplied, false);
+    assert.equal(repinned.manifest.runId, draft.manifest.runId);
+    assert.equal(repinned.manifest.flowId, "demo");
+    assert.equal(repinned.manifest.createdAt, pinned.manifest.createdAt);
+    assert.equal(repinned.manifest.documents.proposal?.path, v2);
+    assert.equal(repinned.manifest.repins?.length, 1);
+    assert.equal(repinned.manifest.repins?.[0]?.schema, "run-repin/v1");
+    assert.equal(repinned.manifest.repins?.[0]?.applicationId, "vc-1");
+    assert.equal(repinned.manifest.repins?.[0]?.decisionId, "dec-vca");
+    const repeat = await repinPinnedRun(project.root, draft.manifest.runId, {
+      targets: [{ kind: "proposal", path: v2, sha256: v2sha }],
+      applicationId: "vc-1",
+      at,
+    });
+    assert.equal(repeat.ok, true);
+    if (repeat.ok) {
+      assert.equal(repeat.alreadyApplied, true);
+      assert.equal(repeat.manifest.repins?.length, 1);
+    }
+
+    // 未冻结的新版本 ⇒ versioned-doc-not-frozen（ready 语义，fail-closed）
+    const v3 = "docs/proposals/demo-proposal-v3.md";
+    const v3sha = await writeProjectFile(project.root, v3, "---\nschema: project-proposal/v2\n---\n# proposal v3\n");
+    const denied = await repinPinnedRun(project.root, draft.manifest.runId, {
+      targets: [{ kind: "proposal", path: v3, sha256: v3sha }],
+      applicationId: "vc-2",
+      at,
+    });
+    assert.equal(denied.ok, false);
+    if (!denied.ok) assert.equal(denied.code, "versioned-doc-not-frozen");
+
+    // 哈希不符（磁盘字节重算，不信任自报）
+    const badHash = await repinPinnedRun(project.root, draft.manifest.runId, {
+      targets: [{ kind: "proposal", path: v2, sha256: "f".repeat(64) }],
+      applicationId: "vc-1",
+      at,
+    });
+    assert.equal(badHash.ok, false);
+    if (!badHash.ok) assert.equal(badHash.code, "run-pin-hash-mismatch");
+
+  } finally {
+    await fs.rm(project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
+test("S3：prepareRunPin 在 ready 语义（已有冻结记录）下拒绝未冻结的最新版本化文档", async () => {
+  const project = await createTrunkProject({ withRun: false, freezeKeys: [] });
+  try {
+    // 仅冻结 intent ⇒ baseline 出现冻结记录（ready 语义）；proposal 等仍为草稿
+    const intentSha = sha256(await fs.readFile(path.join(project.root, PATHS.intent), "utf8"));
+    const frozen = await appendDocFreezeRecords([
+      {
+        projectRoot: project.root,
+        relPath: PATHS.intent,
+        sha256: intentSha,
+        freeze: {
+          schema: "doc-freeze/v1",
+          applicationId: "migration",
+          reason: "migrated-legacy",
+          origin: "application",
+          frozenAt: "2026-11-04T12:30:00.000Z",
+        },
+      },
+    ]);
+    assert.equal(frozen.ok, true);
+    await refreshVersionedDocFreezeSnapshot(project.root, { migrationCompleted: true });
+    const prepared = await prepareRunPin(project.root, "demo", {
+      d3: { decisionId: "dec-x", targetRoleIds: ["impl"] },
+    });
+    assert.equal(prepared.ok, false);
+    if (!prepared.ok) assert.equal(prepared.code, "versioned-doc-not-frozen");
+  } finally {
+    await fs.rm(project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
+test("S3：legacy baseline（无冻结记录）按 F29 默认冻结允许 pin、不写 bootstrap；baseline corrupt ⇒ pin fail-closed 指针不变", async () => {
+  const legacy = await createTrunkProject({ withRun: false, freezeKeys: [] });
+  try {
+    const recorded = await recordVersionedDocBaselines({ projectRoot: legacy.root, recordedBy: "app:test" });
+    assert.ok(recorded > 0);
+    const draft = await ensureDraftRun(legacy.root, "demo");
+    assert.equal(draft.ok, true);
+    if (!draft.ok) return;
+    const pinned = await pinRun(legacy.root, draft.manifest.runId, {
+      d3: { decisionId: "dec-legacy", targetRoleIds: ["impl"] },
+    });
+    assert.equal(pinned.ok, true, pinned.ok ? "" : pinned.reason);
+    const text = await fs.readFile(path.join(legacy.root, ".ans/state/versions.jsonl"), "utf8");
+    assert.ok(!text.includes("handoff-pin-bootstrap"), "legacy 已初始化 baseline：不写 bootstrap 冻结");
+  } finally {
+    await fs.rm(legacy.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+
+  const corrupt = await createTrunkProject({ withRun: false, freezeKeys: [] });
+  try {
+    await fs.mkdir(path.join(corrupt.root, ".ans/state"), { recursive: true });
+    await fs.writeFile(path.join(corrupt.root, ".ans/state/versions.jsonl"), "not-json\n", "utf8");
+    await fs.writeFile(path.join(corrupt.root, ".ans/state/versions.initialized"), "{}\n", "utf8");
+    const draft = await ensureDraftRun(corrupt.root, "demo");
+    assert.equal(draft.ok, true);
+    if (!draft.ok) return;
+    const pinned = await pinRun(corrupt.root, draft.manifest.runId, {
+      d3: { decisionId: "dec-corrupt", targetRoleIds: ["impl"] },
+    });
+    assert.equal(pinned.ok, false);
+    if (!pinned.ok) assert.equal(pinned.code, "versioned-doc-not-frozen");
+    const after = await readRunManifest(corrupt.root, draft.manifest.runId);
+    assert.equal(after.ok, true);
+    if (after.ok) assert.equal(after.manifest.state, "draft", "pin 失败不改 run 指针");
+  } finally {
+    await fs.rm(corrupt.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });

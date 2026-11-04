@@ -398,6 +398,121 @@ const DOWNLOAD_KEYS = [
   "ui.directive.panel.consumer.downloadLegacyOff",
 ] as const satisfies readonly MessageKey[];
 
+/**
+ * 主干/冻结与版本变更 C3 冻结 key 契约（2026-11-04 trunk-amendment-model；C3 冻结）。
+ * 99 key = ui.versionChange 34 + ui.stableWrite 12 + ui.refactor 14 + ui.freeze 17 + ui.trunk 22。
+ * 需求来源：桌面UI P1 Rev 1 §6.2；`ui.trunk.*` 22 为 C3 目录内 key 家族扩展，E1 披露；
+ * 冻结记录 `角色卡/项目管理/docs/change/2026-11-04_trunk-amendment-model-C3-freeze.md`。
+ * U1/D1 只按本清单消费；新增/改名须回到项目管理并显式更新本断言与分区计数。
+ * F17：D1 不提供 `refactor:request`，U1 只读指引；本清单无提交表单 key。
+ */
+const TRUNK_AMENDMENT_KEYS = [
+  // ui.versionChange.*（34）
+  "ui.versionChange.entry",
+  "ui.versionChange.entryHint",
+  "ui.versionChange.disabledUnavailable",
+  "ui.versionChange.disabledUnknown",
+  "ui.versionChange.loading",
+  "ui.versionChange.empty",
+  "ui.versionChange.loadError",
+  "ui.versionChange.schemaUnsupported",
+  "ui.versionChange.tabPending",
+  "ui.versionChange.tabHistory",
+  "ui.versionChange.tabFrozen",
+  "ui.versionChange.kind.detailAmendment",
+  "ui.versionChange.kind.versionUpgrade",
+  "ui.versionChange.initiator",
+  "ui.versionChange.flow",
+  "ui.versionChange.status.draft",
+  "ui.versionChange.status.submitted",
+  "ui.versionChange.status.approved",
+  "ui.versionChange.status.rejected",
+  "ui.versionChange.status.applied",
+  "ui.versionChange.status.superseded",
+  "ui.versionChange.targetLine",
+  "ui.versionChange.targetMore",
+  "ui.versionChange.summary",
+  "ui.versionChange.hash",
+  "ui.versionChange.diff",
+  "ui.versionChange.semantics.versionUpgrade",
+  "ui.versionChange.semantics.detailAmendment",
+  "ui.versionChange.openCard",
+  "ui.versionChange.presentAction",
+  "ui.versionChange.noChannel",
+  "ui.versionChange.decision",
+  "ui.versionChange.resultTrunk",
+  "ui.versionChange.submitGuidance",
+  // ui.stableWrite.*（12）
+  "ui.stableWrite.record.section",
+  "ui.stableWrite.record.line",
+  "ui.stableWrite.record.empty",
+  "ui.stableWrite.record.unchangedVersion",
+  "ui.stableWrite.kind.workflow",
+  "ui.stableWrite.kind.roleCard",
+  "ui.stableWrite.kind.boundary",
+  "ui.stableWrite.confirm.baseHash",
+  "ui.stableWrite.confirm.targetHash",
+  "ui.stableWrite.confirm.diff",
+  "ui.stableWrite.confirm.semantics",
+  "ui.stableWrite.confirm.noDrift",
+  // ui.refactor.*（14）
+  "ui.refactor.entry",
+  "ui.refactor.panelTitle",
+  "ui.refactor.auditOnly",
+  "ui.refactor.status.requested",
+  "ui.refactor.status.accepted",
+  "ui.refactor.status.closed",
+  "ui.refactor.status.rejected",
+  "ui.refactor.status.superseded",
+  "ui.refactor.empty",
+  "ui.refactor.summary",
+  "ui.refactor.scope",
+  "ui.refactor.boundaryHint",
+  "ui.refactor.disabledUnavailable",
+  "ui.refactor.submitGuidance",
+  // ui.freeze.*（17）
+  "ui.freeze.status.frozen",
+  "ui.freeze.status.draft",
+  "ui.freeze.migratedLegacy",
+  "ui.freeze.migratedDraft",
+  "ui.freeze.failClosed",
+  "ui.freeze.unavailable",
+  "ui.freeze.listLine",
+  "ui.freeze.empty",
+  "ui.freeze.reason.vcaApproved",
+  "ui.freeze.reason.versionUpgradeApproved",
+  "ui.freeze.reason.detailItemApplied",
+  "ui.freeze.reason.amendmentSubmitted",
+  "ui.freeze.reason.handoffPinBootstrap",
+  "ui.freeze.reason.bootstrapVcaApproved",
+  "ui.freeze.reason.migratedLegacy",
+  "ui.freeze.reason.proposalConfirmed",
+  "ui.freeze.reason.intentConfirmed",
+  // ui.trunk.*（22；C3 目录内扩展）
+  "ui.trunk.entry",
+  "ui.trunk.entryHint",
+  "ui.trunk.panelTitle",
+  "ui.trunk.segment.versionChange",
+  "ui.trunk.segment.trunk",
+  "ui.trunk.segment.refactor",
+  "ui.trunk.version",
+  "ui.trunk.versionNone",
+  "ui.trunk.section.current",
+  "ui.trunk.section.stable",
+  "ui.trunk.section.history",
+  "ui.trunk.section.upgrade",
+  "ui.trunk.emergencyOnly",
+  "ui.trunk.upgrade.disabledNoTrunk",
+  "ui.trunk.upgrade.disabledUnavailable",
+  "ui.trunk.upgrade.disabledUnknown",
+  "ui.trunk.upgrade.highRisk",
+  "ui.trunk.upgrade.reason",
+  "ui.trunk.upgrade.submit",
+  "ui.trunk.upgrade.success",
+  "ui.trunk.history.empty",
+  "ui.trunk.stable.empty",
+] as const satisfies readonly MessageKey[];
+
 function templateTexts(template: unknown): string[] {
   if (typeof template === "string") return [template];
   if (template !== null && typeof template === "object") return Object.values(template).filter((v): v is string => typeof v === "string");
@@ -419,7 +534,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 1092 / main 626 / shared 62 / preferences 3，总计 1783", () => {
+test("key 分区计数：ui 1191 / main 626 / shared 62 / preferences 3，总计 1882", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -427,8 +542,8 @@ test("key 分区计数：ui 1092 / main 626 / shared 62 / preferences 3，总计
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 1092, main: 626, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1783);
+  assert.deepEqual(prefixes, { ui: 1191, main: 626, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1882);
 });
 
 test("下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han", () => {
@@ -829,4 +944,244 @@ test("shell 升级 key 契约：§7.3 清单中英成对且回执保留兜底子
   assert.equal(zhCN["ui.confirm.escalation.reject"], "拒绝");
   assert.ok(zhCN["ui.confirm.escalation.customerNotJudge"].includes("客户手批 ≠ judge 放行"));
   assert.ok(zhCN["ui.confirm.escalation.necessityNote"].includes("由角色提供，未经验证"));
+});
+
+test("主干/冻结与版本变更 C3 冻结：99 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han", () => {
+  assert.equal(TRUNK_AMENDMENT_KEYS.length, 99);
+  assert.equal(new Set(TRUNK_AMENDMENT_KEYS).size, 99, "TRUNK_AMENDMENT_KEYS 存在重复 key");
+  const families = {
+    versionChange: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.versionChange.")).length,
+    stableWrite: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.stableWrite.")).length,
+    refactor: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.refactor.")).length,
+    freeze: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.freeze.")).length,
+    trunk: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.trunk.")).length,
+  };
+  assert.deepEqual(families, { versionChange: 34, stableWrite: 12, refactor: 14, freeze: 17, trunk: 22 });
+
+  for (const key of TRUNK_AMENDMENT_KEYS) {
+    assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
+    assert.ok(key in enUS, `en-US 缺 ${key}`);
+    assert.deepEqual(placeholdersOf(zhCN[key]), placeholdersOf(enUS[key]), `占位符不一致：${key}`);
+    assert.deepEqual(templateTexts(enUS[key]).filter((text) => HAN.test(text)), [], `en-US 含中文：${key}`);
+  }
+
+  // 逐字冻结（99 项；与桌面UI P1 Rev 1 §6.2 一致；C3 冻结记录同清单）。
+  const expected: Record<string, { zh: string; en: string }> = {
+    "ui.versionChange.entry": { zh: "版本变更", en: "Version changes" },
+    "ui.versionChange.entryHint": {
+      zh: "查看待批与历史版本变更申请；批准/拒绝在决策卡完成。",
+      en: "Review pending and past version-change applications; approve or reject them on the decision card.",
+    },
+    "ui.versionChange.disabledUnavailable": {
+      zh: "当前桌面桥未提供版本变更入口（重启应用后重试）。",
+      en: "The desktop bridge does not provide version changes yet (restart the app and retry).",
+    },
+    "ui.versionChange.disabledUnknown": {
+      zh: "无法读取版本变更状态（{detail}）；请刷新后重试。",
+      en: "Cannot read version-change state ({detail}); refresh and retry.",
+    },
+    "ui.versionChange.loading": { zh: "正在读取版本变更…", en: "Loading version changes…" },
+    "ui.versionChange.empty": { zh: "暂无版本变更申请。", en: "No version-change applications." },
+    "ui.versionChange.loadError": { zh: "版本变更读取失败：{detail}", en: "Failed to load version changes: {detail}" },
+    "ui.versionChange.schemaUnsupported": {
+      zh: "版本变更数据版本不受支持。",
+      en: "Unsupported version-change data schema.",
+    },
+    "ui.versionChange.tabPending": { zh: "待批", en: "Pending" },
+    "ui.versionChange.tabHistory": { zh: "历史", en: "History" },
+    "ui.versionChange.tabFrozen": { zh: "冻结清单", en: "Frozen documents" },
+    "ui.versionChange.kind.detailAmendment": { zh: "修正案", en: "Detail amendment" },
+    "ui.versionChange.kind.versionUpgrade": { zh: "版本升级", en: "Version upgrade" },
+    "ui.versionChange.initiator": { zh: "发起者：{role}", en: "Initiator: {role}" },
+    "ui.versionChange.flow": { zh: "流程：{flowId}", en: "Flow: {flowId}" },
+    "ui.versionChange.status.draft": { zh: "草稿", en: "Draft" },
+    "ui.versionChange.status.submitted": { zh: "待确认", en: "Submitted" },
+    "ui.versionChange.status.approved": { zh: "已批准（执行中）", en: "Approved (applying)" },
+    "ui.versionChange.status.rejected": { zh: "已拒绝", en: "Rejected" },
+    "ui.versionChange.status.applied": { zh: "已生效", en: "Applied" },
+    "ui.versionChange.status.superseded": { zh: "已被取代", en: "Superseded" },
+    "ui.versionChange.targetLine": { zh: "{path} · v{version} · {hash}", en: "{path} · v{version} · {hash}" },
+    "ui.versionChange.targetMore": { zh: "另有 {count} 项", en: "{count} more targets" },
+    "ui.versionChange.summary": { zh: "摘要：{summary}", en: "Summary: {summary}" },
+    "ui.versionChange.hash": { zh: "提交哈希：{hash}", en: "Submitted hash: {hash}" },
+    "ui.versionChange.diff": { zh: "差异预览", en: "Diff preview" },
+    "ui.versionChange.semantics.versionUpgrade": {
+      zh: "批准 = 最终内容确认；批准后冻结目标并切换主干。",
+      en: "Approval is the final content confirmation; approved targets are frozen and the trunk switches.",
+    },
+    "ui.versionChange.semantics.detailAmendment": {
+      zh: "批准 = 提交/冻结门槛；逐项确认才是内容门槛。",
+      en: "Approval is the submission/freeze gate; item confirmations are the content gate.",
+    },
+    "ui.versionChange.openCard": { zh: "在决策面板处理", en: "Handle in Decisions" },
+    "ui.versionChange.presentAction": { zh: "重新发卡", en: "Resend card" },
+    "ui.versionChange.noChannel": {
+      zh: "申请已记录；未找到客户卡通道，请打开客户会话后重试。",
+      en: "The application is recorded; no customer card channel is available. Open a customer session and retry.",
+    },
+    "ui.versionChange.decision": { zh: "决定：{decisionId} · {time}", en: "Decision: {decisionId} · {time}" },
+    "ui.versionChange.resultTrunk": { zh: "结果主干：t{version}", en: "Resulting trunk: t{version}" },
+    "ui.versionChange.submitGuidance": {
+      zh: "提交在发起角色（产品/策划）的会话中经能力工具完成；本面板只显示状态与入口说明。",
+      en: "Submission happens in the initiator role's session (product/planning) via its capability tool; this panel only shows status and entry guidance.",
+    },
+    "ui.stableWrite.record.section": { zh: "stable 文件确认/续接", en: "Stable-file confirmations" },
+    "ui.stableWrite.record.line": {
+      zh: "{path} · {decisionId} · {oldSha} → {newSha} · {time}",
+      en: "{path} · {decisionId} · {oldSha} → {newSha} · {time}",
+    },
+    "ui.stableWrite.record.empty": { zh: "暂无 stable 文件确认记录。", en: "No stable-file confirmations yet." },
+    "ui.stableWrite.record.unchangedVersion": {
+      zh: "stable 确认不升主干版本。",
+      en: "Stable confirmations do not raise the trunk version.",
+    },
+    "ui.stableWrite.kind.workflow": { zh: "workflow", en: "Workflow" },
+    "ui.stableWrite.kind.roleCard": { zh: "角色卡", en: "Role card" },
+    "ui.stableWrite.kind.boundary": { zh: "边界", en: "Boundary" },
+    "ui.stableWrite.confirm.baseHash": { zh: "写入前哈希（base）：{hash}", en: "Base hash: {hash}" },
+    "ui.stableWrite.confirm.targetHash": { zh: "写入后哈希（target）：{hash}", en: "Target hash: {hash}" },
+    "ui.stableWrite.confirm.diff": { zh: "变更预览", en: "Diff preview" },
+    "ui.stableWrite.confirm.semantics": {
+      zh: "批准后立即写入并刷新主干快照（不升主干版本）；拒绝则不写入。",
+      en: "Approval writes immediately and refreshes the trunk snapshot (no trunk-version bump); rejection writes nothing.",
+    },
+    "ui.stableWrite.confirm.noDrift": {
+      zh: "stable 文件确认后自动续接，不再显示漂移。",
+      en: "Stable files continue automatically after confirmation; drift is no longer displayed.",
+    },
+    "ui.refactor.entry": { zh: "重构", en: "Refactors" },
+    "ui.refactor.panelTitle": { zh: "重构审计", en: "Refactor audit" },
+    "ui.refactor.auditOnly": {
+      zh: "只读：重构由应用调度层机械管理，不产生主干版本，客户不批准。",
+      en: "Read-only: refactors are managed mechanically by the application scheduler, create no trunk version, and need no customer approval.",
+    },
+    "ui.refactor.status.requested": { zh: "已申请", en: "Requested" },
+    "ui.refactor.status.accepted": { zh: "已接受", en: "Accepted" },
+    "ui.refactor.status.closed": { zh: "已完成", en: "Closed" },
+    "ui.refactor.status.rejected": { zh: "已拒绝", en: "Rejected" },
+    "ui.refactor.status.superseded": { zh: "已被取代", en: "Superseded" },
+    "ui.refactor.empty": { zh: "暂无重构记录。", en: "No refactor records." },
+    "ui.refactor.summary": { zh: "说明：{reason}", en: "Reason: {reason}" },
+    "ui.refactor.scope": { zh: "范围：{paths}", en: "Scope: {paths}" },
+    "ui.refactor.boundaryHint": {
+      zh: "涉及契约/边界/stable 文件时会被拒绝并转版本变更申请。",
+      en: "Requests touching contracts, boundaries or stable files are rejected and redirected to a version-change application.",
+    },
+    "ui.refactor.disabledUnavailable": {
+      zh: "当前桌面桥未提供重构审计（重启应用后重试）。",
+      en: "The desktop bridge does not provide refactor audit (restart the app and retry).",
+    },
+    "ui.refactor.submitGuidance": {
+      zh: "重构申请在运营会话中经能力工具提交；本面板只读显示审计。",
+      en: "Refactor requests are submitted in the operator session via its capability tool; this panel shows the audit read-only.",
+    },
+    "ui.freeze.status.frozen": { zh: "已冻结", en: "Frozen" },
+    "ui.freeze.status.draft": { zh: "草稿（未冻结）", en: "Draft (not frozen)" },
+    "ui.freeze.migratedLegacy": { zh: "迁移：历史文档按已冻结处理", en: "Migrated: treated as frozen" },
+    "ui.freeze.migratedDraft": { zh: "迁移：已证明未确认的草稿", en: "Migrated: proven unconfirmed draft" },
+    "ui.freeze.failClosed": {
+      zh: "冻结状态不可用；覆盖保护已按冻结处理（fail-closed）。",
+      en: "Freeze state is unavailable; overwrite protection fails closed.",
+    },
+    "ui.freeze.unavailable": { zh: "冻结清单暂不可用。", en: "Frozen registry unavailable." },
+    "ui.freeze.listLine": { zh: "{path} · v{version} · {hash} · {reason}", en: "{path} · v{version} · {hash} · {reason}" },
+    "ui.freeze.empty": { zh: "暂无冻结文档记录。", en: "No frozen documents." },
+    "ui.freeze.reason.vcaApproved": { zh: "客户批准版本变更", en: "Approved (version change)" },
+    "ui.freeze.reason.versionUpgradeApproved": { zh: "客户批准版本升级", en: "Approved (version upgrade)" },
+    "ui.freeze.reason.detailItemApplied": { zh: "逐项确认生效", en: "Item applied" },
+    "ui.freeze.reason.amendmentSubmitted": { zh: "修正案提交冻结", en: "Amendment submitted" },
+    "ui.freeze.reason.handoffPinBootstrap": { zh: "首次 pin 冻结", en: "First pin bootstrap" },
+    "ui.freeze.reason.bootstrapVcaApproved": { zh: "启动申请批准", en: "Bootstrap VCA approved" },
+    "ui.freeze.reason.migratedLegacy": { zh: "迁移冻结", en: "Migrated legacy" },
+    "ui.freeze.reason.proposalConfirmed": { zh: "方案确认", en: "Proposal confirmed" },
+    "ui.freeze.reason.intentConfirmed": { zh: "意图确认", en: "Intent confirmed" },
+    "ui.trunk.entry": { zh: "主干升级", en: "Trunk upgrade" },
+    "ui.trunk.entryHint": {
+      zh: "仅用于紧急/恢复（manifest 损坏、紧急 re-pin）；常规变更请走 stable 确认或版本变更申请。",
+      en: "For emergencies and recovery only (corrupt manifest, emergency re-pin); use stable confirmation or version-change applications for routine changes.",
+    },
+    "ui.trunk.panelTitle": { zh: "主干与版本变更", en: "Trunk and version changes" },
+    "ui.trunk.segment.versionChange": { zh: "版本变更", en: "Version changes" },
+    "ui.trunk.segment.trunk": { zh: "主干", en: "Trunk" },
+    "ui.trunk.segment.refactor": { zh: "重构", en: "Refactors" },
+    "ui.trunk.version": { zh: "主干版本：t{version}", en: "Trunk version: t{version}" },
+    "ui.trunk.versionNone": { zh: "尚未建立主干。", en: "No trunk yet." },
+    "ui.trunk.section.current": { zh: "当前主干", en: "Current trunk" },
+    "ui.trunk.section.stable": { zh: "stable 文件快照", en: "Stable-file snapshots" },
+    "ui.trunk.section.history": { zh: "升级历史", en: "Upgrade history" },
+    "ui.trunk.section.upgrade": { zh: "紧急/恢复", en: "Emergency / recovery" },
+    "ui.trunk.emergencyOnly": {
+      zh: "主干升级仅用于紧急/恢复；不能修改版本化文档或常规 stable 内容。",
+      en: "Trunk upgrade is only for emergencies and recovery; it cannot change versioned documents or routine stable content.",
+    },
+    "ui.trunk.upgrade.disabledNoTrunk": { zh: "当前项目没有主干，无法升级。", en: "No trunk exists to upgrade." },
+    "ui.trunk.upgrade.disabledUnavailable": {
+      zh: "当前桌面桥未提供主干升级入口（重启应用后重试）。",
+      en: "The desktop bridge does not provide trunk upgrade (restart the app and retry).",
+    },
+    "ui.trunk.upgrade.disabledUnknown": {
+      zh: "无法读取主干状态（{detail}）；请刷新项目后重试。",
+      en: "Cannot read trunk state ({detail}); refresh the project and retry.",
+    },
+    "ui.trunk.upgrade.highRisk": {
+      zh: "高风险事项：升级/恢复需客户二次确认并记录审计。",
+      en: "High risk: customer double confirmation and an audit record are required.",
+    },
+    "ui.trunk.upgrade.reason": { zh: "紧急原因", en: "Emergency reason" },
+    "ui.trunk.upgrade.submit": { zh: "请求升级", en: "Request upgrade" },
+    "ui.trunk.upgrade.success": {
+      zh: "已提交主干升级请求；请在确认中二次确认。",
+      en: "Trunk-upgrade request submitted; confirm it with double confirmation.",
+    },
+    "ui.trunk.history.empty": { zh: "暂无升级历史。", en: "No upgrade history." },
+    "ui.trunk.stable.empty": { zh: "暂无 stable 确认记录。", en: "No stable confirmation records." },
+  };
+  for (const key of TRUNK_AMENDMENT_KEYS) {
+    assert.equal(zhCN[key], expected[key]!.zh, `zh-CN 文案不一致：${key}`);
+    assert.equal(enUS[key], expected[key]!.en, `en-US 文案不一致：${key}`);
+  }
+
+  // 关键占位符冻结（C1/D1/U1 消费方按此传参）。
+  assert.deepEqual(placeholdersOf(zhCN["ui.versionChange.targetLine"]), ["hash", "path", "version"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.versionChange.targetMore"]), ["count"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.versionChange.decision"]), ["decisionId", "time"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.stableWrite.record.line"]), ["decisionId", "newSha", "oldSha", "path", "time"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.freeze.listLine"]), ["hash", "path", "reason", "version"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.refactor.summary"]), ["reason"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.refactor.scope"]), ["paths"]);
+  assert.deepEqual(placeholdersOf(zhCN["ui.trunk.upgrade.disabledUnknown"]), ["detail"]);
+
+  // F10/F17 冻结：无提交表单 key（VCA/重构只经角色能力工具；D1 不提供 `refactor:request`）。
+  const allKeys = Object.keys(zhCN);
+  assert.deepEqual(allKeys.filter((key) => /^ui\.versionChange\.submit\./.test(key)), [], "不得新增 VCA 提交表单 key");
+  assert.deepEqual(allKeys.filter((key) => /^ui\.refactor\.submit\./.test(key)), [], "不得新增重构提交表单 key");
+  assert.deepEqual(allKeys.filter((key) => key.includes("refactor:request")), [], "不得出现 refactor:request key");
+
+  // 无 drift（AC-36）：唯一「不再显示漂移」解释句为 `ui.stableWrite.confirm.noDrift`。
+  for (const key of TRUNK_AMENDMENT_KEYS) {
+    if (key === "ui.stableWrite.confirm.noDrift") continue;
+    assert.equal(
+      templateTexts(zhCN[key]).some((text) => text.includes("漂移")),
+      false,
+      `不得含 drift 语义：${key}`,
+    );
+    assert.equal(
+      templateTexts(enUS[key]).some((text) => /\bdrift\b/i.test(text)),
+      false,
+      `不得含 drift 语义：${key}`,
+    );
+  }
+
+  // 旧 run-change 文案迁移（AC-17/AC-23/AC-36）：入口与提示指向「版本变更/主干升级」。
+  assert.equal(zhCN["ui.runChange.entry"], "版本变更");
+  assert.equal(enUS["ui.runChange.entry"], "Version changes");
+  assert.equal(allKeys.filter((key) => key.startsWith("ui.runChange.")).length, 14, "低层 run-change key 应保留 14 个");
+  for (const key of ["ui.projectState.pinnedHint", "main.versionDecision.error.runChangeRequired"] as const) {
+    assert.ok(zhCN[key].includes("版本变更"), `${key} 未指向版本变更：${zhCN[key]}`);
+    assert.ok(zhCN[key].includes("主干升级"), `${key} 未提示主干升级：${zhCN[key]}`);
+    assert.equal(zhCN[key].includes("契约变更"), false, `${key} 仍含旧入口文案：${zhCN[key]}`);
+    assert.ok(enUS[key].includes("Version changes"), `${key} 未指向 Version changes：${enUS[key]}`);
+    assert.ok(enUS[key].toLowerCase().includes("trunk upgrade"), `${key} 未提示 trunk upgrade：${enUS[key]}`);
+    assert.equal(enUS[key].includes("Contract change"), false, `${key} 仍含旧入口文案：${enUS[key]}`);
+  }
 });

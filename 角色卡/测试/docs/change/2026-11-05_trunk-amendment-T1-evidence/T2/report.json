@@ -1,0 +1,389 @@
+{
+  "task": "2026-11-04-trunk-amendment-model",
+  "node": "24.21.0",
+  "at": "2026-11-04T18:59:24.027Z",
+  "electron": "44.7.0",
+  "chrome": "152.0.7977.130",
+  "command": "node_modules/.bin/electron test/测试/trunk-amendment-electron-probe.mjs",
+  "out": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2",
+  "window": {
+    "width": 1360,
+    "height": 860,
+    "useContentSize": true
+  },
+  "checks": [
+    {
+      "name": "客户侧无 #run-change 按钮",
+      "ok": true,
+      "detail": {
+        "hasRunChange": false,
+        "buttons": [
+          {
+            "id": "win-min",
+            "text": "",
+            "aria": "最小化"
+          },
+          {
+            "id": "win-max",
+            "text": "",
+            "aria": "最大化"
+          },
+          {
+            "id": "win-close",
+            "text": "",
+            "aria": "关闭"
+          },
+          {
+            "id": "runtime-select",
+            "text": "Pi",
+            "aria": "会话引擎，当前 Pi"
+          },
+          {
+            "id": "tab-work",
+            "text": "工作概览",
+            "aria": "工作概览"
+          },
+          {
+            "id": "version-change",
+            "text": "版本变更1",
+            "aria": "查看待批与历史版本变更申请；批准/拒绝在决策卡完成。"
+          },
+          {
+            "id": "trunk-upgrade",
+            "text": "主干升级",
+            "aria": "仅用于紧急/恢复（manifest 损坏、紧急 re-pin）；常规变更请走 stable 确认或版本变更申请。"
+          },
+          {
+            "id": "tab-decisions",
+            "text": "决策",
+            "aria": "决策/审批"
+          },
+          {
+            "id": "tab-tasks",
+            "text": "任务",
+            "aria": "任务与日志"
+          },
+          {
+            "id": "tab-card",
+            "text": "角色资料",
+            "aria": "角色资料"
+          }
+        ],
+        "bodyHasRefactorButton": false
+      }
+    },
+    {
+      "name": "客户侧无「重构」按钮",
+      "ok": true,
+      "detail": {
+        "hasRunChange": false,
+        "buttons": [
+          {
+            "id": "win-min",
+            "text": "",
+            "aria": "最小化"
+          },
+          {
+            "id": "win-max",
+            "text": "",
+            "aria": "最大化"
+          },
+          {
+            "id": "win-close",
+            "text": "",
+            "aria": "关闭"
+          },
+          {
+            "id": "runtime-select",
+            "text": "Pi",
+            "aria": "会话引擎，当前 Pi"
+          },
+          {
+            "id": "tab-work",
+            "text": "工作概览",
+            "aria": "工作概览"
+          },
+          {
+            "id": "version-change",
+            "text": "版本变更1",
+            "aria": "查看待批与历史版本变更申请；批准/拒绝在决策卡完成。"
+          },
+          {
+            "id": "trunk-upgrade",
+            "text": "主干升级",
+            "aria": "仅用于紧急/恢复（manifest 损坏、紧急 re-pin）；常规变更请走 stable 确认或版本变更申请。"
+          },
+          {
+            "id": "tab-decisions",
+            "text": "决策",
+            "aria": "决策/审批"
+          },
+          {
+            "id": "tab-tasks",
+            "text": "任务",
+            "aria": "任务与日志"
+          },
+          {
+            "id": "tab-card",
+            "text": "角色资料",
+            "aria": "角色资料"
+          }
+        ],
+        "bodyHasRefactorButton": false
+      }
+    },
+    {
+      "name": "存在「版本变更」入口",
+      "ok": true,
+      "detail": [
+        {
+          "id": "win-min",
+          "text": "",
+          "aria": "最小化"
+        },
+        {
+          "id": "win-max",
+          "text": "",
+          "aria": "最大化"
+        },
+        {
+          "id": "win-close",
+          "text": "",
+          "aria": "关闭"
+        },
+        {
+          "id": "runtime-select",
+          "text": "Pi",
+          "aria": "会话引擎，当前 Pi"
+        },
+        {
+          "id": "tab-work",
+          "text": "工作概览",
+          "aria": "工作概览"
+        },
+        {
+          "id": "version-change",
+          "text": "版本变更1",
+          "aria": "查看待批与历史版本变更申请；批准/拒绝在决策卡完成。"
+        },
+        {
+          "id": "trunk-upgrade",
+          "text": "主干升级",
+          "aria": "仅用于紧急/恢复（manifest 损坏、紧急 re-pin）；常规变更请走 stable 确认或版本变更申请。"
+        },
+        {
+          "id": "tab-decisions",
+          "text": "决策",
+          "aria": "决策/审批"
+        },
+        {
+          "id": "tab-tasks",
+          "text": "任务",
+          "aria": "任务与日志"
+        },
+        {
+          "id": "tab-card",
+          "text": "角色资料",
+          "aria": "角色资料"
+        }
+      ]
+    },
+    {
+      "name": "存在收窄「主干升级」入口",
+      "ok": true,
+      "detail": [
+        {
+          "id": "win-min",
+          "text": "",
+          "aria": "最小化"
+        },
+        {
+          "id": "win-max",
+          "text": "",
+          "aria": "最大化"
+        },
+        {
+          "id": "win-close",
+          "text": "",
+          "aria": "关闭"
+        },
+        {
+          "id": "runtime-select",
+          "text": "Pi",
+          "aria": "会话引擎，当前 Pi"
+        },
+        {
+          "id": "tab-work",
+          "text": "工作概览",
+          "aria": "工作概览"
+        },
+        {
+          "id": "version-change",
+          "text": "版本变更1",
+          "aria": "查看待批与历史版本变更申请；批准/拒绝在决策卡完成。"
+        },
+        {
+          "id": "trunk-upgrade",
+          "text": "主干升级",
+          "aria": "仅用于紧急/恢复（manifest 损坏、紧急 re-pin）；常规变更请走 stable 确认或版本变更申请。"
+        },
+        {
+          "id": "tab-decisions",
+          "text": "决策",
+          "aria": "决策/审批"
+        },
+        {
+          "id": "tab-tasks",
+          "text": "任务",
+          "aria": "任务与日志"
+        },
+        {
+          "id": "tab-card",
+          "text": "角色资料",
+          "aria": "角色资料"
+        }
+      ]
+    },
+    {
+      "name": "版本变更面板显示待批修正案（kind/发起者/目标/hash/语义）",
+      "ok": true,
+      "detail": "待批修正案待确认发起者：rapporteur流程：demodocs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72摘要：补充合同交付细节批准 = 提交/冻结门槛；逐项确认才是内容门槛。在决策面板处理重新发卡历史版本升级已生效发起者：product流程：demodocs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72摘要：产品版本升级：契约 v2批准 = 最终内容确认；批准后冻结目标并切换主干。决定：decision-op-1 · 2026-11-05T00:30:00.000Z结果主干：t2冻结清单已冻结docs/proposals/demo-proposal-v1.md · v1 · aca7be8a927c23414655ad2f047798b64cc1587c74b4219f3eb0eb4f93e3b9d2 · 迁移冻结迁移：历史文档按已冻结处理已冻结docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60"
+    },
+    {
+      "name": "版本变更面板显示历史版本升级与结果主干",
+      "ok": true,
+      "detail": "待批修正案待确认发起者：rapporteur流程：demodocs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72摘要：补充合同交付细节批准 = 提交/冻结门槛；逐项确认才是内容门槛。在决策面板处理重新发卡历史版本升级已生效发起者：product流程：demodocs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72摘要：产品版本升级：契约 v2批准 = 最终内容确认；批准后冻结目标并切换主干。决定：decision-op-1 · 2026-11-05T00:30:00.000Z结果主干：t2冻结清单已冻结docs/proposals/demo-proposal-v1.md · v1 · aca7be8a927c23414655ad2f047798b64cc1587c74b4219f3eb0eb4f93e3b9d2 · 迁移冻结迁移：历史文档按已冻结处理已冻结docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60"
+    },
+    {
+      "name": "F15：三类 stable 快照齐全（workflow/角色卡/边界）",
+      "ok": true,
+      "detail": "当前主干主干版本：t2upgradefrozenstable 文件快照workflowdocs/workflow.md39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5角色卡impl角色卡/impl/role-card.md1ce7deef8b55d321d797eac57441062a954fcf44d63f26d530e4c1f5d6164259边界impl角色卡/impl/boundary.yaml9332c8c72a631b290482567102baa939e43d1587f66b55376d5ced346b8fbe1bstable 文件确认/续接stable 确认不升主干版本。stable 文件确认后自动续接，不再显示漂移。workflowdocs/workflow.md · decision-op-1 · 8f53f3c1f77b3558b89784f29f4debbeef8b7c40745f09a58df5cfcefcbd8dd6 → 39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5 · 2026-11-05T00:30:00.000Z冻结清单已冻结docs/proposals/demo-proposal-v1.md · v1 · aca7be8a927c23414655ad2f047798b64cc1587c74b4219f3eb0eb4f93e3b9d2 · 迁移冻结迁移：历史文档按已冻结处理已冻结docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72 · 客户批准版本升级已冻结docs/scheduling/demo-team-v2.md · v2 · db1eaa0b11ca7eac4f376e3344ee994fbf30e5ea762"
+    },
+    {
+      "name": "stable 确认/续接记录含路径/decisionId/old→new",
+      "ok": true,
+      "detail": "当前主干主干版本：t2upgradefrozenstable 文件快照workflowdocs/workflow.md39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5角色卡impl角色卡/impl/role-card.md1ce7deef8b55d321d797eac57441062a954fcf44d63f26d530e4c1f5d6164259边界impl角色卡/impl/boundary.yaml9332c8c72a631b290482567102baa939e43d1587f66b55376d5ced346b8fbe1bstable 文件确认/续接stable 确认不升主干版本。stable 文件确认后自动续接，不再显示漂移。workflowdocs/workflow.md · decision-op-1 · 8f53f3c1f77b3558b89784f29f4debbeef8b7c40745f09a58df5cfcefcbd8dd6 → 39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5 · 2026-11-05T00:30:00.000Z冻结清单已冻结docs/proposals/demo-proposal-v1.md · v1 · aca7be8a927c23414655ad2f047798b64cc1587c74b4219f3eb0eb4f93e3b9d2 · 迁移冻结迁移：历史文档按已冻结处理已冻结docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72 · 客户批准版本升级已冻结docs/scheduling/demo-team-v2.md · v2 · db1eaa0b11ca7eac4f376e3344ee994fbf30e5ea762"
+    },
+    {
+      "name": "无 drift 状态行（仅展示「不再显示漂移」的说明文案）",
+      "ok": true,
+      "detail": "当前主干主干版本：t2upgradefrozenstable 文件快照workflowdocs/workflow.md39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5角色卡impl角色卡/impl/role-card.md1ce7deef8b55d321d797eac57441062a954fcf44d63f26d530e4c1f5d6164259边界impl角色卡/impl/boundary.yaml9332c8c72a631b290482567102baa939e43d1587f66b55376d5ced346b8fbe1bstable 文件确认/续接stable 确认不升主干版本。stable 文件确认后自动续接，不再显示漂移。workflowdocs/workflow.md · decision-op-1 · 8f53f3c1f77b3558b89784f29f4debbeef8b7c40745f09a58df5cfcefcbd8dd6 → 39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5 · 2026-11-05T00:30:00.000Z冻结清单已冻结docs/proposals/demo-proposal-v1.md · v1 · aca7be8a927c23414655ad2f047798b64cc1587c74b4219f3eb0eb4f93e3b9d2 · 迁移冻结迁移：历史文档按已冻结处理已冻结docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72 · 客户批准版本升级已冻结docs/scheduling/demo-team-v2.md · v2 · db1eaa0b11ca7eac4f376e3344ee994fbf30e5ea762"
+    },
+    {
+      "name": "恢复区只显示说明，无本地重建/解冻按钮",
+      "ok": true,
+      "detail": "当前主干主干版本：t2upgradefrozenstable 文件快照workflowdocs/workflow.md39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5角色卡impl角色卡/impl/role-card.md1ce7deef8b55d321d797eac57441062a954fcf44d63f26d530e4c1f5d6164259边界impl角色卡/impl/boundary.yaml9332c8c72a631b290482567102baa939e43d1587f66b55376d5ced346b8fbe1bstable 文件确认/续接stable 确认不升主干版本。stable 文件确认后自动续接，不再显示漂移。workflowdocs/workflow.md · decision-op-1 · 8f53f3c1f77b3558b89784f29f4debbeef8b7c40745f09a58df5cfcefcbd8dd6 → 39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd5 · 2026-11-05T00:30:00.000Z冻结清单已冻结docs/proposals/demo-proposal-v1.md · v1 · aca7be8a927c23414655ad2f047798b64cc1587c74b4219f3eb0eb4f93e3b9d2 · 迁移冻结迁移：历史文档按已冻结处理已冻结docs/proposals/demo-proposal-v2.md · v2 · 3adeedeaf604838e60e8fd539c321d88d8dc49b904749b7fa98cff3293f3fe72 · 客户批准版本升级已冻结docs/scheduling/demo-team-v2.md · v2 · db1eaa0b11ca7eac4f376e3344ee994fbf30e5ea762"
+    },
+    {
+      "name": "重构审计只读（无批准/拒绝/关闭按钮、无申请表单）",
+      "ok": true,
+      "detail": {
+        "text": "只读：重构由应用调度层机械管理，不产生主干版本，客户不批准。涉及契约/边界/stable 文件时会被拒绝并转版本变更申请。重构申请在运营会话中经能力工具提交；本面板只读显示审计。重构审计模块内重复代码清理已申请rf-1demo范围：src/说明：降低维护成本（不改变契约/边界）2026-11-05T00:30:00.000Z",
+        "buttons": [],
+        "hasInput": false
+      }
+    },
+    {
+      "name": "重构审计显示标题/范围/只读状态",
+      "ok": true,
+      "detail": "只读：重构由应用调度层机械管理，不产生主干版本，客户不批准。涉及契约/边界/stable 文件时会被拒绝并转版本变更申请。重构申请在运营会话中经能力工具提交；本面板只读显示审计。重构审计模块内重复代码清理已申请rf-1demo范围：src/说明：降低维护成本（不改变契约/边界）2026-11-05T00:30:00.000Z"
+    },
+    {
+      "name": "主干升级请求按钮可点击（应急/恢复）",
+      "ok": true
+    },
+    {
+      "name": "升级预览显示 stable 差异 old→new",
+      "ok": true,
+      "detail": "紧急/恢复主干升级仅用于紧急/恢复；不能修改版本化文档或常规 stable 内容。高风险事项：升级/恢复需客户二次确认并记录审计。emergencyrecovery紧急原因请求升级已提交主干升级请求；请在确认中二次确认。主干版本：t2workflowdocs/workflow.md8f53f3c1f77b3558b89784f29f4debbeef8b7c40745f09a58df5cfcefcbd8dd6 → 39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd52026-11-05T01:00:00.000Z高风险事项：升级/恢复需客户二次确认并记录审计。再次确认执行取消已提交主干升级请求；请在确认中二次确认。"
+    },
+    {
+      "name": "升级需高危勾选（acknowledged 未勾选时确认禁用）",
+      "ok": true,
+      "detail": "紧急/恢复主干升级仅用于紧急/恢复；不能修改版本化文档或常规 stable 内容。高风险事项：升级/恢复需客户二次确认并记录审计。emergencyrecovery紧急原因请求升级已提交主干升级请求；请在确认中二次确认。主干版本：t2workflowdocs/workflow.md8f53f3c1f77b3558b89784f29f4debbeef8b7c40745f09a58df5cfcefcbd8dd6 → 39bdb88a7e3672b8500e25b5466f79dbd6baaa8f331cd82f94a6bc81d8e1fbd52026-11-05T01:00:00.000Z高风险事项：升级/恢复需客户二次确认并记录审计。再次确认执行取消已提交主干升级请求；请在确认中二次确认。"
+    },
+    {
+      "name": "二次确认只对同一 previewId 提交 acknowledged:true",
+      "ok": true,
+      "detail": {
+        "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\project",
+        "previewId": "tup-1",
+        "acknowledged": true
+      }
+    },
+    {
+      "name": "升级请求只允许 emergency/recovery",
+      "ok": true,
+      "detail": {
+        "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\project",
+        "reason": "emergency",
+        "scope": [
+          "manifest 紧急恢复（T2 探针）"
+        ]
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "01-customer-header",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\01-customer-header.png",
+      "sha256": "4a9f146feeeb8baa698ea9729f4a9eb31776c48349b9b8780820e2b8475c57ba",
+      "bytes": 58656,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "02-version-change-panel",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\02-version-change-panel.png",
+      "sha256": "63d2a4a01330cfa8cf5ec0b0ec193447a88a90c98f37b2e116c172b032e7aad7",
+      "bytes": 121529,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "03-trunk-panel-stable",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\03-trunk-panel-stable.png",
+      "sha256": "885e920e14df59b3b7f8f42074519e20170a9c74df5df61fce816ec771042e94",
+      "bytes": 118476,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "04-refactor-audit",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\04-refactor-audit.png",
+      "sha256": "beaa1feaa85c36594b9dee6d0dd719d84f4138d838eed742ab7bc6dbebaf5989",
+      "bytes": 86047,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "05-trunk-upgrade-preview",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\05-trunk-upgrade-preview.png",
+      "sha256": "f1105e66f8190639b589e55abc8dcd5d1f749f7ebebe8cf14c04c617edfe9785",
+      "bytes": 126887,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    },
+    {
+      "name": "06-trunk-upgrade-confirmed",
+      "file": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\角色卡\\测试\\docs\\change\\2026-11-05_trunk-amendment-T1-evidence\\T2\\06-trunk-upgrade-confirmed.png",
+      "sha256": "1d006d4b4cbffe07ef4253b4a812d9820117ae6419d46d6a3d80b659bd763c1d",
+      "bytes": 127408,
+      "window": {
+        "width": 1360,
+        "height": 860
+      }
+    }
+  ],
+  "operatorResponses": []
+}

@@ -16,6 +16,34 @@ import type {
   VersionDecisionStatus,
 } from "./project-state.ts";
 import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
+import type {
+  TrunkAmendmentApplyState,
+  TrunkAmendmentItemKind,
+  TrunkAmendmentItemResult,
+  TrunkAmendmentStatus,
+  TrunkSource,
+  TrunkStateOp,
+} from "./trunk.ts";
+import type {
+  DocFreezeReason,
+  RefactorErrorCode,
+  RefactorForbiddenKind,
+  RefactorRequestScope,
+  RefactorRequestStatus,
+  StableFileKind,
+  StableWriteErrorCode,
+  StableWriteStatus,
+  VersionChangeErrorCode,
+  VersionChangeInitiatorRoleId,
+  VersionChangeKind,
+  VersionChangeStatus,
+  VersionChangeTargetAction,
+  VersionChangeTargetKind,
+  DOC_FREEZE_SCHEMA,
+  REFACTOR_REQUEST_SCHEMA,
+  STABLE_WRITE_SCHEMA,
+  VERSION_CHANGE_SCHEMA,
+} from "./version-change.ts";
 import type { RuntimeKind } from "../common/shared/runtime-shared.ts";
 import type { createDiagnosticLogger } from "../common/shared/diagnostics.ts";
 export type { RuntimeKind } from "../common/shared/runtime-shared.ts";
@@ -169,7 +197,24 @@ export interface RoleSession {
   dispose(): Promise<void>;
 }
 
-export type WriteGate = (targetPath: string) => WriteDecision;
+/** 写门禁操作类型（F6）：仅内容上下文的分类，不改变任何判定/审批/预授权语义。 */
+export type WriteGateOperation = "write" | "edit";
+
+/**
+ * 写门禁内容上下文（F6；P1 r2 §3.3-8）：**可选第二参数**，缺席 = 旧单参语义。
+ * 供 `run-role.gate` 对 stable 路径消费 `contentSha256` 调 `stableWriteDecision`（S3 接线）。
+ */
+export interface WriteGateContext {
+  /**
+   * 写前最终字节 sha256（hex）：`write_file` = `Buffer.from(content)`；
+   * `edit_file` = 编辑应用后、`atomicWriteFile` 前的字节（BOM 原样保留）。
+   */
+  contentSha256?: string;
+  operation?: WriteGateOperation;
+}
+
+/** 向后兼容：既有单参数实现/调用不变；可选第二参数缺席 = 旧语义。 */
+export type WriteGate = (targetPath: string, context?: WriteGateContext) => WriteDecision;
 
 /** 2026-10-29（客户 Q1/Q2 口径修正）：脚本/不透明执行的审查上下文（应用提供、有界、不可信数据）。 */
 export interface ShellApprovalScript {
@@ -421,13 +466,31 @@ export type GovernanceChoiceCardKind = "proposal" | "appointment" | "acceptance"
 export type GovernanceConfirmCardKind = "appointment-write";
 
 /**
+ * 应用自有、**永不进入判断分组**的治理卡种（2026-11-04 trunk-amendment C1b；PM 复审 §4.5 F2）：
+ * `stable-write` = P1.6 §4.5.1 的 stable 文件（workflow）轻量写入确认卡，项目级、无 flowId；
+ * 只由应用自有通道（stable-write-runtime）构造，客户本人回答，**永不进判断器/委托/指令**；
+ * 不是 `request_choice`/`request_confirmation` 可发卡种（两个工具卡种联合均不含它）。
+ */
+export type AppOwnedGovernanceCardKind = "stable-write";
+
+/** 应用自有、非判断分组的卡种清单（与 `GOVERNANCE_CARD_GROUP` 键集互斥；`GOVERNANCE_CARD_KINDS` 派生来源）。 */
+export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze(["stable-write"]);
+
+/**
  * 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。
  * `"download"`（2026-11-04 下载申请）是**应用自有 confirm 种**：只由 `request_download`
  * 能力路径构造，**不是** `request_confirmation` 可发卡种——`GovernanceConfirmCardKind`
  * 仍只有 `appointment-write`，`CONFIRM_CARD_KINDS` 字面量不动；工具层拒绝以
  * `cardKind:"download"` 调用 `request_confirmation`（结构测试 AC-23）。
+ * `stable-write`（2026-11-04 trunk-amendment C1b）同属应用自有卡：只由 stable-write-runtime
+ * 构造，`governanceCardGroup("stable-write") === undefined` ⇒ 永不判断/代选；
+ * 账本 cardKind 白名单见 `GOVERNANCE_CARD_KINDS`。
  */
-export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCardKind | "download";
+export type GovernanceCardKind =
+  | GovernanceChoiceCardKind
+  | GovernanceConfirmCardKind
+  | "download"
+  | AppOwnedGovernanceCardKind;
 
 // —————————————— 治理卡判断 agent 分组（「替我审批」/「替我决策」）单一来源 ——————————————
 //
@@ -440,7 +503,8 @@ export type GovernanceCardKind = GovernanceChoiceCardKind | GovernanceConfirmCar
 export type GovernanceJudgeGroup = "approval" | "decision";
 
 /**
- * 卡片种类 → 开关分组（冻结；新增卡种必须回到评审更新本表）。
+ * 卡片种类 → 开关分组（冻结；新增**判断**卡种必须回到评审更新本表；
+ * app-owned 非判断卡种（如 `stable-write`）不进本表，只进 `GOVERNANCE_CARD_KINDS` 白名单）。
  *
  * **`intent-confirm`**：2026-10-18 客户曾拍板「需求确认卡由客户本人回答、判断 agent 永不介入」；
  * **2026-10-20 客户新要求「勾了替我决策就不用我管」**推翻该口径——需求确认卡纳入 `decision` 组，
@@ -453,13 +517,16 @@ export type GovernanceJudgeGroup = "approval" | "decision";
 export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind, GovernanceJudgeGroup>>> = Object.freeze({
   "appointment-write": "approval",
   // 2026-11-04 下载申请：应用自有 confirm 种，归 approval 组（「替我审批」开关）；
-  // 不是 `request_confirmation` 卡种。任务账本的 cardKind 白名单直接来自本表键集。
+  // 不是 `request_confirmation` 卡种。账本 cardKind 白名单见 `GOVERNANCE_CARD_KINDS`（含本键）。
   download: "approval",
   proposal: "decision",
   appointment: "decision",
   acceptance: "decision",
   "intent-confirm": "decision",
   decision: "decision",
+  // 2026-11-04 trunk-amendment C1b：`stable-write`（应用自有 stable 写入确认卡）**故意不在此表**——
+  // app-owned、客户本人，永不判断/代选（`governanceCardGroup("stable-write") === undefined`）。
+  // 账本 cardKind 白名单已拆分为 `GOVERNANCE_CARD_KINDS`（本表键集 + app-owned 非判断卡种）。
 });
 
 /**
@@ -471,6 +538,18 @@ export function governanceCardGroup(kind: GovernanceCardKind | undefined): Gover
   if (kind === undefined || typeof kind !== "string") return undefined;
   return Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, kind) ? GOVERNANCE_CARD_GROUP[kind] : undefined;
 }
+
+/**
+ * 账本 `cardKind` 白名单单一来源（2026-11-04 trunk-amendment C1b；PM 复审 §4.5 F2）：
+ * 判断分组键集 + app-owned 非判断卡种（**派生**，不手抄复制，避免白名单与分组表漂移）。
+ * 编排 C2a 的 `isGovernanceCardKind` 改读本白名单（S3 同批）；桌面 D1/U1 只消费冻结 token。
+ * 本白名单**不表达权限**：`stable-write` 虽在白名单内，但不在 `GOVERNANCE_CARD_GROUP`
+ * ⇒ `governanceCardGroup("stable-write") === undefined` ⇒ 永不判断/代选。
+ */
+export const GOVERNANCE_CARD_KINDS: readonly GovernanceCardKind[] = Object.freeze([
+  ...(Object.keys(GOVERNANCE_CARD_GROUP) as GovernanceCardKind[]),
+  ...GOVERNANCE_APP_OWNED_CARD_KINDS,
+]);
 
 /** 客户交互卡的治理元数据：并入 `CustomerInputRequest`（供桌面卡片显示）与 `CustomerInputMetadata`（供账本分类）。 */
 export interface GovernanceCardMetadata extends GovernanceFlowMetadata {
@@ -510,6 +589,18 @@ export interface CustomerInputOption {
   recommended?: boolean;
 }
 
+/**
+ * 客户交互卡的勾选项（2026-11-04 trunk-amendment C1 加法；依据 PM 复审 F1 裁决）：
+ * 对象数组 `{id, label, required}`——不是 `string[]`。`id` 词表由桌面/文案层定义，
+ * Model 不枚举；D1 透传并在结算时按 `required` 校验，U1 按对象数组渲染。
+ * 缺席 = 旧卡（零行为变化）。
+ */
+export interface CustomerInputAcknowledgement {
+  id: string;
+  label: string;
+  required: boolean;
+}
+
 export type CustomerInputRequest = (
   | {
       kind: "confirm";
@@ -537,7 +628,13 @@ export type CustomerInputRequest = (
       preview?: string;
     }
 ) &
-  GovernanceCardMetadata;
+  GovernanceCardMetadata & {
+    /**
+     * 卡片勾选项（P1.6 AC-18；2026-11-04 C1 加法）：客户必须逐项确认的结构化清单
+     * （如修正案逐项确认/边界扩大）。可选；缺席＝旧卡。
+     */
+    acknowledgments?: CustomerInputAcknowledgement[];
+  };
 
 /**
  * 客户输入结算结果。`operatorId` 前缀是工具回执分流依据（2026-10-25）：`judge:<engine>` = 判断
@@ -548,6 +645,12 @@ export type CustomerInputOutcome =
   | {
       outcome: "answered";
       value: { confirmed?: boolean; selected?: string[] };
+      /**
+       * 已勾选的 acknowledgment id（2026-11-04 C1 加法；对应
+       * `CustomerInputRequest.acknowledgments`）。仅 answered 分支；缺席＝旧卡/无勾选项。
+       * `declined`/`unavailable` 不带本字段。
+       */
+      acknowledged?: string[];
       operatorId?: string;
       /**
        * 应用生成的裁决 id（`decision-<requestId>`；2026-10-29 方案 v2.1 §5.4/M4）：仅 application 层
@@ -987,6 +1090,184 @@ export interface VersionDecisionEvent extends TaskStateEventBase {
   message?: string;
 }
 
+// —————————————— 主干/冻结/版本变更申请账本事件（2026-11-04 trunk-amendment-model C1 加法） ——————————————
+//
+// 形状单一来源＝本模块；消费方（编排 C2a、桌面 D1）从本模块导入事件类型，从
+// `./trunk.ts` / `./version-change.ts` 导入记录/枚举常量——不复制字面量、不另造同义枚举。
+// 归属纪律（P1.6 §5.5/AC-31 + PM 复审 §4.1）：
+// · VCA/修正案/主干**决策**（approved/rejected、逐项 applied/kept/cancelled）⇒ `decidedBy:"customer"`；
+// · 提交/应用/冻结/迁移/bootstrap/观测 ⇒ `origin:"application"`、`decidedBy` 缺省（不冒充客户）；
+// · `refactor.request` ⇒ `origin:"application"`、无 `decidedBy`（不是客户决定；客户只读）；
+// · `stable.write.requested/written/failed` ⇒ `origin:"application"`；
+//   `stable.write.approved/rejected` ⇒ `origin:"customer"` + `decisionId`/`confirmationId`；
+// · `trunk.state(op:"stable-repinned")` 为客户确认后的应用动作（`origin/decidedBy:"customer"`，
+//   绑定 `confirmationId`/`decisionId`，**trunkVersion 不变**）。
+// 所有事件均为加法；旧读者把未知 kind 当坏行跳过、不阻塞、不丢数据。
+
+/** `trunk.state`：主干状态/决策审计（op 集合与归属常量见 `./trunk.ts`）。 */
+export interface TrunkStateEvent extends TaskStateEventBase {
+  kind: "trunk.state";
+  op: TrunkStateOp;
+  /** 事件前的当前 trunk 版本；`stable-repinned` 必填且与事件前一致（不升版本）。 */
+  trunkVersion: number;
+  previousTrunkVersion?: number;
+  runId?: string | null;
+  flowId?: string;
+  source?: TrunkSource;
+  /** 决策类/客户确认后动作必填；`gap` 等应用观测缺省。 */
+  decidedBy?: "customer";
+  origin: "customer" | "application";
+  channel?: "governance-card" | "application-observer" | "low-level-run-change";
+  decisionId?: string;
+  /** mini re-pin 必备：客户确认 id（workflow 轻量卡/appointment-write）。 */
+  confirmationId?: string;
+  amendmentId?: string;
+  journalId?: string;
+  /** stable-repinned：被续接的 stable 文件路径。 */
+  path?: string;
+  /** stable-repinned：续接前哈希。 */
+  oldSha?: string;
+  /** stable-repinned：续接后哈希（= 确认内容哈希）。 */
+  newSha?: string;
+  reason?: string;
+  scope?: string[];
+  highRisk?: { acknowledged: true; items?: string[] };
+  message?: string;
+}
+
+/** `trunk.amendment`：修正案生命周期/逐项确认审计（P1.3 形状保留 + `applicationId`/`applyState`）。 */
+export interface TrunkAmendmentEvent extends TaskStateEventBase {
+  kind: "trunk.amendment";
+  amendmentId: string;
+  flowId: string;
+  status: TrunkAmendmentStatus;
+  applyState?: TrunkAmendmentApplyState;
+  /** VCA 关联（P1.6 §5.3；旧事件可缺省）。 */
+  applicationId?: string;
+  /** 客户批准/拒绝、逐项决策时填；提交/应用动作缺省。 */
+  decidedBy?: "customer";
+  origin: "customer" | "application";
+  decisionId?: string;
+  journalId?: string;
+  itemId?: string;
+  itemKind?: TrunkAmendmentItemKind;
+  itemResult?: TrunkAmendmentItemResult;
+  resultTrunkVersion?: number;
+  message?: string;
+}
+
+/** `version.change`：VCA 生命周期审计（`vcKind` 为业务 kind，判别字段仍是 `kind`）。 */
+export interface VersionChangeEvent extends TaskStateEventBase {
+  kind: "version.change";
+  schema: typeof VERSION_CHANGE_SCHEMA;
+  applicationId: string;
+  vcKind: VersionChangeKind;
+  initiatorRoleId: VersionChangeInitiatorRoleId;
+  flowId: string;
+  status: VersionChangeStatus;
+  baseTrunkVersion?: number;
+  bootstrap?: boolean;
+  targets?: {
+    kind: VersionChangeTargetKind;
+    path: string;
+    action: "add" | "modify";
+    toSha256?: string;
+  }[];
+  /** 仅 approved/rejected（客户决定）。 */
+  decidedBy?: "customer";
+  origin: "customer" | "application";
+  /** applied/superseded 也携带（供审计；不记 customer，PM 裁决 Q3）。 */
+  decisionId?: string;
+  journalId?: string;
+  resultTrunkVersion?: number;
+  message?: string;
+}
+
+/** `doc.freeze`：冻结记录事件（R9 baseline `freeze` 子形状的账本镜像；归属见 reason 常量）。 */
+export interface DocFreezeEvent extends TaskStateEventBase {
+  kind: "doc.freeze";
+  schema: typeof DOC_FREEZE_SCHEMA;
+  path: string;
+  version: number;
+  sha256: string;
+  applicationId: string;
+  reason: DocFreezeReason;
+  origin: "customer" | "application";
+  /** 仅客户确认类 reason（`DOC_FREEZE_CUSTOMER_REASONS`）。 */
+  decidedBy?: "customer";
+  decisionId?: string;
+  actorRoleId?: string;
+}
+
+/** `refactor.request`：轻量重构申请审计（无客户决定；应用调度层机械管理）。 */
+export interface RefactorRequestEvent extends TaskStateEventBase {
+  kind: "refactor.request";
+  schema: typeof REFACTOR_REQUEST_SCHEMA;
+  requestId: string;
+  flowId: string;
+  initiatedBy: "convener";
+  title: string;
+  reason: string;
+  scope: { modules: string[]; paths: string[]; roles: string[] };
+  status: RefactorRequestStatus;
+  /** 应用调度层语义（不是新增角色；F31）。 */
+  managedBy: "application-scheduler";
+  enforcement: { writeSet: string[]; forbiddenKinds: RefactorForbiddenKind[] };
+}
+
+/** `stable.write.*` 的事件 kind（approved/rejected = customer；requested/written/failed = application）。 */
+export type StableWriteEventKind =
+  | "stable.write.requested"
+  | "stable.write.approved"
+  | "stable.write.rejected"
+  | "stable.write.written"
+  | "stable.write.failed";
+export const STABLE_WRITE_EVENT_KINDS: readonly StableWriteEventKind[] = Object.freeze([
+  "stable.write.requested",
+  "stable.write.approved",
+  "stable.write.rejected",
+  "stable.write.written",
+  "stable.write.failed",
+]);
+/** 客户决定事件（必须带 `decisionId` 或 `confirmationId`）。 */
+export const STABLE_WRITE_CUSTOMER_EVENT_KINDS: readonly StableWriteEventKind[] = Object.freeze([
+  "stable.write.approved",
+  "stable.write.rejected",
+]);
+/** 应用动作/观测事件（`decidedBy` 缺省，不冒充客户）。 */
+export const STABLE_WRITE_APPLICATION_EVENT_KINDS: readonly StableWriteEventKind[] = Object.freeze([
+  "stable.write.requested",
+  "stable.write.written",
+  "stable.write.failed",
+]);
+
+/** `stable.write.*`：stable 文件确认即写审计（`stableKind` 为业务 kind，判别字段仍是 `kind`）。 */
+export interface StableWriteEvent extends TaskStateEventBase {
+  kind: StableWriteEventKind;
+  schema: typeof STABLE_WRITE_SCHEMA;
+  requestId: string;
+  roleId: string;
+  path: string;
+  stableKind: StableFileKind;
+  /** "" = 写入前文件不存在（与 permit/record 同约定）。 */
+  baseSha256: string;
+  targetSha256: string;
+  /** 与 kind 后缀同义冗余；C2a 校验以 `kind` 为准。 */
+  status: StableWriteStatus;
+  /** 仅 approved/rejected（客户决定）。 */
+  decidedBy?: "customer";
+  origin: "customer" | "application";
+  decisionId?: string;
+  confirmationId?: string;
+  /** F14：与 C2a `stable.write.*` 字段一致的可选审计字段（批准后）。 */
+  approvedAt?: string;
+  /** F14：批准后必填（记录侧）；事件侧可选。 */
+  expiresAt?: string;
+  consumedAt?: string;
+  reason?: string;
+  message?: string;
+}
+
 /** `.ans/state/tasks.jsonl` 的单行事件联合（append-only；每行一个事件）。 */
 export type TaskStateEvent =
   | TaskCreatedEvent
@@ -1005,7 +1286,13 @@ export type TaskStateEvent =
   | ApprovalExpiredEvent
   | ProjectFocusEvent
   | ProjectNoteEvent
-  | VersionDecisionEvent;
+  | VersionDecisionEvent
+  | TrunkStateEvent
+  | TrunkAmendmentEvent
+  | VersionChangeEvent
+  | DocFreezeEvent
+  | RefactorRequestEvent
+  | StableWriteEvent;
 
 /** 每角色运行日志条目（B-04；字段白名单，写入侧脱敏/截断）。 */
 export interface RoleLogEntry {
@@ -1431,6 +1718,97 @@ export type RequestVersionDecisionFn = (
   input: VersionDecisionRequest,
   signal?: AbortSignal,
 ) => Promise<VersionDecisionResult>;
+
+// —————————————— Batch 3.5 提交能力（C1d；注入才注册、只提交不批准） ——————————————
+//
+// 三工具与注入实现（S5 编排 / D1b 桌面）的共同契约：工具只做参数形状校验与角色门控，
+// 然后**恰好调用能力一次**并如实转达结构化回执；绝不批准、绝不发客户卡、绝不签发许可、
+// 绝不直接写账本/项目文件。能力实现负责接入 C2c Service（VCA/stable-write/refactor）
+// 与 at/baseTrunk 等应用侧事实（不由模型自报）。
+
+/** 提交工具参数上界（工具层与 `schema.ts` 单一来源；超限拒绝、不截断）。 */
+export const VCA_SUBMISSION_TARGETS_MAX = 64;
+export const VCA_SUBMISSION_PATH_MAX_CHARS = 500;
+export const REFACTOR_SCOPE_ITEMS_MAX = 64;
+export const STABLE_WRITE_CONTENT_MAX_CHARS = 262144;
+
+/** VCA 目标声明（与 C2c `VersionChangeTargetDraft` 同字段；kind 放宽为 string 以便服务给出 `vca-target-invalid`）。 */
+export interface VersionChangeTargetSubmission {
+  kind: string;
+  path: string;
+  action: VersionChangeTargetAction;
+  from?: string;
+  roleId?: string;
+}
+
+/** `submit_version_change` 能力输入（身份由工具从 `scope.roleId` 填入，不接受模型自报）。 */
+export interface SubmitVersionChangeInput {
+  kind: VersionChangeKind;
+  initiatorRoleId: VersionChangeInitiatorRoleId;
+  flowId: string;
+  summary: string;
+  targets: VersionChangeTargetSubmission[];
+  amendmentId?: string;
+  amendmentDocPath?: string;
+  bootstrap?: boolean;
+}
+
+/** 结构化回执（Batch 3.5 三工具同形；`errorCode` 对齐 C2c 冻结错误码）。 */
+export interface SubmitVersionChangeResult {
+  ok: boolean;
+  applicationId?: string;
+  status?: VersionChangeStatus;
+  errorCode?: VersionChangeErrorCode;
+  message?: string;
+}
+
+export type SubmitVersionChangeFn = (
+  input: SubmitVersionChangeInput,
+  signal?: AbortSignal,
+) => Promise<SubmitVersionChangeResult>;
+
+/** `submit_refactor` 能力输入（convener 唯一发起；`roleId` 同样由工具填入）。 */
+export interface SubmitRefactorInput {
+  roleId: string;
+  flowId: string;
+  title: string;
+  reason: string;
+  scope: RefactorRequestScope;
+}
+
+export interface SubmitRefactorResult {
+  ok: boolean;
+  requestId?: string;
+  status?: RefactorRequestStatus;
+  errorCode?: RefactorErrorCode;
+  message?: string;
+}
+
+export type SubmitRefactorFn = (
+  input: SubmitRefactorInput,
+  signal?: AbortSignal,
+) => Promise<SubmitRefactorResult>;
+
+/** `request_stable_write` 能力输入：仅 `docs/workflow.md`（role-card/boundary 走 appointment-write）。 */
+export interface RequestStableWriteInput {
+  roleId: string;
+  kind: "workflow";
+  /** 提议写入的完整最终内容（targetSha256/baseSha256 由应用计算）。 */
+  content: string;
+}
+
+export interface RequestStableWriteResult {
+  ok: boolean;
+  requestId?: string;
+  status?: StableWriteStatus;
+  errorCode?: StableWriteErrorCode;
+  message?: string;
+}
+
+export type RequestStableWriteFn = (
+  input: RequestStableWriteInput,
+  signal?: AbortSignal,
+) => Promise<RequestStableWriteResult>;
 
 // —————————————— 推理与推理强度（G-5 wave 1 契约层；冻结符号，单一来源＝本模块） ——————————————
 //
@@ -2337,6 +2715,23 @@ export interface GovernedToolsOptions {
    * （`request.orphaned(reason:"initiator-aborted")`，不执行）。
    */
   requestVersionDecision?: RequestVersionDecisionFn;
+  /**
+   * Batch 3.5（C1d）：`submit_version_change` 能力。**注入才注册**；product/rapporteur 会话由
+   * S5/D1b 注入。工具只提交 VCA 请求（create+submit）并如实转达；**绝不批准/发卡/写文档**；
+   * `version-upgrade` 仅 product、`detail-amendment` 仅 rapporteur（工具按 `roleId` 门控）。
+   */
+  submitVersionChange?: SubmitVersionChangeFn;
+  /**
+   * Batch 3.5（C1d）：`submit_refactor` 能力。**只给 convener 会话注入**；未注入 ⇒ 工具不注册。
+   * 工具只提交重构申请（refactor.request），不派发任务、不写代码、不产生 trunk 版本、无客户卡。
+   */
+  submitRefactor?: SubmitRefactorFn;
+  /**
+   * Batch 3.5（C1d）：`request_stable_write` 能力。**只给 convener 会话注入**；未注入 ⇒ 工具不注册。
+   * 工具只提交 `docs/workflow.md` 写入请求（等待 stable-write 客户确认卡），**不签发许可、不批准、
+   * 不直接写入**；role-card/boundary 仍走 appointment-write。
+   */
+  requestStableWrite?: RequestStableWriteFn;
   /**
    * 判断 agent（「替我审」）只读能力注入。**这是能力注入，不是工具注入**：注入后 Service 必须走
    * `buildShellJudgeTools`（`src/common/runtime-core/shell-judge/`），**不得**走 `buildGovernedTools`——

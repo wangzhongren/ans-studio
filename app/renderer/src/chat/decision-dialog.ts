@@ -8,12 +8,51 @@
  */
 
 import { DEFAULT_LOCALE, translate, type Locale } from "../i18n/index.ts";
+import type { OperatorDecisionPayload } from "../lib/platform.ts";
 
 export interface DecisionOptionView {
   id: string;
   label: string;
   description?: string;
   recommended: boolean;
+}
+
+/**
+ * 卡片勾选项视图（C1 `CustomerInputAcknowledgement` 对象数组；2026-11-04 trunk-amendment C1/F1）。
+ * 客户必须逐项勾选（`required`）后才能提交正向选项；不预勾选、不默认全选。
+ */
+export interface DecisionAcknowledgementView {
+  id: string;
+  label: string;
+  required: boolean;
+}
+
+/** confirm 回传载荷（D3 冻结形状；D4/U2 加法 `acknowledged`）。 */
+export type ConfirmDecisionPayload = Extract<OperatorDecisionPayload, { kind: "confirm" }>;
+
+/**
+ * 正向 confirm 回传（D4/2026-11-05）：
+ * · 请求声明 `required` 勾选项时，**必须全部已勾选**才能提交（否则返回 null，防御性早退）；
+ * · 携带的 `acknowledged` 恰为 required id（按声明顺序；非 required 勾选不混入，D3 按“恰覆盖”校验）；
+ * · 未声明 required ⇒ 旧 payload `{kind:"confirm", confirmed:true}`，零变化。
+ */
+export function confirmDecisionPayload(
+  acknowledgments: readonly DecisionAcknowledgementView[],
+  acknowledged: readonly string[],
+): ConfirmDecisionPayload | null {
+  const required = acknowledgments
+    .filter((item) => item.required)
+    .map((item) => item.id);
+  if (required.length === 0) return { kind: "confirm", confirmed: true };
+  const checked = new Set(acknowledged);
+  const covered = required.filter((id) => checked.has(id));
+  if (covered.length !== required.length) return null;
+  return { kind: "confirm", confirmed: true, acknowledged: covered };
+}
+
+/** 拒绝/否定 confirm（`confirmed:false`）**不带** acknowledged（D3 不要求/不校验 ack）。 */
+export function rejectDecisionPayload(): ConfirmDecisionPayload {
+  return { kind: "confirm", confirmed: false };
 }
 
 export interface DecisionView {
@@ -27,6 +66,8 @@ export interface DecisionView {
   cardKind: string;
   paths: string[];
   options: DecisionOptionView[];
+  /** C1 对象数组防御读取结果（缺失/非法 ⇒ 空数组 = 旧卡行为）。 */
+  acknowledgments: DecisionAcknowledgementView[];
   multiple: boolean;
   recommendedId: string | null;
   judgeNotice: string;
@@ -55,7 +96,16 @@ export interface AcceptanceReportView {
 
 const ACCEPTANCE_REPORT_MAX_BYTES = 16384;
 
-const DECISION_KINDS = new Set(["proposal", "appointment", "acceptance", "intent-confirm", "decision"]);
+const DECISION_KINDS = new Set([
+  "proposal",
+  "appointment",
+  "acceptance",
+  "intent-confirm",
+  "decision",
+  // 2026-11-04 trunk-amendment C1/F2：stable workflow 写入确认卡为 app-owned 卡种
+  // （不进治理判断分组、永不代选）；此处仅复用对话框优先级/破坏性样式。
+  "stable-write",
+]);
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -97,6 +147,24 @@ function text(value: unknown): string {
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item !== "") : [];
+}
+
+/**
+ * `request.acknowledgments` 防御读取（C1 对象数组）：丢弃非对象/空 id/重复 id；
+ * `label` 缺失时回落 id（不翻译、不猜）；`required` 仅严格 `true` 才算必选。
+ */
+function readAcknowledgments(value: unknown): DecisionAcknowledgementView[] {
+  if (!Array.isArray(value)) return [];
+  const out: DecisionAcknowledgementView[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const record = asRecord(item);
+    const id = text(record.id).trim();
+    if (id === "" || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, label: text(record.label) || id, required: record.required === true });
+  }
+  return out;
 }
 
 export function decisionRequestOf(payload: unknown): Record<string, unknown> {
@@ -168,6 +236,7 @@ export function decisionView(payload: unknown, locale: Locale = DEFAULT_LOCALE):
     acceptance,
     acceptanceReport: acceptance ? readAcceptanceReport(payload) : null,
     paths: stringList(request.paths),
+    acknowledgments: readAcknowledgments(request.acknowledgments),
     options,
     multiple: request.multiple === true,
     recommendedId: recommended.length === 1 ? recommended[0]!.id : null,

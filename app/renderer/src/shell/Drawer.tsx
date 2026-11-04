@@ -28,6 +28,7 @@ import { ProfilePanel } from "@/shell/ProfilePanel";
 import { WorkOverview } from "@/shell/WorkOverview";
 import { DecisionCenterPanel } from "@/chat/DecisionCenterPanel";
 import { TaskCenterPanel } from "@/chat/TaskCenterPanel";
+import { TrunkPanels } from "@/chat/TrunkPanels";
 import { DocumentView } from "@/shell/DocumentView";
 import { QueueSubview } from "@/shell/QueueSubview";
 import { useLocaleState, useT } from "@/i18n";
@@ -71,8 +72,10 @@ export function Drawer() {
       ? engineSettingsTitle(runtimeLabel(settingsEngine, locale), locale)
       : effective === "work"
         ? workTitle(roleName, locale)
-        : effective === "decisions"
-          ? t("ui.decisionDialog.panelTitle")
+        : effective === "trunk-version"
+          ? t("ui.trunk.panelTitle")
+          : effective === "decisions"
+            ? t("ui.decisionDialog.panelTitle")
           : effective === "tasks"
             ? t("ui.taskCenter.title")
             : effective === "document" && docsView
@@ -113,7 +116,8 @@ export function Drawer() {
 
   // 打开/切面/返回：外层滚动恢复（按角色×引擎×项目）。
   useLayoutEffect(() => {
-    if (!open || effective === "pi" || effective === "document") return;
+    // 「主干与版本变更」是项目级面板（不按角色阅读态恢复）；设置/文档同样排除。
+    if (!open || effective === "pi" || effective === "document" || effective === "trunk-version") return;
     const element = bodyRef.current;
     if (!element) return;
     const target = (open ? "1" : "0") + "|" + roleKey + "|" + effective;
@@ -257,6 +261,7 @@ export function Drawer() {
           {!showingQueue && effective === "work" ? <WorkOverview roleId={selectedRoleId || null} /> : null}
           {effective === "decisions" ? <DecisionCenterPanel /> : null}
           {effective === "tasks" ? <TaskCenterPanel /> : null}
+          {effective === "trunk-version" ? <TrunkPanels /> : null}
           {effective === "document" ? <DocumentView /> : null}
         </div>
       </motion.aside>

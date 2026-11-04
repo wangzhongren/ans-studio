@@ -13,9 +13,17 @@
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
+import type { DocFreezeLookupState, StableWritePermit } from "../../model/version-change.ts";
 import path from "node:path";
 import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchRoutineShellCommand } from "./classify-shell.ts";
-import { checkVersionedDocWrite, protectedVersionedPathsSync, versionedDocExists, versionedDocOverwriteDecision } from "./versioned-doc-guard.ts";
+import {
+  isVersionedDocPath,
+  protectedVersionedPathsSync,
+  stableWritePathOf,
+  versionedDocExists,
+  versionedDocOverwriteDecision,
+  type VersionedDocOperation,
+} from "./versioned-doc-guard.ts";
 import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../编排/mechanical-rejection.ts";
 
 export interface ShellWriteGuardInput {
@@ -34,6 +42,44 @@ export interface ShellWriteGuardInput {
    * realResolve/boundary/scope/skillRoot 封在本闭包内——不得另写第二份路径判定。
    */
   checkWrite: (relPath: string) => { allowed: boolean; reason?: string };
+  /**
+   * 注入：C2b 生产唯一同步冻结查询 `versionedDocFreezeState(projectRoot, rel, exists)`（编排 S3 注入，
+   * 不自建第二份 Map）。缺省 ⇒ 版本化既有目标按旧口径「存在即拒」保护；提供后 frozen ⇒ 拒绝、
+   * draft ⇒ 允许（仍先过 `checkWrite`）、unknown ⇒ fail-closed。
+   */
+  freezeStateOf?: (relPath: string) => DocFreezeLookupState;
+  /**
+   * 预留（C2c 契约形状）：shell 无法预知写入内容 hash，stable 目标**一律拒绝**（C7）——
+   * 该查询不用于放行，只允许调度层按同一形状注入。
+   */
+  stablePermitOf?: (relPath: string) => StableWritePermit | undefined;
+}
+
+/** stable 文件路径出现在命令文本（opaque/ambiguous/脚本审查前）——写能力命令提及即拒（C7）。 */
+const STABLE_PATH_MENTION_PATTERN = /(docs[\\/]workflow\.md|角色卡[\\/][^\\/\s"'`]+[\\/](?:role-card\.md|boundary\.yaml))/i;
+
+function stablePathMention(text: string): string | undefined {
+  return STABLE_PATH_MENTION_PATTERN.exec(text)?.[1];
+}
+
+function stableTargetDenial(rel: string): ShellWriteGuardDecision {
+  const info = stableWritePathOf(rel);
+  const owner = info?.kind === "workflow" ? "convener" : info?.kind === undefined ? "app" : "nominator";
+  const rejection = makeMechanicalRejection(
+    "stable-write-permit-missing",
+    [`stable 文件（workflow/角色卡/边界）写入必须走 stable-write 确认卡或 appointment-write：${rel}（shell 无法提供内容 hash）`],
+    { owner, action: "改走 stable-write/appointment-write 确认通道；shell 不得写 stable 文件。", retryable: true, docs: [rel] },
+  );
+  return { kind: "deny", reason: formatMechanicalRejection(rejection), targets: [rel], code: rejection.code, rejection };
+}
+
+function stableMentionDenial(mentioned: string): ShellWriteGuardDecision {
+  const rejection = makeMechanicalRejection(
+    "stable-write-permit-missing",
+    [`命令触及 stable 文件（workflow/角色卡/边界）：${mentioned}；opaque/无法解析的命令不得写 stable 文件（无内容 hash/无许可）`],
+    { owner: "app", action: "改为精确的 stable-write/appointment-write 确认通道；不要用脚本/cp/tee 绕过。", retryable: true, docs: [mentioned] },
+  );
+  return { kind: "deny", reason: formatMechanicalRejection(rejection), targets: [mentioned], code: rejection.code, rejection };
 }
 
 /** 守卫三态（2026-10-29 R2 对齐）：pass / deny / script（进入脚本内容审查）。 */
@@ -476,6 +522,39 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
     const text = argv.join(" ");
     return protectedVersionedPathsSync(input.projectRoot).find((rel) => text.includes(rel));
   };
+  // 2026-11-04（C2b/C7）：stable 文件（workflow/role-card/boundary）不提供内容 hash ⇒ shell 写入一律拒绝。
+  const stableMention = (): string | undefined => stablePathMention(argv.join(" "));
+  const shellOperation: VersionedDocOperation =
+    program === "rm" || program === "rmdir" || program === "del" || program === "erase" || program === "shred" || program === "truncate"
+      ? "delete"
+      : program === "mv" || program === "move" || program === "ren" || program === "rename"
+        ? "rename"
+        : "write";
+  /**
+   * C2b 全调用点：stable 目标一律拒绝（C7）；版本化目标统一走唯一同步判定
+   * `versionedDocOverwriteDecision`（frozen 由注入的 `freezeStateOf` 提供；缺省保留旧「存在即拒」）。
+   */
+  const guardResolvedTarget = (rel: string): ShellWriteGuardDecision | undefined => {
+    if (stableWritePathOf(rel) !== undefined) return stableTargetDenial(rel);
+    if (!isVersionedDocPath(rel)) return undefined;
+    const exists = versionedDocExists(input.projectRoot, rel);
+    let frozen: DocFreezeLookupState | undefined;
+    if (input.freezeStateOf !== undefined) {
+      try {
+        frozen = input.freezeStateOf(rel);
+      } catch {
+        frozen = "unknown"; // 查询失败 ⇒ fail-closed（拒绝版本化路径变更）
+      }
+    }
+    const guarded = versionedDocOverwriteDecision({
+      relPath: rel,
+      exists,
+      operation: shellOperation,
+      ...(frozen !== undefined ? { frozen } : {}),
+    });
+    if (guarded.allowed) return undefined;
+    return { kind: "deny", reason: guarded.reason, targets: [rel], code: guarded.code, rejection: guarded.rejection };
+  };
 
   if (program !== "") {
     // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
@@ -564,6 +643,8 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
           return { kind: "deny" as const, reason: formatMechanicalRejection(rejection), targets: [protectedPath], code: "versioned-doc-overwrite" as const, rejection };
         })();
       }
+      const mentionedStable = stableMention();
+      if (mentionedStable !== undefined) return stableMentionDenial(mentionedStable);
       return {
         kind: "script",
         reason: `${explicit.reason}；写目标无法静态解析，交由审批判断（开关开启时由判断 agent 审查脚本/上下文，关闭时客户本人确认）。`,
@@ -598,11 +679,10 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
             targets: [rel],
           };
         }
-        // 2026-10-29（v2.8 R6）：既有版本化文档只读——任何通道覆盖一律 deny（不进审批）。
-        if (versionedDocExists(input.projectRoot, rel)) {
-          const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
-          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel], code: guarded.code, rejection: guarded.rejection };
-        }
+        // 2026-10-29（v2.8 R6）→ 2026-11-04（C2b）：stable 一律拒绝；版本化统一冻结判定
+        // （frozen ⇒ deny；draft ⇒ allow；unknown/缺省既有 ⇒ fail-closed/旧口径）。
+        const guarded = guardResolvedTarget(rel);
+        if (guarded !== undefined) return guarded;
       }
       const protectedPath = protectedPathMention();
       if (protectedPath !== undefined) {
@@ -611,6 +691,8 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
           return { kind: "deny" as const, reason: formatMechanicalRejection(rejection), targets: [protectedPath], code: "versioned-doc-overwrite" as const, rejection };
         })();
       }
+      const mentionedStable = stableMention();
+      if (mentionedStable !== undefined) return stableMentionDenial(mentionedStable);
       return { kind: "script", reason: `${explicit.reason}；交由审批判断（开关开启时由判断 agent 审查，关闭时客户本人确认）。` };
     }
     if (explicit.kind === "targets") {
@@ -639,11 +721,10 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
             targets: [rel],
           };
         }
-        // 2026-10-29（v2.8 R6）：既有版本化文档只读——任何通道覆盖一律 deny（不进审批）。
-        if (versionedDocExists(input.projectRoot, rel)) {
-          const guarded = versionedDocOverwriteDecision({ relPath: rel, exists: true });
-          if (!guarded.allowed) return { kind: "deny", reason: guarded.reason, targets: [rel], code: guarded.code, rejection: guarded.rejection };
-        }
+        // 2026-10-29（v2.8 R6）→ 2026-11-04（C2b）：stable 一律拒绝；版本化统一冻结判定
+        // （frozen ⇒ deny；draft ⇒ allow；unknown/缺省既有 ⇒ fail-closed/旧口径）。
+        const guarded = guardResolvedTarget(rel);
+        if (guarded !== undefined) return guarded;
         resolvedTargets.push(rel);
       }
       if (resolvedTargets.length > 0) return { kind: "pass" };
@@ -660,6 +741,8 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
     if (protectedPath !== undefined) {
       return { kind: "deny", reason: `版本化文档只读：命令触及 ${protectedPath}（已存在，禁止覆盖）。`, targets: [protectedPath] };
     }
+    const mentionedStable = stableMention();
+    if (mentionedStable !== undefined) return stableMentionDenial(mentionedStable);
     return {
       kind: "script",
       reason:

@@ -157,12 +157,15 @@ interface HarnessOptions {
   /** 客户卡通道的作答策略；缺省 ⇒ declined。`withCustomerInput:false` ⇒ 不接通道（兜底场景）。 */
   answer?: (request: CustomerInputRequest) => Promise<import("../../src/model/runtime.ts").CustomerInputOutcome> | import("../../src/model/runtime.ts").CustomerInputOutcome;
   withCustomerInput?: boolean;
+  /** AC-17（D2）：版本变更栈（只读 `listVersionChanges` 判定在途 VCA）。 */
+  stack?: import("../../app/desktop/version-change.ts").VersionChangeStack;
 }
 
 function harness(root: string, options: HarnessOptions = {}) {
   const caps: Record<string, DispatchTaskFn | undefined> = {};
   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
   const customerRequests: CustomerInputRequest[] = [];
+  const events: Array<{ roleId: string; projectRoot: string; runtime: string; event: { kind: string; summary?: string } }> = [];
   const customerInput: CustomerInputFn | undefined = options.withCustomerInput === false
     ? undefined
     : async (request) => {
@@ -186,10 +189,13 @@ function harness(root: string, options: HarnessOptions = {}) {
     createDemoAdapter: () => { throw new Error("no demo"); },
     buildProjectConfig,
     getListing: (r) => (r === root ? listing(root) : undefined),
-    emitEvent: () => {},
+    emitEvent: (envelope) => {
+      events.push(envelope as unknown as (typeof events)[number]);
+    },
     ...(customerInput !== undefined ? { customerInput } : {}),
+    ...(options.stack !== undefined ? { getVersionChangeStack: () => options.stack } : {}),
   });
-  return { mgr, caps, customerInputs, customerRequests };
+  return { mgr, caps, customerInputs, customerRequests, events };
 }
 
 const D3_TARGETS = ["engine-dev", "render-dev", "ui-dev", "test-dev", "docs-dev"];
@@ -472,6 +478,85 @@ test("提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-ch
     const choice = cards[0] as Extract<CustomerInputRequest, { kind: "choice" }>;
     assert.deepEqual(choice.options.map((option) => option.id), ["continue-frozen", "stop-and-restart", "stop"]);
     assert.equal(h.customerRequests.length, 1, "提案卡本身没有被呈现（只出现 run-change 卡）");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
+/** AC-17（D2）：只读 VCA 记录的最小栈（open 只需 ensureInitialized；抑制判定只需 listVersionChanges）。 */
+function vcaStack(records: Array<{ applicationId: string; status: string }>): import("../../app/desktop/version-change.ts").VersionChangeStack {
+  return {
+    projectRoot: "/p",
+    ensureInitialized: async () => ({ ok: true, cacheHealth: "ok" }),
+    listVersionChanges: async () =>
+      records.map((entry) => ({
+        applicationId: entry.applicationId,
+        status: entry.status,
+        kind: "version-upgrade",
+        initiatorRoleId: "product",
+        flowId: FLOW,
+        summary: "test",
+        bootstrap: false,
+        baseTrunk: null,
+        targets: [],
+        at: "2026-11-05T00:00:00.000Z",
+      })),
+  } as unknown as import("../../app/desktop/version-change.ts").VersionChangeStack;
+}
+
+test("AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-vca-suppress-"));
+  const pending = [{ applicationId: "vc-1", status: "submitted" }];
+  const h = harness(root, {
+    answer: () => ({ outcome: "declined", operatorId: "customer", reason: "客户暂不在" }),
+    stack: vcaStack(pending),
+  });
+  try {
+    await setupPinnedRun(root, h);
+    await writeProjectV2(root);
+    assert.equal((await h.mgr.open({ projectRoot: root, roleId: "rapporteur", runtime: "demo" })).ok, true);
+    await tick(20);
+    const injected = h.customerInputs.rapporteur;
+    assert.equal(typeof injected, "function", "rapporteur 会话应注入客户卡通道");
+    const proposalCard: CustomerInputRequest = {
+      kind: "choice",
+      title: "接受提案 v2",
+      cardKind: "proposal",
+      flowId: FLOW,
+      options: [{ id: "accept", label: "接受" }, { id: "reject", label: "拒绝" }],
+    };
+    const first = await injected!(proposalCard, { cardKind: "proposal", flowId: FLOW } as never);
+    assert.equal(first?.outcome, "declined");
+    if (first?.outcome === "declined") {
+      assert.equal(first.notPresented, true, "VCA 在途 ⇒ 提案卡未呈现");
+      assert.match(first.reason ?? "", /vc-1/, "拒绝原因指出在途 VCA");
+    }
+    assert.equal(runChangeCards(h.customerRequests).length, 0, "VCA 在途 ⇒ 不弹自动 run-change 卡");
+    assert.ok(
+      h.events.some(
+        (envelope) =>
+          envelope.event.kind === "message" && (envelope.event.summary ?? "").includes("vc-1"),
+      ),
+      "发系统行提示 VCA 在途",
+    );
+    // approved 同样抑制。
+    pending[0]!.status = "approved";
+    await injected!(proposalCard, { cardKind: "proposal", flowId: FLOW } as never);
+    assert.equal(runChangeCards(h.customerRequests).length, 0, "approved 在途同样抑制");
+    // VCA 结束（列表为空）⇒ 自动 offer 恢复（同一 run 未被占自动提示名额）。
+    pending.length = 0;
+    await injected!(proposalCard, { cardKind: "proposal", flowId: FLOW } as never);
+    assert.equal(runChangeCards(h.customerRequests).length, 1, "VCA 结束后自动 run-change offer 恢复");
+    // 显式低层入口不被抑制。
+    pending.push({ applicationId: "vc-2", status: "submitted" });
+    const explicit = await h.mgr.requestRunChangeDecision({ projectRoot: root, flowId: FLOW });
+    assert.equal(explicit.ok, true);
+    if (explicit.ok) {
+      const outcome = await explicit.outcome;
+      assert.equal(outcome?.outcome, "declined");
+    }
+    assert.equal(runChangeCards(h.customerRequests).length, 2, "显式入口仍呈现 run-change 卡");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });

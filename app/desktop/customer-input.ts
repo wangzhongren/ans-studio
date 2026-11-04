@@ -160,8 +160,28 @@ export interface OperatorRequestPayload {
  * `cancelled:true` ⇒ declined。任何非法回包拒绝受理（`{ok:false}`，pending 保留、界面可重试）。
  */
 export type OperatorDecisionPayload =
-  | { kind: "confirm"; confirmed: boolean }
-  | { kind: "choice"; selected?: string[]; cancelled?: boolean };
+  | {
+      kind: "confirm";
+      confirmed: boolean;
+      /**
+       * 已勾选的 acknowledgment id（D4/2026-11-05；渲→主不可信输入）：
+       * confirm 请求声明 `acknowledgments[].required` 时必须为字符串数组且去重后**恰覆盖**全部
+       * required id（缺失/多余/非数组一律拒收，pending 保留）；`confirmed:false` 不要求/不校验 ack；
+       * 未声明 required ⇒ 旧行为零变化。合法时结算回传 `CustomerInputOutcome.acknowledged`。
+       */
+      acknowledged?: string[];
+    }
+  | {
+      kind: "choice";
+      selected?: string[];
+      cancelled?: boolean;
+      /**
+       * 已勾选的 acknowledgment id（2026-11-04 trunk-amendment C1/F1；渲→主不可信输入）。
+       * 请求声明 `required` 项时必须是字符串数组且**恰覆盖**全部 required id（去重后集合相等）；
+       * 未声明 ⇒ 旧行为零变化。结算回传 `CustomerInputOutcome.acknowledged`，`request.resolved` 不加字段。
+       */
+      acknowledged?: string[];
+    };
 
 /** 主进程注入的推送端点：把请求如实送到界面（electron webContents.send；测试注入收集器）。 */
 export type OperatorRequestPresenter = (payload: OperatorRequestPayload) => void;
@@ -320,15 +340,39 @@ export const DECISION_CARD_KIND = "decision" as const;
  */
 const RUN_CHANGE_MODE_OPTION_IDS: readonly string[] = ["continue-frozen", "stop-and-restart", "stop"];
 const VERSION_DECISION_OPTION_IDS: readonly string[] = ["version-modify", "new-version-development"];
+/**
+ * 2026-11-04 trunk-amendment D1：版本变更申请（VCA）、修正案逐项/最终确认卡的选项词汇——
+ * 这些卡与 run-change/版本决策同属**应用发行、客户本人**的卡（P1.6 §4.4/§4.7；AC-4/AC-18）。
+ * `item-apply`/`item-keep`/`item-cancel-amendment` 来自 S4 `AmendmentItemChoice`；`apply-amendment`/
+ * `defer-amendment` 为 P1.3 最终卡词汇（本批未发最终卡，保留排除面）；`acknowledge-none` 为可选
+ * 「未改类别」说明卡词汇（F42；不发则无影响）。
+ */
+const VERSION_CHANGE_OPTION_IDS: readonly string[] = ["approve-version-change", "reject-version-change"];
+const AMENDMENT_ITEM_OPTION_IDS: readonly string[] = ["item-apply", "item-keep", "item-cancel-amendment"];
+const AMENDMENT_FINAL_OPTION_IDS: readonly string[] = ["apply-amendment", "defer-amendment"];
+/** stable workflow 轻量确认卡（app-owned 卡种；P1.6 §4.5.1；PM 复审 F2）。 */
+const STABLE_WRITE_CARD_KIND = "stable-write" as const;
+const STABLE_WRITE_OPTION_IDS: readonly string[] = ["approve-stable-write", "reject-stable-write"];
 
 function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
   if (request.kind !== "choice") return false;
-  if ((request as { cardKind?: unknown }).cardKind !== DECISION_CARD_KIND) return false;
+  const cardKind = (request as { cardKind?: unknown }).cardKind;
+  // stable workflow 确认卡：app-owned、无 flowId；客户本人，永不判断/委托/指令。
+  if (cardKind === STABLE_WRITE_CARD_KIND) {
+    if ((request as { application?: unknown }).application !== true) return false;
+    const offered = new Set(request.options.map((option) => option.id));
+    return STABLE_WRITE_OPTION_IDS.every((id) => offered.has(id));
+  }
+  if (cardKind !== DECISION_CARD_KIND) return false;
   if ((request as { application?: unknown }).application !== true) return false;
   const offered = new Set(request.options.map((option) => option.id));
+  const hasAll = (ids: readonly string[]): boolean => ids.every((id) => offered.has(id));
   return (
-    RUN_CHANGE_MODE_OPTION_IDS.every((id) => offered.has(id)) ||
-    VERSION_DECISION_OPTION_IDS.every((id) => offered.has(id))
+    hasAll(RUN_CHANGE_MODE_OPTION_IDS) ||
+    hasAll(VERSION_DECISION_OPTION_IDS) ||
+    hasAll(VERSION_CHANGE_OPTION_IDS) ||
+    hasAll(AMENDMENT_ITEM_OPTION_IDS) ||
+    hasAll(AMENDMENT_FINAL_OPTION_IDS)
   );
 }
 
@@ -963,12 +1007,33 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   };
 
   /**
+   * 客户主权卡的**结算出口最后防线**（2026-11-04 trunk-amendment D1；PM 复审 §4.6/F9）：
+   * outcome 带 judge 审计或 operatorId 以 `judge:`/`directive:` 开头 ⇒ 一律拒绝结算（pending 保留），
+   * 即使上游接线错误也不会把非客户选择送给 Pipeline。其他卡种零行为变化。
+   */
+  const isSovereignCard = (entry: ChannelEntry): boolean =>
+    isApplicationDecisionReservedForCustomer(entry.request) || isGovernanceWriteCardKind(cardKindOf(entry));
+  const isNonCustomerOutcome = (outcome: CustomerInputOutcome): boolean => {
+    const operatorId = "operatorId" in outcome && typeof outcome.operatorId === "string" ? outcome.operatorId : undefined;
+    if (operatorId !== undefined && (operatorId.startsWith("judge:") || operatorId.startsWith("directive:"))) return true;
+    return outcome.outcome === "answered" && outcome.judge !== undefined;
+  };
+
+  /**
    * 结算一张卡（已呈现或判断中）：清对应登记/占位 → 清监听 → resolve → 下一步推导 → 按序呈现同项目下一张。
    * **`notifyNextStep`/`drainProject` 恰一次**（§4.3）：代批成功与客户手批走同一条结算路径，
    * 下一步的 `advanceGovernanceFlow`/`dispatch.accepted(app)` 语义逐字不变。
    */
   const settleEntry = (entry: ChannelEntry, outcome: CustomerInputOutcome, from: "active" | "judging" | "directing"): void => {
     if (entry.state !== from) return;
+    if (isSovereignCard(entry) && isNonCustomerOutcome(outcome)) {
+      diagnostic.error(
+        "sovereign-card.non-customer-settlement.blocked",
+        new Error("非客户来源的主权卡结算被拒绝"),
+        { requestId: entry.payload.id, operatorId: "operatorId" in outcome ? outcome.operatorId : undefined },
+      );
+      return;
+    }
     if (from === "active") pending.delete(entry.payload.id);
     else if (from === "judging") judging.delete(entry.payload.id);
     else directingHolds.delete(entry.payload.id);
@@ -1034,6 +1099,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         outcome: "answered",
         value: outcome.value,
         operatorId: resolved,
+        ...(outcome.acknowledged !== undefined ? { acknowledged: outcome.acknowledged } : {}),
         ...(outcome.directive !== undefined ? { directive: outcome.directive } : {}),
         ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
       };
@@ -1755,6 +1821,10 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   const tryApplyDirectiveDecision = (entry: ChannelEntry): boolean => {
     if (entry.directiveEvaluated === true || entry.state !== "queued") return false;
     if (cardKindOf(entry) !== DECISION_CARD_KIND) return false;
+    // 2026-11-04 trunk-amendment D1（PM 复审 F9）：VCA/修正案逐项/最终卡与 run-change/版本决策同为
+    // 客户主权卡——`@决策` 指令**不得代选/代拒**（不消费指令、不写 directive:<id>、不结算）。
+    // 这是本轮补上的排除点；appointment-write/stable-write 不进入本函数。
+    if (isApplicationDecisionReservedForCustomer(entry.request)) return false;
     if (opts.directive === undefined) return false;
     const request = entry.request;
     if (request.kind !== "choice") return false;
@@ -2291,6 +2361,29 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     });
   };
 
+  /**
+   * required acknowledgments 结算校验（confirm/choice **共用**，D4；不复制第二套）：
+   * 请求声明 `acknowledgments[].required` ⇒ `raw` 必须为字符串数组且去重后**恰等于** required id
+   * 集合（缺失/多余/非数组一律拒收，pending 保留可重试）；无 required ⇒ 旧行为（不校验/不回传）。
+   */
+  function settleAcknowledgements(
+    request: CustomerInputRequest,
+    raw: unknown,
+  ): { ok: true; acknowledged?: string[] } | { ok: false; error: string } {
+    const declared = Array.isArray(request.acknowledgments) ? request.acknowledgments : [];
+    const requiredIds = declared.filter((item) => item.required === true).map((item) => item.id);
+    if (requiredIds.length === 0) return { ok: true };
+    if (!Array.isArray(raw) || raw.some((value) => typeof value !== "string")) {
+      return { ok: false, error: mainT("main.customerInput.selectionMustBeArray") };
+    }
+    const unique = [...new Set(raw as string[])];
+    const required = new Set(requiredIds);
+    if (unique.length !== required.size || unique.some((id) => !required.has(id))) {
+      return { ok: false, error: mainT("main.customerInput.selectionNotInRequest") };
+    }
+    return { ok: true, acknowledged: unique };
+  }
+
   function respondUnsafe(input: { id?: unknown; decision?: unknown }): { ok: boolean; error?: string; expired?: boolean } {
     const id = input && typeof input.id === "string" ? input.id : "";
     diagnostic.record("interaction.response", { requestId: id });
@@ -2312,9 +2405,19 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (d.confirmed !== true && d.confirmed !== false) {
         return { ok: false, error: mainT("main.customerInput.confirmMustBeBoolean") };
       }
-      settleActive(entry, d.confirmed === true
-        ? { outcome: "answered", value: { confirmed: true }, operatorId }
-        : { outcome: "declined", operatorId, reason: mainT("main.customerInput.customerDeclined") });
+      if (d.confirmed === false) {
+        // D4：拒绝不要求/不校验 acknowledged，也不回传（declined 分支无该字段）。
+        settleActive(entry, { outcome: "declined", operatorId, reason: mainT("main.customerInput.customerDeclined") });
+        return { ok: true };
+      }
+      const ack = settleAcknowledgements(entry.request, d.acknowledged);
+      if (!ack.ok) return { ok: false, error: ack.error };
+      settleActive(entry, {
+        outcome: "answered",
+        value: { confirmed: true },
+        operatorId,
+        ...(ack.acknowledged !== undefined ? { acknowledged: ack.acknowledged } : {}),
+      });
       return { ok: true };
     }
     // —— choice：取消 ⇒ declined；作答 ⇒ selected 必须 ⊆ 已给选项、去重、单选恰一个。——
@@ -2341,7 +2444,18 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       if (entry.request.multiple !== true && selected.length !== 1) {
         return { ok: false, error: mainT("main.customerInput.singleChoiceOnly") };
       }
-      settleActive(entry, { outcome: "answered", value: { selected }, operatorId });
+      // 2026-11-04 trunk-amendment C1/F1（D4 抽出共用 helper）：请求声明 `required` 勾选项时，
+      // `acknowledged` 必须为字符串数组且去重后**恰等于** required id 集合（缺失/多余/非数组一律拒收，
+      // pending 保留）。未声明 ⇒ 旧行为零变化。结算值回传 `acknowledged: string[]`
+      // （`request.resolved` 不加字段）。
+      const ack = settleAcknowledgements(entry.request, d.acknowledged);
+      if (!ack.ok) return { ok: false, error: ack.error };
+      settleActive(entry, {
+        outcome: "answered",
+        value: { selected },
+        operatorId,
+        ...(ack.acknowledged !== undefined ? { acknowledged: ack.acknowledged } : {}),
+      });
       return { ok: true };
     }
     return { ok: false, error: mainT("main.customerInput.unknownDecisionType") };

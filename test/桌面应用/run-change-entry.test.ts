@@ -193,17 +193,21 @@ test("requestRunChange（真实链路）：convener 会话呈现 run-change 卡�
   }
 });
 
-test("跨层源码钉：main handler / preload 桥 / platform 类型 / ChatHeader 按钮 / 触发点接线", () => {
+test("跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按钮已移除（低层 API 保留）/ 触发点接线", () => {
   const main = read("app/main.ts");
   assert.ok(main.includes('registerHandler("run:change-request", (_e, input) => desktop.requestRunChange(input))'), "main.ts 注册 run:change-request");
   const preload = read("app/preload.cjs");
   assert.ok(preload.includes('requestRunChange: (input) => ipcRenderer.invoke("run:change-request", input)'), "preload 暴露 requestRunChange");
   const platform = read("app/renderer/src/lib/platform.ts");
-  assert.ok(platform.includes("requestRunChange?: (input: { projectRoot: string; flowId?: string; reason?: string }) => Promise<unknown>"), "platform 桥类型声明");
+  assert.ok(platform.includes("requestRunChange?: (input: { projectRoot: string; flowId?: string; reason?: string }) => Promise<unknown>"), "platform 桥类型声明（低层 API 保留）");
   const header = read("app/renderer/src/shell/ChatHeader.tsx");
-  assert.ok(header.includes('id="run-change"'), "会话头存在「契约变更 · 重开 run」按钮");
-  assert.ok(header.includes("bridge.requestRunChange"), "按钮点击经 preload 桥发起 run-change");
-  assert.ok(header.includes("runChangeButtonView"), "按钮可用性由 activeRuns 事实派生");
+  // 2026-11-05（P1.6 §4.10 / U1）：客户侧移除 `#run-change` 与「重构」按钮，改为「版本变更」+ 收窄「主干升级」；
+  // 低层 run-change API/通道保留（preload/Interface/SessionManager 不动），仅 UI 入口移除。
+  assert.equal(header.includes('id="run-change"'), false, "旧「契约变更 · 重开 run」按钮已移除");
+  assert.equal(header.includes("bridge.requestRunChange"), false, "会话头不再经 preload 桥发起 run-change");
+  assert.equal(header.includes("runChangeButtonView"), false, "旧按钮可用性视图已移除");
+  assert.ok(header.includes('id="version-change"'), "会话头有「版本变更」入口");
+  assert.ok(header.includes('id="trunk-upgrade"'), "会话头有收窄的「主干升级」入口");
   const iface = read("app/desktop/interface.ts");
   assert.ok(iface.includes("requestRunChange(input: unknown): Promise<RunChangeRequestReply>"), "Interface 暴露 requestRunChange");
   assert.ok(iface.includes("manager.requestRunChangeDecision("), "Interface 调 SessionManager.requestRunChangeDecision");

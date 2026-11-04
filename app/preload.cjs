@@ -19,6 +19,15 @@ if (typeof ipcRenderer.on === "function") {
   });
 }
 
+// 2026-11-04 trunk-amendment-model D1：`trunk:state` **单一状态源**的主→渲推送。preload 加载即缓存
+// 最后一条，`onTrunkState` 注册时同步回放（首帧即可渲染面板/按钮禁用原因）。
+let lastTrunkState = null;
+if (typeof ipcRenderer.on === "function") {
+  ipcRenderer.on("trunk:state", (_event, payload) => {
+    lastTrunkState = payload;
+  });
+}
+
 contextBridge.exposeInMainWorld("desktop", {
   reportDiagnostic: (input) => ipcRenderer.invoke("app:renderer-diagnostic", input),
   getRecoveryState: () => ipcRenderer.invoke("app:recovery-state"),
@@ -68,6 +77,96 @@ contextBridge.exposeInMainWorld("desktop", {
    * 三模式卡（继续冻结 / 停止并重开 / 停止）。不代选模式；无 pinned run/无可呈现会话 ⇒ 如实失败。
    */
   requestRunChange: (input) => ipcRenderer.invoke("run:change-request", input),
+
+  // —— 2026-11-04 trunk-amendment-model D1：版本变更/冻结/stable/重构/trunk（白名单；无 submit/refactor:request）——
+  // 渲→主只读 + 受控确认；**无** `version-change:submit` / `refactor:request` / `stable-write:request`
+  // （F10/F17：提交只经发起角色能力工具；客户批准/拒绝只经 `operatorRespond`）。
+  listVersionChanges: (input) =>
+    ipcRenderer.invoke("version-change:list", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+    }),
+  /** 对 submitted VCA 重发批准卡（无通道 ⇒ `{ok:true,status:"pending"}`；不改 VCA 状态）。 */
+  presentVersionChange: (input) =>
+    ipcRenderer.invoke("version-change:present", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      applicationId: input && typeof input.applicationId === "string" ? input.applicationId : "",
+    }),
+  listStableWrites: (input) =>
+    ipcRenderer.invoke("stable-write:list", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      ...(input && typeof input.limit === "number" ? { limit: input.limit } : {}),
+    }),
+  listRefactorRequests: (input) =>
+    ipcRenderer.invoke("refactor:list", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+    }),
+  listDocFreezes: (input) =>
+    ipcRenderer.invoke("doc-freeze:list", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      ...(input && typeof input.limit === "number" ? { limit: input.limit } : {}),
+    }),
+  listTrunks: (input) =>
+    ipcRenderer.invoke("trunk:list", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+    }),
+  /** 主干升级预览（**仅 emergency/recovery**；常规内容变更由主进程结构化拒绝）。 */
+  requestTrunkUpgrade: (input) =>
+    ipcRenderer.invoke("trunk:upgrade-request", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      reason: input && (input.reason === "emergency" || input.reason === "recovery") ? input.reason : "",
+      ...(input && Array.isArray(input.scope) ? { scope: input.scope.filter((item) => typeof item === "string") } : {}),
+    }),
+  /**
+   * 主干升级**客户 UI 二次确认**：同一 previewId、一次性/过期拒绝；`acknowledged` 必须显式为 true。
+   * **不是** VCA/stable 的批准捷径（客户批准/拒绝只经 `operatorRespond`）。
+   */
+  confirmTrunkUpgrade: (input) =>
+    ipcRenderer.invoke("trunk:upgrade-confirm", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      previewId: input && typeof input.previewId === "string" ? input.previewId : "",
+      acknowledged: !!(input && input.acknowledged === true),
+    }),
+  /** 重新冻结（Batch 3.5/S5）：只更新 stable 快照、不升 trunkVersion；reason 必填、acknowledged 必须为 true。 */
+  requestTrunkRefreeze: (input) =>
+    ipcRenderer.invoke("trunk:refreeze-request", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      reason: input && typeof input.reason === "string" ? input.reason : "",
+      acknowledged: !!(input && input.acknowledged === true),
+    }),
+  /** 放弃升级（Batch 3.5/S5）：不 re-pin/不改指针；reason 必填、acknowledged 必须为 true。 */
+  abandonTrunkUpgrade: (input) =>
+    ipcRenderer.invoke("trunk:abandon-upgrade", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      reason: input && typeof input.reason === "string" ? input.reason : "",
+      acknowledged: !!(input && input.acknowledged === true),
+    }),
+  /** 受控恢复（客户确认；reason 必填、acknowledged 必须为 true）。 */
+  requestTrunkRecover: (input) =>
+    ipcRenderer.invoke("trunk:recover-request", {
+      projectRoot: input && typeof input.projectRoot === "string" ? input.projectRoot : "",
+      reason: input && typeof input.reason === "string" ? input.reason : "",
+      acknowledged: !!(input && input.acknowledged === true),
+    }),
+  /**
+   * 订阅 `trunk:state`（主→渲；**单一状态源**）：注册时先同步回放 preload 缓存的最后一条，
+   * 再订阅后续推送；返回取消订阅函数。
+   */
+  onTrunkState: (cb) => {
+    if (lastTrunkState !== null) {
+      try {
+        cb(lastTrunkState);
+      } catch {
+        /* 渲染侧回调异常不外溢到 preload。 */
+      }
+    }
+    if (typeof ipcRenderer.on !== "function") return () => {};
+    const listener = (_event, payload) => {
+      lastTrunkState = payload;
+      cb(payload);
+    };
+    ipcRenderer.on("trunk:state", listener);
+    return () => ipcRenderer.removeListener("trunk:state", listener);
+  },
 
   /** 发送一轮消息；开启后可反复调用（多轮聊天，不再确认）。
    *  **P0-1（2026-10-13 客户批准）**：`images` 为可选图片载荷（`[{type:"image", data:<base64>, mimeType}]`）——

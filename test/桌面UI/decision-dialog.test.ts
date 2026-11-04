@@ -2,17 +2,23 @@
 // E 批：决策对话框卡视图/优先级/推荐项/待办语义（纯逻辑）。
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
+  confirmDecisionPayload,
   decisionPriority,
   decisionView,
   isDestructiveDecision,
   nextDecisionId,
   orderedDecisionIds,
   pendingMoreCount,
+  rejectDecisionPayload,
   sameDisplayText,
   shouldOpenDecision,
+  type DecisionAcknowledgementView,
 } from "../../app/renderer/src/chat/decision-dialog.ts";
 
 const ACCEPTANCE_REQUEST = {
@@ -232,4 +238,121 @@ test("preview 去重判据：仅统一换行/去首尾空白后完全相等", ()
   assert.equal(sameDisplayText("", "   "), true);
   assert.equal(sameDisplayText("a\n\nb", "a\nb"), false);
   assert.equal(sameDisplayText("a", "b"), false);
+});
+
+test("acknowledgments（C1 对象数组）：防御读取、required 严格 true、去重、旧卡零变化", () => {
+  const view = decisionView(
+    payload(
+      {},
+      {
+        kind: "choice",
+        title: "修正案逐项确认",
+        cardKind: "decision",
+        options: [
+          { id: "item-apply", label: "采纳" },
+          { id: "item-keep", label: "不采纳", recommended: true },
+        ],
+        acknowledgments: [
+          { id: "boundary-expansion-0", label: "边界扩大：A → B", required: true },
+          { id: "note-1", label: "附注", required: false },
+          { id: "", label: "坏项" },
+          { id: "boundary-expansion-0", label: "重复" },
+          "bad",
+        ],
+      },
+    ),
+  );
+  assert.deepEqual(view.acknowledgments, [
+    { id: "boundary-expansion-0", label: "边界扩大：A → B", required: true },
+    { id: "note-1", label: "附注", required: false },
+  ]);
+  assert.equal(view.answerable, true);
+  // 旧卡（无 acknowledgments/非数组）⇒ 空数组，行为零变化。
+  assert.deepEqual(decisionView(payload()).acknowledgments, []);
+  assert.deepEqual(
+    decisionView(payload({}, { kind: "confirm", acknowledgments: "nope" })).acknowledgments,
+    [],
+  );
+});
+
+test("stable-write 卡种：仅复用 decision 组优先级/样式（priority 2），appointment-write 与未知卡种不变", () => {
+  const stable = payload(
+    {},
+    {
+      kind: "choice",
+      title: "workflow 写入确认",
+      cardKind: "stable-write",
+      options: [
+        { id: "approve-stable-write", label: "放行执行" },
+        { id: "reject-stable-write", label: "拒绝", recommended: true },
+      ],
+    },
+  );
+  assert.equal(decisionPriority(stable), 2);
+  const view = decisionView(stable);
+  assert.equal(view.cardKind, "stable-write");
+  assert.equal(view.priority, 2);
+  assert.equal(view.destructive, false);
+  assert.equal(view.recommendedId, "reject-stable-write");
+
+  assert.equal(decisionPriority(payload({}, { kind: "confirm", cardKind: "appointment-write" })), 1);
+  assert.equal(decisionPriority(payload({}, { kind: "confirm", cardKind: "unknown-kind" })), 3);
+});
+
+// —————————————— D4（2026-11-05）：confirm 正向确认携带 acknowledged ——————————————
+
+const ACKS: DecisionAcknowledgementView[] = [
+  { id: "boundary-expansion-0", label: "边界扩大：A → B", required: true },
+  { id: "boundary-expansion-1", label: "边界扩大：B → C", required: true },
+  { id: "note-optional", label: "附注（可选）", required: false },
+];
+
+test("D4 confirm：required 全勾选 ⇒ acknowledged 恰为 required ids（声明序；非 required 不混入）", () => {
+  const decision = confirmDecisionPayload(ACKS, ["note-optional", "boundary-expansion-1", "boundary-expansion-0"]);
+  assert.deepEqual(decision, {
+    kind: "confirm",
+    confirmed: true,
+    acknowledged: ["boundary-expansion-0", "boundary-expansion-1"],
+  });
+  // 只勾选 required 子集也按声明序输出。
+  const subset = confirmDecisionPayload(ACKS, ["boundary-expansion-1", "boundary-expansion-0"]);
+  assert.deepEqual(subset?.acknowledged, ["boundary-expansion-0", "boundary-expansion-1"]);
+});
+
+test("D4 confirm：required 未勾选齐全 ⇒ null（不能 confirm）", () => {
+  assert.equal(confirmDecisionPayload(ACKS, []), null);
+  assert.equal(confirmDecisionPayload(ACKS, ["boundary-expansion-0"]), null);
+  assert.equal(confirmDecisionPayload(ACKS, ["note-optional"]), null);
+});
+
+test("D4 confirm：无 required ⇒ 旧 payload 零变化（不带 acknowledged）", () => {
+  const noRequired = confirmDecisionPayload(
+    [{ id: "note-optional", label: "附注", required: false }],
+    ["note-optional"],
+  );
+  assert.deepEqual(noRequired, { kind: "confirm", confirmed: true });
+  assert.equal(noRequired !== null && "acknowledged" in noRequired, false);
+
+  const empty = confirmDecisionPayload([], []);
+  assert.deepEqual(empty, { kind: "confirm", confirmed: true });
+  assert.equal(empty !== null && "acknowledged" in empty, false);
+});
+
+test("D4 reject：confirmed:false 不带 acknowledged", () => {
+  const reject = rejectDecisionPayload();
+  assert.deepEqual(reject, { kind: "confirm", confirmed: false });
+  assert.equal("acknowledged" in reject, false);
+});
+
+test("D4 接线：DecisionDialog.confirm 经 confirmDecisionPayload；reject 经 rejectDecisionPayload（无旧直发）", () => {
+  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const source = readFileSync(join(root, "app", "renderer", "src", "chat", "DecisionDialog.tsx"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  assert.match(source, /confirmDecisionPayload\(view\.acknowledgments, acknowledged\)/);
+  assert.match(source, /rejectDecisionPayload\(\)/);
+  assert.equal(source.includes('{ kind: "confirm", confirmed: true }'), false);
+  const platform = readFileSync(join(root, "app", "renderer", "src", "lib", "platform.ts"), "utf8");
+  assert.match(platform, /export type OperatorDecisionPayload/);
+  assert.match(platform, /kind: "confirm";\s*confirmed: boolean;\s*acknowledged\?: string\[\];/);
 });

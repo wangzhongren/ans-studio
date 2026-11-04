@@ -14,7 +14,14 @@ import { AlertTriangle, ShieldCheck, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/chat/chat-store";
-import { decisionView, pendingMoreCount, sameDisplayText, type DecisionOptionView } from "@/chat/decision-dialog";
+import {
+  confirmDecisionPayload,
+  decisionView,
+  pendingMoreCount,
+  rejectDecisionPayload,
+  sameDisplayText,
+  type DecisionOptionView,
+} from "@/chat/decision-dialog";
 import { renderMarkdown } from "@/chat/markdown";
 import { operatorFinalNote } from "@/chat/operator-view";
 import { findRole, roleDisplayName } from "@/chat/role-view";
@@ -45,6 +52,7 @@ export function DecisionDialog() {
   const resolve = useDecisionCenterStore((s) => s.resolve);
   const shellBlocking = useConfirmStore((s) => Boolean(s.shellConfirm || s.recoveryConfirm));
   const [selected, setSelected] = useState<string[]>([]);
+  const [acknowledged, setAcknowledged] = useState<string[]>([]);
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -62,6 +70,7 @@ export function DecisionDialog() {
   useEffect(() => {
     if (!activeId) {
       setSelected([]);
+      setAcknowledged([]);
       setArmed(false);
       setBusy(false);
       sendLock.current = false;
@@ -76,6 +85,8 @@ export function DecisionDialog() {
     }
     const recommended = view?.options.filter((option) => option.recommended).map((option) => option.id) ?? [];
     setSelected(recommended);
+    // 客户主权（C1/F1）：勾选项一律不预选、不默认全选；换卡即清空。
+    setAcknowledged([]);
     setArmed(false);
     setBusy(false);
     sendLock.current = false;
@@ -140,10 +151,16 @@ export function DecisionDialog() {
     setError("");
   };
 
+  const requiredAcknowledgments =
+    view.acknowledgments.filter((item) => item.required).map((item) => item.id) ?? [];
+  const acknowledgmentsSatisfied = requiredAcknowledgments.every((id) =>
+    acknowledged.includes(id),
+  );
   const canSubmit =
-    view.kind === "confirm"
+    (view.kind === "confirm"
       ? view.answerable
-      : view.answerable && selected.length > 0 && (view.multiple || selected.length === 1);
+      : view.answerable && selected.length > 0 && (view.multiple || selected.length === 1)) &&
+    acknowledgmentsSatisfied;
 
   const send = async (decision: unknown, options?: { allowCancel?: boolean }) => {
     // 取消/拒绝不要求选项完整性；只有正向提交受 canSubmit 约束。
@@ -168,20 +185,30 @@ export function DecisionDialog() {
       setArmed(true);
       return;
     }
-    void send({ kind: "confirm", confirmed: true });
+    // D4（2026-11-05）：confirm 卡声明 required acknowledgments 时，正向确认携带
+    // `acknowledged`（恰为 required ids）；未勾选齐全 ⇒ null（按钮已禁用，这里防御性早退）。
+    const decision = confirmDecisionPayload(view.acknowledgments, acknowledged);
+    if (decision === null) return;
+    void send(decision);
   };
 
   const reject = () => {
     if (view.kind === "choice") {
       void send({ kind: "choice", cancelled: true }, { allowCancel: true });
     } else {
-      void send({ kind: "confirm", confirmed: false }, { allowCancel: true });
+      // 拒绝不带 acknowledged（D3：confirmed:false 不要求/不校验 ack）。
+      void send(rejectDecisionPayload(), { allowCancel: true });
     }
   };
 
   const submitChoice = () => {
     if (!canSubmit) return;
-    void send({ kind: "choice", selected });
+    // C1/F1：回传**已勾选的必选项 id**（`required` 恰覆盖；可选勾选项不混入，D1 按 required 结算）。
+    void send({
+      kind: "choice",
+      selected,
+      ...(requiredAcknowledgments.length > 0 ? { acknowledged: requiredAcknowledgments } : {}),
+    });
   };
 
   const dialog = (
@@ -288,6 +315,33 @@ export function DecisionDialog() {
         ) : null}
         {view.detail ? <p className="dd-detail">{view.detail}</p> : null}
         {view.question ? <p className="dd-question">{view.question}</p> : null}
+
+        {view.acknowledgments.length > 0 ? (
+          <div className="dd-acks" role="group" aria-label={view.title}>
+            {view.acknowledgments.map((item) => {
+              const checked = acknowledged.includes(item.id);
+              return (
+                <label className={"dd-ack" + (checked ? " is-checked" : "")} key={item.id}>
+                  <input
+                    type="checkbox"
+                    value={item.id}
+                    checked={checked}
+                    aria-required={item.required}
+                    onChange={(event) => {
+                      setAcknowledged((current) =>
+                        event.target.checked
+                          ? [...current.filter((id) => id !== item.id), item.id]
+                          : current.filter((id) => id !== item.id),
+                      );
+                      setError("");
+                    }}
+                  />
+                  <span className="dd-ack-label">{item.label}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : null}
 
         {view.kind === "choice" ? (
           <div className="dd-options" role="group" aria-label={t("ui.decisionDialog.optionsAria")}>

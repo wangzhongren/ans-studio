@@ -98,7 +98,7 @@ import type { OrchestrationEvent, HandbackEvent } from "../../src/common/编排/
 // `renderHandbackPrompt`（投递给 su 的输入文案）与 `handbackKey`（去重键）。**两前端共用、不得各写一份**。
 import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt, renderWorkReportBatchPrompt, handbackKey, extractDispatchReadPaths, planDispatchDelivery, type TaskHandback } from "../../src/common/编排/handback.ts";
 // C 批（方案 §6.4.1/C-06）：appointment-write 的应用侧结构/D3 校验使用编排出品的声明路径单一实现。
-import { declaredConfirmPaths } from "../../src/common/编排/confirmed-writes.ts";
+import { declaredConfirmPaths, declaredPathBodies } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
 import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
 import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
@@ -161,7 +161,28 @@ import {
   type RosterLoadResult,
 } from "../../src/common/编排/workflow-preconditions.ts";
 import { collectDispatchAdvisories, type DispatchAdvisory } from "../../src/common/编排/dispatch-advisories.ts";
-import { verifyVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import { registerVersionedDocAfterWrite, stableWritePathOf, verifyVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import type { StableWritePermit, StableWriteRecord, VersionChangeRecord } from "../../src/model/version-change.ts";
+import type {
+  AmendmentItemOutcome,
+  VcaCardOutcome,
+} from "../../src/pipeline/orchestration/version-change-runtime.ts";
+import type { StableWriteCardOutcome } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
+import {
+  appointmentStableWriteInputs,
+  buildAmendmentItemCard,
+  buildStableBoundaryRisk,
+  buildStableWriteCard,
+  buildVersionChangeCard,
+  mergeAcknowledgements,
+  toAmendmentItemOutcome,
+  toStableWriteOutcome,
+  toVersionChangeOutcome,
+  validateStableWriteCardShape,
+  type AmendmentItemPresentation,
+  type StableWritePreview,
+  type VersionChangeStack,
+} from "./version-change.ts";
 
 /**
  * 内置来源回交→Lead 与同轮 settle 治理反馈的去重窗口（2026-10-24）：标记只在回交入队后到本轮
@@ -213,7 +234,7 @@ import { mainT } from "./i18n.ts";
 // 客户授权平面 Q9 A（2026-11-03）：`operatorId:"directive:<id>"` 的唯一解析（不信任其他字段）。
 import { directiveIdFromOperatorId } from "./directive-input.ts";
 import { type RoleStatusFn, type RoleStatusPayload, type SessionTailFn, type SessionTailPayload, type WatchdogToolResult } from "../../src/common/编排/watchdog.ts";
-import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent } from "../../src/model/runtime.ts";
+import type { WriteGate, RuntimeAdapter, ShellGate, OperatorChannelFn, CustomerInputFn, CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, PromptTurnStartedMetadata, ShellJudgeFn, GovernanceJudgeFn, ViewImageFn, ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef, GovernanceCardKind, ShellEscalationPresentFn, ShellEscalationCardRequest, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn, VersionDecisionEvent, SubmitVersionChangeFn, SubmitVersionChangeInput, SubmitVersionChangeResult, SubmitRefactorFn, SubmitRefactorInput, SubmitRefactorResult, RequestStableWriteFn, RequestStableWriteInput, RequestStableWriteResult } from "../../src/model/runtime.ts";
 import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinEvidenceRoots, loadCriteria, parseEvidenceMeta, readArtifact, validateEvidencePath, EVIDENCE_META_SCHEMA } from "../../src/common/编排/evidence-check.ts";
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
@@ -653,6 +674,20 @@ export interface SessionManagerDeps {
       /** **升级卡呈现端**（2026-10-31 shell 判拒升级方案 v1.3 §6.4）：本层按每会话包装后透传；
        *  缺省 ⇒ 不传 ⇒ 编排不创建 registry、`request_shell_escalation` 不注册。 */
       shellEscalationPresenter?: ShellEscalationPresentFn;
+      /**
+       * **stable 写入一次性许可**（2026-11-04 trunk-amendment-model D1/F16）：run-role gate 的
+       * **同步候选 permit**；`stableWriteDecision` 仍以 C2b 已安装许可快照为唯一权威。缺省 ⇒
+       * 编排保留既有确认制路径（S3 分阶段接线），不新增无确认直写。
+       */
+      stablePermitOf?: (relPath: string) => StableWritePermit | undefined;
+      /**
+       * **Batch 3.5 / C1d：三提交能力**（`openRoleSession` 按会话角色门控后转交适配器；注入才注册）：
+       * · `submitVersionChange`：product/rapporteur；`submitRefactor`/`requestStableWrite`：convener；
+       * · 工具只提交请求，不批准/不发卡/不签发许可（客户主权）。未注入 ⇒ 工具不存在（fail-closed）。
+       */
+      submitVersionChange?: SubmitVersionChangeFn;
+      submitRefactor?: SubmitRefactorFn;
+      requestStableWrite?: RequestStableWriteFn;
     },
     deps: { createAdapter: RuntimeAdapterFactory },
   ) => Promise<RoleSessionHandle>;
@@ -800,6 +835,12 @@ export interface SessionManagerDeps {
    * （发行 writeSet 在编排 `confirmed-writes.ts`；写不写在 gate/工具）。
    */
   customerInput?: DesktopCustomerInputFn;
+  /**
+   * **版本变更/冻结/stable/重构/trunk 桌面栈**（2026-11-04 trunk-amendment-model D1）：
+   * 由 Interface 每项目构建并注入；缺省 ⇒ 本层不注入 `stablePermitOf`/不接 appointment-write 钩子
+   * （能力缺席 = fail-closed，旧行为）。本层只调用其公开方法，不做冻结/许可/trunk 判定。
+   */
+  getVersionChangeStack?: (projectRoot: string) => VersionChangeStack | undefined;
   /**
    * **需求变更申请能力**（2026-10-26 `request_requirement_change`）：绑定项目的应用侧实现（`projectRoot`、
    * 发起角色 `requesterRoleId` 与会话引擎 `runtime` 由本层按会话补入；工具载荷只带
@@ -2240,6 +2281,292 @@ export class SessionManager {
     return { ok: true, runId: active.manifest.runId, outcome, first };
   }
 
+  // —————————————— 2026-11-04 trunk-amendment-model D1：应用自有客户卡（VCA/逐项/stable） ——————————————
+
+  /**
+   * 治理会话客户卡通道选择（convener → rapporteur → chief；需本会话已构造 `governedCardContext`）。
+   * 与 run-change 的会话选择同一顺序/同一呈现面；只选**已打开的治理会话**，不自动开会话。
+   */
+  private pickGovernedCardEntry(projectRoot: string): LiveSession | undefined {
+    const preferred = [this.handbackOwnerRoleId(projectRoot), "rapporteur", this.chiefTaskRoleIdOf(projectRoot)]
+      .filter((id): id is string => id !== null && id !== "");
+    let selected: LiveSession | undefined;
+    let bestRank = Number.POSITIVE_INFINITY;
+    for (const [key, candidate] of this.sessions) {
+      if (!key.startsWith(`${projectRoot}\u0000`)) continue;
+      if (candidate.projectRoot !== projectRoot) continue;
+      if (candidate.governedCardContext === undefined) continue;
+      if (selected === undefined) selected = candidate;
+      const rank = preferred.indexOf(candidate.roleId);
+      if (rank >= 0 && rank < bestRank) {
+        bestRank = rank;
+        selected = candidate;
+      }
+    }
+    return selected;
+  }
+
+  /**
+   * 应用自有卡的统一呈现（**客户本人**；`notify:"none"`；会话生命周期并入中止信号）：
+   * · 只呈现，不代选/不改业务状态；无通道/无治理会话 ⇒ 返回 undefined（调用方 fail-closed）；
+   * · `sourceRoleId:"application"`；`request.resolved.by` 只可能是 customer（主权卡在通道层排除
+   *   judge/委托/`@决策`，`to*Outcome` 再做 operatorId/judge 二次校验）；
+   * · 客户卡批准/拒绝**只经** `session:operator-response`，本方法不提供渲→主捷径。
+   */
+  private async presentAppCard(input: {
+    projectRoot: string;
+    request: CustomerInputRequest;
+    metadata?: CustomerInputMetadata;
+    requestId: string;
+    signal?: AbortSignal;
+  }): Promise<CustomerInputOutcome | undefined> {
+    const entry = this.pickGovernedCardEntry(input.projectRoot);
+    if (entry === undefined || entry.governedCardContext === undefined || this.deps.customerInput === undefined) {
+      return undefined;
+    }
+    const signals: AbortSignal[] = [entry.interactionState.lifetime.signal];
+    if (input.signal !== undefined) signals.push(input.signal);
+    try {
+      const outcome = await this.withRequestLifecycle(
+        input.projectRoot,
+        "application",
+        input.request,
+        input.metadata,
+        async (request, context, metadata) => this.deps.customerInput!(request, context, metadata),
+        (request, extras) => entry.governedCardContext!(request, extras),
+        input.requestId,
+        { notify: "none", signal: AbortSignal.any(signals) },
+      );
+      return outcome ?? { outcome: "unavailable", reason: mainT("main.customerInput.presenterMissing") };
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot: input.projectRoot }).error("app-card.failed", error, {
+        requestId: input.requestId,
+      });
+      return undefined;
+    }
+  }
+
+  /** VCA 批准/拒绝卡（application-owned decision；客户本人；无通道 ⇒ unavailable/保持 submitted）。 */
+  async presentVersionChangeCard(input: {
+    projectRoot: string;
+    record: VersionChangeRecord;
+    signal?: AbortSignal;
+  }): Promise<VcaCardOutcome> {
+    const built = buildVersionChangeCard({ record: input.record });
+    if (built === undefined) return { outcome: "unavailable" };
+    const outcome = await this.presentAppCard({
+      projectRoot: input.projectRoot,
+      request: built.request,
+      metadata: built.metadata,
+      requestId: `vc-${input.record.applicationId}`,
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
+    });
+    return toVersionChangeOutcome(outcome);
+  }
+
+  /** 修正案逐项确认卡（只对实际变更项；acknowledgments 必选结算）。 */
+  async presentAmendmentItemCard(
+    input: AmendmentItemPresentation & { projectRoot: string; signal?: AbortSignal },
+  ): Promise<AmendmentItemOutcome> {
+    const built = buildAmendmentItemCard({
+      record: input.record,
+      item: input.item,
+      index: input.index,
+      total: input.total,
+      ...(input.acknowledgments !== undefined ? { acknowledgments: input.acknowledgments } : {}),
+    });
+    if (built === undefined) return { outcome: "unavailable" };
+    const outcome = await this.presentAppCard({
+      projectRoot: input.projectRoot,
+      request: built.request,
+      metadata: built.metadata,
+      requestId: `vc-item-${input.applicationId}-${input.item.itemId}`,
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
+    });
+    return toAmendmentItemOutcome(outcome, built.request);
+  }
+
+  /** stable workflow 轻量确认卡（app-owned `stable-write`；独立结构校验；不签发许可）。 */
+  async presentStableWriteCard(input: {
+    projectRoot: string;
+    record: StableWriteRecord;
+    preview: StableWritePreview;
+    signal?: AbortSignal;
+  }): Promise<StableWriteCardOutcome> {
+    const built = buildStableWriteCard({ record: input.record, preview: input.preview });
+    if (built === undefined) return { outcome: "unavailable" };
+    const shape = validateStableWriteCardShape(built.request, input.preview);
+    if (!shape.ok) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot: input.projectRoot }).record(
+        "stable-write.card.invalid",
+        { requestId: input.record.requestId, reason: shape.reason },
+      );
+      return { outcome: "unavailable" };
+    }
+    const outcome = await this.presentAppCard({
+      projectRoot: input.projectRoot,
+      request: built.request,
+      metadata: built.metadata,
+      requestId: `sw-card-${input.record.requestId}`,
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
+    });
+    return toStableWriteOutcome(outcome);
+  }
+
+  /** 幕僚/运营通知（只通知、无批准权；诚实行，不冒充客户决定）。 */
+  noteVersionChange(projectRoot: string, summary: string): void {
+    const chief = this.chiefTaskRoleIdOf(projectRoot);
+    const runtime =
+      (chief !== null ? this.findLiveRuntime(projectRoot, chief) : undefined) ??
+      this.lastGovernanceRuntime.get(projectRoot) ??
+      this.activeRuntimeFor(projectRoot) ??
+      "demo";
+    this.emitDeliveryNote(projectRoot, runtime, chief, chief ?? "chief", `[${mainT("ui.trunk.panelTitle")}] ${summary}`);
+  }
+
+  /**
+   * stable 写入的 post-write 复核（D1/F16）：**只在运行时核心 write/edit 成功后**由
+   * `versionedDocAfterWrite` 接缝调用；桌面不写盘、不缓存许可、不复算 target hash。
+   * 失败只系统行/诊断（写入已成事实；许可由 S2 作废，trunk 快照不更新——无 drift 状态）。
+   */
+  private async afterStableWrite(
+    stack: VersionChangeStack,
+    projectRoot: string,
+    roleId: string,
+    runtime: RuntimeKind,
+    absPath: string,
+  ): Promise<void> {
+    try {
+      const rel = path.relative(projectRoot, absPath);
+      if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) return;
+      const posix = rel.split(path.sep).join("/");
+      const actual = createHash("sha256").update(await fs.promises.readFile(absPath)).digest("hex");
+      const result = await stack.completeStableWriteAfterWrite(posix, actual, new Date(this.now()).toISOString());
+      if (!result.ok) {
+        this.emitDeliveryNote(
+          projectRoot,
+          runtime,
+          roleId,
+          roleId,
+          `${mainT("ui.stableWrite.record.section")} · ${posix} · ${mainT("shared.common.failed")}${result.code !== undefined ? ` (${result.code})` : ""}`,
+        );
+      }
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("stable-write.complete.failed", error);
+    }
+  }
+
+  /**
+   * AC-13（D2）：stable boundary 确认卡扩大检测与 ack 注入。
+   * 只读调用 S7 `detectStableBoundaryExpansion`（preview body → 条目级扩大）；
+   * role-card/boundary 的 appointment-write 语义不变（只增预览横幅/required acknowledgments）。
+   */
+  private async enrichAppointmentWriteBoundaryCard(
+    stack: VersionChangeStack,
+    projectRoot: string,
+    request: CustomerInputRequest,
+  ): Promise<{ kind: "pass"; request: CustomerInputRequest } | { kind: "reject"; reason: string }> {
+    if (request.kind !== "confirm") return { kind: "pass", request };
+    const paths = declaredConfirmPaths(request);
+    const boundaryPaths = paths.filter((rel) => stableWritePathOf(rel)?.kind === "boundary");
+    if (boundaryPaths.length === 0) return { kind: "pass", request };
+    const bodies = new Map(declaredPathBodies(request.preview, boundaryPaths).map((entry) => [entry.path, entry]));
+    const expansions: string[] = [];
+    for (const relPath of boundaryPaths) {
+      const info = stableWritePathOf(relPath);
+      if (info === undefined || info.kind !== "boundary" || info.roleId === undefined) continue;
+      const body = bodies.get(relPath) ?? bodies.get(info.path);
+      if (body === undefined || body.hasBody !== true) {
+        return { kind: "reject", reason: mainT("main.interface.boundaryParseFailed", { detail: relPath }) };
+      }
+      const detected = await stack.detectStableBoundaryExpansion({
+        roleId: info.roleId,
+        fromPath: info.path,
+        toYamlText: body.body,
+      });
+      expansions.push(...detected.expansions);
+    }
+    if (expansions.length === 0) return { kind: "pass", request };
+    const risk = buildStableBoundaryRisk(expansions);
+    if (risk.unparseable) {
+      return {
+        kind: "reject",
+        reason: mainT("main.interface.boundaryParseFailed", { detail: expansions.join("；") }),
+      };
+    }
+    return {
+      kind: "pass",
+      request: {
+        ...request,
+        preview: `${risk.banner}\n\n${request.preview ?? ""}`,
+        acknowledgments: mergeAcknowledgements(request.acknowledgments, risk.acknowledgments),
+      },
+    };
+  }
+
+  /**
+   * appointment-write 确认后的 stable 许可签发（role-card/boundary；**不写盘**）：
+   * 正文取自确认卡 preview 的逐路径正文；真实写入由角色 write_file/edit_file 经 run-role gate 执行。
+   * 失败只系统行（写入会被门禁拒绝——fail-closed，不伪造成功）。
+   * AC-13：扩大检测要求的 required acknowledgments 未齐 ⇒ **不签发任何许可**（最后防线）。
+   */
+  private async afterAppointmentWriteApproved(
+    stack: VersionChangeStack,
+    projectRoot: string,
+    roleId: string,
+    runtime: RuntimeKind,
+    request: CustomerInputRequest,
+    outcome: CustomerInputOutcome | null | undefined,
+  ): Promise<void> {
+    if (outcome === null || outcome === undefined || outcome.outcome !== "answered" || outcome.value.confirmed !== true) return;
+    const requiredBoundaryAcks = (request.acknowledgments ?? [])
+      .filter((entry) => entry.required === true && entry.id.startsWith("boundary-expansion-"))
+      .map((entry) => entry.id);
+    if (requiredBoundaryAcks.length > 0) {
+      const acknowledged = Array.isArray(outcome.acknowledged) ? outcome.acknowledged : [];
+      if (requiredBoundaryAcks.some((id) => !acknowledged.includes(id))) {
+        this.emitDeliveryNote(
+          projectRoot,
+          runtime,
+          roleId,
+          roleId,
+          `${mainT("ui.stableWrite.record.section")} · ${mainT("ui.stableWrite.kind.boundary")} · ${mainT("shared.common.failed")} (boundary-ack-missing)`,
+        );
+        return;
+      }
+    }
+    const confirmationId =
+      typeof outcome.decisionId === "string" && outcome.decisionId.trim() !== "" ? outcome.decisionId : undefined;
+    if (confirmationId === undefined) return;
+    const inputs = appointmentStableWriteInputs(request);
+    for (const input of inputs) {
+      try {
+        const result = await stack.onAppointmentWriteApproved({
+          roleId: input.roleId,
+          kind: input.kind,
+          content: input.content,
+          confirmationId,
+          ...(input.diffPreview !== undefined ? { diffPreview: input.diffPreview } : {}),
+          at: new Date(this.now()).toISOString(),
+        });
+        if (!result.ok) {
+          this.emitDeliveryNote(
+            projectRoot,
+            runtime,
+            roleId,
+            roleId,
+            `${mainT("ui.stableWrite.record.section")} · ${mainT("ui.stableWrite.kind.roleCard")}/${mainT("ui.stableWrite.kind.boundary")} · ${mainT("shared.common.failed")}${result.code !== undefined ? ` (${result.code})` : ""}`,
+          );
+        }
+      } catch (error) {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error(
+          "stable-write.appointment.failed",
+          error,
+        );
+      }
+    }
+  }
+
   /**
    * 2026-10-31（run-change 触发缺陷）：当前项目的 active run（draft/pinned）只读摘要——供桌面
    * 「契约变更 · 重开 run」入口判断是否可用（无 pinned run 时禁用并给原因）。
@@ -2274,6 +2601,7 @@ export class SessionManager {
     projectRoot: string,
     request: CustomerInputRequest,
     metadata: CustomerInputMetadata | undefined,
+    sourceRoleId?: string,
   ): Promise<{ rejection: MechanicalRejection; presented: boolean } | undefined> {
     if (request.cardKind !== "proposal") return undefined;
     const flowId = request.flowId ?? metadata?.flowId;
@@ -2291,12 +2619,42 @@ export class SessionManager {
       reason: `提案卡引用了比 pin 更新的提案（${proposalDoc.path}，v${proposalDoc.version} > pin v${proposalDoc.pinnedVersion ?? "?"}）；当前 run 已冻结，新版本不激活`,
       missing: `当前 run 冻结基线内的提案版本（磁盘 ${proposalDoc.path} v${proposalDoc.version} > pin v${proposalDoc.pinnedVersion ?? "?"}）`,
       requestedBy: "planner",
+      ...(sourceRoleId !== undefined ? { noteRoleId: sourceRoleId } : {}),
     });
+  }
+
+  /**
+   * AC-17（D2）：当前项目在途 VCA（submitted/approved）。查询失败 ⇒ fail-closed（调用方抑制自动
+   * run-change）；无版本变更栈（未接）⇒ 空（旧行为零变化）。
+   */
+  private async pendingVersionChangesFor(
+    projectRoot: string,
+  ): Promise<{ ok: true; pending: Array<{ applicationId: string; status: string }> } | { ok: false; reason: string }> {
+    const stack = this.deps.getVersionChangeStack?.(projectRoot);
+    if (stack === undefined) return { ok: true, pending: [] };
+    try {
+      const records = await stack.listVersionChanges();
+      return {
+        ok: true,
+        pending: records
+          .filter((record) => record.status === "submitted" || record.status === "approved")
+          .map((record) => ({ applicationId: record.applicationId, status: record.status })),
+      };
+    } catch (error) {
+      createDiagnosticLogger({ component: "desktop.session", projectRoot }).error(
+        "version-change.pending.read.failed",
+        error,
+      );
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   /**
    * 2026-10-31：呈现 run-change 卡（同一 run 自动仅一次）+ 组装 `run-change-required` 三段式。
    * 冻结语义不变——调用方仍拒绝原操作；客户决定后按 continue-frozen / stop-and-restart / stop 继续。
+   * AC-17（D2）：修订/VCA 在途（submitted/approved）⇒ **抑制自动 offer**（不占用自动提示名额，
+   * 不弹 run-change 卡；显式低层入口 `requestRunChangeDecision` 不受影响）；VCA 结束后下一次
+   * 冻结冲突自动 offer 恢复。
    */
   private async offerRunChangeOnFrozenContract(input: {
     projectRoot: string;
@@ -2307,7 +2665,46 @@ export class SessionManager {
     /** 三段式 missing 用（「拒绝：缺少 …」通顺的名词短语）；缺省回退 reason。 */
     missing?: string;
     requestedBy?: "convener" | "planner" | "product";
+    /** AC-17：系统行落位（来源角色；缺省 chief）。 */
+    noteRoleId?: string;
   }): Promise<{ rejection: MechanicalRejection; presented: boolean }> {
+    // AC-17（D2）：在途 VCA 抑制自动 run-change offer；不写 `runChangeAutoPrompted`，VCA 结束后可恢复。
+    const inFlight = await this.pendingVersionChangesFor(input.projectRoot);
+    if (!inFlight.ok || inFlight.pending.length > 0) {
+      const detail = inFlight.ok
+        ? inFlight.pending
+            .map(
+              (entry) =>
+                `${entry.applicationId} (${mainT(
+                  entry.status === "approved"
+                    ? "ui.versionChange.status.approved"
+                    : "ui.versionChange.status.submitted",
+                )})`,
+            )
+            .join("、")
+        : inFlight.reason;
+      const reason = inFlight.ok
+        ? `${mainT("ui.versionChange.entry")} · ${detail} — ${mainT("ui.versionChange.submitGuidance")}`
+        : mainT("ui.versionChange.disabledUnknown", { detail });
+      const runtime =
+        (input.noteRoleId !== undefined ? this.findLiveRuntime(input.projectRoot, input.noteRoleId) : undefined) ??
+        this.lastGovernanceRuntime.get(input.projectRoot) ??
+        "demo";
+      this.emitDeliveryNote(
+        input.projectRoot,
+        runtime,
+        input.noteRoleId ?? null,
+        "chief",
+        `[${mainT("ui.trunk.panelTitle")}] ${reason}`,
+      );
+      return {
+        rejection: makeMechanicalRejection("run-change-required", [reason], {
+          action: `${mainT("ui.versionChange.entry")}: ${mainT("ui.versionChange.submitGuidance")}`,
+          docs: input.newer.map((doc) => doc.path).slice(0, 5),
+        }),
+        presented: false,
+      };
+    }
     const key = `${input.projectRoot}\u0000${input.manifest.runId}`;
     const proposedDocs: Record<string, string> = {};
     for (const doc of input.newer) proposedDocs[doc.kind] = doc.path;
@@ -2679,6 +3076,58 @@ export class SessionManager {
     // （会话选择顺序 convener → rapporteur → chief）。这只扩大**应用内**的发卡呈现面，不新增模型工具：
     // `request_requirement_change` 仍只注入 proposal/schedule（上面 canInitiateRequirementChange 未变）。
     const canPresentAppRunChange = canInitiateRequirementChange || governanceFunction === "chief";
+    // 2026-11-04 trunk-amendment-model D1：每项目版本变更/冻结/stable 栈（Interface 注入；缺省 ⇒
+    // 不注入 `stablePermitOf`、不接 appointment-write 钩子——旧行为，能力缺席 = fail-closed）。
+    const versionChangeStack = this.deps.getVersionChangeStack?.(req.projectRoot);
+    // Batch 3.5（C1d/S5）：三提交能力的桌面实现——**只提交**，不批准/不发卡/不签发许可。
+    // 角色门控：product/rapporteur → submitVersionChange；convener → submitRefactor + requestStableWrite；
+    // 其他角色不注入（run-role 仍二次门控；工具不存在 = fail-closed）。身份以 req.roleId 强制，
+    // 不信任模型/tool 载荷自报。
+    const submitVersionChangeCapability: SubmitVersionChangeFn | undefined =
+      versionChangeStack !== undefined && (req.roleId === "product" || req.roleId === "rapporteur")
+        ? async (input, signal) => {
+            try {
+              return await versionChangeStack.submitVersionChange(
+                { ...input, initiatorRoleId: req.roleId as "product" | "rapporteur" },
+                signal,
+              );
+            } catch (error) {
+              return {
+                ok: false,
+                errorCode: "vca-invalid",
+                message: error instanceof Error ? error.message : String(error),
+              };
+            }
+          }
+        : undefined;
+    const submitRefactorCapability: SubmitRefactorFn | undefined =
+      versionChangeStack !== undefined && req.roleId === "convener"
+        ? async (input, signal) => {
+            try {
+              return await versionChangeStack.submitRefactor({ ...input, roleId: req.roleId }, signal);
+            } catch (error) {
+              return {
+                ok: false,
+                errorCode: "refactor-invalid",
+                message: error instanceof Error ? error.message : String(error),
+              };
+            }
+          }
+        : undefined;
+    const requestStableWriteCapability: RequestStableWriteFn | undefined =
+      versionChangeStack !== undefined && req.roleId === "convener"
+        ? async (input, signal) => {
+            try {
+              return await versionChangeStack.requestStableWrite({ ...input, roleId: req.roleId }, signal);
+            } catch (error) {
+              return {
+                ok: false,
+                errorCode: "stable-write-write-failed",
+                message: error instanceof Error ? error.message : String(error),
+              };
+            }
+          }
+        : undefined;
     const requestRequirementChange: RequestRequirementChangeFn | undefined =
       canInitiateRequirementChange && this.deps.requestRequirementChange !== undefined
         ? (input: RequestRequirementChangeInput) =>
@@ -2829,14 +3278,41 @@ export class SessionManager {
     try {
       await this.deps.prepareRuntimeProfile?.(req.runtime);
       profileRevision = this.profileRevision(req.runtime);
+      // 2026-11-04 trunk-amendment-model D1：stable 写入的 **post-write 复核钩子**（F16）。
+      // write/edit 成功后由运行时核心调用（同一 `versionedDocAfterWrite` 接缝，先保留既有 R9 登记语义）：
+      // · 版本登记返回 false ⇒ 维持原回退语义；
+      // · stable 路径且存在候选许可 ⇒ `completeWrite(actualSha)` 复核/消费/mini re-pin（桌面不写盘）。
+      const baseAfterWrite = this.deps.runtimeOptions?.versionedDocAfterWrite;
+      const stableAfterWrite =
+        versionChangeStack === undefined
+          ? undefined
+          : async (absPath: string): Promise<boolean | void> => {
+              if (baseAfterWrite !== undefined) {
+                const registered = await baseAfterWrite(absPath);
+                if (registered === false) return false;
+              } else {
+                const registered = await registerVersionedDocAfterWrite({
+                  projectRoot: req.projectRoot,
+                  absPath,
+                  recordedBy: "app:session",
+                });
+                if (registered === false) return false;
+              }
+              await this.afterStableWrite(versionChangeStack, req.projectRoot, req.roleId, req.runtime, absPath);
+              return true;
+            };
+      const sessionRuntimeOptions =
+        stableAfterWrite === undefined
+          ? this.deps.runtimeOptions
+          : { ...this.deps.runtimeOptions, versionedDocAfterWrite: stableAfterWrite };
       if (this.deps.createRuntimeAdapterFactory) {
-        createAdapter = this.deps.createRuntimeAdapterFactory(project, req.runtime, { ...this.deps.runtimeOptions, shellGate: this.deps.shellGate });
+        createAdapter = this.deps.createRuntimeAdapterFactory(project, req.runtime, { ...sessionRuntimeOptions, shellGate: this.deps.shellGate });
       } else if (req.runtime === "pi") {
         createAdapter = this.deps.createPiAdapterFactory(project, this.deps.shellGate);
       } else if (req.runtime === "demo") {
         createAdapter = (gate) => this.deps.createDemoAdapter({ gate, boundary });
       } else {
-        createAdapter = createRuntimeAdapterFactory(project, req.runtime, this.deps.runtimeOptions);
+        createAdapter = createRuntimeAdapterFactory(project, req.runtime, sessionRuntimeOptions);
       }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -3019,17 +3495,61 @@ export class SessionManager {
           // 同一请求 id、同一份 pending、只答一次——不是第二个请求。普通角色逐字不传。
           ...(customerInput
             ? {
-                customerInput: (r: CustomerInputRequest, metadata?: CustomerInputMetadata) =>
-                  this.withRequestLifecycle(
+                customerInput: async (r: CustomerInputRequest, metadata?: CustomerInputMetadata) => {
+                  // AC-13（D2）：stable boundary 确认卡——用 S7 API 检测 preview 正文扩大；
+                  // 扩大 ⇒ 卡面横幅 + required acknowledgments；不可解析 ⇒ 不呈现、结构化拒绝。
+                  let effectiveRequest = r;
+                  if (versionChangeStack !== undefined && r.cardKind === "appointment-write") {
+                    const enriched = await this.enrichAppointmentWriteBoundaryCard(
+                      versionChangeStack,
+                      req.projectRoot,
+                      r,
+                    );
+                    if (enriched.kind === "reject") {
+                      void this.appendRoleActivity(req.projectRoot, req.roleId, {
+                        kind: "request.rejected",
+                        summary: shortenSummary(enriched.reason, 200),
+                        status: "not-presented",
+                      });
+                      this.emitDeliveryNote(req.projectRoot, req.runtime, req.roleId, req.roleId, enriched.reason);
+                      return { outcome: "declined", notPresented: true, reason: enriched.reason };
+                    }
+                    effectiveRequest = enriched.request;
+                  }
+                  const outcome = await this.withRequestLifecycle(
                     req.projectRoot,
                     req.roleId,
-                    r,
+                    effectiveRequest,
                     metadata,
                     (request, context, meta) => customerInput(request, context, meta),
                     (request, extras) => buildCustomerInputContext(request, extras),
-                  ),
+                  );
+                  // 2026-11-04 trunk-amendment-model D1 / F16 + D2/AC-13：appointment-write 确认后
+                  // **只签发** role-card/boundary 的一次性 stable 许可（正文取自确认卡 preview 的逐路径正文）；
+                  // 真实写入仍由角色 write_file/edit_file 经 run-role gate 执行——桌面无直接写盘路径。
+                  // 扩大检测要求的 acknowledgments 未齐 ⇒ 不签发任何许可（fail-closed）。
+                  if (versionChangeStack !== undefined && r.cardKind === "appointment-write") {
+                    await this.afterAppointmentWriteApproved(
+                      versionChangeStack,
+                      req.projectRoot,
+                      req.roleId,
+                      req.runtime,
+                      effectiveRequest,
+                      outcome,
+                    );
+                  }
+                  return outcome;
+                },
               }
             : {}),
+          // 2026-11-04 trunk-amendment-model D1：run-role gate 的同步候选许可（C2b 快照仍为判定权威）。
+          ...(versionChangeStack !== undefined
+            ? { stablePermitOf: (rel: string) => versionChangeStack.stablePermitOf(rel) }
+            : {}),
+          // Batch 3.5（C1d/S5）：三提交能力（角色门控在本层；run-role 二次门控；只提交不批准）。
+          ...(submitVersionChangeCapability ? { submitVersionChange: submitVersionChangeCapability } : {}),
+          ...(submitRefactorCapability ? { submitRefactor: submitRefactorCapability } : {}),
+          ...(requestStableWriteCapability ? { requestStableWrite: requestStableWriteCapability } : {}),
           // 2026-11-04 下载申请（W-1）：每会话能力；未注入 ⇒ 编排/运行时核心不注册 `request_download`。
           ...(requestDownload ? { requestDownload } : {}),
           // H-1：派发能力（仅 su 会话注入；契约字段名 `dispatchTask`——编排落地后由其转发给适配器）。
@@ -3138,11 +3658,23 @@ export class SessionManager {
         : {}),
       // 2026-11-02（版本决策）：chief 的**原始**客户卡上下文（不含 request.* 生命周期）——
       // 只由 `requestVersionDecision` 经 `withRequestLifecycle` 包装使用，避免第二套审计链。
-      ...(customerInput !== undefined && governanceFunction === "chief"
+      // 2026-11-04 trunk-amendment D1：应用自有的 VCA/逐项/stable 卡同样经它 + `withRequestLifecycle`
+      // 呈现（与 run-change 同一会话选择面 convener→rapporteur→chief；客户本人，不进判断器/委托/指令）。
+      ...(customerInput !== undefined && canPresentAppRunChange
         ? { governedCardContext: buildCustomerInputContext }
         : {}),
     };
     this.sessions.set(key, entry);
+    // 2026-11-04 trunk-amendment D1：会话打开即预加载冻结快照/重建许可快照（best-effort；
+    // 失败只诊断，`trunk:state`/`doc-freeze:list` 会如实给出 cacheHealth，不阻塞会话）。
+    if (versionChangeStack !== undefined) {
+      void versionChangeStack.ensureInitialized().catch((error) => {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId }).error(
+          "version-change.init.failed",
+          error,
+        );
+      });
+    }
     // 评审 §5.6：只记录**回交主人**（trio=Convener；single=su）的 runtime——看护向主人投递时择路用。
     if (canSchedule || governanceFunction === "chief") this.lastGovernanceRuntime.set(req.projectRoot, req.runtime);
     entry.unsubscribePersistence = entry.handle.onPersistenceChange?.(change => {
@@ -4247,7 +4779,7 @@ export class SessionManager {
     // 2026-10-31（run-change 触发）：冻结 run 上出现比 pin 更新的提案卡 ⇒ 先尝试 run-change 卡，
     // 本提案卡以 run-change-required 三段式拒发（未呈现；不冒充客户拒绝、不改冻结语义）。
     if (request.cardKind === "proposal") {
-      const frozen = await this.proposalCardFrozenRejection(projectRoot, request, metadata);
+      const frozen = await this.proposalCardFrozenRejection(projectRoot, request, metadata, sourceRoleId);
       if (frozen !== undefined) {
         const formatted = formatMechanicalRejection(frozen.rejection);
         this.appendRoleActivity(projectRoot, sourceRoleId, {

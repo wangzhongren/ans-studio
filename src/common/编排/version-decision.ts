@@ -132,7 +132,9 @@ export function validateVersionDecisionContext(input: VersionDecisionContextInpu
     return {
       ok: false,
       code: "run-change-required",
-      message: "当前 flow 存在 pinned（或多个 pinned 冲突）；版本决策不适用，请走 run-change（契约变更 · 重开 run）",
+      // 2026-11-04（trunk-amendment S3/P1.6 §4.10）：UI 入口迁移——低层机制保留，文案指向
+      // 「版本变更申请」/「主干升级」（不再出现 run-change 按钮口径）。
+      message: "当前 flow 存在 pinned（或多个 pinned 冲突）；版本决策不适用，请走「版本变更申请」或「主干升级」（客户入口；低层 run-change 机制仅保留）",
     };
   }
   const activeRuns = derivation.activeRuns;

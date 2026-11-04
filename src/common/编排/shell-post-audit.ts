@@ -14,7 +14,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { ShellExecutionOutcome, ShellPostAuditResult, ShellReviewRequest } from "../../model/runtime.ts";
-import { baselineShaFor, isVersionedDocPath } from "../门禁引擎/versioned-doc-guard.ts";
+import {
+  baselineShaFor,
+  isVersionedDocPath,
+  versionedDocFreezeState,
+} from "../门禁引擎/versioned-doc-guard.ts";
+import type { DocFreezeLookupState } from "../../model/version-change.ts";
 
 export interface TreeEntryFacts {
   mtimeMs: number;
@@ -216,6 +221,11 @@ export interface CreateShellPostAuditOptions {
   maxEntries?: number;
   /** 显式声明的额外监视根（如 skillRoot）。 */
   extraRoots?: readonly string[];
+  /**
+   * 2026-11-04（trunk-amendment S3/F33）：版本化文档冻结状态查询（同步）。生产注入 C2b
+   * `versionedDocFreezeState`；缺省同源调用（快照未安装 ⇒ unknown ⇒ fail-closed 审计）。
+   */
+  freezeStateOf?: (relPath: string, exists: boolean) => DocFreezeLookupState;
 }
 
 export function createShellPostAudit(options: CreateShellPostAuditOptions): ShellPostAudit {
@@ -267,15 +277,33 @@ export function createShellPostAudit(options: CreateShellPostAuditOptions): Shel
         forbiddenPrefixes: options.forbiddenPrefixes,
         checkWrite: options.checkWrite,
       });
-      // R9：受管版本化文档与 baseline 比对——shell/外部写入导致旧版变化 ⇒ 越界审计。
+      // 2026-11-04（trunk-amendment S3；C2b R9/F29/F33）：受管版本化文档按冻结状态分开判定——
+      // · frozen：hash 漂移/删除 ⇒ 越界（不自动修复）；
+      // · draft：原位改/新增版本为合法草稿 ⇒ **不误报**；删除已登记草稿 ⇒ 越界（C8 安全收窄，
+      //   与 R9 verify 的 missing fail-closed 一致，不静默）；
+      // · unknown/corrupt（快照未安装/损坏）⇒ fail-closed 越界（宁多报不放行）。
+      const freezeStateOf =
+        options.freezeStateOf ??
+        ((relPath: string, exists: boolean) => versionedDocFreezeState(options.projectRoot, relPath, exists));
       for (const change of changes) {
         if (!isVersionedDocPath(change.path) || violations.some((entry) => entry.path === change.path)) continue;
-        const baseline = await baselineShaFor(options.projectRoot, change.path);
-        if (!baseline.ok || baseline.sha256 === undefined) {
-          violations.push({ path: change.path, change: change.change === "deleted" ? "deleted" : "modified" });
+        const existsAfter = change.change !== "deleted";
+        const state = freezeStateOf(change.path, existsAfter);
+        if (state === "draft") {
+          if (change.change === "deleted") violations.push({ path: change.path, change: "deleted" });
           continue;
         }
-        if (change.change === "deleted") {
+        if (state === "unknown") {
+          violations.push({ path: change.path, change: existsAfter ? "modified" : "deleted" });
+          continue;
+        }
+        // frozen：冻结为终态（latest-record-per-path 的 baseline 比对）
+        const baseline = await baselineShaFor(options.projectRoot, change.path);
+        if (!baseline.ok || baseline.sha256 === undefined) {
+          violations.push({ path: change.path, change: existsAfter ? "modified" : "deleted" });
+          continue;
+        }
+        if (!existsAfter) {
           violations.push({ path: change.path, change: "deleted" });
           continue;
         }
