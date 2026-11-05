@@ -362,6 +362,57 @@ test("S3：首次 handoff pin 先写 handoff-pin-bootstrap 冻结再 pin；repin
   }
 });
 
+test("S3：re-pin 名单文档时 run rosterVersion 跟随文档版本（不再滞后）", async () => {
+  const project = await createTrunkProject({ withRun: false, freezeKeys: [] });
+  try {
+    const draft = await ensureDraftRun(project.root, "demo");
+    assert.equal(draft.ok, true);
+    if (!draft.ok) return;
+    const pinned = await pinRun(project.root, draft.manifest.runId, {
+      d3: { decisionId: "dec-pin", targetRoleIds: ["impl"] },
+    });
+    assert.equal(pinned.ok, true, pinned.ok ? "" : pinned.reason);
+    if (!pinned.ok) return;
+
+    const rosterV2 = "docs/proposals/demo-roster-v2.md";
+    const rosterV2sha = await writeProjectFile(
+      project.root,
+      rosterV2,
+      "---\nschema: project-roster/v3\nversion: 2\n---\n# roster v2\n",
+    );
+    const at = "2026-11-04T12:30:00.000Z";
+    const frozen = await appendDocFreezeRecords([
+      {
+        projectRoot: project.root,
+        relPath: rosterV2,
+        sha256: rosterV2sha,
+        freeze: {
+          schema: "doc-freeze/v1",
+          applicationId: "vc-r",
+          reason: "detail-item-applied",
+          origin: "customer",
+          decidedBy: "customer",
+          decisionId: "dec-r",
+          frozenAt: at,
+        },
+      },
+    ]);
+    assert.equal(frozen.ok, true);
+    const repinned = await repinPinnedRun(project.root, draft.manifest.runId, {
+      targets: [{ kind: "roster", path: rosterV2, sha256: rosterV2sha }],
+      applicationId: "vc-r",
+      decisionId: "dec-r",
+      at,
+    });
+    assert.equal(repinned.ok, true, repinned.ok ? "" : repinned.reason);
+    if (!repinned.ok) return;
+    assert.equal(repinned.manifest.documents.roster?.path, rosterV2);
+    assert.equal(repinned.manifest.rosterVersion, 2, "rosterVersion 必须跟随名单文档版本");
+  } finally {
+    await fs.rm(project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
 test("S3：prepareRunPin 在 ready 语义（已有冻结记录）下拒绝未冻结的最新版本化文档", async () => {
   const project = await createTrunkProject({ withRun: false, freezeKeys: [] });
   try {

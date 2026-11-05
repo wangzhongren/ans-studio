@@ -329,6 +329,7 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
         rosterVersion?: number;
         d3?: { decisionId: string; targetRoleIds: string[] };
         roles?: string[];
+        topologyFollow?: { path: string; sha256: string };
       }
     | { ok: false; message: string }
   > {
@@ -379,12 +380,32 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       }
       documents[repinKindOf(target.path) as TrunkDocKind] = { path: target.path, sha256: target.toSha256 };
     }
+    // 名单内嵌拓扑：roster 目标推进时，topology 引用必须跟随到新名单文件（保留 #fragment），
+    // 否则主干/run 的拓扑会继续指向旧名单的内嵌区块（真机 vc-3 暴露）。
+    let topologyFollow: { path: string; sha256: string } | undefined;
+    if (current !== undefined) {
+      const rosterTarget = record.targets.find((target) => repinKindOf(target.path) === "roster");
+      const currentTopology = current.artifacts.documents.topology;
+      const currentRoster = current.artifacts.documents.roster;
+      if (
+        rosterTarget !== undefined &&
+        currentTopology !== undefined &&
+        currentRoster !== undefined &&
+        currentTopology.path.split("#")[0] === currentRoster.path.split("#")[0]
+      ) {
+        const hashIndex = currentTopology.path.indexOf("#");
+        const fragment = hashIndex >= 0 ? currentTopology.path.slice(hashIndex) : "";
+        topologyFollow = { path: `${rosterTarget.path}${fragment}`, sha256: rosterTarget.toSha256 };
+        documents.topology = topologyFollow;
+      }
+    }
     return {
       ok: true,
       runId: stable.runId,
       ...(stable.rosterVersion !== undefined ? { rosterVersion: stable.rosterVersion } : {}),
       ...(stable.d3 !== undefined ? { d3: stable.d3 } : {}),
       ...(stable.roles !== undefined ? { roles: stable.roles } : {}),
+      ...(topologyFollow !== undefined ? { topologyFollow } : {}),
       target: {
         trunkVersion: current?.trunkVersion ?? 0,
         runId: stable.runId,
@@ -451,6 +472,10 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       path: target.path,
       sha256: target.toSha256,
     }));
+    // 内嵌拓扑跟随名单：run 的 topology 引用也要一起 re-pin（否则 run 侧继续指向旧名单区块）。
+    if (built.topologyFollow !== undefined) {
+      repinTargets.push({ kind: "topology", path: built.topologyFollow.path, sha256: built.topologyFollow.sha256 });
+    }
     const base = record.baseTrunk;
     const applied =
       base === null

@@ -10,7 +10,7 @@ import fs from "node:fs/promises";
 import { test } from "node:test";
 
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
-import { readRunManifest } from "../../src/common/编排/run-manifest.ts";
+import { readRunManifest, writeRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { createVersionChangeRuntime } from "../../src/pipeline/orchestration/version-change-runtime.ts";
 import type {
@@ -219,6 +219,86 @@ test("version-change-runtime：既有 trunk 上 version-upgrade（冻结 → app
     const freeze = rig.events.filter((event) => event.kind === "doc.freeze");
     assert.equal(freeze.length, 1);
     if (freeze[0]?.kind === "doc.freeze") assert.equal(freeze[0].reason, "version-upgrade-approved");
+  } finally {
+    await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
+test("version-change-runtime：名单内嵌拓扑——roster 升级时 topology 跟随新名单并回绑 run rosterVersion", async () => {
+  const rig = await setup();
+  try {
+    // 把 run 与主干基线改为「拓扑内嵌在名单文档」的形态（真实项目：roster 文档内嵌拓扑图）。
+    const embedRef = (rosterPath: string) => `${rosterPath}#人员+模块拓扑图`;
+    const rosterV1Sha = rig.project.hashes[PATHS.roster]!;
+    const read = await readRunManifest(rig.project.root, rig.project.runId);
+    assert.equal(read.ok, true);
+    if (!read.ok) return;
+    const rewritten = await writeRunManifest(rig.project.root, {
+      ...read.manifest,
+      documents: {
+        ...read.manifest.documents,
+        topology: { path: embedRef(PATHS.roster), sha256: rosterV1Sha },
+      },
+    });
+    assert.equal(rewritten.ok, true);
+    if (!rewritten.ok) return;
+
+    const snapshot = rig.project.snapshot();
+    const boot = await rig.trunkRuntime.bootstrap({
+      flowId: FLOW_ID,
+      runId: rig.project.runId,
+      applicationId: "vc-boot",
+      decisionId: "dec-boot",
+      target: {
+        ...snapshot,
+        documents: { ...snapshot.documents, topology: { path: embedRef(PATHS.roster), sha256: rosterV1Sha } },
+      },
+      rosterVersion: 1,
+      d3: { decisionId: "dec-0", targetRoleIds: ["impl"] },
+      roles: ["impl"],
+      at: AT,
+    });
+    assert.equal(boot.ok, true, boot.ok ? "" : `${boot.code}: ${boot.message ?? ""}`);
+
+    // 名单 v3：内容同构、版本号递增。
+    const rosterV1Text = await fs.readFile(`${rig.project.root}/${PATHS.roster}`, "utf8");
+    const rosterV3 = "docs/proposals/demo-roster-v3.md";
+    const rosterV3sha = await writeProjectFile(
+      rig.project.root,
+      rosterV3,
+      rosterV1Text.replace("version: 1", "version: 3"),
+    );
+    const current = await rig.integration.trunk.current();
+    assert.ok(current !== null);
+    if (current === null) return;
+    const submitted = await rig.runtime.submit({
+      kind: "version-upgrade",
+      initiatorRoleId: "product",
+      flowId: FLOW_ID,
+      baseTrunk: current,
+      targets: [{ kind: "roster", path: rosterV3, action: "add" }],
+      summary: "内嵌拓扑跟随",
+      applicationId: "vc-9",
+      at: AT,
+    });
+    assert.equal(submitted.ok, true, submitted.ok ? "" : `${submitted.code}: ${submitted.message ?? ""}`);
+    const presented = await rig.runtime.present("vc-9");
+    assert.equal(presented.ok, true, presented.ok ? "" : `${presented.code}: ${presented.message ?? ""}`);
+
+    // 主干：topology 跟随新名单、rosterVersion 由名单文档版本推进。
+    const status = await rig.integration.trunk.status();
+    assert.equal(status.manifest?.artifacts.documents.topology?.path, embedRef(rosterV3));
+    assert.equal(status.manifest?.artifacts.documents.topology?.sha256, rosterV3sha);
+    assert.equal(status.manifest?.rosterVersion, 3);
+
+    // run：名单/拓扑/rosterVersion 均回绑。
+    const run = await readRunManifest(rig.project.root, rig.project.runId);
+    assert.equal(run.ok, true);
+    if (!run.ok) return;
+    assert.equal(run.manifest.documents.roster?.path, rosterV3);
+    assert.equal(run.manifest.documents.topology?.path, embedRef(rosterV3));
+    assert.equal(run.manifest.rosterVersion, 3);
+    assert.deepEqual((await rig.integration.trunk.verify()).violations, []);
   } finally {
     await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
