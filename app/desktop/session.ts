@@ -7382,14 +7382,20 @@ export class SessionManager {
       } else if (ownerRoleId !== null && hb.roleId === ownerRoleId) {
         return; // single su 自身等防御（trio 的 Convener 走上方内置分支）
       }
-      // BUG-5：任务已完成（已报告/已收口）后的重复回交不再入队/不再产生新的报告投递。
+      // BUG-5（2026-11-05 精化）：任务已收口或**同一回合**已报告 ⇒ 重复回交不再入队；
+      // blocked 之后的新回合真实报告必须投递（详见 shouldSuppressStarTaskReport 注释）。
       if (starTask && typeof hb.taskId === "string" && hb.taskId !== "") {
         const record = (await this.readTasks(projectRoot)).records.get(hb.taskId);
-        if (record !== undefined && (record.closed !== undefined || record.reports.length > 0)) {
+        const suppressed = record !== undefined && shouldSuppressStarTaskReport({
+          closed: record.closed !== undefined,
+          priorTurnIds: record.reports.map((entry) => entry.turnId),
+          ...(hb.turnId !== undefined ? { turnId: hb.turnId } : {}),
+        });
+        if (suppressed) {
           diagnostic.record("report.suppressed.task-terminal", {
             taskId: hb.taskId,
-            closed: record.closed !== undefined,
-            reports: record.reports.length,
+            closed: record?.closed !== undefined,
+            reports: record?.reports.length ?? 0,
           });
           return;
         }
@@ -9628,4 +9634,22 @@ ${formatted}` };
     });
     diagnostic.record("delivery.claim.end", { state: sent.kind, count: batchCount });
   }
+}
+
+/**
+ * BUG-5 精化（2026-11-05，真机缺陷）：星形任务回交的报告抑制判据。
+ * 仅两种情况抑制：①任务已**收口**（closed，终态）；②**同一回合**（turnId 相同）已报告（重复）。
+ * `blocked` 报告不是终态——此后**新回合**的真实报告（如重试完成/更完整回执）必须投递；
+ * 旧实现「已有任何报告即抑制」曾在演示缺陷中用假 blocked 报告吞掉真实 worker 报告。
+ * 无 turnId 的旧载荷不做回合级抑制（跨回合重复由回交去重键与账本 reportKey 兜底）。
+ */
+export function shouldSuppressStarTaskReport(input: {
+  closed: boolean;
+  priorTurnIds: readonly (string | undefined)[];
+  turnId?: string;
+}): boolean {
+  if (input.closed) return true;
+  const turnId = typeof input.turnId === "string" && input.turnId !== "" ? input.turnId : undefined;
+  if (turnId === undefined) return false;
+  return input.priorTurnIds.some((prior) => prior === turnId);
 }
