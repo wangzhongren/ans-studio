@@ -216,6 +216,13 @@ const D04_ALLOWLIST: readonly D04AllowlistEntry[] = Object.freeze([
     reason:
       "P1.6 §4.8/AC-7（F40，C1d）：submit_refactor 的 scope.paths 参数描述列出重构被拒绝的工件类别（team-plan/flow 属 execution 工件，重构不得触碰；机械保证在 WriteGate）",
   },
+  {
+    file: "src/provider/runtime/schema.ts",
+    token: "docs/flows/",
+    line: /^"Target kind is an author-area class, NOT a document type\. contract = docs\/proposals\/<flowId>-\{proposal,modules,topology\}-vN\.md and docs\/contracts\/<flowId>-\{architecture,assets\}-vN\.md; roster = docs\/proposals\/<flowId>-roster-vN\.md; execution = docs\/scheduling\/<flowId>-team-vN\.md and docs\/flows\/<flowId>\.yaml\. version-upgrade allows contract\/roster only; detail-amendment also allows execution\.",$/,
+    reason:
+      "P1.6 §4.4/§4.7（F39/AC-29）：VCA target kind 工具说明按作者写区类别列出 execution 工件（docs/scheduling/、docs/flows/），与 targets-items.ts 作者写区注释同语义，属合法工件类别词面（非旧 flow 机器残留）",
+  },
 ]);
 
 function collectD04Hits(): { hits: string[]; unusedAllowlist: string[] } {
