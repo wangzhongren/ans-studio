@@ -742,6 +742,7 @@ export async function repinPinnedRun(
   const documents = { ...manifest.documents };
   let teamPlan = manifest.execution.teamPlan;
   let flow = manifest.execution.flow;
+  let rosterVersion = manifest.rosterVersion;
   for (const target of input.targets) {
     if (target.kind === "teamPlan") {
       if (teamPlan !== null && teamPlan.path === target.path && teamPlan.sha256 === target.sha256) continue;
@@ -757,6 +758,15 @@ export async function repinPinnedRun(
       flow = { ...flow, path: target.path, sha256: target.sha256 };
       changed = true;
       continue;
+    }
+    // 名单文档版本即 run rosterVersion 的事实来源：re-pin 名单时同步推进，避免版本字段滞后于文档。
+    if (target.kind === "roster") {
+      const match = /-v(\d+)\.md$/i.exec(target.path.split("#")[0]!);
+      const nextVersion = match !== null ? Number(match[1]) : Number.NaN;
+      if (Number.isInteger(nextVersion) && nextVersion >= 1 && nextVersion !== rosterVersion) {
+        rosterVersion = nextVersion;
+        changed = true;
+      }
     }
     const existing = documents[target.kind];
     if (existing !== null && existing !== undefined && existing.path === target.path && existing.sha256 === target.sha256) {
@@ -778,6 +788,7 @@ export async function repinPinnedRun(
     ...manifest,
     documents,
     execution: { teamPlan, flow },
+    rosterVersion,
     updatedAt: at,
     repins: [...(manifest.repins ?? []), repin],
   };
