@@ -19,7 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { SessionManager } from "../../app/desktop/session.ts";
+import { SessionManager, shouldSuppressStarTaskReport } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { renderHandbackPrompt, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -73,6 +73,17 @@ const HANDBACK_A: TaskHandback = {
   evidence: ["docs/x.md"],
   at: "2026-10-12T05:00:00.000Z",
 };
+
+test("2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递", () => {
+  assert.equal(shouldSuppressStarTaskReport({ closed: true, priorTurnIds: [], turnId: "T2" }), true, "已收口一律抑制");
+  assert.equal(shouldSuppressStarTaskReport({ closed: false, priorTurnIds: ["T1"], turnId: "T1" }), true, "同回合重复抑制");
+  assert.equal(
+    shouldSuppressStarTaskReport({ closed: false, priorTurnIds: ["T1"], turnId: "T2" }),
+    false,
+    "blocked 之后新回合的真实报告必须投递（旧实现被假 blocked 报告吞掉的现场）",
+  );
+  assert.equal(shouldSuppressStarTaskReport({ closed: false, priorTurnIds: ["T1"] }), false, "无 turnId 旧载荷不做回合级抑制");
+});
 
 function listing(): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
