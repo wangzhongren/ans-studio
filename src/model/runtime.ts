@@ -273,6 +273,10 @@ export interface ShellExecutionOutcome {
 /** 执行后写审计：越界写入清单（空 = 未发现）。 */
 export interface ShellPostAuditResult {
   violations: { path: string; change: "added" | "modified" | "deleted" }[];
+  /** 应用运行态写入（`.ans/**`、bootstrap 清单等；**仍被审计**、记入审计记录，不按越界处理）。 */
+  appStateChanges?: { path: string; change: "added" | "modified" | "deleted" }[];
+  /** 经写日志归因的合法工具写入（并发会话/应用工具落盘；记入审计记录，不按越界处理）。 */
+  attributed?: { path: string; change: "added" | "modified" | "deleted" }[];
 }
 
 /** 执行后写审计钩子（2026-10-29 方案 v2.1 §6.5；由编排 shell-arming 装配、run_shell 执行完调用）。 */

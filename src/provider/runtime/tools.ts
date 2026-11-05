@@ -111,6 +111,7 @@ import type { MessageKey } from "../../common/shared/i18n/keys.ts";
 import { describeTool } from "./schema.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
 import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
+import { recordToolWrite } from "../../common/编排/write-journal.ts";
 import { validateEvidencePath } from "../../common/编排/evidence-check.ts";
 // 2026-10-18 真机修复：写前校验角色 boundary.yaml 内容（**只经 Service 公共出口**——Provider 不直接
 // import 门禁引擎私有 `common/门禁引擎/boundary-yaml.ts`；该出口再导出**同一函数引用**，单一来源不变，
@@ -501,6 +502,9 @@ async function writeGuarded(
       return { ok: false, message: `${name} 已写入 ${path}，但版本登记失败：${reasonOf(err)}（已尝试回退新版本）` };
     }
   }
+  // 2026-11-05（审计归因修复，回执 ANS-AUDIT-2026-11-05-001）：登记写日志，供 shell 执行后审计
+  // 把本次合法落盘（含并发会话）与 shell/外部进程写入区分开；不改变任何写权限。
+  recordToolWrite(abs, sha256Hex(data));
   return { ok: true, message: `${name} 已获准并落盘：${path}（${data.length} 字节写入 ${abs}）` };
 }
 
