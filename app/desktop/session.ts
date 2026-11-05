@@ -884,6 +884,14 @@ export interface SessionManagerDeps {
    */
   deliveryQueueStorePath?: string;
   /**
+   * **演示运行时（demo）的自动投递开关**（2026-11-05 真机缺陷「又卡住」修复）。
+   * demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，用于演示"写前被拒"）；若投递机自动为
+   * 未打开的 demo 目标开会话，该回合必然被门禁拒绝，失败结果再经回交/派发级联成 blocked。
+   * 生产（Interface）置 `false`：demo 会话只由用户亲手打开、只投给已存在的会话；缺省 `true`
+   * （测试/演示宿主维持既有自动开启语义）。
+   */
+  demoRuntimeAutoDeliver?: boolean;
+  /**
    * **P2 网络状态门（2026-10-30）**：主进程权威（`net.isOnline` 采样 + 渲染/power 提示）经 Interface 注入；
    * 离线期间**不认领新的模型投递**（队列保留、`blockedReason:"network"` 可见），恢复后按既有顺序 drain。
    * 缺省 ⇒ 视为在线（旧行为零变化）。
@@ -9355,6 +9363,15 @@ ${formatted}` };
 
     let entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
     if (!entry || entry.projectRoot !== projectRoot) {
+      // 2026-11-05（真机缺陷「又卡住」）：生产宿主（Interface）把 `demoRuntimeAutoDeliver` 置 false ⇒
+      // **演示运行时（demo）不自动开会话**。demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，
+      // 用于演示"写前被拒"），自动唤醒只会得到被门禁拒绝的回合，失败结果再经回交/派发级联成 blocked
+      // （重启后持久队列里的历史 demo 项会连锁触发）。demo 仅供用户显式体验：只投给已打开的 demo 会话；
+      // 未打开则保持排队（不丢消息、不自动开启）。缺省 true 保持测试/演示宿主既有语义。
+      if (runtime === "demo" && this.deps.demoRuntimeAutoDeliver === false) {
+        diagnostic.record("delivery.skip.demo-not-opened", { state: item.kind, targetRoleId: resolvedTarget, queueDepth: q.length });
+        return;
+      }
       // 目标会话**未开**（或属于别的项目）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
       // 后台开启（`userInitiated=false`）：**不抢活动角色**——用户正在看的会话不因投递而易主。
       const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime }, false);

@@ -60,13 +60,15 @@ interface Instance {
   mgr: SessionManager;
   streams: Record<string, OrchestrationEvent[]>;
   sent: Record<string, string[]>;
+  openCalls: Array<{ roleId: string; runtime: string }>;
   disposeHandles: () => void;
 }
 
-function makeInstance(options: { storePath: string; gateFirstSend?: boolean }): Instance {
+function makeInstance(options: { storePath: string; gateFirstSend?: boolean; extraDeps?: Record<string, unknown> }): Instance {
   const l = listing();
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
+  const openCalls: Array<{ roleId: string; runtime: string }> = [];
   const attempts: Record<string, number> = { su: 0, A: 0 };
   const stopped: Record<string, boolean> = { su: false, A: false };
   let gate: Promise<void> | undefined;
@@ -110,7 +112,10 @@ function makeInstance(options: { storePath: string; gateFirstSend?: boolean }): 
     },
   });
   const mgr = new SessionManager({
-    openRoleSession: async (input) => makeHandle(input.roleId),
+    openRoleSession: async (input) => {
+      openCalls.push({ roleId: input.roleId, runtime: String(input.runtime) });
+      return makeHandle(input.roleId);
+    },
     createPiAdapterFactory: () => {
       throw new Error("本用例不应构造 pi 适配器");
     },
@@ -121,11 +126,13 @@ function makeInstance(options: { storePath: string; gateFirstSend?: boolean }): 
     getListing: (root) => (root === l.projectRoot ? l : undefined),
     emitEvent: () => {},
     deliveryQueueStorePath: options.storePath,
+    ...(options.extraDeps ?? {}),
   });
   return {
     mgr,
     streams,
     sent,
+    openCalls,
     disposeHandles: () => {
       stopped.su = true;
       stopped.A = true;
@@ -208,6 +215,52 @@ test("P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 re
     await second.mgr.stop(null).catch(() => undefined);
     await disposeDiagnostics();
     await tick(120); // 等持久化链收尾（Windows 下先删目录会撞 ENOTEMPTY）
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test("2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久队列里的 demo 项不自动开会话、不投递", async () => {
+  // 背景（真机缺陷「又卡住」）：demo 适配器执行内置演示脚本（对 src/evil.ts 的越界写，用于演示"写前
+  // 被拒"）。若投递机把未打开的 demo 会话自动开启，该回合必然被门禁拒绝，失败结果经回交/派发级联成
+  // blocked（重启后持久队列里的历史 demo 项会连锁触发）。生产宿主置 false：demo 只投给已打开的会话。
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-queue-demo-guard-"));
+  const storePath = path.join(root, "delivery-queue.json");
+  const diagDir = path.join(root, "diagnostics");
+  configureDiagnostics({ directory: diagDir });
+  await fs.writeFile(
+    storePath,
+    JSON.stringify({
+      version: 1,
+      items: [
+        {
+          state: "queued",
+          key: { projectRoot: "/proj", roleId: "A", runtime: "demo" },
+          item: {
+            kind: "dispatch",
+            targetRoleId: "A",
+            sourceRoleId: "su",
+            text: "[派发·恢复] demo 演示项",
+            summary: "demo 演示项",
+            dedupKey: "demo-key-1",
+            enqueuedAt: "2026-11-05T00:00:00.000Z",
+          },
+        },
+      ],
+    }),
+    "utf8",
+  );
+  const inst = makeInstance({ storePath, extraDeps: { demoRuntimeAutoDeliver: false } });
+  try {
+    const report = await inst.mgr.restorePersistedDeliveries();
+    assert.equal(report.restored, 1, "demo 项被恢复入队（不丢消息）");
+    await tick(200);
+    assert.deepEqual(inst.openCalls, [], "demo 项不得自动开启会话");
+    assert.deepEqual(inst.sent.A ?? [], [], "demo 项不得自动投递");
+  } finally {
+    inst.disposeHandles();
+    await inst.mgr.stop(null).catch(() => undefined);
+    await disposeDiagnostics();
+    await tick(120);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });
