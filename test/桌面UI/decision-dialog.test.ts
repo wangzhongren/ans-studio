@@ -356,3 +356,12 @@ test("D4 接线：DecisionDialog.confirm 经 confirmDecisionPayload；reject 经
   assert.match(platform, /export type OperatorDecisionPayload/);
   assert.match(platform, /kind: "confirm";\s*confirmed: boolean;\s*acknowledged\?: string\[\];/);
 });
+
+test("VCA 卡底部「拒绝」：选中 reject-version-change 并提交（不再发 cancelled 放弃作答）", () => {
+  const root = fileURLToPath(new URL("../..", import.meta.url));
+  const source = readFileSync(join(root, "app", "renderer", "src", "chat", "DecisionDialog.tsx"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  assert.match(source, /view\.options\.find\(\(option\) => option\.id === "reject-version-change"\)/);
+  assert.match(source, /send\(\{ kind: "choice", selected: \[rejectOption\.id\] \}, \{ allowCancel: true \}\)/);
+});

@@ -385,6 +385,12 @@ test("version-change-runtime：批准前 toSha256 漂移 ⇒ vca-hash-drift（�
     const records = await rig.runtime.list({ flowId: FLOW_ID });
     assert.equal(records.find((record) => record.applicationId === "vc-1")?.status, "submitted");
     assert.ok(!rig.events.some((event) => event.kind === "version.change" && event.status === "approved"));
+    // 卡片已作答但批准失败必须回显（否则客户看不到任何失败信号、申请继续挂待批）。
+    assert.equal(
+      rig.notifications.some((message) => message.includes("处理失败") && message.includes("批准未完成")),
+      true,
+      JSON.stringify(rig.notifications),
+    );
     const current = await rig.integration.trunk.current();
     assert.equal(current?.trunkVersion, 1, "trunk 指针未变");
   } finally {

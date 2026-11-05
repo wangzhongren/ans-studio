@@ -1482,7 +1482,8 @@ export function describeTool(name: string): ToolDescription {
                 kind: {
                   type: "string",
                   enum: ["contract", "roster", "execution"],
-                  description: "Target kind; version-upgrade allows contract/roster only, detail-amendment also allows execution",
+                  description:
+                    "Target kind is an author-area class, NOT a document type. contract = docs/proposals/<flowId>-{proposal,modules,topology}-vN.md and docs/contracts/<flowId>-{architecture,assets}-vN.md; roster = docs/proposals/<flowId>-roster-vN.md; execution = docs/scheduling/<flowId>-team-vN.md and docs/flows/<flowId>.yaml. version-upgrade allows contract/roster only; detail-amendment also allows execution.",
                 },
                 path: {
                   type: "string",
@@ -1526,6 +1527,7 @@ export function describeTool(name: string): ToolDescription {
       promptGuidelines: [
         "用 submit_version_change 提交 VCA；你只能提交，不能批准/代选，也不要在正文里声称已获批准。",
         "version-upgrade 只能由 product 提交（contract/roster）；detail-amendment 只能由 rapporteur 提交（contract/roster/execution）。",
+        "target 的 kind 是作者写区类别、不是文档类型：模块/提案/拓扑/架构/资产文档一律按 kind=\"contract\" 申报，名单按 kind=\"roster\"，执行文档按 kind=\"execution\"；不要用文档名当 kind。批准时申请中的全部 targets 会一起冻结，apply 时一起进主干。",
         "workflow/boundary 不是 VCA target：workflow 走 request_stable_write 的客户确认卡，role-card/boundary 走 appointment-write。",
         "不要自行判断或声明 bootstrap：应用按 trunk 实际状态机械判定——已有主干则以当前主干为基线；无主干则自动按 bootstrap 提交，批准后以现有 pinned run 基线建立主干 t1 并回绑。不要以“不能伪装 bootstrap”为由拒绝提交。",
         "按回执如实行动：submitted 只表示已提交；批准后还有冻结/re-pin 或逐项确认。",
