@@ -67,6 +67,16 @@ const DENY_ALL_WRITE_GATE: WriteGate = (targetPath: string): WriteDecision => ({
 // —————————————————————— 公共辅助 ——————————————————————
 
 /**
+ * 纯展示文本段（治理权力矩阵，C4a）：过滤空串元素后按原顺序以空行连接；空/缺省 ⇒ 零渲染。
+ * **只做哑拼接**：不 trim、不清洗、不截断、不解析、不判定——数据化包裹/清洗/限长由矩阵
+ * Service（C1b）渲染、编排（C3）注入；本函数逐字保留接收到的文本。
+ */
+function renderContextSections(contextSections?: readonly string[]): string {
+  if (contextSections === undefined) return "";
+  return contextSections.filter((section) => section.length > 0).join("\n\n");
+}
+
+/**
  * 由角色卡文本与边界来源拼出系统提示（不做任何判定，只做呈现）。
  *
  * G-4（客户 2026-10-16 批准）：追加「已安装技能」注入节——`renderInstalledSkillsSection`
@@ -74,8 +84,11 @@ const DENY_ALL_WRITE_GATE: WriteGate = (targetPath: string): WriteDecision => ({
  * **非空 ⇒ 整段拼接**（逐字不改写、不重排、不另写模板）；空串（零技能/从未安装/空 projectRoot）
  * ⇒ 逐字零渲染（对照会话与未装技能角色系统提示零变化）。判据与坏件处置全在渲染器内，
  * 调用侧不预扫 `docs/skills`。假适配器与防真外壳共用本函数（测试面跨运行时逐字一致）。
+ *
+ * C4a（治理权力矩阵）：`contextSections` 在「边界来源」之后、「已安装技能」节之前按序拼接；
+ * 判断会话的防御性置空由调用方按既有 judge 状态执行（本函数不感知角色/会话类型）。
  */
-function renderSystemPrompt(role: ResolvedRole, projectRoot?: string): string {
+function renderSystemPrompt(role: ResolvedRole, projectRoot?: string, contextSections?: readonly string[]): string {
   const base = [
     `# 角色：${role.id}`,
     "",
@@ -84,8 +97,12 @@ function renderSystemPrompt(role: ResolvedRole, projectRoot?: string): string {
     `## 边界来源`,
     role.boundarySource,
   ].join("\n");
+  const context = renderContextSections(contextSections);
+  let withContext = base;
+  if (context !== "") withContext = `${base}\n\n${context}`;
   const skills = renderInstalledSkillsSection(projectRoot ?? "", role.id);
-  return skills === "" ? base : `${base}\n\n${skills}`;
+  if (skills === "") return withContext;
+  return `${withContext}\n\n${skills}`;
 }
 
 // —————————————————————— 假适配器（仅单元测试） ——————————————————————
@@ -113,6 +130,12 @@ export function createFakeRuntimeAdapter(opts: {
    * 渲染器返回空串 ⇒ 逐字零渲染，旧行为逐字不变）。
    */
   projectRoot?: string;
+  /**
+   * 纯展示文本段（治理权力矩阵，C4a）：与 `RuntimeProviderOptions.contextSections` 同一通道/语义；
+   * 非空元素按序以空行拼接在边界来源之后、已安装技能节之前；空数组/空串元素/缺省 ⇒ 系统提示逐字不变。
+   * 假适配器的 judge 构造（`shellJudge`/`governanceJudge`）即使误传也不拼接（与生产同口径）。
+   */
+  contextSections?: readonly string[];
   /** 读根（read_file 相对路径基准）；缺省 process.cwd()。 */
   readRoot?: string;
   /** 写根（write_file/edit_file 落盘安全基准）；缺省不落盘。 */
@@ -165,7 +188,10 @@ export function createFakeRuntimeAdapter(opts: {
 
   return {
     async composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }> {
-      return { systemPrompt: renderSystemPrompt(role, opts.projectRoot) };
+      const judge = opts.shellJudge !== undefined || opts.governanceJudge !== undefined;
+      let contextSections = opts.contextSections;
+      if (judge) contextSections = undefined;
+      return { systemPrompt: renderSystemPrompt(role, opts.projectRoot, contextSections) };
     },
 
     async bindRole(role: ResolvedRole): Promise<RoleSession> {
@@ -257,6 +283,12 @@ export interface PiRuntimeAdapterOptions extends PiProviderConfigInput {
   gate: WriteGate;
   projectRoot: string;
   skillRoot: string;
+  /**
+   * 纯展示文本段（治理权力矩阵，C4a）：与 `RuntimeProviderOptions.contextSections` 同一通道/语义；
+   * 非空元素按序以空行拼接在边界来源之后、已安装技能节之前；空/缺省逐字不变。
+   * legacy judge 构造（`shellJudge`/`governanceJudge`/`judgeMode`）下即使误传也不拼接。
+   */
+  contextSections?: readonly string[];
   /** shell 命令级闸（设计 §7.2）；由编排装配后注入。**缺省时 run_shell 不注册**（§7.5.1）。 */
   shellGate?: ShellGate;
   /**
@@ -353,7 +385,9 @@ export function createPiRuntimeAdapter(opts: RuntimeProviderOptions | PiRuntimeA
   return {
     async composeContext(role) {
       // No SDK initialization is needed to render this text.
-      return { systemPrompt: renderSystemPrompt(role, adapterInput.projectRoot) };
+      let contextSections = adapterInput.contextSections;
+      if (judgeMode) contextSections = undefined;
+      return { systemPrompt: renderSystemPrompt(role, adapterInput.projectRoot, contextSections) };
     },
     async bindRole(role) {
       const mod = await load();

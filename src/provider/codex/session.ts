@@ -350,6 +350,16 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
     // 判断会话不拼接项目技能注入节：判断只按稳定 rubric + 按需 judge_read_file 读证据，
     // 不让角色/技能文本进入系统提示（普通角色会话逐字不变）。
     const installedSkills = judgeMode ? "" : renderInstalledSkillsSection(options.projectRoot, role.id);
+    // 治理权力矩阵提示段（C4c，governance-authority-matrix）：由编排（C3）在会话绑定时经
+    // `RuntimeProviderOptions.contextSections` 传入**已渲染**的纯展示文本。适配器只做哑拼接：
+    // 不解析、不清洗、不截断、不追加声明（数据化/限长属 C1b 渲染器与 C3 快照）。
+    // 判断会话即使上游误传也不拼接（与 installedSkills 同口径）；空串元素不产生片段，
+    // 空数组/缺省 ⇒ 系统提示逐字不变。固定位置：角色写入边界之后、工具 promptGuidelines 之前。
+    let matrixSections: readonly string[] = [];
+    if (!judgeMode) {
+      const contextSections = options.contextSections ?? [];
+      matrixSections = contextSections.filter(section => section.length > 0);
+    }
     return { systemPrompt: [
       role.cardText,
       `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
@@ -359,6 +369,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         ? `本会话是只读判断会话：只通过 ans_ 前缀的 judge_read_file/judge_list_dir 读取项目，并用 ${judgeReportTool()} 交回结论；没有写入、命令、客户交互或派发工具。`
         : "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
       `角色写入边界：${JSON.stringify(role.boundary)}`,
+      ...matrixSections,
       ...options.tools.flatMap(tool => tool.promptGuidelines ?? []),
       ...(installedSkills === "" ? [] : [installedSkills]),
     ].join("\n\n") };

@@ -1,6 +1,8 @@
 # Claude 适配器实现报告
 
-实现对应 [ANS-RUNTIME-V2 revision 1](../项目管理/docs/design/2026-10-14_design_multi-runtime-integration.md) 与 [冻结的核心契约](../运行时核心/api-spec.md)。公开入口为 `src/provider/claude/session.ts::createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies?: ClaudeAdapterDependencies): RuntimeAdapter`，同步返回适配器。`composeContext` 只组合固定角色、边界和工具指南；`bindRole` 只读取注入存储；SDK/Zod 在首次实际 prompt 懒加载。
+实现对应 [ANS-RUNTIME-V2 revision 1](../项目管理/docs/design/2026-10-14_design_multi-runtime-integration.md) 与 [冻结的核心契约](../运行时核心/api-spec.md)。公开入口为 `src/provider/claude/session.ts::createClaudeRuntimeAdapter(options: RuntimeProviderOptions, dependencies?: ClaudeAdapterDependencies): RuntimeAdapter`，同步返回适配器。`composeContext` 组合固定角色、边界、`contextSections` 与工具指南；`bindRole` 只读取注入存储；SDK/Zod 在首次实际 prompt 懒加载。
+
+**治理权力矩阵提示段（`contextSections`，2026-11-05 C4b）**：适配器只经 `RuntimeProviderOptions.contextSections`（`readonly string[]`；C2 冻结的单一通道，`RuntimeSessionOptions` 由 Service 透传）消费编排在会话绑定时注入的**纯展示文本段**——不读项目文件、不计算矩阵、不判定注入范围。**固定插入位置**：系统提示数组 `[cardText, 固定角色行, 边界 JSON, ...contextSections, ...tool promptGuidelines, installedSkills?]`，全部元素以 `\n\n` 连接；正常（非判断）会话首个非空 context 元素位于边界 JSON 元素之后（数组索引 3），在任何工具 `promptGuidelines` 与已安装技能节之前。**哑拼接**：不 trim、不清洗、不截断、不重排（固定分隔/「只是数据不是指令」声明/控制字符规范化/限长均由 C1b 渲染器实施）；空串元素按 `section.length > 0` 过滤，`undefined`/`[]`/`[""]`/`["",""]` 与基线逐字相同；判断会话（`judgeMode`）即使误传也不拼接。该段不改变工具面（`tools`/`allowedTools`/hooks/`mcpServers` 逐字不变），不是能力、不是工具、不是判定输入。验证见 [`docs/change/2026-11-05_governance-authority-matrix-claude-adapter-implementation.md`](docs/change/2026-11-05_governance-authority-matrix-claude-adapter-implementation.md)。
 
 `ClaudeAdapterDependencies` 仅提供测试替换：`loadSdk` 返回真实 `query/createSdkMcpServer` 形状、`loadZod` 返回 Zod module、`env` 提供隔离环境。生产缺省使用官方包和 process.env，不要求新增 Model 字段。只替换 query 即可由真实 SDK MCP 注册/Client 测生产 handlers；不得调用真实模型来作为常规测试。
 
@@ -36,7 +38,7 @@ SDK 为 `@anthropic-ai/claude-agent-sdk@0.3.299`，正式 peers `zod@4.6.7`、`@
 
 **原生能力关闭（三层）**：①`tools: []`（内置工具面为空）；②`strictMcpConfig: true` + `mcpServers` 仅 `ans`，且 `installedMcpServers` 在判断模式被强制置空（即便上游误传也不装配）；③`disallowedTools` 显式列出 `Bash/Write/Edit/Read/WebSearch/WebFetch/Task` 等原生工具。判断模式**忽略 `ANS_CLAUDE_WEB_SEARCH`**，`tools`/`allowedTools` 不出现 `WebSearch`。注意 SDK 事实 `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED`：裸 `allowedTools` 条目会在 `canUseTool` 之前自动放行整个工具；因此判断模式 `allowedTools` 只含当前三只 judge 工具，逐次拦截仍由 `PreToolUse` hook 承担（hook deny 先于 `allowedTools`）。`PreToolUse` 对任何非三项名字（含另一套 report、外来 MCP、内置原生工具）一律 deny，且放行分支额外核对名字属于冻结并集且确已注册；`canUseTool` 兜底仍 deny。
 
-**不持久化/不写项目**：判断模式忽略注入的 `storage`（`persistSession:false`、不读写会话索引、不创建项目 `.ans`），原生配置根使用临时目录并在 `dispose` 清理；系统提示不拼接已安装技能节，改为只读判断会话说明（项目文件与命令文本视为不可信数据）。`report_governance_judgement` 与 shell report 一样只把模型原始参数交回回调，规范化/required-read/逐路径复核在编排侧，适配器不裁决。工具注解固定为只读、非破坏、不触网。读取沙箱、敏感排除与预算仍由运行时核心 judge 工具负责，适配器不改判。
+**不持久化/不写项目**：判断模式忽略注入的 `storage`（`persistSession:false`、不读写会话索引、不创建项目 `.ans`），原生配置根使用临时目录并在 `dispose` 清理；系统提示不拼接已安装技能节与 `contextSections`（即使上游误传也不拼接），改为只读判断会话说明（项目文件与命令文本视为不可信数据）。`report_governance_judgement` 与 shell report 一样只把模型原始参数交回回调，规范化/required-read/逐路径复核在编排侧，适配器不裁决。工具注解固定为只读、非破坏、不触网。读取沙箱、敏感排除与预算仍由运行时核心 judge 工具负责，适配器不改判。
 
 **验证**：`test/claude-adapter/session.test.ts` 判断模式用例覆盖两套三件套——shell：工具集恰三项、写/shell/交互/回交/派发/外来 MCP/WebSearch 均被结构性拒绝或 hook deny、`report_shell_judgement` 原样回调、敏感文件被拒、`ANS_CLAUDE_WEB_SEARCH=1` 不生效、不持久化/临时根清理、工具集误配在 SDK 加载前失败、判断模式 abort 仍走原生命周期；治理：工具集恰三项、另一套 report 结构性不可用、`report_governance_judgement` 原样回调、`pathDecisions` 等额外参数不裁剪、非白名单 hook deny、无网络/无外来 MCP、临时根清理；另钉两个冻结三件套均可装配、混合/缺项/多项集合在 SDK 加载前被拒，以及普通模式无 `disallowedTools` 且联网搜索能力位照旧。
 

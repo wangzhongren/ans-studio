@@ -309,3 +309,125 @@ test("T14：有角色目录但全无效角色 → hasRoles:false + 提示可用 
   assert.match(w, /缺少 boundary/);
   assert.match(w, /未枚举到有效角色|可发起 bootstrap/);
 });
+
+// —————————————————————— 治理权力矩阵 C1a：listing 加法 ——————————————————————
+
+test("C1a：空项目 roleDirectories/issues 事实；内置行无 cardSections", async () => {
+  const empty = join(ROOT, "matrix-empty");
+  mkdirSync(empty, { recursive: true });
+  const listing = await listProject(empty);
+  assert.deepEqual(listing.roleDirectories, { found: false, totalDirs: 0, archivedSkips: 0 });
+  assert.deepEqual(listing.issues, []);
+  assert.equal(listing.roles.every((role) => role.cardSections === undefined), true);
+});
+
+test("C1a：有效 worker 的 cardSections（含 title）与 roleDirectories 计数", async () => {
+  const proj = join(ROOT, "matrix-card-sections");
+  const d = join(proj, "角色卡", "实现者");
+  mkdirSync(d, { recursive: true });
+  writeFileSync(
+    join(d, "role-card.md"),
+    [
+      "# 实现者",
+      "",
+      "## 能力描述",
+      "实现即时战斗。",
+      "",
+      "## 职责与功能导航",
+      "战斗内核导航。",
+      "",
+      "## 交接输入输出",
+      "实现任务只来自运营。",
+      "",
+      "## 标准工作流",
+      "1. 读任务",
+      "2. 实现",
+      "",
+      "## 执行原则",
+      "不写角色卡与治理路径。",
+    ].join("\n"),
+  );
+  writeFileSync(join(d, "boundary.yaml"), "entries:\n  - kind: directory\n    path: gameplay/\n    purpose: t\n");
+
+  const listing = await listProject(proj);
+  const role = listing.roles.find((candidate) => candidate.roleId === "实现者");
+  assert.ok(role !== undefined);
+  assert.equal(role?.cardSections?.title, "实现者");
+  assert.match(role?.cardSections?.ability ?? "", /即时战斗/);
+  assert.match(role?.cardSections?.responsibility ?? "", /战斗内核导航/);
+  assert.match(role?.cardSections?.handoff ?? "", /实现任务只来自运营/);
+  assert.match(role?.cardSections?.workflow ?? "", /2\. 实现/);
+  assert.match(role?.cardSections?.executionPrinciples ?? "", /不写角色卡/);
+  assert.deepEqual(listing.roleDirectories, { found: true, totalDirs: 1, archivedSkips: 0 });
+  assert.deepEqual(listing.issues, []);
+  // 内置行不携带 cardSections（无卡文件；显示字段来自注册表）。
+  const builtInRows = listing.roles.filter((candidate) => candidate.builtIn === true);
+  assert.ok(builtInRows.length > 0);
+  assert.equal(builtInRows.every((candidate) => candidate.cardSections === undefined), true);
+});
+
+test("C1a：issues 逐 code 映射、归档不出 issue、roleDirectories 计数；既有 warnings 文案不变", async () => {
+  const proj = join(ROOT, "matrix-issues");
+  const roleRoot = join(proj, "角色卡");
+  const enRoot = join(proj, "role-cards");
+
+  const badYaml = join(roleRoot, "bad-yaml");
+  mkdirSync(badYaml, { recursive: true });
+  writeFileSync(join(badYaml, "role-card.md"), "# bad-yaml");
+  writeFileSync(join(badYaml, "boundary.yaml"), "entries:\n  - kind: nope\n    path: src/b.ts\n    purpose: t\n");
+
+  const noboundary = join(roleRoot, "noboundary");
+  mkdirSync(noboundary, { recursive: true });
+  writeFileSync(join(noboundary, "role-card.md"), "# noboundary");
+
+  const nocard = join(roleRoot, "nocard");
+  mkdirSync(nocard, { recursive: true });
+  writeFileSync(join(nocard, "boundary.yaml"), "entries: []\n");
+
+  const reserved = join(roleRoot, "chief");
+  mkdirSync(reserved, { recursive: true });
+  writeFileSync(join(reserved, "role-card.md"), "# chief");
+  writeFileSync(join(reserved, "boundary.yaml"), "entries:\n  - kind: directory\n    path: src/x\n    purpose: t\n");
+
+  const archived = join(roleRoot, "archived-role");
+  mkdirSync(archived, { recursive: true });
+  writeFileSync(join(archived, "role-card.md"), "# archived-role");
+  writeFileSync(join(archived, "boundary.yaml"), "archived: true\nentries:\n  - kind: directory\n    path: src/x\n    purpose: t\n");
+
+  const dupZh = join(roleRoot, "dup");
+  mkdirSync(dupZh, { recursive: true });
+  writeFileSync(join(dupZh, "role-card.md"), "# dup");
+  writeFileSync(join(dupZh, "boundary.yaml"), "entries:\n  - kind: directory\n    path: src/x\n    purpose: t\n");
+
+  const dupEn = join(enRoot, "dup");
+  mkdirSync(dupEn, { recursive: true });
+  writeFileSync(join(dupEn, "role-card.md"), "# dup");
+  writeFileSync(join(dupEn, "boundary.yaml"), "entries:\n  - kind: directory\n    path: src/x\n    purpose: t\n");
+
+  const listing = await listProject(proj);
+  const issues = listing.issues ?? [];
+  const byCode = (code: string) => issues.filter((issue) => issue.code === code);
+  assert.equal(byCode("boundary-parse-error").length, 1);
+  assert.equal(byCode("boundary-missing").length, 1);
+  assert.equal(byCode("role-card-missing").length, 1);
+  assert.equal(byCode("reserved-id-conflict").length, 1);
+  assert.equal(byCode("duplicate-role").length, 1);
+  assert.equal(issues.length, 5);
+  assert.equal(byCode("boundary-parse-error")[0].relDir, "角色卡/bad-yaml");
+  assert.equal(byCode("boundary-missing")[0].relDir, "角色卡/noboundary");
+  assert.equal(byCode("role-card-missing")[0].relDir, "角色卡/nocard");
+  assert.equal(byCode("reserved-id-conflict")[0].roleId, "chief");
+  assert.equal(byCode("duplicate-role")[0].roleId, "dup");
+  // 归档静默跳过：不出现在 roles、不产生 issue。
+  assert.equal(listing.roles.some((role) => role.roleId === "archived-role"), false);
+  assert.equal(issues.some((issue) => issue.relDir.includes("archived-role")), false);
+  // roleDirectories：7 个子目录（含归档与失败目录）、1 个归档跳过。
+  assert.deepEqual(listing.roleDirectories, { found: true, totalDirs: 7, archivedSkips: 1 });
+  // 既有 warnings 文案不变（结构化 issues 是加法，不替代 warnings）。
+  const w = listing.warnings.join("\n");
+  assert.match(w, /bad-yaml：边界解析失败/);
+  assert.match(w, /noboundary：缺少 boundary\.yaml/);
+  assert.match(w, /nocard：缺少 role-card\.md/);
+  assert.match(w, /chief：与内置治理角色 id 冲突，已跳过/);
+  assert.match(w, /dup：角色重复/);
+});

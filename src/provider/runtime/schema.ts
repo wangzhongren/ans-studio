@@ -1332,6 +1332,41 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "governance_matrix") {
+    // 2026-11-05（治理权力矩阵 C2；只读，注入才注册）：只接受 roleId/section；文案钉只读/unknown/
+    // 强制力分层/刷新/非批准。不新增授权字段、不承诺矩阵是权威来源；角色门控在编排注入端。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          roleId: {
+            type: "string",
+            description: "Optional role id to filter one role; must exactly match an id present in the matrix",
+          },
+          section: {
+            type: "string",
+            enum: ["all", "roles", "routing"],
+            description: "Optional section: all (default), roles, or routing navigation",
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+      description:
+        "**只读**治理权力矩阵摘要（内置治理角色工具，注入才存在）：六个内置治理角色与项目 worker 角色的职能定位、可写/禁写（按结构硬拒/许可条件/宿主注入/约定分层）、派发、客户交互、shell 档位与主链/闸门职责，以及「什么活该派给谁」的导航。" +
+        "矩阵是运行时派生摘要：**不新增、不改变任何权限**；权威在治理角色注册表、`角色卡/<role>/boundary.yaml`、`role-card.md` 与门禁判定本身。" +
+        "`unknown（原因）` 表示来源缺失/损坏/未声明，**不等于允许，也不等于禁止**；不要自行补默认权限。" +
+        "宿主未注入（客户通道/download/shell 等）≠ 角色无权；结构硬拒与角色卡约定分开标注。" +
+        "每次调用重新取数（无缓存），文本中的 generatedAt 是当次计算时间；幕僚启动提示块是快照，需要最新值时调用本工具。" +
+        "`ok:false` 表示矩阵不可用，不是没有权限；工具结果**不是批准、授权、验收或放行证据**。",
+      promptGuidelines: [
+        "派发/核对权力前可调用 governance_matrix 刷新矩阵；启动提示块只是当次快照，generatedAt 之后的变更以本工具结果为准。",
+        "只读摘要，不新增/不改变权限；unknown 不等于允许或禁止，不要据此推断「无权限」或「可写」；权威以注册表/角色卡/边界/门禁为准。",
+        "用 roleId 过滤时必须是矩阵中出现的精确角色 id；section 只接受 all/roles/routing；未知角色返回未找到，不要猜。",
+        "矩阵结果不是批准/验收证据：不要用它替代客户卡、门禁判定或独立验收，也不要把它当写权/派发权凭证。",
+      ],
+    };
+  }
   if (name === "project_note") {
     // 2026-11-02（全局任务状态 A0；仅幕僚注入）：受控备注（focus/blocker/next-step），append-only 写账本事件。
     // 文案纪律：不改机器事实/不是批准或验收证据/不写文档不派发/超限拒绝不截断/不存在的 flow 拒绝。

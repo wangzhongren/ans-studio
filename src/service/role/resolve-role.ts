@@ -43,7 +43,13 @@ import {
 import { ansProjectPath, readGovernanceModel } from "../../common/shared/config-loader.ts";
 import { joinRoot, readTextFile } from "../../common/门禁引擎/io.ts";
 import { parseRoleGroupMetadata } from "../../common/门禁引擎/role-card-metadata.ts";
+import { parseRoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
+import type { RoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
 import { readdir, stat } from "node:fs/promises";
+
+// 公共出口：角色卡结构化章节（共享解析唯一实现恒在门禁引擎私有 role-card-sections.ts；
+// 跨角色只可经本文件消费，不得导入私有解析器或自行解析 cardText）。
+export type { RoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
 
 export async function resolveRole(roleId: string, project: ProjectConfig): Promise<ResolvedRole> {
   const model = project.governanceModel ?? "single";
@@ -125,6 +131,23 @@ export interface ProjectRoleSummary extends RoleGroupMetadata {
   builtIn?: boolean;
   /** 仅 trio 的内置治理角色携带；旧 `liaison` 只读别名不进入列表；`su` 与项目角色不出现。 */
   governanceFunction?: GovernanceFunction;
+  /** 仅项目角色：共享结构化章节解析（矩阵等消费方只读此字段，不得自行解析 cardText）。 */
+  cardSections?: RoleCardSections;
+}
+
+/** 结构化跳过原因（加法；矩阵据此显示「未纳入/未知」条目——仅目录+原因，不回填部分卡字段）。 */
+export interface ProjectRoleIssue {
+  /** 例如 `角色卡/broken-role`。 */
+  relDir: string;
+  roleId?: string;
+  code:
+    | "role-card-missing"
+    | "boundary-missing"
+    | "boundary-parse-error"
+    | "card-read-failed"
+    | "reserved-id-conflict"
+    | "duplicate-role";
+  message: string;
 }
 
 export interface ProjectListing {
@@ -141,6 +164,16 @@ export interface ProjectListing {
   /** 治理模型（评审 §5.4/§5.5）：`listProject` **恒返回**该字段；类型上可选只为让其他角色
    *  在 W3 前构造的测试夹具保持可编译——消费方读取时 `?? "single"` 即旧行为。 */
   governanceModel?: GovernanceModel;
+  /** 加法（治理权力矩阵 C1a）：结构化跳过原因；不携带 cardText 或部分能力字段。 */
+  issues?: ProjectRoleIssue[];
+  /** 加法（治理权力矩阵 C1a）：角色目录事实；`error` 是枚举失败的**唯一**结构化载体（G-4）。 */
+  roleDirectories?: {
+    found: boolean;
+    totalDirs: number;
+    archivedSkips: number;
+    /** 项目根不可读/枚举失败时由调用方（Pipeline）填写；`listProject` 自身失败仍抛错。 */
+    error?: string;
+  };
 }
 
 /** 治理会话角色解析结果（评审 §5.4 公共出口，`openGovernanceSession`/CLI `ans govern`/测试共用）。 */
@@ -283,6 +316,8 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
   }
 
   const warnings: string[] = [];
+  // 加法（治理权力矩阵 C1a）：结构化跳过原因；与 warnings 同源、文案不变，消费方按 relDir+code 去重。
+  const issues: ProjectRoleIssue[] = [];
   // 无角色目录**是正常状态**（§10.2）：这是「项目尚未 bootstrap」的初始态，客户为「空文件夹 →
   // 与内置治理角色对话 → 建角色」专门设计了整套流程，故**既不抛错、也不报警**——hasRoles:false 与界面
   // 「项目尚未 bootstrap」提示已把它说清楚，再画一条红字反而是噪声。warnings 只留给真异常
@@ -316,11 +351,15 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
       // 警告文案是跨角色可断言契约的一部分（不静默丢弃）。`liaison` 是批次 D 退休的旧内置 id：
       // 不再是内置角色/别名，但其历史目录仍按保留 id 跳过，避免旧目录被误枚举为项目角色。
       if (isBuiltInGovernanceRoleId(roleId) || roleId === "liaison") {
-        warnings.push(`${relDir}：与内置治理角色 id 冲突，已跳过`);
+        const message = `${relDir}：与内置治理角色 id 冲突，已跳过`;
+        warnings.push(message);
+        issues.push({ relDir, roleId, code: "reserved-id-conflict", message });
         continue;
       }
       if (seen.has(roleId)) {
-        warnings.push(`${root.name}/${roleId}：角色重复，已在其它角色目录优先采用，跳过`);
+        const message = `${root.name}/${roleId}：角色重复，已在其它角色目录优先采用，跳过`;
+        warnings.push(message);
+        issues.push({ relDir, roleId, code: "duplicate-role", message });
         continue;
       }
 
@@ -344,11 +383,15 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
 
       const cardName = await firstExistingFile(joinRoot(projAbs, relDir), CARD_NAMES);
       if (!cardName) {
-        warnings.push(`${relDir}：缺少 role-card.md，已跳过`);
+        const message = `${relDir}：缺少 role-card.md，已跳过`;
+        warnings.push(message);
+        issues.push({ relDir, roleId, code: "role-card-missing", message });
         continue;
       }
       if (boundaryName === null || boundary === undefined) {
-        warnings.push(`${relDir}：缺少 boundary.yaml，已跳过`);
+        const message = `${relDir}：缺少 boundary.yaml，已跳过`;
+        warnings.push(message);
+        issues.push({ relDir, roleId, code: "boundary-missing", message });
         continue;
       }
 
@@ -359,18 +402,30 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
       try {
         cardText = await readTextFile(joinRoot(projAbs, cardPath));
       } catch (err) {
-        warnings.push(`${relDir}：读取 role-card.md 失败（${(err as Error).message}），已跳过`);
+        const message = `${relDir}：读取 role-card.md 失败（${(err as Error).message}），已跳过`;
+        warnings.push(message);
+        issues.push({ relDir, roleId, code: "card-read-failed", message });
         continue;
       }
 
       // 边界解析失败（复用上方探测时的解析结果，与 resolveRole 同源）
       if (boundary.parseError) {
-        warnings.push(`${relDir}：边界解析失败：${boundary.parseError}，已跳过`);
+        const message = `${relDir}：边界解析失败：${boundary.parseError}，已跳过`;
+        warnings.push(message);
+        issues.push({ relDir, roleId, code: "boundary-parse-error", message });
         continue;
       }
 
       seen.add(roleId);
-      projectRoles.push({ roleId, cardPath, boundaryPath, cardText, boundary, ...parseRoleGroupMetadata(cardText) });
+      projectRoles.push({
+        roleId,
+        cardPath,
+        boundaryPath,
+        cardText,
+        boundary,
+        cardSections: parseRoleCardSections(cardText),
+        ...parseRoleGroupMetadata(cardText),
+      });
     }
   }
 
@@ -447,5 +502,19 @@ export async function listProject(projectRoot: string): Promise<ProjectListing> 
     );
   }
 
-  return { projectRoot, roles, warnings, hasRoles, primaryRoleId, governanceModel };
+  return {
+    projectRoot,
+    roles,
+    warnings,
+    hasRoles,
+    primaryRoleId,
+    governanceModel,
+    issues,
+    roleDirectories: {
+      found: foundRoots.length > 0,
+      totalDirs: totalRoleDirs,
+      archivedSkips,
+      // `error` 由封装方（Pipeline）在 listProject 抛错的场景填写；本函数失败仍抛错（既有语义）。
+    },
+  };
 }

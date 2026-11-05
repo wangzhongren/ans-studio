@@ -74,3 +74,28 @@ Pi唯一tool_call事件源为SDK tool_execution_start，detail带真实turnId/to
 内部 buildExplicitRuntime 的可选 compatibility 状态只为本角色 bindRole 装配使用。原 ReasoningDegradeOptions/REASONING_DEGRADED_SUMMARY 与 makeRolePrompt.reasoningDegrade 已删除；外部生产消费者不依赖这些测试接缝。替换为 SDK 公开 ProviderStreams + fetch 的当前请求兼容，不能再调用两次 native.prompt。同一 provider 调用去参后 SDK transport retry 也沿用去参；正常助手结果才确认当前 model/provider/baseUrl 的活会话兼容。拒绝识别仅 400/422 的明确 thinking 参数/值拒绝，保存设置不变。
 
 system 消息只在活动 prompt 中发出，reasonCode=PI_REASONING，state=configured/compatibility-attempt/compatibility-confirmed/budget-clamped/thinking-disabled。普通消息正文仍为 summary，无公共新字段协议要求。默认预算保护与显式相同，high/xhigh 不增加预算或 maxTokens。实现、真实 SDK 测试与边界见[修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility-and-default.md)。
+
+## 2026-11-05 C4a 治理权力矩阵：`contextSections` 提示段（implemented-unverified）
+
+依据 P1.1 §4.3.1、团队计划 §4.3 C4a 与 PM 裁决 P-1/R-5/R-6/R-7。**状态 `implemented-unverified`（未独立验收；不写 verified）。**
+
+**输入（单一通道，R-5）**
+- 生产入口：`RuntimeProviderOptions.contextSections?: readonly string[]`（C2 冻结，运行时核心主属；Service 仅在已定义时透传）。
+- legacy 直接入口：`PiRuntimeAdapterOptions.contextSections?: readonly string[]`；假适配器选项同名（仅测试面）。
+- 不新增第二字段/第二类型/第二承载通道；`undefined`、`[]`、`[""]`、`["", ""]` ⇒ 系统提示逐字不变（R-7：过滤 `section.length > 0`）。
+
+**固定插入位置（两处 `renderSystemPrompt` 同步，分别断言）**
+- `src/provider/pi/session.ts::renderSystemPrompt`（假适配器与公开外壳 `composeContext`）与 `src/common/pi-adapter/real-adapter.ts::renderSystemPrompt`（真实适配器 `composeContext` 与 `bindRole` 的 `ResourceLoader.systemPrompt`）统一为：
+  `# 角色 → cardText → ## 边界来源 → boundarySource → contextSections → 已安装技能节`。
+- 非空元素按原顺序以 `\n\n` 连接；技能节缺省时提示段为末尾。只做哑拼接：不 trim/不清洗/不截断/不解析；数据化包裹/清洗/限长由矩阵 Service（C1b）渲染、编排（C3）注入。
+- `governance_matrix` 工具与 `promptGuidelines` 不进系统提示拼接，仍随注入的 `ToolDefinition` 透传（不变）。
+
+**判断会话防御（P-1/R-6）**
+- `shellJudge`/`governanceJudge`（假适配器与 legacy 外壳）或 `judgeMode === true`（公开外壳与真实适配器）成立时，即使误传 `contextSections` 也置空、不拼接。
+- 四个调用点：`pi/session.ts` 假适配器 `composeContext`、公开外壳 `composeContext`、`real-adapter.ts` `composeContext`、`real-adapter.ts` `bindRole` 的 `ResourceLoader.systemPrompt`。该守卫只做包含性防御，不改变注入范围/工具面/权限。
+
+**测试与证据**
+- `test/pi-adapter/governance-matrix-context.test.ts`（10 例，10/10 pass）：两处实现固定位置、多段保序、缺省/空数组/空串逐字不变、判断会话误传不拼、数据化文本逐字透传。
+- pi-adapter 全量 40 文件：346/343/2/1（exit 1；2 项为既有 Windows symlink EPERM，新增失败/skip=0；`write-sequencing.test.ts` 排除）。
+- T2：`npm run typecheck` exit 0；T3 全量 4,130/4,103/9/18（9 项既有 EPERM；新增确定性失败 0、新增 skip 0）。
+- 候选：HEAD `0418746ae9f2ed20f389c26da34ef55840febfe6` + 工作树快照 `839b922f…`。实施记录见 [`docs/change/2026-11-05_governance-authority-matrix-pi-adapter-implementation.md`](docs/change/2026-11-05_governance-authority-matrix-pi-adapter-implementation.md)。

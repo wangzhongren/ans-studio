@@ -1,6 +1,6 @@
 # 门禁引擎边界 —— Section 1 唯一写入白名单
 # 未列路径默认只读。超出下列文件的业务源码须先由 ANS Governance 更新本文件并经客户确认。
-# src/model/ 的三个文件是跨层共享类型，本角色是唯一主属主；其他角色只读引用。
+# src/model/ 的四个文件是跨层共享类型，本角色是唯一主属主；其他角色只读引用。
 role: 门禁引擎
 entries:
   - kind: file
@@ -13,6 +13,9 @@ entries:
     path: src/model/decision.ts
     purpose: 写入判定结果的共享类型
   - kind: file
+    path: src/model/governance-matrix.ts
+    purpose: 治理权力矩阵共享类型（governance-matrix/v1：来源/unknown 枚举、工具结果契约、GovernanceMatrixFn；无 I/O；本角色为唯一主属主）
+  - kind: file
     path: src/service/boundary/resolve-boundary.ts
     purpose: 双来源边界解析（含项目覆盖）
   - kind: file
@@ -24,6 +27,9 @@ entries:
   - kind: file
     path: src/service/gate/shell-rules.ts
     purpose: shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认）
+  - kind: directory
+    path: src/service/governance-matrix/
+    purpose: 矩阵组装/渲染 Service 的有界私有模块根（纯组装与有界渲染；不调用其他 Service、不读盘、不写盘；不构成 src/service/ 整目录授权）
   - kind: directory
     path: src/common/门禁引擎/
     purpose: 本角色私有辅助代码
