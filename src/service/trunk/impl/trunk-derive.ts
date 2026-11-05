@@ -30,6 +30,7 @@ import type { TrunkServiceResult } from "../abstract/trunk-service.ts";
 import {
   computeTrunkDigest,
   docVersionOfPath,
+  filePathOfRef,
   sha256File,
 } from "./trunk-common.ts";
 
@@ -40,9 +41,10 @@ function fail(message: string): TrunkServiceResult<never> {
 }
 
 async function artifactRef(projectRoot: string, relPath: string): Promise<TrunkArtifactRef | undefined> {
-  const sha256 = await sha256File(projectRoot, relPath);
+  // run documents 允许 `path#fragment`（内嵌区块）；哈希取文件部分，引用串原样保留。
+  const sha256 = await sha256File(projectRoot, filePathOfRef(relPath));
   if (sha256 === undefined) return undefined;
-  const version = docVersionOfPath(relPath);
+  const version = docVersionOfPath(filePathOfRef(relPath));
   return { path: relPath, sha256, ...(version !== undefined ? { version } : {}) };
 }
 
@@ -192,7 +194,7 @@ export async function runManifestMatchesTarget(
   for (const [kind, expected] of Object.entries(target.documents)) {
     const ref = run.documents[kind as keyof typeof run.documents];
     if (ref === null || ref === undefined) return false;
-    if (path.posix.normalize(ref.path) !== path.posix.normalize(expected.path)) return false;
+    if (path.posix.normalize(filePathOfRef(ref.path)) !== path.posix.normalize(filePathOfRef(expected.path))) return false;
     if (ref.sha256 !== undefined && ref.sha256.toLowerCase() !== expected.sha256.toLowerCase()) return false;
   }
   const plan = run.execution.teamPlan;

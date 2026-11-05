@@ -10,6 +10,7 @@ import fs from "node:fs/promises";
 import { test } from "node:test";
 
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
+import { readRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { createVersionChangeRuntime } from "../../src/pipeline/orchestration/version-change-runtime.ts";
 import type {
@@ -35,6 +36,7 @@ interface Rig {
   runtime: VersionChangeRuntime;
   events: TaskStateEvent[];
   notifications: string[];
+  initiatorNotes: Array<{ roleId: string; message: string }>;
   presenterCalls: { versionChange: number; items: number };
 }
 
@@ -48,6 +50,7 @@ async function setup(options: { presenter?: boolean } = {}): Promise<Rig> {
   });
   const events: TaskStateEvent[] = [];
   const notifications: string[] = [];
+  const initiatorNotes: Array<{ roleId: string; message: string }> = [];
   const trunkRuntime = createTrunkRuntime({
     projectRoot: project.root,
     service: integration.trunk,
@@ -79,9 +82,12 @@ async function setup(options: { presenter?: boolean } = {}): Promise<Rig> {
     notify: (message) => {
       notifications.push(message);
     },
+    notifyInitiator: (roleId, message) => {
+      initiatorNotes.push({ roleId, message });
+    },
     now: () => new Date(AT),
   });
-  return { project, integration, trunkRuntime, runtime, events, notifications, presenterCalls };
+  return { project, integration, trunkRuntime, runtime, events, notifications, initiatorNotes, presenterCalls };
 }
 
 async function bootstrap(rig: Rig): Promise<void> {
@@ -108,7 +114,7 @@ test("version-change-runtime：bootstrap version-upgrade（present → approve �
   const rig = await setup();
   try {
     const v2 = "docs/proposals/demo-proposal-v2.md";
-    await writeProjectFile(rig.project.root, v2, "---\nschema: project-proposal/v2\n---\n# proposal v2\n");
+    const v2sha = await writeProjectFile(rig.project.root, v2, "---\nschema: project-proposal/v2\n---\n# proposal v2\n");
     const submitted = await rig.runtime.submit({
       kind: "version-upgrade",
       initiatorRoleId: "product",
@@ -134,6 +140,29 @@ test("version-change-runtime：bootstrap version-upgrade（present → approve �
     const current = await rig.integration.trunk.current();
     assert.equal(current?.trunkVersion, 1);
 
+    // 存量项目基线绑定：bootstrap apply 同时把唯一 pinned run 回绑到 t1 内容（v2 目标），
+    // 不允许出现「trunk 指向 v2、run 仍 pin v1」的割裂。
+    const run = await readRunManifest(rig.project.root, rig.project.runId);
+    assert.equal(run.ok, true, run.ok ? "" : run.reason);
+    if (run.ok) {
+      assert.equal(run.manifest.documents.proposal?.path, v2);
+      assert.equal(run.manifest.documents.proposal?.sha256, v2sha);
+      const repins = (run.manifest as unknown as { repins?: Array<{ applicationId?: string }> }).repins ?? [];
+      assert.equal(
+        repins.some((repin) => repin.applicationId === "vc-1"),
+        true,
+        "bootstrap apply 应记录 run re-pin",
+      );
+    }
+
+    // 存量项目 bootstrap：派生基线的 roster/D3/roles 必须一起落进 t1，verify 零违规。
+    const bootstrapStatus = await rig.integration.trunk.status();
+    assert.equal(bootstrapStatus.manifest?.d3?.decisionId, "dec-0");
+    assert.deepEqual(bootstrapStatus.manifest?.roles, ["impl"]);
+    assert.equal(bootstrapStatus.manifest?.rosterVersion, 1);
+    const bootstrapVerify = await rig.integration.trunk.verify();
+    assert.deepEqual(bootstrapVerify.violations, []);
+
     const versionEvents = rig.events.filter((event) => event.kind === "version.change");
     const statuses = versionEvents.map((event) => (event.kind === "version.change" ? event.status : ""));
     assert.deepEqual(statuses, ["submitted", "approved", "applied"]);
@@ -150,6 +179,11 @@ test("version-change-runtime：bootstrap version-upgrade（present → approve �
       assert.equal(freezeEvents[0].origin, "application");
     }
     assert.equal(rig.presenterCalls.versionChange, 1);
+    assert.equal(
+      rig.initiatorNotes.some((note) => note.roleId === "product" && note.message.includes("已批准并应用")),
+      true,
+      `发起人未收到批准回执：${JSON.stringify(rig.initiatorNotes)}`,
+    );
   } finally {
     await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
@@ -368,6 +402,7 @@ test("version-change-runtime：客户卡拒绝 ⇒ rejected（customer 事件，
       runRepin: createRunRepinPort(project.root),
     });
     const events: TaskStateEvent[] = [];
+    const initiatorNotes: Array<{ roleId: string; message: string }> = [];
     const trunkRuntime = createTrunkRuntime({
       projectRoot: project.root,
       service: integration.trunk,
@@ -388,6 +423,9 @@ test("version-change-runtime：客户卡拒绝 ⇒ rejected（customer 事件，
         async presentVersionChange() {
           return { outcome: "answered", choice: "reject-version-change", decisionId: "dec-no" };
         },
+      },
+      notifyInitiator: (roleId, message) => {
+        initiatorNotes.push({ roleId, message });
       },
       now: () => new Date(AT),
     });
@@ -421,6 +459,11 @@ test("version-change-runtime：客户卡拒绝 ⇒ rejected（customer 事件，
       assert.equal(rejected.decisionId, "dec-no");
     }
     assert.equal(await integration.trunk.current(), null);
+    assert.equal(
+      initiatorNotes.some((note) => note.roleId === "product" && note.message.includes("已拒绝")),
+      true,
+      `发起人未收到拒绝回执：${JSON.stringify(initiatorNotes)}`,
+    );
   } finally {
     await fs.rm(project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }

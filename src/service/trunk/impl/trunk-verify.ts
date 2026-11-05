@@ -16,7 +16,7 @@ import type { FreezeRegistryStore } from "../../../provider/version-change/abstr
 import type { TrunkStore } from "../../../provider/trunk/abstract/trunk-store.ts";
 import type { TrunkVerifyResult } from "../abstract/trunk-service.ts";
 import { deriveTrunk } from "./trunk-derive.ts";
-import { docFreezeState, samePath, sha256File } from "./trunk-common.ts";
+import { docFreezeState, filePathOfRef, samePath, sha256File } from "./trunk-common.ts";
 
 export interface TrunkVerifyDeps {
   projectRoot: string;
@@ -101,7 +101,7 @@ async function verifyFrozenDocuments(
   if (state === "missing") return; // migration-required：F29 既有文档默认冻结，不误报
   for (const [kind, ref] of Object.entries(manifest.artifacts.documents)) {
     if (ref === undefined) continue;
-    const frozen = await docFreezeState(registry, ref.path, ref.sha256);
+    const frozen = await docFreezeState(registry, filePathOfRef(ref.path), ref.sha256);
     if (frozen === "corrupt") {
       violations.push(`freeze: registry corrupt while checking ${kind}`);
       continue;

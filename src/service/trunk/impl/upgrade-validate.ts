@@ -27,7 +27,7 @@ import type {
   UpgradeChainValidation,
   UpgradeChainValidationInput,
 } from "../abstract/trunk-service.ts";
-import { sha256File } from "./trunk-common.ts";
+import { filePathOfRef, sha256File } from "./trunk-common.ts";
 
 function fail<T>(message: string): TrunkServiceResult<T> {
   return { ok: false, code: "trunk-item-invalid", message };
@@ -79,12 +79,14 @@ export async function validateUpgradeChain(
   for (const kind of Object.keys(input.documents) as TrunkDocKind[]) {
     const ref = input.documents[kind];
     if (ref === undefined) continue;
-    const actual = await sha256File(projectRoot, ref.path);
+    // 文档引用允许 `path#fragment`（run documents 约定）；哈希/读取取文件部分。
+    const fileRel = filePathOfRef(ref.path);
+    const actual = await sha256File(projectRoot, fileRel);
     if (actual === undefined) return fail(`documents.${kind} 文件缺失：${ref.path}`);
     if (actual.toLowerCase() !== ref.sha256.toLowerCase()) {
       return fail(`documents.${kind} 哈希不符：${ref.path}`);
     }
-    const text = await readText(projectRoot, ref.path);
+    const text = await readText(projectRoot, fileRel);
     if (text === undefined) return fail(`documents.${kind} 不可读：${ref.path}`);
     texts.set(kind, text);
   }
@@ -134,21 +136,21 @@ export async function validateUpgradeChain(
     if (roster.proposal !== proposalRef.path) {
       return fail(`契约版本链不匹配：roster.proposal=${roster.proposal} ≠ 有效 proposal=${proposalRef.path}`);
     }
-    const proposalText = texts.get("proposal") ?? (await readText(projectRoot, proposalRef.path));
+    const proposalText = texts.get("proposal") ?? (await readText(projectRoot, filePathOfRef(proposalRef.path)));
     if (proposalText === undefined) return fail(`proposal 不可读：${proposalRef.path}`);
     if (!proposalText.includes(roster.intent)) {
       return fail(`契约版本链不匹配：proposal 未引用 roster.intent=${roster.intent}`);
     }
     const architectureRef = input.documents.architecture;
     if (architectureRef === undefined) return fail("roster 变更必须同时提供 architecture 目标文档（版本链）");
-    const architectureText = texts.get("architecture") ?? (await readText(projectRoot, architectureRef.path));
+    const architectureText = texts.get("architecture") ?? (await readText(projectRoot, filePathOfRef(architectureRef.path)));
     if (architectureText === undefined) return fail(`architecture 不可读：${architectureRef.path}`);
     if (!architectureText.includes(roster.proposal)) {
       return fail(`契约版本链不匹配：architecture 未引用 roster.proposal=${roster.proposal}`);
     }
     const modulesRef = input.documents.modules;
     if (modulesRef === undefined) return fail("roster 变更必须同时提供 modules 目标文档（版本链）");
-    const modulesText = texts.get("modules") ?? (await readText(projectRoot, modulesRef.path));
+    const modulesText = texts.get("modules") ?? (await readText(projectRoot, filePathOfRef(modulesRef.path)));
     if (modulesText === undefined) return fail(`modules 不可读：${modulesRef.path}`);
     const modulesParsed = parseProjectModules(modulesText, input.flowId);
     if (!modulesParsed.ok) return fail(`modules 非法：${modulesParsed.reason}`);

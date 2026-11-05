@@ -2528,6 +2528,8 @@ export const enUS = {
   "ui.versionChange.targetMore": "{count} more targets",
   "ui.versionChange.summary": "Summary: {summary}",
   "ui.versionChange.hash": "Submitted hash: {hash}",
+  "ui.versionChange.baselineBootstrap":
+    "Trunk baseline: none (bootstrap) — approval establishes trunk t1 from the existing pinned frozen documents plus this change.",
   "ui.versionChange.diff": "Diff preview",
   "ui.versionChange.semantics.versionUpgrade": "Approval is the final content confirmation; approved targets are frozen and the trunk switches.",
   "ui.versionChange.semantics.detailAmendment": "Approval is the submission/freeze gate; item confirmations are the content gate.",

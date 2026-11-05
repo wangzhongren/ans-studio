@@ -40,6 +40,7 @@ import {
   computeTrunkDigest,
   docFreezeState,
   docVersionOfPath,
+  filePathOfRef,
   sha256File,
   snapshotMatchesManifest,
   snapshotOfManifest,
@@ -97,11 +98,11 @@ function mergeTarget(input: InternalApplyInput, current: TrunkManifest | undefin
   };
 }
 
-/** 目标内容哈希以磁盘字节复核（内容匹配为主）；返回错误消息。 */
+/** 目标内容哈希以磁盘字节复核（内容匹配为主；引用允许 `path#fragment`，哈希取文件部分）。 */
 async function verifyTargetContent(projectRoot: string, target: TrunkApplySnapshot): Promise<string | undefined> {
   if (target.workflow === undefined) return "target.workflow 缺失";
   const check = async (label: string, relPath: string, expected: string): Promise<string | undefined> => {
-    const actual = await sha256File(projectRoot, relPath);
+    const actual = await sha256File(projectRoot, filePathOfRef(relPath));
     if (actual === undefined) return `${label} 文件缺失：${relPath}`;
     if (actual.toLowerCase() !== expected.toLowerCase()) return `${label} 哈希不符：${relPath}`;
     return undefined;
@@ -137,7 +138,8 @@ async function verifyTargetsFrozen(
   target: TrunkApplySnapshot,
 ): Promise<string | undefined> {
   for (const [kind, ref] of Object.entries(target.documents)) {
-    const state = await docFreezeState(deps.freezeRegistry, ref.path, ref.sha256);
+    // 冻结记录按文件路径登记（无 fragment）；引用 `path#fragment` 时查文件部分。
+    const state = await docFreezeState(deps.freezeRegistry, filePathOfRef(ref.path), ref.sha256);
     if (state === "corrupt") return "冻结注册表不可用：fail-closed（不自动重建）";
     if (state !== "frozen") return `documents.${kind} 未冻结：${ref.path}`;
   }
@@ -253,8 +255,15 @@ export async function commitTrunkApply(
   const target = mergeTarget(input, current, newVersion);
 
   // 幂等：当前 manifest 内容已等于目标内容（崩溃后重放；版本按当前 manifest 归一比较）。
+  // 元数据（rosterVersion/d3/roles）也须一致——显式修复携带名单事实时不得被内容幂等短路。
+  const metadataMatches =
+    current !== undefined &&
+    (input.rosterVersion === undefined || input.rosterVersion === current.rosterVersion) &&
+    (input.d3 === undefined || JSON.stringify(input.d3) === JSON.stringify(current.d3)) &&
+    (input.roles === undefined || JSON.stringify(input.roles) === JSON.stringify(current.roles));
   if (
     current !== undefined &&
+    metadataMatches &&
     current.flowId === input.flowId &&
     snapshotMatchesManifest({ ...target, trunkVersion: current.trunkVersion, runId: current.runId }, current)
   ) {
