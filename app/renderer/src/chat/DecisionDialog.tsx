@@ -194,6 +194,13 @@ export function DecisionDialog() {
 
   const reject = () => {
     if (view.kind === "choice") {
+      // VCA 客户主权卡（选项含 reject-version-change）：底部「拒绝」必须**真正拒绝申请**
+      // （选中拒绝项并提交）；不能用 cancelled——那只是放弃作答，申请会继续挂在待批（旧陷阱）。
+      const rejectOption = view.options.find((option) => option.id === "reject-version-change");
+      if (rejectOption !== undefined) {
+        void send({ kind: "choice", selected: [rejectOption.id] }, { allowCancel: true });
+        return;
+      }
       void send({ kind: "choice", cancelled: true }, { allowCancel: true });
     } else {
       // 拒绝不带 acknowledged（D3：confirmed:false 不要求/不校验 ack）。

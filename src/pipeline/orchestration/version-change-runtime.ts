@@ -540,11 +540,28 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       }
       if (outcome.choice === "reject-version-change") {
         const rejected = await this.reject(applicationId, outcome.decisionId);
+        if (!rejected.ok) {
+          // 卡片已作答但拒绝未完成：必须回显（否则客户只看到卡关闭、申请仍挂在待批）。
+          await notifyStatus(
+            record,
+            "处理失败",
+            `：拒绝未完成（${rejected.code}${rejected.message !== undefined ? ` ${rejected.message}` : ""}）；申请保持 ${record.status}，可重新呈现`,
+          );
+        }
         return rejected.ok
           ? { ok: true, value: { record: rejected.value, needsItems: false } }
           : rejected;
       }
-      return this.approve(applicationId, outcome.decisionId);
+      const approved = await this.approve(applicationId, outcome.decisionId);
+      if (!approved.ok) {
+        // 卡片已作答但批准/应用未完成（如版本链校验失败）：同样回显，申请保持 submitted。
+        await notifyStatus(
+          record,
+          "处理失败",
+          `：批准未完成（${approved.code}${approved.message !== undefined ? ` ${approved.message}` : ""}）；申请保持 submitted，可重新呈现`,
+        );
+      }
+      return approved;
     },
 
     async approve(applicationId, decisionId) {
