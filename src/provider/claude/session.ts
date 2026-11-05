@@ -184,16 +184,25 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
   // G-4 installed-skills section: the render is the single orchestration source (hash/matching/bad-file
   // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
   // string renders nothing (zero-skill status quo stays byte-identical).
+  // C4b（治理权力矩阵）：纯展示文本段只经 `RuntimeProviderOptions.contextSections` 单一通道注入，
+  // 由编排在会话绑定时给定；适配器只在固定位置拼接（边界 JSON 之后、工具 guidelines/技能节之前），
+  // 不改写、不重排、不判定。判断会话即使误传也不拼接（与 installedMcpServers/技能节的既有收口同型）；
+  // 空数组/缺省以及全空串元素视为无片段（PM 裁决 R-5/R-6/R-7），系统提示逐字不变。
   const systemPrompt = (role: ResolvedRole) => {
     // 判断会话不拼接项目技能注入节：判断只按稳定 rubric + 按需 judge_read_file 读证据，
     // 不让角色/技能文本进入系统提示（普通角色会话逐字不变）。
     const installedSkills = judgeMode ? "" : renderInstalledSkillsSection(options.projectRoot, role.id);
+    let contextSections: readonly string[] = [];
+    if (!judgeMode) {
+      contextSections = (options.contextSections ?? []).filter((section) => section.length > 0);
+    }
     return [
       role.cardText,
       judgeMode
         ? claudeJudgeSystemPromptLine(role.id, claudeJudgeReportToolName(options.tools))
         : `你始终绑定角色 ${role.id}。只能通过 mcp__ans__ 工具操作环境；所有写入、shell 和交互由 ANS 的注入能力判断。`,
       `当前角色边界：${JSON.stringify(role.boundary)}`,
+      ...contextSections,
       ...options.tools.flatMap((tool) => tool.promptGuidelines ?? []),
       ...(installedSkills === "" ? [] : [installedSkills]),
     ].join("\n\n");

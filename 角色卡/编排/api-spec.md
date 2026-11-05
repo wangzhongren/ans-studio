@@ -1183,3 +1183,16 @@ function evaluateDispatchPreflight(input: DispatchPreflightInput): DispatchPrefl
 - **判断/机械**：W-6 `requiredArtifactPaths("download")={paths:[],missing:false}`；W-7 download rubric + `request.download` 渲染 + 合成 `flowId:"download"` 标注；`governance-judge-verdict.ts` `case "download"`（confirm+`confirmed:true`，无 paths/pathDecisions）+ `SAFE_MANUAL_REASON_CODES` 加 `download-facts-missing`；`RejectionOwner:"requester"` + 17 个 `download-*` RULES + `download-facts-missing` 入 UNVERIFIABLE。
 - **能力位**：`AdapterCapabilities.requestDownload` + `openRoleSession` 输入/`createRuntimeAdapterFactory` 透传；`CARD_KIND_ROUTE_HINTS.download`（F6）；CLI/判断会话结构缺席。
 - **冻结**：上述 Provider/Service 公共入口、Pipeline 句柄/presenter/结果形状、`takeDownloadDirective`/`list()` 投影、`consumerOf("download")`、W-6/W-7、错误码/owner、`downloads.jsonl`/`download-consumer.json`、并发 ≤2；C1/C2/D1 只消费，变更回 B1 重跑证据。
+
+## 2026-11-05 治理权力矩阵 C3：Pipeline 取数 / 幕僚提示块 / 六角色工具门控（implemented-unverified）
+
+状态：已实现、`test/编排` 925/924/1（唯一失败=既有 Windows symlink EPERM）、`npm run typecheck` exit 0；**未验收、未 commit/push**。证据见 [实施记录](docs/change/2026-11-05_governance-authority-matrix-orchestration-implementation.md)。
+
+- `src/pipeline/orchestration/run-role.ts`（C3，唯一源码写集）：
+  - `openRoleSession` 在 `trio + built-in-governance + 六个内置角色之一` 时启用矩阵：chief 在能力组装前计算**一次**快照并经 `AdapterCapabilities.contextSections`（单段、非空）交给 C2；六个内置角色注入 `AdapterCapabilities.governanceMatrix`（注入才注册；五个非幕僚启动不计算；工具调用每次重新取数 + C1b `buildGovernanceMatrix`/`renderGovernanceMatrix`）。
+  - 取数：`listProject` 一次（worker `filter(!builtIn)`、`issues`/`warnings`/`roleDirectories` 透传；枚举失败唯一载体 `roleDirectories.error`）；acceptance 仅对可解析角色（内置六角色或 `project.roles[roleId]` 存在）经 Service 公开出口 `resolveBoundary(...).acceptance`；worker 只消费 listing 声明 `boundary.entries` 与 `cardSections`（`displayName ← cardSections.title`）；`cardKindsByRole` 为 `TRIO_CARD_KINDS` 按 `GOVERNANCE_CONFIRM_CARD_KINDS` 的拆分快照；`initiationByRole` 由既有门控谓词派生；会话标志取真实注入状态。
+  - 上限常量：`GOVERNANCE_MATRIX_PROMPT_MAX_CHARS`/`GOVERNANCE_MATRIX_TOOL_MAX_CHARS`/`GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS` 均从 C1b `src/service/governance-matrix/public.ts` 导入；`run-role.ts` 不写字面量。
+  - 诊断（不含卡面全文/敏感信息）：`governance.matrix.build`（trigger/tool、status、roles、warnings、truncated）、`governance.matrix.unavailable`、`governance.matrix.listing.failed`、`governance.matrix.contract-violation`、`governance.matrix.acceptance.failed`。
+  - 不注入：worker、`su`/single、判断会话（不经 `openRoleSession`）、`runRole` 一次性 CLI（`createAdapter(gate)` 无 capabilities）。`createRuntimeAdapterFactory` 对 `contextSections`/`governanceMatrix` 纯透传。
+- 消费契约（只读）：C1a `src/model/governance-matrix.ts`（`GovernanceMatrixFn`/`GovernanceMatrixInput`/`MatrixRoleDirectories.error`/`WorkerRoleInput.displayName`）；C1a `ProjectListing.issues/roleDirectories`、`ProjectRoleSummary.cardSections.title`；C1b `src/service/governance-matrix/public.ts`；C2 `GovernedToolsOptions.governanceMatrix`、`RuntimeProviderOptions.contextSections`、`RuntimeSessionOptions.contextSections`。
+- 冻结：本文件列出的 `openRoleSession` 矩阵注入行为与工具门控（对外表现）；C3 完成即冻结，变更回编排并重跑受影响证据。

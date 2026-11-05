@@ -80,6 +80,11 @@ export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "curre
   requestRetryMaxDelayMs?: number;
   /** P3 单回合所有 attempt 的总预算（毫秒；缺省 600000＝10min）；超出不再重试，终态 failed。 */
   requestRetryBudgetMs?: number;
+  /**
+   * 纯展示文本段（见 `RuntimeProviderOptions.contextSections`）：由编排（C3）在会话绑定时注入；
+   * 未定义 ⇒ 不下发字段（系统提示逐字不变）；空数组不在本层拼接，由适配器按「非空才拼」处理。
+   */
+  contextSections?: readonly string[];
   /** Demo-only script; no SDK and no fallback for another runtime. */
   script?: ToolCall[];
 }
@@ -230,6 +235,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
           // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
           ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
+          // 治理权力矩阵（C2）：纯展示通道；仅编排在会话绑定时注入，未定义不下发字段（逐字现状）。
+          // 空数组是否拼接由适配器按「非空才拼」处理（本层不做判定）。
+          ...(options.contextSections !== undefined ? { contextSections: options.contextSections } : {}),
           ...resolveRuntimeTimeouts(options.runtime, options),
           // P1 请求级超时：宿主/测试注入才覆盖；缺省由适配器用 90s/300s（单一来源
           // `runtime-core/request-timeout.ts`）。Pi/Codex 不改超时语义（Q10）。

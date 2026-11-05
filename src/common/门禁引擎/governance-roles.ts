@@ -43,6 +43,22 @@ export interface GovernanceCapabilities {
   shell: "none" | "readonly" | "operator-approve";
 }
 
+/**
+ * 内置治理角色的**只读展示摘要**（治理权力矩阵 C1a；OQ-3 客户 2026-11-05 已接受）。
+ * 仅展示、不参与任何判定：不得被门禁/派发/客户卡校验/冻结/trunk/VCA/stable-write 代码导入或读取；
+ * 与 `cardText` 同文件维护、同源评审；与卡文本冲突时以卡文本/注册表为准并修正摘要。
+ */
+export interface BuiltInGovernanceMatrixSummary {
+  /** 职能定位短句（六角色必须非空）。 */
+  duty: string;
+  /** 主链/闸门职责短句（六角色必须非空）。 */
+  mainChain: readonly string[];
+  /** 卡面纪律短摘录（可选；矩阵渲染为 force.conventions）。 */
+  cardDiscipline?: readonly string[];
+  /** 派发范围短摘录（可选；仅文案）。 */
+  dispatchScope?: string;
+}
+
 /** 一个 trio 内置治理角色的完整规格（评审 §5.2；2026-10-18 增 liaison/verifier）。
  *  2026-10-28 批次 A（方案 v9.2）：六角色 `chief`/`product`/`rapporteur`/`nominator`/`convener`/
  *  `verifier`；`liaison` 已退休（不再有别名/规格）。 */
@@ -61,6 +77,8 @@ export interface BuiltInGovernanceRoleSpec {
   /** 先于 `resolveWrite` 判定的禁写前缀（应用治理记录/其他治理角色资料），命中即拒。 */
   forbiddenWritePaths: readonly string[];
   capabilities: GovernanceCapabilities;
+  /** 只读展示摘要（治理权力矩阵；**不参与判定**）。 */
+  matrix: BuiltInGovernanceMatrixSummary;
 }
 
 export type TrioGovernanceRoleId = BuiltInGovernanceRoleSpec["id"];
@@ -294,6 +312,18 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       installMcp: false,
       shell: "operator-approve",
     },
+    matrix: {
+      duty: "工作流管理、按序派发、短报汇总、运行日志巡检（不是决定权）。",
+      mainChain: [
+        "产品意图 → 策划方案/名单/架构 → 人事写卡 → 交付运营。",
+        "实现阶段由运营派 worker，幕僚收汇总；可调度质检做验收核对。",
+        "需求确认卡 intent-confirm；不批准提案/任命/验收。",
+      ],
+      cardDiscipline: [
+        "任务文本写清目标/期望产出/证据；短报如实区分完成/阻塞/失败；不伪造完成、不把推荐项当客户决定。",
+      ],
+      dispatchScope: "派发目标：内置角色 + 项目 worker（自身除外）；范围由应用派发前校验。",
+    },
   },
   {
     id: "product",
@@ -327,6 +357,16 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       installMcp: false,
       shell: "operator-approve",
     },
+    matrix: {
+      duty: "产品取舍、产品评审、产品意图文档；派策划的机械前置。",
+      mainChain: [
+        "产出 docs/product/<flowId>-intent-vN.md（版本化，不原地改）。",
+        "不写实现方案/提案/名单/角色卡。",
+      ],
+      cardDiscipline: [
+        "只写 docs/product/；不写提案/名单/架构/角色卡；不实现、不招人。",
+      ],
+    },
   },
   {
     id: "rapporteur",
@@ -352,6 +392,16 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       installSkill: false,
       installMcp: false,
       shell: "operator-approve",
+    },
+    matrix: {
+      duty: "据产品意图出策划方案、人员名单、项目架构；提案/契约。",
+      mainChain: [
+        "提案/名单/架构是人事招人的唯一依据。",
+        "发提案卡/decision 卡；细节修正/修正案走版本变更申请。",
+      ],
+      cardDiscipline: [
+        "名单是人事招人的唯一依据；不写角色卡、不招人、不实现、不改产品意图。",
+      ],
     },
   },
   {
@@ -384,6 +434,16 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       installSkill: true,
       installMcp: true,
       shell: "operator-approve",
+    },
+    matrix: {
+      duty: "按名单招人；角色卡/边界/技能/MCP 治理写入。",
+      mainChain: [
+        "无最新合法名单不得写卡。",
+        "发招人决定卡 appointment 与写卡确认卡 appointment-write；不招名单外角色。",
+      ],
+      cardDiscipline: [
+        "无名单不得写卡；不招名单外角色；不批准提案/验收，不代客户决定。",
+      ],
     },
   },
   {
@@ -420,6 +480,18 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       installMcp: false,
       shell: "operator-approve",
     },
+    matrix: {
+      duty: "接交付；派发实现任务给 worker、收短报、汇总幕僚；可发起验收（质检执行）。",
+      mainChain: [
+        "工作流先行（维护 docs/workflow.md）。",
+        "派发限 D3 选中 worker 与质检；重构申请与 stable 写入由它发起。",
+        "不写卡/不招人。",
+      ],
+      cardDiscipline: [
+        "不写角色卡、不招人、不改名单、不写项目源码；不批准、不验收。",
+      ],
+      dispatchScope: "派发目标限 D3 选中 worker 与质检（应用预检）。",
+    },
   },
   {
     id: "verifier",
@@ -451,6 +523,17 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = [
       installSkill: false,
       installMcp: false,
       shell: "operator-approve",
+    },
+    matrix: {
+      duty: "可选质量核对与验收执行者。",
+      mainChain: [
+        "由运营发起或幕僚调度。",
+        "报告写 docs/quality/、证据写 docs/verification/；发 acceptance 卡。",
+        "不批准、不代客户验收。",
+      ],
+      cardDiscipline: [
+        "不批准、不代客户验收；证据最多真实运行截图，不要求录屏。",
+      ],
     },
   },
 ];

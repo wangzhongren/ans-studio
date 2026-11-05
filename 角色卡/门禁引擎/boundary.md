@@ -7,10 +7,12 @@
 | 单文件 | `src/model/boundary.ts` | 边界条目与 Section 1 的共享类型 |
 | 单文件 | `src/model/role.ts` | 角色与来源的共享类型 |
 | 单文件 | `src/model/decision.ts` | 写入判定结果的共享类型 |
+| 单文件 | `src/model/governance-matrix.ts` | 治理权力矩阵共享类型（`governance-matrix/v1`：来源/unknown 枚举、工具结果契约、`GovernanceMatrixFn`；无 I/O；本角色为唯一主属主） |
 | 单文件 | `src/service/boundary/resolve-boundary.ts` | 双来源边界解析（含项目覆盖） |
 | 单文件 | `src/service/role/resolve-role.ts` | 双来源角色解析 |
 | 单文件 | `src/service/gate/resolve-write.ts` | 路径判定 |
 | 单文件 | `src/service/gate/shell-rules.ts` | shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认） |
+| 目录（私有） | `src/service/governance-matrix/` | 矩阵组装/渲染 Service 的有界私有模块根（纯组装与有界渲染；不调用其他 Service、不读盘、不写盘；不构成 `src/service/` 整目录授权） |
 | 目录（私有） | `src/common/门禁引擎/` | 本角色私有辅助代码 |
 | 目录（测试） | `test/门禁引擎/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/门禁引擎/feature-map.md` | 功能导航 |
@@ -23,6 +25,6 @@
 | 目录 | `角色卡/门禁引擎/docs/change/` | 变更记录 |
 | 目录 | `角色卡/门禁引擎/docs/fix/` | 修复记录 |
 
-`src/model/` 的这三个文件是跨层共享类型，本角色是唯一主属主；其他角色只读引用。改动它们会使所有引用方的既有证据失效，须先经项目管理角色协调。
+`src/model/` 的这四个文件是跨层共享类型，本角色是唯一主属主；其他角色只读引用。改动它们会使所有引用方的既有证据失效，须先经项目管理角色协调。
 
 未列路径默认只读。超出上述文件的业务源码须先由 ANS Governance 更新 Section 1 并经客户确认。本边界不授权修改角色卡、边界、其他角色资料或权限配置。

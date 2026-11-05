@@ -70,9 +70,10 @@ import {
   versionedDocOverwriteDecision,
 } from "../../common/门禁引擎/versioned-doc-guard.ts";
 import type { StableWritePermit } from "../../model/version-change.ts";
-import { resolveRole } from "../../service/role/resolve-role.ts";
+import { listProject, resolveRole, type ProjectListing, type ProjectRoleSummary } from "../../service/role/resolve-role.ts";
 import { resolveBoundary, validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
 import {
+  BUILT_IN_GOVERNANCE_ROLES,
   LEGACY_SU_PREAUTHORIZED_DIRS,
   appGovernanceBoundary,
   governanceCapabilitiesOf,
@@ -81,6 +82,22 @@ import {
   type GovernanceRoleSpec,
 } from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite } from "../../service/gate/resolve-write.ts";
+import {
+  GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
+  GOVERNANCE_MATRIX_PROMPT_MAX_CHARS,
+  GOVERNANCE_MATRIX_TOOL_MAX_CHARS,
+  buildGovernanceMatrix,
+  renderGovernanceMatrix,
+} from "../../service/governance-matrix/public.ts";
+import type {
+  GovernanceMatrixFn,
+  GovernanceMatrixInput,
+  MatrixAcceptance,
+  MatrixEntryView,
+  MatrixIssueInput,
+  MatrixRoleDirectories,
+  WorkerRoleInput,
+} from "../../model/governance-matrix.ts";
 import type {
   RuntimeReplayEntry,
   RuntimeSessionRecord,
@@ -195,7 +212,7 @@ export type {
   DecisionCardRejectReason,
   DecisionCardValidation,
 } from "../../common/编排/decision-card.ts";
-import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
+import { createDiagnosticLogger, type DiagnosticLogger } from "../../common/shared/diagnostics.ts";
 import { readIntentEntryFacts, resolveIntentEntryReference } from "../../common/shared/intent-entry-contract.ts";
 // 跨角色共享路径原语（**单一来源** = pm 属主 `src/common/shared/path-primitives.ts`；工程法案 §一.5
 // 消费方名单已含编排；同 `confirmed-writes.ts` 先例）——用于 su 预授权目录的**词法**归属判定：
@@ -308,6 +325,19 @@ export interface AdapterCapabilities {
   submitVersionChange?: SubmitVersionChangeFn;
   submitRefactor?: SubmitRefactorFn;
   requestStableWrite?: RequestStableWriteFn;
+  /**
+   * 治理权力矩阵（governance-authority-matrix，C2/C3）：`governance_matrix` 工具能力位。
+   * **注入才注册**——仅 trio 六个内置治理角色（`openRoleSession` 内门控）；worker、`su`、
+   * 判断会话、single 旧模型与 `runRole` 一次性 CLI 均不注入（工具不存在）。
+   * 类型单一来源＝`src/model/governance-matrix.ts`（C1a 冻结）；本层只透传，不组装、不判定。
+   */
+  governanceMatrix?: GovernanceMatrixFn;
+  /**
+   * 治理权力矩阵（C3）：幕僚会话启动快照的**纯展示文本段**（当前仅 chief 非空、单段）。
+   * 经 C2 `RuntimeProviderOptions.contextSections` 交给适配器；非 chief 会话字段缺席（不传
+   * 空数组/空串元素）。不是能力、不是工具、不是判定输入；空/缺省 ⇒ 系统提示逐字不变。
+   */
+  contextSections?: readonly string[];
   shellGate?: ShellGate;
   /** 2026-10-29（§6.5）：run_shell 执行后写审计（与 shellGate 同注入；缺省不审计）。 */
   shellPostAudit?: ShellPostAuditFn;
@@ -1418,7 +1448,7 @@ export async function openRoleSession(
   // project_note / request_version_decision 只给 trio chief。未注入 ⇒ 工具不注册（fail-closed）。
   const projectState = builtInGovernance ? input.projectState : undefined;
   const projectNote = trioSpec?.id === "chief" ? input.projectNote : undefined;
-  const requestVersionDecision = trioSpec?.id === "chief" ? input.requestVersionDecision : undefined;
+  const requestVersionDecision = trioSpec !== undefined && canRequestVersionDecision(trioSpec.id) ? input.requestVersionDecision : undefined;
 
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
@@ -1525,7 +1555,7 @@ export async function openRoleSession(
 
   // 需求变更申请：只给内置治理角色中的报告员/统筹注入（沿用 C 批发起方规则）。
   const requestRequirementChange: RequestRequirementChangeFn | undefined =
-    isTrio && (trioSpec?.id === "rapporteur" || trioSpec?.id === "convener") && input.requestRequirementChange !== undefined
+    isTrio && trioSpec !== undefined && canRequestRequirementChange(trioSpec.id) && input.requestRequirementChange !== undefined
       ? input.requestRequirementChange
       : undefined;
 
@@ -1535,7 +1565,55 @@ export async function openRoleSession(
   const submitVersionChange =
     setup.role.id === "product" || setup.role.id === "rapporteur" ? input.submitVersionChange : undefined;
   const submitRefactor = setup.role.id === "convener" ? input.submitRefactor : undefined;
-  const requestStableWrite = setup.role.id === "convener" ? input.requestStableWrite : undefined;
+  const requestStableWrite = canRequestStableWrite(setup.role.id) ? input.requestStableWrite : undefined;
+
+  // —————— 治理权力矩阵（C3）：幕僚启动快照 + 六角色工具能力（注入才注册） ——————
+  // 仅 trio + 内置治理 + 六个内置角色之一；worker/su/single 不启用。
+  const governanceMatrixEnabled = governanceModel === "trio" && builtInGovernance && isTrio;
+  const governanceMatrixSessionFlags: GovernanceMatrixSessionFlags = {
+    customerInput: governedInput !== undefined,
+    download: input.requestDownload !== undefined,
+    shell: shellGate !== undefined,
+    shellEscalation: shellGate !== undefined && shellEscalationSession !== undefined,
+  };
+  // 幕僚必读块：计算一次（在 bindRole 前；能力组装前以取得真实 shell/升级会话标志）。
+  // 渲染不可用 ⇒ 短声明，不阻塞会话；不自动改写系统提示。
+  let contextSections: readonly string[] | undefined;
+  if (governanceMatrixEnabled && trioSpec?.id === "chief") {
+    try {
+      const matrixInput = await loadGovernanceMatrixInput({
+        project: input.project,
+        session: governanceMatrixSessionFlags,
+        generatedAt: new Date().toISOString(),
+        log,
+      });
+      const matrix = buildGovernanceMatrix(matrixInput);
+      if (matrix.status === "unavailable") {
+        contextSections = [GOVERNANCE_MATRIX_UNAVAILABLE_NOTICE];
+        log.record("governance.matrix.unavailable", { trigger: "session-start", status: matrix.status });
+      } else {
+        const text = renderGovernanceMatrix(matrix, {
+          maxChars: GOVERNANCE_MATRIX_PROMPT_MAX_CHARS,
+          perRoleMaxChars: GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
+        });
+        if (text !== "") contextSections = [text];
+        log.record("governance.matrix.build", {
+          trigger: "session-start",
+          status: matrix.status,
+          roles: matrix.roles.length,
+          warnings: matrix.warnings.length,
+          truncated: matrix.render.truncated,
+        });
+      }
+    } catch (err) {
+      contextSections = [GOVERNANCE_MATRIX_UNAVAILABLE_NOTICE];
+      log.error("governance.matrix.unavailable", err, { trigger: "session-start" });
+    }
+  }
+  // 六角色只读工具（含 chief）：注入才注册；五个非幕僚启动时不计算（闭包惰性）。
+  const governanceMatrix = governanceMatrixEnabled
+    ? createGovernanceMatrixFn({ project: input.project, session: governanceMatrixSessionFlags, log })
+    : undefined;
 
   const capabilities: AdapterCapabilities = {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
@@ -1571,6 +1649,9 @@ export async function openRoleSession(
     ...(submitVersionChange !== undefined ? { submitVersionChange } : {}),
     ...(submitRefactor !== undefined ? { submitRefactor } : {}),
     ...(requestStableWrite !== undefined ? { requestStableWrite } : {}),
+    // 治理权力矩阵（C3）：仅 chief 有提示段（单段、非空）；六角色有工具能力（未启用/未注入 ⇒ 缺席）。
+    ...(contextSections !== undefined ? { contextSections } : {}),
+    ...(governanceMatrix !== undefined ? { governanceMatrix } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(shellGate !== undefined ? { shellPostAudit: shellPostAudit.auditAfter } : {}),
     // 2026-10-31（判拒升级）：`request_shell_escalation` 工具能力——只在 shell 已 arm 且 registry 已创建时
@@ -1918,6 +1999,237 @@ async function setupRole(
   } catch (err) {
     return { ok: false, code: EXIT_FAILURE, reason: `角色/边界解析失败：${errText(err)}` };
   }
+}
+
+// —————— 治理权力矩阵（governance-authority-matrix，C3：Pipeline 取数 / 注入 / 工具门控）——————
+// 分层纪律：本节只做「取数 + 注入 + 门控」；组装/渲染在 C1b 纯 Service（不调用其他 Service、
+// 不读盘/写盘），提示拼接在三适配器，Provider 只做工具注册与参数形状校验。
+// 纯读、零写入：不写项目文件/账本/trunk/VCA/stable-write；诊断日志除外。
+interface GovernanceMatrixSessionFlags {
+  customerInput: boolean;
+  download: boolean;
+  shell: boolean;
+  shellEscalation: boolean;
+}
+
+/** 幕僚提示块的矩阵不可用短声明（不含错误详情/路径；不阻塞会话）。 */
+const GOVERNANCE_MATRIX_UNAVAILABLE_NOTICE =
+  "# 治理权力矩阵\n> 矩阵不可用（矩阵读取失败）；不得据此推断权限。";
+
+/** 既有角色门控的单一谓词（矩阵快照与注入门控共用；行为逐字不变）。 */
+function canRequestRequirementChange(roleId: string): boolean {
+  return roleId === "rapporteur" || roleId === "convener";
+}
+function canRequestVersionDecision(roleId: string): boolean {
+  return roleId === "chief";
+}
+function canRequestStableWrite(roleId: string): boolean {
+  return roleId === "convener";
+}
+
+/** worker 章节 → 矩阵输入（不含 title；title 单独进 displayName，R-3/G-1）。 */
+function workerCardSectionsOf(row: ProjectRoleSummary): WorkerRoleInput["cardSections"] | undefined {
+  const sections = row.cardSections;
+  if (sections === undefined) return undefined;
+  const mapped: NonNullable<WorkerRoleInput["cardSections"]> = {};
+  if (sections.ability !== undefined) mapped.ability = sections.ability;
+  if (sections.responsibility !== undefined) mapped.responsibility = sections.responsibility;
+  if (sections.handoff !== undefined) mapped.handoff = sections.handoff;
+  if (sections.workflow !== undefined) mapped.workflow = sections.workflow;
+  if (sections.executionPrinciples !== undefined) mapped.executionPrinciples = sections.executionPrinciples;
+  return Object.keys(mapped).length > 0 ? mapped : undefined;
+}
+
+/**
+ * Pipeline 取数（P1.1 §4.2.1/§5.2）：`listProject` 一次 + 仅可解析角色的 acceptance +
+ * 共享 cardSections + 卡种/发起/会话快照。**枚举失败唯一载体** = `roleDirectories.error`（G-4）；
+ * `role-enumeration-failed` 只是 C1b 生成的原因码，不是第二输入字段。
+ */
+async function loadGovernanceMatrixInput(input: {
+  project: ProjectConfig;
+  session: GovernanceMatrixSessionFlags;
+  generatedAt: string;
+  log: DiagnosticLogger;
+}): Promise<GovernanceMatrixInput> {
+  const { project, session, generatedAt, log } = input;
+  let listing: ProjectListing | undefined;
+  let listingError: string | undefined;
+  try {
+    listing = await listProject(project.projectRoot);
+  } catch (err) {
+    listingError = errText(err);
+    log.error("governance.matrix.listing.failed", err);
+  }
+
+  const workerRows = listing === undefined ? [] : listing.roles.filter((role) => role.builtIn !== true);
+  const issues: MatrixIssueInput[] = [];
+  for (const issue of listing?.issues ?? []) {
+    issues.push({
+      relDir: issue.relDir,
+      ...(issue.roleId !== undefined ? { roleId: issue.roleId } : {}),
+      code: issue.code,
+      message: issue.message,
+    });
+  }
+
+  let roleDirectories: MatrixRoleDirectories;
+  if (listingError !== undefined) {
+    roleDirectories = { found: false, totalDirs: 0, archivedSkips: 0, error: listingError };
+  } else if (listing?.roleDirectories === undefined) {
+    // 不猜测 found/计数：字段缺失是契约违约，按降级（error 非空）诚实处理。
+    log.record("governance.matrix.contract-violation", { field: "roleDirectories" });
+    roleDirectories = {
+      found: false,
+      totalDirs: 0,
+      archivedSkips: 0,
+      error: "listProject 未返回 roleDirectories（契约违约）",
+    };
+  } else {
+    roleDirectories = {
+      found: listing.roleDirectories.found,
+      totalDirs: listing.roleDirectories.totalDirs,
+      archivedSkips: listing.roleDirectories.archivedSkips,
+      ...(listing.roleDirectories.error !== undefined ? { error: listing.roleDirectories.error } : {}),
+    };
+  }
+
+  const workerRoles: WorkerRoleInput[] = workerRows.map((row) => {
+    const displayName = row.cardSections?.title?.trim() ?? "";
+    const groupText = [row.group?.trim() ?? "", row.groupDuty?.trim() ?? ""]
+      .filter((part) => part !== "")
+      .join(" / ");
+    const cardSections = workerCardSectionsOf(row);
+    return {
+      roleId: row.roleId,
+      ...(displayName !== "" ? { displayName } : {}),
+      ...(groupText !== "" ? { group: groupText } : {}),
+      ...(cardSections !== undefined ? { cardSections } : {}),
+      boundary: {
+        entries: row.boundary.entries.map((entry): MatrixEntryView => ({
+          path: entry.path,
+          kind: entry.kind,
+          purpose: entry.purpose,
+        })),
+        boundarySource: row.boundary.boundarySource,
+      },
+      cardPath: row.cardPath,
+      boundaryPath: row.boundaryPath,
+    };
+  });
+
+  const acceptanceByRole: Record<string, MatrixAcceptance> = {};
+  const resolveAcceptance = async (roleId: string): Promise<MatrixAcceptance> => {
+    try {
+      const boundary = await resolveBoundary(roleId, project);
+      return {
+        state: "known",
+        accepted: boundary.acceptance.accepted,
+        evidence: boundary.acceptance.source,
+        basis: "runtime",
+      };
+    } catch (err) {
+      log.error("governance.matrix.acceptance.failed", err, { roleId });
+      return { state: "unknown", reason: "acceptance-unavailable", detail: errText(err) };
+    }
+  };
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    acceptanceByRole[spec.id] = await resolveAcceptance(spec.id);
+  }
+  for (const row of workerRows) {
+    if (acceptanceByRole[row.roleId] !== undefined) continue;
+    // 只有开会话时已在 ProjectConfig.roles 快照中的 worker 才可解析 acceptance；
+    // 会话中途新增角色落到治理边界覆盖分支，不得把其 accepted 冒充为本角色接受（F5）。
+    if (project.roles?.[row.roleId] === undefined) continue;
+    acceptanceByRole[row.roleId] = await resolveAcceptance(row.roleId);
+  }
+
+  const cardKindsByRole: Record<string, { choice: readonly string[]; confirm: readonly string[] }> = {};
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    const kinds = TRIO_CARD_KINDS[spec.id];
+    cardKindsByRole[spec.id] = {
+      choice: kinds.filter((kind) => !GOVERNANCE_CONFIRM_CARD_KINDS.includes(kind)),
+      confirm: kinds.filter((kind) => GOVERNANCE_CONFIRM_CARD_KINDS.includes(kind)),
+    };
+  }
+
+  const initiationByRole: Record<string, { requirementChange: boolean; versionDecision: boolean; stableWrite: boolean }> = {};
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    initiationByRole[spec.id] = {
+      requirementChange: canRequestRequirementChange(spec.id),
+      versionDecision: canRequestVersionDecision(spec.id),
+      stableWrite: canRequestStableWrite(spec.id),
+    };
+  }
+
+  return {
+    projectRoot: project.projectRoot,
+    governanceModel: "trio",
+    workerRoles,
+    issues,
+    warnings: [...(listing?.warnings ?? [])],
+    roleDirectories,
+    acceptanceByRole,
+    cardKindsByRole,
+    initiationByRole,
+    session,
+    generatedAt,
+  };
+}
+
+/**
+ * `governance_matrix` 注入函数（C3）：每次调用重新取数 + build/render；未知 roleId 在 C3 预检
+ * （不回显、不依赖渲染器）；只读、无写盘/账本/状态事件。
+ */
+function createGovernanceMatrixFn(deps: {
+  project: ProjectConfig;
+  session: GovernanceMatrixSessionFlags;
+  log: DiagnosticLogger;
+}): GovernanceMatrixFn {
+  return async (request = {}) => {
+    const keys = Object.keys(request);
+    if (keys.some((key) => key !== "roleId" && key !== "section")) {
+      return { ok: false, message: "参数不受支持：只接受 roleId 与 section。" };
+    }
+    const section = request.section;
+    if (section !== undefined && section !== "all" && section !== "roles" && section !== "routing") {
+      return { ok: false, message: "section 仅支持 all / roles / routing。" };
+    }
+    try {
+      const matrixInput = await loadGovernanceMatrixInput({
+        project: deps.project,
+        session: deps.session,
+        generatedAt: new Date().toISOString(),
+        log: deps.log,
+      });
+      const matrix = buildGovernanceMatrix(matrixInput);
+      if (matrix.status === "unavailable") {
+        return { ok: false, message: "治理权力矩阵暂不可用；不得据此推断权限。" };
+      }
+      if (request.roleId !== undefined && !matrix.roles.some((role) => role.roleId === request.roleId)) {
+        return { ok: false, message: "未找到该角色；请使用矩阵中已有的 roleId（可用 section 过滤）。" };
+      }
+      const message = renderGovernanceMatrix(matrix, {
+        maxChars: GOVERNANCE_MATRIX_TOOL_MAX_CHARS,
+        perRoleMaxChars: GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
+        ...(request.roleId !== undefined ? { roleId: request.roleId } : {}),
+        ...(section !== undefined ? { section } : {}),
+      });
+      if (message === "") {
+        return { ok: false, message: "治理权力矩阵暂不可用；不得据此推断权限。" };
+      }
+      deps.log.record("governance.matrix.build", {
+        trigger: "tool",
+        status: matrix.status,
+        roles: matrix.roles.length,
+        warnings: matrix.warnings.length,
+        truncated: matrix.render.truncated,
+      });
+      return { ok: true, message };
+    } catch (err) {
+      deps.log.error("governance.matrix.unavailable", err, { trigger: "tool" });
+      return { ok: false, message: "治理权力矩阵暂不可用；不得据此推断权限。" };
+    }
+  };
 }
 
 // 构造 gate：把 scope（可能为 undefined）原样传给 resolveWrite——无 scope 即不做任务收窄。
@@ -2507,6 +2819,10 @@ export function createRuntimeAdapterFactory(
     submitVersionChange: capabilities?.submitVersionChange,
     submitRefactor: capabilities?.submitRefactor,
     requestStableWrite: capabilities?.requestStableWrite,
+    // 治理权力矩阵（C3）：纯展示提示段（C2 `RuntimeProviderOptions.contextSections`）与只读工具
+    // 能力位（C2 `GovernedToolsOptions.governanceMatrix`）。undefined ⇒ 字段缺席/工具不注册。
+    contextSections: capabilities?.contextSections,
+    governanceMatrix: capabilities?.governanceMatrix,
     // 2026-10-26 需求变更申请（request_requirement_change）：运行时核心 `GovernedToolsOptions` 同名
     // 能力位（形状同源 `model/runtime.ts` `RequestRequirementChangeFn`）；`undefined` ⇒ 工具不注册
     // （能力缺席 = 最强 fail-closed）。本层纯透传——意图校验/去重/

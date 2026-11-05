@@ -16,6 +16,7 @@ import type {
   VersionDecisionStatus,
 } from "./project-state.ts";
 import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
+import type { GovernanceMatrixFn } from "./governance-matrix.ts";
 import type {
   TrunkAmendmentApplyState,
   TrunkAmendmentItemKind,
@@ -2703,6 +2704,14 @@ export interface GovernedToolsOptions {
    */
   projectState?: ProjectStateFn;
   /**
+   * 治理权力矩阵只读能力（governance-authority-matrix，C2）：`governance_matrix` 工具。
+   * **注入才注册**：未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。注入面由编排（C3）决定：
+   * 仅 trio 六个内置治理角色；worker、`su`、判断会话、single 旧模型不注入。
+   * 类型单一来源＝`src/model/governance-matrix.ts`（C1a 冻结）；本文件只读引用，不复制、不重定义。
+   * 纯读：不写盘、不写账本、不产生 trunk/VCA/stable-write 事件；工具输出不是批准/验收证据。
+   */
+  governanceMatrix?: GovernanceMatrixFn;
+  /**
    * 2026-11-02（全局任务状态，A0）：`project_note` 受控备注能力。**只给 trio chief 注入**；
    * 未注入 ⇒ 工具不注册。备注 append-only 写账本事件，不是机器事实、不是批准/验收证据；
    * 不改变任务状态/run 状态/manifest/文档。
@@ -2824,6 +2833,12 @@ export interface RuntimeProviderOptions {
   projectRoot: string;
   skillRoot: string;
   tools: readonly ToolDefinition[];
+  /**
+   * 会话启动时由 Pipeline 注入的**纯展示文本段**（当前仅幕僚会话的「治理权力矩阵」必读块）。
+   * 只允许编排在会话绑定时注入；适配器按固定位置拼接，不改写、不重排、不判定。
+   * 不是能力、不是工具、不是判定输入；空数组/缺省 ⇒ 系统提示逐字不变。
+   */
+  contextSections?: readonly string[];
   storage?: RuntimeSessionStorage;
   interactionGate: InteractionGate;
   currentTurnId: () => string | undefined;

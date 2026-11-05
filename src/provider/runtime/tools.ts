@@ -76,6 +76,7 @@ import {
   VERSION_DECISION_REFS_MAX,
 } from "../../model/project-state.ts";
 import type { ProjectNoteInput, ProjectNoteOp, ProjectStateQuery, VersionDecisionRequest } from "../../model/project-state.ts";
+import type { GovernanceMatrixFn } from "../../model/governance-matrix.ts";
 import {
   CONTRACT_SCHEMA_TOPICS,
   GOVERNANCE_SLUG_PATTERN,
@@ -3502,6 +3503,85 @@ function makeProjectStateTool(
   };
 }
 
+// —————————————— 治理权力矩阵只读工具（governance-authority-matrix，C2，2026-11-05） ——————————————
+
+export const GOVERNANCE_MATRIX_TOOL_NAME = "governance_matrix";
+const GOVERNANCE_MATRIX_ARG_KEYS: ReadonlySet<string> = new Set(["roleId", "section"]);
+const GOVERNANCE_MATRIX_SECTIONS = ["all", "roles", "routing"] as const;
+
+/**
+ * governance_matrix：治理权力矩阵**只读**摘要（注入才注册；角色门控在编排注入端）。
+ * 本层只做参数形状校验（仅 roleId/section）并调用注入函数，**原样转达** ok/message：
+ * 不读项目文件、不组装矩阵、不写盘/账本、不缓存、不产生状态事件。
+ * `ok:false` 表示矩阵不可用，**不是「没有权限」**；抛错/回执畸形如实报告，绝不编造权限。
+ * `roleId` 由注入函数做精确匹配（本层只 trim 首尾空白）；`section` 缺省由注入函数按 all 处理。
+ */
+function makeGovernanceMatrixTool(fn: GovernanceMatrixFn): ExecutableTool {
+  const name = GOVERNANCE_MATRIX_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      const unknown = unknownGovernanceArg(call.args, GOVERNANCE_MATRIX_ARG_KEYS, name);
+      if (unknown !== undefined) return unknown;
+      const roleIdRaw = call.args["roleId"];
+      let roleId: string | undefined;
+      if (roleIdRaw !== undefined && roleIdRaw !== null) {
+        if (typeof roleIdRaw !== "string") {
+          return { ok: false, message: `${name}：roleId 应为字符串（本工具只接受矩阵中已有的精确角色 id）——未执行` };
+        }
+        const trimmedRoleId = roleIdRaw.trim();
+        if (trimmedRoleId === "") {
+          return { ok: false, message: `${name}：roleId 不能为空——未执行` };
+        }
+        roleId = trimmedRoleId;
+      }
+      const sectionRaw = call.args["section"];
+      let section: "all" | "roles" | "routing" | undefined;
+      if (sectionRaw !== undefined && sectionRaw !== null) {
+        if (typeof sectionRaw !== "string") {
+          return { ok: false, message: `${name}：section 应为字符串（${GOVERNANCE_MATRIX_SECTIONS.join("|")}）——未执行` };
+        }
+        const trimmedSection = sectionRaw.trim();
+        if (!(GOVERNANCE_MATRIX_SECTIONS as readonly string[]).includes(trimmedSection)) {
+          return { ok: false, message: `${name}：section 非法（应为 ${GOVERNANCE_MATRIX_SECTIONS.join("|")}）——未执行` };
+        }
+        section = trimmedSection as "all" | "roles" | "routing";
+      }
+      const input = {
+        ...(roleId !== undefined ? { roleId } : {}),
+        ...(section !== undefined ? { section } : {}),
+      };
+      let result: unknown;
+      try {
+        result = await raceAbort(
+          Promise.resolve().then(() => {
+            if (call.signal?.aborted) throw new Error("会话已中止");
+            return fn(input);
+          }),
+          call.signal,
+          `${name} 读取治理权力矩阵`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：矩阵读取**未完成**（原因：${reasonOf(err)}）——没有拿到摘要就**不要推断任何权限**，如实告知客户。` };
+      }
+      if (result === null || typeof result !== "object") {
+        return { ok: false, message: `${name}：数据源未返回明确结果（回执缺失或非法）——**不要据此判断权限**。` };
+      }
+      const receipt = result as Record<string, unknown>;
+      const ok = receipt["ok"];
+      const message = receipt["message"];
+      if (typeof ok !== "boolean") {
+        return { ok: false, message: `${name}：数据源未返回明确结果（回执缺失或非法）——**不要据此判断权限**。` };
+      }
+      if (typeof message !== "string" || message === "") {
+        return { ok: false, message: `${name}：数据源未返回文本（结果不明）——**不要据此判断权限**。` };
+      }
+      // ok:true / ok:false 均原样转达；ok:false 表示矩阵不可用，不是「没有权限」。
+      return { ok, message };
+    },
+  };
+}
+
 /**
  * project_note：幕僚**受控备注**（set-focus / blocker / next-step）。本层做严格参数形状与长度校验，
  * 再调注入能力（应用校验 flow 存在性并 append-only 写事件）。备注**不是机器事实、不是批准/验收证据**；
@@ -4363,6 +4443,13 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const projectState = options?.projectState;
   if (projectState !== undefined) {
     tools.push(makeProjectStateTool(projectState, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
+  }
+  // 治理权力矩阵（2026-11-05 C2）：**注入才注册**——未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。
+  // 角色门控在编排（C3）注入端：仅 trio 六个内置治理角色；worker/`su`/判断会话/single 不注入。
+  // 本层不硬编码角色 id、不读项目文件、不组装矩阵；handler 只调用注入函数并原样转达回执。
+  const governanceMatrix = options?.governanceMatrix;
+  if (governanceMatrix !== undefined) {
+    tools.push(makeGovernanceMatrixTool(governanceMatrix));
   }
   const projectNote = options?.projectNote;
   if (projectNote !== undefined) {

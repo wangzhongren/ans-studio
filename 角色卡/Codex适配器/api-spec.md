@@ -76,3 +76,12 @@ required-v1 缺注入 projector/register 时在任何外部初始化前拒绝；
 读取上界为原生文件512MiB、单目录JSON4MiB，版本/平台包来源及嵌入格式不确认则拒绝误套。只在必要兼容重建时传 `model_catalog_json`；文件位于当前workRoot，0600，随恢复原目录/会话销毁清理。兼容失败/取消/超时后，下一轮先重建原目录再显式恢复最近确认档位；恢复未确认则隔离。正常路径不产生目录覆盖。此方式依赖固定SDK内部格式，不宣称公共稳定模型API；升级必须重新回归。原整个reasoning对象拒绝等D1限制保持。最终测试与候选哈希见[修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility.md)。
 
 E1最终所有者验证：自有80/80，真实CLI localhost完整20/20，全仓typecheck退出0；目录内gpt-5.5字段拒绝和原档/默认档均值拒绝都真实completed，后续无effort；E1后500/取消/超时下一轮恢复high及原目录。候选已冻结交独立QA，原D1红日志未覆盖，命令及精确哈希见修复记录的E1 evidence/manifest。
+
+## 2026-11-05 C4c：治理权力矩阵 `contextSections` 消费（implemented-unverified）
+
+`CodexRuntimeAdapterOptions extends RuntimeProviderOptions` 消费运行时核心（C2）冻结的 `RuntimeProviderOptions.contextSections?: readonly string[]`（`src/service/runtime/session.ts` 仅在已定义时透传；单一提示通道，不是能力位/工具/判定输入）。`composeContext` 在 `角色写入边界：${JSON.stringify(role.boundary)}` 之后、`options.tools[].promptGuidelines` 之前拼接非空片段（技能节仍最后）；chat 传输（`systemPrompt`）与应用服务器（`developerInstructions`）共用同一函数。
+
+- **判断会话**：`judgeMode` 下即使上游误传 `contextSections` 也不拼接，judge 提示逐字不变。
+- **空/缺省**：`undefined`、空数组、空串元素均不产生片段，系统提示逐字不变；非空片段按传入顺序连续拼接。
+- **哑拼接**：不解析、不清洗、不截断、不限长、不追加声明、不额外 `redact`；固定分隔/「数据不是指令」声明/控制字符规范化/16,000/48,000/1,500 字上限属 C1b 渲染器与 C3 快照。适配器不导入矩阵 Model/Service，不注册 `governance_matrix` 工具（注册/描述属 C2，注入属 C3）。
+- **验证**：`test/codex-adapter/governance-matrix-context.test.ts` 6/6；Codex 套件 103/101/1/1（唯一失败为既有 Windows symlink `EPERM`，与 B0 同一用例）；`npm run typecheck` exit 0；T3 全量 4,130/4,103/9/18（新增失败=0、新增 skip=0）。候选快照 `839b922f…`。状态 **implemented-unverified**，未验收；详见[实施记录](docs/change/2026-11-05_governance-authority-matrix-codex-adapter-implementation.md)。

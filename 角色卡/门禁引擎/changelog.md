@@ -1,5 +1,9 @@
 # 门禁引擎 变更记录
 
+## 2026-11-05 — 边界增补 B-1/B-2：新增 `src/model/governance-matrix.ts` 与 `src/service/governance-matrix/`（闸门 2 后人事执行）
+
+依据团队计划 `docs/scheduling/2026-11-05_team-plan_governance-authority-matrix.md`（660 行，SHA-256 `07378444cb62fc714a7cce0a492ce5a12b5b7d0a0868f4602edb0be134fc7805`）§4.5 B-1/B-2，及闸门 2 确认记录 `docs/communication/2026-11-05_intent_governance-authority-matrix.md`「闸门 2（角色分配确认，2026-11-05）」（客户答案「批准 B-1+B-2」）与「实施授权（IA，2026-11-05）」（已授权，要求人事先补 B-1/B-2 边界）。实施基线为设计 P1.1（`docs/planning/2026-11-05_design_governance-authority-matrix.md`，1056 行，SHA-256 `1f6518b898aa33b649c21124e26816cd05715a5eba6a147aed8b8cab9cfb26d6`）。本次在权威 `boundary.md` Section 1 表内新增两行，并在 `boundary.yaml` 同步同样条目：**B-1** 单文件 `src/model/governance-matrix.ts`（治理权力矩阵共享类型 `governance-matrix/v1`：来源/unknown 枚举、工具结果契约、`GovernanceMatrixFn`；无 I/O；本角色为唯一主属主）；**B-2** 目录（私有）`src/service/governance-matrix/`（矩阵组装/渲染 Service 的有界私有模块根；纯组装与有界渲染，不调用其他 Service、不读盘、不写盘；不构成 `src/service/` 整目录授权）。**职责不变、无权限扩大**：仅新增上述两条写路径；未改角色 id/显示名/能力描述/角色卡正文；不新增/改名角色，不改其他路径；未写代码/测试、未改业务文件、未 commit/push。
+
 ## 2026-10-31 — 边界漂移校正 B-1：权威 `boundary.md` 补列 `src/service/gate/shell-rules.ts`（闸门 2 后人事执行）
 
 依据团队计划 `docs/scheduling/2026-10-31_team-plan_shell-deny-customer-escalation.md`（575 行，SHA-256 `4d52bdf4309b23c14065cd6893301cd43971a25726bacdd7338e1c987fc40203`）§4.5 B-1，及闸门 2 确认记录 `docs/communication/2026-10-31_intent_shell-deny-customer-escalation.md`「闸门 2 记录（2026-10-31）」（客户原话「确认闸门 2：参与角色、写集与 3 项边界变更」）。`boundary.yaml` 第 24–26 行原已登记该单文件条目（用途：shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认）），权威 `boundary.md` Section 1 此前漏列，属既有 Markdown/YAML 漂移；本次按计划 §4.5 原文在 `boundary.md` Section 1 表内（`src/service/gate/resolve-write.ts` 之后、`src/common/门禁引擎/` 目录条目之前）补入一行精确单文件条目，类型/路径/用途与 YAML 对应条目一致。**职责不变、不扩权限**：仅把 YAML 已存在的同一条目对齐到权威 md；不新增角色、不改角色 id/显示名/角色卡正文、不改其他路径；未写代码/测试、未改业务文件、未 commit/push、未启动应用。
