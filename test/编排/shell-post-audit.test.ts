@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {
+  classifyTreeChanges,
   createShellPostAudit,
   diffTreeSnapshots,
   findOutOfBoundChanges,
@@ -17,7 +18,12 @@ import {
   type ShellPostAuditRecord,
   type TreeSnapshot,
 } from "../../src/common/编排/shell-post-audit.ts";
+import {
+  __resetWriteJournalForTests,
+  recordToolWrite,
+} from "../../src/common/编排/write-journal.ts";
 import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import { createHash } from "node:crypto";
 
 const req = (toolCallId = "call-1") => ({ command: "node script.mjs", argv: ["node", "script.mjs"], cwd: "/proj", toolCallId });
 
@@ -185,14 +191,32 @@ test("R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（
   }
 });
 
-test("P6 返工（R2 审计诚实口径）：`.ans/` 项目内变化按越界记录；审计不宣称覆盖项目外写入", async () => {
-  // `.ans/`：即使 checkWrite 错误地全部放行，也必须判越界（项目内可见性）。
-  const ansViolations = findOutOfBoundChanges({
+test("P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入", async () => {
+  // 2026-11-05（回执 ANS-AUDIT-2026-11-05-001）：`.ans/**` 与 `docs/bootstrap-manifest.md` 是应用自身
+  // 持续写入的运行态路径；时间窗 diff 无法归因，故按「应用状态写入」记录（appStateChanges，仍被审计），
+  // 不再作为越界。显式传入空 appRuntime 的旧入口（findOutOfBoundChanges）保持原语义，供兼容调用。
+  const classified = classifyTreeChanges({
+    changes: [
+      { path: ".ans/state/tasks.jsonl", change: "modified" },
+      { path: "docs/bootstrap-manifest.md", change: "modified" },
+      { path: "other/x.ts", change: "added" },
+    ],
+    forbiddenPrefixes: [],
+    checkWrite: (rel) => ({ allowed: rel.startsWith("src/") }),
+  });
+  assert.deepEqual(classified.appStateChanges.map((entry) => entry.path), [
+    ".ans/state/tasks.jsonl",
+    "docs/bootstrap-manifest.md",
+  ]);
+  assert.deepEqual(classified.violations.map((entry) => entry.path), ["other/x.ts"]);
+
+  // 兼容入口（显式无 appRuntime）仍把 `.ans` 判为越界（旧行为保留，实际使用见 createShellPostAudit）。
+  const legacy = findOutOfBoundChanges({
     changes: [{ path: ".ans/state/tasks.jsonl", change: "modified" }],
     forbiddenPrefixes: [],
     checkWrite: () => ({ allowed: true }),
   });
-  assert.deepEqual(ansViolations, [{ path: ".ans/state/tasks.jsonl", change: "modified" }]);
+  assert.deepEqual(legacy, [{ path: ".ans/state/tasks.jsonl", change: "modified" }]);
 
   // 防御：快照键若出现绝对路径/`..`（不该出现），按越界记录；但项目外写入的拦截由 static guard 与
   // judge 负责，执行后审计**不宣称**覆盖项目外。
@@ -216,6 +240,93 @@ test("P6 返工（R2 审计诚实口径）：`.ans/` 项目内变化按越界记
     assert.deepEqual([...snapshot.keys()].sort(), [".ans/state/tasks.jsonl", "src/a.ts"]);
     assert.ok([...snapshot.keys()].every((key) => !key.startsWith("@outside:")));
   } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界", async () => {
+  const snapshots: TreeSnapshot[] = [
+    new Map([["src/a.ts", { mtimeMs: 1, size: 1 }]]),
+    new Map([
+      ["src/a.ts", { mtimeMs: 1, size: 1 }],
+      [".ans/state/tasks.jsonl", { mtimeMs: 2, size: 9 }],
+      ["docs/bootstrap-manifest.md", { mtimeMs: 3, size: 7 }],
+    ]),
+  ];
+  const records: ShellPostAuditRecord[] = [];
+  let index = 0;
+  const audit = createShellPostAudit({
+    projectRoot: "/proj",
+    forbiddenPrefixes: [".ans/"],
+    checkWrite: (rel) => ({ allowed: rel.startsWith("src/") || rel.startsWith("docs/") }),
+    snapshot: async () => snapshots[index++]!,
+    auditWriter: (record) => {
+      records.push(record);
+    },
+    now: () => new Date("2026-11-05T00:00:00.000Z"),
+  });
+  const request = req("call-appstate");
+  await audit.snapshotBefore(request);
+  const result = await audit.auditAfter(request, { exitCode: 0 });
+  assert.deepEqual(result.violations, [], "应用运行态写入不算越界");
+  assert.deepEqual(result.appStateChanges?.map((entry) => entry.path), [
+    ".ans/state/tasks.jsonl",
+    "docs/bootstrap-manifest.md",
+  ]);
+  assert.equal(records.length, 1, "应用运行态写入仍写审计记录（可复核）");
+  assert.deepEqual(records[0]!.violations, []);
+  assert.equal(records[0]!.appStateChanges?.length, 2);
+});
+
+test("归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界", async () => {
+  __resetWriteJournalForTests();
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-post-journal-"));
+  try {
+    await fs.mkdir(path.join(root, "src"), { recursive: true });
+    await fs.writeFile(path.join(root, "src", "a.ts"), "a", "utf8");
+    const abs = path.join(root, "src", "a.ts");
+    const content = "a written by tool";
+    const sha = createHash("sha256").update(content).digest("hex");
+    const audit = createShellPostAudit({
+      projectRoot: root,
+      forbiddenPrefixes: [],
+      checkWrite: () => ({ allowed: false }),
+      clock: () => 1000,
+    });
+    const request = req("call-journal");
+    await audit.snapshotBefore(request as never);
+    // 模拟并发会话经写门禁的合法落盘（writeGuarded 成功后 recordToolWrite）。
+    await fs.writeFile(abs, content, "utf8");
+    recordToolWrite(abs, sha, 1001);
+    const result = await audit.auditAfter(request as never, { exitCode: 0 } as never);
+    assert.deepEqual(result.violations, [], "写日志命中的合法写入不算越界");
+    assert.deepEqual(result.attributed?.map((entry) => entry.path), ["src/a.ts"]);
+
+    // 未登记的写入（shell/外部进程）仍判越界。
+    __resetWriteJournalForTests();
+    const audit2 = createShellPostAudit({ projectRoot: root, forbiddenPrefixes: [], checkWrite: () => ({ allowed: false }) });
+    const request2 = req("call-external");
+    await audit2.snapshotBefore(request2 as never);
+    await fs.writeFile(abs, "external write", "utf8");
+    const result2 = await audit2.auditAfter(request2 as never, { exitCode: 0 } as never);
+    assert.deepEqual(result2.violations.map((entry) => entry.path), ["src/a.ts"]);
+
+    // 关闭写日志归因（journalAttribution:false）⇒ 与旧行为一致（一律按越界）。
+    __resetWriteJournalForTests();
+    const audit3 = createShellPostAudit({
+      projectRoot: root,
+      forbiddenPrefixes: [],
+      checkWrite: () => ({ allowed: false }),
+      journalAttribution: false,
+    });
+    const request3 = req("call-nojournal");
+    await audit3.snapshotBefore(request3 as never);
+    await fs.writeFile(abs, "tool write without journal", "utf8");
+    recordToolWrite(abs, createHash("sha256").update("tool write without journal").digest("hex"), Date.now());
+    const result3 = await audit3.auditAfter(request3 as never, { exitCode: 0 } as never);
+    assert.deepEqual(result3.violations.map((entry) => entry.path), ["src/a.ts"]);
+  } finally {
+    __resetWriteJournalForTests();
     await fs.rm(root, { recursive: true, force: true });
   }
 });
