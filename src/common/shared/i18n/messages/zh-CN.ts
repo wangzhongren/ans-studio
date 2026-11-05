@@ -2260,6 +2260,8 @@ export const zhCN = {
   "ui.versionChange.targetMore": "另有 {count} 项",
   "ui.versionChange.summary": "摘要：{summary}",
   "ui.versionChange.hash": "提交哈希：{hash}",
+  "ui.versionChange.baselineBootstrap":
+    "主干基线：无（bootstrap）——批准后以现有已 pin 的冻结文档为基线建立主干 t1，并应用本次变更。",
   "ui.versionChange.diff": "差异预览",
   "ui.versionChange.semantics.versionUpgrade": "批准 = 最终内容确认；批准后冻结目标并切换主干。",
   "ui.versionChange.semantics.detailAmendment": "批准 = 提交/冻结门槛；逐项确认才是内容门槛。",

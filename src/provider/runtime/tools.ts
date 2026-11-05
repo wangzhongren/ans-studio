@@ -3997,7 +3997,8 @@ const VCA_RECEIPT_SPEC: SubmissionReceiptSpec = {
   okStatus: "submitted",
   statusSet: VERSION_CHANGE_STATUS_SET,
   errorCodeSet: VERSION_CHANGE_ERROR_CODE_SET,
-  successHint: "申请≠批准：批准/拒绝由客户卡决定；不要视为已批准，也不要重复提交。",
+  successHint:
+    "申请≠批准：批准/拒绝由客户卡决定；无已落盘主干时应用已按 bootstrap 提交（批准后以现有 pinned 基线建立 t1 并回绑 run）。不要视为已批准，也不要重复提交。",
 };
 
 const REFACTOR_RECEIPT_SPEC: SubmissionReceiptSpec = {

@@ -1189,6 +1189,82 @@ test("Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested�
   });
 });
 
+test("VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）", async () => {
+  await withProject(async (project, root) => {
+    // 不 bootstrap：项目只有唯一 pinned run + 迁移冻结文档（与存量项目一致）。
+    const events: TaskStateEvent[] = [];
+    const stack = createVersionChangeStack({
+      projectRoot: root,
+      now: () => new Date(AT),
+      emitEvent: async (event) => {
+        events.push(event);
+      },
+    });
+    try {
+      await stack.ensureInitialized();
+      const v2 = "docs/proposals/demo-proposal-v2.md";
+      await writeProjectFile(root, v2, "---\nschema: project-proposal/v2\nflowId: demo\nversion: 2\n---\n# v2\n");
+      const vca = await stack.submitVersionChange({
+        kind: "version-upgrade",
+        initiatorRoleId: "product",
+        flowId: FLOW_ID,
+        targets: [{ kind: "contract", path: v2, action: "add" }],
+        summary: "存量项目基线绑定",
+      });
+      assert.equal(vca.ok, true, vca.ok ? "" : `${vca.errorCode}: ${vca.message ?? ""}`);
+      const list = await stack.listVersionChanges();
+      const record = list.find((candidate) => candidate.applicationId === vca.applicationId);
+      assert.ok(record !== undefined);
+      assert.equal(record?.bootstrap, true, "无 trunk ⇒ 应用自动按 bootstrap 提交");
+      assert.equal(record?.baseTrunk, null);
+      assert.equal(record?.status, "submitted");
+      assert.equal(await project.service.current(), null, "提交不建立 trunk；批准时才落 t1");
+      assert.ok(events.some((event) => event.kind === "version.change" && (event as { status?: string }).status === "submitted"));
+    } finally {
+      stack.dispose();
+    }
+  });
+});
+
+test("VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）", async () => {
+  await withProject(async (project, root) => {
+    await bootstrapTrunk(project);
+    const presented: string[] = [];
+    const stack = createVersionChangeStack({
+      projectRoot: root,
+      now: () => new Date(AT),
+      emitEvent: async () => {},
+      presentVersionChangeCard: async (record) => {
+        presented.push(record.applicationId);
+        return { outcome: "declined" };
+      },
+    });
+    try {
+      await stack.ensureInitialized();
+      const v2 = "docs/proposals/demo-proposal-v2.md";
+      await writeProjectFile(root, v2, "---\nschema: project-proposal/v2\nflowId: demo\nversion: 2\n---\n# v2\n");
+      const vca = await stack.submitVersionChange({
+        kind: "version-upgrade",
+        initiatorRoleId: "product",
+        flowId: FLOW_ID,
+        targets: [{ kind: "contract", path: v2, action: "add" }],
+        summary: "自动呈现",
+      });
+      assert.equal(vca.ok, true, vca.ok ? "" : `${vca.errorCode}: ${vca.message ?? ""}`);
+      // 自动呈现是提交后的异步动作：等到 presenter 收到该申请。
+      for (let i = 0; i < 50 && presented.length === 0; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert.deepEqual(presented, [vca.applicationId]);
+      // 客户卡无应答（declined）⇒ 保持 submitted，不伪造批准。
+      const list = await stack.listVersionChanges();
+      assert.equal(list.find((record) => record.applicationId === vca.applicationId)?.status, "submitted");
+    } finally {
+      stack.dispose();
+    }
+  });
+});
+
 test("Batch 3.5 request_stable_write：客户拒绝 ⇒ 回执失败且不签发许可", async () => {
   await withProject(async (project, root) => {
     await bootstrapTrunk(project);

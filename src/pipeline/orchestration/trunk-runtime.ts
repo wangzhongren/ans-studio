@@ -89,6 +89,8 @@ export interface TrunkBootstrapInput {
   rosterVersion?: number;
   d3?: { decisionId: string; targetRoleIds: string[] };
   roles?: string[];
+  /** 有 pinned run 时把基线回绑到 t1 内容（VCA bootstrap apply；无 run 不提供）。 */
+  repin?: NonNullable<TrunkApplyInput["repin"]>;
   journalId?: string;
   at: string;
 }
@@ -232,6 +234,7 @@ export function createTrunkRuntime(deps: TrunkRuntimeDeps): TrunkRuntime {
         ...(input.rosterVersion !== undefined ? { rosterVersion: input.rosterVersion } : {}),
         ...(input.d3 !== undefined ? { d3: input.d3 } : {}),
         ...(input.roles !== undefined ? { roles: input.roles } : {}),
+        ...(input.repin !== undefined ? { repin: input.repin } : {}),
         ...(input.journalId !== undefined ? { journalId: input.journalId } : {}),
         at: input.at,
       });

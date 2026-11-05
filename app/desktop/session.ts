@@ -2424,6 +2424,16 @@ export class SessionManager {
     this.emitDeliveryNote(projectRoot, runtime, chief, chief ?? "chief", `[${mainT("ui.trunk.panelTitle")}] ${summary}`);
   }
 
+  /** 客户决定结果返回发起角色（如 product/rapporteur；只通知，不触发模型/门禁/派发）。 */
+  noteVersionChangeInitiator(projectRoot: string, roleId: string, summary: string): void {
+    const runtime =
+      this.findLiveRuntime(projectRoot, roleId) ??
+      this.lastGovernanceRuntime.get(projectRoot) ??
+      this.activeRuntimeFor(projectRoot) ??
+      "demo";
+    this.emitDeliveryNote(projectRoot, runtime, roleId, roleId, `[${mainT("ui.trunk.panelTitle")}] ${summary}`);
+  }
+
   /**
    * stable 写入的 post-write 复核（D1/F16）：**只在运行时核心 write/edit 成功后**由
    * `versionedDocAfterWrite` 接缝调用；桌面不写盘、不缓存许可、不复算 target hash。

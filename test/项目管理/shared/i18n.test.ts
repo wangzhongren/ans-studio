@@ -407,7 +407,7 @@ const DOWNLOAD_KEYS = [
  * F17：D1 不提供 `refactor:request`，U1 只读指引；本清单无提交表单 key。
  */
 const TRUNK_AMENDMENT_KEYS = [
-  // ui.versionChange.*（34）
+  // ui.versionChange.*（35）
   "ui.versionChange.entry",
   "ui.versionChange.entryHint",
   "ui.versionChange.disabledUnavailable",
@@ -433,6 +433,7 @@ const TRUNK_AMENDMENT_KEYS = [
   "ui.versionChange.targetMore",
   "ui.versionChange.summary",
   "ui.versionChange.hash",
+  "ui.versionChange.baselineBootstrap",
   "ui.versionChange.diff",
   "ui.versionChange.semantics.versionUpgrade",
   "ui.versionChange.semantics.detailAmendment",
@@ -534,7 +535,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 1191 / main 626 / shared 62 / preferences 3，总计 1882", () => {
+test("key 分区计数：ui 1192 / main 626 / shared 62 / preferences 3，总计 1883", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -542,8 +543,8 @@ test("key 分区计数：ui 1191 / main 626 / shared 62 / preferences 3，总计
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 1191, main: 626, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1882);
+  assert.deepEqual(prefixes, { ui: 1192, main: 626, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1883);
 });
 
 test("下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han", () => {
@@ -946,9 +947,9 @@ test("shell 升级 key 契约：§7.3 清单中英成对且回执保留兜底子
   assert.ok(zhCN["ui.confirm.escalation.necessityNote"].includes("由角色提供，未经验证"));
 });
 
-test("主干/冻结与版本变更 C3 冻结：99 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han", () => {
-  assert.equal(TRUNK_AMENDMENT_KEYS.length, 99);
-  assert.equal(new Set(TRUNK_AMENDMENT_KEYS).size, 99, "TRUNK_AMENDMENT_KEYS 存在重复 key");
+test("主干/冻结与版本变更 C3 冻结：100 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han", () => {
+  assert.equal(TRUNK_AMENDMENT_KEYS.length, 100);
+  assert.equal(new Set(TRUNK_AMENDMENT_KEYS).size, 100, "TRUNK_AMENDMENT_KEYS 存在重复 key");
   const families = {
     versionChange: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.versionChange.")).length,
     stableWrite: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.stableWrite.")).length,
@@ -956,7 +957,7 @@ test("主干/冻结与版本变更 C3 冻结：99 key 中英成对、家族计�
     freeze: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.freeze.")).length,
     trunk: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.trunk.")).length,
   };
-  assert.deepEqual(families, { versionChange: 34, stableWrite: 12, refactor: 14, freeze: 17, trunk: 22 });
+  assert.deepEqual(families, { versionChange: 35, stableWrite: 12, refactor: 14, freeze: 17, trunk: 22 });
 
   for (const key of TRUNK_AMENDMENT_KEYS) {
     assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
@@ -1004,6 +1005,10 @@ test("主干/冻结与版本变更 C3 冻结：99 key 中英成对、家族计�
     "ui.versionChange.targetMore": { zh: "另有 {count} 项", en: "{count} more targets" },
     "ui.versionChange.summary": { zh: "摘要：{summary}", en: "Summary: {summary}" },
     "ui.versionChange.hash": { zh: "提交哈希：{hash}", en: "Submitted hash: {hash}" },
+    "ui.versionChange.baselineBootstrap": {
+      zh: "主干基线：无（bootstrap）——批准后以现有已 pin 的冻结文档为基线建立主干 t1，并应用本次变更。",
+      en: "Trunk baseline: none (bootstrap) — approval establishes trunk t1 from the existing pinned frozen documents plus this change.",
+    },
     "ui.versionChange.diff": { zh: "差异预览", en: "Diff preview" },
     "ui.versionChange.semantics.versionUpgrade": {
       zh: "批准 = 最终内容确认；批准后冻结目标并切换主干。",

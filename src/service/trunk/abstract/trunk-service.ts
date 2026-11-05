@@ -265,6 +265,17 @@ export interface TrunkRecoveryInput {
   reason: string;
   /** true = 优先用 apply-journal 的 target 内容；缺省从唯一 pinned run 重新派生。 */
   useJournalTarget?: boolean;
+  /**
+   * 显式修复目标（维护/修复用，优先级最高）：由调用方组装快照；service 仍以磁盘字节复核
+   * 内容哈希并校验版本化文档已冻结，未通过即拒绝（fail-closed，不改指针）。
+   */
+  target?: TrunkApplySnapshot;
+  /** 需要同时回绑 pinned run 时提供（与 apply/bootstrap 同语义、同提交协议）。 */
+  repin?: { runId: string; targets: TrunkRepinTarget[] };
+  /** 修复目标携带的名单事实（缺省沿用当前 manifest 值；存量重建时由调用方从派生基线提供）。 */
+  rosterVersion?: number;
+  d3?: { decisionId: string; targetRoleIds: string[] };
+  roles?: string[];
   journalId?: string;
   at: string;
 }

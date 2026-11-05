@@ -276,7 +276,7 @@ export function buildVersionChangeCard(input: VcaCardInput): BuiltCard | undefin
     ...(record.applicationSha256 !== undefined && record.applicationSha256 !== ""
       ? [mainT("ui.versionChange.hash", { hash: record.applicationSha256 })]
       : []),
-    ...(record.baseTrunk === null ? [mainT("ui.trunk.versionNone")] : []),
+    ...(record.baseTrunk === null ? [mainT("ui.versionChange.baselineBootstrap")] : []),
     mainT(
       record.kind === "version-upgrade"
         ? "ui.versionChange.semantics.versionUpgrade"
@@ -662,6 +662,8 @@ export interface VersionChangeStackOptions {
   onEvent?: (event: TaskStateEvent) => void;
   /** 幕僚/运营通知（只通知，无批准权）。 */
   notify?: (message: string) => void | Promise<void>;
+  /** 客户决定结果返回发起角色（如 product/rapporteur；只通知）。 */
+  notifyInitiator?: (roleId: string, message: string) => void | Promise<void>;
   /** 卡通道（由 SessionManager/Interface 注入；缺省 ⇒ 无 presenter，fail-closed）。 */
   presentVersionChangeCard?: (record: VersionChangeRecord) => Promise<VcaCardOutcome>;
   presentAmendmentItemCard?: (input: AmendmentItemPresentation) => Promise<AmendmentItemOutcome>;
@@ -904,6 +906,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     emitEvent,
     ...(presenter !== undefined ? { presenter } : {}),
     ...(options.notify !== undefined ? { notify: options.notify } : {}),
+    ...(options.notifyInitiator !== undefined ? { notifyInitiator: options.notifyInitiator } : {}),
     now,
   });
 
@@ -1219,7 +1222,11 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
       try {
         const at = now().toISOString();
         const current = await trunkService.current();
-        const baseTrunk = input.bootstrap === true ? null : current;
+        // 应用侧事实（C1d/S5）：无已落盘 trunk manifest ⇒ 本次申请只能以 bootstrap 模式提交。
+        // 模式不由发起角色自报：批准时以派生快照（唯一 pinned run）为基线落 t1，叠加本次变更；
+        // 已有 trunk 时以当前主干为基线（此时显式 bootstrap:true 交由 Service 拒绝，不在此吞掉）。
+        const bootstrapMode = current === null || input.bootstrap === true;
+        const baseTrunk = bootstrapMode ? null : current;
         let amendmentItems: SnapshotItem[] | undefined;
         if (input.kind === "detail-amendment" && input.amendmentDocPath !== undefined) {
           const validated = await trunkService.validateAmendment({
@@ -1236,7 +1243,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
           initiatorRoleId: input.initiatorRoleId,
           flowId: input.flowId,
           baseTrunk,
-          ...(input.bootstrap !== undefined ? { bootstrap: input.bootstrap } : {}),
+          ...(bootstrapMode ? { bootstrap: true } : {}),
           targets: input.targets.map((target) => ({
             kind: target.kind,
             path: target.path,
@@ -1259,6 +1266,14 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
             errorCode: "vca-conflict",
             message: `同目标 VCA 已存在（status=${result.value.status}）；不重复提交，请查看版本变更面板。`,
           };
+        }
+        // 提交成功即**自动呈现客户批准卡**（决策中心弹窗由 pending 驱动；不阻塞发起轮次）。
+        // 无 presenter/无治理会话 ⇒ present 返回 vca-channel-unavailable：保持 submitted，
+        // 可从版本变更面板重发，绝不伪造批准。
+        if (presenter !== undefined) {
+          void versionChangeRuntime.present(result.value.applicationId).catch((error: unknown) => {
+            diagnostic.error("version-change.auto-present.failed", error);
+          });
         }
         return { ok: true, applicationId: result.value.applicationId, status: "submitted" };
       } catch (error) {

@@ -1511,7 +1511,8 @@ export function describeTool(name: string): ToolDescription {
           },
           bootstrap: {
             type: "boolean",
-            description: "Optional: submit with baseTrunk=null + bootstrap when no trunk exists yet (service validates)",
+            description:
+              "Optional and normally omitted: the app derives the mode from actual trunk state (no trunk manifest ⇒ automatic bootstrap, baseTrunk=null; approval establishes trunk t1 from the existing pinned baseline). The service still validates any explicit value against the real state.",
           },
         },
         required: ["kind", "flowId", "summary", "targets"],
@@ -1526,6 +1527,7 @@ export function describeTool(name: string): ToolDescription {
         "用 submit_version_change 提交 VCA；你只能提交，不能批准/代选，也不要在正文里声称已获批准。",
         "version-upgrade 只能由 product 提交（contract/roster）；detail-amendment 只能由 rapporteur 提交（contract/roster/execution）。",
         "workflow/boundary 不是 VCA target：workflow 走 request_stable_write 的客户确认卡，role-card/boundary 走 appointment-write。",
+        "不要自行判断或声明 bootstrap：应用按 trunk 实际状态机械判定——已有主干则以当前主干为基线；无主干则自动按 bootstrap 提交，批准后以现有 pinned run 基线建立主干 t1 并回绑。不要以“不能伪装 bootstrap”为由拒绝提交。",
         "按回执如实行动：submitted 只表示已提交；批准后还有冻结/re-pin 或逐项确认。",
       ],
       executionMode: "sequential",

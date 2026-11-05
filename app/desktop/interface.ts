@@ -2164,6 +2164,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       projectRoot,
       ...(nowMs !== undefined ? { now: () => new Date(nowMs()) } : {}),
       notify: (message) => manager.noteVersionChange(projectRoot, message),
+      notifyInitiator: (roleId, message) => manager.noteVersionChangeInitiator(projectRoot, roleId, message),
       presentVersionChangeCard: (record) => manager.presentVersionChangeCard({ projectRoot, record }),
       presentAmendmentItemCard: (input) => manager.presentAmendmentItemCard({ projectRoot, ...input }),
       presentStableWriteCard: (record, preview) => manager.presentStableWriteCard({ projectRoot, record, preview }),

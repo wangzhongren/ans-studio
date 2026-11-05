@@ -49,8 +49,8 @@ export async function recoverTrunk(
   const currentRead = await deps.store.readManifest();
   const current = currentRead.ok ? currentRead.value : undefined;
 
-  let target: TrunkApplySnapshot | undefined;
-  if (input.useJournalTarget === true) {
+  let target: TrunkApplySnapshot | undefined = input.target;
+  if (target === undefined && input.useJournalTarget === true) {
     const journal = await deps.store.readJournal();
     if (journal.ok) target = journal.value.target;
   }
@@ -77,6 +77,10 @@ export async function recoverTrunk(
     runId,
     baseTrunkVersion: current?.trunkVersion ?? null,
     target,
+    ...(input.repin !== undefined ? { repin: input.repin } : {}),
+    ...(input.rosterVersion !== undefined ? { rosterVersion: input.rosterVersion } : {}),
+    ...(input.d3 !== undefined ? { d3: input.d3 } : {}),
+    ...(input.roles !== undefined ? { roles: input.roles } : {}),
     reason: input.reason,
     ...(input.journalId !== undefined ? { journalId: input.journalId } : {}),
     at: input.at,

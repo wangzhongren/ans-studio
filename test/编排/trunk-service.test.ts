@@ -13,6 +13,7 @@ import { test } from "node:test";
 
 import { TRUNK_APPLY_JOURNAL_SCHEMA, TRUNK_MANIFEST_SCHEMA } from "../../src/model/trunk.ts";
 import type { TrunkApplyJournal, TrunkApplySnapshot, TrunkManifest } from "../../src/model/trunk.ts";
+import { readRunManifest, writeRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { createTrunkService } from "../../src/service/trunk/public/trunk-service.ts";
 import type { TrunkService } from "../../src/service/trunk/public/trunk-service.ts";
 import {
@@ -113,6 +114,50 @@ test("派生 fail-closed：无 pinned/多 pinned/坏 manifest", async () => {
 
   const status = await none.service.status();
   assert.equal(status.availability, "unavailable");
+});
+
+test("派生/应用支持 `path#fragment` 引用：哈希/冻结按文件部分，引用串原样保留", async () => {
+  const project = await createTrunkProject();
+  // run documents 允许 `path#section`（真实项目：roster 文档内嵌拓扑图）。
+  const read = await readRunManifest(project.root, project.runId);
+  assert.equal(read.ok, true);
+  if (!read.ok) return;
+  const fragmentRef = `${PATHS.topology}#人员+模块拓扑图`;
+  const rewritten = await writeRunManifest(project.root, {
+    ...read.manifest,
+    documents: {
+      ...read.manifest.documents,
+      topology: { path: fragmentRef, sha256: project.hashes[PATHS.topology]! },
+    },
+  });
+  assert.equal(rewritten.ok, true);
+  if (!rewritten.ok) return;
+
+  // 派生：成功且保留 fragment 引用串；哈希取文件部分。
+  const derived = await project.service.derive();
+  assert.equal(derived.ok, true, derived.ok ? "" : `${derived.code}: ${derived.message ?? ""}`);
+  if (!derived.ok) return;
+  assert.equal(derived.value.manifest.artifacts.documents.topology?.path, fragmentRef);
+  assert.equal(derived.value.manifest.artifacts.documents.topology?.sha256, project.hashes[PATHS.topology]);
+
+  // bootstrap apply：内容哈希/冻结校验按文件部分通过；manifest 保留 fragment 引用串。
+  const snapshot = project.snapshot();
+  const boot = await bootstrap(project, project.service, {
+    target: {
+      ...snapshot,
+      documents: {
+        ...snapshot.documents,
+        topology: { path: fragmentRef, sha256: project.hashes[PATHS.topology]! },
+      },
+    },
+  });
+  assert.equal(boot.ok, true, boot.ok ? "" : `${boot.code}: ${boot.message ?? ""}`);
+  if (!boot.ok) return;
+  assert.equal(boot.value.manifest.artifacts.documents.topology?.path, fragmentRef);
+
+  // verifyTrunk 不再误报「文件缺失 / 未冻结」。
+  const verified = await project.service.verify();
+  assert.equal(verified.ok, true, JSON.stringify(verified.violations));
 });
 
 test("verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规", async () => {
@@ -416,6 +461,45 @@ test("recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/�
   });
   assert.equal(corruptRegistry.ok, false);
   if (!corruptRegistry.ok) assert.equal(corruptRegistry.code, "trunk-recovery-invalid");
+});
+
+test("recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针", async () => {
+  const project = await createTrunkProject();
+  manifestOf(await bootstrap(project));
+
+  // 磁盘内容变化（workflow v2）+ 显式目标快照 ⇒ 恢复按目标落 t2（内容以磁盘字节复核）。
+  const newSha = await writeProjectFile(project.root, PATHS.workflow, "# workflow repaired\n");
+  const base = project.snapshot();
+  const repaired = await project.service.recover({
+    decisionId: "dec-repair",
+    reason: "baseline-repair",
+    target: { ...base, workflow: { path: PATHS.workflow, sha256: newSha } },
+    rosterVersion: 1,
+    d3: { decisionId: "dec-0", targetRoleIds: ["impl"] },
+    roles: ["impl"],
+    at: AT2,
+  });
+  assert.equal(repaired.ok, true, repaired.ok ? "" : `${repaired.code}: ${repaired.message ?? ""}`);
+  if (!repaired.ok) return;
+  assert.equal(repaired.value.manifest.source, "recovery");
+  assert.equal(repaired.value.manifest.trunkVersion, 2);
+  assert.equal(repaired.value.manifest.artifacts.workflow.sha256, newSha);
+  assert.equal(repaired.value.manifest.d3?.decisionId, "dec-0");
+  assert.deepEqual(repaired.value.manifest.roles, ["impl"]);
+  const repairedVerify = await project.service.verify();
+  assert.deepEqual(repairedVerify.violations, []);
+
+  // 目标与磁盘字节不符 ⇒ 拒绝且不改指针（仍 t2）。
+  const rejected = await project.service.recover({
+    decisionId: "dec-repair-2",
+    reason: "mismatch",
+    target: { ...base, workflow: { path: PATHS.workflow, sha256: "0".repeat(64) } },
+    at: AT2,
+  });
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.code, "trunk-apply-failed");
+  const status = await project.service.status();
+  assert.equal(status.manifest?.trunkVersion, 2);
 });
 
 test("applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接", async () => {

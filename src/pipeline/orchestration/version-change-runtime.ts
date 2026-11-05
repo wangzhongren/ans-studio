@@ -84,6 +84,8 @@ export interface VersionChangeRuntimeDeps {
   presenter?: VersionChangePresenter;
   /** 幕僚/运营通知（只通知，无批准权）。 */
   notify?: (message: string) => void | Promise<void>;
+  /** 发起人回执（客户决定后返回发起角色会话；只通知，不触发批准/派发）。 */
+  notifyInitiator?: (roleId: string, message: string) => void | Promise<void>;
   now?: () => Date;
   log?: (message: string) => void;
 }
@@ -264,6 +266,15 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
     }
   }
 
+  /** 把客户决定结果返回发起人（只通知；失败不改变业务结果）。 */
+  async function notifyInitiator(record: VersionChangeRecord, summary: string): Promise<void> {
+    try {
+      await deps.notifyInitiator?.(record.initiatorRoleId, summary);
+    } catch {
+      /* 通知失败不改变业务结果 */
+    }
+  }
+
   async function emitEvents(events: TaskStateEvent[]): Promise<void> {
     for (const event of events) await deps.emitEvent(event);
   }
@@ -274,7 +285,16 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
   }
 
   async function stableFilesForManifest(): Promise<
-    | { ok: true; workflow: { path: string; sha256: string }; roleCards?: Record<string, { path: string; sha256: string }>; boundaries?: Record<string, { path: string; sha256: string }>; runId: string | null }
+    | {
+        ok: true;
+        workflow: { path: string; sha256: string };
+        roleCards?: Record<string, { path: string; sha256: string }>;
+        boundaries?: Record<string, { path: string; sha256: string }>;
+        runId: string | null;
+        rosterVersion?: number;
+        d3?: { decisionId: string; targetRoleIds: string[] };
+        roles?: string[];
+      }
     | { ok: false; message: string }
   > {
     const status = await trunkService.status();
@@ -288,6 +308,11 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
           : {}),
         boundaries: stableMapOf(manifest.artifacts.boundaries),
         runId: manifest.runId,
+        // 存量项目 bootstrap：清单基线（派生自 pinned run）的 roster/D3/roles 必须一起携带，
+        // 否则 t1 与 pinned run 校验不一致（verify 报 d3/roster 漂移）。
+        ...(manifest.rosterVersion !== undefined ? { rosterVersion: manifest.rosterVersion } : {}),
+        ...(manifest.d3 !== undefined ? { d3: manifest.d3 } : {}),
+        ...(manifest.roles !== undefined ? { roles: manifest.roles } : {}),
       };
     }
     // bootstrap：无 manifest ⇒ stable 快照取磁盘（workflow 必需；role-card/boundary 未知角色 ⇒ 空）。
@@ -297,7 +322,15 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
   }
 
   async function targetFor(record: VersionChangeRecord, appliedPaths?: readonly string[]): Promise<
-    { ok: true; target: TrunkApplySnapshot; runId: string | null } | { ok: false; message: string }
+    | {
+        ok: true;
+        target: TrunkApplySnapshot;
+        runId: string | null;
+        rosterVersion?: number;
+        d3?: { decisionId: string; targetRoleIds: string[] };
+        roles?: string[];
+      }
+    | { ok: false; message: string }
   > {
     const stable = await stableFilesForManifest();
     if (!stable.ok) return stable;
@@ -349,6 +382,9 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
     return {
       ok: true,
       runId: stable.runId,
+      ...(stable.rosterVersion !== undefined ? { rosterVersion: stable.rosterVersion } : {}),
+      ...(stable.d3 !== undefined ? { d3: stable.d3 } : {}),
+      ...(stable.roles !== undefined ? { roles: stable.roles } : {}),
       target: {
         trunkVersion: current?.trunkVersion ?? 0,
         runId: stable.runId,
@@ -424,6 +460,14 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
             applicationId: record.applicationId,
             decisionId,
             target: built.target,
+            // 存量项目：bootstrap 以唯一 pinned run 派生基线落 t1，同时把 run 回绑到新版本
+            // （与升级通道的 re-pin 同义）；无 pinned run 的纯新项目不提供 re-pin。
+            ...(built.rosterVersion !== undefined ? { rosterVersion: built.rosterVersion } : {}),
+            ...(built.d3 !== undefined ? { d3: built.d3 } : {}),
+            ...(built.roles !== undefined ? { roles: built.roles } : {}),
+            ...(built.runId !== null
+              ? { repin: { runId: built.runId, targets: repinTargets } }
+              : {}),
             journalId: `j-${record.applicationId}`,
             at,
           })
@@ -451,6 +495,10 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
     if (!marked.ok) return marked;
     await emitEvents([versionChangeEvent(marked.value.record, "applied", at)]);
     await notifyStatus(marked.value.record, "applied", `（trunk v${applied.value.manifest.trunkVersion}）`);
+    await notifyInitiator(
+      marked.value.record,
+      `客户已批准并应用 ${marked.value.record.applicationId}（${marked.value.record.kind}/${marked.value.record.flowId}）→ 主干 t${applied.value.manifest.trunkVersion}；批准已生效，实施排期仍按治理流程。`,
+    );
     return { ok: true, value: { record: marked.value.record, needsItems: false, resultTrunkVersion: applied.value.manifest.trunkVersion } };
   }
 
@@ -516,6 +564,10 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       await emitEvents([...freezeEvents(approved.value.freezes), versionChangeEvent(record, "approved", at)]);
       await notifyStatus(record, "approved");
       if (record.kind === "detail-amendment") {
+        await notifyInitiator(
+          record,
+          `客户已批准 ${record.applicationId}（${record.kind}/${record.flowId}）；等待逐项确认后应用。`,
+        );
         return { ok: true, value: { record, needsItems: true } };
       }
       return applyUpgrade(record, decisionId, at);
@@ -532,6 +584,7 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       if (!rejected.ok) return rejected;
       await emitEvents([versionChangeEvent(rejected.value, "rejected", at, message !== undefined ? { message } : {})]);
       await notifyStatus(rejected.value, "rejected");
+      await notifyInitiator(rejected.value, `客户已拒绝 ${rejected.value.applicationId}（${rejected.value.kind}/${rejected.value.flowId}）。`);
       return rejected;
     },
 

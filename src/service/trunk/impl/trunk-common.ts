@@ -31,6 +31,15 @@ export async function sha256File(projectRoot: string, relPath: string): Promise<
   }
 }
 
+/**
+ * 引用路径的**文件部分**：去 `#fragment`（与 run-manifest 的 pin/re-pin 约定一致——
+ * run documents 允许 `path#section` 形式引用文档内嵌区块，如 roster 内嵌拓扑图）。
+ * manifest/账本保留完整引用串；凡读磁盘字节或查冻结记录一律用本函数。
+ */
+export function filePathOfRef(relPath: string): string {
+  return relPath.split("#")[0]!;
+}
+
 /** 项目相对 POSIX 路径规范化（拒绝绝对路径/`..` 逃逸）。 */
 export function normalizeRelPath(relPath: unknown): string | undefined {
   if (typeof relPath !== "string") return undefined;
