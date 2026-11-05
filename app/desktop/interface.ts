@@ -2089,6 +2089,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     // P2（2026-10-30）：网络状态门（monitor 注入）——会话层据此在离线时保留队列、不认领新投递；
     // 适配器经同一 gate 暂停/恢复请求计时（runtimeOptions 原样透传到 Service/Provider）。
     networkGate: deps.runtimeOptions?.networkGate,
+    // 2026-11-05（真机缺陷「又卡住」）：演示运行时 demo 不自动开会话接收投递——demo 适配器执行内置
+    // 演示脚本（对 src/evil.ts 的越界写），自动唤醒只会产生被门禁拒绝的回合并级联成 blocked。
+    // 生产置 false：demo 仅由用户亲手打开、只投给已存在的 demo 会话（测试/演示宿主缺省 true 不受影响）。
+    demoRuntimeAutoDeliver: false,
     // 「替我审」：每会话判断闭包工厂（会话用同一份 runtimeOptions/createAdapter 构造；缺省真实实现）。
     createShellJudge: createShellJudgeFn,
     // 「替我决策」（2026-10-18 双开关评审 §8.2）：每会话治理判断闭包工厂（仅 trio + 通道已接时构造）。
