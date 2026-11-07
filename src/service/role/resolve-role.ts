@@ -71,6 +71,27 @@ async function resolveRoleDocumentContext(roleId: string, project: ProjectConfig
 // 跨角色只可经本文件消费，不得导入私有解析器或自行解析 cardText）。
 export type { RoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
 
+// ---- 角色模块公共只读入口（E2 X-R1；E0.3 §10.2 D2/D6；契约 §4.4 接口评审，无客户卡）----
+//
+// 消费方（编排 / 运行时核心 / 桌面）只可经本 Service 出口读取**已装配**的角色模块与 D1 工具声明
+// 校验；不得 import `src/common/门禁引擎/` 私有 common。以下能力均**同一绑定再导出**（不复制实现）：
+//  - `builtInRoleModules`：六角色完整 `BuiltInRoleModuleMap`（X-R6 收口；值即模块本体，不复制数据）。
+//  - `builtInRoleModuleOf(roleId)`：按 id 取已装配的完整 `BuiltInRoleModule`（X-R6 起六角色全部装配；
+//    `su` / 项目角色 / 未知 id 返回 undefined，调用方按 fail-closed 处理）。
+//  - `validateRoleToolDeclaration(roleId, declaredIds)`：D1 工具声明校验（未知/越权/重复 ⇒ 整单 deny、
+//    tools:[]，不注入不静默忽略）；返回类型随函数一同再导出。
+// 接口评审记录：`角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_gate-facade-product-evidence.md` §4；
+// X-R6 收口：`角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_gate-facade-chief-and-closure-evidence.md`。
+export {
+  builtInRoleModuleOf,
+  builtInRoleModules,
+} from "../../common/门禁引擎/governance-roles.ts";
+export { validateRoleToolDeclaration } from "../../common/门禁引擎/role-tool-registry.ts";
+export type {
+  RoleToolBinding,
+  RoleToolDeclarationValidation,
+} from "../../common/门禁引擎/role-tool-registry.ts";
+
 export async function resolveRole(roleId: string, project: ProjectConfig): Promise<ResolvedRole> {
   const frozen = await resolveRoleDocumentContext(roleId, project);
   if (frozen) return { id: roleId, kind: "project", cardText: frozen.cardText, boundary: frozen.boundary,

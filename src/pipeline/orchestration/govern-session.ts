@@ -471,7 +471,8 @@ function withGovernanceRole(project: ProjectConfig, govId: string): ProjectConfi
 
 /**
  * shell 面统一口径（客户 2026-10-19 新规则：所有角色都有运行 shell 的权限，包括读写与任意需要
- * 命令的权限，但一律提交审批、按原有流程审批）。与门禁引擎角色卡 `SHELL_APPROVAL_CARD_LINE` 同义，
+ * 命令的权限，但一律提交审批、按原有流程审批）。与内置治理角色模块卡文本中的 shell 审批档口径同义
+ * （原门禁引擎共享常量 `SHELL_APPROVAL_CARD_LINE` 已随角色模块化删除；文案现由各角色模块卡持有），
  * 此处按**治理会话提示词**单独表述（不导入角色卡文案；措辞侧重行为约束：审批 ≠ 写边界扩张）。
  */
 const SHELL_APPROVAL_PROMPT_LINE =

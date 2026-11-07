@@ -23,8 +23,9 @@ import type {
   InteractionGate, PromptImage, PromptOptions, RoleSession, RuntimeToolErrorFactsV1,
   RuntimeToolEventFactsV1, RuntimeToolEventProjector, RuntimeToolResultFactsV1, RuntimeTurnOutcome,
   SessionEvent, ToolDefinition, ToolResult,
-  RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeNativeToolSurfaceFacts,
+  RuntimeApplicationToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeNativeToolSurfaceFacts,
 } from "../../model/runtime.ts";
+import { isRuntimeNativeToolSurfaceFacts } from "../../model/runtime.ts";
 import { eventQueue, object, pausedDeadline, observeNativeStop } from "./protocol.ts";
 import { CODEX_IMAGE_UNAVAILABLE_NOTE, CODEX_TOOL_RESULT_IMAGE_MIMES, mapCodexToolResultImages } from "./tool-result-images.ts";
 
@@ -269,6 +270,28 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
         factory: "codex-chat", status: reasons.length ? "unknown" : "observed", observedAt: new Date().toISOString(),
         appTools: [...toolMap.keys()], foreignMcpServers: [], nativeBuiltinTools: [], reasons,
         ...(factoryPlan ? { factoryPlan: { ...factoryPlan } } : {}) };
+    },
+    /**
+     * P1.6 §4.6 Codex 行：同一闭包内的应用中介事实。`appTools` 是实际 `toolMap` 键（含被注册的
+     * 受控 shell `run_shell`/`start_background_task`，那是 app 级工具而不是 native builtin）；
+     * chat 传输没有 MCP 连接或 native builtin，故两数组恒为空。Codex 不允许无 native 证据走应用
+     * 中介：native 事实缺失/身份不符/自身 unknown 时只回 `status:"unknown"`（fail-closed），
+     * 绝不冒充 `observed`。本方法不改动 `inspectNativeToolSurface` 的既有判定。
+     */
+    inspectApplicationToolSurface(): RuntimeApplicationToolSurfaceFacts {
+      const reasons: string[] = [];
+      let native: RuntimeNativeToolSurfaceFacts | undefined;
+      try { native = session.inspectNativeToolSurface?.(); } catch { native = undefined; }
+      let lifecycleInstanceId: string | undefined;
+      try { lifecycleInstanceId = session.nativeLifecycle?.instanceId; } catch { lifecycleInstanceId = undefined; }
+      if (!isRuntimeNativeToolSurfaceFacts(native)) reasons.push("chat-native-surface-unavailable");
+      else if (native.nativeInstanceId !== instanceId || native.nativeInstanceId !== lifecycleInstanceId
+        || native.roleId !== boundRoleId || native.runtime !== "codex" || native.factory !== "codex-chat") reasons.push("chat-native-identity-mismatch");
+      else if (native.status !== "observed" || native.reasons.length > 0) reasons.push("chat-native-surface-unknown");
+      return { source: "application-mediated-tool-surface", nativeInstanceId: instanceId, roleId: boundRoleId,
+        runtime: "codex", factory: "codex-chat", status: reasons.length ? "unknown" : "observed",
+        observedAt: new Date().toISOString(), appTools: [...toolMap.keys()],
+        foreignMcpServers: [], nativeBuiltinTools: [], reasons };
     },
     nativeLifecycle: {
       instanceId, inspect: inspectNative,

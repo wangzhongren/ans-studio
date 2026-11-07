@@ -7,7 +7,23 @@ import { join } from "node:path";
 
 import { parseBoundarySection1 } from "../../src/common/门禁引擎/boundary-parse.ts";
 import { resolveBoundary } from "../../src/service/boundary/resolve-boundary.ts";
-import { resolveRole } from "../../src/service/role/resolve-role.ts";
+import {
+  builtInRoleModuleOf,
+  builtInRoleModules,
+  resolveRole,
+  validateRoleToolDeclaration,
+} from "../../src/service/role/resolve-role.ts";
+import {
+  builtInRoleModuleOf as privateBuiltInRoleModuleOf,
+  builtInRoleModules as privateBuiltInRoleModules,
+} from "../../src/common/门禁引擎/governance-roles.ts";
+import { validateRoleToolDeclaration as privateValidateRoleToolDeclaration } from "../../src/common/门禁引擎/role-tool-registry.ts";
+import { chiefRoleModule } from "../../src/common/roles/chief/index.ts";
+import { convenerRoleModule } from "../../src/common/roles/convener/index.ts";
+import { nominatorRoleModule } from "../../src/common/roles/nominator/index.ts";
+import { productRoleModule } from "../../src/common/roles/product/index.ts";
+import { rapporteurRoleModule } from "../../src/common/roles/rapporteur/index.ts";
+import { verifierRoleModule } from "../../src/common/roles/verifier/index.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "svc-"));
 const PROJ = join(ROOT, "proj");
@@ -132,4 +148,39 @@ test("resolveRole：未配置角色 → 内置治理角色", async () => {
   const role = await resolveRole("内置治理", project);
   assert.equal(role.kind, "built-in-governance");
   assert.equal(role.boundary.acceptance.accepted, false);
+});
+
+test("X-R1–X-R6 Service 公共出口：完整角色模块 map / lookup 与 D1 工具声明校验同一绑定再导出（消费方不直连私有 common）", () => {
+  // 同一绑定再导出，不复制实现（E0 §4.4 接口评审；X-R1 证据 §4、X-R2 证据 §5、X-R3 证据 §3、X-R4 证据 §3、X-R5 证据 §3、X-R6 证据 §3）。
+  assert.equal(builtInRoleModuleOf, privateBuiltInRoleModuleOf);
+  assert.equal(builtInRoleModules, privateBuiltInRoleModules);
+  assert.equal(validateRoleToolDeclaration, privateValidateRoleToolDeclaration);
+  // X-R6：六角色全部装配（完整 map 值 = 模块本体）；lookup 与 map 同一引用。
+  assert.equal(builtInRoleModules.chief, chiefRoleModule);
+  assert.equal(builtInRoleModules.product, productRoleModule);
+  assert.equal(builtInRoleModules.rapporteur, rapporteurRoleModule);
+  assert.equal(builtInRoleModules.nominator, nominatorRoleModule);
+  assert.equal(builtInRoleModules.convener, convenerRoleModule);
+  assert.equal(builtInRoleModules.verifier, verifierRoleModule);
+  for (const id of ["chief", "product", "rapporteur", "nominator", "convener", "verifier"] as const) {
+    assert.equal(builtInRoleModuleOf(id), builtInRoleModules[id]);
+  }
+  // su 与项目角色恒 undefined（不得自造兜底）。
+  for (const unknown of ["su", "implementer", ""]) {
+    assert.equal(builtInRoleModuleOf(unknown), undefined);
+  }
+  // D1 校验经公共出口可用：product 合法声明整单放行；越权/未知整单拒绝、不注入。
+  assert.deepEqual(validateRoleToolDeclaration("product", ["submitVersionChange"]), {
+    allow: true,
+    tools: [{ id: "submitVersionChange", name: "submit_version_change" }],
+    reasons: [],
+  });
+  const denied = validateRoleToolDeclaration("product", ["roleActivityLog"]);
+  assert.equal(denied.allow, false);
+  assert.deepEqual(denied.tools, []);
+  assert.equal(denied.reasons[0]?.code, "role-tool-not-allowed");
+  const unknown = validateRoleToolDeclaration("product", ["dispatch_task"]);
+  assert.equal(unknown.allow, false);
+  assert.deepEqual(unknown.tools, []);
+  assert.equal(unknown.reasons[0]?.code, "role-tool-id-unknown");
 });

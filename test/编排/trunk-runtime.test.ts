@@ -13,7 +13,7 @@ import { test } from "node:test";
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
 import type { TrunkApplySnapshot, TrunkManifest } from "../../src/model/trunk.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
-import { createRunRepinPort, createTrunkRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+import { createRunRepinPort, createTrunkRuntime, prepareRoleDispatch } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { TrunkRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import {
   AT,
@@ -340,6 +340,23 @@ test("trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件", as
     const event = rig.events.filter((item) => item.kind === "trunk.state").at(-1);
     assert.equal(event?.kind === "trunk.state" ? event.op : undefined, "recovered");
     assert.equal(event?.kind === "trunk.state" ? event.reason : undefined, "manifest-corrupt");
+  } finally {
+    await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
+test("trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）", async () => {
+  // P1-C 影响面：`validParent` 的宿主缺失短路（`if (!context) return true`）逐字保留；
+  // 本用例钉住“没有 hostInitialization 时不会触发父门拒绝”，业务拒绝与父门无关。
+  const rig = await setup();
+  try {
+    const result = await prepareRoleDispatch({ projectRoot: rig.project.root, fromRoleId: "convener", targetRoleId: "impl", flowId: FLOW_ID });
+    assert.equal(result.ok, false, "夹具没有可派发的未来 run/团队计划，业务层必然拒绝");
+    if (!result.ok) {
+      assert.notEqual(result.code, undefined);
+      assert.notEqual(result.message, "Repository initialization parent is not the actual active accepted chief dispatch turn",
+        "host 缺失 ⇒ 父门按旧行为直接放行，不得报 stale parent");
+    }
   } finally {
     await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }

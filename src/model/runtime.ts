@@ -177,6 +177,11 @@ export interface RoleSession {
   /** Adapter-owned optional lifecycle hook; Service exposes only copied facts to its callers. */
   readonly nativeLifecycle?: RuntimeNativeLifecycle;
   inspectNativeToolSurface?(): RuntimeNativeToolSurfaceFacts;
+  /**
+   * 适配器实际构造的**应用中介**工具注册面（Claude/Pi/Codex 应用面）。
+   * 缺失/不可读即该路径无证据（fail-closed）；它不证明 native 进程/传输/效果闭包。
+   */
+  inspectApplicationToolSurface?(): RuntimeApplicationToolSurfaceFacts;
   inspectLifecycle?(): RuntimeSessionLifecycleFacts;
   inspectToolSurface?(): RuntimeSessionToolSurfaceFacts;
   stopAndInspect?(input: RuntimeStopAndInspectInput, signal?: AbortSignal): Promise<RuntimeSessionLifecycleFacts>;
@@ -230,6 +235,29 @@ export interface RuntimeSessionToolSurfaceFacts {
   filesystemConfinement: "unknown";
   reasons: readonly string[];
   native?: RuntimeNativeToolSurfaceFacts;
+  /**
+   * 受限**应用中介**证据（P1.6 §4.3/§4.4）：只在严格 `status` 非 `observed` 且包装层
+   * 身份/注册表/工厂/白名单检查全部成立时出现（`status:"verified"`），否则缺席。
+   * 只供**派发父门与 controller resume**；写/发布/停稳门（initialization protection、
+   * stable-write、run-stop）一律不读本字段。它不证明 native 进程已退出或效果闭包。
+   */
+  applicationMediation?: {
+    kind: "application-mediated-unknown-native";
+    status: "verified" | "unknown";
+    runtime: RuntimeKind;
+    factory: "claude-sdk-mcp" | "pi-custom-tools" | "codex-chat";
+    observedAt: string;
+    /**
+     * 与 P1.6 §4.4 字面一致（Amendment-1）：包装层构造时填入已绑定且已核对的
+     * `nativeInstanceId`（同一会话绑定期值）；verified 时恒等于
+     * `RuntimeApplicationToolSurfaceFacts.nativeInstanceId` 与 `native.nativeInstanceId`。
+     */
+    nativeInstanceId: string;
+    appTools: readonly string[];
+    foreignMcpServers: readonly string[];
+    nativeBuiltinTools: readonly string[];
+    reasons: readonly string[];
+  };
   roleCapabilityGuards?: RuntimeBlockedRoleCapabilityFacts;
   fileWriteProtection?: {
     mechanism: "canonical-roots-and-nlink-v1";
@@ -255,6 +283,27 @@ export interface RuntimeNativeToolSurfaceFacts {
   reasons: readonly string[];
   /** Present only when constructed from the actual native precreation preparation. */
   factoryPlan?: { planId: string; configDigest: string };
+}
+/**
+ * 适配器实际构造的应用中介工具注册面；不是 native 进程/传输证明。
+ * 应用中介路径只接受 `runtime: "claude" | "pi" | "codex"`，结构 guard 不据此授权。
+ */
+export interface RuntimeApplicationToolSurfaceFacts {
+  source: "application-mediated-tool-surface";
+  /** 必须等于同一会话 `nativeLifecycle.instanceId`。 */
+  nativeInstanceId: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  factory: "claude-sdk-mcp" | "pi-custom-tools" | "codex-chat";
+  status: "observed" | "unknown";
+  observedAt: string;
+  /** 实际注册给模型的 ANS 工具名（不是配置意图）。 */
+  appTools: readonly string[];
+  /** 实际配置的外来 MCP server 名；Claude/Pi 允许非空但必须精确枚举。 */
+  foreignMcpServers: readonly string[];
+  /** 实际启用的 native builtin；应用中介路径必须为空（如 Claude WebSearch 启用即计入）。 */
+  nativeBuiltinTools: readonly string[];
+  reasons: readonly string[];
 }
 
 /** Non-secret native factory intent, produced before SDK/process construction. Not an authorization receipt. */
@@ -329,6 +378,18 @@ export interface RuntimeCoreRegistryFacts {
     reasons: readonly string[];
   }[];
   reasons: readonly string[];
+}
+export function isRuntimeApplicationToolSurfaceFacts(value: unknown): value is RuntimeApplicationToolSurfaceFacts {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const fact = value as RuntimeApplicationToolSurfaceFacts;
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+  const names = (value: unknown): value is string[] => Array.isArray(value) && value.every(text) && new Set(value).size === value.length;
+  return fact.source === "application-mediated-tool-surface" && text(fact.nativeInstanceId) && text(fact.roleId)
+    && ["demo", "pi", "claude", "codex"].includes(fact.runtime)
+    && ["claude-sdk-mcp", "pi-custom-tools", "codex-chat"].includes(fact.factory)
+    && ["observed", "unknown"].includes(fact.status) && text(fact.observedAt)
+    && names(fact.appTools) && names(fact.foreignMcpServers) && names(fact.nativeBuiltinTools)
+    && Array.isArray(fact.reasons) && fact.reasons.every(text);
 }
 export function isRuntimeNativeToolSurfaceFacts(value: unknown): value is RuntimeNativeToolSurfaceFacts {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;

@@ -20,8 +20,10 @@ import { createFsTrunkStore, createProjectTrunkStore, readGitProtectionFacts } f
 import { appendOperationEvent, operationDeliveryRecorded, recordOperationDelivery } from "../../provider/version-change/public/version-change-store.ts";
 import { createTrunkService } from "../../service/trunk/public/trunk-service.ts";
 import { validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
+import { builtInRoleModuleOf } from "../../service/role/resolve-role.ts";
 
 import type { TaskStateEvent, SubmitVersionChangeInput, SubmitVersionChangeResult } from "../../model/runtime.ts";
+import type { RolePolicyDecision } from "../../model/role.ts";
 import type { DirectActionReceipt, DirectActionSource } from "../../model/trunk.ts";
 import type {
   TrunkApplySnapshot,
@@ -256,6 +258,71 @@ function repinKindOf(pathRel: string): TrunkRepinTargetKind {
   if (pathRel.startsWith("docs/scheduling/")) return "teamPlan";
   if (pathRel.startsWith("docs/flows/")) return "flow";
   return "proposal";
+}
+
+/**
+ * X-R1（E2 S4）：product 模块 `preflight.checkAction("version-upgrade", …)` 的拒绝映射到既有 Direct
+ * 回执码。模块 `code`/`messageKey` 只作稳定内部诊断，不得进入客户可见文案；外部
+ * `SubmitVersionChangeResult.errorCode` 保持与迁移前 Service 路径同向：
+ *
+ * - `product-initiator-mismatch` / `product-kind-mismatch` / `product-operation-id-missing`：
+ *   `submitDirect` 既有早退 ⇒ `vca-role-not-allowed`（本单元在早退**之后**调用，这些分支不可达；
+ *   映射仅作 fail-closed 兜底）；
+ * - `product-bootstrap-mismatch`：调用点以 `baseTrunk === null` 派生 bootstrap（既有 direct 语义），
+ *   正常不可达；防御性映射 `vca-invalid`；
+ * - `product-base-trunk-invalid` / `product-amendment-ref-forbidden` / `product-facts-*` /
+ *   `action-not-covered`：迁移前 `vca-invalid`（畸形 baseTrunk 属 D-PRE-1 已登记的更早拒绝，
+ *   码取同一 `vca-invalid` 语义）；
+ * - `product-targets-invalid`（空 targets）：迁移前 `vca-service.prepareDirect` ⇒ `vca-invalid`；
+ * - `product-targets-invalid`（缺 `expectedFromSha256`）：迁移前 `prepareDirectSubmission` ⇒
+ *   `trunk-item-invalid`，由 `submitDirect` 既有映射 ⇒ `vca-target-invalid`。
+ */
+function productPreflightRejection(
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+): { code: VersionChangeErrorCode; message: string } {
+  const details: unknown = decision.details;
+  const reason = typeof details === "object" && details !== null && typeof (details as { reason?: unknown }).reason === "string"
+    ? (details as { reason: string }).reason
+    : undefined;
+  switch (decision.code) {
+    case "product-targets-invalid":
+      return reason === "expectedFromSha256"
+        // 与迁移前 `prepareDirectSubmission` 的拒绝文案逐字一致（外部 message 不变）。
+        ? { code: "vca-target-invalid", message: "Duplicate target or missing expected original hash" }
+        : { code: "vca-invalid", message: `Direct submission target is invalid (${decision.code}${reason === undefined ? "" : `:${reason}`})` };
+    case "product-bootstrap-mismatch":
+      return { code: "vca-invalid", message: `Direct submission base/bootstrap mismatch (${decision.code})` };
+    case "product-initiator-mismatch":
+    case "product-kind-mismatch":
+    case "product-operation-id-missing":
+      // 与迁移前 `submitDirect` 早退文案逐字一致（本调用点在早退之后，正常不可达）。
+      return { code: "vca-role-not-allowed", message: "Direct submit requires the real session role, operation id and explicit expected base" };
+    default:
+      return { code: "vca-invalid", message: `Direct submission role preflight rejected (${decision.code})` };
+  }
+}
+
+/**
+ * X-R2（E2 S4）：rapporteur 模块 `preflight.checkAction("detail-amendment", …)` 的拒绝映射到既有
+ * Direct 回执码。direct 路径的事实由本层按既有语义供给：整单（`wholeOrder:true`；逐项/最终卡通道
+ * 已关闭）且无 legacy 卡路径（`legacyCardPath:"none"`），因此模块的 `amendment-not-whole-order` /
+ * `amendment-legacy-card-path` 分支在 direct 路径不可达。其余拒绝分支亦被 `submitDirect` 既有早退
+ * （operationId/baseTrunk/actor + kind=detail-amendment）与上述固定事实排除，属 fail-closed 兜底：
+ *
+ * - `rapporteur-initiator-mismatch`：早退已要求真实 actor = rapporteur 且 `initiatorRoleId === actor`，
+ *   正常不可达；防御性映射沿用早退文案/码 `vca-role-not-allowed`；
+ * - `rapporteur-facts-*` / `rapporteur-amendment-*` / `action-not-covered`：`vca-invalid`
+ *   （与迁移前 direct 路径对畸形修正案请求的既有 `vca-invalid` 同向）。
+ *
+ * 模块 `code`/`messageKey` 只作稳定内部诊断；外部 `errorCode` 保持既有集合。
+ */
+function rapporteurDetailAmendmentRejection(
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+): { code: VersionChangeErrorCode; message: string } {
+  if (decision.code === "rapporteur-initiator-mismatch") {
+    return { code: "vca-role-not-allowed", message: "Direct submit requires the real session role, operation id and explicit expected base" };
+  }
+  return { code: "vca-invalid", message: `Direct amendment role preflight rejected (${decision.code})` };
 }
 
 // —————————————— 工厂 ——————————————
@@ -567,6 +634,54 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Dire
         || trustedActorRoleId !== (input.kind === "version-upgrade" ? "product" : input.kind === "detail-amendment" ? "rapporteur" : undefined))
         return rejected("Direct submit requires the real session role, operation id and explicit expected base", "vca-role-not-allowed");
       if (!services.vca.prepareDirect || !services.vca.finalizeDirect) return rejected("Direct metadata capabilities are unavailable", "vca-channel-unavailable");
+      // X-R1（E2 S4）：product 的 version-upgrade 直接提交前置——只在 direct 路径、在既有
+      // operationId/baseTrunk/真实 actor 校验之后、Service 最终校验之前调用。模块只回答角色侧前置；
+      // `allow` 不替代任何 Service 校验（文件字节/hash、target 写区/版本链、base 全等、快照等仍由
+      // `prepareDirectSubmission` / `vca-service` 执行）。普通 `submit`（历史客户卡通道）不调用
+      // （非 direct 路径不得调用）。
+      if (input.kind === "version-upgrade") {
+        const preflight = builtInRoleModuleOf("product")?.preflight;
+        if (preflight !== undefined) {
+          const facts: Record<string, unknown> = {
+            initiatorRoleId: input.initiatorRoleId,
+            kind: input.kind,
+            operationId: input.operationId,
+            baseTrunk: input.baseTrunk,
+            // 既有 direct 语义：bootstrap = `baseTrunk === null`（`vca-service.prepareDirect` 以此写入
+            // `record.bootstrap`）；旧 `bootstrap` 兼容参数在 direct 路径不参与判定。为保持零差异，
+            // 事实包取**实际**语义，而不是把可能省略/矛盾的兼容参数原样透传。
+            bootstrap: input.baseTrunk === null,
+            targets: input.targets.map((target) => ({
+              ...(target.expectedFromSha256 !== undefined ? { expectedFromSha256: target.expectedFromSha256 } : {}),
+            })),
+          };
+          const decision = preflight.checkAction({ action: "version-upgrade", facts });
+          if (!decision.allow) {
+            const rejection = productPreflightRejection(decision);
+            return rejected(rejection.message, rejection.code);
+          }
+        }
+      } else if (input.kind === "detail-amendment") {
+        // X-R2（E2 S4）：rapporteur 的 detail-amendment 直接提交前置——同一调用纪律（direct 路径、
+        // 既有早退之后、Service 最终校验之前）。事实按 rapporteur `api-spec.md` §5.3 登记键供给：
+        // direct 通道只接受**整单**修正案（逐项/最终卡通道已关闭），且不经过任何 legacy 卡/批准路径。
+        // `allow` 不替代 Service 最终校验（targets/hash/base/权限/trunk 事务仍在
+        // `prepareDirectSubmission` 与 `apply-journal`）。
+        const preflight = builtInRoleModuleOf("rapporteur")?.preflight;
+        if (preflight !== undefined) {
+          const facts: Record<string, unknown> = {
+            initiatorRoleId: input.initiatorRoleId,
+            kind: input.kind,
+            wholeOrder: true,
+            legacyCardPath: "none",
+          };
+          const decision = preflight.checkAction({ action: "detail-amendment", facts });
+          if (!decision.allow) {
+            const rejection = rapporteurDetailAmendmentRejection(decision);
+            return rejected(rejection.message, rejection.code);
+          }
+        }
+      }
       const direct = deps.directTrunkService ?? createTrunkService({ projectRoot: deps.projectRoot });
       const requestDigest = sha256(JSON.stringify({ operationId, actor: trustedActorRoleId, kind: input.kind, flowId: input.flowId, baseTrunk: input.baseTrunk,
         summary: input.summary, targets: input.targets.map(target => ({ kind: target.kind, path: target.path, action: target.action, from: target.from,

@@ -1,7 +1,7 @@
 // Public Service composition entry. Pipeline selects runtime and injects policy; Providers execute it.
 import { randomUUID, createHash } from "node:crypto";
 import { resolve } from "node:path";
-import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED, isChiefDecisionExecutionContext, isRuntimeNativeLifecycleFacts, isRuntimeNativeToolSurfaceFacts } from "../../model/runtime.ts";
+import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED, isChiefDecisionExecutionContext, isRuntimeApplicationToolSurfaceFacts, isRuntimeNativeLifecycleFacts, isRuntimeNativeToolSurfaceFacts } from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
@@ -22,6 +22,7 @@ import type {
   ViewImageFn,
   ChiefDecisionExecutionContext,
   RuntimeSessionLifecycleFacts, RuntimeOwnedProcessFact,
+  RuntimeSessionToolSurfaceFacts,
   RuntimeNativeLifecycle, RuntimeNativeLifecycleFacts,
   RuntimeNativeToolSurfaceFacts,
   RuntimeNativeFactoryPreparation, RuntimeNativeFactoryPlanFacts, RuntimeRolePreparation, RuntimePreparedRoleToken,
@@ -239,7 +240,78 @@ async function readCoreProtectionScope(projectRoot: string): Promise<{ state: "r
 }
 /** These actual script entry points have no proven filesystem confinement profile. */
 const hasUnconfinedScriptTools = (names: readonly string[]) => names.some(name => name === "run_shell" || name === "start_background_task");
-
+/** Exact set equality of registry names (duplicates on the left are a mismatch). */
+const sameNameSet = (left: readonly string[], right: readonly string[]) => left.length === right.length
+  && new Set(left).size === left.length && left.every(name => right.includes(name));
+/**
+ * P1.6 §4.4：受限应用中介路径的唯一 reason 白名单/阻断集（不另维护第二份；门模块回链本口径）。
+ * 只允许与下列**包装层** reason 共存；任何其它 reason（含阻断集与未列入者）默认拒绝。
+ */
+const APPLICATION_MEDIATION_FACTORIES: Readonly<Record<"claude" | "pi" | "codex", "claude-sdk-mcp" | "pi-custom-tools" | "codex-chat">> = Object.freeze({
+  claude: "claude-sdk-mcp" as const, pi: "pi-custom-tools" as const, codex: "codex-chat" as const,
+});
+const APPLICATION_MEDIATION_COEXISTING_REASONS: Readonly<Record<"claude" | "pi" | "codex", readonly string[]>> = Object.freeze({
+  claude: Object.freeze(["native-tool-registry-binding-unverified"]),
+  pi: Object.freeze(["native-tool-registry-binding-unverified"]),
+  codex: Object.freeze(["unmediated-execution-registered"]),
+});
+/** Inputs of the wrapper's single application-mediation composition rule (P1.6 §4.4). */
+export interface RuntimeApplicationMediationCompositionInput {
+  runtime: RuntimeKind;
+  factoryProvenance: "default-production" | "custom-override" | "demo";
+  disposed: boolean;
+  /** 包装层严格路径已计算出的 reasons；`length === 0` ⇔ 严格 status 已 observed。 */
+  strictReasons: readonly string[];
+  roleId: string;
+  /** 绑定期捕获的 native 实例 id；必须与实时 `nativeLifecycle.instanceId` 一致。 */
+  nativeInstanceId?: string;
+  nativeLifecycleInstanceId?: string;
+  appTools: readonly string[];
+  configuredForeignMcpServers: readonly string[];
+  nativeFact?: RuntimeNativeToolSurfaceFacts;
+  /** 惰性读取适配器事实；只在构造门槛内调用一次，抛错按无证据处理。 */
+  applicationFact?: () => unknown;
+}
+/**
+ * 包装层构造 `applicationMediation` 的唯一规则（P1.6 §4.4「包装层构造 applicationMediation 的条件」）。
+ * 返回 `undefined` 即该证据缺席（fail-closed：缺失/不匹配一律不放行）；只有全部条件成立才返回
+ * `status:"verified"`。严格 `status` 已 observed 时不构造（避免双路径）；demo/custom factory/disposed
+ * 不构造。本函数不改变严格路径的 `status`/`nativeToolRegistry`，也不被写/发布/停稳门消费。
+ */
+export function composeRuntimeApplicationMediation(input: RuntimeApplicationMediationCompositionInput):
+  NonNullable<RuntimeSessionToolSurfaceFacts["applicationMediation"]> | undefined {
+  if (input.runtime !== "claude" && input.runtime !== "pi" && input.runtime !== "codex") return undefined;
+  const runtime = input.runtime, factory = APPLICATION_MEDIATION_FACTORIES[runtime];
+  if (input.factoryProvenance !== "default-production" || input.disposed) return undefined;
+  // 严格路径已 observed 时保持 applicationMediation 缺席，避免双路径歧义（§4.4 F15）。
+  if (input.strictReasons.length === 0) return undefined;
+  const allowed = APPLICATION_MEDIATION_COEXISTING_REASONS[runtime];
+  // 任何未列入对应 runtime 白名单的 reason（含全部阻断 reason）默认拒绝。
+  if (!input.strictReasons.every(reason => allowed.includes(reason))) return undefined;
+  let fact: unknown;
+  try { fact = input.applicationFact?.(); } catch { return undefined; }
+  if (!isRuntimeApplicationToolSurfaceFacts(fact)) return undefined;
+  if (fact.status !== "observed" || fact.reasons.length !== 0) return undefined;
+  if (fact.factory !== factory || fact.runtime !== runtime || fact.roleId !== input.roleId) return undefined;
+  if (!input.nativeInstanceId || input.nativeLifecycleInstanceId !== input.nativeInstanceId
+    || fact.nativeInstanceId !== input.nativeInstanceId) return undefined;
+  if (!sameNameSet(fact.appTools, input.appTools)
+    || !sameNameSet(fact.foreignMcpServers, input.configuredForeignMcpServers)) return undefined;
+  if (fact.nativeBuiltinTools.length !== 0) return undefined;
+  if (runtime === "codex") {
+    // Codex 追加：native 事实必须存在且绑定；chat 传输不支持外来 MCP ⇒ 配置非空即 fail-closed（N28/F19）。
+    // `unmediated-execution-registered` 只允许来自 app 级受控 shell，不得来自 native builtin/foreign。
+    if (!input.nativeFact || input.nativeFact.factory !== "codex-chat"
+      || input.nativeFact.nativeInstanceId !== input.nativeInstanceId
+      || input.nativeFact.nativeBuiltinTools.length !== 0) return undefined;
+    if (input.configuredForeignMcpServers.length > 0 || fact.foreignMcpServers.length > 0) return undefined;
+  }
+  // Amendment-1：按 P1.6 §4.4 字面填入已绑定且已核对的 nativeInstanceId（上面恒等于
+  // `fact.nativeInstanceId` 与 `input.nativeLifecycleInstanceId`）；不匹配已在门槛处 fail-closed。
+  return { kind: "application-mediated-unknown-native", status: "verified", runtime, factory,
+    observedAt: fact.observedAt, nativeInstanceId: input.nativeInstanceId, appTools: [...fact.appTools],
+    foreignMcpServers: [...fact.foreignMcpServers], nativeBuiltinTools: [...fact.nativeBuiltinTools], reasons: [] };
+}
 const roleCapabilitySlots = [
   ["install_skill", "installSkill"], ["uninstall_skill", "uninstallSkill"],
   ["install_mcp", "installMcp"], ["uninstall_mcp", "uninstallMcp"],
@@ -754,14 +826,12 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           const reasons: string[] = [];
           let native: RuntimeNativeToolSurfaceFacts | undefined;
           let nativeToolRegistry: "application-mediated" | "unknown" = "unknown";
-          const sameNames = (left: readonly string[], right: readonly string[]) => left.length === right.length
-            && new Set(left).size === left.length && left.every(name => right.includes(name));
           try {
             if (!Array.isArray(provider.options.tools) || !Array.isArray(provider.options.installedMcpServers)) throw new Error("registry unavailable");
             appTools = provider.options.tools.map(tool => tool.name);
             configuredForeignMcpServers = provider.options.installedMcpServers.map(server => server.name);
             if ([...appTools, ...configuredForeignMcpServers].some(name => typeof name !== "string" || !name.trim())) throw new Error("invalid registry name");
-            if (!sameNames(appTools, provider.initialAppTools) || !sameNames(configuredForeignMcpServers, provider.initialMcpServers)) reasons.push("core-registry-changed-after-factory");
+            if (!sameNameSet(appTools, provider.initialAppTools) || !sameNameSet(configuredForeignMcpServers, provider.initialMcpServers)) reasons.push("core-registry-changed-after-factory");
             if (provider.options.tools.some((tool, index) => tool.handler !== provider.initialToolHandlers[index])) reasons.push("core-tool-handler-changed-after-factory");
           } catch { reasons.push("core-registry-read-failed"); }
           if (options.runtime !== "demo") {
@@ -781,7 +851,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
                   || lifecycle.activeTools.some(tool => !appTools.includes(tool.name))) reasons.push("native-tool-execution-coverage-unverified");
                 if (options.runtime !== "codex" || native.factory !== "codex-chat" || native.status !== "observed" || native.reasons.length)
                   reasons.push("native-production-tool-factory-unverified");
-                if (!sameNames(native.appTools, appTools) || !sameNames(native.foreignMcpServers, configuredForeignMcpServers)) reasons.push("native-tool-registry-mismatch");
+                if (!sameNameSet(native.appTools, appTools) || !sameNameSet(native.foreignMcpServers, configuredForeignMcpServers)) reasons.push("native-tool-registry-mismatch");
                 if (native.nativeBuiltinTools.length || native.foreignMcpServers.length || configuredForeignMcpServers.length
                   || appTools.includes("run_shell") || appTools.includes("start_background_task")) reasons.push("unmediated-execution-registered");
                 const coreWork = provider.lifecycle.snapshot();
@@ -797,10 +867,22 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             ...(native?.factoryPlan ? { nativePlanId: native.factoryPlan.planId, nativeConfigDigest: native.factoryPlan.configDigest } : {}) });
           if (roleCapabilityGuards?.status === "unknown") reasons.push("role-capability-callback-guard-unverified");
           if (!reasons.length && native && provider.factoryProvenance === "default-production") nativeToolRegistry = "application-mediated";
+          // P1.6 §4.4 包装层组合：仅严格 status !== observed（reasons 非空）且 claude/pi/codex +
+          // default-production + 未 disposed 时尝试构造受限应用中介证据；否则字段缺席（fail-closed）。
+          // 本字段不改变上面的 status/nativeToolRegistry 判定，也不被写/发布/停稳门读取。
+          let liveNativeInstanceId: string | undefined;
+          try { liveNativeInstanceId = nativeLifecycle?.instanceId; } catch { liveNativeInstanceId = undefined; }
+          const applicationMediation = composeRuntimeApplicationMediation({
+            runtime: options.runtime, factoryProvenance: provider.factoryProvenance, disposed, strictReasons: reasons,
+            roleId: role.id, nativeInstanceId, nativeLifecycleInstanceId: liveNativeInstanceId,
+            appTools, configuredForeignMcpServers, nativeFact: native,
+            applicationFact: () => inner.inspectApplicationToolSurface?.(),
+          });
           return { source: "core-provider-assembly", sessionId, roleId: role.id, runtime: options.runtime,
             status: reasons.length ? "unknown" : "observed", appTools, configuredForeignMcpServers,
             factoryProvenance: provider.factoryProvenance, nativeToolRegistry, filesystemConfinement: "unknown", reasons,
             ...(roleCapabilityGuards ? { roleCapabilityGuards } : {}),
+            ...(applicationMediation ? { applicationMediation } : {}),
             ...(options.writeRoot !== undefined && !disposed && !reasons.includes("core-tool-handler-changed-after-factory")
               && !reasons.includes("core-registry-changed-after-factory") && !reasons.includes("core-registry-read-failed")
               && appTools.includes("write_file") && appTools.includes("edit_file") ? { fileWriteProtection: {

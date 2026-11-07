@@ -437,10 +437,20 @@ export function createPiRuntimeAdapter(opts: RuntimeProviderOptions | PiRuntimeA
   };
 }
 
-/** 会话外壳：生产/legacy 两条路径共用（turn 去重与只读属性透传语义逐字一致）。 */
-function wrapSession(role: ResolvedRole, inner: RoleSession, turn: { id?: string }): RoleSession {
+/**
+ * 会话外壳：生产/legacy 两条路径共用（turn 去重与只读属性透传语义逐字一致）。
+ *
+ * E0 契约 §9.2 / delta P-2：可选的应用面证据方法按 **inner 的实际存在性条件转发**，并绑定
+ * `inner` 作为接收者——`inner` 没有该方法时外壳也保持缺失（不伪造、不补造事实；包装层据此
+ * fail-closed）。导出仅供 `test/pi-adapter/` 接线测试（与 `real-adapter.ts::makeRoleSession`
+ * 的测试接缝同口径），不是公共契约的扩展。
+ */
+export function wrapSession(role: ResolvedRole, inner: RoleSession, turn: { id?: string }): RoleSession {
   return {
     runtime: "pi", roleId: role.id,
+    ...(inner.inspectApplicationToolSurface
+      ? { inspectApplicationToolSurface: inner.inspectApplicationToolSurface.bind(inner) }
+      : {}),
     get contextSource() { return inner.contextSource; },
     get nativeSessionId() { return inner.nativeSessionId; },
     get contextWarning() { return inner.contextWarning; },

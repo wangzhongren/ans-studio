@@ -47,7 +47,7 @@
 // 此时**不做任务级收窄**，只用角色边界；编排把 undefined 原样传给 resolveWrite，绝不伪造全量 writeSet。
 // （确认制会话例外：其 writeSet 由发行器动态持有；其中 Section 1 预授权/旧 su 预授权目录见上。）
 
-import type { GovernanceFunction, ProjectConfig, ResolvedRole } from "../../model/role.ts";
+import type { GovernanceFunction, GovernanceModel, ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { BoundaryEntry } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
 import type { TaskScope, WriteDecision } from "../../model/decision.ts";
@@ -57,8 +57,11 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 // C 批（方案 §6.4.1/C-06）：appointment-write 预览的 role-card 必填章节单一来源。
 import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governance-roles.ts";
+// X-R6（E2 S2）：intent-confirm 卡纯数据（固定选项/分组/代批范围）唯一真源 = chief 角色模块。
+// 本文件只消费数据做条件/默认卡判定，不复制第二份卡面数据、不构造卡、不写账本。
+import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
-import { loadLatestRoster, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { loadLatestRoster, nominationD3CardFacts, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
 import {
@@ -69,7 +72,15 @@ import {
   versionedDocOverwriteDecision,
 } from "../../common/门禁引擎/versioned-doc-guard.ts";
 import type { StableWritePermit } from "../../model/version-change.ts";
-import { listProject, resolveRole, type ProjectListing, type ProjectRoleSummary } from "../../service/role/resolve-role.ts";
+import {
+  builtInRoleModuleOf,
+  listProject,
+  resolveRole,
+  validateRoleToolDeclaration,
+  type ProjectListing,
+  type ProjectRoleSummary,
+  type RoleToolDeclarationValidation,
+} from "../../service/role/resolve-role.ts";
 import { resolveBoundary, validateBoundaryYamlText, refreshAndInstallVersionedDocFreezeSnapshot, registerVersionedDocument } from "../../service/boundary/resolve-boundary.ts";
 import {
   BUILT_IN_GOVERNANCE_ROLES,
@@ -136,6 +147,7 @@ import type {
   CloseCreatedTaskFn,
   SubmitRefactorFn,
   RequestStableWriteFn,
+  RequestStableWriteInput,
   RoleStatusFn,
   ContractCheckFn,
   EvidenceCheckFn,
@@ -1226,7 +1238,7 @@ export async function openRoleSession(
               trioSpec!.id,
               req.options.map((option) => option.id),
             );
-            if (defaulted !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(defaulted)) {
+            if (defaulted !== undefined && cardKindsOf(trioSpec!.id).includes(defaulted)) {
               cardKind = defaulted;
               effectiveReq = { ...req, cardKind: defaulted };
               effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
@@ -1292,6 +1304,26 @@ export async function openRoleSession(
               return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
             }
             appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
+            // X-R3（E2 S4）：D3 卡角色侧前置——在既有名单/选项/推荐集/env-bootstrap 校验之后调用
+            // nominator 模块 `preflight.checkAction("appointment", stage:"d3-card")`。事实只取自已校验的
+            // `loadLatestRoster` 产物与 `rosterCard` 结果（严格 api-spec 登记键；`intentEntryConsistent`
+            // 是可选诊断事实且旧路径不校验 ⇒ 不传）。allow 不替代应用/Service 校验；deny 走既有
+            // `appointment-invalid` 回执（`rejectAppointment`），不发卡、不写账本。
+            const nominatorPreflight = builtInRoleModuleOf("nominator")?.preflight;
+            const nominatorFacts = nominationD3CardFacts({
+              roster,
+              multiple: effectiveReq.multiple === true,
+              optionIds: effectiveReq.options.map((option) => option.id),
+              recommendedRoleIds: rosterCard.recommendedRoleIds,
+            });
+            if (nominatorPreflight !== undefined && nominatorFacts !== undefined) {
+              const decision = nominatorPreflight.checkAction({ action: "appointment", facts: nominatorFacts });
+              if (!decision.allow) {
+                return rejectAppointment(
+                  `招人决定卡未通过人事角色策略前置（诊断码：${decision.code}）；本次未向客户发卡、未写任何记录。`,
+                );
+              }
+            }
             // 2026-10-29（客户追加口径）：D3 卡 preview 必须带上「人员+模块拓扑图」（应用依据已校验名单生成）。
             const topologyText = rosterTopologyText(roster.roster);
             const existingPreview = typeof effectiveReq.preview === "string" ? effectiveReq.preview.trim() : "";
@@ -1329,8 +1361,11 @@ export async function openRoleSession(
           // 不发卡、不发行、不调判断、不写 customer.decision（客户只处理 intent-confirm 需求确认）。
           if (isTrio && req.kind === "choice" && isCoordinatorGovernanceSpec(trioSpec)) {
             const optionIds = req.options.map((option) => option.id);
-            if (!optionIds.includes("confirm") && (cardKind === undefined || cardKind === "intent-confirm")) {
-              const reason = cardKind === "intent-confirm"
+            // X-R6（E2 S2）：intent-confirm 的卡种/必需选项 id 读 chief 模块卡数据（唯一真源）；
+            // 文案保持既有口径（卡面数据不含用户文案）。
+            if (!optionIds.includes(CHIEF_INTENT_CONFIRM_CARD.requiredOptionId)
+              && (cardKind === undefined || cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind)) {
+              const reason = cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind
                 ? "intent-confirm 必须有 confirm/revise 选项；本卡缺少 confirm 选项，未向客户呈现。请补齐选项后重试。"
                 : "这是内部协调/工程决策，不应要求客户选择；请幕僚自行决定，或用 dispatch_task 派给项目角色；客户只处理 intent-confirm 需求确认。";
               log.record("governance.choice.rejected", {
@@ -1342,7 +1377,7 @@ export async function openRoleSession(
             }
           }
           if (isTrio) {
-            const allowed = TRIO_CARD_KINDS[trioSpec!.id];
+            const allowed = cardKindsOf(trioSpec!.id);
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             // C 批（方案 §6.4.1/R2）：归属键由 `flowId` 放宽为 `flowId | intentId | taskId` 至少一个；
             // 旧调用（只带 flowId）逐字仍有效。优先 flowId，其次 intentId，最后 taskId。
@@ -1467,7 +1502,7 @@ export async function openRoleSession(
           }
           // D 批：judgeContext 只从申请上下文构造（无账本/flow 事实）；Q4 A rubric 保留。
           let judgeMetadata = effectiveMetadata;
-          if (isTrio && cardKind !== undefined && TRIO_CARD_KINDS[trioSpec!.id].includes(cardKind)) {
+          if (isTrio && cardKind !== undefined && cardKindsOf(trioSpec!.id).includes(cardKind)) {
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             const judgeAttribution = isGovernanceFlowId(flowId)
               ? flowId
@@ -1550,7 +1585,9 @@ export async function openRoleSession(
             }
           }
           let intentConfirmation: PreparedIntentConfirmation | undefined;
-          if (isTrio && setup.role.id === "chief" && cardKind === "intent-confirm" && effectiveReq.kind === "choice") {
+          // X-R6（E2 S2）：intent-confirm 卡种读 chief 模块卡数据（`CHIEF_INTENT_CONFIRM_CARD.cardKind`）；
+          // 其余流程（prepareIntentConfirmation / 冻结 / 标记）仍按 Service 事务与真实客户回执。
+          if (isTrio && setup.role.id === "chief" && cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind && effectiveReq.kind === "choice") {
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             const prepared = flowId ? await createTrunkService({ projectRoot: input.project.projectRoot }).prepareIntentConfirmation(flowId) : undefined;
             if (!prepared?.ok) return { outcome: "declined", notPresented: true, reason: prepared && !prepared.ok ? prepared.message ?? prepared.code : "Intent confirmation has no actual flow" };
@@ -1680,11 +1717,10 @@ export async function openRoleSession(
   const sessionDir =
     input.persistSession === false ? undefined : sessionDirFor(input.project.projectRoot, setup.role.id, input.runtime);
 
-  // H-1 派发任务（评审 §5.6）：能力矩阵驱动——仅 `capabilities.dispatchTask`（trio=Convener；su 旧行为）。
+  // H-1 派发任务（评审 §5.6）：能力矩阵驱动——仅 `capabilities.dispatchTask`（trio=chief/convener；su 旧行为）。
   // B 批（2026-10-28）：**幕僚（trio chief）的星形派发不套旧 flow 派发门**——任务/汇报主链走
   // `tasks.jsonl`，目标由桌面星形路由校验（任意内置/项目 worker、自身除外）。convener 的旧 dispatch
   // 仍逐字走原派发范围门（保留至 D）；single/su 旧行为不变。
-  const chiefStarDispatch = trioSpec?.id === "chief";
   const dispatchTask: DispatchTaskFn | undefined =
     cap?.dispatchTask === true && input.dispatchTask !== undefined ? input.dispatchTask : undefined;
 
@@ -1694,12 +1730,17 @@ export async function openRoleSession(
   // B 批（2026-10-28）：chief 经上方能力叠加获得 roleStatus/sessionTail；`role_activity_log` 只给 chief。
   const roleStatus = cap?.roleStatus === true ? input.roleStatus : undefined;
   const sessionTail = cap?.sessionTail === true ? input.sessionTail : undefined;
+  // X-R6（E2 S2）：以下三行是**旧角色门控回退值**（单/双人模型或模块未装配路径；旧源码行逐字保留，
+  // 供迁移前差分 fixture 与回滚对照）。trio 下的实际注入值见下方 `effective*`：由已装配 chief 模块
+  // `tools()` 的 D1 校验结果决定；模块声明缺席/校验失败 ⇒ 不注入（fail-closed，不放宽旧路径）。
   const roleActivityLog = trioSpec?.id === "chief" ? input.roleActivityLog : undefined;
   const terminateRoleRun = trioSpec?.id === "chief" ? input.terminateRoleRun : undefined;
   const redispatchTask = trioSpec?.id === "chief" ? input.redispatchTask : undefined;
 
   // 2026-11-02（全局任务状态/版本决策）：project_state 给全部内置治理角色（含旧 su）只读；
   // project_note / request_version_decision 只给 trio chief。未注入 ⇒ 工具不注册（fail-closed）。
+  // X-R6（E2 S2）：project_note / request_version_decision 的旧门控保留为模块未装配时的回退值；
+  // trio 实际注入改读 chief 模块 `tools()`（D1 校验后）。
   const projectState = builtInGovernance ? input.projectState : undefined;
   const projectNote = trioSpec?.id === "chief" ? input.projectNote : undefined;
   const requestVersionDecision = trioSpec !== undefined && canRequestVersionDecision(trioSpec.id) ? input.requestVersionDecision : undefined;
@@ -1811,23 +1852,120 @@ export async function openRoleSession(
   }
 
   // 需求变更申请：只给内置治理角色中的报告员/统筹注入（沿用 C 批发起方规则）。
+  // X-R2（E2 S2）/X-R4（E2 S2）：rapporteur/convener 分支均改读已装配角色模块 `tools()`（旧内联谓词
+  // `canRequestRequirementChange` 已删除）。X-R4 收尾（E2 评审 V-7）：角色侧 requirement-change 前置
+  // 由 Provider 工具层（`provider/runtime/tools.ts`）单一消费，编排不再包装、同一引用原样透传。
+  // 未提供 ⇒ 不注入。
   const requestRequirementChange: RequestRequirementChangeFn | undefined =
-    isTrio && trioSpec !== undefined && canRequestRequirementChange(trioSpec.id) && input.requestRequirementChange !== undefined
+    isTrio && trioSpec !== undefined && moduleRoleDeclaresTool(trioSpec.id, "requestRequirementChange") && input.requestRequirementChange !== undefined
       ? input.requestRequirementChange
       : undefined;
 
   // Batch 3.5（S5）：三提交能力的角色门控——模型自报角色不可信（会话角色 id 由解析结果给出）。
-  // product/rapporteur → submit_version_change（工具内再按 kind 限定唯一发起角色）；
-  // convener → submit_refactor + request_stable_write；其他角色一律不注入。
-  const submitVersionChange =
-    setup.role.id === "product" || setup.role.id === "rapporteur" ? input.submitVersionChange : undefined;
+  // X-R1（E2 S2）：product 的角色专属工具声明改读已装配角色模块 `builtInRoleModuleOf("product").tools()`；
+  // X-R2（E2 S2）：rapporteur 同（submitVersionChange / selectRunChange；requestRequirementChange 见上方谓词）；
+  // X-R3（E2 S2）：nominator 同（activateRoleDocuments）；X-R4（E2 S2）：convener 同（completeTeamPlan /
+  // closeCreatedTask / submitRefactor / requestStableWrite；requestRequirementChange 见上方谓词）；
+  // X-R5（E2 S2）：verifier 同——模块 `tools()` 是**合法空声明**（14 项 RoleToolId 均不含 verifier，
+  // api-spec §3），经 D1 装配表 `validateRoleToolDeclaration` 校验为 allow/[]，故不注入任何专属工具；
+  // 能力位（customerInput/shell 等）仍由门面 spec（本模块同一真源）提供，不由 tools() 推导第二份。
+  // X-R6（E2 S2）：chief 同——模块 `tools()` trio 声明 6 项（roleActivityLog / terminateRoleRun /
+  // redispatchTask / projectNote / requestVersionDecision / closeCreatedTask；E2 C-1 补齐），经 D1
+  // 校验后注入。`decidePendingRequest` **不**在本模块声明：仍只由独立决策上下文调用点装配
+  // （`provider/runtime/tools.ts::buildChiefDecisionTools`；普通会话不因 tools() 获得）。
+  // 均经 Service 公共出口读取，并以 D1 装配表 `validateRoleToolDeclaration` 校验 id→运行时工具名映射；
+  // 只有 **trio + 模块已装配** 才走模块。single/su 与未装配模块保留旧角色 id 门控（旧路径逐字不变；
+  // single+product/rapporteur 的 P-6/R-7 不可达口径亦保持）。
+  // 其余角色一律不注入。
+  const moduleToolsRole =
+    setup.role.id === "product" || setup.role.id === "rapporteur" || setup.role.id === "nominator"
+    || setup.role.id === "convener" || setup.role.id === "verifier" || setup.role.id === "chief";
+  const moduleTools = moduleToolsRole ? moduleToolDeclarationOf(setup.role.id, governanceModel) : undefined;
+  if (moduleTools !== undefined && !moduleTools.allow) {
+    log.record("role.tools.declaration.rejected", {
+      roleId: setup.role.id,
+      reasons: moduleTools.reasons.map((reason) => reason.code),
+    });
+  }
+  /** 模块路径激活时回答「模块是否声明该工具」；`undefined` = 走旧角色门控（single/su/未装配）。 */
+  const moduleDeclaresTool = (toolId: string): boolean | undefined =>
+    moduleTools === undefined ? undefined : moduleTools.allow && moduleTools.tools.some((binding) => binding.id === toolId);
   const directGovernance = governanceModel === "trio" && builtInGovernance && isTrio && chiefDecisionContext === undefined;
-  const selectRunChange = directGovernance && setup.role.id === "rapporteur" ? input.selectRunChange : undefined;
-  const completeTeamPlan = directGovernance && setup.role.id === "convener" ? input.completeTeamPlan : undefined;
-  const activateRoleDocuments = directGovernance && setup.role.id === "nominator" ? input.activateRoleDocuments : undefined;
+  /**
+   * X-R6（E2 S2）：工具注入值的三态选择——模块声明生效（trio + D1 allow）时按模块 `tools()`；
+   * 模块路径未激活（single/su/未装配）时逐字使用旧门控回退值；模块整单拒绝 ⇒ 不注入（fail-closed）。
+   */
+  const moduleToolValue = <T>(toolId: string, legacy: T | undefined, value: T | undefined): T | undefined => {
+    const declared = moduleDeclaresTool(toolId);
+    return declared === undefined ? legacy : declared ? value : undefined;
+  };
+  const effectiveRoleActivityLog = moduleToolValue("roleActivityLog", roleActivityLog, input.roleActivityLog);
+  const effectiveTerminateRoleRun = moduleToolValue("terminateRoleRun", terminateRoleRun, input.terminateRoleRun);
+  const effectiveRedispatchTask = moduleToolValue("redispatchTask", redispatchTask, input.redispatchTask);
+  const effectiveProjectNote = moduleToolValue("projectNote", projectNote, input.projectNote);
+  const effectiveRequestVersionDecision = moduleToolValue("requestVersionDecision", requestVersionDecision, input.requestVersionDecision);
+  const moduleSubmitVersionChange = moduleDeclaresTool("submitVersionChange");
+  const legacySubmitVersionChange =
+    setup.role.id === "product" || setup.role.id === "rapporteur" ? input.submitVersionChange : undefined;
+  const submitVersionChange = moduleSubmitVersionChange === undefined
+    ? legacySubmitVersionChange
+    : moduleSubmitVersionChange
+      ? input.submitVersionChange
+      : undefined;
+  // X-R2（E2 S2/R-6）：selectRunChange 的角色声明改读模块；引擎仍保留既有 `directGovernance`
+  // 会话模式门控（模块只声明最大允许集，实际注入仍由引擎决定）。
+  const moduleSelectRunChange = moduleDeclaresTool("selectRunChange");
+  const legacySelectRunChange = directGovernance && setup.role.id === "rapporteur" ? input.selectRunChange : undefined;
+  const selectRunChange = moduleSelectRunChange === undefined
+    ? legacySelectRunChange
+    : moduleSelectRunChange && directGovernance
+      ? input.selectRunChange
+      : undefined;
+  const moduleCompleteTeamPlan = moduleDeclaresTool("completeTeamPlan");
+  const legacyCompleteTeamPlan = directGovernance && setup.role.id === "convener" ? input.completeTeamPlan : undefined;
+  const completeTeamPlan = moduleCompleteTeamPlan === undefined
+    ? legacyCompleteTeamPlan
+    : moduleCompleteTeamPlan && directGovernance
+      ? input.completeTeamPlan
+      : undefined;
+  // X-R3（E2 S2）：nominator 的 activateRoleDocuments 角色声明改读模块 `tools()`（trio 声明
+  // `activateRoleDocuments`；single/未装配回退旧角色 id 门控）。引擎仍保留既有 `directGovernance`
+  // 会话模式门控——模块只声明最大允许集，实际注入由本层决定。
+  const moduleActivateRoleDocuments = moduleDeclaresTool("activateRoleDocuments");
+  const legacyActivateRoleDocuments = directGovernance && setup.role.id === "nominator" ? input.activateRoleDocuments : undefined;
+  const activateRoleDocuments = moduleActivateRoleDocuments === undefined
+    ? legacyActivateRoleDocuments
+    : moduleActivateRoleDocuments && directGovernance
+      ? input.activateRoleDocuments
+      : undefined;
+  // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 的角色声明经模块 `tools()` 复核（`moduleDeclaresTool`
+  // 在 trio + D1 校验后回答；single/su 以 `undefined` 保持旧路径）。**旧合并字面量逐字保留为回退值**：
+  //   · convener（X-R4）与 chief（X-R6）的模块 trio 声明均含 closeCreatedTask；
+  //   · 会话模式门控仍由引擎 `directGovernance` 判定（模块只声明最大允许集，E0.3 Q2）。
+  const moduleCloseCreatedTask = moduleDeclaresTool("closeCreatedTask");
   const closeCreatedTask = directGovernance && (setup.role.id === "chief" || setup.role.id === "convener") ? input.closeCreatedTask : undefined;
-  const submitRefactor = setup.role.id === "convener" ? input.submitRefactor : undefined;
-  const rawRequestStableWrite = canRequestStableWrite(setup.role.id) ? input.requestStableWrite : undefined;
+  const effectiveCloseCreatedTask = moduleCloseCreatedTask === undefined
+    ? closeCreatedTask
+    : moduleCloseCreatedTask && directGovernance
+      ? input.closeCreatedTask
+      : undefined;
+  // X-R4（E2 S2）：submitRefactor / requestStableWrite 的角色声明改读模块 `tools()`；single/su/未装配
+  // 回退旧角色 id 门控（旧谓词 `canRequestStableWrite` 已删除）。两项在旧代码中不以治理模型二次收窄，
+  // 故不加 `directGovernance` 会话门控（与模块 single 声明保持一致）。
+  const moduleSubmitRefactor = moduleDeclaresTool("submitRefactor");
+  const legacySubmitRefactor = setup.role.id === "convener" ? input.submitRefactor : undefined;
+  const submitRefactor = moduleSubmitRefactor === undefined ? legacySubmitRefactor : moduleSubmitRefactor ? input.submitRefactor : undefined;
+  const moduleRequestStableWrite = moduleDeclaresTool("requestStableWrite");
+  const legacyRequestStableWrite = setup.role.id === "convener" ? input.requestStableWrite : undefined;
+  const declaredRequestStableWrite = moduleRequestStableWrite === undefined
+    ? legacyRequestStableWrite
+    : moduleRequestStableWrite
+      ? input.requestStableWrite
+      : undefined;
+  // X-R4（E2 S4）：稳定写角色侧前置——在触达注入能力之前调用 convener 模块 `stable-write` preflight
+  // （事实 = 本层将转交的 request 形状；工具 schema 已保证 kind=workflow/content 非空）。deny 映射既有
+  // `stable-write-invalid` 回执、能力零调用；allow 不替代 stable-write Service 的许可/内容最终校验。
+  const rawRequestStableWrite = declaredRequestStableWrite === undefined ? undefined : withConvenerStableWritePreflight(declaredRequestStableWrite);
   const requestStableWrite: RequestStableWriteFn | undefined = rawRequestStableWrite === undefined ? undefined : roleCapabilityProtection.state === "unmanaged" ? rawRequestStableWrite : async (request, signal) => {
     const result = await rawRequestStableWrite(request, signal);
     if (!result.ok || !result.requestId) return result;
@@ -1840,7 +1978,7 @@ export async function openRoleSession(
     // Non-Desktop hosts without an inventory retain their explicit trusted task; this never proves mutation coverage.
     const taskId = inventory ? bindings.length === 1 ? bindings[0]!.taskId : undefined : input.taskId;
     const blocked = (message: string) => ({ ...result, ok: false, errorCode: "stable-write-invalid" as const, message: `Initial workflow source was not captured; publication remains blocked: ${message}` });
-    if (signal?.aborted || protection.state !== "required" || setup.role.id !== "convener" || !taskId || !actual || actual.construction !== "default-core" || actual.disposed
+    if (signal?.aborted || protection.state !== "required" || !moduleRoleDeclaresTool(setup.role.id, "requestStableWrite") || !taskId || !actual || actual.construction !== "default-core" || actual.disposed
       || actual.toolSurface?.factoryProvenance !== "default-production" || !actual.lifecycle?.activeTools.some(tool => ["request_stable_write", "ans_request_stable_write"].includes(tool.name))) return blocked("actual accepted Core tool/task binding is unproven");
     const lease = beginGitHostAction({ projectRoot: input.project.projectRoot, kind: "arm" }); if (!lease.ok) return blocked(lease.code);
     try {
@@ -1920,8 +2058,8 @@ export async function openRoleSession(
     // 2026-11-04 下载申请：纯透传；未注入 ⇒ 字段缺席、工具不注册。
     ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
     ...(projectState !== undefined ? { projectState } : {}),
-    ...(projectNote !== undefined ? { projectNote } : {}),
-    ...(requestVersionDecision !== undefined ? { requestVersionDecision } : {}),
+    ...(effectiveProjectNote !== undefined ? { projectNote: effectiveProjectNote } : {}),
+    ...(effectiveRequestVersionDecision !== undefined ? { requestVersionDecision: effectiveRequestVersionDecision } : {}),
     // D 批：验收产物汇报能力已撤除（不注入 reportArtifact）；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
     // 不调用、不写盘/flow、不伪造接受或决定。
@@ -1929,9 +2067,9 @@ export async function openRoleSession(
     ...(input.contractCheck !== undefined ? { contractCheck: input.contractCheck } : {}),
     ...(input.evidenceCheck !== undefined ? { evidenceCheck: input.evidenceCheck } : {}),
     ...(sessionTail !== undefined ? { sessionTail } : {}),
-    ...(roleActivityLog !== undefined ? { roleActivityLog } : {}),
-    ...(terminateRoleRun !== undefined ? { terminateRoleRun } : {}),
-    ...(redispatchTask !== undefined ? { redispatchTask } : {}),
+    ...(effectiveRoleActivityLog !== undefined ? { roleActivityLog: effectiveRoleActivityLog } : {}),
+    ...(effectiveTerminateRoleRun !== undefined ? { terminateRoleRun: effectiveTerminateRoleRun } : {}),
+    ...(effectiveRedispatchTask !== undefined ? { redispatchTask: effectiveRedispatchTask } : {}),
     ...(installSkill !== undefined ? { installSkill } : {}),
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
     ...(installMcp !== undefined ? { installMcp } : {}),
@@ -1940,7 +2078,9 @@ export async function openRoleSession(
     ...(selectRunChange !== undefined ? { selectRunChange } : {}),
     ...(completeTeamPlan !== undefined ? { completeTeamPlan } : {}),
     ...(activateRoleDocuments !== undefined ? { activateRoleDocuments } : {}),
-    ...(closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
+    // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 经模块声明 + 既有 directGovernance 会话模式门控
+    // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。
+    ...(effectiveCloseCreatedTask !== undefined ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
     ...(input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
     ...(input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
     ...(input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
@@ -2337,15 +2477,79 @@ interface GovernanceMatrixSessionFlags {
 const GOVERNANCE_MATRIX_UNAVAILABLE_NOTICE =
   "# 治理权力矩阵\n> 矩阵不可用（矩阵读取失败）；不得据此推断权限。";
 
-/** 既有角色门控的单一谓词（矩阵快照与注入门控共用；行为逐字不变）。 */
-function canRequestRequirementChange(roleId: string): boolean {
-  return roleId === "rapporteur" || roleId === "convener";
+/**
+ * 既有角色门控的单一谓词（矩阵快照与注入门控共用）。
+ *
+ * X-R2（E2 S2）/X-R4（E2 S2）：rapporteur 与 convener 的 `requestRequirementChange`/`requestStableWrite`
+ * 声明改读**已装配角色模块** `tools()`（moduleToolDeclarationOf 只在 trio 返回结果，并经 D1 装配表校验
+ * id→工具名映射）；模块未装配/校验失败 ⇒ false（fail-closed）。旧内联谓词
+ * `canRequestRequirementChange`/`canRequestStableWrite` 已随两角色模块化删除。
+ * 矩阵快照（仅 trio chief 构建）与注入门控（`isTrio` 前置）对该谓词的使用均为 trio 语义，
+ * 故这里以 `"trio"` 读取声明，不引入第二套模型参数。
+ */
+function moduleRoleDeclaresTool(roleId: string, toolId: string): boolean {
+  const declaration = moduleToolDeclarationOf(roleId, "trio");
+  return declaration !== undefined
+    && declaration.allow
+    && declaration.tools.some((binding) => binding.id === toolId);
 }
+/**
+ * 迁移前版本决策发起谓词（X-R6 起仅作**模块未装配回退**；trio 权威 = chief 模块 `tools()` 声明）。
+ *
+ * 旧行为：只有 trio chief 可发起 `request_version_decision`。X-R6（E2 S2）后注入与矩阵快照均改读
+ * `moduleRoleDeclaresTool(..., "requestVersionDecision")`；本谓词保留给 single/su/未装配模块路径，
+ * 与其余工具回退值同批（不回退第二份权限表）。
+ */
 function canRequestVersionDecision(roleId: string): boolean {
   return roleId === "chief";
 }
-function canRequestStableWrite(roleId: string): boolean {
-  return roleId === "convener";
+
+/**
+ * X-R4（E2 S4）：convener `request_stable_write` 的角色侧前置事实（api-spec §5.2 登记键
+ * `actorRoleId`/`kind`/`content`）。导出仅供编排模块消费测试逐键核对。
+ */
+export function convenerStableWriteFacts(request: RequestStableWriteInput): Readonly<Record<string, unknown>> {
+  return { actorRoleId: "convener", kind: request.kind, content: request.content };
+}
+
+/**
+ * X-R4（E2 S4）：convener `request_stable_write` 的角色侧前置包装——事实 = 工具层将转交的
+ * `{kind, content}`（工具 schema 已保证 kind=`workflow`、content 非空；模块 deny 只覆盖 schema
+ * 不可达形状）。deny ⇒ 既有 `stable-write-invalid` 回执（能力零调用）；allow 不替代 stable-write
+ * Service 的许可/内容最终校验。
+ */
+function withConvenerStableWritePreflight(fn: RequestStableWriteFn): RequestStableWriteFn {
+  const preflight = builtInRoleModuleOf("convener")?.preflight;
+  if (preflight === undefined) return fn;
+  return async (request, signal) => {
+    const decision = preflight.checkAction({ action: "stable-write", facts: convenerStableWriteFacts(request) });
+    if (!decision.allow) {
+      return {
+        ok: false,
+        errorCode: "stable-write-invalid",
+        message: `stable 写入请求未通过运营角色策略前置（内部 code=${decision.code}）；未签发许可、未写入。`,
+      };
+    }
+    return fn(request, signal);
+  };
+}
+
+/**
+ * X-R1/X-R2（E2 S2）：读取**已装配**角色模块的工具声明，并经 D1 装配表 `validateRoleToolDeclaration`
+ * 校验 id→运行时工具名映射（未知/越权/重复 ⇒ 整单 deny、`tools: []`，不注入不静默忽略）。
+ *
+ * 返回 `undefined` = 该角色没有可走模块的路径（非 trio，或模块未装配——X-R4 起六角色中
+ * product/rapporteur/nominator/convener 已装配）；调用方必须保留旧角色 id 门控（single/su 旧路径逐字不变）。
+ * 返回校验结果 = 模块路径生效，调用方只可按 `allow`/`tools` 决定注入（fail-closed）。
+ */
+function moduleToolDeclarationOf(
+  roleId: string,
+  governanceModel: GovernanceModel,
+): RoleToolDeclarationValidation | undefined {
+  if (governanceModel !== "trio") return undefined;
+  const module = builtInRoleModuleOf(roleId);
+  if (module === undefined) return undefined;
+  return validateRoleToolDeclaration(roleId, module.tools({ governanceModel }).tools);
 }
 
 /** worker 章节 → 矩阵输入（不含 title；title 单独进 displayName，R-3/G-1）。 */
@@ -2466,7 +2670,7 @@ async function loadGovernanceMatrixInput(input: {
 
   const cardKindsByRole: Record<string, { choice: readonly string[]; confirm: readonly string[] }> = {};
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
-    const kinds = TRIO_CARD_KINDS[spec.id];
+    const kinds = cardKindsOf(spec.id);
     cardKindsByRole[spec.id] = {
       choice: kinds.filter((kind) => !GOVERNANCE_CONFIRM_CARD_KINDS.includes(kind)),
       confirm: kinds.filter((kind) => GOVERNANCE_CONFIRM_CARD_KINDS.includes(kind)),
@@ -2476,9 +2680,10 @@ async function loadGovernanceMatrixInput(input: {
   const initiationByRole: Record<string, { requirementChange: boolean; versionDecision: boolean; stableWrite: boolean }> = {};
   for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
     initiationByRole[spec.id] = {
-      requirementChange: canRequestRequirementChange(spec.id),
-      versionDecision: canRequestVersionDecision(spec.id),
-      stableWrite: canRequestStableWrite(spec.id),
+      requirementChange: moduleRoleDeclaresTool(spec.id, "requestRequirementChange"),
+      // X-R6（E2 S2）：版本决策发起权改读已装配角色模块 `tools()`（chief trio 声明 requestVersionDecision）。
+      versionDecision: moduleRoleDeclaresTool(spec.id, "requestVersionDecision"),
+      stableWrite: moduleRoleDeclaresTool(spec.id, "requestStableWrite"),
     };
   }
 
@@ -2745,11 +2950,14 @@ function isGovernanceFlowId(value: unknown): value is string {
 
 /**
  * 2026-10-20 真机 bookmank op-1：Lead 的 `request_choice`（intent-confirm）漏带 cardKind ⇒ 无 judge 事件。
- * choice 卡的**角色默认**（仅当该 kind 在该角色 `TRIO_CARD_KINDS` 白名单内才生效）：
- *   liaison → intent-confirm（选项须含 confirm）；rapporteur → proposal（须含 accept）；
- *   convener → appointment（2026-10-22 第 1 项：选项为**角色 id**、不含治理卡保留选项时视为任命形状）；
- *   nominator → 不默认（Crew 只写卡，不再发任命卡）；verifier → acceptance（须含 accept）；
- *   其他/项目角色不猜。
+ * choice 卡的**角色默认**（仅当该 kind 在该角色 `cardKindsOf` 白名单内才生效；X-R1 起已装配角色
+ * 读角色模块 `cards`）：
+ *   chief → 模块卡数据 `CHIEF_INTENT_CONFIRM_CARD`（选项须含 confirm；X-R6 起）；rapporteur → proposal
+ *   （须含 accept；X-R2 起改读模块 cards，decision 卡因推荐项守卫永不默认化）；convener → 模块 cards
+ *   驱动（X-R4 起 `cards=["decision"]`，不默认化——旧 `appointment` 候选本就被白名单过滤）；
+ *   nominator → 不默认（X-R3：卡种白名单已由模块 `cards` 提供；默认化仍保持关闭，
+ *   Crew 只写卡，不再发任命卡）；verifier → 模块 cards 驱动（X-R5 起 `cards=["acceptance"]`，
+ *   选项含 accept 时默认 acceptance）；product → 模块 cards（当前为空 ⇒ 不默认）；其他/项目角色不猜。
  * 选项形状守卫避免把「普通选择卡」误判为治理决定卡（沿用旧行为）。
  * **调用点前置守卫（2026-10-26）**：`hasRecommendedOption(req)` 为真（带 `recommended:true`）时
  * **不进入本函数**——缺 cardKind 的 decision 形状卡必须 fail-closed，不得默认成 appointment 等。
@@ -2808,21 +3016,63 @@ function defaultGovernanceChoiceCardKind(
   roleId: GovernanceRoleSpec["id"],
   optionIds: readonly string[],
 ): GovernanceCardKind | undefined {
-  const has = (id: string): boolean => optionIds.includes(id);
   switch (roleId) {
     case "chief":
-      return has("confirm") ? "intent-confirm" : undefined;
+      // X-R6（E2 S2 / D8）：默认卡种改读角色模块卡数据（`CHIEF_INTENT_CONFIRM_CARD`）：卡种
+      // intent-confirm 由模块 `cards` 白名单确认；选项须含模块登记的 `requiredOptionId`（confirm），
+      // 与迁移前 `has("confirm") ? "intent-confirm" : undefined` 同值。
+      return optionIds.includes(CHIEF_INTENT_CONFIRM_CARD.requiredOptionId)
+        && cardKindsOf("chief").includes(CHIEF_INTENT_CONFIRM_CARD.cardKind)
+        ? CHIEF_INTENT_CONFIRM_CARD.cardKind
+        : undefined;
     case "rapporteur":
-      return has("accept") ? "proposal" : undefined;
+      // X-R2（E2 S2 / D8）：默认卡种改读角色模块 `cards`（rapporteur = ["proposal","decision"]）。
+      // decision 卡按客户规则含恰一 `recommended:true`，前置 `hasRecommendedOption` 守卫已阻止默认化
+      // （fail-closed）；本函数对该角色只可能给出 proposal（选项含 accept 时），与迁移前逐字一致。
+      return defaultChoiceKindFromModule("rapporteur", optionIds);
     case "convener":
-      return looksLikeAppointmentChoice(optionIds) ? "appointment" : undefined;
+      // X-R4（E2 S2 / D8）：默认卡种改读角色模块 `cards`（convener = ["decision"]）。迁移前的
+      // `looksLikeAppointmentChoice ⇒ "appointment"` 候选从未生效（appointment 已不在 convener 白名单，
+      // 调用方按 `cardKindsOf` 过滤）；模块路径下直接不默认化（decision 因推荐项守卫永不进入默认化），
+      // 净行为逐字一致。
+      return defaultChoiceKindFromModule("convener", optionIds);
     case "nominator":
+      // X-R3（E2 S2/D8）：卡种白名单已改读模块 `cards`（`cardKindsOf`）；**默认卡种保持不默认**
+      // （迁移前行为逐字保留：不得把普通角色 id 选择卡自动当 appointment）。
       return undefined;
     case "verifier":
-      return has("accept") ? "acceptance" : undefined;
+      // X-R5（E2 S2 / D8）：默认卡种改读角色模块 `cards`（verifier = ["acceptance"]）：选项含
+      // accept ⇒ acceptance，与迁移前 `has("accept") ? "acceptance" : undefined` 同值；前置
+      // `hasRecommendedOption` 守卫不变（带推荐项的卡不默认化）。
+      return defaultChoiceKindFromModule("verifier", optionIds);
     case "product":
-      return undefined;
+      // X-R1（E2 S2 / D8）：product 的默认卡种按角色模块 `cards` 推导（当前 `cards=[]` ⇒ 不默认；
+      // 与迁移前 `return undefined` 同向，零行为变化）。
+      return defaultChoiceKindFromModule("product", optionIds);
   }
+}
+
+/**
+ * X-R1（E2 S2 / D8）：**模块卡种驱动**的默认 choice 卡种——只在角色模块声明了对应卡种时返回既有
+ * 启发式候选；模块未装配时 `cardKindsOf` 回退迁移前内联表（X-R6 后该表仅保留 product 行，供
+ * product-code 源码 fixture；其余五角色已迁移、模块缺席 fail-closed）。
+ * product 模块 `cards=[]` ⇒ 恒 `undefined`；rapporteur 模块 `cards=["proposal","decision"]` ⇒
+ * 与迁移前 `has("accept") ? "proposal" : undefined` 同值（decision 因推荐项守卫不进入默认化）；
+ * convener 模块 `cards=["decision"]` ⇒ 恒 `undefined`（旧 appointment 候选本就被白名单过滤）；
+ * verifier 模块 `cards=["acceptance"]`（X-R5）⇒ 与迁移前 `has("accept") ? "acceptance" : undefined` 同值。
+ */
+function defaultChoiceKindFromModule(
+  roleId: GovernanceRoleSpec["id"],
+  optionIds: readonly string[],
+): GovernanceCardKind | undefined {
+  const cards = cardKindsOf(roleId);
+  if (optionIds.includes("confirm") && cards.includes("intent-confirm")) return "intent-confirm";
+  if (optionIds.includes("accept")) {
+    if (cards.includes("proposal")) return "proposal";
+    if (cards.includes("acceptance")) return "acceptance";
+  }
+  if (looksLikeAppointmentChoice(optionIds) && cards.includes("appointment")) return "appointment";
+  return undefined;
 }
 
 function serializeGovernanceTask<T>(
@@ -2856,45 +3106,65 @@ function isCoordinatorGovernanceSpec(spec: GovernanceRoleSpec | undefined): bool
  * appointment/proposal 决定、不进入 `latestAcceptanceDecision`、也不能充当 flow 的
  * `customer-decision` 证据；分类只写 `decisionKind:"material-choice"`，**不得被当成提案/验收批准**。
  */
-const TRIO_CARD_KINDS: Record<GovernanceRoleSpec["id"], readonly GovernanceCardKind[]> = {
+const TRIO_CARD_KINDS: Readonly<Partial<Record<GovernanceRoleSpec["id"], readonly GovernanceCardKind[]>>> = {
   // C 目标态（2026-10-28）：模型可见 schema 已删除通用 `write`；本表仍保留它以让旧 direct/legacy
   // 项目与旧测试在过渡期可编译/可运行（**不向模型列出**），D 批随旧机器一并删除。
   // 2026-10-28 批次 A：幕僚（chief）承接旧主入口的 intent-confirm 需求确认卡；其它治理卡仍结构性拒绝。
   // 旧 `liaison` 是只读别名（D 批删除），行为与基线逐字一致（仅 intent-confirm）。
-  chief: ["intent-confirm"],
+  // X-R6（E2 S2/D8）：chief 表项已删除——卡种唯一真源 = 角色模块 `cards`（值为 `["intent-confirm"]`）；
+  // 模块意外缺席时 `cardKindsOf` 对该角色 fail-closed 空集（不静默放宽）。旧表项不保留第二份副本。
   // 产品（product）是幕僚的 worker；批次 A 只做身份层，不开放治理选择/确认卡（申请线在 C 批）。
+  // X-R1（E2 S2 / D8）：trio 运行时经 `cardKindsOf("product")` 读取**角色模块** `cards`（当前为空）
+  // 作为唯一真源；本字面量只为 `builtInRoleModuleOf` 不可用时的回退与迁移前源码 oracle 保留
+  // （product-code 的 `test/roles/product/product-differential.test.ts` 仍读取此文本；不在编排写集）。
   product: [],
-  // 2026-10-26 客户纠正/补充：报告员可发 **decision 卡，仅限需求变更审批**（发起方不得自批；
-  // 审批人是判断 agent/客户，主理只执行）；提案与写盘卡不变。
-  rapporteur: ["proposal", "decision"],
-  // 2026-10-29（方案 v2.1 §5.1/M3，F7）：**招人决定卡（appointment）只由人事发起**——
-  // 选项=最新名单角色、推荐集由应用从名单生成；写卡（appointment-write）保留。
-  nominator: ["appointment", "appointment-write"],
-  // 2026-10-26 客户新增：统筹可发 decision 卡（材料性选择；需求变更审批卡统筹也可发起）。
-  // 2026-10-29：从 convener 白名单**移除 appointment**（招人卡只归人事）。
-  convener: ["decision"],
-  // 验收权归 Proof / 验收（verifier）；Draft / 提案不再发 acceptance。
-  verifier: ["acceptance"],
+  // X-R2（E2 S2 / D8）：rapporteur 条目已删除——卡种唯一真源 = 角色模块 `cards`
+  // （`["proposal","decision"]`）。迁移已完成角色不得保留第二份表；模块意外缺席时 `cardKindsOf`
+  // 对该角色 fail-closed 返回空集（不静默放宽）。
+  // X-R3（E2 S2/D8）：nominator 条目已删除——卡种唯一真源 = 角色模块 `cards`
+  // （`["appointment","appointment-write"]`）。模块意外缺席时 `cardKindsOf` 对该角色 fail-closed
+  // 返回空集（不静默放宽）。**默认卡种仍不默认化**（迁移前逐字：Crew 只写卡；模块 cards 只作白名单）。
+  // X-R4（E2 S2/D8）：convener 条目已删除——卡种唯一真源 = 角色模块 `cards`（`["decision"]`；
+  // 2026-10-29 起 appointment 已从白名单移除，招人卡只归人事）。模块意外缺席时 fail-closed 空集。
+  // X-R5（E2 S2/D8）：verifier 条目已删除——卡种唯一真源 = 角色模块 `cards`（`["acceptance"]`）；
+  // 模块意外缺席时 `cardKindsOf` fail-closed 空集。验收权归独立验收/质检，Draft / 提案不再发 acceptance。
 };
 
+/** 迁移已完成角色但模块缺席时的 fail-closed 卡种（冻结空集；不伪造第二份白名单）。 */
+const NO_CARD_KINDS: readonly GovernanceCardKind[] = Object.freeze([]);
+
 /**
- * 卡种 → 可发起角色（由 `TRIO_CARD_KINDS` 反推，单一来源；不手写第二张权限表）。
+ * X-R1–X-R6（E2 S2 / D8）：卡种唯一真源 = 角色模块 `cards`（经 Service 公共出口读取
+ * **已装配**模块）。X-R1–X-R6 依次装配 product/rapporteur/nominator/convener/verifier/chief；
+ * 迁移已完成角色的模块缺席属结构性错误 ⇒ fail-closed 空集，不回退第二份表。`TRIO_CARD_KINDS`
+ * 仅保留 product 行（product-code 迁移前源码 fixture；运行期模块已装配、优先命中模块）。
+ * 模块 `cards` 是冻结只读数组，直接返回同一引用，不复制第二份表。
+ */
+function cardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
+  const module = builtInRoleModuleOf(roleId);
+  if (module !== undefined) return module.cards;
+  return TRIO_CARD_KINDS[roleId] ?? NO_CARD_KINDS;
+}
+
+/**
+ * 卡种 → 可发起角色（由 `cardKindsOf` 反推，单一来源；不手写第二张权限表）。
+ * 遍历六内置治理角色全量（已装配读模块；未装配回退迁移前表），不依赖回退表键集。
  * 越权拒绝文案据此告诉模型「该谁做」；不改变白名单或判定顺序。
  */
 const TRIO_CARD_ORIGINATORS: ReadonlyMap<GovernanceCardKind, readonly GovernanceRoleSpec["id"][]> = (() => {
   const map = new Map<GovernanceCardKind, GovernanceRoleSpec["id"][]>();
-  for (const roleId of Object.keys(TRIO_CARD_KINDS) as GovernanceRoleSpec["id"][]) {
-    for (const kind of TRIO_CARD_KINDS[roleId]) {
+  for (const spec of BUILT_IN_GOVERNANCE_ROLES) {
+    for (const kind of cardKindsOf(spec.id)) {
       const originators = map.get(kind);
-      if (originators === undefined) map.set(kind, [roleId]);
-      else originators.push(roleId);
+      if (originators === undefined) map.set(kind, [spec.id]);
+      else originators.push(spec.id);
     }
   }
   return map;
 })();
 
 /**
- * 越权卡种的可操作改派提示（文案，不是权限；权限仍只由 `TRIO_CARD_KINDS` 决定）。
+ * 越权卡种的可操作改派提示（文案，不是权限；权限仍只由 `cardKindsOf`（已装配读模块）/迁移前表决定）。
  * 2026-10-31 真机：运营被执行官要求「重新提交验收」，按指示发 acceptance 被结构性拒绝；
  * 旧文案只说「不允许」，没说该类卡该谁发起、下一步该怎么改派。
  *
@@ -2917,7 +3187,7 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> &
 
 /**
  * 越权 `cardKind` 的三段式拒绝文案：缺什么（不允许的卡种）/ 该做什么（改派提示）/
- * 谁来做（发起该卡种的角色，由 `TRIO_CARD_KINDS` 反推）。调用方保证不弹卡、不写账本。
+ * 谁来做（发起该卡种的角色，由 `cardKindsOf` 反推）。调用方保证不弹卡、不写账本。
  */
 function cardKindNotAllowedReason(
   roleId: string,
@@ -2944,14 +3214,14 @@ function cardKindNotAllowedReason(
 
 /**
  * `request_confirmation` 的**工具级** cardKind 枚举（与运行时核心 `CONFIRM_CARD_KINDS` 同值）。
- * 本地只用于在拒绝文案里给出「本角色允许的确认卡 kind」——TRIO_CARD_KINDS 同时混有 choice 类，
+ * 本地只用于在拒绝文案里给出「本角色允许的确认卡 kind」——卡种表同时混有 choice 类，
  * 直接列出会把 `proposal`/`acceptance` 等误报成可确认卡种。
  */
 const GOVERNANCE_CONFIRM_CARD_KINDS: readonly GovernanceCardKind[] = ["appointment-write"];
 
-/** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ `TRIO_CARD_KINDS`，按设计 §4.2 表序；主入口为空）。 */
+/** 某内置治理角色允许的**确认卡** kinds（工具枚举 ∩ 模块卡种；主入口为空）。 */
 function confirmCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
-  return GOVERNANCE_CONFIRM_CARD_KINDS.filter((kind) => TRIO_CARD_KINDS[roleId].includes(kind));
+  return GOVERNANCE_CONFIRM_CARD_KINDS.filter((kind) => cardKindsOf(roleId).includes(kind));
 }
 
 /** 账本条目签名（本会话内存合并去重用；只比较能唯一识别一次决定/事件的字段）。 */

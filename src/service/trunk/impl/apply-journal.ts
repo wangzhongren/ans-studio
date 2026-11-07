@@ -19,7 +19,13 @@ import { readGitStableCompletionBasis, appendGitStableCompletionTaskEvent, readG
 import { validateTaskStateEvent } from "../../../common/编排/task-state.ts";
 import { isRunGitBases, type RunGitBases } from "../../../common/编排/run-manifest.ts";
 import { isTaskParentRef, isTaskReviewBasisRef, isDispatchTaskReviewTarget, isTaskReviewControllerRef, isDispatchTaskResumeController, isTaskWorkSourceRef } from "../../../model/runtime.ts";
-import { parseTeamPlan, parseProjectRoster, parseProjectModules, evaluatePlanningHandoff } from "../../../common/编排/workflow-preconditions.ts";
+import { parseTeamPlan, parseProjectRoster, parseProjectModules, evaluatePlanningHandoff, isConvenerBuiltInDispatchTarget } from "../../../common/编排/workflow-preconditions.ts";
+// X-R5（E2 S4）：verifier 最终 review 的角色侧前置——角色模块 public entry（api-spec §5 登记事实键）。
+// 只消费 `preflight`；不调用模块 `dispatch()`（E2 评审 X-2/X-4：目标模块为 diff-only，不进生产路由）。
+import { verifierRoleModule } from "../../../common/roles/verifier/index.ts";
+// X-R6（E2 S2）：chief hub 派发的角色策略纯数据（routing/source/report/purpose/schema/五目标）。
+// 只消费数据；Service 事务/账本/证据核验与真实 creator 路由逐字保留（E0 R-2）。
+import { CHIEF_HUB_DISPATCH } from "../../../common/roles/chief/index.ts";
 import type { SubmitVersionChangeInput, SelectRunChangeInput, SelectRunChangeResult, CompleteTeamPlanInput, CloseCreatedTaskInput, CloseCreatedTaskResult, TaskStateEvent, TaskClosedEvent, ActivateRoleDocumentsInput, ActivateRoleDocumentsResult, CustomerInputOutcome, DispatchTaskReviewTarget } from "../../../model/runtime.ts";
 import { isValidDocFreezeRecord, type DocFreezeRecord } from "../../../model/version-change.ts";
 import type { BoundaryEntry } from "../../../model/boundary.ts";
@@ -1818,14 +1824,47 @@ async function readReviewMaterial(deps: TrunkServiceDeps, input: { parentTaskId:
       contextText: `Read-only final candidate review\n${canonicalJson(reviewBasisRef)}\nFrozen completion requirements (${proposal.path}):\n${text}\nA model pass or a ref alone is not quality evidence. Report unavailable required execution as blocked.` } };
   } catch (error) { return invalid(String(error)); }
 }
+
+/**
+ * X-R5（E2 S4）：verifier 最终 review 的角色侧前置事实（api-spec §5 登记键，**恰好两个**）：
+ *  - `reviewTarget` = 最终 review 的期望目标（`operationId` 即期望 CID；`candidate` 即最终候选完整 OID）；
+ *  - `criteria` = 宿主冻结材料产出的冻结 criteria（`GitEvidenceRef[]`）。
+ * 只投影宿主已核验的材料，不造键、不读取验收结论（`accepted`/`passed` 等属未登记键，模块一律 deny）。
+ */
+export function verifierReviewFacts(input: {
+  target: DispatchTaskReviewTarget;
+  reviewBasisRef: import("../abstract/trunk-service.ts").ReviewMaterial["reviewBasisRef"];
+}): Readonly<Record<string, unknown>> {
+  return { reviewTarget: input.target, criteria: input.reviewBasisRef.criteria };
+}
+
 export async function prepareReviewTask(deps: TrunkServiceDeps, input: { parentTaskId: string; flowId: string; runId: string; target: DispatchTaskReviewTarget }): Promise<TrunkServiceResult<import("../abstract/trunk-service.ts").PreparedReviewTask>> {
   const parent = await prepareParentTaskRef(deps, { actorRoleId: "convener", taskId: input.parentTaskId, flowId: input.flowId, runId: input.runId });
   if (!parent.ok) return fail("trunk-item-invalid", parent.message);
-  const material = await readReviewMaterial(deps, input); return material.ok ? { ok: true, value: { ...material.value, parentTaskRef: parent.parentTaskRef } } : material;
+  const material = await readReviewMaterial(deps, input);
+  if (!material.ok) return material;
+  // X-R5（E2 S4）：review 角色侧前置——在宿主材料（`reviewBasisRef`：最终候选/CID/冻结 criteria）
+  // 产出后、返回/提交前调用 verifier 模块；事实键严格按 api-spec 登记（`reviewTarget`/`criteria`），
+  // 未登记键不传。普通调查任务没有最终 CID，不进入本函数（不调用 preflight）。
+  // deny ⇒ 既有 `trunk-item-invalid` 回执（不新增错误码、不改变 Service 既有拒绝顺序/文案语义）；
+  // allow 只表示角色侧不反对，**不替代**独立验收判定、证据内容核验或 Service 事务/账本校验。
+  const decision = verifierRoleModule.preflight?.checkAction({
+    action: "review",
+    facts: verifierReviewFacts({ target: input.target, reviewBasisRef: material.value.reviewBasisRef }),
+  });
+  if (decision !== undefined && !decision.allow) {
+    return fail("trunk-item-invalid", `Final review material was rejected by the verifier role precondition (internal code=${decision.code}); no review task was prepared.`);
+  }
+  return { ok: true, value: { ...material.value, parentTaskRef: parent.parentTaskRef } };
 }
 export async function readAssignedReviewContext(deps: TrunkServiceDeps, input: { taskId: string; actorRoleId: string }): Promise<TrunkServiceResult<import("../abstract/trunk-service.ts").ReviewMaterial>> {
   return readReviewTaskContext(deps, input, false);
 }
+/**
+ * 已指派 review 材料的读取（事务/账本/证据绑定）。**不调用** `preflight.checkAction`：
+ * X-R5 的 review 前置只在 `prepareReviewTask`（最终 review 准备）消费；普通调查任务与重复读取
+ * 不重复执行角色策略前置，也不得用前置 allow 替代本函数/Service 的证据核验。
+ */
 async function readReviewTaskContext(deps: TrunkServiceDeps, input: { taskId: string; actorRoleId: string }, allowClosed: boolean): Promise<TrunkServiceResult<import("../abstract/trunk-service.ts").ReviewMaterial>> {
   const invalid = (message: string) => fail<import("../abstract/trunk-service.ts").ReviewMaterial>("trunk-item-invalid", message);
   const read = await readOperationEvents(deps.projectRoot); if (!read.ok) return invalid(read.reason);
@@ -3086,7 +3125,18 @@ function isActivationMeta(value: unknown): value is ActivationMeta {
     && Array.isArray(value.writesets) && value.writesets.every(path => typeof path === "string");
 }
 
-/** Prepare actual D3 + completed plan + three draft bytes. No role is enabled by this preparation. */
+/**
+ * Prepare actual D3 + completed plan + three draft bytes. No role is enabled by this preparation.
+ *
+ * X-R3（E2 S4，nominator）：本函数**不**调用角色模块 preflight——`role-documents` 阶段事实包中的
+ * `boundaryWithinRoleModules` / `boundaryMdYamlSynchronized` / `roleCardRequiredSections` 由 G 侧
+ * `validateRoleDocumentsSnapshot` 产出，调用点在 Pipeline
+ * `trunk-runtime.ts::createDirectRoleRuntime.activateRoleDocuments`（两处 G 校验之后）。此处保留
+ * Service 事务/账本/证据最终校验（真实 D3 账本、计划完成证据、名单/模块绑定、三文档字节 hash），
+ * 不因 preflight allow 省略任何一步；recovery/revalidate 路径（`prepareDirectAuthority` 的
+ * `prepareRoleActivation(..., true)`）不重复调用角色策略（该路径事实不可得且原始激活已过 preflight，
+ * 见 `角色卡/编排/docs/change/2026-11-07_E2-XR3_orchestration-nominator-evidence.md`）。
+ */
 export async function prepareRoleActivation(deps: TrunkServiceDeps, input: ActivateRoleDocumentsInput, actor: string, revalidatePending = false): Promise<TrunkServiceResult<PreparedRoleActivation>> {
   const invalid = (message: string) => fail<PreparedRoleActivation>("trunk-item-invalid", message), { store } = deps;
   if (actor !== "nominator" || !input.operationId || !input.targetRoleId || !store.readSnapshotArtifact || !store.prepareSnapshot || !store.readOperation)
@@ -3497,15 +3547,57 @@ export async function prepareRoleDraftScope(deps: TrunkServiceDeps, input: { flo
   } catch (error) { return invalid(String(error)); }
 }
 
-/** Formal handoff/worker dispatch preflight. A report alone never releases a plan dependency. */
+/**
+ * X-R6（E2 S2）：chief hub 可派发目标判定——唯一真源 = 角色模块纯数据 `CHIEF_HUB_DISPATCH.targetRoleIds`
+ * （迁移前五内置字面量，同值）。只回答“是否 hub 目标”，不授予派发权限；权限/事务/账本/证据核验仍由
+ * 本 Service 既有校验与调用方硬授权共同决定。
+ */
+function isChiefHubDispatchTarget(roleId: string): boolean {
+  return CHIEF_HUB_DISPATCH.targetRoleIds.some((targetRoleId) => targetRoleId === roleId);
+}
+
+/**
+ * Formal handoff/worker dispatch preflight. A report alone never releases a plan dependency.
+ *
+ * X-R4（E2 S3）消费边界（仅角色侧**纯数据**；R-2）：
+ *  - worker 派发目标的允许内置集改读已装配 convener 模块的 `CONVENER_WORKER_DISPATCH_TARGETS`
+ *    （经 `workflow-preconditions.isConvenerBuiltInDispatchTarget`）；迁移前为字面量
+ *    `targetRoleId === "verifier"`，集合等价（`["verifier"]`），0 行为差异。
+ *  - run/module/D3/roster/交付属主、hub/legacy/review 路由与报告时点**仍在本 Service**
+ *    （冻结路径校验、任务/账本/证据核验）——不从模块扩张，也不因模块化放宽。
+ *  - `prepareRoleDispatch` 的 Service 首检（来源/目标/冻结 run/模块/依赖收口）逐字保留；
+ *    角色侧策略前置（team-plan/stable-write/requirement-change）由 Pipeline/能力注入层调用，
+ *    本 Service 不重复、也不替代。
+ *
+ * X-R5（verifier）核对结论——**无适用路由条件替换项**（记录理由）：
+ *  - convener→内置目标的 review 路由已由 X-R4 改读来源模块纯数据（`isConvenerBuiltInDispatchTarget`）；
+ *  - 本文件其余 `targetRoleId/to/from === "verifier"` 条件均为 Service 任务身份、账本事件、review
+ *    材料/证据绑定（如 `readReviewTaskContext`、`isControllerReviewTask`、delivery 证据闭包）⇒ 保留；
+ *  - hub 目标列表（`["product",…,"verifier"]`）属 **chief 来源**路由，归 X-R6 收口（E0 R-2）；
+ *  - **不调用** verifier 模块 `dispatch()`：E2 评审 X-2/X-4 明确目标模块为 diff-only，接入生产会
+ *    把 convener→verifier 的 `kind=project` 事实误判为 `target-kind-mismatch`（旧行为 allow）。
+ *  - 唯一的 verifier 角色侧消费 = `prepareReviewTask` 的 review preflight（S4，见上）。
+ *
+ * X-R6（chief）消费边界（仅角色侧**纯数据**；R-2）：
+ *  - `prepareRoleDispatch` 的 hub 分支来源/目标/路由/purpose/schema 改读 `CHIEF_HUB_DISPATCH`
+ *    （`sourceRoleId`/`targetRoleIds`/`routing`/`purpose`/`workSourceSchema`）；迁移前为同值字面量，
+ *    0 行为差异。非 hub 的 chief→built-in 文档/协调/角色准备路由的来源判定同读 `sourceRoleId`；
+ *    具体目标映射仍属引擎路由。
+ *  - review 目标仍要求显式 `targetRoleId === "verifier"` + 真实 convener controller 证据（本模块的
+ *    review 路由语义不在 hub 纯数据内）；报告路由仍按真实 task creator（`workflow-preconditions`）。
+ *  - **保留**：任务身份/账本事件/工作源字节与证据核验（含 `inspectAssignedTask`、journal apply 中的
+ *    hub 来源绑定与 `task.to` 五内置校验）——证据核验面不因模块化放宽，目标表副本不构成第二权限源。
+ *  - **不调用** chief 模块 `dispatch()`：S3 硬授权组合属 `workflow-preconditions`/桌面单元（E2 评审
+ *    C-3/C-4），本 Service 不做来源模块派发判定。
+ */
 export async function prepareRoleDispatch(deps: TrunkServiceDeps, input: { fromRoleId: string; targetRoleId: string; flowId: string; runId?: string; moduleId?: string;
   parentTaskId?: string; reviewTarget?: DispatchTaskReviewTarget; hostInitialization?: import("../abstract/trunk-service.ts").RepositoryInitializationContext; hubRouting?: import("../../../model/runtime.ts").TaskHubRouting }): Promise<RoleDispatchResult> {
   const invalid = (message: string): RoleDispatchResult => ({ ok: false, code: "trunk-verify-failed", message });
   try {
-    if (input.hubRouting === "chief-hub-v1") {
+    if (input.hubRouting === CHIEF_HUB_DISPATCH.routing) {
       const host = input.hostInitialization;
-      if (input.fromRoleId !== "chief" || !["product", "rapporteur", "nominator", "convener", "verifier"].includes(input.targetRoleId)
-        || !/^[a-z0-9][a-z0-9-]{0,63}$/i.test(input.flowId) || !host || host.parent.roleId !== "chief" || host.parent.inputAccepted !== true || host.parent.settled !== false
+      if (input.fromRoleId !== CHIEF_HUB_DISPATCH.sourceRoleId || !isChiefHubDispatchTarget(input.targetRoleId)
+        || !/^[a-z0-9][a-z0-9-]{0,63}$/i.test(input.flowId) || !host || host.parent.roleId !== CHIEF_HUB_DISPATCH.sourceRoleId || host.parent.inputAccepted !== true || host.parent.settled !== false
         || host.registration.source !== "native-directory-selection" || !host.registration.selectionId || !Number.isSafeInteger(host.registration.listingGeneration)
         || host.registration.listingGeneration < 1 || !Number.isFinite(Date.parse(host.registration.selectedAt))
         || (!host.creatorReports && host.parent.kind !== undefined && host.parent.kind !== "message")) return invalid("Ordinary builtin preparation requires the actual current chief input and project identity");
@@ -3530,17 +3622,17 @@ export async function prepareRoleDispatch(deps: TrunkServiceDeps, input: { fromR
       const execution = input.targetRoleId === "convener" && creator?.ok && !finalReview ? await readRestartExecutionSelection(deps, input.flowId, creator.value.reports) : undefined;
       if (execution && !execution.ok) return invalid(execution.message ?? execution.code);
       const executionRunSelection = execution?.ok ? execution.value.selection : undefined;
-      const sourceId = `init-source-${directHash(["chief-hub-v1", host.registration.selectionId, host.parent.sessionId, host.parent.turnId, input.flowId, input.targetRoleId, ...(finalReview ? [finalReview.reviewBasisRef] : []), ...(executionRunSelection ? [executionRunSelection] : [])])}`;
+      const sourceId = `init-source-${directHash([CHIEF_HUB_DISPATCH.routing, host.registration.selectionId, host.parent.sessionId, host.parent.turnId, input.flowId, input.targetRoleId, ...(finalReview ? [finalReview.reviewBasisRef] : []), ...(executionRunSelection ? [executionRunSelection] : [])])}`;
       const runId = finalReview?.runId ?? executionRunSelection?.replacementRunId ?? `run-hub-${directHash(sourceId).slice(0, 48)}`;
-      const body = canonicalJson({ schema: "repository-work-source/v1", kind: creator ? "creator-report" : "customer-turn", purpose: "builtin-preparation", hubRouting: "chief-hub-v1",
+      const body = canonicalJson({ schema: CHIEF_HUB_DISPATCH.workSourceSchema, kind: creator ? "creator-report" : "customer-turn", purpose: CHIEF_HUB_DISPATCH.purpose, hubRouting: CHIEF_HUB_DISPATCH.routing,
         sourceId, flowId: input.flowId, projectRoot: root.projectRoot, targetRoleId: input.targetRoleId, planningRunId: runId, registration: host.registration, parent: host.parent,
         ...(creator?.ok ? { creatorReports: creator.value.reports } : {}), ...(finalReview ? { reviewBasisRef: finalReview.reviewBasisRef, reviewControllerRef } : {}),
         ...(executionRunSelection ? { executionRunSelection } : {}) });
       const stored = await deps.store.writeInitializationSource(sourceId, Buffer.from(body).toString("base64")); if (!stored.ok) return invalid(stored.message ?? stored.reason);
-      if (finalReview) return { ok: true, value: { kind: "review", purpose: "builtin-preparation", hubRouting: "chief-hub-v1", flowId: input.flowId, runId,
+      if (finalReview) return { ok: true, value: { kind: "review", purpose: CHIEF_HUB_DISPATCH.purpose, hubRouting: CHIEF_HUB_DISPATCH.routing, flowId: input.flowId, runId,
         basisDigest: directHash({ sourceId, review: finalReview.reviewBasisRef, runSha256: finalReview.runRecordSha256 }), reviewBasisRef: finalReview.reviewBasisRef, reviewControllerRef,
         initializationSource: { sourceId, ...stored.value, kind: creator ? "chief-creator-report" : "chief-customer-turn" } } };
-      if (executionRunSelection) return { ok: true, value: { kind: "execution", purpose: "builtin-preparation", hubRouting: "chief-hub-v1", flowId: input.flowId, runId,
+      if (executionRunSelection) return { ok: true, value: { kind: "execution", purpose: CHIEF_HUB_DISPATCH.purpose, hubRouting: CHIEF_HUB_DISPATCH.routing, flowId: input.flowId, runId,
         basisDigest: directHash({ sourceId, executionRunSelection }),
         initializationSource: { sourceId, ...stored.value, kind: "chief-creator-report" } } };
       const prior = await deps.store.readRunRecord(runId);
@@ -3553,17 +3645,17 @@ export async function prepareRoleDispatch(deps: TrunkServiceDeps, input: { fromR
           schemas: { run: "ans-run/v1" }, documents: {}, execution: { teamPlan: null, flow: null }, builtinPreparationSource: sourceId });
         if (!saved.ok) return invalid(saved.message ?? saved.code);
       }
-      return { ok: true, value: { kind: "planning", purpose: "builtin-preparation", hubRouting: "chief-hub-v1", flowId: input.flowId, runId,
+      return { ok: true, value: { kind: "planning", purpose: CHIEF_HUB_DISPATCH.purpose, hubRouting: CHIEF_HUB_DISPATCH.routing, flowId: input.flowId, runId,
         basisDigest: directHash({ projectRoot: root.projectRoot, sourceId }), initializationSource: { sourceId, ...stored.value, kind: creator ? "chief-creator-report" : "chief-customer-turn" } } };
     }
-    const coordination = input.fromRoleId === "chief" && input.targetRoleId === "convener" ? await readEffectiveSnapshot(deps) : undefined;
+    const coordination = input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && input.targetRoleId === "convener" ? await readEffectiveSnapshot(deps) : undefined;
     const teamPlanning = coordination?.ok === true;
-    const rolePreparation = input.fromRoleId === "chief" && input.targetRoleId === "nominator";
-    if (input.fromRoleId === "chief" && (["product", "rapporteur"].includes(input.targetRoleId) || teamPlanning || rolePreparation)) {
+    const rolePreparation = input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && input.targetRoleId === "nominator";
+    if (input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && (["product", "rapporteur"].includes(input.targetRoleId) || teamPlanning || rolePreparation)) {
       const host = input.hostInitialization;
       if (!/^[a-z0-9][a-z0-9-]{0,63}$/i.test(input.flowId) || !host || host.registration.source !== "native-directory-selection" || !host.registration.selectionId
         || !Number.isSafeInteger(host.registration.listingGeneration) || host.registration.listingGeneration < 1 || !Number.isFinite(Date.parse(host.registration.selectedAt))
-        || host.parent.roleId !== "chief" || host.parent.inputAccepted !== true || host.parent.settled !== false
+        || host.parent.roleId !== CHIEF_HUB_DISPATCH.sourceRoleId || host.parent.inputAccepted !== true || host.parent.settled !== false
         || (host.creatorReports === undefined && host.parent.kind !== undefined && host.parent.kind !== "message"))
         return invalid("Document preparation requires the actual registered root and current accepted chief customer work source");
       const root = await readGitInitializationFacts(deps.projectRoot), selected = await readGitInitializationFacts(host.registration.selectedRoot), registered = await readGitInitializationFacts(host.registration.projectRoot);
@@ -3627,8 +3719,8 @@ export async function prepareRoleDispatch(deps: TrunkServiceDeps, input: { fromR
       return { ok: true, value: { kind: "planning", purpose, flowId: input.flowId, runId, basisDigest, initializationSource: { sourceId, ...stored.value,
         kind: host.creatorReports ? "chief-creator-report" : "chief-customer-turn" } } };
     }
-    if (input.reviewTarget !== undefined || input.fromRoleId === "convener" && input.targetRoleId === "verifier") {
-      if (input.fromRoleId !== "convener" || input.targetRoleId !== "verifier" || !input.parentTaskId || !input.runId || !isDispatchTaskReviewTarget(input.reviewTarget))
+    if (input.reviewTarget !== undefined || input.fromRoleId === "convener" && isConvenerBuiltInDispatchTarget(input.targetRoleId)) {
+      if (input.fromRoleId !== "convener" || !isConvenerBuiltInDispatchTarget(input.targetRoleId) || !input.parentTaskId || !input.runId || !isDispatchTaskReviewTarget(input.reviewTarget))
         return invalid("Final verifier coordination needs its actual parent/run and an explicit ordinary expected candidate target");
       const prepared = await prepareReviewTask(deps, { parentTaskId: input.parentTaskId, flowId: input.flowId, runId: input.runId, target: input.reviewTarget });
       if (!prepared.ok) return invalid(prepared.message ?? prepared.code);
@@ -3636,7 +3728,7 @@ export async function prepareRoleDispatch(deps: TrunkServiceDeps, input: { fromR
         basisDigest: directHash({ ref: prepared.value.reviewBasisRef, runSha256: prepared.value.runRecordSha256 }), reviewBasisRef: prepared.value.reviewBasisRef,
         parentTaskRef: prepared.value.parentTaskRef } };
     }
-    if (input.fromRoleId === "chief" && input.targetRoleId === "convener") {
+    if (input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && input.targetRoleId === "convener") {
       const effective = await readEffectiveSnapshot(deps);
       if (!effective.ok) {
         const stored = await deps.store.readManifest();
@@ -3644,7 +3736,7 @@ export async function prepareRoleDispatch(deps: TrunkServiceDeps, input: { fromR
         const initial = await deps.store.readGitInitializationFacts();
         const host = input.hostInitialization;
         if (!host || host.registration.source !== "native-directory-selection" || !host.registration.selectionId || !Number.isSafeInteger(host.registration.listingGeneration)
-          || host.registration.listingGeneration < 1 || !Number.isFinite(Date.parse(host.registration.selectedAt)) || host.parent.roleId !== "chief"
+          || host.registration.listingGeneration < 1 || !Number.isFinite(Date.parse(host.registration.selectedAt)) || host.parent.roleId !== CHIEF_HUB_DISPATCH.sourceRoleId
           || host.creatorReports !== undefined || (host.parent.kind !== undefined && host.parent.kind !== "message"))
           return invalid("Repository initialization requires the actual native project selection and accepted chief turn");
         const selected = await readGitInitializationFacts(host.registration.selectedRoot), registered = await readGitInitializationFacts(host.registration.projectRoot);

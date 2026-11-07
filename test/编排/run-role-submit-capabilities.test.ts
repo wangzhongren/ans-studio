@@ -248,7 +248,14 @@ test("run-role 能力注入：product → 仅 submitVersionChange；rapporteur �
           assert.equal(caps!.submitVersionChange, submitVersionChange, "注入同一引用（不包装）");
         }
         if (expected.includes("submitRefactor")) assert.equal(caps!.submitRefactor, submitRefactor);
-        if (expected.includes("requestStableWrite")) assert.equal(caps!.requestStableWrite, requestStableWrite);
+        if (expected.includes("requestStableWrite")) {
+          // X-R4（E2 S4）：convener 稳定写能力经模块 preflight 包装（委托同一注入能力；合法 workflow
+          // 事实 allow，回执原样返回）。submitRefactor 无模块 preflight，保持同一引用。
+          assert.equal(typeof caps!.requestStableWrite, "function");
+          assert.notEqual(caps!.requestStableWrite, requestStableWrite, "稳定写经 convener 模块前置包装（能力委托）");
+          const receipt = await caps!.requestStableWrite!({ roleId: "convener", kind: "workflow", content: "# w\n" });
+          assert.equal(receipt.ok, true, "模块 allow 后委托注入能力并如实返回回执");
+        }
       } finally {
         await handle.dispose();
       }

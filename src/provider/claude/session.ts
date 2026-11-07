@@ -8,7 +8,7 @@ import { isDeepStrictEqual } from "node:util";
 import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1, RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, JsonSchema } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1, RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeApplicationToolSurfaceFacts, JsonSchema } from "../../model/runtime.ts";
 import { MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
@@ -339,6 +339,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       let disposed = false;
       let active: Turn | undefined;
       let engine: Engine | undefined;
+      // P1.6 §4.6：实际构造的应用中介工具面。只在引擎成功构造（工具已注册、query 已创建）后产生；
+      // 未构造时方法返回 status:"unknown" 的不可用事实，包装层据此保持 applicationMediation 缺席
+      // （fail-closed）。这里只记录构造事实，不读配置意图，也不改变任何工具注册/权限/hook。
+      let applicationToolSurface: RuntimeApplicationToolSurfaceFacts | undefined;
       const instanceId = randomUUID();
       // Keep retired engines observable: rejecting the ANS turn does not drain their callbacks.
       const observedEngines = new Set<Engine>();
@@ -636,6 +640,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         const server = sdk.createSdkMcpServer({ name: "ans", version: "1.0.0", tools: [] });
         server.timeout = MCP_TOOL_TIMEOUT_MS;
         const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, statusReported: false, toolTail: Promise.resolve(), pumpEnded: false, pumpFailed: false, stopRequested: false, observedTools: new Map(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map(), nativeCalls: new Map() };
+        // Actual registration order/targets of this engine's ANS MCP server (P1.6 §4.6 appTools source);
+        // pushed only after registerTool accepts the tool, so a schema failure can never be reported.
+        const registeredToolNames: string[] = [];
         for (const tool of options.tools) {
           const protectedSchema = claudeAbsentPropertiesSchema(tool.inputSchema);
           const properties = (protectedSchema.properties ?? {}) as Record<string, unknown>;
@@ -706,6 +713,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             try { return await run; }
             finally { current.observedTools.delete(toolCallId); }
           });
+          registeredToolNames.push(tool.name);
         }
         // Web search capability bit (construction-time env snapshot). Default off is fail-closed:
         // unset/0/off/unknown keeps tools/allowedTools/hooks exactly as before. 判断模式强制关闭：
@@ -805,6 +813,18 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         current.query = sdk.query({ prompt: input.stream(), options: queryOptions });
         observedEngines.add(current);
         engine = current;
+        // P1.6 §4.6：从本次**实际**构造面记录事实（已注册的 ANS 工具名、实际注入的外来 MCP 配置键、
+        // 与 `tools` 同源的 WebSearch 开关）。构造失败（schema/query 抛错）不会到达这里，因此报告中
+        // 不会出现从未构造成功的工具或 server；`ans` 由本适配器固定装配，不属于外来 MCP。
+        applicationToolSurface = {
+          source: "application-mediated-tool-surface",
+          nativeInstanceId: instanceId, roleId: role.id, runtime: "claude", factory: "claude-sdk-mcp",
+          status: "observed", observedAt: new Date().toISOString(),
+          appTools: [...registeredToolNames],
+          foreignMcpServers: Object.keys(installedMcpConfigs),
+          nativeBuiltinTools: webSearchEnabled ? ["WebSearch"] : [],
+          reasons: [],
+        };
         void (async () => {
           try {
             for await (const message of current.query) {
@@ -942,6 +962,21 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       return {
         runtime: "claude", roleId: role.id,
         nativeLifecycle,
+        inspectApplicationToolSurface(): RuntimeApplicationToolSurfaceFacts {
+          // P1.6 §4.6：只报告实际构造的引擎面；身份必须与本会话 live nativeLifecycle 一致。
+          // 未构造任何引擎（或身份不一致）⇒ 返回结构合法但 status:"unknown" 的不可用事实，
+          // 包装层据此保持 applicationMediation 缺席（fail-closed），不发明 reason 文案。
+          const surface = applicationToolSurface;
+          if (!surface || surface.nativeInstanceId !== nativeLifecycle.instanceId) return {
+            source: "application-mediated-tool-surface", nativeInstanceId: instanceId, roleId: role.id,
+            runtime: "claude", factory: "claude-sdk-mcp", status: "unknown", observedAt: new Date().toISOString(),
+            appTools: [], foreignMcpServers: [], nativeBuiltinTools: [], reasons: [],
+          };
+          return {
+            ...surface, appTools: [...surface.appTools], foreignMcpServers: [...surface.foreignMcpServers],
+            nativeBuiltinTools: [...surface.nativeBuiltinTools], reasons: [...surface.reasons],
+          };
+        },
         get contextSource() { return contextSource; },
         get nativeSessionId() { return nativeId; },
         get contextWarning() { return warning; },

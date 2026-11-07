@@ -125,6 +125,12 @@ import type { DiagnosticLog } from "../../model/runtime.ts";
 import { DEFAULT_LOCALE, translate } from "../../common/shared/i18n/index.ts";
 import type { MessageKey } from "../../common/shared/i18n/keys.ts";
 import { describeTool } from "./schema.ts";
+// E2 X-R2/X-R4（rapporteur / convener）：requirement-change 动作前置的角色模块 public entry。
+// E0.3 §2 依赖方向：engines（含 Provider）只经角色模块 `index.ts` 只读消费；本前置不经 Service，
+// 也不 import 角色模块内部文件/门禁引擎私有 common。模块为纯数据/纯策略（无 I/O、无状态）。
+import type { RolePolicyDecision } from "../../model/role.ts";
+import { convenerRoleModule } from "../../common/roles/convener/index.ts";
+import { rapporteurRoleModule } from "../../common/roles/rapporteur/index.ts";
 import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts";
 import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
 import { recordToolWrite } from "../../common/编排/write-journal.ts";
@@ -3675,8 +3681,72 @@ function requestRequirementChangeResultMessage(name: string, value: unknown): To
   return { ok: false, message: `${name}：需求变更申请**未成功**${detail}——**不要当已提交/已获批准**；如实告知客户。` };
 }
 
+/**
+ * E2 X-R2/X-R4（rapporteur / convener）：`request_requirement_change` 的工具层角色前置事实投影。
+ *
+ * 事实来源：handler 已完成形状校验、尚未触达注入能力的 `input`；只投影各角色 api-spec 登记的键：
+ * - rapporteur（api-spec §5.5）：`initiatorRoleId`；`claimsApproved`/`selfApproval` **不由模型参数
+ *   提供**（参数面排除，见 `REQUEST_REQUIREMENT_CHANGE_ARG_KEYS`）——工具不得替发起方声明任何批准事实。
+ * - convener（api-spec §5.3）：`actorRoleId`；模块键集不含批准声明键（给出即 `facts-unknown`）。
+ *
+ * 返回 `undefined` ⇒ 该角色不在 preflight 接线面（保持旧行为，不新增拒绝条件）。
+ *
+ * 依赖边界（E0.3 §2）：Provider 属 engines，只经角色模块 public entry 只读消费纯策略；不 import
+ * Service/门禁引擎私有实现。`allow` 只表示角色侧策略不反对，**不是权限票**：归属/去重/派发/账本/
+ * 审批卡仍由注入的应用能力与 Service 最终校验完成（本层不复制、不省略）。
+ */
+function requirementChangePreflightFacts(
+  roleId: "rapporteur" | "convener",
+  input: RequestRequirementChangeInput,
+): Readonly<Record<string, unknown>> {
+  return {
+    ...(roleId === "rapporteur" ? { initiatorRoleId: "rapporteur" } : { actorRoleId: "convener" }),
+    changeKind: input.changeKind,
+    ...(input.flowId !== undefined ? { flowId: input.flowId } : {}),
+    ...(input.intentId !== undefined ? { intentId: input.intentId } : {}),
+    ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
+    summary: input.summary,
+    rationale: input.rationale,
+    ...(input.impact !== undefined ? { impact: input.impact } : {}),
+    ...(input.proposedIntentPatch !== undefined ? { proposedIntentPatch: input.proposedIntentPatch } : {}),
+  };
+}
+
+/**
+ * E2 X-R2/X-R4：按真实会话角色选择 requirement-change 前置（纯函数）。
+ *
+ * - `rapporteur`（X-R2）与 `convener`（X-R4）各自调用本角色模块的 `requirement-change` 策略；
+ *   `facts` 必须是该角色 api-spec 登记的事实投影（上方的 `requirementChangePreflightFacts`）。
+ * - 缺省/其他角色返回 `undefined` ⇒ 调用方保持旧行为（不会因本单元新增拒绝条件）。
+ * - 角色 id 来自可信 scope（`GovernedToolsOptions.roleId`，由编排注入真实会话角色），不是模型参数。
+ * - 导出供契约测试直接覆盖 allow / 缺事实 / 未知键；生产调用点只有 handler 一处。
+ */
+export function requirementChangePreflight(
+  roleId: string | undefined,
+  facts: Readonly<Record<string, unknown>>,
+): RolePolicyDecision | undefined {
+  if (roleId === "rapporteur") return rapporteurRoleModule.preflight?.checkAction({ action: "requirement-change", facts });
+  if (roleId === "convener") return convenerRoleModule.preflight?.checkAction({ action: "requirement-change", facts });
+  return undefined;
+}
+
+/**
+ * E2 X-R2/X-R4：角色前置 deny ⇒ 既有 `{ok:false,message}` 工具回执形状（能力零调用）。
+ * 内部 code 只作模型侧诊断；不写客户文案、不冒充应用回执 code、不改 Service 最终校验/拒绝顺序。
+ */
+export function requirementChangePreflightRejection(
+  name: string,
+  roleId: "rapporteur" | "convener",
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+): ToolResult {
+  return {
+    ok: false,
+    message: `${name}: ${roleId} 角色前置策略拒绝（内部 code=${decision.code}）——未提交；申请≠批准，不要当已提交/已获批准；如实告知客户。`,
+  };
+}
+
 /** request_requirement_change：把需求变更要点提交给应用（归属/去重/派发/账本由应用实现；回执如实转达）。 */
-function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): ExecutableTool {
+function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn, scope?: Pick<GovernedToolsOptions, "roleId">): ExecutableTool {
   const name = REQUEST_REQUIREMENT_CHANGE_TOOL_NAME;
   return {
     name,
@@ -3717,6 +3787,14 @@ function makeRequestRequirementChangeTool(fn: RequestRequirementChangeFn): Execu
         ...(impact.value !== undefined ? { impact: impact.value } : {}),
         ...(proposedIntentPatch.value !== undefined ? { proposedIntentPatch: proposedIntentPatch.value } : {}),
       };
+      // E2 X-R2/X-R4（rapporteur / convener）：角色侧前置——在形状校验之后、触达注入能力之前。
+      // 只对真实会话角色 rapporteur/convener 生效（缺省角色保持旧行为）；deny ⇒ 既有
+      // `{ok:false,message}` 回执、能力零调用；allow 不替代 Service 最终校验。
+      const preflightRole = scope?.roleId === "rapporteur" || scope?.roleId === "convener" ? scope.roleId : undefined;
+      if (preflightRole !== undefined) {
+        const preflight = requirementChangePreflight(preflightRole, requirementChangePreflightFacts(preflightRole, input));
+        if (preflight !== undefined && !preflight.allow) return requirementChangePreflightRejection(name, preflightRole, preflight);
+      }
       let result: unknown;
       try {
         result = await raceAbort(
@@ -5131,7 +5209,9 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   // 统筹发起/持有（decision 卡；判断 agent 按推荐项或客户手选），**发起方不得自批**；主理不审批，
   // 只在批准后执行意图变更。
   const requestRequirementChange = options?.requestRequirementChange;
-  if (requestRequirementChange !== undefined) tools.push(makeRequestRequirementChangeTool(requestRequirementChange));
+  if (requestRequirementChange !== undefined) {
+    tools.push(makeRequestRequirementChangeTool(requestRequirementChange, { roleId: options?.roleId }));
+  }
   // 结构性保证（2026-11-02 全局任务状态/版本决策，A0）：三能力各自「注入才注册」；
   // 未注入 ⇒ 工具不存在（能力缺席 = 最强 fail-closed）。本层不硬编码角色 id——注入面由编排/桌面
   // 注入端决定：project_state 给全部内置治理角色（chief 完整、其余裁剪），project_note/

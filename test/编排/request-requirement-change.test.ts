@@ -257,10 +257,12 @@ test("request_requirement_change：convener（运营）同样注入同一引用�
     assert.equal((result as { ok?: boolean }).ok, true, "回执原样转达");
   });
   try {
+    // X-R4 收尾（E2 评审 V-7）：角色侧 requirement-change 前置的唯一消费点在 Provider 工具层
+    // （`provider/runtime/tools.ts`，X-R2/X-R4）。编排不再包装：注入即同一引用；结构守卫见下。
     assert.equal(
       opened.caps?.requestRequirementChange,
       requestRequirementChange,
-      "openRoleSession 对运营把同一引用并入 capabilities",
+      "编排纯透传：运营能力同一引用（前置归 Provider 工具层单一消费）",
     );
     await opened.handle.send("请提交需求变更申请");
     assert.deepEqual(
@@ -271,7 +273,30 @@ test("request_requirement_change：convener（运营）同样注入同一引用�
         summary: "客户要求扩展范围（运营转达）",
         rationale: "策划角色与运营都可发起需求变更审批卡。",
       }],
-      "运营路径同样纯透传（不做校验/改写）",
+      "运营路径载荷原样路由（编排不做任何校验/改写）",
+    );
+    // 结构守卫：编排不再定义/使用 convener requirement-change 前置包装，注入仍走模块声明且同一引用。
+    const runRole = fs.readFileSync(new URL("../../src/pipeline/orchestration/run-role.ts", import.meta.url), "utf8");
+    assert.doesNotMatch(
+      runRole,
+      /withConvenerRequirementChangePreflight|convenerRequirementChangeFacts/,
+      "run-role 不再包含 convener requirement-change 前置包装（双消费点已处置）",
+    );
+    assert.match(
+      runRole,
+      /moduleRoleDeclaresTool\(trioSpec\.id, "requestRequirementChange"\) && input\.requestRequirementChange !== undefined\s*\n\s*\? input\.requestRequirementChange\s*\n\s*: undefined;/,
+      "requestRequirementChange 注入仍走模块声明且同一引用（无包装）",
+    );
+    const providerTools = fs.readFileSync(new URL("../../src/provider/runtime/tools.ts", import.meta.url), "utf8");
+    assert.match(
+      providerTools,
+      /const preflight = requirementChangePreflight\(preflightRole, requirementChangePreflightFacts\(preflightRole, input\)\);/,
+      "Provider 工具层单一消费 requirement-change 前置（形状校验之后）",
+    );
+    assert.match(
+      providerTools,
+      /if \(preflight !== undefined && !preflight\.allow\) return requirementChangePreflightRejection\(name, preflightRole, preflight\);/,
+      "Provider 工具层在触达能力之前拒绝（deny 映射既有回执）",
     );
   } finally {
     await opened.handle.dispose();

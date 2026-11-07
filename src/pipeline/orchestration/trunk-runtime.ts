@@ -18,17 +18,24 @@
 import { repinPinnedRun } from "../../common/编排/run-manifest.ts";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { parse as parseYaml } from "yaml";
 import { isDispatchTaskResumeController } from "../../model/runtime.ts";
-import type { TaskStateEvent, SelectRunChangeFn, CompleteTeamPlanFn, CloseCreatedTaskFn, ActivateRoleDocumentsFn } from "../../model/runtime.ts";
-import type { ProjectConfig } from "../../model/role.ts";
-import { listProject } from "../../service/role/resolve-role.ts";
+import type { TaskStateEvent, SelectRunChangeFn, SelectRunChangeInput, CompleteTeamPlanFn, CompleteTeamPlanInput, CloseCreatedTaskFn, ActivateRoleDocumentsFn } from "../../model/runtime.ts";
+import type { ProjectConfig, RolePolicyDecision } from "../../model/role.ts";
+import { listProject, builtInRoleModuleOf } from "../../service/role/resolve-role.ts";
 import { createTrunkService } from "../../service/trunk/public/trunk-service.ts";
 import { createGitCapabilityService, type GitQueryContext, type RepositoryInitializationContext } from "../../service/trunk/public/trunk-service.ts";
 import { inspectManagedRoleSessionEvidence, inspectManagedRoleSessionInventory, recheckRoleSessionOpenFailureInventory } from "./run-role.ts";
 import { inspectRuntimeCoreRegistry } from "../../service/runtime/session.ts";
+import { evaluateChiefDispatchParent, type DispatchParentHostFacts, type DispatchParentCoreFacts, type DispatchParentDecision } from "../../common/gates/index.ts";
 import { beginGitHostAction, endGitHostAction, checkGitHostAction, inspectGitHostCoordinator, readGitProtectionFacts, readGitInitializationTaskBasis } from "../../provider/trunk/public/trunk-store.ts";
 import { checkGitPolicy } from "../../service/gate/shell-rules.ts";
-import { validateRoleDocumentsSnapshot, validateBoundaryYamlText, verifyVersionedDocuments } from "../../service/boundary/resolve-boundary.ts";
+import { validateRoleDocumentsSnapshot, validateBoundaryYamlText, verifyVersionedDocuments, isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
+import { isValidIntentId } from "../../common/shared/intent-entry-contract.ts";
+import { parseProjectRoster, rosterContainsBuiltInRoleIds, rosterRoleIds, isConvenerBuiltInDispatchTarget } from "../../common/编排/workflow-preconditions.ts";
+// X-R6（E2 S2）：chief hub 派发的角色策略纯数据（来源/目标/路由）；本文件只做路由选择，不授予权限。
+import { CHIEF_HUB_DISPATCH } from "../../common/roles/chief/index.ts";
+import { validateTaskStateEvent } from "../../common/编排/task-state.ts";
 import type {
   TrunkApplySnapshot,
   TrunkDocKind,
@@ -47,6 +54,7 @@ import type {
   TrunkServiceResult,
   TrunkStatusView,
   CompletedTeamPlanReceipt,
+  PreparedRoleActivation,
 } from "../../service/trunk/public/trunk-service.ts";
 
 export type { RunRepinPort };
@@ -359,6 +367,192 @@ export async function executeGitInitialWorkflowPublication(input: { projectRoot:
 export type DirectNotificationSink = (input: { key: string; recipientRoleId: string; message: string;
   source: Extract<DirectActionSource, { kind: "role-direct" }> }) => Promise<void>;
 
+/**
+ * X-R2（E2 S4）：rapporteur 模块 `preflight.checkAction("run-change", …)` 的事实包投影。
+ * 事实按 rapporteur `api-spec.md` §5.4 登记键供给（真实 actor + `SelectRunChangeInput` 全部字段）；
+ * 模块只做角色侧纯策略（三模式闭集、绑定事实齐备），**不采集/不判定停稳证据**——实际 pin/目标
+ * 一致性、停稳、两阶段提交与 CAS 仍由 Service/宿主最终校验（`allow` 不是提交成功）。
+ */
+function rapporteurRunChangeFacts(actorRoleId: string, request: SelectRunChangeInput): Record<string, unknown> {
+  return {
+    initiatorRoleId: actorRoleId,
+    mode: request.mode,
+    operationId: request.operationId,
+    runId: request.runId,
+    expectedPinDigest: request.expectedPinDigest,
+    targetTrunkVersion: request.targetTrunk.version,
+    targetTrunkDigest: request.targetTrunk.digest,
+    reason: request.reason,
+  };
+}
+
+/** 模块事实键 → 迁移前 Service 首次拒绝码/文案（deny 映射既有回执；见 E2-XR2 证据 §切换点）。 */
+function rapporteurRunChangeRejection(
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+  surface: "direct" | "host",
+): { errorCode: string; message: string } {
+  const details: unknown = decision.details;
+  const factKey = typeof details === "object" && details !== null && typeof (details as { factKey?: unknown }).factKey === "string"
+    ? (details as { factKey: string }).factKey
+    : undefined;
+  if (surface === "host") {
+    // `prepareRunChange` 迁移前由 Service `createRunChangePort.prepareRunChange` 拒绝，统一码
+    // `trunk-item-invalid`；文案按字段与其首检顺序逐字对应。
+    if (factKey === "expectedPinDigest") return { errorCode: "trunk-item-invalid", message: "Old pin changed" };
+    if (factKey === "targetTrunkVersion" || factKey === "targetTrunkDigest")
+      return { errorCode: "trunk-item-invalid", message: "Requested target is not an actual same-flow complete baseline" };
+    if (factKey === "runId") return { errorCode: "trunk-item-invalid", message: "run-corrupt" };
+    return { errorCode: "trunk-item-invalid", message: "An actual assigned rapporteur stop/restart request is required" };
+  }
+  // direct（continue-frozen 等）迁移前由 Service `selectRunChange` 拒绝：按字段取同一既有码/文案。
+  if (factKey === "runId") return { errorCode: "run-evidence-unavailable", message: "run-corrupt" };
+  if (factKey === "expectedPinDigest") return { errorCode: "run-pin-conflict", message: "Expected pin differs from the actual immutable run" };
+  if (factKey === "targetTrunkVersion" || factKey === "targetTrunkDigest")
+    return { errorCode: "run-target-unavailable", message: "Target trunk is not a real complete baseline for this flow" };
+  return { errorCode: "run-change-invalid", message: "Only the real rapporteur may explicitly select a valid run mode" };
+}
+
+/**
+ * X-R4（E2 S4）：convener 模块 `preflight.checkAction("team-plan", …)` 的事实包（api-spec §5.1：
+ * `actorRoleId` + `CompleteTeamPlanInput` 全部字段；`runId` 可选，未给不造键）。工具 schema 已保证
+ * operationId/flowId/baseDigest/plan 形状；`plan.path` 的 flow/version 规则由模块与 Service 双检。
+ */
+export function convenerTeamPlanFacts(request: CompleteTeamPlanInput): Readonly<Record<string, unknown>> {
+  return {
+    actorRoleId: "convener",
+    operationId: request.operationId,
+    flowId: request.flowId,
+    ...(request.runId !== undefined ? { runId: request.runId } : {}),
+    baseDigest: request.baseDigest,
+    plan: { path: request.plan.path, sha256: request.plan.sha256, version: request.plan.version },
+  };
+}
+
+/** 模块 deny → 迁移前 Service 首检码/文案（路径规则对应 `plan-path-invalid`，其余 `plan-identity-invalid`）。 */
+function convenerTeamPlanRejection(
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+): { errorCode: string; message: string } {
+  if (decision.code === "team-plan-path-invalid") {
+    return { errorCode: "plan-path-invalid", message: "Plan path and declared version must identify the real flow team plan" };
+  }
+  return { errorCode: "plan-identity-invalid", message: "Only the real convener can complete a plan against an actual document basis" };
+}
+
+/**
+ * 计划 frontmatter 的 roleRows[].roleId（事实投影；计划字节已由 `prepareRoleActivation` 校验）。
+ */
+function planRoleIdsOf(text: string): string[] | undefined {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  if (match === null) return undefined;
+  try {
+    const parsed: unknown = parseYaml(match[1]!);
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const rows = (parsed as { roleRows?: unknown }).roleRows;
+    if (!Array.isArray(rows)) return undefined;
+    const ids: string[] = [];
+    for (const row of rows) {
+      if (row === null || typeof row !== "object" || typeof (row as { roleId?: unknown }).roleId !== "string")
+        return undefined;
+      ids.push((row as { roleId: string }).roleId);
+    }
+    return ids;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * X-R3（E2 S4）：nominator 模块 `preflight.checkAction("appointment")` 的 `role-documents` 事实包。
+ *
+ * 事实只取自已由 `prepareRoleActivation` 校验并绑定到不可变 snapshot 的字节（名单/计划/D3 证据）：
+ *  - 名单：`evidence.rosterRef` 指向的快照字节，用 `parseProjectRoster(flowId)` 复解析（版本/roles/envBootstrap）；
+ *  - D3：`evidence.d3Ref` 内的 `resolvedBytesBase64`（真实账本行，`validateTaskStateEvent` 复验）；
+ *  - 计划：`evidence.planRef` 的 frontmatter `roleRows[].roleId`（计划完成证据已由 Service 校验）；
+ *  - 三个文档结构事实 `boundaryWithinRoleModules` / `boundaryMdYamlSynchronized` /
+ *    `roleCardRequiredSections`：由紧邻调用点的 `validateRoleDocumentsSnapshot` 通过保证（此处只在
+ *    该函数成功之后调用），不是自报值。
+ *
+ * 返回 `undefined` = 事实包无法按 api-spec 完整构造（flowId 非治理 slug、快照字节缺失或解析失败）
+ * ⇒ 调用方跳过模块调用，保留迁移前路径。`intentEntryConsistent` 为可选诊断事实，不传（E2 D-1）。
+ */
+export function nominatorRoleDocumentsFacts(value: PreparedRoleActivation): Record<string, unknown> | undefined {
+  const input = value.input, evidence = value.evidence;
+  if (!isValidIntentId(input.flowId)) return undefined;
+  // 事实包要求（api-spec）：targetRoleId 治理 slug；d3DecisionId/operationId 非空且不含控制字符。
+  // 不满足时返回 undefined（调用方跳过），避免把无法登记的事实包交给模块造成新增拒绝。
+  if (!isValidIntentId(input.targetRoleId)
+      || input.d3DecisionId.length === 0 || /[\u0000-\u001f\u007f]/.test(input.d3DecisionId)
+      || input.operationId.length === 0 || /[\u0000-\u001f\u007f]/.test(input.operationId)) return undefined;
+  const textOf = (ref: { path: string; sha256: string }): string | undefined => {
+    const found = value.snapshot.files.find((file) => file.path === ref.path && file.sha256 === ref.sha256);
+    return found === undefined ? undefined : Buffer.from(found.bytesBase64, "base64").toString("utf8");
+  };
+  const rosterText = textOf(evidence.rosterRef);
+  if (rosterText === undefined) return undefined;
+  const roster = parseProjectRoster(rosterText, input.flowId);
+  if (!roster.ok) return undefined;
+  const planText = textOf(evidence.planRef);
+  if (planText === undefined) return undefined;
+  const planRoleIds = planRoleIdsOf(planText);
+  if (planRoleIds === undefined) return undefined;
+  const d3Text = textOf(evidence.d3Ref);
+  if (d3Text === undefined) return undefined;
+  let d3Record: unknown;
+  try {
+    d3Record = JSON.parse(d3Text);
+  } catch {
+    return undefined;
+  }
+  if (d3Record === null || typeof d3Record !== "object" || Array.isArray(d3Record)) return undefined;
+  const resolvedBase64 = (d3Record as { resolvedBytesBase64?: unknown }).resolvedBytesBase64;
+  if (typeof resolvedBase64 !== "string") return undefined;
+  let resolvedValue: unknown;
+  try {
+    resolvedValue = JSON.parse(Buffer.from(resolvedBase64, "base64").toString("utf8"));
+  } catch {
+    return undefined;
+  }
+  const resolved = validateTaskStateEvent(resolvedValue);
+  if (!resolved.ok || resolved.event.kind !== "request.resolved") return undefined;
+  const d3 = resolved.event;
+  if (d3.by !== "customer" && d3.by !== "chief-delegated") return undefined;
+  const d3TargetRoleIds = d3.targetRoleIds, d3RosterVersion = d3.rosterVersion, d3RosterSha256 = d3.rosterSha256;
+  if (!Array.isArray(d3TargetRoleIds) || d3TargetRoleIds.length === 0
+      || typeof d3RosterVersion !== "number" || !Number.isSafeInteger(d3RosterVersion) || d3RosterVersion < 1
+      || typeof d3RosterSha256 !== "string") return undefined;
+  if ((d3.by === "customer" ? d3.decisionId : d3.requestId) !== input.d3DecisionId) return undefined;
+  return {
+    stage: "role-documents",
+    flowId: input.flowId,
+    rosterFound: true,
+    rosterVersion: roster.roster.version,
+    rosterSha256: evidence.rosterRef.sha256,
+    rosterRoleIds: rosterRoleIds(roster.roster),
+    rosterEnvBootstrapOmitted: roster.roster.envBootstrap?.omitted === true,
+    rosterContainsBuiltInRoleIds: rosterContainsBuiltInRoleIds(roster.roster),
+    targetRoleId: input.targetRoleId,
+    targetIsBuiltIn: isBuiltInGovernanceRoleId(input.targetRoleId),
+    d3Present: true,
+    d3By: d3.by,
+    d3TargetRoleIds: [...d3TargetRoleIds],
+    d3RosterVersion,
+    d3RosterSha256,
+    d3DecisionId: input.d3DecisionId,
+    operationId: input.operationId,
+    planCompleted: true,
+    planRoleIds,
+    cardPath: value.role.cardPath,
+    cardSha256: evidence.cardRef.sha256,
+    boundaryMdPath: value.role.boundaryMdPath,
+    boundaryMdSha256: evidence.boundaryMdRef.sha256,
+    boundaryYamlPath: value.role.boundaryYamlPath,
+    boundaryYamlSha256: evidence.boundaryYamlRef.sha256,
+    boundaryWithinRoleModules: true,
+    boundaryMdYamlSynchronized: true,
+    roleCardRequiredSections: true,
+  };
+}
+
 /** Direct capabilities bind identity once from the host session, never from tool arguments. */
 export function createDirectRoleRuntime(input: { projectRoot: string; actorRoleId: string; notifyDirect?: DirectNotificationSink }): { selectRunChange: SelectRunChangeFn; completeTeamPlan: (...args: Parameters<CompleteTeamPlanFn>) => Promise<CompletedTeamPlanReceipt>; closeCreatedTask: CloseCreatedTaskFn; activateRoleDocuments: ActivateRoleDocumentsFn } {
   const service = createTrunkService({ projectRoot: input.projectRoot });
@@ -393,6 +587,18 @@ export function createDirectRoleRuntime(input: { projectRoot: string; actorRoleI
     if (!yaml) return rejected("Actual boundary bytes are missing");
     const boundary = validateBoundaryYamlText(Buffer.from(yaml.bytesBase64, "base64").toString("utf8"));
     if (!boundary.ok) return rejected(boundary.message);
+    // X-R3（E2 S4）：三文档激活的角色侧前置——在既有 G 校验（validateRoleDocumentsSnapshot /
+    // validateBoundaryYamlText）之后调用 nominator 模块 preflight。事实取自已校验的不可变 snapshot；
+    // allow 不替代 Service 最终校验（D3 账本/计划完成证据/三文档字节 hash/CAS 均保留在 prepare 与
+    // activateRoleDocumentsInternal 中）。deny 映射既有 `activation-not-ready` 回执。
+    const preflight = builtInRoleModuleOf("nominator")?.preflight;
+    if (preflight !== undefined) {
+      const facts = nominatorRoleDocumentsFacts(value);
+      if (facts !== undefined) {
+        const decision = preflight.checkAction({ action: "appointment", facts });
+        if (!decision.allow) return rejected(`Activation premise was refused by the nominator role policy (${decision.code})`);
+      }
+    }
     const protection = await readGitProtectionFacts(input.projectRoot);
     const receipt = protection.identity ? await executeGitActiveRolePublication({ projectRoot: input.projectRoot, activation: value, checks: validated.roleDocumentChecks, boundaryEntries: boundary.entries, actorRoleId: input.actorRoleId }) : await service.activateRoleDocuments(value, validated.roleDocumentChecks, boundary.entries);
     const pending = await notify(receipt); return pending ? { ...receipt, ...pending } : receipt;
@@ -405,12 +611,40 @@ export function createDirectRoleRuntime(input: { projectRoot: string; actorRoleI
   }, completeTeamPlan: async (request, signal) => {
     if (signal?.aborted) return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest,
       targetDigest: null, errorCode: "plan-cancelled", message: "The turn was cancelled before invocation" };
+    // X-R4（E2 S4）：team-plan 角色侧前置——在 abort 之后、Git/Service 最终校验之前调用 convener 模块
+    // （事实 = 本层将提交的 input 逐字段投影；api-spec §5.1 登记键）。deny 映射迁移前 Service 首检码
+    // （`plan-path-invalid` / `plan-identity-invalid`），不触达 Service/Git；allow 不替代 Service 的
+    // flow/baseDigest/字节哈希/roster/modules/结构/DAG 校验与 CAS 提交点。
+    if (input.actorRoleId === "convener") {
+      const preflight = builtInRoleModuleOf("convener")?.preflight;
+      if (preflight !== undefined) {
+        const decision = preflight.checkAction({ action: "team-plan", facts: convenerTeamPlanFacts(request) });
+        if (!decision.allow) {
+          const rejection = convenerTeamPlanRejection(decision);
+          return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest,
+            targetDigest: null, errorCode: rejection.errorCode, message: rejection.message };
+        }
+      }
+    }
     const protection = await readGitProtectionFacts(input.projectRoot);
     const receipt = protection.identity ? await executeGitTeamPlanPublication({ projectRoot: input.projectRoot, request, actorRoleId: input.actorRoleId }) : await service.completeTeamPlan(request, input.actorRoleId);
     const pending = await notify(receipt); return pending ? { ...receipt, ...pending } : receipt;
   }, selectRunChange: async (request, signal) => {
     if (signal?.aborted) return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.expectedPinDigest,
       targetDigest: null, errorCode: "run-change-cancelled", message: "The turn was cancelled before invocation" };
+    // X-R2（E2 S4/R-4）：角色侧前置——在既有 abort 检查之后、Service 最终校验之前调用；位置与
+    // `service.selectRunChange` 之前的事实齐备点一致。allow 只表示角色侧策略不反对，**不是停稳证明**：
+    // stop/stop-and-restart 仍由 Service 返回既有 `blocked(run-stop-unverified)`，continue-frozen 的
+    // pin/目标一致性与 CAS 仍由 Service 校验。deny 映射既有回执码/文案（迁移前首检语义）。
+    const preflight = builtInRoleModuleOf("rapporteur")?.preflight;
+    if (preflight !== undefined) {
+      const decision = preflight.checkAction({ action: "run-change", facts: rapporteurRunChangeFacts(input.actorRoleId, request) });
+      if (!decision.allow) {
+        const rejection = rapporteurRunChangeRejection(decision, "direct");
+        return { ok: false, status: "rejected", operationId: request.operationId, runId: request.runId,
+          baseDigest: request.expectedPinDigest, targetDigest: null, errorCode: rejection.errorCode, message: rejection.message };
+      }
+    }
     const receipt = await service.selectRunChange(request, input.actorRoleId);
     const pending = await notify(receipt); return pending ? { ...receipt, ...pending } : receipt;
   } };
@@ -435,6 +669,17 @@ export async function prepareRunChange(input: { projectRoot: string; request: im
   if (!actual || actual.roleKind !== "built-in-governance" || actual.roleId !== "rapporteur" || actual.construction !== "default-core" || actual.disposed
     || actual.lifecycle?.stopRequested || !actual.lifecycle?.turnId || !actual.lifecycle.activeTools.some(tool => ["select_run_change", "ans_select_run_change"].includes(tool.name)))
     return reject("run-change-actor-unproven", "The real current built-in rapporteur select_run_change invocation is required");
+  // X-R2（E2 S4）：host stop/restart 请求的角色侧前置——在真实 actor 已证明（身份即 rapporteur）、
+  // 请求事实齐备处调用；仍未提交任何效果。allow 不等于停稳：prepare/finalize 的 host 两阶段与
+  // Service 停稳/队列/边界校验、`run-stop-unverified` 语义逐字保留。deny 映射迁移前 Service 首检回执。
+  const preflight = builtInRoleModuleOf("rapporteur")?.preflight;
+  if (preflight !== undefined) {
+    const decision = preflight.checkAction({ action: "run-change", facts: rapporteurRunChangeFacts("rapporteur", input.request) });
+    if (!decision.allow) {
+      const rejection = rapporteurRunChangeRejection(decision, "host");
+      return reject(rejection.errorCode, rejection.message);
+    }
+  }
   const service = createTrunkService({ projectRoot: input.projectRoot });
   const prepared = await service.prepareRunChange({ request: input.request, actorRoleId: "rapporteur", taskId: input.requesterTaskId, ...(input.replacementRunId ? { replacementRunId: input.replacementRunId } : {}) });
   if (!prepared.ok) return reject(prepared.code, prepared.message ?? prepared.code);
@@ -668,25 +913,14 @@ export async function freezeExecutionRun(input: { projectRoot: string; runId: st
     snapshotRef: { snapshotId: pinned.value.snapshot.snapshotId, digest: pinned.value.snapshot.digest }, frozenRoles: pinned.value.frozenRoles };
 }
 
+/**
+ * 唯一生产调用为 chief→convener controller resume（`hub: true` 保持其 creatorReports 分支旧行为）。
+ * 每次调用都重新读取当刻证据（三次复检），判定本身只走 `evaluateChiefDispatchParent`。
+ */
 function currentChiefResumeSource(projectRoot: string, context: RepositoryInitializationContext): boolean {
-    if (!context) return false;
-    const core = inspectManagedRoleSessionEvidence({ projectRoot: projectRoot, sessionId: context.parent.sessionId });
-    const activeDispatch = core?.lifecycle?.activeTools.some(tool => tool.name === "dispatch_task" || tool.name === "ans_dispatch_task");
-    if (!core || core.disposed || core.construction !== "default-core" || core.roleId !== "chief" || core.runtime !== context.parent.runtime
-      || core.toolSurface?.status !== "observed" || core.toolSurface.sessionId !== context.parent.sessionId || core.toolSurface.factoryProvenance === "custom-override" || core.lifecycle?.turnId !== context.parent.turnId || core.lifecycle?.stopRequested
-      || !activeDispatch || context.parent.inputAccepted !== true || context.parent.settled !== false)
-      return false;
-    if (context.creatorReports !== undefined) {
-      const provenance = core.turnInput?.provenance;
-      if (!context.creatorReports.length || context.creatorReports.length > 16 || !provenance || provenance.kind !== "handback"
-        || core.turnInput?.turnId !== context.parent.turnId || provenance.target.roleId !== "chief" || provenance.target.runtime !== core.runtime
-        || provenance.reports.length !== context.creatorReports.length || new Set(context.creatorReports.map(report => report.taskId)).size !== context.creatorReports.length) return false;
-      return context.creatorReports.every(expected => provenance.reports.some(actual => actual.taskId === expected.taskId && actual.source.roleId === expected.roleId
-        && actual.source.turnId === expected.turnId && actual.reportId === expected.reportId
-        && ["submitted-report", "terminal-fallback"].includes(actual.origin) && ["completed", "blocked", "failed", "unreported", "aborted"].includes(actual.status)));
-    }
-    if (context.parent.kind !== undefined && context.parent.kind !== "message") return false;
-    return true;
+  if (!context) return false;
+  const core = inspectManagedRoleSessionEvidence({ projectRoot: projectRoot, sessionId: context.parent.sessionId });
+  return evaluateChiefDispatchParent({ host: context, core, hub: true }).ok;
 }
 
 // Only an actual Chief dispatch accepted by this Pipeline can enter its delayed host queue path.
@@ -723,11 +957,22 @@ export async function prepareControllerResume(input: { projectRoot: string; resu
 /** Formal route preflight: planning needs real documents; execution uses only its immutable run authorization. */
 export async function prepareRoleDispatch(input: { projectRoot: string; fromRoleId: string; targetRoleId: string; flowId: string; runId?: string; moduleId?: string;
   parentTaskId?: string; reviewTarget?: import("../../model/runtime.ts").DispatchTaskReviewTarget; hostInitialization?: RepositoryInitializationContext }) {
-  const review = input.fromRoleId === "convener" && input.targetRoleId === "verifier";
-  const documents = input.fromRoleId === "chief" && ["product", "rapporteur"].includes(input.targetRoleId);
-  const coordination = input.fromRoleId === "chief" && input.targetRoleId === "convener";
-  const rolePreparation = input.fromRoleId === "chief" && input.targetRoleId === "nominator";
-  const hub = input.fromRoleId === "chief" && ["product", "rapporteur", "nominator", "convener", "verifier"].includes(input.targetRoleId);
+  // X-R4（E2 S3/数据消费）：convener 来源的内置目标集合改读角色模块纯数据
+  // （`CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds`；迁移前字面量 `"verifier"`，等价）。
+  // 其余 hub/文档/协调/role-preparation 路由与 run/module/D3 校验逐字保留。
+  // X-R5（verifier）核对：本文件**无**可替换的 verifier 角色策略条件——convener review 路由已是
+  // 来源模块数据（X-R4）；`hub` 目标列表属 chief 来源路由（X-R6 已切换为模块数据）；`:162` 的 verifier
+  // 条件是 Git review 证据的 actor 证明（Service 证据核验，保留）。verifier 模块 `dispatch()` 为
+  // diff-only（E2 评审 X-2/X-4），不进入本生产路由。
+  // X-R6（E2 S2）：chief 来源与 hub 目标集合改读 `CHIEF_HUB_DISPATCH`（纯数据；迁移前同值字面量）。
+  // documents/coordination/rolePreparation 的具体目标映射属引擎路由（R-2：模块只提供五目标集合，
+  // 不提供 purpose→target 映射），保留字面量并逐字不变。
+  const review = input.fromRoleId === "convener" && isConvenerBuiltInDispatchTarget(input.targetRoleId);
+  const documents = input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && ["product", "rapporteur"].includes(input.targetRoleId);
+  const coordination = input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && input.targetRoleId === "convener";
+  const rolePreparation = input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId && input.targetRoleId === "nominator";
+  const hub = input.fromRoleId === CHIEF_HUB_DISPATCH.sourceRoleId
+    && CHIEF_HUB_DISPATCH.targetRoleIds.some((roleId) => roleId === input.targetRoleId);
   if (hub) {
     if (!input.hostInitialization) return { ok: false as const, code: "trunk-verify-failed" as const, message: "Document preparation needs the actual registered project and current chief work source" };
     const listing = await listProject(input.projectRoot);
@@ -751,26 +996,11 @@ export async function prepareRoleDispatch(input: { projectRoot: string; fromRole
   const validParent = () => {
     const context = input.hostInitialization; if (!context) return true;
     const core = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: context.parent.sessionId });
-    const activeDispatch = core?.lifecycle?.activeTools.some(tool => tool.name === "dispatch_task" || tool.name === "ans_dispatch_task");
-    if (!core || core.disposed || core.construction !== "default-core" || core.roleId !== "chief" || core.runtime !== context.parent.runtime
-      || core.toolSurface?.status !== "observed" || core.toolSurface.sessionId !== context.parent.sessionId || core.toolSurface.factoryProvenance === "custom-override" || core.lifecycle?.turnId !== context.parent.turnId || core.lifecycle?.stopRequested
-      || !activeDispatch || context.parent.inputAccepted !== true || context.parent.settled !== false)
-      return false;
-    if (context.creatorReports !== undefined) {
-      const provenance = core.turnInput?.provenance;
-      if (!hub || !context.creatorReports.length || context.creatorReports.length > 16 || !provenance || provenance.kind !== "handback"
-        || core.turnInput?.turnId !== context.parent.turnId || provenance.target.roleId !== "chief" || provenance.target.runtime !== core.runtime
-        || provenance.reports.length !== context.creatorReports.length || new Set(context.creatorReports.map(report => report.taskId)).size !== context.creatorReports.length) return false;
-      return context.creatorReports.every(expected => provenance.reports.some(actual => actual.taskId === expected.taskId && actual.source.roleId === expected.roleId
-        && actual.source.turnId === expected.turnId && actual.reportId === expected.reportId
-        && ["submitted-report", "terminal-fallback"].includes(actual.origin) && ["completed", "blocked", "failed", "unreported", "aborted"].includes(actual.status)));
-    }
-    if (context.parent.kind !== undefined && context.parent.kind !== "message") return false;
-    return true;
+    return evaluateChiefDispatchParent({ host: context, core, hub }).ok;
   };
   const staleParent = () => ({ ok: false as const, code: "trunk-verify-failed" as const, message: "Repository initialization parent is not the actual active accepted chief dispatch turn" });
   if (!validParent()) return staleParent();
-  const result = await createTrunkService({ projectRoot: input.projectRoot }).prepareRoleDispatch({ ...input, ...(hub ? { hubRouting: "chief-hub-v1" as const } : {}) });
+  const result = await createTrunkService({ projectRoot: input.projectRoot }).prepareRoleDispatch({ ...input, ...(hub ? { hubRouting: CHIEF_HUB_DISPATCH.routing } : {}) });
   if (review && !reviewActorCurrent()) return { ok: false as const, code: "review-controller-changed", message: "The actual controller changed while preparing review material" };
   return validParent() ? result : staleParent();
 }
