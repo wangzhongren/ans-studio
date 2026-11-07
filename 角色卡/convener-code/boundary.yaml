@@ -1,0 +1,36 @@
+# 运营代码维护角色边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增/变更路径须先由 ANS 人事更新本文件并经客户确认。
+# 模块纪律：唯一 public entry 为 index.ts；只依赖 Model/shared public entry；角色模块之间零 import；
+# 不写旧引擎文件；模块只含纯 TypeScript 数据与纯策略函数（无 I/O/账本/会话/时钟/随机数/可变状态）。
+role: convener-code
+entries:
+  - kind: directory
+    path: src/common/roles/convener/
+    purpose: convener 角色模块（唯一 public entry index.ts；模块内可增删/拆分内部文件，模块根不得散放其他文件）
+  - kind: directory
+    path: test/roles/convener/
+    purpose: 本角色模块的单元测试与夹具（不做跨角色集成）
+  - kind: file
+    path: 角色卡/convener-code/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/convener-code/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/convener-code/functional-description.md
+    purpose: 实际职责、交接与代码位置
+  - kind: file
+    path: 角色卡/convener-code/api-spec.md
+    purpose: 模块 public API 实现报告
+  - kind: directory
+    path: 角色卡/convener-code/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/convener-code/docs/feature/
+    purpose: 稳定功能说明与流程图
+  - kind: directory
+    path: 角色卡/convener-code/docs/change/
+    purpose: 变更记录与证据
+  - kind: directory
+    path: 角色卡/convener-code/docs/fix/
+    purpose: 修复记录

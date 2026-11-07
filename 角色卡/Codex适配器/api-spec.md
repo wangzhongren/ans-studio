@@ -119,3 +119,14 @@ R29 host-only chiefDecisionContext已消费。session.ts新增独立assertIsolat
 真实default Core/Codex+本地HTTP到exact工具/真实handler一次，回执pending非批准，重复attempt/shell/第二turn拒；wrongrole/extra tools/非法context构造前拒。原两file+两judge59=58pass/0fail/1原POSIXskip，20日志自然exit0，21主TS0。18/19错误payload身份断言首红保留，按真实契约修正为session身份+payload深等后通过。正式默认窄decision适配已自测，后继R旧测试更新/独验由原owner接续。
 
 N6（2026-11-07）Chat历史窄修：无工具assistant回答现在也保存一次，包含真实reasoning_content且不产生空tool_calls，后续用户澄清能看到上轮回答；原失败/超时/abort本轮历史rollback不变。真实HTTP首红23保留，修后24完整Chat22/22、25主TS0；API及工具权限不变。source冻结3E4E4D875384A3CC0A284EDCF2C152FB618308C23FA7FBA24BEFF6122AC9BCA8，后继Q接续普通澄清真实场景。
+
+## 2026-11-07 P1-B：应用中介工具面事实（`inspectApplicationToolSurface`）
+
+依据 P1.6 §4.6 Codex 行与团队计划 §7.2。Chat 绑定会话在 `src/common/codex-adapter/chat-transport.ts` 同一闭包新增 `inspectApplicationToolSurface(): RuntimeApplicationToolSurfaceFacts`（Model 冻结形状由 P1-A 提供，本节点只实现生产者）：
+
+- **observed 条件（事实可完整产生）**：`inspectNativeToolSurface()` 的 native 事实结构合法、`nativeInstanceId` 与本会话 `nativeLifecycle.instanceId` 一致、`roleId`/`runtime`/`factory` 一致，且 native 自身 `status:"observed"`、`reasons` 为空。
+- **字段**：`source:"application-mediated-tool-surface"`、`nativeInstanceId`（=实例 id）、`roleId`、`runtime:"codex"`、`factory:"codex-chat"`、`observedAt`、`appTools`＝实际 `toolMap` 键（含被注册的受控 shell `run_shell`/`start_background_task`；精确、天然唯一）、`foreignMcpServers:[]`、`nativeBuiltinTools:[]`、`reasons:[]`。
+- **fail-closed**：native 事实缺失/不可用 → `chat-native-surface-unavailable`；native 身份不符 → `chat-native-identity-mismatch`；native 自身 unknown → `chat-native-surface-unknown`；均回 `status:"unknown"`，不冒充 observed。**Codex 不允许无 native 证据走应用中介（N14/N27）。**
+- **结构事实**：chat 传输不实现原生 MCP / 联网搜索 / native builtin（`chat-transport.ts:18`），模型只能调用注入 `toolMap`；`installedMcpServers` 非空在构造期拒绝（`provider/codex/session.ts:546`，N28），故 `foreignMcpServers:[]` 不是隐藏 MCP 通道。Responses/native 路径没有该 port。
+- **不变**：`inspectNativeToolSurface` 原判定逐字保留（含受控 shell 时包装层仍按原条件给 `unmediated-execution-registered`）；`inspectInitializationProtection`、stable-write、run-stop 等写/发布/停稳门不消费本事实。
+- **验证**：新 `test/codex-adapter/application-surface.test.ts` 4 例（实际构造面=报告面含 shell、native 缺失/身份不符/unknown fail-closed、外来 MCP 构造期拒绝、真实事实→P1-A 冻结组合规则桥接）；`node --test "test/codex-adapter/**/*.test.ts"` 123/122/0/1（写前 119/118/0/1，新增失败=0、新增 skip=0）exit 0；`npm run typecheck` exit 0。状态 **implemented-unverified**，未验收；详见[实施取证](docs/change/2026-11-07_P1-B_codex-application-surface-evidence.md)。

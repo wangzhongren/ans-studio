@@ -1,6 +1,6 @@
 # 项目管理共享组件实现报告
 
-本角色只维护 `src/common/shared/`；业务实现由各属主交付。现行复用目录见 [共享组件目录](docs/architecture/shared-components.md)。
+本文件是项目管理历史实现报告。2026-11-07 E1 起，`src/common/shared/` 与 `test/项目管理/shared/` 已移交 `shared-code`，本角色不再维护共享代码；共享组件现行唯一目录见 [共享组件目录](../shared-code/docs/architecture/shared-components.md)（212 行 / `351b0b3b0f23b7882b550d24d17703f5902c01231853ccc7aaa85ee74801c6ea`），旧副本 `角色卡/项目管理/docs/architecture/shared-components.md` 已于同日删除。
 
 ## D3 轻量修复：原子写普通权限位
 

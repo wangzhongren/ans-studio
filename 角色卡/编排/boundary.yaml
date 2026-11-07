@@ -48,7 +48,7 @@ entries:
   # --- Delta-TA-2（2026-11-04，团队计划 §4.5 B-2；闸门 2）：新增 1 个 Pipeline 公共句柄单文件（trunk-runtime），逐文件授权 ---
   - kind: file
     path: src/pipeline/orchestration/trunk-runtime.ts
-    purpose: 主干/修订 Pipeline 公共句柄：按钮→草案→校验→逐项卡→应用/解冻/重新冻结/恢复编排；不写项目文档、不派角色
+    purpose: 主干/修订 Pipeline 公共句柄：按钮→草案→校验→逐项卡→应用/解冻/重新冻结/恢复编排；不写项目文档、不派角色；P1 D-minimal 门谓词 evaluateChiefDispatchParent 唯一内联实现（E2 改调门控模块后删除）
   # --- Delta-TA-3（2026-11-04，团队计划 §4.5 B-3；闸门 2）：新增 2 个有界模块目录（trunk Provider/Service）；仅 trunk 模块私有根，不是整层目录授权 ---
   - kind: directory
     path: src/provider/trunk/
@@ -78,7 +78,7 @@ entries:
     purpose: stable 文件写入 Pipeline 公共句柄：workflow 轻量确认卡、appointment-write 钩子、一次性许可、写入校验、mini re-pin
   - kind: directory
     path: src/common/编排/
-    purpose: 本角色私有辅助代码
+    purpose: 本角色私有辅助代码；含 handback.ts/workflow-preconditions.ts 稳定公开只读入口（编排唯一 writer；本变更默认不迁移）
   - kind: directory
     path: test/编排/
     purpose: 本角色的单元与层契约测试及夹具

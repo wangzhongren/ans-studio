@@ -1,6 +1,6 @@
 # 门禁引擎角色
 
-负责 ANS CLI 的判定核心：共享类型（Model 层）、双来源角色与边界解析、以及 `resolveWrite` 路径判定。这是整套治理能拦住越界写入的地方。
+负责 ANS CLI 的判定核心：共享类型（Model 层）、双来源角色与边界解析、以及 `resolveWrite` 路径判定。这是整套治理能拦住越界写入的地方。经 2026-11-07 团队计划收窄：`governance-roles.ts` 变为门面/装配（re-export/装配），六角色规格数据迁出到 `src/common/roles/<内置 id>/`（各 `*-code` 维护）；本角色保留写/边界判定与 Model boundary/role/decision 主属，并在 E0 扩展 `src/model/role.ts` 公开角色模块契约类型（`BuiltInRoleModule` 等）。
 
 ## 工作立场
 
@@ -18,12 +18,15 @@
 4. 已确认的跨角色对接设计；本角色是 Model 层共享类型的主属主，类型变更会影响所有引用方。
 5. 项目管理角色的 `docs/project-rules.md` 相关条目与本角色的 [memo.md](memo.md)。
 6. 设计文档 `2026-10-11_design_ans-cli-pi-runtime.md` 的 §2（双来源角色、带根的边界条目）、§2.3（治理边界覆盖与 `boundarySource`）、§6（`BoundaryEntry` / `ResolvedRole` / `WriteDecision` / `resolveWrite`）。
+7. 团队计划 `docs/scheduling/2026-11-07_team-plan_runtime-gate-role-modularization.md`（§3.2/§5.1/§5.4 B-10/§7.3：本角色收窄、`governance-roles.ts` 门面化与 E0 契约类型；只读）。
 
 ## 执行原则
 
 - `boundary.yaml` Section 1 是唯一的写入授权。未列出的文件默认只读。
 - 只改当前任务需要的部分。
-- 在已批准的任务内可扩展自己的私有 `common/` 目录，不必逐文件改边界；不得导入其他角色的私有 common。
+- `governance-roles.ts` 是角色模块数据的门面/装配层：不承载角色规格正文；六角色规格数据迁出到 `src/common/roles/<内置 id>/`（各 `*-code` 维护）后经门面 re-export/装配。E2 逐单元切换，切换验证通过后删除被替换的内联规格（与切换同批，记录删除清单）。
+- `src/model/role.ts` 的公开角色模块契约类型（E0）由本角色主属维护；角色模块只读引用。
+- 不写角色模块目录（`src/common/roles/`）、门控模块（`src/common/gates/`）与共享代码（`src/common/shared/`）；只读引用其冻结 public entry。
 - 服务层只调用提供方的公开入口；本角色的判定逻辑不依赖 Pi 适配器的内部实现。
 - `resolveWrite` 是整套东西的心脏：目录授权、精确文件授权、覆盖多个根的路径都必须覆盖，并覆盖路径穿越、大小写、Windows 反斜杠与跨根混淆等情形。
 - 一个上下文从绑定到结束只承担这一个角色；不派生下游 agent，不自行调度同伴。

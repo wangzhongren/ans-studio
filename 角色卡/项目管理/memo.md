@@ -128,3 +128,31 @@
 - 2026-10-21（5B 实施完成/独立验收 needs-work）：**5B 产品门全过；AC1/2/4/5/6/7 pass，AC3/AC8 needs-work；5B 门未关闭。** 候选 HTML 3c4da2a2/JS f568e2aa/CSS 76fad7ce，包 edeeef19（406,507,281B），入口 dist/index.html，旧渲染器/vendor/旧测试已删。补正：F1 OPEN_CARD_AT_ARRIVAL 207→206 补 G3 行+修台账；F2 桌面UI 契约面最终入口/过期引用；F3 产品复核+提案状态；F4 无关 src/common|provider|model|service+adapter 测试由测试列名、PM 确认不进入 Phase 5 判定（不触 app/renderer/main/preload/vite/electron-builder/release；package 变化为已批准；共享模块归各属主）；F5 旧 uiux 套件限制；F6 683/504 统一；F7 probe/CSS 说明；F8 .ti-badge 非阻塞不改产品；F9 证据位置；F10 rg 环境红。补正只文档/台账，不改产品；否则重冻重跑。补正后独立验收重判 AC3/AC8；PM 不自我验收。评审文档 revision 18、§二十一。
 - 2026-10-21（5B 门关闭/Phase 5 完成）：**独立验收 pass（AC1–AC8 全过）；5B 门关闭；Phase 5 实施与独立验收完成（范围内）。** 候选 HTML 3c4da2a2/JS f568e2aa/CSS 76fad7ce，包 edeeef19（406,507,281B），入口 dist/index.html；378 文件独立清单+16 DELETED；AC3 以 424 名 0 回归证实质等价；AC8 契约面/产品复核/无关改动/计数/probe 收口。范围限 macOS 本机离线/本地构建/本地打包；六类 missing-evidence 未判（真实模型/网络/.env、Windows/DPI/屏读、签名/公证/安装器、发布流水线与 CI、Linux、真实主进程通道/真实引擎）。非阻塞：.ti-badge 死 CSS、CSS 85B 说明、rg 环境红、UIUX 证据位置、产品时点、提供方 manifest。PM 未自我验收；不授予提交/发布/部署/签名；release 配方零 diff。工程法案 §三同步。评审文档 revision 19、§二十二。
 - 2026-10-23（i18n B1–B4 共享 key 契约，`implemented-unverified`）：一次性为 B1/B2 渲染层、B3 主进程用户可见文本、B4 共享设置元数据建立 key，**不迁移消费方**。目录总 key 1203（含 B0 13），新增 1190：B1 407 / B2 269 / B3 452 / B4+shared 62。zh 逐字保留（837 exact + 337 composed-all + 4 composed-partial + 12 多段拼接，见证据）；en 齐全、占位符逐 key 一致、复数 one/other。`app/**` 零改动；allowlist 仍 62、0 违规（scanned=107，比任务预期 103 多 4 个 B0 接线文件）。测试 171/166 pass/0 fail/5 skip，typecheck 0。B4 只加 key，`runtime-settings.ts`/`runtime-shared.ts` 形状未改。迁移期文本依赖（`startsWith("已保存到 .env")`、`indexOf("未写入任何文件"/"可读历史保留")`、events 历史前缀）已记录，须改结构化判定。未做：消费方迁移、allowlist 收紧、布局/切换/重启/真实 Electron、独立验收；不 commit。详见 [B1–B4 变更记录](docs/change/2026-10-23_change_i18n-b1-b4-keys.md)。
+
+- 2026-11-05 C0-P1（仅文档交付）：固定项目管理，按根P3.1/T1形成 [直接能力合同](docs/design/2026-11-05_design_direct-role-capabilities-contract.md)。候选trunk-amendment HEAD77945d9保全部旧差异；旧writer释放采用根I3客户明确确认，不由旧报告推断。合同列R/O/G/W/U入口、拟议签名（owner实施前冻结）、原子完整快照/旧run缺物证、冻结来源及O→G私有I/O边。最小遗漏路径G versioned-doc-guard及其测试、O guard-freeze-registry按既有§1由统筹必要细化，真边界/权限变化再回delta。不运行应用/模型/测试，不commit。后继R可先做不相交Model；本人不派发、不验收。
+
+- 2026-11-05 P1续派：已做R/G实施后短核（不倒填事前审核）：G1 recommend approval；R仅CloseCreatedTaskInput执行结果枚举需对齐既有accepted/rework/rejected，needs revision已交统筹原owner窄修，其余Model可供准备。新增roleDirectApplied中英单键，1906总键/C3 101，i18n定向最终13/13；首轮漏C3计数12/13已保留。C0补真实chief独立有界上下文及O/G既定分层解释，详见同日change。未跑应用/模型或全类型，无commit。
+
+- 2026-11-05 P2：一次核O22行/U12行/R收口实修，均recommend approval，已先消息统筹供O立即实施。R outcome复用TaskClosedOutcome、cancelled负例关闭P1一项；C0 §5冻结同对象后继R工具schema/O1/U IPC/W普通接线复用审结，未知实际接缝不假评估。仅本人四文档，无源码/测试/应用/模型运行，交付后释放，不常驻等owner。
+
+- 2026-11-05 P3：仅核R3两合同delta，均recommend approval已即时回统筹。规划trunk缺workflow诚实保留，执行真实workflow/D3/激活/授权闭包另核；R Model唯一冻结纯结构不读当前开关，历史chief物证关后仍有效。三源测聚合C89F819AC54FAB8B7871DFB246BF17E5638BA4334F51C7486D096A301118A66D；R10/10/40 caller红原样保留，O/W/Q后继消费无需重述review。本人只四文档、无源码/测试/应用/模型运行，交付释放。
+
+- 2026-11-05 P4：仅六类chief客户notice＋来源/处理中/接管3标签共9中英key，已消息统筹供W/U消费；唯一勾选复用decisionOff，保历史judge语义、无raw-code插槽，退修真实退回/不批准与卡取消非任务取消明确。i18n首次13/13，总1915；生产只两目录/测试本人单文件，change有映射/时间/hash。不改C0/W/U/allowlist，无应用模型commit，释放给U。
+
+- 2026-11-05 P5：唯一入口文案1key已落，i18n首次13/13，总1916，renderer类型exit0。定点三合同交C0 §7并先消息O：teamplan候选最小字段（现无parser/producer）、ActiveRoleEvidence不造run＋双维CAS独立snapshot、真实stop生命周期尚缺可证实现列R3具体问题。unknown stop/restart blocked，continue/direct先行；不代owner写源/不假Schema或停稳。保全部旧差异，无应用模型commit，交付释放。
+
+- 2026-11-05 P6：根Git P2/G-T1已确认，形成G-C1实施合同（新本人design）及Git change/nav/api。结构化三Fn、可信host/全OID、G纯策略/O四新文件、原五参CAS兼容、双介质单ref迁移/未知恢复/撤权先后已交。修改隔离/同临界区未证保持blocked，不以same-token spawn/classify/postaudit/native停稳充沙箱；复用原8refs/creator-close/四Fn通知。无源/i18n/Git/形式测试/应用模型/commit，保旧差异，交付释放。
+
+- 2026-11-06 P7：仅api-spec追加23条R9IO最短合同，已核O public实际baseline raw CAS/lock/scan与TrunkStore.readProjectFile；G Service业务/纯common、Pipeline/W接线、permit无Provider upcall、R绑定canonical/currentFile普通facts/先授权读后最终写、G同步gate不FS及最小写集差额。与O14 worker首因无关，不改G-C1/源/测试/边界；无测试/模型/应用/Git/OShelper或启动PID。潜在shared/path-primitives差额明确未授不改，R真实facts接缝未证保持blocked，交付释放。
+
+- 2026-11-06 P8：仅api追加25条host写前phase精确合同（lexical-read→canonical-read→final-write），真实双root来自O createRuntimeAdapterFactory的project配置，R私有对象绑invocation/path/op/stage、Service验普通facts，O Pipeline分别调用R/G Service，G不peer/不FS。先角色path授权仅canonical，再canonical授权内容读求currentSHA，最终同步G及Provider原保护仍必经；preflight非write许可，managed缺证拒、legacy只非受管兼容。真实绑定/G纯preflight尚未实现，负例未运行；不改G-C1/源测/边界，无tests/process/model/app/Git/OShelper，交付释放。
+
+- 2026-11-06 I5同步：仅G-C1 §7/API/memo对齐根P1.1 A151C2DB…79F39与H01–H10，P1.1 supersedes新任务旧Convener quality parent；核R25字段/O prepare及queued inspect真实公开口、进程登记/重启拒绝/旧stop未知、reportonly无泛广播/effectnotify保留。Q54执行窗不改production/test源、不跑测试或Git/模型/应用、不派peer；保旧版本失败证据，不宣实现/四闭环/验收通过，交付释放。
+
+- 2026-11-06 revert短合同：P2既定后继，已先5行key交统筹；G-C1 §8补13条普通revertBasis/实际父与root空tree/当前base逆变化/保不变entry/冲突/新CID质检再CAS。R纯Model、O原Provider/Service、G纯验证原owner；当前G不支持/O stub如实保留，不阻CHANGE/Q62，不改源测/边界/新文件、不跑Git/测试/SDK/模型/应用，交hash即释放。
+
+- 2026-11-06 P9：仅G-C1 §8.2/5/14及本人API/memo采纳G22只读needs-revision：current codeBasis原commit bytes补齐，R原trunk唯一共享Raw shape、G/O消费无第三镜像；完整tree特殊mode须保并可明确拒，不扩candidate写权限。Q62窗口源测零写、无Git/test/model/app运行；先key交统筹，hash后释放。
+
+- 2026-11-06 P10：Q67 READY有界只读CHANGE publication修材末段→R strict DTO/schema/summary200/evidence提示/报告creator/真实replacement来源/固定phase余量，no-blocker已先回S。仅API/memo短记，不假后半worker/code/quality/delivery或四链通过；源测0写/无执行，hash后释放。
+
+- 2026-11-07 E1 共享组件目录移交收尾：按团队计划 §6.4 单写者顺序第 3 步，逐项核对 shared-code 新目录 `角色卡/shared-code/docs/architecture/shared-components.md`（212 行 / `351b0b3b0f23b7882b550d24d17703f5902c01231853ccc7aaa85ee74801c6ea`）与旧副本 `角色卡/项目管理/docs/architecture/shared-components.md`（216 行 / `dd33fdf7805e1ca08c60cf62b804b4f20b6dd7d5c9d4632431706bbaeeca6339`）：旧目录实际登记 10 个组件，新目录 11 个（10 个保留 + `intent-entry-contract` 新增）；各组件名称与用途、代码与 public entry、消费者、契约、测试与变更影响均覆盖，public entry/消费者为现行超集，测试计数按现行实测登记（旧计数部分为历史值），owner 按移交更新为 `shared-code`，无组件遗漏或信息降级。已删除旧副本（删除前 SHA-256 `dd33fdf7805e1ca08c60cf62b804b4f20b6dd7d5c9d4632431706bbaeeca6339`）；自此后共享组件目录唯一现行路径为 shared-code 目录，旧路径仅存于 Git 历史。`api-spec.md` 现行目录链接同步改指新路径。共享测试复核 199 tests / 194 pass / 0 fail / 5 skipped。证据：`docs/change/2026-11-07_E1_shared-catalog-handover-evidence.md`。未改 `src/**`、`test/**`、shared-code 目录、其他角色文件、`docs/scheduling|acceptance|communication|planning`；不提交/推送；不跑真实模型；不判验收。

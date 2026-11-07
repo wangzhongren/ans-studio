@@ -1712,3 +1712,41 @@ Pipeline finalizeControllerStop({projectRoot,plan,hostLeaseId},signal?) requires
 ## O477 original workflow/stable pending test maintenance — 483
 Two authorized existing test files only; production unchanged.477 captured current real default Core callback calls=1, original model taskId spoof refusal and actual request accepted, followed by stable-write-invalid because the old direct Service approval fixture never installed the new Pipeline-owned permit snapshot. This does not explain or overwrite Q97 prior calls=0 without tool reply.479 then passes after original approval calls public refreshStableWritePermitSnapshot; actual source precedes guarded write, one physical workflow write and real consumption/empty refreshed snapshot remain asserted. Failed callback-count assertion now permanently includes real safe tool replies/task/run/Core fields; optional separate evidence output preserves raw replies for this diagnostic.
 trunk-runtime expected pending result now keeps actual stable-manifest-unavailable/missing diagnostic fields; original mini-repin/no version bump/no spurious event assertions remain.478 single1/1, then480 and final482 complete two-file20/20 natural EXIT/CLOSE0, scoped diffcheck0/owned0; no behavior assertion removed.481 only external W52 ProcessEnv typing red retained, later fixed and type0 reported by original W owner/S; no cross-write or repeated global polling. W52 test in flight is a nondependency change, so this is not global freeze/T3 acceptance.483-O-workflow-test-maintenance-frozen.json records exact two-file SHA, command metadata and unchanged tracked production. Pending G-T1.3 Provider remains uncreated.
+
+## P1-C 派发父门 D-minimal（2026-11-07）
+
+`src/pipeline/orchestration/trunk-runtime.ts` 新增唯一导出的纯函数
+`evaluateChiefDispatchParent({host, core, hub}): ChiefDispatchParentDecision`（`{ok:true} | {ok:false, reasons}`），
+以及输入投影类型 `ChiefDispatchParentHostFacts` / `ChiefDispatchParentCoreFacts`。它只判定已取得的事实，
+不采集/不伪造证据、不读注册表、不调用 Service；输入复用 Model `RuntimeKind` / `RuntimeInputProvenanceV1`。
+
+消费者（本文件内恰好两处调用）：`prepareRoleDispatch` 的 `validParent`（Service 调用前、后各复检一次，
+`hub` 为 chief→五内置角色）与 `currentChiefResumeSource`（唯一生产调用 `prepareControllerResume` 三次复检，
+恒传 `hub:true`）。对外错误语义不变：仍 `code:"trunk-verify-failed"` + 原文案；`reasons` 为内部稳定码
+（`disposed`/`not-default-core`/`wrong-runtime`/`tool-surface-unknown`/`custom-factory`/
+`application-mediation-ambiguous`/`application-mediation-unverified`/`registry-mismatch`/
+`native-builtin-present`/`turn-mismatch`/`stopped`/`no-active-dispatch`/`input-not-accepted`/`turn-settled`/
+`evidence-identity-mismatch`/`creator-reports-mismatch`/`parent-kind-invalid`/`evidence-missing`），
+不改变回执。运行时分支：claude/pi 只走受限应用中介路径；codex 先严格 native、严格不成立且
+`status:"unknown"` 时走受限、`observed`+`applicationMediation.status:"verified"` 双路径歧义拒绝（N20）；
+demo 只走严格路径；其它 runtime 拒绝。严格路径保持 Codex 原条件与短路顺序，仅新增
+`applicationMediation === undefined` 互斥 guard。受限路径要求 `status:"unknown"`、`nativeToolRegistry:"unknown"`、
+`factoryProvenance:"default-production"`、`kind:"application-mediated-unknown-native"`、
+`status:"verified"`、runtime/factory 匹配、`reasons` 为空、`nativeBuiltinTools` 为空、appTools/foreignMcpServers
+与包装层一致、active dispatch 工具名在 appTools 中；Codex 追加 native 事实存在且绑定
+（P1-A 冻结形状无 `applicationMediation.nativeInstanceId`，故以 `native.nativeInstanceId === lifecycle.native.instanceId`
+核对，见证据偏差登记）。host 缺失保持旧行为（`validParent` ⇒ true、`currentChiefResumeSource` ⇒ false）。
+`inspectInitializationProtection`、stable-write、run-stop 等写/发布/停稳门逐字未改，不读 `applicationMediation`。
+
+证据：[P1-C 证据文档](docs/change/2026-11-07_P1-C_dispatch-parent-d-minimal-evidence.md)（编排套件写前
+1,017/991/24/2→写后 1,036/1,010/24/2，失败集合逐条一致；差分 175 场景/350 比较/54 预期差异/0 非预期；
+`npm run typecheck` exit 0）。实现状态 implemented-unverified；未提交/推送。
+
+**Amendment-1（2026-11-07）**：P1-A Amendment-1 冻结
+`RuntimeSessionToolSurfaceFacts.applicationMediation.nativeInstanceId: string`（必填）后，Codex 受限路径绑定
+改为 P1.6 §4.4 字面谓词
+`native?.factory === "codex-chat" && native.nativeInstanceId === applicationMediation.nativeInstanceId`。
+两侧实例 id 缺失/空串（伪造或旧事实）继续 fail-closed；`native.nativeInstanceId === lifecycle.native.instanceId`
+保留为附加防御，仅在 lifecycle native 证据在场时核对（包装层保证 verified 时三者同值，不拒绝合法 verified 事实）。
+claude/pi 不读该字段。证据追加于 P1-C 证据文档「Amendment-1」节（编排套件 1,036/1,010/24/2 → 1,037/1,011/24/2；
+差分 182 场景/364 比较/56 预期差异/0 非预期；定向 26/26；typecheck exit 0）。

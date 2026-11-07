@@ -126,3 +126,254 @@
 - 2026-10-22：**角色粒度/MapReduce（Map C）桌面窗口部分实现完成（implemented-unverified）**，Doc: `docs/change/2026-10-22_change_role-granularity-parallel-testing.md`。可复用事实：① 团队计划 v2 **单一解析器**在编排 `src/common/编排/team-plan.ts`；桌面必须经 pipeline 公共出口 `src/pipeline/orchestration/run-role.ts` 消费（`parseTeamPlan`/`teamPlanIssueMessages` 等），不得直接 import 私有 common 或保留第二份 v2 解析（Q9 A / P14）。② `parseTeamPlan` 的 legacy 分支只返回问题字符串、不返回角色行；桌面仍保留最小 v1 行读取（类型+四列）供 `existing` 迁移门控，v1 表格结论仍走共享 `legacyTeamPlanRoleRowIssues`。③ V12 覆盖判定：计划写集 file 需 boundary `file` 精确同路径；计划目录/file 可被 `directory`/`conditional-directory` 前缀覆盖（仅 project root）；new/changed 未覆盖为 Crew 阻塞（文案同时给「计划有误报告 Convener」回归路径），`existing` 仅 warning。④ v2 的 `warning`/`exception-review` 只记诊断（`warning:true`），不得当阻塞；计划 `error` 来源始终 Convener。⑤ 任务文案扩展测试时优先**保留既有金句**（如「计划缺职责目标/能力要求/写集/依赖等细节时」「直接发任命卡」「团队计划 <path>」），只追加 v2 段落，避免跨套件金文本断言无谓转红；本轮跨套件只读复跑 `governance-e2e-auto` 68/68、三组 verify 86/86。⑥ `customer-input.ts` 已按结构透传 `teamPlanPath`，模块/并行不是冻结请求字段 ⇒ 本轮 N/A，不改通道。⑦ 本批证据：定向 171/171、`test/桌面应用/**` 518/518、typecheck 0；候选哈希见变更记录；未验收/未提交/未推送。
 
 - 2026-11-03：**客户授权平面 C1 实施完成（implemented-unverified）**，Doc: `docs/change/2026-11-03_customer-authorization-plane-C1-implementation.md`。可复用事实：① `sendSession` 在图片校验/`manager.send` **之前**解析 A1 `parseDirectiveMarker`；命中即只走指令控制器，带图直接拒绝，target 取卡载荷且缺失/非法/跨项目 fail-closed（Composer 未开会话也不回退普通聊天）。② 指令控制器（`directive-input.ts`）每项目懒创建 B1 `CustomerDirectiveRuntime`；项目切换只取消未决面板、不销毁旧运行时；输入式 `撤销 #d-N` 由 C1 确认后调 `runtime.revoke`（`submitFromInput` 只创建）。③ decision 消费者在 `presentEntryNow` 的 `tryAutoSelectDecision` 之前；新增 `directing` 占位（不占客户卡队列/不计挂起数）；冲突/不匹配绕过默认推荐并投 A3 `main.directive.decision.*` delivery-note；可见行 `emitResult` 先于 durable `once` 消费（B1 冻结）。④ Q9 归属唯一解析 `directiveIdFromOperatorId`；run-change/`request.resolved`/`version.decision` 三值 + `directiveId`，`request.presented.to` 不扩展。⑤ 冻结五 IPC/preload 名与载荷（`directivesEnabled`/`confirmable`/`directiveConfirmRespond`）；`directive:state` 主进程先行推送 + preload 缓存回放；应用运行级 `sessionId` 启动生成一次、切项目不重置。⑥ 证据：目标 22/22、受影响 26/26、桌面 522/522、typecheck exit 0；A1/A2/A3/B1 22 文件哈希写前=写后；未 commit/push。
+
+- 2026-11-04：**主干/冻结与版本变更申请模型 D1 P1 提案已写盘（proposal-only，未实施）**，Doc: `docs/change/2026-11-04_trunk-amendment-model-P1.md`（**Revision 1：461 行 / `1a0b5c9a6bcbcb165e3c45c7c70408aee22d4f3f77d046a66a5b0f0219549c42`**；按 PM 审核 `2026-11-04_trunk-amendment-model-P1.6-review.md`（368 行 / `2cb04cae…`）F1/F2/F5/F9/F10/F11 修订；上一版 437 行 / `7fe52f3c…`）。可复用事实/线索：① 现状无 trunk/version-change/stable-write 源码与桌面模块；`test/桌面应用/trunk.test.ts`/`version-change.test.ts` 为边界已登记、待建（B-4/B-10，B-13 条件）。② 可复用范式：应用自有 decision 卡 = `buildRunChangeCard` 形状（`application:true`/`sourceRoleId:"application"`/恰一 recommended/真实 flowId）；VCA 卡通道选择复用 `requestRunChangeDecision` 的 convener→rapporteur→chief 顺序（建议提取私有 helper）；生命周期复用 `requestVersionDecision` 的 `withRequestLifecycle(sourceRoleId:"application", notify:"none")`；presenter/能力注入复用下载特性（`session.ts:2940-3005`）。③ **两个主权排除点**：`customer-input.ts::tryAutoSelectDecision`（既有词汇判据扩展）+ **`tryApplyDirectiveDecision`（`@决策` 指令消费者，实际符号；现未调用主权谓词，D1 必须补，F9）**；另需结算后 `operatorId`（judge:/directive:）二次校验。④ **PM 裁决（F2/F10/F11）**：VCA/逐项/trunk 卡复用 `decision`（真实 flowId）；**只新增 app-owned `stable-write` 卡种**（独立 `GOVERNANCE_CARD_KINDS` 白名单、不进 GROUP、永不判断；`run-role.ts` route hint 由编排一行解锁）；**无 `version-change:submit`/`refactor:request` 渲→主 IPC**（VCA 只经角色能力，重构只经 convener 能力）；单 `trunk:state` 推送；`trunk:upgrade-confirm` 仅限同一 previewId 的客户 UI 二次确认。⑤ **F1/F5**：acknowledgments 为 C1 对象数组 `{id,label,required}`、outcome `acknowledged:string[]`、`request.resolved` 不加字段；stable 许可含 `approvedAt`/`expiresAt`（批准后必填）/`consumedAt?`、`baseSha256=""` 新文件、pre-write 纯函数 + post-write 复核消费、失败许可作废、TTL 30 分钟。⑥ 引用按 PM 审核 §1.3 裁决：V1 350 行/`3c40acad…`、B0 最终版 221 行/`8c6272d5…`（旧 173 行/`27f9b94d…` 勿引用）、G2a 25 行/`bfac5781…`。⑦ 桌面基线：B0 桌面套件 562/562（57 文件）；D1 新增两测试先跑定向 + 全目录对照。⑧ 未写产品/测试代码、未改 boundary/changelog、未 commit/push；待 PM 复审（不自行放行）。
+
+
+## 2026-11-05 W1 当前接缝（实施中）
+
+固定桌面窗口，仅统筹精确写集。旧writer差异保全，不归本轮。权威decision三IPC加revision；保留业务卡先于旧@/推荐/judge分支，只off客户/on独立chief。真实Pipeline bounded host已可用；证据prepare等待O合法公开入口，当前缺证据不批准。来源actionSource与真实requestId入request.resolved/by=chief-delegated，root要求revise以declined+来源释放工具调用让原角色补材重提。02/06为隔离TEMP sandbox真实hardlink EPERM；04精确提权25/25，07其余三套48/48，11无workflow负例1/1。主类型当时余O/Q外属workflow4诊断，renderer0；后续变更影响证据需重测。无提交/合并/发布。
+
+W1本次释放槽checkpoint：最终五定向75/75（12日志）；主类型仅O/Q外属workflow4诊断，renderer0/diff-check0（14–17）；文件hash见18。O材料43/43已收到并接Interface生产入口，但真实SessionManager忙chief/worker循环整链未测，R工具回执chief归属待修，等统筹后继再续；不占槽等无关材料。
+
+W1b释放checkpoint：11三真实闭环3/3，12五定向78/78；14主类型仅Q integration workflow两条，renderer0/diff0。退修用例必须真实有权rapporteur.write_file→门禁/pin/冻结缓存/N+1登记→物理v2→O新refs与base→同flow新卡，不能恢复03/04 Provider直接fs改材弱证。@预设已真实controller用户确认+durable active once，不是stub。O材料/R4正常组合，生产源码本续未变；hash见w1b-window/18。P文案与W2仍未做，无提交。
+
+W2a安全释放：42/42、主TS0/renderer0/diff0（w2-window/02–08）。客户send仅chief且不信伪内部metadata；P六key/真实chief无客户ID；两tasks writer统一Pipeline，系统不fakeclosed；四Fn/submitDirect/固定key入队通知已接，回交await report→真ref原creator。formal planning已接不提前pin；workerfreeze/context/依赖队列与规划draft creatorclose、四Fn最终通知sink/剩取消卡待原W后继，不报四正常全链。
+
+W3a释放：默认Core/默认CodexChat+localHTTP真实git_query与同实例inventory positive、custom伪producer仍unknown negative2/2；三个owner套件16/16（w3/05），采样main0/renderer0/diff0（06–09）。普通facts与Git完整前后hash在两proof.json，10文件指纹。O2四Fn sink/Git动态真实task注入已接；库存coverage unknown，O4 lease/main动作、worker目录scope与冻结依赖链待后继，R9最后IOguard未证；别把无shell注册或disposed当FSsafe。无开发Git操作。
+
+
+W4a真实native bootstrap路由短交：真实空root+pickProject→list→publicchief/defaultCore/defaultChat localHTTP→actualdispatch→draft task/run/convener session已通；仅枚举/选后取消都0convener。O官方factory误判首红02保留，03修后过；await后/写task前/enqueue前选择+TurnRef重核，任务flow取actualmanifest。06当前17/17，主renderer0/diff0；Git init仍actualblocked/no.git。O初始化work-source持久回执在飞未消费、不造formalTaskID或source evidence。worker完整scope/freeze/dependencies及O库存串行lease待后继；额外installcallbacks只读登记并refresh可能重建MCP，闭包unknown。
+
+W4a释放补充：O immutable source后采样10/W4 1/1、09类型0；W不保留requestedEvidence host前缀，等R明确workSourceRef后续消费。既过17/17三源码/测试SHA与08一致，最终指纹见11。
+
+
+W5安全释放R11：生产专字段仅真实O source receipt+fixedkind+Rpureguard；requestedEvidence用户普通prefix原样。真实五分支4/5，唯一modelhostfield因R dispatch handler2519忽略而非预callback拒，expected0保红；source没被伪造采用不等于合同通过。06三套20pass/2fail含父聚合，03主0/04renderer0/05diff0，02/firstproof保留。父chiefquiescent+UI换项目后childsource持续真SHA；无field历史不补写。native selection/append尚未同critical，Gitinit依旧blocked；后继等R11后重测，不扩大W。
+
+
+W6短交：R11原defaultHTTP5模式全过01；新增actual dispatch lease跨actual ledger await期间旧sourceclear busy且不dialog，commit后native换root成功、父chiefquiescent/UI焦点变化不撤childsource，init仍blocked。Interface old+newroots同步source变更与session childappend共O hostcritical，无超时提前放/openconvener嵌套；最后await后selection核已加。09三套23/23，10主0/07renderer0/最终diff11。仅source选择vschildcommit，stop/arm/全inventory及postopenchildquery仍缺，已报O，不冒safe/全链。
+
+
+W7a短交腾R：实际recordGitHostInventory持续发布（含openChains start/end/runtime event），normal/boundedopen同session-open lease，busy provider0；disposebusy走O interruption并保他lease/实际revision，abort/revoke先fence；initpostopen真inspectAssignedTask，publicopen剥renderer taskId。04当前23/23，07main0/06renderer0；05 O test局部process外红保留owner修后0。缺创建前真实plan→原R/Codex，不能name/ENV/create后inspect冒admission；三commonjudgers直接bindRole绕库存已报，unknown不清。worker taskId/fullfreeze/context及已有session换task重建未完成；不得把此checkpoint冒init/四链。
+
+
+W8短交腾R：W外层native openlease已删，pending/creating/失败不丢，Core prepare/bind唯一实际租约。05当前23/23，06/07类型0，04首红只旧库存1行→真实busy失败+creating2行精确更新，不变0构造/host拒。真实首childconvener准入已稳，next git-old-core-programs-unproven；before/after全Core JSON已给父/O：R先disposed=true再inspect使真quiescent变unknown后存disposed，native同id仍quiescentcomplete；不W伪停稳/不过滤旧root。QfreshNode首链并行不替该回归。workerbinding等旧缺口继续，未称init/四链通。
+
+
+W9临时slice短交：四安装Fn保注册但全部canNominate（含unmanaged）effect前拒、旧apply不可达，普通actualCore/turn/binding audit不作O许可；此状态未保nonGit旧兼容，父明确不能进最终候选。待O fresh scope+内部R15factory后required/unknown拒、unmanaged原Fn恢复，不能flag猜。05四工具实际1/1，3HTTP第三为chief真实回报；08三套24/24，06/07类型0，03/04首红firstJSON保留。效应核：固定读技能登记/正文和MCP声明，唯一refreshidle重建经Core/Native；busy/no target deferred，无直接spawn/download/write登记。HRactivation未通，腾O恢复不等consumer。
+
+
+W10最终scope收口：O publicfresh scope已消费，actualunmanaged原四apply恢复；required/unknown前拒由O内部R15 factory真绑定，非W safe。06四模式5/5（含父），07/08类型0；required实际nativepick→chiefaccepted→child来源，unknown物理坏关联0HTTP。当前source/lifetime/origin await和重建dispose链前fresh/同target核；原客户轮guard改actualorigin message，system不再冒客户。04/05 fixture红（默认single/.git非required/通知Pi无key）保留，现真Chief Codex原通知链稳定。W9全域拒临时限制已撤，Q实际激活后继，非四链验收。
+
+
+W12只读短交：未改App/测试。03JSON实际rawrequest/toolresult/recordpermit+7源码Q前后当前SHA全相同，真实S4pendingnote+workflowbase空writtenconsumed证fallback已await，非W漏注入；selector store/newtrunkRuntime proxy正确。O actualsource/staging存在基线匹配，specific当时code没保，旧Coreunknown事实不准倒推；O自己保错误并交R。App version-change成功投影丢repin/pending但未获W12源预留不写；01/02类型0只采样。无新E2E/旧Qroot不写，不伪sourceauthority。
+
+
+W13短交：app/desktop/session真实catch await Pipeline inspectRoleSessionOpenFailure(error原对象,hostHandle本次)，有ref保存再publishrev；不改phase/errors/清历史/造safe，getter异常不遮原错。02真实2/2（official pureChat leasebusy sameattemptref→freshneverstarted/重开不跨host；custom真marker副作用throw无ref原错），03interface8/8，04/05类型0。R新EE9548…冻结后跑，非旧R。Q接槽，不声明workflow/四链。
+
+
+W14启动续接 2026-11-05T17:17:37.029269+00:00：尚无本轮生产/测试代码改动，仅此memo状态更新；全部既存diff保留不归本轮。基线app/desktop/session.ts SHA256=833CB0164EF3368BD7DB68A5CF424C09D46D5ECA46982B213DA083C2C7064A78；app/desktop/interface.ts SHA256=84D2AA33F4709509FADE4F435F059500E443C43661B188F49447AFAB287FAEAC；test/桌面应用/chief-workflow.test.ts SHA256=9BBF99CD1F25B83BFB9268B6E9AA754DCB268413983960B2E0C9DF840ABEFA30。无owned命令/PID/运行开始/期限（均无，尚未启动测试）。下一精确断点：真实convener current assignedtask核→同run freeze→prepareRoleDispatch→pinned TaskCreated→worker taskId/context绑定；O14接口并行原owner，未跨写。计划源仅app/desktop/session.ts，必要测试chief-workflow.test.ts；若需既授interface测试先准确列case，不新session.test/新源目录。继续W14，不标完成/不切model。
+
+W14恢复续接 2026-11-05T23:24:02.487817+00:00：同角色/同模型，不更改账户信息。实际app/desktop/session.ts SHA256=0DA3A5C9387164CCD3751D97EE963064E0BB2CAF4542814F7BEC4686214FFC37；test/桌面应用/chief-workflow.test.ts SHA256=9BBF99CD1F25B83BFB9268B6E9AA754DCB268413983960B2E0C9DF840ABEFA30；session两独立接口已落，chief-workflow仍原baseline未新增case。最近owned命令npx tsc --noEmit已自然exit0，无当前owned命令/session_id/PID/运行期限；不重启旧O151、不当其未留exit为通过。下一精确断点：落原chief-workflow真实默认Core/Chat有界缺执行闭包负例，核当前真实convener origin/task而非constructor、透stage/code且0worker创建/推理；formalparentRef/R9 parentCAS尚未接，后继R/O，当前不冒原子父来源。
+
+
+W14短交 2026-11-05T23:30:44.360872+00:00：session B68A37F72D63F581C82958201E9502AF9721E9CE8902E3AEBB6C26204883C943，chief-workflow 24D02EB397AF8AA99D48767747322C6E9F7CA5E0D3E231E3FC7C974D59DFC449。02首闭包负例自然1/1 PID10868 23:29:48.479→23:29:49.095Z exit0/signalnull；真实constructor无task/currentdelivery真task，stageprepare/trunk-verify-failed/effective-manifest-missing，0worker。01额外第二bootstrap tmpENOENT原红保留，不冒两父复用/D3单项。03主TS PID17816/04rendererPID2388均自然exit0；无owned命令/期限。R18 shape已落但O prepareParentTaskRef/R9父CAS未接，needs-parent-contract；当前freeze/preflight/透码独立段稳，释放O，不宣全执行链。
+
+
+W15续接 2026-11-05T23:43:37.200763+00:00：session基线B68A37F72D63F581C82958201E9502AF9721E9CE8902E3AEBB6C26204883C943；chief-workflow基线24D02EB397AF8AA99D48767747322C6E9F7CA5E0D3E231E3FC7C974D59DFC449。当前无owned命令/PID/期限。只原session消费O prepareParentTaskRef并保replay不授权执行、child fresh核，必要原chief-workflow真实负例重验；不伪父ref/Accepted/pin、不迁GIO。
+
+
+W15短交 2026-11-05T23:48:55.552700+00:00：session59D56BAD4795393FC6809A915B8D155FDAB7B5D65788D4444B5305C34034C944/test16A478420E9920E713599183E2ADD54AEBFDFA726C99FAA67F7EE062168CA4DB。actualparentRef已由Pipeline真实receipt接最终append，ProviderCAS归O；replay只登记不重开投递，child当前run/权限/目录核不依父prompt。builtin真实preflight已加，无fakeplanning。03两真实defaultCoreChat缺闭包负例2/2，PID25088 23:48:06.544→07.312Z exit0/signalnull；04主TS/05renderer自然0。01nominator正确权限红和02旧builtin漏检原件留，02不算合法规划通过。无owned命令/期限。下一Q15完整材料workerparent正链，当前两负例未到parent取ref不冒已证；释放槽。
+
+
+W16启动 2026-11-06T00:45:45.325670+00:00：session基线59D56BAD4795393FC6809A915B8D155FDAB7B5D65788D4444B5305C34034C944；无owned命令/PID/期限。最小可运行步：原chief-workflow用实际SessionManager+现openRoleSession注入缝拒绝runtime-open，测watchdog系统队列attempt/保留/stop后late入队及显式open恢复；层测试不作GitE2E或权限票。只读drainQueue finally仅删链、open失败保队列return，尚无直接自旋因果，Q19 CPU归因仍unknown；stop未设自动投递fence，晚到入队可再open这一独立行为待实测。
+
+
+W16短交 2026-11-06T00:51:24.424171+00:00：session22A27DE140BA648EFA1998E41AF0752C1A0D83E9396BE897FC4B2365FF5A4252/testB1BB4824E354FDF543EA8C13643488E98547D51A00EC984E2C8BBDD00F03D7D7。01首红stop后late open4应3保留；失败后attempt稳定未复现自旋。stop首await前fence+generation/晚handle真实dispose/queue保留，显式open-only恢复对应key；看护调用redeliverNudge不解除。06相关4/4 PID15604 00:50:36.651→37.595Z、07interface8/8 PID24116、08主TS PID2832/09rendererPID14416均自然CLOSE0/signalnull/前后hash同；无owned命令/PID/期限。Q19 CPU归因仍unknown，独立stop缺口已修但不冒长diag或业务全链通过。
+
+
+W17启动 2026-11-06T02:03:30.784633+00:00：session基线22A27DE140BA648EFA1998E41AF0752C1A0D83E9396BE897FC4B2365FF5A4252；无owned命令/PID/期限。最小步：现stableAfterWrite fallback旧common register调用改O公开Pipeline registerVersionedDocumentAfterWrite，保false/undefined/exactbytes流程。rg -a实际只1处legacy调用（import+call两触点），其它baseAfterWrite仍用户既有hook；review只读O在飞公开字段，不空等，不改unknown busy。
+
+
+W17短交 2026-11-06T02:11:38.814733+00:00：session7B987B17C1196073560CCDDC9899F3C5221C091137E0A4C08EAF9A1A4719642C/test1CD8478C37C07B342B0F4106FCB42AA14189877AD3D65C8F685D451AF85DD318。afterwrite/commonIO1call+import退至publicPipeline，dispatch扫描collect口亦已消费；purehelper保。review kindhostref/actualtaskId已接，无module/safe票/造criteria，ownchild不依父prompt。08定向5/5 PID14320 02:10:11.302→12.360Z、09interface8/8 PID10652、10主TS PID4608/11rendererPID24084均自然CLOSE0/signalnull/前后hash同；无owned命令/期限。01/03/06/07真实红保（canonical旧expect、初始化cleanup、预存版本migrationfrozen正确拒），最终fixture先await空root初始化再观察新版本，保ownedroot不掩活动资源。review正链/qualityaccepted待Q25/O，未知CPU未改不冒过。
+
+
+W18启动 2026-11-06T02:36:08.340213+00:00：session基线7B987B17C1196073560CCDDC9899F3C5221C091137E0A4C08EAF9A1A4719642C；无owned命令/PID/期限。只读因果：sendDelivery仅dispatch写origin.taskId；handback新origin不设parent且handback opts required=false覆盖Core，currentGitRuntime只读origin致父task/run缺。需公开fresh assignmentresolver按实际child.parentRef或真实boundparent核同creator/flow/run/open，已报O不Interface加ledgerIO。下一可运行步：现SessionManager层初始派发→持久child回交→捕获第二send的handback/task与Gitcallbacks，先准备同真实公共口再绑定；不fakeparent/pin/Accepted。
+
+
+W18只读短交 2026-11-06T02:39:45.926252+00:00：source仍7B987B17C1196073560CCDDC9899F3C5221C091137E0A4C08EAF9A1A4719642C，source/test0delta；owned0/无测试START/期限。已证dispatch-only origin→handback false清task，Git和report两份同丢recipient父。O21需公开resolveDeliveryAssignment exactassigned或persistedchildparent普通fresh解析，现口不足，不Interface新ledgerIO/不造ref。证据/API/change后释放槽，待O口原W续，非修复完成。
+
+
+W19实施启动 2026-11-06T02:48:26.582980+00:00：source基线7B987B17C1196073560CCDDC9899F3C5221C091137E0A4C08EAF9A1A4719642C；owned0/尚无START。首写sendDelivery按公开resolveDeliveryAssignment同步恢复本轮origin.assignment/Git+Corehandback；dispatchexact任务/child-report持久父/system仅已真实bound，新chat清绑定。Git回调去私ledger取run，freshresolver+同handleorigin/lifetime核。不造parent/sourceTaskId/权限票，stopfence保。
+
+
+W19短交 2026-11-06T03:04:28.963461+00:00：source2D3659AF9781A88B90631CBF8802B89AAC319A72EF3701DA81E787062DEA763E/test0FF414C80FAF9744E53F905983ABB68730480EC34AB161AD5B85F962EAAF0CD1。publicresolver统一origin/Git/Core报告，boundsystem/新chat清scope/关闭父knownpre-effect typedblock；回交open前核parent，topchief无Task保，stopfence不退。11相关6/6+12接口8/8+14renderer0，15actualCore最后1/1 PID29132 03:03:13.540→14.430Z/16main PID7692 03:03:37.853→39.247Z自然CLOSE0/signalnull。无owned命令/期限。SDK脚本/规划数据consumer层非workerpin/RoleACL正链，Q26真实NEW验integration/Verifier；01-08原红全留不冒总链过。
+
+
+W20启动 2026-11-06T03:23:59.642403+00:00：source基线2D3659AF9781A88B90631CBF8802B89AAC319A72EF3701DA81E787062DEA763E；owned0/无START。只读reportState queued+两dedup均在ledger成功前占，appendfalse会return丢chief入队；Q26 firstcode未存，delivery timestamp晚于handback只支持CAS待测，不倒填。system closed init是另一症状，不能冒product目标。首写仅使reportappend实际code/message进入既有note，再真默认Core/Chat product最小fixture抓首拒；不大prefix/不改Qroot。
+
+
+W20短交 2026-11-06T03:42:40.413558+00:00：session2410CE627531016AF4A616FDA7F850AE09B4D20F48EB68DFB0AA6C1A81F029E3/testBEF6CB9ADC9B471818952CDD3DD442CC058D44AE4D2596A2D0397A4D67E04BB6。02owned真R9CAS首拒task-ledger-append-failed/task-row-cas-conflict（非Q26倒填）；115bytes保存但无reported，原root后读单存。成功dedup后移/processing独立、自deliverycommit一次等待无自等；08三case/09相关8/10接口8/11主TS0/12renderer0自然CLOSE0，beforeafterhash稳定。exactclosednotice原source/op经O23→information-only，unknown保队列；新客户/其他recipient推进，parentclosed不能执行/新chat清scope。05/07fixture瞬时态红原件保。owned0/无PID/期限；只剩文档/hash，后继Q27真NEW验workflow/worker/integration/Verifier，本轮不冒整链通过。
+
+
+W21启动 2026-11-06T03:50:28.895148+00:00: source2410CE627531016AF4A616FDA7F850AE09B4D20F48EB68DFB0AA6C1A81F029E3，owned0/无START。实际sendDelivery把assignment存在直接转required，应用role-direct通知同任务再纯ack会触发fallback；首写将仅真实queueDirectNotification来源区分义务，保system bound continuation/child-report required。O原run-role false删taskId为独立身份缺口，先最小真实Core两turn证，再合法消费O窄口，不伪source/权限。
+
+
+W21短交 2026-11-06T04:03:10.741037+00:00：source0606C89318653C589156258175DFF369FCEC092A5BBC819D321D8D8A355C9C3C/test4F019ABCC200A65AC01D2AC043E33316F6AB9D162633887C858C347E80DBDE41。仅actualqueueDirectNotification分离身份/报告义务，O24 requiredfalse保task；ordinarysystem/dispatch/真实childreport required。09旧表达式真实1fallback红保，08弱latest采样不足如实留；10真实第二explicitreportCAS已补同taskcommit顺序，无retry/timer/新许可。16相关10/17接口8/15主TS0/18renderer0自然CLOSE0/signalnull，owned0/无期限。实际defaultCore/Chat publicpick/productintent/customerconfirm/rapporteurwrite/productApplied/docnoticeACK/Chiefacceptedclose，explicitblocked保真与真实child未reportfallback均验。原fixture红/failedroot只读snapshot保；后继Q28完整NEW，未称四链通过。只读交接抽取6点已给统筹，不实施重构/新文件。
+
+
+W22启动 2026-11-06T04:13:26.169056+00:00: source0606C89318653C589156258175DFF369FCEC092A5BBC819D321D8D8A355C9C3C，owned0/无START。已读actualconvener origin→inspectAssignedTask真flow/run存在，但builtin旧verifyPinnedRun advisory会清runManifest→anchorflow缺→finalappend跳过review/parentgate仍裸登记。首写仅显式reviewTarget以真实父task+run走公开prepareRoleDispatch必需preflight并原样hostrefs定格；旧advisory不作为review授权/降级入口。负例沿原defaultCore最小缺物证0child，Q29真实完整材料正链。
+
+
+W22短交 2026-11-06T04:17:01.687598+00:00：sourceDD231F00075160943516BC32691220160BF1BA58676AB4D93FB8FFBEB63C2163/test1AE04CF3FE37CEBAF7ABE02E384BE71BED239DC17EDF3B2DE019ACFFDCF39832。只显式review先实际parent+flow/run强prepareRoleDispatch，原样kindreview双refs绑定created/pinned，跳过此route旧advisory锚点降级；末append仍freshpreflight/父CAS，缺ref0task。05 actualdefaultCore/Chat有效GitOid目标缺完整pin原码trunk-verify-failed/Run lacks a complete executable immutable pin、0Verifier任务/HTTP。06相关11/09接口8/07main0/08renderer0自然CLOSE0/signalnull/无owned，01/02语法/03schema层原件保。source/publicAPI稳可交Q29真实fullcandidate正链，未冒正链通过；不改O/G/common/Model、不新文件/权。
+
+
+W23启动 2026-11-06T04:19:58.142440+00:00: sourceDD231F00075160943516BC32691220160BF1BA58676AB4D93FB8FFBEB63C2163，owned0/无START。原review谓词只explicit，现按O同合同对actualconvener→actualbuiltinverifier同走必需preflight；无target拒且零task，不借role名/sideEffect授权，不改其它builtin/P2。
+
+
+W23短交 2026-11-06T04:21:23.701856+00:00：sourceC48152D094219EFE31C9CFE132E5140DB6989587F5534E9E25154778540B9836/test2E344E575448E52DC4B5544D4AFA516206D00072D01CE8C9783B219C14330877。mandatoryReview explicit或actualconvener→当前listing builtinverifier，未知target拒，缺target strongpreflight0task/0HTTP，不改其它builtin/advisory/P2。01负例2/02main0/03相关11/04接口8自然CLOSE0/signalnull/owned0；全命令20s预算，最新03 PID11864 04:20:53.476Z。Q29正链待验，不把draftnegative说完整pin通过；O源单writer/无devGit/真model。
+
+
+W24启动 2026-11-06T05:05:42.923427+00:00: sourceC48152D094219EFE31C9CFE132E5140DB6989587F5534E9E25154778540B9836，owned0/无START。只读Q32旧公开queue缺entrysource/boundtask不可倒填。首写原inventory投影queueEntryId/sourceRoleId/notificationSource+operationId/systemAssignmentTaskId+knownstate/lastAttempt真实code；无body/secret/清队列/权限票。原resolver false实际code在原attempt记录，不从message猜。最小沿既有W19真closedsource/wrongsource队列验证字段稳定与不执行。
+
+
+W24短交 2026-11-06T05:07:23.817529+00:00：source1AC2C71872E444E1262671A31E3CF74105E223A4C7E7C090727E17485D2D00DB/testE6DAC9CD8AD905080E11AF1DA7FEE30BF07DE8F75859575FD6ECF8466447F27D。仅原session readonly queuedmetadata及actualattemptcode采集；真实原W19错source/closedparent队列同entry UUID/op/绑定parent/返回delivery-assignment-unavailable、深clone不可改原值/无正文元数据通过。01 1/1、03main0、04相关11/11、05接口8/8自然CLOSE0/signalnull/owned0，02测试assert已收窄后冗余比较TS红保留。原Q32无private来源不可倒填；生产已freeze供Q33新实际head短预算采样。未改消息清理/classify/权限/原信息与工作义务，不冒finaldrain修复。
+
+
+W25启动 2026-11-06T05:12:19.835512+00:00: source1AC2C71872E444E1262671A31E3CF74105E223A4C7E7C090727E17485D2D00DB，owned0/无START。已读Q33实际sourceclose产品draft≠convener旧init绑定，原O classify把boundtask当关闭对象。W consumer只看O information-only不强同task，现判断生产可0delta，先原W19层真creatorclose已报告第三方child→实际notifycallbackconvener旧closedparent绑定负例/回归；不自查Service/ledger/不改unknown处理。O原口签名待其freeze，不空等长文。
+
+
+W25短交 2026-11-06T05:13:47.302418+00:00：W生产0delta/source仍1AC2C71872E444E1262671A31E3CF74105E223A4C7E7C090727E17485D2D00DB，test48EAF5B06D3E6740A2B2FEB70ED444CB1CE68F1834977EC877F655392D9226E3。只原chief-workflow强化actualCore/ledger层：真convener close已报告rapporteur child、回执notifyconvener实际绑定旧closedparent（对象不同），O同口info后本项退队0modelturn；原wrongsource保留/后续客户消息及其它chief继续、真实工作报告义务不变。01 1/02main0/03相关11/04接口8自然CLOSE0/signalnull/owned0，03 PID16124 05:13:25.462Z起20s内；diff0。原Q33真head根因不倒填旧Q32；w25-third-party-close-notice-proof保存enqueue实际source/assignment/closed数据。仅callback/ledger consumer层，Q34完整NEW待实测；不改O/Service/私ledger/信息action范围，不泛清queue。
+
+
+W26只读准备 2026-11-06T05:32:45.755891+00:00：Q36 source窗内生产/test0写/owned0/未运行命令测试。session仍1AC2C71872E444E1262671A31E3CF74105E223A4C7E7C090727E17485D2D00DB/test48EAF5B06D3E6740A2B2FEB70ED444CB1CE68F1834977EC877F655392D9226E3。stop4732先fence/rebuild/handle.dispose但未awaitqueuechain；disposeEntry1963只入链，persist7457真实mkdir/write/rename串行只有enqueuedseq，完成/失败/pending未投影。已交统筹8行最小后继合同：仅persist/stop所有return统一barrier、普通实际path/enqueued/completed/committed/pending/error观察；completed不得等于成功，真实失败须可见，不宣globalproducerdrain。W16在途ctor特意stop后才release，不可盲awaitopenChains或自身modeldelivery；未来真正外部新queue仍可保留，新seq不误算旧target。拟真实ownedpath armed连续写→stop核target全部settled/实际bytes与IO失败、late/explicitresume回归。尚未实施/未测试该barrier，待Q36窗结束正式放行，不把4ms尾写归CPU根因。
+
+
+W27 START 2026-11-06T05:36:26.551439+00:00: Q36窗已结束获放行；session1AC2C71872E444E1262671A31E3CF74105E223A4C7E7C090727E17485D2D00DB，owned0。仅persist/stop finitechain outcome：先fence+既知dispose，capture targetseq/promise，await cutoff actual settled/committed/failure，不追未来queue或W16未释放ctor。真实path/seq/pending/error+knownproducercount只普通观察，不冒全proc drain；Q35红保、不归CPU。
+
+
+W27短交 2026-11-06T05:40:34.907510+00:00：source6D28837232DA177C289F820074E5EF94A3DA8EFEEADB8ED994E16A80236695AB/testBC7F49A12D73348BE5ABAF7EC0D206E261AA1C3DDEBB5B48B5D6A447C6F406ED。原persist串行原子IO now结果区分settled/committed/error；stop先既有fence/dispose后有限capture seq+promise await，所有normal earlyreturn统一，未来事件不追/不阻。真实armed24写→stop读回、no-session/定向与future事件cutoff、真实ownedfile阻mkdir失败(EEXIST/ENOTDIR)→修环境新写恢复2/2；旧lastError/failureCount保不永久锁。W16 gatedctor原语义保且已知openChain>0仍显式可见，不把queuebarrier冒全producer完成。03相关13/04接口8/05renderer0/06main0自然CLOSE0/signalnull/owned0/diff0；02原Qdriver.readRef外属type红保并由原owner修，未越写。command.json有START/PID/20s预算/actualCLOSE/source前后hash；w27-finite-write-barrier/w27-real-io-failure-recovery原件保。Q35红/4ms尾写不归190sCPU，Q36standalone0不替Q37原NodeTest完整业务复验。
+
+
+W28 START 2026-11-06T06:26:05.212491+00:00: Q39已自然0窗结束；session6D28837232DA177C289F820074E5EF94A3DA8EFEEADB8ED994E16A80236695AB，owned0/未START命令。消费O32prepare/finalize同公开口，稳定managerId、真实boundtask/run库存、run/task fence及exacthandle.stopAndInspect→owneddispose→queuecutoff+freshrev。deferred先工具真实blocked，真实sameCore/turn completedsettled后detached同plan；未知/取消拒、restart无distincttarget先prepare拒，不造票/不自等/不全局停别任务。
+
+
+W28 staged短交 2026-11-06T06:41:01.775301+00:00：source486F4761EBA4198BBEF01487EA673E14A3F0FD2C744AC88880F4BF2FBEE23667/test9C977E8CE0D598C594BF1E61D1CA21F60168BD59A2D13794D4601BB271EDE479。旧select Fn已消费O prepare→exact own handles stop/native lifecycle/stream drain→cutoff/runStops新rev→finalize；continue原语义，caller-in-set先blocked待sameCore/turn completedsettled，取消/未知/漂移拒，不selfwait。manager identity/actualboundtaskrun普通事实，W27 durable字段保；不造restart目标。06实际defaultCore/Chat customerconfirm→真实assigned草稿rapporteur两stop/restart请求均trunk-item-invalid/缺complete immutable pin，0runStops/所有live stopRequestedfalse，仅negative不冒强stop正链。07相关15/08接口8/09renderer0/10main0自然CLOSE0/signalnull，owned0/diff0。01原O外属7type红由owner修保，05sandbox首send false保，02/03空工具批次无commandmetadata且内部allSettled原因遗漏，实际reason未知/不倒填auto-review拒或Node错误（后续serial均显式捕获）。Q真实合法plan/stop/deferred/cancel/三mode尚待；生产freeze后释放，不等Q正链。
+
+
+W29 START 2026-11-06T06:53:48.463395+00:00: source486F4761EBA4198BBEF01487EA673E14A3F0FD2C744AC88880F4BF2FBEE23667，owned0。Q41rawflow q2-new真实；later publicselector readonly同flowmanifest t2，legacy activepinned verify违例intent missing(runsha前后同)，不倒填原private栈。O34现公口customer document-preparation返回真实source-bound planningdraft，不是oldexec：W只chief注册product/rapporteur且实际pinned文档准备分支消费；原NEW合法draft/真实handback路径保。flowscope与可选执行anchor分离，source缺/错flow0task，finalfresh公口+dispatchlease/真实worksource，不读私ledger、不伪run。
+
+
+W29 customer pinned文档准备子口checkpoint 2026-11-06T07:17:30.815276+00:00：source1017F00B8BF1644632373436A0D95DEE204DE81DA76262FA7EC6041734B5817E/test83948001049AD591E612B0BBCA97119A62B6689253349619D3C1428C76F03508。只session在actualchief→当前登记builtinproduct/rapporteur遇actualpinnedrun时改用现Pipeline prepareRoleDispatch(document-preparation)，冻结当前acceptedcustomer/native注册来源，返回真实独立run-docs draft+workSourceRef；finalappend前samepublicfresh核run/flow/basis/source并同dispatchlease登记。不把旧pin当创作授权，rawflow若丢锚明确0task。当前customer缺native注册或currentorigin失效0task；原NEW draft/creatorhandback未改作伪customer，也不提前要求未来executionpin。
+10真实defaultCore/Chat/ownedlocalHTTP：真init prepared→chiefclose applied→实际首文档/card/customerconfirm/首baseline applied→原creatorclose→nativepick取消→CHANGE，document-planning-source-unavailable且0新增task/0productHTTP，1/1自然CLOSE0。11main0/12相关14/08interface8/09renderer0，均自然CLOSE0/signalnull/20s预算内，owned0/diff0。
+保01真实requiredscope但.git不存在首write file-gate-host-facts-unproven（已elevated，非sandbox归因）；failedrootfreshscope required+rootsunknown/ENOENT原件存w29-failed-root-protection.json。04实际initprepared后close误传rawreceipt.ok严格拒，fixture只改抽合法字段；05实际init+chiefclose后提前全requiredcustomer调用docpublic被git-media-has-no-effective-ref拒，说明required不等已有文档基线，因此撤回提前通用路径保NEW。上述03/04/05红保，不松guard/断言/IO协议、不填假hostfacts。
+未完成：W29新增正/错flow两层fixture尚未实际命中existingpinned目标分支，未算通过/未删skip断言；当前新接口只pinnedcustomer子集，actual无pin但已有文档baseline的draftCHANGE尚缺freshpublic基线区分，不能用scope.required猜。真实pinnedCHANGE→productHTTP/report正链交Q42 cleanq39，creator-report sourceproducer待O；不冒W29完整绿/三mode/四链完成。
+
+
+W30 START 2026-11-06T07:36:33.286624+00:00：source1017F00B8BF1644632373436A0D95DEE204DE81DA76262FA7EC6041734B5817E/customerinputB64ECFB5EBB28B1FE2273706F746880C474498BCB51948919BDC8761BFE2F029，owned0。优先sameQ43request/实际v2卡marker/decision与R9核：App无intentfinalize私逻辑，O run-role1548-1566实际prepare/raw/finalize。真实v2migrationfreeze无sameintentconfirmed；staticService2552旧confirmed查找未分版本已交原O，不倒填当时appendcode/不先放planning。拟原chief-workflow真Core双版本卡响应负例，creatorReportproducer只准备不伪customer。
+
+
+W30 diagnostic checkpoint 2026-11-06T07:44:54.510726+00:00：production source0delta仍1017F00B8BF1644632373436A0D95DEE204DE81DA76262FA7EC6041734B5817E，testB6634ABBA79992C136CCC9A4688EB9E7DE9EC20882B68F2B63674652E4F60C77。sameQ43actualrequest marker/flow/intentId/decision一致；实际确认callback由O run-role prepare→raw→finalize消费，非W漏调用。02真defaultCore连续双版本write/card/confirm1/1自然0；07同真实prefix后stop/reopen先真实migrationfreeze再v2card/customerconfirm，实际reqreq-4d7e95ca3a800ffa已resolved，O freeze-start→freeze-pending且v2same-requestintentconfirmed缺，5.75s自然CLOSE1/signalnull，严格原断言保。08主type自然0，scope0放行。O新增diag最终code/message被common白名单过滤（实际只path/turn/tool），精确返回尚unknown已给原O；不拿旧v1find静态猜首因，v1path展开事实亦已纠正。
+01storewrapper缺失无START不算pass；03fixture赋值位置/04初始化前过早断言原件保，05fixtureawaitsend先于客户response自等，未resolved；实核12796父23736/worker24240命令/开始时间后依统筹授权仅stop24240，原runnerCLOSE1/cancelled1/230s，cleanup强终止失败非自然成功；07先保sendPromise→真card/respond→再await，无sleep/伪freeze。当前owned0。creatorReports准备只来自真实sendopts.inputProvenance/实际prompt-input，需OprivateCore+latestledger核，W未伪message/customer/从文字取report。问题尚待原O/G真实metadata过渡修，W不跨写，不冒卡answered=已确认、不宣Q43planning通过。
+
+
+W31 checkpoint 2026-11-06T07:55:28.929454+00:00：source1ED81840D19D06DD9006388A750788E78CDF7CCEBF23F7E766C90F8767CBE189/test95BB7B8B56D21619095E1EA2DCF5A42FC888ADB96FCA191C1C48848519A47C06，owned0。仅实际handback typed sendopts.inputProvenance snapshots四身份在samehandle真实onTurnStarted存Origin，actualpromptinput才accepted；当前source分customer/creator，parent.kind原样handback并交OpubliccreatorReports，期望kind与O真实receiptkind一致再exact4workref，finalfresh核kind/path/SHA/source/run/flow。actualmanaged/unknown专业文档准备走O已补emptyinit实际proof分支，unmanaged原draft保持；无Model/text/旧proof安全旗，无新写权。
+06真coldreopen迁移v2sameReqconfirmed+actualCorepromptinput四身份=持久creatorReports/sourceSHA1/1自然0；08existing真实baseline后customerDocChange实际run-docsdraft+源ref+productv2write/report1/1自然0；10wrongflow/source取消2/2；11原相关14/13接口8/12main0/14renderer0，均自然CLOSE0/signalnull/20s内。首01本人field误入SendResulttype红纠正为DeliveryOrigin，05仅测试eventunion按kind收窄；02五case组合超过预定20s且原3.5sawaitnotice超时，真实publication后来applied，不当业务拒或pass；改每次单case预定6.5s condition/20s overall而非sleep/续命，原红保。
+09必要M0反绕真实红：actualinit+productdraftreport后chief直接rapporteur，cards0且新childregistered，完整creatorSource不是批准。此Opublicgate缺口已交O37，W不读私ledger/补卡flag，不把当前source正例冒候选全绿，待O补gate后同09/06新号重核。
+证据完整性差额：w31-04运行前fixture固定w30-intent-v2-restart-proof.json未带label而覆盖旧07详细proof；原07command/output/原红/diagnostics/checkpoint和旧实际root保，原详细proof不声称完整。现proof统一actualrunlabel，w31-04当前新proof另存，未重造旧trace。w31-producer-readback明确postrunreadonly，不冒当时私origin值；actual同turn/provenance等值已由06运行断言。
+
+
+W32 checkpoint 2026-11-06T08:05:52.659759+00:00：production0delta/session1ED81840D19D06DD9006388A750788E78CDF7CCEBF23F7E766C90F8767CBE189，testCE8872BF7E5BEEE1E2083724A9D0B82470B1569ACC9037453E6102E2E59D4825，owned0。冻结O37/R24影响复验01原09M0cards0现严格0rapporteur-source/0task/0HTTP、原06cold实际迁移v2→真同卡客户confirm→R24committed工具回执+same request/version/path/SHA/presentedSnapshot冻结，2/2自然CLOSE0（PID14940/wrapper18712 08:03:08.291Z/20s预算内10.36s）。03actualcustomer专业Doc1/04原相关14/05interface8/06main0/07renderer0均自然CLOSE0/signalnull/预算内，源依赖beforeafter无漂移；只最后证据文件名细化后testhash与早behaviorbytes有别，生产源完全相同。原W31M0绕过红与W30cold红保，不覆/skip/改期待。
+本轮test加强0source、R24committed和exact版本path/snapshot同request条件，不用receipt文本代ledger批准；尚不宣完整Q44 cleanNEW→CHANGE/worker/三mode验收。
+证据命名差额追加：共享loop旧W29/W21/W28观察仍fixedname，W32-03等重复曾覆盖早同名详细观察（与W30旧07固定proof差额相同类别），旧command/output/diagnostic/独立checkpoint/实际root仍保，原详细观察不声称逐份完整；现已将这几个共享loop输出全部改actualrunlabel，后续不再复写。未重造旧trace。当前w32checkpoint逐command列actualclose/owned0/源hash，domain精确读回按本次真实proof记录。
+
+
+W33 checkpoint 2026-11-06T08:20:11.539802+00:00：production0delta/session1ED81840D19D06DD9006388A750788E78CDF7CCEBF23F7E766C90F8767CBE189，test6B7DA17F3DD385ACB4C6D509E9437C20A5BF4203140C70CA7F822FC417CE4A7B，owned0。现consumer只用publicclassifier ok退休已提交host信息，不比较sourceTask==boundtask/run、不重开旧工作，不需W生产改。09精确Q44 actualdefaultCore/Chat：真init报告handback内chiefclose→productDocPrep creatorreport源（parent.kindhandback/真实initreport身份）→真productwrite/report/creatoracceptedclose；同flow sourceDocRun≠旧ConvenerclosedInitRun通知capture真实bound/source，两者未改run，信息退休convener0prompt，真客户intentcard后续合法product任务+报告到chief继续，1/1自然CLOSE0（PID10232 08:19:27.687Z/3.24s/20s内）；10finalmain0/08interface8自然0/diff0。
+02真实root选择前拒尚未到classifier，postrunpublicfacts无reasons不能倒填首拒原因；O后补了原拒真实facts未松守卫。03/04实际投影convener已退休、chief等客户card同op仍排队，本人test错等所有recipient造成红，修为仅目标convener不丢chief/其它项；原投影/红保。05单customer源变体1/1，09再加强为真实creator源与Q44一致。06组合14原casepass但后真init因此前customCore disposed终态unknown被git-old-core-programs-unproven正确拒，整体自然CLOSE1；不清registry/不放终态/不冒15全绿，不拿新Node positive抹该组合负例。原wrongsource/closedparent/workreport等14的实际通过保持分列。
+原W32 M0缺确认0source/task和coldsameReqdomaincommitted证据不在本轮改期望。新case所有raw投影runlabel化，W19三旧观察名本次也改label化防继续覆写；既往fixedname历史差额仍保先前记录不重造。Q45完整cleanNEW仍待，不用Q44失败seed，不冒CHANGE或全部3mode通过。
+
+
+W34 checkpoint 2026-11-06T08:33:58.048283+00:00：sourceDC0F9798975F0EC157F20E3EC0B35CBFB52B81A91982C97FC6014C37843AADE2/test0E8277D452F3AB2B85C0F3135AE20A4CB8823A760BF96E8927C624D878444E08，owned0，production已冻结。Chief→Convener真实handback四身份/parent.kind传同公开口，保存O39team-planning真实run-plan draft/flow/source为anchor，跳旧pinnedadvisory；finalappend前同publicfresh核flow/run/basis/sourcekind/path/SHA/currentorigin/selection并持原critical。repo-init仍customer专属，未赋executionpin。
+03 actualdefaultCore/Chat：实际init/客户intentcard→Rapporteur真实write六份材料→Product首发布applied→Chiefacceptedclose→同creatorhandback派Convener，真实TaskCreatedflow/run-plan draft/creator source及ConvenerHTTP过，1/1自然CLOSE0（08:32:13.361Z/9.56s/25s内）；01/04main0/diff0。未造D3/pin/teamcompleted。Q46另真complete_team_plan/done，后Chiefclosebasis归O源purpose误走init，不冒fullNEW。
+02原6.5s从confirm起混publication前缀，teamtool仅1.876s即cleanupabort；真实run-plan/source已落不能倒填scope拒/锁环。25s超后按精确身份test25312父12940/worker23684仅停ownedworker，原runnerCLOSE1/null/171s强cleanup失败保，不冒自然pass。03预声明分publicationclose/team两milestone，18/20/25s预算，无运行中续时/sleep。team缺源/错flow专门反例W34未单验，不冒全覆盖。新raw label化/旧红保。
+
+
+W36 I5 ordinary hub checkpoint 2026-11-06T09:22:27.936111+00:00：sessionC23FA9563F2D5AFAB645C9558E05C142389FE1665A6283C221172C756CFCE6D2/test0EE0C0B9E118D182A01DA3599470C03FB27EC5284BB808EBCA6C6BC463BD3B8B，owned0。按RootP1.1 A151C2DB…DE79F39/H01-H10原范围，Chief当前customer或actualhandback源统一5个当前登记builtin；同publicbuiltin-preparation回执真run-hub draft/hubRouting/source保存/finalfresh，不再M0/已完成plan/前close/D3作为普通route票，不落legacy可选pin降裸。新Convener→Verifier入口拒，旧记录from/parent/报告不改；worker原真实Convener parent/frozen module/执行门不放宽。Hub child真实assignedopen状态仍fresh核。
+03 actualdefaultCore/Chat/localHTTP：无M0-plan-D3五target均TaskCreated.fromchief/hubRouting/run-hubdraft并真实blocked报告回Chief，普通Verifier无CID可达。HR实际write首拒file-gate-host-facts-unproven/零文件，只证write仍拒，不冒D3单独覆盖。未接resumeController明确unavailable不造普通新task，缺flow明确拒不落裸task，两negative均0新增/0targetHTTP。1/1自然CLOSE0(09:21:06.267Z/2.11s/25s内)；02main0/04interface8/05renderer0/diff0。新rawactualrunlabel/依赖beforeafter见checkpoint。
+Explicitfinalreview仍failclosed待独立controller公口，resume仅notready拒、未宣成功；必要action init/pub/plan/D3/8refs/quality/stop仍原owner校验。旧W31/35 serialticket测试结果只是历史，受I5影响案例尚待后继改期望/全量，不能用本1+8通过冒全套/HB2/四链。W35diff保留但其专用purpose不再普通hub授权条件，不回滚旧历史。
+
+
+W37阶段：新增Chief显式finalreview公开双ref/source初末fresh消费；resume只验证当前实际Chief请求，独立dequeue freshness口缺时明确blocked/未入队，不让合法初检冒busy运输成功。真实新负例见w37-02-no-authority（普通5target仍可；无finalreview的resume及缺实际integration的显式review0新增task/HTTP）；finalCID/acceptedresume正链未验证，等原O查询再续。当前Q49外属type红已报，不跨写。
+
+
+W37 checkpoint 2026-11-06T09:55:58.289670+00:00：sessionE193E1CB2E7A9CC7EC115D117F342880A6620C9975D38C350DAA506B2E6FA3CC/test6ADD8383C85B65FE469641ECB0806DA7BD3E3E4224D5588E76D9D345AB958C67，owned0。Chief显式reviewTarget用真实current信封+public prepare，保存独立reviewControllerRef/reviewBasisRef/source/hubRouting/真实pinnedflowrun，无Convenerparent；finalappend前fresh同controller/CID/criteria/source，普通Verifier无CID仍hub准备。capturedChiefSource小private纯装配复用actualcustomer/报告四身份/turn/selection，非Service能力。
+resume初publicprepare实际接通；实际busydequeue需独立review/CIDfresh，原prepare要求当前Chiefactive不能要求父turn永远running，已报O/S必要inspectQueuedControllerResume普通公口。当前合法初检也明确controller-resume-freshness-unavailable/未入队未创建Task，未部署裸队列成功分支，不selfwait/不拿sourceTaskId冒parent。后继真实acceptedqueue/ACK/重复/取消/restart尚未证明。
+02与04实际defaultCore/Chat普通5角色仍通；无actualfinalreview的resume精确trunk-item-invalid/Resume names no actual Chief-created final review拒，期望CID但无integration的Chiefexplicitreview精确Final review target has no actual same-flow integration controller拒，均0新增task/0targetHTTP；未假seedaccepted/ref/pin。04自然1/1、05interface8、06renderer0/diff0。01initialmain0；03finalmain自然exit1唯一外属Q49test474:89 evidence可能undefined，W源码0diagnostic，未跨写/不冒全type0。所有command自然CLOSE/signalnull/25s内，未forceexit/旧红不改。finalCID正链和transport后半不冒ready，短交释放O口。
+
+
+W38 checkpoint 2026-11-06T10:11:04.696Z：session87ca250f0cc280f8a751282fd7d7f90028a261b97aaae69c8f78d307db5583b6/testf99538a2dd529c485d7d1ca328bfbe0e1af469f710be3f29faf2aec0d614d2fa，production FROZEN/owned0。原Pipeline prepareControllerResume接入：真实当前Chief初末fresh后仅排原controller任务，item密封exact5+resumeKey+basisDigest，稳定键/实际ACK去重；lease不跨drain/open。出队、boundary rebuild后及handle.send前调用inspectQueuedControllerResume，不要求Chief旧turn常驻、不创建Task/不冒sourceTaskId。磁盘parser严格校验并restore保密封metadata，缺metadata的hub-resume拒降普通任务。未受理/过期回执仅拒该运输项并向Chief报实际code，原Task事实保，未ACK不记delivered/不自动忙retry；blocked报告但仍live controller允许受合法续接检查，closed仍拒。
+07负例两分支1case自然1/1：未受理receipt真公口controller-resume-queue-source-unproven，0runtime open/0task，真实队列写回；缺metadata跳过不裸投。08普通5target+该负例2/2，09interface8，10main0/11renderer0，全部自然CLOSE0/signalnull/25s内，diffcheck0。02真实漏传metadata首红已修；03错误stop期望与05未命中newline导致原错误保，07按实际no-session stopfalse但cutoff完成验证，不放宽安全结果。
+本阶段不宣accepted finalCID运输正链、busy/迟报/cancel完整矩阵或重启恢复通过。重启无O私有受理登记仍拒；重新prepare不证明旧program停稳/未决副作用结束，不清库存/fence。Q49须按实际FROZEN→S GO另验完整NEW正链。
+
+
+W39 START 2026-11-06T10:32:56.120Z：source87CA250F0CC280F8A751282FD7D7F90028A261B97AAAE69C8F78D307DB5583B6/owned0。只读Q52 postrun manifest缺schemas，legacy validator精确run-manifest-invalid，未捕当时private frozen.run故不倒填首谓词。先caller错误分shape/state/identity保原prefix，再合法Pipeline只读context及纯validator对照；O核runDTO producer差，不移除校验/不补伪schema/不改旧root。
+
+
+W39 2026-11-06T10:35:09.416Z FROZEN/owned0：session0cfbb5aa834bdad12b2b3679ebbd176871a369865473c4b39ef2d3c17f4856df，testf99538a2dd529c485d7d1ca328bfbe0e1af469f710be3f29faf2aec0d614d2fa本轮0delta。Q52 actualparent=t-mw4u0q59-8bf07134/run-hub-ade609…817；01真public只读readRunRoleContext(impl)成功，但原manifest同bytes validateRunManifest精确run-manifest-invalid/manifest.schemas必须是对象，前后SHA不变。这是postrun对照，不冒原privatefrozen.run/当时失败谓词已捕。O47新Hubrun producer补实际run envelope schema并385真freeze组件2/2，common不改/旧pinned不补，W未改O/旧root。
+原session失败现透shape原code/reason/实际parent/run/flow，identity不符透state与actual/expected runflow，保worker-freeze-return-invalid前缀与全部原validator/immutable8refs/Gitbasis/parent/module强核。02main0、03默认Core/Chat普通hub与未受理resume2/2、04interface8、05renderer0/diff0，全部25s内自然CLOSE0/signalnull。01首次wrapper内存丢失在START前抛，无child不算pass；重建wrapper后的01自然0原件存。只读proof与command beforeafter字节齐；不冒worker已投/HTTP正链，交Q53完整实际caller验证。
+
+
+W40 START 2026-11-06T10:40:36.187Z：source0CFBB5AA834BDAD12B2B3679EBBD176871A369865473C4B39EF2D3C17F4856DF/owned0。Q53postrun exactpublic inspectAssignedTask真实ok/kindreview但value无workSourceRef，Wpreenqueue本地expectedsourceId/SHA比较失败；原private返回未捕不倒填。精确差额直O49，不删校验/不改旧root。先失败实际code+source比较诊断，再真实readonly proof/必要类型回归。
+
+
+W40 2026-11-06T10:41:45.856Z FROZEN/owned0：sessionbe1c6c9b67b5f3758387f3abd186abdbe87278d6289a33de1b5b232193317a65；测试0delta仍f99538a2dd529c485d7d1ca328bfbe0e1af469f710be3f29faf2aec0d614d2fa。Q53 exactReview t-mw4uc85j-39f7b8f2，前补真实public inspect成功kindreview但遗漏workSourceRef，Wpreenqueue本地强source比较会拒；原private首值未捕不倒填。O49 Service只返回已readAssignedReviewContext核sourcebytes/双ref/controller后的真实TaskCreated source，不删W比较。01后修同Task publicreadback四字段逐项同值、本地比较true，ledgerSHA前后90a871a4…ca938相同；不重开/删除/重派旧任务。
+W仅泛错误细分真实Servicecode/message或assigned-child-work-source-mismatch及expected/actual sourceId/SHA，仍recordTaskFailure保assigned-child-unavailable-before-enqueue前缀，不造新业务分支/不放宽fresh。02main0/03普通hub+未受理resume2/2/04interface8/05renderer0/diff0，所有wrapper25s内自然CLOSE0/signalnull；未造reviewseed/accepted/pin，真正Verifier投递与质量后续留Q54 full。
+
+
+W41 2026-11-06T10:47:59.772Z readonly/production0delta/test0delta/owned0：sessionbe1c6c9b67b5f3758387f3abd186abdbe87278d6289a33de1b5b232193317a65原W40冻结字节保。Q54 acceptedreview后actual exact5已从call q48-resume-controller核：{"taskId":"t-mw4ujkdt-1d840b50","flowId":"q2-new","runId":"run-hub-40f734fe1b0fd48a5a933f3aab46dcdcfcf4353bd78c107f","reviewTaskId":"t-mw4ukcsq-7fc630a9","reviewCloseOperationId":"q25-close-verifier"}。同一input原对象传首次prepare与lease内末fresh，无tuple/hostkind转换；实际trunk-item-invalid/Actual accepted review evidence changed before resume原样透自Service1779所有authority.liveFiles+authorityFiles逐file读取/hash，不能仅qualitymd同SHA推其它文件不变。原日志未区分初/末prepare和具体失败file，保持未知；未证W丢来源/改参数，不造诊断业务分支/不删fresh/不改rolecreator。只读证据w41-readonly-checkpoint；无新测试/类型行为通过主张，复用未改W40源类型证据，真实resume/publication留O50+Q55。
+
+
+W42 2026-11-06T11:01:11.958Z FROZEN/owned0：sessiond4d06ebf38748250b2d57a7d5de5a5a38d6651e2f63fd9f1b6b8661f1a591431/test2ca8d2f021638d5c14b4dc6106bd0d0ea1632c158873e85aaa50e43ef04ade82。基线BE1C…3317A65；源码只resume end失败处理/真实persistence seq,outcome,claim开始结束时库存rev发布，未改Provider/R/外锁规则。首01 10:58:17.334Z真实manager.restore+stopfence/ownbegin(dispatch)/publicwatchdogqueue/end同rev，实际git-host-inventory-revision-conflict且dispatch仍持；diff精确deliveryQueuePersistence enqueuedSeq0→1,pending0→1,claims0→1。fixture无Task/审批/pin/SDK，0runtime，失败证据保，不拿它倒填Q55原end/lease未知。
+修后02原断言1/1；03 W27真实durability/IO失败恢复及W42 3/3，保持队列/真实file1条，自己dispatch释放后下一session-open可得并合法end，未构造runtime。04 ordinaryhub/resume拒2/2、05interface8、06main0、07renderer0/diff0，全部25s内自然CLOSE0/signalnull。Actualclaim/persistence新事实仅普通观测不抬safe；resume ownend若失败不再虚报受理或自动drain，原项保留/原错误明确，不擅释放外lease，不poll/unref/forceexit/清库存。
+未证明Q55 private原错误码/具体持锁者，未清旧openfailed unknowneffects，不冒完整acceptedresume/pub/重启停稳通过。Q56同完整生产链另验；w42-checkpoint及before/after lease原件齐。
+
+
+W43 START 2026-11-06T12:14:08.692Z：基线D4D06EBF38748250B2D57A7D5DE5A5A38D6651E2F63FD9F1B6B8661F1A591431/owned0。只Chief→真实builtinConvener Hub可接受O422public execution来源，actualcreator-report/回执run/state与初末kind/basis/source一致；普通planning draft保，不解析私selection/不Modelreplacementid/不伪seed。先主type与ordinary defaultCore回归，正链交Q实际producer。
+
+
+W43 2026-11-06T12:15:24.217Z ownerFROZEN/owned0：session240d887d4cbd621ede3116ac22b0c82892472b0d5fc5a93c504ca051fcc05c4e，test2ca8d2f021638d5c14b4dc6106bd0d0ea1632c158873e85aaa50e43ef04ade82本轮0delta。原publicprepareRoleDispatch execution仅Chief→当前真实builtinConvener Hub、actualcreator-report接受；purpose/hub/run/flow/source纯guard保持，TaskCreated.runState按actualkind execution=pinned/planning=draft，finalfresh kind必须与initial同并对应state，run/basis/source全字段原严格比较不减。其它builtin普通planningdraft/finalreview独立refs/旧历史保，不ModelreplacementID/不解析私executionRunSelection/不造parent或pin。
+01main0/02actualdefaultCore普通5targetdraft+既有缺flow/缺finalreview零task及未受理resume2/2/03interface8/04renderer0/diff0；所有25s内自然CLOSE0/signalnull。未造真实restartselection正seed，未宣三mode/实际replacement投递通过，由O56 producer定向与Q实际完整源正链另验。仅Wowner源冻结，不冒O仍定向时全仓冻结，S后继统一候选锁窗。
+
+
+W45 2026-11-06T12:42:33.602Z ownerFROZEN/owned0：source6a80984644d56e37a56ad4f53e65fc71c1c74c234ac8ddf9dea3f4331fe097fe/testf6b4ad8332fe37db1dc4518ebf8a64f9ecc056a49a3c7496d9cce70ab6f9f1f0，原W43及所有旧diff保。W44静态差额真实运输层复现：01原root+NUL筛抽到同生产wait路径，真实恢复oldtransport队列项/owned无SDKopen仍hold却wait-complete0，12:39:07.360Z PID26180自然CLOSE1，非Q61首因。无业务ledger/run/pin/批准seed，0Modelsend，finally只自身stopfence与释放own gate。
+每实际claim私记root/selected真实运输taskIDs/done，stop同waitForRunStopDeliveryClaims先等affected交集再fresh捕detachedsend/reportcommits，不join整root；未定归属/run-stop-claim-source-unproven、取消/run-stop-claim-wait-cancelled、后续affected变化/run-stop-claim-source-changed保持blocked，不重试回环。handback完整选择前来源未知，真正选定batch后更新actualIDs。私done在actual认领段finally结束才完成；全inventory.deliveryClaims是真所有claimrecords.size，不用筛后0，原native实例/managerfence/cutoff/最终globalproducer强核不变。host方法仅观察等待完成，不是safe/nativeStopped/权限/停止命令。
+13四实际case自然4/4：affected真等待、同root非stopset不会selfwait且publicinventoryproducer仍1、unknown/cancel真拒；04 transport7/05普通hub2/06interface8、12main0/07renderer0/diff0，均20s预算内自然CLOSE/signalnull。03/08本人unusedfactory参数类型红保原件，改明确unusedthrow无cast/guard删；最终真实运输断言不减。晚claim业务竞争/完整stop-restart正链未宣，globalproducer非零可能保守拒finalize但不自等。O/R/Provider0改，无新文件/Model/IPC票。
+
+
+窄IO W46 START 2026-11-06T15:21:23.925Z：version-change基线23E4A0942EB1FD41FC60D2F07691F225C04CB2F4852E1D6FDBF9F6A57ABBA277/owned0。原已授同文件改privateinstall→Pipeline refreshStableWritePermitSnapshot/root显式，初始化只维护普通restored投影，读失败先clear；runtime终于刷新完整candidate后旧restored投影finallyclear，避免fallback过期恢复对象。无Service/Provider新直导/不改权限Map，O源码在飞不cast/不冒全仓freeze。
+
+
+窄IO W46 2026-11-06T15:25:16.471Z ownerFROZEN/owned0：version-changec46bf6f0710466dfcfff3a2d2f572b020c61c924d4e8a54a9102f855789444ab/testc4bbd06da2c201a74cdef461ac562d73fc7b3feceb7ab3d9950c49290aa0b2a4。移除privateGinstall导入（纯stableWritePathOf保），runtime显式projectRoot=root，initialize/rebuild只调publicPipeline refreshStableWritePermitSnapshot并维护原restoredPermits投影；失败先清旧投影，实际G唯一Map由O→G安装，无InterfaceService list/findPermit兜底/新Map/自算TTL。四runtime调用finally同publicrebuild，不是简单clear：request invalid/未答可在approve前返回，需保另一仍有效恢复许可；runtime权威finally由O，桌面只普通lookup重建。初始memo单clear拟稿已纠正未作为最终语义。
+01/03main0，02原stable确认Gate允许→consume、拒绝、哈希失败、restartrestore4/4；04真实新restore→invalid/未答保旧有效permit→ownedrecords坏JSON读失败真实抛并清旧/Gate拒→修复bytes后恢复，wrongroot与expiry拒1/1。所有30s预算内自然CLOSE0/signalnull/diff0。最后私导/直list-findPermit rg无匹配exit1属预期，不冒测试红/忽略失败。无新增source/test文件，无真实模型/权限/IPC变更；是合法fixture Service/FS/Gate行为，不宣Q73完整Core/app写入业务通过。生产owner源暂停，整体候选仍S统一freeze/GO。
+
+
+W47 2026-11-06T16:02:21.702Z test-only/production0delta/owned0：chiefworkflow1f464ebcc2885e26c50b7659b32bc08a90d3be3c6b522c363d9becddd38a162e；session6a80984644d56e37a56ad4f53e65fc71c1c74c234ac8ddf9dea3f4331fe097fe/customerInputb64ecfb5ebb28b1fe2273706f746880c474498bcb51948919bdc8761bfe2f029不改。新增真正defaultCore/defaultCodex+本地HTTP两case，无providerFactories/custom/demo覆盖，独立Chief实际Core/native ID与主Chief不同、factorydefaultproduction、HTTP registry仅ans_decide_pending_request。root只trio配置与真实owned材料（无accepted:true/伪Goal/私receipt/hostsafe），实际客户delegation开关rev1+当前业务request/evidenceSHA/body→typedtrustedsource。主ChiefHTTP仍inflight/providerFinishedfalse时，原rapporteur实际request_choice等待；independent选择非推荐alternate或卡无退修选项时revise→真实declined+理由释放调用，主Chief随后正常恢复。
+04两case2/2/合计10HTTP/0servererror/0人工卡，03main0/diff0，全部20s预算内自然CLOSE0/signalnull。02原select末断言把ledgerchoice误期待answered，实际alternate，正确精确修为alternate；原自然red保，第一失败select详细proof未在末assert前落盘，原ownedroot/audit/command保，不重造原trace。revise首case已过，最终两case原始contexts/realtoolmessages/audit/Corefacts见label化proof。旧custom/demohelper仍旧历史不当新default正例。
+范围只此真实goal/context/channel/defaultCodex忙中业务代决策；不是UI勾选、三nativeengine全支持、补材write重提或唯一B2。关开关/旧rev/CAS/旧preset/fallback按未改依赖最小复用，未冒本轮重跑全矩阵；其他缺口S后继派。
+
+
+W48 2026-11-06T17:52:39.412Z partialFROZEN/owned0：session840f509f8b339664b1c7413b15ffbd35340bbf6c9a34d99e202e4a7a68d10b7f/test04303fc4dab0a6e18e1e9647f5fb889a0b2431a969da0b171c35c4883df53f64，O472Pipeline46830025544f67f6b6113026ce06a2384cd8c0767dfbf0e5b865669eedfc4fbb/R2907673e4ea02394a0925f8a90c2da26b73c0ab791a16ab85ec68c501b1e0d14。原publicControllerStop消费落：真实Chief私entry/origin/Core/turn→exacttaskpublicprepare；managedConvener无task拒、不latest猜；exacthandles/native/run核、只targettaskfence/controllerStops、真实native停与eventconsumer/affectedclaims(排callingChief同entryorigin)/reports/cutoff后publicfinal。私own-disposal对象Set严格op/root/kind/lease/hostid绑定；不为旧foreign/emergency跳中断。去原Chief代目标fromchief failedreport，保role.terminated观察；未写taskclosed/run取消/质量许可。
+06真DefaultCore/Codex loopback：两个普通Hub实际draftcontroller/正式blocked报告，无伪pin/approval；缺task、absent、旧task当前角色已绑不同run均实际未确认，目标native未stop/报告不污染。exact新target确同Core/native quiescent/disposed/affectedproducer0/committedcutoff，但publicfinal仍controller-stop-host-lease-unproven，positive断言自然红保。已证W通用disposeEntry自中断修为严格own对象路径不自撤，R stopAndInspect822/core-dispose1026仍真实recordInterruption，W不跳R/清interrupted。同步endownold→beginnewinspectionlease候选仅给S/O核，**未实施**，不冒stop正例。Provider同rootanylease与跨rootGitmutation同步互斥，interruptedlease保mutex未释放，不为保own漏foreignmutation。
+07main0/08interface8/09producer5/10defaultChief2/11renderer0/diff0，自然CLOSE0/signalnull；01本人fixture变量推断/02过早取receipt/03QA在飞union/04与06真实lease拒原件保。当前所有owned自然终态/无helper/PID，测试强positive仍红未skip/改期待。源暂停立即交O契约只读核，未宣A负向停止通过/全局readiness。
+
+
+W49 2026-11-06T18:01:51.681Z ownerFROZEN/owned0：sessionb92ac8fef31e2e8c3622e05a8430f0bc89c907c88440f518919a44d79a8841cf/test6f62f7c7798bcf4cdeeb69826dee3571f78e078f912531d3dc8b4849fc72471b。按原O只读合同确认，在真实effects/native/dispose/targetclaims-report/cutoff完成后，严格私held对象/op/root/kind/exacthostids→end自己旧effectlease必须ok→紧邻begin(session-dispose,expectedCoordinatorRevision=end.rev)必须ok，无await/hook空窗；新lease仅publicfinalinspection、不再stop/dispose，不清interrupted/继承旧证明。不是OS/跨进程原子/连续持锁，foreignlease从不释放，任一拒真实失败。O/R/Model/Provider0改。
+01main0/02原W48强正断言自然1/1；03main0/04actualdefaultCore/Codex loopback四模式4/4(75HTTP/约2.9s)，全25s内自然CLOSE0/signalnull/diff0。normal真实exactcontroller sealed同Core/native/currentcommittedcutoff/affected0→O final确认，原Convener报告未变/Task未closed。每模式缺task/absent/旧task同role已绑不同run均0stop当前实例。foreign在真正Chief工具调用时持另gitmutationlease→busy且该lease保，目标native不stop。newinterrupt在cutoffrev215→inspection217之后真recordInterruption→finalsource-stale；late-Chief-source调用真实UIabort，actualsend aborted、无成功receipt、ownlease最终清。未伪目标late-report/不冒晚报告矩阵、三native/OS子进程/整run停止/质量发布/B2通过。旧W48/06完整首红原件保。S后续统一整个候选锁窗，现仅W源停写。
+
+
+## W52 — I5 fixture maintenance checkpoint (2026-11-07)
+
+仅改原 `test/桌面应用/chief-workflow.test.ts`：真实 Hub/source 无执行增权、actual report 错流/M0 发布拒、真实角色归属及定向资源清理；按实际 CoreID 关联后隔离旧 custom fixture，未知事实不清除。
+最终整文件 `w52-47` 自然 EXIT/CLOSE1/null，58 tests = 43 pass + 15 fail（含 2 个父测试失败），无 watchdog；主 type `w52-46` 自然0，diff-check0。未宣整文件通过。
+生产 session 保持 B92AC8FEF31E2E8C3622E05A8430F0BC89C907C88440F518919A44D79A8841CF；test FROZEN 01C97535F63BF2FE6B3FA74DBCDD1DA139A308913E3AE41C9A9ABD69880E674A。
+精确失败/primary/ENOTEMPTY 原件见本人 evidence `w52-final-failure-projection.json` 与 `w52-47-final-owned-whole-output.txt`；晚 IO 写者/因果未定，不改 R/Core/SDK。正常环境精确 PID 与子链核 owned0，未执行 stop；见 `w52-owned-final.json`。早前 w52-33 为获授权失败取消，w52-41/47 为自然退出，三者不混记。

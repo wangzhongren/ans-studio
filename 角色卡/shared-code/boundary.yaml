@@ -1,0 +1,39 @@
+# 共享代码维护角色边界 —— Section 1 唯一写入白名单
+# 未列路径默认只读。新增/变更路径须先由 ANS 人事更新本文件并经客户确认。
+# 模块纪律：src/common/shared/ 为既有共享资产（维护/迁移，不重写）；共享 API 变更须评审记录 + 消费者影响清单 + 测试；
+# 单一 owner：不写 src/common/gates/、不写角色模块；不从引擎复制实现；共享不 import 门/角色。
+role: shared-code
+entries:
+  - kind: directory
+    path: src/common/shared/
+    purpose: 跨角色共享组件（既有模块维护/迁移，不是重写；共享 API 变更须评审记录 + 消费者影响清单 + 测试）
+  - kind: directory
+    path: test/项目管理/shared/
+    purpose: 共享组件单元测试与夹具（自项目管理移交；路径保持历史名，改名另立变更）
+  - kind: file
+    path: 角色卡/shared-code/docs/architecture/shared-components.md
+    purpose: 共享组件现行目录（自项目管理迁入，单文件授权；§6.4 迁移在 E1 完成）
+  - kind: file
+    path: 角色卡/shared-code/feature-map.md
+    purpose: 功能导航
+  - kind: file
+    path: 角色卡/shared-code/memo.md
+    purpose: 本角色工作备忘录
+  - kind: file
+    path: 角色卡/shared-code/functional-description.md
+    purpose: 实际职责、交接与代码位置
+  - kind: file
+    path: 角色卡/shared-code/api-spec.md
+    purpose: 模块 public API 实现报告
+  - kind: directory
+    path: 角色卡/shared-code/docs/design/
+    purpose: 设计记录
+  - kind: directory
+    path: 角色卡/shared-code/docs/feature/
+    purpose: 稳定功能说明与流程图
+  - kind: directory
+    path: 角色卡/shared-code/docs/change/
+    purpose: 变更记录与证据
+  - kind: directory
+    path: 角色卡/shared-code/docs/fix/
+    purpose: 修复记录

@@ -1,5 +1,58 @@
 # 门禁引擎公开接口：角色协作组摘要
 
+## E0.2 对齐 D1/D2/D9/D10（2026-11-07；E0 冻结前，未判验收/未冻结）
+
+依据 `docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md`（681 行 / 53674 bytes / `798ce9ce0d23cfd0fcc73c021d0510e517e9a34d6a22c45907605a442550b3fc`，取代 E0.1 `3830fe63…`）§3.1/§10.2；**D3–D8 维持现状**（不重做、不改行为）。证据：`角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence.md`「E0.2 对齐 D1/D2/D9/D10」节。
+
+- **D1 已落（14 id + 映射 + 允许集校验 fail-closed）**：`src/model/role.ts::RoleToolId` 扩为 14 id；新增 `RoleToolName`（14 snake_case，逐字按 §3.1）；`RoleToolPolicy.tools` 保持 `readonly RoleToolId[]`。**id→name→允许角色唯一来源**是新增私有纯模块 `src/common/门禁引擎/role-tool-registry.ts::ROLE_TOOL_CATALOG`（14 项，顺序与 §3.1 表一致）；`roleToolCatalogEntryOf(id)` / `roleToolNameOf(id)` 对未知 id 返回 `undefined`（不猜、不兜底）。E1 引擎装配校验口：
+
+  ```ts
+  validateRoleToolDeclaration(
+    roleId: string,
+    declaredToolIds: readonly string[],
+  ): {
+    allow: boolean;
+    tools: readonly { id: RoleToolId; name: RoleToolName }[];
+    reasons: readonly RolePolicyReason[];
+  }
+  ```
+
+  未知 id / 越权 id（角色允许集之外）/ 重复声明 ⇒ **整单 `allow: false`、`tools: []`、`reasons` 逐项**（不注入、不静默忽略；调用方不得从 deny 结果挑合法项注入）；空声明 ⇒ `allow: true`、`tools: []`。Model 闭集与装配表漂移（Model 有、表无）由 lookup 未命中按未知 id fail-closed；逐项一致由契约测试断言。`decidePendingRequest` 允许角色只有 chief，装配项标 `chiefIndependentDecisionOnly: true`；普通 chief 会话不因声明获得——校验函数只判允许集，会话模式由引擎调用点（`chiefDecisionContext` / `buildChiefDecisionTools`）判定。
+- **D2 已接受**：`governance-roles.ts::builtInRoleModuleDataOf(id)` 零复制门面 lookup 即 E0 产物，E0 不新增完整 map；完整 `builtInRoleModules: BuiltInRoleModuleMap` 在 E1 六模块落地后由门面装配，E2 删除内联规格。
+- **D9 已记录口径**：Model 内 type-only 边豁免（`role.ts↔runtime.ts`、既有 `download.ts` 例外）；禁 value import 反向/环；type-only 共享原语单列。E0 以 `role.ts` 头部注释 + 契约测试（读取两文件源码断言互引仅 `import type`、无 value import）记录；模块图扫描脚本属 E1 gates-code/E3。
+- **D10 已声明**：模块 spec 的 `capabilities` 为唯一真源，`tools()` 输出为派生；类型断言 `BuiltInRoleModule["capabilities"]` 与 `RoleToolPolicy["capabilities"]` 均等于 `GovernanceCapabilities`，契约测试断言 `tools().capabilities` 与模块 spec 同引用。完整模块约束在 E1 接口评审落地。
+- **测试/静态门**：契约测试 8 → **14/14 pass**（新增 D1×4 + D9 + D10；原 8 项未删除/未放宽）；门禁引擎套件 413/407/5/0/1 → **419/413/5/0/1**（新增确定性失败 0、新 skip 0，既有 5 红逐条不变）；`npm run typecheck` exit 0；契约四文件隔离 tsc exit 0。
+- **写后哈希**：`src/model/role.ts` `d5e550a06514b8a61fc66b517a267343ba95d8aa29050eb6ee3c7b7f9b5f8780`（409 行）；`src/common/门禁引擎/governance-roles.ts` `fddda111cb1ea76614f632f931441d45e534e4f9f23297193615fbdf525cd16e`（794 行）；`src/common/门禁引擎/role-tool-registry.ts` `9aca72a5f64e22bc5c68af0997d04200faec58d7762563f02ab09aafd469389b`（157 行，新增）；`test/门禁引擎/role-module-contract.test.ts` `bb0904c90a8dc070d9a8fe4b53031f123c3136aefea0a4e284a164cce6d9d9f1`（595 行）。
+
+## E0 D1–D8 落地（2026-11-07；E0 冻结前精确 delta）
+
+> E0.2 对齐（见上方节）已把 D1 扩为 14 id 并落映射/允许表/校验函数；本节保留为首次落地记录，D1 五 id 描述以 E0.2 节为准。
+
+依据 `docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md`（574 行 / 43032 bytes / `3830fe636849a89e5f604546420cffc0e78f862ab1e345cf4904b91ae1ed04b9`）§10.2；只落 E0 冻结前 delta，不扩大范围、不判验收、不宣布冻结。证据：`角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence.md` 新增「D1–D8 落地」节。
+
+- **D1 已落**：`src/model/role.ts` 新增 `RoleToolId` 五 id 闭集（`roleActivityLog` / `terminateRoleRun` / `redispatchTask` / `projectNote` / `requestVersionDecision`）；`RoleToolPolicy.tools` 收窄为 `readonly RoleToolId[]`；注释写明未知 id 由引擎装配 fail-closed（不注入、不静默忽略），新增 id 走接口评审（契约 §4.4）。
+- **Q5 核对（未自行扩闭集）**：`run-role.ts:1697-1705` 的五个 id 恰为 chief-only 额外注入；另发现现有 role-specific 直接能力工具未列入闭集：`requestRequirementChange`（rapporteur/convener）、`submitVersionChange`（product/rapporteur）、`selectRunChange`（rapporteur）、`completeTeamPlan`（convener）、`activateRoleDocuments`（nominator）、`closeCreatedTask`（chief/convener）、`submitRefactor`（convener）、`requestStableWrite`（convener）。`decidePendingRequest` 仅判断会话注入；`governanceMatrix`（六内置）与 `projectState`（全部内置治理含 su）为共有工具；`installSkill`/`uninstallSkill`/`installMcp`/`uninstallMcp`、`dispatchTask`/`roleStatus`/`sessionTail`、`customerInput`/shell 由能力位表达。上述缺口清单交 E0 评审分类（扩闭集或明确归引擎直接能力），本节点不扩集。
+- **D2 类型已落；门面为 E0 零复制数据投影**：`src/model/role.ts` 新增 `BuiltInRoleModuleMap = Readonly<Record<BuiltInRoleId, BuiltInRoleModule>>`。`governance-roles.ts` 新增 `BuiltInRoleModuleData`（`Omit` 掉 `cards` 与四策略面）、`BUILT_IN_ROLE_MODULE_DATA`（从 `BUILT_IN_GOVERNANCE_ROLES` 装配，`entries`/`preauthorizedDirs`/`forbiddenWritePaths`/`capabilities` 保持同一引用，**零数据复制**）与 lookup `builtInRoleModuleDataOf(id)`。完整 `builtInRoleModules: BuiltInRoleModuleMap` **未导出**：E0 阶段六角色模块不存在，且 `cards` 唯一现行源在 `run-role.ts::TRIO_CARD_KINDS`（Pipeline 私有，本层不得 import），四策略面现行行为在 `run-role.ts`/`apply-journal.ts`；在本层构造完整 map 只能复制第二份数据或伪造模块。替代方案与 E1/E2 装配计划见证据，交 E0 评审处置。
+- **D3 已落**：`RolePolicyDecision.details` / `RolePolicyReason.details` 保持 `unknown`；注释限定为 JSON 可序列化普通数据、无密钥/凭据/客户正文/模型原始输出；消费者只展示/审计，不据此放行。
+- **D4 已落**：`RolePreflightInput.facts` / `RoleContextInput.facts` 保持 `Readonly<Record<string, unknown>>`；注释写明每角色 `api-spec.md` 登记动作 fact 键、缺键/未知/类型不符 deny、不得复制 Service/Provider 最终校验。
+- **D5 已落**：`RoleContextResourceRef.path` 注释写明默认应用资源根；项目 `docs/workflow.md` 不是角色模块资源，由宿主在上下文装配时另行提供（来源/版本/hash 单列）；本版不新增 `root` 字段。
+- **D6/D7/D8 仅迁移注释（本节点未改代码）**：D6 E2 时 `governance-roles.ts` 私有 `GovernanceCapabilities`/规格数据改为 Model 公开投影 re-export/装配或加类型等价断言，`matrix` 展示摘要留在门禁引擎门面、不进入 `BuiltInRoleModule`；D7 E1 gates-code 建 `src/common/gates/index.ts` 使用契约 §5.1 类型，P1 D-minimal 本地结构类型在 E2 删除/别名，reason 闭集按 §5.3，`applicationMediation.nativeInstanceId` 必填纳入 accepted evidence；D8 `cards` 只列当前有效卡种、旧 `"write"` 不进模块数据、E2 门面按旧数据兼容映射。本节点未改 `src/common/gates/`、未改 `governance-roles.ts` 规格数据。
+- **测试/静态门**：`test/门禁引擎/role-module-contract.test.ts` 新增 D1 闭集、`BuiltInRoleModuleMap`、门面数据投影与 lookup 断言；定向 8/8 pass；门禁引擎套件写前 412/406/5/0/1 → 写后 413/407/5/0/1（新增 1 例、新增确定性失败 0、新 skip 0，既有 5 红不变）；`npm run typecheck` exit 0；三文件隔离 tsc exit 0。
+- **写后哈希**：`src/model/role.ts` `e0385fabb1890d9b42abcd3e00129048ef7f13f3e263972b013f9df271051bd1`；`src/common/门禁引擎/governance-roles.ts` `5a3753f3964c249904db02ae9d4f8e83b15cf917a04865c13829e282fbdc2ca0`；`test/门禁引擎/role-module-contract.test.ts` `6484e6334170847c39586e4f7fb5634e9826024764493a3fcf846de3ee26ed1d`。
+
+## E0 角色模块公开契约类型（2026-11-07；草案，待冻结评审）
+
+`src/model/role.ts` 加法新增（208 行，纯类型、无运行时值；写前 `42f74b82f8f1…` → 写后 `e38a20535b59c30031ff0e58d568cd533764f902f60a8625f3dc58e76e50daf5`）：
+
+- `BuiltInRoleModule`（extends `GovernanceRoleSpec`）：`id/displayName/function/card/capabilities/cards` + `tools(input: TrustedToolPolicyInput): RoleToolPolicy`、`dispatch(input: RoleDispatchPolicyInput): RoleDispatchPolicy`、`preflight?: RolePreflightHooks`、`context(input: RoleContextInput): readonly RoleContextSection[]`。
+- `RolePolicyDecision = {allow:true} | {allow:false; code; messageKey; details?}`：typed、无异常、不写文案；缺事实/未知 fail-closed；返回值不携带权限。
+- 公开只读投影：`GovernanceCapabilities`（七能力位，`shell: GovernanceShellTier`）、`RoleCardSpec`（`text/entries/preauthorizedDirs/forbiddenWritePaths`）、`GovernanceRoleSpec`（数据子集，不含私有展示摘要 `matrix`）；`GovernanceCardKind` 从 `src/model/runtime.ts` 唯一真源 type-only 再导出；`BuiltInRoleId` = 六角色。
+- 输入/输出：`TrustedToolPolicyInput{governanceModel}`、`RoleToolPolicy{capabilities,tools,reasons}`、`RoleDispatchPolicyInput{sourceRoleId?,targetRoleId,targetKind,targetExists?}`、`RoleDispatchPolicy{decision,reportToRoleId?}`、`RoleGovernedAction`（10 动作）、`RolePreflightInput{action,facts}`、`RoleContextSection{id,text,resources?}`、`RoleContextResourceRef{path,version?,sha256?}`。
+- 约束：角色模块只依赖 Model/shared public entry；不 import 引擎/门控/其它角色；唯一 public entry `index.ts`；纯数据/纯策略，无 I/O/账本/会话/时钟/随机数/可变状态。E2 由 `src/common/门禁引擎/governance-roles.ts` 门面 re-export/装配。
+- 契约测试：`test/门禁引擎/role-module-contract.test.ts`（7 项：类型级断言 + 六 id 最小构造桩）。写后门禁引擎套件 412 tests / 406 pass / 5 fail / 1 skipped（既有 5 红不变、新增确定性失败 0）；`npm run typecheck` exit 0。
+- 对齐状态：策划 E0 契约文档 `docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md` 开工与收工检查均**不存在**；本草案按 P1.6 §6.2/团队计划 §7.3，标记待对齐。**未宣布冻结**（冻结由统筹在评审后记录）。
+- 证据：`角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence.md` 及同名证据目录。
+
 ## G16 raw integrate普通消费（2026-11-06）
 
 既有`GitRawObjectPlan.input`新增`parents?: readonly GitOid[]`，由原shell-rules同type公开，无新生产文件/Model/效应口。`integrate`只convener+task/run、真实base为首parent、2–65去重完整OID；后parents按原integrationGrants候选顺序逐一绑定。grant为worker owner/path/evidenceDigest，控制器writePaths必须空；全部blob/tree/commit/parents/完整diff/固定commands/ref重算，旧新path按owner grant且不得多owner重叠，禁止mode变动/metadata例外；其它raw模板不借parents/grants扩权。未改base文件留在全tree，冲突仍O生产组合拒。普通grant不是权威票，原source/同run/settled过程/原creatoraccepted/当前Active∩冻结授权仍O最终重核。
