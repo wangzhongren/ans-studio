@@ -40,9 +40,378 @@ import type {
   TrunkStableFileKind,
   TrunkStateOp,
   TrunkVersionRef,
+  DirectActionReceipt, DirectActionSource, CompleteSnapshot, TrunkCommitRef, SnapshotRef, SnapshotArtifactRef, FrozenRoleEvidence, ActiveRoleEvidence,
 } from "../../../model/trunk.ts";
-import type { TrunkStore } from "../../../provider/trunk/abstract/trunk-store.ts";
-import type { FreezeRegistryStore } from "../../../provider/version-change/abstract/freeze-cache.ts";
+import type { CustomerInputRequest, CustomerInputMetadata, CustomerInputOutcome, SubmitVersionChangeInput, SelectRunChangeInput, SelectRunChangeResult, CompleteTeamPlanInput, CloseCreatedTaskInput, CloseCreatedTaskResult, TaskStateEvent, ActivateRoleDocumentsInput, ActivateRoleDocumentsResult } from "../../../model/runtime.ts";
+import type { BoundaryEntry } from "../../../model/boundary.ts";
+import type { TrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
+import type { FreezeRegistryStore } from "../../../provider/version-change/public/version-change-store.ts";
+
+/** Actor identity is supplied by the application's trusted session, never tool arguments. */
+export interface TrunkDirectApplyInput {
+  operationId: string;
+  applicationId: string;
+  actorRoleId: string;
+  kind: "version-upgrade" | "detail-amendment";
+  flowId: string;
+  baseTrunk: TrunkCommitRef | null;
+  target: TrunkApplySnapshot;
+  /** Each changed target slot binds the previous effective reference's exact byte hash. */
+  expectedFrom: readonly { path: string; sha256: string | null }[];
+  amendmentId?: string;
+  amendmentDocPath?: string;
+  rosterVersion?: number;
+  d3?: { decisionId: string; targetRoleIds: string[] };
+  roles?: string[];
+  at: string;
+  preparedSnapshotRef?: SnapshotRef;
+  roleDocumentChecks?: readonly TrunkRoleDocumentCheck[];
+}
+export type { RoleDocumentCheck as TrunkRoleDocumentCheck } from "../../../model/boundary.ts";
+import type { RoleDocumentCheck as TrunkRoleDocumentCheck } from "../../../model/boundary.ts";
+export interface DirectTrunkService extends TrunkService {
+  classifyClosedTaskNotice(input: { recipientRoleId: string; boundTaskId: string; operationId: string; source: DirectActionSource }): Promise<
+    { ok: true; value: { kind: "information-only"; taskId: string; recipientRoleId: string; operationId: string } } | { ok: false; code: string; message: string }>;
+  resolveDeliveryAssignment(input: DeliveryAssignmentInput): Promise<DeliveryAssignmentResult>;
+  prepareParentTaskRef(input: { actorRoleId: "convener"; taskId: string; flowId: string; runId: string }): Promise<
+    { ok: true; parentTaskRef: import("../../../model/runtime.ts").TaskParentRef } | { ok: false; code: string; message: string }>;
+  inspectQueuedControllerResume(input: { resumeController: import("../../../model/runtime.ts").DispatchTaskResumeController }): Promise<TrunkServiceResult<ControllerResumePreparation>>;
+  prepareControllerStop(input: { taskId: string; actorRoleId: "chief" }): Promise<TrunkServiceResult<ControllerStopScope>>;
+  confirmControllerStop(expected: ControllerStopScope): Promise<TrunkServiceResult<ControllerStopScope>>;
+  prepareControllerResume(input: { resumeController: import("../../../model/runtime.ts").DispatchTaskResumeController; hostInitialization: RepositoryInitializationContext }): Promise<TrunkServiceResult<ControllerResumePreparation>>;
+  prepareReviewTask(input: { parentTaskId: string; flowId: string; runId: string; target: import("../../../model/runtime.ts").DispatchTaskReviewTarget }): Promise<TrunkServiceResult<PreparedReviewTask>>;
+  readAssignedReviewContext(input: { taskId: string; actorRoleId: string }): Promise<TrunkServiceResult<ReviewMaterial>>;
+  inspectAssignedTask(input: { taskId: string; actorRoleId: string }): Promise<TrunkServiceResult<{ taskId: string; actorRoleId: string; flowId: string; runId: string; basisDigest: string; kind: "planning" | "execution" | "review"; workSourceRef?: import("../../../model/runtime.ts").TaskWorkSourceRef }>>;
+  readTaskProcessSource(input: { taskId: string; actorRoleId: string; flowId: string; runId: string }): Promise<TrunkServiceResult<PreparedTaskProcessSource>>;
+  prepareAssignedTaskWriteScope(input: { taskId: string; actorRoleId: string }): Promise<TrunkServiceResult<{ taskId: string; runId: string; basisDigest: string; paths: string[] }>>;
+  directDeliveryRecorded(key: string): Promise<boolean>;
+  recordDirectDelivery(key: string): Promise<{ ok: true } | { ok: false; reason: string }>;
+  prepareRoleDispatch(input: { fromRoleId: string; targetRoleId: string; flowId: string; runId?: string; moduleId?: string; parentTaskId?: string; reviewTarget?: import("../../../model/runtime.ts").DispatchTaskReviewTarget; hostInitialization?: RepositoryInitializationContext; hubRouting?: import("../../../model/runtime.ts").TaskHubRouting }): Promise<RoleDispatchResult>;
+  prepareRoleDraftScope(input: { flowId?: string; taskId?: string }): Promise<TrunkServiceResult<RoleDraftScope>>;
+  prepareExecutionRun(input: { runId: string; flowId: string; operationId: string }): Promise<TrunkServiceResult<PreparedExecutionRun>>;
+  pinExecutionRun(prepared: PreparedExecutionRun, checks: readonly TrunkRoleDocumentCheck[]): Promise<TrunkServiceResult<ExecutionRunBasis>>;
+  prepareIntentConfirmation(flowId: string): Promise<TrunkServiceResult<PreparedIntentConfirmation>>;
+  finalizeIntentConfirmation(prepared: PreparedIntentConfirmation, outcome: CustomerInputOutcome): Promise<TrunkServiceResult<{ path: string; sha256: string }>>;
+  prepareRoleActivation(input: ActivateRoleDocumentsInput, trustedActorRoleId: string): Promise<TrunkServiceResult<PreparedRoleActivation>>;
+  activateRoleDocuments(prepared: PreparedRoleActivation, checks: readonly TrunkRoleDocumentCheck[], boundaryEntries: readonly BoundaryEntry[]): Promise<ActivateRoleDocumentsResult>;
+  recordTaskObservation(event: TaskStateEvent): Promise<TaskObservationResult>;
+  closeCreatedTask(input: CloseCreatedTaskInput, trustedActorRoleId: string): Promise<CloseCreatedTaskResult>;
+  completeTeamPlan(input: CompleteTeamPlanInput, trustedActorRoleId: string): Promise<CompletedTeamPlanReceipt>;
+  prepareCreatedTaskClose(taskId: string, trustedActorRoleId: string): Promise<TrunkServiceResult<CreatedTaskCloseBasis>>;
+  selectRunChange(input: SelectRunChangeInput, trustedActorRoleId: string): Promise<SelectRunChangeResult>;
+  prepareRunChange(input: { request: SelectRunChangeInput; actorRoleId: "rapporteur"; taskId: string; replacementRunId?: string }): Promise<TrunkServiceResult<PreparedRunChange>>;
+  commitPreparedRunChange(prepared: PreparedRunChange, evidence: RunStopCommitEvidence): Promise<SelectRunChangeResult>;
+  readRunEvidence(runId: string): Promise<TrunkServiceResult<ExecutionRunBasis>>;
+  inspectExecutionCodeSource(bases: import("../../../provider/trunk/public/trunk-store.ts").GitExecutionBases): Promise<TrunkServiceResult<{ bases: import("../../../provider/trunk/public/trunk-store.ts").GitExecutionBases; controllerTask: { taskId: string; digest: string } | null }>>;
+  prepareDirectSubmission(input: SubmitVersionChangeInput, trustedActorRoleId: string): Promise<TrunkServiceResult<PreparedDirectSubmission>>;
+  prepareDirectCommit?(input: TrunkDirectApplyInput): Promise<TrunkServiceResult<PreparedDirectCommit>>;
+  prepareTeamPlanCommit?(input: CompleteTeamPlanInput, trustedActorRoleId: string): Promise<TrunkServiceResult<PreparedTeamPlanCommit | CompletedTeamPlanReceipt>>;
+  bindInitialWorkflowSource?(input: { requestId: string; taskId: string; coreSessionId: string; coreTurnId?: string; hostLeaseId: string }): Promise<TrunkServiceResult<import("../../../provider/trunk/public/trunk-store.ts").GitInitialWorkflowSource>>;
+  prepareInitialWorkflowCommit?(input: TrunkStableSnapshotInput): Promise<TrunkServiceResult<PreparedInitialWorkflowCommit | TrunkStableSnapshotResult>>;
+  commitPreparedInitialWorkflow?(prepared: PreparedInitialWorkflowCommit, authority: { hostLeaseId: string; taskId: string;
+    candidateVerdict: { allowed: boolean; inputDigest: string; code?: string }; publicationVerdict: { allowed: boolean; inputDigest: string; code?: string } }): Promise<TrunkStableSnapshotResult>;
+  prepareActivationCommit?(activation: PreparedRoleActivation, checks: readonly TrunkRoleDocumentCheck[], boundaryEntries: readonly BoundaryEntry[], trustedActorRoleId: string): Promise<TrunkServiceResult<PreparedActivationCommit | ActivateRoleDocumentsResult>>;
+  commitPreparedActivation?(prepared: PreparedActivationCommit, authority: { hostLeaseId: string; taskId: string;
+    candidateVerdict: { allowed: boolean; inputDigest: string; code?: string }; publicationVerdict: { allowed: boolean; inputDigest: string; code?: string } }): Promise<ActivateRoleDocumentsResult>;
+  prepareDirectAuthority?(prepared: PreparedDirectCommit | PreparedTeamPlanCommit | PreparedActivationCommit | PreparedInitialWorkflowCommit, taskId: string): Promise<TrunkServiceResult<PreparedDirectAuthority>>;
+  commitPreparedTeamPlan?(prepared: PreparedTeamPlanCommit, authority: { hostLeaseId: string; taskId: string;
+    candidateVerdict: { allowed: boolean; inputDigest: string; code?: string }; publicationVerdict: { allowed: boolean; inputDigest: string; code?: string } }): Promise<CompletedTeamPlanReceipt>;
+  commitPreparedDirect?(prepared: PreparedDirectCommit, authority: { hostLeaseId: string; taskId: string;
+    candidateVerdict: { allowed: boolean; inputDigest: string; code?: string }; publicationVerdict: { allowed: boolean; inputDigest: string; code?: string } }): Promise<DirectActionReceipt>;
+  executeDirect(input: TrunkDirectApplyInput): Promise<DirectActionReceipt>;
+  recoverDirect(operationId: string): Promise<DirectActionReceipt>;
+  readDirectOperation(operationId: string): Promise<TrunkServiceResult<{ journal: import("../../../model/trunk.ts").TrunkApplyJournal; manifest: TrunkManifest; snapshot: CompleteSnapshot }>>;
+  readEffectiveSnapshot(): Promise<TrunkServiceResult<{ manifest: TrunkManifest; snapshot: CompleteSnapshot }>>;
+  prepareDecisionEvidence(input: DecisionEvidenceInput): Promise<TrunkServiceResult<PreparedDecisionEvidence>>;
+  checkDecisionEvidence(verification: DecisionEvidenceVerification): Promise<boolean>;
+}
+/** Host delivery provenance only. A successful lookup is not permission to reopen or mutate. */
+export interface DeliveryAssignmentInput {
+  recipientRoleId: string;
+  source: { kind: "assigned-task"; taskId: string } | { kind: "child-report"; childTaskId: string; childRoleId: string };
+  expectedFlowId?: string; expectedRunId?: string;
+}
+export type DeliveryAssignmentResult = { ok: true; value: { taskId: string; actorRoleId: string; flowId: string; runId?: string } }
+  | { ok: false; code: string; message: string };
+/** Ordinary query policy input is composed with G by Pipeline, never a Service peer call. */
+export interface GitQueryContext { actorRoleId: string; taskId?: string; runId?: string; readPaths: readonly string[]; authorizationRevision?: string }
+export interface PreparedGitQuery {
+  request: import("../../../model/runtime.ts").GitQueryRequest;
+  context: GitQueryContext;
+  repoConfigDigest: string;
+  inputDigest: string;
+  basis?: import("../../../model/trunk.ts").GitBasis;
+  basisSource?: { kind: "assigned-run"; runId: string; pinDigest: string; runRecordSha256: string };
+  policyInput: {
+    repoId: string; operationId: string; actorRoleId: string; taskId?: string; runId?: string;
+    authorizationRevision: string; currentAuthorizationRevision: string; objectFormat: "sha1" | "sha256";
+    template: import("../../../model/trunk.ts").GitQueryTemplate; paths: readonly string[]; readPaths: readonly string[]; writePaths: readonly string[];
+    argv: readonly string[]; target?: import("../../../model/trunk.ts").GitOid; other?: import("../../../model/trunk.ts").GitOid; limit?: number;
+    readableOids: readonly import("../../../model/trunk.ts").GitOid[];
+  };
+}
+export interface GitCapabilityService {
+  prepareDelivery(input: import("../../../model/runtime.ts").GitPublishRequest): Promise<
+    { ok: true; value: PreparedGitDelivery } | { ok: false; result: import("../../../model/trunk.ts").GitCapabilityResult }>;
+  executeDelivery(prepared: PreparedGitDelivery, hostLeaseId: string, verdict: { allowed: boolean; inputDigest: string; code?: string }, signal?: AbortSignal): Promise<import("../../../model/trunk.ts").GitCapabilityResult>;
+  prepareIntegration(input: Extract<import("../../../model/runtime.ts").GitCandidateRequest, { action: "integrate" }>): Promise<
+    { ok: true; value: PreparedGitWorkerCommit } | { ok: false; result: import("../../../model/trunk.ts").GitCapabilityResult }>;
+  prepareRevert(input: Extract<import("../../../model/runtime.ts").GitCandidateRequest, { action: "revert" }>): Promise<
+    { ok: true; value: PreparedGitWorkerCommit } | { ok: false; result: import("../../../model/trunk.ts").GitCapabilityResult }>;
+  prepareWorkerCommit(input: Extract<import("../../../model/runtime.ts").GitCandidateRequest, { action: "commit" }>): Promise<
+    { ok: true; value: PreparedGitWorkerCommit } | { ok: false; result: import("../../../model/trunk.ts").GitCapabilityResult }>;
+  executeWorkerCommit(prepared: PreparedGitWorkerCommit, hostLeaseId: string, verdict: { allowed: boolean; inputDigest: string; code?: string }, signal?: AbortSignal): Promise<import("../../../model/trunk.ts").GitCapabilityResult>;
+  prepareInitialization(input: Extract<import("../../../model/runtime.ts").GitCandidateRequest, { action: "init" }>): Promise<
+    { ok: true; value: PreparedGitInitialization } | { ok: false; result: import("../../../model/trunk.ts").GitCapabilityResult }>;
+  /** Pipeline invokes only after its actual project protection/admission closure is held; never a model tool. */
+  executeInitialization(prepared: PreparedGitInitialization, hostLeaseId: string, signal?: AbortSignal): Promise<import("../../../model/trunk.ts").GitCapabilityResult>;
+  prepareQuery(input: import("../../../model/runtime.ts").GitQueryRequest, context: GitQueryContext): Promise<
+    { ok: true; value: PreparedGitQuery } | { ok: false; result: import("../../../model/trunk.ts").GitCapabilityResult }>;
+  executeQuery(prepared: PreparedGitQuery, verdict: { allowed: boolean; inputDigest: string; code?: string }, signal?: AbortSignal): Promise<import("../../../model/trunk.ts").GitCapabilityResult>;
+  candidate: import("../../../model/runtime.ts").GitCandidateFn;
+  publish: import("../../../model/runtime.ts").GitPublishFn;
+}
+export interface PreparedGitDelivery {
+  processSource: PreparedTaskProcessSource;
+  request: import("../../../model/runtime.ts").GitPublishRequest;
+  taskId: string; runId: string; flowId: string; repoId: string; inputDigest: string; requestDigest: string;
+  source: import("../../../provider/trunk/public/trunk-store.ts").GitDeliverySource;
+  plan: import("../../../provider/trunk/public/trunk-store.ts").GitRefPublicationPlan;
+  policyInput: Omit<PreparedGitQuery["policyInput"], "template"> & {
+    template: "publish-delivery"; base: import("../../../model/trunk.ts").GitOid | null; candidate: import("../../../model/trunk.ts").GitOid;
+    ref: string; publicationRef: string; ownedCandidateRef: string; commands: readonly (readonly string[])[];
+    worksite: import("../../../provider/trunk/public/trunk-store.ts").GitRefPublicationPlan["worksite"];
+    allDiff: { complete: true; base: import("../../../model/trunk.ts").GitOid | null; candidate: import("../../../model/trunk.ts").GitOid; entries: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan["diff"] };
+    integrationGrants: NonNullable<PreparedGitWorkerCommit["policyInput"]["integrationGrants"]>;
+    refPublicationPlan: import("../../../provider/trunk/public/trunk-store.ts").GitRefPublicationPlan;
+    deliveryBasis: { base: import("../../../model/trunk.ts").GitOid; baseTree: readonly import("../../../provider/trunk/public/trunk-store.ts").GitTreeEntry[];
+      source: import("../../../provider/trunk/public/trunk-store.ts").GitIntegrationSource | import("../../../provider/trunk/public/trunk-store.ts").GitRevertSource; candidateOperationId: string; baseCommitBytesBase64: string };
+  };
+}
+export interface PreparedGitWorkerCommit {
+  processSource: PreparedTaskProcessSource;
+  request: Extract<import("../../../model/runtime.ts").GitCandidateRequest, { action: "commit" | "integrate" | "revert" }>;
+  taskId: string; runId: string; flowId: string; actorRoleId: string;
+  inputDigest: string; requestDigest: string; repoId: string;
+  source: import("../../../provider/trunk/public/trunk-store.ts").GitTaskCandidateSource | import("../../../provider/trunk/public/trunk-store.ts").GitIntegrationSource | import("../../../provider/trunk/public/trunk-store.ts").GitRevertSource;
+  plan: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan;
+  policyInput: Omit<PreparedGitQuery["policyInput"], "template"> & { template: "commit" | "integrate" | "revert"; ref: string; ownedCandidateRef: string;
+    mainline?: number;
+    integrationGrants?: readonly { ownerRoleId: string; paths: readonly string[]; candidate: import("../../../model/trunk.ts").GitOid; evidenceDigest: string }[];
+    base: import("../../../model/trunk.ts").GitOid; candidate: import("../../../model/trunk.ts").GitOid;
+    allDiff: { complete: true; base: import("../../../model/trunk.ts").GitOid; candidate: import("../../../model/trunk.ts").GitOid; entries: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan["diff"] };
+    rawObjectPlan: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan;
+    worksite: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan["worksite"]; commands: readonly (readonly string[])[] };
+}
+export interface PreparedGitInitialization {
+  request: Extract<import("../../../model/runtime.ts").GitCandidateRequest, { action: "init" }>;
+  projectRoot: string; taskId: string; runId: string; flowId: string;
+  inputDigest: string; rootBasisDigest: string; requestDigest: string; sourceId: string; sourceSha256: string;
+  parentCoreSessionId: string;
+  candidatePlan: ReturnType<typeof import("../../../provider/trunk/public/trunk-store.ts").planEmptyGitCandidate>;
+  initializationPlan?: import("../../../provider/trunk/public/trunk-store.ts").GitInitializationPlan;
+  expectedFiles: readonly { path: string; sha256: string }[];
+}
+export interface RoleDispatchPreparation {
+  kind: "planning" | "execution" | "review";
+  flowId: string;
+  basisDigest: string;
+  purpose?: "repository-initialization" | "document-preparation" | "team-planning" | "role-preparation" | "builtin-preparation";
+  hubRouting?: import("../../../model/runtime.ts").TaskHubRouting;
+  initializationSource?: { sourceId: string; path: string; sha256: string; kind?: import("../../../model/runtime.ts").TaskWorkSourceRef["kind"] };
+  runId?: string;
+  reviewBasisRef?: import("../../../model/runtime.ts").TaskReviewBasisRef;
+  reviewControllerRef?: import("../../../model/runtime.ts").TaskReviewControllerRef;
+  parentTaskRef?: import("../../../model/runtime.ts").TaskParentRef;
+  moduleId?: string;
+  modulePaths?: string[];
+  documentContext?: { runId: string; pinDigest: string; frozenRoleEvidence: FrozenRoleEvidence };
+}
+/** Ordinary target/source expectations. Neither a permit nor a run cancellation. */
+export interface ControllerStopScope {
+  taskId: string; actorRoleId: "convener"; creatorRoleId: "chief"; flowId: string; runId: string;
+  taskDigest: string; ledgerDigest: string; runSha256: string; processSource: PreparedTaskProcessSource;
+}
+export interface ControllerResumePreparation {
+  taskId: string; actorRoleId: "convener"; flowId: string; runId: string;
+  reviewTaskId: string; reviewCloseOperationId: string; resumeKey: string; basisDigest: string;
+}
+export interface ReviewMaterial {
+  flowId: string; runId: string; parentTaskId: string; pinDigest: string; runRecordSha256: string;
+  reviewBasisRef: import("../../../model/runtime.ts").TaskReviewBasisRef;
+  candidateJournalSha256: string; contextText: string;
+  sourceFile?: { path: string; sha256: string };
+  /** The actual approval/child-source rows checked when preparing a new review; final append compares this under R9. */
+  relatedLedgerDigest: string;
+}
+export interface PreparedReviewTask extends ReviewMaterial { parentTaskRef: import("../../../model/runtime.ts").TaskParentRef }
+export interface RepositoryInitializationContext {
+  registration: { selectionId: string; source: "native-directory-selection"; selectedRoot: string; projectRoot: string; selectedAt: string; listingGeneration: number };
+  parent: { roleId: "chief"; runtime: import("../../../model/runtime.ts").RuntimeKind; sessionId: string; turnId: string; clientMessageId?: string; kind?: string; inputAccepted: true; settled: false };
+  /** Host references to the current real handback; Pipeline checks the actual Core-ingested turn, Service checks the original ledger. */
+  creatorReports?: readonly { taskId: string; roleId: string; reportId: string; turnId: string }[];
+}
+export type RoleDispatchResult = { ok: true; value: RoleDispatchPreparation } | { ok: false; code: TrunkErrorCode; message: string;
+  blockedDependencies?: Array<{ roleId: string; moduleId: string }> };
+export interface RoleDraftScope { flowId: string; basisDigest: string; d3RequestId: string; d3Reference: string; paths: string[] }
+export interface PreparedExecutionRun {
+  expectedCodeSourceTask?: { taskId: string; digest: string };
+  runId: string;
+  flowId: string;
+  operationId: string;
+  alreadyPinned: boolean;
+  expectedRunSha256: string;
+  expectedTrunk: TrunkCommitRef;
+  expectedActive: { revision: number; digest: string };
+  expectedDocumentSnapshot?: SnapshotRef;
+  snapshot: CompleteSnapshot;
+  nextRun: Record<string, unknown>;
+  roles: PreparedRoleActivation["role"][];
+}
+export interface PreparedRunChange {
+  processSource?: PreparedTaskProcessSource;
+  runChangeSource?: import("../../../provider/trunk/public/trunk-store.ts").RunChangeSource;
+  requesterSourceFile?: { path: string; sha256: string };
+  request: SelectRunChangeInput; requesterTaskId: string; ledgerDigest: string; requestDigest: string;
+  preparedAt: string;
+  requesterCreationDigest: string;
+  old: ExecutionRunBasis; taskIds: readonly string[]; replacement?: PreparedExecutionRun;
+}
+export interface RunStopCommitEvidence {
+  hostLeaseId: string; coordinatorRevision: number;
+  instances: readonly import("../../../model/runtime.ts").RuntimeSessionLifecycleFacts[];
+  hostStops: readonly import("../../../provider/trunk/public/trunk-store.ts").GitHostRunStopFact[];
+}
+export interface PreparedIntentConfirmation { flowId: string; path: string; sha256: string; version: number; snapshotRef: SnapshotRef; text: string; marker: string }
+export interface PreparedRoleActivation {
+  input: ActivateRoleDocumentsInput;
+  snapshot: CompleteSnapshot;
+  evidence: ActiveRoleEvidence;
+  expectedTrunk: TrunkCommitRef;
+  expectedActive: { revision: number; digest: string | null };
+  targetActive: { revision: number; digest: string };
+  noOp: boolean;
+  role: { roleId: string; cardPath: string; boundaryMdPath: string; boundaryYamlPath: string; allowedPaths: { path: string; kind: "file" | "directory" }[] };
+  writesets: string[];
+}
+export type CompletedTeamPlanReceipt = DirectActionReceipt & { planRef?: SnapshotArtifactRef; rosterRef?: SnapshotArtifactRef; modulesRef?: SnapshotArtifactRef };
+export interface CreatedTaskCloseBasis {
+  taskId: string;
+  runId: string;
+  basisDigest: string;
+  reportRef: SnapshotArtifactRef;
+  reportStatus: import("../../../model/runtime.ts").TaskReportStatus;
+  reportSummary: string;
+  taskDigest: string;
+  runRecordSha256: string;
+  /** Draft planning bytes rechecked under the ledger/run commit lock. */
+  materialRefs?: readonly { path: string; sha256: string }[];
+  activationCommit?: import("../../../provider/trunk/public/trunk-store.ts").GitActiveCompletionBasis;
+  stableCommit?: import("../../../provider/trunk/public/trunk-store.ts").GitStableCompletionBasis;
+  planCommit?: import("../../../provider/trunk/public/trunk-store.ts").GitPlanCompletionBasis;
+  initializationCommit?: Omit<import("../../../provider/trunk/public/trunk-store.ts").GitInitializationTaskBasis, "files">;
+  reviewCommit?: { operationId: string; candidate: import("../../../model/trunk.ts").GitOid; journalSha256: string; criteria: import("../../../model/trunk.ts").GitEvidenceRef[] };
+  /** Derived missing proof, never a model supplied approval. Rework/reject remains available. */
+  acceptanceBlock?: string;
+  acceptanceMessage?: string;
+  relatedLedgerDigest?: string;
+  reportOnly?: true;
+  deliveryCommit?: { operationId: string; journalSha256: string };
+}
+export type TaskObservationResult = { ok: true; replay?: boolean } | { ok: false; code: string; message: string };
+/** A byte-verified existing pin; reading it does not manufacture D3 or grant dispatch authority. */
+export interface ExecutionRunBasis {
+  runId: string;
+  flowId: string;
+  pinDigest: string;
+  recordSha256: string;
+  snapshot: CompleteSnapshot;
+  frozenRoles: Record<string, FrozenRoleEvidence>;
+  run: Record<string, unknown>;
+}
+export interface PreparedDirectSubmission {
+  applicationId: string;
+  applyInput: TrunkDirectApplyInput;
+  snapshot: CompleteSnapshot;
+  currentTrunk: TrunkVersionRef | null;
+  amendmentItems?: TrunkAmendmentItem[];
+}
+export interface PreparedDirectCommit {
+  preparationKind: "direct-document-commit";
+  input: TrunkDirectApplyInput; manifest: TrunkManifest; journal: import("../../../model/trunk.ts").TrunkApplyJournal; snapshot: CompleteSnapshot;
+  expectedActive: { revision: number; digest: string | null }; expectedSnapshot?: SnapshotRef;
+  gitPlan?: import("../../../provider/trunk/public/trunk-store.ts").GitDocumentCommitPlan;
+}
+export interface PreparedTeamPlanCommit {
+  preparationKind: "team-plan-commit";
+  input: CompleteTeamPlanInput; actorRoleId: "convener";
+  baseTrunk: import("../../../model/trunk.ts").TrunkCommitRef;
+  manifest: TrunkManifest; journal: import("../../../model/trunk.ts").TrunkApplyJournal; snapshot: CompleteSnapshot;
+  expectedActive: { revision: number; digest: string | null }; expectedSnapshot: SnapshotRef;
+  gitPlan?: import("../../../provider/trunk/public/trunk-store.ts").GitDocumentCommitPlan;
+}
+export interface PreparedActivationCommit {
+  preparationKind: "active-role-commit";
+  input: ActivateRoleDocumentsInput; actorRoleId: "nominator";
+  activation: PreparedRoleActivation; checks: readonly TrunkRoleDocumentCheck[]; boundaryEntries: readonly BoundaryEntry[];
+  baseTrunk: import("../../../model/trunk.ts").TrunkCommitRef;
+  manifest: TrunkManifest; journal: import("../../../model/trunk.ts").TrunkApplyJournal; snapshot: CompleteSnapshot;
+  expectedActive: { revision: number; digest: string | null }; expectedSnapshot: SnapshotRef;
+  gitPlan?: import("../../../provider/trunk/public/trunk-store.ts").GitActiveCommitPlan;
+}
+export interface InitialWorkflowSnapshotPreparation {
+  preparationKind: "initial-workflow-snapshot"; input: TrunkStableSnapshotInput;
+  source: import("../../../provider/trunk/public/trunk-store.ts").GitInitialWorkflowSource;
+  sourceFile: { path: string; sha256: string };
+  record: import("../../../model/version-change.ts").StableWriteRecord; permit: import("../../../model/version-change.ts").StableWritePermit;
+  before: TrunkManifest; manifest: TrunkManifest; snapshot: CompleteSnapshot;
+}
+export interface PreparedInitialWorkflowCommit extends Omit<InitialWorkflowSnapshotPreparation, "preparationKind" | "input"> {
+  preparationKind: "initial-workflow-commit"; input: TrunkStableSnapshotInput & { operationId: string; flowId: string };
+  baseTrunk: import("../../../model/trunk.ts").TrunkCommitRef;
+  journal: import("../../../model/trunk.ts").TrunkApplyJournal;
+  expectedActive: { revision: number; digest: string | null }; expectedSnapshot: SnapshotRef;
+  gitPlan?: import("../../../provider/trunk/public/trunk-store.ts").GitInitialWorkflowCommitPlan;
+}
+export interface DirectDocumentPolicyInput {
+  repoId: string; operationId: string; actorRoleId: string; taskId: string; runId: string;
+  authorizationRevision: string; currentAuthorizationRevision: string; objectFormat: "sha1" | "sha256";
+  template: "commit" | "publish-documents"; paths: readonly string[]; readPaths: readonly string[]; writePaths: readonly string[];
+  ref: string; ownedCandidateRef: string; publicationRef?: string;
+  base: import("../../../model/trunk.ts").GitOid | null; candidate: import("../../../model/trunk.ts").GitOid;
+  allDiff: { complete: true; base: import("../../../model/trunk.ts").GitOid | null; candidate: import("../../../model/trunk.ts").GitOid; entries: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan["diff"] };
+  argv: readonly string[]; commands: readonly (readonly string[])[];
+  worksite: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan["worksite"];
+  rawObjectPlan: import("../../../provider/trunk/public/trunk-store.ts").GitCandidatePlan;
+  businessPublication: import("../../../provider/trunk/public/trunk-store.ts").GitDocumentCommitPlan["publication"] | import("../../../provider/trunk/public/trunk-store.ts").GitActiveCommitPlan["publication"] | import("../../../provider/trunk/public/trunk-store.ts").GitInitialWorkflowCommitPlan["publication"];
+  appGeneratedFiles: import("../../../provider/trunk/public/trunk-store.ts").GitDocumentCommitPlan["files"];
+  manifestSha256: string; journalDigest: string; businessJournal: import("../../../model/trunk.ts").TrunkApplyJournal;
+  businessBaseManifestBytesBase64?: string;
+}
+export interface PreparedTaskProcessSource {
+  taskId: string; sourceAssignmentTaskId: string; parentCoreSessionId: string;
+  workSourceRef: import("../../../model/runtime.ts").TaskWorkSourceRef;
+  expectedFiles: readonly { path: string; sha256: string }[];
+}
+export interface PreparedDirectAuthority {
+  taskId: string; runId: string; authorizationDigest: string;
+  /** Actual publishing task's immutable Chief input source, independent of repository initialization history. */
+  processSource: { parentCoreSessionId: string; workSourceRef: import("../../../model/runtime.ts").TaskWorkSourceRef };
+  expectedFiles: readonly { path: string; sha256: string }[];
+  candidatePolicyInput: DirectDocumentPolicyInput; publicationPolicyInput: DirectDocumentPolicyInput;
+}
+export interface DecisionEvidenceInput { originRoleId: string; request: CustomerInputRequest; metadata?: CustomerInputMetadata }
+export interface DecisionEvidenceVerification {
+  files: readonly { path: string; sha256: string | null }[];
+  discovery?: { flowId: string; digest: string };
+  task?: { taskId: string; digest: string };
+}
+export interface PreparedDecisionEvidence {
+  baseDigest: string;
+  evidenceRefs: readonly SnapshotArtifactRef[];
+  context: string;
+  verification: DecisionEvidenceVerification;
+}
 
 // —————————————— 通用结果 ——————————————
 
@@ -208,6 +577,7 @@ export interface TrunkStableSnapshotInput {
 
 export interface TrunkStableSnapshotResult {
   applied: boolean;
+  errorCode?: string; message?: string;
   pendingReattach?: boolean;
   audit?: StableRepinAuditPayload;
 }
@@ -339,6 +709,13 @@ export interface UpgradeChainValidationInput {
   rosterVersionFloor?: number;
   /** 当前 D3（trunk manifest.d3 / run d3）；targetRoleIds 必须 ⊆ roster roles。 */
   d3?: { decisionId: string; targetRoleIds: string[] };
+  /** Internal document-publication validation; never changes execution readiness. */
+  planningOnly?: boolean;
+  confirmedIntent?: { path: string; sha256: string };
+  snapshot?: CompleteSnapshot;
+  roleDocumentChecks?: readonly TrunkRoleDocumentCheck[];
+  /** Only a real historical approval recovery; two-file quality is never activation or a new run pin. */
+  legacyApproval?: { applicationId: string; decisionId: string; roles: readonly { roleId: string; cardSha256: string; boundaryYamlSha256: string }[] };
 }
 
 export interface UpgradeChainValidation {

@@ -8,7 +8,7 @@ entries:
     purpose: 边界条目与 Section 1 的共享类型
   - kind: file
     path: src/model/role.ts
-    purpose: 角色与来源的共享类型
+    purpose: 角色与来源的共享类型；E0 起扩展角色模块公开契约类型（BuiltInRoleModule 等公开形状）
   - kind: file
     path: src/model/decision.ts
     purpose: 写入判定结果的共享类型
@@ -32,7 +32,7 @@ entries:
     purpose: 矩阵组装/渲染 Service 的有界私有模块根（纯组装与有界渲染；不调用其他 Service、不读盘、不写盘；不构成 src/service/ 整目录授权）
   - kind: directory
     path: src/common/门禁引擎/
-    purpose: 本角色私有辅助代码
+    purpose: 本角色私有辅助代码；governance-roles.ts 为角色规格数据的门面/装配层（规格正文迁出到各角色模块，E2 逐单元切换后删除内联规格）
   - kind: directory
     path: test/门禁引擎/
     purpose: 本角色的单元与层契约测试及夹具

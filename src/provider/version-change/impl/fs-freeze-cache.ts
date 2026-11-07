@@ -3,7 +3,7 @@
 //
 // 依据 P1 §2.2-5/§3.2/§4.1、F34、AC-27 与 C2b 交接 §八-4：
 // · baseline 读取/快照构建只经 C2b `refreshVersionedDocFreezeSnapshot`（读 `versions.jsonl`、
-//   构建并安装同步快照、返回带 `baselineSha256` 的快照）；本文件不解析/不写 `versions.jsonl`；
+//   构建普通数据投影、返回带 `baselineSha256` 的快照）；G Service负责安装，本文件不调用G；
 // · `doc-freezes.json` 内容 = C2b 快照（`doc-freezes/v1`，单一形状），原子写；
 // · 对账：缓存缺失/陈旧（`baselineSha256` 不同）⇒ 从 baseline 重建并告警；
 //   缓存 JSON/结构损坏 ⇒ `unusable`（fail-closed，不自动重建）；
@@ -14,12 +14,12 @@ import path from "node:path";
 
 import {
   refreshVersionedDocFreezeSnapshot,
-  type VersionedDocFreezeSnapshot,
-} from "../../../common/门禁引擎/versioned-doc-guard.ts";
+} from "./guard-freeze-registry.ts";
 import { atomicWrite } from "../../../common/shared/atomic-write.ts";
 import { DOC_FREEZE_REASONS } from "../../../model/version-change.ts";
 import { DOC_FREEZES_REL } from "../abstract/freeze-cache.ts";
 import type {
+  VersionedDocFreezeSnapshot,
   CacheRebuildResult,
   CacheReconcileResult,
   DocFreezeCache,

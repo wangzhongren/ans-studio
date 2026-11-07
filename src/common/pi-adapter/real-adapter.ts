@@ -27,6 +27,7 @@
 //    与本项目角色边界无关，本文件**不使用**它们、也不据此改动任何边界类型。
 
 import { accessSync, constants, mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   WriteGate, RoleSession, RuntimeAdapter, SessionEvent, PromptImage, PromptOptions,
@@ -34,6 +35,8 @@ import type {
   ToolDefinition as GovernedTool, RuntimeToolEventProjector, RuntimeToolResultFactsV1,
   RuntimeToolErrorFactsV1, RuntimeToolInputFactsV1, ToolDisplayInputRuleV1, RuntimeToolEventSource,
   InstalledMcpServerV1,
+  RuntimeNativeLifecycleFacts, RuntimeOwnedProcessFact, RuntimeActiveToolFact,
+  RuntimeApplicationToolSurfaceFacts,
 } from "../../model/runtime.ts";
 import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
 export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
@@ -1177,6 +1180,31 @@ export interface PromptCapableSession {
   abort(): Promise<void>;
   /** 收口整个底层会话（`makeRoleSession` 的 dispose 用；AgentSession 本就提供）。 */
   dispose(): void;
+  readonly isStreaming?: boolean;
+  readonly isCompacting?: boolean;
+  readonly pendingMessageCount?: number;
+  subscribe?(listener: (event: { type: string; toolCallId?: string; toolName?: string }) => void): () => void;
+}
+
+/** Public transport events only: close() returning is deliberately not an exit observation. */
+export function observePiMcpTransport(transport: {
+  readonly pid?: number;
+  start(): Promise<void>;
+  close(): Promise<void>;
+  onClose(listener: () => void): () => void;
+}, id: string): { inspect(): RuntimeOwnedProcessFact; close(): Promise<void> } {
+  let pid: number | undefined;
+  let state: RuntimeOwnedProcessFact["state"] = "unknown";
+  const start = transport.start.bind(transport);
+  transport.start = async () => {
+    try { await start(); pid ??= transport.pid; if (state !== "exited") state = "running"; }
+    catch (error) { pid ??= transport.pid; throw error; }
+  };
+  transport.onClose(() => { pid ??= transport.pid; state = pid === undefined ? "unknown" : "exited"; });
+  return {
+    inspect: () => ({ id, kind: "mcp", state, ...(pid !== undefined ? { pid } : {}), treeStatus: "unknown" }),
+    close: () => transport.close(),
+  };
 }
 
 /**
@@ -1328,6 +1356,28 @@ export interface RoleSessionDeps {
    * （P0 探针 §一.4 实据：dispose 本身不收回子进程）。有界（5s）且 best-effort：失败只记诊断、不抛出。
    */
   sessionShutdown?: () => Promise<unknown>;
+  /** Real bind metadata. Absence preserves legacy helpers without inventing a native identity. */
+  nativeObservation?: {
+    roleId: string;
+    nativeSessionId: string;
+    currentTurnId?: () => string | undefined;
+    mcpTransports: ReturnType<typeof observePiMcpTransport>[];
+  };
+  /**
+   * P1-B（P1.6 §4.6 Pi 行）：**实际构造**的应用中介工具面快照——`bindRole` 在
+   * `createAgentSession({ noTools: "builtin", customTools })` 成功后、用**同一批**
+   * `customTools` / 已解析 MCP 白名单填入；缺省不传 ⇒ 不产 `inspectApplicationToolSurface()`
+   * 事实（fail-closed：无 bind/observation 即无证据）。本字段只描述应用注册面，
+   * 不证明 native 进程/传输/效果闭包。
+   */
+  applicationToolSurface?: {
+    /** 实际注册给模型的 ANS 工具名（＝实际 `customTools` 名，不读配置意图）。 */
+    appTools: readonly string[];
+    /** 实际注入的外来 MCP server 名（Pi 无 ANS 自有 MCP；精确枚举）。 */
+    foreignMcpServers: readonly string[];
+    /** 实际启用的 native builtin；生产恒为 `[]`（`noTools: "builtin"`）。 */
+    nativeBuiltinTools: readonly string[];
+  };
 }
 
 /**
@@ -1350,6 +1400,82 @@ export interface RoleSessionDeps {
  */
 export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(deps.emit, deps.diagnostics);
+  const observation = deps.nativeObservation;
+  const instanceId = randomUUID();
+  // P1-B（P1.6 §4.3/§4.6 Pi 行）：应用中介工具面事实。只有 bind 同时提供
+  // `nativeObservation`（身份/实例）与**实际构造面快照**才产事实；缺一 ⇒ 方法缺席（fail-closed）。
+  // 快照在构造期复制——调用方之后改写传入数组不会让报告面漂移；每次调用再复一份返回，
+  // 调用方改写返回值也不影响下一次读取。`nativeInstanceId` 恒等于本对象 `nativeLifecycle.instanceId`。
+  const applicationSurface = observation && deps.applicationToolSurface
+    ? {
+        roleId: observation.roleId,
+        observedAt: new Date().toISOString(),
+        appTools: [...deps.applicationToolSurface.appTools],
+        foreignMcpServers: [...deps.applicationToolSurface.foreignMcpServers],
+        nativeBuiltinTools: [...deps.applicationToolSurface.nativeBuiltinTools],
+      }
+    : undefined;
+  const inspectApplication = applicationSurface === undefined
+    ? undefined
+    : (): RuntimeApplicationToolSurfaceFacts => ({
+        source: "application-mediated-tool-surface",
+        nativeInstanceId: instanceId,
+        roleId: applicationSurface.roleId,
+        runtime: "pi",
+        factory: "pi-custom-tools",
+        status: "observed",
+        observedAt: applicationSurface.observedAt,
+        appTools: [...applicationSurface.appTools],
+        foreignMcpServers: [...applicationSurface.foreignMcpServers],
+        nativeBuiltinTools: [...applicationSurface.nativeBuiltinTools],
+        reasons: [],
+      });
+  let coreTurnId: string | undefined;
+  let rawStarted = false;
+  let rawPending = 0;
+  let settledAt: string | undefined;
+  let stopping = false;
+  let disposed = false;
+  let stopWork: Promise<void> | undefined;
+  let stopFailed = false;
+  const activeTools = new Map<string, RuntimeActiveToolFact>();
+  const unsubscribeNative = observation ? deps.session.subscribe?.(event => {
+    if (event.type === "tool_execution_start" && event.toolCallId && event.toolName) {
+      activeTools.set(event.toolCallId, { id: event.toolCallId, name: event.toolName, turnId: coreTurnId });
+    } else if (event.type === "tool_execution_end" && event.toolCallId) activeTools.delete(event.toolCallId);
+    // agent_settled is not the raw prompt's finally and must never clear these facts.
+  }) : undefined;
+  const inspectNative = (extra: string[] = []): RuntimeNativeLifecycleFacts => {
+    const processes = observation!.mcpTransports.map(transport => transport.inspect());
+    const sdkIdle = deps.session.isStreaming === false && deps.session.isCompacting === false && deps.session.pendingMessageCount === 0;
+    const busy = rawPending > 0 || activeTools.size > 0 || deps.session.isStreaming === true || deps.session.isCompacting === true || (deps.session.pendingMessageCount ?? 0) > 0;
+    return {
+      instanceId, roleId: observation!.roleId, runtime: "pi", nativeSessionId: observation!.nativeSessionId,
+      coreTurnId, status: busy ? (stopping ? "stopping" : "running") : "unknown",
+      promptState: rawPending > 0 ? "running" : rawStarted ? "settled" : "not-started",
+      observedAt: new Date().toISOString(), ...(settledAt ? { settledAt } : {}),
+      transport: { kind: "in-process", state: sdkIdle && !busy ? "idle" : busy ? "open" : "unknown" },
+      activeTools: [...activeTools.values()].map(tool => ({ ...tool })), processes,
+      processCoverage: "unknown",
+      reasons: ["pi-sdk-owned-process-tree-coverage-unavailable", "pi-sdk-http-transport-close-unobservable",
+        ...(!sdkIdle ? ["pi-sdk-idle-not-observed"] : []),
+        ...(rawPending > 0 ? ["pi-raw-prompt-pending"] : []),
+        ...(activeTools.size > 0 ? ["pi-native-tools-active"] : []),
+        ...(processes.some(process => process.state !== "exited") ? ["pi-owned-mcp-close-pending"] : []),
+        ...(stopFailed ? ["pi-native-stop-operation-failed"] : []), ...extra],
+    };
+  };
+  const observedSession: PromptCapableSession = observation ? {
+    async prompt(text, options) {
+      if (stopping || disposed) throw new Error("Pi native session is stopping or disposed");
+      if (rawPending > 0) throw new Error("Pi native raw prompt is still running");
+      coreTurnId = observation.currentTurnId?.();
+      rawStarted = true; rawPending++; settledAt = undefined;
+      try { await (options === undefined ? deps.session.prompt(text) : deps.session.prompt(text, options)); }
+      finally { rawPending--; if (rawPending === 0) settledAt = new Date().toISOString(); }
+    },
+    abort: () => deps.session.abort(), dispose: () => deps.session.dispose(),
+  } : deps.session;
   let abortWork: { id?: string; promise: Promise<void> } | undefined;
   const requestAbort = (): Promise<void> => {
     const id = lifecycle.currentTurnId();
@@ -1360,7 +1486,34 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
     return promise;
   };
   return {
-    prompt: makeRolePrompt({ ...deps, lifecycle, requestAbort, finishOnReturn: deps.strictLifecycle }),
+    ...(inspectApplication ? { inspectApplicationToolSurface: inspectApplication } : {}),
+    ...(observation ? { nativeLifecycle: {
+      instanceId, inspect: inspectNative,
+      async stopAndInspect(input, signal) {
+        if (input.expectedInstanceId !== instanceId) throw new Error("Pi native instance mismatch");
+        if (input.expectedCoreTurnId !== undefined && input.expectedCoreTurnId !== coreTurnId) throw new Error("Pi native Core turn mismatch");
+        if (signal?.aborted || !Number.isFinite(input.timeoutMs) || input.timeoutMs <= 0) return inspectNative([signal?.aborted ? "native-stop-observation-aborted" : "native-stop-invalid-timeout"]);
+        stopping = true;
+        lifecycle.fail("aborted", "ABORTED");
+        stopWork ??= Promise.allSettled([
+          ...(rawPending > 0 ? [requestAbort()] : []),
+          ...(deps.sessionShutdown ? [Promise.resolve().then(deps.sessionShutdown)] : []),
+          ...observation.mcpTransports.map(transport => Promise.resolve().then(() => transport.close())),
+        ]).then(results => { stopFailed = results.some(result => result.status === "rejected"); });
+        const deadline = Date.now() + input.timeoutMs;
+        let operationsFinished = false;
+        void stopWork.then(() => { operationsFinished = true; });
+        for (;;) {
+          const facts = inspectNative();
+          if (signal?.aborted) return inspectNative(["native-stop-observation-aborted"]);
+          if (operationsFinished && rawPending === 0 && activeTools.size === 0 && deps.session.isStreaming === false && deps.session.isCompacting === false && deps.session.pendingMessageCount === 0 && facts.processes.every(process => process.state === "exited")) return facts;
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return inspectNative(["native-stop-observation-timeout"]);
+          await new Promise<void>(resolve => setTimeout(resolve, Math.min(10, remaining)));
+        }
+      },
+    } } : {}),
+    prompt: makeRolePrompt({ ...deps, session: observedSession, lifecycle, requestAbort, finishOnReturn: deps.strictLifecycle }),
     events(): AsyncIterable<SessionEvent> {
       return deps.queue.stream;
     },
@@ -1379,6 +1532,7 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
       }
     },
     async dispose(): Promise<void> {
+      disposed = true;
       deps.diagnostics?.record("session.dispose", { turnId: lifecycle.currentTurnId() });
       deps.unsubscribe();
       if (deps.sessionShutdown !== undefined) {
@@ -1394,6 +1548,7 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
         }
       }
       deps.session.dispose();
+      if (rawPending === 0 && activeTools.size === 0) unsubscribeNative?.();
       deps.queue.close();
     },
   };
@@ -1530,6 +1685,9 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           log.stage(notice);
           emit({ kind: "message", summary: notice, detail: { source: "server-tools" } });
           diagnostics.record("server_tool.declare", { count: serverToolConfig.enabled.length, state: "enabled" });
+          // E0 契约 §9.1 / delta P-1：启用服务端工具 ⇒ 本 bind 不提供应用中介工具面事实
+          // （见 bind 尾部判定）。这里只记**内部诊断码**——不是 Model 字段、不改公开事实/门语义。
+          diagnostics.record("pi-provider-server-tools-enabled-unverified", { count: serverToolConfig.enabled.length, state: "unverified" });
         }
 
         // Injected definitions and the exact shared waiting gate are the production capability source.
@@ -1546,6 +1704,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const resolvedMcpServers = mcpActive ? resolveInstalledMcpServers(installedMcp, process.env) : [];
         const mcpWhitelist = resolvedMcpServers.map((server) => server.name);
         let mcpExtension: ReturnType<typeof createMcpExtension> | undefined;
+        const mcpTransports: ReturnType<typeof observePiMcpTransport>[] = [];
         if (mcpActive) {
           diagnostics.record("session.construct.step", { state: "mcp_support", count: resolvedMcpServers.length });
           const mcpLib = await withTimeout(loadPiMcp(), constructMs, "加载 pi-mcp 包");
@@ -1554,7 +1713,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           // server 自身工具链用。`options.env` 为构造期已展开的真值（只存活于内存）。
           const createTransport: McpTransportFactory = (entry, cwd) => {
             const config = entry.config as { command?: unknown; args?: unknown; env?: Record<string, string> };
-            return new mcpLib.StdioTransport({
+            const transport = new mcpLib.StdioTransport({
               command: String(config.command),
               args: Array.isArray(config.args) ? (config.args as string[]) : [],
               cwd,
@@ -1562,6 +1721,8 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
               inheritEnv: false,
               stderr: "pipe",
             });
+            mcpTransports.push(observePiMcpTransport(transport, `pi-mcp:${entry.name}:${mcpTransports.length}`));
+            return transport;
           };
           mcpExtension = createMcpExtension({
             // 配置单一来源＝注入声明（绝不回落 mcp.json/~/.pi/项目信任面）；逐一显式 direct（V1 最小接入）。
@@ -1740,7 +1901,30 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const sessionShutdown = mcpExtension !== undefined
           ? (): Promise<unknown> => session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
           : undefined;
-        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, onPromptStart });
+        // P1-B（P1.6 §4.6 Pi 行）：应用中介工具面快照——**报告面 = 实际构造面**：
+        // · appTools＝实际 `customTools` 名（与注入 governedTools 同名；`getActiveToolNames()` 超面已在
+        //   上面构造期失败，故这里不需要再读活动面——MCP 工具是 bindExtensions 之后异步加入的，读活动面
+        //   会把「尚未连上」误判为漂移）；
+        // · foreignMcpServers＝实际解析并注入 MCP 扩展的白名单名（Pi 无 ANS 自有 MCP；精确枚举，非配置意图）；
+        // · nativeBuiltinTools＝`[]`（本路径固定 `noTools: "builtin"`；若将来真的启用 builtin，必须如实填入）。
+        // 同源对照（customTools ↔ 注入定义、解析白名单 ↔ 配置声明）不一致 ⇒ 不提供事实（fail-closed）。
+        // E0 契约 §9.1 / delta P-1（服务端工具启用即 fail-closed）：`ANS_PI_SERVER_TOOLS` 解析后非空时，
+        // server tools（web_search/web_fetch）由扩展在 provider 请求 wire 上声明——它们既不在 `customTools`
+        // 里（不进 `appTools`），也不是 native builtin（`nativeBuiltinTools` 仍为 `[]`）。冻结的应用中介事实
+        // 因而无法证明「应用默认注册面 + 无额外 native/服务端工具通道」⇒ **不提供** `applicationToolSurface`
+        // （`inspectApplicationToolSurface` 缺席），包装层得到 unknown、派发父门 fail-closed。
+        // 默认关闭时本判据不介入，事实与 P1-B 逐字一致；不新增 Model 字段、不伪造 unknown fact。
+        const appToolNames = customTools.map(tool => tool.name);
+        const configuredMcpNames = installedMcp.map(server => server.name);
+        const serverToolsEnabled = serverToolConfig.enabled.length > 0;
+        const applicationSurfaceEligible = !serverToolsEnabled
+          && appToolNames.length === governedTools.length
+          && appToolNames.every((name, index) => name === governedTools[index].name)
+          && mcpWhitelist.length === configuredMcpNames.length
+          && mcpWhitelist.every((name, index) => name === configuredMcpNames[index]);
+        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, onPromptStart,
+          ...(applicationSurfaceEligible ? { applicationToolSurface: { appTools: appToolNames, foreignMcpServers: [...mcpWhitelist], nativeBuiltinTools: [] } } : {}),
+          nativeObservation: { roleId: role.id, nativeSessionId: sessionSelection.manager.getSessionId(), currentTurnId: opts.currentTurnId, mcpTransports } });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

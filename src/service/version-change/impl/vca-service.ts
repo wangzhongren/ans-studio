@@ -18,6 +18,8 @@
 //   detail 批准后仍走 P1.3 逐项确认，apply 只冻结 applied 项（`detail-item-applied`）。
 // 事件由 Pipeline（S4）写；本 Service 不改 trunk 指针、不写账本/存储。
 
+import { isCompleteSnapshot, isDirectActionReceipt, isSnapshotRef } from "../../../model/trunk.ts";
+import { createFsTrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 import { GOVERNANCE_SLUG_PATTERN } from "../../../model/runtime.ts";
 import {
   AMENDMENT_ID_PATTERN,
@@ -105,6 +107,7 @@ function sameApplicationShape(
 }
 
 export interface VcaServiceDeps {
+  projectRoot?: string;
   repository: VersionChangeRepositoryPort;
   freeze: FreezeService;
   hashes: ProjectHashPort;
@@ -114,6 +117,50 @@ export interface VcaServiceDeps {
 
 export function buildVcaService(deps: VcaServiceDeps): VersionChangeService {
   const { repository, freeze, hashes, trunk } = deps;
+
+  async function directReplacementOf(record: VersionChangeRecord): Promise<VersionChangeRecord | undefined> {
+    return (await repository.findByFlow(record.flowId)).find(next => next.supersedesApplicationId === record.applicationId
+      && next.status === "applied" && next.actionSource?.kind === "role-direct"
+      && next.initiatorRoleId === record.initiatorRoleId && next.kind === record.kind);
+  }
+
+  async function provePendingUncommitted(record: VersionChangeRecord): Promise<string | undefined> {
+    if (!deps.projectRoot) return "Historical commit evidence storage is unavailable";
+    const store = createFsTrunkStore(deps.projectRoot);
+    try {
+      const journal = record.operationId ? await store.readOperation!(record.operationId) : await store.readJournal();
+      if (!journal.ok && journal.reason !== "missing") return `Historical commit journal is ${journal.reason}`;
+      if (record.journalId && (!journal.ok || journal.value.journalId !== record.journalId)) return "Referenced historical journal cannot be verified";
+      const current = await store.readManifest();
+      if (!current.ok && current.reason !== "missing") return `Current commit evidence is ${current.reason}`;
+      const diagnostics: string[] = [];
+      const versions = await store.listHistory({ onDiagnostic: message => { diagnostics.push(message); } });
+      if (diagnostics.length) return "Historical manifest evidence contains unreadable records";
+      if (current.ok) versions.push(current.value.trunkVersion);
+      for (const version of new Set(versions)) {
+        const manifest = await store.readManifestVersion!(version);
+        if (!manifest.ok) return `Historical manifest v${version} is ${manifest.reason}`;
+        if (manifest.value.actionSource?.kind === "role-direct" && manifest.value.actionSource.applicationId === record.applicationId)
+          return "The original application already crossed its commit point; recover it before considering any replacement";
+        if (journal.ok && journal.value.applicationId === record.applicationId && journal.value.target.trunkVersion === version) {
+          const target = journal.value.target;
+          const refs = (value: typeof target) => JSON.stringify({ documents: Object.entries(value.documents).sort(), execution: value.execution,
+            workflow: value.workflow ?? null, roleCards: Object.entries(value.roleCards ?? {}).sort(), boundaries: Object.entries(value.boundaries ?? {}).sort() });
+          const value = manifest.value, documents = Object.fromEntries(Object.entries(value.artifacts.documents).map(([kind, ref]) => [kind, { path: ref.path, sha256: ref.sha256 }]));
+          const roleCards = Object.fromEntries(Object.entries(value.artifacts.roleCards ?? {}).map(([role, ref]) => [role, { path: ref.path, sha256: ref.sha256 }]));
+          const boundaries = Object.fromEntries(Object.entries(value.artifacts.boundaries).map(([role, ref]) => [role, { path: ref.path, sha256: ref.sha256 }]));
+          if (refs(target) === refs({ trunkVersion: version, runId: value.runId, documents, execution: value.artifacts.execution,
+            ...(value.artifacts.workflow ? { workflow: { path: value.artifacts.workflow.path, sha256: value.artifacts.workflow.sha256 } } : {}), roleCards, boundaries }))
+            return "Historical journal target is already committed; metadata status is not proof of non-commit";
+        } else if (version > (record.baseTrunk?.trunkVersion ?? 0)) {
+          const refs = [...Object.values(manifest.value.artifacts.documents), manifest.value.artifacts.execution.teamPlan, manifest.value.artifacts.execution.flow];
+          if (record.targets.length && record.targets.every(target => refs.some(ref => ref?.path === target.path && ref.sha256 === target.toSha256)))
+            return "Matching historical target bytes exist without sufficient operation identity; commit outcome is unknown";
+        }
+      }
+      return undefined;
+    } catch (error) { return `Historical commit proof unavailable: ${String(error)}`; }
+  }
 
   async function nextApplicationId(): Promise<string> {
     if (deps.allocateApplicationId !== undefined) return deps.allocateApplicationId();
@@ -249,6 +296,72 @@ export function buildVcaService(deps: VcaServiceDeps): VersionChangeService {
   }
 
   return {
+    async prepareDirect(input) {
+      const role = VERSION_CHANGE_INITIATOR_BY_KIND[input.kind];
+      if (!role || input.initiatorRoleId !== role) return fail("vca-role-not-allowed", "Trusted role is not the action owner");
+      if (!input.operationId?.trim() || !input.applicationId || !APPLICATION_ID_RE.test(input.applicationId)
+        || !FLOW_ID_RE.test(input.flowId) || !input.summary?.trim() || input.summary.length > VERSION_CHANGE_SUMMARY_MAX
+        || !isCompleteSnapshot(input.snapshot)) return fail("vca-invalid", "Complete direct request and immutable snapshot are required");
+      if (input.baseTrunk === null ? input.currentTrunk !== null
+        : input.currentTrunk === null || input.baseTrunk.trunkVersion !== input.currentTrunk.trunkVersion || input.baseTrunk.digest !== input.currentTrunk.digest)
+        return fail("vca-base-mismatch", "Direct request base differs from effective facts");
+      const targets: VersionChangeTarget[] = [];
+      const seen = new Set<string>();
+      const allowed: readonly string[] = input.kind === "version-upgrade" ? VERSION_UPGRADE_TARGET_KINDS : DETAIL_AMENDMENT_TARGET_KINDS;
+      for (const draft of input.targets) {
+        const rel = normalizeServiceRelPath(draft.path);
+        if (!rel || seen.has(rel) || !allowed.includes(draft.kind) || !targetPathInAuthorArea(draft.kind, rel)
+          || (draft.action !== "add" && draft.action !== "modify")) return fail("vca-target-invalid", "Invalid or duplicate author-area target");
+        seen.add(rel);
+        if (draft.kind !== "execution" && docVersionOf(rel) === undefined) return fail("vca-target-invalid", "Versioned target required");
+        const file = input.snapshot.files.find(file => file.path === rel);
+        if (!file) return fail("vca-target-invalid", "Target bytes absent from complete snapshot");
+        targets.push({ kind: draft.kind as VersionChangeTargetKind, path: rel, action: draft.action,
+          ...(draft.from ? { from: draft.from } : {}), toSha256: file.sha256, ...(draft.roleId ? { roleId: draft.roleId } : {}) });
+      }
+      const refs = validateAmendmentRefs(input, input.kind, targets,
+        input.amendmentItems?.some(item => item.change !== "none") ? input.amendmentItems : undefined);
+      if (input.amendmentItems && !input.amendmentItems.some(item => item.change !== "none") && targets.length)
+        return fail("vca-target-invalid", "No-op amendment cannot contain change targets");
+      if (!refs.ok) return refs;
+      const records = await repository.list();
+      const old = records.find(record => record.operationId === input.operationId || record.applicationId === input.applicationId);
+      if (old) return old.operationId === input.operationId && old.initiatorRoleId === role
+        && old.flowId === input.flowId && old.kind === input.kind && JSON.stringify(old.targets) === JSON.stringify(targets)
+        && (old.baseTrunk?.digest ?? null) === (input.baseTrunk?.digest ?? null) && old.summary === input.summary
+        && old.supersedesApplicationId === input.supersedesApplicationId
+        ? { ok: true, value: old } : fail("vca-conflict", "Direct operation/application id is already bound");
+      const pending = records.filter(record => record.flowId === input.flowId && !record.operationId
+        && (record.status === "submitted" || record.status === "approved"));
+      const linked = pending.find(record => record.applicationId === input.supersedesApplicationId
+        && record.initiatorRoleId === role && record.kind === input.kind);
+      if ((pending.length || input.supersedesApplicationId !== undefined) && !linked)
+        return fail("vca-pending", "Historical pending requests require an explicit resubmission link");
+      if (linked) { const problem = await provePendingUncommitted(linked); if (problem) return fail("vca-conflict", problem); }
+      const record: VersionChangeRecord = { v: 1, schema: VERSION_CHANGE_SCHEMA, applicationId: input.applicationId,
+        operationId: input.operationId, kind: input.kind, initiatorRoleId: role, flowId: input.flowId, baseTrunk: input.baseTrunk,
+        ...(input.requestDigest ? { message: `direct-request:${input.requestDigest}` } : {}),
+        targets, bootstrap: input.baseTrunk === null, summary: input.summary, status: "draft", at: input.at, updatedAt: input.at,
+        snapshotRef: { snapshotId: input.snapshot.snapshotId, digest: input.snapshot.digest },
+        ...(input.amendmentId ? { amendmentId: input.amendmentId } : {}),
+        ...(input.amendmentDocPath ? { amendmentDocPath: input.amendmentDocPath } : {}),
+        ...(input.supersedesApplicationId ? { supersedesApplicationId: input.supersedesApplicationId } : {}) };
+      const saved = await repository.insert(record);
+      return saved.ok ? { ok: true, value: record } : fail("vca-conflict", saved.message ?? saved.code);
+    },
+    async finalizeDirect(input) {
+      const record = await repository.findById(input.applicationId), receipt = input.receipt;
+      if (!record?.operationId || !isDirectActionReceipt(receipt) || !isSnapshotRef(input.snapshotRef)
+        || receipt.source?.kind !== "role-direct" || receipt.source.actorRoleId !== record.initiatorRoleId
+        || receipt.source.action !== record.kind || receipt.operationId !== record.operationId
+        || receipt.applicationId !== record.applicationId || record.snapshotRef?.digest !== input.snapshotRef.digest
+        || (!receipt.ok && receipt.status !== "committed-pending-recovery")) return fail("vca-invalid", "No matching committed direct source/snapshot receipt");
+      if (record.status !== "draft" && record.status !== "applied") return fail("vca-conflict", "Historical pending state cannot be auto-approved");
+      const next: VersionChangeRecord = { ...record, status: "applied", actionSource: receipt.source, directReceipt: receipt,
+        snapshotRef: input.snapshotRef, journalId: receipt.journalId, resultTrunkVersion: input.resultTrunkVersion, updatedAt: input.at };
+      const saved = await repository.updateWithExpectedStatus(next, record.status);
+      return saved.ok ? { ok: true, value: next } : fail("vca-apply-failed", saved.message ?? saved.code);
+    },
     async create(input) {
       if (!(VERSION_CHANGE_KINDS as readonly string[]).includes(input.kind)) {
         return fail("vca-invalid", `未知 VCA kind：${String(input.kind)}`);
@@ -336,6 +449,8 @@ export function buildVcaService(deps: VcaServiceDeps): VersionChangeService {
     async submit(input) {
       const current = await repository.findById(input.applicationId);
       if (current === undefined) return fail("vca-invalid", `VCA 不存在：${input.applicationId}`);
+      if (current.operationId !== undefined) return fail("vca-conflict", "Direct operation cannot enter the historical customer approval state machine");
+      if (await directReplacementOf(current)) return fail("vca-conflict", "Historical request has been replaced by an explicit direct operation; old replies are stale");
       if (current.status === "submitted") {
         return { ok: true, value: { record: current, freezes: [] } };
       }
@@ -411,6 +526,8 @@ export function buildVcaService(deps: VcaServiceDeps): VersionChangeService {
     async approve(input: VersionChangeApproveInput) {
       const current = await repository.findById(input.applicationId);
       if (current === undefined) return fail("vca-invalid", `VCA 不存在：${input.applicationId}`);
+      if (current.operationId !== undefined) return fail("vca-conflict", "Direct operation cannot enter the historical customer approval state machine");
+      if (await directReplacementOf(current)) return fail("vca-conflict", "Historical request has been replaced by an explicit direct operation; old replies are stale");
       if (current.status === "approved") {
         if (input.decisionId.trim() !== "" && current.decisionId === input.decisionId) {
           return { ok: true, value: { record: current, freezes: [] } };
@@ -486,6 +603,8 @@ export function buildVcaService(deps: VcaServiceDeps): VersionChangeService {
     async reject(input: VersionChangeRejectInput) {
       const current = await repository.findById(input.applicationId);
       if (current === undefined) return fail("vca-invalid", `VCA 不存在：${input.applicationId}`);
+      if (current.operationId !== undefined) return fail("vca-conflict", "Direct operation cannot enter the historical customer approval state machine");
+      if (await directReplacementOf(current)) return fail("vca-conflict", "Historical request has been replaced by an explicit direct operation; old replies are stale");
       if (current.status === "rejected" && current.decisionId === input.decisionId) {
         return { ok: true, value: current };
       }
@@ -515,6 +634,8 @@ export function buildVcaService(deps: VcaServiceDeps): VersionChangeService {
     async apply(input: VersionChangeApplyInput) {
       const current = await repository.findById(input.applicationId);
       if (current === undefined) return fail("vca-invalid", `VCA 不存在：${input.applicationId}`);
+      if (current.operationId !== undefined) return fail("vca-conflict", "Direct operation cannot enter the historical customer approval state machine");
+      if (await directReplacementOf(current)) return fail("vca-conflict", "Historical request has been replaced by an explicit direct operation; old replies are stale");
       if (current.status === "applied" && current.journalId === input.journalId) {
         return { ok: true, value: { record: current, freezes: [] } };
       }

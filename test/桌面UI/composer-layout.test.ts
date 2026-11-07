@@ -57,7 +57,7 @@ function assertDeclaration(rule: string, declaration: string, selector: string):
   assert.match(rule, new RegExp(`(?:^|\\n)\\s*${declaration.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*;`), `${selector} 缺少声明 ${declaration}`);
 }
 
-test("Composer 结构：提示文字独占一行，控件（附件/两开关/范围/键盘/动作）同处一行", () => {
+test("Composer 结构：提示文字独占一行，附件/审批/范围/键盘/动作同处控件行；业务决策移至顶部", () => {
   const bottom = jsxBlock("composer-bottom");
   const trustLine = bottom.indexOf('className="composer-trust-line"');
   const controls = bottom.indexOf('className="composer-controls"');
@@ -75,7 +75,6 @@ test("Composer 结构：提示文字独占一行，控件（附件/两开关/范
     'id="btn-attach-image"',
     'className="composer-trust"',
     'id="auto-approve-toggle"',
-    'id="judge-decision-toggle"',
     'id="composer-scope"',
     'className="composer-keyboard"',
     'className="composer-actions"',
@@ -90,7 +89,7 @@ test("Composer 结构：提示文字独占一行，控件（附件/两开关/范
   assert.equal(trustGroup.includes("composer-scope"), false, "composer-scope 不得被包进开关分组");
   assert.ok(trustGroup.includes('role="group"'), "两个开关应以 role=group 分组（可访问性）");
   assert.ok(trustGroup.includes('id="auto-approve-toggle"'), "分组内含「替我审批」");
-  assert.ok(trustGroup.includes('id="judge-decision-toggle"'), "分组内含「替我决策」");
+  assert.equal(composerSource.includes('id="judge-decision-toggle"'), false, "输入区不再复制业务决策入口");
 });
 
 test("CSS 布局：composer-bottom 两行纵向，行/组可收缩（min-width:0），无固定宽度把控件推出视口", () => {

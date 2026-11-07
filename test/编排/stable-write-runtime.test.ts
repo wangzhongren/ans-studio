@@ -12,7 +12,8 @@ import { test } from "node:test";
 
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
-import { createStableWriteRuntime } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
+import { stableWriteDecisionFromFacts } from "../../src/service/gate/resolve-write.ts";
+import { createStableWriteRuntime, refreshStableWritePermitSnapshot } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
 import type { StableWritePresenter, StableWriteRuntime } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
 import { createRunRepinPort, createTrunkRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { TrunkRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
@@ -79,6 +80,7 @@ async function setup(options: { presenter?: boolean; bootstrap?: boolean } = {})
     },
   };
   const runtime = createStableWriteRuntime({
+    projectRoot: project.root,
     stableWrite: integration.services.stableWrite,
     trunkRuntime,
     emitEvent: async (event) => {
@@ -117,6 +119,11 @@ test("stable-write-runtime：workflow 卡预览 + 许可安装 + stablePermitOf 
     const installed = await rig.integration.services.stableWrite.findPermit(PATHS.workflow);
     assert.equal(installed?.permitId, requested.value.permit?.permitId, "许可已安装到 C2b 同步快照");
     assert.equal(rig.runtime.stablePermitOf(PATHS.workflow)?.permitId, requested.value.permit?.permitId);
+    const gateInput = { projectRoot: rig.project.root, relPath: PATHS.workflow, sha256: targetSha, permit: requested.value.permit, now: () => new Date(AT2),
+      currentFile: { state: "present" as const, sha256: requested.value.record.baseSha256 } };
+    assert.equal(stableWriteDecisionFromFacts(gateInput).allowed, true, "Pipeline approval installed the real ordinary permit list into the single Gate snapshot");
+    assert.deepEqual(await refreshStableWritePermitSnapshot({ projectRoot: rig.project.root, now: () => new Date(AT2) }), [requested.value.permit]);
+
 
     const before = await rig.integration.trunk.current();
     // 真实写入执行点 = run-role gate（测试侧直接落盘模拟）
@@ -131,12 +138,13 @@ test("stable-write-runtime：workflow 卡预览 + 许可安装 + stablePermitOf 
     assert.equal(completed.value.record.status, "written");
     assert.equal(completed.value.repinApplied, true);
     assert.equal(completed.value.repinEventEmitted, true);
+    assert.equal(stableWriteDecisionFromFacts({ ...gateInput, currentFile: { state: "present", sha256: targetSha } }).allowed, false, "Consumed permit cannot survive in the Gate snapshot");
     assert.equal(await rig.integration.services.stableWrite.findPermit(PATHS.workflow), undefined);
     assert.equal(rig.runtime.stablePermitOf(PATHS.workflow), undefined);
     const after = await rig.integration.trunk.current();
     assert.equal(after?.trunkVersion, before?.trunkVersion, "mini re-pin 不升 trunkVersion");
     const status = await rig.integration.trunk.status();
-    assert.equal(status.manifest?.artifacts.workflow.sha256, targetSha);
+    assert.equal(status.manifest?.artifacts.workflow?.sha256, targetSha);
 
     const kinds = rig.events.map((event) => event.kind);
     assert.deepEqual(kinds.filter((kind) => kind.startsWith("stable.write.")), [
@@ -181,7 +189,9 @@ test("stable-write-runtime：completeWrite 哈希不符 ⇒ failed 事件 + 许�
     assert.equal(records.find((record) => record.requestId === "sw-2")?.status, "failed");
     assert.equal(rig.runtime.stablePermitOf(PATHS.workflow), undefined);
     const after = await rig.integration.trunk.status();
-    assert.equal(after.manifest?.artifacts.workflow.sha256, before.manifest?.artifacts.workflow.sha256);
+    assert.ok(after.manifest?.artifacts.workflow);
+    assert.ok(before.manifest?.artifacts.workflow);
+    assert.equal(after.manifest.artifacts.workflow.sha256, before.manifest.artifacts.workflow.sha256);
     assert.ok(rig.events.some((event) => event.kind === "stable.write.failed"));
     assert.ok(!rig.events.some((event) => event.kind === "trunk.state"));
   } finally {
@@ -268,8 +278,65 @@ test("stable-write-runtime：无 trunk manifest ⇒ written 但 mini re-pin 只�
     if (!completed.ok) return;
     assert.equal(completed.value.repinApplied, false);
     assert.equal(completed.value.pendingReattach, true);
+    assert.equal(completed.value.publicationError?.code, "stable-manifest-unavailable");
     assert.ok(!rig.events.some((event) => event.kind === "trunk.state"));
   } finally {
     await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
+});
+
+test("stable-write-runtime：真实消费后保留下游拒码和异常，不误报缺manifest或发布成功", async () => {
+  for (const throws of [false, true]) {
+    const rig = await setup({ bootstrap: false });
+    try {
+      await fs.unlink(`${rig.project.root}/${PATHS.workflow}`);
+      const notes: string[] = [], calls: unknown[] = [];
+      const runtime = createStableWriteRuntime({
+        projectRoot: rig.project.root,
+        stableWrite: rig.integration.services.stableWrite,
+        trunkRuntime: { async completeStableWrite(input) {
+          calls.push(input);
+          if (throws) throw new Error("actual publication failure");
+          return { applied: false, pendingReattach: true, errorCode: "git-old-core-programs-unproven", message: "Actual retained Core evidence is unresolved" };
+        } },
+        presenter: { async presentWorkflowWrite() { return { outcome: "answered", choice: "approve-stable-write", decisionId: "dec-observed" }; } },
+        emitEvent: async event => { rig.events.push(event); }, notify: note => { notes.push(note); }, now: () => new Date(AT),
+      });
+      const content = "# actual initial workflow\n";
+      const requested = await runtime.requestWorkflowWrite({ roleId: "convener", content, requestId: "sw-6", at: AT2 });
+      assert.equal(requested.ok, true, requested.ok ? "" : `${requested.code}: ${requested.message}`);
+      await writeProjectFile(rig.project.root, PATHS.workflow, content);
+      const completed = await runtime.completeWrite({ requestId: "sw-6", actualSha256: sha256(content), at: AT3 });
+      assert.equal(completed.ok, true);
+      if (!completed.ok) return;
+      assert.equal(calls.length, 1, "Real written/consumed initial workflow reaches the injected publication port exactly once");
+      assert.equal(completed.value.record.status, "written");
+      assert.equal(completed.value.repinApplied, false);
+      assert.equal(completed.value.pendingReattach, true);
+      assert.equal(completed.value.publicationError?.code, throws ? "initial-workflow-publication-exception" : "git-old-core-programs-unproven");
+      assert.match(completed.value.publicationError?.message ?? "", throws ? /actual publication failure/ : /Actual retained Core/);
+      assert.equal((await rig.integration.services.stableWrite.findPermit(PATHS.workflow)), undefined);
+      assert.ok(notes.some(note => note.includes(completed.value.publicationError!.code)));
+      assert.ok(notes.every(note => !note.includes("无 trunk manifest")));
+      assert.ok(!rig.events.some(event => event.kind === "trunk.state"));
+    } finally {
+      await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    }
+  }
+});
+
+
+test("stable-write-runtime: a foreign service root cannot install its permit facts into this project", async () => {
+  const rig = await setup({ bootstrap: false });
+  try {
+    const wrongRoot = rig.project.root + "-foreign", runtime = createStableWriteRuntime({ projectRoot: wrongRoot, stableWrite: rig.integration.services.stableWrite,
+      trunkRuntime: { async completeStableWrite() { return { applied: false }; } }, emitEvent: async () => {}, now: () => new Date(AT) });
+    const request = await rig.integration.services.stableWrite.request({ roleId: "convener", kind: "workflow", content: "ordinary actual request", at: AT });
+    assert.ok(request.ok); if (!request.ok) return;
+    await assert.rejects(runtime.settle(request.value.requestId, { choice: "approve-stable-write", decisionId: "real-host-choice", at: AT }), /project-root-mismatch/);
+    assert.equal(runtime.stablePermitOf(PATHS.workflow), undefined);
+    const actual = await rig.integration.services.stableWrite.readPermitSnapshot(); assert.equal(actual.length, 1, "The domain receipt remains real; a failed Gate install does not rewrite approval history");
+    assert.equal(stableWriteDecisionFromFacts({ projectRoot: wrongRoot, relPath: PATHS.workflow, sha256: actual[0]!.targetSha256, permit: actual[0], now: () => new Date(AT),
+      currentFile: { state: "present", sha256: actual[0]!.baseSha256 } }).allowed, false);
+  } finally { await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
 });

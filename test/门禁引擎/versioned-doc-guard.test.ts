@@ -7,6 +7,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { syncBuiltinESMExports } from "node:module";
+import type { StableWritePermit } from "../../src/model/version-change.ts";
+import { stableWriteDecisionFromFacts, installStableWritePermitSnapshot, type StableWriteFactsInput } from "../../src/service/gate/resolve-write.ts";
 
 import {
   acquireVersionLock,
@@ -29,8 +32,159 @@ import {
   VERSION_LOCK_REL,
   type VersionBaselineRecord,
   type VersionedDocFreezeSnapshot,
+  planVersionBaselineRegistration,
+  verifyVersionBaselineData,
+  readVersionBaselineShaData,
+  invalidateStableWritePermitSnapshot,
 } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import { evaluateShellWriteTargets } from "../../src/common/门禁引擎/shell-write-guard.ts";
+import { registerVersionedDocument, verifyVersionedDocuments, readVersionBaselineSha, refreshAndInstallVersionedDocFreezeSnapshot } from "../../src/service/boundary/resolve-boundary.ts";
+import { readVersionBaselineState as readProviderBaseline, writeVersionBaselineState as writeProviderBaseline,
+  acquireVersionLock as acquireProviderLock, ownsVersionLock as ownsProviderLock, releaseVersionLock as releaseProviderLock,
+  appendDocFreezeRecords as appendProviderFreeze } from "../../src/provider/version-change/public/version-change-store.ts";
+
+const baselineHash = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+const baselineFile = (file: string, text: string) => ({ path: file, bytesBase64: Buffer.from(text).toString("base64"), sha256: baselineHash(text) });
+
+function pureStableFixture() {
+  const projectRoot = "C:/g15-pure-no-disk", now = () => new Date("2026-11-06T01:10:00.000Z");
+  const permit: StableWritePermit = { v: 1, schema: "stable-write/v1", permitId: "g15-unit-permit", requestId: "g15-unit-request", roleId: "convener", kind: "workflow", path: "docs/workflow.md",
+    baseSha256: baselineHash("old exact bytes"), targetSha256: baselineHash(Buffer.from("\uFEFF# New workflow\n")), authority: { decisionId: "unit-approval-data" }, status: "approved",
+    approvedAt: "2026-11-06T01:00:00.000Z", issuedAt: "2026-11-06T01:00:00.000Z", expiresAt: "2026-11-06T01:30:00.000Z" };
+  const input: StableWriteFactsInput = { projectRoot, relPath: permit.path, sha256: permit.targetSha256, permit, now, currentFile: { state: "present", sha256: permit.baseSha256 } };
+  return { projectRoot, permit, input };
+}
+
+test("G15 stable pure facts retain permit snapshot/base/role/TTL/final BOM-byte SHA checks", t => {
+  const f = pureStableFixture(); t.after(() => invalidateStableWritePermitSnapshot(f.projectRoot));
+  installStableWritePermitSnapshot(f.projectRoot, [f.permit]);
+  assert.equal(stableWriteDecisionFromFacts(f.input).allowed, true);
+  assert.equal(stableWriteDecisionFromFacts({ ...f.input, sha256: baselineHash("# New workflow\n") }).allowed, false, "Final edit BOM bytes cannot be replaced with a text-only hash");
+  assert.equal(stableWriteDecisionFromFacts({ ...f.input, currentFile: { state: "present", sha256: baselineHash("changed old bytes") } }).allowed, false);
+  assert.equal(stableWriteDecisionFromFacts({ ...f.input, permit: { ...f.permit, targetSha256: baselineHash("invented") } }).allowed, false, "Candidate must equal the installed snapshot");
+  for (const permit of [{ ...f.permit, roleId: "product" }, { ...f.permit, expiresAt: "2026-11-06T02:00:00.000Z" },
+    { ...f.permit, status: "consumed" as const, consumedAt: "2026-11-06T01:05:00.000Z" }, { ...f.permit, path: "角色卡/worker/role-card.md" }]) {
+    installStableWritePermitSnapshot(f.projectRoot, [permit]);
+    assert.equal(stableWriteDecisionFromFacts({ ...f.input, permit }).allowed, false, JSON.stringify(permit));
+  }
+  installStableWritePermitSnapshot(f.projectRoot, [f.permit]);
+  assert.equal(stableWriteDecisionFromFacts({ ...f.input, now: () => new Date("2026-11-06T01:30:00.000Z") }).allowed, false);
+});
+
+test("G15 explicit missing differs from current-file unknown, missing facts and existing base SHA", t => {
+  const f = pureStableFixture(); t.after(() => invalidateStableWritePermitSnapshot(f.projectRoot));
+  installStableWritePermitSnapshot(f.projectRoot, [f.permit]);
+  assert.equal(stableWriteDecisionFromFacts({ ...f.input, currentFile: { state: "missing" } }).allowed, false, "Existing base does not match missing");
+  const first = { ...f.permit, baseSha256: "" }; installStableWritePermitSnapshot(f.projectRoot, [first]);
+  const input = { ...f.input, permit: first };
+  assert.equal(stableWriteDecisionFromFacts({ ...input, currentFile: { state: "missing" } }).allowed, true);
+  for (const currentFile of [undefined, { state: "unknown", reason: "EACCES" }, { state: "present", sha256: "" }, { state: "present", sha256: baselineHash("exists") }])
+    assert.equal(stableWriteDecisionFromFacts({ ...input, currentFile } as StableWriteFactsInput).allowed, false, JSON.stringify(currentFile));
+});
+
+test("G15 public managed stable predicate performs zero FS reads for present/missing/unknown facts", t => {
+  const f = pureStableFixture(); installStableWritePermitSnapshot(f.projectRoot, [f.permit]); let reads = 0;
+  t.after(() => invalidateStableWritePermitSnapshot(f.projectRoot));
+  for (const key of ["readFileSync", "statSync", "existsSync", "realpathSync"] as const) t.mock.method(fs, key, () => { reads++; throw new Error("Pure stable gate touched fs"); });
+  syncBuiltinESMExports();
+  try {
+    assert.equal(stableWriteDecisionFromFacts(f.input).allowed, true);
+    assert.equal(stableWriteDecisionFromFacts({ ...f.input, currentFile: { state: "unknown", reason: "EIO" } }).allowed, false);
+    assert.equal(stableWriteDecisionFromFacts({ ...f.input, currentFile: { state: "missing" } }).allowed, false);
+    assert.equal(stableWriteDecisionFromFacts({ ...f.input, currentFile: undefined } as unknown as StableWriteFactsInput).allowed, false);
+    assert.equal(reads, 0);
+  } finally { t.mock.restoreAll(); syncBuiltinESMExports(); }
+});
+
+test("G13 pure registration requires complete authentic bytes and preserves the original baseline text", () => {
+  const relPath = "docs/product/focus-intent-v1.md", file = baselineFile(relPath, "# v1\nUnit draft\n"), at = "2026-11-06T01:02:03.000Z";
+  const input = { baselineText: null, initialized: false, files: [file], scanComplete: true, relPath, at };
+  assert.equal(planVersionBaselineRegistration({ ...input, scanComplete: false }).registered, false);
+  assert.equal(planVersionBaselineRegistration({ ...input, files: [{ ...file, sha256: "f".repeat(64) }] }).registered, false);
+  assert.equal(planVersionBaselineRegistration({ ...input, files: [file, file] }).registered, false);
+  const first = planVersionBaselineRegistration(input); assert.equal(first.registered, true); assert.equal(first.initialize, true);
+  const noNewline = first.nextText!.trimEnd(), changed = baselineFile(relPath, "# v1\nUpdated draft\n");
+  const next = planVersionBaselineRegistration({ ...input, baselineText: noNewline, initialized: true, files: [changed] });
+  assert.equal(next.registered, true); assert.ok(next.nextText!.startsWith(noNewline + "\n"), "Preserve old text exactly, then add the required line separator");
+  assert.deepEqual(verifyVersionBaselineData({ baselineText: next.nextText!, initialized: true, files: [changed], scanComplete: true }), []);
+  assert.deepEqual(readVersionBaselineShaData({ baselineText: next.nextText!, initialized: true, relPath }), { ok: true, sha256: changed.sha256 });
+  assert.equal(readVersionBaselineShaData({ baselineText: next.nextText!, initialized: false, relPath }).ok, false);
+});
+
+test("G13 actual Service TOFU/register/query/verify use Provider bytes and preserve N+1/frozen boundaries", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "g13-baseline-")); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const rel = "docs/product/focus-intent-v1.md", second = "docs/proposals/focus-proposal-v1.md";
+  for (const file of [rel, second]) { fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), "# v1\nOriginal bytes\n"); }
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), true);
+  const first = await readProviderBaseline(root); assert.equal(first.initialized, true); assert.equal(first.text!.trim().split("\n").length, 2, "TOFU registers the full real scan, not just the target");
+  assert.deepEqual(await verifyVersionedDocuments({ projectRoot: root }), []);
+  assert.deepEqual(await readVersionBaselineSha({ projectRoot: root, relPath: rel }), { ok: true, sha256: baselineHash("# v1\nOriginal bytes\n") });
+  assert.deepEqual(await readVersionBaselineSha({ projectRoot: root, relPath: "docs/product/focus-intent" }), { ok: true, sha256: baselineHash("# v1\nOriginal bytes\n") });
+  assert.equal(versionedDocFreezeState(root, rel, true), "frozen", "TOFU does not itself complete migration");
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), true);
+  assert.equal(versionedDocFreezeState(root, rel, true), "frozen", "Repeated registration must not promote migration-required to ready");
+  await refreshAndInstallVersionedDocFreezeSnapshot(root, { migrationCompleted: true });
+  fs.writeFileSync(path.join(root, rel), "# v1\nUpdated draft\n");
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), true);
+  assert.equal(versionedDocFreezeState(root, rel, true), "draft", "Preserve already proven migration readiness after a successful registration");
+  const next = "docs/product/focus-intent-v2.md"; fs.writeFileSync(path.join(root, next), "# v2\nNext version\n");
+  const registered = await Promise.all([registerVersionedDocument({ projectRoot: root, relPath: next }), registerVersionedDocument({ projectRoot: root, relPath: next })]);
+  assert.deepEqual(registered, [true, true]);
+  const state = await readProviderBaseline(root), records = state.text!.trim().split("\n").map(line => JSON.parse(line));
+  assert.equal(records.filter(record => record.doc === "intent" && record.version === 2).length, 1, "Shared lock makes concurrent registration idempotent");
+  const gap = "docs/product/focus-intent-v4.md"; fs.writeFileSync(path.join(root, gap), "# v4\nSkip version\n");
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: gap }), false);
+  assert.equal((await readProviderBaseline(root)).text, state.text);
+  const freeze = { schema: "doc-freeze/v1" as const, applicationId: "unit-intent-decision", reason: "intent-confirmed" as const, origin: "customer" as const,
+    decidedBy: "customer" as const, decisionId: "unit-customer-decision", frozenAt: "2026-11-06T01:02:03.000Z" };
+  assert.ok((await appendProviderFreeze([{ projectRoot: root, relPath: rel, freeze }])).ok);
+  fs.writeFileSync(path.join(root, rel), "# v1\nIllicit frozen overwrite\n");
+  const frozenBaseline = (await readProviderBaseline(root)).text;
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), false);
+  assert.equal((await readProviderBaseline(root)).text, frozenBaseline);
+  assert.ok((await verifyVersionedDocuments({ projectRoot: root })).some(violation => violation.path === rel && violation.reason === "changed"));
+});
+
+test("G13 Service refuses unknown/invalid Provider state and strict scan failures without TOFU repair", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "g13-invalid-")); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const rel = "docs/product/focus-intent-v1.md"; fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), "# v1\n");
+  fs.writeFileSync(path.join(root, "docs/contracts"), "A file is not an enumerable directory");
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), false, "ENOTDIR is unknown scan coverage, not an empty directory");
+  assert.equal((await readProviderBaseline(root)).initialized, false); assert.equal((await readProviderBaseline(root)).text, null);
+  assert.ok((await verifyVersionedDocuments({ projectRoot: root })).length > 0);
+  fs.unlinkSync(path.join(root, "docs/contracts")); assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), true);
+  const baseline = path.join(root, ".ans/state/versions.jsonl"), marker = path.join(root, ".ans/state/versions.initialized"), original = fs.readFileSync(baseline);
+  fs.unlinkSync(marker);
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), false); assert.deepEqual(fs.readFileSync(baseline), original);
+  assert.deepEqual(await readVersionBaselineSha({ projectRoot: root, relPath: rel }), { ok: false, reason: "marker-missing" });
+  fs.writeFileSync(marker, "present\n"); fs.writeFileSync(baseline, "corrupt JSON\n");
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), false);
+  assert.ok((await verifyVersionedDocuments({ projectRoot: root })).some(violation => violation.reason === "baseline-corrupt"));
+  fs.unlinkSync(baseline); fs.mkdirSync(baseline);
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), false, "Provider EISDIR is not missing and cannot initialize a fresh baseline");
+  assert.deepEqual(await readVersionBaselineSha({ projectRoot: root, relPath: rel }), { ok: false, reason: "baseline-corrupt" });
+});
+
+test("G13 pure registration plan cannot bypass the actual Provider byte CAS or lost-lock fencing", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "g13-fence-")); t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const rel = "docs/product/focus-intent-v1.md"; fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true }); fs.writeFileSync(path.join(root, rel), "# v1\nBefore\n");
+  assert.equal(await registerVersionedDocument({ projectRoot: root, relPath: rel }), true);
+  const raw = await readProviderBaseline(root), file = baselineFile(rel, "# v1\nAfter\n");
+  const planned = planVersionBaselineRegistration({ baselineText: raw.text, initialized: raw.initialized, files: [file], scanComplete: true, relPath: rel, at: "2026-11-06T01:02:03.000Z" });
+  assert.equal(planned.registered, true); assert.ok(planned.nextText);
+  const release = await acquireProviderLock(root);
+  try {
+    const baseline = path.join(root, ".ans/state/versions.jsonl"), changed = raw.text! + "\n";
+    fs.writeFileSync(baseline, changed);
+    const stale = await writeProviderBaseline(root, { text: planned.nextText, expectedSha256: baselineHash(raw.text!), lockToken: release.token });
+    assert.deepEqual(stale, { ok: false, reason: "baseline-cas-conflict" }); assert.equal(fs.readFileSync(baseline, "utf8"), changed);
+    const lock = path.join(root, VERSION_LOCK_REL), value = JSON.parse(fs.readFileSync(lock, "utf8")); value.token = "g13-owned-fixture-takeover"; fs.writeFileSync(lock, JSON.stringify(value));
+    assert.equal(await ownsProviderLock(root, release.token), false);
+    const lost = await writeProviderBaseline(root, { text: planned.nextText, expectedSha256: baselineHash(changed), lockToken: release.token });
+    assert.deepEqual(lost, { ok: false, reason: "fencing-lost" }); assert.equal(fs.readFileSync(baseline, "utf8"), changed);
+    await releaseProviderLock(root, value.token);
+  } finally { await release(); }
+});
 
 test("版本化路径识别与版本号：intent/proposal/roster/modules/topology/architecture", () => {
   const paths = [

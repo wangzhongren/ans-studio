@@ -18,6 +18,10 @@ import {
   VCA_SUBMISSION_TARGETS_MAX,
 } from "../../src/model/runtime.ts";
 import { allow } from "./fixtures.ts";
+import { buildChiefDecisionTools, createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
+import { createRuntimeAdapter } from "../../src/service/runtime/session.ts";
+import { role } from "./fixtures.ts";
+import type { ChiefDecisionExecutionContext, RuntimeProviderOptions } from "../../src/model/runtime.ts";
 
 const TOOL_NAMES = [SUBMIT_VERSION_CHANGE_TOOL_NAME, SUBMIT_REFACTOR_TOOL_NAME, REQUEST_STABLE_WRITE_TOOL_NAME] as const;
 
@@ -310,4 +314,204 @@ test("C1d/schema：三工具 schema 单一来源与冻结枚举一致", () => {
   for (const description of [vca, refactor, stable]) {
     assert.equal(description.executionMode, "sequential");
   }
+});
+
+const directDigest = "a".repeat(64), directNext = "b".repeat(64);
+const snapshotRef = { snapshotId: "snapshot-1", path: "docs/evidence.md", sha256: directDigest };
+const appliedReceipt = { ok: true as const, status: "applied" as const, operationId: "op-1", baseDigest: directDigest, targetDigest: directNext };
+const decisionArgs = { requestId: "req-1", baseDigest: directDigest, delegationRevision: 2, disposition: "select", selected: ["alternative"], reason: "Evidence supports the alternative" };
+const decisionReceipt = { ok: true, requestId: "req-1", status: "settled", source: { kind: "chief-delegated", actorRoleId: "chief", originRoleId: "convener",
+  requestId: "req-1", baseDigest: directDigest, delegationRevision: 2, disposition: "select", selected: ["alternative"], reason: decisionArgs.reason, at: "2026-11-05T00:00:00Z" } };
+const narrowCases = [
+  { name: "select_run_change", key: "selectRunChange", roleId: "rapporteur", args: { operationId: "op-1", runId: "run-1", expectedPinDigest: directDigest, targetTrunk: { version: 2, digest: directNext }, mode: "continue-frozen", reason: "keep original evidence" }, receipt: appliedReceipt },
+  { name: "complete_team_plan", key: "completeTeamPlan", roleId: "convener", args: { operationId: "op-1", flowId: "flow-1", baseDigest: directDigest, plan: { path: "docs/team.md", sha256: directDigest, version: 1 } }, receipt: appliedReceipt },
+  { name: "activate_role_documents", key: "activateRoleDocuments", roleId: "nominator", args: { operationId: "op-1", flowId: "flow-1", planRef: snapshotRef, d3DecisionId: "real-d3", rosterRef: snapshotRef, targetRoleId: "worker", documents: {
+    card: { path: "角色卡/worker/role-card.md", sha256: directDigest }, boundaryMd: { path: "角色卡/worker/boundary.md", sha256: directDigest }, boundaryYaml: { path: "角色卡/worker/boundary.yaml", sha256: directDigest } } }, receipt: { ...appliedReceipt, activationDigest: directNext } },
+  { name: "close_created_task", key: "closeCreatedTask", roleId: "chief", args: { operationId: "op-1", taskId: "task-1", runId: "run-1", basisDigest: directDigest, reportRef: snapshotRef, outcome: "accepted" }, receipt: { ...appliedReceipt, taskId: "task-1", eventId: "real-event", taskStatus: "closed" } },
+  { name: "decide_pending_request", key: "decidePendingRequest", roleId: "chief", args: decisionArgs, receipt: decisionReceipt },
+] as const;
+
+test("R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal", async () => {
+  for (const item of narrowCases) {
+    assert.equal(toolsFor().has(item.name), false);
+    const calls: unknown[] = [];
+    const controller = new AbortController();
+    const options = { roleId: item.roleId, [item.key]: async (input: unknown, signal: unknown) => {
+      calls.push({ input, signal }); return item.receipt;
+    } } as GovernedToolsOptions;
+    const result = await run(options, item.name, structuredClone(item.args), controller.signal);
+    assert.equal(result.ok, true, result.message);
+    assert.deepEqual(calls, [{ input: item.args, signal: controller.signal }]);
+    assert.deepEqual(JSON.parse(result.message.slice(item.name.length + 2)), item.receipt);
+    for (const roleId of [undefined, "worker", "product"]) {
+      const invalid = await run({ ...options, roleId }, item.name, structuredClone(item.args));
+      assert.equal(invalid.ok, false); assert.match(invalid.message, /role-not-allowed/);
+    }
+    assert.equal(calls.length, 1);
+  }
+});
+
+test("R2 rejects unknown identity/source/switch and nested malformed evidence before invocation", async () => {
+  for (const item of narrowCases) {
+    let calls = 0;
+    const options = { roleId: item.roleId, [item.key]: async () => { calls++; return item.receipt; } } as GovernedToolsOptions;
+    for (const extra of [{ actorRoleId: item.roleId }, { source: { kind: "customer-decision" } }, { delegationEnabled: true },
+      { roleDocumentChecks: { roleId: "worker", snapshotDigest: directDigest, ok: true } }]) {
+      assert.equal((await run(options, item.name, { ...structuredClone(item.args), ...extra })).ok, false);
+    }
+    const absent = { ...structuredClone(item.args) } as Record<string, unknown>;
+    const required = describeTool(item.name).parameters.required as string[];
+    delete absent[required[0]!];
+    assert.equal((await run(options, item.name, absent)).ok, false);
+    assert.equal(calls, 0);
+  }
+  const badCases: [number, Record<string, unknown>][] = [
+    [0, { ...narrowCases[0].args, targetTrunk: { version: 2, digest: directNext, actorRoleId: "chief" } }],
+    [0, { ...narrowCases[0].args, mode: "automatic" }],
+    [1, { ...narrowCases[1].args, plan: { path: "../escape.md", sha256: directDigest, version: 1 } }],
+    [2, { ...narrowCases[2].args, documents: { card: narrowCases[2].args.documents.card } }],
+    [3, { ...narrowCases[3].args, outcome: "cancelled" }],
+    [4, { ...decisionArgs, disposition: "revise" }],
+    [4, { ...decisionArgs, selected: [] }],
+    [4, { ...decisionArgs, delegationRevision: -1 }],
+  ];
+  for (const [index, args] of badCases) {
+    const item = narrowCases[index]!; let calls = 0;
+    const result = await run({ roleId: item.roleId, [item.key]: async () => { calls++; return item.receipt; } } as GovernedToolsOptions, item.name, args);
+    assert.equal(result.ok, false, JSON.stringify(args)); assert.equal(calls, 0);
+  }
+});
+
+test("R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort", async () => {
+  for (const receipt of [
+    { ...appliedReceipt, status: "no-op", targetDigest: directDigest },
+    { ...appliedReceipt, ok: false, status: "rejected", errorCode: "base-conflict", message: "conflict" },
+    { ...appliedReceipt, ok: false, status: "blocked", errorCode: "missing-evidence", message: "blocked" },
+    { ...appliedReceipt, ok: false, status: "committed-pending-recovery", applicationId: "vc-1", journalId: "j-1", errorCode: "notify-failed", message: "Committed; notification pending" },
+  ]) {
+    const result = await run({ roleId: "convener", completeTeamPlan: async () => receipt } as GovernedToolsOptions, "complete_team_plan", structuredClone(narrowCases[1].args));
+    assert.deepEqual(JSON.parse(result.message.slice("complete_team_plan: ".length)), receipt);
+    assert.equal(result.ok, receipt.ok);
+  }
+  const controller = new AbortController();
+  const result = await run({ roleId: "convener", completeTeamPlan: async () => { controller.abort(); return appliedReceipt; } }, "complete_team_plan", structuredClone(narrowCases[1].args), controller.signal);
+  assert.equal(result.ok, true); assert.match(result.message, /"status":"applied"/);
+  for (const receipt of [{ ...appliedReceipt, operationId: "wrong" }, { ok: true, status: "approved" },
+    { ...appliedReceipt, ok: false, status: "committed-pending-recovery", errorCode: "notify-failed", message: "committed" }]) {
+    const invalid = await run({ roleId: "convener", completeTeamPlan: async () => receipt } as GovernedToolsOptions, "complete_team_plan", structuredClone(narrowCases[1].args));
+    assert.equal(invalid.ok, false); assert.match(invalid.message, /结果未知/); assert.doesNotMatch(invalid.message, /按.*未提交.*处理/);
+  }
+});
+
+test("R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result", async () => {
+  const args = { kind: "version-upgrade", flowId: "flow-1", summary: "direct", targets: [{ ...VCA_TARGETS[0], expectedFromSha256: null }], operationId: "op-1", baseTrunk: { version: 1, digest: directDigest } };
+  let calls = 0;
+  const controller = new AbortController();
+  const result = await run({ roleId: "product", submitVersionChange: async input => {
+    calls++; assert.deepEqual(input, { ...args, initiatorRoleId: "product" }); controller.abort();
+    return { ...appliedReceipt, applicationId: "vc-1", receipt: appliedReceipt };
+  } }, SUBMIT_VERSION_CHANGE_TOOL_NAME, args, controller.signal);
+  assert.equal(result.ok, true); assert.match(result.message, /"status":"applied"/); assert.equal(calls, 1);
+  for (const invalid of [{ ...args, operationId: undefined }, { ...args, baseTrunk: { version: 1, digest: "bad" } },
+    { ...args, targets: VCA_TARGETS }, { ...args, initiatorRoleId: "product" },
+    { ...args, baseTrunk: { ...args.baseTrunk, source: "customer" } },
+    { ...args, roleDocumentChecks: { roleId: "worker", snapshotDigest: directDigest, ok: true } }]) {
+    assert.equal((await run({ roleId: "product", submitVersionChange: async () => { calls++; return { ok: true }; } }, SUBMIT_VERSION_CHANGE_TOOL_NAME, invalid)).ok, false);
+  }
+  assert.equal(calls, 1);
+});
+
+const chiefContext = (): ChiefDecisionExecutionContext => ({ roleId: "chief", executionId: "execution-1", mode: "bounded-decision", productionWriteAuthority: false,
+  tools: ["decide_pending_request"], limits: { maxTurns: 1, timeoutMs: 1000, maxAttempts: 1 }, request: {
+    requestId: "req-1", baseDigest: directDigest, delegationRevision: 2, originRoleId: "convener", cardKind: "decision", question: "Recovery?",
+    options: [{ id: "recommended", label: "First", recommended: true }, { id: "alternative", label: "Second" }], evidenceRefs: [snapshotRef] } });
+
+test("R2 bounded chief tool binds request/revision/options and never substitutes recommended choice", async () => {
+  let calls = 0;
+  const [tool] = buildChiefDecisionTools(async () => { calls++; return decisionReceipt as Awaited<ReturnType<NonNullable<GovernedToolsOptions["decidePendingRequest"]>>>; }, chiefContext());
+  for (const args of [{ ...decisionArgs, requestId: "other" }, { ...decisionArgs, delegationRevision: 1 }, { ...decisionArgs, selected: ["invalid"] }]) assert.equal((await tool!.handler({ name: tool!.name, args })).ok, false);
+  assert.equal(calls, 0);
+  assert.equal((await tool!.handler({ name: tool!.name, args: decisionArgs })).ok, true);
+  assert.equal((await tool!.handler({ name: tool!.name, args: decisionArgs })).ok, false);
+  assert.equal(calls, 1);
+  const [wrongOrigin] = buildChiefDecisionTools(async () => ({ ...decisionReceipt,
+    source: { ...decisionReceipt.source, originRoleId: "different-origin" } }) as Awaited<ReturnType<NonNullable<GovernedToolsOptions["decidePendingRequest"]>>>, chiefContext());
+  assert.equal((await wrongOrigin!.handler({ name: wrongOrigin!.name, args: decisionArgs })).ok, false);
+});
+
+test("R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget", async () => {
+  const captured: RuntimeProviderOptions[] = [];
+  const options = { runtime: "demo" as const, gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(), chiefDecisionContext: chiefContext(),
+    persistSession: true, closeCreatedTask: async () => ({ ...appliedReceipt, taskId: "task-1", eventId: "e-1", taskStatus: "closed" }),
+    decidePendingRequest: async () => decisionReceipt as Awaited<ReturnType<NonNullable<GovernedToolsOptions["decidePendingRequest"]>>>,
+    providerFactories: { demo: (provider: RuntimeProviderOptions) => { captured.push(provider); return createDemoRuntimeAdapter(provider, [{ name: "decide_pending_request", args: decisionArgs }]); } } };
+  const adapter = createRuntimeAdapter(options);
+  await assert.rejects(adapter.bindRole(role("convener")), /trusted chief/);
+  const session = await adapter.bindRole(role("chief"));
+  assert.deepEqual(captured[0]!.tools.map(tool => tool.name), ["decide_pending_request"]);
+  assert.deepEqual(captured[0]!.installedMcpServers, []);
+  assert.equal(captured[0]!.storage, undefined);
+  assert.equal(captured[0]!.turnLastResortMs, 1000);
+  assert.equal(captured[0]!.requestAttemptMax, 1);
+  await session.prompt("Choose using evidence");
+  await assert.rejects(session.prompt("Repeat"), /budget exhausted/);
+  await session.dispose();
+});
+
+test("R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement", async () => {
+  for (const disposition of ["reject", "revise"] as const) {
+    const args = { ...decisionArgs, disposition, selected: undefined };
+    delete args.selected;
+    const result = await run({ roleId: "chief", decidePendingRequest: async input => {
+      assert.deepEqual(input, args);
+      return { ok: false, requestId: "req-1", status: "pending", errorCode: "needs-revision", message: "No revision option; retained for author" };
+    } }, "decide_pending_request", args);
+    assert.equal(result.ok, false); assert.match(result.message, /"status":"pending"/);
+  }
+  const wrong = await run({ roleId: "chief", decidePendingRequest: async () => ({ ...decisionReceipt,
+    source: { ...decisionReceipt.source, selected: ["recommended"] } }) } as GovernedToolsOptions, "decide_pending_request", decisionArgs);
+  assert.equal(wrong.ok, false); assert.match(wrong.message, /结果未知/);
+});
+
+test("R2 chief timeout is finite and normal sessions still receive injected narrow capabilities", async () => {
+  const captured: RuntimeProviderOptions[] = [];
+  const context = chiefContext(); context.limits.timeoutMs = 25;
+  let calls = 0;
+  const session = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+    chiefDecisionContext: context, decidePendingRequest: async (_input, signal) => {
+      calls++;
+      await new Promise<void>((_resolve, reject) => { signal!.addEventListener("abort", () => reject(new Error("aborted")), { once: true }); });
+      throw new Error("unreachable");
+    }, providerFactories: { demo: provider => createDemoRuntimeAdapter(provider, [{ name: "decide_pending_request", args: decisionArgs }]) },
+  }).bindRole(role("chief"));
+  try { await assert.rejects(session.prompt("Decide"), /超时|超过|到点/); assert.equal(calls, 1); }
+  finally { await session.dispose(); }
+  let normalCalls = 0;
+  const normal = await createRuntimeAdapter({ runtime: "demo", gate: allow, projectRoot: process.cwd(), skillRoot: process.cwd(),
+    completeTeamPlan: async () => { normalCalls++; return appliedReceipt; }, providerFactories: { demo: provider => {
+      captured.push(provider); return createDemoRuntimeAdapter(provider, [{ name: "complete_team_plan", args: structuredClone(narrowCases[1].args) }]);
+    } },
+  }).bindRole(role("convener"));
+  try {
+    assert.equal(captured[0]!.tools.some(tool => tool.name === "complete_team_plan"), true);
+    assert.equal(captured[0]!.tools.some(tool => tool.name === "write_file"), true);
+    await normal.prompt("Complete the plan"); assert.equal(normalCalls, 1);
+  } finally { await normal.dispose(); }
+});
+
+test("R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary", async () => {
+  const inputs: SubmitVersionChangeInput[] = [];
+  const options: GovernedToolsOptions = { roleId: "product", submitVersionChange: async input => {
+    inputs.push(input); return { ok: true, applicationId: "vc-3", status: "submitted" };
+  } };
+  const args = { kind: "version-upgrade", flowId: "flow-resubmit", summary: "replace vc-1", targets: VCA_TARGETS };
+  assert.equal((await run(options, SUBMIT_VERSION_CHANGE_TOOL_NAME, { ...args, supersedesApplicationId: "vc-1" })).ok, true);
+  assert.equal(inputs[0]!.supersedesApplicationId, "vc-1");
+  assert.equal((await run(options, SUBMIT_VERSION_CHANGE_TOOL_NAME, args)).ok, true);
+  assert.equal("supersedesApplicationId" in inputs[1]!, false);
+  for (const supersedesApplicationId of [null, "", " VC-1 ", "vc-other", 1]) assert.equal(
+    (await run(options, SUBMIT_VERSION_CHANGE_TOOL_NAME, { ...args, supersedesApplicationId })).ok, false);
+  assert.equal(inputs.length, 2);
+  const properties = describeTool(SUBMIT_VERSION_CHANGE_TOOL_NAME).parameters.properties as Record<string, { pattern?: string }>;
+  assert.equal(properties.supersedesApplicationId!.pattern, "^vc-[0-9]+$");
 });

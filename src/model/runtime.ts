@@ -3,6 +3,7 @@
 import type { ResolvedRole } from "./role.ts";
 import type { WriteDecision } from "./decision.ts";
 import type { PinEntry } from "./boundary.ts";
+import { isSnapshotArtifactRef, isGitOid, isGitLiteralPath } from "./trunk.ts";
 import type {
   ProjectNoteInput,
   ProjectNoteResult,
@@ -18,6 +19,14 @@ import type {
 import type { DownloadJudgeFacts, RequestDownloadFn } from "./download.ts";
 import type { GovernanceMatrixFn } from "./governance-matrix.ts";
 import type {
+  DirectActionReceipt,
+  DirectActionSource,
+  ActiveRoleEvidence,
+  DirectActionStatus,
+  FrozenRoleEvidence,
+  SnapshotArtifactRef,
+  TrunkCommitRef,
+  GitOid, GitBasis, GitEvidenceRef, GitQueryTemplate, GitCapabilityResult,
   TrunkAmendmentApplyState,
   TrunkAmendmentItemKind,
   TrunkAmendmentItemResult,
@@ -163,6 +172,19 @@ export interface PromptOptions {
 }
 
 export interface RoleSession {
+  /** Fresh Service-instance identity; never reconstructed from native id, PID or current role. */
+  readonly sessionId?: string;
+  /** Adapter-owned optional lifecycle hook; Service exposes only copied facts to its callers. */
+  readonly nativeLifecycle?: RuntimeNativeLifecycle;
+  inspectNativeToolSurface?(): RuntimeNativeToolSurfaceFacts;
+  /**
+   * 适配器实际构造的**应用中介**工具注册面（Claude/Pi/Codex 应用面）。
+   * 缺失/不可读即该路径无证据（fail-closed）；它不证明 native 进程/传输/效果闭包。
+   */
+  inspectApplicationToolSurface?(): RuntimeApplicationToolSurfaceFacts;
+  inspectLifecycle?(): RuntimeSessionLifecycleFacts;
+  inspectToolSurface?(): RuntimeSessionToolSurfaceFacts;
+  stopAndInspect?(input: RuntimeStopAndInspectInput, signal?: AbortSignal): Promise<RuntimeSessionLifecycleFacts>;
   readonly persistence?:RuntimeSessionPersistence;
   runtime?: RuntimeKind;
   roleId?: string;
@@ -198,14 +220,315 @@ export interface RoleSession {
   dispose(): Promise<void>;
 }
 
+export interface RuntimeActiveToolFact { id: string; name: string; turnId?: string }
+/** Instance-local constructed registry only, never a project-wide isolation/authorization receipt. */
+export interface RuntimeSessionToolSurfaceFacts {
+  source: "core-provider-assembly";
+  sessionId: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  status: "observed" | "unknown";
+  appTools: readonly string[];
+  configuredForeignMcpServers: readonly string[];
+  factoryProvenance: "default-production" | "custom-override" | "demo";
+  nativeToolRegistry: "application-mediated" | "unknown";
+  filesystemConfinement: "unknown";
+  reasons: readonly string[];
+  native?: RuntimeNativeToolSurfaceFacts;
+  /**
+   * 受限**应用中介**证据（P1.6 §4.3/§4.4）：只在严格 `status` 非 `observed` 且包装层
+   * 身份/注册表/工厂/白名单检查全部成立时出现（`status:"verified"`），否则缺席。
+   * 只供**派发父门与 controller resume**；写/发布/停稳门（initialization protection、
+   * stable-write、run-stop）一律不读本字段。它不证明 native 进程已退出或效果闭包。
+   */
+  applicationMediation?: {
+    kind: "application-mediated-unknown-native";
+    status: "verified" | "unknown";
+    runtime: RuntimeKind;
+    factory: "claude-sdk-mcp" | "pi-custom-tools" | "codex-chat";
+    observedAt: string;
+    /**
+     * 与 P1.6 §4.4 字面一致（Amendment-1）：包装层构造时填入已绑定且已核对的
+     * `nativeInstanceId`（同一会话绑定期值）；verified 时恒等于
+     * `RuntimeApplicationToolSurfaceFacts.nativeInstanceId` 与 `native.nativeInstanceId`。
+     */
+    nativeInstanceId: string;
+    appTools: readonly string[];
+    foreignMcpServers: readonly string[];
+    nativeBuiltinTools: readonly string[];
+    reasons: readonly string[];
+  };
+  roleCapabilityGuards?: RuntimeBlockedRoleCapabilityFacts;
+  fileWriteProtection?: {
+    mechanism: "canonical-roots-and-nlink-v1";
+    coveredTools: readonly ["write_file", "edit_file"];
+    protectedGitRoots: readonly string[];
+    rootDiscovery: "host-provided" | "not-provided";
+    rootCoverage: "unknown";
+    limitations: readonly string[];
+  };
+}
+/** Native producer reports its actual constructed tool map, not configuration intent or a safe flag. */
+export interface RuntimeNativeToolSurfaceFacts {
+  source: "native-provider-tool-registry";
+  nativeInstanceId: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  factory: "codex-chat" | "unknown";
+  status: "observed" | "unknown";
+  observedAt: string;
+  appTools: readonly string[];
+  foreignMcpServers: readonly string[];
+  nativeBuiltinTools: readonly string[];
+  reasons: readonly string[];
+  /** Present only when constructed from the actual native precreation preparation. */
+  factoryPlan?: { planId: string; configDigest: string };
+}
+/**
+ * 适配器实际构造的应用中介工具注册面；不是 native 进程/传输证明。
+ * 应用中介路径只接受 `runtime: "claude" | "pi" | "codex"`，结构 guard 不据此授权。
+ */
+export interface RuntimeApplicationToolSurfaceFacts {
+  source: "application-mediated-tool-surface";
+  /** 必须等于同一会话 `nativeLifecycle.instanceId`。 */
+  nativeInstanceId: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  factory: "claude-sdk-mcp" | "pi-custom-tools" | "codex-chat";
+  status: "observed" | "unknown";
+  observedAt: string;
+  /** 实际注册给模型的 ANS 工具名（不是配置意图）。 */
+  appTools: readonly string[];
+  /** 实际配置的外来 MCP server 名；Claude/Pi 允许非空但必须精确枚举。 */
+  foreignMcpServers: readonly string[];
+  /** 实际启用的 native builtin；应用中介路径必须为空（如 Claude WebSearch 启用即计入）。 */
+  nativeBuiltinTools: readonly string[];
+  reasons: readonly string[];
+}
+
+/** Non-secret native factory intent, produced before SDK/process construction. Not an authorization receipt. */
+export interface RuntimeNativeFactoryPlanFacts {
+  source: "native-factory-plan";
+  planId: string;
+  configDigest: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  status: "observed" | "unknown";
+  factory: "codex-chat" | "unknown";
+  transport: "http" | "owned-process" | "unknown";
+  wire: "chat" | "responses" | "unknown";
+  appTools: readonly string[];
+  foreignMcpServers: readonly string[];
+  nativeBuiltinTools: readonly string[];
+  plannedProcesses: readonly string[];
+  reasons: readonly string[];
+}
+/** Provider-private effect port. Only the Core consumes this; public plans never expose it. */
+export interface RuntimeNativeFactoryPreparation {
+  facts: RuntimeNativeFactoryPlanFacts;
+  adapter?: RuntimeAdapter;
+  /** Checks the captured actual configuration/environment privately, without returning credentials. */
+  isCurrent(): boolean;
+}
+export type RuntimeNativeFactoryPlanner = (options: RuntimeProviderOptions, role: ResolvedRole) => RuntimeNativeFactoryPreparation | Promise<RuntimeNativeFactoryPreparation>;
+declare const runtimePreparedRoleTokenBrand: unique symbol;
+export interface RuntimePreparedRoleToken { readonly [runtimePreparedRoleTokenBrand]: true }
+export interface RuntimeCreationPlanFacts {
+  source: "core-factory-plan";
+  planId: string;
+  configDigest: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  projectRoot: string;
+  factoryProvenance: "default-production" | "custom-override" | "demo";
+  status: "observed" | "unknown";
+  scopeProtection?: { state: "required" | "unmanaged" | "unknown"; revision: number };
+  native?: RuntimeNativeFactoryPlanFacts;
+  roleCapabilityGuards?: RuntimeBlockedRoleCapabilityFacts;
+  reasons: readonly string[];
+}
+export interface RuntimeRolePreparation { plan: RuntimeCreationPlanFacts; token?: RuntimePreparedRoleToken }
+/** Private Core boundaries projected as ordinary observations; status is never caller-supplied authority. */
+export interface RuntimeCoreConstructionFacts {
+  source: "core-construction-boundaries";
+  status: "never-started" | "possibly-started" | "instance-bound";
+  factoryEntered: boolean;
+  nativeBindEntered: boolean;
+  pendingContinuations: number;
+  preparedTokensRevoked: boolean;
+  reasons: readonly string[];
+}
+export interface RuntimeCoreConstructionFailureRef {
+  source: "core-construction-failure";
+  processInstanceId: string;
+  entryId: string;
+  failureId: string;
+}
+export interface RuntimeCoreRegistryFacts {
+  source: "core-session-registry";
+  processInstanceId: string;
+  revision: number;
+  coverage: "current-process-only";
+  entries: readonly {
+    id: string; projectRoot: string; rootRevision: number; roleId: string; runtime: RuntimeKind;
+    state: "preparing" | "prepared" | "creating" | "active" | "disposing" | "disposed" | "failed";
+    planId?: string; sessionId?: string;
+    lifecycle?: RuntimeSessionLifecycleFacts; toolSurface?: RuntimeSessionToolSurfaceFacts;
+    construction?: RuntimeCoreConstructionFacts;
+    reasons: readonly string[];
+  }[];
+  reasons: readonly string[];
+}
+export function isRuntimeApplicationToolSurfaceFacts(value: unknown): value is RuntimeApplicationToolSurfaceFacts {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const fact = value as RuntimeApplicationToolSurfaceFacts;
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+  const names = (value: unknown): value is string[] => Array.isArray(value) && value.every(text) && new Set(value).size === value.length;
+  return fact.source === "application-mediated-tool-surface" && text(fact.nativeInstanceId) && text(fact.roleId)
+    && ["demo", "pi", "claude", "codex"].includes(fact.runtime)
+    && ["claude-sdk-mcp", "pi-custom-tools", "codex-chat"].includes(fact.factory)
+    && ["observed", "unknown"].includes(fact.status) && text(fact.observedAt)
+    && names(fact.appTools) && names(fact.foreignMcpServers) && names(fact.nativeBuiltinTools)
+    && Array.isArray(fact.reasons) && fact.reasons.every(text);
+}
+export function isRuntimeNativeToolSurfaceFacts(value: unknown): value is RuntimeNativeToolSurfaceFacts {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const fact = value as RuntimeNativeToolSurfaceFacts;
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+  const names = (value: unknown): value is string[] => Array.isArray(value) && value.every(text) && new Set(value).size === value.length;
+  return fact.source === "native-provider-tool-registry" && text(fact.nativeInstanceId) && text(fact.roleId)
+    && ["demo", "pi", "claude", "codex"].includes(fact.runtime) && ["codex-chat", "unknown"].includes(fact.factory)
+    && ["observed", "unknown"].includes(fact.status) && text(fact.observedAt)
+    && names(fact.appTools) && names(fact.foreignMcpServers) && names(fact.nativeBuiltinTools)
+    && Array.isArray(fact.reasons) && fact.reasons.every(text)
+    && (fact.factoryPlan === undefined || (typeof fact.factoryPlan === "object" && fact.factoryPlan !== null
+      && text(fact.factoryPlan.planId) && typeof fact.factoryPlan.configDigest === "string"
+      && fact.factoryPlan.configDigest.length === 64 && /^[a-f0-9]{64}$/.test(fact.factoryPlan.configDigest)));
+}
+export interface RuntimeOwnedProcessFact {
+  id: string;
+  kind: "shell" | "background" | "native" | "mcp";
+  state: "running" | "exited" | "unknown";
+  pid?: number;
+  exitCode?: number;
+  signal?: string;
+  /** Primary-child close alone never proves its descendant tree has stopped. */
+  treeStatus: "verified" | "unknown";
+}
+export interface RuntimeStopAndInspectInput { expectedSessionId: string; expectedTurnId?: string; timeoutMs: number }
+export interface RuntimeSessionLifecycleFacts {
+  sessionId: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  turnId?: string;
+  stopRequested: boolean;
+  status: "quiescent" | "stopping" | "unknown";
+  settledAt?: string;
+  settledTurnId?: string;
+  providerFinished: boolean;
+  activeTools: readonly RuntimeActiveToolFact[];
+  processes: readonly RuntimeOwnedProcessFact[];
+  processCoverage: "complete" | "unknown";
+  reasons: readonly string[];
+  native?: RuntimeNativeLifecycleFacts;
+}
+
+/** Native transport observation, not a model tool argument or an authorization receipt. */
+export interface RuntimeNativeLifecycleFacts {
+  instanceId: string;
+  roleId: string;
+  runtime: RuntimeKind;
+  /** Real engine session/thread id when available; never fill one for an unstarted engine. */
+  nativeSessionId?: string;
+  /** Capture options.currentTurnId() when the native prompt starts, retain it after completion. */
+  coreTurnId?: string;
+  nativeTurnId?: string;
+  status: "quiescent" | "running" | "stopping" | "unknown";
+  promptState: "not-started" | "running" | "settled" | "unknown";
+  observedAt: string;
+  settledAt?: string;
+  transport: {
+    kind: "in-process" | "http" | "owned-process" | "unknown";
+    state: "idle" | "open" | "closed" | "unknown";
+  };
+  activeTools: readonly RuntimeActiveToolFact[];
+  processes: readonly RuntimeOwnedProcessFact[];
+  processCoverage: "complete" | "unknown";
+  reasons: readonly string[];
+}
+export interface RuntimeNativeStopInput {
+  expectedInstanceId: string;
+  expectedCoreTurnId?: string;
+  timeoutMs: number;
+}
+export interface RuntimeNativeLifecycle {
+  /** Fresh native-adapter bind identity, stable for this hook; distinct from restored thread id. */
+  readonly instanceId: string;
+  inspect(): RuntimeNativeLifecycleFacts;
+  stopAndInspect(input: RuntimeNativeStopInput, signal?: AbortSignal): Promise<RuntimeNativeLifecycleFacts>;
+}
+/** Structure only. Observed idle/close/exit and complete coverage must come from the adapter. */
+export function isRuntimeNativeLifecycleFacts(value: unknown): value is RuntimeNativeLifecycleFacts {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const fact = value as RuntimeNativeLifecycleFacts;
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+  const optionalText = (value: unknown) => value === undefined || text(value);
+  return text(fact.instanceId) && text(fact.roleId) && ["demo", "pi", "claude", "codex"].includes(fact.runtime)
+    && optionalText(fact.nativeSessionId) && optionalText(fact.coreTurnId) && optionalText(fact.nativeTurnId)
+    && ["quiescent", "running", "stopping", "unknown"].includes(fact.status)
+    && ["not-started", "running", "settled", "unknown"].includes(fact.promptState)
+    && text(fact.observedAt) && optionalText(fact.settledAt) && !!fact.transport
+    && ["in-process", "http", "owned-process", "unknown"].includes(fact.transport.kind)
+    && ["idle", "open", "closed", "unknown"].includes(fact.transport.state)
+    && ["complete", "unknown"].includes(fact.processCoverage)
+    && Array.isArray(fact.activeTools) && fact.activeTools.every(tool => !!tool && text(tool.id) && text(tool.name) && optionalText(tool.turnId))
+    && Array.isArray(fact.processes) && fact.processes.every(process => !!process && text(process.id)
+      && ["shell", "background", "native", "mcp"].includes(process.kind)
+      && ["running", "exited", "unknown"].includes(process.state) && ["verified", "unknown"].includes(process.treeStatus)
+      && (process.pid === undefined || (Number.isSafeInteger(process.pid) && process.pid > 0))
+      && (process.exitCode === undefined || Number.isSafeInteger(process.exitCode)) && optionalText(process.signal))
+    && Array.isArray(fact.reasons) && fact.reasons.every(text);
+}
+
 /** 写门禁操作类型（F6）：仅内容上下文的分类，不改变任何判定/审批/预授权语义。 */
 export type WriteGateOperation = "write" | "edit";
+
+/** Host observations only. These shapes neither grant access nor prove an issued context. */
+export type FileGateStage = "lexical-read" | "canonical-read" | "final-write";
+export interface FileGateProtectionFacts {
+  projectRoot: string;
+  protectedGitRoots: readonly string[];
+  coverage: "complete" | "unknown";
+  basisDigest: string;
+  reasons: readonly string[];
+}
+export interface CanonicalWriteFacts {
+  projectRoot: string; skillRoot: string; target: string;
+  protectedRoots: readonly string[];
+  coverage: "complete" | "unknown"; basisDigest: string; reasons: readonly string[];
+}
+export type CurrentFileFacts = { state: "missing" } | { state: "present"; sha256: string } | { state: "unknown"; reason: string };
+export interface FileGateReadFacts {
+  stage: "lexical-read" | "canonical-read";
+  invocationId: string; operationId: string; targetPath: string; operation: WriteGateOperation;
+  projectRoot: string; skillRoot: string;
+  canonicalFacts?: CanonicalWriteFacts;
+}
+export interface FileGateFinalFacts extends Omit<FileGateReadFacts, "stage"> {
+  stage: "final-write"; currentFile: CurrentFileFacts; contentSha256: string;
+}
+export type FileGateFacts = FileGateReadFacts | FileGateFinalFacts;
 
 /**
  * 写门禁内容上下文（F6；P1 r2 §3.3-8）：**可选第二参数**，缺席 = 旧单参语义。
  * 供 `run-role.gate` 对 stable 路径消费 `contentSha256` 调 `stableWriteDecision`（S3 接线）。
  */
 export interface WriteGateContext {
+  /** Opt-in staged protocol. Only the live Provider-issued identity is inspectable. */
+  stage?: FileGateStage;
+  fileFacts?: FileGateFacts;
+  /** Host-only edit path/read preflight; phase alone is not authority. Validate Core's bound probe identity. */
+  phase?: "edit-read";
   /**
    * 写前最终字节 sha256（hex）：`write_file` = `Buffer.from(content)`；
    * `edit_file` = 编辑应用后、`atomicWriteFile` 前的字节（BOM 原样保留）。
@@ -649,6 +972,9 @@ export type CustomerInputRequest = (
 export type CustomerInputOutcome =
   | {
       outcome: "answered";
+      actionSource?: DirectActionSource;
+      /** Host-observed domain apply result, independent of the retained choice. Not approval or later write authority. */
+      intentConfirmation?: { status: "committed" | "pending-recovery"; code?: string; message?: string };
       value: { confirmed?: boolean; selected?: string[] };
       /**
        * 已勾选的 acknowledgment id（2026-11-04 C1 加法；对应
@@ -676,6 +1002,7 @@ export type CustomerInputOutcome =
     }
   | {
       outcome: "declined";
+      actionSource?: DirectActionSource;
       operatorId?: string;
       reason?: string;
       decisionId?: string;
@@ -836,6 +1163,106 @@ export interface TaskStateEventBase {
   at: string;
 }
 
+/** Host-authored chief work origin; neither a parent Task nor authorization. The owner verifies the actual turn/report. */
+export interface TaskWorkSourceRef {
+  kind: "chief-customer-turn" | "chief-creator-report";
+  sourceId: string;
+  path: string;
+  sha256: string;
+}
+
+/** Pure persisted shape only. The owner verifies bytes, actual turn or creator-report, flow and current basis. */
+export function isTaskWorkSourceRef(value: unknown): value is TaskWorkSourceRef {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const ref = value as Record<string, unknown>;
+  const fields = ["kind", "sourceId", "path", "sha256"];
+  return Object.keys(ref).length === fields.length && fields.every(field => Object.hasOwn(ref, field))
+    && (ref.kind === "chief-customer-turn" || ref.kind === "chief-creator-report")
+    && typeof ref.sourceId === "string" && ref.sourceId.length === 76 && /^init-source-[a-f0-9]{64}$/.test(ref.sourceId)
+    && ref.path === `.ans/trunk/initialization-sources/${ref.sourceId}.json`
+    && typeof ref.sha256 === "string" && ref.sha256.length === 64 && /^[a-f0-9]{64}$/i.test(ref.sha256);
+}
+
+/** Host-derived assigned-parent reference. This is neither a customer source nor a dispatch/permission grant. */
+export interface TaskParentRef {
+  kind: "assigned-task";
+  taskId: string;
+  ledgerSha256: string;
+}
+/** Shape only; the owner must read/CAS the actual parent assignment, flow, run and open state. */
+export function isTaskParentRef(value: unknown): value is TaskParentRef {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const ref = value as Record<string, unknown>;
+  return Object.keys(ref).length === 3 && ["kind", "taskId", "ledgerSha256"].every(key => Object.hasOwn(ref, key))
+    && ref.kind === "assigned-task" && typeof ref.taskId === "string" && ref.taskId.length > 0 && ref.taskId.trim() === ref.taskId
+    && !/[\u0000-\u001f\u007f]/.test(ref.taskId)
+    && typeof ref.ledgerSha256 === "string" && ref.ledgerSha256.length === 64 && /^[a-f0-9]{64}$/i.test(ref.ledgerSha256);
+}
+
+/** Host-bound immutable review material; shape alone proves neither origin nor a review verdict. */
+export interface TaskReviewBasisRef {
+  kind: "git-candidate-review";
+  candidateOperationId: string;
+  candidate: GitOid;
+  criteria: GitEvidenceRef[];
+}
+/** Model may name an expected read-only target. The host must resolve and authorize the actual review. */
+export interface DispatchTaskReviewTarget { operationId: string; candidate: GitOid }
+export const TASK_HUB_ROUTING = "chief-hub-v1" as const;
+export type TaskHubRouting = typeof TASK_HUB_ROUTING;
+/** Independent business target, never a creation parent or proof of a passed review. Host-issued only. */
+export interface TaskReviewControllerRef {
+  kind: "convener-controller";
+  taskId: string;
+  flowId: string;
+  runId: string;
+  reviewBasisRef: TaskReviewBasisRef;
+}
+/** Chief's expected existing controller/review-close target. The host still resolves every actual record. */
+export interface DispatchTaskResumeController {
+  taskId: string;
+  flowId: string;
+  runId: string;
+  reviewTaskId: string;
+  reviewCloseOperationId: string;
+}
+function reviewKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+}
+function reviewOperationId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 500 && value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
+}
+function reviewOid(value: unknown): value is GitOid {
+  return reviewKeys(value, ["objectFormat", "hex"]) && isGitOid(value) && value.hex.length === (value.objectFormat === "sha1" ? 40 : 64);
+}
+export function isDispatchTaskReviewTarget(value: unknown): value is DispatchTaskReviewTarget {
+  return reviewKeys(value, ["operationId", "candidate"]) && reviewOperationId(value.operationId) && reviewOid(value.candidate);
+}
+/** Exact four fields, 1..16 distinct object/path references, full OIDs and literal paths only. No I/O/authentication. */
+export function isTaskReviewBasisRef(value: unknown): value is TaskReviewBasisRef {
+  if (!reviewKeys(value, ["kind", "candidateOperationId", "candidate", "criteria"]) || value.kind !== "git-candidate-review"
+    || !reviewOperationId(value.candidateOperationId) || !reviewOid(value.candidate)
+    || !Array.isArray(value.criteria) || value.criteria.length < 1 || value.criteria.length > 16) return false;
+  const refs = new Set<string>();
+  return value.criteria.every(ref => {
+    if (!reviewKeys(ref, ["oid", "path", "sha256"]) || !reviewOid(ref.oid) || !isGitLiteralPath(ref.path)
+      || ref.path.length > 500 || typeof ref.sha256 !== "string" || ref.sha256.length !== 64 || !/^[a-f0-9]{64}$/i.test(ref.sha256)) return false;
+    const key = `${ref.oid.objectFormat}:${ref.oid.hex.toLowerCase()}:${ref.path}`;
+    if (refs.has(key)) return false;
+    refs.add(key); return true;
+  });
+}
+export function isTaskHubRouting(value: unknown): value is TaskHubRouting { return value === TASK_HUB_ROUTING; }
+export function isTaskReviewControllerRef(value: unknown): value is TaskReviewControllerRef {
+  return reviewKeys(value, ["kind", "taskId", "flowId", "runId", "reviewBasisRef"]) && value.kind === "convener-controller"
+    && [value.taskId, value.flowId, value.runId].every(reviewOperationId) && isTaskReviewBasisRef(value.reviewBasisRef);
+}
+export function isDispatchTaskResumeController(value: unknown): value is DispatchTaskResumeController {
+  return reviewKeys(value, ["taskId", "flowId", "runId", "reviewTaskId", "reviewCloseOperationId"])
+    && [value.taskId, value.flowId, value.runId, value.reviewTaskId, value.reviewCloseOperationId].every(reviewOperationId);
+}
+
 export interface TaskCreatedEvent extends TaskStateEventBase {
   kind: "task.created";
   taskId: string;
@@ -849,6 +1276,16 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
   text: string;
   expectedOutput?: string;
   requestedEvidence?: string[];
+  /** Host-only work origin; absent on historical tasks. Never model-supplied approval or parentTaskId. */
+  workSourceRef?: TaskWorkSourceRef;
+  /** Host-only reference to the actual assigned ledger parent; absent on legacy/top-level customer tasks. */
+  parentTaskRef?: TaskParentRef;
+  /** Application-produced exact Git candidate/criteria references; absent on historical tasks. */
+  reviewBasisRef?: TaskReviewBasisRef;
+  /** New host-created Hub tasks only. Absence preserves the original historical creator/parent semantics. */
+  hubRouting?: TaskHubRouting;
+  /** Only final review tasks carry this separate actual controller/candidate/criteria association. */
+  reviewControllerRef?: TaskReviewControllerRef;
   sideEffect: TaskSideEffect;
   /** 必填：同键视为同一任务（重派沿用原键，任务 id 另给）。 */
   idempotencyKey: string;
@@ -893,6 +1330,10 @@ export interface TaskClosedEvent extends TaskStateEventBase {
   by: "chief" | "convener";
   outcome: TaskClosedOutcome;
   note?: string;
+  /** Application-bound direct-close provenance; absent on historical events. */
+  actionSource?: DirectActionSource;
+  operationId?: string;
+  eventId?: string;
 }
 
 export interface TaskRedispatchEvent extends TaskStateEventBase {
@@ -939,7 +1380,7 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
 export interface RequestPresentedEvent extends TaskStateEventBase {
   kind: "request.presented";
   requestId: string;
-  to: "customer" | "judge";
+  to: "customer" | "judge" | "chief";
 }
 
 /** `request.resolved`（C-03）：裁决/回落；judge 审计随行（不得写成客户本人）。 */
@@ -975,7 +1416,8 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
    * 2026-11-03（客户授权平面 Q9 A）：`"directive"` 表示客户事先记录的决策指令导致的结果
    * （**不是**客户本人点击，也不是 judge 代批）。旧事件无该值仍可读。
    */
-  by: "judge" | "customer" | "directive";
+  by: "judge" | "customer" | "directive" | "chief-delegated";
+  actionSource?: DirectActionSource;
   operatorId?: string;
   /** 仅 `by === "directive"` 时由应用写入 `d-<seq>`；旧事件无该字段仍可读。 */
   directiveId?: string;
@@ -1121,8 +1563,10 @@ export interface TrunkStateEvent extends TaskStateEventBase {
   source?: TrunkSource;
   /** 决策类/客户确认后动作必填；`gap` 等应用观测缺省。 */
   decidedBy?: "customer";
-  origin: "customer" | "application";
-  channel?: "governance-card" | "application-observer" | "low-level-run-change";
+  origin: "customer" | "application" | "role-direct" | "chief-delegated";
+  actionSource?: DirectActionSource;
+  operationId?: string;
+  channel?: "governance-card" | "application-observer" | "low-level-run-change" | "role-direct";
   decisionId?: string;
   /** mini re-pin 必备：客户确认 id（workflow 轻量卡/appointment-write）。 */
   confirmationId?: string;
@@ -1151,7 +1595,9 @@ export interface TrunkAmendmentEvent extends TaskStateEventBase {
   applicationId?: string;
   /** 客户批准/拒绝、逐项决策时填；提交/应用动作缺省。 */
   decidedBy?: "customer";
-  origin: "customer" | "application";
+  origin: "customer" | "application" | "role-direct" | "chief-delegated";
+  actionSource?: DirectActionSource;
+  operationId?: string;
   decisionId?: string;
   journalId?: string;
   itemId?: string;
@@ -1180,7 +1626,10 @@ export interface VersionChangeEvent extends TaskStateEventBase {
   }[];
   /** 仅 approved/rejected（客户决定）。 */
   decidedBy?: "customer";
-  origin: "customer" | "application";
+  origin: "customer" | "application" | "role-direct" | "chief-delegated";
+  actionSource?: DirectActionSource;
+  operationId?: string;
+  directReceipt?: DirectActionReceipt;
   /** applied/superseded 也携带（供审计；不记 customer，PM 裁决 Q3）。 */
   decisionId?: string;
   journalId?: string;
@@ -1197,7 +1646,8 @@ export interface DocFreezeEvent extends TaskStateEventBase {
   sha256: string;
   applicationId: string;
   reason: DocFreezeReason;
-  origin: "customer" | "application";
+  origin: "customer" | "application" | "role-direct" | "chief-delegated";
+  actionSource?: DirectActionSource;
   /** 仅客户确认类 reason（`DOC_FREEZE_CUSTOMER_REASONS`）。 */
   decidedBy?: "customer";
   decisionId?: string;
@@ -1378,6 +1828,11 @@ export type RedispatchTaskFn = (
 ) => RedispatchTaskReceipt | null | undefined | void | Promise<RedispatchTaskReceipt | null | undefined | void>;
 
 export interface DispatchTaskPayload {
+
+  /** Expected read-only review target, not a criteria/source/approval receipt. */
+  reviewTarget?: DispatchTaskReviewTarget;
+  /** Explicit message to an existing live Convener task; cannot be combined with reviewTarget. Not a new task/permission. */
+  resumeController?: DispatchTaskResumeController;
 
   roleId: string;
 
@@ -1650,6 +2105,31 @@ export type UninstallMcpFn = (
   metadata?: ReportHandbackMetadata,
 ) => Promise<InstallMcpReceipt>;
 
+/** Host-only configuration values created by Core; no existing effect callback is accepted. */
+export interface RuntimeBlockedRoleCapabilityCallbacks {
+  installSkill: InstallSkillFn;
+  uninstallSkill: UninstallSkillFn;
+  installMcp: InstallMcpFn;
+  uninstallMcp: UninstallMcpFn;
+}
+export type RuntimeRoleCapabilityTool = "install_skill" | "uninstall_skill" | "install_mcp" | "uninstall_mcp";
+/** Ordinary identity-bound observations, never a model argument or an authority/effect token. */
+export interface RuntimeBlockedRoleCapabilityFacts {
+  source: "core-blocked-role-capability-callbacks";
+  mechanism: "no-effect-rejection-v1";
+  status: "bound" | "unknown";
+  roleId: string;
+  runtime: RuntimeKind;
+  registryDigest: string;
+  guardedTools: readonly RuntimeRoleCapabilityTool[];
+  unguardedTools: readonly RuntimeRoleCapabilityTool[];
+  corePlanId?: string;
+  nativePlanId?: string;
+  nativeConfigDigest?: string;
+  sessionId?: string;
+  reasons: readonly string[];
+}
+
 export type RequestRequirementChangeKind = "scope" | "authorization" | "constraint" | "cost" | "other";
 
 /**
@@ -1744,6 +2224,8 @@ export interface VersionChangeTargetSubmission {
   action: VersionChangeTargetAction;
   from?: string;
   roleId?: string;
+  /** Direct submission CAS: null requires absence; application recomputes actual bytes. */
+  expectedFromSha256?: string | null;
 }
 
 /** `submit_version_change` 能力输入（身份由工具从 `scope.roleId` 填入，不接受模型自报）。 */
@@ -1756,21 +2238,185 @@ export interface SubmitVersionChangeInput {
   amendmentId?: string;
   amendmentDocPath?: string;
   bootstrap?: boolean;
+  /** Required on the direct path; optional only for historical caller compatibility. */
+  operationId?: string;
+  baseTrunk?: TrunkCommitRef | null;
+  /** Explicit linkage only; app validates the old same-flow pending record. Never infer from text. */
+  supersedesApplicationId?: string;
 }
 
 /** 结构化回执（Batch 3.5 三工具同形；`errorCode` 对齐 C2c 冻结错误码）。 */
 export interface SubmitVersionChangeResult {
   ok: boolean;
   applicationId?: string;
-  status?: VersionChangeStatus;
+  status?: VersionChangeStatus | DirectActionStatus;
   errorCode?: VersionChangeErrorCode;
   message?: string;
+  operationId?: string;
+  journalId?: string;
+  baseDigest?: string | null;
+  targetDigest?: string | null;
+  receipt?: DirectActionReceipt;
 }
 
 export type SubmitVersionChangeFn = (
   input: SubmitVersionChangeInput,
   signal?: AbortSignal,
 ) => Promise<SubmitVersionChangeResult>;
+
+/** Git requests carry template data only. Host identity/repo/task/run/current authority are closed over. */
+export interface GitQueryRequest {
+  operationId: string;
+  template: GitQueryTemplate;
+  target?: GitOid;
+  other?: GitOid;
+  paths?: string[];
+  limit?: number;
+}
+export type GitCandidateRequest = { operationId: string; base: GitBasis } & (
+  | { action: "commit"; paths: string[]; message: string }
+  | { action: "integrate"; candidates: GitOid[]; message: string }
+  | { action: "revert"; commit: GitOid; mainline?: number; message: string }
+  | { action: "init"; message: string });
+export interface GitPublishRequest {
+  operationId: string;
+  target: "documents" | "delivery";
+  expected: GitBasis;
+  candidate: GitOid;
+  criteria: GitEvidenceRef[];
+  evidence: GitEvidenceRef[];
+  creatorCloseOperationId?: string;
+}
+export type GitQueryFn = (input: GitQueryRequest, signal?: AbortSignal) => Promise<GitCapabilityResult>;
+export type GitCandidateFn = (input: GitCandidateRequest, signal?: AbortSignal) => Promise<GitCapabilityResult>;
+export type GitPublishFn = (input: GitPublishRequest, signal?: AbortSignal) => Promise<GitCapabilityResult>;
+
+/** Strong input for the new path; identity is still populated from trusted scope. */
+export interface DirectSubmitVersionChangeInput extends SubmitVersionChangeInput {
+  operationId: string;
+  baseTrunk: TrunkCommitRef | null;
+  targets: (VersionChangeTargetSubmission & { expectedFromSha256: string | null })[];
+}
+
+export type RunChangeMode = "continue-frozen" | "stop-and-restart" | "stop";
+export const RUN_CHANGE_MODES: readonly RunChangeMode[] = Object.freeze([
+  "continue-frozen", "stop-and-restart", "stop",
+]);
+/** Identity is bound by the application when injecting these functions, never in tool args. */
+export interface SelectRunChangeInput {
+  operationId: string;
+  runId: string;
+  expectedPinDigest: string;
+  targetTrunk: TrunkCommitRef;
+  mode: RunChangeMode;
+  reason: string;
+}
+export type SelectRunChangeResult = DirectActionReceipt & { runId?: string; replacementRunId?: string };
+export type SelectRunChangeFn = (input: SelectRunChangeInput, signal?: AbortSignal) => Promise<SelectRunChangeResult>;
+
+export interface CompleteTeamPlanInput {
+  operationId: string;
+  flowId: string;
+  runId?: string;
+  baseDigest: string;
+  plan: { path: string; sha256: string; version: number };
+}
+export type CompleteTeamPlanFn = (input: CompleteTeamPlanInput, signal?: AbortSignal) => Promise<DirectActionReceipt>;
+
+export interface ActivateRoleDocumentsInput {
+  operationId: string;
+  flowId: string;
+  planRef: SnapshotArtifactRef;
+  d3DecisionId: string;
+  rosterRef: SnapshotArtifactRef;
+  targetRoleId: string;
+  documents: {
+    card: { path: string; sha256: string };
+    boundaryMd: { path: string; sha256: string };
+    boundaryYaml: { path: string; sha256: string };
+  };
+}
+/** Successful activation binds the exact validated documents to a new immutable version. */
+export type ActivateRoleDocumentsResult = DirectActionReceipt & (
+  | { ok: true; activationDigest: string; evidence?: ActiveRoleEvidence }
+  | { ok: false; activationDigest?: string; evidence?: ActiveRoleEvidence });
+export type ActivateRoleDocumentsFn = (input: ActivateRoleDocumentsInput, signal?: AbortSignal) => Promise<ActivateRoleDocumentsResult>;
+
+export interface CloseCreatedTaskInput {
+  operationId: string;
+  taskId: string;
+  runId: string;
+  basisDigest: string;
+  reportRef: SnapshotArtifactRef;
+  /** Closure verdict reuses task.closed; execution/cancellation stays on its own chain. */
+  outcome: TaskClosedOutcome;
+  note?: string;
+}
+export type CloseCreatedTaskResult = DirectActionReceipt & { taskId: string } & (
+  | { ok: true; eventId: string; taskStatus: string }
+  | { ok: false; eventId?: string; taskStatus?: string });
+export type CloseCreatedTaskFn = (input: CloseCreatedTaskInput, signal?: AbortSignal) => Promise<CloseCreatedTaskResult>;
+
+/** Trusted application request, not model-authored state. Retained business cards only. */
+export interface ChiefPendingDecisionRequest {
+  requestId: string;
+  baseDigest: string;
+  delegationRevision: number;
+  originRoleId: string;
+  cardKind: "appointment" | "acceptance" | "decision" | "proposal";
+  flowId?: string;
+  runId?: string;
+  taskId?: string;
+  question: string;
+  options: readonly { id: string; label: string; description?: string; recommended?: boolean }[];
+  evidenceRefs: readonly SnapshotArtifactRef[];
+}
+export type DecidePendingRequestInput = {
+  requestId: string;
+  baseDigest: string;
+  delegationRevision: number;
+  reason: string;
+} & ({ disposition: "select"; selected: string[] }
+  | { disposition: "reject" | "revise"; selected?: never });
+export type DecidePendingRequestResult =
+  | { ok: true; requestId: string; status: "settled"; source: Extract<import("./trunk.ts").DirectActionSource, { kind: "chief-delegated" }> }
+  | { ok: false; requestId: string; status: "pending" | "stale" | "rejected"; errorCode: string; message: string };
+export type DecidePendingRequestFn = (input: DecidePendingRequestInput, signal?: AbortSignal) => Promise<DecidePendingRequestResult>;
+
+/** A real chief identity in a separate bounded decision turn breaks the busy-main-turn wait cycle.
+ * This context has no production write/dispatch/shell/MCP authority. Host enforces bounds/tools.
+ * Never route it through the former judge or infer a decision from a recommended option. */
+export interface ChiefDecisionExecutionContext {
+  roleId: "chief";
+  executionId: string;
+  mode: "bounded-decision";
+  request: ChiefPendingDecisionRequest;
+  productionWriteAuthority: false;
+  tools: readonly ["decide_pending_request"];
+  limits: { maxTurns: number; timeoutMs: number; maxAttempts: number };
+}
+export function isChiefDecisionExecutionContext(value: unknown): value is ChiefDecisionExecutionContext {
+  if (!value || typeof value !== "object") return false;
+  const context = value as ChiefDecisionExecutionContext;
+  return context.roleId === "chief" && context.mode === "bounded-decision"
+    && typeof context.executionId === "string" && context.executionId.trim().length > 0
+    && context.productionWriteAuthority === false && Array.isArray(context.tools)
+    && context.tools.length === 1 && context.tools[0] === "decide_pending_request"
+    && !!context.request && typeof context.request === "object"
+    && typeof context.request.requestId === "string" && context.request.requestId.trim().length > 0
+    && typeof context.request.baseDigest === "string" && /^[a-f0-9]{64}$/i.test(context.request.baseDigest)
+    && Number.isSafeInteger(context.request.delegationRevision) && context.request.delegationRevision >= 0
+    && typeof context.request.originRoleId === "string" && context.request.originRoleId.trim().length > 0
+    && ["appointment", "acceptance", "decision", "proposal"].includes(context.request.cardKind)
+    && typeof context.request.question === "string" && context.request.question.trim().length > 0
+    && Array.isArray(context.request.options) && context.request.options.length > 0
+    && context.request.options.every(option => !!option && typeof option.id === "string"
+      && option.id.trim().length > 0 && typeof option.label === "string" && option.label.trim().length > 0)
+    && new Set(context.request.options.map(option => option.id)).size === context.request.options.length
+    && Array.isArray(context.request.evidenceRefs) && context.request.evidenceRefs.every(isSnapshotArtifactRef)
+    && !!context.limits && [context.limits.maxTurns, context.limits.timeoutMs, context.limits.maxAttempts]
+      .every(limit => Number.isSafeInteger(limit) && limit > 0);
+}
 
 /** `submit_refactor` 能力输入（convener 唯一发起；`roleId` 同样由工具填入）。 */
 export interface SubmitRefactorInput {
@@ -1793,6 +2439,65 @@ export type SubmitRefactorFn = (
   input: SubmitRefactorInput,
   signal?: AbortSignal,
 ) => Promise<SubmitRefactorResult>;
+
+// —————————————— 2026-11-05：方案升级报告（plan escalation；convener 唯一发起） ——————————————
+//
+// 背景（真机）：方案/验收要求不可执行时（如 E0 要求应用无法创建/证明的 OS 级隔离身份），角色只能反复报告
+// blocked，缺少「判定方案不对 → 客户裁决（修订方案/提供环境/继续/终止）」的出口。本能力只做一件事：
+// convener 向客户提交一张**应用发行的客户主权卡**；卡不进判断器/委托/@决策，申请≠批准；工具不派发、
+// 不写文档、不改任何需求或验收标准——客户裁定后由应用按对应治理路径通知/唤醒相应角色。
+
+export type PlanEscalationCategory = "scheme" | "environment" | "authority" | "evidence";
+export const PLAN_ESCALATION_CATEGORIES: readonly PlanEscalationCategory[] = Object.freeze([
+  "scheme",
+  "environment",
+  "authority",
+  "evidence",
+]);
+/** 方案升级报告 requestId 形如 `plan-escalation-<flowId>`（同 flow 至多一张在途卡）。 */
+export const PLAN_ESCALATION_REQUEST_ID_PATTERN = "^plan-escalation-[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$";
+export const PLAN_ESCALATION_SUMMARY_MAX = 2000;
+export const PLAN_ESCALATION_ERROR_CODES: readonly PlanEscalationErrorCode[] = Object.freeze([
+  "plan-escalation-invalid",
+  "plan-escalation-conflict",
+  "plan-escalation-channel-unavailable",
+  "plan-escalation-role-not-allowed",
+]);
+
+/** 客户主权卡的选项词汇（与 customer-input 的反代选排除表同一冻结词汇）。 */
+export type PlanEscalationChoice =
+  | "escalation-revise"
+  | "escalation-environment"
+  | "escalation-continue"
+  | "escalation-stop";
+
+/** `report_plan_escalation` 能力输入（roleId 由工具从会话身份填入，不接受模型自报）。 */
+export interface PlanEscalationInput {
+  roleId: string;
+  flowId: string;
+  category: PlanEscalationCategory;
+  summary: string;
+}
+
+export type PlanEscalationErrorCode =
+  | "plan-escalation-invalid"
+  | "plan-escalation-conflict"
+  | "plan-escalation-channel-unavailable"
+  | "plan-escalation-role-not-allowed";
+
+export interface PlanEscalationResult {
+  ok: boolean;
+  requestId?: string;
+  /** 卡已提交呈现（等待客户本人裁决；申请≠批准）。 */
+  status?: "presented";
+  errorCode?: PlanEscalationErrorCode;
+  message?: string;
+}
+
+export type PlanEscalationFn = (
+  input: PlanEscalationInput,
+  signal?: AbortSignal,
+) => Promise<PlanEscalationResult>;
 
 /** `request_stable_write` 能力输入：仅 `docs/workflow.md`（role-card/boundary 走 appointment-write）。 */
 export interface RequestStableWriteInput {
@@ -2483,6 +3188,9 @@ export interface BackgroundTaskToolFactsV1 {
 export interface RuntimeAdapter {
   composeContext(role: ResolvedRole): Promise<{ systemPrompt: string }>;
   bindRole(role: ResolvedRole): Promise<RoleSession>;
+  /** Core host-only precreation API; no unknown/custom factory is invoked by prepareRole. */
+  prepareRole?(role: ResolvedRole): Promise<RuntimeRolePreparation>;
+  bindPreparedRole?(token: RuntimePreparedRoleToken): Promise<RoleSession>;
 }
 
 export type RuntimeContextSource = "in-memory" | "fresh" | "resumed" | "recovered";
@@ -2607,6 +3315,15 @@ export interface ToolDefinition {
 }
 
 export interface GovernedToolsOptions {
+  /** Actual host roots, never inferred from readRoot/writeRoot. */
+  projectRoot?: string;
+  skillRoot?: string;
+  /** Enable only with a consumer that inspects each live stage before its pure policy call. */
+  fileGateProtocol?: "host-facts-v1";
+  /** Preserve the host's coverage/digest/reasons; an array of roots alone proves no coverage. */
+  fileGateProtection?: FileGateProtectionFacts;
+  /** Host-only canonical repo/gitdir/common/other-worktree roots. Not model tool arguments or a safe flag. */
+  protectedGitRoots?: readonly string[];
   extraCredentialEnvVars?: readonly string[];
   currentTurnId?: () => string | undefined;
   roleId?: string;
@@ -2734,11 +3451,27 @@ export interface GovernedToolsOptions {
    * `version-upgrade` 仅 product、`detail-amendment` 仅 rapporteur（工具按 `roleId` 门控）。
    */
   submitVersionChange?: SubmitVersionChangeFn;
+  /** P3.1 narrow capabilities; application binds trusted identity, no model actor/source. */
+  selectRunChange?: SelectRunChangeFn;
+  completeTeamPlan?: CompleteTeamPlanFn;
+  activateRoleDocuments?: ActivateRoleDocumentsFn;
+  closeCreatedTask?: CloseCreatedTaskFn;
+  decidePendingRequest?: DecidePendingRequestFn;
+  /** Host-bound Git capabilities; schema never accepts host authorization or confinement receipts. */
+  gitQuery?: GitQueryFn;
+  gitCandidate?: GitCandidateFn;
+  gitPublish?: GitPublishFn;
   /**
    * Batch 3.5（C1d）：`submit_refactor` 能力。**只给 convener 会话注入**；未注入 ⇒ 工具不注册。
    * 工具只提交重构申请（refactor.request），不派发任务、不写代码、不产生 trunk 版本、无客户卡。
    */
   submitRefactor?: SubmitRefactorFn;
+  /**
+   * 2026-11-05：`report_plan_escalation` 能力。**只给 convener 会话注入**；未注入 ⇒ 工具不注册。
+   * 工具只提交"方案升级报告"并呈现客户主权卡（修订方案/提供环境/继续核查/终止），
+   * 不派发、不写文档、不改需求或验收标准；客户裁定后由应用路由（修订 → 通知策划按闸门 1 出方案）。
+   */
+  reportPlanEscalation?: PlanEscalationFn;
   /**
    * Batch 3.5（C1d）：`request_stable_write` 能力。**只给 convener 会话注入**；未注入 ⇒ 工具不注册。
    * 工具只提交 `docs/workflow.md` 写入请求（等待 stable-write 客户确认卡），**不签发许可、不批准、
@@ -2829,6 +3562,8 @@ export interface RuntimeSessionStorage {
 }
 
 export interface RuntimeProviderOptions {
+  /** Same host-only protection roots used by Core write/edit final I/O guards. */
+  protectedGitRoots?: readonly string[];
   toolDisplayMode?: "required-v1" | "legacy-standalone";
   projectToolEvent?: RuntimeToolEventProjector;
   registerToolDisplayProfile?: RegisterRuntimeToolDisplayProfileV1;
@@ -2837,9 +3572,11 @@ export interface RuntimeProviderOptions {
   projectRoot: string;
   skillRoot: string;
   tools: readonly ToolDefinition[];
+  /** Host-only bounded Chief decision context, already validated/cloned by Core. Never model tool input. */
+  chiefDecisionContext?: ChiefDecisionExecutionContext;
   /**
-   * 会话启动时由 Pipeline 注入的**纯展示文本段**（当前仅幕僚会话的「治理权力矩阵」必读块）。
-   * 只允许编排在会话绑定时注入；适配器按固定位置拼接，不改写、不重排、不判定。
+   * Host非授权上下文：Pipeline注入的治理权力矩阵及Service从应用资源加载的内置Chief流程。
+   * 仅宿主在会话绑定时提供；适配器按固定位置拼接，不改写、不重排、不判定。
    * 不是能力、不是工具、不是判定输入；空数组/缺省 ⇒ 系统提示逐字不变。
    */
   contextSections?: readonly string[];

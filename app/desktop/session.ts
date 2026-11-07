@@ -1,4 +1,5 @@
-import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN } from "../../src/model/runtime.ts";
+import { isDirectActionSource } from "../../src/model/trunk.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN, isTaskWorkSourceRef, isDispatchTaskResumeController } from "../../src/model/runtime.ts";
 import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
 import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
 import { createToolDisplayContext } from "../../src/common/runtime-core/tool-display.ts";
@@ -67,7 +68,11 @@ import { governanceRoleOf, isBuiltInGovernanceRoleId, resolveBoundary, trioGover
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import type { ChiefDecisionExecutionContext, DecidePendingRequestFn, SelectRunChangeFn, CompleteTeamPlanFn, ActivateRoleDocumentsFn, CloseCreatedTaskFn, GitQueryFn, GitCandidateFn, GitPublishFn, RuntimeSessionLifecycleFacts, RuntimeSessionToolSurfaceFacts, TaskWorkSourceRef } from "../../src/model/runtime.ts";
 import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
+import { readRoleCapabilityProtectionScope, inspectRoleSessionOpenFailure, registerVersionedDocumentAfterWrite } from "../../src/pipeline/orchestration/run-role.ts";
+import type { GitHostOpenFailureRef } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+import { createGitRoleRuntime, createDirectRoleRuntime, recordTaskObservation, prepareCreatedTaskClose, freezeExecutionRun, readRunRoleContext, prepareRoleDispatch, beginGitHostAction, endGitHostAction, recordGitHostInventory, inspectAssignedTask, recordGitHostInterruption, prepareAssignedTaskWriteScope, prepareParentTaskRef, collectDispatchBaselineFacts, resolveDeliveryAssignment, classifyClosedTaskNotice, prepareRunChange, finalizeRunChange, prepareControllerResume, inspectQueuedControllerResume, prepareControllerStop, finalizeControllerStop, type ControllerStopHostPlan, type RunChangeHostPlan } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import { createRuntimeAdapterFactory, type RuntimeAdapterFactoryBuilder, type RuntimeAdapterFactoryOptions, type RuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
 import {
   createDirectiveInterpreter as realCreateDirectiveInterpreter,
@@ -100,8 +105,8 @@ import { renderHandbackPrompt, renderHandbackBatchPrompt, renderWorkReportPrompt
 // C 批（方案 §6.4.1/C-06）：appointment-write 的应用侧结构/D3 校验使用编排出品的声明路径单一实现。
 import { declaredConfirmPaths, declaredPathBodies } from "../../src/common/编排/confirmed-writes.ts";
 // B 批（2026-10-28）：任务/汇报主干与最小状态（编排单一来源，本层只接线）。
-import { appendTaskEvent, classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
-import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
+import { classifyTaskSideEffect, findTaskByIdempotencyKey, newTaskId, readTaskState, redispatchCountOf, redispatchTaskId, renderTaskCardLines, shortenSummary, taskCardOf, taskCards, taskEvent, taskIdempotencyKey, taskReportStatusOf, type TaskCardView, type TaskReplay } from "../../src/common/编排/task-state.ts";
+import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, validateRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 // 2026-11-02（全局任务状态/版本决策，A2）：只读复用 A1 的派生/纯逻辑；不复制 flow/run/账本状态机。
 import {
   buildProjectStateView,
@@ -161,7 +166,7 @@ import {
   type RosterLoadResult,
 } from "../../src/common/编排/workflow-preconditions.ts";
 import { collectDispatchAdvisories, type DispatchAdvisory } from "../../src/common/编排/dispatch-advisories.ts";
-import { registerVersionedDocAfterWrite, stableWritePathOf, verifyVersionedDocBaselines } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import { stableWritePathOf } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type { StableWritePermit, StableWriteRecord, VersionChangeRecord } from "../../src/model/version-change.ts";
 import type {
   AmendmentItemOutcome,
@@ -239,6 +244,10 @@ import { checkEvidence, checkEvidenceCollection, deriveAcceptanceFact, isWithinE
 // 2026-10-26 需求变更申请（request_requirement_change）：同源契约；仅统筹/提案会话注入。
 // 申请 ≠ 批准：审批由客户/判断 agent 在发起方会话的 decision 卡完成，主理只在批准后执行意图变更。
 import type { RequestRequirementChangeFn, RequestRequirementChangeInput, RequestRequirementChangeResult } from "../../src/model/runtime.ts";
+// 2026-11-05：方案升级报告卡（convener → 客户主权卡；修订方案/提供环境/继续/终止）。
+import { PLAN_ESCALATION_CATEGORIES } from "../../src/model/runtime.ts";
+import type { PlanEscalationFn, PlanEscalationInput, PlanEscalationResult } from "../../src/model/runtime.ts";
+import { buildPlanEscalationCard } from "./plan-escalation.ts";
 // W6-B：决定卡镜像已由 C 批移除（申请/结果直达来源角色，幕僚只收系统通知）；报告指针文案在此接线。
 import { governanceAcceptanceReportPath } from "./governance-advance.ts";
 // H-1（2026-10-12）：派发能力的冻结契约（§4 冻结家；只读导入、不复制形状）。
@@ -265,7 +274,7 @@ import type { DesktopOperatorChannelFn, DesktopShellArming } from "./operator-ch
 import type { AssembleOperatorShellGateOptions, AssembleReadonlyShellGateOptions, RoutineShellPolicy } from "../../src/pipeline/orchestration/shell-arming.ts";
 // 桌面客户交互通道（A-5）：请求/裁决的冻结形状在 §4 冻结契约家（model/runtime.ts），
 // 本模块只读导入转出；`DesktopCustomerInputFn` 是本层对「带角色上下文」的窄扩展（请求本体不带 roleId）。
-import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn } from "./customer-input.ts";
+import type { AcceptanceReportDisplayV1, DesktopCustomerInputFn, ChiefDecisionBasis, ChiefDecisionHost } from "./customer-input.ts";
 // 2026-10-26 view_image：工具读取的图片 → 下一轮同角色后台提示（投递经既有投递机）。契约形状
 // （`ViewImageFn`/`ViewImageInput`）只读导入契约家；桌面本地只保留投递工厂与提示文本。
 import { createViewImageDelivery } from "./view-image.ts";
@@ -339,6 +348,8 @@ export interface SessionOpenRequest {
   projectRoot: string;
   roleId: string;
   runtime: RuntimeKind;
+  /** Host dispatch only; public openSession strips this field and the ledger is rechecked. */
+  taskId?: string;
 }
 
 /**
@@ -442,9 +453,20 @@ export interface SendResult {
   directiveCancelled?: true;
 }
 
+export interface DeliveryQueuePersistenceOutcome {
+  completedSeq: number; committedSeq: number; failureCount: number;
+  lastError?: { seq: number; code: string; path: string };
+}
+export interface DeliveryQueuePersistenceFacts extends DeliveryQueuePersistenceOutcome {
+  managerId: string;
+  path?: string; armed: boolean; enqueuedSeq: number; pending: number;
+  knownProducers: { openChains: number; deliveryClaims: number; handbackCommits: number };
+}
 export interface StopResult {
   ok: boolean;
   note: string;
+  /** A finite queue-write barrier, not proof that all external/late producers have stopped. */
+  deliveryQueuePersistence?: DeliveryQueuePersistenceOutcome & { managerId: string; targetSeq: number; pending: number; armed: boolean; path?: string };
 }
 
 /** P1-1（2026-10-13 客户裁定）：撤回一条**未投递**排队消息的结果——`summary` 供聊天流如实一行
@@ -601,7 +623,22 @@ export interface CloseTaskResult {
   message: string;
 }
 
+export interface NativeProjectRegistration {
+  selectionId: string;
+  selectedRoot: string;
+  projectRoot: string;
+  source: "native-directory-selection";
+  selectedAt: string;
+  listingGeneration: number;
+}
+
 export interface SessionManagerDeps {
+  /** Native selection + successful same-root listing only; never renderer/model metadata. */
+  getRegisteredProjectLifecycle?: (projectRoot: string) => NativeProjectRegistration | undefined;
+  prepareChiefDecisionEvidence?: (input: {
+    projectRoot: string; originRoleId: string; request: CustomerInputRequest; metadata?: CustomerInputMetadata;
+  }) => Promise<ChiefDecisionBasis>;
+
   /** 建会话（缺省为编排的 openRoleSession；注入以便单测）。入参形状镜像编排当前的公开输入
    *  （`customerInput`/`autoRepin`；`genesisFinalize`/`operatorChannel` 随 A-4 已删）。 */
   openRoleSession: (
@@ -609,6 +646,8 @@ export interface SessionManagerDeps {
       roleId: string;
       project: ProjectConfig;
       runtime?: RuntimeKind;
+      chiefDecisionContext?: ChiefDecisionExecutionContext;
+      decidePendingRequest?: DecidePendingRequestFn;
       routineShellPolicy?: RoutineShellPolicy;
       taskId?: string;
       scope?: undefined;
@@ -685,6 +724,13 @@ export interface SessionManagerDeps {
        * · `submitVersionChange`：product/rapporteur；`submitRefactor`/`requestStableWrite`：convener；
        * · 工具只提交请求，不批准/不发卡/不签发许可（客户主权）。未注入 ⇒ 工具不存在（fail-closed）。
        */
+      gitQuery?: GitQueryFn;
+      gitCandidate?: GitCandidateFn;
+      gitPublish?: GitPublishFn;
+      selectRunChange?: SelectRunChangeFn;
+      completeTeamPlan?: CompleteTeamPlanFn;
+      activateRoleDocuments?: ActivateRoleDocumentsFn;
+      closeCreatedTask?: CloseCreatedTaskFn;
       submitVersionChange?: SubmitVersionChangeFn;
       submitRefactor?: SubmitRefactorFn;
       requestStableWrite?: RequestStableWriteFn;
@@ -923,8 +969,14 @@ export interface RedeliverResult {
 }
 
 /** 一个**保活**中的角色会话（B-2：每角色一个句柄 + LRU）。 */
+type DeliveryAssignment = Extract<Awaited<ReturnType<typeof resolveDeliveryAssignment>>, { ok: true }>["value"];
 interface DeliveryOrigin {
+  assignmentRejectionCode?: string;
+  taskId?: string;
+  assignment?: DeliveryAssignment;
   inputAccepted?: true;
+  /** Immutable identities from this turn's actual host handback input, never from message text. */
+  creatorReports?: readonly { taskId: string; roleId: string; reportId: string; turnId: string }[];
   outcome?: RuntimeTurnOutcome;
   clientMessageId?: string;
   turnId?: string;
@@ -937,7 +989,12 @@ interface DeliveryOrigin {
   handbackEvidence?: string[];
 }
 
+interface ActualDispatchSource { entry: LiveSession; origin: DeliveryOrigin }
+interface ControllerDisposalLease { projectRoot: string; leaseId: string; operationId: string; kind: "session-dispose"; hostHandleIds: readonly string[] }
+
 interface LiveSession {
+  eventConsumerDone?: Promise<void>;
+  eventConsumerFailed?: true;
   unsubscribePersistence?: () => void;
   readonly origins: { byTurn: Map<string, DeliveryOrigin>; running?: DeliveryOrigin };
   readonly roleId: string;
@@ -945,6 +1002,9 @@ interface LiveSession {
   readonly profileRevision: number;
   readonly interactionState: { lifetime: AbortController; turn: AbortController };
   readonly handle: RoleSessionHandle;
+  readonly assignedTaskId?: string;
+  /** Exact accepted assignment, never a latest-role lookup or a model-supplied task ID. */
+  boundAssignment?: DeliveryAssignment;
   /** 建会话时的项目根——换项目重开同一角色前须先释放旧句柄（角色 id 可能跨项目同名）。 */
   readonly projectRoot: string;
   readonly config: EffectiveConfigInfo;
@@ -1031,7 +1091,16 @@ interface LiveSession {
 }
 
 /** 一次**系统投递**（E-1 回交投 su / H-1 派发投目标角色 / L-1 客户消息）——投递机的队列条目（**一套机，多调用方**）。 */
+type ControllerResumeDelivery = { expected: NonNullable<DispatchTaskPayload["resumeController"]>; resumeKey: string; basisDigest: string };
 interface DeliveryItem {
+  /** Host-sealed expected tuple and actual prepare receipt; not a model permission. */
+  controllerResume?: ControllerResumeDelivery;
+  queueEntryId?: string;
+  lastAttempt?: { state: "blocked" | "failed"; code: string; at: string };
+  /** Captured host notification source, never a model-supplied authority receipt. */
+  notificationSource?: Extract<import("../../src/model/trunk.ts").DirectActionSource, { kind: "role-direct" }>;
+  /** Undefined only for direct send; queued system messages freeze their original assignment or explicit absence. */
+  systemAssignment?: DeliveryAssignment | null;
   report?: RuntimeReportSnapshotV1;
   liveReport?: RuntimeLiveReportViewV1;
   liveDurability?: 'memory-only' | 'unknown-live';
@@ -1098,6 +1167,10 @@ export interface PersistedDeliveryItemV1 {
     flowId?: string;
     /** B 批：星形任务 id（重启续投保持同一任务关联）。 */
     taskId?: string;
+    queueEntryId?: string;
+    controllerResume?: ControllerResumeDelivery;
+    systemAssignment?: DeliveryAssignment | null;
+    notificationSource?: Extract<import("../../src/model/trunk.ts").DirectActionSource, { kind: "role-direct" }>;
     deliveryId?: string;
     /** 应用任务的稳定身份（2026-10-25）：跨重启恢复后与新的同任务调用相认（「已投递」标记本身只在内存）。 */
     clientMessageId?: string;
@@ -1248,7 +1321,315 @@ function isAssistantTextEvent(ev: OrchestrationEvent): ev is Exclude<Orchestrati
  * 会话管理器（B-2：**每角色一个保活句柄** + 上限 LRU）：点角色即开、多轮直发；
  * **切走不 dispose、切回直接续**；超出 `MAX_LIVE_SESSIONS` 时淘汰最久未用者。
  */
+export type InstallationCapabilityTool = "install_skill" | "uninstall_skill" | "install_mcp" | "uninstall_mcp";
+/** Plain observations of an actual refused callback invocation; never effect-scope authority. */
+export interface InstallationEffectRefusalObservation {
+  bindingId: string; toolName: InstallationCapabilityTool; projectRoot: string; actorRoleId: string; runtime: RuntimeKind;
+  observedAt: string; coreSessionId?: string; toolTurnId?: string; activeTurnId?: string; originKind?: string;
+  disposition: "refused-before-activation"; reasonCode: "effect-scope-unproven";
+}
+
+export interface DesktopSessionInventoryFact {
+  hostHandleId: string; projectRoot: string; roleId: string; runtime: RuntimeKind; kind: "role" | "bounded-chief";
+  phase: "creating" | "live" | "open-failed" | "disposing" | "disposed" | "dispose-failed";
+  coreSessionId?: string; taskId?: string; runId?: string;
+  openFailureRef?: GitHostOpenFailureRef;
+  toolSurface?: RuntimeSessionToolSurfaceFacts; lifecycle?: RuntimeSessionLifecycleFacts;
+  errors: string[];
+}
+type DesktopRunStopFact = NonNullable<Parameters<typeof recordGitHostInventory>[0]["runStops"]>[number];
+type DesktopControllerStopFact = NonNullable<Parameters<typeof recordGitHostInventory>[0]["controllerStops"]>[number];
+export interface DesktopProjectExecutionInventory {
+  source: "desktop-session-manager"; projectRoot: string; observedAt: string; revision: number;
+  coverage: "unknown"; reasons: string[]; sessions: DesktopSessionInventoryFact[];
+  pendingOpens: string[]; queuedDispatches: Array<{ queueEntryId: string; roleId: string; runtime: RuntimeKind; taskId?: string; kind: string;
+    sourceRoleId: string; notificationSource?: DeliveryItem["notificationSource"]; notificationSourceState: "recorded" | "unknown";
+    operationId?: string; systemAssignmentTaskId?: string; systemAssignmentState: "bound" | "unassigned" | "unknown" | "not-system";
+    lastAttempt: NonNullable<DeliveryItem["lastAttempt"]> | { state: "unknown" } }>;
+  activeDeliveries: Array<{ roleId: string; runtime: RuntimeKind; taskId?: string; kind: string }>;
+  deliveryQueuePersistence: DeliveryQueuePersistenceFacts[];
+  runStops: DesktopRunStopFact[];
+  controllerStops: DesktopControllerStopFact[];
+}
+const desktopSessionManagers = new Set<SessionManager>();
+let desktopExecutionRevision = 0;
+const inventoryListeners = new Set<(event: { projectRoot: string; revision: number; reason: string }) => void>();
+/** Host coordination only. Listeners receive ordinary change facts, never a permission or effect handle. */
+export function subscribeDesktopExecutionInventory(listener: (event: { projectRoot: string; revision: number; reason: string }) => void): () => void {
+  inventoryListeners.add(listener); return () => { inventoryListeners.delete(listener); };
+}
+export function desktopProjectExecutionInventory(projectRoot: string): DesktopProjectExecutionInventory {
+  const result: DesktopProjectExecutionInventory = { source: "desktop-session-manager", projectRoot, observedAt: new Date().toISOString(),
+    revision: desktopExecutionRevision, coverage: "unknown", reasons: ["Historical processes and sessions outside the registered desktop handles are unproven", "Tool registry observations do not prove filesystem confinement"],
+    sessions: [], pendingOpens: [], queuedDispatches: [], activeDeliveries: [], deliveryQueuePersistence: [], runStops: [], controllerStops: [] };
+  for (const manager of desktopSessionManagers) {
+    const part = manager.executionInventoryFacts(projectRoot);
+    result.sessions.push(...part.sessions); result.pendingOpens.push(...part.pendingOpens);
+    result.queuedDispatches.push(...part.queuedDispatches); result.activeDeliveries.push(...part.activeDeliveries);
+    result.deliveryQueuePersistence.push(...part.deliveryQueuePersistence); result.runStops.push(...part.runStops); result.controllerStops.push(...part.controllerStops);
+  }
+  return result;
+}
+
 export class SessionManager {
+  private readonly inventoryRegistration = (() => { desktopSessionManagers.add(this); return true; })();
+  private readonly managerId = randomUUID();
+  private runStopGeneration = 0;
+  private readonly fencedRunTasks = new Map<string, Set<string>>();
+  private readonly fencedRuns = new Map<string, Set<string>>();
+  private readonly runStopFacts = new Map<string, { projectRoot: string; fact: DesktopRunStopFact }>();
+  private readonly controllerStopFacts = new Map<string, { projectRoot: string; fact: DesktopControllerStopFact }>();
+  private readonly controllerDisposalOwners = new Set<ControllerDisposalLease>();
+  private readonly deferredRunChanges = new Map<string, { plan: RunChangeHostPlan; entry: LiveSession; origin: DeliveryOrigin; controller: AbortController }>();
+  private readonly runChangeOperations = new Map<string, { plan: RunChangeHostPlan; controller: AbortController }>();
+  private readonly observedHandles = new Map<string, { fact: DesktopSessionInventoryFact; handle?: RoleSessionHandle }>();
+  private readonly observedHandleIds = new WeakMap<RoleSessionHandle, string>();
+  private readonly inventoryPublicationErrors = new Map<string, string>();
+  private readonly observedInventoryRoots = new Set<string>();
+  private readonly installationRefusals: InstallationEffectRefusalObservation[] = [];
+  installationEffectObservations(projectRoot: string): InstallationEffectRefusalObservation[] {
+    return structuredClone(this.installationRefusals.filter(event => event.projectRoot === projectRoot));
+  }
+  private refuseUnprovenInstallation(bindingId: string, toolName: InstallationCapabilityTool, projectRoot: string,
+    actorRoleId: string, runtime: RuntimeKind, handle: RoleSessionHandle | undefined, metadata?: ReportHandbackMetadata): InstallSkillReceipt {
+    const entry = this.sessions.get(this.sessionKey(projectRoot, actorRoleId, runtime));
+    const origin = handle && entry?.handle === handle ? entry.origins.running : undefined;
+    const observation: InstallationEffectRefusalObservation = { bindingId, toolName, projectRoot, actorRoleId, runtime,
+      observedAt: new Date().toISOString(), disposition: "refused-before-activation", reasonCode: "effect-scope-unproven",
+      ...(handle?.sessionId ? { coreSessionId: handle.sessionId } : {}),
+      ...(metadata?.turnId ? { toolTurnId: metadata.turnId } : {}),
+      ...(origin?.turnId ? { activeTurnId: origin.turnId } : {}), ...(origin?.kind ? { originKind: origin.kind } : {}) };
+    this.installationRefusals.push(observation);
+    if (this.installationRefusals.length > 128) this.installationRefusals.shift();
+    createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: actorRoleId }).record("capability.effect.refused", {
+      toolName, bindingId, reasonCode: observation.reasonCode, ...(observation.coreSessionId ? { sessionId: observation.coreSessionId } : {}),
+      ...(observation.toolTurnId ? { turnId: observation.toolTurnId } : {}) });
+    return { ok: false, reason: "effect-scope-unproven", message: "此安装或卸载操作的执行范围尚未完成核验，未执行。现有配置保持不变，请稍后重试。" };
+  }
+
+  private runTaskIsFenced(projectRoot: string, taskId?: string, runId?: string): boolean {
+    return !!(taskId && this.fencedRunTasks.get(projectRoot)?.has(taskId) || runId && this.fencedRuns.get(projectRoot)?.has(runId));
+  }
+
+  private async selectRunChangeForHandle(projectRoot: string, runtime: RuntimeKind, handle: RoleSessionHandle | undefined,
+    request: Parameters<SelectRunChangeFn>[0], signal?: AbortSignal): Promise<Awaited<ReturnType<SelectRunChangeFn>>> {
+    const blocked = (errorCode: string, message: string): Awaited<ReturnType<SelectRunChangeFn>> => ({ ok: false, status: "blocked",
+      operationId: request.operationId, runId: request.runId, baseDigest: request.expectedPinDigest, targetDigest: null, errorCode, message });
+    const key = this.sessionKey(projectRoot, "rapporteur", runtime), entry = this.sessions.get(key), origin = entry?.origins.running;
+    const current = () => !!entry && !!origin && entry.handle === handle && this.sessions.get(key) === entry && entry.origins.running === origin &&
+      entry.busy && !origin.settled && !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted;
+    if (!current() || !origin?.taskId || !origin.turnId || !handle?.sessionId || signal?.aborted)
+      return blocked("run-change-source-unavailable", "缺少当前真实受派策划回合，未改变运行状态。");
+    const pendingKey = `${handle.sessionId}\u0000${origin.turnId}\u0000${request.operationId}`;
+    if (this.deferredRunChanges.has(pendingKey)) return blocked("run-stop-deferred", "同一运行变更正在等待本轮真实结束，未重复执行。");
+    const prepared = await prepareRunChange({ projectRoot, request, requesterTaskId: origin.taskId });
+    if (!prepared.ok) return blocked(prepared.code, prepared.message);
+    if (!current() || signal?.aborted || prepared.value.requesterCoreSessionId !== handle.sessionId || prepared.value.requesterTurnId !== origin.turnId)
+      return blocked("run-change-source-changed", "准备期间真实发起回合已变化，未停止运行。");
+    const plan = prepared.value, owners = this.ownedRunStopMembers(plan);
+    if (!owners.ok) return blocked(owners.code, owners.message);
+    const controller = new AbortController(); this.runChangeOperations.set(plan.planId, { plan, controller });
+    // Fence exact old task/run producers before allowing another dispatch or prompt; no other run is suspended.
+    for (const [manager, members] of owners.groups) {
+      const tasks = manager.fencedRunTasks.get(projectRoot) ?? new Set<string>();
+      for (const taskId of plan.taskIds) tasks.add(taskId);
+      manager.fencedRunTasks.set(projectRoot, tasks);
+      const runs = manager.fencedRuns.get(projectRoot) ?? new Set<string>(); runs.add(plan.runId); manager.fencedRuns.set(projectRoot, runs);
+      const fact: DesktopRunStopFact = { managerId: manager.managerId, operationId: plan.operationId, runId: plan.runId, requestDigest: plan.requestDigest,
+        generation: ++manager.runStopGeneration, state: "fenced", hostHandleIds: members.map(row => row.member.hostHandleId), targetSeq: manager.deliveryPersistSeq };
+      manager.runStopFacts.set(`${projectRoot}\u0000${plan.operationId}`, { projectRoot, fact });
+      manager.inventoryChanged(projectRoot, "run-stop-producers-fenced");
+    }
+    if (plan.deferred) {
+      this.deferredRunChanges.set(pendingKey, { plan, entry: entry!, origin, controller });
+      return blocked("run-stop-deferred", "已保留同一操作；本轮真实结束后由宿主继续停止，当前尚未提交运行变更。");
+    }
+    try { return await this.executeOwnedRunStop(plan, signal ? AbortSignal.any([signal, controller.signal]) : controller.signal); }
+    finally { this.runChangeOperations.delete(plan.planId); }
+  }
+
+  private ownedRunStopMembers(plan: Pick<RunChangeHostPlan, "projectRoot" | "handles">) {
+    const groups = new Map<SessionManager, { member: RunChangeHostPlan["handles"][number]; handle: RoleSessionHandle }[]>();
+    const invalid = (message: string) => ({ ok: false as const, code: "run-stop-host-instance-unproven", message });
+    if (!plan.handles.length) return invalid("实际停止句柄集合不可用。");
+    try {
+      for (const member of plan.handles) {
+        const owners = [...desktopSessionManagers].filter(manager => manager.observedHandles.has(member.hostHandleId));
+        if (owners.length !== 1) return invalid("实际句柄没有唯一宿主，未停止运行。");
+        const manager = owners[0]!, observed = manager.observedHandles.get(member.hostHandleId)!;
+        const fact = manager.executionInventoryFacts(plan.projectRoot).sessions.find(row => row.hostHandleId === member.hostHandleId);
+        const lifecycle = observed.handle?.inspectLifecycle?.();
+        if (!fact || !observed.handle?.stopAndInspect || observed.handle.sessionId !== member.coreSessionId || fact.taskId !== member.taskId ||
+            fact.roleId !== member.roleId || fact.projectRoot !== plan.projectRoot || !["live", "disposed"].includes(fact.phase) ||
+            lifecycle?.sessionId !== member.coreSessionId || lifecycle.native?.instanceId !== member.nativeInstanceId)
+          return invalid("原任务、Core 或 native 实例已变化，未停止运行。");
+        if (!manager.deliveryStoreArmed || manager.openChains.size) return invalid("队列持久化或仍在创建的宿主尚未就绪，未停止运行。");
+        const members = groups.get(manager) ?? []; members.push({ member, handle: observed.handle }); groups.set(manager, members);
+      }
+      return { ok: true as const, groups };
+    } catch { return invalid("真实句柄生命周期无法读取，未停止运行。"); }
+  }
+
+  private async executeOwnedRunStop(plan: RunChangeHostPlan, signal: AbortSignal): Promise<Awaited<ReturnType<SelectRunChangeFn>>> {
+    const blocked = (errorCode: string, message: string): Awaited<ReturnType<SelectRunChangeFn>> => ({ ok: false, status: "blocked",
+      operationId: plan.operationId, runId: plan.runId, baseDigest: null, targetDigest: null, errorCode, message });
+    const owned = this.ownedRunStopMembers(plan); if (!owned.ok) return blocked(owned.code, owned.message);
+    try {
+      for (const [manager, members] of owned.groups) for (const { member, handle } of members) {
+        if (signal.aborted) return blocked("run-change-cancelled", "宿主运行变更已取消，未提交。");
+        const fresh = handle.inspectLifecycle?.();
+        const stopped = await handle.stopAndInspect!({ expectedSessionId: member.coreSessionId,
+          ...(fresh?.turnId ? { expectedTurnId: fresh.turnId } : {}), timeoutMs: 5000 }, signal);
+        if (stopped.sessionId !== member.coreSessionId || stopped.native?.instanceId !== member.nativeInstanceId || stopped.status !== "quiescent" ||
+            !stopped.providerFinished || stopped.activeTools.length)
+          return blocked("run-stop-lifecycle-unproven", "同一真实实例尚未排空，运行变更未提交。");
+        const entry = [...manager.sessions.entries()].find(([, value]) => value.handle === handle);
+        // Close the actual SDK stream while its original W consumer still owns the entry:
+        // terminal reports must be consumed before removing their handback/persistence owner.
+        if (entry) {
+          await manager.disposeObservedHandle(handle);
+          await entry[1].eventConsumerDone;
+          if (entry[1].eventConsumerFailed) return blocked("run-stop-event-consumer-unproven", "原实例事件消费失败，未提交运行变更。");
+          const error = await manager.disposeEntry(entry[0], entry[1]); if (error) return blocked("run-stop-dispose-failed", error);
+        }
+      }
+      for (const [manager] of owned.groups) {
+        const taskIds = new Set(plan.taskIds), rootPrefix = `${plan.projectRoot}\u0000`;
+        const claimed = await manager.waitForRunStopDeliveryClaims({ projectRoot: plan.projectRoot, taskIds: plan.taskIds, signal });
+        if (claimed.status !== "wait-complete") return blocked(claimed.code, "投递认领归属或结束状态尚未核实，未提交运行变更。");
+        // Capture detached producers after affected claims have finished their actual send handoff.
+        const deliveries = [...manager.taskDeliveryCommits.entries()].filter(([key]) => key.startsWith(rootPrefix) && taskIds.has(key.slice(rootPrefix.length))).map(([, row]) => row.done);
+        const handbacks = [...manager.taskHandbackCommits.entries()].filter(([key]) => key.startsWith(rootPrefix) && taskIds.has(key.slice(rootPrefix.length))).map(([, promise]) => promise);
+        await Promise.all([...deliveries, ...handbacks]);
+        const cutoff = await manager.finishStopPersistence({ ok: true, note: "" });
+        if (!cutoff.ok || !cutoff.deliveryQueuePersistence) return blocked("run-stop-persistence-unproven", cutoff.note);
+        const row = manager.runStopFacts.get(`${plan.projectRoot}\u0000${plan.operationId}`);
+        if (!row || row.fact.requestDigest !== plan.requestDigest) return blocked("run-stop-host-fence-unproven", "真实运行暂停来源已变化。");
+        row.fact = { ...row.fact, targetSeq: cutoff.deliveryQueuePersistence.targetSeq };
+        manager.inventoryChanged(plan.projectRoot, "run-stop-cutoff-completed");
+        if (manager.inventoryPublicationErrors.has(plan.projectRoot)) return blocked("run-stop-inventory-unavailable", "停止事实发布失败，未提交运行变更。");
+      }
+      if (signal.aborted) return blocked("run-change-cancelled", "宿主运行变更已取消，未提交。");
+      return await finalizeRunChange({ projectRoot: plan.projectRoot, planId: plan.planId, requestDigest: plan.requestDigest }, signal);
+    } catch (error) { return blocked("run-stop-host-failed", error instanceof Error ? error.message : String(error)); }
+  }
+
+  private resumeDeferredRunChanges(entry: LiveSession, origin: DeliveryOrigin): void {
+    for (const [key, held] of this.deferredRunChanges) {
+      if (held.entry !== entry || held.origin !== origin || held.plan.requesterTurnId !== origin.turnId) continue;
+      this.deferredRunChanges.delete(key);
+      if (origin.outcome !== "completed" || entry.interactionState.lifetime.signal.aborted || held.controller.signal.aborted) {
+        held.controller.abort(); this.runChangeOperations.delete(held.plan.planId); continue;
+      }
+      void Promise.resolve().then(() => this.executeOwnedRunStop(held.plan, held.controller.signal)).then(receipt => {
+        this.emitDeliveryNote(entry.projectRoot, entry.runtime, entry.roleId, entry.roleId,
+          receipt.message ?? (receipt.ok ? "原运行已停止。" : `运行变更尚未提交：${receipt.errorCode ?? receipt.status}`));
+      }).catch(error => {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot: entry.projectRoot, roleId: entry.roleId }).error("run-change.continuation.failed", error);
+      }).finally(() => { this.runChangeOperations.delete(held.plan.planId); });
+    }
+  }
+
+  private inventoryChanged(projectRoot: string, reason: string): void {
+    this.observedInventoryRoots.add(projectRoot);
+    desktopExecutionRevision++;
+    const published = recordGitHostInventory(desktopProjectExecutionInventory(projectRoot));
+    if (published.ok) this.inventoryPublicationErrors.delete(projectRoot);
+    else {
+      this.inventoryPublicationErrors.set(projectRoot, published.code);
+      createDiagnosticLogger({ component: "desktop.session", projectRoot }).record("host-inventory.publish.failed", { reasonCode: published.code });
+    }
+    for (const listener of inventoryListeners) { try { listener({ projectRoot, revision: desktopExecutionRevision, reason }); } catch { /* observer failure never creates authority */ } }
+  }
+  private publishDeliveryInventory(reason: string): void {
+    for (const projectRoot of this.observedInventoryRoots) this.inventoryChanged(projectRoot, reason);
+  }
+  executionInventoryFacts(projectRoot: string): Pick<DesktopProjectExecutionInventory, "sessions" | "pendingOpens" | "queuedDispatches" | "activeDeliveries" | "deliveryQueuePersistence" | "runStops" | "controllerStops"> {
+    const sessions: DesktopSessionInventoryFact[] = [];
+    for (const { fact, handle } of this.observedHandles.values()) {
+      if (fact.projectRoot !== projectRoot) continue;
+      const current = structuredClone(fact);
+      const entry = [...this.sessions.values()].find(entry => entry.handle === handle);
+      const assignment = entry?.origins.running ? entry.origins.running.assignment : entry?.boundAssignment;
+      const taskId = entry ? (entry.origins.running ? entry.origins.running.taskId : assignment?.taskId ?? entry.assignedTaskId) : current.taskId;
+      if (taskId !== undefined) current.taskId = taskId; else if (entry) delete current.taskId;
+      if (assignment?.runId) current.runId = assignment.runId;
+      if (handle !== undefined) {
+        if (handle.sessionId !== undefined) current.coreSessionId = handle.sessionId;
+        try { if (handle.inspectToolSurface) current.toolSurface = structuredClone(handle.inspectToolSurface());
+          else current.errors.push("tool-surface-observation-unavailable"); } catch { current.errors.push("tool-surface-observation-failed"); }
+        try { if (handle.inspectLifecycle) current.lifecycle = structuredClone(handle.inspectLifecycle());
+          else current.errors.push("lifecycle-observation-unavailable"); } catch { current.errors.push("lifecycle-observation-failed"); }
+      }
+      sessions.push(current);
+    }
+    return { sessions, deliveryQueuePersistence: [this.deliveryQueuePersistenceFacts()],
+      controllerStops: [...this.controllerStopFacts.values()].filter(row => row.projectRoot === projectRoot).map(row => structuredClone(row.fact)),
+      runStops: [...this.runStopFacts.values()].filter(row => row.projectRoot === projectRoot).map(row => structuredClone(row.fact)), pendingOpens: [...this.openChains.keys()].filter(key => key.startsWith(`${projectRoot}\u0000`)),
+      queuedDispatches: [...this.deliveryQueues.entries()].filter(([key]) => key.startsWith(`${projectRoot}\u0000`)).flatMap(([, items]) => items.map(item => ({ queueEntryId: item.queueEntryId ?? "unknown", roleId: item.targetRoleId, runtime: item.runtime,
+        taskId: item.taskId, kind: item.kind, sourceRoleId: item.sourceRoleId || "unknown",
+        notificationSourceState: item.notificationSource ? "recorded" as const : "unknown" as const,
+        ...(item.notificationSource ? { notificationSource: structuredClone(item.notificationSource), operationId: item.notificationSource.operationId } : {}),
+        systemAssignmentState: item.kind !== "system" ? "not-system" as const : item.systemAssignment === undefined ? "unknown" as const : item.systemAssignment === null ? "unassigned" as const : "bound" as const,
+        ...(item.systemAssignment ? { systemAssignmentTaskId: item.systemAssignment.taskId } : {}),
+        lastAttempt: item.lastAttempt ? { ...item.lastAttempt } : { state: "unknown" as const } }))),
+      activeDeliveries: [...this.activeDeliveries.entries()].filter(([key]) => key.startsWith(`${projectRoot}\u0000`)).map(([, item]) => ({ roleId: item.targetRoleId, runtime: item.runtime, taskId: item.taskId, kind: item.kind })) };
+  }
+  private async openObservedRoleSession(input: Parameters<SessionManagerDeps["openRoleSession"]>[0], deps: Parameters<SessionManagerDeps["openRoleSession"]>[1]): Promise<RoleSessionHandle> {
+    const hostHandleId = randomUUID();
+    const fact: DesktopSessionInventoryFact = { hostHandleId, projectRoot: input.project.projectRoot, roleId: input.roleId,
+      runtime: input.runtime ?? "demo", kind: input.chiefDecisionContext ? "bounded-chief" : "role", phase: "creating", errors: [],
+      ...(input.taskId ? { taskId: input.taskId } : {}), ...(input.project.documentContext?.runId ? { runId: input.project.documentContext.runId } : {}) };
+    const record: { fact: DesktopSessionInventoryFact; handle?: RoleSessionHandle } = { fact };
+    // Core's prepared bind is the sole owner of the native session-open admission lease.
+    // Publish pending construction before entering Pipeline; this row is not a safety permit.
+    this.observedHandles.set(hostHandleId, record); this.inventoryChanged(fact.projectRoot, "session-creating");
+    try {
+      if (this.inventoryPublicationErrors.has(fact.projectRoot)) throw new Error("会话库存登记失败，会话尚未创建。请检查诊断后重试。");
+      const handle = await this.deps.openRoleSession(input, deps); record.handle = handle; fact.phase = "live";
+      this.observedHandleIds.set(handle, hostHandleId); this.inventoryChanged(fact.projectRoot, "session-created");
+      if (this.inventoryPublicationErrors.has(fact.projectRoot)) throw new Error("会话库存登记失败，无法接纳该会话。请检查诊断。");
+      return handle;
+    } catch (error) {
+      fact.phase = "open-failed"; fact.errors.push("partial-construction-closure-unproven");
+      try {
+        const ref = await inspectRoleSessionOpenFailure({ error, hostHandleId });
+        if (ref !== undefined) fact.openFailureRef = ref;
+      } catch {
+        // Evidence lookup failure must not replace the actual failed-open error or create authority.
+        try { createDiagnosticLogger({ component: "desktop.session", projectRoot: fact.projectRoot, roleId: fact.roleId })
+          .record("session.open.failure-ref.unavailable", { reasonCode: "pipeline-lookup-failed" }); } catch { /* preserve the original error */ }
+      }
+      if (record.handle) {
+        try { await record.handle.dispose(); fact.phase = "disposed"; }
+        catch { fact.phase = "dispose-failed"; fact.errors.push("failed-admission-disposal-unproven"); }
+      }
+      this.inventoryChanged(fact.projectRoot, "session-open-failed"); throw error;
+    }
+  }
+  private ownsControllerDisposal(handle: RoleSessionHandle, lease: ControllerDisposalLease): boolean {
+    const id = this.observedHandleIds.get(handle), fact = id ? this.observedHandles.get(id)?.fact : undefined;
+    return !!id && !!fact && lease.projectRoot === fact.projectRoot && lease.kind === "session-dispose" && !!lease.operationId && lease.hostHandleIds.includes(id) &&
+      [...desktopSessionManagers].some(manager => manager.controllerDisposalOwners.has(lease));
+  }
+  private async disposeObservedHandle(handle: RoleSessionHandle, heldLease?: ControllerDisposalLease): Promise<void> {
+    const id = this.observedHandleIds.get(handle), record = id === undefined ? undefined : this.observedHandles.get(id);
+    const root = record?.fact.projectRoot;
+    if (heldLease && !this.ownsControllerDisposal(handle, heldLease)) throw new Error("controller-stop-dispose-owner-unproven");
+    const lease = root && !heldLease ? beginGitHostAction({ projectRoot: root, kind: "session-dispose" }) : undefined;
+    if (root && lease && !lease.ok) recordGitHostInterruption({ projectRoot: root, reason: "session-dispose-during-host-action", coreSessionId: handle.sessionId });
+    if (record) { record.fact.phase = "disposing"; this.inventoryChanged(record.fact.projectRoot, "session-disposing"); }
+    try { await handle.dispose(); if (record) record.fact.phase = "disposed"; }
+    catch (error) { if (record) { record.fact.phase = "dispose-failed"; record.fact.errors.push("disposal-unproven"); } throw error; }
+    finally {
+      if (record) this.inventoryChanged(record.fact.projectRoot, "session-dispose-observed");
+      if (root && lease?.ok) {
+        const ended = endGitHostAction({ projectRoot: root, leaseId: lease.leaseId });
+        if (!ended.ok) throw new Error("会话处置协调未能完成，请检查诊断。");
+      }
+    }
+  }
+
   private readonly deps: SessionManagerDeps;
   private readonly loadEffectiveConfig: (opts: LoadConfigOptions) => Promise<LoadedConfig>;
   /** 保活中的会话：project × role × runtime → 句柄（上限见 `MAX_LIVE_SESSIONS`）。 */
@@ -1279,6 +1660,22 @@ export class SessionManager {
    * 单链持有 16 分 55 秒，同项目其他角色的投递/回交/客户消息全被迫串行等待）。
    */
   private readonly drainChains = new Map<string, Promise<void>>();
+  private readonly drainClaimRecords = new Set<{ projectRoot: string; taskIds?: readonly string[]; owner?: ActualDispatchSource; done: Promise<void> }>();
+  /** Explicit stop fences automatic work, including late callbacks; only an explicit resume reopens its key. */
+  private deliveryStopVersion = 0;
+  private deliveryStoppedAll = false;
+  private readonly stoppedDeliveryKeys = new Set<string>();
+  private readonly resumedDeliveryKeys = new Set<string>();
+  private readonly deliveryKeyStopVersions = new Map<string, number>();
+  private deliveryIsStopped(key: string): boolean {
+    return this.stoppedDeliveryKeys.has(key) || this.deliveryStoppedAll && !this.resumedDeliveryKeys.has(key);
+  }
+  private deliveryLifecycle(key: string): string {
+    return `${this.deliveryStopVersion}:${this.deliveryKeyStopVersions.get(key) ?? 0}`;
+  }
+  private resumeDelivery(key: string): void {
+    this.stoppedDeliveryKeys.delete(key); this.resumedDeliveryKeys.add(key);
+  }
   /**
    * **`openInternal` 的按会话键互斥链（F-2-opt2，2026-10-16 客户批准）**：同一会话键的 `openInternal` 至多
    * 一个在跑（其余按序等待）——闭合既有双开窗口（① 用户 open × 投递机自动开；② 两次用户 open）：旧实现
@@ -1308,6 +1705,13 @@ export class SessionManager {
   private readonly reportedTaskKeys = new Set<string>();
   /** B-07：连续卡死升级卡（按链根去重；同一链只提交一次）。 */
   private readonly escalationRequests = new Map<string, Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }>>();
+  /** 2026-11-05：在途方案升级卡（`projectRoot\0flowId` 去重；同一 flow 至多一张）。 */
+  private readonly planEscalations = new Map<string, Promise<void>>();
+  /**
+   * 2026-11-05（客户最终口径）：已向 convener 发过「是否自己调用 report_plan_escalation」提示的 flow。
+   * 首次 blocked 即提示，同一 flow 在 done/failed/aborted 或升级卡成功提交后清除标记（下一次 blocked 可再提示）。
+   */
+  private readonly planEscalationPrompted = new Set<string>();
   /** C 批：系统通知去重（`requestId\0event`）。 */
   private readonly requestNotifiedKeys = new Set<string>();
   /**
@@ -1321,13 +1725,17 @@ export class SessionManager {
   private readonly requestPresentedKeys = new Set<string>();
   /** B 批：每角色最近运行日志的内存摘要（看护巡检/日志静默用；真实日志在 `.ans/state/logs/`）。 */
   private readonly lastRoleActivity = new Map<string, { at: number; kind: string; summary: string }>();
-  private readonly reportStates = new Map<string, { owner?: LiveSession; event?: HandbackEvent; state?: ReportSaveStateV1; queued: boolean }>();
+  private readonly reportStates = new Map<string, { owner?: LiveSession; event?: HandbackEvent; state?: ReportSaveStateV1; queued: boolean; inFlight?: boolean }>();
   private readonly attemptStates = new Map<string, { owner?: LiveSession; receipt: RuntimeDeliveryReceiptV1 }>();
   private readonly knownReports = new Set<string>();
   private readonly knownAttempts = new Set<string>();
   private readonly persistenceInFlight = new Map<string, Promise<unknown>>();
   /** 回交去重键（`handbackKey` 单一来源；`projectRoot\0<key>`）——**一条回交只投递一次**（永不放行重投）。 */
   private readonly enqueuedHandbackKeys = new Set<string>();
+  private readonly pendingHandbackKeys = new Set<string>();
+  private readonly taskHandbackCommits = new Map<string, Promise<void>>();
+  /** Only an already-started delivery observation; Core.send never awaits the detached report consumer. */
+  private readonly taskDeliveryCommits = new Map<string, { done: Promise<void>; finish: () => void }>();
   /**
    * 派发去重键——**队列期窗口去重**（投递成功即释放，见 `drainQueue`；返工可再派发同文任务）。
    * 契约的 `DispatchTaskPayload` 无 id/时间（钉死不扩），桌面无法区分「重试同一调用」与「新的一次相同文本
@@ -1382,7 +1790,8 @@ export class SessionManager {
    * 崩溃重启只重投**未完成**的投递）。
    */
   private readonly deliveryQueueStorePath: string | undefined;
-  private deliveryPersistChain: Promise<void> = Promise.resolve();
+  private deliveryPersistOutcome: DeliveryQueuePersistenceOutcome = { completedSeq: 0, committedSeq: 0, failureCount: 0 };
+  private deliveryPersistChain: Promise<DeliveryQueuePersistenceOutcome> = Promise.resolve(this.deliveryPersistOutcome);
   private deliveryPersistSeq = 0;
   private readonly deliveredDeliveryKeys = new Set<string>();
   /**
@@ -1602,18 +2011,54 @@ export class SessionManager {
     return entry.origins.byTurn.get(event.turnId); // Only the original prompt's real ack creates this mapping.
   }
 
-  private async sendDelivery(entry: LiveSession, origin: DeliveryOrigin, text: string, opts?: PromptOptions, requiresHandback = false, handbackTaskId?: string): Promise<void> {
-    // **「替我审」上下文**（PM 评审 §8.1）：当前轮投递给该角色的文本 ≤4KB，内存内（会话 dispose 即清）；
-    // 超限截断但**不据此 manual**；不读转录/历史回放。写入点即真实投递（直发/出队/派发/回交同一路径）。
-    entry.lastUserText = boundTurnText(text);
-    // Every invocation declares its own source; chat also overrides any legacy session taskId.
-    let promptOptions: RoleSessionSendOptions = {
-      ...opts,
-      handback: {
-        required: requiresHandback,
-        ...(handbackTaskId !== undefined && handbackTaskId !== "" ? { taskId: handbackTaskId } : {}),
-      },
+  private async sendDelivery(entry: LiveSession, origin: DeliveryOrigin, text: string, opts?: PromptOptions, requiresHandback = false, handbackTaskId?: string,
+    reportedChildren?: readonly { childTaskId: string; childRoleId: string; flowId?: string }[], queuedSystemAssignment?: DeliveryAssignment | null, applicationNotice = false, controllerResume?: ControllerResumeDelivery): Promise<void> {
+    const key = this.sessionKey(entry.projectRoot, entry.roleId, entry.runtime);
+    const current = () => this.sessions.get(key) === entry && entry.origins.running === origin && !origin.settled &&
+      !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted && !this.deliveryIsStopped(key);
+    if (!current()) throw new Error("delivery-assignment-source-changed:当前会话或投递来源已变化");
+    let assignment: DeliveryAssignment | undefined;
+    const resolve = async (source: Parameters<typeof resolveDeliveryAssignment>[0]["source"], flowId?: string, runId?: string) => {
+      const result = await resolveDeliveryAssignment({ projectRoot: entry.projectRoot, recipientRoleId: entry.roleId, source,
+        ...(flowId ? { expectedFlowId: flowId } : {}), ...(runId ? { expectedRunId: runId } : {}) });
+      if (!current()) throw new Error("delivery-assignment-source-changed:核验期间当前会话或投递来源已变化");
+      if (!result.ok) { origin.assignmentRejectionCode = result.code; throw new Error(`${result.code}:${result.message}`); }
+      if (assignment && (assignment.taskId !== result.value.taskId || assignment.flowId !== result.value.flowId || assignment.runId !== result.value.runId))
+        throw new Error("delivery-assignment-mixed:不同父任务的回交不能共用一次任务回合");
+      assignment = result.value;
     };
+    if (requiresHandback && handbackTaskId) {
+      await resolve({ kind: "assigned-task", taskId: handbackTaskId }, origin.flowIds?.length === 1 ? origin.flowIds[0] : undefined);
+    } else if (origin.kind === "handback" && entry.roleId === "convener") {
+      if (!reportedChildren?.length) throw new Error("delivery-child-source-invalid:缺少真实报告child来源，未按旧任务续投");
+      for (const child of reportedChildren) await resolve({ kind: "child-report", childTaskId: child.childTaskId, childRoleId: child.childRoleId }, child.flowId);
+    } else if (origin.kind === "system") {
+      const bound = queuedSystemAssignment === undefined ? entry.boundAssignment : queuedSystemAssignment;
+      if (bound) await resolve({ kind: "assigned-task", taskId: bound.taskId }, bound.flowId, bound.runId);
+    } else if (origin.kind === "message") {
+      delete entry.boundAssignment; // A new customer chat explicitly clears any older assignment, including constructor taskId.
+    }
+    if (!current()) throw new Error("delivery-assignment-source-changed:发送前当前投递已失效");
+    if (assignment && this.runTaskIsFenced(entry.projectRoot, assignment.taskId, assignment.runId)) {
+      origin.assignmentRejectionCode = "run-stop-host-fenced"; throw new Error("run-stop-host-fenced:原运行正在停止，未重新投递。");
+    }
+    entry.lastUserText = boundTurnText(text);
+    if (assignment) { origin.taskId = assignment.taskId; origin.assignment = assignment; origin.flowIds = [assignment.flowId]; }
+    const acceptAssignment = () => { if (assignment && this.sessions.get(key) === entry && !entry.interactionState.lifetime.signal.aborted) {
+      entry.boundAssignment = assignment;
+      const id = this.observedHandleIds.get(entry.handle), observed = id ? this.observedHandles.get(id) : undefined;
+      if (observed) { observed.fact.taskId = assignment.taskId; if (assignment.runId) observed.fact.runId = assignment.runId; }
+    } };
+    // Task identity remains fresh for explicit reports/tools. An application receipt notice is not
+    // another assigned work round; its acknowledgement alone must not manufacture a fallback report.
+    // Ordinary system continuations and real child reports retain their work/report obligation.
+    let promptOptions: RoleSessionSendOptions = { ...opts, handback: { required: requiresHandback || assignment !== undefined && !applicationNotice,
+      ...(assignment ? { taskId: assignment.taskId } : {}) } };
+    const handbackInput = origin.kind === "handback" && opts?.inputProvenance?.kind === "handback" ? opts.inputProvenance : undefined;
+    const creatorReports = handbackInput?.target.roleId === entry.roleId && handbackInput.target.runtime === entry.runtime &&
+      handbackInput.reports.length > 0 && handbackInput.reports.length <= 16 && handbackInput.reports.every(report =>
+        typeof report.taskId === "string" && report.taskId !== "" && report.reportId !== "" && report.source.roleId !== "" && report.source.turnId !== "")
+      ? handbackInput.reports.map(report => ({ taskId: report.taskId!, roleId: report.source.roleId, reportId: report.reportId, turnId: report.source.turnId })) : undefined;
     if (entry.handle.runtime !== undefined || origin.clientMessageId !== undefined || opts?.onTurnStarted !== undefined) {
       const onTurnStarted = (metadata: PromptTurnStartedMetadata): void => {
         const key = this.sessionKey(entry.projectRoot, entry.roleId, entry.runtime);
@@ -1621,6 +2066,8 @@ export class SessionManager {
         if (metadata.runtime !== entry.runtime || metadata.roleId !== entry.roleId || typeof metadata.turnId !== "string" || metadata.turnId === "") return;
         if (origin.turnId === undefined) {
           origin.turnId = metadata.turnId;
+          if (creatorReports) origin.creatorReports = structuredClone(creatorReports);
+          acceptAssignment();
           entry.origins.byTurn.set(metadata.turnId, origin);
           // **ACK 即已投递**（2026-10-25）：应用任务的稳定键在运行时同步开轮回执时即记「已投递」——
           // 之后即便发送 promise 因重建/收尾阶段报错，同一任务也不会被重投（at-most-once）。
@@ -1633,7 +2080,14 @@ export class SessionManager {
       };
       promptOptions = { ...promptOptions, onTurnStarted };
     }
+    if (controllerResume) {
+      const inspected = await inspectQueuedControllerResume({ projectRoot: entry.projectRoot, resumeController: controllerResume.expected, resumeKey: controllerResume.resumeKey, basisDigest: controllerResume.basisDigest });
+      if (!inspected.ok) { origin.assignmentRejectionCode = inspected.code; throw new Error(`${inspected.code}:${inspected.message ?? inspected.code}`); }
+      if (!current() || assignment?.taskId !== inspected.value.taskId || assignment.runId !== inspected.value.runId || assignment.flowId !== inspected.value.flowId)
+        { origin.assignmentRejectionCode = "controller-resume-source-changed"; throw new Error("controller-resume-source-changed:实际运营输入身份已变化"); }
+    }
     await entry.handle.send(text, promptOptions);
+    acceptAssignment();
   }
 
   private sendFacts(entry: LiveSession, origin: DeliveryOrigin): Pick<SendResult, 'turnId' | 'clientMessageId' | 'inputAccepted' | 'outcome' | 'sessionCurrent'> {
@@ -1672,8 +2126,14 @@ export class SessionManager {
    *  并发路径（settle 触发的 refreshStaleBoundaries 与用户下一次 send/open 各自的作废重建）在各自 `await`
    *  期间可能已被对方替换/重建；照删会把**新会话（可能正在跑轮次）**误删并推 busy=false（真机「轮次还在跑
    *  但忙态翻假」的根因一类）。已被替换 ⇒ 本调用 no-op（新条目的处置归它自己的路径）。 */
-  private async disposeEntry(roleId: string, entry: LiveSession): Promise<string | null> {
+  private async disposeEntry(roleId: string, entry: LiveSession, heldLease?: ControllerDisposalLease): Promise<string | null> {
+    if (heldLease && !this.ownsControllerDisposal(entry.handle, heldLease)) return "controller-stop-dispose-owner-unproven";
+    if (!heldLease) recordGitHostInterruption({ projectRoot: entry.projectRoot, reason: "desktop-session-revoked", coreSessionId: entry.handle.sessionId });
+    this.inventoryChanged(entry.projectRoot, "session-revocation-requested");
     if (this.sessions.get(roleId) !== entry) return null; // TOCTOU 防误删（见方法注释）
+    for (const [id, deferred] of this.deferredRunChanges) if (deferred.entry === entry) {
+      deferred.controller.abort(); this.deferredRunChanges.delete(id); this.runChangeOperations.delete(deferred.plan.planId);
+    }
     try { entry.unsubscribePersistence?.(); } catch { /* closing a presenter cannot retain a stale handle */ }
     for (const [key, state] of this.reportStates) if (state.owner === entry) {
       if (state.state?.retryAvailable) {
@@ -1726,7 +2186,7 @@ export class SessionManager {
       }
     }
     try {
-      await entry.handle.dispose();
+      await this.disposeObservedHandle(entry.handle, heldLease);
       return null;
     } catch (err) {
       return err instanceof Error ? err.message : String(err);
@@ -1896,7 +2356,7 @@ export class SessionManager {
     // **F-2-opt2 防死锁**：本重开是**持锁方（openInternal 的续接前查陈旧）所等待的那条链**内的续段——
     // 必须直调 `openInternalUnsafe`（不再入 openChains）并带 `internalReopen`（不再查陈旧/不再入 rebuild 链，
     // 防「链内等待自身尾」的自死锁）；此处旧条目已 dispose（或纯新建），不会再触发任何 reopen 预检。
-    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime }, false, this.selectionVersion, true);
+    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime, ...((entry.boundAssignment?.taskId ?? entry.assignedTaskId) ? { taskId: entry.boundAssignment?.taskId ?? entry.assignedTaskId } : {}) }, false, this.selectionVersion, true);
     if (reopened.ok) this.queueRebuildWritePermitsNotice(roleId); // 入参＝会话键（本函数参数即键）
     if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
       const current = this.sessions.get(roleId);
@@ -1960,6 +2420,7 @@ export class SessionManager {
     const selectionVersion = ++this.selectionVersion;
     const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
     this.selectionTargetRoleId = key;
+    this.resumeDelivery(key);
     await this.rebuildChains.get(key);
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
     diagnostic.record("session.open.start");
@@ -2084,6 +2545,25 @@ export class SessionManager {
       { projectRoot: input.projectRoot, roleId: input.roleId, runtime: input.runtime },
       { background: true, ...(input.kind !== undefined ? { kind: input.kind } : {}), ...(clientMessageId !== undefined ? { clientMessageId } : {}) },
     );
+  }
+
+  /** Idempotent host notification: enqueue acknowledgement never waits for the recipient's current turn. */
+  async queueDirectNotification(projectRoot: string, input: { key: string; recipientRoleId: string; message: string;
+    source: Extract<import("../../src/model/trunk.ts").DirectActionSource, { kind: "role-direct" }> }): Promise<void> {
+    const allowed = ["chief", "convener", input.source.actorRoleId];
+    if (!input.key || !allowed.includes(input.recipientRoleId)) throw new Error("Invalid direct notification recipient");
+    const runtime = this.findLiveRuntime(projectRoot, input.recipientRoleId) ?? this.lastGovernanceRuntime.get(projectRoot);
+    if (runtime === undefined) throw new Error("No actual runtime is selected for the notification recipient");
+    const clientMessageId = this.appTaskClientMessageIdFromSeed(input.key);
+    const key = this.queueKey(projectRoot, input.recipientRoleId, runtime);
+    if (this.deliveredAppTaskIds.has(clientMessageId)
+      || this.deliveryQueues.get(key)?.some(item => item.clientMessageId === clientMessageId)
+      || this.activeDeliveries.get(key)?.clientMessageId === clientMessageId) return;
+    this.enqueueDelivery(projectRoot, input.recipientRoleId, { kind: "system", runtime, targetRoleId: input.recipientRoleId,
+      sourceRoleId: input.source.actorRoleId, text: `[应用·文档更新] ${input.message}`, summary: shortenSummary(input.message),
+      dedupKey: input.key, clientMessageId, notificationSource: structuredClone(input.source) });
+    // Do not await drain: the publisher may itself be waiting inside the current recipient turn.
+    void this.drainQueue(projectRoot, input.recipientRoleId, runtime);
   }
 
   /** 某角色当前是否有轮次在跑（纯读；W6-B 时序修复用）。 */
@@ -2440,6 +2920,126 @@ export class SessionManager {
       this.activeRuntimeFor(projectRoot) ??
       "demo";
     this.emitDeliveryNote(projectRoot, runtime, roleId, roleId, `[${mainT("ui.trunk.panelTitle")}] ${summary}`);
+  }
+
+  // —————————————— 2026-11-05：方案升级报告卡（convener 提交 → 客户主权裁决） ——————————————
+
+  /**
+   * 方案升级报告（`report_plan_escalation` 落地）：只做校验/去重/发卡，**不派发、不改需求或验收标准**；
+   * 卡由应用发行（application-owned decision），客户本人裁决；同一 flow 至多一张在途卡。
+   * 返回 `presented` 只代表**已呈现/已发起呈现**，不代表客户结论（申请≠批准）。
+   */
+  async reportPlanEscalation(projectRoot: string, input: PlanEscalationInput, signal?: AbortSignal): Promise<PlanEscalationResult> {
+    const roleId = typeof input?.roleId === "string" ? input.roleId : "";
+    const flowId = typeof input?.flowId === "string" ? input.flowId.trim() : "";
+    const summary = typeof input?.summary === "string" ? input.summary.trim() : "";
+    const category = input?.category;
+    if (roleId !== "convener") {
+      return { ok: false, errorCode: "plan-escalation-role-not-allowed", message: "方案升级报告只能由 convener 会话提交。" };
+    }
+    if (flowId === "" || !GOVERNANCE_SLUG_RE.test(flowId) || summary === "" || !PLAN_ESCALATION_CATEGORIES.includes(category)) {
+      return { ok: false, errorCode: "plan-escalation-invalid", message: "flowId/category/summary 非法（不猜测参数，未发卡）。" };
+    }
+    const key = `${projectRoot}\u0000${flowId}`;
+    if (this.planEscalations.has(key)) {
+      return { ok: false, errorCode: "plan-escalation-conflict", message: `flow ${flowId} 已有在途方案升级卡；客户未裁定前不重复提交。` };
+    }
+    const built = buildPlanEscalationCard({ flowId, category, summary });
+    if (built === undefined) {
+      return { ok: false, errorCode: "plan-escalation-invalid", message: "卡面字段缺失，未发卡。" };
+    }
+    const entry = this.pickGovernedCardEntry(projectRoot);
+    if (entry === undefined || entry.governedCardContext === undefined || this.deps.customerInput === undefined) {
+      return { ok: false, errorCode: "plan-escalation-channel-unavailable", message: "无客户卡通道（无已打开的治理会话）：方案升级卡未呈现；稍后可重试。" };
+    }
+    const requestId = `plan-escalation-${flowId}`;
+    // 发卡与决策处理分离：工具调用立即返回 presented；决策经 afterPlanEscalation 如实回到运营/幕僚。
+    const pending = this.presentAppCard({
+      projectRoot,
+      request: built.request,
+      metadata: built.metadata,
+      requestId,
+      ...(signal !== undefined ? { signal } : {}),
+    })
+      .then((outcome) => this.afterPlanEscalation(projectRoot, { requestId, flowId }, outcome))
+      .catch((error) => {
+        createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("plan-escalation.card.failed", error, { requestId });
+      })
+      .finally(() => {
+        this.planEscalations.delete(key);
+      });
+    this.planEscalations.set(key, pending);
+    // 升级卡已成功提交 ⇒ 清除该 flow 的「已提示」标记（下一次 blocked 可再提示；裁定前由在途卡节流）。
+    this.planEscalationPrompted.delete(key);
+    return { ok: true, requestId, status: "presented" };
+  }
+
+  /** 方案升级卡决策后的如实通报与（仅「修订方案」时向策划 rapporteur 的）重做方案投递；不代客户决定、不改需求。 */
+  private async afterPlanEscalation(
+    projectRoot: string,
+    input: { requestId: string; flowId: string },
+    outcome: CustomerInputOutcome | null | undefined,
+  ): Promise<void> {
+    const convener = this.handbackOwnerRoleId(projectRoot) ?? "convener";
+    const chief = this.chiefTaskRoleIdOf(projectRoot) ?? "chief";
+    const notify = (roleId: string, text: string): void => {
+      const runtime =
+        this.findLiveRuntime(projectRoot, roleId) ??
+        this.lastGovernanceRuntime.get(projectRoot) ??
+        this.activeRuntimeFor(projectRoot) ??
+        "demo";
+      this.emitDeliveryNote(projectRoot, runtime, roleId, roleId, `[${mainT("ui.planEscalation.title")}] ${text}`);
+    };
+    if (outcome === null || outcome === undefined || outcome.outcome !== "answered") {
+      const reason = outcome === null || outcome === undefined ? "unavailable" : outcome.outcome;
+      notify(convener, mainT("main.planEscalation.notAnswered", { flowId: input.flowId, reason: String(reason) }));
+      return;
+    }
+    const selected = Array.isArray(outcome.value?.selected) ? String(outcome.value.selected[0] ?? "") : "";
+    let resultText: string;
+    switch (selected) {
+      case "escalation-revise":
+        resultText = mainT("main.planEscalation.result.revise", { flowId: input.flowId });
+        break;
+      case "escalation-environment":
+        resultText = mainT("main.planEscalation.result.environment", { flowId: input.flowId });
+        break;
+      case "escalation-continue":
+        resultText = mainT("main.planEscalation.result.continue", { flowId: input.flowId });
+        break;
+      case "escalation-stop":
+        resultText = mainT("main.planEscalation.result.stop", { flowId: input.flowId });
+        break;
+      default:
+        resultText = mainT("main.planEscalation.result.unknown", { flowId: input.flowId, selected });
+        break;
+    }
+    notify(convener, resultText);
+    if (chief !== convener) notify(chief, resultText);
+    if (selected === "escalation-revise") {
+      // 「修订方案」⇒ 请策划（rapporteur）按客户裁定重做方案（投一条消息；不自动改方案/文档/验收标准）。
+      const planner = "rapporteur";
+      const runtime =
+        this.findLiveRuntime(projectRoot, planner) ??
+        this.lastGovernanceRuntime.get(projectRoot) ??
+        this.activeRuntimeFor(projectRoot);
+      if (runtime !== undefined) {
+        // 运行时的投递政策（如生产宿主 `demoRuntimeAutoDeliver:false` 不自动开 demo 会话）由投递机统一裁决——
+        // 本层不按 runtime 种类静默丢弃客户裁定；消息入队保留，不伪造已投递。
+        const decisionKey = typeof outcome.decisionId === "string" && outcome.decisionId !== "" ? outcome.decisionId : input.requestId;
+        const text = mainT("main.planEscalation.revisePrompt", { flowId: input.flowId, requestId: input.requestId });
+        this.enqueueDelivery(projectRoot, planner, {
+          kind: "message",
+          runtime,
+          targetRoleId: planner,
+          sourceRoleId: convener,
+          text,
+          summary: shortenSummary(text, 120),
+          dedupKey: `${projectRoot}\u0000plan-escalation\u0000${input.flowId}\u0000${decisionKey}`,
+        });
+        void this.drainQueue(projectRoot, planner, runtime);
+      }
+    }
   }
 
   /**
@@ -2879,18 +3479,22 @@ export class SessionManager {
   }
 
   private async openInternal(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
+    if (req.taskId && this.runTaskIsFenced(req.projectRoot, req.taskId)) return { ok: false, error: "run-stop-host-fenced:原运行任务已暂停，未重新开启。" };
     const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
+    const lifecycle = this.deliveryLifecycle(key);
     const prev = this.openChains.get(key) ?? Promise.resolve();
     let release!: () => void;
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const tail: Promise<void> = prev.then(() => gate);
     this.openChains.set(key, tail);
+    this.inventoryChanged(req.projectRoot, "session-open-chain-queued");
     try {
       await prev;
-      return await this.openInternalUnsafe(req, userInitiated, selectionVersion);
+      return await this.openInternalUnsafe(req, userInitiated, selectionVersion, false, lifecycle);
     } finally {
       release();
       if (this.openChains.get(key) === tail) this.openChains.delete(key); // 链尾清理（防泄漏）
+      this.inventoryChanged(req.projectRoot, "session-open-chain-settled");
     }
   }
 
@@ -2899,12 +3503,31 @@ export class SessionManager {
    *  **不再查陈旧、不再入 rebuild 链**——① 防「链内等待自身尾」的自死锁（rebuildIfBoundaryStaleUnsafe 的
    * 重开处于该角色的 rebuild 链内，再入链会等自己）；② 此时旧条目已被本链 dispose；若并发方已重建出新会话，
    *  如实按续接返回（不重复重建——重开目标已达成）。 */
-  private async openInternalUnsafe(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion, internalReopen = false): Promise<OpenResult> {
+  private async openInternalUnsafe(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion, internalReopen = false,
+    lifecycle = this.deliveryLifecycle(this.sessionKey(req.projectRoot, req.roleId, req.runtime))): Promise<OpenResult> {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: mainT("main.session.missingProjectOrRole") };
     }
     if (!(RUNTIME_KINDS as readonly string[]).includes(req.runtime)) return { ok: false, error: mainT("main.common.unknownRuntime") };
     const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
+    const stopped = () => this.deliveryIsStopped(key) || this.deliveryLifecycle(key) !== lifecycle;
+    const stoppedResult = (): OpenResult => ({ ok: false, error: "会话已停止，待投递消息已保留；请显式打开会话或重试投递。" });
+    if (stopped()) return stoppedResult();
+    let requestedAssignment: DeliveryAssignment | undefined;
+    if (req.taskId) {
+      const actual = await resolveDeliveryAssignment({ projectRoot: req.projectRoot, recipientRoleId: req.roleId, source: { kind: "assigned-task", taskId: req.taskId } });
+      if (!actual.ok) return { ok: false, error: `${actual.code}:${actual.message}` };
+      if (stopped()) return stoppedResult();
+      requestedAssignment = actual.value;
+    }
+    // A worker's frozen document context and task-directory gate belong to one real assigned child.
+    const previousTaskSession = this.sessions.get(key);
+    if (req.taskId && (req.roleId === "verifier" || !isBuiltInGovernanceRoleId(req.roleId)) && previousTaskSession && previousTaskSession.assignedTaskId !== req.taskId) {
+      if (previousTaskSession.busy || previousTaskSession.origins.running !== undefined)
+        return { ok: false, error: "worker-task-session-busy：目标正在执行另一真实任务，保持排队。" };
+      const disposed = await this.disposeEntry(key, previousTaskSession);
+      if (disposed !== null) return { ok: false, error: disposed };
+    }
     // B-2：该角色已有**同项目**的保活会话 → 续接（句柄与模型上下文原样保留）。
     const existing = this.sessions.get(key);
     if (existing && existing.projectRoot === req.projectRoot) {
@@ -2998,10 +3621,21 @@ export class SessionManager {
     //
     // 角色表仍取门禁引擎的枚举结果（本层不另写解析，与左树同源）——载入器的 `project.roles` 只是 `.ans`
     // 分支的产物（`ans-invalid` 分支为空），桌面有意以**枚举角色**为准。
-    const { project, source } = await buildEffectiveProjectConfig(listing, {
+    const { project: baseProject, source } = await buildEffectiveProjectConfig(listing, {
       buildProjectConfig: this.deps.buildProjectConfig,
       loadEffectiveConfig: this.loadEffectiveConfig,
     });
+    let project = baseProject;
+    if (req.taskId && role.builtIn !== true) {
+      const assigned = await inspectAssignedTask({ projectRoot: req.projectRoot, taskId: req.taskId, actorRoleId: req.roleId });
+      if (!assigned.ok) return { ok: false, error: `${assigned.code}：${assigned.message ?? assigned.code}` };
+      if (assigned.value.kind !== "execution") return { ok: false, error: "worker-task-context-unavailable：缺少实际执行任务绑定。" };
+      const context = await readRunRoleContext({ projectRoot: req.projectRoot, runId: assigned.value.runId, roleId: req.roleId });
+      if (!context.ok) return { ok: false, error: `${context.code}：${context.message}` };
+      const taskScope = await prepareAssignedTaskWriteScope({ projectRoot: req.projectRoot, taskId: req.taskId, actorRoleId: req.roleId });
+      if (!taskScope.ok) return { ok: false, error: `${taskScope.code}：${taskScope.message ?? taskScope.code}` };
+      project = { ...project, documentContext: context.documentContext };
+    }
     const config: EffectiveConfigInfo = {
       kind: source.kind,
       accepted: source.acceptance.accepted === true,
@@ -3010,6 +3644,27 @@ export class SessionManager {
       reason: source.downgradeReason,
     };
     const boundary = role.boundary;
+    const gitBinding: { handle?: RoleSessionHandle } = {};
+    const currentGitRuntime = async () => {
+      const entry = this.sessions.get(key), origin = entry?.origins.running;
+      const current = () => !!entry && this.sessions.get(key) === entry && entry.handle === gitBinding.handle && entry.origins.running === origin &&
+        !!origin && !origin.settled && !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted && !this.deliveryIsStopped(key);
+      if (!current()) return { ok: false as const, code: "git-delivery-source-changed", message: "没有当前真实工具回合" };
+      let assignment = origin?.assignment;
+      if (assignment) {
+        const fresh = await resolveDeliveryAssignment({ projectRoot: req.projectRoot, recipientRoleId: req.roleId,
+          source: { kind: "assigned-task", taskId: assignment.taskId }, expectedFlowId: assignment.flowId,
+          ...(assignment.runId ? { expectedRunId: assignment.runId } : {}) });
+        if (!current()) return { ok: false as const, code: "git-delivery-source-changed", message: "核验期间工具回合已变化" };
+        if (!fresh.ok) return fresh;
+        assignment = fresh.value;
+        if (this.runTaskIsFenced(req.projectRoot, assignment.taskId, assignment.runId)) return { ok: false as const, code: "run-stop-host-fenced", message: "原运行的工具来源已暂停" };
+      }
+      return { ok: true as const, runtime: createGitRoleRuntime({ projectRoot: req.projectRoot, context: { actorRoleId: req.roleId, readPaths: ["."],
+        ...(assignment ? { taskId: assignment.taskId, ...(assignment.runId ? { runId: assignment.runId } : {}) } : {}) } }) };
+    };
+    const gitContextFailure = (operationId: string, failure: { code: string; message: string }) => ({ operationId, repoId: "unavailable",
+      status: "blocked" as const, code: failure.code, message: failure.message });
     let routineShellPolicy: RoutineShellPolicy | undefined;
     if (role.builtIn !== true && config.accepted) {
       routineShellPolicy = { enabled: true, projectRoot: req.projectRoot, authorizationSource: "customer-delegated-routine-checks" };
@@ -3072,10 +3727,14 @@ export class SessionManager {
     // 2026-10-29（方案 v2.1/Topology v4.1）：派发能力给幕僚（主链/验收调度）、运营（实现任务/验收核对）
     // 与 single/su；目标矩阵由 `routeDispatch` → `evaluateDispatchPreflight` 机械执行。
     const canDispatch = governanceFunction === "chief" || governanceFunction === "schedule" || legacyBuiltIn;
-    const dispatchTask: DispatchTaskFn | undefined =
-      canDispatch
-        ? (d: DispatchTaskPayload) => this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d) // Promise<DispatchReceipt>——契约允许（工具侧 await）
-        : undefined;
+    const dispatchBinding: { handle?: RoleSessionHandle } = {};
+    const dispatchTask: DispatchTaskFn | undefined = canDispatch ? (d, metadata) => {
+      const entry = this.sessions.get(key), origin = entry?.origins.running;
+      const source = entry?.handle === dispatchBinding.handle && origin &&
+        (!metadata || metadata.turnId === origin.turnId && (!metadata.roleId || metadata.roleId === req.roleId) &&
+          (!metadata.runtime || metadata.runtime === req.runtime)) ? { entry, origin } : undefined;
+      return this.routeDispatch(req.projectRoot, req.runtime, req.roleId, d, source);
+    } : undefined;
     // 2026-10-26 `view_image`（全部角色）：工具读取的图片作为**下一轮用户提示的图片附件**排队给**同一角色**。
     // 目标在开会话时定格（不认 `activeRoleId`，也不接受调用方改投）；投递经既有 `send` → 同一投递机——
     // 工具本轮内角色必然 busy ⇒ 按到达序入队，settle 后投递；直发失败/会话不可用如实回执。
@@ -3097,6 +3756,14 @@ export class SessionManager {
     // 2026-11-04 trunk-amendment-model D1：每项目版本变更/冻结/stable 栈（Interface 注入；缺省 ⇒
     // 不注入 `stablePermitOf`、不接 appointment-write 钩子——旧行为，能力缺席 = fail-closed）。
     const versionChangeStack = this.deps.getVersionChangeStack?.(req.projectRoot);
+    const direct = governanceModel === "trio" ? createDirectRoleRuntime({ projectRoot: req.projectRoot, actorRoleId: req.roleId, notifyDirect: input => this.queueDirectNotification(req.projectRoot, input) }) : undefined;
+    const closeCreatedTask: CloseCreatedTaskFn | undefined = direct !== undefined && (req.roleId === "chief" || req.roleId === "convener")
+      ? async (input, signal) => {
+          const result = await direct.closeCreatedTask(input, signal);
+          if (result.ok) void this.drainAllQueuesFor(req.projectRoot);
+          return result;
+        } : undefined;
+
     // Batch 3.5（C1d/S5）：三提交能力的桌面实现——**只提交**，不批准/不发卡/不签发许可。
     // 角色门控：product/rapporteur → submitVersionChange；convener → submitRefactor + requestStableWrite；
     // 其他角色不注入（run-role 仍二次门控；工具不存在 = fail-closed）。身份以 req.roleId 强制，
@@ -3127,6 +3794,21 @@ export class SessionManager {
               return {
                 ok: false,
                 errorCode: "refactor-invalid",
+                message: error instanceof Error ? error.message : String(error),
+              };
+            }
+          }
+        : undefined;
+    // 2026-11-05：方案升级报告（仅 convener；应用发行客户主权卡；不派发/不改需求或验收标准）。
+    const reportPlanEscalationCapability: PlanEscalationFn | undefined =
+      req.roleId === "convener"
+        ? async (input, signal) => {
+            try {
+              return await this.reportPlanEscalation(req.projectRoot, { ...input, roleId: req.roleId }, signal);
+            } catch (error) {
+              return {
+                ok: false,
+                errorCode: "plan-escalation-invalid" as const,
                 message: error instanceof Error ? error.message : String(error),
               };
             }
@@ -3172,12 +3854,14 @@ export class SessionManager {
       governanceFunction === "chief"
         ? async (payload) => {
             const runtime = this.findLiveRuntime(req.projectRoot, payload.roleId) ?? req.runtime;
+            const caller = this.sessions.get(this.sessionKey(req.projectRoot, req.roleId, req.runtime));
+            const callerOrigin = caller?.origins.running;
             return this.terminateRoleRun({
               projectRoot: req.projectRoot,
               roleId: payload.roleId,
               runtime,
               ...(payload.taskId !== undefined ? { taskId: payload.taskId } : {}),
-            });
+            }, caller && caller.handle === handle && callerOrigin ? { entry: caller, origin: callerOrigin } : undefined);
           }
         : undefined;
     const redispatchTaskCapability: RedispatchTaskFn | undefined =
@@ -3212,24 +3896,43 @@ export class SessionManager {
     // `governanceFunction === "nomination"`（Nominator）；single/su 保留旧行为。「未注入即不注册」=
     // 最强 fail-closed（项目角色零感知）。工具 handler 只把 `{roleId,name}` 载荷交进来；
     // 护栏/校验/激活/回执/系统行全在本层（`applySkillChange`）。
-    const installSkill: InstallSkillFn | undefined =
-      canNominate
-        ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("installed", req.projectRoot, req.runtime, req.roleId, d)
-        : undefined;
-    const uninstallSkill: UninstallSkillFn | undefined =
-      canNominate
-        ? (d: InstallSkillPayload, _metadata?: ReportHandbackMetadata) => this.applySkillChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
-        : undefined;
+    const installationBinding: { handle?: RoleSessionHandle } = {};
+    const scopedInstallation = (toolName: InstallationCapabilityTool): InstallSkillFn => {
+      const bindingId = randomUUID();
+      return async (payload, metadata) => {
+        const boundHandle = installationBinding.handle;
+        const entry = this.sessions.get(key);
+        const origin = boundHandle && entry?.handle === boundHandle ? entry.origins.running : undefined;
+        const stillCurrent = () => !!entry && !!origin && entry.handle === boundHandle && this.sessions.get(key) === entry &&
+          entry.busy && entry.origins.running === origin && !origin.settled &&
+          !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted &&
+          (!metadata || metadata.turnId === origin.turnId && (!metadata.roleId || metadata.roleId === req.roleId) &&
+            (!metadata.runtime || metadata.runtime === req.runtime));
+        const stillUnmanaged = async () => {
+          if (!stillCurrent()) return false;
+          try {
+            const scope = await readRoleCapabilityProtectionScope({ projectRoot: req.projectRoot });
+            return scope.state === "unmanaged" && stillCurrent();
+          } catch { return false; }
+        };
+        const refuse = () => this.refuseUnprovenInstallation(bindingId, toolName, req.projectRoot, req.roleId,
+          req.runtime, boundHandle, metadata);
+        if (!(await stillUnmanaged())) return refuse();
+        const action = toolName === "uninstall_skill" || toolName === "uninstall_mcp" ? "uninstalled" : "installed";
+        const result = toolName === "install_skill" || toolName === "uninstall_skill"
+          ? await this.applySkillChange(action, req.projectRoot, req.runtime, req.roleId, payload, stillUnmanaged)
+          : await this.applyMcpChange(action, req.projectRoot, req.runtime, req.roleId, payload, stillUnmanaged);
+        return !result.ok && result.reason === "effect-scope-unproven" ? refuse() : result;
+      };
+    };
+    // Fresh scope is only a compatibility selector; protected/unknown effects use Core's identity-bound gate.
+    // Ordinary desktop observations never substitute for that authoritative callback binding.
+    const installSkill: InstallSkillFn | undefined = canNominate ? scopedInstallation("install_skill") : undefined;
+    const uninstallSkill: UninstallSkillFn | undefined = canNominate ? scopedInstallation("uninstall_skill") : undefined;
     // G-4 V2（2026-10-16 客户批准；同处注入）：**外来 MCP 安装/卸载能力**——与技能两工具**逐字同构**
     // （仅 nomination；「未注入即不注册」）；护栏/校验（声明）/激活/回执/系统行全在本层（`applyMcpChange`）。
-    const installMcp: InstallMcpFn | undefined =
-      canNominate
-        ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("installed", req.projectRoot, req.runtime, req.roleId, d)
-        : undefined;
-    const uninstallMcp: UninstallMcpFn | undefined =
-      canNominate
-        ? (d: InstallMcpPayload, _metadata?: ReportHandbackMetadata) => this.applyMcpChange("uninstalled", req.projectRoot, req.runtime, req.roleId, d)
-        : undefined;
+    const installMcp: InstallMcpFn | undefined = canNominate ? scopedInstallation("install_mcp") : undefined;
+    const uninstallMcp: UninstallMcpFn | undefined = canNominate ? scopedInstallation("uninstall_mcp") : undefined;
 
     // (a) 操作者确认通道（I-1 arm）：项目角色 → 编排装配 (c)/(b)/(a) 三层链；
     // **全部内置治理角色**（`role.builtIn === true`）→ 经下方 `shellOperatorOnly` 装配**审批档**。
@@ -3309,7 +4012,7 @@ export class SessionManager {
                 const registered = await baseAfterWrite(absPath);
                 if (registered === false) return false;
               } else {
-                const registered = await registerVersionedDocAfterWrite({
+                const registered = await registerVersionedDocumentAfterWrite({
                   projectRoot: req.projectRoot,
                   absPath,
                   recordedBy: "app:session",
@@ -3378,6 +4081,38 @@ export class SessionManager {
         governanceJudge = undefined;
       }
     }
+    const chiefDecision: ChiefDecisionHost | undefined = governanceModel !== "trio" ? undefined : {
+      prepare: async (request, metadata) => {
+        if (this.deps.prepareChiefDecisionEvidence === undefined) throw new Error("幕僚决策材料准备能力不可用；保留请求等待接管");
+        return this.deps.prepareChiefDecisionEvidence({ projectRoot: req.projectRoot, originRoleId: req.roleId, request, metadata });
+      },
+      execute: async (context, evidence, decidePendingRequest, signal) => {
+        if (signal.aborted || interactionState.lifetime.signal.aborted) throw new Error("幕僚委托已撤销");
+        // Independent handle, same trusted project/runtime adapter. Never enters the busy chief's queue.
+        const boundedSignal = AbortSignal.any([signal, interactionState.lifetime.signal, AbortSignal.timeout(context.limits.timeoutMs)]);
+        let handle: RoleSessionHandle | undefined;
+        const stop = () => { void handle?.abort?.().catch(() => undefined); };
+        let cancelled: (() => void) | undefined;
+        const aborted = new Promise<never>((_, reject) => {
+          cancelled = () => { stop(); reject(new Error("幕僚独立决策已取消或达到预算")); };
+          boundedSignal.addEventListener("abort", cancelled, { once: true });
+          if (boundedSignal.aborted) cancelled();
+        });
+        const opening = this.openObservedRoleSession({ roleId: "chief", project, runtime: req.runtime,
+          chiefDecisionContext: context, decidePendingRequest }, { createAdapter });
+        void opening.then(late => { if (boundedSignal.aborted && handle !== late) void this.disposeObservedHandle(late).catch(() => undefined); }, () => undefined);
+        try {
+          handle = await Promise.race([opening, aborted]);
+          if (boundedSignal.aborted) throw new Error("幕僚委托已撤销");
+          const consume = (async () => { for await (const _event of handle!.events()) { /* isolated decision stream */ } })();
+          void consume.catch(() => undefined);
+          await Promise.race([handle.send(JSON.stringify({ request: context.request, evidence })), aborted]);
+        } finally {
+          if (cancelled !== undefined) boundedSignal.removeEventListener("abort", cancelled);
+          if (handle !== undefined) await this.disposeObservedHandle(handle);
+        }
+      },
+    };
     // 客户卡通道路由上下文（客户交互通道与需求变更审批卡**共用同一份**构造）：judge 闭包与 turnText
     // 在调用当刻从活会话条目读取（会话已销毁 ⇒ 缺省，通道不判断）；`metadata` 由调用方原样透传。
     const buildCustomerInputContext = (
@@ -3396,6 +4131,7 @@ export class SessionManager {
         governanceModel,
         ...(mirrorRoleId !== undefined ? { mirrorRoleId } : {}),
         ...(judge !== undefined ? { governanceJudge: judge } : {}),
+        ...(chiefDecision !== undefined ? { chiefDecision } : {}),
         ...(typeof turnText === "string" && turnText !== "" ? { turnText } : {}),
         // 写盘确认的应用层兜底（2026-10-25 客户新规则）：本会话的 Section 1 快照 +
         // resolveWrite 的 skill 根（同一份 ProjectConfig）。缺省 ⇒ 通道不做预授权判定。
@@ -3501,9 +4237,11 @@ export class SessionManager {
       // `src/pipeline/orchestration/govern-session.ts` 的 `effectiveScope` 处，本层不复制）。
       // 桌面是否统一改走该入口：另行评估（更正记录见
       // `角色卡/桌面应用/docs/change/2026-10-12_change_session-comment-refresh.md`）。
-      handle = await this.deps.openRoleSession(
+      if (stopped()) return stoppedResult();
+      handle = await this.openObservedRoleSession(
         {
           roleId: req.roleId,
+          ...(req.taskId ? { taskId: req.taskId } : {}),
           runtime: req.runtime,
           project,
           ...(routineShellPolicy ? { routineShellPolicy } : {}),
@@ -3565,8 +4303,17 @@ export class SessionManager {
             ? { stablePermitOf: (rel: string) => versionChangeStack.stablePermitOf(rel) }
             : {}),
           // Batch 3.5（C1d/S5）：三提交能力（角色门控在本层；run-role 二次门控；只提交不批准）。
+          gitQuery: async (input, signal) => { const current = await currentGitRuntime(); return current.ok ? current.runtime.gitQuery(input, signal) : gitContextFailure(input.operationId, current); },
+          gitCandidate: async (input, signal) => { const current = await currentGitRuntime(); return current.ok ? current.runtime.gitCandidate(input, signal) : gitContextFailure(input.operationId, current); },
+          gitPublish: async (input, signal) => { const current = await currentGitRuntime(); return current.ok ? current.runtime.gitPublish(input, signal) : gitContextFailure(input.operationId, current); },
+          ...(direct !== undefined && req.roleId === "rapporteur" ? { selectRunChange: (input, signal) => input.mode === "continue-frozen"
+            ? direct.selectRunChange(input, signal) : this.selectRunChangeForHandle(req.projectRoot, req.runtime, gitBinding.handle, input, signal) } : {}),
+          ...(direct !== undefined && req.roleId === "convener" ? { completeTeamPlan: direct.completeTeamPlan } : {}),
+          ...(direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
+          ...(closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
           ...(submitVersionChangeCapability ? { submitVersionChange: submitVersionChangeCapability } : {}),
           ...(submitRefactorCapability ? { submitRefactor: submitRefactorCapability } : {}),
+          ...(reportPlanEscalationCapability ? { reportPlanEscalation: reportPlanEscalationCapability } : {}),
           ...(requestStableWriteCapability ? { requestStableWrite: requestStableWriteCapability } : {}),
           // 2026-11-04 下载申请（W-1）：每会话能力；未注入 ⇒ 编排/运行时核心不注册 `request_download`。
           ...(requestDownload ? { requestDownload } : {}),
@@ -3613,9 +4360,14 @@ export class SessionManager {
         },
         { createAdapter },
       );
+      installationBinding.handle = handle;
+      dispatchBinding.handle = handle;
+      gitBinding.handle = handle;
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
+
+    if (stopped()) { await this.disposeObservedHandle(handle); return stoppedResult(); }
 
     // O-1：**边界快照指纹**定格（角色边界文件 + 项目治理边界文件（若有）+ `.ans/project.json`）——
     // 这些文件都参与**开会话时**的边界解析（`buildEffectiveProjectConfig` + 门禁 `resolveBoundarySection`）；
@@ -3639,8 +4391,11 @@ export class SessionManager {
     for (const f of skillPaths) boundaryPaths.push(f);
     for (const f of skillPaths) boundaryPrints[path.relative(req.projectRoot, f)] = await filePrint(f);
 
+    if (stopped()) { await this.disposeObservedHandle(handle); return stoppedResult(); }
     const entry: LiveSession = {
       handle,
+      ...(req.taskId && (role.builtIn !== true || req.roleId === "verifier") ? { assignedTaskId: req.taskId } : {}),
+      ...(requestedAssignment ? { boundAssignment: requestedAssignment } : {}),
       origins: { byTurn: new Map() },
       roleId: req.roleId, runtime: req.runtime, profileRevision, interactionState,
       projectRoot: req.projectRoot,
@@ -3722,10 +4477,11 @@ export class SessionManager {
    */
   private consume(key: string, entry: LiveSession): void {
     const { roleId, handle, projectRoot, runtime } = entry;
-    void (async () => {
+    entry.eventConsumerDone = (async () => {
       try {
         for await (const ev of handle.events()) {
           if (this.sessions.get(key) !== entry) break;
+          this.inventoryChanged(projectRoot, "runtime-event-observed");
           const origin = this.captureDeliveryOrigin(entry, ev);
           if (origin && ev.kind === 'message') {
             const detail = ev.detail as { source?: unknown; text?: unknown } | undefined;
@@ -3931,8 +4687,10 @@ export class SessionManager {
           } catch {
             // 外推失败（如窗口已关）不得影响会话本身。
           }
+          if (ev.kind === "settled" && origin && origin.settled) this.resumeDeferredRunChanges(entry, origin);
         }
       } catch (err) {
+        entry.eventConsumerFailed = true;
         createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("session.events.failed", err);
         if (this.sessions.get(key) !== entry) return;
         entry.interactionState.turn.abort();
@@ -3945,6 +4703,10 @@ export class SessionManager {
         });
       }
     })();
+    void entry.eventConsumerDone.catch(error => {
+      entry.eventConsumerFailed = true;
+      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("session.events.completion.failed", error);
+    });
   }
 
   /** 发送一轮消息给**当前活动会话**（最近一次 open 的角色）；可反复调用。
@@ -4043,8 +4805,8 @@ export class SessionManager {
     // 忙态将**永不复位**（队列也永不放行）。失败 ⇒ 复位 + 外推（并没有在跑，如实）。
     const origin = this.beginDeliveryOrigin(entry, clientMessageId);
     if (origin === undefined) return queueBecauseBusy(); // turn lease 争用（同步段不可达；防御：入队不覆盖）
-    // 直接投出的治理唤醒同样带 system 类别（与入队条目同口径；客户消息不设，既有语义不变）。
-    if (deliveryKind === "system") origin.kind = "system";
+    // Direct and queued inputs retain the same actual source kind, including customer messages.
+    origin.kind = deliveryKind;
     entry.interactionState.turn = new AbortController();
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准；busy 期间才被读取）
@@ -4102,6 +4864,8 @@ export class SessionManager {
     }
     try {
       // 中止标记（链式治理推进的早失败护栏）：被请求中止 ≠ 正常结束——链路继续轮询等下一次投递/重试。
+      recordGitHostInterruption({ projectRoot: entry.projectRoot, reason: "desktop-turn-abort-requested", coreSessionId: entry.handle.sessionId });
+      this.inventoryChanged(entry.projectRoot, "turn-abort-requested");
       entry.lastTurnAborted = true;
       entry.interactionState.turn.abort();
       const result = await entry.handle.abort();
@@ -4177,7 +4941,20 @@ export class SessionManager {
   async stop(target?: string | SessionTarget | null): Promise<StopResult> {
     let roleId: string | undefined;
     if (target !== undefined && target !== null) roleId = this.targetKey(target);
-    if (target && roleId === undefined) return { ok: false, note: mainT("main.session.stopNoMatch") };
+    if (target && roleId === undefined) return this.finishStopPersistence({ ok: false, note: mainT("main.session.stopNoMatch") });
+    for (const manager of desktopSessionManagers) for (const operation of manager.runChangeOperations.values()) {
+      const members = operation.plan.handles.filter(member => this.observedHandles.has(member.hostHandleId));
+      if (manager !== this && !members.length) continue;
+      if (!roleId || members.some(member => { const row = this.observedHandles.get(member.hostHandleId)!;
+        return this.sessionKey(operation.plan.projectRoot, member.roleId, row.fact.runtime) === roleId; })) operation.controller.abort();
+    }
+    // Fence before the first await, even if no live entry remains after a failed open.
+    if (roleId) {
+      this.stoppedDeliveryKeys.add(roleId); this.resumedDeliveryKeys.delete(roleId);
+      this.deliveryKeyStopVersions.set(roleId, (this.deliveryKeyStopVersions.get(roleId) ?? 0) + 1);
+    } else {
+      ++this.deliveryStopVersion; this.deliveryStoppedAll = true; this.resumedDeliveryKeys.clear();
+    }
     createDiagnosticLogger({ component: "desktop.session", roleId: roleId ?? undefined }).record("session.stop", { count: this.sessions.size });
     if (typeof roleId !== "string" || roleId === "" || roleId === this.selectionTargetRoleId) {
       ++this.selectionVersion;
@@ -4193,15 +4970,15 @@ export class SessionManager {
     if (typeof roleId === "string" && roleId !== "") {
       const entry = this.sessions.get(roleId);
       if (!entry) {
-        return { ok: false, note: mainT("main.session.releaseNoSession", { roleId }) };
+        return this.finishStopPersistence({ ok: false, note: mainT("main.session.releaseNoSession", { roleId }) });
       }
       const err = await this.disposeEntry(roleId, entry);
-      return err === null
+      return this.finishStopPersistence(err === null
         ? { ok: true, note: mainT("main.session.releasedRole", { roleId }) }
-        : { ok: false, note: mainT("main.session.releaseError", { detail: String(err) }) };
+        : { ok: false, note: mainT("main.session.releaseError", { detail: String(err) }) });
     }
     if (this.sessions.size === 0) {
-      return { ok: false, note: mainT("main.session.noOpenSessions") };
+      return this.finishStopPersistence({ ok: false, note: mainT("main.session.noOpenSessions") });
     }
     const n = this.sessions.size;
     let firstError: string | null = null;
@@ -4211,8 +4988,8 @@ export class SessionManager {
       const err = await this.disposeEntry(id, entry);
       if (err !== null && firstError === null) firstError = err;
     }
-    if (firstError !== null) return { ok: false, note: mainT("main.session.releaseError", { detail: String(firstError) }) };
-    return { ok: true, note: n === 1 ? mainT("main.session.closed") : mainT("main.session.closedAll", { count: n }) };
+    if (firstError !== null) return this.finishStopPersistence({ ok: false, note: mainT("main.session.releaseError", { detail: String(firstError) }) });
+    return this.finishStopPersistence({ ok: true, note: n === 1 ? mainT("main.session.closed") : mainT("main.session.closedAll", { count: n }) });
   }
 
   /** 是否还有**任何**保活会话（B-2：不再是「唯一句柄」语义）。 */
@@ -4273,13 +5050,22 @@ export class SessionManager {
   }
 
   /** B 批：追加任务事件；失败只记诊断并返回 false（调用方决定是否 fail-closed）。 */
+  private async appendTaskStateResult(projectRoot: string, event: TaskStateEvent): ReturnType<typeof recordTaskObservation> {
+    const result = await recordTaskObservation({ projectRoot, event });
+    if (!result.ok) createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("tasks.append.failed", new Error(result.message),
+      { taskId: "taskId" in event ? event.taskId : undefined, reasonCode: result.code });
+    return result;
+  }
   private async appendTaskState(projectRoot: string, event: TaskStateEvent): Promise<boolean> {
-    const result = await appendTaskEvent(projectRoot, event);
-    if (!result.ok) {
-      createDiagnosticLogger({ component: "desktop.session", projectRoot }).error("tasks.append.failed", new Error(result.message), { taskId: (event as { taskId?: string }).taskId });
-      return false;
-    }
-    return true;
+    return (await this.appendTaskStateResult(projectRoot, event)).ok;
+  }
+
+  private async recordTaskFailure(projectRoot: string, taskId: string, summary: string): Promise<boolean> {
+    const created = (await this.readTasks(projectRoot)).records.get(taskId)?.created;
+    if (created === undefined) return false;
+    return this.appendTaskState(projectRoot, taskEvent("task.reported", {
+      taskId, from: created.to, status: "failed", summary: shortenSummary(`应用观察到失败：${summary}`),
+    }, () => new Date(this.now())));
   }
 
   /** B 批：每角色运行日志观察器（应用侧写，不依赖角色上报；失败只诊断、绝不打断事件循环）。 */
@@ -4390,7 +5176,7 @@ export class SessionManager {
       ? after.then(() => this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now()))))
       : this.appendTaskState(projectRoot, taskEvent("request.notified", { requestId, to: "chief", event }, () => new Date(this.now())));
     const labels: Record<typeof event, string> = { created: "已提交", presented: "已呈现", resolved: "已裁决" };
-    const text = `[系统·申请] ${labels[event]}：角色「${sourceRoleId}」的申请「${shortenSummary(title, 80)}」（#${requestId}）${detail !== undefined && detail !== "" ? `｜${shortenSummary(detail, 120)}` : ""}。申请直达客户/应用裁决，幕僚不转发、不审批、不代选。`;
+    const text = `[系统·申请] ${labels[event]}：角色「${sourceRoleId}」的申请「${shortenSummary(title, 80)}」（#${requestId}）${detail !== undefined && detail !== "" ? `｜${shortenSummary(detail, 120)}` : ""}。申请保持原发起者与回报链；裁决者以结果来源为准。`;
     try {
       const target = this.chiefTaskRoleIdOf(projectRoot) ?? this.handbackOwnerRoleId(projectRoot) ?? "";
       const targetRuntime = this.findLiveRuntime(projectRoot, target) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
@@ -4406,12 +5192,12 @@ export class SessionManager {
     return write.then(() => undefined, () => undefined);
   }
 
-  private async recordRequestPresented(projectRoot: string, requestId: string, sourceRoleId: string, title: string, to: "customer" | "judge", notify = true): Promise<void> {
+  private async recordRequestPresented(projectRoot: string, requestId: string, sourceRoleId: string, title: string, to: "customer" | "judge" | "chief", notify = true): Promise<void> {
     const key = `${requestId}\u0000${to}`;
     if (this.requestPresentedKeys.has(key)) return;
     this.requestPresentedKeys.add(key);
     await this.appendTaskState(projectRoot, taskEvent("request.presented", { requestId, to }, () => new Date(this.now())));
-    if (notify) await this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "judge" ? "判断 agent" : "客户");
+    if (notify) await this.notifyRequest(projectRoot, requestId, sourceRoleId, title, "presented", to === "chief" ? "幕僚委托" : to === "judge" ? "判断 agent" : "客户");
   }
 
   /**
@@ -4887,7 +5673,7 @@ export class SessionManager {
         // 呈现回调只服务审计/下载 presenter 的 requestId 上报；异常不得影响已完成的呈现/结算。
       }
     };
-    const markPresented = (to: "customer" | "judge"): Promise<void> => {
+    const markPresented = (to: "customer" | "judge" | "chief"): Promise<void> => {
       if (aborted) return Promise.resolve();
       if (presentedWrite !== null) return presentedWrite;
       presented = true;
@@ -4902,6 +5688,7 @@ export class SessionManager {
       ...(acceptanceReport !== undefined ? { acceptanceReport } : {}),
       ...(lifecycle?.judgeNotice !== undefined ? { judgeNotice: lifecycle.judgeNotice } : {}),
     });
+    context.requestId = requestId;
     const abortedOutcome: CustomerInputOutcome = {
       outcome: "declined",
       operatorId: "system:initiator-aborted",
@@ -4971,6 +5758,8 @@ export class SessionManager {
       await appendAborted();
       return abortedOutcome;
     }
+    const chiefSource = out !== null && out !== undefined && out.outcome !== "unavailable"
+      && out.actionSource?.kind === "chief-delegated" ? out.actionSource : undefined;
     const answeredOut = out !== null && out !== undefined && out.outcome === "answered" ? out : undefined;
     const operatorId = out !== null && out !== undefined && "operatorId" in out && typeof out.operatorId === "string" ? out.operatorId : undefined;
     // Q9 A（2026-11-03）：指令归属只从 `operatorId:"directive:<id>"` 解析；不伪造 `request.presented.to`
@@ -4986,7 +5775,10 @@ export class SessionManager {
     // answered，会误写成 customer 且不记 presented）。限定 cardKind==="download"，其他卡种行为不变。
     const downloadJudge = request.cardKind === "download" && judgeOrigin;
     const resolvedByJudge = judged || downloadJudge;
-    if (resolvedByJudge && !presented && (answeredOut !== undefined || downloadJudge)) {
+    if (chiefSource !== undefined && !presented) {
+      await markPresented("chief");
+      notifyPresented();
+    } else if (resolvedByJudge && !presented && (answeredOut !== undefined || downloadJudge)) {
       await markPresented("judge");
       notifyPresented();
     } else if (presentedWrite !== null) await presentedWrite;
@@ -4996,7 +5788,8 @@ export class SessionManager {
     const selected = answeredOut?.value.selected ?? [];
     // 2026-10-29（方案 v2.1 §5.4/M4/M11）：裁决 id 回填给工具回执（appointment-write 的凭据）；
     // 招人卡同时记录**当前最新名单**的版本与 hash（应用计算，模型不可自报）。
-    const decisionId = answeredOut !== undefined ? `decision-${requestId}` : undefined;
+    const decisionId = answeredOut !== undefined && chiefSource === undefined ? `decision-${requestId}` : undefined;
+    if (answeredOut !== undefined && chiefSource !== undefined) delete answeredOut.decisionId;
     if (answeredOut !== undefined && decisionId !== undefined) answeredOut.decisionId = decisionId;
     let rosterStamp: { rosterVersion?: number; rosterSha256?: string } = {};
     if (request.cardKind === "appointment" && answeredOut !== undefined) {
@@ -5018,7 +5811,8 @@ export class SessionManager {
       ...(selected.length > 0 && request.cardKind !== "appointment" ? { selectedOptionIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
       ...(metadata?.taskId !== undefined ? { taskId: metadata.taskId } : {}),
-      by: directiveId !== undefined ? "directive" : resolvedByJudge ? "judge" : "customer",
+      by: chiefSource !== undefined ? "chief-delegated" : directiveId !== undefined ? "directive" : resolvedByJudge ? "judge" : "customer",
+      ...(chiefSource !== undefined ? { actionSource: chiefSource } : {}),
       ...(directiveId !== undefined ? { directiveId } : {}),
       ...(operatorId !== undefined ? { operatorId } : {}),
       choice,
@@ -6055,7 +6849,115 @@ export class SessionManager {
    * **终止角色当前轮次 + 后台子进程树**（B-08）。失败/无法确认 ⇒ `terminationConfirmed:false`，
    * 调用方（重派）不得自动重派。记录 `role.terminated`（子进程数/退出/信号）到运行日志。
    */
-  async terminateRoleRun(input: TerminateRoleRunInput): Promise<TerminateRoleRunResult> {
+  private controllerProducerFacts(projectRoot: string, taskId: string, caller: ActualDispatchSource): DesktopControllerStopFact["knownProducers"] | undefined {
+    const claims = [...this.drainClaimRecords].filter(row => row.projectRoot === projectRoot &&
+      !(row.owner?.entry === caller.entry && row.owner.origin === caller.origin));
+    if (claims.some(row => !row.taskIds?.length)) return undefined;
+    const key = `${projectRoot}\u0000${taskId}`;
+    return { openChains: [...this.openChains.keys()].filter(key => key.startsWith(`${projectRoot}\u0000convener\u0000`)).length,
+      deliveryClaims: claims.filter(row => row.taskIds?.includes(taskId)).length + (this.taskDeliveryCommits.has(key) ? 1 : 0),
+      handbackCommits: this.taskHandbackCommits.has(key) ? 1 : 0 };
+  }
+
+  private async stopExactController(input: TerminateRoleRunInput, caller?: ActualDispatchSource): Promise<TerminateRoleRunResult> {
+    const base: TerminateRoleRunResult = { ok: false, roleId: input.roleId, terminationConfirmed: false, childProcesses: 0, childProcessesStopped: 0,
+      childResults: [], partialArtifacts: [], isolatedArtifacts: [], sessionFresh: false, abort: { ok: false, supported: false } };
+    const blocked = (code: string, message: string): TerminateRoleRunResult => ({ ...base, message: `${code}：${message}` });
+    const current = () => !!caller && caller.entry.roleId === "chief" && caller.entry.projectRoot === input.projectRoot &&
+      this.sessions.get(this.sessionKey(input.projectRoot, "chief", caller.entry.runtime)) === caller.entry && caller.entry.origins.running === caller.origin &&
+      caller.entry.busy && !caller.origin.settled && !caller.entry.interactionState.lifetime.signal.aborted && !caller.entry.interactionState.turn.signal.aborted;
+    if (!input.taskId) return blocked("controller-stop-task-required", "受管运营停止必须明确真实任务，未按角色猜测当前目标。");
+    if (!caller?.entry.handle.sessionId || !caller.origin.turnId || !current()) return blocked("controller-stop-caller-unproven", "缺少当前真实幕僚终止调用，未停止。");
+    const prepared = await prepareControllerStop({ projectRoot: input.projectRoot, taskId: input.taskId, chiefCoreSessionId: caller.entry.handle.sessionId, chiefTurnId: caller.origin.turnId });
+    if (!current()) return blocked("controller-stop-source-changed", "准备期间发起回合已变化。");
+    if (!prepared.ok) return blocked(prepared.code, prepared.message);
+    const plan = prepared.value;
+    if (plan.scope.taskId !== input.taskId || plan.scope.actorRoleId !== "convener" || plan.scope.creatorRoleId !== "chief" ||
+        plan.requesterCoreSessionId !== caller.entry.handle.sessionId || plan.requesterTurnId !== caller.origin.turnId)
+      return blocked("controller-stop-target-mismatch", "公开停止计划与真实目标不一致。");
+    const owned = this.ownedRunStopMembers(plan); if (!owned.ok) return blocked(owned.code, owned.message);
+    for (const [manager, members] of owned.groups) {
+      if (!manager.controllerProducerFacts(input.projectRoot, input.taskId, caller)) return blocked("controller-stop-producer-unknown", "目标投递认领归属尚未核实。");
+      if (members.some(({ member }) => manager.executionInventoryFacts(input.projectRoot).sessions.find(row => row.hostHandleId === member.hostHandleId)?.runId !== plan.scope.runId))
+        return blocked("controller-stop-target-mismatch", "目标当前任务或运行已变化。");
+    }
+    const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "session-dispose" });
+    if (!lease.ok) return blocked(lease.code, "项目正在进行另一真实宿主动作，未停止。");
+    const heldLease: ControllerDisposalLease = { projectRoot: input.projectRoot, leaseId: lease.leaseId, operationId: plan.operationId, kind: "session-dispose", hostHandleIds: plan.handles.map(member => member.hostHandleId) };
+    this.controllerDisposalOwners.add(heldLease);
+    let activeLease: { projectRoot: string; leaseId: string } | undefined = heldLease;
+    const signal = AbortSignal.any([caller.entry.interactionState.lifetime.signal, caller.entry.interactionState.turn.signal]);
+    let outcome: TerminateRoleRunResult = blocked("controller-stop-incomplete", "停止未完成。");
+    try {
+      outcome = await (async (): Promise<TerminateRoleRunResult> => {
+        for (const [manager, members] of owned.groups) {
+          const tasks = manager.fencedRunTasks.get(input.projectRoot) ?? new Set<string>(); tasks.add(plan.scope.taskId); manager.fencedRunTasks.set(input.projectRoot, tasks);
+          const producers = manager.controllerProducerFacts(input.projectRoot, plan.scope.taskId, caller); if (!producers) return blocked("controller-stop-producer-unknown", "目标归属已变化。");
+          manager.controllerStopFacts.set(`${input.projectRoot}\u0000${plan.operationId}`, { projectRoot: input.projectRoot, fact: {
+            managerId: manager.managerId, operationId: plan.operationId, taskId: plan.scope.taskId, runId: plan.scope.runId, requestDigest: plan.requestDigest,
+            generation: ++manager.runStopGeneration, state: "fenced", hostHandleIds: members.map(row => row.member.hostHandleId), targetSeq: manager.deliveryPersistSeq, knownProducers: producers } });
+          manager.inventoryChanged(input.projectRoot, "controller-stop-producers-fenced");
+        }
+        for (const [manager, members] of owned.groups) for (const { member, handle } of members) {
+          if (!current() || signal.aborted) return blocked("controller-stop-cancelled", "发起回合已取消。");
+          const before = handle.inspectLifecycle?.();
+          if (before?.sessionId !== member.coreSessionId || before.native?.instanceId !== member.nativeInstanceId)
+            return blocked("controller-stop-instance-changed", "原Core或native实例已变化，未停止错误实例。");
+          const stopped = await handle.stopAndInspect!({ expectedSessionId: member.coreSessionId, ...(before.turnId ? { expectedTurnId: before.turnId } : {}), timeoutMs: 5000 }, signal);
+          if (stopped.sessionId !== member.coreSessionId || stopped.native?.instanceId !== member.nativeInstanceId || stopped.status !== "quiescent" || !stopped.providerFinished || stopped.activeTools.length)
+            return blocked("controller-stop-terminal-unproven", "原实例尚未排空，未确认停止。");
+          const entry = [...manager.sessions.entries()].find(([, value]) => value.handle === handle);
+          if (entry) {
+            await manager.disposeObservedHandle(handle, heldLease); await entry[1].eventConsumerDone;
+            if (entry[1].eventConsumerFailed) return blocked("controller-stop-event-consumer-unproven", "原实例事件消费失败。");
+            const error = await manager.disposeEntry(entry[0], entry[1], heldLease); if (error) return blocked("controller-stop-dispose-failed", error);
+          }
+        }
+        for (const [manager] of owned.groups) {
+          const claims = await manager.waitForRunStopDeliveryClaims({ projectRoot: input.projectRoot, taskIds: [plan.scope.taskId], signal, caller });
+          if (claims.status !== "wait-complete") return blocked(claims.code, "目标认领尚未结束。");
+          const key = `${input.projectRoot}\u0000${plan.scope.taskId}`;
+          await Promise.all([manager.taskDeliveryCommits.get(key)?.done, manager.taskHandbackCommits.get(key)]);
+          const producers = manager.controllerProducerFacts(input.projectRoot, plan.scope.taskId, caller);
+          if (!producers || Object.values(producers).some(count => count !== 0)) return blocked("controller-stop-producers-unproven", "目标仍有在途生产者，未确认停止。");
+          const cutoff = await manager.finishStopPersistence({ ok: true, note: "" });
+          if (!cutoff.ok || !cutoff.deliveryQueuePersistence) return blocked("controller-stop-cutoff-unproven", cutoff.note);
+          const row = manager.controllerStopFacts.get(`${input.projectRoot}\u0000${plan.operationId}`)!;
+          row.fact = { ...row.fact, targetSeq: cutoff.deliveryQueuePersistence.targetSeq, knownProducers: producers };
+          manager.inventoryChanged(input.projectRoot, "controller-stop-cutoff-completed");
+          if (manager.inventoryPublicationErrors.has(input.projectRoot)) return blocked("controller-stop-inventory-unavailable", "真实停止事实发布失败。");
+        }
+        const expectedHandles = plan.handles.map(member => member.hostHandleId).sort();
+        if (!current() || signal.aborted || !this.controllerDisposalOwners.has(heldLease) || heldLease.projectRoot !== plan.projectRoot ||
+            heldLease.operationId !== plan.operationId || heldLease.kind !== "session-dispose" || heldLease.leaseId !== lease.leaseId ||
+            JSON.stringify([...heldLease.hostHandleIds].sort()) !== JSON.stringify(expectedHandles) ||
+            [...owned.groups].some(([manager, members]) => members.some(({ handle }) => !manager.ownsControllerDisposal(handle, heldLease))))
+          return blocked("controller-stop-disposal-owner-changed", "原停止操作或精确句柄归属已变化。");
+        // Core stop/dispose truthfully interrupted the effect lease. End only our own lease, then
+        // acquire an inspection-only lease in this synchronous stack; this is not OS/process atomicity.
+        const endedEffects = endGitHostAction({ projectRoot: heldLease.projectRoot, leaseId: heldLease.leaseId });
+        if (!endedEffects.ok) return blocked(endedEffects.code, "原停止动作的协调未能结束，不能进行最终核验。");
+        const inspection = beginGitHostAction({ projectRoot: input.projectRoot, kind: "session-dispose", expectedCoordinatorRevision: endedEffects.coordinatorRevision });
+        activeLease = inspection.ok ? { projectRoot: input.projectRoot, leaseId: inspection.leaseId } : undefined;
+        this.controllerDisposalOwners.delete(heldLease);
+        if (!inspection.ok) return blocked(inspection.code, "最终停止核验尚未取得当前协调边界。");
+        const finalized = await finalizeControllerStop({ projectRoot: input.projectRoot, plan, hostLeaseId: inspection.leaseId }, signal);
+        if (!finalized.ok) return blocked(finalized.code, finalized.message);
+        this.appendRoleActivity(input.projectRoot, "convener", { kind: "role.terminated", taskId: plan.scope.taskId, status: "confirmed",
+          summary: `原运营任务已精确停止：${finalized.operationId}；未关闭任务、未取消整run、未批准质量或发布。` });
+        return { ...base, ok: true, terminationConfirmed: true, childProcesses: finalized.childProcesses, childProcessesStopped: finalized.childProcessesStopped,
+          sessionFresh: true, abort: { ok: true, supported: true }, message: finalized.message };
+      })();
+    } catch (error) { outcome = blocked("controller-stop-host-failed", error instanceof Error ? error.message : String(error)); }
+    finally {
+      const ended = activeLease ? endGitHostAction(activeLease) : undefined; this.controllerDisposalOwners.delete(heldLease);
+      if (ended && !ended.ok) outcome = blocked(ended.code, "原停止动作的宿主协调尚未完成，不能确认停止。");
+    }
+    return outcome;
+  }
+
+  async terminateRoleRun(input: TerminateRoleRunInput, chiefSource?: ActualDispatchSource): Promise<TerminateRoleRunResult> {
+    if (input.roleId === "convener") return this.stopExactController(input, chiefSource);
     const projectRoot = input.projectRoot;
     const roleId = input.roleId;
     const runtime = input.runtime;
@@ -6164,16 +7066,7 @@ export class SessionManager {
         ...(isolation.stagingDir !== undefined ? { ref: isolation.stagingDir } : {}),
       });
     }
-    // B-07：终止成功 ⇒ 标记任务失败（保留未收口，供幕僚决定重派/升级；不伪造角色提交的报告）。
-    if (terminationConfirmed && input.taskId !== undefined) {
-      await this.appendTaskState(projectRoot, taskEvent("task.reported", {
-        taskId: input.taskId,
-        from: "chief",
-        status: "failed",
-        summary: shortenSummary(`执行终止（stuck）：子进程 ${childProcessesStopped}/${childProcesses} 已停${exits.length > 0 ? `（${exits.join("；")}）` : ""}；部分写入 ${partialArtifacts.length} 项`),
-        ...(entry.origins.running?.turnId !== undefined ? { turnId: entry.origins.running.turnId } : {}),
-      }, () => new Date(this.now())));
-    }
+    // Termination is a host observation, never a report impersonating the assigned role.
     return result;
   }
 
@@ -6286,12 +7179,7 @@ export class SessionManager {
     this.rememberTaskCreator(newId, created);
     const now = () => new Date(this.now());
     // 原任务先收口（rework/stuck-terminated），再写重派事件与新任务；任一步写失败 ⇒ 不投递（如实失败）。
-    if (!(await this.appendTaskState(projectRoot, taskEvent("task.closed", {
-      taskId: record.taskId,
-      by: "chief",
-      outcome: "rework",
-      note: "stuck-terminated:redispatch",
-    }, now)))) {
+    if (!(await this.recordTaskFailure(projectRoot, record.taskId, "stuck-terminated:redispatch"))) {
       return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["任务状态写入失败"], message: "重派未执行：任务状态写入失败。" };
     }
     const redispatchEvent = taskEvent("task.redispatch", {
@@ -6335,12 +7223,7 @@ export class SessionManager {
       },
     );
     if (plan.action === "reject") {
-      await this.appendTaskState(projectRoot, taskEvent("task.closed", {
-        taskId: newId,
-        by: "chief",
-        outcome: "rejected",
-        note: `delivery-rejected: ${shortenSummary(plan.message)}`,
-      }, now));
+      await this.recordTaskFailure(projectRoot, newId, `delivery-rejected: ${shortenSummary(plan.message)}`);
       return { ok: false, safety: "unsafe", autoAllowed: false, reasons: [plan.message], message: plan.message };
     }
     const dedupKey = `${projectRoot}\u0000${targetRuntime}\u0000task\u0000${newId}`;
@@ -6376,24 +7259,7 @@ export class SessionManager {
    * 只由幕僚动作调用（接口/任务卡）；角色不能自行收口。
    */
   async closeTask(input: CloseTaskInput): Promise<CloseTaskResult> {
-    const state = await this.readTasks(input.projectRoot);
-    const record = state.records.get(input.taskId);
-    if (record === undefined || record.created === undefined) {
-      return { ok: false, taskId: input.taskId, message: "收口未执行：任务不存在。" };
-    }
-    if (record.closed !== undefined) {
-      return { ok: false, taskId: input.taskId, outcome: record.closed.outcome, message: "收口未执行：任务已收口（不重写历史）。" };
-    }
-    const note = typeof input.note === "string" && input.note.trim() !== "" ? shortenSummary(input.note) : undefined;
-    const appended = await this.appendTaskState(input.projectRoot, taskEvent("task.closed", {
-      taskId: input.taskId,
-      by: "chief",
-      outcome: input.outcome,
-      ...(note !== undefined ? { note } : {}),
-    }, () => new Date(this.now())));
-    if (!appended) return { ok: false, taskId: input.taskId, message: "收口未执行：任务状态写入失败。" };
-    this.appendRoleActivity(input.projectRoot, "chief", { kind: "task.closed", summary: `任务 #${input.taskId} 收口：${input.outcome}${note !== undefined ? `（${note}）` : ""}`, taskId: input.taskId, status: input.outcome });
-    return { ok: true, taskId: input.taskId, outcome: input.outcome, message: `任务 #${input.taskId} 已收口：${input.outcome}。` };
+    return { ok: false, taskId: input.taskId, message: "请由任务原创建者依据最新报告调用收口能力；客户面板不能冒充角色写入收口。" };
   }
 
   /**
@@ -6486,12 +7352,7 @@ export class SessionManager {
             taskId,
           });
         }
-        await this.appendTaskState(projectRoot, taskEvent("task.closed", {
-          taskId,
-          by: "chief",
-          outcome: "rejected",
-          note: "stuck-escalation:terminate",
-        }, () => new Date(this.now())));
+        await this.recordTaskFailure(projectRoot, taskId, "stuck-escalation:terminate");
       } else if (selected === "continue" || selected === "redispatch" || selected === "replace") {
         // C 批（协调者放行前置）：continue/redispatch/replace 不自动执行第二条危险路径，但**必须定义并
         // 落地人工处置**——写角色日志 + 向幕僚发系统行，任务保持未收口（不伪造完成、不重复副作用）。
@@ -6831,9 +7692,13 @@ export class SessionManager {
   }
 
   private enqueueDelivery(projectRoot: string, targetRoleId: string, item: Omit<DeliveryItem, "enqueuedAt">): void {
+    this.inventoryChanged(projectRoot, "delivery-enqueue-requested");
     const key = this.queueKey(projectRoot, targetRoleId, item.runtime);
     const q = this.deliveryQueues.get(key) ?? [];
-    q.push({ ...item, enqueuedAt: new Date(this.now()).toISOString() }); // 入队时间**入队即定格**（显示用，非执行时间；经注入时钟——与看护同源）
+    const entry = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, item.runtime));
+    const activeAssignment = entry?.origins.running ? entry.origins.running.assignment : entry?.boundAssignment;
+    const systemAssignment = item.kind === "system" ? (item.systemAssignment !== undefined ? item.systemAssignment : activeAssignment ?? null) : undefined;
+    q.push({ ...item, queueEntryId: item.queueEntryId ?? randomUUID(), ...(item.kind === "system" ? { systemAssignment: systemAssignment ? structuredClone(systemAssignment) : null } : {}), enqueuedAt: new Date(this.now()).toISOString() }); // 入队时间**入队即定格**（显示用，非执行时间；经注入时钟——与看护同源）
     this.deliveryQueues.set(key, q);
     // G-2/W3：派发/回交/客户消息**入队** = 真实活动（重武装）；`kind:"system"`（看护自身投递）**不记**——
     // 否则「告警/收束投递本身」会把静默窗口反复重置或反过来触发骚扰回路。
@@ -6863,6 +7728,10 @@ export class SessionManager {
         enqueuedAt: item.enqueuedAt,
         ...(typeof item.flowId === "string" && item.flowId !== "" ? { flowId: item.flowId } : {}),
         ...(typeof item.taskId === "string" && item.taskId !== "" ? { taskId: item.taskId } : {}),
+        ...(item.queueEntryId ? { queueEntryId: item.queueEntryId } : {}),
+        ...(item.kind === "system" && item.systemAssignment !== undefined ? { systemAssignment: item.systemAssignment } : {}),
+        ...(item.notificationSource ? { notificationSource: structuredClone(item.notificationSource) } : {}),
+        ...(item.controllerResume ? { controllerResume: structuredClone(item.controllerResume) } : {}),
         ...(typeof item.deliveryId === "string" ? { deliveryId: item.deliveryId } : {}),
         ...(isAppTaskClientMessageId(item.clientMessageId) ? { clientMessageId: item.clientMessageId } : {}),
         ...(item.handback !== undefined ? { handback: item.handback } : {}),
@@ -6899,31 +7768,52 @@ export class SessionManager {
     return items;
   }
 
-  /** 原子写（tmp+rename，串行链）；失败只记诊断——绝不阻塞/翻转内存投递。 */
+  private deliveryQueuePersistenceFacts(): DeliveryQueuePersistenceFacts {
+    return { managerId: this.managerId, ...structuredClone(this.deliveryPersistOutcome), ...(this.deliveryQueueStorePath ? { path: this.deliveryQueueStorePath } : {}),
+      armed: this.deliveryStoreArmed, enqueuedSeq: this.deliveryPersistSeq,
+      pending: this.deliveryPersistSeq - this.deliveryPersistOutcome.completedSeq,
+      knownProducers: { openChains: this.openChains.size, deliveryClaims: this.drainClaimRecords.size, handbackCommits: this.taskHandbackCommits.size } };
+  }
+
+  private async finishStopPersistence(result: StopResult): Promise<StopResult> {
+    // Capture both before awaiting: new external queue events remain legal and are not this stop's writes.
+    const targetSeq = this.deliveryPersistSeq, chain = this.deliveryPersistChain, armed = this.deliveryStoreArmed;
+    const outcome = await chain;
+    const deliveryQueuePersistence = { managerId: this.managerId, ...structuredClone(outcome), targetSeq, armed, pending: targetSeq - outcome.completedSeq,
+      ...(this.deliveryQueueStorePath ? { path: this.deliveryQueueStorePath } : {}) };
+    if (outcome.committedSeq !== targetSeq) return { ...result, ok: false,
+      note: `${result.note} ${mainT("main.session.releaseError", { detail: `delivery-queue-persistence-failed:${outcome.lastError?.code ?? "unknown"}` })}`,
+      deliveryQueuePersistence };
+    return { ...result, deliveryQueuePersistence };
+  }
+
+  /** Atomic writes stay asynchronous during delivery; stop awaits only its captured finite chain. */
   private persistDeliveryQueues(): void {
     const storePath = this.deliveryQueueStorePath;
-    if (storePath === undefined || !this.deliveryStoreArmed) return; // 恢复前禁止写（防覆盖磁盘待恢复项）
-    let items: PersistedDeliveryItemV1[];
-    try {
-      items = this.deliveryStoreItems();
-    } catch (error) {
-      createDiagnosticLogger({ component: "desktop.delivery" }).error("delivery.queue.persist.snapshot.failed", error);
-      return;
-    }
+    if (storePath === undefined || !this.deliveryStoreArmed) return;
     const seq = ++this.deliveryPersistSeq;
-    this.deliveryPersistChain = this.deliveryPersistChain
-      .then(async () => {
-        const tmp = `${storePath}.tmp-${process.pid}-${seq}`;
-        try {
-          await fs.promises.mkdir(path.dirname(storePath), { recursive: true, mode: 0o700 });
-          await fs.promises.writeFile(tmp, JSON.stringify({ version: 1, items }), "utf8");
-          await fs.promises.rename(tmp, storePath);
-        } catch (error) {
-          createDiagnosticLogger({ component: "desktop.delivery" }).error("delivery.queue.persist.failed", error);
-          try { await fs.promises.rm(tmp, { force: true }); } catch { /* tmp 清理失败不阻断 */ }
-        }
-      })
-      .catch(() => undefined); // 链永不 reject（前后写互不影响）
+    this.publishDeliveryInventory("delivery-persistence-enqueued");
+    let items: PersistedDeliveryItemV1[] | undefined, snapshotError: unknown, snapshotFailed = false;
+    try { items = this.deliveryStoreItems(); } catch (error) { snapshotError = error; snapshotFailed = true; }
+    this.deliveryPersistChain = this.deliveryPersistChain.then(async previous => {
+      const tmp = `${storePath}.tmp-${process.pid}-${seq}`;
+      let outcome: DeliveryQueuePersistenceOutcome;
+      try {
+        if (snapshotFailed) throw snapshotError;
+        await fs.promises.mkdir(path.dirname(storePath), { recursive: true, mode: 0o700 });
+        await fs.promises.writeFile(tmp, JSON.stringify({ version: 1, items }), "utf8");
+        await fs.promises.rename(tmp, storePath);
+        outcome = { ...previous, completedSeq: seq, committedSeq: seq };
+      } catch (error) {
+        const code = error !== null && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "unknown";
+        outcome = { ...previous, completedSeq: seq, failureCount: previous.failureCount + 1, lastError: { seq, code, path: storePath } };
+        try { createDiagnosticLogger({ component: "desktop.delivery" }).error("delivery.queue.persist.failed", error); } catch { /* error observation cannot erase the failed write */ }
+        try { await fs.promises.rm(tmp, { force: true }); } catch { /* preserve original write failure */ }
+      }
+      this.deliveryPersistOutcome = outcome;
+      this.publishDeliveryInventory("delivery-persistence-settled");
+      return outcome;
+    });
   }
 
   /** 读回一条持久条目（模型输入一律不可信：全量重校验；坏条 ⇒ undefined）。 */
@@ -6946,6 +7836,26 @@ export class SessionManager {
     const runtime = key.runtime as RuntimeKind;
     const targetRoleId =
       key.roleId !== "" ? key.roleId : typeof rawItem.targetRoleId === "string" ? rawItem.targetRoleId : "";
+    let systemAssignment: DeliveryAssignment | null = null;
+    if (rawItem.systemAssignment !== undefined && rawItem.systemAssignment !== null) {
+      const value = rawItem.systemAssignment;
+      if (typeof value !== "object" || Array.isArray(value) || !Object.hasOwn(value, "taskId") || !Object.hasOwn(value, "actorRoleId") || !Object.hasOwn(value, "flowId")) return;
+      const fields = value as Record<string, unknown>;
+      if (typeof fields.taskId !== "string" || !fields.taskId || fields.actorRoleId !== targetRoleId || typeof fields.flowId !== "string" || !fields.flowId ||
+          fields.runId !== undefined && (typeof fields.runId !== "string" || !fields.runId)) return;
+      systemAssignment = { taskId: fields.taskId, actorRoleId: targetRoleId, flowId: fields.flowId, ...(typeof fields.runId === "string" ? { runId: fields.runId } : {}) };
+    }
+    let controllerResume: ControllerResumeDelivery | undefined;
+    if (rawItem.controllerResume !== undefined) {
+      const rawResume = rawItem.controllerResume;
+      if (!rawResume || typeof rawResume !== "object" || Array.isArray(rawResume)) return;
+      const fields = rawResume as Record<string, unknown>;
+      if (Object.keys(fields).some(key => !["expected", "resumeKey", "basisDigest"].includes(key)) || !isDispatchTaskResumeController(fields.expected) ||
+          typeof fields.resumeKey !== "string" || !fields.resumeKey || fields.resumeKey.length > 1000 || typeof fields.basisDigest !== "string" || !/^[a-f0-9]{64}$/i.test(fields.basisDigest) ||
+          kind !== "dispatch" || targetRoleId !== "convener" || rawItem.sourceRoleId !== "chief" || rawItem.taskId !== fields.expected.taskId || rawItem.flowId !== fields.expected.flowId) return;
+      controllerResume = { expected: structuredClone(fields.expected), resumeKey: fields.resumeKey, basisDigest: fields.basisDigest };
+    } else if (rawItem.dedupKey.startsWith("hub-resume:")) return;
+    const notificationSource = isDirectActionSource(rawItem.notificationSource) && rawItem.notificationSource.kind === "role-direct" ? rawItem.notificationSource : undefined;
     const item: DeliveryItem = {
       kind,
       runtime,
@@ -6954,6 +7864,10 @@ export class SessionManager {
       text: rawItem.text,
       summary: typeof rawItem.summary === "string" ? rawItem.summary : "",
       dedupKey: rawItem.dedupKey,
+      queueEntryId: typeof rawItem.queueEntryId === "string" && /^[a-f0-9-]{36}$/i.test(rawItem.queueEntryId) ? rawItem.queueEntryId : randomUUID(),
+      ...(rawItem.kind === "system" && rawItem.systemAssignment !== undefined ? { systemAssignment } : {}),
+      ...(notificationSource ? { notificationSource } : {}),
+      ...(controllerResume ? { controllerResume } : {}),
       enqueuedAt:
         typeof rawItem.enqueuedAt === "string" && rawItem.enqueuedAt !== ""
           ? rawItem.enqueuedAt
@@ -7084,6 +7998,7 @@ export class SessionManager {
         ...(item.report !== undefined ? { report: item.report } : {}),
         ...(item.liveReport !== undefined ? { liveReport: item.liveReport } : {}),
         ...(item.liveDurability !== undefined ? { liveDurability: item.liveDurability } : {}),
+        ...(item.controllerResume !== undefined ? { controllerResume: structuredClone(item.controllerResume) } : {}),
       });
       drainKeys.add(queueKey);
       report.restored += 1;
@@ -7155,6 +8070,7 @@ export class SessionManager {
    *  **P1-1（2026-10-13 客户裁定）**：条目视图增 `id`（= `dedupKey`，撤回的定位键）与 `full`（入队即定格的
    *  **全文**——抽屉内「展开看全文」用；摘要字段照旧只作列表显示）。 */
   private notifyRoleState(projectRoot: string, targetRoleId: string, runtime: RuntimeKind): void {
+    this.inventoryChanged(projectRoot, "role-state-observed");
     if (targetRoleId === "") return;
     const q = this.deliveryQueues.get(this.queueKey(projectRoot, targetRoleId, runtime)) ?? [];
     const entry = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, runtime));
@@ -7178,7 +8094,9 @@ export class SessionManager {
     const blockedReason: "target-busy" | "origin-missing" | "session-closed" | "network" | null =
       q.length === 0
         ? null
-        : this.isNetworkOffline()
+        : this.deliveryIsStopped(this.queueKey(projectRoot, targetRoleId, runtime))
+          ? "session-closed"
+          : this.isNetworkOffline()
           ? "network"
           : busy
             ? (runningOrigin === undefined || runningOrigin.settled === true ? "origin-missing" : "target-busy")
@@ -7265,9 +8183,10 @@ export class SessionManager {
     if (record.state?.state === 'saved' && !record.state.report && event?.report) record.state = { ...record.state, report: event.report };
     if (record.state?.state === 'expired') record.event = undefined;
     this.reportStates.set(key, record);
-    if (record.event && record.state?.state === 'saved' && record.state.report && !record.queued) {
-      record.queued = true; // synchronous once gate, before handleHandback's first await
-      void this.handleHandback(entry.projectRoot, entry.runtime, record.event.handback, record.state.report, record.event.liveReport, undefined, this.handbackFlowId(entry, record.event.handback));
+    if (record.event && record.state?.state === 'saved' && record.state.report && !record.queued && !record.inFlight) {
+      record.inFlight = true; // Claim processing, never success/delivery before the actual ledger accepts it.
+      void this.handleHandback(entry.projectRoot, entry.runtime, record.event.handback, record.state.report, record.event.liveReport, undefined, this.handbackFlowId(entry, record.event.handback))
+        .then(queued => { record.queued = queued; record.inFlight = false; }, () => { record.inFlight = false; });
     }
   }
   private rememberReceipt(entry: LiveSession, receipt: RuntimeDeliveryReceiptV1): void {
@@ -7338,9 +8257,23 @@ export class SessionManager {
     return flowIds.length === 1 ? flowIds[0] : undefined;
   }
 
-  private async handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<void> {
+  private handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<boolean> {
+    if (!hb.taskId) return this.commitHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId);
+    const key = `${projectRoot}\u0000${hb.taskId}`;
+    // Consecutive real turns of one task can finish before the prior detached report is registered.
+    // Order those existing observations; never retry a rejected business operation or wait for the creator's model turn.
+    const prior = this.taskHandbackCommits.get(key) ?? Promise.resolve();
+    const attempt = prior.then(() => this.commitHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId));
+    const committed = attempt.then(() => undefined, () => undefined);
+    this.taskHandbackCommits.set(key, committed);
+    void committed.then(() => { if (this.taskHandbackCommits.get(key) === committed) this.taskHandbackCommits.delete(key); });
+    return attempt;
+  }
+
+  private async commitHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<boolean> {
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: hb?.roleId });
     diagnostic.record("report.received", { outcome: hb?.status });
+    let pendingKey: string | undefined;
     try {
       if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
         this.emitDeliveryNote(projectRoot, runtime,
@@ -7348,7 +8281,7 @@ export class SessionManager {
           mainT("main.common.unknownRole"),
           mainT("main.session.handbackMalformed")
         );
-        return;
+        return false;
       }
       hb = structuredClone(hb);
       if (report) report = structuredClone(report);
@@ -7374,14 +8307,16 @@ export class SessionManager {
         // 任务绑定：按创建者路由（creator 缺失的旧记录按 chief 兼容，保持既有主链行为）。
         targetRoleId = reportTargetForTaskCreator({ creator: taskCreator ?? "chief", chiefRoleId, convenerRoleId });
       } else if (builtInSource) {
-        if (model !== "trio") return; // single/su：内置来源（su 自身）不自我回交（旧行为逐字不变）
+        if (model !== "trio") return false; // single/su：内置来源（su 自身）不自我回交（旧行为逐字不变）
         const leadRoleId = typeof listing?.primaryRoleId === "string" ? listing.primaryRoleId : "";
-        if (leadRoleId === "") return; // 主入口未枚举到：不猜、不改投 Steward；settle 反馈同样按无 listing 跳过
-        if (hb.roleId === leadRoleId) return; // Lead 自身不自我回交（防循环）
+        if (leadRoleId === "") return false; // 主入口未枚举到：不猜、不改投 Steward；settle 反馈同样按无 listing 跳过
+        if (hb.roleId === leadRoleId) return false; // Lead 自身不自我回交（防循环）
         targetRoleId = leadRoleId;
       } else if (ownerRoleId !== null && hb.roleId === ownerRoleId) {
-        return; // single su 自身等防御（trio 的 Convener 走上方内置分支）
+        return false; // single su 自身等防御（trio 的 Convener 走上方内置分支）
       }
+      const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
+      let alreadyReported = false;
       // BUG-5（2026-11-05 精化）：任务已收口或**同一回合**已报告 ⇒ 重复回交不再入队；
       // blocked 之后的新回合真实报告必须投递（详见 shouldSuppressStarTaskReport 注释）。
       if (starTask && typeof hb.taskId === "string" && hb.taskId !== "") {
@@ -7397,21 +8332,25 @@ export class SessionManager {
             closed: record?.closed !== undefined,
             reports: record?.reports.length ?? 0,
           });
-          return;
+          if (record?.closed !== undefined) return false;
+          if (this.enqueuedHandbackKeys.has(key)) return true;
+          alreadyReported = true; // Durable prior report without a delivery: resume only its informational handback.
         }
       }
-      const key = `${projectRoot}\u0000${runtime}\u0000${handbackKey(hb)}`;
       if (this.enqueuedHandbackKeys.has(key)) {
         diagnostic.record("report.duplicate");
-        return;
+        return true;
       }
-      this.enqueuedHandbackKeys.add(key);
+      if (this.pendingHandbackKeys.has(key)) return false;
+      this.pendingHandbackKeys.add(key); pendingKey = key;
       // B 批：工作结果事件（`task.reported`）——按 `taskId+turnId` 去重；写失败只诊断、不丢报告
-      // （报告仍入投递机；任务状态读取侧重放坏行/缺事件时如实显示「已投递未登记」）。
+      // （失败保 saved snapshot，可在真实新事实或显式保存/投递操作后重核；不假称已登记/已投递）。
       if (starTask && typeof hb.taskId === "string") {
         const reportKey = `${hb.taskId}\u0000${hb.turnId ?? createHash("sha256").update(hb.summary).digest("hex").slice(0, 16)}`;
-        if (!this.reportedTaskKeys.has(reportKey)) {
-          this.reportedTaskKeys.add(reportKey);
+        if (!this.reportedTaskKeys.has(reportKey) && !alreadyReported) {
+          // Delivery's own post-send ledger writer is independent of this detached consumer.
+          const delivery = this.taskDeliveryCommits.get(`${projectRoot}\u0000${hb.taskId}`);
+          if (delivery) await delivery.done;
           const reportedAt = Date.parse(hb.at);
           const event = taskEvent("task.reported", {
             taskId: hb.taskId,
@@ -7421,7 +8360,58 @@ export class SessionManager {
             ...(hb.evidence.length > 0 ? { evidence: hb.evidence.slice(0, 5) } : {}),
             ...(hb.turnId !== undefined && hb.turnId !== "" ? { turnId: hb.turnId } : {}),
           }, () => Number.isFinite(reportedAt) ? new Date(reportedAt) : new Date(this.now()));
-          void this.appendTaskState(projectRoot, event);
+          const registered = await this.appendTaskStateResult(projectRoot, event);
+          if (!registered.ok) {
+            this.emitDeliveryNote(projectRoot, runtime, targetRoleId, hb.roleId,
+              `任务报告已保存但状态登记失败，尚未投递给原创建者：${registered.code}：${registered.message}`);
+            return false;
+          }
+          this.reportedTaskKeys.add(reportKey);
+        }
+      }
+      // 2026-11-05（客户最终口径：不是自动发卡，是让运营自己选择）：star 任务报告 blocked（trio、flowId 可解析）
+      // 时**首次即**给 convener 一条 delivery-note 提示——是否调用 `report_plan_escalation`
+      // （category 选 scheme/environment/authority/evidence）向客户发方案升级卡，或继续核查/派重做，由运营自行判断。
+      // 应用**不自动发卡、不替运营或客户做决定**。节流：同 flow 有在途升级卡 ⇒ 不提示；已提示且未 done ⇒ 不重复；
+      // done/failed/aborted 或升级卡成功提交 ⇒ 清除标记（下一次 blocked 可再提示）。
+      if (model === "trio" && starTask && typeof hb.taskId === "string" && hb.taskId !== "") {
+        const promptRecord = (await this.readTasks(projectRoot)).records.get(hb.taskId);
+        const promptFlowId = flowId ?? promptRecord?.created?.flowId;
+        if (promptFlowId !== undefined && promptFlowId !== "") {
+          const promptKey = `${projectRoot}\u0000${promptFlowId}`;
+          const reportStatus = taskReportStatusOf(hb.status);
+          if (reportStatus === "blocked") {
+            if (!this.planEscalations.has(promptKey) && !this.planEscalationPrompted.has(promptKey)) {
+              if (this.deps.customerInput !== undefined) {
+                this.planEscalationPrompted.add(promptKey);
+                const convener = this.handbackOwnerRoleId(projectRoot) ?? "convener";
+                const runtimeForNote =
+                  this.findLiveRuntime(projectRoot, convener) ??
+                  this.lastGovernanceRuntime.get(projectRoot) ??
+                  this.activeRuntimeFor(projectRoot) ??
+                  "demo";
+                this.emitDeliveryNote(
+                  projectRoot,
+                  runtimeForNote,
+                  convener,
+                  "convener",
+                  mainT("main.planEscalation.blockedPrompt", {
+                    flowId: promptFlowId,
+                    summary: shortenSummary(hb.summary, 160),
+                  }),
+                );
+              } else {
+                // 无客户卡通道 ⇒ 只记诊断；不提示、不影响报告路由、不伪造裁定。
+                createDiagnosticLogger({ component: "desktop.session", projectRoot }).record("plan-escalation.prompt.skipped", {
+                  requestId: `plan-escalation-${promptFlowId}`,
+                  reasonCode: "customer-card-channel-unavailable",
+                });
+              }
+            }
+          } else {
+            // done/failed/aborted 都清除「已提示」标记——避免陈旧标记阻断后续新的 blocked（取舍见变更记录）。
+            this.planEscalationPrompted.delete(promptKey);
+          }
         }
       }
       // 输入文案：编排的 `renderHandbackPrompt`（**单一来源**——两前端共用，本层不各写一份）；**入队即定格**。
@@ -7436,7 +8426,13 @@ export class SessionManager {
           hb.roleId,
           mainT("main.session.handbackRenderFailed", { detail: err instanceof Error ? err.message : String(err) })
         );
-        return;
+        return false;
+      }
+      if (starTask && hb.taskId !== undefined && (targetRoleId === "chief" || targetRoleId === "convener")) {
+        const closing = await prepareCreatedTaskClose({ projectRoot, actorRoleId: targetRoleId, taskId: hb.taskId });
+        text += closing.ok
+          ? `\n\n[应用绑定的原创建者收口依据]\n${JSON.stringify(closing)}\n由原创建者核对报告后调用 close_created_task；报告返回不等于任务已收口。`
+          : `\n\n[收口依据尚不可用] ${closing.message}`;
       }
       this.enqueueDelivery(projectRoot, targetRoleId ?? "", {
         kind: "handback",
@@ -7452,6 +8448,7 @@ export class SessionManager {
         ...(report ? { report } : {}),
         ...(liveReport ? { liveReport, liveDurability } : {}),
       });
+      this.enqueuedHandbackKeys.add(key);
       // 内置来源回交已投 Lead ⇒ 同一轮 settle 的治理反馈不再重复投（短时标记，见 mirrorGovernanceFeedback）。
       if (builtInSource && model === "trio") {
         this.governanceHandbackMirrored.set(this.queueKey(projectRoot, hb.roleId, runtime), this.now());
@@ -7459,6 +8456,7 @@ export class SessionManager {
       }
       diagnostic.record("report.enqueued");
       await this.drainQueue(projectRoot, targetRoleId, runtime);
+      return true;
     } catch (err) {
       diagnostic.error("report.failed", err);
       // 兜底（belt & braces）：任何意外都如实拦截为系统行——**不产生未捕获拒绝**。
@@ -7467,6 +8465,9 @@ export class SessionManager {
         mainT("main.common.unknownRole"),
         mainT("main.session.handbackException", { detail: err instanceof Error ? err.message : String(err) })
       );
+      return false;
+    } finally {
+      if (pendingKey) this.pendingHandbackKeys.delete(pendingKey);
     }
   }
 
@@ -7495,7 +8496,7 @@ export class SessionManager {
    * 放行文本**入队即定格**（重试复用同一份——绑定「派发那一刻的契约版本」）。回交与客户消息**不经过**本段
    * （不受必读块影响）。
    */
-  private async routeDispatch(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload): Promise<DispatchReceipt> {
+  private async routeDispatch(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload, source?: ActualDispatchSource): Promise<DispatchReceipt> {
     const targetRoleId = d && typeof d.roleId === "string" ? d.roleId.trim() : "";
     const task = d && typeof d.task === "string" ? d.task : "";
     const fail = (message: string, row: string): DispatchReceipt => {
@@ -7528,7 +8529,7 @@ export class SessionManager {
         );
       }
       // 星形任务链（`tasks.jsonl`；不套旧 flow 派发门）；前置检查在 task.created 之前（F10）。
-      return this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task);
+      return this.routeStarDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source);
     }
     const dispatcherRoleId = this.dispatcherRoleIdOf(projectRoot);
     if (dispatcherRoleId === null) {
@@ -7792,6 +8793,64 @@ export class SessionManager {
    * 副作用：幕僚声明 + 应用按任务文本**只升不降**（缺填/非法 ⇒ unknown）。
    * 投递复用既有投递机（自动开会话/排队/失败保留/重启续投）；回交意图携带 `taskId`。
    */
+  private captureChiefDispatchSource(projectRoot: string, runtime: RuntimeKind, source?: ActualDispatchSource) {
+    const registration = this.deps.getRegisteredProjectLifecycle?.(projectRoot), entry = source?.entry, origin = source?.origin;
+    const creatorReports = origin?.kind === "handback" ? origin.creatorReports : undefined;
+    const current = () => !!entry && !!origin && this.sessions.get(this.sessionKey(projectRoot, "chief", runtime)) === entry &&
+      entry.roleId === "chief" && entry.projectRoot === projectRoot && entry.busy && entry.origins.running === origin && !origin.settled &&
+      !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted &&
+      !this.runTaskIsFenced(projectRoot, origin.taskId, origin.assignment?.runId);
+    if (!registration || !entry?.handle.sessionId || !origin?.turnId || origin.inputAccepted !== true || !current() ||
+        (origin.kind !== undefined && origin.kind !== "message" && !creatorReports?.length)) return undefined;
+    const hostInitialization: NonNullable<Parameters<typeof prepareRoleDispatch>[0]["hostInitialization"]> = { registration,
+      parent: { roleId: "chief", runtime, sessionId: entry.handle.sessionId, turnId: origin.turnId, inputAccepted: true, settled: false,
+        ...(origin.kind ? { kind: origin.kind } : {}), ...(origin.clientMessageId ? { clientMessageId: origin.clientMessageId } : {}) },
+      ...(creatorReports ? { creatorReports: structuredClone(creatorReports) } : {}) };
+    const isCurrent = () => { const selected = this.deps.getRegisteredProjectLifecycle?.(projectRoot);
+      return current() && (!creatorReports || origin.creatorReports === creatorReports) && selected?.selectionId === registration.selectionId && selected.listingGeneration === registration.listingGeneration; };
+    return { hostInitialization, isCurrent, expectedKind: creatorReports ? "chief-creator-report" : "chief-customer-turn" };
+  }
+
+  private async resumeChiefController(projectRoot: string, runtime: RuntimeKind, fromRoleId: string, d: DispatchTaskPayload, source?: ActualDispatchSource): Promise<DispatchReceipt> {
+    const reject = (code: string, message: string): DispatchReceipt => ({ ok: false, message: `${code}：${message}` });
+    if (fromRoleId !== "chief" || d.roleId !== "convener" || !d.resumeController || d.reviewTarget)
+      return reject("controller-resume-source-invalid", "续接只允许幕僚明确指向原运营任务，未创建任务。");
+    const host = this.captureChiefDispatchSource(projectRoot, runtime, source);
+    if (!host) return reject("controller-resume-source-unavailable", "缺少当前幕僚实际输入来源。");
+    const input = { projectRoot, resumeController: d.resumeController, hostInitialization: host.hostInitialization };
+    const prepared = await prepareControllerResume(input);
+    if (!host.isCurrent()) return reject("controller-resume-source-changed", "核验期间来源已变化。");
+    if (!prepared.ok) return reject(prepared.code, prepared.message ?? prepared.code);
+    const value = prepared.value, deliveryRuntime = this.findLiveRuntime(projectRoot, "convener") ?? runtime;
+    const key = this.queueKey(projectRoot, "convener", deliveryRuntime), dedupKey = `hub-resume:${value.resumeKey}:${value.basisDigest}`;
+    const clientMessageId = this.appTaskClientMessageIdFromSeed(dedupKey);
+    if (this.deliveredAppTaskIds.has(clientMessageId) || this.deliveredDeliveryKeys.has(`${key}\u0000${dedupKey}`) ||
+        this.deliveryQueues.get(key)?.some(item => item.clientMessageId === clientMessageId) || this.activeDeliveries.get(key)?.clientMessageId === clientMessageId)
+      return { ok: true, message: "同一运营续接已受理或已ACK，未重复投递、未创建任务。" };
+    if (this.deliveryIsStopped(key) || this.runTaskIsFenced(projectRoot, value.taskId, value.runId)) return reject("controller-resume-stopped", "原任务已停止，未重新打开。");
+    const lease = beginGitHostAction({ projectRoot, kind: "dispatch" });
+    if (!lease.ok) return reject(lease.code, "项目状态正在变化，续接未入队。");
+    let endFailure: string | undefined;
+    try {
+      const fresh = await prepareControllerResume(input);
+      if (!fresh.ok) return reject(fresh.code, fresh.message ?? fresh.code);
+      if (!host.isCurrent() || fresh.value.resumeKey !== value.resumeKey || fresh.value.basisDigest !== value.basisDigest ||
+          fresh.value.taskId !== value.taskId || fresh.value.runId !== value.runId || fresh.value.flowId !== value.flowId ||
+          fresh.value.reviewTaskId !== value.reviewTaskId || fresh.value.reviewCloseOperationId !== value.reviewCloseOperationId)
+        return reject("controller-resume-basis-changed", "入队前运营任务或质量依据已变化。");
+      if (this.deliveryIsStopped(key) || this.runTaskIsFenced(projectRoot, value.taskId, value.runId)) return reject("controller-resume-stopped", "原任务已停止，续接未入队。");
+      this.enqueueDelivery(projectRoot, "convener", { kind: "dispatch", runtime: deliveryRuntime, targetRoleId: "convener", sourceRoleId: "chief",
+        taskId: value.taskId, flowId: value.flowId, text: d.task, summary: `续接 #${value.taskId}：${shortenSummary(d.task)}`, dedupKey, clientMessageId,
+        controllerResume: { expected: structuredClone(d.resumeController), resumeKey: value.resumeKey, basisDigest: value.basisDigest } });
+    } finally {
+      const ended = endGitHostAction({ projectRoot, leaseId: lease.leaseId, inventory: desktopProjectExecutionInventory(projectRoot) });
+      if (!ended.ok) endFailure = ended.code;
+    }
+    if (endFailure) return reject(endFailure, "续接消息已保留，但项目协调未完成，尚未投递；请核对后明确恢复。");
+    void this.drainQueue(projectRoot, "convener", deliveryRuntime);
+    return { ok: true, message: `已受理：续接原运营任务 #${value.taskId}，未创建任务；送达/ACK或失败另行报告，受理不等于已执行。` };
+  }
+
   private async routeStarDispatch(
     projectRoot: string,
     runtime: RuntimeKind,
@@ -7799,6 +8858,7 @@ export class SessionManager {
     d: DispatchTaskPayload,
     targetRoleId: string,
     task: string,
+    source?: ActualDispatchSource,
   ): Promise<DispatchReceipt> {
     const fail = (message: string, row: string, rejection?: MechanicalRejection): DispatchReceipt => {
       if (rejection !== undefined) {
@@ -7811,6 +8871,7 @@ ${formatted}` };
       return { ok: false, message };
     };
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
+    if (d.resumeController !== undefined) return this.resumeChiefController(projectRoot, runtime, fromRoleId, d, source);
     // P1-R-05：会话层只拦自派；「target=幕僚且来源非幕僚」交给硬授权矩阵（convener-target-forbidden）。
     if (targetRoleId === fromRoleId) {
       return fail("派发未受理：不能派发给幕僚自己。", "派发未受理：不能派发给幕僚自己——未投递。");
@@ -7871,11 +8932,119 @@ ${formatted}` };
     if (!authorization.ok) {
       return fail(authorization.message, authorization.message, authorization.rejection);
     }
+    if (fromRoleId === convenerRoleId && targetRoleId === "verifier")
+      return fail("chief-hub-review-owner-required：新的质检任务须由幕僚创建，未登记任务。", "新的质检任务须由幕僚创建，未登记任务。");
+    if (d.reviewTarget !== undefined && targetRoleId !== "verifier")
+      return fail("review-target-invalid：只有真实质检目标可申请候选评审，未派发。", "只有真实质检目标可申请候选评审，未派发。");
+    const mandatoryReview = d.reviewTarget !== undefined;
+    if (mandatoryReview && targetRole?.builtIn !== true)
+      return fail("review-target-unproven：当前登记的真实内置质检目标不可用，未派发。", "当前登记的真实内置质检目标不可用，未派发。");
+    const workerDispatch = !targetBuiltIn;
+    const hubPreparation = fromRoleId === chiefRoleId && targetRole?.builtIn === true &&
+      ["product", "rapporteur", "nominator", "convener", "verifier"].includes(targetRoleId) && !mandatoryReview;
+    if (hubPreparation && !d.flowId)
+      return fail("chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。", "缺少明确任务流程，未创建任务。");
+    const documentPlanningRole = fromRoleId === chiefRoleId && targetRole?.builtIn === true && (targetRoleId === "product" || targetRoleId === "rapporteur");
+    const rolePreparation = fromRoleId === chiefRoleId && targetRole?.builtIn === true && targetRoleId === "nominator";
+    const expectedPreparationPurpose = hubPreparation ? "builtin-preparation" : rolePreparation ? "role-preparation" : "document-preparation";
+    if (rolePreparation && !d.flowId) return fail("role-preparation-source-unavailable：人事准备缺少明确流程，未登记任务。", "人事准备缺少明确流程，未登记任务。");
+    const sourceIsCurrent = () => !!source && this.sessions.get(this.sessionKey(projectRoot, fromRoleId, runtime)) === source.entry &&
+      source.entry.busy && source.entry.origins.running === source.origin && !source.origin.settled &&
+      !this.runTaskIsFenced(projectRoot, source.origin.taskId, source.origin.assignment?.runId) &&
+      !source.entry.interactionState.lifetime.signal.aborted && !source.entry.interactionState.turn.signal.aborted;
+    let parentTaskId: string | undefined;
+    let executionRunId: string | undefined, executionFlowId: string | undefined;
+    let executionPaths: string[] | undefined, executionModuleId: string | undefined;
+    if (workerDispatch || fromRoleId === convenerRoleId) {
+      if (fromRoleId !== convenerRoleId || !sourceIsCurrent() || !source?.origin.taskId)
+        return fail("worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。", "缺少当前运营真实受派任务，未派发。");
+      parentTaskId = source.origin.taskId;
+      const parent = await inspectAssignedTask({ projectRoot, taskId: parentTaskId, actorRoleId: fromRoleId });
+      if (!sourceIsCurrent()) return fail("worker-dispatch-source-changed：发起轮次已变化，未派发。", "发起轮次已变化，未派发。");
+      if (!parent.ok) return fail(`${parent.code}：${parent.message ?? parent.code}`, `${parent.message ?? parent.code}`);
+      if (d.flowId !== undefined && d.flowId !== parent.value.flowId)
+        return fail("worker-dispatch-flow-mismatch：派发flow与当前真实父任务不一致。", "派发flow与当前真实父任务不一致。");
+      executionRunId = parent.value.runId; executionFlowId = parent.value.flowId;
+    }
+    // An explicit target or actual convener-to-built-in-verifier route is mandatory immutable review,
+    // never an optional legacy run anchor. Missing target material must reject before task creation.
+    let preparedReview: Extract<Awaited<ReturnType<typeof prepareRoleDispatch>>, { ok: true }>["value"] | undefined;
+    let workSourceRef: TaskWorkSourceRef | undefined;
+    let reviewHost: ReturnType<SessionManager["captureChiefDispatchSource"]>;
+    if (mandatoryReview) {
+      reviewHost = this.captureChiefDispatchSource(projectRoot, runtime, source);
+      if (fromRoleId !== chiefRoleId || targetRoleId !== "verifier" || !d.flowId || !reviewHost)
+        return fail("review-source-unavailable：缺少当前幕僚真实输入及评审流程，未登记任务。", "缺少当前幕僚真实输入及评审流程，未登记任务。");
+      if (requestedModuleId || requestedModulePaths?.length)
+        return fail("review-module-scope-forbidden：评审不接受实现模块写区，未派发。", "评审不接受实现模块写区，未派发。");
+      const review = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: d.flowId,
+        hostInitialization: reviewHost.hostInitialization, reviewTarget: d.reviewTarget });
+      if (!reviewHost.isCurrent()) return fail("review-source-changed：核验期间发起输入已变化。", "核验期间发起输入已变化。");
+      if (!review.ok) return fail(`${review.code}：${review.message}`, review.message);
+      const value = review.value, ref = value.initializationSource;
+      const sourceRef = ref ? { sourceId: ref.sourceId, path: ref.path, sha256: ref.sha256, kind: ref.kind ?? "chief-customer-turn" } : undefined;
+      if (value.kind !== "review" || value.hubRouting !== "chief-hub-v1" || !value.reviewBasisRef || !value.reviewControllerRef ||
+          value.parentTaskRef || !value.runId || value.flowId !== d.flowId || !isTaskWorkSourceRef(sourceRef) || sourceRef.kind !== reviewHost.expectedKind)
+        return fail("review-source-unavailable：正式评审未返回真实独立controller和完整来源。", "正式评审未返回真实独立controller和完整来源。");
+      preparedReview = value; workSourceRef = sourceRef;
+    }
     const chainFacts = await this.chainDispatchFacts(projectRoot, d?.flowId);
-    const dispatchFlowId = d?.flowId ?? chainFacts.flowId;
+    const dispatchFlowId = executionFlowId ?? d?.flowId ?? chainFacts.flowId;
     // M1（幕僚→产品）允许尚未写 flowId：仍先生成 pending draft；后续真实 flow 到达时领养同一 runId。
     const runFlowId = dispatchFlowId ?? (fromRoleId === chiefRoleId && targetRoleId === "product" ? RUN_PENDING_FLOW_ID : undefined);
-    const handoffDispatch = fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId;
+    const handoffDispatch = !hubPreparation && fromRoleId === chiefRoleId && convenerRoleId !== null && targetRoleId === convenerRoleId;
+    let initializationIsCurrent: (() => boolean) | undefined;
+    let initializationSelectionIsCurrent: (() => boolean) | undefined;
+    let preparedTeamPlanning: Extract<Awaited<ReturnType<typeof prepareRoleDispatch>>, { ok: true }>["value"] | undefined;
+    let teamPlanningHostSource: NonNullable<Parameters<typeof prepareRoleDispatch>[0]["hostInitialization"]> | undefined;
+    const initializationChanged = "项目选择或发起输入已变化，初始化未派发。请在当前项目重新发起。";
+    if (handoffDispatch) {
+      if (dispatchFlowId === undefined) return fail("规划协调缺少明确flowId，未派发。", "请先明确当前规划所属项目。");
+      const registration = this.deps.getRegisteredProjectLifecycle?.(projectRoot);
+      const parentEntry = this.sessions.get(this.sessionKey(projectRoot, fromRoleId, runtime));
+      const parentOrigin = parentEntry?.origins.running;
+      const creatorReports = parentOrigin?.kind === "handback" ? parentOrigin.creatorReports : undefined;
+      const hostInitialization = registration && parentEntry?.busy === true && parentEntry.handle.sessionId &&
+        parentOrigin?.inputAccepted === true && parentOrigin.turnId && !parentOrigin.settled && sourceIsCurrent() &&
+        (parentOrigin.kind === undefined || parentOrigin.kind === "message" || creatorReports?.length)
+        ? { registration, parent: { roleId: "chief" as const, sessionId: parentEntry.handle.sessionId,
+            turnId: parentOrigin.turnId, runtime, settled: false as const, inputAccepted: true as const,
+            ...(parentOrigin.clientMessageId ? { clientMessageId: parentOrigin.clientMessageId } : {}),
+            ...(parentOrigin.kind ? { kind: parentOrigin.kind } : {}) },
+            ...(creatorReports ? { creatorReports: structuredClone(creatorReports) } : {}) }
+        : undefined;
+      const planning = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: dispatchFlowId,
+        ...(hostInitialization ? { hostInitialization } : {}) });
+      if (!planning.ok || planning.value.kind !== "planning") return fail(planning.ok ? "规划上下文不匹配。" : planning.message,
+        planning.ok ? "规划上下文不匹配。" : planning.message);
+      if (!hostInitialization || !parentEntry || !parentOrigin || !planning.value.initializationSource)
+        return fail("planning-source-unavailable：未取得当前实际工作来源，未登记团队任务。", "未取得当前实际工作来源，未登记团队任务。");
+      {
+        const isInitialization = planning.value.purpose === "repository-initialization";
+        if (isInitialization && creatorReports) return fail(initializationChanged, initializationChanged);
+        if (!isInitialization && (!planning.value.runId || planning.value.flowId !== dispatchFlowId))
+          return fail("planning-scope-unavailable：团队规划尚无真实独立草稿范围，未登记任务。", "团队规划尚无真实独立草稿范围，未登记任务。");
+        const receipt = planning.value.initializationSource;
+        const expectedKind = creatorReports ? "chief-creator-report" : "chief-customer-turn";
+        const sourceRef = { kind: receipt.kind ?? "chief-customer-turn", sourceId: receipt.sourceId, path: receipt.path, sha256: receipt.sha256 };
+        if (!isTaskWorkSourceRef(sourceRef) || sourceRef.kind !== expectedKind) return fail(initializationChanged, initializationChanged);
+        workSourceRef = sourceRef;
+        if (!isInitialization) { preparedTeamPlanning = planning.value; teamPlanningHostSource = hostInitialization; }
+        initializationSelectionIsCurrent = () => {
+          const current = this.deps.getRegisteredProjectLifecycle?.(projectRoot);
+          return current?.selectionId === registration?.selectionId && current?.listingGeneration === registration?.listingGeneration;
+        };
+        initializationIsCurrent = () => {
+          return initializationSelectionIsCurrent!() &&
+            this.sessions.get(this.sessionKey(projectRoot, fromRoleId, runtime)) === parentEntry &&
+            parentEntry.busy && parentEntry.origins.running === parentOrigin && !parentOrigin.settled &&
+            (!creatorReports || parentOrigin.creatorReports === creatorReports) && sourceIsCurrent() &&
+            parentOrigin.turnId === hostInitialization.parent.turnId && !parentEntry.interactionState.turn.signal.aborted;
+        };
+        if (!initializationIsCurrent()) return fail(initializationChanged, initializationChanged);
+      }
+    }
+
     const hasLegacyFlowTask = dispatchFlowId !== undefined && [...state.records.values()].some(
       (record) => record.created?.flowId === dispatchFlowId && record.created.runId === undefined,
     );
@@ -7884,8 +9053,78 @@ ${formatted}` };
     let runManifest: RunManifest | undefined;
     let runState: "draft" | "pinned" | undefined;
     let pinnedRoster: ProjectRoster | undefined;
-    if (runFlowId !== undefined) {
-      const active = await findActiveRun(projectRoot, runFlowId);
+    let preparedDocumentPlanning: Extract<Awaited<ReturnType<typeof prepareRoleDispatch>>, { ok: true }>["value"] | undefined;
+    let documentHostSource: NonNullable<Parameters<typeof prepareRoleDispatch>[0]["hostInitialization"]> | undefined;
+    let documentSourceIsCurrent: (() => boolean) | undefined;
+    const prepareDocumentScope = async (oldRunId?: string): Promise<DispatchReceipt | undefined> => {
+        // Existing-project authoring is a new planning scope, not reuse of an old execution pin.
+        const registration = this.deps.getRegisteredProjectLifecycle?.(projectRoot);
+        const entry = source?.entry, origin = source?.origin;
+        const customerSource = origin?.kind === undefined || origin.kind === "message";
+        const creatorSource = origin?.kind === "handback" ? origin.creatorReports : undefined;
+        if (!d.flowId || !registration || !entry?.handle.sessionId || !origin?.turnId || origin.inputAccepted !== true ||
+            (!customerSource && !creatorSource?.length) || !sourceIsCurrent())
+          return fail("document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。", "缺少当前客户输入与真实项目选择，未登记文档任务。");
+        if (requestedModuleId || requestedModulePaths?.length)
+          return fail("document-planning-module-forbidden：文档准备不授实现模块写区。", "文档准备不授实现模块写区。");
+        documentHostSource = { registration, parent: { roleId: "chief", sessionId: entry.handle.sessionId, turnId: origin.turnId,
+          runtime, inputAccepted: true, settled: false, ...(origin.clientMessageId ? { clientMessageId: origin.clientMessageId } : {}),
+          ...(origin.kind ? { kind: origin.kind } : {}) }, ...(creatorSource ? { creatorReports: structuredClone(creatorSource) } : {}) };
+        documentSourceIsCurrent = () => {
+          const currentRegistration = this.deps.getRegisteredProjectLifecycle?.(projectRoot);
+          return sourceIsCurrent() && (!creatorSource || origin.creatorReports === creatorSource) && currentRegistration?.selectionId === registration.selectionId && currentRegistration.listingGeneration === registration.listingGeneration;
+        };
+        const planning = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: d.flowId, hostInitialization: documentHostSource });
+        if (!documentSourceIsCurrent()) return fail("document-planning-source-changed：准备期间客户或项目来源已变化，未登记任务。", "准备期间客户或项目来源已变化，未登记任务。");
+        if (!planning.ok) return fail(`${planning.code}：${planning.message}`, planning.message);
+        const executionSelection = planning.value.kind === "execution" && hubPreparation && fromRoleId === chiefRoleId && targetRoleId === "convener" && creatorSource?.length;
+        if ((planning.value.kind !== "planning" && !executionSelection) || planning.value.purpose !== expectedPreparationPurpose || (hubPreparation && planning.value.hubRouting !== "chief-hub-v1") || !planning.value.runId ||
+            (oldRunId !== undefined && planning.value.runId === oldRunId) || planning.value.flowId !== d.flowId || !planning.value.initializationSource)
+          return fail("document-planning-basis-unavailable：缺少真实独立规划来源，未登记任务。", "缺少真实独立规划来源，未登记任务。");
+        const expectedKind = creatorSource ? "chief-creator-report" : "chief-customer-turn";
+        const ref = { ...planning.value.initializationSource, kind: planning.value.initializationSource.kind ?? "chief-customer-turn" };
+        if (ref.kind !== expectedKind) return fail("document-planning-source-invalid：真实工作来源类型与当前输入不一致。", "真实工作来源类型与当前输入不一致。");
+        if (!isTaskWorkSourceRef(ref)) return fail("document-planning-source-invalid：实际工作来源形状无效。", "实际工作来源形状无效。");
+        preparedDocumentPlanning = planning.value; workSourceRef = ref;
+        return undefined;
+    };
+    // A prior executable pin is never an authoring grant for the next customer change.
+    // A fresh customer source must still be current on the original NEW draft path.
+    if ((hubPreparation || documentPlanningRole || rolePreparation) && d.flowId && (source?.origin.kind === undefined || source.origin.kind === "message") &&
+        (!this.deps.getRegisteredProjectLifecycle?.(projectRoot) || !sourceIsCurrent()))
+      return fail("document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。", "缺少当前客户输入与真实项目选择，未登记文档任务。");
+    // The original NEW draft/report path remains separate until it has a real document baseline.
+    if ((hubPreparation || documentPlanningRole || rolePreparation) && d.flowId && sourceIsCurrent() &&
+        (source?.origin.kind === undefined || source.origin.kind === "message" || source.origin.kind === "handback")) {
+      const protection = await readRoleCapabilityProtectionScope({ projectRoot });
+      if (!sourceIsCurrent()) return fail("document-planning-source-changed：读取保护范围期间来源已变化。", "读取保护范围期间来源已变化。");
+      // This fresh observation selects compatibility only; the public planning call proves the actual scope.
+      // A genuine initialized empty Git media is distinguished from corrupt/missing authority by Pipeline.
+      if (hubPreparation || rolePreparation || protection.state !== "unmanaged") { const failure = await prepareDocumentScope(); if (failure) return failure; }
+    }
+    if (workerDispatch && executionRunId && executionFlowId && parentTaskId) {
+      const operationId = `freeze-dispatch-${createHash("sha256").update(JSON.stringify([executionRunId, parentTaskId, idempotencyKey])).digest("hex").slice(0, 40)}`;
+      const frozen = await freezeExecutionRun({ projectRoot, runId: executionRunId, flowId: executionFlowId, operationId });
+      if (!sourceIsCurrent()) return fail("worker-dispatch-source-changed：冻结期间发起轮次已变化，未派发。", "冻结期间发起轮次已变化，未派发。");
+      if (!frozen.ok) return fail(`worker-freeze stage=${frozen.stage} code=${frozen.code} parentTaskId=${parentTaskId} runId=${executionRunId}：${frozen.message}`, frozen.message);
+      const execution = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: executionFlowId,
+        runId: executionRunId, ...(requestedModuleId ? { moduleId: requestedModuleId } : {}) });
+      if (!sourceIsCurrent()) return fail("worker-dispatch-source-changed：核验期间发起轮次已变化，未派发。", "核验期间发起轮次已变化，未派发。");
+      if (!execution.ok) return fail(`${execution.code}：${execution.message}`, execution.message);
+      if (execution.value.kind !== "execution" || !execution.value.moduleId || !execution.value.modulePaths?.length)
+        return fail("worker-module-scope-unavailable：真实执行模块写区不可用，未派发。", "真实执行模块写区不可用，未派发。");
+      const frozenShape = validateRunManifest(frozen.run);
+      if (!frozenShape.ok)
+        return fail(`worker-freeze-return-invalid code=${frozenShape.code} reason=${frozenShape.reason} parentTaskId=${parentTaskId} runId=${executionRunId} flowId=${executionFlowId}：实际冻结run回执形状无效，未派发。`, "实际冻结run回执形状无效，未派发。");
+      if (frozenShape.manifest.state !== "pinned" || frozenShape.manifest.runId !== executionRunId || frozenShape.manifest.flowId !== executionFlowId)
+        return fail(`worker-freeze-return-invalid state=${frozenShape.manifest.state} actualRunId=${frozenShape.manifest.runId} actualFlowId=${frozenShape.manifest.flowId} expectedRunId=${executionRunId} expectedFlowId=${executionFlowId}：实际冻结run回执身份不匹配，未派发。`, "实际冻结run回执身份不匹配，未派发。");
+      runManifest = frozenShape.manifest; runState = "pinned";
+      executionModuleId = execution.value.moduleId; executionPaths = [...execution.value.modulePaths];
+      const roster = await loadPinnedRoster(projectRoot, runManifest);
+      if (!roster.ok) return fail("worker-pinned-roster-unavailable：真实冻结名单不可读，未派发。", "真实冻结名单不可读，未派发。");
+      pinnedRoster = roster.roster;
+    } else if (!mandatoryReview && !preparedDocumentPlanning && !preparedTeamPlanning && runFlowId !== undefined) {
+      const active = executionRunId ? await readRunManifest(projectRoot, executionRunId) : await findActiveRun(projectRoot, runFlowId);
       if (!active.ok) {
         runFacts.ledgerUnavailable = true;
       } else if (active.manifest !== null) {
@@ -7900,7 +9139,10 @@ ${formatted}` };
           runState = "draft";
         }
       }
-      if (runManifest !== undefined && runState === "pinned") {
+      if (runManifest !== undefined && runState === "pinned" && (hubPreparation || documentPlanningRole || rolePreparation)) {
+        const failure = await prepareDocumentScope(runManifest.runId); if (failure) return failure;
+        runManifest = undefined; runState = undefined;
+      } else if (runManifest !== undefined && runState === "pinned") {
         const verified = await verifyPinnedRun(projectRoot, runManifest);
         if (!verified.ok || verified.violations.length > 0) {
           runFacts.documentHashMismatch = true;
@@ -7919,42 +9161,10 @@ ${formatted}` };
       }
     }
 
-    // —— handoff 尽力 pin（R2）；失败只记 runFacts，任务照常创建 ——
-    if (handoffDispatch) {
-      if (runManifest === undefined) {
-        if (!runFacts.documentHashMismatch && !runFacts.pinnedRosterInvalid) runFacts.ledgerUnavailable = true;
-      } else if (runManifest.state !== "pinned") {
-        const pinned = await pinRun(projectRoot, runManifest.runId, {
-          ...(chainFacts.d3DecisionId !== undefined && chainFacts.d3Selected.length > 0
-            ? { d3: { decisionId: chainFacts.d3DecisionId, targetRoleIds: [...chainFacts.d3Selected] } }
-            : {}),
-        });
-        if (!pinned.ok) {
-          runFacts.pinFailed = true;
-        } else {
-          runManifest = pinned.manifest;
-          runState = "pinned";
-          const verifiedAfterPin = await verifyPinnedRun(projectRoot, pinned.manifest);
-          if (!verifiedAfterPin.ok || verifiedAfterPin.violations.length > 0) {
-            runFacts.documentHashMismatch = true;
-            runManifest = undefined;
-            runState = undefined;
-          } else {
-            const pinnedRosterResult = await loadPinnedRoster(projectRoot, pinned.manifest);
-            if (!pinnedRosterResult.ok) {
-              runFacts.pinnedRosterInvalid = true;
-              runManifest = undefined;
-              runState = undefined;
-            } else {
-              pinnedRoster = pinnedRosterResult.roster;
-            }
-          }
-        }
-      }
-    }
+    // Planning coordination must not require future D3, active role documents or workflow.
+    // Worker execution obtains a complete immutable pin through the separate execution preflight.
 
-    // R9：版本化文档基线漂移改为 advisory（A1 collector 唯一产出），不阻断派发。
-    const baselineViolations = await verifyVersionedDocBaselines({ projectRoot });
+    const { baselineViolations } = await collectDispatchBaselineFacts({ projectRoot });
 
     // —— B1/P1 §5.4：advisory 只由 A1 collector 产出；B1 只收集事实 ——
     const targetCardFound =
@@ -8010,9 +9220,27 @@ ${formatted}` };
         anchorState = runState;
         anchorRunId = runManifest.runId;
         anchorRunStage = runManifest.stage?.current;
-        anchorFlowId = chainFacts.flowId;
+        anchorFlowId = runManifest.flowId;
       }
     }
+
+    if (preparedReview) {
+      anchorState = "pinned"; // Proven by the immutable review preflight, not inferred from a role or task label.
+      anchorRunId = preparedReview.runId;
+      anchorFlowId = preparedReview.flowId;
+    }
+
+    if (preparedDocumentPlanning) {
+      anchorState = preparedDocumentPlanning.kind === "execution" ? "pinned" : "draft"; anchorRunId = preparedDocumentPlanning.runId; anchorFlowId = preparedDocumentPlanning.flowId;
+      anchorRunStage = undefined;
+    }
+    if (preparedTeamPlanning) {
+      anchorState = "draft"; anchorRunId = preparedTeamPlanning.runId; anchorFlowId = preparedTeamPlanning.flowId;
+      anchorRunStage = undefined;
+    }
+    // An optional legacy advisory must not erase a supplied flow and still accept a naked task.
+    if (d.flowId !== undefined && anchorFlowId !== d.flowId)
+      return fail("dispatch-scope-unavailable：未取得与请求一致的真实任务范围，未登记或投递任务。", "未取得与请求一致的真实任务范围，未登记或投递任务。");
 
     // —— 模块字段：适用名单=锚定 pinned roster，否则最新 roster（§5.3.3）——
     const applicableRoster =
@@ -8040,12 +9268,15 @@ ${formatted}` };
         : typeof d?.stepId === "string" && d.stepId.trim() !== ""
           ? d.stepId.trim()
           : undefined;
-    const created = taskEvent("task.created", {
+    let created = taskEvent("task.created", {
       taskId,
       from: fromRoleId === convenerRoleId ? "convener" : "chief",
       ...(anchorState !== undefined && anchorFlowId !== undefined ? { flowId: anchorFlowId } : {}),
       ...(dispatchStepId !== undefined ? { stepId: dispatchStepId } : {}),
-      ...(writeModule && taskModule !== undefined
+      ...(workerDispatch && executionModuleId && executionPaths
+        ? { moduleId: executionModuleId, modulePaths: executionPaths,
+            ...(taskModule?.id === executionModuleId && taskModule.path.endsWith("/") ? { moduleDirectory: taskModule.path } : {}) }
+        : writeModule && taskModule !== undefined
         ? {
             moduleId: taskModule.id,
             ...(taskModule.path.endsWith("/") ? { moduleDirectory: taskModule.path } : {}),
@@ -8063,14 +9294,100 @@ ${formatted}` };
         : {}),
       ...(expectedOutput !== undefined ? { expectedOutput } : {}),
       ...(requestedEvidence !== undefined ? { requestedEvidence } : {}),
+      ...(workSourceRef ? { workSourceRef } : {}),
+      ...(preparedDocumentPlanning?.hubRouting === "chief-hub-v1" ? { hubRouting: "chief-hub-v1" as const } : {}),
+      ...(preparedReview ? { reviewBasisRef: preparedReview.reviewBasisRef, reviewControllerRef: preparedReview.reviewControllerRef, hubRouting: "chief-hub-v1" as const } : {}),
       sideEffect,
       idempotencyKey,
     }, () => createdAt);
-    if (!(await this.appendTaskState(projectRoot, created))) {
-      return fail(
-        "派发未受理：任务状态登记写入失败——**未投递**；请稍后重试（不自称已送达）。",
-        "派发未受理：任务状态登记写入失败——**未投递**（不静默）。",
-      );
+    let sourceLease: { projectRoot: string; leaseId: string } | undefined;
+    if (initializationIsCurrent || documentSourceIsCurrent || reviewHost) {
+      const lease = beginGitHostAction({ projectRoot, kind: "dispatch" });
+      if (!lease.ok) return fail("项目状态正在变更，初始化尚未派发。请稍后重试。", "项目状态正在变更，初始化尚未派发。请稍后重试。");
+      sourceLease = { projectRoot, leaseId: lease.leaseId };
+    }
+    try {
+      if (initializationIsCurrent && !initializationIsCurrent()) return fail(initializationChanged, initializationChanged);
+      if (preparedReview) {
+        if (!reviewHost?.isCurrent()) return fail("review-source-changed", "当前幕僚评审来源已变化。");
+        const fresh = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: preparedReview.flowId, reviewTarget: d.reviewTarget, hostInitialization: reviewHost.hostInitialization });
+        if (!fresh.ok) return fail(`${fresh.code}：${fresh.message}`, fresh.message);
+        if (!reviewHost.isCurrent() || fresh.value.kind !== "review" || fresh.value.runId !== created.runId || fresh.value.flowId !== created.flowId ||
+            fresh.value.basisDigest !== preparedReview.basisDigest || JSON.stringify(fresh.value.reviewBasisRef) !== JSON.stringify(created.reviewBasisRef) ||
+            JSON.stringify(fresh.value.reviewControllerRef) !== JSON.stringify(created.reviewControllerRef) || fresh.value.initializationSource?.sourceId !== workSourceRef?.sourceId ||
+            fresh.value.initializationSource?.sha256 !== workSourceRef?.sha256 || fresh.value.initializationSource?.path !== workSourceRef?.path ||
+            (fresh.value.initializationSource?.kind ?? "chief-customer-turn") !== workSourceRef?.kind)
+          return fail("review-basis-changed：提交前评审对象或来源已变化。", "提交前评审对象或来源已变化。");
+      }
+      if (preparedTeamPlanning) {
+        if (!teamPlanningHostSource || !initializationIsCurrent?.()) return fail(initializationChanged, initializationChanged);
+        const fresh = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: preparedTeamPlanning.flowId, hostInitialization: teamPlanningHostSource });
+        if (!fresh.ok) return fail(`${fresh.code}：${fresh.message}`, fresh.message);
+        const receipt = fresh.value.initializationSource;
+        if (!initializationIsCurrent() || fresh.value.kind !== "planning" || fresh.value.flowId !== created.flowId ||
+            fresh.value.runId !== created.runId || fresh.value.basisDigest !== preparedTeamPlanning.basisDigest ||
+            receipt?.sourceId !== workSourceRef?.sourceId || receipt?.path !== workSourceRef?.path || receipt?.sha256 !== workSourceRef?.sha256 ||
+            (receipt?.kind ?? "chief-customer-turn") !== workSourceRef?.kind)
+          return fail("planning-source-changed：提交前团队规划依据或来源已变化，未登记任务。", "提交前团队规划依据或来源已变化，未登记任务。");
+      }
+      if (preparedDocumentPlanning) {
+        if (!documentHostSource || !documentSourceIsCurrent?.()) return fail("document-planning-source-changed：当前客户或项目来源已变化。", "当前客户或项目来源已变化。");
+        const fresh = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: preparedDocumentPlanning.flowId, hostInitialization: documentHostSource });
+        if (!fresh.ok) return fail(`${fresh.code}：${fresh.message}`, fresh.message);
+        if (!documentSourceIsCurrent() || fresh.value.kind !== preparedDocumentPlanning.kind ||
+            created.runState !== (preparedDocumentPlanning.kind === "execution" ? "pinned" : "draft") || fresh.value.purpose !== expectedPreparationPurpose || fresh.value.hubRouting !== preparedDocumentPlanning.hubRouting ||
+            fresh.value.flowId !== created.flowId || fresh.value.runId !== created.runId || fresh.value.basisDigest !== preparedDocumentPlanning.basisDigest ||
+            fresh.value.initializationSource?.sourceId !== workSourceRef?.sourceId || fresh.value.initializationSource?.sha256 !== workSourceRef?.sha256 ||
+            fresh.value.initializationSource?.path !== workSourceRef?.path || (fresh.value.initializationSource?.kind ?? "chief-customer-turn") !== workSourceRef?.kind)
+          return fail("document-planning-source-changed：提交前真实规划依据已变化，未登记任务。", "提交前真实规划依据已变化，未登记任务。");
+      }
+      // Keep the lease across all ledger awaits. Cancellation does not prematurely release an in-flight append.
+      if (mandatoryReview && (!preparedReview || !created.flowId || !created.runId || !created.reviewBasisRef || !created.reviewControllerRef || created.hubRouting !== "chief-hub-v1"))
+        return fail("review-source-unavailable：评审来源未完整绑定，未登记任务。", "评审来源未完整绑定，未登记任务。");
+      if (created.from === "convener" && created.flowId !== undefined) {
+        if (!parentTaskId || created.runId !== executionRunId || created.flowId !== executionFlowId)
+          return fail("task-parent-unavailable：子任务与当前实际父任务run/flow不一致，未登记任务。", "子任务与当前实际父任务run/flow不一致，未登记任务。");
+        if (!sourceIsCurrent()) return fail("worker-dispatch-source-changed：发起轮次已变化，未登记任务。", "发起轮次已变化，未登记任务。");
+        // A built-in target does not turn an execution dispatch into planning authorization.
+        if (!workerDispatch && created.runId) {
+          const checked = await prepareRoleDispatch({ projectRoot, fromRoleId, targetRoleId, flowId: created.flowId, runId: created.runId,
+            parentTaskId, ...(d.reviewTarget ? { reviewTarget: d.reviewTarget } : {}), ...(requestedModuleId ? { moduleId: requestedModuleId } : {}) });
+          if (!checked.ok) return fail(`${checked.code}：${checked.message}`, checked.message);
+          if (!sourceIsCurrent()) return fail("worker-dispatch-source-changed：预检期间发起轮次已变化，未登记任务。", "预检期间发起轮次已变化，未登记任务。");
+          if (checked.value.kind === "review") {
+            if (!checked.value.reviewBasisRef || !checked.value.parentTaskRef || checked.value.runId !== created.runId ||
+                checked.value.flowId !== created.flowId || created.runState !== "pinned")
+              return fail("review-source-unavailable：实际评审来源或已冻结run不匹配，未派发。", "实际评审来源或已冻结run不匹配，未派发。");
+            if (requestedModuleId || requestedModulePaths?.length)
+              return fail("review-module-scope-forbidden：评审不接受实现模块写区，未派发。", "评审不接受实现模块写区，未派发。");
+            const { moduleId, modulePaths, moduleDirectory, ...withoutModule } = created;
+            created = { ...withoutModule, reviewBasisRef: checked.value.reviewBasisRef, parentTaskRef: checked.value.parentTaskRef };
+          } else if (checked.value.kind === "execution") created = { ...created, moduleId: checked.value.moduleId, modulePaths: checked.value.modulePaths };
+        }
+        if (!executionRunId || !executionFlowId) return fail("task-parent-unavailable：缺少实际父任务run/flow，未登记任务。", "缺少实际父任务run/flow，未登记任务。");
+        if (!created.reviewBasisRef) {
+          const parent = await prepareParentTaskRef({ projectRoot, actorRoleId: "convener", taskId: parentTaskId,
+            flowId: executionFlowId, runId: executionRunId });
+          if (!parent.ok) return fail(`${parent.code}：${parent.message}`, parent.message);
+          created = { ...created, parentTaskRef: parent.parentTaskRef };
+        }
+        if (!sourceIsCurrent())
+          return fail("worker-dispatch-source-changed：父任务绑定已变化，未登记任务。", "父任务绑定已变化，未登记任务。");
+      }
+      const appended = await this.appendTaskStateResult(projectRoot, created);
+      if (!appended.ok) return fail(`任务未登记、未投递：${appended.code}：${appended.message}`, `任务未登记、未投递：${appended.message}`);
+      if (appended.replay) return { ok: true, message: `任务 #${taskId} 的同一登记已存在，未重新打开会话或投递；登记重放不授权执行。` };
+      if (workerDispatch) createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: fromRoleId })
+        .record("worker.dispatch.parent-observed", { taskId, parentTaskId, runId: executionRunId, flowId: executionFlowId });
+      // Recheck the source-selection invariant after every ledger await, before releasing this exact lease.
+      if (initializationSelectionIsCurrent && !initializationSelectionIsCurrent())
+        throw new Error("子任务来源在提交期间发生变化，尚未投递，请检查诊断后重试。");
+      // This committed child now owns its durable source; later parent settlement/focus changes do not revoke it.
+    } finally {
+      if (sourceLease) {
+        const ended = endGitHostAction(sourceLease);
+        if (!ended.ok) throw new Error("项目状态协调未能完成，请检查诊断后重试。");
+      }
     }
     this.starTaskIds.add(taskId);
     this.taskCreators.set(taskId, fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief");
@@ -8095,27 +9412,24 @@ ${formatted}` };
       },
     );
     if (plan.action === "reject") {
-      await this.appendTaskState(projectRoot, taskEvent("task.closed", {
-        taskId,
-        by: fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief",
-        outcome: "rejected",
-        note: `delivery-rejected: ${shortenSummary(plan.message)}`,
-      }, () => new Date(this.now())));
+      await this.recordTaskFailure(projectRoot, taskId, `delivery-rejected: ${shortenSummary(plan.message)}`);
       return fail(plan.message, plan.systemRow);
     }
     // 目标已有活会话 ⇒ 按其真实引擎投递（不让幕僚会话的引擎选择串到目标）。
     // 2026-10-29（BUG-5）：目标**无活会话**时先同步 open/resume；失败则拒发并给派发者回执，
     // 绝不再把任务静默留在队列里等一个可能永远不会出现的“下次时机”。
+    if (workSourceRef || created.parentTaskRef || workerDispatch) {
+      const assigned = await inspectAssignedTask({ projectRoot, taskId, actorRoleId: targetRoleId });
+      if (!assigned.ok) return fail(`${assigned.code}：${assigned.message ?? assigned.code}`, assigned.message ?? assigned.code);
+    }
+    const taskBoundDispatch = workerDispatch || created.reviewBasisRef !== undefined || created.hubRouting === "chief-hub-v1";
     let deliveryRuntime = this.findLiveRuntime(projectRoot, targetRoleId) ?? runtime;
-    if (!this.sessions.has(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime))) {
-      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime }, false);
+    const existingWorker = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime));
+    if (!existingWorker || taskBoundDispatch && !existingWorker.busy && existingWorker.origins.running === undefined) {
+      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime,
+        ...(taskBoundDispatch ? { taskId } : {}) }, false);
       if (!opened.ok) {
-        await this.appendTaskState(projectRoot, taskEvent("task.closed", {
-          taskId,
-          by: fromRoleId === this.handbackOwnerRoleId(projectRoot) ? "convener" : "chief",
-          outcome: "rejected",
-          note: `delivery-target-open-failed: ${shortenSummary(opened.error ?? mainT("shared.common.unknownReason"))}`,
-        }, () => new Date(this.now())));
+        await this.recordTaskFailure(projectRoot, taskId, `delivery-target-open-failed: ${shortenSummary(opened.error ?? mainT("shared.common.unknownReason"))}`);
         return fail(
           mainT("main.session.dispatchTargetOpenFailed", {
             target: this.roleDisplayName(projectRoot, targetRoleId),
@@ -8126,6 +9440,19 @@ ${formatted}` };
       }
       deliveryRuntime = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime))?.runtime ?? deliveryRuntime;
     }
+    if (workSourceRef || created.parentTaskRef || workerDispatch) {
+      const assigned = await inspectAssignedTask({ projectRoot, taskId, actorRoleId: targetRoleId });
+      if (!assigned.ok || workSourceRef && (assigned.value.workSourceRef?.sourceId !== workSourceRef.sourceId ||
+          assigned.value.workSourceRef.sha256 !== workSourceRef.sha256)) {
+        const code = assigned.ok ? "assigned-child-work-source-mismatch" : assigned.code;
+        const detail = assigned.ok ? `expectedSourceId=${workSourceRef?.sourceId} actualSourceId=${assigned.value.workSourceRef?.sourceId ?? "missing"} expectedSha256=${workSourceRef?.sha256} actualSha256=${assigned.value.workSourceRef?.sha256 ?? "missing"}` : assigned.message ?? assigned.code;
+        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: fromRoleId }).record("dispatch.child.before-enqueue-rejected", { taskId, errorCode: code, errorMessage: detail });
+        await this.recordTaskFailure(projectRoot, taskId, `assigned-child-unavailable-before-enqueue:${code}:${detail}`);
+        return fail(`assigned-child-unavailable-before-enqueue code=${code}：${detail}。子任务尚未投递。`, "子任务当前来源或授权已失效，尚未投递。");
+      }
+    }
+    // The committed child's durable work source survives its parent turn settling and UI focus changes.
+    // Actual child cancellation, root/basis and execution authorization are rechecked by Pipeline/Service.
     const deliveryDedupKey = `${projectRoot}\u0000${deliveryRuntime}\u0000task\u0000${taskId}`;
     this.activeDispatchKeys.add(deliveryDedupKey);
     this.enqueueDelivery(projectRoot, targetRoleId, {
@@ -8315,11 +9642,11 @@ ${formatted}` };
    * dispose＋重开（保留 ANS 回放；F-5-opt1 注记适用）；**在跑轮次不打断**（busy ⇒ 拒绝并如实回执）。
    * 与陈旧重建（O-1）同链串行（`rebuildChains` 按会话键——同一角色至多一个重建在跑）。
    */
-  async rebuildSession(target: string | SessionTarget): Promise<RebuildSessionResult> {
+  async rebuildSession(target: string | SessionTarget, beforeDispose?: (entry: LiveSession) => Promise<boolean>): Promise<RebuildSessionResult> {
     const key = this.targetKey(target);
     if (key === undefined) return { ok: false, error: mainT("main.session.recoveryNoMatch") };
     const prev = this.rebuildChains.get(key) ?? Promise.resolve();
-    const run = prev.then(() => this.rebuildSessionUnsafe(key));
+    const run = prev.then(() => this.rebuildSessionUnsafe(key, beforeDispose));
     const tail = run.then(() => undefined, () => undefined);
     this.rebuildChains.set(key, tail);
     void tail.then(() => {
@@ -8329,10 +9656,11 @@ ${formatted}` };
   }
 
   /** `rebuildSession` 的链内实现（同 `rebuildIfBoundaryStaleUnsafe` 同款步骤，**去掉陈旧判据**——手动触发）。 */
-  private async rebuildSessionUnsafe(key: string): Promise<RebuildSessionResult> {
+  private async rebuildSessionUnsafe(key: string, beforeDispose?: (entry: LiveSession) => Promise<boolean>): Promise<RebuildSessionResult> {
     const entry = this.sessions.get(key);
     if (!entry) return { ok: false, error: mainT("main.session.recoveryNoSession") };
     if (entry.busy) return { ok: false, error: mainT("main.session.recoveryBusy") };
+    if (beforeDispose && !(await beforeDispose(entry))) return { ok: false, error: "调用来源或执行范围已变化，未刷新目标会话。" };
     if (this.sessions.get(key) !== entry || entry.busy) return { ok: false, error: mainT("main.session.recoveryConcurrent") }; // TOCTOU
     const { projectRoot, roleId, runtime } = entry;
     const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
@@ -8343,7 +9671,7 @@ ${formatted}` };
       event: { kind: "message", summary: mainT("main.session.rebuiltByRecovery", { roleId }) },
     });
     const selectionVersion = this.selectionVersion;
-    const reopened = await this.openInternalUnsafe({ projectRoot, roleId, runtime }, true, selectionVersion, true);
+    const reopened = await this.openInternalUnsafe({ projectRoot, roleId, runtime, ...((entry.boundAssignment?.taskId ?? entry.assignedTaskId) ? { taskId: entry.boundAssignment?.taskId ?? entry.assignedTaskId } : {}) }, true, selectionVersion, true);
     if (reopened.ok) {
       this.queueRebuildWritePermitsNotice(key); // 入参＝会话键
       void this.drainQueue(projectRoot, roleId, runtime);
@@ -8409,19 +9737,14 @@ ${formatted}` };
   // 零副作用**（登记不动、不重建、不投系统行）。**安装/卸载不改变任何角色的写边界**（技能是必读资料，
   // 不是权限）。
 
-  /**
-   * ### 裁定④（G-4）：「su 当前轮次是否由**客户消息**发起」——安装/卸载护栏的唯一判据
-   * （设计 §6.4：「桌面 handler 读该角色当前 `activeDeliveries` 的 kind 即可判定」）。三态：
-   * · 该会话有在跑投递条目：`kind === "message"`（忙时排队的客户消息投出的一轮）⇒ 是；
-   *   `handback` / `dispatch` / `system`（回交验收/派发/看护系统消息等打开的一轮）⇒ 否；
-   * · 无在跑投递条目：**只有直接 `send`** 开跑的轮次如此（其唯一调用方＝客户聊天 `sendSession`）⇒ 是；
-   * · 会话不在 / 不在轮次中（防御——工具只可能在轮次内被调用）⇒ 否。
-   */
+  /** Installation's existing customer-turn rule follows the actual running origin.
+   * Direct system inputs and dispatch/handback rounds are not customer messages;
+   * absence of an active-delivery row is never evidence of customer intent. */
   private isCustomerInitiatedTurn(projectRoot: string, runtime: RuntimeKind, roleId: string): boolean {
     const entry = this.sessions.get(this.sessionKey(projectRoot, roleId, runtime));
     if (!entry || entry.busy !== true) return false;
-    const active = this.activeDeliveries.get(this.queueKey(projectRoot, roleId, runtime));
-    return active === undefined || active.kind === "message";
+    const origin = entry.origins.running;
+    return origin !== undefined && !origin.settled && origin.kind === "message";
   }
 
   /**
@@ -8433,14 +9756,16 @@ ${formatted}` };
    * · `{effective:"next-session", error}`＝重开失败（调用方按各自登记面组成 `rebuild-failed` 回执——
    *   登记/声明仍在，**不假装已生效**）。竞态（检查后目标开跑一轮）按其如实延迟、不报失败。
    */
-  private async activateRoleRefresh(projectRoot: string, runtime: RuntimeKind, roleId: string): Promise<{ effective: "rebuilt" | "next-session"; note?: string; error?: string }> {
+  private async activateRoleRefresh(projectRoot: string, runtime: RuntimeKind, roleId: string, beforeEffect?: () => Promise<boolean>): Promise<{ effective: "rebuilt" | "next-session"; note?: string; error?: string }> {
     const targetSessionKey = this.sessionKey(projectRoot, roleId, runtime);
     const targetEntry = this.sessions.get(targetSessionKey);
     if (!targetEntry) {
       return { effective: "next-session", note: mainT("main.session.configNextSession") };
     }
     if (targetEntry.busy) return { effective: "next-session" }; // 在跑轮次不打断（沿 G-2 语义）；本次回执如实延迟
-    const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime });
+    const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime }, beforeEffect
+      ? async current => current === targetEntry && await beforeEffect()
+      : undefined);
     if (rebuilt.ok) return { effective: "rebuilt" };
     if (this.sessions.get(targetSessionKey)?.busy === true) return { effective: "next-session" }; // 竞态：检查后开跑——不报失败
     return { effective: "next-session", error: rebuilt.error ?? mainT("shared.common.unknownReason") };
@@ -8460,6 +9785,7 @@ ${formatted}` };
     runtime: RuntimeKind,
     callerRoleId: string,
     d: InstallSkillPayload,
+    beforeActivation?: () => Promise<boolean>,
   ): Promise<InstallSkillReceipt> {
     const acting = action === "installed";
     const verb = acting ? mainT("main.session.install.verbInstall") : mainT("main.session.install.verbUninstall");
@@ -8542,7 +9868,9 @@ ${formatted}` };
     //    idle ⇒ rebuilt（即刻生效）；在跑 ⇒ next-session（如实延迟态，**不是错误**——settle 后靠既有
     //    检查点（含裁定⑤ 指纹）收敛）；无会话 ⇒ next-session（无旧上下文可重建）；重开失败 ⇒
     //    rebuild-failed（登记仍在，**不假装已生效**）。
-    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId);
+    if (beforeActivation && !(await beforeActivation()))
+      return refuse("effect-scope-unproven", "调用来源或执行范围已变化，未激活或刷新目标会话。");
+    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId, beforeActivation);
     if (activation.error !== undefined) {
       diagnostic.error("skill.rebuild.failed", new Error(activation.error), { toolName, targetRoleId: roleId });
       return {
@@ -8608,6 +9936,7 @@ ${formatted}` };
     runtime: RuntimeKind,
     callerRoleId: string,
     d: InstallMcpPayload,
+    beforeActivation?: () => Promise<boolean>,
   ): Promise<InstallMcpReceipt> {
     const acting = action === "installed";
     const verb = acting ? mainT("main.session.install.verbInstall") : mainT("main.session.install.verbUninstall");
@@ -8687,7 +10016,9 @@ ${formatted}` };
     }
 
     // ⑥ 激活（共用件 `activateRoleRefresh`——同技能版三态与竞态语义）。
-    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId);
+    if (beforeActivation && !(await beforeActivation()))
+      return refuse("effect-scope-unproven", "调用来源或执行范围已变化，未激活或刷新目标会话。");
+    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId, beforeActivation);
     if (activation.error !== undefined) {
       diagnostic.error("mcp.rebuild.failed", new Error(activation.error), { toolName, targetRoleId: roleId });
       return {
@@ -9260,11 +10591,39 @@ ${formatted}` };
    * 逻辑在 `drainQueueUnsafe`。**F-2-M1 起串行只覆盖「认领段」**：投递开跑（`sendDelivery` 取到 promise）
    * 后链即释放，成功/失败记账在**分离续段**执行（其自身带同款拦截——见 `drainQueueUnsafe` 尾部）。
    */
+  /** Host transport barrier only: completion is not native-stop evidence or execution permission. */
+  async waitForRunStopDeliveryClaims(input: { projectRoot: string; taskIds: readonly string[]; signal?: AbortSignal; caller?: ActualDispatchSource }): Promise<{ status: "wait-complete"; count: number } | { status: "blocked"; code: string }> {
+    const blocked = (code: string) => ({ status: "blocked" as const, code });
+    if (input.signal?.aborted) return blocked("run-stop-claim-wait-cancelled");
+    if (!input.taskIds.length || input.taskIds.some(taskId => !taskId)) return blocked("run-stop-claim-source-unproven");
+    const taskIds = new Set(input.taskIds), current = () => [...this.drainClaimRecords].filter(row => row.projectRoot === input.projectRoot &&
+      !(input.caller && row.owner?.entry === input.caller.entry && row.owner.origin === input.caller.origin));
+    const observed = current();
+    if (observed.some(row => !row.taskIds?.length)) return blocked("run-stop-claim-source-unproven");
+    const claims = observed.filter(row => row.taskIds!.some(taskId => taskIds.has(taskId)));
+    if (claims.length) {
+      const completed = await new Promise<boolean>(resolve => {
+        const abort = () => { input.signal?.removeEventListener("abort", abort); resolve(false); };
+        input.signal?.addEventListener("abort", abort, { once: true });
+        if (input.signal?.aborted) { abort(); return; }
+        void Promise.all(claims.map(row => row.done)).then(() => { input.signal?.removeEventListener("abort", abort); resolve(true); });
+      });
+      if (!completed || input.signal?.aborted) return blocked("run-stop-claim-wait-cancelled");
+    }
+    const fresh = current();
+    if (fresh.some(row => !row.taskIds?.length)) return blocked("run-stop-claim-source-unproven");
+    if (fresh.some(row => row.taskIds!.some(taskId => taskIds.has(taskId)))) return blocked("run-stop-claim-source-changed");
+    return { status: "wait-complete", count: claims.length };
+  }
+
   private async drainQueue(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
     const key = projectRoot;
+    let completeClaim!: () => void;
+    const claim: { projectRoot: string; taskIds?: readonly string[]; owner?: ActualDispatchSource; done: Promise<void> } = { projectRoot, done: new Promise<void>(resolve => { completeClaim = resolve; }) };
+    this.drainClaimRecords.add(claim);
     const prev = this.drainChains.get(key) ?? Promise.resolve();
     const next = prev
-      .then(() => this.drainQueueUnsafe(projectRoot, targetRoleId, runtime))
+      .then(() => this.drainQueueUnsafe(projectRoot, targetRoleId, runtime, claim))
       .catch((err) => {
         this.emitDeliveryNote(projectRoot, runtime,
           this.handbackOwnerRoleId(projectRoot),
@@ -9273,11 +10632,13 @@ ${formatted}` };
         );
       });
     this.drainChains.set(key, next);
+    this.publishDeliveryInventory("delivery-claim-queued");
     try {
       await next;
     } finally {
       // 链尾清理（若期间又有新链悬挂在更后面，让新链自己的 finally 收尾——防泄漏）。
       if (this.drainChains.get(key) === next) this.drainChains.delete(key);
+      this.drainClaimRecords.delete(claim); completeClaim(); this.publishDeliveryInventory("delivery-claim-settled");
     }
   }
 
@@ -9301,10 +10662,13 @@ ${formatted}` };
    * **F-2-opt3（2026-10-16 客户批准）**：认领段起止各记一条诊断（`delivery.claim.start/end`）——下一轮真机
    * 可一眼区分「认领耗时」vs「轮次时长」（本轮 F-2 破案正是靠既有 `delivery.start/end`）。
    */
-  private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind): Promise<void> {
+  private async drainQueueUnsafe(projectRoot: string, targetRoleId: string | null, runtime: RuntimeKind, claim: { taskIds?: readonly string[]; owner?: ActualDispatchSource }): Promise<void> {
     const resolvedTarget =
       targetRoleId !== null && targetRoleId !== "" ? targetRoleId : (this.handbackOwnerRoleId(projectRoot) ?? "");
     const key = this.queueKey(projectRoot, resolvedTarget, runtime);
+    if (this.deliveryIsStopped(key)) return;
+    const lifecycle = this.deliveryLifecycle(key);
+    const stopped = () => this.deliveryIsStopped(key) || this.deliveryLifecycle(key) !== lifecycle;
     const q = this.deliveryQueues.get(key);
     if (!q || q.length === 0) return;
     // 2026-10-20 真机（Convener 卡 1h、队列 24 条回交被 system 看护项堵住）：**回交/派发优先于 system**。
@@ -9313,7 +10677,14 @@ ${formatted}` };
     const priorityIndex = q.findIndex((i) => i.kind !== "system");
     const headIndex = priorityIndex >= 0 ? priorityIndex : 0;
     const item = q[headIndex];
+    // These identities come from the selected transport item, never from the latest role/task.
+    const claimTaskId = item.kind === "dispatch" ? item.taskId : item.kind === "system" ? item.systemAssignment?.taskId : undefined;
+    claim.taskIds = claimTaskId ? [claimTaskId] : undefined;
+    this.publishDeliveryInventory("delivery-claim-assigned");
     const diagnostic = createDiagnosticLogger({ component: "desktop.delivery", projectRoot, roleId: resolvedTarget });
+    if (this.runTaskIsFenced(projectRoot, item.kind === "dispatch" ? item.taskId : item.kind === "system" ? item.systemAssignment?.taskId : undefined, item.kind === "system" ? item.systemAssignment?.runId : undefined)) {
+      item.lastAttempt = { state: "blocked", code: "run-stop-host-fenced", at: new Date(this.now()).toISOString() }; return;
+    }
 
     if (resolvedTarget === "") {
       const noteKey = this.queueKey(projectRoot, "", runtime);
@@ -9328,6 +10699,42 @@ ${formatted}` };
       return;
     }
 
+    const inspectResume = async (): Promise<boolean> => {
+      if (!item.controllerResume) return true;
+      const sealed = item.controllerResume;
+      const actual = await inspectQueuedControllerResume({ projectRoot, resumeController: sealed.expected, resumeKey: sealed.resumeKey, basisDigest: sealed.basisDigest });
+      if (stopped()) return false;
+      if (actual.ok && item.taskId === actual.value.taskId && item.flowId === actual.value.flowId && resolvedTarget === "convener") return true;
+      const code = actual.ok ? "controller-resume-identity-changed" : actual.code;
+      const detail = actual.ok ? "队列任务身份与原运营不一致" : actual.message ?? actual.code;
+      item.lastAttempt = { state: "failed", code, at: new Date(this.now()).toISOString() };
+      const index = q.indexOf(item); if (index !== -1) q.splice(index, 1); if (!q.length) this.deliveryQueues.delete(key);
+      this.activeDispatchKeys.delete(item.dedupKey);
+      diagnostic.record("controller.resume.delivery-rejected", { errorCode: code, errorMessage: detail });
+      this.emitDeliveryNote(projectRoot, runtime, item.sourceRoleId, "convener", `运营续接未投递：${code}：${detail}。原任务事实保留，请幕僚核对后明确重试；此结果不证明旧执行已停止。`);
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime); this.persistDeliveryQueues(); void this.drainQueue(projectRoot, resolvedTarget, runtime);
+      return false;
+    };
+    if (!await inspectResume()) return;
+    // Only the exact persisted close receipt can retire its original assignment's notice.
+    // This is information already committed by the creator, never another model turn or assignment.
+    if (item.kind === "system" && item.systemAssignment && item.notificationSource) {
+      const closed = await classifyClosedTaskNotice({ projectRoot, recipientRoleId: resolvedTarget,
+        boundTaskId: item.systemAssignment.taskId, operationId: item.notificationSource.operationId,
+        source: item.notificationSource });
+      if (stopped()) return;
+      if (closed.ok) {
+        const index = q.indexOf(item); if (index !== -1) q.splice(index, 1);
+        if (q.length === 0) this.deliveryQueues.delete(key);
+        this.deliveredDeliveryKeys.add(`${key}\u0000${item.dedupKey}`);
+        this.rememberAppTaskDelivered(item.clientMessageId);
+        diagnostic.record("delivery.notice.information-only", { taskId: closed.value.taskId, operationId: closed.value.operationId });
+        this.notifyRoleState(projectRoot, resolvedTarget, runtime); this.persistDeliveryQueues();
+        void this.drainQueue(projectRoot, resolvedTarget, runtime);
+        return;
+      }
+    }
+
     // P2（2026-10-30）：离线期间**不认领新的模型投递**——队列保留并标 `blockedReason:"network"`
     // （数据面可见）；恢复后由 `applyNetworkState` 走同一 `drainAllQueuesFor` 继续（不把离线当完成/丢弃）。
     if (this.isNetworkOffline()) {
@@ -9336,11 +10743,14 @@ ${formatted}` };
       return;
     }
 
+    let childRequiresCurrentAssignment = false, taskBoundReview = false;
     // **2026-10-29（BUG-5）**：任务在排队期间已完成（已报告/已收口）⇒ 该派发项不得再投递。
     // 完成后的重复投递只记诊断与丢弃队列项，不产生 task.delivered/新一轮事件；不触碰其他条目。
     if (item.kind === "dispatch" && typeof item.taskId === "string" && item.taskId !== "") {
       const record = (await this.readTasks(projectRoot)).records.get(item.taskId);
-      if (record !== undefined && (record.closed !== undefined || record.reports.length > 0)) {
+      childRequiresCurrentAssignment = !!(record?.created?.parentTaskRef || record?.created?.workSourceRef);
+      taskBoundReview = record?.created?.reviewBasisRef !== undefined;
+      if (record !== undefined && (record.closed !== undefined || !item.controllerResume && record.reports.length > 0)) {
         q.splice(headIndex, 1);
         if (q.length === 0) this.deliveryQueues.delete(key);
         diagnostic.record("delivery.skip.task-terminal", {
@@ -9367,8 +10777,66 @@ ${formatted}` };
       return;
     }
 
+    let pendingControllerAssignment: DeliveryAssignment | undefined;
+    const inspectHandbackAssignment = async () => {
+      if (item.kind !== "handback" || resolvedTarget !== "convener") return true;
+      const members = item.batchItems ?? [item];
+      let selected: DeliveryAssignment | undefined;
+      for (const member of members) {
+        if (!member.handback?.taskId) {
+          diagnostic.record("delivery.blocked", { reasonCode: "delivery-child-source-invalid" });
+          return false;
+        }
+        const actual = await resolveDeliveryAssignment({ projectRoot, recipientRoleId: resolvedTarget,
+          source: { kind: "child-report", childTaskId: member.handback.taskId, childRoleId: member.handback.roleId },
+          ...(member.flowId ? { expectedFlowId: member.flowId } : {}) });
+        if (stopped()) return false;
+        if (!actual.ok) {
+          item.lastAttempt = { state: "blocked", code: actual.code, at: new Date(this.now()).toISOString() };
+          diagnostic.record("delivery.blocked", { reasonCode: actual.code, message: actual.message });
+          this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, member.handback.roleId,
+            `回交当前任务来源不可用，未打开或续投，消息已保留：${actual.code}：${actual.message}`);
+          return false;
+        }
+        if (selected && (selected.taskId !== actual.value.taskId || selected.flowId !== actual.value.flowId || selected.runId !== actual.value.runId)) {
+          diagnostic.record("delivery.blocked", { reasonCode: "delivery-assignment-mixed" });
+          return false;
+        }
+        selected = actual.value;
+      }
+      pendingControllerAssignment = selected;
+      return selected !== undefined;
+    };
+    if (!await inspectHandbackAssignment()) return;
     let entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
-    if (!entry || entry.projectRoot !== projectRoot) {
+    const taskBoundWorker = item.kind === "dispatch" && !!item.taskId && !isBuiltInGovernanceRoleId(resolvedTarget);
+    const taskBoundSession = taskBoundWorker || taskBoundReview || pendingControllerAssignment !== undefined;
+    const assignedDeliveryId = pendingControllerAssignment?.taskId ?? item.taskId;
+    const boundTaskOf = (current: LiveSession | undefined) => current?.boundAssignment?.taskId ?? current?.assignedTaskId;
+    const inspectQueuedChild = async () => {
+      if (!(taskBoundWorker || childRequiresCurrentAssignment) || !item.taskId) return true;
+      const assigned = await inspectAssignedTask({ projectRoot, taskId: item.taskId, actorRoleId: resolvedTarget });
+      if (assigned.ok) {
+        if (!taskBoundWorker) {
+          const created = (await this.readTasks(projectRoot)).records.get(item.taskId)?.created;
+          if (created?.from === "convener" && !created.reviewBasisRef && created.flowId && created.runId) {
+            const checked = await prepareRoleDispatch({ projectRoot, fromRoleId: "convener", targetRoleId: resolvedTarget,
+              flowId: created.flowId, runId: created.runId, ...(created.moduleId ? { moduleId: created.moduleId } : {}) });
+            if (!checked.ok) { diagnostic.record("delivery.blocked", { taskId: item.taskId, reasonCode: checked.code, message: checked.message }); return false; }
+          }
+        }
+        return true;
+      }
+      const index = q.indexOf(item); if (index !== -1) q.splice(index, 1);
+      if (q.length === 0) this.deliveryQueues.delete(key);
+      diagnostic.record("delivery.skip.task-unavailable", { taskId: item.taskId, reasonCode: assigned.code, message: assigned.message });
+      this.notifyRoleState(projectRoot, resolvedTarget, runtime); this.persistDeliveryQueues();
+      return false;
+    };
+    if (!await inspectQueuedChild()) return;
+    if (taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId && entry?.busy) return;
+    if (stopped()) return;
+    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId) {
       // 2026-11-05（真机缺陷「又卡住」）：生产宿主（Interface）把 `demoRuntimeAutoDeliver` 置 false ⇒
       // **演示运行时（demo）不自动开会话**。demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，
       // 用于演示"写前被拒"），自动唤醒只会得到被门禁拒绝的回合，失败结果再经回交/派发级联成 blocked
@@ -9380,8 +10848,10 @@ ${formatted}` };
       }
       // 目标会话**未开**（或属于别的项目）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
       // 后台开启（`userInitiated=false`）：**不抢活动角色**——用户正在看的会话不因投递而易主。
-      const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime }, false);
+      const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime,
+        ...(taskBoundSession ? { taskId: assignedDeliveryId } : {}) }, false);
       if (!opened.ok) {
+        item.lastAttempt = { state: "blocked", code: "unknown", at: new Date(this.now()).toISOString() };
         this.emitDeliveryNote(projectRoot, runtime,
           item.kind === "handback" ? resolvedTarget : item.sourceRoleId,
           item.sourceRoleId,
@@ -9394,7 +10864,7 @@ ${formatted}` };
       entry = this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime));
       this.suDeliveryBlockedNoted.delete(this.queueKey(projectRoot, "", runtime));
     }
-    if (!entry || entry.projectRoot !== projectRoot) return; // 防御：仍不可用则保持排队
+    if (stopped() || !entry || entry.projectRoot !== projectRoot) return; // 停止或仍不可用：保持排队
     this.healStaleOrigin(entry, "stale-origin-before-drain");
     if (entry.busy || entry.origins.running !== undefined || (runtime === "pi" && entry.profileRevision !== this.profileRevision("pi") && this.hasBusyRuntime("pi"))) {
       diagnostic.record("delivery.blocked", { reasonCode: "target-busy", queueDepth: q.length });
@@ -9417,6 +10887,10 @@ ${formatted}` };
       return;
     }
 
+    if (!await inspectQueuedChild() || !await inspectHandbackAssignment() || !await inspectResume()) return;
+    if (stopped() || this.sessions.get(this.sessionKey(projectRoot, resolvedTarget, runtime)) !== entry || entry.busy || entry.origins.running !== undefined ||
+        entry.interactionState.lifetime.signal.aborted) return;
+
     // —— F-2-opt3：认领段开始（自此到 claim.end 之间的同步改动都在串行链内；随后链即释放）——
     diagnostic.record("delivery.claim.start", { state: item.kind, queueDepth: q.length });
     // 仅回交主人队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
@@ -9424,7 +10898,7 @@ ${formatted}` };
     const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
     const handbackOwner = this.handbackOwnerRoleId(projectRoot);
     let batchCount = 1;
-    if (headIndex === 0 && (resolvedTarget === handbackOwner || resolvedTarget === chiefRoleId) && item.kind === "handback" && item.handback && !item.deliveryId) {
+    if (headIndex === 0 && resolvedTarget === chiefRoleId && item.kind === "handback" && item.handback && !item.deliveryId) {
       while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
     }
     let text = item.text;
@@ -9438,6 +10912,9 @@ ${formatted}` };
     }
     const removedItems = q.splice(headIndex, batchCount);
     const sentItems = item.deliveryId && item.batchItems ? [...item.batchItems] : removedItems;
+    const selectedClaimTasks = sentItems.map(row => row.kind === "dispatch" ? row.taskId : row.kind === "system" ? row.systemAssignment?.taskId : row.kind === "handback" ? row.handback?.taskId : undefined);
+    claim.taskIds = selectedClaimTasks.every((taskId): taskId is string => typeof taskId === "string" && taskId.length > 0) ? [...new Set(selectedClaimTasks)] : undefined;
+    this.publishDeliveryInventory("delivery-claim-selected");
     const sent: DeliveryItem = item.deliveryId ? item : { ...sentItems[0], text, summary, batchItems: sentItems, ...(item.kind === 'handback' ? { deliveryId: randomUUID() } : {}) };
     if (q.length === 0) this.deliveryQueues.delete(key);
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // L-1：出队即外推（队列行/徽标随之更新）
@@ -9475,6 +10952,7 @@ ${formatted}` };
       ].slice(0, 10);
     }
     entry.interactionState.turn = new AbortController();
+    claim.owner = { entry, origin };
     entry.busy = true;
     entry.busySince = this.now(); // G-2/W1：本轮起点定格（看护信号 #1 的 elapsed 基准）
     entry.lastTurnAborted = undefined; // 新一轮开始：上一轮的中止标记不再适用于本轮
@@ -9484,6 +10962,13 @@ ${formatted}` };
     // G-2/W3：drain 出队投出 = 真实活动（重武装）；`kind:"system"`（看护自身投递）不记（同 enqueueDelivery 口径）。
     if (sent.kind !== "system") this.noteWatchdogActivity(projectRoot, "delivery-claim");
     this.notifyRoleState(projectRoot, resolvedTarget, runtime); // 状态准确性：投递开跑即外推「工作中」（shift 时快照尚为闲）
+    let deliveryCommit: { key: string; value: { done: Promise<void>; finish: () => void } } | undefined;
+    if (sent.kind === "dispatch" && sent.taskId) {
+      let finish!: () => void;
+      const value = { done: new Promise<void>(resolve => { finish = resolve; }), finish: () => finish() };
+      const taskKey = `${projectRoot}\u0000${sent.taskId}`;
+      this.taskDeliveryCommits.set(taskKey, value); deliveryCommit = { key: taskKey, value };
+    }
     // —— F-2-M1：分离续段（**不再持有串行链**）——IIFE 同步执行到 `await this.sendDelivery(...)` 即挂起，
     // 本方法随后返回（链释放）。try/await/catch 与旧实现**逐字同体**：成功支抛错同样落失败支（逐支等价）。
     void (async () => {
@@ -9505,7 +10990,11 @@ ${formatted}` };
             } };
         }
       }
-      await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch", sent.taskId);
+      await this.sendDelivery(entry, origin, sent.text, sendOptions, sent.kind === "dispatch", sent.taskId,
+        sent.kind === "handback" ? sentItems.flatMap(member => member.handback?.taskId ? [{ childTaskId: member.handback.taskId,
+          childRoleId: member.handback.roleId, ...(member.flowId ? { flowId: member.flowId } : {}) }] : []) : undefined,
+        sent.kind === "system" ? sent.systemAssignment ?? null : undefined,
+        sent.kind === "system" && sent.notificationSource !== undefined, sent.controllerResume);
       // P0（2026-10-30）：settle 收尾可能已先行记账（`terminalRecorded`）——终态诊断恰一次。
       if (sent.terminalRecorded !== true) {
         sent.terminalRecorded = true;
@@ -9544,6 +11033,7 @@ ${formatted}` };
           });
         }
       }
+      deliveryCommit?.value.finish();
       if (sent.kind === "handback") {
         this.emitDeliveryNote(projectRoot, runtime, resolvedTarget, sent.sourceRoleId, mainT("main.session.delivery.autoDelivered", { roles: sentItems.map((queued) => queued.sourceRoleId).join("、"), target: resolvedTarget }));
       } else if (sent.kind === "dispatch") {
@@ -9554,6 +11044,9 @@ ${formatted}` };
       // message 类（排队后的客户消息投递）：**不加额外文案**——消息本体随会话事件出现（真实 pi 的
       // 「用户指令：」回显走注入样式行），此前误落进派发分支（「已接收…派发任务」对消息是错口径，已修）。
     } catch (err) {
+      const lastAttempt = { state: "failed" as const, code: origin.assignmentRejectionCode ?? "unknown", at: new Date(this.now()).toISOString() };
+      sent.lastAttempt = lastAttempt;
+      for (const member of sentItems) member.lastAttempt = lastAttempt;
       // P0（2026-10-30）：终态已由 settle 收尾记账（`delivery.end` phase:"turn-settled"）⇒ 本续段不再重复
       // delivery.failed、也不再回队重投（at-most-once；回合已真实跑完）。
       const terminalRecorded = sent.terminalRecorded === true;
@@ -9571,7 +11064,7 @@ ${formatted}` };
       // 放回队首保留重试（失败重试仍允许）；回交保留 receipt 判据（providerMayHaveStarted）不变。
       // P0：settle 已记 `delivery.end` ⇒ 视为已处理（更不允许重投）。
       const acked = origin.turnId !== undefined || origin.inputAccepted === true || terminalRecorded;
-      const canRetry = terminalRecorded ? false : cAttempt
+      const canRetry = terminalRecorded || sent.controllerResume && origin.assignmentRejectionCode ? false : cAttempt
         ? !!receipt && !receipt.providerMayHaveStarted && receipt.retryDeliveryAllowed
         : !acked;
       const mayBeActive = terminalRecorded ? false : cAttempt && (!receipt || receipt.providerMayHaveStarted);
@@ -9622,6 +11115,11 @@ ${formatted}` };
                 ? mainT("main.session.delivery.systemFailed", { target: resolvedTarget, detail: base })
                 : mainT("main.session.delivery.queuedFailed", { target: resolvedTarget, detail: base })
       );
+    } finally {
+      if (deliveryCommit) {
+        deliveryCommit.value.finish();
+        if (this.taskDeliveryCommits.get(deliveryCommit.key) === deliveryCommit.value) this.taskDeliveryCommits.delete(deliveryCommit.key);
+      }
     }
     })().catch((err) => {
       // 与 drainQueue 安全壳同款：续段已脱离链，其抛错必须**就地**拦截——绝不产生未捕获拒绝

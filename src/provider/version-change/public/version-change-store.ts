@@ -11,8 +11,10 @@ export {
   type DraftMarkerInput,
   type FreezeCacheStore,
   type FreezeRecordInput,
+  type CommittedFreezeBasis,
   type FreezeRegistryState,
   type FreezeRegistryStore,
+  type VersionBaselineState, type VersionBaselineWriteInput, type VersionBaselineWriteResult,
 } from "../abstract/freeze-cache.ts";
 export {
   REFACTOR_REQUESTS_REL,
@@ -33,6 +35,14 @@ export {
   createStableWritePermitStore,
   createStableWriteStore,
   createVersionChangeStore,
-  type StableWritePermitStoreOptions,
 } from "../impl/fs-version-change-store.ts";
 export { createGuardFreezeRegistry, type GuardFreezeRegistryOptions } from "../impl/guard-freeze-registry.ts";
+
+export { refreshVersionedDocFreezeSnapshot, appendDocFreezeRecords, appendDocDraftMarkerRecords, acquireVersionLock, ownsVersionLock, releaseVersionLock, isValidDocFreezeRecord } from "../impl/guard-freeze-registry.ts";
+export type { VersionedDocFreezeSnapshot, VersionedDocFreezeEntry, VersionedDocFreezeSnapshotState } from "../abstract/freeze-cache.ts";
+
+export { completeSnapshotDigest, isStoredCompleteSnapshot } from "../impl/guard-freeze-registry.ts";
+
+export { scanVersionedDocuments } from "../impl/guard-freeze-registry.ts";
+export { readVersionBaselineState, writeVersionBaselineState, readConfirmedIntentEvidence } from "../impl/guard-freeze-registry.ts";
+export { appendOperationEvent, appendTaskLedgerEvent, readOperationEvents, operationDeliveryRecorded, recordOperationDelivery } from "../impl/guard-freeze-registry.ts";

@@ -4,10 +4,11 @@ import { createInterface } from "node:readline";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolResultFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1 } from "../../model/runtime.ts";
-import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, reasoningRejection } from "../../common/codex-adapter/protocol.ts";
+import { isChiefDecisionExecutionContext } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, ToolDefinition, ToolResult, RuntimeTurnOutcome, RuntimeToolEventFactsV1, RuntimeToolResultFactsV1, RuntimeToolErrorFactsV1, InstalledMcpServerV1, RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeNativeFactoryPreparation, RuntimeNativeFactoryPlanFacts } from "../../model/runtime.ts";
+import { object, deferred, eventQueue, pausedDeadline, bounded, webSearchRow, mcpToolName, mcpToolCallNative, reasoningRejection, observeNativeStop } from "../../common/codex-adapter/protocol.ts";
 import type { CodexRpcConnection, CodexEngineInput, CodexEngineFactory } from "../../common/codex-adapter/protocol.ts";
 import { settings, safetyConfig, safetyOverrides, effectiveConfig, verifyThread, reasoningEffortOverride, chatCompletionsEndpoint, type CodexWireApi } from "../../common/codex-adapter/config.ts";
 import { prepareReasoningCatalog, type TemporaryReasoningCatalog } from "../../common/codex-adapter/reasoning-catalog.ts";
@@ -152,6 +153,21 @@ function assertJudgeToolSet(tools: readonly ToolDefinition[]): JudgeToolFlavor {
   return names.has(GOVERNANCE_JUDGE_REPORT_TOOL) ? "governance" : "shell";
 }
 
+/** Chief's bounded decision context is a separate closed capability, never a judge tool set. */
+function assertIsolatedToolSet(options: RuntimeProviderOptions, role?: ResolvedRole): void {
+  if (options.chiefDecisionContext !== undefined) {
+    if (!isChiefDecisionExecutionContext(options.chiefDecisionContext) || options.judgeMode !== true
+        || options.tools.length !== 1 || options.tools[0]?.name !== "decide_pending_request") {
+      throw new Error("Codex bounded Chief requires a valid context and only decide_pending_request");
+    }
+    if (role && (role.id !== "chief" || role.kind !== "built-in-governance" || role.governanceFunction !== "chief")) {
+      throw new Error("Codex bounded Chief requires the real built-in Chief role");
+    }
+    return;
+  }
+  if (options.judgeMode) assertJudgeToolSet(options.tools);
+}
+
 /** JSON-RPC transport owns the native process; importing this module starts nothing. */
 async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<CodexRpcConnection> {
   let command: string;
@@ -183,6 +199,11 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
   // 否则 Windows 上在途句柄未释放，rmdir 会瞬时 EBUSY（见 test/codex-adapter 真机红与 fix 记录）。
   const stdioClosed = deferred<void>();
   let exited = false;
+  let didClose = false;
+  let exitCode: number | undefined;
+  let exitSignal: string | undefined;
+  let treeVerified = false;
+  let runningHandlers = 0;
   const groupExists = () => {
     if (!child.pid) return false;
     if (process.platform === "win32") return !exited;
@@ -218,8 +239,8 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
     for (const listener of listeners) listener("ans/transportClosed", { message: error.message });
   };
   child.on("error", error => { exited = true; rejectPending(error); exit.resolve(); });
-  child.on("exit", code => { exited = true; rejectPending(new Error(`Codex app-server exited (${code ?? "signal"}): ${stderr}`)); exit.resolve(); });
-  child.on("close", () => stdioClosed.resolve());
+  child.on("exit", (code, signal) => { exited = true; exitCode = code ?? undefined; exitSignal = signal ?? undefined; rejectPending(new Error(`Codex app-server exited (${code ?? "signal"}): ${stderr}`)); exit.resolve(); });
+  child.on("close", () => { didClose = true; stdioClosed.resolve(); });
   const lines = createInterface({ input: child.stdout });
   const send = (value: Record<string, unknown>) => {
     if (closed || !child.stdin.writable) throw new Error("Codex app-server transport is closed");
@@ -234,6 +255,7 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
         const requestController = new AbortController();
         const requestKey = String(message.id);
         serverRequests.set(requestKey, requestController);
+        runningHandlers++;
         Promise.resolve().then(() => {
           if (!serverHandler) throw new Error("Codex server request has no governed handler");
           return serverHandler(message.method as string, message.params, { signal: requestController.signal });
@@ -241,7 +263,7 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
           if (!closed) send({ id: message.id, result });
         }, () => {
           if (!closed) send({ id: message.id, error: { code: -32601, message: "ANS rejected unsupported native request" } });
-        }).finally(() => { serverRequests.delete(requestKey); }).catch(error => {
+        }).finally(() => { runningHandlers--; serverRequests.delete(requestKey); }).catch(error => {
           rejectPending(error instanceof Error ? error : new Error("Codex server response failed")); child.kill();
         });
       } else {
@@ -259,6 +281,15 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
     }
   });
   return {
+    inspectLifecycle() {
+      const verified = treeVerified && didClose && runningHandlers === 0;
+      return {
+        transport: { kind: "owned-process", state: didClose && runningHandlers === 0 ? "closed" : closed ? "unknown" : "open" },
+        processes: [{ id: `codex-native:${child.pid ?? "unspawned"}`, kind: "native", ...(child.pid ? { pid: child.pid } : {}), state: exited ? "exited" : "running", treeStatus: verified ? "verified" : "unknown", ...(exitCode !== undefined ? { exitCode } : {}), ...(exitSignal ? { signal: exitSignal } : {}) }],
+        processCoverage: verified ? "complete" : "unknown",
+        reasons: [...(!verified ? ["native-owned-tree-not-verified"] : []), ...(runningHandlers ? ["native-rpc-handler-running"] : [])],
+      };
+    },
     request(method, params) {
       if (closed) return Promise.reject(new Error("Codex app-server transport is closed"));
       const id = ++sequence;
@@ -291,6 +322,7 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
               killer.once("error", reject);
               killer.once("exit", code => { if (code === 0) resolve(); else reject(new Error("Codex owned Windows process tree cleanup failed")); });
             }), 2000, "Windows process cleanup");
+            treeVerified = true;
           }
           child.stdin.destroy();
           await bounded(exit.promise, 80, "Windows process exit");
@@ -308,6 +340,7 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
         }
         // 与 Windows 分支同序：进程组已消失后仍等 stdio 管道关闭再允许删目录。
         await bounded(stdioClosed.promise, 80, "process stdio close");
+        treeVerified = !groupExists();
       }
       finally { lines.close(); }
     })(); },
@@ -316,6 +349,9 @@ async function nativeEngine(input: CodexEngineInput, cliPath?: string): Promise<
 
 interface TurnState {
   ansId: string;
+  coreTurnId?: string;
+  rawSettled?: ReturnType<typeof deferred<void>>;
+  terminalSeen?: boolean;
   nativeId?: string;
   controller: AbortController;
   ready: ReturnType<typeof deferred<string>>;
@@ -334,19 +370,118 @@ interface TurnState {
   reasoningStarted: Map<string, number>;
 }
 
+function resolveCodexBinding(options: CodexRuntimeAdapterOptions) {
+  const environmentSnapshot = { ...(options.env ?? process.env) };
+  const judgeMode = options.judgeMode === true;
+  const config = settings(judgeMode ? { ...options, webSearch: false } : options, environmentSnapshot);
+  const installedServers = prepareInstalledMcpServers(judgeMode ? [] : options.installedMcpServers ?? [], environmentSnapshot);
+  return { environmentSnapshot, config, installedServers };
+}
+
+/** Private equality guards retain credentials only in memory; they never hash or publish them. */
+function captureCodexPlanValue(read: () => unknown, ancestors = new Set<object>()): () => boolean {
+  const initial = read();
+  if (!initial || typeof initial !== "object") return () => read() === initial;
+  const prototype = Object.getPrototypeOf(initial);
+  if (prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null) return () => read() === initial;
+  if (ancestors.has(initial)) throw new Error("Codex cyclic preparation input");
+  const next = new Set(ancestors).add(initial);
+  const keys = Object.keys(initial);
+  const checks = keys.map(key => captureCodexPlanValue(() => {
+    const current = read();
+    return current && typeof current === "object" ? (current as Record<string, unknown>)[key] : undefined;
+  }, next));
+  return () => { const current = read(); return !!current && typeof current === "object"
+    && Object.getPrototypeOf(current) === prototype && Object.keys(current).length === keys.length
+    && keys.every(key => Object.hasOwn(current, key)) && checks.every(check => check()); };
+}
+
+type PreparedCodexBinding = ReturnType<typeof resolveCodexBinding> & {
+  role: ResolvedRole;
+  isCurrent(role: ResolvedRole): boolean;
+  factoryPlan: { planId: string; configDigest: string };
+};
+
+/** Plan the same resolved branch that will bind; preparing performs no external construction. */
+export function prepareCodexRuntimeAdapter(options: RuntimeProviderOptions, role: ResolvedRole): RuntimeNativeFactoryPreparation {
+  const nativeOptions = options as CodexRuntimeAdapterOptions;
+  const planId = randomUUID();
+  let resolved: ReturnType<typeof resolveCodexBinding> | undefined;
+  let current = () => false;
+  let sealedOptions: CodexRuntimeAdapterOptions | undefined;
+  let sealedRole: ResolvedRole | undefined;
+  const reasons: string[] = [];
+  let appTools: string[] = [];
+  try {
+    const optionsCurrent = captureCodexPlanValue(() => options);
+    const roleCurrent = captureCodexPlanValue(() => role);
+    const capturedFetch = globalThis.fetch;
+    resolved = resolveCodexBinding(nativeOptions);
+    const capturedEnvironment = resolved.environmentSnapshot;
+    current = () => {
+      const environment = nativeOptions.env ?? process.env;
+      return optionsCurrent() && roleCurrent() && globalThis.fetch === capturedFetch && Object.keys(environment).length === Object.keys(capturedEnvironment).length
+        && Object.entries(capturedEnvironment).every(([name, value]) => environment[name] === value);
+    };
+    assertIsolatedToolSet(options, role);
+    appTools = options.tools.map(tool => tool.name);
+    if (new Set(appTools).size !== appTools.length || appTools.some(name => !/^[A-Za-z0-9_-]{1,60}$/.test(name))) { appTools = []; reasons.push("native-plan-invalid-tool-registry"); }
+    if (resolved.config.wireApi !== "chat") reasons.push("native-plan-responses-unproven");
+    if (resolved.installedServers.length) reasons.push("native-plan-mcp-unproven");
+    if (resolved.config.webSearch) reasons.push("native-plan-web-search-unproven");
+    if ([nativeOptions.chatFetch, nativeOptions.engineFactory, nativeOptions.mcpLoader, nativeOptions.cliPath].some(value => value !== undefined)) reasons.push("native-plan-custom-transport-unproven");
+    if (reasons.length === 0) {
+      sealedRole = structuredClone(role);
+      sealedOptions = { ...nativeOptions, env: Object.freeze({ ...capturedEnvironment }),
+        tools: options.tools.map(tool => Object.freeze({ ...tool, inputSchema: structuredClone(tool.inputSchema), ...(tool.promptGuidelines ? { promptGuidelines: [...tool.promptGuidelines] } : {}) })),
+        ...(options.contextSections ? { contextSections: [...options.contextSections] } : {}), installedMcpServers: [] };
+    }
+  } catch { reasons.push("native-plan-configuration-unverified"); }
+  const publicShape = { roleId: role.id, runtime: "codex" as const,
+    factory: reasons.length ? "unknown" as const : "codex-chat" as const,
+    transport: reasons.length ? "unknown" as const : "http" as const,
+    wire: resolved?.config.wireApi ?? "unknown" as const, appTools,
+    foreignMcpServers: resolved?.installedServers.map(server => server.name) ?? [], nativeBuiltinTools: [] as string[],
+    // Only the actual HTTP-only Chat creation branch is proven to create no processes.
+    plannedProcesses: [] as string[] };
+  const configDigest = createHash("sha256").update(JSON.stringify(publicShape)).digest("hex");
+  const facts: RuntimeNativeFactoryPlanFacts = { source: "native-factory-plan", planId, configDigest,
+    status: reasons.length ? "unknown" : "observed", ...publicShape, reasons };
+  if (reasons.length || !resolved || !sealedOptions || !sealedRole) return { facts, isCurrent: current };
+  const roleShape = JSON.stringify(sealedRole);
+  const binding: PreparedCodexBinding = { ...resolved, role: sealedRole, factoryPlan: Object.freeze({ planId, configDigest }),
+    isCurrent: candidate => current() && JSON.stringify(candidate) === roleShape };
+  let adapter: RuntimeAdapter;
+  try { adapter = createCodexRuntimeAdapterWithBinding(sealedOptions, binding); }
+  catch { return { facts: { ...facts, status: "unknown", factory: "unknown", reasons: ["native-plan-adapter-options-unverified"] }, isCurrent: current }; }
+  return { facts, adapter, isCurrent: current };
+}
+
 export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): RuntimeAdapter {
+  return createCodexRuntimeAdapterWithBinding(options);
+}
+
+function createCodexRuntimeAdapterWithBinding(options: CodexRuntimeAdapterOptions, prepared?: PreparedCodexBinding): RuntimeAdapter {
   if (options.toolDisplayMode === "required-v1" && (typeof options.projectToolEvent !== "function" || typeof options.registerToolDisplayProfile !== "function")) {
     throw new Error("Codex required-v1 tool display requires projector/register capabilities");
   }
   const judgeMode = options.judgeMode === true;
   // 判断模式：装配前做结构性工具集校验（零副作用）；普通角色会话不受影响。
-  if (judgeMode) assertJudgeToolSet(options.tools);
+  assertIsolatedToolSet(options);
+  const chiefDecision = options.chiefDecisionContext === undefined ? undefined : structuredClone(options.chiefDecisionContext);
+  const assertMode = (role: ResolvedRole) => {
+    assertIsolatedToolSet(options, role);
+    if (JSON.stringify(options.chiefDecisionContext) !== JSON.stringify(chiefDecision)) throw new Error("Codex bounded Chief context changed before binding");
+  };
   /** 判断会话的 report 工具名（每次从注入集重取：工厂与 bind 之间 options 可能被误改）。 */
   const judgeReportTool = () => assertJudgeToolSet(options.tools) === "governance" ? GOVERNANCE_JUDGE_REPORT_TOOL : SHELL_JUDGE_REPORT_TOOL;
   // G-4 installed-skills section: the render is the single orchestration source (hash/matching/bad-file
   // handling all live there). Non-empty splices the whole section verbatim as one prompt segment; empty
   // string renders nothing (zero-skill status quo stays byte-identical).
   const composeContext = async (role: ResolvedRole) => {
+    assertMode(role);
+    if (prepared && !prepared.isCurrent(role)) throw new Error("Codex prepared configuration is stale");
+    if (prepared) role = prepared.role;
     // 判断会话不拼接项目技能注入节：判断只按稳定 rubric + 按需 judge_read_file 读证据，
     // 不让角色/技能文本进入系统提示（普通角色会话逐字不变）。
     const installedSkills = judgeMode ? "" : renderInstalledSkillsSection(options.projectRoot, role.id);
@@ -365,7 +500,9 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       `固定角色：${role.id}。实际项目目录：${options.projectRoot}。`,
       // 判断会话只有只读工具：明确告知可用面，避免模型在不存在的能力上反复尝试（普通会话逐字不变）。
       // 治理 judge 与 shell judge 的 report 工具名不同（并集 allowlist → 按注入集判定）；读取面相同。
-      judgeMode
+      chiefDecision !== undefined
+        ? `本会话是实际 Chief 身份的独立有界决策会话。Goal：仅处理此固定待决请求：${JSON.stringify(chiefDecision.request)}。只允许 ans_decide_pending_request；不扮演 judge，不把推荐项当成批准，不宣称客户本人决定；没有读文件、写入、命令、派发、客户交互或外来 MCP 工具。宿主核验 requestId/baseDigest/delegationRevision、合法选项与有限次数，失败或未决必须如实保留。`
+        : judgeMode
         ? `本会话是只读判断会话：只通过 ans_ 前缀的 judge_read_file/judge_list_dir 读取项目，并用 ${judgeReportTool()} 交回结论；没有写入、命令、客户交互或派发工具。`
         : "只通过 ans_ 前缀工具执行项目读取、修改、命令、交互和回交；原生运行环境只读。派发不转移授权。",
       `角色写入边界：${JSON.stringify(role.boundary)}`,
@@ -378,13 +515,15 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
   return {
     composeContext,
     async bindRole(role) {
+      if (prepared && !prepared.isCurrent(role)) throw new Error("Codex prepared configuration is stale");
+      if (prepared) role = prepared.role;
       // 判断模式再校验一次（options 在工厂与 bind 之间可能被误改；仍为零副作用）。
-      if (judgeMode) assertJudgeToolSet(options.tools);
+      assertMode(role);
       // Resolve authentication, profile registration and child environment from one snapshot.
-      const environmentSnapshot = { ...(options.env ?? process.env) };
+      const binding = prepared ?? resolveCodexBinding(options);
+      const { environmentSnapshot, config, installedServers } = binding;
       // 判断模式强制关闭 server-side web search（忽略 options.webSearch 与 ANS_CODEX_WEB_SEARCH，
       // PM 评审 §6.1/A35：引擎原生工具/网络一律不得进入判断会话）。
-      const config = settings(judgeMode ? { ...options, webSearch: false } : options, environmentSnapshot);
       options.registerToolDisplayProfile?.({
         apiKeyEnvVar: config.keyName,
         credentials: [...new Set([config.keyName, ...(options.toolDisplayCredentialEnvNames ?? [])])]
@@ -399,7 +538,6 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       }
       // G-4 V2：已安装 MCP 的校验/展开（装配前、零副作用）与白名单名集（进程/线程/目录三处恰等、降级面共用）。
       // 判断模式：外来 MCP 一律不装配（即使上游误传声明也置空——PM 评审 §6.1/A35）。
-      const installedServers = prepareInstalledMcpServers(judgeMode ? [] : options.installedMcpServers ?? [], environmentSnapshot);
       const allowedServers = new Set(installedServers.map(server => server.name));
       // 最小 Chat Completions 兼容传输（客户 2026-10-27 补充约束；显式 `wireApi:"chat"` 或
       // `ANS_CODEX_WIRE_API=chat`）。不启动原生 app-server；原生 MCP/联网搜索在 chat 模式
@@ -408,6 +546,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         if (installedServers.length > 0) throw new Error("Codex chat transport does not support installed MCP servers");
         if (config.webSearch) throw new Error("Codex chat transport does not support server-side web search");
         const context = await composeContext(role);
+        if (prepared && !prepared.isCurrent(role)) throw new Error("Codex prepared configuration is stale");
         return createCodexChatSession({
           role,
           systemPrompt: context.systemPrompt,
@@ -421,6 +560,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           projectToolEvent: options.projectToolEvent,
           turnLastResortMs: options.turnLastResortMs ?? DEFAULT_TURN_LAST_RESORT_MS,
           fetchImpl: options.chatFetch,
+          ...(prepared ? { factoryPlan: prepared.factoryPlan } : {}),
         });
       }
       // Only completed compatibility turns commit a new strategy. Every ordinary turn explicitly
@@ -450,6 +590,12 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
       let cleanupPromise: Promise<void> | undefined;
       let disposePromise: Promise<void> | undefined;
       let nativeId = "";
+      let lastTurn: TurnState | undefined;
+      let settledAt: string | undefined;
+      let lifecycleStopping = false;
+      const ownedEngines: CodexRpcConnection[] = [];
+      const runningTools = new Map<string, RuntimeActiveToolFact>();
+      const nativeTools = new Map<string, RuntimeActiveToolFact>();
       const calls = new Map<string, { turn: TurnState; name: string; callId: string }>();
       let sequential: Promise<unknown> = Promise.resolve();
       const scrub = (value: unknown): unknown => {
@@ -516,6 +662,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           // G-5：`model_reasoning_effort` 为顶层标量键、独立一条（探针实证叠加无冲突）；去参数重发＝该条缺席。
           const reasoningOverride = injectReasoning ? reasoningEffortOverride(config.reasoningEffort) : undefined;
           const connected = await engineFactory({ cwd, nativeHome, env: environment, configOverrides: [...safetyOverrides(cwd, disabled, config.webSearch, installedServers), ...(reasoningOverride !== undefined ? [reasoningOverride] : []), ...(reasoningCatalog ? [`model_catalog_json=${JSON.stringify(reasoningCatalog.path)}`] : []), providerDefinition, `model_provider=${JSON.stringify(provider)}`], timeoutMs: options.constructTimeoutMs ?? 30000 });
+          ownedEngines.push(connected);
           // Preflight has no model, thread, MCP connections, or native approval handlers.
           try {
             await connected.request("initialize", { clientInfo: { name: "ans_codex_adapter", version: "2.0.0" }, capabilities: { experimentalApi: true, explicitGatewayOauth: true } });
@@ -560,6 +707,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           const execute = async (): Promise<ToolResult> => {
             if (turn.controller.signal.aborted || turn.completed || active !== turn) return { ok: false, message: "ANS refused a stopped or stale turn" };
             handlerStarted = true;
+            runningTools.set(callId, { id: callId, name, turnId: turn.ansId });
             emitTool(turn, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", name, { toolName: name, name, toolCallId: callId, args });
             try { return await tool.handler({ name, args, toolCallId: callId, signal: turn.controller.signal }); }
             catch (error) {
@@ -567,6 +715,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               if (error instanceof Error) displayError = { message: error.message };
               return { ok: false, message: config.redact(error) };
             }
+            finally { runningTools.delete(callId); }
           };
           // A single queue also prevents a sequential write from overlapping parallel reads/tools.
           const resultPromise = sequential.then(execute, execute);
@@ -622,6 +771,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
           const callId = `codex:${instanceId}:${original.ansId}:${params.turnId}:${params.callId}`;
           calls.set(token, { turn: original, name, callId });
           const cancelledUpstream = () => {
+            if (original.controller.signal.aborted) return;
             original.failure = "Codex native tool request ended before the ANS handler completed";
             void stop(original, "failed").catch(error => { original.failure = config.redact(error); });
           };
@@ -685,6 +835,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               if (ready !== turn.ready || typeof notifyId !== "string" || notifyId !== expected || active !== turn || turn.completed) return;
               if (method === "item/completed") {
                 const item = object(params.item, "native item");
+                if (typeof item.id === "string") nativeTools.delete(item.id);
                 if (item.type === "agentMessage") { turn.outputSeen = true; emit(turn, "message", String(item.text ?? ""), { text: item.text }); }
                 // Server-side (gateway-executed) search: always mapped, never quarantined, never inferred as failure.
                 if (item.type === "webSearch") {
@@ -739,6 +890,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               } else if (method === "item/started") {
                 // G-5：reasoning item 的真实起点（durationMs 信号面）；其余 item/started 不映射（沿既有先例）。
                 const item = object(params.item, "native item");
+                if (typeof item.id === "string" && ["mcpToolCall", "webSearch", "commandExecution"].includes(String(item.type))) nativeTools.set(item.id, { id: item.id, name: String(item.type), turnId: turn.ansId });
                 if (["mcpToolCall", "webSearch", "dynamicToolCall", "agentMessage", "commandExecution", "fileChange"].includes(String(item.type))) turn.outputSeen = true;
                 if (item.type === "reasoning") {
                   turn.outputSeen = true;
@@ -753,6 +905,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
                 turn.reason = outcome;
                 if (completed.error) { turn.failureFacts = completed.error; turn.failure = config.redact(object(completed.error).message ?? "Codex turn failed"); }
                 turn.terminal.resolve();
+                turn.terminalSeen = true;
                 turn.done.resolve(outcome);
               } else if (method === "error" && params.willRetry !== true) {
                 turn.reason = "failed"; turn.failureFacts = params.error;
@@ -783,15 +936,58 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
         await establishThread(engine, previous?.nativeSessionId);
         subscribeNotifications(engine);
         await inspectCatalog(engine);
+        const inspectNative = (extraReasons: readonly string[] = []): RuntimeNativeLifecycleFacts => {
+          const observations = ownedEngines.map(connection => connection.inspectLifecycle?.());
+          const current = engine?.inspectLifecycle?.();
+          const reasons = [...observations.flatMap(fact => fact?.reasons ?? ["native-engine-observation-unavailable"]), ...extraReasons];
+          if (installedServers.length) reasons.push("native-mcp-process-coverage-unavailable");
+          if (runningTools.size) reasons.push("native-tool-handler-running");
+          if (nativeTools.size) reasons.push("native-tool-not-terminal");
+          const promptState = !lastTurn ? "not-started" : !lastTurn.completed ? "running"
+            : lastTurn.terminalSeen || current?.transport.state === "closed" ? "settled" : "unknown";
+          const complete = observations.length > 0 && observations.every(fact => fact?.processCoverage === "complete") && installedServers.length === 0;
+          const quiet = promptState !== "running" && promptState !== "unknown" && runningTools.size === 0 && nativeTools.size === 0
+            && complete && current?.transport.state === "closed" && reasons.length === 0;
+          return { instanceId, roleId: role.id, runtime: "codex", ...(nativeId ? { nativeSessionId: nativeId } : {}),
+            ...(lastTurn?.coreTurnId ? { coreTurnId: lastTurn.coreTurnId } : {}), ...(lastTurn?.nativeId ? { nativeTurnId: lastTurn.nativeId } : {}),
+            status: quiet ? "quiescent" : reasons.length ? "unknown" : lifecycleStopping ? "stopping" : "running", promptState,
+            observedAt: new Date().toISOString(), ...(settledAt ? { settledAt } : {}),
+            transport: current?.transport ?? { kind: "unknown", state: "unknown" },
+            activeTools: [...runningTools.values(), ...nativeTools.values()], processes: observations.flatMap(fact => fact?.processes ?? []), processCoverage: complete ? "complete" : "unknown", reasons };
+        };
         const session: RoleSession = {
           runtime: "codex", roleId: role.id, get contextSource() { return contextSource; }, get nativeSessionId() { return nativeId; },
           ...(contextWarning ? { contextWarning } : {}),
+          nativeLifecycle: {
+            instanceId, inspect: inspectNative,
+            async stopAndInspect(input, signal) {
+              if (input.expectedInstanceId !== instanceId) throw new Error("Codex native instance mismatch");
+              if (input.expectedCoreTurnId !== undefined && input.expectedCoreTurnId !== lastTurn?.coreTurnId) throw new Error("Codex native Core turn mismatch");
+              if (signal?.aborted || !Number.isFinite(input.timeoutMs) || input.timeoutMs <= 0) return inspectNative([signal?.aborted ? "native-stop-observation-aborted" : "native-stop-invalid-timeout"]);
+              lifecycleStopping = true; quarantined = true;
+              const deadline = Date.now() + input.timeoutMs;
+              const turn = active;
+              if (turn) { turn.reason = "aborted"; turn.controller.abort(); turn.ready.resolve(""); }
+              const work = (async () => {
+                await Promise.all(ownedEngines.map(connection => connection.close()));
+                if (turn) { turn.done.resolve("aborted"); await turn.rawSettled?.promise; }
+                // This queue follows actual handlers, including handlers that ignored abort.
+                await sequential;
+                while (ownedEngines.some(connection => connection.inspectLifecycle?.().reasons.includes("native-rpc-handler-running")) && Date.now() < deadline) await new Promise<void>(resolve => setTimeout(resolve, 5));
+              })();
+              const reason = await observeNativeStop(work, input.timeoutMs, signal);
+              lifecycleStopping = false;
+              return inspectNative(reason ? [reason] : []);
+            },
+          },
           async prompt(text, promptOptions) {
             if (disposed || quarantined) throw new Error("Codex session is disposed or quarantined; create a new session");
             if (active) throw new Error("Codex session already has an active turn");
-            const turn: TurnState = { ansId: options.currentTurnId() ?? randomUUID(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), terminal: deferred<void>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
+            const coreTurnId = options.currentTurnId();
+            const turn: TurnState = { ansId: coreTurnId ?? randomUUID(), coreTurnId, rawSettled: deferred<void>(), controller: new AbortController(), ready: deferred<string>(), done: deferred<RuntimeTurnOutcome>(), terminal: deferred<void>(), completed: false, calls: new Set(), searchCalls: 0, outputSeen: false, reasoningStarted: new Map() };
             // Abort can resolve ready before turn/start so early tool requests fail closed.
             active = turn;
+            lastTurn = turn; settledAt = undefined;
             promptCount += 1;
             if (!configurationShown) {
               configurationShown = true;
@@ -876,6 +1072,7 @@ export function createCodexRuntimeAdapter(options: CodexRuntimeAdapterOptions): 
               stopTimer(); turn.completed = true; turn.controller.abort(); turn.ready.resolve("");
               emit(turn, "settled", `Codex turn ${turn.reason ?? "completed"}`, { outcome: turn.reason ?? "completed", ...(turn.failure ? { error: turn.failure } : {}), ...(turn.searchCalls ? { searchCalls: turn.searchCalls } : {}) });
               if (active === turn) active = undefined;
+              settledAt = new Date().toISOString(); turn.rawSettled?.resolve();
             }
           },
           events: queue.events,

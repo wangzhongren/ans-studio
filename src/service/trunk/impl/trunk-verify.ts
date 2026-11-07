@@ -12,8 +12,8 @@ import {
   verifyPinnedRun,
 } from "../../../common/编排/run-manifest.ts";
 import type { TrunkManifest } from "../../../model/trunk.ts";
-import type { FreezeRegistryStore } from "../../../provider/version-change/abstract/freeze-cache.ts";
-import type { TrunkStore } from "../../../provider/trunk/abstract/trunk-store.ts";
+import type { FreezeRegistryStore } from "../../../provider/version-change/public/version-change-store.ts";
+import type { TrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 import type { TrunkVerifyResult } from "../abstract/trunk-service.ts";
 import { deriveTrunk } from "./trunk-derive.ts";
 import { docFreezeState, filePathOfRef, samePath, sha256File } from "./trunk-common.ts";
@@ -31,7 +31,8 @@ async function verifyStableHashes(projectRoot: string, manifest: TrunkManifest, 
     if (actual === undefined) violations.push(`${label}: missing ${relPath}`);
     else if (actual.toLowerCase() !== expected.toLowerCase()) violations.push(`${label}: hash changed ${relPath}`);
   };
-  await check("workflow", manifest.artifacts.workflow.path, manifest.artifacts.workflow.sha256);
+  if (manifest.artifacts.workflow === undefined) violations.push("workflow: execution prerequisite missing");
+  else await check("workflow", manifest.artifacts.workflow.path, manifest.artifacts.workflow.sha256);
   for (const [roleId, ref] of Object.entries(manifest.artifacts.roleCards ?? {})) {
     await check(`roleCards.${roleId}`, ref.path, ref.sha256);
   }

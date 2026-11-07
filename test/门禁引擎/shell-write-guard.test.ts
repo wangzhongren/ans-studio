@@ -110,7 +110,7 @@ test("脚本审查（v2.3/R2）：解释器脚本/npm run（非例行）/npm ins
   }
   for (const argv of [["cat", "README.md"], ["git", "status"], ["ls", "-la"]]) {
     const result = guard(argv);
-    assert.equal(result.decision.kind, "pass", `${argv.join(" ")} 应 pass（只读）`);
+    assert.equal(result.decision.kind, argv[0] === "git" ? "deny" : "pass", `${argv.join(" ")} 按受控Git入口规则`);
   }
 });
 
@@ -242,7 +242,7 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
     ["dd", "if=src/a"],
     ["patch", "-p1"],
   ]) {
-    assert.equal(guard(argv).decision.kind, "script", `${argv.join(" ")} 无法静态解析 ⇒ script`);
+    assert.equal(guard(argv).decision.kind, argv[0] === "git" ? "deny" : "script", `${argv.join(" ")} 按受控Git入口规则`);
   }
 
   // 4) shell 脚本/内联代码 ⇒ script（内容进入审查）；版本查询等只读形态不受影响。
@@ -256,7 +256,7 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
 
   // 5) 只读形态不受影响。
   assert.equal(guard(["tar", "-tf", "x.tar"]).decision.kind, "pass");
-  assert.equal(guard(["git", "status"]).decision.kind, "pass");
+  assert.equal(guard(["git", "status"]).decision.kind, "deny");
   assert.equal(guard(["find", "src", "-name", "*.ts"]).decision.kind, "pass");
 });
 

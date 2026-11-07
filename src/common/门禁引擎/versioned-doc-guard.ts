@@ -30,6 +30,7 @@ import {
   DOC_FREEZE_REASONS,
   STABLE_WRITE_PERMIT_STATUSES,
   STABLE_WRITE_PERMIT_TTL_MS,
+  isValidDocFreezeRecord,
   type DocFreezeLookupState,
   type DocFreezeReason,
   type DocFreezeRecord,
@@ -39,6 +40,7 @@ import {
   type StableWritePermit,
 } from "../../model/version-change.ts";
 import { isBuiltInGovernanceRoleId } from "./governance-roles.ts";
+export { isValidDocFreezeRecord } from "../../model/version-change.ts";
 
 const VERSIONED_DOC_PATTERNS: readonly RegExp[] = [
   /^docs\/product\/[a-z0-9][a-z0-9-]{0,62}[a-z0-9]-intent-v[1-9]\d*\.md$/i,
@@ -302,24 +304,6 @@ function isSha256Hex(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
 }
 
-/** C1 `DocFreezeRecord` 结构校验（reason↔origin 归属一致；applicationId 非空；不复制字段）。 */
-export function isValidDocFreezeRecord(value: unknown): value is DocFreezeRecord {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-  const record = value as Partial<DocFreezeRecord>;
-  if (record.schema !== "doc-freeze/v1") return false;
-  if (typeof record.applicationId !== "string" || record.applicationId.trim() === "") return false;
-  if (typeof record.reason !== "string" || !DOC_FREEZE_REASONS.includes(record.reason as DocFreezeReason)) return false;
-  if (record.origin !== "customer" && record.origin !== "application") return false;
-  const customerReason = DOC_FREEZE_CUSTOMER_REASONS.includes(record.reason as DocFreezeReason);
-  if (customerReason !== (record.origin === "customer")) return false;
-  if (record.decidedBy !== undefined && record.decidedBy !== "customer") return false;
-  if (record.origin === "application" && record.decidedBy !== undefined) return false;
-  if (record.decisionId !== undefined && (typeof record.decisionId !== "string" || record.decisionId.trim() === "")) return false;
-  if (record.actorRoleId !== undefined && (typeof record.actorRoleId !== "string" || record.actorRoleId.trim() === "")) return false;
-  if (typeof record.frozenAt !== "string" || record.frozenAt.trim() === "") return false;
-  return true;
-}
-
 function docKindOf(rel: string): VersionedDocKind | undefined {
   if (/^docs\/product\/[^/]+-intent-v\d+\.md$/i.test(rel)) return "intent";
   if (/^docs\/proposals\/[^/]+-roster-v\d+\.md$/i.test(rel)) return "roster";
@@ -377,7 +361,14 @@ async function readBaselines(projectRoot: string, markerExists?: (abs: string) =
     if (!markerPresent) return { ok: true, records: [], initialized: false }; // 二者都不存在 ⇒ TOFU 候选
     return { ok: false, reason: "baseline-missing" };
   }
-  if (!markerPresent) return { ok: false, reason: "marker-missing" };
+  return parseVersionBaselineState({ baselineText: text, initialized: markerPresent });
+}
+
+/** Pure parser shared by legacy callers and the Provider-backed G Service. No I/O or capability input. */
+export function parseVersionBaselineState(input: { baselineText: string | null; initialized: boolean }): BaselineRead {
+  const text = input.baselineText;
+  if (text === null) return input.initialized ? { ok: false, reason: "baseline-missing" } : { ok: true, records: [], initialized: false };
+  if (!input.initialized) return { ok: false, reason: "marker-missing" };
   if (text.trim() === "") return { ok: false, reason: "baseline-corrupt" };
   const records: VersionBaselineRecord[] = [];
   for (const line of text.split(/\r?\n/)) {
@@ -600,6 +591,98 @@ export type BaselineShaResult =
   | { ok: true; sha256?: string }
   | { ok: false; reason: "baseline-missing" | "baseline-corrupt" | "marker-missing" };
 
+/** Ordinary immutable bytes supplied by the Service after a complete, strict Provider scan. */
+export interface VersionBaselineFile { path: string; bytesBase64: string; sha256: string }
+export interface VersionBaselineData {
+  baselineText: string | null;
+  initialized: boolean;
+  files: readonly VersionBaselineFile[];
+  scanComplete: boolean;
+}
+export interface VersionBaselineRegistration {
+  registered: boolean | undefined;
+  violations: VersionBaselineViolation[];
+  nextText?: string;
+  initialize?: boolean;
+}
+
+function baselineFileMap(input: VersionBaselineData): Map<string, VersionBaselineFile> | undefined {
+  if (input.scanComplete !== true || !Array.isArray(input.files)) return;
+  const files = new Map<string, VersionBaselineFile>(), seen = new Set<string>();
+  for (const file of input.files) {
+    const rel = normalizeVersionedDocPath(file.path), content = typeof file.bytesBase64 === "string" ? Buffer.from(file.bytesBase64, "base64") : undefined;
+    if (rel === undefined || rel !== file.path || !isVersionedDocPath(rel) || seen.has(rel.toLowerCase()) || !content
+      || content.toString("base64") !== file.bytesBase64 || !isSha256Hex(file.sha256)
+      || createHash("sha256").update(content).digest("hex") !== file.sha256.toLowerCase()) return;
+    seen.add(rel.toLowerCase()); files.set(rel, file);
+  }
+  return files;
+}
+
+/** Pure baseline verification. Missing physical files are meaningful only after a complete Provider scan. */
+export function verifyVersionBaselineData(input: VersionBaselineData): VersionBaselineViolation[] {
+  const state = parseVersionBaselineState(input);
+  if (!state.ok) return [{ path: VERSION_BASELINE_REL, reason: state.reason }];
+  const files = baselineFileMap(input);
+  if (!files) return [{ path: VERSION_BASELINE_REL, reason: "baseline-corrupt" }];
+  if (!state.initialized) return files.size ? [{ path: VERSION_BASELINE_REL, reason: "baseline-missing" }] : [];
+  const violations: VersionBaselineViolation[] = [], seen = new Set<string>(), max = new Map<string, number>();
+  for (const record of latestRecordMap(state.records).values()) {
+    const rel = actualPathForRecord(record), file = files.get(rel);
+    seen.add(`${record.flowId}|${record.doc}|${record.version}`);
+    const key = `${record.flowId}|${record.doc}`; max.set(key, Math.max(max.get(key) ?? 0, record.version));
+    if (!file) violations.push({ path: rel, expected: record.sha256, reason: "missing" });
+    else if (file.sha256.toLowerCase() !== record.sha256.toLowerCase()) violations.push({ path: rel, expected: record.sha256, actual: file.sha256, reason: "changed" });
+  }
+  for (const rel of files.keys()) {
+    const flowId = flowIdOf(rel), doc = docKindOf(rel), version = versionedDocVersionOf(rel)!;
+    if (!seen.has(`${flowId}|${doc}|${version}`) && version <= (max.get(`${flowId}|${doc}`) ?? 0)) violations.push({ path: rel, reason: "unrecorded" });
+  }
+  return violations;
+}
+
+/** Pure latest-record lookup; preserves legacy canonical/actual-path read compatibility. */
+export function readVersionBaselineShaData(input: { baselineText: string | null; initialized: boolean; relPath: string }): BaselineShaResult {
+  const rel = normalizeVersionedDocPath(input.relPath);
+  if (rel === undefined) return { ok: false, reason: "baseline-corrupt" };
+  const state = parseVersionBaselineState(input);
+  if (!state.ok) return { ok: false, reason: state.reason };
+  const record = latestRecordMap(state.records).get(rel) ?? state.records.find(record => record.path === rel || actualPathForRecord(record) === rel);
+  return { ok: true, ...(record ? { sha256: record.sha256 } : {}) };
+}
+
+/** Plan registration without reading files, taking locks, installing caches or invoking a Provider. */
+export function planVersionBaselineRegistration(input: VersionBaselineData & { relPath: string; recordedBy?: string; at: string }): VersionBaselineRegistration {
+  const rel = normalizeVersionedDocPath(input.relPath);
+  if (rel !== undefined && !isVersionedDocPath(rel)) return { registered: undefined, violations: [] };
+  const fail = (violations: VersionBaselineViolation[] = []): VersionBaselineRegistration => ({ registered: false, violations });
+  if (rel === undefined) return fail();
+  const state = parseVersionBaselineState(input);
+  if (!state.ok) return fail([{ path: VERSION_BASELINE_REL, reason: state.reason }]);
+  const files = baselineFileMap(input), recordedBy = input.recordedBy ?? "app:session";
+  if (!files || !files.has(rel) || !recordedBy.trim() || !Number.isFinite(Date.parse(input.at))) return fail([{ path: VERSION_BASELINE_REL, reason: "baseline-corrupt" }]);
+  const append = (records: VersionBaselineRecord[], initialize = false): VersionBaselineRegistration => {
+    const previous = input.baselineText ?? "", separator = previous.length && !previous.endsWith("\n") ? "\n" : "";
+    return { registered: true, violations: [], nextText: previous + separator + records.map(record => `${JSON.stringify(record)}\n`).join(""), ...(initialize ? { initialize: true } : {}) };
+  };
+  const recordFor = (path: string, event: VersionBaselineEvent): VersionBaselineRecord => ({ v: 1, flowId: flowIdOf(path), doc: docKindOf(path)!,
+    version: versionedDocVersionOf(path)!, path: canonicalPathFor(flowIdOf(path), docKindOf(path)!), sha256: files.get(path)!.sha256.toLowerCase(),
+    event, recordedAt: input.at, recordedBy });
+  if (!state.initialized) return append([...files.keys()].map(path => recordFor(path, "baseline")), true);
+  const version = versionedDocVersionOf(rel)!, flowId = flowIdOf(rel), doc = docKindOf(rel)!;
+  if (!hasVersionRecord(Buffer.from(files.get(rel)!.bytesBase64, "base64").toString("utf8"), version)) return fail();
+  const prior = latestRecordMap(state.records).get(rel) ?? state.records.find(record => record.flowId === flowId && record.doc === doc && record.version === version);
+  if (prior) {
+    if (state.records.some(record => actualPathForRecord(record) === rel && record.event === "frozen")) return fail();
+    if (prior.sha256.toLowerCase() === files.get(rel)!.sha256.toLowerCase()) return { registered: true, violations: [] };
+    return append([recordFor(rel, "draft-updated")]);
+  }
+  const violations = verifyVersionBaselineData(input);
+  if (violations.length) return fail(violations);
+  const max = Math.max(0, ...state.records.filter(record => record.flowId === flowId && record.doc === doc).map(record => record.version));
+  return version === max + 1 ? append([recordFor(rel, "version-added")]) : fail();
+}
+
 /** shell-post-audit 用：baseline 缺失/坏行/字段缺失 ⇒ fail-closed（不得静默跳过）。 */
 export async function baselineShaFor(projectRoot: string, relPath: string): Promise<BaselineShaResult> {
   const rel = normalizeVersionedDocPath(relPath);
@@ -762,6 +845,11 @@ export function invalidateVersionedDocFreezeSnapshot(projectRoot?: string): void
     return;
   }
   freezeSnapshotStore.delete(snapshotKey(projectRoot));
+}
+
+/** Pure cache metadata: a conservative migration-required lookup is not proof of completed migration. */
+export function hasReadyVersionedDocFreezeSnapshot(projectRoot: string): boolean {
+  return freezeSnapshotStore.get(snapshotKey(projectRoot))?.state === "ready";
 }
 
 /**
@@ -1079,7 +1167,7 @@ function stableOwnerOf(kind: StableFileKind | undefined): RejectionOwner {
   return "app";
 }
 
-function stableWriteDenied(
+function legacyStableWriteDenied(
   code: StableWriteErrorCode,
   missing: string[],
   options: { owner?: RejectionOwner; action?: string; retryable?: boolean; docs?: string[] } = {},
@@ -1098,6 +1186,17 @@ function stableWriteDenied(
     reason,
     writeDecision: { allowed: false, reason, allowedByRoot: { skill: [], project: [] }, code, rejection },
   };
+}
+
+/** G-owned ordinary rejection value; the managed path does not call another owner's private formatter. */
+function stableWriteDeniedFromFacts(code: StableWriteErrorCode, missing: string[], options: {
+  owner?: RejectionOwner; action?: string; retryable?: boolean; docs?: string[];
+} = {}): StableWriteDeniedDecision {
+  const rejection: MechanicalRejection = { code, missing: missing.filter(value => value.trim()).slice(0, 5),
+    owner: options.owner ?? "app", action: options.action ?? "重新取得实际 stable-write 许可与文件事实后重试。",
+    retryable: options.retryable ?? true, docs: (options.docs ?? []).slice(0, 5) };
+  const reason = `${rejection.missing.join("；")}。下一步：${rejection.action} 谁来做：${rejection.owner}。[技术 code：${code}]`;
+  return { allowed: false, reason, code, rejection, writeDecision: { allowed: false, reason, code, rejection, allowedByRoot: { skill: [], project: [] } } };
 }
 
 export type StableWriteDeniedDecision = {
@@ -1135,7 +1234,25 @@ export type StableWriteDecision =
  *
  * 不做状态变更：不写盘、不消费、不发事件（消费在 post-write `completeWrite(actualSha)`）。
  */
+export type StableCurrentFileFacts = { state: "missing" } | { state: "present"; sha256: string } | { state: "unknown"; reason: string };
+export type StableWriteFactsInput = StableWriteDecisionInput & { currentFile: StableCurrentFileFacts };
+
+/** Explicit legacy effect path, retained only until the real callers migrate together. */
 export function stableWriteDecision(input: StableWriteDecisionInput): StableWriteDecision {
+  return evaluateStableWriteDecision(input, () => {
+    try { return { state: "present", sha256: createHash("sha256").update(readFileSync(path.join(input.projectRoot, normalizeVersionedDocPath(input.relPath)!))).digest("hex") }; }
+    catch { return { state: "missing" }; }
+  });
+}
+
+/** Managed synchronous predicate: only ordinary current-file facts, no filesystem access or live fallback. */
+export function stableWriteDecisionFromFacts(input: StableWriteFactsInput): StableWriteDecision {
+  return evaluateStableWriteDecision(input, () => input.currentFile, true);
+}
+
+// The private reader preserves the legacy call's read-after-permit ordering; the managed entry only supplies data.
+function evaluateStableWriteDecision(input: StableWriteDecisionInput, currentFile: () => StableCurrentFileFacts | undefined, pure = false): StableWriteDecision {
+  const stableWriteDenied = pure ? stableWriteDeniedFromFacts : legacyStableWriteDenied;
   const rel = normalizeVersionedDocPath(input.relPath);
   if (rel === undefined) {
     return stableWriteDenied("stable-write-invalid", [`路径非法（absolute/逃逸）：${String(input.relPath)}`]);
@@ -1269,12 +1386,10 @@ export function stableWriteDecision(input: StableWriteDecisionInput): StableWrit
       { owner, docs: [rel] },
     );
   }
-  let currentSha: string | undefined;
-  try {
-    currentSha = createHash("sha256").update(readFileSync(path.join(input.projectRoot, rel))).digest("hex");
-  } catch {
-    currentSha = undefined;
-  }
+  const current = currentFile();
+  if (!current || current.state === "unknown" || (current.state !== "missing" && !(current.state === "present" && isSha256Hex(current.sha256))))
+    return stableWriteDenied("stable-write-permit-invalid", [`当前文件事实缺失/未知；不得猜作missing：${rel}`], { owner, docs: [rel] });
+  const currentSha = current.state === "present" ? current.sha256.toLowerCase() : undefined;
   if (currentSha === undefined) {
     if (authoritative.baseSha256 !== "") {
       return stableWriteDenied(

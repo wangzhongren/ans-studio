@@ -1,0 +1,14 @@
+# 人事治理工作备忘录
+
+本文件只记录 ANS 人事（People Operations）的治理续接线索和已核事实，不是任务状态、不是角色定义，也不写其他角色的文档。
+
+## 2026-11-07 — H1：8 张开发侧代码维护角色卡 + B-9/B-10/B-11/B-12
+
+- 对象：团队计划 `docs/scheduling/2026-11-07_team-plan_runtime-gate-role-modularization.md`（687 行 / SHA-256 `00e1f76b6a527a1237ac1467bb4100805750606904ce6960bb56a013a4ba565c`，实测一致）；闸门 1/2 确认留痕 `docs/communication/2026-11-07_gate-confirmation_team-plan.md`（31 行 / SHA-256 `b788072e8553a708a2891bffde8e9a65d08fea4bf2242b2582a61ab1675c48f0`）。
+- 新建 8 角色（roleId = 目录名，英文短名；中文显示名按计划 §4.2）：`chief-code`、`product-code`、`rapporteur-code`、`nominator-code`、`convener-code`、`verifier-code`、`shared-code`、`gates-code`，各含 `role-card.md` + `boundary.md` + `boundary.yaml` + `changelog.md`。写集按计划 §4.3/§4.4/§5.4 B-1～B-8；六角色模块 = `src/common/roles/<内置 id>/` + `test/roles/<内置 id>/`；`shared-code` = `src/common/shared/`（维护/迁移）+ `test/项目管理/shared/`（自 PM 移交）+ `角色卡/shared-code/docs/architecture/shared-components.md`（迁入，单文件）；`gates-code` = `src/common/gates/` + `test/gates/`。
+- B-9：`角色卡/项目管理/` 移除 `src/common/shared/`、`test/项目管理/shared/` 与共享组件目录 ownership（移交 shared-code）；保留项目规则/架构/设计/协调/文档职责。
+- B-10：`角色卡/门禁引擎/` 角色卡与边界措辞收窄——`governance-roles.ts` 门面/装配化、E0 扩展 `src/model/role.ts` 公开角色模块契约类型；未改 Section 1 条目。
+- B-11：`角色卡/编排/` 角色卡与边界措辞收窄——角色策略外移、P1 D-minimal 门谓词、E2 改调门控模块、`handback.ts`/`workflow-preconditions.ts` 稳定公开只读入口声明（默认不迁移，§9.4-4）；未改 Section 1 条目。
+- B-12：技能参考修订 `C:\Users\51054\.claude\skills\ans-governed-construction\references\shared-directories.md`（仓库外，项目侧以本 memo 与各角色 changelog 留痕）：修订前 44 行 / 6602 bytes / SHA-256 `4e43e615930a6f7da220c68ee563205ec6836a360b18fffb190e9ab4566fd049` → 修订后 49 行 / 8904 bytes / SHA-256 `80ece2c55d9392c5cdae19afc637c340b7fd7831e5fc18fadf96e8b08d946ea3`。修订内容：新增 `common/roles/<id>/`（单一 owner、唯一 `index.ts`、零跨角色 import）与 `common/gates/`（只判定不采集、单一 owner、公开 API 冻结）两类根；`common/shared/` 维护 owner 由项目管理改为共享代码维护角色（S2）；依赖方向改为 `Model ← shared ← {roles, gates} ← engines`；保留「不保留两份独立维护副本」与证据失效规则；新增共享/门控接口评审与角色模块 public entry 变更规则。
+- 一致性校验（H1 交付时实测）：8 个新角色 boundary.md/yaml 条目逐条一致（kind/path/purpose 归一化后 0 差异；YAML 目录尾斜杠由解析器归一化属预期）；写集两两不重叠且与现有角色不重叠（脚本按目录前缀展开核对，涉及新角色的重叠 0；现有角色之间也 0）；`listProject(仓库根)` 枚举出全部 8 个新角色（`roleDirectories.totalDirs=25`，含归档跳过 1；唯一 warning 为 `角色卡/招募：缺少 role-card.md，已跳过`——这是本备忘录目录按技能默认路径产生的预期提示，非角色卡缺陷）。测试：`node --test --test-concurrency=1 test/门禁引擎/boundary-yaml.test.ts test/门禁引擎/boundary-yaml-validation.test.ts test/门禁引擎/boundary-empty-and-builtin.test.ts test/测试/boundary-matrix.test.ts` → 31/31 pass，exit 0；`node --test --test-concurrency=1 test/runtime-core/boundary-write-guard.test.ts test/编排/boundary-write-validation.test.ts` → 9/9 pass，exit 0。已知既有漂移（本变更未引入、未顺手改）：`角色卡/项目管理/boundary.yaml` 含 `docs/audit/` 条件目录而 `boundary.md` 无对应行；`角色卡/编排/boundary.yaml` 含 `pm-reviewer.ts` 条目而 `boundary.md` 含 `init.ts`（两侧各缺一条）；`角色卡/编排` 的 `shell-arming.ts` 用途文字 md/yaml 不同。
+- 状态：H1 治理落地完成；未写代码/测试、未改产品/测试/方案/调度/沟通/验收文档、未 commit/push、未跑真实模型。下一步由统筹核对后按计划 §7.1 派发。

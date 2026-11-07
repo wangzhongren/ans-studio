@@ -352,6 +352,7 @@ export const REFACTOR_STATUS_KEYS: Readonly<Record<RefactorRequestStatus, Messag
 });
 
 export const FREEZE_REASON_KEYS: Readonly<Record<DocFreezeReason, MessageKey>> = Object.freeze({
+  "role-direct-applied": "ui.freeze.reason.roleDirectApplied",
   "vca-approved": "ui.freeze.reason.vcaApproved",
   "version-upgrade-approved": "ui.freeze.reason.versionUpgradeApproved",
   "detail-item-applied": "ui.freeze.reason.detailItemApplied",

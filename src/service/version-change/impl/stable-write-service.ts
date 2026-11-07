@@ -98,6 +98,7 @@ function authorityOf(decision: StableWriteDecision): ServiceResult<StableWriteAu
 }
 
 export interface StableWriteServiceDeps {
+  projectRoot?: string;
   records: StableWriteRepositoryPort;
   permits: StablePermitPort;
   hashes: ProjectHashPort;
@@ -113,15 +114,6 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
 
   function isExpired(permit: StableWritePermit, at: string): boolean {
     return Date.parse(at) >= Date.parse(permit.expiresAt);
-  }
-
-  async function snapshotAll(): Promise<void> {
-    try {
-      const all = await permits.list();
-      await permits.installSnapshot(all);
-    } catch {
-      /* 快照刷新失败 ⇒ C2b 判定 fail-closed；许可记录本身已落库 */
-    }
   }
 
   async function nextRequestId(): Promise<string> {
@@ -147,6 +139,7 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
   }
 
   return {
+    ...(deps.projectRoot ? { projectRoot: deps.projectRoot } : {}),
     async request(input: StableWriteRequestInput) {
       const target = stableWritePathOf(input.kind, input.roleId);
       if (!target.ok) return target;
@@ -235,10 +228,8 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
       const updated = await records.updateWithExpectedStatus(approved, "requested");
       if (!updated.ok) {
         await permits.upsert({ ...permit, status: "failed" });
-        await snapshotAll();
         return fail("stable-write-write-failed", updated.message ?? "stable-write 记录更新失败");
       }
-      await snapshotAll();
       const result: StableWriteApproveResult = { record: approved, permit };
       return { ok: true, value: result };
     },
@@ -290,7 +281,6 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
       if (permit.status === "expired" || isExpired(permit, at)) {
         await records.updateWithExpectedStatus({ ...current, status: "failed" }, "approved");
         await permits.upsert({ ...permit, status: "expired" });
-        await snapshotAll();
         return fail("stable-write-permit-expired", "许可已过期（拒绝且不自动补发）");
       }
 
@@ -299,7 +289,6 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
         const failedRecord: StableWriteRecord = { ...current, status: "failed" };
         await records.updateWithExpectedStatus(failedRecord, "approved");
         await permits.upsert({ ...permit, status: "failed" });
-        await snapshotAll();
         return fail(
           "stable-write-hash-mismatch",
           `写入哈希与批准内容不符（actual=${input.actualSha256} target=${permit.targetSha256}）；许可已作废`,
@@ -318,10 +307,8 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
       const upserted = await permits.upsert(consumed);
       if (!upserted.ok) {
         await records.updateWithExpectedStatus({ ...written, status: "failed" }, "written");
-        await snapshotAll();
         return fail("stable-write-write-failed", upserted.message ?? "许可消费写入失败");
       }
-      await snapshotAll();
 
       let repin: StableRepinOutcome;
       try {
@@ -358,7 +345,6 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
         const permit = all.find((entry) => entry.permitId === current.permitId);
         if (permit !== undefined && permit.status === "approved") {
           await permits.upsert({ ...permit, status: "failed" });
-          await snapshotAll();
         }
       }
       return { ok: true, value: failed };
@@ -372,6 +358,19 @@ export function buildStableWriteService(deps: StableWriteServiceDeps): StableWri
       return all.find(
         (permit) => permit.path === rel && permit.status === "approved" && !isExpired(permit, at),
       );
+    },
+
+    async readPermitSnapshot() {
+      const requests = await records.list(), all = await permits.list(), at = nowIso(), seen = new Set<string>();
+      const applicable: StableWritePermit[] = [];
+      for (const record of requests) {
+        if (record.status !== "approved") continue;
+        const permit = all.find(entry => entry.path === record.path && entry.status === "approved" && !isExpired(entry, at));
+        if (!permit || permit.requestId !== record.requestId || permit.permitId !== record.permitId || seen.has(permit.permitId)
+          || permit.roleId !== record.roleId || permit.kind !== record.kind || permit.baseSha256 !== record.baseSha256 || permit.targetSha256 !== record.targetSha256) continue;
+        seen.add(permit.permitId); applicable.push(structuredClone(permit));
+      }
+      return applicable;
     },
 
     async list() {

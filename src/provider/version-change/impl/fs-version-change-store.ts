@@ -8,16 +8,15 @@
 //   读返回 `corrupt`（`list()` 抛错，不静默清空）；未知字段保留；
 // · `stable-writes.json`（record）与 `stable-write-permits.json`（permit）**分表**（F13）：
 //   record 只以 `permitId` 关联；permit 形状 = C1 `StableWritePermit`（唯一，无第三形状）；
-// · `installSnapshot` 只调用 C2b `installStableWritePermitSnapshot`（同步许可快照单一实现）。
+// · Provider returns ordinary permit records only; Gate snapshot installation belongs to Pipeline.
 //
 // 本文件不做状态机/业务校验（C2c Service 职责），不发事件，不写项目文档。
 
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { installStableWritePermitSnapshot } from "../../../common/门禁引擎/versioned-doc-guard.ts";
 import { atomicWrite } from "../../../common/shared/atomic-write.ts";
-import { TRUNK_STABLE_FILE_KINDS } from "../../../model/trunk.ts";
+import { TRUNK_STABLE_FILE_KINDS, isDirectActionSource, isDirectActionReceipt, isSnapshotRef } from "../../../model/trunk.ts";
 import {
   REFACTOR_MANAGED_BY,
   REFACTOR_REQUEST_SCHEMA,
@@ -94,6 +93,14 @@ function isVersionChangeRecord(value: unknown): value is VersionChangeRecord {
   if (typeof value.summary !== "string") return false;
   if (!includesString(VERSION_CHANGE_STATUSES, value.status)) return false;
   if (!isNonEmptyString(value.at)) return false;
+  if (value.operationId !== undefined && !isNonEmptyString(value.operationId)) return false;
+  if (value.actionSource !== undefined && !isDirectActionSource(value.actionSource)) return false;
+  if (value.directReceipt !== undefined && !isDirectActionReceipt(value.directReceipt)) return false;
+  if (value.snapshotRef !== undefined && !isSnapshotRef(value.snapshotRef)) return false;
+  if (isObject(value.actionSource) && value.actionSource.kind === "role-direct"
+    && (value.actionSource.applicationId !== value.applicationId || value.actionSource.operationId !== value.operationId
+      || value.actionSource.actorRoleId !== value.initiatorRoleId || value.actionSource.action !== value.kind
+      || value.decisionId !== undefined || value.decidedBy !== undefined)) return false;
   return true;
 }
 
@@ -357,22 +364,12 @@ export function createStableWriteStore(projectRoot: string): StableWriteStore {
   };
 }
 
-export interface StableWritePermitStoreOptions {
-  /** 测试/替身注入；缺省调用 C2b `installStableWritePermitSnapshot`（唯一同步快照实现）。 */
-  installSnapshot?: (permits: readonly StableWritePermit[]) => void | Promise<void>;
-}
-
 /** 一次性许可存储（`stable-write-permits.json`；F13 与 record 分表）。 */
 export function createStableWritePermitStore(
   projectRoot: string,
-  options: StableWritePermitStoreOptions = {},
 ): StableWritePermitStore {
   const root = path.resolve(projectRoot);
   const abs = path.join(root, STABLE_WRITE_PERMITS_REL);
-  const installSnapshot = options.installSnapshot ?? ((permits: readonly StableWritePermit[]) => {
-    installStableWritePermitSnapshot(root, permits);
-  });
-
   async function listPermits(): Promise<StableWritePermit[]> {
     const read = await serialize(abs, () => readArrayFile(abs, isStableWritePermit));
     if (read.ok) return read.value;
@@ -396,10 +393,6 @@ export function createStableWritePermitStore(
         else permits.push(permit);
         return writeArrayFile(abs, permits);
       });
-    },
-
-    async installSnapshot(permits: readonly StableWritePermit[]) {
-      await installSnapshot(permits);
     },
 
     readRaw() {

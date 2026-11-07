@@ -104,7 +104,7 @@ export async function refreezeTrunk(
   let workflow = manifest.artifacts.workflow;
   if (input.target.workflow !== undefined) {
     const ref = input.target.workflow;
-    if (workflow.sha256.toLowerCase() !== ref.sha256.toLowerCase() || workflow.path !== ref.path) {
+    if (workflow === undefined || workflow.sha256.toLowerCase() !== ref.sha256.toLowerCase() || workflow.path !== ref.path) {
       workflow = stamp("workflow", ref.path, ref.sha256);
       changed.push("workflow");
     }

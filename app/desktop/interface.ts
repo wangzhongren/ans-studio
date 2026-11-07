@@ -1,11 +1,12 @@
 import type { PersistenceReply, PersistenceValues, PersistenceUpdated, PersistenceScope } from "./session.ts";
 
 import { realpathSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import path from "node:path";
 import { readFile, readdir, stat, mkdir } from "node:fs/promises";
 import { createProjectDocumentReader } from "../../src/pipeline/project-document/read-project-document.ts";
+import { beginGitHostAction, endGitHostAction } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, ReadProjectDocumentResult } from "../../src/model/project-document.ts";
 // app/desktop/interface.ts
 // 桌面应用的 Interface 层：IPC 通道背后的处理器（纯逻辑，不依赖 electron，可在 node 下单测）。
@@ -18,6 +19,7 @@ import type { ProjectDocumentRef, ProjectDocumentScope, DocumentReadErrorCode, R
 import type { BoundarySection1 } from "../../src/model/boundary.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle, RoleSessionAbortResult } from "../../src/pipeline/orchestration/run-role.ts";
+import { prepareChiefDecisionEvidence } from "../../src/pipeline/orchestration/run-role.ts";
 import type { GovernanceFunction, GovernanceModel, ProjectConfig } from "../../src/model/role.ts";
 // 会话事件流类型：编排把 `RoleSessionHandle.events()` 放宽为 `OrchestrationEvent`（既有 `SessionEvent`
 // + 编排在 `settled` 时追加的 `handback` 回交事件，设计 §10.8）。外推时套上 `roleId` 信封
@@ -53,6 +55,8 @@ export type { GovernanceRecordState, GovernanceRecordStatus } from "./project.ts
 // 载入器类型（只读导入共享组件类型；**实现**的唯一来源在 `src/common/shared/config-loader.ts`）。
 import type { LoadConfigOptions, LoadedConfig } from "../../src/common/shared/config-loader.ts";
 import { loadEffectiveConfig as realLoadEffectiveConfig } from "../../src/common/shared/config-loader.ts";
+export { desktopProjectExecutionInventory, subscribeDesktopExecutionInventory } from "./session.ts";
+export type { DesktopProjectExecutionInventory, DesktopSessionInventoryFact } from "./session.ts";
 import { SessionManager, type ActiveRunView, type RunChangeMode, type SessionOpenRequest, type SessionTarget, type SessionMessageMetadata, type SessionManagerDeps, type OpenResult, type SendResult, type StopResult, type WithdrawResult, type SessionEventEnvelope, type BackgroundTasksListReply, type BackgroundTaskReadInput, type BackgroundTaskReadReply, type BackgroundTaskStopInput, type BackgroundTaskStopReply, type TaskListView, type TaskRestoreReport, type TerminateRoleRunInput, type TerminateRoleRunResult, type RedispatchTaskInput, type RedispatchTaskResult, type CloseTaskInput, type CloseTaskResult } from "./session.ts";
 // 2026-11-02（全局任务状态）：UI 只读入口的视图形状（A0 单源）。
 import { PROJECT_STATE_SCHEMA, type ProjectStateView } from "../../src/model/project-state.ts";
@@ -296,6 +300,8 @@ export interface ShellJudgeStateReply {
    * **不影响治理 approval 组**（治理卡判断组仍只看全局开关）。缺省/false = 未暂停。
    */
   paused?: boolean;
+  /** Authority epoch for chief delegation; shell replies omit this field. */
+  revision?: number;
 }
 
 /** 主进程权威的开关状态机（纯内存；由 main.ts 创建并与通道/Interface 共享**同一实例**）。 */
@@ -325,6 +331,25 @@ export function createShellJudgeSwitch(initialEnabled = false): ShellJudgeSwitch
     reset() {
       enabled = false;
     },
+  };
+}
+
+/** Decision delegation state shares the existing three IPC channels. Revision never rewinds. */
+export interface DecisionDelegationSwitch extends ShellJudgeSwitch {
+  get(): ShellJudgeStateReply & { ok: true; enabled: boolean; revision: number };
+  subscribe(listener: () => void): () => void;
+}
+export function createDecisionDelegationSwitch(initialEnabled = false): DecisionDelegationSwitch {
+  const state = createShellJudgeSwitch(initialEnabled);
+  let revision = 0;
+  const listeners = new Set<() => void>();
+  const changed = (): void => { revision += 1; for (const listener of listeners) listener(); };
+  return {
+    isEnabled: () => state.isEnabled(),
+    get: () => ({ ...state.get(), revision }),
+    set(input) { const result = state.set(input); if (result.ok) changed(); return { ...result, revision }; },
+    reset() { state.reset(); changed(); },
+    subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   };
 }
 
@@ -982,7 +1007,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const shellJudgeSwitch = deps.shellJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.approval === true);
   const createShellJudgeFn = deps.createShellJudgeFn ?? realCreateShellJudge;
   // 「替我决策」（2026-10-18 双开关评审 §3.3/§8.2）：同形第二套开关（互不影响）与治理判断闭包工厂。
-  const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createShellJudgeSwitch(deps.initialJudgeSwitches?.decision === true);
+  const decisionJudgeSwitch = deps.decisionJudgeSwitch ?? createDecisionDelegationSwitch(deps.initialJudgeSwitches?.decision === true);
   const createGovernanceJudgeFn = deps.createGovernanceJudgeFn ?? realCreateGovernanceJudge;
   // 2026-11-04 下载申请（C1/F2）：B1 每会话运行时工厂（缺省真实实现；测试可注入桩件）。
   const createDownloadRuntimeFn = deps.createDownloadRuntimeFn ?? realCreateDownloadRequestRuntime;
@@ -1038,6 +1063,31 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
   const documentReader = createProjectDocumentReader();
   let importedProjectRoot: string | undefined;
   let importSequence = 0;
+  let nativeSelectionSequence = 0;
+  let nativeSelection: { selectionId: string; root: string; selectedAt: string } | undefined;
+  let registeredProjectLifecycle: { selectionId: string; selectedRoot: string; projectRoot: string; source: "native-directory-selection";
+    selectedAt: string; listingGeneration: number } | undefined;
+
+  // Only synchronous source-state changes run here; the native dialog and document IO stay outside.
+  const changeProjectSource = (additionalRoots: readonly string[], apply: () => void): void => {
+    const roots = [...new Set([importedProjectRoot, registeredProjectLifecycle?.projectRoot, nativeSelection?.root,
+      ...additionalRoots].filter((root): root is string => typeof root === "string" && root !== "")
+      .map(root => process.platform === "win32" ? path.resolve(root).toLowerCase() : path.resolve(root)))].sort();
+    const leases: Array<{ projectRoot: string; leaseId: string }> = [];
+    try {
+      for (const projectRoot of roots) {
+        const lease = beginGitHostAction({ projectRoot, kind: "authorization-change" });
+        if (!lease.ok) throw new Error("项目正在处理派发或权限变更，选择尚未更改。请稍后重试。");
+        leases.push({ projectRoot, leaseId: lease.leaseId });
+      }
+      apply();
+    } finally {
+      for (const lease of leases.reverse()) {
+        const ended = endGitHostAction(lease);
+        if (!ended.ok) throw new Error("项目状态协调未能完成，请重试并检查诊断。");
+      }
+    }
+  };
 
   /**
    * 卡内入口/Composer 的 target 校验（C1 P1-CAP-15c，fail-closed）：
@@ -2083,6 +2133,10 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
   const manager = new SessionManager({
     openRoleSession: openRoleSessionFn,
+    getRegisteredProjectLifecycle: projectRoot =>
+      importedProjectRoot === projectRoot && registeredProjectLifecycle?.projectRoot === projectRoot
+        ? { ...registeredProjectLifecycle } : undefined,
+    prepareChiefDecisionEvidence,
     createPiAdapterFactory: createPiAdapterFactoryFn,
     createRuntimeAdapterFactory: runtimeFactory,
     runtimeOptions: deps.runtimeOptions,
@@ -2169,6 +2223,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       ...(nowMs !== undefined ? { now: () => new Date(nowMs()) } : {}),
       notify: (message) => manager.noteVersionChange(projectRoot, message),
       notifyInitiator: (roleId, message) => manager.noteVersionChangeInitiator(projectRoot, roleId, message),
+      notifyDirect: (input) => manager.queueDirectNotification(projectRoot, input),
       presentVersionChangeCard: (record) => manager.presentVersionChangeCard({ projectRoot, record }),
       presentAmendmentItemCard: (input) => manager.presentAmendmentItemCard({ projectRoot, ...input }),
       presentStableWriteCard: (record, preview) => manager.presentStableWriteCard({ projectRoot, record, preview }),
@@ -2355,13 +2410,33 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     getDeliveryReceipt: input => persistenceCall('getDeliveryReceipt', input),
     getSessionPersistence: input => persistenceCall('getSessionPersistence', input),
     async pickProject(): Promise<string | null> {
+      let selection = 0;
+      changeProjectSource([], () => {
+        selection = ++nativeSelectionSequence;
+        nativeSelection = undefined;
+        registeredProjectLifecycle = undefined;
+      });
       const root = await deps.pickDirectory();
-      if (root !== null) await documentReader.grantNativeSelection(root);
-      else documentReader.cancelNativeSelection();
+      if (selection !== nativeSelectionSequence) return null;
+      if (root !== null) {
+        await documentReader.grantNativeSelection(root);
+        if (selection !== nativeSelectionSequence) return null;
+        try {
+          changeProjectSource([root], () => {
+            if (selection === nativeSelectionSequence)
+              nativeSelection = { selectionId: randomUUID(), root, selectedAt: new Date().toISOString() };
+          });
+        } catch (error) { documentReader.cancelNativeSelection(); throw error; }
+      } else documentReader.cancelNativeSelection();
       return root;
     },
     readProjectDocument(input) { return documentReader.read(input); },
-    disposeProjectDocuments() { documentReader.dispose(); },
+    disposeProjectDocuments() {
+      changeProjectSource([], () => {
+        ++nativeSelectionSequence; nativeSelection = undefined; registeredProjectLifecycle = undefined;
+        documentReader.dispose();
+      });
+    },
 
     async listProject(input): Promise<ListProjectResult> {
       const projectRoot = input.projectRoot;
@@ -2453,7 +2528,18 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
         if (r.governanceFunction !== undefined) roleView = { ...roleView, governanceFunction: r.governanceFunction };
         roles.push(roleView);
       }
-      if (generation === importSequence) importedProjectRoot = listing.projectRoot;
+      if (generation === importSequence) changeProjectSource([listing.projectRoot], () => {
+        importedProjectRoot = listing.projectRoot;
+        // Path normalization is matching only; O rechecks the actual canonical root and contents.
+        const picked = nativeSelection;
+        if (picked && path.resolve(picked.root) === path.resolve(listing.projectRoot)) {
+          registeredProjectLifecycle = { selectionId: picked.selectionId, selectedRoot: picked.root, projectRoot: listing.projectRoot,
+            source: "native-directory-selection", selectedAt: picked.selectedAt, listingGeneration: generation };
+        } else if (registeredProjectLifecycle?.projectRoot !== listing.projectRoot) {
+          registeredProjectLifecycle = undefined;
+          nativeSelection = undefined;
+        }
+      });
       const documentListing = documentReader.updateListing(documentSequence, listing.projectRoot, roles.map(projectDocumentCandidates));
       for (const role of roles) role.documents = documentListing.documents[role.roleId] ?? [];
       // 根文档只作元数据装配；摘要诊断帮助定位索引/白名单问题（不记路径/正文）。
@@ -2893,7 +2979,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
 
     async openSession(input): Promise<OpenResult> {
       if (!input || typeof input.projectRoot !== "string" || typeof input.roleId !== "string" || !isRuntimeKind(input.runtime)) return { ok: false, error: mainT("main.interface.sessionRequestInvalid") };
-      const result = await manager.open(input);
+      // Host task binding is supplied by actual dispatch, never by renderer open-session input.
+      const result = await manager.open({ projectRoot: input.projectRoot, roleId: input.roleId, runtime: input.runtime });
       // 客户在界面上选定的引擎也是「应用内已选」的事实：成功开会话后记住（per-project；demo 不参与自动派发）。
       if (result.ok) {
         void persistProjectRuntime(deps.runtimeStatePath, input.projectRoot, input.runtime).catch(() => undefined);
@@ -2902,6 +2989,13 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     },
 
     async sendSession(input: { text: string; images?: unknown; target?: SessionTarget; metadata?: SessionMessageMetadata }): Promise<SendResult> {
+      const customerTarget = resolveDirectiveTarget(input?.target);
+      if (!customerTarget.ok || customerTarget.roleId !== "chief") {
+        return { ok: false, error: mainT("ui.composer.customerEntryChiefOnly") };
+      }
+      // Renderer metadata is display correlation only, never an internal system-delivery origin.
+      const customerMetadata: SessionMessageMetadata | undefined = typeof input?.metadata?.clientMessageId === "string"
+        ? { clientMessageId: input.metadata.clientMessageId } : undefined;
       const text = input && typeof input.text === "string" ? input.text : "";
       const rawImages = input && Array.isArray(input.images) ? input.images : [];
       // —— 客户授权平面（C1，2026-11-03）：**先**解析标记（纯函数、零副作用），早于图片校验/manager.send。——
@@ -2942,7 +3036,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       // 逐张：严格 base64 解码 → 魔数嗅探定类型（声明 mime 不作数）→ ≤5MB；**全过才放行**，
       // 任一张不合格 ⇒ 整条拒发（fail-closed：绝不「丢图发文字」让客户以为图已送达）。
       if (rawImages.length === 0) {
-        return manager.send(text, undefined, input?.target, input?.metadata);
+        return manager.send(text, undefined, customerTarget, customerMetadata);
       }
       const cleaned: PromptImage[] = [];
       for (const it of rawImages) {
@@ -2966,7 +3060,7 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
       }
       // 组**契约形状** `PromptOptions`（单一来源 `src/model/runtime.ts`）——之后整包同一引用透传。
       const opts: PromptOptions = { images: cleaned };
-      return manager.send(text, opts, input?.target, input?.metadata);
+      return manager.send(text, opts, customerTarget, customerMetadata);
     },
 
     async stopSession(input?: { roleId?: string | null; projectRoot?: string; runtime?: RuntimeKind }): Promise<StopResult> {

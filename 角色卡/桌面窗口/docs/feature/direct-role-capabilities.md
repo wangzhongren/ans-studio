@@ -1,0 +1,62 @@
+# 角色直接能力的桌面接线
+
+实施中，待独立验收。
+
+触发条件：客户通过既有decision开关开启/关闭幕僚委托；主进程校验布尔意图后更新权威revision，preload只透传状态。保留业务卡进入原请求通道，关闭呈现客户，开启交真实独立chief上下文。专门shell/下载/stable审批不借此放行。
+
+chief根据真实目标、适用基线与不可变物证，在合法选项中选择，或拒绝/退修。应用重新核模式、revision、原请求、物证及未决CAS；来源记录chief-delegated。失败保留原因及关闭后接管入口，退修释放原工具调用给原角色补材重提。
+
+当前窗口层证据在[W1变更](../change/2026-11-05_change_direct-role-capabilities.md)。真实SessionManager材料/独立chief/原请求闭环已补证，五定向78/78；下游直接能力仍有独立节点，不把定向单测称作全链完成。
+
+W3a补证：默认生产Core/CodexChat经本地有限HTTP完成真实安全Git查询，并提供同实例普通库存。当前文件隔离、历史进程与mutation协调仍unknown/blocked；本证明不等于worker执行或四正常链完成。
+
+
+W4a空项目入口：客户原生选择目录并成功载入后，chief当前真实已接收输入可进入有限初始化协调路由；仅枚举、取消或来源变化不派发。此节点已通过真实默认Chat本地HTTP组合，运营已真实收到任务，但Git首建仍明确blocked，不表示完整开发/质检/验收通过。
+
+
+W6补证：项目选择变更与真实初始化子任务提交已共用宿主临界区；提交等待时选择保持，结束后可重试。已提交来源跟随子任务，父chief正常结束或切换项目界面不撤销它。当前23定向通过，Git首建仍blocked，未覆盖全team执行隔离。
+
+
+W7a实际库存已发布到宿主coordinator，会话创建/处置和紧急中断有真实串行或fence记录。当前23定向通过；创建前安全计划、判断器外部会话及worker完整task绑定仍有明确缺口，库存继续unknown，Git初始化未放行。
+
+
+W8已消费真实创建计划与Core唯一native准入租约，桌面保留待建/失败库存。当前首chief到运营子任务准入已稳；旧会话处置后的Core终态证明仍阻止Git首建，已交原owner，不能忽略旧actor视作闭合。
+
+
+W9临时保护：四项安装/卸载工具仍可见，执行范围未证时在callback前拒绝并保真实来源审计。当前误覆盖unmanaged旧行为，尚未保非Git兼容，不能进入最终候选；需实际scope分流和Core私有绑定证明后续消费。当前24定向通过不表示HR激活或四链完成。
+
+
+W10已解除W9临时非Git广拒：真实unmanaged恢复既有四项安装/卸载，required/unknown保Core受信前效拒绝，工具仍可见。四模式实际通过并核原始来源/配置字节；HR实际激活与最终验收仍由后继真实链确认。
+
+
+W13给真实打开失败库存增加同次Pipeline引用，保留失败历史。官方未启动证明可由O复核；未知custom副作用仍无引用、保持拒绝。当前interface8/8，不能据引用本身宣称执行闭包或workflow已完成。
+
+
+W14已把正式worker派发接到本次运营任务的真实run冻结与执行预检，缺材料保具体stage/code，不创建worker任务；worker会话按actualtaskId绑定真实冻结context和目录scope，忙任务排队、闲置异task重建。真实负例1/1与主renderer类型0；父任务同锁CAS和完整执行正链仍待原O/Q后继，未作为验收通过。
+
+
+W15已消费真实host parentRef生成口，统一在convener项目child最终登记前取得引用并交O同锁CAS；普通worker不继承初始化workSource。登记重放抑制新执行，实际child在打开/排队认领时重核当前run与授权。builtin质检目标也走真实执行预检，不能因角色内置或只读文案冒规划许可。两个真实HTTP缺闭包负例通过，主renderer类型0；完整worker父子正链与取消竞态验收仍由Q15后继，不拿负例冒通过。
+
+
+W16修复stop后晚回调可自动重开会话的独立缺口：先暂停自动投递，消息保留，显式打开才恢复对应会话；普通自动nudge不解除暂停。在途构造跨stop后回收真实晚到handle，不安装/投递。两项manager层测试、W14/W15真实负例及原interface回归通过；Q19 CPU忙循环尚无因果归属，不以此宣称其已修或四链通过。
+
+
+W17写后版本登记和dispatch基线事实已经公开Pipeline→所属Service，保原字节与失败语义。review派发按真实currentconvener parent和普通候选目标取得host candidate/criteria两引用，真实pinned child不携模块写区；评审会话按actualtaskId读exactcontext并刷新自身来源。readonly指实现/候选审阅，仍允许builtin自属质量证据，不新增实现权限。5项定向和interface8项通过、类型0；review完整正链与质量最终收口待后继，未称业务验收。
+
+
+W19已修报告/系统续轮丢父assignment：从持久child父关系或真实bound任务fresh取得同一来源，供应用Git上下文和Core报告工具；父自然prompt结束不抹来源，新客户聊天清旧scope。closed/wrong/cancelled来源不能新开或误投，顶层chief回报不造TaskEngine。定向真实Core consumer与原接口回归通过；planning数据层不替代worker完整权限正链，Q26后继验证integration/Verifier。
+
+
+W20：报告成功去重以真实ledger/入队事实为界；自身post-send delivery观察与detached报告consumer先后提交，保存或业务拒绝保pending原码。通知绑定enqueue时任务，exact creatorclose事实只退为纯信息；未知source保持待核，禁止转挂新任务。相关默认Core/Chat本地HTTP/真实R9争用及停止/接口回归自然通过，完整生产链待Q27。
+
+
+W21：应用已生效通知是同真实任务的事实提醒，保身份但纯确认不强制报告；真实工作/子报告续接义务保持。明确提交的报告一律按真实task/turn处理，不过滤blocked；同task连续报告顺序提交，失败保saved与原码。默认Core/Chat本地HTTP实证Applied→done→noticeACK不覆盖done且Chief能真实收口，explicitblocked/必需报告负例亦通过；端到端NEW待Q28。
+
+
+W22：显式候选评审是必需的immutable业务路径，真实parent/run与双hostrefs不能被旧可选advisory锚点抹去；缺任何必需来源直接拒绝，禁止裸Verifier任务。公开preflight/末append双核与scope保持，负例及既有停止/报告/通知回归通过；完整候选正链待Q29。
+
+
+W23：真实运营→登记内置质检的缺省目标也属于必需评审，缺reviewTarget直接拒，不再进入可选legacy锚点。普通planning/bootstrap与其他角色语义不泛改；当前真实默认Core负例与既有回归通过，完整评审正链仍待Q29。
+
+
+W31：专业文档准备可绑定真实当前客户输入或实际creator handback。报告来源只取实际Core输入的immutable报告四身份，保handback类型；O公开预检返回真实规划draft与typed来源后才持久化。来源完整性与M0意图确认独立，M0missing真实负例仍由O37补门禁，不授旧pin/模块/QA权限。冷重启迁移后同request v2真实确认、source-loss/wrongflow与原回归已取证。

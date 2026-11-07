@@ -1,6 +1,8 @@
 # 项目管理 changelog
 
-本角色治理变更记录（边界内文件；新条目置顶）。工程全项目规则见 [docs/project-rules.md](docs/project-rules.md)，共享组件现行目录见 [docs/architecture/shared-components.md](docs/architecture/shared-components.md)。
+本角色治理变更记录（边界内文件；新条目置顶）。工程全项目规则见 [docs/project-rules.md](docs/project-rules.md)；共享组件目录自 2026-11-07 起移交 shared-code（团队计划 §6.4；迁移在 E1 完成后删除本角色旧副本）。
+
+- 2026-11-07 — **治理变更 B-9（S2 共享移交，职责收窄）**。依据团队计划 `docs/scheduling/2026-11-07_team-plan_runtime-gate-role-modularization.md`（687 行 / SHA-256 `00e1f76b6a527a1237ac1467bb4100805750606904ce6960bb56a013a4ba565c`）§3.2/§4.7 S2/§5.1/§5.4 B-9/§6.4，及闸门 1/2 确认留痕 `docs/communication/2026-11-07_gate-confirmation_team-plan.md`（31 行 / SHA-256 `b788072e8553a708a2891bffde8e9a65d08fea4bf2242b2582a61ab1675c48f0`）。**边界变更**：`boundary.md` 与 `boundary.yaml` 移除 `src/common/shared/`、`test/项目管理/shared/` 两个条目（移交 shared-code，单一 owner，不得双 owner）；`api-spec.md` 用途改为「本角色实现报告（无共享代码后按技能如实说明不适用）」；`docs/architecture/` 目录保留但用途收窄为「本角色自己的架构细分文档」，共享组件目录 `shared-components.md` 按 §6.4 迁出至 `角色卡/shared-code/docs/architecture/shared-components.md`（shared-code 单文件授权；E1 单写者顺序：shared-code 写新→评审确认等价→本角色删除旧副本，本批未删任何文件、未改共享代码/测试）。**角色卡**：职责描述与执行原则移除 `common/shared/` 维护职责，保留项目规则/架构/设计/协调/文档职责；必读资料中 shared-directories 说明改为共享/角色/门控目录归属。**B-12 依据**：技能参考 `references/shared-directories.md` 已修订（`common/shared/` owner 由项目管理改为共享代码维护角色/S2；新增 `common/roles/`、`common/gates/` 根），修订前后 SHA-256 `4e43e615930a6f7da220c68ee563205ec6836a360b18fffb190e9ab4566fd049` → `80ece2c55d9392c5cdae19afc637c340b7fd7831e5fc18fadf96e8b08d946ea3`（仓库外文件；项目侧留痕见 `角色卡/招募/memo.md`）。**核对**：`boundary.md`（13 条）与 `boundary.yaml`（14 条）中由本批变更的条目逐条一致；YAML 多出的 `docs/audit/` 条件目录在 MD 无对应行，属本变更前既有漂移，按计划「不顺手改」未处理。本批为治理落地（H1），未写代码/测试、未 commit/push。
 
 - 2026-10-29：**entry-role-minimal F 批最终核对**。`project-rules` §二.13/15/16 已按 D 批修订、§二.9/11/12（ANS 交付流程）不变，F 无新增修改；共享 i18n 无 F 改动，终态 `ui 850 / main 541 / shared 62 / preferences 3 = 1456`，parity/泄漏/旧 key 守卫全过。Doc: `docs/change/2026-10-28_change_entry-role-minimal-F.md`。
 

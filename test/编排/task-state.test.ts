@@ -27,9 +27,44 @@ import {
   taskEvent,
   taskIdempotencyKey,
   taskStatusOf,
+  validateTaskStateEvent,
   type TaskRecord,
 } from "../../src/common/编排/task-state.ts";
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
+import type { DirectActionSource } from "../../src/model/trunk.ts";
+
+test("review task data: the single Model host reference survives replay; forged authority fields fail shape validation", () => {
+  const candidate = { objectFormat: "sha1" as const, hex: "a".repeat(40) }, reviewBasisRef = { kind: "git-candidate-review" as const, candidateOperationId: "actual-operation-reference",
+    candidate, criteria: [{ oid: candidate, path: "docs/proposals/demo-proposal-v1.md", sha256: "b".repeat(64) }] };
+  const event: TaskStateEvent = { v: 1, at: "2026-11-06T00:00:00.000Z", kind: "task.created", taskId: "review-shape-only", from: "convener", to: "verifier", text: "Read the explicit candidate",
+    sideEffect: "read-only", idempotencyKey: "review-shape-only", flowId: "demo", runId: "run-demo", runState: "pinned",
+    parentTaskRef: { kind: "assigned-task", taskId: "parent-shape-only", ledgerSha256: "c".repeat(64) }, reviewBasisRef };
+  assert.equal(validateTaskStateEvent(event).ok, true);
+  assert.deepEqual(replayTaskEvents([event]).records.get(event.taskId)?.created?.reviewBasisRef, reviewBasisRef);
+  for (const bad of [{ ...reviewBasisRef, passed: true }, { ...reviewBasisRef, criteria: [] }, { ...reviewBasisRef, criteria: [{ ...reviewBasisRef.criteria[0], approved: true }] }])
+    assert.equal(validateTaskStateEvent({ ...event, reviewBasisRef: bad }).ok, false);
+});
+
+test("chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append", async () => {
+  const root = await tempRoot(), at = "2026-11-05T00:00:00.000Z";
+  const source: Extract<DirectActionSource, { kind: "chief-delegated" }> = { kind: "chief-delegated", actorRoleId: "chief",
+    originRoleId: "convener", requestId: "chief-request", baseDigest: "a".repeat(64), delegationRevision: 9,
+    disposition: "select", selected: ["second"], reason: "Evidence supports second", at };
+  const presented: TaskStateEvent = { v: 1, at, kind: "request.presented", requestId: source.requestId, to: "chief" };
+  const resolved: TaskStateEvent = { v: 1, at, kind: "request.resolved", requestId: source.requestId, by: "chief-delegated",
+    choice: "second", selectedOptionIds: ["second"], actionSource: source };
+  assert.equal((await appendTaskEvent(root, presented)).ok, true);
+  assert.equal((await appendTaskEvent(root, resolved)).ok, true);
+  const state = await readTaskState(root); assert.equal(state.errors.length, 0);
+  assert.deepEqual(state.events, [presented, resolved]);
+  // No live switch input is read: historical revision/source survives later reloads.
+  assert.deepEqual((await readTaskState(root)).events, state.events);
+  const bad: unknown[] = [{ ...resolved, actionSource: undefined },
+    { ...resolved, requestId: "another" }, { ...resolved, selectedOptionIds: ["first"] },
+    { ...resolved, by: "customer" }, { ...resolved, actionSource: { ...source, decisionId: "fake-customer" } }];
+  for (const event of bad) assert.equal((await appendTaskEvent(root, event as TaskStateEvent)).ok, false);
+  assert.equal((await readTaskState(root)).events.length, 2);
+});
 
 async function tempRoot(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "ans-task-state-"));

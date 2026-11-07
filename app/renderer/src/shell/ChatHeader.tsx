@@ -44,6 +44,8 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useBackgroundTasksStore } from "@/stores/background-tasks-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useVersionChangeStore } from "@/stores/version-change-store";
+import { useConfirmStore } from "@/stores/confirm-store";
+import { judgeToggleView, JUDGE_GROUP_DECISION } from "@/chat/judge";
 import { EngineSelect } from "@/shell/EngineSelect";
 import { useLocaleState, useT } from "@/i18n";
 import "@/shell/phase4b.css";
@@ -65,6 +67,20 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
   const roleBusy = useChatStore((s) => s.roleBusy);
   const queueByRole = useChatStore((s) => s.queueByRole);
   const pendingOperator = useChatStore((s) => s.pendingOperator);
+  const governanceModel = useChatStore((s) => s.governanceModel);
+  const decision = useConfirmStore((s) => s.judge.decision);
+  const setJudgeEnabled = useConfirmStore((s) => s.setJudgeEnabled);
+  const decisionView = judgeToggleView(JUDGE_GROUP_DECISION,
+    decision.available && decision.revision !== null, decision.enabled, decision.busy,
+    { singleDisabled: governanceModel === "single" }, locale);
+  const decisionNotice = Object.values(pendingOperator).find((payload) => {
+    const request = payload.request;
+    return request && typeof request === "object" && "cardKind" in request
+      && ["appointment", "acceptance", "decision", "proposal"].includes(String(request.cardKind))
+      && typeof payload.judgeNotice === "string" && payload.judgeNotice !== "";
+  })?.judgeNotice;
+  const decisionStatus = decision.error || decisionView.note
+    || (!decisionView.available ? decisionView.title : typeof decisionNotice === "string" ? decisionNotice : "");
   const network = useChatStore((s) => s.network);
   const notice = useSettingsStore((s) => s.notice);
   const backgroundRunning = useBackgroundTasksStore((s) => s.runningCount);
@@ -229,6 +245,22 @@ export function ChatHeader({ onOpenDrawer }: ChatHeaderProps) {
           </div>
 
           <div className="session-actions" id="right-tabs">
+            {selectedRoleId === "chief" ? (
+              <div className="header-decision" data-revision={decision.revision ?? undefined}>
+                <label className={"header-decision-toggle" + (decisionView.checked ? " is-on" : "")}
+                  data-trust="decision" title={decisionView.title}>
+                  <input type="checkbox" id="judge-decision-toggle"
+                    checked={decisionView.checked} disabled={decisionView.disabled}
+                    aria-label={t("ui.judge.decisionOff")} aria-describedby="judge-decision-status"
+                    onChange={(event) => void setJudgeEnabled(JUDGE_GROUP_DECISION, event.target.checked)} />
+                  <span id="judge-decision-label">{t("ui.judge.decisionOff")}</span>
+                </label>
+                <span id="judge-decision-status" className="header-decision-status"
+                  role="status" aria-live="polite" hidden={!decisionStatus} title={decisionStatus}>
+                  {decisionStatus}
+                </span>
+              </div>
+            ) : null}
             <EngineSelect
               value={runtime}
               disabled={!projectRoot}

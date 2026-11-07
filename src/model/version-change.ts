@@ -2,15 +2,16 @@
 // （2026-11-04 trunk-amendment-model C1 冻结；形状派生自 P1.6 + PM 复审裁决 F13/F14）。
 //
 // 纪律（C1 冻结）：
-// · 纯类型/常量：无 I/O、不读写账本、不执行任何判定（状态机/冻结服务/许可判定归编排 C2a/C2c
+// · 类型/常量/纯结构不变量：无 I/O、不读写账本、不执行业务判定（状态机/冻结服务/许可判定归编排 C2a/C2c
 //   与门禁引擎 C2b）。
-// · 依赖方向：只允许 `import type { TrunkStableFileKind, TrunkVersionRef } from "./trunk.ts"`（单向）；
+// · 依赖方向：仅单向依赖 ./trunk.ts 的共享类型与纯结构不变量；
 //   不 import `runtime.ts` 或任何运行层；反向禁止。
 // · 不改既有字段语义/不删除/不重命名；新增字段默认可选，旧读者忽略未知字段。
 // · 审计归属（P1.6 §5.5/AC-31）：VCA/修正案的批准/拒绝 = customer；提交/应用/冻结/迁移/bootstrap
 //   = application（不冒充客户）；refactor 无 customer decision。
 
-import type { TrunkStableFileKind, TrunkVersionRef } from "./trunk.ts";
+import type { DirectActionReceipt, DirectActionSource, SnapshotRef, TrunkStableFileKind, TrunkVersionRef } from "./trunk.ts";
+import { isDirectActionSource, isSnapshotRef } from "./trunk.ts";
 
 /** `version-change/v1`（VCA 记录 + `version.change` 事件 schema）。 */
 export const VERSION_CHANGE_SCHEMA = "version-change/v1";
@@ -107,6 +108,8 @@ export interface VersionChangeTarget {
   toSha256: string;
   /** 仅旧 boundary target 的读兼容；新 VCA 不接收 boundary。 */
   roleId?: string;
+  /** null means the target must be absent; omission is legacy-only. */
+  expectedFromSha256?: string | null;
 }
 
 /** VCA 记录（`.ans/state/version-changes.json`）。 */
@@ -140,6 +143,13 @@ export interface VersionChangeRecord {
   message?: string;
   at: string;
   updatedAt?: string;
+  /** P3.1 direct branch: no fabricated approved/customer transition. */
+  operationId?: string;
+  actionSource?: DirectActionSource;
+  directReceipt?: DirectActionReceipt;
+  snapshotRef?: SnapshotRef;
+  /** Explicit resubmission links to the preserved old pending request. */
+  supersedesApplicationId?: string;
 }
 
 export const VERSION_CHANGE_ERROR_CODES = [
@@ -167,6 +177,7 @@ export type VersionChangeErrorCode = (typeof VERSION_CHANGE_ERROR_CODES)[number]
  *   `migrated-legacy`（提交/迁移/bootstrap；`decidedBy` 缺省，不冒充客户）。
  */
 export type DocFreezeReason =
+  | "role-direct-applied"
   | "vca-approved"
   | "version-upgrade-approved"
   | "detail-item-applied"
@@ -177,6 +188,7 @@ export type DocFreezeReason =
   | "proposal-confirmed"
   | "intent-confirmed";
 export const DOC_FREEZE_REASONS: readonly DocFreezeReason[] = Object.freeze([
+  "role-direct-applied",
   "vca-approved",
   "version-upgrade-approved",
   "detail-item-applied",
@@ -201,7 +213,9 @@ export const DOC_FREEZE_APPLICATION_REASONS: readonly DocFreezeReason[] = Object
   "migrated-legacy",
 ]);
 
-export type DocFreezeOrigin = "customer" | "application";
+export type DocFreezeOrigin = "customer" | "application" | "role-direct" | "chief-delegated";
+/** New direct freezing never borrows a historical customer-approved reason. */
+export const DOC_FREEZE_DIRECT_REASONS: readonly DocFreezeReason[] = Object.freeze(["role-direct-applied"]);
 
 /**
  * R9 baseline 追加 variant 记录的冻结子形状（PM 复审 §4.2；不给既有 `VersionBaselineRecord`
@@ -231,6 +245,51 @@ export interface DocFreezeRecord {
   frozenAt: string;
   /** amendment-submitted: rapporteur；其余按触发源。 */
   actorRoleId?: string;
+  /** Required for new direct-origin records; absent only on historical records. */
+  source?: DirectActionSource;
+  snapshotRef?: SnapshotRef;
+}
+
+/** Strong write shape for the new path; the loose record above is retained for old readers. */
+export type DirectDocFreezeRecord = Omit<DocFreezeRecord,
+  "reason" | "origin" | "decidedBy" | "decisionId" | "source" | "snapshotRef"> & {
+  reason: "role-direct-applied";
+  origin: "role-direct";
+  source: Extract<DirectActionSource, { kind: "role-direct" }>;
+  snapshotRef: SnapshotRef;
+  decidedBy?: never;
+  decisionId?: never;
+};
+
+/** Single pure freeze-record invariant, shared by storage and gate readers.
+ * Historical legal records stay valid; current delegation switches/authorization never enter here.
+ */
+export function isValidDocFreezeRecord(value: unknown): value is DocFreezeRecord {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Partial<DocFreezeRecord>;
+  if (record.schema !== DOC_FREEZE_SCHEMA) return false;
+  if (typeof record.applicationId !== "string" || record.applicationId.trim() === "") return false;
+  if (typeof record.reason !== "string" || !DOC_FREEZE_REASONS.includes(record.reason as DocFreezeReason)) return false;
+  if (record.reason === "role-direct-applied") return record.origin === "role-direct"
+    && record.decidedBy === undefined && record.decisionId === undefined
+    && isDirectActionSource(record.source) && record.source.kind === "role-direct"
+    && record.source.applicationId === record.applicationId && record.source.actorRoleId === record.actorRoleId
+    && isSnapshotRef(record.snapshotRef) && typeof record.frozenAt === "string" && record.frozenAt.trim() !== "";
+  if (record.origin === "chief-delegated") return DOC_FREEZE_CUSTOMER_REASONS.includes(record.reason as DocFreezeReason)
+    && record.decidedBy === undefined && record.decisionId === undefined && record.actorRoleId === "chief"
+    && isDirectActionSource(record.source) && record.source.kind === "chief-delegated" && record.source.disposition === "select"
+    && typeof record.frozenAt === "string" && record.frozenAt.trim() !== "";
+  if (record.origin !== "customer" && record.origin !== "application") return false;
+  const customerReason = DOC_FREEZE_CUSTOMER_REASONS.includes(record.reason as DocFreezeReason);
+  if (customerReason !== (record.origin === "customer")) return false;
+  if (record.decidedBy !== undefined && record.decidedBy !== "customer") return false;
+  if (record.origin === "application" && record.decidedBy !== undefined) return false;
+  if (record.decisionId !== undefined && (typeof record.decisionId !== "string" || record.decisionId.trim() === "")) return false;
+  if (record.actorRoleId !== undefined && (typeof record.actorRoleId !== "string" || record.actorRoleId.trim() === "")) return false;
+  if (typeof record.frozenAt !== "string" || record.frozenAt.trim() === "") return false;
+  if (record.source !== undefined && (!isDirectActionSource(record.source) || record.origin !== "customer"
+      || record.source.kind !== "customer-decision" || record.source.decisionId !== record.decisionId)) return false;
+  return true;
 }
 
 /**

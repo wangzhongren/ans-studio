@@ -464,7 +464,7 @@ contextBridge.exposeInMainWorld("desktop", {
   /**
    * 「替我决策」开关（2026-10-18 双开关评审 §3.3，方法名钉死）：与「替我审批」**独立**的第二套开关
    * （默认 false、重载复位、不持久化；两开关互不影响）。`getDecisionJudgeState()` 返回
-   * `{version:1, ok, enabled?, available?, error?}`；`setDecisionJudgeEnabled(enabled)` 仅提交意图，
+   * `{version:1, ok, enabled?, revision?, available?, error?}`；`setDecisionJudgeEnabled(enabled)` 仅提交意图，
    * **以主进程返回为准**（失败不改状态）。**不暴露任何 Node/fs/process 能力。**
    */
   getDecisionJudgeState: () => ipcRenderer.invoke("decision:judge-get"),

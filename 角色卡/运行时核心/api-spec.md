@@ -177,3 +177,202 @@ Service 为每轮提供一个 ID，归一事件的顶层和 `detail.turnId`，�
 - **语义边界**：工具结果是 `{ok,message}` 文本载体；结构化矩阵快照与 unknown/来源语义由 C1b 组装/渲染器持有，本层不解析、不改写；不接入任何门禁/派发/客户卡/冻结/trunk/VCA/stable-write 判定。
 - **验证与状态**：新增 `test/runtime-core/governance-matrix-tool.test.ts` 8/8；runtime-core 全目录 378 计 / 371 过 / 3 既有 Windows symlink EPERM（`file-write-safety.test.ts:97`、`session-store.test.ts:46`/`:58`）/ 4 skip；`npm run typecheck` exit 0；T3 全量 4,130/4,103/9/18（新增确定性失败 0、新增 skip 0）。候选快照 `839b922f…`；状态 **`implemented-unverified`**（未独立验收通过）。证据见 [提案](docs/change/2026-11-05_governance-authority-matrix-runtime-core.md) 与 [实施记录](docs/change/2026-11-05_governance-authority-matrix-runtime-core-implementation.md)。
 
+
+## 2026-11-05 M1-R1：P3.1直接能力Model冻结
+
+纯Model已实施，工具/schema/session尚未实施；下列是本节点实际导出，非已运行的工具。主属仍运行时核心。
+
+- `trunk.ts`：`TrunkCommitRef {version,digest}`（区别旧`TrunkVersionRef.trunkVersion`）；`DirectActionSource`三判别来源；`DirectActionReceipt`判别`applied|no-op|rejected|committed-pending-recovery|blocked`，所有分支带operation/baseDigest/targetDigest，成功target必填，提交后待恢复必有applicationId/journalId/targetDigest；`DIRECT_ACTION_*`常量与`isDirectActionSource/isDirectActionReceipt`纯结构检查。no-op要求base与target摘要相同。
+- 快照：`SnapshotRef {snapshotId,digest}`；`SnapshotArtifactRef {snapshotId,path,sha256,version?}`；`CompleteSnapshot {schema:"complete-snapshot/v1",snapshotId,digest,files:[{path,sha256,bytesBase64}],createdAt}`。`FrozenRoleEvidence {runId,pinDigest,roleId,snapshotRef,rosterRef,planRef,d3Ref,activationRef,cardRef,boundaryMdRef,boundaryYamlRef,authorizationRef}`。`isCompleteSnapshot/isFrozenRoleEvidence/isSnapshotRef/isSnapshotArtifactRef`检查结构和同快照；Provider须再核hash、存储不可变及引用闭合。
+- `version-change.ts`：旧字段保持；记录新增operationId/actionSource/directReceipt/snapshotRef/supersedesApplicationId；`DocFreezeRecord`扩source/snapshotRef和origin，新增`role-direct-applied`原因及`DirectDocFreezeRecord`强写入形状（禁止decisionId/decidedBy）。旧customer/application记录仍可读，不能给新来源借用旧approved理由。
+- `runtime.ts`：保留`SubmitVersionChangeFn(input,signal?)`和旧参数；新增可选operationId/baseTrunk，目标expectedFromSha256。直接路径用`DirectSubmitVersionChangeInput`强制operation/base与每目标期望原hash（null为必须不存在），实际hash由应用重算。结果status扩直接状态，并含可选`receipt:DirectActionReceipt`及operation/journal/base/target字段。
+- 新注入位：`selectRunChange`、`completeTeamPlan`、`activateRoleDocuments`、`closeCreatedTask`、`decidePendingRequest`；均有同名首字母大写`Input/Fn`（前四部分有Result），都是`(input,signal?)=>Promise<...>`。新工具参数没有actor/source；身份由注入闭包绑定。run输入为operationId/runId/expectedPinDigest/targetTrunk/mode/reason；计划为operationId/flowId/runId?/baseDigest/plan(path,sha256,version)；激活为operationId/flowId/planRef/d3DecisionId/rosterRef/targetRoleId/documents(card,boundaryMd,boundaryYaml各path/hash)；收口为operationId/taskId/runId/basisDigest/reportRef/outcome(accepted|rework|rejected，复用TaskClosedOutcome)/note?。激活成功必有activationDigest；收口成功必有真实eventId/taskStatus。
+- chief：`DecidePendingRequestInput`为requestId/baseDigest/delegationRevision/reason与disposition(select必selected，reject/revise禁止selected)；成功返回`{ok:true,requestId,status:"settled",source:chief-delegated}`，否则pending/stale/rejected且errorCode/message。`ChiefPendingDecisionRequest`承载原发起者、保留卡、证据及选项；`ChiefDecisionExecutionContext`为真实chief、bounded-decision、无生产写权、唯一decide_pending_request及有限limits。`isChiefDecisionExecutionContext`只检查结构，宿主核可信身份/开关rev/未决CAS并强制工具限制。
+- 审计消费：`RequestPresentedEvent.to`新增chief，`RequestResolvedEvent.by`及`VersionDecisionDecidedBy`新增chief-delegated；answered/declined和相关trunk/VCA/freeze事件含可选actionSource。来源可区分，不用operator前缀猜客户点击。旧字段和旧记录保持。
+
+实际验证及候选hash见[实施记录](docs/change/2026-11-05_change_direct-role-capabilities.md)。O/G/W必须重测真实caller；本节点不证明提交、冻结存储或首尾流程。
+
+## R2 公共工具/schema与Service实际接缝（2026-11-05）
+
+M1冻结Model未改。现有`describeTool(name)`提供五窄工具严格对象/嵌套对象schema，`additionalProperties:false`；五个`*_TOOL_NAME`常量（SELECT_RUN_CHANGE / COMPLETE_TEAM_PLAN / ACTIVATE_ROLE_DOCUMENTS / CLOSE_CREATED_TASK / DECIDE_PENDING_REQUEST）分别值为select_run_change / complete_team_plan / activate_role_documents / close_created_task / decide_pending_request。注入位与M1五Fn保持同名camelCase，Fn未注入不注册；handler按可信scope核rapporteur / convener / nominator / chief或convener / chief。模型不准给actor/source、委托开关或host-only roleDocumentChecks。原创建者/D3/字节hash/rev/CAS仍由应用重核。
+
+SubmitVersionChangeFn继续原入口：operationId/baseTrunk及每目标expectedFromSha256只要出现任一直接字段即要求整套，原样传入并从scope填initiatorRoleId；baseTrunk(null或version/digest)与期望hash严格校验。历史输入/旧submitted回执保留兼容；生产直接路线由W/O注入并复核。直接回执在ToolResult.message中保留完整JSON（ToolResult原Model无结构化扩字段），含source/journal/operation/状态；若包络有receipt则也核其ok/status一致。不把applied/no-op或已提交待恢复改成客户批准/未提交；调用后抛错/坏回执明确结果未知、沿原operation核对恢复，不自动重试。能力返回后中止不覆盖已发生直接结果。
+
+`RuntimeSessionOptions.chiefDecisionContext?:ChiefDecisionExecutionContext`为宿主新增可选注入锚点，非工具参数，clone后冻结本次使用的内容。与shellJudge/governanceJudge互斥、实际绑定role.id必须chief，必须有decidePendingRequest。该模式走公开`buildChiefDecisionTools(fn,context)`，只决定工具，不进普通governedTools；无生产写/shell/dispatch/close、后台管理器、外来MCP或主chief持久化会话。它复用adapter既有judgeMode只读sandbox标志，实际身份仍chief、工具/决定源仍chief-delegated，不构造旧judge工具或替用推荐项。固定request/base/rev/原发起者与合法选项；限制maxTurns、工具maxAttempts及构造/上下文/轮次timeoutMs，requestAttemptMax=1。宿主另创建此上下文并重核权威开关revision/未决CAS，不等待主chief忙回合。必要证据由宿主请求提供，本模式未额外开放读取工具。
+
+29/29定向与主类型通过；真实宿主创建/完整业务链仍待W/O/Q，见[记录R2](docs/change/2026-11-05_change_direct-role-capabilities.md)。
+
+## R3 规划缺失与冻结结构单一来源（2026-11-05）
+
+`TrunkManifest.artifacts.workflow?:TrunkStableArtifactRef`诚实表达首建规划trunk尚无workflow；`TrunkApplySnapshot.workflow?`原已可缺，语义同步说明。新增`ExecutionTrunkManifest`将workflow收窄为必有；`hasExecutionWorkflow(manifest:TrunkManifest):manifest is ExecutionTrunkManifest`仅纯核workflow存在、kind=workflow、合法相对path和非空有效SHA256，不创建默认引用、不读字节、不表明其他run前提/授权已过。真实run/派发仍必须由执行入口核全部前提，不可凭规划类型或过滤undefined放行。
+
+`version-change.ts`新增规范唯一Model导出`isValidDocFreezeRecord(value:unknown):value is DocFreezeRecord`。实现沿G当前纯结构逻辑：role-direct-applied绑定role-direct来源/应用id/actor及快照、禁止客户凭据；chief-delegated只接受适用客户业务reason和真实select来源，禁止假customer/decisionId；历史customer/application原合法形状兼容，存在customer source则绑定真实decisionId。无I/O、无当前委托enabled/revision输入，也不判业务授权；已提交历史chief物证不会因当前关闭委托而结构失效。O/G由各自原owner改为Model导入/纯兼容出口，尚待其消费验证。
+
+## R4 交互回执真实chief来源（2026-11-05）
+
+request_choice与request_confirmation消费既有answered/declined.actionSource：Model纯shape有效且kind=chief-delegated时显示幕僚选择/确认/拒绝/要求修订，使用原reason/source.reason，ToolResult.message附完整原始outcome JSON（`原始回执：`后），保request/base/revision/selected/原理由。不读取当前委托开关；未决是否可结算仍由宿主决定。退修为ok:false、不赋cancelTask或业务批准；answered须与source.disposition/selected及实际合法选项一致，不一致/坏来源回false且不得回落客户批准。无actionSource的旧customer/judge/directive回执仍原分支原文案；customer-decision来源仍原客户分支。无新Model/schema/权限，真实业务链由W后继验证。
+
+## R5 A/B实际签名与停稳证据边界（2026-11-05）
+
+A：`ActiveRoleEvidence`有roleId/snapshotRef与八refs，无runId/pinDigest；`FrozenRoleEvidence extends ActiveRoleEvidence`仅在真实pin时加真实runId/pinDigest。`isActiveRoleEvidence`与`isFrozenRoleEvidence`各核所需纯结构。manifest可选activeRevision/activeDigest/activeRoles为独立维度；frozenRoles保旧真实run读兼容；ActivateRoleDocumentsResult.evidence改Active。O同锁实现双维度CAS/保留另一维、role-only不升doc版，Model不执行IO。SubmitVersionChangeInput（Direct继承）新增可选supersedesApplicationId，用原VCA ID regex严格验、显式透传，不从summary猜；TaskClosedEvent可选actionSource/operationId/eventId保历史。TrunkSource/TRUNK_SOURCES增team-plan真实计划发布来源，不能伪产品upgrade。
+
+B：`RoleSession.sessionId?`是Service每bind新UUID，区别持久化/native id；新可选`inspectLifecycle():RuntimeSessionLifecycleFacts`及`stopAndInspect({expectedSessionId,expectedTurnId?,timeoutMs},signal?):Promise<RuntimeSessionLifecycleFacts>`，旧Provider保持兼容。Facts含session/role/runtime/turn、stopRequested、status(quiescent|stopping|unknown)、真实raw settledAt/settledTurnId、providerFinished、activeTools、processes(id/kind/state/pid/exitCode/signal/treeStatus)、processCoverage/reasons。调用校验实例/turn/正整数预算，封本Session新prompt，signal abort+请求inner.abort，逐项stop背景任务并等待事实；不通过dispose清空表。真实raw settled与底层prompt结束、Core轮次排空、实际工具/底层Fn清零及已跟踪进程完整退出均需满足才quiescent；Core最终合成settled/事件流finally不作真实Provider settled。
+
+Provider tools公开`createRuntimeToolLifecycle():RuntimeToolLifecycle`（beginTool/snapshot/stopOwnedProcesses），`buildGovernedTools(gate,options?,lifecycle?)`加可选第三参数仅Service注入。工具/实际回调Promise分别跟踪，raceAbort早返不抹底层活任务；runShell对实际spawn child监听close，不把已请求kill当退出。同步与背景均仅触达同Service实例拥有的child/manager，不按外来PID杀进程。O创建handle时将run映射此sessionId/turn并封新派发，先核目标可执行再停旧；W消费同源handle，不向O注入Interface口述停稳。重启没有这个对象和物证时必须unknown，不从空内存或历史PID推断。
+
+本节点真实剩缺口：Windows现process-tree.ts的void taskkill无树完成回执，背景manager没有子树终态证明，故即使primary close真实exited仍treeStatus/processCoverage unknown、不得重启放行。非demo原生adapter未交其自己owned-process lifecycle，也返回native-provider-process-coverage-unavailable；可消费未来同role/native sessionId绑定、complete且全退出的原生事实，目前三适配器未改。相关精确源是common/runtime-core/process-tree.ts、background-tasks.ts，以及provider/pi/session.ts、codex/session.ts、claude/session.ts，需要后继原owner授权补证；本节点未越界扩写。因此58/58表示正确区分可证静止与明确unknown，不是Windows/三SDK全停稳已证明。
+
+## R6 统一可选native事实hook（T1.1）
+
+三adapter统一实现`RoleSession.nativeLifecycle?:RuntimeNativeLifecycle`，不再另造接口。对象在native bind时分配稳定新instanceId（区别恢复thread/session id），提供`inspect():RuntimeNativeLifecycleFacts`及`stopAndInspect({expectedInstanceId,expectedCoreTurnId?,timeoutMs},signal?):Promise<RuntimeNativeLifecycleFacts>`。后者只停止/检查本实例实际owned资源；原abort保持旧API。Service wrapper仅将事实拷贝到`RuntimeSessionLifecycleFacts.native?`，不转交原hook能力。
+
+Facts字段：instanceId/roleId/runtime；真实nativeSessionId?/nativeTurnId?；prompt开始时捕获并保留options.currentTurnId()为coreTurnId?；status=quiescent|running|stopping|unknown；promptState=not-started|running|settled|unknown；observedAt/settledAt?；transport={kind:in-process|http|owned-process|unknown,state:idle|open|closed|unknown}；activeTools/processes/processCoverage/reasons。RuntimeOwnedProcessFact.kind增加native/mcp，其余沿原类型。`isRuntimeNativeLifecycleFacts(unknown)`仅纯shape检查，不能证明SDK事件真实。
+
+Service固定hook instance并核role/runtime/Core turn/实际nativeSessionId；有hook走专门stop，防止同时legacy abort破坏证据；随后仍核Core raw settled/底层prompt/工具排空。只有native显式quiescent、真实settled（或确未启动）、可靠idle/closed transport、complete coverage、无活工具/进程、全树verified且无缺证理由才接受。owned-process实际启动过须closed并带native child退出事实。无hook、错绑定、读取/停止失败、未关闭树继续unknown。三owner现在只需按这同签名落实际观察与离线测试；此核心消费测试不证明三SDK已实现。
+
+## R7 Git统一能力与实例registry事实（G-C1）
+
+trunk.ts规范导出GitOid(objectFormat sha1/sha256＋完整40/64hex)、GitBasis(ref,oid|null)、GitEvidenceRef(oid,path,sha256)、GitCapabilityResult及模板/状态常量、isGitOid/isGitBasis/isGitApplicationRef/isGitLiteralPath/isGitCapabilityResult纯shape。runtime.ts三Request/Fn逐G-C1§1，Fn均(input,signal?)=>Promise<GitCapabilityResult>，注入位gitQuery/gitCandidate/gitPublish；工具git_query/git_candidate/git_publish注入才注册，全部对象/嵌套字段严格，host repo/task/run/actor/revision/protection不接模型。所有Git效果仅进O注入Pipeline callback，工具不spawn Git。
+
+query职责内六角色/worker可调；candidate commit权限由host全核，init/integrate/revert仅convener；publish documents仅product/rapporteur/nominator/convener，delivery仅convener。ref语法限app namespace（refs/ans/trunk、refs/ans/delivery/...、refs/heads/codex/...），仍须host精确绑定；字面path拒.git/逃逸/pathspec/通配/选项。准备成功必须candidate/tree/parents，发布成功必须匹配请求ref/完整candidate，pending-recovery有journal，均保完整JSON/真实状态，不因返回后abort抹发布。
+
+RoleSession.inspectToolSurface?():RuntimeSessionToolSurfaceFacts回本Service实例实际source=core-provider-assembly、sessionId/roleId/runtime、status(observed|unknown)、appTools、configuredForeignMcpServers、nativeToolRegistry=unknown、filesystemConfinement=unknown、reasons；disposed/读取失败status未知。仅普通名字/事实，不返回工具函数或safe布尔，与inspectLifecycle同sessionId。跨team/run/dispatch真实handle inventory由O/W枚举，旧在途/未知/遗漏不可据本方法补成全局安全；实际Codex Chat factory内置闭包仍需原owner核，不按runtime名字推断。OS隔离当前无选定可行机制，shell/native未知写面不因此开放。
+
+## R8 native工具面producer/consumer
+
+原adapter可选`RoleSession.inspectNativeToolSurface():RuntimeNativeToolSurfaceFacts`：source=`native-provider-tool-registry`；nativeInstanceId（必须同本对象nativeLifecycle.instanceId）、roleId/runtime、factory=codex-chat|unknown、status=observed|unknown、observedAt、appTools/foreignMcpServers/nativeBuiltinTools只读名字数组、reasons。`isRuntimeNativeToolSurfaceFacts`只校纯结构，producer须从实际Chat toolMap/factory观察，不从配置/脚本名造事实；非Chat缺port即unknown。
+
+Core实际选择factory的闭包记录factoryProvenance=default-production|custom-override|demo，不能由provider source字符串授予。inspectToolSurface绑定该实际选择、初始与当前Core registry、native实例/role/runtime、producer toolmap/MCP与Core相同集合、真实HTTP生命周期/无未知执行程序；有builtin/外MCP/shell/bg/错误或disposed都unknown。custom factory即使所有source字段同真仍不能获default provenance。满足本实例工具闭包才将nativeToolRegistry细化application-mediated，可附拷贝native数据；filesystemConfinement恒unknown，无safe/函数或全team票。允许在途HTTP推理/已注册app工具，不无意义要求忙chief全idle。O/W仍须跨team/run/dispatch实际handle inventory，G/O另证file/edit/canonical roots与授权串行，不能据本实例部分事实省四链。
+## R9 最终中介文件写入守卫
+
+`GovernedToolsOptions`和`RuntimeProviderOptions`统一增加host-only `protectedGitRoots?:readonly string[]`；Service按实例克隆冻结并透传，不进入任何ModelTool schema。write_file/edit_file显式拒绝模型同名字段。生产文件路径在读取/建目录之前、二次gate和父目录重核之后/原atomicWriteFile之前检查：目标nlink必须为1（存在普通文件）；拒.git词法段、符号链接目标及strict canonical host根内目标。严格realpath仅对ENOENT回溯最近祖先，其它错误拒绝；保留原安全/原子写原语。路径检查与后续open/rename仍有TOCTOU窗口，不能声称OS隔离。
+
+`inspectToolSurface().fileWriteProtection?`仅普通装配观察：mechanism=`canonical-roots-and-nlink-v1`、coveredTools=`[write_file,edit_file]`、protectedGitRoots拷贝、rootDiscovery=`host-provided|not-provided`、rootCoverage恒`unknown`、limitations。只有实例确有writeRoot且两入口/handler未漂移、未dispose才输出；函数不外泄。filesystemConfinement仍unknown，空roots不变complete，不覆盖shell/background/native/下载或安装写入。O真实readGitProtectionFacts的coverage/basisDigest与提交前重读仍由原owner管理；本方法不是全队授权票。
+
+## R10 host工作来源引用
+
+runtime.ts导出`TaskWorkSourceRef {kind:"chief-customer-turn";sourceId:string;path:string;sha256:string}`与纯`isTaskWorkSourceRef(unknown):value is TaskWorkSourceRef`；`TaskCreatedEvent.workSourceRef?`可选保旧历史。validator仅接受这四个自有字段、sourceId精确`init-source-`加64小写hex、path精确`.ans/trunk/initialization-sources/${sourceId}.json`、sha256精确64hex；拒未知字段/伪kind/越界别名/错id/hash/末尾换行。host从O实际preflight initializationSource补kind；模型schema不接，非requestedEvidence保留标记/parentTaskId/批准/权限。source body/字节/flow/当前accepted Turn/注册根与同operation去重由O/W核；真实childtask创建后保来源，不因父自然settled/换焦点撤销，无childtask的孤旧Turn不可重放或跨flow新授。validator不承担这些业务判断。
+
+R11实际执行边界：dispatch_task handler在读取普通载荷或调用能力之前，拒绝原始args自有workSourceRef字段（任何值，含undefined/null）；错误明确host-only，callback零次。合法原payload和requestedEvidence普通文本（含ans-work-source前缀）照旧，不当授权或保留标记。本修正不泛化legacy schema、不改变真实host引用生成/批准判断。
+
+## R12 构造前计划及全Core普通库存
+
+官方native producer约定`prepareCodexRuntimeAdapter(options,role):RuntimeNativeFactoryPreparation|Promise<...>`，含`facts:RuntimeNativeFactoryPlanFacts`、可选私有adapter、`isCurrent():boolean`。facts仅source=native-factory-plan/planId/configDigest/roleId/runtime/status/factory/transport/wire/appTools/foreignMcpServers/nativeBuiltinTools/plannedProcesses/reasons；不含凭据/环境值/secret hash。producer必须从实际resolved配置同一私有快照绑定adapter，私下核当前配置，未知不给adapter；实际native实例`inspectNativeToolSurface.factoryPlan?={planId,configDigest}`回绑同次计划。当前无producer或非已证Chat保持unknown，本层不造正例。
+
+Core `RuntimeAdapter.prepareRole?(role)->Promise<RuntimeRolePreparation>`返回plain plan及可选opaque token；`bindPreparedRole?(token)->Promise<RoleSession>`内部WeakMap同adapter一用，错token/重复/角色配置漂移/reprepare旧token/物理scope revision变化在构造前拒。native实际instance/role/runtime/toolMap/planId/configDigest后验不一致不暴露handle。Model不接这些host参数，Interface不获native effectport。Service独占实际构造session-open lease，W不能再套第二constructor lease。所有legacy bind/compose同样入门；Provider真实readGitHostProtectionRequirement required范围自动严格官方prepare/bind，custom/demo无token拒、unknown范围预拒；只有物理unmanaged旧路径兼容但记录legacy未证，不授Git票。每次factory/nativebind前重核同lease和scope state/revision；紧急stop/abort/dispose只interrupt不放别人lease。
+
+Service `inspectRuntimeCoreRegistry():RuntimeCoreRegistryFacts`回本进程全部实际Core（包括judge）的processInstanceId/revision/coverage=current-process-only/entries，每entry有id/projectRoot/rootRevision/roleId/runtime/state(preparing/prepared/creating/active/disposing/disposed/failed)、planId?/sessionId?/lifecycle?/toolSurface?/reasons。普通拷贝、无函数；active读取真实实例，dispose仍保lifecycle且明确不等停稳，failed/未知不消失。root字面配置不是canonical授权，O临界区须fresh读并按实际根身份绑定；外部native/前进程遗留不在此库存，不声称OS/全历史全队安全。
+
+R13同shape语义修正：`processCoverage`仅表示实际owned进程/树发现是否完整，独立于HTTP请求/Core prompt是否已结束；native已可靠complete且无进程的HTTP在途可coverage complete，但status仍非quiescent、providerFinished false/raw settled未观察，stop判定不放宽。native绑定/读取/覆盖/未知树/缺实际nativechild仍unknown。dispose在关闭前保发现事实，关闭后用实际raw/tool/native同实例状态复核，完整quiescent receipt才保留；handle.inspectLifecycle/registry.lifecycle/合法同id的stopAndInspect可拷贝该已完成receipt。未settled、活工具/进程、丢覆盖、错nativeinstance和custom无权威构造覆盖仍unknown，dispose/空清单不升级。Core已关闭不可再prompt，不能以一个receipt授Git权或绕R12/跨团队真实作用面检查。无新Model字段。
+
+R14同签名追加：物理scope required且真实initialAppTools含run_shell或start_background_task时，Core plan理由`required-scope-unconfined-script-tools`、status unknown且不发token；required legacy自动prepare因此同样构造前拒。实际factory/nativebind之前及prepared bind再读scope/revision并核同初始registry，不能先构造后postinspect。没有已证受控profile便不凭runtime名/env/模型布尔豁免；不删工具造闭包。unknown scope仍拒；unmanaged兼容原脚本、surface仍unknown，不授全队/跨根Git安全票。Model/schema/权限零新增。
+
+R15 Service `createBlockedRoleCapabilityCallbacks():RuntimeBlockedRoleCapabilityCallbacks`零参数，冻结返回installSkill/uninstallSkill/installMcp/uninstallMcp四个原签名函数；每个函数仅返回`{ok:false,reason:"effect-scope-unproven",message:...}`，不接受/保留/调用原effect。私有WeakMap绑定真正函数到对应工具，函数名/可改property/传入guard JSON不作证明。仅O邻层组装实际Core配置，Interface不接此Service effectport，非受管原callback不被全局替换。
+
+R16内容gate：write_file首次与写前复核都带同一实际UTF8 Buffer的contentSha256/operation=write。edit_file读前只发Provider私有WeakMap绑定精确target的冻结`{phase:"edit-read",operation:"edit"}`；Service `isRuntimeEditReadProbe(context:unknown,targetPath:string):boolean`让O只对真对象/同路径走原read/path边界，不消费stable写permit，复制/伪JSON/裸/跨path均false。Model仅新增可选phase型，无可写权限；模型phase/context/sha/op等host参数显式拒。edit读前保nlink/canonical/原guardWriteTarget，保BOM/EOL合成最终bytes后仍strictSHA+原父目录/末gate/原子写/真实afterwrite回执；未授权read次数0。旧单参Gate实现与直接单参调用兼容，工具首probe的旧undefined内部约定已明确改变；旧两caller test未获本轮精确路径确认前不修改。
+
+R17普通construction事实：registry每行可有`RuntimeCoreConstructionFacts {source:"core-construction-boundaries",status:"never-started"|"possibly-started"|"instance-bound",factoryEntered,nativeBindEntered,pendingContinuations,preparedTokensRevoked,reasons}`，来自私有真实factory/native调用边界与实际continuation计数。仅官方可信pure preparation、未触两个边界、pending0且原provider已seal/旧token不可后启，才never-started；活token/未知custom/触界/late continuation不能按状态或role/root忽略。instance-bound仅表已有实际Core实例，仍须同session的完整真实终态；reasons解释不能当never-started的依据，不是授权。
+
+三个Service端口：`inspectRuntimeConstructionFailure(error:unknown)`只同真实Error对象WeakMap给`RuntimeCoreConstructionFailureRef {source:"core-construction-failure",processInstanceId,entryId,failureId}`；`recheckRuntimeConstructionFailure(ref)`回该私有条目fresh construction；`discardRuntimeRolePreparation(actualPrepared,error)`只识别实际prepare返回对象及当前同planId，撤其provider/旧tokens后绑same error。复制/伪字段/latest匹配无效；陈旧attempt不能撤较新plan或借其取得证明。O只在邻层真实catch转自己的唯一hostHandle failureRef，W不deepimport R/O能力。
+
+R17关闭后观察：尚unknown的实例保实际observer，raw settle、underlying完成、Native pump关闭、replay队列、报告/投递保存callback与Core final persist/drain完成后更新同实例receipt与registry revision；不等待当前prompt自身，不把dispose/coveragecomplete当停稳。只有真正quiescent才释放observer；缺raw、错native、活工具/process或custom未证始终unknown。旧R13先完整quiescent再dispose语义保留，R9/R14/R15/R16保护不变。
+
+R18导出纯`TaskParentRef {kind:"assigned-task";taskId:string;ledgerSha256:string}`/`isTaskParentRef`及`TaskCreatedEvent.parentTaskRef?`；严格三字段/真实opaque非空ID无控制字符/64hex，不造父ID或赋权。dispatch_task生产schema单点not及原始handler均拒模型workSourceRef/parentTaskRef，null/undefined亦raw预callback拒；sourceTaskId不转为父依据，legacy/顶级chief customer不补parent。父assigned ledger/to===from/flow/run/open/digest同锁CAS及child成立后的live授权由原O/W履约，R无I/O/账本/Service变更。
+
+### R29 bounded Chief host上下文透传
+
+`RuntimeProviderOptions.chiefDecisionContext?:ChiefDecisionExecutionContext`复用原类型；Service仅把createRuntimeAdapter已校验并structuredClone的本地chiefDecision传给provider。普通role/judge不设，原单工具/无资源边界不变，不增工具schema/票/第二shape。原life port1/1/type/diff自然0，签名/hash已直N5。默认Codex专用toolset由原N5消费；R28旧拒绝原件保，待真实接通后原R在同已准life将旧诊断换默认正例，不将旧错误断言永久当行为合同。
+
+### R28 I6单源Chief workflow加载
+
+原Provider tools公开`loadBuiltinChiefWorkflow():Promise<Readonly<{text,sourceUrl,moduleUrl,version,sha256,bytes,applicationVersion}>>`（均普通资源事实，text/URL/version/SHA为string，bytes为number）。无路径入参：从import.meta.url解析唯一应用内chief-workflow.md，读原bytes、fatal UTF8、Markdown身份/唯一资源版本校验；实际应用版读同应用package.json。缺/空/过大/损坏/版本不明明确throw chief-workflow-resource-unavailable，不依赖cwd/项目角色卡、不fallback手写副本/缓存旧正文。
+
+Service仅id=chief且kind=built-in-governance、非shell/governance judge且非chiefDecision普通上下文自动追加单源完整MD与source/hash/资源版/真实app版事实，经已有contextSections适配器原拼接；Model只细化既有非授权上下文字段注释。普通其它role和项目同名chief不自动带；窄决策无新增工具/资源。此文本不进入动作判定、不改pin/授权；项目docs/workflow.md的适用版本仍原O资料入口，不混作Chief资源。
+
+实证：Node24任意cwd全文/hash、默认Pi/Claude/Codex真实composeContext普通Chief与非Chief、坏资源factory0、受控Core窄单工具/noMD及默认Codex既有judge工具集拒绝均如实记录；R28三个case/type/diff自然0。默认Codex bounded路径仍在其session.ts:150/454拒decide_pending_request，本轮未跨修或冒原生窄正例。electron-builder原配置+本地已装Electron生成win-unpacked实际包（非zip/UI验收），随后从包内tools模块任意cwd真实Node再load全文，8724bytes/SHA9BEF5626…F346与源一致，tools/Service/Model/MD四源包内逐字相同；完整命令/EXIT/CLOSE见memo/evidence。
+
+### R27 raw/revert共享Model已落（尚未被G/O消费）
+
+原trunk.ts唯一导出GitRawTreeEntry/RawTree、GitRawDiffEntry、GitRawObjectInput、GitRawStoredCommit、GitRawRevertCommit、GitRawRevertConflict、GitRawRevertBasis、GitRawObjectPlan。RawTree为readonly {path,mode:string,oid:GitOid}[]，保特殊/未知模式观察供明确拒；input仍原operationId/base/parents?/files(path/bytesBase64|null/executable?)/message/timestamp?，不增加mode写能力。RawObjectPlan保原input/commit/ref/baseTree/worksite/commands/diff，diff保A/M/D/R/C/T两侧path/mode/OID|null，仅新增optional revertBasis。
+
+revertBasis target/codeBasis为{commit:GitOid,commitBytesBase64,tree:GitOid,entries:RawTree}，selectedParent为同形＋1-based index或真root null；conflicts显式{path,parent:entry|null,target:entry|null,current:entry|null,reason}，inverseChanges/complete均普通derived，不能凭空conflicts/complete:true放行。原bytes/真实parent及mainline/空tree/当前codeBasis/fulltree与最终全部权限由G/O实际重构核，不在Model计算或发行票。无IO/operational import/新factory/工具proof参数。
+
+Model SHA5E466272…82EFD8已直G/O。全type首红仅Q在飞test/测试/git-role-workflows-e2e.test.ts:1855 TS7022，不跨修；同实际tsconfig所有compilerOptions的单Model/transitive CLI自然0，既有R21两case0/diff0，无镜像新test。初TS7 compiler API不可用原件保memo。消费者alias/生产者尚未切，不宣唯一消费已完成或revert已可执行。
+
+### R26 raw/revert唯一共享shape只读准备（未实施）
+
+G-C1§8 SHA5688EBDA…8299F26已核。实际G common/门禁引擎/classify-shell.ts:67的GitRawObjectPlan及O provider/trunk/abstract/trunk-store.ts:100/125的GitTreeEntry/GitCandidatePlan目前各自定义，Model尚无。原trunk.ts拟唯一GitRawObjectPlan保input/commit/ref/baseTree/worksite/commands/diff全部既有字段，diff保A/M/D/R/C/T及old/new path/mode/OID|null。RawTree拟readonly {path,mode:string,oid:GitOid}[]，保special/未知mode完整观察供明确拒绝；input仍只bytesBase64|null/executable，不加mode写能力。
+
+revertBasis拟target/codeBasis分别{commit:GitOid,commitBytesBase64,tree:GitOid,entries:RawTree}；selectedParent为null或加index的同形对象（真root/null对应空tree不造父commit，单父/merge选择须按原bytes真parents及既有request.mainline核）；inverseChanges为共享完整diff数组，conflicts每项{path,parent:entry|null,target:entry|null,current:entry|null,reason:string}，complete:boolean只是data。G/O不能以complete或空conflicts作票，须按三套bytes/OID/fulltree重算再核当前codeBasis全部结果/权限。
+
+后继G用Model import/纯alias替自有shape并保shell-rules现公共type出口；O abstract/Provider真实三套对象与Service source/mainline关系消费同Model，现commit/integrate/publication数据不删。Model零IO/下层import，无新file/factory/patch引擎；request仍原commit/mainline，不接revertBasis/proof。本节点仅只读/API/memo，未编译/测试或改源码；Q62冻结未解除前不实施。
+
+### R25 Chief Hub实际共享接缝（P1.1/B1已冻结）
+
+1. TaskCreatedEvent.hubRouting?:"chief-hub-v1"为host新任务标记，缺席保持旧creator/parent；普通Chief→五builtin准备不强求M0/执行pin/finalCID。
+2. TaskReviewControllerRef={kind:"convener-controller";taskId;flowId;runId;reviewBasisRef:TaskReviewBasisRef}独立于creator/parent，复用精确operation/CID/criteria，最终review才携带；纯guard只形状，实际live/journal/标准由O核。
+3. DispatchTaskPayload.resumeController?:{taskId;flowId;runId;reviewTaskId;reviewCloseOperationId}严格五字段仅expected目标；只受信Chief向Convener、与reviewTarget/sourceTaskId互斥，不新建任务或假父；O/W核真实creator/live/run/reviewclose后投原任务与队列ACK/去重。
+4. tools/schema预拒模型hubRouting/reviewControllerRef，保旧work/parent/reviewBasis host拒；普通reviewTarget可缺，不能把finalreview关联变普通Verifier派发门。续接需显式oktrue回执，void不报成功；O/W消费者与schema分支协调，不宣传输ACK/accepted/交付混同。
+5. 原runtime/types与tools/schema由R，O Service/Provider发行/核R9真实引用及结果，W实际Chief矩阵/旧任务入队/报告路由；保原write/activate/publish/execute/stop门、历史事件和sourceTaskId原义，无新账本/IO/权限票。
+
+以上实际已落，导出TASK_HUB_ROUTING/TaskHubRouting/isTaskHubRouting、TaskReviewControllerRef/isTaskReviewControllerRef、DispatchTaskResumeController/isDispatchTaskResumeController。实际resume仅受信scope chief→convener，topflow若提供须一致，strict五目标复制；void/null回执拒绝，oktrue也只报原任务续接请求已接收、不称执行或发布完成。该分支用于最终review后的交付续接；普通调查/准备/修复仍原合法协调/重派，不新增accepted前置。原gitcap相关9/9自然EXIT/CLOSE0、type/diff0；O/W实际Hub/R9/队列/质量证据未由R unit代证。
+
+### R24 choice事实与意图应用结果
+
+`CustomerInputOutcome`仅answered新增可选`intentConfirmation:{status:"committed"|"pending-recovery";code?:string;message?:string}`，是O实际finalize的普通domain结果，不是批准/权限票。request_choice保原选择/source/decisionId，内部formatter在pending时okfalse并显示选择已保留/actual code/message/应用尚未完成，不能按意图确认已生效继续；committed仅说明原Service本次应用完成，后续授权仍检查。旧无字段只报原选择，不默认committed；坏/缺status或非法字段回未知/okfalse，原选择不抹去。raw对模型intentConfirmation/domainApply任何值发起前拒且callback0，request schema无新增field。R仅类型/呈现，业务finalize回填与M0真实链由O/W后继验证。
+
+### R23 chief-creator-report来源kind
+
+`TaskWorkSourceRef.kind`及`isTaskWorkSourceRef`仅增加`"chief-creator-report"`，与旧`"chief-customer-turn"`共用原exact4fields/sourceId固定格式/初始化source namespace path/SHA。此为host来源引用形状，不把报告冒作customer、不会证明child/latestreport/creator/flow/root或批准；实际JSON/证据由O/W原owner核验生成。tools/schema零改，模型任何workSourceRef（含新kind）仍在callback前拒。原3定向/type/diff自然0，旧历史不补source。
+
+### R22 精准只读Verifier目标
+
+runtime公开`TaskReviewBasisRef={kind:"git-candidate-review";candidateOperationId:string;candidate:GitOid;criteria:GitEvidenceRef[]}`与纯`isTaskReviewBasisRef`；exact4keys/fullOID、criteria1..16、每条exact oid/path/sha256，按objectFormat+lowerOID+path唯一，不是passed/批准票。`TaskCreatedEvent.reviewBasisRef?`只应用生成，旧记录不补。`DispatchTaskPayload.reviewTarget?:DispatchTaskReviewTarget`（strict operationId/candidate两字段）及`isDispatchTaskReviewTarget`只表达模型预期只读目标，不含criteria/hostref/授权。tools复制这两个普通字段保留，schema/raw预拒reviewBasisRef及criteria/ref/approved/approval/passed（nested目标额外字段也拒），非法时callback0；原其它别名/普通证据文本保。O真实同parent/run/acceptedchildren及integrate journal/控制ref/process/source、run proposal blob/hash/version与R9重核持久化hostref，R不代造实际来源或verdict。R22相关5/5自然0/type0/diff0，trunk与Service零delta。
+
+### R21 Git结果真实代码basis
+
+原Model/trunk `GitCapabilityResult`新增`basis?:GitBasis`与`basisSource?:{kind:"assigned-run";runId:string;pinDigest:string;runRecordSha256:string}`。纯guard对basis用原完整OID/应用ref规则，来源必须exact4字段、真实形状opaque runId与两64hex；不校验账本真实性或赋权。结果可选兼容，旧pin/旧结果无basis不补latest，continue-frozen代码basis由O真实run保持，不随doc升版漂移。tools原JSON.stringify(result)自动保留两字段，本轮tools/schema零delta、请求schema不增host字段，原严格工具入口拒额外basis/source。R21原gitcap相关4/4、type/diff0，source与自然退出证据见memo。
+
+### R20 实际 host 文件阶段口
+
+`WriteGateContext.stage?/fileFacts?`承载Model `FileGateStage`（lexical-read/canonical-read/final-write）、`FileGateReadFacts|FileGateFinalFacts`；字段与G15实际普通DTO一致，canonical使用coverage/basisDigest/reasons，currentFile明确missing/present-sha/unknown。`GovernedToolsOptions`显式projectRoot/skillRoot、`fileGateProtocol?:"host-facts-v1"`、`fileGateProtection?:{projectRoot,protectedGitRoots,coverage,basisDigest,reasons}`；Service向Provider显式给真实双root，不猜writeRoot。
+
+Service公开`inspectRuntimeFileGateContext(context:unknown,target:string,operation:WriteGateOperation,stage:FileGateStage):FileGateFacts|undefined`。仅同invocation/path/op/stage的Provider私有发行对象在当前同步gate调用窗口内可验，深冻结原ctx/facts；返回独立普通复制，clone/已返回/另阶段/路径/操作/宿主配置漂移不可重放。R16 edit-read身份保留用于真实canonical-read，不能独立替代新阶段验证。新协议每阶段必须实际inspect，旧gate仅allow而不验身份会拒；不设protocol的旧非受管单参API/最终Provider保护不变。
+
+真实顺序：纯lexical读取授权→Provider strict async canonical元数据→纯canonical读取授权→原目标保护/guard→授权目标旧bytes/currentSHA→最终字节（edit保BOM/EOL）→同canonical/baseSHA重核→纯final gate→parent/nlink/保护roots/canonical/baseSHA末重核→原atomicWrite/rename。只ENOENT为missing，权限/IO/coverage未知拒；final deny不写target，rename失败仍原temp清理。元数据/内容来自Provider，Model/common不藏IO，G同步无Promise。宿主保护snapshot的basis来源由O保持真实/当前，R本地重新realpath不等于重新发现Git拓扑；TOCTOU/OS confinement仍未知。
+
+默认off仅为producer/consumer协调接入：O尚需实际传完整保护回执、同边界/task快照先Rinspect再G15纯口及stable/versioned/HR前置；未切完不称旧IO已移除。模型write/edit schema与raw入口拒host阶段字段，不传JSON同形proof。R20单独不宣全项目迁移/验收。
+
+### R19只读接缝定位（未实施/未冻结新接口）
+
+现成项：tools.ts canonicalProtectionPath是async严格realpath，finalFileProtection只回ok/reason；原guardWriteTarget只回abs/rel/parentAbs/parentReal，尚无公开canonical/currentFile facts。WriteGateContext仅phase/contentSha256/operation，R16 WeakMap/Service isRuntimeEditReadProbe只证明edit对象与target身份，不能冒write读取许可。write当前首gate在FS前；edit真probe授权后才保护/read旧Buffer/BOM合成，最后共用末gate/parent/canonical/nlink/atomicWrite，可保留。
+
+拟最小差额仅原R Model/runtime的host-only fileFacts（沿P7 operationId/targetPath/operation/canonical三根与protectedRoots/currentFile missing|present-sha|unknown）及typed host双root配置、原Provider/tools真实采集/冻结/私有对象＋invocation/path/op/stage绑定、原Service/session只验身份；Service须把自己真实projectRoot/skillRoot显式传Provider，不能猜writeRoot等于两root。模型schema不接operationId/fileFacts/roots或可报safe，facts不含secret字节/不输出凭据。
+
+顺序两阶段：读取阶段先G纯lexical/accepted-role/task/path许可，Provider才查canonical元数据，再由同G纯策略核真实路径的角色/任务/secret读边界，允许后才取目标现字节hash（不是先read求hash）；提交阶段携同operation/path真facts与真实最终contentSHA同步判定。write与edit需各自真实probe，不能把edit-read改字符串冒write。旧Buffer能复用edit当前hash来源，write现无旧字节读取；只对确需baseSha的授权stable目标取hash，非必要generic目标不为facts额外读secret。读错/权限/损坏/无法证明的链接父链均unknown，不混missing。最终字节/BOM、R9根/链接/nlink、父目录/rename前复核保，仍不声称消除TOCTOU。
+
+G原resolve-write.ts195/196/203同步realResolve与303失败提示reloadBoundaryEntriesSync需由其owner改消费host canonical/合法刷新后的boundary数据；stableWriteDecision1362当前readFileSync且catch归不存在，应由G改三态currentFile普通输入。O原run-role1113/1115需先验证R身份再传G普通facts，不向同步G塞Promise，Provider不复制角色策略绕层，Model/common不藏I/O。legacy单参Gate及custom缺新事实仅保原非迁移路径语义/Provider保护，不新增读能力；要求新facts的迁移路径缺身份/数据即拒，不能fallback live FS/opaque/hashless许可。
+
+唯一具体前置block：目前不存在G无FS的读取preflight，R16真edit probe仍返回有FS的baseGate；也没有write专属读probe。须原G/O/R在上述现文件先核该阶段与身份/双root合同，不能仅加DTO便称纯gate迁移已成。此轮仅定位，未新增这些字段/端口或运行验证。
+
+Core创建计划及toolSurface可有普通`roleCapabilityGuards:RuntimeBlockedRoleCapabilityFacts`，含source=core-blocked-role-capability-callbacks、mechanism=no-effect-rejection-v1、status(bound|unknown)、roleId/runtime/registryDigest/guardedTools/unguardedTools/reasons，计划绑定corePlanId/nativePlanId/nativeConfigDigest，实例另绑sessionId。事实从实际捕获callback、当前同一引用/role/整个实际registry handler快照得出并拷贝，不是caller的guard配置。required四工具若未证，在token/factory/nativebind前拒；错槽/替换/角色或registry漂移变unknown。O须比对actual session/role/Coreplan/native.factoryPlan/configDigest、实际四工具覆盖及无unguarded/reasons，不可只白名单工具名。工具仍注册，真实调用显式blocked；模型参数不能改私有身份或facts，schema无host guard字段。此机制仅四拒绝回调，不授Git写/OS隔离或跨actor作用范围票。
+
+
+## P1-A 应用中介事实契约冻结（2026-11-07，`implemented-unverified`）
+
+依据 P1.6（`docs/planning/2026-11-07_design_runtime-tool-surface-dispatch-gate.md`，SHA-256 `24150207…9ce`）§4.1–§4.6/§5.1–§5.4、团队计划 §7.1 P1-A、B1 §3.2 与 B0 冻结基线。本节点只做**加法**；严格路径既有 `status`/`nativeToolRegistry`/`reasons` 判定逐字不变。
+
+- **Model 冻结形状（`src/model/runtime.ts`，唯一来源）**：`RuntimeApplicationToolSurfaceFacts{source:"application-mediated-tool-surface";nativeInstanceId;roleId;runtime:RuntimeKind;factory:"claude-sdk-mcp"|"pi-custom-tools"|"codex-chat";status:"observed"|"unknown";observedAt;appTools:readonly string[];foreignMcpServers:readonly string[];nativeBuiltinTools:readonly string[];reasons:readonly string[]}`＋纯结构 guard `isRuntimeApplicationToolSurfaceFacts(unknown)`；`RoleSession.inspectApplicationToolSurface?(): RuntimeApplicationToolSurfaceFacts`；`RuntimeSessionToolSurfaceFacts.applicationMediation?:{kind:"application-mediated-unknown-native";status:"verified"|"unknown";runtime;factory;observedAt;nativeInstanceId;appTools;foreignMcpServers;nativeBuiltinTools;reasons}`（`nativeInstanceId` 为 **Amendment-1** 增补的必填字段）。形状**自本节点冻结**，P1-B（三适配器）与 P1-C（门判定）只按此面消费；任何形状变化回运行时核心重跑。
+- **包装层组合（`src/service/runtime/session.ts::inspectToolSurface`；单一实现 `composeRuntimeApplicationMediation`）**：仅当 runtime ∈ {claude,pi,codex}、`factoryProvenance === "default-production"`、未 disposed、且严格 `status !== "observed"`（`reasons` 非空）时尝试构造；严格已 observed 时保持 `applicationMediation` 缺席（避免双路径 F15/N20）。全部条件成立才输出 `status:"verified"`，否则字段缺席（fail-closed；任务允许「缺席或 unknown」，本实现选缺席且不发明第二套 reason 词汇）。
+- **构造条件**：适配器 fact 存在/guard 合法/`status:"observed"`/`reasons` 空；factory 与 runtime 匹配；`fact.nativeInstanceId === nativeInstanceId === nativeLifecycle.instanceId`、`fact.roleId === role.id`、`fact.runtime === runtime`；`sameNameSet(fact.appTools, appTools)`、`sameNameSet(fact.foreignMcpServers, configuredForeignMcpServers)`；`fact.nativeBuiltinTools` 空。**Codex 追加**：native 事实存在、`factory === "codex-chat"`、`nativeInstanceId` 一致、native `nativeBuiltinTools` 空；外来 MCP 配置/上报非空即 fail-closed（N28/F19）。
+- **reason 白名单/阻断集（唯一实现；门模块回链本口径，不另维护第二份）**：Claude/Pi 只允许与 `native-tool-registry-binding-unverified` 共存；Codex 只允许 `unmediated-execution-registered`（且应用事实字段自证 nativeBuiltin 空、foreign 与配置精确相等、appTools 一致，native builtin/foreign 非空拒绝）。其余 reason（`core-registry-changed-after-factory`、`core-registry-read-failed`、`core-tool-handler-changed-after-factory`、`custom-provider-factory-unverified`、`disposed-registry-not-current`、`role-capability-callback-guard-unverified`、`native-tool-surface-read-failed`、`native-tool-registry-mismatch`、`native-tool-execution-coverage-unverified`、`native-production-tool-factory-unverified`、`owned-execution-program-not-proven-stopped`、未列入者）默认拒绝。
+- **消费边界**：`applicationMediation` 只供派发父门/controller resume（P1-C）；`inspectInitializationProtection`、stable-write、run-stop、写门/Git ACL **不读**本字段（INV-2/N15）。它不证明 native 进程/传输/效果闭包，也不得用于停稳/清理判定。
+- **验证**：新增 `test/runtime-core/application-mediation.test.ts` 7/7；runtime-core 全目录写前→写后 **482/445/33/4 → 489/452/33/4**（+7 tests +7 pass、零新增确定性失败、零新增 skip；失败/跳过集合逐条一致）；`npm run typecheck` exit 0；claude-adapter 116/116、codex-adapter 119/118/0/1 skip、pi-adapter 352/349/2/1 skip 与 B0 逐项一致。P1-B 适配器事实与 P1-C 门尚未落地 ⇒ 生产路径当前不会出现 `verified`（fail-closed toward 现状）。未跑真实模型；未 commit。证据见 [P1-A 证据](docs/change/2026-11-07_P1-A_application-mediation-contract-evidence.md)。
+
+### Amendment-1（2026-11-07，契约增补；写集不变）
+
+- **缺口**：P1.6 §4.4 受限谓词含 `core.toolSurface.native.nativeInstanceId === core.toolSurface.applicationMediation.nativeInstanceId`（Codex 追加绑定），但 §4.3 给出的 `applicationMediation` 形状未列 `nativeInstanceId`——方案内部不一致。
+- **增补（只加法）**：`RuntimeSessionToolSurfaceFacts.applicationMediation` 增加**必填** `nativeInstanceId: string`；`applicationMediation` 本身仍为可选字段，`RuntimeApplicationToolSurfaceFacts` 不变（已有 `nativeInstanceId`）。
+- **填充来源**：包装层 `composeRuntimeApplicationMediation` 构造 `verified` 时填入 `input.nativeInstanceId`——即绑定期捕获、且门槛已核对 `fact.nativeInstanceId === nativeInstanceId === nativeLifecycle.instanceId` 的同源值。身份核对逻辑逐字不变；缺失/不匹配仍 fail-closed（字段整体缺席）。
+- **消费约定**：自本增补起，编排门可直接使用 `applicationMediation.nativeInstanceId`（§4.4 字面谓词）；不得以其他字段替代。P1-C 现有实现（以 `native.nativeInstanceId === lifecycle.native.instanceId` 替代）由其 owner 按新字段更新。
+- **验证**：`test/runtime-core/application-mediation.test.ts` 新增 Amendment-1 用例（verified 时三处同源恒等；缺失/不匹配/Codex native 事实不一致 ⇒ 不 verified）；runtime-core 全目录写前→写后 **489/452/33/4 → 490/453/33/4**（+1 test +1 pass、零新增确定性失败、零新增 skip；失败/跳过集合逐条一致）；`npm run typecheck` exit 0。证据见同目录证据文档「Amendment-1」节。

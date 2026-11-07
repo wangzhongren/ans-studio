@@ -11,11 +11,9 @@
 // · 失败返回 C1 `trunk-item-invalid`（调用方 version-change-runtime 映射为
 //   `vca-target-invalid`（批准前）/`vca-apply-failed`（apply 前））。
 
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { parseBoundaryYaml } from "../../../common/门禁引擎/boundary-yaml.ts";
+import { createFsTrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 import {
   parseProjectModules,
   parseProjectRoster,
@@ -27,7 +25,7 @@ import type {
   UpgradeChainValidation,
   UpgradeChainValidationInput,
 } from "../abstract/trunk-service.ts";
-import { filePathOfRef, sha256File } from "./trunk-common.ts";
+import { filePathOfRef } from "./trunk-common.ts";
 
 function fail<T>(message: string): TrunkServiceResult<T> {
   return { ok: false, code: "trunk-item-invalid", message };
@@ -56,12 +54,13 @@ const EXPECTED_SCHEMA: Partial<Record<TrunkDocKind, string>> = Object.freeze({
   assets: "project-assets/v1",
 });
 
+async function readProjectBytes(projectRoot: string, rel: string) {
+  const read = await createFsTrunkStore(projectRoot).readProjectFile!(rel);
+  return read.ok ? read.value : undefined;
+}
 async function readText(projectRoot: string, rel: string): Promise<string | undefined> {
-  try {
-    return await readFile(path.join(projectRoot, rel), "utf8");
-  } catch {
-    return undefined;
-  }
+  const bytes = await readProjectBytes(projectRoot, rel);
+  return bytes === undefined ? undefined : Buffer.from(bytes.bytesBase64, "base64").toString("utf8");
 }
 
 /**
@@ -73,6 +72,10 @@ export async function validateUpgradeChain(
   input: UpgradeChainValidationInput,
 ): Promise<TrunkServiceResult<UpgradeChainValidation>> {
   const checks: string[] = [];
+  const frozen = input.snapshot === undefined ? undefined : new Map(input.snapshot.files.map(file => [file.path, file]));
+  const readBoundText = async (rel: string): Promise<string | undefined> => frozen === undefined
+    ? readText(projectRoot, rel) : frozen.get(rel) === undefined ? undefined
+      : Buffer.from(frozen.get(rel)!.bytesBase64, "base64").toString("utf8");
 
   // 1) 内容存在 + hash 匹配（内容匹配为主；不信任调用方自报）。
   const texts = new Map<TrunkDocKind, string>();
@@ -81,12 +84,12 @@ export async function validateUpgradeChain(
     if (ref === undefined) continue;
     // 文档引用允许 `path#fragment`（run documents 约定）；哈希/读取取文件部分。
     const fileRel = filePathOfRef(ref.path);
-    const actual = await sha256File(projectRoot, fileRel);
+    const actual = frozen === undefined ? (await readProjectBytes(projectRoot, fileRel))?.sha256 : frozen.get(fileRel)?.sha256;
     if (actual === undefined) return fail(`documents.${kind} 文件缺失：${ref.path}`);
     if (actual.toLowerCase() !== ref.sha256.toLowerCase()) {
       return fail(`documents.${kind} 哈希不符：${ref.path}`);
     }
-    const text = await readText(projectRoot, fileRel);
+    const text = await readBoundText(fileRel);
     if (text === undefined) return fail(`documents.${kind} 不可读：${ref.path}`);
     texts.set(kind, text);
   }
@@ -100,6 +103,16 @@ export async function validateUpgradeChain(
     if (actual !== expected) {
       return fail(`documents.${kind} schema 必须为 ${expected}（实际 ${actual ?? "缺失"}）：${input.documents[kind]?.path ?? ""}`);
     }
+  }
+  if (input.confirmedIntent !== undefined) {
+    const proposal = texts.get("proposal");
+    const frontmatter = proposal && /^---\r?\n([\s\S]*?)\r?\n---/.exec(proposal);
+    let metadata: unknown;
+    try { metadata = frontmatter ? parseYaml(frontmatter[1]!) : undefined; } catch { metadata = undefined; }
+    if (!isObject(metadata) || metadata.intent !== input.confirmedIntent.path
+      || frozen?.get(input.confirmedIntent.path)?.sha256 !== input.confirmedIntent.sha256)
+      return fail("首建规划必须引用真实已确认意图及其冻结字节");
+    checks.push("confirmed-intent");
   }
   checks.push("schema");
 
@@ -136,21 +149,21 @@ export async function validateUpgradeChain(
     if (roster.proposal !== proposalRef.path) {
       return fail(`契约版本链不匹配：roster.proposal=${roster.proposal} ≠ 有效 proposal=${proposalRef.path}`);
     }
-    const proposalText = texts.get("proposal") ?? (await readText(projectRoot, filePathOfRef(proposalRef.path)));
+    const proposalText = texts.get("proposal") ?? (await readBoundText(filePathOfRef(proposalRef.path)));
     if (proposalText === undefined) return fail(`proposal 不可读：${proposalRef.path}`);
     if (!proposalText.includes(roster.intent)) {
       return fail(`契约版本链不匹配：proposal 未引用 roster.intent=${roster.intent}`);
     }
     const architectureRef = input.documents.architecture;
     if (architectureRef === undefined) return fail("roster 变更必须同时提供 architecture 目标文档（版本链）");
-    const architectureText = texts.get("architecture") ?? (await readText(projectRoot, filePathOfRef(architectureRef.path)));
+    const architectureText = texts.get("architecture") ?? (await readBoundText(filePathOfRef(architectureRef.path)));
     if (architectureText === undefined) return fail(`architecture 不可读：${architectureRef.path}`);
     if (!architectureText.includes(roster.proposal)) {
       return fail(`契约版本链不匹配：architecture 未引用 roster.proposal=${roster.proposal}`);
     }
     const modulesRef = input.documents.modules;
     if (modulesRef === undefined) return fail("roster 变更必须同时提供 modules 目标文档（版本链）");
-    const modulesText = texts.get("modules") ?? (await readText(projectRoot, filePathOfRef(modulesRef.path)));
+    const modulesText = texts.get("modules") ?? (await readBoundText(filePathOfRef(modulesRef.path)));
     if (modulesText === undefined) return fail(`modules 不可读：${modulesRef.path}`);
     const modulesParsed = parseProjectModules(modulesText, input.flowId);
     if (!modulesParsed.ok) return fail(`modules 非法：${modulesParsed.reason}`);
@@ -165,18 +178,30 @@ export async function validateUpgradeChain(
 
   // 6) role-card / boundary 完整性（roster 中每个角色；缺失/边界不可解析 ⇒ fail-closed）。
   const roleIds: string[] = roster?.roles.map((role) => role.id) ?? [];
-  for (const roleId of roleIds) {
-    const card = await readText(projectRoot, `角色卡/${roleId}/role-card.md`);
+  for (const roleId of input.planningOnly ? [] : roleIds) {
+    const card = await readBoundText(`角色卡/${roleId}/role-card.md`);
     if (card === undefined || card.trim() === "") return fail(`role-card 缺失：角色卡/${roleId}/role-card.md`);
-    const boundary = await readText(projectRoot, `角色卡/${roleId}/boundary.yaml`);
+    const boundary = await readBoundText(`角色卡/${roleId}/boundary.yaml`);
     if (boundary === undefined) return fail(`boundary 缺失：角色卡/${roleId}/boundary.yaml`);
-    try {
-      parseBoundaryYaml(boundary);
-    } catch (err) {
-      return fail(`boundary 不可解析（${roleId}）：${err instanceof Error ? err.message : String(err)}`);
+    if (frozen !== undefined) {
+      const result = input.roleDocumentChecks?.find(check => check.roleId === roleId && check.ok === true);
+      if (!result || result.snapshotDigest !== input.snapshot!.digest
+        || result.cardSha256 !== frozen.get(`角色卡/${roleId}/role-card.md`)?.sha256
+        || result.boundaryMdSha256 !== frozen.get(`角色卡/${roleId}/boundary.md`)?.sha256
+        || result.boundaryYamlSha256 !== frozen.get(`角色卡/${roleId}/boundary.yaml`)?.sha256)
+        return fail(`缺少同快照角色三文档校验结果：${roleId}`);
+      continue;
     }
+    const legacy = input.legacyApproval;
+    const check = legacy?.roles.find(check => check.roleId === roleId);
+    const cardBytes = await readProjectBytes(projectRoot, `角色卡/${roleId}/role-card.md`);
+    const boundaryBytes = await readProjectBytes(projectRoot, `角色卡/${roleId}/boundary.yaml`);
+    if (!legacy?.applicationId || !legacy.decisionId || !check || check.cardSha256 !== cardBytes?.sha256 || check.boundaryYamlSha256 !== boundaryBytes?.sha256)
+      return fail(`缺少不可变快照与角色三文档校验结果：${roleId}`);
+    // The Pipeline already used G's public parser on these exact original two-file bytes.
+    // This compatibility result cannot create a run or role activation.
   }
-  if (roleIds.length > 0) checks.push("role-cards");
+  if (roleIds.length > 0 && !input.planningOnly) checks.push("role-cards");
 
   return {
     ok: true,

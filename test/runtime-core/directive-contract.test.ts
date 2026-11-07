@@ -85,9 +85,9 @@ type _DeclinedDirective = Assert<
 type _UnavailableNoDirective = Assert<
   Equal<"directive" extends keyof UnavailableOutcome ? true : false, false>
 >;
-type _ResolvedBy = Assert<Equal<RequestResolvedEvent["by"], "judge" | "customer" | "directive">>;
+type _ResolvedBy = Assert<Equal<RequestResolvedEvent["by"], "judge" | "customer" | "directive" | "chief-delegated">>;
 type _ResolvedDirectiveId = Assert<Equal<RequestResolvedEvent["directiveId"], string | undefined>>;
-type _PresentedTo = Assert<Equal<RequestPresentedEvent["to"], "customer" | "judge">>;
+type _PresentedTo = Assert<Equal<RequestPresentedEvent["to"], "customer" | "judge" | "chief">>;
 type _PresentedNoDirective = Assert<
   Equal<"directive" extends keyof RequestPresentedEvent ? true : false, false>
 >;
@@ -104,7 +104,7 @@ function b1Consumer(event: RequestResolvedEvent): string {
     : "none";
 }
 
-// C1 可消费的冻结声明：三处加法字段与三值枚举穷举。
+// C1 可消费的冻结声明：三处加法字段与来源枚举穷举（P3.1 增真实 chief-delegated）。
 function decidedByText(value: VersionDecisionDecidedBy): string {
   switch (value) {
     case "customer":
@@ -113,6 +113,8 @@ function decidedByText(value: VersionDecisionDecidedBy): string {
       return "judge";
     case "directive":
       return "directive";
+    case "chief-delegated":
+      return "chief-delegated";
     default: {
       const exhaustive: never = value;
       return exhaustive;
@@ -367,10 +369,11 @@ test("A1/Q9 A：RequestResolvedEvent 支持 directive 归属，旧事件无 dire
   assert.equal("directiveId" in (JSON.parse(JSON.stringify(oldResolved)) as object), false);
 });
 
-test("A1/Q9 A：VersionDecisionEvent.decidedBy 三值且 directiveId 可选；旧记录可读", () => {
+test("A1/Q9 A + P3.1：VersionDecisionEvent 保留旧来源并增加 chief-delegated", () => {
   assert.equal(decidedByText("customer"), "customer");
   assert.equal(decidedByText("judge"), "judge");
   assert.equal(decidedByText("directive"), "directive");
+  assert.equal(decidedByText("chief-delegated"), "chief-delegated");
   assert.deepEqual(JSON.parse(JSON.stringify(directiveVersionDecision)), directiveVersionDecision);
   assert.deepEqual(JSON.parse(JSON.stringify(oldVersionDecision)), oldVersionDecision);
   assert.equal("directiveId" in (JSON.parse(JSON.stringify(oldVersionDecision)) as object), false);

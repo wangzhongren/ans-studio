@@ -32,12 +32,14 @@ import {
   shellEscalationResponseOutcome,
   shellEscalationResponsePayload,
   shellJudgeToggleResult,
+  decisionDelegationSnapshot,
   type JudgeGroup,
 } from "@/chat/judge";
 
 export type { JudgeGroup };
 
 export interface JudgeSwitchState {
+  revision: number | null;
   available: boolean;
   enabled: boolean;
   busy: boolean;
@@ -70,6 +72,7 @@ interface ConfirmStore {
 }
 
 const EMPTY_SWITCH: JudgeSwitchState = {
+  revision: null,
   available: false,
   enabled: false,
   busy: false,
@@ -381,7 +384,7 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
     set({
       judge: {
         approval: { ...EMPTY_SWITCH, available: approvalAvailable },
-        decision: { ...EMPTY_SWITCH, available: decisionAvailable },
+        decision: { ...EMPTY_SWITCH, available: false },
       },
     });
 
@@ -432,6 +435,17 @@ export const useConfirmStore = create<ConfirmStore>((set, get) => ({
     } catch {
       res = null;
     }
+    if (group === JUDGE_GROUP_DECISION) {
+      const current = get().judge.decision;
+      const record = asCardRecord(res);
+      const snapshot = record.ok === true ? decisionDelegationSnapshot(res, current) : null;
+      const stale = record.ok === true && typeof record.revision === "number"
+        && current.revision !== null && record.revision < current.revision;
+      set({ judge: { ...get().judge, decision: { ...current, ...(snapshot ?? {}), busy: false,
+        error: snapshot || stale ? "" : shellJudgeToggleResult(current.enabled, { error: record.error }, currentLocale()).error } } });
+      syncWarning();
+      return;
+    }
     const next = shellJudgeToggleResult(s.enabled, res, currentLocale());
     const current = get().judge[group];
     const record = asCardRecord(res);
@@ -467,6 +481,14 @@ function applyJudgeState(group: JudgeGroup, payload: unknown): boolean {
   const record = asCardRecord(payload);
   if (record.version !== 1 || typeof record.enabled !== "boolean") return false;
   const current = useConfirmStore.getState().judge[group];
+  if (group === JUDGE_GROUP_DECISION) {
+    const snapshot = decisionDelegationSnapshot(payload, current);
+    if (!snapshot) return false;
+    useConfirmStore.setState({ judge: { ...useConfirmStore.getState().judge,
+      decision: { ...current, ...snapshot, error: "" } } });
+    syncWarning();
+    return true;
+  }
   const available =
     record.available === false ? false : record.available === true ? true : current.available;
   useConfirmStore.setState({
@@ -492,6 +514,14 @@ function readJudgeState(
 ): void {
   const done = (res: unknown) => {
     if (pushedFlags[group]) return;
+    if (group === JUDGE_GROUP_DECISION) {
+      if (asCardRecord(res).ok === true && applyJudgeState(group, res)) return;
+      const current = useConfirmStore.getState().judge.decision;
+      useConfirmStore.setState({ judge: { ...useConfirmStore.getState().judge,
+        decision: { ...current, available: false, busy: false,
+          error: shellJudgeToggleResult(current.enabled, { error: asCardRecord(res).error }, currentLocale()).error } } });
+      return;
+    }
     const next = shellJudgeToggleResult(false, res, currentLocale());
     const record = asCardRecord(res);
     const current = useConfirmStore.getState().judge[group];

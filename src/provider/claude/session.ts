@@ -4,10 +4,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import type * as SDK from "@anthropic-ai/claude-agent-sdk";
 import type * as Zod from "zod";
 import type { ResolvedRole } from "../../model/role.ts";
-import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1 } from "../../model/runtime.ts";
+import type { RuntimeAdapter, RuntimeProviderOptions, RoleSession, SessionEvent, RuntimeTurnOutcome, PromptOptions, RuntimeToolEventFactsV1, RuntimeReasoningFactsV1, RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeApplicationToolSurfaceFacts, JsonSchema } from "../../model/runtime.ts";
 import { MODEL_REQUEST_FAILED, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
 import { RUNTIME_CREDENTIAL_ENV_VARS } from "../../common/shared/runtime-shared.ts";
 import { createDiagnosticLogger } from "../../common/shared/diagnostics.ts";
@@ -41,6 +42,7 @@ export interface ClaudeAdapterDependencies {
 }
 type Turn = {
   id: string;
+  coreTurnId?: string;
   sdkUuid: ReturnType<typeof randomUUID>;
   controller: AbortController;
   done: Promise<void>;
@@ -60,6 +62,11 @@ type Engine = {
   /** One honest installed-MCP status pass per engine (G-4 V2 P1). */
   statusReported: boolean;
   toolTail: Promise<void>;
+  pumpEnded: boolean;
+  pumpFailed: boolean;
+  stopRequested: boolean;
+  observedTools: Map<string, RuntimeActiveToolFact>;
+  promptFact?: { coreTurnId?: string; wireUuid: string; nativeTurnId?: string; state: "running" | "settled"; settledAt?: string };
   contexts: Map<string, { turn: Turn; toolName: string; toolUseId: string; signal: AbortSignal }>;
   nativeTurns: Map<string, { turn: Turn; signal: AbortSignal }>;
   pendingInputs: Map<string, Turn>;
@@ -75,6 +82,77 @@ const INSTALLED_MCP_TOOL_TIMEOUT_MS = 60_000;
 // proved the CLI otherwise hands its full env, including the gateway key, to the process server).
 const MCP_ENV_LAUNCHER = fileURLToPath(new URL("../../common/claude-adapter/mcp-launcher.mjs", import.meta.url));
 const CALL_CONTEXT_ARG = "__ans_call_context";
+/** `not(anyOf(required(key)))` forbids each named property, exactly as property:false does.
+ * Only lower this narrow root shape; the strict converter must still reject every other not.
+ */
+function claudeAbsentPropertiesSchema(schema: JsonSchema): JsonSchema {
+  const constraint = schema.not;
+  if (schema.type !== "object" || !constraint || typeof constraint !== "object" || Array.isArray(constraint)
+    || Object.keys(constraint).length !== 1 || !Object.hasOwn(constraint, "anyOf")) return schema;
+  const branches = (constraint as Record<string, unknown>).anyOf;
+  if (!Array.isArray(branches) || branches.length === 0) return schema;
+  const forbidden: string[] = [];
+  for (const branch of branches) {
+    if (!branch || typeof branch !== "object" || Array.isArray(branch) || Object.keys(branch).length !== 1
+      || !Object.hasOwn(branch, "required") || !Array.isArray(branch.required) || branch.required.length !== 1
+      || typeof branch.required[0] !== "string" || branch.required[0].length === 0) return schema;
+    forbidden.push(branch.required[0]);
+  }
+  if (schema.properties !== undefined && (!schema.properties || typeof schema.properties !== "object" || Array.isArray(schema.properties))) return schema;
+  const { not: _constraint, ...rest } = schema;
+  // fromEntries also preserves literal names such as __proto__, without invoking a setter.
+  return { ...rest, properties: Object.fromEntries([
+    ...Object.entries(schema.properties ?? {}), ...forbidden.map(key => [key, false] as const),
+  ]) };
+}
+function claudeSchemaObject(value: unknown): JsonSchema | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as JsonSchema : undefined;
+}
+/** Two exact dispatch schemas, not a general conditional-schema evaluator. Unknown conditions
+ * remain intact and are rejected by toClaudeSchema. Complete-object branches retain all fields.
+ */
+function claudeMcpInputSchema(schema: JsonSchema, toolName: string): JsonSchema {
+  const input = claudeAbsentPropertiesSchema(schema);
+  if (toolName !== "dispatch_task" || input.type !== "object") return input;
+  const properties = claudeSchemaObject(input.properties);
+  if (!properties) return input;
+  let normalized = input;
+  const review = claudeSchemaObject(properties.reviewTarget);
+  const reviewProperties = claudeSchemaObject(review?.properties);
+  const oid = claudeSchemaObject(reviewProperties?.candidate);
+  const oidProperties = claudeSchemaObject(oid?.properties);
+  const sha1 = { minLength: 40, maxLength: 40, pattern: "^[a-fA-F0-9]{40}$" };
+  const sha256 = { minLength: 64, maxLength: 64, pattern: "^[a-fA-F0-9]{64}$" };
+  const oidCondition = [{ if: { properties: { objectFormat: { const: "sha1" } } },
+    then: { properties: { hex: sha1 } }, else: { properties: { hex: sha256 } } }];
+  if (review && reviewProperties && oid && oidProperties && oid.type === "object"
+    && isDeepStrictEqual(oid.required, ["objectFormat", "hex"])
+    && isDeepStrictEqual(oidProperties.objectFormat, { type: "string", enum: ["sha1", "sha256"] })
+    && isDeepStrictEqual(oidProperties.hex, { type: "string", pattern: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$" })
+    && oid.anyOf === undefined && isDeepStrictEqual(oid.allOf, oidCondition)) {
+    const { allOf: _oidCondition, ...base } = oid;
+    const candidate = { ...base, anyOf: (["sha1", "sha256"] as const).map(format => ({
+      ...base, properties: { ...oidProperties, objectFormat: { type: "string", enum: [format] },
+        hex: { type: "string", ...(format === "sha1" ? sha1 : sha256) } },
+    })) };
+    normalized = { ...input, properties: { ...properties, reviewTarget: { ...review, properties: { ...reviewProperties, candidate } } } };
+  }
+  const resumeCondition = [{ if: { required: ["resumeController"] }, then: {
+    properties: { roleId: { const: "convener" } },
+    not: { anyOf: [{ required: ["reviewTarget"] }, { required: ["sourceTaskId"] }] },
+  } }];
+  if (normalized.anyOf !== undefined || !isDeepStrictEqual(normalized.allOf, resumeCondition)) return normalized;
+  const { allOf: _resumeCondition, ...base } = normalized;
+  const baseProperties = claudeSchemaObject(base.properties)!;
+  const roleId = claudeSchemaObject(baseProperties.roleId);
+  if (!roleId || roleId.type !== "string" || (roleId.const !== undefined && roleId.const !== "convener") || !Array.isArray(base.required)
+    || !base.required.every(key => typeof key === "string")) return normalized;
+  return { ...base, anyOf: [
+    { ...base, properties: { ...baseProperties, resumeController: false } },
+    { ...base, required: [...new Set([...base.required, "resumeController"])],
+      properties: { ...baseProperties, roleId: { ...roleId, const: "convener" }, reviewTarget: false, sourceTaskId: false } },
+  ] };
+}
 const INPUT_CONTEXT_PREFIX = /^\[ANS_INPUT_CONTEXT:([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})\]\n/;
 // Whole-turn last resort (客户裁定 2026-10-17): `promptTimeoutMs` is the watchdog's inspect
 // deadline and never aborts a Claude turn. Only this fixed (option-injectable) deadline ends it;
@@ -261,6 +339,15 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       let disposed = false;
       let active: Turn | undefined;
       let engine: Engine | undefined;
+      // P1.6 §4.6：实际构造的应用中介工具面。只在引擎成功构造（工具已注册、query 已创建）后产生；
+      // 未构造时方法返回 status:"unknown" 的不可用事实，包装层据此保持 applicationMediation 缺席
+      // （fail-closed）。这里只记录构造事实，不读配置意图，也不改变任何工具注册/权限/hook。
+      let applicationToolSurface: RuntimeApplicationToolSurfaceFacts | undefined;
+      const instanceId = randomUUID();
+      // Keep retired engines observable: rejecting the ANS turn does not drain their callbacks.
+      const observedEngines = new Set<Engine>();
+      let latestNativeEngine: Engine | undefined;
+      let observedNativeSessionId: string | undefined;
       // P1 请求级超时（每回合/每次尝试一把 deadline）：pump 的每条 SDK 消息喂 activity()；
       // 客户交互（InteractionGate）、工具执行、abort 清理期间 pause()；P2 网络暂停复用同一中性接口。
       let requestDeadline: RequestDeadline | undefined;
@@ -413,6 +500,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
       const closeEngine = (current: Engine) => {
         if (current.closed) return;
         current.closed = true;
+        current.stopRequested = true;
         stopRequestDeadline();
         current.contexts.clear();
         current.nativeTurns.clear();
@@ -426,6 +514,63 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         active?.reject(abortError());
         try { current.query.close(); }
         catch (error) { teardownError = safeFailure(error); active?.reject(teardownError); }
+      };
+      const inspectNative = (): RuntimeNativeLifecycleFacts => {
+        const engines = [...observedEngines];
+        const latest = latestNativeEngine?.promptFact;
+        const activeTools = engines.flatMap(current => [...current.observedTools.values()]);
+        const pendingPumps = engines.filter(current => !current.pumpEnded);
+        const stopping = engines.some(current => current.stopRequested && (!current.pumpEnded || current.observedTools.size > 0));
+        return {
+          instanceId, roleId: role.id, runtime: "claude",
+          ...(observedNativeSessionId ? { nativeSessionId: observedNativeSessionId } : {}),
+          ...(latest?.coreTurnId ? { coreTurnId: latest.coreTurnId } : {}),
+          ...(latest?.nativeTurnId ? { nativeTurnId: latest.nativeTurnId } : {}),
+          status: activeTools.length || latest?.state === "running" ? stopping ? "stopping" : "running" : "unknown",
+          promptState: latest?.state ?? "not-started", observedAt: new Date().toISOString(),
+          ...(latest?.settledAt ? { settledAt: latest.settledAt } : {}),
+          // This observes the Query message iterator only, never the CLI process or its HTTP socket.
+          transport: { kind: "unknown", state: engines.length === 0 ? "unknown" : pendingPumps.length ? "open" : engines.some(current => current.pumpFailed) ? "unknown" : "closed" },
+          activeTools, processes: [], processCoverage: "unknown",
+          reasons: [
+            "Claude SDK Query exposes no owned PID, descendant-tree inventory, process exit/close event or exit code; process coverage is unknown.",
+            "Query.close(): void and interrupt acknowledgement do not verify CLI exit, HTTP completion or descendant shutdown.",
+            ...(teardownError ? ["SDK query.close failed; shutdown remains unverified."] : []),
+            ...(pendingPumps.length ? ["Query message pump has not finished; local turn rejection/dispose is not native settlement."] : []),
+            ...(engines.some(current => current.pumpFailed) ? ["Query message pump failed; underlying transport closure is unverified."] : []),
+            ...(activeTools.length ? ["Observed tool callbacks or native calls remain unfinished."] : []),
+          ],
+        };
+      };
+      const nativeLifecycle: NonNullable<RoleSession["nativeLifecycle"]> = {
+        instanceId, inspect: inspectNative,
+        async stopAndInspect(input, signal) {
+          if (input.expectedInstanceId !== instanceId) throw new Error("Claude native instance mismatch");
+          const target = latestNativeEngine?.promptFact;
+          if (input.expectedCoreTurnId !== undefined && input.expectedCoreTurnId !== (active ? active.coreTurnId : target?.coreTurnId)) throw new Error("Claude native core turn mismatch");
+          if (!Number.isFinite(input.timeoutMs) || input.timeoutMs < 0) throw new Error("Claude native stop timeout must be finite and non-negative");
+          if (signal?.aborted) return inspectNative();
+          active?.controller.abort();
+          for (const current of observedEngines) {
+            if (current.stopRequested) continue;
+            current.stopRequested = true;
+            // Request owned SDK shutdown, but never interpret either return as an exit event.
+            try { void current.query.interrupt().catch(() => {}); } catch { /* inspect stays conservative */ }
+            closeEngine(current);
+          }
+          diagnostics.record("native.stop.request", { state: "stopping", count: observedEngines.size });
+          const until = Date.now() + input.timeoutMs;
+          while (!signal?.aborted && latestNativeEngine?.promptFact === target &&
+            [...observedEngines].some(current => !current.pumpEnded || current.observedTools.size > 0) && Date.now() < until) {
+            await new Promise<void>(resolve => {
+              const finish = () => { clearTimeout(timer); signal?.removeEventListener("abort", finish); resolve(); };
+              const timer = setTimeout(finish, Math.min(10, Math.max(0, until - Date.now())));
+              signal?.addEventListener("abort", finish, { once: true });
+            });
+          }
+          if (latestNativeEngine?.promptFact !== target) throw new Error("Claude native core turn changed during stop");
+          return inspectNative();
+        },
       };
       const resumeFailed = (current: Engine) => {
         if (!current.resumeId) return;
@@ -494,13 +639,20 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         // cannot preserve additionalProperties at the root; MCP registerTool accepts a Zod object.
         const server = sdk.createSdkMcpServer({ name: "ans", version: "1.0.0", tools: [] });
         server.timeout = MCP_TOOL_TIMEOUT_MS;
-        const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, statusReported: false, toolTail: Promise.resolve(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map(), nativeCalls: new Map() };
+        const current: Engine = { query: undefined as unknown as SDK.Query, input, controller, closed: false, resumeId: nativeId, statusReported: false, toolTail: Promise.resolve(), pumpEnded: false, pumpFailed: false, stopRequested: false, observedTools: new Map(), contexts: new Map(), nativeTurns: new Map(), pendingInputs: new Map(), nativeCalls: new Map() };
+        // Actual registration order/targets of this engine's ANS MCP server (P1.6 §4.6 appTools source);
+        // pushed only after registerTool accepts the tool, so a schema failure can never be reported.
+        const registeredToolNames: string[] = [];
         for (const tool of options.tools) {
-          const properties = (tool.inputSchema.properties ?? {}) as Record<string, unknown>;
+          const protectedSchema = claudeAbsentPropertiesSchema(tool.inputSchema);
+          const properties = (protectedSchema.properties ?? {}) as Record<string, unknown>;
           if (Object.hasOwn(properties, CALL_CONTEXT_ARG)) throw new Error("Claude ANS 工具 schema 包含保留的请求上下文字段");
+          const inputSchema = claudeMcpInputSchema({ ...protectedSchema, properties: { ...properties,
+            [CALL_CONTEXT_ARG]: { type: "string", description: "Internal ANS context assigned by the host; omit this field." },
+          } }, tool.name);
           server.instance.registerTool(tool.name, {
             description: tool.description,
-            inputSchema: toClaudeSchema({ ...tool.inputSchema, properties: { ...properties, [CALL_CONTEXT_ARG]: { type: "string", description: "Internal ANS context assigned by the host; omit this field." } } }, z),
+            inputSchema: toClaudeSchema(inputSchema, z),
             annotations: judgeMode
               // 判断会话三件套（shell 或治理 report）全部只读、不破坏、不触网。
               ? { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
@@ -517,6 +669,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             const signal = AbortSignal.any([controller.signal, ...(callTurn && context ? [callTurn.controller.signal, context.signal] : []), extra.signal]);
             const toolCallId = `${callTurn?.id ?? "idle"}:${context?.toolUseId ?? randomUUID()}`;
             const { [CALL_CONTEXT_ARG]: _privateContext, ...publicArgs } = inputArgs;
+            current.observedTools.set(toolCallId, { id: toolCallId, name: tool.name, ...(callTurn?.coreTurnId ? { turnId: callTurn.coreTurnId } : {}) });
             const run = current.toolTail.then(async () => {
               if (!callTurn || callTurn !== active || signal.aborted || current.closed) return { content: [{ type: "text" as const, text: "原始工具请求上下文无效或已结束，工具未执行" }], isError: true };
               callTurn.replayUnsafe = true;
@@ -557,8 +710,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
               }
             });
             current.toolTail = run.then(() => {}, () => {});
-            return run;
+            try { return await run; }
+            finally { current.observedTools.delete(toolCallId); }
           });
+          registeredToolNames.push(tool.name);
         }
         // Web search capability bit (construction-time env snapshot). Default off is fail-closed:
         // unset/0/off/unknown keeps tools/allowedTools/hooks exactly as before. 判断模式强制关闭：
@@ -596,6 +751,10 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 return { decision: "block", reason: "ANS 无法确认原始请求轮次" };
               }
               current.nativeTurns.set(hook.prompt_id, { turn, signal: hookOptions.signal });
+              if (current.promptFact?.wireUuid === turn.sdkUuid) {
+                current.promptFact.nativeTurnId = hook.prompt_id;
+                if (current === latestNativeEngine && hook.session_id) observedNativeSessionId = hook.session_id;
+              }
               current.pendingInputs.delete(transportUuid!);
               return {};
             }] }],
@@ -618,6 +777,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             // unchanged and the ANS call-context token must never leak outside mcp__ans__ (WebSearch
             // branch precedent). allowedTools only carries the server-level auto-allow fallback.
             if (hook.mcp_server && installedNames.has(hook.mcp_server.name) && hook.mcp_server.source === "dynamic" && hook.tool_name.startsWith(`mcp__${hook.mcp_server.name}__`) && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
+              current.observedTools.set(`native:${hook.tool_use_id}`, { id: `${originalTurn.id}:${hook.tool_use_id}`, name: hook.tool_name, ...(originalTurn.coreTurnId ? { turnId: originalTurn.coreTurnId } : {}) });
               originalTurn.replayUnsafe = true;
               // P1：原生（外来 MCP）工具执行期间请求空闲计时停走，结果帧到达时恢复。
               pauseRequestTimer(originalTurn);
@@ -631,6 +791,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             // without it the fallback below would kill every search. No updatedInput — the model's
             // query must reach the tool unchanged.
             if (webSearchEnabled && hook.tool_name === "WebSearch" && !hook.mcp_server && originalTurn && originalTurn === active && !originalTurn.controller.signal.aborted && !original!.signal.aborted && !controller.signal.aborted && !hookOptions.signal.aborted) {
+              current.observedTools.set(`native:${hook.tool_use_id}`, { id: `${originalTurn.id}:${hook.tool_use_id}`, name: "WebSearch", ...(originalTurn.coreTurnId ? { turnId: originalTurn.coreTurnId } : {}) });
               originalTurn.replayUnsafe = true;
               // P1：原生 WebSearch 执行期间请求空闲计时停走，结果帧到达时恢复。
               pauseRequestTimer(originalTurn);
@@ -650,10 +811,32 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           },
         };
         current.query = sdk.query({ prompt: input.stream(), options: queryOptions });
+        observedEngines.add(current);
         engine = current;
+        // P1.6 §4.6：从本次**实际**构造面记录事实（已注册的 ANS 工具名、实际注入的外来 MCP 配置键、
+        // 与 `tools` 同源的 WebSearch 开关）。构造失败（schema/query 抛错）不会到达这里，因此报告中
+        // 不会出现从未构造成功的工具或 server；`ans` 由本适配器固定装配，不属于外来 MCP。
+        applicationToolSurface = {
+          source: "application-mediated-tool-surface",
+          nativeInstanceId: instanceId, roleId: role.id, runtime: "claude", factory: "claude-sdk-mcp",
+          status: "observed", observedAt: new Date().toISOString(),
+          appTools: [...registeredToolNames],
+          foreignMcpServers: Object.keys(installedMcpConfigs),
+          nativeBuiltinTools: webSearchEnabled ? ["WebSearch"] : [],
+          reasons: [],
+        };
         void (async () => {
           try {
             for await (const message of current.query) {
+              const fact = current.promptFact;
+              if (message.type === "result" && fact && (message.user_message_uuid === fact.wireUuid || message.user_message_uuids?.includes(fact.wireUuid))) {
+                fact.state = "settled"; fact.settledAt = new Date().toISOString();
+                if (current === latestNativeEngine) observedNativeSessionId = message.session_id;
+              }
+              // Observe native tool completion even after local stop seals normal event delivery.
+              if (message.type === "user" && typeof message.message.content !== "string") for (const block of message.message.content) {
+                if (block.type === "tool_result") current.observedTools.delete(`native:${block.tool_use_id}`);
+              }
               const callTurn = active;
               if (current.closed || !callTurn || callTurn.controller.signal.aborted) continue;
               // P1：流活动计数。首字节只认设计口径的四类消息（assistant/user/result/system api_retry）；
@@ -698,12 +881,14 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                     // Native call surface only; the query itself stays inside the tool facts (never a message line).
                     const toolCallId = `${callTurn.id}:${block.id}`;
                     current.nativeCalls.set(block.id, { turn: callTurn, toolCallId, toolName: "WebSearch" });
+                    current.observedTools.set(`native:${block.id}`, { id: toolCallId, name: "WebSearch", ...(callTurn.coreTurnId ? { turnId: callTurn.coreTurnId } : {}) });
                     emitTool(callTurn, { origin: "native-start", phase: "start", toolName: "WebSearch", toolCallId,
                       input: { rule: "none", args: block.input !== null && typeof block.input === "object" && !Array.isArray(block.input) ? block.input as Record<string, unknown> : {} } }, "tool_call", "WebSearch");
                   } else if (block.type === "tool_use" && installedToolPrefixes.some((prefix) => block.name.startsWith(prefix))) {
                     // Frame-truth registration only: the PreToolUse allow branch already emitted the start
                     // row; this arms the tool_result pairing through the same nativeCalls mechanism.
                     current.nativeCalls.set(block.id, { turn: callTurn, toolCallId: `${callTurn.id}:${block.id}`, toolName: block.name });
+                    current.observedTools.set(`native:${block.id}`, { id: `${callTurn.id}:${block.id}`, name: block.name, ...(callTurn.coreTurnId ? { turnId: callTurn.coreTurnId } : {}) });
                   }
                 }
               } else if (message.type === "user") {
@@ -749,6 +934,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
             }
             if (!current.closed && active) active.reject(markRetryable(new Error("Claude SDK 事件流结束，未返回当前轮结果"), current.resumeId === undefined));
           } catch (error) {
+            current.pumpFailed = true;
             if (!current.closed) {
               lastFailureText ??= error instanceof Error ? error.message : String(error);
               const resumeConflict = current.resumeId !== undefined;
@@ -760,13 +946,37 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 && !["AbortError", "TimeoutError"].includes(failure.name);
               active?.reject(markRetryable(failure, retryable));
             }
-          } finally { closeEngine(current); }
+          } finally {
+            current.pumpEnded = true;
+            if (current.promptFact?.state === "running") {
+              current.promptFact.state = "settled";
+              current.promptFact.settledAt = new Date().toISOString();
+            }
+            diagnostics.record("native.pump.finished", { state: current.pumpFailed ? "failed" : "finished" });
+            closeEngine(current);
+          }
         })();
         return current;
       };
 
       return {
         runtime: "claude", roleId: role.id,
+        nativeLifecycle,
+        inspectApplicationToolSurface(): RuntimeApplicationToolSurfaceFacts {
+          // P1.6 §4.6：只报告实际构造的引擎面；身份必须与本会话 live nativeLifecycle 一致。
+          // 未构造任何引擎（或身份不一致）⇒ 返回结构合法但 status:"unknown" 的不可用事实，
+          // 包装层据此保持 applicationMediation 缺席（fail-closed），不发明 reason 文案。
+          const surface = applicationToolSurface;
+          if (!surface || surface.nativeInstanceId !== nativeLifecycle.instanceId) return {
+            source: "application-mediated-tool-surface", nativeInstanceId: instanceId, roleId: role.id,
+            runtime: "claude", factory: "claude-sdk-mcp", status: "unknown", observedAt: new Date().toISOString(),
+            appTools: [], foreignMcpServers: [], nativeBuiltinTools: [], reasons: [],
+          };
+          return {
+            ...surface, appTools: [...surface.appTools], foreignMcpServers: [...surface.foreignMcpServers],
+            nativeBuiltinTools: [...surface.nativeBuiltinTools], reasons: [...surface.reasons],
+          };
+        },
         get contextSource() { return contextSource; },
         get nativeSessionId() { return nativeId; },
         get contextWarning() { return warning; },
@@ -778,7 +988,8 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
           const done = new Promise<void>((pass, fail) => { resolve = pass; reject = fail; });
           // Observe rejection even if construction/abort fails before waitForTurn starts.
           void done.catch(() => {});
-          const turn: Turn = { id: options.currentTurnId() ?? randomUUID(), sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject, replayUnsafe: false, interactionSeen: false };
+          const coreTurnId = options.currentTurnId();
+          const turn: Turn = { id: coreTurnId ?? randomUUID(), coreTurnId, sdkUuid: randomUUID(), controller: new AbortController(), done, resolve, reject, replayUnsafe: false, interactionSeen: false };
           active = turn;
           lastFailureText = undefined;
           promptStartedAt = Date.now();
@@ -809,6 +1020,9 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
                 const current = await waitForTurn(start, turn.controller.signal, options.constructTimeoutMs ?? 30000, options.interactionGate);
                 if (!current.statusReported) { current.statusReported = true; await reportInstalledServerStatus(current, turn); }
                 current.pendingInputs.set(turn.sdkUuid, turn);
+                if (current !== latestNativeEngine) observedNativeSessionId = undefined;
+                current.promptFact = { coreTurnId: turn.coreTurnId, wireUuid: turn.sdkUuid, state: "running" };
+                latestNativeEngine = current;
                 const wireText = `[ANS_INPUT_CONTEXT:${turn.sdkUuid}]\n${text}`;
                 current.input.push({ type: "user", uuid: turn.sdkUuid, session_id: nativeId ?? "", parent_tool_use_id: null, message: {
                   role: "user", content: images.length ? [{ type: "text", text: wireText }, ...images.map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mimeType as ClaudeImageMimeType, data: image.data } }))] : wireText,

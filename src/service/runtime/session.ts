@@ -1,6 +1,7 @@
 // Public Service composition entry. Pipeline selects runtime and injects policy; Providers execute it.
 import { randomUUID, createHash } from "node:crypto";
-import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED } from "../../model/runtime.ts";
+import { resolve } from "node:path";
+import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED, isChiefDecisionExecutionContext, isRuntimeApplicationToolSurfaceFacts, isRuntimeNativeLifecycleFacts, isRuntimeNativeToolSurfaceFacts } from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
@@ -19,9 +20,19 @@ import type {
   BackgroundTaskStopOptions,
   BackgroundTaskStopResult,
   ViewImageFn,
+  ChiefDecisionExecutionContext,
+  RuntimeSessionLifecycleFacts, RuntimeOwnedProcessFact,
+  RuntimeSessionToolSurfaceFacts,
+  RuntimeNativeLifecycle, RuntimeNativeLifecycleFacts,
+  RuntimeNativeToolSurfaceFacts,
+  RuntimeNativeFactoryPreparation, RuntimeNativeFactoryPlanFacts, RuntimeRolePreparation, RuntimePreparedRoleToken,
+  RuntimeCreationPlanFacts, RuntimeCoreRegistryFacts,
+  RuntimeBlockedRoleCapabilityCallbacks, RuntimeBlockedRoleCapabilityFacts, RuntimeRoleCapabilityTool, InstallSkillFn,
+  RuntimeCoreConstructionFacts, RuntimeCoreConstructionFailureRef,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
-import { buildGovernedTools, createDemoRuntimeAdapter } from "../../provider/runtime/tools.ts";
+import { buildChiefDecisionTools, buildGovernedTools, createDemoRuntimeAdapter, createRuntimeToolLifecycle, isFileEditReadProbe, inspectFileGateContext, loadBuiltinChiefWorkflow, type RuntimeToolLifecycle } from "../../provider/runtime/tools.ts";
+import type { FileGateStage, FileGateFacts, WriteGateOperation } from "../../model/runtime.ts";
 import { buildShellJudgeTools } from "../../common/runtime-core/shell-judge/tools.ts";
 import { buildGovernanceJudgeTools } from "../../common/runtime-core/governance-judge/tools.ts";
 import { createRuntimeSessionStore, readRuntimeSessionHistory as readStoredRuntimeSessionHistory } from "../../provider/runtime/session-store.ts";
@@ -34,6 +45,7 @@ import { isRequestFailureCode, requestTimeoutFailureFacts, requestTimeoutSummary
 import { isNetworkOfflineFailure, networkOfflineFailureFacts, networkOfflineSummary } from "../../common/runtime-core/network-gate.ts";
 import { REASONING_DIAGNOSTIC_SUMMARY, REASONING_EVENT_SUMMARY, resolveReasoningEffort } from "../../common/runtime-core/reasoning.ts";
 import { createBackgroundTaskManager } from "../../common/runtime-core/background-tasks.ts";
+import { beginGitHostAction, endGitHostAction, checkGitHostAction, recordGitHostInterruption } from "../../provider/trunk/public/trunk-store.ts";
 
 export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "currentTurnId" | "roleId" | "runtime" | "interactionGate" | "backgroundTasks" | "viewImagePolicy"> {
   runtime: RuntimeKind;
@@ -85,8 +97,20 @@ export interface RuntimeSessionOptions extends Omit<GovernedToolsOptions, "curre
    * 未定义 ⇒ 不下发字段（系统提示逐字不变）；空数组不在本层拼接，由适配器按「非空才拼」处理。
    */
   contextSections?: readonly string[];
+  /** Trusted host-created separate real-chief context, never a tool argument or judge identity. */
+  chiefDecisionContext?: ChiefDecisionExecutionContext;
   /** Demo-only script; no SDK and no fallback for another runtime. */
   script?: ToolCall[];
+}
+
+/** Pipeline may recognize only the actual Provider-issued edit/read probe for this exact gate path. No write authority. */
+export function isRuntimeEditReadProbe(context: unknown, targetPath: string): boolean {
+  return isFileEditReadProbe(context, targetPath);
+}
+
+/** Validate Provider's live invocation/path/operation/stage identity, then expose only ordinary copies. */
+export function inspectRuntimeFileGateContext(context: unknown, targetPath: string, operation: WriteGateOperation, stage: FileGateStage): FileGateFacts | undefined {
+  return inspectFileGateContext(context, targetPath, operation, stage);
 }
 
 /** Tool kind alone is insufficient for generic accepted/denied engine facts. */
@@ -143,8 +167,174 @@ async function defaultFactory(runtime: RuntimeKind): Promise<RuntimeProviderFact
   return factory as RuntimeProviderFactory;
 }
 
+const coreRegistryInstance = randomUUID();
+let coreRegistryRevision = 0;
+const coreRootRevisions = new Map<string, number>();
+type CoreRegistryEntry = { fact: RuntimeCoreRegistryFacts["entries"][number]; session?: RoleSession;
+  construction?: () => RuntimeCoreConstructionFacts; revoke?: () => void };
+const coreRegistry = new Map<string, CoreRegistryEntry>();
+const constructionErrors = new WeakMap<object, { entry: CoreRegistryEntry; ref: RuntimeCoreConstructionFailureRef } | null>();
+const constructionFailures = new Map<string, { entry: CoreRegistryEntry; ref: RuntimeCoreConstructionFailureRef }>();
+const rolePreparations = new WeakMap<object, { entry: CoreRegistryEntry; planId: string }>();
+function bindConstructionFailure(error: unknown, entry: CoreRegistryEntry): RuntimeCoreConstructionFailureRef | undefined {
+  if (error === null || typeof error !== "object") return undefined;
+  const previous = constructionErrors.get(error);
+  if (previous === null || previous && previous.entry !== entry) { constructionErrors.set(error, null); return undefined; }
+  if (previous) return structuredClone(previous.ref);
+  const ref: RuntimeCoreConstructionFailureRef = { source: "core-construction-failure", processInstanceId: coreRegistryInstance, entryId: entry.fact.id, failureId: randomUUID() };
+  const binding = { entry, ref }; constructionErrors.set(error, binding); constructionFailures.set(ref.failureId, binding);
+  return structuredClone(ref);
+}
+/** Same actual error identity only; no role/root/latest matching. */
+export function inspectRuntimeConstructionFailure(error: unknown): RuntimeCoreConstructionFailureRef | undefined {
+  const binding = error !== null && typeof error === "object" ? constructionErrors.get(error) : undefined;
+  return binding ? structuredClone(binding.ref) : undefined;
+}
+/** Narrow cancellation of this actual preparation; copying plan JSON cannot revoke or issue evidence. */
+export function discardRuntimeRolePreparation(prepared: RuntimeRolePreparation, error: unknown): RuntimeCoreConstructionFailureRef | undefined {
+  const binding = prepared !== null && typeof prepared === "object" ? rolePreparations.get(prepared) : undefined;
+  if (!binding || binding.entry.fact.planId !== binding.planId) return undefined;
+  binding.entry.revoke?.(); return bindConstructionFailure(error, binding.entry);
+}
+export function recheckRuntimeConstructionFailure(ref: RuntimeCoreConstructionFailureRef): RuntimeCoreConstructionFacts | undefined {
+  const binding = ref && typeof ref === "object" ? constructionFailures.get(ref.failureId) : undefined;
+  if (!binding || ref.source !== binding.ref.source || ref.processInstanceId !== coreRegistryInstance || ref.entryId !== binding.ref.entryId) return undefined;
+  const fact = binding.entry.construction?.(); return fact ? structuredClone(fact) : undefined;
+}
+function updateCoreRegistry(entry: CoreRegistryEntry, state: CoreRegistryEntry["fact"]["state"], reasons?: readonly string[]): void {
+  const revision = (coreRootRevisions.get(entry.fact.projectRoot) ?? 0) + 1;
+  coreRootRevisions.set(entry.fact.projectRoot, revision); coreRegistryRevision++;
+  entry.fact = { ...entry.fact, state, rootRevision: revision, ...(reasons ? { reasons: [...reasons] } : {}) };
+}
+/** All actual Core preparations/binds, including judgers. No claim about other processes or native bypasses. */
+export function inspectRuntimeCoreRegistry(): RuntimeCoreRegistryFacts {
+  const entries = [...coreRegistry.values()].map(entry => {
+      try {
+        const lifecycle = entry.session?.inspectLifecycle?.();
+        const toolSurface = entry.session && entry.fact.state === "active" ? entry.session.inspectToolSurface?.() : undefined;
+        return structuredClone({ ...entry.fact, ...(entry.construction ? { construction: entry.construction() } : {}),
+          ...(lifecycle ? { lifecycle } : {}), ...(toolSurface ? { toolSurface } : {}) }); }
+      catch { return { ...entry.fact, reasons: [...entry.fact.reasons, "core-instance-inspection-failed"] }; }
+    });
+  return { source: "core-session-registry", processInstanceId: coreRegistryInstance, revision: coreRegistryRevision,
+    coverage: "current-process-only", reasons: ["external-native-and-previous-process-history-not-covered"], entries };
+}
+async function withCoreOpenLease<T>(projectRoot: string, action: (assertHeld: () => void) => Promise<T>): Promise<T> {
+  // One owner/provider coordinator, shared with Pipeline mutations; never a second lock or Interface callback.
+  const lease = beginGitHostAction({ projectRoot, kind: "session-open" });
+  if (!lease.ok) throw new Error(lease.code);
+  const assertHeld = () => { const check = checkGitHostAction({ projectRoot, leaseId: lease.leaseId, kind: "session-open" });
+    if (!check.ok) throw new Error(check.code); };
+  try { return await action(assertHeld); } finally { endGitHostAction({ projectRoot, leaseId: lease.leaseId }); }
+}
+async function readCoreProtectionScope(projectRoot: string): Promise<{ state: "required" | "unmanaged" | "unknown"; revision: number }> {
+  const port = await import("../../provider/trunk/public/trunk-store.ts") as unknown as {
+    readGitHostProtectionRequirement?: (input: { projectRoot: string }) => Promise<{ state: "required" | "unmanaged" | "unknown"; revision: number }>;
+  };
+  try {
+    const fact = await port.readGitHostProtectionRequirement?.({ projectRoot });
+    if (fact && ["required", "unmanaged", "unknown"].includes(fact.state) && Number.isSafeInteger(fact.revision) && fact.revision >= 0)
+      return { state: fact.state, revision: fact.revision };
+  } catch { /* Missing/unreadable physical authority is not an unmanaged scope. */ }
+  return { state: "unknown", revision: 0 };
+}
+/** These actual script entry points have no proven filesystem confinement profile. */
+const hasUnconfinedScriptTools = (names: readonly string[]) => names.some(name => name === "run_shell" || name === "start_background_task");
+/** Exact set equality of registry names (duplicates on the left are a mismatch). */
+const sameNameSet = (left: readonly string[], right: readonly string[]) => left.length === right.length
+  && new Set(left).size === left.length && left.every(name => right.includes(name));
+/**
+ * P1.6 §4.4：受限应用中介路径的唯一 reason 白名单/阻断集（不另维护第二份；门模块回链本口径）。
+ * 只允许与下列**包装层** reason 共存；任何其它 reason（含阻断集与未列入者）默认拒绝。
+ */
+const APPLICATION_MEDIATION_FACTORIES: Readonly<Record<"claude" | "pi" | "codex", "claude-sdk-mcp" | "pi-custom-tools" | "codex-chat">> = Object.freeze({
+  claude: "claude-sdk-mcp" as const, pi: "pi-custom-tools" as const, codex: "codex-chat" as const,
+});
+const APPLICATION_MEDIATION_COEXISTING_REASONS: Readonly<Record<"claude" | "pi" | "codex", readonly string[]>> = Object.freeze({
+  claude: Object.freeze(["native-tool-registry-binding-unverified"]),
+  pi: Object.freeze(["native-tool-registry-binding-unverified"]),
+  codex: Object.freeze(["unmediated-execution-registered"]),
+});
+/** Inputs of the wrapper's single application-mediation composition rule (P1.6 §4.4). */
+export interface RuntimeApplicationMediationCompositionInput {
+  runtime: RuntimeKind;
+  factoryProvenance: "default-production" | "custom-override" | "demo";
+  disposed: boolean;
+  /** 包装层严格路径已计算出的 reasons；`length === 0` ⇔ 严格 status 已 observed。 */
+  strictReasons: readonly string[];
+  roleId: string;
+  /** 绑定期捕获的 native 实例 id；必须与实时 `nativeLifecycle.instanceId` 一致。 */
+  nativeInstanceId?: string;
+  nativeLifecycleInstanceId?: string;
+  appTools: readonly string[];
+  configuredForeignMcpServers: readonly string[];
+  nativeFact?: RuntimeNativeToolSurfaceFacts;
+  /** 惰性读取适配器事实；只在构造门槛内调用一次，抛错按无证据处理。 */
+  applicationFact?: () => unknown;
+}
+/**
+ * 包装层构造 `applicationMediation` 的唯一规则（P1.6 §4.4「包装层构造 applicationMediation 的条件」）。
+ * 返回 `undefined` 即该证据缺席（fail-closed：缺失/不匹配一律不放行）；只有全部条件成立才返回
+ * `status:"verified"`。严格 `status` 已 observed 时不构造（避免双路径）；demo/custom factory/disposed
+ * 不构造。本函数不改变严格路径的 `status`/`nativeToolRegistry`，也不被写/发布/停稳门消费。
+ */
+export function composeRuntimeApplicationMediation(input: RuntimeApplicationMediationCompositionInput):
+  NonNullable<RuntimeSessionToolSurfaceFacts["applicationMediation"]> | undefined {
+  if (input.runtime !== "claude" && input.runtime !== "pi" && input.runtime !== "codex") return undefined;
+  const runtime = input.runtime, factory = APPLICATION_MEDIATION_FACTORIES[runtime];
+  if (input.factoryProvenance !== "default-production" || input.disposed) return undefined;
+  // 严格路径已 observed 时保持 applicationMediation 缺席，避免双路径歧义（§4.4 F15）。
+  if (input.strictReasons.length === 0) return undefined;
+  const allowed = APPLICATION_MEDIATION_COEXISTING_REASONS[runtime];
+  // 任何未列入对应 runtime 白名单的 reason（含全部阻断 reason）默认拒绝。
+  if (!input.strictReasons.every(reason => allowed.includes(reason))) return undefined;
+  let fact: unknown;
+  try { fact = input.applicationFact?.(); } catch { return undefined; }
+  if (!isRuntimeApplicationToolSurfaceFacts(fact)) return undefined;
+  if (fact.status !== "observed" || fact.reasons.length !== 0) return undefined;
+  if (fact.factory !== factory || fact.runtime !== runtime || fact.roleId !== input.roleId) return undefined;
+  if (!input.nativeInstanceId || input.nativeLifecycleInstanceId !== input.nativeInstanceId
+    || fact.nativeInstanceId !== input.nativeInstanceId) return undefined;
+  if (!sameNameSet(fact.appTools, input.appTools)
+    || !sameNameSet(fact.foreignMcpServers, input.configuredForeignMcpServers)) return undefined;
+  if (fact.nativeBuiltinTools.length !== 0) return undefined;
+  if (runtime === "codex") {
+    // Codex 追加：native 事实必须存在且绑定；chat 传输不支持外来 MCP ⇒ 配置非空即 fail-closed（N28/F19）。
+    // `unmediated-execution-registered` 只允许来自 app 级受控 shell，不得来自 native builtin/foreign。
+    if (!input.nativeFact || input.nativeFact.factory !== "codex-chat"
+      || input.nativeFact.nativeInstanceId !== input.nativeInstanceId
+      || input.nativeFact.nativeBuiltinTools.length !== 0) return undefined;
+    if (input.configuredForeignMcpServers.length > 0 || fact.foreignMcpServers.length > 0) return undefined;
+  }
+  // Amendment-1：按 P1.6 §4.4 字面填入已绑定且已核对的 nativeInstanceId（上面恒等于
+  // `fact.nativeInstanceId` 与 `input.nativeLifecycleInstanceId`）；不匹配已在门槛处 fail-closed。
+  return { kind: "application-mediated-unknown-native", status: "verified", runtime, factory,
+    observedAt: fact.observedAt, nativeInstanceId: input.nativeInstanceId, appTools: [...fact.appTools],
+    foreignMcpServers: [...fact.foreignMcpServers], nativeBuiltinTools: [...fact.nativeBuiltinTools], reasons: [] };
+}
+const roleCapabilitySlots = [
+  ["install_skill", "installSkill"], ["uninstall_skill", "uninstallSkill"],
+  ["install_mcp", "installMcp"], ["uninstall_mcp", "uninstallMcp"],
+] as const;
+const blockedRoleCapabilities = new WeakMap<Function, RuntimeRoleCapabilityTool>();
+/** Pure no-effect configuration factory. Deliberately has no old effect, permission or caller-proof parameter. */
+export function createBlockedRoleCapabilityCallbacks(): RuntimeBlockedRoleCapabilityCallbacks {
+  const make = (tool: RuntimeRoleCapabilityTool): InstallSkillFn => {
+    const callback: InstallSkillFn = async () => ({ ok: false, reason: "effect-scope-unproven", message: `${tool}: blocked; effect scope is unproven` });
+    blockedRoleCapabilities.set(callback, tool);
+    return Object.freeze(callback);
+  };
+  return Object.freeze({ installSkill: make("install_skill"), uninstallSkill: make("uninstall_skill"),
+    installMcp: make("install_mcp"), uninstallMcp: make("uninstall_mcp") });
+}
+
 
 export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAdapter {
+  const chiefDecision = options.chiefDecisionContext === undefined ? undefined : structuredClone(options.chiefDecisionContext);
+  if (chiefDecision !== undefined && (!isChiefDecisionExecutionContext(chiefDecision)
+    || options.decidePendingRequest === undefined || options.shellJudge !== undefined || options.governanceJudge !== undefined))
+    throw new Error("Invalid or conflicting real-chief decision context");
+  let chiefTurns = 0;
   if (!(RUNTIME_KINDS as readonly string[]).includes(options.runtime)) throw new Error(`未知运行时：${options.runtime}`);
   // 2026-10-18 双开关评审 §6.2：`shellJudge` 与 `governanceJudge` **恰一**——同时给出是配置错误，
   // 不静默择一（否则 shell 会话可能悄悄拿到治理工具，或反之）。
@@ -152,24 +342,50 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
     throw new Error("shellJudge 与 governanceJudge 互斥：判断会话只能注入其中一种判断能力");
   }
   const providers = new Map<ResolvedRole, Promise<{
-    adapter: RuntimeAdapter; options: RuntimeProviderOptions; display: ReturnType<typeof createToolDisplayContext>; backgroundTasks?: BackgroundTaskCapability; setTurn(id?: string, controller?: AbortController): void;
+    adapter: RuntimeAdapter; options: RuntimeProviderOptions; display: ReturnType<typeof createToolDisplayContext>; backgroundTasks?: BackgroundTaskCapability; lifecycle: RuntimeToolLifecycle; factoryProvenance: "default-production" | "custom-override" | "demo"; initialAppTools: string[]; initialToolHandlers: RuntimeProviderOptions["tools"][number]["handler"][]; initialMcpServers: string[]; protectedGitRoots?: readonly string[]; registry: CoreRegistryEntry; prepareNative(): Promise<RuntimeNativeFactoryPreparation | undefined>; isCurrent(): boolean; setAdmissionGuard(guard: () => void): void; setTurn(id?: string, controller?: AbortController): void;
+    roleCapabilityGuards(binding?: Pick<RuntimeBlockedRoleCapabilityFacts, "corePlanId" | "nativePlanId" | "nativeConfigDigest" | "sessionId">): RuntimeBlockedRoleCapabilityFacts | undefined;
+    revoke(): void; beginContinuation(): () => void;
   }>>();
   const providerFor = (role: ResolvedRole) => {
+    if (chiefDecision !== undefined && role.id !== "chief") throw new Error("Chief decision context requires trusted chief role");
     let provider = providers.get(role);
     if (provider) return provider;
     provider = (async () => {
+      const registry: CoreRegistryEntry = { fact: { id: randomUUID(), projectRoot: resolve(options.projectRoot), rootRevision: 0,
+        roleId: role.id, runtime: options.runtime, state: "preparing", reasons: [] } };
+      coreRegistry.set(registry.fact.id, registry); updateCoreRegistry(registry, "preparing");
+      const construction = { factoryEntered: false, nativeBindEntered: false, pending: 0, revoked: false, trustedPurePreparation: false };
+      registry.construction = () => {
+        const reasons: string[] = [];
+        if (!construction.trustedPurePreparation) reasons.push("official-pure-preparation-unproven");
+        if (!construction.revoked) reasons.push("preparation-not-revoked");
+        if (construction.factoryEntered || construction.nativeBindEntered) reasons.push("effect-construction-boundary-entered");
+        if (construction.pending) reasons.push("construction-continuation-pending");
+        return { source: "core-construction-boundaries", status: registry.fact.sessionId ? "instance-bound" : reasons.length ? "possibly-started" : "never-started",
+          factoryEntered: construction.factoryEntered, nativeBindEntered: construction.nativeBindEntered, pendingContinuations: construction.pending,
+          preparedTokensRevoked: construction.revoked, reasons };
+      };
+      const publishConstruction = () => updateCoreRegistry(registry, registry.fact.state);
+      const revoke = () => { construction.revoked = true; if (providers.get(role) === provider) providers.delete(role); publishConstruction(); };
+      registry.revoke = revoke;
+      const beginContinuation = () => { construction.pending++; publishConstruction(); let ended = false;
+        return () => { if (!ended) { ended = true; construction.pending--; publishConstruction(); } }; };
       let turnId: string | undefined;
       let controller: AbortController | undefined;
       const interactionGate = createInteractionGate();
+      const lifecycle = createRuntimeToolLifecycle();
+      // Host-only defensive roots; the snapshot is not proof that discovery is complete.
+      const protectedGitRoots = options.protectedGitRoots === undefined ? undefined : Object.freeze([...options.protectedGitRoots]);
+      const roleCapabilityCallbacks = Object.fromEntries(roleCapabilitySlots.map(([, key]) => [key, options[key]])) as Partial<RuntimeBlockedRoleCapabilityCallbacks>;
       const display = createToolDisplayContext({credentialEnvNames:[...(options.extraCredentialEnvVars ?? []),...(options.apiKeyEnvVar ? [options.apiKeyEnvVar] : [])],requireProfile:true});
-      const storage = options.persistSession ? createRuntimeSessionStore({ projectRoot: options.projectRoot, roleId: role.id, runtime: options.runtime }) : undefined;
+      const storage = options.persistSession && chiefDecision === undefined ? createRuntimeSessionStore({ projectRoot: options.projectRoot, roleId: role.id, runtime: options.runtime }) : undefined;
       const shellJudge = options.shellJudge;
       const governanceJudge = options.governanceJudge;
       const judgeTools = shellJudge ?? governanceJudge;
       // 后台任务管理器（2026-10-22 B1/B3）：只在**普通受治理会话**（走 buildGovernedTools）且注入了
       // `ShellGate` 时创建——与四工具注册同判据；判断会话不创建管理器（结构性看不到四工具）。
       // `RuntimeSessionOptions` 已 Omit `backgroundTasks`，外部调用方不能自行注入。
-      const backgroundTasks = judgeTools === undefined && options.shellGate !== undefined
+      const backgroundTasks = chiefDecision === undefined && judgeTools === undefined && options.shellGate !== undefined
         ? createBackgroundTaskManager({ diagnostics: options.diagnostics })
         : undefined;
       // 2026-10-27 同轮看图设计：按运行时策略决定 `view_image` 的交付方式（唯一开关＝
@@ -183,17 +399,32 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           ? async () => ({ ok: true, mode: "tool-result" as const })
           : options.viewImage;
       try {
+        const chiefWorkflow = role.id === "chief" && role.kind === "built-in-governance" && chiefDecision === undefined && judgeTools === undefined
+          ? await loadBuiltinChiefWorkflow() : undefined;
+        const contextSections = chiefWorkflow ? Object.freeze([...(options.contextSections ?? []),
+          `## 应用内置 Chief workflow（非授权流程指导）\n${JSON.stringify({ sourceUrl: chiefWorkflow.sourceUrl, moduleUrl: chiefWorkflow.moduleUrl,
+            resourceVersion: chiefWorkflow.version, sha256: chiefWorkflow.sha256, bytes: chiefWorkflow.bytes, applicationVersion: chiefWorkflow.applicationVersion })}\n\n${chiefWorkflow.text}`]) : options.contextSections;
         // 判断 agent：**能力注入，不是工具注入**——注入 `shellJudge` 时只走 `buildShellJudgeTools`
         // （恰三只只读工具）；注入 `governanceJudge` 时只走 `buildGovernanceJudgeTools`
         // （恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`）。两者都**不得**走
         // `buildGovernedTools`（结构性隔离：判断会话不存在 write_file/edit_file/read_file/run_shell/
         // 客户交互/回交/派发/MCP 工具）。二者互斥在 createRuntimeAdapter 入口已检查。
-        const tools = shellJudge !== undefined
+        const sessionTools = chiefDecision !== undefined
+          ? buildChiefDecisionTools(options.decidePendingRequest!, chiefDecision).map(tool => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
+            const signal = controller?.signal;
+            if (turnId === undefined || signal?.aborted) return { ok: false, message: "chief decision turn inactive or aborted" };
+            return tool.handler({ ...call, signal: call.signal && signal ? AbortSignal.any([call.signal, signal]) : signal ?? call.signal });
+          } }))
+          : shellJudge !== undefined
           ? buildShellJudgeTools(shellJudge)
           : governanceJudge !== undefined
             ? buildGovernanceJudgeTools(governanceJudge)
             : buildGovernedTools(options.gate, {
               ...options,
+              ...roleCapabilityCallbacks,
+              protectedGitRoots,
+              projectRoot: options.projectRoot,
+              skillRoot: options.skillRoot,
               // 运行时也覆盖为 Service 自己的管理器（类型已 Omit；JS 调用方即便夹带同名字段也不会被采用）。
               backgroundTasks,
               // 图片策略同理由 Service 单一决定（RuntimeSessionOptions 已 Omit viewImagePolicy）。
@@ -206,11 +437,15 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               roleId: role.id,
               currentTurnId: () => turnId,
               interactionGate,
-            }).map((tool) => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
+            }, lifecycle).map((tool) => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
               const signal = controller?.signal;
               if (turnId === undefined || signal?.aborted) return { ok: false, message: `${tool.name}：本轮未运行或已中止，未执行` };
               return tool.handler({ ...call, signal: signal && call.signal ? AbortSignal.any([signal, call.signal]) : signal ?? call.signal });
             } }));
+        const tools = sessionTools.map(tool => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
+          const end = lifecycle.beginTool(tool.name, turnId);
+          try { return await tool.handler(call); } finally { end(); }
+        } }));
         // G-5：推理强度（wave 1 接线）——按运行时读 env（`ANS_CLAUDE/CODEX/PI_REASONING_EFFORT`）并
         // 归一（**纯读**，providerFor 每次重建即重读＝「改设置 ⇒ 下次开会话生效」沿既有语义）。非法值＝
         // **按未设处理**（本层不注入字段）＋诊断如实；**绝不因偏好值坏件拒开会话/毁轮次**（偏好不是
@@ -222,6 +457,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         const providerOptions: RuntimeProviderOptions = {
           runtime: options.runtime, projectRoot: options.projectRoot, skillRoot: options.skillRoot,
           tools, storage, interactionGate, currentTurnId: () => turnId,
+          protectedGitRoots,
           toolDisplayMode:"required-v1", projectToolEvent:display.projectToolEvent, registerToolDisplayProfile:display.registerToolDisplayProfile, toolDisplayCredentialEnvNames:display.credentialEnvNames,
           modelId: options.modelId, baseUrl: options.baseUrl, providerId: options.providerId, apiKeyEnvVar: options.apiKeyEnvVar,
           // G-4 V2（wave A）：按角色读取 `docs/mcp/**` 声明并随会话注入（**纯读**——绝不建目录；坏件由
@@ -230,14 +466,14 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           // 判断 agent 会话（shell judge 或治理 judge）：`judgeMode:true` ＋ `installedMcpServers:[]`——
           // 外来 MCP 一律不装配（PM 评审 §6.1；2026-10-18 双开关评审 §6.2 对两者一致；
           // Claude 适配器据此强制关闭 WebSearch/外来 MCP）。
-          ...(judgeTools !== undefined
+          ...(judgeTools !== undefined || chiefDecision !== undefined
             ? { judgeMode: true as const, installedMcpServers: [] as const }
             : { installedMcpServers: listInstalledMcpServers(options.projectRoot, role.id) }),
           // G-5：仅 `set` 态注入字段；`unset`/`invalid` 保持字段缺席，交各平台默认策略。
           ...(reasoningEffort.state === "set" ? { reasoningEffort: reasoningEffort.effort } : {}),
-          // 治理权力矩阵（C2）：纯展示通道；仅编排在会话绑定时注入，未定义不下发字段（逐字现状）。
-          // 空数组是否拼接由适配器按「非空才拼」处理（本层不做判定）。
-          ...(options.contextSections !== undefined ? { contextSections: options.contextSections } : {}),
+          // Host non-authorizing context: Pipeline's existing matrix plus Service's single application Chief resource.
+          // Adapters concatenate only; no workflow text becomes a gate input or an execution capability.
+          ...(contextSections !== undefined ? { contextSections } : {}),
           ...resolveRuntimeTimeouts(options.runtime, options),
           // P1 请求级超时：宿主/测试注入才覆盖；缺省由适配器用 90s/300s（单一来源
           // `runtime-core/request-timeout.ts`）。Pi/Codex 不改超时语义（Q10）。
@@ -252,14 +488,108 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           ...(options.requestRetryBaseMs !== undefined ? { requestRetryBaseMs: options.requestRetryBaseMs } : {}),
           ...(options.requestRetryMaxDelayMs !== undefined ? { requestRetryMaxDelayMs: options.requestRetryMaxDelayMs } : {}),
           ...(options.requestRetryBudgetMs !== undefined ? { requestRetryBudgetMs: options.requestRetryBudgetMs } : {}),
+          ...(chiefDecision !== undefined ? { chiefDecisionContext: chiefDecision, requestAttemptMax: 1, requestRetryBudgetMs: chiefDecision.limits.timeoutMs,
+            turnLastResortMs: chiefDecision.limits.timeoutMs, constructTimeoutMs: chiefDecision.limits.timeoutMs } : {}),
         };
-        const factory = options.providerFactories?.[options.runtime] ?? (options.runtime === "demo"
+        const factoryOverride = options.providerFactories?.[options.runtime];
+        const factoryProvenance = factoryOverride !== undefined ? "custom-override" as const
+          : options.runtime === "demo" ? "demo" as const : "default-production" as const;
+        const initialAppTools = tools.map(tool => tool.name);
+        const initialToolHandlers = tools.map(tool => tool.handler);
+        const initialMcpServers = providerOptions.installedMcpServers?.map(server => server.name) ?? [];
+        const factory = factoryOverride ?? (options.runtime === "demo"
           ? ((input: RuntimeProviderOptions) => createDemoRuntimeAdapter(input, options.script ?? [{ name: "write_file", args: { path: "src/evil.ts", content: "// 越界写入示例\n" } }]))
           : await defaultFactory(options.runtime));
         if (typeof providerOptions.projectToolEvent !== "function" || typeof providerOptions.registerToolDisplayProfile !== "function") throw new Error("Core tool display capability missing");
-        const adapter = await factory(providerOptions);
-        return { adapter, display, options: providerOptions, backgroundTasks, setTurn(id?: string, nextController?: AbortController) { turnId = id; controller = nextController; } };
+        let actual: Promise<RuntimeAdapter> | undefined, nativePreparation: RuntimeNativeFactoryPreparation | undefined;
+        let admittedScope: Awaited<ReturnType<typeof readCoreProtectionScope>> | undefined;
+        let assertAdmission: () => void = () => { throw new Error("runtime-core-admission-missing"); };
+        const optionSnapshot = Object.entries(options), roleSnapshot = JSON.stringify(role);
+        const isCurrent = () => !construction.revoked && Object.keys(options).length === optionSnapshot.length
+          && optionSnapshot.every(([key, value]) => (options as unknown as Record<string, unknown>)[key] === value)
+          && options.providerFactories?.[options.runtime] === factoryOverride && JSON.stringify(role) === roleSnapshot
+          && providerOptions.tools.length === initialAppTools.length
+          && providerOptions.tools.every((tool, index) => tool.name === initialAppTools[index] && tool.handler === initialToolHandlers[index])
+          && (!nativePreparation || nativePreparation.isCurrent());
+        const roleCapabilityGuards = (binding: Pick<RuntimeBlockedRoleCapabilityFacts, "corePlanId" | "nativePlanId" | "nativeConfigDigest" | "sessionId"> = {}): RuntimeBlockedRoleCapabilityFacts | undefined => {
+          const registered = roleCapabilitySlots.filter(([tool]) => initialAppTools.includes(tool));
+          if (!registered.length) return undefined;
+          const guardedTools: RuntimeRoleCapabilityTool[] = [], unguardedTools: RuntimeRoleCapabilityTool[] = [], reasons: string[] = [];
+          let drift = false;
+          try { drift = JSON.stringify(role) !== roleSnapshot || providerOptions.tools.length !== initialAppTools.length
+            || providerOptions.tools.some((tool, index) => tool.name !== initialAppTools[index] || tool.handler !== initialToolHandlers[index]); }
+          catch { drift = true; }
+          if (drift) reasons.push("role-or-core-registry-drift");
+          for (const [tool, key] of registered) {
+            const callback = roleCapabilityCallbacks[key];
+            let current = false;
+            try { current = options[key] === callback; } catch { /* Unreadable host binding stays unproven. */ }
+            if (!drift && current && typeof callback === "function" && blockedRoleCapabilities.get(callback) === tool) guardedTools.push(tool);
+            else { unguardedTools.push(tool); reasons.push(`${tool}-callback-identity-unverified`); }
+          }
+          return { source: "core-blocked-role-capability-callbacks", mechanism: "no-effect-rejection-v1", status: reasons.length ? "unknown" : "bound",
+            roleId: registry.fact.roleId, runtime: registry.fact.runtime,
+            registryDigest: createHash("sha256").update(JSON.stringify({ roleId: registry.fact.roleId, runtime: registry.fact.runtime, initialAppTools, guardedTools, unguardedTools })).digest("hex"),
+            guardedTools, unguardedTools, reasons, ...binding };
+        };
+        const assertRoleCapabilityScope = (scope: Awaited<ReturnType<typeof readCoreProtectionScope>>) => {
+          if (scope.state === "required" && roleCapabilityGuards()?.status === "unknown") throw new Error("required-scope-role-capability-effects-unproven");
+        };
+        const ensureAdapter = () => actual ??= (async () => {
+          const end = beginContinuation();
+          try {
+          if (construction.revoked) throw new Error("runtime-preparation-revoked");
+          assertAdmission();
+          const scope = await readCoreProtectionScope(options.projectRoot);
+          if (scope.state === "unknown" || scope.state === "required" && !nativePreparation && options.runtime !== "demo")
+            throw new Error("runtime-protected-scope-requires-verified-plan");
+          if (scope.state === "required" && hasUnconfinedScriptTools(initialAppTools)) throw new Error("required-scope-unconfined-script-tools");
+          assertRoleCapabilityScope(scope);
+          admittedScope = scope;
+          updateCoreRegistry(registry, "creating", nativePreparation ? [] : ["legacy-bind-without-precreation-plan"]);
+          if (nativePreparation) { if (!isCurrent() || !nativePreparation.adapter) throw new Error("runtime-prepared-configuration-changed"); return nativePreparation.adapter; }
+          construction.factoryEntered = true; publishConstruction();
+          return await (chiefDecision === undefined ? factory(providerOptions)
+            : withTimeout(Promise.resolve(factory(providerOptions)), chiefDecision.limits.timeoutMs, "构造chief决策上下文"));
+          } finally { end(); }
+        })();
+        const verifyScope = async () => { const scope = await readCoreProtectionScope(options.projectRoot);
+          if (!admittedScope || scope.state === "unknown" || scope.state !== admittedScope.state || scope.revision !== admittedScope.revision)
+            throw new Error("runtime-protection-scope-changed");
+          if (scope.state === "required" && hasUnconfinedScriptTools(initialAppTools)) throw new Error("required-scope-unconfined-script-tools");
+          assertRoleCapabilityScope(scope);
+          if (construction.revoked) throw new Error("runtime-preparation-revoked");
+          assertAdmission(); };
+        const adapter: RuntimeAdapter = { async composeContext(boundRole) { const end = beginContinuation();
+          try { const materialized = await ensureAdapter(); await verifyScope(); return await materialized.composeContext(boundRole); }
+          catch (error) { revoke(); bindConstructionFailure(error, registry); updateCoreRegistry(registry, "failed", ["core-context-construction-failed"]); throw error; }
+          finally { end(); } },
+          async bindRole(boundRole) { const end = beginContinuation();
+            try { const materialized = await ensureAdapter(); await verifyScope(); construction.nativeBindEntered = true; publishConstruction(); return await materialized.bindRole(boundRole); }
+            finally { end(); } } };
+        const prepareNative = async () => {
+          const end = beginContinuation(); try {
+          if (construction.revoked) throw new Error("runtime-preparation-revoked");
+          if (nativePreparation && isCurrent()) return nativePreparation;
+          if (actual || factoryProvenance !== "default-production" || options.runtime !== "codex") return undefined;
+          const module = await import("../../provider/codex/session.ts") as unknown as {
+            prepareCodexRuntimeAdapter?: import("../../model/runtime.ts").RuntimeNativeFactoryPlanner;
+          };
+          if (!module.prepareCodexRuntimeAdapter) return undefined;
+          const prepared = await module.prepareCodexRuntimeAdapter(providerOptions, role);
+          construction.trustedPurePreparation = !!prepared.adapter && prepared.facts.status === "observed" && prepared.facts.factory === "codex-chat"
+            && prepared.facts.transport === "http" && prepared.facts.wire === "chat" && prepared.facts.foreignMcpServers.length === 0
+            && prepared.facts.nativeBuiltinTools.length === 0 && prepared.facts.plannedProcesses.length === 0 && prepared.facts.reasons.length === 0;
+          nativePreparation = prepared; return prepared;
+          } finally { end(); }
+        };
+        return { adapter, display, options: providerOptions, backgroundTasks, lifecycle, factoryProvenance, initialAppTools, initialToolHandlers, initialMcpServers, protectedGitRoots, registry, prepareNative, isCurrent, roleCapabilityGuards,
+          revoke, beginContinuation,
+          setAdmissionGuard(guard: () => void) { assertAdmission = guard; },
+          setTurn(id?: string, nextController?: AbortController) { turnId = id; controller = nextController; } };
       } catch (error) {
+        revoke(); bindConstructionFailure(error, registry);
+        updateCoreRegistry(registry, "failed", ["core-preparation-failed-resource-coverage-unknown"]);
         // 构造/工厂失败也要释放管理器（生命周期与绑定会话对齐；dispose 幂等）。
         await backgroundTasks?.dispose();
         throw error;
@@ -268,36 +598,69 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
     providers.set(role, provider);
     return provider;
   };
-  return {
-    async composeContext(role) { return (await providerFor(role)).adapter.composeContext(role); },
-    async bindRole(role) {
+  const preparedTokens = new WeakMap<object, { role: ResolvedRole; plan: RuntimeCreationPlanFacts; used: boolean; provider: Awaited<ReturnType<typeof providerFor>> }>();
+  const bindRole = async (role: ResolvedRole, creationPlan: RuntimeCreationPlanFacts | undefined, assertHeld: () => void): Promise<RoleSession> => {
       const provider = await providerFor(role);
+      provider.setAdmissionGuard(assertHeld);
       const storage = provider.options.storage;
       let previous: RuntimeSessionRecord | undefined;
       let inner: RoleSession;
+      let constructed: RoleSession | undefined;
+      const endAttempt = provider.beginContinuation();
       try {
         previous = await storage?.readLatest();
         inner = await withTimeout(provider.adapter.bindRole(role), provider.options.constructTimeoutMs ?? 120000, `${options.runtime} 建立角色会话`);
+        constructed = inner;
         try { provider.display.assertReady(); } catch (error) { await inner.dispose(); throw error; }
+        if (creationPlan?.native) {
+          const actual = inner.inspectNativeToolSurface?.();
+          if (!provider.isCurrent() || !isRuntimeNativeToolSurfaceFacts(actual)
+            || actual.factoryPlan?.planId !== creationPlan.native.planId || actual.factoryPlan?.configDigest !== creationPlan.native.configDigest
+            || actual.roleId !== role.id || actual.runtime !== options.runtime || actual.status !== "observed" || actual.factory !== "codex-chat"
+            || actual.nativeInstanceId !== inner.nativeLifecycle?.instanceId || actual.foreignMcpServers.length || actual.nativeBuiltinTools.length
+            || actual.appTools.length !== creationPlan.native.appTools.length || actual.appTools.some(name => !creationPlan.native!.appTools.includes(name))) {
+            await inner.dispose(); throw new Error("runtime-native-factory-plan-binding-unverified");
+          }
+        }
       } catch (error) {
+        provider.revoke(); bindConstructionFailure(error, provider.registry);
+        updateCoreRegistry(provider.registry, "failed", ["core-construction-failed-resource-coverage-unknown"]);
+        try { await constructed?.dispose(); } catch { /* Retain failed/unknown resource facts, never an empty success. */ }
         // bindRole / assertReady 失败也要释放管理器（后台任务生命周期与绑定会话对齐；dispose 幂等）。
         await provider.backgroundTasks?.dispose();
         throw error;
-      }
+      } finally { endAttempt(); }
+      let nativeLifecycle: RuntimeNativeLifecycle | undefined;
+      let nativeInstanceId: string | undefined;
+      try { nativeLifecycle = inner.nativeLifecycle; nativeInstanceId = nativeLifecycle?.instanceId; }
+      catch { /* An unreadable hook remains unknown; do not infer no native processes. */ }
       providers.delete(role); // Each bound session owns its own turn/controller/tool closure.
       const queue = createEventQueue<SessionEvent>();
       const recordId = previous?.id ?? randomUUID();
+      const sessionId = randomUUID();
       const createdAt = previous?.createdAt ?? new Date().toISOString();
-      type Turn = { plan?:DeliveryPlan; id: string; controller: AbortController; outcome: RuntimeTurnOutcome; outcomeLocked?: boolean; terminal: () => void; terminalPromise: Promise<void>; abortPromise?: Promise<void>; cleanupFailed?: boolean; attempts?: number; replaySafe?: boolean };
+      type Turn = { plan?:DeliveryPlan; id: string; controller: AbortController; outcome: RuntimeTurnOutcome; outcomeLocked?: boolean; terminal: () => void; terminalPromise: Promise<void>; abortPromise?: Promise<void>; cleanupFailed?: boolean; attempts?: number; replaySafe?: boolean; providerStarted?: boolean; providerFinished?: boolean; promptFinalized?: boolean; rawSettledAt?: string };
       let active: Turn | undefined;
+      let latestTurn: Turn | undefined;
+      let stopRequested = false;
+      let stopSealed = false;
+      let stopCleanupPending = 0;
+      const stopCleanupErrors: string[] = [];
+      const backgroundObserved = new Map<string, RuntimeOwnedProcessFact>();
+      const backgroundClosed = new Set<string>();
       let disposed = false;
+      let disposalReceipt: RuntimeSessionLifecycleFacts | undefined;
+      let disposalConstraints: string[] | undefined;
+      let disposalCleanupPending = false;
+      let replayWritesPending = 0;
+      let disposalFingerprint = "";
       let quarantined = false;
       let streamEnded = false;
       let pendingPersist = Promise.resolve();
       let persistenceError: unknown;
       let deliveryPreflight=false;
       const endedTurns=new Set<string>();
-      const persistence=createPersistenceState({scope:{roleId:role.id,runtime:options.runtime},projectRoot:options.projectRoot,storage,display:provider.display,diagnostics:options.diagnostics,ended:endedTurns,disposed:()=>disposed,active:()=>!!active||deliveryPreflight});
+      const persistence=createPersistenceState({scope:{roleId:role.id,runtime:options.runtime},projectRoot:options.projectRoot,storage,display:provider.display,diagnostics:options.diagnostics,ended:endedTurns,disposed:()=>disposed,active:()=>!!active||deliveryPreflight,onDrain:()=>refreshDisposalEvidence()});
       const requestAbort = (turn: Turn): Promise<void> => {
         if (!turn.abortPromise) {
           turn.abortPromise = withTimeout(Promise.resolve().then(() => inner.abort?.()), 1000, "中止清理").catch((error) => {
@@ -308,6 +671,100 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         }
         return turn.abortPromise;
       };
+      const collectLifecycle = (afterDisposal = false): RuntimeSessionLifecycleFacts => {
+        const reasons: string[] = [];
+        let unknown = false;
+        let coverageUnknown = false;
+        let toolFacts: ReturnType<RuntimeToolLifecycle["snapshot"]> = { activeTools: [], processes: [] };
+        try { toolFacts = provider.lifecycle.snapshot(); }
+        catch { reasons.push("tool-lifecycle-read-failed"); unknown = true; coverageUnknown = true; }
+        if (disposed && !afterDisposal) { reasons.push("disposed-lifecycle-evidence-unavailable"); unknown = true; coverageUnknown = true; }
+        if (provider.backgroundTasks && !disposed) {
+          try {
+            const tasks = provider.backgroundTasks.list();
+            if (!Array.isArray(tasks)) throw new Error("background list unavailable");
+            for (const task of tasks) {
+              const exited = backgroundClosed.has(task.taskId) || task.state === "exited" || task.state === "stopped";
+              backgroundObserved.set(task.taskId, { id: task.taskId, kind: "background", state: exited ? "exited" : task.state === "running" ? "running" : "unknown",
+                treeStatus: "unknown", ...(task.pid !== undefined ? { pid: task.pid } : {}),
+                ...(task.exitCode !== undefined ? { exitCode: task.exitCode } : {}), ...(task.signal ? { signal: task.signal } : {}) });
+            }
+            if (provider.backgroundTasks.runningCount > tasks.filter(task => task.state === "running" || task.state === "kill-timeout" || task.state === "failed").length) {
+              reasons.push("background-start-not-yet-observed");
+              coverageUnknown = true;
+            }
+          } catch { reasons.push("background-lifecycle-read-failed"); unknown = true; coverageUnknown = true; }
+        }
+        const processes = [...toolFacts.processes, ...backgroundObserved.values()];
+        const activeTools = [...toolFacts.activeTools];
+        let nativeFacts: RuntimeNativeLifecycleFacts | undefined;
+        if (options.runtime !== "demo") {
+          try {
+            const native = nativeLifecycle?.inspect();
+            if (!isRuntimeNativeLifecycleFacts(native) || !nativeInstanceId || native.instanceId !== nativeInstanceId
+              || nativeLifecycle?.instanceId !== nativeInstanceId || native.roleId !== role.id || native.runtime !== options.runtime
+              || (inner.nativeSessionId !== undefined && native.nativeSessionId !== inner.nativeSessionId)
+              || (latestTurn?.providerStarted && native.coreTurnId !== latestTurn.id)) {
+              reasons.push("native-provider-process-coverage-unavailable"); unknown = true; coverageUnknown = true;
+            } else {
+              nativeFacts = structuredClone(native);
+              if (native.processCoverage !== "complete") coverageUnknown = true;
+              if (native.transport.kind === "unknown" || native.transport.kind === "owned-process" && native.promptState !== "not-started"
+                && !native.processes.some(process => process.kind === "native")) coverageUnknown = true;
+              processes.push(...nativeFacts.processes); activeTools.push(...nativeFacts.activeTools);
+              const promptProven = native.promptState === "settled" && !!native.settledAt
+                || native.promptState === "not-started" && !latestTurn?.providerStarted;
+              const transportProven = native.transport.kind !== "unknown" && (native.transport.state === "idle" || native.transport.state === "closed")
+                && (native.transport.kind !== "owned-process" || native.promptState === "not-started"
+                  || native.transport.state === "closed" && native.processes.some(process => process.kind === "native"));
+              if (native.status !== "quiescent" || !promptProven || !transportProven || native.processCoverage !== "complete"
+                || native.activeTools.length || native.processes.some(process => process.state !== "exited" || process.treeStatus !== "verified")
+                || native.reasons.length) {
+                reasons.push("native-provider-not-proven-quiescent", ...native.reasons.map(reason => `native:${reason}`)); unknown = true;
+              }
+            }
+          } catch { reasons.push("native-provider-lifecycle-read-failed"); unknown = true; coverageUnknown = true; }
+        }
+        if (activeTools.length) reasons.push("active-tool-or-capability-work");
+        if (processes.some(process => process.state !== "exited")) reasons.push("owned-process-not-exited");
+        if (processes.some(process => process.treeStatus !== "verified")) reasons.push("process-tree-unverified");
+        if (processes.some(process => process.state === "unknown" || (process.state === "exited" && process.treeStatus !== "verified"))) unknown = true;
+        if (processes.some(process => process.state === "unknown" || process.treeStatus !== "verified")) coverageUnknown = true;
+        const turn = latestTurn;
+        if (turn?.providerStarted && !turn.providerFinished) reasons.push("provider-still-running");
+        if (turn && !turn.promptFinalized) reasons.push("core-turn-not-drained");
+        if (turn?.providerStarted && !turn.rawSettledAt) {
+          reasons.push("real-provider-settled-not-observed");
+          if (turn.providerFinished) unknown = true;
+        }
+        if (deliveryPreflight) reasons.push("delivery-preflight-in-flight");
+        if (replayWritesPending) reasons.push("replay-write-pending");
+        if (persistence.pendingWrites()) reasons.push("persistence-callback-in-flight");
+        if (disposed && !streamEnded) reasons.push("provider-event-pump-not-drained");
+        if (disposed && disposalCleanupPending) reasons.push("dispose-cleanup-pending");
+        if (stopCleanupPending) reasons.push("stop-cleanup-pending");
+        if (stopCleanupErrors.length) { reasons.push(...stopCleanupErrors); unknown = true; coverageUnknown = true; }
+        return { sessionId, roleId: role.id, runtime: options.runtime, ...(turn ? { turnId: turn.id } : {}), stopRequested,
+          status: reasons.length === 0 ? "quiescent" : unknown ? "unknown" : "stopping",
+          ...(turn?.rawSettledAt ? { settledAt: turn.rawSettledAt, settledTurnId: turn.id } : {}),
+          providerFinished: !turn?.providerStarted || turn.providerFinished === true,
+          activeTools, processes, ...(nativeFacts ? { native: nativeFacts } : {}),
+          // Coverage answers which owned programs are known, independently of whether this HTTP/Core turn has drained.
+          processCoverage: coverageUnknown ? "unknown" : "complete", reasons };
+      };
+      function refreshDisposalEvidence(): void {
+        if (!disposed || !disposalConstraints) return;
+        const terminal = collectLifecycle(true), reasons = [...terminal.reasons, ...disposalConstraints];
+        disposalReceipt = { ...terminal, ...(disposalConstraints.length ? { processCoverage: "unknown" as const } : {}),
+          ...(reasons.length || terminal.status !== "quiescent" ? { status: "unknown" as const,
+            reasons: [...reasons, "disposed-lifecycle-evidence-unavailable"] } : {}) };
+        const fingerprint = JSON.stringify({ ...disposalReceipt, ...(disposalReceipt.native ? { native: { ...disposalReceipt.native, observedAt: undefined } } : {}) });
+        provider.registry.fact = { ...provider.registry.fact, lifecycle: structuredClone(disposalReceipt) };
+        if (fingerprint !== disposalFingerprint) { disposalFingerprint = fingerprint; updateCoreRegistry(provider.registry, provider.registry.fact.state); }
+        // Unknown work retains its actual observer. Only a genuinely drained terminal instance can release it.
+        if (disposalReceipt.status === "quiescent") delete provider.registry.session;
+      }
+      const inspectLifecycle = (): RuntimeSessionLifecycleFacts => { refreshDisposalEvidence(); return disposalReceipt ? structuredClone(disposalReceipt) : collectLifecycle(); };
       const emit = (inputEvent: SessionEvent, plan:DeliveryPlan|undefined=active?.plan, visible=true) => {
         let event = inputEvent.kind === "tool_call" || inputEvent.kind === "accepted" || inputEvent.kind === "denied" ? routeRuntimeDisplayEvent(inputEvent,provider.display,"projected-event") : inputEvent;
         // G-5 推理事实通道**单点**：`detail.source==="reasoning"` 的原始事实在此恰一次过核心投影
@@ -328,15 +785,19 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             storedEvent={...event,detail};
           }
           const entry=persistence.captureEntry(plan,{at:new Date().toISOString(),kind:'event',event:storedEvent,turnId:storedEvent.turnId});
-          pendingPersist=pendingPersist.then(()=>{if(plan&&persistenceError)return;return storage.appendReplay([entry]);}).catch(error=>{persistenceError??=error;});
+          replayWritesPending++;
+          pendingPersist=pendingPersist.then(()=>{if(plan&&persistenceError)return;return storage.appendReplay([entry]);}).catch(error=>{persistenceError??=error;})
+            .finally(()=>{replayWritesPending--;refreshDisposalEvidence();});
         }
       };
       const pump = (async () => {
         try {
           for await (const event of inner.events()) {
-            const turn = active;
+            const turn = active ?? (event.kind === "settled" ? latestTurn : undefined);
             if (!turn || (event.turnId && event.turnId !== turn.id)) continue;
             if (event.kind === "settled") {
+              turn.rawSettledAt = new Date().toISOString();
+              refreshDisposalEvidence();
               const detail = event.detail as { outcome?: unknown; attempts?: unknown; replaySafe?: unknown } | undefined;
               const outcome = detail?.outcome;
               if (!turn.outcomeLocked && ["failed", "aborted", "timed_out"].includes(String(outcome))) turn.outcome = outcome as RuntimeTurnOutcome;
@@ -355,16 +816,148 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             if (!active.outcomeLocked) active.outcome = "failed";
             emit({ kind: "denied", summary: `事件流失败：${error instanceof Error ? error.message : String(error)}`, runtime: options.runtime, roleId: role.id, turnId: active.id });
           }
-        } finally { streamEnded = true; active?.terminal(); }
+        } finally { streamEnded = true; active?.terminal(); refreshDisposalEvidence(); }
       })();
       const wrapper: RoleSession = {
+        sessionId,
+        inspectLifecycle,
+        inspectToolSurface() {
+          let appTools: string[] = [], configuredForeignMcpServers: string[] = [];
+          const reasons: string[] = [];
+          let native: RuntimeNativeToolSurfaceFacts | undefined;
+          let nativeToolRegistry: "application-mediated" | "unknown" = "unknown";
+          try {
+            if (!Array.isArray(provider.options.tools) || !Array.isArray(provider.options.installedMcpServers)) throw new Error("registry unavailable");
+            appTools = provider.options.tools.map(tool => tool.name);
+            configuredForeignMcpServers = provider.options.installedMcpServers.map(server => server.name);
+            if ([...appTools, ...configuredForeignMcpServers].some(name => typeof name !== "string" || !name.trim())) throw new Error("invalid registry name");
+            if (!sameNameSet(appTools, provider.initialAppTools) || !sameNameSet(configuredForeignMcpServers, provider.initialMcpServers)) reasons.push("core-registry-changed-after-factory");
+            if (provider.options.tools.some((tool, index) => tool.handler !== provider.initialToolHandlers[index])) reasons.push("core-tool-handler-changed-after-factory");
+          } catch { reasons.push("core-registry-read-failed"); }
+          if (options.runtime !== "demo") {
+            try {
+              const observed = inner.inspectNativeToolSurface?.();
+              if (isRuntimeNativeToolSurfaceFacts(observed)) native = structuredClone(observed);
+              if (provider.factoryProvenance !== "default-production") reasons.push("custom-provider-factory-unverified");
+              if (!native || !nativeLifecycle || !nativeInstanceId || nativeLifecycle.instanceId !== nativeInstanceId
+                || native.nativeInstanceId !== nativeInstanceId || native.roleId !== role.id || native.runtime !== options.runtime)
+                reasons.push("native-tool-registry-binding-unverified");
+              else {
+                const lifecycle = nativeLifecycle.inspect();
+                if (!isRuntimeNativeLifecycleFacts(lifecycle) || lifecycle.instanceId !== nativeInstanceId
+                  || lifecycle.roleId !== role.id || lifecycle.runtime !== options.runtime || lifecycle.transport.kind !== "http"
+                  || lifecycle.status === "unknown" || lifecycle.promptState === "unknown"
+                  || lifecycle.processCoverage !== "complete" || lifecycle.processes.length > 0
+                  || lifecycle.activeTools.some(tool => !appTools.includes(tool.name))) reasons.push("native-tool-execution-coverage-unverified");
+                if (options.runtime !== "codex" || native.factory !== "codex-chat" || native.status !== "observed" || native.reasons.length)
+                  reasons.push("native-production-tool-factory-unverified");
+                if (!sameNameSet(native.appTools, appTools) || !sameNameSet(native.foreignMcpServers, configuredForeignMcpServers)) reasons.push("native-tool-registry-mismatch");
+                if (native.nativeBuiltinTools.length || native.foreignMcpServers.length || configuredForeignMcpServers.length
+                  || appTools.includes("run_shell") || appTools.includes("start_background_task")) reasons.push("unmediated-execution-registered");
+                const coreWork = provider.lifecycle.snapshot();
+                if (coreWork.processes.some(process => process.state !== "exited" || process.treeStatus !== "verified")
+                  || (provider.backgroundTasks && (provider.backgroundTasks.runningCount !== 0
+                    || provider.backgroundTasks.list().some(task => task.state !== "exited" && task.state !== "stopped")))) reasons.push("owned-execution-program-not-proven-stopped");
+              }
+            } catch { reasons.push("native-tool-surface-read-failed"); }
+          }
+          if (disposed) reasons.push("disposed-registry-not-current");
+          const roleCapabilityGuards = provider.roleCapabilityGuards({ sessionId,
+            ...(creationPlan ? { corePlanId: creationPlan.planId } : {}),
+            ...(native?.factoryPlan ? { nativePlanId: native.factoryPlan.planId, nativeConfigDigest: native.factoryPlan.configDigest } : {}) });
+          if (roleCapabilityGuards?.status === "unknown") reasons.push("role-capability-callback-guard-unverified");
+          if (!reasons.length && native && provider.factoryProvenance === "default-production") nativeToolRegistry = "application-mediated";
+          // P1.6 §4.4 包装层组合：仅严格 status !== observed（reasons 非空）且 claude/pi/codex +
+          // default-production + 未 disposed 时尝试构造受限应用中介证据；否则字段缺席（fail-closed）。
+          // 本字段不改变上面的 status/nativeToolRegistry 判定，也不被写/发布/停稳门读取。
+          let liveNativeInstanceId: string | undefined;
+          try { liveNativeInstanceId = nativeLifecycle?.instanceId; } catch { liveNativeInstanceId = undefined; }
+          const applicationMediation = composeRuntimeApplicationMediation({
+            runtime: options.runtime, factoryProvenance: provider.factoryProvenance, disposed, strictReasons: reasons,
+            roleId: role.id, nativeInstanceId, nativeLifecycleInstanceId: liveNativeInstanceId,
+            appTools, configuredForeignMcpServers, nativeFact: native,
+            applicationFact: () => inner.inspectApplicationToolSurface?.(),
+          });
+          return { source: "core-provider-assembly", sessionId, roleId: role.id, runtime: options.runtime,
+            status: reasons.length ? "unknown" : "observed", appTools, configuredForeignMcpServers,
+            factoryProvenance: provider.factoryProvenance, nativeToolRegistry, filesystemConfinement: "unknown", reasons,
+            ...(roleCapabilityGuards ? { roleCapabilityGuards } : {}),
+            ...(applicationMediation ? { applicationMediation } : {}),
+            ...(options.writeRoot !== undefined && !disposed && !reasons.includes("core-tool-handler-changed-after-factory")
+              && !reasons.includes("core-registry-changed-after-factory") && !reasons.includes("core-registry-read-failed")
+              && appTools.includes("write_file") && appTools.includes("edit_file") ? { fileWriteProtection: {
+                mechanism: "canonical-roots-and-nlink-v1" as const, coveredTools: ["write_file", "edit_file"] as const,
+                protectedGitRoots: [...(provider.protectedGitRoots ?? [])],
+                rootDiscovery: provider.protectedGitRoots === undefined ? "not-provided" as const : "host-provided" as const,
+                rootCoverage: "unknown" as const,
+                limitations: ["path-based-checks-do-not-eliminate-TOCTOU", "host-root-coverage-not-proven", "other-write-capabilities-not-covered", "not-an-OS-sandbox"],
+              } } : {}),
+            ...(native ? { native } : {}) };
+        },
+        async stopAndInspect(input, signal) {
+          const invalid = (reason: string): RuntimeSessionLifecycleFacts => ({ ...inspectLifecycle(), status: "unknown", reasons: [reason] });
+          if (input.expectedSessionId !== sessionId) return invalid("session-identity-mismatch");
+          if (input.expectedTurnId !== undefined && input.expectedTurnId !== latestTurn?.id) return invalid("turn-identity-mismatch");
+          if (!Number.isSafeInteger(input.timeoutMs) || input.timeoutMs <= 0) return invalid("invalid-stop-budget");
+          if (signal?.aborted) return invalid("stop-inspection-aborted");
+          if (disposed) return disposalReceipt?.status === "quiescent" ? structuredClone(disposalReceipt) : invalid("disposed-lifecycle-evidence-unavailable");
+          recordGitHostInterruption({ projectRoot: options.projectRoot, reason: "core-stop-requested", coreSessionId: sessionId });
+          stopRequested = true; stopSealed = true;
+          const turn = latestTurn;
+          const observeCleanup = (work: Promise<unknown>, label: string): void => {
+            stopCleanupPending++;
+            void work.then(() => { stopCleanupPending--; refreshDisposalEvidence(); }, () => { stopCleanupPending--; stopCleanupErrors.push(label); refreshDisposalEvidence(); });
+          };
+          if (turn) {
+            turn.controller.abort();
+            if (!nativeLifecycle && inner.abort && turn.providerStarted && !turn.providerFinished) observeCleanup(requestAbort(turn), "provider-abort-cleanup-failed");
+          }
+          if (nativeLifecycle && options.runtime !== "demo") {
+            try {
+              if (!nativeInstanceId || nativeLifecycle.instanceId !== nativeInstanceId) return invalid("native-instance-identity-mismatch");
+            } catch { return invalid("native-provider-lifecycle-read-failed"); }
+            observeCleanup(Promise.resolve().then(() => nativeLifecycle!.stopAndInspect({ expectedInstanceId: nativeInstanceId!,
+              ...(turn?.providerStarted ? { expectedCoreTurnId: turn.id } : {}), timeoutMs: input.timeoutMs }, signal)).then(result => {
+              if (!isRuntimeNativeLifecycleFacts(result) || result.instanceId !== nativeInstanceId || result.roleId !== role.id
+                || result.runtime !== options.runtime || (turn?.providerStarted && result.coreTurnId !== turn.id)) throw new Error("native stop returned unbound facts");
+            }), "native-stop-facts-invalid-or-failed");
+          }
+          try { provider.lifecycle.stopOwnedProcesses(); } catch { stopCleanupErrors.push("owned-process-stop-failed"); }
+          const stoppingBackgrounds = new Set<string>();
+          const deadline = Date.now() + input.timeoutMs;
+          for (;;) {
+            if (provider.backgroundTasks) {
+              try {
+                const tasks = provider.backgroundTasks.list();
+                if (!Array.isArray(tasks)) throw new Error("background list unavailable");
+                for (const task of tasks) if (!stoppingBackgrounds.has(task.taskId)) {
+                  stoppingBackgrounds.add(task.taskId);
+                  observeCleanup(provider.backgroundTasks.stop(task.taskId).then(result => {
+                    if (!result.ok) throw new Error("background stop not proven");
+                    backgroundClosed.add(task.taskId);
+                  }), "background-stop-not-proven");
+                }
+              } catch { return invalid("background-lifecycle-read-failed"); }
+            }
+            const facts = inspectLifecycle();
+            if (facts.status === "quiescent") return facts;
+            if (signal?.aborted) return { ...facts, status: "unknown", reasons: [...facts.reasons, "stop-inspection-aborted"] };
+            if (Date.now() >= deadline) return { ...facts, status: "unknown", reasons: [...facts.reasons, "stop-drain-budget-exhausted"] };
+            await new Promise<void>(resolve => setTimeout(resolve, Math.min(5, Math.max(1, deadline - Date.now()))));
+          }
+        },
         runtime: options.runtime, roleId: role.id, persistence:persistence.capability,
         get contextSource() { return inner.contextSource ?? (storage ? "fresh" : "in-memory"); },
         get nativeSessionId() { return inner.nativeSessionId; },
         get contextWarning() { return inner.contextWarning; },
         async prompt(text: string, promptOptions?: PromptOptions) {
           if (disposed) throw new Error("会话已关闭");
+          if (stopSealed) throw new Error("会话已封闭停止，不再接受新轮次");
           if (active || quarantined || deliveryPreflight) throw new Error("上一轮仍在运行或中止清理中");
+          if (chiefDecision !== undefined) {
+            if (chiefTurns >= chiefDecision.limits.maxTurns) throw new Error("Chief decision turn budget exhausted");
+            chiefTurns++;
+          }
           let plan:DeliveryPlan|undefined;
           if(promptOptions?.inputProvenance||promptOptions?.inputPresentation){
             deliveryPreflight=true;
@@ -376,12 +969,14 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             }finally{deliveryPreflight=false;}
             if(disposed){persistence.dispose();throw new Error("会话已关闭");}
           }
+          if (stopSealed) throw new Error("会话已封闭停止，不再接受新轮次");
           let terminal!: () => void;
           const terminalPromise = new Promise<void>((resolve) => { terminal = resolve; });
           const turn: Turn = { id: randomUUID(), controller: new AbortController(), outcome: "completed", terminal, terminalPromise };
           turn.plan=plan;
           persistence.attachTurn(plan,turn.id);
           active = turn;
+          latestTurn = turn;
           provider.setTurn(turn.id, turn.controller);
           let underlyingFinished = false;
           let failure: unknown;
@@ -418,11 +1013,12 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               persistence.progress(plan,'provider-may-start',promptOptions);
             }
             const nativeOptions=plan?(promptOptions?.images ? {images:promptOptions.images} : undefined):promptOptions;
+            turn.providerStarted = true;
             underlying = Promise.resolve().then(() => inner.prompt(text, nativeOptions));
             // 隔离的唯一语义＝「底层 provider 轮次可能仍在运行」。只要底层已 settle（成功或失败），
             // 隔离即解除——与清理是否失败无关；清理失败仅保留为诊断/事件事实。底层永不 settle 时，
             // 隔离保持（fail-closed 不放宽）。
-            const settleUnderlying = () => { underlyingFinished = true; quarantined = false; };
+            const settleUnderlying = () => { underlyingFinished = true; turn.providerFinished = true; quarantined = false; refreshDisposalEvidence(); };
             underlying.then(settleUnderlying, settleUnderlying);
             const work = underlying.then(async () => { if (!streamEnded) await terminalPromise; });
             // 整轮上限＝最后兜底（客户裁定 2026-10-17）：promptTimeoutMs 仅属看护到点检查，**不再**用于 abort。
@@ -447,7 +1043,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               failureReplaySafe = requestFailureTimeout?.replaySafe ?? networkFailure?.replaySafe ?? (typeof record?.replaySafe === "boolean" ? record.replaySafe : undefined);
             }
             turn.controller.abort();
-            if (inner.abort && underlying !== undefined && !underlyingFinished) {
+            if (inner.abort && underlying !== undefined && !underlyingFinished && !(stopSealed && nativeLifecycle)) {
               try { await requestAbort(turn); }
               catch (abortError) { emit({ kind: "denied", summary: `中止清理失败：${abortError instanceof Error ? abortError.message : String(abortError)}`, runtime: options.runtime, roleId: role.id, turnId: turn.id }); }
             }
@@ -467,6 +1063,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             await persistence.complete(plan,turn.outcome,record,persistenceError);
             persistence.progress(plan,"settled",promptOptions);
             if(plan){deliveryPreflight=false;queue.push(event);}
+            turn.promptFinalized = true;
+            refreshDisposalEvidence();
           }
           if(plan?.capture && (persistenceError||failure||plan.capture.receipt.history==='failed'))throw new RuntimeDeliveryError("本次投递未完成或历史未保存",plan.capture.receipt);
           if (persistenceError) throw persistenceError;
@@ -494,12 +1092,21 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         ...(inner.abort ? { async abort() {
           if (!active) return;
           const turn = active;
+          recordGitHostInterruption({ projectRoot: options.projectRoot, reason: "core-abort-requested", coreSessionId: sessionId });
           turn.controller.abort();
           await requestAbort(turn);
         } } : {}),
         async dispose() {
           if (disposed) return;
+          // Capture discovery failures before the background manager can discard its live list.
+          const beforeDisposal = collectLifecycle();
+          const lostCoverage = beforeDisposal.reasons.filter(reason => ["tool-lifecycle-read-failed", "background-lifecycle-read-failed", "background-start-not-yet-observed"].includes(reason));
+          if (provider.factoryProvenance === "custom-override") lostCoverage.push("custom-provider-disposal-coverage-unverified");
+          disposalConstraints = lostCoverage;
+          disposalCleanupPending = true;
           disposed = true;
+          recordGitHostInterruption({ projectRoot: options.projectRoot, reason: "core-dispose-requested", coreSessionId: sessionId });
+          updateCoreRegistry(provider.registry, "disposing");
           persistence.dispose();
           active?.controller.abort();
           try {
@@ -511,11 +1118,107 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           }
           await pendingPersist;
           void pump;
+          disposalCleanupPending = false;
+          refreshDisposalEvidence();
+          updateCoreRegistry(provider.registry, "disposed", ["dispose-is-not-a-quiescence-receipt"]);
         },
       };
+      provider.registry.session = wrapper;
+      provider.registry.fact = { ...provider.registry.fact, sessionId, ...(creationPlan ? { planId: creationPlan.planId } : {}) };
+      updateCoreRegistry(provider.registry, "active", creationPlan ? [] : ["legacy-bind-without-precreation-plan"]);
       return wrapper;
+  };
+  const core: RuntimeAdapter = {
+    async composeContext(role) {
+      const scope = await readCoreProtectionScope(options.projectRoot);
+      if (scope.state === "unknown") throw new Error("runtime-protection-scope-unknown");
+      if (scope.state === "required") {
+        const prepared = await core.prepareRole!(role);
+        if (!prepared.token) { const error = new Error("runtime-protected-scope-requires-verified-plan"); discardRuntimeRolePreparation(prepared, error); throw error; }
+      }
+      return withCoreOpenLease(options.projectRoot, async assertHeld => {
+        const provider = await providerFor(role);
+        provider.setAdmissionGuard(assertHeld);
+        const context = provider.adapter.composeContext(role);
+        return chiefDecision === undefined ? context : withTimeout(Promise.resolve(context), chiefDecision.limits.timeoutMs, "准备chief决策上下文");
+      });
+    },
+    async bindRole(role) {
+      const scope = await readCoreProtectionScope(options.projectRoot);
+      if (scope.state === "unknown") throw new Error("runtime-protection-scope-unknown");
+      if (scope.state === "required") {
+        const prepared = await core.prepareRole!(role);
+        if (!prepared.token) { const error = new Error("runtime-protected-scope-requires-verified-plan"); discardRuntimeRolePreparation(prepared, error); throw error; }
+        return core.bindPreparedRole!(prepared.token);
+      }
+      return withCoreOpenLease(options.projectRoot, assertHeld => bindRole(role, undefined, assertHeld));
+    },
+    async prepareRole(role): Promise<RuntimeRolePreparation> {
+      const provider = await providerFor(role), reasons: string[] = [];
+      const scopeProtection = await readCoreProtectionScope(options.projectRoot);
+      if (scopeProtection.state === "unknown") reasons.push("runtime-protection-scope-unknown");
+      if (scopeProtection.state === "required" && hasUnconfinedScriptTools(provider.initialAppTools)) reasons.push("required-scope-unconfined-script-tools");
+      if (scopeProtection.state === "required" && provider.roleCapabilityGuards()?.status === "unknown") reasons.push("required-scope-role-capability-effects-unproven");
+      if (scopeProtection.state === "required" && provider.factoryProvenance !== "default-production") reasons.push("protected-scope-default-native-plan-required");
+      let native: RuntimeNativeFactoryPlanFacts | undefined;
+      if (provider.factoryProvenance === "custom-override") reasons.push("custom-provider-factory-unverified");
+      else if (options.runtime !== "demo") {
+        try {
+          const prepared = await provider.prepareNative(), fact = prepared?.facts;
+          if (fact && fact.source === "native-factory-plan" && typeof fact.planId === "string" && fact.planId.length > 0
+            && typeof fact.configDigest === "string" && fact.configDigest.length === 64 && /^[a-f0-9]{64}$/.test(fact.configDigest)
+            && fact.roleId === role.id && fact.runtime === options.runtime
+            && [fact.appTools, fact.foreignMcpServers, fact.nativeBuiltinTools, fact.plannedProcesses, fact.reasons]
+              .every(names => Array.isArray(names) && names.every(name => typeof name === "string" && name.length > 0))) {
+            // Explicit allowlist projection. Never serialize arbitrary provider fields/options/environment.
+            native = { source: "native-factory-plan", planId: fact.planId, configDigest: fact.configDigest, roleId: fact.roleId,
+              runtime: fact.runtime, status: fact.status, factory: fact.factory, transport: fact.transport, wire: fact.wire,
+              appTools: [...fact.appTools], foreignMcpServers: [...fact.foreignMcpServers], nativeBuiltinTools: [...fact.nativeBuiltinTools],
+              plannedProcesses: [...fact.plannedProcesses], reasons: [...fact.reasons] };
+            if (fact.status !== "observed" || fact.factory !== "codex-chat" || fact.transport !== "http" || fact.wire !== "chat"
+              || fact.foreignMcpServers.length || fact.nativeBuiltinTools.length || fact.plannedProcesses.length || fact.reasons.length
+              || !prepared?.adapter || !provider.isCurrent()
+              || fact.appTools.length !== provider.initialAppTools.length || fact.appTools.some(name => !provider.initialAppTools.includes(name)))
+              reasons.push("native-factory-plan-unverified");
+          } else reasons.push("native-factory-plan-unavailable");
+        } catch { reasons.push("native-factory-plan-preparation-failed"); }
+      }
+      if (!provider.isCurrent()) reasons.push("runtime-prepared-configuration-changed");
+      const plan: RuntimeCreationPlanFacts = { source: "core-factory-plan", planId: randomUUID(), configDigest: "", roleId: role.id,
+        runtime: options.runtime, projectRoot: resolve(options.projectRoot), factoryProvenance: provider.factoryProvenance,
+        status: reasons.length ? "unknown" : "observed", scopeProtection, ...(native ? { native } : {}), reasons };
+      const roleCapabilityGuards = provider.roleCapabilityGuards({ corePlanId: plan.planId,
+        ...(native ? { nativePlanId: native.planId, nativeConfigDigest: native.configDigest } : {}) });
+      if (roleCapabilityGuards) plan.roleCapabilityGuards = roleCapabilityGuards;
+      plan.configDigest = createHash("sha256").update(JSON.stringify({ runtime: plan.runtime, roleId: plan.roleId,
+        factoryProvenance: plan.factoryProvenance, appTools: provider.initialAppTools, native, roleCapabilityGuards })).digest("hex");
+      provider.registry.fact = { ...provider.registry.fact, planId: plan.planId };
+      updateCoreRegistry(provider.registry, "prepared", reasons);
+      if (reasons.length) { const result = { plan: structuredClone(plan) }; rolePreparations.set(result, { entry: provider.registry, planId: plan.planId }); return result; }
+      const token = Object.freeze({}) as RuntimePreparedRoleToken;
+      preparedTokens.set(token, { role, plan, used: false, provider });
+      const result = { plan: structuredClone(plan), token }; rolePreparations.set(result, { entry: provider.registry, planId: plan.planId }); return result;
+    },
+    async bindPreparedRole(token) {
+      const prepared = token && typeof token === "object" ? preparedTokens.get(token) : undefined;
+      if (!prepared || prepared.used) throw new Error("runtime-prepared-token-invalid-or-consumed");
+      prepared.used = true;
+      const provider = prepared.provider;
+      try {
+      if (!provider.isCurrent() || provider.registry.fact.planId !== prepared.plan.planId) throw new Error("runtime-prepared-configuration-changed");
+      return await withCoreOpenLease(options.projectRoot, async assertHeld => {
+        if (!provider.isCurrent() || provider.registry.fact.planId !== prepared.plan.planId) throw new Error("runtime-prepared-configuration-changed");
+        const scope = await readCoreProtectionScope(options.projectRoot);
+        if (scope.state === "unknown" || scope.state !== prepared.plan.scopeProtection?.state || scope.revision !== prepared.plan.scopeProtection.revision)
+          throw new Error("runtime-protection-scope-changed");
+        if (scope.state === "required" && hasUnconfinedScriptTools(provider.initialAppTools)) throw new Error("required-scope-unconfined-script-tools");
+        if (scope.state === "required" && provider.roleCapabilityGuards()?.status === "unknown") throw new Error("required-scope-role-capability-effects-unproven");
+        return bindRole(prepared.role, prepared.plan, assertHeld);
+      });
+      } catch (error) { if (provider.registry.fact.planId === prepared.plan.planId) { provider.revoke(); bindConstructionFailure(error, provider.registry); } throw error; }
     },
   };
+  return core;
 }
 
 // C2 state remains bound to the actual Core session; no caller-selected persistence or paths.
@@ -540,6 +1243,7 @@ interface DeliveryPlan {
 function createPersistenceState(input:{
   scope:{roleId:string;runtime:RuntimeKind};projectRoot:string;storage?:RuntimeSessionStorage;
   display:ReturnType<typeof createToolDisplayContext>;diagnostics?:GovernedToolsOptions['diagnostics'];ended:Set<string>;disposed:()=>boolean;active:()=>boolean;
+  onDrain?:()=>void;
 }) {
   const {storage,scope,display}=input;
   const reports=new Map<string,{snapshot:RuntimeReportSnapshotV1;draftFingerprint:string;state:ReportSaveStateV1;inFlight?:Promise<ReportSaveResultV1>}>();
@@ -582,7 +1286,7 @@ function createPersistenceState(input:{
       reportChange(reportId,holder.state);return result;
     })();
     holder.inFlight=work;
-    void work.finally(()=>{holder.inFlight=undefined;});return work;
+    void work.finally(()=>{holder.inFlight=undefined;input.onDrain?.();});return work;
   };
   const rememberIdentity=(capture:DeliveryCapture)=>seen.set(capture.receipt.attemptId,{deliveryId:capture.receipt.deliveryId,turnId:capture.receipt.turnId,inputSaved:capture.receipt.inputSaved,providerMayHaveStarted:capture.receipt.providerMayHaveStarted,...(capture.receipt.outcome?{outcome:capture.receipt.outcome}:{})});
   const trimReceipts=()=>{const finished=[...deliveries.values()].filter(x=>x.complete);while(finished.length>REPORT_LIMITS.receipts){const old=finished.shift()!;rememberIdentity(old);drop('delivery:'+old.receipt.attemptId);deliveries.delete(old.receipt.attemptId);}};
@@ -655,7 +1359,7 @@ function createPersistenceState(input:{
           if(code!=='PERSIST_FAILED')capture.receipt.retryDeliveryAllowed=false;
           deliveryChange(capture,'failed');return {ok:false,state:'failed',code,receipt:cloneReceipt(capture),retryAvailable:capture.receipt.retryHistoryAvailable,message:'历史补存未完成；未重新调用模型'};
         }
-      })();capture.inFlight=work;void work.finally(()=>{capture.inFlight=undefined;});return work;
+      })();capture.inFlight=work;void work.finally(()=>{capture.inFlight=undefined;input.onDrain?.();});return work;
     },
     onPersistenceChange(listener:(event:RuntimePersistenceChangeV1)=>void){if(!input.disposed())listeners.add(listener);return()=>{listeners.delete(listener);};},
   });
@@ -705,6 +1409,7 @@ function createPersistenceState(input:{
       }
       if(capture.retained){capture.entries.push(safe);remember(capture);}return safe;
     },
+    pendingWrites(){return [...reports.values()].filter(holder=>holder.inFlight).length+[...deliveries.values()].filter(capture=>capture.inFlight).length;},
     progress(plan:DeliveryPlan|undefined,stage:RuntimeDeliveryProgressV1['stage'],opts:PromptOptions|undefined){if(plan?.capture)try{opts?.onDeliveryProgress?.({stage,receipt:cloneReceipt(plan.capture)});}catch{observerFailed();}},
     async complete(plan:DeliveryPlan|undefined,outcome:RuntimeTurnOutcome,record:RuntimeSessionRecord,error:unknown){
       const capture=plan?.capture;if(!capture)return;

@@ -14,10 +14,12 @@
 // · 解冻只能通过新版本 + VCA 或客户确认的迁移/恢复例外；本 Service 不提供解冻写路径。
 // 本文件不 import 门禁引擎实现、不读盘；同步冻结快照归 C2b（F7）。
 
+import { isDirectActionSource, isSnapshotRef } from "../../../model/trunk.ts";
 import {
   DOC_FREEZE_APPLICATION_REASONS,
   DOC_FREEZE_CUSTOMER_REASONS,
   DOC_FREEZE_REASONS,
+  isValidDocFreezeRecord,
   type DocFreezeLookup,
   type DocFreezeReason,
   type DocFreezeRecord,
@@ -80,12 +82,21 @@ export function buildDocFreezeRecord(input: DocFreezeInput): ServiceResult<DocFr
   }
   if (!isKnownReason(input.reason)) return fail("doc-freeze-invalid", `未知冻结 reason：${String(input.reason)}`);
 
+  const direct = input.reason === "role-direct-applied";
+  if (direct && (!isDirectActionSource(input.source) || input.source.kind !== "role-direct"
+    || input.source.applicationId !== input.applicationId || input.actorRoleId !== input.source.actorRoleId
+    || !isSnapshotRef(input.snapshotRef) || input.decisionId !== undefined || input.decidedBy !== undefined))
+    return fail("doc-freeze-invalid", "Direct freezes require the real role source and complete snapshot, without customer fields");
+  if (!direct && input.source?.kind === "role-direct") return fail("doc-freeze-invalid", "Role source requires role-direct-applied reason");
   const customerReason = isCustomerReason(input.reason);
-  const origin = customerReason ? "customer" : "application";
+  const delegated = customerReason && input.source?.kind === "chief-delegated";
+  const origin = direct ? "role-direct" : delegated ? "chief-delegated" : customerReason ? "customer" : "application";
+  if (delegated && (input.decisionId !== undefined || input.decidedBy !== undefined || input.actorRoleId !== "chief"))
+    return fail("doc-freeze-invalid", "Delegated freeze must retain the true chief source without customer fields");
   if (input.origin !== undefined && input.origin !== origin) {
     return fail("doc-freeze-invalid", `reason=${input.reason} 的 origin 必须为 ${origin}（F35）`);
   }
-  if (customerReason && (input.decisionId === undefined || input.decisionId.trim() === "")) {
+  if (customerReason && !delegated && (input.decisionId === undefined || input.decisionId.trim() === "")) {
     return fail("doc-freeze-invalid", `reason=${input.reason} 为客户确认类，必须带 decisionId`);
   }
   if (!customerReason && input.decidedBy !== undefined) {
@@ -108,11 +119,14 @@ export function buildDocFreezeRecord(input: DocFreezeInput): ServiceResult<DocFr
     applicationId,
     reason: input.reason,
     origin,
-    ...(customerReason ? { decidedBy: "customer" as const } : {}),
+    ...(input.source !== undefined ? { source: input.source } : {}),
+    ...(input.snapshotRef !== undefined ? { snapshotRef: input.snapshotRef } : {}),
+    ...(customerReason && !delegated ? { decidedBy: "customer" as const } : {}),
     ...(input.decisionId !== undefined ? { decisionId: input.decisionId } : {}),
     frozenAt: input.at,
     ...(input.actorRoleId !== undefined ? { actorRoleId: input.actorRoleId } : {}),
   };
+  if (!isValidDocFreezeRecord(freeze)) return fail("doc-freeze-invalid", "Freeze source does not satisfy the shared Model invariant");
   return { ok: true, value: { path, version: input.version, sha256: input.sha256, freeze } };
 }
 

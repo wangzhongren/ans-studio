@@ -16,10 +16,15 @@
 // 客户卡永不进判断器/委托/指令；失败不冻结/不 re-pin（S2 保证），事件只按实际结果写。
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { createFsTrunkStore, createProjectTrunkStore, readGitProtectionFacts } from "../../provider/trunk/public/trunk-store.ts";
+import { appendOperationEvent, operationDeliveryRecorded, recordOperationDelivery } from "../../provider/version-change/public/version-change-store.ts";
+import { createTrunkService } from "../../service/trunk/public/trunk-service.ts";
+import { validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
+import { builtInRoleModuleOf } from "../../service/role/resolve-role.ts";
 
-import type { TaskStateEvent } from "../../model/runtime.ts";
+import type { TaskStateEvent, SubmitVersionChangeInput, SubmitVersionChangeResult } from "../../model/runtime.ts";
+import type { RolePolicyDecision } from "../../model/role.ts";
+import type { DirectActionReceipt, DirectActionSource } from "../../model/trunk.ts";
 import type {
   TrunkApplySnapshot,
   TrunkDocKind,
@@ -32,8 +37,9 @@ import type {
   VersionChangeServices,
 } from "../../service/version-change/public/version-change-service.ts";
 import type { VersionChangeErrorCode, VersionChangeRecord, VersionChangeStatus } from "../../model/version-change.ts";
-import type { SnapshotItem, TrunkApplyResult, TrunkRepinTargetKind, TrunkService } from "../../service/trunk/public/trunk-service.ts";
-import type { TrunkRuntime, TrunkRuntimeResult } from "./trunk-runtime.ts";
+import type { SnapshotItem, TrunkApplyResult, TrunkRepinTargetKind, TrunkService, DirectTrunkService } from "../../service/trunk/public/trunk-service.ts";
+import type { TrunkRuntime, TrunkRuntimeResult, DirectNotificationSink } from "./trunk-runtime.ts";
+import { executeGitDocumentPublication } from "./trunk-runtime.ts";
 
 // —————————————— 客户卡 Port（D1 后续实现 IPC/UI；本节点只消费） ——————————————
 
@@ -78,6 +84,9 @@ export interface VersionChangeRuntimeDeps {
   services: VersionChangeServices;
   /** S2 trunk service（修正案解析/当前主干/status）。 */
   trunkService: TrunkService;
+  directTrunkService?: DirectTrunkService;
+  /** Sink must deduplicate the stable key, including a delivery followed by a lost acknowledgement. */
+  notifyDirect?: DirectNotificationSink;
   /** S4 trunk-runtime（apply/bootstrap；事件由它写）。 */
   trunkRuntime: Pick<TrunkRuntime, "applyApproved" | "bootstrap">;
   emitEvent: (event: TaskStateEvent) => Promise<void>;
@@ -100,6 +109,7 @@ export interface ItemDecision {
 export type VersionChangeRuntimeResult<T> = ServiceResult<T, VersionChangeErrorCode>;
 
 export interface VersionChangeRuntime {
+  submitDirect?(input: SubmitVersionChangeInput, trustedActorRoleId: string): Promise<SubmitVersionChangeResult>;
   /** create + submit；已 submitted 的幂等返回不重复写事件。 */
   submit(input: VersionChangeCreateInput): Promise<VersionChangeRuntimeResult<VersionChangeRecord>>;
   /** 客户卡（仅 submitted；无通道 ⇒ vca-channel-unavailable，保持 submitted 可重试）。 */
@@ -121,6 +131,9 @@ export interface VersionChangeRuntime {
     input: { decisionId: string; decisions: ItemDecision[] },
   ): Promise<VersionChangeRuntimeResult<{ record: VersionChangeRecord; resultTrunkVersion: number }>>;
   list(filter?: { flowId?: string; status?: VersionChangeStatus }): Promise<VersionChangeRecord[]>;
+}
+export interface DirectVersionChangeRuntime extends VersionChangeRuntime {
+  submitDirect(input: SubmitVersionChangeInput, trustedActorRoleId: string): Promise<SubmitVersionChangeResult>;
 }
 
 // —————————————— 事件构造 ——————————————
@@ -222,11 +235,8 @@ function sha256(text: string): string {
 }
 
 async function fileSha(projectRoot: string, rel: string): Promise<string | undefined> {
-  try {
-    return sha256(await readFile(path.join(projectRoot, rel), "utf8"));
-  } catch {
-    return undefined;
-  }
+  const read = await createFsTrunkStore(projectRoot).readProjectFile!(rel);
+  return read.ok ? read.value.sha256 : undefined;
 }
 
 function stableMapOf(
@@ -250,9 +260,74 @@ function repinKindOf(pathRel: string): TrunkRepinTargetKind {
   return "proposal";
 }
 
+/**
+ * X-R1（E2 S4）：product 模块 `preflight.checkAction("version-upgrade", …)` 的拒绝映射到既有 Direct
+ * 回执码。模块 `code`/`messageKey` 只作稳定内部诊断，不得进入客户可见文案；外部
+ * `SubmitVersionChangeResult.errorCode` 保持与迁移前 Service 路径同向：
+ *
+ * - `product-initiator-mismatch` / `product-kind-mismatch` / `product-operation-id-missing`：
+ *   `submitDirect` 既有早退 ⇒ `vca-role-not-allowed`（本单元在早退**之后**调用，这些分支不可达；
+ *   映射仅作 fail-closed 兜底）；
+ * - `product-bootstrap-mismatch`：调用点以 `baseTrunk === null` 派生 bootstrap（既有 direct 语义），
+ *   正常不可达；防御性映射 `vca-invalid`；
+ * - `product-base-trunk-invalid` / `product-amendment-ref-forbidden` / `product-facts-*` /
+ *   `action-not-covered`：迁移前 `vca-invalid`（畸形 baseTrunk 属 D-PRE-1 已登记的更早拒绝，
+ *   码取同一 `vca-invalid` 语义）；
+ * - `product-targets-invalid`（空 targets）：迁移前 `vca-service.prepareDirect` ⇒ `vca-invalid`；
+ * - `product-targets-invalid`（缺 `expectedFromSha256`）：迁移前 `prepareDirectSubmission` ⇒
+ *   `trunk-item-invalid`，由 `submitDirect` 既有映射 ⇒ `vca-target-invalid`。
+ */
+function productPreflightRejection(
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+): { code: VersionChangeErrorCode; message: string } {
+  const details: unknown = decision.details;
+  const reason = typeof details === "object" && details !== null && typeof (details as { reason?: unknown }).reason === "string"
+    ? (details as { reason: string }).reason
+    : undefined;
+  switch (decision.code) {
+    case "product-targets-invalid":
+      return reason === "expectedFromSha256"
+        // 与迁移前 `prepareDirectSubmission` 的拒绝文案逐字一致（外部 message 不变）。
+        ? { code: "vca-target-invalid", message: "Duplicate target or missing expected original hash" }
+        : { code: "vca-invalid", message: `Direct submission target is invalid (${decision.code}${reason === undefined ? "" : `:${reason}`})` };
+    case "product-bootstrap-mismatch":
+      return { code: "vca-invalid", message: `Direct submission base/bootstrap mismatch (${decision.code})` };
+    case "product-initiator-mismatch":
+    case "product-kind-mismatch":
+    case "product-operation-id-missing":
+      // 与迁移前 `submitDirect` 早退文案逐字一致（本调用点在早退之后，正常不可达）。
+      return { code: "vca-role-not-allowed", message: "Direct submit requires the real session role, operation id and explicit expected base" };
+    default:
+      return { code: "vca-invalid", message: `Direct submission role preflight rejected (${decision.code})` };
+  }
+}
+
+/**
+ * X-R2（E2 S4）：rapporteur 模块 `preflight.checkAction("detail-amendment", …)` 的拒绝映射到既有
+ * Direct 回执码。direct 路径的事实由本层按既有语义供给：整单（`wholeOrder:true`；逐项/最终卡通道
+ * 已关闭）且无 legacy 卡路径（`legacyCardPath:"none"`），因此模块的 `amendment-not-whole-order` /
+ * `amendment-legacy-card-path` 分支在 direct 路径不可达。其余拒绝分支亦被 `submitDirect` 既有早退
+ * （operationId/baseTrunk/actor + kind=detail-amendment）与上述固定事实排除，属 fail-closed 兜底：
+ *
+ * - `rapporteur-initiator-mismatch`：早退已要求真实 actor = rapporteur 且 `initiatorRoleId === actor`，
+ *   正常不可达；防御性映射沿用早退文案/码 `vca-role-not-allowed`；
+ * - `rapporteur-facts-*` / `rapporteur-amendment-*` / `action-not-covered`：`vca-invalid`
+ *   （与迁移前 direct 路径对畸形修正案请求的既有 `vca-invalid` 同向）。
+ *
+ * 模块 `code`/`messageKey` 只作稳定内部诊断；外部 `errorCode` 保持既有集合。
+ */
+function rapporteurDetailAmendmentRejection(
+  decision: Extract<RolePolicyDecision, { readonly allow: false }>,
+): { code: VersionChangeErrorCode; message: string } {
+  if (decision.code === "rapporteur-initiator-mismatch") {
+    return { code: "vca-role-not-allowed", message: "Direct submit requires the real session role, operation id and explicit expected base" };
+  }
+  return { code: "vca-invalid", message: `Direct amendment role preflight rejected (${decision.code})` };
+}
+
 // —————————————— 工厂 ——————————————
 
-export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): VersionChangeRuntime {
+export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): DirectVersionChangeRuntime {
   const now = deps.now ?? (() => new Date());
   const { services, trunkService, trunkRuntime } = deps;
 
@@ -279,15 +354,20 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
     for (const event of events) await deps.emitEvent(event);
   }
 
+  function withReplacementView(record: VersionChangeRecord, records: readonly VersionChangeRecord[]): VersionChangeRecord {
+    const replacement = records.find(next => next.supersedesApplicationId === record.applicationId && next.status === "applied"
+      && next.actionSource?.kind === "role-direct" && next.initiatorRoleId === record.initiatorRoleId && next.kind === record.kind);
+    return replacement ? { ...record, status: "superseded", message: `Replaced by ${replacement.applicationId}/${replacement.operationId}` } : record;
+  }
   async function load(applicationId: string): Promise<VersionChangeRecord | undefined> {
-    const records = await services.vca.list();
-    return records.find((record) => record.applicationId === applicationId);
+    const records = await services.vca.list(), record = records.find(record => record.applicationId === applicationId);
+    return record ? withReplacementView(record, records) : undefined;
   }
 
   async function stableFilesForManifest(): Promise<
     | {
         ok: true;
-        workflow: { path: string; sha256: string };
+        workflow?: { path: string; sha256: string };
         roleCards?: Record<string, { path: string; sha256: string }>;
         boundaries?: Record<string, { path: string; sha256: string }>;
         runId: string | null;
@@ -302,7 +382,7 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
     if (manifest !== undefined) {
       return {
         ok: true,
-        workflow: { path: manifest.artifacts.workflow.path, sha256: manifest.artifacts.workflow.sha256 },
+        ...(manifest.artifacts.workflow ? { workflow: { path: manifest.artifacts.workflow.path, sha256: manifest.artifacts.workflow.sha256 } } : {}),
         ...(manifest.artifacts.roleCards !== undefined
           ? { roleCards: stableMapOf(manifest.artifacts.roleCards) }
           : {}),
@@ -440,12 +520,28 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       documents[repinKindOf(target.path) as TrunkDocKind] = { path: target.path, sha256: target.toSha256 };
     }
     const rosterChanged = record.targets.some((target) => /-roster-v\d+\.md$/i.test(target.path));
-    const result = await trunkService.validateUpgradeChain({
-      flowId: record.flowId,
-      documents,
-      rosterChanged,
+    if (record.status !== "approved" || record.decidedBy !== "customer" || !record.decisionId)
+      return { ok: false, code: "vca-target-invalid", message: "Only an actual prior customer approval can use historical recovery" };
+    const common = { flowId: record.flowId, documents, rosterChanged,
       ...(status.manifest?.rosterVersion !== undefined ? { rosterVersionFloor: status.manifest.rosterVersion } : {}),
-      ...(status.manifest?.d3 !== undefined ? { d3: status.manifest.d3 } : {}),
+      ...(status.manifest?.d3 !== undefined ? { d3: status.manifest.d3 } : {}) };
+    const planning = await trunkService.validateUpgradeChain({ ...common, planningOnly: true });
+    if (!planning.ok) return { ok: false, code: "vca-target-invalid", message: planning.message ?? planning.code };
+    const roles: Array<{ roleId: string; cardSha256: string; boundaryYamlSha256: string }> = [];
+    const store = createProjectTrunkStore(deps.projectRoot);
+    for (const roleId of planning.value.roleIds) {
+      const cardRef = status.derived ? undefined : status.manifest?.artifacts.roleCards?.[roleId];
+      const yamlRef = status.derived ? undefined : status.manifest?.artifacts.boundaries[roleId];
+      if (!cardRef || !yamlRef) return { ok: false, code: "vca-target-invalid", message: "Historical role byte identities are missing; current live files cannot manufacture them" };
+      const card = await store.readProjectFile!(cardRef.path), yaml = await store.readProjectFile!(yamlRef.path);
+      if (!card.ok || !yaml.ok || card.value.sha256 !== cardRef.sha256 || yaml.value.sha256 !== yamlRef.sha256
+        || !Buffer.from(card.value.bytesBase64, "base64").toString("utf8").trim()) return { ok: false, code: "vca-hash-drift", message: "Historical role bytes differ from their real stable hashes" };
+      const quality = validateBoundaryYamlText(Buffer.from(yaml.value.bytesBase64, "base64").toString("utf8"));
+      if (!quality.ok) return { ok: false, code: "vca-target-invalid", message: quality.message };
+      roles.push({ roleId, cardSha256: card.value.sha256, boundaryYamlSha256: yaml.value.sha256 });
+    }
+    const result = await trunkService.validateUpgradeChain({
+      ...common, legacyApproval: { applicationId: record.applicationId, decisionId: record.decisionId, roles },
     });
     if (result.ok) return { ok: true };
     const message = result.message ?? result.code;
@@ -528,70 +624,155 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
   }
 
   return {
-    async submit(input) {
-      const created = await services.vca.create(input);
-      if (!created.ok) return created;
-      let record = created.value;
-      if (record.status === "draft") {
-        const submitted = await services.vca.submit({ applicationId: record.applicationId, at: input.at });
-        if (!submitted.ok) return submitted;
-        record = submitted.value.record;
-        await emitEvents([versionChangeEvent(record, "submitted", input.at), ...freezeEvents(submitted.value.freezes)]);
-        await notifyStatus(record, "submitted", "：等待客户批准（客户本人；幕僚只通知）");
+    async submitDirect(input, trustedActorRoleId) {
+      const operationId = input.operationId ?? "missing-operation";
+      const rejected = (message: string, code: VersionChangeErrorCode = "vca-invalid"): SubmitVersionChangeResult => ({ ok: false, status: "rejected", errorCode: code, message,
+        operationId, receipt: { ok: false, status: "rejected", operationId, baseDigest: input.baseTrunk?.digest ?? null, targetDigest: null, errorCode: code, message } });
+      let observed: DirectActionReceipt | undefined;
+      try {
+      if (!input.operationId || input.baseTrunk === undefined || input.initiatorRoleId !== trustedActorRoleId
+        || trustedActorRoleId !== (input.kind === "version-upgrade" ? "product" : input.kind === "detail-amendment" ? "rapporteur" : undefined))
+        return rejected("Direct submit requires the real session role, operation id and explicit expected base", "vca-role-not-allowed");
+      if (!services.vca.prepareDirect || !services.vca.finalizeDirect) return rejected("Direct metadata capabilities are unavailable", "vca-channel-unavailable");
+      // X-R1（E2 S4）：product 的 version-upgrade 直接提交前置——只在 direct 路径、在既有
+      // operationId/baseTrunk/真实 actor 校验之后、Service 最终校验之前调用。模块只回答角色侧前置；
+      // `allow` 不替代任何 Service 校验（文件字节/hash、target 写区/版本链、base 全等、快照等仍由
+      // `prepareDirectSubmission` / `vca-service` 执行）。普通 `submit`（历史客户卡通道）不调用
+      // （非 direct 路径不得调用）。
+      if (input.kind === "version-upgrade") {
+        const preflight = builtInRoleModuleOf("product")?.preflight;
+        if (preflight !== undefined) {
+          const facts: Record<string, unknown> = {
+            initiatorRoleId: input.initiatorRoleId,
+            kind: input.kind,
+            operationId: input.operationId,
+            baseTrunk: input.baseTrunk,
+            // 既有 direct 语义：bootstrap = `baseTrunk === null`（`vca-service.prepareDirect` 以此写入
+            // `record.bootstrap`）；旧 `bootstrap` 兼容参数在 direct 路径不参与判定。为保持零差异，
+            // 事实包取**实际**语义，而不是把可能省略/矛盾的兼容参数原样透传。
+            bootstrap: input.baseTrunk === null,
+            targets: input.targets.map((target) => ({
+              ...(target.expectedFromSha256 !== undefined ? { expectedFromSha256: target.expectedFromSha256 } : {}),
+            })),
+          };
+          const decision = preflight.checkAction({ action: "version-upgrade", facts });
+          if (!decision.allow) {
+            const rejection = productPreflightRejection(decision);
+            return rejected(rejection.message, rejection.code);
+          }
+        }
+      } else if (input.kind === "detail-amendment") {
+        // X-R2（E2 S4）：rapporteur 的 detail-amendment 直接提交前置——同一调用纪律（direct 路径、
+        // 既有早退之后、Service 最终校验之前）。事实按 rapporteur `api-spec.md` §5.3 登记键供给：
+        // direct 通道只接受**整单**修正案（逐项/最终卡通道已关闭），且不经过任何 legacy 卡/批准路径。
+        // `allow` 不替代 Service 最终校验（targets/hash/base/权限/trunk 事务仍在
+        // `prepareDirectSubmission` 与 `apply-journal`）。
+        const preflight = builtInRoleModuleOf("rapporteur")?.preflight;
+        if (preflight !== undefined) {
+          const facts: Record<string, unknown> = {
+            initiatorRoleId: input.initiatorRoleId,
+            kind: input.kind,
+            wholeOrder: true,
+            legacyCardPath: "none",
+          };
+          const decision = preflight.checkAction({ action: "detail-amendment", facts });
+          if (!decision.allow) {
+            const rejection = rapporteurDetailAmendmentRejection(decision);
+            return rejected(rejection.message, rejection.code);
+          }
+        }
       }
-      return { ok: true, value: record };
+      const direct = deps.directTrunkService ?? createTrunkService({ projectRoot: deps.projectRoot });
+      const requestDigest = sha256(JSON.stringify({ operationId, actor: trustedActorRoleId, kind: input.kind, flowId: input.flowId, baseTrunk: input.baseTrunk,
+        summary: input.summary, targets: input.targets.map(target => ({ kind: target.kind, path: target.path, action: target.action, from: target.from,
+          roleId: target.roleId, expectedFromSha256: target.expectedFromSha256 })), amendmentId: input.amendmentId, amendmentDocPath: input.amendmentDocPath,
+        supersedesApplicationId: input.supersedesApplicationId }));
+      let record = (await services.vca.list()).find(record => record.operationId === operationId);
+      if (record && (record.message !== `direct-request:${requestDigest}` || record.initiatorRoleId !== trustedActorRoleId)) return rejected("Operation id is bound to a different real request", "vca-conflict");
+      let operation = record ? await direct.readDirectOperation(operationId) : undefined;
+      let receipt: DirectActionReceipt;
+      if (record && operation?.ok) { receipt = await direct.recoverDirect(operationId); observed = receipt; }
+      else {
+        const prepared = await direct.prepareDirectSubmission(input, trustedActorRoleId);
+        if (!prepared.ok) return rejected(prepared.message ?? prepared.code, "vca-target-invalid");
+        const value = prepared.value;
+        const created = await services.vca.prepareDirect({ kind: input.kind, initiatorRoleId: input.initiatorRoleId, flowId: input.flowId,
+          baseTrunk: value.currentTrunk, currentTrunk: value.currentTrunk, targets: input.targets, summary: input.summary,
+          applicationId: value.applicationId, operationId, requestDigest, snapshot: value.snapshot,
+          ...(input.supersedesApplicationId ? { supersedesApplicationId: input.supersedesApplicationId } : {}),
+          ...(input.amendmentId ? { amendmentId: input.amendmentId } : {}), ...(input.amendmentDocPath ? { amendmentDocPath: input.amendmentDocPath } : {}),
+          ...(value.amendmentItems ? { amendmentItems: value.amendmentItems } : {}), at: value.applyInput.at });
+        if (!created.ok) return rejected(created.message ?? created.code, created.code);
+        record = created.value;
+        const git = await readGitProtectionFacts(deps.projectRoot);
+        receipt = git.identity ? await executeGitDocumentPublication({ projectRoot: deps.projectRoot, applyInput: value.applyInput }) : await direct.executeDirect(value.applyInput);
+        observed = receipt;
+        if (!receipt.ok && receipt.status !== "committed-pending-recovery") return { ok: false, status: receipt.status,
+          applicationId: record.applicationId, operationId, errorCode: "vca-apply-failed", message: receipt.message, receipt };
+        operation = await direct.readDirectOperation(operationId);
+      }
+      if (!record || !operation?.ok || receipt.source?.kind !== "role-direct" || !receipt.applicationId || !receipt.journalId || !receipt.targetDigest)
+        throw new Error("Committed operation proof is unavailable");
+      const source = receipt.source, { manifest, snapshot } = operation.value;
+      const pending = (message: string): DirectActionReceipt => ({ ok: false, status: "committed-pending-recovery", operationId,
+        applicationId: receipt.applicationId!, journalId: receipt.journalId!, baseDigest: receipt.baseDigest, targetDigest: receipt.targetDigest!, source,
+        errorCode: "direct-effects-pending", message });
+      try {
+        const finalized = await services.vca.finalizeDirect({ applicationId: record.applicationId, receipt,
+          snapshotRef: { snapshotId: snapshot.snapshotId, digest: snapshot.digest }, resultTrunkVersion: manifest.trunkVersion, at: now().toISOString() });
+        if (!finalized.ok) receipt = pending(finalized.message ?? finalized.code);
+        else record = finalized.value;
+        const event: TaskStateEvent = { v: 1, at: source.at, kind: "version.change", schema: "version-change/v1", applicationId: record.applicationId,
+          vcKind: record.kind, initiatorRoleId: record.initiatorRoleId, flowId: record.flowId, status: "applied", origin: "role-direct", actionSource: source,
+          operationId, directReceipt: receipt, journalId: receipt.journalId, resultTrunkVersion: manifest.trunkVersion,
+          ...(record.baseTrunk ? { baseTrunkVersion: record.baseTrunk.trunkVersion } : { bootstrap: true }),
+          targets: record.targets.map(target => ({ kind: target.kind, path: target.path, action: target.action, toSha256: target.toSha256 })) };
+        const events: TaskStateEvent[] = [event];
+        if (source.baseDigest !== source.targetDigest) events.push({ v: 1, at: source.at, kind: "trunk.state", op: "switched", origin: "role-direct", actionSource: source,
+          operationId, channel: "role-direct", trunkVersion: manifest.trunkVersion, flowId: manifest.flowId, runId: manifest.runId,
+          source: manifest.source, journalId: receipt.journalId, ...(manifest.previous ? { previousTrunkVersion: manifest.previous.trunkVersion } : {}) });
+        for (const event of events) { const stored = await appendOperationEvent(deps.projectRoot, event); if (!stored.ok) throw new Error(stored.reason); }
+        for (const recipientRoleId of ["chief", "convener", trustedActorRoleId]) {
+          const key = `${operationId}:${source.targetDigest}:documents-updated:${recipientRoleId}`;
+          if (await operationDeliveryRecorded(deps.projectRoot, key)) continue;
+          if (!deps.notifyDirect) throw new Error("Idempotent direct notification sink is unavailable");
+          await deps.notifyDirect({ key, recipientRoleId, source, message: `${record.kind} ${record.applicationId} ${receipt.status}; trunk t${manifest.trunkVersion}; ${source.targetDigest}` });
+          const recorded = await recordOperationDelivery(deps.projectRoot, key); if (!recorded.ok) throw new Error(recorded.reason);
+        }
+      } catch (error) { receipt = pending(String(error)); }
+      if (!receipt.ok && receipt.status === "committed-pending-recovery") {
+        await services.vca.finalizeDirect({ applicationId: record.applicationId, receipt,
+          snapshotRef: { snapshotId: snapshot.snapshotId, digest: snapshot.digest }, resultTrunkVersion: manifest.trunkVersion, at: now().toISOString() }).catch(() => undefined);
+      }
+      return { ok: receipt.ok, status: receipt.status, applicationId: record.applicationId, operationId, receipt,
+        journalId: receipt.journalId, baseDigest: receipt.baseDigest ?? undefined, targetDigest: receipt.targetDigest ?? undefined,
+        ...(!receipt.ok ? { errorCode: "vca-apply-failed" as const, message: receipt.message } : {}) };
+      } catch (error) {
+        if (observed && (observed.ok || observed.status === "committed-pending-recovery") && observed.applicationId && observed.journalId && observed.targetDigest) {
+          const receipt: DirectActionReceipt = { ...observed, ok: false, status: "committed-pending-recovery", applicationId: observed.applicationId,
+            journalId: observed.journalId, targetDigest: observed.targetDigest, errorCode: "direct-effects-pending", message: String(error) };
+          return { ok: false, status: receipt.status, operationId, applicationId: receipt.applicationId, receipt,
+            errorCode: "vca-apply-failed", message: receipt.message, targetDigest: receipt.targetDigest };
+        }
+        return rejected(String(error), "vca-apply-failed");
+      }
+    },
+    async submit(input) {
+      return { ok: false, code: "vca-channel-unavailable", message: "Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed." };
     },
 
     async present(applicationId) {
       const record = await load(applicationId);
       if (record === undefined) return { ok: false, code: "vca-invalid", message: `VCA 不存在：${applicationId}` };
-      if (record.status !== "submitted") {
-        return { ok: false, code: "vca-conflict", message: `VCA 状态 ${record.status} 不能发批准卡` };
-      }
-      if (deps.presenter === undefined) {
-        return {
-          ok: false,
-          code: "vca-channel-unavailable",
-          message: "无客户卡通道：VCA 保持 submitted，可稍后重试（不伪造客户批准）",
-        };
-      }
-      const outcome = await deps.presenter.presentVersionChange({ applicationId, record });
-      if (outcome.outcome !== "answered") {
-        return {
-          ok: false,
-          code: "vca-channel-unavailable",
-          message: outcome.outcome === "declined" ? "客户卡未作答：保持 submitted，可重试" : "客户卡通道不可用：保持 submitted",
-        };
-      }
-      if (outcome.choice === "reject-version-change") {
-        const rejected = await this.reject(applicationId, outcome.decisionId);
-        if (!rejected.ok) {
-          // 卡片已作答但拒绝未完成：必须回显（否则客户只看到卡关闭、申请仍挂在待批）。
-          await notifyStatus(
-            record,
-            "处理失败",
-            `：拒绝未完成（${rejected.code}${rejected.message !== undefined ? ` ${rejected.message}` : ""}）；申请保持 ${record.status}，可重新呈现`,
-          );
-        }
-        return rejected.ok
-          ? { ok: true, value: { record: rejected.value, needsItems: false } }
-          : rejected;
-      }
-      const approved = await this.approve(applicationId, outcome.decisionId);
-      if (!approved.ok) {
-        // 卡片已作答但批准/应用未完成（如版本链校验失败）：同样回显，申请保持 submitted。
-        await notifyStatus(
-          record,
-          "处理失败",
-          `：批准未完成（${approved.code}${approved.message !== undefined ? ` ${approved.message}` : ""}）；申请保持 submitted，可重新呈现`,
-        );
-      }
-      return approved;
+      return { ok: false, code: "vca-channel-unavailable", message: record.status === "superseded" ? record.message : "Historical requests remain readable; ordinary customer approval cards cannot be presented. The original owner must explicitly resubmit through submitDirect." };
     },
 
     async approve(applicationId, decisionId) {
       const before = await load(applicationId);
       if (before === undefined) return { ok: false, code: "vca-invalid", message: `VCA 不存在：${applicationId}` };
+      if (before.status === "superseded") return { ok: false, code: "vca-conflict", message: before.message };
+      if (before.status !== "approved" || before.operationId || before.decisionId !== decisionId)
+        return { ok: false, code: "vca-conflict", message: "A new customer approval cannot settle a historical pending request; only a real prior approval may be recovered." };
       // AC-5：批准前 schema/roster/D3/版本链校验（fail-closed；不 approved、不冻结、不 re-pin）。
       if (before.kind === "version-upgrade") {
         const checked = await checkUpgradeChain(before);
@@ -616,68 +797,16 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
     },
 
     async reject(applicationId, decisionId, message) {
-      const at = now().toISOString();
-      const rejected = await services.vca.reject({
-        applicationId,
-        decisionId,
-        ...(message !== undefined ? { message } : {}),
-        at,
-      });
-      if (!rejected.ok) return rejected;
-      await emitEvents([versionChangeEvent(rejected.value, "rejected", at, message !== undefined ? { message } : {})]);
-      await notifyStatus(rejected.value, "rejected");
-      await notifyInitiator(rejected.value, `客户已拒绝 ${rejected.value.applicationId}（${rejected.value.kind}/${rejected.value.flowId}）。`);
-      return rejected;
+      const record = await load(applicationId);
+      if (record?.status === "rejected" && record.decisionId === decisionId) return { ok: true, value: record };
+      return { ok: false, code: "vca-conflict", message: "Historical pending requests are read-only; an old customer-card reply cannot mutate them." };
     },
 
     async runAmendmentItems(applicationId) {
       const record = await load(applicationId);
       if (record === undefined) return { ok: false, code: "vca-invalid", message: `VCA 不存在：${applicationId}` };
-      if (record.kind !== "detail-amendment") return { ok: false, code: "vca-invalid", message: "仅 detail-amendment 有逐项确认" };
-      if (record.status !== "approved") {
-        return { ok: false, code: "vca-conflict", message: `VCA 状态 ${record.status} 不能逐项确认（需 approved）` };
-      }
-      if (deps.presenter?.presentAmendmentItem === undefined) {
-        return { ok: false, code: "vca-channel-unavailable", message: "无逐项确认卡通道：保持 approved，可重试" };
-      }
-      if (record.amendmentDocPath === undefined) {
-        return { ok: false, code: "vca-invalid", message: "detail-amendment 缺少修正案文档" };
-      }
-      const validated = await trunkService.validateAmendment({
-        amendmentDocPath: record.amendmentDocPath,
-        flowId: record.flowId,
-      });
-      if (!validated.ok) return { ok: false, code: "vca-invalid", message: validated.message ?? validated.code };
-      const actual = validated.value.items.filter((item) => item.change !== "none");
-      const decisions: ItemDecision[] = [];
-      for (let index = 0; index < actual.length; index += 1) {
-        const item = actual[index]!;
-        const outcome = await deps.presenter.presentAmendmentItem({
-          applicationId,
-          item,
-          index,
-          total: actual.length,
-        });
-        if (outcome.outcome !== "answered") {
-          return {
-            ok: false,
-            code: "vca-channel-unavailable",
-            message: outcome.outcome === "declined" ? "逐项确认卡未作答：保持 approved，可重试" : "逐项确认卡通道不可用",
-          };
-        }
-        if (outcome.choice === "item-cancel-amendment") {
-          return { ok: true, value: { decisions, cancelled: true } };
-        }
-        decisions.push({
-          itemId: item.itemId,
-          choice: outcome.choice,
-          decisionId: outcome.decisionId,
-          ...(outcome.acknowledgments !== undefined ? { acknowledgments: outcome.acknowledgments } : {}),
-        });
-      }
-      return { ok: true, value: { decisions, cancelled: false } };
+      return { ok: false, code: "vca-channel-unavailable", message: "Final per-item customer cards are closed; the original rapporteur must explicitly resubmit the whole amendment." };
     },
-
     async applyAmendmentItems(applicationId, input) {
       const record = await load(applicationId);
       if (record === undefined) return { ok: false, code: "vca-invalid", message: `VCA 不存在：${applicationId}` };
@@ -803,8 +932,11 @@ export function createVersionChangeRuntime(deps: VersionChangeRuntimeDeps): Vers
       };
     },
 
-    list(filter) {
-      return services.vca.list(filter);
+    async list(filter) {
+      const records = await services.vca.list();
+      const view = records.map(record => withReplacementView(record, records));
+      return view.filter(record => (filter?.flowId === undefined || record.flowId === filter.flowId)
+        && (filter?.status === undefined || record.status === filter.status));
     },
   };
 }

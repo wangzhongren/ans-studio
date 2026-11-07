@@ -1,5 +1,11 @@
 # Pi 公开接口（ANS-RUNTIME-V2 revision 1 / P1）
 
+## 2026-11-05 T1.1 原生停止事实（owner 已实施，未独立验收）
+
+真实 RoleSession.nativeLifecycle 消费 Model 唯一 RuntimeNativeLifecycle/Facts；每 bind 的 instanceId 与实际 nativeSessionId/roleId/runtime=pi 绑定，coreTurnId 在 raw SDK prompt 开始时捕获并保留。inspect 跟踪 raw promise 最终返回、公开 SDK streaming/compacting/pending getters、tool start/end、自持 MCP transport 的公开 PID/真实 child close。legacy wrapper 原样透传同一 hook。
+
+stopAndInspect 校验 instance/Core turn，再共享一次 abort/shutdown/owned transport close 并有界等待。外层 timeout/SDK settled/abort/dispose 或 close promise 不证明退出；晚到事实仍能读取。没有 MCP 或未启动无 PID 也不推全覆盖。SDK 未提供整树、后台覆盖及 HTTP transport close，processCoverage/treeStatus 仍 unknown、不会报告 quiescent；Git 受管 surface 也保持 unknown。接口与原 abort/dispose API 不变，停止后的旧 native instance 不接新 prompt。精确16/16、关联35/35及7/7的实际范围/首红/指纹见[实施记录](docs/change/2026-11-05_change_direct-role-capabilities-native-stop.md)。
+
 中立类型单一入口是 `src/model/runtime.ts`。`src/provider/pi/session.ts` 显式转出原有 ToolCall/SessionEvent/PromptImage/PromptOptions/RoleSession/RuntimeAdapter、WriteGate/ShellGate、客户/操作者、报告、派发、审读及 Finalize 结果类型；新增 CustomerInputMetadata 也转出。没有第二份类型定义；已删除的 FinalizeBootstrapFn 不重建。
 
 `createPiRuntimeAdapter(options: RuntimeProviderOptions): RuntimeAdapter` 是 Service 生产入口。只接受 runtime=pi；输入工具及交互闸、currentTurnId、storage 直接消费。SDK 仍只在 bindRole 时加载；composeContext 仅渲染角色文本。完整工具定义以注入的 inputSchema/description/promptGuidelines/executionMode/handler 为准；SDK execute 原 signal 与调用 ID 原样交给该 handler。客户 metadata 的取消身份由核心 handler 捕获，本适配器不换为后来轮次 signal。
@@ -99,3 +105,33 @@ system 消息只在活动 prompt 中发出，reasonCode=PI_REASONING，state=con
 - pi-adapter 全量 40 文件：346/343/2/1（exit 1；2 项为既有 Windows symlink EPERM，新增失败/skip=0；`write-sequencing.test.ts` 排除）。
 - T2：`npm run typecheck` exit 0；T3 全量 4,130/4,103/9/18（9 项既有 EPERM；新增确定性失败 0、新增 skip 0）。
 - 候选：HEAD `0418746ae9f2ed20f389c26da34ef55840febfe6` + 工作树快照 `839b922f…`。实施记录见 [`docs/change/2026-11-05_governance-authority-matrix-pi-adapter-implementation.md`](docs/change/2026-11-05_governance-authority-matrix-pi-adapter-implementation.md)。
+
+## 2026-11-07 P1-B 应用中介工具面事实（implemented-unverified）
+
+依据 P1.6 §4.3/§4.6 Pi 行、团队计划 §7.2 与 P1-A 冻结接口（`src/model/runtime.ts`；本角色只读消费，未改形状）。
+
+**接口**：真实 Pi `RoleSession` 新增可选 `inspectApplicationToolSurface(): RuntimeApplicationToolSurfaceFacts`。仅当 `makeRoleSession` 同时收到 **bind 提供的 `nativeObservation`** 与**实际构造面快照**（`RoleSessionDeps.applicationToolSurface`）时才存在；缺一 ⇒ 方法缺席（fail-closed，无 bind/observation 即无事实）。
+
+**字段来源（报告面 = 实际构造面）**
+- `source:"application-mediated-tool-surface"`、`runtime:"pi"`、`factory:"pi-custom-tools"`、`status:"observed"`、`reasons:[]`。
+- `nativeInstanceId` = 本会话 `nativeLifecycle.instanceId`（同一 `randomUUID`）；`roleId` = bind 的 `role.id`；`observedAt` = 构造期快照时间。
+- `appTools` = 实际 `customTools` 名（与注入 `governedTools` 逐项同源；`getActiveToolNames()` 超面即构造失败现状不变）。
+- `foreignMcpServers` = 实际解析并注入 MCP 扩展的白名单 server 名（原名、精确枚举；Pi 无 ANS 自有 MCP；judge 会话强制零 MCP）。
+- `nativeBuiltinTools` = `[]`（生产固定 `noTools:"builtin"`）；接缝不硬编码——若传入非空则如实上报（供包装层 fail-closed）。
+- 同源对照（`customTools ↔ governedTools`、解析白名单 ↔ 注入声明）不一致 ⇒ 不提供事实；返回值与构造快照均为副本，不随调用方改写漂移。
+
+**范围/边界**：只描述应用注册面，不是 native 进程/传输/效果闭包证据；不改变工具注册、`noTools`、门禁/扩展、MCP/服务端工具、权限、hook、持久化、prompt/abort/dispose。生产 Service 路径（`RuntimeProviderOptions` 含 `tools`）直接返回真实会话；gate-based legacy `wrapSession` 未转发本可选方法（该文件不在本节点写集，已记录）。
+
+**验证**：`test/pi-adapter/application-surface.test.ts`（5 例：无 observation/构造面 fail-closed、桩件报告面=构造快照与身份绑定、nativeBuiltin 如实上报、真实 faux bind 的注入工具面、非空外来 MCP 精确枚举）。pi-adapter 40 文件同口径写前/写后 352/349/2/0/1（2 项既有 EPERM、1 源内 skip；`write-sequencing.test.ts` 按 B0 排除）；含新测试 41 文件 357/354/2/0/1；`npm run typecheck` exit 0。证据见 [`docs/change/2026-11-07_P1-B_pi-application-surface-evidence.md`](docs/change/2026-11-07_P1-B_pi-application-surface-evidence.md)。**未独立验收；未运行真实模型。**
+
+## 2026-11-07 E0 delta P-1/P-2/P-3：服务端工具启用即 fail-closed + `wrapSession` 条件转发（implemented-unverified）
+
+依据 E0 契约 `docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md`（`3830fe636849a89e5f604546420cffc0e78f862ab1e345cf4904b91ae1ed04b9`）§9.1/§9.2/§9.3 与 §11 Q7/Q8、P1.6 §4.6/§5.2 Pi 行。**状态 `implemented-unverified`（未独立验收；未运行真实模型）。**
+
+**P-1（`src/common/pi-adapter/real-adapter.ts`）**：`ANS_PI_SERVER_TOOLS` 解析后 `enabled.length > 0` ⇒ `bindRole` **不提供** `applicationToolSurface` ⇒ `inspectApplicationToolSurface` **方法缺席**（首选方案；不伪造 `status:"unknown"` fact、不新增 Model 字段）。理由：server tools 由扩展在 provider 请求 wire 上声明，既不进 `customTools`（不进 `appTools`），也不是 native builtin（`nativeBuiltinTools` 仍 `[]`）——冻结事实无法证明「应用默认注册面 + 无额外 native/服务端工具通道」。方法缺席 ⇒ Service 包装层 `composeRuntimeApplicationMediation` 的 `isRuntimeApplicationToolSurfaceFacts` 判假 ⇒ `applicationMediation` 缺席 ⇒ 派发父门 fail-closed（本节点只验证适配器层，未改 Service）。默认关闭 ⇒ 既有同源判定与 P1-B 事实逐字不变。另记内部诊断码 `pi-provider-server-tools-enabled-unverified`（`state:"unverified"`、`count`；仅诊断，不是 Model 字段/公开事实）。判断会话强制 `enabled:[]` ⇒ 不受影响。
+
+**P-2（`src/provider/pi/session.ts::wrapSession`）**：按 `inner` 实际存在性**条件转发**可选方法并绑定 `inner`（`inner.inspectApplicationToolSurface.bind(inner)`）；`inner` 无该方法 ⇒ 属性保持缺失（不伪造）。生产路径（`RuntimeProviderOptions` 含 `tools`）仍直接返回真实会话、不包 wrapper；legacy CLI/facade 由此与生产在应用面证据上一致。`wrapSession` 自本日起导出**仅供接线测试**（与 `real-adapter.ts::makeRoleSession` 测试接缝同口径），不是公共契约扩展。
+
+**P-3（测试）**：`test/pi-adapter/e0-server-tools-and-wrap-session.test.ts`（4 例，离线、不跑真实模型）：① server tools 启用 ⇒ 真实 `bindRole` 方法缺席（own-property 亦不存在）+ 诊断码恰一条；② 默认关闭 ⇒ 事实与 P1-B 一致（guard 通过、`status:"observed"`、`appTools`=实际注入名、身份绑定）；③ wrapper inner 有方法 ⇒ 绑定转发、结果逐字段一致；④ inner 无方法 ⇒ 属性缺失。既有 Pi 事实测试（`application-surface.test.ts` 5 例）保持通过。
+
+**验证**：Pi 套件（排除 `write-sequencing.test.ts`，B0 既有挂起）写前 41 文件 **357/354/2/0/1**；写后**同一 41 个既有文件**仍 **357/354/2/0/1**（逐项一致），含新测试的 42 文件 **361/358/2/0/1**（新增 4 tests / 4 pass；2 项既有 Windows symlink EPERM 逐条一致；skip 1 不变）；新测试单跑 **4/4**；`npm run typecheck` **exit 0**。证据见 [`docs/change/2026-11-07_E0_pi-server-tools-and-wrap-session-evidence.md`](docs/change/2026-11-07_E0_pi-server-tools-and-wrap-session-evidence.md)。**未改** `src/model/**`、`src/service/**`、其他适配器、`trunk-runtime.ts`、`src/provider/runtime/**`、T1 三文件、角色卡/边界/YAML/changelog、`docs/scheduling|acceptance|communication|planning`。

@@ -19,6 +19,10 @@ import { makeMechanicalRejection, type MechanicalRejection } from "./mechanical-
 import { collectDispatchAdvisories } from "./dispatch-advisories.ts";
 import type { DispatchAdvisory } from "./dispatch-advisories.ts";
 import type { ContractSchemaTopic } from "../../model/runtime.ts";
+import { isValidIntentId } from "../shared/intent-entry-contract.ts";
+// X-R4（E2 S3）：convener 来源的派发硬授权改读角色模块 `dispatch()`（来源模块权威；R-2：hub/legacy/
+// review 路由、run/module/D3/roster/交付属主与报告时点仍留在引擎，不进入模块）。
+import { convenerRoleModule, CONVENER_WORKER_DISPATCH_TARGETS } from "../roles/convener/index.ts";
 
 export type { DispatchAdvisory, DispatchAdvisoryCode } from "./dispatch-advisories.ts";
 
@@ -28,6 +32,84 @@ export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
 export const PROJECT_MODULES_SCHEMA = "project-modules/v2" as const;
 export const PROJECT_TOPOLOGY_SCHEMA = "project-topology/v2" as const;
 export const PROJECT_PROPOSAL_SCHEMA = "project-proposal/v2" as const;
+export const TEAM_PLAN_SCHEMA = "teamPlanSchema:3" as const;
+
+export interface TeamPlanFacts {
+  schema: typeof TEAM_PLAN_SCHEMA;
+  flowId: string;
+  version: number;
+  modules: { path: string; sha256: string };
+  roster: { path: string; sha256: string };
+  roleRows: Array<{ roleId: string; modules: string[]; writesets: string[]; dependsOn: string[] }>;
+}
+
+/** Planning coordination precedes D3 and role activation; these are never inferred from this result. */
+export function evaluatePlanningHandoff(input: { fromRoleId: string; targetRoleId: string; flowId: string;
+  proposal: { path: string; sha256: string }; modules: { path: string; sha256: string }; roster: { path: string; sha256: string };
+  rosterFacts: ProjectRoster; modulesFacts: ProjectModulesDoc }): { ok: true } | { ok: false; reason: string } {
+  if (input.fromRoleId !== "chief" || input.targetRoleId !== "convener") return { ok: false, reason: "Planning coordination is the real chief-to-convener route" };
+  if (input.rosterFacts.flowId !== input.flowId || input.modulesFacts.flowId !== input.flowId
+    || input.rosterFacts.proposal !== input.proposal.path || (input.rosterFacts.modulesDoc !== undefined && input.rosterFacts.modulesDoc !== input.modules.path)
+    || JSON.stringify(input.rosterFacts.modules) !== JSON.stringify(input.modulesFacts.modules)
+    || [input.proposal, input.modules, input.roster].some(ref => !ref.path || !/^[a-f0-9]{64}$/i.test(ref.sha256)))
+    return { ok: false, reason: "Planning needs the real consistent proposal, roster and authoritative modules references" };
+  return { ok: true };
+}
+
+/** Plan formation only: ownership comes from the supplied parsed roster, never from this plan. */
+export function parseTeamPlan(text: string, context: {
+  flowId: string; version: number; modules: TeamPlanFacts["modules"]; roster: TeamPlanFacts["roster"]; rosterFacts: ProjectRoster;
+}): { ok: true; plan: TeamPlanFacts } | { ok: false; reason: string } {
+  const invalid = (reason: string) => ({ ok: false as const, reason });
+  const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+  const exact = (value: Record<string, unknown>, fields: string[]) => Object.keys(value).length === fields.length && fields.every(key => Object.hasOwn(value, key));
+  const strings = (value: unknown, empty = false): value is string[] => Array.isArray(value) && (empty || value.length > 0)
+    && value.every(item => typeof item === "string" && item.trim() === item && item.length > 0) && new Set(value).size === value.length;
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  if (!match) return invalid("Team plan requires its machine frontmatter; a schema-only historical plan is read-only");
+  let parsed: unknown; try { parsed = parseYaml(match[1]!); } catch { return invalid("Team plan YAML is invalid or ambiguous"); }
+  if (!object(parsed) || !exact(parsed, ["schema", "flowId", "version", "modules", "roster", "roleRows"])
+    || parsed.schema !== TEAM_PLAN_SCHEMA || parsed.flowId !== context.flowId || parsed.version !== context.version
+    || !Number.isSafeInteger(parsed.version) || (parsed.version as number) < 1) return invalid("Team plan schema, fields, flow or version differ from its real reference");
+  for (const key of ["modules", "roster"] as const) {
+    const ref = parsed[key], expected = context[key];
+    if (!object(ref) || !exact(ref, ["path", "sha256"]) || ref.path !== expected.path || ref.sha256 !== expected.sha256
+      || !/^[a-f0-9]{64}$/i.test(expected.sha256)) return invalid(`Team plan ${key} reference differs from the applicable immutable baseline`);
+  }
+  if (!Array.isArray(parsed.roleRows) || parsed.roleRows.length !== context.rosterFacts.roles.length || !parsed.roleRows.length)
+    return invalid("Team plan role rows must cover the real roster exactly once");
+  const rows: TeamPlanFacts["roleRows"] = [], seen = new Set<string>(), writes: Array<{ roleId: string; path: string }> = [];
+  for (const row of parsed.roleRows) {
+    if (!object(row) || !exact(row, ["roleId", "modules", "writesets", "dependsOn"]) || typeof row.roleId !== "string"
+      || seen.has(row.roleId) || !strings(row.modules) || !strings(row.writesets) || !strings(row.dependsOn, true)) return invalid("Team plan role, modules, writesets and explicit dependency arrays are required and unique");
+    const role = context.rosterFacts.roles.find(role => role.id === row.roleId);
+    if (!role || [...role.modules].sort().join("\0") !== [...row.modules].sort().join("\0")) return invalid("Team plan cannot assign unknown roles/modules or change the roster's module owner");
+    const roots = context.rosterFacts.modules.filter(module => role.modules.includes(module.id)).flatMap(module => module.paths);
+    const writesets = row.writesets;
+    for (const raw of writesets) {
+      const normalized = normalizeModulePath(raw);
+      if (!normalized || normalized.path !== raw || /[\\:\x00-\x1f]/.test(raw) || isGovernanceDirectory(raw)
+        || !roots.some(root => root === raw || (root.endsWith("/") && raw.startsWith(root)))) return invalid(`Team plan writeset exceeds its roster owner: ${row.roleId}`);
+      if (writes.some(write => modulePathsOverlap(write.path, raw))) return invalid("Team plan contains overlapping writers or duplicate writesets");
+      writes.push({ roleId: row.roleId, path: raw });
+    }
+    if (role.modules.some(moduleId => !context.rosterFacts.modules.find(module => module.id === moduleId)?.paths.some(root => writesets.some(write => write === root || (root.endsWith("/") && write.startsWith(root))))))
+      return invalid("Every assigned module needs a concrete writeset within its own root");
+    seen.add(row.roleId); rows.push({ roleId: row.roleId, modules: [...row.modules], writesets: [...row.writesets], dependsOn: [...row.dependsOn] });
+  }
+  if (rows.some(row => row.dependsOn.some(roleId => roleId === row.roleId || !seen.has(roleId)))) return invalid("Team plan dependency is unknown or refers to itself");
+  const visiting = new Set<string>(), complete = new Set<string>();
+  const visit = (roleId: string): boolean => {
+    if (visiting.has(roleId)) return false;
+    if (complete.has(roleId)) return true;
+    visiting.add(roleId);
+    if (!rows.find(row => row.roleId === roleId)!.dependsOn.every(visit)) return false;
+    visiting.delete(roleId); complete.add(roleId); return true;
+  };
+  if (!rows.every(row => visit(row.roleId))) return invalid("Team plan dependencies contain a cycle");
+  return { ok: true, plan: { schema: TEAM_PLAN_SCHEMA, flowId: context.flowId, version: context.version,
+    modules: { ...context.modules }, roster: { ...context.roster }, roleRows: rows } };
+}
 
 // 2026-11-03（contract_check topic）：本文件的 schema 文本/示例（`contractSchemaText` 与
 // `PROJECT_*_SCHEMA_EXAMPLE`）必须与解析规则、错误文案同步修改；改校验/文案时同步更新上述常量与文本。
@@ -1267,6 +1349,15 @@ export function rosterRoleIds(roster: ProjectRoster): string[] {
   return roster.roles.map((role) => role.id);
 }
 
+/**
+ * X-R3（E2 S4）：名单是否含内置治理角色 id（含旧 su/liaison）。
+ * D3 卡事实键 `rosterContainsBuiltInRoleIds` 的唯一来源；`parseProjectRoster` 已在加载期拒绝这些 id，
+ * 故经 `loadLatestRoster` 合法返回的名单恒为 false——仍按真实名单计算，不硬编码结论。
+ */
+export function rosterContainsBuiltInRoleIds(roster: ProjectRoster): boolean {
+  return roster.roles.some((role) => BUILT_IN_ROLE_IDS.has(role.id));
+}
+
 /** 名单给某角色的授权目录；角色不在名单 ⇒ undefined。
  * 2026-10-29（客户追加口径 v2.6）：唯一来源是 `roles[].modules[]` 绑定的模块文件夹地址并集
  * （角色可多模块；同父兄弟目录合法）。 */
@@ -1324,6 +1415,43 @@ export function validateAppointmentCardAgainstRoster(input: {
     }
   }
   return { ok: true, recommendedRoleIds: rosterIds };
+}
+
+/**
+ * X-R3（E2 S4）：nominator 模块 `preflight.checkAction("appointment")` 的 `d3-card` 阶段事实包投影。
+ *
+ * 事实**只取自已校验输入**：
+ *  - `LoadedRoster`（`loadLatestRoster` 的成功产物：版本/字节 SHA-256/roles/envBootstrap 均已校验）；
+ *  - 已通过 `validateAppointmentCardAgainstRoster` 的卡形状（multiple=true、选项集合=名单、推荐集=名单顺序）。
+ *
+ * 严格按 `角色卡/nominator-code/api-spec.md` 的 `stage: "d3-card"` 登记键构造；未登记键一律不传
+ * （模块按 §3.4/D4 拒绝未知键）。`intentEntryConsistent` 是可选诊断事实（E2 D-1）：旧 D3 卡路径不校验，
+ * 故**不传**；模块缺失也不拒绝。
+ *
+ * 返回 `undefined` = 事实包无法按 api-spec 构造（名单 flowId 不是治理 slug）⇒ 调用方跳过模块调用，
+ * 保留迁移前路径（E2.2 零差异：不新增拒绝条件）。
+ */
+export function nominationD3CardFacts(input: {
+  roster: LoadedRoster;
+  multiple: boolean;
+  optionIds: readonly string[];
+  recommendedRoleIds: readonly string[];
+}): Record<string, unknown> | undefined {
+  const roster = input.roster.roster;
+  if (!isValidIntentId(roster.flowId)) return undefined;
+  return {
+    stage: "d3-card",
+    flowId: roster.flowId,
+    rosterFound: true,
+    rosterVersion: input.roster.version,
+    rosterSha256: input.roster.sha256,
+    rosterRoleIds: rosterRoleIds(roster),
+    rosterEnvBootstrapOmitted: roster.envBootstrap?.omitted === true,
+    rosterContainsBuiltInRoleIds: rosterContainsBuiltInRoleIds(roster),
+    d3CardMultiple: input.multiple,
+    d3CardOptionRoleIds: [...input.optionIds],
+    d3CardRecommendedRoleIds: [...input.recommendedRoleIds],
+  };
 }
 
 // —————————————————————— 派发矩阵（M1–M8） ——————————————————————
@@ -1446,6 +1574,16 @@ function resolveTargetExists(input: Pick<DispatchPreflightInput, "targetExists" 
 }
 
 /**
+ * X-R4（E2 S3/数据消费）：convener 可派发的内置目标（角色模块纯数据 `CONVENER_WORKER_DISPATCH_TARGETS`，
+ * 唯一来源）。R-2：本数据只表达「convener 来源可向哪些内置目标派发」，不驱动 hub/legacy/review 路由、
+ * run/module/D3/roster/交付属主或报告时点——这些仍在 `apply-journal.ts` / 本文件 / 桌面路由。
+ * 迁移前字面量为 `targetRoleId === "verifier"`（§5.2 X-R4「worker 派发目标」消费点）。
+ */
+export function isConvenerBuiltInDispatchTarget(targetRoleId: string): boolean {
+  return (CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds as readonly string[]).includes(targetRoleId);
+}
+
+/**
  * 硬授权唯一谓词：只判定「谁能给谁派发、目标是否真实存在」。
  * 不读盘、不写盘、不接收任何状态/run/名单/模块事实。
  */
@@ -1474,21 +1612,36 @@ export function evaluateDispatchAuthorization(input: DispatchAuthorizationInput)
   }
 
   // 来源=运营（`chiefRoleId === null` 时也能到达这里）
-  if (targetBuiltIn && targetRoleId !== "verifier") {
-    return reject(
-      "convener-target-forbidden",
-      "派发未受理：运营只能给项目 worker（实现）或质检（验收核对）派发；不得派产品/策划/人事/幕僚。",
-    );
-  }
-  if (targetBuiltIn) return { ok: true };
-  if (!targetExists) {
+  // X-R4（E2 S3）：**来源模块权威**——convener 分支改读已装配角色模块 `dispatch()`（硬身份/存在性；
+  // R-2：hub/legacy/review 路由与 run/module/D3 等事实仍在本引擎/Service）。模块内部 code 只作诊断，
+  // 对外仍返回迁移前稳定 code/message（E2 评审 §6：模块 messageKey 不进对外文案）。
+  {
+    const policy = convenerRoleModule.dispatch({
+      sourceRoleId: fromRoleId,
+      targetRoleId,
+      targetKind: targetBuiltIn ? "built-in-governance" : "project",
+      targetExists,
+    });
+    if (policy.decision.allow) return { ok: true };
+    const code = policy.decision.code;
+    if (code === "convener-target-forbidden") {
+      return reject(
+        "convener-target-forbidden",
+        "派发未受理：运营只能给项目 worker（实现）或质检（验收核对）派发；不得派产品/策划/人事/幕僚。",
+      );
+    }
+    if (code === "self-dispatch") return reject("self-dispatch", "派发未受理：不能派发给自己。");
+    if (code === "dispatch-source-invalid") {
+      return reject("unknown-source", "派发未受理：只有幕僚或运营可以在 trio 模型下派发任务。");
+    }
+    // dispatch-target-missing / dispatch-target-invalid / dispatch-target-kind-invalid：均映射既有
+    // 「目标不存在/未枚举到」回执（空 id/未知类别为宿主事实违约，生产调用方在更早层拒绝）。
     return reject(
       "target-card-missing",
       `派发未受理：目标角色不存在/未枚举到（${targetRoleId}）；可能是角色卡或边界未就绪、id 拼写错误，或本次角色枚举不可用。` +
         "请先确认目标 id 是否正确、是否为真实存在的项目角色；若目标是项目 worker 且尚未写卡，请人事按 D3 完成写卡后重试。",
     );
   }
-  return { ok: true };
 }
 
 /**
@@ -1500,7 +1653,10 @@ export function evaluateDispatchPreflight(input: DispatchPreflightInput): Dispat
     fromRoleId: input.fromRoleId,
     targetRoleId: input.targetRoleId,
     targetBuiltIn: input.targetBuiltIn,
-    targetExists: resolveTargetExists(input),
+    // X-R4（E2 S3）：复合入口对内建目标强制 `targetExists=true`，保留迁移前「内置目标不读存在性」
+    // 的旧行为；模块 `dispatch()` 的显式存在性要求只对窄入口外部调用方的显式 false/缺省更严格
+    // （E2 接口评审 §7.2 第 3 条：登记为更严差异，不改变复合入口/桌面行为）。
+    targetExists: input.targetBuiltIn ? true : resolveTargetExists(input),
     chiefRoleId: input.chiefRoleId,
     convenerRoleId: input.convenerRoleId,
   });

@@ -5,7 +5,7 @@
 | 类型 | 可操作路径 | 用途 |
 | --- | --- | --- |
 | 单文件 | `src/model/boundary.ts` | 边界条目与 Section 1 的共享类型 |
-| 单文件 | `src/model/role.ts` | 角色与来源的共享类型 |
+| 单文件 | `src/model/role.ts` | 角色与来源的共享类型；E0 起扩展角色模块公开契约类型（`BuiltInRoleModule` 等公开形状） |
 | 单文件 | `src/model/decision.ts` | 写入判定结果的共享类型 |
 | 单文件 | `src/model/governance-matrix.ts` | 治理权力矩阵共享类型（`governance-matrix/v1`：来源/unknown 枚举、工具结果契约、`GovernanceMatrixFn`；无 I/O；本角色为唯一主属主） |
 | 单文件 | `src/service/boundary/resolve-boundary.ts` | 双来源边界解析（含项目覆盖） |
@@ -13,7 +13,7 @@
 | 单文件 | `src/service/gate/resolve-write.ts` | 路径判定 |
 | 单文件 | `src/service/gate/shell-rules.ts` | shell 规则集公开再导出（编排 shell 闸 (c) 层的合法注入源；客户 2026-10-12 确认） |
 | 目录（私有） | `src/service/governance-matrix/` | 矩阵组装/渲染 Service 的有界私有模块根（纯组装与有界渲染；不调用其他 Service、不读盘、不写盘；不构成 `src/service/` 整目录授权） |
-| 目录（私有） | `src/common/门禁引擎/` | 本角色私有辅助代码 |
+| 目录（私有） | `src/common/门禁引擎/` | 本角色私有辅助代码；`governance-roles.ts` 为角色规格数据的门面/装配层（规格正文迁出到各角色模块，E2 逐单元切换后删除内联规格） |
 | 目录（测试） | `test/门禁引擎/` | 本角色的单元与层契约测试及夹具 |
 | 单文件 | `角色卡/门禁引擎/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/门禁引擎/memo.md` | 本角色工作备忘录 |

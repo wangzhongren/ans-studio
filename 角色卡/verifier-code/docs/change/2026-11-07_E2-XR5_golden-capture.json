@@ -1,0 +1,1351 @@
+{
+  "meta": {
+    "task": "2026-11-07-runtime-gate-role-modularization / E2 X-R5 verifier fixture goldenization",
+    "generatedAt": "2026-11-07T13:53:19.876Z",
+    "node": "v24.22.1",
+    "repoRoot": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment",
+    "payloadSha256": "3c4e7a3aaf4a8ceb980145be4622000e6ec2462c7be85fa2f264da10ab9920c0"
+  },
+  "spec": {
+    "id": "verifier",
+    "displayName": "质检",
+    "function": "verification",
+    "entries": [
+      {
+        "root": "project",
+        "path": "docs/quality/",
+        "kind": "directory",
+        "purpose": "质量记录 / 可选核对（D 批目标写区）"
+      },
+      {
+        "root": "project",
+        "path": "docs/verification/",
+        "kind": "directory",
+        "purpose": "可选核对证据附件（不是验收结论）"
+      },
+      {
+        "root": "project",
+        "path": "docs/governance/verifier/",
+        "kind": "directory",
+        "purpose": "质检的治理工作记录"
+      }
+    ],
+    "preauthorizedDirs": [
+      "docs/quality/",
+      "docs/verification/",
+      "docs/governance/verifier/"
+    ],
+    "forbiddenWritePaths": [
+      ".ans/",
+      "docs/bootstrap-manifest.md",
+      "角色卡/governance-boundary.yaml",
+      "角色卡/chief/",
+      "角色卡/product/",
+      "角色卡/rapporteur/",
+      "角色卡/nominator/",
+      "角色卡/convener/",
+      "角色卡/verifier/",
+      "角色卡/su/",
+      "docs/intents/",
+      "docs/proposals/",
+      "docs/contracts/",
+      "docs/nominations/",
+      "docs/skills/",
+      "docs/mcp/",
+      "docs/workflow.md"
+    ],
+    "capabilities": {
+      "customerInput": true,
+      "dispatchTask": false,
+      "roleStatus": false,
+      "sessionTail": false,
+      "installSkill": false,
+      "installMcp": false,
+      "shell": "operator-approve"
+    },
+    "cards": [
+      "acceptance"
+    ],
+    "cardText": {
+      "length": 2250,
+      "lineCount": 16,
+      "sha256": "ac9511ac64603ea5b14a1436854c78160f7c903d779e74400bc7b263cc165199"
+    }
+  },
+  "toolsCatalog": [
+    {
+      "id": "roleActivityLog",
+      "name": "role_activity_log",
+      "allowedRoleIds": [
+        "chief"
+      ]
+    },
+    {
+      "id": "terminateRoleRun",
+      "name": "terminate_role_run",
+      "allowedRoleIds": [
+        "chief"
+      ]
+    },
+    {
+      "id": "redispatchTask",
+      "name": "redispatch_task",
+      "allowedRoleIds": [
+        "chief"
+      ]
+    },
+    {
+      "id": "projectNote",
+      "name": "project_note",
+      "allowedRoleIds": [
+        "chief"
+      ]
+    },
+    {
+      "id": "requestVersionDecision",
+      "name": "request_version_decision",
+      "allowedRoleIds": [
+        "chief"
+      ]
+    },
+    {
+      "id": "requestRequirementChange",
+      "name": "request_requirement_change",
+      "allowedRoleIds": [
+        "rapporteur",
+        "convener"
+      ]
+    },
+    {
+      "id": "submitVersionChange",
+      "name": "submit_version_change",
+      "allowedRoleIds": [
+        "product",
+        "rapporteur"
+      ]
+    },
+    {
+      "id": "selectRunChange",
+      "name": "select_run_change",
+      "allowedRoleIds": [
+        "rapporteur"
+      ]
+    },
+    {
+      "id": "completeTeamPlan",
+      "name": "complete_team_plan",
+      "allowedRoleIds": [
+        "convener"
+      ]
+    },
+    {
+      "id": "activateRoleDocuments",
+      "name": "activate_role_documents",
+      "allowedRoleIds": [
+        "nominator"
+      ]
+    },
+    {
+      "id": "closeCreatedTask",
+      "name": "close_created_task",
+      "allowedRoleIds": [
+        "chief",
+        "convener"
+      ]
+    },
+    {
+      "id": "submitRefactor",
+      "name": "submit_refactor",
+      "allowedRoleIds": [
+        "convener"
+      ]
+    },
+    {
+      "id": "requestStableWrite",
+      "name": "request_stable_write",
+      "allowedRoleIds": [
+        "convener"
+      ]
+    },
+    {
+      "id": "decidePendingRequest",
+      "name": "decide_pending_request",
+      "allowedRoleIds": [
+        "chief"
+      ],
+      "chiefIndependentDecisionOnly": true
+    }
+  ],
+  "toolsDeclaration": {
+    "trio": {
+      "tools": [],
+      "reasons": [],
+      "validation": {
+        "allow": true,
+        "tools": [],
+        "reasons": []
+      }
+    },
+    "single": {
+      "tools": [],
+      "reasons": [],
+      "validation": {
+        "allow": true,
+        "tools": [],
+        "reasons": []
+      }
+    }
+  },
+  "dispatch": [
+    {
+      "name": "chief → verifier（hub 新任务）",
+      "input": {
+        "sourceRoleId": "chief",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "oldCode": null,
+      "oldReportToRoleId": "chief",
+      "expectedAllow": true,
+      "expectedCode": null,
+      "expectedReportToRoleId": "chief",
+      "knownDelta": null
+    },
+    {
+      "name": "convener → verifier（历史路径，仍按真实 creator 回报）",
+      "input": {
+        "sourceRoleId": "convener",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "oldCode": null,
+      "oldReportToRoleId": "convener",
+      "expectedAllow": true,
+      "expectedCode": null,
+      "expectedReportToRoleId": "convener",
+      "knownDelta": null
+    },
+    {
+      "name": "product → verifier（非真实派发来源）",
+      "input": {
+        "sourceRoleId": "product",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "unknown-source",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "unknown-source",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "rapporteur → verifier（非真实派发来源）",
+      "input": {
+        "sourceRoleId": "rapporteur",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "unknown-source",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "unknown-source",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "nominator → verifier（非真实派发来源）",
+      "input": {
+        "sourceRoleId": "nominator",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "unknown-source",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "unknown-source",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "项目角色 → verifier（非真实派发来源）",
+      "input": {
+        "sourceRoleId": "implementer",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "unknown-source",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "unknown-source",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "verifier → verifier（自派禁止）",
+      "input": {
+        "sourceRoleId": "verifier",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "self-dispatch",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "self-dispatch",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "chief → verifier 但 targetKind=project（结构性禁止）",
+      "input": {
+        "sourceRoleId": "chief",
+        "targetRoleId": "verifier",
+        "targetKind": "project",
+        "targetExists": true
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "chief-to-project-forbidden",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "chief-to-project-forbidden",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "chief → verifier 但 targetKind=project 且 targetExists=false（kind 先于存在性）",
+      "input": {
+        "sourceRoleId": "chief",
+        "targetRoleId": "verifier",
+        "targetKind": "project",
+        "targetExists": false
+      },
+      "differential": "zero",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "chief-to-project-forbidden",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "chief-to-project-forbidden",
+      "expectedReportToRoleId": null,
+      "knownDelta": null
+    },
+    {
+      "name": "缺省 sourceRoleId（fail-closed；旧函数同判 unknown-source）",
+      "input": {
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "module-only",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "unknown-source",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "unknown-source",
+      "expectedReportToRoleId": null,
+      "knownDelta": "dispatch-scope"
+    },
+    {
+      "name": "targetRoleId=product（本模块只覆盖向 verifier 的派发）",
+      "input": {
+        "sourceRoleId": "chief",
+        "targetRoleId": "product",
+        "targetKind": "built-in-governance",
+        "targetExists": true
+      },
+      "differential": "module-only",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "oldCode": null,
+      "oldReportToRoleId": "chief",
+      "expectedAllow": false,
+      "expectedCode": "target-not-verifier",
+      "expectedReportToRoleId": null,
+      "knownDelta": "dispatch-scope"
+    },
+    {
+      "name": "convener → verifier 但 targetKind=project（不可能事实；旧函数因 targetExists=true 放行）",
+      "input": {
+        "sourceRoleId": "convener",
+        "targetRoleId": "verifier",
+        "targetKind": "project",
+        "targetExists": true
+      },
+      "differential": "documented",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "oldCode": null,
+      "oldReportToRoleId": "convener",
+      "expectedAllow": false,
+      "expectedCode": "target-kind-mismatch",
+      "expectedReportToRoleId": null,
+      "knownDelta": "dispatch-kind-mismatch"
+    },
+    {
+      "name": "convener → verifier 但 targetKind=project 且 targetExists=false（拒绝码不同）",
+      "input": {
+        "sourceRoleId": "convener",
+        "targetRoleId": "verifier",
+        "targetKind": "project",
+        "targetExists": false
+      },
+      "differential": "documented",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "oldCode": "target-card-missing",
+      "oldReportToRoleId": null,
+      "expectedAllow": false,
+      "expectedCode": "target-kind-mismatch",
+      "expectedReportToRoleId": null,
+      "knownDelta": "dispatch-kind-mismatch"
+    },
+    {
+      "name": "chief → verifier 且 targetExists=false（契约要求缺省/未知即拒绝）",
+      "input": {
+        "sourceRoleId": "chief",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance",
+        "targetExists": false
+      },
+      "differential": "documented",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "oldCode": null,
+      "oldReportToRoleId": "chief",
+      "expectedAllow": false,
+      "expectedCode": "target-card-missing",
+      "expectedReportToRoleId": null,
+      "knownDelta": "dispatch-existence"
+    },
+    {
+      "name": "chief → verifier 且 targetExists 缺省（缺事实即拒绝）",
+      "input": {
+        "sourceRoleId": "chief",
+        "targetRoleId": "verifier",
+        "targetKind": "built-in-governance"
+      },
+      "differential": "documented",
+      "oldAnchor": "workflow-preconditions.ts::evaluateDispatchAuthorization + reportTargetForTaskCreator（E1 捕获期；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "oldCode": null,
+      "oldReportToRoleId": "chief",
+      "expectedAllow": false,
+      "expectedCode": "target-card-missing",
+      "expectedReportToRoleId": null,
+      "knownDelta": "dispatch-existence"
+    }
+  ],
+  "preflight": [
+    {
+      "name": "合法 reviewTarget（sha1）+ 1 项 criteria",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "expectedAllow": true,
+      "expectedCode": null,
+      "knownDelta": null
+    },
+    {
+      "name": "合法 reviewTarget（sha256）+ 2 项不同 criteria",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-2",
+          "candidate": {
+            "objectFormat": "sha256",
+            "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha256",
+              "hex": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            },
+            "path": "docs/verification/flow-1-evidence.md",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": true,
+      "expectedAllow": true,
+      "expectedCode": null,
+      "knownDelta": null
+    },
+    {
+      "name": "缺 reviewTarget",
+      "facts": {
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-missing",
+      "knownDelta": null
+    },
+    {
+      "name": "缺 criteria",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        }
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-missing",
+      "knownDelta": null
+    },
+    {
+      "name": "facts 为空",
+      "facts": {},
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-missing",
+      "knownDelta": null
+    },
+    {
+      "name": "reviewTarget 多一个键（形状不符）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          },
+          "kind": "git-candidate-review"
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-target-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "reviewTarget.operationId 为空串（CID 缺失）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-target-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "reviewTarget.candidate 只有 39 hex（非完整最终候选 OID）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "000000000000000000000000000000000000000"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-target-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "reviewTarget.candidate 未知 objectFormat",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "md5",
+            "hex": "00000000000000000000000000000000"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-target-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria 为空数组",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": []
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria 超过 16 项",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-0.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-2.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-3.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-4.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-5.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-6.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-7.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-8.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-9.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-10.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-11.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-12.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-13.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-14.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-15.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/f-16.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria 重复（objectFormat+hex+path 相同）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria path 含通配（非字面路径）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/*.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria sha256 只有 63 hex",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria 不是数组",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": "docs/quality/flow-1-report-v1.md"
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "criteria 项多一个键（形状不符）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "note": "x"
+          }
+        ]
+      },
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-criteria-invalid",
+      "knownDelta": null
+    },
+    {
+      "name": "合法形状 + 未登记 accepted/passed（值一律不读取，未登记键即 deny）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "accepted": false,
+        "passed": false
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": true,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "合法形状 + 未登记 accepted/passed/approved（E2 评审实测走私输入）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "accepted": true,
+        "passed": true,
+        "approved": true
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": true,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "合法形状 + 未登记 smuggledDecision（未登记键先于形状/缺键）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "smuggledDecision": "accept"
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": true,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "非法形状 + 未登记 accepted/passed/approved（未登记键先于形状判定）",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "accepted": true,
+        "passed": true,
+        "approved": true
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "缺 reviewTarget + 未登记 accepted（未登记键先于缺键判定）",
+      "facts": {
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ],
+        "accepted": true
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "未登记键值为 undefined 仍是未登记键",
+      "facts": {
+        "reviewTarget": {
+          "operationId": "review-op-1",
+          "candidate": {
+            "objectFormat": "sha1",
+            "hex": "0123456789abcdef0123456789abcdef01234567"
+          }
+        },
+        "criteria": [
+          {
+            "oid": {
+              "objectFormat": "sha1",
+              "hex": "0123456789abcdef0123456789abcdef01234567"
+            },
+            "path": "docs/quality/flow-1-report-v1.md",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": true,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "只有未登记键（facts 非空但无登记键）",
+      "facts": {
+        "accepted": true,
+        "passed": true
+      },
+      "differential": "documented",
+      "oldAnchor": "E2 接口评审 P5 / E0.3 §3.4 D4（旧形状 oracle 不检查顶层事实键；模块未登记键一律 deny）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-unknown-key",
+      "knownDelta": "preflight-facts-unknown-key"
+    },
+    {
+      "name": "facts 为 null（非普通对象，fail-closed）",
+      "facts": null,
+      "differential": "zero",
+      "oldAnchor": "model/runtime.ts::isDispatchTaskReviewTarget + isTaskReviewBasisRef（E1 形状 oracle；旧实现删除后仅作历史锚点）",
+      "oldAllow": false,
+      "expectedAllow": false,
+      "expectedCode": "review-facts-missing",
+      "knownDelta": null
+    }
+  ],
+  "knownDeltas": [
+    "dispatch-scope：模块只回答向 verifier 的派发；缺省 sourceRoleId / 非 verifier 目标等模块独有负例旧函数无法表达（运行期分别落 unknown-source / allow），只冻结模块行为与旧观测值，不作 allow 位差额登记。",
+    "dispatch-existence：chief → verifier 且 targetExists=false/缺省（2 例）：旧硬授权对内置目标不读单独 targetExists 返回 allow；模块按契约 §3.1/D4 要求宿主显式核验（缺省即 false），fail-closed 拒绝 target-card-missing。",
+    "dispatch-kind-mismatch：convener → verifier 且 targetKind=project（exists=true/false，2 例）：旧函数因 project+exists=true 放行或报 target-card-missing；模块先判 kind 一致性，fail-closed 拒绝 target-kind-mismatch（内置 id 不能作项目角色 id）。",
+    "preflight-facts-unknown-key：E2 P5 修复——旧 Model 形状 oracle 不检查顶层事实键；合法形状 + 未登记 accepted/passed/approved/smuggledDecision 等键时旧放行（4 例），模块按契约 §3.4/D4 一律 deny review-facts-unknown-key（更严，非放宽；值不被读取）。",
+    "tools-declaration：D1 ROLE_TOOL_CATALOG 14 项无一允许 verifier；旧 validateRoleToolDeclaration('verifier', []) 捕获期 allow:true/tools:[]/reasons:[]；模块声明空集，实际注入仍由引擎按治理模型/宿主能力门控。",
+    "cards-source-oracle：旧 run-role.ts::TRIO_CARD_KINDS.verifier 源码 oracle = ['acceptance']（E1 捕获期）；编排 S2 切换/删除后 cards 唯一真源为模块，金样冻结 ['acceptance'] 且 D8 无 legacy token。"
+  ],
+  "counts": {
+    "specFields": 8,
+    "cardText": 1,
+    "cards": 1,
+    "toolsCatalog": 14,
+    "toolsDeclaration": 2,
+    "dispatchCases": 15,
+    "dispatchZero": 9,
+    "dispatchDocumented": 4,
+    "dispatchModuleOnly": 2,
+    "preflightCases": 24,
+    "preflightZero": 17,
+    "preflightDocumented": 7,
+    "knownDeltas": 6,
+    "fixtureComparisons": 64
+  },
+  "deltaCounts": {
+    "dispatch": {
+      "dispatch-scope": 2,
+      "dispatch-existence": 2,
+      "dispatch-kind-mismatch": 2
+    },
+    "preflight": {
+      "preflight-facts-unknown-key": 7
+    },
+    "documentedStricterOldAllow": 4
+  },
+  "capture": {
+    "governanceRoles": {
+      "path": "src/common/门禁引擎/governance-roles.ts",
+      "lineCount": 794,
+      "sha256": "fddda111cb1ea76614f632f931441d45e534e4f9f23297193615fbdf525cd16e",
+      "anchors": "verifier 内联规格 / VERIFIER_CARD_TEXT / BUILT_IN_ROLE_DIR_PREFIXES（E1 捕获期）",
+      "capturedAt": "E1（2026-11-07）",
+      "e2Disposition": "X-R5 已切换：内联卡/规格删除，`specOf(verifierRoleModule)` 装配；matrix 逐字迁入 `BUILT_IN_ROLE_MATRIX.verifier`（D6）"
+    },
+    "runRole": {
+      "path": "src/pipeline/orchestration/run-role.ts",
+      "lineCount": 3333,
+      "sha256": "026f5e995f4f10cf890a94a5e50d9a9317a0ebbcc04a1106bf287c9d6c2823e6",
+      "anchors": "TRIO_CARD_KINDS.verifier（E1 捕获期源码对照）",
+      "capturedAt": "E1（2026-11-07）",
+      "e2Disposition": "X-R1 起编排单元修改；X-R5 未改本文件。`TRIO_CARD_KINDS.verifier` 仍保留为回退/迁移前源码 oracle（编排 S2 处置）"
+    },
+    "roleToolRegistry": {
+      "path": "src/common/门禁引擎/role-tool-registry.ts",
+      "lineCount": 157,
+      "sha256": "9aca72a5f64e22bc5c68af0997d04200faec58d7762563f02ab09aafd469389b",
+      "anchors": "ROLE_TOOL_CATALOG 14 项（E1 捕获期）",
+      "capturedAt": "E1（2026-11-07）",
+      "e2Disposition": "X-R5 未改（捕获期与切换后逐字节一致）"
+    },
+    "workflowPreconditions": {
+      "path": "src/common/编排/workflow-preconditions.ts",
+      "lineCount": 1609,
+      "sha256": "6c2349a5e7766e8c79edcc5c7b465cbf4bf10bae662cbe13f99499e6c8c4dd41",
+      "anchors": "evaluateDispatchAuthorization / reportTargetForTaskCreator（E1 捕获期）",
+      "capturedAt": "E1（2026-11-07）",
+      "e2Disposition": "X-R5 时点未改；此后并发单元修改（切换后实测见 switch.changed）"
+    },
+    "modelRuntime": {
+      "path": "src/model/runtime.ts",
+      "lineCount": 3945,
+      "sha256": "368559b75268df669f362406d785d5c3f04ca71994736fdfab181b34e019e9e5",
+      "anchors": "isDispatchTaskReviewTarget / isTaskReviewBasisRef（review 形状真源）",
+      "capturedAt": "金样化（2026-11-07；E1 证据未记录该文件哈希）",
+      "e2Disposition": "X-R5 未改；哈希为金样化时实测（历史记录，运行期不读取）"
+    },
+    "modelRole": {
+      "path": "src/model/role.ts",
+      "lineCount": 409,
+      "sha256": "d5e550a06514b8a61fc66b517a267343ba95d8aa29050eb6ee3c7b7f9b5f8780",
+      "anchors": "BuiltInRoleModule / RoleToolId 类型契约（E1 冻结）",
+      "capturedAt": "E1（2026-11-07）",
+      "e2Disposition": "X-R5 未改（逐字节一致）"
+    },
+    "contract": {
+      "path": "docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md",
+      "lineCount": 685,
+      "sha256": "067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3",
+      "anchors": "§3.1/§3.2/§3.4/§10.2 D4/D8/D10",
+      "capturedAt": "E1（2026-11-07）",
+      "e2Disposition": "E0.3 冻结契约；本单元复核未漂移（差分测试仍断言哈希）"
+    }
+  },
+  "switch": {
+    "changed": {
+      "governanceRoles": {
+        "path": "src/common/门禁引擎/governance-roles.ts",
+        "lineCount": 595,
+        "sha256": "70315a80d47881308e6a7f7983bb0f133eceb53f4d971bb502f147d9b1ce7fa5",
+        "anchors": "21-29（verifier 模块 import）/ 232-246（BUILT_IN_ROLE_MATRIX.verifier）/ 345-347（specOf(verifierRoleModule)）/ 364-373（BUILT_IN_ROLE_MODULES 装配）",
+        "change": "X-R5 数据门面切换（E2-XR5 证据 §3/§7.1）"
+      },
+      "runRole": {
+        "path": "src/pipeline/orchestration/run-role.ts",
+        "lineCount": 3566,
+        "sha256": "b63defa415283df23e82e8a77f7fef05f157a77b4bbe087948abb592a4c3b873",
+        "anchors": "TRIO_CARD_KINDS.verifier 回退仍在（编排 S2 待删）",
+        "change": "X-R1 起编排单元修改（非 X-R5）；哈希为金样化实测值（X-R5 证据 §1 记录后并发单元继续修改，故与此后实测可能前移）"
+      },
+      "workflowPreconditions": {
+        "path": "src/common/编排/workflow-preconditions.ts",
+        "lineCount": 1687,
+        "sha256": "480e0e7effa7b8120f44e478673dbe0b5ca4fbdbfcf026f4238c0b73724a7ffc",
+        "change": "E1 捕获后由并发单元修改（非 X-R5）；仅在金样化元数据记录，不参与期望值"
+      }
+    },
+    "unchanged": {
+      "roleToolRegistry": {
+        "path": "src/common/门禁引擎/role-tool-registry.ts",
+        "lineCount": 157,
+        "sha256": "9aca72a5f64e22bc5c68af0997d04200faec58d7762563f02ab09aafd469389b"
+      },
+      "modelRuntime": {
+        "path": "src/model/runtime.ts",
+        "lineCount": 3945,
+        "sha256": "368559b75268df669f362406d785d5c3f04ca71994736fdfab181b34e019e9e5"
+      },
+      "modelRole": {
+        "path": "src/model/role.ts",
+        "lineCount": 409,
+        "sha256": "d5e550a06514b8a61fc66b517a267343ba95d8aa29050eb6ee3c7b7f9b5f8780"
+      },
+      "contract": {
+        "path": "docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md",
+        "lineCount": 685,
+        "sha256": "067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3"
+      }
+    },
+    "measuredAt": "2026-11-07（E2-XR5 证据 §1/§5/§7.1 + 本轮金样化实测）"
+  },
+  "module": {
+    "path": "src/common/roles/verifier/index.ts",
+    "lineCount": 409,
+    "sha256": "bbc5c258f6d58571859dd4f9ed357fb013fc4e79c4702e6b2c4e8523a21407f0"
+  }
+}

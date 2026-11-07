@@ -20,3 +20,13 @@
 - D1+E1 所有者最终结果：80/80自有回归、20/20真实CLI localhost矩阵、全仓typecheck0；原gpt-5.5红例与最终绿例分开保留。固定版本内嵌目录来源及既有限制见[同一修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility.md)，独立验收由对应角色继续。
 
 - [工具结果同轮附图映射 + 最小 Chat Completions 传输（2026-10-27）](docs/change/2026-10-27_change_tool-result-images-codex.md)：`ToolResult.images` → Responses 动态工具 `inputImage` data URL；MIME 白名单、失败/非法载荷 fail-closed、图片不过 redact/日志/事件。0.162.1 Responses 回环 4/4 绿；客户补充约束后新增显式 `ANS_CODEX_WIRE_API=chat` 最小传输（产品需显式 Codex/OpenAI 配置；Pi 仅临时测试显式注入、**不做自动回退**），真实 Chat 探针 3/3（工具消息 `image_url` data URL 图片被模型实际看到）。policy 仍 `next-turn`（翻表属运行时核心）；chat 模式无原生线程恢复/MCP/联网搜索/思考等级。
+
+- [Codex 停止事实（T1.1）](docs/feature/native-stop.md)：同源实例/轮次、真实 owned process/HTTP 终态与 handler 排空；超时、无观察 hook、installed MCP 覆盖缺口保持 unknown。离线新例6/6，完整两文件37/1既有环境红/1原skip，typecheck0，跨run与独验待后继。
+
+- [Chat 实际工具表观察（N2）](docs/feature/native-stop.md)：同源 `inspectNativeToolSurface`，实际注入工具表、无原生命令/MCP fallback；disposed/漂移/identity错 unknown。默认生产工厂＋真实本地HTTP定向9/9，新候选两文件39pass/1原红/1原skip、typecheck0；事实不代表FS沙箱。
+
+- [构造前同源计划（N3）](docs/feature/native-stop.md)：实际配置快照先计划，无spawn/HTTP/根写；已证Chat才给私有prepared adapter，漂移预拒，实例factoryPlan回绑。定向12/12，最终两文件42pass/1原红/1原skip、typecheck0；Core及全actor整链由后继消费。
+
+- N4 验证：原native目录alias fixture Windows junction真实canary对照通过，source不变；两文件43pass/0fail/1原POSIXskip，16日志exit0。当前他owner trunk缺path类型红保留在17；原EPERM历史不覆盖。
+
+- N5：[真实Chief有界单工具会话](docs/feature/native-stop.md)。正式host-only context+真实Chief身份+exact decide_pending_request，独立分支不扩judge白名单；默认Core/Codex实际HTTP正负例与原judge四file58pass/0fail/1原skip、typecheck0。

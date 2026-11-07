@@ -1,0 +1,3 @@
+# 人事代码维护角色变更记录
+
+- 2026-11-07 — **角色创建（B-4，8 角色之 ④）**。依据团队计划 `docs/scheduling/2026-11-07_team-plan_runtime-gate-role-modularization.md`（687 行 / SHA-256 `00e1f76b6a527a1237ac1467bb4100805750606904ce6960bb56a013a4ba565c`）§4.3/§4.4 ④/§5.4 B-4，及闸门 1/2 确认留痕 `docs/communication/2026-11-07_gate-confirmation_team-plan.md`（31 行 / SHA-256 `b788072e8553a708a2891bffde8e9a65d08fea4bf2242b2582a61ab1675c48f0`；预授权 + 全权委托覆盖）。初始建立 `role-card.md`、`boundary.md`、`boundary.yaml`：Section 1 写集为 `src/common/roles/nominator/`、`test/roles/nominator/` 与本角色自身工作文档（feature-map / memo / functional-description / api-spec / docs/{design,feature,change,fix}）；唯一 public entry `index.ts`；零跨角色 import；不写旧引擎文件。本角色为内置 nominator 模块的代码维护者，不执行人事治理（角色卡/边界由 ANS 人事维护）。本批为治理落地（H1），未写代码/测试、未改其他角色、未 commit/push。

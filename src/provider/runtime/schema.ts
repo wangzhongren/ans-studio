@@ -1,9 +1,10 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, REFACTOR_SCOPE_ITEMS_MAX, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX } from "../../model/runtime.ts";
 import {
   AMENDMENT_ID_PATTERN,
   REFACTOR_REASON_MAX,
   VERSION_CHANGE_KINDS,
+  VERSION_CHANGE_ID_PATTERN,
   VERSION_CHANGE_SUMMARY_MAX,
   VERSION_CHANGE_TARGET_ACTIONS,
 } from "../../model/version-change.ts";
@@ -21,6 +22,7 @@ import {
   DOWNLOAD_PURPOSE_MAX_BYTES,
   DOWNLOAD_URL_MAX_BYTES,
 } from "../../model/download.ts";
+import { GIT_QUERY_TEMPLATES, GIT_CAPABILITY_PATHS_MAX, GIT_CAPABILITY_CANDIDATES_MAX, GIT_CAPABILITY_MESSAGE_MAX } from "../../model/trunk.ts";
 /** describeTool 的返回：Pi 侧参数 schema、说明与可选的提示/执行模式（均按工具名分派）。 */
 export interface ToolDescription {
   parameters: Record<string, unknown>;
@@ -31,6 +33,81 @@ export interface ToolDescription {
   executionMode?: "sequential" | "parallel";
 }
 
+// R2: fixed narrow capability shapes, also consumed by the handlers' structural checks.
+function directCapabilityDescription(name: string): ToolDescription | undefined {
+  const text = { type: "string", minLength: 1, maxLength: 500, pattern: "^[^\\u0000-\\u001f]+$" };
+  const digest = { type: "string", pattern: "^[a-fA-F0-9]{64}$" };
+  const path = { ...text, pattern: "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)[^\\\\:\\u0000-\\u001f]+$" };
+  const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: "object", properties, required, additionalProperties: false });
+  const file = object({ path, sha256: digest });
+  const snapshot = object({ snapshotId: text, path, sha256: digest, version: { type: "integer", minimum: 1 } }, ["snapshotId", "path", "sha256"]);
+  const reason = { ...text, maxLength: 4000 };
+  const commit = object({ version: { type: "integer", minimum: 1 }, digest });
+  const shapes: Record<string, { parameters: Record<string, unknown>; description: string }> = {
+    select_run_change: { parameters: object({ operationId: text, runId: text, expectedPinDigest: digest,
+      targetTrunk: commit, mode: { type: "string", enum: [...RUN_CHANGE_MODES] }, reason }),
+      description: "仅策划 rapporteur 显式选择冻结run时机。continue-frozen只登记；stop/restart由应用核停稳与权限，不回滚文档或自动重pin。" },
+    complete_team_plan: { parameters: object({ operationId: text, flowId: text, runId: text, baseDigest: digest,
+      plan: object({ path, sha256: digest, version: { type: "integer", minimum: 1 } }) }, ["operationId", "flowId", "baseDigest", "plan"]),
+      description: "仅运营 convener/schedule 直接完成团队计划；应用重核属主、写集与依赖，不代替D3任命。" },
+    activate_role_documents: { parameters: object({ operationId: text, flowId: text, planRef: snapshot,
+      d3DecisionId: text, rosterRef: snapshot, targetRoleId: text,
+      documents: object({ card: file, boundaryMd: file, boundaryYaml: file }) }),
+      description: "仅人事 nominator 在真实D3与计划范围激活完整卡片/两份边界；应用校验全部内容后才激活，失败保持旧有效版本。" },
+    close_created_task: { parameters: object({ operationId: text, taskId: text, runId: text, basisDigest: digest,
+      reportRef: snapshot, outcome: { type: "string", enum: ["accepted", "rework", "rejected"] }, note: reason },
+      ["operationId", "taskId", "runId", "basisDigest", "reportRef", "outcome"]),
+      description: "chief/convener仅能收口本人创建的任务；应用核task.created.from、当前报告/run/依据与合法状态后写真实收口事件。取消不属于收口判定。" },
+    decide_pending_request: { parameters: object({ requestId: text, baseDigest: digest,
+      delegationRevision: { type: "integer", minimum: 0 }, reason,
+      disposition: { type: "string", enum: ["select", "reject", "revise"] },
+      selected: { type: "array", minItems: 1, maxItems: 64, uniqueItems: true, items: text } },
+      ["requestId", "baseDigest", "delegationRevision", "reason", "disposition"]),
+      description: "真实chief为有效保留卡作业务决定。select必须给合法selected，reject/revise不得携带selected；应用重核委托revision、原请求/依据与未决CAS，不默认选推荐项、不替代专门执行审批。" },
+  };
+  const shape = shapes[name];
+  if (shape && name === "decide_pending_request") Object.assign(shape.parameters, {
+    allOf: [{ if: { properties: { disposition: { const: "select" } } },
+      then: { required: ["selected"] }, else: { not: { required: ["selected"] } } }],
+  });
+  return shape && { ...shape, executionMode: "sequential", promptGuidelines: [
+    "只提交本工具的业务参数；actor/source/委托开关由应用取得，不得自行提供。",
+    "按真实回执区分生效、no-op、拒绝、blocked与已提交待恢复；不要把来源写成客户点击。",
+  ] };
+}
+
+function gitCapabilityDescription(name: string): ToolDescription | undefined {
+  if (!["git_query", "git_candidate", "git_publish"].includes(name)) return undefined;
+  const text = { type: "string", minLength: 1, maxLength: 500, pattern: "^[^\\u0000-\\u001f]+$" };
+  const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: "object", properties, required, additionalProperties: false });
+  const oid = object({ objectFormat: { type: "string", enum: ["sha1", "sha256"] }, hex: { type: "string", pattern: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$" } });
+  Object.assign(oid, { allOf: [{ if: { properties: { objectFormat: { const: "sha1" } } },
+    then: { properties: { hex: { pattern: "^[a-fA-F0-9]{40}$" } } }, else: { properties: { hex: { pattern: "^[a-fA-F0-9]{64}$" } } } }] });
+  const basis = object({ ref: text, oid: { ...oid, type: ["object", "null"] } });
+  const literalPath = { ...text, description: "Literal project-relative path; no .git, traversal, pathspec magic or wildcard. Service rechecks actual ownership." };
+  const paths = { type: "array", minItems: 1, maxItems: GIT_CAPABILITY_PATHS_MAX, uniqueItems: true, items: literalPath };
+  const message = { ...text, maxLength: GIT_CAPABILITY_MESSAGE_MAX };
+  const evidence = { type: "array", maxItems: GIT_CAPABILITY_PATHS_MAX, items: object({ oid, path: literalPath, sha256: { type: "string", pattern: "^[a-fA-F0-9]{64}$" } }) };
+  const candidates = { type: "array", minItems: 1, maxItems: GIT_CAPABILITY_CANDIDATES_MAX, uniqueItems: true, items: oid };
+  let parameters: Record<string, unknown>;
+  if (name === "git_query") parameters = object({ operationId: text, template: { type: "string", enum: [...GIT_QUERY_TEMPLATES] },
+    target: oid, other: oid, paths, limit: { type: "integer", minimum: 1, maximum: 2000 } }, ["operationId", "template"]);
+  else if (name === "git_candidate") {
+    const common = { operationId: text, base: basis, message };
+    const oneOf = [object({ ...common, action: { type: "string", enum: ["commit"] }, paths }),
+      object({ ...common, action: { type: "string", enum: ["integrate"] }, candidates }),
+      object({ ...common, action: { type: "string", enum: ["revert"] }, commit: oid, mainline: { type: "integer", minimum: 1 } }, [...Object.keys(common), "action", "commit"]),
+      object({ ...common, action: { type: "string", enum: ["init"] } })];
+    parameters = { type: "object", oneOf };
+  } else parameters = object({ operationId: text, target: { type: "string", enum: ["documents", "delivery"] }, expected: basis,
+    candidate: oid, criteria: evidence, evidence, creatorCloseOperationId: text }, ["operationId", "target", "expected", "candidate", "criteria", "evidence"]);
+  return { parameters, executionMode: "sequential",
+    description: `${name}：受控Git结构化能力，host绑定真实repo/任务/角色/当前授权及保护物证；本工具不执行Git进程。查询仅模板；候选prepared不等发布；published以实际单ref确认，未知/pending-recovery按原operation对账。`,
+    promptGuidelines: ["不提供argv/env/config/目录或host actor/repo/task/run/authorizationRevision/ProtectionFacts；未知字段拒绝。",
+      "OID给objectFormat和完整40/64 hex，不用短SHA或revision表达式。GitBasis.ref只能匹配应用已分配ref，不能修改用户分支。",
+      "脚本/native写路径未证明隔离时修改blocked；不要改走裸Git命令或绕过原任务/收口/验收。"] };
+}
+
 /**
  * 每个受治理工具的 JSON-Schema 与说明（按名分派；run_shell 的 input 是 `{command}`，**没有 path**，见 §7.7）。
  * run_shell **不接受**任何 token 参数——票据机制已废（§7.1 第 3 条），审核在 execute 内、spawn 之前完成。
@@ -38,6 +115,10 @@ export interface ToolDescription {
  * 导出供**接线实测**使用（test/pi-adapter 的 executionMode/交互工具用例；本函数不调 SDK、纯数据）。
  */
 export function describeTool(name: string): ToolDescription {
+  const git = gitCapabilityDescription(name);
+  if (git) return git;
+  const direct = directCapabilityDescription(name);
+  if (direct) return direct;
   if (name === "run_shell") {
     return {
       parameters: {
@@ -525,6 +606,11 @@ export function describeTool(name: string): ToolDescription {
     };
   }
   if (name === "dispatch_task") {
+    const resumeText = { type: "string", minLength: 1, maxLength: 500, pattern: "^[^\\u0000-\\u001f\\u007f]+$" };
+    const reviewOid = { type: "object", properties: { objectFormat: { type: "string", enum: ["sha1", "sha256"] }, hex: { type: "string", pattern: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$" } },
+      required: ["objectFormat", "hex"], additionalProperties: false,
+      allOf: [{ if: { properties: { objectFormat: { const: "sha1" } } }, then: { properties: { hex: { minLength: 40, maxLength: 40, pattern: "^[a-fA-F0-9]{40}$" } } },
+        else: { properties: { hex: { minLength: 64, maxLength: 64, pattern: "^[a-fA-F0-9]{64}$" } } } }] };
     // 派发任务工具（设计 H-1；注入给 su/主理 Lead——注入端决定）：无 path、无写权。文案写死三条——派发≠授权 / 任务自足 / 返工带证据。
     // 2026-10-20 客户拍板：主理 Lead 成为工作流管理者，可向 Steward（convener）/项目角色派发；Lead→Steward 属**内部协调**、
     // 不是客户批准；仅 convener 这一个内置治理角色可作为目标，不得写成「可派发给任意内置角色」。
@@ -537,11 +623,18 @@ export function describeTool(name: string): ToolDescription {
       parameters: {
         type: "object",
         properties: {
+          resumeController: { type: "object", properties: { taskId: resumeText, flowId: resumeText, runId: resumeText,
+            reviewTaskId: resumeText, reviewCloseOperationId: resumeText }, required: ["taskId", "flowId", "runId", "reviewTaskId", "reviewCloseOperationId"], additionalProperties: false,
+            description: "Chief's explicit request to resume an existing live Convener task after a specified review close. Expected targets only; the application verifies actual creator/live flow/run/candidate/review acceptance and queues this original task. Not a new task, parent, authorization or sourceTaskId." },
+          reviewTarget: { type: "object", properties: {
+            operationId: { type: "string", minLength: 1, maxLength: 500, pattern: "^[^\\u0000-\\u001f\\u007f]+$" }, candidate: reviewOid,
+          }, required: ["operationId", "candidate"], additionalProperties: false,
+            description: "Expected read-only Git candidate to review. Not criteria, host provenance, authorization or a passed verdict; the application resolves the actual immutable review basis." },
           roleId: {
             type: "string",
             description:
-              "Target role id: usually a project role; when the caller is Lead (Liaison), `convener` (Steward) is also allowed as a coordination target. " +
-              "Other built-in governance roles are never valid targets, and you cannot dispatch to yourself",
+              "Target role id: Chief creates and manages product, rapporteur, nominator, convener and verifier tasks; Convener manages project implementation workers. " +
+              "Actual caller/target identity and allowed routing are verified by the application; you cannot dispatch to yourself.",
           },
           task: {
             type: "string",
@@ -595,37 +688,39 @@ export function describeTool(name: string): ToolDescription {
           },
         },
         required: ["roleId", "task"],
+        not: { anyOf: ["workSourceRef", "parentTaskRef", "reviewBasisRef", "reviewControllerRef", "hubRouting", "criteria", "ref", "approved", "approval", "passed"].map(key => ({ required: [key] })) },
+        allOf: [{ if: { required: ["resumeController"] }, then: { properties: { roleId: { const: "convener" } },
+          not: { anyOf: [{ required: ["reviewTarget"] }, { required: ["sourceTaskId"] }] } } }],
         additionalProperties: true,
       },
       description:
         "向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。" +
         "**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的" +
         "已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：" +
-        "写清要做什么、依据哪份文档、完成标准（治理派发带 `flowId`；产品向 Steward 协调时可省 `stepId`）；**返工**时把要求与证据一并写进任务文本。" +
-        "多角色/跨角色协作时**先落盘再派发**：先把冻结契约落盘到 `docs/contracts/<name>-v<N>.md`" +
-        "（写盘许可已预置、直接写即可），工作流由**运营（convener）**落盘到 `docs/workflow.md`" +
-        "（运营的 Section 1 预授权、直接写即可），**再**派发任务。" +
+        "写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。" +
+        "Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。" +
+        "实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。" +
+        "需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。" +
         "任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；" +
         "投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。" +
         "引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。" +
-        "roleId 通常是本项目角色；**产品（Lead/Liaison）还可把 `convener`（Steward）作为协调目标**——其余内置治理角色不可作为目标，也不能派发给调用者自己。" +
-        "B 批星形任务（2026-10-29 拓扑 v4.1）：**幕僚**按序派产品/策划/人事/运营（一次一步，机械前置由应用校验），并可派质检做验收核对；**运营**可派项目 worker（限 D3 选中名单）与质检。项目 worker 的报告按任务创建者路由（运营派 → 运营；幕僚派 → 幕僚）。任务落 `tasks.jsonl`，不使用 flow 步骤语义。" +
-        "产品向 Steward 派发属**内部协调**，**不是客户批准**；Steward/项目角色仍按自己的已接受边界与门禁执行。" +
+        "新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。" +
+        "普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。" +
+        "Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。" +
+        "这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。" +
         "本工具**不写盘、不做治理判定、不改变任何角色的写权**。" +
-        "治理会话可附可选 `flowId`/`stepId`：治理角色派发须同时给出（用于派发范围门与去重）；**产品向 Steward 协调时带 `flowId`、`stepId` 可省**；旧治理模型调用可缺席＝旧行为——" +
-        "**字段本身不构成任何授权**，派发范围门只认应用签发的客户决定与已任命名单。",
+        "`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。",
       promptGuidelines: [
         "派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；" +
           "不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。",
-        "产品（Lead/Liaison）可向 Steward（`convener`）派发任务做**内部协调**——**不是客户批准**，也不代表 Steward 已同意；" +
-          "Steward/项目角色仍按自己的边界与门禁执行。**不要**把这条理解为可向任意内置治理角色派发。",
+        "Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。",
         "dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；" +
-          "治理派发带 `flowId`（产品向 Steward 协调时可省 `stepId`）。",
-        "**多角色/跨角色协作先落盘再派发**：契约落盘到 `docs/contracts/<name>-v<N>.md`（预置写盘目录、直接写即可）、" +
-          "工作流由**运营（convener）**落盘到 `docs/workflow.md`（运营的 Section 1 预授权、直接写即可），**再**派发。" +
+          "给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。",
+        "跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；" +
           "任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；" +
           "**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。",
         "返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。",
+        "最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。",
         "B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。",
       ],
     };
@@ -1494,8 +1589,7 @@ export function describeTool(name: string): ToolDescription {
             type: "string",
             enum: [...VERSION_CHANGE_KINDS],
             description:
-              "VCA kind: version-upgrade (product only; contract/roster targets; freezes/re-pins after customer approval) " +
-              "or detail-amendment (rapporteur only; contract/roster/execution targets; item-by-item confirmation after approval)",
+              "version-upgrade (product only; contract/roster) or whole detail-amendment (rapporteur only; contract/roster/execution). Direct submissions are validated and committed together.",
           },
           flowId: { type: "string", pattern: GOVERNANCE_SLUG_PATTERN, description: "Focus flow id (governance slug)" },
           summary: {
@@ -1529,6 +1623,7 @@ export function describeTool(name: string): ToolDescription {
                 action: { type: "string", enum: [...VERSION_CHANGE_TARGET_ACTIONS], description: "add = new versioned doc; modify = existing draft doc" },
                 from: { type: "string", description: "Optional previous version/path reference for an add/modify (audit only)" },
                 roleId: { type: "string", description: "Optional target role id (only where the service schema requires it)" },
+                expectedFromSha256: { type: ["string", "null"], pattern: "^[a-fA-F0-9]{64}$", description: "Direct CAS expected original hash; null requires target absence. App recomputes actual bytes." },
               },
               required: ["kind", "path", "action"],
               additionalProperties: false,
@@ -1548,24 +1643,29 @@ export function describeTool(name: string): ToolDescription {
           bootstrap: {
             type: "boolean",
             description:
-              "Optional and normally omitted: the app derives the mode from actual trunk state (no trunk manifest ⇒ automatic bootstrap, baseTrunk=null; approval establishes trunk t1 from the existing pinned baseline). The service still validates any explicit value against the real state.",
+              "Legacy compatibility flag; application verifies actual state. Direct bootstrap requires explicit baseTrunk=null.",
           },
+          operationId: { type: "string", minLength: 1, maxLength: 500 },
+          supersedesApplicationId: { type: "string", pattern: VERSION_CHANGE_ID_PATTERN, description: "Explicit old pending VCA id; never inferred or auto-approved" },
+          baseTrunk: { type: ["object", "null"], properties: {
+            version: { type: "integer", minimum: 1 }, digest: { type: "string", pattern: "^[a-fA-F0-9]{64}$" },
+          }, required: ["version", "digest"], additionalProperties: false },
         },
         required: ["kind", "flowId", "summary", "targets"],
         additionalProperties: false,
+        allOf: [{ if: { anyOf: [{ required: ["operationId"] }, { required: ["baseTrunk"] },
+          { properties: { targets: { contains: { required: ["expectedFromSha256"] } } } }] },
+          then: { required: ["operationId", "baseTrunk"], properties: { targets: { items: { required: ["expectedFromSha256"] } } } } }],
       },
       description:
-        "提交**版本变更申请（VCA）**——只提交，绝不批准、绝不发客户卡、绝不写文档。`version-upgrade` 仅 product、`detail-amendment` 仅 rapporteur（按会话角色门控，其他角色/客户直接拒绝）。" +
-        "应用校验发起角色/目标写区/kind 范围/baseTrunk/targets↔items 后把记录置为 `submitted`，再由客户经治理会话决策卡批准或拒绝；**申请≠批准**。" +
-        "targets 的哈希由应用计算（不接受自报）；workflow/boundary 不在 VCA 内（分别走 stable-write 确认与 appointment-write）。" +
-        "成功回执 `{ok:true, applicationId, status:\"submitted\"}`；失败回执 `{ok:false, errorCode:\"<vca-*>\", message?}`；工具不重试、不伪造成功。",
+        "产品升级/策划整单修正沿同一submit_version_change入口。直接路径带operationId、baseTrunk及全部目标expectedFromSha256；应用以scope身份重核全部hash/权限/引用/CAS后整单生效。无逐项或最终批准卡；新trunk不自动重pin旧run。" +
+        "回执如实区分applied/no-op/rejected/committed-pending-recovery/blocked，保留真实来源与journal；历史调用的submitted仅表示已提交，申请≠批准。",
       promptGuidelines: [
-        "用 submit_version_change 提交 VCA；你只能提交，不能批准/代选，也不要在正文里声称已获批准。",
+        "直接提交必须给operationId/baseTrunk和每目标期望原字节hash；应用重算，不自报actor/source或customer批准。",
         "version-upgrade 只能由 product 提交（contract/roster）；detail-amendment 只能由 rapporteur 提交（contract/roster/execution）。",
-        "target 的 kind 是作者写区类别、不是文档类型：模块/提案/拓扑/架构/资产文档一律按 kind=\"contract\" 申报，名单按 kind=\"roster\"，执行文档按 kind=\"execution\"；不要用文档名当 kind。批准时申请中的全部 targets 会一起冻结，apply 时一起进主干。",
-        "workflow/boundary 不是 VCA target：workflow 走 request_stable_write 的客户确认卡，role-card/boundary 走 appointment-write。",
-        "不要自行判断或声明 bootstrap：应用按 trunk 实际状态机械判定——已有主干则以当前主干为基线；无主干则自动按 bootstrap 提交，批准后以现有 pinned run 基线建立主干 t1 并回绑。不要以“不能伪装 bootstrap”为由拒绝提交。",
-        "按回执如实行动：submitted 只表示已提交；批准后还有冻结/re-pin 或逐项确认。",
+        "target kind为作者写区：契约/模块/提案/拓扑/架构/资产=contract，名单=roster，执行文档=execution；整单校验提交。",
+        "workflow/boundary不是VCA目标；人事仅在真实D3/计划范围激活三文档，不申请appointment-write。",
+        "no-op不升版；已提交待恢复保留同operation/journal，不重提、不假称旧版未变；run择时只交策划显式选择。",
       ],
       executionMode: "sequential",
     };
@@ -1656,6 +1756,42 @@ export function describeTool(name: string): ToolDescription {
       executionMode: "sequential",
     };
   }
+  if (name === "report_plan_escalation") {
+    // 2026-11-05：方案升级报告（仅 convener；应用发行客户主权卡）。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          flowId: { type: "string", pattern: GOVERNANCE_SLUG_PATTERN, description: "Focus flow id (governance slug)" },
+          category: {
+            type: "string",
+            enum: [...PLAN_ESCALATION_CATEGORIES],
+            description:
+              "Blocking category: scheme = 方案/验收要求不可执行；environment = 缺环境/身份/隔离写集；authority = 权限/边界不足；evidence = 仅证据不足（通常应继续核查而非升级）",
+          },
+          summary: {
+            type: "string",
+            minLength: 1,
+            maxLength: PLAN_ESCALATION_SUMMARY_MAX,
+            description:
+              `为什么方案/验收要求不可执行（≤${PLAN_ESCALATION_SUMMARY_MAX} characters；引用阻塞证据，不夸大；超限拒绝、不截断）`,
+          },
+        },
+        required: ["flowId", "category", "summary"],
+        additionalProperties: false,
+      },
+      description:
+        "向客户提交**方案升级报告**——仅 convener（运营）会话可提交。应用发行一张**客户主权卡**：修订方案/验收要求｜客户提供环境｜继续核查｜终止；客户本人裁决，判断器/委托/@决策不适用。" +
+        "本工具只提交与呈现，**不派发任务、不写文档、不修改任何需求或验收标准、不伪造裁定**。" +
+        "成功回执 `{ok:true, requestId:\"plan-escalation-<flowId>\", status:\"presented\"}`（= 卡已呈现，申请≠批准）；失败回执 `{ok:false, errorCode:\"<plan-escalation-*>\", message?}`；不重试。",
+      promptGuidelines: [
+        "只有在判定**方案/验收要求不可执行**（不是单纯证据不足）时才用本工具；证据不足请继续派核查任务。",
+        "同一 flow 至多一张在途升级卡；客户未裁定前不要重复提交，也不要在正文里声称已有结论。",
+        "客户裁定后由应用通知/唤醒对应角色（修订 → 策划按闸门 1 出修订方案）；你只提交报告，不改需求/验收标准，不派发。",
+      ],
+      executionMode: "sequential",
+    };
+  }
   if (!["write_file", "edit_file", "read_file"].includes(name)) throw new Error(`未知 ANS 工具：${name}`);
   const parameters = {
     type: "object",
@@ -1666,6 +1802,9 @@ export function describeTool(name: string): ToolDescription {
       new_string: { type: "string", description: "Replacement text (edit_file)" },
     },
     required: name === "write_file" ? ["path", "content"] : name === "edit_file" ? ["path", "old_string", "new_string"] : ["path"],
+    ...(["write_file", "edit_file"].includes(name) ? { not: { anyOf: ["protectedGitRoots", "context", "phase", "contentSha256", "operation", "editReadProbe",
+      "stage", "fileFacts", "invocationId", "operationId", "projectRoot", "skillRoot", "canonicalFacts", "currentFile", "fileGateProtocol", "fileGateProtection",
+      "targetPath", "canonical", "protectedRoots", "coverage", "basisDigest", "reasons", "roots"].map(key => ({ required: [key] })) } } : {}),
     additionalProperties: true,
   };
   const description =

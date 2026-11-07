@@ -74,6 +74,7 @@ test("refreeze：只更新 stable 快照（workflow/roleCards/boundaries）、�
     assert.equal(refrozen.ok, true, refrozen.ok ? "" : `${refrozen.code}: ${refrozen.message ?? ""}`);
     if (!refrozen.ok) return;
     assert.equal(refrozen.value.manifest.trunkVersion, oldVersion, "重新冻结不升 trunkVersion");
+    assert.ok(refrozen.value.manifest.artifacts.workflow, "Execution fixture must contain a real workflow");
     assert.equal(refrozen.value.manifest.artifacts.workflow.sha256, workflowSha);
     assert.equal(refrozen.value.manifest.artifacts.roleCards?.impl.sha256, cardSha);
     assert.equal(refrozen.value.manifest.artifacts.boundaries.impl.sha256, boundarySha);
@@ -90,7 +91,7 @@ test("refreeze：只更新 stable 快照（workflow/roleCards/boundaries）、�
     // 落盘 manifest 已更新且 digest 复算（verify 仍一致）
     const read = await project.store.readManifest();
     assert.equal(read.ok, true);
-    if (read.ok) assert.equal(read.value.artifacts.workflow.sha256, workflowSha);
+    if (read.ok) { assert.ok(read.value.artifacts.workflow); assert.equal(read.value.artifacts.workflow.sha256, workflowSha); }
     const verify = await project.service.verify();
     assert.deepEqual(verify, { ok: true, violations: [] });
   } finally {

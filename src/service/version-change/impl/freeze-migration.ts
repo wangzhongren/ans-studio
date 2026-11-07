@@ -10,14 +10,7 @@
 //   不迁移/不重建（AC-21）；
 // · 冻结记录写入只经 C2c `FreezeService.migrate`（其内部为 C2b `appendDocFreezeRecords`）。
 
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
-import {
-  protectedVersionedPaths,
-  versionedDocVersionOf,
-} from "../../../common/门禁引擎/versioned-doc-guard.ts";
+import { scanVersionedDocuments } from "../../../provider/version-change/public/version-change-store.ts";
 import type { DocFreezeErrorCode } from "../../../model/version-change.ts";
 import type {
   ExistingVersionedDoc,
@@ -28,21 +21,7 @@ import type {
 
 /** 扫描受管版本化文档（只读；版本号/字节哈希；缺失/不可读跳过）。 */
 export async function scanExistingVersionedDocs(projectRoot: string): Promise<ExistingVersionedDoc[]> {
-  const root = path.resolve(projectRoot);
-  const paths = await protectedVersionedPaths(root);
-  const docs: ExistingVersionedDoc[] = [];
-  for (const rel of paths) {
-    const version = versionedDocVersionOf(rel);
-    if (version === undefined) continue;
-    let bytes: Buffer;
-    try {
-      bytes = await readFile(path.join(root, rel));
-    } catch {
-      continue;
-    }
-    docs.push({ path: rel, version, sha256: createHash("sha256").update(bytes).digest("hex") });
-  }
-  return docs.sort((a, b) => (a.path === b.path ? a.version - b.version : a.path < b.path ? -1 : 1));
+  return scanVersionedDocuments(projectRoot);
 }
 
 export type EnsureMigrationResult =

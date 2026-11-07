@@ -44,6 +44,16 @@ const D_RETAINED_KEYS = [
   "ui.governance.power.appointmentWrite",
   "ui.judge.shellOffTitle",
   "ui.judge.shellOnTitle",
+  "ui.judge.chiefDelegated",
+  "ui.judge.chiefDeciding",
+  "ui.judge.chiefTakeover",
+  "ui.composer.customerEntryChiefOnly",
+  "main.customerInput.chief.deciding",
+  "main.customerInput.chief.contextUnavailable",
+  "main.customerInput.chief.noValidDecision",
+  "main.customerInput.chief.revisionRequested",
+  "main.customerInput.chief.modeChanged",
+  "main.customerInput.chief.manualTakeoverRequired",
   "main.requirementChange.dispatched",
   "main.viewImage.queued",
 ] as const;
@@ -400,7 +410,7 @@ const DOWNLOAD_KEYS = [
 
 /**
  * 主干/冻结与版本变更 C3 冻结 key 契约（2026-11-04 trunk-amendment-model；C3 冻结）。
- * 99 key = ui.versionChange 34 + ui.stableWrite 12 + ui.refactor 14 + ui.freeze 17 + ui.trunk 22。
+ * 101 key = ui.versionChange 35 + ui.stableWrite 12 + ui.refactor 14 + ui.freeze 18 + ui.trunk 22。
  * 需求来源：桌面UI P1 Rev 1 §6.2；`ui.trunk.*` 22 为 C3 目录内 key 家族扩展，E1 披露；
  * 冻结记录 `角色卡/项目管理/docs/change/2026-11-04_trunk-amendment-model-C3-freeze.md`。
  * U1/D1 只按本清单消费；新增/改名须回到项目管理并显式更新本断言与分区计数。
@@ -471,7 +481,7 @@ const TRUNK_AMENDMENT_KEYS = [
   "ui.refactor.boundaryHint",
   "ui.refactor.disabledUnavailable",
   "ui.refactor.submitGuidance",
-  // ui.freeze.*（17）
+  // ui.freeze.*（18）
   "ui.freeze.status.frozen",
   "ui.freeze.status.draft",
   "ui.freeze.migratedLegacy",
@@ -480,6 +490,7 @@ const TRUNK_AMENDMENT_KEYS = [
   "ui.freeze.unavailable",
   "ui.freeze.listLine",
   "ui.freeze.empty",
+  "ui.freeze.reason.roleDirectApplied",
   "ui.freeze.reason.vcaApproved",
   "ui.freeze.reason.versionUpgradeApproved",
   "ui.freeze.reason.detailItemApplied",
@@ -535,7 +546,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 1192 / main 626 / shared 62 / preferences 3，总计 1883", () => {
+test("key 分区计数：ui 1211 / main 640 / shared 62 / preferences 3，总计 1916", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -543,8 +554,8 @@ test("key 分区计数：ui 1192 / main 626 / shared 62 / preferences 3，总计
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 1192, main: 626, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1883);
+  assert.deepEqual(prefixes, { ui: 1211, main: 640, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1916);
 });
 
 test("下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han", () => {
@@ -947,9 +958,9 @@ test("shell 升级 key 契约：§7.3 清单中英成对且回执保留兜底子
   assert.ok(zhCN["ui.confirm.escalation.necessityNote"].includes("由角色提供，未经验证"));
 });
 
-test("主干/冻结与版本变更 C3 冻结：100 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han", () => {
-  assert.equal(TRUNK_AMENDMENT_KEYS.length, 100);
-  assert.equal(new Set(TRUNK_AMENDMENT_KEYS).size, 100, "TRUNK_AMENDMENT_KEYS 存在重复 key");
+test("主干/冻结与版本变更 C3 冻结：101 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han", () => {
+  assert.equal(TRUNK_AMENDMENT_KEYS.length, 101);
+  assert.equal(new Set(TRUNK_AMENDMENT_KEYS).size, 101, "TRUNK_AMENDMENT_KEYS 存在重复 key");
   const families = {
     versionChange: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.versionChange.")).length,
     stableWrite: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.stableWrite.")).length,
@@ -957,7 +968,7 @@ test("主干/冻结与版本变更 C3 冻结：100 key 中英成对、家族计�
     freeze: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.freeze.")).length,
     trunk: TRUNK_AMENDMENT_KEYS.filter((key) => key.startsWith("ui.trunk.")).length,
   };
-  assert.deepEqual(families, { versionChange: 35, stableWrite: 12, refactor: 14, freeze: 17, trunk: 22 });
+  assert.deepEqual(families, { versionChange: 35, stableWrite: 12, refactor: 14, freeze: 18, trunk: 22 });
 
   for (const key of TRUNK_AMENDMENT_KEYS) {
     assert.ok(key in zhCN, `zh-CN 缺 ${key}`);
@@ -966,7 +977,7 @@ test("主干/冻结与版本变更 C3 冻结：100 key 中英成对、家族计�
     assert.deepEqual(templateTexts(enUS[key]).filter((text) => HAN.test(text)), [], `en-US 含中文：${key}`);
   }
 
-  // 逐字冻结（99 项；与桌面UI P1 Rev 1 §6.2 一致；C3 冻结记录同清单）。
+  // 逐字冻结（101 项；保留C3旧项，新增角色直接提交生效文案）。
   const expected: Record<string, { zh: string; en: string }> = {
     "ui.versionChange.entry": { zh: "版本变更", en: "Version changes" },
     "ui.versionChange.entryHint": {
@@ -1091,6 +1102,7 @@ test("主干/冻结与版本变更 C3 冻结：100 key 中英成对、家族计�
     "ui.freeze.unavailable": { zh: "冻结清单暂不可用。", en: "Frozen registry unavailable." },
     "ui.freeze.listLine": { zh: "{path} · v{version} · {hash} · {reason}", en: "{path} · v{version} · {hash} · {reason}" },
     "ui.freeze.empty": { zh: "暂无冻结文档记录。", en: "No frozen documents." },
+    "ui.freeze.reason.roleDirectApplied": { zh: "角色直接提交生效", en: "Applied by direct role submission" },
     "ui.freeze.reason.vcaApproved": { zh: "客户批准版本变更", en: "Approved (version change)" },
     "ui.freeze.reason.versionUpgradeApproved": { zh: "客户批准版本升级", en: "Approved (version upgrade)" },
     "ui.freeze.reason.detailItemApplied": { zh: "逐项确认生效", en: "Item applied" },

@@ -38,14 +38,14 @@ test("D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky", () 
   for (const argv of [["cat", "data.txt"], ["cat.exe", "data.txt"], ["ls", "-la"],
     ["rg", "pattern", "src"], ["rg.exe", "pattern", "src"], ["git", "status"], ["git", "log", "-1"],
     ["cmd.exe", "/c", "dir"]]) {
-    assert.equal(classifyShell(argv, rules), "allow", argv.join(" "));
+    assert.equal(classifyShell(argv, rules), argv[0] === "git" ? "deny" : "allow", argv.join(" "));
   }
   for (const argv of [["./sh", "-c", "anything"], ["node.ps1", "-e", "x".repeat(3000)],
     ["C:\\Windows\\System32\\cmd.exe", "/c", "dir"]]) {
     assert.equal(classifyShell(argv, rules), "deny", argv.join(" "));
   }
   for (const argv of [["./rm", "file"], ["rm.cmd", "file"], ["./git", "checkout", "main"]]) {
-    assert.equal(classifyShell(argv, rules), "risky", argv.join(" "));
+    assert.equal(classifyShell(argv, rules), argv[0] === "./git" ? "deny" : "risky", argv.join(" "));
   }
 });
 
@@ -99,7 +99,7 @@ test("白名单：只读命令 → allow", () => {
     ["node", "--version"],
     ["npm", "ls"],
   ]) {
-    assert.equal(classifyShell(argv, rules), "allow", `应放行：${argv.join(" ")}`);
+    assert.equal(classifyShell(argv, rules), argv[0] === "git" ? "deny" : "allow", `按受控入口规则：${argv.join(" ")}`);
   }
 });
 
@@ -448,16 +448,16 @@ test("risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky�
   }
 });
 
-test("risky：git 写子命令与 `--output` 写盘 flag → risky；只读子命令 → allow", () => {
-  assert.equal(classifyShell(["git", "checkout", "main"], rules), "risky");
-  assert.equal(classifyShell(["git", "commit", "-m", "x"], rules), "risky");
-  assert.equal(classifyShell(["git", "push"], rules), "risky");
-  assert.equal(classifyShell(["git", "reset", "--hard"], rules), "risky");
+test("Git P2：所有raw Git含查询和写盘flag必须受控入口，不再走普通shell审批", () => {
+  assert.equal(classifyShell(["git", "checkout", "main"], rules), "deny");
+  assert.equal(classifyShell(["git", "commit", "-m", "x"], rules), "deny");
+  assert.equal(classifyShell(["git", "push"], rules), "deny");
+  assert.equal(classifyShell(["git", "reset", "--hard"], rules), "deny");
   // 只读子命令 + 写盘 flag：`git log --output=x` 会把结果写盘 → risky（不再是 allow）
-  assert.equal(classifyShell(["git", "log", "--output=evil"], rules), "risky");
-  assert.equal(classifyShell(["git", "log", "--output", "evil"], rules), "risky");
+  assert.equal(classifyShell(["git", "log", "--output=evil"], rules), "deny");
+  assert.equal(classifyShell(["git", "log", "--output", "evil"], rules), "deny");
   // 只读子命令 → allow
-  assert.equal(classifyShell(["git", "status"], rules), "allow");
+  assert.equal(classifyShell(["git", "status"], rules), "deny");
 });
 
 test("risky：程序名大小写与 .exe 归一（Windows），路径前缀剥除", () => {
@@ -476,7 +476,7 @@ test("常规未命中命令 → review", () => {
     ["tar", "czf", "x.tar.gz", "dir"],
     ["sort", "file.txt"],
   ]) {
-    assert.equal(classifyShell(argv, rules), "review", `应为 review：${argv.join(" ")}`);
+    assert.equal(classifyShell(argv, rules), argv[0] === "git" ? "deny" : "review", `按受控入口规则：${argv.join(" ")}`);
   }
 });
 
@@ -646,7 +646,7 @@ test("已知缺口：间接执行类整体不可穷尽（命名模式已覆盖�
   assert.equal(classifyShell(["make", "x"], rules), "risky"); // 同类，改判 risky
   // 但类不可封闭：任意 PATH/仓库内二进制、git 别名、被禁清单之外的 runner 都会落 review
   assert.equal(classifyShell(["some-unknown-runner", "target"], rules), "review");
-  assert.equal(classifyShell(["git", "my-alias"], rules), "review", "git 别名不解析 → 未知子命令 → review");
+  assert.equal(classifyShell(["git", "my-alias"], rules), "deny", "raw Git alias cannot bypass controlled config/ACL");
 });
 
 // ===========================================================================
@@ -659,8 +659,8 @@ test("classifyShellDetailed 给出原因与命中规则 id（审计可用）", (
   // risky：命中「危险但有正当用途」程序
   assert.equal(classifyShellDetailed(["rm", "-rf", "build"], rules).ruleId, "risky:program:risky:delete");
   assert.equal(classifyShellDetailed(["tee", "out"], rules).ruleId, "risky:program:risky:fs-write");
-  assert.equal(classifyShellDetailed(["git", "log", "--output=x"], rules).ruleId, "risky:program:risky:git-output-write");
-  assert.equal(classifyShellDetailed(["git", "commit", "-m", "x"], rules).ruleId, "risky:program:risky:git-write");
+  assert.equal(classifyShellDetailed(["git", "log", "--output=x"], rules).ruleId, "deny:raw-git-controlled-tools-required");
+  assert.equal(classifyShellDetailed(["git", "commit", "-m", "x"], rules).ruleId, "deny:raw-git-controlled-tools-required");
   // allow / review
   assert.equal(classifyShellDetailed(["ls"], rules).ruleId, "allow:readonly:ls");
   assert.equal(classifyShellDetailed(["frobnicate"], rules).ruleId, "review");

@@ -10,7 +10,7 @@
 // · `VersionChangeStore` ↔ `VersionChangeRepositoryPort`（list/findById/findByFlow/insert/
 //   updateWithExpectedStatus）；
 // · `StableWriteStore` ↔ `StableWriteRepositoryPort`；
-// · `StableWritePermitStore` ↔ `StablePermitPort`（list/upsert/installSnapshot）。
+// · `StableWritePermitStore` ↔ `StablePermitPort`（list/upsert only）。
 // 结构化兼容由 `test/编排/version-change-store.test.ts` 的类型断言固定；本文件**不 import
 // Service**（依赖方向 Provider ← Service）。
 //
@@ -98,12 +98,10 @@ export interface StableWriteStore {
 
 /**
  * 一次性许可存储（C2c `StablePermitPort` 的 Provider 实现形状；F13 与 record 分表）。
- * `installSnapshot` 只调用 C2b `installStableWritePermitSnapshot`（同步许可快照唯一实现，
- * 编排不自建第二份 Map）；Provider 不实现判定。
+ * Only persistent ordinary data; Pipeline installs the single Gate snapshot after Service joins request/permit facts.
  */
 export interface StableWritePermitStore {
   list(): Promise<StableWritePermit[]>;
   upsert(permit: StableWritePermit): Promise<RepositoryWriteResult>;
-  installSnapshot(permits: readonly StableWritePermit[]): Promise<void>;
   readRaw(): Promise<JsonRecordRead<StableWritePermit[]>>;
 }

@@ -91,4 +91,18 @@ export interface BoundarySection1 {
   //  · 按 id 解析/开启角色的入口（resolveRole，CLI role run 与桌面开启皆经此）**fail-closed 拒绝**。
   // 仅在边界文件解析成功且声明为 true 时出现；不带该键的角色行为完全不变。
   archived?: boolean;
+  /** 宿主读取并验证的不可变依据标识；冻结边界不得再探测 live 文件。 */
+  frozenEvidence?: { snapshotDigest: string; roleId: string } & (
+    { runId: string; pinDigest: string } | { activeRevision: number; activeDigest: string }
+  );
+}
+
+/** 宿主纯校验结果，模型输入不得承载；O Service只核与完整快照字节的绑定。 */
+export interface RoleDocumentCheck {
+  roleId: string;
+  snapshotDigest: string;
+  cardSha256: string;
+  boundaryMdSha256: string;
+  boundaryYamlSha256: string;
+  ok: true;
 }

@@ -3,11 +3,10 @@
 // 冻结状态查询。不属于公共契约（不 re-export）。
 
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { createFsTrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 
 import type { TrunkApplySnapshot, TrunkDocKind, TrunkManifest } from "../../../model/trunk.ts";
-import type { FreezeRegistryStore } from "../../../provider/version-change/abstract/freeze-cache.ts";
+import type { FreezeRegistryStore } from "../../../provider/version-change/public/version-change-store.ts";
 
 /** 规范化 JSON：对象键排序、数组保序、`undefined` 丢弃（digest 跨平台稳定）。 */
 export function canonicalJson(value: unknown): string {
@@ -23,12 +22,8 @@ export function sha256TextOrBytes(content: string | Buffer): string {
 }
 
 export async function sha256File(projectRoot: string, relPath: string): Promise<string | undefined> {
-  try {
-    const bytes = await readFile(path.join(projectRoot, relPath));
-    return createHash("sha256").update(bytes).digest("hex");
-  } catch {
-    return undefined;
-  }
+  const read = await createFsTrunkStore(projectRoot).readProjectFile!(relPath);
+  return read.ok ? read.value.sha256 : undefined;
 }
 
 /**
@@ -69,7 +64,7 @@ export function computeTrunkDigest(input: {
   runId: string | null;
   documents: TrunkManifest["artifacts"]["documents"];
   execution: TrunkManifest["artifacts"]["execution"];
-  workflow: TrunkManifest["artifacts"]["workflow"];
+  workflow?: TrunkManifest["artifacts"]["workflow"];
   roleCards?: TrunkManifest["artifacts"]["roleCards"];
   boundaries: TrunkManifest["artifacts"]["boundaries"];
   rosterVersion?: number;
@@ -112,7 +107,7 @@ export function snapshotOfManifest(manifest: TrunkManifest): TrunkApplySnapshot 
               version: manifest.artifacts.execution.flow.version,
             },
     },
-    workflow: { path: manifest.artifacts.workflow.path, sha256: manifest.artifacts.workflow.sha256 },
+    ...(manifest.artifacts.workflow ? { workflow: { path: manifest.artifacts.workflow.path, sha256: manifest.artifacts.workflow.sha256 } } : {}),
     ...(manifest.artifacts.roleCards !== undefined ? { roleCards } : {}),
     boundaries,
   };

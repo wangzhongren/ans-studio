@@ -13,7 +13,7 @@
 
 import path from "node:path";
 
-import { createFsTrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
+import { createProjectTrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 import {
   createFreezeCacheStore,
   createGuardFreezeRegistry,
@@ -72,13 +72,14 @@ export function createVersionChangeIntegration(options: VersionChangeIntegration
   const freezeCache = createFreezeCacheStore(root, migrationOptions);
   const trunk = createTrunkService({
     projectRoot: root,
-    store: createFsTrunkStore(root),
+    store: createProjectTrunkStore(root),
     freezeRegistry,
     ...(options.runRepin !== undefined ? { runRepin: options.runRepin } : {}),
     now,
   });
 
   const services = createVersionChangeService({
+    projectRoot: root,
     versionChanges: createVersionChangeStore(root),
     freezeRegistry,
     stableWrites: createStableWriteStore(root),

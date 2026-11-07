@@ -20,6 +20,7 @@ import {
   loadLatestRoster,
   parseProjectModules,
   parseProjectRoster,
+  parseTeamPlan,
   PROJECT_MODULES_SCHEMA,
   PROJECT_MODULES_SCHEMA_EXAMPLE,
   PROJECT_ROSTER_SCHEMA,
@@ -34,6 +35,31 @@ import {
   type DispatchPreflightInput,
   type ProjectRoster,
 } from "../../src/common/编排/workflow-preconditions.ts";
+
+test("team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution", () => {
+  const loaded = parseProjectRoster(ROSTER_TEXT, "focus"); assert.ok(loaded.ok); if (!loaded.ok) return;
+  const context = { flowId: "focus", version: 2, modules: { path: "docs/proposals/focus-modules-v1.md", sha256: "a".repeat(64) },
+    roster: { path: "docs/proposals/focus-roster-v1.md", sha256: "b".repeat(64) }, rosterFacts: loaded.roster };
+  const input = { schema: "teamPlanSchema:3", flowId: "focus", version: 2, modules: context.modules, roster: context.roster,
+    roleRows: loaded.roster.roles.map(role => ({ roleId: role.id, modules: role.modules,
+      writesets: loaded.roster.modules.filter(module => role.modules.includes(module.id)).flatMap(module => module.paths),
+      dependsOn: role.id === "qa" ? ["implementer"] : [] as string[] })) };
+  const text = (value: unknown) => `---\n${JSON.stringify(value)}\n---\n# Actual team plan\n`;
+  const parsed = parseTeamPlan(text(input), context); assert.ok(parsed.ok, JSON.stringify(parsed));
+  assert.equal(parsed.ok && "d3" in parsed.plan, false);
+  assert.equal(parseTeamPlan("---\nschema: teamPlanSchema:3\n---\n# legacy plan", context).ok, false);
+  for (const mutate of [
+    (value: typeof input) => { value.roster.sha256 = "c".repeat(64); },
+    (value: typeof input) => { value.roleRows[0]!.modules = value.roleRows[1]!.modules; },
+    (value: typeof input) => { value.roleRows[0]!.writesets = ["src/../escape/"]; },
+    (value: typeof input) => { value.roleRows[1]!.writesets = value.roleRows[0]!.writesets; },
+    (value: typeof input) => { value.roleRows[0]!.dependsOn = ["missing-role"]; },
+    (value: typeof input) => { value.roleRows[0]!.dependsOn = ["qa"]; },
+  ]) { const invalid = structuredClone(input); mutate(invalid); assert.equal(parseTeamPlan(text(invalid), context).ok, false, JSON.stringify(invalid)); }
+  const missing = structuredClone(input) as unknown as Record<string, unknown>;
+  const rows = missing.roleRows as Array<Record<string, unknown>>; delete rows[0]!.dependsOn;
+  assert.equal(parseTeamPlan(text(missing), context).ok, false);
+});
 
 const ROSTER_TEXT = [
   "---",
