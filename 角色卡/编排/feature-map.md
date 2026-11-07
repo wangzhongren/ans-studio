@@ -46,3 +46,18 @@
 - 功能点 = 用户或外部系统能触发并得到结果的行为；本角色不自编项目管理/测试等功能。
 - 跨角色事项（Pi 适配器、门禁引擎、桌面应用）不在本导航重复，按各自角色文档链接。
 - 每份 `docs/feature/<feature-id>.md` 补齐时，在本表对应行更新链接。
+
+- [角色直接能力](docs/feature/direct-role-capabilities.md)：S1完整快照/CAS/恢复；O1规划发布、真实D3草稿/激活、同run物证、creator收口与首建workflow子链；完整跨层闭环见当前限制。
+- [Git权限整合基础](docs/change/2026-11-05_change_git-role-permissions-integration.md)：安全真实查询、完整只读生产adapter/selector、候选与ref CAS/原媒体恢复、真实chief source与task目录范围已接；生产init/修改保护闭包及四闭环仍未完成，详当前限制。
+
+O6 Git首doc/初始化收口：原Trunk Service准备/当前task authority/实例绑定提交；Provider完整raw-object计划与单op受限store；Pipeline正式submit组合G+全Core+host/R9。证据55=69/69，56外属Q类型2条，57当前hash；Q6公共init-close和Q7公共t1六文档另属QA物证。其余Git写能力及完整四链未完成。
+
+O7 complete_team_plan Git：独立PreparedTeamPlanCommit/当前真实任务授权/双G policy/同nonce受限事务，正式Pipeline接线；68真Git1/1、66 Git8/8、64 direct31/31，69TS0（重叠）。70 hash。公共Q计划待验；active-only/stable/run后继各自精确围栏未开放。
+
+O8 active-only Git：独立planActiveCommit/nonce/currentD3task/G/R9/CAS已接真实activate工具；文档维度与旧run保持。R15实际blockedcallbacks按freshscope装配/strictguardfacts消费，unmanaged原Fn不变。88自然71/71、89TS0，90hash；Q生产激活仍待验，stable/run后继未开放。78未退出/83、80-82红全保留，后安全复验自然退出。
+
+O9 active报告close：原creator接口新增current-active-completion typed basis，真实Active8refs/D3/currentplan/Git原op证明及同R9ledgerCAS；92 layer1/1、94 affected47/47、95TS0，96hash。公共Q收口待验。initialworkflow仅普通Provider基础未启生产，后继Service/G/Pipeline仍缺。
+
+O10 initialWorkflow：真实Core/task stable来源+written/consumed exactbytes+G11同nonce/host/R9完整同版本Git发布已接postconsume。115 affected77/77，117最后writtenAt/fullGit1/1，118TS0；119hash。Q公共chain待验，workflow报告close/执行pin与worker/lifecycle未宣完成。
+
+O13/Q14 workflow报告已实际typedbasis→chief acceptedclose，批准227bytes保持。O14/O15：既有firstpin/worker公开口保具体拒码；真实parent来源与同R9子任务登记已接Service/Provider，pure parser消费R18单形状。164五项/163十八项/165TS0，161真实Gitfirstpin+worker1/1均留EXIT/CLOSE元数据（计数不混加重复运行）。W正式parent消费和Q worker链仍待独立复验；不能以registration replay代新open/权限。151历史最终exit未知，146/149 Node native红全保。166为当前hash；G13旧IOcaller迁移另节点。

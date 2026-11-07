@@ -39,6 +39,9 @@ import { createHash } from "node:crypto";
 
 // 契约三型（请求/裁决/原始通道）的**唯一来源**（§4 冻结契约家）：只读导入、原样转出——**不逐字镜像**。
 import type {
+  ChiefPendingDecisionRequest,
+  ChiefDecisionExecutionContext,
+  DecidePendingRequestFn,
   CustomerInputRequest,
   CustomerInputOutcome,
   CustomerInputFn,
@@ -53,6 +56,7 @@ import type {
   GovernanceJudgeRequest,
   RuntimeKind,
 } from "../../src/model/runtime.ts";
+import type { DirectActionSource, SnapshotArtifactRef } from "../../src/model/trunk.ts";
 // 客户授权平面 decision 消费者（C1，2026-11-03）：只经 B1 Pipeline 公共出口（类型只读；实现在主进程控制器）。
 import type {
   DecisionApplyResult,
@@ -108,6 +112,7 @@ import {
   type GovernanceNextStepContext,
   type GovernanceNextStepPayload,
 } from "./governance-advance.ts";
+import { PLAN_ESCALATION_OPTION_IDS } from "./plan-escalation.ts";
 export type { GovernanceNextStepContext, GovernanceNextStepPayload } from "./governance-advance.ts";
 
 /**
@@ -291,6 +296,7 @@ export interface OperatorJudgeResultPayload {
   engine: RuntimeKind;
   model?: string;
   reasonCode: string;
+  actionSource?: DirectActionSource;
   reason?: string;
   selected?: string[];
   confirmed?: true;
@@ -354,7 +360,7 @@ const AMENDMENT_FINAL_OPTION_IDS: readonly string[] = ["apply-amendment", "defer
 const STABLE_WRITE_CARD_KIND = "stable-write" as const;
 const STABLE_WRITE_OPTION_IDS: readonly string[] = ["approve-stable-write", "reject-stable-write"];
 
-function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
+export function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
   if (request.kind !== "choice") return false;
   const cardKind = (request as { cardKind?: unknown }).cardKind;
   // stable workflow 确认卡：app-owned、无 flowId；客户本人，永不判断/委托/指令。
@@ -371,6 +377,8 @@ function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest)
     hasAll(RUN_CHANGE_MODE_OPTION_IDS) ||
     hasAll(VERSION_DECISION_OPTION_IDS) ||
     hasAll(VERSION_CHANGE_OPTION_IDS) ||
+    // 2026-11-05：方案升级卡（convener 发起、应用发行）——修订方案/环境/继续/终止，客户本人裁决。
+    hasAll(PLAN_ESCALATION_OPTION_IDS) ||
     hasAll(AMENDMENT_ITEM_OPTION_IDS) ||
     hasAll(AMENDMENT_FINAL_OPTION_IDS)
   );
@@ -485,8 +493,13 @@ export function evaluateDecisionCardRequest(input: {
  * 路径多时显示前 3 个 + 「等 n 个」。
  */
 export function judgeResultSummary(
-  payload: Pick<OperatorJudgeResultPayload, "group" | "cardKind" | "selected" | "confirmed" | "paths" | "flowId">,
+  payload: Pick<OperatorJudgeResultPayload, "group" | "cardKind" | "selected" | "confirmed" | "paths" | "flowId" | "actionSource">,
 ): string {
+  if (payload.actionSource?.kind === "chief-delegated") {
+    const source = payload.actionSource;
+    const result = source.disposition === "revise" ? "幕僚已退修" : source.disposition === "reject" ? "幕僚已拒绝" : "幕僚已决定";
+    return `${result}：${source.selected?.join("、") ?? ""}${source.selected?.length ? "；" : ""}${source.reason}`;
+  }
   const flow = typeof payload.flowId === "string" && payload.flowId !== "" ? mainT("ui.judge.flowSuffix", { flowId: payload.flowId }) : "";
   // decision 卡（2026-10-26）：judge 默认推荐的结果行必须如实标「自动代理」且不是客户本人；
   // 同一行附不变量「决策卡不是验收、不是客户批准，也不构成验收/提案/任命决定」（不触发 gate/验收，
@@ -594,6 +607,10 @@ export interface CreateCustomerInputChannelOptions {
    * `isGroupEnabled` 是主进程权威——通道在 `presentEntry` 当刻与 `approve` 结算前各查一次。
    * 本模块**不判定**「该不该批」：只把请求与 `metadata.judgeContext` 的应用事实拼给 driver。
    */
+  delegation?: {
+    get(): { enabled: boolean; revision: number };
+    subscribe(listener: () => void): () => void;
+  };
   judge?: {
     /** 每会话注入的判断能力；缺省 ⇒ 不判断。 */
     fn?: GovernanceJudgeFn;
@@ -650,6 +667,18 @@ export interface CreateCustomerInputChannelOptions {
   onWritePreauthorization?: (event: WritePreauthorizationEvent) => void;
 }
 
+/** Trusted host basis; no model-provided baseline, evidence or identity is accepted. */
+export interface ChiefDecisionBasis {
+  baseDigest: string;
+  evidenceRefs: readonly SnapshotArtifactRef[];
+  context: string;
+  isCurrent(): Promise<boolean>;
+}
+export interface ChiefDecisionHost {
+  prepare(request: CustomerInputRequest, metadata?: CustomerInputMetadata): Promise<ChiefDecisionBasis>;
+  execute(context: ChiefDecisionExecutionContext, evidence: string, decide: DecidePendingRequestFn, signal: AbortSignal): Promise<void>;
+}
+
 export interface CustomerInputChannel {
   /**
    * 交给编排的**原始客户通道**（`CustomerInputFn` 形状）。返回恒为冻结三态（绝不返回 null/undefined）；
@@ -699,6 +728,8 @@ export type DesktopCustomerInputFn = (
   req: CustomerInputRequest,
   ctx: {
     roleId: string;
+    /** Application lifecycle id, bound by SessionManager, never model input. */
+    requestId?: string;
     runtime?: CustomerInputMetadata["runtime"];
     projectRoot?: string;
     sessionSignal?: AbortSignal;
@@ -710,6 +741,7 @@ export type DesktopCustomerInputFn = (
     acceptanceReport?: AcceptanceReportDisplayV1;
     /** 每会话判断闭包（编排 `createGovernanceJudge`；与 shell judge 同一份 runtimeOptions/createAdapter）。 */
     governanceJudge?: GovernanceJudgeFn;
+    chiefDecision?: ChiefDecisionHost;
     /** 当前轮投递给该角色的文本（≤4KB；判断 agent 的 `turnText` 输入）。缺省不猜。 */
     turnText?: string;
     /**
@@ -827,6 +859,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     state: "active" | "queued" | "judging" | "triaging" | "directing" | "done";
     /** 同一请求只判断一次（§4.2）：进入 `judging` 即定格；`replay`/`drain` 永不再次判断。 */
     judged?: boolean;
+    chiefAttempted?: boolean;
+    chiefAbort?: AbortController;
+    chiefRevision?: number;
     /**
      * decision 卡发卡前校验的定格结果（2026-10-26）：仅 `cardKind="decision"` 且校验通过时存在。
      * 推荐项在**呈现/代选之前**定格；「替我决策」默认推荐只读本字段，不再重复解析选项。
@@ -838,6 +873,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       projectRoot?: string;
       governanceModel?: "single" | "trio";
       governanceJudge?: GovernanceJudgeFn;
+      chiefDecision?: ChiefDecisionHost;
       turnText?: string;
       /** 卡片呈现成功回调（仅需求变更审批卡携带；presenter 成功后才调用一次）。 */
       onPresented?: () => void;
@@ -870,6 +906,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     /** 被这张分诊卡拦住（或重启后需在作答时补齐结算）的验收请求。 */
     held: ChannelEntry[];
   }
+  const requestResults = new Map<string, { originRoleId: string; fingerprint: string; promise: Promise<CustomerInputOutcome> }>();
   const pending = new Map<string, ChannelEntry>();
   /** 判断中的卡（不呈现、不计入 pending/queued/pendingRoles；中止时一并结算）。 */
   const judging = new Map<string, ChannelEntry>();
@@ -1736,72 +1773,123 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
    * **例外（2026-11-04 客户直修）**：应用自有的 run-change 三模式卡与版本决策卡必须由客户本人选择，
    * 即使本开关开启也**永不**在这里代选（判据见 `isApplicationDecisionReservedForCustomer`）。
    */
-  const tryAutoSelectDecision = (entry: ChannelEntry): boolean => {
-    const decision = entry.decisionCard;
-    if (decision === undefined) return false;
-    // 2026-11-04 客户直修：治理写卡（appointment-write）是客户主权卡，一律排除任何确定性代选
-    //（结构上它不携带 decisionCard；此防线防未来接线变化）。
-    if (isGovernanceWriteCardKind(cardKindOf(entry))) return false;
-    // 2026-11-04 客户直修：应用自有的 run-change / 版本决策卡一律原卡呈现客户，确定性代选不得拦截。
-    if (isApplicationDecisionReservedForCustomer(entry.request)) return false;
-    if (entry.ctx.governanceModel !== "trio") return false; // single/su 不代批（与判断门同口径）
-    if (opts.judge?.isGroupEnabled("decision") !== true) return false;
-    if (entry.signals.some((signal) => signal.aborted)) return false;
-    const runtime = entry.ctx.runtime ?? entry.metadata?.runtime;
-    if (runtime === undefined) return false;
-    // 防御：定格推荐项必须仍在卡上选项内（请求快照被意外改写 ⇒ 不代选，回落客户卡）。
-    const requestOptions = (entry.request as { options?: CustomerInputOption[] }).options ?? [];
-    const offered = new Set(requestOptions.map((option) => option.id));
-    if (!offered.has(decision.recommendedOptionId)) return false;
-    const selected = [decision.recommendedOptionId];
-    const judge: GovernanceJudgeAudit = {
-      group: "decision",
-      cardKind: DECISION_CARD_KIND,
-      engine: runtime,
-      reasonCode: "recommended-default",
-      selected,
-    };
-    const result: OperatorJudgeResultPayload = {
-      version: 1,
-      id: `gj-${++judgeResultSeq}`,
-      requestId: entry.payload.id,
-      anchorKey: entry.payload.anchorKey,
-      toolCallId: entry.payload.toolCallId ?? "",
-      roleId: entry.payload.roleId,
-      at: new Date().toISOString(),
-      ...(entry.request.title.trim() !== "" ? { requestTitle: entry.request.title } : {}),
-      group: "decision",
-      cardKind: DECISION_CARD_KIND,
-      flowId: decision.flowId,
-      engine: runtime,
-      ...(entry.payload.projectRoot !== undefined ? { projectRoot: entry.payload.projectRoot } : {}),
-      ...(entry.payload.runtime !== undefined ? { runtime: entry.payload.runtime } : {}),
-      reasonCode: "recommended-default",
-      selected,
-    };
-    try {
-      if (opts.emitJudgeResult === undefined) return false;
-      opts.emitJudgeResult(result);
-    } catch (error) {
-      // 结果行是代批的可见性条件：投达失败 ⇒ 不代选，回落客户卡（fail-closed，绝不悄悄放行）。
-      diagnostic.error("decision-card.result.failed", error, { requestId: entry.payload.id });
+  const isChiefBusinessCard = (entry: ChannelEntry): boolean => {
+    const kind = cardKindOf(entry);
+    return entry.appCard === undefined && !isApplicationDecisionReservedForCustomer(entry.request)
+      && (kind === "appointment" || kind === "acceptance" || kind === "decision" || kind === "proposal");
+  };
+  const delegationState = () => opts.delegation?.get() ?? { enabled: false, revision: 0 };
+  const chiefWaiting = (entry: ChannelEntry, reason: string): void => {
+    if (entry.state === "done") return;
+    judging.delete(entry.payload.id);
+    entry.chiefAbort?.abort();
+    entry.payload.judgeNotice = reason;
+    presentNow(entry);
+  };
+  const tryChiefDecision = (entry: ChannelEntry): boolean => {
+    if (!isChiefBusinessCard(entry)) return false;
+    const mode = delegationState();
+    if (!mode.enabled || entry.ctx.governanceModel !== "trio") return false;
+    if (entry.chiefAttempted) {
+      entry.payload.judgeNotice = mainT("main.customerInput.chief.noValidDecision");
       return false;
     }
-    diagnostic.record("decision-card.auto-selected", {
-      requestId: entry.payload.id,
-      flowId: decision.flowId,
-      optionId: decision.recommendedOptionId,
-    });
-    entry.judged = true;
-    entry.state = "active";
-    settleActive(entry, {
-      outcome: "answered",
-      value: { selected },
-      operatorId: `judge:${runtime}`,
-      judge,
-    });
+    entry.chiefAttempted = true;
+    entry.payload.judgeNotice = mainT("main.customerInput.chief.deciding");
+    entry.chiefRevision = mode.revision;
+    const controller = new AbortController();
+    entry.chiefAbort = controller;
+    entry.state = "judging";
+    pending.delete(entry.payload.id);
+    judging.set(entry.payload.id, entry);
+    activeByProject.set(entry.projectKey, entry.payload.id);
+    const valid = () => entry.state === "judging" && !controller.signal.aborted
+      && !entry.signals.some(signal => signal.aborted) && delegationState().enabled
+      && delegationState().revision === mode.revision;
+    void (async () => {
+      let stage: "materials" | "execution" = "materials";
+      let failureReason: string | undefined;
+      try {
+        const host = entry.ctx.chiefDecision;
+        if (host === undefined) throw new Error("幕僚决策上下文不可用");
+        if (entry.request.acknowledgments?.some(item => item.required)) throw new Error("本请求需专门确认勾选，幕僚不能代作客户确认");
+        const basis = await host.prepare(entry.request, entry.metadata);
+        if (!valid()) return;
+        if (!/^[a-f0-9]{64}$/i.test(basis.baseDigest) || basis.evidenceRefs.length === 0 || !basis.context.trim()) {
+          throw new Error("当前目标、基线或决策物证缺失");
+        }
+        const kind = cardKindOf(entry);
+        if (kind !== "appointment" && kind !== "acceptance" && kind !== "decision" && kind !== "proposal") return;
+        const options = entry.request.kind === "choice" ? entry.request.options : [
+          { id: "confirm", label: "同意" }, { id: "reject", label: "拒绝" },
+        ];
+        const request: ChiefPendingDecisionRequest = {
+          requestId: entry.payload.id, baseDigest: basis.baseDigest, delegationRevision: mode.revision,
+          originRoleId: entry.payload.roleId, cardKind: kind,
+          ...(entry.request.flowId !== undefined ? { flowId: entry.request.flowId } : {}),
+          ...(entry.metadata?.taskId !== undefined ? { taskId: entry.metadata.taskId } : {}),
+          question: entry.request.title, options: structuredClone(options), evidenceRefs: structuredClone(basis.evidenceRefs),
+        };
+        const context: ChiefDecisionExecutionContext = {
+          roleId: "chief", executionId: `chief-${entry.payload.id}-${mode.revision}`, mode: "bounded-decision",
+          request, productionWriteAuthority: false, tools: ["decide_pending_request"],
+          limits: { maxTurns: 1, maxAttempts: 1, timeoutMs: 120_000 },
+        };
+        const decide: DecidePendingRequestFn = async (input, signal) => {
+          const fail = (errorCode: string, message: string) => { failureReason = message; return { ok: false as const, requestId: request.requestId, status: "stale" as const, errorCode, message }; };
+          if (!valid() || signal?.aborted || input.requestId !== request.requestId
+            || input.baseDigest !== request.baseDigest || input.delegationRevision !== mode.revision) return fail("chief-stale", "委托模式、版本或未决请求已改变");
+          if (!input.reason.trim()) return fail("chief-reason-missing", "需要选择理由");
+          const disposition = input.disposition;
+          if (input.disposition !== "select" && input.disposition !== "reject" && input.disposition !== "revise") return fail("chief-choice-invalid", "非法决定");
+          const selected = input.disposition === "select" ? [...new Set(input.selected)] : undefined;
+          if (selected !== undefined && (selected.length === 0 || selected.some(id => !options.some(option => option.id === id))
+            || (entry.request.kind === "choice" && entry.request.multiple !== true && selected.length !== 1)
+            || (entry.request.kind === "confirm" && (selected.length !== 1 || !["confirm", "reject"].includes(selected[0]!))))) return fail("chief-choice-invalid", "选择不在本次合法选项内");
+          if (!(await basis.isCurrent()) || !valid() || signal?.aborted) return fail("chief-base-stale", "基线或物证已改变；需重新发起请求");
+          // Single synchronous CAS after every await. No external callbacks before settlement.
+          const actionSource: Extract<DirectActionSource, { kind: "chief-delegated" }> = {
+            kind: "chief-delegated", actorRoleId: "chief", originRoleId: request.originRoleId,
+            requestId: request.requestId, baseDigest: request.baseDigest, delegationRevision: mode.revision,
+            disposition, ...(selected !== undefined ? { selected } : {}), reason: input.reason, at: new Date().toISOString(),
+          };
+          const declined = input.disposition === "reject" || input.disposition === "revise" || (entry.request.kind === "confirm" && selected?.[0] === "reject");
+          settleEntry(entry, declined
+            ? { outcome: "declined", operatorId: "chief", actionSource, reason: disposition === "revise" ? `${input.reason} ${mainT("main.customerInput.chief.revisionRequested")}` : input.reason }
+            : { outcome: "answered", operatorId: "chief", actionSource,
+                value: entry.request.kind === "confirm" ? { confirmed: true } : { selected } }, "judging");
+          try {
+            opts.emitJudgeResult?.({ version: 1, id: `chief-${++judgeResultSeq}`, requestId: request.requestId,
+              anchorKey: entry.payload.anchorKey, toolCallId: entry.payload.toolCallId ?? "", roleId: entry.payload.roleId,
+              projectRoot: entry.payload.projectRoot, runtime: entry.payload.runtime, at: actionSource.at,
+              requestTitle: entry.request.title, group: "decision", cardKind: kind, engine: entry.ctx.runtime ?? "demo",
+              reasonCode: "chief-delegated", actionSource, selected, reason: input.reason });
+          } catch (error) { diagnostic.error("chief-decision.notice.failed", error, { requestId: request.requestId }); }
+          return { ok: true, requestId: request.requestId, status: "settled", source: actionSource };
+        };
+        stage = "execution";
+        await host.execute(context, basis.context, decide, controller.signal);
+        if (valid()) chiefWaiting(entry, failureReason === undefined ? mainT("main.customerInput.chief.noValidDecision") : `${failureReason} ${mainT("main.customerInput.chief.noValidDecision")}`);
+      } catch (error) {
+        diagnostic.error("chief-decision.failed", error, { requestId: entry.payload.id, stage });
+        if (valid()) chiefWaiting(entry, stage === "materials"
+          ? mainT("main.customerInput.chief.contextUnavailable")
+          : mainT("main.customerInput.chief.noValidDecision"));
+      }
+    })();
     return true;
   };
+  const unsubscribeDelegation = opts.delegation?.subscribe(() => {
+    for (const entry of [...judging.values()]) {
+      if (entry.chiefRevision === undefined) continue;
+      if (!delegationState().enabled || delegationState().revision !== entry.chiefRevision) {
+        chiefWaiting(entry, mainT("main.customerInput.chief.modeChanged"));
+      }
+    }
+    if (delegationState().enabled) {
+      for (const entry of [...pending.values()]) if (isChiefBusinessCard(entry)) tryChiefDecision(entry);
+    }
+  });
 
   /** 选项 label（可见结果行使用；缺失回退 optionId，不伪造）。 */
   const optionLabel = (options: readonly CustomerInputOption[], optionId: string | undefined): string => {
@@ -1955,10 +2043,16 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
   const presentEntryNow = (entry: ChannelEntry): void => {
+    if (isChiefBusinessCard(entry)) {
+      if (tryChiefDecision(entry)) return;
+      presentNow(entry);
+      return;
+    }
+
     // 客户指令消费者优先（C1）：命中即不进入默认推荐/客户卡；未命中/冲突/失败按 B1 冻结规则回落。
     if (tryApplyDirectiveDecision(entry)) return;
     // decision 卡先尝试「替我决策」确定性默认；未代选 ⇒ 原卡照旧呈现给客户。
-    if (tryAutoSelectDecision(entry)) return;
+
     const plan = planJudge(entry);
     if (plan === undefined) {
       presentNow(entry);
@@ -2246,6 +2340,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   };
 
   const customerInput: DesktopCustomerInputFn = (req, ctx, metadata) => {
+    req = structuredClone(req);
+    if (metadata?.judgeContext !== undefined) metadata = { ...metadata, judgeContext: structuredClone(metadata.judgeContext) };
     // decision 卡发卡前校验（2026-10-26）：在**呈现/判断/排队之前** fail-closed。
     // 拒发卡 ⇒ declined + notPresented:true（卡片从未呈现；不冒充客户拒绝、不写账本、不占一项目一卡）。
     const decisionGate = evaluateDecisionCardRequest({
@@ -2263,13 +2359,25 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
     }
     const preauthorized = preauthorizeWrite(req, ctx, metadata);
     if (preauthorized !== undefined) return preauthorized;
-    return new Promise<CustomerInputOutcome>((resolve) => {
+    const fingerprint = createHash("sha256").update(JSON.stringify(req)).digest("hex");
+    if (ctx.requestId !== undefined) {
+      const previous = requestResults.get(ctx.requestId);
+      if (previous !== undefined) {
+        if (previous.originRoleId !== ctx.roleId || previous.fingerprint !== fingerprint) {
+          return { outcome: "unavailable", reason: "该请求标识已绑定另一张业务卡，请由原发起者重新提交。" };
+        }
+        return previous.promise;
+      }
+    }
+    const result = Promise.withResolvers<CustomerInputOutcome>();
+    if (ctx.requestId !== undefined) requestResults.set(ctx.requestId, { originRoleId: ctx.roleId, fingerprint, promise: result.promise });
+    void new Promise<CustomerInputOutcome>((resolve) => {
       // 退路：通道未配置 → 不可用（能力缺席即 fail-closed；绝不当「没人问、那就放行」）。
       if (opts.presenter === undefined) {
         resolve({ outcome: "unavailable", reason: mainT("main.customerInput.presenterMissing") });
         return;
       }
-      const id = opts.nextId ? opts.nextId() : `op-${++seq}`;
+      const id = ctx.requestId ?? (opts.nextId ? opts.nextId() : `op-${++seq}`);
       const payload: OperatorRequestPayload = { id, roleId: String((ctx && ctx.roleId) || ""), request: req, anchorKey: interactionAnchorKey(req.kind, req.title) };
       // 镜像面（四角色评审 §6.1）：由 SessionManager 计算并给出；仅非空字符串进入载荷。
       // 同一请求仍只登记一条 pending、只结算一次——本字段不改变任何校验/账本/下一步推导。
@@ -2287,7 +2395,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         request: req,
         projectKey,
         signals,
-        cleanup: () => { for (const signal of signals) signal.removeEventListener("abort", cancel); },
+        cleanup: () => { entry.chiefAbort?.abort(); for (const signal of signals) signal.removeEventListener("abort", cancel); },
         resolve,
         state: "queued",
         // 判断上下文（§4.2/§5.2）：只存调用当刻的会话事实；是否判断在 `presentEntry` 当刻再查开关。
@@ -2296,6 +2404,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
           ...(ctx.projectRoot !== undefined ? { projectRoot: ctx.projectRoot } : {}),
           ...(ctx.governanceModel !== undefined ? { governanceModel: ctx.governanceModel } : {}),
           ...(ctx.governanceJudge !== undefined ? { governanceJudge: ctx.governanceJudge } : {}),
+          ...(ctx.chiefDecision !== undefined ? { chiefDecision: ctx.chiefDecision } : {}),
           ...(typeof ctx.turnText === "string" && ctx.turnText !== "" ? { turnText: ctx.turnText } : {}),
           ...(ctx.onPresented !== undefined ? { onPresented: ctx.onPresented } : {}),
         },
@@ -2358,7 +2467,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
         return;
       }
       presentEntry(entry);
-    });
+    }).then(result.resolve, result.reject);
+    return result.promise;
   };
 
   /**
@@ -2392,6 +2502,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
       // 终态：该 id 已无挂起请求——G-1 起只剩「应用关闭/重启清空了未决请求」这一种真实原因（无按时间超时）。
       // 界面据此**定格**，不得解冻重试；文案如实指向重启/关闭。
       return { ok: false, error: mainT("main.customerInput.noPendingRequest"), expired: true };
+    }
+    if (isChiefBusinessCard(entry) && entry.ctx.governanceModel === "trio" && delegationState().enabled) {
+      return { ok: false, error: mainT("main.customerInput.chief.manualTakeoverRequired") };
     }
     const d = input.decision as OperatorDecisionPayload | undefined;
     if (!d || typeof d !== "object") {
@@ -2462,6 +2575,7 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
   }
 
   function rejectAllPending(reason: string): void {
+    unsubscribeDelegation?.();
     diagnostic.record("interaction.closed", { pendingCount: pending.size, queuedCount: queuedCount() });
     // 已呈现的卡、判断中的卡与排队中的请求都归 declined（窗关/项目关闭 = 未获同意，fail-closed）；
     // 排队者从未呈现，仍经 onExpired 让界面清掉「等待前一个决定」行；判断中的卡迟到结果被丢弃（state=done）。

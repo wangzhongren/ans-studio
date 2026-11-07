@@ -179,7 +179,9 @@ test("一次性警告：每次开启只显示一次；关闭复位；两组各�
   assert.ok(approval.some((line) => line.text.includes("按所属开关回落逐张卡")));
   assert.ok(approval.some((line) => line.text.includes("judge 代批 · 代审批/代决策")));
   const both = judgeWarningLines([JUDGE_GROUP_APPROVAL, JUDGE_GROUP_DECISION]);
-  assert.ok(both.some((line) => line.text.includes("替我决策中：提案接受、任命、验收")));
+  assert.ok(both.some((line) => line.text === "幕僚代决策"));
+  const decision = judgeWarningLines([JUDGE_GROUP_DECISION]);
+  assert.equal(decision.some((line) => line.text.includes("不会代你拒绝")), false);
 });
 
 test("开关回包：ok 采用主进程值；失败保持原状态并给出错误", () => {

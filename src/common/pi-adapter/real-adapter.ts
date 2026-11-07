@@ -27,6 +27,7 @@
 //    与本项目角色边界无关，本文件**不使用**它们、也不据此改动任何边界类型。
 
 import { accessSync, constants, mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   WriteGate, RoleSession, RuntimeAdapter, SessionEvent, PromptImage, PromptOptions,
@@ -34,6 +35,7 @@ import type {
   ToolDefinition as GovernedTool, RuntimeToolEventProjector, RuntimeToolResultFactsV1,
   RuntimeToolErrorFactsV1, RuntimeToolInputFactsV1, ToolDisplayInputRuleV1, RuntimeToolEventSource,
   InstalledMcpServerV1,
+  RuntimeNativeLifecycleFacts, RuntimeOwnedProcessFact, RuntimeActiveToolFact,
 } from "../../model/runtime.ts";
 import { selectNativeSessionManager, sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
 export { sessionFileHasForeignToolChangeBlocks } from "./native-session.ts";
@@ -1177,6 +1179,31 @@ export interface PromptCapableSession {
   abort(): Promise<void>;
   /** 收口整个底层会话（`makeRoleSession` 的 dispose 用；AgentSession 本就提供）。 */
   dispose(): void;
+  readonly isStreaming?: boolean;
+  readonly isCompacting?: boolean;
+  readonly pendingMessageCount?: number;
+  subscribe?(listener: (event: { type: string; toolCallId?: string; toolName?: string }) => void): () => void;
+}
+
+/** Public transport events only: close() returning is deliberately not an exit observation. */
+export function observePiMcpTransport(transport: {
+  readonly pid?: number;
+  start(): Promise<void>;
+  close(): Promise<void>;
+  onClose(listener: () => void): () => void;
+}, id: string): { inspect(): RuntimeOwnedProcessFact; close(): Promise<void> } {
+  let pid: number | undefined;
+  let state: RuntimeOwnedProcessFact["state"] = "unknown";
+  const start = transport.start.bind(transport);
+  transport.start = async () => {
+    try { await start(); pid ??= transport.pid; if (state !== "exited") state = "running"; }
+    catch (error) { pid ??= transport.pid; throw error; }
+  };
+  transport.onClose(() => { pid ??= transport.pid; state = pid === undefined ? "unknown" : "exited"; });
+  return {
+    inspect: () => ({ id, kind: "mcp", state, ...(pid !== undefined ? { pid } : {}), treeStatus: "unknown" }),
+    close: () => transport.close(),
+  };
 }
 
 /**
@@ -1328,6 +1355,13 @@ export interface RoleSessionDeps {
    * （P0 探针 §一.4 实据：dispose 本身不收回子进程）。有界（5s）且 best-effort：失败只记诊断、不抛出。
    */
   sessionShutdown?: () => Promise<unknown>;
+  /** Real bind metadata. Absence preserves legacy helpers without inventing a native identity. */
+  nativeObservation?: {
+    roleId: string;
+    nativeSessionId: string;
+    currentTurnId?: () => string | undefined;
+    mcpTransports: ReturnType<typeof observePiMcpTransport>[];
+  };
 }
 
 /**
@@ -1350,6 +1384,54 @@ export interface RoleSessionDeps {
  */
 export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
   const lifecycle = deps.lifecycle ?? createTurnLifecycle(deps.emit, deps.diagnostics);
+  const observation = deps.nativeObservation;
+  const instanceId = randomUUID();
+  let coreTurnId: string | undefined;
+  let rawStarted = false;
+  let rawPending = 0;
+  let settledAt: string | undefined;
+  let stopping = false;
+  let disposed = false;
+  let stopWork: Promise<void> | undefined;
+  let stopFailed = false;
+  const activeTools = new Map<string, RuntimeActiveToolFact>();
+  const unsubscribeNative = observation ? deps.session.subscribe?.(event => {
+    if (event.type === "tool_execution_start" && event.toolCallId && event.toolName) {
+      activeTools.set(event.toolCallId, { id: event.toolCallId, name: event.toolName, turnId: coreTurnId });
+    } else if (event.type === "tool_execution_end" && event.toolCallId) activeTools.delete(event.toolCallId);
+    // agent_settled is not the raw prompt's finally and must never clear these facts.
+  }) : undefined;
+  const inspectNative = (extra: string[] = []): RuntimeNativeLifecycleFacts => {
+    const processes = observation!.mcpTransports.map(transport => transport.inspect());
+    const sdkIdle = deps.session.isStreaming === false && deps.session.isCompacting === false && deps.session.pendingMessageCount === 0;
+    const busy = rawPending > 0 || activeTools.size > 0 || deps.session.isStreaming === true || deps.session.isCompacting === true || (deps.session.pendingMessageCount ?? 0) > 0;
+    return {
+      instanceId, roleId: observation!.roleId, runtime: "pi", nativeSessionId: observation!.nativeSessionId,
+      coreTurnId, status: busy ? (stopping ? "stopping" : "running") : "unknown",
+      promptState: rawPending > 0 ? "running" : rawStarted ? "settled" : "not-started",
+      observedAt: new Date().toISOString(), ...(settledAt ? { settledAt } : {}),
+      transport: { kind: "in-process", state: sdkIdle && !busy ? "idle" : busy ? "open" : "unknown" },
+      activeTools: [...activeTools.values()].map(tool => ({ ...tool })), processes,
+      processCoverage: "unknown",
+      reasons: ["pi-sdk-owned-process-tree-coverage-unavailable", "pi-sdk-http-transport-close-unobservable",
+        ...(!sdkIdle ? ["pi-sdk-idle-not-observed"] : []),
+        ...(rawPending > 0 ? ["pi-raw-prompt-pending"] : []),
+        ...(activeTools.size > 0 ? ["pi-native-tools-active"] : []),
+        ...(processes.some(process => process.state !== "exited") ? ["pi-owned-mcp-close-pending"] : []),
+        ...(stopFailed ? ["pi-native-stop-operation-failed"] : []), ...extra],
+    };
+  };
+  const observedSession: PromptCapableSession = observation ? {
+    async prompt(text, options) {
+      if (stopping || disposed) throw new Error("Pi native session is stopping or disposed");
+      if (rawPending > 0) throw new Error("Pi native raw prompt is still running");
+      coreTurnId = observation.currentTurnId?.();
+      rawStarted = true; rawPending++; settledAt = undefined;
+      try { await (options === undefined ? deps.session.prompt(text) : deps.session.prompt(text, options)); }
+      finally { rawPending--; if (rawPending === 0) settledAt = new Date().toISOString(); }
+    },
+    abort: () => deps.session.abort(), dispose: () => deps.session.dispose(),
+  } : deps.session;
   let abortWork: { id?: string; promise: Promise<void> } | undefined;
   const requestAbort = (): Promise<void> => {
     const id = lifecycle.currentTurnId();
@@ -1360,7 +1442,33 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
     return promise;
   };
   return {
-    prompt: makeRolePrompt({ ...deps, lifecycle, requestAbort, finishOnReturn: deps.strictLifecycle }),
+    ...(observation ? { nativeLifecycle: {
+      instanceId, inspect: inspectNative,
+      async stopAndInspect(input, signal) {
+        if (input.expectedInstanceId !== instanceId) throw new Error("Pi native instance mismatch");
+        if (input.expectedCoreTurnId !== undefined && input.expectedCoreTurnId !== coreTurnId) throw new Error("Pi native Core turn mismatch");
+        if (signal?.aborted || !Number.isFinite(input.timeoutMs) || input.timeoutMs <= 0) return inspectNative([signal?.aborted ? "native-stop-observation-aborted" : "native-stop-invalid-timeout"]);
+        stopping = true;
+        lifecycle.fail("aborted", "ABORTED");
+        stopWork ??= Promise.allSettled([
+          ...(rawPending > 0 ? [requestAbort()] : []),
+          ...(deps.sessionShutdown ? [Promise.resolve().then(deps.sessionShutdown)] : []),
+          ...observation.mcpTransports.map(transport => Promise.resolve().then(() => transport.close())),
+        ]).then(results => { stopFailed = results.some(result => result.status === "rejected"); });
+        const deadline = Date.now() + input.timeoutMs;
+        let operationsFinished = false;
+        void stopWork.then(() => { operationsFinished = true; });
+        for (;;) {
+          const facts = inspectNative();
+          if (signal?.aborted) return inspectNative(["native-stop-observation-aborted"]);
+          if (operationsFinished && rawPending === 0 && activeTools.size === 0 && deps.session.isStreaming === false && deps.session.isCompacting === false && deps.session.pendingMessageCount === 0 && facts.processes.every(process => process.state === "exited")) return facts;
+          const remaining = deadline - Date.now();
+          if (remaining <= 0) return inspectNative(["native-stop-observation-timeout"]);
+          await new Promise<void>(resolve => setTimeout(resolve, Math.min(10, remaining)));
+        }
+      },
+    } } : {}),
+    prompt: makeRolePrompt({ ...deps, session: observedSession, lifecycle, requestAbort, finishOnReturn: deps.strictLifecycle }),
     events(): AsyncIterable<SessionEvent> {
       return deps.queue.stream;
     },
@@ -1379,6 +1487,7 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
       }
     },
     async dispose(): Promise<void> {
+      disposed = true;
       deps.diagnostics?.record("session.dispose", { turnId: lifecycle.currentTurnId() });
       deps.unsubscribe();
       if (deps.sessionShutdown !== undefined) {
@@ -1394,6 +1503,7 @@ export function makeRoleSession(deps: RoleSessionDeps): RoleSession {
         }
       }
       deps.session.dispose();
+      if (rawPending === 0 && activeTools.size === 0) unsubscribeNative?.();
       deps.queue.close();
     },
   };
@@ -1546,6 +1656,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const resolvedMcpServers = mcpActive ? resolveInstalledMcpServers(installedMcp, process.env) : [];
         const mcpWhitelist = resolvedMcpServers.map((server) => server.name);
         let mcpExtension: ReturnType<typeof createMcpExtension> | undefined;
+        const mcpTransports: ReturnType<typeof observePiMcpTransport>[] = [];
         if (mcpActive) {
           diagnostics.record("session.construct.step", { state: "mcp_support", count: resolvedMcpServers.length });
           const mcpLib = await withTimeout(loadPiMcp(), constructMs, "加载 pi-mcp 包");
@@ -1554,7 +1665,7 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
           // server 自身工具链用。`options.env` 为构造期已展开的真值（只存活于内存）。
           const createTransport: McpTransportFactory = (entry, cwd) => {
             const config = entry.config as { command?: unknown; args?: unknown; env?: Record<string, string> };
-            return new mcpLib.StdioTransport({
+            const transport = new mcpLib.StdioTransport({
               command: String(config.command),
               args: Array.isArray(config.args) ? (config.args as string[]) : [],
               cwd,
@@ -1562,6 +1673,8 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
               inheritEnv: false,
               stderr: "pipe",
             });
+            mcpTransports.push(observePiMcpTransport(transport, `pi-mcp:${entry.name}:${mcpTransports.length}`));
+            return transport;
           };
           mcpExtension = createMcpExtension({
             // 配置单一来源＝注入声明（绝不回落 mcp.json/~/.pi/项目信任面）；逐一显式 direct（V1 最小接入）。
@@ -1740,7 +1853,8 @@ export function createRealPiRuntimeAdapter(input: RealPiAdapterOptions, dependen
         const sessionShutdown = mcpExtension !== undefined
           ? (): Promise<unknown> => session.extensionRunner.emit({ type: "session_shutdown", reason: "quit" })
           : undefined;
-        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, onPromptStart });
+        const roleSession = makeRoleSession({ session, promptMs, turnLastResortMs, gate: interactionGate, emit, log, queue, unsubscribe: () => { unsubscribe(); callFacts.clear(); }, lifecycle, diagnostics, abortTimeoutMs: 900, strictLifecycle: true, emitPromptInput: false, lengthFollowup, sessionShutdown, onPromptStart,
+          nativeObservation: { roleId: role.id, nativeSessionId: sessionSelection.manager.getSessionId(), currentTurnId: opts.currentTurnId, mcpTransports } });
         roleSession.runtime = "pi";
         roleSession.roleId = role.id;
         roleSession.contextSource = sessionSelection.contextSource ?? (sessionSelection.mode === "in-memory" ? "in-memory" : sessionSelection.mode === "resumed" ? "resumed" : sessionSelection.note ? "recovered" : "fresh");

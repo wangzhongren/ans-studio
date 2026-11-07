@@ -52,3 +52,7 @@ SDK 为 `@anthropic-ai/claude-agent-sdk@0.3.299`，正式 peers `zod@4.6.7`、`@
 兼容引擎省略 SDK effort/thinking，并在其局部 env 设置 `CLAUDE_CODE_EFFORT_LEVEL=unset`、`CLAUDE_CODE_DISABLE_THINKING=1`；真正省略请求体字段由真实 SDK 回环钉住。成功才确认当前活会话兼容，失败/取消后下一轮原配置不变，不写 `.env` 或主进程环境。正常输出/工具启动后不整轮重放；副作用保护包括 ANS handler 执行前以及三类工具 PreToolUse 放行前。
 
 模型能力钳制和 SDK 原生恢复/失败语义保持；没有引入跨会话缓存、模型能力表或 UI 改动。详见 [修复记录](docs/fix/2026-10-21_fix_reasoning-compatibility.md)。
+
+## T1.1 原生生命周期事实（2026-11-06）
+
+`bindRole()` 返回既有 Model `nativeLifecycle` hook（instanceId/inspect/stopAndInspect），不新增 Model 字段。捕获实际输入的 coreTurnId；真实 SDK hook 绑定 nativeTurnId/nativeSessionId；原生result或消息泵终结才 raw-settled；activeTools追踪实际 handler Promise 与可见 native start/result。stop 校验 instance/最后轮次并有界等待，重复请求不制造终态。SDK Query无PID/整树/退出事件/HTTP完成可等待接口，processCoverage始终unknown，绝不由close:void/abort/dispose/空processes推停稳。当前不能据此放行正常Claude stop/restart或Git受管面。精确session 61/61，主tsc exit0，原失败与Windows等价Node/junction夹具细化见[变更记录](docs/change/2026-11-05_change_direct-role-capabilities-native-stop.md)；[当前流程](docs/feature/native-stop.md)。

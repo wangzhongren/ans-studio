@@ -48,7 +48,7 @@ import type {
   VersionChangeTarget,
   VersionChangeTargetKind,
 } from "../../../model/version-change.ts";
-import type { TrunkAmendmentItem, TrunkVersionRef } from "../../../model/trunk.ts";
+import type { TrunkAmendmentItem, TrunkVersionRef, DirectActionReceipt, DirectActionSource, SnapshotRef, CompleteSnapshot } from "../../../model/trunk.ts";
 
 // —————————————— 通用 ——————————————
 
@@ -188,7 +188,17 @@ export interface VersionChangeRepositoryPort {
  * 仅一个 submitted/approved；applicationId 唯一、重复提交幂等；targets↔items 一致；
  * 批准前/apply 前重验 `toSha256`（F38/AC-26）；批准后 upgrade 冻结全部目标、detail 只冻结 applied 项。
  */
+export interface VersionChangeDirectCreateInput extends VersionChangeCreateInput {
+  operationId: string;
+  requestDigest?: string;
+  supersedesApplicationId?: string;
+  snapshot: CompleteSnapshot;
+  /** Current manifest facts obtained by Pipeline; CAS is performed by the trunk Service. */
+  currentTrunk: TrunkVersionRef | null;
+}
 export interface VersionChangeService {
+  prepareDirect?(input: VersionChangeDirectCreateInput): Promise<ServiceResult<VersionChangeRecord, VersionChangeErrorCode>>;
+  finalizeDirect?(input: { applicationId: string; receipt: DirectActionReceipt; snapshotRef: SnapshotRef; resultTrunkVersion: number; at: string }): Promise<ServiceResult<VersionChangeRecord, VersionChangeErrorCode>>;
   create(input: VersionChangeCreateInput): Promise<ServiceResult<VersionChangeRecord, VersionChangeErrorCode>>;
   submit(input: VersionChangeSubmitInput): Promise<ServiceResult<VersionChangeMutation, VersionChangeErrorCode>>;
   approve(input: VersionChangeApproveInput): Promise<ServiceResult<VersionChangeMutation, VersionChangeErrorCode>>;
@@ -239,6 +249,8 @@ export interface FreezeRegistryPort {
 
 /** 冻结写入输入（reason/origin/decidedBy 归属按 C1 常量推导，F35）。 */
 export interface DocFreezeInput {
+  source?: DirectActionSource;
+  snapshotRef?: SnapshotRef;
   path: string;
   version: number;
   sha256: string;
@@ -400,8 +412,8 @@ export interface StableWriteRepositoryPort {
 export interface StablePermitPort {
   list(): Promise<StableWritePermit[]>;
   upsert(permit: StableWritePermit): Promise<PortWriteResult>;
-  /** 批准后 install、消费/失败后 refresh（绑定 C2b `stableWriteDecision` 的同步快照）。 */
-  installSnapshot(permits: readonly StableWritePermit[]): Promise<void>;
+  /** Legacy injected fixtures may carry this method; the Service never invokes it. Production storage has no upward callback. */
+  installSnapshot?(permits: readonly StableWritePermit[]): Promise<void>;
 }
 
 /**
@@ -431,6 +443,10 @@ export interface TrunkStableSnapshotPort {
  * 无许可/伪造/过期 ⇒ 门禁拒绝（C2b `stableWriteDecision`）；本服务提供 `findPermit` 供快照判定。
  */
 export interface StableWriteService {
+  /** Actual storage root ordinary data; transitional Pipeline callers may read it, never a permission. */
+  readonly projectRoot?: string;
+  /** Ordinary currently applicable approved permits joined to their exact live request records. No Gate installation. */
+  readPermitSnapshot(): Promise<StableWritePermit[]>;
   request(input: StableWriteRequestInput): Promise<ServiceResult<StableWriteRecord, StableWriteErrorCode>>;
   approve(requestId: string, decision: StableWriteDecision): Promise<ServiceResult<StableWriteApproveResult, StableWriteErrorCode>>;
   reject(requestId: string, decision: StableWriteDecision): Promise<ServiceResult<StableWriteRecord, StableWriteErrorCode>>;
@@ -491,6 +507,8 @@ export interface VersionChangeServiceAllocation {
 
 /** 组合依赖（S1 Provider + 门禁引擎 C2b Port + trunk service 注入；本层不触达文件系统）。 */
 export interface VersionChangeServiceDeps {
+  /** Actual storage root for proving an old pending application never passed its commit point. */
+  projectRoot?: string;
   versionChanges: VersionChangeRepositoryPort;
   freezeRegistry: FreezeRegistryPort;
   stableWrites: StableWriteRepositoryPort;

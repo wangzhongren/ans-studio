@@ -11,6 +11,7 @@
 
 import { DEFAULT_LOCALE, translate, type Locale, type MessageKey } from "../i18n/index.ts";
 import type { ShellEscalationAction } from "../lib/platform.ts";
+import { isDirectActionSource, type DirectActionSource } from "../../../../src/model/trunk.ts";
 
 export type { ShellEscalationAction } from "../lib/platform.ts";
 
@@ -199,13 +200,13 @@ export function judgeToggleView(
     checked: on,
     singleDisabled,
     disabled: !ok || singleDisabled || busy === true,
-    label: ok ? (on ? onLabel : offLabel) : missing,
+    label: decision ? offLabel : ok ? (on ? onLabel : offLabel) : missing,
     title: !ok
       ? missing
       : singleDisabled
         ? singleNote
         : on
-          ? onTitle
+          ? decision ? translate(locale, "ui.judge.chiefDelegated") : onTitle
           : offTitle,
     note: ok && singleDisabled ? singleNote : "",
   };
@@ -246,10 +247,11 @@ export function judgeWarningLines(
   }
   if (decision) {
     lines.push({
-      text: translate(locale, "ui.judge.toggleOn.decision"),
+      text: translate(locale, "ui.judge.chiefDelegated"),
       strong: true,
     });
   }
+  if (approval) {
   lines.push({
     text: translate(locale, "ui.judge.scopeNote"),
     strong: false,
@@ -262,7 +264,28 @@ export function judgeWarningLines(
     text: translate(locale, "ui.judge.costNote"),
     strong: false,
   });
+  }
   return lines;
+}
+
+export interface DecisionDelegationSnapshot {
+  enabled: boolean;
+  revision: number;
+  available: boolean;
+}
+
+/** Only main may supply a revision; late replies cannot rewind a pushed state. */
+export function decisionDelegationSnapshot(
+  payload: unknown,
+  current: { revision: number | null; enabled: boolean },
+): DecisionDelegationSnapshot | null {
+  const record = asRecord(payload);
+  const revision = record.revision;
+  if (record.version !== 1 || record.ok === false || typeof record.enabled !== "boolean"
+    || typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0
+    || (current.revision !== null && (revision < current.revision
+      || (revision === current.revision && record.enabled !== current.enabled)))) return null;
+  return { enabled: record.enabled, revision, available: record.available !== false };
 }
 
 /**
@@ -778,16 +801,18 @@ export type GovernanceJudgeKindClass =
   | "generic";
 
 export interface GovernanceJudgeResultView {
+  /** Main-provided source, preserved for current display and history replay. */
+  actionSource?: Extract<DirectActionSource, { kind: "chief-delegated" }>;
   group: JudgeGroup;
   groupLabel: string;
   cardKind: string;
   /** 展示分类（只用于卡片样式，不改变任何语义字段）。 */
   kindClass: GovernanceJudgeKindClass;
-  /** 该行始终是自动代批（judge），用于显式区分客户手批。 */
+  /** 自动结果行；真实chief与历史judge由actionSource区分，不冒充客户手批。 */
   isAuto: true;
-  /** 来源徽标（共享 i18n：自动代理）。 */
+  /** 来源徽标：真实幕僚或历史自动代理。 */
   sourceLabel: string;
-  /** 「自动代批 ≠ 客户手批」说明（共享 i18n）。 */
+  /** chief保留原发起者；历史judge保留原自动代批说明。 */
   customerNote: string;
   title: string;
   badge: string;
@@ -802,6 +827,7 @@ export interface GovernanceJudgeResultView {
   toolCallId: string;
   requestId: string;
   details: {
+    actionSource?: Extract<DirectActionSource, { kind: "chief-delegated" }>;
     reason: string;
     selected: string[];
     paths: string[];
@@ -834,10 +860,14 @@ export function governanceJudgeResultView(
   const record = payload as Record<string, unknown>;
   const group = str(record.group);
   if (group !== JUDGE_GROUP_APPROVAL && group !== JUDGE_GROUP_DECISION) return null;
+  const actionSource = isDirectActionSource(record.actionSource) && record.actionSource.kind === "chief-delegated"
+    ? record.actionSource : undefined;
+  if ((record.actionSource !== undefined || record.reasonCode === "chief-delegated") && !actionSource) return null;
+  if (actionSource && (group !== "decision" || record.requestId !== actionSource.requestId)) return null;
   const cardKind = str(record.cardKind);
   const engine = str(record.engine);
   const flowId = str(record.flowId);
-  const selected = stringList(record.selected);
+  const selected = actionSource ? [...(actionSource.selected ?? [])] : stringList(record.selected);
   const paths = stringList(record.paths);
   const evidence = stringList(record.evidence);
   const pathDecisions = Array.isArray(record.pathDecisions)
@@ -893,8 +923,16 @@ export function governanceJudgeResultView(
       : translate(locale, "ui.judge.headline.autoApproved");
   }
   if (flowId) headline += translate(locale, "ui.judge.flowSuffix", { flowId });
+  if (actionSource) {
+    headline = actionSource.disposition === "revise"
+      ? translate(locale, "main.customerInput.chief.revisionRequested")
+      : actionSource.disposition === "reject"
+        ? translate(locale, "ui.decisionDialog.reject")
+        : selected.length ? translate(locale, "ui.judge.selectedLine", { items: selected.join(locale === "zh-CN" ? "、" : ", ") })
+          : translate(locale, "shared.common.notReported");
+  }
   const lines: string[] = [];
-  const reason = str(record.reason);
+  const reason = actionSource?.reason ?? str(record.reason);
   if (reason) lines.push(translate(locale, "ui.judge.reasonLine", { reason }));
   if (
     selected.length &&
@@ -924,27 +962,31 @@ export function governanceJudgeResultView(
       ? record.readBytes
       : null;
   return {
+    ...(actionSource ? { actionSource } : {}),
     group,
     groupLabel,
     cardKind,
     kindClass: governanceJudgeKindClass(cardKind),
     isAuto: true,
-    sourceLabel: translate(locale, "ui.judge.autoSource"),
-    customerNote: translate(locale, "ui.judge.autoNotCustomerNote"),
-    title: translate(locale, "ui.judge.titlePrefix", { label: groupLabel }),
+    sourceLabel: translate(locale, actionSource ? "ui.judge.chiefDelegated" : "ui.judge.autoSource"),
+    customerNote: actionSource
+      ? translate(locale, "ui.decisionDialog.sourceRole", { role: actionSource.originRoleId })
+      : translate(locale, "ui.judge.autoNotCustomerNote"),
+    title: actionSource ? translate(locale, "ui.judge.chiefDelegated") : translate(locale, "ui.judge.titlePrefix", { label: groupLabel }),
     badge: groupLabel,
     requestTitle: str(record.requestTitle),
     headline,
     engineText: translate(locale, "ui.judge.engineText", {
       engine: shellJudgeEngineLabel(engine, locale),
     }),
-    operatorText: "operator:" + (engine ? "judge:" + engine : "judge"),
+    operatorText: actionSource ? "operator:" + actionSource.actorRoleId : "operator:" + (engine ? "judge:" + engine : "judge"),
     flowText: flowId ? translate(locale, "ui.judge.flowText", { flowId }) : "",
     at: str(record.at),
     lines,
     toolCallId: str(record.toolCallId),
     requestId: str(record.requestId),
     details: {
+      ...(actionSource ? { actionSource } : {}),
       reason,
       selected,
       paths,

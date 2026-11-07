@@ -51,7 +51,7 @@ import type { GovernanceFunction, ProjectConfig, ResolvedRole } from "../../mode
 import type { BoundaryEntry } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
 import type { TaskScope, WriteDecision } from "../../model/decision.ts";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -62,7 +62,6 @@ import { loadLatestRoster, rosterDirectoriesFor, rosterTopologyText, validateApp
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
 import {
-  registerVersionedDocAfterWrite,
   stableWriteDecision,
   stableWritePathOf,
   versionedDocExists,
@@ -71,7 +70,7 @@ import {
 } from "../../common/门禁引擎/versioned-doc-guard.ts";
 import type { StableWritePermit } from "../../model/version-change.ts";
 import { listProject, resolveRole, type ProjectListing, type ProjectRoleSummary } from "../../service/role/resolve-role.ts";
-import { resolveBoundary, validateBoundaryYamlText } from "../../service/boundary/resolve-boundary.ts";
+import { resolveBoundary, validateBoundaryYamlText, refreshAndInstallVersionedDocFreezeSnapshot, registerVersionedDocument } from "../../service/boundary/resolve-boundary.ts";
 import {
   BUILT_IN_GOVERNANCE_ROLES,
   LEGACY_SU_PREAUTHORIZED_DIRS,
@@ -81,7 +80,8 @@ import {
   isBuiltInGovernanceRoleId,
   type GovernanceRoleSpec,
 } from "../../service/boundary/resolve-boundary.ts";
-import { resolveWrite } from "../../service/gate/resolve-write.ts";
+import { resolveWrite, resolveWriteReadPreflight, resolveWriteFinal, stableWriteDecisionFromFacts } from "../../service/gate/resolve-write.ts";
+import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProtectionRequirement, beginGitHostAction, endGitHostAction, inspectGitHostCoordinator, type GitProtectionFacts, type GitHostOpenFailureRef, type GitHostInventory } from "../../provider/trunk/public/trunk-store.ts";
 import {
   GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
   GOVERNANCE_MATRIX_PROMPT_MAX_CHARS,
@@ -98,11 +98,15 @@ import type {
   MatrixRoleDirectories,
   WorkerRoleInput,
 } from "../../model/governance-matrix.ts";
+import { isChiefDecisionExecutionContext } from "../../model/runtime.ts";
 import type {
   RuntimeReplayEntry,
   RuntimeSessionRecord,
   RuntimeContextSource,
   RuntimeKind,
+  FileGateFacts,
+  FileGateProtectionFacts,
+  WriteGateContext,
   RoleSession,
   RuntimeAdapter,
   SessionEvent,
@@ -123,6 +127,13 @@ import type {
   RequestVersionDecisionFn,
   ViewImageFn,
   SubmitVersionChangeFn,
+  GitQueryFn, GitCandidateFn, GitPublishFn,
+  ChiefDecisionExecutionContext,
+  DecidePendingRequestFn,
+  SelectRunChangeFn,
+  CompleteTeamPlanFn,
+  ActivateRoleDocumentsFn,
+  CloseCreatedTaskFn,
   SubmitRefactorFn,
   RequestStableWriteFn,
   RoleStatusFn,
@@ -162,7 +173,8 @@ import type {
   ShellEscalationPresentFn,
 } from "../../model/runtime.ts";
 import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../model/runtime.ts";
-import { createRuntimeAdapter, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
+import { createRuntimeAdapter, createBlockedRoleCapabilityCallbacks, isRuntimeEditReadProbe, inspectRuntimeFileGateContext, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, inspectRuntimeConstructionFailure, recheckRuntimeConstructionFailure, discardRuntimeRolePreparation, inspectRuntimeCoreRegistry, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
+import { createTrunkService, type DecisionEvidenceInput, type PreparedIntentConfirmation } from "../../service/trunk/public/trunk-service.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
 import {
   assembleProjectShellGate,
@@ -274,6 +286,9 @@ import type { RequestDownloadFn } from "../../model/download.ts";
  *   **安装 ≠ 授权**：工具自己不写盘，能力只做校验/激活/回执；不得据此授予或改变任何写权。
  */
 export interface AdapterCapabilities {
+  protectedGitRoots?: readonly string[];
+  fileGateProtocol?: "host-facts-v1";
+  fileGateProtection?: FileGateProtectionFacts;
   customerInput?: CustomerInputFn;
   reportHandback?: ReportHandbackFn;
   sessionDir?: string;
@@ -322,7 +337,18 @@ export interface AdapterCapabilities {
    * · `submitRefactor` / `requestStableWrite`：仅 convener。
    * 工具只提交、绝不批准/发卡/签发许可（客户主权）。
    */
+  chiefDecisionContext?: ChiefDecisionExecutionContext;
+  decidePendingRequest?: DecidePendingRequestFn;
   submitVersionChange?: SubmitVersionChangeFn;
+  selectRunChange?: SelectRunChangeFn;
+  completeTeamPlan?: CompleteTeamPlanFn;
+  activateRoleDocuments?: ActivateRoleDocumentsFn;
+  closeCreatedTask?: CloseCreatedTaskFn;
+  gitQuery?: GitQueryFn;
+  gitCandidate?: GitCandidateFn;
+  gitPublish?: GitPublishFn;
+  /** Ordinary host data for the current real D3-selected draft paths; never model arguments. */
+  roleDraftWritePaths?: readonly string[];
   submitRefactor?: SubmitRefactorFn;
   requestStableWrite?: RequestStableWriteFn;
   /**
@@ -419,7 +445,23 @@ export async function runRole(
   const role = setup.role;
 
   // gate：照抄契约 §5 的构造，绑定 resolveWrite；scope 可能为 undefined（无任务收窄）。
-  const gate = buildGate(role, input.project, input.scope);
+  const protectedGit = await readGitProtectionFacts(input.project.projectRoot);
+  const fileProtectionScope = await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
+  const legacyGate = buildGate(role, input.project, input.scope, protectedGit.protectedGitRoots);
+  const managedBoundary = structuredClone(role.boundary), managedScope = input.scope && structuredClone(input.scope);
+  const gate: WriteGate = fileProtectionScope.state === "unmanaged" ? legacyGate : (p, context) => {
+    const facts = verifiedFileFacts(context, p, input.project, protectedGit);
+    if (!facts) return fileFactsDenied();
+    const decision = facts.stage === "final-write" ? resolveWriteFinal(p, managedBoundary, managedScope, facts)
+      : resolveWriteReadPreflight(p, managedBoundary, managedScope, facts);
+    if (!decision.allowed || facts.stage !== "final-write") return decision;
+    const rel = projectRelativeLexical(p, input.project.projectRoot);
+    if (rel !== undefined && stableWritePathOf(rel)) {
+      const stable = stableWriteDecisionFromFacts({ projectRoot: input.project.projectRoot, relPath: rel, sha256: facts.contentSha256, currentFile: facts.currentFile });
+      if (!stable.allowed) return stable.writeDecision;
+    }
+    return versionedFileDecision(input.project.projectRoot, p, facts) ?? decision;
+  };
 
   record({
     kind: "message",
@@ -446,8 +488,10 @@ export async function runRole(
   let session: RoleSession | undefined;
   try {
     const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "demo", deps.runtimeOptions);
-    const adapter = createAdapter(gate);
-    session = await adapter.bindRole(role);
+    if (deps.createAdapter && !officialCoreAdapterFactories.has(deps.createAdapter)) unmanagedFactoryAttempts.push({ projectRoot: input.project.projectRoot, roleId: role.id, runtime: input.runtime ?? "demo", reason: "unverified-one-shot-adapter-factory" });
+    const adapter = createAdapter(gate, { protectedGitRoots: protectedGit.protectedGitRoots,
+      ...(fileProtectionScope.state !== "unmanaged" ? { fileGateProtocol: "host-facts-v1" as const, fileGateProtection: protectedGit } : {}) });
+    session = await bindPreparedRuntimeRole(adapter, role, input.project.projectRoot);
     await session.prompt(buildTaskPrompt(input.taskId, input.scope));
     // 事件流以 "settled" 为**终止信号**：见到即停并退出循环。
     // 关键：真实 Pi 适配器的 events() 只有在 dispose() 时才 close 队列；若在此等到流自然结束，
@@ -517,6 +561,10 @@ export interface RoleSessionSendOptions extends PromptOptions {
 }
 
 export interface RoleSessionHandle {
+  readonly sessionId?: RoleSession["sessionId"];
+  inspectLifecycle?: RoleSession["inspectLifecycle"];
+  inspectToolSurface?: RoleSession["inspectToolSurface"];
+  stopAndInspect?: RoleSession["stopAndInspect"];
   readonly persistenceMode?: "enabled" | "disabled" | "unknown-live";
   retryReportPersistence?(reportId: string): Promise<ReportSaveResultV1>;
   getReportPersistence?(reportId: string): Promise<ReportSaveStateV1>;
@@ -593,6 +641,106 @@ export interface RoleSessionHandle {
   /** 收口：释放底层会话。可重复调用（幂等）；出错如实抛出，不吞。 */
   dispose(): Promise<void>;
 }
+const managedCoreHandles = new Map<string, { handle: RoleSessionHandle; projectRoot: string; roleKind: ResolvedRole["kind"]; construction: "default-core" | "custom-adapter"; isDisposed: () => boolean;
+  turnInput?: { turnId: string; provenance?: PromptOptions["inputProvenance"] } }>();
+const officialCoreAdapterFactories = new WeakSet<RuntimeAdapterFactory>();
+const unmanagedFactoryAttempts: Array<{ projectRoot: string; roleId: string; runtime: string; reason: string }> = [];
+type OpenFailureRecord = { ref: GitHostOpenFailureRef; coreRef: NonNullable<ReturnType<typeof inspectRuntimeConstructionFailure>>;
+  projectRoot: string; roleId: string; runtime: string; hostHandleId?: string; ambiguous: boolean };
+const openFailureErrors = new WeakMap<object, OpenFailureRecord>();
+const openFailureRecords = new Map<string, OpenFailureRecord>();
+const sameFailureRoot = (left: string, right: string) => process.platform === "win32"
+  ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase() : path.resolve(left) === path.resolve(right);
+function captureRoleSessionOpenFailure(error: unknown, context: { projectRoot: string; roleId: string; runtime: string }, officialFactory: boolean): void {
+  if (!error || typeof error !== "object") return;
+  const previous = openFailureErrors.get(error);
+  if (previous) { previous.ambiguous = true; return; }
+  const coreRef = officialFactory ? inspectRuntimeConstructionFailure(error) : undefined;
+  if (!coreRef) return;
+  const record: OpenFailureRecord = { ...context, coreRef, ambiguous: false,
+    ref: { source: "pipeline-role-open-failure", failureId: randomUUID() } };
+  openFailureErrors.set(error, record); openFailureRecords.set(record.ref.failureId, record);
+}
+/** Claim only the real failed open's error identity, once for its actual host inventory handle. */
+export async function inspectRoleSessionOpenFailure(input: { error: unknown; hostHandleId: string }): Promise<GitHostOpenFailureRef | undefined> {
+  if (!input.error || typeof input.error !== "object" || typeof input.hostHandleId !== "string" || !input.hostHandleId.trim()) return undefined;
+  const record = openFailureErrors.get(input.error);
+  if (!record || record.ambiguous || record.hostHandleId !== undefined && record.hostHandleId !== input.hostHandleId) return undefined;
+  record.hostHandleId = input.hostHandleId;
+  return { ...record.ref };
+}
+/** Fresh same-attempt evidence, never a caller-projected safe flag or a latest-role lookup. */
+export function recheckRoleSessionOpenFailure(input: { ref: GitHostOpenFailureRef; hostHandleId: string; projectRoot: string; roleId: string; runtime: string }) {
+  const ref = input.ref;
+  if (!ref || ref.source !== "pipeline-role-open-failure" || Object.keys(ref).sort().join(",") !== "failureId,source") return undefined;
+  const record = openFailureRecords.get(ref.failureId);
+  if (!record || record.ambiguous || record.hostHandleId !== input.hostHandleId || !sameFailureRoot(record.projectRoot, input.projectRoot)
+    || record.roleId !== input.roleId || record.runtime !== input.runtime) return undefined;
+  const construction = recheckRuntimeConstructionFailure(record.coreRef), registry = inspectRuntimeCoreRegistry();
+  const entry = registry.entries.find(entry => entry.id === record.coreRef.entryId);
+  if (!construction || registry.processInstanceId !== record.coreRef.processInstanceId || !entry
+    || !sameFailureRoot(entry.projectRoot, record.projectRoot) || entry.roleId !== record.roleId || entry.runtime !== record.runtime
+    || !construction.preparedTokensRevoked || construction.pendingContinuations !== 0) return undefined;
+  if (["failed", "prepared"].includes(entry.state) && construction.status === "never-started" && !construction.factoryEntered && !construction.nativeBindEntered && entry.sessionId === undefined)
+    return { status: "never-started" as const, entryId: entry.id, processInstanceId: registry.processInstanceId, registryRevision: registry.revision };
+  const lifecycle = entry.lifecycle;
+  if (["failed", "disposed"].includes(entry.state) && construction.status === "instance-bound" && entry.sessionId && lifecycle?.sessionId === entry.sessionId
+    && lifecycle.status === "quiescent" && lifecycle.providerFinished && lifecycle.processCoverage === "complete" && !lifecycle.activeTools.length
+    && lifecycle.processes.every(process => process.state === "exited" && process.treeStatus === "verified"))
+    return { status: "terminated" as const, entryId: entry.id, processInstanceId: registry.processInstanceId, registryRevision: registry.revision };
+  return undefined;
+}
+/** Inspect the complete ordinary inventory without letting one failure cover two controllers. */
+export function recheckRoleSessionOpenFailureInventory(input: { projectRoot: string; sessions: GitHostInventory["sessions"] }) {
+  const registry = inspectRuntimeCoreRegistry(), handles = new Set<string>(), failedEntries = new Set<string>();
+  const entries: Array<{ hostHandleId: string; entryId: string; status: "never-started" | "terminated" }> = [];
+  for (const session of input.sessions) {
+    if (handles.has(session.hostHandleId)) return undefined;
+    handles.add(session.hostHandleId);
+    if (session.phase !== "open-failed") continue;
+    const evidence = session.openFailureRef && recheckRoleSessionOpenFailure({ ref: session.openFailureRef, hostHandleId: session.hostHandleId,
+      projectRoot: input.projectRoot, roleId: session.roleId, runtime: session.runtime });
+    if (!evidence || evidence.processInstanceId !== registry.processInstanceId || evidence.registryRevision !== registry.revision || failedEntries.has(evidence.entryId)) return undefined;
+    failedEntries.add(evidence.entryId); entries.push({ hostHandleId: session.hostHandleId, entryId: evidence.entryId, status: evidence.status });
+  }
+  return { processInstanceId: registry.processInstanceId, registryRevision: registry.revision, entries };
+}
+/** Actual Pipeline construction history, including controllers which never returned a Core id. */
+export function inspectManagedRoleSessionInventory() {
+  return structuredClone({ unknownFactoryAttempts: unmanagedFactoryAttempts,
+    sessions: [...managedCoreHandles.values()].map(record => ({ projectRoot: record.projectRoot, construction: record.construction,
+      disposed: record.isDisposed(), sessionId: record.handle.sessionId, roleId: record.handle.roleId, runtime: record.handle.runtime })) });
+}
+/** Native effects follow Core's opaque preparation, never caller-projected plan facts. */
+async function bindPreparedRuntimeRole(adapter: RuntimeAdapter, role: ResolvedRole, projectRoot: string): Promise<RoleSession> {
+  if (adapter.prepareRole && adapter.bindPreparedRole) {
+    const prepared = await adapter.prepareRole(role);
+    const requirement = await readGitHostProtectionRequirement({ projectRoot });
+    if (requirement.state === "required" && prepared.plan.native?.appTools.some(tool => ["run_shell", "start_background_task"].includes(tool))) {
+      const error = new Error("runtime-protected-scope-unmediated-app-execution-planned"); discardRuntimeRolePreparation(prepared, error); throw error;
+    }
+    if (prepared.token && prepared.plan.status === "observed") {
+      try { return await adapter.bindPreparedRole(prepared.token); }
+      catch (error) { discardRuntimeRolePreparation(prepared, error); throw error; }
+    }
+    if (requirement.state !== "unmanaged") {
+      const error = new Error(`runtime-creation-admission-unproven:${prepared.plan.reasons.join(",")}`); discardRuntimeRolePreparation(prepared, error); throw error;
+    }
+  } else {
+    const requirement = await readGitHostProtectionRequirement({ projectRoot });
+    if (requirement.state !== "unmanaged") throw new Error("runtime-creation-prepared-api-unavailable");
+  }
+  // Preserve genuinely unmanaged legacy behavior; it stays unverified in the real Core registry and cannot grant Git mutation.
+  return adapter.bindRole(role);
+}
+/** Facts come only from this module's actual constructed handles, never caller-supplied source strings. */
+export function inspectManagedRoleSessionEvidence(input: { projectRoot: string; sessionId: string }) {
+  const record = managedCoreHandles.get(input.sessionId);
+  if (!record || path.resolve(record.projectRoot).toLowerCase() !== path.resolve(input.projectRoot).toLowerCase()) return undefined;
+  try { const lifecycle = record.handle.inspectLifecycle?.(); return structuredClone({ projectRoot: record.projectRoot, construction: record.construction, disposed: record.isDisposed(),
+    sessionId: record.handle.sessionId, roleId: record.handle.roleId, roleKind: record.roleKind, runtime: record.handle.runtime,
+    lifecycle, toolSurface: record.handle.inspectToolSurface?.(), ...(record.turnInput?.turnId === lifecycle?.turnId ? { turnInput: record.turnInput } : {}) }); } catch { return undefined; }
+}
 
 export async function openRoleSession(
   input: {
@@ -667,7 +815,17 @@ export async function openRoleSession(
      * `requestStableWrite`；其他角色（含客户/幕僚/项目角色）一律不注入（工具不注册）。
      * 工具只提交请求；批准/许可/客户卡仍在应用侧（客户本人）。
      */
+    /** Trusted independent chief context. Never a model/CLI argument. */
+    chiefDecisionContext?: ChiefDecisionExecutionContext;
+    decidePendingRequest?: DecidePendingRequestFn;
     submitVersionChange?: SubmitVersionChangeFn;
+    selectRunChange?: SelectRunChangeFn;
+    completeTeamPlan?: CompleteTeamPlanFn;
+    activateRoleDocuments?: ActivateRoleDocumentsFn;
+    closeCreatedTask?: CloseCreatedTaskFn;
+    gitQuery?: GitQueryFn;
+    gitCandidate?: GitCandidateFn;
+    gitPublish?: GitPublishFn;
     submitRefactor?: SubmitRefactorFn;
     requestStableWrite?: RequestStableWriteFn;
     /**
@@ -808,6 +966,12 @@ export async function openRoleSession(
   },
   deps: RoleSessionDeps = {}
 ): Promise<RoleSessionHandle> {
+  const chiefDecisionContext = input.chiefDecisionContext;
+  if (chiefDecisionContext !== undefined && (!isChiefDecisionExecutionContext(chiefDecisionContext)
+    || input.roleId !== "chief" || input.project.governanceModel !== "trio" || input.decidePendingRequest === undefined))
+    throw new Error("Invalid trusted independent chief decision context");
+  if (input.decidePendingRequest !== undefined && chiefDecisionContext === undefined)
+    throw new Error("Chief settlement capability requires its bounded host context");
   const log = createDiagnosticLogger({ component: "orchestration.session", projectRoot: input.project.projectRoot, roleId: input.roleId });
   log.record("session.open.start");
   // 角色/边界解析：失败即抛错（句柄式接口无退出码）。
@@ -824,6 +988,8 @@ export async function openRoleSession(
   // `governanceCapabilitiesOf`；`su` 得到 `LEGACY_SU_CAPABILITIES`（single 旧行为逐字不变）；
   // 项目角色没有治理能力（`undefined`），保持既有「只给内置治理角色」的注入纪律。
   const builtInGovernance = setup.role.kind === "built-in-governance";
+  if (chiefDecisionContext !== undefined && (!builtInGovernance || setup.role.id !== "chief"))
+    throw new Error("Independent decision execution requires the resolved built-in chief");
   const trioSpec: GovernanceRoleSpec | undefined = governanceRoleOf(setup.role.id);
   const isTrio = trioSpec !== undefined;
   const governanceModel = input.project.governanceModel ?? "single";
@@ -857,8 +1023,12 @@ export async function openRoleSession(
     input.customerInput !== undefined && (cap === undefined || cap.customerInput);
   const issued = new Set<string>();
   const conditions = conditionSlugsOf(setup.role.boundary);
-  const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot };
-  const staticScope = input.scope;
+  const gitProtection = await readGitProtectionFacts(input.project.projectRoot);
+  const roleCapabilityProtection = await readGitHostProtectionRequirement({ projectRoot: input.project.projectRoot });
+  const managedFileProtocol = roleCapabilityProtection.state !== "unmanaged";
+  const managedBoundary = structuredClone(setup.role.boundary);
+  const gateCtx = { skillRoot: input.project.skillRoot, projectRoot: input.project.projectRoot, protectedGitRoots: gitProtection.protectedGitRoots };
+  const staticScope = input.scope === undefined ? undefined : structuredClone(input.scope);
 
   // **Section 1 写入预授权（客户 2026-10-25 规则）**——初始可写集覆盖角色 Section 1 白名单：
   //   · 无任务级 writeSet 收窄（`scope === undefined`，桌面聊天即此形态）：trio 五角色与项目角色
@@ -879,6 +1049,32 @@ export async function openRoleSession(
 
   let boundSessionForEvidence: RoleSession | undefined;
   let currentFlowId: string | undefined;
+  const roleDraftWritePaths: string[] = [];
+  const refreshRoleDraftScope = async () => {
+    roleDraftWritePaths.splice(0);
+    if (!isTrio || setup.role.id !== "nominator") return;
+    const scope = await createTrunkService({ projectRoot: input.project.projectRoot }).prepareRoleDraftScope({
+      ...(currentFlowId ? { flowId: currentFlowId } : {}), ...(input.taskId ? { taskId: input.taskId } : {}) });
+    if (scope.ok) roleDraftWritePaths.push(...scope.value.paths);
+  };
+  await refreshRoleDraftScope();
+  const assignedTaskWritePaths: string[] | undefined = input.taskId && setup.role.kind !== "built-in-governance" ? [] : undefined;
+  const refreshAssignedTaskScope = async () => {
+    if (!assignedTaskWritePaths || !input.taskId) return;
+    assignedTaskWritePaths.splice(0);
+    const actual = await createTrunkService({ projectRoot: input.project.projectRoot }).prepareAssignedTaskWriteScope({ taskId: input.taskId, actorRoleId: setup.role.id });
+    if (actual.ok) assignedTaskWritePaths.push(...actual.value.paths);
+  };
+  await refreshAssignedTaskScope();
+  let assignedReview: Awaited<ReturnType<ReturnType<typeof createTrunkService>["readAssignedReviewContext"]>> | undefined;
+  if (input.taskId && setup.role.kind === "built-in-governance" && setup.role.id === "verifier") {
+    const task = await createTrunkService({ projectRoot: input.project.projectRoot }).inspectAssignedTask({ taskId: input.taskId, actorRoleId: setup.role.id });
+    if (!task.ok) throw new Error(`review-task-assignment-unavailable:${task.message ?? task.code}`);
+    if (task.value.kind === "review") {
+      assignedReview = await createTrunkService({ projectRoot: input.project.projectRoot }).readAssignedReviewContext({ taskId: input.taskId, actorRoleId: setup.role.id });
+      if (!assignedReview.ok) throw new Error(`review-task-context-unavailable:${assignedReview.message ?? assignedReview.code}`);
+    }
+  }
 
   // 确认制的初始动态集：**任务级 writeSet（若声明）∪ 已发行集**。任务 writeSet 即「收窄」本身
   // （客户 2026-10-25 规则只把**无任务收窄**时的 Section 1 全量并入预授权，不会扩大任务写集）；
@@ -907,13 +1103,18 @@ export async function openRoleSession(
             scopeWithPreauthorizedWrites(staticScope, p, input.project.projectRoot, preauthorization),
             gateCtx,
           )
-      : buildGate(setup.role, input.project, input.scope);
+      : buildGate(setup.role, input.project, input.scope, gitProtection.protectedGitRoots);
 
   // D 批：门禁/账本撤除；仅保留 `forbiddenWritePaths`（应用治理记录/其他治理角色资料）硬拒绝，
   // 其余写入交给 `resolveWrite` 的写区/预授权判定。
   // 2026-10-29（v2.8 R6）：版本化文档只读——任何通道覆盖既有 -vN.md 一律 deny（不进审批）。
   const gate: WriteGate = (p, context) => {
+    const fileFacts = managedFileProtocol ? verifiedFileFacts(context, p, input.project, gitProtection) : undefined;
+    if (managedFileProtocol && !fileFacts) return fileFactsDenied();
+    if (chiefDecisionContext !== undefined) return { allowed: false, reason: "Independent chief decision has no production write authority", allowedByRoot: { skill: [], project: [] } };
     const rel = projectRelativeLexical(p, input.project.projectRoot);
+    if (assignedTaskWritePaths && (rel === undefined || !assignedTaskWritePaths.some(root => root === rel || (root.endsWith("/") && rel.startsWith(root)))))
+      return { allowed: false, reason: "Target is outside the actual assigned task's frozen module/current authorization intersection", allowedByRoot: { skill: [], project: [] } };
     if (trioSpec !== undefined) {
       const forbidden = forbiddenWriteDecision(trioSpec, rel);
       if (forbidden !== undefined) {
@@ -921,7 +1122,22 @@ export async function openRoleSession(
         return forbidden;
       }
     }
+    // One immutable boundary/task intersection is used at all three genuine Provider stages.
+    // Read preflight authorizes only the next bounded read, never a stable write or permit consumption.
+    const stageScope = confirmationMode
+      ? scopeWithPreauthorizedWrites({ writeSet: [...confinedWriteSet, ...issued], conditions }, p, input.project.projectRoot, preauthorization)
+      : staticScope !== undefined ? (hasPreauthorization ? scopeWithPreauthorizedWrites(staticScope, p, input.project.projectRoot, preauthorization) : staticScope)
+      : hasPreauthorization ? scopeWithPreauthorizedWrites({ writeSet: [], conditions }, p, input.project.projectRoot, preauthorization) : undefined;
+    const stagedDecision = fileFacts && (fileFacts.stage === "final-write"
+      ? resolveWriteFinal(p, managedBoundary, stageScope, fileFacts)
+      : resolveWriteReadPreflight(p, managedBoundary, stageScope, fileFacts));
+    if (stagedDecision && !stagedDecision.allowed) return stagedDecision;
     if (rel !== undefined) {
+      if (isTrio && setup.role.id === "nominator" && /^角色卡\/[^/]+\/(?:role-card\.md|boundary\.md|boundary\.yaml)$/.test(rel)) {
+        if (!roleDraftWritePaths.includes(rel)) return { allowed: false, reason: "Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute", allowedByRoot: { skill: [], project: [] } };
+        return stagedDecision ?? baseGate(p);
+      }
+      if (fileFacts && fileFacts.stage !== "final-write") return stagedDecision!;
       // 2026-11-04（trunk-amendment S3/F13/F16/F33）：
       // · stable 文件（workflow/role-card/boundary）⇒ 一次性许可判定 `stableWriteDecision`
       //   （消费 WriteGateContext.contentSha256；无内容 hash/shell ⇒ 拒绝；denied 直接返回其
@@ -937,20 +1153,24 @@ export async function openRoleSession(
       // · 未注入（B-11 未接）⇒ 保留既有 appointment-write 确认制路径（客户确认发行的 writeSet 仍由
       //   baseGate 把关；不新增无确认直写）。
       const genesisBootstrapSession = input.project.genesisBootstrap !== undefined;
-      if (stable !== undefined && input.stablePermitOf !== undefined && !genesisBootstrapSession) {
-        const permit = input.stablePermitOf(rel);
-        const decision = stableWriteDecision({
+      if (stable !== undefined && (fileFacts !== undefined || (input.stablePermitOf !== undefined && !genesisBootstrapSession))) {
+        // The genuine Provider edit-read probe authorizes only the existing path/scope read stage.
+        // Its frozen object identity and exact target are checked by the actual Core, never tool JSON.
+        if (isRuntimeEditReadProbe(context, p)) return baseGate(p, context);
+        const permit = input.stablePermitOf?.(rel);
+        const stableInput = {
           projectRoot: input.project.projectRoot,
           relPath: rel,
-          sha256: context?.contentSha256 ?? "",
+          sha256: fileFacts?.stage === "final-write" ? fileFacts.contentSha256 : context?.contentSha256 ?? "",
           ...(permit !== undefined ? { permit } : {}),
-        });
+        };
+        const decision = fileFacts?.stage === "final-write" ? stableWriteDecisionFromFacts({ ...stableInput, currentFile: fileFacts.currentFile }) : stableWriteDecision(stableInput);
         if (!decision.allowed) {
           log.record("governance.write.stable-write-denied", { path: rel, code: decision.code });
           return decision.writeDecision;
         }
       } else {
-        const exists = versionedDocExists(input.project.projectRoot, rel);
+        const exists = fileFacts?.stage === "final-write" ? fileFacts.currentFile.state === "present" : versionedDocExists(input.project.projectRoot, rel);
         const frozen = versionedDocFreezeState(input.project.projectRoot, rel, exists);
         const guarded = versionedDocOverwriteDecision({
           relPath: rel,
@@ -970,7 +1190,7 @@ export async function openRoleSession(
         }
       }
     }
-    return baseGate(p, context);
+    return stagedDecision ?? baseGate(p, context);
   };
 
   // 客户通道包装（A-3）：客户确认后，把「已预览且校验在边界内的具体路径」发行进 writeSet。
@@ -1329,7 +1549,39 @@ export async function openRoleSession(
               judgeMetadata = { ...(effectiveMetadata ?? {}), judgeContext };
             }
           }
-          const out = await raw(effectiveReq, judgeMetadata);
+          let intentConfirmation: PreparedIntentConfirmation | undefined;
+          if (isTrio && setup.role.id === "chief" && cardKind === "intent-confirm" && effectiveReq.kind === "choice") {
+            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            const prepared = flowId ? await createTrunkService({ projectRoot: input.project.projectRoot }).prepareIntentConfirmation(flowId) : undefined;
+            if (!prepared?.ok) return { outcome: "declined", notPresented: true, reason: prepared && !prepared.ok ? prepared.message ?? prepared.code : "Intent confirmation has no actual flow" };
+            intentConfirmation = prepared.value;
+            effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.value.marker}`,
+              preview: `${effectiveReq.preview ?? ""}\n\n${prepared.value.path}\nsha256: ${prepared.value.sha256}\n\n${prepared.value.text}` };
+          }
+          let out = await raw(effectiveReq, judgeMetadata);
+          if (isTrio && setup.role.id === "nominator" && cardKind === "appointment") await refreshRoleDraftScope();
+          if (intentConfirmation && out?.outcome === "answered" && out.value.selected?.includes("confirm")) {
+            const intentBinding = { flowId: intentConfirmation.flowId, path: intentConfirmation.path, version: intentConfirmation.version,
+              sha256: intentConfirmation.sha256, snapshotRef: intentConfirmation.snapshotRef, decisionId: out.decisionId,
+              actionSource: out.actionSource, turnId: effectiveMetadata?.turnId, toolCallId: effectiveMetadata?.toolCallId };
+            // Existing diagnostics admits metadata strings, not arbitrary object fields.
+            const intentDiagnostic = { path: intentBinding.path, turnId: intentBinding.turnId, toolCallId: intentBinding.toolCallId,
+              requestId: out.actionSource?.kind === "customer-decision" || out.actionSource?.kind === "chief-delegated" ? out.actionSource.requestId : undefined,
+              contextSource: JSON.stringify({ flowId: intentBinding.flowId, version: intentBinding.version, sha256: intentBinding.sha256,
+                snapshotRef: intentBinding.snapshotRef, decisionId: intentBinding.decisionId }) };
+            log.record("intent.confirmation.freeze-start", { ...intentDiagnostic, phase: "prepared" });
+            const frozen = await createTrunkService({ projectRoot: input.project.projectRoot }).finalizeIntentConfirmation(intentConfirmation, out);
+            if (!frozen.ok) {
+              pendingModelNotice = `The actual intent decision was recorded; its bound bytes are not yet frozen: ${frozen.message ?? frozen.code}. Direct publication remains blocked until recovery.`;
+              log.record("intent.confirmation.freeze-pending", { ...intentDiagnostic, phase: "pending-recovery", errorCode: frozen.code, errorMessage: frozen.message });
+              // The retained choice is real; a failed domain commit cannot issue a write permit.
+              return { ...out, intentConfirmation: { status: "pending-recovery", code: frozen.code, message: frozen.message } };
+            } else {
+              log.record("intent.confirmation.freeze-committed", { ...intentDiagnostic, phase: "committed" });
+              await refreshAndInstallVersionedDocFreezeSnapshot(input.project.projectRoot, { migrationCompleted: true });
+              out = { ...out, intentConfirmation: { status: "committed" } };
+            }
+          }
           // 发行「已确认且在边界内」的实际写入路径（D 批无账本；发行器仍按同一份校验）。
           issue(effectiveReq, out ?? null, effectiveMetadata);
           return out;
@@ -1341,6 +1593,8 @@ export async function openRoleSession(
   // checkWrite 与 F4 写区判定**同一实现**（gate → resolveWrite，含 forbiddenWritePaths 与任务 scope 收窄）；
   // 守卫不另写第二份真实路径判定。显式写目标越界即拒；不透明执行交客户本人（manualOnly）。
   const shellCheckWrite = (relPath: string): { allowed: boolean; reason?: string } => {
+    if (isTrio && setup.role.id === "nominator" && /^角色卡\/[^/]+\/(?:role-card\.md|boundary\.md|boundary\.yaml)$/.test(relPath))
+      return { allowed: false, reason: "D3 role drafts use the guarded write_file/edit_file path; opaque shell cannot write or activate role documents" };
     const decision = gate(relPath);
     return decision.allowed === true ? { allowed: true } : { allowed: false, reason: decision.reason };
   };
@@ -1452,13 +1706,14 @@ export async function openRoleSession(
 
   // G-4 技能安装/卸载两能力（I1/I2）：能力矩阵驱动——仅 `capabilities.installSkill`
   // （trio=Nominator；su 旧行为）。字段名**逐字**＝契约家能力名（错一名 ⇒ 工具静默零注册）。
-  const installSkill = cap?.installSkill === true ? input.installSkill : undefined;
-  const uninstallSkill = cap?.installSkill === true ? input.uninstallSkill : undefined;
+  const blockedRoleCapabilities = roleCapabilityProtection.state === "unmanaged" ? undefined : createBlockedRoleCapabilityCallbacks();
+  const installSkill = cap?.installSkill === true && input.installSkill !== undefined ? blockedRoleCapabilities?.installSkill ?? input.installSkill : undefined;
+  const uninstallSkill = cap?.installSkill === true && input.uninstallSkill !== undefined ? blockedRoleCapabilities?.uninstallSkill ?? input.uninstallSkill : undefined;
 
   // G-4 V2 MCP 安装/卸载两能力：能力矩阵驱动——仅 `capabilities.installMcp`
   // （trio=Nominator；su 旧行为）。**安装不改变任何角色的写边界**。
-  const installMcp = cap?.installMcp === true ? input.installMcp : undefined;
-  const uninstallMcp = cap?.installMcp === true ? input.uninstallMcp : undefined;
+  const installMcp = cap?.installMcp === true && input.installMcp !== undefined ? blockedRoleCapabilities?.installMcp ?? input.installMcp : undefined;
+  const uninstallMcp = cap?.installMcp === true && input.uninstallMcp !== undefined ? blockedRoleCapabilities?.uninstallMcp ?? input.uninstallMcp : undefined;
 
   // I-1 开放 shell（项目角色三层链）+ 审批档/只读档——共用同一个 `shellGate` 能力位
   // （「注入才注册」：注入了 ⇒ 适配器注册 `run_shell`；未注入/装配失败 ⇒ **不 arm**，fail-closed）。
@@ -1503,7 +1758,9 @@ export async function openRoleSession(
       : {};
 
   let shellGate: ShellGate | undefined;
-  if (input.shellOperatorOnly !== undefined) {
+  if (chiefDecisionContext !== undefined) {
+    // Independent real-chief contexts never construct a normal shell surface.
+  } else if (input.shellOperatorOnly !== undefined) {
     if (input.shellReadonly !== undefined) {
       // 互斥：不择一静默生效（PM 评审 §3.4）。
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "conflicts-with-shellReadonly" });
@@ -1564,12 +1821,39 @@ export async function openRoleSession(
   // convener → submit_refactor + request_stable_write；其他角色一律不注入。
   const submitVersionChange =
     setup.role.id === "product" || setup.role.id === "rapporteur" ? input.submitVersionChange : undefined;
+  const directGovernance = governanceModel === "trio" && builtInGovernance && isTrio && chiefDecisionContext === undefined;
+  const selectRunChange = directGovernance && setup.role.id === "rapporteur" ? input.selectRunChange : undefined;
+  const completeTeamPlan = directGovernance && setup.role.id === "convener" ? input.completeTeamPlan : undefined;
+  const activateRoleDocuments = directGovernance && setup.role.id === "nominator" ? input.activateRoleDocuments : undefined;
+  const closeCreatedTask = directGovernance && (setup.role.id === "chief" || setup.role.id === "convener") ? input.closeCreatedTask : undefined;
   const submitRefactor = setup.role.id === "convener" ? input.submitRefactor : undefined;
-  const requestStableWrite = canRequestStableWrite(setup.role.id) ? input.requestStableWrite : undefined;
+  const rawRequestStableWrite = canRequestStableWrite(setup.role.id) ? input.requestStableWrite : undefined;
+  const requestStableWrite: RequestStableWriteFn | undefined = rawRequestStableWrite === undefined ? undefined : roleCapabilityProtection.state === "unmanaged" ? rawRequestStableWrite : async (request, signal) => {
+    const result = await rawRequestStableWrite(request, signal);
+    if (!result.ok || !result.requestId) return result;
+    const protection = await readRoleCapabilityProtectionScope({ projectRoot: input.project.projectRoot });
+    if (protection.state === "unmanaged") return result;
+    const actual = session?.sessionId ? inspectManagedRoleSessionEvidence({ projectRoot: input.project.projectRoot, sessionId: session.sessionId }) : undefined;
+    const inventory = inspectGitHostCoordinator({ projectRoot: input.project.projectRoot }).inventory;
+    const bindings = inventory?.sessions.filter(entry => entry.phase === "live" && entry.roleId === setup.role.id && entry.coreSessionId === actual?.sessionId) ?? [];
+    // A reused Desktop Core must use its current real delivery, not its construction-time task.
+    // Non-Desktop hosts without an inventory retain their explicit trusted task; this never proves mutation coverage.
+    const taskId = inventory ? bindings.length === 1 ? bindings[0]!.taskId : undefined : input.taskId;
+    const blocked = (message: string) => ({ ...result, ok: false, errorCode: "stable-write-invalid" as const, message: `Initial workflow source was not captured; publication remains blocked: ${message}` });
+    if (signal?.aborted || protection.state !== "required" || setup.role.id !== "convener" || !taskId || !actual || actual.construction !== "default-core" || actual.disposed
+      || actual.toolSurface?.factoryProvenance !== "default-production" || !actual.lifecycle?.activeTools.some(tool => ["request_stable_write", "ans_request_stable_write"].includes(tool.name))) return blocked("actual accepted Core tool/task binding is unproven");
+    const lease = beginGitHostAction({ projectRoot: input.project.projectRoot, kind: "arm" }); if (!lease.ok) return blocked(lease.code);
+    try {
+      const service = createTrunkService({ projectRoot: input.project.projectRoot });
+      const source = await service.bindInitialWorkflowSource?.({ requestId: result.requestId, taskId, coreSessionId: actual.sessionId!,
+        ...(actual.lifecycle.turnId ? { coreTurnId: actual.lifecycle.turnId } : {}), hostLeaseId: lease.leaseId });
+      return source?.ok ? result : blocked(source && !source.ok ? source.message ?? source.code : "source storage unavailable");
+    } finally { endGitHostAction({ projectRoot: input.project.projectRoot, leaseId: lease.leaseId }); }
+  };
 
   // —————— 治理权力矩阵（C3）：幕僚启动快照 + 六角色工具能力（注入才注册） ——————
   // 仅 trio + 内置治理 + 六个内置角色之一；worker/su/single 不启用。
-  const governanceMatrixEnabled = governanceModel === "trio" && builtInGovernance && isTrio;
+  const governanceMatrixEnabled = chiefDecisionContext === undefined && governanceModel === "trio" && builtInGovernance && isTrio;
   const governanceMatrixSessionFlags: GovernanceMatrixSessionFlags = {
     customerInput: governedInput !== undefined,
     download: input.requestDownload !== undefined,
@@ -1615,7 +1899,11 @@ export async function openRoleSession(
     ? createGovernanceMatrixFn({ project: input.project, session: governanceMatrixSessionFlags, log })
     : undefined;
 
-  const capabilities: AdapterCapabilities = {
+  if (assignedReview?.ok) contextSections = [...(contextSections ?? []), assignedReview.value.contextText];
+  const capabilities: AdapterCapabilities = chiefDecisionContext !== undefined ? {
+    chiefDecisionContext: structuredClone(chiefDecisionContext), decidePendingRequest: input.decidePendingRequest,
+    persistSession: false, ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
+  } : {
     ...(governedInput !== undefined ? { customerInput: governedInput } : {}),
     ...(reportHandback !== undefined ? { reportHandback } : {}),
     // 2026-10-26 图片查看（view_image）：**通用只读能力**——项目角色与内置治理角色都注入（只要调用方
@@ -1623,6 +1911,8 @@ export async function openRoleSession(
     // 不影响其他能力的注入矩阵。
     ...(input.viewImage !== undefined ? { viewImage: input.viewImage } : {}),
     ...(sessionDir !== undefined ? { sessionDir } : {}),
+    protectedGitRoots: gitProtection.protectedGitRoots,
+    ...(managedFileProtocol ? { fileGateProtocol: "host-facts-v1" as const, fileGateProtection: gitProtection } : {}),
     ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
     ...(input.persistSession !== undefined ? { persistSession: input.persistSession } : {}),
     ...(dispatchTask !== undefined ? { dispatchTask } : {}),
@@ -1647,6 +1937,14 @@ export async function openRoleSession(
     ...(installMcp !== undefined ? { installMcp } : {}),
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
     ...(submitVersionChange !== undefined ? { submitVersionChange } : {}),
+    ...(selectRunChange !== undefined ? { selectRunChange } : {}),
+    ...(completeTeamPlan !== undefined ? { completeTeamPlan } : {}),
+    ...(activateRoleDocuments !== undefined ? { activateRoleDocuments } : {}),
+    ...(closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
+    ...(input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
+    ...(input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
+    ...(input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
+    ...(isTrio && setup.role.id === "nominator" ? { roleDraftWritePaths } : {}),
     ...(submitRefactor !== undefined ? { submitRefactor } : {}),
     ...(requestStableWrite !== undefined ? { requestStableWrite } : {}),
     // 治理权力矩阵（C3）：仅 chief 有提示段（单段、非空）；六角色有工具能力（未启用/未注入 ⇒ 缺席）。
@@ -1662,19 +1960,25 @@ export async function openRoleSession(
     ...(input.shellVerdict !== undefined ? { shellVerdict: input.shellVerdict } : {}),
   };
   const createAdapter = deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions);
+  if (deps.createAdapter && !officialCoreAdapterFactories.has(deps.createAdapter)) unmanagedFactoryAttempts.push({ projectRoot: input.project.projectRoot, roleId: setup.role.id, runtime: input.runtime ?? "pi", reason: "unverified-role-session-adapter-factory" });
   const adapter = createAdapter(
     gate,
     Object.keys(capabilities).length > 0 ? capabilities : undefined,
   );
   let session: RoleSession;
   try {
-    session = await adapter.bindRole(setup.role);
+    session = await bindPreparedRuntimeRole(adapter, setup.role, input.project.projectRoot);
   } catch (err) {
+    captureRoleSessionOpenFailure(err, { projectRoot: input.project.projectRoot, roleId: setup.role.id, runtime: input.runtime ?? "pi" },
+      !deps.createAdapter || officialCoreAdapterFactories.has(deps.createAdapter));
     log.error("session.open.failed", err);
     throw err;
   }
   boundSessionForEvidence = session;
   log.record("session.open.ready");
+  const inspectCoreLifecycle = session.inspectLifecycle?.bind(session);
+  const inspectCoreToolSurface = session.inspectToolSurface?.bind(session);
+  const stopCoreAndInspect = session.stopAndInspect?.bind(session);
 
   // 自动收尾的授权边界 = **本会话解析出的边界**（创世态下即治理种子边界；普通角色下即其项目
   // 边界）——与 su 同一授权。治理边界文档落点：项目未声明（如桌面创世 `path` 为空串）时用默认约定路径。
@@ -1682,7 +1986,7 @@ export async function openRoleSession(
 
   // 自动收尾 + 自动重 pin（A-4 / §13.3）：缺省仅**内置治理角色（su）会话**开启。
   // `repinIfBootstrapped`：创世态 = **首次收尾**（无可 pin 之物 → 零副作用）；非创世态 = 重扫更新 pin。
-  const autoRepinEnabled = input.autoRepin ?? setup.role.kind === "built-in-governance";
+  const autoRepinEnabled = chiefDecisionContext === undefined && (input.autoRepin ?? setup.role.kind === "built-in-governance");
 
   let disposed = false;
   // F-5-opt1：排入的模型可见注记（下一次 send 的输入前缀；送达一次即消费——见 queueModelNotice 文档）。
@@ -1752,6 +2056,10 @@ export async function openRoleSession(
     return safe;
   }
   const base: RoleSessionHandle = {
+    get sessionId() { return session.sessionId; },
+    ...(inspectCoreLifecycle ? { inspectLifecycle: () => structuredClone(inspectCoreLifecycle()) } : {}),
+    ...(inspectCoreToolSurface ? { inspectToolSurface: () => structuredClone(inspectCoreToolSurface()) } : {}),
+    ...(stopCoreAndInspect ? { stopAndInspect: async (input: Parameters<NonNullable<RoleSession["stopAndInspect"]>>[0], signal?: AbortSignal) => structuredClone(await stopCoreAndInspect(structuredClone(input), signal)) } : {}),
     get persistenceMode() {
       if (session.persistence !== undefined) return session.persistence.mode;
       return "unknown-live";
@@ -1794,6 +2102,13 @@ export async function openRoleSession(
     get nativeSessionId() { return session.nativeSessionId; },
     get contextWarning() { return session.contextWarning; },
     async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
+      if (assignedReview?.ok && input.taskId) {
+        const current = await createTrunkService({ projectRoot: input.project.projectRoot }).readAssignedReviewContext({ taskId: input.taskId, actorRoleId: setup.role.id });
+        if (!current.ok || JSON.stringify(current.value.reviewBasisRef) !== JSON.stringify(assignedReview.value.reviewBasisRef))
+          throw new Error(`review-task-context-changed:${current.ok ? "Assigned final candidate/criteria changed" : current.message ?? current.code}`);
+      }
+      await refreshRoleDraftScope();
+      await refreshAssignedTaskScope();
       legacyReport = undefined;
       // 账本快照刷新（评审 §5.7 时序边界）：每次 send 开始时重读盘面——跨会话的新客户决定在此生效；
       // 未含决定则门禁拒，绝不猜。读取失败 → 快照 errors 非空 → 门禁 fail-closed。
@@ -1803,7 +2118,9 @@ export async function openRoleSession(
       let intent: HandbackIntent;
       if (opts?.handback !== undefined) {
         intent = { required: opts.handback.required };
-        if (opts.handback.required && opts.handback.taskId) intent.taskId = opts.handback.taskId;
+        // Host-verified task identity and automatic-report duty are independent.
+        // An explicit empty chat intent still clears the constructor task; no permission scope is changed here.
+        if (opts.handback.taskId) intent.taskId = opts.handback.taskId;
       } else {
         intent = { required: typeof input.taskId === "string" && input.taskId !== "" };
         if (intent.required) intent.taskId = input.taskId;
@@ -1820,6 +2137,8 @@ export async function openRoleSession(
             || typeof metadata.turnId !== "string" || metadata.turnId === ""
             || completedTurns.has(metadata.turnId)) return;
           acknowledged = true;
+          const managed = session.sessionId ? managedCoreHandles.get(session.sessionId) : undefined;
+          if (managed) managed.turnInput = { turnId: metadata.turnId, ...(opts?.inputProvenance ? { provenance: structuredClone(opts.inputProvenance) } : {}) };
           turnIntents.set(metadata.turnId, intent);
           if (legacyIntent === intent) legacyIntent = undefined;
           opts?.onTurnStarted?.(metadata);
@@ -1960,6 +2279,8 @@ export async function openRoleSession(
       await session.dispose(); // 出错如实抛出（调用方在 finally 收口）
     },
   };
+  managedCoreHandles.set(session.sessionId ?? `unidentified-${randomUUID()}`, { handle: base, projectRoot: gitProtection.projectRoot, roleKind: setup.role.kind,
+    construction: !deps.createAdapter || officialCoreAdapterFactories.has(deps.createAdapter) ? "default-core" : "custom-adapter", isDisposed: () => disposed });
   return base;
 }
 
@@ -2232,16 +2553,42 @@ function createGovernanceMatrixFn(deps: {
   };
 }
 
-// 构造 gate：把 scope（可能为 undefined）原样传给 resolveWrite——无 scope 即不做任务收窄。
+function fileFactsDenied(): WriteDecision {
+  return { allowed: false, reason: "file-gate-host-facts-unproven: genuine current stage, roots and Git protection basis are required", allowedByRoot: { skill: [], project: [] } };
+}
+function verifiedFileFacts(context: WriteGateContext | undefined, target: string, project: ProjectConfig, protection: GitProtectionFacts): FileGateFacts | undefined {
+  if (!context || (context.operation !== "write" && context.operation !== "edit")
+    || (context.stage !== "lexical-read" && context.stage !== "canonical-read" && context.stage !== "final-write")) return undefined;
+  const facts = inspectRuntimeFileGateContext(context, target, context.operation, context.stage);
+  const same = (a: string, b: string) => process.platform === "win32" ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
+  if (!facts || !same(facts.projectRoot, project.projectRoot) || !same(facts.skillRoot, project.skillRoot)
+    || !checkGitProtectionFactsCurrent(protection)) return undefined;
+  if (facts.canonicalFacts && (facts.canonicalFacts.basisDigest !== protection.basisDigest
+    || facts.canonicalFacts.coverage !== protection.coverage || facts.canonicalFacts.reasons.length !== protection.reasons.length
+    || JSON.stringify(facts.canonicalFacts.protectedRoots) !== JSON.stringify(protection.protectedGitRoots))) return undefined;
+  return facts;
+}
+function versionedFileDecision(root: string, target: string, facts: FileGateFacts): WriteDecision | undefined {
+  if (facts.stage !== "final-write") return undefined;
+  const rel = projectRelativeLexical(target, root);
+  if (rel === undefined) return undefined;
+  const exists = facts.currentFile.state === "present";
+  const decision = versionedDocOverwriteDecision({ relPath: rel, exists, frozen: versionedDocFreezeState(root, rel, exists), operation: facts.operation });
+  return decision.allowed ? undefined : { allowed: false, reason: decision.reason, allowedByRoot: { skill: [], project: [] }, code: decision.code, rejection: decision.rejection };
+}
+
+// Legacy unmanaged compatibility only. Managed file tools use verifiedFileFacts and the pure stage gates.
 function buildGate(
   role: ResolvedRole,
   project: ProjectConfig,
-  scope: TaskScope | undefined
+  scope: TaskScope | undefined,
+  protectedGitRoots?: readonly string[],
 ): WriteGate {
   return (p) =>
     resolveWrite(p, role.boundary, scope, {
       skillRoot: project.skillRoot,
       projectRoot: project.projectRoot,
+      protectedGitRoots,
     });
 }
 
@@ -2779,14 +3126,45 @@ function buildTaskPrompt(taskId: string | undefined, scope: TaskScope | undefine
   );
 }
 
+/** Fresh host-derived ordinary scope facts. This is not a permission or an effect capability. */
+export async function readRoleCapabilityProtectionScope(input: { projectRoot: string }): Promise<{ state: "required" | "unmanaged" | "unknown"; revision: number }> {
+  const { state, revision } = await readGitHostProtectionRequirement(input);
+  return { state, revision };
+}
+
 /** Compatibility factory shape; capability injection still controls tool registration. */
 export type RuntimeAdapterFactory = (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
+/** Trusted host evidence preparation, separate from opening or scheduling a chief session. */
+export async function prepareChiefDecisionEvidence(input: DecisionEvidenceInput & { projectRoot: string }): Promise<{
+  baseDigest: string;
+  evidenceRefs: readonly import("../../model/trunk.ts").SnapshotArtifactRef[];
+  context: string;
+  isCurrent(): Promise<boolean>;
+}> {
+  const service = createTrunkService({ projectRoot: input.projectRoot });
+  const request = structuredClone(input.request);
+  const metadata = input.metadata === undefined ? undefined : {
+    ...input.metadata,
+    judgeContext: input.metadata.judgeContext === undefined ? undefined : structuredClone(input.metadata.judgeContext),
+  };
+  const prepared = await service.prepareDecisionEvidence({ originRoleId: input.originRoleId, request, metadata });
+  if (!prepared.ok) throw new Error(prepared.message ?? prepared.code);
+  const { baseDigest, evidenceRefs, context, verification } = prepared.value;
+  return { baseDigest, evidenceRefs, context, isCurrent: () => service.checkDecisionEvidence(verification) };
+}
 export type AdapterFactoryBuilder = (project: ProjectConfig, shellGate?: ShellGate) => RuntimeAdapterFactory;
 export type RuntimeAdapterFactoryOptions = Omit<RuntimeSessionOptions, "runtime" | "gate" | "projectRoot" | "skillRoot">;
 export type RuntimeAdapterFactoryBuilder = (project: ProjectConfig, runtime: RuntimeKind, options?: RuntimeAdapterFactoryOptions) => RuntimeAdapterFactory;
 export interface RoleSessionDeps {
   createAdapter?: RuntimeAdapterFactory;
   runtimeOptions?: RuntimeAdapterFactoryOptions;
+}
+
+/** Host after-write observation. The G Service owns baseline I/O; this receipt grants no write authority. */
+export async function registerVersionedDocumentAfterWrite(input: { projectRoot: string; absPath: string; recordedBy?: string }): Promise<boolean | undefined> {
+  const relPath = projectRelativeLexical(input.absPath, input.projectRoot);
+  if (relPath === undefined) return false;
+  return registerVersionedDocument({ projectRoot: input.projectRoot, relPath, ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}) });
 }
 
 /** Fixed engine, shared governed tools, exact project roots; no fallback engine. */
@@ -2796,7 +3174,7 @@ export function createRuntimeAdapterFactory(
   options: RuntimeAdapterFactoryOptions = {},
 ): RuntimeAdapterFactory {
   if (!(RUNTIME_KINDS as readonly string[]).includes(runtime)) throw new Error(`未知运行时：${runtime}`);
-  return (gate, capabilities) => createRuntimeAdapter({
+  const factory: RuntimeAdapterFactory = (gate, capabilities) => createRuntimeAdapter({
     ...options,
     runtime, gate, projectRoot: project.projectRoot, skillRoot: project.skillRoot,
     readRoot: project.projectRoot,
@@ -2805,9 +3183,12 @@ export function createRuntimeAdapterFactory(
     persistSession: capabilities?.persistSession ?? options.persistSession ?? (capabilities?.sessionDir !== undefined),
     customerInput: capabilities?.customerInput,
     // 2026-10-29（v2.13）：属主 write_file/edit_file 成功后，guard 在项目锁内登记版本基线。
-    versionedDocAfterWrite:
-      options.versionedDocAfterWrite ??
-      ((absPath: string) => registerVersionedDocAfterWrite({ projectRoot: project.projectRoot, absPath, recordedBy: "app:session" })),
+    versionedDocAfterWrite: async (absPath: string) => {
+      const rel = projectRelativeLexical(absPath, project.projectRoot);
+      if (rel !== undefined && capabilities?.roleDraftWritePaths?.includes(rel)) return true;
+      return options.versionedDocAfterWrite ? options.versionedDocAfterWrite(absPath)
+        : registerVersionedDocumentAfterWrite({ projectRoot: project.projectRoot, absPath, recordedBy: "app:session" });
+    },
     reportHandback: capabilities?.reportHandback,
     // 2026-10-26 图片查看（view_image）：运行时核心 `GovernedToolsOptions.viewImage` 同名能力位
     // （形状同源 `model/runtime.ts` `ViewImageFn`）；Service 以 `...options` 透传给
@@ -2816,7 +3197,19 @@ export function createRuntimeAdapterFactory(
     viewImage: capabilities?.viewImage,
     dispatchTask: capabilities?.dispatchTask,
     // Batch 3.5（C1d/S5）：三提交能力位（注入才注册；角色门控在 openRoleSession）。
+    chiefDecisionContext: capabilities?.chiefDecisionContext,
+    decidePendingRequest: capabilities?.decidePendingRequest,
     submitVersionChange: capabilities?.submitVersionChange,
+    selectRunChange: capabilities?.selectRunChange,
+    completeTeamPlan: capabilities?.completeTeamPlan,
+    activateRoleDocuments: capabilities?.activateRoleDocuments,
+    closeCreatedTask: capabilities?.closeCreatedTask,
+    gitQuery: capabilities?.gitQuery,
+    gitCandidate: capabilities?.gitCandidate,
+    gitPublish: capabilities?.gitPublish,
+    protectedGitRoots: capabilities?.protectedGitRoots,
+    fileGateProtocol: capabilities?.fileGateProtocol,
+    fileGateProtection: capabilities?.fileGateProtection,
     submitRefactor: capabilities?.submitRefactor,
     requestStableWrite: capabilities?.requestStableWrite,
     // 治理权力矩阵（C3）：纯展示提示段（C2 `RuntimeProviderOptions.contextSections`）与只读工具
@@ -2872,6 +3265,8 @@ export function createRuntimeAdapterFactory(
       : {}),
     shellVerdict: capabilities?.shellVerdict,
   });
+  officialCoreAdapterFactories.add(factory);
+  return factory;
 }
 
 export function selectAdapterFactory(

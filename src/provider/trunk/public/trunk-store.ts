@@ -14,6 +14,42 @@ export {
   type StoreWriteFailure,
   type StoreWriteFailureCode,
   type TrunkStore,
+  type RunChangeSource,
   type TrunkStoreError,
+  type ManifestCasResult,
+  type ActiveCommitRef,
+  type ActiveRolesState,
+  type SnapshotCaptureInput,
+  type GitProcessFacts, type GitRepositoryIdentity, type GitProtectionFacts, type GitInitializationFacts, type GitQueryPort, type GitCandidateInput,
+  type GitCandidateStore, type GitStoredCommit, type GitTreeEntry, type GitRefJournal, type GitRefStore,
+  type GitCandidatePlan,
+  type GitRevertInput, type GitRevertPlanResult,
+  type GitTaskCandidateSource,
+  type GitIntegrationSource,
+  type GitRevertSource,
+  type GitCandidateEvidence,
+  type GitExecutionBases,
+  type GitRefPublicationPlan, type GitDeliverySource,
+  type StorageOperationIdentity,
+  type GitOperationRecord, type GitBusinessPreparation,
+  type GitInitializationRecord,
+  type GitInitializationPlan,
+  type InitialGitPublicationBasis,
+  type GitInitializationTaskBasis,
+  type GitDocumentMutationScope,
+  type GitDocumentCommitPlan,
+  type GitActiveCommitPlan, type GitActiveCompletionBasis, type GitPlanCompletionBasis, type GitStableCompletionBasis, type GitInitialWorkflowSource, type GitInitialWorkflowCommitPlan,
+  type GitHostInventory, type GitHostActionKind, type GitHostOpenFailureRef, type GitHostQueuePersistenceFacts, type GitHostRunStopFact, type GitHostControllerStopFact,
 } from "../abstract/trunk-store.ts";
 export { createFsTrunkStore } from "../impl/fs-trunk-store.ts";
+export { createGitQueryPort, initializeGitRepository, planGitRepositoryInitialization, readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitInitializationFacts } from "../impl/git-command.ts";
+export { readGitInitializationRecord, writeGitInitializationRecord } from "../impl/git-command.ts";
+export { createGitCandidateStore, planEmptyGitCandidate } from "../impl/git-candidate-store.ts";
+export { createGitRefStore, createGitTrunkStore, createGitDocumentMutationStore, createGitActiveMutationStore, createGitInitialWorkflowMutationStore, readGitActiveCompletionBasis, appendGitActiveCompletionTaskEvent, readGitInitialWorkflowSource, writeGitInitialWorkflowSource, createProjectTrunkStore, migrateLegacyTrunkToGit, readGitInitializationTaskBasis, appendGitInitializationTaskEvent } from "../impl/git-trunk-store.ts";
+export { readGitStableCompletionBasis, appendGitStableCompletionTaskEvent } from "../impl/git-trunk-store.ts";
+export { readGitPlanCompletionBasis, appendGitPlanCompletionTaskEvent } from "../impl/git-trunk-store.ts";
+export { readGitCandidateEvidence, appendGitCandidateTaskEvent } from "../impl/git-trunk-store.ts";
+export { readGitDeliveryEvidence, readGitPublishedReadEvidence, appendGitDocumentPreparationTaskEvent } from "../impl/git-trunk-store.ts";
+export { planGitRefPublication } from "../impl/git-trunk-store.ts";
+
+export { recordGitHostInventory, beginGitHostAction, endGitHostAction, recordGitHostInterruption, inspectGitHostCoordinator, checkGitHostAction, readGitHostProtectionRequirement } from "../impl/git-command.ts";

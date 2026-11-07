@@ -560,6 +560,7 @@ test("appointment-write：role-card 钩子 → 许可 → gate → mini re-pin r
 // ———————————————— 4. apply-journal / 对账 ————————————————
 
 function snapshotOfManifest(manifest: TrunkManifest): TrunkApplySnapshot {
+  assert.ok(manifest.artifacts.workflow, "This execution fixture has a real workflow; planning-only manifests are not executable");
   const documents: TrunkApplySnapshot["documents"] = {};
   for (const kind of Object.keys(manifest.artifacts.documents)) {
     const ref = manifest.artifacts.documents[kind as keyof typeof manifest.artifacts.documents];

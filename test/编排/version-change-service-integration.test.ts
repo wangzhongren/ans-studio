@@ -359,7 +359,7 @@ test("stable-write：request/approve/completeWrite(actualSha) + mini re-pin；�
   const read = await integration.trunk.derive();
   assert.equal(read.ok, true);
   const status = await integration.trunk.status();
-  assert.equal(status.manifest?.artifacts.workflow.sha256, targetSha);
+  assert.equal(status.manifest?.artifacts.workflow?.sha256, targetSha);
 
   // 失败：哈希不符 ⇒ record/permit failed（不可复用）、mini re-pin 不更新
   const badContent = "# workflow v3\n";
@@ -388,7 +388,7 @@ test("stable-write：request/approve/completeWrite(actualSha) + mini re-pin；�
   assert.equal(failedRecord.find((record) => record.requestId === "sw-2")?.status, "failed");
   assert.equal(await integration.services.stableWrite.findPermit(PATHS.workflow), undefined);
   const after = await integration.trunk.status();
-  assert.equal(after.manifest?.artifacts.workflow.sha256, targetSha); // 未被失败写入污染
+  assert.equal(after.manifest?.artifacts.workflow?.sha256, targetSha); // 未被失败写入污染
   assert.notEqual(badTarget, targetSha);
 });
 

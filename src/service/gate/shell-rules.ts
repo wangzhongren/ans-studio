@@ -15,3 +15,7 @@
 //        命中 id 稳定（`allow:routine:<id>`）；委托策略只接受原委托三 id（npm-test / npm-run-typecheck / node-test）。
 
 export { classifyShell, defaultShellRules, matchRoutineShellCommand } from "../../common/门禁引擎/classify-shell.ts";
+export { checkGitPolicy, computeGitPolicyDigest } from "../../common/门禁引擎/classify-shell.ts";
+export type { GitPolicyFacts, GitPolicyResult, GitPolicyTemplate, GitPolicyDiffEntry, GitRawObjectPlan, GitAppGeneratedFile, GitBusinessPublication, GitRoleActivationPublication, GitStableInitialWorkflowSource, GitInitialWorkflowPublication, GitPolicyTreeEntry, GitDeliveryTaskSource, GitDeliveryIntegrationSource, GitRefPublicationPolicyPlan, GitDeliveryBasis } from "../../common/门禁引擎/classify-shell.ts";
+export type { GitRawTreeEntry, RawTree, GitRawDiffEntry, GitRawObjectInput, GitRawStoredCommit, GitRawRevertCommit, GitRawRevertBasis, GitRawRevertConflict } from "../../model/trunk.ts";
+export type { GitDeliveryRevertSource } from "../../common/门禁引擎/classify-shell.ts";

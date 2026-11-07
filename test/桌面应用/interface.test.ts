@@ -14,10 +14,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createServer } from "node:http";
 
 import {
   createDesktopInterface,
   createShellJudgeSwitch,
+  desktopProjectExecutionInventory,
   type DesktopInterface,
 } from "../../app/desktop/interface.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
@@ -27,6 +29,8 @@ import {
   readPreferences,
 } from "../../app/desktop/preferences.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
+import { inspectRoleSessionOpenFailure, recheckRoleSessionOpenFailure } from "../../src/pipeline/orchestration/run-role.ts";
+import { beginGitHostAction, endGitHostAction, inspectGitHostCoordinator } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 
@@ -187,7 +191,7 @@ test("接线源码钉：loadInterface 不再复位开关；新启动从 initialJ
   assert.equal(loadBody.includes("shellJudgeSwitch.reset()"), false, "渲染重载不得复位「替我审批」");
   assert.equal(loadBody.includes("decisionJudgeSwitch.reset()"), false, "渲染重载不得复位「替我决策」");
   assert.ok(main.includes("createShellJudgeSwitch(initialJudgeSwitches.approval)"), "新启动按持久值种子（approval）");
-  assert.ok(main.includes("createShellJudgeSwitch(initialJudgeSwitches.decision)"), "新启动按持久值种子（decision）");
+  assert.ok(main.includes("createDecisionDelegationSwitch(initialJudgeSwitches.decision)"), "新启动按持久值种子（decision）");
   assert.ok(main.includes("initialJudgeSwitches = preferencesRead.judgeSwitches"), "启动读取偏好后填充开关初值");
 });
 
@@ -260,11 +264,14 @@ function twoRoleListing(): ProjectListing {
   };
 }
 
-test("requestRoleStates：两个角色忙态→重放→恰好两条 role-state（busy=true）；结束后重放为闲", async () => {
+test("requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用", async () => {
   const t = tempDir("ans-interface-replay-");
   const states: Parameters<NonNullable<Parameters<typeof createDesktopInterface>[0]["emitRoleState"]>>[0][] = [];
-  const handles: Record<string, FakeHandle> = { A: fakeHandle(), B: fakeHandle() };
+  const handles: Record<string, FakeHandle> = { chief: fakeHandle(), B: fakeHandle() };
   const listing = twoRoleListing();
+  listing.roles[0] = { ...listing.roles[0]!, roleId: "chief", builtIn: true, governanceFunction: "chief" };
+  listing.primaryRoleId = "chief";
+  listing.governanceModel = "trio";
   const desktop: DesktopInterface = createDesktopInterface({
     pickDirectory: async () => null,
     emitEvent: () => {},
@@ -278,31 +285,34 @@ test("requestRoleStates：两个角色忙态→重放→恰好两条 role-state�
   });
   try {
     await desktop.listProject({ projectRoot: "/proj" });
-    assert.equal((await desktop.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" })).ok, true);
+    assert.equal((await desktop.openSession({ projectRoot: "/proj", roleId: "chief", runtime: "demo" })).ok, true);
     assert.equal((await desktop.openSession({ projectRoot: "/proj", roleId: "B", runtime: "demo" })).ok, true);
     await tick(30);
 
     // 两个角色都进入「工作中」（send 挂起未返回）。
-    const sendA = desktop.sendSession({ text: "A 的活", target: { roleId: "A", projectRoot: "/proj", runtime: "demo" } });
-    const sendB = desktop.sendSession({ text: "B 的活", target: { roleId: "B", projectRoot: "/proj", runtime: "demo" } });
+    const sendA = desktop.sendSession({ text: "A 的活", target: { roleId: "chief", projectRoot: "/proj", runtime: "demo" } });
+    const sendB = await desktop.sendSession({ text: "B 的活", target: { roleId: "B", projectRoot: "/proj", runtime: "demo" }, metadata: { background: true, kind: "system" } });
+    assert.equal(sendB.ok, false);
+    assert.equal(handles.B.sendCalls.length, 0, "Renderer cannot impersonate an internal dispatch/report origin");
     await tick(40);
-    assert.ok(states.some((s) => s.roleId === "A" && s.busy === true), "A 开跑即外推 busy");
-    assert.ok(states.some((s) => s.roleId === "B" && s.busy === true), "B 开跑即外推 busy");
+    assert.ok(states.some((s) => s.roleId === "chief" && s.busy === true), "A 开跑即外推 busy");
+    assert.ok(states.some((s) => s.roleId === "B" && s.busy === false), "Diagnostic session stays idle after denied customer send");
 
     // 晚订阅的渲染侧：主动拉快照 → 重放两条。
     states.length = 0;
     assert.deepEqual(await desktop.requestRoleStates(), { ok: true });
     assert.equal(states.length, 2, "重放应恰好两条（每个在场会话一条）");
-    assert.deepEqual(states.map((s) => s.roleId).sort(), ["A", "B"]);
-    assert.ok(states.every((s) => s.busy === true), "重放快照如实携带 busy=true");
+    assert.deepEqual(states.map((s) => s.roleId).sort(), ["B", "chief"]);
+    assert.equal(states.find(s => s.roleId === "chief")?.busy, true);
+    assert.equal(states.find(s => s.roleId === "B")?.busy, false);
     assert.ok(states.every((s) => s.runtime === "demo" && s.projectRoot === "/proj"));
 
     // 两轮结束 → 重放为闲。
-    handles.A.release();
+    handles.chief.release();
     handles.B.release();
     await sendA;
     await sendB;
-    handles.A.push({ kind: "settled", summary: "A 结束" });
+    handles.chief.push({ kind: "settled", summary: "A 结束" });
     handles.B.push({ kind: "settled", summary: "B 结束" });
     await tick(60);
     states.length = 0;
@@ -330,4 +340,105 @@ test("接线源码钉：session:role-states handler / preload 桥 / 渲染侧主
   assert.ok(platform.includes("requestRoleStates?: () => Promise<{ ok: boolean }>"), "platform 桥类型声明");
   const iface = read("app/desktop/session.ts");
   assert.ok(iface.includes("broadcastRoleStates(): void"), "SessionManager 提供快照重放");
+});
+
+
+test("decision权威revision只由主进程推进，非法set不变，重开旧revision失效", async () => {
+  const { createDecisionDelegationSwitch } = await import("../../app/desktop/interface.ts");
+  const state = createDecisionDelegationSwitch();
+  const initial = state.get(); let updates = 0;
+  const unsubscribe = state.subscribe(() => { updates++; });
+  assert.equal(initial.enabled, false);
+  state.set({ enabled: true }); const enabled = state.get();
+  assert.ok(enabled.revision > initial.revision);
+  state.set({ enabled: false }); state.set({ enabled: true });
+  assert.ok(state.get().revision > enabled.revision);
+  const current = state.get().revision;
+  assert.equal(state.set({ enabled: true, revision: 0 }).ok, false);
+  assert.equal(state.get().revision, current);
+  assert.equal(updates, 3);
+  unsubscribe(); state.reset();
+  assert.equal(updates, 3); assert.ok(state.get().revision > current);
+});
+
+
+test("W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留", async () => {
+  const { dir: root, cleanup } = tempDir("ans-w13-official-failure-");
+  const priorWire = process.env.ANS_CODEX_WIRE_API, priorKey = process.env.ANS_W13_LOCAL_HTTP_KEY;
+  process.env.ANS_CODEX_WIRE_API = "chat"; process.env.ANS_W13_LOCAL_HTTP_KEY = "fixture-only";
+  let requests = 0, desktop: DesktopInterface | undefined;
+  let held: { leaseId: string } | undefined;
+  const server = createServer((_request, response) => { requests++; response.writeHead(500); response.end("unexpected inference"); });
+  try {
+    await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
+    const address = server.address(); assert.ok(address && typeof address !== "string");
+    desktop = createDesktopInterface({ pickDirectory: async () => root, emitEvent() {},
+      runtimeOptions: { baseUrl: `http://127.0.0.1:${address.port}/v1`, apiKeyEnvVar: "ANS_W13_LOCAL_HTTP_KEY",
+        modelId: "w13-local-only", requestAttemptMax: 1, requestFirstByteTimeoutMs: 1000, turnLastResortMs: 3000 },
+      envFilePath: path.join(root, ".env"), piConfigEnv: {}, runtimeStatePath: path.join(root, ".runtime-selection.json") });
+    assert.equal(await desktop.pickProject(), root); await desktop.listProject({ projectRoot: root });
+    const beforeRevision = desktopProjectExecutionInventory(root).revision;
+    const lease = beginGitHostAction({ projectRoot: root, kind: "git-mutation" }); assert.ok(lease.ok); held = lease;
+    const refused = await desktop.openSession({ projectRoot: root, roleId: "chief", runtime: "codex" });
+    assert.equal(refused.ok, false); assert.match(refused.error ?? "", /git-host-coordinator-busy/);
+    const failedInventory = desktopProjectExecutionInventory(root); assert.equal(failedInventory.sessions.length, 1);
+    const failed = failedInventory.sessions[0]!;
+    assert.equal(failed.phase, "open-failed"); assert.deepEqual(failed.errors, ["partial-construction-closure-unproven"]);
+    assert.equal(failed.coreSessionId, undefined); assert.ok(failed.openFailureRef);
+    assert.deepEqual(Object.keys(failed.openFailureRef).sort(), ["failureId", "source"]);
+    assert.equal(failed.openFailureRef.source, "pipeline-role-open-failure");
+    const fresh = recheckRoleSessionOpenFailure({ ref: failed.openFailureRef, hostHandleId: failed.hostHandleId,
+      projectRoot: root, roleId: "chief", runtime: "codex" });
+    assert.equal(fresh?.status, "never-started");
+    assert.equal(recheckRoleSessionOpenFailure({ ref: failed.openFailureRef, hostHandleId: `${failed.hostHandleId}-other`,
+      projectRoot: root, roleId: "chief", runtime: "codex" }), undefined);
+    assert.equal(await inspectRoleSessionOpenFailure({ error: new Error("unknown same-text error"), hostHandleId: failed.hostHandleId }), undefined);
+    const published = inspectGitHostCoordinator({ projectRoot: root });
+    assert.equal(published.activeAction, "git-mutation", "Failed open never releases another owner's lease");
+    assert.deepEqual(published.inventory?.sessions.find(row => row.hostHandleId === failed.hostHandleId)?.openFailureRef, failed.openFailureRef);
+    assert.ok(failedInventory.revision > beforeRevision); assert.equal(requests, 0);
+    assert.ok(endGitHostAction({ projectRoot: root, leaseId: held.leaseId }).ok); held = undefined;
+    const retry = await desktop.openSession({ projectRoot: root, roleId: "chief", runtime: "codex" }); assert.ok(retry.ok, retry.error ?? "retry failed");
+    const retried = desktopProjectExecutionInventory(root); assert.equal(retried.sessions.length, 2);
+    const live = retried.sessions.find(row => row.phase === "live")!; assert.ok(live);
+    assert.notEqual(live.hostHandleId, failed.hostHandleId); assert.ok(live.coreSessionId); assert.equal(live.openFailureRef, undefined);
+    assert.equal(live.toolSurface?.factoryProvenance, "default-production"); assert.equal(live.toolSurface?.native?.factory, "codex-chat");
+    assert.equal(retried.sessions.find(row => row.hostHandleId === failed.hostHandleId)?.phase, "open-failed");
+    assert.equal(recheckRoleSessionOpenFailure({ ref: failed.openFailureRef, hostHandleId: live.hostHandleId,
+      projectRoot: root, roleId: "chief", runtime: "codex" }), undefined);
+    assert.equal(requests, 0, "Pure preparation/retry does not send inference or start a custom provider");
+    if (process.env.ANS_W13_EVIDENCE_DIR) fs.writeFileSync(path.join(process.env.ANS_W13_EVIDENCE_DIR, "official-failure-ref.json"),
+      JSON.stringify({ root, refused, failedInventory, published, fresh, retry, retried, requests }, null, 2));
+  } finally {
+    if (held) endGitHostAction({ projectRoot: root, leaseId: held.leaseId });
+    await desktop?.stopSession(); desktop?.disposeProjectDocuments(); server.closeAllConnections();
+    if (server.listening) await new Promise<void>(resolve => server.close(() => resolve()));
+    if (priorWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = priorWire;
+    if (priorKey === undefined) delete process.env.ANS_W13_LOCAL_HTTP_KEY; else process.env.ANS_W13_LOCAL_HTTP_KEY = priorKey;
+    if (!process.env.ANS_W13_EVIDENCE_DIR) cleanup();
+  }
+});
+
+test("W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变", async () => {
+  const { dir: root, cleanup } = tempDir("ans-w13-custom-failure-");
+  const marker = path.join(root, "actual-sdk-effect.txt"), original = new Error("owned custom SDK effect then throw");
+  let constructions = 0;
+  const desktop = createDesktopInterface({ pickDirectory: async () => root, emitEvent() {},
+    createRuntimeAdapterFactoryFn: () => () => { constructions++; fs.writeFileSync(marker, "actual custom constructor entered\n"); throw original; },
+    envFilePath: path.join(root, ".env"), piConfigEnv: {}, runtimeStatePath: path.join(root, ".runtime-selection.json") });
+  try {
+    assert.equal(await desktop.pickProject(), root); await desktop.listProject({ projectRoot: root });
+    const result = await desktop.openSession({ projectRoot: root, roleId: "chief", runtime: "codex" });
+    assert.equal(result.ok, false); assert.equal(result.error, original.message); assert.equal(constructions, 1);
+    assert.equal(fs.readFileSync(marker, "utf8"), "actual custom constructor entered\n");
+    const inventory = desktopProjectExecutionInventory(root); assert.equal(inventory.sessions.length, 1);
+    const failed = inventory.sessions[0]!; assert.equal(failed.phase, "open-failed");
+    assert.deepEqual(failed.errors, ["partial-construction-closure-unproven"]); assert.equal(failed.openFailureRef, undefined);
+    assert.equal(await inspectRoleSessionOpenFailure({ error: original, hostHandleId: failed.hostHandleId }), undefined);
+    const published = inspectGitHostCoordinator({ projectRoot: root }).inventory;
+    assert.equal(published?.sessions.find(row => row.hostHandleId === failed.hostHandleId)?.openFailureRef, undefined);
+    assert.equal(published?.coverage, "unknown");
+    if (process.env.ANS_W13_EVIDENCE_DIR) fs.writeFileSync(path.join(process.env.ANS_W13_EVIDENCE_DIR, "custom-effect-no-ref.json"),
+      JSON.stringify({ root, result, constructions, markerContent: fs.readFileSync(marker, "utf8"), inventory, published }, null, 2));
+  } finally { await desktop.stopSession(); desktop.disposeProjectDocuments(); if (!process.env.ANS_W13_EVIDENCE_DIR) cleanup(); }
 });

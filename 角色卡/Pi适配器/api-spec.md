@@ -1,5 +1,11 @@
 # Pi 公开接口（ANS-RUNTIME-V2 revision 1 / P1）
 
+## 2026-11-05 T1.1 原生停止事实（owner 已实施，未独立验收）
+
+真实 RoleSession.nativeLifecycle 消费 Model 唯一 RuntimeNativeLifecycle/Facts；每 bind 的 instanceId 与实际 nativeSessionId/roleId/runtime=pi 绑定，coreTurnId 在 raw SDK prompt 开始时捕获并保留。inspect 跟踪 raw promise 最终返回、公开 SDK streaming/compacting/pending getters、tool start/end、自持 MCP transport 的公开 PID/真实 child close。legacy wrapper 原样透传同一 hook。
+
+stopAndInspect 校验 instance/Core turn，再共享一次 abort/shutdown/owned transport close 并有界等待。外层 timeout/SDK settled/abort/dispose 或 close promise 不证明退出；晚到事实仍能读取。没有 MCP 或未启动无 PID 也不推全覆盖。SDK 未提供整树、后台覆盖及 HTTP transport close，processCoverage/treeStatus 仍 unknown、不会报告 quiescent；Git 受管 surface 也保持 unknown。接口与原 abort/dispose API 不变，停止后的旧 native instance 不接新 prompt。精确16/16、关联35/35及7/7的实际范围/首红/指纹见[实施记录](docs/change/2026-11-05_change_direct-role-capabilities-native-stop.md)。
+
 中立类型单一入口是 `src/model/runtime.ts`。`src/provider/pi/session.ts` 显式转出原有 ToolCall/SessionEvent/PromptImage/PromptOptions/RoleSession/RuntimeAdapter、WriteGate/ShellGate、客户/操作者、报告、派发、审读及 Finalize 结果类型；新增 CustomerInputMetadata 也转出。没有第二份类型定义；已删除的 FinalizeBootstrapFn 不重建。
 
 `createPiRuntimeAdapter(options: RuntimeProviderOptions): RuntimeAdapter` 是 Service 生产入口。只接受 runtime=pi；输入工具及交互闸、currentTurnId、storage 直接消费。SDK 仍只在 bindRole 时加载；composeContext 仅渲染角色文本。完整工具定义以注入的 inputSchema/description/promptGuidelines/executionMode/handler 为准；SDK execute 原 signal 与调用 ID 原样交给该 handler。客户 metadata 的取消身份由核心 handler 捕获，本适配器不换为后来轮次 signal。

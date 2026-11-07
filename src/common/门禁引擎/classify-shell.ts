@@ -50,6 +50,1056 @@ import type {
   ShellRiskyRule,
   ShellRules,
 } from "../../model/decision.ts";
+import { createHash } from "node:crypto";
+import { isCompleteSnapshot, isDirectActionSource, isActiveRoleEvidence, isGitApplicationRef, FROZEN_ROLE_REF_KEYS, type ActiveRoleEvidence, type CompleteSnapshot, type GitOid, type TrunkApplyJournal, type SnapshotRef } from "../../model/trunk.ts";
+import type { GitRawObjectPlan, GitRawTreeEntry, GitRawDiffEntry, GitRawRevertCommit, GitRawRevertBasis, RawTree } from "../../model/trunk.ts";
+export type { GitRawObjectPlan, GitRawTreeEntry, RawTree, GitRawDiffEntry, GitRawObjectInput, GitRawStoredCommit, GitRawRevertCommit, GitRawRevertBasis, GitRawRevertConflict } from "../../model/trunk.ts";
+import { isValidDocFreezeRecord, type StableWriteAuthority, type StableWriteRecord, type StableWritePermit } from "../../model/version-change.ts";
+import { validateRoleDocumentsSnapshot, parseSnapshotRoleDocuments, snapshotDocumentText } from "./boundary-core.ts";
+import { parse as parseYaml } from "yaml";
+
+export type GitPolicyTemplate = "status" | "diff" | "log" | "show" | "rev-parse" | "ls-files" | "ls-tree" | "merge-base" | "branch-list" | "worktree-list"
+  | "commit" | "integrate" | "revert" | "init" | "publish-documents" | "publish-delivery";
+export type GitPolicyDiffEntry = GitRawDiffEntry;
+export interface GitAppGeneratedFile {
+  path: string; sha256: string; oid: GitOid;
+  kind: "manifest" | "complete-snapshot" | "history" | "frozen-application-evidence" | "snapshot-content";
+}
+export type GitPolicyTreeEntry = GitRawTreeEntry;
+/** Ordinary settled-source data; authenticity/current authority are rechecked by O, not inferred here. */
+export interface GitDeliveryTaskSource {
+  kind: "assigned-run-task"; taskId: string; runId: string; flowId: string; roleId: string; moduleId: string;
+  pinDigest: string; taskDigest: string; runRecordSha256: string; scopeDigest: string;
+  base: { ref: string; oid: GitOid | null }; files: readonly { path: string; sha256: string | null }[];
+}
+export interface GitDeliveryIntegrationSource extends Omit<GitDeliveryTaskSource, "kind" | "moduleId"> {
+  kind: "run-integration";
+  contributors: readonly { operationId: string; candidate: GitOid; source: GitDeliveryTaskSource; closeOperationId: string; closeEventId: string; reportSha256: string }[];
+}
+export interface GitDeliveryRevertSource extends Omit<GitDeliveryTaskSource, "kind" | "moduleId"> {
+  kind: "run-revert"; roleId: "convener"; target: GitOid; mainline?: number;
+  revertBasis: GitRawRevertBasis;
+  ownerGrants: readonly { ownerRoleId: string; paths: readonly string[]; evidenceDigest: string }[];
+}
+export interface GitRefPublicationPolicyPlan {
+  ref: string; oldOid: GitOid | null;
+  commitBytesBase64: string; oldCommitBytesBase64: string | null;
+  commit: { candidate: GitOid; tree: GitOid; parents: GitOid[]; message: string };
+  baseTree: readonly GitPolicyTreeEntry[]; candidateTree: readonly GitPolicyTreeEntry[];
+  worksite: { kind: "ref-only"; index: "not-used"; checkout: "not-used" };
+  argv: readonly string[]; diff: readonly GitPolicyDiffEntry[];
+}
+export interface GitDeliveryBasis {
+  base: GitOid; baseTree: readonly GitPolicyTreeEntry[]; source: GitDeliveryIntegrationSource | GitDeliveryRevertSource;
+  candidateOperationId: string; baseCommitBytesBase64: string;
+}
+export interface GitBusinessPublication {
+  kind: "direct-document-publication"; flowId: string; operationId: string; actorRoleId: string; applicationId: string; action: string;
+  snapshot: SnapshotRef; documents: Readonly<Record<string, unknown>>; execution: { teamPlan: unknown; flow: unknown };
+}
+export interface GitRoleActivationPublication extends Omit<GitBusinessPublication, "kind" | "action"> {
+  kind: "role-activation-publication"; action: "activate-role-documents";
+  documentSnapshot: SnapshotRef; targetRoleId: string;
+  expectedActive: { revision: number; digest: string | null };
+  targetActive: { revision: number; digest: string; roles: Record<string, ActiveRoleEvidence> };
+  evidence: ActiveRoleEvidence;
+}
+export interface GitStableInitialWorkflowSource {
+  schema: "stable-initial-workflow-source/v1"; kind: "stable-initial-workflow"; operationId: string;
+  flowId: string; taskId: string; runId: string; coreSessionId: string; coreTurnId?: string;
+  roleId: "convener"; requestId: string; permitId: string; path: "docs/workflow.md"; baseSha256: ""; targetSha256: string;
+  authority: StableWriteAuthority; documentCommit: { version: number; digest: string }; documentSnapshot: SnapshotRef;
+}
+export interface GitInitialWorkflowPublication extends Omit<GitBusinessPublication, "kind" | "action" | "applicationId" | "actorRoleId"> {
+  kind: "stable-initial-workflow-publication"; actorRoleId: "convener"; documentSnapshot: SnapshotRef;
+  source: GitStableInitialWorkflowSource; record: StableWriteRecord; permit: StableWritePermit;
+}
+/** Host-resolved ordinary evidence, never model parameters or execution-isolation proof. */
+export interface GitPolicyFacts {
+  repoId: string; operationId: string; actorRoleId: string; taskId?: string; runId?: string;
+  authorizationRevision: string | number; currentAuthorizationRevision: string | number;
+  objectFormat: "sha1" | "sha256"; template: GitPolicyTemplate;
+  paths: readonly string[]; readPaths: readonly string[]; writePaths: readonly string[];
+  target?: GitOid; other?: GitOid; limit?: number; readableOids?: readonly GitOid[];
+  base?: GitOid | null; candidate?: GitOid | null;
+  ref?: string; ownedCandidateRef?: string; publicationRef?: string;
+  ownedWorktreeId?: string; currentWorktreeId?: string; ownedIndexId?: string; currentIndexId?: string;
+  /** Exact planned transport argv including the fixed safety prefix. */
+  argv: readonly string[];
+  /** Complete per-operation plumbing commands for modifying operations. */
+  commands?: readonly (readonly string[])[];
+  allDiff?: { complete: boolean; base: GitOid | null; candidate: GitOid | null; entries: readonly GitPolicyDiffEntry[] };
+  d3SelectedRoleIds?: readonly string[];
+  integrationGrants?: readonly { ownerRoleId: string; paths: readonly string[]; candidate: GitOid; evidenceDigest: string }[];
+  approvedInitRoot?: string; ownedTemplateDir?: string; mainline?: number;
+  worksite?: { kind: "raw-object-plumbing" | "ref-only"; index: "not-used"; checkout: "not-used" };
+  initializationBasis?: {
+    kind: "uninitialized-root"; projectRoot: string; qualificationDigest: string;
+    operationId: string; requestDigest: string; sourceId: string; sourceSha256: string;
+  };
+  rawObjectPlan?: GitRawObjectPlan;
+  refPublicationPlan?: GitRefPublicationPolicyPlan;
+  deliveryBasis?: GitDeliveryBasis;
+  businessPublication?: GitBusinessPublication | GitRoleActivationPublication | GitInitialWorkflowPublication;
+  appGeneratedFiles?: readonly GitAppGeneratedFile[];
+  manifestSha256?: string; journalDigest?: string; businessJournal?: TrunkApplyJournal;
+  businessBaseManifestBytesBase64?: string;
+}
+export interface GitPolicyResult {
+  allowed: boolean; inputDigest: string; code?: string;
+  deniedPaths?: string[]; deniedRefs?: string[];
+}
+function gitCanonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(gitCanonical);
+  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, val]) => [key, gitCanonical(val)]));
+  return value;
+}
+export function computeGitPolicyDigest(facts: GitPolicyFacts): string {
+  return createHash("sha256").update(JSON.stringify(gitCanonical(facts))).digest("hex");
+}
+const gitText = (v: unknown): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= 1024 && !/[\x00-\x1f\x7f]/.test(v);
+function gitPath(value: unknown): value is string {
+  return gitText(value) && !value.startsWith("/") && !value.startsWith("-") && !/[\\:*?\[\]]/.test(value)
+    && !value.split("/").some(p => !p || p === "." || p === ".." || p.toLowerCase() === ".git");
+}
+function gitCovered(file: string, scopes: readonly string[]): boolean {
+  return scopes.some(scope => scope === "." || (scope.endsWith("/")
+    ? file.toLowerCase().startsWith(scope.toLowerCase()) : file.toLowerCase() === scope.toLowerCase()));
+}
+function gitOid(value: unknown, format: GitPolicyFacts["objectFormat"]): value is GitOid {
+  if (!value || typeof value !== "object") return false;
+  const v = value as GitOid;
+  return v.objectFormat === format && (format === "sha1" ? /^[a-f0-9]{40}$/i : /^[a-f0-9]{64}$/i).test(v.hex);
+}
+function sameGitOid(a: GitOid | null | undefined, b: GitOid | null | undefined): boolean {
+  return a === null ? b === null : !!a && !!b && a.objectFormat === b.objectFormat && a.hex.toLowerCase() === b.hex.toLowerCase();
+}
+function gitBody(argv: readonly string[]): readonly string[] | undefined {
+  if (!Array.isArray(argv) || argv.length > 256 || argv.some(v => typeof v !== "string" || /[\x00-\x1f\x7f]/.test(v))) return;
+  if (JSON.stringify(argv.slice(0, 3)) !== JSON.stringify(["--no-pager", "--no-optional-locks", "--literal-pathspecs"])) return;
+  const nullFile = argv[4] === "core.fsmonitor=false" && argv[6] === "core.hooksPath=NUL" ? "NUL" : "/dev/null";
+  const config = ["core.fsmonitor=false", `core.hooksPath=${nullFile}`, "core.untrackedCache=false", `core.excludesFile=${nullFile}`,
+    "core.pager=cat", "pager.status=false", "pager.diff=false", "maintenance.auto=false", "gc.auto=0", "protocol.allow=never", "diff.external=", `core.attributesFile=${nullFile}`];
+  const prefix = ["--no-pager", "--no-optional-locks", "--literal-pathspecs", ...config.flatMap(v => ["-c", v])];
+  if (JSON.stringify(argv.slice(0, prefix.length)) !== JSON.stringify(prefix)) return;
+  return argv.slice(prefix.length);
+}
+function gitQueryBody(facts: GitPolicyFacts): string[] | undefined {
+  const paths = [...facts.paths], a = facts.target?.hex, b = facts.other?.hex;
+  switch (facts.template) {
+    case "status": return ["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--ignore-submodules=all", "--", ...paths];
+    case "diff": return ["diff", "--no-ext-diff", "--no-textconv", "--ignore-submodules=all", ...(a ? [a] : []), ...(b ? [b] : []), "--", ...paths];
+    case "log": return ["log", `-${facts.limit ?? 20}`, "--format=%H%x00%P%x00%s", ...(a ? [a] : ["--all"]), "--", ...paths];
+    case "show": return a && paths.length === 1 ? ["cat-file", "blob", `${a}:${paths[0]}`] : undefined;
+    case "rev-parse": return a ? ["rev-parse", "--verify", `${a}^{commit}`] : undefined;
+    case "ls-files": return ["ls-files", "--stage", "-z", "--", ...paths];
+    case "ls-tree": return a ? ["ls-tree", "-r", "-z", "--full-tree", a, "--", ...paths] : undefined;
+    case "merge-base": return a && b ? ["merge-base", a, b] : undefined;
+    case "branch-list": return ["for-each-ref", `--count=${facts.limit ?? 20}`, "--format=%(refname)%00%(objectname)", "refs/heads/"];
+    case "worktree-list": return ["worktree", "list", "--porcelain", "-z"];
+    default: return;
+  }
+}
+function gitRolePath(f: GitPolicyFacts, file: string): boolean {
+  if (!gitCovered(file, f.writePaths) || /^(?:\.ans\/|\.git(?:\/|$))/i.test(file)
+      || file.split("/").some(p => [".gitattributes", ".gitmodules"].includes(p.toLowerCase()))) return false;
+  const roots: Record<string, readonly string[]> = {
+    chief: ["docs/intents/"], product: ["docs/product/"], rapporteur: ["docs/proposals/", "docs/contracts/", "docs/governance/rapporteur/"],
+    convener: ["docs/scheduling/", "docs/workflow.md", "docs/governance/convener/"],
+    verifier: ["docs/quality/", "docs/verification/", "docs/governance/verifier/"],
+  };
+  if (f.actorRoleId === "nominator") {
+    const match = /^角色卡\/([^/]+)\/(role-card\.md|boundary\.md|boundary\.yaml)$/.exec(file);
+    return !!match && !["chief", "product", "rapporteur", "nominator", "convener", "verifier", "su"].includes(match[1]!)
+      && !!f.d3SelectedRoleIds?.includes(match[1]!);
+  }
+  if (roots[f.actorRoleId]) return gitCovered(file, roots[f.actorRoleId]!);
+  return f.actorRoleId !== "su" && f.actorRoleId !== "liaison" && !/^(?:角色卡\/|docs\/(?:intents|product|proposals|contracts|scheduling|quality|verification|governance)\/|docs\/workflow\.md$)/i.test(file);
+}
+function gitModificationBody(f: GitPolicyFacts, body: readonly string[]): boolean {
+  const oid = (v: unknown) => typeof v === "string" && gitOid({ objectFormat: f.objectFormat, hex: v }, f.objectFormat);
+  const same = (...expected: string[]) => JSON.stringify(body) === JSON.stringify(expected);
+  if (same("hash-object", "-w", "--stdin", "--no-filters") || same("mktree", "-z")) return !f.template.startsWith("publish-") && f.template !== "init";
+  if (body[0] === "cat-file") return body.length === 3 && body[1] === "commit" && oid(body[2]);
+  if (body[0] === "ls-tree") return body.length === 5 && body[1] === "-r" && body[2] === "-z" && body[3] === "--full-tree" && oid(body[4]);
+  if (body[0] === "rev-parse") return body.length === 4 && body[1] === "--verify" && body[2] === "--quiet" && body[3] === f.ref;
+  if (body[0] === "commit-tree") {
+    if (f.template.startsWith("publish-") || f.template === "init" || !oid(body[1]) || body.at(-2) !== "-F" || body.at(-1) !== "-") return false;
+    const parents = body.slice(2, -2);
+    return parents.length % 2 === 0 && parents.every((value, i) => i % 2 === 0 ? value === "-p" : oid(value))
+      && (f.base === null ? parents.length === 0 : parents[1]?.toLowerCase() === f.base?.hex.toLowerCase());
+  }
+  if (body[0] === "update-ref") return body.length === 5 && body[1] === "--no-deref" && body[2] === f.ref && oid(body[3])
+    && typeof body[4] === "string" && (oid(body[4]) || /^0{40}$|^0{64}$/.test(body[4]))
+    && (!f.template.startsWith("publish-") || (body[3]?.toLowerCase() === f.candidate?.hex.toLowerCase()
+      && body[4]?.toLowerCase() === (f.base?.hex.toLowerCase() ?? "0".repeat(f.objectFormat === "sha1" ? 40 : 64))));
+  if (body[0] === "merge-tree") return f.template === "integrate" && body.length === 5 && body[1] === "--write-tree"
+    && body[2] === "--no-messages" && oid(body[3]) && oid(body[4]);
+  if (body[0] === "revert") return f.template === "revert" && (f.mainline === undefined ? body.length === 3 && body[1] === "--no-commit" && oid(body[2])
+    : Number.isSafeInteger(f.mainline) && f.mainline > 0 && body.length === 5 && body[1] === "--no-commit" && body[2] === "-m" && body[3] === String(f.mainline) && oid(body[4]));
+  if (body[0] === "init") return f.template === "init" && f.base === null && f.candidate === null
+    && gitText(f.approvedInitRoot) && gitText(f.ownedTemplateDir)
+    && same("init", `--template=${f.ownedTemplateDir}`, `--object-format=${f.objectFormat}`, "--initial-branch=ans-unpublished", "--", f.approvedInitRoot);
+  return false;
+}
+
+function initialGitPolicyError(f: GitPolicyFacts): string | undefined {
+  const b = f.initializationBasis, w = f.worksite;
+  const exactKeys = (value: object, keys: string[]) => JSON.stringify(Object.keys(value).sort()) === JSON.stringify(keys.sort());
+  const digest = (v: unknown) => typeof v === "string" && /^[a-f0-9]{64}$/i.test(v);
+  const canonicalRoot = (root: unknown): root is string => {
+    if (!gitText(root)) return false;
+    const value = root.replace(/\\/g, "/");
+    if (!/^(?:[A-Za-z]:\/|\/)/.test(value) || value === "/" || /^[A-Za-z]:\/$/.test(value)) return false;
+    return !value.replace(/^(?:[A-Za-z]:\/|\/)/, "").split("/").some(p => !p || p === "." || p === ".." || /[\x00-\x1f]/.test(p));
+  };
+  if (f.actorRoleId !== "convener" || !gitText(f.taskId) || !["init", "commit"].includes(f.template)
+      || !b || b.kind !== "uninitialized-root" || !exactKeys(b, ["kind", "projectRoot", "qualificationDigest", "operationId", "requestDigest", "sourceId", "sourceSha256"])
+      || !canonicalRoot(b.projectRoot) || b.operationId !== f.operationId || f.operationId.length > 200
+      || !digest(b.qualificationDigest) || !digest(b.requestDigest) || !digest(b.sourceSha256) || !gitText(b.sourceId))
+    return "git-policy-initialization-basis";
+  if (!w || !exactKeys(w, ["kind", "index", "checkout"]) || w.kind !== "raw-object-plumbing" || w.index !== "not-used" || w.checkout !== "not-used"
+      || [f.ownedWorktreeId, f.currentWorktreeId, f.ownedIndexId, f.currentIndexId].some(v => v !== undefined)) return "git-policy-initialization-worksite";
+  if (f.base !== null || f.paths.length || f.writePaths.length || !f.allDiff?.complete || f.allDiff.base !== null
+      || !Array.isArray(f.allDiff.entries) || f.allDiff.entries.length || !sameGitOid(f.candidate, f.allDiff.candidate)
+      || f.target !== undefined || f.other !== undefined || f.publicationRef !== undefined || f.integrationGrants !== undefined
+      || f.d3SelectedRoleIds !== undefined || f.mainline !== undefined) return "git-policy-initialization-empty-diff";
+  const allocated = `refs/ans/candidates/${createHash("sha256").update(f.operationId).digest("hex")}`;
+  if (f.ref !== allocated || f.ownedCandidateRef !== allocated) return "git-policy-initialization-ref";
+  if (!Array.isArray(f.commands) || !f.commands.length || JSON.stringify(f.argv) !== JSON.stringify(f.commands[0])) return "git-policy-initialization-plan";
+  if (f.approvedInitRoot !== undefined && f.approvedInitRoot !== b.projectRoot) return "git-policy-initialization-root";
+  const template = `${b.projectRoot.replace(/\\/g, "/")}/.ans/git-empty-template`;
+  if (f.ownedTemplateDir !== undefined && f.ownedTemplateDir.replace(/\\/g, "/") !== template) return "git-policy-initialization-root";
+  let expected: readonly (readonly string[])[];
+  if (f.template === "init") {
+    if (f.candidate !== null || f.allDiff.candidate !== null || f.approvedInitRoot !== b.projectRoot || !gitText(f.ownedTemplateDir)) return "git-policy-initialization-root";
+    expected = [["init", `--template=${f.ownedTemplateDir}`, `--object-format=${f.objectFormat}`, "--initial-branch=ans-unpublished", "--", b.projectRoot]];
+  } else {
+    if (!gitOid(f.candidate, f.objectFormat)) return "git-policy-initialization-candidate";
+    const tree = createHash(f.objectFormat).update(Buffer.from("tree 0\0")).digest("hex");
+    expected = [["mktree", "-z"], ["commit-tree", tree, "-F", "-"], ["cat-file", "commit", f.candidate.hex],
+      ["update-ref", "--no-deref", allocated, f.candidate.hex, "0".repeat(f.objectFormat === "sha1" ? 40 : 64)]];
+  }
+  const actual = f.commands.map(argv => gitBody(argv));
+  return JSON.stringify(actual) === JSON.stringify(expected) ? undefined : "git-policy-initialization-plan";
+}
+
+type PolicyObject = Record<string, unknown>;
+const policyObject = (value: unknown): value is PolicyObject => value !== null && typeof value === "object" && !Array.isArray(value);
+const policySha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
+const policyEqual = (a: unknown, b: unknown) => JSON.stringify(gitCanonical(a)) === JSON.stringify(gitCanonical(b));
+function policyRequire(condition: unknown, code: string): asserts condition { if (!condition) throw new Error(code); }
+function policyBytes(value: string): Buffer {
+  const bytes = Buffer.from(value, "base64"); policyRequire(bytes.toString("base64") === value, "git-policy-raw-base64"); return bytes;
+}
+function policyGitObject(format: "sha1" | "sha256", kind: string, bytes: Buffer): GitOid {
+  return { objectFormat: format, hex: createHash(format).update(Buffer.from(`${kind} ${bytes.length}\0`)).update(bytes).digest("hex") };
+}
+/** First stable workflow publication; the source was captured by the host before its written/consumed result. */
+function initialWorkflowMetadataPaths(f: GitPolicyFacts, pub: GitInitialWorkflowPublication, bytes: Map<string, Buffer>, before: Map<string, { path: string; mode: "100644" | "100755"; oid: GitOid }>): Set<string> {
+  const check: typeof policyRequire = policyRequire, canonical = (value: unknown) => JSON.stringify(gitCanonical(value));
+  const decode = (content: Buffer): unknown => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(content));
+  const object = (content: Buffer): PolicyObject => { const value = decode(content); check(policyObject(value), "git-policy-workflow-json"); return value; };
+  const json = (path: string) => { const content = bytes.get(path); check(content, "git-policy-workflow-file-missing"); return object(content); };
+  const source = pub.source, record = pub.record, permit = pub.permit, journal = f.businessJournal;
+  check(pub.actorRoleId === "convener" && f.actorRoleId === "convener" && pub.operationId === f.operationId && f.base !== null
+    && source && source.schema === "stable-initial-workflow-source/v1" && source.kind === "stable-initial-workflow"
+    && source.operationId === f.operationId && source.flowId === pub.flowId && source.taskId === f.taskId && source.runId === f.runId
+    && [source.flowId, source.taskId, source.runId, source.coreSessionId, source.requestId, source.permitId].every(gitText)
+    && (source.coreTurnId === undefined || gitText(source.coreTurnId)) && source.roleId === "convener" && source.path === "docs/workflow.md"
+    && source.baseSha256 === "" && /^[a-f0-9]{64}$/.test(source.targetSha256)
+    && policyEqual(source.documentSnapshot, pub.documentSnapshot)
+    && f.operationId === `initial-workflow-${policySha(JSON.stringify([pub.flowId, source.requestId, source.permitId]))}`, "git-policy-workflow-source");
+  const authority = source.authority;
+  check(policyObject(authority) && (gitText(authority.decisionId) || gitText(authority.confirmationId))
+    && Object.keys(authority).every(key => ["decisionId", "confirmationId"].includes(key))
+    && [authority.decisionId, authority.confirmationId].every(value => value === undefined || gitText(value)), "git-policy-workflow-authority");
+  check(policyEqual(source, { schema: source.schema, kind: source.kind, operationId: source.operationId, flowId: source.flowId, taskId: source.taskId, runId: source.runId,
+    coreSessionId: source.coreSessionId, ...(source.coreTurnId === undefined ? {} : { coreTurnId: source.coreTurnId }), roleId: "convener", requestId: source.requestId, permitId: source.permitId,
+    path: "docs/workflow.md", baseSha256: "", targetSha256: source.targetSha256, authority, documentCommit: source.documentCommit, documentSnapshot: source.documentSnapshot }), "git-policy-workflow-source-fields");
+  for (const item of [record, permit]) check(item && item.v === 1 && item.schema === "stable-write/v1" && item.requestId === source.requestId && item.permitId === source.permitId
+    && item.roleId === "convener" && item.path === source.path && item.kind === "workflow" && item.baseSha256 === "" && item.targetSha256 === source.targetSha256, "git-policy-workflow-write-binding");
+  check(record.status === "written" && permit.status === "consumed" && policyEqual(permit.authority, authority)
+    && record.decisionId === authority.decisionId && record.confirmationId === authority.confirmationId
+    && record.approvedAt === permit.approvedAt && record.expiresAt === permit.expiresAt && record.consumedAt === permit.consumedAt, "git-policy-workflow-consumption");
+  const time = (value: unknown) => typeof value === "string" ? Date.parse(value) : NaN;
+  const approved = time(permit.approvedAt), issued = time(permit.issuedAt), consumed = time(permit.consumedAt), written = time(record.writtenAt), expires = time(permit.expiresAt);
+  check([approved, issued, consumed, written, expires, time(record.at)].every(Number.isFinite)
+    && time(record.at) <= approved && approved <= issued && issued <= consumed && approved <= written && written <= consumed && consumed <= expires, "git-policy-workflow-write-times");
+  const manifestPath = ".ans/trunk/manifest.json", manifest = json(manifestPath);
+  check(f.businessBaseManifestBytesBase64, "git-policy-workflow-base-missing");
+  const oldBytes = policyBytes(f.businessBaseManifestBytesBase64), previous = object(oldBytes);
+  check(before.get(manifestPath)?.mode === "100644" && sameGitOid(before.get(manifestPath)?.oid, policyGitObject(f.objectFormat, "blob", oldBytes))
+    && previous.schema === "trunk/v1" && previous.flowId === pub.flowId && previous.runId === null && policyObject(previous.artifacts)
+    && previous.artifacts.workflow === undefined && !before.has(source.path)
+    && policyEqual(source.documentCommit, { version: previous.trunkVersion, digest: previous.digest }) && policyEqual(previous.snapshotRef, pub.documentSnapshot), "git-policy-workflow-initial-basis");
+  check(journal && journal.actionSource === undefined && journal.v === 1 && journal.schema === "trunk-apply-journal/v1"
+    && journal.operationId === f.operationId && journal.flowId === pub.flowId && journal.applicationId === `stable:${source.requestId}` && journal.journalId === `j-${f.operationId}`
+    && policyEqual(journal.beforeSnapshot, pub.documentSnapshot) && policyEqual(journal.targetSnapshot, pub.snapshot) && typeof journal.message === "string", "git-policy-workflow-journal");
+  const metadata = object(Buffer.from(journal.message)), input = metadata.input;
+  const sourcePath = `.ans/trunk/operations/${policySha(f.operationId)}/stable-source.json`, sourceBytes = Buffer.from(canonical(source));
+  const sourceFile = { path: sourcePath, sha256: policySha(sourceBytes) };
+  check(policyObject(input) && input.kind === "workflow" && input.roleId === "convener" && input.path === source.path && input.oldSha === "" && input.newSha === source.targetSha256
+    && input.decisionId === authority.decisionId && input.confirmationId === authority.confirmationId && Number.isFinite(time(input.at))
+    && Object.keys(input).every(key => ["kind", "roleId", "path", "oldSha", "newSha", "decisionId", "confirmationId", "at"].includes(key))
+    && journal.message === canonical({ schema: "stable-initial-workflow/v1", source, sourceFile, record, permit, input }), "git-policy-workflow-source-metadata");
+  check(bytes.get(sourcePath)?.equals(sourceBytes), "git-policy-workflow-source-bytes");
+  const workflow = { kind: "workflow", path: source.path, sha256: source.targetSha256, updatedAt: input.at, ...authority };
+  check(policyEqual(manifest, { ...previous, snapshotRef: pub.snapshot, updatedAt: input.at, artifacts: { ...previous.artifacts, workflow } })
+    && policyEqual(previous.artifacts.documents, pub.documents) && policyEqual(previous.artifacts.execution, pub.execution), "git-policy-workflow-unrelated-metadata");
+  check(policyEqual(journal.target, { ...journal.before, workflow: { path: source.path, sha256: source.targetSha256 } })
+    && journal.before.workflow === undefined && journal.before.trunkVersion === previous.trunkVersion && journal.before.runId === previous.runId
+    && policyEqual(journal.before.execution, pub.execution) && journal.startedAt === input.at && journal.updatedAt === input.at, "git-policy-workflow-journal-target");
+  check(policyEqual(journal.before.documents, Object.fromEntries(Object.entries(pub.documents).map(([kind, ref]) => {
+    check(policyObject(ref), "git-policy-workflow-document-ref"); return [kind, { path: ref.path, sha256: ref.sha256 }];
+  }))), "git-policy-workflow-journal-documents");
+  const { phase: _phase, updatedAt: _updated, result: _result, ...binding } = journal;
+  check(f.manifestSha256 === policySha(bytes.get(manifestPath)!) && f.journalDigest === policySha(canonical(binding))
+    && f.rawObjectPlan?.input.timestamp === input.at && f.rawObjectPlan.input.message === `ANS trunk ${previous.trunkVersion} ${previous.digest}`, "git-policy-workflow-binding");
+  check(Array.isArray(f.appGeneratedFiles) && f.appGeneratedFiles.length === bytes.size, "git-policy-workflow-files-incomplete");
+  const table = new Map<string, GitAppGeneratedFile>();
+  for (const row of f.appGeneratedFiles) {
+    const content = bytes.get(row.path); check(content && !table.has(row.path) && row.sha256 === policySha(content)
+      && sameGitOid(row.oid, policyGitObject(f.objectFormat, "blob", content)), "git-policy-workflow-file-hash"); table.set(row.path, row);
+  }
+  const recordsPath = ".ans/state/stable-writes.json", permitsPath = ".ans/state/stable-write-permits.json";
+  const records = decode(bytes.get(recordsPath)!), permits = decode(bytes.get(permitsPath)!);
+  check(Array.isArray(records) && Array.isArray(permits) && records.length <= 2048 && permits.length <= 2048
+    && records.filter(row => policyObject(row) && row.requestId === source.requestId).length === 1
+    && permits.filter(row => policyObject(row) && row.permitId === source.permitId).length === 1
+    && policyEqual(records.find(row => policyObject(row) && row.requestId === source.requestId), record)
+    && policyEqual(permits.find(row => policyObject(row) && row.permitId === source.permitId), permit), "git-policy-workflow-permit-table");
+  const refs = new Map([[pub.snapshot.snapshotId, pub.snapshot.digest]]);
+  for (const collection of [previous.activeRoles, previous.frozenRoles]) if (collection !== undefined) {
+    check(policyObject(collection), "git-policy-workflow-role-collection"); for (const item of Object.values(collection)) {
+      check(isActiveRoleEvidence(item), "git-policy-workflow-role-evidence"); const digest = refs.get(item.snapshotRef.snapshotId);
+      check(digest === undefined || digest === item.snapshotRef.digest, "git-policy-workflow-snapshot-conflict"); refs.set(item.snapshotRef.snapshotId, item.snapshotRef.digest);
+    }
+  }
+  const snapshots = new Map<string, CompleteSnapshot>(), allowed = new Set([manifestPath, source.path, recordsPath, permitsPath, sourcePath]);
+  for (const row of table.values()) if (row.kind === "complete-snapshot") {
+    const snapshot = json(row.path); check(isCompleteSnapshot(snapshot) && row.path === `.ans/trunk/snapshots/${snapshot.snapshotId}.json`
+      && refs.get(snapshot.snapshotId) === snapshot.digest, "git-policy-workflow-snapshot-ref");
+    snapshotDocumentText(snapshot, snapshot.files[0]!.path); snapshots.set(snapshot.snapshotId, snapshot); allowed.add(row.path);
+    if (snapshot.snapshotId !== pub.snapshot.snapshotId) check(sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-workflow-old-snapshot-change");
+  }
+  const primary = snapshots.get(pub.snapshot.snapshotId); check(primary && snapshots.size === refs.size, "git-policy-workflow-snapshot-missing");
+  const additions = new Set([source.path, recordsPath, permitsPath, sourcePath]), original = primary.files.filter(file => !additions.has(file.path));
+  check(primary.files.filter(file => additions.has(file.path)).length === 4
+    && policySha(JSON.stringify([...original].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map(file => [file.path, file.sha256.toLowerCase(), file.bytesBase64]))) === pub.documentSnapshot.digest,
+  "git-policy-workflow-original-snapshot");
+  const workflowBytes = bytes.get(source.path); check(workflowBytes && policySha(workflowBytes) === source.targetSha256
+    && new TextDecoder("utf-8", { fatal: true }).decode(workflowBytes).trim().length > 0, "git-policy-workflow-content-hash");
+  const identity = policySha(JSON.stringify([previous.snapshotRef, source.requestId, source.targetSha256, table.get(recordsPath)?.sha256, table.get(permitsPath)?.sha256]));
+  check(primary.snapshotId === `s-initial-workflow-${identity}` && primary.createdAt === input.at, "git-policy-workflow-snapshot-identity");
+  const materialized = new Map(primary.files.map(file => [file.path, policyBytes(file.bytesBase64)]));
+  for (const [id] of snapshots) materialized.set(`.ans/trunk/snapshots/${id}.json`, bytes.get(`.ans/trunk/snapshots/${id}.json`)!);
+  materialized.set(manifestPath, bytes.get(manifestPath)!);
+  const archive = `.ans/trunk/history/manifest-v${previous.trunkVersion}.json`;
+  if (!before.has(archive)) { check(bytes.get(archive)?.equals(oldBytes), "git-policy-workflow-history-bytes"); materialized.set(archive, oldBytes); allowed.add(archive); }
+  check(materialized.size === bytes.size && [...materialized].every(([path, content]) => bytes.get(path)?.equals(content)), "git-policy-workflow-materialized-files");
+  for (const row of table.values()) {
+    const kind = row.path === manifestPath ? "manifest" : snapshots.has(row.path.slice(".ans/trunk/snapshots/".length, -5)) && row.path.startsWith(".ans/trunk/snapshots/") ? "complete-snapshot"
+      : row.path === archive ? "history" : row.path.startsWith(".ans/") ? "frozen-application-evidence" : "snapshot-content";
+    check(row.kind === kind, "git-policy-workflow-file-kind");
+    if (!allowed.has(row.path)) check(before.get(row.path)?.mode === "100644" && sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-workflow-unrelated-bytes");
+  }
+  return allowed;
+}
+/** Activation changes only one independent role pointer. Ordinary data is not host authorization or an I/O capability. */
+function activationMetadataPaths(f: GitPolicyFacts, pub: GitRoleActivationPublication, bytes: Map<string, Buffer>, before: Map<string, { path: string; mode: "100644" | "100755"; oid: GitOid }>): Set<string> {
+  const check: typeof policyRequire = policyRequire, canonical = (value: unknown) => JSON.stringify(gitCanonical(value));
+  const parse = (content: Buffer): PolicyObject => { const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(content)); check(policyObject(value), "git-policy-active-json"); return value; };
+  const json = (path: string) => { const content = bytes.get(path); check(content, "git-policy-active-file-missing"); return parse(content); };
+  check(pub.actorRoleId === "nominator" && f.actorRoleId === "nominator" && pub.action === "activate-role-documents"
+    && pub.operationId === f.operationId && gitText(pub.flowId) && gitText(pub.targetRoleId) && !/[\\/]/.test(pub.targetRoleId)
+    && f.base !== null && f.businessBaseManifestBytesBase64 && isActiveRoleEvidence(pub.evidence) && pub.evidence.roleId === pub.targetRoleId
+    && !("runId" in pub.evidence) && !("pinDigest" in pub.evidence) && policyEqual(pub.evidence.snapshotRef, pub.snapshot), "git-policy-active-source");
+  const evidence = pub.evidence, manifestPath = ".ans/trunk/manifest.json", manifest = json(manifestPath);
+  const baseBytes = policyBytes(f.businessBaseManifestBytesBase64), previous = parse(baseBytes);
+  check(before.get(manifestPath)?.mode === "100644" && sameGitOid(before.get(manifestPath)?.oid, policyGitObject(f.objectFormat, "blob", baseBytes)), "git-policy-active-base");
+  const stripActive = (value: PolicyObject) => { const { activeRoles: _roles, activeRevision: _revision, activeDigest: _digest, ...document } = value; return document; };
+  check(manifest.schema === "trunk/v1" && manifest.flowId === pub.flowId && policyEqual(stripActive(manifest), stripActive(previous))
+    && policyEqual(manifest.snapshotRef, pub.documentSnapshot) && policyObject(manifest.artifacts)
+    && policyEqual(manifest.artifacts.documents, pub.documents) && policyEqual(manifest.artifacts.execution, pub.execution), "git-policy-active-document-change");
+  const oldRoles = previous.activeRoles ?? {}; check(policyObject(oldRoles), "git-policy-active-old-roles");
+  const unchanged = policyEqual(oldRoles[pub.targetRoleId], evidence);
+  check(policyEqual(pub.expectedActive, { revision: previous.activeRevision ?? 0, digest: previous.activeDigest ?? null })
+    && Number.isSafeInteger(pub.expectedActive.revision) && pub.expectedActive.revision >= 0
+    && pub.targetActive.revision === pub.expectedActive.revision + (unchanged ? 0 : 1)
+    && policyEqual(pub.targetActive.roles, { ...oldRoles, [pub.targetRoleId]: evidence })
+    && pub.targetActive.digest === policySha(canonical(pub.targetActive.roles))
+    && manifest.activeRevision === pub.targetActive.revision && manifest.activeDigest === pub.targetActive.digest
+    && policyEqual(manifest.activeRoles, pub.targetActive.roles), "git-policy-active-target");
+  const journal = f.businessJournal, source = journal?.actionSource;
+  const opHash = policySha(canonical(f.operationId)), identityHash = policySha(canonical([pub.flowId, f.operationId]));
+  check(journal && isDirectActionSource(source) && source.kind === "role-direct" && source.actorRoleId === "nominator"
+    && source.action === "activate-role-documents" && source.operationId === f.operationId && source.applicationId === pub.applicationId
+    && pub.applicationId === `activation-${identityHash}` && source.journalId === `j-activation-${opHash.slice(0, 24)}`
+    && source.baseDigest === pub.expectedActive.digest && source.targetDigest === pub.targetActive.digest
+    && journal.operationId === f.operationId && journal.applicationId === pub.applicationId && journal.journalId === source.journalId
+    && journal.flowId === pub.flowId && policyEqual(journal.targetSnapshot, pub.snapshot) && policyEqual(journal.beforeSnapshot, pub.documentSnapshot)
+    && policyEqual(journal.target, journal.before) && journal.target.trunkVersion === manifest.trunkVersion && journal.target.runId === manifest.runId
+    && policyEqual(journal.target.execution, pub.execution) && typeof journal.message === "string", "git-policy-active-journal");
+  check(policyEqual(journal.target.documents, Object.fromEntries(Object.entries(pub.documents).map(([kind, ref]) => {
+    check(policyObject(ref), "git-policy-active-document-ref"); return [kind, { path: ref.path, sha256: ref.sha256 }];
+  }))), "git-policy-active-journal-documents");
+  const { phase: _phase, updatedAt: _updated, result: _result, ...binding } = journal;
+  check(f.journalDigest === policySha(canonical(binding)) && f.manifestSha256 === policySha(bytes.get(manifestPath)!)
+    && f.rawObjectPlan?.input.timestamp === manifest.updatedAt && f.rawObjectPlan?.input.message === `ANS trunk ${manifest.trunkVersion} ${manifest.digest}`, "git-policy-active-binding");
+  check(Array.isArray(f.appGeneratedFiles) && f.appGeneratedFiles.length === bytes.size, "git-policy-active-files-incomplete");
+  const table = new Map<string, GitAppGeneratedFile>();
+  for (const row of f.appGeneratedFiles) {
+    const content = bytes.get(row.path); check(content && !table.has(row.path) && row.sha256 === policySha(content)
+      && sameGitOid(row.oid, policyGitObject(f.objectFormat, "blob", content)), "git-policy-active-file-hash"); table.set(row.path, row);
+  }
+  check(table.get(manifestPath)?.kind === "manifest", "git-policy-active-manifest-kind");
+  const refs = new Map([[pub.documentSnapshot.snapshotId, pub.documentSnapshot.digest]]);
+  for (const collection of [manifest.activeRoles, manifest.frozenRoles]) if (collection !== undefined) {
+    check(policyObject(collection), "git-policy-active-collection");
+    for (const item of Object.values(collection)) {
+      check(isActiveRoleEvidence(item), "git-policy-active-evidence-shape"); const old = refs.get(item.snapshotRef.snapshotId);
+      check(old === undefined || old === item.snapshotRef.digest, "git-policy-active-snapshot-conflict"); refs.set(item.snapshotRef.snapshotId, item.snapshotRef.digest);
+    }
+  }
+  const snapshots = new Map<string, CompleteSnapshot>(), allowed = new Set([manifestPath]);
+  for (const row of table.values()) if (row.kind === "complete-snapshot") {
+    const snapshot = json(row.path); check(isCompleteSnapshot(snapshot) && refs.get(snapshot.snapshotId) === snapshot.digest
+      && row.path === `.ans/trunk/snapshots/${snapshot.snapshotId}.json`, "git-policy-active-snapshot-ref");
+    snapshotDocumentText(snapshot, snapshot.files[0]!.path); snapshots.set(snapshot.snapshotId, snapshot); allowed.add(row.path);
+    if (snapshot.snapshotId !== pub.snapshot.snapshotId || unchanged) check(sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-active-old-snapshot-change");
+  }
+  check(snapshots.size === refs.size, "git-policy-active-snapshot-missing");
+  const snapshot = snapshots.get(pub.snapshot.snapshotId), document = snapshots.get(pub.documentSnapshot.snapshotId);
+  check(snapshot && document && snapshot.files.length === FROZEN_ROLE_REF_KEYS.length
+    && new Set(FROZEN_ROLE_REF_KEYS.map(key => evidence[key].path)).size === FROZEN_ROLE_REF_KEYS.length, "git-policy-active-eight-refs");
+  for (const key of FROZEN_ROLE_REF_KEYS) {
+    const ref = evidence[key], file = snapshot.files.find(file => file.path === ref.path && file.sha256 === ref.sha256);
+    check(file && table.get(ref.path)?.sha256 === ref.sha256 && bytes.get(ref.path)?.equals(policyBytes(file.bytesBase64)), "git-policy-active-ref-bytes");
+  }
+  const projectRef = (ref: { path: string; sha256: string }) => ({ path: ref.path, sha256: ref.sha256 });
+  const currentRoster = pub.documents.roster, currentModules = pub.documents.modules;
+  check(policyObject(currentRoster) && policyObject(currentModules)
+    && policyEqual(projectRef(evidence.rosterRef), { path: currentRoster.path, sha256: currentRoster.sha256 })
+    && policyEqual(projectRef(evidence.planRef), pub.execution.teamPlan), "git-policy-active-plan-roster");
+  for (const ref of [evidence.rosterRef, evidence.planRef]) check(document.files.some(file => file.path === ref.path && file.sha256 === ref.sha256), "git-policy-active-document-evidence");
+  const frontmatter = (path: string): PolicyObject => {
+    const text = snapshotDocumentText(snapshot, path), match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+    check(match, "git-policy-active-frontmatter"); const value: unknown = parseYaml(match[1]!); check(policyObject(value), "git-policy-active-frontmatter"); return value;
+  };
+  const roster = frontmatter(evidence.rosterRef.path), plan = frontmatter(evidence.planRef.path);
+  check(roster.schema === "project-roster/v3" && roster.flowId === pub.flowId && Array.isArray(roster.roles) && Array.isArray(roster.modules)
+    && plan.schema === "teamPlanSchema:3" && plan.flowId === pub.flowId && Array.isArray(plan.roleRows)
+    && policyEqual(plan.roster, projectRef(evidence.rosterRef)) && policyEqual(plan.modules, { path: currentModules.path, sha256: currentModules.sha256 }), "git-policy-active-planning-shape");
+  const rosterRoles = roster.roles;
+  const selected = rosterRoles.filter((role: unknown) => policyObject(role) && role.id === pub.targetRoleId), rows = plan.roleRows.filter((row: unknown) => policyObject(row) && row.roleId === pub.targetRoleId);
+  check(selected.length === 1 && rows.length === 1 && policyObject(selected[0]) && Array.isArray(selected[0].modules)
+    && policyObject(rows[0]) && policyEqual(rows[0].modules, selected[0].modules) && Array.isArray(rows[0].writesets) && rows[0].writesets.length > 0, "git-policy-active-plan-role");
+  const writesets: string[] = rows[0].writesets; check(writesets.every(path => typeof path === "string" && gitPath(path.replace(/\/$/, ""))), "git-policy-active-writesets");
+  const scopes: { path: string; kind: "file" | "directory" }[] = [];
+  for (const moduleId of selected[0].modules) {
+    const modules = roster.modules.filter((module: unknown) => policyObject(module) && module.id === moduleId);
+    check(modules.length === 1 && policyObject(modules[0]) && roster.roles.filter((role: unknown) => policyObject(role) && Array.isArray(role.modules) && role.modules.includes(moduleId)).length === 1, "git-policy-active-module-owner");
+    const rawPaths: unknown = modules[0].paths ?? modules[0].path, paths: unknown[] = Array.isArray(rawPaths) ? rawPaths : [rawPaths];
+    check(paths.length > 0, "git-policy-active-module-path");
+    for (const raw of paths) { check(typeof raw === "string", "git-policy-active-module-path"); const path = raw.trim().replace(/\\/g, "/");
+      check(gitPath(path.replace(/\/$/, "")), "git-policy-active-module-path"); scopes.push({ path, kind: path.endsWith("/") ? "directory" : "file" }); }
+  }
+  const role = { roleId: pub.targetRoleId, cardPath: evidence.cardRef.path, boundaryMdPath: evidence.boundaryMdRef.path, boundaryYamlPath: evidence.boundaryYamlRef.path, allowedPaths: scopes };
+  check(validateRoleDocumentsSnapshot({ snapshot, roles: [role] }).ok, "git-policy-active-role-documents");
+  const parsedRole = parseSnapshotRoleDocuments(snapshot, role);
+  check(writesets.every(write => parsedRole.entries.some(entry => entry.root === "project" && entry.kind !== "conditional-directory"
+    && (entry.kind === "file" ? write === entry.path : gitCovered(write, [entry.path.endsWith("/") ? entry.path : `${entry.path}/`])))), "git-policy-active-boundary-writesets");
+  const d3 = json(evidence.d3Ref.path); check(typeof d3.createdBytesBase64 === "string" && typeof d3.resolvedBytesBase64 === "string", "git-policy-active-d3-bytes");
+  const created = parse(policyBytes(d3.createdBytesBase64)), resolved = parse(policyBytes(d3.resolvedBytesBase64));
+  check(created.v === 1 && created.kind === "request.created" && created.flowId === pub.flowId && created.cardKind === "appointment" && created.sourceRoleId === "nominator"
+    && gitText(created.requestId) && resolved.v === 1 && resolved.kind === "request.resolved" && resolved.cardKind === "appointment" && resolved.requestId === created.requestId
+    && (resolved.flowId === undefined || resolved.flowId === pub.flowId) && ["customer", "chief-delegated"].includes(String(resolved.by))
+    && Array.isArray(resolved.targetRoleIds) && resolved.targetRoleIds.includes(pub.targetRoleId)
+    && resolved.targetRoleIds.every(id => rosterRoles.some((role: unknown) => policyObject(role) && role.id === id))
+    && resolved.rosterVersion === roster.version && resolved.rosterSha256 === evidence.rosterRef.sha256
+    && evidence.d3Ref.path === `.ans/role-evidence/d3-${policySha(canonical(created.requestId))}.json`, "git-policy-active-d3-selection");
+  if (resolved.by === "chief-delegated") check(isDirectActionSource(resolved.actionSource) && resolved.actionSource.kind === "chief-delegated"
+    && resolved.actionSource.requestId === created.requestId && resolved.actionSource.originRoleId === "nominator" && resolved.actionSource.disposition === "select"
+    && policyEqual(resolved.actionSource.selected, resolved.targetRoleIds) && resolved.decisionId === undefined, "git-policy-active-delegated-d3");
+  else check(gitText(resolved.decisionId) && (resolved.actionSource === undefined || (isDirectActionSource(resolved.actionSource)
+    && resolved.actionSource.kind === "customer-decision" && resolved.actionSource.decisionId === resolved.decisionId)), "git-policy-active-customer-d3");
+  const activation = json(evidence.activationRef.path), input = activation.input, authorization = json(evidence.authorizationRef.path);
+  check(activation.schema === "role-activation/v1" && activation.actorRoleId === "nominator" && policyObject(input) && input.flowId === pub.flowId
+    && input.targetRoleId === pub.targetRoleId && gitText(input.operationId) && (unchanged || input.operationId === f.operationId)
+    && input.d3DecisionId === (resolved.by === "customer" ? resolved.decisionId : resolved.requestId) && policyObject(input.documents)
+    && policyEqual(input.documents, { card: projectRef(evidence.cardRef), boundaryMd: projectRef(evidence.boundaryMdRef), boundaryYaml: projectRef(evidence.boundaryYamlRef) })
+    && policyObject(input.planRef) && policyObject(input.rosterRef) && gitText(input.planRef.snapshotId) && input.planRef.snapshotId === input.rosterRef.snapshotId
+    && policyEqual(projectRef(input.planRef as { path: string; sha256: string }), projectRef(evidence.planRef))
+    && policyEqual(projectRef(input.rosterRef as { path: string; sha256: string }), projectRef(evidence.rosterRef))
+    && evidence.activationRef.path === `.ans/role-evidence/activation-${policySha(canonical(input.operationId))}.json`, "git-policy-active-input");
+  const expectedAuthorization = { schema: "role-authorization/v1", flowId: pub.flowId, roleId: pub.targetRoleId, plan: projectRef(evidence.planRef), roster: projectRef(evidence.rosterRef),
+    d3RequestId: created.requestId, d3Source: resolved.by, ...(resolved.actionSource ? { actionSource: resolved.actionSource } : { decisionId: resolved.decisionId }), writesets };
+  check(evidence.authorizationRef.path === `.ans/role-evidence/authorization-${pub.targetRoleId}.json` && policyEqual(authorization, expectedAuthorization), "git-policy-active-authorization");
+  const metadata = parse(Buffer.from(journal.message));
+  check(policyEqual(metadata.evidence, evidence) && policyEqual(metadata.expectedActive, pub.expectedActive)
+    && policyEqual(metadata.targetActive, { revision: pub.targetActive.revision, digest: pub.targetActive.digest }) && metadata.noOp === unchanged
+    && policyEqual(metadata.expectedTrunk, { version: manifest.trunkVersion, digest: manifest.digest }) && policyEqual(metadata.role, role) && policyEqual(metadata.writesets, writesets)
+    && policyEqual(metadata.input, { ...input, operationId: f.operationId }), "git-policy-active-prepared-metadata");
+  const targetPaths = new Set([evidence.cardRef.path, evidence.boundaryMdRef.path, evidence.boundaryYamlRef.path, evidence.d3Ref.path, evidence.activationRef.path, evidence.authorizationRef.path]);
+  for (const row of table.values()) {
+    check(row.kind !== "history" && !row.path.startsWith(".ans/trunk/history/"), "git-policy-active-history");
+    if (row.kind === "manifest" || row.kind === "complete-snapshot") continue;
+    if (targetPaths.has(row.path)) { check(row.kind === (row.path.startsWith("角色卡/") ? "snapshot-content" : "frozen-application-evidence"), "git-policy-active-target-kind"); allowed.add(row.path); }
+    else check(before.get(row.path)?.mode === "100644" && sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-active-unrelated-bytes");
+  }
+  // Immutable snapshots retain their full bytes. Physical aliases follow the real active-only materializer:
+  // document files plus six refs per active role; frozen historical plan/roster aliases are not rewritten.
+  const materialized = new Map(document.files.map(file => [file.path, policyBytes(file.bytesBase64)]));
+  for (const [id] of snapshots) materialized.set(`.ans/trunk/snapshots/${id}.json`, bytes.get(`.ans/trunk/snapshots/${id}.json`)!);
+  materialized.set(manifestPath, bytes.get(manifestPath)!);
+  for (const active of Object.values(pub.targetActive.roles)) {
+    const stored = snapshots.get(active.snapshotRef.snapshotId); check(stored, "git-policy-active-materialized-snapshot");
+    for (const key of ["cardRef", "boundaryMdRef", "boundaryYamlRef", "d3Ref", "activationRef", "authorizationRef"] as const) {
+      const ref = active[key], file = stored.files.find(file => file.path === ref.path && file.sha256 === ref.sha256);
+      check(file, "git-policy-active-materialized-ref"); materialized.set(ref.path, policyBytes(file.bytesBase64));
+    }
+  }
+  check(materialized.size === bytes.size && [...materialized].every(([path, content]) => bytes.get(path)?.equals(content)), "git-policy-active-complete-files");
+  return allowed;
+}
+function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before: Map<string, { path: string; mode: "100644" | "100755"; oid: GitOid }>): Set<string> {
+  if (f.businessPublication?.kind === "stable-initial-workflow-publication") return initialWorkflowMetadataPaths(f, f.businessPublication, bytes, before);
+  if (f.businessPublication?.kind === "role-activation-publication") return activationMetadataPaths(f, f.businessPublication, bytes, before);
+  const allowed = new Set<string>(), pub = f.businessPublication;
+  policyRequire(pub && pub.kind === "direct-document-publication" && pub.operationId === f.operationId && pub.actorRoleId === f.actorRoleId
+    && gitText(pub.flowId) && gitText(pub.applicationId)
+    && ((pub.action === "version-upgrade" && f.actorRoleId === "product") || (pub.action === "detail-amendment" && f.actorRoleId === "rapporteur")
+      || (pub.action === "complete-team-plan" && f.actorRoleId === "convener")), "git-policy-business-source");
+  const teamPlan = pub.action === "complete-team-plan";
+  policyRequire(Array.isArray(f.appGeneratedFiles) && f.appGeneratedFiles.length === bytes.size, "git-policy-app-files-incomplete");
+  const table = new Map<string, GitAppGeneratedFile>();
+  for (const row of f.appGeneratedFiles) {
+    const content = bytes.get(row.path);
+    policyRequire(content && !table.has(row.path) && row.sha256 === policySha(content)
+      && sameGitOid(row.oid, policyGitObject(f.objectFormat, "blob", content)), "git-policy-app-file-hash");
+    table.set(row.path, row);
+  }
+  const json = (file: string): PolicyObject => {
+    const content = bytes.get(file); policyRequire(content, "git-policy-app-file-missing");
+    const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(content));
+    policyRequire(policyObject(parsed), "git-policy-app-json"); return parsed;
+  };
+  const manifestPath = ".ans/trunk/manifest.json", manifestBytes = bytes.get(manifestPath), manifest = json(manifestPath);
+  policyRequire(table.get(manifestPath)?.kind === "manifest" && manifestBytes && policySha(manifestBytes) === f.manifestSha256
+    && manifest.schema === "trunk/v1" && manifest.flowId === pub.flowId && policyEqual(manifest.snapshotRef, pub.snapshot)
+    && policyObject(manifest.artifacts) && policyEqual(manifest.artifacts.documents, pub.documents) && policyEqual(manifest.artifacts.execution, pub.execution), "git-policy-app-manifest-binding");
+  const source = manifest.actionSource, journal = f.businessJournal;
+  policyRequire(isDirectActionSource(source) && source.kind === "role-direct" && source.operationId === f.operationId
+    && source.actorRoleId === f.actorRoleId && source.applicationId === pub.applicationId && source.action === pub.action
+    && source.targetDigest === manifest.digest && journal && journal.operationId === f.operationId
+    && policyEqual(journal.actionSource, source) && policyEqual(journal.targetSnapshot, pub.snapshot)
+    && journal.target.trunkVersion === manifest.trunkVersion
+    && policyEqual(journal.target.documents, Object.fromEntries(Object.entries(pub.documents).map(([key, ref]) => {
+      policyRequire(policyObject(ref), "git-policy-app-document-ref"); return [key, { path: ref.path, sha256: ref.sha256 }];
+    })))
+    && policyEqual(journal.target.execution, pub.execution), "git-policy-app-journal-source");
+  const { phase: _phase, updatedAt: _updated, result: _result, ...journalBinding } = journal;
+  policyRequire(policySha(JSON.stringify(gitCanonical(journalBinding))) === f.journalDigest, "git-policy-app-journal-digest");
+  policyRequire(f.rawObjectPlan?.input.timestamp === manifest.updatedAt
+    && f.rawObjectPlan?.input.message === `ANS trunk ${manifest.trunkVersion} ${manifest.digest}`, "git-policy-app-command-source");
+  let previous: PolicyObject | undefined;
+  if (f.base !== null) {
+    policyRequire(f.businessBaseManifestBytesBase64 && before.get(manifestPath), "git-policy-app-base-unproven");
+    const old = policyBytes(f.businessBaseManifestBytesBase64);
+    policyRequire(sameGitOid(before.get(manifestPath)!.oid, policyGitObject(f.objectFormat, "blob", old)), "git-policy-app-base-hash");
+    const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(old));
+    policyRequire(policyObject(parsed) && parsed.flowId === pub.flowId && policyObject(parsed.artifacts), "git-policy-app-base-shape"); previous = parsed;
+    for (const key of ["activeRoles", "activeRevision", "activeDigest", "frozenRoles", "d3", "roles", "runId"])
+      policyRequire(policyEqual(manifest[key], previous[key]), "git-policy-app-authorization-change");
+    for (const key of ["workflow", "roleCards", "boundaries"])
+      policyRequire(policyEqual(manifest.artifacts[key], parsed.artifacts[key]), "git-policy-app-stable-change");
+  } else {
+    policyRequire(!teamPlan, "git-policy-plan-base-required");
+    for (const key of ["activeRoles", "activeRevision", "activeDigest", "frozenRoles", "d3", "roles"])
+      policyRequire(manifest[key] === undefined, "git-policy-app-future-authorization");
+    policyRequire(manifest.runId === null && manifest.artifacts.workflow === undefined
+      && [manifest.artifacts.roleCards, manifest.artifacts.boundaries].every(v => v === undefined || (policyObject(v) && Object.keys(v).length === 0)), "git-policy-app-future-execution");
+  }
+  let planPath: string | undefined, planMarker: { path: string; bytes: string } | undefined;
+  if (teamPlan) {
+    policyRequire(previous && policyObject(previous.artifacts) && policyObject(previous.artifacts.execution) && policyObject(manifest.artifacts.execution)
+      && policyEqual(manifest.artifacts.documents, previous.artifacts.documents)
+      && policyEqual(manifest.artifacts.execution.flow, previous.artifacts.execution.flow)
+      && source.baseDigest === previous.digest && policyEqual(journal.beforeSnapshot, previous.snapshotRef)
+      && journal.before.trunkVersion === previous.trunkVersion && policyEqual(journal.before.execution, previous.artifacts.execution), "git-policy-plan-basis");
+    const ref = pub.execution.teamPlan;
+    policyRequire(policyObject(ref) && typeof ref.path === "string" && typeof ref.sha256 === "string"
+      && policyEqual(ref, { path: ref.path, sha256: ref.sha256 }), "git-policy-plan-ref");
+    policyRequire(policyEqual(manifest, { ...previous, source: manifest.source, trunkVersion: manifest.trunkVersion, previous: manifest.previous,
+      updatedAt: manifest.updatedAt, artifacts: { ...previous.artifacts, execution: { ...previous.artifacts.execution, teamPlan: ref } },
+      snapshotRef: manifest.snapshotRef, digest: manifest.digest, actionSource: source }), "git-policy-plan-unrelated-metadata");
+    planPath = ref.path;
+    const match = /-team-v([1-9]\d*)\.md$/.exec(planPath), version = Number(match?.[1]);
+    policyRequire(Number.isSafeInteger(version) && planPath === `docs/scheduling/${pub.flowId}-team-v${version}.md`
+      && policyObject(pub.documents.modules) && policyObject(pub.documents.roster), "git-policy-plan-ref");
+    const noOp = policyEqual(ref, previous.artifacts.execution.teamPlan);
+    policyRequire(Number.isSafeInteger(previous.trunkVersion) && manifest.trunkVersion === Number(previous.trunkVersion) + (noOp ? 0 : 1)
+      && (noOp ? manifest.digest === previous.digest && manifest.source === previous.source && policyEqual(manifest.previous, previous.previous)
+        : manifest.source === "team-plan" && manifest.digest !== previous.digest
+          && policyEqual(manifest.previous, { trunkVersion: previous.trunkVersion, runId: previous.runId })), "git-policy-plan-version");
+    const projection = (ref: PolicyObject) => ({ path: ref.path, sha256: ref.sha256 });
+    const marker = { schema: "team-plan-completion/v1", operationId: f.operationId, actorRoleId: "convener", flowId: pub.flowId,
+      plan: { ...projection(ref), version }, modules: projection(pub.documents.modules), roster: projection(pub.documents.roster) };
+    const opDigest = policySha(JSON.stringify(f.operationId));
+    planMarker = { path: `.ans/trunk/plan-completions/${opDigest}.json`, bytes: JSON.stringify(gitCanonical(marker)) };
+    policyRequire(pub.applicationId === `plan-${policySha(JSON.stringify([pub.flowId, f.operationId]))}`
+      && source.journalId === `j-plan-${opDigest.slice(0, 24)}` && journal.journalId === source.journalId
+      && journal.applicationId === pub.applicationId && journal.flowId === pub.flowId && journal.target.runId === previous.runId,
+    "git-policy-plan-source");
+    policyRequire(table.get(planMarker.path)?.kind === "frozen-application-evidence" && bytes.get(planMarker.path)?.equals(Buffer.from(planMarker.bytes)), "git-policy-plan-marker");
+    if (!noOp) policyRequire(manifest.digest === policySha(JSON.stringify(gitCanonical({ flowId: pub.flowId, trunkVersion: manifest.trunkVersion,
+      artifacts: manifest.artifacts, snapshotRef: manifest.snapshotRef }))), "git-policy-plan-target-digest");
+  }
+  const expectedSnapshots = new Map([[pub.snapshot.snapshotId, pub.snapshot.digest]]);
+  for (const collection of [manifest.activeRoles, manifest.frozenRoles]) if (collection !== undefined) {
+    policyRequire(policyObject(collection), "git-policy-app-role-evidence-shape");
+    for (const evidence of Object.values(collection)) {
+      policyRequire(policyObject(evidence) && policyObject(evidence.snapshotRef) && typeof evidence.snapshotRef.snapshotId === "string"
+        && typeof evidence.snapshotRef.digest === "string", "git-policy-app-role-snapshot-ref");
+      const snapshotId = evidence.snapshotRef.snapshotId, digest = evidence.snapshotRef.digest, prior = expectedSnapshots.get(snapshotId);
+      policyRequire(prior === undefined || prior === digest, "git-policy-app-snapshot-conflict"); expectedSnapshots.set(snapshotId, digest);
+    }
+  }
+  const snapshots = new Map<string, import("../../model/trunk.ts").CompleteSnapshot>();
+  for (const row of table.values()) if (row.kind === "complete-snapshot") {
+    const parsed = json(row.path);
+    policyRequire(isCompleteSnapshot(parsed) && row.path === `.ans/trunk/snapshots/${parsed.snapshotId}.json`
+      && expectedSnapshots.get(parsed.snapshotId) === parsed.digest, "git-policy-app-snapshot-shape");
+    const seen = new Set<string>();
+    for (const file of parsed.files) {
+      policyRequire(!seen.has(file.path.toLowerCase()) && policySha(policyBytes(file.bytesBase64)) === file.sha256.toLowerCase(), "git-policy-app-snapshot-bytes"); seen.add(file.path.toLowerCase());
+    }
+    const digest = policySha(JSON.stringify([...parsed.files].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map(file => [file.path, file.sha256.toLowerCase(), file.bytesBase64])));
+    policyRequire(digest === parsed.digest, "git-policy-app-snapshot-digest"); snapshots.set(parsed.snapshotId, parsed); allowed.add(row.path);
+  }
+  const primary = snapshots.get(pub.snapshot.snapshotId);
+  policyRequire(primary && primary.digest === pub.snapshot.digest && snapshots.size === expectedSnapshots.size, "git-policy-app-snapshot-missing");
+  policyRequire(primary.files.every(file => {
+    const row = table.get(file.path); return row?.sha256 === file.sha256
+      && ["snapshot-content", "frozen-application-evidence"].includes(row.kind);
+  }), "git-policy-app-snapshot-content-incomplete");
+  const artifactPaths = new Set<string>();
+  const patterns: Record<string, RegExp> = { intent: /^docs\/product\/[^/]+-intent-v[1-9]\d*\.md$/, proposal: /^docs\/proposals\/[^/]+-proposal-v[1-9]\d*\.md$/,
+    roster: /^docs\/proposals\/[^/]+-roster-v[1-9]\d*\.md$/, modules: /^docs\/proposals\/[^/]+-modules-v[1-9]\d*\.md$/, topology: /^docs\/proposals\/[^/]+-topology-v[1-9]\d*\.md$/,
+    architecture: /^docs\/contracts\/[^/]+-architecture-v[1-9]\d*\.md$/, assets: /^docs\/contracts\/[^/]+-assets-v[1-9]\d*\.md$/ };
+  for (const [kind, ref] of Object.entries(pub.documents)) {
+    policyRequire(patterns[kind] && policyObject(ref) && typeof ref.path === "string" && typeof ref.sha256 === "string", "git-policy-app-document-ref");
+    const file = ref.path.split("#")[0]!;
+    const directory = ["architecture", "assets"].includes(kind) ? "contracts" : "proposals";
+    policyRequire(patterns[kind]!.test(file) && file.startsWith(`docs/${directory}/${pub.flowId}-${kind}-v`)
+      && primary.files.some(f => f.path === file && f.sha256 === ref.sha256), "git-policy-app-document-closure"); artifactPaths.add(file);
+  }
+  for (const [kind, ref] of Object.entries(pub.execution)) if (ref !== null) {
+    policyRequire(["teamPlan", "flow"].includes(kind) && policyObject(ref) && typeof ref.path === "string" && typeof ref.sha256 === "string", "git-policy-app-execution-ref");
+    const file = ref.path.split("#")[0]!;
+    policyRequire((kind === "teamPlan" ? file.startsWith("docs/scheduling/") : file.startsWith("docs/flows/"))
+      && primary.files.some(f => f.path === file && f.sha256 === ref.sha256), "git-policy-app-execution-closure"); artifactPaths.add(file);
+  }
+  for (const row of table.values()) {
+    if (row.kind === "manifest") policyRequire(row.path === manifestPath, "git-policy-app-manifest-path");
+    else if (row.kind === "history") {
+      policyRequire(previous && row.path === `.ans/trunk/history/manifest-v${previous.trunkVersion}.json`
+        && bytes.get(row.path)!.equals(policyBytes(f.businessBaseManifestBytesBase64!)), "git-policy-app-history-binding"); allowed.add(row.path);
+    } else if (row.kind === "frozen-application-evidence") {
+      if (planMarker && row.path === planMarker.path) {
+        policyRequire(primary.files.some(file => file.path === row.path && file.sha256 === row.sha256)
+          && bytes.get(row.path)!.equals(Buffer.from(planMarker.bytes)), "git-policy-plan-marker"); allowed.add(row.path); continue;
+      }
+      policyRequire(row.path === ".ans/state/versions.jsonl" && primary.files.some(file => file.path === row.path && file.sha256 === row.sha256), "git-policy-app-evidence-path");
+      for (const line of bytes.get(row.path)!.toString("utf8").split(/\r?\n/).filter(line => line.trim())) {
+        const record: unknown = JSON.parse(line);
+        policyRequire(policyObject(record) && record.v === 1 && record.flowId === pub.flowId && typeof record.path === "string"
+          && Number.isSafeInteger(record.version) && Number(record.version) > 0 && typeof record.sha256 === "string", "git-policy-app-freeze-record");
+        const file = /-v\d+\.md$/.test(record.path) ? record.path : `${record.path}-v${record.version}.md`;
+        policyRequire(primary.files.some(item => item.path === file && item.sha256 === record.sha256), "git-policy-app-freeze-closure");
+        policyRequire(record.event === "frozen" ? isValidDocFreezeRecord(record.freeze)
+          : ["baseline", "version-added", "draft-updated", "draft-marker"].includes(String(record.event)) && record.freeze === undefined, "git-policy-app-freeze-source");
+      }
+      allowed.add(row.path);
+    } else if (row.kind === "snapshot-content") {
+      policyRequire(!row.path.startsWith(".ans/") && primary.files.some(file => file.path === row.path && file.sha256 === row.sha256), "git-policy-app-content-closure");
+      if (artifactPaths.has(row.path)) allowed.add(row.path);
+    } else policyRequire(row.kind === "complete-snapshot" && allowed.has(row.path), "git-policy-app-file-kind");
+  }
+  if (teamPlan) for (const row of table.values()) if (row.kind === "snapshot-content" || row.kind === "frozen-application-evidence") {
+    if (row.path === planPath || row.path === planMarker!.path) continue;
+    policyRequire(before.get(row.path)?.mode === "100644" && sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-plan-unrelated-bytes");
+  }
+  allowed.add(manifestPath); return allowed;
+}
+
+/** Reconstruct immutable objects and an exact, conflict-free inverse. No observations authorize effects. */
+function revertExpectedTree(f: GitPolicyFacts, observation: { basis: GitRawRevertBasis; target: GitOid | undefined; mainline: number | undefined; base: GitOid | null | undefined; baseTree: RawTree }): Map<string, GitRawTreeEntry> {
+  const check: typeof policyRequire = policyRequire, basis = observation.basis, format = f.objectFormat;
+  check(basis && f.actorRoleId === "convener" && gitText(f.runId) && gitOid(observation.target, format) && gitOid(observation.base, format)
+    && f.writePaths.length === 0 && !f.businessPublication && !f.appGeneratedFiles, "git-policy-revert-basis");
+  const read = (fact: GitRawRevertCommit) => {
+    check(fact && gitOid(fact.commit, format) && gitOid(fact.tree, format) && Array.isArray(fact.entries) && fact.entries.length <= 2048, "git-policy-revert-object");
+    const bytes = policyBytes(fact.commitBytesBase64);
+    check(bytes.length <= 65536 && sameGitOid(policyGitObject(format, "commit", bytes), fact.commit), "git-policy-revert-commit-hash");
+    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes), split = text.indexOf("\n\n"), header = text.slice(0, split).split("\n");
+    check(split > 0 && header[0] === `tree ${fact.tree.hex}` && header.filter(line => line.startsWith("tree ")).length === 1, "git-policy-revert-commit-tree");
+    const parents = header.filter(line => line.startsWith("parent ")).map(line => ({ objectFormat: format, hex: line.slice(7) }));
+    check(parents.length <= 65 && parents.every(parent => gitOid(parent, format)) && new Set(parents.map(p => p.hex)).size === parents.length, "git-policy-revert-parent-shape");
+    type Dir = Map<string, Dir | GitRawTreeEntry>; const root: Dir = new Map(), entries = new Map<string, GitRawTreeEntry>();
+    for (const entry of fact.entries) {
+      check(gitPath(entry.path) && ["100644", "100755", "120000", "160000"].includes(entry.mode) && gitOid(entry.oid, format)
+        && ![...entries.keys()].some(p => p.toLowerCase() === entry.path.toLowerCase()), "git-policy-revert-entry"); entries.set(entry.path, entry);
+      const parts = entry.path.split("/"); let dir = root;
+      for (const name of parts.slice(0, -1)) { const prior = dir.get(name); check(!prior || prior instanceof Map, "git-policy-revert-tree-collision"); const next = prior ?? new Map(); dir.set(name, next); dir = next; }
+      check(!dir.has(parts.at(-1)!), "git-policy-revert-tree-collision"); dir.set(parts.at(-1)!, entry);
+    }
+    const hashTree = (dir: Dir): GitOid => {
+      const rows = [...dir].map(([name, value]) => value instanceof Map ? { name, mode: "40000", oid: hashTree(value), directory: true } : { name, mode: value.mode, oid: value.oid, directory: false });
+      const content = Buffer.concat(rows.sort((a, b) => Buffer.compare(Buffer.from(a.name + (a.directory ? "/" : "")), Buffer.from(b.name + (b.directory ? "/" : ""))))
+        .flatMap(row => [Buffer.from(`${row.mode} ${row.name}\0`), Buffer.from(row.oid.hex, "hex")])); return policyGitObject(format, "tree", content);
+    };
+    check(sameGitOid(hashTree(root), fact.tree), "git-policy-revert-tree-hash"); return { parents, entries };
+  };
+  const target = read(basis.target), current = read(basis.codeBasis);
+  check(sameGitOid(basis.target.commit, observation.target) && sameGitOid(basis.codeBasis.commit, observation.base)
+    && policyEqual(observation.baseTree, basis.codeBasis.entries), "git-policy-revert-code-basis");
+  let parent = new Map<string, GitRawTreeEntry>();
+  if (!target.parents.length) check(basis.selectedParent === null && observation.mainline === undefined, "git-policy-revert-root-parent");
+  else {
+    const selected = basis.selectedParent, index = target.parents.length === 1 ? 1 : observation.mainline;
+    check(selected && Number.isSafeInteger(index) && index! > 0 && index! <= target.parents.length
+      && (target.parents.length > 1 || observation.mainline === undefined) && selected.index === index
+      && sameGitOid(selected.commit, target.parents[index! - 1]), "git-policy-revert-mainline"); parent = read(selected).entries;
+  }
+  const inverse: GitPolicyDiffEntry[] = [], conflicts: import("../../model/trunk.ts").GitRawRevertConflict[] = [], after = new Map(current.entries);
+  const equal = (a: GitRawTreeEntry | undefined, b: GitRawTreeEntry | undefined) => !a ? !b : !!b && a.mode === b.mode && sameGitOid(a.oid, b.oid);
+  for (const file of [...new Set([...target.entries.keys(), ...parent.keys()])].sort()) {
+    const from = target.entries.get(file), to = parent.get(file), now = current.entries.get(file); if (equal(from, to)) continue;
+    inverse.push({ status: !from ? "A" : !to ? "D" : from.mode !== to.mode ? "T" : "M", ...(from ? { oldPath: file, oldMode: from.mode, oldOid: from.oid } : {}), ...(to ? { newPath: file, newMode: to.mode, newOid: to.oid } : {}) });
+    if (!equal(from, now)) conflicts.push({ path: file, parent: to ?? null, target: from ?? null, current: now ?? null, reason: "current-entry-differs-from-target" });
+    if (to) after.set(file, to); else after.delete(file);
+  }
+  check(basis.complete === true && policyEqual(basis.inverseChanges, inverse) && policyEqual(basis.conflicts, conflicts), "git-policy-revert-derived-binding");
+  check(conflicts.length === 0, "git-policy-revert-conflict");
+  const names = [...after.keys()];
+  check(!names.some((a, i) => names.some((b, j) => i !== j && (a.toLowerCase() === b.toLowerCase() || b.toLowerCase().startsWith(a.toLowerCase() + "/")))), "git-policy-revert-conflict");
+  check([...current.entries.values(), ...after.values()].every(entry => ["100644", "100755"].includes(entry.mode)), "git-policy-revert-unsupported-mode");
+  const grants = f.integrationGrants;
+  check(Array.isArray(grants) && grants.length > 0 && grants.length <= 64, "git-policy-revert-grants");
+  for (const grant of grants) check(gitText(grant.ownerRoleId) && !["chief", "product", "rapporteur", "nominator", "convener", "verifier", "su", "liaison"].includes(grant.ownerRoleId)
+    && sameGitOid(grant.candidate, observation.target) && /^[a-f0-9]{64}$/i.test(grant.evidenceDigest) && Array.isArray(grant.paths) && grant.paths.length > 0 && grant.paths.length <= 128
+    && grant.paths.every((p: unknown) => typeof p === "string" && gitPath(p.replace(/\/$/, ""))), "git-policy-revert-grants");
+  return after;
+}
+
+/** Validate the entire ordinary raw-object plan, without invoking Provider or claiming host authority. */
+function rawObjectPolicyError(f: GitPolicyFacts): string | undefined {
+  try {
+    const plan = f.rawObjectPlan!;
+    const integrating = f.template === "integrate", reverting = f.template === "revert";
+    policyRequire(gitText(f.taskId) && ["commit", "publish-documents", "integrate", "revert"].includes(f.template) && (reverting || plan.revertBasis === undefined) && !f.initializationBasis
+      && f.worksite && policyEqual(f.worksite, { kind: "raw-object-plumbing", index: "not-used", checkout: "not-used" }) && policyEqual(plan.worksite, f.worksite)
+      && [f.ownedWorktreeId, f.currentWorktreeId, f.ownedIndexId, f.currentIndexId].every(v => v === undefined), "git-policy-raw-worksite");
+    const input = plan.input, format = f.objectFormat;
+    policyRequire(input.operationId === f.operationId && sameGitOid(input.base, f.base) && sameGitOid(plan.commit.candidate, f.candidate)
+      && gitOid(plan.commit.tree, format) && Array.isArray(plan.baseTree) && plan.baseTree.length <= 2048 && (input.base !== null || plan.baseTree.length === 0), "git-policy-raw-basis");
+    const parents = input.parents === undefined ? input.base ? [input.base] : [] : [...input.parents];
+    policyRequire(parents.length <= 65 && parents.every(parent => gitOid(parent, format))
+      && new Set(parents.map(parent => parent.hex.toLowerCase())).size === parents.length
+      && (input.parents === undefined || (input.base && sameGitOid(parents[0], input.base))), "git-policy-raw-parents");
+    const revertTree = reverting ? revertExpectedTree(f, { basis: plan.revertBasis!, target: f.target, mainline: f.mainline, base: f.base, baseTree: plan.baseTree }) : undefined;
+    if (reverting) policyRequire(policyEqual(plan.input.files.map(row => row.path).sort(), plan.revertBasis!.inverseChanges.map(row => row.oldPath ?? row.newPath).sort()), "git-policy-revert-inverse-paths");
+    if (reverting) policyRequire(parents.length === 1 && sameGitOid(parents[0], f.base), "git-policy-revert-candidate-parent");
+    else if (integrating) {
+      const grants = f.integrationGrants;
+      policyRequire(f.actorRoleId === "convener" && gitText(f.runId) && gitOid(input.base, format) && input.parents !== undefined && parents.length >= 2
+        && f.writePaths.length === 0 && Array.isArray(grants) && grants.length === parents.length - 1
+        && !f.businessPublication && [f.appGeneratedFiles, f.businessJournal, f.manifestSha256, f.journalDigest, f.businessBaseManifestBytesBase64].every(value => value === undefined), "git-policy-raw-integration-basis");
+      for (let index = 0; index < grants.length; index++) {
+        const grant = grants[index]!;
+        policyRequire(gitText(grant.ownerRoleId) && !["chief", "product", "rapporteur", "nominator", "convener", "verifier", "su", "liaison"].includes(grant.ownerRoleId)
+          && /^[a-f0-9]{64}$/i.test(grant.evidenceDigest) && sameGitOid(grant.candidate, parents[index + 1])
+          && Array.isArray(grant.paths) && grant.paths.length > 0 && grant.paths.length <= 128
+          && grant.paths.every((path: unknown) => typeof path === "string" && gitPath(path.replace(/\/$/, ""))), "git-policy-raw-integration-grant");
+      }
+    } else policyRequire(input.parents === undefined && f.integrationGrants === undefined, "git-policy-raw-parents-template");
+    policyRequire(Array.isArray(input.files) && input.files.length <= 128 && typeof input.message === "string" && input.message.trim().length > 0 && input.message.length <= 4000, "git-policy-raw-input");
+    const seconds = Math.floor(Date.parse(input.timestamp ?? "") / 1000); policyRequire(Number.isSafeInteger(seconds) && seconds >= 0, "git-policy-raw-time");
+    const before = new Map<string, { path: string; mode: "100644" | "100755"; oid: GitOid }>();
+    for (const entry of plan.baseTree) {
+      policyRequire(gitPath(entry.path) && (entry.mode === "100644" || entry.mode === "100755") && gitOid(entry.oid, format)
+        && ![...before.keys()].some(p => p.toLowerCase() === entry.path.toLowerCase()), "git-policy-raw-base-tree"); before.set(entry.path, { path: entry.path, mode: entry.mode, oid: entry.oid });
+    }
+    const after = new Map(before), bytes = new Map<string, Buffer>(), commands: string[][] = [];
+    const files = [...input.files].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0), seen = new Set<string>(); let total = 0;
+    policyRequire(policyEqual([...f.paths].sort(), files.map(file => file.path).sort()), "git-policy-raw-path-binding");
+    for (const file of files) {
+      policyRequire(gitPath(file.path) && !seen.has(file.path.toLowerCase()) && (file.executable === undefined || typeof file.executable === "boolean"), "git-policy-raw-file"); seen.add(file.path.toLowerCase());
+      if (file.bytesBase64 === null) { policyRequire(after.delete(file.path), "git-policy-raw-delete"); continue; }
+      const content = policyBytes(file.bytesBase64); total += content.length; policyRequire(content.length <= 1024 * 1024 && total <= 4 * 1024 * 1024, "git-policy-raw-byte-budget");
+      bytes.set(file.path, content); after.set(file.path, { path: file.path, mode: file.executable ? "100755" : "100644", oid: policyGitObject(format, "blob", content) });
+      commands.push(["hash-object", "-w", "--stdin", "--no-filters"]);
+    }
+    policyRequire(after.size <= 2048, "git-policy-raw-tree-budget");
+    if (revertTree) policyRequire(policyEqual([...after.values()].sort((a, b) => a.path < b.path ? -1 : 1), [...revertTree.values()].sort((a, b) => a.path < b.path ? -1 : 1)), "git-policy-revert-result-tree");
+    type Entry = { path: string; mode: "100644" | "100755"; oid: GitOid }; type Dir = Map<string, Dir | Entry>; const root: Dir = new Map();
+    for (const entry of after.values()) { const parts = entry.path.split("/"); let dir = root;
+      for (const name of parts.slice(0, -1)) { const prior = dir.get(name); policyRequire(!prior || prior instanceof Map, "git-policy-raw-tree-collision"); const next = prior ?? new Map(); dir.set(name, next); dir = next; }
+      policyRequire(!dir.has(parts.at(-1)!), "git-policy-raw-tree-collision"); dir.set(parts.at(-1)!, entry);
+    }
+    function treeFor(dir: Dir): GitOid {
+      const values = [...dir].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([name, value]) => value instanceof Map
+        ? { name, mode: "40000", oid: treeFor(value), directory: true } : { name, mode: value.mode, oid: value.oid, directory: false });
+      const content = Buffer.concat(values.sort((a, b) => Buffer.compare(Buffer.from(a.name + (a.directory ? "/" : "")), Buffer.from(b.name + (b.directory ? "/" : ""))))
+        .flatMap(value => [Buffer.from(`${value.mode} ${value.name}\0`), Buffer.from(value.oid.hex, "hex")]));
+      commands.push(["mktree", "-z"]); return policyGitObject(format, "tree", content);
+    }
+    const tree = treeFor(root), request = policySha(JSON.stringify({ ...input, files }));
+    const message = `${input.message}\n\nANS-Request: ${request}\n`;
+    const candidate = policyGitObject(format, "commit", Buffer.from(`tree ${tree.hex}\n${parents.map(p => `parent ${p.hex}\n`).join("")}author ANS Application <ans@localhost> ${seconds} +0000\ncommitter ANS Application <ans@localhost> ${seconds} +0000\n\n${message}`));
+    const allocated = `refs/ans/candidates/${policySha(f.operationId)}`;
+    policyRequire(sameGitOid(tree, plan.commit.tree) && sameGitOid(candidate, plan.commit.candidate) && policyEqual(parents, plan.commit.parents)
+      && message === plan.commit.message && plan.ref === allocated && f.ownedCandidateRef === allocated, "git-policy-raw-object-binding");
+    commands.push(["commit-tree", tree.hex, ...parents.flatMap(parent => ["-p", parent.hex]), "-F", "-"], ["cat-file", "commit", candidate.hex], ["update-ref", "--no-deref", allocated, candidate.hex, "0".repeat(format === "sha1" ? 40 : 64)]);
+    policyRequire(policyEqual(plan.commands.map(argv => gitBody(argv)), commands), "git-policy-raw-command-plan");
+    const diff: GitPolicyDiffEntry[] = [];
+    for (const file of [...new Set([...before.keys(), ...after.keys()])].sort()) { const from = before.get(file), to = after.get(file);
+      if (from && to && from.mode === to.mode && sameGitOid(from.oid, to.oid)) continue;
+      diff.push({ status: !from ? "A" : !to ? "D" : from.mode !== to.mode ? "T" : "M", ...(from ? { oldPath: file, oldMode: from.mode, oldOid: from.oid } : {}), ...(to ? { newPath: file, newMode: to.mode, newOid: to.oid } : {}) });
+    }
+    policyRequire(f.allDiff?.complete && sameGitOid(f.allDiff.base, input.base) && sameGitOid(f.allDiff.candidate, candidate)
+      && policyEqual(diff, plan.diff) && policyEqual(diff, f.allDiff.entries), "git-policy-raw-complete-diff");
+    const exceptions = f.businessPublication ? appMetadataPaths(f, bytes, before) : new Set<string>();
+    policyRequire(f.businessPublication || [f.appGeneratedFiles, f.businessJournal, f.manifestSha256, f.journalDigest, f.businessBaseManifestBytesBase64].every(v => v === undefined), "git-policy-raw-unbound-metadata");
+    for (const row of diff) {
+      policyRequire(row.status !== "T", "git-policy-raw-mode-change");
+      for (const file of [row.oldPath, row.newPath]) if (file) {
+        if (integrating || reverting) {
+          const owners = f.integrationGrants!.filter(grant => gitRolePath({ ...f, actorRoleId: grant.ownerRoleId, writePaths: grant.paths }, file));
+          policyRequire(owners.length > 0 && new Set(owners.map(grant => grant.ownerRoleId)).size === 1, "git-policy-raw-integration-scope");
+        } else policyRequire((exceptions.has(file) && after.get(file)?.mode === "100644") || gitRolePath(f, file), "git-policy-raw-write-scope");
+      }
+    }
+    const expected = [...commands];
+    if (f.template === "publish-documents") {
+      policyRequire(f.businessPublication && f.ref === "refs/ans/trunk" && f.publicationRef === f.ref, "git-policy-raw-publication-ref");
+      expected.push(["update-ref", "--no-deref", f.ref, candidate.hex, input.base?.hex ?? "0".repeat(format === "sha1" ? 40 : 64)]);
+    } else policyRequire(f.ref === allocated, "git-policy-raw-candidate-ref");
+    policyRequire(f.commands && policyEqual(f.commands.map(argv => gitBody(argv)), expected) && policyEqual(f.argv, f.commands[0]), "git-policy-raw-operation-plan");
+    return undefined;
+  } catch (error) { return error instanceof Error ? error.message : "git-policy-raw-invalid"; }
+}
+
+/** Full ref-CAS facts are distinct from the immutable code-basis authorization diff. */
+function refPublicationPolicyError(f: GitPolicyFacts): string | undefined {
+  try {
+    const plan = f.refPublicationPlan!, basis = f.deliveryBasis, format = f.objectFormat;
+    const check: typeof policyRequire = policyRequire;
+    const digest = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+    check(f.template === "publish-delivery" && f.actorRoleId === "convener" && gitText(f.taskId) && gitText(f.runId)
+      && f.writePaths.length === 0 && basis && gitText(basis.candidateOperationId) && gitOid(basis.base, format)
+      && policyEqual(f.worksite, { kind: "ref-only", index: "not-used", checkout: "not-used" }) && policyEqual(plan.worksite, f.worksite)
+      && [f.ownedWorktreeId, f.currentWorktreeId, f.ownedIndexId, f.currentIndexId, f.rawObjectPlan, f.initializationBasis,
+        f.businessPublication, f.appGeneratedFiles, f.businessJournal, f.manifestSha256, f.journalDigest, f.businessBaseManifestBytesBase64].every(v => v === undefined), "git-policy-delivery-basis");
+    const source = basis.source, grants = f.integrationGrants;
+    check(source && ["run-integration", "run-revert"].includes(source.kind) && source.roleId === "convener" && source.taskId === f.taskId && source.runId === f.runId
+      && /^[a-z0-9][a-z0-9-]{1,95}$/.test(source.flowId) && isGitApplicationRef(source.base?.ref)
+      && (source.base.ref === "refs/ans/trunk" || source.base.ref.startsWith("refs/ans/delivery/")) && sameGitOid(source.base.oid, basis.base)
+      && [source.pinDigest, source.taskDigest, source.runRecordSha256, source.scopeDigest].every(digest)
+      && Array.isArray(grants) && grants.length > 0 && grants.length <= 64, "git-policy-delivery-source");
+    if (source.kind === "run-integration") check(Array.isArray(source.contributors) && source.contributors.length > 0 && source.contributors.length <= 64
+      && grants.length === source.contributors.length, "git-policy-delivery-source");
+    check(f.ref === `refs/ans/delivery/${source.flowId}` && f.publicationRef === f.ref && plan.ref === f.ref
+      && f.ownedCandidateRef === `refs/ans/candidates/${policySha(basis.candidateOperationId)}`
+      && sameGitOid(plan.oldOid, f.base) && gitOid(plan.commit.candidate, format) && sameGitOid(plan.commit.candidate, f.candidate)
+      && gitOid(plan.commit.tree, format) && typeof plan.commit.message === "string", "git-policy-delivery-ref");
+    const parents = source.kind === "run-integration" ? [basis.base, ...source.contributors.map(row => row.candidate)] : [basis.base];
+    check(parents.every(parent => gitOid(parent, format)) && new Set(parents.map(parent => parent.hex.toLowerCase())).size === parents.length
+      && policyEqual(plan.commit.parents, parents), "git-policy-delivery-parents");
+    const workerOps = new Set<string>(), workerTasks = new Set<string>(), sourceFiles = new Map<string, string | null>();
+    const validFiles = (files: GitDeliveryTaskSource["files"]) => Array.isArray(files) && files.length > 0 && files.length <= 128
+      && files.every(file => gitPath(file.path) && (file.sha256 === null || digest(file.sha256)))
+      && new Set(files.map(file => file.path.toLowerCase())).size === files.length;
+    if (source.kind === "run-integration") {
+    for (let index = 0; index < source.contributors.length; index++) {
+      const row = source.contributors[index]!, worker = row.source, grant = grants[index]!;
+      check(gitText(row.operationId) && !workerOps.has(row.operationId) && gitText(row.closeOperationId) && gitText(row.closeEventId) && digest(row.reportSha256)
+        && worker && worker.kind === "assigned-run-task" && gitText(worker.taskId) && !workerTasks.has(worker.taskId) && gitText(worker.moduleId)
+        && worker.runId === source.runId && worker.flowId === source.flowId && worker.pinDigest === source.pinDigest && policyEqual(worker.base, source.base)
+        && [worker.taskDigest, worker.runRecordSha256, worker.scopeDigest].every(digest)
+        && gitText(worker.roleId) && !["chief", "product", "rapporteur", "nominator", "convener", "verifier", "su", "liaison"].includes(worker.roleId)
+        && validFiles(worker.files), "git-policy-delivery-contributor");
+      workerOps.add(row.operationId); workerTasks.add(worker.taskId);
+      check(grant.ownerRoleId === worker.roleId && sameGitOid(grant.candidate, row.candidate)
+        && grant.evidenceDigest === policySha(JSON.stringify(gitCanonical(worker)))
+        && Array.isArray(grant.paths) && policyEqual([...grant.paths].sort(), worker.files.map((file: { path: string }) => file.path).sort()), "git-policy-delivery-grant");
+      for (const file of worker.files) {
+        check(!sourceFiles.has(file.path) || sourceFiles.get(file.path) === file.sha256, "git-policy-delivery-source-conflict"); sourceFiles.set(file.path, file.sha256);
+      }
+    }
+    check(source.scopeDigest === policySha(JSON.stringify(gitCanonical(source.contributors.map(row => row.source)))) && validFiles(source.files)
+      && policyEqual([...source.files].sort((a, b) => a.path.localeCompare(b.path)), [...sourceFiles].map(([path, sha256]) => ({ path, sha256 })).sort((a, b) => a.path.localeCompare(b.path))), "git-policy-delivery-source-files");
+    } else {
+      check(!("contributors" in source) && Array.isArray(source.ownerGrants) && source.ownerGrants.length > 0 && source.ownerGrants.length <= 64
+        && gitOid(source.target, format) && validFiles(source.files)
+        && source.scopeDigest === policySha(JSON.stringify(gitCanonical(source.ownerGrants)))
+        && policyEqual(grants, source.ownerGrants.map(grant => ({ ...grant, candidate: source.target }))), "git-policy-delivery-revert-source");
+      for (const file of source.files) sourceFiles.set(file.path, file.sha256);
+    }
+    const tree = (entries: readonly GitPolicyTreeEntry[]) => {
+      check(Array.isArray(entries) && entries.length <= 2048, "git-policy-delivery-tree");
+      const values = new Map<string, GitPolicyTreeEntry>();
+      for (const entry of entries) {
+        check(gitPath(entry.path) && ["100644", "100755"].includes(entry.mode) && gitOid(entry.oid, format)
+          && ![...values.keys()].some(p => p.toLowerCase() === entry.path.toLowerCase()), "git-policy-delivery-tree"); values.set(entry.path, entry);
+      }
+      type Dir = Map<string, Dir | GitPolicyTreeEntry>; const root: Dir = new Map();
+      for (const entry of values.values()) { const parts = entry.path.split("/"); let dir = root;
+        for (const name of parts.slice(0, -1)) { const prior = dir.get(name); check(!prior || prior instanceof Map, "git-policy-delivery-tree-collision"); const next = prior ?? new Map(); dir.set(name, next); dir = next; }
+        check(!dir.has(parts.at(-1)!), "git-policy-delivery-tree-collision"); dir.set(parts.at(-1)!, entry);
+      }
+      const hashTree = (dir: Dir): GitOid => {
+        const rows = [...dir].map(([name, entry]) => entry instanceof Map ? { name, mode: "40000", oid: hashTree(entry), directory: true } : { name, mode: entry.mode, oid: entry.oid, directory: false });
+        const content = Buffer.concat(rows.sort((a, b) => Buffer.compare(Buffer.from(a.name + (a.directory ? "/" : "")), Buffer.from(b.name + (b.directory ? "/" : ""))))
+          .flatMap(row => [Buffer.from(`${row.mode} ${row.name}\0`), Buffer.from(row.oid.hex, "hex")]));
+        return policyGitObject(format, "tree", content);
+      };
+      return { values, oid: hashTree(root) };
+    };
+    const before = tree(plan.baseTree), after = tree(plan.candidateTree), original = tree(basis.baseTree);
+    if (source.kind === "run-revert") {
+      const expected = revertExpectedTree(f, { basis: source.revertBasis, target: source.target, mainline: source.mainline, base: basis.base, baseTree: basis.baseTree });
+      const sorted = (values: Iterable<GitRawTreeEntry>) => [...values].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+      check(policyEqual(sorted(expected.values()), sorted(after.values.values())), "git-policy-delivery-revert-result");
+      check(policyEqual(source.files.map(file => file.path).sort(), source.revertBasis.inverseChanges.map(row => row.oldPath ?? row.newPath).sort()), "git-policy-delivery-revert-files");
+    }
+    check(plan.oldOid !== null || before.values.size === 0, "git-policy-delivery-null-base");
+    check(sameGitOid(after.oid, plan.commit.tree), "git-policy-delivery-tree-hash");
+    const commitFromBytes = (encoded: string, oid: GitOid, treeOid: GitOid) => {
+      const bytes = policyBytes(encoded); check(bytes.length > 0 && bytes.length <= 16384
+        && sameGitOid(policyGitObject(format, "commit", bytes), oid), "git-policy-delivery-commit-hash");
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes), split = text.indexOf("\n\n");
+      check(split > 0, "git-policy-delivery-commit-shape");
+      const headers = text.slice(0, split).split("\n"), parents: GitOid[] = [];
+      check(headers.shift() === `tree ${treeOid.hex}`, "git-policy-delivery-commit-tree");
+      while (headers[0]?.startsWith("parent ")) { const parent = { objectFormat: format, hex: headers.shift()!.slice(7) }; check(gitOid(parent, format), "git-policy-delivery-commit-parent"); parents.push(parent); }
+      check(headers.length === 2 && /^author ANS Application <ans@localhost> \d+ \+0000$/.test(headers[0]!)
+        && headers[1] === headers[0]!.replace(/^author /, "committer "), "git-policy-delivery-commit-shape");
+      return { parents, message: text.slice(split + 2) };
+    };
+    const actual = commitFromBytes(plan.commitBytesBase64, plan.commit.candidate, after.oid);
+    check(policyEqual(actual.parents, plan.commit.parents) && actual.message === plan.commit.message, "git-policy-delivery-commit-binding");
+    commitFromBytes(basis.baseCommitBytesBase64, basis.base, original.oid);
+    if (plan.oldOid === null) check(plan.oldCommitBytesBase64 === null, "git-policy-delivery-null-base");
+    else commitFromBytes(plan.oldCommitBytesBase64!, plan.oldOid, before.oid);
+    const diff = (a: Map<string, GitPolicyTreeEntry>, b: Map<string, GitPolicyTreeEntry>) => {
+      const rows: GitPolicyDiffEntry[] = [];
+      for (const file of [...new Set([...a.keys(), ...b.keys()])].sort()) { const old = a.get(file), next = b.get(file);
+        if (old && next && old.mode === next.mode && sameGitOid(old.oid, next.oid)) continue;
+        rows.push({ status: !old ? "A" : !next ? "D" : old.mode !== next.mode ? "T" : "M",
+          ...(old ? { oldPath: file, oldMode: old.mode, oldOid: old.oid } : {}), ...(next ? { newPath: file, newMode: next.mode, newOid: next.oid } : {}) });
+      } return rows;
+    };
+    const casDiff = diff(before.values, after.values), authorizationDiff = diff(original.values, after.values);
+    check(f.allDiff?.complete && sameGitOid(f.allDiff.base, plan.oldOid) && sameGitOid(f.allDiff.candidate, plan.commit.candidate)
+      && policyEqual(casDiff, plan.diff) && policyEqual(casDiff, f.allDiff.entries)
+      && policyEqual([...f.paths].sort(), [...new Set(casDiff.flatMap(row => [row.oldPath, row.newPath].filter((p): p is string => !!p)))].sort()), "git-policy-delivery-complete-diff");
+    for (const row of authorizationDiff) {
+      check(row.status !== "T", "git-policy-delivery-mode-change");
+      for (const file of [row.oldPath, row.newPath]) if (file) {
+        const owners = grants.filter(grant => gitRolePath({ ...f, actorRoleId: grant.ownerRoleId, writePaths: grant.paths }, file));
+        check(owners.length > 0 && new Set(owners.map(grant => grant.ownerRoleId)).size === 1 && sourceFiles.has(file)
+          && (row.status === "D" ? sourceFiles.get(file) === null : sourceFiles.get(file) !== null), "git-policy-delivery-write-scope");
+      }
+    }
+    const expected = ["update-ref", "--no-deref", f.ref!, plan.commit.candidate.hex, plan.oldOid?.hex ?? "0".repeat(format === "sha1" ? 40 : 64)];
+    check(policyEqual(gitBody(plan.argv), expected) && policyEqual(f.argv, plan.argv) && policyEqual(f.commands, [plan.argv]), "git-policy-delivery-command");
+    return undefined;
+  } catch (error) { return error instanceof Error ? error.message : "git-policy-delivery-invalid"; }
+}
+
+/** Pure ACL only. O still needs real repo protection, inventory closure and critical-section evidence. */
+export function checkGitPolicy(facts: GitPolicyFacts): GitPolicyResult {
+  let inputDigest = "";
+  try {
+    inputDigest = computeGitPolicyDigest(facts);
+    const deny = (code: string, paths?: string[], refs?: string[]): GitPolicyResult => ({ allowed: false, inputDigest, code,
+      ...(paths?.length ? { deniedPaths: paths } : {}), ...(refs?.length ? { deniedRefs: refs } : {}) });
+    if (!facts || (facts.repoId !== "uninitialized" && !/^[a-f0-9]{64}$/i.test(facts.repoId)) || !["sha1", "sha256"].includes(facts.objectFormat)
+        || ![facts.operationId, facts.actorRoleId].every(gitText) || (facts.taskId !== undefined && !gitText(facts.taskId))) return deny("git-policy-invalid-facts");
+    const rev = facts.authorizationRevision;
+    if (!(typeof rev === "string" ? gitText(rev) : Number.isSafeInteger(rev) && rev >= 0)
+        || rev !== facts.currentAuthorizationRevision) return deny("git-policy-stale-authorization");
+    if (![facts.paths, facts.readPaths, facts.writePaths].every(Array.isArray)
+        || facts.paths.length > 128 || facts.paths.some(p => !gitPath(p))) return deny("git-policy-invalid-path");
+    if ([...facts.readPaths, ...facts.writePaths].some(p => p !== "." && !gitPath(p.replace(/\/$/, "")))) return deny("git-policy-invalid-scope");
+    for (const oid of [facts.target, facts.other, facts.base, facts.candidate]) if (oid !== undefined && oid !== null && !gitOid(oid, facts.objectFormat)) return deny("git-policy-invalid-oid");
+    if (facts.limit !== undefined && (!Number.isSafeInteger(facts.limit) || facts.limit < 1 || facts.limit > 100)) return deny("git-policy-query-budget");
+    if (facts.repoId === "uninitialized") {
+      if (facts.rawObjectPlan || facts.refPublicationPlan || facts.deliveryBasis || facts.businessPublication || facts.appGeneratedFiles) return deny("git-policy-initialization-plan");
+      const error = initialGitPolicyError(facts);
+      return error ? deny(error) : { allowed: true, inputDigest };
+    }
+    if (facts.refPublicationPlan !== undefined) {
+      const error = refPublicationPolicyError(facts); return error ? deny(error) : { allowed: true, inputDigest };
+    }
+    if (facts.deliveryBasis !== undefined) return deny("git-policy-delivery-plan-missing");
+    if (facts.rawObjectPlan !== undefined) {
+      const error = rawObjectPolicyError(facts); return error ? deny(error) : { allowed: true, inputDigest };
+    }
+    if (facts.template === "revert") return deny("git-policy-revert-plan-missing");
+    if (facts.worksite !== undefined || facts.initializationBasis !== undefined || facts.businessPublication !== undefined || facts.appGeneratedFiles !== undefined)
+      return deny("git-policy-existing-repo-initialization-basis");
+    const query = gitQueryBody(facts);
+    if (query) {
+      const body = gitBody(facts.argv);
+      if (!body || JSON.stringify(body) !== JSON.stringify(query)) return deny("git-policy-argv-template");
+      if ((!facts.paths.length && !facts.readPaths.includes(".")) || facts.paths.some(p => !gitCovered(p, facts.readPaths))) return deny("git-policy-read-scope", [...facts.paths]);
+      if ([facts.target, facts.other].some(oid => oid && !facts.readableOids?.some(allowed => sameGitOid(oid, allowed)))) return deny("git-policy-read-oid");
+      return { allowed: true, inputDigest };
+    }
+    if (!["commit", "integrate", "revert", "init", "publish-documents", "publish-delivery"].includes(facts.template)) return deny("git-policy-unknown-template");
+    if (!gitText(facts.taskId)) return deny("git-policy-task-missing");
+    if (!gitText(facts.ownedWorktreeId) || facts.ownedWorktreeId !== facts.currentWorktreeId || !gitText(facts.ownedIndexId)
+        || facts.ownedIndexId !== facts.currentIndexId) return deny("git-policy-unowned-worksite");
+    const ref = facts.ref;
+    const candidateRef = gitText(facts.ownedCandidateRef) && /^(?:refs\/heads\/codex\/[a-zA-Z0-9_/-]+|refs\/ans\/candidates\/[a-f0-9]{64})$/.test(facts.ownedCandidateRef)
+      && !facts.ownedCandidateRef.includes("..") && !facts.ownedCandidateRef.includes("//");
+    const publishing = facts.template.startsWith("publish-");
+    const goodRef = publishing ? ref === facts.publicationRef && (facts.template === "publish-documents" ? ref === "refs/ans/trunk"
+      : /^refs\/ans\/delivery\/[a-z0-9][a-z0-9-]{1,95}$/.test(ref ?? "")) : candidateRef && ref === facts.ownedCandidateRef;
+    if (!goodRef) return deny("git-policy-ref", undefined, [String(ref)]);
+    if (["integrate", "revert", "init", "publish-delivery"].includes(facts.template) && facts.actorRoleId !== "convener") return deny("git-policy-role-action");
+    if (facts.template === "publish-documents" && !["product", "rapporteur", "nominator", "convener"].includes(facts.actorRoleId)) return deny("git-policy-role-action");
+    if (!facts.allDiff?.complete || !sameGitOid(facts.base ?? null, facts.allDiff.base) || !sameGitOid(facts.candidate ?? null, facts.allDiff.candidate)
+        || !Array.isArray(facts.allDiff.entries) || facts.allDiff.entries.length > 2048) return deny("git-policy-incomplete-diff");
+    const deniedPaths: string[] = [];
+    for (const entry of facts.allDiff.entries) {
+      if (!["A", "M", "D", "R", "C", "T"].includes(entry.status)) return deny("git-policy-diff-shape");
+      const oldRequired = entry.status !== "A", newRequired = entry.status !== "D";
+      if ((oldRequired && (!gitPath(entry.oldPath) || !gitOid(entry.oldOid, facts.objectFormat)))
+          || (newRequired && (!gitPath(entry.newPath) || !gitOid(entry.newOid, facts.objectFormat)))
+          || (oldRequired && !["100644", "100755"].includes(entry.oldMode ?? ""))
+          || (newRequired && !["100644", "100755"].includes(entry.newMode ?? ""))) return deny("git-policy-diff-shape-or-mode");
+      if (oldRequired && newRequired && entry.oldMode !== entry.newMode) return deny("git-policy-mode-change");
+      for (const file of [oldRequired ? entry.oldPath : undefined, newRequired ? entry.newPath : undefined]) if (file) {
+        const direct = gitRolePath(facts, file);
+        const integrated = facts.actorRoleId === "convener" && ["integrate", "revert", "publish-delivery"].includes(facts.template)
+          && facts.integrationGrants?.some(grant => gitText(grant.ownerRoleId) && /^[a-f0-9]{64}$/i.test(grant.evidenceDigest)
+            && gitOid(grant.candidate, facts.objectFormat) && gitRolePath({ ...facts, actorRoleId: grant.ownerRoleId, writePaths: grant.paths }, file));
+        if (!direct && !integrated) deniedPaths.push(file);
+      }
+    }
+    if (deniedPaths.length) return deny("git-policy-write-scope", [...new Set(deniedPaths)]);
+    if (!facts.commands?.length || JSON.stringify(facts.argv) !== JSON.stringify(facts.commands[0])
+        || facts.commands.some(argv => { const body = gitBody(argv); return !body || !gitModificationBody(facts, body); }))
+      return deny("git-policy-command-plan-unverified");
+    return { allowed: true, inputDigest };
+  } catch { return { allowed: false, inputDigest, code: "git-policy-invalid-facts" }; }
+}
 
 /** 引擎已知的规则集版本；rules.version 与之不符 → 硬拒（版本未知，fail-closed）。
  *  "2"：T8a 起规则集按「程序 + argv」重述、元字符仅在 `executionModel` 会经 shell 解释时生效（§7.10）。
@@ -436,6 +1486,9 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
     return { decision: "deny", reason: "argv 含非字符串元素（fail-closed）", ruleId: "deny:argv-invalid" };
   }
   const args = argv as string[];
+  const rawGitProgram = args[0]!.replace(/\\/g, "/").split("/").at(-1)!.toLowerCase();
+  if (/^git(?:\.exe|\.cmd|\.bat)?$/.test(rawGitProgram)) return { decision: "deny", ruleId: "deny:raw-git-controlled-tools-required",
+    reason: "裸 Git 未经受控配置/env/完整模板与角色ACL；请使用 git_query / git_candidate / git_publish，旧shell审批不能替代该边界。" };
 
   // 3) 结构性硬拒：换行/回车（多命令拼接）——**仅当执行模型会经 shell 解释时**成立（§7.10）。
   //    shell:false 下 argv 元素里的换行只是普通字节、不产生第二条命令，故不拒（否则误杀多行参数）。

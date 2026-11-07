@@ -3,6 +3,7 @@
 // 只用可擦除语法。
 
 import type { Acceptance, BoundarySection1 } from "./boundary.ts";
+import type { FrozenRoleEvidence } from "./trunk.ts";
 
 export type RoleKind = "project" | "built-in-governance";
 
@@ -66,6 +67,8 @@ export interface ResolvedRole extends RoleGroupMetadata {
 }
 
 export interface ProjectConfig {
+  /** 仅宿主注入的可信读取上下文；有run缺物证必须拒绝，不能退回live。 */
+  documentContext?: { runId?: string; pinDigest?: string; frozenRoleEvidence?: FrozenRoleEvidence };
   projectRoot: string;
   skillRoot: string;
   roles: Record<string, RoleLocation>; // F8：由配置提供

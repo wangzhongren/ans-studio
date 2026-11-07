@@ -28,6 +28,84 @@ export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
 export const PROJECT_MODULES_SCHEMA = "project-modules/v2" as const;
 export const PROJECT_TOPOLOGY_SCHEMA = "project-topology/v2" as const;
 export const PROJECT_PROPOSAL_SCHEMA = "project-proposal/v2" as const;
+export const TEAM_PLAN_SCHEMA = "teamPlanSchema:3" as const;
+
+export interface TeamPlanFacts {
+  schema: typeof TEAM_PLAN_SCHEMA;
+  flowId: string;
+  version: number;
+  modules: { path: string; sha256: string };
+  roster: { path: string; sha256: string };
+  roleRows: Array<{ roleId: string; modules: string[]; writesets: string[]; dependsOn: string[] }>;
+}
+
+/** Planning coordination precedes D3 and role activation; these are never inferred from this result. */
+export function evaluatePlanningHandoff(input: { fromRoleId: string; targetRoleId: string; flowId: string;
+  proposal: { path: string; sha256: string }; modules: { path: string; sha256: string }; roster: { path: string; sha256: string };
+  rosterFacts: ProjectRoster; modulesFacts: ProjectModulesDoc }): { ok: true } | { ok: false; reason: string } {
+  if (input.fromRoleId !== "chief" || input.targetRoleId !== "convener") return { ok: false, reason: "Planning coordination is the real chief-to-convener route" };
+  if (input.rosterFacts.flowId !== input.flowId || input.modulesFacts.flowId !== input.flowId
+    || input.rosterFacts.proposal !== input.proposal.path || (input.rosterFacts.modulesDoc !== undefined && input.rosterFacts.modulesDoc !== input.modules.path)
+    || JSON.stringify(input.rosterFacts.modules) !== JSON.stringify(input.modulesFacts.modules)
+    || [input.proposal, input.modules, input.roster].some(ref => !ref.path || !/^[a-f0-9]{64}$/i.test(ref.sha256)))
+    return { ok: false, reason: "Planning needs the real consistent proposal, roster and authoritative modules references" };
+  return { ok: true };
+}
+
+/** Plan formation only: ownership comes from the supplied parsed roster, never from this plan. */
+export function parseTeamPlan(text: string, context: {
+  flowId: string; version: number; modules: TeamPlanFacts["modules"]; roster: TeamPlanFacts["roster"]; rosterFacts: ProjectRoster;
+}): { ok: true; plan: TeamPlanFacts } | { ok: false; reason: string } {
+  const invalid = (reason: string) => ({ ok: false as const, reason });
+  const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+  const exact = (value: Record<string, unknown>, fields: string[]) => Object.keys(value).length === fields.length && fields.every(key => Object.hasOwn(value, key));
+  const strings = (value: unknown, empty = false): value is string[] => Array.isArray(value) && (empty || value.length > 0)
+    && value.every(item => typeof item === "string" && item.trim() === item && item.length > 0) && new Set(value).size === value.length;
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+  if (!match) return invalid("Team plan requires its machine frontmatter; a schema-only historical plan is read-only");
+  let parsed: unknown; try { parsed = parseYaml(match[1]!); } catch { return invalid("Team plan YAML is invalid or ambiguous"); }
+  if (!object(parsed) || !exact(parsed, ["schema", "flowId", "version", "modules", "roster", "roleRows"])
+    || parsed.schema !== TEAM_PLAN_SCHEMA || parsed.flowId !== context.flowId || parsed.version !== context.version
+    || !Number.isSafeInteger(parsed.version) || (parsed.version as number) < 1) return invalid("Team plan schema, fields, flow or version differ from its real reference");
+  for (const key of ["modules", "roster"] as const) {
+    const ref = parsed[key], expected = context[key];
+    if (!object(ref) || !exact(ref, ["path", "sha256"]) || ref.path !== expected.path || ref.sha256 !== expected.sha256
+      || !/^[a-f0-9]{64}$/i.test(expected.sha256)) return invalid(`Team plan ${key} reference differs from the applicable immutable baseline`);
+  }
+  if (!Array.isArray(parsed.roleRows) || parsed.roleRows.length !== context.rosterFacts.roles.length || !parsed.roleRows.length)
+    return invalid("Team plan role rows must cover the real roster exactly once");
+  const rows: TeamPlanFacts["roleRows"] = [], seen = new Set<string>(), writes: Array<{ roleId: string; path: string }> = [];
+  for (const row of parsed.roleRows) {
+    if (!object(row) || !exact(row, ["roleId", "modules", "writesets", "dependsOn"]) || typeof row.roleId !== "string"
+      || seen.has(row.roleId) || !strings(row.modules) || !strings(row.writesets) || !strings(row.dependsOn, true)) return invalid("Team plan role, modules, writesets and explicit dependency arrays are required and unique");
+    const role = context.rosterFacts.roles.find(role => role.id === row.roleId);
+    if (!role || [...role.modules].sort().join("\0") !== [...row.modules].sort().join("\0")) return invalid("Team plan cannot assign unknown roles/modules or change the roster's module owner");
+    const roots = context.rosterFacts.modules.filter(module => role.modules.includes(module.id)).flatMap(module => module.paths);
+    const writesets = row.writesets;
+    for (const raw of writesets) {
+      const normalized = normalizeModulePath(raw);
+      if (!normalized || normalized.path !== raw || /[\\:\x00-\x1f]/.test(raw) || isGovernanceDirectory(raw)
+        || !roots.some(root => root === raw || (root.endsWith("/") && raw.startsWith(root)))) return invalid(`Team plan writeset exceeds its roster owner: ${row.roleId}`);
+      if (writes.some(write => modulePathsOverlap(write.path, raw))) return invalid("Team plan contains overlapping writers or duplicate writesets");
+      writes.push({ roleId: row.roleId, path: raw });
+    }
+    if (role.modules.some(moduleId => !context.rosterFacts.modules.find(module => module.id === moduleId)?.paths.some(root => writesets.some(write => write === root || (root.endsWith("/") && write.startsWith(root))))))
+      return invalid("Every assigned module needs a concrete writeset within its own root");
+    seen.add(row.roleId); rows.push({ roleId: row.roleId, modules: [...row.modules], writesets: [...row.writesets], dependsOn: [...row.dependsOn] });
+  }
+  if (rows.some(row => row.dependsOn.some(roleId => roleId === row.roleId || !seen.has(roleId)))) return invalid("Team plan dependency is unknown or refers to itself");
+  const visiting = new Set<string>(), complete = new Set<string>();
+  const visit = (roleId: string): boolean => {
+    if (visiting.has(roleId)) return false;
+    if (complete.has(roleId)) return true;
+    visiting.add(roleId);
+    if (!rows.find(row => row.roleId === roleId)!.dependsOn.every(visit)) return false;
+    visiting.delete(roleId); complete.add(roleId); return true;
+  };
+  if (!rows.every(row => visit(row.roleId))) return invalid("Team plan dependencies contain a cycle");
+  return { ok: true, plan: { schema: TEAM_PLAN_SCHEMA, flowId: context.flowId, version: context.version,
+    modules: { ...context.modules }, roster: { ...context.roster }, roleRows: rows } };
+}
 
 // 2026-11-03（contract_check topic）：本文件的 schema 文本/示例（`contractSchemaText` 与
 // `PROJECT_*_SCHEMA_EXAMPLE`）必须与解析规则、错误文案同步修改；改校验/文案时同步更新上述常量与文本。

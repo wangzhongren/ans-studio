@@ -27,6 +27,7 @@ const dumpEnvPath = arg("dump-env");
 const callLogPath = arg("call-log");
 const initDelayMs = Number(arg("init-delay") ?? "0") || 0;
 const withResources = argv.includes("--resources");
+const closeDelayMs = Number(arg("close-delay") ?? "0") || 0;
 
 if (dumpEnvPath !== undefined) {
   writeFileSync(
@@ -121,6 +122,9 @@ process.stdin.on("data", (chunk: string) => {
     }
   }
 });
-process.stdin.on("end", () => process.exit(0));
+process.stdin.on("end", () => {
+  if (closeDelayMs > 0) setTimeout(() => process.exit(0), closeDelayMs);
+  else process.exit(0);
+});
 process.on("SIGTERM", () => process.exit(0));
 process.on("SIGINT", () => process.exit(0));

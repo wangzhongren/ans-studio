@@ -88,7 +88,7 @@ function snapshotOfManifest(manifest: TrunkManifest): TrunkApplySnapshot {
               version: manifest.artifacts.execution.flow.version,
             },
     },
-    workflow: { path: manifest.artifacts.workflow.path, sha256: manifest.artifacts.workflow.sha256 },
+    ...(manifest.artifacts.workflow ? { workflow: { path: manifest.artifacts.workflow.path, sha256: manifest.artifacts.workflow.sha256 } } : {}),
     roleCards,
     boundaries,
   };
@@ -248,6 +248,7 @@ test("trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认
     if (!upgraded.ok) return;
     assert.equal(upgraded.value.manifest.trunkVersion, 2);
     assert.equal(upgraded.value.manifest.source, "upgrade");
+    assert.ok(upgraded.value.manifest.artifacts.workflow, "Execution fixture must contain a real workflow");
     assert.equal(upgraded.value.manifest.artifacts.workflow.sha256, newSha);
     const last = rig.events.filter((event) => event.kind === "trunk.state").at(-1);
     assert.equal(last?.kind === "trunk.state" ? last.decidedBy : undefined, "customer");
@@ -261,6 +262,7 @@ test("trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 mani
   try {
     await bootstrap(rig);
     const before = await rig.trunkService.status();
+    assert.ok(before.manifest!.artifacts.workflow, "Execution fixture must contain a real workflow");
     const oldSha = before.manifest!.artifacts.workflow.sha256;
     const newSha = await writeProjectFile(rig.project.root, PATHS.workflow, "# workflow v2\n");
     const repinned = await rig.runtime.completeStableWrite({
@@ -275,6 +277,7 @@ test("trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 mani
     assert.equal(repinned.applied, true);
     const after = await rig.trunkService.status();
     assert.equal(after.manifest!.trunkVersion, before.manifest!.trunkVersion);
+    assert.ok(after.manifest!.artifacts.workflow, "Execution fixture must contain a real workflow");
     assert.equal(after.manifest!.artifacts.workflow.sha256, newSha);
     const event = rig.events.filter((item) => item.kind === "trunk.state").at(-1);
     assert.equal(event?.kind === "trunk.state" ? event.op : undefined, "stable-repinned");
@@ -312,7 +315,7 @@ test("trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 mani
       newSha: sha256("x"),
       at: AT2,
     });
-    assert.deepEqual(pending, { applied: false, pendingReattach: true });
+    assert.deepEqual(pending, { applied: false, pendingReattach: true, errorCode: "stable-manifest-unavailable", message: "missing" });
     assert.equal(events.length, 0, "无 manifest 不写 stable-repinned 事件（只记待续接）");
   } finally {
     await fs.rm(fresh.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });

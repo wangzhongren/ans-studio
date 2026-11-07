@@ -444,6 +444,7 @@ function wrapSession(role: ResolvedRole, inner: RoleSession, turn: { id?: string
     get contextSource() { return inner.contextSource; },
     get nativeSessionId() { return inner.nativeSessionId; },
     get contextWarning() { return inner.contextWarning; },
+    get nativeLifecycle() { return inner.nativeLifecycle; },
     async prompt(text, options) {
       if (turn.id) throw new Error("Agent is already processing a prompt.");
       turn.id = randomUUID();

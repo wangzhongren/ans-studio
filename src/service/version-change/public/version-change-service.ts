@@ -27,6 +27,7 @@ export const VERSION_CHANGE_SERVICE_CONTRACT_VERSION = "version-change-service/v
 export function createVersionChangeService(deps: VersionChangeServiceDeps): VersionChangeServices {
   const freeze = buildFreezeService({ registry: deps.freezeRegistry });
   const vca = buildVcaService({
+    ...(deps.projectRoot !== undefined ? { projectRoot: deps.projectRoot } : {}),
     repository: deps.versionChanges,
     freeze,
     hashes: deps.hashes,
@@ -36,6 +37,7 @@ export function createVersionChangeService(deps: VersionChangeServiceDeps): Vers
       : {}),
   });
   const stableWrite = buildStableWriteService({
+    ...(deps.projectRoot !== undefined ? { projectRoot: deps.projectRoot } : {}),
     records: deps.stableWrites,
     permits: deps.permits,
     hashes: deps.hashes,
@@ -90,6 +92,7 @@ export type {
   VersionChangeRejectInput,
   VersionChangeRepositoryPort,
   VersionChangeService,
+  VersionChangeDirectCreateInput,
   VersionChangeServiceAllocation,
   VersionChangeServiceDeps,
   VersionChangeServices,

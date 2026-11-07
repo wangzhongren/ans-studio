@@ -10,7 +10,7 @@
 // · 运行时组合（`createVersionChangeStack`）：把 S1 存储 + S2 Service + S4 四句柄接进桌面；
 //   `emitEvent` 注入 task-state（生产 `appendTaskEvent`）；presenter/notify 注入会话卡通道。
 // · stable-write：确认后许可由 S2 安装到 C2b 快照；桌面在重启后**重建**同步许可快照
-//   （`installStableWritePermitSnapshot`）并把候选 permit 注入 run-role `stablePermitOf`；
+//   （Pipeline `refreshStableWritePermitSnapshot`）并把候选 permit 注入 run-role `stablePermitOf`；
 //   写入后的 `completeWrite(actualSha)` 由桌面 after-write 钩子调用（F16：**桌面无直接写盘路径**）。
 // · 客户主权：VCA/逐项/stable 卡永不进判断器/委托/`@决策`；presenter 结果再做 operatorId/judge
 //   二次校验（非 customer ⇒ unavailable）。
@@ -22,13 +22,10 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { appendTaskEvent } from "../../src/common/编排/task-state.ts";
+import { refreshAndInstallVersionedDocFreezeSnapshot } from "../../src/service/boundary/resolve-boundary.ts";
+import { recordTaskObservation } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import { declaredConfirmPaths, declaredPathBodies } from "../../src/common/编排/confirmed-writes.ts";
-import {
-  installStableWritePermitSnapshot,
-  refreshVersionedDocFreezeSnapshot,
-  stableWritePathOf,
-} from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+import { stableWritePathOf } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type { VersionedDocFreezeSnapshot } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import { createDiagnosticLogger } from "../../src/common/shared/diagnostics.ts";
 import type {
@@ -59,7 +56,7 @@ import type { DocFreezeRecordInput } from "../../src/service/version-change/publ
 import type { SnapshotItem, TrunkStableSnapshotTarget, TrunkStatusView } from "../../src/service/trunk/public/trunk-service.ts";
 import { createRefactorRuntime } from "../../src/pipeline/orchestration/refactor-runtime.ts";
 import type { RefactorRuntime } from "../../src/pipeline/orchestration/refactor-runtime.ts";
-import { createStableWriteRuntime } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
+import { createStableWriteRuntime, refreshStableWritePermitSnapshot } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
 import type {
   StableWriteCardOutcome,
   StableWritePresenter,
@@ -664,6 +661,7 @@ export interface VersionChangeStackOptions {
   notify?: (message: string) => void | Promise<void>;
   /** 客户决定结果返回发起角色（如 product/rapporteur；只通知）。 */
   notifyInitiator?: (roleId: string, message: string) => void | Promise<void>;
+  notifyDirect?: NonNullable<Parameters<typeof createVersionChangeRuntime>[0]["notifyDirect"]>;
   /** 卡通道（由 SessionManager/Interface 注入；缺省 ⇒ 无 presenter，fail-closed）。 */
   presentVersionChangeCard?: (record: VersionChangeRecord) => Promise<VcaCardOutcome>;
   presentAmendmentItemCard?: (input: AmendmentItemPresentation) => Promise<AmendmentItemOutcome>;
@@ -842,7 +840,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     try {
       if (options.emitEvent !== undefined) await options.emitEvent(event);
       else {
-        const result = await appendTaskEvent(root, event);
+        const result = await recordTaskObservation({ projectRoot: root, event });
         if (!result.ok) diagnostic.error("event.append.failed", new Error(result.message), { kind: event.kind });
       }
     } catch (error) {
@@ -898,7 +896,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
             : {}),
         };
 
-  const versionChangeRuntime: VersionChangeRuntime = createVersionChangeRuntime({
+  const versionChangeRuntime = createVersionChangeRuntime({
     projectRoot: root,
     services,
     trunkService,
@@ -907,6 +905,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     ...(presenter !== undefined ? { presenter } : {}),
     ...(options.notify !== undefined ? { notify: options.notify } : {}),
     ...(options.notifyInitiator !== undefined ? { notifyInitiator: options.notifyInitiator } : {}),
+    ...(options.notifyDirect !== undefined ? { notifyDirect: options.notifyDirect } : {}),
     now,
   });
 
@@ -920,6 +919,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
         };
 
   const stableWriteRuntime: StableWriteRuntime = createStableWriteRuntime({
+    projectRoot: root,
     stableWrite: services.stableWrite,
     trunkRuntime: { completeStableWrite: (input) => trunkRuntime.completeStableWrite(input) },
     emitEvent,
@@ -938,22 +938,17 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
   });
 
   async function rebuildPermitSnapshot(): Promise<void> {
-    const records = await services.stableWrite.list();
-    const permits: StableWritePermit[] = [];
-    const seen = new Set<string>();
-    for (const record of records) {
-      if (record.status !== "approved") continue;
-      const permit = await services.stableWrite.findPermit(record.path);
-      if (permit === undefined || permit.requestId !== record.requestId || seen.has(permit.permitId)) continue;
-      seen.add(permit.permitId);
-      permits.push(permit);
-    }
-    installStableWritePermitSnapshot(root, permits);
     restoredPermits.clear();
+    const permits = await refreshStableWritePermitSnapshot({ projectRoot: root, now });
     for (const permit of permits) {
       const key = stableKeyOf(permit.path);
       if (key !== undefined) restoredPermits.set(key, permit);
     }
+  }
+
+  async function withRuntimePermitProjection<T>(operation: Promise<T>): Promise<T> {
+    try { return await operation; }
+    finally { await rebuildPermitSnapshot(); } // Rebuild only the ordinary projection from the same public authoritative snapshot.
   }
 
   async function initialize(): Promise<InitResult> {
@@ -969,7 +964,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     }
     migrationDone = true;
     // 迁移完成后以 completed=true 重新构建 C2b 快照（missing 迁移后不得停留在 migration-required）。
-    const snapshot = await refreshVersionedDocFreezeSnapshot(root, { migrationCompleted: true, now });
+    const snapshot = await refreshAndInstallVersionedDocFreezeSnapshot(root, { migrationCompleted: true, now });
     await rebuildPermitSnapshot();
     return { ok: true, cacheHealth: snapshotHealth(snapshot) };
   }
@@ -1019,9 +1014,11 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
       }
       return { path: ref.path, sha256: sha };
     };
-    const workflow = await hashRef("workflow", manifest.artifacts.workflow);
+    const workflowRef = manifest.artifacts.workflow;
+    if (workflowRef === undefined) return { ok: false, error: "workflow-missing: execution requires a real workflow" };
+    const workflow = await hashRef("workflow", workflowRef);
     if (workflow === undefined) {
-      return { ok: false, error: mainT("main.interface.readFileFailed", { detail: manifest.artifacts.workflow.path }) };
+      return { ok: false, error: mainT("main.interface.readFileFailed", { detail: workflowRef.path }) };
     }
     const roleCards: Record<string, { path: string; sha256: string }> | undefined =
       manifest.artifacts.roleCards === undefined ? undefined : {};
@@ -1077,9 +1074,11 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
   async function stableSnapshotTarget(
     manifest: TrunkManifest,
   ): Promise<{ ok: true; target: TrunkStableSnapshotTarget } | { ok: false; error: string }> {
-    const workflowSha = await fileSha256(root, manifest.artifacts.workflow.path);
+    const workflowRef = manifest.artifacts.workflow;
+    if (workflowRef === undefined) return { ok: false, error: "workflow-missing: refreeze requires a real workflow" };
+    const workflowSha = await fileSha256(root, workflowRef.path);
     if (workflowSha === undefined) {
-      return { ok: false, error: mainT("main.interface.readFileFailed", { detail: manifest.artifacts.workflow.path }) };
+      return { ok: false, error: mainT("main.interface.readFileFailed", { detail: workflowRef.path }) };
     }
     const roleCards: Record<string, { path: string; sha256: string }> = {};
     for (const [roleId, ref] of Object.entries(manifest.artifacts.roleCards ?? {})) {
@@ -1096,7 +1095,7 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     return {
       ok: true,
       target: {
-        workflow: { path: manifest.artifacts.workflow.path, sha256: workflowSha },
+        workflow: { path: workflowRef.path, sha256: workflowSha },
         roleCards,
         boundaries,
       },
@@ -1171,11 +1170,11 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     async completeStableWriteAfterWrite(relPath, actualSha256, at) {
       const permit = stablePermitOf(relPath);
       if (permit === undefined) return { ok: true, skipped: true };
-      const completed = await stableWriteRuntime.completeWrite({
+      const completed = await withRuntimePermitProjection(stableWriteRuntime.completeWrite({
         requestId: permit.requestId,
         actualSha256,
         at: at ?? now().toISOString(),
-      });
+      }));
       if (completed.ok) {
         const key = stableKeyOf(relPath);
         if (key !== undefined) restoredPermits.delete(key);
@@ -1189,26 +1188,26 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
       };
     },
     async onAppointmentWriteApproved(input) {
-      const approved = await stableWriteRuntime.onAppointmentWriteApproved({
+      const approved = await withRuntimePermitProjection(stableWriteRuntime.onAppointmentWriteApproved({
         roleId: input.roleId,
         kind: input.kind,
         content: input.content,
         confirmationId: input.confirmationId,
         ...(input.diffPreview !== undefined ? { diffPreview: input.diffPreview } : {}),
         ...(input.at !== undefined ? { at: input.at } : {}),
-      });
+      }));
       return approved.ok
         ? { ok: true }
         : { ok: false, code: approved.code, ...(approved.message !== undefined ? { message: approved.message } : {}) };
     },
     async requestWorkflowWrite(input) {
-      const result = await stableWriteRuntime.requestWorkflowWrite({
+      const result = await withRuntimePermitProjection(stableWriteRuntime.requestWorkflowWrite({
         roleId: input.roleId,
         content: input.content,
         ...(input.diffPreview !== undefined ? { diffPreview: input.diffPreview } : {}),
         ...(input.requestId !== undefined ? { requestId: input.requestId } : {}),
         ...(input.at !== undefined ? { at: input.at } : {}),
-      });
+      }));
       return result.ok
         ? {
             ok: true,
@@ -1219,71 +1218,9 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
     // —————————————— Batch 3.5 / C1d：三提交能力（只提交，不批准/不签发许可） ——————————————
     async submitVersionChange(input, signal) {
       if (signal?.aborted) return { ok: false, errorCode: "vca-invalid", message: "发起轮次已中止——未提交。" };
-      try {
-        const at = now().toISOString();
-        const current = await trunkService.current();
-        // 应用侧事实（C1d/S5）：无已落盘 trunk manifest ⇒ 本次申请只能以 bootstrap 模式提交。
-        // 模式不由发起角色自报：批准时以派生快照（唯一 pinned run）为基线落 t1，叠加本次变更；
-        // 已有 trunk 时以当前主干为基线（此时显式 bootstrap:true 交由 Service 拒绝，不在此吞掉）。
-        const bootstrapMode = current === null || input.bootstrap === true;
-        const baseTrunk = bootstrapMode ? null : current;
-        let amendmentItems: SnapshotItem[] | undefined;
-        if (input.kind === "detail-amendment" && input.amendmentDocPath !== undefined) {
-          const validated = await trunkService.validateAmendment({
-            amendmentDocPath: input.amendmentDocPath,
-            flowId: input.flowId,
-          });
-          if (!validated.ok) {
-            return { ok: false, errorCode: "vca-invalid", message: validated.message ?? validated.code };
-          }
-          amendmentItems = validated.value.items;
-        }
-        const result = await versionChangeRuntime.submit({
-          kind: input.kind,
-          initiatorRoleId: input.initiatorRoleId,
-          flowId: input.flowId,
-          baseTrunk,
-          ...(bootstrapMode ? { bootstrap: true } : {}),
-          targets: input.targets.map((target) => ({
-            kind: target.kind,
-            path: target.path,
-            action: target.action,
-            ...(target.from !== undefined ? { from: target.from } : {}),
-            ...(target.roleId !== undefined ? { roleId: target.roleId } : {}),
-          })),
-          ...(input.amendmentId !== undefined ? { amendmentId: input.amendmentId } : {}),
-          ...(input.amendmentDocPath !== undefined ? { amendmentDocPath: input.amendmentDocPath } : {}),
-          ...(amendmentItems !== undefined ? { amendmentItems } : {}),
-          summary: input.summary,
-          at,
-        });
-        if (!result.ok) {
-          return { ok: false, errorCode: result.code, ...(result.message !== undefined ? { message: result.message } : {}) };
-        }
-        if (result.value.status !== "submitted") {
-          return {
-            ok: false,
-            errorCode: "vca-conflict",
-            message: `同目标 VCA 已存在（status=${result.value.status}）；不重复提交，请查看版本变更面板。`,
-          };
-        }
-        // 提交成功即**自动呈现客户批准卡**（决策中心弹窗由 pending 驱动；不阻塞发起轮次）。
-        // 无 presenter/无治理会话 ⇒ present 返回 vca-channel-unavailable：保持 submitted，
-        // 可从版本变更面板重发，绝不伪造批准。
-        if (presenter !== undefined) {
-          void versionChangeRuntime.present(result.value.applicationId).catch((error: unknown) => {
-            diagnostic.error("version-change.auto-present.failed", error);
-          });
-        }
-        return { ok: true, applicationId: result.value.applicationId, status: "submitted" };
-      } catch (error) {
-        return {
-          ok: false,
-          errorCode: "vca-invalid",
-          message: error instanceof Error ? error.message : String(error),
-        };
-      }
+      return versionChangeRuntime.submitDirect(input, input.initiatorRoleId);
     },
+
     async submitRefactor(input, signal) {
       if (signal?.aborted) return { ok: false, errorCode: "refactor-invalid", message: "发起轮次已中止——未提交。" };
       try {
@@ -1320,11 +1257,11 @@ export function createVersionChangeStack(options: VersionChangeStackOptions): Ve
       try {
         // S4 `requestWorkflowWrite`：记录请求 → 客户 stable-write 确认卡 → 客户批准后 S2 签发一次性许可。
         // **本能力不签发许可/不批准**；成功后按工具冻结回执返回 `requested`（许可已在确认后签发）。
-        const result = await stableWriteRuntime.requestWorkflowWrite({
+        const result = await withRuntimePermitProjection(stableWriteRuntime.requestWorkflowWrite({
           roleId: input.roleId,
           content: input.content,
           at: now().toISOString(),
-        });
+        }));
         if (!result.ok) {
           return {
             ok: false,

@@ -1,12 +1,32 @@
-import type { InteractionGate, SessionEvent } from "../../model/runtime.ts";
+import type { InteractionGate, SessionEvent, RuntimeNativeLifecycleFacts } from "../../model/runtime.ts";
 
 /** Infrastructure is constructed in Provider; these are adapter-private wire shapes. */
 export interface CodexRpcConnection {
+  /** Observation only; close() resolving or a rejected RPC does not supply this evidence. */
+  inspectLifecycle?(): Pick<RuntimeNativeLifecycleFacts, "transport" | "processes" | "processCoverage" | "reasons">;
   request(method: string, params: Record<string, unknown>): Promise<unknown>;
   notify(method: string, params: Record<string, unknown>): void;
   onNotification(listener: (method: string, params: unknown) => void): () => void;
   onServerRequest(handler: (method: string, params: unknown, request?: { signal: AbortSignal }) => Promise<Record<string, unknown>>): void;
   close(): Promise<void>;
+}
+
+/** Bound observation without pretending that the losing work has settled. */
+export async function observeNativeStop(work: Promise<unknown>, timeoutMs: number, signal?: AbortSignal): Promise<string | undefined> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return "native-stop-invalid-timeout";
+  if (signal?.aborted) return "native-stop-observation-aborted";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  try {
+    return await Promise.race([
+      work.then(() => undefined, () => "native-stop-cleanup-failed"),
+      new Promise<string>(resolve => {
+        timer = setTimeout(() => resolve("native-stop-timeout"), timeoutMs);
+        onAbort = () => resolve("native-stop-observation-aborted");
+        signal?.addEventListener("abort", onAbort, { once: true });
+      }),
+    ]);
+  } finally { clearTimeout(timer); if (onAbort) signal?.removeEventListener("abort", onAbort); }
 }
 export interface CodexEngineInput {
   cwd: string;

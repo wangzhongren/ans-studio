@@ -129,7 +129,8 @@ test("approve/reject：客户确认 id 必备；一次性许可含 approvedAt/ex
   assert.equal(permit.targetSha256, rig.hashes.sha256Content(TARGET));
   assert.equal(approved.value.record.status, "approved");
   assert.equal(approved.value.record.permitId, permit.permitId);
-  assert.ok(rig.permits.snapshots.length > 0, "批准后安装 C2b 同步许可快照");
+  assert.equal(rig.permits.snapshots.length, 0, "Service never invokes a storage callback to install Gate state");
+  assert.deepEqual(await rig.services.stableWrite.readPermitSnapshot(), [permit]);
 
   const again = await rig.services.stableWrite.approve(requested.value.requestId, {
     decisionId: "dec-sw-1",
@@ -412,7 +413,7 @@ test("F13/F16 联合契约：PermitFact 可作 StableWriteDecisionInput.permit�
   );
   assert.deepEqual(
     Object.keys(rig.services.stableWrite).sort(),
-    ["approve", "completeWrite", "fail", "findPermit", "list", "reject", "request"],
+    ["approve", "completeWrite", "fail", "findPermit", "list", "readPermitSnapshot", "reject", "request"],
     "F16：Service 只提供契约，无 writeFile/写盘方法；真实执行在 run-role gate + completeWrite",
   );
 });
@@ -515,4 +516,23 @@ test("C2b/C2c 联合契约（F13/F16）：C2c 一次性许可经 C2b stableWrite
     invalidateStableWritePermitSnapshot(root);
     await fs.rm(root, { recursive: true, force: true });
   }
+});
+
+
+test("readPermitSnapshot: real request join excludes expired/consumed/failed and mismatched permits without callbacks", async () => {
+  const rig = createTestRig(), requested = await rig.services.stableWrite.request({ roleId: "convener", kind: "workflow", content: TARGET, at: AT });
+  assert.ok(requested.ok); if (!requested.ok) return;
+  const approved = await rig.services.stableWrite.approve(requested.value.requestId, { decisionId: "ordinary-approved-choice", at: AT });
+  assert.ok(approved.ok); if (!approved.ok) return;
+  const permit = approved.value.permit;
+  const copy = await rig.services.stableWrite.readPermitSnapshot(); assert.deepEqual(copy, [permit]); copy[0]!.status = "failed";
+  assert.deepEqual(await rig.services.stableWrite.readPermitSnapshot(), [permit], "Returned ordinary lists do not mutate storage");
+  for (const changed of [{ ...permit, status: "consumed" as const }, { ...permit, status: "failed" as const }, { ...permit, expiresAt: AT },
+    { ...permit, requestId: "sw-999" }, { ...permit, roleId: "another-role" }, { ...permit, targetSha256: "a".repeat(64) }]) {
+    await rig.permits.upsert(changed); assert.deepEqual(await rig.services.stableWrite.readPermitSnapshot(), []);
+  }
+  await rig.permits.upsert(permit);
+  assert.ok((await rig.services.stableWrite.fail(requested.value.requestId, "actual rejected completion", AT)).ok);
+  assert.deepEqual(await rig.services.stableWrite.readPermitSnapshot(), []);
+  assert.equal(rig.permits.snapshots.length, 0, "No storage-supplied opaque installation callback runs");
 });

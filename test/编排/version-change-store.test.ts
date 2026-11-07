@@ -16,6 +16,7 @@ import {
   VERSION_INITIALIZED_REL,
   VERSION_BASELINE_REL,
   versionedDocFreezeState,
+  installVersionedDocFreezeSnapshot,
   type VersionedDocFreezeSnapshot,
 } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import {
@@ -30,6 +31,7 @@ import {
 } from "../../src/model/version-change.ts";
 import {
   DOC_FREEZES_REL,
+  refreshVersionedDocFreezeSnapshot,
   REFACTOR_REQUESTS_REL,
   STABLE_WRITE_PERMITS_REL,
   STABLE_WRITES_REL,
@@ -235,15 +237,10 @@ test("重构记录：CRUD 与状态期望更新", async () => {
   assert.equal(JSON.parse(file).length, 1);
 });
 
-test("stable-write：record 与 permit 分表（F13）、upsert、installSnapshot 注入", async () => {
+test("stable-write：record 与 permit 分表（F13）、upsert、普通数据不执行上层安装", async () => {
   const root = await makeRoot();
   const records = createStableWriteStore(root);
-  const snapshots: StableWritePermit[][] = [];
-  const permits = createStableWritePermitStore(root, {
-    installSnapshot: (entries) => {
-      snapshots.push(entries.map((entry) => ({ ...entry })));
-    },
-  });
+  const permits = createStableWritePermitStore(root);
 
   assert.deepEqual(await records.insert(stableRecord({ permitId: "sw-1-p1" })), { ok: true });
   assert.deepEqual(await permits.upsert(permit()), { ok: true });
@@ -259,9 +256,8 @@ test("stable-write：record 与 permit 分表（F13）、upsert、installSnapsho
   assert.ok(permitText.includes('"targetSha256"'));
 
   const installed = await permits.list();
-  await permits.installSnapshot(installed);
-  assert.equal(snapshots.length, 1);
-  assert.equal(snapshots[0]?.length, 1);
+  assert.equal(installed.length, 1);
+  assert.equal("installSnapshot" in permits, false, "The Provider exposes ordinary records, never a Gate callback");
 
   const invalid = await permits.upsert({ ...permit(), status: "requested" as StableWritePermit["status"] });
   assert.equal(invalid.ok, false);
@@ -396,6 +392,7 @@ test("guard 冻结注册表：append 经 C2b 落 R9、frozen 状态、幂等/冲
   assert.equal(freezes[0]?.path, project.docA.path);
   assert.equal(freezes[0]?.sha256, project.docA.sha256);
   assert.equal(freezes[0]?.freeze.reason, "vca-approved");
+  installVersionedDocFreezeSnapshot(project.root, await refreshVersionedDocFreezeSnapshot(project.root, { migrationCompleted: true }));
   assert.equal(versionedDocFreezeState(project.root, project.docA.path, true), "frozen");
 
   // 同 sha/同 reason/同 applicationId ⇒ 幂等跳过
@@ -425,6 +422,7 @@ test("guard 冻结注册表：append 经 C2b 落 R9、frozen 状态、幂等/冲
   const markers = await draftRegistry.listDraftMarkers();
   assert.equal(markers.length, 1);
   assert.equal(markers[0]?.path, draftProject.docA.path);
+  installVersionedDocFreezeSnapshot(draftProject.root, await refreshVersionedDocFreezeSnapshot(draftProject.root, { migrationCompleted: true }));
   assert.equal(versionedDocFreezeState(draftProject.root, draftProject.docA.path, true), "draft");
 });
 
@@ -483,7 +481,7 @@ test("Port 对齐：Provider 结构兼容 C2c 冻结 Port", async () => {
   const root = await makeRoot();
   const vcaPort: VersionChangeRepositoryPort = createVersionChangeStore(root);
   const stablePort: StableWriteRepositoryPort = createStableWriteStore(root);
-  const permitPort: StablePermitPort = createStableWritePermitStore(root, { installSnapshot: () => {} });
+  const permitPort: StablePermitPort = createStableWritePermitStore(root);
   const registryPort: FreezeRegistryPort = createGuardFreezeRegistry(root, {
     refresh: async () => snapshotOf("ready", undefined),
   });

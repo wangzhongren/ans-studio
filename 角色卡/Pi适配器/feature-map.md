@@ -29,3 +29,6 @@
 
 - 2026-10-15：工具与输入事件同源身份修复已实现，见[修复记录](docs/fix/2026-10-15_fix_canonical-tool-events.md)。
 - 2026-10-15：Windows Release 中 shell 自终止的测试改为直接子进程事实对照，保持 POSIX 信号断言和 Windows 实际退出码，见[测试修复记录](docs/fix/2026-10-15_fix_windows-shell-termination-oracle.md)。生产行为未改。
+# 原生停止事实（T1.1）
+
+真实 bind/native session/Core turn、raw prompt、工具与 MCP 主进程 close 的当前说明见[Pi 原生停止事实](docs/feature/native-stop.md)。owner 已实施且离线定向验证；整树/HTTP coverage 仍 unknown，未独立验收，不表示 Pi 停稳或三引擎完成。历史及原证据见[变更记录](docs/change/2026-11-05_change_direct-role-capabilities-native-stop.md)。

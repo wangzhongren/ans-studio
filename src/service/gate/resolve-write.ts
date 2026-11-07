@@ -18,6 +18,8 @@
 import type { BoundaryEntry, BoundarySection1, Root } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
 import type { AllowedPathsByRoot, TaskScope, WriteDecision } from "../../model/decision.ts";
+import type { StableWritePermit } from "../../model/version-change.ts";
+import { installStableWritePermitSnapshot as installPermitSnapshot } from "../../common/门禁引擎/versioned-doc-guard.ts";
 import {
   absRel,
   compareKey,
@@ -29,6 +31,105 @@ import {
 import { reloadBoundaryEntriesSync } from "../../common/门禁引擎/boundary-core.ts";
 import { governanceWriteOwnerGuidance } from "../../common/门禁引擎/governance-roles.ts";
 import { makeMechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
+
+/** Ordinary host facts only. O validates R's context identity before invoking these pure entry points. */
+export interface CanonicalWriteFacts {
+  projectRoot: string; skillRoot: string; target: string;
+  protectedRoots: readonly string[];
+  coverage: "complete" | "unknown"; basisDigest: string; reasons: readonly string[];
+}
+export type CurrentFileFacts =
+  | { state: "missing" }
+  | { state: "present"; sha256: string }
+  | { state: "unknown"; reason: string };
+export interface FileGateReadContext {
+  stage: "lexical-read" | "canonical-read";
+  invocationId: string; operationId: string; targetPath: string; operation: "write" | "edit";
+  projectRoot: string; skillRoot: string;
+  canonicalFacts?: CanonicalWriteFacts;
+}
+export interface FileGateFinalContext extends Omit<FileGateReadContext, "stage"> {
+  stage: "final-write"; currentFile: CurrentFileFacts; contentSha256: string;
+}
+export { stableWriteDecisionFromFacts } from "../../common/门禁引擎/versioned-doc-guard.ts";
+export type { StableWriteFactsInput } from "../../common/门禁引擎/versioned-doc-guard.ts";
+
+/** Install host-read ordinary permits into the existing single Gate snapshot; no persistence or authority issuance. */
+export function installStableWritePermitSnapshot(projectRoot: string, permits: readonly StableWritePermit[]): void {
+  installPermitSnapshot(projectRoot, permits);
+}
+
+function hostText(value: unknown): value is string { return typeof value === "string" && value.trim().length > 0 && !/[\x00-\x1f\x7f]/.test(value); }
+function absoluteFact(value: unknown): value is string {
+  return hostText(value) && isAbsoluteAny(value) && !/[:*?"<>|]/.test(value.replace(/^[A-Za-z]:/, ""));
+}
+function forbiddenReadPath(value: string): boolean {
+  return value.replace(/\\/g, "/").split("/").some(part => {
+    const key = part.replace(/[. ]+$/, "").toLowerCase();
+    return key === ".git" || key.startsWith(".git:") || key === ".ans" || /^\.env(?:\.|$)/.test(key)
+      || [".ssh", ".aws", ".gnupg", ".netrc", "id_rsa", "id_ed25519", "id_dsa", "id_ecdsa"].includes(key);
+  });
+}
+function pureDeny(reason: string, boundary: BoundarySection1 | undefined, scope: TaskScope | undefined): WriteDecision {
+  const safe = boundary && Array.isArray(boundary.entries) && boundary.entries.every(entry => entry && typeof entry.path === "string")
+    ? boundary : { entries: [], boundarySource: "<unavailable>", acceptance: { accepted: false, source: "" } };
+  return { allowed: false, reason, allowedByRoot: allowedByRootOf(safe, scope), code: rejectionCodeForReason(reason) };
+}
+function pureGateDecision(targetPath: string, boundary: BoundarySection1, scope: TaskScope | undefined,
+  ctx: FileGateReadContext | FileGateFinalContext): WriteDecision {
+  const empty: BoundarySection1 = { entries: [], boundarySource: "<unavailable>", acceptance: { accepted: false, source: "" } };
+  const validEntries = boundary && Array.isArray(boundary.entries) && boundary.entries.every(entry => entry && ["project", "skill"].includes(entry.root)
+    && ["file", "directory", "conditional-directory"].includes(entry.kind) && hostText(entry.path) && !isAbsoluteAny(entry.path)
+    && !normalizeLexical(entry.path).startsWith(".."));
+  const reject = (reason: string) => pureDeny(reason, validEntries ? boundary : empty, scope);
+  if (!validEntries || boundary.archived || boundary.parseError
+    || boundary.acceptance?.accepted !== true || !hostText(boundary.acceptance?.source)) return reject("缺少实际已接受的角色边界（F6）：纯阶段拒绝，不读取live边界。");
+  if (!ctx || !["lexical-read", "canonical-read", "final-write"].includes(ctx.stage)
+    || ![ctx.invocationId, ctx.operationId].every(hostText) || ctx.targetPath !== targetPath || !["write", "edit"].includes(ctx.operation)
+    || !absoluteFact(ctx.projectRoot) || !absoluteFact(ctx.skillRoot))
+    return reject("缺少或错配受管文件阶段/目标/操作/真实双root事实，拒绝读取和写入。");
+  if (!scope || !Array.isArray(scope.writeSet) || !Array.isArray(scope.conditions))
+    return reject("缺少实际任务scope/条件，拒绝读取和写入，不推定无任务。");
+  if (!hostText(targetPath) || /[:*?"<>|]/.test(targetPath.replace(/^[A-Za-z]:/, ""))) return reject("目标路径为空或含非法名称。");
+  const projectRoot = normalizeLexical(ctx.projectRoot), skillRoot = normalizeLexical(ctx.skillRoot);
+  const absolute = isAbsoluteAny(targetPath) ? normalizeLexical(targetPath) : normalizeLexical(`${projectRoot}/${targetPath}`);
+  const inProject = absRel(absolute, projectRoot), inSkill = absRel(absolute, skillRoot);
+  const root: Root = inProject !== null ? "project" : "skill", rel = inProject ?? inSkill;
+  if (rel === null) return reject("目标路径不在真实配置的skill/project根内。");
+  if (forbiddenReadPath(absolute)) return reject("目标命中敏感文件/应用状态/Git控制路径，不授目标内容读取。");
+  const lexical = resolveRelativeWrite(rel, root, boundary, scope, projectRoot, skillRoot, false);
+  if (!lexical.allowed || ctx.stage === "lexical-read") return lexical;
+  const facts = ctx.canonicalFacts;
+  if (!facts || facts.coverage !== "complete" || !/^[a-f0-9]{64}$/i.test(facts.basisDigest)
+    || !Array.isArray(facts.reasons) || facts.reasons.length !== 0 || !Array.isArray(facts.protectedRoots)
+    || ![facts.projectRoot, facts.skillRoot, facts.target, ...facts.protectedRoots].every(absoluteFact))
+    return reject("canonical/保护根事实缺失或覆盖unknown，拒绝读取和写入。");
+  const realTarget = normalizeLexical(facts.target), realRoot = normalizeLexical(root === "project" ? facts.projectRoot : facts.skillRoot);
+  if (forbiddenReadPath(realTarget)) return reject("真实目标命中敏感文件/应用状态/Git控制路径，不授目标内容读取。");
+  for (const protectedRoot of facts.protectedRoots) if (absRel(realTarget, normalizeLexical(protectedRoot)) !== null || absRel(absolute, normalizeLexical(protectedRoot)) !== null)
+    return reject("真实目标命中宿主Git控制区/其它worktree保护根。");
+  const realRel = absRel(realTarget, realRoot);
+  if (realRel === null) return reject("canonical目标逃逸对应真实根（F7）。");
+  const actual = resolveRelativeWrite(realRel, root, boundary, scope, projectRoot, skillRoot, false);
+  if (!actual.allowed) return actual;
+  if (ctx.stage === "final-write") {
+    if (!/^[a-f0-9]{64}$/i.test(ctx.contentSha256) || !ctx.currentFile
+      || (ctx.currentFile.state !== "missing" && !(ctx.currentFile.state === "present" && /^[a-f0-9]{64}$/i.test(ctx.currentFile.sha256))))
+      return reject("final-write缺少明确currentFile/最终contentSHA；unknown不当missing。");
+  }
+  return lexical;
+}
+
+/** Allowed only authorizes the next bound Provider read stage, never a write. No FS/live-boundary fallback. */
+export function resolveWriteReadPreflight(targetPath: string, boundary: BoundarySection1, scope: TaskScope | undefined, ctx: FileGateReadContext): WriteDecision {
+  if (!ctx || !["lexical-read", "canonical-read"].includes(ctx.stage)) return pureDeny("读取preflight阶段不合法。", boundary, scope);
+  return pureGateDecision(targetPath, boundary, scope, ctx);
+}
+/** Pure final path/current-file predicate; O also applies the stable/versioned business predicates before writing. */
+export function resolveWriteFinal(targetPath: string, boundary: BoundarySection1, scope: TaskScope | undefined, ctx: FileGateFinalContext): WriteDecision {
+  if (!ctx || ctx.stage !== "final-write") return pureDeny("最终写入阶段不合法。", boundary, scope);
+  return pureGateDecision(targetPath, boundary, scope, ctx);
+}
 
 /** 条目是否被当前任务的条件声明激活（非条件条目恒真；无 scope 时无声明 → 条件条目不激活） */
 function isActive(e: BoundaryEntry, scope: TaskScope | undefined): boolean {
@@ -141,7 +242,7 @@ export function resolveWrite(
   targetPath: string,
   boundary: BoundarySection1,
   scope: TaskScope | undefined,
-  ctx: { skillRoot: string; projectRoot: string },
+  ctx: { skillRoot: string; projectRoot: string; protectedGitRoots?: readonly string[] },
 ): WriteDecision {
   // 边界解析失败 → 拒绝一切写入（fail-closed），理由说明解析失败
   if (typeof boundary.parseError === "string" && boundary.parseError !== "") {
@@ -194,6 +295,16 @@ export function resolveWrite(
   const rootAbs = root === "skill" ? skillRootAbs : projectRootAbs;
   const realRoot = realResolve(rootAbs);
   const realTarget = realResolve(absCandidate);
+  // Protected roots are host-resolved canonical gitdir/common-dir/other-worktree facts, never role input.
+  // This only protects tools that actually enter this gate; it is not subprocess isolation evidence.
+  const gitSegment = (value: string) => value.split(/[\\/]/).some(part => part.replace(/[. ]+$/, "").toLowerCase() === ".git" || part.toLowerCase().startsWith(".git:"));
+  if (gitSegment(absCandidate) || gitSegment(realTarget)) return deny("Git控制路径仅由受控Provider修改，文件工具不可写入.git及其真实别名。", boundary, scope);
+  for (const protectedRoot of ctx.protectedGitRoots ?? []) {
+    if (!isAbsoluteAny(protectedRoot)) return deny("宿主Git保护根不是绝对路径，拒绝写入。", boundary, scope);
+    const canonical = realResolve(normalizeLexical(protectedRoot));
+    if (absRel(absCandidate, normalizeLexical(protectedRoot)) !== null || absRel(realTarget, canonical) !== null)
+      return deny("目标命中宿主Git控制区/其他worktree保护根，文件工具不可写入。", boundary, scope);
+  }
   const realRel = absRel(realTarget, realRoot);
   if (realRel === null) {
     return deny(
@@ -225,7 +336,9 @@ function resolveRelativeWrite(
   scope: TaskScope | undefined,
   projectRootAbs: string,
   skillRootAbs: string,
+  liveDiagnostics = true,
 ): WriteDecision {
+  const reject = liveDiagnostics ? deny : pureDeny;
   const sameRoot = boundary.entries.filter((e) => e.root === root);
   // 被条件激活且路径覆盖的条目
   const active = sameRoot.filter((e) => pathCovers(e, rel) && isActive(e, scope));
@@ -239,6 +352,7 @@ function resolveRelativeWrite(
     if (scope !== undefined && !writeSetContains(scope, rel)) {
       {
         const reason = `路径在角色边界内，但不在任务 writeSet 内（F4）：${rel}${F4_DENIAL_GUIDANCE}`;
+        if (!liveDiagnostics) return { allowed: false, reason, allowedByRoot: issuedByRootOf(boundary, scope), code: "task-write-set-missing" };
         const rejection = makeMechanicalRejection("task-write-set-missing", [reason], {
           docs: Array.isArray(scope.writeSet) ? scope.writeSet.slice(0, 5) : [],
         });
@@ -259,7 +373,7 @@ function resolveRelativeWrite(
   // 条件目录命中路径但缺条件 → 与"未匹配任何条目"是不同的拒绝理由
   if (inactiveConditional.length > 0) {
     const slug = inactiveConditional[0].condition;
-    return deny(
+    return reject(
       `命中条件目录但缺少条件 \`${slug}\`：任务未在 conditions 声明该条件（拒绝）：${rel}`,
       boundary,
       scope,
@@ -271,7 +385,7 @@ function resolveRelativeWrite(
     (e) => e.root !== root && pathCovers(e, rel) && isActive(e, scope),
   );
   if (cross.length > 0) {
-    return deny(
+    return reject(
       `跨根混淆：目标归属 ${root} 根，却命中另一根的条目（拒绝）：${rel}`,
       boundary,
       scope,
@@ -290,15 +404,15 @@ function resolveRelativeWrite(
   // 流程→召集人、应用记录→应用），不能只给「未匹配边界」。只追加文案，判定零变化。
   const ownerGuidance = governanceWriteOwnerGuidance(boundary.boundarySource, rel);
   const withOwner = ownerGuidance !== undefined ? `${base}。${ownerGuidance}` : base;
-  const fresh = reloadBoundaryEntriesSync(boundary.boundarySource, projectRootAbs, skillRootAbs);
+  const fresh = !liveDiagnostics || boundary.frozenEvidence ? null : reloadBoundaryEntriesSync(boundary.boundarySource, projectRootAbs, skillRootAbs);
   const freshCovers =
     fresh !== null && fresh.some((e) => e.root === root && pathCovers(e, rel) && isActive(e, scope));
   if (freshCovers) {
-    return deny(
+    return reject(
       `${withOwner}。本会话可能持有旧边界快照（盘上边界现已含该路径）——请重开会话后重试；本次判定不变，仍为拒绝。`,
       boundary,
       scope,
     );
   }
-  return deny(withOwner, boundary, scope);
+  return reject(withOwner, boundary, scope);
 }

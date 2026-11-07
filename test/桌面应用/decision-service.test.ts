@@ -10,7 +10,13 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { createCustomerInputChannel, evaluateDecisionCardRequest, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+import { createCustomerInputChannel, evaluateDecisionCardRequest, type OperatorJudgeResultPayload, type OperatorRequestPayload, type ChiefDecisionHost } from "../../app/desktop/customer-input.ts";
+import { mainT } from "../../app/desktop/i18n.ts";
+import { createDecisionDelegationSwitch } from "../../app/desktop/interface.ts";
+import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
+import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
+import { createHash } from "node:crypto";
+import { createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
 import { buildRunChangeCard } from "../../src/common/编排/run-manifest.ts";
 import { buildVersionDecisionCard, versionDecisionCardToRequest } from "../../src/common/编排/version-decision.ts";
 import type {
@@ -58,7 +64,9 @@ function channelHarness(
       durationMs: 1,
     };
   };
+  const delegation = createDecisionDelegationSwitch(groupEnabled);
   const channel = createCustomerInputChannel({
+    delegation,
     presenter: (payload) => pushed.push(payload),
     operatorId: "tester",
     nextId: () => `op-${++n}`,
@@ -68,7 +76,7 @@ function channelHarness(
       results.push(payload);
     },
   });
-  return { channel, pushed, results, judgeCalls: () => judgeCalls };
+  return { channel, pushed, results, delegation, judgeCalls: () => judgeCalls };
 }
 
 const ctx = { roleId: "application", projectRoot: "/p", runtime: "demo" as const, governanceModel: "trio" as const };
@@ -85,30 +93,27 @@ test("decision 开关关闭：应用 decision 卡呈现客户，客户手选；�
   assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
 });
 
-test("decision 开关开启：唯一推荐 deterministic 代选（judge 代批，不呈现卡）", async () => {
+test("开启委托但无真实chief上下文：保留原因，禁人工/旧judge/默认推荐；关闭后接管", async () => {
   const h = channelHarness(true);
-  const outcome = await h.channel.customerInput(appDecisionRequest(), ctx);
-  assert.equal(h.pushed.length, 0, "代批成功不呈现客户卡");
-  assert.equal(h.results.length, 1);
-  assert.equal(h.results[0]!.group, "decision");
-  assert.equal(h.results[0]!.cardKind, "decision");
-  assert.equal(h.results[0]!.requestTitle, "任务升级", "judge 结果行携带原始申请标题");
-  assert.deepEqual(h.results[0]!.selected, ["terminate"]);
-  assert.equal(outcome?.outcome, "answered");
-  assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["terminate"]);
-  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "judge:demo");
-  assert.equal(outcome?.outcome === "answered" ? outcome.judge?.group : undefined, "decision");
-  assert.equal(outcome?.outcome === "answered" ? outcome.judge?.engine : undefined, "demo");
+  const pending = h.channel.customerInput(appDecisionRequest(), ctx);
+  await tick();
+  assert.equal(h.judgeCalls(), 0);
+  assert.equal(h.results.length, 0);
+  assert.match(h.pushed[0]!.judgeNotice ?? "", /幕僚/);
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["redispatch"] } }).ok, false);
+  h.delegation.set({ enabled: false });
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["redispatch"] } }).ok, true);
+  const out = await pending;
+  assert.equal(out?.outcome === "answered" ? out.operatorId : "", "tester");
 });
 
-test("结果行投达失败 ⇒ 不擅自代选，回落客户卡", async () => {
+test("无chief时不以旧结果行充当业务决定", async () => {
   const h = channelHarness(true, { emitFails: true });
   const pending = h.channel.customerInput(appDecisionRequest(), ctx);
-  assert.equal(h.pushed.length, 1, "结果行是代批可见性条件：失败 ⇒ 原卡");
+  await tick(); h.delegation.set({ enabled: false });
   assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["continue"] } }).ok, true);
-  const outcome = await pending;
-  assert.equal(outcome?.outcome, "answered");
-  assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined);
+  assert.equal((await pending)?.outcome, "answered");
+  assert.equal(h.judgeCalls(), 0);
 });
 
 test("应用自有 decision 卡通过共享校验且不扩大角色允许集；非法推荐数/非应用 chief 仍拒", () => {
@@ -150,133 +155,134 @@ const proposalMetadata: CustomerInputMetadata = {
 };
 const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-test("① 无法核对（artifact-missing）⇒ 原卡转客户确认，不自动拒绝", async () => {
-  const h = channelHarness(true, {
-    judge: (request) => ({
-      verdict: "manual",
-      group: request.group,
-      cardKind: request.cardKind,
-      engine: request.runtime,
-      reasonCode: "artifact-missing",
-      reason: "规范物证缺失：docs/proposals/focus-proposal-v1.md（判断无法核对）；请补齐物证后重新提交。",
-    }),
+// The model boundary is scripted; real Pipeline, Runtime Service, tools and channel settlement run.
+async function realChiefHost(root: string, selected: string[] | "reject" | "revise", hooks: {
+  beforeModel?: () => Promise<void>; current?: () => Promise<boolean>; noDecision?: boolean;
+} = {}): Promise<ChiefDecisionHost> {
+  const evidencePath = path.join(root, "evidence.md");
+  await fs.writeFile(evidencePath, "# Confirmed objective\nRecover using the second option.\n");
+  const hash = () => fs.readFile(evidencePath).then(bytes => createHash("sha256").update(bytes).digest("hex"));
+  const evidenceSha = await hash();
+  const captured = await createFsTrunkStore(root).captureSnapshot!({ snapshotId: "chief-fixture", createdAt: "2026-11-05T00:00:00.000Z", files: [{ path: "evidence.md", sha256: evidenceSha }] });
+  assert.ok(captured.ok, captured.ok ? "" : captured.message ?? captured.reason);
+  const base = captured.value.digest;
+  return {
+    prepare: async () => ({ baseDigest: base, evidenceRefs: [{ snapshotId: captured.value.snapshotId, path: "evidence.md", sha256: evidenceSha }],
+      context: await fs.readFile(evidencePath, "utf8"), isCurrent: hooks.current ?? (async () => (await hash()) === evidenceSha) }),
+    execute: async (context, evidence, decidePendingRequest, signal) => {
+      const handle = await openRoleSession({ roleId: "chief", runtime: "demo", project: { projectRoot: root,
+        skillRoot: root, roles: {}, builtInRoles: ["chief"], governanceModel: "trio" },
+        chiefDecisionContext: context, decidePendingRequest }, { runtimeOptions: { providerFactories: {
+          demo: async options => {
+            assert.deepEqual(options.tools.map(tool => tool.name), ["decide_pending_request"]);
+            assert.equal(options.storage, undefined);
+            await hooks.beforeModel?.();
+            return createDemoRuntimeAdapter(options, hooks.noDecision ? [] : [{ name: "decide_pending_request", args: {
+              requestId: context.request.requestId, baseDigest: context.request.baseDigest,
+              delegationRevision: context.request.delegationRevision, reason: "证据支持替代方案",
+              ...(Array.isArray(selected) ? { disposition: "select", selected } : { disposition: selected }),
+            } }]);
+          },
+        } } });
+      const cancel = () => { void handle.abort?.(); };
+      signal.addEventListener("abort", cancel, { once: true });
+      try { await handle.send(evidence); } finally { signal.removeEventListener("abort", cancel); await handle.dispose(); }
+    },
+  };
+}
+async function withChiefRoot(run: (root: string) => Promise<void>): Promise<void> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-window-chief-"));
+  try { await run(root); } finally { await fs.rm(root, { recursive: true, force: true }); }
+}
+
+test("真实chief独立上下文可选非推荐项，结果可信来源且不伪装客户/judge", async () => {
+  await withChiefRoot(async root => {
+    const h = channelHarness(true);
+    const host = await realChiefHost(root, ["redispatch"]);
+    const out = await h.channel.customerInput(appDecisionRequest(), { ...ctx, projectRoot: root, chiefDecision: host });
+    assert.equal(out?.outcome, "answered");
+    if (out?.outcome !== "answered") return;
+    assert.deepEqual(out.value.selected, ["redispatch"]);
+    assert.equal(out.operatorId, "chief"); assert.equal(out.judge, undefined);
+    assert.equal(out.actionSource?.kind, "chief-delegated");
+    if (out.actionSource?.kind === "chief-delegated") {
+      assert.equal(out.actionSource.actorRoleId, "chief"); assert.equal(out.actionSource.originRoleId, "application");
+      assert.equal(out.actionSource.delegationRevision, h.delegation.get().revision);
+      assert.deepEqual(out.actionSource.selected, ["redispatch"]);
+    }
+    assert.equal(h.judgeCalls(), 0); assert.equal(h.pushed.length, 0);
+    assert.equal(h.results[0]?.reasonCode, "chief-delegated");
+    assert.equal(h.results[0]?.actionSource?.kind, "chief-delegated");
   });
-  let settled = false;
-  const pending = h.channel.customerInput(proposalRequest(), proposalCtx, proposalMetadata);
-  Promise.resolve(pending).then(() => {
-    settled = true;
-  });
-  await tick();
-  assert.equal(h.pushed.length, 1, "无法核对 ⇒ 原卡呈现客户");
-  assert.equal(h.results.length, 0, "不自动拒绝 ⇒ 无结果行");
-  assert.equal(settled, false, "卡保持挂起等客户作答");
-  assert.equal(h.judgeCalls(), 1, "judge 只运行一次且未自动放行");
-  const notice = h.pushed[0]!.judgeNotice ?? "";
-  assert.match(notice, /规范物证缺失/, "卡面说明无法核对的原因");
-  assert.match(notice, /（判断无法核对）/, "原因保留驱动括注");
-  assert.match(notice, /已转你手动确认/, "卡面声明已转客户确认");
-  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-  const outcome = await pending;
-  assert.equal(outcome?.outcome, "answered");
-  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester", "客户手批，不是 judge");
 });
 
-test("② 可核对卡仍走原有自动判定（approve 结果行 + judge 审计）", async () => {
-  const h = channelHarness(true, {
-    judge: (request) => ({
-      verdict: "approve",
-      group: request.group,
-      cardKind: request.cardKind,
-      engine: request.runtime,
-      model: "judge-model",
-      reasonCode: "sufficient",
-      reason: "意图与提案一致",
-      value: { selected: ["accept"] },
-      evidence: ["docs/proposals/focus-proposal-v1.md"],
-      durationMs: 3,
-    }),
+test("真实chief拒绝/退修释放原工具Promise，原角色补材后新请求可独立决定", async () => {
+  await withChiefRoot(async root => {
+    const rejecting = channelHarness(true);
+    const reject = await rejecting.channel.customerInput(proposalRequest(), { ...proposalCtx, chiefDecision: await realChiefHost(root, "reject") }, proposalMetadata);
+    assert.equal(reject?.outcome, "declined");
+    assert.equal(reject?.outcome === "declined" ? reject.actionSource?.kind : undefined, "chief-delegated");
+    const revising = channelHarness(true);
+    const returned = await revising.channel.customerInput(proposalRequest(), { ...proposalCtx, chiefDecision: await realChiefHost(root, "revise") }, proposalMetadata);
+    assert.equal(returned?.outcome, "declined", "原工具调用已得到typed退回，可继续补材");
+    assert.equal(returned?.outcome === "declined" ? returned.reason : undefined, `证据支持替代方案 ${mainT("main.customerInput.chief.revisionRequested")}`);
+    assert.equal(returned?.outcome === "declined" && returned.actionSource?.kind === "chief-delegated" ? returned.actionSource.disposition : undefined, "revise");
+    assert.equal(revising.channel.pendingCount(), 0);
+    const revised = { ...proposalRequest(), title: "修订方案：补齐证据" };
+    const next = await revising.channel.customerInput(revised, { ...proposalCtx, chiefDecision: await realChiefHost(root, ["accept"]) }, proposalMetadata);
+    assert.equal(next?.outcome, "answered");
+    assert.deepEqual(next?.outcome === "answered" ? next.value.selected : undefined, ["accept"]);
+    assert.equal(revising.delegation.get().enabled, true, "不依赖客户关闭再开关救场");
   });
-  const outcome = await h.channel.customerInput(proposalRequest(), proposalCtx, proposalMetadata);
-  assert.equal(outcome?.outcome, "answered");
-  assert.equal(h.pushed.length, 0, "代批成功不呈现客户卡");
-  assert.equal(h.results.length, 1, "approve 仍发结果行");
-  assert.equal(h.results[0]!.group, "decision");
-  assert.equal(h.results[0]!.cardKind, "proposal");
-  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "judge:demo");
-  assert.equal(outcome?.outcome === "answered" ? outcome.judge?.group : undefined, "decision");
 });
 
-test("③ 同卡指纹的自动拒绝只发生一次：重复 ⇒ 原卡转客户", async () => {
-  const h = channelHarness(true, {
-    judge: (request) => ({
-      verdict: "manual",
-      group: request.group,
-      cardKind: request.cardKind,
-      engine: request.runtime,
-      reasonCode: "timeout",
-      reason: "判断超时（>120s）",
-    }),
+test("关闭再开启使在途真实chief旧revision无效；同请求不会无限自派", async () => {
+  await withChiefRoot(async root => {
+    let release!: () => void, modelEntered!: () => void;
+    const entered = new Promise<void>(resolve => { modelEntered = resolve; });
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const h = channelHarness(true);
+    const host = await realChiefHost(root, ["redispatch"], { beforeModel: async () => { modelEntered(); await held; } });
+    const pending = h.channel.customerInput(appDecisionRequest(), { ...ctx, chiefDecision: host });
+    await entered;
+    const revision = h.delegation.get().revision;
+    h.delegation.set({ enabled: false });
+    h.delegation.set({ enabled: true });
+    assert.ok(h.delegation.get().revision > revision);
+    release(); await tick(); await tick();
+    assert.equal(h.results.length, 0);
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["continue"] } }).ok, false);
+    h.delegation.set({ enabled: false });
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["continue"] } }).ok, true);
+    const out = await pending;
+    assert.equal(out?.outcome === "answered" ? out.actionSource : undefined, undefined);
   });
-  const first = await h.channel.customerInput(proposalRequest(), proposalCtx, proposalMetadata);
-  assert.equal(first?.outcome, "declined", "首次 manual(timeout) 仍按既有自动退回");
-  assert.equal(first?.outcome === "declined" ? first.operatorId : undefined, "judge:demo");
-  assert.equal(h.pushed.length, 0, "首次自动退回不呈现客户卡");
-  assert.equal(h.judgeCalls(), 1);
-
-  let settled = false;
-  const second = h.channel.customerInput(proposalRequest(), proposalCtx, proposalMetadata);
-  Promise.resolve(second).then(() => {
-    settled = true;
-  });
-  await tick();
-  assert.equal(h.pushed.length, 1, "同指纹第二次 ⇒ 原卡呈现客户");
-  assert.equal(settled, false, "卡保持挂起等客户作答");
-  assert.equal(h.judgeCalls(), 2, "judge 仍被调用，但结果只能升级客户");
-  assert.match(h.pushed[0]!.judgeNotice ?? "", /已转你手动确认/);
-  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["reject"] } }).ok, true);
-  const outcome = await second;
-  assert.equal(outcome?.outcome, "answered");
-  assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["reject"]);
 });
 
-test("④ 升级审计：不可核对升级恰记一条 escalated，且不记 manual-as-rework", async () => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "ans-decision-escalate-"));
-  configureDiagnostics({ directory });
-  try {
-    const h = channelHarness(true, {
-      judge: (request) => ({
-        verdict: "manual",
-        group: request.group,
-        cardKind: request.cardKind,
-        engine: request.runtime,
-        reasonCode: "artifact-missing",
-        reason: "规范物证缺失：docs/proposals/focus-proposal-v1.md（判断无法核对）；请补齐物证后重新提交。",
-      }),
-    });
-    const pending = h.channel.customerInput(proposalRequest(), proposalCtx, proposalMetadata);
-    await tick();
-    await flushDiagnostics();
-    const files = (await fs.readdir(directory)).filter((name) => name.startsWith("ans-diagnostics-") && name.endsWith(".jsonl"));
-    const rows = files.flatMap((name) =>
-      readFileSync(path.join(directory, name), "utf8")
-        .trim()
-        .split("\n")
-        .filter((line) => line.trim() !== "")
-        .map((line) => JSON.parse(line) as Record<string, unknown>),
-    );
-    const escalated = rows.filter((row) => row.event === "governance-judge.escalated");
-    assert.equal(escalated.length, 1, "恰一条升级审计");
-    assert.equal(escalated[0]!.decision, "present-to-customer-unverifiable");
-    assert.equal(escalated[0]!.reasonCode, "artifact-missing");
-    assert.equal(escalated[0]!.outcome, "manual");
-    assert.equal(rows.filter((row) => row.event === "governance-judge.manual-as-rework").length, 0, "升级路径不记自动退回");
-    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-    const outcome = await pending;
-    assert.equal(outcome?.outcome, "answered");
-  } finally {
-    await disposeDiagnostics();
-    await fs.rm(directory, { recursive: true, force: true });
-  }
+test("真实chief提交时基线变化拒绝，原请求等待关闭接管", async () => {
+  await withChiefRoot(async root => {
+    const h = channelHarness(true);
+    const pending = h.channel.customerInput(appDecisionRequest(), { ...ctx, chiefDecision: await realChiefHost(root, ["redispatch"], { current: async () => false }) });
+    for (let n = 0; n < 100 && h.pushed.length === 0; n++) await tick();
+    assert.equal(h.results.length, 0);
+    assert.equal(h.channel.pendingCount(), 1);
+    h.delegation.set({ enabled: false });
+    h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["replace"] } });
+    assert.equal((await pending)?.outcome, "answered");
+  });
+});
+
+test("业务卡的旧@决策预设不能形成第三个自动执行者", async () => {
+  let directiveCalls = 0;
+  const pushed: OperatorRequestPayload[] = [];
+  const mode = createDecisionDelegationSwitch(false);
+  const channel = createCustomerInputChannel({ operatorId: "customer", presenter: payload => pushed.push(payload), delegation: mode,
+    directive: { decisionFacts: () => { directiveCalls++; throw new Error("must not enter"); },
+      applyDecisionDirective: async () => { directiveCalls++; return undefined; }, emitResult() {}, emitNotice() {} } });
+  const pending = channel.customerInput(appDecisionRequest(), ctx);
+  assert.equal(directiveCalls, 0); assert.equal(pushed.length, 1);
+  channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["replace"] } });
+  assert.equal((await pending)?.outcome, "answered");
 });
 
 // ———————————————— 2026-11-04 客户直修：应用自有 decision 卡不被「替我决策」代选 ————————————————
@@ -408,18 +414,16 @@ test("2026-11-04 直修 (b)：版本决策两动作均呈现客户、不代选�
   }
 });
 
-test("2026-11-04 直修 (c)：非 application 的普通 decision 卡在开关开启时仍被确定性代选（回归守护）", async () => {
+test("普通角色decision与应用decision同样禁用旧推荐兜底", async () => {
   const h = channelHarness(true);
-  const outcome = await h.channel.customerInput(roleDecisionRequest(), convenerCtx);
-  assert.equal(h.pushed.length, 0, "普通 decision 卡仍代批成功、不呈现客户卡");
-  assert.equal(h.results.length, 1, "仍产生一条 judge 结果行");
-  assert.equal(h.results[0]!.group, "decision");
-  assert.equal(h.results[0]!.cardKind, "decision");
-  assert.deepEqual(h.results[0]!.selected, ["beta"]);
-  assert.equal(outcome?.outcome, "answered");
-  assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["beta"]);
-  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "judge:demo");
-  assert.equal(outcome?.outcome === "answered" ? outcome.judge?.group : undefined, "decision");
+  const pending = h.channel.customerInput(roleDecisionRequest(), { ...ctx, roleId: "convener" });
+  await tick();
+  assert.equal(h.results.length, 0); assert.equal(h.judgeCalls(), 0);
+  h.delegation.set({ enabled: false });
+  h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["alpha"] } });
+  const out = await pending;
+  assert.equal(out?.outcome, "answered");
+  assert.deepEqual(out?.outcome === "answered" ? out.value.selected : undefined, ["alpha"]);
 });
 
 test("2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为与现状一致（原卡呈现、客户手选、无 judge）", async () => {
@@ -611,3 +615,28 @@ test("2026-11-04 直修 (e)：判断器异常与 ledger-unavailable 分支对写
   assert.equal(ledgerOutcome?.outcome === "answered" ? ledgerOutcome.operatorId : undefined, "tester");
 });
 
+
+
+test("同真实requestId并发/重试复用一次结算，关闭不撤已提交来源，换origin/卡面拒绝", async () => {
+  await withChiefRoot(async root => {
+    const h = channelHarness(true);
+    const host = await realChiefHost(root, ["redispatch"]);
+    let executions = 0;
+    const counted: ChiefDecisionHost = { ...host, execute(...args) { executions++; return host.execute(...args); } };
+    const trusted = { ...ctx, requestId: "req-exact-once", chiefDecision: counted };
+    const first = h.channel.customerInput(appDecisionRequest(), trusted);
+    const duplicate = h.channel.customerInput(appDecisionRequest(), trusted);
+    assert.equal(first, duplicate);
+    const settled = await first;
+    assert.equal(executions, 1); assert.equal(h.results.length, 1);
+    h.delegation.set({ enabled: false });
+    const replay = await h.channel.customerInput(appDecisionRequest(), trusted);
+    assert.equal(replay, settled, "已提交source不因关开关而撤销/改归客户");
+    assert.equal(replay?.outcome === "answered" ? replay.actionSource?.kind : undefined, "chief-delegated");
+    const changedOrigin = await h.channel.customerInput(appDecisionRequest(), { ...trusted, roleId: "convener" });
+    assert.equal(changedOrigin?.outcome, "unavailable");
+    const changedCard = await h.channel.customerInput({ ...appDecisionRequest(), title: "another card" }, trusted);
+    assert.equal(changedCard?.outcome, "unavailable");
+    assert.equal(executions, 1);
+  });
+});

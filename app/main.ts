@@ -18,7 +18,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from "electron";
 
-import { createDesktopInterface, createShellJudgeSwitch, createShellSessionPauseState, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
+import { createDesktopInterface, createShellJudgeSwitch, createDecisionDelegationSwitch, createShellSessionPauseState, isShellJudgeIpcSender, registerPreferencesIpc, type DesktopInterface } from "./desktop/interface.ts";
 // P2（2026-10-30）：网络状态监听——主进程 `net.isOnline` 权威 + powerMonitor 提示；状态经 IPC 推渲染层，
 // 同时经 Interface 传入 SessionManager（离线队列保留）与运行时（请求 deadline 暂停/恢复）。
 // 纯逻辑在 `desktop/network-monitor.ts`（可注入 probe/clock；本文件只接 Electron 事件与 IPC）。
@@ -350,7 +350,8 @@ function registerIpc(win: BrowserWindow): void {
   // 同一实例交给通道（调用当刻读 `isEnabled()`）与 Interface（`shell:judge-*` / `decision:judge-*`），
   // 两处永不漂移。代码符号沿用 `shellJudgeSwitch`（approval 组现为「shell + 写盘族」），通道名不改。
   const shellJudgeSwitch = createShellJudgeSwitch(initialJudgeSwitches.approval);
-  const decisionJudgeSwitch = createShellJudgeSwitch(initialJudgeSwitches.decision);
+  const decisionJudgeSwitch = createDecisionDelegationSwitch(initialJudgeSwitches.decision);
+  win.webContents.on("did-start-loading", () => { decisionJudgeSwitch.set({ enabled: decisionJudgeSwitch.isEnabled() }); });
   const shellJudgeLog = createDiagnosticLogger({ component: "desktop.shell-judge" });
   const decisionJudgeLog = createDiagnosticLogger({ component: "desktop.decision-judge" });
   // —————— Phase 5A（PM §17.3）：入口解析 + dev server 一次性回退 ——————
@@ -598,6 +599,7 @@ function registerIpc(win: BrowserWindow): void {
       win.webContents.send("session:operator-request", payload);
     },
     operatorId: desktopOperatorId(),
+    delegation: decisionJudgeSwitch,
     onExpired: (payload) => { if (!win.isDestroyed()) win.webContents.send("session:operator-expired", payload); },
     // 三权（评审 §6.1 硬约束 / §九-10）：同项目已有待决定卡 ⇒ 后续请求排队、不呈现；
     // 推一条状态事件让渲染侧显示「等待前一个决定」（不自动合并、不自动批准）。

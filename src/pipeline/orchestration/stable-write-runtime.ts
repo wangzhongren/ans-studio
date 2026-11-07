@@ -15,13 +15,16 @@
 // 纪律：本层**不写项目文档**（真实写入 = run-role write/edit gate 按 permit 执行，F16）；
 // 账本经注入 `emitEvent`；客户本人，永不进判断器/委托/指令。
 
+import path from "node:path";
+import { createVersionChangeIntegration } from "../../service/version-change/public/version-change-integration.ts";
+import { installStableWritePermitSnapshot } from "../../service/gate/resolve-write.ts";
 import type { TaskStateEvent } from "../../model/runtime.ts";
 import type { StableWriteErrorCode, StableWritePermit, StableWriteRecord, StableWriteStatus } from "../../model/version-change.ts";
 import type {
   ServiceResult,
   StableWriteService,
 } from "../../service/version-change/public/version-change-service.ts";
-import type { TrunkRuntime } from "./trunk-runtime.ts";
+import type { TrunkRuntime, TrunkStableRepinResult } from "./trunk-runtime.ts";
 
 export type StableWriteCardOutcome =
   | {
@@ -41,6 +44,7 @@ export interface StableWritePresenter {
 }
 
 export interface StableWriteRuntimeDeps {
+  projectRoot?: string;
   stableWrite: StableWriteService;
   trunkRuntime: Pick<TrunkRuntime, "completeStableWrite">;
   emitEvent: (event: TaskStateEvent) => Promise<void>;
@@ -89,6 +93,8 @@ export interface StableWriteRuntime {
         record: StableWriteRecord;
         repinApplied: boolean;
         pendingReattach?: boolean;
+        /** A written file can still await publication; keep the actual refusal. */
+        publicationError?: { code: string; message?: string };
         /** 已写 `trunk.state(stable-repinned)`（无 manifest 时为 false）。 */
         repinEventEmitted: boolean;
       },
@@ -130,7 +136,39 @@ function writeEvent(record: StableWriteRecord, at: string, extra: { permit?: Sta
   } as TaskStateEvent;
 }
 
+/** Actual Service facts -> the one Gate snapshot. Failed reads invalidate stale permits before surfacing the failure. */
+async function refreshPermitSnapshot(projectRoot: string, service: Pick<StableWriteService, "readPermitSnapshot" | "projectRoot">): Promise<StableWritePermit[]> {
+  try {
+    const key = (root: string) => process.platform === "win32" ? path.resolve(root).toLowerCase() : path.resolve(root);
+    if (!service.projectRoot || key(service.projectRoot) !== key(projectRoot)) throw new Error("stable-write-project-root-mismatch");
+    const permits = await service.readPermitSnapshot();
+    installStableWritePermitSnapshot(projectRoot, permits);
+    return permits;
+  } catch (error) {
+    installStableWritePermitSnapshot(projectRoot, []);
+    throw error;
+  }
+}
+
+/** Host initialization/recovery entry. Returns ordinary applicable permits for the caller's existing lookup projection. */
+export async function refreshStableWritePermitSnapshot(input: { projectRoot: string; now?: () => Date }): Promise<StableWritePermit[]> {
+  const integration = createVersionChangeIntegration({ projectRoot: input.projectRoot, ...(input.now ? { now: input.now } : {}) });
+  return refreshPermitSnapshot(input.projectRoot, integration.services.stableWrite);
+}
+
 export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWriteRuntime {
+  const projectRoot = deps.projectRoot ?? deps.stableWrite.projectRoot;
+  const withFreshPermits = async <T>(operation: Promise<T>): Promise<T> => {
+    try { return await operation; }
+    finally {
+      try {
+        if (!projectRoot) throw new Error("stable-write-project-root-unavailable");
+        const actual = await refreshPermitSnapshot(projectRoot, deps.stableWrite);
+        candidates.clear(); for (const permit of actual) candidates.set(permit.path, permit);
+      } catch(error) { candidates.clear(); throw error; }
+    }
+  };
+
   const now = deps.now ?? (() => new Date());
   // 候选许可缓存：仅用于把 permit **对象**注入 `stableWriteDecision`（C2b 快照逐字段校验 +
   // 一次性/过期判定仍为唯一权威；F7 的同步快照不自建第二份）。
@@ -205,21 +243,21 @@ export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWr
     async settle(requestId, decision) {
       const at = decision.at ?? now().toISOString();
       if (decision.choice === "reject-stable-write") {
-        const rejected = await deps.stableWrite.reject(requestId, {
+        const rejected = await withFreshPermits(deps.stableWrite.reject(requestId, {
           ...(decision.decisionId !== undefined ? { decisionId: decision.decisionId } : {}),
           ...(decision.confirmationId !== undefined ? { confirmationId: decision.confirmationId } : {}),
           at,
-        });
+        }));
         if (!rejected.ok) return rejected;
         await emit(writeEvent(rejected.value, at));
         await notify(`stable.write ${requestId}（${rejected.value.path}）→ rejected：未写入`);
         return { ok: true, value: { record: rejected.value } };
       }
-      const approved = await deps.stableWrite.approve(requestId, {
+      const approved = await withFreshPermits(deps.stableWrite.approve(requestId, {
         ...(decision.decisionId !== undefined ? { decisionId: decision.decisionId } : {}),
         ...(decision.confirmationId !== undefined ? { confirmationId: decision.confirmationId } : {}),
         at,
-      });
+      }));
       if (!approved.ok) return approved;
       remember(approved.value.permit);
       await emit(writeEvent(approved.value.record, at, { permit: approved.value.permit }));
@@ -239,10 +277,10 @@ export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWr
       });
       if (!requested.ok) return requested;
       await emit(writeEvent(requested.value, at));
-      const approved = await deps.stableWrite.approve(requested.value.requestId, {
+      const approved = await withFreshPermits(deps.stableWrite.approve(requested.value.requestId, {
         confirmationId: input.confirmationId,
         at,
-      });
+      }));
       if (!approved.ok) return approved;
       remember(approved.value.permit);
       await emit(writeEvent(approved.value.record, at, { permit: approved.value.permit }));
@@ -252,11 +290,11 @@ export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWr
 
     async completeWrite(input) {
       const at = input.at ?? now().toISOString();
-      const completed = await deps.stableWrite.completeWrite({
+      const completed = await withFreshPermits(deps.stableWrite.completeWrite({
         requestId: input.requestId,
         actualSha256: input.actualSha256,
         at,
-      });
+      }));
       if (!completed.ok) {
         const failed = await deps.stableWrite.list();
         const record = failed.find((candidate) => candidate.requestId === input.requestId);
@@ -267,11 +305,20 @@ export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWr
         }
         return completed;
       }
-      const { record, permit, repin } = completed.value;
+      const { record, permit } = completed.value;
+      let repin: TrunkStableRepinResult = completed.value.repin;
+      let eventEmittedByTrunk = false;
+      if (!repin.applied && record.kind === "workflow" && record.baseSha256 === "") {
+        try {
+          repin = await deps.trunkRuntime.completeStableWrite({ kind: record.kind, roleId: record.roleId, path: record.path, oldSha: record.baseSha256,
+            newSha: record.targetSha256, ...(record.confirmationId ? { confirmationId: record.confirmationId } : {}), ...(record.decisionId ? { decisionId: record.decisionId } : {}), at });
+          eventEmittedByTrunk = repin.applied && repin.audit !== undefined;
+        } catch (error) { repin = { applied: false, pendingReattach: true, errorCode: "initial-workflow-publication-exception", message: String(error) }; }
+      }
       forget(permit);
       await emit(writeEvent(record, at, { permit }));
       const repinApplied = repin.applied && repin.audit !== undefined;
-      if (repinApplied) {
+      if (repinApplied && !eventEmittedByTrunk) {
         const audit = repin.audit!;
         await emit({
           v: 1,
@@ -289,7 +336,7 @@ export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWr
         } as TaskStateEvent);
       }
       await notify(
-        `stable.write ${record.requestId}（${record.path}）→ written${repinApplied ? "，已 mini re-pin（trunkVersion 不变）" : "，待续接（无 trunk manifest）"}`,
+        `stable.write ${record.requestId}（${record.path}）→ written${repinApplied ? "，已 mini re-pin（trunkVersion 不变）" : `，待续接（${repin.errorCode ?? "stable-publication-pending"}${repin.message ? `: ${repin.message}` : ""}）`}`,
       );
       return {
         ok: true,
@@ -297,13 +344,14 @@ export function createStableWriteRuntime(deps: StableWriteRuntimeDeps): StableWr
           record,
           repinApplied,
           ...(repin.pendingReattach === true ? { pendingReattach: true } : {}),
+          ...(!repin.applied && repin.errorCode ? { publicationError: { code: repin.errorCode, ...(repin.message ? { message: repin.message } : {}) } } : {}),
           repinEventEmitted: repinApplied,
         },
       };
     },
 
     async fail(requestId, reason, at) {
-      const failed = await deps.stableWrite.fail(requestId, reason, at ?? now().toISOString());
+      const failed = await withFreshPermits(deps.stableWrite.fail(requestId, reason, at ?? now().toISOString()));
       if (!failed.ok) return failed;
       for (const [relPath, permit] of candidates) {
         if (permit.requestId === requestId) candidates.delete(relPath);

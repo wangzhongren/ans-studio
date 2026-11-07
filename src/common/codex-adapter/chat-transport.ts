@@ -23,11 +23,14 @@ import type {
   InteractionGate, PromptImage, PromptOptions, RoleSession, RuntimeToolErrorFactsV1,
   RuntimeToolEventFactsV1, RuntimeToolEventProjector, RuntimeToolResultFactsV1, RuntimeTurnOutcome,
   SessionEvent, ToolDefinition, ToolResult,
+  RuntimeNativeLifecycleFacts, RuntimeActiveToolFact, RuntimeNativeToolSurfaceFacts,
 } from "../../model/runtime.ts";
-import { eventQueue, object, pausedDeadline } from "./protocol.ts";
+import { eventQueue, object, pausedDeadline, observeNativeStop } from "./protocol.ts";
 import { CODEX_IMAGE_UNAVAILABLE_NOTE, CODEX_TOOL_RESULT_IMAGE_MIMES, mapCodexToolResultImages } from "./tool-result-images.ts";
 
 export interface CodexChatSessionOptions {
+  /** Private reference from the Provider's actual resolved preparation; absent for legacy direct binds. */
+  factoryPlan?: { planId: string; configDigest: string };
   role: ResolvedRole;
   systemPrompt: string;
   tools: readonly ToolDefinition[];
@@ -108,10 +111,13 @@ function normalizeToolCalls(raw: unknown): NormalizedToolCall[] {
  * 污染下一次请求。所有事件仍按 Codex 适配器既有 SessionEvent 形状发出。
  */
 export function createCodexChatSession(options: CodexChatSessionOptions): RoleSession {
+  const factoryPlan = options.factoryPlan ? { ...options.factoryPlan } : undefined;
   const role = options.role;
   const redact = options.redact;
   const fetchImpl = options.fetchImpl ?? fetch;
   const toolMap = new Map(options.tools.map(tool => [tool.name, tool]));
+  const boundRoleId = role.id;
+  const toolBindings = [...toolMap].map(([name, tool]) => ({ name, tool, handler: tool.handler }));
   const toolSpecs = options.tools.map(tool => ({
     type: "function" as const,
     function: { name: `${TOOL_PREFIX}${tool.name}`, description: tool.description, parameters: tool.inputSchema },
@@ -122,6 +128,20 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
   let disposed = false;
   let promptCount = 0;
   let configurationShown = false;
+  const instanceId = randomUUID();
+  let coreTurnId: string | undefined;
+  let promptState: RuntimeNativeLifecycleFacts["promptState"] = "not-started";
+  let settledAt: string | undefined;
+  let requestsInFlight = 0;
+  const activeTools = new Map<string, RuntimeActiveToolFact>();
+  const inspectNative = (reasons: readonly string[] = []): RuntimeNativeLifecycleFacts => ({
+    instanceId, roleId: role.id, runtime: "codex", ...(coreTurnId ? { coreTurnId } : {}),
+    status: reasons.length ? "unknown" : active ? active.controller.signal.aborted ? "stopping" : "running" : "quiescent",
+    promptState, observedAt: new Date().toISOString(), ...(settledAt ? { settledAt } : {}),
+    transport: { kind: "http", state: requestsInFlight ? "open" : disposed ? "closed" : "idle" },
+    activeTools: [...activeTools.values()], processes: [], processCoverage: "complete",
+    reasons: [...reasons, ...(activeTools.size ? ["chat-tool-handler-running"] : []), ...(requestsInFlight ? ["chat-http-request-running"] : [])],
+  });
 
   const scrub = (value: unknown): unknown => {
     if (typeof value === "string") return redact(value);
@@ -156,7 +176,7 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
     return { role: "user", content: parts };
   };
 
-  const requestModel = async (signal: AbortSignal): Promise<Record<string, unknown>> => {
+  const requestModelBody = async (signal: AbortSignal): Promise<Record<string, unknown>> => {
     let response: Response;
     try {
       response = await fetchImpl(options.endpoint, {
@@ -182,6 +202,11 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
     if (!Array.isArray(choices) || choices.length === 0) throw new Error("Codex chat transport returned no choices");
     return object(object(choices[0], "chat choice").message, "chat message");
   };
+  const requestModel = async (signal: AbortSignal): Promise<Record<string, unknown>> => {
+    requestsInFlight++;
+    try { return await requestModelBody(signal); }
+    finally { requestsInFlight--; }
+  };
 
   /**
    * Execute one model tool call. Returns the `tool` message content: text string for text-only results;
@@ -202,12 +227,14 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
     emitTool(turnId, { ...facts, phase: "start", origin: "handler-start" }, "tool_call", name, { toolName: name, name, toolCallId: call.id, args });
     let result: ToolResult;
     let displayError: RuntimeToolErrorFactsV1 | undefined;
+    activeTools.set(call.id, { id: call.id, name, turnId });
     try {
       result = await tool.handler({ name, args, toolCallId: call.id, signal });
     } catch (error) {
       displayError = error instanceof Error ? { message: error.message } : {};
       result = { ok: false, message: redact(error) };
     }
+    finally { activeTools.delete(call.id); }
     const mapping = mapCodexToolResultImages(result);
     const deliveredOk = result.ok && !mapping.invalid;
     const modelMessage = mapping.invalid ? `${result.message}${CODEX_IMAGE_UNAVAILABLE_NOTE}` : result.message;
@@ -224,10 +251,37 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
     ];
   };
 
-  return {
+  const session: RoleSession = {
     runtime: "codex",
     roleId: role.id,
     contextSource: "in-memory",
+    inspectNativeToolSurface(): RuntimeNativeToolSurfaceFacts {
+      const reasons: string[] = [];
+      if (disposed) reasons.push("chat-session-disposed");
+      if (session.nativeLifecycle?.instanceId !== instanceId || session.roleId !== boundRoleId || role.id !== boundRoleId || session.runtime !== "codex") reasons.push("chat-native-identity-mismatch");
+      if (toolSpecs.length !== toolMap.size || toolBindings.length !== toolMap.size
+          || toolBindings.some(({ name, tool, handler }, index) => !/^[A-Za-z0-9_-]{1,60}$/.test(name)
+            || toolMap.get(name) !== tool || tool.name !== name || tool.handler !== handler
+            || toolSpecs[index]?.function.name !== `${TOOL_PREFIX}${name}`)) reasons.push("chat-tool-registry-changed");
+      // These are the actual function dispatch map and HTTP-only execution path of this closure.
+      // There is no MCP connection, native command dispatcher or fallback in runToolCall.
+      return { source: "native-provider-tool-registry", nativeInstanceId: instanceId, roleId: boundRoleId, runtime: "codex",
+        factory: "codex-chat", status: reasons.length ? "unknown" : "observed", observedAt: new Date().toISOString(),
+        appTools: [...toolMap.keys()], foreignMcpServers: [], nativeBuiltinTools: [], reasons,
+        ...(factoryPlan ? { factoryPlan: { ...factoryPlan } } : {}) };
+    },
+    nativeLifecycle: {
+      instanceId, inspect: inspectNative,
+      async stopAndInspect(input, signal) {
+        if (input.expectedInstanceId !== instanceId) throw new Error("Codex chat native instance mismatch");
+        if (input.expectedCoreTurnId !== undefined && input.expectedCoreTurnId !== coreTurnId) throw new Error("Codex chat native Core turn mismatch");
+        if (signal?.aborted || !Number.isFinite(input.timeoutMs) || input.timeoutMs <= 0) return inspectNative([signal?.aborted ? "native-stop-observation-aborted" : "native-stop-invalid-timeout"]);
+        const current = active;
+        current?.controller.abort();
+        const reason = await observeNativeStop(current?.settled ?? Promise.resolve(), input.timeoutMs, signal);
+        return inspectNative(reason ? [reason] : []);
+      },
+    },
     async prompt(text: string, promptOptions?: PromptOptions) {
       if (disposed) throw new Error("Codex chat session is disposed");
       if (active) throw new Error("Codex chat session already has an active turn");
@@ -236,7 +290,9 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
       const settled = new Promise<void>(resolve => { resolveSettled = resolve; });
       const turnState = { controller, settled };
       active = turnState;
-      const turnId = options.currentTurnId?.() ?? randomUUID();
+      coreTurnId = options.currentTurnId?.();
+      const turnId = coreTurnId ?? randomUUID();
+      promptState = "running"; settledAt = undefined;
       promptCount += 1;
       if (!configurationShown) {
         configurationShown = true;
@@ -260,16 +316,15 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
           const contentText = typeof message.content === "string" ? message.content : "";
           if (contentText !== "") emit(turnId, "message", contentText, { text: contentText });
           const toolCalls = normalizeToolCalls(message.tool_calls);
-          if (toolCalls.length === 0) break;
-          rounds += 1;
-          if (rounds > maxRounds) throw new Error(`Codex chat tool loop exceeded ${maxRounds} rounds`);
+          if (toolCalls.length > 0 && ++rounds > maxRounds) throw new Error(`Codex chat tool loop exceeded ${maxRounds} rounds`);
           // DeepSeek 思考模式要求把 reasoning_content 原样回传；不携带会 400。
           messages.push({
             role: "assistant",
             content: typeof message.content === "string" ? message.content : null,
-            tool_calls: toolCalls,
+            ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
             ...(typeof message.reasoning_content === "string" ? { reasoning_content: message.reasoning_content } : {}),
           });
+          if (toolCalls.length === 0) break;
           for (const call of toolCalls) {
             if (controller.signal.aborted) break;
             const parts = await runToolCall(turnId, call, controller.signal);
@@ -285,6 +340,7 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
         // 失败/中止/超时：回滚本轮历史，绝不让半截 assistant.tool_calls 在下一次请求里悬空。
         if (state.outcome !== "completed") messages.length = historyMark;
         if (active === turnState) active = undefined;
+        promptState = "settled"; settledAt = new Date().toISOString();
         emit(turnId, "settled", `Codex chat turn ${state.outcome}`, { outcome: state.outcome, ...(state.failure !== undefined ? { error: state.failure } : {}) });
         resolveSettled();
       }
@@ -307,4 +363,5 @@ export function createCodexChatSession(options: CodexChatSessionOptions): RoleSe
       queue.end();
     },
   };
+  return session;
 }

@@ -70,6 +70,7 @@ test("派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状�
   assert.equal(manifest.flowId, FLOW_ID);
   assert.equal(manifest.runId, project.runId);
   assert.equal(manifest.artifacts.documents.proposal?.path, PATHS.proposal);
+  assert.ok(manifest.artifacts.workflow, "Execution fixture must contain a real workflow");
   assert.equal(manifest.artifacts.workflow.sha256, project.hashes[PATHS.workflow]);
   assert.equal(manifest.rosterVersion, 1);
   assert.deepEqual(manifest.roles, ["impl"]);
@@ -483,6 +484,7 @@ test("recover 显式 target（修复入口）：按目标重建 tN+1（字节复
   if (!repaired.ok) return;
   assert.equal(repaired.value.manifest.source, "recovery");
   assert.equal(repaired.value.manifest.trunkVersion, 2);
+  assert.ok(repaired.value.manifest.artifacts.workflow, "Execution fixture must contain a real workflow");
   assert.equal(repaired.value.manifest.artifacts.workflow.sha256, newSha);
   assert.equal(repaired.value.manifest.d3?.decisionId, "dec-0");
   assert.deepEqual(repaired.value.manifest.roles, ["impl"]);
@@ -530,6 +532,7 @@ test("applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/�
   assert.equal(read.ok, true);
   if (read.ok) {
     assert.equal(read.value.trunkVersion, 1); // 不升版本
+    assert.ok(read.value.artifacts.workflow, "Execution fixture must contain a real workflow");
     assert.equal(read.value.artifacts.workflow.sha256, newSha);
   }
 

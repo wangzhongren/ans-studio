@@ -4,6 +4,10 @@
 // 走 legacy Markdown 表格解析（boundary-parse.ts，仅为技能内置边界保留，技能安装目录不可改）。
 
 import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { isCompleteSnapshot, isActiveRoleEvidence, isFrozenRoleEvidence, type CompleteSnapshot,
+  type ActiveRoleEvidence, type FrozenRoleEvidence, type TrunkManifest } from "../../model/trunk.ts";
+import type { RoleDocumentCheck } from "../../model/boundary.ts";
 import type { Acceptance, BoundaryEntry, BoundarySection1, PinEntry, Root } from "../../model/boundary.ts";
 import type { ProjectConfig } from "../../model/role.ts";
 import { parseBoundarySection1 } from "./boundary-parse.ts";
@@ -19,7 +23,151 @@ import { buildGovernanceSeedBoundaryForGate } from "./governance-seed.ts";
 // trio 四人的 Card/Section 1 来自内置注册表，不再是 su 的单一治理边界文档。注册表是
 // **纯数据 + 纯查询**，不反向读取本文件的顶层绑定（仅以 live binding 再导出 `LEGACY_*`），
 // 故不构成初始化顺序风险。
-import { governanceRoleOf, trioGovernanceSource } from "./governance-roles.ts";
+import { governanceRoleOf, trioGovernanceSource, ROLE_CARD_REQUIRED_SECTIONS } from "./governance-roles.ts";
+
+export interface SnapshotRolePaths {
+  roleId: string;
+  cardPath: string;
+  boundaryMdPath: string;
+  boundaryYamlPath: string;
+}
+export interface SnapshotRoleDocuments extends SnapshotRolePaths {
+  allowedPaths: readonly { path: string; kind: "file" | "directory" }[];
+}
+export type RoleDocumentsValidation = { ok: true; roleDocumentChecks: RoleDocumentCheck[] }
+  | { ok: false; message: string };
+
+function safeSnapshotPath(value: string): boolean {
+  return typeof value === "string" && value.length > 0 && !/[\\:\x00-\x1f]/.test(value)
+    && !value.startsWith("/") && !value.split("/").some(p => !p || p === "." || p === "..");
+}
+function entryIdentity(entry: BoundaryEntry): string {
+  return JSON.stringify([entry.root, entry.kind, entry.path, entry.condition ?? null]);
+}
+function coversModule(parent: { path: string; kind: "file" | "directory" }, child: { path: string; kind: string }): boolean {
+  const root = parent.path.replace(/\/$/, "").toLowerCase();
+  const target = child.path.replace(/\/$/, "").toLowerCase();
+  return parent.kind === "file" ? child.kind === "file" && root === target
+    : target === root || target.startsWith(`${root}/`);
+}
+
+/** Pure exact-byte validation; the digest algorithm is the immutable CompleteSnapshot contract. */
+export function snapshotDocumentText(snapshot: CompleteSnapshot, rel: string): string {
+  if (!isCompleteSnapshot(snapshot) || !safeSnapshotPath(rel)) throw new Error("invalid-complete-snapshot");
+  const seen = new Set<string>();
+  for (const file of snapshot.files) {
+    const bytes = Buffer.from(file.bytesBase64, "base64");
+    if (seen.has(file.path.toLowerCase()) || bytes.toString("base64") !== file.bytesBase64
+        || createHash("sha256").update(bytes).digest("hex") !== file.sha256.toLowerCase())
+      throw new Error("snapshot-byte-hash-mismatch");
+    seen.add(file.path.toLowerCase());
+  }
+  const digest = createHash("sha256").update(JSON.stringify([...snapshot.files]
+    .sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0)
+    .map(file => [file.path, file.sha256.toLowerCase(), file.bytesBase64]))).digest("hex");
+  if (digest !== snapshot.digest) throw new Error("snapshot-digest-mismatch");
+  const file = snapshot.files.find(f => f.path === rel);
+  if (!file) throw new Error(`snapshot-file-missing:${rel}`);
+  return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(file.bytesBase64, "base64"));
+}
+
+/** Parse only immutable bytes. The host separately binds the eight evidence refs and authority. */
+export function parseSnapshotRoleDocuments(snapshot: CompleteSnapshot, role: SnapshotRolePaths): {
+  cardText: string; entries: BoundaryEntry[]; check: RoleDocumentCheck;
+} {
+  if (!role.roleId || /[\\/\x00-\x1f]/.test(role.roleId) || isBuiltInReserved(role.roleId))
+    throw new Error("invalid-project-role-id");
+  const canonical = `角色卡/${role.roleId}/`;
+  if (role.cardPath !== `${canonical}role-card.md` || role.boundaryMdPath !== `${canonical}boundary.md`
+      || role.boundaryYamlPath !== `${canonical}boundary.yaml`) throw new Error("role-document-path-mismatch");
+  const cardText = snapshotDocumentText(snapshot, role.cardPath);
+  for (const section of ROLE_CARD_REQUIRED_SECTIONS) {
+    const headings = cardText.split(/\r?\n/).filter(line => /^#{1,6}\s/.test(line));
+    if (!headings.some(line => section.test.test(line))) throw new Error(`role-card-section-missing:${section.label}`);
+  }
+  const markdown = snapshotDocumentText(snapshot, role.boundaryMdPath);
+  const yamlText = snapshotDocumentText(snapshot, role.boundaryYamlPath);
+  const yaml = parseBoundaryYamlDoc(yamlText);
+  if (yaml.archived) throw new Error("frozen-role-archived");
+  // The strict parser validates all YAML keys; bind the optional role label as well.
+  const label = /^role:\s*([^#\r\n]+)\s*$/m.exec(yamlText)?.[1]?.trim().replace(/^["']|["']$/g, "");
+  if (label !== role.roleId) throw new Error("boundary-role-mismatch");
+  const md = parseBoundarySection1(markdown, "project");
+  const yamlKeys = yaml.entries.map(entryIdentity).sort(), mdKeys = md.map(entryIdentity).sort();
+  if (!yaml.entries.length || new Set(yamlKeys).size !== yamlKeys.length
+      || JSON.stringify(yamlKeys) !== JSON.stringify(mdKeys)) throw new Error("boundary-md-yaml-mismatch");
+  for (const entry of yaml.entries) {
+    if (entry.root !== "project" || entry.kind === "conditional-directory" || !safeSnapshotPath(entry.path))
+      throw new Error("invalid-role-boundary-scope");
+  }
+  const hash = (rel: string) => snapshot.files.find(f => f.path === rel)!.sha256.toLowerCase();
+  return { cardText, entries: yaml.entries, check: { roleId: role.roleId, snapshotDigest: snapshot.digest,
+    cardSha256: hash(role.cardPath), boundaryMdSha256: hash(role.boundaryMdPath), boundaryYamlSha256: hash(role.boundaryYamlPath), ok: true } };
+}
+function isBuiltInReserved(roleId: string): boolean {
+  return roleId === "su" || governanceRoleOf(roleId) !== undefined;
+}
+
+/** Pipeline supplies authoritative module scope; this function has no I/O or state writes. */
+export function validateRoleDocumentsSnapshot(input: {
+  snapshot: CompleteSnapshot; roles: readonly SnapshotRoleDocuments[];
+}): RoleDocumentsValidation {
+  try {
+    if (!Array.isArray(input.roles) || !input.roles.length) throw new Error("missing-role-documents");
+    const checks: RoleDocumentCheck[] = [], claimed: { roleId: string; path: string; kind: "file" | "directory" }[] = [];
+    const ids = new Set<string>();
+    for (const role of input.roles as readonly SnapshotRoleDocuments[]) {
+      if (ids.has(role.roleId) || !role.allowedPaths.length) throw new Error("duplicate-or-unscoped-role");
+      ids.add(role.roleId);
+      for (const scope of role.allowedPaths) {
+        if (!["file", "directory"].includes(scope.kind) || !safeSnapshotPath(scope.path.replace(/\/$/, ""))) throw new Error("invalid-module-scope");
+        if (claimed.some(other => other.roleId !== role.roleId && (coversModule(other, scope) || coversModule(scope, other))))
+          throw new Error("module-owner-overlap");
+        claimed.push({ ...scope, roleId: role.roleId });
+      }
+      const parsed = parseSnapshotRoleDocuments(input.snapshot, role);
+      if (parsed.entries.some(entry => !role.allowedPaths.some(scope => coversModule(scope, entry))))
+        throw new Error("boundary-outside-role-modules");
+      checks.push(parsed.check);
+    }
+    return { ok: true, roleDocumentChecks: checks };
+  } catch (error) { return { ok: false, message: error instanceof Error ? error.message : String(error) }; }
+}
+
+type RoleDocumentAuthority = { runId: string; pinDigest: string } | { activeRevision: number; activeDigest: string };
+export function selectRoleDocumentEvidence(roleId: string, project: ProjectConfig, manifest?: TrunkManifest):
+  | { kind: "frozen"; evidence: FrozenRoleEvidence; authority: Extract<RoleDocumentAuthority, { runId: string }> }
+  | { kind: "active"; evidence: ActiveRoleEvidence; authority: Extract<RoleDocumentAuthority, { activeRevision: number }> } {
+  const context = project.documentContext;
+  if (context !== undefined) {
+    const evidence = context.frozenRoleEvidence;
+    if (!context.runId || !context.pinDigest || !isFrozenRoleEvidence(evidence)
+        || evidence.runId !== context.runId || evidence.pinDigest !== context.pinDigest || evidence.roleId !== roleId)
+      throw new Error("frozen-role-context-missing-or-mismatched");
+    return { kind: "frozen", evidence, authority: { runId: context.runId, pinDigest: context.pinDigest } };
+  }
+  const evidence = manifest?.activeRoles?.[roleId];
+  if (!manifest || !isActiveRoleEvidence(evidence) || evidence.roleId !== roleId
+      || "runId" in evidence || "pinDigest" in evidence
+      || !Number.isSafeInteger(manifest.activeRevision) || manifest.activeRevision! < 1
+      || typeof manifest.activeDigest !== "string" || !/^[a-f0-9]{64}$/i.test(manifest.activeDigest))
+    throw new Error("active-role-evidence-missing-or-mismatched");
+  return { kind: "active", evidence, authority: { activeRevision: manifest.activeRevision!, activeDigest: manifest.activeDigest } };
+}
+
+export function frozenSnapshotBoundary(snapshot: CompleteSnapshot, evidence: ActiveRoleEvidence, authority: RoleDocumentAuthority): {
+  cardText: string; boundary: BoundarySection1; location: { card: string; boundary: string };
+} {
+  const parsed = parseSnapshotRoleDocuments(snapshot, { roleId: evidence.roleId, cardPath: evidence.cardRef.path,
+    boundaryMdPath: evidence.boundaryMdRef.path, boundaryYamlPath: evidence.boundaryYamlRef.path });
+  const authorityKey = "runId" in authority ? `run:${authority.runId}/${authority.pinDigest}`
+    : `active:${authority.activeRevision}/${authority.activeDigest}`;
+  const boundarySource = `<immutable:${authorityKey}/${evidence.roleId}>`;
+  return { cardText: parsed.cardText, location: { card: evidence.cardRef.path, boundary: evidence.boundaryYamlRef.path },
+    boundary: { entries: parsed.entries, boundarySource,
+      acceptance: { accepted: true, source: `immutable-evidence:${authorityKey}` },
+      frozenEvidence: { ...authority, roleId: evidence.roleId, snapshotDigest: snapshot.digest } } };
+}
 
 export const BUILT_IN_SOURCE = "<built-in:ans-governed-construction SKILL boundary>";
 

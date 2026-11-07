@@ -12,14 +12,14 @@
 //   `toSha256` 取 to 路径当刻字节），发起者不自报；
 // · 只读：不写修正案/不开卡；逐项确认由 S4 编排。
 
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { parse as parseYaml } from "yaml";
 
-import { protectedVersionedPaths } from "../../../common/门禁引擎/versioned-doc-guard.ts";
+import { scanVersionedDocuments } from "../../../provider/version-change/public/version-change-store.ts";
+import { createFsTrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 import {
   TRUNK_AMENDMENT_SCHEMA,
   TRUNK_AMENDMENT_VCA_ITEM_KINDS,
+  type CompleteSnapshot,
   type TrunkAmendmentDoc,
   type TrunkAmendmentItem,
   type TrunkAmendmentItemChange,
@@ -27,7 +27,7 @@ import {
   type TrunkAmendmentState,
   type TrunkAmendmentStatus,
 } from "../../../model/trunk.ts";
-import type { TrunkStore } from "../../../provider/trunk/abstract/trunk-store.ts";
+import type { TrunkStore } from "../../../provider/trunk/public/trunk-store.ts";
 import type {
   AmendmentValidation,
   SnapshotItem,
@@ -100,7 +100,7 @@ function itemChangeOf(value: unknown): TrunkAmendmentItemChange | undefined {
   return value === "add" || value === "modify" || value === "none" ? value : undefined;
 }
 
-function validateDocShape(data: unknown, flowId: string, fileNameVersion: number): TrunkServiceResult<TrunkAmendmentDoc> {
+function validateDocShape(data: unknown, flowId: string, fileNameVersion: number, allowNoOp = false): TrunkServiceResult<TrunkAmendmentDoc> {
   if (!isObject(data)) return invalid("修正案 frontmatter 不是映射");
   if (data.schema !== TRUNK_AMENDMENT_SCHEMA) {
     return invalid(`修正案 schema 必须为 ${TRUNK_AMENDMENT_SCHEMA}`);
@@ -167,7 +167,7 @@ function validateDocShape(data: unknown, flowId: string, fileNameVersion: number
       ...(raw.reason !== undefined ? { reason: String(raw.reason) } : {}),
     });
   }
-  if (!items.some((item) => item.change !== "none")) {
+  if (!allowNoOp && !items.some((item) => item.change !== "none")) {
     return invalid("修正案没有实际变更项（change:none 不是 target）");
   }
   const baseTrunk =
@@ -267,12 +267,9 @@ export async function validateAmendment(input: {
   }
   const version = docVersionOfPath(rel);
   if (version === undefined) return invalid(`修正案文档缺少版本号：${rel}`);
-  let bytes: Buffer;
-  try {
-    bytes = await readFile(path.join(input.projectRoot, rel));
-  } catch {
-    return { ok: false, code: "trunk-amendment-not-found", message: `修正案文档不存在：${rel}` };
-  }
+  const read = await createFsTrunkStore(input.projectRoot).readProjectFile!(rel);
+  if (!read.ok) return { ok: false, code: "trunk-amendment-not-found", message: `修正案文档不存在：${rel}` };
+  const bytes = Buffer.from(read.value.bytesBase64, "base64");
   const text = bytes.toString("utf8");
   const data = parseFrontmatter(text);
   if (data === undefined) return invalid("修正案 frontmatter 缺失或 YAML 非法");
@@ -304,7 +301,7 @@ export async function selectTargetVersion(input: {
   const rel = normalizeRelPath(input.path);
   const family = rel === undefined ? undefined : pathFamilyOfPath(rel);
   if (family === undefined) return { candidates: [] };
-  const all = await protectedVersionedPaths(input.projectRoot);
+  const all = (await scanVersionedDocuments(input.projectRoot)).map(doc => doc.path);
   const candidates = all
     .filter((candidate) => pathFamilyOfPath(candidate) === family)
     .map((candidate) => ({ path: candidate, version: docVersionOfPath(candidate) ?? 0 }))
@@ -330,4 +327,13 @@ export function validateAmendmentState(state: TrunkAmendmentState): string | und
     return `amendment applyState 非法：${String(state.applyState)}`;
   }
   return undefined;
+}
+
+/** Direct path: parse the exact immutable amendment bytes; no live or run fallback. */
+export function parseAmendmentSnapshot(snapshot: CompleteSnapshot, rel: string, flowId: string): TrunkServiceResult<TrunkAmendmentDoc> {
+  if (!AMENDMENT_DOC_RE.test(rel) || !rel.startsWith(`docs/proposals/${flowId}-amendment-v`)) return invalid("Invalid amendment document path");
+  const file = snapshot.files.find(file => file.path === rel);
+  if (!file) return invalid("Amendment bytes absent from complete snapshot");
+  const data = parseFrontmatter(Buffer.from(file.bytesBase64, "base64").toString("utf8"));
+  return validateDocShape(data, flowId, docVersionOfPath(rel)!, true);
 }

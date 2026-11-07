@@ -33,6 +33,8 @@ import {
   builtInBoundarySection,
   loadBoundaryFile,
   resolveBoundarySection,
+  frozenSnapshotBoundary,
+  selectRoleDocumentEvidence,
 } from "../../common/门禁引擎/boundary-core.ts";
 import {
   BUILT_IN_GOVERNANCE_ROLES,
@@ -46,12 +48,33 @@ import { parseRoleGroupMetadata } from "../../common/门禁引擎/role-card-meta
 import { parseRoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
 import type { RoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
 import { readdir, stat } from "node:fs/promises";
+import { createProjectTrunkStore } from "../../provider/trunk/public/trunk-store.ts";
+
+// Each Service owns its legal Provider call; only pure evidence selection/parsing is shared.
+async function resolveRoleDocumentContext(roleId: string, project: ProjectConfig): Promise<ReturnType<typeof frozenSnapshotBoundary> | null> {
+  const context = project.documentContext;
+  if (context === undefined && (roleId === "su" || governanceRoleOf(roleId))) return null;
+  const store = createProjectTrunkStore(project.projectRoot);
+  const manifest = context === undefined ? await store.readManifest() : undefined;
+  if (manifest && !manifest.ok) {
+    if (manifest.reason === "missing") return null;
+    throw new Error(`effective-trunk-${manifest.reason}`);
+  }
+  const selected = selectRoleDocumentEvidence(roleId, project, manifest?.ok ? manifest.value : undefined);
+  const read = selected.kind === "frozen" ? await store.readFrozenRoleEvidence!(selected.evidence)
+    : await store.readActiveRoleEvidence!(selected.evidence);
+  if (!read.ok) throw new Error(`frozen-role-${read.reason}:${read.message ?? ""}`);
+  return frozenSnapshotBoundary(read.value, selected.evidence, selected.authority);
+}
 
 // 公共出口：角色卡结构化章节（共享解析唯一实现恒在门禁引擎私有 role-card-sections.ts；
 // 跨角色只可经本文件消费，不得导入私有解析器或自行解析 cardText）。
 export type { RoleCardSections } from "../../common/门禁引擎/role-card-sections.ts";
 
 export async function resolveRole(roleId: string, project: ProjectConfig): Promise<ResolvedRole> {
+  const frozen = await resolveRoleDocumentContext(roleId, project);
+  if (frozen) return { id: roleId, kind: "project", cardText: frozen.cardText, boundary: frozen.boundary,
+    boundarySource: frozen.boundary.boundarySource, location: frozen.location, ...parseRoleGroupMetadata(frozen.cardText) };
   const model = project.governanceModel ?? "single";
 
   // trio 迁移后 su 归档：隐藏、不可开启、历史只读（客户 2026-10-17 拍板；评审 §二-13/§5.3）。

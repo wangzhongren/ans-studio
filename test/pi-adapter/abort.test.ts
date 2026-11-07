@@ -18,9 +18,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createFakeRuntimeAdapter, type RoleSession, type SessionEvent, type CustomerInputFn } from "../../src/provider/pi/session.ts";
+import { createFakeRuntimeAdapter, createPiRuntimeAdapter, type RoleSession, type SessionEvent, type CustomerInputFn } from "../../src/provider/pi/session.ts";
 import { buildGovernedTools, REQUEST_CONFIRMATION_TOOL_NAME } from "../../src/provider/pi/tools.ts";
-import { buildGovernanceExtension, makeRoleSession, toPiTool, wireSettledOnce, type PromptCapableSession, type RoleSessionDeps } from "../../src/common/pi-adapter/real-adapter.ts";
+import { buildGovernanceExtension, makeRoleSession, observePiMcpTransport, toPiTool, wireSettledOnce, type PromptCapableSession, type RoleSessionDeps } from "../../src/common/pi-adapter/real-adapter.ts";
+import { isRuntimeNativeLifecycleFacts } from "../../src/model/runtime.ts";
+import { fileURLToPath } from "node:url";
 import { createEventQueue, type EventQueue } from "../../src/common/pi-adapter/event-queue.ts";
 import { createInteractionGate, type InteractionGate } from "../../src/common/pi-adapter/timeout.ts";
 import { ANS_SETTINGS_OVERRIDES } from "../../src/common/pi-adapter/settings.ts";
@@ -228,6 +230,7 @@ async function boot(opts: {
   });
   await resourceLoader.reload();
 
+  const nativeManager = SessionManager.inMemory(opts.dir);
   const { session } = await createAgentSession({
     cwd: opts.dir,
     noTools: "builtin",
@@ -235,7 +238,7 @@ async function boot(opts: {
     resourceLoader,
     model: model as never,
     modelRuntime: runtime,
-    sessionManager: SessionManager.inMemory(opts.dir),
+    sessionManager: nativeManager,
     settingsManager,
   });
 
@@ -249,6 +252,7 @@ async function boot(opts: {
     log: silentLogger(),
     queue,
     unsubscribe,
+    nativeObservation: { roleId: "offline-pi", nativeSessionId: nativeManager.getSessionId(), currentTurnId: () => "offline-core-turn", mcpTransports: [] },
   });
   return { roleSession, gate, events };
 }
@@ -276,10 +280,15 @@ test("P0-2 主用例（faux 离线）：确认卡挂起中 abort → settled 恰
       const round = roleSession.prompt("请先向客户确认");
       await started; // 确认卡已挂起（会话在等客户）
       assert.equal(gate.isWaiting(), true, "前置：交互工具确已进入等待（gate 计数 > 0）");
+      assert.equal(roleSession.nativeLifecycle!.inspect().activeTools[0]?.name, REQUEST_CONFIRMATION_TOOL_NAME);
+      assert.equal(roleSession.nativeLifecycle!.inspect().coreTurnId, "offline-core-turn");
 
       await roleSession.abort?.(); // 停当前轮次——必须不抛错（消费方写法即契约钉的 `abort?.()`）
       await round; // 进行中的 prompt promise **正常返回**（SDK 把中止落成 stopReason:"aborted" 收尾，不向上拒绝）
       assert.equal(gate.isWaiting(), false, "abort 带动等待中的客户确认 fail-closed 返回（run 级 signal → raceAbort → askCustomer 收闸）");
+      assert.equal(roleSession.nativeLifecycle!.inspect().promptState, "settled");
+      assert.equal(roleSession.nativeLifecycle!.inspect().activeTools.length, 0);
+      assert.equal(roleSession.nativeLifecycle!.inspect().processCoverage, "unknown");
 
       const settled = events.filter((e) => e.kind === "settled").length;
       assert.equal(settled, 1, "中止后 settled 仍发射且恰 1（既有行为 + X-1 唯一发射点）——消费方不会挂起");
@@ -326,6 +335,196 @@ test("P0-2：无进行中轮次 abort = no-op 不抛错（prompt 前 / 两轮之
       await roleSession.dispose();
     }
   } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function nativeStub(options: { prompt?: () => Promise<void>; abort?: () => Promise<void>; dispose?: () => void; transports?: ReturnType<typeof observePiMcpTransport>[]; turn?: () => string; turnLastResortMs?: number } = {}) {
+  const listeners = new Set<(event: { type: string; toolCallId?: string; toolName?: string }) => void>();
+  const sdk: PromptCapableSession = {
+    prompt: options.prompt ?? (async () => {}), abort: options.abort ?? (async () => {}), dispose: options.dispose ?? (() => {}),
+    isStreaming: false, isCompacting: false, pendingMessageCount: 0,
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+  };
+  const session = makeRoleSession({ ...makeDeps(sdk), strictLifecycle: true, abortTimeoutMs: 25, turnLastResortMs: options.turnLastResortMs,
+    nativeObservation: { roleId: "pi-role", nativeSessionId: "real-session-fixture", currentTurnId: options.turn ?? (() => "core-1"), mcpTransports: options.transports ?? [] } });
+  return { session, hook: session.nativeLifecycle!, fire: (event: { type: string; toolCallId?: string; toolName?: string }) => { for (const listener of listeners) listener(event); } };
+}
+
+test("Pi native: stable bind identity, retained Core turn, mismatch is side-effect free and empty process list is unknown", async () => {
+  let aborts = 0;
+  let turn = "core-1";
+  const a = nativeStub({ abort: async () => { aborts++; }, turn: () => turn });
+  const b = nativeStub();
+  try {
+    assert.notEqual(a.hook.instanceId, b.hook.instanceId);
+    assert.equal(a.hook.inspect().promptState, "not-started");
+    await a.session.prompt("offline");
+    turn = "later-core-turn";
+    assert.equal(a.hook.inspect().coreTurnId, "core-1");
+    await assert.rejects(a.hook.stopAndInspect({ expectedInstanceId: b.hook.instanceId, timeoutMs: 20 }), /instance mismatch/);
+    await assert.rejects(a.hook.stopAndInspect({ expectedInstanceId: a.hook.instanceId, expectedCoreTurnId: turn, timeoutMs: 20 }), /turn mismatch/);
+    assert.equal(aborts, 0);
+    const facts = await a.hook.stopAndInspect({ expectedInstanceId: a.hook.instanceId, expectedCoreTurnId: "core-1", timeoutMs: 30 });
+    assert.ok(isRuntimeNativeLifecycleFacts(facts));
+    assert.equal(facts.roleId, "pi-role");
+    assert.equal(facts.nativeSessionId, "real-session-fixture");
+    assert.equal(facts.promptState, "settled");
+    assert.equal(facts.status, "unknown");
+    assert.equal(facts.processCoverage, "unknown");
+    await assert.rejects(a.session.prompt("must not restart stopped native instance"), /stopping or disposed/);
+  } finally { await a.session.dispose(); await b.session.dispose(); }
+});
+
+test("Pi native: SDK settled, abort success, and dispose early return do not settle a pending raw prompt or active tool", async () => {
+  let release!: () => void;
+  let aborts = 0;
+  const raw = new Promise<void>(resolve => { release = resolve; });
+  const { session, hook, fire } = nativeStub({ prompt: () => raw, abort: async () => { aborts++; } });
+  const round = session.prompt("offline raw");
+  fire({ type: "tool_execution_start", toolCallId: "owned-tool", toolName: "held-tool" });
+  fire({ type: "agent_settled" });
+  try {
+    const input = { expectedInstanceId: hook.instanceId, expectedCoreTurnId: "core-1", timeoutMs: 20 };
+    const [first, second] = await Promise.all([hook.stopAndInspect(input), hook.stopAndInspect(input)]);
+    assert.equal(aborts, 1);
+    for (const facts of [first, second]) {
+      assert.equal(facts.promptState, "running");
+      assert.equal(facts.status, "stopping");
+      assert.equal(facts.activeTools[0]?.turnId, "core-1");
+      assert.ok(facts.reasons.includes("native-stop-observation-timeout"));
+    }
+    await session.dispose();
+    assert.equal(hook.inspect().promptState, "running");
+    release(); await round;
+    assert.equal(hook.inspect().promptState, "settled");
+    assert.equal(hook.inspect().activeTools.length, 1, "raw completion cannot drain an unobserved tool end");
+    fire({ type: "tool_execution_end", toolCallId: "owned-tool" });
+    assert.equal(hook.inspect().activeTools.length, 0);
+    assert.equal(hook.inspect().status, "unknown");
+  } finally { release(); await round; await session.dispose(); }
+});
+
+test("Pi native: cancelled observation and invalid timeout do not request abort", async () => {
+  let aborts = 0;
+  const { session, hook } = nativeStub({ abort: async () => { aborts++; } });
+  try {
+    const cancelled = await hook.stopAndInspect({ expectedInstanceId: hook.instanceId, timeoutMs: 20 }, AbortSignal.abort());
+    assert.ok(cancelled.reasons.includes("native-stop-observation-aborted"));
+    const invalid = await hook.stopAndInspect({ expectedInstanceId: hook.instanceId, timeoutMs: 0 });
+    assert.ok(invalid.reasons.includes("native-stop-invalid-timeout"));
+    assert.equal(aborts, 0);
+  } finally { await session.dispose(); }
+});
+
+test("Pi native: outer prompt timeout cannot settle raw SDK work; unobserved activity and non-started transport cannot prove idle/exit", async () => {
+  let release!: () => void;
+  const raw = new Promise<void>(resolve => { release = resolve; });
+  const { session, hook } = nativeStub({ prompt: () => raw, turnLastResortMs: 15 });
+  try {
+    await assert.rejects(session.prompt("timeout offline"), /最后兜底/);
+    assert.equal(hook.inspect().promptState, "running");
+    assert.equal(hook.inspect().settledAt, undefined);
+    await assert.rejects(session.prompt("do not overlap raw work"), /raw prompt is still running/);
+    release(); await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(hook.inspect().promptState, "settled");
+    assert.ok(hook.inspect().settledAt);
+  } finally { release(); await session.dispose(); }
+  let close!: () => void;
+  const unstarted = observePiMcpTransport({ start: async () => {}, close: async () => { close(); }, onClose: listener => { close = listener; return () => {}; } }, "unstarted-no-pid");
+  await unstarted.close();
+  assert.equal(unstarted.inspect().state, "unknown");
+  const unknownActivity = makeRoleSession({ ...makeDeps(stubSdkSession().session), nativeObservation: { roleId: "pi-role", nativeSessionId: "offline-id", mcpTransports: [unstarted] } });
+  try {
+    const facts = await unknownActivity.nativeLifecycle!.stopAndInspect({ expectedInstanceId: unknownActivity.nativeLifecycle!.instanceId, timeoutMs: 15 });
+    assert.equal(facts.status, "unknown");
+    assert.equal(facts.transport.state, "unknown");
+    assert.ok(facts.reasons.includes("pi-sdk-idle-not-observed"));
+    assert.ok(facts.reasons.includes("native-stop-observation-timeout"));
+  } finally { await unknownActivity.dispose(); }
+});
+
+test("Pi native MCP: actual owned Node close, delayed close, and close promise early return retain honest tree unknown", async () => {
+  const { StdioTransport } = await import("@earendil-works/pi-mcp");
+  const fixture = fileURLToPath(new URL("./mcp-fixture-server.ts", import.meta.url));
+  for (const earlyReturn of [false, true]) {
+    const transport = new StdioTransport({ command: process.execPath, args: [fixture, "--close-delay=90"], inheritEnv: false, env: { PATH: process.env.PATH ?? "" }, closeTimeoutMs: 200 });
+    const source = earlyReturn ? {
+      get pid() { return transport.pid; }, start: () => transport.start(), close: async () => {}, onClose: (listener: () => void) => transport.onClose(listener),
+    } : transport;
+    const owned = observePiMcpTransport(source, "owned-node-mcp");
+    const { session, hook } = nativeStub({ transports: [owned] });
+    try {
+      await source.start();
+      const pid = owned.inspect().pid;
+      assert.ok(pid && pid > 0);
+      assert.equal(owned.inspect().state, "running");
+      const pending = await hook.stopAndInspect({ expectedInstanceId: hook.instanceId, timeoutMs: 15 });
+      assert.equal(pending.processes[0]?.state, "running");
+      assert.ok(pending.reasons.includes("native-stop-observation-timeout"));
+      await transport.close();
+      const facts = await hook.stopAndInspect({ expectedInstanceId: hook.instanceId, timeoutMs: 400 });
+      assert.equal(facts.processes[0]?.pid, pid);
+      assert.equal(facts.processes[0]?.state, "exited");
+      assert.equal(facts.processes[0]?.treeStatus, "unknown");
+      assert.equal(facts.processCoverage, "unknown");
+      assert.equal(facts.status, "unknown");
+    } finally { await transport.close(); await session.dispose(); }
+  }
+});
+
+test("Pi public bind returns real hook: production SDK raw turn and MCP close, legacy wrapper preserves hook", async () => {
+  const pi = await import("@earendil-works/pi-coding-agent");
+  const ai = await import("@earendil-works/pi-ai");
+  const faux = ai.fauxProvider();
+  faux.setResponses([ai.fauxAssistantMessage("offline production hook"), ai.fauxAssistantMessage("offline legacy hook")]);
+  const runtime = await pi.ModelRuntime.create({ credentials: new ai.InMemoryCredentialStore(), modelsPath: null, refreshOnCreate: false, allowModelNetwork: false });
+  runtime.registerNativeProvider(faux.provider);
+  const model = runtime.getModel(faux.provider.id, faux.models[0].id)!;
+  const dir = mkdtempSync(join(tmpdir(), "ans-pi-native-production-"));
+  const credentialKey = "ANS_PI_NATIVE_STOP_OFFLINE_FIXTURE";
+  const previous = process.env[credentialKey];
+  process.env[credentialKey] = "offline-placeholder";
+  let session: RoleSession | undefined;
+  try {
+    const common = {
+      gate: makeGate({ skill: [], project: [] }), projectRoot: dir, skillRoot: dir,
+      providerId: "offline-pi-native", baseUrl: "https://offline.invalid/", modelId: "offline-model", apiKeyEnvVar: credentialKey, contextWindow: 500000,
+      dependencies: { buildRuntime: async () => ({ runtime, model }) },
+    };
+    const production = { ...common, runtime: "pi" as const, tools: [], interactionGate: createInteractionGate(), currentTurnId: () => "production-core-turn",
+      installedMcpServers: [{ name: "offline_owned", command: process.execPath, args: [fileURLToPath(new URL("./mcp-fixture-server.ts", import.meta.url)), "--close-delay=60"] }] };
+    session = await createPiRuntimeAdapter(production).bindRole(makeRole());
+    const hook = session.nativeLifecycle!;
+    assert.ok(hook, "public production entry must return the real adapter hook");
+    const initial = hook.inspect();
+    assert.equal(initial.nativeSessionId, session.nativeSessionId);
+    assert.equal(initial.roleId, session.roleId);
+    assert.equal(initial.runtime, "pi");
+    await session.prompt("offline only");
+    const raw = hook.inspect();
+    assert.equal(raw.processes[0]?.state, "running");
+    assert.ok(raw.processes[0]?.pid);
+    assert.equal(raw.promptState, "settled");
+    assert.ok(raw.coreTurnId);
+    const stopped = await hook.stopAndInspect({ expectedInstanceId: hook.instanceId, expectedCoreTurnId: raw.coreTurnId, timeoutMs: 1500 });
+    assert.equal(stopped.coreTurnId, raw.coreTurnId);
+    assert.equal(stopped.processes[0]?.pid, raw.processes[0]?.pid);
+    assert.equal(stopped.processes[0]?.state, "exited");
+    assert.equal(stopped.processCoverage, "unknown");
+    assert.equal(stopped.status, "unknown");
+    assert.equal(stopped.reasons.includes("native-stop-observation-timeout"), false);
+    await session.dispose();
+    session = await createPiRuntimeAdapter(common).bindRole(makeRole());
+    assert.ok(session.nativeLifecycle, "legacy wrapper must preserve the real adapter hook");
+    await session.prompt("offline legacy only");
+    const legacy = session.nativeLifecycle.inspect();
+    assert.ok(legacy.coreTurnId);
+    assert.equal(legacy.promptState, "settled");
+    assert.equal(legacy.nativeSessionId, session.nativeSessionId);
+  } finally {
+    await session?.dispose();
+    if (previous === undefined) delete process.env[credentialKey]; else process.env[credentialKey] = previous;
     rmSync(dir, { recursive: true, force: true });
   }
 });

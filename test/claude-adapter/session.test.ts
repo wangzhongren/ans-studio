@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, readFile, access, rm, symlink, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, access, rm, symlink, mkdir, writeFile, lstat, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 import { setTimeout as delay, setImmediate as nextIO } from "node:timers/promises";
 import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { Options, SDKMessage, SDKUserMessage, Query } from "@anthropic-ai/claude-agent-sdk";
@@ -94,6 +95,189 @@ function fake(script: Script, statuses: unknown[] | (() => Promise<unknown[]>) =
 // P3（2026-10-30）：本套件聚焦适配器既有语义，关闭 ANS 同回合重试（重试行为由
 // test/claude-adapter/replay-safe-retry.test.ts 真实路径覆盖），避免既有失败/恢复用例被重试改变。
 const options = (root: string, tools: readonly ToolDefinition[], interactionGate = gate()): RuntimeProviderOptions => ({ runtime: "claude", projectRoot: root, skillRoot: root, tools, interactionGate, currentTurnId: () => undefined, requestAttemptMax: 1 });
+
+// Only the injected Query seam is controlled. Its iterator cannot end before the actual owned
+// child close event; no close() promise or invented child/PID field is passed to production.
+function nativeStopTransport(closeDelayMs: number | undefined, result = false) {
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  let closes = 0;
+  let interrupts = 0;
+  let childExit: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+  let child: ReturnType<typeof spawn> | undefined;
+  let childClosed: Promise<void> | undefined;
+  let closeTimer: ReturnType<typeof setTimeout> | undefined;
+  const query = ({ prompt, options: opts }: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }) => {
+    child = spawn(process.execPath, ["-e", "process.stdin.resume();process.stdin.on('end',()=>process.exit(0));"], { stdio: ["pipe", "ignore", "ignore"], windowsHide: true });
+    childClosed = new Promise<void>((resolve, reject) => {
+      child!.once("error", reject);
+      child!.once("close", (code, signal) => { childExit = { code, signal }; resolve(); });
+    });
+    // Every cleanup only addresses this fixture-owned handle.
+    release = () => { child!.stdin?.end(); };
+    const generator = (async function* () {
+      const input = await (prompt as AsyncIterable<SDKUserMessage>)[Symbol.asyncIterator]().next();
+      const user = input.value!;
+      await opts!.hooks!.UserPromptSubmit![0]!.hooks[0]!({ hook_event_name: "UserPromptSubmit", prompt_id: "native-owned-prompt", prompt: user.message.content as string, session_id: "native-owned-session", transcript_path: "fixture", cwd: opts!.cwd! }, undefined, { signal: opts!.abortController!.signal });
+      entered();
+      if (result) yield { type: "result", subtype: "success", is_error: false, session_id: "native-owned-session", user_message_uuid: user.uuid } as SDKMessage;
+      await childClosed;
+    })();
+    return Object.assign(generator, {
+      async interrupt() { interrupts++; },
+      close() { closes++; if (closeDelayMs !== undefined) closeTimer = setTimeout(release, closeDelayMs); },
+    }) as unknown as Query;
+  };
+  return {
+    started, release: () => release(),
+    get closes() { return closes; }, get interrupts() { return interrupts; }, get childExit() { return childExit; },
+    async cleanup() { if (closeTimer) clearTimeout(closeTimer); release?.(); await childClosed; },
+    dependencies: { env: environment, loadSdk: async () => ({ createSdkMcpServer, query }), loadZod: async () => z },
+  };
+}
+
+test("native lifecycle: real owned child close ends visible pump but cannot prove SDK process/tree coverage", () => fixture(async root => {
+  const transport = nativeStopTransport(25);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), currentTurnId: () => "core-owned" }, transport.dependencies).bindRole(role);
+  try {
+    const lifecycle = session.nativeLifecycle!;
+    assert.equal(lifecycle.inspect().promptState, "not-started");
+    assert.equal(lifecycle.inspect().nativeSessionId, undefined);
+    const pending = session.prompt("offline fixture");
+    const rejection = assert.rejects(pending, { name: "AbortError" });
+    await transport.started;
+    const running = lifecycle.inspect();
+    assert.equal(running.coreTurnId, "core-owned");
+    assert.equal(running.nativeTurnId, "native-owned-prompt");
+    await assert.rejects(lifecycle.stopAndInspect({ expectedInstanceId: "another-instance", expectedCoreTurnId: "core-owned", timeoutMs: 1 }), /instance mismatch/);
+    await assert.rejects(lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "old-turn", timeoutMs: 1 }), /core turn mismatch/);
+    assert.equal(transport.closes, 0);
+    const short = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "core-owned", timeoutMs: 1 });
+    await rejection;
+    assert.equal(short.promptState, "running");
+    assert.equal(short.transport.state, "open");
+    assert.equal(short.status, "stopping");
+    const ended = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "core-owned", timeoutMs: 2000 });
+    assert.deepEqual(transport.childExit, { code: 0, signal: null });
+    assert.equal(ended.promptState, "settled");
+    assert.equal(ended.transport.state, "closed");
+    assert.ok(ended.settledAt);
+    assert.equal(ended.processCoverage, "unknown");
+    assert.deepEqual(ended.processes, []);
+    assert.equal(ended.status, "unknown");
+    assert.match(ended.reasons.join(" "), /PID.*exit\/close.*exit code/);
+    assert.equal(transport.closes, 1);
+    assert.equal(transport.interrupts, 1);
+  } finally { await transport.cleanup(); await session.dispose(); }
+}));
+
+test("native lifecycle: never-closing query stays running after dispose early return and repeated abort", () => fixture(async root => {
+  const transport = nativeStopTransport(undefined);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), currentTurnId: () => "held" }, transport.dependencies).bindRole(role);
+  try {
+    const pending = assert.rejects(session.prompt("hold"), { name: "AbortError" });
+    await transport.started;
+    await session.dispose();
+    await pending;
+    await session.abort!(); await session.abort!();
+    const lifecycle = session.nativeLifecycle!;
+    const stopped = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "held", timeoutMs: 20 });
+    assert.equal(stopped.promptState, "running");
+    assert.equal(stopped.transport.state, "open");
+    assert.equal(stopped.status, "stopping");
+    assert.equal(stopped.settledAt, undefined);
+    assert.equal(transport.childExit, undefined);
+    assert.equal(stopped.processCoverage, "unknown");
+  } finally { await transport.cleanup(); await session.dispose(); }
+}));
+
+test("native lifecycle: native result settles prompt without closing live message transport", () => fixture(async root => {
+  const transport = nativeStopTransport(undefined, true);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), currentTurnId: () => "result-turn" }, transport.dependencies).bindRole(role);
+  try {
+    await session.prompt("complete");
+    const facts = session.nativeLifecycle!.inspect();
+    assert.equal(facts.promptState, "settled");
+    assert.equal(facts.nativeSessionId, "native-owned-session");
+    assert.equal(facts.transport.state, "open");
+    assert.equal(facts.status, "unknown");
+    assert.equal(transport.childExit, undefined);
+    assert.equal(facts.processCoverage, "unknown");
+  } finally { await transport.cleanup(); await session.dispose(); }
+}));
+
+test("native lifecycle: last-resort timeout rejects local turn without inventing native settlement", () => fixture(async root => {
+  const transport = nativeStopTransport(undefined);
+  const session = await createClaudeRuntimeAdapter({ ...options(root, []), currentTurnId: () => "timeout-turn", turnLastResortMs: 20 }, transport.dependencies).bindRole(role);
+  try {
+    await assert.rejects(session.prompt("timeout"), { name: "TimeoutError" });
+    const facts = session.nativeLifecycle!.inspect();
+    assert.equal(facts.coreTurnId, "timeout-turn");
+    assert.equal(facts.promptState, "running");
+    assert.equal(facts.transport.state, "open");
+    assert.equal(facts.settledAt, undefined);
+    assert.equal(facts.processCoverage, "unknown");
+    assert.equal(transport.childExit, undefined);
+  } finally { await transport.cleanup(); await session.dispose(); }
+}));
+
+test("native lifecycle: actual handler remains active after local reject until its Promise finishes", () => fixture(async root => {
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const sdk = fake(async client => { await client.callTool({ name: "probe", arguments: {} }); });
+  const session = await createClaudeRuntimeAdapter({ ...options(root, [{ ...probeTool(), handler: async () => { entered(); await blocked; return { ok: true, message: "finished" }; } }]), currentTurnId: () => "tool-turn" }, sdk.dependencies).bindRole(role);
+  try {
+    const pending = assert.rejects(session.prompt("tool"), { name: "AbortError" });
+    await started;
+    const lifecycle = session.nativeLifecycle!;
+    const facts = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "tool-turn", timeoutMs: 10 });
+    await pending;
+    assert.equal(facts.activeTools.length, 1);
+    assert.equal(facts.activeTools[0]!.name, "probe");
+    assert.equal(facts.activeTools[0]!.turnId, "tool-turn");
+    // Closing the real linked MCP client releases the Query pump before the ANS handler;
+    // raw settlement is valid, but the separately observed live callback must block quiescence.
+    assert.equal(facts.promptState, "settled");
+    assert.equal(facts.status, "stopping");
+    release();
+    const done = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "tool-turn", timeoutMs: 2000 });
+    assert.deepEqual(done.activeTools, []);
+    assert.equal(done.processCoverage, "unknown");
+    assert.notEqual(done.status, "quiescent");
+  } finally { release(); await session.dispose(); }
+}));
+test("native lifecycle: old core turn and another bind cannot stop the current turn; cancelled stop makes no request", () => fixture(async root => {
+  let turnId = "first-turn";
+  let release!: () => void;
+  let entered!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  const sdk = fake(async (_client, _opts, user) => {
+    if ((user.message.content as string).endsWith("second")) { entered(); await blocked; }
+  });
+  const adapter = createClaudeRuntimeAdapter({ ...options(root, []), currentTurnId: () => turnId }, sdk.dependencies);
+  const session = await adapter.bindRole(role);
+  const another = await adapter.bindRole(role);
+  try {
+    assert.notEqual(session.nativeLifecycle!.instanceId, another.nativeLifecycle!.instanceId);
+    await session.prompt("first");
+    turnId = "second-turn";
+    const pending = assert.rejects(session.prompt("second"), { name: "AbortError" });
+    await started;
+    const lifecycle = session.nativeLifecycle!;
+    await assert.rejects(lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "first-turn", timeoutMs: 10 }), /turn mismatch/);
+    const controller = new AbortController(); controller.abort();
+    const facts = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "second-turn", timeoutMs: 10 }, controller.signal);
+    assert.equal(facts.coreTurnId, "second-turn");
+    assert.equal(facts.promptState, "running");
+    assert.equal(sdk.closes, 0);
+    await session.abort!();
+    await pending;
+  } finally { release(); await session.dispose(); await another.dispose(); }
+}));
 async function fixture(run: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(tmpdir(), "ans-claude-test-"));
   try { await run(root); } finally { await rm(root, { recursive: true, force: true }); }
@@ -176,6 +360,160 @@ test("schema preserves required/optional/union/nested object and rejects unsuppo
   assert.throws(() => toClaudeSchema({ type: "object", required: ["unknown"] }, z), /required/);
   assert.throws(() => toClaudeSchema({ type: "object", properties: { invalid: { type: "unsupported-type" } } }, z), /unsupported JSON Schema type/);
 });
+
+test("host-only schema lowering preserves all 23 write/edit rejections on actual MCP and leaves read/schema unchanged", () => fixture(async root => {
+  const hostKeys = ["protectedGitRoots", "context", "phase", "contentSha256", "operation", "editReadProbe", "stage", "fileFacts", "invocationId", "operationId",
+    "projectRoot", "skillRoot", "canonicalFacts", "currentFile", "fileGateProtocol", "fileGateProtection", "targetPath", "canonical", "protectedRoots", "coverage", "basisDigest", "reasons", "roots"];
+  const observed: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const tools = buildGovernedTools(allow).filter(tool => ["write_file", "edit_file", "read_file"].includes(tool.name))
+    .map(tool => ({ ...tool, handler: async (call: Parameters<ToolDefinition["handler"]>[0]) => {
+      observed.push({ name: call.name, args: call.args }); return { ok: true, message: "validated" };
+    } }));
+  const before = structuredClone(tools.map(tool => tool.inputSchema));
+  for (const tool of tools.filter(tool => tool.name !== "read_file")) {
+    assert.deepEqual(tool.inputSchema.not, { anyOf: hostKeys.map(key => ({ required: [key] })) });
+  }
+  const engine = fake(async client => {
+    const listed = (await client.listTools()).tools;
+    for (const name of ["write_file", "edit_file"]) {
+      const good = name === "write_file" ? { path: "fixture", content: "content" } : { path: "fixture", old_string: "old", new_string: "new" };
+      const emitted = listed.find(tool => tool.name === name)!.inputSchema;
+      assert.deepEqual(emitted.required, name === "write_file" ? ["path", "content"] : ["path", "old_string", "new_string"]);
+      assert.deepEqual(emitted.additionalProperties, {});
+      for (const key of hostKeys) {
+        // The fake's wrapper mints a valid original-turn nonce before the real MCP validation.
+        // A lost constraint would therefore reach the observed handler, not a missing-nonce guard.
+        const count = observed.length;
+        const denied = await client.callTool({ name, arguments: { ...good, [key]: null } });
+        assert.equal(denied.isError, true, `${name}:${key}`);
+        assert.match(JSON.stringify(denied), /[Ii]nvalid.*(?:arguments|input)|expected never/, `${name}:${key}`);
+        assert.equal(observed.length, count, `${name}:${key} handler must not start`);
+      }
+      const count = observed.length;
+      assert.equal((await client.callTool({ name, arguments: { ...good, context: false } })).isError, true);
+      assert.equal(observed.length, count);
+      assert.equal((await client.callTool({ name, arguments: { ...good, extension: "retained" } })).isError, false);
+      assert.deepEqual(observed.at(-1), { name, args: { ...good, extension: "retained" } });
+    }
+    assert.equal((await client.callTool({ name: "read_file", arguments: { path: "fixture", context: "still-an-extension" } })).isError, false);
+    assert.deepEqual(observed.at(-1), { name: "read_file", args: { path: "fixture", context: "still-an-extension" } });
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, tools), engine.dependencies).bindRole(role);
+  try { await session.prompt("validate host-only fields offline"); }
+  finally { await session.dispose(); }
+  assert.equal(observed.length, 3);
+  assert.deepEqual(tools.map(tool => tool.inputSchema), before);
+}));
+
+test("host-only schema lowering rejects general/malformed not and cannot overwrite a forbidden nonce", () => fixture(async root => {
+  const unsupported = [
+    { required: ["context"] },
+    { anyOf: [] },
+    { anyOf: [{ required: ["context", "phase"] }] },
+    { anyOf: [{ required: ["context"], properties: {} }] },
+    { anyOf: [{ required: ["context"] }], description: "extra constraint" },
+    { anyOf: [{ required: [""] }] },
+  ];
+  for (const not of unsupported) {
+    const engine = fake(async () => { assert.fail("unsupported schema must not create a Query"); });
+    const session = await createClaudeRuntimeAdapter(options(root, [{ ...probeTool(), inputSchema: { type: "object", properties: {}, not } }]), engine.dependencies).bindRole(role);
+    try { await assert.rejects(session.prompt("unsupported not"), /unsupported JSON Schema keyword not/); }
+    finally { await session.dispose(); }
+    assert.equal(engine.configurations.length, 0);
+  }
+  const engine = fake(async () => { assert.fail("forbidden nonce must not create a Query"); });
+  const session = await createClaudeRuntimeAdapter(options(root, [{ ...probeTool(), inputSchema: { type: "object", properties: {}, not: { anyOf: [{ required: ["__ans_call_context"] }] } } }]), engine.dependencies).bindRole(role);
+  try { await assert.rejects(session.prompt("forbidden nonce"), /保留/); }
+  finally { await session.dispose(); }
+  assert.equal(engine.configurations.length, 0);
+}));
+
+test("dispatch conditional schema preserves GitOid formats and complete resume constraints on real MCP", () => fixture(async root => {
+  const original = buildGovernedTools(allow, { dispatchTask: () => ({ ok: true }) }).find(tool => tool.name === "dispatch_task")!;
+  assert.ok(original);
+  const before = structuredClone(original.inputSchema);
+  const observed: Record<string, unknown>[] = [];
+  const tool = { ...original, handler: async (call: Parameters<ToolDefinition["handler"]>[0]) => {
+    observed.push(call.args); return { ok: true, message: "validated dispatch" };
+  } };
+  const resume = { taskId: "task", flowId: "flow", runId: "run", reviewTaskId: "review", reviewCloseOperationId: "close" };
+  const review = (objectFormat: string, hex: string) => ({ operationId: "op", candidate: { objectFormat, hex } });
+  const engine = fake(async client => {
+    const accept = async (args: Record<string, unknown>) => {
+      const count = observed.length;
+      assert.equal((await client.callTool({ name: "dispatch_task", arguments: args })).isError, false, JSON.stringify(args));
+      assert.equal(observed.length, count + 1);
+      assert.deepEqual(observed.at(-1), args, "private nonce stripped, public dispatch fields preserved");
+    };
+    const reject = async (args: Record<string, unknown>) => {
+      const count = observed.length;
+      const result = await client.callTool({ name: "dispatch_task", arguments: args });
+      assert.equal(result.isError, true, JSON.stringify(args));
+      assert.match(JSON.stringify(result), /[Ii]nvalid.*(?:arguments|input)|expected never/);
+      assert.equal(observed.length, count, "invalid conditional input must never start handler");
+    };
+    const ordinary = { roleId: "worker", task: "ordinary", sourceTaskId: "legacy-source", idempotencyKey: "ordinary-key", extension: "retained" };
+    await accept(ordinary);
+    for (const [format, length] of [["sha1", 40], ["sha256", 64]] as const) {
+      await accept({ roleId: "verifier", task: "review", reviewTarget: review(format, "aF".repeat(length / 2)) });
+      for (const invalid of ["f".repeat(length - 1), "f".repeat(length + 1), "g".repeat(length), "f".repeat(format === "sha1" ? 64 : 40)]) {
+        await reject({ roleId: "verifier", task: "review", reviewTarget: review(format, invalid) });
+      }
+    }
+    await reject({ roleId: "verifier", task: "review", reviewTarget: review("sha512", "f".repeat(64)) });
+    for (const candidate of [{ hex: "f".repeat(40) }, { objectFormat: "sha1" }, { objectFormat: "sha1", hex: "f".repeat(40), extra: true }]) {
+      await reject({ roleId: "verifier", task: "review", reviewTarget: { operationId: "op", candidate } });
+    }
+    const resuming = { roleId: "convener", task: "resume", resumeController: resume, idempotencyKey: "resume-key" };
+    await accept(resuming);
+    await accept({ roleId: "convener", task: "resume without optional idempotency override", resumeController: resume });
+    await reject({ ...resuming, roleId: "worker" });
+    await reject({ ...resuming, idempotencyKey: {} });
+    await reject({ ...resuming, reviewTarget: review("sha1", "f".repeat(40)) });
+    await reject({ ...resuming, sourceTaskId: null });
+    await reject({ ...resuming, resumeController: null });
+    await reject({ ...resuming, resumeController: { ...resume, extra: "never" } });
+    for (const key of Object.keys(resume)) {
+      const incomplete: Record<string, unknown> = { ...resume }; delete incomplete[key];
+      await reject({ ...resuming, resumeController: incomplete });
+      for (const invalid of ["", "control\u0000", "x".repeat(501)]) {
+        await reject({ ...resuming, resumeController: { ...resume, [key]: invalid } });
+      }
+    }
+    for (const key of ["workSourceRef", "parentTaskRef", "reviewBasisRef", "reviewControllerRef", "hubRouting", "criteria", "ref", "approved", "approval", "passed"]) {
+      await reject({ ...ordinary, [key]: null });
+      await reject({ ...resuming, [key]: null });
+    }
+    await reject({ task: "missing role" });
+    await reject({ roleId: "worker" });
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, [tool]), engine.dependencies).bindRole(role);
+  try { await session.prompt("real MCP conditional validation"); }
+  finally { await session.dispose(); }
+  assert.equal(observed.length, 5);
+  assert.deepEqual(original.inputSchema, before);
+}));
+
+test("dispatch conditional schema rejects unknown if branches instead of dropping their conditions", () => fixture(async root => {
+  const original = buildGovernedTools(allow, { dispatchTask: () => ({ ok: true }) }).find(tool => tool.name === "dispatch_task")!;
+  const unknownSchemas = [
+    { ...original.inputSchema, allOf: [{ if: { required: ["differentController"] }, then: { properties: { roleId: { const: "convener" } } } }] },
+    { ...original.inputSchema, allOf: [{ if: { required: ["resumeController"] }, then: { properties: { roleId: { const: "worker" } } } }] },
+    { ...original.inputSchema, anyOf: [{ type: "object" }] },
+    { type: "object", properties: { reviewTarget: { type: "object", properties: { candidate: {
+      type: "object", properties: { objectFormat: { type: "string", enum: ["sha1", "sha256"] }, hex: { type: "string", pattern: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$" } },
+      required: ["objectFormat", "hex"], additionalProperties: false,
+      allOf: [{ if: { properties: { objectFormat: { const: "sha256" } } }, then: { properties: { hex: { minLength: 64 } } } }],
+    } } } } },
+  ];
+  for (const inputSchema of unknownSchemas) {
+    const engine = fake(async () => { assert.fail("unknown condition must not create Query"); });
+    const session = await createClaudeRuntimeAdapter(options(root, [{ ...original, inputSchema }]), engine.dependencies).bindRole(role);
+    try { await assert.rejects(session.prompt("unknown conditional schema"), /unsupported JSON Schema keyword if/); }
+    finally { await session.dispose(); }
+    assert.equal(engine.configurations.length, 0);
+  }
+}));
 
 test("actual MCP exposes union and nested required schema without losing optional/extra parameters", async () => fixture(async (root) => {
   let input: Record<string, unknown> | undefined;
@@ -334,7 +672,7 @@ test("missing dependency/API key and URL userinfo fail before query, explicit se
 
 test("actual shell tool deny prevents marker and allow returns actual command output", async () => fixture(async (root) => {
   const engine = fake(async (client) => {
-    const result = await client.callTool({ name: "run_shell", arguments: { command: "printf bad > shell-marker.txt" } });
+    const result = await client.callTool({ name: "run_shell", arguments: { command: `"${process.execPath}" -e "require('node:fs').writeFileSync('shell-marker.txt','bad')"` } });
     assert.equal(result.isError, true);
   });
   const session = await createClaudeRuntimeAdapter(options(root, buildGovernedTools(allow, { shellCwd: root, shellGate: async () => ({ allow: false, by: "fixture", reason: "fixture denied" }) })), engine.dependencies).bindRole(role);
@@ -342,7 +680,7 @@ test("actual shell tool deny prevents marker and allow returns actual command ou
   await assert.rejects(access(join(root, "shell-marker.txt")));
   await session.dispose();
   const allowed = fake(async (client) => {
-    const result = await client.callTool({ name: "run_shell", arguments: { command: "printf fixture-shell-output" } });
+    const result = await client.callTool({ name: "run_shell", arguments: { command: `"${process.execPath}" -e "process.stdout.write('fixture-shell-output')"` } });
     assert.equal(result.isError, false);
     assert.match(JSON.stringify(result), /fixture-shell-output/);
   });
@@ -640,10 +978,15 @@ test("native symlink and storage runtime mismatch fail before SDK query", async 
   const storage = createRuntimeSessionStore({ projectRoot: root, roleId: role.id, runtime: "claude" });
   await storage.prepareNativeDirectory!();
   await rm(storage.nativeDirectory, { recursive: true });
-  await symlink(root, storage.nativeDirectory);
+  await writeFile(join(root, "native-link-canary.txt"), "unchanged-native-target");
+  await symlink(root, storage.nativeDirectory, process.platform === "win32" ? "junction" : "dir");
+  assert.equal((await lstat(storage.nativeDirectory)).isSymbolicLink(), true);
+  assert.equal(await realpath(storage.nativeDirectory), await realpath(root));
+  assert.equal(await readFile(join(storage.nativeDirectory, "native-link-canary.txt"), "utf8"), "unchanged-native-target");
   const engine = fake(async () => {});
   await assert.rejects(createClaudeRuntimeAdapter({ ...options(root, []), storage }, engine.dependencies).bindRole(role));
   assert.equal(engine.loadCount, 0);
+  assert.equal(await readFile(join(root, "native-link-canary.txt"), "utf8"), "unchanged-native-target");
   await assert.rejects(createClaudeRuntimeAdapter({ ...options(root, []), storage: { ...storage, runtime: "codex" } }, engine.dependencies).bindRole(role), /不匹配/);
 }));
 

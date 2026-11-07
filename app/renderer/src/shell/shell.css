@@ -475,6 +475,7 @@
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .session-identity {
   min-width: 0;
@@ -512,7 +513,15 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
+.header-decision { display: flex; flex-direction: column; min-width: 0; max-width: 100%; }
+.header-decision-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12.5px; }
+.header-decision-toggle.is-on { color: var(--foreground); }
+.header-decision-toggle input { accent-color: var(--primary); }
+.header-decision-status { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--text-2); }
 .session-actions button {
   font-size: 12.5px;
 }

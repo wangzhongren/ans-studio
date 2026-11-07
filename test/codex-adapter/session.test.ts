@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, readFile, rm, symlink, writeFile, lstat, realpath } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import os from "node:os";
@@ -348,7 +348,7 @@ test("exact role/runtime native store checks, confirmed resume vs recovered; lat
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary", async () => {
+test("native directory symlink rejected before engine, absent persistence creates no .ans, images stay temporary", async t => {
   const root = await temporary();
   const outside = await temporary();
   try {
@@ -366,10 +366,22 @@ test("native directory symlink rejected before engine, absent persistence create
     const store = createRuntimeSessionStore({ projectRoot: root, roleId: role.id, runtime: "codex" });
     await store.prepareNativeDirectory!();
     await rm(store.nativeDirectory, { recursive: true });
-    await symlink(outside, store.nativeDirectory, "dir");
+    const aliasKind = process.platform === "win32" ? "junction" : "dir";
+    const canary = path.join(outside, "owned-outside-canary.txt");
+    const canaryText = "owned outside native directory fixture";
+    await writeFile(canary, canaryText);
+    await symlink(outside, store.nativeDirectory, aliasKind);
+    // Prove a real traversable reparse-point alias before asking the product to reject it.
+    // A sandbox denying creation/read would fail these assertions, never count as protection.
+    assert.equal((await lstat(store.nativeDirectory)).isSymbolicLink(), true);
+    assert.equal(await realpath(store.nativeDirectory), await realpath(outside));
+    assert.equal(await readFile(path.join(store.nativeDirectory, "owned-outside-canary.txt"), "utf8"), canaryText);
+    t.diagnostic(`native directory alias=${aliasKind}; actual outside canary read succeeded before product validation`);
     const refused = harness();
     await assert.rejects(createCodexRuntimeAdapter(options(root, refused, { storage: store })).bindRole(role), /会话目录不是普通目录/);
     assert.equal(refused.engines.length, 0);
+    assert.equal(await readFile(canary, "utf8"), canaryText);
+    await rm(canary);
     assert.deepEqual(await readdir(outside), []);
   } finally { await rm(root, { recursive: true, force: true }); await rm(outside, { recursive: true, force: true }); }
 });
@@ -468,6 +480,83 @@ test("actual native process JSON-RPC parser routes callbacks and serverRequest/r
   assert.equal(session.dispose(), firstDisposal);
   await firstDisposal; await events.done;
   assert.equal(events.entries.filter(event => event.kind === "settled").length, 2);
+});
+
+test("native lifecycle observes owned process exit/stdio and does not settle a live handler", async t => {
+  const fixture = fileURLToPath(new URL("./fixtures/native-cli.mjs", import.meta.url));
+  const originalSpawn = childProcess.spawn;
+  t.mock.method(childProcess, "spawn", (...args: Parameters<typeof childProcess.spawn>) => args[0] === fixture
+    ? originalSpawn(process.execPath, [fixture, ...(args[1] as readonly string[])], args[2]) : originalSpawn(...args));
+  syncBuiltinESMExports();
+  t.after(() => { childProcess.spawn = originalSpawn; syncBuiltinESMExports(); });
+  let release!: () => void;
+  let entered = false;
+  let coreTurn = "core-native-stop";
+  const tool: ToolDefinition = { name: "probe", description: "fixture", inputSchema: { type: "object" }, async handler() {
+    entered = true; await new Promise<void>(resolve => { release = resolve; }); return { ok: true, message: "late handler returned" };
+  } };
+  const session = await createCodexRuntimeAdapter(options("/fixture", harness(), { tools: [tool], engineFactory: undefined, cliPath: fixture, currentTurnId: () => coreTurn })).bindRole(role);
+  const lifecycle = session.nativeLifecycle!;
+  const prompt = session.prompt("normal");
+  void prompt.catch(() => {});
+  try {
+    await until(() => entered);
+    const initial = lifecycle.inspect();
+    assert.equal(initial.coreTurnId, "core-native-stop");
+    assert.equal(initial.nativeTurnId, "process-turn-1");
+    await assert.rejects(lifecycle.stopAndInspect({ expectedInstanceId: "old-instance", timeoutMs: 10 }), /instance mismatch/);
+    await assert.rejects(lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: "old-turn", timeoutMs: 10 }), /turn mismatch/);
+    assert.equal(lifecycle.inspect().transport.state, "open");
+    const blocked = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, expectedCoreTurnId: coreTurn, timeoutMs: 20 });
+    assert.equal(blocked.status, "unknown");
+    assert.equal(blocked.activeTools.length, 1);
+    assert.ok(blocked.reasons.includes("native-stop-timeout"));
+    release(); await prompt;
+    const stopped = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, timeoutMs: 5000 });
+    assert.equal(stopped.status, "quiescent");
+    assert.equal(stopped.transport.state, "closed");
+    assert.equal(stopped.promptState, "settled");
+    assert.equal(stopped.processCoverage, "complete");
+    assert.ok(stopped.processes.every(process => process.state === "exited" && process.treeStatus === "verified"));
+    assert.equal(stopped.processes.length, 1);
+    assert.ok(stopped.processes[0]!.pid! > 0);
+    assert.ok(stopped.processes[0]!.exitCode !== undefined || stopped.processes[0]!.signal !== undefined);
+    coreTurn = "later-core-turn";
+    assert.equal(lifecycle.inspect().coreTurnId, "core-native-stop");
+    assert.equal((await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, timeoutMs: 5000 })).status, "quiescent");
+  } finally { release?.(); await prompt; await session.dispose(); }
+});
+
+test("native lifecycle cannot promote injected close completion without process coverage", async () => {
+  const session = await createCodexRuntimeAdapter(options("/fixture", harness())).bindRole(role);
+  try {
+    assert.equal(session.inspectNativeToolSurface, undefined, "Responses/native has no proven Chat tool registry port");
+    const lifecycle = session.nativeLifecycle!;
+    const stopped = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, timeoutMs: 100 });
+    assert.equal(stopped.status, "unknown");
+    assert.equal(stopped.processCoverage, "unknown");
+    assert.ok(stopped.reasons.includes("native-engine-observation-unavailable"));
+  } finally { await session.dispose(); }
+});
+
+test("native lifecycle bounds a close that has not returned and refuses to invent coverage after late close", async () => {
+  const engines = harness();
+  const session = await createCodexRuntimeAdapter(options("/fixture", engines)).bindRole(role);
+  let release!: () => void;
+  const close = new Promise<void>(resolve => { release = resolve; });
+  engines.engine.close = () => close;
+  try {
+    const lifecycle = session.nativeLifecycle!;
+    const facts = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, timeoutMs: 10 });
+    assert.equal(facts.status, "unknown");
+    assert.ok(facts.reasons.includes("native-stop-timeout"));
+    assert.equal(facts.processCoverage, "unknown");
+    release();
+    const late = await lifecycle.stopAndInspect({ expectedInstanceId: lifecycle.instanceId, timeoutMs: 100 });
+    assert.equal(late.status, "unknown");
+    assert.equal(late.transport.state, "unknown");
+    assert.equal(late.processCoverage, "unknown");
+  } finally { release(); await session.dispose(); }
 });
 
 test("owned native process group cleanup kills a wrapper and child that ignore SIGTERM", { skip: process.platform === "win32" }, async () => {

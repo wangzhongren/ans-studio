@@ -33,6 +33,12 @@ import {
   STABLE_WRITE_APPLICATION_EVENT_KINDS,
   STABLE_WRITE_CUSTOMER_EVENT_KINDS,
   STABLE_WRITE_EVENT_KINDS,
+  VCA_SUBMISSION_TARGETS_MAX,
+  isTaskWorkSourceRef,
+  isTaskParentRef,
+  isTaskHubRouting,
+  isTaskReviewControllerRef,
+  isTaskReviewBasisRef,
 } from "../../model/runtime.ts";
 // 2026-11-04（trunk-amendment-model C2a）：新账本事件的枚举/常量单一来源 = C1 Model；
 // 本模块只消费、不复制字面量、不另造同义枚举（C1 冻结记录 §3.1/§3.2）。
@@ -75,6 +81,8 @@ import {
   TRUNK_STATE_LEGACY_OPS,
   TRUNK_STATE_OPS,
   TRUNK_VERSION_MIN,
+  isDirectActionSource,
+  isDirectActionReceipt,
 } from "../../model/trunk.ts";
 import {
   PROJECT_NOTE_BLOCKER_TEXT_MAX,
@@ -357,6 +365,12 @@ export function appendTaskEvent(
   event: TaskStateEvent,
   options: { allowLegacyRun?: boolean } = {},
 ): Promise<AppendResult> {
+  if ((event.kind === "request.presented" && event.to === "chief")
+    || (event.kind === "request.resolved" && event.by === "chief-delegated")
+    || ("actionSource" in event && event.actionSource !== undefined)) {
+    const checked = validateEvent(event);
+    if (!checked.ok) return Promise.resolve({ ok: false, code: "invalid-event-source", message: checked.message });
+  }
   // 2026-10-30（3.1/P1.3 R1）：**新建**项目任务（flowId 有值）必须带 runId+runState；
   // 只有历史既有/测试重放可用 allowLegacyRun 写入无 run 的旧形状。读侧仍按 legacy 兼容。
   if (event.kind === "task.created" && event.flowId !== undefined && options.allowLegacyRun !== true) {
@@ -411,11 +425,27 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
         return { ok: false, message: "request.created.cardKind 非法" };
       }
     }
+    if (kind === "request.presented" && rec["to"] !== "customer" && rec["to"] !== "judge" && rec["to"] !== "chief")
+      return { ok: false, message: "request.presented.to 非法" };
     if (kind === "request.resolved") {
       // 2026-11-03（客户授权平面 Q9 A）：`"directive"` 表示客户事先记录的决策指令导致的结果；
       // `directiveId` 可选，给出时必须匹配 A1 `CUSTOMER_DIRECTIVE_ID_PATTERN`，且 `by==="directive"` 时必填。
       const by = rec["by"];
-      if (by !== "judge" && by !== "customer" && by !== "directive") return { ok: false, message: "request.resolved.by 非法" };
+      if (by !== "judge" && by !== "customer" && by !== "directive" && by !== "chief-delegated") return { ok: false, message: "request.resolved.by 非法" };
+      const actionSource = rec["actionSource"];
+      if (actionSource !== undefined && !isDirectActionSource(actionSource)) return { ok: false, message: "request.resolved.actionSource 非法" };
+      if (by === "chief-delegated") {
+        if (!isDirectActionSource(actionSource) || actionSource.kind !== "chief-delegated" || actionSource.requestId !== rec["requestId"]
+          || rec["judge"] !== undefined || rec["directiveId"] !== undefined)
+          return { ok: false, message: "request.resolved chief source/request binding missing" };
+        const ids = rec["selectedOptionIds"] ?? rec["targetRoleIds"];
+        if (actionSource.disposition === "select" && ids !== undefined
+          && (!Array.isArray(ids) || ids.length !== actionSource.selected?.length || ids.some(id => !actionSource.selected?.includes(id))))
+          return { ok: false, message: "request.resolved chief selection mismatch" };
+        if (actionSource.disposition !== "select" && Array.isArray(ids) && ids.length)
+          return { ok: false, message: "request.resolved chief reject/revise cannot select" };
+      } else if (actionSource !== undefined && (actionSource.kind !== "customer-decision" || by !== "customer"
+        || actionSource.decisionId !== rec["decisionId"])) return { ok: false, message: "request.resolved source/by mismatch" };
       if (rec["directiveId"] !== undefined) {
         const directiveId = rec["directiveId"];
         if (typeof directiveId !== "string" || !CUSTOMER_DIRECTIVE_ID_RE.test(directiveId)) {
@@ -608,8 +638,12 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     const applicationOp = isOneOf(TRUNK_STATE_APPLICATION_OPS, op);
     if (!customerOp && !applicationOp) return { ok: false, message: "trunk.state.op 归属未定义" };
     const origin = rec["origin"];
-    if (origin !== "customer" && origin !== "application") return { ok: false, message: "trunk.state.origin 非法" };
-    if (customerOp) {
+    if (origin === "role-direct" || origin === "chief-delegated") {
+      const source = rec["actionSource"];
+      if (!isDirectActionSource(source) || source.kind !== origin || rec["decisionId"] !== undefined || rec["decidedBy"] !== undefined
+        || (source.kind === "role-direct" && rec["operationId"] !== source.operationId)) return { ok: false, message: "trunk.state direct source binding invalid" };
+    } else if (origin !== "customer" && origin !== "application") return { ok: false, message: "trunk.state.origin 非法" };
+    else if (customerOp) {
       if (origin !== "customer") return { ok: false, message: "trunk.state 客户 op 必须 origin customer" };
       if (rec["decidedBy"] !== "customer") return { ok: false, message: "trunk.state 客户 op 必须 decidedBy customer" };
     } else {
@@ -726,11 +760,20 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       return { ok: false, message: "version.change.status 非法（draft 不是账本事件状态）" };
     }
     const origin = rec["origin"];
-    if (origin !== "customer" && origin !== "application") return { ok: false, message: "version.change.origin 非法" };
+    const direct = origin === "role-direct";
+    if (direct) {
+      const source = rec["actionSource"];
+      if (!isDirectActionSource(source) || source.kind !== "role-direct" || source.operationId !== rec["operationId"]
+        || source.applicationId !== applicationId || source.actorRoleId !== rec["initiatorRoleId"] || source.action !== vcKind
+        || rec["decisionId"] !== undefined || rec["decidedBy"] !== undefined || !applicationStatus
+        || (rec["directReceipt"] !== undefined && !isDirectActionReceipt(rec["directReceipt"]))) return { ok: false, message: "version.change direct source binding invalid" };
+    } else if (origin !== "customer" && origin !== "application") return { ok: false, message: "version.change.origin 非法" };
     if (rec["decidedBy"] !== undefined && rec["decidedBy"] !== "customer") {
       return { ok: false, message: "version.change.decidedBy 非法" };
     }
-    if (customerStatus) {
+    if (direct) {
+      // New role actions never borrow a historical approved/customer transition.
+    } else if (customerStatus) {
       // approved/rejected：客户决定（origin/decidedBy customer + decisionId）。
       if (origin !== "customer" || rec["decidedBy"] !== "customer" || !isNonEmptyTrimmedString(rec["decisionId"])) {
         return { ok: false, message: "version.change 客户决定事件必须 origin/decidedBy customer 且带 decisionId" };
@@ -747,7 +790,7 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     }
     if (rec["targets"] !== undefined) {
       const targets = rec["targets"];
-      if (!Array.isArray(targets) || targets.length > 32) return { ok: false, message: "version.change.targets 非法" };
+      if (!Array.isArray(targets) || targets.length > VCA_SUBMISSION_TARGETS_MAX) return { ok: false, message: "version.change.targets 非法" };
       for (const target of targets) {
         if (!isPlainRecord(target)) return { ok: false, message: "version.change.targets 非法" };
         // contract/roster/execution 的并集 = detail 允许集合（upgrade 为其子集；逐项合法性由业务层判定）。
@@ -787,10 +830,15 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     if (!isOneOf(DOC_FREEZE_REASONS, reason)) return { ok: false, message: "doc.freeze.reason 非法" };
     const customerReason = isOneOf(DOC_FREEZE_CUSTOMER_REASONS, reason);
     const applicationReason = isOneOf(DOC_FREEZE_APPLICATION_REASONS, reason);
-    if (!customerReason && !applicationReason) return { ok: false, message: "doc.freeze.reason 归属未定义" };
     const origin = rec["origin"];
-    if (origin !== "customer" && origin !== "application") return { ok: false, message: "doc.freeze.origin 非法" };
-    if (customerReason) {
+    if (origin === "role-direct" || origin === "chief-delegated") {
+      const source = rec["actionSource"];
+      if (!isDirectActionSource(source) || source.kind !== origin || rec["decisionId"] !== undefined || rec["decidedBy"] !== undefined
+        || (source.kind === "role-direct" ? reason !== "role-direct-applied" || source.applicationId !== rec["applicationId"] || source.actorRoleId !== rec["actorRoleId"]
+          : !customerReason || source.disposition !== "select" || rec["actorRoleId"] !== "chief")) return { ok: false, message: "doc.freeze direct source binding invalid" };
+    } else if (!customerReason && !applicationReason) return { ok: false, message: "doc.freeze.reason 归属未定义" };
+    else if (origin !== "customer" && origin !== "application") return { ok: false, message: "doc.freeze.origin 非法" };
+    else if (customerReason) {
       if (origin !== "customer" || rec["decidedBy"] !== "customer") {
         return { ok: false, message: "doc.freeze 客户确认类 reason 必须 origin/decidedBy customer" };
       }
@@ -897,6 +945,11 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
   }
   if (typeof rec["taskId"] !== "string" || rec["taskId"] === "") return { ok: false, message: "缺 taskId" };
   if (kind === "task.created") {
+    if (rec["workSourceRef"] !== undefined && !isTaskWorkSourceRef(rec["workSourceRef"])) return { ok: false, message: "task.created workSourceRef invalid" };
+    if (rec["parentTaskRef"] !== undefined && !isTaskParentRef(rec["parentTaskRef"])) return { ok: false, message: "task.created parentTaskRef invalid" };
+    if (rec["reviewBasisRef"] !== undefined && !isTaskReviewBasisRef(rec["reviewBasisRef"])) return { ok: false, message: "task.created reviewBasisRef invalid" };
+    if (rec["hubRouting"] !== undefined && !isTaskHubRouting(rec["hubRouting"])) return { ok: false, message: "task.created hubRouting invalid" };
+    if (rec["reviewControllerRef"] !== undefined && !isTaskReviewControllerRef(rec["reviewControllerRef"])) return { ok: false, message: "task.created reviewControllerRef invalid" };
     // 2026-10-29（方案 v2.1 §5.4，F2）：创建者受控放宽到 chief / convener（运营派发实现任务）。
     if (rec["from"] !== "chief" && rec["from"] !== "convener") {
       return { ok: false, message: "task.created.from 必须为 chief 或 convener" };
@@ -970,6 +1023,12 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
     // 2026-10-29（方案 v2.1 §5.4，F2）：任务创建者收口自己的任务（chief / convener）。
     if (rec["by"] !== "chief" && rec["by"] !== "convener") return { ok: false, message: "task.closed.by 必须为 chief 或 convener" };
     if (typeof rec["outcome"] !== "string" || !(CLOSED_OUTCOMES as readonly string[]).includes(rec["outcome"])) return { ok: false, message: "task.closed.outcome 非法" };
+    if (rec["actionSource"] !== undefined || rec["operationId"] !== undefined || rec["eventId"] !== undefined) {
+      const source = rec["actionSource"];
+      if (!isDirectActionSource(source) || source.kind !== "role-direct" || source.action !== "close-created-task"
+        || source.actorRoleId !== rec["by"] || source.operationId !== rec["operationId"] || !isNonEmptyTrimmedString(rec["eventId"]))
+        return { ok: false, message: "task.closed direct creator/source binding invalid" };
+    }
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
   if (kind === "task.redispatch") {
@@ -1076,6 +1135,9 @@ export async function readTaskState(projectRoot: string): Promise<TaskStateReadR
   }
   return { ...replay, files: [...read.files] };
 }
+
+/** Pure shared O event parser. Storage access remains at the caller's legal Provider boundary. */
+export function validateTaskStateEvent(value: unknown): ReturnType<typeof validateEvent> { return validateEvent(value); }
 
 // —————————————— 查询辅助 ——————————————
 

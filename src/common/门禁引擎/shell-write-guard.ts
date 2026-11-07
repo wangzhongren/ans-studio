@@ -557,6 +557,8 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
   };
 
   if (program !== "") {
+    if (program === "git") return { kind: "deny", code: "shell-write-hard-deny", targets: [],
+      reason: "裸 Git 硬拒：可能执行仓库 fsmonitor/alias/外部配置；必须使用受控 git_query / git_candidate / git_publish，shell批准不能覆盖Git角色拒绝。" };
     // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
     const inlineEvalPrograms = new Set(["eval", "exec", "source", "command", "."]);
     if (inlineEvalPrograms.has(program)) {

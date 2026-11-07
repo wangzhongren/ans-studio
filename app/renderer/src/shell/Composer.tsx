@@ -4,14 +4,14 @@
  * - 发送：`sendSession(text, images, target, {clientMessageId})`；ok/queued/failure 如实呈现；
  *   未接受拒发恢复原文与附件，已接受轮次由真实 settled 报告结果。
  * - 停止本轮：`abortSession(target)` 三态如实一行（已请求/不支持/失败），不做乐观「已停止」。
- * - 双开关：主进程权威（shell:judge-state / decision:judge-state）；桥缺失禁用并显示固定文案，
- *   single 项目禁用「替我决策」；默认关、互不影响、重载复位；开启后一次性警告（知道了 / 约 9 秒）。
+ * - shell审批在输入区；业务决策唯一勾选移至chief会话顶部，状态仍来自主进程。
+ * - 客户新任务/澄清仅能发给chief；其他角色保留历史阅读、停止与诊断。
  * - 附件：渲染侧只读 File API 字节并交主进程校验；不触碰 Node/fs。
  * - textarea 保持非受控（DOM value 是唯一文本源，兼容旧 e2e 直接写值）；按角色保存草稿与附件。
  */
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Scale, ScrollText, ShieldCheck, Square, X } from "lucide-react";
+import { ImagePlus, ScrollText, ShieldCheck, Square, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getDesktopBridge } from "@/lib/platform";
@@ -30,7 +30,6 @@ import {
   judgeToggleView,
   judgeWarningLines,
   JUDGE_GROUP_APPROVAL,
-  JUDGE_GROUP_DECISION,
   type JudgeGroup,
 } from "@/chat/judge";
 import { useConfirmStore } from "@/stores/confirm-store";
@@ -143,7 +142,6 @@ export function Composer() {
   const projectRoot = useChatStore((s) => s.projectRoot);
   const sessionOpenRoleId = useChatStore((s) => s.sessionOpenRoleId);
   const roleBusy = useChatStore((s) => s.roleBusy);
-  const governanceModel = useChatStore((s) => s.governanceModel);
   const appendLocalUser = useChatStore((s) => s.appendLocalUser);
   const appendSystemRow = useChatStore((s) => s.appendSystemRow);
   const setHint = useChatStore((s) => s.setHint);
@@ -167,26 +165,18 @@ export function Composer() {
   const sessionOpen = !!selectedRoleId && sessionOpenRoleId === selectedRoleId;
   const busy = !!selectedRoleId && roleBusy[selectedRoleId] === true;
   const bridge = getDesktopBridge();
-  const canSend = sessionOpen && !!projectRoot;
+  const customerEntry = selectedRoleId === "chief";
+  const canSend = customerEntry && sessionOpen && !!projectRoot;
   const directivePanelTitle = directiveCapabilityAvailable
     ? t("ui.directive.panel.title")
     : t("ui.directive.error.capabilityUnavailable");
 
-  const singleDisabled = governanceModel === "single";
   const approvalView = judgeToggleView(
     JUDGE_GROUP_APPROVAL,
     judge.approval.available,
     judge.approval.enabled,
     judge.approval.busy,
     null,
-    locale,
-  );
-  const decisionView = judgeToggleView(
-    JUDGE_GROUP_DECISION,
-    judge.decision.available,
-    judge.decision.enabled,
-    judge.decision.busy,
-    { singleDisabled },
     locale,
   );
   const warningLines = judgeWarningLines(warning.groups, locale);
@@ -271,6 +261,8 @@ export function Composer() {
     const el = textareaRef.current;
     const text = (el?.value || "").trim();
     const roleId = selectedRoleId;
+    // Also guard the handler: a disabled DOM control alone is not a send boundary.
+    if (roleId !== "chief" || useUiStore.getState().selectedRoleId !== "chief") return;
     if (!el || !roleId) return;
     if (!text) {
       // 图片随消息发送，不单独发图（队列条目正文形状钉死非空正文）。
@@ -580,6 +572,7 @@ export function Composer() {
   };
 
   const pickImage = async () => {
+    if (!customerEntry) return;
     const requestRole = selectedRoleId;
     const requestKey = requestRole ? draftKey(runtime, requestRole) : "";
     if (!bridge?.pickImage) {
@@ -620,6 +613,7 @@ export function Composer() {
   };
 
   const attachBrowserFile = async (file: File) => {
+    if (!customerEntry) return;
     const requestRole = selectedRoleId;
     const requestKey = requestRole ? draftKey(runtime, requestRole) : "";
     const problem = clientImageProblem(file as ImageFileLike, locale);
@@ -715,10 +709,8 @@ export function Composer() {
   };
 
   const approvalStatus = judge.approval.error || approvalView.note || "";
-  const decisionStatus = judge.decision.error || decisionView.note || "";
   const approvalStatusIsNote =
     !judge.approval.error && approvalView.note !== "";
-  const decisionStatusIsNote = !judge.decision.error && decisionView.note !== "";
 
   return (
     <div className="composer">
@@ -768,11 +760,13 @@ export function Composer() {
       >
         <Textarea
           id="inp-message"
+          disabled={!customerEntry}
+          title={!customerEntry ? t("ui.composer.customerEntryChiefOnly") : undefined}
           ref={textareaRef}
           rows={1}
           defaultValue=""
           placeholder={
-            role
+            !customerEntry ? t("ui.composer.customerEntryChiefOnly") : role
               ? t("ui.composer.placeholderToRole", { role: selectedRoleName })
               : t("ui.composer.placeholderSelectRole")
           }
@@ -814,7 +808,7 @@ export function Composer() {
                 : t("ui.composer.addImageUnavailable")
             }
             aria-label={t("ui.composer.ariaAddImage")}
-            disabled={!bridge?.pickImage || !sessionOpen}
+            disabled={!customerEntry || !bridge?.pickImage || !sessionOpen}
             onClick={() => void pickImage()}
           >
             <ImagePlus size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -875,45 +869,6 @@ export function Composer() {
               {approvalStatus}
             </span>
 
-            <label
-              className={
-                "composer-auto-approve" +
-                (decisionView.enabled ? " is-on" : "") +
-                (!decisionView.available || decisionView.singleDisabled
-                  ? " is-unsupported"
-                  : "")
-              }
-              data-trust="decision"
-              title={decisionView.title}
-            >
-              <Scale
-                className="trust-icon"
-                size={13}
-                strokeWidth={1.5}
-                aria-hidden="true"
-              />
-              <input
-                type="checkbox"
-                id="judge-decision-toggle"
-                checked={decisionView.checked}
-                disabled={decisionView.disabled}
-                aria-label={t("ui.judge.decisionOff")}
-                onChange={onJudgeToggle(JUDGE_GROUP_DECISION)}
-              />
-              <span id="judge-decision-label">{decisionView.label}</span>
-              <span className="composer-label-short" aria-hidden="true">{t("ui.judge.decisionShort")}</span>
-            </label>
-            <span
-              id="judge-decision-status"
-              className={
-                "composer-judge-status" + (decisionStatusIsNote ? " is-note" : "")
-              }
-              role="status"
-              aria-live="polite"
-              hidden={decisionStatus === ""}
-            >
-              {decisionStatus}
-            </span>
           </div>
 
           <span id="composer-scope" className="composer-scope">
@@ -971,7 +926,7 @@ export function Composer() {
 
       <div className="compose-note">
         <span id="composer-demo-status" role="status" aria-live="polite">
-          {status ||
+          {(!customerEntry ? t("ui.composer.customerEntryChiefOnly") : status) ||
             (canSend
               ? t("ui.composer.footerWorking")
               : t("ui.composer.footerIdle"))}

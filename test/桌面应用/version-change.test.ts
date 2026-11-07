@@ -18,6 +18,7 @@ import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import {
   createCustomerInputChannel,
+  isApplicationDecisionReservedForCustomer,
   type DesktopCustomerInputFn,
   type OperatorRequestPayload,
 } from "../../app/desktop/customer-input.ts";
@@ -38,8 +39,10 @@ import {
   type VersionChangeStack,
 } from "../../app/desktop/version-change.ts";
 import type { TrunkStatePayloadV1 } from "../../app/desktop/trunk.ts";
+import { buildPlanEscalationCard, PLAN_ESCALATION_OPTION_IDS } from "../../app/desktop/plan-escalation.ts";
 import { validateDecisionCardRequest } from "../../src/common/编排/decision-card.ts";
-import { readTaskState } from "../../src/common/编排/task-state.ts";
+import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
+import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
 import { stableWriteDecision } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import type {
   CustomerInputFn,
@@ -54,6 +57,7 @@ import type {
 import type { StableWriteRecord, VersionChangeRecord } from "../../src/model/version-change.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+import type { TaskHandback } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import {
   AT,
@@ -652,6 +656,7 @@ test("stable workflow：确认卡 → 一次性许可 → completeWrite 复核/�
       const read = await project.store.readManifest();
       assert.equal(read.ok, true);
       if (read.ok) {
+        assert.ok(read.value.artifacts.workflow, "execution fixture has real workflow");
         assert.equal(read.value.trunkVersion, 1, "mini re-pin 不升 trunkVersion");
         assert.equal(read.value.artifacts.workflow.sha256, sha256(content));
         assert.equal(read.value.artifacts.workflow.decisionId, "decision-sw");
@@ -704,7 +709,10 @@ test("stable 写入哈希不符：completeWrite fail-closed、许可作废、不
       assert.equal(stack.stablePermitOf("docs/workflow.md"), undefined);
       const read = await project.store.readManifest();
       assert.equal(read.ok, true);
-      if (read.ok) assert.equal(read.value.artifacts.workflow.sha256, sha256("# workflow\n"));
+      if (read.ok) {
+        assert.ok(read.value.artifacts.workflow);
+        assert.equal(read.value.artifacts.workflow.sha256, sha256("# workflow\n"));
+      }
       const records = await stack.listStableWrites();
       assert.equal(records[0]?.status, "failed");
     } finally {
@@ -877,6 +885,7 @@ test("主干升级（仅紧急/恢复）：预览变更 → 同一 previewId 客
       const read = await project.store.readManifest();
       assert.equal(read.ok, true);
       if (read.ok) {
+        assert.ok(read.value.artifacts.workflow, "execution fixture has real workflow");
         assert.equal(read.value.trunkVersion, 2);
         assert.equal(read.value.artifacts.workflow.sha256, sha256(nextWorkflow));
       }
@@ -1312,6 +1321,7 @@ test("Batch 3.5 trunk 客户动作：refreeze 只 stable、不升版本；abando
       const read = await project.store.readManifest();
       assert.equal(read.ok, true);
       if (read.ok) {
+        assert.ok(read.value.artifacts.workflow, "execution fixture has real workflow");
         assert.equal(read.value.trunkVersion, 1);
         assert.equal(read.value.artifacts.workflow.sha256, sha256(nextWorkflow));
       }
@@ -1612,4 +1622,678 @@ test("D4 端到端：appointment-write 扩大 boundary 经真实确认通道回�
     stack.dispose();
     await fs.rm(project.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
+});
+
+// ———————————————— 9. 2026-11-05：方案升级报告卡（convener 提交 → 客户主权裁决） ————————————————
+//
+// 客户批准特性：运营（convener）在「方案/验收要求不可执行」时向客户提交一张应用发行的
+// decision 卡（修订方案/验收要求｜客户提供环境｜继续核查｜终止）；工具只提交/呈现，不派发、
+// 不写文档、不改需求或验收标准；判断器/委托/@决策永不代答；同一 flow 至多一张在途卡。
+
+type CapturedEnvelope = {
+  roleId: string;
+  projectRoot: string;
+  runtime: string;
+  event: { kind: string; summary?: string; detail?: { source?: string } };
+};
+
+test("方案升级卡：application-owned decision、真实 flowId、四选项固定顺序 + escalation-continue 推荐、preview 语义", () => {
+  const built = buildPlanEscalationCard({
+    flowId: "demo-flow",
+    category: "scheme",
+    summary: "E0 要求应用创建 OS 级隔离身份，当前无法执行",
+  });
+  assert.ok(built !== undefined);
+  if (built === undefined) return;
+  const request = built.request;
+  assert.equal(request.kind, "choice");
+  assert.equal((request as { cardKind?: string }).cardKind, "decision");
+  assert.equal((request as { application?: boolean }).application, true);
+  assert.equal((request as { sourceRoleId?: string }).sourceRoleId, "application");
+  assert.equal(request.flowId, "demo-flow");
+  assert.deepEqual(built.metadata, { cardKind: "decision", flowId: "demo-flow" });
+  const choice = request as Extract<CustomerInputRequest, { kind: "choice" }>;
+  assert.deepEqual(choice.options.map((option) => option.id), [...PLAN_ESCALATION_OPTION_IDS]);
+  assert.deepEqual(
+    choice.options.map((option) => option.id),
+    ["escalation-revise", "escalation-environment", "escalation-continue", "escalation-stop"],
+  );
+  assert.equal(choice.options.filter((option) => option.recommended === true).length, 1);
+  assert.equal(choice.options.find((option) => option.recommended === true)?.id, "escalation-continue");
+  const preview = choice.preview ?? "";
+  assert.match(preview, /demo-flow/, "preview 含流程 id");
+  assert.match(preview, /方案不合理/, "preview 含类别中文标签");
+  assert.match(preview, /E0 要求应用创建 OS 级隔离身份/, "preview 含摘要");
+  assert.match(preview, /申请，不是批准/, "preview 明示申请≠批准");
+  // 应用发行卡不借角色槽位：共享 decision 校验通过，推荐项/flowId 可被通道读取。
+  const validation = validateDecisionCardRequest({ request, roleId: "convener", governanceModel: "trio" });
+  assert.equal(validation.ok, true);
+  if (validation.ok) {
+    assert.equal(validation.applicable, true);
+    assert.equal(validation.flowId, "demo-flow");
+    assert.equal(validation.recommendedOptionId, "escalation-continue");
+  }
+  // 四类类别的中文标签各不相同。
+  const labels: Array<[ "scheme" | "environment" | "authority" | "evidence", string]> = [
+    ["scheme", "方案不合理"],
+    ["environment", "环境不具备"],
+    ["authority", "权限/授权不足"],
+    ["evidence", "证据不足"],
+  ];
+  for (const [category, label] of labels) {
+    const card = buildPlanEscalationCard({ flowId: "demo-flow", category, summary: "s" });
+    assert.ok(card !== undefined);
+    if (card !== undefined) {
+      assert.match((card.request as Extract<CustomerInputRequest, { kind: "choice" }>).preview ?? "", new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
+  }
+  // 空 flow / 空 summary ⇒ 不发卡（fail-closed，不猜参数）。
+  assert.equal(buildPlanEscalationCard({ flowId: "   ", category: "scheme", summary: "s" }), undefined);
+  assert.equal(buildPlanEscalationCard({ flowId: "demo-flow", category: "scheme", summary: " \n " }), undefined);
+});
+
+test("客户主权：方案升级整卡排除代选/判断/@决策；application 非 true 或选项子集 ⇒ 不排除", async () => {
+  const built = buildPlanEscalationCard({ flowId: "demo", category: "environment", summary: "缺隔离环境" });
+  assert.ok(built !== undefined);
+  if (built === undefined) return;
+  const request = built.request as Extract<CustomerInputRequest, { kind: "choice" }>;
+  assert.equal(isApplicationDecisionReservedForCustomer(request), true);
+  // application 不是 true（缺省/false）⇒ 不是主权卡。
+  const withoutApplication = { ...request } as Extract<CustomerInputRequest, { kind: "choice" }> & { application?: boolean };
+  delete withoutApplication.application;
+  assert.equal(isApplicationDecisionReservedForCustomer(withoutApplication as CustomerInputRequest), false);
+  assert.equal(
+    isApplicationDecisionReservedForCustomer({ ...request, application: false } as unknown as CustomerInputRequest),
+    false,
+  );
+  // 选项子集（缺一个）⇒ 不识别为主权卡。
+  assert.equal(
+    isApplicationDecisionReservedForCustomer({ ...request, options: request.options.slice(0, 3) } as CustomerInputRequest),
+    false,
+  );
+  // cardKind 非 decision ⇒ 不识别。
+  assert.equal(
+    isApplicationDecisionReservedForCustomer({ ...request, cardKind: "proposal" } as unknown as CustomerInputRequest),
+    false,
+  );
+  // 通道层：@决策 指令不消费、判断器不产生结果行，原卡到达客户。
+  const pushed: OperatorRequestPayload[] = [];
+  let applyCalls = 0;
+  let judgeCalls = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    directive: {
+      decisionFacts: () => ({ active: [], ledgerErrors: 0 }),
+      applyDecisionDirective: async () => {
+        applyCalls += 1;
+        return { kind: "selected", id: "d-1", optionId: "escalation-stop", action: "select-recommended" };
+      },
+      emitResult: () => {
+        throw new Error("方案升级主权卡不得产生指令结果行");
+      },
+      emitNotice: () => {},
+    },
+    judge: {
+      isGroupEnabled: () => true,
+      fn: async () => {
+        judgeCalls += 1;
+        return { verdict: "manual", group: "decision", cardKind: "decision", engine: "demo", reasonCode: "not-used" };
+      },
+    },
+    emitJudgeResult: () => {
+      throw new Error("方案升级主权卡不得产生 judge 结果行");
+    },
+  });
+  const pending = channel.customerInput(request, ctx);
+  await tick(10);
+  assert.equal(applyCalls, 0, "@决策 指令不得消费方案升级卡");
+  assert.equal(judgeCalls, 0, "判断器不得判断方案升级卡");
+  assert.equal(pushed.length, 1, "原卡呈现客户");
+  assert.equal(pushed[0]!.request.kind, "choice");
+  assert.equal(channel.respond({ id: pushed[0]!.id, decision: { kind: "choice", selected: ["escalation-continue"] } }).ok, true);
+  const outcome = await pending;
+  assert.equal(outcome?.outcome, "answered");
+  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester");
+});
+
+test("SessionManager 方案升级：仅 convener 注入/提交；在途同 flow 至多一张；裁定后如实通知且不派发/不写文档", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-plan-escalation-"));
+  const captured: CustomerInputRequest[] = [];
+  const envelopes: CapturedEnvelope[] = [];
+  const injected = new Map<string, Record<string, unknown>>();
+  let release!: (outcome: CustomerInputOutcome) => void;
+  const held = new Promise<CustomerInputOutcome>((resolve) => {
+    release = resolve;
+  });
+  const customerInput: CustomerInputFn = async (request) => {
+    captured.push(request);
+    return held;
+  };
+  const mgr = await makeManager(root, customerInput, {
+    openRoleSession: async (input) => {
+      injected.set(input.roleId, input as unknown as Record<string, unknown>);
+      return capabilityHandle();
+    },
+    emitEvent: (envelope) => {
+      envelopes.push(envelope as unknown as CapturedEnvelope);
+    },
+  });
+  try {
+    await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    await mgr.open({ projectRoot: root, roleId: "product", runtime: "demo" });
+    await tick(30);
+    assert.equal(typeof injected.get("convener")?.reportPlanEscalation, "function", "convener 会话注入方案升级能力");
+    assert.equal(injected.get("product")?.reportPlanEscalation, undefined, "其他角色不注入");
+    const docsExistedBefore = await fs.stat(path.join(root, "docs")).then(() => true, () => false);
+    // 非 convener 直接调用 ⇒ role-not-allowed；非法参数 ⇒ invalid；均不发卡。
+    const denied = await mgr.reportPlanEscalation(root, { roleId: "chief", flowId: "demo", category: "scheme", summary: "s" });
+    assert.equal(denied.ok, false);
+    assert.equal(denied.errorCode, "plan-escalation-role-not-allowed");
+    const invalidFlow = await mgr.reportPlanEscalation(root, { roleId: "convener", flowId: "BAD ID", category: "scheme", summary: "s" });
+    assert.equal(invalidFlow.ok, false);
+    assert.equal(invalidFlow.errorCode, "plan-escalation-invalid");
+    const invalidCategory = await mgr.reportPlanEscalation(root, {
+      roleId: "convener",
+      flowId: "demo",
+      category: "nope" as never,
+      summary: "s",
+    });
+    assert.equal(invalidCategory.ok, false);
+    assert.equal(invalidCategory.errorCode, "plan-escalation-invalid");
+    assert.equal(captured.length, 0, "非法参数不发卡");
+    // 注入的能力强制会话身份（模型自报角色被覆盖）：以 chief 自报调用仍按 convener 提交。
+    const submit = injected.get("convener")!.reportPlanEscalation as (input: {
+      roleId: string;
+      flowId: string;
+      category: string;
+      summary: string;
+    }) => Promise<{ ok: boolean; requestId?: string; status?: string; errorCode?: string }>;
+    const first = await submit({ roleId: "chief", flowId: "demo", category: "scheme", summary: "方案/验收要求不可执行" });
+    assert.deepEqual(first, { ok: true, requestId: "plan-escalation-demo", status: "presented" });
+    // 同一 flow 在途卡：第二次提交被拒绝（客户未裁定前不重复发卡）。
+    const second = await mgr.reportPlanEscalation(root, { roleId: "convener", flowId: "demo", category: "scheme", summary: "重复" });
+    assert.equal(second.ok, false);
+    assert.equal(second.errorCode, "plan-escalation-conflict");
+    assert.equal(captured.length, 1);
+    const card = captured[0]!;
+    assert.equal((card as { application?: boolean }).application, true);
+    assert.equal((card as { sourceRoleId?: string }).sourceRoleId, "application");
+    assert.equal(card.flowId, "demo");
+    assert.deepEqual(
+      (card as Extract<CustomerInputRequest, { kind: "choice" }>).options.map((option) => option.id),
+      [...PLAN_ESCALATION_OPTION_IDS],
+    );
+    // 只呈现：不写文档（与提交前一致）。
+    const docsExistsAfter = await fs.stat(path.join(root, "docs")).then(() => true, () => false);
+    assert.equal(docsExistsAfter, docsExistedBefore, "方案升级只呈现，不写文档");
+    // 客户裁定「继续核查」⇒ convener/chief 各收到一条如实通知；request.resolved 记客户归属。
+    release({ outcome: "answered", value: { selected: ["escalation-continue"] }, operatorId: "customer" });
+    const hintNotes = (): CapturedEnvelope[] =>
+      envelopes.filter(
+        (envelope) =>
+          envelope.event.kind === "message" &&
+          envelope.event.detail?.source === "delivery-note" &&
+          typeof envelope.event.summary === "string" &&
+          envelope.event.summary.includes("客户裁定"),
+      );
+    for (let attempt = 0; attempt < 200 && hintNotes().length < 2; attempt += 1) await tick(10);
+    const notes = hintNotes();
+    const convenerNote = notes.find((envelope) => envelope.roleId === "convener");
+    const chiefNote = notes.find((envelope) => envelope.roleId === "chief");
+    assert.ok(convenerNote !== undefined, "convener 收到裁定通知");
+    assert.ok(chiefNote !== undefined, "chief 收到裁定通知");
+    assert.match(String(convenerNote?.event.summary), /继续核查/);
+    assert.match(String(chiefNote?.event.summary), /继续核查/);
+    const state = await readTaskState(root);
+    const resolved = state.events.filter(
+      (event) => event.kind === "request.resolved" && (event as { requestId?: string }).requestId === "plan-escalation-demo",
+    );
+    assert.equal(resolved.length, 1);
+    assert.equal((resolved[0] as { by?: string }).by, "customer");
+    assert.deepEqual((resolved[0] as { selectedOptionIds?: string[] }).selectedOptionIds, ["escalation-continue"]);
+    assert.equal(state.events.some((event) => event.kind === "task.created"), false, "方案升级不派发任务");
+    assert.equal(state.events.some((event) => event.kind === "request.notified"), false, "notify:none 不发幕僚请求通知");
+    // 裁定后在途释放：同一 flow 可再次提交（发新卡）。
+    const third = await mgr.reportPlanEscalation(root, { roleId: "convener", flowId: "demo", category: "scheme", summary: "再次提交" });
+    assert.equal(third.ok, true);
+    assert.equal(captured.length, 2);
+  } finally {
+    await mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("SessionManager 方案升级：未获客户裁定 ⇒ 如实通知 convener（不宣称已变更）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-plan-escalation-declined-"));
+  const envelopes: CapturedEnvelope[] = [];
+  const customerInput: CustomerInputFn = async () => ({ outcome: "declined", operatorId: "customer", reason: "客户拒绝" });
+  const mgr = await makeManager(root, customerInput, {
+    emitEvent: (envelope) => {
+      envelopes.push(envelope as unknown as CapturedEnvelope);
+    },
+  });
+  try {
+    await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    const submitted = await mgr.reportPlanEscalation(root, { roleId: "convener", flowId: "demo", category: "evidence", summary: "证据不足" });
+    assert.equal(submitted.ok, true);
+    for (let attempt = 0; attempt < 200 && envelopes.filter((envelope) => envelope.event.kind === "message").length === 0; attempt += 1) {
+      await tick(10);
+    }
+    const note = envelopes.find(
+      (envelope) => envelope.roleId === "convener" && envelope.event.kind === "message" && envelope.event.detail?.source === "delivery-note",
+    );
+    assert.ok(note !== undefined);
+    assert.match(String(note?.event.summary), /未获客户裁定/);
+    assert.match(String(note?.event.summary), /declined/);
+    assert.doesNotMatch(String(note?.event.summary), /已通知幕僚|已修改|已完成方案/);
+    await tick(20);
+    assert.equal(envelopes.some((envelope) => envelope.roleId === "chief" && envelope.event.kind === "message"), false, "未裁定只通知发起者 convener");
+  } finally {
+    await mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("SessionManager 方案升级：客户选「修订方案」⇒ 向 rapporteur 投递重做消息（不派发、不改需求）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-plan-escalation-revise-"));
+  const captured: CustomerInputRequest[] = [];
+  const sent: Record<string, string[]> = {};
+  const envelopes: CapturedEnvelope[] = [];
+  const customerInput: CustomerInputFn = async (request) => {
+    captured.push(request);
+    return { outcome: "answered", value: { selected: ["escalation-revise"] }, operatorId: "customer" };
+  };
+  const mgr = await makeManager(root, customerInput, {
+    createPiAdapterFactory: () => (() => {
+      throw new Error("本用例不应调用真实 pi 适配器");
+    }) as never,
+    openRoleSession: async (input) => {
+      const sink = (sent[input.roleId] ??= []);
+      return {
+        async send(text: string) {
+          sink.push(text);
+        },
+        events() {
+          return {
+            [Symbol.asyncIterator]() {
+              return {
+                async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                  await tick(20);
+                  return { value: undefined as unknown as OrchestrationEvent, done: true };
+                },
+              };
+            },
+          };
+        },
+        async dispose() {},
+      } satisfies RoleSessionHandle;
+    },
+    emitEvent: (envelope) => {
+      envelopes.push(envelope as unknown as CapturedEnvelope);
+    },
+  });
+  try {
+    const opened = await mgr.open({ projectRoot: root, roleId: "convener", runtime: "pi" });
+    assert.equal(opened.ok, true, opened.ok ? "" : opened.error ?? "");
+    const submitted = await mgr.reportPlanEscalation(root, { roleId: "convener", flowId: "demo", category: "scheme", summary: "方案不可执行" });
+    assert.equal(submitted.ok, true);
+    assert.equal(captured.length, 1);
+    // 客户裁定「修订方案」⇒ 应用向 rapporteur 投递一条重做消息（投递机自动开目标会话）。
+    for (let attempt = 0; attempt < 300 && (sent["rapporteur"]?.length ?? 0) === 0; attempt += 1) await tick(10);
+    const reviseMessages = sent["rapporteur"] ?? [];
+    assert.equal(reviseMessages.length, 1, "恰好一条重做消息");
+    assert.match(reviseMessages[0]!, /修订方案/);
+    assert.match(reviseMessages[0]!, /demo/);
+    assert.match(reviseMessages[0]!, /不要自行改动需求或验收标准/);
+    // convener/chief 的裁定通知同样如实。
+    const notes = envelopes.filter(
+      (envelope) =>
+        envelope.event.kind === "message" &&
+        envelope.event.detail?.source === "delivery-note" &&
+        typeof envelope.event.summary === "string" &&
+        envelope.event.summary.includes("客户裁定"),
+    );
+    for (let attempt = 0; attempt < 200 && notes.length < 2; attempt += 1) await tick(10);
+    assert.equal(notes.some((envelope) => envelope.roleId === "convener"), true);
+    assert.equal(notes.some((envelope) => envelope.roleId === "chief"), true);
+    // 不派发任务、不写文档/需求。
+    const state = await readTaskState(root);
+    assert.equal(state.events.some((event) => event.kind === "task.created"), false);
+    const docsExisted = await fs.stat(path.join(root, "docs")).then(() => true, () => false);
+    assert.equal(docsExisted, false, "方案升级不写文档");
+  } finally {
+    await mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+/** 可推送事件流的会话句柄（blocked 提示测试）：events() 轮询共享数组，dispose 后收口；send 记入 sent。 */
+function eventFeedHarness(): {
+  feedOf: (roleId: string) => OrchestrationEvent[];
+  handleFor: (roleId: string) => RoleSessionHandle;
+  sent: Record<string, string[]>;
+} {
+  const feeds = new Map<string, OrchestrationEvent[]>();
+  const stops = new Map<string, { stopped: boolean }>();
+  const sent: Record<string, string[]> = {};
+  const feedOf = (roleId: string): OrchestrationEvent[] => {
+    let feed = feeds.get(roleId);
+    if (feed === undefined) {
+      feed = [];
+      feeds.set(roleId, feed);
+    }
+    return feed;
+  };
+  const handleFor = (roleId: string): RoleSessionHandle => {
+    const feed = feedOf(roleId);
+    const stop = stops.get(roleId) ?? { stopped: false };
+    stops.set(roleId, stop);
+    const sink = (sent[roleId] ??= []);
+    let index = 0;
+    return {
+      async send(text: string) {
+        sink.push(text);
+      },
+      events() {
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (;;) {
+                  if (stop.stopped) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  if (index < feed.length) return { value: feed[index++]!, done: false };
+                  await tick(5);
+                }
+              },
+            };
+          },
+        };
+      },
+      async dispose() {
+        stop.stopped = true;
+      },
+    } satisfies RoleSessionHandle;
+  };
+  return { feedOf, handleFor, sent };
+}
+
+/** 登记星形任务 T-plan-1（flowId=demo，创建者 convener）供 handleHandback 的 starTask/flow 判据使用。 */
+async function seedPlanTask(root: string, mgr: SessionManager): Promise<void> {
+  const created = await appendTaskEvent(
+    root,
+    taskEvent(
+      "task.created",
+      {
+        taskId: "T-plan-1",
+        from: "convener",
+        to: "product",
+        text: "执行演示任务",
+        sideEffect: "read-only",
+        idempotencyKey: "idem-plan-1",
+        flowId: "demo",
+        runId: "run-test-1",
+        runState: "pinned",
+      },
+      () => new Date(AT),
+    ),
+  );
+  assert.equal(created.ok, true, created.ok ? "" : created.message);
+  await mgr.listTasks(root); // 登记星形任务（handleHandback 的 starTask 判据）
+}
+
+function planBlockedHandback(turnId: string, status: TaskHandback["status"], summary: string): OrchestrationEvent {
+  return {
+    kind: "handback",
+    summary,
+    handback: { roleId: "product", taskId: "T-plan-1", status, summary, evidence: [], at: AT, turnId },
+  };
+}
+
+async function waitPlanReported(root: string, turnId: string): Promise<void> {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const state = await readTaskState(root);
+    if (state.events.some((event) => event.kind === "task.reported" && (event as { turnId?: string }).turnId === turnId)) {
+      await tick(40); // 让同一次 handleHandback 的提示分支跑完
+      return;
+    }
+    await tick(10);
+  }
+  assert.fail(`等待 task.reported(${turnId}) 超时`);
+}
+
+test("SessionManager blocked 提示：首次 blocked 即提示运营自行选择（不是客户卡）；在途卡/已提示节流；done/failed 与提交升级卡后清除", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-plan-blocked-"));
+  const harness = eventFeedHarness();
+  const envelopes: CapturedEnvelope[] = [];
+  let customerCardCalls = 0;
+  let releaseCard!: (outcome: CustomerInputOutcome) => void;
+  const cardHeld = new Promise<CustomerInputOutcome>((resolve) => {
+    releaseCard = resolve;
+  });
+  const customerInput: CustomerInputFn = async () => {
+    customerCardCalls += 1;
+    return cardHeld;
+  };
+  const mgr = await makeManager(root, customerInput, {
+    openRoleSession: async (input) => harness.handleFor(input.roleId),
+    emitEvent: (envelope) => {
+      envelopes.push(envelope as unknown as CapturedEnvelope);
+    },
+  });
+  const promptNotes = (): CapturedEnvelope[] =>
+    envelopes.filter(
+      (envelope) =>
+        envelope.roleId === "convener" &&
+        envelope.event.kind === "message" &&
+        envelope.event.detail?.source === "delivery-note" &&
+        typeof envelope.event.summary === "string" &&
+        envelope.event.summary.includes("report_plan_escalation"),
+    );
+  const waitPrompts = async (count: number): Promise<void> => {
+    for (let attempt = 0; attempt < 200 && promptNotes().length < count; attempt += 1) await tick(10);
+  };
+  const push = (turnId: string, status: TaskHandback["status"], summary: string): void => {
+    harness.feedOf("product").push(planBlockedHandback(turnId, status, summary));
+  };
+  try {
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "product", runtime: "demo" })).ok, true);
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" })).ok, true);
+    await seedPlanTask(root, mgr);
+    const docsBefore = await fs.stat(path.join(root, "docs")).then(() => true, () => false);
+    // a) 首次 blocked（不再等第 2 次）⇒ convener 恰收到一次提示；客户卡呈现 0 次。
+    push("turn-1", "blocked", "缺隔离环境，无法继续");
+    await waitPlanReported(root, "turn-1");
+    await waitPrompts(1);
+    assert.equal(promptNotes().length, 1, "首次 blocked 立即提示");
+    const firstPrompt = String(promptNotes()[0]?.event.summary);
+    assert.match(firstPrompt, /demo/);
+    assert.match(firstPrompt, /缺隔离环境/);
+    assert.match(firstPrompt, /report_plan_escalation/);
+    assert.match(firstPrompt, /不会自动发卡/);
+    assert.equal(customerCardCalls, 0, "提示不是客户卡：未呈现任何客户卡");
+    // b1) 已提示且任务未 done ⇒ 同 flow 再次 blocked 不重复提示。
+    push("turn-2", "blocked", "再次缺隔离环境");
+    await waitPlanReported(root, "turn-2");
+    await tick(60);
+    assert.equal(promptNotes().length, 1, "已提示未 done 不重复");
+    // b2) 在途升级卡存在 ⇒ 不提示（提交时已清除「已提示」标记，此时由在途卡节流）。
+    const submitted = await mgr.reportPlanEscalation(root, {
+      roleId: "convener",
+      flowId: "demo",
+      category: "scheme",
+      summary: "方案不可执行",
+    });
+    assert.equal(submitted.ok, true);
+    assert.equal(customerCardCalls, 1, "手动提交恰呈现一张客户卡");
+    push("turn-3", "blocked", "在途卡期间 blocked");
+    await waitPlanReported(root, "turn-3");
+    await tick(60);
+    assert.equal(promptNotes().length, 1, "在途升级卡存在时不提示");
+    // c1) 升级卡成功提交后标记已清除：客户裁定、卡离开在途后，下一次 blocked 可再提示。
+    releaseCard({ outcome: "answered", value: { selected: ["escalation-continue"] }, operatorId: "customer" });
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      const state = await readTaskState(root);
+      if (state.events.some((event) => event.kind === "request.resolved" && (event as { requestId?: string }).requestId === "plan-escalation-demo")) break;
+      await tick(10);
+    }
+    await tick(60);
+    push("turn-4", "blocked", "卡裁定后再次 blocked");
+    await waitPlanReported(root, "turn-4");
+    await waitPrompts(2);
+    assert.equal(promptNotes().length, 2, "升级卡提交清除标记后再次提示");
+    // c2) 任务 done ⇒ 清除标记：下一次 blocked 可再提示。
+    push("turn-5", "completed", "补齐环境后完成");
+    await waitPlanReported(root, "turn-5");
+    push("turn-6", "blocked", "done 后再次 blocked");
+    await waitPlanReported(root, "turn-6");
+    await waitPrompts(3);
+    assert.equal(promptNotes().length, 3, "done 清除标记后再次提示");
+    // c3) failed 也清除标记（避免陈旧标记阻断后续新 blocked；aborted 同属 failed 分支）。
+    push("turn-7", "failed", "执行失败");
+    await waitPlanReported(root, "turn-7");
+    push("turn-8", "blocked", "failed 后再次 blocked");
+    await waitPlanReported(root, "turn-8");
+    await waitPrompts(4);
+    assert.equal(promptNotes().length, 4, "failed 清除标记后再次提示");
+    // d) 提示只是 delivery note；不派发任务、不写文档、不产生客户卡。
+    assert.equal(promptNotes().every((envelope) => envelope.event.detail?.source === "delivery-note"), true);
+    const state = await readTaskState(root);
+    assert.equal(
+      state.events.some((event) => event.kind === "task.created" && (event as { taskId?: string }).taskId !== "T-plan-1"),
+      false,
+      "提示不派发新任务",
+    );
+    const docsAfter = await fs.stat(path.join(root, "docs")).then(() => true, () => false);
+    assert.equal(docsAfter, docsBefore, "提示不写文档");
+    assert.equal(customerCardCalls, 1, "blocked 提示本身不呈现客户卡（仅手动提交一次）");
+  } finally {
+    await mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-plan-blocked-nochannel-"));
+  const harness = eventFeedHarness();
+  const envelopes: CapturedEnvelope[] = [];
+  const diagnosticsDir = path.join(root, "diagnostics");
+  configureDiagnostics({ directory: diagnosticsDir });
+  const mgr = await makeManager(root, undefined as unknown as DesktopCustomerInputFn, {
+    openRoleSession: async (input) => harness.handleFor(input.roleId),
+    emitEvent: (envelope) => {
+      envelopes.push(envelope as unknown as CapturedEnvelope);
+    },
+  });
+  try {
+    assert.equal((await mgr.open({ projectRoot: root, roleId: "product", runtime: "demo" })).ok, true);
+    await seedPlanTask(root, mgr);
+    harness.feedOf("product").push(planBlockedHandback("turn-1", "blocked", "缺隔离环境，无法继续"));
+    await waitPlanReported(root, "turn-1");
+    // 报告路由照常：星形回交仍投递给 convener（任务创建者）。
+    for (let attempt = 0; attempt < 300 && (harness.sent["convener"]?.length ?? 0) === 0; attempt += 1) await tick(10);
+    const handbackText = harness.sent["convener"]?.[0] ?? "";
+    assert.match(handbackText, /\[工作结果\]/);
+    assert.match(handbackText, /缺隔离环境/);
+    // 不提示 convener（无客户卡通道时不冒充可用能力）。
+    await tick(60);
+    assert.equal(
+      envelopes.filter(
+        (envelope) =>
+          envelope.event.kind === "message" &&
+          typeof envelope.event.summary === "string" &&
+          envelope.event.summary.includes("report_plan_escalation"),
+      ).length,
+      0,
+      "无客户卡通道不提示",
+    );
+    // 只记诊断（共享 logger；白名单字段 requestId/reasonCode 承载 flow 与原因）。
+    await flushDiagnostics();
+    const diagFiles = await fs.readdir(diagnosticsDir);
+    const diagText = (
+      await Promise.all(diagFiles.map((file) => fs.readFile(path.join(diagnosticsDir, file), "utf8")))
+    ).join("\n");
+    assert.match(diagText, /plan-escalation\.prompt\.skipped/);
+    assert.match(diagText, /customer-card-channel-unavailable/);
+    assert.match(diagText, /plan-escalation-demo/);
+  } finally {
+    await mgr.stop(null);
+    await disposeDiagnostics();
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+
+test("规划trunk缺workflow诚实可读，升级/refreeze执行分支明确拒绝且不合成workflow", async () => {
+  await withProject(async (project, root) => {
+    await bootstrapTrunk(project);
+    const current = await project.store.readManifest(); assert.ok(current.ok);
+    const { workflow: _workflow, ...planningArtifacts } = current.value.artifacts;
+    const planning = { ...current.value, artifacts: planningArtifacts };
+    const written = await project.store.writeManifest(planning); assert.ok(written.ok);
+    const stack = stackFor(root, [], {});
+    try {
+      const state = await stack.trunkState();
+      assert.equal(state.ok, true);
+      assert.equal(state.stable.workflow, null);
+      const upgrade = await stack.requestTrunkUpgrade({ reason: "recovery" });
+      assert.equal(upgrade.ok, false); assert.match(upgrade.error ?? "", /workflow/);
+      const refreeze = await stack.refreeze({ reason: "recover planning state", acknowledged: true });
+      assert.equal(refreeze.ok, false); assert.match(refreeze.error ?? "", /workflow/);
+      const after = await project.store.readManifest(); assert.ok(after.ok);
+      assert.equal(after.value.artifacts.workflow, undefined);
+      assert.equal(after.value.trunkVersion, current.value.trunkVersion);
+    } finally { stack.dispose(); }
+  });
+});
+
+
+test("W2 ordinary submit uses real direct validation and never revives the former approval card", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w2-direct-entry-"));
+  let cards = 0;
+  const stack = createVersionChangeStack({ projectRoot: root,
+    presentVersionChangeCard: async () => { cards++; throw new Error("Retired approval must not be presented"); },
+    presentAmendmentItemCard: async () => { cards++; throw new Error("Retired item approval must not be presented"); },
+  });
+  try {
+    const result = await stack.submitVersionChange({ kind: "version-upgrade", initiatorRoleId: "rapporteur", flowId: "focus",
+      summary: "Missing a real operation and expected baseline must reject", targets: [{ kind: "proposal", path: "docs/proposals/focus-proposal-v1.md", action: "add" }] });
+    assert.equal(result.ok, false); assert.equal(cards, 0);
+    assert.equal((await stack.listVersionChanges()).length, 0, "Invalid direct input produces no invented approval/application");
+  } finally { stack.dispose(); await fs.rm(root, { recursive: true, force: true }); }
+});
+
+
+test("W46 Pipeline许可恢复投影：无效/未答保有效许可，真实读错清旧且修复可恢复", async () => {
+  await withProject(async (project, root) => {
+    await bootstrapTrunk(project);
+    const content = "# workflow owned restored permit\n", first = stackFor(root, [], { approveWorkflow: true });
+    try { assert.equal((await first.requestWorkflowWrite({ roleId: "convener", content })).ok, true); }
+    finally { first.dispose(); }
+    const restored = stackFor(root, []);
+    const recordsPath = path.join(root, ".ans/state/stable-writes.json");
+    let originalRecords: string | undefined;
+    try {
+      assert.equal((await restored.ensureInitialized()).ok, true);
+      const permit = restored.stablePermitOf("docs/workflow.md"); assert.ok(permit);
+      const decide = (projectRoot = root, now = AT) => stableWriteDecision({ projectRoot, relPath: "docs/workflow.md", sha256: sha256(content), permit, now: () => new Date(now) });
+      assert.equal(decide().allowed, true);
+      assert.equal(decide(path.join(root, "other-root")).allowed, false, "A different root cannot reuse this installed permit");
+      const invalid = await restored.requestWorkflowWrite({ roleId: "convener", content: "# different target\n", requestId: permit.requestId });
+      assert.equal(invalid.ok, false); assert.equal(restored.stablePermitOf("docs/workflow.md")?.permitId, permit.permitId); assert.equal(decide().allowed, true);
+      const unanswered = await restored.requestWorkflowWrite({ roleId: "convener", content: "# no presenter target\n" });
+      assert.equal(unanswered.ok, false); assert.equal(restored.stablePermitOf("docs/workflow.md")?.permitId, permit.permitId); assert.equal(decide().allowed, true);
+      originalRecords = await fs.readFile(recordsPath, "utf8");
+      await fs.writeFile(recordsPath, "{broken owned fixture", "utf8");
+      await assert.rejects(() => restored.requestWorkflowWrite({ roleId: "convener", content: "# read failure\n" }), error => error instanceof Error && error.message.includes("stable-writes.json"));
+      assert.equal(restored.stablePermitOf("docs/workflow.md"), undefined); assert.equal(decide().allowed, false, "Failed refresh must invalidate the Gate snapshot and local fallback");
+      await fs.writeFile(recordsPath, originalRecords, "utf8"); originalRecords = undefined;
+      const recovered = stackFor(root, []);
+      try { assert.equal((await recovered.ensureInitialized()).ok, true); assert.equal(recovered.stablePermitOf("docs/workflow.md")?.permitId, permit.permitId); assert.equal(decide().allowed, true); }
+      finally { recovered.dispose(); }
+      const expiredAt = new Date(Date.parse(permit.expiresAt) + 1), expired = stackFor(root, [], { now: () => expiredAt });
+      try { assert.equal((await expired.ensureInitialized()).ok, true); assert.equal(expired.stablePermitOf("docs/workflow.md"), undefined); assert.equal(decide(root, expiredAt.toISOString()).allowed, false); }
+      finally { expired.dispose(); }
+    } finally { if (originalRecords !== undefined) await fs.writeFile(recordsPath, originalRecords, "utf8"); restored.dispose(); }
+  });
 });

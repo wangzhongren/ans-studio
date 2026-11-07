@@ -20,6 +20,7 @@ import {
   PROJECT_PROPOSAL_SCHEMA,
   PROJECT_ROSTER_SCHEMA,
   PROJECT_TOPOLOGY_SCHEMA,
+  TEAM_PLAN_SCHEMA,
   loadLatestRoster,
   parseProjectModules,
   parseProjectRoster,
@@ -27,6 +28,7 @@ import {
 } from "./workflow-preconditions.ts";
 import { CUSTOMER_DIRECTIVE_ID_PATTERN } from "../../model/directive.ts";
 import type { VersionDecisionDecidedBy } from "../../model/project-state.ts";
+import { isGitBasis, type SnapshotRef, type SnapshotArtifactRef, type FrozenRoleEvidence, type TrunkCommitRef, type GitBasis } from "../../model/trunk.ts";
 import type { DocFreezeRecord } from "../../model/version-change.ts";
 import {
   appendDocFreezeRecords,
@@ -42,7 +44,7 @@ export const RUN_SCHEMA = "ans-run/v1" as const;
 export const RUN_INTENT_SCHEMA = "project-intent/v1" as const;
 export const RUN_ARCHITECTURE_SCHEMA = "project-architecture/v1" as const;
 export const RUN_ASSETS_SCHEMA = "project-assets/v1" as const;
-export const RUN_TEAM_PLAN_SCHEMA = "teamPlanSchema:3" as const;
+export const RUN_TEAM_PLAN_SCHEMA = TEAM_PLAN_SCHEMA;
 export const RUN_EVIDENCE_SCHEMA = "evidence-meta/v1" as const;
 export const RUN_CHANGE_SCHEMA = "run-change/v1" as const;
 /** M1 尚无 flowId 时的 draft 占位 flow；下一真实 flow 到达时由 ensureDraftRun 领养同一 runId。 */
@@ -105,6 +107,37 @@ export interface RunManifest {
   runChange?: RunChangeRecord;
   /** 2026-11-04（S3）：re-pin 追加记录（同 runId；旧读者忽略）。 */
   repins?: RunRepinRecord[];
+  /** New pins carry exact immutable bytes; absence on a historical run never permits live backfill. */
+  snapshotRef?: SnapshotRef;
+  pinDigest?: string;
+  workflowRef?: SnapshotArtifactRef;
+  frozenRoles?: Record<string, FrozenRoleEvidence>;
+  documentCommit?: TrunkCommitRef;
+  activeBasis?: { revision: number; digest: string };
+  pinOperationId?: string;
+  /** Exact app-ref at original Git run pin; absent historical pins are never filled from latest live refs. */
+  codeBasis?: GitBasis;
+  /** Independent immutable Git source for this run's document snapshot, never guessed from its code commit. */
+  documentGitBasis?: GitBasis;
+  codeBasisSource?: RunCodeBasisSource;
+}
+
+export type RunCodeBasisSource = { kind: "document-ref"; operationId: string; journalBindingSha256: string; sourceFlowId: string }
+  | { kind: "delivery-ref"; operationId: string; journalSha256: string; sourceFlowId: string; sourceRunId: string; controllerTaskId: string };
+export interface RunGitBases { codeBasis: GitBasis; documentGitBasis: GitBasis; codeBasisSource: RunCodeBasisSource }
+/** Ordinary persisted provenance shape only; actual objects/journals are checked by the Provider. */
+export function isRunGitBases(value: unknown): value is RunGitBases {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>, source = record.codeBasisSource;
+  if (!isGitBasis(record.codeBasis) || !record.codeBasis.oid || !isGitBasis(record.documentGitBasis) || !record.documentGitBasis.oid
+    || record.documentGitBasis.ref !== "refs/ans/trunk" || !source || typeof source !== "object" || Array.isArray(source)) return false;
+  const item = source as Record<string, unknown>, text = (v: unknown): v is string => typeof v === "string" && !!v && v === v.trim() && !/[\x00-\x1f\x7f]/.test(v);
+  const sha = (v: unknown) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
+  if (!text(item.operationId) || !text(item.sourceFlowId)) return false;
+  if (item.kind === "document-ref") return Object.keys(item).length === 4 && sha(item.journalBindingSha256) && record.codeBasis.ref === "refs/ans/trunk"
+    && record.codeBasis.oid.objectFormat === record.documentGitBasis.oid.objectFormat && record.codeBasis.oid.hex === record.documentGitBasis.oid.hex;
+  return item.kind === "delivery-ref" && Object.keys(item).length === 6 && sha(item.journalSha256) && text(item.sourceRunId) && text(item.controllerTaskId)
+    && record.codeBasis.ref === `refs/ans/delivery/${item.sourceFlowId}` && record.codeBasis.oid.objectFormat === record.documentGitBasis.oid.objectFormat;
 }
 
 export interface RunChangeRecord {
@@ -192,6 +225,8 @@ export function validateRunManifest(value: unknown): RunManifestResult<{ manifes
   if (!isRecord(value["schemas"])) return { ok: false, code: "run-manifest-invalid", reason: "manifest.schemas 必须是对象。" };
   if (!isRecord(value["documents"])) return { ok: false, code: "run-manifest-invalid", reason: "manifest.documents 必须是对象。" };
   if (!isRecord(value["execution"])) return { ok: false, code: "run-manifest-invalid", reason: "manifest.execution 缺失。" };
+  if ((value.documentGitBasis !== undefined || value.codeBasisSource !== undefined) && !isRunGitBases(value))
+    return { ok: false, code: "run-manifest-invalid", reason: "The independent frozen Git code/document sources are incomplete or malformed." };
   return { ok: true, manifest: value as unknown as RunManifest };
 }
 

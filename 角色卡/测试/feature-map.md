@@ -70,3 +70,29 @@
 - 2026-10-21：macOS 真机验证。整机 e2e `E2E_PASS=true`/397 名/17 截图；打包应用空项目五角色/S0/设置/工作概览/资料/队列/关闭重开正常，黑绿 ANS 图标确认，项目前后零写入；开发版 Pi 真实模型 `deepseek-v4-flash[1m]` 回复 510 字、working→idle、无 console/CSP、工具仅 `list_dir`/`read_file`、无写盘/确认卡；app 自动写 `.ans/sessions` 3 文件，空项目状态行未显示「三权 · 五角色」。见 [真机报告](docs/change/2026-10-21_change_real-machine-test.md) 与 [证据](docs/change/2026-10-21-real-machine-evidence/index.md)。
 
 - 2026-10-21：角色显示名修复后真机重跑。新 dist HTML `c8ad0e82`/JS `050776ec`/CSS `76fad7ce`；角色树为 Lead、Draft/提案、Crew/组队、Steward/统筹、Proof，旧称不存在；MIRROR 8/8（含镜像卡/状态行）；真实 Pi `deepseek-v4-flash[1m]` 回复 563 字、working 467ms→idle 4,574ms、首模型活动 1.375s/正文 4.195s、仅 `list_dir`、无写盘/确认卡；app 自动写 `.ans/sessions` 42,249 B；打包 zip 仍为修复前旧称，需重新打包/冻结。见 [真机报告](docs/change/2026-10-21_change_real-machine-test.md)。
+
+- [角色直接能力：实施前基线与Q1真实脚本准备](docs/change/2026-11-05_change_direct-role-capabilities.md)：六身份driver/早期首建入口、等待图与UI探针准备；完整流程与UI仍未验证。
+
+- [Git角色工作流真实HTTP测试](docs/change/2026-11-05_change_git-role-permissions-integration.md)：默认CodexChat/真实Git查询及空项目首派阻点；四闭环/12组场景与真实UI后继。
+
+- Git角色工作流Q7：两Git driver/E2E真实默认HTTP推理替身；空root至首doc物理发布/创建者收口已取证，正式运营计划complete_team_plan停于真实git-mutation-lease-unproven。通知有限纯ack及kind收窄已实跑type0；worker闭包J03/J16、D3/三卡/激活与完整四链/UI未判。见docs/change/2026-11-05_change_git-role-permissions-integration.md Q7及q7-delivery.json。
+
+- Git角色工作流Q8：生产首t2计划、原creatorclose、真D3与零文件三件写入已实证，完整激活被生产Git lease拒绝；源稳定a4ac0ea6…993d但非最终冻结。Q7→Q8源码修补过链不计六角色业务fallback，原B1/P2全矩阵仍保。见change Q8/q8-delivery，未到worker不宣J03/J16闭包。
+
+- Git角色工作流Q9：真实Active revision1/八ref/授权/Git同op已读回；nominator实际报告后chief缺typed activation收口依据，workflow未执行。69/104HTTP、60s预算前置、28.6秒自然失败、末主type0。证据q9-first-physical-active-proof/q9-delivery；实施修补不计同source六回退，worker J03/J16与完整四链/UI保留未判。
+
+- Git角色工作流Q10：真实HR报告/原chief acceptedclose已取证；真实workflow专门审批已批准但生产write拒内容SHA非法，无file/Gitref/pin。统一exact系统重建前缀通知解析、仍有限绑定/未知重复hardfail。type0；业务case失败且外层150s watchdog超时不算自然终态。见q10-delivery，worker闭包/同source六回退/完整四链/UI未判。
+
+- Git角色工作流Q11：真实workflow专门批准→written/consumed已取证，Gitworkflow引用仍pending且应用称无manifest、实际Git t2/Active1存在。81/144HTTP、自然exit1/37.98s、末主type0。q11交付记录绑定typed输入与原业务；未到worker不宣闭包，源码修补不计同source业务fallback。
+
+- Git角色工作流Q12：新增观察条件唯一诊断，实际publication notify首code git-host-admission-in-flight，Desktop两open-failed精确门槛与邻近Core/managed/coordinator原件保留；不倒推Q11，不计通过/业务fallback。type0、80/144HTTP、38.108s自然exit1，src/app冻结hash前后相同；见q12-delivery，后继worker/UI等全保留。
+
+- Git角色工作流Q13：首次完整真实Gitworkflow绑定/readback已取证；自由workflow真实报告仍缺原chief typedclose basis，未pin/worker。原bytes不改，type0/单fail自然退出；独立Pi源变不冒全冻结/同source六fallback。见q13-first-git-workflow-proof/q13-delivery，全部后继矩阵保留。
+
+- Git角色工作流Q14：真实workflow报告原creator acceptedclose里程碑已证；worker登记拒未投递，actual run draft/worker无runtime。原首内部code缺证如实留；type0/自然单fail/同窗源稳。worker工具面capture代码准备不等已采，全矩阵后继未判，见q14-delivery。
+
+- Git角色工作流Q15：实际parent+firstpin8refs+pinnedchild持久化与workerproducer Core打开分证；HTTP尚未发生，不能宣tool HTTP闭包。原失败Q已知relay漏名单已窄修/末type0无复跑，none runner生命周期完整自然CLOSE1，不当产品修复。见q15-delivery，后继矩阵全保留。
+
+- Git角色工作流Q16：knownrelay精确绑定已实过，pin/child8refs重复核真；下一个真实blocked回交chief未脚本化，HTTP0/未执行worker。none runner自然EXITCLOSE1/type0/源稳，见q16-delivery，未计同source业务fallback或四链通过。
+
+- Git角色工作流Q17：first worker真实HTTP/11toolschema+provenance、实际scopedwrite/donereport已证；case1pass只到该阶段，提前stopall且外层watchdog失败。代码候选/质量/creatorclose/四链未完成；见q17-delivery，原condition/sourcebytes保全，不冒整体通过。
