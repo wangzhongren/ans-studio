@@ -405,19 +405,32 @@ test("host-only schema lowering preserves all 23 write/edit rejections on actual
   assert.deepEqual(tools.map(tool => tool.inputSchema), before);
 }));
 
-test("host-only schema lowering rejects general/malformed not and cannot overwrite a forbidden nonce", () => fixture(async root => {
-  const unsupported = [
-    { required: ["context"] },
-    { anyOf: [] },
-    { anyOf: [{ required: ["context", "phase"] }] },
-    { anyOf: [{ required: ["context"], properties: {} }] },
-    { anyOf: [{ required: ["context"] }], description: "extra constraint" },
-    { anyOf: [{ required: [""] }] },
-  ];
-  for (const not of unsupported) {
-    const engine = fake(async () => { assert.fail("unsupported schema must not create a Query"); });
+test("general not is enforced semantically, malformed not is still rejected, and a forbidden nonce cannot be overwritten", () => fixture(async root => {
+  // General conditional constraints are supported now: they must be enforced, never silently dropped.
+  const probe = async (not: unknown, calls: Array<[Record<string, unknown>, boolean]>) => {
+    const engine = fake(async client => {
+      for (const [args, isError] of calls) {
+        const result = await client.callTool({ name: "probe", arguments: args });
+        assert.equal(result.isError, isError, `${JSON.stringify(args)} => ${JSON.stringify(result)}`);
+      }
+    });
     const session = await createClaudeRuntimeAdapter(options(root, [{ ...probeTool(), inputSchema: { type: "object", properties: {}, not } }]), engine.dependencies).bindRole(role);
-    try { await assert.rejects(session.prompt("unsupported not"), /unsupported JSON Schema keyword not/); }
+    try { await session.prompt("not semantics"); } finally { await session.dispose(); }
+  };
+  await probe({ required: ["context"] }, [[{ context: null }, true], [{ extension: "kept" }, false]]);
+  await probe({ anyOf: [{ required: ["context"] }, { required: ["phase"] }] }, [[{ context: null }, true], [{ phase: "x" }, true], [{ extension: "kept" }, false]]);
+  // 多键 required 分支不会被 host-only lowering 改写，走通用条件求值：只有两键同时出现才违反 not。
+  await probe({ anyOf: [{ required: ["context", "phase"] }] }, [[{ context: null }, false], [{ context: null, phase: "x" }, true]]);
+  const malformed: Array<[unknown, RegExp]> = [
+    [{ anyOf: [] }, /invalid anyOf/],
+    [{ required: "context" }, /required/],
+    [{ if: {}, then: 5 }, /invalid JSON Schema/],
+    [{ anyOf: [{ required: ["context"], custom: 1 }] }, /unsupported JSON Schema keyword custom/],
+  ];
+  for (const [not, pattern] of malformed) {
+    const engine = fake(async () => { assert.fail("malformed schema must not create a Query"); });
+    const session = await createClaudeRuntimeAdapter(options(root, [{ ...probeTool(), inputSchema: { type: "object", properties: {}, not } }]), engine.dependencies).bindRole(role);
+    try { await assert.rejects(session.prompt("malformed not"), pattern); }
     finally { await session.dispose(); }
     assert.equal(engine.configurations.length, 0);
   }
@@ -494,25 +507,89 @@ test("dispatch conditional schema preserves GitOid formats and complete resume c
   assert.deepEqual(original.inputSchema, before);
 }));
 
-test("dispatch conditional schema rejects unknown if branches instead of dropping their conditions", () => fixture(async root => {
+test("dispatch conditional schema converts unknown if branches and enforces them instead of dropping conditions", () => fixture(async root => {
   const original = buildGovernedTools(allow, { dispatchTask: () => ({ ok: true }) }).find(tool => tool.name === "dispatch_task")!;
-  const unknownSchemas = [
-    { ...original.inputSchema, allOf: [{ if: { required: ["differentController"] }, then: { properties: { roleId: { const: "convener" } } } }] },
-    { ...original.inputSchema, allOf: [{ if: { required: ["resumeController"] }, then: { properties: { roleId: { const: "worker" } } } }] },
-    { ...original.inputSchema, anyOf: [{ type: "object" }] },
-    { type: "object", properties: { reviewTarget: { type: "object", properties: { candidate: {
-      type: "object", properties: { objectFormat: { type: "string", enum: ["sha1", "sha256"] }, hex: { type: "string", pattern: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$" } },
-      required: ["objectFormat", "hex"], additionalProperties: false,
-      allOf: [{ if: { properties: { objectFormat: { const: "sha256" } } }, then: { properties: { hex: { minLength: 64 } } } }],
-    } } } } },
-  ];
-  for (const inputSchema of unknownSchemas) {
-    const engine = fake(async () => { assert.fail("unknown condition must not create Query"); });
-    const session = await createClaudeRuntimeAdapter(options(root, [{ ...original, inputSchema }]), engine.dependencies).bindRole(role);
-    try { await assert.rejects(session.prompt("unknown conditional schema"), /unsupported JSON Schema keyword if/); }
+  assert.ok(original);
+  const before = structuredClone(original.inputSchema);
+  const exercise = async (inputSchema: Record<string, unknown>, run: (accept: (args: Record<string, unknown>) => Promise<void>, reject: (args: Record<string, unknown>) => Promise<void>) => Promise<void>) => {
+    const observed: Record<string, unknown>[] = [];
+    const tool = { ...original, inputSchema, handler: async (call: Parameters<ToolDefinition["handler"]>[0]) => {
+      observed.push(call.args); return { ok: true, message: "validated" };
+    } };
+    const engine = fake(async client => {
+      const accept = async (args: Record<string, unknown>) => {
+        const count = observed.length;
+        const result = await client.callTool({ name: "dispatch_task", arguments: args });
+        assert.equal(result.isError, false, `expected accept ${JSON.stringify(args)} => ${JSON.stringify(result)}`);
+        assert.equal(observed.length, count + 1);
+        assert.deepEqual(observed.at(-1), args, "private nonce stripped, public dispatch fields preserved");
+      };
+      const reject = async (args: Record<string, unknown>) => {
+        const count = observed.length;
+        const result = await client.callTool({ name: "dispatch_task", arguments: args });
+        assert.equal(result.isError, true, `expected reject ${JSON.stringify(args)}`);
+        assert.match(JSON.stringify(result), /[Ii]nvalid.*(?:arguments|input)|expected never|constraint failed/);
+        assert.equal(observed.length, count, "invalid conditional input must never start handler");
+      };
+      await run(accept, reject);
+    });
+    const session = await createClaudeRuntimeAdapter(options(root, [tool]), engine.dependencies).bindRole(role);
+    try { await session.prompt("conditional schema semantics"); }
     finally { await session.dispose(); }
-    assert.equal(engine.configurations.length, 0);
-  }
+  };
+  // 未知但合法的 if 分支：转换后必须按原条件执行，而不是被丢弃。
+  await exercise({ ...original.inputSchema, allOf: [{ if: { required: ["differentController"] }, then: { properties: { roleId: { const: "convener" } } } }] }, async (accept, reject) => {
+    await accept({ roleId: "worker", task: "ordinary" });
+    await accept({ roleId: "convener", task: "resume", differentController: { taskId: "task" } });
+    await reject({ roleId: "worker", task: "resume", differentController: { taskId: "task" } });
+  });
+  const resume = { taskId: "task", flowId: "flow", runId: "run", reviewTaskId: "review", reviewCloseOperationId: "close" };
+  await exercise({ ...original.inputSchema, allOf: [{ if: { required: ["resumeController"] }, then: { properties: { roleId: { const: "worker" } } } }] }, async (accept, reject) => {
+    await accept({ roleId: "worker", task: "resume", resumeController: resume });
+    await reject({ roleId: "convener", task: "resume", resumeController: resume });
+  });
+  // anyOf 阻止了会话侧的精确形状改写，剩余条件也必须按语义生效。
+  await exercise({ ...original.inputSchema, anyOf: [{ type: "object" }] }, async (accept, reject) => {
+    await accept({ roleId: "worker", task: "ordinary" });
+    await accept({ roleId: "convener", task: "resume", resumeController: resume });
+    await reject({ roleId: "worker", task: "resume", resumeController: resume });
+  });
+  const reviewOidSchema = {
+    type: "object",
+    properties: {
+      reviewTarget: {
+        type: "object",
+        properties: {
+          candidate: {
+            type: "object",
+            properties: {
+              objectFormat: { type: "string", enum: ["sha1", "sha256"] },
+              hex: { type: "string", pattern: "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$" },
+            },
+            required: ["objectFormat", "hex"],
+            additionalProperties: false,
+            allOf: [{ if: { properties: { objectFormat: { const: "sha256" } } }, then: { properties: { hex: { minLength: 64, maxLength: 64 } } } }],
+          },
+        },
+        required: ["candidate"],
+        additionalProperties: false,
+      },
+    },
+    required: ["reviewTarget"],
+    additionalProperties: false,
+  };
+  await exercise(reviewOidSchema, async (accept, reject) => {
+    await accept({ reviewTarget: { candidate: { objectFormat: "sha1", hex: "a".repeat(40) } } });
+    await accept({ reviewTarget: { candidate: { objectFormat: "sha256", hex: "a".repeat(64) } } });
+    await reject({ reviewTarget: { candidate: { objectFormat: "sha256", hex: "a".repeat(40) } } });
+  });
+  // 未知关键字（即使藏在条件片段里）仍然在 Query 创建前被拒绝。
+  const engine = fake(async () => { assert.fail("unknown conditional keyword must not create Query"); });
+  const session = await createClaudeRuntimeAdapter(options(root, [{ ...original, inputSchema: { ...original.inputSchema, allOf: [{ if: { required: ["differentController"], custom: 1 }, then: { properties: { roleId: { const: "convener" } } } }] } }]), engine.dependencies).bindRole(role);
+  try { await assert.rejects(session.prompt("unknown conditional keyword"), /unsupported JSON Schema keyword custom/); }
+  finally { await session.dispose(); }
+  assert.equal(engine.configurations.length, 0);
+  assert.deepEqual(original.inputSchema, before);
 }));
 
 test("actual MCP exposes union and nested required schema without losing optional/extra parameters", async () => fixture(async (root) => {
