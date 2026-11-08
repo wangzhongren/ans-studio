@@ -129,7 +129,12 @@ export function describeTool(name: string): ToolDescription {
         required: ["command"],
         additionalProperties: true,
       },
-      description: "受治理的程序执行工具。每次调用只执行一个程序及其参数，按 argv 直接启动，不经 shell。`&&`、`;`、`|`、重定向、变量展开和命令替换不会按 shell 语法执行；多条命令请分开调用。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。",
+      description: "受治理的程序执行工具。每次调用只执行一个程序及其参数，按 argv 直接启动，不经 shell。`&&`、`;`、`|`、重定向、变量展开和命令替换不会按 shell 语法执行；多条命令请分开调用。执行前必须过 ShellGate 审核；未获明确 allow 绝不执行。" +
+        "**Git**：只读子命令（status / log / diff / show / rev-parse / ls-files / ls-tree / merge-base / blame / cat-file，参数按精确白名单）由应用经固定 Git 传输执行；其他 `git` 形态一律拒绝——写/发布请用结构化 git_candidate / git_publish，查询请用 git_query（角色 ACL/策略/审计）。",
+      promptGuidelines: [
+        "只读查看仓库状态/历史可用 `git status`、`git log -5`、`git diff`、`git show <完整oid>:<路径>` 等只读白名单形态；每个子命令只接受白名单参数，未列 flag 与全局选项（如 -c / -C / --git-dir）一律拒绝。",
+        "Git 写/发布不要用 run_shell 裸命令：查询用 git_query、提交用 git_candidate、发布用 git_publish（受角色 ACL/策略/审计与真实任务绑定）。",
+      ],
     };
   }
   if (name === "start_background_task") {
@@ -156,6 +161,7 @@ export function describeTool(name: string): ToolDescription {
         "当前会话同时最多运行 8 个后台任务（超限在审核前直接拒绝），最多保留 32 个（运行中的任务永不淘汰）。" +
         "**任务只属于当前会话、不跨重启**：任务表与日志只在内存，日志不落盘；会话关闭或应用重启后旧任务号只会返回「未知任务」。" +
         "**轮次结束或停止本轮不会终止后台任务**——只有 stop_background_task 或关闭会话才会清理；应用崩溃/被强杀时进程可能残留。" +
+        "**Git**：后台入口不接受 `git` 命令（包括只读形态）；只读 Git 请用 run_shell，写/发布请用结构化 git_query / git_candidate / git_publish。" +
         "启动后会返回任务号（如 bg-1）；用 list_background_tasks / read_background_task / stop_background_task 管理它。",
       promptGuidelines: [
         "启动开发服务器/长进程用 start_background_task，不要用 run_shell 占住整个回合；工具会立即返回任务号与 pid。",

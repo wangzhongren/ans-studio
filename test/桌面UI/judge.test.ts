@@ -1,8 +1,14 @@
 // test/桌面UI/judge.test.ts
 // Phase 3B 纯逻辑：judge 结果映射 / 双开关状态映射 / 一次性警告 / 确认卡标题与档位。
+// W5-U（2026-11-08）：审批卡入口标签（前台命令 / 后台任务）与卡面接线源码守卫。
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { zhCN } from "../../src/common/shared/i18n/messages/zh-CN.ts";
+import { enUS } from "../../src/common/shared/i18n/messages/en-US.ts";
 import {
   DECISION_JUDGE_OFF_LABEL,
   DECISION_JUDGE_SINGLE_NOTE,
@@ -15,11 +21,15 @@ import {
   JUDGE_GROUP_DECISION,
   JUDGE_BRIDGE_MISSING,
   recoveryActionView,
+  shellConfirmEntryLabel,
   shellConfirmTitle,
   shellJudgeResultView,
   shellJudgeToggleResult,
   suApprovalTierLabel,
 } from "../../app/renderer/src/chat/judge.ts";
+
+const ROOT = fileURLToPath(new URL("../..", import.meta.url));
+const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
 test("shell 判断结果：allow/deny 视图逐字；manual 不产生结果行", () => {
   const allow = shellJudgeResultView({
@@ -211,4 +221,53 @@ test("确认卡标题/档位/恢复动作：逐字沿用旧文案；未知不编
     note: "停该角色当前轮次；不销毁会话。",
   });
   assert.equal(recoveryActionView("mystery"), null);
+});
+
+test("审批卡入口标签：start_background_task ⇒「后台任务」；run_shell/缺省 ⇒「前台命令」", () => {
+  // D1：文案全部来自共享 i18n 键（前台为 shared-code 成对新增的 ui.judge.entryForeground）。
+  assert.equal(zhCN["ui.judge.entryForeground"], "前台命令");
+  assert.equal(enUS["ui.judge.entryForeground"], "Foreground command");
+  // 两态：主进程给出 entry 时如实转写（后台复用既有 ui.background.title）。
+  assert.equal(shellConfirmEntryLabel("start_background_task"), "后台任务");
+  assert.equal(shellConfirmEntryLabel("run_shell"), "前台命令");
+  // 缺省兼容：旧主进程无 entry / 非字符串 / 未知值 ⇒ 前台命令（不编语义、不隐藏入口）。
+  assert.equal(shellConfirmEntryLabel(undefined), "前台命令");
+  assert.equal(shellConfirmEntryLabel(null), "前台命令");
+  assert.equal(shellConfirmEntryLabel(""), "前台命令");
+  assert.equal(shellConfirmEntryLabel("mystery"), "前台命令");
+  // en-US：后台走既有目录（Background tasks），前台走新增成对键。
+  assert.equal(shellConfirmEntryLabel("start_background_task", "en-US"), "Background tasks");
+  assert.equal(shellConfirmEntryLabel("run_shell", "en-US"), "Foreground command");
+  assert.equal(shellConfirmEntryLabel(undefined, "en-US"), "Foreground command");
+});
+
+test("卡面接线守卫：entry 徽标只做加法展示；既有元素 id 与提交/拒绝路径不变", () => {
+  const card = read("app/renderer/src/shell/ConfirmCard.tsx");
+  // 加法展示：入口标签取自纯映射函数（单一来源），卡内不得出现第二份 entry 判定。
+  assert.ok(card.includes('id="sc-entry"'));
+  assert.ok(card.includes("shellConfirmEntryLabel(payload.entry, locale)"));
+  assert.equal(card.includes("start_background_task"), false);
+  // 既有卡结构/元素 id 逐字保留。
+  for (const id of [
+    "sc-close",
+    "sc-title",
+    "sc-command",
+    "sc-summary",
+    "sc-judge-notice",
+    "sc-reason",
+    "sc-details",
+    "sc-cwd",
+    "sc-argv",
+    "sc-reason-raw",
+    "sc-allow",
+    "sc-deny",
+    "sc-hint",
+  ]) {
+    assert.ok(card.includes(`id="${id}"`), `缺既有元素 id=${id}`);
+  }
+  // 提交/拒绝路径逐字不变（仅 allow:true 放行；拒绝/关闭 = 不执行）。
+  assert.ok(card.includes("onClick={() => void respond(true)}"));
+  assert.ok(card.includes("onClick={() => void respond(false)}"));
+  assert.ok(card.includes("hidden={!card}"));
+  assert.ok(card.includes("<details id=\"sc-details\" className=\"sc-details\" key={card.id}>"));
 });

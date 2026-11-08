@@ -926,6 +926,7 @@ export const zhCN = {
   "ui.judge.roleName.verifier": "质检",
   "ui.judge.titleSu": "治理命令审批",
   "ui.judge.titleShell": "shell 命令请求",
+  "ui.judge.entryForeground": "前台命令",
   "ui.judge.tier.risky": "风险命令（risky）",
   "ui.judge.tier.review": "未自动判定（review）",
   "ui.judge.tier.deny": "硬拒类（deny）",

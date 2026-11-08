@@ -36,9 +36,12 @@ test("D3：显式程序路径和脚本后缀只将原只读 allow 降为 review"
 
 test("D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky", () => {
   for (const argv of [["cat", "data.txt"], ["cat.exe", "data.txt"], ["ls", "-la"],
-    ["rg", "pattern", "src"], ["rg.exe", "pattern", "src"], ["git", "status"], ["git", "log", "-1"],
-    ["cmd.exe", "/c", "dir"]]) {
-    assert.equal(classifyShell(argv, rules), argv[0] === "git" ? "deny" : "allow", argv.join(" "));
+    ["rg", "pattern", "src"], ["rg.exe", "pattern", "src"], ["cmd.exe", "/c", "dir"]]) {
+    assert.equal(classifyShell(argv, rules), "allow", argv.join(" "));
+  }
+  // 2026-11-08（W3-G）：只读 Git 精确形态改为 allow（非白名单形态仍 deny，见下方 Git P2 段）。
+  for (const argv of [["git", "status"], ["git", "log", "-1"]]) {
+    assert.equal(classifyShell(argv, rules), "allow", argv.join(" "));
   }
   for (const argv of [["./sh", "-c", "anything"], ["node.ps1", "-e", "x".repeat(3000)],
     ["C:\\Windows\\System32\\cmd.exe", "/c", "dir"]]) {
@@ -93,13 +96,14 @@ test("白名单：只读命令 → allow", () => {
     ["grep", "TODO", "src/index.ts"],
     ["pwd"],
     ["echo", "hello"],
+    // 2026-11-08（W3-G）：只读 Git 精确白名单 → allow（分类器第 2 步、先于 hardDeny/risky/readonly）。
     ["git", "status"],
     ["git", "log", "--oneline"],
-    ["git", "diff", "HEAD"],
+    ["git", "diff"],
     ["node", "--version"],
     ["npm", "ls"],
   ]) {
-    assert.equal(classifyShell(argv, rules), argv[0] === "git" ? "deny" : "allow", `按受控入口规则：${argv.join(" ")}`);
+    assert.equal(classifyShell(argv, rules), "allow", `应 allow：${argv.join(" ")}`);
   }
 });
 
@@ -448,16 +452,20 @@ test("risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky�
   }
 });
 
-test("Git P2：所有raw Git含查询和写盘flag必须受控入口，不再走普通shell审批", () => {
-  assert.equal(classifyShell(["git", "checkout", "main"], rules), "deny");
-  assert.equal(classifyShell(["git", "commit", "-m", "x"], rules), "deny");
-  assert.equal(classifyShell(["git", "push"], rules), "deny");
-  assert.equal(classifyShell(["git", "reset", "--hard"], rules), "deny");
-  // 只读子命令 + 写盘 flag：`git log --output=x` 会把结果写盘 → risky（不再是 allow）
-  assert.equal(classifyShell(["git", "log", "--output=evil"], rules), "deny");
-  assert.equal(classifyShell(["git", "log", "--output", "evil"], rules), "deny");
-  // 只读子命令 → allow
-  assert.equal(classifyShell(["git", "status"], rules), "deny");
+test("Git P2（W3-G 收窄）：只读精确形态 allow；写子命令/写盘 flag/未列形态仍硬拒（不走普通 shell 审批）", () => {
+  for (const argv of [
+    ["git", "checkout", "main"], ["git", "commit", "-m", "x"], ["git", "push"], ["git", "reset", "--hard"],
+    // 只读子命令 + 写盘/未列 flag：`git log --output=x` 会把结果写盘；未列即拒（不落 (a)）。
+    ["git", "log", "--output=evil"], ["git", "log", "--output", "evil"], ["git", "log", "-o", "evil"],
+    ["git", "--version"], ["git", "-c", "core.fsmonitor=helper", "status"], ["git", "-C", "other", "status"],
+  ]) {
+    assert.equal(classifyShell(argv, rules), "deny", `必须仍 deny：${argv.join(" ")}`);
+  }
+  // 精确只读形态 → allow，ruleId 口径固定（allow:readonly:git:<id>）。
+  assert.equal(classifyShell(["git", "status"], rules), "allow");
+  assert.equal(classifyShellDetailed(["git", "status"], rules).ruleId, "allow:readonly:git:status");
+  assert.equal(classifyShellDetailed(["git", "log", "-5"], rules).ruleId, "allow:readonly:git:log");
+  assert.equal(classifyShellDetailed(["git", "diff"], rules).ruleId, "allow:readonly:git:diff");
 });
 
 test("risky：程序名大小写与 .exe 归一（Windows），路径前缀剥除", () => {
@@ -616,10 +624,13 @@ test("默认规则集每次返回全新对象（无共享可变状态）；带 i
   assert.notEqual(a.readOnly, b.readOnly);
   assert.notEqual(a.riskyPrograms, b.riskyPrograms);
   assert.equal(a.version, SHELL_RULES_VERSION);
-  assert.equal(a.version, "3");
+  assert.equal(a.version, "4");
+  assert.equal(a.id, "ans-default-v4");
   assert.equal(a.executionModel, "argv-noshell");
   assert.equal(typeof a.id, "string");
   assert.notEqual(a.id, "");
+  // W3-G/v4：死 `readonly:git` 条目已删除（只读 Git 单一来源为 matchReadonlyGit）。
+  assert.equal(a.readOnly.some((rule) => rule.program.toLowerCase() === "git"), false);
   assert.ok(Array.isArray(a.riskyPrograms) && a.riskyPrograms.length > 0);
 });
 
@@ -661,8 +672,10 @@ test("classifyShellDetailed 给出原因与命中规则 id（审计可用）", (
   assert.equal(classifyShellDetailed(["tee", "out"], rules).ruleId, "risky:program:risky:fs-write");
   assert.equal(classifyShellDetailed(["git", "log", "--output=x"], rules).ruleId, "deny:raw-git-controlled-tools-required");
   assert.equal(classifyShellDetailed(["git", "commit", "-m", "x"], rules).ruleId, "deny:raw-git-controlled-tools-required");
-  // allow / review
+  // allow / review（W3-G：只读 Git ruleId 口径固定为 allow:readonly:git:<id>）
   assert.equal(classifyShellDetailed(["ls"], rules).ruleId, "allow:readonly:ls");
+  assert.equal(classifyShellDetailed(["git", "status"], rules).ruleId, "allow:readonly:git:status");
+  assert.equal(classifyShellDetailed(["git", "ls-files", "-z"], rules).ruleId, "allow:readonly:git:ls-files");
   assert.equal(classifyShellDetailed(["frobnicate"], rules).ruleId, "review");
   assert.match(classifyShellDetailed(["ls"] as never, undefined as never).ruleId, /rules-invalid/);
 });

@@ -10,14 +10,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 // 公开出口（被测）
-import { classifyShell, defaultShellRules, matchRoutineShellCommand } from "../../src/service/gate/shell-rules.ts";
+import { buildReadonlyGitBody, classifyShell, defaultShellRules, matchReadonlyGit, matchRoutineShellCommand } from "../../src/service/gate/shell-rules.ts";
 // 私有源（同源性对照）
 import * as priv from "../../src/common/门禁引擎/classify-shell.ts";
 import type { ShellClass } from "../../src/model/decision.ts";
 
 const FOUR_STATES: ShellClass[] = ["allow", "deny", "risky", "review"];
 
-test("公开再导出与私有源同源：三符号均为同一函数引用（逐字转出，非复制实现）", () => {
+test("公开再导出与私有源同源：五符号均为同一函数引用（逐字转出，非复制实现）", () => {
   assert.equal(classifyShell, priv.classifyShell, "classifyShell 必须是同一函数引用（再导出）");
   assert.equal(defaultShellRules, priv.defaultShellRules, "defaultShellRules 必须是同一函数引用（再导出）");
   // 2026-10-31（方案 v1.3 §5.3）：例行白名单谓词经 Service 公开出口再导出——B1 委托策略的合法导入源。
@@ -26,6 +26,28 @@ test("公开再导出与私有源同源：三符号均为同一函数引用（�
     priv.matchRoutineShellCommand,
     "matchRoutineShellCommand 必须是同一函数引用（再导出，不复制实现/不另立规则集）",
   );
+  // 2026-11-08（W3-G / 设计 P1.3 §2.4.3 / F5）：只读 Git matcher 与规范体经同一公开出口再导出——
+  // 编排 trunk 的 `executeReadonlyGit` 与运行时路由的合法导入源；不得复制实现或另立第二份模板。
+  assert.equal(
+    matchReadonlyGit,
+    priv.matchReadonlyGit,
+    "matchReadonlyGit 必须是同一函数引用（再导出，分类器/写守卫/编排共用）",
+  );
+  assert.equal(
+    buildReadonlyGitBody,
+    priv.buildReadonlyGitBody,
+    "buildReadonlyGitBody 必须是同一函数引用（规范 argv 体单一来源）",
+  );
+});
+
+test("公开出口冒烟：matchReadonlyGit / buildReadonlyGitBody 经公开入口命中精确形态（审计 ruleId/canonicalArgv 口径）", () => {
+  const status = matchReadonlyGit(["git", "status", "--porcelain", "--", "src/a.ts"]);
+  assert.deepEqual(status, { id: "status", template: "status", paths: ["src/a.ts"] });
+  assert.deepEqual(buildReadonlyGitBody(status!), [
+    "status", "--porcelain=v1", "-z", "--untracked-files=normal", "--ignore-submodules=all", "--", "src/a.ts",
+  ]);
+  assert.equal(matchReadonlyGit(["git", "commit", "-m", "x"]), undefined);
+  assert.equal(matchReadonlyGit(["git", "-c", "core.fsmonitor=helper", "status"]), undefined);
 });
 
 test("公开出口可用冒烟：matchRoutineShellCommand 经公开入口命中 §5.1 精确形态", () => {

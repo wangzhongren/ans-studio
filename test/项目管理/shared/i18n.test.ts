@@ -546,7 +546,7 @@ test("locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN", () => {
   assert.equal(DEFAULT_LOCALE, "zh-CN");
 });
 
-test("key 分区计数：ui 1211 / main 640 / shared 62 / preferences 3，总计 1916", () => {
+test("key 分区计数：ui 1212 / main 640 / shared 62 / preferences 3，总计 1917", () => {
   const keys = Object.keys(zhCN);
   const prefixes = {
     ui: keys.filter((key) => key.startsWith("ui.")).length,
@@ -554,8 +554,8 @@ test("key 分区计数：ui 1211 / main 640 / shared 62 / preferences 3，总计
     shared: keys.filter((key) => key.startsWith("shared.")).length,
     preferences: keys.filter((key) => key.startsWith("preferences.")).length,
   };
-  assert.deepEqual(prefixes, { ui: 1211, main: 640, shared: 62, preferences: 3 });
-  assert.equal(keys.length, 1916);
+  assert.deepEqual(prefixes, { ui: 1212, main: 640, shared: 62, preferences: 3 });
+  assert.equal(keys.length, 1917);
 });
 
 test("下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han", () => {

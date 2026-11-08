@@ -6,7 +6,10 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { GitProcessFacts, GitRepositoryIdentity, GitQueryPort, GitProtectionFacts, GitRefJournal, GitOperationRecord, GitInitializationFacts, GitInitializationRecord, GitHostInventory, GitHostActionKind } from "../abstract/trunk-store.ts";
 import { isGitOid, isGitBasis, isGitLiteralPath, TRUNK_APPLY_JOURNAL_SCHEMA, TRUNK_APPLY_JOURNAL_PHASES, isDirectActionSource, isSnapshotRef, type TrunkApplyJournal } from "../../../model/trunk.ts";
-import type { GitQueryRequest } from "../../../model/runtime.ts";
+import type { GitQueryRequest, ReadonlyGitExecutionFacts } from "../../../model/runtime.ts";
+// 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4/§4.1）：只读 Git 规范体**单一来源**（门禁引擎纯函数，
+// 经 Service 公共出口同一函数引用）。本 Provider 只做固定传输，不复制 matcher/规范体逻辑。
+import { buildReadonlyGitBody, type ReadonlyGitMatch } from "../../../service/gate/shell-rules.ts";
 import { atomicWrite } from "../../../common/shared/atomic-write.ts";
 import { acquireVersionLock, ownsVersionLock } from "../../version-change/public/version-change-store.ts";
 
@@ -511,6 +514,103 @@ export function createGitQueryPort(root: string, budgets: { timeoutMs?: number; 
   }
   return { inspect: () => inspectGitRepository(root), async plan(input) { const { identity, body } = await build(input); return { identity, argv: commandArgs(body) }; },
     async query(input, signal) { const { identity, body } = await build(input); return executeGit(identity.root, body, { signal, operationId: input.operationId, ...budgets }); } };
+}
+
+// —————————————————————— 只读 Git 固定传输（2026-11-08 W3b） ——————————————————————
+// 设计 P1.3 §2.4.3 / 派发接口评审 I0-4：`run_shell` 命中只读 Git 白名单后的**唯一执行入口**。
+// - **不接受任意 argv**：只接受 `matchReadonlyGit` 的受限描述（结构校验后经单一来源
+//   `buildReadonlyGitBody` 构造规范体；matcher/规范体逻辑不在本文件复制）；
+// - **固定传输**：复用 `executeGit`——绝对可执行文件（`GIT_EXECUTABLE` realpath，不按 PATH/cwd 解析）、
+//   `--no-pager --no-optional-locks --literal-pathspecs` + 12 项固定 `-c` 前缀、重建 env
+//   （SystemRoot/WINDIR/TEMP/TMP、PATH=git dir、HOME/XDG、GIT_* 固定、LC_ALL/LANG/TZ），
+//   `spawn(executable, args, { cwd: root, shell: false })`；
+// - **预算有界**：`executeGit` 内 clamp（timeout 1..30000ms、输出 1B..4MiB；缺省 5000ms/1MiB）；
+// - 返回映射为运行时核心 `ReadonlyGitExecutionFacts`（与 `run_shell` 的 spawn 回执同形）。
+
+const READONLY_GIT_TEMPLATE_IDS: ReadonlySet<string> = new Set([
+  "status", "log", "diff", "show", "rev-parse", "ls-files", "ls-tree", "merge-base", "blame", "cat-file",
+]);
+const READONLY_GIT_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const READONLY_GIT_TARGET = /^(?:[0-9a-f]{40}|[0-9a-f]{64}|HEAD)$/;
+const READONLY_GIT_CAT_FILE_MODES: ReadonlySet<string> = new Set(["-t", "-s", "-e", "-p", "blob", "commit", "tree", "tag"]);
+const READONLY_GIT_DISPLAY: ReadonlySet<string> = new Set(["stat", "name-only", "name-status"]);
+
+/**
+ * 校验受限描述形状（只做字段/类型/取值域检查——**不是**第二份 matcher：白名单解析与规范体
+ * 构造仍唯一在门禁引擎；此处只拒绝形状不合法的对象，防调用方把任意对象当 argv 注入）。
+ */
+function assertReadonlyGitMatch(value: object): ReadonlyGitMatch {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error("readonly-git-match-invalid");
+  const rec = value as Record<string, unknown>;
+  const template = rec.template;
+  if (typeof template !== "string" || !READONLY_GIT_TEMPLATE_IDS.has(template) || rec.id !== template) throw new Error("readonly-git-match-invalid");
+  if (!Array.isArray(rec.paths) || rec.paths.some((entry) => typeof entry !== "string")) throw new Error("readonly-git-match-invalid");
+  const paths = rec.paths as readonly string[];
+  const target = rec.target;
+  const other = rec.other;
+  if (target !== undefined && (typeof target !== "string" || !READONLY_GIT_TARGET.test(target))) throw new Error("readonly-git-match-invalid");
+  if (other !== undefined && (typeof other !== "string" || !READONLY_GIT_TARGET.test(other))) throw new Error("readonly-git-match-invalid");
+  if (rec.limit !== undefined && (typeof rec.limit !== "number" || !Number.isInteger(rec.limit) || rec.limit < 1 || rec.limit > 100)) throw new Error("readonly-git-match-invalid");
+  if (rec.oneline !== undefined && typeof rec.oneline !== "boolean") throw new Error("readonly-git-match-invalid");
+  if (rec.display !== undefined && !READONLY_GIT_DISPLAY.has(String(rec.display))) throw new Error("readonly-git-match-invalid");
+  if (rec.catFileMode !== undefined && !READONLY_GIT_CAT_FILE_MODES.has(String(rec.catFileMode))) throw new Error("readonly-git-match-invalid");
+  if (rec.lineStart !== undefined || rec.lineEnd !== undefined) {
+    if (typeof rec.lineStart !== "number" || typeof rec.lineEnd !== "number"
+      || !Number.isInteger(rec.lineStart) || !Number.isInteger(rec.lineEnd)
+      || rec.lineStart < 1 || rec.lineEnd < rec.lineStart || rec.lineEnd > 2000 || rec.lineEnd - rec.lineStart + 1 > 2000) throw new Error("readonly-git-match-invalid");
+  }
+  switch (template) {
+    case "show":
+      if (typeof target !== "string" || !READONLY_GIT_OID.test(target) || paths.length !== 1) throw new Error("readonly-git-match-invalid");
+      break;
+    case "rev-parse":
+      if (typeof target !== "string") throw new Error("readonly-git-match-invalid");
+      break;
+    case "merge-base":
+      if (typeof target !== "string" || typeof other !== "string") throw new Error("readonly-git-match-invalid");
+      break;
+    case "cat-file":
+      if (typeof target !== "string" || typeof rec.catFileMode !== "string") throw new Error("readonly-git-match-invalid");
+      break;
+    case "blame":
+      if (paths.length !== 1) throw new Error("readonly-git-match-invalid");
+      break;
+    case "status":
+    case "ls-files":
+      if (target !== undefined || other !== undefined) throw new Error("readonly-git-match-invalid");
+      break;
+    default:
+      break;
+  }
+  return value as ReadonlyGitMatch;
+}
+
+/**
+ * 只读 Git 固定传输（公共出口经 `src/provider/trunk/public/trunk-store.ts` 导出；I0-4）。
+ * 只接受 matcher 的受限描述；内部经 `buildReadonlyGitBody` 构造规范体后交 `executeGit`。
+ */
+export async function executeReadonlyGit(
+  projectRoot: string,
+  match: object,
+  budgets: { timeoutMs?: number; outputLimit?: number } = {},
+): Promise<ReadonlyGitExecutionFacts> {
+  if (typeof projectRoot !== "string" || projectRoot.trim() === "") throw new Error("readonly-git-root-invalid");
+  const body = buildReadonlyGitBody(assertReadonlyGitMatch(match));
+  const timeoutMs = typeof budgets.timeoutMs === "number" && Number.isFinite(budgets.timeoutMs) ? budgets.timeoutMs : undefined;
+  const outputLimit = typeof budgets.outputLimit === "number" && Number.isFinite(budgets.outputLimit) ? budgets.outputLimit : undefined;
+  const facts = await executeGit(projectRoot, body, {
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    ...(outputLimit !== undefined ? { outputLimit } : {}),
+  });
+  return {
+    ...(facts.exitCode !== null ? { exitCode: facts.exitCode } : {}),
+    ...(facts.signal !== null ? { signal: facts.signal } : {}),
+    stdout: facts.stdout,
+    stderr: facts.stderr,
+    ...(facts.error !== undefined ? { error: facts.error } : {}),
+    ...(facts.timedOut ? { timedOut: true } : {}),
+    ...(facts.outputTruncated ? { stdoutTruncated: true } : {}),
+  };
 }
 
 interface HostCoordinator { revision: number; inventory?: GitHostInventory; lease?: { id: string; kind: GitHostActionKind; interrupted?: string };

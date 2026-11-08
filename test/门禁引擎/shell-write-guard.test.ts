@@ -108,10 +108,12 @@ test("脚本审查（v2.3/R2）：解释器脚本/npm run（非例行）/npm ins
     const result = guard(argv);
     assert.equal(result.decision.kind, "script", `${argv.join(" ")} 应判 script（进入脚本审查）`);
   }
-  for (const argv of [["cat", "README.md"], ["git", "status"], ["ls", "-la"]]) {
+  for (const argv of [["cat", "README.md"], ["ls", "-la"]]) {
     const result = guard(argv);
-    assert.equal(result.decision.kind, argv[0] === "git" ? "deny" : "pass", `${argv.join(" ")} 按受控Git入口规则`);
+    assert.equal(result.decision.kind, "pass", `${argv.join(" ")} 只读命令应 pass`);
   }
+  // 2026-11-08（W3-G）：只读 Git 精确命中 ⇒ pass（仅前台；后台入口见下方入口规则测试）。
+  assert.equal(guard(["git", "status"]).decision.kind, "pass");
 });
 
 // 2026-10-31（方案 v1.3 §5.3 关键陷阱）：例行命令在写守卫**必须**返回 pass——否则 `node --test`/npm
@@ -256,8 +258,48 @@ test("P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny�
 
   // 5) 只读形态不受影响。
   assert.equal(guard(["tar", "-tf", "x.tar"]).decision.kind, "pass");
-  assert.equal(guard(["git", "status"]).decision.kind, "deny");
+  // W3-G：只读 Git 精确形态 pass；写形态（上组 git clean/checkout/restore）仍 deny。
+  assert.equal(guard(["git", "status"]).decision.kind, "pass");
+  assert.equal(guard(["git", "log", "-3"]).decision.kind, "pass");
   assert.equal(guard(["find", "src", "-name", "*.ts"]).decision.kind, "pass");
+});
+
+// —————————————— 2026-11-08（W3-G）：只读 Git 入口规则（AC-22） ——————————————
+
+test("只读 Git 入口规则：缺省/run_shell ⇒ pass；start_background_task ⇒ deny；写形态两入口都 deny", () => {
+  const rules = defaultShellRules();
+  const OID40 = "a".repeat(40);
+  const READONLY: string[][] = [
+    ["git", "status"],
+    ["git", "status", "--porcelain", "--", "src/a.ts"],
+    ["git", "log", "-5"],
+    ["git", "diff"],
+    ["git", "show", `${OID40}:README.md`],
+    ["git", "rev-parse", "--verify", "HEAD"],
+    ["git", "ls-files"],
+    ["git", "ls-tree", "HEAD"],
+    ["git", "merge-base", "HEAD", OID40],
+    ["git", "blame", "--", "README.md"],
+    ["git", "cat-file", "-p", OID40],
+  ];
+  for (const argv of READONLY) {
+    assert.equal(guard(argv).decision.kind, "pass", `${argv.join(" ")} 缺省入口 ⇒ pass`);
+    assert.equal(guard(argv, undefined, { entry: "run_shell" }).decision.kind, "pass", `${argv.join(" ")} run_shell ⇒ pass`);
+    assert.equal(guard(argv, undefined, { entry: "start_background_task" }).decision.kind, "deny",
+      `${argv.join(" ")} start_background_task ⇒ deny（AC-22，不因只读白名单放行）`);
+    // 分类器同一 argv 恒 allow（分类器不区分入口；入口收紧在写守卫）。
+    const detail = classifyShellDetailed([...argv], rules);
+    assert.equal(detail.decision, "allow", `${argv.join(" ")} 分类器应 allow`);
+    assert.equal(detail.ruleId, `allow:readonly:git:${argv[1]}`, `${argv.join(" ")} ruleId 口径`);
+  }
+  for (const argv of [["git", "clean", "-fdx"], ["git", "checkout", "--", "."], ["git", "restore", "."],
+    ["git", "commit", "-m", "x"], ["git", "status", "--output=x"], ["git", "-c", "core.fsmonitor=helper", "status"]]) {
+    for (const entry of [undefined, "run_shell", "start_background_task"] as const) {
+      const result = guard(argv, undefined, entry === undefined ? {} : { entry });
+      assert.equal(result.decision.kind, "deny", `${argv.join(" ")} entry=${String(entry)} ⇒ deny`);
+      if (result.decision.kind === "deny") assert.equal(result.decision.code, "shell-write-hard-deny");
+    }
+  }
 });
 
 // —————————————— 2026-11-04 C2b：冻结注入 / stable 目标拒绝 ——————————————

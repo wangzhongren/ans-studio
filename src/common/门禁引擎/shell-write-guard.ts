@@ -6,16 +6,25 @@
 //   · 目标可被**完整静态解析**且全部落在角色写区内 ⇒ pass（继续既有审批链）；
 //   · 解析出目标但任一越界/命中禁写/逃逸 ⇒ deny（直接拒绝，不弹卡）；
 //   · **无法静态解析出全部写目标**（未知/歧义选项、`-t/--target-directory` 等目标型选项、
-//     `find -delete/-exec`、`xargs`、`git clean/checkout`、`rsync`、`tar` 解包、`install` 等）⇒
+//     `find -delete/-exec`、`xargs`、`rsync`、`tar` 解包、`install` 等）⇒
 //     `opaque`（manualOnly：必须客户本人审批，「替我审批」不代批）。
 //   · 解释器脚本/构建包脚本（node 脚本、npm run 等）同样 `opaque`。
 // 该口径对新增程序/新 flag 天然 fail-closed：不认识 ⇒ 交客户本人，不自动放行。
+//
+// 2026-11-08（W3-G，设计 P1.3 §2.4.2/§2.4.3）：裸 Git 从「一律硬拒」收窄为——
+//   `matchReadonlyGit` 命中**且**入口不是 `start_background_task` ⇒ pass；其余 Git 维持硬拒
+//   （`shell-write-hard-deny`）。本守卫与分类器**共用同一 matcher 函数引用**（防「只改分类器、
+//   写守卫仍拒」的经典陷阱）。
+//   ★ 硬地板依赖：**接 (a) 的装配路径（项目三层链 / 内置角色审批档）必须注入本守卫**——因为
+//     classifier 的 `deny` 在 advisory/operatorOnly+approveDeny 模式下会交 (a) 审批，不能当硬地板；
+//     只读档不接 (a)、classifier `c=deny` 即终结，不依赖本守卫（R5/AC-30）。
+//   ★ 后台入口不享受只读 Git 放行（AC-22）；`entry` 缺省按前台处理（既有调用方兼容）。
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import type { DocFreezeLookupState, StableWritePermit } from "../../model/version-change.ts";
 import path from "node:path";
-import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchRoutineShellCommand } from "./classify-shell.ts";
+import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchReadonlyGit, matchRoutineShellCommand } from "./classify-shell.ts";
 import {
   isVersionedDocPath,
   protectedVersionedPathsSync,
@@ -53,6 +62,13 @@ export interface ShellWriteGuardInput {
    * 该查询不用于放行，只允许调度层按同一形状注入。
    */
   stablePermitOf?: (relPath: string) => StableWritePermit | undefined;
+  /**
+   * 调用入口（2026-11-08，W3-G / AC-22）：`run_shell` | `start_background_task`。
+   * 只读 Git 放行**仅前台**；后台入口一律维持 Git 硬拒。可选：缺省按前台处理
+   * （既有调用方不传 `entry` 仍可编译/行为不变；装配方应在 run_shell 与
+   * start_background_task 两条路径分别传入真实入口）。
+   */
+  entry?: "run_shell" | "start_background_task";
 }
 
 /** stable 文件路径出现在命令文本（opaque/ambiguous/脚本审查前）——写能力命令提及即拒（C7）。 */
@@ -428,12 +444,6 @@ function parseExplicitWriteTargets(program: string, args: string[]): ExplicitPar
   }
 }
 
-const READONLY_GIT_SUBCOMMANDS = new Set([
-  "status", "log", "diff", "show", "blame", "ls-files", "ls-tree", "shortlog",
-  "whatchanged", "describe", "rev-parse", "rev-list", "merge-base", "cat-file",
-  "grep", "show-ref", "name-rev", "for-each-ref", "var", "count-objects", "fsck",
-]);
-
 /** 写能力但无法（或未）完整静态解析目标的命令 → opaque（manualOnly）。 */
 function opaqueWriteCapableReason(program: string, args: string[]): string | undefined {
   const hasOutputFlag = (flags: readonly string[]): boolean =>
@@ -482,11 +492,8 @@ function opaqueWriteCapableReason(program: string, args: string[]): string | und
       );
       return destructive ? "find 带 -delete/-exec/-fprint 等会写文件系统，无法静态确认目标" : undefined;
     }
-    case "git": {
-      const subcommand = args.find((arg) => !arg.startsWith("-"));
-      if (subcommand === undefined || READONLY_GIT_SUBCOMMANDS.has(subcommand)) return undefined;
-      return `git ${subcommand} 可能写工作树/索引/.git（含 clean/checkout/restore），无法静态确认目标`;
-    }
+    // git 不在此列：2026-11-08（W3-G）起由上方 `program === "git"` 分支统一终结
+    // （只读白名单 pass / 其余硬拒），不会落到本函数。
     default:
       return undefined;
   }
@@ -557,8 +564,17 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
   };
 
   if (program !== "") {
-    if (program === "git") return { kind: "deny", code: "shell-write-hard-deny", targets: [],
-      reason: "裸 Git 硬拒：可能执行仓库 fsmonitor/alias/外部配置；必须使用受控 git_query / git_candidate / git_publish，shell批准不能覆盖Git角色拒绝。" };
+    if (program === "git") {
+      // 2026-11-08（W3-G）：只读 Git 精确白名单命中（与分类器同一函数引用）且**非后台入口** ⇒ pass；
+      // 其余 Git 一律硬拒。接 (a) 的装配路径必须注入本守卫（classifier deny 在 advisory/operatorOnly
+      // 下可交 (a)，不是硬地板）；只读档不接 (a)、c=deny 即终结（R5）。
+      const readonlyGit = matchReadonlyGit(argv);
+      if (readonlyGit !== undefined && input.entry !== "start_background_task") return { kind: "pass" };
+      return { kind: "deny", code: "shell-write-hard-deny", targets: [],
+        reason: readonlyGit !== undefined
+          ? "只读 Git 仅允许经 run_shell 前台执行；start_background_task 入口一律拒绝，请改用前台只读命令。"
+          : "裸 Git 硬拒：只读精确白名单之外可能执行仓库 fsmonitor/alias/外部配置；必须使用受控 git_query / git_candidate / git_publish，shell批准不能覆盖Git角色拒绝。" };
+    }
     // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
     const inlineEvalPrograms = new Set(["eval", "exec", "source", "command", "."]);
     if (inlineEvalPrograms.has(program)) {

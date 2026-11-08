@@ -90,6 +90,22 @@ export function shellConfirmTitle(
   );
 }
 
+/**
+ * 审批卡「入口」标签（2026-11-08 P1.3 §2.5.2 加法；卡面显示「前台命令 / 后台任务」）。
+ * 只转写主进程已给出的 `entry`，不做任何判定；缺省（旧主进程）/`run_shell` ⇒「前台命令」。
+ * 文案全部走共享 i18n 目录：后台入口 `ui.background.title`，前台入口
+ * `ui.judge.entryForeground`（D1 由 shared-code 成对补键；本角色不自持硬编码文案）。
+ */
+export function shellConfirmEntryLabel(
+  entry: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  if (entry === "start_background_task") {
+    return translate(locale, "ui.background.title");
+  }
+  return translate(locale, "ui.judge.entryForeground");
+}
+
 /** su 审批档位可见标签（未知/缺省 ⇒ 空串，只显示原因与警告，不编档位）。 */
 export function suApprovalTierLabel(
   tier: unknown,

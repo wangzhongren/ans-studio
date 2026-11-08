@@ -877,6 +877,17 @@ export interface ShellConfirmRequest {
   roleId?: string;
   projectRoot?: string;
   runtime?: import("../../src/model/runtime.ts").RuntimeKind;
+  /**
+   * 审核入口（2026-11-08 方案 P1.3 §2.5.2，加法）：`run_shell`＝前台命令；`start_background_task`＝后台任务。
+   * 卡片据此显示「前台命令 / 后台任务」；缺省（旧调用方/旧闸未传）⇒ 不显示。**仅展示，不参与判定**
+   * （放行与否仍由编排审核链决定，仿真载荷不能改判）。
+   */
+  entry?: "run_shell" | "start_background_task";
+  /**
+   * 受保护项目标识（2026-11-08 方案 P1.3 §2.5.2，加法）：仅在为 `true` 时展示
+   * 「受保护项目：非只读操作需审批并审计」；**不参与判定**（判定以真实装配/门禁为准）。缺省 ⇒ 不展示。
+   */
+  protectedScope?: boolean;
   /** 命令**逐字原文**（决不改写/截断——它是人核对的唯一依据）。 */
   command: string;
   /** 白话摘要（`shellIntentSummary`；无从概括为 null——渲染侧隐藏该行）。 */
@@ -901,14 +912,28 @@ export interface ShellConfirmRequest {
 
 /** 由既有呈现（`describeShellCommand` 的产物）构建确认卡数据面（纯函数；命令原文逐字转抄）。
  *  `roleDisplayName` 为展示用角色名（`approvalRoleDisplayName` 的产物）——只影响审批档的
- *  `reasonPlain` 文案；`reasonRaw`/`tier`/`policy` 与内部前缀解析**逐字不变**（解析兼容）。 */
+ *  `reasonPlain` 文案；`reasonRaw`/`tier`/`policy` 与内部前缀解析**逐字不变**（解析兼容）。
+ *  `operator`（2026-11-08 方案 P1.3 §2.5.2，加法）：可选的会话事实（`entry`/`roleId`/`protectedScope`）——
+ *  只做**展示字段转抄**，缺省不写（旧卡面逐字不变）；`roleId` 仍以会话闭包为准，不信任渲染侧。 */
+export interface ShellConfirmOperatorFacts {
+  entry?: "run_shell" | "start_background_task";
+  roleId?: string;
+  protectedScope?: boolean;
+}
+
 export function buildShellConfirmRequest(
   id: string,
   display: ShellCommandDisplay,
   roleDisplayName?: string,
+  operator?: ShellConfirmOperatorFacts,
 ): ShellConfirmRequest {
   const reasonRaw = typeof display.reason === "string" && display.reason !== "" ? display.reason : null;
   const tier = parseSuApprovalTier(reasonRaw);
+  // 运行时防御：只接受两个已知入口字面量；未知形状/未知值不写（不伪造卡面事实）。
+  const entry =
+    operator?.entry === "run_shell" || operator?.entry === "start_background_task" ? operator.entry : undefined;
+  const roleId =
+    typeof operator?.roleId === "string" && operator.roleId !== "" ? operator.roleId : undefined;
   return {
     kind: "approval",
     id,
@@ -920,6 +945,10 @@ export function buildShellConfirmRequest(
     cwd: display.cwd,
     tier,
     policy: tier !== null ? "su-approval" : "project",
+    ...(entry !== undefined ? { entry } : {}),
+    ...(roleId !== undefined ? { roleId } : {}),
+    // 仅 `true` 表示受保护项目；`false`/缺省与旧卡面一致（不展示）。
+    ...(operator?.protectedScope === true ? { protectedScope: true as const } : {}),
     // PM 评审 §10.4：`buildShellConfirmRequest` **原样拷贝**；presenter 不得改写或丢弃。
     ...(display.judgeNotice !== undefined ? { judgeNotice: display.judgeNotice } : {}),
   };
@@ -992,11 +1021,21 @@ export function createShellConfirmPresenter(opts: CreateShellConfirmPresenterOpt
         // 2026-10-19 客户反馈：审批档文案按**实际内置治理角色**显示（verifier ⇒「Proof / 验收 审批档」）；
         // 只映射展示名，内部 `su-审批档[tier]` 前缀与 tier/policy 解析不变。缺省/su ⇒「SU」旧文案。
         const roleDisplayName = approvalRoleDisplayName(metadata?.roleId);
+        // 2026-11-08（W5-D，P1.3 §2.5.2）：卡面加法事实——`prompt.entry`（前台命令/后台任务）与
+        // `prompt.protectedScope`（受保护项目标识）由审核链入口带来，缺省不写（旧卡面逐字不变）；
+        // `roleId` 以 `prompt.roleId` 优先、`metadata.roleId` 兜底（两者都是宿主闭包事实，不信任渲染侧）。
+        // **仅展示，不参与判定**——放行与否仍完全由编排审核链与既有卡面回包语义决定。
+        const listedRoleId =
+          typeof _prompt.roleId === "string" && _prompt.roleId !== "" ? _prompt.roleId : metadata?.roleId;
         const allowed = await core.mount(
           (id) => {
-            const request = buildShellConfirmRequest(id, display, roleDisplayName);
+            const request = buildShellConfirmRequest(id, display, roleDisplayName, {
+              ...(_prompt.entry !== undefined ? { entry: _prompt.entry } : {}),
+              ...(listedRoleId !== undefined ? { roleId: listedRoleId } : {}),
+              ...(_prompt.protectedScope === true ? { protectedScope: true as const } : {}),
+            });
             if (metadata) {
-              request.roleId = metadata.roleId;
+              request.roleId = listedRoleId ?? metadata.roleId;
               request.projectRoot = metadata.projectRoot;
               request.runtime = metadata.runtime;
             }

@@ -333,6 +333,44 @@ export interface RuntimeNativeFactoryPreparation {
 export type RuntimeNativeFactoryPlanner = (options: RuntimeProviderOptions, role: ResolvedRole) => RuntimeNativeFactoryPreparation | Promise<RuntimeNativeFactoryPreparation>;
 declare const runtimePreparedRoleTokenBrand: unique symbol;
 export interface RuntimePreparedRoleToken { readonly [runtimePreparedRoleTokenBrand]: true }
+/**
+ * 创建准入的审批链事实（2026-11-08「会话创建准入按操作审批」方案 P1.3 §2.3.3，加法字段）。
+ *
+ * 受保护范围（`scopeProtection.state==="required"`）且应用工具注册表包含 shell 工具
+ * （`run_shell`/`start_background_task`）时，创建准入要求该会话的审批链/审计在装配期**真实存在**：
+ * 本投影只登记白名单事实（模式/通道/规则注入/审计 `file+durable+probe ok`/项目根），**无时间戳、
+ * 无凭据、无适配器 options/env**；它由 `shell-approval-binding` 的登记事实经稳定投影得出，并计入
+ * `RuntimeCreationPlanFacts.configDigest`（token 因此绑定该证据）。
+ *
+ * 证据边界（如实，与 binding 模块同口径）：本字段只证明「当前进程内该 gate 由应用自己的
+ * `createShellGate` 构造且审计探针当时放行」，**不**证明 native 效果闭包、不覆盖其它进程或绕过，
+ * 也不得被写/发布/停稳门当作放行票据（§2.8：新证据只进入创建准入）。
+ */
+export interface RuntimeApprovalChainPlanFacts {
+  source: "orchestration-shell-gate";
+  /** 可接受集合（§2.3.1）：readonly（更严档，只放行只读）/ operator-approve / rules-advisory / three-layer。 */
+  mode: "readonly" | "operator-approve" | "rules-advisory" | "three-layer";
+  /** (c) 分类器注入。 */
+  classifier: boolean;
+  /** (c) 规则集注入。 */
+  rules: boolean;
+  /** (b) pm 审读通道注入。 */
+  pmAsk: boolean;
+  /** (a) 操作者审批通道注入。 */
+  operatorChannel: boolean;
+  /** 客户升级授权消费（「替我审批」/升级卡）。 */
+  takeGrant: boolean;
+  /** 客户事先指令消费。 */
+  takeDirective: boolean;
+  /** 例行策略。 */
+  routinePolicy: boolean;
+  /** 判拒后客户升级通道。 */
+  escalation: boolean;
+  /** 审计事实：只登记持久 file sink 且写门禁探针 ok 的形态（内存/自定义 sink 不满足受保护准入）。 */
+  audit: { sink: "file"; durable: true; probe: "ok"; relPath?: string };
+  /** 登记 gate 的项目根（准入时与 Core 项目根做规范化比较）。 */
+  projectRoot: string;
+}
 export interface RuntimeCreationPlanFacts {
   source: "core-factory-plan";
   planId: string;
@@ -344,6 +382,7 @@ export interface RuntimeCreationPlanFacts {
   status: "observed" | "unknown";
   scopeProtection?: { state: "required" | "unmanaged" | "unknown"; revision: number };
   native?: RuntimeNativeFactoryPlanFacts;
+  approvalChain?: RuntimeApprovalChainPlanFacts;
   roleCapabilityGuards?: RuntimeBlockedRoleCapabilityFacts;
   reasons: readonly string[];
 }
@@ -576,6 +615,11 @@ export interface ShellReviewRequest {
    * 客户升级，后台入口的判拒不写入/不清除前台记录、也不消费前台授权。缺省按 `run_shell` 兼容旧调用。
    */
   entry?: "run_shell" | "start_background_task";
+  /**
+   * 会话角色 id（2026-11-08 方案 P1.3 §2.5.1，加法）：由适配器 options（`GovernedToolsOptions.roleId`）
+   * 注入，**不是模型输入**——模型参数里不存在本字段。仅用于审计/展示关联；角色身份仍以 Core 会话闭包为准。
+   */
+  roleId?: string;
   /** 应用补充的脚本内容审查上下文（由编排 shell-approval-context 读取；有界）。 */
   approvalContext?: ShellApprovalContext;
   /**
@@ -709,6 +753,18 @@ export interface OperatorPrompt {
   toolCallId: string;
 
   reason?: string;
+
+  /**
+   * 审核入口（2026-11-08 方案 P1.3 §2.5.2，加法；桌面卡面显示「前台命令 / 后台任务」）。
+   * 缺省按 `run_shell` 兼容旧调用；判定仍以编排审核链的 `entry` 为准，不信任渲染/模型输入。
+   */
+  entry?: "run_shell" | "start_background_task";
+  /** 会话角色 id（应用注入；审计/展示关联，roleId 仍以会话闭包为准，不信任渲染侧）。 */
+  roleId?: string;
+  /**
+   * 受保护项目标识（仅展示「受保护项目：非只读操作需审批并审计」；**不参与判定**，判定以真实装配为准）。
+   */
+  protectedScope?: boolean;
 
   /** 客户本人确认标记（旧口径；2026-10-29 客户口径修正后由守卫不再设置，保留兼容）。 */
   manualOnly?: boolean;
@@ -3314,6 +3370,41 @@ export interface ToolDefinition {
   handler(call: ToolExecutionCall): Promise<ToolResult>;
 }
 
+/**
+ * 只读 Git 固定传输的**执行事实**（2026-11-08 W4-R，I0-4；与 `run_shell` 的 spawn 执行回执形状一致）。
+ *
+ * 执行实现由编排 trunk Provider 的固定传输入口提供（绝对可执行文件 + 固定 config/env + 规范 argv 体），
+ * 运行时核心工具层只消费本形状并映射为与通用 spawn 相同的工具回执；**不允许**回退通用 spawn。
+ */
+export interface ReadonlyGitExecutionFacts {
+  exitCode?: number;
+  signal?: string;
+  stdout: string;
+  stderr: string;
+  error?: string;
+  timedOut?: boolean;
+  timeoutMs?: number;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
+}
+
+/**
+ * 注入的只读 Git 能力（2026-11-08 W4-R，设计 P1.3 §2.4.3 / I0-4；**注入才生效**）。
+ *
+ * - `match(argv)`：对完整 argv（含程序名）做只读白名单匹配；命中返回**不透明**的受限描述（本模型层
+ *   不了解其内部字段，具体形状由门禁引擎定义并经 `src/service/gate/shell-rules.ts` 类型再导出）；
+ *   未命中/非 Git 返回 `undefined`。
+ * - `execute(match, budgets?)`：只接受 `match` 的返回对象并自行构造规范 argv 体经固定传输执行；
+ *   不接受任意 argv 字符串（I0-4：不得出现第二份 matcher/规范体实现）。
+ *
+ * 安全边界：`run_shell` 在 shellGate 放行后，程序名为 `git` 时**只能**经本能力执行；未注入或未命中
+ * ⇒ 工具层 fail-closed（`readonly-git-runner-unavailable`），绝不回退通用 spawn（N12：防 PATH/同名程序劫持）。
+ */
+export interface ReadonlyGitCapability {
+  match(argv: readonly string[]): object | undefined;
+  execute(match: object, budgets?: { timeoutMs?: number; outputLimit?: number }): Promise<ReadonlyGitExecutionFacts>;
+}
+
 export interface GovernedToolsOptions {
   /** Actual host roots, never inferred from readRoot/writeRoot. */
   projectRoot?: string;
@@ -3344,6 +3435,16 @@ export interface GovernedToolsOptions {
    * 资格/去重/限流/卡片/授权由编排 registry 实现。`RuntimeSessionOptions` 继承本字段（编排注入）。
    */
   shellEscalation?: ShellEscalationFn;
+  /**
+   * 只读 Git 固定传输能力（2026-11-08 W4-R，设计 P1.3 §2.4.3 / I0-4）。**注入才生效**：
+   * `run_shell` 在 shellGate 放行后，程序名（basename、去 .exe/.cmd/.bat、小写）为 `git` 时——
+   * 有能力且 `match(argv)` 命中 ⇒ 走 `execute(match, budgets)`（结果映射为与 spawn 相同的工具回执）；
+   * 无能力/未命中 ⇒ `readonly-git-runner-unavailable`，**绝不回退通用 spawn**；非 git 命令维持现状 spawn。
+   * `start_background_task` 入口**不做**只读 Git 路由（后台入口的 git 由审核链拒绝）。
+   * 构造与注入端（编排 `run-role`/桌面）从 `matchReadonlyGit` + trunk `executeReadonlyGit` 装配；
+   * 本层不依赖门禁引擎类型（I0-9：`match` 对 Model 保持不透明）。
+   */
+  readonlyGit?: ReadonlyGitCapability;
   /**
    * 2026-10-29（v2.13）：属主 write_file/edit_file 成功后的版本登记入口（guard 锁内追加/回退）。
    * 缺省 ⇒ 不登记（旧行为）；注入端由编排提供。
