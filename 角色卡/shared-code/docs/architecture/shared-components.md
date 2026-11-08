@@ -10,7 +10,7 @@
 
 ---
 
-## 1. 共享组件总表（11 项，E0 §4.2 默认公开入口清单）
+## 1. 共享组件总表（12 项：E0 §4.2 默认清单 11 项 + 2026-11-08 新增 1 项）
 
 | # | 组件 | 代码 | 主要 public entry（既有导出，不复制） | 现行消费者 | 专属测试 |
 | --- | --- | --- | --- | --- | --- |
@@ -25,9 +25,10 @@
 | 9 | `i18n` | `src/common/shared/i18n/`（`index.ts` 为 public entry） | `Locale`/`SUPPORTED_LOCALES`/`DEFAULT_LOCALE`/`isLocale`/`resolveLocale`；`MessageKey`；`translate`/`createTranslator`/`TranslateOptions`/`TranslateDiagnostic`；`formatNumber`/`formatDateTime`/`selectPluralCategory`；`Catalog*`/`Message*`/`PluralCategory`；`zhCN`/`enUS` | 编排、运行时核心 `provider/runtime/tools.ts`、桌面窗口、桌面UI（facade 再导出） | `i18n.test.ts`（13）+ `i18n-guard.test.ts`（6）+ 扫描器/allowlist 夹具 |
 | 10 | `jsonl-ledger` | `src/common/shared/jsonl-ledger.ts` | `appendJsonlLine`、`readJsonlLedger`、`jsonlSegmentFiles`、`DEFAULT_JSONL_MAX_BYTES`/`DEFAULT_JSONL_ROTATIONS`、`JsonlLedgerLimits`/`JsonlAppendResult`/`JsonlParseResult`/`JsonlReadError`/`JsonlReadResult` | 编排 `task-state.ts`、Provider（directive/download/version-change） | `jsonl-ledger.test.ts`（16） |
 | 11 | `intent-entry-contract` | `src/common/shared/intent-entry-contract.ts` | `INTENT_ENTRY_DIR`/`INTENT_ENTRY_ID_RULE`/`INTENT_ENTRY_NAMING_RULE`/`INTENT_ENTRY_TEMPLATE`、`resolveIntentEntryReference`、`intentEntryContractText`、`intentEntryRejectionHint`、`isValidIntentId`、`intentIdFromFrontmatter`、`readIntentEntryFacts`、`IntentContractRole`/`IntentReferenceSource`/`IntentEntryResolution`/`IntentEntryFacts` | 编排（governance-judge-intent/-evidence）、门禁引擎（`governance-roles.ts`）、Pipeline（`run-role.ts`）、桌面窗口（`session.ts`） | `intent-entry-contract.test.ts`（22，E1 新增专属单测；此前只有消费方间接覆盖） |
+| 12 | `shell-approval-binding` | `src/common/shared/shell-approval-binding.ts` | `registerShellApproval`、`inspectShellApproval`、`probeShellApproval`、`hasShellApprovalTestNonDurableAllowance`、`SHELL_APPROVAL_TEST_ALLOW_NON_DURABLE`（**测试私有 Symbol**，生产公共出口不得再导出）、`ShellApprovalFacts`/`FrozenShellApprovalFacts`/`ShellApprovalAuditFacts`/`ShellApprovalProbeSink`/`ShellApprovalMode`/`ShellApprovalAuditSinkKind`/`ShellApprovalAuditProbeState` | 编排 `shell-gate.ts`（`createShellGate` 构造成功后**唯一**登记；`buildShellGate`/`assemble*` 只传 `projectRoot`/sink，不参与 probe 值传递）、运行时核心 `session.ts`（`prepareRole`/`bindPreparedRole` 读取准入事实）、测试 | `shell-approval-binding.test.ts`（19，W1 新增） |
 
 > 测试列括号内为 `test/项目管理/shared/` 内的用例数；共享测试单源为 `node --test "test/项目管理/shared/**/*.test.ts"`。
-> 上表是 E0 §4.2 的**默认公开入口清单**；新增/收敛 public entry 须在冻结记录与本目录登记并走 §4 接口评审（Q1：保持 per-component public entry，**不新增伞状 `index.ts`**）。
+> 上表是 E0 §4.2 的**默认公开入口清单**；新增/收敛 public entry 须在冻结记录与本目录登记并走 §4 接口评审（Q1：保持 per-component public entry，**不新增伞状 `index.ts`**）。第 12 项 `shell-approval-binding` 为 2026-11-08「会话创建准入按操作审批」变更新增（设计 P1.3 §2.3/§4.1；派发 I0-1/I0-2/I0-3/I0-9），共享 API 变更评审记录与消费者影响清单见 §4。
 
 ---
 
@@ -143,6 +144,16 @@
 | **契约与示例** | `resolveIntentEntryReference` 是**唯一意图解析器**：请求显式 `intentId`（source=request）→ 提案 frontmatter（proposal）→ 产品意图 frontmatter（product）→ flowId 回落（flow-id，证据如实标注）；显式请求与提案/产品不一致、产品与提案不一致 ⇒ fail-closed `intent-ambiguous`；任一来源非空但不符合 slug ⇒ fail-closed `intent-unconfirmed`。`intentEntryContractText(role)` = 角色职责 + 命名规则 + 模板；`intentEntryRejectionHint()` = 命名规则 + 模板；`readIntentEntryFacts` 只读解析（显式路径优先，否则 `<flowId>-intent-vN.md` / `<flowId>-proposal-vN.md` 取最新；入口固定 `docs/intents/<intentId>.md`）。**不写盘、不判语义**。示例：<br>`const r = resolveIntentEntryReference({ flowId, proposalIntentId, productIntentId });`<br>`const facts = await readIntentEntryFacts({ projectRoot, flowId });` |
 | **测试与变更影响** | **E1 新增专属单测** `test/项目管理/shared/intent-entry-contract.test.ts`（22 例）：解析优先级（request/proposal/product/flow-id）、冲突/非法 slug fail-closed、空白裁剪、`isValidIntentId`、`intentIdFromFrontmatter`、四角色契约文本同源、拒绝提示、`readIntentEntryFacts` 发现/显式路径/冲突/回落/入口不一致/空 flowId（注入桩件，不触真实文件系统）。此前只有消费方间接覆盖（编排/桌面用例）。**变更影响**：契约文本与解析器被角色卡、`contract_check` 与判断文案共享；变更须同步重跑编排/门禁/Pipeline/桌面消费方证据，并检查角色卡文本引用。 |
 
+### 2.12 `shell-approval-binding` —— shell 审批链身份绑定与审计探针（2026-11-08 新增）
+
+| 字段 | 说明 |
+| --- | --- |
+| **名称与用途** | 「会话创建准入按操作审批」变更的**审批链身份证据**共享件（设计 P1.3 §2.3）：把 `createShellGate` 构造成功后的 gate 函数登记进进程内 `WeakMap`，记录模式/通道/规则注入/审计 sink 描述等**白名单事实**，并提供审计写门禁探针。用途：创建准入不再要求「预知未来命令」，改为要求「若注册了 shell 工具，则应用自己的审批链与审计在装配期已真实存在且可写」——本模块是该证据的单一来源，**不含任何策略/判定**（可接受的 mode 集合、受保护准入口径由运行时核心按事实判定）。 |
+| **代码与 public entry** | `src/common/shared/shell-approval-binding.ts`。见总表 #12。`registerShellApproval(gate, facts, sink)`：仅由 `createShellGate` 在构造成功后调用；对 facts 做**白名单投影**（白名单外字段拒绝、不携带凭据/环境），`audit.probe` 必须为 `"unknown"`（**不接受调用方回填 probe 结果**），模块私有保存深度冻结副本与**私有 sink 引用**（sink 不出现在返回 facts 中）。`inspectShellApproval(gate)`：同步返回冻结基础事实或 `undefined`（未登记）。`probeShellApproval(gate)`：**无值入参**，模块内部 `await sink.probe()`；无 sink/无 `probe()`/抛错/非法返回值 ⇒ `"unavailable"`；同一 gate 并发共享同一 promise、结果冻结 memoize；**不存在接受 probe 结果值的 API**（无 finalize 类入口）。`SHELL_APPROVAL_TEST_ALLOW_NON_DURABLE`：测试私有 Symbol（载体 = **sink 对象**的非枚举属性；`hasShellApprovalTestNonDurableAllowance` 只认非枚举自有属性）；**生产装配不得设置、生产公共出口不得再导出**。 |
+| **属主与消费者** | **属主/维护者：`shared-code`**（设计 P1.3 §4.1 勘误 E3；PR #72 B-9 已移交）。消费者：**编排** `src/common/编排/shell-gate.ts`（`createShellGate` 登记；`buildShellGate`/`assemble*` 只传 `projectRoot`/sink）、**运行时核心** `src/service/runtime/session.ts`（`prepareRole`/`bindPreparedRole` 读取 `inspectShellApproval`/`probeShellApproval` 事实）、**测试** `test/项目管理/shared/shell-approval-binding.test.ts`。依赖方向：本模块**自包含（零 import）**，不引用编排/门禁引擎/角色模块/引擎层（I0-9）；sink 与事实类型为结构类型。 |
+| **契约与示例** | 事实形状：`{ source:"orchestration-shell-gate", version:1, projectRoot?, mode:"readonly"\|"operator-approve"\|"rules-advisory"\|"three-layer", classifier, rules, pmAsk, operatorChannel, takeGrant, takeDirective, routinePolicy, audit:{ sink:"file"\|"memory"\|"custom", durable, probe:"ok"\|"unavailable"\|"unknown", relPath? }, escalation }`（全部 boolean 字段为通道/注入存在性）。结构性 sink：`{ probe?(): Promise<三态>; describe?(): { kind; durable; relPath? } }`（file sink 的探针/描述由编排实现，含一次 F-6-1 refresh 重试语义）。示例：<br>`registerShellApproval(gate, baseFacts, opts.audit);`<br>`const base = inspectShellApproval(gate); // 未登记 ⇒ undefined`<br>`const facts = await probeShellApproval(gate); // probe 由 binding 内部执行并 memoize`<br>**证据边界（如实）**：只证明「当前进程内该 gate 由应用 `createShellGate` 构造、登记事实与 sink 已带入、探针只能由 binding 执行」；不证明 native 效果闭包、不覆盖其它进程/绕过、不防御恶意宿主代码。 |
+| **测试与变更影响** | `test/项目管理/shared/shell-approval-binding.test.ts`（19 例，W1 新增）：登记/未登记/身份隔离/重复登记拒绝；白名单投影与深度冻结（登记后再改原对象不影响副本、白名单外字段拒绝、probe 不可回填）；probe 无值入参、并发共享同一 promise、结果冻结 memoize；sink 三态（memory/custom/缺失/异步与同步抛错/非法返回值 ⇒ unavailable）；Symbol 非枚举载具与可枚举设置不认可；静态断言（Symbol 不得经 `src/service/gate/shell-rules.ts` 等生产出口导出、生产装配不得设置、模块零 import）。**变更影响**：本模块是受保护项目创建准入（`protected-scope-approval-chain-unproven`/`protected-scope-audit-unavailable`/`protected-scope-approval-chain-changed`）的事实来源；行为或形状变更须重跑运行时核心/编排消费方证据并重走 §4 接口评审。 |
+
 ---
 
 ## 3. 角色模块 / 门控 / 共享：owner 与 public entry（E0 冻结口径）
@@ -176,7 +187,7 @@ engines (Interface/Pipeline/Service/Provider) ← 现有 owner；只读消费
 | `convener` | `src/common/roles/convener/index.ts` | `convener-code` | 编排（Git 能力装配）、Service apply-journal/hub、桌面 | `test/roles/convener/` | greenfield，E1 并行建设中（未收敛；未判验收） |
 | `verifier` | `src/common/roles/verifier/index.ts` | `verifier-code` | Service/桌面（review/acceptance 路由） | `test/roles/verifier/` | greenfield，E1 并行建设中（未收敛；未判验收） |
 | `gates` | `src/common/gates/index.ts`（`evaluateChiefDispatchParent` + 冻结输入/输出类型 + reason 闭集） | `gates-code` | 编排（`trunk-runtime.ts`）、Service | `test/gates/`（含模块图扫描） | greenfield，E1 并行建设中（未收敛；未判验收） |
-| `shared` | `src/common/shared/<component>.ts`、`src/common/shared/i18n/index.ts`（**per-component，无伞状 index**） | `shared-code` | 见 §1 总表逐项；被 roles/gates/engines 只读消费 | `test/项目管理/shared/`（历史路径名，不改名） | 既有 11 项，E1 接管维护（本目录） |
+| `shared` | `src/common/shared/<component>.ts`、`src/common/shared/i18n/index.ts`（**per-component，无伞状 index**） | `shared-code` | 见 §1 总表逐项；被 roles/gates/engines 只读消费 | `test/项目管理/shared/`（历史路径名，不改名） | E1 既有 11 项 + 2026-11-08 新增 1 项（`shell-approval-binding`），本目录维护 |
 | Model 契约 | `src/model/role.ts`（门禁引擎 owner）、`src/model/runtime.ts`（运行时核心 owner） | 原 Model owner | roles/gates/shared type-only 引用 | 对应角色测试 | 只读契约输入（E0 D1 已落） |
 | 编排公开只读入口 | `src/common/编排/handback.ts`（`isDispatchableRoleId`）、`src/common/编排/workflow-preconditions.ts`（`evaluateDispatchAuthorization`/`evaluateDispatchPreflight`/`reportTargetForTaskCreator`） | 编排（唯一 writer） | Service/桌面等现有消费者 | `test/编排/`、`test/桌面应用/` | **不迁移**（E0 §4.3/Q6）；shared 不复制 |
 
@@ -194,6 +205,13 @@ engines (Interface/Pipeline/Service/Provider) ← 现有 owner；只读消费
 
 **评审记录要求（无记录不得合并/新增）**：语义与兼容性说明、消费者影响清单、测试证据（共享单测 + 受影响消费者契约测试）、迁移路径（若破坏兼容）。E1 无新增/变更 public entry（见证据文档），故本文件不附评审记录。
 
+**2026-11-08 新增 public entry 的评审记录（W1，`shell-approval-binding`）**：
+1. 需求/接口评审（冻结结论）：`docs/scheduling/2026-11-08_dispatch-log_session-admission-approval.md` §二 I0（I0-1 登记点/签名、I0-2 Symbol 挂 sink 非枚举且不得经生产出口再导出、I0-3 未登记/probe 失败语义、I0-9 依赖方向）。
+2. 设计：`docs/planning/2026-11-08_design_session-admission-approval-based.md`（P1.3，855 行 / SHA-256 `2553b97a…`）§2.3.1–§2.3.4、§4.1、§4.4。
+3. 设计复核：`docs/planning/2026-11-08_review_session-admission-approval-based.md` §F8、R1–R3、R8a–R8c。
+4. 验收标准：`docs/acceptance/2026-11-08_session-admission-approval-criteria-v1.md`（B1 v1，`fb881126…`）§0.3、AC-12、AC-27。
+5. 消费者影响清单与测试证据（W1）：`角色卡/shared-code/docs/change/2026-11-08_W1_shell-approval-binding.md`。
+
 ---
 
 ## 5. 消费者影响与已知观察（非阻断，供各 owner 后续接口评审）
@@ -210,3 +228,4 @@ engines (Interface/Pipeline/Service/Provider) ← 现有 owner；只读消费
 ## 6. 变更（本文件）
 
 - **2026-11-07（E1）**：建立 `角色卡/shared-code/docs/architecture/shared-components.md`（shared-code 现行唯一目录）。以 `角色卡/项目管理/docs/architecture/shared-components.md`（216 行 / `dd33fdf7…`，只读输入）迁建：登记 `src/common/shared/` 全部 **11** 个组件（含 PM 旧目录未列的 `intent-entry-contract`）的 name/用途、代码与 public entry、owner（`shared-code`）、消费者、契约/示例、测试与变更影响；新增 §3「六角色模块/门控/共享的 owner–public entry–消费者」与 §5 消费者影响观察。**未改** `src/common/shared/` 代码（E1 行为零变更）、未改 `src/common/编排/` 两文件、未迁移任何引擎行为；共享测试新增 `intent-entry-contract` 专属单测（22 例，补测试缺口）。旧副本由项目管理按团队计划 §6.4 在 E1 迁移窗口删除，删除前冻结只读。证据：`角色卡/shared-code/docs/change/2026-11-07_E1_shared-catalog-and-maintenance-evidence.md`。
+- **2026-11-08（W1）**：新增第 12 项 `shell-approval-binding`（`src/common/shared/shell-approval-binding.ts`；会话创建准入按操作审批的审批链身份绑定/审计探针共享件；owner `shared-code`）。更新 §1 总表（11→12 项）、新增 §2.12、更新 §3.2 `shared` 行与 §4 评审记录；**未改**既有 11 个组件与任何引擎/门控代码。证据：`角色卡/shared-code/docs/change/2026-11-08_W1_shell-approval-binding.md`。
