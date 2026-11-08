@@ -112,7 +112,7 @@ import type {
   MatrixRoleDirectories,
   WorkerRoleInput,
 } from "../../model/governance-matrix.ts";
-import { isChiefDecisionExecutionContext } from "../../model/runtime.ts";
+import { isChiefDecisionExecutionContext, isRuntimeSessionDrained } from "../../model/runtime.ts";
 import type {
   RuntimeReplayEntry,
   RuntimeSessionRecord,
@@ -713,9 +713,11 @@ export function recheckRoleSessionOpenFailure(input: { ref: GitHostOpenFailureRe
   if (["failed", "prepared"].includes(entry.state) && construction.status === "never-started" && !construction.factoryEntered && !construction.nativeBindEntered && entry.sessionId === undefined)
     return { status: "never-started" as const, entryId: entry.id, processInstanceId: registry.processInstanceId, registryRevision: registry.revision };
   const lifecycle = entry.lifecycle;
+  // A10/C7（P1.4 §3.2）：失败打开的终止证据改用运行时中立 drain 谓词——Claude/Pi 形态
+  // （status/processCoverage 为 unknown、native 覆盖不可观测）不再结构性阻塞后续 Git 动作；
+  // 未知/live-work 类 reason 仍由 `isRuntimeSessionDrained` 默认阻断（I0-3）。
   if (["failed", "disposed"].includes(entry.state) && construction.status === "instance-bound" && entry.sessionId && lifecycle?.sessionId === entry.sessionId
-    && lifecycle.status === "quiescent" && lifecycle.providerFinished && lifecycle.processCoverage === "complete" && !lifecycle.activeTools.length
-    && lifecycle.processes.every(process => process.state === "exited" && process.treeStatus === "verified"))
+    && isRuntimeSessionDrained(lifecycle))
     return { status: "terminated" as const, entryId: entry.id, processInstanceId: registry.processInstanceId, registryRevision: registry.revision };
   return undefined;
 }

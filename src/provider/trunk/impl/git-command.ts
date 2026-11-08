@@ -1,8 +1,8 @@
 // Fixed local Git transport. No public argv/env/config entry; no import-time I/O.
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { lstat, readFile, readdir, realpath, mkdir } from "node:fs/promises";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import { lstat, open, readFile, readdir, realpath, mkdir } from "node:fs/promises";
+import { constants as fsConstants, lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import type { GitProcessFacts, GitRepositoryIdentity, GitQueryPort, GitProtectionFacts, GitRefJournal, GitOperationRecord, GitInitializationFacts, GitInitializationRecord, GitHostInventory, GitHostActionKind } from "../abstract/trunk-store.ts";
 import { isGitOid, isGitBasis, isGitLiteralPath, TRUNK_APPLY_JOURNAL_SCHEMA, TRUNK_APPLY_JOURNAL_PHASES, isDirectActionSource, isSnapshotRef, type TrunkApplyJournal } from "../../../model/trunk.ts";
@@ -152,6 +152,259 @@ export async function writeGitInitializationRecord(root: string, value: GitIniti
     await atomicWrite(path.join(dir, "init.json"), JSON.stringify(value));
   } finally { await release?.(); }
 }
+
+// —————————————————————— Git 动作授权 sidecar（2026-11-08 W3a；设计 P1.4 §3.4.3、I0-1/I0-2） ——————————————————————
+// 每次结构化 Git mutation 尝试的 append-only 授权审计，路径固定为
+// `<canonical projectRoot>/.ans/trunk/operations/<sha256(operationId)>/authorization.jsonl`。
+// 不写入 `GitRefJournal`/`GitInitializationRecord`，因此不进入既有 replay/settlement 身份比较；
+// 旧 journal 没有该文件天然兼容（读取返回空记录）。write-ahead：调用点在真实效果前 append；
+// append 失败 ⇒ `git-action-audit-unavailable`（调用方不得执行），不产生 ref/对象/工作树效果。
+// 预算（I0-1 冻结，自洽组合）：单行 ≤ 4 KiB、同一 operationId 最多 16 次尝试、文件 ≤ 64 KiB（4 KiB × 16）。
+
+/** sidecar v1 白名单字段；无凭据、无环境、无 `applicationMediation`。 */
+export interface GitActionAuthorizationRecord {
+  source: "git-action-authorization"; version: 1; operationId: string; template: string;
+  actorRoleId: string; coreSessionId: string; taskId?: string; runId?: string; turnId: string; activeTool: string;
+  projectRoot: string; rootsDigest: string; registryRevision: string | number; inventoryRevision: string | number;
+  leaseId: string; policyInputDigests: { init?: string; candidate?: string; publication?: string };
+  optionalEvidence: {
+    toolSurfaceStatus?: string; nativeStatus?: string; nativeReasonsCount?: number; processCoverage?: string;
+    configuredForeignMcpServers?: readonly string[]; unknownTools?: readonly string[];
+  };
+}
+export interface GitActionAuthorizationRead {
+  ok: true; records: readonly GitActionAuthorizationRecord[];
+  /** e.g. 末行截断被忽略（`authorization-tail-truncated-ignored:<bytes>`），不改变 ok。 */
+  diagnostics: readonly string[];
+}
+export type GitActionAuthorizationReadResult = GitActionAuthorizationRead | { ok: false; code: "git-action-audit-unavailable"; message: string };
+
+export const GIT_ACTION_AUTHORIZATION_MAX_LINE_BYTES = 4 * 1024;
+export const GIT_ACTION_AUTHORIZATION_MAX_ATTEMPTS = 16;
+export const GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES = 64 * 1024;
+
+const GIT_ACTION_AUTHORIZATION_FIELDS: ReadonlySet<string> = new Set([
+  "source", "version", "operationId", "template", "actorRoleId", "coreSessionId", "taskId", "runId", "turnId", "activeTool",
+  "projectRoot", "rootsDigest", "registryRevision", "inventoryRevision", "leaseId", "policyInputDigests", "optionalEvidence",
+]);
+const GIT_ACTION_AUTHORIZATION_DIGEST_FIELDS = ["init", "candidate", "publication"] as const;
+const GIT_ACTION_AUTHORIZATION_EVIDENCE_TEXT_FIELDS = ["toolSurfaceStatus", "nativeStatus", "processCoverage"] as const;
+const GIT_ACTION_AUTHORIZATION_EVIDENCE_FIELDS: ReadonlySet<string> = new Set([
+  ...GIT_ACTION_AUTHORIZATION_EVIDENCE_TEXT_FIELDS, "nativeReasonsCount", "configuredForeignMcpServers", "unknownTools",
+]);
+const gitActionAuditError = (detail: string) => new Error(`git-action-audit-unavailable:${detail}`);
+const gitActionAuditDetail = (error: unknown) =>
+  ((error instanceof Error ? error.message : String(error)).replaceAll(/\s+/g, " ").slice(0, 300)) || "unknown";
+const sameAuthorizationRoot = (left: string, right: string) => process.platform === "win32"
+  ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase() : path.resolve(left) === path.resolve(right);
+const isAuthorizationText = (value: unknown, max = 256): value is string =>
+  typeof value === "string" && value.length > 0 && value.length <= max && !/[\x00-\x1f\x7f]/.test(value);
+const isAuthorizationDigest = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+const isAuthorizationRevision = (value: unknown): value is string | number =>
+  typeof value === "number" ? Number.isSafeInteger(value) && value >= 0 : isAuthorizationText(value, 128);
+const isAuthorizationNameList = (value: unknown): value is readonly string[] =>
+  Array.isArray(value) && value.length <= 32 && value.every(entry => isAuthorizationText(entry, 128));
+function isGitActionAuthorizationEvidence(value: unknown): boolean {
+  if (!gitRecord(value) || Object.keys(value).some(key => !GIT_ACTION_AUTHORIZATION_EVIDENCE_FIELDS.has(key))) return false;
+  return GIT_ACTION_AUTHORIZATION_EVIDENCE_TEXT_FIELDS.every(key => value[key] === undefined || isAuthorizationText(value[key], 128))
+    && (value.nativeReasonsCount === undefined || typeof value.nativeReasonsCount === "number" && Number.isSafeInteger(value.nativeReasonsCount) && value.nativeReasonsCount >= 0)
+    && (value.configuredForeignMcpServers === undefined || isAuthorizationNameList(value.configuredForeignMcpServers))
+    && (value.unknownTools === undefined || isAuthorizationNameList(value.unknownTools));
+}
+/** 未知字段一律拒绝（fail-closed）；读取与写入共用同一白名单校验。 */
+function isGitActionAuthorizationRecord(value: unknown): value is GitActionAuthorizationRecord {
+  if (!gitRecord(value) || Object.keys(value).some(key => !GIT_ACTION_AUTHORIZATION_FIELDS.has(key))) return false;
+  if (value.source !== "git-action-authorization" || value.version !== 1) return false;
+  if (!isAuthorizationText(value.operationId) || !isAuthorizationText(value.template, 128) || !isAuthorizationText(value.actorRoleId)
+    || !isAuthorizationText(value.coreSessionId) || !isAuthorizationText(value.turnId) || !isAuthorizationText(value.activeTool, 64)
+    || !isAuthorizationText(value.projectRoot, 2048) || !isAuthorizationDigest(value.rootsDigest)
+    || !isAuthorizationRevision(value.registryRevision) || !isAuthorizationRevision(value.inventoryRevision)
+    || !isAuthorizationText(value.leaseId, 128)) return false;
+  if (value.taskId !== undefined && !isAuthorizationText(value.taskId)) return false;
+  if (value.runId !== undefined && !isAuthorizationText(value.runId)) return false;
+  if (!gitRecord(value.policyInputDigests)) return false;
+  const digests = value.policyInputDigests, keys = Object.keys(digests);
+  if (!keys.length || keys.some(key => !(GIT_ACTION_AUTHORIZATION_DIGEST_FIELDS as readonly string[]).includes(key))
+    || !keys.every(key => isAuthorizationDigest(digests[key]))) return false;
+  return isGitActionAuthorizationEvidence(value.optionalEvidence);
+}
+/** 显式字段投影（固定顺序）；先经白名单校验，未知/多余字段不会被写出。 */
+function projectGitActionAuthorization(record: GitActionAuthorizationRecord, canonicalRoot: string): string {
+  const projected: Record<string, unknown> = {
+    source: record.source, version: record.version, operationId: record.operationId, template: record.template,
+    actorRoleId: record.actorRoleId, coreSessionId: record.coreSessionId,
+  };
+  if (record.taskId !== undefined) projected.taskId = record.taskId;
+  if (record.runId !== undefined) projected.runId = record.runId;
+  projected.turnId = record.turnId; projected.activeTool = record.activeTool; projected.projectRoot = canonicalRoot;
+  projected.rootsDigest = record.rootsDigest; projected.registryRevision = record.registryRevision;
+  projected.inventoryRevision = record.inventoryRevision; projected.leaseId = record.leaseId;
+  const digests: Record<string, string> = {};
+  for (const key of GIT_ACTION_AUTHORIZATION_DIGEST_FIELDS) { const digestValue = record.policyInputDigests[key]; if (digestValue !== undefined) digests[key] = digestValue; }
+  projected.policyInputDigests = digests;
+  const evidence: Record<string, unknown> = {};
+  for (const key of [...GIT_ACTION_AUTHORIZATION_EVIDENCE_TEXT_FIELDS, "nativeReasonsCount", "configuredForeignMcpServers", "unknownTools"] as const) {
+    const evidenceValue = record.optionalEvidence[key]; if (evidenceValue !== undefined) evidence[key] = evidenceValue;
+  }
+  projected.optionalEvidence = evidence;
+  return JSON.stringify(projected);
+}
+/** `bytes` 必须以 "\n" 结尾（或为空）；每行按含换行的 UTF-8 字节计预算，坏 JSON/未知字段/身份不符 fail-closed。 */
+function parseGitActionAuthorizationLines(bytes: Buffer, operationId: string, canonicalRoot: string): GitActionAuthorizationRecord[] {
+  const records: GitActionAuthorizationRecord[] = [];
+  let start = 0;
+  for (let index = 0; index < bytes.length; index++) {
+    if (bytes[index] !== 0x0a) continue;
+    const line = bytes.subarray(start, index);
+    if (line.length + 1 > GIT_ACTION_AUTHORIZATION_MAX_LINE_BYTES) throw gitActionAuditError("authorization-line-budget");
+    let value: unknown;
+    try { value = JSON.parse(line.toString("utf8")); } catch { throw gitActionAuditError("authorization-json-invalid"); }
+    if (!isGitActionAuthorizationRecord(value) || value.operationId !== operationId || !sameAuthorizationRoot(value.projectRoot, canonicalRoot))
+      throw gitActionAuditError("authorization-record-invalid");
+    records.push(value);
+    if (records.length > GIT_ACTION_AUTHORIZATION_MAX_ATTEMPTS) throw gitActionAuditError("authorization-attempt-budget");
+    start = index + 1;
+  }
+  return records;
+}
+
+/**
+ * Write-ahead 追加一行授权记录（I0-1/I0-2）。单次 `O_APPEND` 写入 + fsync；短写/任何失败 ⇒
+ * `git-action-audit-unavailable`。在项目版本锁（或调用方显式持有的 `heldLockToken`）内写入，
+ * 并核验记录中的 `leaseId` 正是当前持有的 `git-mutation` host lease（lease 语义）。
+ * 末行截断（上次崩溃的半行）在追加前修复到最后一个完整行；完整行始终严格校验。
+ */
+export async function appendGitActionAuthorization(
+  projectRoot: string, record: GitActionAuthorizationRecord, options: { heldLockToken?: string } = {},
+): Promise<void> {
+  try {
+    if (!isAuthorizationText(projectRoot, 2048)) throw gitActionAuditError("project-root-invalid");
+    if (!gitRecord(record)) throw gitActionAuditError("authorization-record-invalid");
+    const normalized: GitActionAuthorizationRecord = { ...record, optionalEvidence: record.optionalEvidence === undefined ? {} : record.optionalEvidence };
+    if (!isGitActionAuthorizationRecord(normalized)) throw gitActionAuditError("authorization-record-invalid");
+    const canonicalRoot = await realpath(projectRoot);
+    if (!sameAuthorizationRoot(canonicalRoot, path.resolve(projectRoot))) throw gitActionAuditError("project-root-not-canonical");
+    if (!sameAuthorizationRoot(normalized.projectRoot, canonicalRoot)) throw gitActionAuditError("authorization-project-root-mismatch");
+    const leaseCurrent = () => checkGitHostAction({ projectRoot: canonicalRoot, leaseId: normalized.leaseId, kind: "git-mutation" }).ok;
+    if (!leaseCurrent()) throw gitActionAuditError("authorization-lease-invalid");
+    const release = options.heldLockToken ? undefined : await acquireVersionLock(canonicalRoot), lockToken = options.heldLockToken ?? release!.token;
+    try {
+      if (!await ownsVersionLock(canonicalRoot, lockToken)) throw gitActionAuditError("authorization-lock-lost");
+      if (!leaseCurrent()) throw gitActionAuditError("authorization-lease-invalid");
+      let dir = canonicalRoot;
+      for (const part of [".ans", "trunk", "operations"]) {
+        dir = path.join(dir, part); await mkdir(dir, { recursive: true });
+        const info = await lstat(dir);
+        if (!info.isDirectory() || info.isSymbolicLink() || await realpath(dir) !== dir) throw gitActionAuditError("control-path-unsafe");
+      }
+      const operationDir = path.join(dir, digest(normalized.operationId));
+      await mkdir(operationDir, { recursive: true });
+      const operationInfo = await lstat(operationDir);
+      if (!operationInfo.isDirectory() || operationInfo.isSymbolicLink() || await realpath(operationDir) !== operationDir)
+        throw gitActionAuditError("operation-directory-unsafe");
+      // 行长预算不依赖既有文件，先于任何文件创建判定（超预算不创建审计文件）。
+      const bytes = Buffer.from(projectGitActionAuthorization(normalized, canonicalRoot) + "\n", "utf8");
+      if (bytes.length > GIT_ACTION_AUTHORIZATION_MAX_LINE_BYTES) throw gitActionAuditError("authorization-line-budget");
+      const file = path.join(operationDir, "authorization.jsonl");
+      let fileExists = true;
+      try {
+        const info = await lstat(file);
+        if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || await realpath(file) !== file) throw gitActionAuditError("authorization-file-unsafe");
+        if (info.size > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES) throw gitActionAuditError("authorization-file-budget");
+      } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") fileExists = false; else throw error; }
+      // 读取/末行修复与写入分开：Windows 的 O_APPEND 句柄不允许 ftruncate，写入仍是单次 O_APPEND。
+      let keep = 0, records: GitActionAuthorizationRecord[] = [];
+      if (fileExists) {
+        const reader = await open(file, "r+");
+        try {
+          const opened = await reader.stat();
+          if (!opened.isFile() || opened.nlink !== 1 || await realpath(file) !== file) throw gitActionAuditError("authorization-file-unsafe");
+          if (opened.size > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES) throw gitActionAuditError("authorization-file-budget");
+          const existing = await reader.readFile();
+          if (existing.length > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES) throw gitActionAuditError("authorization-file-budget");
+          keep = existing.length;
+          const truncatedTail = keep > 0 && existing[keep - 1] !== 0x0a;
+          if (truncatedTail) keep = existing.lastIndexOf(0x0a) + 1;
+          records = parseGitActionAuthorizationLines(existing.subarray(0, keep), normalized.operationId, canonicalRoot);
+          if (records.length >= GIT_ACTION_AUTHORIZATION_MAX_ATTEMPTS) throw gitActionAuditError("authorization-attempt-budget");
+          if (keep + bytes.length > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES) throw gitActionAuditError("authorization-file-budget");
+          // 末行截断只可能是未完成的追加（调用方从未在失败 append 后执行效果）；修复到完整前缀再追加。
+          if (truncatedTail) { await reader.truncate(keep); await reader.sync(); }
+        } finally { await reader.close().catch(() => undefined); }
+      }
+      // O_APPEND 保证单次 write 只能追加；O_NOFOLLOW 在支持的平台拒绝叶子符号链接（其余平台由 lstat/realpath 复核）。
+      const flags = fsConstants.O_WRONLY | fsConstants.O_APPEND | fsConstants.O_CREAT
+        | (typeof fsConstants.O_NOFOLLOW === "number" ? fsConstants.O_NOFOLLOW : 0);
+      const handle = await open(file, flags);
+      let writeAttempted = false, succeeded = false;
+      try {
+        const opened = await handle.stat();
+        if (!opened.isFile() || opened.nlink !== 1 || await realpath(file) !== file) throw gitActionAuditError("authorization-file-unsafe");
+        // 版本锁内不应有并发追加者；尺寸与预期前缀不符 ⇒ fail-closed（绝不覆盖或盲追加）。
+        if (opened.size !== keep) throw gitActionAuditError("authorization-file-changed");
+        writeAttempted = true;
+        const written = await handle.write(bytes, 0, bytes.length, null);
+        if (written.bytesWritten !== bytes.length) throw gitActionAuditError("authorization-short-write");
+        await handle.sync();
+        succeeded = true;
+      } finally {
+        // 写入失败/短写时回滚到此前完整前缀，避免留下会让后续追加产生中间坏行的半行（best-effort）。
+        if (writeAttempted && !succeeded) {
+          try { const repair = await open(file, "r+"); try { await repair.truncate(keep); await repair.sync(); } finally { await repair.close().catch(() => undefined); } }
+          catch { /* 保持 fail-closed 返回值；截断容错由读取侧兜底 */ }
+        }
+        await handle.close().catch(() => undefined);
+      }
+    } finally { await release?.(); }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw message.startsWith("git-action-audit-unavailable") ? error : gitActionAuditError(gitActionAuditDetail(error));
+  }
+}
+
+/**
+ * 读取某 operation 的授权 sidecar（测试/诊断；不改 journal）。缺失文件 ⇒ `ok:true` 空记录（旧 journal 兼容）；
+ * 末行截断 ⇒ 忽略并留诊断；坏 JSON/超长行/未知字段/超预算/路径不安全 ⇒ fail-closed 返回错误。
+ */
+export async function readGitActionAuthorizations(projectRoot: string, operationId: string): Promise<GitActionAuthorizationReadResult> {
+  try {
+    if (!isAuthorizationText(projectRoot, 2048) || !isAuthorizationText(operationId)) throw gitActionAuditError("authorization-read-argument-invalid");
+    const canonicalRoot = await realpath(projectRoot);
+    if (!sameAuthorizationRoot(canonicalRoot, path.resolve(projectRoot))) throw gitActionAuditError("project-root-not-canonical");
+    let dir = canonicalRoot;
+    for (const part of [".ans", "trunk", "operations"]) {
+      dir = path.join(dir, part);
+      try {
+        const info = await lstat(dir);
+        if (!info.isDirectory() || info.isSymbolicLink() || await realpath(dir) !== dir) throw gitActionAuditError("control-path-unsafe");
+      } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { ok: true, records: [], diagnostics: [] }; throw error; }
+    }
+    const operationDir = path.join(dir, digest(operationId));
+    try {
+      const info = await lstat(operationDir);
+      if (!info.isDirectory() || info.isSymbolicLink() || await realpath(operationDir) !== operationDir) throw gitActionAuditError("operation-directory-unsafe");
+    } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { ok: true, records: [], diagnostics: [] }; throw error; }
+    const file = path.join(operationDir, "authorization.jsonl");
+    let size: number;
+    try {
+      const info = await lstat(file);
+      if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || await realpath(file) !== file) throw gitActionAuditError("authorization-file-unsafe");
+      size = info.size;
+    } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return { ok: true, records: [], diagnostics: [] }; throw error; }
+    if (size > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES) throw gitActionAuditError("authorization-file-budget");
+    const bytes = await readFile(file);
+    if (bytes.length > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES) throw gitActionAuditError("authorization-file-budget");
+    let keep = bytes.length; const diagnostics: string[] = [];
+    if (keep > 0 && bytes[keep - 1] !== 0x0a) {
+      keep = bytes.lastIndexOf(0x0a) + 1;
+      diagnostics.push(`authorization-tail-truncated-ignored:${bytes.length - keep}`);
+    }
+    return { ok: true, records: parseGitActionAuthorizationLines(bytes.subarray(0, keep), operationId, canonicalRoot), diagnostics };
+  } catch (error) {
+    return { ok: false, code: "git-action-audit-unavailable", message: gitActionAuditDetail(error) };
+  }
+}
+
 /** Both storage adapters use the same journal reader; no cyclic Provider construction. */
 export async function listGitOperationJournals(root: string): Promise<readonly GitOperationRecord[]> {
   const base = path.join(root, ".ans/trunk/operations");
@@ -170,7 +423,36 @@ export async function listGitOperationJournals(root: string): Promise<readonly G
       if (!gitRecord(source) || source.schema !== "stable-initial-workflow-source/v1" || source.kind !== "stable-initial-workflow"
         || typeof source.operationId !== "string" || digest(source.operationId) !== name) throw new Error("stable-work-source-corrupt");
       if (await exists(path.join(base, `${name}.json`))) throw new Error("operation-bound-to-two-requests");
-      if (!await exists(file)) { if ((await readdir(dir)).some(entry => entry !== "stable-source.json")) throw new Error("stable-work-source-directory-unknown"); continue; }
+      if (!await exists(file)) {
+        // I0-12（initial workflow write-ahead）：stable-write source 与发布操作同 operationId；append 先于
+        // journal 时目录为 `stable-source.json` + `authorization.jsonl`。sidecar 安全校验后容忍（内容由
+        // `readGitActionAuthorizations` 校验）；其它未知文件、损坏 source 与既有稳定源安全检查不变（fail-closed）。
+        const extras = (await readdir(dir)).filter(entry => entry !== "stable-source.json");
+        if (extras.length === 0) continue;
+        if (extras.length === 1 && extras[0] === "authorization.jsonl") {
+          const sidecar = path.join(dir, "authorization.jsonl"), sidecarInfo = await lstat(sidecar);
+          if (!sidecarInfo.isFile() || sidecarInfo.isSymbolicLink() || sidecarInfo.nlink !== 1
+            || sidecarInfo.size > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES || await realpath(sidecar) !== sidecar)
+            throw new Error("authorization-sidecar-file-unsafe");
+          continue;
+        }
+        throw new Error("stable-work-source-directory-unknown");
+      }
+    }
+    // I0-11（W3b 阻塞处置）：write-ahead sidecar-only 操作目录是合法状态——authorization append 先于
+    // journal 写入时，目录内只有 `authorization.jsonl`。校验 sidecar 文件安全后跳过；journal 仍是唯一
+    // 权威（sidecar 不参与 replay/settlement），sidecar 内容校验仍由 `readGitActionAuthorizations` 负责。
+    // 含未知额外文件的目录、缺 journal 且无 sidecar 的目录、init/stable-source/git journal 分支均保持 fail-closed。
+    if (!await exists(file)) {
+      const entries = await readdir(dir);
+      if (entries.includes("authorization.jsonl")) {
+        if (entries.length !== 1) throw new Error("authorization-sidecar-directory-unknown");
+        const sidecar = path.join(dir, "authorization.jsonl"), sidecarInfo = await lstat(sidecar);
+        if (!sidecarInfo.isFile() || sidecarInfo.isSymbolicLink() || sidecarInfo.nlink !== 1
+          || sidecarInfo.size > GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES || await realpath(sidecar) !== sidecar)
+          throw new Error("authorization-sidecar-file-unsafe");
+        continue;
+      }
     }
     const fileInfo = await lstat(file);
     if (!fileInfo.isFile() || fileInfo.isSymbolicLink() || fileInfo.nlink > 1 || fileInfo.size > 2 * 1024 * 1024) throw new Error("git-journal-file-unsafe");

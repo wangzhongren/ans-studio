@@ -1,5 +1,5 @@
 import { isDirectActionSource } from "../../src/model/trunk.ts";
-import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN, isTaskWorkSourceRef, isDispatchTaskResumeController } from "../../src/model/runtime.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN, isRuntimeSessionDrained, isTaskWorkSourceRef, isDispatchTaskResumeController } from "../../src/model/runtime.ts";
 import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
 import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
 import { createToolDisplayContext } from "../../src/common/runtime-core/tool-display.ts";
@@ -1459,9 +1459,13 @@ export class SessionManager {
         const manager = owners[0]!, observed = manager.observedHandles.get(member.hostHandleId)!;
         const fact = manager.executionInventoryFacts(plan.projectRoot).sessions.find(row => row.hostHandleId === member.hostHandleId);
         const lifecycle = observed.handle?.inspectLifecycle?.();
+        // P1.4 §3.2 C8 / I0-5 / Q8：native instance 为可选证据——absent 允许；
+        // present-but-changed（instance/role 不符）拒绝。Core session/role/task/project 身份与宿主就绪检查不变。
         if (!fact || !observed.handle?.stopAndInspect || observed.handle.sessionId !== member.coreSessionId || fact.taskId !== member.taskId ||
             fact.roleId !== member.roleId || fact.projectRoot !== plan.projectRoot || !["live", "disposed"].includes(fact.phase) ||
-            lifecycle?.sessionId !== member.coreSessionId || lifecycle.native?.instanceId !== member.nativeInstanceId)
+            lifecycle?.sessionId !== member.coreSessionId ||
+            (lifecycle.native !== undefined && member.nativeInstanceId !== undefined &&
+              (lifecycle.native.instanceId !== member.nativeInstanceId || lifecycle.native.roleId !== member.roleId)))
           return invalid("原任务、Core 或 native 实例已变化，未停止运行。");
         if (!manager.deliveryStoreArmed || manager.openChains.size) return invalid("队列持久化或仍在创建的宿主尚未就绪，未停止运行。");
         const members = groups.get(manager) ?? []; members.push({ member, handle: observed.handle }); groups.set(manager, members);
@@ -1480,8 +1484,12 @@ export class SessionManager {
         const fresh = handle.inspectLifecycle?.();
         const stopped = await handle.stopAndInspect!({ expectedSessionId: member.coreSessionId,
           ...(fresh?.turnId ? { expectedTurnId: fresh.turnId } : {}), timeoutMs: 5000 }, signal);
-        if (stopped.sessionId !== member.coreSessionId || stopped.native?.instanceId !== member.nativeInstanceId || stopped.status !== "quiescent" ||
-            !stopped.providerFinished || stopped.activeTools.length)
+        // P1.4 §3.2 C8 / §3.7：终止判定=运行时中立 drain 谓词（status/processCoverage 仅证据、
+        // native 可选：absent 允许、present-but-changed 拒绝）；5s 仅上限（W1 已 drain 即返回）。
+        if (stopped.sessionId !== member.coreSessionId ||
+            (stopped.native !== undefined && member.nativeInstanceId !== undefined &&
+              (stopped.native.instanceId !== member.nativeInstanceId || stopped.native.roleId !== member.roleId)) ||
+            !isRuntimeSessionDrained(stopped))
           return blocked("run-stop-lifecycle-unproven", "同一真实实例尚未排空，运行变更未提交。");
         const entry = [...manager.sessions.entries()].find(([, value]) => value.handle === handle);
         // Close the actual SDK stream while its original W consumer still owns the entry:

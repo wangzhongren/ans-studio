@@ -19,7 +19,7 @@ import { repinPinnedRun } from "../../common/编排/run-manifest.ts";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { parse as parseYaml } from "yaml";
-import { isDispatchTaskResumeController } from "../../model/runtime.ts";
+import { isDispatchTaskResumeController, isRuntimeSessionDrained } from "../../model/runtime.ts";
 import type { TaskStateEvent, SelectRunChangeFn, SelectRunChangeInput, CompleteTeamPlanFn, CompleteTeamPlanInput, CloseCreatedTaskFn, ActivateRoleDocumentsFn } from "../../model/runtime.ts";
 import type { ProjectConfig, RolePolicyDecision } from "../../model/role.ts";
 import { listProject, builtInRoleModuleOf } from "../../service/role/resolve-role.ts";
@@ -28,7 +28,7 @@ import { createGitCapabilityService, type GitQueryContext, type RepositoryInitia
 import { inspectManagedRoleSessionEvidence, inspectManagedRoleSessionInventory, recheckRoleSessionOpenFailureInventory } from "./run-role.ts";
 import { inspectRuntimeCoreRegistry } from "../../service/runtime/session.ts";
 import { evaluateChiefDispatchParent, type DispatchParentHostFacts, type DispatchParentCoreFacts, type DispatchParentDecision } from "../../common/gates/index.ts";
-import { beginGitHostAction, endGitHostAction, checkGitHostAction, inspectGitHostCoordinator, readGitProtectionFacts, readGitInitializationTaskBasis } from "../../provider/trunk/public/trunk-store.ts";
+import { appendGitActionAuthorization, beginGitHostAction, endGitHostAction, checkGitHostAction, inspectGitHostCoordinator, readGitProtectionFacts, readGitInitializationTaskBasis, type GitActionAuthorizationRecord } from "../../provider/trunk/public/trunk-store.ts";
 import { checkGitPolicy } from "../../service/gate/shell-rules.ts";
 import { validateRoleDocumentsSnapshot, validateBoundaryYamlText, verifyVersionedDocuments, isBuiltInGovernanceRoleId } from "../../service/boundary/resolve-boundary.ts";
 import { isValidIntentId } from "../../common/shared/intent-entry-contract.ts";
@@ -63,84 +63,172 @@ export type { RepositoryInitializationContext };
 export type { GitHostInventory, GitHostActionKind, GitHostOpenFailureRef } from "../../provider/trunk/public/trunk-store.ts";
 export { recordGitHostInventory, beginGitHostAction, endGitHostAction, recordGitHostInterruption, inspectGitHostCoordinator } from "../../provider/trunk/public/trunk-store.ts";
 
+/**
+ * 动作时 Git 授权门（2026-11-08「删除全部预知式门控」P1.4 §3.3 / I0-4/I0-6；
+ * **原 `inspectInitializationProtection`**——改名保留溯源，注册表级预知前提已删除）。
+ *
+ * 职责边界（F1）：只做**身份/根/注册表闭包**与运行时中立终止/可读性检查（H1–H14）；
+ * **不接收** `GitPolicyFacts`、不做 `checkGitPolicy`、不持有 mutation lease、不返回 authorization；
+ * 角色 ACL / `checkGitPolicy().inputDigest` / host mutation lease 仍由调用点按既有顺序执行，
+ * authorization 由调用点在政策判定与 lease 之后组合（W3b）。
+ *
+ * 证据 ≠ 授权（F8/B10）：`toolSurface.status`、native 状态、`processCoverage`、closedTools 快照、
+ * `configuredForeignMcpServers` 与未命中 closedTools 的工具名只记录在 `optionalEvidence`，
+ * **不参与判定**；PR #72 契约保持：本函数**不读**应用中介证据字段（写/发布门零引用）。
+ */
+
+/** active-tool 模式下被要求处于活动状态的工具族（`ans_` 前缀别名同组）。 */
+export type GitActionExpectedTool = "git_query" | "git_candidate" | "git_publish" | "select_run_change"
+  | "complete_team_plan" | "activate_role_documents" | "submit_version_change" | "versioned-doc-write";
+const GIT_ACTION_TOOL_NAMES: Record<GitActionExpectedTool, readonly string[]> = {
+  "git_query": ["git_query", "ans_git_query"],
+  "git_candidate": ["git_candidate", "ans_git_candidate"],
+  "git_publish": ["git_publish", "ans_git_publish"],
+  // run-change 不是 Git mutation：真实 active rapporteur 的 `select_run_change` 调用即动作来源（身份 fail-closed）。
+  "select_run_change": ["select_run_change", "ans_select_run_change"],
+  // 业务发布（团队计划/激活/文档提交）由对应真实工具回合发起。
+  "complete_team_plan": ["complete_team_plan", "ans_complete_team_plan"],
+  "activate_role_documents": ["activate_role_documents", "ans_activate_role_documents"],
+  "submit_version_change": ["submit_version_change", "ans_submit_version_change"],
+  // stable initial workflow 发布由 post-write 接缝触发，真实活动工具是刚完成写入的 write_file/edit_file。
+  "versioned-doc-write": ["write_file", "edit_file"],
+};
+
+export interface GitActionAuthorizationInput {
+  projectRoot: string;
+  taskId: string;
+  parentCoreSessionId: string;
+  expectedActor: { roleId?: string; coreSessionId?: string };
+  /** active-tool 模式必填；缺失即 fail-closed（S5）。host-continuation 模式不使用。 */
+  expectedTool?: GitActionExpectedTool;
+  authorizationMode: "active-tool" | "host-continuation";
+  /** 仅 finalizeRunChange 的 deferred/resume 宿主继续（F2/R1）。 */
+  hostContinuation?: { requesterTurnId: string; planId: string };
+}
+
+type GitActionRegistryEntry = ReturnType<typeof inspectRuntimeCoreRegistry>["entries"][number];
+export interface GitActionActorSummary {
+  entryId: string; coreSessionId: string; roleId: string; runtime: string;
+  taskId?: string; runId?: string; turnId: string; projectRoot: string;
+}
+export interface GitActionOptionalEvidence {
+  toolSurfaceStatus?: string;
+  nativeStatus?: string;
+  nativeReasons?: readonly string[];
+  processCoverage?: string;
+  configuredForeignMcpServers?: readonly string[];
+  unknownTools?: readonly string[];
+}
+export type GitActionAuthorizationResult = { ok: false; code: string; message: string } | {
+  ok: true; registryRevision: number; inventoryRevision: string | number; rootsDigest: string;
+  actor: GitActionActorSummary;
+  controls: {
+    drain: { disposed: boolean };
+    fileWriteProtection?: import("../../model/runtime.ts").RuntimeSessionToolSurfaceFacts["fileWriteProtection"];
+    roleCapabilityGuards?: import("../../model/runtime.ts").RuntimeSessionToolSurfaceFacts["roleCapabilityGuards"];
+  };
+  optionalEvidence: GitActionOptionalEvidence;
+};
+
 /** Fresh observations from actual producer registries. Ordinary caller-supplied inventory never establishes a safe surface. */
-async function inspectInitializationProtection(projectRoot: string, prepared: { taskId: string; projectRoot: string; parentCoreSessionId: string; actorRoleId?: string; actorCoreSessionId?: string }) {
+export async function inspectGitActionAuthorization(input: GitActionAuthorizationInput): Promise<GitActionAuthorizationResult> {
   const key = (value: string) => process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
   const reject = (code: string, message: string) => ({ ok: false as const, code, message });
-  const inventory = inspectGitHostCoordinator({ projectRoot }).inventory;
+  // H1：host 可对账（真实 host 事实，非预知）。
+  const inventory = inspectGitHostCoordinator({ projectRoot: input.projectRoot }).inventory;
   if (!inventory) return reject("git-host-inventory-unavailable", "The actual desktop inventory has not been published");
   if (inventory.pendingOpens.length || inventory.sessions.some(s => ["creating", "disposing", "dispose-failed"].includes(s.phase)))
     return reject("git-host-admission-in-flight", "An actual creation/disposal or failed controller remains unaccounted for");
   const registry = inspectRuntimeCoreRegistry(), entries = registry.entries, pipeline = inspectManagedRoleSessionInventory();
-  const failedAdmissions = recheckRoleSessionOpenFailureInventory({ projectRoot, sessions: inventory.sessions });
+  // H2：失败准入可对账（终止条件经运行时中立 drain，A10/C7）。
+  const failedAdmissions = recheckRoleSessionOpenFailureInventory({ projectRoot: input.projectRoot, sessions: inventory.sessions });
   if (!failedAdmissions || failedAdmissions.processInstanceId !== registry.processInstanceId || failedAdmissions.registryRevision !== registry.revision)
     return reject("git-host-admission-in-flight", "The failed host admission has no unique fresh same-attempt revoked preparation or instance-bound terminal receipt");
   const verifiedOpenFailures = new Set(failedAdmissions.entries.map(entry => entry.hostHandleId));
+  // H3：无未登记 controller/factory（身份/历史，非预知）。
   if (pipeline.unknownFactoryAttempts.length || pipeline.sessions.some(session => !session.sessionId || session.construction !== "default-core"
     || !entries.some(entry => entry.sessionId === session.sessionId)))
-    return reject("git-app-controller-history-unproven", "An actual app-owned controller/factory, including another root, has no verified effect scope or owned-process termination proof");
-  if (!entries.some(entry => entry.sessionId === prepared.parentCoreSessionId && entry.roleId === "chief" && key(entry.projectRoot) === key(projectRoot)))
+    return reject("git-app-controller-history-unproven", "An actual app-owned controller/factory, including another root, has no verified history or owned-process termination proof");
+  // H6：source parent 在本进程 Core 历史（身份）。
+  if (!entries.some(entry => entry.sessionId === input.parentCoreSessionId && entry.roleId === "chief" && key(entry.projectRoot) === key(input.projectRoot)))
     return reject("git-source-process-history-unproven", "The true source parent is not in this process's actual Core history; old process programs cannot be inferred stopped");
-  const actor = inventory.sessions.filter(session => session.taskId === prepared.taskId && session.roleId === (prepared.actorRoleId ?? "convener")
-    && (prepared.actorCoreSessionId ? session.coreSessionId === prepared.actorCoreSessionId : session.phase === "live"));
-  if (actor.length !== 1 || !actor[0]!.coreSessionId || !entries.some(entry => entry.sessionId === actor[0]!.coreSessionId
-    && (entry.state === "active" || prepared.actorCoreSessionId !== undefined && entry.state === "disposed")))
-    return reject("git-actor-core-binding-unproven", "The actual action source has no unique current or genuinely settled Core instance");
+  // H4/H5：actor 身份与动作来源（两种授权模式；F1/F2/R1）。
+  const actorRoleId = input.expectedActor.roleId ?? "convener";
+  let actorRow: (typeof inventory.sessions)[number] | undefined;
+  let actorEntry: GitActionRegistryEntry | undefined;
+  if (input.authorizationMode === "active-tool") {
+    if (!input.expectedTool) return reject("git-actor-core-binding-unproven", "An actual active tool invocation is required for this action");
+    const toolNames = GIT_ACTION_TOOL_NAMES[input.expectedTool];
+    const actors = inventory.sessions.filter(session => session.phase === "live" && session.taskId === input.taskId && session.roleId === actorRoleId
+      && session.coreSessionId !== undefined
+      && (input.expectedActor.coreSessionId === undefined || session.coreSessionId === input.expectedActor.coreSessionId));
+    if (actors.length !== 1) return reject("git-actor-core-binding-unproven", "The actual action source has no unique current Core instance");
+    actorRow = actors[0]!;
+    actorEntry = entries.find(entry => entry.sessionId === actorRow!.coreSessionId);
+    if (!actorEntry || actorEntry.state !== "active" || actorEntry.roleId !== actorRoleId || key(actorEntry.projectRoot) !== key(input.projectRoot)
+      || !actorEntry.lifecycle?.turnId || actorEntry.lifecycle.stopRequested
+      || !actorEntry.lifecycle.activeTools.some(tool => toolNames.includes(tool.name)))
+      return reject("git-actor-core-binding-unproven", "The action source Core instance is not this role/project's actual active tool invocation");
+  } else {
+    // host-continuation：deferred/resume finalize（F2/R1）——active 或真正 settled（disposed+drain）的 rapporteur；
+    // 不要求 live member / activeTools；taskId 由 inventory 记录与调用点 `held.plan.requesterTaskId` 双绑定。
+    if (!input.hostContinuation) return reject("git-actor-core-binding-unproven", "The host continuation facts are required");
+    if (!input.expectedActor.coreSessionId) return reject("git-actor-core-binding-unproven", "The continuation actor Core session is required");
+    const records = inventory.sessions.filter(session => session.coreSessionId === input.expectedActor.coreSessionId && session.taskId === input.taskId
+      && session.roleId === actorRoleId && (session.phase === "live" || session.phase === "disposed"));
+    if (records.length !== 1) return reject("git-actor-core-binding-unproven", "The continuation actor has no unique task-bound live/disposed host record");
+    actorRow = records[0]!;
+    actorEntry = entries.find(entry => entry.sessionId === input.expectedActor.coreSessionId);
+    if (!actorEntry || actorEntry.roleId !== actorRoleId || key(actorEntry.projectRoot) !== key(input.projectRoot)
+      || !(actorEntry.state === "active" || (actorEntry.state === "disposed" && actorEntry.lifecycle !== undefined && isRuntimeSessionDrained(actorEntry.lifecycle)))
+      || actorEntry.lifecycle?.turnId !== input.hostContinuation.requesterTurnId)
+      return reject("git-actor-core-binding-unproven", "The continuation actor is not the genuinely settled requesting instance");
+  }
+  // H4 续：每个真实 desktop controller 必须在 Core 注册表（身份一致性；不要求能力）。
   for (const session of inventory.sessions) {
     if (verifiedOpenFailures.has(session.hostHandleId)) continue;
     if (!session.coreSessionId || !entries.some(entry => entry.sessionId === session.coreSessionId && entry.roleId === session.roleId && entry.runtime === session.runtime))
       return reject("git-controller-history-unproven", "A real desktop controller is absent from the authoritative Core registry");
   }
-  const roots = await readGitProtectionFacts(projectRoot), expected = [path.join(prepared.projectRoot, ".git")];
+  // H7：根身份（恰为 projectRoot/.git）。
+  const roots = await readGitProtectionFacts(input.projectRoot), expected = [path.join(input.projectRoot, ".git")];
   if (roots.protectedGitRoots.length !== expected.length || !expected.every(root => roots.protectedGitRoots.some(actual => key(actual) === key(root))))
     return reject("git-root-discovery-unproven", "The actual metadata/other-worktree roots exceed this new independent repository surface");
+  // H13/H14/H11：逐 entry 运行时中立闭包（F4/R10；不要求 native/processCoverage）。
+  const closedTools = new Set(["write_file", "edit_file", "read_file", "list_dir", "view_image", "request_confirmation", "request_choice",
+    "submit_report", "dispatch_task", "role_status", "contract_check", "evidence_check", "session_tail", "role_activity_log",
+    "terminate_role_run", "redispatch_task", "project_state", "governance_matrix", "project_note", "request_version_decision",
+    "close_created_task", "git_query", "git_candidate", "git_publish", "complete_team_plan", "activate_role_documents", "request_requirement_change",
+    "submit_refactor", "request_stable_write", "submit_version_change", "select_run_change", "decide_pending_request", "judge_read_file", "judge_list_dir", "report_shell_judgement", "report_governance_judgement"]);
+  const capabilityTools = ["install_skill", "uninstall_skill", "install_mcp", "uninstall_mcp"] as const;
+  const foreignServers = new Set<string>(), unknownTools = new Set<string>();
   for (const entry of entries) {
     const lifecycle = entry.lifecycle;
     const construction = entry.construction;
-    if (["prepared", "failed"].includes(entry.state) && entry.sessionId === undefined && construction?.status === "never-started"
-      && !construction.factoryEntered && !construction.nativeBindEntered && construction.preparedTokensRevoked && construction.pendingContinuations === 0) continue;
-    if (entry.state === "failed" && construction?.status === "instance-bound" && construction.preparedTokensRevoked && construction.pendingContinuations === 0
-      && entry.sessionId && lifecycle?.sessionId === entry.sessionId && lifecycle.status === "quiescent" && lifecycle.providerFinished
-      && !lifecycle.activeTools.length && lifecycle.processCoverage === "complete"
-      && lifecycle.processes.every(process => process.state === "exited" && process.treeStatus === "verified")) continue;
+    // H13：非 active 条目的 in-flight/pending 闭包（handle 未产生前的 pending 准备不得被忽略）。
+    if (entry.state === "preparing" || entry.state === "creating" || entry.state === "disposing")
+      return reject("git-core-in-flight-unproven", "An actual Core session is still preparing/creating/disposing");
+    if (entry.state === "prepared" || entry.state === "failed") {
+      if (construction?.status === "never-started" && entry.sessionId === undefined
+        && !construction.factoryEntered && !construction.nativeBindEntered && construction.preparedTokensRevoked && construction.pendingContinuations === 0) continue;
+      if (entry.state === "failed" && construction?.status === "instance-bound" && entry.sessionId && lifecycle?.sessionId === entry.sessionId
+        && isRuntimeSessionDrained(lifecycle)) continue;
+      return reject("git-core-in-flight-unproven", "A prepared/failed Core entry retains factory/native-bind entries, pending continuations or unrevoked preparation");
+    }
     if (entry.state === "disposed") {
-      if (!lifecycle || lifecycle.status !== "quiescent" || !lifecycle.providerFinished || lifecycle.activeTools.length || lifecycle.processCoverage !== "complete"
-        || lifecycle.processes.some(process => process.state !== "exited" || process.treeStatus !== "verified"))
-        return reject("git-old-core-programs-unproven", "Disposed is not evidence that the actual old owned programs stopped");
+      // H11：disposed 只用运行时中立 drain（不要求 processCoverage/native；unknown 的 native 覆盖如实接受并披露）。
+      if (!lifecycle || !isRuntimeSessionDrained(lifecycle))
+        return reject("git-old-core-programs-unproven", "Disposed tracked processes are not proven stopped (native coverage may be unknown)");
       continue;
     }
-    if (entry.state !== "active" || !entry.planId || entry.reasons.length || !lifecycle || lifecycle.stopRequested || lifecycle.processCoverage !== "complete"
-      || lifecycle.processes.some(process => process.state !== "exited" || process.treeStatus !== "verified"))
-      return reject("git-core-creation-proof-unavailable", "An actual Core actor lacks its creation plan/current owned-process coverage");
+    if (entry.state !== "active")
+      return reject("git-core-in-flight-unproven", "An actual Core entry is in an unknown lifecycle state");
+    // H14：active 条目必须可读 lifecycle/toolSurface 且身份一致（不允许 fail-open）。
     const surface = entry.toolSurface;
-    if (!surface || surface.sessionId !== entry.sessionId || surface.roleId !== entry.roleId || surface.runtime !== entry.runtime
-      || surface.factoryProvenance !== "default-production" || surface.status !== "observed" || surface.nativeToolRegistry !== "application-mediated"
-      || surface.configuredForeignMcpServers.length || surface.reasons.length || !surface.native?.factoryPlan)
-      return reject("git-native-surface-unproven", "Actual default native factory/closed registry proof is missing or drifted");
-    // Closed first-init surface: known Core handlers plus the existing app operations whose mutation paths use the same R9/admission boundaries.
-    // Download/install/MCP and any future/unknown callback are deliberately absent: their names alone prove no fixed effect scope.
-    const closedTools = new Set(["write_file", "edit_file", "read_file", "list_dir", "view_image", "request_confirmation", "request_choice",
-      "submit_report", "dispatch_task", "role_status", "contract_check", "evidence_check", "session_tail", "role_activity_log",
-      "terminate_role_run", "redispatch_task", "project_state", "governance_matrix", "project_note", "request_version_decision",
-      "close_created_task", "git_query", "git_candidate", "git_publish", "complete_team_plan", "activate_role_documents", "request_requirement_change",
-      "submit_refactor", "request_stable_write", "submit_version_change", "select_run_change", "decide_pending_request", "judge_read_file", "judge_list_dir", "report_shell_judgement", "report_governance_judgement"]);
-    const capabilityTools = ["install_skill", "uninstall_skill", "install_mcp", "uninstall_mcp"] as const;
-    const actualCapabilities = capabilityTools.filter(tool => surface.appTools.includes(tool));
-    const provedRoleCapabilities = new Set<string>();
-    if (actualCapabilities.length) {
-      const guard = surface.roleCapabilityGuards;
-      const digest = createHash("sha256").update(JSON.stringify({ roleId: entry.roleId, runtime: entry.runtime, initialAppTools: surface.appTools,
-        guardedTools: actualCapabilities, unguardedTools: [] })).digest("hex");
-      if (!guard || guard.source !== "core-blocked-role-capability-callbacks" || guard.mechanism !== "no-effect-rejection-v1" || guard.status !== "bound"
-        || guard.roleId !== entry.roleId || guard.runtime !== entry.runtime || guard.sessionId !== entry.sessionId || guard.corePlanId !== entry.planId
-        || guard.nativePlanId !== surface.native.factoryPlan.planId || guard.nativeConfigDigest !== surface.native.factoryPlan.configDigest
-        || guard.registryDigest !== digest || guard.reasons.length || guard.unguardedTools.length
-        || JSON.stringify(guard.guardedTools) !== JSON.stringify(actualCapabilities))
-        return reject("git-role-capability-guard-unproven", "The actual four role-capability callbacks are not bound to this Core/native plan and no-effect registry");
-      for (const tool of guard.guardedTools) provedRoleCapabilities.add(tool);
-    }
-    const unknownTools = surface.appTools.filter(tool => !closedTools.has(tool) && !provedRoleCapabilities.has(tool));
-    if (unknownTools.length) return reject("git-unclosed-effect-registered", `Actual callback/tool effect scope is unproven: ${unknownTools.join(",")}`);
+    if (!lifecycle || entry.reasons.includes("core-instance-inspection-failed") || !surface
+      || surface.sessionId !== entry.sessionId || surface.roleId !== entry.roleId || surface.runtime !== entry.runtime)
+      return reject("git-core-inspection-unavailable", "An active Core entry's lifecycle/tool surface is unreadable or identity-drifted");
+    // H12/B12：控制面守卫（按条目工具面条件；非预知）。
     if (surface.appTools.some(tool => tool === "write_file" || tool === "edit_file")) {
       const guard = surface.fileWriteProtection;
       if (!guard || guard.mechanism !== "canonical-roots-and-nlink-v1" || guard.rootDiscovery !== "host-provided"
@@ -148,8 +236,93 @@ async function inspectInitializationProtection(projectRoot: string, prepared: { 
         || !expected.every(root => guard.protectedGitRoots.some(actual => key(actual) === key(root))))
         return reject("git-file-final-guard-unproven", "Actual file/edit handlers do not carry the current canonical metadata roots and link guard");
     }
+    // H12/B11：能力回调绑定（core plan/session/role/runtime/registryDigest/guardedTools 仍核；native 绑定有则核、无则略）。
+    const actualCapabilities = capabilityTools.filter(tool => surface.appTools.includes(tool));
+    if (actualCapabilities.length) {
+      const guard = surface.roleCapabilityGuards;
+      const digest = createHash("sha256").update(JSON.stringify({ roleId: entry.roleId, runtime: entry.runtime, initialAppTools: surface.appTools,
+        guardedTools: actualCapabilities, unguardedTools: [] })).digest("hex");
+      const nativePlan = surface.native?.factoryPlan;
+      if (!guard || guard.source !== "core-blocked-role-capability-callbacks" || guard.mechanism !== "no-effect-rejection-v1" || guard.status !== "bound"
+        || guard.roleId !== entry.roleId || guard.runtime !== entry.runtime || guard.sessionId !== entry.sessionId
+        || typeof guard.corePlanId !== "string" || !guard.corePlanId || guard.corePlanId !== entry.planId
+        || (nativePlan !== undefined && guard.nativePlanId !== undefined && guard.nativePlanId !== nativePlan.planId)
+        || (nativePlan !== undefined && guard.nativeConfigDigest !== undefined && guard.nativeConfigDigest !== nativePlan.configDigest)
+        || guard.registryDigest !== digest || guard.reasons.length || guard.unguardedTools.length
+        || JSON.stringify(guard.guardedTools) !== JSON.stringify(actualCapabilities))
+        return reject("git-role-capability-guard-unproven", "The actual four role-capability callbacks are not bound to this Core plan and no-effect registry");
+    }
+    // 可选证据（不判定）：跨会话 foreign MCP / 未命中 closedTools 的工具名只记录（F8；不宣称已阻断）。
+    for (const server of surface.configuredForeignMcpServers) foreignServers.add(server);
+    for (const tool of surface.appTools) if (!closedTools.has(tool) && !(capabilityTools as readonly string[]).includes(tool)) unknownTools.add(tool);
   }
-  return { ok: true as const, registryRevision: registry.revision, inventoryRevision: inventory.revision, rootsDigest: roots.basisDigest };
+  // 输出（I0-4）：actor/controls/optionalEvidence；不返回 authorization/policyInputDigests/leaseId。
+  const actorSurface = actorEntry.toolSurface;
+  const optionalEvidence: GitActionOptionalEvidence = {
+    ...(actorSurface ? { toolSurfaceStatus: actorSurface.status, configuredForeignMcpServers: actorSurface.configuredForeignMcpServers } : {}),
+    ...(actorEntry.lifecycle?.native ? { nativeStatus: actorEntry.lifecycle.native.status, nativeReasons: actorEntry.lifecycle.native.reasons } : {}),
+    ...(actorEntry.lifecycle ? { processCoverage: actorEntry.lifecycle.processCoverage } : {}),
+  };
+  if (foreignServers.size) optionalEvidence.configuredForeignMcpServers = [...foreignServers].sort();
+  if (unknownTools.size) optionalEvidence.unknownTools = [...unknownTools].sort();
+  return {
+    ok: true as const, registryRevision: registry.revision, inventoryRevision: inventory.revision, rootsDigest: roots.basisDigest,
+    actor: { entryId: actorEntry.id, coreSessionId: actorRow!.coreSessionId!, roleId: actorRoleId, runtime: actorEntry.runtime,
+      ...(actorRow!.taskId !== undefined ? { taskId: actorRow!.taskId } : {}), ...(actorRow!.runId !== undefined ? { runId: actorRow!.runId } : {}),
+      turnId: actorEntry.lifecycle!.turnId!, projectRoot: actorEntry.projectRoot },
+    controls: { drain: { disposed: actorEntry.state === "disposed" },
+      ...(actorSurface?.fileWriteProtection !== undefined ? { fileWriteProtection: actorSurface.fileWriteProtection } : {}),
+      ...(actorSurface?.roleCapabilityGuards !== undefined ? { roleCapabilityGuards: actorSurface.roleCapabilityGuards } : {}) },
+    optionalEvidence,
+  };
+}
+
+/**
+ * W3b（2026-11-08「删除全部预知式门控」P1.4 §3.3.1/§3.4.3 + I0-1/I0-2）：
+ * 调用点在第二次 gate `current` 通过、policy verdict 与 `git-mutation` lease 均成立之后、
+ * **真实效果之前**逐动作组合 authorization 并 write-ahead 写入 sidecar。
+ *
+ * 字段来源（R2）：`actor`/`optionalEvidence`/`rootsDigest`/revisions 取第一次 gate 的 `closure`
+ * （第二次 `current` 已复检一致）；`policyInputDigests` 为调用点按动作映射的
+ * `checkGitPolicy().inputDigest`；`leaseId` 是当前持有、直到效果结束的 mutation lease。
+ * append 失败 ⇒ 调用点返回 `git-action-audit-unavailable` 且**不执行效果**（不产生 ref/对象/
+ * 工作树/journal 效果）；run-change/finalize/controller-stop 不是结构化 Git mutation，不写 sidecar。
+ */
+function verifiedActiveToolName(entryId: string, expected: GitActionExpectedTool): string {
+  const names = GIT_ACTION_TOOL_NAMES[expected];
+  const entry = inspectRuntimeCoreRegistry().entries.find(candidate => candidate.id === entryId);
+  return entry?.lifecycle?.activeTools.find(tool => names.includes(tool.name))?.name ?? names[0]!;
+}
+async function appendGitActionAuthorizationBeforeEffects(input: {
+  projectRoot: string; operationId: string; template: string; expectedTool: GitActionExpectedTool;
+  closure: Extract<GitActionAuthorizationResult, { ok: true }>; leaseId: string;
+  policyInputDigests: GitActionAuthorizationRecord["policyInputDigests"];
+}): Promise<{ ok: true } | { ok: false; code: "git-action-audit-unavailable"; message: string }> {
+  const evidence = input.closure.optionalEvidence;
+  const record: GitActionAuthorizationRecord = {
+    source: "git-action-authorization", version: 1, operationId: input.operationId, template: input.template,
+    actorRoleId: input.closure.actor.roleId, coreSessionId: input.closure.actor.coreSessionId,
+    ...(input.closure.actor.taskId !== undefined ? { taskId: input.closure.actor.taskId } : {}),
+    ...(input.closure.actor.runId !== undefined ? { runId: input.closure.actor.runId } : {}),
+    turnId: input.closure.actor.turnId, activeTool: verifiedActiveToolName(input.closure.actor.entryId, input.expectedTool),
+    projectRoot: input.projectRoot, rootsDigest: input.closure.rootsDigest, registryRevision: input.closure.registryRevision,
+    inventoryRevision: input.closure.inventoryRevision, leaseId: input.leaseId, policyInputDigests: input.policyInputDigests,
+    optionalEvidence: {
+      ...(evidence.toolSurfaceStatus !== undefined ? { toolSurfaceStatus: evidence.toolSurfaceStatus } : {}),
+      ...(evidence.nativeStatus !== undefined ? { nativeStatus: evidence.nativeStatus } : {}),
+      ...(evidence.nativeReasons !== undefined ? { nativeReasonsCount: evidence.nativeReasons.length } : {}),
+      ...(evidence.processCoverage !== undefined ? { processCoverage: evidence.processCoverage } : {}),
+      ...(evidence.configuredForeignMcpServers !== undefined ? { configuredForeignMcpServers: evidence.configuredForeignMcpServers } : {}),
+      ...(evidence.unknownTools !== undefined ? { unknownTools: evidence.unknownTools } : {}),
+    },
+  };
+  try {
+    await appendGitActionAuthorization(input.projectRoot, record);
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, code: "git-action-audit-unavailable",
+      message: `The actual authorization sidecar could not be appended before effects (${error instanceof Error ? error.message : String(error)})` };
+  }
 }
 
 /** Trusted host read scope comes from role resolution; request schemas never accept this context. */
@@ -208,12 +381,18 @@ export function createGitRoleRuntime(input: { projectRoot: string; context: GitQ
       const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "git-mutation" });
       if (!lease.ok) return fail(lease.code, "A real admission/authorization action owns the mutation lease");
       try {
-        const actual = { taskId: value.taskId, actorRoleId: value.actorRoleId, actorCoreSessionId: actors[0]!.coreSessionId!, projectRoot: input.projectRoot, parentCoreSessionId: value.processSource.parentCoreSessionId };
-        const closure = await inspectInitializationProtection(input.projectRoot, actual); if (!closure.ok) return fail(closure.code, closure.message);
+        const actual: GitActionAuthorizationInput = { projectRoot: input.projectRoot, taskId: value.taskId, parentCoreSessionId: value.processSource.parentCoreSessionId,
+          expectedActor: { roleId: value.actorRoleId, coreSessionId: actors[0]!.coreSessionId! }, expectedTool: "git_candidate", authorizationMode: "active-tool" };
+        const closure = await inspectGitActionAuthorization(actual); if (!closure.ok) return fail(closure.code, closure.message);
         const verdict = checkGitPolicy(value.policyInput); if (!verdict.allowed) return fail(verdict.code ?? "git-worker-policy-denied", "The actual full-tree no-index candidate plan was refused");
-        const current = await inspectInitializationProtection(input.projectRoot, actual); if (!current.ok) return fail(current.code, current.message);
+        const current = await inspectGitActionAuthorization(actual); if (!current.ok) return fail(current.code, current.message);
         if (current.registryRevision !== closure.registryRevision || current.inventoryRevision !== closure.inventoryRevision || current.rootsDigest !== closure.rootsDigest)
           return fail("git-worker-protection-stale", "Actual all-controller/root/authorization closure changed before effects");
+        // R2：commit/integrate/revert ⇒ { candidate: verdict.inputDigest }；模板取候选策略输入的真实来源。
+        const audit = await appendGitActionAuthorizationBeforeEffects({ projectRoot: input.projectRoot, operationId: request.operationId,
+          template: value.policyInput.template, expectedTool: "git_candidate", closure, leaseId: lease.leaseId,
+          policyInputDigests: { candidate: verdict.inputDigest } });
+        if (!audit.ok) return fail(audit.code, audit.message);
         return await service.executeWorkerCommit(value, lease.leaseId, verdict, signal);
       } finally { endGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId }); }
     }
@@ -223,7 +402,10 @@ export function createGitRoleRuntime(input: { projectRoot: string; context: GitQ
     const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "git-mutation" });
     if (!lease.ok) return fail(lease.code, "A real host admission/authorization action is in progress");
     try {
-      const closure = await inspectInitializationProtection(input.projectRoot, prepared.value);
+      // init 不是 Git mutation 之前的「预知」：真实 convener 的 git_candidate(init) 活动工具调用即动作来源。
+      const actual: GitActionAuthorizationInput = { projectRoot: input.projectRoot, taskId: prepared.value.taskId, parentCoreSessionId: prepared.value.parentCoreSessionId,
+        expectedActor: { roleId: "convener" }, expectedTool: "git_candidate", authorizationMode: "active-tool" };
+      const closure = await inspectGitActionAuthorization(actual);
       if (!closure.ok) return fail(closure.code, closure.message);
       const init = prepared.value.initializationPlan, candidate = prepared.value.candidatePlan;
       if (!init) return fail("git-initialization-recovery-policy-required", "Existing initialization is recovered from its actual operation, never reinitialized");
@@ -241,10 +423,15 @@ export function createGitRoleRuntime(input: { projectRoot: string; context: GitQ
       if (!candidatePolicy.allowed) return fail(candidatePolicy.code ?? "git-initial-candidate-policy-denied", "The actual complete empty candidate byte/command plan has not passed pure policy");
       if (signal?.aborted || !checkGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId, kind: "git-mutation" }).ok)
         return fail("git-host-mutation-interrupted", "The actual mutation lease was cancelled before effects");
-      const current = await inspectInitializationProtection(input.projectRoot, prepared.value);
+      const current = await inspectGitActionAuthorization(actual);
       if (!current.ok) return fail(current.code, current.message);
       if (current.registryRevision !== closure.registryRevision || current.inventoryRevision !== closure.inventoryRevision || current.rootsDigest !== closure.rootsDigest)
         return fail("git-protection-basis-stale", "Actual actors/authorization or root identity changed before effects");
+      // R2：init ⇒ { init: initPolicy.inputDigest, candidate: candidatePolicy.inputDigest }；模板为真实 `init`。
+      const audit = await appendGitActionAuthorizationBeforeEffects({ projectRoot: input.projectRoot, operationId: request.operationId,
+        template: "init", expectedTool: "git_candidate", closure, leaseId: lease.leaseId,
+        policyInputDigests: { init: initPolicy.inputDigest, candidate: candidatePolicy.inputDigest } });
+      if (!audit.ok) return fail(audit.code, audit.message);
       return await service.executeInitialization(prepared.value, lease.leaseId, signal);
     } finally { endGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId }); }
   }, async gitPublish(request, signal) {
@@ -264,12 +451,18 @@ export function createGitRoleRuntime(input: { projectRoot: string; context: GitQ
     const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "git-mutation" });
     if (!lease.ok) return fail(lease.code, "Actual admission or authority change owns the mutation boundary");
     try {
-      const actual = { taskId: value.taskId, actorRoleId: "convener", actorCoreSessionId: actors[0]!.coreSessionId!, projectRoot: input.projectRoot, parentCoreSessionId: value.processSource.parentCoreSessionId };
-      const closure = await inspectInitializationProtection(input.projectRoot, actual); if (!closure.ok) return fail(closure.code, closure.message);
+      const actual: GitActionAuthorizationInput = { projectRoot: input.projectRoot, taskId: value.taskId, parentCoreSessionId: value.processSource.parentCoreSessionId,
+        expectedActor: { roleId: "convener", coreSessionId: actors[0]!.coreSessionId! }, expectedTool: "git_publish", authorizationMode: "active-tool" };
+      const closure = await inspectGitActionAuthorization(actual); if (!closure.ok) return fail(closure.code, closure.message);
       const verdict = checkGitPolicy(value.policyInput); if (!verdict.allowed) return fail(verdict.code ?? "git-delivery-policy-denied", "The complete actual ref-only delivery plan was refused");
-      const current = await inspectInitializationProtection(input.projectRoot, actual); if (!current.ok) return fail(current.code, current.message);
+      const current = await inspectGitActionAuthorization(actual); if (!current.ok) return fail(current.code, current.message);
       if (signal?.aborted || current.registryRevision !== closure.registryRevision || current.inventoryRevision !== closure.inventoryRevision || current.rootsDigest !== closure.rootsDigest)
         return fail("git-delivery-protection-stale", "Actual actors/root/authority changed before publication");
+      // R2：delivery ⇒ { publication: verdict.inputDigest }；模板取发布策略输入的真实来源。
+      const audit = await appendGitActionAuthorizationBeforeEffects({ projectRoot: input.projectRoot, operationId: request.operationId,
+        template: value.policyInput.template, expectedTool: "git_publish", closure, leaseId: lease.leaseId,
+        policyInputDigests: { publication: verdict.inputDigest } });
+      if (!audit.ok) return fail(audit.code, audit.message);
       return await service.executeDelivery(value, lease.leaseId, verdict, signal);
     } finally { endGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId }); }
   } };
@@ -326,14 +519,23 @@ async function executeGitBusinessPublication(input: { projectRoot: string } & (
   const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "git-mutation" });
   if (!lease.ok) return fail(lease.code, "A real admission/authorization action owns this project");
   try {
-    const context = { taskId: actors[0]!.taskId!, actorRoleId, projectRoot: value.gitPlan?.repo.root ?? input.projectRoot, parentCoreSessionId: authority.value.processSource.parentCoreSessionId };
-    const closure = await inspectInitializationProtection(input.projectRoot, context); if (!closure.ok) return fail(closure.code, closure.message);
+    // 业务发布：真实业务工具回合（complete_team_plan / activate_role_documents / submit_version_change）即动作来源。
+    const expectedTool: GitActionExpectedTool = input.kind === "plan" ? "complete_team_plan" : input.kind === "active" ? "activate_role_documents" : "submit_version_change";
+    const context: GitActionAuthorizationInput = { projectRoot: input.projectRoot, taskId: actors[0]!.taskId!,
+      parentCoreSessionId: authority.value.processSource.parentCoreSessionId, expectedActor: { roleId: actorRoleId, coreSessionId: actors[0]!.coreSessionId! },
+      expectedTool, authorizationMode: "active-tool" };
+    const closure = await inspectGitActionAuthorization(context); if (!closure.ok) return fail(closure.code, closure.message);
     const candidateVerdict = checkGitPolicy(authority.value.candidatePolicyInput), publicationVerdict = checkGitPolicy(authority.value.publicationPolicyInput);
     if (!candidateVerdict.allowed) return fail(candidateVerdict.code ?? "git-document-candidate-policy-denied", "The actual complete candidate tree/command plan was refused");
     if (!publicationVerdict.allowed) return fail(publicationVerdict.code ?? "git-document-publication-policy-denied", "The actual complete business publication was refused");
-    const current = await inspectInitializationProtection(input.projectRoot, context); if (!current.ok) return fail(current.code, current.message);
+    const current = await inspectGitActionAuthorization(context); if (!current.ok) return fail(current.code, current.message);
     if (current.registryRevision !== closure.registryRevision || current.inventoryRevision !== closure.inventoryRevision || current.rootsDigest !== closure.rootsDigest
       || !checkGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId, kind: "git-mutation" }).ok) return fail("git-document-protection-stale", "Actual actors/root/admission changed before publication");
+    // R2：文档/计划/激活发布 ⇒ { candidate, publication } 两键；模板取发布策略输入的真实来源。
+    const audit = await appendGitActionAuthorizationBeforeEffects({ projectRoot: input.projectRoot, operationId: request.operationId,
+      template: authority.value.publicationPolicyInput.template, expectedTool, closure, leaseId: lease.leaseId,
+      policyInputDigests: { candidate: candidateVerdict.inputDigest, publication: publicationVerdict.inputDigest } });
+    if (!audit.ok) return fail(audit.code, audit.message);
     const commitAuthority = { hostLeaseId: lease.leaseId, taskId: context.taskId, candidateVerdict, publicationVerdict };
     return value.preparationKind === "team-plan-commit" ? await service.commitPreparedTeamPlan(value, commitAuthority) : value.preparationKind === "active-role-commit" ? await service.commitPreparedActivation(value, commitAuthority) : await service.commitPreparedDirect(value, commitAuthority);
   } finally { endGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId }); }
@@ -351,14 +553,21 @@ export async function executeGitInitialWorkflowPublication(input: { projectRoot:
   const authority = await service.prepareDirectAuthority(value, value.source.taskId); if (!authority.ok) return fail(authority.code, authority.message ?? authority.code);
   const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "git-mutation" }); if (!lease.ok) return fail(lease.code, "Another actual host action owns this root");
   try {
-    const context = { taskId: value.source.taskId, actorRoleId: "convener", actorCoreSessionId: value.source.coreSessionId,
-      projectRoot: value.gitPlan?.repo.root ?? input.projectRoot, parentCoreSessionId: authority.value.processSource.parentCoreSessionId };
-    const closure = await inspectInitializationProtection(input.projectRoot, context); if (!closure.ok) return fail(closure.code, closure.message);
+    // stable initial workflow 发布由 post-write 接缝触发：真实活动工具是刚完成写入的 write_file/edit_file。
+    const context: GitActionAuthorizationInput = { projectRoot: input.projectRoot, taskId: value.source.taskId,
+      parentCoreSessionId: authority.value.processSource.parentCoreSessionId,
+      expectedActor: { roleId: "convener", coreSessionId: value.source.coreSessionId }, expectedTool: "versioned-doc-write", authorizationMode: "active-tool" };
+    const closure = await inspectGitActionAuthorization(context); if (!closure.ok) return fail(closure.code, closure.message);
     const candidateVerdict = checkGitPolicy(authority.value.candidatePolicyInput), publicationVerdict = checkGitPolicy(authority.value.publicationPolicyInput);
     if (!candidateVerdict.allowed || !publicationVerdict.allowed) return fail(candidateVerdict.code ?? publicationVerdict.code ?? "initial-workflow-policy-denied", "The complete actual stable workflow publication was refused");
-    const current = await inspectInitializationProtection(input.projectRoot, context); if (!current.ok) return fail(current.code, current.message);
+    const current = await inspectGitActionAuthorization(context); if (!current.ok) return fail(current.code, current.message);
     if (current.registryRevision !== closure.registryRevision || current.inventoryRevision !== closure.inventoryRevision || current.rootsDigest !== closure.rootsDigest
       || !checkGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId, kind: "git-mutation" }).ok) return fail("initial-workflow-protection-stale", "Actual source/controllers/authorization/root changed before publication");
+    // R2：initial workflow 发布 ⇒ { candidate, publication } 两键；operationId 取准备阶段解析出的真实操作。
+    const audit = await appendGitActionAuthorizationBeforeEffects({ projectRoot: input.projectRoot, operationId: value.input.operationId,
+      template: authority.value.publicationPolicyInput.template, expectedTool: "versioned-doc-write", closure, leaseId: lease.leaseId,
+      policyInputDigests: { candidate: candidateVerdict.inputDigest, publication: publicationVerdict.inputDigest } });
+    if (!audit.ok) return fail(audit.code, audit.message);
     return await service.commitPreparedInitialWorkflow(value, { hostLeaseId: lease.leaseId, taskId: value.source.taskId, candidateVerdict, publicationVerdict });
   } finally { endGitHostAction({ projectRoot: input.projectRoot, leaseId: lease.leaseId }); }
 }
@@ -654,7 +863,8 @@ export interface RunChangeHostPlan {
   planId: string; operationId: string; projectRoot: string; runId: string; flowId: string; requestDigest: string;
   requesterTaskId: string; requesterCoreSessionId: string; requesterTurnId: string; deferred: boolean;
   taskIds: readonly string[]; replacementRunId?: string;
-  handles: readonly { hostHandleId: string; coreSessionId: string; nativeInstanceId: string; roleId: string; taskId: string }[];
+  // Q8/I0-5：native instance 为可选证据（Claude/Pi 运行成员也可停止）；present-but-changed 在 finalize 拒绝。
+  handles: readonly { hostHandleId: string; coreSessionId: string; nativeInstanceId?: string; roleId: string; taskId: string }[];
 }
 const runChangePreparations = new Map<string, { plan: RunChangeHostPlan; service: ReturnType<typeof createTrunkService>;
   prepared: import("../../service/trunk/public/trunk-service.ts").PreparedRunChange; rootsDigest: string; parentCoreSessionId: string }>();
@@ -690,7 +900,10 @@ export async function prepareRunChange(input: { projectRoot: string; request: im
   const initialized = await readGitInitializationTaskBasis(input.projectRoot, { flowId: prepared.value.old.flowId });
   if (!initialized.ok) return reject("run-change-root-source-unproven", initialized.message ?? initialized.reason);
   if (!prepared.value.processSource) return reject("run-change-current-source-unproven", "The actual requester has no immutable current-action Chief process source");
-  const closure = await inspectInitializationProtection(input.projectRoot, { projectRoot: input.projectRoot, taskId: input.requesterTaskId, actorRoleId: "rapporteur", actorCoreSessionId: actorId, parentCoreSessionId: prepared.value.processSource.parentCoreSessionId });
+  // prepareRunChange 不是 Git mutation：真实 active rapporteur 的 `select_run_change` 调用即动作来源（身份 fail-closed；不要求 Git 工具）。
+  const closure = await inspectGitActionAuthorization({ projectRoot: input.projectRoot, taskId: input.requesterTaskId,
+    parentCoreSessionId: prepared.value.processSource.parentCoreSessionId, expectedActor: { roleId: "rapporteur", coreSessionId: actorId },
+    expectedTool: "select_run_change", authorizationMode: "active-tool" });
   if (!closure.ok) return reject(closure.code, closure.message);
   const current = inspectGitHostCoordinator({ projectRoot: input.projectRoot }).inventory;
   const ids = new Set(prepared.value.taskIds), members = current?.sessions.filter(row => row.taskId && ids.has(row.taskId)) ?? [];
@@ -700,9 +913,11 @@ export async function prepareRunChange(input: { projectRoot: string; request: im
     if (!member.coreSessionId || !member.taskId || !["live", "disposed"].includes(member.phase)) return reject("run-stop-members-unproven", "An actual run member is still constructing or has unknown effects");
     const fact = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: member.coreSessionId });
     const native = fact?.lifecycle?.native;
-    if (!fact || fact.construction !== "default-core" || fact.runtime !== "codex" || fact.roleId !== member.roleId || !native || native.runtime !== "codex")
-      return reject("run-stop-member-lifecycle-unproven", "This run member lacks an actual default Core/native instance");
-    handles.push({ hostHandleId: member.hostHandleId, coreSessionId: member.coreSessionId, nativeInstanceId: native.instanceId, roleId: member.roleId, taskId: member.taskId });
+    // C1：成员身份 = 真实 default Core session + 可选 native instance（不再要求 codex/native；Claude/Pi 运行成员可停止）。
+    if (!fact || fact.construction !== "default-core" || fact.roleId !== member.roleId || fact.runtime !== member.runtime
+      || (native !== undefined && native.roleId !== member.roleId))
+      return reject("run-stop-member-lifecycle-unproven", "This run member lacks an actual default Core instance");
+    handles.push({ hostHandleId: member.hostHandleId, coreSessionId: member.coreSessionId, ...(native ? { nativeInstanceId: native.instanceId } : {}), roleId: member.roleId, taskId: member.taskId });
   }
   const freshActor = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: actorId });
   if (freshActor?.lifecycle?.turnId !== actual.lifecycle.turnId || freshActor.disposed || freshActor.lifecycle.stopRequested
@@ -738,14 +953,19 @@ export async function finalizeRunChange(input: { projectRoot: string; planId: st
   const instances: import("../../model/runtime.ts").RuntimeSessionLifecycleFacts[] = [];
   for (const member of held.plan.handles) {
     const fact = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: member.coreSessionId });
-    const live = inventory.sessions.find(row => row.hostHandleId === member.hostHandleId);
+    const live = inventory.sessions.find(row => row.hostHandleId === member.hostHandleId), native = fact?.lifecycle?.native;
+    // C2/F12：终止证据=运行时中立 drain（native/processCoverage 仅证据）；native absent 允许、present-but-changed 拒绝。
     if (!fact || !live || live.coreSessionId !== member.coreSessionId || live.taskId !== member.taskId || live.roleId !== member.roleId
-      || fact.construction !== "default-core" || fact.lifecycle?.status !== "quiescent" || fact.lifecycle.native?.instanceId !== member.nativeInstanceId
-      || (!fact.disposed && !fact.lifecycle.stopRequested)) return blocked("run-stop-instance-unproven", "The same actual run instance has not reached a sealed drained terminal state");
+      || fact.construction !== "default-core" || (!fact.disposed && !fact.lifecycle?.stopRequested) || !fact.lifecycle || !isRuntimeSessionDrained(fact.lifecycle)
+      || (native !== undefined && member.nativeInstanceId !== undefined && (native.instanceId !== member.nativeInstanceId || native.roleId !== member.roleId)))
+      return blocked("run-stop-instance-unproven", "The same actual run instance has not reached a sealed drained terminal state (native coverage may be unknown)");
     instances.push(fact.lifecycle);
   }
-  const source = { projectRoot: input.projectRoot, taskId: held.plan.requesterTaskId, actorRoleId: "rapporteur", actorCoreSessionId: held.plan.requesterCoreSessionId, parentCoreSessionId: held.parentCoreSessionId };
-  const closure = await inspectInitializationProtection(input.projectRoot, source); if (!closure.ok) return blocked(closure.code, closure.message);
+  // I0-5/R6：gate 保持先于 host lease 的既有顺序；host-continuation 只做闭包（无 policy/sidecar/lease 判定）。
+  const source: GitActionAuthorizationInput = { projectRoot: input.projectRoot, taskId: held.plan.requesterTaskId, parentCoreSessionId: held.parentCoreSessionId,
+    expectedActor: { roleId: "rapporteur", coreSessionId: held.plan.requesterCoreSessionId }, authorizationMode: "host-continuation",
+    hostContinuation: { requesterTurnId: held.plan.requesterTurnId, planId: held.plan.planId } };
+  const closure = await inspectGitActionAuthorization(source); if (!closure.ok) return blocked(closure.code, closure.message);
   if (closure.rootsDigest !== held.rootsDigest || inspectGitHostCoordinator({ projectRoot: input.projectRoot }).coordinatorRevision !== snapshot.coordinatorRevision) return blocked("run-stop-source-stale", "Actual root/host evidence changed during final inspection");
   const lease = beginGitHostAction({ projectRoot: input.projectRoot, kind: "git-mutation", expectedCoordinatorRevision: snapshot.coordinatorRevision });
   if (!lease.ok) return blocked(lease.code, "A current host action prevents run transition commit");
@@ -762,7 +982,8 @@ export interface ControllerStopHostPlan {
   operationId: string; projectRoot: string; requestDigest: string;
   requesterCoreSessionId: string; requesterTurnId: string; inventoryRevision: string | number;
   scope: import("../../service/trunk/public/trunk-service.ts").ControllerStopScope;
-  handles: readonly { hostHandleId: string; coreSessionId: string; nativeInstanceId: string; roleId: "convener"; taskId: string }[];
+  // Q8/I0-5：native instance 可选证据；present-but-changed 在 finalize 拒绝。
+  handles: readonly { hostHandleId: string; coreSessionId: string; nativeInstanceId?: string; roleId: "convener"; taskId: string }[];
 }
 function isCurrentChiefStopCaller(input: { projectRoot: string; chiefCoreSessionId: string; chiefTurnId: string }): boolean {
   const actual = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: input.chiefCoreSessionId });
@@ -792,9 +1013,11 @@ export async function prepareControllerStop(input: { projectRoot: string; taskId
     const handles: ControllerStopHostPlan["handles"][number][] = [];
     for (const member of members) {
       const actual = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: member.coreSessionId! }), native = actual?.lifecycle?.native;
-      if (!actual || actual.roleId !== "convener" || actual.roleKind !== "built-in-governance" || actual.construction !== "default-core" || actual.runtime !== "codex"
-        || !native || native.roleId !== "convener" || native.runtime !== "codex") return invalid("controller-stop-target-instance-unproven", "Actual default Core/native identity is required; unknown engines remain blocked");
-      handles.push({ hostHandleId: member.hostHandleId, coreSessionId: member.coreSessionId!, nativeInstanceId: native.instanceId, roleId: "convener", taskId: input.taskId });
+      // C3：Core/role/task 身份保留；native 可选（不再要求 codex/native；present-but-changed 在 finalize 拒绝）。
+      if (!actual || actual.roleId !== "convener" || actual.roleKind !== "built-in-governance" || actual.construction !== "default-core" || actual.runtime !== member.runtime
+        || (native !== undefined && native.roleId !== "convener"))
+        return invalid("controller-stop-target-instance-unproven", "Actual default Core identity is required");
+      handles.push({ hostHandleId: member.hostHandleId, coreSessionId: member.coreSessionId!, ...(native ? { nativeInstanceId: native.instanceId } : {}), roleId: "convener", taskId: input.taskId });
     }
     handles.sort((a,b) => a.hostHandleId < b.hostHandleId ? -1 : a.hostHandleId > b.hostHandleId ? 1 : 0);
     if (!isCurrentChiefStopCaller(input) || inspectGitHostCoordinator({ projectRoot: input.projectRoot }).coordinatorRevision !== coordinator.coordinatorRevision)
@@ -836,14 +1059,12 @@ export async function finalizeControllerStop(input: { projectRoot: string; plan:
     const processes = new Map<string, import("../../model/runtime.ts").RuntimeOwnedProcessFact>();
     for (const member of plan.handles) {
       const actual = inspectManagedRoleSessionEvidence({ projectRoot: input.projectRoot, sessionId: member.coreSessionId }), fact = actual?.lifecycle, native = fact?.native;
-      if (!actual || actual.roleKind !== "built-in-governance" || actual.roleId !== "convener" || actual.construction !== "default-core" || actual.runtime !== "codex"
-        || (!actual.disposed && !fact?.stopRequested) || !fact || fact.sessionId !== member.coreSessionId || fact.status !== "quiescent" || !fact.providerFinished || fact.activeTools.length
-        || fact.processCoverage !== "complete" || fact.reasons.length || fact.processes.some(row => row.state !== "exited" || row.treeStatus !== "verified")
-        || !native || native.instanceId !== member.nativeInstanceId || native.roleId !== "convener" || native.runtime !== "codex" || native.status !== "quiescent"
-        || !["not-started", "settled"].includes(native.promptState) || !["idle", "closed"].includes(native.transport.state) || native.activeTools.length
-        || native.processCoverage !== "complete" || native.reasons.length || native.processes.some(row => row.state !== "exited" || row.treeStatus !== "verified"))
-        return invalid("controller-stop-terminal-unproven", "The original Core/native instance has not reached sealed complete drained terminal facts");
-      for (const process of [...fact.processes, ...native.processes]) processes.set(`${member.coreSessionId}:${process.id}`, process);
+      // C4：terminal 用运行时中立 drain（native/processCoverage 仅证据）；native absent 允许、present-but-changed 拒绝。
+      if (!actual || actual.roleKind !== "built-in-governance" || actual.roleId !== "convener" || actual.construction !== "default-core"
+        || (!actual.disposed && !fact?.stopRequested) || !fact || fact.sessionId !== member.coreSessionId || !isRuntimeSessionDrained(fact)
+        || (native !== undefined && member.nativeInstanceId !== undefined && (native.instanceId !== member.nativeInstanceId || native.roleId !== "convener")))
+        return invalid("controller-stop-terminal-unproven", "The original Core instance has not reached drained terminal facts (native coverage may be unknown)");
+      for (const process of [...fact.processes, ...(native?.processes ?? [])]) processes.set(`${member.coreSessionId}:${process.id}`, process);
     }
     const source = await createTrunkService({ projectRoot: input.projectRoot }).confirmControllerStop(plan.scope);
     if (!source.ok) return invalid("controller-stop-source-stale", source.message ?? source.code);
