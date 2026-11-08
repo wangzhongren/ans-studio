@@ -26,6 +26,7 @@ import {
   judgePauseState,
   recoveryActionView,
   recoveryTimeText,
+  shellConfirmEntryLabel,
   shellConfirmKind,
   shellConfirmTitle,
   shellEscalationView,
@@ -279,6 +280,8 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
   const suApproval = payload.policy === "su-approval";
   const roleId = asString(payload.roleId);
   const title = shellConfirmTitle(payload.policy, roleId, locale);
+  // 入口标签（P1.3 §2.5.2 加法）：主进程给出 `entry` 时如实转写；缺省/run_shell ⇒「前台命令」。
+  const entryLabel = shellConfirmEntryLabel(payload.entry, locale);
   const command = asString(payload.command);
   const summary = asString(payload.summary);
   const tierLabel = suApproval ? suApprovalTierLabel(payload.tier, locale) : "";
@@ -339,6 +342,13 @@ function ShellConfirmCard({ card }: { card: ConfirmCardRecord | null }) {
                   {t("ui.confirm.suApprovalBadge")}
                 </Badge>
               ) : null}
+              <Badge
+                id="sc-entry"
+                variant="outline"
+                className="h-[16px] rounded-[4px] border-border bg-muted px-1 text-[10px] text-muted-foreground"
+              >
+                {entryLabel}
+              </Badge>
             </div>
             <button
               id="sc-close"

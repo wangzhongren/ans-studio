@@ -90,10 +90,20 @@ import {
 import {
   buildShellAuditGate,
   createFileAuditSink,
+  SHELL_AUDIT_REL_PATH,
   SHELL_GATE_CONDITION,
   type ShellAuditRecord,
   type ShellAuditSink,
 } from "./shell-audit.ts";
+// 2026-11-08（会话创建准入按操作审批 P1.3 §2.3 / I0-1）；`createShellGate` 构造成功后**唯一登记点**。
+// 登记事实只做白名单投影；测试私有 Symbol 仅在此内部只读检查（生产装配不得设置）。
+import {
+  registerShellApproval,
+  hasShellApprovalTestNonDurableAllowance,
+  type ShellApprovalAuditFacts,
+  type ShellApprovalFacts,
+  type ShellApprovalMode,
+} from "../shared/shell-approval-binding.ts";
 // 跨角色共享 argv 原语（**单一来源**，属主：项目管理）。此前本文件保有一份**逐字相同**的本地
 // `normalizeArgv`；T23 起正文迁至 `src/common/shared/argv-primitives.ts`，本文件改为**只读导入**
 // （工程法案 §一.5、`docs/architecture/shared-components.md`）——**不得留第二份实现**。行为逐字不变。
@@ -185,7 +195,9 @@ export type { OperatorPrompt, OperatorOutcome, OperatorChannelFn };
 import { matchesDelegatedRoutineCheck, type RoutineShellPolicy } from "./routine-shell-policy.ts";
 // 2026-10-31 客户裁定 A（只读档不适用例行白名单）：分类器只回裸串时（生产桌面经 Service 出口注入的
 // `classifyShell` 四态封装不带 ruleId），用**同一个**冻结谓词判定 routine 命中——单一实现，不复制第二份。
-import { matchRoutineShellCommand } from "../../service/gate/shell-rules.ts";
+// 2026-11-08（只读 Git）：matcher/规范体同样经 `src/service/gate/shell-rules.ts` 公共出口**同一函数引用**
+// 消费（设计 P1.3 §2.4.3 / I0-7；不得在本文件复制 matcher/规范体逻辑）。
+import { matchRoutineShellCommand, matchReadonlyGit, buildReadonlyGitBody } from "../../service/gate/shell-rules.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 // **确定性前置封堵**（客户 2026-10-19：「grep/长内联命令 这个应该让判断AI 做好封堵」）：
 // 在 (c) 分类、模型判断与客户通道**之前**拒绝长内联命令与无界递归搜索（不调模型、不弹卡）。
@@ -367,7 +379,13 @@ export interface ShellGateReviewedOutcome {
 }
 
 export interface CreateShellGateOptions {
-  /** 仅诊断上下文，不参与分类授权。 */
+  /**
+   * 项目根。
+   * **2026-11-08（P1.3 §2.3.2 / I0-1）契约变更**：由「仅诊断上下文，不参与分类授权」改为**准入绑定字段**——
+   * `createShellGate` 构造成功后把它写入 `shell-approval-binding` 的登记事实；受保护项目的会话创建准入
+   * 要求绑定事实中的项目根与会话项目根一致（否则 `protected-scope-approval-chain-unproven`）。
+   * 本字段仍**不参与命令分类判定**。
+   */
   projectRoot?: string;
   /** 门禁引擎的纯函数 `classifyShell`（注入）。缺失 → 一律拒绝（能力缺席即 fail-closed）。 */
   classifyShell?: ClassifyShellFn;
@@ -469,6 +487,14 @@ export interface CreateShellGateOptions {
    * 同一 `shell-gate` 条件、同一 append-only 文件）。缺省不传 = 旧行为。
    */
   onAuditSinkCreated?: (sink: ShellAuditSink) => void;
+  /**
+   * **审计失败策略**（2026-11-08 P1.3 §2.5.5 / I0-6，可选）：
+   * - `"observe"`（缺省，现状）：审计 append 失败只 stderr，**不翻转**判定；
+   * - `"deny-non-readonly"`（受保护范围由 `assembleProjectShellGate`/`assembleOperatorShellGate` 启用）：
+   *   最终结论 allow 且该 allow **来自审批/指令/升级路径**（非 `c-allow` 只读白名单）、审计 append 失败 ⇒
+   *   改为拒绝（`by:"audit:unavailable"`；诊断 `shell.audit.deny`）。只读 `c-allow` 不翻转（只读放行不受影响）。
+   */
+  auditFailurePolicy?: "observe" | "deny-non-readonly";
 }
 
 /** 内部：一次审核的结论 + 审计所需的分支/结论分类。 */
@@ -485,6 +511,11 @@ interface ReviewOutcome {
   customerGrant?: ShellGrant;
   /** 2026-11-03：本次结果来自客户事先记录的审批指令（审计写 `directive`，不写 `judge`/`customerGrant`）。 */
   directive?: ShellDirectiveDecision;
+  /**
+   * 2026-11-08（P1.3 §2.4.3 / I0-7）：只读 Git 白名单放行时的审计字段——
+   * `id` 为只读子命令模板；`canonicalArgv` 为实际执行的规范 argv 体（单一来源 `buildReadonlyGitBody`）。
+   */
+  readonlyGit?: { id: string; canonicalArgv: string[] };
   /** 2026-10-31：`onReviewed` 使用的请求（script 分支带 `approvalContext`；非 script 即原请求）。 */
   reviewedReq?: ShellGateRequest;
 }
@@ -657,7 +688,9 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     let writeGuardDecision: ShellWriteGuardDecision | undefined;
     if (typeof opts.writeGuard === "function") {
       try {
-        writeGuardDecision = opts.writeGuard(req);
+        // 2026-11-08（W3-G 支持可选 `entry`）：把真实入口并入守卫输入——`start_background_task`
+        // 不享受只读 Git 放行（AC-22）；缺省按 `run_shell`（旧调用方兼容）。判定顺序不变。
+        writeGuardDecision = opts.writeGuard({ ...req, entry: req.entry ?? "run_shell" });
       } catch (err) {
         return {
           result: { allow: false, reason: `shell 写目标守卫异常，拒绝执行：${reasonOf(err)}`, by: "write-guard:error" },
@@ -688,7 +721,21 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       };
     }
 
-    const by = `ruleset:${detail.ruleId ?? rulesId}`;
+    // 只读 Git 审计（2026-11-08 P1.3 §2.4.3 / I0-7）：分类结果为 `allow` 且命中只读 Git 白名单时，
+    // 用**同一函数引用**的 matcher 取得受限描述并记录规范执行体（`canonicalArgv` 与实际执行体同源
+    // `buildReadonlyGitBody`，不得复制第二份逻辑）。生产桌面的四态封装只回裸串（不带 ruleId）——
+    // 沿用 routine 白名单同一先例：ruleId 缺省时按 argv 兜底判定并把 ruleId 补为
+    // `allow:readonly:git:<id>`（by 前缀口径；byTagged 档位后缀保留）。
+    let readonlyGitAudit: { id: string; canonicalArgv: string[] } | undefined;
+    let effectiveRuleId = detail.ruleId;
+    if (detail.decision === "allow" && (detail.ruleId === undefined || detail.ruleId.startsWith("allow:readonly:git:"))) {
+      const readonlyGitMatch = matchReadonlyGit(argv);
+      if (readonlyGitMatch !== undefined) {
+        readonlyGitAudit = { id: readonlyGitMatch.id, canonicalArgv: buildReadonlyGitBody(readonlyGitMatch) };
+        if (detail.ruleId === undefined) effectiveRuleId = `allow:readonly:git:${readonlyGitMatch.id}`;
+      }
+    }
+    const by = `ruleset:${effectiveRuleId ?? rulesId}`;
     // 档位后缀（审计 `by` 可辨识；两者互斥，构造期已守）：
     //   · 只读档 ⇒ `（su 只读档）`（既有，逐字不变）；
     //   · 审批档 ⇒ `（su 审批档）`（2026-10-17；**不得**复用只读档后缀）。
@@ -837,6 +884,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         result: { allow: true, by: byTagged },
         conclusion: "allow",
         branch: BRANCH_C_ALLOW,
+        ...(readonlyGitAudit !== undefined ? { readonlyGit: readonlyGitAudit } : {}),
       };
     }
     // —— 客户升级授权（2026-10-31 方案 v1.3 §4.1/§6.3；非 script 分支）——
@@ -1051,6 +1099,10 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       cwd: req.cwd,
       toolCallId: req.toolCallId,
       reason: b.why,
+      // 2026-11-08（W5-D 只读核对补线，P1.3 §2.5.2）：卡面展示字段加法透传——审核入口（前台/后台）
+      // 与会话角色 id（来自适配器 options，非模型输入）。只拷贝、不默认；不参与判定。
+      ...(req.entry !== undefined ? { entry: req.entry } : {}),
+      ...(req.roleId !== undefined ? { roleId: req.roleId } : {}),
       ...(req.manualOnly === true ? { manualOnly: true } : {}),
       ...(req.approvalContext !== undefined ? { approvalContext: req.approvalContext } : {}),
     };
@@ -1113,7 +1165,7 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     );
   }
 
-  return async (req: ShellGateRequest): Promise<ShellReviewResult> => {
+  const gate = async (req: ShellGateRequest): Promise<ShellReviewResult> => {
     // 超时包装整个审核；超时 = 拒绝（§7.5 退路 3）。
     let outcome: ReviewOutcome;
     try {
@@ -1149,21 +1201,46 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         process.stderr.write(`shell 闸审核结束回调异常（不影响判定）：${reasonOf(err)}\n`);
       }
     }
-    await audit(req, outcome, now());
+    const auditOutcome = await audit(req, outcome, now());
+    // **审计失败策略**（2026-11-08 P1.3 §2.5.5 / I0-6）：受保护装配（`deny-non-readonly`）下，
+    // 审批/指令/升级路径的放行若审计 append 失败 ⇒ **改为拒绝**（fail-closed）；只读 `c-allow`
+    // 白名单放行不翻转（客户要求只读放行；其审计失败仍如实 stderr）。
+    let finalOutcome = outcome;
+    if (
+      opts.auditFailurePolicy === "deny-non-readonly" &&
+      auditOutcome.ok !== true &&
+      outcome.conclusion === "allow" &&
+      outcome.branch !== BRANCH_C_ALLOW
+    ) {
+      log.record("shell.audit.deny", { toolCallId: req.toolCallId, reasonCode: "audit-unavailable" });
+      finalOutcome = {
+        result: { allow: false, reason: "审计写入失败，已拒绝执行（fail-closed）", by: "audit:unavailable" },
+        conclusion: "deny",
+        branch: "audit-unavailable",
+      };
+    }
     // 2026-10-29（§6.5）：最终放行后、spawn 之前拍快照（执行后由 run_shell 调 postAudit 对比）。
-    if (outcome.result.allow === true && typeof opts.snapshotBefore === "function") {
+    if (finalOutcome.result.allow === true && typeof opts.snapshotBefore === "function") {
       try {
         await opts.snapshotBefore(req);
       } catch (err) {
         process.stderr.write(`shell 写审计快照失败（不影响执行）：${reasonOf(err)}\n`);
       }
     }
-    return outcome.result;
+    return finalOutcome.result;
   };
 
+  // —— 审批链绑定登记（2026-11-08 P1.3 §2.3.2 / 派发 I0-1）：**构造成功后唯一登记点** ——
+  // 登记事实只做白名单投影（mode/通道/规则注入/审计 describe）；sink 引用由 binding 模块私有保存，
+  // 探针只能由 `probeShellApproval` 内部执行。`buildShellGate`/`assemble*` 不参与登记与 probe 值传递。
+  registerShellApproval(gate, approvalBindingFacts(opts), opts.audit);
+
+  return gate;
+
   // **F-6-2（2026-10-16 客户批准）：审计失败提示去重 + 如实话术**（状态 `auditFailure` 声明在函数体前部，
-  // 见上——闭包在 `return` 之后才执行，状态必须提前声明）。判定不受影响（「审计失败不翻转判定」不变）。
-  async function audit(req: ShellGateRequest, outcome: ReviewOutcome, at: Date): Promise<void> {
+  // 见上——闭包在 `return` 之后才执行，状态必须提前声明）。判定不受影响（「审计失败不翻转判定」不变）；
+  // `deny-non-readonly` 策略的翻转由调用方依据本函数返回值处理（只读 c-allow 不翻转）。
+  async function audit(req: ShellGateRequest, outcome: ReviewOutcome, at: Date): Promise<{ ok: boolean; reason?: string }> {
     const record: ShellAuditRecord = {
       timestamp: at.toISOString(),
       toolCallId: req.toolCallId,
@@ -1177,6 +1254,10 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       execution: "未执行", // 审核发生在执行之前；exit code 由 Pi 适配器执行后另记
       // 审核入口（2026-10-31 加法；缺省按 run_shell 兼容旧调用）。
       entry: req.entry ?? "run_shell",
+      // 只读 Git 放行的规范执行体（2026-11-08 I0-7；仅 `allow:readonly:git:<id>` 放行时出现）。
+      ...(outcome.readonlyGit !== undefined ? { readonlyGit: outcome.readonlyGit } : {}),
+      // 会话角色 id（2026-11-08 加法；来自适配器 options，非模型输入）。
+      ...(req.roleId !== undefined && req.roleId !== "" ? { roleId: req.roleId } : {}),
       // 判断 agent（「替我审」）自己做出的 allow/deny 才写；manual 后客户手批不带本字段。
       ...(outcome.judge !== undefined ? { judge: outcome.judge } : {}),
       // 2026-10-31：客户升级授权放行的 review 记录（**不得**与 judge 同时出现；by 以 customer: 开头）。
@@ -1207,13 +1288,18 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
           auditFailure = { reason, total: (auditFailure?.total ?? 0) + 1, suppressed: 0 };
           process.stderr.write(`shell 闸审计未落盘：${reason}\n`);
         }
-      } else if (auditFailure !== undefined) {
+        return { ok: false, reason };
+      }
+      if (auditFailure !== undefined) {
         const total = auditFailure.total;
         auditFailure = undefined;
         process.stderr.write(`shell 闸审计已恢复落盘（此前未落盘 ${total} 条）\n`);
       }
+      return { ok: true };
     } catch (err) {
+      const reason = `审计异常：${reasonOf(err)}`;
       process.stderr.write(`shell 闸审计异常：${reasonOf(err)}\n`);
+      return { ok: false, reason };
     }
   }
 }
@@ -1292,6 +1378,8 @@ export interface ShellGateBuildDeps {
   takeDirective?: TakeDirectiveFn;
   /** 审计 sink 共享回调（见 `CreateShellGateOptions.onAuditSinkCreated`）。 */
   onAuditSinkCreated?: (sink: ShellAuditSink) => void;
+  /** 审计失败策略（见 `CreateShellGateOptions.auditFailurePolicy`；2026-11-08 P1.3 §2.5.5 / I0-6）。 */
+  auditFailurePolicy?: "observe" | "deny-non-readonly";
 }
 
 export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
@@ -1338,10 +1426,74 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
     ...(deps.takeGrant !== undefined ? { takeGrant: deps.takeGrant } : {}),
     ...(deps.takeDirective !== undefined ? { takeDirective: deps.takeDirective } : {}),
     ...(deps.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: deps.onAuditSinkCreated } : {}),
+    ...(deps.auditFailurePolicy !== undefined ? { auditFailurePolicy: deps.auditFailurePolicy } : {}),
   });
 }
 
 // —— 内部辅助 ——
+
+/**
+ * 审批链登记事实（2026-11-08 P1.3 §2.3.2 / 派发 I0-1；白名单投影，无凭据/环境/适配器 options）。
+ * `mode` 由构造选项决定；`audit` 由 sink 的 `describe()` 投影（缺失 = custom/非持久）；
+ * `audit.probe` 恒 `"unknown"`——探针结果只能由 binding 内部 `sink.probe()` 得出。
+ * **测试私有 Symbol**（`hasShellApprovalTestNonDurableAllowance(opts.audit)`）仅把登记事实投影为
+ * `file+durable`（测试专用模拟；生产装配不得设置）；它不进入任何分类/判定路径。
+ */
+function approvalBindingFacts(opts: CreateShellGateOptions): ShellApprovalFacts {
+  const mode: ShellApprovalMode =
+    opts.readonlyOnly === true
+      ? "readonly"
+      : opts.operatorOnly === true
+        ? "operator-approve"
+        : opts.advisoryRuleset === true
+          ? "rules-advisory"
+          : "three-layer";
+  return {
+    source: "orchestration-shell-gate",
+    version: 1,
+    ...(opts.projectRoot !== undefined ? { projectRoot: opts.projectRoot } : {}),
+    mode,
+    classifier: typeof opts.classifyShell === "function",
+    rules: opts.rules !== undefined && opts.rules !== null,
+    pmAsk: typeof opts.pmAsk === "function",
+    operatorChannel: typeof opts.operatorChannel === "function",
+    takeGrant: typeof opts.takeGrant === "function",
+    takeDirective: typeof opts.takeDirective === "function",
+    routinePolicy: opts.routineShellPolicy !== undefined,
+    audit: approvalBindingAuditFacts(opts),
+    escalation: typeof opts.onReviewed === "function",
+  };
+}
+
+function approvalBindingAuditFacts(opts: CreateShellGateOptions): ShellApprovalAuditFacts {
+  if (opts.audit === undefined || opts.audit === null) {
+    return { sink: "custom", durable: false, probe: "unknown" };
+  }
+  if (hasShellApprovalTestNonDurableAllowance(opts.audit)) {
+    // 测试专用模拟投影：非持久 sink 以 file+durable 登记（生产装配不得设置该 Symbol）。
+    return { sink: "file", durable: true, probe: "unknown", relPath: SHELL_AUDIT_REL_PATH };
+  }
+  let described: { kind?: unknown; durable?: unknown; relPath?: unknown } | undefined;
+  try {
+    described = opts.audit.describe?.() as { kind?: unknown; durable?: unknown; relPath?: unknown } | undefined;
+  } catch {
+    described = undefined;
+  }
+  if (described === undefined || described === null) {
+    return { sink: "custom", durable: false, probe: "unknown" };
+  }
+  const kind =
+    described.kind === "file" || described.kind === "memory" || described.kind === "custom"
+      ? described.kind
+      : "custom";
+  const relPath = typeof described.relPath === "string" && described.relPath !== "" ? described.relPath : undefined;
+  return {
+    sink: kind,
+    durable: described.durable === true,
+    probe: "unknown",
+    ...(relPath !== undefined ? { relPath } : {}),
+  };
+}
 
 function normalizeClassification(v: ShellClass | ShellClassifyDetail): ShellClassifyDetail {
   if (typeof v === "string") return { decision: v };

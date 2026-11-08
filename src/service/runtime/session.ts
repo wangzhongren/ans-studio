@@ -5,7 +5,7 @@ import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EX
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
-  RuntimeProviderOptions, RuntimeReplayEntry, RuntimeSessionRecord, RuntimeTurnOutcome, SessionEvent, ToolCall, WriteGate,
+  RuntimeProviderOptions, RuntimeReplayEntry, RuntimeSessionRecord, RuntimeTurnOutcome, SessionEvent, ShellGate, ToolCall, WriteGate,
   RuntimeLegacyHistoryProjectionInputV1, RuntimeLegacyHistoryProjectionV1, RuntimeSessionStorage,
   RuntimeSessionPersistence, RuntimeReportDraftV1, RuntimeReportSnapshotV1, RuntimeLiveReportDraftV1, RuntimeLiveReportViewV1,
   RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, RuntimeInputTextProjectionV1, RuntimeDeliveryReceiptV1,
@@ -26,11 +26,12 @@ import type {
   RuntimeNativeLifecycle, RuntimeNativeLifecycleFacts,
   RuntimeNativeToolSurfaceFacts,
   RuntimeNativeFactoryPreparation, RuntimeNativeFactoryPlanFacts, RuntimeRolePreparation, RuntimePreparedRoleToken,
-  RuntimeCreationPlanFacts, RuntimeCoreRegistryFacts,
+  RuntimeCreationPlanFacts, RuntimeCoreRegistryFacts, RuntimeApprovalChainPlanFacts,
   RuntimeBlockedRoleCapabilityCallbacks, RuntimeBlockedRoleCapabilityFacts, RuntimeRoleCapabilityTool, InstallSkillFn,
   RuntimeCoreConstructionFacts, RuntimeCoreConstructionFailureRef,
 } from "../../model/runtime.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
+import { inspectShellApproval, probeShellApproval, type FrozenShellApprovalFacts } from "../../common/shared/shell-approval-binding.ts";
 import { buildChiefDecisionTools, buildGovernedTools, createDemoRuntimeAdapter, createRuntimeToolLifecycle, isFileEditReadProbe, inspectFileGateContext, loadBuiltinChiefWorkflow, type RuntimeToolLifecycle } from "../../provider/runtime/tools.ts";
 import type { FileGateStage, FileGateFacts, WriteGateOperation } from "../../model/runtime.ts";
 import { buildShellJudgeTools } from "../../common/runtime-core/shell-judge/tools.ts";
@@ -238,8 +239,76 @@ async function readCoreProtectionScope(projectRoot: string): Promise<{ state: "r
   } catch { /* Missing/unreadable physical authority is not an unmanaged scope. */ }
   return { state: "unknown", revision: 0 };
 }
-/** These actual script entry points have no proven filesystem confinement profile. */
-const hasUnconfinedScriptTools = (names: readonly string[]) => names.some(name => name === "run_shell" || name === "start_background_task");
+/**
+ * 2026-11-08（准入按操作审批，P1.3 §2.2.3/§2.3）：受保护范围下**注册了**这些工具才要求审批链/审计证据。
+ * 原 `hasUnconfinedScriptTools`（「含 shell 即创建期拒绝」）已退役——不再产生
+ * `required-scope-unconfined-script-tools`；证明对象改为「审批链与审计在装配期真实存在」。
+ */
+const SHELL_ADMISSION_TOOLS: readonly string[] = ["run_shell", "start_background_task"];
+const hasShellAdmissionTools = (names: readonly string[]) => SHELL_ADMISSION_TOOLS.some(name => names.includes(name));
+/** 项目根规范化（纯字符串；Windows 大小写不敏感）：仅用于与 binding 登记事实比较，不做文件系统 I/O。 */
+const canonicalProjectRoot = (value: string): string => {
+  const resolved = resolve(value);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+};
+/**
+ * 审批链稳定白名单投影（§2.3.3）：只含模式/通道/审计 `file+durable+probe ok`/项目根，无时间戳/凭据/环境，
+ * 可安全进入 plan 与 `configDigest`。调用方必须先确认 `audit` 三态与项目根，本函数不做策略判断。
+ */
+function projectApprovalChainFacts(facts: FrozenShellApprovalFacts & { projectRoot: string }): RuntimeApprovalChainPlanFacts {
+  return {
+    source: "orchestration-shell-gate",
+    mode: facts.mode,
+    classifier: facts.classifier,
+    rules: facts.rules,
+    pmAsk: facts.pmAsk,
+    operatorChannel: facts.operatorChannel,
+    takeGrant: facts.takeGrant,
+    takeDirective: facts.takeDirective,
+    routinePolicy: facts.routinePolicy,
+    escalation: facts.escalation,
+    audit: { sink: "file", durable: true, probe: "ok", ...(facts.audit.relPath !== undefined ? { relPath: facts.audit.relPath } : {}) },
+    projectRoot: facts.projectRoot,
+  };
+}
+/**
+ * 审批链一致性判据（§2.2.4 绑定/执行期复核）：live 事实的稳定投影必须与计划中的投影逐字段一致。
+ *
+ * 防御性判据（复核 R6 / B1 AC-27）：端到端路径上 prepare→bind 之间替换 `shellGate` 会先被
+ * `isCurrent()` 拦为 `runtime-prepared-configuration-changed`，本判据几乎不可达；因此按模块级判据
+ * 直接测试本函数（`protected-scope-approval-chain-changed` 由绑定/执行期复核在异常路径抛出）。
+ */
+export function matchesRuntimeApprovalChain(
+  live: RuntimeApprovalChainPlanFacts | undefined,
+  planned: RuntimeApprovalChainPlanFacts | undefined,
+): boolean {
+  if (live === undefined || planned === undefined) return false;
+  return live.source === planned.source && live.mode === planned.mode
+    && live.classifier === planned.classifier && live.rules === planned.rules
+    && live.pmAsk === planned.pmAsk && live.operatorChannel === planned.operatorChannel
+    && live.takeGrant === planned.takeGrant && live.takeDirective === planned.takeDirective
+    && live.routinePolicy === planned.routinePolicy && live.escalation === planned.escalation
+    && live.audit.sink === planned.audit.sink && live.audit.durable === planned.audit.durable
+    && live.audit.probe === planned.audit.probe && live.audit.relPath === planned.audit.relPath
+    && canonicalProjectRoot(live.projectRoot) === canonicalProjectRoot(planned.projectRoot);
+}
+type ApprovalChainEvidence =
+  | { kind: "verified"; chain: RuntimeApprovalChainPlanFacts }
+  | { kind: "unproven" }
+  | { kind: "audit-unavailable" };
+/**
+ * 读取一次审批链证据（§2.2.3）：`probeShellApproval` **无值入参**、探针由 binding 内部执行并冻结 memoize
+ * （I0-3）；未登记/项目根不符 ⇒ unproven；已登记但 sink 非 file / 非持久 / probe 非 ok ⇒ audit-unavailable。
+ */
+async function readApprovalChainEvidence(gate: ShellGate | undefined, projectRoot: string): Promise<ApprovalChainEvidence> {
+  if (typeof gate !== "function") return { kind: "unproven" };
+  const facts = await probeShellApproval(gate);
+  if (!facts || !facts.projectRoot || canonicalProjectRoot(facts.projectRoot) !== canonicalProjectRoot(projectRoot))
+    return { kind: "unproven" };
+  if (facts.audit.sink !== "file" || facts.audit.durable !== true || facts.audit.probe !== "ok")
+    return { kind: "audit-unavailable" };
+  return { kind: "verified", chain: projectApprovalChainFacts({ ...facts, projectRoot: facts.projectRoot }) };
+}
 /** Exact set equality of registry names (duplicates on the left are a mismatch). */
 const sameNameSet = (left: readonly string[], right: readonly string[]) => left.length === right.length
   && new Set(left).size === left.length && left.every(name => right.includes(name));
@@ -345,6 +414,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
     adapter: RuntimeAdapter; options: RuntimeProviderOptions; display: ReturnType<typeof createToolDisplayContext>; backgroundTasks?: BackgroundTaskCapability; lifecycle: RuntimeToolLifecycle; factoryProvenance: "default-production" | "custom-override" | "demo"; initialAppTools: string[]; initialToolHandlers: RuntimeProviderOptions["tools"][number]["handler"][]; initialMcpServers: string[]; protectedGitRoots?: readonly string[]; registry: CoreRegistryEntry; prepareNative(): Promise<RuntimeNativeFactoryPreparation | undefined>; isCurrent(): boolean; setAdmissionGuard(guard: () => void): void; setTurn(id?: string, controller?: AbortController): void;
     roleCapabilityGuards(binding?: Pick<RuntimeBlockedRoleCapabilityFacts, "corePlanId" | "nativePlanId" | "nativeConfigDigest" | "sessionId">): RuntimeBlockedRoleCapabilityFacts | undefined;
     revoke(): void; beginContinuation(): () => void;
+    setAdmittedPlan(plan: RuntimeCreationPlanFacts): void; verifyApprovalChainBinding(plan: RuntimeCreationPlanFacts | undefined): Promise<void>;
   }>>();
   const providerFor = (role: ResolvedRole) => {
     if (chiefDecision !== undefined && role.id !== "chief") throw new Error("Chief decision context requires trusted chief role");
@@ -503,6 +573,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         if (typeof providerOptions.projectToolEvent !== "function" || typeof providerOptions.registerToolDisplayProfile !== "function") throw new Error("Core tool display capability missing");
         let actual: Promise<RuntimeAdapter> | undefined, nativePreparation: RuntimeNativeFactoryPreparation | undefined;
         let admittedScope: Awaited<ReturnType<typeof readCoreProtectionScope>> | undefined;
+        // 2026-11-08（P1.3 §2.2.4）：受保护范围的执行/绑定准入计划。只在 `bindPreparedRole`/`composeContext`
+        // 的 token 成立后由 `setAdmittedPlan` 设置（并与 planId/`isCurrent()` 一致），`ensureAdapter` 据此放行。
+        let admittedPlan: RuntimeCreationPlanFacts | undefined;
         let assertAdmission: () => void = () => { throw new Error("runtime-core-admission-missing"); };
         const optionSnapshot = Object.entries(options), roleSnapshot = JSON.stringify(role);
         const isCurrent = () => !construction.revoked && Object.keys(options).length === optionSnapshot.length
@@ -535,15 +608,35 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         const assertRoleCapabilityScope = (scope: Awaited<ReturnType<typeof readCoreProtectionScope>>) => {
           if (scope.state === "required" && roleCapabilityGuards()?.status === "unknown") throw new Error("required-scope-role-capability-effects-unproven");
         };
+        /** Token 成立后登记准入计划：必须仍是当前配置/计划（否则视为配置已变，fail-closed）。 */
+        const setAdmittedPlan = (plan: RuntimeCreationPlanFacts) => {
+          if (!isCurrent() || registry.fact.planId !== plan.planId) throw new Error("runtime-prepared-configuration-changed");
+          admittedPlan = plan;
+        };
+        /**
+         * §2.2.4 绑定/执行期审批链复核：受保护 + 注册了 shell 工具时，重读 live binding（inspect/probe），
+         * 要求存在、项目根一致（规范化比较）、`file+durable+probe ok`、稳定投影与计划一致；
+         * 任一不符 ⇒ `protected-scope-approval-chain-changed`（防御性判据，见 `matchesRuntimeApprovalChain`）。
+         */
+        const verifyApprovalChainBinding = async (plan: RuntimeCreationPlanFacts | undefined): Promise<void> => {
+          if (plan?.scopeProtection?.state !== "required" || !hasShellAdmissionTools(initialAppTools)) return;
+          const gate = options.shellGate;
+          if (typeof gate !== "function" || inspectShellApproval(gate) === undefined)
+            throw new Error("protected-scope-approval-chain-changed");
+          const evidence = await readApprovalChainEvidence(gate, options.projectRoot);
+          if (evidence.kind !== "verified" || !matchesRuntimeApprovalChain(evidence.chain, plan.approvalChain))
+            throw new Error("protected-scope-approval-chain-changed");
+        };
         const ensureAdapter = () => actual ??= (async () => {
           const end = beginContinuation();
           try {
           if (construction.revoked) throw new Error("runtime-preparation-revoked");
           assertAdmission();
           const scope = await readCoreProtectionScope(options.projectRoot);
-          if (scope.state === "unknown" || scope.state === "required" && !nativePreparation && options.runtime !== "demo")
+          // P1.3 §2.2.4：受保护范围只接受 token 成立的准入计划（admittedPlan）；unsupported/demo 在
+          // prepareRole 即被 reason 拒绝，不会产生 token。
+          if (scope.state === "unknown" || scope.state === "required" && !admittedPlan)
             throw new Error("runtime-protected-scope-requires-verified-plan");
-          if (scope.state === "required" && hasUnconfinedScriptTools(initialAppTools)) throw new Error("required-scope-unconfined-script-tools");
           assertRoleCapabilityScope(scope);
           admittedScope = scope;
           updateCoreRegistry(registry, "creating", nativePreparation ? [] : ["legacy-bind-without-precreation-plan"]);
@@ -556,8 +649,12 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         const verifyScope = async () => { const scope = await readCoreProtectionScope(options.projectRoot);
           if (!admittedScope || scope.state === "unknown" || scope.state !== admittedScope.state || scope.revision !== admittedScope.revision)
             throw new Error("runtime-protection-scope-changed");
-          if (scope.state === "required" && hasUnconfinedScriptTools(initialAppTools)) throw new Error("required-scope-unconfined-script-tools");
           assertRoleCapabilityScope(scope);
+          // 2026-11-08（§2.2.4）：删除原 unconfined 检查；受保护范围复核审批链仍一致。
+          if (scope.state === "required") {
+            if (!admittedPlan) throw new Error("runtime-protected-scope-requires-verified-plan");
+            await verifyApprovalChainBinding(admittedPlan);
+          }
           if (construction.revoked) throw new Error("runtime-preparation-revoked");
           assertAdmission(); };
         const adapter: RuntimeAdapter = { async composeContext(boundRole) { const end = beginContinuation();
@@ -584,7 +681,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           } finally { end(); }
         };
         return { adapter, display, options: providerOptions, backgroundTasks, lifecycle, factoryProvenance, initialAppTools, initialToolHandlers, initialMcpServers, protectedGitRoots, registry, prepareNative, isCurrent, roleCapabilityGuards,
-          revoke, beginContinuation,
+          revoke, beginContinuation, setAdmittedPlan, verifyApprovalChainBinding,
           setAdmissionGuard(guard: () => void) { assertAdmission = guard; },
           setTurn(id?: string, nextController?: AbortController) { turnId = id; controller = nextController; } };
       } catch (error) {
@@ -1132,13 +1229,20 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
     async composeContext(role) {
       const scope = await readCoreProtectionScope(options.projectRoot);
       if (scope.state === "unknown") throw new Error("runtime-protection-scope-unknown");
+      let prepared: RuntimeRolePreparation | undefined;
       if (scope.state === "required") {
-        const prepared = await core.prepareRole!(role);
+        prepared = await core.prepareRole!(role);
         if (!prepared.token) { const error = new Error("runtime-protected-scope-requires-verified-plan"); discardRuntimeRolePreparation(prepared, error); throw error; }
       }
       return withCoreOpenLease(options.projectRoot, async assertHeld => {
         const provider = await providerFor(role);
         provider.setAdmissionGuard(assertHeld);
+        if (prepared?.token) {
+          // P1.3 §2.2.4：token 成立后设置 admittedPlan（与 planId/isCurrent 一致）并复核审批链；
+          // prepare→compose 之间绑定变化 ⇒ protected-scope-approval-chain-changed。
+          await provider.verifyApprovalChainBinding(prepared.plan);
+          provider.setAdmittedPlan(prepared.plan);
+        }
         const context = provider.adapter.composeContext(role);
         return chiefDecision === undefined ? context : withTimeout(Promise.resolve(context), chiefDecision.limits.timeoutMs, "准备chief决策上下文");
       });
@@ -1157,12 +1261,25 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const provider = await providerFor(role), reasons: string[] = [];
       const scopeProtection = await readCoreProtectionScope(options.projectRoot);
       if (scopeProtection.state === "unknown") reasons.push("runtime-protection-scope-unknown");
-      if (scopeProtection.state === "required" && hasUnconfinedScriptTools(provider.initialAppTools)) reasons.push("required-scope-unconfined-script-tools");
-      if (scopeProtection.state === "required" && provider.roleCapabilityGuards()?.status === "unknown") reasons.push("required-scope-role-capability-effects-unproven");
-      if (scopeProtection.state === "required" && provider.factoryProvenance !== "default-production") reasons.push("protected-scope-default-native-plan-required");
+      let approvalChain: RuntimeApprovalChainPlanFacts | undefined;
+      if (scopeProtection.state === "required") {
+        // 保留：custom/demo（provenance≠default-production）继续拒绝。
+        if (provider.factoryProvenance !== "default-production") reasons.push("protected-scope-default-native-plan-required");
+        if (provider.roleCapabilityGuards()?.status === "unknown") reasons.push("required-scope-role-capability-effects-unproven");
+        // P1.3 §2.2.3：受保护 + 注册了 shell 工具 ⇒ 审批链与审计必须在装配期已真实存在（fail-closed）。
+        // 未登记（含传裸函数）/项目根不符 ⇒ approval-chain-unproven；sink 非持久 file 或探针非 ok ⇒ audit-unavailable。
+        if (hasShellAdmissionTools(provider.initialAppTools)) {
+          const evidence = await readApprovalChainEvidence(options.shellGate, options.projectRoot);
+          if (evidence.kind === "unproven") reasons.push("protected-scope-approval-chain-unproven");
+          else if (evidence.kind === "audit-unavailable") reasons.push("protected-scope-audit-unavailable");
+          else approvalChain = evidence.chain;
+        }
+      }
       let native: RuntimeNativeFactoryPlanFacts | undefined;
       if (provider.factoryProvenance === "custom-override") reasons.push("custom-provider-factory-unverified");
-      else if (options.runtime !== "demo") {
+      else if (options.runtime === "codex") {
+        // P1.3 §2.2.3/§2.6：仅 Codex 保留原生工厂计划严格校验（原条件逐字保留）；claude/pi 不再
+        // 产生 `native-factory-plan-*`（该证明对非 codex 结构性不可得，已取消为通用前提）。
         try {
           const prepared = await provider.prepareNative(), fact = prepared?.facts;
           if (fact && fact.source === "native-factory-plan" && typeof fact.planId === "string" && fact.planId.length > 0
@@ -1186,12 +1303,14 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       if (!provider.isCurrent()) reasons.push("runtime-prepared-configuration-changed");
       const plan: RuntimeCreationPlanFacts = { source: "core-factory-plan", planId: randomUUID(), configDigest: "", roleId: role.id,
         runtime: options.runtime, projectRoot: resolve(options.projectRoot), factoryProvenance: provider.factoryProvenance,
-        status: reasons.length ? "unknown" : "observed", scopeProtection, ...(native ? { native } : {}), reasons };
+        status: reasons.length ? "unknown" : "observed", scopeProtection, ...(native ? { native } : {}),
+        ...(approvalChain ? { approvalChain } : {}), reasons };
       const roleCapabilityGuards = provider.roleCapabilityGuards({ corePlanId: plan.planId,
         ...(native ? { nativePlanId: native.planId, nativeConfigDigest: native.configDigest } : {}) });
       if (roleCapabilityGuards) plan.roleCapabilityGuards = roleCapabilityGuards;
+      // 2026-11-08（§2.3.3）：审批链证据计入摘要——token 因此绑定 approvalChain（变化即换摘要）。
       plan.configDigest = createHash("sha256").update(JSON.stringify({ runtime: plan.runtime, roleId: plan.roleId,
-        factoryProvenance: plan.factoryProvenance, appTools: provider.initialAppTools, native, roleCapabilityGuards })).digest("hex");
+        factoryProvenance: plan.factoryProvenance, appTools: provider.initialAppTools, native, roleCapabilityGuards, approvalChain })).digest("hex");
       provider.registry.fact = { ...provider.registry.fact, planId: plan.planId };
       updateCoreRegistry(provider.registry, "prepared", reasons);
       if (reasons.length) { const result = { plan: structuredClone(plan) }; rolePreparations.set(result, { entry: provider.registry, planId: plan.planId }); return result; }
@@ -1211,8 +1330,11 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         const scope = await readCoreProtectionScope(options.projectRoot);
         if (scope.state === "unknown" || scope.state !== prepared.plan.scopeProtection?.state || scope.revision !== prepared.plan.scopeProtection.revision)
           throw new Error("runtime-protection-scope-changed");
-        if (scope.state === "required" && hasUnconfinedScriptTools(provider.initialAppTools)) throw new Error("required-scope-unconfined-script-tools");
         if (scope.state === "required" && provider.roleCapabilityGuards()?.status === "unknown") throw new Error("required-scope-role-capability-effects-unproven");
+        // P1.3 §2.2.4：删除原 unconfined 检查；重读 live binding（inspect/probe），要求存在、项目根一致、
+        // `file+durable+probe ok`、稳定投影与 plan.approvalChain 一致；否则 protected-scope-approval-chain-changed。
+        await provider.verifyApprovalChainBinding(prepared.plan);
+        provider.setAdmittedPlan(prepared.plan);
         return bindRole(prepared.role, prepared.plan, assertHeld);
       });
       } catch (error) { if (provider.registry.fact.planId === prepared.plan.planId) { provider.revoke(); bindConstructionFailure(error, provider.registry); } throw error; }

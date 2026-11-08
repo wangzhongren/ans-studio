@@ -185,7 +185,9 @@ function gitBody(argv: readonly string[]): readonly string[] | undefined {
   if (JSON.stringify(argv.slice(0, prefix.length)) !== JSON.stringify(prefix)) return;
   return argv.slice(prefix.length);
 }
-function gitQueryBody(facts: GitPolicyFacts): string[] | undefined {
+// 导出仅供同仓测试做「只读 Git 规范体 × 结构化查询模板」差分对照（2026-11-08，W3-G）；
+// 不属公共出口——`src/service/gate/shell-rules.ts` **不得**再导出本函数（单一来源仍在本文件）。
+export function gitQueryBody(facts: GitPolicyFacts): string[] | undefined {
   const paths = [...facts.paths], a = facts.target?.hex, b = facts.other?.hex;
   switch (facts.template) {
     case "status": return ["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--ignore-submodules=all", "--", ...paths];
@@ -1105,8 +1107,12 @@ export function checkGitPolicy(facts: GitPolicyFacts): GitPolicyResult {
  *  "2"：T8a 起规则集按「程序 + argv」重述、元字符仅在 `executionModel` 会经 shell 解释时生效（§7.10）。
  *  "3"：T40 起 `ShellClass` 增第四档 `risky`（§14）；硬拒名单重划（re-shell/内联求值/提权/系统破坏/LOLBin
  *       仍硬拒；删除/原地改写/编辑器/进程服务/网络/间接执行器/构建/包管理/git 写 → risky）；规则集新增
- *       `riskyPrograms` 段。旧 "2" 规则集因版本不符一律被拒（fail-closed）。 */
-export const SHELL_RULES_VERSION = "3";
+ *       `riskyPrograms` 段。旧 "2" 规则集因版本不符一律被拒（fail-closed）。
+ *  "4"：W3-G（2026-11-08，设计 P1.3 §2.4.3/§4.4）起裸 Git 改为「只读精确白名单（`matchReadonlyGit`）
+ *       ⇒ allow / 其余硬拒」；删除 `defaultReadOnly()` 中不可达的 `readonly:git` 死条目（规则数据变化，
+ *       bump）。**不兼容读 v3**：v3 规则集/项目级 pin 一律因版本不符整条拒绝（fail-closed，不静默放宽）；
+ *       迁移须改用 `defaultShellRules()`（`ans-default-v4`）。 */
+export const SHELL_RULES_VERSION = "4";
 
 /** 带原因的判定结果；classifyShell 只取其中的 decision（冻结契约是四态字符串）。 */
 export interface ShellVerdict {
@@ -1409,6 +1415,343 @@ export function matchRoutineShellCommand(argv: string[]): { id: string } | undef
   return undefined;
 }
 
+// —————————————— 只读 Git 精确白名单（2026-11-08，W3-G；设计 P1.3 §2.4.3）——————————————
+//
+// **唯一实现**：分类器（`classifyShellDetailed`）与 shell 写目标守卫（`shell-write-guard.ts`）
+// **共用本函数引用**；`src/service/gate/shell-rules.ts` 公共出口逐字再导出（同一引用，沿用
+// `matchRoutineShellCommand` 先例）。不得复制实现、不得另立第二份模板（设计 F5/F13）。
+//
+// 判据（客户 2026-11-08 补充规格「git 命令只读放行」）：
+//   * `git` 之后**第一项必须是子命令**——任何全局选项（`-c`/`-C`/`--git-dir`/`--work-tree`/
+//     `--exec-path`/`--config-env`/`--namespace`/`--bare`/`--no-pager`/`--literal-pathspecs`/
+//     `--version`/`--help` …）一律拒绝；
+//   * 每个子命令只接受 §2.4.3 表中列出的精确 flag/参数形态，**未列即拒**（deny-by-default；
+//     不落审批——裸 Git 写路径在角色模型里不存在，写/发布只走结构化能力）；
+//   * 路径必须是**字面项目相对路径**：非空、非绝对（含盘符/UNC）、无 `..`/`.`/空段、
+//     无 `.git` 段（大小写不敏感）、无通配（`*`/`?`/`[`/`]`）、无 pathspec magic（`:`，含 `:(…)`）、
+//     无反斜杠与 NUL/控制字符；
+//   * OID 必须是完整 40/64 hex（不接受短 SHA/revision 表达式/分支名）；`HEAD` 仅出现在
+//     `log` 目标、`rev-parse --verify`、`ls-tree` 目标、`merge-base` 参数的允许位置。
+//
+// 执行层不按本 argv 的 PATH/cwd 解析（N12）：只读 Git 经固定本地传输（绝对可执行 + 固定
+// config/env；`executeReadonlyGit`，编排 trunk Provider）执行——**模型提供的程序名只用于匹配**。
+// `buildReadonlyGitBody(match)` 给出**规范 argv 体**（单一来源；审计 `readonlyGit.canonicalArgv`
+// 必须与实际执行体一致，I0-7）。
+
+/** 只读 Git 白名单覆盖的子命令（同时是稳定 id / template / 审计 `allow:readonly:git:<id>` 的 `<id>`）。 */
+export type ReadonlyGitTemplate =
+  | "status" | "log" | "diff" | "show" | "rev-parse"
+  | "ls-files" | "ls-tree" | "merge-base" | "blame" | "cat-file";
+
+/**
+ * `matchReadonlyGit` 的匹配结果（受限描述；执行层只接受本形状并自行构造规范体，
+ * **不接受任意 argv**——见 `executeReadonlyGit` 契约）。`target`/`other` 为小写完整 OID
+ * 或 `HEAD`（视子命令）；`paths` 为按输入原样保留的字面路径。
+ */
+export interface ReadonlyGitMatch {
+  id: ReadonlyGitTemplate;
+  template: ReadonlyGitTemplate;
+  /** 主目标：完整 OID 或 HEAD（log/ls-tree 可缺省 ⇒ HEAD；show/rev-parse/cat-file/merge-base 必有）。 */
+  target?: string;
+  /** 第二目标：diff 的第二个 OID / merge-base 右侧。 */
+  other?: string;
+  /** 字面项目相对路径（`--` 之后原样保留）。 */
+  paths: readonly string[];
+  /** `log -<N>`（1..100；缺省 20）。 */
+  limit?: number;
+  /** `log --oneline`（只影响输出）。 */
+  oneline?: boolean;
+  /** `diff` 显示类 flag（只影响输出，规范体原样保留）。 */
+  display?: "stat" | "name-only" | "name-status";
+  /** `cat-file` 模式：`-t`/`-s`/`-e`/`-p` 或对象类型。 */
+  catFileMode?: "-t" | "-s" | "-e" | "-p" | "blob" | "commit" | "tree" | "tag";
+  /** `blame -L <start>,<end>`（1..2000；跨度 ≤2000）。 */
+  lineStart?: number;
+  lineEnd?: number;
+}
+
+/** `git` 程序名判定（路径前缀/`.exe|.cmd|.bat` 归一，小写）——与 `gitQueryBody` 的受控入口同一判据。 */
+function isRawGitProgramName(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const base = raw.replace(/\\/g, "/").split("/").at(-1) ?? "";
+  return /^git(?:\.exe|\.cmd|\.bat)?$/i.test(base);
+}
+
+/** 字面项目相对路径（§2.4.3）：非空/非绝对/无 `..`/`.git` 段/无通配或 pathspec magic/无控制字符。 */
+function isReadonlyGitPath(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
+  if (/[\x00-\x1f\x7f]/.test(value)) return false;
+  if (value.startsWith("-")) return false;
+  if (value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:/.test(value)) return false;
+  // `:`（含 `:(…)` magic）、`*`/`?`/`[`/`]` 通配、反斜杠分隔符（Windows 路径）一律不命中。
+  if (/[\\:*?\[\]]/.test(value)) return false;
+  const body = value.endsWith("/") ? value.slice(0, -1) : value;
+  if (body.length === 0) return false;
+  return body.split("/").every((seg) => seg !== "" && seg !== "." && seg !== ".." && seg.toLowerCase() !== ".git");
+}
+
+/** 完整 OID：40 或 64 位 hex（大小写接受；规范体统一小写）。 */
+function isReadonlyGitOid(value: unknown): value is string {
+  return typeof value === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i.test(value);
+}
+
+function readonlyGitHeadOrOid(value: unknown): value is string {
+  return value === "HEAD" || isReadonlyGitOid(value);
+}
+
+/** 规范体目标记号：OID 统一小写；HEAD 原样。 */
+function readonlyGitTarget(value: string): string {
+  return value === "HEAD" ? "HEAD" : value.toLowerCase();
+}
+
+/**
+ * 拆分 `<flags> [-- <literal paths>…]`：`--` 最多出现一次；无 `--` 时全部 token 都必须是 flag
+ * （路径必须位于 `--` 之后——表形态如此）；`--` 之后的每一项都必须过 `isReadonlyGitPath`。
+ */
+function splitReadonlyGitPathspec(tokens: readonly string[]): { flags: string[]; paths: string[] } | undefined {
+  const idx = tokens.indexOf("--");
+  if (idx === -1) return { flags: [...tokens], paths: [] };
+  if (tokens.indexOf("--", idx + 1) !== -1) return undefined;
+  const paths = tokens.slice(idx + 1);
+  if (!paths.every(isReadonlyGitPath)) return undefined;
+  return { flags: tokens.slice(0, idx).map(String), paths: [...paths] };
+}
+
+const READONLY_GIT_CAT_FILE_MODES: ReadonlySet<string> = new Set(["-t", "-s", "-e", "-p", "blob", "commit", "tree", "tag"]);
+const READONLY_GIT_DIFF_DISPLAY: ReadonlyMap<string, ReadonlyGitMatch["display"]> = new Map([
+  ["--stat", "stat"],
+  ["--name-only", "name-only"],
+  ["--name-status", "name-status"],
+]);
+
+/**
+ * 只读 Git 精确白名单谓词（§2.4.3 白名单全形态；唯一实现）。
+ * 命中返回受限描述 `ReadonlyGitMatch`；未命中返回 `undefined`（调用方维持硬拒 / 非 Git 路径不受影响）。
+ * 纯函数：无 IO、无副作用、不依赖规则集。
+ */
+export function matchReadonlyGit(argv: readonly unknown[]): ReadonlyGitMatch | undefined {
+  if (!Array.isArray(argv) || argv.length < 2) return undefined;
+  if (!argv.every((a) => typeof a === "string")) return undefined;
+  const args = argv as readonly string[];
+  if (!isRawGitProgramName(args[0])) return undefined;
+  const sub = args[1]!;
+  const rest = args.slice(2);
+  switch (sub) {
+    case "status": {
+      const split = splitReadonlyGitPathspec(rest);
+      if (!split) return undefined;
+      if (!split.flags.every((f) => f === "--porcelain" || f === "--porcelain=v1" || f === "--short" || f === "-s")) return undefined;
+      return { id: "status", template: "status", paths: split.paths };
+    }
+    case "log": {
+      const split = splitReadonlyGitPathspec(rest);
+      if (!split) return undefined;
+      let limit: number | undefined;
+      let oneline = false;
+      let target: string | undefined;
+      for (const token of split.flags) {
+        const limitMatch = /^-([1-9]\d{0,2})$/.exec(token);
+        if (limitMatch) {
+          if (limit !== undefined) return undefined;
+          limit = Number(limitMatch[1]);
+          if (limit > 100) return undefined;
+          continue;
+        }
+        if (token === "--oneline") {
+          if (oneline) return undefined;
+          oneline = true;
+          continue;
+        }
+        if (readonlyGitHeadOrOid(token)) {
+          if (target !== undefined) return undefined;
+          target = readonlyGitTarget(token);
+          continue;
+        }
+        return undefined;
+      }
+      return {
+        id: "log",
+        template: "log",
+        ...(target !== undefined ? { target } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+        ...(oneline ? { oneline: true } : {}),
+        paths: split.paths,
+      };
+    }
+    case "diff": {
+      const split = splitReadonlyGitPathspec(rest);
+      if (!split) return undefined;
+      // 显示类 flag 只影响输出（规范体原样保留）；`--no-ext-diff`/`--no-textconv` 与规范体幂等。
+      let display: ReadonlyGitMatch["display"];
+      const oids: string[] = [];
+      for (const token of split.flags) {
+        const displayValue = READONLY_GIT_DIFF_DISPLAY.get(token);
+        if (displayValue !== undefined) {
+          if (display !== undefined) return undefined;
+          display = displayValue;
+          continue;
+        }
+        if (token === "--no-ext-diff" || token === "--no-textconv") continue;
+        if (isReadonlyGitOid(token)) {
+          if (oids.length >= 2) return undefined;
+          oids.push(token.toLowerCase());
+          continue;
+        }
+        return undefined;
+      }
+      return {
+        id: "diff",
+        template: "diff",
+        ...(oids[0] !== undefined ? { target: oids[0] } : {}),
+        ...(oids[1] !== undefined ? { other: oids[1] } : {}),
+        ...(display !== undefined ? { display } : {}),
+        paths: split.paths,
+      };
+    }
+    case "show": {
+      if (rest.length !== 1) return undefined;
+      const match = /^([0-9a-fA-F]{40}|[0-9a-fA-F]{64}):(.+)$/.exec(rest[0]!);
+      if (!match) return undefined;
+      const [, oidText, pathText] = match;
+      if (!isReadonlyGitPath(pathText)) return undefined;
+      return { id: "show", template: "show", target: oidText!.toLowerCase(), paths: [pathText!] };
+    }
+    case "rev-parse": {
+      if (rest.length !== 2 || rest[0] !== "--verify" || !readonlyGitHeadOrOid(rest[1])) return undefined;
+      return { id: "rev-parse", template: "rev-parse", target: readonlyGitTarget(rest[1]!), paths: [] };
+    }
+    case "ls-files": {
+      const split = splitReadonlyGitPathspec(rest);
+      if (!split) return undefined;
+      if (!split.flags.every((f) => f === "--stage" || f === "-z")) return undefined;
+      return { id: "ls-files", template: "ls-files", paths: split.paths };
+    }
+    case "ls-tree": {
+      const split = splitReadonlyGitPathspec(rest);
+      if (!split) return undefined;
+      let target: string | undefined;
+      for (const token of split.flags) {
+        if (token === "-r" || token === "--full-tree") continue;
+        if (readonlyGitHeadOrOid(token)) {
+          if (target !== undefined) return undefined;
+          target = readonlyGitTarget(token);
+          continue;
+        }
+        return undefined;
+      }
+      return { id: "ls-tree", template: "ls-tree", ...(target !== undefined ? { target } : {}), paths: split.paths };
+    }
+    case "merge-base": {
+      if (rest.length !== 2 || !readonlyGitHeadOrOid(rest[0]) || !readonlyGitHeadOrOid(rest[1])) return undefined;
+      return {
+        id: "merge-base",
+        template: "merge-base",
+        target: readonlyGitTarget(rest[0]!),
+        other: readonlyGitTarget(rest[1]!),
+        paths: [],
+      };
+    }
+    case "blame": {
+      let lineStart: number | undefined;
+      let lineEnd: number | undefined;
+      let tokens = rest;
+      if (tokens[0] === "-L") {
+        const range = tokens[1];
+        if (range === undefined) return undefined;
+        const match = /^([1-9]\d{0,3}),([1-9]\d{0,3})$/.exec(range);
+        if (!match) return undefined;
+        lineStart = Number(match[1]);
+        lineEnd = Number(match[2]);
+        // 行号 1..2000、跨度 ≤2000（§2.4.3）。
+        if (lineStart > 2000 || lineEnd > 2000 || lineStart > lineEnd || lineEnd - lineStart + 1 > 2000) return undefined;
+        tokens = tokens.slice(2);
+      }
+      if (tokens.length !== 2 || tokens[0] !== "--" || !isReadonlyGitPath(tokens[1])) return undefined;
+      return {
+        id: "blame",
+        template: "blame",
+        paths: [tokens[1]!],
+        ...(lineStart !== undefined && lineEnd !== undefined ? { lineStart, lineEnd } : {}),
+      };
+    }
+    case "cat-file": {
+      if (rest.length !== 2 || !READONLY_GIT_CAT_FILE_MODES.has(rest[0]!) || !isReadonlyGitOid(rest[1])) return undefined;
+      return {
+        id: "cat-file",
+        template: "cat-file",
+        target: rest[1]!.toLowerCase(),
+        catFileMode: rest[0] as ReadonlyGitMatch["catFileMode"],
+        paths: [],
+      };
+    }
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * 只读 Git 规范 argv 体（单一来源，§2.4.3；审计 `readonlyGit.canonicalArgv` 与实际执行体一致）。
+ * 与 `gitQueryBody` 的重叠模板由 `test/门禁引擎/readonly-git-matcher.test.ts` 做差分断言；
+ * 允许的分叉（log 默认 HEAD 而非 `--all`、`--oneline`、diff 显示类 flag、ls-tree 默认 HEAD、
+ * blame/cat-file 无结构化模板）逐条记录在同一测试与变更证据中。
+ */
+export function buildReadonlyGitBody(match: ReadonlyGitMatch): string[] {
+  const paths = [...match.paths];
+  switch (match.template) {
+    case "status":
+      return ["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--ignore-submodules=all", "--", ...paths];
+    case "log":
+      return [
+        "log",
+        `-${match.limit ?? 20}`,
+        ...(match.oneline === true ? ["--oneline"] : []),
+        "--format=%H%x00%P%x00%s",
+        match.target ?? "HEAD",
+        "--",
+        ...paths,
+      ];
+    case "diff": {
+      const display = match.display === "stat" ? ["--stat"]
+        : match.display === "name-only" ? ["--name-only"]
+          : match.display === "name-status" ? ["--name-status"] : [];
+      return [
+        "diff",
+        ...display,
+        "--no-ext-diff",
+        "--no-textconv",
+        "--ignore-submodules=all",
+        ...(match.target !== undefined ? [match.target] : []),
+        ...(match.other !== undefined ? [match.other] : []),
+        "--",
+        ...paths,
+      ];
+    }
+    case "show":
+      return ["cat-file", "blob", `${match.target!}:${paths[0]!}`];
+    case "rev-parse":
+      return ["rev-parse", "--verify", `${match.target!}^{commit}`];
+    case "ls-files":
+      return ["ls-files", "--stage", "-z", "--", ...paths];
+    case "ls-tree":
+      return ["ls-tree", "-r", "-z", "--full-tree", match.target ?? "HEAD", "--", ...paths];
+    case "merge-base":
+      return ["merge-base", match.target!, match.other!];
+    case "blame":
+      return [
+        "blame",
+        ...(match.lineStart !== undefined && match.lineEnd !== undefined ? ["-L", `${match.lineStart},${match.lineEnd}`] : []),
+        "--",
+        paths[0]!,
+      ];
+    case "cat-file":
+      return ["cat-file", match.catFileMode!, match.target!];
+    default: {
+      const exhaustive: never = match.template;
+      throw new Error(`未知只读 Git 模板：${String(exhaustive)}`);
+    }
+  }
+}
+
 // rg 的带值选项仅用于跳过参数值（例如 -e --pre 是模式），不是新的安全白名单。
 // D3 只识别显式 --pre；隐藏配置、其他间接执行能力沿用已接受的风险取舍。
 const RG_VALUE_OPTIONS = new Set([
@@ -1486,9 +1829,19 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
     return { decision: "deny", reason: "argv 含非字符串元素（fail-closed）", ruleId: "deny:argv-invalid" };
   }
   const args = argv as string[];
-  const rawGitProgram = args[0]!.replace(/\\/g, "/").split("/").at(-1)!.toLowerCase();
-  if (/^git(?:\.exe|\.cmd|\.bat)?$/.test(rawGitProgram)) return { decision: "deny", ruleId: "deny:raw-git-controlled-tools-required",
-    reason: "裸 Git 未经受控配置/env/完整模板与角色ACL；请使用 git_query / git_candidate / git_publish，旧shell审批不能替代该边界。" };
+  // 2) 裸 Git（2026-11-08，W3-G）：**只读精确白名单**命中 ⇒ allow（供 run_shell；执行侧经固定传输，
+  //    见 `executeReadonlyGit`）；未命中 ⇒ 维持硬拒（写/发布只走结构化 git_query / git_candidate /
+  //    git_publish）。本判定位置仍在 hardDeny/denyTokens/risky/readonly 分支**之前**：
+  //    只读 Git 不受自定义硬拒/risky 规则误伤；非白名单形态也绝不会落入 (b)/(a) 被批准。
+  //    分类器本身不区分入口——`start_background_task` 不享受放行由写目标守卫按 `entry` 拒绝。
+  if (isRawGitProgramName(args[0])) {
+    const readonlyGit = matchReadonlyGit(args);
+    if (readonlyGit !== undefined) {
+      return { decision: "allow", reason: `命中只读 Git 精确白名单：${readonlyGit.id}`, ruleId: `allow:readonly:git:${readonlyGit.id}` };
+    }
+    return { decision: "deny", ruleId: "deny:raw-git-controlled-tools-required",
+      reason: "裸 Git 只读白名单之外一律硬拒：未经受控配置/env/完整模板与角色ACL；请使用 git_query / git_candidate / git_publish，旧shell审批不能替代该边界。" };
+  }
 
   // 3) 结构性硬拒：换行/回车（多命令拼接）——**仅当执行模型会经 shell 解释时**成立（§7.10）。
   //    shell:false 下 argv 元素里的换行只是普通字节、不产生第二条命令，故不拒（否则误杀多行参数）。
@@ -1639,17 +1992,8 @@ function defaultReadOnly(): ShellReadOnlyRule[] {
     { id: "readlink", program: "readlink" },
     { id: "basename", program: "basename" },
     { id: "dirname", program: "dirname" },
-    // git：仅明确只读的子命令；--output/-o 会写文件，故列入 blockedFlags
-    {
-      id: "git",
-      program: "git",
-      subcommands: [
-        "status", "log", "diff", "show", "blame", "ls-files", "ls-tree", "shortlog",
-        "whatchanged", "describe", "rev-parse", "rev-list", "merge-base", "cat-file",
-        "grep", "show-ref", "name-rev", "for-each-ref", "var", "count-objects", "fsck",
-      ],
-      blockedFlags: ["--output", "-o"],
-    },
+    // git：**不在此表**（W3-G 起单一来源为 `matchReadonlyGit` 精确白名单，分类器第 2 步先于本表判定；
+    // 旧 `readonly:git` 子命令表是裸 Git 硬拒下的死数据，已随规则集 v4 删除，避免双口径/误读为仍生效）。
     // 解释器仅放「打印版本」这一确定只读形态（其余形态见硬拒/已知缺口）
     { id: "node-version", program: "node", subcommands: ["--version", "-v"] },
     {
@@ -1756,10 +2100,11 @@ function defaultRisky(): ShellRiskyRule[] {
       ],
     },
     // git 的「危险 flag」写开关：`--output`/`--output=<file>` 会把结果写盘（§7.10「危险 flag」）。
-    // 置于 git 写子命令之前：只带 --output 的只读子命令（如 `git log --output=x`）也据此判 risky。
-    // （readonly:git 的 blockedFlags 保留作纵深冗余。）
+    // 2026-11-08（W3-G/v4）：裸 Git 已在分类器第 2 步终结（只读白名单 allow / 其余硬拒），本规则在
+    // 默认规则集下**不可达**——保留为数据纵深（若未来有人把 Git 分支挪到 risky 之后，写形态仍按 risky
+    // 交 (b)+(a)，而不是静默 review）；它不是只读白名单的一部分，也不得被用作放行依据。
     { id: "risky:git-output-write", programs: ["git"], onlyWithFlag: ["--output"] },
-    // git 的写子命令（与 readonly:git 互补：这里列出会改盘/改历史的子命令）
+    // git 的写子命令（同上：默认规则集下不可达的数据纵深，列出会改盘/改历史的子命令）
     {
       id: "risky:git-write",
       programs: ["git"],
@@ -1789,7 +2134,7 @@ function defaultDenyTokens(): string[] {
 export function defaultShellRules(): ShellRules {
   return {
     version: SHELL_RULES_VERSION,
-    id: "ans-default-v3", // 规则集 id（审计 / §7.6 归属；装配方可取它，不必另传 rulesId）
+    id: "ans-default-v4", // 规则集 id（审计 / §7.6 归属；装配方可取它，不必另传 rulesId）；v4 起删除死 readonly:git
     // 执行模型（§7.10）：本规则集按「程序 + argv」分类，绑定 `spawn(shell:false)`。
     // ★ 若执行层改回 shell 字符串 / shell:true，必须改为 "shell-string"（或删字段），否则元字符规则空转。
     executionModel: "argv-noshell",

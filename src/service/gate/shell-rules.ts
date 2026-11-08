@@ -13,8 +13,18 @@
 //     —— 例行命令确定性白名单谓词（2026-10-31，方案 v1.3 §5.3）：分类器与写守卫的**唯一实现**；
 //        编排/委托策略（`routine-shell-policy`）经本出口消费同一函数引用，不复制形状判定。
 //        命中 id 稳定（`allow:routine:<id>`）；委托策略只接受原委托三 id（npm-test / npm-run-typecheck / node-test）。
+//   matchReadonlyGit(argv: readonly string[]): ReadonlyGitMatch | undefined
+//     —— 只读 Git 精确白名单谓词（2026-11-08，W3-G / 设计 P1.3 §2.4.3）：分类器与写守卫的**唯一实现**
+//        （同一函数引用，防「只改分类器、写守卫仍拒」）；命中 id 稳定（`allow:readonly:git:<id>`）。
+//        编排 trunk 的固定传输入口（`executeReadonlyGit`，I0-4）与运行时路由经本出口构造/消费，
+//        **不得**复制 matcher 或另立第二份模板实现。
+//   buildReadonlyGitBody(match: ReadonlyGitMatch): string[]
+//     —— 规范 argv 体单一来源（审计 `readonlyGit.canonicalArgv` 必须与实际执行体一致，I0-7）。
+//
+// 私有实现（`gitQueryBody` 等）**不**经本出口导出；同仓测试可直接引用私有模块对照。
 
-export { classifyShell, defaultShellRules, matchRoutineShellCommand } from "../../common/门禁引擎/classify-shell.ts";
+export { classifyShell, defaultShellRules, matchRoutineShellCommand, matchReadonlyGit, buildReadonlyGitBody } from "../../common/门禁引擎/classify-shell.ts";
+export type { ReadonlyGitMatch, ReadonlyGitTemplate } from "../../common/门禁引擎/classify-shell.ts";
 export { checkGitPolicy, computeGitPolicyDigest } from "../../common/门禁引擎/classify-shell.ts";
 export type { GitPolicyFacts, GitPolicyResult, GitPolicyTemplate, GitPolicyDiffEntry, GitRawObjectPlan, GitAppGeneratedFile, GitBusinessPublication, GitRoleActivationPublication, GitStableInitialWorkflowSource, GitInitialWorkflowPublication, GitPolicyTreeEntry, GitDeliveryTaskSource, GitDeliveryIntegrationSource, GitRefPublicationPolicyPlan, GitDeliveryBasis } from "../../common/门禁引擎/classify-shell.ts";
 export type { GitRawTreeEntry, RawTree, GitRawDiffEntry, GitRawObjectInput, GitRawStoredCommit, GitRawRevertCommit, GitRawRevertBasis, GitRawRevertConflict } from "../../model/trunk.ts";

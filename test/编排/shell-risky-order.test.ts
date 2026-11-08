@@ -36,7 +36,9 @@ import {
 import { createMemoryAuditSink } from "../../src/common/编排/shell-audit.ts";
 import { classifyShell, defaultShellRules } from "../../src/common/门禁引擎/classify-shell.ts";
 
-const RULES: ShellRules = { version: "3", readOnly: [], hardDenyPrograms: [], riskyPrograms: [], denyTokens: [] };
+// 2026-11-08（W3-G I0-5 规则集 v4）：夹具 version 同步为当前规则集版本 "4"（stub classifier 不经
+// `validateRules`，此同步是口径一致性；不改变任何判定）。
+const RULES: ShellRules = { version: "4", readOnly: [], hardDenyPrograms: [], riskyPrograms: [], denyTokens: [] };
 const RULES_ID = "test-ruleset";
 // 一条「危险但有正当用途」的命令形态（真实分类由 stub 覆盖为 risky）。
 const REQ = { command: "rm -rf build", argv: ["rm", "-rf", "build"], cwd: "/proj", toolCallId: "call-1" };

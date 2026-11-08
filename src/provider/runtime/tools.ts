@@ -16,6 +16,8 @@ import type {
   ShellExecutionOutcome,
   ShellReviewResult,
   ShellEscalationFn,
+  ReadonlyGitCapability,
+  ReadonlyGitExecutionFacts,
   CustomerInputFn,
   CustomerInputRequest,
   CustomerInputOutcome,
@@ -1511,7 +1513,21 @@ function makeRequestShellEscalationTool(fn: ShellEscalationFn): ExecutableTool {
  * **审核与 spawn 同址**（§7.1 第 3 条）：这是**唯一** spawn 点，且**没有 token**——不再「登记票据交扩展层」，
  * 因为票据可由公开输入重算、证明不了审核发生过。此处就是每调用保证的唯一落点。
  */
-function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[], shellPostAudit?: ShellPostAuditFn, lifecycle?: RuntimeToolLifecycle): ExecutableTool {
+/**
+ * 只读 Git 路由的程序名判据（2026-11-08 W4-R，设计 P1.3 §2.4.3 / I0-4）：
+ * basename（去目录）、去 `.exe`/`.cmd`/`.bat`、小写后为 `git`。
+ *
+ * 仅用于**路由决定**；实际执行必须经注入的 `readonlyGit` 固定传输能力（绝对可执行 + 固定 config/env），
+ * **绝不回退通用 spawn**（N12：执行层不按 PATH/cwd 解析，防项目内同名程序劫持）。
+ */
+function isReadonlyGitProgram(argv: readonly string[]): boolean {
+  const program = argv[0];
+  if (typeof program !== "string" || program === "") return false;
+  const base = program.split(/[\\/]/).pop() ?? "";
+  return base.toLowerCase().replace(/\.(exe|cmd|bat)$/, "") === "git";
+}
+
+function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutMs: number, execTimeoutMs: number, gate?: InteractionGate, diagnostics?: DiagnosticLog, currentTurnId?: () => string | undefined, extraCredentialEnvVars?: readonly string[], shellPostAudit?: ShellPostAuditFn, lifecycle?: RuntimeToolLifecycle, roleId?: string, readonlyGit?: ReadonlyGitCapability): ExecutableTool {
   const name = SHELL_TOOL_NAME;
   return {
     name,
@@ -1530,7 +1546,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       const auditNote = async (outcome: ShellExecutionOutcome): Promise<{ note: string; violated: boolean }> => {
         if (shellPostAudit === undefined) return { note: "", violated: false };
         try {
-          const result = await shellPostAudit({ command, argv, cwd, toolCallId, entry: "run_shell" }, outcome);
+          const result = await shellPostAudit({ command, argv, cwd, toolCallId, entry: "run_shell", ...(roleId !== undefined ? { roleId } : {}) }, outcome);
           if (result.violations.length === 0) return { note: "", violated: false };
           const shown = result.violations.slice(0, 8).map((v) => `${v.change}:${v.path}`).join("、");
           const more = result.violations.length > 8 ? ` 等 ${result.violations.length} 项` : "";
@@ -1560,7 +1576,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       gate?.begin();
       diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
       try {
-        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "run_shell" }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "run_shell", ...(roleId !== undefined ? { roleId } : {}) }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
       } catch (err) {
         diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
         // 审核抛错 / 超时 → **绝不 spawn**（fail-closed；超时 = 拒绝，§7.5.2）。
@@ -1586,7 +1602,47 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
       //     观测（F-1-d）：`shell.exec.start` 携带**生效**的时限值，供观测与测试快速断言解析链（不必真等分钟级）。
       const execBegan = Date.now();
       diagnostics?.record("shell.exec.start", { turnId, toolCallId, toolName: name, timeoutMs: execTimeoutMs });
-      const outcome = await runShell(argv, cwd, buildShellEnv(process.env, extraCredentialEnvVars), call.signal, execTimeoutMs, lifecycle);
+      // 2026-11-08（W4-R，设计 P1.3 §2.4.3 / I0-4）：只读 Git 固定传输路由。审核已 allow，但程序名为
+      // `git` 时**不得**回退通用 spawn（N12）：有能力且 `match(argv)` 命中 ⇒ `execute`；无能力/未命中
+      // ⇒ `readonly-git-runner-unavailable` 且零执行。非 git 命令维持现状 spawn。
+      let outcome: ShellExecOutcome;
+      let gitRouted = false;
+      if (isReadonlyGitProgram(argv)) {
+        const match = readonlyGit?.match(argv);
+        if (readonlyGit === undefined || match === undefined || match === null) {
+          diagnostics?.record("shell.exec.readonly-git.unavailable", { turnId, toolCallId, toolName: name, reasonCode: "readonly-git-runner-unavailable" });
+          return {
+            ok: false,
+            message: `${name} 未执行：只读 Git 路由不可用（readonly-git-runner-unavailable）——本次未启动任何进程，也不会回退通用 spawn。` +
+              `只读 Git 需应用注入固定传输能力；写/发布请使用结构化 git_candidate / git_publish，查询请使用 git_query。` + grantNote,
+          };
+        }
+        gitRouted = true;
+        diagnostics?.record("shell.exec.readonly-git.start", { turnId, toolCallId, toolName: name });
+        let facts: ReadonlyGitExecutionFacts;
+        try {
+          facts = await readonlyGit.execute(match, { timeoutMs: execTimeoutMs, outputLimit: MAX_SHELL_OUTPUT_BYTES });
+        } catch (err) {
+          return { ok: false, message: `${name} 执行失败（只读 Git 固定传输）：${reasonOf(err)}` + grantNote };
+        }
+        if (!facts || typeof facts !== "object" || typeof facts.stdout !== "string" || typeof facts.stderr !== "string") {
+          return { ok: false, message: `${name} 执行失败（只读 Git 固定传输返回的执行事实非法，按未执行处理）` + grantNote };
+        }
+        outcome = {
+          ...(facts.exitCode !== undefined ? { code: facts.exitCode } : {}),
+          signal: facts.signal ?? null,
+          stdout: facts.stdout,
+          stderr: facts.stderr,
+          ...(facts.error !== undefined ? { error: facts.error } : {}),
+          ...(facts.timedOut !== undefined ? { timedOut: facts.timedOut } : {}),
+          ...(facts.timeoutMs !== undefined ? { timeoutMs: facts.timeoutMs } : {}),
+          stdoutTruncated: facts.stdoutTruncated === true,
+          stderrTruncated: facts.stderrTruncated === true,
+        };
+      } else {
+        outcome = await runShell(argv, cwd, buildShellEnv(process.env, extraCredentialEnvVars), call.signal, execTimeoutMs, lifecycle);
+      }
+      const transportNote = gitRouted ? "\n说明：本次为只读 Git 白名单命令，经应用固定 Git 传输执行（不按 PATH 查找程序）。" : "";
       // —— 命令级超时（F-1-a）：如实返回「超时已终止（N ms）」+ 已收集的部分输出；**轮次继续**
       //    （模型可重试/换脚本/如实报告）——与「停止本轮」的 ABORTED 语义明确区分。 ——
       if (outcome.timedOut === true) {
@@ -1608,12 +1664,12 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
             stdoutTruncated: outcome.stdoutTruncated === true,
             stderrTruncated: outcome.stderrTruncated === true,
           },
-          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note + grantNote,
+          message: `${head}\nstdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}\n提示：可重试、拆分命令，或把逻辑写成脚本文件后执行；本轮可继续。` + audited.note + grantNote + transportNote,
         };
       }
       if (outcome.error !== undefined) {
         const audited = await auditNote({ error: outcome.error, ...(outcome.code !== undefined ? { exitCode: outcome.code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
-        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note + grantNote, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
+        return { ok: false, message: `${name} 执行失败（未能启动或运行）：${outcome.error}` + audited.note + grantNote + transportNote, execution: { error: outcome.error, ...(outcome.code !== undefined ? { exitCode:outcome.code } : {}), ...(outcome.signal ? {signal:outcome.signal} : {}) } };
       }
       const code = outcome.code;
       const audited = await auditNote({ ...(code !== undefined ? { exitCode: code } : {}), ...(outcome.signal ? { signal: outcome.signal } : {}) });
@@ -1622,7 +1678,7 @@ function makeRunShellTool(shellGate: ShellGate, shellCwd: string, reviewTimeoutM
         execution: { ...(code !== undefined ? {exitCode:code} : {}), ...(outcome.signal ? {signal:outcome.signal} : {}), stdout:outcome.stdout, stderr:outcome.stderr, stdoutTruncated:outcome.stdoutTruncated === true, stderrTruncated:outcome.stderrTruncated === true },
         message:
           `${name} 已执行：${command}（exit ${code ?? "?"}${outcome.signal ? `，signal ${outcome.signal}` : ""}）\n` +
-          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note + grantNote,
+          `stdout:\n${outcome.stdout}\nstderr:\n${outcome.stderr}` + audited.note + grantNote + transportNote,
       };
     },
   };
@@ -1682,6 +1738,7 @@ function makeStartBackgroundTaskTool(
   diagnostics?: DiagnosticLog,
   currentTurnId?: () => string | undefined,
   extraCredentialEnvVars?: readonly string[],
+  roleId?: string,
 ): ExecutableTool {
   const name = START_BACKGROUND_TASK_TOOL_NAME;
   return {
@@ -1722,7 +1779,7 @@ function makeStartBackgroundTaskTool(
       gate?.begin();
       diagnostics?.record("shell.review.start", { turnId, toolCallId, toolName: name });
       try {
-        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "start_background_task" }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
+        review = await withTimeout(raceAbort(Promise.resolve().then(() => { if (call.signal?.aborted) throw new Error("会话已中止"); return shellGate({ command, argv, cwd, toolCallId, entry: "start_background_task", ...(roleId !== undefined ? { roleId } : {}) }); }), call.signal, `${name} 审核`), reviewTimeoutMs, `${name} 审核`);
       } catch (err) {
         diagnostics?.error("shell.review.failed", err, { turnId, toolCallId, toolName: name });
         return { ok: false, message: `${name} 未启动：审核未通过（${reasonOf(err)}）——未执行任何进程` };
@@ -5074,7 +5131,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     // 与 reviewMs 同址在构建时解析一次；`RuntimeSessionOptions` 以 `...options` 透传，桌面端经 env 即可起效。
     const execMs =
       options?.shellExecTimeoutMs ?? readTimeoutMs(process.env, SHELL_EXEC_TIMEOUT_ENV, DEFAULT_SHELL_EXEC_TIMEOUT_MS);
-    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.shellPostAudit, lifecycle));
+    tools.push(makeRunShellTool(shellGate, shellCwd, reviewMs, execMs, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.shellPostAudit, lifecycle, options?.roleId, options?.readonlyGit));
 
     // 结构性保证（2026-10-31 升级方案 v1.3 §6.4，「注入才注册」）：`request_shell_escalation`
     // **只在 shell 已 arm（注入了 ShellGate）且注入了 `shellEscalation` 能力时**注册；能力缺席 ⇒
@@ -5090,7 +5147,7 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
     const backgroundTasks = options?.backgroundTasks;
     if (backgroundTasks !== undefined) {
       tools.push(
-        makeStartBackgroundTaskTool(shellGate, shellCwd, reviewMs, backgroundTasks, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars),
+        makeStartBackgroundTaskTool(shellGate, shellCwd, reviewMs, backgroundTasks, options?.interactionGate, options?.diagnostics, options?.currentTurnId, options?.extraCredentialEnvVars, options?.roleId),
         makeListBackgroundTasksTool(backgroundTasks),
         makeReadBackgroundTaskTool(backgroundTasks),
         makeStopBackgroundTaskTool(backgroundTasks),

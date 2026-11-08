@@ -1007,6 +1007,7 @@ export const enUS = {
   "ui.judge.roleName.verifier": "QA",
   "ui.judge.titleSu": "Governance command approval",
   "ui.judge.titleShell": "shell command request",
+  "ui.judge.entryForeground": "Foreground command",
   "ui.judge.tier.risky": "Risky command (risky)",
   "ui.judge.tier.review": "Not auto-classified (review)",
   "ui.judge.tier.deny": "Hard-deny class (deny)",

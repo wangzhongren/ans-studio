@@ -137,6 +137,11 @@ export interface AssembleShellGateOptions extends ShellEscalationWiring, ShellDi
    * 显式 `false` 保留旧硬拒路径用于回归。
    */
   advisoryRuleset?: boolean;
+  /**
+   * **审计失败策略**（2026-11-08 P1.3 §2.5.5 / I0-6）：`run-role` 按受保护范围传入
+   * （`required` ⇒ `"deny-non-readonly"`；否则缺省 `"observe"`）。透传到 `buildShellGate`/`createShellGate`。
+   */
+  auditFailurePolicy?: "observe" | "deny-non-readonly";
 }
 
 /**
@@ -214,6 +219,8 @@ export async function assembleProjectShellGate(opts: AssembleShellGateOptions): 
     ...(opts.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: opts.onAuditSinkCreated } : {}),
     // 项目角色三层链默认 advisory（客户 2026-10-18）：规则只放行，不拒绝；拒绝交 (a)。
     advisoryRuleset: opts.advisoryRuleset ?? true,
+    // 2026-11-08（I0-6）：审计失败策略（受保护范围由 run-role 传入 `deny-non-readonly`）。
+    ...(opts.auditFailurePolicy !== undefined ? { auditFailurePolicy: opts.auditFailurePolicy } : {}),
   });
 }
 
@@ -337,6 +344,8 @@ export interface AssembleOperatorShellGateOptions extends ShellEscalationWiring,
   snapshotBefore?: (req: Parameters<ShellGate>[0]) => Promise<void> | void;
   /** 2026-10-29（Q1/Q2 口径修正）：不透明执行/脚本命令的审查上下文加载器（有界脚本内容）。 */
   approvalContextLoader?: (req: Parameters<ShellGate>[0]) => Promise<{ ok: true; context: ShellApprovalContext } | { ok: false; reason: string }>;
+  /** 审计失败策略（见 `AssembleShellGateOptions.auditFailurePolicy`；2026-11-08 P1.3 §2.5.5 / I0-6）。 */
+  auditFailurePolicy?: "observe" | "deny-non-readonly";
 }
 
 /**
@@ -403,6 +412,8 @@ export async function assembleOperatorShellGate(
     // 2026-11-03 客户授权平面（B1）：审批指令消费者（缺省不传 = 旧行为逐字不变）。
     ...(opts.takeDirective !== undefined ? { takeDirective: opts.takeDirective } : {}),
     ...(opts.onAuditSinkCreated !== undefined ? { onAuditSinkCreated: opts.onAuditSinkCreated } : {}),
+    // 2026-11-08（I0-6）：审计失败策略（受保护范围由 run-role 传入 `deny-non-readonly`）。
+    ...(opts.auditFailurePolicy !== undefined ? { auditFailurePolicy: opts.auditFailurePolicy } : {}),
   });
 }
 

@@ -122,6 +122,15 @@ export interface ShellAuditRecord {
   escalation?: ShellAuditEscalation;
   /** 审核入口（可选加法；缺省按 `run_shell` 兼容旧调用）。授权键/审计可辨。 */
   entry?: "run_shell" | "start_background_task";
+  /**
+   * **只读 Git 放行**（2026-11-08「会话创建准入按操作审批」方案 P1.3 §2.4.3；派发接口评审 I0-7）：
+   * 仅当分类结果为只读 Git 白名单命中（ruleId `allow:readonly:git:<id>`）时出现。
+   * `id` 为只读子命令模板 id；`canonicalArgv` 为**实际执行的规范 argv 体**——单一来源
+   * `buildReadonlyGitBody(match)`，与实际执行体逐字一致（不得另写第二份模板实现）。
+   */
+  readonlyGit?: { id: string; canonicalArgv: string[] };
+  /** 会话角色 id（可选加法；来自适配器 options，非模型输入）。 */
+  roleId?: string;
 }
 
 /** 审计落盘结果；false 时 reason 说明为何未落盘（如条件缺失被门禁拒绝）。 */
@@ -133,6 +142,17 @@ export interface ShellAuditOutcome {
 /** 审计落盘接口（注入给 `createShellGate`）。 */
 export interface ShellAuditSink {
   append(record: ShellAuditRecord): Promise<ShellAuditOutcome>;
+  /**
+   * **审计写门禁探针**（2026-11-08 P1.3 §2.3.1/F4，供 `shell-approval-binding` 内部执行）：
+   * 与运行期 `append` 同一 F-6-1 语义——用当前活跃门禁做**纯判定**（不写盘、不建目录）；
+   * 被拒且注入了 `refreshGate` ⇒ await 刷新后以新门禁重试一次；两次都拒/刷新失败 ⇒ `"unavailable"`；
+   * 放行 ⇒ `"ok"`。可选：缺省（自定义 sink）视为无探针 ⇒ 绑定层按 `"unavailable"` 处理。
+   */
+  probe?(): Promise<"ok" | "unavailable" | "unknown">;
+  /**
+   * sink 白名单描述（准入证据投影用）：类型/持久性/相对路径。可选：缺省 = `custom` + 非持久。
+   */
+  describe?(): { kind: "file" | "memory" | "custom"; durable: boolean; relPath?: string };
 }
 
 /**
@@ -162,6 +182,46 @@ export function createFileAuditSink(opts: {
   // 活跃门禁：初值 = 装配时快照；F-6-1 重试放行后切换为刷新所得的新 gate。
   let activeGate = opts.gate;
   return {
+    /**
+     * sink 描述（准入证据投影）：文件 sink 恒为 `file` + 持久；`relPath` 即实际落盘相对路径。
+     */
+    describe(): { kind: "file"; durable: true; relPath: string } {
+      return { kind: "file", durable: true, relPath };
+    },
+    /**
+     * 审计写门禁探针（2026-11-08 P1.3 §2.3.1/F4；由 `shell-approval-binding` 内部执行）：
+     * 与 `append` 同一 F-6-1 语义——**只用当前活跃门禁做纯判定**（不写盘、不建目录）；
+     * 首查被拒且注入 `refreshGate` ⇒ await 刷新后以新门禁重试一次；重试放行 ⇒ 切换活跃门禁并
+     * 返回 `"ok"`；两次都拒 / 刷新失败 / 门禁抛错 ⇒ `"unavailable"`。
+     */
+    async probe(): Promise<"ok" | "unavailable" | "unknown"> {
+      const abs = resolve(opts.projectRoot, relPath);
+      let firstAllowed = false;
+      try {
+        firstAllowed = activeGate(abs).allowed === true;
+      } catch {
+        return "unavailable";
+      }
+      if (firstAllowed) return "ok";
+      if (opts.refreshGate === undefined) return "unavailable";
+      let fresh: WriteGate | undefined;
+      try {
+        fresh = await opts.refreshGate();
+      } catch {
+        return "unavailable";
+      }
+      if (fresh === undefined) return "unavailable";
+      let retryAllowed = false;
+      try {
+        retryAllowed = fresh(abs).allowed === true;
+      } catch {
+        return "unavailable";
+      }
+      if (!retryAllowed) return "unavailable";
+      // 重试放行 → 与 append 一致：切换活跃门禁（后续命令直接走新 gate）。
+      activeGate = fresh;
+      return "ok";
+    },
     async append(record: ShellAuditRecord): Promise<ShellAuditOutcome> {
       const abs = resolve(opts.projectRoot, relPath);
 
@@ -221,11 +281,17 @@ export function createFileAuditSink(opts: {
   };
 }
 
-/** 内存审计落盘（单元测试与无盘场景）；记录按追加顺序保留。 */
+/** 内存审计落盘（单元测试与无盘场景）；记录按追加顺序保留。非持久 sink（准入证据如实投影）。 */
 export function createMemoryAuditSink(): ShellAuditSink & { records: ShellAuditRecord[] } {
   const records: ShellAuditRecord[] = [];
   return {
     records,
+    describe(): { kind: "memory"; durable: false } {
+      return { kind: "memory", durable: false };
+    },
+    async probe(): Promise<"ok" | "unavailable" | "unknown"> {
+      return "ok";
+    },
     async append(record: ShellAuditRecord): Promise<ShellAuditOutcome> {
       records.push(record);
       return { ok: true };

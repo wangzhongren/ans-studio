@@ -840,9 +840,16 @@ test("publish roles and convener integration use full owner-bound diffs without 
   assert.equal(checkGitPolicy({ ...delivery, commands: [command("update-ref", "--no-deref", ref, candidate.hex, candidate.hex)], argv: command("update-ref", "--no-deref", ref, candidate.hex, candidate.hex) }).allowed, false);
 });
 
-test("raw Git is structurally denied before shell approval, including status/config/aliases and path programs", () => {
+test("raw Git：只读精确形态 allow/pass（固定传输）；别名/写形态/全局选项仍硬拒", () => {
   const boundary: BoundarySection1 = { entries: [], boundarySource: "<test>", acceptance: { accepted: true, source: "fixture" } };
-  for (const argv of [["git", "status"], ["git", "my-alias"], ["C:/Program Files/Git/cmd/git.exe", "status"], ["git", "-c", "core.fsmonitor=helper", "status"]]) {
+  // 2026-11-08（W3-G，设计 P1.3 §2.4.3）：只读精确白名单 ⇒ 分类器 allow、写守卫 pass（前台）。
+  // 程序名带路径也按 basename 匹配（模型提供的程序名只用于匹配；执行层经固定传输，不按 PATH/cwd 解析）。
+  for (const argv of [["git", "status"], ["git", "log", "-5"], ["C:/Program Files/Git/cmd/git.exe", "status"]]) {
+    assert.equal(classifyShell(argv, defaultShellRules()), "allow", argv.join(" "));
+    const result = evaluateShellWriteTargets({ argv, cwd: process.cwd(), projectRoot: process.cwd(), skillRoot: process.cwd(), boundary, forbiddenPrefixes: [], checkWrite: () => ({ allowed: true }) });
+    assert.equal(result.kind, "pass", argv.join(" "));
+  }
+  for (const argv of [["git", "my-alias"], ["C:/Program Files/Git/cmd/git.exe", "commit", "-m", "x"], ["git", "-c", "core.fsmonitor=helper", "status"]]) {
     assert.equal(classifyShell(argv, defaultShellRules()), "deny");
     const result = evaluateShellWriteTargets({ argv, cwd: process.cwd(), projectRoot: process.cwd(), skillRoot: process.cwd(), boundary, forbiddenPrefixes: [], checkWrite: () => ({ allowed: true }) });
     assert.equal(result.kind, "deny");

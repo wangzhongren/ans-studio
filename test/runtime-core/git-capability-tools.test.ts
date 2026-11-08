@@ -596,7 +596,10 @@ test("R14 actual required scope rejects registered scripts before native bind wh
     assert.equal(prepared.plan.scopeProtection!.state, "required"); assert.equal(prepared.plan.native!.factory, "codex-chat");
     assert.ok(prepared.plan.native!.appTools.includes("run_shell")); assert.ok(prepared.plan.native!.appTools.includes("start_background_task"));
     assert.equal(prepared.plan.status, "unknown"); assert.equal(prepared.token, undefined);
-    assert.ok(prepared.plan.reasons.includes("required-scope-unconfined-script-tools"));
+    // 2026-11-08（准入按操作审批，P1.3 §2.3.4/§4.5）：裸函数 gate 无 binding ⇒ 新 reason；
+    // 旧 `required-scope-unconfined-script-tools` 退役（不再产生）。
+    assert.ok(prepared.plan.reasons.includes("protected-scope-approval-chain-unproven"));
+    assert.equal(prepared.plan.reasons.includes("required-scope-unconfined-script-tools"), false);
     await assert.rejects(unsafe.bindRole(actor), /protected-scope-requires-verified-plan/);
     await assert.rejects(unsafe.composeContext(actor), /protected-scope-requires-verified-plan/);
     assert.equal(nativeConstructions, 0); assert.equal(requests, 0); await assert.rejects(lstat(marker), { code: "ENOENT" });

@@ -622,6 +622,86 @@ test("审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ �
   await project;
 });
 
+// ————— 2026-11-08（W5-D，方案 P1.3 §2.5.2）：卡面加法字段 entry / protectedScope / roleId —————
+// 只做展示字段转抄：缺省不写（旧卡面逐字不变），未知值不伪造；不改变任何放行判定。
+
+test("审批卡数据面（W5-D 加法）：entry/protectedScope 由构建参数写入；roleId 可选；缺省/未知值不出现", () => {
+  const display = describeShellCommand(req("npm test", ["npm", "test"], "/proj", "risky：自动审核判定有风险"));
+  // 旧调用方（无第四参）：三个加法字段全部缺省——既有卡面逐字不变。
+  const base = buildShellConfirmRequest("sc-base", display);
+  assert.equal(base.entry, undefined, "无入口事实 ⇒ entry 缺省");
+  assert.equal(base.protectedScope, undefined, "无保护事实 ⇒ protectedScope 缺省");
+  assert.equal(base.roleId, undefined, "无角色事实 ⇒ roleId 缺省");
+  assert.equal(base.command, "npm test", "既有字段逐字不变");
+  assert.equal(base.policy, "project", "既有字段逐字不变");
+
+  const bg = buildShellConfirmRequest("sc-bg", display, undefined, {
+    entry: "start_background_task",
+    roleId: "product",
+    protectedScope: true,
+  });
+  assert.equal(bg.entry, "start_background_task", "后台任务入口如实转抄");
+  assert.equal(bg.roleId, "product", "roleId 如实转抄");
+  assert.equal(bg.protectedScope, true, "受保护项目标识如实转抄");
+
+  const fg = buildShellConfirmRequest("sc-fg", display, undefined, { entry: "run_shell" });
+  assert.equal(fg.entry, "run_shell", "前台命令入口如实转抄");
+  assert.equal(fg.protectedScope, undefined, "未给保护事实 ⇒ 不写");
+
+  // 运行时防御：未知入口值 / 非 true 的保护标记 / 空 roleId 一律不写（不伪造卡面事实）。
+  const bogus = buildShellConfirmRequest("sc-bogus", display, undefined, {
+    entry: "write_file" as never,
+    roleId: "",
+    protectedScope: false,
+  });
+  assert.equal(bogus.entry, undefined, "未知入口值不写");
+  assert.equal(bogus.roleId, undefined, "空 roleId 不写");
+  assert.equal(bogus.protectedScope, undefined, "false 不写（仅 true 表示受保护项目）");
+});
+
+test("审批卡 presenter（W5-D 接线）：prompt.entry/protectedScope 写入请求；roleId 以 prompt 优先、metadata 兜底；既有字段不变", async () => {
+  const sent: ShellConfirmRequest[] = [];
+  const p = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {} });
+  const signal = new AbortController().signal;
+  const reason = "risky：自动审核判定有风险";
+
+  // 后台任务 + 受保护项目：两个加法字段随请求推达渲染侧（仅展示，判定不在此）。
+  const bgPrompt: OperatorPrompt = {
+    ...req("npm install", ["npm", "install"], "/proj", reason),
+    entry: "start_background_task",
+    roleId: "product",
+    protectedScope: true,
+  };
+  const bg = p.presenter.present(bgPrompt, describeShellCommand(bgPrompt), { roleId: "product", projectRoot: "/proj", runtime: "pi", signal });
+  assert.equal(sent.length, 1, "卡片已推达");
+  assert.equal(sent[0].entry, "start_background_task", "presenter 把 prompt.entry 写入请求");
+  assert.equal(sent[0].protectedScope, true, "presenter 把 prompt.protectedScope 写入请求");
+  assert.equal(sent[0].roleId, "product", "prompt.roleId 写入请求（与 metadata 一致）");
+  assert.equal(sent[0].command, "npm install", "既有卡面字段逐字不变");
+  assert.equal(sent[0].reasonRaw, reason, "既有折叠原文逐字不变");
+  assert.equal(sent[0].cwd, "/proj");
+  assert.equal(p.respond({ id: sent[0].id, allow: false }).ok, true);
+  await bg;
+
+  // prompt.roleId 与 metadata.roleId 冲突 ⇒ prompt.roleId 优先（审核链入口事实 > 展示元数据；二者都来自宿主）。
+  const promptRole: OperatorPrompt = { ...req("npm test", ["npm", "test"]), roleId: "verifier" };
+  const pr = p.presenter.present(promptRole, describeShellCommand(promptRole), { roleId: "product", projectRoot: "/proj", runtime: "pi", signal });
+  assert.equal(sent[1].roleId, "verifier", "prompt.roleId 优先");
+  assert.equal(sent[1].entry, undefined, "未给 entry ⇒ 字段缺省（旧卡面不变）");
+  assert.equal(sent[1].protectedScope, undefined, "未给 protectedScope ⇒ 字段缺省");
+  assert.equal(p.respond({ id: sent[1].id, allow: false }).ok, true);
+  await pr;
+
+  // 无 prompt.roleId ⇒ metadata.roleId 兜底（既有行为逐字保留）。
+  const plain = req("npm test", ["npm", "test"]);
+  const mr = p.presenter.present(plain, describeShellCommand(plain), { roleId: "X", projectRoot: "/proj", runtime: "pi", signal });
+  assert.equal(sent[2].roleId, "X", "metadata.roleId 兜底");
+  assert.equal(sent[2].entry, undefined);
+  assert.equal(sent[2].protectedScope, undefined);
+  assert.equal(p.respond({ id: sent[2].id, allow: false }).ok, true);
+  await mr;
+});
+
 test("M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行", async () => {
   const sent: ShellConfirmRequest[] = [];
   const p = createShellConfirmPresenter({ present: (r) => sent.push(r), cleanupAfterMs: 60000, env: {} });

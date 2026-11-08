@@ -92,7 +92,10 @@ import {
   type GovernanceRoleSpec,
 } from "../../service/boundary/resolve-boundary.ts";
 import { resolveWrite, resolveWriteReadPreflight, resolveWriteFinal, stableWriteDecisionFromFacts } from "../../service/gate/resolve-write.ts";
-import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProtectionRequirement, beginGitHostAction, endGitHostAction, inspectGitHostCoordinator, type GitProtectionFacts, type GitHostOpenFailureRef, type GitHostInventory } from "../../provider/trunk/public/trunk-store.ts";
+import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProtectionRequirement, beginGitHostAction, endGitHostAction, inspectGitHostCoordinator, executeReadonlyGit, type GitProtectionFacts, type GitHostOpenFailureRef, type GitHostInventory } from "../../provider/trunk/public/trunk-store.ts";
+// 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git matcher 经 Service 公共出口**同一函数引用**
+// （门禁引擎单一实现；不复制白名单/解析逻辑）。
+import { matchReadonlyGit } from "../../service/gate/shell-rules.ts";
 import {
   GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
   GOVERNANCE_MATRIX_PROMPT_MAX_CHARS,
@@ -125,6 +128,7 @@ import type {
   ShellGate,
   ShellReviewRequest,
   ShellPostAuditFn,
+  ReadonlyGitCapability,
   CustomerInputFn,
   CustomerInputMetadata,
   CustomerInputOutcome,
@@ -379,6 +383,19 @@ export interface AdapterCapabilities {
   shellGate?: ShellGate;
   /** 2026-10-29（§6.5）：run_shell 执行后写审计（与 shellGate 同注入；缺省不审计）。 */
   shellPostAudit?: ShellPostAuditFn;
+  /**
+   * 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git 固定传输能力
+   * （运行时核心 `GovernedToolsOptions.readonlyGit` 同名能力位）。由 `openRoleSession` 从
+   * `matchReadonlyGit`（Service 公共出口同一函数引用）+ trunk `executeReadonlyGit` 构造；
+   * `run_shell` 在 gate 放行后对 `git` 只能经本能力执行（无能力/未命中 ⇒ `readonly-git-runner-unavailable`，
+   * 绝不回退通用 spawn）。桌面路径经同一工厂/选项透传。
+   */
+  readonlyGit?: ReadonlyGitCapability;
+  /**
+   * 会话角色 id（2026-11-08 加法）：随适配器 capabilities 交给自定义工厂；官方工厂由 Service 按
+   * `role.id` 注入工具 options（`GovernedToolsOptions.roleId`），不采用调用方值。仅用于审计/展示关联。
+   */
+  roleId?: string;
   shellVerdict?: ShellVerdictFn;
   /**
    * 2026-10-31（shell 判拒升级方案 v1.3 §6.1/§6.4）：`request_shell_escalation` 工具能力
@@ -728,8 +745,13 @@ async function bindPreparedRuntimeRole(adapter: RuntimeAdapter, role: ResolvedRo
   if (adapter.prepareRole && adapter.bindPreparedRole) {
     const prepared = await adapter.prepareRole(role);
     const requirement = await readGitHostProtectionRequirement({ projectRoot });
-    if (requirement.state === "required" && prepared.plan.native?.appTools.some(tool => ["run_shell", "start_background_task"].includes(tool))) {
-      const error = new Error("runtime-protected-scope-unmediated-app-execution-planned"); discardRuntimeRolePreparation(prepared, error); throw error;
+    // 2026-11-08（设计 P1.3 §2.2.4；退役旧门 `runtime-protected-scope-unmediated-app-execution-planned`）：
+    // 受保护范围下「注册了 shell 工具」不再于创建期拒绝，改为要求审批链证据——防御性断言：
+    // plan 声称注册了 shell 但未携带 `approvalChain`（理论上不可达：prepareRole 已按新算法拒绝）⇒
+    // 按准入未证明 fail-closed 处理。
+    if (requirement.state === "required" && prepared.plan.native?.appTools.some(tool => ["run_shell", "start_background_task"].includes(tool))
+      && prepared.plan.approvalChain === undefined) {
+      const error = new Error("runtime-creation-admission-unproven:protected-scope-approval-chain-unproven"); discardRuntimeRolePreparation(prepared, error); throw error;
     }
     if (prepared.token && prepared.plan.status === "observed") {
       try { return await adapter.bindPreparedRole(prepared.token); }
@@ -1639,6 +1661,8 @@ export async function openRoleSession(
     evaluateShellWriteTargets({
       argv: req.argv,
       cwd: req.cwd,
+      // 2026-11-08（W3-G / AC-22）：真实入口——只读 Git 放行仅前台 `run_shell`；后台入口维持 Git 硬拒。
+      entry: req.entry ?? "run_shell",
       projectRoot: input.project.projectRoot,
       skillRoot: input.project.skillRoot,
       boundary: setup.role.boundary,
@@ -1811,7 +1835,9 @@ export async function openRoleSession(
       log.record("shell.operatorOnly.rejected", { mode: "shellOperatorOnly", outcome: "not-armed", reasonCode: "capability-denied" });
     } else {
       try {
-        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, ...escalationWiring, ...directiveWiring, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader });
+        shellGate = await assembleOperatorShellGate({ project: input.project, ...input.shellOperatorOnly, ...escalationWiring, ...directiveWiring, writeGuard: shellWriteGuard, snapshotBefore: (req) => shellPostAudit.snapshotBefore(req), approvalContextLoader: shellApprovalContextLoader,
+          // 2026-11-08（I0-6）：受保护范围启用审批类放行 + 审计失败 ⇒ 拒绝（fail-closed）。
+          auditFailurePolicy: roleCapabilityProtection.state === "required" ? "deny-non-readonly" : "observe" });
       } catch (err) {
         log.error("shell.arming.failed", err);
         shellGate = undefined; // 装配失败 ⇒ 不 arm（能力缺席 = fail-closed，run_shell 不注册）
@@ -1844,12 +1870,23 @@ export async function openRoleSession(
         writeGuard: shellWriteGuard,
         snapshotBefore: (req) => shellPostAudit.snapshotBefore(req),
         approvalContextLoader: shellApprovalContextLoader,
+        // 2026-11-08（I0-6）：受保护范围启用审批类放行 + 审计失败 ⇒ 拒绝（fail-closed）。
+        auditFailurePolicy: roleCapabilityProtection.state === "required" ? "deny-non-readonly" : "observe",
       });
     } catch (err) {
       log.error("shell.arming.failed", err);
       shellGate = undefined;
     }
   }
+
+  // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git 固定传输能力（注入才生效）——
+  // matcher 经 Service 公共出口**同一函数引用**（门禁引擎单一实现）；执行经 trunk Provider 固定传输
+  // （绝对可执行 + 固定 config/env + 规范 argv 体，不接受任意 argv）。`run_shell` 在 gate 放行后对
+  // `git` 只能经本能力执行；无能力/未命中 ⇒ `readonly-git-runner-unavailable`（绝不回退通用 spawn）。
+  const readonlyGit: ReadonlyGitCapability = {
+    match: (argv) => matchReadonlyGit(argv),
+    execute: (match, budgets) => executeReadonlyGit(input.project.projectRoot, match, budgets),
+  };
 
   // 需求变更申请：只给内置治理角色中的报告员/统筹注入（沿用 C 批发起方规则）。
   // X-R2（E2 S2）/X-R4（E2 S2）：rapporteur/convener 分支均改读已装配角色模块 `tools()`（旧内联谓词
@@ -2092,6 +2129,9 @@ export async function openRoleSession(
     ...(governanceMatrix !== undefined ? { governanceMatrix } : {}),
     ...(shellGate !== undefined ? { shellGate } : {}),
     ...(shellGate !== undefined ? { shellPostAudit: shellPostAudit.auditAfter } : {}),
+    // 2026-11-08（W3b）：只读 Git 固定传输能力 + 会话角色 id（审计/展示关联；角色身份仍以会话闭包为准）。
+    readonlyGit,
+    roleId: setup.role.id,
     // 2026-10-31（判拒升级）：`request_shell_escalation` 工具能力——只在 shell 已 arm 且 registry 已创建时
     // 注入（运行时核心「注入才注册」；未注入 ⇒ 工具不存在，fail-closed）。工具只发起申请，不执行命令。
     ...(shellGate !== undefined && shellEscalationSession !== undefined
@@ -3526,6 +3566,10 @@ export function createRuntimeAdapterFactory(
     // Service 侧二者互斥（同时给出 ⇒ 抛配置错误）。
     governanceJudge: capabilities?.governanceJudge ?? options.governanceJudge,
     shellGate: capabilities?.shellGate ?? options.shellGate,
+    // 2026-11-08（W3b，I0-4）：只读 Git 固定传输能力（运行时核心 `GovernedToolsOptions.readonlyGit`）；
+    // capabilities 优先（每会话注入），其次 runtimeOptions（桌面/测试统一工厂透传）。缺省 ⇒ `run_shell`
+    // 对 `git` 一律 `readonly-git-runner-unavailable`（零执行、绝不回退通用 spawn）。
+    readonlyGit: capabilities?.readonlyGit ?? options.readonlyGit,
     // 2026-10-31（判拒升级）：`request_shell_escalation` 工具能力（运行时核心同名能力位；工具只在
     // shell 已 arm 且本能力注入时注册）。`undefined` ⇒ 工具不注册（能力缺席 = 最强 fail-closed）。
     shellEscalation: capabilities?.shellEscalation ?? options.shellEscalation,
