@@ -4,7 +4,7 @@
 - **记录角色**：ANS 统筹调度（Scheduler）
 - **日期**：2026-11-09
 - **状态**：团队计划已写盘；**实施已放行**。基线 `3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1`（团队计划 run 变更已提交并推送，PR #80；合并待客户逐 PR 允许）；`git status --porcelain -- src app test` = 0；分支 `feat/document-format-specifications`。共享 `src/model/runtime.ts`、`app/desktop/session.ts` 以该基线串行写。
-- **依据**：团队计划 `docs/scheduling/2026-11-09_team-plan_document-format-specifications.md`（`4d99586f6b32d884ab461307541e7f01f82cc092f0e5c9eaaeabc42f615ebdc2`）；方案 P1.2 `docs/planning/2026-11-09_design_document-format-specifications.md`（`886fef84…`）；复核 R1.1 `docs/planning/2026-11-09_review_document-format-specifications.md`（`2cbe6919…`，建议提交、must-fix 0）；**B1 最新 v1.1（唯一判据）** `docs/acceptance/2026-11-09_document-format-specifications-criteria-v1.md`（497 行 / 75,577 bytes / `621c5da7654407d132c29dfd87955ac52ca9ab41e66a2b3e7725271468e6244a`；v1.1 只澄清 RR 方法/AC-12-3/AC-14-1 口径，未改 AC/TM/RR/EV 强度）。
+- **依据**：团队计划 `docs/scheduling/2026-11-09_team-plan_document-format-specifications.md`（`4d99586f6b32d884ab461307541e7f01f82cc092f0e5c9eaaeabc42f615ebdc2`）；方案 P1.2 `docs/planning/2026-11-09_design_document-format-specifications.md`（`886fef84…`）；复核 R1.1 `docs/planning/2026-11-09_review_document-format-specifications.md`（`2cbe6919…`，建议提交、must-fix 0）；**B1 最新 v1.2（唯一判据）** `docs/acceptance/2026-11-09_document-format-specifications-criteria-v1.md`（509 行 / 80,864 bytes / `9e52a4aadecfb0849e2ce03e7dc29fc057b659840b13ea64102f5060d3dea5bb`；v1.2 只澄清真实运行隔离/停止规则，未改 AC/TM/RR/EV 强度）。
 - **协调方裁决（2026-11-09）**：文档格式维持 **Q13 默认 T2**（除非策划给出实质风险升级理由并回报）；实施序：团队计划 run B2 后 → 文档格式实施 → D1 → RR → B2。
 
 ## 一、批次与单写者
@@ -52,4 +52,4 @@
 | B5 跨角色集成 | 完成 | 1 新 | `doc-format-all-roles.test.ts` `d992b164…`；5/5；8 角色注册、40 次真实轮次调用 |
 | D1 | 完成（v1.1） | — | 记录 `adc23f45…`（227 行 / 42,274 B）；候选 11 文件聚合 **`bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3`**、manifest 1,113 / `fc296e95…`；v1.0 曾发现 1 条 governance-matrix 导入隔离失败，编排修复（B18 唯一字面量、无 import）后 **18/18** 消除；新增确定性失败 0/新 skip 0；typecheck exit 0；TM-1–TM-14 有证据锚点 |
 | RR | 完成（RR3；项目角色 RR-7 回落） | — | RR3 记录 `44bdf61c…`（212 行 / 31,639 B），证据 `25137114…`（106 文件）；1 消息 → 派发 product（无模块字段）成功 → 产品真实 `doc_format` 1 次（`project-intent/v1`，回执 2,162 B）→ 意图 v4 `905870be…` 25,686 B → `prepareIntentConfirmation` 通过 → 意图卡 1 张 + 客户 confirm + `freeze-committed`；6 内置 + 项目角色 `test-dev` 会话注册；项目角色直连被 `sendSession` 拒绝，按 **B1 v1.1 RR-7** 回落并标注；产品 1 write+5 edit（frontmatter 首写正确）、3 次 run_shell 未执行 + 1 审批卡（B1 v1.1 不计入意图卡 ≤1）；预算 1 消息/1 意图卡/产品 1/3/墙钟 ≈8m27s；9222 零监听、9223 释放、贪吃蛇零触碰；候选/manifest 前后不变；模型 `deepseek-v4-flash`（非 Anthropic） |
-| B2 | **执行中** | — | 同一独立验收按 B1 v1.1 `621c5da7…` 判定 11 文件候选 + D1 v1.1 + RR3 |
+| B2 | **完成（pass 53/53）** | — | 独立验收按 B1 v1.2 判 **53 pass / 0 fail / 0 insufficient / 0 NA**；报告 `docs/acceptance/2026-11-09_document-format-specifications-report-v1.md`（232 行 / 36,566 bytes / `99c02439…`）；B2 v1 的 4 项隔离缺口经 B1 v1.2 澄清后 pass（9222 未占用/快照子项 N/A；shell 审批卡不构成停止触发）。**提交 `ecf9ead`，PR #81**（合并待客户逐 PR 允许）。 |
