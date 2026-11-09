@@ -1,0 +1,13 @@
+{
+  "schema": "ans-run/v1",
+  "runId": "run-w7-roles",
+  "flowId": "demo",
+  "state": "draft",
+  "documents": {},
+  "execution": {
+    "teamPlan": null,
+    "flow": null
+  },
+  "createdAt": "2026-11-08T00:00:00.000Z",
+  "documentPreparationSource": "init-source-16e497efd5ea12391ae2eb875823300a7665f739a62dcc9f8802200959b2df02"
+}

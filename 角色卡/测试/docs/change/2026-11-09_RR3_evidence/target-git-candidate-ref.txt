@@ -1,0 +1,17 @@
+ref: refs/ans/candidates/4140b85897180bd3ecfd1d2bb4365fb89229fa10cb8bdcb2c400117dc9a37e59
+oid: 02c795601a14186be51a32e402465818f9f78583
+type: commit
+commit:
+tree 5283c88a4c129009034a3e4227af7e541084e906
+parent 71754a834c99e96b7d064b3ed295371da21de032
+author ANS Application <ans@localhost> 1794189870 +0000
+committer ANS Application <ans@localhost> 1794189870 +0000
+
+RR3 live commit: create result.txt
+
+ANS-Request: 4b24aa63194770e6f1506943b9ddd522d4bc7135ecaf60ad72b3ceb6d38a0e68
+tree:
+040000 tree 6339a1de19babf133468ed428ef95dfdb6407af9	.ans
+040000 tree 2704aed04be18d0a1cca6d7eb100a35eaa8ab542	docs
+040000 tree 12daa4db9137ccc0a0ca0d3143033da7f07cf662	src
+040000 tree 97f70aca0fd7b19861b7e69c253a74be1c0d89b0	"\350\247\222\350\211\262\345\215\241"

@@ -1,0 +1,9 @@
+[ANS_INPUT_CONTEXT:bef04a9a-54be-4ae8-9cb3-738142a30f38]
+[派发] 来自 幕僚 的任务
+任务编号：#rr2-worker-task
+本任务只做一件事，两步，各执行一次，不重试；不要调用 run_shell，也不需要先调用 git_query。
+第一步：调用 write_file 在项目内创建文件 src/impl/result.txt，内容为任意非空文本（一行即可）。
+第二步：调用 git_candidate 提交该文件。入参必须逐字使用下面的 JSON（字段名与值都不得改动；base 是已冻结的执行基线，请原样传入）：
+{"operationId":"rr2-final-commit-20261109-01","action":"commit","base":{"ref":"refs/ans/trunk","oid":{"objectFormat":"sha1","hex":"71dc290f774b422566044fe6b061a7679256b89b"}},"paths":["src/impl/result.txt"],"message":"feat(impl): add result.txt for E3-R RR2 final real run"}
+完成后调用 submit_report 如实汇报 git_candidate 的回执原文（成功或错误码），不要夸大。
+完成后请交回报告（改了什么/结论/证据）。

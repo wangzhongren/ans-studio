@@ -1,0 +1,215 @@
+{
+  "checkedAt": "2026-11-09T01:34:13.558Z",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6",
+  "protection": {
+    "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6",
+    "protectedGitRoots": [
+      "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6\\.git"
+    ],
+    "coverage": "complete",
+    "identity": {
+      "root": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6",
+      "gitDir": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6\\.git",
+      "commonDir": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6\\.git",
+      "objectFormat": "sha1",
+      "configDigest": "05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc",
+      "repoId": "b99992ed31ab4c80826dfdafe92edbde78783c427dce347436fdcfd5f05bf9f5"
+    },
+    "reasons": [],
+    "basisDigest": "91a71d11b4b807e97a6017bdbc215a05bdc520cd7d3a0fa3aa6a772530f9cae9"
+  },
+  "assigned": {
+    "ok": true,
+    "value": {
+      "taskId": "rr2-worker-task",
+      "actorRoleId": "impl",
+      "flowId": "demo",
+      "runId": "run-w7-exec",
+      "kind": "execution",
+      "basisDigest": "1d6a96ca002bd3e250fc19a40eb007e515310f1d2798bdbac2a7158b7cebc8cd"
+    }
+  },
+  "scope": {
+    "ok": true,
+    "value": {
+      "taskId": "rr2-worker-task",
+      "runId": "run-w7-exec",
+      "paths": [
+        "src/impl/"
+      ],
+      "basisDigest": "c3303968a65bf85b3b0a5306ede803590da4b24288912a9c3a33b4b06e436354"
+    }
+  },
+  "runEvidence": {
+    "ok": true,
+    "runId": "run-w7-exec",
+    "flowId": "demo",
+    "pinDigest": "39d493a392a6e152de455aab899d1c4e17b948e55cb3804546d5f55a483db0c6",
+    "recordSha256": "da1bba78d06f41d7a95d5b2809d8c88148220236758f6fd34da0e0330dd573b7",
+    "frozenRoles": [
+      "impl"
+    ],
+    "codeBasis": {
+      "ref": "refs/ans/trunk",
+      "oid": {
+        "objectFormat": "sha1",
+        "hex": "71dc290f774b422566044fe6b061a7679256b89b"
+      }
+    },
+    "state": "pinned"
+  },
+  "runEvidenceSummary": {
+    "ok": true,
+    "runId": "run-w7-exec",
+    "flowId": "demo",
+    "pinDigest": "39d493a392a6e152de455aab899d1c4e17b948e55cb3804546d5f55a483db0c6",
+    "recordSha256": "da1bba78d06f41d7a95d5b2809d8c88148220236758f6fd34da0e0330dd573b7",
+    "frozenRoles": [
+      "impl"
+    ],
+    "codeBasis": {
+      "ref": "refs/ans/trunk",
+      "oid": {
+        "objectFormat": "sha1",
+        "hex": "71dc290f774b422566044fe6b061a7679256b89b"
+      }
+    },
+    "state": "pinned"
+  },
+  "processSource": {
+    "ok": true,
+    "value": {
+      "taskId": "rr2-worker-task",
+      "sourceAssignmentTaskId": "rr2-controller-task",
+      "parentCoreSessionId": "c57c0cea-6a7d-49f3-8ff0-d5c131939433",
+      "workSourceRef": {
+        "kind": "chief-customer-turn",
+        "sourceId": "init-source-773bb8ee60fb726291e153ca31fc1f7d0cc05d1129b8985163363966f223179f",
+        "path": ".ans/trunk/initialization-sources/init-source-773bb8ee60fb726291e153ca31fc1f7d0cc05d1129b8985163363966f223179f.json",
+        "sha256": "953b7fa5a369e95f1f9b4761e4ac903f6477ffaa2c8a762d3111e9ae3c452654"
+      },
+      "expectedFiles": [
+        {
+          "path": ".ans/trunk/initialization-sources/init-source-773bb8ee60fb726291e153ca31fc1f7d0cc05d1129b8985163363966f223179f.json",
+          "sha256": "953b7fa5a369e95f1f9b4761e4ac903f6477ffaa2c8a762d3111e9ae3c452654"
+        },
+        {
+          "path": ".ans/runs/run-w7-exec/manifest.json",
+          "sha256": "da1bba78d06f41d7a95d5b2809d8c88148220236758f6fd34da0e0330dd573b7"
+        },
+        {
+          "path": ".ans/state/tasks.jsonl",
+          "sha256": "d9b54019e98d12c33b0337a15cecd7f789999446c8c34fabae53c9f9bc6b932f"
+        }
+      ]
+    }
+  },
+  "manifest": {
+    "trunkVersion": 2,
+    "digest": "5ee701e61d240045a7fd6bfb15c6d4d2fe768c09a6857edd9b8d052b2b99384a",
+    "activeRevision": 1,
+    "activeRoles": [
+      "impl"
+    ]
+  },
+  "workerTaskRows": {
+    "count": 1,
+    "kinds": [
+      "task.created"
+    ],
+    "created": {
+      "v": 1,
+      "at": "2026-11-08T00:00:00.000Z",
+      "kind": "task.created",
+      "taskId": "rr2-worker-task",
+      "from": "convener",
+      "to": "impl",
+      "text": "本任务只做一件事，两步，各执行一次，不重试；不要调用 run_shell，也不需要先调用 git_query。\n第一步：调用 write_file 在项目内创建文件 src/impl/result.txt，内容为任意非空文本（一行即可）。\n第二步：调用 git_candidate 提交该文件。入参必须逐字使用下面的 JSON（字段名与值都不得改动；base 是已冻结的执行基线，请原样传入）：\n{\"operationId\":\"rr2-final-commit-20261109-01\",\"action\":\"commit\",\"base\":{\"ref\":\"refs/ans/trunk\",\"oid\":{\"objectFormat\":\"sha1\",\"hex\":\"71dc290f774b422566044fe6b061a7679256b89b\"}},\"paths\":[\"src/impl/result.txt\"],\"message\":\"feat(impl): add result.txt for E3-R RR2 final real run\"}\n完成后调用 submit_report 如实汇报 git_candidate 的回执原文（成功或错误码），不要夸大。",
+      "sideEffect": "code",
+      "idempotencyKey": "rr2-worker-task",
+      "flowId": "demo",
+      "runId": "run-w7-exec",
+      "runState": "pinned",
+      "moduleId": "impl-core",
+      "moduleDirectory": "src/impl/",
+      "modulePaths": [
+        "src/impl/"
+      ],
+      "parentTaskRef": {
+        "kind": "assigned-task",
+        "taskId": "rr2-controller-task",
+        "ledgerSha256": "6d3ca63b824dc1a94ecad43a55901caa864f8db3eb3e19e7e475449da7291e6d"
+      }
+    }
+  },
+  "controllerRows": [
+    "task.created",
+    "task.delivered"
+  ],
+  "openUndelivered": [
+    "rr2-worker-task"
+  ],
+  "operations": [
+    "2008de287276b997483ceddd7c7b47b332267e6ebe5843e8d42412742e83baf1",
+    "2c8d27bf6ea75aae3616989029e375a668d765854fe92aa8c39b205f06eaad58",
+    "53b656ccd9b16fd7ca412b9010e78d8ad4b35f21d849dfe6e977b3b9c6581fa8",
+    "5a8deffd50354e23d38c4fc16d01d10ef39b2f14f939452c58176074bf9319e4",
+    "afa001db4ed58778505a6b8f08a7ad733ca36708cbac5fa0d53149d9e7b37706"
+  ],
+  "commitOperationId": "rr2-final-commit-20261109-01",
+  "commitOperationDir": "3aea3e06f8e247b7a142b9758c0812cd143fdc8100057afd7ba0945a41b72a12",
+  "commitOperationDirPresent": false,
+  "audit": {
+    "source": {
+      "kind": "ans",
+      "path": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-final-2026-11-09\\rr\\tmp\\ans-rr2-final-J06mW6\\.ans\\project.json",
+      "acceptance": {
+        "accepted": true,
+        "source": "desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）",
+        "pin": [
+          {
+            "path": "角色卡/governance-boundary.yaml",
+            "sha256": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93"
+          },
+          {
+            "path": "角色卡/impl/boundary.yaml",
+            "sha256": "01418df21aa5b37c049334d7cc872f8b491b920a16e02edfefd7633e9b169ffa"
+          }
+        ]
+      },
+      "pinPaths": [
+        "角色卡/governance-boundary.yaml",
+        "角色卡/impl/boundary.yaml"
+      ]
+    },
+    "governanceModel": "trio",
+    "roles": [
+      "impl"
+    ],
+    "facts": {
+      "source": "orchestration-shell-gate",
+      "version": 1,
+      "projectRoot": "C:/Users/51054/Desktop/work/ans-dogfood-call-context-final-2026-11-09/rr/tmp/ans-rr2-final-J06mW6",
+      "mode": "operator-approve",
+      "classifier": true,
+      "rules": true,
+      "pmAsk": false,
+      "operatorChannel": true,
+      "takeGrant": false,
+      "takeDirective": false,
+      "routinePolicy": false,
+      "audit": {
+        "sink": "file",
+        "durable": true,
+        "probe": "unknown",
+        "relPath": "docs/audit/shell-gate.jsonl"
+      },
+      "escalation": false
+    },
+    "auditVerdict": "OK",
+    "operationsProbe": {
+      "ok": true
+    }
+  },
+  "verdict": "OK"
+}
