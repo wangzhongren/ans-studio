@@ -1,0 +1,35 @@
+when: 2026-11-09T01:36:21Z
+== refs ==
+5a7ffa757c9befaacaddf561a4dc209100f2df09 commit	refs/ans/candidates/2008de287276b997483ceddd7c7b47b332267e6ebe5843e8d42412742e83baf1
+00ce5e7248904e163274790b5a57fe6456faebe9 commit	refs/ans/candidates/2c8d27bf6ea75aae3616989029e375a668d765854fe92aa8c39b205f06eaad58
+e1fd4d4f8fb9ab3b1f232c59af936cf62f78023a commit	refs/ans/candidates/53b656ccd9b16fd7ca412b9010e78d8ad4b35f21d849dfe6e977b3b9c6581fa8
+71dc290f774b422566044fe6b061a7679256b89b commit	refs/ans/candidates/5a8deffd50354e23d38c4fc16d01d10ef39b2f14f939452c58176074bf9319e4
+d100350371d3a74fc0c98ff1f3903587c8866572 commit	refs/ans/candidates/afa001db4ed58778505a6b8f08a7ad733ca36708cbac5fa0d53149d9e7b37706
+71dc290f774b422566044fe6b061a7679256b89b commit	refs/ans/trunk
+== status ==
+?? .ans/
+?? docs/
+?? "\350\247\222\350\211\262\345\215\241/"
+== log ==
+fatal: your current branch 'ans-unpublished' does not have any commits yet
+== config-sections ==
+file:C:/Program Files/Git/etc/gitconfig	diff.astextplain.textconv=astextplain
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.clean=git-lfs clean -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.smudge=git-lfs smudge -- %f
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.process=git-lfs filter-process
+file:C:/Program Files/Git/etc/gitconfig	filter.lfs.required=true
+file:C:/Program Files/Git/etc/gitconfig	http.sslbackend=schannel
+file:C:/Program Files/Git/etc/gitconfig	core.autocrlf=true
+file:C:/Program Files/Git/etc/gitconfig	core.fscache=true
+file:C:/Program Files/Git/etc/gitconfig	core.symlinks=false
+file:C:/Program Files/Git/etc/gitconfig	pull.rebase=false
+file:C:/Program Files/Git/etc/gitconfig	credential.helper=manager
+file:C:/Program Files/Git/etc/gitconfig	credential.https://dev.azure.com.usehttppath=true
+file:C:/Program Files/Git/etc/gitconfig	init.defaultbranch=master
+file:C:/Users/51054/.gitconfig	user.name=Wlink
+file:C:/Users/51054/.gitconfig	user.email=22568687+wangzhongren@users.noreply.github.com
+file:C:/Users/51054/.gitconfig	credential.https://github.com.helper=
+file:C:/Users/51054/.gitconfig	credential.https://github.com.helper=!'C:\Program Files\GitHub CLI\gh.exe' auth git-credential
+file:C:/Users/51054/.gitconfig	credential.https://gist.github.com.helper=
+file:C:/Users/51054/.gitconfig	credential.https://gist.github.com.helper=!'C:\Program Files\GitHub CLI\gh.exe' auth git-credential
+file:.git/config	core.repositoryformatversion=0

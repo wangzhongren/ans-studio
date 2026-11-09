@@ -1,0 +1,10 @@
+[ANS_INPUT_CONTEXT:f7fc4127-8a39-423b-8696-ca1ff87248e8]
+[派发] 来自 幕僚 的任务
+任务编号：#t-mw8mb9ba-933f53b3
+请运营把下面的实现任务派发给 impl。只做一次派发，不要自己执行实现。调用 dispatch_task，参数：roleId 为 "impl"，flowId 为 "demo"，moduleId 为 "impl-core"，task 为下面这段『实现任务文本』（原样传入，不要改写其中任何 JSON）：
+『实现任务文本』：本任务只做两件事，各执行一次，不重试；不要调用 run_shell，也不需要先调用 git_query。
+第一步：调用 write_file 在项目内创建文件 src/impl/result.txt，内容为任意非空文本（一行即可）。
+第二步：调用 git_candidate 提交该文件。入参必须逐字使用下面的 JSON（字段名与值都不得改动；base 是已冻结的执行基线，请原样传入）：
+{"action":"commit","operationId":"rr2-live-commit-20261109-01","base":{"ref":"refs/ans/trunk","oid":{"objectFormat":"sha1","hex":"71754a834c99e96b7d064b3ed295371da21de032"}},"message":"RR3 live commit: create result.txt","paths":["src/impl/result.txt"]}
+完成后调用 submit_report 如实汇报 git_candidate 的回执原文（成功或错误码），不要夸大。
+完成后请交回报告（改了什么/结论/证据）。

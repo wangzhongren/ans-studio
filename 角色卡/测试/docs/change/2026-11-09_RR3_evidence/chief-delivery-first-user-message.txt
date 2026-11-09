@@ -1,0 +1,11 @@
+[ANS_INPUT_CONTEXT:1fbbfbd6-fa01-4d66-bf60-f22fe789cb39]
+请执行一次两级派发验证。严格按下面做：只派发一次，不要重试，不要自己执行实现，也不要另行改派他人。
+第 1 步（你现在做）：调用 dispatch_task 工具派发给运营。参数：roleId 为 "convener"，flowId 为 "demo"，task 为下面的『给运营的任务文本』（原样传入，不要改写其中任何 JSON）。
+『给运营的任务文本』：
+请运营把下面的实现任务派发给 impl。只做一次派发，不要自己执行实现。调用 dispatch_task，参数：roleId 为 "impl"，flowId 为 "demo"，moduleId 为 "impl-core"，task 为下面这段『实现任务文本』（原样传入，不要改写其中任何 JSON）：
+『实现任务文本』：本任务只做两件事，各执行一次，不重试；不要调用 run_shell，也不需要先调用 git_query。
+第一步：调用 write_file 在项目内创建文件 src/impl/result.txt，内容为任意非空文本（一行即可）。
+第二步：调用 git_candidate 提交该文件。入参必须逐字使用下面的 JSON（字段名与值都不得改动；base 是已冻结的执行基线，请原样传入）：
+{"action":"commit","operationId":"rr2-live-commit-20261109-01","base":{"ref":"refs/ans/trunk","oid":{"objectFormat":"sha1","hex":"71754a834c99e96b7d064b3ed295371da21de032"}},"message":"RR3 live commit: create result.txt","paths":["src/impl/result.txt"]}
+完成后调用 submit_report 如实汇报 git_candidate 的回执原文（成功或错误码），不要夸大。
+第 2 步：派发之后，无论应用的受理回执如何，请把回执原文如实告诉我（成功或错误码/原因）。不要夸大，也不要自行重试。

@@ -1,0 +1,227 @@
+{
+  "checkedAt": "2026-11-09T02:02:27.914Z",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9",
+  "trunkExpected": {
+    "ref": "refs/ans/trunk",
+    "oid": {
+      "objectFormat": "sha1",
+      "hex": "71754a834c99e96b7d064b3ed295371da21de032"
+    }
+  },
+  "protection": {
+    "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9",
+    "protectedGitRoots": [
+      "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9\\.git"
+    ],
+    "coverage": "complete",
+    "identity": {
+      "root": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9",
+      "gitDir": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9\\.git",
+      "commonDir": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9\\.git",
+      "objectFormat": "sha1",
+      "configDigest": "05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc",
+      "repoId": "b242f3451ee4b6ce57f5e6e03ea8bdaa96455dd0b339e9610a991cb4faab9256"
+    },
+    "reasons": [],
+    "basisDigest": "f956dd3c06f39e92d4a7e59f97c5ec9a4f1b053d9636de713b94abe3724782d5"
+  },
+  "manifest": {
+    "trunkVersion": 2,
+    "flowId": "demo",
+    "digest": "5ee701e61d240045a7fd6bfb15c6d4d2fe768c09a6857edd9b8d052b2b99384a",
+    "activeRevision": 1,
+    "activeRoles": [
+      "impl"
+    ]
+  },
+  "trunkActual": {
+    "objectFormat": "sha1",
+    "hex": "71754a834c99e96b7d064b3ed295371da21de032"
+  },
+  "trunkMatches": true,
+  "runs": [
+    {
+      "runId": "run-w7-docs",
+      "state": "draft",
+      "flowId": "demo",
+      "docSource": "init-source-5b94bfcc906a52746efecf37c6959b87e806622aab770740a5e46a08c1b42788",
+      "hubSource": null
+    },
+    {
+      "runId": "run-w7-plan",
+      "state": "draft",
+      "flowId": "demo",
+      "docSource": "init-source-116c92db1fcf15c201808a095810dc0df99b1ff5317a84b7e047d3075a203fb0",
+      "hubSource": null
+    },
+    {
+      "runId": "run-w7-roles",
+      "state": "draft",
+      "flowId": "demo",
+      "docSource": "init-source-16e497efd5ea12391ae2eb875823300a7665f739a62dcc9f8802200959b2df02",
+      "hubSource": null
+    },
+    {
+      "runId": "run-w7-workflow",
+      "state": "draft",
+      "flowId": "demo",
+      "docSource": null,
+      "hubSource": null
+    }
+  ],
+  "pinnedRuns": [],
+  "runEvidenceRefusals": {
+    "run-w7-docs": "trunk-verify-failed",
+    "run-w7-plan": "trunk-verify-failed",
+    "run-w7-roles": "trunk-verify-failed",
+    "run-w7-workflow": "trunk-verify-failed"
+  },
+  "initBasis": {
+    "ok": true,
+    "taskId": "w7-init-task",
+    "runId": "run-w7-docs",
+    "flowId": "demo",
+    "repoId": "b242f3451ee4b6ce57f5e6e03ea8bdaa96455dd0b339e9610a991cb4faab9256",
+    "parentCoreSessionId": "cbf079d8-582f-4b5b-83dd-af38d7cadebe",
+    "sourceId": "init-source-4e172675ab5ce3b5e74f67c4f701ce0176859cc5653a42ef7d79dfeaa1cf93a0"
+  },
+  "ledger": {
+    "rows": 15,
+    "creates": [
+      {
+        "taskId": "w7-init-task",
+        "from": "chief",
+        "to": "convener",
+        "flowId": "demo",
+        "runId": "run-w7-docs",
+        "runState": "draft",
+        "sideEffect": "unknown"
+      },
+      {
+        "taskId": "w7-doc-task",
+        "from": "chief",
+        "to": "product",
+        "flowId": "demo",
+        "runId": "run-w7-docs",
+        "runState": "draft",
+        "sideEffect": "docs"
+      },
+      {
+        "taskId": "w7-plan-task",
+        "from": "chief",
+        "to": "convener",
+        "flowId": "demo",
+        "runId": "run-w7-plan",
+        "runState": "draft",
+        "sideEffect": "docs"
+      },
+      {
+        "taskId": "w7-nomination-task",
+        "from": "chief",
+        "to": "nominator",
+        "flowId": "demo",
+        "runId": "run-w7-roles",
+        "runState": "draft",
+        "sideEffect": "docs"
+      },
+      {
+        "taskId": "w7-workflow-task",
+        "from": "chief",
+        "to": "convener",
+        "flowId": "demo",
+        "runId": "run-w7-workflow",
+        "runState": "draft",
+        "sideEffect": "docs"
+      }
+    ]
+  },
+  "openUndelivered": [],
+  "operations": [
+    {
+      "rel": ".ans/trunk/operations/2008de287276b997483ceddd7c7b47b332267e6ebe5843e8d42412742e83baf1/git.json",
+      "sha256": "cf57e2690c91a8c5a1b477728244258616a6ecade740bf844c72bc0c3c306f66",
+      "bytes": 8836
+    },
+    {
+      "rel": ".ans/trunk/operations/2c8d27bf6ea75aae3616989029e375a668d765854fe92aa8c39b205f06eaad58/git.json",
+      "sha256": "d7fa28f697505f461c98e72c523c0b16c6ae69c8e66555883aa5612ca019efae",
+      "bytes": 3387
+    },
+    {
+      "rel": ".ans/trunk/operations/53b656ccd9b16fd7ca412b9010e78d8ad4b35f21d849dfe6e977b3b9c6581fa8/init.json",
+      "sha256": "5ca8f59c327d9660b5996f2d4b646cd9af0217e493a313cb3ffa6408c99a6ab9",
+      "bytes": 1329
+    },
+    {
+      "rel": ".ans/trunk/operations/5a8deffd50354e23d38c4fc16d01d10ef39b2f14f939452c58176074bf9319e4/git.json",
+      "sha256": "e41722be5a0f1f9d89911704e99fa51b843c7e5e4a8662aeb1410db5857fb18e",
+      "bytes": 7302
+    },
+    {
+      "rel": ".ans/trunk/operations/5a8deffd50354e23d38c4fc16d01d10ef39b2f14f939452c58176074bf9319e4/stable-source.json",
+      "sha256": "7f39c46539675fd74cdd08ea3308a265a0b8dd2f7a17b715206c58fc6d25c0e6",
+      "bytes": 877
+    },
+    {
+      "rel": ".ans/trunk/operations/afa001db4ed58778505a6b8f08a7ad733ca36708cbac5fa0d53149d9e7b37706/git.json",
+      "sha256": "9bf74a5223a1b0f4b9a1977ceacf60832b83e3895ed71935c648ccb7fe40e9bd",
+      "bytes": 4960
+    }
+  ],
+  "commitOperationId": "rr2-live-commit-20261109-01",
+  "commitOperationDir": "4140b85897180bd3ecfd1d2bb4365fb89229fa10cb8bdcb2c400117dc9a37e59",
+  "commitOperationDirPresent": false,
+  "audit": {
+    "source": {
+      "kind": "ans",
+      "path": "C:\\Users\\51054\\Desktop\\work\\ans-dogfood-call-context-live-2026-11-09\\rr\\tmp\\ans-rr3-live-PBUOU9\\.ans\\project.json",
+      "acceptance": {
+        "accepted": true,
+        "source": "desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）",
+        "pin": [
+          {
+            "path": "角色卡/governance-boundary.yaml",
+            "sha256": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93"
+          },
+          {
+            "path": "角色卡/impl/boundary.yaml",
+            "sha256": "01418df21aa5b37c049334d7cc872f8b491b920a16e02edfefd7633e9b169ffa"
+          }
+        ]
+      },
+      "pinPaths": [
+        "角色卡/governance-boundary.yaml",
+        "角色卡/impl/boundary.yaml"
+      ]
+    },
+    "governanceModel": "trio",
+    "roles": [
+      "impl"
+    ],
+    "facts": {
+      "source": "orchestration-shell-gate",
+      "version": 1,
+      "projectRoot": "C:/Users/51054/Desktop/work/ans-dogfood-call-context-live-2026-11-09/rr/tmp/ans-rr3-live-PBUOU9",
+      "mode": "operator-approve",
+      "classifier": true,
+      "rules": true,
+      "pmAsk": false,
+      "operatorChannel": true,
+      "takeGrant": false,
+      "takeDirective": false,
+      "routinePolicy": false,
+      "audit": {
+        "sink": "file",
+        "durable": true,
+        "probe": "unknown",
+        "relPath": "docs/audit/shell-gate.jsonl"
+      },
+      "escalation": false
+    },
+    "auditVerdict": "OK",
+    "operationsProbe": {
+      "ok": true
+    }
+  },
+  "verdict": "OK"
+}

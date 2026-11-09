@@ -1,0 +1,28 @@
+{
+  "projectRoot": "C:/Users/51054/Desktop/work/ans-dogfood-call-context-final-2026-11-09/rr/tmp/ans-rr2-final-J06mW6",
+  "skillRoot": "C:/Users/51054/.claude/skills/ans-governed-construction",
+  "governanceModel": "trio",
+  "roles": {
+    "impl": {
+      "card": "角色卡/impl/role-card.md",
+      "boundary": "角色卡/impl/boundary.yaml"
+    }
+  },
+  "governanceBoundary": {
+    "path": "角色卡/governance-boundary.yaml",
+    "acceptance": {
+      "accepted": true,
+      "source": "desktop-app:操作者为已有角色的项目显式建立治理记录（操作者点击确认）",
+      "pin": [
+        {
+          "path": "角色卡/governance-boundary.yaml",
+          "sha256": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93"
+        },
+        {
+          "path": "角色卡/impl/boundary.yaml",
+          "sha256": "01418df21aa5b37c049334d7cc872f8b491b920a16e02edfefd7633e9b169ffa"
+        }
+      ]
+    }
+  }
+}

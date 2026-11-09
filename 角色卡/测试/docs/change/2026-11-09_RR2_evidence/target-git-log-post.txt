@@ -1,0 +1,2 @@
+GIT_ERROR Command failed: git log --oneline -5
+fatal: your current branch 'ans-unpublished' does not have any commits yet
