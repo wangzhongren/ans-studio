@@ -108,6 +108,40 @@ function claudeAbsentPropertiesSchema(schema: JsonSchema): JsonSchema {
 function claudeSchemaObject(value: unknown): JsonSchema | undefined {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonSchema : undefined;
 }
+/** The host-owned request-context field is declared next to a tool's own properties so that
+ * `additionalProperties:false` accepts it. A top-level `oneOf`/`anyOf` keeps that strictness
+ * inside each object branch, where a root-only declaration is invisible (branch strictness only
+ * exempts the branch's own `properties`); the same optional field is therefore added to every
+ * `additionalProperties:false` object branch of a top-level `oneOf`/`anyOf`. `required`,
+ * `pattern` and `additionalProperties` stay verbatim, nothing outside those top-level branches
+ * is touched, and the reserved name is never silently overwritten: an existing declaration at
+ * the root or in any target branch throws. Returns a deep copy; the input (and the public tool
+ * schema it came from) is never modified. Exported for the adapter's unit tests.
+ */
+export function claudeToolInputWithCallContext(schema: JsonSchema): JsonSchema {
+  const contextProperty = () => ({ type: "string", description: "Internal ANS context assigned by the host; omit this field." });
+  const reserved = (properties: unknown): boolean => {
+    const declared = claudeSchemaObject(properties);
+    return declared !== undefined && Object.hasOwn(declared, CALL_CONTEXT_ARG);
+  };
+  const strictBranches = (branches: unknown): JsonSchema[] => Array.isArray(branches)
+    ? branches.filter((branch): branch is JsonSchema => claudeSchemaObject(branch) !== undefined && (branch as JsonSchema).additionalProperties === false)
+    : [];
+  if (reserved(schema.properties)) throw new Error("Claude ANS 工具 schema 包含保留的请求上下文字段");
+  if ([...strictBranches(schema.oneOf), ...strictBranches(schema.anyOf)].some((branch) => reserved(branch.properties))) {
+    throw new Error("Claude ANS 工具 schema 包含保留的请求上下文字段");
+  }
+  const copy = structuredClone(schema);
+  const root = claudeSchemaObject(copy);
+  // Malformed root properties stay untouched so toClaudeSchema still rejects them.
+  if (!root || (root.properties !== undefined && !claudeSchemaObject(root.properties))) return copy;
+  root.properties = { ...(claudeSchemaObject(root.properties) ?? {}), [CALL_CONTEXT_ARG]: contextProperty() };
+  for (const branch of [...strictBranches(root.oneOf), ...strictBranches(root.anyOf)]) {
+    if (branch.properties !== undefined && !claudeSchemaObject(branch.properties)) continue;
+    branch.properties = { ...(claudeSchemaObject(branch.properties) ?? {}), [CALL_CONTEXT_ARG]: contextProperty() };
+  }
+  return copy;
+}
 /** Two exact dispatch schemas, not a general conditional-schema evaluator. Unknown conditions
  * remain intact and are rejected by toClaudeSchema. Complete-object branches retain all fields.
  */
@@ -645,11 +679,7 @@ export function createClaudeRuntimeAdapter(options: RuntimeProviderOptions, depe
         const registeredToolNames: string[] = [];
         for (const tool of options.tools) {
           const protectedSchema = claudeAbsentPropertiesSchema(tool.inputSchema);
-          const properties = (protectedSchema.properties ?? {}) as Record<string, unknown>;
-          if (Object.hasOwn(properties, CALL_CONTEXT_ARG)) throw new Error("Claude ANS 工具 schema 包含保留的请求上下文字段");
-          const inputSchema = claudeMcpInputSchema({ ...protectedSchema, properties: { ...properties,
-            [CALL_CONTEXT_ARG]: { type: "string", description: "Internal ANS context assigned by the host; omit this field." },
-          } }, tool.name);
+          const inputSchema = claudeMcpInputSchema(claudeToolInputWithCallContext(protectedSchema), tool.name);
           server.instance.registerTool(tool.name, {
             description: tool.description,
             inputSchema: toClaudeSchema(inputSchema, z),
