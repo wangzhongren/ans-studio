@@ -1,0 +1,196 @@
+{
+  "at": "2026-11-09T13:10:32.736Z",
+  "head": "24799cb61239272e8603018adc094881bb6263dd",
+  "tree": "409a4ac7bb077c0fc5b19f3c99383cf0b09dd13e",
+  "branch": "feat/plan-escalation-card",
+  "candidate": {
+    "fileCount": {
+      "pre": 15,
+      "post": 15
+    },
+    "aggregate": {
+      "pre": "a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59",
+      "post": "a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59",
+      "equal": true
+    },
+    "filesEqual": true,
+    "manifest": {
+      "fileCount": 1107,
+      "fileHash": "f62a81a6485c2bb1047c1dbf2c6d260c90c94c4073cb5b3bd7e469f2013a7d15",
+      "aggregate": "b06433b5ad162907a7ec5395f9cb31c89e6c48244ca0e5eb21115de13c7fdbf0",
+      "fileHashEqual": true,
+      "aggregateEqual": true
+    },
+    "untrackedSrcAppTest": 0,
+    "headEqual": true,
+    "treeEqual": true,
+    "branchEqual": true,
+    "stagedEmpty": true
+  },
+  "targetDiff": {
+    "preCount": 88,
+    "postCount": 101,
+    "added": 13,
+    "removed": 0,
+    "changed": 14
+  },
+  "trunkManifestPost": {
+    "exists": false,
+    "sha256": null,
+    "trunkDirListing": [
+      "initialization-sources",
+      "snapshots"
+    ]
+  },
+  "appRootZeroTouch": {
+    "name": "snake-app-root",
+    "root": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09",
+    "preCount": 0,
+    "postCount": 0,
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "identical": true
+  },
+  "snakeRunRootZeroTouch": {
+    "name": "snake-run-root",
+    "root": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-run-2026-11-09",
+    "preCount": 108,
+    "postCount": 108,
+    "added": [],
+    "removed": [],
+    "changed": [],
+    "identical": true
+  },
+  "portsPost": {
+    "listeners9222": 0,
+    "listeners9223": 0,
+    "timeWait9223": 0,
+    "electronProcesses": 0
+  },
+  "plan": {
+    "toolCalls": 0,
+    "receipts": 0,
+    "gateRows": 7
+  },
+  "convenerReports": [
+    {
+      "file": "6f61eb74b5862cc3b98c131d12708e07a20d14edb04dfb4c6503d4b3ffde854f.json",
+      "mtime": "2026-11-09T05:38:38.187Z",
+      "newInRun": false,
+      "taskId": "t-mw8tsyms-8eb2422f",
+      "status": "blocked",
+      "mentionsPlan": true,
+      "codes": []
+    },
+    {
+      "file": "b60a8440180c6add83d6a228d159fe96b72976044868a49a6b9fdc115a428313.json",
+      "mtime": "2026-11-09T05:39:36.205Z",
+      "newInRun": false,
+      "taskId": "t-mw8tsyms-8eb2422f",
+      "status": "blocked",
+      "mentionsPlan": true,
+      "codes": []
+    },
+    {
+      "file": "bc1b0489708cfce80b60c5b3479a77a9227fb87c4f325a1d905577e3367d0de0.json",
+      "mtime": "2026-11-09T03:09:28.500Z",
+      "newInRun": false,
+      "taskId": "t-mw8ok0hu-5806d8f9",
+      "status": "completed",
+      "mentionsPlan": true,
+      "codes": []
+    }
+  ],
+  "convenerReportsNewInRun": 0,
+  "snapshotsNewInRun": 0,
+  "runsPost": [
+    {
+      "dir": "run-hub-0e70d5e3955385b3012978e3db355cf7b1c88b49703c683f",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-165790f40491375e54a2aae1712f7b2fe196145ee346fc37",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-3d2b4fdf07f1fe1b3d7183edfc59bbb2399101da3ef0b22a",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-65ad9642649228de668effa4068b9555c9cb844c64669509",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-c0ceba36499de3624ecb6822aec9b10071a4082cb5b07c7b",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-c9791d41e08d1f6eb5773656de17623d3378690cc1aa493e",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-ce6048f9c594c51207f703b806ba20353926fac90a3fe1cd",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-f275cf67a6f6046c85a7a14b6eb93b47c548418c4ff51130",
+      "state": "draft"
+    }
+  ],
+  "budgetPost": {
+    "cardsTotal": 1,
+    "cardsByKind": {
+      "proposal": 1
+    },
+    "dispatches": 2,
+    "turnsByRole": {
+      "chief": 3,
+      "rapporteur": 3
+    },
+    "abortedTurnsByRole": {
+      "chief": 1,
+      "rapporteur": 1
+    },
+    "settledDetail": [
+      {
+        "role": "chief",
+        "at": "2026-11-09T13:02:19.866Z",
+        "summary": "会话结束",
+        "aborted": false
+      },
+      {
+        "role": "chief",
+        "at": "2026-11-09T13:05:34.495Z",
+        "summary": "会话结束",
+        "aborted": false
+      },
+      {
+        "role": "chief",
+        "at": "2026-11-09T13:05:39.437Z",
+        "summary": "本轮已中止",
+        "aborted": true
+      },
+      {
+        "role": "rapporteur",
+        "at": "2026-11-09T13:04:08.685Z",
+        "summary": "会话结束",
+        "aborted": false
+      },
+      {
+        "role": "rapporteur",
+        "at": "2026-11-09T13:05:27.747Z",
+        "summary": "会话结束",
+        "aborted": false
+      },
+      {
+        "role": "rapporteur",
+        "at": "2026-11-09T13:05:40.450Z",
+        "summary": "本轮已中止",
+        "aborted": true
+      }
+    ],
+    "gitCalls": 0
+  },
+  "evidenceFiles": 167
+}

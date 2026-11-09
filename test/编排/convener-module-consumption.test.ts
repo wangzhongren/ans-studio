@@ -26,8 +26,13 @@ import {
   convenerStableWriteFacts,
   type AdapterCapabilities,
 } from "../../src/pipeline/orchestration/run-role.ts";
-import { convenerTeamPlanFacts, createDirectRoleRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+import { convenerTeamPlanFacts, createDirectRoleRuntime, inspectAssignedTask, recordTaskObservation } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import { isConvenerBuiltInDispatchTarget, evaluateDispatchAuthorization } from "../../src/common/编排/workflow-preconditions.ts";
+import { buildProjectStateView, deriveActiveRunFromManifests, scanRunManifestsForState } from "../../src/common/编排/project-state.ts";
+import { validateVersionDecisionContext } from "../../src/common/编排/version-decision.ts";
+import { createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
+import { TRUNK_MANIFEST_SCHEMA, type TrunkManifest } from "../../src/model/trunk.ts";
+import { createTrunkProject } from "./fixtures/trunk-project.ts";
 import { convenerRoleModule } from "../../src/common/roles/convener/index.ts";
 import type { RolePreflightInput } from "../../src/model/role.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
@@ -270,6 +275,12 @@ test("X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Ser
   assert.deepEqual(decide("team-plan", { ...facts }), { allow: true });
   const withRun = convenerTeamPlanFacts({ ...input, runId: "run-demo" });
   assert.equal("runId" in withRun, true);
+  // B1 AC-10 / P-13：缺省 baseDigest/plan.sha256 不投影（不造键）；preflight 视为缺省（allow）。
+  const omitted = convenerTeamPlanFacts({ operationId: "xr4-plan-op", flowId: "demo", plan: { path: "docs/scheduling/demo-team-v2.md", version: 2 } });
+  assert.deepEqual(Object.keys(omitted).sort(), ["actorRoleId", "flowId", "operationId", "plan"], "缺省 baseDigest 不投影");
+  assert.deepEqual(Object.keys(omitted["plan"] as Record<string, unknown>).sort(), ["path", "version"], "缺省 plan.sha256 不投影");
+  assert.equal("baseDigest" in omitted, false); assert.equal("sha256" in (omitted["plan"] as Record<string, unknown>), false);
+  assert.deepEqual(decide("team-plan", { ...omitted }), { allow: true }, "缺省字段由 preflight 视为缺省（allow）");
   const wrongPath = decide("team-plan", { ...facts, plan: { ...input.plan, path: "docs/scheduling/other-team-v2.md" } });
   assert.equal(wrongPath.allow, false);
   if (!wrongPath.allow) assert.equal(wrongPath.code, "team-plan-path-invalid");
@@ -359,4 +370,56 @@ test("X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；�
   const protectionIndex = trunkRuntime.indexOf("const protection = await readGitProtectionFacts(input.projectRoot);", preflightIndex);
   assert.ok(preflightIndex > 0 && protectionIndex > preflightIndex, "team-plan 前置在 Git 保护事实/Service 提交之前");
   assert.ok(trunkRuntime.indexOf("if (signal?.aborted)") < preflightIndex, "abort 早于前置");
+});
+
+test("team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变", async () => {
+  const at = "2026-11-09T00:00:00.000Z";
+  const project = await createTrunkProject({ withRun: false });
+  try {
+    const store = createFsTrunkStore(project.root), documents = project.snapshot().documents;
+    const captured = await store.captureSnapshot!({ snapshotId: "p13-planning-basis", createdAt: at, files: Object.values(documents) });
+    assert.ok(captured.ok, JSON.stringify(captured)); if (!captured.ok) return;
+    const initial: TrunkManifest = { schema: TRUNK_MANIFEST_SCHEMA, source: "bootstrap", trunkVersion: 1, previous: null, runId: null, flowId: "demo",
+      digest: sha("p13-planning-basis"), snapshotRef: captured.value, createdAt: at, updatedAt: at,
+      artifacts: { documents, execution: { teamPlan: null, flow: null }, boundaries: {} } };
+    assert.ok((await store.compareAndSwapManifest!(null, initial, captured.value)).ok);
+    const runIds = ["run-p13-draft-a", "run-p13-draft-b"];
+    for (const runId of runIds) assert.ok((await store.compareAndSwapRunRecord!(runId, null, { schema: "ans-run/v1", runId, flowId: "demo", state: "draft",
+      schemas: {}, documents: {}, execution: { teamPlan: null, flow: null }, createdAt: at, updatedAt: at })).ok);
+    // 受派任务：chief → convener，真实 draft run（本任务 run = run-p13-draft-a）。
+    const taskId = "task-p13-team-plan-convener";
+    assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.created", taskId, from: "chief", to: "convener",
+      text: "Prepare the p13 team plan", sideEffect: "docs", idempotencyKey: taskId, flowId: "demo", runId: runIds[0], runState: "draft" } })).ok);
+    const assigned = await inspectAssignedTask({ projectRoot: project.root, actorRoleId: "convener", taskId });
+    assert.ok(assigned.ok, JSON.stringify(assigned)); if (!assigned.ok) return;
+    assert.equal(assigned.value.runId, runIds[0]); assert.equal(assigned.value.flowId, "demo");
+    const scan = async () => {
+      const scanned = await scanRunManifestsForState(project.root);
+      assert.deepEqual(scanned.errors, []);
+      const derivation = deriveActiveRunFromManifests(scanned.manifests, "demo");
+      const decision = validateVersionDecisionContext({ derivation, hasPending: false });
+      const ambiguous = (await buildProjectStateView(project.root, { flowId: "demo", now: new Date(at) })).blockers.filter(blocker => blocker.kind === "run-ambiguous");
+      return { derivation, decision, ambiguous };
+    };
+    const before = await scan();
+    assert.equal(before.derivation.activeRuns.length, 2, "两个 draft run 均为活动 run（多 draft 非 pinned 冲突）");
+    assert.equal(before.decision.ok, false); if (!before.decision.ok) assert.equal(before.decision.code, "run-ambiguous");
+    assert.equal(before.ambiguous.length, 1, "project_state 保留 run-ambiguous（版本决策面事实）");
+    const planPath = "docs/scheduling/demo-team-v2.md";
+    const plan = { schema: "teamPlanSchema:3", flowId: "demo", version: 2, modules: documents.modules, roster: documents.roster,
+      roleRows: [{ roleId: "impl", modules: ["impl-core"], writesets: ["src/impl/"], dependsOn: [] }] };
+    const text = `---\n${JSON.stringify(plan)}\n---\n# p13 real team plan\n`;
+    await fs.writeFile(path.join(project.root, planPath), text);
+    // 模型不提供 runId/baseDigest/sha256；宿主按真实受派任务注入 runId（W6 语义的编排层等价）。
+    const registered = await createDirectRoleRuntime({ projectRoot: project.root, actorRoleId: "convener", notifyDirect: async () => {} }).completeTeamPlan(
+      { operationId: "p13-team-plan-registration", flowId: "demo", runId: assigned.value.runId, plan: { path: planPath, version: 2 } });
+    assert.equal(registered.status, "applied", JSON.stringify(registered));
+    assert.equal(registered.source?.kind === "role-direct" && registered.source.runId, runIds[0], "回执 source.runId = 受派任务 run");
+    assert.ok(registered.planRef); assert.equal(registered.planRef?.sha256, sha(text), "planRef.sha256 = 实际字节派生值");
+    const after = await scan();
+    assert.deepEqual(after.derivation.activeRuns.map(run => run.runId).sort(), runIds, "登记不创建/关闭/pin 任何 run；多 draft 保持活动");
+    assert.deepEqual(after.decision, before.decision, "version-decision 的 run-ambiguous 语义/文案不变");
+    assert.deepEqual(after.ambiguous, before.ambiguous, "project_state 的 run-ambiguous blocker 不变（只读对照）");
+    for (const runId of runIds) { const record = await store.readRunRecord!(runId); assert.ok(record.ok); if (record.ok) assert.equal(record.value.value.state, "draft"); }
+  } finally { await fs.rm(project.root, { recursive: true, force: true }); }
 });

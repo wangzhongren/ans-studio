@@ -2465,12 +2465,18 @@ export interface SelectRunChangeInput {
 export type SelectRunChangeResult = DirectActionReceipt & { runId?: string; replacementRunId?: string };
 export type SelectRunChangeFn = (input: SelectRunChangeInput, signal?: AbortSignal) => Promise<SelectRunChangeResult>;
 
+/**
+ * The application derives `baseDigest` from the effective trunk manifest digest and `plan.sha256`
+ * from the actual plan bytes; a model-supplied value is only an assertion, and a mismatch is
+ * rejected with the existing plan-base-conflict / plan-hash-drift codes. `runId` is bound by the
+ * desktop host from the current actually-assigned task; a model self-report is only an assertion.
+ */
 export interface CompleteTeamPlanInput {
   operationId: string;
   flowId: string;
   runId?: string;
-  baseDigest: string;
-  plan: { path: string; sha256: string; version: number };
+  baseDigest?: string;
+  plan: { path: string; sha256?: string; version: number };
 }
 export type CompleteTeamPlanFn = (input: CompleteTeamPlanInput, signal?: AbortSignal) => Promise<DirectActionReceipt>;
 

@@ -1448,6 +1448,35 @@ export class SessionManager {
     finally { this.runChangeOperations.delete(plan.planId); }
   }
 
+  /**
+   * W6（团队计划登记 run 绑定，B1 AC-6/P-12）：与 `selectRunChangeForHandle` 同款「当前真实回合」校验——
+   * 只信当前 busy 的受派 convener 回合的 `origin.taskId`，经 `inspectAssignedTask` 取该任务的实际 run
+   * 并注入 `runId`；模型自报 runId 只作断言（不一致 ⇒ 既有 service 码 `plan-run-conflict`）。
+   * inspect 失败直通其原码（`trunk-item-invalid`，不重写）；仅宿主本地前置用 host-local 码
+   * （`plan-task-unavailable`/`plan-task-changed`/`plan-flow-conflict`——沿用 run-change-source-* 先例，
+   * 不登记共享稳定码，S2）。
+   */
+  private async completeTeamPlanForHandle(projectRoot: string, runtime: RuntimeKind, handle: RoleSessionHandle | undefined,
+    request: Parameters<CompleteTeamPlanFn>[0], direct: { completeTeamPlan: CompleteTeamPlanFn },
+    signal?: AbortSignal): Promise<Awaited<ReturnType<CompleteTeamPlanFn>>> {
+    const blocked = (errorCode: string, message: string): Awaited<ReturnType<CompleteTeamPlanFn>> => ({ ok: false, status: "blocked",
+      operationId: request.operationId, baseDigest: request.baseDigest ?? null, targetDigest: null, errorCode, message });
+    const key = this.sessionKey(projectRoot, "convener", runtime), entry = this.sessions.get(key), origin = entry?.origins.running;
+    const current = () => !!entry && !!origin && entry.handle === handle && this.sessions.get(key) === entry && entry.origins.running === origin &&
+      entry.busy && !origin.settled && !entry.interactionState.lifetime.signal.aborted && !entry.interactionState.turn.signal.aborted;
+    if (!current() || !origin?.taskId || signal?.aborted)
+      return blocked("plan-task-unavailable", "缺少当前真实受派运营回合或任务，未登记团队计划。");
+    const assigned = await inspectAssignedTask({ projectRoot, actorRoleId: "convener", taskId: origin.taskId });
+    if (!assigned.ok) return blocked(assigned.code, assigned.message ?? assigned.code);
+    if (assigned.value.flowId !== request.flowId)
+      return blocked("plan-flow-conflict", "团队计划 flow 与实际受派任务不一致，未登记团队计划。");
+    if (request.runId !== undefined && request.runId !== assigned.value.runId)
+      return blocked("plan-run-conflict", "Plan task refers to a different or unavailable real run");
+    if (!current() || signal?.aborted)
+      return blocked("plan-task-changed", "核验期间真实受派回合已变化，未登记团队计划。");
+    return direct.completeTeamPlan({ ...request, runId: assigned.value.runId }, signal);
+  }
+
   private ownedRunStopMembers(plan: Pick<RunChangeHostPlan, "projectRoot" | "handles">) {
     const groups = new Map<SessionManager, { member: RunChangeHostPlan["handles"][number]; handle: RoleSessionHandle }[]>();
     const invalid = (message: string) => ({ ok: false as const, code: "run-stop-host-instance-unproven", message });
@@ -3736,6 +3765,8 @@ export class SessionManager {
     // 与 single/su；目标矩阵由 `routeDispatch` → `evaluateDispatchPreflight` 机械执行。
     const canDispatch = governanceFunction === "chief" || governanceFunction === "schedule" || legacyBuiltIn;
     const dispatchBinding: { handle?: RoleSessionHandle } = {};
+    // W6（B1 AC-6）：团队计划登记的宿主 run 绑定——handle 在开会话成功处与 gitBinding/dispatchBinding 同源定格。
+    const planBinding: { handle?: RoleSessionHandle } = {};
     const dispatchTask: DispatchTaskFn | undefined = canDispatch ? (d, metadata) => {
       const entry = this.sessions.get(key), origin = entry?.origins.running;
       const source = entry?.handle === dispatchBinding.handle && origin &&
@@ -4316,7 +4347,8 @@ export class SessionManager {
           gitPublish: async (input, signal) => { const current = await currentGitRuntime(); return current.ok ? current.runtime.gitPublish(input, signal) : gitContextFailure(input.operationId, current); },
           ...(direct !== undefined && req.roleId === "rapporteur" ? { selectRunChange: (input, signal) => input.mode === "continue-frozen"
             ? direct.selectRunChange(input, signal) : this.selectRunChangeForHandle(req.projectRoot, req.runtime, gitBinding.handle, input, signal) } : {}),
-          ...(direct !== undefined && req.roleId === "convener" ? { completeTeamPlan: direct.completeTeamPlan } : {}),
+          ...(direct !== undefined && req.roleId === "convener" ? { completeTeamPlan: (input, signal) =>
+            this.completeTeamPlanForHandle(req.projectRoot, req.runtime, planBinding.handle, input, direct, signal) } : {}),
           ...(direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
           ...(closeCreatedTask !== undefined ? { closeCreatedTask } : {}),
           ...(submitVersionChangeCapability ? { submitVersionChange: submitVersionChangeCapability } : {}),
@@ -4371,6 +4403,7 @@ export class SessionManager {
       installationBinding.handle = handle;
       dispatchBinding.handle = handle;
       gitBinding.handle = handle;
+      planBinding.handle = handle;
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }

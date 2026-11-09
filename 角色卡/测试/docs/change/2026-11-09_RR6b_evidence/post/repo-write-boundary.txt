@@ -1,0 +1,8 @@
+# repo write boundary check (pre-run git status vs final git status)
+preLines: 264
+finalLines: 266
+added vs pre (2):
++ ?? 角色卡/测试/docs/change/2026-11-09_RR6b_evidence/
++ ?? 角色卡/测试/docs/change/2026-11-09_RR6b_team-plan-run-binding.md
+removed vs pre (0):
+expected: only 角色卡/测试/docs/change/2026-11-09_RR6b_team-plan-run-binding.md and 2026-11-09_RR6b_evidence/ additions

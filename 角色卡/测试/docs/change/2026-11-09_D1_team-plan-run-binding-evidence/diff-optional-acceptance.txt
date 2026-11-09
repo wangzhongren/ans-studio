@@ -1,0 +1,13 @@
+== suite: optional-acceptance
+--- before summary:
+--- after summary:
+SUMMARY tests=3 pass=2 fail=1 cancelled=0 skipped=0 todo=0
+--- FAIL before-only:
+grep: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/角色卡/测试/docs/change/2026-11-09_D1_team-plan-run-binding-evidence/before-optional-acceptance.analysis.txt: No such file or directory
+--- FAIL after-only (new):
+grep: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/角色卡/测试/docs/change/2026-11-09_D1_team-plan-run-binding-evidence/before-optional-acceptance.analysis.txt: No such file or directory
+幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚
+--- SKIP before-only:
+grep: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/角色卡/测试/docs/change/2026-11-09_D1_team-plan-run-binding-evidence/before-optional-acceptance.analysis.txt: No such file or directory
+--- SKIP after-only (new):
+grep: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/角色卡/测试/docs/change/2026-11-09_D1_team-plan-run-binding-evidence/before-optional-acceptance.analysis.txt: No such file or directory

@@ -1,0 +1,2 @@
+SUMMARY tests=43 pass=42 fail=1 cancelled=0 skipped=0 todo=0
+FAIL	1	Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation

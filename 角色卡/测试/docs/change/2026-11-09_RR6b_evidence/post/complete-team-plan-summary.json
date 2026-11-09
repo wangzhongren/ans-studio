@@ -1,0 +1,37 @@
+{
+  "callCount": 1,
+  "calls": [
+    {
+      "role": "convener",
+      "ts": "2026-11-09T13:23:51.315Z",
+      "inputHasBaseDigest": false,
+      "inputHasPlanSha256": false,
+      "inputHasRunId": false,
+      "input": {
+        "flowId": "snake-game",
+        "operationId": "ctp-snake-team-v1-1",
+        "plan": {
+          "path": "docs/scheduling/snake-game-team-v1.md",
+          "version": 1
+        }
+      }
+    }
+  ],
+  "receiptCount": 1,
+  "receipts": [
+    {
+      "role": "convener",
+      "ts": "2026-11-09T13:23:51.340Z",
+      "ok": "false",
+      "status": "rejected",
+      "errorCode": "trunk-unavailable",
+      "message": "effective-manifest-missing",
+      "operationId": "ctp-snake-team-v1-1",
+      "baseDigest": null,
+      "targetDigest": null,
+      "planRefSha256": null,
+      "sourceRunId": null,
+      "textHead": "complete_team_plan: {\"ok\":false,\"status\":\"rejected\",\"operationId\":\"ctp-snake-team-v1-1\",\"baseDigest\":null,\"targetDigest\":null,\"errorCode\":\"trunk-unavailable\",\"message\":\"effective-manifest-missing\"}"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+record: 角色卡/测试/docs/change/2026-11-09_RR6b_team-plan-run-binding.md
+lines: 222
+bytes: 32167
+sha256: 3d69277ed4b177d925c24775b20da77235abe42f9bb2d9b8da0acaaccfc8d0f4
+measuredAt: 2026-11-09T13:29:47Z

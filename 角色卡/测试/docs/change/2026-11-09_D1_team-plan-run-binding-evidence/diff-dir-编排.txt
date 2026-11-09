@@ -1,0 +1,9 @@
+== suite: dir-编排
+--- before summary:
+SUMMARY tests=1133 pass=1109 fail=22 cancelled=0 skipped=2 todo=0
+--- after summary:
+SUMMARY tests=1139 pass=1115 fail=22 cancelled=0 skipped=2 todo=0
+--- FAIL before-only:
+--- FAIL after-only (new):
+--- SKIP before-only:
+--- SKIP after-only (new):

@@ -1,0 +1,6 @@
+{"v":1,"at":"2026-11-09T13:05:16.918Z","kind":"request.created","requestId":"req-83771b765b37d527","flowId":"snake-game","cardKind":"proposal","taskId":"t-mw99tis6-1f4d5eab","sourceRoleId":"rapporteur","title":"确认「2D 贪吃蛇小游戏」实施提案（v2，含暂停/继续）","context":"是否接受该提案？","options":[{"id":"accept","label":"接受"},{"id":"revise","label":"退修"}]}
+{"v":1,"at":"2026-11-09T13:05:16.931Z","kind":"request.notified","requestId":"req-83771b765b37d527","to":"chief","event":"created"}
+{"v":1,"at":"2026-11-09T13:05:16.932Z","kind":"request.presented","requestId":"req-83771b765b37d527","to":"customer"}
+{"v":1,"at":"2026-11-09T13:05:16.980Z","kind":"request.notified","requestId":"req-83771b765b37d527","to":"chief","event":"presented"}
+{"v":1,"at":"2026-11-09T13:05:17.420Z","kind":"request.resolved","requestId":"req-83771b765b37d527","decisionId":"decision-req-83771b765b37d527","cardKind":"proposal","selectedOptionIds":["accept"],"taskId":"t-mw99tis6-1f4d5eab","by":"customer","operatorId":"51054","choice":"accept"}
+{"v":1,"at":"2026-11-09T13:05:17.430Z","kind":"request.notified","requestId":"req-83771b765b37d527","to":"chief","event":"resolved"}

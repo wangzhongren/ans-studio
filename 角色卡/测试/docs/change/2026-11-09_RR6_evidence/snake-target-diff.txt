@@ -1,0 +1,31 @@
+# target file diff (pre 88 -> post 101)
+added: 13
++ .ans/runs/run-hub-0e70d5e3955385b3012978e3db355cf7b1c88b49703c683f/manifest.json  c9d873a5b0d0426ecd0329c971fc6f07f6e4fca523c2aa2462a00ca93436b9fa  466B
++ .ans/runs/run-hub-165790f40491375e54a2aae1712f7b2fe196145ee346fc37/manifest.json  fe475da0c4118544f53e0d3d62704595d0a6bc473daaeb29cde69c78b458ad8c  466B
++ .ans/sessions/chief/claude/native/backups/.claude.json.backup.1794229295715  e448fa7f9e8bc52e5fcb37ef76a8c29471e94358d206312806468c37cba88998  61921B
++ .ans/sessions/rapporteur/claude/ans/reports/2196c52b93ff7c9f5af1f1a306e567c28b811f6fbe1524df2f53195a2c9e4b6f.json  3ce322946e962837055dd5c65cf73c585b359c879ebf170c73942af306d51481  2428B
++ .ans/sessions/rapporteur/claude/ans/reports/bb65f316a4017712dba1099328f061ac3805c3ca52d7e6864eaea7c079609436.json  e40fba685fa0374c50e3c56bd4ff2e0f9dd7c0ab1e3cf5f90dd758b38a815002  3249B
++ .ans/sessions/rapporteur/claude/native/backups/.claude.json.backup.1794229335783  706e3a2ec04fef91413bc3fc87549ec6bfdf2973b35ad88da1cb50607ecf30c8  61918B
++ .ans/sessions/rapporteur/claude/native/sessions/11536.c5e62095466583fab20e853520245f8e69e298abe994c7fbd989712ef8206ef5.key  d30a64bde47d11ade898244d2dae5a45af179f98902f19491bb0d885d52ff078  119B
++ .ans/sessions/rapporteur/claude/native/sessions/11536.json  aa6132895b34e61b61c1e861ec95cc10ef2b7ddaf377afd9e3ffa78ccb3b2db7  590B
++ .ans/trunk/initialization-sources/init-source-3bc5afebbe2ce924891517a4958918c09f45676153826975a9839767f356a3d8.json  5351e0a8c3326d59516368de52ab5aa0afce92dfdcfb53f1d90834a8c14b4b16  1019B
++ .ans/trunk/initialization-sources/init-source-853cc3ea658d169d1f12ce279480b3b53f499086cf4088acea3555b3d61ab3af.json  3403f0a952a900cff681ee83b7600fefec083a927eec5f37a5fc9ed77bf7c22e  962B
++ docs/contracts/snake-game-architecture-v2.md  5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f  8269B
++ docs/contracts/snake-game-contract-v2.md  5561d9d4f1907760dc41140570ff194054896a3c53ad8a0612fc389c1306dc8c  11136B
++ docs/proposals/snake-game-proposal-v2.md  e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844  15008B
+removed: 0
+changed: 14
+~ .ans/sessions/chief/claude/ans/index.json  pre=5b7df6caed32a5bb42da1c250c3af60459da50c67581987e855d5bb8a582d87d (255B)  post=f04deae6149b5e572b699a68ee357d5f14f25e18822b3e8d154fd236639edc21 (255B)
+~ .ans/sessions/chief/claude/ans/replay.jsonl  pre=09fc1364ce38655cdd50d58e5f9f89412860dc42a756411a1cf0f27f23951dca (1298084B)  post=7822b846137d8c07abe572ee36a55383f2f4a1e0be0096dd6126f5a47e13050b (1390866B)
+~ .ans/sessions/chief/claude/native/.claude.json  pre=e448fa7f9e8bc52e5fcb37ef76a8c29471e94358d206312806468c37cba88998 (61921B)  post=d15bfdd79df6f1bf0180811d6d3c1ddeece3c5db76bf59ffe3cf21b0466366a1 (62020B)
+~ .ans/sessions/chief/claude/native/plugins/plugin-directory-cache-v2.json  pre=1aa9a30432a207d1ef56c58c6a303651b2fe267e50d657f48eac257fe24fa3fc (2723883B)  post=cfd5b6cda4ea506d2148b352cd8c6921ed1a1ab3971ea31a29ada5559b7ecaea (2725016B)
+~ .ans/sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-game2d-snake-2026-11-09-target/ed16b752-88f1-4747-905c-781135a5e227.jsonl  pre=aeef68fac7d9cccfd4693abb7e64bbe37ca36c8c53b95d16c8aa9d96fd64b24d (2178132B)  post=8b397875ecf23c7156fa8a10cc4cd1f003aff88c7492805b17a9cf9bce58f811 (2323080B)
+~ .ans/sessions/rapporteur/claude/ans/index.json  pre=9841364bb973d84bb97475ad9496cebe8822877bc244c2351a4245f17909f721 (258B)  post=b0dccf396d7c852c27cfac9ea4db52fd23d3a756b41ccb9f393bd0a63b0b101b (260B)
+~ .ans/sessions/rapporteur/claude/ans/replay.jsonl  pre=7fe4de95444dee4b1a73dd2f1733cbff0157307b313487f23b1955791eeffcd3 (508563B)  post=6e5ce5b36179a4c4df83dcf87ba85b435f355dc14b81b4b98f5a182436972aa7 (745788B)
+~ .ans/sessions/rapporteur/claude/native/.claude.json  pre=706e3a2ec04fef91413bc3fc87549ec6bfdf2973b35ad88da1cb50607ecf30c8 (61918B)  post=c2b5ff14e8da4454ae6ffbf0de1fef711c5a3e379be77f81d3618a613e9451e3 (62017B)
+~ .ans/sessions/rapporteur/claude/native/projects/C--Users-51054-Desktop-work-ans-game2d-snake-2026-11-09-target/71c2e2e3-22b4-4f99-acc1-4f8462cbb9a7.jsonl  pre=5759f5687f67b3124f431c85ea7198f64e3dd1c6352b5b3d65290fe956725216 (233568B)  post=8a6116ca2530554bdd9b3fd9eec9dd49f48c5492b28a6605022cbaa90a59009d (699421B)
+~ .ans/state/doc-freezes.json  pre=df0f094ffafb462fd94ba6fd845df1b300f431aeb7d11ae590fb90cab611e55c (1562B)  post=39fdfeffe60a58ec3ff3487e7468fb4b206113cd278e4614af5207e669a4e419 (1960B)
+~ .ans/state/logs/chief.jsonl  pre=8a37ba6c9a33b87a51b5826a0f7b2534262b292577f9df634f23ecc806611920 (108659B)  post=34e27ba234521a8566180bbec95fce5cea4b646e1bd983412f3e952b9220aa84 (115783B)
+~ .ans/state/logs/rapporteur.jsonl  pre=58ad4552a033c6eedc5f5fcbbdc4af5d0ee563bec6406ddc94901cd2ec3d5536 (57804B)  post=7b8bf8a0089765696b1143f4ac4ad7d0546224a27ab87dd6e799375a1c504089 (75409B)
+~ .ans/state/tasks.jsonl  pre=2812527dee968a662c9d7cbbc0ff38103ff909b2883f51e6ec3be6ed4dbeaba6 (65155B)  post=bf782270f03f0f0d668dc0a022282d32b12b4031500317797e2fd4ace1b11c29 (79782B)
+~ .ans/state/versions.jsonl  pre=932d0e8107a87b80170252416b9bbbbadb5873fbbcb924e8e83048c71af7db56 (4633B)  post=6a77122b5ecb01b5f9756650bbc1676fd1ed7386df0604236f5e97bbbdfc26a7 (5181B)

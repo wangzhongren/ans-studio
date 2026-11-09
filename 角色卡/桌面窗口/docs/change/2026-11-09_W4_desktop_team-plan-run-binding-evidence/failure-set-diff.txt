@@ -1,0 +1,18 @@
+--- "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-09_W4_desktop_team-plan-run-binding-evidence/before-failure-titles.txt"	2026-11-09 19:13:37.023492100 +0800
++++ "\350\247\222\350\211\262\345\215\241/\346\241\214\351\235\242\347\252\227\345\217\243/docs/change/2026-11-09_W4_desktop_team-plan-run-binding-evidence/after-failure-titles.txt"	2026-11-09 19:16:36.393481500 +0800
+@@ -1,6 +1,6 @@
+-W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+ W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
++W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+ W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+ W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+ W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+@@ -10,7 +10,3 @@
+ W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+ W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+ W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+-W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+-required
+-selected
+-unmanaged

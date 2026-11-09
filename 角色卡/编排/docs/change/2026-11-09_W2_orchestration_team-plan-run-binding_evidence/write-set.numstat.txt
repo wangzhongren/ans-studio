@@ -1,0 +1,6 @@
+9	8	src/pipeline/orchestration/trunk-runtime.ts
+29	13	src/service/trunk/impl/apply-journal.ts
+64	1	"test/\347\274\226\346\216\222/convener-module-consumption.test.ts"
+229	1	"test/\347\274\226\346\216\222/direct-role-capabilities.test.ts"
+1	1	"test/\347\274\226\346\216\222/fixtures/git-action-authorization-wiring.ts"
+82	0	"test/\347\274\226\346\216\222/git-capabilities.test.ts"

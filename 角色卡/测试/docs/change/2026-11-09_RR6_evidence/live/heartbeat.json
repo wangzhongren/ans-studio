@@ -1,0 +1,33 @@
+{
+  "at": "2026-11-09T13:05:38.920Z",
+  "elapsedSec": 242,
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 1,
+    "cardsByKind": {
+      "proposal": 1
+    },
+    "dispatches": 2,
+    "turnsByRole": {
+      "chief": 2,
+      "rapporteur": 2
+    },
+    "gitCalls": 0
+  },
+  "proposalRequestId": "req-83771b765b37d527",
+  "resolved": {
+    "by": "customer",
+    "choice": "accept"
+  },
+  "dialogs": 1,
+  "newSessionDirs": [],
+  "planToolCalls": 0,
+  "planReceipts": 0,
+  "gate": {
+    "kind": "task-reported-blocked",
+    "taskId": "t-mw99tis6-1f4d5eab",
+    "role": "rapporteur",
+    "summary": "按派发执行「原地更新提案/契约/架构 v1」时被门禁结构性拒绝：docs/proposals/snake-game-proposal-v1.md 为已冻结版本化文档，禁止覆盖/原地修改（errorCode=versioned-doc-overwrite），要求新建 -v2 并提交版本变更申请。按任务第 7 条「写入被拒即原样记录并停止」的要求停止，未重试、未改任何文档、未发提案卡。同时 flow…",
+    "at": "2026-11-09T13:04:08.685Z"
+  }
+}

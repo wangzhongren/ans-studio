@@ -1,0 +1,17 @@
+{
+  "schema": "ans-run/v1",
+  "runId": "run-hub-c0ceba36499de3624ecb6822aec9b10071a4082cb5b07c7b",
+  "flowId": "snake-game",
+  "state": "draft",
+  "createdAt": "2026-11-09T02:52:23.434Z",
+  "updatedAt": "2026-11-09T02:52:23.434Z",
+  "schemas": {
+    "run": "ans-run/v1"
+  },
+  "documents": {},
+  "execution": {
+    "teamPlan": null,
+    "flow": null
+  },
+  "builtinPreparationSource": "init-source-811d05b4096e4339657c83b635b1e43482a5f529fbeeb95f02e7ff68de786740"
+}

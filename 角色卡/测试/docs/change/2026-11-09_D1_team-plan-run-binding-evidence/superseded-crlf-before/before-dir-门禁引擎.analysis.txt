@@ -1,0 +1,9 @@
+SUMMARY tests=427 pass=419 fail=7 cancelled=0 skipped=1 todo=0
+FAIL	1	Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+FAIL	1	D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+FAIL	1	listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+FAIL	1	listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+FAIL	1	test\\门禁引擎\\git-shell-acl.test.ts
+FAIL	1	卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+FAIL	1	渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+SKIP	1	unreadable（权限）：文件不可读 → status=unreadable、actual=null

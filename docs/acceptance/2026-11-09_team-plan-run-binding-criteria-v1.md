@@ -1,8 +1,9 @@
-# 团队计划登记 run 绑定 / baseDigest 合法来源：实施前验收标准 B1 v1
+# 团队计划登记 run 绑定 / baseDigest 合法来源：实施前验收标准 B1 v1.2
 
 - 日期：2026-11-09；固定身份：**ANS 独立验收（Independent Acceptance）唯一主上下文**。本文件只做实施前验收标准；**不实施、不派发、不运行真实模型、不运行测试、不授权提交/推送/合并/发布**。
+- 版本：**v1.2（2026-11-09）** = v1.1 + convener-code 批次窄修订；v1.2 增补 §2.1 写集行（T8/T9）与 §4.3 旧/新记录，并在附录 B 记录理由/证据；**明确否决 `角色卡/convener-code/api-spec.md` 纳入写集（应回退，见附录 B）**；v1.1 的 T7/附录 A 原样保留；**不改 AC-1–AC-13、P-1–P-15、RR-1–RR-8、EV1–EV7 与判定规则**；全部条目仍 `未取证`。
 - 风险档位：**T2（按 P1.1 §5.1；协调方已批准按 change 处理；Q1 口径待协调方维持/升档）**。本 B1 默认按 **T2 + 全量受影响回归**判定；若协调方按「凡改 Model 公共工具契约即 T3」裁定 T3，则按 T3 执行全量回归（§4.2），AC 与判据不变。档位不得由实施侧/验收侧自行下调，也不得用 T2 口径规避 T3 回归。
-- 状态：**实施前冻结标准（B1 v1）**；全部条目当前 `未取证`，不得视为已通过。B2 只对**同一最终候选**与本版本判定。
+- 状态：**实施前冻结标准（B1 v1.2；v1.1 + convener-code 批次窄修订）**；全部条目当前 `未取证`，不得视为已通过。B2 只对**同一最终候选**与本版本判定。
 - 依据（写盘前实测）：
   - 方案 **P1.1**：`docs/planning/2026-11-09_design_team-plan-run-binding.md`，**438 行 / 60,802 bytes / SHA-256 `2bb663fec3baee7b275ae7a8747bb3a31091304cd728b4329787d17bab86608b`**（M1/G1/G2/S1–S6 已处置，§8 处置表在案）。
   - 独立复核记录：`docs/planning/2026-11-09_review_team-plan-run-binding.md`，**279 行 / 46,262 bytes / SHA-256 `452f6437ac116d72b1bf5e8a03754cbf78026d8c81e30dc6691e348531d353d8`**；R1.0 结论「建议修订后提交」（1 must-fix M1、2 general G1/G2、S1–S6），R1.1 窄复核结论「M1/G1/G2/S1–S6 全部闭合；无新增 must-fix；建议提交（可进入 B1/实施派发）」，余 N1–N4 建议不阻断。
@@ -11,8 +12,10 @@
   - 并行变更（只读引用）：judge 代批 P1.2 `docs/planning/2026-11-09_design_judge-delegated-decision-effectiveness.md`（686 行 / 88,988 bytes / `1477a6e423a74a7007824b7db82cac4e0f6dbb9e48abaa60a7f452704672e6be`），其实现 25 文件在本工作树**未提交**（D1 `角色卡/测试/docs/change/2026-11-09_D1_judge-delegated-effectiveness.md` 224 行 / 23,909 bytes / `d7c16852684140fcc0dbe912e93d71adb51727a124f1106c793c2ee1ef1c2e64`；RR `角色卡/测试/docs/change/2026-11-09_RR_judge-delegated-effectiveness.md` 169 行 / 22,238 bytes / `22cc60f30119937747f55c182613f629a7775375b4f9699a9618cfc7ad6f02fe`）；文档格式 P1.2 `docs/planning/2026-11-09_design_document-format-specifications.md`（979 行 / 146,555 bytes / `886fef84c3db34515a98f5874a33bb22134a3fc3b02f20aa3d185b828a3e7c54`）与其 B1 `docs/acceptance/2026-11-09_document-format-specifications-criteria-v1.md`（482 行 / 69,121 bytes / `bec45edfa47dd54229e1f37faac540db7ae9773e967b61004e47f65902c15dbe`）；提案卡修复已提交 HEAD `fb1aa39e787934f334b9c164e4221074f97f6147`（B2 pass 记录 `docs/acceptance/2026-11-09_proposal-card-run-binding-fix-report-v1.md` 只读引用）。
   - 预授权：`docs/communication/2026-11-07_preauthorization_proceed-without-gates.md`（38 行 / 3,418 bytes / `e2bdd96b19a2b58b190ea4bdeb6dc647b97139b5bf22cabcfa05dd7496d9011a`，实测）；方案/复核/团队计划/实施免逐次闸门，**任何实质变化（范围、角色结构、治理语义、风险档位）必须停下回报**；提交/推送/合并/发布未授权。
 - 代码基线（写盘时实测）：worktree `.claude/worktrees/trunk-amendment`，分支 `feat/plan-escalation-card`，HEAD **`fb1aa39e787934f334b9c164e4221074f97f6147`**（tree `ee33c3e95d9b3fb61dc5d05eea66c2d0a2eb9583`）；`git status --porcelain -- src app test` = **25 项（23 M + 2 `??`）**，为 judge P1.2 在飞实现（`src/model/runtime.ts`、`src/service/trunk/impl/apply-journal.ts`、`src/pipeline/orchestration/trunk-runtime.ts`、`test/编排/direct-role-capabilities.test.ts`、`test/测试/2026-11-09_judge-delegated-*.test.ts` 等），**不属于本变更候选**。**当前工作树状态不得作为本变更实施基线**；实施须在 judge 冻结/B2 后按 BASE-1 重取。P1.1 的 `file:line` 为当前检出快照；judge 合并后行号漂移，**实施/验收以符号名与文本锚点为准**。
+- v1.1 修订时点（实测）：HEAD **`24799cb61239272e8603018adc094881bb6263dd`**（提交「feat(judge-delegated): judge 代批生效（T3）…」；judge 已合入；分支 `feat/plan-escalation-card`）；`git status --porcelain -- src app test` = **3 项（修订时点实测；此后实施继续推进，本文不作实时状态镜像）**（运行时核心批次 W1/W2/T4 在飞：`src/model/runtime.ts`、`src/provider/runtime/schema.ts`、`test/runtime-core/submit-capability-tools.test.ts`）；本修订不把任何在飞批次计入候选/B2 证据，实施基线/候选仍按 BASE-1/BASE-4 认定。W1 证据（只读引用）：`角色卡/运行时核心/docs/change/2026-11-09_W1_team-plan-run-binding-evidence/after-typecheck.log`（**33 行 / 5,165 bytes / `9c5d7eedfdee5866c1c43029ad9aedcf24b9ec1ec1271d5977367953ca678127`**）；其中 `test/编排/fixtures/git-action-authorization-wiring.ts(163,76)` TS2322 为本修订对象（修复点 `:76`）；同日志 `apply-journal.ts:2858/2861/2863` 错误为 B1 W3 已列机械触点（编排批次待实施），不属写集外。
+- v1.2 修订时点（实测）：HEAD **`24799cb61239272e8603018adc094881bb6263dd`**；`git status --porcelain -- src app test` = **7 项 M（修订时点实测；实施继续推进，本文不作实时状态镜像）**——W1/W2/T4 3 文件 + W5/T3 4 文件（`src/common/roles/convener/index.ts`、`test/roles/convener/{convener-module,convener-differential}.test.ts`、`test/roles/convener/oracle-fixture.ts`）；另有 `角色卡/convener-code/api-spec.md` M（**本修订明确不纳入、应回退**，见附录 B）与 convener-code 未跟踪实施记录（不计候选）。本修订独立复跑 convener 两测试文件 = **32/32 pass、0 fail/0 skip**（修订时点；B2 仍在最终候选重测，不作为 B1 证据）。
 - 关系：本 B1 只覆盖本变更（应用侧派生/断言 + 宿主 run 绑定）；**不修改**其它 B1、其它在飞变更（judge、文档格式、提案卡修复）与已验收候选；不改变公共校验语义；发布/tag 不在授权内。
-- 编号口径：方案 §4.1 定义 **P-1..P-15**（14+1 条）；本 B1 逐条转写并新增 **BASE-1..BASE-8、AC-1..AC-13、RR-1..RR-8、EV1..EV-7**；不新增验收语义。
+- 编号口径：方案 §4.1 定义 **P-1..P-15**（14+1 条）；本 B1 逐条转写并新增 **BASE-1..BASE-8、AC-1..AC-13、RR-1..RR-8、EV1..EV-7**；不新增验收语义；v1.1 增补 §2.1 的 T7 写集行与 §4.3 记录（不新增 P/AC/RR/EV 判据）；v1.2 增补 T8/T9 写集行与 §4.3 记录，并明确 `角色卡/convener-code/api-spec.md` 不纳入（不改 P/AC/RR/EV 判据）。
 
 ## 0. 范围与非目标
 
@@ -72,6 +75,9 @@
 | T4 | `test/runtime-core/submit-capability-tools.test.ts` | 运行时核心 | schema 形状：省略 base/sha 合法、缺 path/version 非法、未知键拒绝、旧形状合法 | P-11 |
 | T5 | `test/桌面应用/chief-workflow.test.ts` | 桌面窗口 | 宿主绑定：真实 busy convener 回合、task run 注入、冲突/无任务拒绝（**避免使用 `test/桌面应用/session.test.ts`**——该文件当前不存在，文档格式变更计划恢复，避免同文件冲突） | P-12 |
 | T6 | `test/编排/convener-module-consumption.test.ts` | 编排 | 多 draft run 下登记成功、pinned 冲突不受影响（集成层）；facts 投影（缺省不造键） | P-13、AC-10 |
+| T7 | `test/编排/fixtures/git-action-authorization-wiring.ts` | 编排 | **v1.1 增补**：`holdableCompleteTeamPlan()` 回执 `baseDigest: input.baseDigest ?? null` 机械适配（W1 可选化后 `string \| undefined` 不满足 `DirectActionReceipt.baseDigest: string \| null`；不改断言/行为）；支撑 `git-action-authorization-wiring*` 发布/授权 wiring 用例族与全量 typecheck（T2/P-9 相关；T6/P-13 不直接引用该 fixture——实测） | AC-4、AC-9、BASE-4 |
+| T8 | `test/roles/convener/oracle-fixture.ts` | convener-code | **v1.2 增补**：金样用例「plan 缺 sha256」由旧「已知更严格差异（deny）」改为新契约允许（allow）；`KNOWN_DELTAS` 2→1、`counts.preflightKnownDeltas` 3→2、`payloadSha256` 重算（`b82c364e…` → `67ef107d…`）；机械同步，不弱化 Service fail-closed（`plan-hash-drift`/`plan-base-conflict` 仍在 Service） | AC-10、P-10、BASE-4 |
+| T9 | `test/roles/convener/convener-differential.test.ts` | convener-code | **v1.2 增补**：team-plan 组期望 allowed 3→4、compared 10→11、knownDelta 2→1；机械同步，不改其它断言 | AC-10、P-10、BASE-4 |
 
 - 既有测试若断言「`baseDigest`/`plan.sha256` 为 schema/preflight 必填」需改写：按 §4.3 逐条记录旧断言/新断言/理由（不得静默放宽 fail-closed 断言）。
 - 测试基线已知红项按 BASE-3 口径：**新增确定性失败 = 0、新 skip = 0、已知红项不恶化**；不得为求绿改基线红项或在写集外修测试。
@@ -83,6 +89,7 @@
 - **提案卡修复文件**：`app/desktop/customer-input.ts` 与既有已提交内容（只读）。
 - **路径/格式/解析实现**：`src/common/编排/workflow-preconditions.ts`、`parseTeamPlan`、`run-manifest.ts`、`evidence-check.ts`、`src/service/trunk/impl/amendment-validate.ts` 等 parser/validator。
 - **其它**：`app/renderer/**`、`角色卡/**` 的 `role-card.md`/`boundary.md`/`boundary.yaml`、`test/桌面应用/optional-acceptance.test.ts`、`.ans/**`、目标项目产品文档；不新增依赖、不改构建/发布配置。
+- **v1.2 明确排除**：`角色卡/convener-code/api-spec.md`（工作树当前 M）**不纳入本变更候选，应回退**——P1.1 §3.2 明确「不改任何 `角色卡/**`」（H1 delta=0），B1 §0.2-1 亦不允许角色卡/角色职责/边界变更；其契约描述同步需求按附录 B v1.2 处置（如协调方/方案修订批准，另版纳入）。
 
 ### 2.3 边界与升级条件
 
@@ -167,6 +174,10 @@
 5. 其它任何被改写的既有断言：逐条给出 `文件:行`、旧断言原文、新断言、理由、对应 P/AC；**不得删除/弱化 fail-closed 断言**（`plan-base-conflict`/`plan-hash-drift`/`plan-path-invalid`/`plan-run-conflict`/`trunk-unavailable` 等负例必须保留并加强）；未记录即视为静默放宽，判 fail。
 6. N3 文案：`plan-hash-drift` 现有两条文案（旧 `:2896` 与新增「Plan bytes are unreadable or absent from the effective snapshot」）；B1 写盘时 grep 确认旧文案仅存在于 `apply-journal.ts:2896`、无测试断言；若实施新增文案断言，按新文案逐条记录，不要求旧文案断言。
 7. P-9 既有红项用例不得改写求绿；`git-capabilities.test.ts` 既有「Git team plan publication…」不得被删除/跳过。
+8. （v1.1 增补，机械触点非断言改写）`test/编排/fixtures/git-action-authorization-wiring.ts:69-76`：旧返回 `baseDigest: input.baseDigest`（W1 后类型 `string | undefined`，不满足 `DirectActionReceipt.baseDigest: string | null`，typecheck TS2322 见证据）；新返回 `baseDigest: input.baseDigest ?? null`。理由：与 P1.1 G2 同族的 `?? null` 机械适配；**不改断言/行为**——现有调用均提供 `baseDigest` 时两者取值相同，缺省时 fixture 回执如实为 null；不改变任何 fail-closed/路径/重放语义。证据：`角色卡/运行时核心/docs/change/2026-11-09_W1_team-plan-run-binding-evidence/after-typecheck.log`（33 行 / 5,165 bytes / `9c5d7eed…`；错误位于 `test/编排/fixtures/git-action-authorization-wiring.ts(163,76)`，修复点 `:76`）。对应 T7/AC-4/AC-9/BASE-4。
+9. （v1.2 增补，金样契约同步）`test/roles/convener/oracle-fixture.ts:886-911/:1438-1443/:1616-1632`：旧「team-plan plan 缺 sha256（已知差异）」`expectedAllow:false`/`expectedCode:"team-plan-facts-invalid"`/`knownDelta:"team-plan-fact-schema"`；新「team-plan plan 缺 sha256（新契约允许）」`expectedAllow:true`/`expectedCode:null`/`knownDelta:null`；`KNOWN_DELTAS` 2→1、`counts.preflightKnownDeltas` 3→2、`payloadSha256` `b82c364e96fd52e0f6754e819792e2a70695f16f4b2c6025edb12a3dbc258c34` → `67ef107d65c0d753d9041563d187183d58bc1b40a707ca17aca1f6779ac6f31e`。文件 SHA-256：`998f372f39ba47488f6232c7e8598b4c497b9716fe7ff57b0501a7c83230bc28` → `b7c7f2e8e543c9054e8864be22ede705d4c2d8e4b33e08594a94bcfeeb589528`。理由：新契约允许缺省 `plan.sha256`（应用派生）；Service 仍执行 `plan-hash-drift`/CAS/结构校验，金样只同步 preflight 事实契约，不弱化 fail-closed。对应 T8/AC-10/P-10/BASE-4。
+10. （v1.2 增补，差分期望同步）`test/roles/convener/convener-differential.test.ts:13-19/:211-216`：旧 allowed 3/compared 10/knownDelta 2；新 allowed 4/compared 11/knownDelta 1。文件 SHA-256：`53a9b94a7fd3a63ab6c576c05ef04a67030c336b7f5f6686b73953f0e08e5549` → `f46f7bd308620a8a934b04263c231ca6c53788326b7c2f649a13defbc4f24172`。理由：跟随 T8 的新契约金样计数；不改其它断言。对应 T9/AC-10/P-10/BASE-4。
+11. （v1.2 明确否决，非改写）`角色卡/convener-code/api-spec.md` **不纳入候选、应回退**：基线 SHA-256 `20e6336dcbd47acda251dbc4fb7cf5a7a95ebc40c3c6beac4837f7a60933aea4`；工作树当前 `874a18cfcb8ed673fc4adfb83580a8d20294bc33092073a0ccd1e60980b31c99`（§5.1/§7 契约描述同步）不得出现在候选。依据：P1.1 §3.2「不改任何 `角色卡/**`」、B1 §0.2-1（H1 delta=0，不改角色卡/角色职责/边界）；如需同步，须协调方/方案修订批准后另版纳入。文档偏差按 Q5 同口径处置（工具描述为执行口径），B2 以 api-spec diff=0 判定。
 
 ### 4.4 候选/证据层级独立
 
@@ -257,7 +268,30 @@
 
 ## 11. 当前状态
 
-- **B1 完成、冻结（实施前）**；BASE-1–BASE-8、AC-1–AC-13、P-1–P-15、RR-1–RR-8、EV1–EV7 当前全部 `未取证`，不得判 pass。
-- 实施前置当前未满足：judge 25 文件在飞未冻结/B2；实施基线须重取；Q1/Q4/Q6/Q7 与 S2 需协调方按 §9 确认（默认处置已在案）。
+- **B1 v1 完成、冻结；v1.1 窄修订完成；v1.2 窄修订完成（实施前）**；BASE-1–BASE-8、AC-1–AC-13、P-1–P-15、RR-1–RR-8、EV1–EV7 当前全部 `未取证`，不得判 pass。
+- 实施前置（v1.1 时点）：judge 已于 `24799cb` 合入，judge 冻结/B2 条件已满足；本变更从该基线实施（运行时核心批次 W1/W2/T4 在飞 3 文件）；Q1/Q4/Q6/Q7 与 S2 需协调方按 §9 确认（默认处置已在案）；文档格式变更仍按 BASE-2 在其后串行。
+- **v1.1 修订时点（2026-11-09）**：本修订只补 T7 写集与 §4.3 记录，不判任何条目；其余批次与 B2 仍按本 B1（BASE-1–BASE-8、AC-1–AC-13、P-1–P-15、RR-1–RR-8、EV1–EV7）执行。
+- **v1.2 修订时点（2026-11-09）**：convener-code 批次 W5/T3 在飞（含 T8/T9 两测试支撑文件）；`角色卡/convener-code/api-spec.md` 不纳入写集、须回退（附录 B）；本修订不判任何条目；其余批次与 B2 仍按本 B1 执行。
 - 后续由**同一独立验收身份**在实施/确定性测试/真实运行证据交付后按本 B1 作 B2；阶段独立报告，不跨阶段合并；不授权提交/推送/合并/发布。
 - 本 B1 不修改其它 B1/在飞变更；发布/tag 不在授权内。
+
+---
+
+## 附录 A（v1.1，2026-11-09）：实施期机械写集补充
+
+- **修订性质**：v1.1 = v1 正文原样 + 本次窄修订；**不改** AC-1–AC-13、P-1–P-15、RR-1–RR-8、EV1–EV7、§7 判定规则与 §8 阶段出口；只增补 §2.1 的 T7 写集行与 §4.3 的旧/新记录。全部条目仍 `未取证`，本修订不构成任何 pass。
+- **修订理由（实测）**：W1 将 `CompleteTeamPlanInput.baseDigest` 改为可选后，`test/编排/fixtures/git-action-authorization-wiring.ts` 的 `holdableCompleteTeamPlan()` 返回 `baseDigest: input.baseDigest`（`string | undefined`），不满足 `CompleteTeamPlanFn` 的 `DirectActionReceipt.baseDigest: string | null`；`npm run typecheck` 报 TS2322（`after-typecheck.log:26`，错误位置 `test/编排/fixtures/git-action-authorization-wiring.ts(163,76)`）。修复只能是该行 `?? null`（与 P1.1 G2 同族），不改断言/行为/公共契约。
+- **写集/边界**：文件在 `test/编排/` 授权目录（`角色卡/编排/boundary.yaml:83`），owner 编排；无 H1、无角色卡/边界/职责变更；不属于 T3 触发器（非 run 生命周期/marker/classify-shell/公共契约 breaking/新数据模型）。
+- **证据**：基线 `24799cb61239272e8603018adc094881bb6263dd`；修订时点 W1/W2/T4 在飞 3 文件（`src/model/runtime.ts`、`src/provider/runtime/schema.ts`、`test/runtime-core/submit-capability-tools.test.ts`；此后 W5 等批次继续推进，状态以 BASE-1/候选记录为准）；`after-typecheck.log` **33 行 / 5,165 bytes / `9c5d7eedfdee5866c1c43029ad9aedcf24b9ec1ec1271d5977367953ca678127`**；同日志 `apply-journal.ts:2858/2861/2863` 错误为 B1 W3 已列机械触点（编排批次待实施），不属写集外。
+- **影响**：不改变任何 AC/P/RR/EV 判据或判定规则；只把该 fixture 纳入 §2.1 允许写集，避免 B2 按写集外 diff=0 误判 fail。若实施发现更多同类机械触点，须按本附录同口径记录/递增版本，不得静默扩展写集。
+
+---
+
+## 附录 B（v1.2，2026-11-09）：convener-code 批次机械写集补充与 api-spec 否决
+
+- **修订性质**：v1.2 = v1.1 + 本次窄修订；**不改** AC-1–AC-13、P-1–P-15、RR-1–RR-8、EV1–EV7、§7 判定规则与 §8 阶段出口；只增补 §2.1 的 T8/T9 写集行与 §4.3 的旧/新记录，并明确否决 `角色卡/convener-code/api-spec.md`。全部条目仍 `未取证`，本修订不构成任何 pass。
+- **修订理由（W5/T3 机械触点）**：W5 将 convener preflight 的 `baseDigest`/`plan.sha256` 放宽为可缺省后，`test/roles/convener/oracle-fixture.ts` 与 `test/roles/convener/convener-differential.test.ts` 中按旧契约冻结的金样/差分期望必须同步（否则 `test/roles/convener/**` 产生新的确定性失败）。改动仅为契约同步：oracle 金样「plan 缺 sha256」由 known-delta deny 改为 allow，`KNOWN_DELTAS` 2→1、`preflightKnownDeltas` 3→2、`payloadSha256` 重算；differential 期望 allowed 3→4/compared 10→11/knownDelta 2→1。**不弱化 Service fail-closed**（`plan-base-conflict`/`plan-hash-drift`/CAS/结构校验仍在 Service）；不删除/弱化其它断言。
+- **api-spec 否决（应回退）**：`角色卡/convener-code/api-spec.md` 虽在 convener-code boundary §1 内且改动为契约描述同步，但 P1.1 §3.2 明确「不改任何 `角色卡/**`」（H1 delta=0），B1 §0.2-1 亦不允许角色卡/角色职责/边界变更；该文件不在已批准的 §2.1 写集内。**结论：api-spec 应回退到基线 `20e6336d…`；不得出现在本变更候选。** 其与实现后的契约描述偏差按 Q5 同口径处置（以工具描述为执行口径）；如需同步，须协调方/方案修订批准后另版纳入。
+- **写集/边界**：T8/T9 在 `test/roles/convener/` 授权目录（`角色卡/convener-code/boundary.yaml:11`），owner convener-code；无 H1、无角色卡/边界/职责变更；不属于 T3 触发器（非 run 生命周期/marker/classify-shell/公共契约 breaking/新数据模型）。
+- **证据（实测/实现侧报告）**：HEAD `24799cb61239272e8603018adc094881bb6263dd`；T8 文件 `998f372f…` → `b7c7f2e8e543c9054e8864be22ede705d4c2d8e4b33e08594a94bcfeeb589528`；T9 文件 `53a9b94a…` → `f46f7bd308620a8a934b04263c231ca6c53788326b7c2f649a13defbc4f24172`；api-spec 基线 `20e6336d…`（工作树 `874a18cf…` 应回退）。本修订独立复跑 `test/roles/convener/convener-module.test.ts` + `test/roles/convener/convener-differential.test.ts` = **32/32 pass、0 fail/0 skip**（2026-11-09，修订时点；B2 仍须在最终候选上重测）；typecheck 剩余 8 条均为 W3/W4/T7 已列触点（实现侧报告；B2 重测）。
+- **影响**：不改变任何 AC/P/RR/EV 判据或判定规则；B2 对 T8/T9 按 §4.3 记录核对，对 api-spec 按 diff=0（回退后）核对；若实施发现更多同类机械触点，须按本附录同口径记录/递增版本，不得静默扩展写集。

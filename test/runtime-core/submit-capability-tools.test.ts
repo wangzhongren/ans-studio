@@ -382,6 +382,67 @@ test("R2 rejects unknown identity/source/switch and nested malformed evidence be
   }
 });
 
+test("R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状", () => {
+  const parameters = describeTool("complete_team_plan").parameters;
+  assert.equal(parameters["additionalProperties"], false);
+  assert.deepEqual(parameters["required"], ["operationId", "flowId", "plan"]);
+  assert.equal(parameters["oneOf"], undefined, "不新增顶层 oneOf");
+  assert.equal(parameters["anyOf"], undefined, "不新增顶层 anyOf");
+  const properties = parameters["properties"] as Record<string, Record<string, unknown>>;
+  assert.equal(properties["baseDigest"]!["pattern"], "^[a-fA-F0-9]{64}$");
+  assert.equal(properties["runId"]!["type"], "string");
+  const plan = properties["plan"]!;
+  assert.equal(plan["additionalProperties"], false);
+  assert.deepEqual(plan["required"], ["path", "version"]);
+  const planProperties = plan["properties"] as Record<string, Record<string, unknown>>;
+  assert.equal(planProperties["sha256"]!["pattern"], "^[a-fA-F0-9]{64}$");
+});
+
+test("R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256", async () => {
+  const omitted = { operationId: "op-plan-1", flowId: "flow-1", plan: { path: "docs/scheduling/flow-1-team-v1.md", version: 1 } };
+  const calls: unknown[] = [];
+  const controller = new AbortController();
+  const receipt = { ...appliedReceipt, operationId: "op-plan-1",
+    planRef: { snapshotId: "snapshot-2", path: "docs/scheduling/flow-1-team-v1.md", sha256: directNext, version: 1 } };
+  const result = await run({ roleId: "convener", completeTeamPlan: async (input, signal) => {
+    calls.push({ input, signal }); return receipt;
+  } } as GovernedToolsOptions, "complete_team_plan", structuredClone(omitted), controller.signal);
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(calls, [{ input: omitted, signal: controller.signal }], "工具层不得注入或改写模型参数（派生与宿主绑定由应用内完成）");
+  const parsed = JSON.parse(result.message.slice("complete_team_plan: ".length));
+  assert.deepEqual(parsed, receipt);
+  assert.equal(parsed.planRef.sha256, directNext, "成功回执 JSON 含派生 planRef.sha256");
+});
+
+test("R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力", async () => {
+  const planPath = "docs/scheduling/flow-1-team-v1.md";
+  const valid = { operationId: "op-plan-2", flowId: "flow-1", plan: { path: planPath, version: 1 } };
+  let calls = 0;
+  const options = { roleId: "convener", completeTeamPlan: async () => { calls++; return appliedReceipt; } } as GovernedToolsOptions;
+  const badArgs: Array<Record<string, unknown>> = [
+    { operationId: "op-plan-2", flowId: "flow-1", plan: { version: 1 } },
+    { operationId: "op-plan-2", flowId: "flow-1", plan: { path: planPath } },
+    { operationId: "op-plan-2", flowId: "flow-1" },
+    { flowId: "flow-1", plan: structuredClone(valid.plan) },
+    { operationId: "op-plan-2", plan: structuredClone(valid.plan) },
+    { ...structuredClone(valid), unexpected: true },
+    { ...structuredClone(valid), plan: { ...structuredClone(valid.plan), sha256: directDigest, extra: true } },
+    { ...structuredClone(valid), baseDigest: "not-hex" },
+    { ...structuredClone(valid), baseDigest: "a".repeat(63) },
+    { ...structuredClone(valid), baseDigest: "g".repeat(64) },
+    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: planPath, sha256: "a".repeat(63), version: 1 } },
+    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: planPath, sha256: "z".repeat(64), version: 1 } },
+    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: "../escape.md", sha256: directDigest, version: 1 } },
+    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: planPath, sha256: directDigest, version: 0 } },
+  ];
+  for (const args of badArgs) {
+    const result = await run(options, "complete_team_plan", args);
+    assert.equal(result.ok, false, JSON.stringify(args).slice(0, 160));
+    assert.match(result.message, /invalid-arguments/, JSON.stringify(args).slice(0, 160));
+  }
+  assert.equal(calls, 0);
+});
+
 test("R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort", async () => {
   for (const receipt of [
     { ...appliedReceipt, status: "no-op", targetDigest: directDigest },

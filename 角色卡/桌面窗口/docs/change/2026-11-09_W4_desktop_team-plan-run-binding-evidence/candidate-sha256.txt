@@ -1,0 +1,2 @@
+9c690cf363d1bc8d15c531cab19238f06d26078bcee0e5c934c170acaf7ec862 *app/desktop/session.ts
+87983bde4a21387d6b2e1b7a26c430efba73a3ccc92fe01d30cb3182c03ac494 *test/桌面应用/chief-workflow.test.ts

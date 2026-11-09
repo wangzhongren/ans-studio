@@ -1,0 +1,54 @@
+{
+  "cardsTotal": 0,
+  "cardsByKind": {},
+  "dispatches": 1,
+  "turnsByRole": {
+    "chief": 3,
+    "convener": 1,
+    "rapporteur": 2
+  },
+  "abortedTurnsByRole": {
+    "chief": 2,
+    "convener": 1,
+    "rapporteur": 1
+  },
+  "settledDetail": [
+    {
+      "role": "chief",
+      "at": "2026-11-09T13:23:44.325Z",
+      "summary": "会话结束",
+      "aborted": false
+    },
+    {
+      "role": "chief",
+      "at": "2026-11-09T13:23:59.070Z",
+      "summary": "本轮已中止",
+      "aborted": true
+    },
+    {
+      "role": "chief",
+      "at": "2026-11-09T13:24:00.095Z",
+      "summary": "本轮已中止",
+      "aborted": true
+    },
+    {
+      "role": "convener",
+      "at": "2026-11-09T13:24:00.097Z",
+      "summary": "本轮已中止",
+      "aborted": true
+    },
+    {
+      "role": "rapporteur",
+      "at": "2026-11-09T13:23:58.341Z",
+      "summary": "会话结束",
+      "aborted": false
+    },
+    {
+      "role": "rapporteur",
+      "at": "2026-11-09T13:24:00.098Z",
+      "summary": "本轮已中止",
+      "aborted": true
+    }
+  ],
+  "gitCalls": 0
+}

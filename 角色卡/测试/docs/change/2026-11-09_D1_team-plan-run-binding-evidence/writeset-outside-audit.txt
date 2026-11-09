@@ -1,0 +1,20 @@
+# writeset-outside audit (D1)
+date_utc=2026-11-09T11:25:35Z
+HEAD=24799cb61239272e8603018adc094881bb6263dd tree=409a4ac7bb077c0fc5b19f3c99383cf0b09dd13e branch=feat/plan-escalation-card
+
+## tracked modifications outside src/app/test (git status --porcelain, non-?? lines):
+ M docs/acceptance/2026-11-09_team-plan-run-binding-criteria-v1.md
+ M docs/communication/memo.md
+
+## excluded paths diff lines (expect 0):
+exclusion_count=0
+api_spec_worktree_blob=b3b651b7c7b13deaf25024fa86d59085ee483a5a
+api_spec_head_blob=b3b651b7c7b13deaf25024fa86d59085ee483a5a
+api_spec_head_content_sha256=20e6336dcbd47acda251dbc4fb7cf5a7a95ebc40c3c6beac4837f7a60933aea4
+api_spec_diff_bytes=0
+
+## 角色卡 tracked changes (expect empty):
+rolecard_tracked_changes=0
+
+## untracked under src/app/test (expect empty):
+untracked_src_app_test=0

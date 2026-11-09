@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
 import { createGuardFreezeRegistry, acquireVersionLock, readVersionBaselineState, writeVersionBaselineState, scanVersionedDocuments, readConfirmedIntentEvidence, completeSnapshotDigest } from "../../src/provider/version-change/public/version-change-store.ts";
 import { createTrunkService, type TrunkDirectApplyInput } from "../../src/service/trunk/public/trunk-service.ts";
+import { canonicalJson } from "../../src/service/trunk/impl/trunk-common.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { prepareChiefDecisionEvidence, openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
@@ -18,7 +19,7 @@ import { validateRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { readTaskState, validateTaskStateEvent } from "../../src/common/编排/task-state.ts";
 import { createTrunkProject, PATHS } from "./fixtures/trunk-project.ts";
 import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
-import type { CustomerInputRequest, CustomerInputMetadata, TaskCreatedEvent, TaskReportedEvent, RequestCreatedEvent, RequestResolvedEvent, CustomerInputOutcome, GovernanceJudgeAudit } from "../../src/model/runtime.ts";
+import type { CustomerInputRequest, CustomerInputMetadata, TaskCreatedEvent, TaskReportedEvent, RequestCreatedEvent, RequestResolvedEvent, CustomerInputOutcome, GovernanceJudgeAudit, CompleteTeamPlanInput } from "../../src/model/runtime.ts";
 import { validateRoleDocumentsSnapshot, validateBoundaryYamlText } from "../../src/service/boundary/resolve-boundary.ts";
 import { TRUNK_MANIFEST_SCHEMA, COMPLETE_SNAPSHOT_SCHEMA, FROZEN_ROLE_REF_KEYS, type TrunkManifest, type SnapshotRef, type FrozenRoleEvidence, type ActiveRoleEvidence, type CompleteSnapshot } from "../../src/model/trunk.ts";
 
@@ -1569,4 +1570,231 @@ test("Provider strict scan: real non-ENOENT directory failure is never a complet
   await fs.mkdir(path.join(root, "docs")); await fs.writeFile(path.join(root, "docs/proposals"), "Actual ENOTDIR fixture");
   await assert.rejects(scanVersionedDocuments(root, { strict: true }), error => !!error && typeof error === "object" && "code" in error && error.code === "ENOTDIR");
   assert.deepEqual(await scanVersionedDocuments(root), [], "Existing best-effort callers keep their documented compatibility; G complete-scan calls must opt into strict");
+});
+
+// ———— 2026-11-09《团队计划登记 run 绑定 / baseDigest 合法来源》T1（P-1..P-8、P-15） ————
+// 应用侧派生/断言：模型可缺省 baseDigest 与 plan.sha256；声明值只作严格相等断言；来源选择逐字保留现状
+// （G1）；resolved 只进 marker/target/回执；journal message 保持 team-plan:<digest>（原样 input，M1）。
+type TeamPlanDocuments = { modules?: { path: string; sha256: string }; roster?: { path: string; sha256: string } };
+function teamPlanText(documents: TeamPlanDocuments, tail: string): string {
+  assert.ok(documents.modules !== undefined && documents.roster !== undefined, "team plan fixture requires modules/roster refs");
+  const plan = { schema: "teamPlanSchema:3", flowId: "demo", version: 2, modules: documents.modules, roster: documents.roster,
+    roleRows: [{ roleId: "impl", modules: ["impl-core"], writesets: ["src/impl/"], dependsOn: [] }] };
+  return `---\n${JSON.stringify(plan)}\n---\n# Real team plan\n${tail}\n`;
+}
+async function teamPlanFixture(initialPlanTail?: string) {
+  const project = await createTrunkProject({ withRun: false }), store = createFsTrunkStore(project.root), documents = project.snapshot().documents;
+  const planPath = "docs/scheduling/demo-team-v2.md";
+  const initialPlanText = initialPlanTail !== undefined ? teamPlanText(documents, initialPlanTail) : undefined;
+  if (initialPlanText !== undefined) await fs.writeFile(path.join(project.root, planPath), initialPlanText);
+  const files = [...Object.values(documents), ...(initialPlanText !== undefined ? [{ path: planPath, sha256: sha(initialPlanText) }] : [])];
+  const captured = await store.captureSnapshot!({ snapshotId: "team-plan-effective-basis", createdAt: at, files });
+  if (!captured.ok) throw new Error(`team plan fixture snapshot: ${captured.message ?? captured.reason}`);
+  const initial: TrunkManifest = { schema: TRUNK_MANIFEST_SCHEMA, source: "bootstrap", trunkVersion: 1, previous: null, runId: null, flowId: "demo",
+    digest: "abcdef0123456789".repeat(4), snapshotRef: captured.value, createdAt: at, updatedAt: at,
+    artifacts: { documents, execution: { teamPlan: null, flow: null }, boundaries: {} } };
+  const seeded = await store.compareAndSwapManifest!(null, initial, captured.value);
+  if (!seeded.ok) throw new Error(`team plan fixture manifest: ${seeded.message ?? seeded.code}`);
+  return { project, store, documents, planPath, initial, initialPlanText,
+    service: createTrunkService({ projectRoot: project.root, store, freezeRegistry: createGuardFreezeRegistry(project.root, { migrationCompleted: () => true }), now: () => new Date(at) }) };
+}
+async function teamPlanJournalOf(store: ReturnType<typeof createFsTrunkStore>, operationId: string) {
+  const journal = await store.readOperation!(operationId);
+  assert.ok(journal.ok, JSON.stringify(journal));
+  if (!journal.ok) throw new Error("team plan journal missing");
+  const target = journal.value.targetSnapshot;
+  assert.ok(target !== undefined);
+  const snapshot = await store.readSnapshot!(target!);
+  assert.ok(snapshot.ok);
+  if (!snapshot.ok) throw new Error("team plan snapshot missing");
+  const markerFile = snapshot.value.files.find(entry => entry.path.startsWith(".ans/trunk/plan-completions/"));
+  assert.ok(markerFile);
+  if (!markerFile) throw new Error("team plan marker missing");
+  const markerText = Buffer.from(markerFile.bytesBase64, "base64").toString("utf8");
+  return { journal: journal.value, markerText, marker: JSON.parse(markerText) as Record<string, unknown> };
+}
+
+test("Team plan (P-1/P-6/P-8): derived baseDigest/plan.sha256, marker/journal byte anchors, NoOp and replay variants hold", async () => {
+  const derived = await teamPlanFixture();
+  try {
+    const text = teamPlanText(derived.documents, "derived values");
+    await fs.writeFile(path.join(derived.project.root, derived.planPath), text);
+    const input: CompleteTeamPlanInput = { operationId: "team-plan-derived-values", flowId: "demo", plan: { path: derived.planPath, version: 2 } };
+    const applied = await derived.service.completeTeamPlan(input, "convener");
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(applied.baseDigest, derived.initial.digest, "回执 baseDigest = 应用派生的 effective trunk digest");
+    assert.ok(applied.source?.kind === "role-direct");
+    assert.equal(applied.source.baseDigest, derived.initial.digest);
+    assert.ok(applied.planRef); assert.equal(applied.planRef?.sha256, sha(text), "planRef.sha256 = 实际字节 SHA-256");
+    const published = await derived.store.readManifest(); assert.ok(published.ok); if (!published.ok) return;
+    assert.equal(published.value.trunkVersion, 2, "trunk 版本 +1");
+    assert.equal(published.value.artifacts.execution.teamPlan?.sha256, sha(text), "target.execution.teamPlan 使用派生值");
+    const { journal, marker, markerText } = await teamPlanJournalOf(derived.store, input.operationId);
+    assert.equal(journal.message, `team-plan:${sha(canonicalJson({ input, actor: "convener" }))}`, "team-plan:<digest> 字节锚点基于原样 input");
+    assert.equal(canonicalJson(marker), markerText, "marker 为规范 JSON 字节");
+    assert.deepEqual(marker["plan"], { path: derived.planPath, sha256: sha(text), version: 2 }, "marker.plan 使用派生值");
+    assert.equal("runId" in marker, false, "marker 不写 runId");
+    assert.equal(journal.actionSource?.kind === "role-direct" && journal.actionSource.baseDigest, derived.initial.digest);
+    // P-8①：成功后删除计划文件，同 operationId 同原样 payload 重放 ⇒ 命中先序回执（不读 effective/不重派生）。
+    await fs.unlink(path.join(derived.project.root, derived.planPath));
+    assert.deepEqual(await derived.service.completeTeamPlan(input, "convener"), applied, "同 operationId/同原样 payload 重放返回既有回执");
+    // P-8③：同 operationId、payload 形态变化（补上声明值）⇒ plan-operation-conflict（既有语义）。
+    const reshaped: CompleteTeamPlanInput = { ...input, baseDigest: derived.initial.digest, plan: { ...input.plan, sha256: sha(text) } };
+    const conflict = await derived.service.completeTeamPlan(reshaped, "convener");
+    assert.equal(conflict.ok, false); assert.equal(conflict.status, "rejected");
+    if (conflict.ok === false) assert.equal(conflict.errorCode, "plan-operation-conflict");
+    // NoOp：恢复 live 字节，新 operationId、同原样形态 ⇒ no-op，trunk 不前进。
+    await fs.writeFile(path.join(derived.project.root, derived.planPath), text);
+    const noOp = await derived.service.completeTeamPlan({ ...input, operationId: "team-plan-derived-noop" }, "convener");
+    assert.equal(noOp.status, "no-op", JSON.stringify(noOp));
+    assert.equal(noOp.targetDigest, applied.targetDigest, "NoOp 保持同一 effective digest");
+    const unchanged = await derived.store.readManifest(); assert.equal(unchanged.ok && unchanged.value.trunkVersion, 2);
+    // P-6：旧式完整正确 payload 与新式派生路径等价（同字节 ⇒ 同 target/marker 字节/回执；journal message 各绑原样 input）。
+    const legacy = await teamPlanFixture();
+    try {
+      await fs.writeFile(path.join(legacy.project.root, legacy.planPath), text);
+      const legacyInput: CompleteTeamPlanInput = { operationId: "team-plan-derived-values", flowId: "demo", baseDigest: legacy.initial.digest,
+        plan: { path: legacy.planPath, sha256: sha(text), version: 2 } };
+      const legacyApplied = await legacy.service.completeTeamPlan(legacyInput, "convener");
+      assert.equal(legacyApplied.status, "applied", JSON.stringify(legacyApplied));
+      assert.deepEqual(legacyApplied, applied, "旧式完整 payload 与派生路径回执逐字等价（I6）");
+      const legacyJournal = await teamPlanJournalOf(legacy.store, legacyInput.operationId);
+      assert.equal(legacyJournal.journal.message, `team-plan:${sha(canonicalJson({ input: legacyInput, actor: "convener" }))}`, "旧式 team-plan:<digest> 字节锚点保持");
+      assert.equal(legacyJournal.markerText, markerText, "marker 字节与派生路径一致");
+      assert.deepEqual(legacyJournal.journal.targetSnapshot, journal.targetSnapshot, "target 快照一致（I6）");
+    } finally { await fs.rm(legacy.project.root, { recursive: true, force: true }); }
+  } finally { await fs.rm(derived.project.root, { recursive: true, force: true }); }
+});
+
+test("Team plan (P-2/P-3/P-15): declared values are strict assertions (uppercase rejected), canonical path enforced, no side effects", async () => {
+  const f = await teamPlanFixture();
+  try {
+    let text = teamPlanText(f.documents, "strict assertions");
+    while (!/[a-f]/.test(sha(text))) text += "x";
+    await fs.writeFile(path.join(f.project.root, f.planPath), text);
+    const derivedBase = f.initial.digest, derivedSha = sha(text);
+    const attempts: Array<{ label: string; input: CompleteTeamPlanInput; expected: string }> = [
+      { label: "声明 baseDigest 不等于 effective", expected: "plan-base-conflict",
+        input: { operationId: "p2-wrong-base", flowId: "demo", baseDigest: "0".repeat(64), plan: { path: f.planPath, version: 2 } } },
+      { label: "大写 hex baseDigest 值正确也被严格相等拒绝", expected: "plan-base-conflict",
+        input: { operationId: "p2-uppercase-base", flowId: "demo", baseDigest: derivedBase.toUpperCase(), plan: { path: f.planPath, version: 2 } } },
+      { label: "声明 plan.sha256 不等于实际字节", expected: "plan-hash-drift",
+        input: { operationId: "p3-wrong-sha", flowId: "demo", plan: { path: f.planPath, sha256: "0".repeat(64), version: 2 } } },
+      { label: "大写 hex plan.sha256 值正确也被严格相等拒绝", expected: "plan-hash-drift",
+        input: { operationId: "p3-uppercase-sha", flowId: "demo", plan: { path: f.planPath, sha256: derivedSha.toUpperCase(), version: 2 } } },
+      { label: "RR5 非规范路径", expected: "plan-path-invalid",
+        input: { operationId: "p15-rr5-path", flowId: "demo", plan: { path: "docs/scheduling/demo-team-plan-v1.md", version: 1 } } },
+      { label: "roster 路径不是团队计划", expected: "plan-path-invalid",
+        input: { operationId: "p15-roster-path", flowId: "demo", plan: { path: "docs/proposals/demo-roster-v1.md", version: 1 } } },
+      { label: "规范路径与声明版本不一致", expected: "plan-path-invalid",
+        input: { operationId: "p15-version-mismatch", flowId: "demo", plan: { path: "docs/scheduling/demo-team-v3.md", version: 2 } } },
+    ];
+    for (const attempt of attempts) {
+      const receipt = await f.service.completeTeamPlan(attempt.input, "convener");
+      assert.equal(receipt.ok, false, attempt.label); assert.equal(receipt.status, "rejected", attempt.label);
+      if (receipt.ok === false) assert.equal(receipt.errorCode, attempt.expected, attempt.label);
+      assert.equal(receipt.baseDigest, derivedBase, `${attempt.label}：effective 读取成功后失败回执回显派生 baseDigest`);
+      assert.equal((await f.store.readOperation!(attempt.input.operationId)).ok, false, `${attempt.label}：无 journal`);
+    }
+    const manifest = await f.store.readManifest(); assert.ok(manifest.ok); if (!manifest.ok) return;
+    assert.equal(manifest.value.digest, derivedBase, "负例不改变 trunk digest");
+    assert.equal(manifest.value.artifacts.execution.teamPlan, null, "负例不写 target.execution.teamPlan");
+  } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
+});
+
+test("Team plan (P-4): frozen-vs-live source selection (i)/(ii)/(iii) keeps baseline semantics; both-unreadable fails closed", async () => {
+  // (i) 声明 sha 命中冻结快照同 path ⇒ 用冻结字节（即使 live 不同、不读 live）。
+  {
+    const f = await teamPlanFixture("frozen bytes");
+    try {
+      const frozenText = f.initialPlanText!, liveText = teamPlanText(f.documents, "live differs");
+      await fs.writeFile(path.join(f.project.root, f.planPath), liveText);
+      const receipt = await f.service.completeTeamPlan({ operationId: "p4-frozen-hit", flowId: "demo", baseDigest: f.initial.digest,
+        plan: { path: f.planPath, sha256: sha(frozenText), version: 2 } }, "convener");
+      assert.equal(receipt.status, "applied", JSON.stringify(receipt));
+      assert.equal(receipt.planRef?.sha256, sha(frozenText), "声明命中冻结 ⇒ 使用冻结字节");
+      const manifest = await f.store.readManifest(); if (manifest.ok) assert.equal(manifest.value.artifacts.execution.teamPlan?.sha256, sha(frozenText));
+    } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
+  }
+  // (ii) 声明 sha 未命中冻结 ⇒ 读 live 并要求 live 命中（即使 frozen 同路径留有旧字节）。
+  {
+    const f = await teamPlanFixture("old frozen bytes");
+    try {
+      const liveText = teamPlanText(f.documents, "live accepted");
+      await fs.writeFile(path.join(f.project.root, f.planPath), liveText);
+      const receipt = await f.service.completeTeamPlan({ operationId: "p4-live-hit", flowId: "demo", plan: { path: f.planPath, sha256: sha(liveText), version: 2 } }, "convener");
+      assert.equal(receipt.status, "applied", JSON.stringify(receipt));
+      assert.equal(receipt.planRef?.sha256, sha(liveText), "冻结未命中且 live 命中 ⇒ 使用 live 字节");
+    } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
+  }
+  // (iii-a) 缺省 sha ⇒ live 优先（即使 frozen 同 path 留有旧字节）。
+  {
+    const f = await teamPlanFixture("stale frozen bytes");
+    try {
+      const liveText = teamPlanText(f.documents, "live preferred");
+      await fs.writeFile(path.join(f.project.root, f.planPath), liveText);
+      const receipt = await f.service.completeTeamPlan({ operationId: "p4-live-preferred", flowId: "demo", plan: { path: f.planPath, version: 2 } }, "convener");
+      assert.equal(receipt.status, "applied", JSON.stringify(receipt));
+      assert.equal(receipt.planRef?.sha256, sha(liveText), "缺省 sha ⇒ live 可读时使用 live");
+    } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
+  }
+  // (iii-b) 缺省 sha 且 live 不可读 ⇒ 同 path frozen 兜底。
+  {
+    const f = await teamPlanFixture("frozen fallback");
+    try {
+      await fs.unlink(path.join(f.project.root, f.planPath));
+      const receipt = await f.service.completeTeamPlan({ operationId: "p4-frozen-fallback", flowId: "demo", plan: { path: f.planPath, version: 2 } }, "convener");
+      assert.equal(receipt.status, "applied", JSON.stringify(receipt));
+      assert.equal(receipt.planRef?.sha256, sha(f.initialPlanText!), "live 不可读 ⇒ 冻结同 path 兜底");
+    } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
+  }
+  // (iii-c) 缺省 sha 且 live/frozen 都不可得 ⇒ plan-hash-drift（新文案），无副作用。
+  {
+    const f = await teamPlanFixture();
+    try {
+      const receipt = await f.service.completeTeamPlan({ operationId: "p4-unreadable", flowId: "demo", plan: { path: f.planPath, version: 2 } }, "convener");
+      assert.equal(receipt.ok, false); assert.equal(receipt.status, "rejected");
+      if (receipt.ok === false) { assert.equal(receipt.errorCode, "plan-hash-drift"); assert.equal(receipt.message, "Plan bytes are unreadable or absent from the effective snapshot"); }
+      assert.equal((await f.store.readOperation!("p4-unreadable")).ok, false, "不可读负例无 journal");
+      const manifest = await f.store.readManifest(); if (manifest.ok) { assert.equal(manifest.value.digest, f.initial.digest); assert.equal(manifest.value.artifacts.execution.teamPlan, null); }
+      // 声明 sha 且 live/frozen 都不可得 ⇒ 沿用旧 plan-hash-drift 文案。
+      const declared = await f.service.completeTeamPlan({ operationId: "p4-unreadable-declared", flowId: "demo", plan: { path: f.planPath, sha256: sha("absent bytes"), version: 2 } }, "convener");
+      assert.equal(declared.ok, false); if (declared.ok === false) { assert.equal(declared.errorCode, "plan-hash-drift"); assert.equal(declared.message, "Plan bytes differ from the submitted exact hash"); }
+    } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
+  }
+});
+
+test("Team plan (P-5/P-7): missing effective trunk stays trunk-unavailable; run assertions bind real runs and reject foreign/absent runs", async () => {
+  const untrunked = await createTrunkProject({ withRun: false });
+  try {
+    await fs.writeFile(path.join(untrunked.root, "docs/scheduling/demo-team-v2.md"), teamPlanText(untrunked.snapshot().documents, "no trunk"));
+    const service = createTrunkService({ projectRoot: untrunked.root, now: () => new Date(at) });
+    const receipt = await service.completeTeamPlan({ operationId: "p5-no-trunk", flowId: "demo", plan: { path: "docs/scheduling/demo-team-v2.md", version: 2 } }, "convener");
+    assert.equal(receipt.ok, false); assert.equal(receipt.status, "rejected");
+    if (receipt.ok === false) assert.equal(receipt.errorCode, "trunk-unavailable");
+    assert.equal(receipt.baseDigest, null, "effective 读取前失败回执回显 input.baseDigest ?? null");
+    assert.equal(await fs.stat(path.join(untrunked.root, ".ans/trunk/manifest.json")).then(() => true, () => false), false, "不 bootstrap trunk");
+    assert.equal(await fs.stat(path.join(untrunked.root, ".ans/trunk/plan-completions")).then(() => true, () => false), false, "不生成 marker/摘要");
+  } finally { await fs.rm(untrunked.root, { recursive: true, force: true }); }
+  const f = await teamPlanFixture();
+  try {
+    const text = teamPlanText(f.documents, "run binding");
+    await fs.writeFile(path.join(f.project.root, f.planPath), text);
+    const runId = "run-team-plan-task", otherRun = "run-team-plan-other-flow", absentRun = "run-team-plan-absent";
+    assert.ok((await f.store.compareAndSwapRunRecord!(runId, null, { schema: "ans-run/v1", runId, flowId: "demo", state: "draft", documents: {}, execution: { teamPlan: null, flow: null }, createdAt: at })).ok);
+    assert.ok((await f.store.compareAndSwapRunRecord!(otherRun, null, { schema: "ans-run/v1", runId: otherRun, flowId: "other", state: "draft", documents: {}, execution: { teamPlan: null, flow: null }, createdAt: at })).ok);
+    const applied = await f.service.completeTeamPlan({ operationId: "p7-run-belongs", flowId: "demo", runId, plan: { path: f.planPath, version: 2 } }, "convener");
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(applied.source?.kind === "role-direct" && applied.source.runId, runId, "source.runId 记录受派任务 run");
+    const { journal, marker } = await teamPlanJournalOf(f.store, "p7-run-belongs");
+    assert.equal(journal.actionSource?.kind === "role-direct" && journal.actionSource.runId, runId);
+    assert.equal("runId" in marker, false, "marker 仍不写 runId");
+    for (const [label, badRun] of [["不属于 flow 的 run", otherRun], ["不存在的 run", absentRun]] as const) {
+      const rejected = await f.service.completeTeamPlan({ operationId: `p7-run-${badRun}`, flowId: "demo", runId: badRun, plan: { path: f.planPath, version: 2 } }, "convener");
+      assert.equal(rejected.ok, false, label);
+      if (rejected.ok === false) assert.equal(rejected.errorCode, "plan-run-conflict", label);
+      assert.equal((await f.store.readOperation!(`p7-run-${badRun}`)).ok, false, `${label}：无 journal`);
+    }
+    const manifest = await f.store.readManifest(); if (manifest.ok) assert.equal(manifest.value.trunkVersion, 2, "run 拒绝不改变 trunk");
+  } finally { await fs.rm(f.project.root, { recursive: true, force: true }); }
 });

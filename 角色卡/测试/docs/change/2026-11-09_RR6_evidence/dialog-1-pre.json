@@ -1,0 +1,28 @@
+{
+  "seq": 1,
+  "at": "2026-11-09T13:05:17.363Z",
+  "requestId": "req-83771b765b37d527",
+  "cardKind": "proposal",
+  "title": "确认「2D 贪吃蛇小游戏」实施提案（v2，含暂停/继续）",
+  "options": [
+    {
+      "id": "accept",
+      "checked": false
+    },
+    {
+      "id": "revise",
+      "checked": false
+    }
+  ],
+  "labels": [
+    "接受",
+    "退修"
+  ],
+  "acknowledgments": [],
+  "submitDisabled": true,
+  "confirmDisabled": null,
+  "error": null,
+  "judgeNotice": null,
+  "more": null,
+  "bodyTail": " 生效；R 仍只在 GAME_OVER 生效；补 AC-11 覆盖与测试步骤；不改意图/模块/名单。\n更新后发出全新提案确认卡（cardKind=proposal、flowId=snake-game、新 requestId、taskId=t-mw99tis6-1f4d5eab 去 #），选项含 accept/revise；只发一次，若被拒原样回报 errorCode/message 并停止。\n\n后续将按你的备忘执行\n\n团队计划写入规范路径 docs/scheduling/snake-game-team-v1.md；\ncomplete_team_plan 只提供 {path, version}，baseDigest/sha256 由应用从 effective trunk 与实际文件字节派生，不自报、不猜测；runId 由应用绑定；\n任命卡由人事（nominator）发起，不越权代发；任何被拒调用不重试，如实记录完整回执后停止并交回报告。\n\n你在新提案卡上做出选择后，我会继续团队计划与任命流程，并如实转达每一步回执。\n\n会话结束\n系统消息 · 治理反馈\n\n来自 策划 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：\n本轮按派发执行时被门禁结构性拒绝，已按要求停止并如实回报:\n\n结论:阻塞(未修改任何文档、未发送提案卡)\n\n复核:已按序读取 docs/contracts/snake-game-contract-v1.md、docs/contracts/snake-game-architecture-v1.md,并复核 docs/proposals/snake-game-proposal-v1.md 与 docs/product/snake-game-intent-v1.md,结构确认无误。\n\n首次写入(提案 v1 原地更新)被拒,回执原文:\n\n拒绝:缺少 版本化文档已冻结:docs/proposals/snake-game-proposal-v1.md(禁止覆盖/原地修改/删除/重命名/移动;只能新建 vN+1 并提交版本变更申请)。下一步:旧版本只读;新建 -vN+1 并在引用链中指向最新。谁来做:app。依据:docs/proposals/snake-game-proposal-v1.md。修正后可原样重试。[技术 code:versioned-doc-overwrite]\n\n按任务第 7 条停止:未重试被拒调用、未改任何文档、未新建 v2、未调用 submit_version_change、未发提案卡。\n\n额外结构约束(供决策):\n\ncontract_check 明确「治理/版本化文档覆盖」为禁止项;合法路径是新建 -v2 并提交版本变更申请;\nproject_state 显示 run-ambiguous(多个活动 run,版本决策需指定 runId);\n版本变更(detail-amendment)还需 amendmentId/amendmentDocPath 等,本轮派发未提供;按约束我未自填任何应用派生值。\n\n需要幕僚/应用明确:改用 v2 新版本路径、指定 runId,并提供版本变更所需参数后,我可再执行(含暂停/继续需求的三份 v2 文档 + 全新提案卡)。\n请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。\n\n已派发任务给 策划（已投递到其会话；其结果/交付会回到本会话）。\n幕\n幕僚\n\n[系统·申请] 已提交：角色「rapporteur」的申请「确认「2D 贪吃蛇小游戏」实施提案（v2，含暂停/继续）」（#req-83771b765b37d527）。申请保持原发起者与回报链；裁决者以结果来源为准。\n\n幕\n幕僚\n\n[系统·申请] 已呈现：角色「rapporteur」的申请「确认「2D 贪吃蛇小游戏」实施提案（v2，含暂停/继续）」（#req-83771b765b37d527）｜客户。申请保持原发起者与回报链；裁决者以结果来源为准。\n\n第 1 位\n交付 · 来自 rapporteur\n交付 · 来自 rapporteur\n正在工作\n托管\n五个内置角色正式向幕僚汇报，由幕僚协调；项目实现角色仍由运营管理。业务决策可通过“替我决策”委托幕僚，执行审批仍按独立门禁处理。\n替我审批\n幕僚 / Claude\nEnter 发送，Shift + Enter 换行\nEnter 发送，Shift+Enter 换行；发送失败会如实提示。\n实际写入导入项目，角色边界外的写入会被拒绝。\n确认「2D 贪吃蛇小游戏」实施提案（v2，含暂停/继续）\nproposal\n\n来源：策划\n\n高风险事项；确认前请核对来源与影响。\n\n## 2D 贪吃蛇小游戏 — 实施提案（v2，含暂停/继续）\n\n- flowId: `snake-game` / intentId: `snake-2d-game`\n- 依据产品意图：`docs/product/snake-game-intent-v1.md`（v1，客户已本人确认）\n- 提案：`docs/proposals/snake-game-proposal-v2.md`\n- 配套契约/架构：`docs/contracts/snake-game-contract-v2.md`、`docs/contracts/snake-game-architecture-v2.md`\n\n### 本版新增（客户需求）\n- 运行中按 **空格键** 或点击 **`#pause` 按钮** 暂停/继续；按钮文案在「暂停」/「继续」间切换。\n- 状态机新增 `PAUSED`：`READY → RUNNING ↔ PAUSED → GAME_OVER`。\n- 暂停时清除步进定时器，蛇、食物、分数静止不变；继续时恢复单一 120ms 步进。\n- 仅在 `RUNNING`/`PAUSED` 生效；`READY`/`GAME_OVER` 下空格与按钮无副作用（按钮可禁用）。\n- 与重开不冲突：`R` 仍仅在 `GAME_OVER` 生效；「重新开始」按钮始终可见；暂停中点击重新开始按新一局处理并直接进入 `RUNNING`。\n- 分数、最高分、localStorage 行为不受影响；新增 AC-11（暂停/继续）覆盖与验证步骤。\n- 非目标不变（不做自动暂停、不做设置菜单）。\n\n### 既有定案（不变）\n纯前端、零第三方依赖三文件交付（`game/index.html`、`game/styles.css`、`game/game.js`），浏览器直接打开；24×24 格、120ms 步进；方向键 + WASD；吃食物 +1 并变长；撞墙/撞自身结束；当前分与最高分（localStorage）；AC-1 ~ AC-10 保持。\n\n（说明：本卡片只用于确认提案，未获明确接受前提案不视为通过。）\n\n是否接受该提案？\n\n接受\n接受 docs/proposals/snake-game-proposal-v2.md（含暂停/继续），进入后续实现流程\n退修\n退回策划修改（请附修改意见原文）\n\n请选择一项。\n\n稍后处理\n拒绝\n提交选择"
+}

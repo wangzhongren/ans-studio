@@ -1,0 +1,13 @@
+== suite: chief-workflow
+--- before summary:
+SUMMARY tests=63 pass=50 fail=13 cancelled=0 skipped=0 todo=0
+--- after summary:
+SUMMARY tests=66 pass=51 fail=15 cancelled=0 skipped=0 todo=0
+--- FAIL before-only:
+selected
+--- FAIL after-only (new):
+W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+unmanaged
+--- SKIP before-only:
+--- SKIP after-only (new):

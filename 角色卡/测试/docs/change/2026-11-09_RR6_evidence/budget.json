@@ -1,0 +1,13 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 1,
+  "cardsByKind": {
+    "proposal": 1
+  },
+  "dispatches": 2,
+  "turnsByRole": {
+    "chief": 2,
+    "rapporteur": 2
+  },
+  "gitCalls": 0
+}

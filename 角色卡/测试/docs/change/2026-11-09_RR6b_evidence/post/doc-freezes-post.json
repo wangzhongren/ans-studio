@@ -1,0 +1,65 @@
+{
+  "v": 1,
+  "schema": "doc-freezes/v1",
+  "state": "ready",
+  "baselineSha256": "72bca77a0647b66dbcfa2fcecacf5d8239250a9ae98c591d7ade6191c662bf29",
+  "entries": [
+    {
+      "path": "docs/contracts/snake-game-architecture-v1.md",
+      "version": 1,
+      "sha256": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/contracts/snake-game-architecture-v2.md",
+      "version": 2,
+      "sha256": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/product/snake-game-intent-v1.md",
+      "version": 1,
+      "sha256": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "frozen": true,
+      "reason": "intent-confirmed",
+      "applicationId": "intent-req-d62b01ac49ba84b6"
+    },
+    {
+      "path": "docs/proposals/snake-game-modules-v1.md",
+      "version": 1,
+      "sha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v1.md",
+      "version": 1,
+      "sha256": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v2.md",
+      "version": 2,
+      "sha256": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v1.md",
+      "version": 1,
+      "sha256": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    }
+  ],
+  "builtAt": "2026-11-09T13:22:35.734Z"
+}

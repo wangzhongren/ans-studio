@@ -1,0 +1,42 @@
+[
+  {
+    "role": "chief",
+    "runtimes": [
+      {
+        "runtime": "claude",
+        "replayLines": 487,
+        "settledTurns": 28
+      }
+    ]
+  },
+  {
+    "role": "convener",
+    "runtimes": [
+      {
+        "runtime": "claude",
+        "replayLines": 181,
+        "settledTurns": 3
+      }
+    ]
+  },
+  {
+    "role": "product",
+    "runtimes": [
+      {
+        "runtime": "claude",
+        "replayLines": 86,
+        "settledTurns": 4
+      }
+    ]
+  },
+  {
+    "role": "rapporteur",
+    "runtimes": [
+      {
+        "runtime": "claude",
+        "replayLines": 323,
+        "settledTurns": 9
+      }
+    ]
+  }
+]

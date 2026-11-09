@@ -1,0 +1,20 @@
+{
+  "at": "2026-11-09T13:23:42.816Z",
+  "elapsedSec": 60,
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 0,
+    "cardsByKind": {},
+    "dispatches": 1,
+    "turnsByRole": {},
+    "gitCalls": 0
+  },
+  "proposalRequestId": null,
+  "resolved": null,
+  "dialogs": 0,
+  "newSessionDirs": [],
+  "planToolCalls": 0,
+  "planReceipts": 0,
+  "convenerReports": 0,
+  "gate": null
+}

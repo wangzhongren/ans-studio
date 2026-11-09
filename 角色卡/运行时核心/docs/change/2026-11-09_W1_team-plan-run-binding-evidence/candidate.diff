@@ -1,0 +1,112 @@
+diff --git a/src/model/runtime.ts b/src/model/runtime.ts
+index 184a0a8..ff4d2b1 100644
+--- a/src/model/runtime.ts
++++ b/src/model/runtime.ts
+@@ -2465,12 +2465,18 @@ export interface SelectRunChangeInput {
+ export type SelectRunChangeResult = DirectActionReceipt & { runId?: string; replacementRunId?: string };
+ export type SelectRunChangeFn = (input: SelectRunChangeInput, signal?: AbortSignal) => Promise<SelectRunChangeResult>;
+ 
++/**
++ * The application derives `baseDigest` from the effective trunk manifest digest and `plan.sha256`
++ * from the actual plan bytes; a model-supplied value is only an assertion, and a mismatch is
++ * rejected with the existing plan-base-conflict / plan-hash-drift codes. `runId` is bound by the
++ * desktop host from the current actually-assigned task; a model self-report is only an assertion.
++ */
+ export interface CompleteTeamPlanInput {
+   operationId: string;
+   flowId: string;
+   runId?: string;
+-  baseDigest: string;
+-  plan: { path: string; sha256: string; version: number };
++  baseDigest?: string;
++  plan: { path: string; sha256?: string; version: number };
+ }
+ export type CompleteTeamPlanFn = (input: CompleteTeamPlanInput, signal?: AbortSignal) => Promise<DirectActionReceipt>;
+ 
+diff --git a/src/provider/runtime/schema.ts b/src/provider/runtime/schema.ts
+index 71597ff..9411142 100644
+--- a/src/provider/runtime/schema.ts
++++ b/src/provider/runtime/schema.ts
+@@ -48,8 +48,8 @@ function directCapabilityDescription(name: string): ToolDescription | undefined
+       targetTrunk: commit, mode: { type: "string", enum: [...RUN_CHANGE_MODES] }, reason }),
+       description: "仅策划 rapporteur 显式选择冻结run时机。continue-frozen只登记；stop/restart由应用核停稳与权限，不回滚文档或自动重pin。" },
+     complete_team_plan: { parameters: object({ operationId: text, flowId: text, runId: text, baseDigest: digest,
+-      plan: object({ path, sha256: digest, version: { type: "integer", minimum: 1 } }) }, ["operationId", "flowId", "baseDigest", "plan"]),
+-      description: "仅运营 convener/schedule 直接完成团队计划；应用重核属主、写集与依赖，不代替D3任命。" },
++      plan: object({ path, sha256: digest, version: { type: "integer", minimum: 1 } }, ["path", "version"]) }, ["operationId", "flowId", "plan"]),
++      description: "仅运营 convener/schedule 直接完成团队计划；baseDigest（effective trunk manifest digest）与 plan.sha256（计划实际字节 SHA-256）由应用派生，可省略，给出时必须与实际值匹配（断言）；未知/不可读/漂移一律拒绝。runId 由应用按当前实际受派任务绑定，勿猜。应用重核属主、写集与依赖，不代替D3任命。" },
+     activate_role_documents: { parameters: object({ operationId: text, flowId: text, planRef: snapshot,
+       d3DecisionId: text, rosterRef: snapshot, targetRoleId: text,
+       documents: object({ card: file, boundaryMd: file, boundaryYaml: file }) }),
+diff --git a/test/runtime-core/submit-capability-tools.test.ts b/test/runtime-core/submit-capability-tools.test.ts
+index 8750ecf..d3f23c8 100644
+--- a/test/runtime-core/submit-capability-tools.test.ts
++++ b/test/runtime-core/submit-capability-tools.test.ts
+@@ -382,6 +382,67 @@ test("R2 rejects unknown identity/source/switch and nested malformed evidence be
+   }
+ });
+ 
++test("R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状", () => {
++  const parameters = describeTool("complete_team_plan").parameters;
++  assert.equal(parameters["additionalProperties"], false);
++  assert.deepEqual(parameters["required"], ["operationId", "flowId", "plan"]);
++  assert.equal(parameters["oneOf"], undefined, "不新增顶层 oneOf");
++  assert.equal(parameters["anyOf"], undefined, "不新增顶层 anyOf");
++  const properties = parameters["properties"] as Record<string, Record<string, unknown>>;
++  assert.equal(properties["baseDigest"]!["pattern"], "^[a-fA-F0-9]{64}$");
++  assert.equal(properties["runId"]!["type"], "string");
++  const plan = properties["plan"]!;
++  assert.equal(plan["additionalProperties"], false);
++  assert.deepEqual(plan["required"], ["path", "version"]);
++  const planProperties = plan["properties"] as Record<string, Record<string, unknown>>;
++  assert.equal(planProperties["sha256"]!["pattern"], "^[a-fA-F0-9]{64}$");
++});
++
++test("R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256", async () => {
++  const omitted = { operationId: "op-plan-1", flowId: "flow-1", plan: { path: "docs/scheduling/flow-1-team-v1.md", version: 1 } };
++  const calls: unknown[] = [];
++  const controller = new AbortController();
++  const receipt = { ...appliedReceipt, operationId: "op-plan-1",
++    planRef: { snapshotId: "snapshot-2", path: "docs/scheduling/flow-1-team-v1.md", sha256: directNext, version: 1 } };
++  const result = await run({ roleId: "convener", completeTeamPlan: async (input, signal) => {
++    calls.push({ input, signal }); return receipt;
++  } } as GovernedToolsOptions, "complete_team_plan", structuredClone(omitted), controller.signal);
++  assert.equal(result.ok, true, result.message);
++  assert.deepEqual(calls, [{ input: omitted, signal: controller.signal }], "工具层不得注入或改写模型参数（派生与宿主绑定由应用内完成）");
++  const parsed = JSON.parse(result.message.slice("complete_team_plan: ".length));
++  assert.deepEqual(parsed, receipt);
++  assert.equal(parsed.planRef.sha256, directNext, "成功回执 JSON 含派生 planRef.sha256");
++});
++
++test("R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力", async () => {
++  const planPath = "docs/scheduling/flow-1-team-v1.md";
++  const valid = { operationId: "op-plan-2", flowId: "flow-1", plan: { path: planPath, version: 1 } };
++  let calls = 0;
++  const options = { roleId: "convener", completeTeamPlan: async () => { calls++; return appliedReceipt; } } as GovernedToolsOptions;
++  const badArgs: Array<Record<string, unknown>> = [
++    { operationId: "op-plan-2", flowId: "flow-1", plan: { version: 1 } },
++    { operationId: "op-plan-2", flowId: "flow-1", plan: { path: planPath } },
++    { operationId: "op-plan-2", flowId: "flow-1" },
++    { flowId: "flow-1", plan: structuredClone(valid.plan) },
++    { operationId: "op-plan-2", plan: structuredClone(valid.plan) },
++    { ...structuredClone(valid), unexpected: true },
++    { ...structuredClone(valid), plan: { ...structuredClone(valid.plan), sha256: directDigest, extra: true } },
++    { ...structuredClone(valid), baseDigest: "not-hex" },
++    { ...structuredClone(valid), baseDigest: "a".repeat(63) },
++    { ...structuredClone(valid), baseDigest: "g".repeat(64) },
++    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: planPath, sha256: "a".repeat(63), version: 1 } },
++    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: planPath, sha256: "z".repeat(64), version: 1 } },
++    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: "../escape.md", sha256: directDigest, version: 1 } },
++    { ...structuredClone(valid), baseDigest: directDigest, plan: { path: planPath, sha256: directDigest, version: 0 } },
++  ];
++  for (const args of badArgs) {
++    const result = await run(options, "complete_team_plan", args);
++    assert.equal(result.ok, false, JSON.stringify(args).slice(0, 160));
++    assert.match(result.message, /invalid-arguments/, JSON.stringify(args).slice(0, 160));
++  }
++  assert.equal(calls, 0);
++});
++
+ test("R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort", async () => {
+   for (const receipt of [
+     { ...appliedReceipt, status: "no-op", targetDigest: directDigest },

@@ -1,0 +1,9 @@
+== suite: git-capabilities
+--- before summary:
+SUMMARY tests=15 pass=12 fail=1 cancelled=0 skipped=2 todo=0
+--- after summary:
+SUMMARY tests=16 pass=13 fail=1 cancelled=0 skipped=2 todo=0
+--- FAIL before-only:
+--- FAIL after-only (new):
+--- SKIP before-only:
+--- SKIP after-only (new):

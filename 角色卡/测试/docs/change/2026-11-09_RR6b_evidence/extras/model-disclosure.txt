@@ -1,0 +1,5 @@
+provider session dir: runtime=claude (all three sessions this run)
+ANS_CLAUDE_MODEL=deepseek-v4-flash
+ANS_CLAUDE_REASONING_EFFORT=high
+native message.model values seen: deepseek-v4-flash, <synthetic>
+note: ANS_CLAUDE_MODEL is NOT an Anthropic model; this run does not claim Claude/Anthropic.

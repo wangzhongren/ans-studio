@@ -1,0 +1,15 @@
+34	1	app/desktop/session.ts
+7	3	src/common/roles/convener/index.ts
+8	2	src/model/runtime.ts
+9	8	src/pipeline/orchestration/trunk-runtime.ts
+2	2	src/provider/runtime/schema.ts
+29	13	src/service/trunk/impl/apply-journal.ts
+5	4	test/roles/convener/convener-differential.test.ts
+28	2	test/roles/convener/convener-module.test.ts
+9	7	test/roles/convener/oracle-fixture.ts
+61	0	test/runtime-core/submit-capability-tools.test.ts
+142	1	test/桌面应用/chief-workflow.test.ts
+64	1	test/编排/convener-module-consumption.test.ts
+229	1	test/编排/direct-role-capabilities.test.ts
+1	1	test/编排/fixtures/git-action-authorization-wiring.ts
+82	0	test/编排/git-capabilities.test.ts

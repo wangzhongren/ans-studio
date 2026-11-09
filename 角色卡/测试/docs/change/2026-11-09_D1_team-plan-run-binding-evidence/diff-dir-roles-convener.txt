@@ -1,0 +1,9 @@
+== suite: dir-roles-convener
+--- before summary:
+SUMMARY tests=32 pass=32 fail=0 cancelled=0 skipped=0 todo=0
+--- after summary:
+SUMMARY tests=32 pass=32 fail=0 cancelled=0 skipped=0 todo=0
+--- FAIL before-only:
+--- FAIL after-only (new):
+--- SKIP before-only:
+--- SKIP after-only (new):
