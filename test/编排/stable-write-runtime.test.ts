@@ -10,7 +10,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { test } from "node:test";
 
-import type { TaskStateEvent } from "../../src/model/runtime.ts";
+import type { TaskStateEvent, RuntimeSessionLifecycleFacts } from "../../src/model/runtime.ts";
+import { isRuntimeSessionDrained } from "../../src/model/runtime.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { stableWriteDecisionFromFacts } from "../../src/service/gate/resolve-write.ts";
 import { createStableWriteRuntime, refreshStableWritePermitSnapshot } from "../../src/pipeline/orchestration/stable-write-runtime.ts";
@@ -339,4 +340,44 @@ test("stable-write-runtime: a foreign service root cannot install its permit fac
     assert.equal(stableWriteDecisionFromFacts({ projectRoot: wrongRoot, relPath: PATHS.workflow, sha256: actual[0]!.targetSha256, permit: actual[0], now: () => new Date(AT),
       currentFile: { state: "present", sha256: actual[0]!.baseSha256 } }).allowed, false);
   } finally { await fs.rm(rig.project.root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); }
+});
+
+// ———————————————— W2（P1.4 §3.2 B8/C5）：`git-old-core-programs-unproven` 语义收窄 ————————————————
+
+/** Claude/Pi disposed 形态：status/processCoverage unknown，native 仅覆盖类证据 reason。 */
+function drainedLifecycle(overrides: Partial<RuntimeSessionLifecycleFacts> = {}): RuntimeSessionLifecycleFacts {
+  return {
+    sessionId: "settled-session", roleId: "convener", runtime: "claude", stopRequested: true, status: "unknown",
+    providerFinished: true, activeTools: [], processes: [], processCoverage: "unknown",
+    reasons: ["native-provider-not-proven-quiescent",
+      "native:Claude SDK Query exposes no owned PID, descendant-tree inventory, process exit/close event or exit code; process coverage is unknown."],
+    ...overrides,
+  };
+}
+
+test("stable-write-runtime：git-old-core-programs-unproven 码保留、语义收窄为运行时中立 drain（Claude/Pi 形态可排空；live-work 仍阻断）", async () => {
+  // 写/初始化门（原 inspectInitializationProtection → inspectGitActionAuthorization）disposed 分支：
+  // 只用 drain 谓词；native/processCoverage 不再是前提（P1.4 B8/H11）。
+  const gateSource = await fs.readFile(new URL("../../src/pipeline/orchestration/trunk-runtime.ts", import.meta.url), "utf8");
+  const start = gateSource.indexOf("export async function inspectGitActionAuthorization");
+  const end = gateSource.indexOf("export function createGitRoleRuntime", start);
+  assert.ok(start > 0 && end > start, "写门段按符号可定位");
+  const segment = gateSource.slice(start, end);
+  assert.ok(segment.includes("git-old-core-programs-unproven"), "码保留");
+  assert.ok(segment.includes("isRuntimeSessionDrained(lifecycle)"), "disposed 终止证据=运行时中立 drain");
+  assert.equal(segment.includes('processCoverage !== "complete"') || segment.includes('processCoverage === "complete"'), false,
+    "processCoverage 不再在门段作为判定（仅可选证据投影）");
+  // 正例：Claude/Pi disposed 形态（status=unknown、processCoverage=unknown、native 覆盖类 reason）⇒ drained。
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle()), true, "Claude disposed 形态可排空");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ runtime: "pi", reasons: ["native-provider-process-coverage-unavailable",
+    "native:pi-sdk-owned-process-tree-coverage-unavailable", "native:pi-sdk-http-transport-close-unobservable"] })), true, "Pi disposed 形态可排空");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ processes: [{ id: "bg-1", kind: "background", state: "exited", treeStatus: "unknown" }] })), true,
+    "background 以管理器 stop/exited 为准");
+  // 负例：live-work / 清理失败 / 未知 reason / 未退出 tracked process ⇒ 阻断（fail-closed）。
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ activeTools: [{ id: "tool-1", name: "write_file" }] })), false, "active tool 阻断");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ providerFinished: false })), false, "provider 未完成阻断");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ processes: [{ id: "p-1", kind: "shell", state: "running", treeStatus: "unknown" }] })), false, "tracked process 未退出阻断");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ reasons: ["native:pi-sdk-idle-not-observed"] })), false, "非 idle Pi 保持阻断（I0-3）");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ reasons: ["provider-abort-cleanup-failed"] })), false, "清理失败阻断");
+  assert.equal(isRuntimeSessionDrained(drainedLifecycle({ reasons: ["some-unknown-future-reason"] })), false, "未知 reason 默认阻断");
 });

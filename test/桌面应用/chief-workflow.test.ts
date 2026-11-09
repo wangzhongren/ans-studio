@@ -6,12 +6,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { acquireVersionLock } from "../../src/provider/version-change/public/version-change-store.ts";
 import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../../src/common/shared/diagnostics.ts";
 
-import { SessionManager, type StopResult } from "../../app/desktop/session.ts";
+import { SessionManager, type StopResult, type DesktopSessionInventoryFact } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { appendRoleLog } from "../../src/common/编排/role-log.ts";
 import { createCustomerInputChannel, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
@@ -20,12 +20,14 @@ import { mainT } from "../../app/desktop/i18n.ts";
 import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
 import { createDecisionDelegationSwitch, createDesktopInterface, desktopProjectExecutionInventory, subscribeDesktopExecutionInventory } from "../../app/desktop/interface.ts";
 import { initializeGitRepository, createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
-import { inspectGitHostCoordinator, beginGitHostAction, endGitHostAction, recordGitHostInterruption, recordTaskObservation, prepareParentTaskRef, prepareCreatedTaskClose, createDirectRoleRuntime } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+import { inspectGitHostCoordinator, beginGitHostAction, endGitHostAction, recordGitHostInterruption, recordTaskObservation, prepareParentTaskRef, prepareCreatedTaskClose, createDirectRoleRuntime, type RunChangeHostPlan } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 // Test-only observation of the actual public Core registry; production Interface does not import Service.
 import { inspectRuntimeCoreRegistry } from "../../src/service/runtime/session.ts";
 import { createRuntimeAdapterFactory, openRoleSession, prepareChiefDecisionEvidence, readRoleCapabilityProtectionScope } from "../../src/pipeline/orchestration/run-role.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
-import type { RuntimeInputProvenanceV1, ChiefPendingDecisionRequest, RuntimeProviderOptions, ToolResult, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts } from "../../src/model/runtime.ts";
+import type { RuntimeInputProvenanceV1, ChiefPendingDecisionRequest, RuntimeProviderOptions, ToolResult, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeSessionLifecycleFacts } from "../../src/model/runtime.ts";
+// W4（P1.4 §3.2 C8/§3.7）：桌面 run-stop 终止判定与运行时中立 drain 谓词（只读消费运行时核心单一来源）。
+import { isRuntimeSessionDrained } from "../../src/model/runtime.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
 import type { WriteGate } from "../../src/model/runtime.ts";
 import { listProject as readActualProject, type ProjectListing } from "../../src/service/role/resolve-role.ts";
@@ -2184,7 +2186,11 @@ test(`W48 默认Core精确controller停止：缺/错task零停止，当前任务
     const stopped = desktopProjectExecutionInventory(root).sessions.find(row => row.coreSessionId === targetBefore.coreSessionId);
     if (stopMode === "foreign-lease") { assert.equal(stopped?.phase, "live"); assert.equal(stopped?.lifecycle?.stopRequested, false); }
     else {
-      assert.equal(stopped?.phase, "disposed"); assert.equal(stopped?.lifecycle?.status, "quiescent");
+      assert.equal(stopped?.phase, "disposed");
+      // P1.4 §3.2 C8/§3.7 契约变更：停止成功以运行时中立 drain 判定（status/processCoverage 仅证据）。
+      // Codex 本路径的实际运行时事实仍如实为 quiescent/complete（保留原断言作为证据，不是门的前提）。
+      assert.equal(isRuntimeSessionDrained(stopped.lifecycle!), true, "停止成功=运行时中立 drain");
+      assert.equal(stopped?.lifecycle?.status, "quiescent");
       assert.equal(stopped.lifecycle.native?.instanceId, targetBefore.lifecycle.native.instanceId); assert.equal(stopped.lifecycle.processCoverage, "complete");
     }
     assert.equal(errors.length, 0, errors.join("\n"));
@@ -2199,3 +2205,155 @@ test(`W48 默认Core精确controller停止：缺/错task零停止，当前任务
   }
 });
 }
+
+// ———————————————— W4（2026-11-08 删除预知式门控）：桌面 run-stop drain / native 可选 ————————————————
+//
+// P1.4 §3.2 C8 / §3.7 / I0-5 / Q8：`executeOwnedRunStop` 的终止判定改为运行时中立
+// `isRuntimeSessionDrained(stopped)`（status/processCoverage/native 仅证据）；`ownedRunStopMembers`
+// 的 native instance 比对改为可选（absent 允许、present-but-changed 拒绝）；Core session/role/task/
+// project 身份、宿主就绪与队列持久化检查逐字保留；错误码 `run-stop-lifecycle-unproven` /
+// `run-stop-host-instance-unproven` 保留、语义收窄。
+// 本用例直接驱动 SessionManager 的私有 host 边界（真实 manager 实例 + 受控 observed handle/宿主事实，
+// 不伪造 Core 会话、不冒充真实 turn）。finalize 侧未注册 prepared run 时以 `run-preparation-invalid`
+// 拒绝，因此「推进到 finalize 边界」即证明 drain 门已通过（旧 quiescent 门会先以
+// `run-stop-lifecycle-unproven` 拒绝）；该 finalize 码不是本批语义，只作边界观测。
+test("W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、present-but-changed 拒绝", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w4-run-stop-"));
+  const manager = new SessionManager({
+    openRoleSession: async () => { throw new Error("W4 direct host-boundary test never opens a role session"); },
+    createPiAdapterFactory: () => { throw new Error("no pi"); },
+    createDemoAdapter: () => { throw new Error("no demo"); },
+    buildProjectConfig,
+    getListing: (r) => (r === root ? listing(root) : undefined),
+    emitEvent: () => {},
+  });
+  type RunStopMember = { member: RunChangeHostPlan["handles"][number]; handle: RoleSessionHandle };
+  type Internals = {
+    managerId: string;
+    observedHandles: Map<string, { fact: DesktopSessionInventoryFact; handle?: RoleSessionHandle }>;
+    deliveryStoreArmed: boolean;
+    runStopFacts: Map<string, { projectRoot: string; fact: { managerId: string; operationId: string; runId: string; requestDigest: string;
+      generation: number; state: "fenced"; hostHandleIds: readonly string[]; targetSeq: number } }>;
+    ownedRunStopMembers(plan: Pick<RunChangeHostPlan, "projectRoot" | "handles">):
+      { ok: true; groups: Map<SessionManager, RunStopMember[]> } | { ok: false; code: string; message: string };
+    executeOwnedRunStop(plan: RunChangeHostPlan, signal: AbortSignal): Promise<{ ok: boolean; status: string; errorCode?: string; message?: string }>;
+  };
+  const internals = manager as unknown as Internals;
+  internals.deliveryStoreArmed = true;
+  const taskId = "w4-task", coreSessionId = "w4-core-session", projectRoot = root;
+  const nativeFacts = (instanceId: string, roleId = "rapporteur"): RuntimeNativeLifecycleFacts => ({
+    instanceId, roleId, runtime: "claude", status: "quiescent", promptState: "settled", observedAt: "2026-11-08T00:00:00.000Z",
+    transport: { kind: "in-process", state: "closed" }, activeTools: [], processes: [], processCoverage: "complete", reasons: [],
+  });
+  // Claude/Pi 的真实形态：status/processCoverage unknown、无 native；白名单 reason 只作证据。
+  const lifecycleFor = (runtime: "claude" | "pi", stopped: boolean, native?: RuntimeNativeLifecycleFacts): RuntimeSessionLifecycleFacts => ({
+    sessionId: coreSessionId, roleId: "rapporteur", runtime, turnId: "w4-turn", stopRequested: stopped, status: "unknown",
+    providerFinished: true, activeTools: [], processes: [], processCoverage: "unknown",
+    reasons: runtime === "claude"
+      ? ["native-provider-not-proven-quiescent",
+        "native:Claude SDK Query exposes no owned PID, descendant-tree inventory, process exit/close event or exit code; process coverage is unknown.",
+        "native:Query.close(): void and interrupt acknowledgement do not verify CLI exit, HTTP completion or descendant shutdown."]
+      : ["native-provider-not-proven-quiescent", "native:pi-sdk-owned-process-tree-coverage-unavailable", "native:pi-sdk-http-transport-close-unobservable"],
+    ...(native ? { native } : {}),
+  });
+  const arm = (lifecycle: RuntimeSessionLifecycleFacts, stopped: RuntimeSessionLifecycleFacts): string => {
+    const hostHandleId = randomUUID();
+    const handle: RoleSessionHandle = {
+      sessionId: coreSessionId,
+      inspectLifecycle: () => structuredClone(lifecycle),
+      stopAndInspect: async () => structuredClone(stopped),
+      async send() {},
+      events() { return { [Symbol.asyncIterator]() { return { async next(): Promise<IteratorResult<OrchestrationEvent>> { return { value: undefined as unknown as OrchestrationEvent, done: true }; } }; } }; },
+      async dispose() {},
+    };
+    internals.observedHandles.set(hostHandleId, { fact: { hostHandleId, projectRoot, roleId: "rapporteur", runtime: lifecycle.runtime,
+      kind: "role", phase: "live", errors: [], taskId }, handle });
+    return hostHandleId;
+  };
+  const planFor = (hostHandleId: string, nativeInstanceId?: string): RunChangeHostPlan => {
+    const plan: RunChangeHostPlan = { planId: randomUUID(), operationId: `w4-op-${randomUUID()}`, projectRoot, runId: "w4-run",
+      flowId: "w4-flow", requestDigest: randomUUID(), requesterTaskId: taskId, requesterCoreSessionId: coreSessionId,
+      requesterTurnId: "w4-turn", deferred: false, taskIds: [taskId],
+      handles: [{ hostHandleId, coreSessionId, roleId: "rapporteur", taskId, ...(nativeInstanceId ? { nativeInstanceId } : {}) }] };
+    internals.runStopFacts.set(`${projectRoot}\u0000${plan.operationId}`, { projectRoot, fact: { managerId: internals.managerId,
+      operationId: plan.operationId, runId: plan.runId, requestDigest: plan.requestDigest, generation: 1, state: "fenced",
+      hostHandleIds: [hostHandleId], targetSeq: 0 } });
+    return plan;
+  };
+  try {
+    // 1) Claude/Pi 正向：status/processCoverage unknown、native absent，但 isRuntimeSessionDrained 为真
+    //    ⇒ 旧 quiescent 门不再拒绝（executeOwnedRunStop 推进到 finalize 边界）。
+    for (const runtime of ["claude", "pi"] as const) {
+      const stopped = lifecycleFor(runtime, true);
+      assert.equal(stopped.status, "unknown"); assert.equal(stopped.processCoverage, "unknown"); assert.equal(stopped.native, undefined);
+      assert.equal(isRuntimeSessionDrained(stopped), true, `${runtime} 形态必须 drained`);
+      const plan = planFor(arm(lifecycleFor(runtime, false), stopped));
+      const members = internals.ownedRunStopMembers(plan);
+      assert.equal(members.ok, true, members.ok ? "" : members.message);
+      const receipt = await internals.executeOwnedRunStop(plan, new AbortController().signal);
+      assert.notEqual(receipt.errorCode, "run-stop-lifecycle-unproven", `${runtime}：drain 成立不得以旧 quiescent 语义拒绝`);
+      assert.equal(receipt.errorCode, "run-preparation-invalid", `${runtime}：已通过 drain 门到达 finalize 边界（本用例未注册真实 prepared run）`);
+    }
+    // 2) native absent 允许：plan 曾记录 native instance，当前 lifecycle/停止回执均 absent ⇒ 不阻断。
+    {
+      const plan = planFor(arm(lifecycleFor("claude", false), lifecycleFor("claude", true)), "w4-native-plan");
+      const members = internals.ownedRunStopMembers(plan);
+      assert.equal(members.ok, true, "当前 native absent ⇒ 允许（可选证据）");
+      const receipt = await internals.executeOwnedRunStop(plan, new AbortController().signal);
+      assert.equal(receipt.errorCode, "run-preparation-invalid", "absent 不阻断 drain 推进");
+    }
+    // 3) native present-but-changed（成员校验）：instance 或 role 漂移 ⇒ run-stop-host-instance-unproven，不提交。
+    for (const drift of [nativeFacts("w4-native-other"), nativeFacts("w4-native-plan", "chief")] as const) {
+      const plan = planFor(arm(lifecycleFor("claude", false, drift), lifecycleFor("claude", true)), "w4-native-plan");
+      const members = internals.ownedRunStopMembers(plan);
+      assert.equal(members.ok, false);
+      if (!members.ok) assert.equal(members.code, "run-stop-host-instance-unproven");
+      const receipt = await internals.executeOwnedRunStop(plan, new AbortController().signal);
+      assert.equal(receipt.ok, false);
+      assert.equal(receipt.errorCode, "run-stop-host-instance-unproven", "成员 native instance/role 漂移 ⇒ 既有码拒绝、不提交");
+    }
+    // 4) native present-but-changed（停止回执）：成员校验通过、回执漂移 ⇒ run-stop-lifecycle-unproven，不提交。
+    for (const drift of [nativeFacts("w4-native-other"), nativeFacts("w4-native-plan", "chief")] as const) {
+      const plan = planFor(arm(lifecycleFor("claude", false, nativeFacts("w4-native-plan")), lifecycleFor("claude", true, drift)), "w4-native-plan");
+      const members = internals.ownedRunStopMembers(plan);
+      assert.equal(members.ok, true);
+      const receipt = await internals.executeOwnedRunStop(plan, new AbortController().signal);
+      assert.equal(receipt.ok, false);
+      assert.equal(receipt.errorCode, "run-stop-lifecycle-unproven", "停止回执 native instance/role 漂移 ⇒ 拒绝、不提交");
+      assert.notEqual(receipt.errorCode, "run-preparation-invalid");
+    }
+    // 5) drain 不成立（非 idle Pi：native:pi-sdk-idle-not-observed 未列白名单，默认阻断）⇒ 既有码拒绝、不提交。
+    {
+      const blocked = lifecycleFor("pi", true);
+      const blockedFacts: RuntimeSessionLifecycleFacts = { ...blocked, reasons: [...blocked.reasons, "native:pi-sdk-idle-not-observed"] };
+      assert.equal(isRuntimeSessionDrained(blockedFacts), false, "非 idle Pi 保持阻断");
+      const plan = planFor(arm(lifecycleFor("pi", false), blockedFacts));
+      const receipt = await internals.executeOwnedRunStop(plan, new AbortController().signal);
+      assert.equal(receipt.ok, false);
+      assert.equal(receipt.errorCode, "run-stop-lifecycle-unproven", "drain 不成立 ⇒ 拒绝、不提交");
+    }
+    // 6) 契约守卫：旧 quiescent/processCoverage/native 必填前提不再存在；身份/队列持久化/宿主 fence 检查保留。
+    const source = await fs.readFile(new URL("../../app/desktop/session.ts", import.meta.url), "utf8");
+    const slice = (from: string, to: string): string => {
+      const start = source.indexOf(from), end = source.indexOf(to, start);
+      assert.ok(start > 0 && end > start, `源码段可定位：${from} → ${to}`);
+      return source.slice(start, end);
+    };
+    const owned = slice("private ownedRunStopMembers", "private async executeOwnedRunStop");
+    const execute = slice("private async executeOwnedRunStop", "private resumeDeferredRunChanges");
+    assert.ok(execute.includes("isRuntimeSessionDrained(stopped)"), "C8：停止回执使用运行时中立 drain");
+    assert.equal(execute.includes('stopped.status !== "quiescent"'), false, "C8：不再以 quiescent 作为前提");
+    assert.equal(execute.includes("!stopped.providerFinished"), false, "C8：providerFinished 由 drain 谓词统一判定");
+    assert.equal(execute.includes("stopped.activeTools.length"), false, "C8：activeTools 由 drain 谓词统一判定");
+    assert.ok(owned.includes("lifecycle.native !== undefined && member.nativeInstanceId !== undefined"), "C8：仅 present-but-changed 拒绝（absent 允许）");
+    assert.equal(owned.includes("lifecycle.native?.instanceId !== member.nativeInstanceId"), false, "C8：native 不再必填比对");
+    assert.ok(owned.includes("run-stop-host-instance-unproven") && execute.includes("run-stop-lifecycle-unproven"), "既有错误码保留、语义收窄");
+    assert.ok(owned.includes("fact.taskId !== member.taskId") && owned.includes("fact.roleId !== member.roleId") &&
+      owned.includes("observed.handle.sessionId !== member.coreSessionId") && owned.includes("fact.projectRoot !== plan.projectRoot"), "Core/任务/角色/项目身份保留");
+    assert.ok(owned.includes("!manager.deliveryStoreArmed || manager.openChains.size"), "队列持久化/宿主就绪检查保留");
+    assert.ok(execute.includes("run-stop-host-fence-unproven") && execute.includes("run-stop-persistence-unproven"), "宿主 fence/持久化检查保留");
+  } finally {
+    await manager.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});

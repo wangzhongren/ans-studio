@@ -15,7 +15,7 @@ import { beginGitHostAction, endGitHostAction } from "../../src/provider/trunk/p
 import { createDemoRuntimeAdapter, loadBuiltinChiefWorkflow } from "../../src/provider/runtime/tools.ts";
 import { createEventQueue } from "../../src/common/runtime-core/event-queue.ts";
 import type { RoleSession, RuntimeProviderFactory, RuntimeProviderOptions, SessionEvent, RuntimeNativeLifecycle, RuntimeNativeLifecycleFacts, ChiefDecisionExecutionContext } from "../../src/model/runtime.ts";
-import { isRuntimeNativeLifecycleFacts } from "../../src/model/runtime.ts";
+import { isRuntimeNativeLifecycleFacts, isRuntimeSessionDrained } from "../../src/model/runtime.ts";
 import { allow, role, until, registerControlledDisplayProfile } from "./fixtures.ts";
 
 test("R29 Core forwards only its validated cloned Chief decision context; ordinary and judge providers receive no field", async () => {
@@ -334,7 +334,10 @@ test("R13 disposal cannot promote missing raw settlement, missing native evidenc
     await session.dispose();
     const receipt = session.inspectLifecycle!(), registry = inspectRuntimeCoreRegistry().entries.find(entry => entry.sessionId === session.sessionId)!;
     assert.equal(receipt.status, "unknown", scenario); assert.deepEqual(registry.lifecycle, receipt);
-    assert.ok(receipt.reasons.includes("disposed-lifecycle-evidence-unavailable"));
+    // 2026-11-08 W1：这些场景全部来自 custom factory（custom-provider-disposal-coverage-unverified 属
+    // F6 阻断项）或真实未知（未结算/运行中进程），中性 drain 不成立 ⇒ 证据缺失标记如实保留。
+    assert.ok(receipt.reasons.includes("disposed-lifecycle-evidence-unavailable"), scenario);
+    assert.equal(isRuntimeSessionDrained(receipt), false, scenario);
     if (scenario === "missing-raw") assert.equal(receipt.settledAt, undefined);
     if (scenario === "missing-native" || scenario === "wrong-instance") assert.equal(receipt.processCoverage, "unknown");
     if (scenario === "custom-without-process-proof") { assert.equal(receipt.processCoverage, "unknown"); assert.ok(receipt.reasons.includes("custom-provider-disposal-coverage-unverified")); }
@@ -537,4 +540,103 @@ test("R6 unreadable native facts never fall back to a closed flag or legacy life
   assert.ok(result.reasons.includes("native-provider-lifecycle-read-failed"));
   assert.ok(result.reasons.includes("native-stop-facts-invalid-or-failed"));
   await session.dispose();
+});
+
+const CLAUDE_COVERAGE_REASONS = [
+  "Claude SDK Query exposes no owned PID, descendant-tree inventory, process exit/close event or exit code; process coverage is unknown.",
+  "Query.close(): void and interrupt acknowledgement do not verify CLI exit, HTTP completion or descendant shutdown.",
+];
+const PI_IDLE_REASONS = ["pi-sdk-owned-process-tree-coverage-unavailable", "pi-sdk-http-transport-close-unobservable"];
+
+test("F7/P1.4 C9 stopAndInspect 活动排空循环 drain 即返回：Claude/Pi 覆盖 unknown 不耗满预算（custom-factory disposed 仍按 F6 阻断）", async () => {
+  for (const shape of [
+    { runtime: "claude" as const, reasons: CLAUDE_COVERAGE_REASONS, transport: "http" as const },
+    { runtime: "pi" as const, reasons: PI_IDLE_REASONS, transport: "in-process" as const },
+  ]) {
+    let facts!: RuntimeNativeLifecycleFacts;
+    const fixture = controlled({
+      nativeLifecycle: options => ({ instanceId: `w1-f7-${shape.runtime}`, inspect: () => facts,
+        async stopAndInspect() { return facts; } }),
+      work: async options => {
+        facts = { instanceId: `w1-f7-${shape.runtime}`, roleId: "worker", runtime: shape.runtime, coreTurnId: options.currentTurnId(),
+          status: "unknown", promptState: "settled", settledAt: new Date().toISOString(), observedAt: new Date().toISOString(),
+          transport: { kind: shape.transport, state: "idle" }, activeTools: [], processes: [], processCoverage: "unknown", reasons: [...shape.reasons] };
+      },
+    });
+    const session = await createRuntimeAdapter({ ...base(), runtime: shape.runtime, providerFactories: { [shape.runtime]: fixture.factory } }).bindRole(role("worker"));
+    const prompt = session.prompt(`w1 f7 ${shape.runtime} drain`).catch(error => error);
+    fixture.release(); await prompt;
+    const current = session.inspectLifecycle!();
+    assert.equal(current.status, "unknown", `${shape.runtime}: native coverage unknown ⇒ status unknown`);
+    assert.equal(current.processCoverage, "unknown");
+    assert.ok(current.reasons.includes("native-provider-not-proven-quiescent"));
+    assert.ok(current.reasons.some(reason => reason === `native:${shape.reasons[0]}`), "native 原因如实记录（D8 证据）");
+    assert.equal(isRuntimeSessionDrained(current), true, `${shape.runtime}: 中性 drain 成立`);
+    const stopped = await session.stopAndInspect!({ expectedSessionId: session.sessionId!, expectedTurnId: current.turnId, timeoutMs: 60 });
+    assert.equal(stopped.status, "unknown");
+    assert.equal(stopped.reasons.includes("stop-drain-budget-exhausted"), false, `${shape.runtime}: drain 即返回，不耗满预算`);
+    assert.equal(isRuntimeSessionDrained(stopped), true);
+    await session.dispose();
+    await until(() => session.inspectLifecycle!().reasons.includes("provider-event-pump-not-drained") === false);
+    // F6：custom factory 的 dispose 覆盖无法证明 ⇒ `custom-provider-disposal-coverage-unverified` 阻断，
+    // disposed receipt 仍如实标记证据缺失（不得被中性 drain 放过）。
+    const receipt = session.inspectLifecycle!();
+    assert.ok(receipt.reasons.includes("custom-provider-disposal-coverage-unverified"));
+    assert.ok(receipt.reasons.includes("disposed-lifecycle-evidence-unavailable"));
+    assert.equal(isRuntimeSessionDrained(receipt), false);
+    const disposed = await session.stopAndInspect!({ expectedSessionId: session.sessionId!, timeoutMs: 10 });
+    assert.equal(disposed.status, "unknown");
+    assert.deepEqual(disposed.reasons, ["disposed-lifecycle-evidence-unavailable"]);
+    const entry = inspectRuntimeCoreRegistry().entries.find(candidate => candidate.sessionId === session.sessionId)!;
+    assert.equal(entry.state, "disposed");
+    assert.equal(isRuntimeSessionDrained(entry.lifecycle!), false);
+  }
+});
+
+test("F7/P1.4 C9 default-production Claude 未运行会话：disposed receipt 以中性 drain 返回（native 覆盖 unknown 不阻断）", async () => {
+  const session = await createRuntimeAdapter({ ...base(), runtime: "claude" }).bindRole(role("worker"));
+  const current = session.inspectLifecycle!();
+  assert.equal(current.status, "unknown", `native coverage unknown ⇒ status unknown: ${JSON.stringify(current.reasons)}`);
+  assert.equal(current.processCoverage, "unknown");
+  assert.equal(current.providerFinished, true);
+  assert.equal(isRuntimeSessionDrained(current), true, "未运行默认 Claude 会话只含显式证据白名单 reason");
+  const stopped = await session.stopAndInspect!({ expectedSessionId: session.sessionId!, timeoutMs: 60 });
+  assert.equal(stopped.status, "unknown");
+  assert.equal(stopped.reasons.includes("stop-drain-budget-exhausted"), false);
+  await session.dispose();
+  await until(() => isRuntimeSessionDrained(session.inspectLifecycle!()));
+  const disposed = await session.stopAndInspect!({ expectedSessionId: session.sessionId!, timeoutMs: 10 });
+  assert.equal(disposed.status, "unknown");
+  assert.equal(disposed.reasons.includes("disposed-lifecycle-evidence-unavailable"), false, "drain 成立时不需要阻断标记");
+  assert.equal(isRuntimeSessionDrained(disposed), true, "Claude disposed receipt 可被运行时中立消费（W2 H11 前置）");
+  const entry = inspectRuntimeCoreRegistry().entries.find(candidate => candidate.sessionId === session.sessionId)!;
+  assert.equal(entry.state, "disposed");
+  assert.equal(isRuntimeSessionDrained(entry.lifecycle!), true);
+});
+
+test("F7/S1 非 idle Pi（native:pi-sdk-idle-not-observed）保持阻断：stop 预算耗尽、disposed 标记证据缺失", async () => {
+  let facts!: RuntimeNativeLifecycleFacts;
+  const fixture = controlled({
+    nativeLifecycle: options => ({ instanceId: "w1-f7-pi-busy", inspect: () => facts, async stopAndInspect() { return facts; } }),
+    work: async options => {
+      facts = { instanceId: "w1-f7-pi-busy", roleId: "worker", runtime: "pi", coreTurnId: options.currentTurnId(),
+        status: "running", promptState: "settled", settledAt: new Date().toISOString(), observedAt: new Date().toISOString(),
+        transport: { kind: "in-process", state: "open" }, activeTools: [], processes: [], processCoverage: "unknown",
+        reasons: [...PI_IDLE_REASONS, "pi-sdk-idle-not-observed"] };
+    },
+  });
+  const session = await createRuntimeAdapter({ ...base(), runtime: "pi", providerFactories: { pi: fixture.factory } }).bindRole(role("worker"));
+  const prompt = session.prompt("w1 f7 busy pi").catch(error => error);
+  fixture.release(); await prompt;
+  const current = session.inspectLifecycle!();
+  assert.equal(isRuntimeSessionDrained(current), false, "白名单外的 native:pi-sdk-idle-not-observed 默认阻断");
+  const stopped = await session.stopAndInspect!({ expectedSessionId: session.sessionId!, expectedTurnId: current.turnId, timeoutMs: 60 });
+  assert.equal(stopped.status, "unknown");
+  assert.ok(stopped.reasons.includes("stop-drain-budget-exhausted"), "非 drain 时必须如实耗尽预算");
+  assert.equal(isRuntimeSessionDrained(stopped), false);
+  await session.dispose();
+  const disposed = await session.stopAndInspect!({ expectedSessionId: session.sessionId!, timeoutMs: 10 });
+  assert.equal(disposed.status, "unknown");
+  assert.ok(disposed.reasons.includes("disposed-lifecycle-evidence-unavailable"));
+  assert.equal(isRuntimeSessionDrained(disposed), false);
 });

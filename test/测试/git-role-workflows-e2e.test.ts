@@ -379,12 +379,10 @@ function createAssignedWorkerReceivers(options: {
       const names = body.tools?.map(tool => tool.function?.name) ?? [];
       options.progress.push({ stage: "worker-runtime", reply: JSON.stringify({ names, actualHostSurface: live?.toolSurface }) });
       const raw = names.filter(name => /^(ans_)?(run_shell|exec_command|run_script|start_background_command|start_background_process|spawn_process|background)$/.test(name ?? ""));
-      const surface = live?.toolSurface, native = surface?.native;
-      if (raw.length || !surface || surface.factoryProvenance !== "default-production" || !native || native.factory !== "codex-chat"
-        || !Array.isArray(native.nativeBuiltinTools) || native.nativeBuiltinTools.length || !Array.isArray(surface.configuredForeignMcpServers) || surface.configuredForeignMcpServers.length) {
-        options.progress.push({ stage: "worker-surface-blocked", reply: JSON.stringify({ raw, actualHostSurface: live?.toolSurface, reason: "required actual worker tool/native surface unproven; no tool calls emitted" }) });
-        return modelDone("当前真实worker工具或native面闭包尚未证明，保持阻塞，不调用原始命令或写入。" );
-      }
+      // W5（P1.4 §4.5 / AC-1–AC-7）：旧 strict-surface 契约已删除——worker 按真实 ACL/任务绑定直接调用
+      // 结构化工具（write_file/git_query/git_candidate）；native/toolSurface/strict 事实仅作为证据记录，
+      // 不再据此决定是否 emit 工具调用（其它会话的 native/processCoverage 不再是动作前提）。
+      options.progress.push({ stage: "worker-surface-evidence", reply: JSON.stringify({ raw, actualHostSurface: live?.toolSurface ?? null }) });
       const task = observation.tasks.find(task => task.created?.idempotencyKey === options.workerTaskKey);
       assert.equal(task?.created?.runState, "pinned", "Q14_WORKER_ACTUAL_RUN_NOT_PINNED");
       return modelCalls(gitTool(options.ids.write, "write_file", { path: options.output.path, content: options.output.content }));
@@ -1258,6 +1256,8 @@ test("Q2 real default CodexChat HTTP: chief Git query preserves real metadata an
     assert.equal(driver.trace.length, 2); assert.deepEqual(driver.errors, []);
     const observation = await driver.observe(), live = observation.inventory.sessions.find(fact => fact.phase === "live" && fact.kind === "role");
     assert.ok(live?.coreSessionId); assert.equal(live.toolSurface?.sessionId, live.coreSessionId);
+    // W5（P1.4 §3.5/§4.2）：以下 strict/native 字段断言是**证据生产**事实（PR #72 不变），不是 Git 动作门前提；
+    // 本变更后 native/toolSurface 缺失/unknown 不再阻断结构化 Git 动作（写门改动作时授权）。
     assert.equal(live.toolSurface?.factoryProvenance, "default-production");
     assert.equal(live.toolSurface?.nativeToolRegistry, "application-mediated");
     assert.equal(live.toolSurface?.native?.factory, "codex-chat");
@@ -2181,13 +2181,17 @@ export async function runFirstNewBusinessCase() {
     }
     await driver.save(path.join(evidence, `${caseTag}-first-pin-child-verified-proof.json`), { parent, child: actualChild, runRead, snapshot: runBytes.value, frozenRole: frozen });
     await driver.bounded("actual worker required surface / scoped write", async signal => {
-      while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap" || item.stage === "worker-surface-blocked")) {
+      while (!roleProgress.some(item => item.stage === "controller-bounded-stop" || item.stage === "worker-candidate-source-gap")) {
         const failed = driver.inspectInventory().sessions.find(session => session.roleId === "impl" && ["open-failed", "dispose-failed"].includes(session.phase));
         if (failed) throw new Error(`Q15_WORKER_OPEN_BLOCK ${JSON.stringify({ phase: failed.phase, errors: failed.errors, coreSessionId: failed.coreSessionId })}`);
         if (driver.errors.length) throw new Error(driver.errors.join("\n")); signal.throwIfAborted(); await new Promise(resolve => setTimeout(resolve, 10));
       }
     });
-    const blockedWorker = roleProgress.find(item => item.stage === "worker-surface-blocked"); assert.equal(blockedWorker, undefined, `Q14_REQUIRED_WORKER_SURFACE_UNPROVEN ${blockedWorker?.reply}`);
+    // W5（P1.4 §4.5）：worker 不再据 native/strict surface 阻塞；真实工具面证据单独断言——
+    // 结构化写路径不得向 worker 暴露原始 shell 工具（N7：裸 Git 写仍硬拒；声明为事实观察，不是动作门）。
+    const workerSurfaceEvidence = roleProgress.find(item => item.stage === "worker-surface-evidence"); assert.ok(workerSurfaceEvidence, "Q14_WORKER_SURFACE_EVIDENCE_MISSING");
+    const workerSurfaceFacts: { raw?: unknown } = JSON.parse(workerSurfaceEvidence.reply);
+    assert.ok(Array.isArray(workerSurfaceFacts.raw) && workerSurfaceFacts.raw.length === 0, `Q14_WORKER_RAW_SHELL_SURFACE_EXPOSED ${workerSurfaceEvidence.reply}`);
     await driver.bounded("actual worker latest report and matching persisted turn end", async signal => {
       for (;;) {
         const observation = await driver.observe(), child = observation.tasks.find(task => task.created?.idempotencyKey === "q11-dispatch-worker");

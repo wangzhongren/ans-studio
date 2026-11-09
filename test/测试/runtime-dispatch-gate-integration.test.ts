@@ -375,9 +375,8 @@ test("P1-D：controller resume 与 validParent 共用 predicate——有效证�
 test("P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段", async () => {
   const composed = composeRuntimeApplicationMediation(composition({ runtime: "pi", applicationFact: () => applicationFact({ runtime: "pi", factory: "pi-custom-tools" }) }));
   assert.ok(composed);
-  // inspectInitializationProtection 只接受严格 observed + nativeToolRegistry application-mediated
-  // （按符号取源码段，不绑定行号）；应用中介证据不会改变这两个字段（包装层返回 status unknown /
-  // nativeToolRegistry unknown）。
+  // 写/发布门（本变更 P1.4 §3.2 B8–B10 / §3.3 H13/H14 / I0-8：原 `inspectInitializationProtection`
+  // 已改名为 `inspectGitActionAuthorization` 并删除注册表级预知前提）。受限应用中介证据不升级严格字段。
   const surface: RuntimeSessionToolSurfaceFacts = { source: "core-provider-assembly", sessionId: SESSION, roleId: "chief", runtime: "pi",
     status: "unknown", appTools: ["dispatch_task", "read_file"], configuredForeignMcpServers: [], factoryProvenance: "default-production",
     nativeToolRegistry: "unknown", filesystemConfinement: "unknown", reasons: ["native-tool-registry-binding-unverified"], applicationMediation: composed };
@@ -406,12 +405,30 @@ test("P1-D：N15——写/发布/停稳门不消费 applicationMediation，受�
   }
   // 判定层已整体移出 trunk-runtime：本文件 0 次引用应用中介证据（写/发布/停稳门不消费）。
   assert.equal((trunkSource.match(/applicationMediation/g) ?? []).length, 0, "trunk-runtime 不消费 applicationMediation");
-  // 语义断言（保持）：inspectInitializationProtection 的写门仍要求严格 observed + application-mediated 注册表证据。
-  const protectionStart = trunkSource.indexOf("async function inspectInitializationProtection");
-  const protectionEnd = trunkSource.indexOf("export function createGitRoleRuntime", protectionStart);
-  assert.ok(protectionStart > 0 && protectionEnd > protectionStart, "inspectInitializationProtection 源码段必须可按符号定位");
-  const protectionSource = trunkSource.slice(protectionStart, protectionEnd);
-  assert.match(protectionSource, /surface\.status !== "observed"/, "写/发布/停稳门仍要求严格 observed（N15 未放宽）");
-  assert.match(protectionSource, /surface\.nativeToolRegistry !== "application-mediated"/, "写/发布/停稳门仍要求 application-mediated registry 证据（N15 未放宽）");
-  assert.equal((protectionSource.match(/applicationMediation/g) ?? []).length, 0, "inspectInitializationProtection 不读应用中介证据");
+  // 语义断言（W5 按新契约改写；契约变更见 W5 证据 before/after）：
+  // 写/发布门已改名为 `inspectGitActionAuthorization`（I0-8 保留旧名溯源注释），不再要求注册表级
+  // strict observed / application-mediated registry / native factoryPlan / closedTools（B8–B10 删除）；
+  // 改为运行时中立闭包（H13/H14）并把证据只收进 optionalEvidence，仍不读应用中介证据（PR #72 零引用）。
+  const gateStart = trunkSource.indexOf("export async function inspectGitActionAuthorization");
+  const gateEnd = trunkSource.indexOf("export function createGitRoleRuntime", gateStart);
+  assert.ok(gateStart > 0 && gateEnd > gateStart, "inspectGitActionAuthorization 源码段必须可按符号定位");
+  const legacyTrace = trunkSource.indexOf("inspectInitializationProtection");
+  assert.ok(legacyTrace > 0 && legacyTrace < gateStart && gateStart - legacyTrace < 4000,
+    "改名必须保留旧名溯源注释（I0-8）");
+  const gateSource = trunkSource.slice(gateStart, gateEnd);
+  for (const retiredPremise of [
+    'surface.status !== "observed"',
+    'surface.nativeToolRegistry !== "application-mediated"',
+    "git-core-creation-proof-unavailable",
+    "git-native-surface-unproven",
+    "git-unclosed-effect-registered",
+  ]) assert.equal(gateSource.includes(retiredPremise), false, `写门不得再含预知式前提：${retiredPremise}`);
+  // closedTools 仅保留为 optionalEvidence 的未知工具快照（`unknownTools`），不再是拒绝条件。
+  assert.ok(gateSource.includes("unknownTools"), "closedTools 快照只进 optionalEvidence（B10 降级）");
+  assert.ok(gateSource.includes("git-core-in-flight-unproven"), "H13 运行时中立 in-flight 闭包存在");
+  assert.ok(gateSource.includes("git-core-inspection-unavailable"), "H14 可读性闭包存在");
+  assert.ok(gateSource.includes("isRuntimeSessionDrained(lifecycle)"), "disposed 条目使用运行时中立 drain（H11）");
+  assert.ok(gateSource.includes("optionalEvidence"), "native/toolSurface/foreign MCP 只进 optionalEvidence（不判定）");
+  assert.ok(gateSource.includes("authorizationMode"), "active-tool / host-continuation 两种授权模式（I0-4）");
+  assert.equal((gateSource.match(/applicationMediation/g) ?? []).length, 0, "inspectGitActionAuthorization 不读应用中介证据（PR #72 保持）");
 });

@@ -1,7 +1,7 @@
 // Public Service composition entry. Pipeline selects runtime and injects policy; Providers execute it.
 import { randomUUID, createHash } from "node:crypto";
 import { resolve } from "node:path";
-import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED, isChiefDecisionExecutionContext, isRuntimeApplicationToolSurfaceFacts, isRuntimeNativeLifecycleFacts, isRuntimeNativeToolSurfaceFacts } from "../../model/runtime.ts";
+import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED, isChiefDecisionExecutionContext, isRuntimeApplicationToolSurfaceFacts, isRuntimeNativeLifecycleFacts, isRuntimeNativeToolSurfaceFacts, isRuntimeSessionDrained } from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
 import type {
   GovernedToolsOptions, PromptInputEventDetail, PromptOptions, RoleSession, RuntimeAdapter, RuntimeKind, RuntimeProviderFactory,
@@ -292,6 +292,25 @@ export function matchesRuntimeApprovalChain(
     && live.audit.probe === planned.audit.probe && live.audit.relPath === planned.audit.relPath
     && canonicalProjectRoot(live.projectRoot) === canonicalProjectRoot(planned.projectRoot);
 }
+/**
+ * P1.4 F5/A6：可选 native 强证明的绑定核对（仅当 creation plan **主动采用** `plan.native` 时调用）。
+ *
+ * 语义：`absent`（plan 未投影 native）⇒ 调用点不核对、不拒绝；`present-but-changed`（planId/
+ * configDigest/appTools/角色/运行时/实例身份/注册面漂移）⇒ false ⇒ `runtime-native-factory-plan-binding-unverified`。
+ * 与 `matchesRuntimeApprovalChain` 同风格：模块级纯判据，便于按字段 fail-closed 直接测试。
+ */
+export function matchesRuntimeNativeFactoryPlanBinding(
+  planned: RuntimeNativeFactoryPlanFacts,
+  actual: RuntimeNativeToolSurfaceFacts | undefined,
+  context: { current: boolean; roleId: string; runtime: RuntimeKind; nativeLifecycleInstanceId?: string },
+): boolean {
+  return context.current && isRuntimeNativeToolSurfaceFacts(actual)
+    && actual.factoryPlan?.planId === planned.planId && actual.factoryPlan?.configDigest === planned.configDigest
+    && actual.roleId === context.roleId && actual.runtime === context.runtime && actual.status === "observed"
+    && actual.factory === "codex-chat" && actual.nativeInstanceId === context.nativeLifecycleInstanceId
+    && actual.foreignMcpServers.length === 0 && actual.nativeBuiltinTools.length === 0
+    && actual.appTools.length === planned.appTools.length && actual.appTools.every(name => planned.appTools.includes(name));
+}
 type ApprovalChainEvidence =
   | { kind: "verified"; chain: RuntimeApprovalChainPlanFacts }
   | { kind: "unproven" }
@@ -427,13 +446,14 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       const construction = { factoryEntered: false, nativeBindEntered: false, pending: 0, revoked: false, trustedPurePreparation: false };
       registry.construction = () => {
         const reasons: string[] = [];
-        if (!construction.trustedPurePreparation) reasons.push("official-pure-preparation-unproven");
+        // P1.4 A9/D6：`never-started` 只由真实边界（factoryEntered/nativeBindEntered/pending/revoked）决定；
+        // `trustedPurePreparation` 保留为可选证据字段，不再产生 `official-pure-preparation-unproven`。
         if (!construction.revoked) reasons.push("preparation-not-revoked");
         if (construction.factoryEntered || construction.nativeBindEntered) reasons.push("effect-construction-boundary-entered");
         if (construction.pending) reasons.push("construction-continuation-pending");
         return { source: "core-construction-boundaries", status: registry.fact.sessionId ? "instance-bound" : reasons.length ? "possibly-started" : "never-started",
           factoryEntered: construction.factoryEntered, nativeBindEntered: construction.nativeBindEntered, pendingContinuations: construction.pending,
-          preparedTokensRevoked: construction.revoked, reasons };
+          preparedTokensRevoked: construction.revoked, trustedPurePreparation: construction.trustedPurePreparation, reasons };
       };
       const publishConstruction = () => updateCoreRegistry(registry, registry.fact.state);
       const revoke = () => { construction.revoked = true; if (providers.get(role) === provider) providers.delete(role); publishConstruction(); };
@@ -578,12 +598,14 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         let admittedPlan: RuntimeCreationPlanFacts | undefined;
         let assertAdmission: () => void = () => { throw new Error("runtime-core-admission-missing"); };
         const optionSnapshot = Object.entries(options), roleSnapshot = JSON.stringify(role);
+        // P1.4 F5：只有**被采用的** native 强证明（带 adapter）必须保持 current；无 adapter 的可选证据
+        // 不阻塞准入/回落（其配置新鲜度由工厂构造时重新解析，见 codex `prepared ?? resolveCodexBinding`）。
         const isCurrent = () => !construction.revoked && Object.keys(options).length === optionSnapshot.length
           && optionSnapshot.every(([key, value]) => (options as unknown as Record<string, unknown>)[key] === value)
           && options.providerFactories?.[options.runtime] === factoryOverride && JSON.stringify(role) === roleSnapshot
           && providerOptions.tools.length === initialAppTools.length
           && providerOptions.tools.every((tool, index) => tool.name === initialAppTools[index] && tool.handler === initialToolHandlers[index])
-          && (!nativePreparation || nativePreparation.isCurrent());
+          && (!nativePreparation?.adapter || nativePreparation.isCurrent());
         const roleCapabilityGuards = (binding: Pick<RuntimeBlockedRoleCapabilityFacts, "corePlanId" | "nativePlanId" | "nativeConfigDigest" | "sessionId"> = {}): RuntimeBlockedRoleCapabilityFacts | undefined => {
           const registered = roleCapabilitySlots.filter(([tool]) => initialAppTools.includes(tool));
           if (!registered.length) return undefined;
@@ -639,8 +661,11 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             throw new Error("runtime-protected-scope-requires-verified-plan");
           assertRoleCapabilityScope(scope);
           admittedScope = scope;
-          updateCoreRegistry(registry, "creating", nativePreparation ? [] : ["legacy-bind-without-precreation-plan"]);
-          if (nativePreparation) { if (!isCurrent() || !nativePreparation.adapter) throw new Error("runtime-prepared-configuration-changed"); return nativePreparation.adapter; }
+          // P1.4 F5/R9：native factory plan 只是**可选强证明**。原生准备未带 adapter（例如 responses/MCP/
+          // WebSearch/custom transport 不可用）时**回落工厂构造**，不得因缺 adapter 抛
+          // `runtime-prepared-configuration-changed`；只有带 adapter 的可选强证明仍要求配置未漂移。
+          updateCoreRegistry(registry, "creating", nativePreparation?.adapter ? [] : ["legacy-bind-without-precreation-plan"]);
+          if (nativePreparation?.adapter) { if (!isCurrent()) throw new Error("runtime-prepared-configuration-changed"); return nativePreparation.adapter; }
           construction.factoryEntered = true; publishConstruction();
           return await (chiefDecision === undefined ? factory(providerOptions)
             : withTimeout(Promise.resolve(factory(providerOptions)), chiefDecision.limits.timeoutMs, "构造chief决策上下文"));
@@ -674,6 +699,7 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           };
           if (!module.prepareCodexRuntimeAdapter) return undefined;
           const prepared = await module.prepareCodexRuntimeAdapter(providerOptions, role);
+          // P1.4 A9/D6：纯准备强证据仅作**可选证据字段**记录，不产生 reason、不决定 construction.status。
           construction.trustedPurePreparation = !!prepared.adapter && prepared.facts.status === "observed" && prepared.facts.factory === "codex-chat"
             && prepared.facts.transport === "http" && prepared.facts.wire === "chat" && prepared.facts.foreignMcpServers.length === 0
             && prepared.facts.nativeBuiltinTools.length === 0 && prepared.facts.plannedProcesses.length === 0 && prepared.facts.reasons.length === 0;
@@ -709,15 +735,12 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         inner = await withTimeout(provider.adapter.bindRole(role), provider.options.constructTimeoutMs ?? 120000, `${options.runtime} 建立角色会话`);
         constructed = inner;
         try { provider.display.assertReady(); } catch (error) { await inner.dispose(); throw error; }
-        if (creationPlan?.native) {
-          const actual = inner.inspectNativeToolSurface?.();
-          if (!provider.isCurrent() || !isRuntimeNativeToolSurfaceFacts(actual)
-            || actual.factoryPlan?.planId !== creationPlan.native.planId || actual.factoryPlan?.configDigest !== creationPlan.native.configDigest
-            || actual.roleId !== role.id || actual.runtime !== options.runtime || actual.status !== "observed" || actual.factory !== "codex-chat"
-            || actual.nativeInstanceId !== inner.nativeLifecycle?.instanceId || actual.foreignMcpServers.length || actual.nativeBuiltinTools.length
-            || actual.appTools.length !== creationPlan.native.appTools.length || actual.appTools.some(name => !creationPlan.native!.appTools.includes(name))) {
-            await inner.dispose(); throw new Error("runtime-native-factory-plan-binding-unverified");
-          }
+        // P1.4 F5/A6：仅核对**主动采用**的可选 native 强证明（plan.native 只在 observed+adapter 时投影）。
+        // `absent` ⇒ 不拒绝；present-but-changed ⇒ runtime-native-factory-plan-binding-unverified。
+        if (creationPlan?.native && !matchesRuntimeNativeFactoryPlanBinding(creationPlan.native, inner.inspectNativeToolSurface?.(), {
+          current: provider.isCurrent(), roleId: role.id, runtime: options.runtime, nativeLifecycleInstanceId: inner.nativeLifecycle?.instanceId,
+        })) {
+          await inner.dispose(); throw new Error("runtime-native-factory-plan-binding-unverified");
         }
       } catch (error) {
         provider.revoke(); bindConstructionFailure(error, provider.registry);
@@ -852,9 +875,13 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       function refreshDisposalEvidence(): void {
         if (!disposed || !disposalConstraints) return;
         const terminal = collectLifecycle(true), reasons = [...terminal.reasons, ...disposalConstraints];
+        // P1.4 C9/D8：终止证据口径统一为运行时中立 drain 谓词（native/processCoverage 仅证据）。
+        // drain 成立时保留终端事实原样（status 可以为 unknown），不再附加阻断性的
+        // `disposed-lifecycle-evidence-unavailable`；不成立时照旧如实标记为未知。
+        const drained = reasons.length === 0 || isRuntimeSessionDrained({ ...terminal, reasons });
         disposalReceipt = { ...terminal, ...(disposalConstraints.length ? { processCoverage: "unknown" as const } : {}),
-          ...(reasons.length || terminal.status !== "quiescent" ? { status: "unknown" as const,
-            reasons: [...reasons, "disposed-lifecycle-evidence-unavailable"] } : {}) };
+          ...(drained ? {} : { status: "unknown" as const,
+            reasons: [...reasons, "disposed-lifecycle-evidence-unavailable"] }) };
         const fingerprint = JSON.stringify({ ...disposalReceipt, ...(disposalReceipt.native ? { native: { ...disposalReceipt.native, observedAt: undefined } } : {}) });
         provider.registry.fact = { ...provider.registry.fact, lifecycle: structuredClone(disposalReceipt) };
         if (fingerprint !== disposalFingerprint) { disposalFingerprint = fingerprint; updateCoreRegistry(provider.registry, provider.registry.fact.state); }
@@ -997,7 +1024,10 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
           if (input.expectedTurnId !== undefined && input.expectedTurnId !== latestTurn?.id) return invalid("turn-identity-mismatch");
           if (!Number.isSafeInteger(input.timeoutMs) || input.timeoutMs <= 0) return invalid("invalid-stop-budget");
           if (signal?.aborted) return invalid("stop-inspection-aborted");
-          if (disposed) return disposalReceipt?.status === "quiescent" ? structuredClone(disposalReceipt) : invalid("disposed-lifecycle-evidence-unavailable");
+          // P1.4 C9：disposed 分支用运行时中立 drain 谓词（保留 quiescent 快路径）；native/processCoverage
+          // 覆盖 unknown 的证据事实（显式白名单）不再阻塞返回。
+          if (disposed) return disposalReceipt && (disposalReceipt.status === "quiescent" || isRuntimeSessionDrained(disposalReceipt))
+            ? structuredClone(disposalReceipt) : invalid("disposed-lifecycle-evidence-unavailable");
           recordGitHostInterruption({ projectRoot: options.projectRoot, reason: "core-stop-requested", coreSessionId: sessionId });
           stopRequested = true; stopSealed = true;
           const turn = latestTurn;
@@ -1037,7 +1067,8 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
               } catch { return invalid("background-lifecycle-read-failed"); }
             }
             const facts = inspectLifecycle();
-            if (facts.status === "quiescent") return facts;
+            // P1.4 C9/F7：quiescent 快路径或运行时中立 drain 即返回——Claude/Pi 不再等满每成员预算。
+            if (facts.status === "quiescent" || isRuntimeSessionDrained(facts)) return facts;
             if (signal?.aborted) return { ...facts, status: "unknown", reasons: [...facts.reasons, "stop-inspection-aborted"] };
             if (Date.now() >= deadline) return { ...facts, status: "unknown", reasons: [...facts.reasons, "stop-drain-budget-exhausted"] };
             await new Promise<void>(resolve => setTimeout(resolve, Math.min(5, Math.max(1, deadline - Date.now()))));
@@ -1278,27 +1309,27 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
       let native: RuntimeNativeFactoryPlanFacts | undefined;
       if (provider.factoryProvenance === "custom-override") reasons.push("custom-provider-factory-unverified");
       else if (options.runtime === "codex") {
-        // P1.3 §2.2.3/§2.6：仅 Codex 保留原生工厂计划严格校验（原条件逐字保留）；claude/pi 不再
-        // 产生 `native-factory-plan-*`（该证明对非 codex 结构性不可得，已取消为通用前提）。
+        // P1.4 F5/D1：Codex native factory plan 只作**可选强证明**。仅当 provider 事实 observed 且
+        // adapter/绑定确实存在时投影进 creation plan；否则从 plan **省略**。native-plan-* 证据原因
+        // 不再导致创建/动作拒绝（保留在 `RuntimeNativeFactoryPlanFacts.reasons` 供适配器侧审计）。
         try {
           const prepared = await provider.prepareNative(), fact = prepared?.facts;
           if (fact && fact.source === "native-factory-plan" && typeof fact.planId === "string" && fact.planId.length > 0
             && typeof fact.configDigest === "string" && fact.configDigest.length === 64 && /^[a-f0-9]{64}$/.test(fact.configDigest)
             && fact.roleId === role.id && fact.runtime === options.runtime
             && [fact.appTools, fact.foreignMcpServers, fact.nativeBuiltinTools, fact.plannedProcesses, fact.reasons]
-              .every(names => Array.isArray(names) && names.every(name => typeof name === "string" && name.length > 0))) {
+              .every(names => Array.isArray(names) && names.every(name => typeof name === "string" && name.length > 0))
+            && fact.status === "observed" && fact.factory === "codex-chat" && fact.transport === "http" && fact.wire === "chat"
+            && fact.foreignMcpServers.length === 0 && fact.nativeBuiltinTools.length === 0 && fact.plannedProcesses.length === 0
+            && fact.reasons.length === 0 && !!prepared?.adapter && provider.isCurrent()
+            && fact.appTools.length === provider.initialAppTools.length && fact.appTools.every(name => provider.initialAppTools.includes(name))) {
             // Explicit allowlist projection. Never serialize arbitrary provider fields/options/environment.
             native = { source: "native-factory-plan", planId: fact.planId, configDigest: fact.configDigest, roleId: fact.roleId,
               runtime: fact.runtime, status: fact.status, factory: fact.factory, transport: fact.transport, wire: fact.wire,
               appTools: [...fact.appTools], foreignMcpServers: [...fact.foreignMcpServers], nativeBuiltinTools: [...fact.nativeBuiltinTools],
               plannedProcesses: [...fact.plannedProcesses], reasons: [...fact.reasons] };
-            if (fact.status !== "observed" || fact.factory !== "codex-chat" || fact.transport !== "http" || fact.wire !== "chat"
-              || fact.foreignMcpServers.length || fact.nativeBuiltinTools.length || fact.plannedProcesses.length || fact.reasons.length
-              || !prepared?.adapter || !provider.isCurrent()
-              || fact.appTools.length !== provider.initialAppTools.length || fact.appTools.some(name => !provider.initialAppTools.includes(name)))
-              reasons.push("native-factory-plan-unverified");
-          } else reasons.push("native-factory-plan-unavailable");
-        } catch { reasons.push("native-factory-plan-preparation-failed"); }
+          }
+        } catch { /* P1.4 F5: native 证据不可用不是创建门（原生准备失败 ⇒ plan 省略 native）。 */ }
       }
       if (!provider.isCurrent()) reasons.push("runtime-prepared-configuration-changed");
       const plan: RuntimeCreationPlanFacts = { source: "core-factory-plan", planId: randomUUID(), configDigest: "", roleId: role.id,

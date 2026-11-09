@@ -395,6 +395,12 @@ export interface RuntimeCoreConstructionFacts {
   nativeBindEntered: boolean;
   pendingContinuations: number;
   preparedTokensRevoked: boolean;
+  /**
+   * 可选证据（P1.4 A9/D6）：native 纯准备（Codex observed factory plan + adapter）曾成立。
+   * **不产生 reason、不参与 `status` 判定**；`status` 只由真实边界（factoryEntered/nativeBindEntered/
+   * pendingContinuations/revoked）决定。`official-pure-preparation-unproven` 已退役（不再产生）。
+   */
+  trustedPurePreparation?: boolean;
   reasons: readonly string[];
 }
 export interface RuntimeCoreConstructionFailureRef {
@@ -470,6 +476,42 @@ export interface RuntimeSessionLifecycleFacts {
   processCoverage: "complete" | "unknown";
   reasons: readonly string[];
   native?: RuntimeNativeLifecycleFacts;
+}
+
+/**
+ * 只作证据、不阻断 drain 的 Core 包装层 reason（P1.4 §3.7 F6/R7，I0-3 冻结；显式白名单）。
+ * `DRAIN_NATIVE_EVIDENCE_REASONS` 之外的一切 reason（含 live-work、清理失败、读取失败、未知 reason）
+ * 一律阻断（安全方向：未列默认阻断）。
+ */
+export const DRAIN_EVIDENCE_ONLY_REASONS: ReadonlySet<string> = new Set([
+  "native-provider-not-proven-quiescent",
+  "native-provider-process-coverage-unavailable",
+]);
+/**
+ * native 覆盖/传输关闭类证据（P1.4 §3.7 R7/S1，I0-3 冻结）：逐字列名，**不得**用 `native:` 前缀通配。
+ * 字面量与适配器逐字一致（包装层 `collectLifecycle` 加 `native:` 前缀）：
+ * `src/common/pi-adapter/real-adapter.ts` 与 `src/provider/claude/session.ts` 的 coverage/transport-close 声明。
+ * 注意：`native:pi-sdk-idle-not-observed`（非 idle Pi）不在白名单 —— 属 live-work 信号，默认阻断。
+ */
+export const DRAIN_NATIVE_EVIDENCE_REASONS: ReadonlySet<string> = new Set([
+  "native:pi-sdk-owned-process-tree-coverage-unavailable",
+  "native:pi-sdk-http-transport-close-unobservable",
+  "native:Claude SDK Query exposes no owned PID, descendant-tree inventory, process exit/close event or exit code; process coverage is unknown.",
+  "native:Query.close(): void and interrupt acknowledgement do not verify CLI exit, HTTP completion or descendant shutdown.",
+]);
+/**
+ * 运行时中立 drain 谓词（P1.4 §3.7 / I0-3）：providerFinished + 无 active tool + tracked processes 全部
+ * exited（tree verified；background 以管理器 stop/exited 为准）+ 仅显式白名单 reason 不阻断。
+ *
+ * 不要求 `status === "quiescent"`（Claude/Pi native 覆盖未知使 status 恒 unknown）、不要求
+ * `processCoverage === "complete"`、不要求 `native` 存在；native/processCoverage 仅作可选证据。
+ */
+export function isRuntimeSessionDrained(facts: RuntimeSessionLifecycleFacts): boolean {
+  return facts.providerFinished
+    && facts.activeTools.length === 0
+    && facts.processes.every(process => process.state === "exited"
+      && (process.treeStatus === "verified" || process.kind === "background"))
+    && !facts.reasons.some(reason => !(DRAIN_EVIDENCE_ONLY_REASONS.has(reason) || DRAIN_NATIVE_EVIDENCE_REASONS.has(reason)));
 }
 
 /** Native transport observation, not a model tool argument or an authorization receipt. */

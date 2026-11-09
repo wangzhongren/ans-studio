@@ -47,6 +47,10 @@ export { createGitQueryPort, initializeGitRepository, planGitRepositoryInitializ
 // 的受限描述（不接受任意 argv），内部构造规范体并经绝对可执行 + 固定 config/env 执行。
 export { executeReadonlyGit } from "../impl/git-command.ts";
 export { readGitInitializationRecord, writeGitInitializationRecord } from "../impl/git-command.ts";
+// 2026-11-08（W3a，设计 P1.4 §3.4.3 / I0-1/I0-2）：Git 动作授权 sidecar 公共出口——append-only 逐尝试授权审计
+// （`<canonical projectRoot>/.ans/trunk/operations/<sha256(operationId)>/authorization.jsonl`）；只提供能力，
+// 调用点（W3b 的 trunk-runtime）在真实效果前 write-ahead 追加，失败 ⇒ `git-action-audit-unavailable`（不执行）。
+export { appendGitActionAuthorization, readGitActionAuthorizations, GIT_ACTION_AUTHORIZATION_MAX_LINE_BYTES, GIT_ACTION_AUTHORIZATION_MAX_ATTEMPTS, GIT_ACTION_AUTHORIZATION_MAX_FILE_BYTES, type GitActionAuthorizationRecord, type GitActionAuthorizationRead, type GitActionAuthorizationReadResult } from "../impl/git-command.ts";
 export { createGitCandidateStore, planEmptyGitCandidate } from "../impl/git-candidate-store.ts";
 export { createGitRefStore, createGitTrunkStore, createGitDocumentMutationStore, createGitActiveMutationStore, createGitInitialWorkflowMutationStore, readGitActiveCompletionBasis, appendGitActiveCompletionTaskEvent, readGitInitialWorkflowSource, writeGitInitialWorkflowSource, createProjectTrunkStore, migrateLegacyTrunkToGit, readGitInitializationTaskBasis, appendGitInitializationTaskEvent } from "../impl/git-trunk-store.ts";
 export { readGitStableCompletionBasis, appendGitStableCompletionTaskEvent } from "../impl/git-trunk-store.ts";

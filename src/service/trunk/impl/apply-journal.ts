@@ -18,7 +18,7 @@ import { createGitQueryPort, readGitInitializationFacts, readGitProtectionFacts,
 import { readGitStableCompletionBasis, appendGitStableCompletionTaskEvent, readGitDeliveryEvidence, appendGitDocumentPreparationTaskEvent, readGitPlanCompletionBasis, appendGitPlanCompletionTaskEvent } from "../../../provider/trunk/public/trunk-store.ts";
 import { validateTaskStateEvent } from "../../../common/编排/task-state.ts";
 import { isRunGitBases, type RunGitBases } from "../../../common/编排/run-manifest.ts";
-import { isTaskParentRef, isTaskReviewBasisRef, isDispatchTaskReviewTarget, isTaskReviewControllerRef, isDispatchTaskResumeController, isTaskWorkSourceRef } from "../../../model/runtime.ts";
+import { isTaskParentRef, isTaskReviewBasisRef, isDispatchTaskReviewTarget, isTaskReviewControllerRef, isDispatchTaskResumeController, isTaskWorkSourceRef, isRuntimeSessionDrained } from "../../../model/runtime.ts";
 import { parseTeamPlan, parseProjectRoster, parseProjectModules, evaluatePlanningHandoff, isConvenerBuiltInDispatchTarget } from "../../../common/编排/workflow-preconditions.ts";
 // X-R5（E2 S4）：verifier 最终 review 的角色侧前置——角色模块 public entry（api-spec §5 登记事实键）。
 // 只消费 `preflight`；不调用模块 `dispatch()`（E2 评审 X-2/X-4：目标模块为 diff-only，不进生产路由）。
@@ -1600,11 +1600,8 @@ export function createRunChangePort(deps: TrunkServiceDeps) {
         runId: request.runId, baseDigest: request.expectedPinDigest, targetDigest: null, errorCode: code, message });
       if (prepared.get(value) !== directHash(value)) return invalid("run-preparation-invalid", "Only this unchanged private preparation can commit");
       if (!deps.store.commitRunTransition) return invalid("run-transition-store-unavailable", "The actual run transition storage is unavailable");
-      if (!evidence.instances.length || evidence.instances.some(fact => fact.status !== "quiescent" || !fact.providerFinished || fact.activeTools.length
-        || fact.processCoverage !== "complete" || fact.processes.some(process => process.state !== "exited" || process.treeStatus !== "verified")
-        || !fact.native || fact.native.status !== "quiescent" || fact.native.processCoverage !== "complete" || fact.native.activeTools.length
-        || fact.native.processes.some(process => process.state !== "exited" || process.treeStatus !== "verified") || fact.native.reasons.length || fact.reasons.length))
-        return invalid("run-stop-unverified", "Actual same-instance Core/native drain and complete owned-process facts are required");
+      if (!evidence.instances.length || evidence.instances.some(fact => !isRuntimeSessionDrained(fact)))
+        return invalid("run-stop-unverified", "Actual same-instance Core drain and tracked-process termination facts are required (native coverage may be unknown)");
       if (!evidence.hostStops.length || evidence.hostStops.some(fact => fact.operationId !== request.operationId || fact.runId !== request.runId || fact.requestDigest !== value.requestDigest || fact.state !== "fenced"))
         return invalid("run-host-fence-unverified", "The exact host run/operation producer fence is required");
       // A natural tool return may persist its own report before a deferred host stop. It never closes/replaces the actual source assignment.

@@ -385,12 +385,27 @@ test("X-G：D5 单实现守卫（最终结构）——gates 唯一判定实现�
     "dispatchParentTailFailure", "strictNativeFailure", "restrictedApplicationMediationFailure", "applicationMediation"]) {
     assert.equal((runtimeSource.match(new RegExp(`\\b${symbol}\\b`, "g")) ?? []).length, 0, `trunk-runtime 不得残留 ${symbol}`);
   }
-  // 5) N15：写/停稳门（inspectInitializationProtection）仍只接受严格 observed；应用中介证据不进入写门。
-  const protectionStart = runtimeSource.indexOf("async function inspectInitializationProtection");
+  // 5) N15（2026-11-08 W2 改写）：写/初始化门已改名为 `inspectGitActionAuthorization`（注释保留溯源），
+  //    注册表级预知前提（strict observed / native factoryPlan / closedTools）已删除；闭包改运行时中立
+  //    H13/H14；应用中介证据仍不进入写门（PR #72 零引用保持）。
+  const protectionStart = runtimeSource.indexOf("export async function inspectGitActionAuthorization");
   const protectionEnd = runtimeSource.indexOf("export function createGitRoleRuntime", protectionStart);
-  assert.ok(protectionStart > 0 && protectionEnd > protectionStart, "写门段按函数符号可定位（inspectInitializationProtection → createGitRoleRuntime）");
+  assert.ok(protectionStart > 0 && protectionEnd > protectionStart, "写门段按函数符号可定位（inspectGitActionAuthorization → createGitRoleRuntime）");
   const protectionSource = runtimeSource.slice(protectionStart, protectionEnd);
-  assert.ok(protectionSource.includes('surface.status !== "observed"'), "inspectInitializationProtection 仍只接受严格 observed（N15）");
-  assert.ok(protectionSource.includes('surface.nativeToolRegistry !== "application-mediated"'), "写门仍要求 application-mediated 注册表证据（N15）");
-  assert.equal((protectionSource.match(/applicationMediation/g) ?? []).length, 0, "inspectInitializationProtection 不读应用中介证据");
+  assert.ok(runtimeSource.includes("原 `inspectInitializationProtection`"), "改名保留旧名溯源注释（I0-8）");
+  for (const removed of ['surface.status !== "observed"', 'surface.nativeToolRegistry !== "application-mediated"',
+    'surface.factoryProvenance !== "default-production"', "!surface.native?.factoryPlan"]) {
+    assert.equal(protectionSource.includes(removed), false, `预知式前提已删除：${removed}`);
+  }
+  for (const retired of ["git-core-creation-proof-unavailable", "git-native-surface-unproven", "git-unclosed-effect-registered"]) {
+    assert.equal(protectionSource.includes(retired), false, `退役码不再产生：${retired}`);
+    assert.equal(runtimeSource.includes(retired), false, `trunk-runtime 全文件不再产生退役码：${retired}`);
+  }
+  assert.ok(protectionSource.includes('"git-core-in-flight-unproven"'), "H13：非 active 条目 in-flight/未撤销准备 ⇒ git-core-in-flight-unproven");
+  assert.ok(protectionSource.includes('"git-core-inspection-unavailable"'), "H14：active 条目 lifecycle/toolSurface 不可读/身份漂移 ⇒ git-core-inspection-unavailable（不 fail-open）");
+  assert.ok(protectionSource.includes("isRuntimeSessionDrained(lifecycle)"), "H11/H13：终止证据用运行时中立 drain 谓词");
+  assert.equal((protectionSource.match(/processCoverage !== "complete"/g) ?? []).length, 0, "processCoverage 不再是门控前提（仅可选证据）");
+  assert.ok(protectionSource.includes("core-instance-inspection-failed"), "H14 读取 registry 的 inspection-failed reason（不跳过）");
+  assert.equal((protectionSource.match(/applicationMediation/g) ?? []).length, 0, "inspectGitActionAuthorization 不读应用中介证据");
+  assert.ok(protectionSource.includes("authorizationMode"), "gate 输入按 I0-4 区分 active-tool / host-continuation");
 });

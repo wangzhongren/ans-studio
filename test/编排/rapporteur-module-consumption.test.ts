@@ -30,12 +30,14 @@ import type {
   RequestRequirementChangeFn,
   RoleSession,
   RuntimeAdapter,
+  RuntimeSessionLifecycleFacts,
   SelectRunChangeFn,
   SelectRunChangeInput,
   SessionEvent,
   SubmitVersionChangeFn,
   WriteGate,
 } from "../../src/model/runtime.ts";
+import { isRuntimeSessionDrained } from "../../src/model/runtime.ts";
 import { TRUNK_MANIFEST_SCHEMA, type TrunkManifest } from "../../src/model/trunk.ts";
 
 const at = "2026-11-07T00:00:00.000Z";
@@ -450,4 +452,43 @@ test("X-R2 接缝守卫：消费点经 Service 公共出口；apply-journal 不�
   );
   assert.match(applyJournal, /if \(input\.mode !== "continue-frozen"\) return \{ \.\.\.rejected\("run-stop-unverified"/,
     "Service 停稳拒绝语义逐字保留");
+});
+
+// ———————————————— W2 C5：commitPreparedRunChange 改为运行时中立 drain ————————————————
+
+/** Claude/Pi disposed 形态：status/processCoverage unknown，native 仅覆盖类证据 reason（I0-3 白名单）。 */
+function drainedInstance(overrides: Partial<RuntimeSessionLifecycleFacts> = {}): RuntimeSessionLifecycleFacts {
+  return {
+    sessionId: "run-member-session", roleId: "rapporteur", runtime: "claude", stopRequested: true, status: "unknown",
+    providerFinished: true, activeTools: [], processes: [], processCoverage: "unknown",
+    reasons: ["native-provider-not-proven-quiescent",
+      "native:Claude SDK Query exposes no owned PID, descendant-tree inventory, process exit/close event or exit code; process coverage is unknown."],
+    ...overrides,
+  };
+}
+
+test("W2 C5 commitPreparedRunChange：run-stop 终止证据改运行时中立 drain（native/processCoverage 前提删除；direct-stop 拒绝与 host fence 不变；不写 sidecar）", async () => {
+  const applyJournal = await fs.readFile(new URL("../../src/service/trunk/impl/apply-journal.ts", import.meta.url), "utf8");
+  const start = applyJournal.indexOf("async commitPreparedRunChange(");
+  const end = applyJournal.indexOf("/** Produce the report reference", start);
+  assert.ok(start > 0 && end > start, "commitPreparedRunChange 段按符号可定位");
+  const segment = applyJournal.slice(start, end);
+  assert.ok(segment.includes("isRuntimeSessionDrained(fact)"), "终止证据 = 运行时中立 drain 谓词（P1.4 C5）");
+  assert.equal(segment.includes("processCoverage"), false, "processCoverage 不再是 run-stop commit 前提");
+  assert.equal(segment.includes("fact.native"), false, "native 不再是 run-stop commit 前提（仅可选证据）");
+  assert.equal(segment.includes('fact.status !== "quiescent"'), false, "status=quiescent 不再是前提");
+  assert.ok(segment.includes("run-stop-unverified"), "码保留（语义收窄）");
+  assert.ok(segment.includes("run-host-fence-unverified") && segment.includes("hostStops"), "host fence/ledger 校验保留");
+  assert.equal(segment.includes("appendGitActionAuthorization"), false, "run-stop 不写 sidecar（R6：终止事实写 run transition journal）");
+  // direct-stop 治理拒绝（原 :1487）逐字不变。
+  assert.match(applyJournal, /if \(input\.mode !== "continue-frozen"\) return \{ \.\.\.rejected\("run-stop-unverified"/);
+  // 正例：Claude/Pi drained 形态通过 C5 终止前提（不要求 native/processCoverage complete）。
+  assert.equal(isRuntimeSessionDrained(drainedInstance()), true);
+  assert.equal(isRuntimeSessionDrained(drainedInstance({ runtime: "pi", reasons: ["native:pi-sdk-owned-process-tree-coverage-unavailable"] })), true);
+  // 负例：live-work/清理失败/未知 reason/运行中进程 ⇒ `run-stop-unverified` 仍拒绝。
+  assert.equal(isRuntimeSessionDrained(drainedInstance({ activeTools: [{ id: "t", name: "select_run_change" }] })), false);
+  assert.equal(isRuntimeSessionDrained(drainedInstance({ processes: [{ id: "p", kind: "shell", state: "running", treeStatus: "unknown" }] })), false);
+  assert.equal(isRuntimeSessionDrained(drainedInstance({ reasons: ["native:pi-sdk-idle-not-observed"] })), false, "非 idle Pi 保持阻断");
+  assert.equal(isRuntimeSessionDrained(drainedInstance({ reasons: ["owned-process-stop-failed"] })), false);
+  assert.equal(isRuntimeSessionDrained(drainedInstance({ reasons: ["unknown-new-reason"] })), false, "未知 reason 默认阻断");
 });

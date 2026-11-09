@@ -8,13 +8,14 @@ import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import { createRequire, syncBuiltinESMExports } from "node:module";
 import { createServer } from "node:http";
+import { registerShellApproval, type ShellApprovalFacts, type ShellApprovalProbeSink } from "../../src/common/shared/shell-approval-binding.ts";
 import { buildGovernedTools, GIT_QUERY_TOOL_NAME, GIT_CANDIDATE_TOOL_NAME, GIT_PUBLISH_TOOL_NAME } from "../../src/provider/runtime/tools.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
 import { createRuntimeAdapter, inspectRuntimeCoreRegistry, createBlockedRoleCapabilityCallbacks, isRuntimeEditReadProbe, inspectRuntimeFileGateContext, type RuntimeSessionOptions } from "../../src/service/runtime/session.ts";
 import { beginGitHostAction, endGitHostAction, inspectGitHostCoordinator, recordGitHostInterruption, initializeGitRepository, readGitProtectionFacts } from "../../src/provider/trunk/public/trunk-store.ts";
 import { resolveWriteReadPreflight, resolveWriteFinal } from "../../src/service/gate/resolve-write.ts";
 import { isGitOid, isGitCapabilityResult, type GitCapabilityResult } from "../../src/model/trunk.ts";
-import type { GovernedToolsOptions, GitCandidateRequest, GitQueryRequest, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeProviderOptions, WriteGate, WriteGateContext, CustomerInputOutcome } from "../../src/model/runtime.ts";
+import type { GovernedToolsOptions, GitCandidateRequest, GitQueryRequest, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeProviderOptions, ShellGate, WriteGate, WriteGateContext, CustomerInputOutcome } from "../../src/model/runtime.ts";
 import { isRuntimeNativeToolSurfaceFacts, isTaskWorkSourceRef, isTaskParentRef, isTaskReviewBasisRef, isDispatchTaskReviewTarget,
   TASK_HUB_ROUTING, isTaskHubRouting, isTaskReviewControllerRef, isDispatchTaskResumeController,
   type TaskReviewControllerRef, type DispatchTaskResumeController, type TaskReviewBasisRef, type TaskCreatedEvent, type TaskWorkSourceRef, type TaskParentRef } from "../../src/model/runtime.ts";
@@ -561,7 +562,18 @@ test("R15 actual callback and registry replacement make observer facts unknown i
   } finally { await session.dispose(); }
 });
 
-test("R14 actual required scope rejects registered scripts before native bind while clean Chat and unmanaged scripts work", async t => {
+/** W1 冻结 API 夹具：登记一个「应用构造成功」的受保护审批链 gate（同 session-admission-approval.test.ts 口径）。 */
+function registeredGate(input: { projectRoot: string; mode?: "readonly" | "operator-approve" | "rules-advisory" | "three-layer" }): ShellGate {
+  const gate: ShellGate = async () => ({ allow: true, by: "r14-registered-fixture" });
+  const facts: ShellApprovalFacts = { source: "orchestration-shell-gate", version: 1, projectRoot: input.projectRoot, mode: input.mode ?? "three-layer",
+    classifier: true, rules: true, pmAsk: true, operatorChannel: true, takeGrant: true, takeDirective: true, routinePolicy: false, escalation: true,
+    audit: { sink: "file", durable: true, probe: "unknown" } };
+  const sink: ShellApprovalProbeSink = { probe: async () => "ok", describe: () => ({ kind: "file", durable: true }) };
+  registerShellApproval(gate, facts, sink);
+  return gate;
+}
+
+test("R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work", async t => {
   const root = await mkdtemp(join(tmpdir(), "ans-r14-required-")), unmanaged = await mkdtemp(join(tmpdir(), "ans-r14-unmanaged-"));
   const sourceId = `init-source-${"d".repeat(64)}`, sourceDir = join(root, ".ans", "trunk", "initialization-sources");
   await mkdir(sourceDir, { recursive: true }); await writeFile(join(sourceDir, `${sourceId}.json`), JSON.stringify({
@@ -600,10 +612,28 @@ test("R14 actual required scope rejects registered scripts before native bind wh
     // 旧 `required-scope-unconfined-script-tools` 退役（不再产生）。
     assert.ok(prepared.plan.reasons.includes("protected-scope-approval-chain-unproven"));
     assert.equal(prepared.plan.reasons.includes("required-scope-unconfined-script-tools"), false);
+    // P1.4 F5：Codex native plan observed 但审批链不成立时，拒绝原因只有审批链；native 证据不再是创建门。
+    assert.equal(prepared.plan.reasons.some(reason => reason.startsWith("native-factory-plan-")), false);
     await assert.rejects(unsafe.bindRole(actor), /protected-scope-requires-verified-plan/);
     await assert.rejects(unsafe.composeContext(actor), /protected-scope-requires-verified-plan/);
     assert.equal(nativeConstructions, 0); assert.equal(requests, 0); await assert.rejects(lstat(marker), { code: "ENOENT" });
     assert.ok(inspectRuntimeCoreRegistry().entries.filter(entry => entry.roleId === actor.id).every(entry => !entry.sessionId && entry.state === "prepared"));
+    // 2026-11-08 W1（P1.4 §3.2 A5/A6）：审批链成立 + Codex native observed ⇒ 绑定成功并可真实执行受控 shell；
+    // 不再以「含 shell」或「native plan 之外的能力面」作为预知拒绝。
+    const approved = createRuntimeAdapter({ ...common, projectRoot: root, skillRoot: root, shellGate: registeredGate({ projectRoot: root }) });
+    const approvedPlan = await approved.prepareRole!(role("r14-required-approved"));
+    assert.equal(approvedPlan.plan.scopeProtection!.state, "required");
+    assert.equal(approvedPlan.plan.status, "observed", JSON.stringify(approvedPlan.plan.reasons));
+    assert.ok(approvedPlan.token);
+    assert.equal(approvedPlan.plan.native!.status, "observed", "native observed ⇒ 可选强证明记录");
+    assert.ok(approvedPlan.plan.approvalChain, "审批链成立即可绑定");
+    assert.equal(approvedPlan.plan.reasons.includes("required-scope-unconfined-script-tools"), false);
+    const approvedSession = await approved.bindPreparedRole!(approvedPlan.token!); sessions.push(approvedSession);
+    shellPhase = true; shellReplied = false;
+    await approvedSession.prompt("real approved shell control");
+    assert.equal(await readFile(marker, "utf8"), "owned-control");
+    assert.equal(nativeConstructions, 1); assert.equal(requests, 2);
+    shellPhase = false;
     const driftRoot = await mkdtemp(join(tmpdir(), "ans-r14-scope-drift-"));
     const drift = createRuntimeAdapter({ ...common, projectRoot: driftRoot, skillRoot: driftRoot, shellGate });
     const driftPlan = await drift.prepareRole!(role("r14-scope-drift"));
@@ -611,21 +641,21 @@ test("R14 actual required scope rejects registered scripts before native bind wh
     const driftDir = join(driftRoot, ".ans", "trunk", "initialization-sources"); await mkdir(driftDir, { recursive: true });
     await writeFile(join(driftDir, `${sourceId}.json`), JSON.stringify({ schema: "repository-work-source/v1", kind: "customer-turn", sourceId, projectRoot: driftRoot }));
     await assert.rejects(drift.bindPreparedRole!(driftPlan.token!), /protection-scope-changed/);
-    assert.equal(nativeConstructions, 0); assert.equal(requests, 0);
+    assert.equal(nativeConstructions, 1); assert.equal(requests, 2);
     const clean = createRuntimeAdapter({ ...common, projectRoot: root, skillRoot: root });
     const cleanPlan = await clean.prepareRole!(role("r14-required-clean")); assert.equal(cleanPlan.plan.status, "observed");
     const cleanSession = await clean.bindPreparedRole!(cleanPlan.token!); sessions.push(cleanSession);
-    await cleanSession.prompt("real clean Chat control"); assert.equal(nativeConstructions, 1); assert.equal(requests, 1);
-    shellPhase = true;
+    await cleanSession.prompt("real clean Chat control"); assert.equal(nativeConstructions, 2); assert.equal(requests, 3);
+    shellPhase = true; shellReplied = false;
     const compatible = createRuntimeAdapter({ ...common, projectRoot: unmanaged, skillRoot: unmanaged, shellGate, shellCwd: unmanaged });
     const controlPlan = await compatible.prepareRole!(role("r14-unmanaged-script"));
     assert.equal(controlPlan.plan.scopeProtection!.state, "unmanaged"); assert.equal(controlPlan.plan.status, "observed");
     const control = await compatible.bindPreparedRole!(controlPlan.token!); sessions.push(control);
     await control.prompt("real unmanaged script control"); assert.equal(await readFile(marker, "utf8"), "owned-control");
-    assert.equal(nativeConstructions, 2); assert.equal(requests, 3);
+    assert.equal(nativeConstructions, 3); assert.equal(requests, 5);
     assert.equal(control.inspectToolSurface!().nativeToolRegistry, "unknown", "unmanaged script compatibility never becomes an isolation receipt");
     t.diagnostic(JSON.stringify({ root, unmanaged, requiredScripts: prepared.plan.native!.appTools.filter(name => /shell|background/.test(name)),
-      rejectedNativeConstructions: 0, rejectedHttp: 0, rejectedMarkerWrites: 0, cleanAndUnmanagedNativeConstructions: nativeConstructions, actualHttp: requests, ownedMarker: marker }));
+      rejectedNativeConstructions: 0, rejectedHttp: 0, rejectedMarkerWrites: 0, admittedNativeConstructions: nativeConstructions, actualHttp: requests, ownedMarker: marker }));
   } finally {
     await Promise.all(sessions.map(session => session.dispose()));
     crypto.randomUUID = originalUUID; syncBuiltinESMExports(); server.closeAllConnections();
@@ -648,7 +678,7 @@ test("R12 preparing an override is effect-free, unknown and credential-free; for
   assert.equal(constructions, 0);
 });
 
-test("R12 unsupported default native plan remains unknown before any native spawn or project write", async () => {
+test("R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write", async () => {
   const root = await mkdtemp(join(tmpdir(), "ans-r12-plan-"));
   const oldWire = process.env.ANS_CODEX_WIRE_API; process.env.ANS_CODEX_WIRE_API = "responses";
   const childProcess = createRequire(import.meta.url)("node:child_process") as typeof import("node:child_process");
@@ -658,8 +688,14 @@ test("R12 unsupported default native plan remains unknown before any native spaw
   try {
     const adapter = createRuntimeAdapter({ runtime: "codex", gate: allow, projectRoot: root, skillRoot: root });
     const prepared = await adapter.prepareRole!(role("r12-default-unsupported"));
-    assert.equal(prepared.plan.factoryProvenance, "default-production"); assert.equal(prepared.plan.status, "unknown");
-    assert.equal(prepared.token, undefined); assert.equal(spawns, 0); assert.deepEqual(await readdir(root), []);
+    assert.equal(prepared.plan.factoryProvenance, "default-production");
+    // 2026-11-08 W1（P1.4 F5）：native factory plan 降为可选证据；responses wire 不可观测时 plan 省略
+    // native，不再产生 native-factory-plan-* 拒绝（旧断言 status unknown / token undefined 已按契约变更改写）。
+    assert.equal(prepared.plan.status, "observed", JSON.stringify(prepared.plan.reasons));
+    assert.ok(prepared.token);
+    assert.equal("native" in prepared.plan, false);
+    assert.equal(prepared.plan.reasons.some(reason => reason.startsWith("native-factory-plan-")), false);
+    assert.equal(spawns, 0); assert.deepEqual(await readdir(root), []);
   } finally {
     childProcess.spawn = oldSpawn; syncBuiltinESMExports();
     if (oldWire === undefined) delete process.env.ANS_CODEX_WIRE_API; else process.env.ANS_CODEX_WIRE_API = oldWire;
