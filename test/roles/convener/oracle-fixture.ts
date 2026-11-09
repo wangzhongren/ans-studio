@@ -886,7 +886,9 @@ export const ORACLE_PREFLIGHT_CASES: readonly OraclePreflightCase[] = Object.fre
     knownDelta: null,
   }),
   Object.freeze({
-    name: "team-plan plan 缺 sha256（已知差异）",
+    // 2026-11-09《团队计划登记 run 绑定 / baseDigest 合法来源》B1 §4.3：缺省 plan.sha256 由旧
+    // 「模块更严格差异」改为契约允许（应用按计划实际字节派生）；旧角色侧谓词同样 allow。
+    name: "team-plan plan 缺 sha256（新契约允许）",
     action: "team-plan",
     facts: Object.freeze({
       actorRoleId: "convener",
@@ -901,9 +903,9 @@ export const ORACLE_PREFLIGHT_CASES: readonly OraclePreflightCase[] = Object.fre
     }),
     oldAnchor: "apply-journal.ts:2795/2816-2818（completeTeamPlan 角色侧身份/依据/路径）；run-role.ts:1826（directGovernance）",
     oldAllow: true,
-    expectedAllow: false,
-    expectedCode: "team-plan-facts-invalid",
-    knownDelta: "team-plan-fact-schema",
+    expectedAllow: true,
+    expectedCode: null,
+    knownDelta: null,
   }),
   Object.freeze({
     name: "team-plan plan sha256 非 64hex（已知差异）",
@@ -1438,7 +1440,7 @@ export const KNOWN_DELTAS: readonly string[] = Object.freeze([
   "dispatch-code-map：旧 evaluateDispatchAuthorization 使用 target-card-missing/unknown-source 等粗粒度拒绝码；新模块按 R-2 给出条件化稳定码（dispatch-target-* / convener-target-forbidden / self-dispatch）。allow 位一致。",
   "dispatch-existence：内置 verifier + targetExists 缺省/false（2 例）：旧谓词对内置目标忽略存在性事实返回 allow；模块按契约 §3.1/D4 要求宿主显式核验（缺省即 false），fail-closed 拒绝。",
   "dispatch-empty-target：空 targetRoleId + project + targetExists=true：旧谓词不校验空 id 返回 allow；模块按硬身份拒绝空目标（dispatch-target-invalid）。",
-  "team-plan-fact-schema：plan 缺 sha256 或 sha256 非 64hex（2 例）：旧角色侧谓词只看 path/version 正则；模块按 D4 校验 fact 类型。旧 Service 仍做最终 hash 漂移/结构/名单/属主校验，模块不复制。",
+  "team-plan-fact-schema：plan sha256 非 64hex（1 例）：旧角色侧谓词只看 path/version 正则；模块按 D4 校验 fact 类型。旧 Service 仍做最终 hash 漂移/结构/名单/属主校验，模块不复制。2026-11-09 起 plan 缺 sha256 已按新契约允许（应用派生，B1 §4.3），不再属本差异。",
   "stable-write-empty-content：content 空串：旧类型只约束 string 并返回 allow；模块把空内容视为无事实（fail-closed）。Provider/Service 仍做最终内容校验。",
   "git-action-no-pure-oracle：Git 动作的角色侧条件闭包于 Git Service/宿主上下文，旧实现无纯函数 oracle；fixture 冻结模块行为与历史源码锚点，行为正负例由本矩阵与模块单测共同覆盖。",
 ]);
@@ -1614,7 +1616,7 @@ export const ORACLE_GOLDEN_META = Object.freeze({
     dispatchCases: 54,
     dispatchKnownDeltas: 3,
     preflightCases: 27,
-    preflightKnownDeltas: 3,
+    preflightKnownDeltas: 2,
     gitActionCases: 9,
     knownDeltas: 6,
     fixtureComparisons: 107,
@@ -1630,5 +1632,5 @@ export const ORACLE_GOLDEN_META = Object.freeze({
     knownDeltas: "差分/已知差异清单：6 类前缀齐备且与用例登记一致",
     provenance: "金样/provenance：元数据自洽 / 载荷哈希 / 无旧引擎 live 依赖",
   }),
-  payloadSha256: "b82c364e96fd52e0f6754e819792e2a70695f16f4b2c6025edb12a3dbc258c34",
+  payloadSha256: "67ef107d65c0d753d9041563d187183d58bc1b40a707ca17aca1f6779ac6f31e",
 });

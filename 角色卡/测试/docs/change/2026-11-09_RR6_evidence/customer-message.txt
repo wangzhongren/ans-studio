@@ -1,0 +1,10 @@
+请按 ANS 既有真实流程推进「2D 贪吃蛇小游戏」项目的一个小需求：为基础玩法增加暂停/继续功能（运行时按空格键或点击界面按钮可暂停与继续），并在既有验收范围内交付。本条消息是唯一客户指令：不要使用 run_shell；不要伪造或代填任何工具结果；每一步都如实回报；遇到门禁或阻塞时如实记录门码/回执原文后停止，不要重试被拒的调用，不要猜测或自填应用派生值。
+
+流程备忘（请转达给相应角色）：
+1. 先完成提案确认卡（cardKind=proposal，flowId=snake-game，必须是全新 requestId，历史卡片均已结算不得复用），由客户在真实对话框中决定；客户接受后继续团队计划与任命流程。
+2. 团队计划必须写入规范路径 docs/scheduling/snake-game-team-v1.md（即 docs/scheduling/<flowId>-team-v<N>.md，flowId=snake-game，N=1；其他路径会被应用拒绝）。
+3. 调用 complete_team_plan 时 plan 只需提供 {path, version}；baseDigest 与 plan.sha256 由应用从 effective trunk 与实际文件字节派生，不需要提供，严禁伪造或猜测；runId 由应用从真实受派任务绑定，不要自报。
+4. 任命卡按既有分工由人事（nominator）发起；不要越权代发。
+5. 若团队计划登记被应用拒绝，如实记录完整回执（含 errorCode/message）后停止并交回报告，不要重试。
+
+如派发给其它角色，请在投递任务中写明：taskId 使用投递消息头部的任务编号去掉开头 # 的部分（例如 #t-abc → t-abc），不得包含 # 字符。

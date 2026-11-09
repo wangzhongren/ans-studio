@@ -1,0 +1,186 @@
+{
+  "at": "2026-11-09T12:57:39.727Z",
+  "repo": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+  "runRoot": "C:\\Users\\51054\\Desktop\\work\\ans-team-plan-run-2026-11-09",
+  "head": "24799cb61239272e8603018adc094881bb6263dd",
+  "tree": "409a4ac7bb077c0fc5b19f3c99383cf0b09dd13e",
+  "branch": "feat/plan-escalation-card",
+  "candidateFileCount": 15,
+  "candidateStatusLines": [
+    " M app/desktop/session.ts",
+    " M src/common/roles/convener/index.ts",
+    " M src/model/runtime.ts",
+    " M src/pipeline/orchestration/trunk-runtime.ts",
+    " M src/provider/runtime/schema.ts",
+    " M src/service/trunk/impl/apply-journal.ts",
+    " M test/roles/convener/convener-differential.test.ts",
+    " M test/roles/convener/convener-module.test.ts",
+    " M test/roles/convener/oracle-fixture.ts",
+    " M test/runtime-core/submit-capability-tools.test.ts",
+    " M test/桌面应用/chief-workflow.test.ts",
+    " M test/编排/convener-module-consumption.test.ts",
+    " M test/编排/direct-role-capabilities.test.ts",
+    " M test/编排/fixtures/git-action-authorization-wiring.ts",
+    " M test/编排/git-capabilities.test.ts"
+  ],
+  "candidateAggregate": "a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59",
+  "manifestFileCount": 1107,
+  "manifestFileHash": "f62a81a6485c2bb1047c1dbf2c6d260c90c94c4073cb5b3bd7e469f2013a7d15",
+  "manifestAggregate": "b06433b5ad162907a7ec5395f9cb31c89e6c48244ca0e5eb21115de13c7fdbf0",
+  "untrackedSrcAppTest": 0,
+  "entryPath": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\app\\main.ts",
+  "entrySha256": "339fcfaa4d0daaf7b79fa8381743ce4ec2eb0f205bd9c5705cc4ac6f4d532bba",
+  "entryBytes": 83599,
+  "rendererIndex": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\app\\renderer\\dist\\index.html",
+    "exists": true,
+    "sha256": "fc24534e8c6286ec6885511607f74a1f287ce809903c6636cb7d6db54738bfd1"
+  },
+  "env": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.env",
+    "exists": true,
+    "keys": [
+      "ANTHROPIC_API_KEY",
+      "ANS_CLAUDE_MODEL",
+      "ANTHROPIC_BASE_URL",
+      "ANS_CLAUDE_REASONING_EFFORT"
+    ],
+    "ANS_CLAUDE_MODEL": "deepseek-v4-flash",
+    "ANS_CLAUDE_REASONING_EFFORT": "high"
+  },
+  "electronVersion": "44.7.0",
+  "nodeVersion": "v24.22.1",
+  "platform": "MINGW64_NT-10.0-26300 DESKTOP-8MOD9RB 3.6.10-710e5275.x86_64 2026-07-28 09:32 UTC x86_64 Msys",
+  "portsPre": {
+    "lines": [],
+    "listeners9222": 0,
+    "listeners9223": 0
+  },
+  "processesPre": {
+    "electron": []
+  },
+  "targetPreFileCount": 88,
+  "trunkManifestExists": false,
+  "trunkManifestSha256": null,
+  "trunkDirListing": [
+    "initialization-sources",
+    "snapshots"
+  ],
+  "ledgerPreRows": 83,
+  "oldRequestIds": [
+    "req-602986f616d00900",
+    "req-d62b01ac49ba84b6",
+    "req-e6ff1693840f0ed0",
+    "req-2454680582827a06",
+    "req-d5cde26a4c8977c0",
+    "req-c986eb67f284868e",
+    "req-4d9cad12f7f51043",
+    "req-5a9f23a5034b45eb"
+  ],
+  "runsPre": [
+    {
+      "dir": "run-hub-3d2b4fdf07f1fe1b3d7183edfc59bbb2399101da3ef0b22a",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-65ad9642649228de668effa4068b9555c9cb844c64669509",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-c0ceba36499de3624ecb6822aec9b10071a4082cb5b07c7b",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-c9791d41e08d1f6eb5773656de17623d3378690cc1aa493e",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-ce6048f9c594c51207f703b806ba20353926fac90a3fe1cd",
+      "state": "draft"
+    },
+    {
+      "dir": "run-hub-f275cf67a6f6046c85a7a14b6eb93b47c548418c4ff51130",
+      "state": "draft"
+    }
+  ],
+  "trunkSnapshotsPre": 5,
+  "initSources": [
+    {
+      "name": "init-source-207488eacaa5ee6f23c4260818dc860b763714f14a2f5072d9bfde38ff237c2d.json",
+      "sha256": "94fe2384c8b3090eb644ea4eb262fca881fad3767e98d5342001f78290e5c253",
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+      "registrationProjectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target"
+    },
+    {
+      "name": "init-source-36a543fbf7f83245ebdf91f0c383ce81335b8120db19b062a3dff70866050d9a.json",
+      "sha256": "69699b2f8aee70331d517e0d6aa60662bd6d1b0cdfd79a0ac67261bdf143e726",
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+      "registrationProjectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target"
+    },
+    {
+      "name": "init-source-811d05b4096e4339657c83b635b1e43482a5f529fbeeb95f02e7ff68de786740.json",
+      "sha256": "f3e10c468d3cdf8a2698ca0516bd222a63bf3ffaad0c9721bc54df79602f8f30",
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+      "registrationProjectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target"
+    },
+    {
+      "name": "init-source-b3d974fea83204767b6e4b050c042d52240cc90ddc93ea1fe50e05b154d5f9cc.json",
+      "sha256": "8b9f849f5f1aae1a4ecd583ebc9dc1aac7398d34e2ca8f9e643ce611e55cd9aa",
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+      "registrationProjectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target"
+    },
+    {
+      "name": "init-source-cc869b60e2cce3d8466b8709956210bbbc45a12c36037c2c41b63eef09f34518.json",
+      "sha256": "d1fbcc8a573be6f59b66415d920b378c739b5bf45d5657da5c00e80185d9049d",
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+      "registrationProjectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target"
+    },
+    {
+      "name": "init-source-d501f67e2ef8cc31406b569debc41ead5ba29e2259d969c8e85105af48ed84b0.json",
+      "sha256": "196b00861529e6b915899458c04c6b14b4ea3787d65c6ba20d6a86b50cf7774a",
+      "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target",
+      "registrationProjectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-game2d-snake-2026-11-09\\target"
+    }
+  ],
+  "sessionsPre": [
+    {
+      "role": "chief",
+      "runtimes": [
+        {
+          "runtime": "claude",
+          "settledTurns": 25
+        }
+      ]
+    },
+    {
+      "role": "convener",
+      "runtimes": [
+        {
+          "runtime": "claude",
+          "settledTurns": 3
+        }
+      ]
+    },
+    {
+      "role": "product",
+      "runtimes": [
+        {
+          "runtime": "claude",
+          "settledTurns": 4
+        }
+      ]
+    },
+    {
+      "role": "rapporteur",
+      "runtimes": [
+        {
+          "runtime": "claude",
+          "settledTurns": 6
+        }
+      ]
+    }
+  ],
+  "appRootNonTargetFileCount": 0,
+  "snakeRunRootFileCount": 108
+}

@@ -73,7 +73,7 @@ export function holdableCompleteTeamPlan() {
     release: () => release(),
     completeTeamPlan: async (input: CompleteTeamPlanInput) => {
       await held;
-      return { ok: false as const, status: "rejected" as const, operationId: input.operationId, baseDigest: input.baseDigest, targetDigest: null,
+      return { ok: false as const, status: "rejected" as const, operationId: input.operationId, baseDigest: input.baseDigest ?? null, targetDigest: null,
         errorCode: "fixture-held", message: "fixture only" };
     },
   };

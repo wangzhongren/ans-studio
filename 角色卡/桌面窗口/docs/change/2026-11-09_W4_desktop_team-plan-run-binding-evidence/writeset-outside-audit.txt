@@ -1,0 +1,28 @@
+== excluded-clean diff (expect empty) ==
+== in-flight files (read-only for this batch): sha256 + mtime ==
+307694ceac763033f42a5686a511b9e05cece31f0f49f27a206298ab4a98a61e *src/model/runtime.ts
+2026-11-09 18:16:54.708183200 +0800
+b0b01f010b7e971cf6cbb55b2f1832a699c950474380a797f6d8b2738308a01d *src/provider/runtime/schema.ts
+2026-11-09 18:16:57.537764500 +0800
+5b1e927d653295757687e29fa72f28168eea8f8abb4618f0cf31d7b9991b4224 *src/common/roles/convener/index.ts
+2026-11-09 18:22:04.666426000 +0800
+b213a7dd2a6ecbb010be822c7f399a0c463a9c617580c0106e20ec6ae49d7898 *src/service/trunk/impl/apply-journal.ts
+2026-11-09 18:31:49.135468500 +0800
+5b718ffdd970ab24dcba6eae2fef7f813c6155dc89e8be977d8b3efecb5bc1af *src/pipeline/orchestration/trunk-runtime.ts
+2026-11-09 18:29:49.143379900 +0800
+c6f7a24abfc8f3a8c83079752d769651086bdc936c288de9210d445ea53174c3 *test/runtime-core/submit-capability-tools.test.ts
+2026-11-09 18:17:12.580430300 +0800
+ead7981240f3c955a8e633d5635b36e75e2eaf97340a4cf4c02b821cb58a9640 *test/roles/convener/convener-module.test.ts
+2026-11-09 18:22:16.341115000 +0800
+f46f7bd308620a8a934b04263c231ca6c53788326b7c2f649a13defbc4f24172 *test/roles/convener/convener-differential.test.ts
+2026-11-09 18:22:27.070163400 +0800
+b7c7f2e8e543c9054e8864be22ede705d4c2d8e4b33e08594a94bcfeeb589528 *test/roles/convener/oracle-fixture.ts
+2026-11-09 18:22:41.045178800 +0800
+9e2cd3c08ac40feb9fad89ba2bacd237a01ee06314c2e2efad07876e8984e6a3 *test/编排/direct-role-capabilities.test.ts
+2026-11-09 18:37:01.144839700 +0800
+a2de9417977507b9bd1620eac27bd810c3ae9f796bc1a8adcd9b6d84c8d4bba7 *test/编排/git-capabilities.test.ts
+2026-11-09 18:36:14.162784400 +0800
+4c7dfc6a317181935a4729f948fcc625b8db86e5788daa62bfbc211a8dc815c9 *test/编排/convener-module-consumption.test.ts
+2026-11-09 18:34:42.116512200 +0800
+30d5a0a640bedca2f34cedf79134be771ceb6b820d10b0f55052504bdade6a17 *test/编排/fixtures/git-action-authorization-wiring.ts
+2026-11-09 18:29:49.754454500 +0800

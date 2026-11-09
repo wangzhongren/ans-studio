@@ -11,6 +11,7 @@ import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { createGuardFreezeRegistry } from "../../src/provider/version-change/public/version-change-store.ts";
 import { checkGitPolicy, computeGitPolicyDigest } from "../../src/service/gate/shell-rules.ts";
+import { canonicalJson } from "../../src/service/trunk/impl/trunk-common.ts";
 import type { TaskCreatedEvent, GitQueryRequest } from "../../src/model/runtime.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
 import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
@@ -834,3 +835,84 @@ test("Git team plan publication and active-only activation: real tasks and struc
   traceExecution("actual-convener-integration-candidate-created");
 });
 
+
+// ———— 2026-11-09《团队计划登记 run 绑定 / baseDigest 合法来源》T2（P-9） ————
+// Git prepare→commit：省略 baseDigest/plan.sha256 时由 prepare 派生并经 manifest/journal/targetSnapshot 承载；
+// PreparedTeamPlanCommit.input 保持原样（M1）；提交后原样重放命中先序回执（P-8②）；prepare 后字节漂移 fail-closed。
+// 与既有「Git team plan publication…」基线红项隔离：本夹具使用真实 chief work source（红因即该任务无父来源）。
+test("Git team plan prepare→commit (P-9): omitted values derive at prepare, prepared input stays exact, replay and post-prepare drift stay fail-closed", async () => {
+  const at = "2026-11-09T00:00:00.000Z";
+  const project = await createTrunkProject({ withRun: false }), fsStore = createFsTrunkStore(project.root), documents = project.snapshot().documents;
+  const snapshot = await fsStore.captureSnapshot!({ snapshotId: "p9-real-planning-basis", createdAt: at, files: Object.values(documents) });
+  assert.ok(snapshot.ok); if (!snapshot.ok) return;
+  const initial: TrunkManifest = { schema: TRUNK_MANIFEST_SCHEMA, source: "bootstrap", trunkVersion: 1, previous: null, runId: null, flowId: "demo",
+    digest: "abcdef0123456789".repeat(4), snapshotRef: snapshot.value, createdAt: at, updatedAt: at,
+    artifacts: { documents, execution: { teamPlan: null, flow: null }, boundaries: {} } };
+  assert.ok((await fsStore.compareAndSwapManifest!(null, initial, snapshot.value)).ok);
+  await initializeGitRepository(project.root);
+  const canonical = await fs.realpath(project.root);
+  assert.ok((await migrateLegacyTrunkToGit(project.root, { operationId: "p9-fixture-migration", expected: { version: 1, digest: initial.digest } })).ok);
+  const runId = "run-p9-planning", taskId = "task-p9-real-convener";
+  assert.ok((await fsStore.compareAndSwapRunRecord!(runId, null, { schema: "ans-run/v1", runId, flowId: "demo", state: "draft",
+    schemas: {}, documents: {}, execution: { teamPlan: null, flow: null }, createdAt: at, updatedAt: at })).ok);
+  const sourceId = "init-source-" + "a".repeat(64);
+  const writtenSource = await fsStore.writeInitializationSource!(sourceId, Buffer.from(JSON.stringify({ schema: "repository-work-source/v1", kind: "customer-turn",
+    sourceId, projectRoot: canonical, flowId: "demo", parent: { roleId: "chief", sessionId: "p9-chief-core-session", inputAccepted: true, settled: false } })).toString("base64"));
+  assert.ok(writtenSource.ok, JSON.stringify(writtenSource)); if (!writtenSource.ok) return;
+  const recordedP9Task = await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.created", taskId, from: "chief", to: "convener",
+    text: "Prepare the real Git team plan", sideEffect: "docs", idempotencyKey: taskId, flowId: "demo", runId, runState: "draft",
+    workSourceRef: { kind: "chief-customer-turn", sourceId, path: writtenSource.value.path, sha256: writtenSource.value.sha256 } } });
+  assert.ok(recordedP9Task.ok, JSON.stringify(recordedP9Task)); if (!recordedP9Task.ok) return;
+  const planPath = "docs/scheduling/demo-team-v2.md";
+  const plan = { schema: "teamPlanSchema:3", flowId: "demo", version: 2, modules: documents.modules, roster: documents.roster,
+    roleRows: [{ roleId: "impl", modules: ["impl-core"], writesets: ["src/impl/"], dependsOn: [] }] };
+  const text = `---\n${JSON.stringify(plan)}\n---\n# Real Git team plan\n`, sha = (value: string) => createHash("sha256").update(value).digest("hex");
+  await fs.writeFile(path.join(project.root, planPath), text);
+  const input = { operationId: "p9-real-plan-publication", flowId: "demo", runId, plan: { path: planPath, version: 2 } };
+  const service = createTrunkService({ projectRoot: project.root });
+  const prepared = await service.prepareTeamPlanCommit!(input, "convener");
+  assert.ok(prepared.ok, JSON.stringify(prepared)); if (!prepared.ok || !("preparationKind" in prepared.value)) { assert.fail(JSON.stringify(prepared)); return; }
+  const value = prepared.value;
+  assert.deepEqual(value.input, input, "PreparedTeamPlanCommit.input 保持提交原样（M1）");
+  assert.equal("baseDigest" in value.input, false); assert.equal("sha256" in (value.input.plan as Record<string, unknown>), false);
+  assert.equal(value.manifest.artifacts.execution.teamPlan?.sha256, sha(text), "manifest 承载派生 plan sha");
+  assert.equal(value.journal.message, `team-plan:${createHash("sha256").update(canonicalJson({ input, actor: "convener" })).digest("hex")}`,
+    "team-plan:<digest> 锚点仍基于原样 input");
+  const markerFile = value.snapshot.files.find(file => file.path.startsWith(".ans/trunk/plan-completions/"));
+  assert.ok(markerFile); if (!markerFile) return;
+  const markerText = Buffer.from(markerFile.bytesBase64, "base64").toString("utf8"), marker = JSON.parse(markerText) as Record<string, unknown>;
+  assert.equal(canonicalJson(marker), markerText); assert.deepEqual(marker["plan"], { path: planPath, sha256: sha(text), version: 2 });
+  assert.equal("runId" in marker, false);
+  const authority = await service.prepareDirectAuthority!(value, taskId);
+  assert.ok(authority.ok, JSON.stringify(authority)); if (!authority.ok) return;
+  let candidateVerdict = checkGitPolicy(authority.value.candidatePolicyInput), publicationVerdict = checkGitPolicy(authority.value.publicationPolicyInput);
+  assert.equal(candidateVerdict.allowed, true, JSON.stringify(candidateVerdict)); assert.equal(publicationVerdict.allowed, true, JSON.stringify(publicationVerdict));
+  const lease = beginGitHostAction({ projectRoot: project.root, kind: "git-mutation" }); assert.ok(lease.ok); if (!lease.ok) return;
+  let committed: Awaited<ReturnType<NonNullable<typeof service.commitPreparedTeamPlan>>>;
+  try { committed = await service.commitPreparedTeamPlan!(value, { hostLeaseId: lease.leaseId, taskId, candidateVerdict, publicationVerdict }); }
+  finally { endGitHostAction({ projectRoot: project.root, leaseId: lease.leaseId }); }
+  assert.equal(committed.status, "applied", JSON.stringify(committed));
+  assert.equal(committed.source?.kind === "role-direct" && committed.source.runId, runId, "source.runId = 受派任务 run");
+  assert.ok(committed.planRef); assert.equal(committed.planRef?.sha256, sha(text), "回执 planRef.sha256 = 派生值");
+  // P-8②：Git prepare→commit 完成后以同 operationId/同原样 payload 重放 ⇒ 命中先序回执。
+  assert.deepEqual(await service.completeTeamPlan(input, "convener"), committed, "prepare→commit 后原样 payload 重放返回同一回执");
+  const published = await createProjectTrunkStore(project.root).readManifest(); assert.ok(published.ok); if (!published.ok) return;
+  assert.equal(published.value.trunkVersion, 2); assert.equal(published.value.artifacts.execution.teamPlan?.sha256, sha(text));
+  // prepare 后计划字节漂移 ⇒ commit 重派生无法复现 prepared journal/manifest，必须 fail-closed 且不改 trunk。
+  const driftInput = { ...input, operationId: "p9-plan-drift" };
+  const driftPrepared = await service.prepareTeamPlanCommit!(driftInput, "convener");
+  assert.ok(driftPrepared.ok); if (!driftPrepared.ok || !("preparationKind" in driftPrepared.value)) { assert.fail(JSON.stringify(driftPrepared)); return; }
+  const driftAuthority = await service.prepareDirectAuthority!(driftPrepared.value, taskId);
+  assert.ok(driftAuthority.ok, JSON.stringify(driftAuthority)); if (!driftAuthority.ok) return;
+  const driftCandidate = checkGitPolicy(driftAuthority.value.candidatePolicyInput), driftPublication = checkGitPolicy(driftAuthority.value.publicationPolicyInput);
+  assert.equal(driftCandidate.allowed, true, JSON.stringify(driftCandidate)); assert.equal(driftPublication.allowed, true, JSON.stringify(driftPublication));
+  await fs.writeFile(path.join(project.root, planPath), text + "drifted after prepare\n");
+  const driftLease = beginGitHostAction({ projectRoot: project.root, kind: "git-mutation" }); assert.ok(driftLease.ok); if (!driftLease.ok) return;
+  let driftResult: Awaited<ReturnType<NonNullable<typeof service.commitPreparedTeamPlan>>>;
+  try { driftResult = await service.commitPreparedTeamPlan!(driftPrepared.value, { hostLeaseId: driftLease.leaseId, taskId, candidateVerdict: driftCandidate, publicationVerdict: driftPublication }); }
+  finally { endGitHostAction({ projectRoot: project.root, leaseId: driftLease.leaseId }); }
+  assert.notEqual(driftResult.status, "applied", "prepare 后字节漂移的 commit 必须拒绝");
+  assert.equal(driftResult.ok, false, JSON.stringify(driftResult));
+  const afterDrift = await createProjectTrunkStore(project.root).readManifest();
+  assert.deepEqual(afterDrift, published, "漂移拒绝不改变已提交 trunk");
+});

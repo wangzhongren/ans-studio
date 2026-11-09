@@ -13,8 +13,9 @@
 //  - dispatch：9 目标 × 2 类别 × 3 存在性 = 54 组合（allow 位、稳定码、reportToRoleId）；
 //  - preflight：team-plan 12 + stable-write 5 + requirement-change 10 = 27 例；
 //  - git-action：9 例模块行为（旧实现无纯函数 oracle；历史锚点随金样冻结）；
-//  - 已知差异：dispatch-existence（2）/ dispatch-empty-target（1）/ team-plan-fact-schema（2）
+//  - 已知差异：dispatch-existence（2）/ dispatch-empty-target（1）/ team-plan-fact-schema（1）
 //    / stable-write-empty-content（1），以及 code-map / git-action-no-pure-oracle 说明项。
+//    （2026-11-09：plan 缺 sha256 按新契约允许，team-plan-fact-schema 由 2 例减为 1 例 = sha256 非 64hex。）
 //
 // 本文件只读取当前角色模块源码做模块纪律自检；不读取旧引擎文件字节。
 
@@ -210,9 +211,9 @@ function checkPreflightGroup(action: GoldenPreflightAction): {
 test("差分/team-plan：allow 位与旧角色侧身份/依据/路径谓词金样一致", () => {
   const result = checkPreflightGroup("team-plan");
   assert.equal(result.cases, 12);
-  assert.equal(result.allowed, 3);
-  assert.equal(result.compared, 10);
-  assert.equal(result.knownCounts.get("team-plan-fact-schema"), 2);
+  assert.equal(result.allowed, 4);
+  assert.equal(result.compared, 11);
+  assert.equal(result.knownCounts.get("team-plan-fact-schema"), 1);
 });
 
 test("差分/stable-write：allow 位与旧 canRequestStableWrite/kind 门控金样一致", () => {

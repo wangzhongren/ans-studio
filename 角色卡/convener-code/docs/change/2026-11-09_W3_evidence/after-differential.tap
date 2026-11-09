@@ -1,0 +1,21 @@
+✔ 差分/规格：模块规格与冻结金样逐字段一致 (0.8396ms)
+✔ 差分/卡文本：sha256 / 长度 / 行数零差异 (0.3089ms)
+✔ 差分/cards：模块 cards 与金样一致（D8 无 legacy token） (0.1466ms)
+✔ 差分/tools：trio/single 集合与冻结金样逐项同序 (0.0858ms)
+✔ 差分/dispatch：allow 位/稳定码/reportToRoleId 与金样逐组合一致 (0.2165ms)
+✔ 差分/team-plan：allow 位与旧角色侧身份/依据/路径谓词金样一致 (0.3876ms)
+✔ 差分/stable-write：allow 位与旧 canRequestStableWrite/kind 门控金样一致 (0.1588ms)
+✔ 差分/requirement-change：allow 位与旧工具侧事实/归属谓词金样一致 (0.1388ms)
+✔ 差分/git-action：模块行为与冻结金样一致（旧实现无纯函数 oracle） (0.3474ms)
+✔ 差分/已知差异清单：分类齐备且与用例登记一致 (0.1947ms)
+✔ 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9） (4.5335ms)
+✔ E1 模块纪律：模块根只有 index.ts（内部文件只在子目录），唯一 public entry (0.31ms)
+✔ E1 模块纪律：只 import Model 公开入口（type-only），无引擎/门控/其他角色/Node I/O (0.5119ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 96.0098

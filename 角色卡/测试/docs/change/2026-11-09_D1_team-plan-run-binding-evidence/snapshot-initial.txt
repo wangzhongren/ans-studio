@@ -1,0 +1,13 @@
+# D1 snapshot-initial (candidate identity at evidence start)
+utc=2026-11-09T11:26:33Z
+worktree=/c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch=feat/plan-escalation-card
+HEAD=24799cb61239272e8603018adc094881bb6263dd
+HEAD_tree=409a4ac7bb077c0fc5b19f3c99383cf0b09dd13e
+staged_changes=0
+candidate_status_count=15
+candidate_aggregate=a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59
+manifest_files=1107
+manifest_file_sha256=f62a81a6485c2bb1047c1dbf2c6d260c90c94c4073cb5b3bd7e469f2013a7d15
+manifest_aggregate=b06433b5ad162907a7ec5395f9cb31c89e6c48244ca0e5eb21115de13c7fdbf0
+candidate_diff_sha256=e4b5b157c2fa84ce067bfedd218c60e3e70deb663e8a8daef72d35a33d98a367

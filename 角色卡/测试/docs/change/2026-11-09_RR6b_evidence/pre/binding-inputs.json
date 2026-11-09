@@ -1,0 +1,37 @@
+{
+  "b1v12": {
+    "rel": "docs/acceptance/2026-11-09_team-plan-run-binding-criteria-v1.md",
+    "exists": true,
+    "bytes": 74210,
+    "lines": 298,
+    "sha256": "0f528a0b9f80cb9c451985c2a3d37c25a51b7f1959910600ec54a93246303d1b"
+  },
+  "teamPlan": {
+    "rel": "docs/scheduling/2026-11-09_team-plan_team-plan-run-binding.md",
+    "exists": true,
+    "bytes": 14393,
+    "lines": 101,
+    "sha256": "48148836ed80291446e16e021446512b734f4b7546f767b497a093c50324934d"
+  },
+  "dispatchLog": {
+    "rel": "docs/scheduling/2026-11-09_dispatch-log_team-plan-run-binding.md",
+    "exists": true,
+    "bytes": 5594,
+    "lines": 44,
+    "sha256": "70b868e505dba3e06b073c0c76e63417ec5edcfa665c7c94bd63c7f69d576a85"
+  },
+  "d1Record": {
+    "rel": "角色卡/测试/docs/change/2026-11-09_D1_team-plan-run-binding.md",
+    "exists": true,
+    "bytes": 29663,
+    "lines": 217,
+    "sha256": "1b69a1bca89843a303c061802721aa8cb86e18d0078f87eebad8fa9a15aae0a5"
+  },
+  "rr6Record": {
+    "rel": "角色卡/测试/docs/change/2026-11-09_RR6_team-plan-run-binding.md",
+    "exists": true,
+    "bytes": 28778,
+    "lines": 201,
+    "sha256": "7f672fb2813db0bde1180806e806e129fcddce2e4e1b8c0b26c16d6ec3115829"
+  }
+}

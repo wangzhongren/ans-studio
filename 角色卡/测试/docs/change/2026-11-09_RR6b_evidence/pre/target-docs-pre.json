@@ -1,0 +1,78 @@
+{
+  "docs/proposals": [
+    {
+      "name": "snake-game-modules-v1.md",
+      "bytes": 1750,
+      "sha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "mtime": "2026-11-09T02:54:04.900Z"
+    },
+    {
+      "name": "snake-game-proposal-v1.md",
+      "bytes": 11973,
+      "sha256": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "mtime": "2026-11-09T02:54:02.506Z"
+    },
+    {
+      "name": "snake-game-proposal-v2.md",
+      "bytes": 15008,
+      "sha256": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+      "mtime": "2026-11-09T13:04:46.869Z"
+    },
+    {
+      "name": "snake-game-roster-v1.md",
+      "bytes": 3286,
+      "sha256": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "mtime": "2026-11-09T02:54:41.668Z"
+    }
+  ],
+  "docs/contracts": [
+    {
+      "name": "snake-game-architecture-v1.md",
+      "bytes": 7554,
+      "sha256": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "mtime": "2026-11-09T03:07:02.007Z"
+    },
+    {
+      "name": "snake-game-architecture-v2.md",
+      "bytes": 8269,
+      "sha256": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+      "mtime": "2026-11-09T13:05:12.027Z"
+    },
+    {
+      "name": "snake-game-contract-v1.md",
+      "bytes": 8901,
+      "sha256": "2b0f1d87e4c74b94735e5b758a46662f5fce664597cc3157750260345fa2cd19",
+      "mtime": "2026-11-09T03:07:02.335Z"
+    },
+    {
+      "name": "snake-game-contract-v2.md",
+      "bytes": 11136,
+      "sha256": "5561d9d4f1907760dc41140570ff194054896a3c53ad8a0612fc389c1306dc8c",
+      "mtime": "2026-11-09T13:05:01.489Z"
+    }
+  ],
+  "docs/scheduling": [
+    {
+      "name": "snake-game-team-plan-v1.md",
+      "bytes": 2892,
+      "sha256": "b013a1a2575b55d2eb4ac78ffcce6b484070732153df16212c637fa983b5ba4a",
+      "mtime": "2026-11-09T05:36:48.942Z"
+    }
+  ],
+  "docs/product": [
+    {
+      "name": "snake-game-intent-v1.md",
+      "bytes": 9630,
+      "sha256": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "mtime": "2026-11-09T02:48:22.597Z"
+    }
+  ],
+  "docs/intents": [
+    {
+      "name": "snake-2d-game.md",
+      "bytes": 1472,
+      "sha256": "5ec8feafce2ff3fcd0c7eca9608499b98b3f96d7c9b66f3b95c2fd7532bcf4d4",
+      "mtime": "2026-11-09T02:45:43.514Z"
+    }
+  ]
+}

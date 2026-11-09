@@ -1,0 +1,165 @@
+diff --git "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts" "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
+index 81db923..0371b89 100644
+--- "a/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
++++ "b/test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
+@@ -20,6 +20,9 @@ import { mainT } from "../../app/desktop/i18n.ts";
+ import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
+ import { createDecisionDelegationSwitch, createDesktopInterface, desktopProjectExecutionInventory, subscribeDesktopExecutionInventory } from "../../app/desktop/interface.ts";
+ import { initializeGitRepository, createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
++import { TRUNK_MANIFEST_SCHEMA, type TrunkManifest } from "../../src/model/trunk.ts";
++// W6/T5（P-12）：真实文件系统 trunk 夹具（只读复用编排 owner 的共享夹具，不修改该文件）。
++import { createTrunkProject, PATHS as TRUNK_PATHS } from "../编排/fixtures/trunk-project.ts";
+ import { inspectGitHostCoordinator, beginGitHostAction, endGitHostAction, recordGitHostInterruption, recordTaskObservation, prepareParentTaskRef, prepareCreatedTaskClose, createDirectRoleRuntime, type RunChangeHostPlan } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+ // Test-only observation of the actual public Core registry; production Interface does not import Service.
+ import { inspectRuntimeCoreRegistry } from "../../src/service/runtime/session.ts";
+@@ -33,7 +36,7 @@ import type { WriteGate } from "../../src/model/runtime.ts";
+ import { listProject as readActualProject, type ProjectListing } from "../../src/service/role/resolve-role.ts";
+ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+ import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
+-import type { DispatchTaskFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn } from "../../src/model/runtime.ts";
++import type { DispatchTaskFn, CompleteTeamPlanFn, RoleActivityLogFn, RoleStatusFn, SessionTailFn, TerminateRoleRunFn, RedispatchTaskFn, ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn } from "../../src/model/runtime.ts";
+ 
+ const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+ 
+@@ -2504,3 +2507,141 @@ test("W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、pre
+     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+   }
+ });
++
++// ———— 2026-11-09《团队计划登记 run 绑定 / baseDigest 合法来源》T5（B1 P-12）：桌面宿主 run 绑定 ————
++// 真实 SessionManager 投递/回合状态（busy、origins.running、lifetime/turn abort、真实 settle 语义之外的
++// 句柄为桩）+ 真实 task 账本/run 记录 + 真实 trunk 服务与文件存储；宿主绑定只读当前真实受派回合的
++// origin.taskId，经 inspectAssignedTask 注入任务 run；模型自报 runId 只作断言（不一致拒绝）。
++type TeamPlanCapability = { completeTeamPlan?: CompleteTeamPlanFn };
++const inertRoleHandle = (): RoleSessionHandle => ({
++  async send() {},
++  events() {
++    return { [Symbol.asyncIterator]() { return { async next(): Promise<IteratorResult<OrchestrationEvent>> { await tick(50); return { value: undefined as unknown as OrchestrationEvent, done: true }; } }; } };
++  },
++  async dispose() {},
++});
++async function teamPlanHostFixture() {
++  const project = await createTrunkProject({ withRun: false }), store = createFsTrunkStore(project.root);
++  const documents = project.snapshot().documents, at = new Date().toISOString();
++  const planText = `---\n${JSON.stringify({ schema: "teamPlanSchema:3", flowId: "demo", version: 1, modules: documents.modules, roster: documents.roster,
++    roleRows: [{ roleId: "impl", modules: ["impl-core"], writesets: ["src/impl/"], dependsOn: [] }] })}\n---\n# Real team plan\nW6 host binding\n`;
++  await fs.writeFile(path.join(project.root, TRUNK_PATHS.teamPlan), planText);
++  const documentRefs = Object.values(documents).filter((ref): ref is { path: string; sha256: string } => ref !== undefined);
++  const captured = await store.captureSnapshot!({ snapshotId: "w6-team-plan-basis", createdAt: at,
++    files: [...documentRefs, { path: TRUNK_PATHS.teamPlan, sha256: createHash("sha256").update(planText).digest("hex") }] });
++  if (!captured.ok) throw new Error(`W6 fixture snapshot: ${captured.message ?? captured.reason}`);
++  const manifest: TrunkManifest = { schema: TRUNK_MANIFEST_SCHEMA, source: "bootstrap", trunkVersion: 1, previous: null, runId: null, flowId: "demo",
++    digest: "abcdef0123456789".repeat(4), snapshotRef: captured.value, createdAt: at, updatedAt: at,
++    artifacts: { documents, execution: { teamPlan: null, flow: null }, boundaries: {} } };
++  const seeded = await store.compareAndSwapManifest!(null, manifest, captured.value);
++  if (!seeded.ok) throw new Error(`W6 fixture manifest: ${seeded.message ?? seeded.code}`);
++  const runId = "run-w6-team-plan", taskId = "task-w6-team-plan";
++  const recorded = await store.compareAndSwapRunRecord!(runId, null, { schema: "ans-run/v1", runId, flowId: "demo", state: "draft",
++    documents: {}, execution: { teamPlan: null, flow: null }, createdAt: at });
++  if (!recorded.ok) throw new Error(`W6 fixture run: ${recorded.message ?? recorded.code}`);
++  const created = await recordTaskObservation({ projectRoot: project.root, event: { v: 1, at, kind: "task.created", taskId, from: "chief", to: "convener",
++    flowId: "demo", runId, runState: "draft", text: "W6 team plan host binding fixture", sideEffect: "read-only", idempotencyKey: "w6-team-plan" } });
++  if (!created.ok) throw new Error(`W6 fixture task: ${created.message ?? created.code}`);
++  return { root: project.root, store, manifest, planPath: TRUNK_PATHS.teamPlan, planText, runId, taskId };
++}
++function teamPlanHostManager(root: string, caps: Record<string, TeamPlanCapability>) {
++  return new SessionManager({
++    openRoleSession: async (input) => { caps[input.roleId] = input as TeamPlanCapability; return inertRoleHandle(); },
++    createPiAdapterFactory: () => { throw new Error("no pi"); },
++    createDemoAdapter: () => { throw new Error("no demo"); },
++    buildProjectConfig,
++    getListing: (r) => (r === root ? listing(root) : undefined),
++    emitEvent: () => {},
++  });
++}
++
++test("W6/T5 团队计划宿主绑定：省略 runId 注入受派任务 run；自报不一致/flow 不符拒绝；成功回执 source.runId=任务 run", async () => {
++  const f = await teamPlanHostFixture(), caps: Record<string, TeamPlanCapability> = {};
++  const manager = teamPlanHostManager(f.root, caps), target = { projectRoot: f.root, roleId: "convener", runtime: "demo" as const };
++  try {
++    const opened = await manager.open({ ...target, taskId: f.taskId }); assert.equal(opened.ok, true, opened.error ?? "convener open");
++    const plan = caps.convener?.completeTeamPlan; assert.equal(typeof plan, "function", "convener 会话注入宿主包装后的 complete_team_plan 能力");
++    assert.equal((await manager.sendBackground({ ...target, text: "W6 团队计划真实回合", kind: "system", identitySeed: "w6-plan-turn" })).ok, true);
++    // 模型省略 runId ⇒ 宿主注入当前受派任务的实际 run；回执 planRef.sha256 为应用派生值。
++    const applied = await plan!({ operationId: "w6-plan-omitted-run", flowId: "demo", plan: { path: f.planPath, version: 1 } });
++    assert.equal(applied.ok, true, JSON.stringify(applied)); assert.equal(applied.status, "applied");
++    assert.equal(applied.baseDigest, f.manifest.digest, "回执 baseDigest = 应用派生的 effective trunk digest");
++    assert.ok(applied.source?.kind === "role-direct"); assert.equal(applied.source.action, "complete-team-plan");
++    assert.equal(applied.source.runId, f.runId, "省略 runId ⇒ 注入受派任务的实际 run");
++    assert.equal((applied as typeof applied & { planRef?: { sha256?: string } }).planRef?.sha256,
++      createHash("sha256").update(f.planText).digest("hex"), "成功回执 planRef.sha256 = 应用派生实际字节摘要");
++    // 模型自报不同 runId ⇒ 既有 service 码 plan-run-conflict（只作断言、不触达提交）。
++    const wrongRun = await plan!({ operationId: "w6-plan-wrong-run", flowId: "demo", runId: "run-not-the-assigned-task", plan: { path: f.planPath, version: 1 } });
++    assert.equal(wrongRun.ok, false); assert.equal(wrongRun.status, "blocked");
++    if (wrongRun.ok === false) assert.equal(wrongRun.errorCode, "plan-run-conflict");
++    // flow 与实际受派任务不符 ⇒ host-local plan-flow-conflict。
++    const wrongFlow = await plan!({ operationId: "w6-plan-wrong-flow", flowId: "other-flow", plan: { path: f.planPath, version: 1 } });
++    assert.equal(wrongFlow.ok, false); assert.equal(wrongFlow.status, "blocked");
++    if (wrongFlow.ok === false) assert.equal(wrongFlow.errorCode, "plan-flow-conflict");
++    // 自报即任务 run（断言一致）⇒ 成功；同计划再登记 ⇒ no-op 且仍记录任务 run（P-7 语义）。
++    const asserted = await plan!({ operationId: "w6-plan-assert-task-run", flowId: "demo", runId: f.runId, plan: { path: f.planPath, version: 1 } });
++    assert.equal(asserted.ok, true, JSON.stringify(asserted)); assert.equal(asserted.status, "no-op");
++    assert.ok(asserted.source?.kind === "role-direct"); assert.equal(asserted.source.runId, f.runId);
++  } finally {
++    await manager.stop(null);
++    await fs.rm(f.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
++
++test("W6/T5 团队计划宿主绑定拒绝分层：plan-task-unavailable/plan-task-changed 本地前置、inspect 失败直通 trunk-item-invalid", async () => {
++  const f = await teamPlanHostFixture(), caps: Record<string, TeamPlanCapability> = {};
++  const manager = teamPlanHostManager(f.root, caps), target = { projectRoot: f.root, roleId: "convener", runtime: "demo" as const };
++  try {
++    const opened = await manager.open({ ...target, taskId: f.taskId }); assert.equal(opened.ok, true, opened.error ?? "convener open");
++    const plan = caps.convener!.completeTeamPlan!;
++    // 无当前回合 ⇒ host-local plan-task-unavailable。
++    const noTurn = await plan({ operationId: "w6-plan-no-turn", flowId: "demo", plan: { path: f.planPath, version: 1 } });
++    assert.equal(noTurn.ok, false); assert.equal(noTurn.status, "blocked");
++    if (noTurn.ok === false) assert.equal(noTurn.errorCode, "plan-task-unavailable");
++    // 入口即已中止 ⇒ 同一 host-local 码（不触达核验/提交）。
++    const preAborted = new AbortController(); preAborted.abort();
++    const entryAbort = await plan({ operationId: "w6-plan-entry-aborted", flowId: "demo", plan: { path: f.planPath, version: 1 } }, preAborted.signal);
++    assert.equal(entryAbort.ok, false); if (entryAbort.ok === false) assert.equal(entryAbort.errorCode, "plan-task-unavailable");
++    // 真实 busy 受派回合（origin.taskId = 任务账本行）。
++    assert.equal((await manager.sendBackground({ ...target, text: "W6 拒绝分层真实回合", kind: "system", identitySeed: "w6-failure-layer" })).ok, true);
++    // 核验期间调用被中止/回合变化 ⇒ host-local plan-task-changed，不执行、trunk 不前进。
++    const aborter = new AbortController();
++    const pending = plan({ operationId: "w6-plan-changed", flowId: "demo", plan: { path: f.planPath, version: 1 } }, aborter.signal);
++    aborter.abort();
++    const changed = await pending;
++    assert.equal(changed.ok, false); assert.equal(changed.status, "blocked");
++    if (changed.ok === false) assert.equal(changed.errorCode, "plan-task-changed");
++    const untouched = await f.store.readManifest(); assert.ok(untouched.ok);
++    if (untouched.ok) assert.equal(untouched.value.trunkVersion, 1, "plan-task-changed 不触达提交、trunk 不前进");
++    // 核验成功后、提交前即可拒绝：自报不同 runId ⇒ 既有 service 码。
++    const wrongRun = await plan({ operationId: "w6-plan-layer-wrong-run", flowId: "demo", runId: "run-not-the-assigned-task", plan: { path: f.planPath, version: 1 } });
++    assert.equal(wrongRun.ok, false); if (wrongRun.ok === false) assert.equal(wrongRun.errorCode, "plan-run-conflict");
++    // inspectAssignedTask 失败（受派 run 记录不可读）⇒ 直通其原码 trunk-item-invalid，不重写。
++    await fs.rm(path.join(f.root, ".ans", "runs", f.runId), { recursive: true, force: true });
++    const invalid = await plan({ operationId: "w6-plan-trunk-item-invalid", flowId: "demo", plan: { path: f.planPath, version: 1 } });
++    assert.equal(invalid.ok, false); assert.equal(invalid.status, "blocked");
++    if (invalid.ok === false) assert.equal(invalid.errorCode, "trunk-item-invalid");
++  } finally {
++    await manager.stop(null);
++    await fs.rm(f.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});
++
++test("W6/T5 团队计划宿主绑定：普通消息回合无受派任务 ⇒ host-local plan-task-unavailable", async () => {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w6-plan-no-task-")), caps: Record<string, TeamPlanCapability> = {};
++  const manager = teamPlanHostManager(root, caps), target = { projectRoot: root, roleId: "convener", runtime: "demo" as const };
++  try {
++    assert.equal((await manager.open(target)).ok, true);
++    // 仅 convener 注入宿主绑定能力（其它治理角色不获得 complete_team_plan 能力）。
++    assert.equal((await manager.open({ ...target, roleId: "chief" })).ok, true);
++    assert.equal(caps.chief?.completeTeamPlan, undefined, "非 convener 会话不注入 complete_team_plan");
++    const plan = caps.convener!.completeTeamPlan!;
++    assert.equal((await manager.send("W6 普通客户消息（无受派任务）", undefined, target)).ok, true);
++    const receipt = await plan({ operationId: "w6-plan-message-origin", flowId: "demo", plan: { path: "docs/scheduling/demo-team-v1.md", version: 1 } });
++    assert.equal(receipt.ok, false); assert.equal(receipt.status, "blocked");
++    if (receipt.ok === false) assert.equal(receipt.errorCode, "plan-task-unavailable");
++  } finally {
++    await manager.stop(null);
++    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
++  }
++});

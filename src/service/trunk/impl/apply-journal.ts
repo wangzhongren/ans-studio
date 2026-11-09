@@ -1241,7 +1241,7 @@ export function createDirectCommitPort(deps: TrunkServiceDeps) {
       return { ok: true as const, value: result };
     },
     async commitPreparedTeamPlan(value: PlanPreparation, authority: { hostLeaseId: string; taskId: string; candidateVerdict: { allowed: boolean; inputDigest: string; code?: string }; publicationVerdict: { allowed: boolean; inputDigest: string; code?: string } }): Promise<CompletedTeamPlanReceipt> {
-      const invalid = (message: string) => directFailure(value.input.operationId, value.input.baseDigest, "plan-commit-binding-invalid", message);
+      const invalid = (message: string) => directFailure(value.input.operationId, value.input.baseDigest ?? null, "plan-commit-binding-invalid", message);
       const current = await prepareDirectAuthority(value, authority.taskId);
       if (!current.ok || !value.gitPlan) return invalid(current.ok ? "Git plan missing" : current.message ?? current.code);
       if (!authority.candidateVerdict.allowed || authority.candidateVerdict.inputDigest !== directHash(current.value.candidatePolicyInput)
@@ -2855,12 +2855,15 @@ export async function prepareCreatedTaskClose(deps: TrunkServiceDeps, taskId: st
 /** Publish the convener's actual structurally complete plan, independently of future execution authority. */
 export async function completeTeamPlan(deps: TrunkServiceDeps, input: CompleteTeamPlanInput, actor: string, operationTime?: string): Promise<CompletedTeamPlanReceipt> {
   const result = await completeTeamPlanInternal(deps, input, actor, false, operationTime);
-  return "preparationKind" in result ? directFailure(input.operationId, input.baseDigest, "plan-preparation-only", "No pointer committed") : result;
+  return "preparationKind" in result ? directFailure(input.operationId, input.baseDigest ?? null, "plan-preparation-only", "No pointer committed") : result;
 }
 async function completeTeamPlanInternal(deps: TrunkServiceDeps, input: CompleteTeamPlanInput, actor: string, prepareOnly = false, operationTime?: string): Promise<CompletedTeamPlanReceipt | import("../abstract/trunk-service.ts").PreparedTeamPlanCommit> {
-  const reject = (code: string, message: string): CompletedTeamPlanReceipt => directFailure(input.operationId, input.baseDigest, code, message);
+  // B1 AC-1 / Q10：失败回执 baseDigest 分层——effective 读取成功后回显派生值；此前回显 input.baseDigest ?? null。
+  let effectiveBase: string | undefined;
+  const reject = (code: string, message: string): CompletedTeamPlanReceipt => directFailure(input.operationId, effectiveBase ?? input.baseDigest ?? null, code, message);
   const { store } = deps;
-  if (actor !== "convener" || !input.operationId || !input.flowId || !/^[a-f0-9]{64}$/i.test(input.baseDigest)) return reject("plan-identity-invalid", "Only the real convener can complete a plan against an actual document basis");
+  // B1 AC-1：baseDigest 可缺省（应用派生）；给了必须保持既有 64 hex 形状，随后严格值断言。
+  if (actor !== "convener" || !input.operationId || !input.flowId || (input.baseDigest !== undefined && !/^[a-f0-9]{64}$/i.test(input.baseDigest))) return reject("plan-identity-invalid", "Only the real convener can complete a plan against an actual document basis");
   if (!store.readOperation || !store.writeOperation || !store.captureSnapshot || !store.readSnapshot || !store.prepareSnapshot || !store.compareAndSwapManifest) return reject("plan-store-unavailable", "Complete atomic plan storage is unavailable");
   const requestDigest = directHash({ input, actor });
   let preparedJournal: TrunkApplyJournal | undefined;
@@ -2880,7 +2883,10 @@ async function completeTeamPlanInternal(deps: TrunkServiceDeps, input: CompleteT
     if (prior.reason !== "missing") return reject("plan-journal-corrupt", `operation-${prior.reason}`);
     const effective = await readEffectiveSnapshot(deps); if (!effective.ok) return reject(effective.code, effective.message ?? effective.code);
     const { manifest: current, snapshot: old } = effective.value;
-    if (current.flowId !== input.flowId || current.digest !== input.baseDigest) return reject("plan-base-conflict", "Plan basis differs from the actual effective flow document snapshot");
+    // B1 AC-1：baseDigest 由 effective trunk manifest digest 派生；声明值只作严格相等断言（无 case fold）。
+    const derivedBase = current.digest;
+    effectiveBase = derivedBase;
+    if (current.flowId !== input.flowId || (input.baseDigest !== undefined && input.baseDigest !== derivedBase)) return reject("plan-base-conflict", "Plan basis differs from the actual effective flow document snapshot");
     if (input.runId) { const run = await store.readRunRecord?.(input.runId); if (!run?.ok || run.value.value.flowId !== input.flowId) return reject("plan-run-conflict", "Plan task refers to a different or unavailable real run"); }
     const escaped = input.flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (!new RegExp(`^docs/scheduling/${escaped}-team-v${input.plan.version}\\.md$`).test(input.plan.path)) return reject("plan-path-invalid", "Plan path and declared version must identify the real flow team plan");
@@ -2891,21 +2897,30 @@ async function completeTeamPlanInternal(deps: TrunkServiceDeps, input: CompleteT
     const roster = parseProjectRoster(Buffer.from(rosterBytes.bytesBase64, "base64").toString("utf8"), input.flowId);
     const modules = parseProjectModules(Buffer.from(modulesBytes.bytesBase64, "base64").toString("utf8"), input.flowId);
     if (!roster.ok || !modules.ok || canonicalJson(roster.roster.modules) !== canonicalJson(modules.doc.modules)) return reject("plan-owner-invalid", "The real roster and authoritative modules disagree");
-    const frozenPlan = old.files.find(file => file.path === input.plan.path && file.sha256 === input.plan.sha256);
-    const planBytes = frozenPlan ? { ok: true as const, value: frozenPlan } : await store.readProjectFile?.(input.plan.path);
-    if (!planBytes?.ok || planBytes.value.sha256 !== input.plan.sha256) return reject("plan-hash-drift", "Plan bytes differ from the submitted exact hash");
-    const parsed = parseTeamPlan(Buffer.from(planBytes.value.bytesBase64, "base64").toString("utf8"), { flowId: input.flowId, version: input.plan.version,
+    // B1 AC-2：来源选择逐字保留现状（G1）。(i) 声明 sha 命中冻结快照同 path ⇒ 用冻结字节（不读 live）；
+    // (ii) 声明 sha 未命中 ⇒ 读 live 并要求 live 命中声明；(iii) 缺省 sha ⇒ live 优先、同 path frozen 兜底。
+    const frozenPlan = input.plan.sha256 !== undefined ? old.files.find(file => file.path === input.plan.path && file.sha256 === input.plan.sha256) : undefined;
+    const livePlan = frozenPlan === undefined ? await store.readProjectFile?.(input.plan.path) : undefined;
+    const planBytes = frozenPlan ?? (livePlan?.ok ? livePlan.value : undefined)
+      ?? (input.plan.sha256 === undefined ? old.files.find(file => file.path === input.plan.path) : undefined);
+    if (!planBytes) return reject("plan-hash-drift", input.plan.sha256 === undefined
+      ? "Plan bytes are unreadable or absent from the effective snapshot" : "Plan bytes differ from the submitted exact hash");
+    const derivedSha = planBytes.sha256;
+    if (input.plan.sha256 !== undefined && input.plan.sha256 !== derivedSha) return reject("plan-hash-drift", "Plan bytes differ from the submitted exact hash");
+    const parsed = parseTeamPlan(Buffer.from(planBytes.bytesBase64, "base64").toString("utf8"), { flowId: input.flowId, version: input.plan.version,
       modules: modulesRef, roster: rosterRef, rosterFacts: roster.roster });
     if (!parsed.ok) return reject("plan-structure-invalid", parsed.reason);
-    const noOp = target.execution.teamPlan?.path === input.plan.path && target.execution.teamPlan.sha256 === input.plan.sha256;
-    target.execution.teamPlan = { path: input.plan.path, sha256: input.plan.sha256 };
+    // resolved 只用于 marker/target/回执/commit 断言；journal message/source/targetDigest 语义不变（M1）。
+    const resolvedPlan = { path: input.plan.path, sha256: derivedSha, version: input.plan.version };
+    const noOp = target.execution.teamPlan?.path === resolvedPlan.path && target.execution.teamPlan.sha256 === resolvedPlan.sha256;
+    target.execution.teamPlan = { path: resolvedPlan.path, sha256: resolvedPlan.sha256 };
     const at = operationTime ?? (deps.now ?? (() => new Date()))().toISOString(), applicationId = `plan-${directHash([input.flowId, input.operationId])}`;
     let captured = await store.captureSnapshot({ snapshotId: `s-plan-bytes-${directHash([input.flowId, input.operationId])}`, createdAt: at,
       files: directRefs(target), baseSnapshotRef: current.snapshotRef });
     if (!captured.ok) return reject("plan-snapshot-invalid", captured.message ?? captured.reason);
     const bytes = await store.readSnapshot(captured.value); if (!bytes.ok) return reject("plan-snapshot-invalid", bytes.message ?? bytes.reason);
     const marker = canonicalJson({ schema: "team-plan-completion/v1", operationId: input.operationId, actorRoleId: actor, flowId: input.flowId,
-      plan: input.plan, modules: modulesRef, roster: rosterRef });
+      plan: resolvedPlan, modules: modulesRef, roster: rosterRef });
     const files = [...bytes.value.files, { path: `.ans/trunk/plan-completions/${directHash(input.operationId)}.json`, sha256: directHashBytes(marker), bytesBase64: Buffer.from(marker).toString("base64") }];
     captured = await store.prepareSnapshot({ schema: "complete-snapshot/v1", snapshotId: `s-plan-${directHash([input.flowId, input.operationId])}`,
       digest: completeSnapshotDigest(files), files, createdAt: at });
@@ -2915,7 +2930,8 @@ async function completeTeamPlanInternal(deps: TrunkServiceDeps, input: CompleteT
       artifacts: { ...current.artifacts, execution: target.execution }, snapshotRef: captured.value };
     next.digest = noOp ? current.digest : directHash({ flowId: input.flowId, trunkVersion: next.trunkVersion, artifacts: next.artifacts, snapshotRef: captured.value });
     const source: RoleDirectSource = { kind: "role-direct", actorRoleId: actor, action: "complete-team-plan", operationId: input.operationId,
-      applicationId, journalId: `j-plan-${directHash(input.operationId).slice(0, 24)}`, baseDigest: current.digest, targetDigest: next.digest, at };
+      applicationId, journalId: `j-plan-${directHash(input.operationId).slice(0, 24)}`, ...(input.runId !== undefined ? { runId: input.runId } : {}),
+      baseDigest: current.digest, targetDigest: next.digest, at };
     next.actionSource = source;
     const journal: TrunkApplyJournal = { v: 1, schema: TRUNK_APPLY_JOURNAL_SCHEMA, operationId: input.operationId, applicationId,
       journalId: source.journalId!, flowId: input.flowId, phase: "prepared", message: `team-plan:${requestDigest}`, target: { ...target, trunkVersion: next.trunkVersion },

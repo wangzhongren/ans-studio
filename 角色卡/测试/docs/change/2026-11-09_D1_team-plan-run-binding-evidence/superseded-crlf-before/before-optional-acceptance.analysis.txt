@@ -1,0 +1,2 @@
+SUMMARY tests=3 pass=2 fail=1 cancelled=0 skipped=0 todo=0
+FAIL	1	幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚

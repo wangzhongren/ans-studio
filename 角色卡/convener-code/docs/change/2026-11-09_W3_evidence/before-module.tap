@@ -1,0 +1,27 @@
+✔ 规格数据：id/displayName/function/capabilities/cards 与旧 convener 规格一致（D8/D10） (0.9375ms)
+✔ tools()：trio 返回 convener 五个允许工具；capabilities 与 spec 同源（D10） (0.1377ms)
+✔ tools()：single 只保留旧角色门控两项；未知治理模型 fail-closed (0.0709ms)
+✔ dispatch()：真实 convener → 真实项目 worker（宿主显式存在）允许，报告期望 convener (0.1051ms)
+✔ dispatch()：内置目标只允许质检（verifier）；其它内置目标拒绝 (0.1484ms)
+✔ dispatch()：来源非 convener、空目标、自派、项目目标不存在、内置矛盾事实一律 fail-closed (0.1271ms)
+✔ preflight：非本角色动作与非法 facts 默认拒绝（action-not-covered / facts-invalid） (0.1574ms)
+✔ preflight：未知 fact 键 deny（只读 api-spec 登记的键，fail-closed） (0.2697ms)
+✔ preflight/team-plan：合法事实允许；路径/版本/哈希与身份缺失拒绝 (0.2886ms)
+✔ preflight/stable-write：仅 convener 的 workflow 内容写入允许 (0.1574ms)
+✔ preflight/requirement-change：至少一个归属键；changeKind/必填文本非法拒绝 (0.1345ms)
+✔ preflight/git-action/init：真实客户来源 + 仓库不存在才允许 (0.1233ms)
+✔ preflight/git-action/commit：base/paths 与本人 scope 事实 (0.1682ms)
+✔ preflight/git-action/integrate：只收已授权且已收口的 owner 候选 (0.1701ms)
+✔ preflight/git-action/revert：controller/review/OID 重新核验事实 (0.1373ms)
+✔ preflight/git-action/publish：仅 delivery + 最终候选/收口/证据事实 (0.1888ms)
+✔ preflight/git-action：未知动作拒绝（git-action-invalid） (0.0397ms)
+✔ context()：decision 卡 / 项目 workflow / 报告期望三段稳定文本 (0.0927ms)
+✔ context()：不同治理模型返回同一静态模板（无运行时事实拼接、无 I/O） (0.0388ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 95.5352

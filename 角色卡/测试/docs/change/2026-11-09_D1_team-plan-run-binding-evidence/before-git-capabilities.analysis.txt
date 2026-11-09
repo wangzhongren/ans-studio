@@ -1,0 +1,4 @@
+SUMMARY tests=15 pass=12 fail=1 cancelled=0 skipped=2 todo=0
+FAIL	1	Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+SKIP	1	Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources
+SKIP	1	Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources

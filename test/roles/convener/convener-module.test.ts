@@ -388,14 +388,31 @@ test("preflight：未知 fact 键 deny（只读 api-spec 登记的键，fail-clo
 
 // —————————————————————— preflight：team-plan ——————————————————————
 
-test("preflight/team-plan：合法事实允许；路径/版本/哈希与身份缺失拒绝", () => {
+test("preflight/team-plan：合法事实允许；baseDigest/plan.sha256 可缺省；路径/版本/形状/身份错误拒绝", () => {
   assert.deepEqual(preflight("team-plan", validTeamPlanFacts()), { allow: true });
 
-  for (const key of ["actorRoleId", "operationId", "flowId", "baseDigest", "plan"]) {
+  for (const key of ["actorRoleId", "operationId", "flowId", "plan"]) {
     const invalid = validTeamPlanFacts();
     delete invalid[key];
     assert.equal(denyCode(preflight("team-plan", invalid)), "team-plan-facts-invalid", key);
   }
+
+  // 2026-11-09（B1 §4.3 旧断言改写）：旧断言为「删除 baseDigest ⇒ team-plan-facts-invalid」。
+  // 新契约下 baseDigest 由应用从 effective trunk manifest digest 派生，角色侧事实包缺省合法 ⇒ allow。
+  const withoutBaseDigest = validTeamPlanFacts();
+  delete withoutBaseDigest["baseDigest"];
+  assert.deepEqual(preflight("team-plan", withoutBaseDigest), { allow: true });
+
+  // 新增正例（P-10）：plan 恰为 {path, version}（无 sha256）⇒ allow；sha256 由应用按实际字节派生。
+  assert.deepEqual(
+    preflight("team-plan", validTeamPlanFacts({ plan: { path: "docs/scheduling/focus-team-v2.md", version: 2 } })),
+    { allow: true },
+  );
+  // 新 payload 形态（baseDigest 与 plan.sha256 均缺省）⇒ allow。
+  const minimal = validTeamPlanFacts({ plan: { path: "docs/scheduling/focus-team-v2.md", version: 2 } });
+  delete minimal["baseDigest"];
+  assert.deepEqual(preflight("team-plan", minimal), { allow: true });
+
   for (const overrides of [
     { actorRoleId: "chief" },
     { operationId: "" },
@@ -405,6 +422,9 @@ test("preflight/team-plan：合法事实允许；路径/版本/哈希与身份�
     { plan: { path: "docs/scheduling/focus-team-v2.md", sha256: SHA_B, version: 0 } },
     { plan: { path: "docs/scheduling/focus-team-v2.md", sha256: "not-a-sha", version: 2 } },
     { plan: { path: "docs/scheduling/focus-team-v2.md", sha256: SHA_B, version: 2, extra: true } },
+    { plan: { path: "docs/scheduling/focus-team-v2.md", version: 2, extra: true } },
+    { plan: { path: "docs/scheduling/focus-team-v2.md" } },
+    { plan: { version: 2 } },
   ]) {
     assert.equal(denyCode(preflight("team-plan", validTeamPlanFacts(overrides))), "team-plan-facts-invalid", JSON.stringify(overrides));
   }
@@ -415,6 +435,12 @@ test("preflight/team-plan：合法事实允许；路径/版本/哈希与身份�
     plan: { path: "docs/scheduling/focus-team-v3.md", sha256: SHA_B, version: 2 },
   });
   assert.equal(denyCode(preflight("team-plan", wrongVersion)), "team-plan-path-invalid");
+  // RR5 形态非规范路径（`docs/scheduling/snake-game-team-plan-v1.md`）仍被路径规则拒绝（P-15/AC-8；不放宽）。
+  const rr5Path = validTeamPlanFacts({
+    flowId: "snake-game",
+    plan: { path: "docs/scheduling/snake-game-team-plan-v1.md", sha256: SHA_B, version: 1 },
+  });
+  assert.equal(denyCode(preflight("team-plan", rr5Path)), "team-plan-path-invalid");
   assert.equal(denyMessageKey(preflight("team-plan", wrongFlow)), "role.convener.preflight.teamPlanPathInvalid");
 });
 

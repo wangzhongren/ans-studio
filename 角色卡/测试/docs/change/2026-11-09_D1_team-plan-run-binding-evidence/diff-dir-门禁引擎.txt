@@ -1,0 +1,9 @@
+== suite: dir-门禁引擎
+--- before summary:
+SUMMARY tests=453 pass=447 fail=5 cancelled=0 skipped=1 todo=0
+--- after summary:
+SUMMARY tests=453 pass=447 fail=5 cancelled=0 skipped=1 todo=0
+--- FAIL before-only:
+--- FAIL after-only (new):
+--- SKIP before-only:
+--- SKIP after-only (new):

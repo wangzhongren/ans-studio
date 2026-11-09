@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: direct governance bridge: only the trusted trio action owner receives each capability
+ok 1 - direct governance bridge: only the trusted trio action owner receives each capability
+  ---
+  duration_ms: 39.1322
+  type: 'test'
+  ...
+# Subtest: chief bridge: trusted bounded context forwards only decision capability and denies production writes
+ok 2 - chief bridge: trusted bounded context forwards only decision capability and denies production writes
+  ---
+  duration_ms: 4.2006
+  type: 'test'
+  ...
+# Subtest: chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction
+ok 3 - chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction
+  ---
+  duration_ms: 0.7312
+  type: 'test'
+  ...
+# Subtest: chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence
+ok 4 - chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence
+  ---
+  duration_ms: 12.8862
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无
+ok 5 - run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无
+  ---
+  duration_ms: 21.6215
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信）
+ok 6 - run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信）
+  ---
+  duration_ms: 20.7039
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用）
+ok 7 - run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用）
+  ---
+  duration_ms: 3.8294
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检）
+ok 8 - run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检）
+  ---
+  duration_ms: 0.1652
+  type: 'test'
+  ...
+# Subtest: Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions
+ok 9 - Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions
+  ---
+  duration_ms: 1672.9595
+  type: 'test'
+  ...
+# Subtest: Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task
+ok 10 - Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task
+  ---
+  duration_ms: 61.7539
+  type: 'test'
+  ...
+# Subtest: Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+ok 11 - Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+  ---
+  duration_ms: 2276.8148
+  type: 'test'
+  ...
+# Subtest: Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle
+ok 12 - Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle
+  ---
+  duration_ms: 16.2841
+  type: 'test'
+  ...
+# Subtest: Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology
+ok 13 - Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology
+  ---
+  duration_ms: 982.8709
+  type: 'test'
+  ...
+# Subtest: Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association
+ok 14 - Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association
+  ---
+  duration_ms: 112.3287
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5544.1004

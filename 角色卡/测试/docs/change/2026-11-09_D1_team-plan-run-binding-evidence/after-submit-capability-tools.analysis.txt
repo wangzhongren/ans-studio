@@ -1,0 +1,3 @@
+SUMMARY tests=25 pass=23 fail=2 cancelled=0 skipped=0 todo=0
+FAIL	1	R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+FAIL	1	R2 chief timeout is finite and normal sessions still receive injected narrow capabilities

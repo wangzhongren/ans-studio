@@ -1,0 +1,29 @@
+# D1 snapshot-post (after all evidence runs)
+utc=2026-11-09T12:50:42Z
+branch=feat/plan-escalation-card
+HEAD=24799cb61239272e8603018adc094881bb6263dd
+HEAD_tree=409a4ac7bb077c0fc5b19f3c99383cf0b09dd13e
+staged_changes=0
+candidate_status_count=15
+candidate_aggregate=a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59
+manifest_file_sha256=f62a81a6485c2bb1047c1dbf2c6d260c90c94c4073cb5b3bd7e469f2013a7d15
+manifest_aggregate=b06433b5ad162907a7ec5395f9cb31c89e6c48244ca0e5eb21115de13c7fdbf0
+manifest_identical_to_initial=YES
+full_status_tracked:
+ M app/desktop/session.ts
+ M docs/acceptance/2026-11-09_team-plan-run-binding-criteria-v1.md
+ M docs/communication/memo.md
+ M src/common/roles/convener/index.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/trunk-runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/service/trunk/impl/apply-journal.ts
+ M test/roles/convener/convener-differential.test.ts
+ M test/roles/convener/convener-module.test.ts
+ M test/roles/convener/oracle-fixture.ts
+ M test/runtime-core/submit-capability-tools.test.ts
+ M test/桌面应用/chief-workflow.test.ts
+ M test/编排/convener-module-consumption.test.ts
+ M test/编排/direct-role-capabilities.test.ts
+ M test/编排/fixtures/git-action-authorization-wiring.ts
+ M test/编排/git-capabilities.test.ts

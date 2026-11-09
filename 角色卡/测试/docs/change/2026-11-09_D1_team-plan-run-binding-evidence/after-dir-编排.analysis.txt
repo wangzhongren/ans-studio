@@ -1,0 +1,25 @@
+SUMMARY tests=1139 pass=1115 fail=22 cancelled=0 skipped=2 todo=0
+FAIL	1	A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）
+FAIL	1	AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+FAIL	1	AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+FAIL	1	AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+FAIL	1	AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+FAIL	1	AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+FAIL	1	BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+FAIL	1	BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+FAIL	1	D-1：projectRoot 为空 → 不传 sessionDir（旧行为）
+FAIL	1	D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）
+FAIL	1	Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+FAIL	1	P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+FAIL	1	Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+FAIL	1	applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+FAIL	1	node test外指符号链接路径不获委托；项目内测试路径获委托
+FAIL	1	openRoleSession：普通角色 settle → 发出 handback（形状正确）
+FAIL	1	real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+FAIL	1	v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力
+FAIL	1	人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒
+FAIL	1	卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report
+FAIL	1	卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡
+FAIL	1	有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒
+SKIP	1	Delivered Hub code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources
+SKIP	1	Delivered legacy code provenance: an explicit real read-only trace keeps its original quality creator and frozen sources

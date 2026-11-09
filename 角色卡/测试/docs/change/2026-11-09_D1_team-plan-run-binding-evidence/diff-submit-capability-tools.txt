@@ -1,0 +1,9 @@
+== suite: submit-capability-tools
+--- before summary:
+SUMMARY tests=22 pass=20 fail=2 cancelled=0 skipped=0 todo=0
+--- after summary:
+SUMMARY tests=25 pass=23 fail=2 cancelled=0 skipped=0 todo=0
+--- FAIL before-only:
+--- FAIL after-only (new):
+--- SKIP before-only:
+--- SKIP after-only (new):

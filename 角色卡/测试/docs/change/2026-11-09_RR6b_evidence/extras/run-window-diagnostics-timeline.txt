@@ -1,0 +1,38 @@
+2026-11-09T13:22:35.668Z desktop.interface tasks.restored
+2026-11-09T13:22:35.679Z desktop.delivery delivery.skip.demo-not-opened rapporteur dispatch
+2026-11-09T13:22:39.690Z desktop.session session.open.start chief
+2026-11-09T13:22:39.694Z orchestration.session session.open.start chief
+2026-11-09T13:22:39.732Z orchestration.session session.open.ready chief
+2026-11-09T13:22:39.735Z desktop.session session.open.end chief
+2026-11-09T13:22:41.010Z provider.claude request.attempt.start chief
+2026-11-09T13:23:07.944Z provider.claude request.first-byte chief
+2026-11-09T13:23:31.019Z orchestration.session session.open.start convener
+2026-11-09T13:23:31.041Z orchestration.session session.open.ready convener
+2026-11-09T13:23:31.060Z desktop.delivery delivery.start convener dispatch
+2026-11-09T13:23:31.090Z provider.claude request.attempt.start convener
+2026-11-09T13:23:35.860Z provider.claude request.first-byte convener
+2026-11-09T13:23:44.326Z desktop.session turn.settled chief origin-matched
+2026-11-09T13:23:44.328Z desktop.governance-feedback governance.feedback.skip chief primary
+2026-11-09T13:23:44.340Z desktop.interface tasks.restored
+2026-11-09T13:23:44.344Z desktop.delivery delivery.skip.demo-not-opened rapporteur dispatch
+2026-11-09T13:23:44.359Z orchestration.session session.open.start rapporteur
+2026-11-09T13:23:44.481Z orchestration.session session.open.ready rapporteur
+2026-11-09T13:23:44.511Z desktop.delivery delivery.start rapporteur dispatch
+2026-11-09T13:23:44.537Z provider.claude request.attempt.start rapporteur
+2026-11-09T13:23:53.699Z provider.claude request.first-byte rapporteur
+2026-11-09T13:23:55.750Z orchestration.session report.received rapporteur blocked
+2026-11-09T13:23:58.351Z desktop.session report.received rapporteur
+2026-11-09T13:23:58.353Z desktop.session turn.settled rapporteur origin-matched
+2026-11-09T13:23:58.355Z desktop.delivery delivery.end rapporteur dispatch
+2026-11-09T13:23:58.356Z desktop.session session.open-background.start chief
+2026-11-09T13:23:58.359Z desktop.session session.open-background.end chief
+2026-11-09T13:23:58.370Z desktop.interface tasks.restored
+2026-11-09T13:23:58.374Z provider.claude request.attempt.start chief
+2026-11-09T13:23:58.376Z desktop.delivery delivery.skip.demo-not-opened rapporteur dispatch
+2026-11-09T13:23:58.397Z desktop.delivery delivery.start rapporteur dispatch
+2026-11-09T13:23:58.447Z provider.claude request.attempt.start rapporteur
+2026-11-09T13:23:58.466Z desktop.delivery delivery.blocked chief target-busy
+2026-11-09T13:23:59.076Z desktop.delivery delivery.skip.task-terminal rapporteur
+2026-11-09T13:23:59.081Z desktop.delivery delivery.start chief handback
+2026-11-09T13:23:59.106Z desktop.governance-feedback governance.feedback.dispatch.failed rapporteur
+2026-11-09T13:23:59.140Z provider.claude request.attempt.start chief

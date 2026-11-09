@@ -473,7 +473,7 @@ export async function executeGitDocumentPublication(input: { projectRoot: string
   return executeGitBusinessPublication({ projectRoot: input.projectRoot, kind: "direct", request: input.applyInput });
 }
 export async function executeGitTeamPlanPublication(input: { projectRoot: string; request: import("../../model/runtime.ts").CompleteTeamPlanInput; actorRoleId: string }): Promise<CompletedTeamPlanReceipt> {
-  if (input.actorRoleId !== "convener") return { ok: false, status: "rejected", operationId: input.request.operationId, baseDigest: input.request.baseDigest,
+  if (input.actorRoleId !== "convener") return { ok: false, status: "rejected", operationId: input.request.operationId, baseDigest: input.request.baseDigest ?? null,
     targetDigest: null, errorCode: "plan-identity-invalid", message: "Only the actual convener can publish the plan" };
   return executeGitBusinessPublication({ projectRoot: input.projectRoot, kind: "plan", request: input.request });
 }
@@ -496,7 +496,7 @@ async function executeGitBusinessPublication(input: { projectRoot: string } & (
 )): Promise<CompletedTeamPlanReceipt | import("../../model/runtime.ts").ActivateRoleDocumentsResult> {
   const request = input.request, actorRoleId = input.kind === "plan" ? "convener" : input.kind === "active" ? "nominator" : input.request.actorRoleId;
   const fail = (code: string, message: string): DirectActionReceipt => ({ ok: false, status: "blocked", operationId: request.operationId,
-    baseDigest: input.kind === "plan" ? input.request.baseDigest : input.kind === "active" ? input.activation.expectedActive.digest : input.request.baseTrunk?.digest ?? null, targetDigest: null, errorCode: code, message });
+    baseDigest: input.kind === "plan" ? (input.request.baseDigest ?? null) : input.kind === "active" ? input.activation.expectedActive.digest : input.request.baseTrunk?.digest ?? null, targetDigest: null, errorCode: code, message });
   const service = createTrunkService({ projectRoot: input.projectRoot });
   if (!service.prepareDirectCommit || !service.prepareDirectAuthority || !service.commitPreparedDirect || !service.prepareTeamPlanCommit || !service.commitPreparedTeamPlan || !service.prepareActivationCommit || !service.commitPreparedActivation)
     return fail("git-document-service-unavailable", "Bound business commit capabilities are unavailable");
@@ -623,8 +623,9 @@ function rapporteurRunChangeRejection(
 
 /**
  * X-R4（E2 S4）：convener 模块 `preflight.checkAction("team-plan", …)` 的事实包（api-spec §5.1：
- * `actorRoleId` + `CompleteTeamPlanInput` 全部字段；`runId` 可选，未给不造键）。工具 schema 已保证
- * operationId/flowId/baseDigest/plan 形状；`plan.path` 的 flow/version 规则由模块与 Service 双检。
+ * `actorRoleId` + `CompleteTeamPlanInput` 全部字段；`runId` 可选，未给不造键）。`baseDigest`/
+ * `plan.sha256` 是应用派生的机器事实（B1 AC-10）：缺省字段不投影，给了由模块按 64 hex 校验；
+ * 工具 schema 保证 operationId/flowId/plan 基本形状；`plan.path` 的 flow/version 规则由模块与 Service 双检。
  */
 export function convenerTeamPlanFacts(request: CompleteTeamPlanInput): Readonly<Record<string, unknown>> {
   return {
@@ -632,8 +633,8 @@ export function convenerTeamPlanFacts(request: CompleteTeamPlanInput): Readonly<
     operationId: request.operationId,
     flowId: request.flowId,
     ...(request.runId !== undefined ? { runId: request.runId } : {}),
-    baseDigest: request.baseDigest,
-    plan: { path: request.plan.path, sha256: request.plan.sha256, version: request.plan.version },
+    ...(request.baseDigest !== undefined ? { baseDigest: request.baseDigest } : {}),
+    plan: { path: request.plan.path, version: request.plan.version, ...(request.plan.sha256 !== undefined ? { sha256: request.plan.sha256 } : {}) },
   };
 }
 
@@ -821,7 +822,7 @@ export function createDirectRoleRuntime(input: { projectRoot: string; actorRoleI
     // It is not a document/permission effect and must not start unrelated model turns.
     return service.closeCreatedTask(request, input.actorRoleId);
   }, completeTeamPlan: async (request, signal) => {
-    if (signal?.aborted) return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest,
+    if (signal?.aborted) return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest ?? null,
       targetDigest: null, errorCode: "plan-cancelled", message: "The turn was cancelled before invocation" };
     // X-R4（E2 S4）：team-plan 角色侧前置——在 abort 之后、Git/Service 最终校验之前调用 convener 模块
     // （事实 = 本层将提交的 input 逐字段投影；api-spec §5.1 登记键）。deny 映射迁移前 Service 首检码
@@ -833,7 +834,7 @@ export function createDirectRoleRuntime(input: { projectRoot: string; actorRoleI
         const decision = preflight.checkAction({ action: "team-plan", facts: convenerTeamPlanFacts(request) });
         if (!decision.allow) {
           const rejection = convenerTeamPlanRejection(decision);
-          return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest,
+          return { ok: false, status: "rejected", operationId: request.operationId, baseDigest: request.baseDigest ?? null,
             targetDigest: null, errorCode: rejection.errorCode, message: rejection.message };
         }
       }

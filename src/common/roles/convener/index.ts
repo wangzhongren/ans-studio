@@ -402,6 +402,10 @@ function deny(code: string, messageKey: string, details?: unknown): RolePolicyDe
   return { allow: false, code, messageKey, ...(details === undefined ? {} : { details }) };
 }
 
+// 2026-11-09《团队计划登记 run 绑定 / baseDigest 合法来源》（B1 AC-10 / P-10）：
+// `baseDigest` 与 `plan.sha256` 是应用拥有的机器事实（effective trunk digest / 计划文件实际
+// 字节摘要），由 Service 派生；角色侧事实包允许缺省（缺省字段不投影），给出时必须保持既有
+// 形状（64 hex）。路径/版本规则、未知键规则与 `TEAM_PLAN_FACT_KEYS` 逐字保留。
 function checkTeamPlan(facts: Facts): RolePolicyDecision {
   const unknown = findUnknownFact(facts, TEAM_PLAN_FACT_KEYS);
   if (unknown !== undefined) {
@@ -411,7 +415,7 @@ function checkTeamPlan(facts: Facts): RolePolicyDecision {
     facts["actorRoleId"] !== "convener" ||
     !isNonEmptyString(facts["operationId"]) ||
     !isNonEmptyString(facts["flowId"]) ||
-    !isHex64(facts["baseDigest"]) ||
+    (facts["baseDigest"] !== undefined && !isHex64(facts["baseDigest"])) ||
     (facts["runId"] !== undefined && !isNonEmptyString(facts["runId"]))
   ) {
     return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });
@@ -419,9 +423,9 @@ function checkTeamPlan(facts: Facts): RolePolicyDecision {
   const plan = facts["plan"];
   if (
     !isPlainRecord(plan) ||
-    !hasExactKeys(plan, ["path", "sha256", "version"]) ||
+    !(hasExactKeys(plan, ["path", "version"]) || hasExactKeys(plan, ["path", "sha256", "version"])) ||
     !isNonEmptyString(plan["path"]) ||
-    !isHex64(plan["sha256"]) ||
+    (plan["sha256"] !== undefined && !isHex64(plan["sha256"])) ||
     !isPositiveSafeInteger(plan["version"])
   ) {
     return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", {

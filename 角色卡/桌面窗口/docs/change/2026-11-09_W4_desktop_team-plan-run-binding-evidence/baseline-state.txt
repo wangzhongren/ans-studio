@@ -1,0 +1,9 @@
+# W4（W6/T5）基线状态（2026-11-09；before 证据采集时点）
+worktree: .claude/worktrees/trunk-amendment
+branch: feat/plan-escalation-card
+HEAD: 24799cb61239272e8603018adc094881bb6263dd
+HEAD^{tree}: 409a4ac7bb077c0fc5b19f3c99383cf0b09dd13e
+node: v24.22.1
+baseline command: node --test --test-concurrency=1 --test-reporter=tap test/桌面应用/chief-workflow.test.ts
+before state of this batch's write set: app/desktop/session.ts and test/桌面应用/chief-workflow.test.ts both clean (unmodified at HEAD; git status --porcelain showed neither).
+in-flight (other owners; read-only for this batch, not modified): src/model/runtime.ts, src/provider/runtime/schema.ts, src/common/roles/convener/index.ts, src/service/trunk/impl/apply-journal.ts, src/pipeline/orchestration/trunk-runtime.ts, test/runtime-core/submit-capability-tools.test.ts, test/roles/convener/{convener-module,convener-differential}.test.ts, test/roles/convener/oracle-fixture.ts, test/编排/{direct-role-capabilities,git-capabilities,convener-module-consumption}.test.ts, test/编排/fixtures/git-action-authorization-wiring.ts

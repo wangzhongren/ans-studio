@@ -1,0 +1,6 @@
+b213a7dd2a6ecbb010be822c7f399a0c463a9c617580c0106e20ec6ae49d7898 *src/service/trunk/impl/apply-journal.ts
+5b718ffdd970ab24dcba6eae2fef7f813c6155dc89e8be977d8b3efecb5bc1af *src/pipeline/orchestration/trunk-runtime.ts
+30d5a0a640bedca2f34cedf79134be771ceb6b820d10b0f55052504bdade6a17 *test/编排/fixtures/git-action-authorization-wiring.ts
+9e2cd3c08ac40feb9fad89ba2bacd237a01ee06314c2e2efad07876e8984e6a3 *test/编排/direct-role-capabilities.test.ts
+a2de9417977507b9bd1620eac27bd810c3ae9f796bc1a8adcd9b6d84c8d4bba7 *test/编排/git-capabilities.test.ts
+4c7dfc6a317181935a4729f948fcc625b8db86e5788daa62bfbc211a8dc815c9 *test/编排/convener-module-consumption.test.ts

@@ -1,0 +1,24 @@
+{
+  "fileCount": {
+    "pre": 15,
+    "post": 15
+  },
+  "aggregate": {
+    "pre": "a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59",
+    "post": "a80e93dad2bc598a6bda3adae239bf79d46213538f391c6beba8cf25439eda59",
+    "equal": true
+  },
+  "filesEqual": true,
+  "manifest": {
+    "fileCount": 1107,
+    "fileHash": "f62a81a6485c2bb1047c1dbf2c6d260c90c94c4073cb5b3bd7e469f2013a7d15",
+    "aggregate": "b06433b5ad162907a7ec5395f9cb31c89e6c48244ca0e5eb21115de13c7fdbf0",
+    "fileHashEqual": true,
+    "aggregateEqual": true
+  },
+  "untrackedSrcAppTest": 0,
+  "headEqual": true,
+  "treeEqual": true,
+  "branchEqual": true,
+  "stagedEmpty": true
+}

@@ -1,0 +1,12 @@
+请按 ANS 既有真实流程继续推进「2D 贪吃蛇小游戏」项目（同一现有 target；为基础玩法增加暂停/继续：运行时按空格键或点击界面按钮可暂停与继续）。本轮目标：完成团队计划阶段并继续既定链路。本条消息是唯一客户指令：不要使用 run_shell；不要伪造或代填任何工具结果；每一步都如实回报；遇到门禁或阻塞时如实记录门码/回执原文后停止，不要重试被拒的调用，不要猜测或自填应用派生值。
+
+现状与流程备忘（请转达给相应角色）：
+1. 提案步骤已完成：上一轮已新建 docs/proposals/snake-game-proposal-v2.md（含暂停/继续），且客户已接受提案卡 req-83771b765b37d527（request.resolved / choice=accept，已结算）。不要重新发起提案、不要建重复提案卡；若流程确需新的提案文件，只能新建更高版本（如 -v3）或新 flowId，绝不得修改/覆盖/原地改写任何已冻结的 v1 文档——尤其 docs/proposals/snake-game-proposal-v1.md 已冻结只读（原地改写会被应用以 versioned-doc-overwrite 拒绝）。
+2. 直接进入团队计划：由运营（convener）把团队计划写入规范路径 docs/scheduling/snake-game-team-v1.md（即 docs/scheduling/<flowId>-team-v1.md，flowId=snake-game，版本号 v1；其他路径会被应用以 plan-path-invalid 拒绝）。派发/任务文本中必须写明该规范路径。
+3. 调用 complete_team_plan 时，plan 只需提供 {path, version}；不要提供 baseDigest，也不要提供 plan.sha256——baseDigest 由应用从 effective trunk 派生、plan.sha256 由应用按实际文件字节派生；runId 由应用从真实受派任务绑定，不要自报或猜测任何派生值。若仍自报了错误值，应用会按既有稳定 code 断言拒绝，如实记录即可。
+4. 若团队计划登记成功（ok:true），按既有流程继续（任命卡按既有分工由人事 nominator 发起，不要越权代发）。
+5. 每步客户面对卡必须经真实 UI 呈现并由客户确认；本轮卡片总数不超过 4。
+6. 若团队计划登记被应用拒绝（如 trunk-unavailable / plan-basis-incomplete / plan-path-invalid / plan-base-conflict 等），如实记录完整回执原文（含 errorCode/message）后停止并交回报告；不要重试、不要 bootstrap trunk、不要伪造成功。
+7. 上一轮遗留任务 t-mw99xpan-4f066d25 已过期（其内容已完成：v2 文档已存在且提案卡已接受）。如它被系统恢复投递或以任何方式出现，不要重复执行、不要再建重复提案卡；如实记录即可。
+
+如派发给其它角色，请在投递任务中写明：taskId 使用投递消息头部的任务编号去掉开头 # 的部分（例如 #t-abc → t-abc），不得包含 # 字符。
