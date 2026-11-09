@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: X-R1 run-role：trio product 注入 submitVersionChange；single+product 结构不可达（P-6 旧口径）
+ok 1 - X-R1 run-role：trio product 注入 submitVersionChange；single+product 结构不可达（P-6 旧口径）
+  ---
+  duration_ms: 9.3444
+  type: 'test'
+  ...
+# Subtest: X-R1 VCA direct：product preflight allow 不替代 Service——合法提交仍由既有 direct 链路落盘
+ok 2 - X-R1 VCA direct：product preflight allow 不替代 Service——合法提交仍由既有 direct 链路落盘
+  ---
+  duration_ms: 155.663
+  type: 'test'
+  ...
+# Subtest: X-R1 VCA direct：product 模块 deny 映射既有回执码，且拒绝不落盘
+ok 3 - X-R1 VCA direct：product 模块 deny 映射既有回执码，且拒绝不落盘
+  ---
+  duration_ms: 30.5863
+  type: 'test'
+  ...
+# Subtest: X-R1 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 product 策略
+ok 4 - X-R1 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 product 策略
+  ---
+  duration_ms: 2.948
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 513.3724

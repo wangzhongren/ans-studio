@@ -6,7 +6,7 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 import { createFsTrunkStore } from "../../src/provider/trunk/public/trunk-store.ts";
-import { createGuardFreezeRegistry, acquireVersionLock, readVersionBaselineState, writeVersionBaselineState, scanVersionedDocuments, readConfirmedIntentEvidence } from "../../src/provider/version-change/public/version-change-store.ts";
+import { createGuardFreezeRegistry, acquireVersionLock, readVersionBaselineState, writeVersionBaselineState, scanVersionedDocuments, readConfirmedIntentEvidence, completeSnapshotDigest } from "../../src/provider/version-change/public/version-change-store.ts";
 import { createTrunkService, type TrunkDirectApplyInput } from "../../src/service/trunk/public/trunk-service.ts";
 import { createVersionChangeIntegration } from "../../src/service/version-change/public/version-change-integration.ts";
 import { prepareChiefDecisionEvidence, openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
@@ -19,7 +19,7 @@ import { readTaskState, validateTaskStateEvent } from "../../src/common/编排/t
 import { createTrunkProject, PATHS } from "./fixtures/trunk-project.ts";
 import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
 import type { CustomerInputRequest, CustomerInputMetadata, TaskCreatedEvent, TaskReportedEvent, RequestCreatedEvent, RequestResolvedEvent } from "../../src/model/runtime.ts";
-import { TRUNK_MANIFEST_SCHEMA, FROZEN_ROLE_REF_KEYS, type TrunkManifest, type SnapshotRef, type FrozenRoleEvidence, type ActiveRoleEvidence } from "../../src/model/trunk.ts";
+import { TRUNK_MANIFEST_SCHEMA, COMPLETE_SNAPSHOT_SCHEMA, FROZEN_ROLE_REF_KEYS, type TrunkManifest, type SnapshotRef, type FrozenRoleEvidence, type ActiveRoleEvidence, type CompleteSnapshot } from "../../src/model/trunk.ts";
 
 const at = "2026-11-05T00:00:00.000Z";
 const sha = (b: string | Buffer) => createHash("sha256").update(b).digest("hex");
@@ -953,6 +953,126 @@ test("chief evidence: draft planning run needs bound document hashes and never r
   await fs.writeFile(path.join(root, "docs/evidence.md"), "Drifted draft");
   assert.equal(await bundle.isCurrent(), false);
   await assert.rejects(prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "convener", request: decisionRequest, metadata }), /drifted/);
+});
+// ———— A′（fix 2026-11-09 proposal-draft-run-evidence-binding）：B1 v1 §4.1 A1–A5 新增矩阵 ————
+// draft manifest documents/execution 恒空（pin 前无绑定写点）时，应用按实际项目字节完成等价绑定：
+// 目标集 = host artifacts/criteriaRef，否则按 flowId 的版本化文档发现；快照 complete-snapshot/v1 + 逐文件 SHA-256；
+// 结算前由 discovery/verification 复核，漂移 fail-closed；manifest 永不因 prepare 被写。
+const draftRunManifest = (runId: string) => JSON.stringify({ runId, flowId: "demo", state: "draft", documents: {}, execution: { teamPlan: null, flow: null } });
+async function emptyDraftFixture(runId: string) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chief-draft-evidence-"));
+  await fs.mkdir(path.join(root, `.ans/runs/${runId}`), { recursive: true });
+  await fs.writeFile(path.join(root, `.ans/runs/${runId}/manifest.json`), draftRunManifest(runId));
+  return root;
+}
+function emptyDraftMetadata(runId: string): CustomerInputMetadata {
+  const metadata = decisionMetadata(runId);
+  metadata.judgeContext!.facts.runState = "draft";
+  delete metadata.judgeContext!.artifacts;
+  return metadata;
+}
+test("chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest", async () => {
+  const runId = "run-20261109-demo-draft-a1", root = await emptyDraftFixture(runId);
+  const proposal = "Actual pending proposal v1\n", intent = "Actual product intent v1\n";
+  await fs.mkdir(path.join(root, "docs/proposals"), { recursive: true });
+  await fs.mkdir(path.join(root, "docs/product"), { recursive: true });
+  await fs.writeFile(path.join(root, "docs/proposals/demo-proposal-v1.md"), proposal);
+  await fs.writeFile(path.join(root, "docs/product/demo-intent-v1.md"), intent);
+  const runPath = path.join(root, `.ans/runs/${runId}/manifest.json`), manifestBefore = await fs.readFile(runPath);
+  const bundle = await prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "rapporteur", request: decisionRequest, metadata: emptyDraftMetadata(runId) });
+  assert.ok(bundle.context.includes(proposal)); assert.ok(bundle.context.includes(intent));
+  assert.ok(bundle.context.includes("Recover the actual target"));
+  assert.equal(bundle.evidenceRefs.length, 3, "two discovered documents plus the request input enter the snapshot");
+  const snapshotIds = [...new Set(bundle.evidenceRefs.map(ref => ref.snapshotId))];
+  assert.equal(snapshotIds.length, 1); assert.match(snapshotIds[0]!, /^decision-[a-f0-9]{64}$/);
+  const snapshot = await createFsTrunkStore(root).readSnapshot!({ snapshotId: snapshotIds[0]!, digest: snapshotIds[0]!.slice("decision-".length) });
+  assert.equal(snapshot.ok, true); if (!snapshot.ok) return;
+  assert.equal(snapshot.value.schema, COMPLETE_SNAPSHOT_SCHEMA);
+  assert.equal(snapshot.value.digest, completeSnapshotDigest(snapshot.value.files));
+  for (const [rel, text] of [["docs/proposals/demo-proposal-v1.md", proposal], ["docs/product/demo-intent-v1.md", intent]] as const) {
+    const file: CompleteSnapshot["files"][number] | undefined = snapshot.value.files.find(entry => entry.path === rel);
+    assert.ok(file !== undefined, `snapshot carries the actual bytes of ${rel}`);
+    assert.equal(file.sha256, sha(text));
+    assert.equal(Buffer.from(file.bytesBase64, "base64").toString("utf8"), text);
+    assert.ok(bundle.evidenceRefs.some(ref => ref.path === rel && ref.sha256 === sha(text)));
+  }
+  assert.equal(await bundle.isCurrent(), true);
+  assert.deepEqual(await fs.readFile(runPath), manifestBefore, "prepare must not write the draft run manifest");
+});
+test("chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes", async () => {
+  const runId = "run-20261109-demo-draft-a2", root = await emptyDraftFixture(runId);
+  await fs.mkdir(path.join(root, "docs/proposals"), { recursive: true });
+  const v1 = path.join(root, "docs/proposals/demo-proposal-v1.md");
+  await fs.writeFile(v1, "Actual pending proposal v1\n");
+  const invoke = () => prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "rapporteur", request: decisionRequest, metadata: emptyDraftMetadata(runId) });
+  const first = await invoke();
+  assert.ok(first.context.includes("Actual pending proposal v1")); assert.equal(await first.isCurrent(), true);
+  await fs.writeFile(v1, "Changed after preparing\n");
+  assert.equal(await first.isCurrent(), false, "changed actual bytes invalidate the earlier basis");
+  await fs.writeFile(path.join(root, "docs/proposals/demo-proposal-v2.md"), "Actual newer pending proposal v2\n");
+  assert.equal(await first.isCurrent(), false, "a new bound target version invalidates the earlier basis");
+  const second = await invoke();
+  assert.ok(second.context.includes("Actual newer pending proposal v2"));
+  assert.equal(second.context.includes("Changed after preparing"), false, "the latest version replaces the earlier family bytes");
+  assert.notEqual(second.baseDigest, first.baseDigest);
+  assert.equal(await second.isCurrent(), true);
+});
+test("chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot", async () => {
+  const runId = "run-20261109-demo-draft-a3", root = await emptyDraftFixture(runId);
+  const snapshots = path.join(root, ".ans/trunk/snapshots");
+  await assert.rejects(prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "rapporteur", request: decisionRequest, metadata: emptyDraftMetadata(runId) }),
+    /Draft request target is not bound to that run/, "no app-computed target means no binding");
+  await assert.rejects(fs.access(snapshots), /ENOENT/, "an unbound draft produces no evidence snapshot");
+  await fs.mkdir(path.join(root, "docs/proposals"), { recursive: true });
+  await fs.writeFile(path.join(root, "docs/proposals/demo-proposal-v1.md"), "Actual pending proposal v1\n");
+  await fs.writeFile(path.join(root, "docs/role-private.md"), "Role-reported bytes must never be read\n");
+  const reported = { ...emptyDraftMetadata(runId), paths: ["docs/role-private.md"] };
+  await assert.rejects(prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "rapporteur", request: decisionRequest, metadata: reported }),
+    /Draft request target is not bound to that run/, "a self-reported path outside the app evidence set is never read and never bound");
+  const escaping = decisionMetadata(runId); escaping.judgeContext!.facts.runState = "draft";
+  escaping.judgeContext!.artifacts = { proposalPath: "../outside.md" };
+  await assert.rejects(prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "rapporteur", request: decisionRequest, metadata: escaping }),
+    /invalid-project-path/, "an out-of-project artifact path is rejected by actual-byte reading");
+  await assert.rejects(fs.access(snapshots), /ENOENT/, "rejected drafts produce no evidence snapshot");
+});
+test("chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification", async () => {
+  const runId = "run-20261109-demo-draft-a4", root = await emptyDraftFixture(runId);
+  const invoke = (metadata: CustomerInputMetadata) => prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "rapporteur", request: decisionRequest, metadata });
+  await fs.mkdir(path.join(root, "docs"), { recursive: true });
+  await fs.writeFile(path.join(root, "docs/evidence.md"), "Actual target evidence\n");
+  const missing = decisionMetadata(runId); missing.judgeContext!.facts.runState = "draft";
+  missing.judgeContext!.artifacts = { proposalPath: "docs/missing.md" };
+  await assert.rejects(invoke(missing), /Target evidence is unreadable: docs\/missing\.md/);
+  await fs.writeFile(path.join(root, ".env"), "API_KEY=example-secret-value");
+  const secret = decisionMetadata(runId); secret.judgeContext!.facts.runState = "draft";
+  secret.judgeContext!.artifacts = { proposalPath: ".env" };
+  await assert.rejects(invoke(secret), /secret/);
+  await fs.writeFile(path.join(root, "docs/evidence.md"), "x".repeat(65537));
+  const oversized = decisionMetadata(runId); oversized.judgeContext!.facts.runState = "draft";
+  await assert.rejects(invoke(oversized), /oversized/);
+  await fs.writeFile(path.join(root, "docs/evidence.md"), Buffer.from([0xff, 0xfe, 0xfd, 0x00]));
+  const nonText = decisionMetadata(runId); nonText.judgeContext!.facts.runState = "draft";
+  await assert.rejects(invoke(nonText), /non-text/);
+  await fs.writeFile(path.join(root, "docs/evidence.md"), "Actual target evidence\n");
+  const mismatched = emptyDraftMetadata(runId);
+  mismatched.criteriaRef = { path: "docs/evidence.md", sha256: "0".repeat(64), version: 1 };
+  await assert.rejects(invoke(mismatched), /Target evidence hash differs from the criteria reference/);
+  await assert.rejects(fs.access(path.join(root, ".ans/trunk/snapshots")), /ENOENT/, "failed prepares produce no evidence snapshot");
+  const matched = emptyDraftMetadata(runId);
+  matched.criteriaRef = { path: "docs/evidence.md", sha256: sha("Actual target evidence\n"), version: 1 };
+  const bundle = await invoke(matched);
+  assert.ok(bundle.context.includes("Actual target evidence")); assert.equal(await bundle.isCurrent(), true);
+});
+test("chief evidence (A5): manifest-bound draft refs keep their authority over request targets", async () => {
+  const root = await decisionFixture(), runId = "run-20261109-demo-draft-a5";
+  await fs.mkdir(path.join(root, `.ans/runs/${runId}`), { recursive: true });
+  await fs.writeFile(path.join(root, `.ans/runs/${runId}/manifest.json`), JSON.stringify({ runId, flowId: "demo", state: "draft",
+    documents: { proposal: { path: "docs/evidence.md", sha256: sha("Actual target evidence\n") } }, execution: { teamPlan: null, flow: null } }));
+  await fs.writeFile(path.join(root, "docs/other.md"), "Actual unrelated target\n");
+  const metadata = decisionMetadata(runId); metadata.judgeContext!.facts.runState = "draft";
+  metadata.judgeContext!.artifacts = { proposalPath: "docs/other.md" };
+  await assert.rejects(prepareChiefDecisionEvidence({ projectRoot: root, originRoleId: "convener", request: decisionRequest, metadata }),
+    /Draft request target is not bound to that run/, "bound refs stay authoritative; A′ does not bypass them");
 });
 test("chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version", async () => {
   const root = await decisionFixture(); await fs.mkdir(path.join(root, "docs/proposals"));

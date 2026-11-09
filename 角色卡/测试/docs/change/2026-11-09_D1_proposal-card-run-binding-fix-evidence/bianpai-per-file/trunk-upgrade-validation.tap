@@ -1,0 +1,126 @@
+TAP version 13
+# Subtest: AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+not ok 1 - AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+  ---
+  duration_ms: 58.2481
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:148:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:163:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+not ok 2 - AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+  ---
+  duration_ms: 47.0383
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:171:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:177:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+not ok 3 - AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+  ---
+  duration_ms: 49.2923
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:195:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+not ok 4 - AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+  ---
+  duration_ms: 47.353
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:202:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:209:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+not ok 5 - AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+  ---
+  duration_ms: 49.8319
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:216:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:222:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-13：stable boundary 预览扩大/收窄/无变化/不可解析
+ok 6 - AC-13：stable boundary 预览扩大/收窄/无变化/不可解析
+  ---
+  duration_ms: 28.5217
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 1
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 584.1449

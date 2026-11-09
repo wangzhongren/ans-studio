@@ -1,0 +1,44 @@
+# D1 summary (raw numbers; no acceptance judgment)
+candidate: HEAD c1439ce57430ef783b80a01bb6e6437fcb20cabd + 4 working-tree files
+  aggregate(4 files, path\0sha256, LC_ALL=C byte sort): bf12745676901055ccfcb98e3578205465c88a3ef8293faa91827dc5beb80986
+  manifest(1109 files, canonical two-space/LF): 4958207f196109ef5c7d25e642f8846880236a94e6fe4fca6bb6af03e1cab064
+
+## test/编排/** (107 files, node --test --test-concurrency=1 per file == glob-equivalent)
+tests=1127 pass=1103 fail=22 cancelled=0 skipped=2 todo=0
+baseline (A' evidence after state): tests=1127 pass=1103 fail=22 cancelled=0 skipped=2
+failure-name set diff vs A' after-failing-tests.txt: EMPTY (22/22 same names)
+skip names: 2, same as A' after-test.log (Delivered Hub/legacy code provenance)
+new A1-A5 (direct-role-capabilities.test.ts ok 27-31): all pass
+files with exit=1: 13 (all expected known-red files); files exit=0: 93 (+ version-change-runtime standalone exit=0)
+full-glob incident: first attempt hung >10min at child test/编排/version-change-runtime.test.ts after 1053/1127 tests;
+  standalone rerun 5/5 pass exit 0 in 0.7s => file-process handle leak under load (same class as A' contaminated run1);
+  partial TAP kept as bianpai-full-glob-incident.tap; NOT used for counts.
+
+## test/桌面应用/chief-workflow.test.ts (63 tests; run twice)
+run1: tests=63 pass=51 fail=12 cancelled=0 skipped=0 exit=1 duration=67.9s
+run2: tests=63 pass=49 fail=14 cancelled=0 skipped=0 exit=1 duration=69.2s
+baseline (B evidence, HEAD): tests=59 pass=47 fail=12
+new tests: W1b(missing evidence rewrite) + B1 + B2 + B3/B4 + B5 = all PASS in both runs
+failure union across run1+run2 = baseline names {W5(+nested commit-race), W14, W19, W22, W23, W28 stop, W28 stop-and-restart, W33, W34, W47 select}
+  + environment-flake names {W20, W29, W10/unmanaged, W47 revise}
+super-baseline isolation reruns (same candidate, --test-name-pattern):
+  W20: 2/2 pass exit 0
+  W29: 2 tests pass (6.8s/6.3s); failure is file-level Node native teardown crash (cleanup_queue assertion, exitCode 134), not a test assertion
+  W10: 5/5 pass exit 0
+  W47: select pass; revise fails ENOTEMPTY temp-dir cleanup (flips across runs; run1 both pass, run2 both fail)
+new deterministic failures = 0; new skips = 0
+
+## read-only regressions
+decision-service: 20/20 pass exit 0 (baseline 20/20)
+application-line: 3/3 pass exit 0 (baseline 2 pass/1 fail machine flake; not worse)
+run-change-trigger: 9 fail, names identical to baseline 9 (baseline known red), exit 1
+pending-card-restart: 1/1 pass exit 0
+optional-acceptance (BASE-3 cmd, untouched): tests=6 pass=2 fail=1 cancelled=3 skipped=0 exit=1 — identical to BASE-3; file diff vs HEAD = 0
+
+## static gates
+npm run typecheck exit 0
+npm run typecheck:renderer exit 0
+
+## stability
+manifest before/after: 1109 files, line diff EMPTY, canonical sha 4958207f... before and after
+candidate 4 hashes before/after identical; HEAD/tree/branch unchanged; index staged 0; src app test status = the same 4 files

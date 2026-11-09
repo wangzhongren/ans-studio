@@ -1,0 +1,37 @@
+{
+  "startedUtc": "2026-11-09T05:06:26.142Z",
+  "endedUtc": "2026-11-09T05:06:39.382Z",
+  "proposalRequestId": "req-303944cb359e95cd",
+  "resolvedRow": {
+    "at": "2026-11-09T05:06:27.390Z",
+    "by": "customer",
+    "choice": "accept"
+  },
+  "toggleOff": true,
+  "submitResult": {
+    "result": "submitted",
+    "selected": "accept"
+  },
+  "secondCard": false,
+  "stopCause": "resolved-window-done",
+  "pre": {
+    "dialogOpen": true,
+    "title": "确认「2D 贪吃蛇小游戏」实施提案（v1）",
+    "opts": [
+      {
+        "id": "accept",
+        "checked": false
+      },
+      {
+        "id": "revise",
+        "checked": false
+      }
+    ],
+    "delegationChecked": true,
+    "delegationDisabled": false,
+    "error": null,
+    "judgeNotice": "幕僚未提交有效决定，本次未作批准。可关闭“替我决策”接管，或由原发起者补齐材料后重新提交。",
+    "submitDisabled": true,
+    "bodyTail": "角色：rapporteur（策划）\nflowId：snake-game\n任务编号：#t-mw8srveh-e875be9e（sideEffect=docs）\n状态：已受理，任务将投递给策划会话；投递结果/失败会在双方聊天流如实显示。受理 ≠ 已完成，也不等于对方一定执行或写盘——对方仅在其已接受边界内执行，我不代授权。\n\n任务原文已逐字投递，内含出卡参数与「取消息头部任务号去掉 # 作为 taskId」的说明（该任务号即 t-mw8srveh-e875be9e）。本轮结束，等待策划的真实回报。\n\n[任务] #t-mw8srveh-e875be9e；run：run-hub-4b3e91d59ae3c59f5b3c8943c7b84bbd5341f3b6eb22f0eb（draft）；目标角色：rapporteur；目标：请先核查 docs/proposals/snake-game-proposal-v1.md，然后调用 request_choice 向客户发出提案确认卡，参数如下： - title: 确认「2D 贪吃蛇小游戏」实施提案（v1） - cardKind: proposal - flowId: snake-game - taskId: 取投递消息头部的任务编号，去掉开头 # 后逐字使用（例如 #t-a…；状态：created｜副作用：docs｜时间：2026-11-09T05:05:03.929Z\n会话结束\n幕\n幕僚\n\n[系统·申请] 已提交：角色「rapporteur」的申请「确认「2D 贪吃蛇小游戏」实施提案（v1）」（#req-303944cb359e95cd）。申请保持原发起者与回报链；裁决者以结果来源为准。\n\n幕\n幕僚\n\n[系统·申请] 已呈现：角色「rapporteur」的申请「确认「2D 贪吃蛇小游戏」实施提案（v1）」（#req-303944cb359e95cd）｜客户。申请保持原发起者与回报链；裁决者以结果来源为准。\n\n托管\n五个内置角色正式向幕僚汇报，由幕僚协调；项目实现角色仍由运营管理。业务决策可通过“替我决策”委托幕僚，执行审批仍按独立门禁处理。\n替我审批\n幕僚 / Claude\nEnter 发送，Shift + Enter 换行\nEnter 发送，Shift+Enter 换行；发送失败会如实提示。\n实际写入导入项目，角色边界外的写入会被拒绝。\n确认「2D 贪吃蛇小游戏」实施提案（v1）\nproposal\n\n来源：策划\n\n高风险事项；确认前请核对来源与影响。\n\n幕僚未提交有效决定，本次未作批准。可关闭“替我决策”接管，或由原发起者补齐材料后重新提交。\n\n### 提案核查结果：docs/proposals/snake-game-proposal-v1.md\n\n- schema: project-proposal/v2；flowId: snake-game；intentId: snake-2d-game；version: 1；status: draft\n- intent 引用：docs/product/snake-game-intent-v1.md（v1，客户已经 intent-confirm 本人确认）\n\n**交付形态**：纯前端零依赖单页游戏，`game/` 下 `index.html` + `styles.css` + `game.js`，浏览器直接打开即可游玩（无构建、无服务器、无网络请求）。\n\n**关键定案**：\n- 24×24 棋盘、20px 格、固定 120ms 步进、不做加速/难度\n- 方向键 + WASD 双套控制，禁止 180° 掉头，方向队列容量 2\n- 吃食物 +1 分并变长；撞墙/撞自身结束\n- 状态机 READY → RUNNING → GAME_OVER；首次加载需按方向键开始\n- R 键（仅 GAME_OVER）或「重新开始」按钮重开，重开直接进入 RUNNING\n- 最高分用 localStorage（key: snake-game.highscore.v1）持久化，不可用时降级为内存记录\n- 覆盖 AC-1 ~ AC-10，核心必测 AC-1/2/6/7/8\n\n**团队与分工**：见名单 docs/proposals/snake-game-roster-v1.md（实现角色 game-dev；纯静态交付故省略 env-bootstrap，需客户确认该取舍）。\n\n**非目标复述**：无后端/账号/联网/在线排行榜；无移动端触屏与响应式适配要求；无音效/皮肤/多关卡/障碍物/道具/加速难度；无多人对战；不引入第三方库、构建工具、包管理器。\n\n本提案未获客户明确接受前不视为通过，也不进入实现。\n\n是否接受该提案？\n\n接受\n退修\n\n请选择一项。\n\n稍后处理\n拒绝\n提交选择"
+  }
+}

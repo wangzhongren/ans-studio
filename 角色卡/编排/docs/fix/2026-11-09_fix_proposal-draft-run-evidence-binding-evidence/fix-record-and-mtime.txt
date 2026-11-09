@@ -1,0 +1,7 @@
+=== 修复记录 ===
+d414799743a0bf0f432bc4a8dac2824359651bd4aceaa8721f86dc324ad0aa12 *角色卡/编排/docs/fix/2026-11-09_fix_proposal-draft-run-evidence-binding.md
+81 角色卡/编排/docs/fix/2026-11-09_fix_proposal-draft-run-evidence-binding.md
+mtime 2026-11-09 11:59:43.698327900 +0800
+=== 代码/测试 mtime（须晚于修复记录） ===
+2026-11-09 12:20:03.711061000 +0800 src/service/trunk/impl/apply-journal.ts
+2026-11-09 12:20:03.753183300 +0800 test/编排/direct-role-capabilities.test.ts

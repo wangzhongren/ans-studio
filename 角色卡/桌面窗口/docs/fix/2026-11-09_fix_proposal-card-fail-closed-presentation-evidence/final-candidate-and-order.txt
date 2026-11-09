@@ -1,0 +1,25 @@
+date: 2026-11-09T04:16:50Z
+HEAD: c1439ce57430ef783b80a01bb6e6437fcb20cabd
+TREE: 262e7ba42ee646d055f65f92e640834a89addde1
+branch: feat/plan-escalation-card
+--- git status --porcelain -- src app test:
+ M app/desktop/customer-input.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
+--- diff stat (all tracked):
+ app/desktop/customer-input.ts                      |  40 ++++-
+ .../chief-workflow.test.ts"                        | 187 ++++++++++++++++++---
+ 2 files changed, 202 insertions(+), 25 deletions(-)
+--- write-set after hashes:
+71e0cc0bb7be44257312c3421f210a88376f3ca07efcf448be54de1b8f217fa0 *app/desktop/customer-input.ts
+f5dd81d64cefa707a0348f16be9b2fa2e8827976ded2ae87780364e61ba450fc *test/桌面应用/chief-workflow.test.ts
+--- untouched public contract files (must equal baseline git):
+63caf4e9708ec409b0fe6105a12bc55fcc75b3a5  app/desktop/session.ts
+797e129b5fcf6e569cfaad5d683735f0a5cdc3ff  src/provider/runtime/tools.ts
+e4ffcd573f53e33e2c474587e7c13a6e2308382b  src/model/runtime.ts
+5d967320725710106d44b7706b67788110e986c2  src/common/编排/run-manifest.ts
+b82a923b2887624c5cb2ae843c23ee17cf30d15e  src/pipeline/orchestration/run-role.ts
+518070f28b0b5ba1a184a8ff23892e3e6af1c0ae  test/桌面应用/optional-acceptance.test.ts
+--- mtimes (F7 order):
+2026-11-09 12:02:19.573428000 +0800  角色卡/桌面窗口/docs/fix/2026-11-09_fix_proposal-card-fail-closed-presentation.md
+2026-11-09 12:13:21.314780100 +0800  app/desktop/customer-input.ts
+2026-11-09 12:10:21.588152900 +0800  test/桌面应用/chief-workflow.test.ts

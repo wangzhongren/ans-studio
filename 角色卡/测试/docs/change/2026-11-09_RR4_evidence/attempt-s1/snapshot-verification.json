@@ -1,0 +1,50 @@
+{
+  "schema": "complete-snapshot/v1",
+  "snapshotId": "decision-3755042aea965a2b4b9bdbf565c80b0ec49f96911e43441cd7979512260bd3d4",
+  "digest": "3755042aea965a2b4b9bdbf565c80b0ec49f96911e43441cd7979512260bd3d4",
+  "fileCount": 6,
+  "rows": [
+    {
+      "path": "docs/contracts/snake-game-architecture-v1.md",
+      "snapshotSha256": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "onDisk": true,
+      "actualSha256": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "match": true
+    },
+    {
+      "path": "docs/product/snake-game-intent-v1.md",
+      "snapshotSha256": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "onDisk": true,
+      "actualSha256": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-modules-v1.md",
+      "snapshotSha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "onDisk": true,
+      "actualSha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v1.md",
+      "snapshotSha256": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "onDisk": true,
+      "actualSha256": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v1.md",
+      "snapshotSha256": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "onDisk": true,
+      "actualSha256": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "match": true
+    },
+    {
+      "path": ".ans/decision-input/22b59a434bc681281fdfbbea0279f004f7d724953dd46a991ec51d25d60742b6.json",
+      "snapshotSha256": "22b59a434bc681281fdfbbea0279f004f7d724953dd46a991ec51d25d60742b6",
+      "onDisk": false,
+      "actualSha256": null,
+      "match": "embedded"
+    }
+  ]
+}

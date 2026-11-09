@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: sidecar: append/read round-trip at the frozen path with whitelist field projection
+ok 1 - sidecar: append/read round-trip at the frozen path with whitelist field projection
+  ---
+  duration_ms: 40.6936
+  type: 'test'
+  ...
+# Subtest: sidecar: same operationId retries append new lines and never change journal replay/settlement identity
+ok 2 - sidecar: same operationId retries append new lines and never change journal replay/settlement identity
+  ---
+  duration_ms: 53.2108
+  type: 'test'
+  ...
+# Subtest: sidecar: unsafe path shapes (nlink, junction links, non-canonical root) are rejected fail-closed
+ok 3 - sidecar: unsafe path shapes (nlink, junction links, non-canonical root) are rejected fail-closed
+  ---
+  duration_ms: 57.039
+  type: 'test'
+  ...
+# Subtest: sidecar: frozen budgets (4 KiB line / 16 attempts / 64 KiB file) reject with git-action-audit-unavailable
+ok 4 - sidecar: frozen budgets (4 KiB line / 16 attempts / 64 KiB file) reject with git-action-audit-unavailable
+  ---
+  duration_ms: 265.7644
+  type: 'test'
+  ...
+# Subtest: sidecar: truncated tail tolerated with diagnostics and repaired before append; bad JSON/unknown fields fail closed
+ok 5 - sidecar: truncated tail tolerated with diagnostics and repaired before append; bad JSON/unknown fields fail closed
+  ---
+  duration_ms: 54.6251
+  type: 'test'
+  ...
+# Subtest: sidecar: audit failures are fail-closed git-action-audit-unavailable (lease, lock, blocked store)
+ok 6 - sidecar: audit failures are fail-closed git-action-audit-unavailable (lease, lock, blocked store)
+  ---
+  duration_ms: 15.9574
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 680.6845

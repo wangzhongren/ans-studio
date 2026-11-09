@@ -1,0 +1,41 @@
+TAP version 13
+# Subtest: W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+    # Subtest: unmanaged
+    ok 1 - unmanaged
+      ---
+      duration_ms: 211.9724
+      type: 'test'
+      ...
+    # Subtest: unmanaged-system
+    ok 2 - unmanaged-system
+      ---
+      duration_ms: 87.3077
+      type: 'test'
+      ...
+    # Subtest: required
+    ok 3 - required
+      ---
+      duration_ms: 264.4184
+      type: 'test'
+      ...
+    # Subtest: unknown
+    ok 4 - unknown
+      ---
+      duration_ms: 12.78
+      type: 'test'
+      ...
+    1..4
+ok 1 - W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  ---
+  duration_ms: 577.4872
+  type: 'test'
+  ...
+1..1
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 993.2773

@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: X-R5 run-role：verifier 工具声明为空（D1 allow/[]），trio 不注入任何 RoleToolId 专属工具
+ok 1 - X-R5 run-role：verifier 工具声明为空（D1 allow/[]），trio 不注入任何 RoleToolId 专属工具
+  ---
+  duration_ms: 14.219
+  type: 'test'
+  ...
+# Subtest: X-R5 卡种：TRIO_CARD_KINDS.verifier 表项已删除；cardKindsOf 读模块 cards；默认卡种按模块数据
+ok 2 - X-R5 卡种：TRIO_CARD_KINDS.verifier 表项已删除；cardKindsOf 读模块 cards；默认卡种按模块数据
+  ---
+  duration_ms: 1.1904
+  type: 'test'
+  ...
+# Subtest: X-R5 apply-journal：review 前置事实键严格按 api-spec（恰好 reviewTarget/criteria）；未登记键 deny
+ok 3 - X-R5 apply-journal：review 前置事实键严格按 api-spec（恰好 reviewTarget/criteria）；未登记键 deny
+  ---
+  duration_ms: 0.5047
+  type: 'test'
+  ...
+# Subtest: X-R5 apply-journal：review 前置在 prepareReviewTask 材料产出后、返回前；指派读取不调用；deny 映射既有回执
+ok 4 - X-R5 apply-journal：review 前置在 prepareReviewTask 材料产出后、返回前；指派读取不调用；deny 映射既有回执
+  ---
+  duration_ms: 1.0686
+  type: 'test'
+  ...
+# Subtest: X-R5 路由核对：不调用 verifier dispatch（diff-only）；convener review 路由读来源模块数据；Service 证据核验保留
+ok 5 - X-R5 路由核对：不调用 verifier dispatch（diff-only）；convener review 路由读来源模块数据；Service 证据核验保留
+  ---
+  duration_ms: 1.5197
+  type: 'test'
+  ...
+# Subtest: X-R5 收尾：临时三态开关与 legacy 分支已删除（无残留）
+ok 6 - X-R5 收尾：临时三态开关与 legacy 分支已删除（无残留）
+  ---
+  duration_ms: 1.1763
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 301.179

@@ -1,0 +1,4 @@
+5d9b18887617acbfcda897ce31435accb1b22fa7e16438ef34280809b726326f *src/service/trunk/impl/apply-journal.ts
+4220c17590e68c7d3ffc0b63a5a6118b76edfb1abf0366a48e552ea8a47fa2cc *test/编排/direct-role-capabilities.test.ts
+a5bbb067557dfb59e24d01b99988ca587700d8f381c1bd522e4277fbb5a44e86 *src/common/编排/run-manifest.ts
+53459ba43c51ef4c8c9086e7c6bbfa499028de7680c3f4d4acbbc5a93b556db3 *src/pipeline/orchestration/run-role.ts

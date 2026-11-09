@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind）
+ok 1 - 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind）
+  ---
+  duration_ms: 20.9987
+  type: 'test'
+  ...
+# Subtest: unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留）
+ok 2 - unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留）
+  ---
+  duration_ms: 10.5803
+  type: 'test'
+  ...
+# Subtest: 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId
+ok 3 - 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId
+  ---
+  duration_ms: 10.4615
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 332.1254

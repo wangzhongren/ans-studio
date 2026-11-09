@@ -1,0 +1,87 @@
+TAP version 13
+# ans role run 用法错误：缺少角色 id；缺少 --task
+# ans role run 用法错误：未知参数：--bogus
+# ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+# ans role run 无法启动：缺少 scope 配置：runRoleCommand 需由装配入口经 deps.scope 注入任务写集（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+# ans role run 失败：未知角色：不存在的角色（未登记在 project.roles）
+# ans role run 失败：未知角色：不存在的角色（未登记在 project.roles）
+# Subtest: 退出码约定：0 = 成功；EXIT_USAGE / EXIT_FAILURE 均为非 0
+ok 1 - 退出码约定：0 = 成功；EXIT_USAGE / EXIT_FAILURE 均为非 0
+  ---
+  duration_ms: 0.4514
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 用法错误（空 argv：缺角色、缺 --task）→ 非 0
+ok 2 - runRoleCommand 用法错误（空 argv：缺角色、缺 --task）→ 非 0
+  ---
+  duration_ms: 0.5076
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 未知参数 → 非 0
+ok 3 - runRoleCommand 未知参数 → 非 0
+  ---
+  duration_ms: 0.1203
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 缺少注入 project → 非 0
+ok 4 - runRoleCommand 缺少注入 project → 非 0
+  ---
+  duration_ms: 0.1113
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 缺少注入 scope → 非 0
+ok 5 - runRoleCommand 缺少注入 scope → 非 0
+  ---
+  duration_ms: 1.5567
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 未知角色 → 非 0
+ok 6 - runRoleCommand 未知角色 → 非 0
+  ---
+  duration_ms: 1.7357
+  type: 'test'
+  ...
+# Subtest: runRole 未知角色（未登记 project.roles）→ 非 0
+ok 7 - runRole 未知角色（未登记 project.roles）→ 非 0
+  ---
+  duration_ms: 1.4624
+  type: 'test'
+  ...
+# ans role run 失败：边界解析失败：读取边界文件失败：ENOENT: no such file or directory, open 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-bianpai-QCVwNM\\角色卡\\X\\boundary.yaml'
+# Subtest: runRole 边界解析失败（boundary 文件缺失→parseError）→ 非 0
+ok 8 - runRole 边界解析失败（boundary 文件缺失→parseError）→ 非 0
+  ---
+  duration_ms: 12.3358
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run 会话失败：bindRole 故意失败
+# Subtest: runRole bindRole 失败 → 非 0
+ok 9 - runRole bindRole 失败 → 非 0
+  ---
+  duration_ms: 13.2634
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# Subtest: runRole 正常会话 → 0（对照基线）
+ok 10 - runRole 正常会话 → 0（对照基线）
+  ---
+  duration_ms: 9.1436
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 333.7042

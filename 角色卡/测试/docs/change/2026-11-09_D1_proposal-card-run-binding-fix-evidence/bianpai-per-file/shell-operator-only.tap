@@ -1,0 +1,122 @@
+TAP version 13
+# Subtest: allow：直接放行、operator 调用 0 次、branch c-allow；审计含 command/argv/cwd/by/conditions
+ok 1 - allow：直接放行、operator 调用 0 次、branch c-allow；审计含 command/argv/cwd/by/conditions
+  ---
+  duration_ms: 2.775
+  type: 'test'
+  ...
+# Subtest: risky：批准 → c-risky→a-allow；reason 用 su 审批档前缀并披露写边界风险
+ok 2 - risky：批准 → c-risky→a-allow；reason 用 su 审批档前缀并披露写边界风险
+  ---
+  duration_ms: 0.393
+  type: 'test'
+  ...
+# Subtest: risky：拒绝 → c-risky→a-deny；超时 → c-risky→a-timeout；不可用 → c-risky→a-unavailable
+ok 3 - risky：拒绝 → c-risky→a-deny；超时 → c-risky→a-timeout；不可用 → c-risky→a-unavailable
+  ---
+  duration_ms: 28.1975
+  type: 'test'
+  ...
+# Subtest: review：批准 → c-review→a-allow；拒绝 → c-review→a-deny（不接 (b)）
+ok 4 - review：批准 → c-review→a-allow；拒绝 → c-review→a-deny（不接 (b)）
+  ---
+  duration_ms: 0.4121
+  type: 'test'
+  ...
+# Subtest: deny + approveDeny=true（非 re-shell 的硬拒例）：批准 → c-deny→a-allow；拒绝 → c-deny→a-deny
+ok 5 - deny + approveDeny=true（非 re-shell 的硬拒例）：批准 → c-deny→a-allow；拒绝 → c-deny→a-deny
+  ---
+  duration_ms: 0.4677
+  type: 'test'
+  ...
+# Subtest: deny + approveDeny=false：既有硬拒终结（c-deny，0 次 operator，回归）
+ok 6 - deny + approveDeny=false：既有硬拒终结（c-deny，0 次 operator，回归）
+  ---
+  duration_ms: 0.192
+  type: 'test'
+  ...
+# Subtest: 构造守卫：模式互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk / 带 routineShellPolicy
+ok 7 - 构造守卫：模式互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk / 带 routineShellPolicy
+  ---
+  duration_ms: 0.3617
+  type: 'test'
+  ...
+# Subtest: renderSuApprovalReason：前缀/档位/命中原因/写边界警告逐字；项目三层链文案不含前缀
+ok 8 - renderSuApprovalReason：前缀/档位/命中原因/写边界警告逐字；项目三层链文案不含前缀
+  ---
+  duration_ms: 0.1273
+  type: 'test'
+  ...
+# Subtest: CLI 提示：su 审批档不再写「(b) 未定」；非审批档维持既有文案
+ok 9 - CLI 提示：su 审批档不再写「(b) 未定」；非审批档维持既有文案
+  ---
+  duration_ms: 0.1496
+  type: 'test'
+  ...
+# Subtest: assembleOperatorShellGate：allow 0 卡；risky 出卡；审计落 sink；缺 classifier/rules fail-closed
+ok 10 - assembleOperatorShellGate：allow 0 卡；risky 出卡；审计落 sink；缺 classifier/rules fail-closed
+  ---
+  duration_ms: 13.4399
+  type: 'test'
+  ...
+# Subtest: openRoleSession：su + shellOperatorOnly ⇒ arm；项目角色误传/与 shellReadonly 同时给出 ⇒ 不 arm
+ok 11 - openRoleSession：su + shellOperatorOnly ⇒ arm；项目角色误传/与 shellReadonly 同时给出 ⇒ 不 arm
+  ---
+  duration_ms: 26.7018
+  type: 'test'
+  ...
+# Subtest: 不透明执行（writeGuard=opaque）⇒ 交 (a)，审阅上下文含脚本内容；不再强制客户本人（Q1/Q2 口径修正）
+ok 12 - 不透明执行（writeGuard=opaque）⇒ 交 (a)，审阅上下文含脚本内容；不再强制客户本人（Q1/Q2 口径修正）
+  ---
+  duration_ms: 0.3592
+  type: 'test'
+  ...
+# Subtest: 不透明执行但审查上下文不可用（脚本不可读/超限/越界）⇒ fail-closed 拒绝（0 卡、0 判断）
+ok 13 - 不透明执行但审查上下文不可用（脚本不可读/超限/越界）⇒ fail-closed 拒绝（0 卡、0 判断）
+  ---
+  duration_ms: 0.1819
+  type: 'test'
+  ...
+# Subtest: 显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operator、审计分支 write-guard:deny
+ok 14 - 显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operator、审计分支 write-guard:deny
+  ---
+  duration_ms: 0.1479
+  type: 'test'
+  ...
+# Subtest: P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+not ok 15 - P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+  ---
+  duration_ms: 3.249
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\shell-operator-only.test.ts:511:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    git clean -fdx：审批通过 ⇒ 放行
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/shell-operator-only.test.ts:577:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: F6 真实 gate：短 node -e 进入 script 审查并携带代码原文；长内联硬拒
+ok 16 - F6 真实 gate：短 node -e 进入 script 审查并携带代码原文；长内联硬拒
+  ---
+  duration_ms: 1.2017
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 15
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 365.7909

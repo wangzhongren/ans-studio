@@ -945,11 +945,37 @@ export async function prepareDecisionEvidence(deps: TrunkServiceDeps, input: Dec
           if (!evidenceObject(value) || typeof value.path !== "string" || typeof value.sha256 !== "string") return unavailable("Draft run lacks bound planning hashes");
           refs.push({ path: filePathOfRef(value.path), sha256: value.sha256 });
         }
-        if (!refs.length || paths.some(rel => !refs.some(ref => ref.path === filePathOfRef(rel)))) return unavailable("Draft request target is not bound to that run");
-        for (const ref of refs) {
-          const read = await markers(ref.path);
-          if (!read.ok || read.value.sha256 !== ref.sha256) return unavailable("Draft run evidence drifted");
-          files.push({ path: ref.path, ...read.value });
+        if (refs.length) {
+          // A draft that already carries manifest-bound refs keeps the manifest as sole authority.
+          if (paths.some(rel => !refs.some(ref => ref.path === filePathOfRef(rel)))) return unavailable("Draft request target is not bound to that run");
+          for (const ref of refs) {
+            const read = await markers(ref.path);
+            if (!read.ok || read.value.sha256 !== ref.sha256) return unavailable("Draft run evidence drifted");
+            files.push({ path: ref.path, ...read.value });
+          }
+        } else {
+          // A′（fix 2026-11-09 proposal-draft-run-evidence-binding）：draft 在 pin 之前没有文档绑定写点
+          // （manifest documents/execution 恒空）。以应用计算的目标集（host artifacts / criteriaRef；无则按
+          // flowId 的版本化文档发现，与无 runId 分支同一机制）读取实际项目字节，逐文件 SHA-256 进入
+          // complete-snapshot/v1，再由 verification/discovery 在结算前复核（漂移 fail-closed）。
+          // 角色自报路径只做 ⊆ 校验，绝不直接读取；未知/空目标仍拒绝。
+          if (!paths.length) {
+            const discovered = await discoverDecisionFiles(deps.projectRoot, flowId);
+            if (!discovered.length) return unavailable("Draft request target is not bound to that run");
+            discovery = { flowId, digest: directHash(discovered) };
+            paths.push(...discovered.map(file => file.path));
+          }
+          const targets = [...new Set(paths.map(filePathOfRef))];
+          const declared = [...(metadata?.paths ?? []), ...(judge?.paths ?? [])].filter(rel => typeof rel === "string").map(filePathOfRef);
+          if (declared.some(rel => !targets.includes(rel))) return unavailable("Draft request target is not bound to that run");
+          const criteriaPath = metadata?.criteriaRef?.path === undefined ? undefined : filePathOfRef(metadata.criteriaRef.path);
+          for (const target of targets) {
+            const read = await markers(target);
+            if (!read.ok) return unavailable(`Target evidence is unreadable: ${target}`);
+            if (target === criteriaPath && typeof metadata?.criteriaRef?.sha256 === "string" && read.value.sha256 !== metadata.criteriaRef.sha256)
+              return unavailable(`Target evidence hash differs from the criteria reference: ${target}`);
+            files.push({ path: target, ...read.value });
+          }
         }
       }
     } else {

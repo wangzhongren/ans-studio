@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: provider：200 成功、原子写、无 .part/占位残留、Content-Disposition 定名
+ok 1 - provider：200 成功、原子写、无 .part/占位残留、Content-Disposition 定名
+  ---
+  duration_ms: 29.3305
+  type: 'test'
+  ...
+# Subtest: provider：重名不覆盖（既有文件字节不变；新文件加 (1)）
+ok 2 - provider：重名不覆盖（既有文件字节不变；新文件加 (1)）
+  ---
+  duration_ms: 8.5292
+  type: 'test'
+  ...
+# Subtest: provider：同域重定向 301/302/303/307/308 逐跳跟随；跨域/降级/跳数/异常 3xx/缺 Location
+ok 3 - provider：同域重定向 301/302/303/307/308 逐跳跟随；跨域/降级/跳数/异常 3xx/缺 Location
+  ---
+  duration_ms: 38.7687
+  type: 'test'
+  ...
+# Subtest: provider：https→http 降级拒绝（download-unsafe-url）
+ok 4 - provider：https→http 降级拒绝（download-unsafe-url）
+  ---
+  duration_ms: 9.1296
+  type: 'test'
+  ...
+# Subtest: provider：大小上限（Content-Length/流式）、状态码（204/206/201/500）、编码
+ok 5 - provider：大小上限（Content-Length/流式）、状态码（204/206/201/500）、编码
+  ---
+  duration_ms: 8.2452
+  type: 'test'
+  ...
+# Subtest: provider：空闲/总超时、连接超时、AbortSignal；服务端请求次数符合无自动重试
+ok 6 - provider：空闲/总超时、连接超时、AbortSignal；服务端请求次数符合无自动重试
+  ---
+  duration_ms: 238.377
+  type: 'test'
+  ...
+# Subtest: provider：rebinding——连接地址不在钉扎集合 ⇒ download-rebinding-detected，不落盘
+ok 7 - provider：rebinding——连接地址不在钉扎集合 ⇒ download-rebinding-detected，不落盘
+  ---
+  duration_ms: 2.2059
+  type: 'test'
+  ...
+# Subtest: provider：TLS 自签/过期/主机名不匹配 ⇒ download-network-error，无落盘
+ok 8 - provider：TLS 自签/过期/主机名不匹配 ⇒ download-network-error，无落盘
+  ---
+  duration_ms: 10.7222
+  type: 'test'
+  ...
+# Subtest: provider：download 目录为普通文件 ⇒ download-write-failed；目录不存在时创建
+ok 9 - provider：download 目录为普通文件 ⇒ download-write-failed；目录不存在时创建
+  ---
+  duration_ms: 2.9887
+  type: 'test'
+  ...
+# Subtest: provider：downloads.jsonl 事件形状/坏行（复用共享 jsonl-ledger）
+ok 10 - provider：downloads.jsonl 事件形状/坏行（复用共享 jsonl-ledger）
+  ---
+  duration_ms: 29.4117
+  type: 'test'
+  ...
+# Subtest: epoch store：missing→ensure 创建 ready；不可读不重写；同一文件供面板只读
+ok 11 - epoch store：missing→ensure 创建 ready；不可读不重写；同一文件供面板只读
+  ---
+  duration_ms: 13.6492
+  type: 'test'
+  ...
+# Subtest: AC-12 故障注入：rename 失败 ⇒ download-write-failed；清理 temp/占位，既有同名文件字节不变
+ok 12 - AC-12 故障注入：rename 失败 ⇒ download-write-failed；清理 temp/占位，既有同名文件字节不变
+  ---
+  duration_ms: 17.4791
+  type: 'test'
+  ...
+# Subtest: AC-12 故障注入：写盘失败 ⇒ download-write-failed；无 .part/占位/半成品
+ok 13 - AC-12 故障注入：写盘失败 ⇒ download-write-failed；无 .part/占位/半成品
+  ---
+  duration_ms: 3.3022
+  type: 'test'
+  ...
+# Subtest: AC-13：download 为 Windows junction ⇒ download-write-failed，不跟随/不写目标目录
+ok 14 - AC-13：download 为 Windows junction ⇒ download-write-failed，不跟随/不写目标目录
+  ---
+  duration_ms: 29.0403
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 908.483

@@ -1,0 +1,59 @@
+# A′ 验证记录（前后计数与环境说明）
+
+日期：2026-11-09；角色：ANS 编排；修复记录：`角色卡/编排/docs/fix/2026-11-09_fix_proposal-draft-run-evidence-binding.md`（hash `d414799743a0bf0f432bc4a8dac2824359651bd4aceaa8721f86dc324ad0aa12`，81 行，mtime 11:59:43，早于代码 mtime 12:20:03）。
+
+## 命令与环境
+
+- 命令（前后完全一致）：`node --test --test-concurrency=1 "test/编排/**/*.test.ts"`
+- 环境：Windows 11，Node v24.22.1；worktree `.claude/worktrees/trunk-amendment`，分支 `feat/plan-escalation-card`，HEAD `c1439ce57430ef783b80a01bb6e6437fcb20cabd`（tree `262e7ba42ee646d055f65f92e640834a89addde1`）。
+- 说明：本 worktree 同时存在桌面窗口角色（子修复 B）的并发在制工作（`app/desktop/customer-input.ts`、`test/桌面应用/chief-workflow.test.ts`），不属于本记录的候选或证据；`test/编排/` 不导入这些文件（已核实无引用）。验证期间桌面角色的测试进程并发运行，构成本套件的环境负载。
+- 未运行真实模型/Electron；未占用/影响贪吃蛇 9222 实例（PID 9764 `--remote-debugging-port=9222` 全程在运行，未触碰）。
+- 未提交/推送/合并/发布。
+
+## 基线口径
+
+- 干净基线 = HEAD 上我的两个写集文件均未被修改（`git status --porcelain -- src test` 中不含我的文件；用 `git checkout --` 临时还原、跑完后恢复；临时副本 hash 与恢复后一致：`apply-journal.ts` `09130d02…`、`direct-role-capabilities.test.ts` `4f98332f…`）。
+- 中途曾有一次基线尝试被并发负载打断（`git-trunk-store.test.ts` 在共享负载下泄漏句柄忙等、整文件不退出；该文件在空闲时单独运行 13/13 通过、64s 退出 0），完整日志保留为 `before-test-run1-contaminated.log`，不作判据。
+- **基线已知红项补充（重要）**：B1 v1 只登记了 `test/桌面应用/optional-acceptance.test.ts`（不在本套件、未运行、diff = 0）；本次实测 `test/编排/` 在 HEAD 上另有 **22 个确定性失败 + 2 个既有 skip**（见 `before-failing-tests.txt`），与本修复无关（如 `trio-worker-report.test.ts` 3 项单独复跑即失败），不在本子修复写集内、不修复、不弱化。
+
+## 前后计数
+
+| 指标 | before（HEAD 干净基线） | after（A′ 候选） | 增量 |
+| --- | --- | --- | --- |
+| tests | 1122 | 1127 | +5（A1–A5 新用例） |
+| pass | 1098 | 1103 | +5 |
+| fail | 22 | 22 | **0（失败用例名集合逐条相同，diff 为空）** |
+| cancelled | 0 | 0 | 0 |
+| skipped | 2 | 2 | **0（skip 名集合相同）** |
+| exit | 1 | 1 | —（由 22 个既有红项导致） |
+| duration_ms | 194842 | 186848 | — |
+
+- 失败集合对照：`before-failing-tests.txt` vs `after-failing-tests.txt` → `diff` 为空。
+- 新增确定性失败 = 0；新 skip = 0。
+- 决策证据相关 10 项在 after 全量日志中全部 `✔`（5 个既有：initial/pinned/draft-bound/ordinary-discovery/missing-targets；5 个新增 A1–A5），含 A5 既有用例「draft planning run needs bound document hashes」原样通过。
+
+## 静态门
+
+- `npm run typecheck`（`tsc --noEmit`）exit 0（`typecheck.log`）。
+
+## 写集与公共契约
+
+- 改动文件（仅此两个）：
+  - `src/service/trunk/impl/apply-journal.ts`（+31/−5；单一 hunk `@@ -945,11 +945,37 @@`，只覆盖 draft 分支 refs 为空段；pinned 分支与无 runId 分支无 diff）
+  - `test/编排/direct-role-capabilities.test.ts`（+124/−2；两行 import 扩展 + A1–A5 用例）
+- 保护文件 diff（`src/common/编排/run-manifest.ts`、`src/model/**`、`src/pipeline/orchestration/run-role.ts`、`src/provider/runtime/tools.ts`、`app/desktop/session.ts`、`app/renderer/**`、`test/桌面应用/optional-acceptance.test.ts`）= 0（`candidate-identity.txt`）。
+- 未写 run manifest / 不新增数据模型或公共契约（`RunDocKind`、`request.*`、IPC 形状均未动）。
+- 候选聚合 SHA-256（按路径排序 `path + "\0" + sha256` 串联）：`bb24291eb6ba3adcaa7ceff5483fbfe73f8fb70cc9a8275b79ecfd9d04b6b8f0`。
+
+## 关键行为说明（如实披露）
+
+1. draft 空 refs + 无 artifacts/criteriaRef ⇒ 按 `flowId` 版本化文档发现（`docs/product|proposals|contracts` 下 `<flowId>-*` 最新版）；发现集写入 `verification.discovery`，结算前重算摘要 ⇒ 内容变更/新版本均使旧基底过期（A2）。
+2. 角色自报路径（`metadata.paths` / `judgeContext.paths`）只做“⊆ 目标集”校验，不在目标集内即 `unavailable("Draft request target is not bound to that run")`，且**从不直接读取**自报路径字节（A3 负例：盘上存在 `docs/role-private.md` 也不会被读入）。
+3. 越界 artifact 路径（如 `../outside.md`）由 `store.readProjectFile` 既有分类拒绝（`invalid-project-path`，fail-closed、无快照）——与 AC-4「既有错误分类」一致；该情形的报错文本为既有分类文本，而非 “not bound” 文本，如实记录。
+4. `criteriaRef.sha256` 与盘上字节不符 ⇒ `unavailable("Target evidence hash differs from the criteria reference: <path>")`（A4 正/负例均覆盖）。
+5. A1 断言 prepare 前后 run manifest 字节完全一致（`documents` 仍为空对象、不写 manifest）。
+
+## 旧断言改写（B1 §4.3）
+
+- **无**：本次未改写/删除/弱化任何既有断言；`direct-role-capabilities.test.ts` 的既有用例（含 `:945-956` draft bound hashes、pinned 与无 runId 全部用例）逐字保留并通过。仅新增 A1–A5 用例（+ 两行 import 扩展）。
+- 负例断言均以真实磁盘文件与真实 Store 快照/哈希为准，未使用桩替代 `prepareDecisionEvidence` 的真实字节路径。

@@ -1,0 +1,74 @@
+TAP version 13
+# Subtest: 幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚
+not ok 1 - 幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚
+  ---
+  duration_ms: 43.5693
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\optional-acceptance.test.ts:111:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/optional-acceptance.test.ts:128:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 无自动验收机器：源码不接线 acceptance 派发/gate/复核能力（F-03 结构性钉）
+ok 2 - 无自动验收机器：源码不接线 acceptance 派发/gate/复核能力（F-03 结构性钉）
+  ---
+  duration_ms: 3.4962
+  type: 'test'
+  ...
+# Subtest: 开关关闭：验收卡呈现客户，客户手选通过——不自动验收
+ok 3 - 开关关闭：验收卡呈现客户，客户手选通过——不自动验收
+  ---
+  duration_ms: 2.3478
+  type: 'test'
+  ...
+# Subtest: 开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发
+not ok 4 - 开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发
+  ---
+  duration_ms: 6008.9838
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\optional-acceptance.test.ts:239:1'
+  failureType: 'testTimeoutFailure'
+  error: 'test timed out after 6000ms'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底
+not ok 5 - §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底
+  ---
+  duration_ms: 6005.0898
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\optional-acceptance.test.ts:252:1'
+  failureType: 'testTimeoutFailure'
+  error: 'test timed out after 6000ms'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板
+not ok 6 - §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板
+  ---
+  duration_ms: 6015.1441
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\optional-acceptance.test.ts:287:1'
+  failureType: 'testTimeoutFailure'
+  error: 'test timed out after 6000ms'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 2
+# fail 1
+# cancelled 3
+# skipped 0
+# todo 0
+# duration_ms 18473.6354

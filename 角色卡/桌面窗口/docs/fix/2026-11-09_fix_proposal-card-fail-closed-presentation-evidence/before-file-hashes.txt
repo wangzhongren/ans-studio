@@ -1,0 +1,19 @@
+date: 2026-11-09T04:01:34Z
+HEAD: c1439ce57430ef783b80a01bb6e6437fcb20cabd
+TREE: 262e7ba42ee646d055f65f92e640834a89addde1
+branch: feat/plan-escalation-card
+status-src-app-test: 2 lines
+--- sha256 of governed inputs:
+21dfb43cfc330dcd19058a42a5e72bd1ea27bda3a264a68770160a0173ba300c *docs/communication/2026-11-09_defect_proposal-card-run-binding.md
+4e8fb3545f3679ee48b397b4c43d1eb4ab517e9b40a7e541b4ba0daf3fa7ea85 *docs/scheduling/2026-11-09_fix-routing_proposal-card-run-binding.md
+42a1ec9b86b8ae2fe7805de9fcedbac3ab71ae266999e09266c794abc65c963b *docs/acceptance/2026-11-09_proposal-card-run-binding-fix-criteria-v1.md
+8c7d5c273c1404d4f0876ec0219bbfc08090c09cb736e3d93e0d7b2adcbd25e1 *角色卡/桌面窗口/boundary.md
+1f9f23cc28af1ee4c777ef88c32ea2afba54c4d4a4958fc52dd263d796a70519 *角色卡/桌面窗口/role-card.md
+--- wc -l -c of governed inputs:
+   48  5529 docs/communication/2026-11-09_defect_proposal-card-run-binding.md
+  183 32508 docs/scheduling/2026-11-09_fix-routing_proposal-card-run-binding.md
+  196 35639 docs/acceptance/2026-11-09_proposal-card-run-binding-fix-criteria-v1.md
+  427 73676 total
+--- before hashes (candidate files):
+b64ecfb5ebb28b1fe2273706f746880c474498bcb51948919bdc8761bfe2f029 *app/desktop/customer-input.ts
+457214b54c9fe0dc0d5ebc354079a7e2fbfb1b5374e33c5866fce44826270866 *test/桌面应用/chief-workflow.test.ts
