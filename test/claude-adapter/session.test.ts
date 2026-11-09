@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, readFile, access, rm, symlink, mkdir, writeFile, lstat, realpath } from "node:fs/promises";
+import { mkdtemp, readFile, access, rm, symlink, mkdir, writeFile, lstat, realpath, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { randomUUID, createHash } from "node:crypto";
@@ -12,8 +12,9 @@ import type { Options, SDKMessage, SDKUserMessage, Query } from "@anthropic-ai/c
 import * as z from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createClaudeRuntimeAdapter } from "../../src/provider/claude/session.ts";
+import { createClaudeRuntimeAdapter, claudeToolInputWithCallContext } from "../../src/provider/claude/session.ts";
 import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+import { describeTool } from "../../src/provider/runtime/schema.ts";
 import { createRuntimeSessionStore } from "../../src/provider/runtime/session-store.ts";
 import { createRuntimeAdapter, projectRuntimeLiveHandback } from "../../src/service/runtime/session.ts";
 import { toClaudeSchema } from "../../src/common/claude-adapter/schema.ts";
@@ -2155,3 +2156,265 @@ test("tool-result images ride the real MCP transport; failures and invalid paylo
   assert.equal(everything.includes("not base64"), false);
   await session.dispose();
 }));
+
+// ---- 2026-11-09 修复：`__ans_call_context` 与顶层 oneOf/anyOf 复合工具 schema 兼容（T1） ----
+const CALL_CONTEXT_FIELD = "__ans_call_context";
+const CALL_CONTEXT_CONTRACT = { type: "string", description: "Internal ANS context assigned by the host; omit this field." };
+const jsonRecord = (value: unknown): Record<string, unknown> => {
+  assert.ok(value && typeof value === "object" && !Array.isArray(value));
+  return value as Record<string, unknown>;
+};
+const gitCandidateCases = () => {
+  const base = { ref: "refs/ans/trunk", oid: { objectFormat: "sha1", hex: "7b8acd9a792af9293dcc6d5f47f1e5313b7ffb9d" } };
+  return {
+    commit: { action: "commit", base, paths: ["docs/product/rr-git-note.md"], message: "docs(product): add rr-git-note.md for structured Git commit verification", operationId: "op-product-rr-git-commit-candidate-1" },
+    integrate: { action: "integrate", base, candidates: [{ objectFormat: "sha1", hex: "0123456789abcdef0123456789abcdef01234567" }], message: "m", operationId: "op-1" },
+    revert: { action: "revert", base, commit: { objectFormat: "sha1", hex: "0123456789abcdef0123456789abcdef01234567" }, mainline: 1, message: "m", operationId: "op-1" },
+    init: { action: "init", base, message: "m", operationId: "op-1" },
+  };
+};
+
+test("real git_candidate oneOf: host call context passes commit/integrate/revert/init on real MCP; invalid inputs stay rejected", async () => fixture(async (root) => {
+  const description = describeTool("git_candidate");
+  const publicSchema = description.parameters as Record<string, unknown>;
+  const publicBefore = structuredClone(publicSchema);
+  const branches = publicSchema.oneOf as Array<Record<string, unknown>>;
+  assert.equal(branches.length, 4, "public schema keeps its four top-level oneOf branches");
+  assert.deepEqual(branches.map((branch) => jsonRecord(jsonRecord(branch.properties).action).enum), [["commit"], ["integrate"], ["revert"], ["init"]]);
+  // 公共 schema 自身：分支严格且未声明保留字段（修复不预置、不放宽公共契约）。
+  for (const [index, branch] of branches.entries()) {
+    assert.equal(branch.additionalProperties, false, `public branch ${index} strict`);
+    assert.equal(Object.hasOwn(jsonRecord(branch.properties), CALL_CONTEXT_FIELD), false, `public branch ${index} has no reserved field`);
+  }
+  // 适配器助手：每个严格分支只新增同一个可选字段；required/pattern/additionalProperties 逐字保留。
+  const adapted = claudeToolInputWithCallContext(publicSchema);
+  const adaptedBranches = adapted.oneOf as Array<Record<string, unknown>>;
+  for (const [index, source] of branches.entries()) {
+    const target = adaptedBranches[index]!;
+    assert.equal(target.additionalProperties, false, `adapted branch ${index} stays strict`);
+    assert.deepEqual(target.required, source.required, `adapted branch ${index} required verbatim`);
+    assert.deepEqual(jsonRecord(target.properties)[CALL_CONTEXT_FIELD], CALL_CONTEXT_CONTRACT);
+    const { [CALL_CONTEXT_FIELD]: _injected, ...restProperties } = jsonRecord(target.properties);
+    assert.deepEqual(restProperties, jsonRecord(source.properties), `adapted branch ${index}: only the reserved field was added`);
+  }
+  assert.deepEqual(publicSchema, publicBefore, "helper never mutates the public tool schema");
+  assert.equal(Object.hasOwn(jsonRecord(publicSchema.properties ?? {}), CALL_CONTEXT_FIELD), false, "public schema root stays unchanged");
+
+  const observed: Array<Record<string, unknown>> = [];
+  const inputSchema = publicSchema;
+  const tool: ToolDefinition = { name: "git_candidate", description: description.description, inputSchema, handler: async (call) => { observed.push(call.args as Record<string, unknown>); return { ok: true, message: "validated" }; } };
+  const inputBefore = structuredClone(inputSchema);
+  const engine = fake(async (client) => {
+    const listed = (await client.listTools()).tools.find((entry) => entry.name === "git_candidate");
+    assert.ok(listed, "real git_candidate registers through the adapter's real MCP server");
+    const cases = gitCandidateCases();
+    // 四分支合法入参：PreToolUse 注入 host token 后再经真实 MCP 校验；原先 invalid_union 必须消失。
+    for (const [name, value] of Object.entries(cases)) {
+      const result = await client.callTool({ name: "git_candidate", arguments: { ...value, [CALL_CONTEXT_FIELD]: "forged-model-token" } });
+      assert.equal(result.isError, false, `${name} must pass: ${JSON.stringify(result)}`);
+    }
+    assert.equal(observed.length, 4);
+    assert.deepEqual(observed.map((args) => args.action), ["commit", "integrate", "revert", "init"]);
+    for (const args of observed) assert.equal(Object.hasOwn(args, CALL_CONTEXT_FIELD), false, "handler receives public args only");
+    assert.deepEqual(observed[0], cases.commit);
+    const rejected = async (label: string, args: Record<string, unknown>, pattern: RegExp) => {
+      const count = observed.length;
+      const result = await client.callTool({ name: "git_candidate", arguments: args });
+      assert.equal(result.isError, true, `${label} must stay rejected`);
+      assert.match(JSON.stringify(result), pattern, label);
+      assert.equal(observed.length, count, `${label}: handler must not start`);
+    };
+    const again = gitCandidateCases();
+    await rejected("unknown extra field", { ...again.commit, extra: true }, /Invalid|invalid/);
+    await rejected("wrong branch field (commit+candidates)", { ...again.commit, candidates: [{ objectFormat: "sha1", hex: "0123456789abcdef0123456789abcdef01234567" }] }, /Invalid|invalid/);
+    await rejected("revert carrying paths", { ...again.revert, paths: ["a"] }, /Invalid|invalid/);
+    const { paths: _paths, ...missingPaths } = again.commit;
+    await rejected("missing required (commit.paths)", missingPaths, /Invalid|invalid/);
+    await rejected("type error (message)", { ...again.commit, message: 42 }, /Invalid|invalid/);
+    await rejected("pattern/conditional error (sha1/64 hex)", { ...again.commit, base: { ref: "refs/ans/trunk", oid: { objectFormat: "sha1", hex: "a".repeat(64) } } }, /conditional|Invalid|invalid/);
+    await rejected("unknown action", { ...again.init, action: "publish" }, /Invalid|invalid/);
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, [tool]), engine.dependencies).bindRole(role);
+  try { await session.prompt("real git_candidate composite schema"); }
+  finally { await session.dispose(); }
+  assert.equal(engine.configurations.length, 1);
+  assert.deepEqual(inputSchema, inputBefore, "adapter registration never mutates the tool input schema");
+}));
+
+test("composite git_candidate: forged context is overwritten by the host token, stripped before the handler, and never enters events", async () => fixture(async (root) => {
+  const description = describeTool("git_candidate");
+  const observed: Array<Record<string, unknown>> = [];
+  const tool: ToolDefinition = { name: "git_candidate", description: description.description, inputSchema: description.parameters, handler: async (call) => { observed.push(call.args as Record<string, unknown>); return { ok: true, message: "validated" }; } };
+  const cases = gitCandidateCases();
+  const engine = fake(async (client, _config, _user, _index, rawCall) => {
+    // 模型自带字符串/空串/非字符串值：PreToolUse 一律以 host token 覆盖，调用正常通过。
+    for (const forged of ["forged-model-token", "", 42]) {
+      const result = await client.callTool({ name: "git_candidate", arguments: { ...cases.commit, [CALL_CONTEXT_FIELD]: forged } });
+      assert.equal(result.isError, false, `forged ${JSON.stringify(forged)} is replaced by the host token`);
+    }
+    assert.equal(observed.length, 3);
+    for (const args of observed) {
+      assert.deepEqual(args, cases.commit);
+      assert.equal(Object.hasOwn(args, CALL_CONTEXT_FIELD), false, "context stripped before the handler");
+    }
+    // 绕过 PreToolUse 直接到达 MCP：未知 token 不是授权，不执行任何效果。
+    const unknown = await rawCall({ name: "git_candidate", arguments: { ...cases.commit, [CALL_CONTEXT_FIELD]: "forged-model-token" } });
+    assert.equal(unknown.isError, true);
+    assert.match(JSON.stringify(unknown), /原始工具请求上下文无效或已结束/);
+    // 非字符串伪造值由 schema 本身拒绝（字段是可选 string）。
+    const nonString = await rawCall({ name: "git_candidate", arguments: { ...cases.commit, [CALL_CONTEXT_FIELD]: 42 } });
+    assert.equal(nonString.isError, true);
+    assert.match(JSON.stringify(nonString), /Invalid|invalid/);
+    assert.equal(observed.length, 3, "unknown/non-string tokens never reach the handler");
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, [tool]), engine.dependencies).bindRole(role);
+  const reading = collect(session, 1);
+  await session.prompt("forged composite context");
+  const rows = await reading;
+  const serialized = JSON.stringify(rows);
+  assert.equal(serialized.includes("forged-model-token"), false, "model value never reaches events/audit");
+  assert.equal(serialized.includes(CALL_CONTEXT_FIELD), false, "private field never reaches events/audit");
+  await session.dispose();
+}));
+
+test("flat git_query/git_publish: only the top-level optional field is added; valid calls pass and invalid calls stay rejected", async () => fixture(async (root) => {
+  const queryDescription = describeTool("git_query");
+  const publishDescription = describeTool("git_publish");
+  const querySchema = structuredClone(queryDescription.parameters) as Record<string, unknown>;
+  const publishSchema = structuredClone(publishDescription.parameters) as Record<string, unknown>;
+  const queryBefore = structuredClone(querySchema);
+  const publishBefore = structuredClone(publishSchema);
+  for (const [label, schema, before] of [["git_query", querySchema, queryBefore], ["git_publish", publishSchema, publishBefore]] as const) {
+    const adapted = claudeToolInputWithCallContext(schema);
+    assert.equal(adapted.oneOf, undefined, `${label} has no oneOf`);
+    assert.equal(adapted.anyOf, undefined, `${label} has no anyOf`);
+    assert.deepEqual(adapted.required, before.required, `${label} required unchanged`);
+    assert.equal(adapted.additionalProperties, before.additionalProperties, `${label} strictness unchanged`);
+    const { [CALL_CONTEXT_FIELD]: _injected, ...restProperties } = jsonRecord(adapted.properties);
+    assert.deepEqual(restProperties, jsonRecord(before.properties), `${label}: only the top-level field was added`);
+    assert.deepEqual(jsonRecord(adapted.properties)[CALL_CONTEXT_FIELD], CALL_CONTEXT_CONTRACT);
+  }
+  const observed: Array<{ name: string; args: Record<string, unknown> }> = [];
+  const tools: ToolDefinition[] = [
+    { name: "git_query", description: queryDescription.description, inputSchema: querySchema as ToolDefinition["inputSchema"], handler: async (call) => { observed.push({ name: call.name, args: call.args as Record<string, unknown> }); return { ok: true, message: "validated" }; } },
+    { name: "git_publish", description: publishDescription.description, inputSchema: publishSchema as ToolDefinition["inputSchema"], handler: async (call) => { observed.push({ name: call.name, args: call.args as Record<string, unknown> }); return { ok: true, message: "validated" }; } },
+  ];
+  const engine = fake(async (client) => {
+    const template = (jsonRecord(queryBefore.properties).template as { enum: string[] }).enum[0]!;
+    const oid = { objectFormat: "sha1", hex: "a".repeat(40) };
+    const query = { operationId: "op", template, target: oid };
+    assert.equal((await client.callTool({ name: "git_query", arguments: { ...query, [CALL_CONTEXT_FIELD]: "forged" } })).isError, false);
+    assert.equal((await client.callTool({ name: "git_query", arguments: { ...query, extra: true } })).isError, true);
+    assert.equal((await client.callTool({ name: "git_query", arguments: { ...query, target: { objectFormat: "sha1", hex: "a".repeat(64) } } })).isError, true);
+    const publish = { operationId: "op", target: "documents", expected: { ref: "main", oid: null }, candidate: oid, criteria: [], evidence: [] };
+    assert.equal((await client.callTool({ name: "git_publish", arguments: { ...publish, [CALL_CONTEXT_FIELD]: "forged" } })).isError, false);
+    assert.equal((await client.callTool({ name: "git_publish", arguments: { ...publish, extra: true } })).isError, true);
+    assert.equal((await client.callTool({ name: "git_publish", arguments: { ...publish, candidate: { objectFormat: "sha1", hex: "a".repeat(64) } } })).isError, true);
+  });
+  const session = await createClaudeRuntimeAdapter(options(root, tools), engine.dependencies).bindRole(role);
+  try { await session.prompt("flat git tools"); } finally { await session.dispose(); }
+  assert.equal(observed.length, 2);
+  for (const call of observed) assert.equal(Object.hasOwn(call.args, CALL_CONTEXT_FIELD), false);
+  assert.deepEqual(querySchema, queryBefore, "flat git_query schema untouched");
+  assert.deepEqual(publishSchema, publishBefore, "flat git_publish schema untouched");
+}));
+
+test("claudeToolInputWithCallContext: deep copy, strict-branch propagation, reserved-name collision, flat/nested shapes", () => {
+  const strictBranch = () => ({ type: "object", properties: { a: { type: "string", pattern: "^a+$" } }, required: ["a"], additionalProperties: false });
+  const looseBranch = () => ({ type: "object", properties: { b: { type: "number" } }, additionalProperties: true });
+  const schema: Record<string, unknown> = { type: "object", oneOf: [strictBranch(), looseBranch(), { type: "string" }, false] };
+  const snapshot = structuredClone(schema);
+  const out = claudeToolInputWithCallContext(schema);
+  // 深拷贝：入参不被修改，输出与入参不共享节点。
+  assert.deepEqual(schema, snapshot, "input schema is not mutated");
+  assert.notEqual(out, schema);
+  const outBranches = out.oneOf as Array<Record<string, unknown>>;
+  assert.notEqual(outBranches[0], (schema.oneOf as Array<Record<string, unknown>>)[0]);
+  assert.notEqual(jsonRecord(outBranches[0]!.properties), jsonRecord((schema.oneOf as Array<Record<string, unknown>>)[0]!.properties));
+  // 顶层：可选字符串字段，required 不被新增。
+  assert.deepEqual(jsonRecord(out.properties)[CALL_CONTEXT_FIELD], CALL_CONTEXT_CONTRACT);
+  assert.equal(Object.hasOwn(out, "required"), false);
+  // 仅 additionalProperties:false 对象分支获得同字段；其余逐字保留。
+  const strict = outBranches[0]!;
+  assert.deepEqual(jsonRecord(strict.properties)[CALL_CONTEXT_FIELD], CALL_CONTEXT_CONTRACT);
+  assert.deepEqual(strict.required, ["a"]);
+  assert.equal(strict.additionalProperties, false);
+  const { [CALL_CONTEXT_FIELD]: _added, ...strictRest } = jsonRecord(strict.properties);
+  assert.deepEqual(strictRest, { a: { type: "string", pattern: "^a+$" } });
+  assert.deepEqual(outBranches[1], looseBranch(), "non-strict object branch untouched");
+  assert.deepEqual(outBranches[2], { type: "string" }, "non-object branch untouched");
+  assert.deepEqual(outBranches[3], false, "boolean branch untouched");
+  // 输出可安全修改：修改输出不回写输入。
+  jsonRecord(jsonRecord(strict.properties).a).pattern = "changed";
+  assert.equal(jsonRecord(jsonRecord((schema.oneOf as Array<Record<string, unknown>>)[0]!.properties).a).pattern, "^a+$");
+  // anyOf 对称；既有顶层 properties 保留。
+  const anySchema: Record<string, unknown> = { type: "object", anyOf: [strictBranch()], properties: { note: { type: "string" } } };
+  const anyOut = claudeToolInputWithCallContext(anySchema);
+  assert.deepEqual(jsonRecord(jsonRecord((anyOut.anyOf as Array<Record<string, unknown>>)[0]!.properties)[CALL_CONTEXT_FIELD]), CALL_CONTEXT_CONTRACT);
+  assert.deepEqual(jsonRecord(anyOut.properties).note, { type: "string" });
+  // 不递归：分支内部的嵌套 oneOf 不注入。
+  const nested: Record<string, unknown> = { type: "object", properties: { inner: { type: "object", oneOf: [strictBranch()] } }, oneOf: [strictBranch()] };
+  const nestedOut = claudeToolInputWithCallContext(nested);
+  const innerBranch = (jsonRecord(jsonRecord(nestedOut.properties).inner).oneOf as Array<Record<string, unknown>>)[0]!;
+  assert.equal(Object.hasOwn(jsonRecord(innerBranch.properties), CALL_CONTEXT_FIELD), false, "nested oneOf is out of scope");
+  assert.ok(Object.hasOwn(jsonRecord((nestedOut.oneOf as Array<Record<string, unknown>>)[0]!.properties), CALL_CONTEXT_FIELD));
+  // 无 properties 的严格对象分支也获得该字段（否则 host 注入无法通过严格分支）。
+  const emptyStrict = claudeToolInputWithCallContext({ type: "object", oneOf: [{ type: "object", additionalProperties: false }] });
+  const emptyBranch = (emptyStrict.oneOf as Array<Record<string, unknown>>)[0]!;
+  assert.deepEqual(jsonRecord(emptyBranch.properties), { [CALL_CONTEXT_FIELD]: CALL_CONTEXT_CONTRACT });
+  assert.equal(emptyBranch.additionalProperties, false);
+  // 保留名冲突抛错（顶层/目标分支），不静默覆盖。
+  assert.throws(() => claudeToolInputWithCallContext({ type: "object", properties: { [CALL_CONTEXT_FIELD]: { type: "string" } } }), /保留/);
+  assert.throws(() => claudeToolInputWithCallContext({ type: "object", oneOf: [{ type: "object", properties: { [CALL_CONTEXT_FIELD]: { type: "string" } }, additionalProperties: false }] }), /保留/);
+  assert.throws(() => claudeToolInputWithCallContext({ type: "object", anyOf: [{ type: "object", additionalProperties: false, properties: { [CALL_CONTEXT_FIELD]: { type: "string" } } }] }), /保留/);
+  // 非目标（非严格）分支的既有声明不被覆盖、也不触发抛错。
+  const looseDeclared = claudeToolInputWithCallContext({ type: "object", oneOf: [{ type: "object", properties: { [CALL_CONTEXT_FIELD]: { type: "number" } }, additionalProperties: true }] });
+  assert.deepEqual(jsonRecord(jsonRecord((looseDeclared.oneOf as Array<Record<string, unknown>>)[0]!.properties)[CALL_CONTEXT_FIELD]), { type: "number" });
+  assert.deepEqual(jsonRecord(looseDeclared.properties)[CALL_CONTEXT_FIELD], CALL_CONTEXT_CONTRACT);
+  // 扁平严格对象：只在顶层加字段。
+  const flat: Record<string, unknown> = { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false };
+  const flatOut = claudeToolInputWithCallContext(flat);
+  assert.deepEqual(flatOut.required, ["path"]);
+  assert.equal(flatOut.additionalProperties, false);
+  assert.deepEqual(Object.keys(jsonRecord(flatOut.properties)).sort(), [CALL_CONTEXT_FIELD, "path"].sort());
+});
+
+test("unknown keywords inside oneOf branches and conditional constraints are not hidden by call-context propagation", async () => fixture(async (root) => {
+  // 目标分支内的未知关键字仍在注册期被 toClaudeSchema 拒绝（不静默丢弃）。
+  const unsupported: ToolDefinition = { name: "probe", description: "fixture", inputSchema: { type: "object", oneOf: [{ type: "object", properties: {}, additionalProperties: false, patternProperties: {} }] }, handler: async () => ({ ok: true, message: "never" }) };
+  const engine = fake(async () => { assert.fail("unsupported schema must not create a Query"); });
+  const session = await createClaudeRuntimeAdapter(options(root, [unsupported]), engine.dependencies).bindRole(role);
+  await assert.rejects(session.prompt("unsupported keyword"), /unsupported JSON Schema keyword patternProperties/);
+  assert.equal(engine.configurations.length, 0);
+  await session.dispose();
+  // 条件（if/then）语义不变：真实 git_candidate 的 oid 条件仍按 objectFormat 强制 40/64 位。
+  const description = describeTool("git_candidate");
+  let conditionalCalls = 0;
+  const tool: ToolDefinition = { name: "git_candidate", description: description.description, inputSchema: description.parameters, handler: async () => { conditionalCalls += 1; return { ok: true, message: "validated" }; } };
+  const engine2 = fake(async (client) => {
+    const base = (objectFormat: string, hex: string) => ({ ref: "refs/ans/trunk", oid: { objectFormat, hex } });
+    const commit = (value: Record<string, unknown>) => ({ action: "commit", base: value, paths: ["a"], message: "m", operationId: "op" });
+    assert.equal((await client.callTool({ name: "git_candidate", arguments: commit(base("sha256", "a".repeat(64))) })).isError, false);
+    assert.equal((await client.callTool({ name: "git_candidate", arguments: commit(base("sha256", "a".repeat(40))) })).isError, true);
+    assert.equal((await client.callTool({ name: "git_candidate", arguments: commit(base("sha1", "a".repeat(64))) })).isError, true);
+  });
+  const session2 = await createClaudeRuntimeAdapter(options(root, [tool]), engine2.dependencies).bindRole(role);
+  try { await session2.prompt("conditional semantics"); } finally { await session2.dispose(); }
+  assert.equal(conditionalCalls, 1, "only the conditional-valid call reached the handler");
+}));
+
+test("Pi/Codex adapter sources never reference the Claude request-context field", async () => {
+  const directories = ["../../src/provider/pi/", "../../src/provider/codex/", "../../src/common/pi-adapter/"];
+  const files: string[] = [];
+  const walk = async (directory: string): Promise<void> => {
+    try { await access(directory); } catch { return; }
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) await walk(path);
+      else files.push(path);
+    }
+  };
+  for (const directory of directories) await walk(fileURLToPath(new URL(directory, import.meta.url)));
+  assert.ok(files.length > 0, "Pi/Codex adapter sources are present");
+  for (const file of files) assert.equal((await readFile(file, "utf8")).includes(CALL_CONTEXT_FIELD), false, file);
+});
