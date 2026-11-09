@@ -1,0 +1,20 @@
+{
+  "added": [
+    ".ans/runs/run-hub-37aca786d0019df9914fd2a7e2fdeb8591a0ec4006600b24/manifest.json",
+    ".ans/sessions/chief/claude/ans/index.json",
+    ".ans/sessions/chief/claude/ans/replay.jsonl",
+    ".ans/sessions/chief/claude/native/.claude.json",
+    ".ans/sessions/chief/claude/native/.last-cleanup",
+    ".ans/sessions/chief/claude/native/backups/.claude.json.backup.1794243067461",
+    ".ans/sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-target/60a57f9e-5bce-42aa-98e9-5b06d3f1ee0d.jsonl",
+    ".ans/state/doc-freezes.json",
+    ".ans/trunk/initialization-sources/init-source-baef4b456e2942d92608369574edf607fffa10fe75774e528e3904b553e53d02.json"
+  ],
+  "removed": [],
+  "changed": [
+    ".ans/state/logs/chief.jsonl",
+    ".ans/state/tasks.jsonl",
+    ".ans/state/versions.jsonl",
+    "docs/bootstrap-manifest.md"
+  ]
+}

@@ -2096,6 +2096,36 @@ export type ContractCheckFn = (
   metadata?: { roleId?: string; turnId?: string; runtime?: RuntimeKind },
 ) => string | null | undefined | void | Promise<string | null | undefined | void>;
 
+/** `doc_format` 的可选裁剪参数（2026-11-09 文档格式权威说明，方案 P1.2 §4.1；仅详情模式生效）。 */
+export type DocFormatPart = "fields" | "example" | "errors";
+
+/** `doc_format` 只读格式查询（2026-11-09 文档格式权威说明，方案 P1.2 §4.1）。 */
+export interface DocFormatInput {
+  /** 文档格式 id（如 `project-intent/v1`）；缺省/空串 ⇒ 返回全部格式索引（模型无需先验 id）。 */
+  format?: string;
+  /** 可选缩小范围：仅字段表/加载级、仅最小合法样例、仅常见错误与修复。 */
+  part?: DocFormatPart;
+}
+
+/**
+ * `doc_format` 数据源的纯文本返回（S1）：与 `ContractCheckFn` 同型——数据源返回纯文本，
+ * 由工具包装层统一生成 `{ok:true,message}`/`{ok:false,message}` 信封（不抛、不猜）。
+ */
+export type DocFormatResult = string | null | undefined | void | Promise<string | null | undefined | void>;
+
+/**
+ * `doc_format` 注入数据源（契约；实现方＝桌面窗口以静态注册表渲染提供）：
+ * - **只读**：调用无任何副作用（不写盘、不入队、不改会话/权限/判定链），零磁盘 I/O；
+ *   静态公开文本，不含角色/项目/run 事实；
+ * - 缺省/空串 `format` ⇒ 格式索引；给出 `format` ⇒ 该格式详情（`part` 可裁剪）；
+ * - 输出超 **8 KiB** 由工具层按 UTF-8 字节防御性截断并如实标注；数据层失败/无结果以
+ *   null/空/抛错表达（工具层转 `{ok:false,message}`）。
+ */
+export type DocFormatFn = (
+  input: DocFormatInput,
+  metadata?: { roleId?: string; turnId?: string; runtime?: RuntimeKind },
+) => DocFormatResult;
+
 /**
  * `session_tail` 的注入数据源（桌面主进程经**受保护投影管线**产出；G-2 §4.2）。契约（实现方＝桌面窗口 W5）：
  * - **纯读**；必须沿既有受保护投影（凭据清洗 / display 保护，`runtime-history.ts::getSessionHistory`
@@ -3579,6 +3609,12 @@ export interface GovernedToolsOptions {
   roleStatus?: RoleStatusFn;
   /** 2026-10-30（3.2）：`contract_check` 只读数据源；未注入 ⇒ 工具不注册。 */
   contractCheck?: ContractCheckFn;
+  /**
+   * 2026-11-09（文档格式权威说明，方案 P1.2 §4.1）：`doc_format` 只读数据源（格式索引/详情）。
+   * **注入才注册**——未注入 ⇒ 工具不存在、既有行为逐字不变。只读：不写盘、不入队、不改权限/状态；
+   * 静态公开文本（不含角色/项目事实）；查询结果**不构成放行/授权**。
+   */
+  docFormat?: DocFormatFn;
   /** 3.4：`evidence_check` 只读数据源；未注入 ⇒ 工具不注册。 */
   evidenceCheck?: EvidenceCheckFn;
   /** G-2/R1：`session_tail` 数据源（受保护投影后的会话尾线）。只给内置治理角色 注入；未注入 ⇒ 工具不注册。 */

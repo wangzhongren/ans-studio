@@ -1,0 +1,33 @@
+{
+  "added": [
+    ".ans/runs/run-hub-a2e2eba317af1f35b3e6a271d835b75505331f0edf5220d9/manifest.json",
+    ".ans/sessions/chief/claude/ans/index.json",
+    ".ans/sessions/chief/claude/ans/replay.jsonl",
+    ".ans/sessions/chief/claude/native/.claude.json",
+    ".ans/sessions/chief/claude/native/.last-cleanup",
+    ".ans/sessions/chief/claude/native/backups/.claude.json.backup.1794244062212",
+    ".ans/sessions/chief/claude/native/plugins/plugin-directory-cache-v2.json",
+    ".ans/sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/6ae8a725-5f59-4656-b153-d5e56977caed.jsonl",
+    ".ans/sessions/product/claude/ans/index.json",
+    ".ans/sessions/product/claude/ans/replay.jsonl",
+    ".ans/sessions/product/claude/ans/reports/76fed0d12eb5ba169e54aee5b5c61c6bee6907346ca95868b53705b4272bd62a.json",
+    ".ans/sessions/product/claude/native/.claude.json",
+    ".ans/sessions/product/claude/native/.last-cleanup",
+    ".ans/sessions/product/claude/native/backups/.claude.json.backup.1794244072882",
+    ".ans/sessions/product/claude/native/plugins/plugin-directory-cache-v2.json",
+    ".ans/sessions/product/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/94598c7d-1102-4aec-91c0-a458588eb3b6.jsonl",
+    ".ans/state/doc-freezes.json",
+    ".ans/trunk/initialization-sources/init-source-ba3b79ea7cad63aa76b521fe60c3e873d88e8a4962da8048667c13679835eb77.json",
+    ".ans/trunk/snapshots/s-intent-e54bdbf924bce76ba549e86f7d7704b1adc43269206501b0896794b35055ce00.json",
+    "docs/product/jinyong-rogue-2d-intent-v4.md"
+  ],
+  "removed": [],
+  "changed": [
+    ".ans/state/logs/chief.jsonl",
+    ".ans/state/logs/product.jsonl",
+    ".ans/state/tasks.jsonl",
+    ".ans/state/versions.jsonl",
+    "docs/audit/shell-gate.jsonl",
+    "docs/bootstrap-manifest.md"
+  ]
+}

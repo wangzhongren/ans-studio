@@ -1,0 +1,40 @@
+=== session.test.ts imports ===
+20:import test, { mock } from "node:test";
+21:import assert from "node:assert/strict";
+22:import fs from "node:fs";
+23:import os from "node:os";
+24:import path from "node:path";
+26:import { SessionManager, type SessionManagerDeps, type SessionEventEnvelope } from "../../app/desktop/session.ts";
+27:import { buildProjectConfig } from "../../app/desktop/project.ts";
+28:import { openRoleSession, createRuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
+29:import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
+30:import {
+35:} from "../../src/common/编排/doc-format-specs.ts";
+36:import { contractSchemaText } from "../../src/common/编排/workflow-preconditions.ts";
+37:import { buildGovernanceJudgeTools } from "../../src/common/runtime-core/governance-judge/tools.ts";
+38:import { buildShellJudgeTools } from "../../src/common/runtime-core/shell-judge/tools.ts";
+39:import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+40:import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+41:import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
+42:import type {
+51:} from "../../src/model/runtime.ts";
+
+=== doc-format-all-roles.test.ts imports ===
+29:import test, { mock } from "node:test";
+30:import assert from "node:assert/strict";
+31:import { createHash } from "node:crypto";
+32:import fs from "node:fs";
+33:import os from "node:os";
+34:import path from "node:path";
+36:import { SessionManager, type SessionManagerDeps, type SessionEventEnvelope } from "../../app/desktop/session.ts";
+37:import { buildProjectConfig } from "../../app/desktop/project.ts";
+38:import { openRoleSession, createRuntimeAdapterFactory } from "../../src/pipeline/orchestration/run-role.ts";
+39:import { createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
+40:import {
+45:} from "../../src/common/编排/doc-format-specs.ts";
+46:import { buildGovernanceJudgeTools } from "../../src/common/runtime-core/governance-judge/tools.ts";
+47:import { buildShellJudgeTools } from "../../src/common/runtime-core/shell-judge/tools.ts";
+48:import { describeTool } from "../../src/provider/runtime/schema.ts";
+49:import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+50:import type {
+58:} from "../../src/model/runtime.ts";

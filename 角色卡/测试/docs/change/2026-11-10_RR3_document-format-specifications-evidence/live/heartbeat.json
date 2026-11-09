@@ -1,0 +1,25 @@
+{
+  "at": "2026-11-09T17:15:46.353Z",
+  "elapsedSec": 483,
+  "budget": {
+    "customerMessages": 1,
+    "cards": 1,
+    "cardsByTitle": {
+      "确认需求意图 v4：战斗暂停 / 继续（Esc 暂停与继续，暂停时冻结战斗输入与计时）": 1
+    },
+    "operatorProjectMessages": 0,
+    "productDocFormatCalls": 1,
+    "projectRoleDocFormatCalls": 0,
+    "modelTurns": {},
+    "wallClockStartUtc": "2026-11-09T17:07:36.498Z"
+  },
+  "intentCardSeen": true,
+  "productReadDone": true,
+  "projectQueryStarted": true,
+  "projectReadDone": false,
+  "gate": {
+    "kind": "shell-confirm-card",
+    "title": "命令审批 · 产品",
+    "at": "2026-11-09T17:08:59.480Z"
+  }
+}

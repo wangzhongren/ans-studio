@@ -1,0 +1,10 @@
+baseline copy v2 (EOL-aligned): C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2
+node: v24.22.1
+
+workflow-preconditions | exit=0 | ℹ tests 29 ℹ pass 29 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+run-manifest | exit=0 | ℹ tests 12 ℹ pass 12 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+evidence-check | exit=0 | ℹ tests 10 ℹ pass 10 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+boundary-yaml | exit=0 | ℹ tests 13 ℹ pass 13 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+mcp-declarations | exit=0 | ℹ tests 6 ℹ pass 6 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+run-pin | exit=1 | ℹ tests 20 ℹ pass 9 ℹ fail 11 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+rejection-copy | exit=0 | ℹ tests 17 ℹ pass 17 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 

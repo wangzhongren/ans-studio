@@ -1,0 +1,160 @@
+TAP version 13
+# Subtest: TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+ok 1 - TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+  ---
+  duration_ms: 1.1181
+  type: 'test'
+  ...
+# Subtest: TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+ok 2 - TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+  ---
+  duration_ms: 0.3971
+  type: 'test'
+  ...
+# Subtest: TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+ok 3 - TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+  ---
+  duration_ms: 0.1497
+  type: 'test'
+  ...
+# Subtest: TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+ok 4 - TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+  ---
+  duration_ms: 2.0531
+  type: 'test'
+  ...
+# Subtest: TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+ok 5 - TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+  ---
+  duration_ms: 3.2774
+  type: 'test'
+  ...
+# Subtest: TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+ok 6 - TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+  ---
+  duration_ms: 0.2212
+  type: 'test'
+  ...
+# Subtest: TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+ok 7 - TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+  ---
+  duration_ms: 0.9132
+  type: 'test'
+  ...
+# Subtest: TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+ok 8 - TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+  ---
+  duration_ms: 0.1646
+  type: 'test'
+  ...
+# Subtest: TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+ok 9 - TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+  ---
+  duration_ms: 0.6816
+  type: 'test'
+  ...
+# Subtest: TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+ok 10 - TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+  ---
+  duration_ms: 74.5537
+  type: 'test'
+  ...
+# Subtest: TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+ok 11 - TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+  ---
+  duration_ms: 1.5131
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+ok 12 - TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+  ---
+  duration_ms: 1.6318
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+ok 13 - TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+  ---
+  duration_ms: 35.2353
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+ok 14 - TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+  ---
+  duration_ms: 3.8408
+  type: 'test'
+  ...
+# Subtest: TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+ok 15 - TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+  ---
+  duration_ms: 350.413
+  type: 'test'
+  ...
+# Subtest: TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+ok 16 - TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+  ---
+  duration_ms: 27.3211
+  type: 'test'
+  ...
+# Subtest: TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+ok 17 - TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+  ---
+  duration_ms: 7.5035
+  type: 'test'
+  ...
+# Subtest: TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+ok 18 - TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+  ---
+  duration_ms: 57.5272
+  type: 'test'
+  ...
+# Subtest: TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+ok 19 - TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+  ---
+  duration_ms: 36.1224
+  type: 'test'
+  ...
+# Subtest: TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+ok 20 - TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+  ---
+  duration_ms: 40.1293
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+ok 21 - TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+  ---
+  duration_ms: 65.674
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+ok 22 - TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+  ---
+  duration_ms: 18.988
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+ok 23 - TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+  ---
+  duration_ms: 0.556
+  type: 'test'
+  ...
+# Subtest: TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+ok 24 - TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+  ---
+  duration_ms: 1.4494
+  type: 'test'
+  ...
+# Subtest: TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+ok 25 - TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+  ---
+  duration_ms: 0.1831
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 985.3924

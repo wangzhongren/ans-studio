@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind）
+ok 1 - 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind）
+  ---
+  duration_ms: 22.4308
+  type: 'test'
+  ...
+# Subtest: unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留）
+ok 2 - unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留）
+  ---
+  duration_ms: 11.3375
+  type: 'test'
+  ...
+# Subtest: 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId
+ok 3 - 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId
+  ---
+  duration_ms: 10.913
+  type: 'test'
+  ...
+# Subtest: run-role gate：stable 一次性许可 allowed/denied 映射（hash/无上下文/无许可/过期）
+ok 4 - run-role gate：stable 一次性许可 allowed/denied 映射（hash/无上下文/无许可/过期）
+  ---
+  duration_ms: 24.1787
+  type: 'test'
+  ...
+# Subtest: run-role gate：版本化 frozen 拒绝 / draft 允许 / pin 必须 frozen / unknown fail-closed
+ok 5 - run-role gate：版本化 frozen 拒绝 / draft 允许 / pin 必须 frozen / unknown fail-closed
+  ---
+  duration_ms: 15.3814
+  type: 'test'
+  ...
+# Subtest: run-role gate：未注入 stablePermitOf ⇒ 保留既有确认制路径（B-11 接线前分阶段兼容）
+ok 6 - run-role gate：未注入 stablePermitOf ⇒ 保留既有确认制路径（B-11 接线前分阶段兼容）
+  ---
+  duration_ms: 12.0198
+  type: 'test'
+  ...
+# Subtest: direct governance bridge: only the trusted trio action owner receives each capability
+ok 7 - direct governance bridge: only the trusted trio action owner receives each capability
+  ---
+  duration_ms: 39.9823
+  type: 'test'
+  ...
+# Subtest: chief bridge: trusted bounded context forwards only decision capability and denies production writes
+ok 8 - chief bridge: trusted bounded context forwards only decision capability and denies production writes
+  ---
+  duration_ms: 4.4692
+  type: 'test'
+  ...
+# Subtest: chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction
+ok 9 - chief bridge: wrong role, single model and unbound settlement capability fail before adapter construction
+  ---
+  duration_ms: 0.726
+  type: 'test'
+  ...
+# Subtest: chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence
+ok 10 - chief bridge: real runtime Service sees only decide tool, separate host context, and no session persistence
+  ---
+  duration_ms: 12.9308
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无
+ok 11 - run-role 能力注入：product → 仅 submitVersionChange；rapporteur 同；convener → refactor+stable；chief 全无
+  ---
+  duration_ms: 21.2452
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信）
+ok 12 - run-role 能力注入：项目角色即便调用方误给也不注入三能力（模型自报角色不可信）
+  ---
+  duration_ms: 12.8937
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用）
+ok 13 - run-role 能力注入：未注入 ⇒ 能力位缺席（工具不注册；无副作用）
+  ---
+  duration_ms: 5.9127
+  type: 'test'
+  ...
+# Subtest: run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检）
+ok 14 - run-role 能力注入：假实现的结构化回执形状（submitted/requested）由工具层透传（形状自检）
+  ---
+  duration_ms: 0.1696
+  type: 'test'
+  ...
+# Subtest: Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions
+ok 15 - Pipeline actual role-capability assembly: required default Chat registers genuine no-effect callbacks; unmanaged keeps the original functions
+  ---
+  duration_ms: 1658.8742
+  type: 'test'
+  ...
+# Subtest: Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task
+ok 16 - Pipeline handback turn intent: real task identity survives optional info reports; work still requires a report and chat clears old task
+  ---
+  duration_ms: 86.4987
+  type: 'test'
+  ...
+# Subtest: Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+ok 17 - Pipeline initial workflow source: actual approved Core request binds task before the real guarded write
+  ---
+  duration_ms: 2112.2366
+  type: 'test'
+  ...
+# Subtest: Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle
+ok 18 - Pipeline failed open: actual Core preparation is revoked and error reference binds one host handle
+  ---
+  duration_ms: 11.0186
+  type: 'test'
+  ...
+# Subtest: Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology
+ok 19 - Pipeline host-facts stages: actual required default Chat writes/edits and rejects host forgery, scope and stale Git topology
+  ---
+  duration_ms: 947.7686
+  type: 'test'
+  ...
+# Subtest: Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association
+ok 20 - Hub NoGit stage facts: actual default Chat writes a legal product draft and rejects a late Git association
+  ---
+  duration_ms: 85.7624
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5363.5491

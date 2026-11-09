@@ -1,0 +1,14 @@
+# tracked modifications numstat (git diff --numstat -- src app test)
+32	1	app/desktop/session.ts
+36	0	src/model/runtime.ts
+20	0	src/pipeline/orchestration/run-role.ts
+26	0	src/provider/runtime/schema.ts
+95	0	src/provider/runtime/tools.ts
+
+# line counts / bytes for untracked new files
+src/common/编排/doc-format-specs.ts	2291 lines	100105 bytes
+test/编排/doc-format-specs.test.ts	1672 lines	99507 bytes
+test/runtime-core/doc-format-specs-pin.test.ts	281 lines	19754 bytes
+test/门禁引擎/doc-format-specs-pin.test.ts	678 lines	33709 bytes
+test/桌面应用/session.test.ts	588 lines	26853 bytes
+test/测试/doc-format-all-roles.test.ts	724 lines	35241 bytes

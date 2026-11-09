@@ -1,0 +1,11 @@
+ M app/desktop/session.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? src/common/编排/doc-format-specs.ts
+?? test/runtime-core/doc-format-specs-pin.test.ts
+?? test/桌面应用/session.test.ts
+?? test/测试/doc-format-all-roles.test.ts
+?? test/编排/doc-format-specs.test.ts
+?? test/门禁引擎/doc-format-specs-pin.test.ts

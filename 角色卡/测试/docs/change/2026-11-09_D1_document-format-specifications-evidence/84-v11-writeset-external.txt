@@ -1,0 +1,11 @@
+=== v1.1 write-set-external recheck (expect empty) ===
+(end)
+=== hash-object SAME spot-check ===
+SAME src/common/编排/workflow-preconditions.ts
+SAME src/common/门禁引擎/boundary-yaml.ts
+SAME test/桌面应用/optional-acceptance.test.ts
+SAME test/桌面应用/chief-workflow.test.ts
+SAME 角色卡/编排/role-card.md
+SAME 角色卡/桌面窗口/boundary.yaml
+=== status count ===
+11

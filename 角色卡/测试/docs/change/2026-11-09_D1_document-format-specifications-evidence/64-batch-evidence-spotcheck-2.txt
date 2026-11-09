@@ -1,0 +1,17 @@
+=== W4a evidence ===
+candidate-run-role.diff
+candidate-run-role.diff.stderr.txt
+candidate-run-role.sha256.txt
+regression-workflow-preconditions-doc-format-specs.tap
+run-role-direct.tap
+typecheck-after.log
+typecheck-before.log
+write-set-external.status.txt
+89b495787f46b7d3760fdaf2d854d3a32e360c1333a26e8faae6c898c59a3b25 *角色卡/编排/docs/change/2026-11-09_W4a_run-role_document-format-specifications_evidence/regression-workflow-preconditions-doc-format-specs.tap
+677b42a00f0b1fbe3f7117eeed6a07da0253f9428327ab67f618dfb8e80aef1a *角色卡/编排/docs/change/2026-11-09_W4a_run-role_document-format-specifications_evidence/run-role-direct.tap
+d4e088834210a24934ea8a148de6f550d33472c337fc4651ae1407ef695c0388 *角色卡/编排/docs/change/2026-11-09_W4a_run-role_document-format-specifications_evidence/typecheck-after.log
+18fe318746f03b5150292b844384bf7bbe62335315f489493a47d81f9935a8aa *角色卡/编排/docs/change/2026-11-09_W4a_run-role_document-format-specifications_evidence/typecheck-before.log
+375cf1e8a3ed65570d6d1abe1de5f0a75fb835595d98b4f501b422232407125c *角色卡/编排/docs/change/2026-11-09_W4a_run-role_document-format-specifications_evidence/candidate-run-role.diff
+
+=== W4b evidence search ===
+d4e225723a28e2e06ddab98d26f7278a434ceaed034bad25cbd6bcdd02f49033 *角色卡/桌面窗口/docs/change/2026-11-09_W4b_desktop_document-format-specifications.md

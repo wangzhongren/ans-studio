@@ -1,0 +1,10 @@
+D1 combined determinism verification — context
+date: 2026-11-09T14:56:44Z (UTC)
+worktree: .claude/worktrees/trunk-amendment
+branch: feat/document-format-specifications
+HEAD: 3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1
+HEAD^{tree}: e05d68ad26d768297cb076af4f8e24316c7d71b7
+node: v24.22.1
+npm: 11.19.1
+git: git version 2.55.0.windows.5
+core.quotepath check: unset

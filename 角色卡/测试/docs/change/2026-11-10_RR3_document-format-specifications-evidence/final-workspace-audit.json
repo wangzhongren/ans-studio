@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-09T17:18:20.113Z",
+  "record": {
+    "lines": 212,
+    "bytes": 31639,
+    "sha256": "44bdf61c39cdc65ecc35aa611ece06469e845057fff69cb670536bad27f9bba6"
+  },
+  "onlyOurEvidenceAdded": true,
+  "candidate": {
+    "count": 11,
+    "aggregate": "bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3"
+  },
+  "manifest": {
+    "count": 1113,
+    "aggregate": "fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f"
+  },
+  "ports": [],
+  "electron": 0
+}

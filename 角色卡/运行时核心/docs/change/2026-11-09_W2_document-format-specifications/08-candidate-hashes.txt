@@ -1,0 +1,26 @@
+# candidate hashes (W2 B2 batch)
+branch: feat/document-format-specifications
+head: 3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1
+head_tree: e05d68ad26d768297cb076af4f8e24316c7d71b7
+node: v24.22.1
+status_src_app_test:
+   M src/model/runtime.ts
+   M src/provider/runtime/schema.ts
+   M src/provider/runtime/tools.ts
+  ?? "src/common/\347\274\226\346\216\222/doc-format-specs.ts"
+  ?? test/runtime-core/doc-format-specs-pin.test.ts
+  ?? "test/\347\274\226\346\216\222/doc-format-specs.test.ts"
+  ?? "test/\351\227\250\347\246\201\345\274\225\346\223\216/doc-format-specs-pin.test.ts"
+numstat:
+  36	0	src/model/runtime.ts
+  26	0	src/provider/runtime/schema.ts
+  95	0	src/provider/runtime/tools.ts
+files:
+  src/model/runtime.ts | 4183 lines | 212397 bytes | 89e5fbc97b3a3f6994cf858696750fe6d3acfbe45ed1d0cf571b8a35037f4959
+  src/provider/runtime/tools.ts | 5482 lines | 335868 bytes | b07c3f805ab9eb88f13d4a6d4098b001d101e04b59b6162f57eda1e47a06ba79
+  src/provider/runtime/schema.ts | 1861 lines | 147921 bytes | fd3ee646e07e6d6beb3ba006a5f3079de5fb92c2fc08909dc6c9f4322e7a13a6
+  test/runtime-core/doc-format-specs-pin.test.ts | 281 lines | 19754 bytes | f05471e38ca83f626856352ce85d914ec0ff85a1035c111eadc5e43659592003
+  AGGREGATE_4FILES=16a5fadf3da013d8536177dd762630f654952ffdf11a2c090cfa78d1c606e043
+b1_reference_unchanged:
+  src/common/编排/doc-format-specs.ts | 100105 bytes | f141e4ba3314f3a67673f83fa70daf8a80ac5fca7270b214eb30aeeba1008871
+  test/编排/doc-format-specs.test.ts | 99507 bytes | f9abe8f35fbe920cf14c53c4fb9f2e9df5017f03741200bf2b2050753e1395c4

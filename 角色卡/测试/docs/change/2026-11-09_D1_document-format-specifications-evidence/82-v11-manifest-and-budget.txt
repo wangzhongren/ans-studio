@@ -1,0 +1,17 @@
+=== v1.1 primary manifest (tracked+candidate) ===
+files: 1113
+total bytes: 25907278
+manifest digest (sorted "path\0sha256" concat, SHA-256): fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f
+
+=== v1.1 disk-all manifest ===
+files: 1117
+total bytes: 27565627
+manifest digest (sorted "path\0sha256" concat, SHA-256): b2bb60d621d3130fbb4f23065fb134389e17abf7431bb1855a24591c8f47e82e
+
+=== registry budget re-measure (v1.1) ===
+ids: 54 index bytes: 5223 max detail: 4089 project-roster/v3
+B18 detail contains governance-matrix/v1: true
+B18 detail contains unique-copy note: true
+
+=== new pinned-literal test presence ===
+849:test("TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import", async () => {

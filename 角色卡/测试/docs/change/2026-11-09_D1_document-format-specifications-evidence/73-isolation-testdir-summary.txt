@@ -1,0 +1,3 @@
+judge-effectiveness exit=0 wall=67s | ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 
+delivery-claude exit=0 wall=94s | ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 
+governance-matrix exit=1 wall=0s | ℹ tests 1 ℹ pass 0 ℹ fail 1 ℹ cancelled 0 ℹ skipped 0 

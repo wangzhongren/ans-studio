@@ -1,0 +1,19 @@
+# suite: dir-测试
+FILE test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+  counts before={"tests":1,"pass":1,"fail":0,"cancelled":0,"skipped":0,"todo":0} after={"tests":2,"pass":1,"fail":1,"cancelled":0,"skipped":0,"todo":0} exit before=0 after=1
+  AFTER-ONLY FAIL: test\测试\2026-11-09_judge-delegated-effectiveness.test.ts
+FILE test/测试/doc-format-all-roles.test.ts: NEW (after only) counts={"tests":5,"pass":5,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0
+FILE test/测试/git-action-commit-pi-e2e.test.ts
+  counts before={"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0} after={"tests":1,"pass":1,"fail":0,"cancelled":0,"skipped":0,"todo":0} exit before=1 after=0
+  BEFORE-ONLY FAIL: test\测试\git-action-commit-pi-e2e.test.ts
+FILE test/测试/git-action-delivery-claude-e2e.test.ts
+  counts before={"tests":1,"pass":1,"fail":0,"cancelled":0,"skipped":0,"todo":0} after={"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0} exit before=0 after=1
+  AFTER-ONLY FAIL: test\测试\git-action-delivery-claude-e2e.test.ts
+FILE test/测试/git-role-workflows-e2e.test.ts
+  counts before={"tests":19,"pass":5,"fail":2,"cancelled":0,"skipped":12,"todo":0} after={"tests":19,"pass":7,"fail":0,"cancelled":0,"skipped":12,"todo":0} exit before=1 after=0
+  BEFORE-ONLY FAIL: Q30 fixture HTTP preserves split UTF8 and byte budget
+  BEFORE-ONLY FAIL: Q74 owned Git metadata observer atomic rename race remains bounded and strict
+FILE test/测试/governance-matrix-integration.test.ts
+  counts before={"tests":18,"pass":18,"fail":0,"cancelled":0,"skipped":0,"todo":0} after={"tests":18,"pass":17,"fail":1,"cancelled":0,"skipped":0,"todo":0} exit before=0 after=1
+  AFTER-ONLY FAIL: T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入
+TOTALS: files=114 new-after-only-failures=3 new-after-only-skips=0

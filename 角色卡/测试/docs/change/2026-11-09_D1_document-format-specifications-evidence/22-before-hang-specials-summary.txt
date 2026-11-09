@@ -1,0 +1,8 @@
+=== before customer-authorization-plane-integration (registered hang, 90s watchdog) ===
+exit=124
+ℹ tests 1 ℹ pass 0 ℹ fail 1 ℹ cancelled 0 ℹ skipped 0 ℹ todo 0 
+
+=== before bounded reruns (--test-timeout=6000 --test-reporter=tap) for desktop hang files ===
+directive-decision exit=1 | # tests 8 # pass 2 # fail 2 # cancelled 4 # skipped 0 
+session-rebuild-race exit=1 | # tests 18 # pass 14 # fail 3 # cancelled 1 # skipped 0 
+stuck-redispatch exit=1 | # tests 10 # pass 6 # fail 3 # cancelled 1 # skipped 0 

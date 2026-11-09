@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+ok 1 - team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+  ---
+  duration_ms: 7.3387
+  type: 'test'
+  ...
+# Subtest: 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+ok 2 - 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+  ---
+  duration_ms: 3.3235
+  type: 'test'
+  ...
+# Subtest: 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+ok 3 - 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+  ---
+  duration_ms: 1.278
+  type: 'test'
+  ...
+# Subtest: 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+ok 4 - 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+  ---
+  duration_ms: 9.0647
+  type: 'test'
+  ...
+# Subtest: 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+ok 5 - 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+  ---
+  duration_ms: 13.4704
+  type: 'test'
+  ...
+# Subtest: 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+ok 6 - 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+  ---
+  duration_ms: 22.8351
+  type: 'test'
+  ...
+# Subtest: 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+ok 7 - 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+  ---
+  duration_ms: 0.5575
+  type: 'test'
+  ...
+# Subtest: D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+ok 8 - D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+  ---
+  duration_ms: 0.3282
+  type: 'test'
+  ...
+# Subtest: 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+ok 9 - 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+  ---
+  duration_ms: 0.8162
+  type: 'test'
+  ...
+# Subtest: 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+ok 10 - 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+  ---
+  duration_ms: 0.2173
+  type: 'test'
+  ...
+# Subtest: 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+ok 11 - 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+  ---
+  duration_ms: 0.0736
+  type: 'test'
+  ...
+# Subtest: 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+ok 12 - 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+  ---
+  duration_ms: 0.0726
+  type: 'test'
+  ...
+# Subtest: 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+ok 13 - 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+  ---
+  duration_ms: 2.0614
+  type: 'test'
+  ...
+# Subtest: env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+ok 14 - env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+  ---
+  duration_ms: 1.3667
+  type: 'test'
+  ...
+# Subtest: 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+ok 15 - 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+  ---
+  duration_ms: 3.752
+  type: 'test'
+  ...
+# Subtest: envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+ok 16 - envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+  ---
+  duration_ms: 1.2954
+  type: 'test'
+  ...
+# Subtest: 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+ok 17 - 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+  ---
+  duration_ms: 0.5542
+  type: 'test'
+  ...
+# Subtest: 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+ok 18 - 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+  ---
+  duration_ms: 0.186
+  type: 'test'
+  ...
+# Subtest: R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+ok 19 - R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+  ---
+  duration_ms: 0.0569
+  type: 'test'
+  ...
+# Subtest: targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+ok 20 - targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+  ---
+  duration_ms: 0.0952
+  type: 'test'
+  ...
+# Subtest: evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+ok 21 - evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+  ---
+  duration_ms: 0.0844
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+ok 22 - AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+  ---
+  duration_ms: 0.8122
+  type: 'test'
+  ...
+# Subtest: AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+ok 23 - AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+  ---
+  duration_ms: 0.1295
+  type: 'test'
+  ...
+# Subtest: AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+ok 24 - AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+  ---
+  duration_ms: 0.1093
+  type: 'test'
+  ...
+# Subtest: AC-18：roster schema 文本含三条警告与占位 omissionReason
+ok 25 - AC-18：roster schema 文本含三条警告与占位 omissionReason
+  ---
+  duration_ms: 0.0413
+  type: 'test'
+  ...
+# Subtest: AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 26 - AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 7.8158
+  type: 'test'
+  ...
+# Subtest: AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 27 - AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 3.5515
+  type: 'test'
+  ...
+# Subtest: AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+ok 28 - AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+  ---
+  duration_ms: 1.8656
+  type: 'test'
+  ...
+# Subtest: AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+ok 29 - AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+  ---
+  duration_ms: 42.5167
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 261.1215

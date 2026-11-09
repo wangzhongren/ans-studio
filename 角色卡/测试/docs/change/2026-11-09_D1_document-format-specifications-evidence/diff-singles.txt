@@ -1,0 +1,42 @@
+# suite: workflow-preconditions
+before: {"tests":29,"pass":29,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+after : {"tests":29,"pass":29,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+failures common=0 before-only=0 after-only=0
+skips before-only=0 after-only=0
+
+# suite: run-manifest
+before: {"tests":12,"pass":12,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+after : {"tests":12,"pass":12,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+failures common=0 before-only=0 after-only=0
+skips before-only=0 after-only=0
+
+# suite: evidence-check
+before: {"tests":10,"pass":10,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+after : {"tests":10,"pass":10,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+failures common=0 before-only=0 after-only=0
+skips before-only=0 after-only=0
+
+# suite: boundary-yaml
+before: {"tests":13,"pass":13,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+after : {"tests":13,"pass":13,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+failures common=0 before-only=0 after-only=0
+skips before-only=0 after-only=0
+
+# suite: mcp-declarations
+before: {"tests":6,"pass":6,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+after : {"tests":6,"pass":6,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+failures common=0 before-only=0 after-only=0
+skips before-only=0 after-only=0
+
+# suite: run-pin
+before: {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} failures=11 skips=0
+after : {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} failures=11 skips=0
+failures common=11 before-only=0 after-only=0
+skips before-only=0 after-only=0
+
+# suite: rejection-copy
+before: {"tests":17,"pass":17,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+after : {"tests":17,"pass":17,"fail":0,"cancelled":0,"skipped":0,"todo":0} failures=0 skips=0
+failures common=0 before-only=0 after-only=0
+skips before-only=0 after-only=0
+

@@ -1,0 +1,66 @@
+=== skip/todo/force-exit scan in new test files (expect none) ===
+test/编排/doc-format-specs.test.ts:8:// 不新增 skip/force-exit；人工豁免必须带理由（MATRIX_EXEMPTIONS / OVERCLAIM_EXEMPTIONS /
+test/runtime-core/doc-format-specs-pin.test.ts:16:// 纪律：不改既有断言；不新增 skip/force-exit；数据源用真实注册表（`doc-format-specs.ts`）或最小替身，
+test/门禁引擎/doc-format-specs-pin.test.ts:14:// （不改写既有片段）；负例断言到稳定 code；不新增 skip/force-exit；不写盘（临时目录除外）。
+test/测试/doc-format-all-roles.test.ts:24:// `src/common/编排/doc-format-specs.ts` 的可复算输出）；不新增 skip/force-exit。
+
+=== doc-format-specs.ts purity: imports ===
+21:import {
+32:import {
+40:import { CRITERIA_SCHEMA, EVIDENCE_META_SCHEMA } from "./evidence-check.ts";
+41:import { CUSTOMER_DIRECTIVE_SCHEMA } from "../../model/directive.ts";
+42:import { DOWNLOAD_REQUEST_SCHEMA } from "../../model/download.ts";
+43:import { GOVERNANCE_MATRIX_SCHEMA } from "../../model/governance-matrix.ts";
+44:import { PROJECT_STATE_SCHEMA, VERSION_DECISION_SCHEMA } from "../../model/project-state.ts";
+45:import {
+51:import {
+57:import {
+
+=== doc-format-specs.ts fs/app/service references ===
+18:// 纪律：本模块不 import `node:fs`、不 import `app/`/`service/`、不写盘；`docFormatSpecText` 对未知 id
+
+=== tools.ts: docFormat injection site ===
+236:export const DOC_FORMAT_TOOL_NAME = "doc_format";
+3186:function makeDocFormatTool(fn: DocFormatFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+3187:  const name = DOC_FORMAT_TOOL_NAME;
+5301:  if (options?.docFormat !== undefined) {
+5302:    tools.push(makeDocFormatTool(options.docFormat, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));
+
+=== schema.ts: doc_format describeTool ===
+30:  /** 仅该工具激活时进系统提示的准则条目（SDK types.d.ts:455-456 的 promptGuidelines）。 */
+31:  promptGuidelines?: string[];
+73:  return shape && { ...shape, executionMode: "sequential", promptGuidelines: [
+106:    promptGuidelines: ["不提供argv/env/config/目录或host actor/repo/task/run/authorizationRevision/ProtectionFacts；未知字段拒绝。",
+134:      promptGuidelines: [
+166:      promptGuidelines: [
+206:      promptGuidelines: [
+220:      promptGuidelines: ["需要确认有哪些后台任务或查看状态时用 list_background_tasks；不要假设已过期的任务号仍然有效。"],
+250:      promptGuidelines: [
+276:      promptGuidelines: [
+396:      promptGuidelines: [
+461:      promptGuidelines: [
+559:      promptGuidelines: [
+603:      promptGuidelines: [
+719:      promptGuidelines: [
+
+=== run-role.ts: docFormat sites ===
+416:  docFormat?: DocFormatFn;
+888:    docFormat?: DocFormatFn;
+2122:    ...(input.docFormat !== undefined ? { docFormat: input.docFormat } : {}),
+3564:    // `GovernedToolsOptions.docFormat` 同名能力位，形状同源 `model/runtime.ts` `DocFormatFn`）；
+3566:    docFormat: capabilities?.docFormat,
+
+=== session.ts: docFormat sites ===
+172:import { docFormatIndexText, docFormatSpecText } from "../../src/common/编排/doc-format-specs.ts";
+689:      docFormat?: DocFormatFn;
+Binary file app/desktop/session.ts matches
+
+=== runtime.ts: DocFormat types ===
+2100:export type DocFormatPart = "fields" | "example" | "errors";
+2103:export interface DocFormatInput {
+2107:  part?: DocFormatPart;
+2114:export type DocFormatResult = string | null | undefined | void | Promise<string | null | undefined | void>;
+2124:export type DocFormatFn = (
+2125:  input: DocFormatInput,
+2127:) => DocFormatResult;
+3617:  docFormat?: DocFormatFn;

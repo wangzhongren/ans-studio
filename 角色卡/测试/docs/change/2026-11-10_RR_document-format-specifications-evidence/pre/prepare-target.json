@@ -1,0 +1,396 @@
+{
+  "at": "2026-11-09T16:48:41.355Z",
+  "source": "C:\\Users\\51054\\Desktop\\work\\jinyong-rogue-2d",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-doc-format-run-2026-11-10\\target",
+  "skipped": [
+    ".ans/sessions"
+  ],
+  "sourceRoleDirs": [
+    "art-dev",
+    "combat-dev",
+    "content-dev",
+    "dungeon-dev",
+    "engine-dev",
+    "env-bootstrap",
+    "render-dev",
+    "test-dev"
+  ],
+  "sourceFiles": {
+    "角色卡/art-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 455,
+        "sha256": "1b87c3217e2deaa8bbcae073f6b3f0fca4a56fa6c80aa7266a16f03ce0705a6d"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 8786,
+        "sha256": "0af2308017b8fe1316c0ccb45e25d9021de7e99744d4539d08013e615a8b6403"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 1115,
+        "sha256": "7b55c5ff5fc2e1d210c02aff97c4317447ba1c8e8019fdc7258bdf9372eeeb93"
+      }
+    ],
+    "角色卡/combat-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 187,
+        "sha256": "e743fb1d625d90917588bd29dd7653a94d08fead1a2ab13cb42d43677047988a"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7325,
+        "sha256": "438b1dd4725389173f23ef3d1c1fa117e21572af5d431df18755e0e38e8556f0"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 867,
+        "sha256": "c37934bc952d52d0e15133d9f10ed32f034b10b753be1ed7d53fff26a3857cdb"
+      }
+    ],
+    "角色卡/content-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 173,
+        "sha256": "2dc2f8e1bff62f274ad4748a30e3e96cb637797513aa45f865db03cda1589ebb"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7133,
+        "sha256": "41bf6f8520f4c54205f32be8f5a8b1663826f0aae1031e29f0d84d6675c6b57d"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 846,
+        "sha256": "defdd4865fac98581585afa864822aa7069c38d1f6e369bc0fba771f78e9ebcc"
+      }
+    ],
+    "角色卡/dungeon-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 322,
+        "sha256": "f04c9faf4aaa06556a6bbe4c03b6e9cfce9d03e6be2c309331ac5af6fcd0e6bb"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7381,
+        "sha256": "d3f1a9bd9f19fda6ec9844ba622f7aef56514ce770ebe2ee5476bbc14ab0fcae"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 848,
+        "sha256": "364386ee1245db314c27f55441ea4afa0c000b442b4e7f3f4801d2a91f208c72"
+      }
+    ],
+    "角色卡/engine-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 177,
+        "sha256": "72a255f68b600bdb6410b5d4fd2e87487e89186e17ada384bdc74210336d3a3c"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7948,
+        "sha256": "719ac67ed7f3a3cabba2a1a913dd433e03d1fdfd3754b13faea53f7c7f980849"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 867,
+        "sha256": "679d5d27c137698f5c166762161b1b29294bbd2fbafdad537e2899fbed2f61b0"
+      }
+    ],
+    "角色卡/env-bootstrap": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 920,
+        "sha256": "7a58103f9eb74d074739d417bb120e568d1a0bb603f3857decfdd03c34993972"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 8604,
+        "sha256": "66b0471ca8ee5c8b806b66c44ca3d47863aea5a690e40ee59a62bd9c315098af"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 1189,
+        "sha256": "0cea6e291b1492538b4460b6d7bd196fed8c380febd3ff22c81b23d6cd4162b1"
+      }
+    ],
+    "角色卡/render-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 172,
+        "sha256": "e528a99b5f12c831771a1fb29c360b1c8d4ad7508bdf09331479e60b4e7c4f42"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7191,
+        "sha256": "a21c74bcbfa7bea735445c765c716ba7db0a299c66e963f4f74c2b784f532fce"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 899,
+        "sha256": "1f6f3243143ddf0d51b47147df6a0f2a9ad3c60031d1d8fbc7b45bfedf774a10"
+      }
+    ],
+    "角色卡/test-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 167,
+        "sha256": "539819ff72b9b161066a5d8cb4ab3b90b0f100fab40c4e085c2fbe9a556c1e2f"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7513,
+        "sha256": "00f756f640b20bcc201f0f59dc00a9738d269585411eb2f28281dc76009d0ded"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 886,
+        "sha256": "6968cacf7e010705bfaf278ac59fab892799f2c085b2b72770ac7f6e3b1d95b1"
+      }
+    ],
+    "角色卡/governance-boundary.yaml": {
+      "bytes": 388,
+      "sha256": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93"
+    },
+    ".ans/project.json": {
+      "bytes": 3046,
+      "sha256": "03d8e438976fc038b04cf114be9b8e81c096d41a5e7b71a0a8d63871629785ca"
+    },
+    ".ans/state/tasks.jsonl": {
+      "bytes": 677338,
+      "sha256": "044ca6f96c8d46668023e24d67057f82116c2bb3d104e504d4699e8d581ac4df"
+    },
+    ".ans/state/versions.jsonl": {
+      "bytes": 7565,
+      "sha256": "536ef2377d84be6df9d9bbb0faded4058d8466398cc2ba8bfb04247a0fd34819"
+    }
+  },
+  "copiedFileCount": 462,
+  "projectJsonRewrite": {
+    "path": ".ans/project.json",
+    "oldRoot": "C:/Users/51054/Desktop/work/jinyong-rogue-2d",
+    "newRoot": "C:/Users/51054/Desktop/work/ans-doc-format-run-2026-11-10/target",
+    "roles": [
+      "art-dev",
+      "combat-dev",
+      "content-dev",
+      "dungeon-dev",
+      "engine-dev",
+      "env-bootstrap",
+      "render-dev",
+      "test-dev"
+    ],
+    "governanceModel": "trio",
+    "acceptanceAccepted": true,
+    "pinCount": 9
+  },
+  "targetRoles": {
+    "art-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 455,
+        "sha256": "1b87c3217e2deaa8bbcae073f6b3f0fca4a56fa6c80aa7266a16f03ce0705a6d"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 8786,
+        "sha256": "0af2308017b8fe1316c0ccb45e25d9021de7e99744d4539d08013e615a8b6403"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 1115,
+        "sha256": "7b55c5ff5fc2e1d210c02aff97c4317447ba1c8e8019fdc7258bdf9372eeeb93"
+      }
+    ],
+    "combat-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 187,
+        "sha256": "e743fb1d625d90917588bd29dd7653a94d08fead1a2ab13cb42d43677047988a"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7325,
+        "sha256": "438b1dd4725389173f23ef3d1c1fa117e21572af5d431df18755e0e38e8556f0"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 867,
+        "sha256": "c37934bc952d52d0e15133d9f10ed32f034b10b753be1ed7d53fff26a3857cdb"
+      }
+    ],
+    "content-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 173,
+        "sha256": "2dc2f8e1bff62f274ad4748a30e3e96cb637797513aa45f865db03cda1589ebb"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7133,
+        "sha256": "41bf6f8520f4c54205f32be8f5a8b1663826f0aae1031e29f0d84d6675c6b57d"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 846,
+        "sha256": "defdd4865fac98581585afa864822aa7069c38d1f6e369bc0fba771f78e9ebcc"
+      }
+    ],
+    "dungeon-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 322,
+        "sha256": "f04c9faf4aaa06556a6bbe4c03b6e9cfce9d03e6be2c309331ac5af6fcd0e6bb"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7381,
+        "sha256": "d3f1a9bd9f19fda6ec9844ba622f7aef56514ce770ebe2ee5476bbc14ab0fcae"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 848,
+        "sha256": "364386ee1245db314c27f55441ea4afa0c000b442b4e7f3f4801d2a91f208c72"
+      }
+    ],
+    "engine-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 177,
+        "sha256": "72a255f68b600bdb6410b5d4fd2e87487e89186e17ada384bdc74210336d3a3c"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7948,
+        "sha256": "719ac67ed7f3a3cabba2a1a913dd433e03d1fdfd3754b13faea53f7c7f980849"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 867,
+        "sha256": "679d5d27c137698f5c166762161b1b29294bbd2fbafdad537e2899fbed2f61b0"
+      }
+    ],
+    "env-bootstrap": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 920,
+        "sha256": "7a58103f9eb74d074739d417bb120e568d1a0bb603f3857decfdd03c34993972"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 8604,
+        "sha256": "66b0471ca8ee5c8b806b66c44ca3d47863aea5a690e40ee59a62bd9c315098af"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 1189,
+        "sha256": "0cea6e291b1492538b4460b6d7bd196fed8c380febd3ff22c81b23d6cd4162b1"
+      }
+    ],
+    "render-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 172,
+        "sha256": "e528a99b5f12c831771a1fb29c360b1c8d4ad7508bdf09331479e60b4e7c4f42"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7191,
+        "sha256": "a21c74bcbfa7bea735445c765c716ba7db0a299c66e963f4f74c2b784f532fce"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 899,
+        "sha256": "1f6f3243143ddf0d51b47147df6a0f2a9ad3c60031d1d8fbc7b45bfedf774a10"
+      }
+    ],
+    "test-dev": [
+      {
+        "file": "boundary.yaml",
+        "bytes": 167,
+        "sha256": "539819ff72b9b161066a5d8cb4ab3b90b0f100fab40c4e085c2fbe9a556c1e2f"
+      },
+      {
+        "file": "role-card.md",
+        "bytes": 7513,
+        "sha256": "00f756f640b20bcc201f0f59dc00a9738d269585411eb2f28281dc76009d0ded"
+      },
+      {
+        "file": "工作文档.md",
+        "bytes": 886,
+        "sha256": "6968cacf7e010705bfaf278ac59fab892799f2c085b2b72770ac7f6e3b1d95b1"
+      }
+    ]
+  },
+  "boundaryPinCheck": [
+    {
+      "path": "角色卡/governance-boundary.yaml",
+      "pin": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93",
+      "actual": "a19ee561cac958c29ae4c1b4b8001f57303e17f48a83ab780bc87dde7f6fce93",
+      "match": true
+    },
+    {
+      "path": "角色卡/art-dev/boundary.yaml",
+      "pin": "1b87c3217e2deaa8bbcae073f6b3f0fca4a56fa6c80aa7266a16f03ce0705a6d",
+      "actual": "1b87c3217e2deaa8bbcae073f6b3f0fca4a56fa6c80aa7266a16f03ce0705a6d",
+      "match": true
+    },
+    {
+      "path": "角色卡/combat-dev/boundary.yaml",
+      "pin": "e743fb1d625d90917588bd29dd7653a94d08fead1a2ab13cb42d43677047988a",
+      "actual": "e743fb1d625d90917588bd29dd7653a94d08fead1a2ab13cb42d43677047988a",
+      "match": true
+    },
+    {
+      "path": "角色卡/content-dev/boundary.yaml",
+      "pin": "2dc2f8e1bff62f274ad4748a30e3e96cb637797513aa45f865db03cda1589ebb",
+      "actual": "2dc2f8e1bff62f274ad4748a30e3e96cb637797513aa45f865db03cda1589ebb",
+      "match": true
+    },
+    {
+      "path": "角色卡/dungeon-dev/boundary.yaml",
+      "pin": "f04c9faf4aaa06556a6bbe4c03b6e9cfce9d03e6be2c309331ac5af6fcd0e6bb",
+      "actual": "f04c9faf4aaa06556a6bbe4c03b6e9cfce9d03e6be2c309331ac5af6fcd0e6bb",
+      "match": true
+    },
+    {
+      "path": "角色卡/engine-dev/boundary.yaml",
+      "pin": "72a255f68b600bdb6410b5d4fd2e87487e89186e17ada384bdc74210336d3a3c",
+      "actual": "72a255f68b600bdb6410b5d4fd2e87487e89186e17ada384bdc74210336d3a3c",
+      "match": true
+    },
+    {
+      "path": "角色卡/env-bootstrap/boundary.yaml",
+      "pin": "7a58103f9eb74d074739d417bb120e568d1a0bb603f3857decfdd03c34993972",
+      "actual": "7a58103f9eb74d074739d417bb120e568d1a0bb603f3857decfdd03c34993972",
+      "match": true
+    },
+    {
+      "path": "角色卡/render-dev/boundary.yaml",
+      "pin": "e528a99b5f12c831771a1fb29c360b1c8d4ad7508bdf09331479e60b4e7c4f42",
+      "actual": "e528a99b5f12c831771a1fb29c360b1c8d4ad7508bdf09331479e60b4e7c4f42",
+      "match": true
+    },
+    {
+      "path": "角色卡/test-dev/boundary.yaml",
+      "pin": "539819ff72b9b161066a5d8cb4ab3b90b0f100fab40c4e085c2fbe9a556c1e2f",
+      "actual": "539819ff72b9b161066a5d8cb4ab3b90b0f100fab40c4e085c2fbe9a556c1e2f",
+      "match": true
+    }
+  ],
+  "roleCardCheckAllMatch": true,
+  "ledger": {
+    "rows": 401,
+    "cardKinds": {
+      "?": 20
+    },
+    "openUndeliveredCount": 0,
+    "openRequestsCount": 0,
+    "openUndelivered": [],
+    "openRequests": []
+  }
+}

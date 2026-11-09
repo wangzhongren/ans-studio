@@ -1,0 +1,38 @@
+=== v1.1 FINAL snapshot (2026-11-09T16:39:41Z) ===
+branch: feat/document-format-specifications
+HEAD: 3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1
+HEAD^{tree}: e05d68ad26d768297cb076af4f8e24316c7d71b7
+staged: 0
+status -- src app test:
+ M app/desktop/session.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? src/common/编排/doc-format-specs.ts
+?? test/runtime-core/doc-format-specs-pin.test.ts
+?? test/桌面应用/session.test.ts
+?? test/测试/doc-format-all-roles.test.ts
+?? test/编排/doc-format-specs.test.ts
+?? test/门禁引擎/doc-format-specs-pin.test.ts
+count: 11
+
+=== primary manifest recompute ===
+files: 1113
+total bytes: 25907278
+manifest digest (sorted "path\0sha256" concat, SHA-256): fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f
+
+=== disk-all recompute ===
+files: 1117
+total bytes: 27565627
+manifest digest (sorted "path\0sha256" concat, SHA-256): b2bb60d621d3130fbb4f23065fb134389e17abf7431bb1855a24591c8f47e82e
+
+=== candidate hashes/aggregate recompute ===
+test/测试/doc-format-all-roles.test.ts	B5/W5	35241	d992b164fcd0e36d8eea0646d0736a3b5da08e16922d6e248d828a0de543b2e5	d992b164fcd0e36d8eea0646d0736a3b5da08e16922d6e248d828a0de543b2e5	YES
+test/编排/doc-format-specs.test.ts	B1/W1-fix	101313	54e5b01ab47c59f091ec2c9617b5209b6e3b254fe2aa757ec211455166aa2e94	54e5b01ab47c59f091ec2c9617b5209b6e3b254fe2aa757ec211455166aa2e94	YES
+test/门禁引擎/doc-format-specs-pin.test.ts	B3/W3	33709	45b1ce34ed2d06f460264b252d2d702bebd78d55bf155c2922af1b39f520d369	45b1ce34ed2d06f460264b252d2d702bebd78d55bf155c2922af1b39f520d369	YES
+
+11/11 equal (9 original batch + 2 W1-fix §9.5): true
+
+combination aggregate (v1.1): bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3
+B1 two-file aggregate: f6d4475ce676c55ebf462d144a58ae38ba0477a983c98ca1b1a4b266a3b3bb0f (expected f6d4475ce676c55ebf462d144a58ae38ba0477a983c98ca1b1a4b266a3b3bb0f) MATCH

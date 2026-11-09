@@ -1,0 +1,12 @@
+{"file":"test/桌面应用/abort-unwedge.test.ts","exit":0,"wall":1,"counts":{"tests":3,"pass":3,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/acceptance-evidence.test.ts","exit":0,"wall":1,"counts":{"tests":3,"pass":3,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/acceptance-proposal-path.test.ts","exit":0,"wall":2,"counts":{"tests":7,"pass":7,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/acceptance-return-card.test.ts","exit":0,"wall":2,"counts":{"tests":10,"pass":10,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/ans-wiring.test.ts","exit":0,"wall":0,"counts":{"tests":7,"pass":7,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/application-line.test.ts","exit":1,"wall":1,"counts":{"tests":3,"pass":2,"fail":1,"cancelled":0,"skipped":0,"todo":0},"failures":["申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl"],"skips":[]}
+{"file":"test/桌面应用/boundary-refresh.test.ts","exit":1,"wall":4,"counts":{"tests":14,"pass":13,"fail":1,"cancelled":0,"skipped":0,"todo":0},"failures":["G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞"],"skips":[]}
+{"file":"test/桌面应用/chain-enforcement.test.ts","exit":1,"wall":3,"counts":{"tests":9,"pass":3,"fail":6,"cancelled":0,"skipped":0,"todo":0},"failures":["D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）","D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略","F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚","M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理","M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据","M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚"],"skips":[]}
+{"file":"test/桌面应用/composer-images.test.ts","exit":0,"wall":0,"counts":{"tests":3,"pass":3,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/decision-service.test.ts","exit":0,"wall":1,"counts":{"tests":22,"pass":22,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/diagnostics.test.ts","exit":0,"wall":0,"counts":{"tests":8,"pass":8,"fail":0,"cancelled":0,"skipped":0,"todo":0},"failures":[],"skips":[]}
+{"file":"test/桌面应用/directive-decision.test.ts","counts":{"tests":null,"pass":null,"fail":null,"cancelled":null,"skipped":null,"todo":null},"failures":[],"skips":[]}

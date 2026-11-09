@@ -815,6 +815,32 @@ export function describeTool(name: string): ToolDescription {
       ],
     };
   }
+  if (name === "doc_format") {
+    // 文档格式权威说明（2026-11-09，方案 P1.2 §4.1/§4.6；B1 TM-11）：**扁平 schema**（顶层 object +
+    // 非空 properties + required；**无顶层 oneOf/anyOf**，避免 `tools/list` 呈空重演）。描述与
+    // promptGuidelines 即全员可发现入口：写治理文档前先查、无参数列全部、只读不构成放行。
+    return {
+      parameters: {
+        type: "object",
+        properties: {
+          format: { type: "string", description: "Optional format id (e.g. \"project-intent/v1\"); omit or empty for the full format index" },
+          part: { type: "string", enum: ["fields", "example", "errors"], description: "Optional narrowing: fields = field table + load checks; example = minimal valid example; errors = common errors and fixes" },
+        },
+        required: [],
+        additionalProperties: true,
+      },
+      description:
+        "**只读文档格式说明**（2026-11-09）：写任何治理文档/角色卡/边界/验收标准/提案/意图前，**先查**该格式的权威说明" +
+        "（字段表与必填/枚举、加载级约束与错误码、最小合法样例、常见错误与修复）。**无参数调用返回全部格式索引**" +
+        "（模型无需先知道 id）；`format=<id>` 返回该格式详情，`part=fields|example|errors` 可缩小范围；输出超 8 KiB 会截断并如实标注。" +
+        "**纯读**：不写盘、不读 run/项目、不改变任何权限或判定；查询结果**不构成放行/授权**。未知 format 会返回可用 id 列表，不会猜测。",
+      promptGuidelines: [
+        "写任何治理文档/角色卡/边界/验收标准/提案/意图前，先用 doc_format 查该格式的字段表与最小合法样例；不要凭记忆猜 schema 或字段名。",
+        "不知道格式 id 时先无参数调用 doc_format 取索引（按阶段分组列出全部格式）；part=fields|example|errors 可缩小输出范围。",
+        "doc_format 只读、不构成放行/授权；说明与实际门禁不一致时以门禁真实回执为准，不得用查询成功冒充校验通过。",
+      ],
+    };
+  }
   if (name === "role_status") {
     // 看护只读工具（G-2/R1，只给 su 注入）：读取主进程权威快照的结构化文本。文案纪律：只读/8 KiB 截断如实/
     // 失败不编造/不做任何恢复（「注入才注册」由 tools.ts 结构性保证；本处只写语义与取用口径）。

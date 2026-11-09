@@ -1,0 +1,77 @@
+TAP version 13
+# Subtest: TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf
+ok 1 - TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf
+  ---
+  duration_ms: 1.8348
+  type: 'test'
+  ...
+# Subtest: TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变
+ok 2 - TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变
+  ---
+  duration_ms: 0.8515
+  type: 'test'
+  ...
+# Subtest: TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision）
+ok 3 - TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision）
+  ---
+  duration_ms: 0.7582
+  type: 'test'
+  ...
+# Subtest: TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源
+ok 4 - TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源
+  ---
+  duration_ms: 0.2398
+  type: 'test'
+  ...
+# Subtest: TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源
+ok 5 - TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源
+  ---
+  duration_ms: 0.1914
+  type: 'test'
+  ...
+# Subtest: TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true}
+ok 6 - TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true}
+  ---
+  duration_ms: 0.3812
+  type: 'test'
+  ...
+# Subtest: TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型）
+ok 7 - TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型）
+  ---
+  duration_ms: 0.1865
+  type: 'test'
+  ...
+# Subtest: TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传）
+ok 8 - TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传）
+  ---
+  duration_ms: 0.1482
+  type: 'test'
+  ...
+# Subtest: TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源
+ok 9 - TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源
+  ---
+  duration_ms: 0.1413
+  type: 'test'
+  ...
+# Subtest: TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住
+ok 10 - TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住
+  ---
+  duration_ms: 8.7217
+  type: 'test'
+  ...
+# Subtest: TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注
+ok 11 - TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注
+  ---
+  duration_ms: 1.0688
+  type: 'test'
+  ...
+# 预算实测：索引 5223 B；最大详情 4089 B（project-roster/v3）
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 246.3911

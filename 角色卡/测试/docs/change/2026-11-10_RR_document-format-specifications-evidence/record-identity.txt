@@ -1,0 +1,4 @@
+record: 角色卡/测试/docs/change/2026-11-10_RR_document-format-specifications.md
+lines: 179
+bytes: 27708
+sha256: 7e95ea07c6284935836ee5be9e72ddec512559b63b34426ed56030be524dfa42

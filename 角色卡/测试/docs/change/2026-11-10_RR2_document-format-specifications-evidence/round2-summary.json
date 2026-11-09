@@ -1,0 +1,81 @@
+{
+  "round": "RR2",
+  "status": "halted-at-first-decisive-result: chief dispatch_task rejected by application before any task row/delivery",
+  "decisiveFailure": {
+    "at": "2026-11-09T17:01:28.023Z",
+    "receipt": "dispatch_task：任务未能派发（回执：document-planning-module-forbidden：文档准备不授实现模块写区。）——请如实向客户说明；不要当它成功、不要宣称已送达。",
+    "inputContext": "第二次 dispatch_task 携带 roleId=product、flowId=jinyong-rogue-2d、moduleId=combat-entities（按客户消息/协调方案要求）；应用拒绝 document planning 任务携带模块字段。",
+    "firstAttempt": "2026-11-09T17:01:23.895Z MCP input validation error（幕僚首次入参字段名 to/sideEffect=write-docs 错误）",
+    "additionalRootCause": "复制目标的 .ans/state/tasks.jsonl 含 10 条 legacy task.created 行，moduleDirectory 为文件路径（index.html/package.json/tools/verify_assets.mjs，无尾随 /），当前 validateTaskStateEvent 会拒绝；readOperationEvents 在投递分配时校验全部账本行 ⇒ 即使修正 moduleId，投递仍会被 delivery-assignment-ledger-invalid 拒绝（首轮 RR 的同一错误即由此产生）"
+  },
+  "sessionsOpened": [
+    {
+      "roleId": "chief",
+      "result": {
+        "at": "2026-11-09T17:01:10.948Z",
+        "via": "diagnostic"
+      }
+    },
+    {
+      "roleId": "product",
+      "result": {
+        "at": "2026-11-09T17:01:11.005Z",
+        "via": "diagnostic"
+      }
+    },
+    {
+      "roleId": "rapporteur",
+      "result": {
+        "at": "2026-11-09T17:01:11.046Z",
+        "via": "diagnostic"
+      }
+    },
+    {
+      "roleId": "nominator",
+      "result": {
+        "at": "2026-11-09T17:01:11.119Z",
+        "via": "diagnostic"
+      }
+    },
+    {
+      "roleId": "convener",
+      "result": {
+        "at": "2026-11-09T17:01:11.161Z",
+        "via": "diagnostic"
+      }
+    },
+    {
+      "roleId": "verifier",
+      "result": {
+        "at": "2026-11-09T17:01:11.205Z",
+        "via": "diagnostic"
+      }
+    },
+    {
+      "roleId": "chief",
+      "result": {
+        "at": "2026-11-09T17:01:10.948Z",
+        "via": "diagnostic"
+      }
+    }
+  ],
+  "docFormatRows": [],
+  "dispatchRows": [],
+  "promptSnapshots": [
+    {
+      "role": "chief",
+      "systemPromptBytes": 58145,
+      "hasDocFormatGuideline": true,
+      "systemPromptSha256": "80ddaf5d6e7cfd1109cc60b963efe91dc737dd528eddaa10bff199ce738d5ebf"
+    }
+  ],
+  "customerMessageSentAt": "2026-11-09T17:01:11.363Z",
+  "budget": {
+    "customerMessages": 1,
+    "cards": 0,
+    "operatorProjectMessages": 0,
+    "productDocFormatCalls": 0,
+    "projectRoleDocFormatCalls": 0,
+    "chiefDocFormatCalls": 0
+  }
+}

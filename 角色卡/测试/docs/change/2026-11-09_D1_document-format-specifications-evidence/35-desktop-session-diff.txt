@@ -1,0 +1,80 @@
+=== git diff app/desktop/session.ts ===
+diff --git a/app/desktop/session.ts b/app/desktop/session.ts
+index ce965f2..3e2dc13 100644
+--- a/app/desktop/session.ts
++++ b/app/desktop/session.ts
+@@ -3,7 +3,7 @@ import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_
+ import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
+ import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
+ import { createToolDisplayContext } from "../../src/common/runtime-core/tool-display.ts";
+-import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult, NetworkGate, NetworkState } from "../../src/model/runtime.ts";
++import type { SessionEvent, RuntimeTurnOutcome, RuntimePersistenceChangeV1, ReportSaveResultV1, ReportSaveStateV1, DeliverySaveResultV1, DeliveryReceiptQueryV1, RuntimeDeliveryReceiptV1, RuntimeReportSnapshotV1, RuntimeLiveReportViewV1, RuntimeInputProvenanceV1, RuntimeLiveHandbackPresentationV1, GovernanceJudgeContext, BackgroundTaskSnapshot, BackgroundTaskReadOptions, BackgroundTaskReadResult, BackgroundTaskStopOptions, BackgroundTaskStopResult, NetworkGate, NetworkState, DocFormatFn, DocFormatInput } from "../../src/model/runtime.ts";
+ // app/desktop/session.ts
+ // 桌面应用的「会话」装配（纯逻辑，不依赖 electron，可在 node 下单测）。
+ //
+@@ -166,6 +166,10 @@ import {
+   type RosterLoadResult,
+ } from "../../src/common/编排/workflow-preconditions.ts";
+ import { collectDispatchAdvisories, type DispatchAdvisory } from "../../src/common/编排/dispatch-advisories.ts";
++// 2026-11-09（文档格式权威说明，方案 P1.2 §3.1）：`doc_format` 只读数据源的单一事实来源——
++// 与既有 `workflow-preconditions.ts` 同类的公开只读入口（纯数据/纯渲染、无 I/O、无判定）。
++// 本层只渲染静态文本，不复制第二份格式说明。
++import { docFormatIndexText, docFormatSpecText } from "../../src/common/编排/doc-format-specs.ts";
+ import { stableWritePathOf } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
+ import type { StableWritePermit, StableWriteRecord, VersionChangeRecord } from "../../src/model/version-change.ts";
+ import type {
+@@ -681,6 +685,8 @@ export interface SessionManagerDeps {
+       roleStatus?: RoleStatusFn;
+       /** **contract_check 只读数据源**（3.2；所有角色注入）。 */
+       contractCheck?: ContractCheckFn;
++      /** **doc_format 只读数据源**（2026-11-09 文档格式权威说明；所有角色注入；`contractCheck` 相邻）。 */
++      docFormat?: DocFormatFn;
+       /** **evidence_check 只读数据源**（3.4；所有角色注入）。 */
+       evidenceCheck?: EvidenceCheckFn;
+       /** **session_tail 数据源**（G-2/W1，仅 chief/su 注入；形状＝契约家 `SessionTailFn`）。 */
+@@ -3880,6 +3886,14 @@ export class SessionManager {
+       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
+     const contractCheck: ContractCheckFn | undefined =
+       (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input);
++    // 2026-11-09（文档格式权威说明，方案 P1.2 §3.1/§4.1；B1 AC-9/AC-10）：`doc_format` 只读数据源——
++    // **所有角色会话**（6 个内置治理角色 + 项目角色）与 `contractCheck` 同位无条件注入（项目角色走同一条
++    // `openRoleSession` 路径，不依赖技能安装/动态 id 登记）。数据源 `docFormatText` 第一条语句静态早退到
++    // 注册表（纯文本、零磁盘 IO、不读 run/项目/角色事实、不含角色差异）；`{ok,message}` 信封与 8 KiB
++    // 防御性截断由运行时核心工具包装层统一生成（S1，与 `contract_check` 同型）。judge 会话（「替我审」/
++    // 「替我决策」）与有界 Chief 决策会话**不经过**本输入对象（见各自独立构造），工具集逐字不变。
++    const docFormat: DocFormatFn =
++      (input: DocFormatInput) => this.docFormatText(req.projectRoot, req.roleId, input);
+     const evidenceCheck: EvidenceCheckFn | undefined =
+       (input: EvidenceCheckInput) => this.evidenceCheckText(req.projectRoot, req.roleId, input);
+     const sessionTail: SessionTailFn | undefined =
+@@ -4371,6 +4385,9 @@ export class SessionManager {
+           ...(requestVersionDecisionCapability ? { requestVersionDecision: requestVersionDecisionCapability } : {}),
+           ...(roleStatus ? { roleStatus } : {}),
+           contractCheck,
++          // 2026-11-09（文档格式权威说明）：`doc_format` 只读数据源（与 `contractCheck` 相邻、无条件注入——
++          // 内置治理角色与项目角色全员可读；编排按 `contractCheck` 同条件透传，未注入 ⇒ 工具不注册）。
++          docFormat,
+           evidenceCheck,
+           ...(sessionTail ? { sessionTail } : {}),
+           // B 批（2026-10-28）：幕僚的运行日志只读数据面（仅 chief 注入；其余角色拿不到 role_activity_log）。
+@@ -10412,6 +10429,20 @@ ${formatted}` };
+     return `${truncated}${marker}`;
+   }
+ 
++  /**
++   * 2026-11-09（文档格式权威说明，方案 P1.2 §3.1/§4.1；B1 AC-10）：`doc_format` 只读数据源。
++   * **第一条语句静态早退**到注册表（索引/详情均为纯静态公开文本）：早退前不调用 `getListing`/
++   * `refreshListingNow`、不做任何 `readFile`/`writeFile`、不读 run/项目/角色事实；不写盘、不入队、
++   * 不改会话状态；返回值与输入确定（同一输入恒返回同一文本）。查询结果**不构成放行/授权**。
++   * 与 `contractCheckText` 同型（S1：返回纯文本 `Promise<string>`）；`{ok,message}` 信封与 8 KiB
++   * 防御性截断由运行时核心工具包装层统一生成。`part` 原样透传（`fields|example|errors`；render 型
++   * 由注册表整段返回并标注）；未知 id 由注册表返回「未知格式 …；可用：…」纯文本（数据源不抛）。
++   */
++  private async docFormatText(projectRoot: string, callerRoleId: string, input: DocFormatInput): Promise<string> {
++    if (input.format === undefined || input.format.trim() === "") return docFormatIndexText();
++    return docFormatSpecText(input.format, input.part);
++  }
++
+   /** `role_status` 结构化文本（设计 §4.1：su 行 + 各角色行 + 队列明细 + 可选诊断节；**纯读**、无副作用；
+    *  数据层失败以 `{ok:false, message}` 如实表达（不抛——抛错由工具层按「读取未完成」如实转达）；
+    *  8 KiB 截断由工具层执行（本层不预截断）。 */

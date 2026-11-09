@@ -1,0 +1,41 @@
+=== before desktop rest (57 files, per-file 120s watchdog) ===
+TOTAL files=57 tests=605 pass=530 fail=75 cancelled=0 skipped=0
+test/桌面应用/boundary-refresh.test.ts | exit=1 | {"tests":14,"pass":13,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/chain-enforcement.test.ts | exit=1 | {"tests":9,"pass":3,"fail":6,"cancelled":0,"skipped":0,"todo":0} | failures=6
+test/桌面应用/directive-decision.test.ts | exit=124 | {"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/directive-input.test.ts | exit=1 | {"tests":19,"pass":14,"fail":5,"cancelled":0,"skipped":0,"todo":0} | failures=5
+test/桌面应用/download-decision.test.ts | exit=1 | {"tests":8,"pass":7,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/download-request.test.ts | exit=1 | {"tests":8,"pass":7,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/genesis-bootstrap.test.ts | exit=1 | {"tests":7,"pass":6,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/handback-delivery.test.ts | exit=1 | {"tests":18,"pass":12,"fail":6,"cancelled":0,"skipped":0,"todo":0} | failures=6
+test/桌面应用/log-actions.test.ts | exit=1 | {"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/multi-runtime.test.ts | exit=1 | {"tests":39,"pass":31,"fail":8,"cancelled":0,"skipped":0,"todo":0} | failures=8
+test/桌面应用/operator-channel.test.ts | exit=1 | {"tests":59,"pass":58,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/p0-halt-and-images.test.ts | exit=1 | {"tests":5,"pass":2,"fail":3,"cancelled":0,"skipped":0,"todo":0} | failures=3
+test/桌面应用/project.test.ts | exit=1 | {"tests":23,"pass":22,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/queue-visibility.test.ts | exit=1 | {"tests":2,"pass":1,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/run-change-trigger.test.ts | exit=1 | {"tests":10,"pass":1,"fail":9,"cancelled":0,"skipped":0,"todo":0} | failures=9
+test/桌面应用/run-pin.test.ts | exit=1 | {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} | failures=11
+test/桌面应用/session-rebuild-race.test.ts | exit=124 | {"tests":17,"pass":14,"fail":3,"cancelled":0,"skipped":0,"todo":0} | failures=3
+test/桌面应用/star-routing.test.ts | exit=1 | {"tests":10,"pass":3,"fail":7,"cancelled":0,"skipped":0,"todo":0} | failures=7
+test/桌面应用/stuck-redispatch.test.ts | exit=124 | {"tests":7,"pass":4,"fail":3,"cancelled":0,"skipped":0,"todo":0} | failures=3
+test/桌面应用/task-restart.test.ts | exit=1 | {"tests":2,"pass":1,"fail":1,"cancelled":0,"skipped":0,"todo":0} | failures=1
+test/桌面应用/version-change.test.ts | exit=1 | {"tests":46,"pass":42,"fail":4,"cancelled":0,"skipped":0,"todo":0} | failures=4
+
+=== before chief-workflow ===
+{"tests":66,"pass":59,"fail":7,"cancelled":0,"skipped":0,"todo":0} failures=7 skips=0
+failures:
+- W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+- W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+- W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+- W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+- W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止
+- W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+- W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+
+=== before optional-acceptance ===
+{"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0}
+- §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底
+- §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板
+- 幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚
+- 开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发

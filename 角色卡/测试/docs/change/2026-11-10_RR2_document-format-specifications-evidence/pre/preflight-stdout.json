@@ -1,0 +1,165 @@
+{
+  "head": "3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1",
+  "tree": "e05d68ad26d768297cb076af4f8e24316c7d71b7",
+  "branch": "feat/document-format-specifications",
+  "candidate": {
+    "count": 11,
+    "aggregate": "bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3"
+  },
+  "manifest": {
+    "count": 1113,
+    "aggregate": "fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f",
+    "bytes": 25907278
+  },
+  "entrySha256": "339fcfaa4d0daaf7b79fa8381743ce4ec2eb0f205bd9c5705cc4ac6f4d532bba",
+  "model": "deepseek-v4-flash",
+  "provider": "https://aiproxy2.abujlb.com/deepseek",
+  "portsPre": {
+    "listeners9222": 0,
+    "listeners9223": 0
+  },
+  "electronProcessesPre": 0,
+  "targetPreFileCount": 462,
+  "roster": {
+    "path": "docs/proposals/jinyong-rogue-2d-roster-v11.md",
+    "bytes": 29707,
+    "sha256": "b8071dc5e2452686d5f05e2faebcf5d9cb136e81d7d5ab25180e88f5a28649c3",
+    "roleIds": [
+      "env-bootstrap",
+      "engine-dev",
+      "dungeon-dev",
+      "combat-dev",
+      "render-dev",
+      "content-dev",
+      "art-dev",
+      "test-dev"
+    ],
+    "modules": [
+      {
+        "id": "env-resources",
+        "path": null,
+        "paths": [
+          "package.json",
+          "server.mjs",
+          "README.md",
+          ".gitignore",
+          ".env.example"
+        ]
+      },
+      {
+        "id": "entry-index",
+        "path": null,
+        "paths": [
+          "index.html",
+          "src/main.mjs"
+        ]
+      },
+      {
+        "id": "engine-core",
+        "path": "src/core/",
+        "paths": []
+      },
+      {
+        "id": "rng-seed",
+        "path": "src/rng/",
+        "paths": []
+      },
+      {
+        "id": "dungeon-gen",
+        "path": "src/dungeon/",
+        "paths": []
+      },
+      {
+        "id": "combat-entities",
+        "path": "src/combat/",
+        "paths": []
+      },
+      {
+        "id": "render-ui",
+        "path": "src/render/",
+        "paths": []
+      },
+      {
+        "id": "content-data",
+        "path": "src/content/",
+        "paths": []
+      },
+      {
+        "id": "assets-art",
+        "path": "assets/",
+        "paths": []
+      },
+      {
+        "id": "art-toolchain",
+        "path": "tools/art/",
+        "paths": []
+      },
+      {
+        "id": "verify-tool",
+        "path": "tools/verify_assets.mjs",
+        "paths": []
+      },
+      {
+        "id": "tests-suite",
+        "path": "tests/",
+        "paths": []
+      }
+    ]
+  },
+  "docsProduct": [
+    "jinyong-rogue-2d-intent-v1.md",
+    "jinyong-rogue-2d-intent-v2.md",
+    "jinyong-rogue-2d-intent-v3.md"
+  ],
+  "bindings": {
+    "b1v1": {
+      "rel": "docs/acceptance/2026-11-09_document-format-specifications-criteria-v1.md",
+      "exists": true,
+      "bytes": 69121,
+      "lines": 483,
+      "sha256": "bec45edfa47dd54229e1f37faac540db7ae9773e967b61004e47f65902c15dbe"
+    },
+    "teamPlan": {
+      "rel": "docs/scheduling/2026-11-09_team-plan_document-format-specifications.md",
+      "exists": true,
+      "bytes": 15475,
+      "lines": 102,
+      "sha256": "4d99586f6b32d884ab461307541e7f01f82cc092f0e5c9eaaeabc42f615ebdc2"
+    },
+    "dispatchLog": {
+      "rel": "docs/scheduling/2026-11-09_dispatch-log_document-format-specifications.md",
+      "exists": true,
+      "bytes": 7762,
+      "lines": 56,
+      "sha256": "afce6546723ee0c8ace5eda2b8941ca7369c626acd9eb95efece30300dee0c8f"
+    },
+    "designP12": {
+      "rel": "docs/planning/2026-11-09_design_document-format-specifications.md",
+      "exists": true,
+      "bytes": 146555,
+      "lines": 980,
+      "sha256": "886fef84c3db34515a98f5874a33bb22134a3fc3b02f20aa3d185b828a3e7c54"
+    },
+    "reviewR11": {
+      "rel": "docs/planning/2026-11-09_review_document-format-specifications.md",
+      "exists": true,
+      "bytes": 82067,
+      "lines": 500,
+      "sha256": "2cbe69195f75a700ccdb747cdbdcb9343c1bfc20fb6d011367a1b39c60daee05"
+    },
+    "d1Record": {
+      "rel": "角色卡/测试/docs/change/2026-11-09_D1_document-format-specifications.md",
+      "exists": true,
+      "bytes": 42274,
+      "lines": 228,
+      "sha256": "adc23f45f56f8cd16251e41756f9fce1b56430fadbf10b6add6e2cef3aec090f"
+    },
+    "rr1Record": {
+      "rel": "角色卡/测试/docs/change/2026-11-10_RR_document-format-specifications.md",
+      "exists": true,
+      "bytes": 27708,
+      "lines": 179,
+      "sha256": "7e95ea07c6284935836ee5be9e72ddec512559b63b34426ed56030be524dfa42"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+✔ YAML 合法：解析出三条，root 缺省 project，condition 保留 (4.742ms)
+✔ YAML：root 可显式指定 skill (0.3094ms)
+✔ YAML 非法：语法错误 → 抛错 (0.9053ms)
+✔ YAML 非法：未知顶层键 → 抛错 (0.2245ms)
+✔ YAML 非法：未知 kind → 抛错 (0.2625ms)
+✔ YAML 非法：缺 path → 抛错 (0.2121ms)
+✔ YAML 非法：缺 purpose → 抛错 (0.3091ms)
+✔ YAML 非法：conditional-directory 缺 condition → 抛错 (0.2424ms)
+✔ YAML 非法：condition slug 非法 → 抛错 (0.2809ms)
+✔ YAML 非法：条目含未知键 → 抛错 (0.3556ms)
+✔ resolveBoundary：非法 YAML → 未接受且带 parseError；resolveWrite 理由含边界解析失败 (9.9881ms)
+✔ resolveBoundary+resolveWrite：合法 YAML 三条路径判定正确 (9.4522ms)
+✔ Markdown 回退：.md 走 legacy 表格解析 (4.7866ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 220.9953

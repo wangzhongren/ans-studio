@@ -1,0 +1,9 @@
+# primary manifest: tracked + non-ignored untracked under src/app/test (git ls-files -co --exclude-standard)
+files: 1113
+total bytes: 25904972
+manifest digest (sorted "path\0sha256" concat, SHA-256): 4535a943aaa4a0767ad1c2e299d3a408a1ba4723495b7d0df415022d6410bbae
+
+# secondary on-disk manifest (includes ignored app/renderer/dist)
+files: 1117
+total bytes: 27563321
+manifest digest (sorted "path\0sha256" concat, SHA-256): 5142fe1d09005e6f65bc6b770b8fe005862d37af39f13e7a6e788b9d2865d683

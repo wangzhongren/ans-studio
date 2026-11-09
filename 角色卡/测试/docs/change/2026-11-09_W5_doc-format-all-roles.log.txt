@@ -1,0 +1,133 @@
+# B5 跨角色集成批次证据日志（2026-11-09）
+# 角色：测试（独立验证上下文）；工作目录：.claude/worktrees/trunk-amendment
+# 基线 HEAD：3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1；分支：feat/document-format-specifications
+# Node：v24.22.1；平台：win32（Git Bash）
+# 说明：本日志只读运行既有套件与新增 B5 测试；不使用真实模型/Electron；未提交/推送/合并/发布。
+
+## $ node --test --test-concurrency=1 test/测试/doc-format-all-roles.test.ts
+✔ B5/TM-13/AC-9 注册矩阵：6 内置治理角色 + 旧 su + 动态项目角色经真实 openRoleSession 均注册 doc_format (108.81ms)
+ℹ 注册矩阵 8/8：chief,product,rapporteur,nominator,convener,verifier,su,worker-doc-format-b5
+✔ B5 注入才注册（动态项目角色）：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只且其它工具定义/顺序逐字不变 (22.5433ms)
+✔ B5/AC-9 judge 与有界 Chief 隔离：judge 恰三只无 doc_format；有界 Chief 恰 decide_pending_request（提供 docFormat 也不注册） (6.6276ms)
+✔ B5/TM-13 数据源：全部角色返回同一静态索引（无角色裁剪）；索引/详情零 getListing/refresh/文件 IO、不含项目/角色事实 (77.9818ms)
+ℹ 数据源 8/8 同源：索引 5223 B；已知 id 54 个
+✔ B5/TM-13 可调用：8 个角色会话的 doc_format 经真实轮次可调用（索引/详情 ok:true、未知 ok:false）；同输入同文本、目录不变、无额外事件/落盘 (346.0486ms)
+ℹ 可调用 8/8 角色 × 5 次 = 40 次工具调用；未知 ok:false 与注册表未知文本一致
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 950.4991
+
+## $ node --test --test-concurrency=1 test/桌面应用/session.test.ts（只读回归）
+✔ TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format (100.5346ms)
+✔ AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变 (18.5002ms)
+✔ AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定 (3.2859ms)
+✔ AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变 (49.5852ms)
+✔ AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用） (2.8246ms)
+✔ AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变 (82.456ms)
+✔ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin） (0.6043ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 680.5885
+
+## $ node --test --test-concurrency=1 test/runtime-core/doc-format-specs-pin.test.ts（只读回归）
+✔ TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf (1.8348ms)
+✔ TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变 (0.8305ms)
+✔ TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision） (0.7456ms)
+✔ TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源 (0.221ms)
+✔ TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源 (0.1805ms)
+✔ TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true} (0.3653ms)
+✔ TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型） (0.1988ms)
+✔ TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传） (0.1465ms)
+✔ TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源 (0.147ms)
+✔ TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住 (14.3229ms)
+✔ TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注 (1.0605ms)
+ℹ 预算实测：索引 5223 B；最大详情 4089 B（project-roster/v3）
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 260.7717
+
+## $ node --test --test-concurrency=1 test/编排/doc-format-specs.test.ts（只读回归）
+✔ TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致 (1.1545ms)
+✔ TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note (0.3845ms)
+✔ TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核） (0.1517ms)
+✔ TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定 (1.9706ms)
+✔ TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘 (3.0295ms)
+✔ TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛 (0.2052ms)
+✔ TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回 (0.1358ms)
+✔ TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板） (0.6225ms)
+✔ TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过 (70.2509ms)
+✔ TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例 (1.5524ms)
+✔ TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例） (1.6764ms)
+✔ TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根 (25.5414ms)
+✔ TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露 (3.9701ms)
+✔ TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言 (360.8384ms)
+✔ TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display (27.5104ms)
+✔ TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition (7.8829ms)
+✔ TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由） (48.7018ms)
+✔ TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由） (37.76ms)
+✔ TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由） (37.3322ms)
+✔ TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例 (69.1007ms)
+✔ TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-* (17.9981ms)
+✔ TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露 (0.5503ms)
+✔ TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed (7.3749ms)
+✔ TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例 (0.2087ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 982.058
+
+## $ node --test --test-concurrency=1 test/门禁引擎/doc-format-specs-pin.test.ts（只读回归）
+✔ 规范锚点：A17/A18/A19/A21 的 validator 指向真实实现文件与导出符号 (1.2069ms)
+✔ A17：ROLE_CARD_REQUIRED_SECTIONS 冻结 10 章节，与任务/B1 口径逐项相等 (0.4149ms)
+✔ A17：spec 章节字段逐项/按序包含 10 章节，并披露 #{1,6} 空白匹配口径 (0.1288ms)
+✔ A17：三文件规范路径与 boundary-core 校验一致（正例 + role-document-path-mismatch 负例） (5.0276ms)
+✔ A17：10 章节逐章节缺失 ⇒ role-card-section-missing:<label>；完整模板正例 ok (1.6184ms)
+✔ A18/A19：boundary-yaml 私有常量 KINDS/ROOTS/TOP_KEYS/ENTRY_KEYS 源码字面量冻结 (0.3474ms)
+✔ A18/A19：spec 字段逐项包含 kind/root/entry 键/顶层键与条件目录 slug 口径 (0.239ms)
+✔ A19：validateBoundaryYamlText 正例（spec example 与归档布尔），及条件目录 slug 正例 (1.4964ms)
+✔ A19：严格 YAML 负例 —— 未知顶层键/entry 键/kind/root/condition/archived 非布尔 (2.6048ms)
+✔ A19：条件目录 slug 走 model CONDITION_SLUG_PATTERN（正例/负例一致） (0.1336ms)
+✔ A17/A18/A19：spec 三文件样例经 parseSnapshotRoleDocuments/validateRoleDocumentsSnapshot 为 ok (0.8164ms)
+✔ A17/A18/A19：boundary.md↔yaml 不一致 ⇒ boundary-md-yaml-mismatch（条目多/少/重复/空集） (1.3434ms)
+✔ A17/A18/A19：archived:true ⇒ frozen-role-archived；role 标签不一致 ⇒ boundary-role-mismatch (0.598ms)
+✔ A17/A18/A19：项目角色范围负例 ⇒ invalid-role-boundary-scope（条件目录/路径逃逸） (1.4686ms)
+✔ A21：七键与源码解析键集逐项相等；NAME_PATTERN/RESERVED_NAMES/ENV_NAME_PATTERN 源码字面量冻结 (0.4311ms)
+✔ A21：spec 文本包含名字符集/保留名/env 形态，pathPattern 与状态口径冻结 (0.472ms)
+✔ A21：spec example 经真实 readMcpDeclaration/listInstalledMcpServers 为 ok（七键视图/env 原文） (2.2444ms)
+✔ A21：负例 —— name-invalid/reserved-name/env 名非法/! 前缀/状态未知/必填缺失（readMcpDeclaration 不抛错） (4.6136ms)
+✔ 既有片段：角色卡/编排/boundary.md、角色卡/产品/boundary.yaml 与本角色边界经真实 parser 为 ok (4.2058ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 201.917
+
+## $ npm run typecheck
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+
+# typecheck exit 0；以上各测试命令 exit 0。

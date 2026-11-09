@@ -1,0 +1,160 @@
+{
+  "docs/product": [
+    {
+      "name": "jinyong-rogue-2d-intent-v1.md",
+      "bytes": 27343,
+      "sha256": "5462da1b2212eeac6770448dd19bf5757243544f198e94ec20667588b32bb79e"
+    },
+    {
+      "name": "jinyong-rogue-2d-intent-v2.md",
+      "bytes": 29221,
+      "sha256": "1b38853382c5aa505508164d7144c922b54f87e9db712058a1a00581a620d45e"
+    },
+    {
+      "name": "jinyong-rogue-2d-intent-v3.md",
+      "bytes": 39997,
+      "sha256": "9573d6df430eb8c1bd8f2b736c0d289c1c8727b02fdcb52a1f2e373556c1c7ef"
+    }
+  ],
+  "docs/proposals": [
+    {
+      "name": "jinyong-rogue-2d-modules-v1.md",
+      "bytes": 17027,
+      "sha256": "c1086e05d4fa1416044309e1f61f440188c4827f8be94d1349ea19a669f692c5"
+    },
+    {
+      "name": "jinyong-rogue-2d-modules-v2.md",
+      "bytes": 21919,
+      "sha256": "8bb06cd9c5d212acaacfa08bc65528b3b455e778e439e50849d9d7a09e96b29e"
+    },
+    {
+      "name": "jinyong-rogue-2d-modules-v3.md",
+      "bytes": 21968,
+      "sha256": "ec8d5e6aed5ea629bfe6821e3f127ecd70a274938e1a860d394ef5a9a09668a8"
+    },
+    {
+      "name": "jinyong-rogue-2d-modules-v4.md",
+      "bytes": 21668,
+      "sha256": "c977fe164fafd2e97dcc77e0accc7994ca3dab4078992b87bced9599ff396172"
+    },
+    {
+      "name": "jinyong-rogue-2d-proposal-v1.md",
+      "bytes": 43805,
+      "sha256": "5cddaaf732003296970cdd0806c7b3afdc3dce7251bf6d1e12a27f6bcc03ddda"
+    },
+    {
+      "name": "jinyong-rogue-2d-proposal-v2.md",
+      "bytes": 54240,
+      "sha256": "5dc4ea6e5c71ce2291edaa63661b5f8bc15cfb4fda405189c4858d5206455605"
+    },
+    {
+      "name": "jinyong-rogue-2d-proposal-v3.md",
+      "bytes": 56235,
+      "sha256": "f590776431ef1ad19ab838545990a6f84e5cd5d1aec841922cdeec6954840e1f"
+    },
+    {
+      "name": "jinyong-rogue-2d-proposal-v4.md",
+      "bytes": 59589,
+      "sha256": "b6b9258fad09c53fdbddd8397b8434f658b0aaaacccd5c550d7657ee4e63f113"
+    },
+    {
+      "name": "jinyong-rogue-2d-proposal-v5.md",
+      "bytes": 61324,
+      "sha256": "eb12b013ae5489ee86c0807037cd77d2e4c3f1265d14e519bb62648e0195faf0"
+    },
+    {
+      "name": "jinyong-rogue-2d-proposal-v6.md",
+      "bytes": 63568,
+      "sha256": "ba7df44b55686a527c3ce5fd17c7216fcf0683df087685d00421360f6d4e36b6"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v1.md",
+      "bytes": 24798,
+      "sha256": "39fc1a09eca6623b79354814b5c48ba82371a39bbe1683824a9bfa060302d0db"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v10.md",
+      "bytes": 34521,
+      "sha256": "e4ef23c276399ca2214213c9212cb0d4e5e37c664e166bd291ad084f1c497d22"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v11.md",
+      "bytes": 29707,
+      "sha256": "b8071dc5e2452686d5f05e2faebcf5d9cb136e81d7d5ab25180e88f5a28649c3"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v2.md",
+      "bytes": 26707,
+      "sha256": "4d66dc78b367191f3bc1cad1c88669cebec232fc5654f0c631d743e85d5dabff"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v3.md",
+      "bytes": 27859,
+      "sha256": "1e911be0914ad133077e6b8b104b03fbfa3446f9a583a9353cbb4d714b4b40ec"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v4.md",
+      "bytes": 29912,
+      "sha256": "6fda13e62c09657b8b4b83c4d531a72e2733a0c9a0ad80bf83f8a4a011b05d2e"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v5.md",
+      "bytes": 30405,
+      "sha256": "a966db9186e9d22cd5a7ff2eb67ea39cf2ef15f4ea758d27179dd0ab4ddf584d"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v6.md",
+      "bytes": 32163,
+      "sha256": "6ac9080c883539f02644403152570a0ee1e1df2c9db824e9b420ae16437d1062"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v7.md",
+      "bytes": 32285,
+      "sha256": "4379193924ae8ac6ef37f6b85391c330cf1d51ce2e8eba4296660f17f1ed66ad"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v8.md",
+      "bytes": 33188,
+      "sha256": "4bc3fa686b409f8a8f28416bff1e7f875fda0dbb41bdf6c7083f200425460597"
+    },
+    {
+      "name": "jinyong-rogue-2d-roster-v9.md",
+      "bytes": 33252,
+      "sha256": "27e19b42bd59a88ade706f42f20deabe9e269092deebdd478be96d9d7cb2e48f"
+    },
+    {
+      "name": "jinyong-rogue-2d-v1.md",
+      "bytes": 6325,
+      "sha256": "2a3941e5116f424f4f4fcef4d70cb64cf74d61534e8acf6272b2857c932d6fbe"
+    }
+  ],
+  "docs/contracts": [
+    {
+      "name": "jinyong-rogue-2d-architecture-v1.md",
+      "bytes": 25618,
+      "sha256": "cf59becff269629a5589028f7b11748981061a2a755cd3d9d223a60703f2cc8e"
+    },
+    {
+      "name": "jinyong-rogue-2d-architecture-v2.md",
+      "bytes": 29803,
+      "sha256": "a180da211b6ddaa4b7511cf154ba0b0cdb07a80f2c17c184cb791b3c438c5751"
+    },
+    {
+      "name": "jinyong-rogue-2d-architecture-v3.md",
+      "bytes": 29885,
+      "sha256": "b378f113304af64989a6299d29ca697a0f236f145b66097a99b2383a360b703a"
+    }
+  ],
+  "docs/intents": [
+    {
+      "name": "jinyong-rogue-2d-requirements-brief.md",
+      "bytes": 3366,
+      "sha256": "f42005667263cd155a9fae9d81e80cf1b8a1cb9632ce270f4400248cde13e5b7"
+    },
+    {
+      "name": "jinyong-rogue-2d.md",
+      "bytes": 10936,
+      "sha256": "461a47daaecd084ae4cdbd88fcea800b333415954330675b9aeafe66e3f8d0ea"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "at": "2026-11-09T17:04:49.155Z",
+  "record": {
+    "lines": 169,
+    "bytes": 23751,
+    "sha256": "7bde21e8b237e306116bd350254370210b23b4e53ff450be8409976c4f99368e"
+  },
+  "evidence": {
+    "files": 72,
+    "manifestBytes": 7039,
+    "manifestSha256": "0b4625b15ed53096fd7f938eeee15d2d73cb14f68240eec3cc8d71bc912374bb"
+  },
+  "onlyOurEvidenceAdded": true,
+  "candidate": {
+    "count": 11,
+    "aggregate": "bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3"
+  },
+  "manifest": {
+    "count": 1113,
+    "aggregate": "fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f"
+  },
+  "ports": [
+    "  TCP    127.0.0.1:9223         127.0.0.1:58964        TIME_WAIT       0"
+  ],
+  "electron": 0
+}

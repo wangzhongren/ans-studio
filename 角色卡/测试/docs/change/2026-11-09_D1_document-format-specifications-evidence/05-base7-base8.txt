@@ -1,0 +1,89 @@
+=== BASE-7: session.test.ts at HEAD ===
+fatal: path 'test/桌面应用/session.test.ts' exists on disk, but not in 'HEAD'
+ABSENT at HEAD (expected)
+
+=== HEAD test/桌面应用 listing ===
+test/桌面应用/abort-unwedge.test.ts
+test/桌面应用/acceptance-evidence.test.ts
+test/桌面应用/acceptance-proposal-path.test.ts
+test/桌面应用/acceptance-return-card.test.ts
+test/桌面应用/ans-wiring.test.ts
+test/桌面应用/application-line.test.ts
+test/桌面应用/boundary-refresh.test.ts
+test/桌面应用/chain-enforcement.test.ts
+test/桌面应用/chief-workflow.test.ts
+test/桌面应用/composer-images.test.ts
+test/桌面应用/decision-service.test.ts
+test/桌面应用/diagnostics.test.ts
+test/桌面应用/directive-decision.test.ts
+test/桌面应用/directive-input.test.ts
+test/桌面应用/dispatch-fresh-enum.test.ts
+test/桌面应用/download-decision.test.ts
+test/桌面应用/download-request.test.ts
+test/桌面应用/e2e
+test/桌面应用/genesis-bootstrap.test.ts
+test/桌面应用/handback-delivery.test.ts
+test/桌面应用/hot-path.test.ts
+test/桌面应用/interface.test.ts
+test/桌面应用/log-actions.test.ts
+test/桌面应用/log-patrol.test.ts
+test/桌面应用/log-stuck.test.ts
+test/桌面应用/message-queue.test.ts
+test/桌面应用/multi-runtime.test.ts
+test/桌面应用/network-monitor.test.ts
+test/桌面应用/operator-channel.test.ts
+test/桌面应用/optional-acceptance.test.ts
+test/桌面应用/p0-halt-and-images.test.ts
+test/桌面应用/pending-card-restart.test.ts
+test/桌面应用/pi-config.test.ts
+test/桌面应用/project-document.test.ts
+test/桌面应用/project-state.test.ts
+test/桌面应用/project.test.ts
+test/桌面应用/queue-visibility.test.ts
+test/桌面应用/queue-withdraw-lru.test.ts
+test/桌面应用/rejection-copy.test.ts
+test/桌面应用/replay-safe-retry.test.ts
+test/桌面应用/request-timeout-wiring.test.ts
+test/桌面应用/role-log.test.ts
+test/桌面应用/run-change-entry.test.ts
+test/桌面应用/run-change-trigger.test.ts
+test/桌面应用/run-change.test.ts
+test/桌面应用/run-pin.test.ts
+test/桌面应用/session-history.test.ts
+test/桌面应用/session-rebuild-race.test.ts
+test/桌面应用/shell-escalation.test.ts
+test/桌面应用/star-routing.test.ts
+test/桌面应用/stuck-redispatch-safety.test.ts
+test/桌面应用/stuck-redispatch.test.ts
+test/桌面应用/su-effective-boundary.test.ts
+test/桌面应用/task-restart.test.ts
+test/桌面应用/trunk.test.ts
+test/桌面应用/turn-lease.test.ts
+test/桌面应用/version-change.test.ts
+test/桌面应用/version-decision.test.ts
+test/桌面应用/watchdog-reuse.test.ts
+test/桌面应用/write-safety.test.ts
+
+=== deletion commit 4c24149 ===
+4c24149 test(batch-D3): register D removals and evidence
+4c24149 test(batch-D3): register D removals and evidence
+ .../session.test.ts"                               | 2688 --------------------
+ 1 file changed, 2688 deletions(-)
+
+=== boundary listings (read-only) ===
+角色卡/桌面窗口/boundary.yaml:99:    path: test/桌面应用/session.test.ts
+角色卡/桌面窗口/boundary.md:39:| 单文件 | `test/桌面应用/session.test.ts` | 主进程侧测试：会话开启/多轮/保活 |
+
+=== B8: new files under boundary Section 1 dirs ===
+25:    purpose: 流程状态 YAML 契约的 Pipeline 公共出口（桌面自动验收门消费；实现同源于 src/common/编排/flow-state.ts）
+80:    path: src/common/编排/
+83:    path: test/编排/
+47:    path: test/runtime-core/
+37:    path: test/门禁引擎/
+7:    path: test/测试/
+
+=== no deletions/renames in src app test ===
+      5  M
+      6 ??
+warning: in the working copy of 'src/pipeline/orchestration/run-role.ts', LF will be replaced by CRLF the next time Git touches it
+(empty above = no renames/mode changes)

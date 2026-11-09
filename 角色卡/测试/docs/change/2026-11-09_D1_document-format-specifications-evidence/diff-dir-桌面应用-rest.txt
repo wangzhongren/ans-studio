@@ -1,0 +1,5 @@
+# suite: dir-桌面应用-rest
+FILE test/桌面应用/application-line.test.ts
+  counts before={"tests":3,"pass":3,"fail":0,"cancelled":0,"skipped":0,"todo":0} after={"tests":3,"pass":2,"fail":1,"cancelled":0,"skipped":0,"todo":0} exit before=0 after=1
+  AFTER-ONLY FAIL: 申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl
+TOTALS: files=57 new-after-only-failures=1 new-after-only-skips=0

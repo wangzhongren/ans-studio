@@ -1,0 +1,2516 @@
+===== FILE: test/桌面应用/abort-unwedge.test.ts =====
+✔ P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续 (105.2267ms)
+✔ P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态 (357.9319ms)
+✔ P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断） (44.7276ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 898.5663
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/acceptance-evidence.test.ts =====
+✔ P4.1/P4.5：AcceptanceFact.priority 来自 criteria；sidecar p0:false 不降级；P0 缺 sidecar 不通过 (29.6266ms)
+✔ P4.4：criteriaRef 显式 path+sha+version；无 ref 不取 latest (9.2129ms)
+✔ P4.4/F1–F3/F5：真实会话 evidence_check——collection 路由、角色范围、路径、flow 绑定 (99.0527ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 518.7347
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/acceptance-proposal-path.test.ts =====
+✔ T1：pinned run 的 manifest proposal 路径优先——磁盘更新版本/别名不覆盖 (182.2932ms)
+✔ T1b：pinned 但 manifest 无 proposal（null/缺失/空串）⇒ undefined，不回退最新扫描/别名 (489.6057ms)
+✔ T2：无 pin 取数字最大 -proposal-vN；别名 <flowId>-v1.md 不选 (153.0048ms)
+✔ T2b：无 pin 且仅有别名 <flowId>-v1.md ⇒ undefined (155.5414ms)
+✔ T3：无提案 ⇒ undefined（继承旧值被覆盖）；证据包 artifact-missing 且指向正确约定路径 (189.8338ms)
+✔ T4：试跑形状（pinned 真提案 + 别名）⇒ 证据包读取真路径/sha256，别名不进入 evidence (154.1155ms)
+✔ T5：pinned 路径不可读（pin 后删除）⇒ artifact-missing「物证不可读：<pinned path>」，不回退 v2/别名 (159.8771ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1870.8071
+===== EXIT 0 WALL 2s =====
+===== FILE: test/桌面应用/acceptance-return-card.test.ts =====
+✔ 正常文件：ctx/presenter payload 为 16 KiB 投影，选项/作答路径不变，任务账本无展示正文 (133.3964ms)
+✔ >16 KiB：投影为 UTF-8 前缀且 truncated=true，原文件不改写 (106.4722ms)
+✔ 净化：测试注入的伪凭据值被替换且 redacted=true，不泄漏明文 (136.747ms)
+✔ 空文件：无 acceptanceReport，preview 保留，卡仍可作答 (87.2679ms)
+✔ 缺失文件：无 acceptanceReport，preview 保留，卡仍可作答 (122.8785ms)
+✔ 不可读（报告路径为目录/EISDIR）：无 acceptanceReport，不抛错，卡仍可作答 (106.5502ms)
+✔ 无 flowId（P1-ARC-04）：不构造/不读取 docs/quality，judgeContext 不新增报告路径，preview 与作答不变 (99.3952ms)
+✔ 非法 flowId：不越界读取，facts/artifacts 不含报告路径，unavailableReason fail-closed (75.2078ms)
+✔ 旧 payload（channel 级）：无 acceptanceReport 字段，preview 保留，卡仍可作答（P1-ARC-05） (0.7197ms)
+✔ 诊断只记白名单元数据：不写报告正文/凭据，成功时 state 编码 flags (100.2727ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1404.051
+===== EXIT 0 WALL 2s =====
+===== FILE: test/桌面应用/ans-wiring.test.ts =====
+✔ 有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，边界内写入被接受 (106.3688ms)
+✔ .ans 的 pin 与文件 hash 不符 → 门禁判未接受（fail-closed，会话被拒） (21.6314ms)
+✔ .ans 存在但不可解析 → 未接受、不回退运行期同意（界面据 config 如实呈现） (68.557ms)
+✔ 无 .ans → 回退运行期同意（登记的非-pin 例外，行为不变） (63.6863ms)
+✔ D 批治理记录撤除：preload 不暴露治理记录/迁移方法，main.ts 不注册对应通道 (4.8001ms)
+✔ Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写死渲染入口 (3.2001ms)
+✔ E 批任务/日志接线：preload 白名单与 main.ts 通道逐字对上 (0.8105ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 674.5614
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/application-line.test.ts =====
+✖ 申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl (147.7793ms)
+✔ 写侧卡种收口（2026-10-31）：decision 裁决写 selectedOptionIds、不写 targetRoleIds；appointment 仍写 targetRoleIds (261.4901ms)
+✔ 项目 worker 无申请线：不注入 customerInput；内置角色才注入 (2.0978ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 847.2479
+
+✖ failing tests:
+
+test at test\桌面应用\application-line.test.ts:53:1
+✖ 申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl (147.7793ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   'presented',
+      'created',
+  -   'presented',
+      'resolved'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/application-line.test.ts:103:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'presented', 'created', 'resolved' ],
+    expected: [ 'created', 'presented', 'resolved' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/桌面应用/boundary-refresh.test.ts =====
+✔ O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文） (371.2839ms)
+✔ O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建 (207.3453ms)
+✔ O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发） (499.3373ms)
+✔ O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重 (452.2998ms)
+✔ O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次 (402.5833ms)
+✔ O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支 (0.6323ms)
+✔ F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话） (94.774ms)
+✔ F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装） (46.8876ms)
+✔ G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡 (220.7183ms)
+✔ G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建 (218.0581ms)
+✔ G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md (218.6424ms)
+✔ G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对） (204.182ms)
+✔ G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响 (203.5987ms)
+✖ G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞 (1.7377ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 13
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3533.0069
+
+✖ failing tests:
+
+test at test\桌面应用\boundary-refresh.test.ts:491:1
+✖ G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞 (1.7377ms)
+  AssertionError [ERR_ASSERTION]: 两工具同名同形（共用 handler）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/boundary-refresh.test.ts:498:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 4s =====
+===== FILE: test/桌面应用/chain-enforcement.test.ts =====
+✖ M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理 (41.3842ms)
+✖ M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据 (62.786ms)
+✖ D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖） (117.5135ms)
+✖ D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略 (111.4069ms)
+✖ M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚 (63.6873ms)
+✔ M11：D3 名单版本/hash 与最新名单不一致 ⇒ appointment-write 被拒（旧 D3 作废） (49.3734ms)
+✔ M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 即可匹配 D3，并按名单版本拒绝旧 D3 (59.1874ms)
+✖ F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚 (46.6565ms)
+✔ R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed (264.4644ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 3
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2731.0058
+
+✖ failing tests:
+
+test at test\桌面应用\chain-enforcement.test.ts:340:1
+✖ M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理 (41.3842ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:353:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chain-enforcement.test.ts:413:1
+✖ M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据 (62.786ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:426:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chain-enforcement.test.ts:527:1
+✖ D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖） (117.5135ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:580:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chain-enforcement.test.ts:601:1
+✖ D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略 (111.4069ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:620:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chain-enforcement.test.ts:658:1
+✖ M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚 (63.6873ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:669:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chain-enforcement.test.ts:797:1
+✖ F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚 (46.6565ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:808:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 3s =====
+===== FILE: test/桌面应用/composer-images.test.ts =====
+✔ K-2 纯逻辑：类型白名单/命名 MIME；尺寸上限；base64 严格解码；**魔数嗅探以内容为准** (1.1448ms)
+✔ K-2 Interface（attachImage）：以**真实字节**判定——声明谎报也按内容；失败逐类如实 (7.6662ms)
+✔ K-2 Interface（pickImage）：选图经注入替身（主进程读文件）；取消安静；失败/未接如实 (0.7131ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 417.2285
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/decision-service.test.ts =====
+✔ decision 开关关闭：应用 decision 卡呈现客户，客户手选；无 judge 审计 (3.2296ms)
+✔ 开启委托但无真实chief上下文：保留原因，禁人工/旧judge/默认推荐；关闭后接管 (2.0267ms)
+✔ 无chief时不以旧结果行充当业务决定 (10.3111ms)
+✔ 应用自有 decision 卡通过共享校验且不扩大角色允许集；非法推荐数/非应用 chief 仍拒 (0.261ms)
+✔ 真实chief独立上下文可选非推荐项，结果可信来源且不伪装客户/judge (38.0512ms)
+✔ 真实chief拒绝/退修释放原工具Promise，原角色补材后新请求可独立决定 (55.6024ms)
+✔ 关闭再开启使在途真实chief旧revision无效；同请求不会无限自派 (33.0362ms)
+✔ 真实chief提交时基线变化拒绝，原请求等待关闭接管 (20.703ms)
+✔ 业务卡的旧@决策预设不能形成第三个自动执行者 (0.322ms)
+✔ 2026-11-04 直修 (a)：替我决策开启 ⇒ run-change 卡呈现客户、作答前不结算、无 judge 代批 (9.1095ms)
+✔ 2026-11-04 直修 (b)：run-change 三模式分别由客户选择后原样结算 (45.3738ms)
+✔ 2026-11-04 直修 (b)：版本决策两动作均呈现客户、不代选；客户选择后原样交回 (15.5473ms)
+✔ 普通角色decision与应用decision同样禁用旧推荐兜底 (15.6896ms)
+✔ 2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为与现状一致（原卡呈现、客户手选、无 judge） (15.2228ms)
+✔ 2026-11-04 直修 (a)：替我审批开启 + appointment-write ⇒ 呈现客户、judge 0 调用、0 结果行、无 judge 审计 (15.8514ms)
+✔ 2026-11-04 直修 (b)：替审批关闭 + appointment-write ⇒ 呈现客户；客户拒绝语义不变 (15.9309ms)
+✔ 2026-11-04 直修 (c)：普通 confirm 卡在开关开启时行为不变（呈现客户、不调 judge） (0.7764ms)
+✔ 2026-11-04 直修 (d)：无 presenter ⇒ appointment-write 与治理卡均 unavailable（fail-closed 不变） (0.1978ms)
+✔ 2026-11-04 直修 (e)：判断器异常与 ledger-unavailable 分支对写卡不再可达——仍原卡呈现客户 (31.2664ms)
+✔ 同真实requestId并发/重试复用一次结算，关闭不撤已提交来源，换origin/卡面拒绝 (26.1964ms)
+✔ J12：judge 代批 intent-confirm ⇒ outcome 字段回归钉（operatorId/judge 审计；非客户） (0.848ms)
+✔ J12：开关关闭 ⇒ intent-confirm 原卡呈现客户、judge 0 调用、无 judge 结算 (3.1333ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 763.2377
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/diagnostics.test.ts =====
+✔ 窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文 (18.5705ms)
+✔ dev 回退 hook：被接管的主帧加载失败不显示恢复页，未接管/-3/子帧仍按既有语义 (0.2055ms)
+✔ 导航兜底策略：只放行同 URL/允许入口，http(s) 外开，file/data/javascript 阻止且不执行 (1.2538ms)
+✔ 主进程导航守卫接线：https 外开一次、窗口 URL 不变；恶意协议不导航/不外开；window.open 一律拒绝 (0.9483ms)
+✔ 窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道 (0.182ms)
+✔ 客户请求恢复：重放同id不作答，仍可答旧请求，已结束请求不复活 (2.2554ms)
+✔ shell确认恢复：不重置时限、不代答，失效请求不能复活 (18.2857ms)
+✔ C actual preload saving/query bridges and typed subscriptions are cancellable and do not send model text (1.6113ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 347.2578
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/directive-decision.test.ts =====
+✖ test\桌面应用\directive-decision.test.ts (119992.7679ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 119997.6345
+
+✖ failing tests:
+
+test at test\桌面应用\directive-decision.test.ts:1:1
+✖ test\桌面应用\directive-decision.test.ts (119992.7679ms)
+  'test failed'
+===== EXIT 124 WALL 121s =====
+===== FILE: test/桌面应用/directive-input.test.ts =====
+✔ 指令提交：确认面板字段（原文/动作/范围/期限/confirmable/开关快照）；确认后 durable 落账 + 回执 + 双视图 (34.2262ms)
+✔ 指令取消：不落账、无回执、directiveCancelled；未知 id 为 expired；关窗 cancelAll (56.0247ms)
+✔ 输入式撤销：@审批 撤销 #id 经确认后调 runtime.revoke；同 target/active；回执与列表刷新；跨 target/终态直接回错 (123.8945ms)
+✔ 高危复核：approval 宽命令/forever 未勾选拒绝且面板保持；勾选后落账 (40.9625ms)
+✔ AC-13 2×2：decision 项目级 select-recommended 仅在「开关关闭」时高危；flow 范围无该高危 (130.7851ms)
+✔ 幂等与重推：同 clientMessageId 同文只开一张面板、返回同一 id；replayPending 复用同一 requestId (43.9697ms)
+✔ 项目切换：未决面板取消、不销毁旧运行时；切回后同一运行内 session 指令仍 active (64.9121ms)
+✖ sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道 (47.4891ms)
+✔ sendSession target fail-closed：缺失/非法/跨项目/角色不在清单/无效引擎均不落账、不投递、不回退 (4.1403ms)
+✖ sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变） (3.4288ms)
+✔ sendSession：未命中标记时普通消息行为逐字不变（含图片校验路径仍在） (3.3197ms)
+✖ sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席） (4.0732ms)
+✔ 控制器：自然语言解释成功 ⇒ 面板预填 AI 解释；解释器收到 target/正文/原文/项目/角色/引擎；确认后落账 (18.2194ms)
+✔ 控制器：解释失败 ⇒ 回退现有面板（confirmable=false、未识别片段）；伪造确认也不落账 (10.73ms)
+✔ 控制器：撤销快路径不调用解释器；确认后 durable revoked (22.0223ms)
+✖ sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账 (4005.4599ms)
+✖ sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂 (4012.5212ms)
+✔ preload：directive:state 注册即同步回放缓存；订阅后续推送；取消订阅保留顶层缓存监听 (1.4941ms)
+✔ 冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用运行级 sessionId、Q9 旧读者三值 (2.2848ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 14
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9048.5867
+
+✖ failing tests:
+
+test at test\桌面应用\directive-input.test.ts:482:1
+✖ sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道 (47.4891ms)
+  AssertionError [ERR_ASSERTION]: 命中即有确认面板
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:497:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\directive-input.test.ts:574:1
+✖ sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变） (3.4288ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /图片/. Input:
+  
+  '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:589:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。',
+    expected: /图片/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\directive-input.test.ts:628:1
+✖ sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席） (4.0732ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /能力不可用/. Input:
+  
+  '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:649:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。',
+    expected: /能力不可用/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\directive-input.test.ts:766:1
+✖ sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账 (4005.4599ms)
+  Error: waitFor 超时
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:40:49)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:793:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\桌面应用\directive-input.test.ts:814:1
+✖ sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂 (4012.5212ms)
+  Error: waitFor 超时
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:40:49)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:836:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+===== EXIT 1 WALL 9s =====
+===== FILE: test/桌面应用/dispatch-fresh-enum.test.ts =====
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (264.4774ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (265.1291ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 948.6801
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/download-decision.test.ts =====
+✔ W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡 (104.6152ms)
+✔ judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正） (86.2112ms)
+✔ 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework (223.379ms)
+✔ unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用） (0.4008ms)
+✔ 开关关：下载卡直接客户卡（judge 零调用） (115.7253ms)
+✔ single 治理模型：不构造 judge、下载卡直接客户卡 (102.0125ms)
+✔ 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput (1.3679ms)
+✖ 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝） (3101.1002ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4141.9677
+
+✖ failing tests:
+
+test at test\桌面应用\download-decision.test.ts:445:1
+✖ 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝） (3101.1002ms)
+  AssertionError [ERR_ASSERTION]: timeout waiting for 第二次 deny 升级客户卡
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/download-decision.test.ts:271:39)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/download-decision.test.ts:457:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 4s =====
+===== FILE: test/桌面应用/download-request.test.ts =====
+✔ buildDownloadCardRequest：字段/归属/judgeContext/factsAvailable 映射 (1.2911ms)
+✔ toDownloadApprovalOutcome：客户/judge/中止/unavailable 归属映射 (0.1732ms)
+✔ createRequestDownloadCapability：B1 结果映射/attribution/信号/回执（含 G1 提示） (0.4262ms)
+✔ SessionManager 卡片路径：能力注入/卡片字段/生命周期/requestId/回执；项目角色仍无 customerInput (100.5644ms)
+✔ SessionManager 预授权路径：B1 不调 presenter ⇒ 零客户卡、零 request.*；downloadId 由 B1 生成 (1.5631ms)
+✖ 一项目一卡：前一张未决时下载卡排队，不呈现 (3003.6189ms)
+✔ preauthorizeWrite 排除：下载卡即使带 paths/writeBoundary 也不被写预授权 accept/reject (0.6505ms)
+✔ dispose：会话结束 await B1 运行时 dispose（幂等） (2.0053ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3512.8692
+
+✖ failing tests:
+
+test at test\桌面应用\download-request.test.ts:506:1
+✖ 一项目一卡：前一张未决时下载卡排队，不呈现 (3003.6189ms)
+  AssertionError [ERR_ASSERTION]: timeout waiting for 第二张下载卡排队
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/download-request.test.ts:305:39)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/download-request.test.ts:519:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 4s =====
+===== FILE: test/桌面应用/genesis-bootstrap.test.ts =====
+✔ 未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfig 带 genesisBootstrap，source 含主入口 (3.6402ms)
+✔ 未 bootstrap + 显式 single（旧项目）：仍 su 主入口、带 genesisBootstrap（迁移前 su 行为不变） (16.0628ms)
+✔ 已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件） (40.3599ms)
+✔ 未 bootstrap（single）：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行） (13.1287ms)
+✔ 未 bootstrap（single）：su 的 gate 放行 docs/ 与 .ans/ 治理产物 (6.9498ms)
+✔ 未 bootstrap（single）：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径 (6.3861ms)
+✖ 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权） (30.7857ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 428.0066
+
+✖ failing tests:
+
+test at test\桌面应用\genesis-bootstrap.test.ts:151:1
+✖ 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权） (30.7857ms)
+  Error: runtime-creation-prepared-api-unavailable
+      at bindPreparedRuntimeRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:774:50)
+      at async openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:2168:15)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/genesis-bootstrap.test.ts:159:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+===== EXIT 1 WALL 0s =====
+===== FILE: test/桌面应用/handback-delivery.test.ts =====
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (195.5401ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (204.0391ms)
+✖ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (402.278ms)
+✔ P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投 (451.7516ms)
+✖ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (75.1497ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (78.0929ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (3.629ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (358.8102ms)
+✖ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (306.2297ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (360.1252ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (62.164ms)
+✖ C frozen batch retries keep members and delivery ID while later reports stay separate (78.2164ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (190.0956ms)
+✔ C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire (29.8311ms)
+✔ C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs (61.9847ms)
+✔ F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次 (450.5261ms)
+✖ 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发 (3241.8988ms)
+✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (3116.8138ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 12
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10056.0637
+
+✖ failing tests:
+
+test at test\桌面应用\handback-delivery.test.ts:253:1
+✖ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (402.278ms)
+  AssertionError [ERR_ASSERTION]: settle 后同一输入含两份报告且顺序保持
+  + actual - expected
+  
+    [
+  +   '[回交] 来自 A 的报告（任务 T1）\n' +
+  -   '[回交] 已收到2份角色结果，请核对后向客户汇总。\n' +
+  -     '[回交] 来自 A 的报告（任务 T1）\n' +
+        '结论：completed\n' +
+        '摘要：改完了 role-card\n' +
+        '证据：\n' +
+        '  - 角色卡/A/role-card.md\n' +
+  -     '[回交] 来自 A 的报告（任务 T2）\n' +
+  -     '结论：completed\n' +
+  -     '摘要：改完了 role-card\n' +
+  -     '证据：\n' +
+  -     '  - 角色卡/A/role-card.md\n' +
+        '请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n' +
+        '只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n' +
+        '没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n' +
+        '已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:269:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '[回交] 来自 A 的报告（任务 T1）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。' ],
+    expected: [ '[回交] 已收到2份角色结果，请核对后向客户汇总。\n[回交] 来自 A 的报告（任务 T1）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n[回交] 来自 A 的报告（任务 T2）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\handback-delivery.test.ts:329:1
+✖ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (75.1497ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+  +   '[回交] 来自 A 的报告（任务 T1）\n' +
+  -   '[回交] 已收到2份角色结果，请核对后向客户汇总。\n' +
+  -     '[回交] 来自 A 的报告（任务 T1）\n' +
+        '结论：completed\n' +
+        '摘要：改完了 role-card\n' +
+        '证据：\n' +
+        '  - 角色卡/A/role-card.md\n' +
+  -     '[回交] 来自 A 的报告（任务 T2）\n' +
+  -     '结论：completed\n' +
+  -     '摘要：改完了 role-card\n' +
+  -     '证据：\n' +
+  -     '  - 角色卡/A/role-card.md\n' +
+        '请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n' +
+        '只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n' +
+        '没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n' +
+        '已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:343:12)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ '[回交] 来自 A 的报告（任务 T1）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。' ],
+    expected: [ '[回交] 已收到2份角色结果，请核对后向客户汇总。\n[回交] 来自 A 的报告（任务 T1）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n[回交] 来自 A 的报告（任务 T2）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\handback-delivery.test.ts:409:1
+✖ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (306.2297ms)
+  AssertionError [ERR_ASSERTION]: 坏形状应如实系统行（不崩、不静默）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:431:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\handback-delivery.test.ts:495:1
+✖ C frozen batch retries keep members and delivery ID while later reports stay separate (78.2164ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'one',
+  -   'two'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:508:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'one' ],
+    expected: [ 'one', 'two' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\handback-delivery.test.ts:588:1
+✖ 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发 (3241.8988ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:30:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:600:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\handback-delivery.test.ts:629:1
+✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (3116.8138ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:30:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:667:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 10s =====
+===== FILE: test/桌面应用/hot-path.test.ts =====
+✔ Q-1 push-batcher：事件窗口合并（N 推 → 1 次 send、顺序不变）；flush/dispose 语义；角色状态去抖只留最新 (151.1968ms)
+✔ Q-1 事件风暴（300 事件，假适配器）：管理器侧处理耗时护栏 + 事件仍逐条外推（批量在 main 层） (34.9193ms)
+✔ Q-1 O-1 哈希缓存：未变文件只 stat（mtime+size 命中）；内容真变仍被检出——判据不回退 (74.2956ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 670.9657
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/interface.test.ts =====
+✔ 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状） (58.4035ms)
+✔ 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变 (24.9937ms)
+✔ 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子 (0.495ms)
+✔ requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用 (156.666ms)
+✔ 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型 (1.9014ms)
+✔ decision权威revision只由主进程推进，非法set不变，重开旧revision失效 (0.2654ms)
+✔ W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留 (61.7776ms)
+✔ W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变 (11.9049ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 731.2494
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/log-actions.test.ts =====
+✖ listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执 (81.224ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5454.4253
+
+✖ failing tests:
+
+test at test\桌面应用\log-actions.test.ts:34:1
+✖ listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执 (81.224ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'rework'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/log-actions.test.ts:82:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'rework',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 6s =====
+===== FILE: test/桌面应用/log-patrol.test.ts =====
+✔ 首 tick 只登记基准；10 分钟到点发一条巡检；空项目/无 busy 内置角色不发 (2.653ms)
+✔ 等待/闲置角色不巡检；项目 worker（非内置）默认不列入巡检 (0.4713ms)
+✔ patrolPending 最多 1：未结算跳过并计数；连续 2 次跳过发系统行；幕僚 settled 后恢复巡检 (0.3254ms)
+✔ 巡检内容为纯系统消息（无客户卡/无裁决语义） (0.1532ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 116.0393
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/log-stuck.test.ts =====
+✔ 阈值：normal/slow/stuck/hard-cap（5/10/30 分钟默认） (0.4357ms)
+✔ slow：只发一次告警、不调用终止；同一活跃期不重复 (2.5504ms)
+✔ stuck：默认只告警；env auto-terminate 才回调一次（同活跃期去重） (0.3549ms)
+✔ 正确等待不报：有挂起确认卡时不发 log-silence；高硬顶 hard-cap 仍可告警 (0.1682ms)
+✔ B-07 共享 episode：log-silence 与 10 分钟巡检读取同一活跃期/告警状态（不重复告警） (0.5046ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 101.7898
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/message-queue.test.ts =====
+✔ 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递 (0.5535ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (362.5668ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (44.9411ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (357.6334ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (48.889ms)
+✔ 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts (732.3219ms)
+✔ 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts (47.1721ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (0.6192ms)
+✔ F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递 (825.3949ms)
+✔ G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回 (390.5386ms)
+✔ P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型 (175.9015ms)
+✔ G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束） (388.0973ms)
+✔ G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn (296.7631ms)
+✔ 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime (333.5512ms)
+✔ 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投 (295.4294ms)
+✔ 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用） (186.3951ms)
+✔ 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供 (32.2037ms)
+✔ 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写） (29.9997ms)
+✔ 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色 (298.4376ms)
+✔ 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离 (292.2664ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5525.9992
+===== EXIT 0 WALL 6s =====
+===== FILE: test/桌面应用/multi-runtime.test.ts =====
+✔ D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset (15.1819ms)
+✔ D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure (21.3947ms)
+✔ G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 file 来源＋choices 元数据）；非法值如实拒绝、不落盘、不回显；codex 无 off 档（值域按运行时）；空串清除合法 (28.493ms)
+✔ 档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查时限非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices (29.4991ms)
+✔ i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 key 解析（en-US）；字段集/必填/choices 不变；demo 走共享 key；切回 zh 逐字 (2.2975ms)
+✔ D1 same role and project across engines and same role across projects keep distinct handles and exact input targets (25.4703ms)
+✔ D1 background dispatch, queued customer input and handback pin the source engine after selection switches (34.0773ms)
+✖ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (36.3333ms)
+✖ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (15.2727ms)
+✖ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (15.0202ms)
+✖ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (13.3972ms)
+✖ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (16.5134ms)
+✔ D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card (2.0333ms)
+✔ D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired (7.3667ms)
+✔ D1 state debouncing and constrained bridges preserve project/runtime identity (2.9991ms)
+✔ D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn (13.6205ms)
+✔ D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card (152.7109ms)
+✔ D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof (11.1638ms)
+✔ D1R ANS history preserves authoritative turn/event identity, independent same text and delta order (8.3334ms)
+✔ G-5 wave 2：推理行回放载体——reasoning message 事件的回放行携带投影形 row.reasoning（逐字/幂等）；坏件与旧数据无该字段 ⇒ 原行为逐字 (7.3043ms)
+✔ D1R legacy Pi rows keep optional turn/event metadata absent (16.5852ms)
+✔ D1R2 direct and queued identical inputs retain original client ID through delayed old settled (51.9887ms)
+✔ D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client (19.3091ms)
+✖ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (1523.1045ms)
+✖ D1R2 actual ack preserves a failed delayed terminal and the next aborted original client (1517.2555ms)
+✔ D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call (9.6892ms)
+✔ typed prompt input history joins only actual same-turn input sources and preserves legacy facts (9.347ms)
+✔ operator payload preserves original call identity and leaves absent legacy IDs absent (0.36ms)
+✔ history preserves canonical start/blocked/result phases for the same failed tool call (12.1997ms)
+✔ F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留） (12.6556ms)
+✔ A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts (6.7253ms)
+✔ A legacy provenance and authoritative metadata omissions survive the protected Window mapping (25.4354ms)
+✔ stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session (46.2345ms)
+✔ send rejection before public events remains unknown; later same-client different turns do not borrow outcomes (15.2946ms)
+✔ no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome (15.7793ms)
+✔ send result reports the original handle is no longer current after replacement while its turn rejects (17.0918ms)
+✖ actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt (1527.2537ms)
+✔ same client IDs across sequential actual turns retain separate first public outcomes (10.0777ms)
+✔ foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn (15.3676ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 31
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5721.4973
+
+✖ failing tests:
+
+test at test\桌面应用\multi-runtime.test.ts:383:3
+✖ D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly (36.3333ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\multi-runtime.test.ts:383:3
+✖ D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly (15.2727ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\multi-runtime.test.ts:383:3
+✖ D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly (15.0202ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\multi-runtime.test.ts:383:3
+✖ D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly (13.3972ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\multi-runtime.test.ts:429:1
+✖ D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged (16.5134ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'next-session'
+  - 'after-active-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:445:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'next-session',
+    expected: 'after-active-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\multi-runtime.test.ts:745:1
+✖ D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text (1523.1045ms)
+  Error: D1 test wait expired
+      at until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:770:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\桌面应用\multi-runtime.test.ts:787:1
+✖ D1R2 actual ack preserves a failed delayed terminal and the next aborted original client (1517.2555ms)
+  Error: D1 test wait expired
+      at until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:829:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\桌面应用\multi-runtime.test.ts:1048:1
+✖ actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt (1527.2537ms)
+  Error: D1 test wait expired
+      at until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:1054:109)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+===== EXIT 1 WALL 5s =====
+===== FILE: test/桌面应用/network-monitor.test.ts =====
+✔ 默认值：5s 采样 / 连续 2 次离线 / 1s 稳定窗口；首采样定初始状态（在线不外推、离线外推一次） (1.2953ms)
+✔ 稳定窗口：2s 采样、1s 窗口 —— 首次离线采样不判离线；窗口到点重探仍离线才判（reason interface-down） (0.192ms)
+✔ 连续 2 次采样：稳定窗口调长时，第二次离线采样判离线；1 次瞬时抖动被恢复抹掉 (0.1301ms)
+✔ 恢复立即：一个在线采样即恢复；状态门同步；reason=probe (0.1202ms)
+✔ 渲染层提示：只触发重探（两次离线提示=两次采样判离线）；渲染在线不能纠正接口离线 (0.2188ms)
+✔ power：锁屏 ≠ 离线；suspend/resume 只重探；解锁不强制离线 (0.1166ms)
+✔ 诊断字段：network.* 仅用既有白名单字段；探针异常不误判离线 (0.1553ms)
+✔ F1：已知离线 + 探针异常 ⇒ 保持离线、gate 不回在线、无 onState 迁移 (0.1211ms)
+✔ F1：启动即离线 + 探针异常 ⇒ 保持离线、不产生新迁移 (0.1748ms)
+✔ F1：启动首采样探针异常 ⇒ 保持在线占位（unknown）、不迁移；后续采样可正常判定 (0.1897ms)
+✔ F1 真实计时（默认时钟）：已知离线 + probe 抛错 ⇒ 保持离线、无 onState 迁移 (107.4805ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 212.5736
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/operator-channel.test.ts =====
+✔ describeShellCommand：命令原文逐字呈现（不加工、不截断），argv 逐项、cwd 原样 (1.2776ms)
+✔ describeShellCommand：reason 有值时被展示（(b) 为何交人确认） (0.1444ms)
+✔ describeShellCommand：对不可信输入稳健（argv 含非字符串项被过滤，缺字段不炸） (0.0947ms)
+✔ 操作者放行：presenter 返回 allow → {outcome:'allow', operatorId}，且 presenter 收到原文 (0.6008ms)
+✔ 操作者拒绝：presenter 返回 deny → {outcome:'deny', operatorId}，reason 可读 (0.2379ms)
+✔ 拒绝带上 note（如操作者附言）时如实带出为 reason (0.1396ms)
+✔ 仅 outcome:'allow' 放行：presenter 返回非布尔/false → 一律 deny（绝不默认放行） (0.1054ms)
+✔ fail-closed·不可用：presenter 抛错 → unavailable（编排据此拒绝） (0.1725ms)
+✔ fail-closed·未配置：无 presenter → unavailable（能力缺席即 fail-closed） (0.1616ms)
+✔ fail-closed·超时：presenter 不返回 → 超时即 unavailable（编排据此拒绝） (28.9596ms)
+✔ 超时 env 可覆盖（非法值回退默认，不炸） (0.2004ms)
+✔ arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 实件与 (a) 通道**同处接线**（两件同备才 arm） (3.1759ms)
+✔ I-1 补丁：(c) 实件构造——只读导入的两件**引用同一性**（classifyShell 同一函数引用；rules 原样透传）；失败 ⇒ 不 arm (0.5748ms)
+✖ I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立） (94.1159ms)
+✔ su 审批档（**真正接通**核查）：真实 openRoleSession + 真实装配——ls 免审批直放 / 显式越界写被写区守卫拒绝 / risky 网络命令出卡经客户批准或拒绝 (88.5863ms)
+✔ M-1 数据面：白话摘要只取命令首词（不编意图）；升级原因译人话（行话不外露）；命令原文逐字 (0.6344ms)
+✔ 审批档角色化（纯映射）：六内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名 (0.2083ms)
+✔ 审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ 卡片「质检 / Proof 审批档」；su ⇒ SU；项目角色不显示治理名 (0.5493ms)
+✔ 审批卡数据面（W5-D 加法）：entry/protectedScope 由构建参数写入；roleId 可选；缺省/未知值不出现 (0.1002ms)
+✔ 审批卡 presenter（W5-D 接线）：prompt.entry/protectedScope 写入请求；roleId 以 prompt 优先、metadata 兜底；既有字段不变 (0.2054ms)
+✔ M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行 (0.2694ms)
+✔ M-1 presenter 兜底与失败：清理兜底解析为不放行（无泄漏）；推送抛错（窗口已关）⇒ 上抛（通道归 unavailable） (32.9715ms)
+✔ M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡（通道两端齐备；旧文本墙路径退役） (1.0487ms)
+✔ arm 接缝（历史形状）：不提供已装配 shellGate → pi 工厂收到 undefined（该接缝缺省即不合闸） (1.8411ms)
+✔ arm 接缝（历史形状）：提供已装配 shellGate → 原样透传给 pi 工厂（保留给直接持 gate 的调用方） (1.4518ms)
+✔ I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（三层链）；su（内置治理角色）不接 (b)/(a)——改收**只读档**（同一份 (c) 实件） (2.5566ms)
+✔ I-1 补丁：未 arm（未配置两件）时**什么都不传**——输入里不出现两个字段（等同不注入） (1.3737ms)
+✔ su 审批档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellOperatorOnly/shellOperatorChannel/shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽） (1.1909ms)
+✔ arm 只影响 pi 路径：demo 路径不构造 pi 工厂（无 shell 入口） (1.1059ms)
+✔ F-4-T1 超时取值链：专用 env 优先 → 未设时**跟随 ANS_PI_SHELL_REVIEW_TIMEOUT_MS**（注入小值断言实际等待随之变化）→ 都未设 120000；非法值沿链回退 (161.8289ms)
+✔ F-4-T2 到期原因分流：超时中止的失效文案 = 如实超时文案（含时限与恢复指引，不再误报「本轮已结束」）；轮次中止保留原文案（组合信号 reason 驱动，Node 24 传播首验） (90.911ms)
+✔ F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时限）；轮次中止 ⇒ shell-confirm.cancelled——presented 之后的每种去向都可判定 (91.2027ms)
+✔ F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起的 shell 确认卡；replayPending 只推仍挂起者 (0.786ms)
+✔ G-2/W5 恢复卡：恰 allow:true 才为真；缺字段/取消 → false；未知 id → expired（未获执行文案）；id 前缀 rp- (0.3648ms)
+✔ G-2/W5 恢复卡：等待不设限（零计时器）；关窗/中止 = 未获执行；replayPending 只推仍挂起者 (0.9675ms)
+✔ G-2/W5 shell 卡按角色 pending 视图（W1 依赖项）：metadata.roleId 聚合；无 metadata 不计角色 (0.1796ms)
+✔ 替我审·开关关：不调 judge，presenter 原路径逐字不变（默认手动） (0.2141ms)
+✔ 替我审·开关开 + manualOnly（不透明执行类）：判断 agent 不代批，强制客户本人确认（Q1 A） (0.1316ms)
+✔ 替我审·无 metadata.judge：不调判断，原 present 路径 (0.0899ms)
+✔ 替我审·signal 已中止：不调判断，原 present 路径（交回既有中止路径） (0.1014ms)
+✔ 替我审·allow：请求字段完整、先发结果行，返回 allow + operatorId=judge:<engine> + 审计 judge (0.2148ms)
+✔ 替我审·allow 但结果行投达失败 ⇒ 按拒绝处理（row-failed），不弹卡；审计保留 row-failed 与模型 allow 事实 (0.2002ms)
+✔ 替我审·deny：不调用 presenter；结果行投达 + 格式化原因（说明/原因/替代方案/出路） (0.226ms)
+✔ 替我审·deny 结果行投达失败 ⇒ 仍 deny（拒绝是安全方向），只记诊断、不弹卡 (0.1403ms)
+✔ 替我审·manual（context-too-large/budget/timeout）⇒ presenter 零调用、按 deny 处理；理由含具体人话，审计保留 manual 事实 (0.2959ms)
+✔ 替我审·manual/retry-capped ⇒ 仍拒绝不弹卡；审计保留 manual 事实；回执给出申请客户确认的新出路 (0.1639ms)
+✔ 替我审·manual ⇒ deny 诊断保留原 reasonCode 与 manual 事实（不写模型主动 allow/deny 的 decision 诊断） (9.2119ms)
+✔ 替我审·read-denied ⇒ 拒绝理由带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18 口径保留） (0.4106ms)
+✔ 替我审·manual ⇒ deny 理由尾部标点归一（不出现「。；」/「。。」） (0.1771ms)
+✔ 替我审·独立超时：judge 不返回 ⇒ manual/timeout 按拒绝处理（不占用确认超时、不弹卡） (34.8679ms)
+✔ 替我审·通道超时同步：默认 135s（driver 120s+15s），env 派生/非法回 135s；确认超时仍 120s (0.2135ms)
+✔ 替我审·deny 档：judge 放行**不转换**——outcome 仍 allow，只按 tier 置 hardDenyOverride/label（客户 D1） (0.2255ms)
+✔ 替我审·deny 档也进入 judge（第一层规则不拒绝）：judge deny ⇒ 0 卡、审计保留 tier 与 judge 结论 (0.1366ms)
+✔ 替我审·项目角色 deny 类命令也进入 judge（规则不拒绝）：policy=project、judge 结论 0 卡 (0.1002ms)
+✔ 承接 2026-10-18 裁定：shell-judge.decision 诊断保留 c 规则判定（policy/tier）与 judge 结论 (13.4688ms)
+✔ judgeNotice：buildShellConfirmRequest 原样拷贝、不进入 reasonRaw（§10.4） (0.1646ms)
+✔ 替我审·session：每会话构造 judge 闭包（同一份 runtimeOptions/createAdapter）；metadata 注入 turnText（≤4KB）与 judge；dispose 即清 (2.7361ms)
+✔ 替我审 + 脚本上下文：judge 收到脚本内容并据其裁决；开关关 ⇒ 客户卡展示内容 (0.4084ms)
+✔ approvalContext.failClosed：开关开 ⇒ 不调 judge 直接拒绝；开关关 ⇒ 客户卡 (0.1188ms)
+ℹ tests 59
+ℹ suites 0
+ℹ pass 58
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1073.1938
+
+✖ failing tests:
+
+test at test\桌面应用\operator-channel.test.ts:271:1
+✖ I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立） (94.1159ms)
+  AssertionError [ERR_ASSERTION]: 会话应能开启（真实装配在此路径不触网）
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/operator-channel.test.ts:310:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/桌面应用/p0-halt-and-images.test.ts =====
+✖ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停） (76.3228ms)
+✔ P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实 (5.3938ms)
+✖ P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实） (7.016ms)
+✖ P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源 (3.4918ms)
+✔ P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图） (249.983ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 2
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6789.4506
+
+✖ failing tests:
+
+test at test\桌面应用\p0-halt-and-images.test.ts:118:1
+✖ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停） (76.3228ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/p0-halt-and-images.test.ts:134:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\p0-halt-and-images.test.ts:199:1
+✖ P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实） (7.016ms)
+  AssertionError [ERR_ASSERTION]: 错误如实（图片未发送——本条未发出）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/p0-halt-and-images.test.ts:220:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\p0-halt-and-images.test.ts:231:1
+✖ P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源 (3.4918ms)
+  AssertionError [ERR_ASSERTION]: 合法图放行
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/p0-halt-and-images.test.ts:254:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 7s =====
+===== FILE: test/桌面应用/pending-card-restart.test.ts =====
+✔ 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等 (103.2544ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 477.8619
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/pi-config.test.ts =====
+✔ 面板键恰为 3+3（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/PROMPT_TIMEOUT/REASONING_EFFORT）；provider 不在面板里；默认路径为仓库根 .env (1.0474ms)
+✔ 载入：loadPiEnv 把假 .env 的值带进 env（补 --env-file） (7.9048ms)
+✔ 载入：.env 不存在 → 无操作、不抛（与 loadEnvFileInto 的 ENOENT 语义一致） (0.8213ms)
+✔ 掩码：getPiConfig 对机密键恒返空 value，只给 isSet；非机密键回填真实值 (6.1858ms)
+✔ 掩码：.env 不存在 → 视图为空、各键 isSet=false（不抛） (0.6401ms)
+✔ 保存：只动指定键、逐字节保留其余内容（注释/空行/未知键/其它键/顺序） (13.0105ms)
+✔ 保存：缺键追加到末尾（含机密键），且面板键过滤掉非面板键 (16.4637ms)
+✔ 保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；已存在的那行原样保留（只改相关键） (15.8928ms)
+✔ G-5：旧面板路径可读写 ANS_PI_REASONING_EFFORT（纳入面板键；值域校验单一来源在注册表保存链——旧路径不复制第二份判定） (8.7834ms)
+✔ 凭据不回显：哨兵 token 绝不出现在保存回报或错误文本里（含写失败路径） (1.4595ms)
+✔ 保存：无面板键可写时恒等（不触碰文件、回报空 apply） (1.3075ms)
+✔ interface：getPiConfig/savePiConfig 经注入的临时路径读写（不碰真实仓库根 .env） (12.186ms)
+✔ packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path (0.7335ms)
+✔ packaged settings save and a fresh startup environment share the injected writable path without touching bundled config (10.2688ms)
+✔ packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request (1.8177ms)
+✔ packaged smoke script checks entry/root/driver/CSP plus existing IPC without publishing configuration values or calling save/model APIs (1.0536ms)
+✔ i18n B4：pi 设置视图 label/help/choiceLabels 按 en-US 解析、保存错误 en；旧面板视图无文案字段；切回 zh 逐字 (2.3879ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 516.3761
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/project-document.test.ts =====
+✔ B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes (12.6235ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Provider refuses unsupported platforms, lexical escapes, directories and symlinks (3.6697ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Provider detects check/open and opened/read file replacement and closes the original handle (3.7896ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests (6.9302ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Service fatal UTF8, binary, BOM, absent file and bounded failure classification (4.0242ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Service late read never returns content after scope revoke; provider failures are fixed safe messages (0.7476ms)
+✔ B Pipeline preserves trusted native grant and close sequencing over the real Service (4.3388ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Provider rejects symlink parents, escaped links and root replacement after grant (3.783ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B Provider detects in-place growth and parent directory replacement around a descriptor read (8.5479ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B refs cannot be minted for hidden, unknown formats or lexical escape listing entries (4.2694ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B actual preload exports only the restricted document invoke shape (1.4322ms)
+✔ B out-of-order listings and root-grant failure cannot publish stale or unsupported refs (0.1474ms)
+✔ B failed/cancelled native imports retain active refs until a successful listing commits (6.6492ms)
+ℹ Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+✔ B a newer native selection invalidates an older listing without revoking the active project (0.2792ms)
+✔ B Service mints opaque refs only for exact role-root candidates and appends them after existing refs (5.1629ms)
+ℹ Windows B2 fail-closed asserted for role-root candidates; POSIX read assertions remain active on supported platforms.
+✔ B Service silently rejects non-whitelist role-root candidates, de-duplicates legal paths and rejects empty roleDir (4.6414ms)
+ℹ Windows B2 fail-closed asserted for rejected role-root candidates; POSIX rejection assertions remain active on supported platforms.
+✔ B Windows fail-closed: role-root candidates mint no refs and read no bytes on every host (2.5236ms)
+✔ B Service role-root whitelist, de-duplication and ref ordering are platform-independent (injected reader) (0.3132ms)
+✔ B Service diagnostics record listing availability and rejected root candidates without content or paths (13.3309ms)
+✔ B Windows fail-closed Provider and Service reject without minting references or reading content on every host (2.6542ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 179.0814
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/project-state.test.ts =====
+✔ project-state:get：IPC 形状/计数/版本/备注/零写入；空 root 返回空视图+errors (40.7829ms)
+✔ project-state:get：chief 完整、convener 裁剪、worker 无 project_state 工具；项目状态工具文本 ≤8 KiB (71.4588ms)
+✔ IPC 面：只新增 project-state:get；不注册/不暴露 project:note、version-decision:request 写桥 (1.5411ms)
+✔ project_note：set-focus/blocker/next-step 校验、幂等、解除、重启重建；不改任务/run/文档 (113.3141ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 637.8577
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/project.test.ts =====
+✔ resolveSkillRoot：优先 ANS_SKILL_ROOT (0.7569ms)
+✔ posixDirname：取目录名 (0.0916ms)
+✖ buildProjectConfig：由枚举结果构造角色表，acceptance 透传 (43.7143ms)
+✔ readRoleDocsIndex：列出 docs 目录并读到设计稿；读到 changelog.md (2.1309ms)
+✔ su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的 roles 映射 (22.0503ms)
+✔ su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错 (21.6055ms)
+✔ deriveGovernanceRecord：missing——无 .ans（builtin-fallback），即使回退 acceptance 是运行期同意 (0.2518ms)
+✔ deriveGovernanceRecord：present——ans + accepted + 治理边界路径非空（不校验 pin 逐文件哈希） (0.0624ms)
+✔ deriveGovernanceRecord：invalid——ans-invalid 原样取载入器 downgradeReason (0.0699ms)
+✔ deriveGovernanceRecord：invalid——ans 但未接受（如 accepted:true 无 pin 被降级），reason 取 downgradeReason (0.2876ms)
+✔ deriveGovernanceRecord：invalid——治理边界路径为空或纯空白（含 accepted） (0.1033ms)
+✔ applyPinEvidence：ok 保持原 present（不新增字段）；mismatch → pin-mismatch + 明细；invalid → invalid + 原因 (0.1264ms)
+✔ applyPinEvidence：missing / invalid 原样返回（不因 pin 证据改写既有形状） (0.0359ms)
+✔ deriveGovernanceRecordWithPins：present 以外不做哈希、原样返回（检查器零调用） (0.0969ms)
+✔ deriveGovernanceRecordWithPins：pins 缺失或为空 → invalid（fail-closed，检查器零调用） (0.0596ms)
+✔ deriveGovernanceRecordWithPins：present 时透传 projectRoot/pins/治理边界路径，并映射证据 (0.1097ms)
+✔ deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；检查器抛错 → invalid 且永不 reject (0.1615ms)
+✔ readRoleDocsIndex：rootDocs 只含三个白名单文件（固定顺序），memo/任意根文件永不入索引；changelog 与 docs/ 不回归 (10.14ms)
+✔ readRoleDocsIndex：部分根文档缺失只返回存在的，顺序保持相对；只有 memo 时 rootDocs 为空且不抛错 (3.8172ms)
+✔ readRoleDocsIndex：cardPath 为空/绝对/盘符/反斜杠/空段/`.`/`..` 一律返回空索引且不抛错 (2.6989ms)
+✔ readRoleDocsIndex：符号链接角色目录与根文档不列入（POSIX 实测；Windows 以非法路径/非目录用例覆盖） (0.1531ms)
+ℹ Windows 创建符号链接受权限限制；索引跳过逻辑由非法路径/非目录用例覆盖，POSIX 另行实测。
+✔ projectDocumentCandidates：透传 rootDocs 元数据；旧调用方（无 rootDocs）不产生字段 (0.0988ms)
+✔ readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文） (13.7781ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 22
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 319.302
+
+✖ failing tests:
+
+test at test\桌面应用\project.test.ts:29:1
+✖ buildProjectConfig：由枚举结果构造角色表，acceptance 透传 (43.7143ms)
+  AssertionError [ERR_ASSERTION]: 枚举不应有任何警告（归档目录按归档键约定静默跳过、零提示）
+  + actual - expected
+  
+  + [
+  +   '角色卡/招募：缺少 role-card.md，已跳过'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/project.test.ts:34:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ '角色卡/招募：缺少 role-card.md，已跳过' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 0s =====
+===== FILE: test/桌面应用/queue-visibility.test.ts =====
+✖ P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待） (99.7816ms)
+✔ P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启） (76.5077ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 554.6418
+
+✖ failing tests:
+
+test at test\桌面应用\queue-visibility.test.ts:167:1
+✖ P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待） (99.7816ms)
+  AssertionError [ERR_ASSERTION]: 回交合批后队列清空
+  
+  8 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/queue-visibility.test.ts:210:12)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 8,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/桌面应用/queue-withdraw-lru.test.ts =====
+✔ P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前移、id/full 在快照里）；进行中/回交/不存在都如实回错 (654.0616ms)
+✔ P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；settled 后下一时机再收；在跑的全程不被掐断 (823.2289ms)
+✔ F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，撤回无效」；放行后两笔按序送达（撤回无效 ≠ 丢弃） (329.5336ms)
+✔ G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归治理流只读面（与派发/回交同语义） (189.1294ms)
+✔ 2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目（UI 显示「系统」、不可撤回）；缺省仍为客户消息类别 (141.0333ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2587.6178
+===== EXIT 0 WALL 3s =====
+===== FILE: test/桌面应用/rejection-copy.test.ts =====
+✔ 三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code (0.9914ms)
+✔ BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因 (0.4987ms)
+✔ BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试） (0.8201ms)
+✔ code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc） (0.1887ms)
+✔ contract_check 工具：只读、按角色裁剪、≤4KB、缺失数据如实报错 (1.8083ms)
+✔ contract_check 输出超长由工具层截断到 4KB 内 (0.3004ms)
+✔ contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02） (0.2523ms)
+✔ contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07） (0.2589ms)
+✔ contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6） (0.2185ms)
+✔ contract_check topic：null/空串/空白串走 legacy（AC-16） (0.2887ms)
+✔ contract_check topic：角色隔离先于 topic（AC-7） (0.1404ms)
+✔ contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8） (0.2858ms)
+✔ contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9） (0.0738ms)
+✔ 旧 code 别名可读：canonical code + legacyCode 保留 (0.111ms)
+✔ 真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段） (0.7198ms)
+✔ 真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code (0.2378ms)
+✔ F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留 (6.0255ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 249.0793
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/replay-safe-retry.test.ts =====
+✔ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (174.2993ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (106.47ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (160.0575ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.862ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 829.6699
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/request-timeout-wiring.test.ts =====
+✔ 首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续 (171.2566ms)
+✔ 空闲超时与一般请求失败：各自人话系统行（不串文案、不含 code） (232.2319ms)
+✔ 无 errorCode 的普通失败：不新增系统行（既有语义不变） (109.6385ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 898.9548
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/role-log.test.ts =====
+✔ 脱敏：凭据/令牌/项目外绝对路径/换行与 200 字截断 (0.9967ms)
+✔ 追加/读取：字段白名单、since/limit、坏行跳过、非法角色 id fail-closed (19.0529ms)
+✔ 非法角色 id：返回失败（不落盘、不抛） (0.858ms)
+✔ 轮转：超过上限时保留 .1，读取仍按旧→新返回最近条目 (17.3407ms)
+✔ SessionManager 观察器：会话消息/工具/终局自动写日志（脱敏），角色无需上报 (181.9543ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2016.4625
+===== EXIT 0 WALL 2s =====
+===== FILE: test/桌面应用/run-change-entry.test.ts =====
+✔ listProject 附带 activeRuns（pinned/draft 摘要；draft 不算可发起） (24.2232ms)
+✔ requestRunChange：无 pinned run / 多 pinned run / 无可呈现会话 ⇒ 如实失败（不伪造成功） (10.7318ms)
+✔ requestRunChange（真实链路）：convener 会话呈现 run-change 卡，客户答 continue-frozen 后落账 (64.1325ms)
+✔ 跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按钮已移除（低层 API 保留）/ 触发点接线 (3.0144ms)
+✔ requestRunChange（真实客户卡通道 + 替我决策开启）：三模式卡呈现客户、不代选；客户作答后按 customer 落账 (80.523ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 623.3451
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/run-change-trigger.test.ts =====
+✖ 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0 (93.6588ms)
+✖ 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变 (71.9711ms)
+✖ 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变 (77.4037ms)
+✖ 显式入口（stop）：requestRunChangeDecision 三模式落账不变 (75.9984ms)
+✖ stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色 (80.0391ms)
+✖ 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡） (77.4034ms)
+✖ 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change (74.9439ms)
+✖ 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发 (83.1036ms)
+✖ AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留 (69.9718ms)
+✔ J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge） (133.5909ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 1
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1229.3057
+
+✖ failing tests:
+
+test at test\桌面应用\run-change-trigger.test.ts:251:1
+✖ 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0 (93.6588ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:259:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:291:3
+✖ 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变 (71.9711ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:291:3
+✖ 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变 (77.4037ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:291:3
+✖ 显式入口（stop）：requestRunChangeDecision 三模式落账不变 (75.9984ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:350:1
+✖ stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色 (80.0391ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:356:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:399:1
+✖ 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡） (77.4034ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:403:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:424:1
+✖ 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change (74.9439ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:430:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:453:1
+✖ 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发 (83.1036ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:459:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-change-trigger.test.ts:511:1
+✖ AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留 (69.9718ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:519:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/桌面应用/run-change.test.ts =====
+✔ run-change 卡：复用 decision、issuedBy=app、三选项与回退映射 (0.988ms)
+✔ run-change 三模式：continue-frozen 不改 run；stop-and-restart 收口旧 run 并要求新 run；stop 取消 (39.2992ms)
+✔ session run-change：convener 通道呈现 app 卡；客户选择 stop-and-restart 后落决定/关闭 run (74.2814ms)
+✔ session run-change：客户指令归属（Q9 A）——decidedBy=directive + directiveId (61.8168ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 561.5578
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/run-pin.test.ts =====
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (86.9261ms)
+✖ D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集 (131.0797ms)
+✖ run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned (79.8367ms)
+✔ run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等 (71.568ms)
+✔ legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned (5.6707ms)
+✔ P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝 (39.6983ms)
+✔ P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写 (59.7261ms)
+✖ P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId (33.6236ms)
+✔ R2（P1.3）：legacy 任务验收 facts 标 runState=legacy (159.7921ms)
+✔ contract_check session：pinned run/角色写区/legacy 明示（只读） (75.3421ms)
+✔ contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12） (44.9578ms)
+✔ contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8） (47.427ms)
+✖ F2：版本化文档基线违规受理 + advisory；基线/文档未被改写 (85.652ms)
+✔ §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出 (248.8856ms)
+✖ R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable (39.0874ms)
+✖ R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable (66.4979ms)
+✖ AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点 (76.3805ms)
+✖ AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点 (95.4588ms)
+✖ AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读 (65.0305ms)
+✖ P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定 (106.7247ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 9
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3545.1212
+
+✖ failing tests:
+
+test at test\桌面应用\run-pin.test.ts:184:1
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (86.9261ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:194:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:268:1
+✖ D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集 (131.0797ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:297:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:316:1
+✖ run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned (79.8367ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:325:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:454:1
+✖ P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId (33.6236ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:461:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:606:1
+✖ F2：版本化文档基线违规受理 + advisory；基线/文档未被改写 (85.652ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:620:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:723:1
+✖ R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable (39.0874ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:730:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:745:1
+✖ R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable (66.4979ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:755:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:770:1
+✖ AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点 (76.3805ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:782:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:796:1
+✖ AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点 (95.4588ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:814:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:829:1
+✖ AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读 (65.0305ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:849:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:864:1
+✖ P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定 (106.7247ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:878:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 4s =====
+===== FILE: test/桌面应用/session-history.test.ts =====
+✔ D-1 目录契约 + 解析：header + user/assistant(含 toolCall)/toolResult(isError) → 规范化行（顺序与时间保留） (1.2357ms)
+✔ D-1 防御式：坏行/未知 entry/未知 role 跳过不抛（计入 skipped）；header 不合法 → 整体判失败 (0.2316ms)
+✔ D-1 pickLatestSessionFile：mtime 大者优先；并列取名字大者（确定性） (0.0814ms)
+✔ D-1 粗探 probeSessionFile：无文件=missing；header 合法=ok；坏文件=corrupt（打开会话时分类 contextSource 用） (14.1382ms)
+✔ D-1 readRoleSessionHistory：无目录=无历史（ok）；挑最近文件；坏文件→ok:false+error；**跨角色不串** (10.9685ms)
+✔ 锚点标识：request_confirmation 的调用行与结论行带同一 requestId/anchorKey（toolCallId 配对，不解析正文） (0.563ms)
+✔ 锚点标识：request_choice 同样配对；非交互工具/缺 title/孤儿结论一概不着锚（其余行零变化） (0.3022ms)
+✔ legacy anchors keep exact original equivalence without sending raw titles or merging distinct calls (0.1341ms)
+✔ F-8-b：display.process 结构化事实优先——非零退出与超时终止不归 denied；timedOut 独立一类；无事实的旧文本行行为不变 (0.3166ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 258.4059
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/session-rebuild-race.test.ts =====
+✔ 并发作废重建（settle 触发的 refreshStaleBoundaries × 用户 send）——身份守卫下：恰一次作废/重建、条目保活、轮次不被误删 (135.8065ms)
+✔ 在跑轮次不被作废重建打断：busy 期间 refreshStaleBoundaries/send 的陈旧检查都跳过（不误删、不误复位） (105.8767ms)
+✔ 后台重建完成后再发送：恢复活动目标，消息恰一次送达重建后的句柄 (10.7956ms)
+✔ 非活动角色后台重建不抢位 (6.627ms)
+✔ 重建 dispose 等待窗口：select B 保持用户目标/关闭契约 (6.7423ms)
+✔ 重建 dispose 等待窗口：failed select 保持用户目标/关闭契约 (7.6473ms)
+✖ 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约 (4.7739ms)
+✖ 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约 (7.2522ms)
+✔ 重建 dispose 等待窗口：stop B 保持用户目标/关闭契约 (5.4443ms)
+✔ 重建 open 等待窗口：select B 保持用户目标/关闭契约 (6.3582ms)
+✔ 重建 open 等待窗口：failed select 保持用户目标/关闭契约 (6.2787ms)
+✖ 重建 open 等待窗口：stop A 保持用户目标/关闭契约 (4.449ms)
+✔ 重建 open 等待窗口：stop all 保持用户目标/关闭契约 (7.4186ms)
+✔ 重建 open 等待窗口：stop B 保持用户目标/关闭契约 (5.8643ms)
+✔ 夹具守卫（O-1 缓存口径）：makeProject 初始边界**比重写长**——(mtimeMs,size) 缓存下陈旧触发确定性检出，不落时间戳粒度合并窗 (1.4522ms)
+✔ 陈旧检出对平台 mtime 粒度合并免疫（尺寸可判）：即便 stat 报告与冻结完全相同的 mtime，陈旧仍被检出并如实失败 (3.5856ms)
+✔ 重开失败保留原错误，不恢复假活动目标、不发送消息 (4.3125ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 14
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 120003.7828
+
+✖ failing tests:
+
+test at test\桌面应用\session-rebuild-race.test.ts:278:5
+✖ 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约 (4.7739ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session-rebuild-race.test.ts:323:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\session-rebuild-race.test.ts:278:5
+✖ 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约 (7.2522ms)
+  AssertionError [ERR_ASSERTION]: 新项目的新句柄接收，旧重建句柄已释放
+  + actual - expected
+  
+    [
+  +   3
+  -   4
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session-rebuild-race.test.ts:336:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 3 ],
+    expected: [ 4 ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\session-rebuild-race.test.ts:278:5
+✖ 重建 open 等待窗口：stop A 保持用户目标/关闭契约 (4.449ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session-rebuild-race.test.ts:323:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 124 WALL 120s =====
+===== FILE: test/桌面应用/shell-escalation.test.ts =====
+✔ 升级卡数据面：命令/argv/cwd/judge 事实逐字取自判拒记录；necessity 原样携带且不作为标题/选项来源 (1.1027ms)
+✔ 升级卡数据面：可选字段缺席不伪造（不编造 judge 理由/上下文/过期时刻） (0.2542ms)
+✔ 升级卡三选项：allow-once ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权 (0.7054ms)
+✔ 升级卡三选项：allow-session ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权 (0.1256ms)
+✔ 升级卡三选项：deny ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权 (0.2367ms)
+✔ 升级卡回包：未知 id / 非法动作 / 误投布尔回包 ⇒ expired（不放行）；动作解析严格三选一 (0.2745ms)
+✔ 升级卡超时：cleanup 兜底 ⇒ expired（默认拒绝）；消耗后不可再答 (29.0281ms)
+✔ 升级卡中止（轮次停止/会话重建/窗口关闭）：expired；关窗 rejectAllPending 全部失效 (0.492ms)
+✔ 升级卡推达失败（窗口已关）：unavailable（默认拒绝）；不残留 pending (0.3081ms)
+✔ 升级卡 replay：focus/show 幂等重推仍挂起者；已决项不复活 (0.2298ms)
+✔ 升级卡按角色挂起视图：roleId 来自判拒记录（看护「正确等待不报」数据面） (0.2238ms)
+✔ 仲裁·升级卡先到：审批卡在主进程等待（不推达渲染）；等待期间不启动确认超时；升级决出后审批卡推达 (436.5273ms)
+✔ 仲裁·审批卡先到：升级申请返回 pending（不排队、不弹卡、不消耗额度），回执如实提示稍后 (1.5497ms)
+✔ 仲裁·已有升级卡待答：第二个角色的升级申请同样返回 pending；槽释放后可再申请 (1.2775ms)
+✔ 仲裁·等待超时：升级卡久不决出 ⇒ 审批卡按 unavailable fail-closed，且从未推达渲染 (41.7761ms)
+✔ 仲裁·轮次中止：等待槽位期间中止 ⇒ 审批卡 unavailable，不推达、不泄漏槽 (31.0873ms)
+✔ 仲裁·恢复卡不参与共享槽：未配置 slot 的核不改变既有「等待客户不设限」语义 (1.3922ms)
+✔ 回包路由：kind/action 区分升级与审批；旧回包 {id, allow} 绝不误路由 (0.0741ms)
+✔ 开关关闭：既有确认路径逐字不变；不产生升级卡、升级 presenter 不被调用 (0.2138ms)
+✔ 暂停状态机：只接受 {paused:boolean}；非法输入不改状态；默认未暂停（重启清零的模块初值） (0.1678ms)
+✔ 暂停 IPC 接线：main.ts 模块级单例、shell-only 生效、不影响治理 approval 组、推送含 paused (0.4791ms)
+✔ preload 受限桥：新增暂停与升级回包方法（白名单；不暴露 Node 能力） (0.3006ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 963.1282
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/star-routing.test.ts =====
+✔ 星形派发（2026-10-29 v4.1，M8）：chief → 项目 worker 被拒，拒绝发生在 task.created 之前（不写任务行） (52.5911ms)
+✖ 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝 (44.0329ms)
+✖ convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务 (44.0276ms)
+✖ BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递） (48.9829ms)
+✖ BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队 (47.7218ms)
+✖ BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断） (61.3586ms)
+✖ BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递） (50.4108ms)
+✔ R1/P1-R-05：convener→chief 归矩阵；convener→不存在 worker 硬拒；硬拒无任务/会话/run (43.089ms)
+✔ AC-1.2：wrong-source 桌面证据——非 chief/convener 直接调用 routeDispatch 被拒 (1.5134ms)
+✖ AC-4.3：洁净派发无 advisory、无诊断噪声 (48.7443ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 3
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2341.1609
+
+✖ failing tests:
+
+test at test\桌面应用\star-routing.test.ts:150:1
+✖ 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝 (44.0329ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:158:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:179:1
+✖ convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务 (44.0276ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:187:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:198:1
+✖ BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递） (48.9829ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:207:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:238:1
+✖ BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队 (47.7218ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /无法打开|未投递/. Input:
+  
+  'document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:246:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。',
+    expected: /无法打开|未投递/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:259:1
+✖ BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断） (61.3586ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:269:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:288:1
+✖ BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递） (50.4108ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:295:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:371:1
+✖ AC-4.3：洁净派发无 advisory、无诊断噪声 (48.7443ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:380:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 2s =====
+===== FILE: test/桌面应用/stuck-redispatch-safety.test.ts =====
+✔ unsafe：external/destructive/unknown 零次自动重派（即使终止已确认） (0.5382ms)
+✔ unsafe：终止未确认 / 已发生外部副作用 (0.1305ms)
+✔ needs-review：部分写入/未完成工具调用/已有完成报告 ⇒ 不自动重派 (0.0995ms)
+✔ safe：仅 read-only/docs/code 且终止确认、无部分写入/无外部副作用 (1.1175ms)
+✔ 应用强制升类（不降类）：缺填/非法 ⇒ unknown；shell/删除/发布/源码/文档按文本升类 (0.8713ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 171.9175
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/stuck-redispatch.test.ts =====
+✖ safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递 (86.5889ms)
+✔ unsafe：external 副作用 0 次自动重派；原任务保持未收口并如实给原因 (140.1361ms)
+✔ needs-review：部分写入 ⇒ 不自动重派；终止未确认 ⇒ unsafe (73.1316ms)
+✔ 重派上限：同链已 2 次仍卡死 ⇒ 第 3 次不自动重派（升级） (17.2187ms)
+✖ B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务 (237.9339ms)
+✖ B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐） (112.8548ms)
+✔ C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，客户选 continue ⇒ 任务保持未收口并留人工处置 (139.7143ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 4
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 120001.4148
+
+✖ failing tests:
+
+test at test\桌面应用\stuck-redispatch.test.ts:112:1
+✖ safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递 (86.5889ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'rework'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:129:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'rework',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\stuck-redispatch.test.ts:232:1
+✖ B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务 (237.9339ms)
+  AssertionError [ERR_ASSERTION]: 替代角色收到重派任务
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:252:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\stuck-redispatch.test.ts:260:1
+✖ B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐） (112.8548ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'rejected'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:292:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'rejected',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 124 WALL 120s =====
+===== FILE: test/桌面应用/su-effective-boundary.test.ts =====
+✔ 已 bootstrap + 有效 .ans（治理边界 pin-backed）→ 界面不再派生「只读」标记（RoleView 无该字段） (19.7743ms)
+✔ 已 bootstrap + 有效 .ans → 引擎为 su 解析出的生效边界为**已接受**（治理边界覆盖） (5.9566ms)
+✔ 已 bootstrap + 有效 .ans → su 的 gate 放行其**治理边界内**的写、拒绝边界外的写 (17.1009ms)
+✔ 已 bootstrap 但**无** .ans → su 回退内置未接受（写入被拒；该路径不变） (4.3365ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 488.0477
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/task-restart.test.ts =====
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2044.7043ms)
+✔ 任务已收口：恢复不重投；列表显示 closed (108.8041ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2544.7984
+
+✖ failing tests:
+
+test at test\桌面应用\task-restart.test.ts:57:1
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2044.7043ms)
+  Error: 等待超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:88:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+===== EXIT 1 WALL 3s =====
+===== FILE: test/桌面应用/trunk.test.ts =====
+✔ trunk:state 载荷：F15 workflow/roleCards/boundaries 三类；禁用原因与冻结健康派生 (0.6651ms)
+✔ Interface 版本变更/重构/冻结只读：空项目根结构化失败；有栈件时返回摘要 (2.7624ms)
+✔ Interface VCA 重发卡：submitted 重发回执 answered/recordStatus；不提供 submit 通道 (0.873ms)
+✔ detail VCA 批准后：后台驱动逐项卡收集 → apply（needsItems；不新增 IPC） (30.8522ms)
+✔ Interface trunk：state 单一载荷、list、升级预览→同一 previewId 二次确认、恢复/重冻结构 (1.1629ms)
+✔ 接线源码钉：main.ts 注册冻结 IPC 集；无 submit/refactor:request/stable-write:request；preload 白名单 (0.7916ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 440.789
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/turn-lease.test.ts =====
+✔ P0 turn lease：失败投递不覆盖在跑回合的 origin；turn.end 后 busy 复位、队列继续（现场形状） (114.0137ms)
+✔ P0 settled 按 turnId 兜底：无 turnId 的终局也清 busy（idle-busy 自愈）；迟到旧 turnId 不误清新回合 (235.0632ms)
+✔ P0 并发 direct send + drain：同一时刻至多一个回合开跑，另一条排队；先后各投一次、队列清空 (236.8486ms)
+✔ P0 delivery.end 完整性：turn 先 settled、send promise 后解析——终态恰一次 (249.4092ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1233.3887
+===== EXIT 0 WALL 1s =====
+===== FILE: test/桌面应用/version-change.test.ts =====
+✔ VCA 卡：application-owned decision、真实 flowId、推荐 reject、目标/hash/语义齐全 (1.6969ms)
+✔ stable 卡：app-owned `stable-write`、无 flowId、恰一推荐；独立结构校验；decision 校验不适用 (0.324ms)
+✔ 修正案逐项卡：item-apply/item-keep/item-cancel-amendment + acknowledgments 透传；none 不发卡 (0.2051ms)
+✔ 客户端三态映射：只认 customer；judge/directive 一律 unavailable；acknowledgments 回传 (0.2471ms)
+✔ 客户主权：VCA 卡 @决策 指令不消费（不写 directive、不结算），原卡呈现客户 (18.3763ms)
+✔ acknowledgments：required 缺失/多余/非数组 ⇒ 拒收且 pending 保留；齐全 ⇒ settlement 带 acknowledged (0.4919ms)
+✔ customer-input 最后防线：主权卡 judge/directive 结算被拒绝（pending 保留） (0.1981ms)
+✔ SessionManager VCA 卡：经 convener 会话呈现；request.* 生命周期客户归属；notify:none (87.3218ms)
+✔ SessionManager：无治理会话/通道 ⇒ VCA/stable 卡 unavailable（fail-closed；不伪造批准） (0.9072ms)
+✔ SessionManager 修正案逐项卡：acknowledgments 对象数组呈现并回传 (69.5153ms)
+✔ stable workflow：确认卡 → 一次性许可 → completeWrite 复核/消费/mini re-pin（trunkVersion 不变） (87.7259ms)
+✔ stable 拒绝：不签发许可、不写记录为 written (50.404ms)
+✔ stable 写入哈希不符：completeWrite fail-closed、许可作废、不更新快照 (86.5811ms)
+✔ 重启重建许可快照：新栈从磁盘恢复 approved 许可并安装 C2b 快照 (54.1018ms)
+✔ appointment-write 钩子（F16）：只提取 preview 正文/签发许可；桌面不写盘 (59.2743ms)
+✔ 冻结迁移/损坏：ready ⇒ cacheHealth ok；baseline 损坏 ⇒ fail-closed 且不自动重建 (35.1256ms)
+✔ trunk:state（F15）：workflow / roleCards / boundaries 三类 stable 快照齐全；单一来源摘要 (49.1111ms)
+✔ 主干升级（仅紧急/恢复）：预览变更 → 同一 previewId 客户确认 → t2；重复确认/常规理由拒绝 (101.312ms)
+✔ refactor：convener 提交（能力层）/只读列表；非 convener 拒绝；无 trunk 版本 (27.5379ms)
+✔ IPC 冻结集：无 submit/refactor:request/stable-write:request；只保留一条 trunk:state 推送 (0.1512ms)
+✔ 只读列表面：VCA/stable/冻结摘要有界、无 drift 字段；cacheHealth 如实 (59.2828ms)
+✔ Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话角色（不信任工具自报） (121.7617ms)
+✖ Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可） (51.234ms)
+✖ VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”） (24.8241ms)
+✖ VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted） (40.0227ms)
+✔ Batch 3.5 request_stable_write：客户拒绝 ⇒ 回执失败且不签发许可 (55.431ms)
+✔ Batch 3.5 trunk 客户动作：refreeze 只 stable、不升版本；abandon 不改指针；history 只读 (80.7754ms)
+✔ AC-13：buildStableBoundaryRisk 生成横幅/required ack；不可解析标记 fail-closed (0.2221ms)
+✔ AC-13：boundary 扩大（新增目录）⇒ 卡面横幅 + required ack；勾选后可签发许可 (192.8884ms)
+✔ AC-13：扩大未勾选 ⇒ 不签发许可（最后防线，fail-closed） (158.5431ms)
+✔ AC-13：收窄/无变化 ⇒ 不误报；正常签发许可 (433.0962ms)
+✔ AC-13：预览不可解析 ⇒ 拒绝且不呈现卡/不签发许可 (56.2176ms)
+✔ D4 confirm 回执：required ack 合法 ⇒ answered/acknowledged；缺失/多余/非数组 ⇒ 拒收且 pending (0.2939ms)
+✔ D4 confirm：confirmed:false 不要求/不校验 ack，不回传 acknowledged (0.1443ms)
+✔ D4 confirm：请求无 required ack ⇒ 旧行为零变化（不要求/不回传） (0.1126ms)
+✔ D4 端到端：appointment-write 扩大 boundary 经真实确认通道回传 ack ⇒ 签发许可 (226.2816ms)
+✔ 方案升级卡：application-owned decision、真实 flowId、四选项固定顺序 + escalation-continue 推荐、preview 语义 (0.4894ms)
+✔ 客户主权：方案升级整卡排除代选/判断/@决策；application 非 true 或选项子集 ⇒ 不排除 (19.0444ms)
+✔ SessionManager 方案升级：仅 convener 注入/提交；在途同 flow 至多一张；裁定后如实通知且不派发/不写文档 (98.1781ms)
+✔ SessionManager 方案升级：未获客户裁定 ⇒ 如实通知 convener（不宣称已变更） (74.7448ms)
+✔ SessionManager 方案升级：客户选「修订方案」⇒ 向 rapporteur 投递重做消息（不派发、不改需求） (47.4828ms)
+✔ SessionManager blocked 提示：首次 blocked 即提示运营自行选择（不是客户卡）；在途卡/已提示节流；done/failed 与提交升级卡后清除 (939.126ms)
+✖ SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常 (4770.7727ms)
+✔ 规划trunk缺workflow诚实可读，升级/refreeze执行分支明确拒绝且不合成workflow (72.1666ms)
+✔ W2 ordinary submit uses real direct validation and never revives the former approval card (0.7207ms)
+✔ W46 Pipeline许可恢复投影：无效/未答保有效许可，真实读错清旧且修复可恢复 (81.7525ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 42
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8726.0169
+
+✖ failing tests:
+
+test at test\桌面应用\version-change.test.ts:1140:1
+✖ Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可） (51.234ms)
+  AssertionError [ERR_ASSERTION]: vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1168:14
+      at async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1141:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\version-change.test.ts:1201:1
+✖ VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”） (24.8241ms)
+  AssertionError [ERR_ASSERTION]: vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1223:14
+      at async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1202:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\version-change.test.ts:1238:1
+✖ VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted） (40.0227ms)
+  AssertionError [ERR_ASSERTION]: vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1262:14
+      at async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1239:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\version-change.test.ts:2176:1
+✖ SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常 (4770.7727ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\[工作结果\]/. Input:
+  
+  ''
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:2196:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '',
+    expected: /\[工作结果\]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 9s =====
+===== FILE: test/桌面应用/version-decision.test.ts =====
+✔ 版本决策前置：参数/flow/pinned/multi-run/pending/channel-unavailable，失败不发卡 (114.5847ms)
+✔ 版本决策前置：未决 decision-pending；无 chief 会话 ⇒ channel-unavailable (33.6681ms)
+✔ 版本修改（客户）：application-owned 卡、targetVersions、executing→executed；不改 run/文档/任务 (93.6367ms)
+✔ 版本修改（客户指令 Q9 A）：request.resolved.by=directive + directiveId；version.decision 三值归属 (127.6669ms)
+✔ 新版本开发（judge 代批）：新 flow/run；旧 flow 全部活动 run 关闭；orphan 旧申请；旧任务不自动关闭 (179.6732ms)
+✔ 拒绝/重试/通知不吞；超时/不可用写 resolved 不写 version.decision (261.2353ms)
+✔ 发起轮次中止：orphaned(initiator-aborted)、无 resolved/version.decision；晚到答案丢弃 (142.3964ms)
+✔ 重启恢复：第二未决独立 orphan；F5 resolved-without-execution → uncertain；已 orphaned 排除 (51.9925ms)
+✔ 重启对账：executing→executed/uncertain；不重复创建新 flow；执行期 pinned failed 不误判 (68.4427ms)
+✔ 执行期 pinned（发卡后 pin）：failed/run-change-required、零创建/零关闭/零 orphan (107.2479ms)
+✔ 关闭阶段失败（部分失败）：停止关闭其余 run，failed 如实记录 closedRunIds；不切 focus (520.837ms)
+✔ R1-e/执行侧坏 manifest：无关坏 manifest 不阻断前置；版本修改成功；新版本开发如实 execution-failed (197.0223ms)
+✔ requestId/pending 结构化匹配：一个 runId 是另一个前缀时互不串/attempt 正确 (93.3945ms)
+✔ 2026-11-04 直修：版本修改卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按 customer 执行 (111.3908ms)
+✔ 2026-11-04 直修：新建版本开发卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按既有语义执行 (152.7016ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2691.3584
+===== EXIT 0 WALL 3s =====
+===== FILE: test/桌面应用/watchdog-reuse.test.ts =====
+✔ P0（2026-10-30）：默认自动中止保持 0——本波不顺手改客户 2026-10-21 口径 (0.431ms)
+✔ 复用单一 tick：start 只创建一个 setInterval（幂等）；巡检/日志静默不新增定时器 (0.8448ms)
+✔ 既有信号 #1：轮次到点检查仍工作（budget/挂起卡语义不变） (1.7848ms)
+✔ 既有信号 #2/#3/#4 仍工作（队列积压/命令超时/重复失败） (0.5112ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 99.2498
+===== EXIT 0 WALL 0s =====
+===== FILE: test/桌面应用/write-safety.test.ts =====
+✔ 通用 write 卡与 legacy 直调已删除；appointment-write 保留（审批路径） (2.7147ms)
+✔ 角色卡边界 YAML：缺 role/entries 或坏语法 ⇒ 校验失败；合法结构通过 (4.2214ms)
+✔ C-06 appointment-write 应用校验：D3 匹配才发卡；缺 decision/错配/内置/越界一律 declined+notPresented (248.4642ms)
+✔ C-06 appointment-write 归属键：intentId 与 D3 一致同样可发卡 (261.2406ms)
+✔ C-06 appointment-write 预览结构：role-card 必需章节 / boundary 顶层 role / 路径越界 / 内置目标 (2.5095ms)
+✔ 治理写卡客户主权（会话级 a）：替我审批开启 ⇒ 真实 SessionManager 呈现客户、judge 0 调用/0 结果行、approval.resolved by=customer (264.7022ms)
+✔ 治理写卡客户主权（会话级 b）：替审批关闭 ⇒ 呈现客户；客户拒绝落 approval.resolved by=customer (268.7917ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1450.1883
+===== EXIT 0 WALL 1s =====

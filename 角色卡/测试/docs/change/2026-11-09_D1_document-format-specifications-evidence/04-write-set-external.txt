@@ -1,0 +1,117 @@
+=== exclusion list (precise): git status --porcelain (expect empty) ===
+exit=0
+
+=== exclusion list (precise): git diff --numstat (expect empty) ===
+exit=0
+
+=== sha256 disk-vs-HEAD for top-level role-card/boundary/api-spec files ===
+DIFF  角色卡/Claude适配器/role-card.md (HEAD e84efec3240a22dea1b4567074e8b25cf6a9d2c5d452ec9047463fb955cef62b / disk f2217f0ad1d7979c29bd95e9842c1adeeb56c015593ba1938ef610ac6660e3a3)
+DIFF  角色卡/Codex适配器/role-card.md (HEAD 0b632c28c3a2f8ad68c69c1b3f0358aea88cb2909857bdfca043f6ed5083b30c / disk e20bb01e02d44615cc70c050abe2207ba1090463e6baab11c33d57bd6785ae89)
+DIFF  角色卡/Pi适配器/role-card.md (HEAD 2f8202cd615d803118d0ced689ccab5784e458a75d74e12599864ecbb7a33459 / disk dea1347d8e8afff30b3a5733ade9c48896147d647b7d82bfb28288c5f5724d05)
+DIFF  角色卡/UIUX设计师/role-card.md (HEAD 6a4766bbb033315cb83607d1d61b8ed865807c9d9be5cc3112fbd97f71d151e7 / disk 93b733ebf37adc5b2a36949566000a9aefe9e6adf201d0a6f0cd32ada6c8a38d)
+SAME  角色卡/chief-code/role-card.md
+SAME  角色卡/convener-code/role-card.md
+SAME  角色卡/gates-code/role-card.md
+SAME  角色卡/nominator-code/role-card.md
+SAME  角色卡/product-code/role-card.md
+SAME  角色卡/rapporteur-code/role-card.md
+SAME  角色卡/shared-code/role-card.md
+SAME  角色卡/verifier-code/role-card.md
+DIFF  角色卡/产品/role-card.md (HEAD 9a3c849fcdd2df7d1e440e464acb52c1b45e76ebc9ad3c1fd90ba8a3b4036e7a / disk 988b440ac89c3e24b5d15d8703cb31baa48944055d5dc69992042b944ba20b76)
+DIFF  角色卡/宣传/role-card.md (HEAD e02032a6a4bec91212df2a4109f216ed0a970cb0c3ecf16208da6b001171eff9 / disk 84b17b3db85625983055552c7ea47cea5b58ccdf10e4cc845b2c709ffab3dbbf)
+DIFF  角色卡/桌面UI/role-card.md (HEAD 602641e75d9b5b8ca0f4fa04a09b433314694237f1b11fc60179250484797934 / disk 89704083a2cc8110bd0f49b839da82f53836e0eee0148ea9e4a4179ebc49b7c2)
+DIFF  角色卡/桌面应用/role-card.md (HEAD c07c79cdfa1f4103a33beb8cabea717c12545b9e04c2d121960e7b88739ccf2a / disk 24b394b94628845ed7cabd636a82ef5bf515ad8f8826b670e9df73916e1cd551)
+DIFF  角色卡/桌面窗口/role-card.md (HEAD f11418cd5cb5c5f47274279b989befa9d13a441450c57315cdec308ada132bdb / disk 1f9f23cc28af1ee4c777ef88c32ea2afba54c4d4a4958fc52dd263d796a70519)
+DIFF  角色卡/测试/role-card.md (HEAD e40d5b4c8619f7e70bc750a27e819ed9b6e0da84394df04436a167804603415c / disk 452cee435b7f08c6dd6f34b1156d7b5ea5f08ba8862ad68d824d2ff44af10068)
+DIFF  角色卡/独立验收/role-card.md (HEAD 12e43699751eb532005c4f85ffd1b96b4b1cc474df50d0496c66faacab1e4dac / disk db56060e0218db06b59dd68522d85c1dee12750f6219ae6449e8a23d48bda9ab)
+DIFF  角色卡/编排/role-card.md (HEAD 63ee79e8ef61b4e937ee4a65d342e5a647d5ae62eaa4d5af8fff98a20e010874 / disk 414a4b1709445dc6a39a7f8ae5d446a4f362b87e90ce9579f1663f83530a843a)
+DIFF  角色卡/装配/role-card.md (HEAD 0de56ee17a8a9fcf127d59c552896c03c74432e0e254d929ff2dcc50c103fcd2 / disk da6b1365f533d699687ad0f33014661db621227120d7ad923debd457a3c08d75)
+DIFF  角色卡/运行时核心/role-card.md (HEAD 3805616619cd059ea67506a8c1688de503a327194b07019948230e606118e45f / disk 0de109a0a6a17b012eb4cdc1c974924ae791d6fe70d4205012d084a1665c5ba4)
+DIFF  角色卡/门禁引擎/role-card.md (HEAD f729faabd0cdc401476fd328527cccd8bdc5c466a2f87fa37ef972710efc0daf / disk 97e37c545cdd98297fca1fb42319637802db1f7ea828677a3b9548b754e90239)
+DIFF  角色卡/项目管理/role-card.md (HEAD 8e1949920546cd89d94aedc4aa2386f6a513964a4000c8d7b597814ed409dd89 / disk 094addeb9cf42f78df7d697e0cf33654bc29a11fc52ca8b50bc41762fd9c7c90)
+DIFF  角色卡/Claude适配器/boundary.md (HEAD 95c4b40380bed1b1c72238d75f5311cc9e1340b3a08ed7b8b3bb76a137583b12 / disk 1d9b9668d57e037a1191277b784a3ac30d8ff9919dd9bed1b1ec99f1d81728ed)
+DIFF  角色卡/Codex适配器/boundary.md (HEAD d2efe169780056df8f60d8d2410aaa80d1bafd46256b436f456146c3d8c45f5b / disk 5fd7562b36453a4c3c6feaaef010e7ea7331f550305488f91990f4d4881706c2)
+DIFF  角色卡/Pi适配器/boundary.md (HEAD d5c4ff282555f08033471dba8833b4216bed5f35ad7115ed7611c5d3b4fdda90 / disk 79aeed3e352af630f1339930af5fa7d25fe2a7b6d35302828459cb8898d18331)
+DIFF  角色卡/UIUX设计师/boundary.md (HEAD 2fa63bab97f9c77ebd06ef1e89995c6fcc7ed2edc432779987c635dfe6964569 / disk 074b90892afedc39dbce65190b06e26be27b0feb326b6c534c67315df076e062)
+SAME  角色卡/chief-code/boundary.md
+SAME  角色卡/convener-code/boundary.md
+SAME  角色卡/gates-code/boundary.md
+SAME  角色卡/nominator-code/boundary.md
+SAME  角色卡/product-code/boundary.md
+SAME  角色卡/rapporteur-code/boundary.md
+SAME  角色卡/shared-code/boundary.md
+SAME  角色卡/verifier-code/boundary.md
+DIFF  角色卡/宣传/boundary.md (HEAD b4418d9405ab8389852f330247a0db71b3927f453b8b1866b0648c480b2c2ba0 / disk ce1568b2fce53f0660f6f4aa557dd303885ed3f848934c6b76d843d67d187aa5)
+DIFF  角色卡/桌面UI/boundary.md (HEAD 42878f294ebf57773249eb4f719dce043f09e94f0eefbd6f20a1beec2f2ac770 / disk 99578261917e2bdb359828aa77dc1a0ff0cf5c31174eeb97f7d666c21cb52cf0)
+DIFF  角色卡/桌面窗口/boundary.md (HEAD 56cae83d5cb90f211f7bc137c75fb0ab76c4ad9f0c7a41588e9a4bc1d66dbdae / disk 8c7d5c273c1404d4f0876ec0219bbfc08090c09cb736e3d93e0d7b2adcbd25e1)
+DIFF  角色卡/测试/boundary.md (HEAD 96b0cfadc73dcc34eaadaedc1cf2520b00ac6854fdefcca410a94e1011e42ca8 / disk 9a2eba3fc842f185eb228ef49cd30dfd66ec3933c42cca0202ff2ae26c97859f)
+DIFF  角色卡/独立验收/boundary.md (HEAD 00a902824851a22e4e0aa5c24c08cff2a67db30ab9b1b2563936585feb490682 / disk 1113989cabcfaf4c1756396838ce79559f83c6909dfd7c28f3875f71ad3975d3)
+DIFF  角色卡/编排/boundary.md (HEAD d96c37079cdd07804f5e56aa568b3ba5ebc8534a00f46261a517bc5195e35aad / disk 4c03a1b31d201c5d71d253553835888c94679c26717c7190dc38b332a5607943)
+DIFF  角色卡/装配/boundary.md (HEAD 730478b8e1bd7acdd087b5a0963895e99b3ff77444a410a81867382aaee62b05 / disk 9fdd595795a16128ff8c0ceb24ea6f0f7717609352611f5b87d71dc7c16505ba)
+DIFF  角色卡/运行时核心/boundary.md (HEAD ae6c936dce78ef45df6bda86918b472026049a936d501b2c7c6b36c7f263b20f / disk 9d4cf845abdd37da8cfc70a219c1df5a753ef5ec9ab82a1544f0b984b28670e4)
+DIFF  角色卡/门禁引擎/boundary.md (HEAD aaef9d83aab6ec359a0b6d53fd544420f909ebe6ddf9c210098f2053c37e6ce3 / disk b5e8b8166c50fb4063c5fa53b28ea696a4b562fd987f70548cef6972b17ae283)
+DIFF  角色卡/项目管理/boundary.md (HEAD 3b3f5bed9cbeb5a242de9751983a6ed8da09814c397a3fe4f8279b879660a570 / disk a826205b587b748c7a68223118fd0d4f85ea4bc68a4d64c205894770b0297a62)
+DIFF  角色卡/Claude适配器/boundary.yaml (HEAD 65091f0ac8eb0657e3e558c7a3589f21804e0cffafc520d63b6013077b3959fe / disk 3a0e6d4ae45793f5db6b464dce106b16f7b07ab073f2e38026223faceaa05803)
+DIFF  角色卡/Codex适配器/boundary.yaml (HEAD f9f643444703d632b7e738e645f16fe5c8245297844025f3adbb7a9b959b599e / disk 0ead04433ac021d661828772472b5f02eeec7b81ba6528a50b840ad9334ce813)
+DIFF  角色卡/Pi适配器/boundary.yaml (HEAD 63a04b9b58cb3ecbdf953c4d36e4e2266aac53cf8ebdb6c615997b304ef687b4 / disk 421c61731abf1c52cf9cb481f7a702c03ef07f9a40263dfa08ca728bb1f30214)
+DIFF  角色卡/UIUX设计师/boundary.yaml (HEAD f0e2266ce8ed4d69fdc0592eb8f1018de28e8144450691058a1b7e5025d8661a / disk b589965b185af9c5f1a8089cd5e88667ab487a108ccd5cea9dfe7787757654ec)
+SAME  角色卡/chief-code/boundary.yaml
+SAME  角色卡/convener-code/boundary.yaml
+SAME  角色卡/gates-code/boundary.yaml
+SAME  角色卡/nominator-code/boundary.yaml
+SAME  角色卡/product-code/boundary.yaml
+SAME  角色卡/rapporteur-code/boundary.yaml
+SAME  角色卡/shared-code/boundary.yaml
+SAME  角色卡/verifier-code/boundary.yaml
+DIFF  角色卡/产品/boundary.yaml (HEAD 517f783ed3fe30c874c4afddbca0c4ae69d8eab4eb4c87a0593de48e0554cf26 / disk bb313dae9821570eeecbab02ec767c87d57de013ee7c5a8ef465b6a810541baf)
+DIFF  角色卡/宣传/boundary.yaml (HEAD a681df89c2a980d4e5b0c025f3d01301b61cf4629f70fa5005c0a60cc3da4714 / disk 1c7ca07331ff8c4a67d95fabada3e35c355a101635a5ae5305b68a4f01d1cf44)
+DIFF  角色卡/桌面UI/boundary.yaml (HEAD ba73bda61256fe85d98d37006b8d04cbccec47591ec92ade52167bbf9ff4b782 / disk e1af4d93ab5e022ec447c0412743e41974d04be8ef12cc1c5a5914dd90dda093)
+DIFF  角色卡/桌面应用/boundary.yaml (HEAD b816b357c0229d43794ce5f9469fd8675fb486b076b0dc7e6ebb6c20b0d07726 / disk 0bf41c3cc872474993d70dc3d558c1439cf61ea0d037f533984e307a68b2ff26)
+DIFF  角色卡/桌面窗口/boundary.yaml (HEAD 6afd6e0f37da92365abebdb92d36510715a794d10c9304c1fc66bf24bfcbeeef / disk e5af2b30c305fe199f7a6b25ef6ded43794ea9fe3c1de036e17f8341108ad43f)
+DIFF  角色卡/测试/boundary.yaml (HEAD 58c99ca3c790b2a7d3aed59465eea3cfd0f37254230b9f4e86e3f6d6f8ee84b4 / disk 3c8f7e0e34d44bcdc55995f2747cd8eccaea7ad0875ad074569f6acc7beea14c)
+DIFF  角色卡/独立验收/boundary.yaml (HEAD 49b963263355094d5e586b267da2f61356e4e926b93d4d303aa70980e80bcd6c / disk 7b118c042fb8fd71fc89a32e8e07ce9317d0f586d7e23ce146788b305b6d1e2b)
+DIFF  角色卡/编排/boundary.yaml (HEAD 329704f90ee5d2346aab8a9f86894eaf6571297eea162e24bf84ef62e73a4d2e / disk dbabf44f31d1509c3f338583562fcb57d9fff3b57d7c345fd4928d4db3121318)
+DIFF  角色卡/装配/boundary.yaml (HEAD f448cc2c8b864e9b9f42de05f73b0fe5ddd255b03c5f4267ad2fa843cd990b3c / disk 932965e88ffbbd9451d654d425b291c88eef1e99a095cb33c2651d94d8fe1cfa)
+DIFF  角色卡/运行时核心/boundary.yaml (HEAD 0876f23913545b83ab8357bc5b56e315a0a2f93fe65379ee168cb139b9084f3d / disk 06d087a936687b26bffd138a3507874b45ae4e7bf4a04072b7cc12017d482f3a)
+DIFF  角色卡/门禁引擎/boundary.yaml (HEAD 5e5627ec48940376148ee2b44bad63b7e9ea33f829bd6b0f5750f1d97bc45405 / disk f580eca02e9f35a7c0c7327401e359db109898381c4a00a6ab09f68ade26a91e)
+DIFF  角色卡/项目管理/boundary.yaml (HEAD ae64311b5f9f1933504aa624e4524282d29169ae16a16188dbd2b42f8988a77e / disk a7451940d4f8bfd122aaba75f100fd03804ba34537b091adcb9ca785ea7d0ef0)
+DIFF  角色卡/Claude适配器/api-spec.md (HEAD 6fb491bb113bf0a67630048d2b706fe9add20553732f10c2c807a5756c032894 / disk ab15eced3f5524188143b0d13bd87ce5b1b8f25375ccab2de95950073fb03ecc)
+DIFF  角色卡/Codex适配器/api-spec.md (HEAD 0aae3489659ddbf96b7a3eaf19b55f9ab49bd355012873a0bda62f5553507c1f / disk 5b1d527fa79d7fce0f6bd44d6632ea2d57e7973e4c7d9196c904417e1d3cedca)
+DIFF  角色卡/Pi适配器/api-spec.md (HEAD 4212bc364509720e4053f5dd0c6356ca7f8581bf1382fe12d21878ff8ddfb3cb / disk 61faf02020cfad22a1e2dcf80ff723c40bb51b813e4b5d72373f98b148aac073)
+DIFF  角色卡/UIUX设计师/api-spec.md (HEAD ad80e6f4fe4db3aa358356c8687300469d31029830f9172834e51731d7549779 / disk e43f41541d0e1ec7e0ce43ccea4f463066b6392185b6f39b5dfa52c8fb7c01e4)
+SAME  角色卡/chief-code/api-spec.md
+DIFF  角色卡/convener-code/api-spec.md (HEAD 20e6336dcbd47acda251dbc4fb7cf5a7a95ebc40c3c6beac4837f7a60933aea4 / disk 9d8aed098fe38781f95c624b541216ade2a545613effe58123b8efdbd63d5f7d)
+SAME  角色卡/gates-code/api-spec.md
+SAME  角色卡/nominator-code/api-spec.md
+SAME  角色卡/product-code/api-spec.md
+SAME  角色卡/rapporteur-code/api-spec.md
+SAME  角色卡/shared-code/api-spec.md
+SAME  角色卡/verifier-code/api-spec.md
+DIFF  角色卡/宣传/api-spec.md (HEAD 89511eee85c9d5be1ac5dda158f76838c4b79f59a74dd33f08a9af70a74f46f3 / disk 0c339305b277fb7a9edea8718868c904e07ec963c159dcda640c32b75c63218f)
+DIFF  角色卡/桌面UI/api-spec.md (HEAD 286143338eefe1c3196dccedcca95159e7c56ea02a0678829981c1c53add12d3 / disk e4a2ac313663bfa718456b7625e82755d862fe743115997c360c55404038242f)
+DIFF  角色卡/桌面应用/api-spec.md (HEAD 1c7601ae840af94313eb1ee55ca96e59dec2f3c2fd43008ab9a91909e533f9e3 / disk 503e7d61340c9c3be05b4a3035c8ab0883d6aa86fb705fc950739ee4305353b4)
+SAME  角色卡/桌面窗口/api-spec.md
+DIFF  角色卡/编排/api-spec.md (HEAD be5e29a01d00137f98f10ba7250ec7014fb37a42c4bc90bc0f508b1ca716fcd4 / disk 4647e47eaa2e8f0b4dd7d9ddb066398391059d1a00c16db58a1bf0941167e8b0)
+DIFF  角色卡/装配/api-spec.md (HEAD d65d556eab27b77cb2d07efea88c3fe63edaac01a1cdf272af4790e2658b2ca4 / disk efeba36b4d65cba5b76eacbecc243bd261ce5d3fda0a00fc78886d4616405164)
+DIFF  角色卡/运行时核心/api-spec.md (HEAD 718b4cc8bafafbd8522b3e8bb38858d9153fe39cfecbee8a4d60758da68d1679 / disk 1d5ead14f0b4aaac3f82fc22621c1c0d99d38ff6982ec8e830aac1dac058ed63)
+DIFF  角色卡/门禁引擎/api-spec.md (HEAD a3853deba39392602db67a82eab4c1d5444485b21d9064e3b5acce84cdf8ab15 / disk 92e84c14e8cae8df2fe333f005481edcb9c9762248b7c616dd416e551a5758cd)
+DIFF  角色卡/项目管理/api-spec.md (HEAD ce370987e418ac7a34d5f1ec0f6adeae8d4e90cf07e1ce4cac73527d11e1046c / disk ed71019863c1b7d63da9aefa9d063f0011d1d47cef8cd3a0b8f5da89efca2350)
+
+=== named exclusion files sha256 disk-vs-HEAD ===
+DIFF  src/common/门禁引擎/classify-shell.ts (HEAD a9340ec149e288f49dd07ca33393811babf508004e6f07dfeddd72c7a5566888 / disk a98f09e42b10d88a8d18ad26a1f37284a1435880be11df3e3f18babafdc9e7c1)
+DIFF  src/common/编排/run-manifest.ts (HEAD 52709e1c51ece35db3c9e90739b1ff989ecf78fbc5bf7651137eb12fa641011f / disk a5bbb067557dfb59e24d01b99988ca587700d8f381c1bd522e4277fbb5a44e86)
+DIFF  src/common/编排/workflow-preconditions.ts (HEAD 52ba8d26a45c0059e6eef8d2d374374357cbb537fb1dec6a14235e6f86f91fc5 / disk 480e0e7effa7b8120f44e478673dbe0b5ca4fbdbfcf026f4238c0b73724a7ffc)
+DIFF  src/common/编排/evidence-check.ts (HEAD 7c5980b810a709620498a26928dbd6122bfdf1746afcba069b83a6a95f10478a / disk 14ce0ad5f58de192a3d8e2fa320b9fc3131046d914d0dbe37d122d287ec5d4cb)
+DIFF  src/service/trunk/impl/amendment-validate.ts (HEAD 836f2538bd539757bce24e7c96593512b8fb2809b25976f653e38282ffd1110c / disk 4f0f3ed09ff2192bb52ee70e5dd06c32af47d5a9839303a76197c02298520862)
+DIFF  src/service/trunk/impl/upgrade-validate.ts (HEAD f7286d052679f2372abde47e4ac7c8478bdc629e82acf4d3cf8575e818c2a1be / disk c97003b88c594d844c7bc8f20136e386b13df2b3d1d87aa377c6c22048bdee21)
+DIFF  test/桌面应用/optional-acceptance.test.ts (HEAD 201bba627e4677331f7570f4673efe5bdf760f97046512db70dfc83b0a0d9c9a / disk 3e5760f1835db14404f4c6faca2a1f22f36d244b1499f330fc117b825b8822b8)
+SAME  test/桌面应用/chief-workflow.test.ts
+DIFF  src/common/门禁引擎/boundary-core.ts (HEAD 1e302c7036b1d39fb78eeb1579aff6993b85093b19ae1a33394023267ca9a5ea / disk 66cf597549e5af60897476a35dcb5daabd6b1932cf4740cf44a15eeef5271ec7)
+DIFF  src/common/门禁引擎/boundary-parse.ts (HEAD 6765b029a1bc95204bb7fd4bb4c492c12dbc57db0acac723066621e8e414bef7 / disk a47516a3a9bc524532fea83477f8b7d82034510e13d4f441a199c313861fe577)
+DIFF  src/common/门禁引擎/boundary-yaml.ts (HEAD 197d877c60d016ca4e1ff4319b06857ec9534e826942f8375ae3645a3ae6475f / disk a24adb927c477d14a2422331efe084eb63c57cc6611b775fcd7e55ef503a7f6c)
+
+=== app/renderer tracked diff ===
+(empty above = clean)
+
+=== test/桌面应用/chief-workflow.test.ts sha256 ===
+87983bde4a21387d6b2e1b7a26c430efba73a3ccc92fe01d30cb3182c03ac494 *test/桌面应用/chief-workflow.test.ts
