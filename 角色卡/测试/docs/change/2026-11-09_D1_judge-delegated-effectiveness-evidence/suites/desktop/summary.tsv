@@ -1,0 +1,5 @@
+file	status	tests	pass	fail	cancelled	skipped	todo	exit	duration_s
+test/桌面应用/decision-service.test.ts	natural	22	22	0	0	0	0	0	1
+test/桌面应用/chain-enforcement.test.ts	natural	9	3	6	0	0	0	1	3
+test/桌面应用/run-pin.test.ts	natural	20	9	11	0	0	0	1	4
+test/桌面应用/run-change-trigger.test.ts	natural	10	1	9	0	0	0	1	1

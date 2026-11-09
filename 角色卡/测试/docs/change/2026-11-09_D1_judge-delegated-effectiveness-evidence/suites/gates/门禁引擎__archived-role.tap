@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 解析：archived: true 为合法顶层键；条目照常解析、标记经 loadBoundaryFile 回传
+ok 1 - 解析：archived: true 为合法顶层键；条目照常解析、标记经 loadBoundaryFile 回传
+  ---
+  duration_ms: 7.7469
+  type: 'test'
+  ...
+# Subtest: 解析：archived 仅接受布尔；false / 缺省不产生归档标记
+ok 2 - 解析：archived 仅接受布尔；false / 缺省不产生归档标记
+  ---
+  duration_ms: 1.4748
+  type: 'test'
+  ...
+# Subtest: listProject：archived: true 的目录静默跳过——不枚举、不产生任何警告（与活角色共存）
+ok 3 - listProject：archived: true 的目录静默跳过——不枚举、不产生任何警告（与活角色共存）
+  ---
+  duration_ms: 13.0596
+  type: 'test'
+  ...
+# Subtest: listProject：目录全部为归档 → 与「无有效角色」同等静默（无逐条警告、无汇总提示）
+ok 4 - listProject：目录全部为归档 → 与「无有效角色」同等静默（无逐条警告、无汇总提示）
+  ---
+  duration_ms: 2.2145
+  type: 'test'
+  ...
+# Subtest: listProject：归档目录缺 role-card.md 也静默（归档探测先于缺卡检查）
+ok 5 - listProject：归档目录缺 role-card.md 也静默（归档探测先于缺卡检查）
+  ---
+  duration_ms: 2.5663
+  type: 'test'
+  ...
+# Subtest: listProject：不带 archived 键的目录行为不变——缺 boundary 仍逐条告警（归档不吞旁告警）
+ok 6 - listProject：不带 archived 键的目录行为不变——缺 boundary 仍逐条告警（归档不吞旁告警）
+  ---
+  duration_ms: 4.9585
+  type: 'test'
+  ...
+# Subtest: resolveRole：归档角色 fail-closed 拒绝开启（「角色 X 已归档，不可开启」）；活角色照常解析
+ok 7 - resolveRole：归档角色 fail-closed 拒绝开启（「角色 X 已归档，不可开启」）；活角色照常解析
+  ---
+  duration_ms: 14.7372
+  type: 'test'
+  ...
+# Subtest: 防御深度：绕过开启入口按 id 解析归档角色的边界 → 未接受 + parseError；resolveWrite 拒绝一切写入
+ok 8 - 防御深度：绕过开启入口按 id 解析归档角色的边界 → 未接受 + parseError；resolveWrite 拒绝一切写入
+  ---
+  duration_ms: 5.1582
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 249.267

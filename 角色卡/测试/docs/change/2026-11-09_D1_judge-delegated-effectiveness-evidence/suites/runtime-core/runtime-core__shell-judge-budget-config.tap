@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 默认预算放宽为 12 次 / 512KB 总量 / 128KB 单文件（有限值，超限仍 fail-closed）
+ok 1 - 默认预算放宽为 12 次 / 512KB 总量 / 128KB 单文件（有限值，超限仍 fail-closed）
+  ---
+  duration_ms: 9.5225
+  type: 'test'
+  ...
+# Subtest: env 覆盖生效：ANS_SHELL_JUDGE_MAX_CALLS / MAX_FILE_BYTES / MAX_BYTES
+ok 2 - env 覆盖生效：ANS_SHELL_JUDGE_MAX_CALLS / MAX_FILE_BYTES / MAX_BYTES
+  ---
+  duration_ms: 8.8741
+  type: 'test'
+  ...
+# Subtest: env 校验：正整数且在上下限内生效；非法/越界回落缺省（不静默夹取）
+ok 3 - env 校验：正整数且在上下限内生效；非法/越界回落缺省（不静默夹取）
+  ---
+  duration_ms: 0.6523
+  type: 'test'
+  ...
+# Subtest: 显式 budget 优先于 env（宿主注入不被环境变量意外覆盖）
+ok 4 - 显式 budget 优先于 env（宿主注入不被环境变量意外覆盖）
+  ---
+  duration_ms: 1.9672
+  type: 'test'
+  ...
+# Subtest: 会话内读取缓存：同路径+同范围复用结果不再读盘，预算/统计口径不变
+ok 5 - 会话内读取缓存：同路径+同范围复用结果不再读盘，预算/统计口径不变
+  ---
+  duration_ms: 7.5067
+  type: 'test'
+  ...
+# Subtest: 缓存按判断会话隔离：不跨 buildShellJudgeTools 实例
+ok 6 - 缓存按判断会话隔离：不跨 buildShellJudgeTools 实例
+  ---
+  duration_ms: 5.3662
+  type: 'test'
+  ...
+# Subtest: 缓存命中不得绕过剩余总预算：不足时回落真实读取并按 remaining 截断
+ok 7 - 缓存命中不得绕过剩余总预算：不足时回落真实读取并按 remaining 截断
+  ---
+  duration_ms: 4.5287
+  type: 'test'
+  ...
+# Subtest: 拒绝结果不缓存：会话中途新建的文件可被后续读取（无负缓存）
+ok 8 - 拒绝结果不缓存：会话中途新建的文件可被后续读取（无负缓存）
+  ---
+  duration_ms: 4.6739
+  type: 'test'
+  ...
+# Subtest: 缓存有界：超过条目上限按插入顺序淘汰最旧结果
+ok 9 - 缓存有界：超过条目上限按插入顺序淘汰最旧结果
+  ---
+  duration_ms: 22.5622
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 163.6452

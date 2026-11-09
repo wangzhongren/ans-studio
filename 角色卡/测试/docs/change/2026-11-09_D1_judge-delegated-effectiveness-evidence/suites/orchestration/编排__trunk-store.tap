@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: manifest：原子写/读回、未知字段保留、无临时文件残留
+ok 1 - manifest：原子写/读回、未知字段保留、无临时文件残留
+  ---
+  duration_ms: 26.8876
+  type: 'test'
+  ...
+# Subtest: 缺失/坏件判别：missing/corrupt、不自动重建/不覆盖
+ok 2 - 缺失/坏件判别：missing/corrupt、不自动重建/不覆盖
+  ---
+  duration_ms: 11.4268
+  type: 'test'
+  ...
+# Subtest: 并发写串行：25 路并发写最终一致且文件完整可解析
+ok 3 - 并发写串行：25 路并发写最终一致且文件完整可解析
+  ---
+  duration_ms: 194.378
+  type: 'test'
+  ...
+# Subtest: amendment/journal：读写回、旧状态读兼容、legacy 状态写拒绝
+ok 4 - amendment/journal：读写回、旧状态读兼容、legacy 状态写拒绝
+  ---
+  duration_ms: 21.1468
+  type: 'test'
+  ...
+# Subtest: history：归档/列表/同版本幂等/不同内容拒绝/坏件跳过并诊断
+ok 5 - history：归档/列表/同版本幂等/不同内容拒绝/坏件跳过并诊断
+  ---
+  duration_ms: 31.0345
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 487.7592

@@ -381,6 +381,35 @@ test("preflight role-documents：合法事实 allow", () => {
   assert.deepEqual(checkAppointment(roleDocumentsFacts()), { allow: true });
 });
 
+test("preflight role-documents：Runtime 包装层 judge D3 事实包被接受；customer/chief-delegated 回归（W-J2b）", () => {
+  // W-J2b（judge 代批生效，D3/激活链）：Runtime 包装层 `nominatorRoleDocumentsFacts`
+  //（src/pipeline/orchestration/trunk-runtime.ts）在 judge D3 下如实产出 d3By:"judge"，
+  // d3DecisionId 为共享函数 requestResolvedD3DecisionId 的真实应用值 `decision-<requestId>`
+  //（customer/judge => decisionId；chief-delegated => requestId）。本模块按模块单测范围
+  // 只消费该事实包形状（不 import pipeline，不做跨角色集成）。
+  for (const d3By of ["customer", "chief-delegated", "judge"] as const) {
+    assert.deepEqual(checkAppointment(roleDocumentsFacts({ d3By })), { allow: true }, d3By);
+  }
+  // judge D3 的真实 decisionId 形状（decision-<requestId>，不是客户 decisionId）。
+  assert.deepEqual(
+    checkAppointment(
+      roleDocumentsFacts({ d3By: "judge", d3DecisionId: "decision-d3-request" }),
+    ),
+    { allow: true },
+  );
+});
+
+test("preflight role-documents：d3By 非法值仍 fail-closed（model/空串/非字符串）", () => {
+  // W-J2b：接受集之外一律拒绝（fail-closed）；既有 `model` 负例保留在下方目标/D3 负例中。
+  for (const d3By of ["model", "directive", "", 42, true, null] as const) {
+    expectDeny(
+      checkAppointment(roleDocumentsFacts({ d3By })),
+      "appointment-facts-invalid",
+      "role.nominator.preflight.factsInvalid",
+    );
+  }
+});
+
 test("preflight role-documents：目标/D3 负例", () => {
   expectDeny(
     checkAppointment(roleDocumentsFacts({ targetIsBuiltIn: true })),

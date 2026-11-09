@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: A1/AC-03：request_shell_escalation 只在 shell 已 arm 且注入 shellEscalation 时注册（能力缺席=不注册）
+ok 1 - A1/AC-03：request_shell_escalation 只在 shell 已 arm 且注入 shellEscalation 时注册（能力缺席=不注册）
+  ---
+  duration_ms: 1.9408
+  type: 'test'
+  ...
+# Subtest: A1/AC-03：argv 由工具侧 splitCommand 生成，模型提供的 argv/授权字段被忽略；command/necessity 原样转交
+ok 2 - A1/AC-03：argv 由工具侧 splitCommand 生成，模型提供的 argv/授权字段被忽略；command/necessity 原样转交
+  ---
+  duration_ms: 0.7556
+  type: 'test'
+  ...
+# Subtest: A1/§4.3：necessity 双上限（500 字符 / 1KB 字节）超限拒绝不截断，非法类型拒绝，空命令不提交
+ok 3 - A1/§4.3：necessity 双上限（500 字符 / 1KB 字节）超限拒绝不截断，非法类型拒绝，空命令不提交
+  ---
+  duration_ms: 0.5358
+  type: 'test'
+  ...
+# Subtest: A1/AC-05：回执如实转达；异常/契约外回执按未获客户允许处理，绝不谎报批准
+ok 4 - A1/AC-05：回执如实转达；异常/契约外回执按未获客户允许处理，绝不谎报批准
+  ---
+  duration_ms: 0.3127
+  type: 'test'
+  ...
+# Subtest: A1/AC-01：run_shell 与 start_background_task 在 ShellReviewRequest 中填 entry（拒绝⇒零 spawn）
+ok 5 - A1/AC-01：run_shell 与 start_background_task 在 ShellReviewRequest 中填 entry（拒绝⇒零 spawn）
+  ---
+  duration_ms: 1.1248
+  type: 'test'
+  ...
+# Subtest: A1：run_shell 的执行后写审计请求同样携带 entry=run_shell
+ok 6 - A1：run_shell 的执行后写审计请求同样携带 entry=run_shell
+  ---
+  duration_ms: 77.134
+  type: 'test'
+  ...
+# Subtest: A1/§6.3：授权放行结果按 grant 附「客户已允许一次/本会话」说明；无 grant 时文案不含授权说明
+ok 7 - A1/§6.3：授权放行结果按 grant 附「客户已允许一次/本会话」说明；无 grant 时文案不含授权说明
+  ---
+  duration_ms: 126.6858
+  type: 'test'
+  ...
+# Subtest: A1/AC-03：schema 只含 command + 可选 necessity，不暴露 argv/授权字段；说明含精确命令/每会话一次/不执行
+ok 8 - A1/AC-03：schema 只含 command + 可选 necessity，不暴露 argv/授权字段；说明含精确命令/每会话一次/不执行
+  ---
+  duration_ms: 0.2149
+  type: 'test'
+  ...
+# Subtest: E2 R2：ShellEscalationDecision 增 pending 支（reason 可选）；既有三支形状不变
+ok 9 - E2 R2：ShellEscalationDecision 增 pending 支（reason 可选）；既有三支形状不变
+  ---
+  duration_ms: 0.1089
+  type: 'test'
+  ...
+# Subtest: A1：模型加法字段兼容——旧形状原样可用，新字段按 §6.3/§7.1 契约接受
+ok 10 - A1：模型加法字段兼容——旧形状原样可用，新字段按 §6.3/§7.1 契约接受
+  ---
+  duration_ms: 0.1845
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 431.4139

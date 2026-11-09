@@ -32,6 +32,7 @@ import {
 } from "../../src/common/编排/task-state.ts";
 import type { TaskStateEvent } from "../../src/model/runtime.ts";
 import type { DirectActionSource } from "../../src/model/trunk.ts";
+import { DOC_FREEZE_SCHEMA, type JudgeDelegatedSource } from "../../src/model/version-change.ts";
 
 test("review task data: the single Model host reference survives replay; forged authority fields fail shape validation", () => {
   const candidate = { objectFormat: "sha1" as const, hex: "a".repeat(40) }, reviewBasisRef = { kind: "git-candidate-review" as const, candidateOperationId: "actual-operation-reference",
@@ -339,6 +340,52 @@ test("task.closed.by 放宽到 chief/convener；request.resolved 名单 version/
     assert.equal(bad.errors.length, 2, JSON.stringify(bad.errors));
   } finally {
     await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读", async () => {
+  const root = await tempRoot();
+  try {
+    const at = "2026-11-06T00:00:00.000Z", hash = "a".repeat(64);
+    const source: JudgeDelegatedSource = { kind: "judge-delegated", requestId: "judge-intent-req", engine: "claude", model: "claude-unit",
+      operatorId: "judge:claude", reasonCode: "sufficient", reason: "唯一推荐项与意图证据一致", selected: ["confirm"], cardKind: "intent-confirm", at };
+    const now = () => new Date(at);
+    const validIntent = taskEvent("doc.freeze", { schema: DOC_FREEZE_SCHEMA, path: "docs/product/focus-intent-v1.md", version: 1, sha256: hash,
+      applicationId: "intent-judge-intent-req", reason: "intent-confirmed", origin: "judge-delegated", actionSource: source }, now);
+    const validProposal = taskEvent("doc.freeze", { schema: DOC_FREEZE_SCHEMA, path: "docs/proposals/focus-proposal-v1.md", version: 1, sha256: hash,
+      applicationId: "proposal-judge-intent-req", reason: "proposal-confirmed", origin: "judge-delegated", actionSource: { ...source, cardKind: "proposal" } }, now);
+    // 旧行（customer / application）逐字可读（既有记录兼容）。
+    const legacyCustomer = { v: 1, at, kind: "doc.freeze", schema: DOC_FREEZE_SCHEMA, path: "docs/proposals/focus-proposal-v2.md", version: 2, sha256: hash,
+      applicationId: "vc-1", reason: "vca-approved", origin: "customer", decidedBy: "customer", decisionId: "decision-vca-1" };
+    const legacyApplication = { v: 1, at, kind: "doc.freeze", schema: DOC_FREEZE_SCHEMA, path: "docs/proposals/focus-proposal-v3.md", version: 3, sha256: hash,
+      applicationId: "am-1", reason: "amendment-submitted", origin: "application" };
+    const bad: Record<string, unknown>[] = [
+      { ...validIntent, actionSource: undefined },                                   // source 缺失
+      { ...validIntent, actionSource: "judge-delegated" },                           // source 非对象
+      { ...validIntent, actionSource: { ...source, engine: "" } },                   // engine 空串
+      { ...validIntent, actionSource: { ...source, operatorId: "judge:codex" } },    // operatorId 与 engine 不符
+      { ...validIntent, actionSource: { ...source, at: "2026-11-06T00:00:01.000Z" } }, // at !== source.at
+      { ...validIntent, actionSource: { ...source, cardKind: "proposal" } },         // cardKind 与 reason 不匹配
+      { ...validIntent, decidedBy: "customer" },                                     // 客户字段混入
+      { ...validIntent, decisionId: "decision-fake" },
+      { ...validIntent, actorRoleId: "chief" },
+      { ...validIntent, applicationId: "intent-other-request" },                     // applicationId 不匹配
+      { ...validIntent, reason: "vca-approved" },                                    // reason 非 judge 子集（Q5）
+      { ...validProposal, applicationId: "intent-judge-intent-req" },
+    ];
+    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, [validIntent, validProposal, legacyCustomer, legacyApplication, ...bad].map(item => JSON.stringify(item)).join("\n") + "\n", "utf8");
+    const state = await readTaskState(root);
+    assert.equal(state.errors.length, bad.length, JSON.stringify(state.errors));
+    assert.equal(state.events.length, 4, "仅四个合法行进入读结果");
+    const judgeEvents = state.events.filter(event => event.kind === "doc.freeze" && event.origin === "judge-delegated");
+    assert.equal(judgeEvents.length, 2);
+    assert.deepEqual(judgeEvents[0]?.kind === "doc.freeze" ? judgeEvents[0].actionSource : undefined, source);
+    assert.equal(state.events.find(event => event.kind === "doc.freeze" && event.origin === "customer")?.kind, "doc.freeze");
+    for (const event of bad) assert.equal(validateTaskStateEvent(event).ok, false);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
 });
 

@@ -1,0 +1,107 @@
+TAP version 13
+# Subtest: openRoleSession：send 两次都生效，底层会话只建一次，dispose 收口且幂等
+ok 1 - openRoleSession：send 两次都生效，底层会话只建一次，dispose 收口且幂等
+  ---
+  duration_ms: 20.2695
+  type: 'test'
+  ...
+# Subtest: openRoleSession：未知角色 → 抛错（句柄式接口无退出码）
+ok 2 - openRoleSession：未知角色 → 抛错（句柄式接口无退出码）
+  ---
+  duration_ms: 1.7416
+  type: 'test'
+  ...
+# Subtest: openRoleSession：scope 可选——无 scope 仅按角色边界（允许），有 scope 才做 F4 收窄
+ok 3 - openRoleSession：scope 可选——无 scope 仅按角色边界（允许），有 scope 才做 F4 收窄
+  ---
+  duration_ms: 18.7234
+  type: 'test'
+  ...
+# ans role run 失败：未知角色：su（未登记在 project.roles）
+# Subtest: openRoleSession：project.builtInRoles 声明 su → 内置角色可开（不抛错，建会话一次）
+ok 4 - openRoleSession：project.builtInRoles 声明 su → 内置角色可开（不抛错，建会话一次）
+  ---
+  duration_ms: 5.9797
+  type: 'test'
+  ...
+# Subtest: openRoleSession：未声明 builtInRoles → 同 roleId 被拒（未知角色）
+ok 5 - openRoleSession：未声明 builtInRoles → 同 roleId 被拒（未知角色）
+  ---
+  duration_ms: 1.3894
+  type: 'test'
+  ...
+# Subtest: runRole：即便配置声明了 builtInRoles，CLI 一次性路径仍拒绝内置角色（EXIT_USAGE）
+ok 6 - runRole：即便配置声明了 builtInRoles，CLI 一次性路径仍拒绝内置角色（EXIT_USAGE）
+  ---
+  duration_ms: 1.3184
+  type: 'test'
+  ...
+# Subtest: F-5-opt1：queueModelNotice 的注记作为**下一轮输入前缀**送达并消费一次；失败且未开轮则保留；空串忽略
+ok 7 - F-5-opt1：queueModelNotice 的注记作为**下一轮输入前缀**送达并消费一次；失败且未开轮则保留；空串忽略
+  ---
+  duration_ms: 8.7124
+  type: 'test'
+  ...
+# Subtest: F-5-opt1：该轮 prompt 失败且未开轮（无 ACK）→ 注记保留，下一轮重试仍带上
+ok 8 - F-5-opt1：该轮 prompt 失败且未开轮（无 ACK）→ 注记保留，下一轮重试仍带上
+  ---
+  duration_ms: 7.9611
+  type: 'test'
+  ...
+# Subtest: su 预授权：确认制会话开局即可写 docs/su/**、docs/contracts/**、docs/skills/** 与 docs/mcp/**（含子路径/绝对路径），零确认
+ok 9 - su 预授权：确认制会话开局即可写 docs/su/**、docs/contracts/**、docs/skills/** 与 docs/mcp/**（含子路径/绝对路径），零确认
+  ---
+  duration_ms: 7.0864
+  type: 'test'
+  ...
+# Subtest: su 预授权严格边界：docs/ 其它路径与 角色卡/ 仍走确认（未确认 = F4 拒）；相近前缀不算覆盖；边界外照拒
+ok 10 - su 预授权严格边界：docs/ 其它路径与 角色卡/ 仍走确认（未确认 = F4 拒）；相近前缀不算覆盖；边界外照拒
+  ---
+  duration_ms: 6.7396
+  type: 'test'
+  ...
+# Subtest: 项目角色按自己的 Section 1 预授权（不借用 su 四棵）：边界内直接放行、边界外照拒
+ok 11 - 项目角色按自己的 Section 1 预授权（不借用 su 四棵）：边界内直接放行、边界外照拒
+  ---
+  duration_ms: 21.877
+  type: 'test'
+  ...
+# Subtest: su 静态 scope 会话同口径：预授权树并入初始 writeSet（scope 内照常、树外仍 F4 拒）
+ok 12 - su 静态 scope 会话同口径：预授权树并入初始 writeSet（scope 内照常、树外仍 F4 拒）
+  ---
+  duration_ms: 5.5365
+  type: 'test'
+  ...
+# Subtest: 会话重建（新开会话）后预授权仍然生效——初始集合的一部分，不依赖发行器/前一句柄
+ok 13 - 会话重建（新开会话）后预授权仍然生效——初始集合的一部分，不依赖发行器/前一句柄
+  ---
+  duration_ms: 8.4343
+  type: 'test'
+  ...
+# Subtest: openRoleSession：底层实现后台任务三方法 → 句柄原样透传 list/read/stop（结果不重造）
+ok 14 - openRoleSession：底层实现后台任务三方法 → 句柄原样透传 list/read/stop（结果不重造）
+  ---
+  duration_ms: 8.937
+  type: 'test'
+  ...
+# Subtest: openRoleSession：底层未实现后台任务三方法 → 句柄对应属性保持 undefined（不伪造空实现）
+ok 15 - openRoleSession：底层未实现后台任务三方法 → 句柄对应属性保持 undefined（不伪造空实现）
+  ---
+  duration_ms: 8.7074
+  type: 'test'
+  ...
+# Subtest: openRoleSession：stop 的 ok:false（unknown-task）与抛错原样返回——不吞失败语义
+ok 16 - openRoleSession：stop 的 ok:false（unknown-task）与抛错原样返回——不吞失败语义
+  ---
+  duration_ms: 15.4597
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 439.633

@@ -1,0 +1,379 @@
+TAP version 13
+# Subtest: R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+ok 1 - R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+  ---
+  duration_ms: 1.2705
+  type: 'test'
+  ...
+# Subtest: R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+ok 2 - R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+  ---
+  duration_ms: 3.5411
+  type: 'test'
+  ...
+# Subtest: R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+ok 3 - R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+  ---
+  duration_ms: 1.1098
+  type: 'test'
+  ...
+# Subtest: R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+ok 4 - R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+  ---
+  duration_ms: 0.3737
+  type: 'test'
+  ...
+# Subtest: R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+ok 5 - R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+  ---
+  duration_ms: 0.9349
+  type: 'test'
+  ...
+# Subtest: R24 malformed apply replies never become committed and delegated selection retains its real source
+ok 6 - R24 malformed apply replies never become committed and delegated selection retains its real source
+  ---
+  duration_ms: 0.7574
+  type: 'test'
+  ...
+# Subtest: R24 model host result fields are rejected before the real choice callback and never enter request schema
+ok 7 - R24 model host result fields are rejected before the real choice callback and never enter request schema
+  ---
+  duration_ms: 1.0485
+  type: 'test'
+  ...
+# Subtest: R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+ok 8 - R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+  ---
+  duration_ms: 0.4401
+  type: 'test'
+  ...
+# Subtest: R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+ok 9 - R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+  ---
+  duration_ms: 0.8763
+  type: 'test'
+  ...
+# Subtest: R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+ok 10 - R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+  ---
+  duration_ms: 0.5068
+  type: 'test'
+  ...
+# Subtest: R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+ok 11 - R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+  ---
+  duration_ms: 0.7729
+  type: 'test'
+  ...
+# Subtest: R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+ok 12 - R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+  ---
+  duration_ms: 118.252
+  type: 'test'
+  ...
+# {"actualDefaultCoreAndChat":true,"roots":["C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r20-default-chat-VCsr8D","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r20-default-chat-VCsr8D\\\\actual-skills-root"],"sourceBasisDigest":"367032c08c993b7082fd3d65682b425d829460c6ebebe5ba6f4d5f964a072829","http":4,"stages":["write:lexical-read","write:canonical-read","write:final-write","edit:lexical-read","edit:canonical-read","edit:final-write"],"modelHostInjection":"rejected-before-gate"}
+# Subtest: R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+ok 13 - R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+  ---
+  duration_ms: 0.3079
+  type: 'test'
+  ...
+# Subtest: R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+ok 14 - R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+  ---
+  duration_ms: 0.3411
+  type: 'test'
+  ...
+# Subtest: R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+ok 15 - R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+  ---
+  duration_ms: 13.5869
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r18-parent-tool-bQl6wj","actualDefaultChat":true,"http":3,"normalDispatchCallbacks":1,"forgedParentCallbacks":0}
+# Subtest: R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+ok 16 - R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+  ---
+  duration_ms: 31.765
+  type: 'test'
+  ...
+# Subtest: R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+ok 17 - R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+  ---
+  duration_ms: 7.9864
+  type: 'test'
+  ...
+# Subtest: R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+ok 18 - R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+  ---
+  duration_ms: 16.6225
+  type: 'test'
+  ...
+# Subtest: R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+ok 19 - R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+  ---
+  duration_ms: 35.347
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r15-required-2lXCA8","actualRegisteredTools":["install_skill","uninstall_skill","install_mcp","uninstall_mcp"],"blockedResults":4,"oldEffects":0,"nativeConstructions":1,"http":2,"filesAndRegistrationsUnchanged":true}
+# Subtest: R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+ok 20 - R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+  ---
+  duration_ms: 2.751
+  type: 'test'
+  ...
+# Subtest: R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+ok 21 - R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+  ---
+  duration_ms: 152.422
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-required-AVbaV3","unmanaged":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-unmanaged-vnMKmt","requiredScripts":["run_shell","start_background_task","list_background_tasks","read_background_task","stop_background_task"],"rejectedNativeConstructions":0,"rejectedHttp":0,"rejectedMarkerWrites":0,"admittedNativeConstructions":3,"actualHttp":5,"ownedMarker":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-unmanaged-vnMKmt\\\\owned-node-marker.txt"}
+# Subtest: R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+ok 22 - R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+  ---
+  duration_ms: 1.0769
+  type: 'test'
+  ...
+# Subtest: R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+ok 23 - R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+  ---
+  duration_ms: 1.7071
+  type: 'test'
+  ...
+# Subtest: R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+ok 24 - R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+  ---
+  duration_ms: 6.2258
+  type: 'test'
+  ...
+# Subtest: R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+not ok 25 - R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+  ---
+  duration_ms: 0.738
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:739:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /coordinator-busy/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:747:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:747:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 interruption during async factory preparation prevents the subsequent native bind
+not ok 26 - R12 interruption during async factory preparation prevents the subsequent native bind
+  ---
+  duration_ms: 0.8146
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:770:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /lease-interrupted/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:779:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:779:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+not ok 27 - R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+  ---
+  duration_ms: 0.5877
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:783:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:791:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+ok 28 - R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+  ---
+  duration_ms: 12.705
+  type: 'test'
+  ...
+# Subtest: R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+ok 29 - R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+  ---
+  duration_ms: 0.426
+  type: 'test'
+  ...
+# Subtest: R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+ok 30 - R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+  ---
+  duration_ms: 0.2663
+  type: 'test'
+  ...
+# Subtest: R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+ok 31 - R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+  ---
+  duration_ms: 0.1647
+  type: 'test'
+  ...
+# Subtest: Git capabilities register only when injected; all six roles/worker may query a host-bound template
+ok 32 - Git capabilities register only when injected; all six roles/worker may query a host-bound template
+  ---
+  duration_ms: 0.394
+  type: 'test'
+  ...
+# Subtest: Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+ok 33 - Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+  ---
+  duration_ms: 0.8891
+  type: 'test'
+  ...
+# Subtest: full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+ok 34 - full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+  ---
+  duration_ms: 0.4517
+  type: 'test'
+  ...
+# Subtest: candidate actions have exact shapes and trusted scope; prepared is not published
+ok 35 - candidate actions have exact shapes and trusted scope; prepared is not published
+  ---
+  duration_ms: 0.3104
+  type: 'test'
+  ...
+# Subtest: publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+ok 36 - publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+  ---
+  duration_ms: 0.295
+  type: 'test'
+  ...
+# Subtest: Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+ok 37 - Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+  ---
+  duration_ms: 0.3734
+  type: 'test'
+  ...
+# Subtest: Git schema declarations are strict nested templates, with no host-only fields
+ok 38 - Git schema declarations are strict nested templates, with no host-only fields
+  ---
+  duration_ms: 0.1567
+  type: 'test'
+  ...
+# Subtest: actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+not ok 39 - actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+  ---
+  duration_ms: 2.7392
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:985:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:987:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 a custom factory cannot self-report the default Codex Chat production provenance
+not ok 40 - R8 a custom factory cannot self-report the default Codex Chat production provenance
+  ---
+  duration_ms: 0.6707
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:1022:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1023:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 native registry/instance/role/runtime/activity mismatches remain unknown
+not ok 41 - R8 native registry/instance/role/runtime/activity mismatches remain unknown
+  ---
+  duration_ms: 0.5294
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:1039:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1056:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 active HTTP inference alone is not treated as an uncontrolled execution program
+not ok 42 - R8 active HTTP inference alone is not treated as an uncontrolled execution program
+  ---
+  duration_ms: 0.4747
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:1068:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1069:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+ok 43 - R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+  ---
+  duration_ms: 190.0916
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm","commands":[["git","init","--quiet","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\repo"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\repo","-c","user.name=R9 fixture","-c","user.email=r9@example.invalid","commit","--quiet","--allow-empty","-m","owned fixture"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\repo","worktree","add","--quiet","--detach","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\other-worktree","HEAD"],["git","init","--quiet","--separate-git-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\common-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\separate-repo"]],"gateCalls":18,"evidence":[{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\repo\\\\.git\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\hardlink-0.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\common-dir\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\hardlink-1.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\other-worktree\\\\owned.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\hardlink-2.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9","afterSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\repo\\\\.git\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\junction-0\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\common-dir\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\junction-1\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\other-worktree\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-yt4Stm\\\\junction-2\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"}]}
+# Subtest: R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+ok 44 - R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+  ---
+  duration_ms: 28.4194
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-final-xcLmeo","ordinary":"write+edit succeeded","lateHardlink":"both rejected","newRepo":"no .git created"}
+# Subtest: R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+ok 45 - R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+  ---
+  duration_ms: 2.7626
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 38
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 900.9233

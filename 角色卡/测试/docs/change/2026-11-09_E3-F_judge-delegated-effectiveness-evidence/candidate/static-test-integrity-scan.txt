@@ -1,0 +1,52 @@
+== test-file deletions between HEAD and working tree (src app test):
+(none)
+
+== skip/force-exit/timeout markers added in delta (git diff src test, added lines):
+warning: in the working copy of 'src/common/roles/nominator/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/model/version-change.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pipeline/orchestration/trunk-runtime.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pipeline/orchestration/version-change-runtime.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/service/trunk/impl/apply-journal.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/roles/nominator/nominator-module.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/runtime-core/direct-role-capabilities.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/runtime-core/version-change-contract.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/git-write-chain-fixture.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/trunk-events.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/version-change-service.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/门禁引擎/direct-role-capabilities.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/门禁引擎/git-shell-acl.test.ts', LF will be replaced by CRLF the next time Git touches it
+(none)
+
+== skip/todo markers in the two new test files:
+(none)
+
+== removed assertion-bearing lines in delta (count):
+warning: in the working copy of 'src/common/roles/nominator/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/model/version-change.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pipeline/orchestration/trunk-runtime.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pipeline/orchestration/version-change-runtime.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/service/trunk/impl/apply-journal.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/roles/nominator/nominator-module.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/runtime-core/direct-role-capabilities.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/runtime-core/version-change-contract.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/git-write-chain-fixture.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/trunk-events.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/version-change-service.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/门禁引擎/direct-role-capabilities.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/门禁引擎/git-shell-acl.test.ts', LF will be replaced by CRLF the next time Git touches it
+2
+== added assertion-bearing lines in delta (count):
+warning: in the working copy of 'src/common/roles/nominator/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/model/version-change.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pipeline/orchestration/trunk-runtime.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pipeline/orchestration/version-change-runtime.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/service/trunk/impl/apply-journal.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/roles/nominator/nominator-module.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/runtime-core/direct-role-capabilities.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/runtime-core/version-change-contract.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/git-write-chain-fixture.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/trunk-events.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/编排/version-change-service.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/门禁引擎/direct-role-capabilities.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/门禁引擎/git-shell-acl.test.ts', LF will be replaced by CRLF the next time Git touches it
+183

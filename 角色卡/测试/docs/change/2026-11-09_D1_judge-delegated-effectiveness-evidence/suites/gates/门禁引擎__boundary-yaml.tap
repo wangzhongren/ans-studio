@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: YAML 合法：解析出三条，root 缺省 project，condition 保留
+ok 1 - YAML 合法：解析出三条，root 缺省 project，condition 保留
+  ---
+  duration_ms: 4.6982
+  type: 'test'
+  ...
+# Subtest: YAML：root 可显式指定 skill
+ok 2 - YAML：root 可显式指定 skill
+  ---
+  duration_ms: 0.326
+  type: 'test'
+  ...
+# Subtest: YAML 非法：语法错误 → 抛错
+ok 3 - YAML 非法：语法错误 → 抛错
+  ---
+  duration_ms: 0.9447
+  type: 'test'
+  ...
+# Subtest: YAML 非法：未知顶层键 → 抛错
+ok 4 - YAML 非法：未知顶层键 → 抛错
+  ---
+  duration_ms: 0.2261
+  type: 'test'
+  ...
+# Subtest: YAML 非法：未知 kind → 抛错
+ok 5 - YAML 非法：未知 kind → 抛错
+  ---
+  duration_ms: 0.2905
+  type: 'test'
+  ...
+# Subtest: YAML 非法：缺 path → 抛错
+ok 6 - YAML 非法：缺 path → 抛错
+  ---
+  duration_ms: 0.2969
+  type: 'test'
+  ...
+# Subtest: YAML 非法：缺 purpose → 抛错
+ok 7 - YAML 非法：缺 purpose → 抛错
+  ---
+  duration_ms: 0.2096
+  type: 'test'
+  ...
+# Subtest: YAML 非法：conditional-directory 缺 condition → 抛错
+ok 8 - YAML 非法：conditional-directory 缺 condition → 抛错
+  ---
+  duration_ms: 0.2221
+  type: 'test'
+  ...
+# Subtest: YAML 非法：condition slug 非法 → 抛错
+ok 9 - YAML 非法：condition slug 非法 → 抛错
+  ---
+  duration_ms: 0.3164
+  type: 'test'
+  ...
+# Subtest: YAML 非法：条目含未知键 → 抛错
+ok 10 - YAML 非法：条目含未知键 → 抛错
+  ---
+  duration_ms: 0.5135
+  type: 'test'
+  ...
+# Subtest: resolveBoundary：非法 YAML → 未接受且带 parseError；resolveWrite 理由含边界解析失败
+ok 11 - resolveBoundary：非法 YAML → 未接受且带 parseError；resolveWrite 理由含边界解析失败
+  ---
+  duration_ms: 9.9698
+  type: 'test'
+  ...
+# Subtest: resolveBoundary+resolveWrite：合法 YAML 三条路径判定正确
+ok 12 - resolveBoundary+resolveWrite：合法 YAML 三条路径判定正确
+  ---
+  duration_ms: 12.4592
+  type: 'test'
+  ...
+# Subtest: Markdown 回退：.md 走 legacy 表格解析
+ok 13 - Markdown 回退：.md 走 legacy 表格解析
+  ---
+  duration_ms: 9.4867
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 244.3736

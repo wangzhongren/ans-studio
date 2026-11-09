@@ -1,0 +1,328 @@
+TAP version 13
+# Subtest: D3：显式程序路径和脚本后缀只将原只读 allow 降为 review
+ok 1 - D3：显式程序路径和脚本后缀只将原只读 allow 降为 review
+  ---
+  duration_ms: 1.5908
+  type: 'test'
+  ...
+# Subtest: D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky
+ok 2 - D3：保留裸读取命令、exe、既有窄re-shell及原deny/risky
+  ---
+  duration_ms: 0.5254
+  type: 'test'
+  ...
+# Subtest: D3：rg显式预处理选项在位置参数前后均为review
+ok 3 - D3：rg显式预处理选项在位置参数前后均为review
+  ---
+  duration_ms: 0.1873
+  type: 'test'
+  ...
+# Subtest: D3：rg模式、选项值及--后的文件名不是预处理选项
+ok 4 - D3：rg模式、选项值及--后的文件名不是预处理选项
+  ---
+  duration_ms: 0.2804
+  type: 'test'
+  ...
+# Subtest: 四档：allow / deny / risky / review 各有一条可达用例
+ok 5 - 四档：allow / deny / risky / review 各有一条可达用例
+  ---
+  duration_ms: 0.1255
+  type: 'test'
+  ...
+# Subtest: 白名单：只读命令 → allow
+ok 6 - 白名单：只读命令 → allow
+  ---
+  duration_ms: 0.262
+  type: 'test'
+  ...
+# Subtest: 执行模型（argv-noshell）：`>` 是普通参数，白名单程序照常放行（不再误判为重定向）
+ok 7 - 执行模型（argv-noshell）：`>` 是普通参数，白名单程序照常放行（不再误判为重定向）
+  ---
+  duration_ms: 0.1099
+  type: 'test'
+  ...
+# Subtest: 执行模型（argv-noshell）：`|`/`;`/`$()`/反引号 是普通参数，不再过头拦截
+ok 8 - 执行模型（argv-noshell）：`|`/`;`/`$()`/反引号 是普通参数，不再过头拦截
+  ---
+  duration_ms: 0.1451
+  type: 'test'
+  ...
+# Subtest: 执行模型（argv-noshell）：换行只是普通字节，多行参数不被拒
+ok 9 - 执行模型（argv-noshell）：换行只是普通字节，多行参数不被拒
+  ---
+  duration_ms: 0.0819
+  type: 'test'
+  ...
+# Subtest: 执行模型（shell-string）：元字符规则恢复拦截（`>`/`|`/`$()`/换行）
+ok 10 - 执行模型（shell-string）：元字符规则恢复拦截（`>`/`|`/`$()`/换行）
+  ---
+  duration_ms: 0.3258
+  type: 'test'
+  ...
+# Subtest: 执行模型（缺省）：省略 executionModel ⇒ 保守假定 shell 解释，元字符仍生效（fail-closed 缺省）
+ok 11 - 执行模型（缺省）：省略 executionModel ⇒ 保守假定 shell 解释，元字符仍生效（fail-closed 缺省）
+  ---
+  duration_ms: 0.0984
+  type: 'test'
+  ...
+# Subtest: 执行模型（shell-string）：硬拒记号先于白名单（echo 在白名单但含 `>` → deny）
+ok 12 - 执行模型（shell-string）：硬拒记号先于白名单（echo 在白名单但含 `>` → deny）
+  ---
+  duration_ms: 0.059
+  type: 'test'
+  ...
+# Subtest: fail-closed：executionModel 未知 → deny
+ok 13 - fail-closed：executionModel 未知 → deny
+  ---
+  duration_ms: 0.039
+  type: 'test'
+  ...
+# Subtest: 硬拒：外壳 sh -c / bash -c / cmd /c / pwsh（argv 藏命令）→ deny
+ok 14 - 硬拒：外壳 sh -c / bash -c / cmd /c / pwsh（argv 藏命令）→ deny
+  ---
+  duration_ms: 0.079
+  type: 'test'
+  ...
+# Subtest: 只读 re-shell：cmd [/d] /c dir|where 与 powershell Test-Path '<路径>' → allow（ruleId 钉死）
+ok 15 - 只读 re-shell：cmd [/d] /c dir|where 与 powershell Test-Path '<路径>' → allow（ruleId 钉死）
+  ---
+  duration_ms: 0.1474
+  type: 'test'
+  ...
+# Subtest: 只读 re-shell 仍守住：del/Get-Process/元字符/变量/绝对路径/pwsh → deny
+ok 16 - 只读 re-shell 仍守住：del/Get-Process/元字符/变量/绝对路径/pwsh → deny
+  ---
+  duration_ms: 0.1844
+  type: 'test'
+  ...
+# Subtest: 反向守卫：sh -c 仍硬拒——**不是** risky、**不是** allow（防止后人顺手放宽，§14.4）
+ok 17 - 反向守卫：sh -c 仍硬拒——**不是** risky、**不是** allow（防止后人顺手放宽，§14.4）
+  ---
+  duration_ms: 0.1088
+  type: 'test'
+  ...
+# Subtest: 硬拒：eval / exec / source / command（求值内建）→ deny；同样不得是 risky/allow
+ok 18 - 硬拒：eval / exec / source / command（求值内建）→ deny；同样不得是 risky/allow
+  ---
+  duration_ms: 0.0919
+  type: 'test'
+  ...
+# Subtest: 解释器内联：短内联（bounds 内）→ script 审查（review）；长内联/超界 → deny；deno eval 仍 deny
+ok 19 - 解释器内联：短内联（bounds 内）→ script 审查（review）；长内联/超界 → deny；deno eval 仍 deny
+  ---
+  duration_ms: 0.2336
+  type: 'test'
+  ...
+# Subtest: 反向守卫：长内联仍 deny；短内联落 review——不是 risky、不是 allow
+ok 20 - 反向守卫：长内联仍 deny；短内联落 review——不是 risky、不是 allow
+  ---
+  duration_ms: 0.0784
+  type: 'test'
+  ...
+# Subtest: 硬拒：awk/gawk（可 system()/重定向）→ deny；不得是 risky/allow
+ok 21 - 硬拒：awk/gawk（可 system()/重定向）→ deny；不得是 risky/allow
+  ---
+  duration_ms: 0.0679
+  type: 'test'
+  ...
+# Subtest: 硬拒：提权 sudo/doas/su/pkexec → deny
+ok 22 - 硬拒：提权 sudo/doas/su/pkexec → deny
+  ---
+  duration_ms: 0.0668
+  type: 'test'
+  ...
+# Subtest: 硬拒：系统级破坏/控制 mkfs/diskpart/wipefs/fdisk/shutdown/reboot/halt → deny
+ok 23 - 硬拒：系统级破坏/控制 mkfs/diskpart/wipefs/fdisk/shutdown/reboot/halt → deny
+  ---
+  duration_ms: 0.0929
+  type: 'test'
+  ...
+# Subtest: 硬拒：Windows 脚本宿主/LOLBin mshta/wscript/cscript/rundll32/certutil/bitsadmin → deny
+ok 24 - 硬拒：Windows 脚本宿主/LOLBin mshta/wscript/cscript/rundll32/certutil/bitsadmin → deny
+  ---
+  duration_ms: 0.0739
+  type: 'test'
+  ...
+# Subtest: risky：删除/截断 rm/rmdir/del/shred/truncate/dd → risky（删临时文件等正当）
+ok 25 - risky：删除/截断 rm/rmdir/del/shred/truncate/dd → risky（删临时文件等正当）
+  ---
+  duration_ms: 0.1311
+  type: 'test'
+  ...
+# Subtest: risky：原地改写 sed -i / perl -i；普通 sed → review（只读式）
+ok 26 - risky：原地改写 sed -i / perl -i；普通 sed → review（只读式）
+  ---
+  duration_ms: 0.0763
+  type: 'test'
+  ...
+# Subtest: risky：编辑器 vi/vim/nano/notepad → risky
+ok 27 - risky：编辑器 vi/vim/nano/notepad → risky
+  ---
+  duration_ms: 0.0663
+  type: 'test'
+  ...
+# Subtest: risky：进程/服务 kill/systemctl/reg/schtasks → risky
+ok 28 - risky：进程/服务 kill/systemctl/reg/schtasks → risky
+  ---
+  duration_ms: 0.0776
+  type: 'test'
+  ...
+# Subtest: risky：网络抓取/远程 curl/wget/ssh/scp → risky
+ok 29 - risky：网络抓取/远程 curl/wget/ssh/scp → risky
+  ---
+  duration_ms: 0.0748
+  type: 'test'
+  ...
+# Subtest: risky：间接执行器 xargs/env/nohup/timeout → risky（程序名在 argv 里可见，区别于 A-1 藏进 string）
+ok 30 - risky：间接执行器 xargs/env/nohup/timeout → risky（程序名在 argv 里可见，区别于 A-1 藏进 string）
+  ---
+  duration_ms: 0.093
+  type: 'test'
+  ...
+# Subtest: risky：构建/任务运行器 make/gradle/cargo/dotnet → risky
+ok 31 - risky：构建/任务运行器 make/gradle/cargo/dotnet → risky
+  ---
+  duration_ms: 0.1029
+  type: 'test'
+  ...
+# Subtest: risky：包管理 npm run / npm install / npx → risky；npm ls（只读）→ allow
+ok 32 - risky：包管理 npm run / npm install / npx → risky；npm ls（只读）→ allow
+  ---
+  duration_ms: 0.0901
+  type: 'test'
+  ...
+# Subtest: 例行白名单（§5.4）：npm test / npm ci → allow；npm install / npm run build 仍 risky
+ok 33 - 例行白名单（§5.4）：npm test / npm ci → allow；npm install / npm run build 仍 risky
+  ---
+  duration_ms: 0.1225
+  type: 'test'
+  ...
+# Subtest: risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky（正当写盘，程序名可见）
+ok 34 - risky：文件写入/创建/权限 cp/mv/mkdir/touch/chmod/tee → risky（正当写盘，程序名可见）
+  ---
+  duration_ms: 0.4452
+  type: 'test'
+  ...
+# Subtest: Git P2（W3-G 收窄）：只读精确形态 allow；写子命令/写盘 flag/未列形态仍硬拒（不走普通 shell 审批）
+ok 35 - Git P2（W3-G 收窄）：只读精确形态 allow；写子命令/写盘 flag/未列形态仍硬拒（不走普通 shell 审批）
+  ---
+  duration_ms: 0.2266
+  type: 'test'
+  ...
+# Subtest: risky：程序名大小写与 .exe 归一（Windows），路径前缀剥除
+ok 36 - risky：程序名大小写与 .exe 归一（Windows），路径前缀剥除
+  ---
+  duration_ms: 0.0634
+  type: 'test'
+  ...
+# Subtest: 常规未命中命令 → review
+ok 37 - 常规未命中命令 → review
+  ---
+  duration_ms: 0.0766
+  type: 'test'
+  ...
+# Subtest: fail-closed：规则集缺失 → deny（不是 allow）
+ok 38 - fail-closed：规则集缺失 → deny（不是 allow）
+  ---
+  duration_ms: 0.0262
+  type: 'test'
+  ...
+# Subtest: fail-closed：规则集非对象 / 版本未知 / 形状非法 → deny
+ok 39 - fail-closed：规则集非对象 / 版本未知 / 形状非法 → deny
+  ---
+  duration_ms: 0.2046
+  type: 'test'
+  ...
+# Subtest: fail-closed：riskyPrograms 缺失（v3 必需）→ deny（不静默降级为 review）
+ok 40 - fail-closed：riskyPrograms 缺失（v3 必需）→ deny（不静默降级为 review）
+  ---
+  duration_ms: 0.043
+  type: 'test'
+  ...
+# Subtest: fail-closed：id 若存在但非法（空串/非字符串）→ deny
+ok 41 - fail-closed：id 若存在但非法（空串/非字符串）→ deny
+  ---
+  duration_ms: 0.043
+  type: 'test'
+  ...
+# Subtest: fail-closed：即使规则集有效，空白名单也不放行任何命令
+ok 42 - fail-closed：即使规则集有效，空白名单也不放行任何命令
+  ---
+  duration_ms: 0.0646
+  type: 'test'
+  ...
+# Subtest: fail-closed：argv 非法（空/非数组/非字符串元素）→ deny
+ok 43 - fail-closed：argv 非法（空/非数组/非字符串元素）→ deny
+  ---
+  duration_ms: 0.044
+  type: 'test'
+  ...
+# Subtest: argv[0] 含空白（整条命令串塞进一个元素）→ deny
+ok 44 - argv[0] 含空白（整条命令串塞进一个元素）→ deny
+  ---
+  duration_ms: 0.0673
+  type: 'test'
+  ...
+# Subtest: 规则集是数据：自定义 denyToken / 白名单被实际消费
+ok 45 - 规则集是数据：自定义 denyToken / 白名单被实际消费
+  ---
+  duration_ms: 0.0611
+  type: 'test'
+  ...
+# Subtest: 规则集是数据：自定义 risky 程序被实际消费（→ risky）
+ok 46 - 规则集是数据：自定义 risky 程序被实际消费（→ risky）
+  ---
+  duration_ms: 0.0496
+  type: 'test'
+  ...
+# Subtest: 规则集是数据：argv-noshell 下自定义 denyToken 也不生效（记号是参数字符）
+ok 47 - 规则集是数据：argv-noshell 下自定义 denyToken 也不生效（记号是参数字符）
+  ---
+  duration_ms: 0.0285
+  type: 'test'
+  ...
+# Subtest: 默认规则集每次返回全新对象（无共享可变状态）；带 id、执行模型与三段规则
+ok 48 - 默认规则集每次返回全新对象（无共享可变状态）；带 id、执行模型与三段规则
+  ---
+  duration_ms: 0.1049
+  type: 'test'
+  ...
+# Subtest: 已知缺口：任意解释器运行『脚本文件』→ review（不是 deny）
+ok 49 - 已知缺口：任意解释器运行『脚本文件』→ review（不是 deny）
+  ---
+  duration_ms: 0.0823
+  type: 'test'
+  ...
+# Subtest: 已知缺口：JVM/其它运行器与项目内脚本 → review
+ok 50 - 已知缺口：JVM/其它运行器与项目内脚本 → review
+  ---
+  duration_ms: 0.0552
+  type: 'test'
+  ...
+# Subtest: 已知缺口：间接执行类整体不可穷尽（命名模式已覆盖，其余如实列缺）
+ok 51 - 已知缺口：间接执行类整体不可穷尽（命名模式已覆盖，其余如实列缺）
+  ---
+  duration_ms: 0.0677
+  type: 'test'
+  ...
+# Subtest: classifyShellDetailed 给出原因与命中规则 id（审计可用）
+ok 52 - classifyShellDetailed 给出原因与命中规则 id（审计可用）
+  ---
+  duration_ms: 0.2099
+  type: 'test'
+  ...
+# Subtest: bash/sh <script> 不再是硬拒（进入脚本审查）；-c/eval/exec/source/awk/find -exec 仍 deny
+ok 53 - bash/sh <script> 不再是硬拒（进入脚本审查）；-c/eval/exec/source/awk/find -exec 仍 deny
+  ---
+  duration_ms: 0.1237
+  type: 'test'
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 53
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 163.9041

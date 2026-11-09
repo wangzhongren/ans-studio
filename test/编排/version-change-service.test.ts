@@ -620,6 +620,60 @@ test("冻结归属（F35/AC-31）：customer 类需 decisionId；application 类
   if (!emptyAppId.ok) assert.equal(emptyAppId.code, "doc-freeze-application-id-missing");
 });
 
+test("judge-delegated 冻结派生（W-J2/J3，2026-11-09）：judge source 仅 proposal/intent；applicationId 按 requestId 合成；客户字段与 Q5 reason 拒绝", async () => {
+  const rig = createTestRig();
+  const judgeSource = { kind: "judge-delegated" as const, requestId: "req-judge-1", engine: "claude", model: "claude-unit",
+    operatorId: "judge:claude", reasonCode: "sufficient", reason: "唯一推荐项与意图证据一致", selected: ["confirm"], cardKind: "proposal", at: "2026-11-04T10:00:00.000Z" };
+  const synthesizedProposal = await rig.services.freeze.freeze({
+    path: CONTRACT_PATH, version: 2, sha256: H1, applicationId: "", reason: "proposal-confirmed", source: judgeSource, at: judgeSource.at,
+  });
+  assert.equal(synthesizedProposal.ok, true, JSON.stringify(synthesizedProposal));
+  if (synthesizedProposal.ok) {
+    assert.equal(synthesizedProposal.value.freeze.applicationId, "proposal-req-judge-1");
+    assert.equal(synthesizedProposal.value.freeze.origin, "judge-delegated");
+    assert.equal(synthesizedProposal.value.freeze.decidedBy, undefined);
+    assert.equal(synthesizedProposal.value.freeze.decisionId, undefined);
+    assert.equal(synthesizedProposal.value.freeze.actorRoleId, undefined);
+    assert.deepEqual(synthesizedProposal.value.freeze.source, judgeSource);
+  }
+  const intentSource = { ...judgeSource, requestId: "req-judge-2", cardKind: "intent-confirm", selected: ["confirm"] };
+  const synthesizedIntent = await rig.services.freeze.freeze({
+    path: ROSTER_PATH, version: 2, sha256: H2, applicationId: "", reason: "intent-confirmed", source: intentSource, at: intentSource.at,
+  });
+  assert.equal(synthesizedIntent.ok, true, JSON.stringify(synthesizedIntent));
+  if (synthesizedIntent.ok) assert.equal(synthesizedIntent.value.freeze.applicationId, "intent-req-judge-2");
+  // 显式 applicationId 与 requestId 派生一致 ⇒ 通过（不覆盖既有 applicationId 语义）。
+  const explicit = await rig.services.freeze.freeze({
+    path: ROSTER_PATH, version: 2, sha256: H2, applicationId: "intent-req-judge-2", reason: "intent-confirmed", source: intentSource, at: intentSource.at,
+  });
+  assert.equal(explicit.ok, true, JSON.stringify(explicit));
+  // Q5 客户主权：VCA/version-upgrade/detail 等 reason + judge source ⇒ 拒绝。
+  const vcaJudge = await rig.services.freeze.freeze({
+    path: CONTRACT_PATH, version: 3, sha256: H1, applicationId: "vc-judge", reason: "vca-approved", source: judgeSource, at: judgeSource.at,
+  });
+  assert.equal(vcaJudge.ok, false);
+  if (!vcaJudge.ok) assert.equal(vcaJudge.code, "doc-freeze-invalid");
+  // 客户字段混入 ⇒ 拒绝（审计真实）。
+  for (const patch of [{ decidedBy: "customer" as const }, { decisionId: "decision-x" }, { actorRoleId: "chief" }]) {
+    const rejected = await rig.services.freeze.freeze({
+      path: CONTRACT_PATH, version: 4, sha256: H1, applicationId: "proposal-req-judge-1", reason: "proposal-confirmed", source: judgeSource, at: judgeSource.at, ...patch,
+    });
+    assert.equal(rejected.ok, false, JSON.stringify(patch));
+  }
+  // frozenAt !== source.at ⇒ Model 不变量兜底拒绝。
+  const drift = await rig.services.freeze.freeze({
+    path: CONTRACT_PATH, version: 5, sha256: H1, applicationId: "proposal-req-judge-1", reason: "proposal-confirmed", source: judgeSource, at: "2026-11-04T11:00:00.000Z",
+  });
+  assert.equal(drift.ok, false);
+  // operatorId 与 engine 不符 / engine 空串 / cardKind 与 reason 不匹配 ⇒ 拒绝。
+  for (const patch of [{ operatorId: "judge:codex" }, { engine: "" }, { cardKind: "intent-confirm" }]) {
+    const rejected = await rig.services.freeze.freeze({
+      path: CONTRACT_PATH, version: 6, sha256: H1, applicationId: "proposal-req-judge-1", reason: "proposal-confirmed", source: { ...judgeSource, ...patch }, at: judgeSource.at,
+    });
+    assert.equal(rejected.ok, false, JSON.stringify(patch));
+  }
+});
+
 test("冻结 bootstrap（F30/AC-25）：handoff-pin 合成 applicationId；bootstrap-vca 需 VCA id；已冻结跳过", async () => {
   const rig = createTestRig();
   const pin = await rig.services.freeze.bootstrap({

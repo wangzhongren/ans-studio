@@ -1,0 +1,26 @@
+AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+显式入口（stop）：requestRunChangeDecision 三模式落账不变
+派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0

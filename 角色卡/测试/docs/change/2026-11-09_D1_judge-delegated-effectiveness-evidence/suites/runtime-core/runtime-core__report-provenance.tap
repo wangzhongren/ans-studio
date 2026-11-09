@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution
+ok 1 - actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution
+  ---
+  duration_ms: 34.2308
+  type: 'test'
+  ...
+# Subtest: source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it
+ok 2 - source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it
+  ---
+  duration_ms: 18.3414
+  type: 'test'
+  ...
+# Subtest: target stores safe text but Provider receives original model text and images; final receipt survives a new handle
+ok 3 - target stores safe text but Provider receives original model text and images; final receipt survives a new handle
+  ---
+  duration_ms: 57.2583
+  type: 'test'
+  ...
+# Subtest: ACK is not delivery: user failure has exact Provider count and history retry never invokes it
+ok 4 - ACK is not delivery: user failure has exact Provider count and history retry never invokes it
+  ---
+  duration_ms: 38.7571
+  type: 'test'
+  ...
+# Subtest: ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it
+ok 5 - ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it
+  ---
+  duration_ms: 49.8557
+  type: 'test'
+  ...
+# Subtest: ACK is not delivery: index failure has exact Provider count and history retry never invokes it
+ok 6 - ACK is not delivery: index failure has exact Provider count and history retry never invokes it
+  ---
+  duration_ms: 54.2099
+  type: 'test'
+  ...
+# Subtest: partial replay is not silently repaired or replayed; later foreign records also block repair
+ok 7 - partial replay is not silently repaired or replayed; later foreign records also block repair
+  ---
+  duration_ms: 38.2107
+  type: 'test'
+  ...
+# Subtest: disabled bound mode does not create directories; live-only views do not become durable report snapshots
+ok 8 - disabled bound mode does not create directories; live-only views do not become durable report snapshots
+  ---
+  duration_ms: 2.9523
+  type: 'test'
+  ...
+# Subtest: live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories
+ok 9 - live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories
+  ---
+  duration_ms: 2.5445
+  type: 'test'
+  ...
+# Subtest: foreign later replay records block history repair without altering the replay or invoking Provider again
+ok 10 - foreign later replay records block history repair without altering the replay or invoking Provider again
+  ---
+  duration_ms: 39.7631
+  type: 'test'
+  ...
+# Subtest: no final receipt cannot be reconstructed from boundary or nearby settled after reopening
+ok 11 - no final receipt cannot be reconstructed from boundary or nearby settled after reopening
+  ---
+  duration_ms: 47.4504
+  type: 'test'
+  ...
+# Subtest: 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction
+ok 12 - 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction
+  ---
+  duration_ms: 11.6041
+  type: 'test'
+  ...
+# Subtest: 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material
+ok 13 - 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material
+  ---
+  duration_ms: 1844.6118
+  type: 'test'
+  ...
+# Subtest: an ambiguously successful final receipt write is idempotently confirmed, not appended twice
+ok 14 - an ambiguously successful final receipt write is idempotently confirmed, not appended twice
+  ---
+  duration_ms: 38.6738
+  type: 'test'
+  ...
+# Subtest: unknown persisted C versions do not become a final receipt or permit a new automatic attempt
+ok 15 - unknown persisted C versions do not become a final receipt or permit a new automatic attempt
+  ---
+  duration_ms: 8.0988
+  type: 'test'
+  ...
+# Subtest: unknown report file versions are listed as read errors and not silently upgraded
+ok 16 - unknown report file versions are listed as read errors and not silently upgraded
+  ---
+  duration_ms: 28.0386
+  type: 'test'
+  ...
+# Subtest: public live and report projections whitelist values rather than carrying arbitrary sidecars
+ok 17 - public live and report projections whitelist values rather than carrying arbitrary sidecars
+  ---
+  duration_ms: 0.2031
+  type: 'test'
+  ...
+# Subtest: same-attempt known execution is monotonic even if the replay becomes an unreadable directory
+ok 18 - same-attempt known execution is monotonic even if the replay becomes an unreadable directory
+  ---
+  duration_ms: 27.8801
+  type: 'test'
+  ...
+# Subtest: reopened live-only delivery uses its actual user/turn record for inputSaved without claiming durable source reports
+ok 19 - reopened live-only delivery uses its actual user/turn record for inputSaved without claiming durable source reports
+  ---
+  duration_ms: 33.0886
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2605.2731

@@ -1,0 +1,5 @@
+write_set_files: 25
+manifest_files: 1107
+manifest_total_bytes: 25517395
+tracked_at_HEAD(src app test): 1105
+untracked(src app test): 2

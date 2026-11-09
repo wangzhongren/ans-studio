@@ -55,6 +55,7 @@ import { isCompleteSnapshot, isDirectActionSource, isActiveRoleEvidence, isGitAp
 import type { GitRawObjectPlan, GitRawTreeEntry, GitRawDiffEntry, GitRawRevertCommit, GitRawRevertBasis, RawTree } from "../../model/trunk.ts";
 export type { GitRawObjectPlan, GitRawTreeEntry, RawTree, GitRawDiffEntry, GitRawObjectInput, GitRawStoredCommit, GitRawRevertCommit, GitRawRevertBasis, GitRawRevertConflict } from "../../model/trunk.ts";
 import { isValidDocFreezeRecord, type StableWriteAuthority, type StableWriteRecord, type StableWritePermit } from "../../model/version-change.ts";
+import { isJudgeD3Resolution, requestResolvedD3DecisionId, type RequestResolvedEvent } from "../../model/runtime.ts";
 import { validateRoleDocumentsSnapshot, parseSnapshotRoleDocuments, snapshotDocumentText } from "./boundary-core.ts";
 import { parse as parseYaml } from "yaml";
 
@@ -515,9 +516,13 @@ function activationMetadataPaths(f: GitPolicyFacts, pub: GitRoleActivationPublic
     && (entry.kind === "file" ? write === entry.path : gitCovered(write, [entry.path.endsWith("/") ? entry.path : `${entry.path}/`])))), "git-policy-active-boundary-writesets");
   const d3 = json(evidence.d3Ref.path); check(typeof d3.createdBytesBase64 === "string" && typeof d3.resolvedBytesBase64 === "string", "git-policy-active-d3-bytes");
   const created = parse(policyBytes(d3.createdBytesBase64)), resolved = parse(policyBytes(d3.resolvedBytesBase64));
+  // 账本事件为裸 JSON.parse（PolicyObject）。2026-11-09 judge-delegated（方案 §3.7/F11/§4.9）：来源判定与
+  // D3 引用值一律走 `src/model/runtime.ts` 的共享纯函数（唯一实现），不在此手写三元式/来源条件；
+  // 函数内部自行做运行时 fail-closed 校验（judge 为 null/非对象/缺字段不抛错）。
+  const resolvedEvent = resolved as unknown as RequestResolvedEvent;
   check(created.v === 1 && created.kind === "request.created" && created.flowId === pub.flowId && created.cardKind === "appointment" && created.sourceRoleId === "nominator"
     && gitText(created.requestId) && resolved.v === 1 && resolved.kind === "request.resolved" && resolved.cardKind === "appointment" && resolved.requestId === created.requestId
-    && (resolved.flowId === undefined || resolved.flowId === pub.flowId) && ["customer", "chief-delegated"].includes(String(resolved.by))
+    && (resolved.flowId === undefined || resolved.flowId === pub.flowId) && ["customer", "chief-delegated", "judge"].includes(String(resolved.by))
     && Array.isArray(resolved.targetRoleIds) && resolved.targetRoleIds.includes(pub.targetRoleId)
     && resolved.targetRoleIds.every(id => rosterRoles.some((role: unknown) => policyObject(role) && role.id === id))
     && resolved.rosterVersion === roster.version && resolved.rosterSha256 === evidence.rosterRef.sha256
@@ -525,12 +530,13 @@ function activationMetadataPaths(f: GitPolicyFacts, pub: GitRoleActivationPublic
   if (resolved.by === "chief-delegated") check(isDirectActionSource(resolved.actionSource) && resolved.actionSource.kind === "chief-delegated"
     && resolved.actionSource.requestId === created.requestId && resolved.actionSource.originRoleId === "nominator" && resolved.actionSource.disposition === "select"
     && policyEqual(resolved.actionSource.selected, resolved.targetRoleIds) && resolved.decisionId === undefined, "git-policy-active-delegated-d3");
+  else if (resolved.by === "judge") check(isJudgeD3Resolution(resolvedEvent), "git-policy-active-judge-d3");
   else check(gitText(resolved.decisionId) && (resolved.actionSource === undefined || (isDirectActionSource(resolved.actionSource)
     && resolved.actionSource.kind === "customer-decision" && resolved.actionSource.decisionId === resolved.decisionId)), "git-policy-active-customer-d3");
   const activation = json(evidence.activationRef.path), input = activation.input, authorization = json(evidence.authorizationRef.path);
   check(activation.schema === "role-activation/v1" && activation.actorRoleId === "nominator" && policyObject(input) && input.flowId === pub.flowId
     && input.targetRoleId === pub.targetRoleId && gitText(input.operationId) && (unchanged || input.operationId === f.operationId)
-    && input.d3DecisionId === (resolved.by === "customer" ? resolved.decisionId : resolved.requestId) && policyObject(input.documents)
+    && input.d3DecisionId === requestResolvedD3DecisionId(resolvedEvent) && policyObject(input.documents)
     && policyEqual(input.documents, { card: projectRef(evidence.cardRef), boundaryMd: projectRef(evidence.boundaryMdRef), boundaryYaml: projectRef(evidence.boundaryYamlRef) })
     && policyObject(input.planRef) && policyObject(input.rosterRef) && gitText(input.planRef.snapshotId) && input.planRef.snapshotId === input.rosterRef.snapshotId
     && policyEqual(projectRef(input.planRef as { path: string; sha256: string }), projectRef(evidence.planRef))

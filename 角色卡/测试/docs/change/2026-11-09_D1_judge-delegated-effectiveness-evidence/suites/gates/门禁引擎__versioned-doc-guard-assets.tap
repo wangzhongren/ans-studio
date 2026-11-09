@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: assets 第七类：路径识别、新建允许、覆盖拒绝、baseline canonical 在 docs/contracts
+ok 1 - assets 第七类：路径识别、新建允许、覆盖拒绝、baseline canonical 在 docs/contracts
+  ---
+  duration_ms: 46.3385
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 170.3507

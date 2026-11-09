@@ -1,0 +1,10 @@
+请执行一个很小的验证步骤。本条消息是唯一指令：不要运行 shell；不要写入任何文件（意图文档已存在，不要改）；不要发其它卡；每一步如实回报。
+
+请调用 request_choice 向客户发出需求确认卡，参数如下：
+- title: 确认「judge-demo」需求意图（v1）
+- cardKind: intent-confirm
+- flowId: judge-demo
+- question: 是否确认该产品意图（目标/范围/验收标准/非目标与约束）？
+- options: [{"id":"confirm","label":"确认意图，进入提案阶段"},{"id":"revise","label":"需要修改（请在卡片反馈中说明）"}]
+
+不要调用其它工具；出卡后据实报告工具回执并结束回合。

@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+ok 1 - X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+  ---
+  duration_ms: 14.3293
+  type: 'test'
+  ...
+# Subtest: X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+ok 2 - X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+  ---
+  duration_ms: 5.8604
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+ok 3 - X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+  ---
+  duration_ms: 3.9868
+  type: 'test'
+  ...
+# Subtest: X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+ok 4 - X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+  ---
+  duration_ms: 4.9107
+  type: 'test'
+  ...
+# Subtest: X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+ok 5 - X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+  ---
+  duration_ms: 1.0544
+  type: 'test'
+  ...
+# Subtest: X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+ok 6 - X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+  ---
+  duration_ms: 0.3307
+  type: 'test'
+  ...
+# Subtest: X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+ok 7 - X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+  ---
+  duration_ms: 1.4175
+  type: 'test'
+  ...
+# Subtest: X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+ok 8 - X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+  ---
+  duration_ms: 0.9951
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 332.5463

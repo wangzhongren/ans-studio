@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: PLAN-ESC/未注入能力：report_plan_escalation 不注册（能力缺席 = 最强 fail-closed）
+ok 1 - PLAN-ESC/未注入能力：report_plan_escalation 不注册（能力缺席 = 最强 fail-closed）
+  ---
+  duration_ms: 1.9154
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/convener 成功：能力恰调用一次、身份由工具填入、回执 presented 且文案含「申请≠批准」
+ok 2 - PLAN-ESC/convener 成功：能力恰调用一次、身份由工具填入、回执 presented 且文案含「申请≠批准」
+  ---
+  duration_ms: 0.8873
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/summary 边界：恰为上限的码点长度接受；超 1 个码点拒绝且不调用
+ok 3 - PLAN-ESC/summary 边界：恰为上限的码点长度接受；超 1 个码点拒绝且不调用
+  ---
+  duration_ms: 0.3209
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/角色门控：非 convener 或身份缺失 ⇒ plan-escalation-role-not-allowed 且能力不被调用
+ok 4 - PLAN-ESC/角色门控：非 convener 或身份缺失 ⇒ plan-escalation-role-not-allowed 且能力不被调用
+  ---
+  duration_ms: 0.2265
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/形状非法 ⇒ plan-escalation-invalid 且能力不被调用（未知参数/category/flowId/summary）
+ok 5 - PLAN-ESC/形状非法 ⇒ plan-escalation-invalid 且能力不被调用（未知参数/category/flowId/summary）
+  ---
+  duration_ms: 0.6597
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/能力失败：ok:false 回执如实转达、恰一次调用；抛错按未提交处理
+ok 6 - PLAN-ESC/能力失败：ok:false 回执如实转达、恰一次调用；抛错按未提交处理
+  ---
+  duration_ms: 0.2856
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/越权或契约外回执（approved、坏/缺 requestId、坏 errorCode）⇒ ok:false 且恰一次调用
+ok 7 - PLAN-ESC/越权或契约外回执（approved、坏/缺 requestId、坏 errorCode）⇒ ok:false 且恰一次调用
+  ---
+  duration_ms: 0.5618
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+ok 8 - PLAN-ESC/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+  ---
+  duration_ms: 0.2058
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/schema：required/enum/additionalProperties/maxLength/executionMode 与 Model 单一来源一致
+ok 9 - PLAN-ESC/schema：required/enum/additionalProperties/maxLength/executionMode 与 Model 单一来源一致
+  ---
+  duration_ms: 0.1118
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 221.6912

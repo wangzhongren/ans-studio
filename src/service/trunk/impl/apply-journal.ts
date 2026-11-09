@@ -18,7 +18,7 @@ import { createGitQueryPort, readGitInitializationFacts, readGitProtectionFacts,
 import { readGitStableCompletionBasis, appendGitStableCompletionTaskEvent, readGitDeliveryEvidence, appendGitDocumentPreparationTaskEvent, readGitPlanCompletionBasis, appendGitPlanCompletionTaskEvent } from "../../../provider/trunk/public/trunk-store.ts";
 import { validateTaskStateEvent } from "../../../common/编排/task-state.ts";
 import { isRunGitBases, type RunGitBases } from "../../../common/编排/run-manifest.ts";
-import { isTaskParentRef, isTaskReviewBasisRef, isDispatchTaskReviewTarget, isTaskReviewControllerRef, isDispatchTaskResumeController, isTaskWorkSourceRef, isRuntimeSessionDrained } from "../../../model/runtime.ts";
+import { governanceCardGroup, isJudgeD3Resolution, isTaskParentRef, isTaskReviewBasisRef, isDispatchTaskReviewTarget, isTaskReviewControllerRef, isDispatchTaskResumeController, isTaskWorkSourceRef, isRuntimeSessionDrained, requestResolvedD3DecisionId } from "../../../model/runtime.ts";
 import { parseTeamPlan, parseProjectRoster, parseProjectModules, evaluatePlanningHandoff, isConvenerBuiltInDispatchTarget } from "../../../common/编排/workflow-preconditions.ts";
 // X-R5（E2 S4）：verifier 最终 review 的角色侧前置——角色模块 public entry（api-spec §5 登记事实键）。
 // 只消费 `preflight`；不调用模块 `dispatch()`（E2 评审 X-2/X-4：目标模块为 diff-only，不进生产路由）。
@@ -26,8 +26,8 @@ import { verifierRoleModule } from "../../../common/roles/verifier/index.ts";
 // X-R6（E2 S2）：chief hub 派发的角色策略纯数据（routing/source/report/purpose/schema/五目标）。
 // 只消费数据；Service 事务/账本/证据核验与真实 creator 路由逐字保留（E0 R-2）。
 import { CHIEF_HUB_DISPATCH } from "../../../common/roles/chief/index.ts";
-import type { SubmitVersionChangeInput, SelectRunChangeInput, SelectRunChangeResult, CompleteTeamPlanInput, CloseCreatedTaskInput, CloseCreatedTaskResult, TaskStateEvent, TaskClosedEvent, ActivateRoleDocumentsInput, ActivateRoleDocumentsResult, CustomerInputOutcome, DispatchTaskReviewTarget } from "../../../model/runtime.ts";
-import { isValidDocFreezeRecord, type DocFreezeRecord } from "../../../model/version-change.ts";
+import type { SubmitVersionChangeInput, SelectRunChangeInput, SelectRunChangeResult, CompleteTeamPlanInput, CloseCreatedTaskInput, CloseCreatedTaskResult, TaskStateEvent, TaskClosedEvent, ActivateRoleDocumentsInput, ActivateRoleDocumentsResult, CustomerInputOutcome, DispatchTaskReviewTarget, GovernanceCardKind, GovernanceJudgeAudit } from "../../../model/runtime.ts";
+import { isValidDocFreezeRecord, type DocFreezeRecord, type JudgeDelegatedSource } from "../../../model/version-change.ts";
 import type { BoundaryEntry } from "../../../model/boundary.ts";
 import { randomUUID, createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
@@ -692,7 +692,7 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
   if (!current) {
     await deps.freezeRegistry.refreshSnapshot();
     const intents = (await deps.freezeRegistry.listFreezes()).filter(entry => entry.freeze.reason === "intent-confirmed"
-      && (entry.freeze.origin === "customer" || entry.freeze.origin === "chief-delegated")
+      && (entry.freeze.origin === "customer" || entry.freeze.origin === "chief-delegated" || entry.freeze.origin === "judge-delegated")
       && entry.path.startsWith(`docs/product/${input.flowId}-intent-v`)).sort((a, b) => b.version - a.version);
     if (!intents[0] || !store.readProjectFile) return reject("direct-bootstrap-evidence-missing", "No actual confirmed-intent record");
     confirmedIntent = { path: intents[0].path, sha256: intents[0].sha256 };
@@ -1328,7 +1328,7 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
     if (!current) {
       await deps.freezeRegistry.refreshSnapshot();
       const intent = (await deps.freezeRegistry.listFreezes()).filter(entry => entry.freeze.reason === "intent-confirmed"
-        && (entry.freeze.origin === "customer" || entry.freeze.origin === "chief-delegated") && entry.path.startsWith(`docs/product/${input.flowId}-intent-v`))
+        && (entry.freeze.origin === "customer" || entry.freeze.origin === "chief-delegated" || entry.freeze.origin === "judge-delegated") && entry.path.startsWith(`docs/product/${input.flowId}-intent-v`))
         .sort((a, b) => b.version - a.version)[0];
       if (!intent) return invalid("Initial publication lacks actual confirmed-intent evidence");
       extra.push({ path: intent.path, sha256: intent.sha256 });
@@ -1701,7 +1701,7 @@ async function verifyReviewIntent(deps: TrunkServiceDeps, basis: ExecutionRunBas
       if (`${row.path}-v${row.version}.md` !== intent.path) continue;
       if (row.v !== 1 || row.sha256 !== intent.sha256 || !Number.isSafeInteger(row.version) || typeof row.version !== "number" || row.version < 1
         || !isValidDocFreezeRecord(row.freeze) || row.freeze.reason !== "intent-confirmed" || !isSnapshotRef(row.freeze.snapshotRef)
-        || !row.freeze.source || (row.freeze.origin !== "customer" && row.freeze.origin !== "chief-delegated")) return "Frozen intent confirmation record is invalid";
+        || !row.freeze.source || (row.freeze.origin !== "customer" && row.freeze.origin !== "chief-delegated" && row.freeze.origin !== "judge-delegated")) return "Frozen intent confirmation record is invalid";
       const candidate = { path: intent.path, sha256: intent.sha256, version: row.version, freeze: row.freeze };
       if (approved && canonicalJson(approved) !== canonicalJson(candidate)) return "Frozen intent approval has conflicting historical sources";
       approved = candidate;
@@ -1710,7 +1710,7 @@ async function verifyReviewIntent(deps: TrunkServiceDeps, basis: ExecutionRunBas
   if (!approved?.freeze.snapshotRef || !approved.freeze.source) return "No actual confirmed-intent record in the frozen document Git history";
   const original = await deps.store.readSnapshot(approved.freeze.snapshotRef);
   if (!original.ok || !original.value.files.some(file => file.path === approved.path && file.sha256 === approved.sha256)) return "Original approved intent snapshot bytes are unavailable";
-  const source = approved.freeze.source, requestId = source.kind === "customer-decision" || source.kind === "chief-delegated" ? source.requestId : undefined;
+  const source = approved.freeze.source, requestId = source.kind === "customer-decision" || source.kind === "chief-delegated" || source.kind === "judge-delegated" ? source.requestId : undefined;
   const created = ledger.filter(row => row.value.kind === "request.created" && row.value.requestId === requestId), resolved = ledger.filter(row => row.value.kind === "request.resolved" && row.value.requestId === requestId);
   if (created.length !== 1 || resolved.length !== 1) return "Original intent confirmation is missing or ambiguous";
   const request = validateTaskStateEvent(created[0]!.value), decision = validateTaskStateEvent(resolved[0]!.value);
@@ -1721,8 +1721,14 @@ async function verifyReviewIntent(deps: TrunkServiceDeps, basis: ExecutionRunBas
   if (source.kind === "customer-decision") {
     if (decision.event.by !== "customer" || decision.event.decisionId !== source.decisionId || source.decisionId !== approved.freeze.decisionId
       || source.at !== decision.event.at || decision.event.judge || decision.event.directiveId) return "Original customer intent confirmation source differs";
-  } else if (source.kind !== "chief-delegated" || decision.event.by !== "chief-delegated" || decision.event.decisionId !== undefined
-    || canonicalJson(decision.event.actionSource) !== canonicalJson(source)) return "Original delegated intent confirmation source differs";
+  } else if (source.kind === "chief-delegated") {
+    if (decision.event.by !== "chief-delegated" || decision.event.decisionId !== undefined
+      || canonicalJson(decision.event.actionSource) !== canonicalJson(source)) return "Original delegated intent confirmation source differs";
+  } else if (source.kind === "judge-delegated") {
+    // 2026-11-09 judge-delegated（W-J2/P1.2 §3.5）：从账本重放逐字段核对 judge 来源，不信任冻结记录自述。
+    if (approved.freeze.origin !== "judge-delegated" || approved.freeze.decisionId !== undefined || approved.freeze.decidedBy !== undefined
+      || approved.freeze.applicationId !== `intent-${requestId}` || !judgeIntentAuditMatchesSource(decision.event, source)) return "Original judge intent confirmation source differs";
+  } else return "Original intent confirmation source differs";
   return undefined;
 }
 
@@ -3209,7 +3215,9 @@ export async function prepareRoleActivation(deps: TrunkServiceDeps, input: Activ
       if (parsed.event.kind === "request.resolved" && parsed.event.cardKind === "appointment" && requests.has(parsed.event.requestId)) decision = { created: requests.get(parsed.event.requestId)!.raw, resolved: record.raw, event: parsed.event };
     }
     const d3 = decision?.event;
-    if (!decision || !d3 || (d3.by !== "customer" && d3.by !== "chief-delegated") || (d3.by === "customer" ? d3.decisionId : d3.requestId) !== input.d3DecisionId
+    // 2026-11-09 judge-delegated（W-J2/I-30/F11）：来源判定与参考值一律走共享纯函数；judge 用真实应用 decisionId。
+    const judgeD3 = d3 !== undefined && d3.by === "judge" && isJudgeD3Resolution(d3);
+    if (!decision || !d3 || (d3.by !== "customer" && d3.by !== "chief-delegated" && !judgeD3) || requestResolvedD3DecisionId(d3) !== input.d3DecisionId
       || !d3.targetRoleIds?.includes(input.targetRoleId) || d3.rosterVersion !== actualRoster.roster.version || d3.rosterSha256 !== rosterRef.sha256
       || d3.targetRoleIds.some(roleId => !actualRoster.roster.roles.some(role => role.id === roleId))) return invalid("Latest actual D3 does not select this role against the applicable roster bytes");
     const canonical = { card: `角色卡/${input.targetRoleId}/role-card.md`, boundaryMd: `角色卡/${input.targetRoleId}/boundary.md`, boundaryYaml: `角色卡/${input.targetRoleId}/boundary.yaml` };
@@ -3357,11 +3365,85 @@ export async function prepareIntentConfirmation(deps: TrunkServiceDeps, flowId: 
   } catch (error) { return invalid(String(error)); }
 }
 
+/**
+ * 2026-11-09 judge-delegated（W-J2，P1.2 §3.3/§3.5）：冻结 source 与账本 `request.resolved`
+ * （及其 `judge` 审计）逐字段一致性——从账本重放验证，不信任冻结记录自述。
+ * G1 单一策略：只做类型/自洽/一致性核对，不设长度上界、不截断；任何非法形状 fail-closed、不抛错。
+ */
+function judgeIntentAuditMatchesSource(event: Extract<TaskStateEvent, { kind: "request.resolved" }>, source: JudgeDelegatedSource): boolean {
+  if (event.by !== "judge") return false;
+  const judge: unknown = event.judge;
+  if (judge === null || typeof judge !== "object" || Array.isArray(judge)) return false;
+  const audit = judge as Record<string, unknown>;
+  const engine = audit["engine"], reasonCode = audit["reasonCode"], cardKind = audit["cardKind"], group = audit["group"];
+  const model = audit["model"], reason = audit["reason"], selected = audit["selected"], confirmed = audit["confirmed"];
+  if (typeof engine !== "string" || engine === "" || engine !== source.engine) return false;
+  if (typeof reasonCode !== "string" || reasonCode === "" || reasonCode !== source.reasonCode) return false;
+  if (typeof cardKind !== "string" || cardKind !== "intent-confirm" || source.cardKind !== "intent-confirm") return false;
+  if (typeof group !== "string" || group !== governanceCardGroup(cardKind as GovernanceCardKind)) return false;
+  if (event.operatorId !== source.operatorId || source.operatorId !== `judge:${source.engine}`) return false;
+  if ((model ?? undefined) !== (source.model ?? undefined)) return false;
+  if ((reason ?? undefined) !== (source.reason ?? undefined)) return false;
+  if (selected !== undefined && (!Array.isArray(selected) || selected.some(part => typeof part !== "string"))) return false;
+  const auditSelected = selected === undefined ? undefined : [...(selected as string[])];
+  const sourceSelected = source.selected === undefined ? undefined : [...source.selected];
+  if (canonicalJson(auditSelected) !== canonicalJson(sourceSelected)) return false;
+  if (auditSelected !== undefined && canonicalJson(auditSelected) !== canonicalJson(event.selectedOptionIds)) return false;
+  if (confirmed !== undefined && confirmed !== true) return false;
+  if ((confirmed === true) !== (source.confirmed === true)) return false;
+  if (event.actionSource !== undefined || event.directiveId !== undefined) return false;
+  if (typeof event.requestId !== "string" || event.requestId === "" || event.decisionId !== `decision-${event.requestId}`) return false;
+  return true;
+}
+
+/**
+ * 2026-11-09 judge-delegated（W-J2，P1.2 §3.3）：由真实账本裁决构造 intent-confirmed 冻结。
+ * `outcome.judge` 与 `resolved.judge` 逐字段对账（G1：摘要按账本原值复制、不截断）；
+ * `operatorId === "judge:"+engine`；`decisionId === "decision-"+requestId`；禁止 actionSource/directiveId。
+ * 任何非法形状返回 undefined（fail-closed，不抛错）。
+ */
+function judgeIntentConfirmFreeze(outcome: CustomerInputOutcome, resolved: Extract<TaskStateEvent, { kind: "request.resolved" }>, snapshotRef: PreparedIntentConfirmation["snapshotRef"]): DocFreezeRecord | undefined {
+  if (outcome.outcome !== "answered" || outcome.judge === undefined || !evidenceObject(outcome.judge)) return undefined;
+  if (resolved.by !== "judge" || !evidenceObject(resolved.judge)) return undefined;
+  if (canonicalJson(outcome.judge) !== canonicalJson(resolved.judge)) return undefined;
+  const audit = resolved.judge as Record<string, unknown>;
+  const engine = audit["engine"], model = audit["model"], reasonCode = audit["reasonCode"], reason = audit["reason"];
+  const selected = audit["selected"], confirmed = audit["confirmed"], cardKind = audit["cardKind"], group = audit["group"];
+  if (typeof engine !== "string" || engine === "") return undefined;
+  if (typeof reasonCode !== "string" || reasonCode === "") return undefined;
+  if (typeof cardKind !== "string" || cardKind !== "intent-confirm") return undefined;
+  if (typeof group !== "string" || group !== governanceCardGroup(cardKind as GovernanceCardKind)) return undefined;
+  if (typeof resolved.requestId !== "string" || resolved.requestId === "" || resolved.decisionId !== `decision-${resolved.requestId}`) return undefined;
+  if (resolved.operatorId !== outcome.operatorId || outcome.operatorId !== `judge:${engine}`) return undefined;
+  if (resolved.actionSource !== undefined || resolved.directiveId !== undefined) return undefined;
+  if (model !== undefined && typeof model !== "string") return undefined;
+  if (reason !== undefined && typeof reason !== "string") return undefined;
+  if (selected !== undefined && (!Array.isArray(selected) || selected.some(part => typeof part !== "string"))) return undefined;
+  const auditSelected = selected === undefined ? undefined : [...(selected as string[])];
+  if (auditSelected !== undefined && canonicalJson(auditSelected) !== canonicalJson(resolved.selectedOptionIds)) return undefined;
+  if (confirmed !== undefined && confirmed !== true) return undefined;
+  const source: JudgeDelegatedSource = {
+    kind: "judge-delegated",
+    requestId: resolved.requestId,
+    engine,
+    ...(model !== undefined ? { model: model as string } : {}),
+    operatorId: `judge:${engine}`,
+    reasonCode,
+    ...(reason !== undefined ? { reason: reason as string } : {}),
+    ...(auditSelected !== undefined ? { selected: auditSelected } : {}),
+    ...(confirmed === true ? { confirmed: true as const } : {}),
+    cardKind,
+    at: resolved.at,
+  };
+  return { schema: "doc-freeze/v1", applicationId: `intent-${resolved.requestId}`, reason: "intent-confirmed", origin: "judge-delegated",
+    source, snapshotRef, frozenAt: resolved.at };
+}
+
 /** Only an actually persisted retained-card confirmation can create intent-confirmed R9 evidence. */
 export async function finalizeIntentConfirmation(deps: TrunkServiceDeps, prepared: PreparedIntentConfirmation, outcome: CustomerInputOutcome): Promise<TrunkServiceResult<{ path: string; sha256: string }>> {
   const invalid = (message: string) => fail<{ path: string; sha256: string }>("trunk-item-invalid", message);
   if (outcome.outcome !== "answered" || !outcome.value.selected?.includes("confirm") || outcome.value.selected.includes("revise")
-    || outcome.judge || outcome.directive || !deps.store.readSnapshot || !deps.store.readProjectFile) return invalid("No real retained-card confirmation to freeze");
+    || outcome.directive || !deps.store.readSnapshot || !deps.store.readProjectFile) return invalid("No real retained-card confirmation to freeze");
   try {
     const snapshot = await deps.store.readSnapshot(prepared.snapshotRef), live = await deps.store.readProjectFile(prepared.path);
     if (!snapshot.ok || !live.ok || live.value.sha256 !== prepared.sha256 || !snapshot.value.files.some(file => file.path === prepared.path && file.sha256 === prepared.sha256)) return invalid("Intent changed while its exact bytes were being confirmed");
@@ -3384,6 +3466,12 @@ export async function finalizeIntentConfirmation(deps: TrunkServiceDeps, prepare
         || canonicalJson(resolved.actionSource) !== canonicalJson(delegated) || delegated.disposition !== "select") return invalid("Chief confirmation must retain its true source without fabricated customer ids");
       freeze = { schema: "doc-freeze/v1", applicationId: `intent-${resolved.requestId}`, reason: "intent-confirmed", origin: "chief-delegated",
         actorRoleId: "chief", source: delegated, snapshotRef: prepared.snapshotRef, frozenAt: resolved.at };
+    } else if (resolved.by === "judge") {
+      // 2026-11-09 judge-delegated（W-J2/I-01..I-03）：客户开启「替我决策」后的 judge approve 是真实保留卡确认；
+      // 冻结如实携带 judge 来源，不写 decidedBy/decisionId/actorRoleId（不冒充客户）。客户/幕僚分支逐字不变。
+      const judged = outcome.outcome === "answered" ? judgeIntentConfirmFreeze(outcome, resolved, prepared.snapshotRef) : undefined;
+      if (!judged) return invalid("Judgement source is not a real judge delegation");
+      freeze = judged;
     } else {
       if (resolved.by !== "customer" || !resolved.decisionId || resolved.judge || resolved.directiveId) return invalid("Confirmation source is not a real customer decision");
       freeze = { schema: "doc-freeze/v1", applicationId: `intent-${resolved.requestId}`, reason: "intent-confirmed", origin: "customer", decidedBy: "customer",
@@ -3451,10 +3539,12 @@ export async function prepareExecutionRun(deps: TrunkServiceDeps, input: { runId
         || typeof decisionBytes.createdBytesBase64 !== "string" || typeof decisionBytes.resolvedBytesBase64 !== "string") return invalid(`Role ${role.id} has invalid authorization or D3 bytes`);
       const created = validateTaskStateEvent(JSON.parse(Buffer.from(decisionBytes.createdBytesBase64, "base64").toString("utf8")));
       const resolved = validateTaskStateEvent(JSON.parse(Buffer.from(decisionBytes.resolvedBytesBase64, "base64").toString("utf8")));
+      // 2026-11-09 judge-delegated（W-J2/I-32/F11）：judge 来源经共享校验；chief/customer 分支逐字保留。
+      const judgeD3 = resolved.ok && resolved.event.kind === "request.resolved" && resolved.event.by === "judge" && isJudgeD3Resolution(resolved.event);
       if (!created.ok || created.event.kind !== "request.created" || created.event.cardKind !== "appointment" || created.event.sourceRoleId !== "nominator" || created.event.flowId !== input.flowId
         || !resolved.ok || resolved.event.kind !== "request.resolved" || resolved.event.requestId !== created.event.requestId || resolved.event.cardKind !== "appointment"
         || !resolved.event.targetRoleIds?.includes(role.id) || resolved.event.rosterSha256 !== rosterRef.sha256 || resolved.event.rosterVersion !== roster.roster.version
-        || (resolved.event.by !== "customer" && resolved.event.by !== "chief-delegated") || (resolved.event.by === "chief-delegated" && resolved.event.decisionId !== undefined))
+        || (resolved.event.by !== "customer" && resolved.event.by !== "chief-delegated" && !judgeD3) || (resolved.event.by === "chief-delegated" && resolved.event.decisionId !== undefined))
         return invalid(`Role ${role.id} is not authorized by its real frozen D3`);
       for (const file of active.value.files) {
         const original = files.get(file.path), documentRef = [...Object.values(current.artifacts.documents), ...Object.values(current.artifacts.execution), current.artifacts.workflow].find(ref => ref?.path === file.path);
@@ -3559,13 +3649,17 @@ export async function prepareRoleDraftScope(deps: TrunkServiceDeps, input: { flo
       if (event.event.kind === "request.created" && event.event.cardKind === "appointment" && event.event.flowId === flowId && event.event.sourceRoleId === "nominator") requests.add(event.event.requestId);
       if (event.event.kind === "request.resolved" && event.event.cardKind === "appointment" && requests.has(event.event.requestId)) decision = event.event;
     }
-    if (!decision || (decision.by !== "customer" && decision.by !== "chief-delegated") || !decision.targetRoleIds?.length
+    // 2026-11-09 judge-delegated（W-J2/I-33/F11）：judge 来源经共享校验；d3Reference 统一走共享参考值。
+    const judgeD3 = decision !== undefined && decision.by === "judge" && isJudgeD3Resolution(decision);
+    if (!decision || (decision.by !== "customer" && decision.by !== "chief-delegated" && !judgeD3) || !decision.targetRoleIds?.length
       || decision.rosterVersion !== roster.roster.version || decision.rosterSha256 !== rosterRef.sha256
-      || (decision.by === "customer" ? !decision.decisionId : decision.decisionId !== undefined)
+      || (decision.by === "customer" ? !decision.decisionId : decision.by === "chief-delegated" ? decision.decisionId !== undefined : false)
       || decision.targetRoleIds.some(roleId => !roster.roster.roles.some(role => role.id === roleId) || !plan.plan.roleRows.some(row => row.roleId === roleId)))
       return invalid("No actual current D3 selects the draft roles for this plan/roster");
+    const d3Reference = requestResolvedD3DecisionId(decision);
+    if (d3Reference === undefined) return invalid("No actual current D3 selects the draft roles for this plan/roster");
     return { ok: true, value: { flowId, basisDigest: current.digest, d3RequestId: decision.requestId,
-      d3Reference: decision.by === "customer" ? decision.decisionId! : decision.requestId,
+      d3Reference,
       paths: decision.targetRoleIds.flatMap(roleId => ["role-card.md", "boundary.md", "boundary.yaml"].map(name => `角色卡/${roleId}/${name}`)) } };
   } catch (error) { return invalid(String(error)); }
 }

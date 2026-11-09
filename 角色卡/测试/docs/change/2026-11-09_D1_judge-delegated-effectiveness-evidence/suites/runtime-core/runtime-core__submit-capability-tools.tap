@@ -1,0 +1,175 @@
+TAP version 13
+# Subtest: C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed）
+ok 1 - C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed）
+  ---
+  duration_ms: 1.9883
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入
+ok 2 - C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入
+  ---
+  duration_ms: 1.0449
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段
+ok 3 - C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段
+  ---
+  duration_ms: 0.352
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用
+ok 4 - C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用
+  ---
+  duration_ms: 0.338
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用
+ok 5 - C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用
+  ---
+  duration_ms: 0.4968
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准
+ok 6 - C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准
+  ---
+  duration_ms: 0.3723
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：convener 提交成功；输入身份恒为 convener
+ok 7 - C1d/submit_refactor：convener 提交成功；输入身份恒为 convener
+  ---
+  duration_ms: 0.3438
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码
+ok 8 - C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码
+  ---
+  duration_ms: 0.2718
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理
+ok 9 - C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理
+  ---
+  duration_ms: 0.2553
+  type: 'test'
+  ...
+# Subtest: C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入
+ok 10 - C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入
+  ---
+  duration_ms: 0.2781
+  type: 'test'
+  ...
+# Subtest: C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理
+ok 11 - C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理
+  ---
+  duration_ms: 1.5528
+  type: 'test'
+  ...
+# Subtest: C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+ok 12 - C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+  ---
+  duration_ms: 0.1696
+  type: 'test'
+  ...
+# Subtest: C1d/schema：三工具 schema 单一来源与冻结枚举一致
+ok 13 - C1d/schema：三工具 schema 单一来源与冻结枚举一致
+  ---
+  duration_ms: 0.0945
+  type: 'test'
+  ...
+# Subtest: R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal
+ok 14 - R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal
+  ---
+  duration_ms: 1.4541
+  type: 'test'
+  ...
+# Subtest: R2 rejects unknown identity/source/switch and nested malformed evidence before invocation
+ok 15 - R2 rejects unknown identity/source/switch and nested malformed evidence before invocation
+  ---
+  duration_ms: 1.6738
+  type: 'test'
+  ...
+# Subtest: R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort
+ok 16 - R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort
+  ---
+  duration_ms: 0.5249
+  type: 'test'
+  ...
+# Subtest: R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result
+ok 17 - R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result
+  ---
+  duration_ms: 0.3335
+  type: 'test'
+  ...
+# Subtest: R2 bounded chief tool binds request/revision/options and never substitutes recommended choice
+ok 18 - R2 bounded chief tool binds request/revision/options and never substitutes recommended choice
+  ---
+  duration_ms: 0.3651
+  type: 'test'
+  ...
+# Subtest: R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+not ok 19 - R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+  ---
+  duration_ms: 4.7076
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\submit-capability-tools.test.ts:442:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /trusted chief/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:449:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:449:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement
+ok 20 - R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement
+  ---
+  duration_ms: 0.6557
+  type: 'test'
+  ...
+# Subtest: R2 chief timeout is finite and normal sessions still receive injected narrow capabilities
+not ok 21 - R2 chief timeout is finite and normal sessions still receive injected narrow capabilities
+  ---
+  duration_ms: 0.767
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\submit-capability-tools.test.ts:476:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:480:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary
+ok 22 - R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary
+  ---
+  duration_ms: 0.3879
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 20
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 254.3655

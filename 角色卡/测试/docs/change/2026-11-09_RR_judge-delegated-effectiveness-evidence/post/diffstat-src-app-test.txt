@@ -1,0 +1,24 @@
+ src/common/roles/nominator/index.ts                |   2 +-
+ .../common/\347\274\226\346\216\222/task-state.ts" |  16 ++
+ .../classify-shell.ts"                             |  10 +-
+ src/model/runtime.ts                               |  59 +++++-
+ src/model/version-change.ts                        | 113 +++++++++++-
+ src/pipeline/orchestration/trunk-runtime.ts        |   9 +-
+ .../orchestration/version-change-runtime.ts        |   8 +-
+ .../version-change/impl/guard-freeze-registry.ts   |  64 +++++--
+ src/service/trunk/impl/apply-journal.ts            | 124 +++++++++++--
+ .../abstract/version-change-service.ts             |   6 +-
+ src/service/version-change/impl/freeze-service.ts  |  43 ++++-
+ test/roles/nominator/nominator-module.test.ts      |  29 +++
+ test/runtime-core/direct-role-capabilities.test.ts | 135 +++++++++++++-
+ test/runtime-core/version-change-contract.test.ts  |  90 +++++++++-
+ .../decision-service.test.ts"                      |  90 ++++++++++
+ .../run-change-trigger.test.ts"                    | 106 ++++++++++-
+ .../git-write-chain-fixture.ts"                    |  80 +++++++--
+ .../direct-role-capabilities.test.ts"              | 199 ++++++++++++++++++++-
+ "test/\347\274\226\346\216\222/task-state.test.ts" |  47 +++++
+ .../\347\274\226\346\216\222/trunk-events.test.ts" |  27 +++
+ .../version-change-service.test.ts"                |  54 ++++++
+ .../direct-role-capabilities.test.ts"              |  31 +++-
+ .../git-shell-acl.test.ts"                         |  58 +++++-
+ 23 files changed, 1318 insertions(+), 82 deletions(-)

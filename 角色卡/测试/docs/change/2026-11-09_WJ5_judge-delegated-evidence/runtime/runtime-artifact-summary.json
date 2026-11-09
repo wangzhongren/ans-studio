@@ -1,0 +1,50 @@
+{
+  "freeze": {
+    "applicationId": "intent-w7-intent-request",
+    "reason": "intent-confirmed",
+    "origin": "judge-delegated",
+    "frozenAt": "2026-11-08T00:00:00.000Z",
+    "snapshotId": "s-intent-251c54e4095488cc3e8365681e7f02262f9f3b9a63304965dcf8dd66a59e97a0",
+    "hasCustomerFields": [],
+    "source": {
+      "kind": "judge-delegated",
+      "requestId": "w7-intent-request",
+      "engine": "claude",
+      "operatorId": "judge:claude",
+      "reasonCode": "sufficient",
+      "cardKind": "intent-confirm",
+      "at": "2026-11-08T00:00:00.000Z",
+      "modelLength": 531,
+      "reasonLength": 4110,
+      "selected": [
+        "confirm"
+      ]
+    }
+  },
+  "resolved": {
+    "by": "judge",
+    "operatorId": "judge:claude",
+    "decisionId": "decision-w7-intent-request",
+    "judgeGroup": "decision",
+    "judgeCardKind": "intent-confirm",
+    "reasonLength": 4110,
+    "modelLength": 531
+  },
+  "authorization": {
+    "d3Source": "judge",
+    "decisionId": "decision-w7-d3-request",
+    "hasActionSource": false
+  },
+  "d3Resolved": {
+    "by": "judge",
+    "operatorId": "judge:claude",
+    "decisionId": "decision-w7-d3-request",
+    "group": "decision",
+    "cardKind": "appointment"
+  },
+  "nominatorGap": {
+    "ok": false,
+    "status": "rejected",
+    "message": "Activation premise was refused by the nominator role policy (appointment-facts-invalid)"
+  }
+}

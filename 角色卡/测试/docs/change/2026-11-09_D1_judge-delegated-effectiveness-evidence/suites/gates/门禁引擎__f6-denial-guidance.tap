@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: F6（accepted:false）：仍拒绝一切写入；首句逐字开头；其后为完整恢复指引
+ok 1 - F6（accepted:false）：仍拒绝一切写入；首句逐字开头；其后为完整恢复指引
+  ---
+  duration_ms: 0.7186
+  type: 'test'
+  ...
+# Subtest: F6（accepted:true 但 source 为空）：同样仍拒绝、同样带指引
+ok 2 - F6（accepted:true 但 source 为空）：同样仍拒绝、同样带指引
+  ---
+  duration_ms: 0.1182
+  type: 'test'
+  ...
+# Subtest: 渲染链：两份 format-denial 的输出都包含完整指引（renders reason 自动带出）
+ok 3 - 渲染链：两份 format-denial 的输出都包含完整指引（renders reason 自动带出）
+  ---
+  duration_ms: 0.1358
+  type: 'test'
+  ...
+# Subtest: 已接受边界：覆盖路径照常放行（不出现指引）
+ok 4 - 已接受边界：覆盖路径照常放行（不出现指引）
+  ---
+  duration_ms: 0.7117
+  type: 'test'
+  ...
+# Subtest: 已接受边界的非 F6 拒绝（未匹配）：不出现 F6 指引
+ok 5 - 已接受边界的非 F6 拒绝（未匹配）：不出现 F6 指引
+  ---
+  duration_ms: 0.5802
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 159.7921

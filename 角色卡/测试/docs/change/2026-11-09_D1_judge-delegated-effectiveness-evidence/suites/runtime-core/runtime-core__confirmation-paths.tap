@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: schema：request_confirmation 增可选 paths（项目相对、逐文件、≤64、不得含仅引用文件）
+ok 1 - schema：request_confirmation 增可选 paths（项目相对、逐文件、≤64、不得含仅引用文件）
+  ---
+  duration_ms: 1.9119
+  type: 'test'
+  ...
+# Subtest: 合法 paths：posix 化后原样透传到卡片请求与 metadata
+ok 2 - 合法 paths：posix 化后原样透传到卡片请求与 metadata
+  ---
+  duration_ms: 1.2135
+  type: 'test'
+  ...
+# Subtest: 非法 paths：工具错误且不向客户发卡（零卡片副作用）
+ok 3 - 非法 paths：工具错误且不向客户发卡（零卡片副作用）
+  ---
+  duration_ms: 0.808
+  type: 'test'
+  ...
+# Subtest: 缺省 paths：旧卡逐字兼容（请求/metadata 不出现该键）
+ok 4 - 缺省 paths：旧卡逐字兼容（请求/metadata 不出现该键）
+  ---
+  duration_ms: 0.1659
+  type: 'test'
+  ...
+# Subtest: 64 项边界合法（上限含 64）
+ok 5 - 64 项边界合法（上限含 64）
+  ---
+  duration_ms: 0.1905
+  type: 'test'
+  ...
+# Subtest: R4 choice/confirmation show chief rejection or revision, retaining typed reason/source without task cancellation
+ok 6 - R4 choice/confirmation show chief rejection or revision, retaining typed reason/source without task cancellation
+  ---
+  duration_ms: 0.9582
+  type: 'test'
+  ...
+# Subtest: R4 chief answered receipts show the actual non-recommended selection/confirmation and original provenance
+ok 7 - R4 chief answered receipts show the actual non-recommended selection/confirmation and original provenance
+  ---
+  duration_ms: 0.4118
+  type: 'test'
+  ...
+# Subtest: R4 malformed source or contradictory chief outcome cannot fall through to customer approval
+ok 8 - R4 malformed source or contradictory chief outcome cannot fall through to customer approval
+  ---
+  duration_ms: 0.5818
+  type: 'test'
+  ...
+# Subtest: R4 historical customer, judge and directive outcomes keep their existing receipt wording
+ok 9 - R4 historical customer, judge and directive outcomes keep their existing receipt wording
+  ---
+  duration_ms: 0.3558
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 248.0384

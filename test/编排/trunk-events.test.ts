@@ -23,7 +23,10 @@ import {
   TASKS_STATE_REL,
   readTaskState,
   taskStatusOf,
+  validateTaskStateEvent,
 } from "../../src/common/编排/task-state.ts";
+import { freezeEvents } from "../../src/pipeline/orchestration/version-change-runtime.ts";
+import type { DocFreezeRecordInput } from "../../src/service/version-change/public/version-change-service.ts";
 import {
   STABLE_WRITE_APPLICATION_EVENT_KINDS,
   STABLE_WRITE_CUSTOMER_EVENT_KINDS,
@@ -329,4 +332,28 @@ test("F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段�
   } finally {
     await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
   }
+});
+
+test("W-J2/J17：freezeEvents 防御镜像——无 source 的既有事件字节逐字不变；judge-delegated source 镜像 actionSource 且通过账本校验", () => {
+  const vcaFreeze: DocFreezeRecordInput = { path: "docs/proposals/focus-proposal-v1.md", version: 1, sha256: SHA_A,
+    freeze: { schema: DOC_FREEZE_SCHEMA, applicationId: "vc-1", reason: "vca-approved" as const, origin: "customer" as const,
+      decidedBy: "customer" as const, decisionId: "decision-vca-1", frozenAt: AT } };
+  const applicationFreeze: DocFreezeRecordInput = { path: "docs/proposals/focus-proposal-v2.md", version: 2, sha256: SHA_B,
+    freeze: { schema: DOC_FREEZE_SCHEMA, applicationId: "am-1", reason: "amendment-submitted" as const, origin: "application" as const, frozenAt: AT } };
+  const events = freezeEvents([vcaFreeze, applicationFreeze]);
+  assert.deepEqual(events, [
+    { v: 1, at: AT, kind: "doc.freeze", schema: DOC_FREEZE_SCHEMA, path: vcaFreeze.path, version: 1, sha256: SHA_A, applicationId: "vc-1",
+      reason: "vca-approved", origin: "customer", decidedBy: "customer", decisionId: "decision-vca-1" },
+    { v: 1, at: AT, kind: "doc.freeze", schema: DOC_FREEZE_SCHEMA, path: applicationFreeze.path, version: 2, sha256: SHA_B, applicationId: "am-1",
+      reason: "amendment-submitted", origin: "application" },
+  ], "无 source 的 VCA/application 路径不新增 actionSource 键，事件字节与当前逐字一致");
+  const source = { kind: "judge-delegated" as const, requestId: "judge-intent-req", engine: "claude", model: "claude-unit", operatorId: "judge:claude",
+    reasonCode: "sufficient", reason: "checked the intent evidence", selected: ["confirm"], cardKind: "intent-confirm", at: AT };
+  const judgeFreeze: DocFreezeRecordInput = { path: "docs/product/focus-intent-v1.md", version: 1, sha256: SHA_A,
+    freeze: { schema: DOC_FREEZE_SCHEMA, applicationId: "intent-judge-intent-req", reason: "intent-confirmed" as const, origin: "judge-delegated" as const, source, frozenAt: AT } };
+  const [mirrored] = freezeEvents([judgeFreeze]);
+  assert.equal(mirrored?.kind, "doc.freeze");
+  assert.deepEqual(mirrored?.kind === "doc.freeze" ? mirrored.actionSource : undefined, source);
+  const checked = validateTaskStateEvent(mirrored);
+  assert.equal(checked.ok, true, JSON.stringify(checked), "judge 镜像事件通过 doc.freeze 账本校验（J16 分支）");
 });

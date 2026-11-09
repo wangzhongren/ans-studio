@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: 文档面清单逐项在卡文本中（五文件 + 四目录 + 测试目录 + temp；kind 按项标注）
+ok 1 - 文档面清单逐项在卡文本中（五文件 + 四目录 + 测试目录 + temp；kind 按项标注）
+  ---
+  duration_ms: 0.4895
+  type: 'test'
+  ...
+# Subtest: 交付纪律：每次交付同步文档、代码与文档同批交回、不得靠「下次补」
+ok 2 - 交付纪律：每次交付同步文档、代码与文档同批交回、不得靠「下次补」
+  ---
+  duration_ms: 0.0884
+  type: 'test'
+  ...
+# Subtest: 反向断言：不得暗示文档路径可选/可后补；不得出现「未列即默认可写」式表述
+ok 3 - 反向断言：不得暗示文档路径可选/可后补；不得出现「未列即默认可写」式表述
+  ---
+  duration_ms: 0.2112
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 135.9731

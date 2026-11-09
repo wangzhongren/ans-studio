@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: three audit sources round-trip distinctly without fabricated customer facts
+ok 1 - three audit sources round-trip distinctly without fabricated customer facts
+  ---
+  duration_ms: 1.46
+  type: 'test'
+  ...
+# Subtest: chief delegation requires revision, request, basis, reason and a real disposition
+ok 2 - chief delegation requires revision, request, basis, reason and a real disposition
+  ---
+  duration_ms: 0.1389
+  type: 'test'
+  ...
+# Subtest: direct receipts distinguish committed recovery from pre-commit failure and no-op
+ok 3 - direct receipts distinguish committed recovery from pre-commit failure and no-op
+  ---
+  duration_ms: 0.1676
+  type: 'test'
+  ...
+# Subtest: complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+ok 4 - complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+  ---
+  duration_ms: 0.7251
+  type: 'test'
+  ...
+# Subtest: run frozen evidence is all-or-nothing and never combines different snapshots
+ok 5 - run frozen evidence is all-or-nothing and never combines different snapshots
+  ---
+  duration_ms: 0.3736
+  type: 'test'
+  ...
+# Subtest: historical customer freeze remains unchanged while direct freeze has no customer credentials
+ok 6 - historical customer freeze remains unchanged while direct freeze has no customer credentials
+  ---
+  duration_ms: 0.0912
+  type: 'test'
+  ...
+# Subtest: bounded real-chief decision context has no production writer or alternate executor
+ok 7 - bounded real-chief decision context has no production writer or alternate executor
+  ---
+  duration_ms: 0.1713
+  type: 'test'
+  ...
+# Subtest: existing submit function remains callable and all three explicit run choices remain distinct
+ok 8 - existing submit function remains callable and all three explicit run choices remain distinct
+  ---
+  duration_ms: 0.1019
+  type: 'test'
+  ...
+# Subtest: R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+ok 9 - R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+  ---
+  duration_ms: 0.1751
+  type: 'test'
+  ...
+# Subtest: R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+ok 10 - R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+  ---
+  duration_ms: 0.3481
+  type: 'test'
+  ...
+# Subtest: R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+ok 11 - R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+  ---
+  duration_ms: 0.1616
+  type: 'test'
+  ...
+# Subtest: J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+ok 12 - J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+  ---
+  duration_ms: 0.3189
+  type: 'test'
+  ...
+# Subtest: J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+ok 13 - J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+  ---
+  duration_ms: 0.2205
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 138.4886

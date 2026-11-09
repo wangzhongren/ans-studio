@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: 冻结值集与环境键：五值恰序（关/低/中/高/极高）；三键逐字；demo 无键面
+ok 1 - 冻结值集与环境键：五值恰序（关/低/中/高/极高）；三键逐字；demo 无键面
+  ---
+  duration_ms: 0.7866
+  type: 'test'
+  ...
+# Subtest: 归一：合法五值＋大小写/空白变体 ⇒ set（规范小写形）；未设/空串/纯空白 ⇒ unset（静默，留空＝平台默认）
+ok 2 - 归一：合法五值＋大小写/空白变体 ⇒ set（规范小写形）；未设/空串/纯空白 ⇒ unset（静默，留空＝平台默认）
+  ---
+  duration_ms: 0.1462
+  type: 'test'
+  ...
+# Subtest: 归一：非法 ⇒ invalid（绝不猜档——minimal/max/ultra/中文标签/任意串均不近似；原值如实带回）
+ok 3 - 归一：非法 ⇒ invalid（绝不猜档——minimal/max/ultra/中文标签/任意串均不近似；原值如实带回）
+  ---
+  duration_ms: 0.0891
+  type: 'test'
+  ...
+# Subtest: resolve：按运行时各取各键（互不串）；键未设＝unset
+ok 4 - resolve：按运行时各取各键（互不串）；键未设＝unset
+  ---
+  duration_ms: 0.0706
+  type: 'test'
+  ...
+# Subtest: Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形）
+not ok 5 - Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形）
+  ---
+  duration_ms: 3.8035
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:87:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:89:19
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:88:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席
+not ok 6 - 未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席
+  ---
+  duration_ms: 1.1037
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:99:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:102:55
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:100:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话
+not ok 7 - 非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话
+  ---
+  duration_ms: 0.6832
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:111:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:115:21
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:113:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响）
+not ok 8 - 诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响）
+  ---
+  duration_ms: 0.7099
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:128:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:131:21
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:130:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 4
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 240.087

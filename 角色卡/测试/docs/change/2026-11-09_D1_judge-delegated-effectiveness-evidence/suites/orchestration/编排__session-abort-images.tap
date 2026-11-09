@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: P0-2 abort：会话有 abort ⇒ 透传（ok:true supported:true），不销毁会话，下一条照发
+ok 1 - P0-2 abort：会话有 abort ⇒ 透传（ok:true supported:true），不销毁会话，下一条照发
+  ---
+  duration_ms: 18.8837
+  type: 'test'
+  ...
+# Subtest: P0-2 abort：会话 abort 为同步 void（契约允许 Promise<void>|void）⇒ ok:true supported:true
+ok 2 - P0-2 abort：会话 abort 为同步 void（契约允许 Promise<void>|void）⇒ ok:true supported:true
+  ---
+  duration_ms: 10.6318
+  type: 'test'
+  ...
+# Subtest: P0-2 abort：会话不带 abort（demo 替身形状）⇒ supported:false，如实文案，绝不假装已停
+ok 3 - P0-2 abort：会话不带 abort（demo 替身形状）⇒ supported:false，如实文案，绝不假装已停
+  ---
+  duration_ms: 9.3553
+  type: 'test'
+  ...
+# Subtest: P0-2 abort：SDK 报错 ⇒ ok:false supported:true，error 为错误原文（不吞、不谎报）
+ok 4 - P0-2 abort：SDK 报错 ⇒ ok:false supported:true，error 为错误原文（不吞、不谎报）
+  ---
+  duration_ms: 8.5066
+  type: 'test'
+  ...
+# Subtest: P0-2 abort：假适配器（createFakeRuntimeAdapter，无 abort 字段）端到端 ⇒ supported:false 如实
+ok 5 - P0-2 abort：假适配器（createFakeRuntimeAdapter，无 abort 字段）端到端 ⇒ supported:false 如实
+  ---
+  duration_ms: 10.2601
+  type: 'test'
+  ...
+# Subtest: P0-1 send：opts 原样透传给 prompt(text, opts)——逐字相等且同一引用（不克隆）
+ok 6 - P0-1 send：opts 原样透传给 prompt(text, opts)——逐字相等且同一引用（不克隆）
+  ---
+  duration_ms: 8.774
+  type: 'test'
+  ...
+# Subtest: P0-1 send：空数组 = 无图，同样原样透传（不吞字段）
+ok 7 - P0-1 send：空数组 = 无图，同样原样透传（不吞字段）
+  ---
+  duration_ms: 9.4442
+  type: 'test'
+  ...
+# Subtest: P0-1 send：不传 opts ⇒ 旧行为逐字不变（prompt 恰 1 个实参）
+ok 8 - P0-1 send：不传 opts ⇒ 旧行为逐字不变（prompt 恰 1 个实参）
+  ---
+  duration_ms: 8.9697
+  type: 'test'
+  ...
+# Subtest: 逐轮来源只由编排消费，真实ACK链回一次且图片数组原引用保留
+ok 9 - 逐轮来源只由编排消费，真实ACK链回一次且图片数组原引用保留
+  ---
+  duration_ms: 11.2175
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 395.1432

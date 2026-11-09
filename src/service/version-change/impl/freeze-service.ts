@@ -10,7 +10,8 @@
 // · 冻结按触发源归属（F35）：customer 类 reason（vca-approved/version-upgrade-approved/
 //   detail-item-applied/proposal-confirmed/intent-confirmed）带 `decidedBy:"customer"`；
 //   application 类 reason（amendment-submitted/handoff-pin-bootstrap/bootstrap-vca-approved/
-//   migrated-legacy）不冒充客户；
+//   migrated-legacy）不冒充客户；judge-delegated（2026-11-09，客户「替我决策」下判断 agent 代批）
+//   仅 proposal-confirmed/intent-confirmed，携带 judge 来源、**无** decidedBy/decisionId/actorRoleId；
 // · 解冻只能通过新版本 + VCA 或客户确认的迁移/恢复例外；本 Service 不提供解冻写路径。
 // 本文件不 import 门禁引擎实现、不读盘；同步冻结快照归 C2b（F7）。
 
@@ -18,7 +19,9 @@ import { isDirectActionSource, isSnapshotRef } from "../../../model/trunk.ts";
 import {
   DOC_FREEZE_APPLICATION_REASONS,
   DOC_FREEZE_CUSTOMER_REASONS,
+  DOC_FREEZE_JUDGE_DELEGATED_REASONS,
   DOC_FREEZE_REASONS,
+  isJudgeDelegatedSource,
   isValidDocFreezeRecord,
   type DocFreezeLookup,
   type DocFreezeReason,
@@ -71,7 +74,8 @@ function keyOf(path: string, version: number): string {
 
 /**
  * 构造并校验一条冻结记录（F35 归属纪律）。customer 类 reason 必须带 `decisionId`；
- * `proposal-confirmed`/`intent-confirmed` 无 VCA 时合成非空 applicationId（PM §4.10-7）。
+ * `proposal-confirmed`/`intent-confirmed` 无 VCA 时合成非空 applicationId（PM §4.10-7）；
+ * judge-delegated（2026-11-09）按 `source.requestId` 合成 `proposal-/intent-<requestId>`，禁止客户字段。
  */
 export function buildDocFreezeRecord(input: DocFreezeInput): ServiceResult<DocFreezeRecordInput, FreezeFailureCode> {
   const path = normalizeServiceRelPath(input.path);
@@ -90,13 +94,22 @@ export function buildDocFreezeRecord(input: DocFreezeInput): ServiceResult<DocFr
   if (!direct && input.source?.kind === "role-direct") return fail("doc-freeze-invalid", "Role source requires role-direct-applied reason");
   const customerReason = isCustomerReason(input.reason);
   const delegated = customerReason && input.source?.kind === "chief-delegated";
-  const origin = direct ? "role-direct" : delegated ? "chief-delegated" : customerReason ? "customer" : "application";
+  // 2026-11-09 judge-delegated（W-J2/I-21/F6）：客户开启「替我决策」后的 judge 代批来源；
+  // 仅 proposal-confirmed/intent-confirmed 允许（Q5 客户主权：VCA/version-upgrade/detail 等拒绝 judge 来源）。
+  const judged = customerReason && input.source?.kind === "judge-delegated";
+  const origin = direct ? "role-direct" : delegated ? "chief-delegated" : judged ? "judge-delegated" : customerReason ? "customer" : "application";
+  if (!direct && input.source?.kind === "judge-delegated" && (!judged
+    || !(DOC_FREEZE_JUDGE_DELEGATED_REASONS as readonly string[]).includes(input.reason)))
+    return fail("doc-freeze-invalid", "Judge source only supports proposal-confirmed/intent-confirmed without customer fields");
   if (delegated && (input.decisionId !== undefined || input.decidedBy !== undefined || input.actorRoleId !== "chief"))
     return fail("doc-freeze-invalid", "Delegated freeze must retain the true chief source without customer fields");
+  if (judged && (!isJudgeDelegatedSource(input.source)
+    || input.decisionId !== undefined || input.decidedBy !== undefined || input.actorRoleId !== undefined))
+    return fail("doc-freeze-invalid", "Judge-delegated freeze must keep its judge source without fabricated customer fields");
   if (input.origin !== undefined && input.origin !== origin) {
     return fail("doc-freeze-invalid", `reason=${input.reason} 的 origin 必须为 ${origin}（F35）`);
   }
-  if (customerReason && !delegated && (input.decisionId === undefined || input.decisionId.trim() === "")) {
+  if (customerReason && !delegated && !judged && (input.decisionId === undefined || input.decisionId.trim() === "")) {
     return fail("doc-freeze-invalid", `reason=${input.reason} 为客户确认类，必须带 decisionId`);
   }
   if (!customerReason && input.decidedBy !== undefined) {
@@ -105,13 +118,31 @@ export function buildDocFreezeRecord(input: DocFreezeInput): ServiceResult<DocFr
 
   let applicationId = input.applicationId?.trim() ?? "";
   if (applicationId === "") {
-    if (input.reason === "proposal-confirmed" && input.decisionId !== undefined) {
+    if (judged && input.source?.kind === "judge-delegated") {
+      // F4：judge 无客户 decisionId，统一按 source.requestId 合成（与 intent-confirmed 生产/复核口径一致）。
+      applicationId = `${input.reason === "intent-confirmed" ? "intent" : "proposal"}-${input.source.requestId}`;
+    } else if (input.reason === "proposal-confirmed" && input.decisionId !== undefined) {
       applicationId = `proposal-${input.decisionId}`;
     } else if (input.reason === "intent-confirmed" && input.decisionId !== undefined) {
       applicationId = `intent-${input.decisionId}`;
     } else {
       return fail("doc-freeze-application-id-missing", `reason=${input.reason} 的 applicationId 不得为空`);
     }
+  }
+
+  if (judged && input.source?.kind === "judge-delegated") {
+    // F6：judge 记录显式构造（不依赖 spread），不带客户字段；摘要字段按账本原值复制、不截断（G1）。
+    const freeze: DocFreezeRecord = {
+      schema: "doc-freeze/v1",
+      applicationId,
+      reason: input.reason,
+      origin: "judge-delegated",
+      source: input.source,
+      ...(input.snapshotRef !== undefined ? { snapshotRef: input.snapshotRef } : {}),
+      frozenAt: input.at,
+    };
+    if (!isValidDocFreezeRecord(freeze)) return fail("doc-freeze-invalid", "Freeze source does not satisfy the shared Model invariant");
+    return { ok: true, value: { path, version: input.version, sha256: input.sha256, freeze } };
   }
 
   const freeze: DocFreezeRecord = {
@@ -121,7 +152,7 @@ export function buildDocFreezeRecord(input: DocFreezeInput): ServiceResult<DocFr
     origin,
     ...(input.source !== undefined ? { source: input.source } : {}),
     ...(input.snapshotRef !== undefined ? { snapshotRef: input.snapshotRef } : {}),
-    ...(customerReason && !delegated ? { decidedBy: "customer" as const } : {}),
+    ...(customerReason && !delegated && !judged ? { decidedBy: "customer" as const } : {}),
     ...(input.decisionId !== undefined ? { decisionId: input.decisionId } : {}),
     frozenAt: input.at,
     ...(input.actorRoleId !== undefined ? { actorRoleId: input.actorRoleId } : {}),

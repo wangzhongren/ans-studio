@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: manifest 形状：draft/pinned 合法；schema/state/runId 非法拒绝
+ok 1 - manifest 形状：draft/pinned 合法；schema/state/runId 非法拒绝
+  ---
+  duration_ms: 0.6739
+  type: 'test'
+  ...
+# Subtest: pending draft：M1 无 flow 先建 pending；真实 flow 到达时领养同一 runId
+ok 2 - pending draft：M1 无 flow 先建 pending；真实 flow 到达时领养同一 runId
+  ---
+  duration_ms: 14.693
+  type: 'test'
+  ...
+# Subtest: F5：非法 manifest 不静默跳过——findActiveRun fail-closed
+ok 3 - F5：非法 manifest 不静默跳过——findActiveRun fail-closed
+  ---
+  duration_ms: 4.1001
+  type: 'test'
+  ...
+# Subtest: F5：verifyPinnedRun 要求七类文档键齐备（assets 可为 null，但键必须存在）
+ok 4 - F5：verifyPinnedRun 要求七类文档键齐备（assets 可为 null，但键必须存在）
+  ---
+  duration_ms: 1.3792
+  type: 'test'
+  ...
+# Subtest: P2.4：静态 quickref 由 manifest 生成，逐项与 manifest 文档/hash 一致
+ok 5 - P2.4：静态 quickref 由 manifest 生成，逐项与 manifest 文档/hash 一致
+  ---
+  duration_ms: 0.3102
+  type: 'test'
+  ...
+# Subtest: R4：closeRun 记录 supersede closeReason/幂等；多 draft 逐个关闭；listRunManifestsResult 语义不变
+ok 6 - R4：closeRun 记录 supersede closeReason/幂等；多 draft 逐个关闭；listRunManifestsResult 语义不变
+  ---
+  duration_ms: 22.0975
+  type: 'test'
+  ...
+# Subtest: R1：listRunManifestsResult 保持 all-or-nothing（坏 manifest 整体失败；run-manifest.ts 零改动）
+ok 7 - R1：listRunManifestsResult 保持 all-or-nothing（坏 manifest 整体失败；run-manifest.ts 零改动）
+  ---
+  duration_ms: 3.0645
+  type: 'test'
+  ...
+# Subtest: Q9 A：applyRunChange 接受 directive + directiveId 并写入 manifest；缺/非法 id 拒绝
+ok 8 - Q9 A：applyRunChange 接受 directive + directiveId 并写入 manifest；缺/非法 id 拒绝
+  ---
+  duration_ms: 10.2222
+  type: 'test'
+  ...
+# Subtest: S3：首次 handoff pin 先写 handoff-pin-bootstrap 冻结再 pin；repin 追加 repins/幂等/未冻结拒绝
+ok 9 - S3：首次 handoff pin 先写 handoff-pin-bootstrap 冻结再 pin；repin 追加 repins/幂等/未冻结拒绝
+  ---
+  duration_ms: 66.08
+  type: 'test'
+  ...
+# Subtest: S3：re-pin 名单文档时 run rosterVersion 跟随文档版本（不再滞后）
+ok 10 - S3：re-pin 名单文档时 run rosterVersion 跟随文档版本（不再滞后）
+  ---
+  duration_ms: 61.3723
+  type: 'test'
+  ...
+# Subtest: S3：prepareRunPin 在 ready 语义（已有冻结记录）下拒绝未冻结的最新版本化文档
+ok 11 - S3：prepareRunPin 在 ready 语义（已有冻结记录）下拒绝未冻结的最新版本化文档
+  ---
+  duration_ms: 32.9403
+  type: 'test'
+  ...
+# Subtest: S3：legacy baseline（无冻结记录）按 F29 默认冻结允许 pin、不写 bootstrap；baseline corrupt ⇒ pin fail-closed 指针不变
+ok 12 - S3：legacy baseline（无冻结记录）按 F29 默认冻结允许 pin、不写 bootstrap；baseline corrupt ⇒ pin fail-closed 指针不变
+  ---
+  duration_ms: 58.55
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 504.9178

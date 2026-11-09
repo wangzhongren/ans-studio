@@ -36,6 +36,7 @@ import type {
 } from "./trunk.ts";
 import type {
   DocFreezeReason,
+  DocFreezeSource,
   RefactorErrorCode,
   RefactorForbiddenKind,
   RefactorRequestScope,
@@ -1524,6 +1525,56 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
   judge?: GovernanceJudgeAudit;
 }
 
+/**
+ * D3/appointment 决定引用（2026-11-09 judge-delegated 单一实现，F11）：
+ * customer/judge 用应用真实回填的 `decisionId`；chief-delegated 用 `requestId`；其他来源 `undefined`。
+ * 调用方：apply-journal（prepareRoleActivation/prepareRoleDraftScope）、trunk-runtime、classify-shell
+ * ——一律调用本函数，不得各自手写三元式。judge 的 `decisionId` 是应用生成值（`decision-<requestId>`），
+ * 不是客户 decisionId，也不写入冻结记录。
+ */
+export function requestResolvedD3DecisionId(
+  event: Extract<TaskStateEvent, { kind: "request.resolved" }>,
+): string | undefined {
+  const raw: unknown = event;
+  if (raw === null || typeof raw !== "object") return undefined;
+  if (event.by === "customer" || event.by === "judge") {
+    return typeof event.decisionId === "string" && event.decisionId !== "" ? event.decisionId : undefined;
+  }
+  if (event.by === "chief-delegated") return event.requestId;
+  return undefined;
+}
+
+/**
+ * D3/appointment 的 judge 裁决校验（apply-journal / trunk-runtime / classify-shell 共用，唯一实现；F11/S1）。
+ * 账本事件为裸 JSON.parse：任何非法形状（judge 为 null/非对象/缺字段、engine/reasonCode 空、
+ * operatorId 与 engine 不符、actionSource/directiveId 混入、decisionId 非 `decision-<requestId>`、
+ * group 与 cardKind 不自洽）一律 fail-closed、不抛错。
+ * 卡种/名单约束（targetRoleIds/rosterVersion/rosterSha256 等）由各调用点既有校验保留。
+ */
+export function isJudgeD3Resolution(
+  event: Extract<TaskStateEvent, { kind: "request.resolved" }>,
+): boolean {
+  const raw: unknown = event;
+  if (raw === null || typeof raw !== "object") return false;
+  if (event.by !== "judge") return false;
+  const judge: unknown = event.judge;
+  if (typeof judge !== "object" || judge === null) return false;
+  const audit = judge as GovernanceJudgeAudit;
+  // 账本为裸 JSON.parse：`engine` 的静态类型是 RuntimeKind 字面量联合，但运行时可能是任意值；
+  // 经 unknown 局部量后做真实运行时校验（空串/非字符串 fail-closed），不做静态身份假设。
+  const engine: unknown = audit.engine;
+  if (typeof engine !== "string" || engine === "") return false;
+  if (typeof audit.reasonCode !== "string" || audit.reasonCode === "") return false;
+  if (typeof audit.cardKind !== "string" || typeof audit.group !== "string") return false;
+  if (event.operatorId !== `judge:${engine}`) return false;
+  if (event.actionSource !== undefined || event.directiveId !== undefined) return false;
+  // requestId 缺失/空串必须 fail-closed（否则 `decision-undefined` 等畸形等值可绕过）。
+  if (typeof event.requestId !== "string" || event.requestId === "") return false;
+  if (typeof event.decisionId !== "string" || event.decisionId !== `decision-${event.requestId}`) return false;
+  const group = governanceCardGroup(audit.cardKind);
+  return group !== undefined && group === audit.group;
+}
+
 /** `request.notified`（C-03）：系统通知幕僚；按 `requestId+event` 去重。 */
 export interface RequestNotifiedEvent extends TaskStateEventBase {
   kind: "request.notified";
@@ -1744,9 +1795,11 @@ export interface DocFreezeEvent extends TaskStateEventBase {
   sha256: string;
   applicationId: string;
   reason: DocFreezeReason;
-  origin: "customer" | "application" | "role-direct" | "chief-delegated";
-  actionSource?: DirectActionSource;
-  /** 仅客户确认类 reason（`DOC_FREEZE_CUSTOMER_REASONS`）。 */
+  /** 2026-11-09：追加 `judge-delegated`（judge 代批来源；无当前 producer，防御/未来路径）。 */
+  origin: "customer" | "application" | "role-direct" | "chief-delegated" | "judge-delegated";
+  /** 2026-11-09：type-import 放宽为 `DocFreezeSource`（`DirectActionSource | JudgeDelegatedSource`，不复制）。 */
+  actionSource?: DocFreezeSource;
+  /** 仅客户确认类 reason（`DOC_FREEZE_CUSTOMER_REASONS`）；judge-delegated 不得携带。 */
   decidedBy?: "customer";
   decisionId?: string;
   actorRoleId?: string;

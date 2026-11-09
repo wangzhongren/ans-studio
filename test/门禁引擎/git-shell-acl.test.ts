@@ -436,14 +436,16 @@ async function activationPolicyFixture(format: "sha1" | "sha256") {
   const canonicalRef = (ref: { path: string; sha256: string }) => ({ path: ref.path, sha256: ref.sha256 });
   const plan = previous.artifacts.execution.teamPlan!, roster = previous.artifacts.documents.roster!;
   type Mutation = (input: { manifest: TrunkManifest; activation: Record<string, unknown>; auth: Record<string, unknown>; resolved: Record<string, unknown>; content: Map<string, Buffer> }) => void;
-  async function facts(mutate?: Mutation, delegated = false): Promise<GitPolicyFacts> {
+  async function facts(mutate?: Mutation, delegated = false, judged = false): Promise<GitPolicyFacts> {
     const operationId = "g10-unit-activation", opHash = sha(testJson(operationId)), idHash = sha(testJson(["unit", operationId])), snapshotId = `s-activation-${idHash}`;
-    const requestId = "g10-unit-d3", decisionId = "unit-customer-d3", sourceBy = delegated ? "chief-delegated" : "customer";
+    const requestId = "g10-unit-d3", decisionId = judged ? `decision-${requestId}` : "unit-customer-d3", sourceBy = judged ? "judge" : delegated ? "chief-delegated" : "customer";
     const delegatedSource = { kind: "chief-delegated", actorRoleId: "chief", originRoleId: "nominator", requestId, baseDigest: sha("historical delegation basis"), delegationRevision: 2,
       disposition: "select", selected: ["impl"], reason: "Recorded delegated selection", at };
+    // 2026-11-09 judge-delegated（W-J3）：审计按账本事实自洽（engine/operatorId/group），decisionId 为应用真实回填值。
+    const judgeAudit = { group: "decision", cardKind: "appointment", engine: "claude", reasonCode: "sufficient", selected: ["impl"], at };
     const created = { v: 1, at, kind: "request.created", requestId, flowId: "unit", sourceRoleId: "nominator", cardKind: "appointment" };
     const resolved: Record<string, unknown> = { v: 1, at, kind: "request.resolved", requestId, cardKind: "appointment", by: sourceBy, targetRoleIds: ["impl"], rosterVersion: 1,
-      rosterSha256: roster.sha256, ...(delegated ? { actionSource: delegatedSource } : { decisionId }) };
+      rosterSha256: roster.sha256, ...(judged ? { decisionId, operatorId: "judge:claude", judge: judgeAudit } : delegated ? { actionSource: delegatedSource } : { decisionId }) };
     const content = new Map(baseContent);
     const roleTexts = { "role-card.md": "# Unit implementation\n" + ["组别", "工作立场", "能力描述", "职责与功能导航", "必读资料", "交接", "执行原则", "质量职责", "标准工作流", "交付物清单"].map(section => `## ${section}\nMaintain assigned files.\n`).join(""),
       "boundary.md": "# Boundary\n## Section 1: 可修改文件与目录\n| 类型 | 可操作路径 | 用途 |\n| --- | --- | --- |\n| 目录（私有） | `src/impl/` | implementation |\n",
@@ -592,6 +594,56 @@ for (const format of ["sha1", "sha256"] as const) test(`G10 actual ${format} ind
     assert.ok(facts.businessPublication?.kind === "role-activation-publication");
     assert.equal("runId" in facts.businessPublication.evidence, false); assert.equal("pinDigest" in facts.businessPublication.evidence, false);
   }
+});
+
+// 2026-11-09 judge-delegated（方案 §3.7/I-35、B1 J11/AC-J7）：active D3 接受诚实 judge 审计，
+// 授权期望形状为 `d3Source:"judge"` + 应用真实 `decisionId`（`decision-<requestId>`，不是客户 decisionId、无 actionSource）。
+for (const format of ["sha1", "sha256"] as const) test(`G10 actual ${format} judge-delegated D3 accepts honest judge audit with the real application decisionId`, async t => {
+  const fixture = await activationPolicyFixture(format); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  const facts = await fixture.facts(undefined, false, true), result = checkGitPolicy(facts);
+  assert.equal(result.allowed, true, JSON.stringify(result));
+  const pub = { ...facts, template: "publish-documents" as const, ref: "refs/ans/trunk", publicationRef: "refs/ans/trunk", commands: [...facts.commands!, command("update-ref", "--no-deref", "refs/ans/trunk", facts.candidate!.hex, facts.base!.hex)] };
+  assert.equal(checkGitPolicy(pub).allowed, true, JSON.stringify(checkGitPolicy(pub)));
+});
+
+test("G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources", async t => {
+  const fixture = await activationPolicyFixture("sha1"); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
+  const baseline = await fixture.facts(undefined, false, true);
+  assert.equal(checkGitPolicy(baseline).allowed, true, JSON.stringify(checkGitPolicy(baseline)));
+  const judgeShape = (patch: Record<string, unknown>): Parameters<typeof fixture.facts>[0] => ({ resolved }) => Object.assign(resolved, patch);
+  const mutations: Parameters<typeof fixture.facts>[0][] = [
+    judgeShape({ judge: null }), judgeShape({ judge: "sufficient" }), judgeShape({ judge: [] }), judgeShape({ judge: {} }),
+    ({ resolved }) => { delete resolved.judge; },
+    ({ resolved }) => { (resolved.judge as Record<string, unknown>).engine = ""; },
+    ({ resolved }) => { (resolved.judge as Record<string, unknown>).reasonCode = ""; },
+    ({ resolved }) => { (resolved.judge as Record<string, unknown>).cardKind = "stable-write"; },
+    ({ resolved }) => { (resolved.judge as Record<string, unknown>).group = "approval"; },
+    ({ resolved }) => { resolved.operatorId = "judge:codex"; },
+    ({ resolved }) => { delete resolved.operatorId; },
+    ({ resolved }) => { resolved.decisionId = "unit-customer-d3"; },
+    ({ resolved }) => { resolved.decisionId = "decision-other-request"; },
+    ({ resolved }) => { delete resolved.decisionId; },
+    ({ resolved }) => { resolved.actionSource = { kind: "chief-delegated" }; },
+    ({ resolved }) => { resolved.directiveId = "d-1"; },
+  ];
+  for (const mutate of mutations) {
+    const result = checkGitPolicy(await fixture.facts(mutate, false, true));
+    assert.equal(result.allowed, false, JSON.stringify(result));
+    assert.equal(result.code, "git-policy-active-judge-d3", JSON.stringify(result));
+  }
+  // 授权期望形状只消费 d3Source 与真实 decisionId；伪造/混入其他来源必须拒绝。
+  const authMutations: Parameters<typeof fixture.facts>[0][] = [
+    ({ auth }) => { auth.decisionId = "invented"; }, ({ auth }) => { auth.d3Source = "customer"; },
+    ({ auth }) => { delete auth.decisionId; }, ({ auth }) => { auth.actionSource = { kind: "judge-delegated" }; },
+  ];
+  for (const mutate of authMutations) {
+    const result = checkGitPolicy(await fixture.facts(mutate, false, true));
+    assert.equal(result.allowed, false, JSON.stringify(result));
+    assert.equal(result.code, "git-policy-active-authorization", JSON.stringify(result));
+  }
+  // 既有 customer/chief fixture 伪造 `by:"judge"` 但无审计：继续拒绝（不因新增 judge 分支放行）。
+  const forged = await fixture.facts(({ resolved }) => { resolved.by = "judge"; });
+  assert.equal(checkGitPolicy(forged).allowed, false, JSON.stringify(checkGitPolicy(forged)));
 });
 
 test("G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport", async t => {

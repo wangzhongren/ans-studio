@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: D3 project：根内链接不能把目录授权扩到真实目标（已有文件及不存在尾部）
+ok 1 - D3 project：根内链接不能把目录授权扩到真实目标（已有文件及不存在尾部）
+  ---
+  duration_ms: 3.0284
+  type: 'test'
+  ...
+# Subtest: D3 project：输入和真实路径分别匹配角色边界及任务精确写集
+ok 2 - D3 project：输入和真实路径分别匹配角色边界及任务精确写集
+  ---
+  duration_ms: 2.2845
+  type: 'test'
+  ...
+# Subtest: D3 project：真实路径的条件目录仍须激活，另一根的同名授权不能替代
+ok 3 - D3 project：真实路径的条件目录仍须激活，另一根的同名授权不能替代
+  ---
+  duration_ms: 2.1909
+  type: 'test'
+  ...
+# Subtest: D3 skill：根内链接不能把目录授权扩到真实目标（已有文件及不存在尾部）
+ok 4 - D3 skill：根内链接不能把目录授权扩到真实目标（已有文件及不存在尾部）
+  ---
+  duration_ms: 1.5253
+  type: 'test'
+  ...
+# Subtest: D3 skill：输入和真实路径分别匹配角色边界及任务精确写集
+ok 5 - D3 skill：输入和真实路径分别匹配角色边界及任务精确写集
+  ---
+  duration_ms: 2.9698
+  type: 'test'
+  ...
+# Subtest: D3 skill：真实路径的条件目录仍须激活，另一根的同名授权不能替代
+ok 6 - D3 skill：真实路径的条件目录仍须激活，另一根的同名授权不能替代
+  ---
+  duration_ms: 1.6472
+  type: 'test'
+  ...
+# Subtest: D3：合法链接项目根与技能根以真实根计算相对授权
+ok 7 - D3：合法链接项目根与技能根以真实根计算相对授权
+  ---
+  duration_ms: 1.1083
+  type: 'test'
+  ...
+# Subtest: F6：acceptance.accepted 非 true → 拒绝
+ok 8 - F6：acceptance.accepted 非 true → 拒绝
+  ---
+  duration_ms: 0.1045
+  type: 'test'
+  ...
+# Subtest: F6：accepted 为 true 但 source 为空 → 拒绝
+ok 9 - F6：accepted 为 true 但 source 为空 → 拒绝
+  ---
+  duration_ms: 0.081
+  type: 'test'
+  ...
+# Subtest: F6：accepted 为 true 且 source 非空 → 通过接受门
+ok 10 - F6：accepted 为 true 且 source 非空 → 通过接受门
+  ---
+  duration_ms: 0.3452
+  type: 'test'
+  ...
+# Subtest: file：精确匹配允许，同目录其他文件不匹配
+ok 11 - file：精确匹配允许，同目录其他文件不匹配
+  ---
+  duration_ms: 0.5493
+  type: 'test'
+  ...
+# Subtest: directory：目录下任意路径（含目录自身）允许
+ok 12 - directory：目录下任意路径（含目录自身）允许
+  ---
+  duration_ms: 0.4457
+  type: 'test'
+  ...
+# Subtest: F5：条件目录 + 任务未声明该条件 → 拒绝，理由含缺失 slug，allowedByRoot 不含该目录
+ok 13 - F5：条件目录 + 任务未声明该条件 → 拒绝，理由含缺失 slug，allowedByRoot 不含该目录
+  ---
+  duration_ms: 0.2975
+  type: 'test'
+  ...
+# Subtest: F5：条件目录 + 任务声明该条件 → 放行（仍须过 F4 writeSet）
+ok 14 - F5：条件目录 + 任务声明该条件 → 放行（仍须过 F4 writeSet）
+  ---
+  duration_ms: 0.42
+  type: 'test'
+  ...
+# Subtest: F5：缺失条件与‘未匹配任何条目’是两种不同拒绝理由
+ok 15 - F5：缺失条件与‘未匹配任何条目’是两种不同拒绝理由
+  ---
+  duration_ms: 0.5145
+  type: 'test'
+  ...
+# Subtest: F5 对照：普通 directory 不受 conditions 影响
+ok 16 - F5 对照：普通 directory 不受 conditions 影响
+  ---
+  duration_ms: 0.291
+  type: 'test'
+  ...
+# Subtest: F5：condition slug 格式不合法 → 不激活（不放行）
+ok 17 - F5：condition slug 格式不合法 → 不激活（不放行）
+  ---
+  duration_ms: 0.307
+  type: 'test'
+  ...
+# Subtest: F4：边界内但不在 writeSet 内 → 拒绝；在 writeSet 内 → 允许
+ok 18 - F4：边界内但不在 writeSet 内 → 拒绝；在 writeSet 内 → 允许
+  ---
+  duration_ms: 0.4309
+  type: 'test'
+  ...
+# Subtest: 跨根混淆：项目相对路径命中技能条目 → 拒绝
+ok 19 - 跨根混淆：项目相对路径命中技能条目 → 拒绝
+  ---
+  duration_ms: 0.2347
+  type: 'test'
+  ...
+# Subtest: 跨根混淆：技能绝对路径命中项目条目 → 拒绝
+ok 20 - 跨根混淆：技能绝对路径命中项目条目 → 拒绝
+  ---
+  duration_ms: 0.2345
+  type: 'test'
+  ...
+# Subtest: 规范化：../ 穿越与绝对路径越根
+ok 21 - 规范化：../ 穿越与绝对路径越根
+  ---
+  duration_ms: 0.6055
+  type: 'test'
+  ...
+# Subtest: 规范化：Windows 反斜杠等价
+ok 22 - 规范化：Windows 反斜杠等价
+  ---
+  duration_ms: 0.2739
+  type: 'test'
+  ...
+# Subtest: 规范化：Windows 大小写不敏感（仅 win32）
+ok 23 - 规范化：Windows 大小写不敏感（仅 win32）
+  ---
+  duration_ms: 0.4238
+  type: 'test'
+  ...
+# Subtest: 规范化：绝对与相对混合一致
+ok 24 - 规范化：绝对与相对混合一致
+  ---
+  duration_ms: 0.4115
+  type: 'test'
+  ...
+# Subtest: F7：符号链接/junction 逃逸出根 → 拒绝
+ok 25 - F7：符号链接/junction 逃逸出根 → 拒绝
+  ---
+  duration_ms: 0.5566
+  type: 'test'
+  ...
+# Subtest: F10：拒绝信息按根分组列出允许路径
+ok 26 - F10：拒绝信息按根分组列出允许路径
+  ---
+  duration_ms: 0.7094
+  type: 'test'
+  ...
+# Subtest: scope 可选：无 scope 时仅按边界判定（边界内允许，边界外拒绝）
+ok 27 - scope 可选：无 scope 时仅按边界判定（边界内允许，边界外拒绝）
+  ---
+  duration_ms: 0.6059
+  type: 'test'
+  ...
+# Subtest: scope 可选：有 scope 时 F4 照旧（回归）；无 scope 不抛错
+ok 28 - scope 可选：有 scope 时 F4 照旧（回归）；无 scope 不抛错
+  ---
+  duration_ms: 0.6164
+  type: 'test'
+  ...
+# Subtest: scope 可选：无 scope 时条件目录仍需声明条件（无声明即不激活，fail-closed）
+ok 29 - scope 可选：无 scope 时条件目录仍需声明条件（无声明即不激活，fail-closed）
+  ---
+  duration_ms: 0.2776
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 178.9385

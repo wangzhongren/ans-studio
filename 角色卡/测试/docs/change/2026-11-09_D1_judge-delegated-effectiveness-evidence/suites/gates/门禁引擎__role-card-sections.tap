@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: parseRoleCardSections：H1 与五个映射章节；非映射章节不进入字段
+ok 1 - parseRoleCardSections：H1 与五个映射章节；非映射章节不进入字段
+  ---
+  duration_ms: 0.848
+  type: 'test'
+  ...
+# Subtest: parseRoleCardSections：缺章节/空章节 → undefined（不产生空 known 值）
+ok 2 - parseRoleCardSections：缺章节/空章节 → undefined（不产生空 known 值）
+  ---
+  duration_ms: 0.1631
+  type: 'test'
+  ...
+# Subtest: parseRoleCardSections：忽略 fenced code block 内的伪标题；真实章节正文保留代码块
+ok 3 - parseRoleCardSections：忽略 fenced code block 内的伪标题；真实章节正文保留代码块
+  ---
+  duration_ms: 0.1037
+  type: 'test'
+  ...
+# Subtest: parseRoleCardSections：CRLF/控制字符/空行折叠/首尾修剪与块分隔标记清洗
+ok 4 - parseRoleCardSections：CRLF/控制字符/空行折叠/首尾修剪与块分隔标记清洗
+  ---
+  duration_ms: 0.1099
+  type: 'test'
+  ...
+# Subtest: parseRoleCardSections：标题 200 码点 / 章节 4,000 码点截断并标注原长
+ok 5 - parseRoleCardSections：标题 200 码点 / 章节 4,000 码点截断并标注原长
+  ---
+  duration_ms: 0.4084
+  type: 'test'
+  ...
+# Subtest: stripRoleDataMarkers：两种块分隔标记都替换为 [marker removed]
+ok 6 - stripRoleDataMarkers：两种块分隔标记都替换为 [marker removed]
+  ---
+  duration_ms: 0.0643
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 108.6884

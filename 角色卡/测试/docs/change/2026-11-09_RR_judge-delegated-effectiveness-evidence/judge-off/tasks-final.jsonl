@@ -1,0 +1,6 @@
+{"v":1,"at":"2026-11-09T08:52:39.384Z","kind":"request.created","requestId":"req-9a03babc4a474269","flowId":"judge-demo2","cardKind":"intent-confirm","sourceRoleId":"chief","title":"确认「judge-demo2」需求意图（v1）","context":"是否确认该产品意图（目标/范围/验收标准/非目标与约束）？\n\n[ans-intent-evidence snapshot=s-intent-efdb27397ffc1f6324eaa65b0359084eaf7ed5bbb62b8940de9330f8a28f23d9 path=docs/product/judge-demo2-intent-v1.md sha256=1dc5979fcdf16b3ab42323db143605ef9fed0c71423c4ea403e966d22823541f version=1]","options":[{"id":"confirm","label":"确认意图，进入提案阶段"},{"id":"revise","label":"需要修改（请在卡片反馈中说明）"}]}
+{"v":1,"at":"2026-11-09T08:52:39.395Z","kind":"request.presented","requestId":"req-9a03babc4a474269","to":"customer"}
+{"v":1,"at":"2026-11-09T08:52:39.407Z","kind":"request.notified","requestId":"req-9a03babc4a474269","to":"chief","event":"presented"}
+{"v":1,"at":"2026-11-09T08:52:39.395Z","kind":"request.notified","requestId":"req-9a03babc4a474269","to":"chief","event":"created"}
+{"v":1,"at":"2026-11-09T08:52:39.565Z","kind":"request.resolved","requestId":"req-9a03babc4a474269","decisionId":"decision-req-9a03babc4a474269","cardKind":"intent-confirm","selectedOptionIds":["confirm"],"by":"customer","operatorId":"51054","choice":"confirm"}
+{"v":1,"at":"2026-11-09T08:52:39.574Z","kind":"request.notified","requestId":"req-9a03babc4a474269","to":"chief","event":"resolved"}

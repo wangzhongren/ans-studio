@@ -1,0 +1,12 @@
+test/runtime-core/abort-quarantine.test.ts	natural	3	0	3	0	0	0	1	0
+test/runtime-core/dispatch-workflow-writer-copy.test.ts	natural	2	0	2	0	0	0	1	0
+test/runtime-core/effective-timeouts.test.ts	natural	7	4	3	0	0	0	1	0
+test/runtime-core/file-write-safety.test.ts	natural	11	6	1	0	4	0	1	0
+test/runtime-core/git-capability-tools.test.ts	natural	45	38	7	0	0	0	1	1
+test/runtime-core/prompt-start-acknowledgement.test.ts	natural	5	1	4	0	0	0	1	0
+test/runtime-core/reasoning-effort.test.ts	natural	8	4	4	0	0	0	1	0
+test/runtime-core/session-store.test.ts	natural	4	2	2	0	0	0	1	1
+test/runtime-core/session.test.ts	natural	21	18	3	0	0	0	1	1
+test/runtime-core/submit-capability-tools.test.ts	natural	22	20	2	0	0	0	1	1
+test/runtime-core/trunk-contract.test.ts	natural	8	7	1	0	0	0	1	0
+test/runtime-core/version-change-contract.test.ts	natural	18	17	1	0	0	0	1	0

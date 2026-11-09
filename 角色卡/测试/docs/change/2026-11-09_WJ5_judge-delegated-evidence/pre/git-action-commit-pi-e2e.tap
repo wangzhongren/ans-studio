@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: AC-2：Pi product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）
+ok 1 - AC-2：Pi product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）
+  ---
+  duration_ms: 54453.2225
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 54783.1587

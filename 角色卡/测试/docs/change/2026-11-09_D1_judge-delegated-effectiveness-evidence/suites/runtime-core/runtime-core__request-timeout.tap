@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 默认值：首字节 90000ms / 流空闲 300000ms；错误码与短报为人话且不泄露技术 code
+ok 1 - 默认值：首字节 90000ms / 流空闲 300000ms；错误码与短报为人话且不泄露技术 code
+  ---
+  duration_ms: 0.824
+  type: 'test'
+  ...
+# Subtest: 首字节：到点触发 first-byte，有效耗时如实；错误名不是 TimeoutError（终态 failed）
+ok 2 - 首字节：到点触发 first-byte，有效耗时如实；错误名不是 TimeoutError（终态 failed）
+  ---
+  duration_ms: 0.6994
+  type: 'test'
+  ...
+# Subtest: isRequestFailureCode：已知请求失败码包含 P3 重试耗尽；未知码不误收
+ok 3 - isRequestFailureCode：已知请求失败码包含 P3 重试耗尽；未知码不误收
+  ---
+  duration_ms: 0.0924
+  type: 'test'
+  ...
+# Subtest: 流空闲：首条消息关闭首字节；后续每条消息重置 idle；未超时（长回合）不被误杀
+ok 4 - 流空闲：首条消息关闭首字节；后续每条消息重置 idle；未超时（长回合）不被误杀
+  ---
+  duration_ms: 0.1456
+  type: 'test'
+  ...
+# Subtest: 暂停：交互/工具/abort 清理期间计时停走，恢复后按剩余时间继续（引用计数）
+ok 5 - 暂停：交互/工具/abort 清理期间计时停走，恢复后按剩余时间继续（引用计数）
+  ---
+  duration_ms: 0.1555
+  type: 'test'
+  ...
+# Subtest: stop：停止后不再触发；首字节已到达后的空闲阶段同样可停
+ok 6 - stop：停止后不再触发；首字节已到达后的空闲阶段同样可停
+  ---
+  duration_ms: 0.0909
+  type: 'test'
+  ...
+# Subtest: 首字节时限关闭（0/非有限）时：首条消息前不超时；活动后仍按 idle 计时
+ok 7 - 首字节时限关闭（0/非有限）时：首条消息前不超时；活动后仍按 idle 计时
+  ---
+  duration_ms: 0.1519
+  type: 'test'
+  ...
+# Subtest: 暂停中收到首条消息：首字节标记生效，恢复后只按剩余 idle 计时
+ok 8 - 暂停中收到首条消息：首字节标记生效，恢复后只按剩余 idle 计时
+  ---
+  duration_ms: 0.0961
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 136.2186

@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: Model：schema 常量与冻结导出面（无构建器/seam 运行时导出）
+ok 1 - Model：schema 常量与冻结导出面（无构建器/seam 运行时导出）
+  ---
+  duration_ms: 0.771
+  type: 'test'
+  ...
+# Subtest: Model：registry-unavailable 保留为契约成员（G-5b；生产不使用）
+ok 2 - Model：registry-unavailable 保留为契约成员（G-5b；生产不使用）
+  ---
+  duration_ms: 0.0758
+  type: 'test'
+  ...
+# Subtest: Model：MatrixField/MatrixForce/MatrixRoleDirectories 加法形状可构造
+ok 3 - Model：MatrixField/MatrixForce/MatrixRoleDirectories 加法形状可构造
+  ---
+  duration_ms: 0.086
+  type: 'test'
+  ...
+# Subtest: Model：MatrixRequestChannel 三分量来源语义（内置 registry-capability / worker app-rule）
+ok 4 - Model：MatrixRequestChannel 三分量来源语义（内置 registry-capability / worker app-rule）
+  ---
+  duration_ms: 0.063
+  type: 'test'
+  ...
+# Subtest: Model：无 I/O、不依赖运行层（源码静态检查）
+ok 5 - Model：无 I/O、不依赖运行层（源码静态检查）
+  ---
+  duration_ms: 0.3908
+  type: 'test'
+  ...
+# Subtest: 注册表：六角色矩阵展示字段非空、只读且不进入能力位
+ok 6 - 注册表：六角色矩阵展示字段非空、只读且不进入能力位
+  ---
+  duration_ms: 0.2023
+  type: 'test'
+  ...
+# Subtest: 注册表：ROLE_CARD_REQUIRED_SECTIONS 仍含解析器使用的五个 label（单一来源）
+ok 7 - 注册表：ROLE_CARD_REQUIRED_SECTIONS 仍含解析器使用的五个 label（单一来源）
+  ---
+  duration_ms: 0.0779
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 121.7592

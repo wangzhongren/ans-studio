@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: VCA（version-upgrade bootstrap）：create/submit/approve 冻结 → trunk t1 → apply；幂等与并发
+ok 1 - VCA（version-upgrade bootstrap）：create/submit/approve 冻结 → trunk t1 → apply；幂等与并发
+  ---
+  duration_ms: 111.162
+  type: 'test'
+  ...
+# Subtest: VCA（detail-amendment）：提交冻结修正案 → 批准 → 逐项 applied 冻结 + trunk t2 + apply
+ok 2 - VCA（detail-amendment）：提交冻结修正案 → 批准 → 逐项 applied 冻结 + trunk t2 + apply
+  ---
+  duration_ms: 153.6407
+  type: 'test'
+  ...
+# Subtest: VCA：批准前 toSha256 重验（漂移 ⇒ vca-hash-drift，不冻结）
+ok 3 - VCA：批准前 toSha256 重验（漂移 ⇒ vca-hash-drift，不冻结）
+  ---
+  duration_ms: 43.311
+  type: 'test'
+  ...
+# Subtest: stable-write：request/approve/completeWrite(actualSha) + mini re-pin；失败作废许可
+ok 4 - stable-write：request/approve/completeWrite(actualSha) + mini re-pin；失败作废许可
+  ---
+  duration_ms: 108.1228
+  type: 'test'
+  ...
+# Subtest: 冻结迁移：missing ⇒ 既有文档一律冻结（migrated-legacy）；corrupt ⇒ fail-closed；draft-marker
+ok 5 - 冻结迁移：missing ⇒ 既有文档一律冻结（migrated-legacy）；corrupt ⇒ fail-closed；draft-marker
+  ---
+  duration_ms: 37.0259
+  type: 'test'
+  ...
+# Subtest: refactor 机械写集；C8 裁决：不新增 removed/moved 记录，草稿删除由 R9 verify fail-closed
+ok 6 - refactor 机械写集；C8 裁决：不新增 removed/moved 记录，草稿删除由 R9 verify fail-closed
+  ---
+  duration_ms: 41.5564
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 733.6969

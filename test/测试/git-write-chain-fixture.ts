@@ -17,7 +17,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { RoleSession, RuntimeKind, RuntimeProviderOptions, TaskCreatedEvent, WriteGate } from "../../src/model/runtime.ts";
+import type { CustomerInputOutcome, GovernanceJudgeAudit, RoleSession, RuntimeKind, RuntimeProviderOptions, TaskCreatedEvent, WriteGate } from "../../src/model/runtime.ts";
 import type { CompleteTeamPlanInput, TaskStateEvent } from "../../src/model/runtime.ts";
 import { inspectRuntimeFileGateContext, type RuntimeSessionOptions } from "../../src/service/runtime/session.ts";
 import { openRoleSession } from "../../src/pipeline/orchestration/run-role.ts";
@@ -31,7 +31,7 @@ import { validateRoleDocumentsSnapshot, validateBoundaryYamlText } from "../../s
 import { checkGitPolicy } from "../../src/service/gate/shell-rules.ts";
 import { beginGitHostAction, endGitHostAction, createFsTrunkStore, createProjectTrunkStore, readGitPlanCompletionBasis } from "../../src/provider/trunk/public/trunk-store.ts";
 import { readConfirmedIntentEvidence, readOperationEvents } from "../../src/provider/version-change/public/version-change-store.ts";
-import { executeGitActiveRolePublication, freezeExecutionRun, recordGitHostInventory, recordTaskObservation } from "../../src/pipeline/orchestration/trunk-runtime.ts";
+import { createDirectRoleRuntime, executeGitActiveRolePublication, freezeExecutionRun, recordGitHostInventory, recordTaskObservation } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import { PATHS } from "../编排/fixtures/trunk-project.ts";
 import { AT, sha256, bindSession, entryOf, until } from "./git-action-cross-runtime-fixture.ts";
 
@@ -175,11 +175,16 @@ export interface WriteChain {
   activationInput: Record<string, unknown>;
   activationReceipt: Record<string, unknown>;
   activationSessionId?: string;
+  /** W-J2b：activationMode:"wrapper" 时 Runtime 包装层经真实 recordDirectDelivery 记账的收件人。 */
+  activationNotifications?: Array<{ key: string; recipientRoleId: string }>;
   workflowOperationId: string;
   workflowHeld: ReturnType<typeof holdableVersionedDocWrite>;
   pin: { runId: string; pinDigest: string; run: Record<string, unknown> };
   manifest: Record<string, unknown>;
   workflowAt: string;
+  /** W-J5：真实 intent-confirm 请求/裁决标识与（judge 模式下的）账本 judge 审计。 */
+  intentRequestId: string; intentDecisionId: string; d3RequestId: string; d3DecisionId: string;
+  intentJudgeAudit?: GovernanceJudgeAudit; d3JudgeAudit?: GovernanceJudgeAudit;
 }
 
 /** 以固定来源写一条真实 `repository-work-source/v1`（parent = 真实 chief Core 会话）。 */
@@ -218,7 +223,14 @@ function chainTask(input: {
 export async function buildWriteChain(input: {
   prefix: string;
   extras?: ChainSessionSpec[];
-  activationMode?: "service" | "runtime";
+  /** "wrapper"：W-J2b amendment——经 `createDirectRoleRuntime.activateRoleDocuments` 完成激活（judge D3 跨层正例）。 */
+  activationMode?: "service" | "runtime" | "wrapper";
+  /** W-J5：intent-confirm 结算来源（缺省 customer，既有行为逐字不变）。 */
+  intentBy?: "customer" | "judge";
+  /** W-J5：D3 appointment 结算来源（缺省 customer，既有行为逐字不变）。 */
+  d3By?: "customer" | "judge";
+  /** W-J5：judge 审计字段覆盖（G1 超长原值/引擎变体）。 */
+  judgeAudit?: { engine?: RuntimeKind; model?: string; reason?: string; reasonCode?: string; selected?: string[] };
 }): Promise<WriteChain> {
   const rawRoot = await fsp.mkdtemp(path.join(os.tmpdir(), input.prefix));
   const root = await fsp.realpath(rawRoot);
@@ -247,7 +259,8 @@ export async function buildWriteChain(input: {
     providerFactories: { demo: (options: RuntimeProviderOptions) => createDemoRuntimeAdapter(options, [{ name: "write_file", args: { path: PATHS.workflow, content: CHAIN_WORKFLOW_TEXT } }]) },
   });
   sessions.workflowConvener = workflowConvener as BoundSession;
-  const runtimeActivation = input.activationMode === "runtime";
+  const runtimeActivation = input.activationMode === "runtime" || input.activationMode === "wrapper";
+  const activationNotifications: Array<{ key: string; recipientRoleId: string }> = [];
   const activationHold = runtimeActivation ? holdableActivateRoleDocuments() : undefined;
   const runtimeNominator = runtimeActivation ? await bindSession(root, "claude", "nominator", {
     activateRoleDocuments: activationHold!.activateRoleDocuments,
@@ -298,13 +311,30 @@ export async function buildWriteChain(input: {
   const service = createTrunkService({ projectRoot: root, freezeRegistry: createGuardFreezeRegistry(root, { migrationCompleted: () => true }) });
   const intentPrepared = await service.prepareIntentConfirmation(FLOW_ID);
   if (!intentPrepared.ok) assert.fail(JSON.stringify(intentPrepared));
-  const intentRequestId = "w7-intent-request", intentDecisionId = "w7-intent-decision";
+  const intentRequestId = "w7-intent-request";
+  // W-J5：judge 模式按应用真实回执形状（by/operatorId/judge/decisionId=decision-<requestId>）落账，
+  // 并以与账本 judge 审计逐字段一致的 outcome 结算；缺省 customer 分支逐字不变。
+  const intentJudged = input.intentBy === "judge";
+  const intentDecisionId = intentJudged ? `decision-${intentRequestId}` : "w7-intent-decision";
+  const judgeEngine = input.judgeAudit?.engine ?? "claude" as RuntimeKind;
+  const intentJudgeAudit: GovernanceJudgeAudit | undefined = intentJudged ? {
+    group: "decision", cardKind: "intent-confirm", engine: judgeEngine,
+    ...(input.judgeAudit?.model !== undefined ? { model: input.judgeAudit.model } : {}),
+    reasonCode: input.judgeAudit?.reasonCode ?? "sufficient",
+    ...(input.judgeAudit?.reason !== undefined ? { reason: input.judgeAudit.reason } : {}),
+    selected: [...(input.judgeAudit?.selected ?? ["confirm"])],
+  } : undefined;
   assert.ok((await recordTaskObservation({ projectRoot: root, event: { v: 1, at: AT, kind: "request.created", requestId: intentRequestId, flowId: FLOW_ID,
     sourceRoleId: "chief", cardKind: "intent-confirm", title: "Confirm the exact W7 chain intent", context: intentPrepared.value.marker,
     options: [{ id: "confirm", label: "Confirm" }, { id: "revise", label: "Revise" }] } })).ok);
-  assert.ok((await recordTaskObservation({ projectRoot: root, event: { v: 1, at: AT, kind: "request.resolved", requestId: intentRequestId, cardKind: "intent-confirm",
+  assert.ok((await recordTaskObservation({ projectRoot: root, event: intentJudgeAudit ? { v: 1, at: AT, kind: "request.resolved", requestId: intentRequestId,
+    cardKind: "intent-confirm", by: "judge", decisionId: intentDecisionId, selectedOptionIds: [...intentJudgeAudit.selected!], choice: "confirm",
+    operatorId: `judge:${judgeEngine}`, judge: intentJudgeAudit } : { v: 1, at: AT, kind: "request.resolved", requestId: intentRequestId, cardKind: "intent-confirm",
     by: "customer", decisionId: intentDecisionId, selectedOptionIds: ["confirm"], choice: "confirm" } })).ok);
-  const intentFinalized = await service.finalizeIntentConfirmation(intentPrepared.value, { outcome: "answered", value: { selected: ["confirm"] }, decisionId: intentDecisionId });
+  const intentOutcome: CustomerInputOutcome = intentJudgeAudit
+    ? { outcome: "answered", value: { selected: [...intentJudgeAudit.selected!] }, decisionId: intentDecisionId, operatorId: `judge:${judgeEngine}`, judge: intentJudgeAudit }
+    : { outcome: "answered", value: { selected: ["confirm"] }, decisionId: intentDecisionId };
+  const intentFinalized = await service.finalizeIntentConfirmation(intentPrepared.value, intentOutcome);
   assert.ok(intentFinalized.ok, JSON.stringify(intentFinalized));
   const confirmedIntent = await readConfirmedIntentEvidence(root, "docs/product/demo-intent-v1.md");
   if (!confirmedIntent.ok) assert.fail(JSON.stringify(confirmedIntent));
@@ -415,11 +445,20 @@ export async function buildWriteChain(input: {
     runState: "draft", sideEffect: "docs", text: "Activate the selected role (W7 chain)",
     source: { sourceId: nominationSourceId, path: nominationSource.path, sha256: nominationSource.sha256 } }) });
   assert.ok(nominationRecorded.ok, JSON.stringify(nominationRecorded));
-  const d3RequestId = "w7-d3-request", d3DecisionId = "w7-d3-decision";
+  const d3RequestId = "w7-d3-request";
+  // W-J5：judge 模式下 D3 按应用真实回执形状落账（judge 审计、decisionId=decision-<requestId>）。
+  const d3Judged = input.d3By === "judge";
+  const d3DecisionId = d3Judged ? `decision-${d3RequestId}` : "w7-d3-decision";
+  const d3JudgeAudit: GovernanceJudgeAudit | undefined = d3Judged ? {
+    group: "decision", cardKind: "appointment", engine: judgeEngine,
+    reasonCode: input.judgeAudit?.reasonCode ?? "sufficient", selected: ["impl"],
+  } : undefined;
   assert.ok((await recordTaskObservation({ projectRoot: root, event: { v: 1, at: AT, kind: "request.created", requestId: d3RequestId, flowId: FLOW_ID,
     sourceRoleId: "nominator", cardKind: "appointment", title: "Select the implementation role", options: [{ id: "impl", label: "Implementation" }] } })).ok);
   const rosterRef = planReceipt.rosterRef as { path: string; sha256: string };
-  assert.ok((await recordTaskObservation({ projectRoot: root, event: { v: 1, at: AT, kind: "request.resolved", requestId: d3RequestId, cardKind: "appointment",
+  assert.ok((await recordTaskObservation({ projectRoot: root, event: d3JudgeAudit ? { v: 1, at: AT, kind: "request.resolved", requestId: d3RequestId, cardKind: "appointment",
+    by: "judge", decisionId: d3DecisionId, selectedOptionIds: ["impl"], choice: "impl", targetRoleIds: ["impl"], rosterVersion: 1, rosterSha256: rosterRef.sha256,
+    operatorId: `judge:${judgeEngine}`, judge: d3JudgeAudit } : { v: 1, at: AT, kind: "request.resolved", requestId: d3RequestId, cardKind: "appointment",
     by: "customer", decisionId: d3DecisionId, choice: "impl", targetRoleIds: ["impl"], rosterVersion: 1, rosterSha256: rosterRef.sha256 } })).ok);
   const cardBytes = await fsp.readFile(path.join(root, PATHS.roleCard));
   const boundaryMdBytes = await fsp.readFile(path.join(root, "角色卡/impl/boundary.md"));
@@ -435,9 +474,11 @@ export async function buildWriteChain(input: {
   if (!quality.ok) assert.fail(JSON.stringify(quality));
   if (!boundary.ok) assert.fail(JSON.stringify(boundary));
   let activationReceipt: Record<string, unknown>, activationSessionId: string | undefined;
-  if (input.activationMode === "runtime") {
-    // runtime 激活：真实 nominator Core 回合（active activate_role_documents）+ 真实 host inventory +
-    // `executeGitActiveRolePublication`（调用点组合 authorization 并 write-ahead 写 sidecar）。
+  if (input.activationMode === "runtime" || input.activationMode === "wrapper") {
+    // runtime/wrapper 激活：真实 nominator Core 回合（active activate_role_documents）+ 真实 host
+    // inventory。runtime 直接调 `executeGitActiveRolePublication`（调用点组合 authorization 并
+    // write-ahead 写 sidecar）；wrapper（W-J2b）经 `createDirectRoleRuntime.activateRoleDocuments`
+    // 的完整包装层（含 nominator 模块 preflight 与真实直投记账）完成同一激活。
     const nominator = runtimeNominator;
     assert.ok(nominator && activationHold, "runtime activation requires its pre-bound nominator session");
     if (!nominator || !activationHold) throw new Error("missing runtime nominator session");
@@ -449,8 +490,13 @@ export async function buildWriteChain(input: {
         { hostHandleId: "host-chief", session: sessions.chief!, roleId: "chief", runtime: "demo" },
         { hostHandleId: "host-nominator", session: nominator, roleId: "nominator", runtime: "claude", taskId: nominationTaskId, runId: roleRunId },
       ], 1).ok);
-      const receipt = await executeGitActiveRolePublication({ projectRoot: root, activation: activation.value,
-        checks: quality.roleDocumentChecks, boundaryEntries: boundary.entries, actorRoleId: "nominator" });
+      const receipt = input.activationMode === "wrapper"
+        ? await createDirectRoleRuntime({ projectRoot: root, actorRoleId: "nominator",
+            notifyDirect: async (item) => { activationNotifications.push({ key: item.key, recipientRoleId: item.recipientRoleId }); } })
+          .activateRoleDocuments(activationInput as never)
+        : await executeGitActiveRolePublication({ projectRoot: root, activation: activation.value,
+            checks: quality.roleDocumentChecks, boundaryEntries: boundary.entries, actorRoleId: "nominator" });
+      assert.equal(receipt.ok, true, JSON.stringify(receipt));
       assert.equal(receipt.status, "applied", JSON.stringify(receipt));
       activationReceipt = receipt as unknown as Record<string, unknown>;
       activationSessionId = nominator.sessionId;
@@ -539,9 +585,11 @@ export async function buildWriteChain(input: {
   if (!manifestFinal.ok) assert.fail("w7 fixture final manifest missing: " + JSON.stringify(manifestFinal));
 
   return { root, canonical: root, sessions, service, integration, fsStore, docsRunId, execRunId, initTaskId, docTaskId, planTaskId, nominationTaskId, workflowTaskId,
-    initOperationId, planPath, planText, manifestV1Digest: manifestV1.value.digest, planReceipt, activationInput, activationReceipt, activationSessionId,
+    initOperationId, planPath, planText, manifestV1Digest: manifestV1.value.digest, planReceipt, activationInput, activationReceipt, activationSessionId, activationNotifications,
     workflowOperationId, workflowHeld, pin: { runId: pin.runId, pinDigest: pin.pinDigest, run: pin.run as unknown as Record<string, unknown> },
-    manifest: manifestFinal.value as unknown as Record<string, unknown>, workflowAt };
+    manifest: manifestFinal.value as unknown as Record<string, unknown>, workflowAt,
+    intentRequestId, intentDecisionId, d3RequestId, d3DecisionId,
+    ...(intentJudgeAudit !== undefined ? { intentJudgeAudit } : {}), ...(d3JudgeAudit !== undefined ? { d3JudgeAudit } : {}) };
 }
 
 /** 发布真实 host inventory（真实 desktop 边界；不用调用方自报的普通事实替代）。 */

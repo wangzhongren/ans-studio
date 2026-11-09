@@ -1,0 +1,44 @@
+TAP version 13
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+ok 1 - 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+  ---
+  duration_ms: 243.8562
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+ok 2 - 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+  ---
+  duration_ms: 164.0338
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+ok 3 - alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+  ---
+  duration_ms: 217.8889
+  type: 'test'
+  ...
+# Subtest: 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+ok 4 - 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+  ---
+  duration_ms: 172.8441
+  type: 'test'
+  ...
+# Subtest: 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+ok 5 - 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+  ---
+  duration_ms: 0.5101
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 975.2623

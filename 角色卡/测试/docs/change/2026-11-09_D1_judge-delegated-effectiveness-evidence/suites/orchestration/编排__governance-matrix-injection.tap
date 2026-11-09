@@ -1,0 +1,145 @@
+TAP version 13
+# Subtest: A1 chief：启动快照经 contextSections 注入（单段、固定句、generatedAt、提示上限）
+ok 1 - A1 chief：启动快照经 contextSections 注入（单段、固定句、generatedAt、提示上限）
+  ---
+  duration_ms: 29.6829
+  type: 'test'
+  ...
+# Subtest: A2 五个非幕僚：有工具、无提示段、启动不计算（诊断无 session-start build）
+ok 2 - A2 五个非幕僚：有工具、无提示段、启动不计算（诊断无 session-start build）
+  ---
+  duration_ms: 42.5452
+  type: 'test'
+  ...
+# Subtest: A3 worker：无提示段、无工具；无矩阵诊断 build
+ok 3 - A3 worker：无提示段、无工具；无矩阵诊断 build
+  ---
+  duration_ms: 20.2507
+  type: 'test'
+  ...
+# Subtest: A4 single/su：无提示段、无工具（逐字兼容）
+ok 4 - A4 single/su：无提示段、无工具（逐字兼容）
+  ---
+  duration_ms: 4.7852
+  type: 'test'
+  ...
+# [message] 已解析角色 alpha（kind=project），角色卡：角色卡/alpha/role-card.md
+# [message] 已解析边界，来源：<built-in:ans-governed-construction SKILL boundary>；acceptance=rejected（来源：缺）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 task-1 未声明 scope（仅按角色边界，不做任务收窄）
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# Subtest: A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）
+not ok 5 - A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）
+  ---
+  duration_ms: 10.2619
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\governance-matrix-injection.test.ts:316:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + {
+    +   protectedGitRoots: [
+    +     'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-matrix-arYrpA\\.git'
+    +   ]
+    + }
+    - undefined
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  actual:
+    protectedGitRoots:
+      0: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-matrix-arYrpA\\.git'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/governance-matrix-injection.test.ts:325:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B1 六个内置治理角色均可调用只读工具；chief 同时有提示段
+ok 6 - B1 六个内置治理角色均可调用只读工具；chief 同时有提示段
+  ---
+  duration_ms: 57.4978
+  type: 'test'
+  ...
+# Subtest: B2 参数矩阵：roleId 过滤/未知 roleId 不回显/非法 section/多余字段
+ok 7 - B2 参数矩阵：roleId 过滤/未知 roleId 不回显/非法 section/多余字段
+  ---
+  duration_ms: 43.6364
+  type: 'test'
+  ...
+# Subtest: B3 只读 + 零账本 + gate 判定不变（AC-10/AC-11 编排侧）
+ok 8 - B3 只读 + 零账本 + gate 判定不变（AC-10/AC-11 编排侧）
+  ---
+  duration_ms: 24.9796
+  type: 'test'
+  ...
+# Subtest: C1 卡种快照：六角色 choice/confirm 与 TRIO_CARD_KINDS 拆分一致
+ok 9 - C1 卡种快照：六角色 choice/confirm 与 TRIO_CARD_KINDS 拆分一致
+  ---
+  duration_ms: 9.6548
+  type: 'test'
+  ...
+# Subtest: C2 派发导航：Model 常量/卡种/发起快照/app-rule 派生
+ok 10 - C2 派发导航：Model 常量/卡种/发起快照/app-rule 派生
+  ---
+  duration_ms: 6.608
+  type: 'test'
+  ...
+# Subtest: C3 会话标志：chief 注入通道/下载/shell 时为 available；product 会话 customerInput=false
+ok 11 - C3 会话标志：chief 注入通道/下载/shell 时为 available；product 会话 customerInput=false
+  ---
+  duration_ms: 11.7403
+  type: 'test'
+  ...
+# Subtest: C4 发起快照：六角色 requirementChange/versionDecision/stableWrite 与既有门控一致
+ok 12 - C4 发起快照：六角色 requirementChange/versionDecision/stableWrite 与既有门控一致
+  ---
+  duration_ms: 8.834
+  type: 'test'
+  ...
+# Subtest: D1 启动快照不自动改写；工具刷新、generatedAt 更新、无持久缓存
+ok 13 - D1 启动快照不自动改写；工具刷新、generatedAt 更新、无持久缓存
+  ---
+  duration_ms: 47.2337
+  type: 'test'
+  ...
+# Subtest: E1 枚举失败：worker 段 unavailable/degraded，不误报尚未 bootstrap
+ok 14 - E1 枚举失败：worker 段 unavailable/degraded，不误报尚未 bootstrap
+  ---
+  duration_ms: 5.9322
+  type: 'test'
+  ...
+# Subtest: E2 无目录 / 全坏目录 / 归档：三种状态如实区分且归档不出行
+ok 15 - E2 无目录 / 全坏目录 / 归档：三种状态如实区分且归档不出行
+  ---
+  duration_ms: 18.0812
+  type: 'test'
+  ...
+# Subtest: E3 恶意/超长角色卡：数据化包裹、清洗、限长（PROMPT/TOOL 常量）
+ok 16 - E3 恶意/超长角色卡：数据化包裹、清洗、限长（PROMPT/TOOL 常量）
+  ---
+  duration_ms: 326.3265
+  type: 'test'
+  ...
+# Subtest: E4 来源/unknown/强制力：unknown 带原因、worker 约定不写成硬拒、固定句
+ok 17 - E4 来源/unknown/强制力：unknown 带原因、worker 约定不写成硬拒、固定句
+  ---
+  duration_ms: 14.0027
+  type: 'test'
+  ...
+# Subtest: F3 上限常量与 C1b 冻结值一致，且工具文本不超限
+ok 18 - F3 上限常量与 C1b 冻结值一致，且工具文本不超限
+  ---
+  duration_ms: 0.1153
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 17
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1003.5146

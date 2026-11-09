@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: A1/§3.1 示例表：命中 target 与 body 逐条符合
+ok 1 - A1/§3.1 示例表：命中 target 与 body 逐条符合
+  ---
+  duration_ms: 0.6656
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 边界：标记后必须是空白或文本结束，近失配一律不命中
+ok 2 - A1/§3.1 边界：标记后必须是空白或文本结束，近失配一律不命中
+  ---
+  duration_ms: 0.0932
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 前导空白：空格/制表符/换行/全角空格/BOM 均被跳过
+ok 3 - A1/§3.1 前导空白：空格/制表符/换行/全角空格/BOM 均被跳过
+  ---
+  duration_ms: 0.4221
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 多行与正文：只检查开头，其余全部为正文且不二次识别
+ok 4 - A1/§3.1 多行与正文：只检查开头，其余全部为正文且不二次识别
+  ---
+  duration_ms: 0.0975
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 空正文：命中且 body 为空（面板留空、确认禁用）
+ok 5 - A1/§3.1 空正文：命中且 body 为空（面板留空、确认禁用）
+  ---
+  duration_ms: 0.0929
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 空文本/仅空白不命中
+ok 6 - A1/§3.1 空文本/仅空白不命中
+  ---
+  duration_ms: 0.4798
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 非字符串入参返回 undefined 且不抛错
+ok 7 - A1/§3.1 非字符串入参返回 undefined 且不抛错
+  ---
+  duration_ms: 0.1515
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 零依赖：marker 源文件无 import/require、无 Node 全局
+ok 8 - A1/§3.1 零依赖：marker 源文件无 import/require、无 Node 全局
+  ---
+  duration_ms: 2.6779
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 118.497

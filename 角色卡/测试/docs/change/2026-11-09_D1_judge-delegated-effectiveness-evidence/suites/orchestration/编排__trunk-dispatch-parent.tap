@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: P1-C：demo 严格路径保持现状通过；Claude/Pi/Codex 受限应用中介路径通过（P3/P4/P6/P7 判定层）
+ok 1 - P1-C：demo 严格路径保持现状通过；Claude/Pi/Codex 受限应用中介路径通过（P3/P4/P6/P7 判定层）
+  ---
+  duration_ms: 1.1567
+  type: 'test'
+  ...
+# Subtest: P1-C：活跃 dispatch 工具名必须在该运行时的 applicationMediation.appTools 中（P6/N16 正向侧）
+ok 2 - P1-C：活跃 dispatch 工具名必须在该运行时的 applicationMediation.appTools 中（P6/N16 正向侧）
+  ---
+  duration_ms: 0.1653
+  type: 'test'
+  ...
+# Subtest: P1-C：受控 shell（run_shell/start_background_task）列在 appTools 时受限路径可通过（P6/N16）
+ok 3 - P1-C：受控 shell（run_shell/start_background_task）列在 appTools 时受限路径可通过（P6/N16）
+  ---
+  duration_ms: 0.1148
+  type: 'test'
+  ...
+# Subtest: P1-C：Claude/Pi 已配置外来 MCP 精确枚举且一致时通过（P7/N26 正向侧）
+ok 4 - P1-C：Claude/Pi 已配置外来 MCP 精确枚举且一致时通过（P7/N26 正向侧）
+  ---
+  duration_ms: 0.0859
+  type: 'test'
+  ...
+# Subtest: P1-C：creatorReports 只在 hub=true 时校验；合法 provenance 通过（P5/hub 行为）
+ok 5 - P1-C：creatorReports 只在 hub=true 时校验；合法 provenance 通过（P5/hub 行为）
+  ---
+  duration_ms: 0.2057
+  type: 'test'
+  ...
+# Subtest: P1-C：parent.kind 缺省或 message 通过；提供 creatorReports 时跳过 kind 检查（旧分支顺序）
+ok 6 - P1-C：parent.kind 缺省或 message 通过；提供 creatorReports 时跳过 kind 检查（旧分支顺序）
+  ---
+  duration_ms: 0.1074
+  type: 'test'
+  ...
+# Subtest: P1-C：严格路径原条件逐条保留（disposed/非默认核/非 chief/wrong runtime/unknown surface/session/factory/turn/stop/no dispatch/input/settled）
+ok 7 - P1-C：严格路径原条件逐条保留（disposed/非默认核/非 chief/wrong runtime/unknown surface/session/factory/turn/stop/no dispatch/input/settled）
+  ---
+  duration_ms: 0.1686
+  type: 'test'
+  ...
+# Subtest: P1-C：demo 只走严格路径——新应用中介路径拒绝 demo（N13）
+ok 8 - P1-C：demo 只走严格路径——新应用中介路径拒绝 demo（N13）
+  ---
+  duration_ms: 0.0766
+  type: 'test'
+  ...
+# Subtest: P1-C：applicationMediation 与 observed 同时出现 ⇒ 双路径歧义拒绝（N20/F15）
+ok 9 - P1-C：applicationMediation 与 observed 同时出现 ⇒ 双路径歧义拒绝（N20/F15）
+  ---
+  duration_ms: 0.1128
+  type: 'test'
+  ...
+# Subtest: P1-C：其它 runtime 一律拒绝；core 缺失时拒绝（N1/N9 判定侧）
+ok 10 - P1-C：其它 runtime 一律拒绝；core 缺失时拒绝（N1/N9 判定侧）
+  ---
+  duration_ms: 0.1206
+  type: 'test'
+  ...
+# Subtest: P1-C：受限路径逐条负例（N10/N21/N22/N23/N25/N27/N28）
+ok 11 - P1-C：受限路径逐条负例（N10/N21/N22/N23/N25/N27/N28）
+  ---
+  duration_ms: 0.2379
+  type: 'test'
+  ...
+# Subtest: P1-C：Codex 应用中介路径必须有 native 事实且绑定（N14/N27）
+ok 12 - P1-C：Codex 应用中介路径必须有 native 事实且绑定（N14/N27）
+  ---
+  duration_ms: 0.083
+  type: 'test'
+  ...
+# Subtest: P1-C Amendment-1：Codex 绑定按 P1.6 §4.4 字面谓词——字段同值通过，任一缺失/不一致拒绝（N14/N27）
+ok 13 - P1-C Amendment-1：Codex 绑定按 P1.6 §4.4 字面谓词——字段同值通过，任一缺失/不一致拒绝（N14/N27）
+  ---
+  duration_ms: 0.1118
+  type: 'test'
+  ...
+# Subtest: P1-C：Codex 配置外来 MCP ⇒ fail-closed（N28/F19）
+ok 14 - P1-C：Codex 配置外来 MCP ⇒ fail-closed（N28/F19）
+  ---
+  duration_ms: 0.0623
+  type: 'test'
+  ...
+# Subtest: P1-C：Codex 先走严格路径；严格路径不成立时才走受限路径，且严格路径本身仍 unknown（P6）
+ok 15 - P1-C：Codex 先走严格路径；严格路径不成立时才走受限路径，且严格路径本身仍 unknown（P6）
+  ---
+  duration_ms: 0.0762
+  type: 'test'
+  ...
+# Subtest: P1-C：creatorReports 数量/重复/角色/turn/reportId/origin/status 任一不匹配 ⇒ 拒绝（N19）
+ok 16 - P1-C：creatorReports 数量/重复/角色/turn/reportId/origin/status 任一不匹配 ⇒ 拒绝（N19）
+  ---
+  duration_ms: 0.1793
+  type: 'test'
+  ...
+# Subtest: P1-C：parent.kind 非 message（且无 creatorReports）⇒ 拒绝（N18）
+ok 17 - P1-C：parent.kind 非 message（且无 creatorReports）⇒ 拒绝（N18）
+  ---
+  duration_ms: 0.0406
+  type: 'test'
+  ...
+# Subtest: P1-C：TOCTOU 两次复检——证据在两次判定之间变化时第二次拒绝（N17）
+ok 18 - P1-C：TOCTOU 两次复检——证据在两次判定之间变化时第二次拒绝（N17）
+  ---
+  duration_ms: 0.0834
+  type: 'test'
+  ...
+# Subtest: X-G：D5 单实现守卫（最终结构）——gates 唯一判定实现、trunk-runtime 只 import 并恰两处调用、无本地实现/声明/桥接、写/停稳门不读应用中介证据
+ok 19 - X-G：D5 单实现守卫（最终结构）——gates 唯一判定实现、trunk-runtime 只 import 并恰两处调用、无本地实现/声明/桥接、写/停稳门不读应用中介证据
+  ---
+  duration_ms: 5.5528
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 91.5841

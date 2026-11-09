@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny
+ok 1 - 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny
+  ---
+  duration_ms: 15.7446
+  type: 'test'
+  ...
+# Subtest: 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖）
+ok 2 - 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖）
+  ---
+  duration_ms: 0.4555
+  type: 'test'
+  ...
+# Subtest: 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝
+ok 3 - 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝
+  ---
+  duration_ms: 6.155
+  type: 'test'
+  ...
+# Subtest: 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」）
+ok 4 - 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」）
+  ---
+  duration_ms: 19.9844
+  type: 'test'
+  ...
+# Subtest: W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit
+ok 5 - W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit
+  ---
+  duration_ms: 12.4089
+  type: 'test'
+  ...
+# Subtest: 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny
+ok 6 - 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny
+  ---
+  duration_ms: 3.8151
+  type: 'test'
+  ...
+# Subtest: run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变）
+ok 7 - run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变）
+  ---
+  duration_ms: 15.256
+  type: 'test'
+  ...
+# Subtest: run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用）
+ok 8 - run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用）
+  ---
+  duration_ms: 12.2654
+  type: 'test'
+  ...
+# Subtest: run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑
+ok 9 - run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑
+  ---
+  duration_ms: 12.0602
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 393.4259

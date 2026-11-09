@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: drain I0-3 白名单逐字冻结：仅两个包装层 reason + 四个 native 覆盖/传输关闭 reason
+ok 1 - drain I0-3 白名单逐字冻结：仅两个包装层 reason + 四个 native 覆盖/传输关闭 reason
+  ---
+  duration_ms: 0.8966
+  type: 'test'
+  ...
+# Subtest: drain 基础真值表：providerFinished/activeTools/tracked processes
+ok 2 - drain 基础真值表：providerFinished/activeTools/tracked processes
+  ---
+  duration_ms: 0.1862
+  type: 'test'
+  ...
+# Subtest: drain 不要求 status quiescent / processCoverage complete / native 存在（Claude/Pi 形态）
+ok 3 - drain 不要求 status quiescent / processCoverage complete / native 存在（Claude/Pi 形态）
+  ---
+  duration_ms: 0.0875
+  type: 'test'
+  ...
+# Subtest: drain 显式白名单 reason 单独与组合均不阻断
+ok 4 - drain 显式白名单 reason 单独与组合均不阻断
+  ---
+  duration_ms: 0.0761
+  type: 'test'
+  ...
+# Subtest: drain 未列/未知 reason 一律阻断（F6/R7/S1 清单）
+ok 5 - drain 未列/未知 reason 一律阻断（F6/R7/S1 清单）
+  ---
+  duration_ms: 0.0996
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 90.1612

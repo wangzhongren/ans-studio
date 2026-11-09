@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（2000 ms）」+ timedOut/timeoutMs，耗时短收口
+ok 1 - F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（2000 ms）」+ timedOut/timeoutMs，耗时短收口
+  ---
+  duration_ms: 2109.3564
+  type: 'test'
+  ...
+# Subtest: F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据
+ok 2 - F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据
+  ---
+  duration_ms: 2111.5382
+  type: 'test'
+  ...
+# Subtest: F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实
+ok 3 - F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实
+  ---
+  duration_ms: 4922.5142
+  type: 'test'
+  ...
+# Subtest: F-1：快命令 + 大时限不误杀（ok:true、无 timedOut）
+ok 4 - F-1：快命令 + 大时限不误杀（ok:true、无 timedOut）
+  ---
+  duration_ms: 53.2985
+  type: 'test'
+  ...
+# Subtest: F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env
+ok 5 - F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env
+  ---
+  duration_ms: 2352.7707
+  type: 'test'
+  ...
+# Subtest: F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果
+ok 6 - F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果
+  ---
+  duration_ms: 2400.7502
+  type: 'test'
+  ...
+# Subtest: F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例）
+ok 7 - F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例）
+  ---
+  duration_ms: 161.5987
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 14345.2746

@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 文案常量定格：投影 summary 两条（消费方回退标签；措辞变化须显式改契约）
+ok 1 - 文案常量定格：投影 summary 两条（消费方回退标签；措辞变化须显式改契约）
+  ---
+  duration_ms: 0.4561
+  type: 'test'
+  ...
+# Subtest: 形状钉：原始事实 → 呈现详情（text 为 DisplayTextV1 三字段；status/durationMs 透传；无多余字段）
+ok 2 - 形状钉：原始事实 → 呈现详情（text 为 DisplayTextV1 三字段；status/durationMs 透传；无多余字段）
+  ---
+  duration_ms: 1.0995
+  type: 'test'
+  ...
+# Subtest: 如实面：omitted＝平台省略正文（违规随载荷带正文也按省略归一为空、不呈现）；status 未知＝诊断（不发明新态）
+ok 3 - 如实面：omitted＝平台省略正文（违规随载荷带正文也按省略归一为空、不呈现）；status 未知＝诊断（不发明新态）
+  ---
+  duration_ms: 0.1551
+  type: 'test'
+  ...
+# Subtest: 如实面：durationMs 仅真实信号（0＝真实保留；负数/NaN/Infinity/非数字一律丢弃——绝不发明时间）
+ok 4 - 如实面：durationMs 仅真实信号（0＝真实保留；负数/NaN/Infinity/非数字一律丢弃——绝不发明时间）
+  ---
+  duration_ms: 0.214
+  type: 'test'
+  ...
+# Subtest: 保护面：凭据值替换（redacted:true）＋清洁管道（Bearer/URL）＋UTF-8 字节预算（truncated:true、无截断鬼影）
+ok 5 - 保护面：凭据值替换（redacted:true）＋清洁管道（Bearer/URL）＋UTF-8 字节预算（truncated:true、无截断鬼影）
+  ---
+  duration_ms: 0.4306
+  type: 'test'
+  ...
+# Subtest: 幂等：已投影形再投影，形状与标记不变（历史读取路径的再投影即此性质）
+ok 6 - 幂等：已投影形再投影，形状与标记不变（历史读取路径的再投影即此性质）
+  ---
+  duration_ms: 0.1147
+  type: 'test'
+  ...
+# Subtest: 坏件 ⇒ 如实诊断形（绝不抛、绝不假内容）：版本/source/status/text 形状逐项
+ok 7 - 坏件 ⇒ 如实诊断形（绝不抛、绝不假内容）：版本/source/status/text 形状逐项
+  ---
+  duration_ms: 0.1263
+  type: 'test'
+  ...
+# Subtest: Service 单点：原始推理事实在 emit 恰一次投影（summary 定格、turnId 保留、原始正文与随载荷 summary 绝不外流）；坏件走如实诊断行；非推理事件逐字现状
+ok 8 - Service 单点：原始推理事实在 emit 恰一次投影（summary 定格、turnId 保留、原始正文与随载荷 summary 绝不外流）；坏件走如实诊断行；非推理事件逐字现状
+  ---
+  duration_ms: 10.8707
+  type: 'test'
+  ...
+# Subtest: 持久化/回放同形：存储面只见投影形且无原始凭据；历史读取对存量投影（幂等）与手编原始事实（同管道）都过同一单点
+ok 9 - 持久化/回放同形：存储面只见投影形且无原始凭据；历史读取对存量投影（幂等）与手编原始事实（同管道）都过同一单点
+  ---
+  duration_ms: 33.6783
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 270.6246

@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: C2c 契约版本与状态转移表（create/submit/approve/reject/apply）
+ok 1 - C2c 契约版本与状态转移表（create/submit/approve/reject/apply）
+  ---
+  duration_ms: 0.5554
+  type: 'test'
+  ...
+# Subtest: VCA 发起角色唯一：version-upgrade 仅 product，detail-amendment 仅 rapporteur
+ok 2 - VCA 发起角色唯一：version-upgrade 仅 product，detail-amendment 仅 rapporteur
+  ---
+  duration_ms: 1.2665
+  type: 'test'
+  ...
+# Subtest: VCA 目标矩阵：upgrade 只 contract/roster；detail 可 execution；workflow/boundary/product-intent 拒绝
+ok 3 - VCA 目标矩阵：upgrade 只 contract/roster；detail 可 execution；workflow/boundary/product-intent 拒绝
+  ---
+  duration_ms: 0.6181
+  type: 'test'
+  ...
+# Subtest: 作者写区/kind 映射纯函数（AC-19/AC-29）
+ok 4 - 作者写区/kind 映射纯函数（AC-19/AC-29）
+  ---
+  duration_ms: 0.1761
+  type: 'test'
+  ...
+# Subtest: targets↔items 一致性（F36/F42/AC-28）：none 不是 target、无实际变更/额外项拒绝
+ok 5 - targets↔items 一致性（F36/F42/AC-28）：none 不是 target、无实际变更/额外项拒绝
+  ---
+  duration_ms: 0.3106
+  type: 'test'
+  ...
+# Subtest: baseTrunk 匹配与 bootstrap（F30/AC-25）：null+bootstrap 仅无 trunk 时可用
+ok 6 - baseTrunk 匹配与 bootstrap（F30/AC-25）：null+bootstrap 仅无 trunk 时可用
+  ---
+  duration_ms: 1.2844
+  type: 'test'
+  ...
+# Subtest: version-upgrade 全流程：提交定格/批准冻结/apply 记录；幂等（AC-4/AC-5/AC-14）
+ok 7 - version-upgrade 全流程：提交定格/批准冻结/apply 记录；幂等（AC-4/AC-5/AC-14）
+  ---
+  duration_ms: 0.3337
+  type: 'test'
+  ...
+# Subtest: 并发与状态保护：同 flow 仅一个 submitted/approved；批准前不能 apply；拒绝后不可复用
+ok 8 - 并发与状态保护：同 flow 仅一个 submitted/approved；批准前不能 apply；拒绝后不可复用
+  ---
+  duration_ms: 0.409
+  type: 'test'
+  ...
+# Subtest: 批准前哈希重验（F38/AC-26）：目标漂移拒绝批准且保持 submitted
+ok 9 - 批准前哈希重验（F38/AC-26）：目标漂移拒绝批准且保持 submitted
+  ---
+  duration_ms: 0.4355
+  type: 'test'
+  ...
+# Subtest: detail-amendment：提交即冻结修正案；批准后逐项 apply 才冻结 applied 项（AC-2/AC-6）
+ok 10 - detail-amendment：提交即冻结修正案；批准后逐项 apply 才冻结 applied 项（AC-2/AC-6）
+  ---
+  duration_ms: 0.3941
+  type: 'test'
+  ...
+# Subtest: 冻结服务迁移（F29/AC-10/AC-21）：missing=一律冻结；migrated-draft 需证据；corrupt=fail-closed
+ok 11 - 冻结服务迁移（F29/AC-10/AC-21）：missing=一律冻结；migrated-draft 需证据；corrupt=fail-closed
+  ---
+  duration_ms: 0.5525
+  type: 'test'
+  ...
+# Subtest: 冻结归属（F35/AC-31）：customer 类需 decisionId；application 类不得带 decidedBy；合成 applicationId
+ok 12 - 冻结归属（F35/AC-31）：customer 类需 decisionId；application 类不得带 decidedBy；合成 applicationId
+  ---
+  duration_ms: 0.1962
+  type: 'test'
+  ...
+# Subtest: judge-delegated 冻结派生（W-J2/J3，2026-11-09）：judge source 仅 proposal/intent；applicationId 按 requestId 合成；客户字段与 Q5 reason 拒绝
+ok 13 - judge-delegated 冻结派生（W-J2/J3，2026-11-09）：judge source 仅 proposal/intent；applicationId 按 requestId 合成；客户字段与 Q5 reason 拒绝
+  ---
+  duration_ms: 0.475
+  type: 'test'
+  ...
+# Subtest: 冻结 bootstrap（F30/AC-25）：handoff-pin 合成 applicationId；bootstrap-vca 需 VCA id；已冻结跳过
+ok 14 - 冻结 bootstrap（F30/AC-25）：handoff-pin 合成 applicationId；bootstrap-vca 需 VCA id；已冻结跳过
+  ---
+  duration_ms: 0.2609
+  type: 'test'
+  ...
+# Subtest: 轻量重构校验（F31/F40/AC-7/AC-8）：convener/flow/越界转 VCA/机械写集/managedBy
+ok 15 - 轻量重构校验（F31/F40/AC-7/AC-8）：convener/flow/越界转 VCA/机械写集/managedBy
+  ---
+  duration_ms: 0.7751
+  type: 'test'
+  ...
+# Subtest: C2b/C2c 联合契约（F34/F35）：C2c 冻结记录经 C2b R9 追加 → 同步快照 frozen/draft 一致
+ok 16 - C2b/C2c 联合契约（F34/F35）：C2c 冻结记录经 C2b R9 追加 → 同步快照 frozen/draft 一致
+  ---
+  duration_ms: 41.1199
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 251.4032

@@ -173,7 +173,12 @@ function versionChangeEvent(
   } as TaskStateEvent;
 }
 
-function freezeEvents(freezes: readonly DocFreezeRecordInput[]): TaskStateEvent[] {
+/**
+ * `doc.freeze` 账本事件镜像（内部纯函数；模块级 export 仅作测试 seam，不是包级公共契约）。
+ * 2026-11-09 judge-delegated（W-J2/I-25/F3）：仅当冻结记录携带 `source` 时镜像 `actionSource`
+ * （防御/未来路径——当前唯一调用方 VCA approve/detail apply 均不带 source，既有事件字节逐字不变，J17 钉住）。
+ */
+export function freezeEvents(freezes: readonly DocFreezeRecordInput[]): TaskStateEvent[] {
   return freezes.map(
     (entry) =>
       ({
@@ -190,6 +195,7 @@ function freezeEvents(freezes: readonly DocFreezeRecordInput[]): TaskStateEvent[
         ...(entry.freeze.decidedBy !== undefined ? { decidedBy: entry.freeze.decidedBy } : {}),
         ...(entry.freeze.decisionId !== undefined ? { decisionId: entry.freeze.decisionId } : {}),
         ...(entry.freeze.actorRoleId !== undefined ? { actorRoleId: entry.freeze.actorRoleId } : {}),
+        ...(entry.freeze.source !== undefined ? { actionSource: entry.freeze.source } : {}),
       }) as TaskStateEvent,
   );
 }

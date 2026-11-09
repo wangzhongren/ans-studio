@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: F6/write_file：首次与写前复核均收到真实最终字节 sha256 与 operation=write
+ok 1 - F6/write_file：首次与写前复核均收到真实最终字节 sha256 与 operation=write
+  ---
+  duration_ms: 21.9952
+  type: 'test'
+  ...
+# Subtest: F6/edit_file：写前复核 gate 收到编辑后最终字节（BOM 保留）sha256 与 operation=edit
+ok 2 - F6/edit_file：写前复核 gate 收到编辑后最终字节（BOM 保留）sha256 与 operation=edit
+  ---
+  duration_ms: 19.1682
+  type: 'test'
+  ...
+# Subtest: F6/向后兼容：旧单参数 WriteGate 实现与直接单参调用零变化
+ok 3 - F6/向后兼容：旧单参数 WriteGate 实现与直接单参调用零变化
+  ---
+  duration_ms: 5.73
+  type: 'test'
+  ...
+# Subtest: F6/写前复核拒绝：携带内容上下文时拒绝 ⇒ write/edit 均不落盘
+ok 4 - F6/写前复核拒绝：携带内容上下文时拒绝 ⇒ write/edit 均不落盘
+  ---
+  duration_ms: 2.848
+  type: 'test'
+  ...
+# Subtest: F6/类型形状：纯phase型不是读取/写入权限，最终hash与operation保持
+ok 5 - F6/类型形状：纯phase型不是读取/写入权限，最终hash与operation保持
+  ---
+  duration_ms: 0.175
+  type: 'test'
+  ...
+# Subtest: R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy
+ok 6 - R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy
+  ---
+  duration_ms: 14.1182
+  type: 'test'
+  ...
+# Subtest: R20 authorized stable edit preserves BOM, exact current SHA and permit base/final SHA policy
+ok 7 - R20 authorized stable edit preserves BOM, exact current SHA and permit base/final SHA policy
+  ---
+  duration_ms: 10.3083
+  type: 'test'
+  ...
+# Subtest: R20 unapproved lexical/canonical paths, unknown coverage, legacy consumers and I/O failures never read unauthorized bytes
+ok 8 - R20 unapproved lexical/canonical paths, unknown coverage, legacy consumers and I/O failures never read unauthorized bytes
+  ---
+  duration_ms: 5.9179
+  type: 'test'
+  ...
+# Subtest: R20 host drift, final base drift, hardlinks and canonical parent replacement fail without commit
+ok 9 - R20 host drift, final base drift, hardlinks and canonical parent replacement fail without commit
+  ---
+  duration_ms: 18.0447
+  type: 'test'
+  ...
+# Subtest: R20 final deny and real rename failure preserve target bytes and remove only the owned temp
+ok 10 - R20 final deny and real rename failure preserve target bytes and remove only the owned temp
+  ---
+  duration_ms: 11.6102
+  type: 'test'
+  ...
+# Subtest: R20 production schema/raw refuse staged host fields before gate, while legacy nonmanaged calls keep old behavior
+ok 11 - R20 production schema/raw refuse staged host fields before gate, while legacy nonmanaged calls keep old behavior
+  ---
+  duration_ms: 11.3035
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 348.4832

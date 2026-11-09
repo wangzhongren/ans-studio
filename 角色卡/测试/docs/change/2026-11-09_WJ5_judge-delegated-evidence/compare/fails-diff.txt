@@ -1,0 +1,18 @@
+--- .tmp-wj5/compare/fails-pre.txt	2026-11-09 15:00:38.763773200 +0800
++++ .tmp-wj5/compare/fails-post.txt	2026-11-09 15:00:42.366743900 +0800
+@@ -1,5 +1,6 @@
+ abort-cleanup-verify	abort 抛错但底层稍后 settle：隔离解除，后续 prompt 可再次进入，不永久卡在「中止清理中」
+ abort-cleanup-verify	底层永不 settle：仍需拒绝后续 prompt（fail-closed），清理失败不等于放行
++customer-authorization-plane-integration	test\\测试\\customer-authorization-plane-integration.test.ts
+ direct-role-capabilities-e2e	Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze
+ download-requests-integration	审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读
+ entry-role-minimal-d	D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）
+@@ -11,6 +12,8 @@
+ g4-skill-verify__h-scope-audit	范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用
+ g4v2-mcp-verify__f-handler	F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行
+ g4v2-mcp-verify__f-handler	F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖
++git-action-activation-e2e	test\\测试\\git-action-activation-e2e.test.ts
++git-action-delivery-claude-e2e	test\\测试\\git-action-delivery-claude-e2e.test.ts
+ governance-e2e-auto__i-full-chain	F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+ governance-e2e-auto__i-full-chain	最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+ real-entry	真实入口:ans role run 编排 --task T-1 以 0 结束

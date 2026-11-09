@@ -1,0 +1,365 @@
+TAP version 13
+# Subtest: 可申请：judge 主动 deny（review 档）→ 记录 → 申请 → 三选一卡（字段取自判拒记录）
+ok 1 - 可申请：judge 主动 deny（review 档）→ 记录 → 申请 → 三选一卡（字段取自判拒记录）
+  ---
+  duration_ms: 2.3384
+  type: 'test'
+  ...
+# Subtest: 可申请：manual + retry-capped（manualAsDeny===true）→ 记录并出卡
+ok 2 - 可申请：manual + retry-capped（manualAsDeny===true）→ 记录并出卡
+  ---
+  duration_ms: 0.1708
+  type: 'test'
+  ...
+# Subtest: 可申请：script 分支（带 approvalContext）→ 记录保存上下文并展示在卡上
+ok 3 - 可申请：script 分支（带 approvalContext）→ 记录保存上下文并展示在卡上
+  ---
+  duration_ms: 0.4069
+  type: 'test'
+  ...
+# Subtest: 不可申请：c=deny 硬拒（script 路径，judge 也在 deny 档） → 工具拒绝、不弹卡、不调 judge/客户
+ok 4 - 不可申请：c=deny 硬拒（script 路径，judge 也在 deny 档） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.1017
+  type: 'test'
+  ...
+# Subtest: 不可申请：c-deny→a-deny（advisory 非 script 的 c=deny 分支） → 工具拒绝、不弹卡、不调 judge/客户
+ok 5 - 不可申请：c-deny→a-deny（advisory 非 script 的 c=deny 分支） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0874
+  type: 'test'
+  ...
+# Subtest: 不可申请：审批档 tier=deny 的 judge 判拒 → 工具拒绝、不弹卡、不调 judge/客户
+ok 6 - 不可申请：审批档 tier=deny 的 judge 判拒 → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0882
+  type: 'test'
+  ...
+# Subtest: 不可申请：确定性前置封堵 preblock:inline-too-large → 工具拒绝、不弹卡、不调 judge/客户
+ok 7 - 不可申请：确定性前置封堵 preblock:inline-too-large → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0531
+  type: 'test'
+  ...
+# Subtest: 不可申请：确定性前置封堵 preblock:unbounded-search → 工具拒绝、不弹卡、不调 judge/客户
+ok 8 - 不可申请：确定性前置封堵 preblock:unbounded-search → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0459
+  type: 'test'
+  ...
+# Subtest: 不可申请：写目标守卫 deny → 工具拒绝、不弹卡、不调 judge/客户
+ok 9 - 不可申请：写目标守卫 deny → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0543
+  type: 'test'
+  ...
+# Subtest: 不可申请：script:context-unavailable → 工具拒绝、不弹卡、不调 judge/客户
+ok 10 - 不可申请：script:context-unavailable → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0921
+  type: 'test'
+  ...
+# Subtest: 不可申请：脚本上下文 failClosed → 工具拒绝、不弹卡、不调 judge/客户
+ok 11 - 不可申请：脚本上下文 failClosed → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0568
+  type: 'test'
+  ...
+# Subtest: 不可申请：只读档 readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+ok 12 - 不可申请：只读档 readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0517
+  type: 'test'
+  ...
+# Subtest: 不可申请：只读档 script:readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+ok 13 - 不可申请：只读档 script:readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0403
+  type: 'test'
+  ...
+# Subtest: 不可申请：客户手拒（无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+ok 14 - 不可申请：客户手拒（无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0251
+  type: 'test'
+  ...
+# Subtest: 不可申请：pm b-deny（旧路径，无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+ok 15 - 不可申请：pm b-deny（旧路径，无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0228
+  type: 'test'
+  ...
+# Subtest: 不可申请：其它 manual（timeout，manualAsDeny===true） → 工具拒绝、不弹卡、不调 judge/客户
+ok 16 - 不可申请：其它 manual（timeout，manualAsDeny===true） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0212
+  type: 'test'
+  ...
+# Subtest: 不可申请：row-failed → 工具拒绝、不弹卡、不调 judge/客户
+ok 17 - 不可申请：row-failed → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0177
+  type: 'test'
+  ...
+# Subtest: 不可申请：judge allow（非拒绝） → 工具拒绝、不弹卡、不调 judge/客户
+ok 18 - 不可申请：judge allow（非拒绝） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0562
+  type: 'test'
+  ...
+# Subtest: 不可申请：后台入口（start_background_task）的判拒不写入可申请台账
+ok 19 - 不可申请：后台入口（start_background_task）的判拒不写入可申请台账
+  ---
+  duration_ms: 0.0787
+  type: 'test'
+  ...
+# Subtest: 旧记录清理：judge deny 后同一 key 被 judge allow ⇒ 删除 recorded，申请被拒
+ok 20 - 旧记录清理：judge deny 后同一 key 被 judge allow ⇒ 删除 recorded，申请被拒
+  ---
+  duration_ms: 0.0731
+  type: 'test'
+  ...
+# Subtest: 旧记录清理：judge deny 后同一 key 出现客户手拒 ⇒ 记录被清除，申请被拒
+ok 21 - 旧记录清理：judge deny 后同一 key 出现客户手拒 ⇒ 记录被清除，申请被拒
+  ---
+  duration_ms: 0.0512
+  type: 'test'
+  ...
+# Subtest: 旧记录清理：judge deny 后同一 key 出现其它 manual ⇒ 记录被清除，申请被拒
+ok 22 - 旧记录清理：judge deny 后同一 key 出现其它 manual ⇒ 记录被清除，申请被拒
+  ---
+  duration_ms: 0.0307
+  type: 'test'
+  ...
+# Subtest: 后台 review 不清除 run_shell 记录：判拒 → 后台 review → 申请仍可出卡
+ok 23 - 后台 review 不清除 run_shell 记录：判拒 → 后台 review → 申请仍可出卡
+  ---
+  duration_ms: 0.0919
+  type: 'test'
+  ...
+# Subtest: 资格只认最近一次审核：deny → allow → deny ⇒ 新判拒记录可申请
+ok 24 - 资格只认最近一次审核：deny → allow → deny ⇒ 新判拒记录可申请
+  ---
+  duration_ms: 0.0992
+  type: 'test'
+  ...
+# Subtest: 状态机：allow-once → granted-once → 下一次精确匹配消费 → consumed（不可再申请）
+ok 25 - 状态机：allow-once → granted-once → 下一次精确匹配消费 → consumed（不可再申请）
+  ---
+  duration_ms: 0.2076
+  type: 'test'
+  ...
+# Subtest: 状态机：allow-session 反复放行；会话 dispose 后失效（重建 fail-closed）
+ok 26 - 状态机：allow-session 反复放行；会话 dispose 后失效（重建 fail-closed）
+  ---
+  duration_ms: 0.1365
+  type: 'test'
+  ...
+# Subtest: 状态机：客户拒绝 → denied，回执明确未获允许且不可再申请
+ok 27 - 状态机：客户拒绝 → denied，回执明确未获允许且不可再申请
+  ---
+  duration_ms: 0.0978
+  type: 'test'
+  ...
+# Subtest: 状态机：expired 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 28 - 状态机：expired 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0962
+  type: 'test'
+  ...
+# Subtest: 状态机：unavailable 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 29 - 状态机：unavailable 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0967
+  type: 'test'
+  ...
+# Subtest: 状态机：非法动作 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 30 - 状态机：非法动作 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0632
+  type: 'test'
+  ...
+# Subtest: 状态机：null 回包 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 31 - 状态机：null 回包 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0458
+  type: 'test'
+  ...
+# Subtest: 状态机：presenter 抛错 ⇒ expired（fail-closed，不产生授权）
+ok 32 - 状态机：presenter 抛错 ⇒ expired（fail-closed，不产生授权）
+  ---
+  duration_ms: 0.1543
+  type: 'test'
+  ...
+# Subtest: 状态机：presenter 超时 ⇒ expired（呈现超时链兜底）
+ok 33 - 状态机：presenter 超时 ⇒ expired（呈现超时链兜底）
+  ---
+  duration_ms: 29.5956
+  type: 'test'
+  ...
+# Subtest: 状态机：轮次已中止（signal aborted）⇒ 不出卡、expired
+ok 34 - 状态机：轮次已中止（signal aborted）⇒ 不出卡、expired
+  ---
+  duration_ms: 0.1625
+  type: 'test'
+  ...
+# shell 升级决定审计未落盘：门禁拒绝
+# Subtest: 并发/待答：同会话同时最多 1 张待答申请；待答期间新申请直接拒绝（不排队）
+ok 35 - 并发/待答：同会话同时最多 1 张待答申请；待答期间新申请直接拒绝（不排队）
+  ---
+  duration_ms: 0.4202
+  type: 'test'
+  ...
+# Subtest: E2 R2：presenter 返回 pending ⇒ 回滚消耗（无审计、额度/申请权归还），同命令稍后再申请成功
+ok 36 - E2 R2：presenter 返回 pending ⇒ 回滚消耗（无审计、额度/申请权归还），同命令稍后再申请成功
+  ---
+  duration_ms: 0.2881
+  type: 'test'
+  ...
+# Subtest: E2 R2：多次 pending 不累计消耗会话额度（5 次额度仍可用于真实申请）
+ok 37 - E2 R2：多次 pending 不累计消耗会话额度（5 次额度仍可用于真实申请）
+  ---
+  duration_ms: 0.1422
+  type: 'test'
+  ...
+# Subtest: 限流：同一命令每会话最多一次（拒绝后再次申请也被拒，不弹卡）
+ok 38 - 限流：同一命令每会话最多一次（拒绝后再次申请也被拒，不弹卡）
+  ---
+  duration_ms: 0.0597
+  type: 'test'
+  ...
+# Subtest: 限流：会话总上限默认 5；第 6 次拒绝且不弹卡
+ok 39 - 限流：会话总上限默认 5；第 6 次拒绝且不弹卡
+  ---
+  duration_ms: 0.11
+  type: 'test'
+  ...
+# Subtest: 限流：maxRequestsPerSession 可注入（1 次）
+ok 40 - 限流：maxRequestsPerSession 可注入（1 次）
+  ---
+  duration_ms: 0.0485
+  type: 'test'
+  ...
+# Subtest: 必要性上限：>500 字符或 >1KB 拒绝且不弹卡；未提交申请
+ok 41 - 必要性上限：>500 字符或 >1KB 拒绝且不弹卡；未提交申请
+  ---
+  duration_ms: 0.0835
+  type: 'test'
+  ...
+# Subtest: 键精确性：argv 全等才交接（派生命令/改参数不生效，且不消费一次性授权）
+ok 42 - 键精确性：argv 全等才交接（派生命令/改参数不生效，且不消费一次性授权）
+  ---
+  duration_ms: 0.0599
+  type: 'test'
+  ...
+# Subtest: 键精确性：cwd / 角色 / 项目不同不生效（不跨会话交接）
+ok 43 - 键精确性：cwd / 角色 / 项目不同不生效（不跨会话交接）
+  ---
+  duration_ms: 0.0734
+  type: 'test'
+  ...
+# Subtest: 键精确性：后台入口 takeGrant 不消费也不交接前台授权
+ok 44 - 键精确性：后台入口 takeGrant 不消费也不交接前台授权
+  ---
+  duration_ms: 0.0636
+  type: 'test'
+  ...
+# Subtest: 会话授权：同 cwd/argv 反复放行；派生命令不继承
+ok 45 - 会话授权：同 cwd/argv 反复放行；派生命令不继承
+  ---
+  duration_ms: 0.0683
+  type: 'test'
+  ...
+# Subtest: digestApprovalContext：稳定、仅随内容/路径变化；undefined ⇒ undefined
+ok 46 - digestApprovalContext：稳定、仅随内容/路径变化；undefined ⇒ undefined
+  ---
+  duration_ms: 0.1291
+  type: 'test'
+  ...
+# Subtest: stale：once 授权消费时脚本上下文变化 ⇒ 拒绝、授权作废、终态不可再申请
+ok 47 - stale：once 授权消费时脚本上下文变化 ⇒ 拒绝、授权作废、终态不可再申请
+  ---
+  duration_ms: 0.1207
+  type: 'test'
+  ...
+# Subtest: stale：上下文不可读（undefined）也按 stale 拒绝（fail-closed）
+ok 48 - stale：上下文不可读（undefined）也按 stale 拒绝（fail-closed）
+  ---
+  duration_ms: 0.084
+  type: 'test'
+  ...
+# Subtest: stale：会话授权每次消费都比对 sha256（未变化则持续有效）
+ok 49 - stale：会话授权每次消费都比对 sha256（未变化则持续有效）
+  ---
+  duration_ms: 0.0804
+  type: 'test'
+  ...
+# Subtest: 非脚本授权不做 sha256 比对（判拒记录无上下文）
+ok 50 - 非脚本授权不做 sha256 比对（判拒记录无上下文）
+  ---
+  duration_ms: 0.0507
+  type: 'test'
+  ...
+# Subtest: 审计：允许一次/本会话/拒绝/超时各写一条完整 escalation-decision（同一 sink、append-only）
+ok 51 - 审计：允许一次/本会话/拒绝/超时各写一条完整 escalation-decision（同一 sink、append-only）
+  ---
+  duration_ms: 0.1822
+  type: 'test'
+  ...
+# Subtest: 审计：卡与审计的命令原文取自判拒记录（不取模型本次输入）
+ok 52 - 审计：卡与审计的命令原文取自判拒记录（不取模型本次输入）
+  ---
+  duration_ms: 0.0722
+  type: 'test'
+  ...
+# Subtest: 审计：sink 故障不翻转决定（回执仍如实、授权仍按客户决定创建）
+ok 53 - 审计：sink 故障不翻转决定（回执仍如实、授权仍按客户决定创建）
+  ---
+  duration_ms: 0.1005
+  type: 'test'
+  ...
+# Subtest: 回滚开关：ANS_SHELL_ESCALATION_DISABLED=1 判定（仅精确值 1）
+ok 54 - 回滚开关：ANS_SHELL_ESCALATION_DISABLED=1 判定（仅精确值 1）
+  ---
+  duration_ms: 0.046
+  type: 'test'
+  ...
+# Subtest: 闸接线：onReviewed 与审计同址（每判定一次）；onAuditSinkCreated 共享同一 sink
+ok 55 - 闸接线：onReviewed 与审计同址（每判定一次）；onAuditSinkCreated 共享同一 sink
+  ---
+  duration_ms: 1.4353
+  type: 'test'
+  ...
+# Subtest: 闸接线：script 分支以带 approvalContext 的请求回调 onReviewed 与 takeGrant
+ok 56 - 闸接线：script 分支以带 approvalContext 的请求回调 onReviewed 与 takeGrant
+  ---
+  duration_ms: 0.6185
+  type: 'test'
+  ...
+# Subtest: openRoleSession：presenter 注入 ⇒ shellEscalation 能力位到达适配器；判拒→申请→授权放行端到端
+ok 57 - openRoleSession：presenter 注入 ⇒ shellEscalation 能力位到达适配器；判拒→申请→授权放行端到端
+  ---
+  duration_ms: 21.4158
+  type: 'test'
+  ...
+# Subtest: openRoleSession：ANS_SHELL_ESCALATION_DISABLED=1 ⇒ registry 不创建、工具能力不注入
+ok 58 - openRoleSession：ANS_SHELL_ESCALATION_DISABLED=1 ⇒ registry 不创建、工具能力不注入
+  ---
+  duration_ms: 10.7059
+  type: 'test'
+  ...
+# Subtest: openRoleSession：未提供 presenter ⇒ 不创建 registry（shellEscalation 缺席）
+ok 59 - openRoleSession：未提供 presenter ⇒ 不创建 registry（shellEscalation 缺席）
+  ---
+  duration_ms: 10.8112
+  type: 'test'
+  ...
+1..59
+# tests 59
+# suites 0
+# pass 59
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 379.918

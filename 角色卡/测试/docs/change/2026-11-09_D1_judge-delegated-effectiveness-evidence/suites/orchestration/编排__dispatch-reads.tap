@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: extractDispatchReadPaths（G-1）：只认 workflow 与 contracts/*.md；workflow 置首、契约按首现序、去重
+ok 1 - extractDispatchReadPaths（G-1）：只认 workflow 与 contracts/*.md；workflow 置首、契约按首现序、去重
+  ---
+  duration_ms: 1.1439
+  type: 'test'
+  ...
+# Subtest: extractDispatchReadPaths（G-1）：产物路径/其它 docs/非 .md/目录式/URL/绝对路径/契约目录之外的都不捕获
+ok 2 - extractDispatchReadPaths（G-1）：产物路径/其它 docs/非 .md/目录式/URL/绝对路径/契约目录之外的都不捕获
+  ---
+  duration_ms: 0.1648
+  type: 'test'
+  ...
+# Subtest: extractDispatchReadPaths（G-1）：句尾 ASCII 标点剥离（role-card.md. 式）；空文本 → 空
+ok 3 - extractDispatchReadPaths（G-1）：句尾 ASCII 标点剥离（role-card.md. 式）；空文本 → 空
+  ---
+  duration_ms: 0.1
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：无引用 → 旧格式逐字不变（引用块是「加」出来的；去重键不受影响）
+ok 4 - renderDispatchPrompt（G-1）：无引用 → 旧格式逐字不变（引用块是「加」出来的；去重键不受影响）
+  ---
+  duration_ms: 0.1648
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt：sourceRoleId → 首行「来自 <角色> 的任务」；[派发] 前缀与 task 原文不变
+ok 5 - renderDispatchPrompt：sourceRoleId → 首行「来自 <角色> 的任务」；[派发] 前缀与 task 原文不变
+  ---
+  duration_ms: 0.1126
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt：sourceRoleId + 必读块 → 仅首行变化，块格式逐字不变
+ok 6 - renderDispatchPrompt：sourceRoleId + 必读块 → 仅首行变化，块格式逐字不变
+  ---
+  duration_ms: 0.1078
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery：第三参透传 sourceRoleId（有/无必读引用两个 deliver 分支）
+ok 7 - planDispatchDelivery：第三参透传 sourceRoleId（有/无必读引用两个 deliver 分支）
+  ---
+  duration_ms: 0.1861
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：workflow+契约 → 逐行必读块（编号/缩进/哈希逐字/完成口令指向）；无授权语义
+ok 8 - renderDispatchPrompt（G-1）：workflow+契约 → 逐行必读块（编号/缩进/哈希逐字/完成口令指向）；无授权语义
+  ---
+  duration_ms: 0.0985
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：仅契约 → 无 workflow 行、（未引用 workflow 时）完成句为旧句；多行 task 逐字保留
+ok 9 - renderDispatchPrompt（G-1）：仅契约 → 无 workflow 行、（未引用 workflow 时）完成句为旧句；多行 task 逐字保留
+  ---
+  duration_ms: 0.0927
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：workflow 缺失降级 → 块内如实标注、省略该行、不拒投口吻；有契约时契约照常编号
+ok 10 - renderDispatchPrompt（G-1）：workflow 缺失降级 → 块内如实标注、省略该行、不拒投口吻；有契约时契约照常编号
+  ---
+  duration_ms: 0.1152
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：标注与引用同路径矛盾 → 引用为准（探测后的事实），抑制标注、保留完成口令行
+ok 11 - renderDispatchPrompt（G-1）：标注与引用同路径矛盾 → 引用为准（探测后的事实），抑制标注、保留完成口令行
+  ---
+  duration_ms: 0.0841
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1 单一来源复用）：全齐 → 放行；放行文本与 renderDispatchPrompt 逐字一致（无第二份渲染）
+ok 12 - planDispatchDelivery（G-1 单一来源复用）：全齐 → 放行；放行文本与 renderDispatchPrompt 逐字一致（无第二份渲染）
+  ---
+  duration_ms: 0.1199
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：契约缺失（未探测/`<missing>`/非法值）→ 拒投 + 逐字回执；**不产生可投递文本**
+ok 13 - planDispatchDelivery（G-1）：契约缺失（未探测/`<missing>`/非法值）→ 拒投 + 逐字回执；**不产生可投递文本**
+  ---
+  duration_ms: 0.1346
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：多个契约缺失 → 报首现序第一个；workflow 也缺时拒投优先（契约 > 降级）
+ok 14 - planDispatchDelivery（G-1）：多个契约缺失 → 报首现序第一个；workflow 也缺时拒投优先（契约 > 降级）
+  ---
+  duration_ms: 0.0769
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：仅 workflow 缺失 → 降级放行（不拒投）；编号重排；旧完成句；workflow 恢复后指向其在场版本
+ok 15 - planDispatchDelivery（G-1）：仅 workflow 缺失 → 降级放行（不拒投）；编号重排；旧完成句；workflow 恢复后指向其在场版本
+  ---
+  duration_ms: 0.0931
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：未引用任何必读 → 放行旧文案逐字；probes 多余项不参与、不影响
+ok 16 - planDispatchDelivery（G-1）：未引用任何必读 → 放行旧文案逐字；probes 多余项不参与、不影响
+  ---
+  duration_ms: 0.0692
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：提取与整理保序——workflow 在文本后段出现也置首编号；哈希逐字透传
+ok 17 - planDispatchDelivery（G-1）：提取与整理保序——workflow 在文本后段出现也置首编号；哈希逐字透传
+  ---
+  duration_ms: 0.0679
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（B）：任务编号/期望产出/可选证据作为固定字段；旧调用逐字不变
+ok 18 - renderDispatchPrompt（B）：任务编号/期望产出/可选证据作为固定字段；旧调用逐字不变
+  ---
+  duration_ms: 0.1599
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（B）：任务卡字段透传；契约缺失仍 fail-closed 拒投（不因 taskId 放行）
+ok 19 - planDispatchDelivery（B）：任务卡字段透传；契约缺失仍 fail-closed 拒投（不因 taskId 放行）
+  ---
+  duration_ms: 0.0707
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 153.382

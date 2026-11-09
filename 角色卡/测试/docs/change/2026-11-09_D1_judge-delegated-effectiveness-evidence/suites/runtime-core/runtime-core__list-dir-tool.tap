@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: list_dir 默认注册（无需注入能力），schema 严格：path 可选字符串
+ok 1 - list_dir 默认注册（无需注入能力），schema 严格：path 可选字符串
+  ---
+  duration_ms: 2.307
+  type: 'test'
+  ...
+# Subtest: 列目录：默认根、项目相对路径、只列一层、目录名带 `/`
+ok 2 - 列目录：默认根、项目相对路径、只列一层、目录名带 `/`
+  ---
+  duration_ms: 12.1839
+  type: 'test'
+  ...
+# Subtest: 敏感项不列名：.env/密钥/凭据/.git/审计/会话；敏感目录本身拒绝
+ok 3 - 敏感项不列名：.env/密钥/凭据/.git/审计/会话；敏感目录本身拒绝
+  ---
+  duration_ms: 8.191
+  type: 'test'
+  ...
+# Subtest: 越界拒绝：`..`、项目外绝对路径、符号链接逃逸；不存在/非目录明确报错
+ok 4 - 越界拒绝：`..`、项目外绝对路径、符号链接逃逸；不存在/非目录明确报错
+  ---
+  duration_ms: 3.5443
+  type: 'test'
+  ...
+# Subtest: 条目上限 200：超出截断并如实标记
+ok 5 - 条目上限 200：超出截断并如实标记
+  ---
+  duration_ms: 57.8788
+  type: 'test'
+  ...
+# Subtest: 中止信号 ⇒ 未执行（不触碰文件系统）
+ok 6 - 中止信号 ⇒ 未执行（不触碰文件系统）
+  ---
+  duration_ms: 0.6921
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 307.6817

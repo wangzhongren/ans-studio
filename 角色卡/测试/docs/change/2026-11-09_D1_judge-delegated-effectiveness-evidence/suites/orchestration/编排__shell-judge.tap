@@ -1,0 +1,214 @@
+TAP version 13
+# Subtest: allow → necessary；命令/项目根进入提示，系统提示稳定且含不可信数据警告
+ok 1 - allow → necessary；命令/项目根进入提示，系统提示稳定且含不可信数据警告
+  ---
+  duration_ms: 2.924
+  type: 'test'
+  ...
+# Subtest: deny + alternative → safer-alternative；客户说明可用时不改写
+ok 2 - deny + alternative → safer-alternative；客户说明可用时不改写
+  ---
+  duration_ms: 0.5225
+  type: 'test'
+  ...
+# Subtest: deny 无 alternative → no-alternative；缺客户说明时合成并含标准出路
+ok 3 - deny 无 alternative → no-alternative；缺客户说明时合成并含标准出路
+  ---
+  duration_ms: 0.359
+  type: 'test'
+  ...
+# Subtest: 模型自报 manual → model-manual（不当作 deny）
+ok 4 - 模型自报 manual → model-manual（不当作 deny）
+  ---
+  duration_ms: 0.311
+  type: 'test'
+  ...
+# Subtest: 非法/未知裁决 → manual/parse-failed（绝不从散文里猜结论）
+ok 5 - 非法/未知裁决 → manual/parse-failed（绝不从散文里猜结论）
+  ---
+  duration_ms: 1.0233
+  type: 'test'
+  ...
+# Subtest: 工具缺失时降级解析纯 JSON message（可去代码围栏）
+ok 6 - 工具缺失时降级解析纯 JSON message（可去代码围栏）
+  ---
+  duration_ms: 0.2433
+  type: 'test'
+  ...
+# Subtest: 读取损伤：allow 一律降 manual（budget 优先 / read-truncated / read-denied）；deny 不变
+ok 7 - 读取损伤：allow 一律降 manual（budget 优先 / read-truncated / read-denied）；deny 不变
+  ---
+  duration_ms: 0.699
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：列项目相对路径与类别（app-private 条目可随其他拒绝一起展示）
+ok 8 - read-denied 摘要：列项目相对路径与类别（app-private 条目可随其他拒绝一起展示）
+  ---
+  duration_ms: 0.2109
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：根外条目（path 为空）只显示类别
+ok 9 - read-denied 摘要：根外条目（path 为空）只显示类别
+  ---
+  duration_ms: 0.1976
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：deniedPaths 为空 ⇒ 保留原泛化文案
+ok 10 - read-denied 摘要：deniedPaths 为空 ⇒ 保留原泛化文案
+  ---
+  duration_ms: 0.2014
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：最多 3 条、更多追加「等 N 个路径」且 ≤200 字符
+ok 11 - read-denied 摘要：最多 3 条、更多追加「等 N 个路径」且 ≤200 字符
+  ---
+  duration_ms: 0.2239
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：按原因码细化（not-found ⇒ 路径不存在，不再显示「受限路径」）
+ok 12 - read-denied 摘要：按原因码细化（not-found ⇒ 路径不存在，不再显示「受限路径」）
+  ---
+  duration_ms: 0.0801
+  type: 'test'
+  ...
+# Subtest: app-private 拒绝不计入 deniedReads：单独出现不触发 read-denied
+ok 13 - app-private 拒绝不计入 deniedReads：单独出现不触发 read-denied
+  ---
+  duration_ms: 0.1647
+  type: 'test'
+  ...
+# Subtest: tier=deny 且模型 allow → 照常 allow，hardDenyOverride + label（不转换、不拦截）
+ok 14 - tier=deny 且模型 allow → 照常 allow，hardDenyOverride + label（不转换、不拦截）
+  ---
+  duration_ms: 0.1414
+  type: 'test'
+  ...
+# Subtest: 普通 risky/review 放行不带 hardDenyOverride/label
+ok 15 - 普通 risky/review 放行不带 hardDenyOverride/label
+  ---
+  duration_ms: 0.256
+  type: 'test'
+  ...
+# Subtest: 超时前已捕获合法结论 → 结论保留（超时只中止等待）
+ok 16 - 超时前已捕获合法结论 → 结论保留（超时只中止等待）
+  ---
+  duration_ms: 45.0437
+  type: 'test'
+  ...
+# Subtest: 超时且无结论 → manual/timeout
+ok 17 - 超时且无结论 → manual/timeout
+  ---
+  duration_ms: 30.9174
+  type: 'test'
+  ...
+# Subtest: 超时配置：shell 默认 120s、env 覆盖、非法回退；执行时限不变
+ok 18 - 超时配置：shell 默认 120s、env 覆盖、非法回退；执行时限不变
+  ---
+  duration_ms: 31.2371
+  type: 'test'
+  ...
+# Subtest: 外部中止 → manual/aborted（丢弃已捕获结果）；预中止不建会话
+ok 19 - 外部中止 → manual/aborted（丢弃已捕获结果）；预中止不建会话
+  ---
+  duration_ms: 1.3941
+  type: 'test'
+  ...
+# Subtest: 迟到 bindRole：超时后会话才返回 → 立即 dispose（不泄漏）
+ok 20 - 迟到 bindRole：超时后会话才返回 → 立即 dispose（不泄漏）
+  ---
+  duration_ms: 152.5771
+  type: 'test'
+  ...
+# Subtest: 防循环：同一命令连续 deny 达上限 → manual/retry-capped（不调用模型）
+ok 21 - 防循环：同一命令连续 deny 达上限 → manual/retry-capped（不调用模型）
+  ---
+  duration_ms: 1.2251
+  type: 'test'
+  ...
+# Subtest: 防循环：allow 清零计数、manual 不递增
+ok 22 - 防循环：allow 清零计数、manual 不递增
+  ---
+  duration_ms: 0.5038
+  type: 'test'
+  ...
+# Subtest: 支持矩阵：claude/pi/codex 支持；demo → manual/unsupported-engine（不建会话）
+ok 23 - 支持矩阵：claude/pi/codex 支持；demo → manual/unsupported-engine（不建会话）
+  ---
+  duration_ms: 0.0832
+  type: 'test'
+  ...
+# Subtest: 会话不可用 → manual/unavailable（不抛错）
+ok 24 - 会话不可用 → manual/unavailable（不抛错）
+  ---
+  duration_ms: 0.1473
+  type: 'test'
+  ...
+# Subtest: 上下文缺失/超限 → context-missing / context-too-large
+ok 25 - 上下文缺失/超限 → context-missing / context-too-large
+  ---
+  duration_ms: 1.807
+  type: 'test'
+  ...
+# Subtest: 判断会话只见三项只读工具；写门禁 deny-all；不改 RuntimeAdapter 契约
+ok 26 - 判断会话只见三项只读工具；写门禁 deny-all；不改 RuntimeAdapter 契约
+  ---
+  duration_ms: 1.3055
+  type: 'test'
+  ...
+# Subtest: 审计透传 judge：allow + tier=deny + hardDenyOverride；by 以 operator:judge:<引擎> 结尾
+ok 27 - 审计透传 judge：allow + tier=deny + hardDenyOverride；by 以 operator:judge:<引擎> 结尾
+  ---
+  duration_ms: 2.0356
+  type: 'test'
+  ...
+# Subtest: 审计透传 judge：deny 也带 judge；人工手批不带 judge
+ok 28 - 审计透传 judge：deny 也带 judge；人工手批不带 judge
+  ---
+  duration_ms: 0.296
+  type: 'test'
+  ...
+# Subtest: shellJudgeAuditOf：只映射 allow/deny；deny 档放行带 label；manual 不产审计
+ok 29 - shellJudgeAuditOf：只映射 allow/deny；deny 档放行带 label；manual 不产审计
+  ---
+  duration_ms: 0.2571
+  type: 'test'
+  ...
+# Subtest: normalizeShellJudgeVerdict：严格取值域、长度上限、alternative 坏件忽略
+ok 30 - normalizeShellJudgeVerdict：严格取值域、长度上限、alternative 坏件忽略
+  ---
+  duration_ms: 0.1274
+  type: 'test'
+  ...
+# Subtest: synthesizeCustomerMessage：含标准出路、已含则不重复
+ok 31 - synthesizeCustomerMessage：含标准出路、已含则不重复
+  ---
+  duration_ms: 0.0773
+  type: 'test'
+  ...
+# Subtest: redactJudgeText：脱敏环境凭据与 Bearer/api-key 形态并做有界截断
+ok 32 - redactJudgeText：脱敏环境凭据与 Bearer/api-key 形态并做有界截断
+  ---
+  duration_ms: 0.0914
+  type: 'test'
+  ...
+# Subtest: buildShellJudgePrompt：只放本次数据，不复述历史；turnText 按 4KB 截断
+ok 33 - buildShellJudgePrompt：只放本次数据，不复述历史；turnText 按 4KB 截断
+  ---
+  duration_ms: 0.058
+  type: 'test'
+  ...
+# Subtest: 客户出路句：判拒后可申请客户确认，保留「关闭替我审批」兜底（旧/新表述兼容）
+ok 34 - 客户出路句：判拒后可申请客户确认，保留「关闭替我审批」兜底（旧/新表述兼容）
+  ---
+  duration_ms: 0.0513
+  type: 'test'
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 445.3702

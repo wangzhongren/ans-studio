@@ -1,0 +1,4 @@
+file	test/测试/git-run-stop-host-continuation-e2e.test.ts
+timeout_s	300	exit	0	killed	0
+tests	1	pass	1	fail	0	cancelled	0	skipped	0	todo	0
+wall_ms	43734

@@ -1,0 +1,202 @@
+TAP version 13
+# Subtest: A1 契约常量：路径/ID 模式/字段上限与 Provider relPath 一致（P1-CAP-13）
+ok 1 - A1 契约常量：路径/ID 模式/字段上限与 Provider relPath 一致（P1-CAP-13）
+  ---
+  duration_ms: 0.9434
+  type: 'test'
+  ...
+# Subtest: Provider：追加一行 durable 后 replay 旧→新可读；路径 = 项目根下 A1 常量
+ok 2 - Provider：追加一行 durable 后 replay 旧→新可读；路径 = 项目根下 A1 常量
+  ---
+  duration_ms: 13.9487
+  type: 'test'
+  ...
+# Subtest: Provider：按大小轮转（.1 最新、.N 最旧）且 replay 旧→新；坏行计数不阻塞
+ok 3 - Provider：按大小轮转（.1 最新、.N 最旧）且 replay 旧→新；坏行计数不阻塞
+  ---
+  duration_ms: 16.5411
+  type: 'test'
+  ...
+# Subtest: Service 回放：version>1/坏行/未知 kind/seq 非单调/伪造 target-action 组合的容错矩阵
+ok 4 - Service 回放：version>1/坏行/未知 kind/seq 非单调/伪造 target-action 组合的容错矩阵
+  ---
+  duration_ms: 1.1809
+  type: 'test'
+  ...
+# Subtest: Service：ID d-<seq> 单调、回放含轮转的全局 max+1、target 快照互不含
+ok 5 - Service：ID d-<seq> 单调、回放含轮转的全局 max+1、target 快照互不含
+  ---
+  duration_ms: 1.5139
+  type: 'test'
+  ...
+# Subtest: Service：撤销同 target/active；跨 target/已撤销/已消费/已失效明确错误；append-only 保留历史
+ok 6 - Service：撤销同 target/active；跨 target/已撤销/已消费/已失效明确错误；append-only 保留历史
+  ---
+  duration_ms: 0.9272
+  type: 'test'
+  ...
+# Subtest: Service：once 消费写账本；session 消费只返回成功、不写账本
+ok 7 - Service：once 消费写账本；session 消费只返回成功、不写账本
+  ---
+  duration_ms: 0.6237
+  type: 'test'
+  ...
+# Subtest: Service：sessionId 重启失效（session→app-restart；未用 once→unused-once；forever 保留）
+ok 8 - Service：sessionId 重启失效（session→app-restart；未用 once→unused-once；forever 保留）
+  ---
+  duration_ms: 0.8216
+  type: 'test'
+  ...
+# Subtest: Service：账本写失败 ⇒ ledger-write-failed，不更新视图
+ok 9 - Service：账本写失败 ⇒ ledger-write-failed，不更新视图
+  ---
+  duration_ms: 0.6344
+  type: 'test'
+  ...
+# Subtest: 高危 2×2：decisionGroupEnabled 关×项目级 select-recommended 是唯一触发（未确认拒绝落账）
+ok 10 - 高危 2×2：decisionGroupEnabled 关×项目级 select-recommended 是唯一触发（未确认拒绝落账）
+  ---
+  duration_ms: 0.804
+  type: 'test'
+  ...
+# Subtest: 高危：approval forever / 项目级 reject / select-option / 通配域名 / 宽路径 / 宽命令
+ok 11 - 高危：approval forever / 项目级 reject / select-option / 通配域名 / 宽路径 / 宽命令
+  ---
+  duration_ms: 0.6792
+  type: 'test'
+  ...
+# Subtest: 字段上限：rawText/command/host/path/selector 超限与空命令拒绝（invalid-input）
+ok 12 - 字段上限：rawText/command/host/path/selector 超限与空命令拒绝（invalid-input）
+  ---
+  duration_ms: 0.559
+  type: 'test'
+  ...
+# Subtest: submitFromInput：presenter 确认 → durable d-1；presenter 收到 target/原文/预填/开关快照
+ok 13 - submitFromInput：presenter 确认 → durable d-1；presenter 收到 target/原文/预填/开关快照
+  ---
+  duration_ms: 1.7525
+  type: 'test'
+  ...
+# Subtest: submitFromInput：取消/通道异常/非法回包/标记不符/超长 ⇒ 不落账
+ok 14 - submitFromInput：取消/通道异常/非法回包/标记不符/超长 ⇒ 不落账
+  ---
+  duration_ms: 0.8203
+  type: 'test'
+  ...
+# Subtest: submitFromInput：幂等键 (target,rawText,clientMessageId) 复用同一 id；presenter 只调一次
+ok 15 - submitFromInput：幂等键 (target,rawText,clientMessageId) 复用同一 id；presenter 只调一次
+  ---
+  duration_ms: 0.5841
+  type: 'test'
+  ...
+# Subtest: submitFromInput：decisionGroupEnabled 快照原样进 presenter；高危未确认/已确认
+ok 16 - submitFromInput：decisionGroupEnabled 快照原样进 presenter；高危未确认/已确认
+  ---
+  duration_ms: 0.7842
+  type: 'test'
+  ...
+# Subtest: submitFromInput：正文预填保守（shell/选项/未知片段/不可确认）
+ok 17 - submitFromInput：正文预填保守（shell/选项/未知片段/不可确认）
+  ---
+  duration_ms: 0.6183
+  type: 'test'
+  ...
+# Subtest: takeDirective：精确命令 + cwd 匹配；session 反复生效；不匹配/cwd 不同 ⇒ undefined
+ok 18 - takeDirective：精确命令 + cwd 匹配；session 反复生效；不匹配/cwd 不同 ⇒ undefined
+  ---
+  duration_ms: 2.5066
+  type: 'test'
+  ...
+# Subtest: takeDirective：once 原子消费一次；消费失败 ⇒ undefined 且不放行
+ok 19 - takeDirective：once 原子消费一次；消费失败 ⇒ undefined 且不放行
+  ---
+  duration_ms: 2.4525
+  type: 'test'
+  ...
+# Subtest: takeDirective：deny 优先（intent=allow 也返回 deny）；domain/path 无消费者不匹配
+ok 20 - takeDirective：deny 优先（intent=allow 也返回 deny）；domain/path 无消费者不匹配
+  ---
+  duration_ms: 0.6748
+  type: 'test'
+  ...
+# Subtest: takeDirective：ledgerErrors>0 ⇒ undefined（消费者按无指令）；跨 target 记录不进入 approvalFacts
+ok 21 - takeDirective：ledgerErrors>0 ⇒ undefined（消费者按无指令）；跨 target 记录不进入 approvalFacts
+  ---
+  duration_ms: 2.1157
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：select-recommended 代选；emitResult 先于 durable consume
+ok 22 - applyDecisionDirective：select-recommended 代选；emitResult 先于 durable consume
+  ---
+  duration_ms: 2.8948
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：选项 id/标签/前缀唯一匹配；0/多匹配 no-match 且不消费
+ok 23 - applyDecisionDirective：选项 id/标签/前缀唯一匹配；0/多匹配 no-match 且不消费
+  ---
+  duration_ms: 1.1107
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：冲突（reject vs select）不消费；scope flowId 不匹配不适用
+ok 24 - applyDecisionDirective：冲突（reject vs select）不消费；scope flowId 不匹配不适用
+  ---
+  duration_ms: 2.3334
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：拒绝（项目级/flow）结算 rejected；once 消费
+ok 25 - applyDecisionDirective：拒绝（项目级/flow）结算 rejected；once 消费
+  ---
+  duration_ms: 0.6682
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：emitResult 抛错/缺钩子 ⇒ 不消费、返回 undefined；非 decision 卡不处理
+ok 26 - applyDecisionDirective：emitResult 抛错/缺钩子 ⇒ 不消费、返回 undefined；非 decision 卡不处理
+  ---
+  duration_ms: 2.3006
+  type: 'test'
+  ...
+# Subtest: revoke：同 target/active 可撤销；跨 target/不存在明确错误；撤销后 takeDirective 不再命中
+ok 27 - revoke：同 target/active 可撤销；跨 target/不存在明确错误；撤销后 takeDirective 不再命中
+  ---
+  duration_ms: 2.44
+  type: 'test'
+  ...
+# Subtest: list：账本读取失败 ⇒ ok:false；坏行 ⇒ ok:true + ledgerErrors（面板显示错误不伪造空）
+ok 28 - list：账本读取失败 ⇒ ok:false；坏行 ⇒ ok:true + ledgerErrors（面板显示错误不伪造空）
+  ---
+  duration_ms: 0.665
+  type: 'test'
+  ...
+# Subtest: task-state 迁移等价：默认常量 = A2；append/read/轮转/坏行/旧→新与迁移前一致
+ok 29 - task-state 迁移等价：默认常量 = A2；append/read/轮转/坏行/旧→新与迁移前一致
+  ---
+  duration_ms: 20.2361
+  type: 'test'
+  ...
+# Subtest: takeDownloadDirective：epoch 门槛/精确 host/归一/once 消费/deny 优先/通配
+ok 30 - takeDownloadDirective：epoch 门槛/精确 host/归一/once 消费/deny 优先/通配
+  ---
+  duration_ms: 0.7959
+  type: 'test'
+  ...
+# Subtest: list()：G8 A epoch 投影——旧 domain ⇒ consumer:none；新 domain ⇒ download；path 不变
+ok 31 - list()：G8 A epoch 投影——旧 domain ⇒ consumer:none；新 domain ⇒ download；path 不变
+  ---
+  duration_ms: 0.3684
+  type: 'test'
+  ...
+# Subtest: consumerOf：domain 创建时基线为 download（Service 视图）；系统 boot 事件自动 acceptance
+ok 32 - consumerOf：domain 创建时基线为 download（Service 视图）；系统 boot 事件自动 acceptance
+  ---
+  duration_ms: 0.1107
+  type: 'test'
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 297.3675

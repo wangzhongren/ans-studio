@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
+import { createCustomerInputChannel, type DesktopCustomerInputFn, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { parseProjectRoster } from "../../src/common/编排/workflow-preconditions.ts";
 import { appendTaskEvent, readTaskState } from "../../src/common/编排/task-state.ts";
 import { findActiveRun, pinRun, readRunManifest } from "../../src/common/编排/run-manifest.ts";
@@ -22,7 +23,7 @@ import { recordVersionedDocBaselines } from "../../src/common/门禁引擎/versi
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
-import type { CustomerInputFn, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
+import type { CustomerInputFn, CustomerInputMetadata, CustomerInputRequest, DispatchReceipt, DispatchTaskFn } from "../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -156,6 +157,8 @@ function listing(root: string): ProjectListing {
 interface HarnessOptions {
   /** 客户卡通道的作答策略；缺省 ⇒ declined。`withCustomerInput:false` ⇒ 不接通道（兜底场景）。 */
   answer?: (request: CustomerInputRequest) => Promise<import("../../src/model/runtime.ts").CustomerInputOutcome> | import("../../src/model/runtime.ts").CustomerInputOutcome;
+  /** 真实客户通道（如 `createCustomerInputChannel` 的输出）；给出时替代 `answer` 桩。 */
+  customerInput?: DesktopCustomerInputFn;
   withCustomerInput?: boolean;
   /** AC-17（D2）：版本变更栈（只读 `listVersionChanges` 判定在途 VCA）。 */
   stack?: import("../../app/desktop/version-change.ts").VersionChangeStack;
@@ -166,12 +169,12 @@ function harness(root: string, options: HarnessOptions = {}) {
   const customerInputs: Record<string, CustomerInputFn | undefined> = {};
   const customerRequests: CustomerInputRequest[] = [];
   const events: Array<{ roleId: string; projectRoot: string; runtime: string; event: { kind: string; summary?: string } }> = [];
-  const customerInput: CustomerInputFn | undefined = options.withCustomerInput === false
+  const customerInput: DesktopCustomerInputFn | undefined = options.withCustomerInput === false
     ? undefined
-    : async (request) => {
+    : options.customerInput ?? (async (request) => {
         customerRequests.push(request);
         return options.answer !== undefined ? options.answer(request) : { outcome: "declined", operatorId: "test" };
-      };
+      });
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       caps[input.roleId] = (input as { dispatchTask?: DispatchTaskFn }).dispatchTask;
@@ -557,6 +560,101 @@ test("AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统
       assert.equal(outcome?.outcome, "declined");
     }
     assert.equal(runChangeCards(h.customerRequests).length, 2, "显式入口仍呈现 run-change 卡");
+  } finally {
+    await h.mgr.stop(null);
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
+});
+
+// ———————————————— 2026-11-09 judge 代批生效（W-J4/J12）：intent-confirm 的 request.resolved 回归钉 ————————————————
+//
+// 客户裁定：开关开启 = 明确委托，judge 代批 `intent-confirm` 生效；审计如实记 judge，不得伪装 customer。
+// 本用例走**真实**客户通道（`createCustomerInputChannel` judge approve）→ SessionManager
+// `withRequestLifecycle` 落账，钉住应用层的 `request.resolved` 映射：
+// `by:"judge"`、`operatorId:"judge:<engine>"`、`decisionId:"decision-<requestId>"`、`judge` 审计、
+// `selectedOptionIds`（非 appointment 卡不写 `targetRoleIds`）、`request.presented.to:"judge"`。
+
+test("J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-run-change-judge-intent-"));
+  const pushed: OperatorRequestPayload[] = [];
+  let judgeCalls = 0;
+  const channel = createCustomerInputChannel({
+    presenter: (payload) => pushed.push(payload),
+    operatorId: "tester",
+    judge: {
+      isGroupEnabled: () => true,
+      fn: async (request) => {
+        judgeCalls += 1;
+        return {
+          verdict: "approve",
+          group: request.group,
+          cardKind: request.cardKind,
+          engine: "demo",
+          model: "judge-model",
+          reasonCode: "sufficient",
+          reason: "意图与证据一致",
+          value: { selected: ["confirm"] },
+        };
+      },
+    },
+    emitJudgeResult: () => {},
+  });
+  const h = harness(root, { customerInput: (request, context, metadata) => channel.customerInput(request, context, metadata) });
+  try {
+    await writeProjectV1(root);
+    assert.equal((await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" })).ok, true);
+    const injected = h.customerInputs.chief;
+    assert.equal(typeof injected, "function", "chief 会话应注入客户卡通道");
+    const card: CustomerInputRequest = {
+      kind: "choice",
+      title: "确认意图：focus",
+      cardKind: "intent-confirm",
+      flowId: FLOW,
+      options: [
+        { id: "confirm", label: "确认" },
+        { id: "revise", label: "修订" },
+      ],
+    };
+    const metadata: CustomerInputMetadata = {
+      cardKind: "intent-confirm",
+      flowId: FLOW,
+      judgeContext: {
+        flowId: FLOW,
+        facts: { governanceModel: "trio", flowId: FLOW, ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] },
+      },
+    };
+    const outcome = await injected!(card, metadata);
+    assert.equal(judgeCalls, 1, "开关开启 + judgeContext ⇒ 判断器恰调用一次");
+    assert.equal(pushed.length, 0, "judge 代批不弹客户卡");
+    assert.equal(outcome?.outcome, "answered");
+    if (outcome?.outcome !== "answered") return;
+    assert.deepEqual(outcome.value.selected, ["confirm"]);
+    assert.equal(outcome.operatorId, "judge:demo", "归因判断引擎，不伪装客户");
+    const state = await readTaskState(root);
+    const createdEvent = state.events.find((event) => event.kind === "request.created" && event.cardKind === "intent-confirm");
+    assert.ok(createdEvent !== undefined, "intent-confirm 的 request.created 已入账");
+    if (createdEvent?.kind !== "request.created") return assert.fail("intent-confirm 的 request.created 已入账");
+    const requestId = createdEvent.requestId;
+    assert.equal(outcome.decisionId, `decision-${requestId}`, "应用回填 decisionId=decision-<requestId>");
+    const resolvedEvent = state.events.find((event) => event.kind === "request.resolved" && event.requestId === requestId);
+    assert.ok(resolvedEvent !== undefined, "request.resolved 已入账");
+    if (resolvedEvent?.kind !== "request.resolved") return assert.fail("request.resolved 已入账");
+    assert.equal(resolvedEvent.by, "judge", "resolved 归因 judge，不伪装客户");
+    assert.equal(resolvedEvent.operatorId, "judge:demo");
+    assert.equal(resolvedEvent.decisionId, `decision-${requestId}`);
+    assert.deepEqual(resolvedEvent.judge, outcome.judge, "resolved.judge 与 outcome.judge 同源");
+    const audit = resolvedEvent.judge!;
+    assert.equal(audit.group, "decision");
+    assert.equal(audit.cardKind, "intent-confirm");
+    assert.equal(audit.engine, "demo");
+    assert.equal(audit.model, "judge-model");
+    assert.equal(audit.reasonCode, "sufficient");
+    assert.equal(audit.reason, "意图与证据一致");
+    assert.deepEqual(audit.selected, ["confirm"]);
+    assert.deepEqual(resolvedEvent.selectedOptionIds, ["confirm"], "非 appointment 卡只写审计用 selectedOptionIds");
+    assert.equal(resolvedEvent.targetRoleIds, undefined, "intent-confirm 不得污染 D3 targetRoleIds");
+    const presented = state.events.find((event) => event.kind === "request.presented" && event.requestId === requestId);
+    assert.equal(presented?.kind === "request.presented" ? presented.to : undefined, "judge", "presented 归因 judge");
   } finally {
     await h.mgr.stop(null);
     await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });

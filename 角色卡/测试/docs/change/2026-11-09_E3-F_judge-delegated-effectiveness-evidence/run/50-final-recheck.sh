@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Final candidate recheck (post-run): write-set aggregate, manifest, status, app/desktop diff.
+set -u
+REPO="C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment"
+EV="$REPO/角色卡/测试/docs/change/2026-11-09_E3-F_judge-delegated-effectiveness-evidence"
+OUT="$EV/candidate/recheck-final"
+mkdir -p "$OUT"
+cd "$REPO" || exit 2
+git -c core.quotepath=false status --porcelain -- src app test > "$OUT/status-src-app-test.txt"
+git -c core.quotepath=false status --porcelain > "$OUT/status-full.txt"
+git -c core.quotepath=false status --porcelain -- app > "$OUT/status-app.txt"
+git diff --stat -- app/desktop > "$OUT/app-desktop-diffstat.txt"
+git -c core.quotepath=false status --porcelain -- src app test | cut -c4- > "$OUT/write-set-paths.txt"
+: > "$OUT/write-set-raw.tsv"
+while IFS= read -r p; do h=$(sha256sum -- "$p" | awk '{print $1}'); printf '%s  %s\n' "$h" "$p" >> "$OUT/write-set-raw.tsv"; done < "$OUT/write-set-paths.txt"
+LC_ALL=C sort -k2 "$OUT/write-set-raw.tsv" > "$OUT/write-set-actual.tsv"
+sha256sum "$OUT/write-set-actual.tsv" | awk '{print $1}' > "$OUT/write-set-canonical-aggregate.txt"
+git -c core.quotepath=false ls-files --cached --others --exclude-standard -- src app test | LC_ALL=C sort > "$OUT/manifest-files.txt"
+: > "$OUT/manifest-raw.tsv"
+while IFS= read -r p; do h=$(sha256sum -- "$p" | awk '{print $1}'); printf '%s  %s\n' "$h" "$p" >> "$OUT/manifest-raw.tsv"; done < "$OUT/manifest-files.txt"
+LC_ALL=C sort -k2 "$OUT/manifest-raw.tsv" > "$OUT/manifest-src-app-test.tsv"
+sha256sum "$OUT/manifest-src-app-test.tsv" | awk '{print $1}' > "$OUT/manifest-canonical-aggregate.txt"
+echo "HEAD=$(git rev-parse HEAD) tree=$(git rev-parse HEAD^{tree}) branch=$(git rev-parse --abbrev-ref HEAD)"
+echo "status_lines=$(wc -l < "$OUT/status-src-app-test.txt") app_status_lines=$(wc -l < "$OUT/status-app.txt") app_desktop_diffstat_lines=$(wc -l < "$OUT/app-desktop-diffstat.txt")"
+echo "write_set_aggregate=$(cat "$OUT/write-set-canonical-aggregate.txt") manifest_entries=$(wc -l < "$OUT/manifest-src-app-test.tsv") manifest_aggregate=$(cat "$OUT/manifest-canonical-aggregate.txt")"
+diff "$EV/candidate/write-set-actual.tsv" "$OUT/write-set-actual.tsv" > "$OUT/write-set-diff-pre-vs-final.txt"; echo "write_set_diff_lines=$(wc -l < "$OUT/write-set-diff-pre-vs-final.txt")"
+diff "$EV/candidate/manifest-src-app-test.tsv" "$OUT/manifest-src-app-test.tsv" > "$OUT/manifest-diff-pre-vs-final.txt"; echo "manifest_diff_lines=$(wc -l < "$OUT/manifest-diff-pre-vs-final.txt")"
+diff "$EV/candidate/status-src-app-test.txt" "$OUT/status-src-app-test.txt" > "$OUT/status-diff-pre-vs-final.txt"; echo "status_diff_lines=$(wc -l < "$OUT/status-diff-pre-vs-final.txt")"

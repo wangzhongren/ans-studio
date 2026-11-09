@@ -1,0 +1,5 @@
+test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts	MISSING	natural	MISSING	2	MISSING	2	MISSING	0	MISSING	0	MISSING	0	MISSING	0	MISSING	0
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	MISSING	natural	MISSING	1	MISSING	1	MISSING	0	MISSING	0	MISSING	0	MISSING	0	MISSING	0
+test/测试/customer-authorization-plane-integration.test.ts	natural	hang(90s)	-	1	-	0	-	1	-	0	-	0	-	0	1	124
+test/测试/git-action-activation-e2e.test.ts	natural	hang(300s)	1	2	1	1	0	1	0	0	0	0	0	0	0	124
+test/测试/git-action-delivery-claude-e2e.test.ts	natural	hang(300s)	1	2	1	1	0	1	0	0	0	0	0	0	0	124

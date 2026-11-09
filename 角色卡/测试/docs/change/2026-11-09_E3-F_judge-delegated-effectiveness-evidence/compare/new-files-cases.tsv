@@ -1,0 +1,9 @@
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	ok	W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例
+test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts	ok	J17：无 source 的既有冻结 entry 事件字节逐字不变；judge-delegated source 如实镜像 actionSource
+test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts	ok	J16：judge-delegated doc.freeze 经真实账本追加/读取正例通过；缺失/伪造/客户字段负例 fail-closed
+test/测试/git-action-activation-e2e.test.ts	ok	P1.2-AC-31：activation 发布 E2E（真实 plan→D3→nominator 回合；sidecar {candidate,publication} 两键 + ref/journal + 发布回执；无 native）
+test/测试/git-action-commit-claude-e2e.test.ts	ok	AC-1：Claude product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）
+test/测试/git-action-commit-pi-e2e.test.ts	ok	AC-2：Pi product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中）
+test/测试/git-action-delivery-claude-e2e.test.ts	ok	AC-4：Claude convener 在受保护项目完成任务/回合内 git_publish delivery 完整链（sidecar {publication}/ref journal/发布回执，无 native 前提）
+test/测试/git-run-stop-host-continuation-e2e.test.ts	not_ok	test\测试\git-run-stop-host-continuation-e2e.test.ts
+test/测试/git-run-stop-host-continuation-e2e.test.ts	not_ok	test\测试\git-run-stop-host-continuation-e2e.test.ts

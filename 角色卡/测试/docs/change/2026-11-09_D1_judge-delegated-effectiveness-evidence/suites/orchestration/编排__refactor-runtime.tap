@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: refactor-runtime：convener 发起 → 机械写集 + refactor.request（application，无 decidedBy）
+ok 1 - refactor-runtime：convener 发起 → 机械写集 + refactor.request（application，无 decidedBy）
+  ---
+  duration_ms: 40.6651
+  type: 'test'
+  ...
+# Subtest: refactor-runtime：非 convener 拒绝（无记录/无事件）
+ok 2 - refactor-runtime：非 convener 拒绝（无记录/无事件）
+  ---
+  duration_ms: 20.3819
+  type: 'test'
+  ...
+# Subtest: refactor-runtime：越界（版本化文档/边界）拒绝并提示转 VCA/stable；flow 缺失拒绝
+ok 3 - refactor-runtime：越界（版本化文档/边界）拒绝并提示转 VCA/stable；flow 缺失拒绝
+  ---
+  duration_ms: 42.7757
+  type: 'test'
+  ...
+# Subtest: refactor-runtime：状态流转（accepted/closed）事件无客户决定；重复 requestId 幂等拒绝
+ok 4 - refactor-runtime：状态流转（accepted/closed）事件无客户决定；重复 requestId 幂等拒绝
+  ---
+  duration_ms: 42.1025
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 371.5639

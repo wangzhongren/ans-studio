@@ -1,0 +1,172 @@
+TAP version 13
+# Subtest: G15 stable pure facts retain permit snapshot/base/role/TTL/final BOM-byte SHA checks
+ok 1 - G15 stable pure facts retain permit snapshot/base/role/TTL/final BOM-byte SHA checks
+  ---
+  duration_ms: 2.0867
+  type: 'test'
+  ...
+# Subtest: G15 explicit missing differs from current-file unknown, missing facts and existing base SHA
+ok 2 - G15 explicit missing differs from current-file unknown, missing facts and existing base SHA
+  ---
+  duration_ms: 0.3738
+  type: 'test'
+  ...
+# Subtest: G15 public managed stable predicate performs zero FS reads for present/missing/unknown facts
+ok 3 - G15 public managed stable predicate performs zero FS reads for present/missing/unknown facts
+  ---
+  duration_ms: 0.6393
+  type: 'test'
+  ...
+# Subtest: G13 pure registration requires complete authentic bytes and preserves the original baseline text
+ok 4 - G13 pure registration requires complete authentic bytes and preserves the original baseline text
+  ---
+  duration_ms: 1.6372
+  type: 'test'
+  ...
+# Subtest: G13 actual Service TOFU/register/query/verify use Provider bytes and preserve N+1/frozen boundaries
+ok 5 - G13 actual Service TOFU/register/query/verify use Provider bytes and preserve N+1/frozen boundaries
+  ---
+  duration_ms: 195.2286
+  type: 'test'
+  ...
+# Subtest: G13 Service refuses unknown/invalid Provider state and strict scan failures without TOFU repair
+ok 6 - G13 Service refuses unknown/invalid Provider state and strict scan failures without TOFU repair
+  ---
+  duration_ms: 88.3582
+  type: 'test'
+  ...
+# Subtest: G13 pure registration plan cannot bypass the actual Provider byte CAS or lost-lock fencing
+ok 7 - G13 pure registration plan cannot bypass the actual Provider byte CAS or lost-lock fencing
+  ---
+  duration_ms: 40.3716
+  type: 'test'
+  ...
+# Subtest: 版本化路径识别与版本号：intent/proposal/roster/modules/topology/architecture
+ok 8 - 版本化路径识别与版本号：intent/proposal/roster/modules/topology/architecture
+  ---
+  duration_ms: 0.2967
+  type: 'test'
+  ...
+# Subtest: 覆盖既有版本化文档 ⇒ deny；新建下一版本/非版本化文件 ⇒ allow
+ok 9 - 覆盖既有版本化文档 ⇒ deny；新建下一版本/非版本化文件 ⇒ allow
+  ---
+  duration_ms: 0.3295
+  type: 'test'
+  ...
+# Subtest: shell 写目标：既有版本化文档 ⇒ 结构化 deny（不进审批）；新版本放行；脚本 argv 触及时 deny
+ok 10 - shell 写目标：既有版本化文档 ⇒ 结构化 deny（不进审批）；新版本放行；脚本 argv 触及时 deny
+  ---
+  duration_ms: 2.6785
+  type: 'test'
+  ...
+# Subtest: R9 版本基线：TOFU 仅一次；marker 后 baseline 缺失/空/坏行/旧条目缺失 fail-closed 且禁止重建
+ok 11 - R9 版本基线：TOFU 仅一次；marker 后 baseline 缺失/空/坏行/旧条目缺失 fail-closed 且禁止重建
+  ---
+  duration_ms: 95.8975
+  type: 'test'
+  ...
+# Subtest: R9 新版本：marker 后新版本首次出现可登记；旧版缺失不补齐
+ok 12 - R9 新版本：marker 后新版本首次出现可登记；旧版缺失不补齐
+  ---
+  duration_ms: 51.6922
+  type: 'test'
+  ...
+# Subtest: v2.11：并发登记不丢 version-added（项目级串行队列）；canonical path 唯一键
+ok 13 - v2.11：并发登记不丢 version-added（项目级串行队列）；canonical path 唯一键
+  ---
+  duration_ms: 69.3439
+  type: 'test'
+  ...
+# Subtest: v2.11：v2.10 旧记录（path 含 -vN）读取兼容；canonical 指向文件缺失 ⇒ missing
+ok 14 - v2.11：v2.10 旧记录（path 含 -vN）读取兼容；canonical 指向文件缺失 ⇒ missing
+  ---
+  duration_ms: 32.6299
+  type: 'test'
+  ...
+# Subtest: v2.12 锁协议：O_EXCL 独占/超时 fail-closed/陈旧接管/只释放自己 token
+ok 15 - v2.12 锁协议：O_EXCL 独占/超时 fail-closed/陈旧接管/只释放自己 token
+  ---
+  duration_ms: 314.8369
+  type: 'test'
+  ...
+# Subtest: v2.12 旧记录归一化：event/recordedBy/实际 path 只读兼容；非法旧字段整文件 fail
+ok 16 - v2.12 旧记录归一化：event/recordedBy/实际 path 只读兼容；非法旧字段整文件 fail
+  ---
+  duration_ms: 23.3618
+  type: 'test'
+  ...
+# Subtest: v2.13 入口：属主写成功后按单文件登记（TOFU/version-added），不扫描补齐
+ok 17 - v2.13 入口：属主写成功后按单文件登记（TOFU/version-added），不扫描补齐
+  ---
+  duration_ms: 72.4402
+  type: 'test'
+  ...
+# Subtest: v2.15 入口预检负例：缺版本记录章节/跳号/旧版已改 ⇒ 不登记
+ok 18 - v2.15 入口预检负例：缺版本记录章节/跳号/旧版已改 ⇒ 不登记
+  ---
+  duration_ms: 48.2035
+  type: 'test'
+  ...
+# Subtest: 2026-10-30（3.1/Delta-W1-1）：assets 作为第七类 vN 文档纳入只读守卫
+ok 19 - 2026-10-30（3.1/Delta-W1-1）：assets 作为第七类 vN 文档纳入只读守卫
+  ---
+  duration_ms: 0.1541
+  type: 'test'
+  ...
+# Subtest: C2b 唯一同步判定真值表：frozen 拒绝 / draft 允许 / unknown fail-closed / 缺省保留旧保护
+ok 20 - C2b 唯一同步判定真值表：frozen 拒绝 / draft 允许 / unknown fail-closed / 缺省保留旧保护
+  ---
+  duration_ms: 0.235
+  type: 'test'
+  ...
+# Subtest: C2b pin/re-pin：只有已冻结目标是允许的（versioned-doc-not-frozen）
+ok 21 - C2b pin/re-pin：只有已冻结目标是允许的（versioned-doc-not-frozen）
+  ---
+  duration_ms: 0.0882
+  type: 'test'
+  ...
+# Subtest: C2b rename/move：源与目标同判（目标 frozen/unknown 拒绝，新目标允许）
+ok 22 - C2b rename/move：源与目标同判（目标 frozen/unknown 拒绝，新目标允许）
+  ---
+  duration_ms: 0.0679
+  type: 'test'
+  ...
+# Subtest: C2b amendment 模式：-amendment-vN.md 纳入版本化；draft 允许/frozen 拒绝/登记 canonical
+ok 23 - C2b amendment 模式：-amendment-vN.md 纳入版本化；draft 允许/frozen 拒绝/登记 canonical
+  ---
+  duration_ms: 23.1972
+  type: 'test'
+  ...
+# Subtest: C2b 冻结快照：latest-record-per-path、migration-required、corrupt/unknown fail-closed、invalidate
+ok 24 - C2b 冻结快照：latest-record-per-path、migration-required、corrupt/unknown fail-closed、invalidate
+  ---
+  duration_ms: 0.8408
+  type: 'test'
+  ...
+# Subtest: C2b R9 冻结追加：bootstrap 建 baseline/marker、幂等、冻结冲突、刷新快照/损坏 fail-closed
+ok 25 - C2b R9 冻结追加：bootstrap 建 baseline/marker、幂等、冻结冲突、刷新快照/损坏 fail-closed
+  ---
+  duration_ms: 45.2368
+  type: 'test'
+  ...
+# Subtest: C2b R9 draft-updated：草稿原位改登记最新 sha；冻结后写后登记拒绝；verify 不误报
+ok 26 - C2b R9 draft-updated：草稿原位改登记最新 sha；冻结后写后登记拒绝；verify 不误报
+  ---
+  duration_ms: 72.1263
+  type: 'test'
+  ...
+# Subtest: C2b draft-marker：migrated-draft 标注（不写 doc.freeze）且快照标记 migratedDraft
+ok 27 - C2b draft-marker：migrated-draft 标注（不写 doc.freeze）且快照标记 migratedDraft
+  ---
+  duration_ms: 21.708
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1413.5468

@@ -1,0 +1,2 @@
+72e8a723c08d970e04c330f52675f36f02abe847460239e1d59c6d82e0af0516  *C:/Users/51054/Desktop/work/ans-judge-delegated-run-2026-11-09/pre/snake-run-root.sha256.tsv
+acd1578e5d41165b646ce2bf008711e052a6f420592779372adf22f4da455e91  *C:/Users/51054/Desktop/work/ans-judge-delegated-run-2026-11-09/pre/snake-target.sha256.tsv

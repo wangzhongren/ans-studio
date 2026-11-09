@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: openGovernanceSession：句柄含治理角色/边界来源/scope；gate 对项目治理边界求值
+ok 1 - openGovernanceSession：句柄含治理角色/边界来源/scope；gate 对项目治理边界求值
+  ---
+  duration_ms: 20.2854
+  type: 'test'
+  ...
+# Subtest: openGovernanceSession：驱动句柄（send + 事件流）能建出 角色卡/X/ 并落盘
+ok 2 - openGovernanceSession：驱动句柄（send + 事件流）能建出 角色卡/X/ 并落盘
+  ---
+  duration_ms: 30.8646
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [message] 用户指令：任务 T-ENG-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# 目标角色：X。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「建角色 X」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-engine-A9g58O\\proj\\角色卡\\X\\role-card.md）
+# [settled] 会话结束
+# Subtest: runGovernSession：CLI 前端复用同一引擎（同一边界来源/scope）并以码返回
+ok 3 - runGovernSession：CLI 前端复用同一引擎（同一边界来源/scope）并以码返回
+  ---
+  duration_ms: 17.5084
+  type: 'test'
+  ...
+# Subtest: openGovernanceSession：不预建骨架（无 bootstrap 选项）→ 空项目上仍能开会话（创世种子边界）
+ok 4 - openGovernanceSession：不预建骨架（无 bootstrap 选项）→ 空项目上仍能开会话（创世种子边界）
+  ---
+  duration_ms: 5.094
+  type: 'test'
+  ...
+# Subtest: openGovernanceSession：targetDir 原样透传到句柄（供装配据它设 projectRoot / T33 finalize）
+ok 5 - openGovernanceSession：targetDir 原样透传到句柄（供装配据它设 projectRoot / T33 finalize）
+  ---
+  duration_ms: 6.8392
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 387.4532

@@ -1,0 +1,4 @@
+file	test/桌面应用/chief-workflow.test.ts
+timeout_s	300	exit	124	killed	1
+tests	63	pass	51	fail	12	cancelled	0	skipped	0	todo	0
+wall_ms	300119

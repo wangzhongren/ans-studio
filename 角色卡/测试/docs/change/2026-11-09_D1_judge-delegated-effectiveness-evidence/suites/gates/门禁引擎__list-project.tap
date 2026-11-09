@@ -1,0 +1,139 @@
+TAP version 13
+# Subtest: listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+not ok 1 - listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+  ---
+  duration_ms: 44.9726
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\list-project.test.ts:23:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   '角色卡/招募：缺少 role-card.md，已跳过'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: '角色卡/招募：缺少 role-card.md，已跳过'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/list-project.test.ts:51:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: listProject：内置治理角色 su 永远排在第一位，无角色目录，边界为内置（未接受）
+ok 2 - listProject：内置治理角色 su 永远排在第一位，无角色目录，边界为内置（未接受）
+  ---
+  duration_ms: 22.8494
+  type: 'test'
+  ...
+# Subtest: listProject：英文 role-cards/，坏边界进 warnings，其余照常返回
+ok 3 - listProject：英文 role-cards/，坏边界进 warnings，其余照常返回
+  ---
+  duration_ms: 13.2012
+  type: 'test'
+  ...
+# Subtest: listProject：中文 角色卡/ 目录名可识别
+ok 4 - listProject：中文 角色卡/ 目录名可识别
+  ---
+  duration_ms: 4.9331
+  type: 'test'
+  ...
+# Subtest: listProject：真实项目级错误仍抛出（不存在 / 不是目录）
+ok 5 - listProject：真实项目级错误仍抛出（不存在 / 不是目录）
+  ---
+  duration_ms: 1.4093
+  type: 'test'
+  ...
+# Subtest: T14/六角色：导入空目录（新空项目）→ 不抛错、trio 六内置、chief 主入口、空 warnings
+ok 6 - T14/六角色：导入空目录（新空项目）→ 不抛错、trio 六内置、chief 主入口、空 warnings
+  ---
+  duration_ms: 0.8644
+  type: 'test'
+  ...
+# Subtest: 三权：无显式模型但已有角色目录（旧项目）→ single，su 行为逐字不变
+ok 7 - 三权：无显式模型但已有角色目录（旧项目）→ single，su 行为逐字不变
+  ---
+  duration_ms: 3.0276
+  type: 'test'
+  ...
+# Subtest: 三权：`.ans/project.json` 缺 governanceModel（旧记录）→ single；显式 trio → trio
+ok 8 - 三权：`.ans/project.json` 缺 governanceModel（旧记录）→ single；显式 trio → trio
+  ---
+  duration_ms: 11.015
+  type: 'test'
+  ...
+# Subtest: 三权：`.ans` 不可解析 → single（行为不变，不崩）
+ok 9 - 三权：`.ans` 不可解析 → single（行为不变，不崩）
+  ---
+  duration_ms: 3.653
+  type: 'test'
+  ...
+# Subtest: 三权：首角色已落盘但 `.ans` 未写出、任务状态存在 → trio、chief 主入口、六内置角色
+ok 10 - 三权：首角色已落盘但 `.ans` 未写出、任务状态存在 → trio、chief 主入口、六内置角色
+  ---
+  duration_ms: 3.9722
+  type: 'test'
+  ...
+# Subtest: 三权：同上但无任务状态 → single、su 主入口（旧项目行为逐字不变）
+ok 11 - 三权：同上但无任务状态 → single、su 主入口（旧项目行为逐字不变）
+  ---
+  duration_ms: 1.8333
+  type: 'test'
+  ...
+# Subtest: 三权：显式 `.ans/project.json` single 优先于任务状态 → 仍 single
+ok 12 - 三权：显式 `.ans/project.json` single 优先于任务状态 → 仍 single
+  ---
+  duration_ms: 5.4322
+  type: 'test'
+  ...
+# Subtest: 三权：`.ans/project.json` 不可解析 + 任务状态存在 → 仍 single（unreadable fail-closed 不变）
+ok 13 - 三权：`.ans/project.json` 不可解析 + 任务状态存在 → 仍 single（unreadable fail-closed 不变）
+  ---
+  duration_ms: 1.1559
+  type: 'test'
+  ...
+# Subtest: 六角色：保留 id 冲突——项目里的 su/chief/product/liaison/rapporteur/nominator/convener/verifier 目录跳过并警告
+ok 14 - 六角色：保留 id 冲突——项目里的 su/chief/product/liaison/rapporteur/nominator/convener/verifier 目录跳过并警告
+  ---
+  duration_ms: 8.3082
+  type: 'test'
+  ...
+# Subtest: T14：有角色目录但全无效角色 → hasRoles:false + 提示可用 su 发起 bootstrap（不抛错）
+ok 15 - T14：有角色目录但全无效角色 → hasRoles:false + 提示可用 su 发起 bootstrap（不抛错）
+  ---
+  duration_ms: 1.5955
+  type: 'test'
+  ...
+# Subtest: C1a：空项目 roleDirectories/issues 事实；内置行无 cardSections
+ok 16 - C1a：空项目 roleDirectories/issues 事实；内置行无 cardSections
+  ---
+  duration_ms: 0.7544
+  type: 'test'
+  ...
+# Subtest: C1a：有效 worker 的 cardSections（含 title）与 roleDirectories 计数
+ok 17 - C1a：有效 worker 的 cardSections（含 title）与 roleDirectories 计数
+  ---
+  duration_ms: 4.736
+  type: 'test'
+  ...
+# Subtest: C1a：issues 逐 code 映射、归档不出 issue、roleDirectories 计数；既有 warnings 文案不变
+ok 18 - C1a：issues 逐 code 映射、归档不出 issue、roleDirectories 计数；既有 warnings 文案不变
+  ---
+  duration_ms: 8.6771
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 17
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 348.6973

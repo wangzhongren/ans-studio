@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不存在、与技能对互不搭车）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+ok 1 - G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不存在、与技能对互不搭车）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+  ---
+  duration_ms: 2.7558
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/门禁之外执行＝能力级授予（非逐调用受审）/不改变写边界/失败文案枚举（含 not-customer-turn）
+ok 2 - schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/门禁之外执行＝能力级授予（非逐调用受审）/不改变写边界/失败文案枚举（含 not-customer-turn）
+  ---
+  duration_ms: 0.2041
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4 V2）：uninstall_mcp 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/卸载＝下次会话摘除/声明保留二分/已发生副作用不可撤
+ok 3 - schema 文案（G-4 V2）：uninstall_mcp 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/卸载＝下次会话摘除/声明保留二分/已发生副作用不可撤
+  ---
+  duration_ms: 0.1012
+  type: 'test'
+  ...
+# Subtest: G-4 V2：install_mcp 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现声明 path/digest/生效态并重申写边界与门禁外执行面
+ok 4 - G-4 V2：install_mcp 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现声明 path/digest/生效态并重申写边界与门禁外执行面
+  ---
+  duration_ms: 0.5058
+  type: 'test'
+  ...
+# Subtest: G-4 V2：失败如实——枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+ok 5 - G-4 V2：失败如实——枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+  ---
+  duration_ms: 0.7556
+  type: 'test'
+  ...
+# Subtest: G-4 V2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已装
+ok 6 - G-4 V2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已装
+  ---
+  duration_ms: 0.4301
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 232.6961

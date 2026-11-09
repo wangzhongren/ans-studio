@@ -11,10 +11,12 @@ import {
   DOC_FREEZE_BASELINE_EVENT_KINDS,
   DOC_FREEZE_CUSTOMER_REASONS,
   DOC_FREEZE_ERROR_CODES,
+  DOC_FREEZE_JUDGE_DELEGATED_REASONS,
   DOC_FREEZE_LOOKUP_STATES,
   DOC_FREEZE_REASONS,
   DOC_FREEZE_SCHEMA,
   DOC_MIGRATION_MARKS,
+  isJudgeDelegatedSource,
   REFACTOR_ERROR_CODES,
   REFACTOR_FORBIDDEN_KINDS,
   REFACTOR_MANAGED_BY,
@@ -40,8 +42,11 @@ import {
   VERSION_UPGRADE_TARGET_KINDS,
   type DocFreezeLookup,
   type DocFreezeLookupState,
+  type DocFreezeOrigin,
   type DocFreezeReason,
   type DocFreezeRecord,
+  type DocFreezeSource,
+  type JudgeDelegatedSource,
   type RefactorErrorCode,
   type RefactorRequestRecord,
   type StableFileKind,
@@ -65,7 +70,7 @@ import {
   type TaskStateEvent,
   type VersionChangeEvent,
 } from "../../src/model/runtime.ts";
-import type { TrunkStableFileKind } from "../../src/model/trunk.ts";
+import type { DirectActionSource, TrunkStableFileKind } from "../../src/model/trunk.ts";
 
 const AT = "2026-11-04T00:00:00.000Z";
 const SHA_A = "a".repeat(64);
@@ -562,4 +567,87 @@ test("四组错误码稳定、无重复（含 vca-conflict；排除 trunk-drift�
   // @ts-expect-error 未知错误码不属于 RefactorErrorCode
   const badRefactorCode: RefactorErrorCode = "refactor-unknown";
   void badRefactorCode;
+});
+
+// —————————————— 2026-11-09 judge-delegated 契约（W-J1；B1 J1/J2 + AC-J6/AC-J9 契约面） ——————————————
+
+const judgeSource: JudgeDelegatedSource = { kind: "judge-delegated", requestId: "req-1", engine: "claude",
+  model: "claude-fable-5", operatorId: "judge:claude", reasonCode: "sufficient", reason: "匹配意图",
+  selected: ["confirm"], cardKind: "intent-confirm", at: AT };
+
+test("judge-delegated reason 子集：恰为 proposal/intent、是 customer 分区子集、不扩既有 reason 全集", () => {
+  assert.deepEqual([...DOC_FREEZE_JUDGE_DELEGATED_REASONS], ["proposal-confirmed", "intent-confirmed"]);
+  const judge = new Set<string>(DOC_FREEZE_JUDGE_DELEGATED_REASONS);
+  const customer = new Set<string>(DOC_FREEZE_CUSTOMER_REASONS);
+  for (const reason of judge) assert.equal(customer.has(reason), true, reason);
+  for (const forbidden of ["vca-approved", "version-upgrade-approved", "detail-item-applied",
+    "amendment-submitted", "handoff-pin-bootstrap", "bootstrap-vca-approved", "migrated-legacy",
+    "role-direct-applied"]) {
+    assert.equal(judge.has(forbidden), false, forbidden);
+  }
+});
+
+test("DocFreezeOrigin/DocFreezeSource 扩展 judge-delegated：诚实来源可赋给记录，且不混入既有 DirectActionSource", () => {
+  const origins: DocFreezeOrigin[] = ["customer", "application", "role-direct", "chief-delegated", "judge-delegated"];
+  assert.equal(new Set(origins).size, 5);
+  const asSource: DocFreezeSource = judgeSource;
+  assert.equal(asSource.kind, "judge-delegated");
+  const record = {
+    schema: DOC_FREEZE_SCHEMA,
+    applicationId: "intent-req-1",
+    reason: "intent-confirmed",
+    origin: "judge-delegated",
+    source: asSource,
+    frozenAt: AT,
+    snapshotRef: { snapshotId: "snapshot-1", digest: SHA_A },
+  } satisfies DocFreezeRecord;
+  assert.equal(record.origin, "judge-delegated");
+  assert.equal(isJudgeDelegatedSource(record.source), true);
+  // 结构守卫 fail-closed：operatorId 与 engine 绑定、engine 非空、客户字段混入即拒绝
+  assert.equal(isJudgeDelegatedSource({ ...judgeSource, operatorId: "judge:codex" }), false);
+  assert.equal(isJudgeDelegatedSource({ ...judgeSource, engine: "" }), false);
+  assert.equal(isJudgeDelegatedSource({ ...judgeSource, decidedBy: "customer" }), false);
+  assert.equal(isJudgeDelegatedSource({ ...judgeSource, decisionId: "decision-req-1" }), false);
+  // @ts-expect-error judge-delegated 不是既有 DirectActionSource 的成员（不得冒充直连/客户来源）
+  const wrong: DirectActionSource = judgeSource;
+  void wrong;
+  // @ts-expect-error origin 不得写成 `judge`（与 request.resolved.by 的归因值区分）
+  const badOrigin: DocFreezeOrigin = "judge";
+  void badOrigin;
+});
+
+test("doc.freeze 事件 origin=judge-delegated + DocFreezeSource 可赋给 TaskStateEvent；customer 事件形状不变", () => {
+  const judgeEvent = {
+    v: 1,
+    at: AT,
+    kind: "doc.freeze",
+    schema: DOC_FREEZE_SCHEMA,
+    path: "docs/intent.md",
+    version: 1,
+    sha256: SHA_A,
+    applicationId: "intent-req-1",
+    reason: "intent-confirmed",
+    origin: "judge-delegated",
+    actionSource: judgeSource,
+  } satisfies DocFreezeEvent;
+  const asTaskEvent: TaskStateEvent = judgeEvent;
+  assert.equal(asTaskEvent.kind, "doc.freeze");
+  assert.equal("decidedBy" in judgeEvent, false, "judge 事件不得携带客户字段");
+  assert.equal("decisionId" in judgeEvent, false);
+  assert.equal("actorRoleId" in judgeEvent, false);
+  const customerEvent = {
+    v: 1,
+    at: AT,
+    kind: "doc.freeze",
+    schema: DOC_FREEZE_SCHEMA,
+    path: "docs/a.md",
+    version: 2,
+    sha256: SHA_A,
+    applicationId: "vc-1",
+    reason: "vca-approved",
+    origin: "customer",
+    decidedBy: "customer",
+    decisionId: "decision-1",
+  } satisfies DocFreezeEvent;
+  assert.equal(customerEvent.origin, "customer");
 });

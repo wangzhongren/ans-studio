@@ -1,0 +1,46 @@
+# W-J5 amendment evidence manifest (sha256) — 2026-11-09
+# node: v24.22.1
+# HEAD: fb1aa39e787934f334b9c164e4221074f97f6147 branch: feat/plan-escalation-card
+
+## write-set (after)
+7c40f724683cfbfaaad4b97a879bb43a59611a282e3a3fc13ab79023e487fcdd *test/测试/2026-11-09_judge-delegated-effectiveness.test.ts
+59700e5fab72796cb27fccfe4aaf0f35e9f83b324f4edfdedb20f981788d7ea7 *test/测试/git-write-chain-fixture.ts
+c811d51895c1ba66c7031ce0b3a9546e49ae026c8ecc4c54c577784db40d8881 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated.md
+
+## amendment evidence files
+961442cad6f627bce0eff44c6a9a87a5450f0083b9c712eaf8f30a87b18cbcea *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/2026-11-09_judge-delegated-doc-freeze.tap
+ff24c451d7f9eb0da3fc6785f0206f5d5ab8e1128a947ba876a3266a83a74457 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/2026-11-09_judge-delegated-effectiveness.tap
+b5110596e1c0ca79103b6edf12d182bfcc5115c5a742881045e31dbaf81331d8 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/effectiveness-first.tap
+308e957a95ab54346c3303b12e5bb11b6a049ace41be7c1e88c1b15f1aa55fde *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/git-action-activation-e2e.tap
+5e1e66bcfe0ade098284c78268141b34d83f4778b13a7fcb6162b9f3a11b797e *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/git-action-commit-claude-e2e.tap
+81212cf77dea6138c2e49111f3982d1c8851fcea4ad7f24182d01ea8bc3a19b5 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/git-action-commit-pi-e2e.tap
+bd4fafb988873a9cb749a9e9789d73da98f25ec01a6bc892502c1608f5756870 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/git-action-delivery-claude-e2e.tap
+c68dea8d619d64dc4ddaa279559e22f3404575aca2069b718454b270e62192d4 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/git-run-stop-host-continuation-e2e.tap
+26f62c87fd1b529417f86c45ed5e49577003f720334dfd439ff84206aa0746dd *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/runtime/wj5-main-freeze.first-run.json
+e5656f07f0b85fb92d1c386f1a1d9838c71b8fb41c14b5e7663681a6717966d2 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/runtime/wj5-main-freeze.json
+9ccd3ad6b1d6115a1b8f53626dbde746fc9ac6814733ca845287f990f1124705 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/after/summary.tsv
+2143eb0b4a7d3f1531c5c30c2306749a342cc4f635f9f30d38262822ffaffc79 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/2026-11-09_judge-delegated-doc-freeze.tap
+5a15e8791a1a03087ad79b6ca898999f87b61bf639aaee7fe8b57e2e346248bc *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/2026-11-09_judge-delegated-effectiveness.tap
+8ecad41f49f2d2d32bfc72c54b754805510e484cabae2fdcea0cb7af79726f85 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/git-action-activation-e2e.tap
+b550bf77b036ca601da8786f5596a3c01aba773d62d4afd183f700c86e9b9f83 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/git-action-commit-claude-e2e.tap
+d132e021d26371489b45a089a9a6c152c2e9cca57053c777480fad94d5e518a6 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/git-action-commit-pi-e2e.tap
+56af4fb34ad8e84ae5294a848c3161bc14fcc3ff233bcc1a162ce2d54dd8d54b *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/git-action-delivery-claude-e2e.tap
+83874a8c6a9ce72f6386dececa985cf92cacf66321a6c03d57f21c3468c2f7d6 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/git-run-stop-host-continuation-e2e.tap
+fe949ecd00d976781032ad0ef758a27b44e3d1ea5addbae76afa168cc78db86c *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/isolated-delivery-rerun.tap
+5033182745d7ea21b5230b4b6b17a111c7bf1711ee33b1e41c62eaf84e2aab74 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/before/summary.tsv
+f9ee71c5e7178deba2d3669ee8a6cbf8b071b7a96670d78bd113b1769a2e19e0 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare.sh
+d3714af5d2db8a7ed4dcf58745224791f1c2b8ddd6c06bf525763f708ad46dfe *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/fails-diff.txt
+11af81e3943474cbbf35a2c85fb5318eb8efc443142ce52bb35f6d658e6f5b27 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/fails-post.txt
+fc686eee1a87baf6e1cf25a57e0c833f71847da3a543c8564a78d48386e081aa *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/fails-pre.txt
+e3ace6e3cbb10968e12c988e0bf0e22f43d16f89b7980d9315f5ec693d3069e5 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/per-file-diff.tsv
+603e675e667da8edfd49e351a0b7a1f650ea165e76ba2dd3cf33d8ae5d5659f4 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/per-file-joined.tsv
+c6f5a80e180856a47e9c9a17860b1700835d5cfc5a2a081402d617a4a29bf3ca *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/post-normalized.tsv
+3c7393850babbc8f1645fba15c5c2a6c7edf52004938d6cd52ad82151b343e02 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/pre-normalized.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/skips-diff.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/skips-post.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/skips-pre.txt
+d926210474a6f3727c993dcb68a983eb0ec71421b1139dea9cb75d1cb7d3dcb4 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/totals.tsv
+fc06ce834335664b8222294992fe5610fd8b8bf42b599570a1f60c44478fb771 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/isolated/commit-pi-after-rerun.tap
+fe949ecd00d976781032ad0ef758a27b44e3d1ea5addbae76afa168cc78db86c *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/isolated/delivery-claude-before-rerun.tap
+67ddf03a90aa2f9e0bf596f0bcbf9f34e355f9de48f7a0bfea8d1077351f8b5a *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/run-related.sh
+22d52cc9fc6af45ff16ea0c9c37829064d4d00eac6d144007dc9166796b6a247 *角色卡/测试/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/typecheck-after.txt
