@@ -1,0 +1,12 @@
+=== git diff --stat -- test (expect empty: no existing test files modified) ===
+=== git status -- test ===
+?? test/测试/bootstrap-frozen-closure-integration.test.ts
+?? test/编排/bootstrap-frozen-closure.test.ts
+?? test/门禁引擎/freeze-closure.test.ts
+=== git diff --stat -- app (expect empty) ===
+=== git status -- app ===
+=== key existing test file hashes (worktree filtered vs HEAD blob) ===
+test/门禁引擎/git-shell-acl.test.ts worktree=dc1970d609ae24d62f5fbc44293b89b083d89c31 head=dc1970d609ae24d62f5fbc44293b89b083d89c31 match=yes
+test/测试/version-change-integration.test.ts worktree=952b740fd684ef263294d8f857e48b5aba408858 head=952b740fd684ef263294d8f857e48b5aba408858 match=yes
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts worktree=1ca9fba2452cd29abc3efbb0fd8477b3ba4bf495 head=1ca9fba2452cd29abc3efbb0fd8477b3ba4bf495 match=yes
+test/编排/direct-role-capabilities.test.ts worktree=3ca1c05d139ce7d78f3f2670f51e645ae75a67c0 head=3ca1c05d139ce7d78f3f2670f51e645ae75a67c0 match=yes

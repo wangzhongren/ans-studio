@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+ok 1 - W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+  ---
+  duration_ms: 67.0855
+  type: 'test'
+  ...
+# Subtest: W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+ok 2 - W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+  ---
+  duration_ms: 48.7908
+  type: 'test'
+  ...
+# Subtest: W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+ok 3 - W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+  ---
+  duration_ms: 44.1572
+  type: 'test'
+  ...
+# Subtest: W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+ok 4 - W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+  ---
+  duration_ms: 57.511
+  type: 'test'
+  ...
+# Subtest: W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+ok 5 - W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+  ---
+  duration_ms: 48.2362
+  type: 'test'
+  ...
+# Subtest: W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+ok 6 - W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+  ---
+  duration_ms: 43.2837
+  type: 'test'
+  ...
+# Subtest: W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+ok 7 - W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+  ---
+  duration_ms: 38.4962
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 541.8246

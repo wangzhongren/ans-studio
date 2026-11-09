@@ -693,7 +693,7 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
     const row = table.get(file.path); return row?.sha256 === file.sha256
       && ["snapshot-content", "frozen-application-evidence"].includes(row.kind);
   }), "git-policy-app-snapshot-content-incomplete");
-  const artifactPaths = new Set<string>();
+  const artifactPaths = new Set<string>(), frozenClosurePaths = new Set<string>();
   const patterns: Record<string, RegExp> = { intent: /^docs\/product\/[^/]+-intent-v[1-9]\d*\.md$/, proposal: /^docs\/proposals\/[^/]+-proposal-v[1-9]\d*\.md$/,
     roster: /^docs\/proposals\/[^/]+-roster-v[1-9]\d*\.md$/, modules: /^docs\/proposals\/[^/]+-modules-v[1-9]\d*\.md$/, topology: /^docs\/proposals\/[^/]+-topology-v[1-9]\d*\.md$/,
     architecture: /^docs\/contracts\/[^/]+-architecture-v[1-9]\d*\.md$/, assets: /^docs\/contracts\/[^/]+-assets-v[1-9]\d*\.md$/ };
@@ -721,13 +721,21 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
           && bytes.get(row.path)!.equals(Buffer.from(planMarker.bytes)), "git-policy-plan-marker"); allowed.add(row.path); continue;
       }
       policyRequire(row.path === ".ans/state/versions.jsonl" && primary.files.some(file => file.path === row.path && file.sha256 === row.sha256), "git-policy-app-evidence-path");
+      // 冻结闭包只针对真实冻结证据：`event:"frozen"` 行必须逐字节进入候选快照（强度不变）。
+      // 其余合法事件（baseline/version-added/draft-updated/draft-marker）是原位改写后的草稿历史行，
+      // 旧 sha 在磁盘/任何快照中都不存在，只保留既有形状/归属校验，不再要求快照携带其历史字节；
+      // 未知 `event` 仍由下方 `git-policy-app-freeze-source` 拒绝（不新增豁免）。
       for (const line of bytes.get(row.path)!.toString("utf8").split(/\r?\n/).filter(line => line.trim())) {
         const record: unknown = JSON.parse(line);
         policyRequire(policyObject(record) && record.v === 1 && record.flowId === pub.flowId && typeof record.path === "string"
           && Number.isSafeInteger(record.version) && Number(record.version) > 0 && typeof record.sha256 === "string", "git-policy-app-freeze-record");
+        const frozen = record.event === "frozen";
         const file = /-v\d+\.md$/.test(record.path) ? record.path : `${record.path}-v${record.version}.md`;
-        policyRequire(primary.files.some(item => item.path === file && item.sha256 === record.sha256), "git-policy-app-freeze-closure");
-        policyRequire(record.event === "frozen" ? isValidDocFreezeRecord(record.freeze)
+        if (frozen) {
+          policyRequire(primary.files.some(item => item.path === file && item.sha256 === record.sha256), "git-policy-app-freeze-closure");
+          frozenClosurePaths.add(file);
+        }
+        policyRequire(frozen ? isValidDocFreezeRecord(record.freeze)
           : ["baseline", "version-added", "draft-updated", "draft-marker"].includes(String(record.event)) && record.freeze === undefined, "git-policy-app-freeze-source");
       }
       allowed.add(row.path);
@@ -736,6 +744,11 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
       if (artifactPaths.has(row.path)) allowed.add(row.path);
     } else policyRequire(row.kind === "complete-snapshot" && allowed.has(row.path), "git-policy-app-file-kind");
   }
+  // M2：把「经 frozen 闭包证明（`primary.files` 同 path 同 sha）且元数据行 kind=snapshot-content」的路径
+  // 加入 allowed，使 bootstrap 候选树接纳历史冻结文档（首建 trunk 时它们是新增文件，product 的
+  // gitRolePath 只覆盖 docs/product/）。仅此证明集：未被 frozen 记录证明的额外 snapshot-content
+  // 仍走 gitRolePath / git-policy-raw-write-scope；字节已由 frozen 记录 + 快照 digest + 账本在快照内三重钉死。
+  for (const file of frozenClosurePaths) if (table.get(file)?.kind === "snapshot-content") allowed.add(file);
   if (teamPlan) for (const row of table.values()) if (row.kind === "snapshot-content" || row.kind === "frozen-application-evidence") {
     if (row.path === planPath || row.path === planMarker!.path) continue;
     policyRequire(before.get(row.path)?.mode === "100644" && sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-plan-unrelated-bytes");

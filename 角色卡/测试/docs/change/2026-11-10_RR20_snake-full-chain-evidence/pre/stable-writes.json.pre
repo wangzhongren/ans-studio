@@ -1,0 +1,33 @@
+[
+  {
+    "v": 1,
+    "schema": "stable-write/v1",
+    "requestId": "sw-1",
+    "roleId": "convener",
+    "path": "docs/workflow.md",
+    "kind": "workflow",
+    "baseSha256": "",
+    "targetSha256": "032e4d370296b9e3a59b6d689f112a12794ef337066f5b661f2bb605ac28aaf3",
+    "diffPreview": "",
+    "status": "rejected",
+    "at": "2026-11-09T18:15:01.876Z",
+    "decisionId": "decision-sw-card-sw-1"
+  },
+  {
+    "v": 1,
+    "schema": "stable-write/v1",
+    "requestId": "sw-2",
+    "roleId": "convener",
+    "path": "docs/workflow.md",
+    "kind": "workflow",
+    "baseSha256": "",
+    "targetSha256": "032e4d370296b9e3a59b6d689f112a12794ef337066f5b661f2bb605ac28aaf3",
+    "diffPreview": "",
+    "status": "approved",
+    "at": "2026-11-09T18:20:17.756Z",
+    "permitId": "swp-1",
+    "decisionId": "decision-sw-card-sw-2",
+    "approvedAt": "2026-11-09T18:20:17.756Z",
+    "expiresAt": "2026-11-09T18:50:17.756Z"
+  }
+]

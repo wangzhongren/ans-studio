@@ -1,0 +1,58 @@
+{
+  "candidate": {
+    "allowed": true,
+    "code": null,
+    "inputDigest": "aca836aeeb59a6cb71c2e6060db087c99b027c06ee92582af710425159f43485"
+  },
+  "publication": {
+    "allowed": true,
+    "code": null,
+    "inputDigest": "52256ac8ef683ddbffae0dd133d11c7cd0845db161c400b0aa5dbfd4400c5b3f"
+  },
+  "businessPublication": {
+    "kind": "direct-document-publication",
+    "flowId": "demo",
+    "operationId": "w5-t1-bootstrap",
+    "actorRoleId": "product",
+    "applicationId": "vc-21707093749911",
+    "action": "version-upgrade",
+    "snapshot": {
+      "snapshotId": "s-13be139cb097ffa5ed24f57e4b72194c5c2017de1708a5f9d437e619bc496b0f",
+      "digest": "f75fe55aeb3cef0c9545108695ddaaa153fc052a8909539eecb6ef26a1ddfa49"
+    },
+    "documents": {
+      "proposal": {
+        "path": "docs/proposals/demo-proposal-v2.md",
+        "sha256": "62063725cb18c308413dc068f0ccf914e9d6b485fb94e192aac9c739480eaa80",
+        "version": 2
+      },
+      "architecture": {
+        "path": "docs/contracts/demo-architecture-v2.md",
+        "sha256": "59e2ac90d354cadd7aa30cc8f8936fff0c23cf338f63f5a1c6879eaa6e8a2075",
+        "version": 2
+      },
+      "roster": {
+        "path": "docs/proposals/demo-roster-v2.md",
+        "sha256": "0194795b56bcfe46c6e486062cc1cb99c49bd6993a88d4115760f59b56892524",
+        "version": 2
+      },
+      "modules": {
+        "path": "docs/proposals/demo-modules-v1.md",
+        "sha256": "506c8a73f0698ff96b77101fba31aff9dd91000e2d175acf37896fcfbabfdbb0",
+        "version": 1
+      }
+    },
+    "execution": {
+      "teamPlan": null,
+      "flow": null
+    }
+  },
+  "manifest": {
+    "trunkVersion": 1,
+    "digest": "fdf38c7de87641cdca8b00acce31b69c8b03da9e017cab1fa9be06c707d8439f",
+    "snapshotRef": {
+      "snapshotId": "s-13be139cb097ffa5ed24f57e4b72194c5c2017de1708a5f9d437e619bc496b0f",
+      "digest": "f75fe55aeb3cef0c9545108695ddaaa153fc052a8909539eecb6ef26a1ddfa49"
+    }
+  }
+}

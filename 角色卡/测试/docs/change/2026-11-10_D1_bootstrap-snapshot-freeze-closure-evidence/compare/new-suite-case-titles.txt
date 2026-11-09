@@ -1,0 +1,33 @@
+===== w1-targeted =====
+     1	T1 bootstrap closure: 4 current-version targets + 8 frozen records assemble the exact 9-file sorted snapshot and pass vca.prepareDirect
+     2	T2 bootstrap same-kind multi-version targets are rejected explicitly (M1), never last-wins, with no side effects
+     3	T3 bootstrap closure fails closed when a frozen record file is missing, drifted or unreadable
+     4	T6 ledger negative cases fail closed without skipping: bad line, unknown event, invalid freeze shape
+     5	T7 same-path sources with different sha fail closed with the conflicting path
+     6	T8 no-history bootstrap keeps the original snapshot content (targets + confirmed intent + versions only)
+     7	T9 non-bootstrap upgrade does not collect the freeze ledger (snapshot bytes unchanged)
+     8	T13 scale: many frozen records assemble linearly in path order with a deterministic digest
+     9	T14 legacy call: non-bootstrap executeDirect without preparedSnapshotRef keeps the old capture set
+    10	T15 FS media: direct bootstrap executeDirect (no preparedSnapshotRef) assembles the frozen closure and applies
+    11	T15 negative: bootstrap executeDirect fallback fails closed on closure drift with no manifest/journal/freeze effects
+    12	T16 replay: same operationId produces a stable digest; a different file set fails snapshot-immutable-conflict
+    13	T17 another-flow ledger row fails closed without silent filtering
+    14	T18 frozen record whose -vN suffix differs from record.version fails closed service-side
+===== w2-targeted =====
+     1	W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+     2	W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+     3	W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+     4	W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+     5	W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+     6	W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+     7	W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+===== w5-integration =====
+     1	W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交
+     2	W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）
+     3	W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot
+     4	W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）
+     5	W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径
+     6	W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）
+     7	W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝
+     8	W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行
+     9	W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）

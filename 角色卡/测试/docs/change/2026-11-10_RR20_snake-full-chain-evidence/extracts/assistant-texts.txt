@@ -1,0 +1,27 @@
+===== chief @ 2026-11-09T21:58:29.660Z =====
+已核实当前事实：`project_state` 显示 `snake-game` 存在 `run-ambiguous`（多个活动 run），trunk 尚未 bootstrap（`.ans/trunk/manifest.json` 不存在，此前 product 的 `submit_version_change` 曾以 `vca-target-invalid` 失败）。按指令先派产品做 4-target 标准 bootstrap VCA。
+
+===== chief @ 2026-11-09T21:58:56.394Z =====
+本轮已按指令启动第一步，当前状态如下（如实、以工具回执为准）：
+
+## 已核实的事实（只读）
+- `project_state(flow=snake-game)`：仍存在应用侧 blocker `run-ambiguous`（多个活动 run，版本决策需指定 runId）；全部版本 `pinned=none`；`contract_check` 显示应用当前 run 为 `run-hub-c9791d41…`（`state=draft`）。
+- 仓库为 git 仓库但内容全部未跟踪（`git status`: `?? .ans/`、`?? docs/`），此前 product 的 `submit_version_change` 曾以 `vca-target-invalid` 失败（历史记录在 `docs/governance/convener/`）。
+- 4 个 target 文件均存在；`docs/workflow.md` 尚不存在（后续为初始创建）；`docs/scheduling/snake-game-team-v2.md` 已存在，但其 frontmatter 仍引用 `docs/proposals/snake-game-roster-v1.md`（与本次 roster-v2 不一致，登记时可能触发引用校验失败——若发生将按你的要求逐字记录回执后停止，不改写旧文件）。
+
+## 已执行
+- **派发 product**：任务 `#t-mw9szhcm-b0c14cf4`，要求其以 `submit_version_change`（`version-upgrade`、`baseTrunk:null`、targets 恰为 proposal-v2 / modules-v1 / roster-v2 / architecture-v2 且 `expectedFromSha256` 全为 `null`、显式新 operationId 以 `-02` 结尾、禁止复用 RR19 op/快照、非成功即记录原文并停止）完成首个 trunk bootstrap；期望产出为 VCA 成功回执 + effective trunk manifest 与 `refs/ans/trunk` 实际 OID。
+- 派发为异步：受理 ≠ 完成。已记录 next-step 备注。
+
+## 本轮未做
+- 未调用 `run_shell`（全程仅 `git_query status` 一次只读查询）；未写任何文档、未改冻结/旧版本文件；未伪造任何回执；未自填应用派生值。
+
+## 下一步（待 product 正式回报驱动）
+1. 核 VCA 回执与首个 effective trunk manifest / `refs/ans/trunk`；
+2. 派 convener：`request_stable_write` 写 `docs/workflow.md`（客户卡选「放行执行」）→ `complete_team_plan` 登记团队计划 → 完成 run pin；
+3. 任命 D3 / nominator 写卡激活 → convener 发布工作流并派发实现，直到可玩的贪吃蛇或下一门。
+
+如 product 回执为 blocked/拒绝，我将按其回执原文如实报告并停止，不重试。
+
+===== chief @ 2026-11-09T21:59:15.781Z =====
+VCA 已生效（`vc-87528873023338`，trunk t1）。只读核实到 `refs/ans/trunk` 指向 `100a6621…`，其提交信息记录 `ANS trunk 1 30194da5…`，且存在前序 init 提交。现在按第二步派 convener。

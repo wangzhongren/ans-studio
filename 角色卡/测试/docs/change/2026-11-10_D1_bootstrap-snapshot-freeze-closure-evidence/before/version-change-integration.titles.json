@@ -1,0 +1,25 @@
+{
+  "file": "角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure-evidence/before/version-change-integration.tap.txt",
+  "summary": {
+    "tests": 12,
+    "pass": 3,
+    "fail": 9,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "failCount": 9,
+  "skipCount": 0,
+  "failTitles": [
+    "VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）",
+    "VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）",
+    "VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied",
+    "VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖",
+    "VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）",
+    "VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）",
+    "VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）",
+    "bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1",
+    "冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准"
+  ],
+  "skipTitles": []
+}

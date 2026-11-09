@@ -1,0 +1,158 @@
+TAP version 13
+# Subtest: W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+not ok 1 - W2 actual sha1 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+  ---
+  duration_ms: 53.4199
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\freeze-closure.test.ts:123:51'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"allowed":false,"inputDigest":"371da401f8d327399ffc117a7ff727472871e07755fc0485a5bc29feefed2a21","code":"git-policy-app-freeze-closure"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/freeze-closure.test.ts:126:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+not ok 2 - W2 actual sha256 bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）
+  ---
+  duration_ms: 40.8503
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\freeze-closure.test.ts:123:51'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"allowed":false,"inputDigest":"a0428d8673260890e82b914c475432dbca0d1e3a94edf4bf229d90271f5e3c59","code":"git-policy-app-freeze-closure"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/freeze-closure.test.ts:126:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+not ok 3 - W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）
+  ---
+  duration_ms: 45.0744
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\freeze-closure.test.ts:137:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    M2 允许集只接纳 frozen 证明路径
+    + actual - expected
+    
+    + 'git-policy-app-freeze-closure'
+    - 'git-policy-raw-write-scope'
+                  ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'git-policy-raw-write-scope'
+  actual: 'git-policy-app-freeze-closure'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/freeze-closure.test.ts:145:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+not ok 4 - W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）
+  ---
+  duration_ms: 48.4753
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\freeze-closure.test.ts:148:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"rows":[{"v":1,"flowId":"unit","doc":"intent","version":1,"path":"docs/product/unit-intent","sha256":"aa2c8f10530a790b1e4041d24055b141626b52517f240a89175b0656a5415793","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-intent-v1","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"proposal","version":1,"path":"docs/proposals/unit-proposal","sha256":"aad6d9eec607bd089ebfe7d076f4999fe894d1083e6efbd419228c0917bcf884","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-proposal-v1","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"proposal","version":2,"path":"docs/proposals/unit-proposal","sha256":"36b8926bf4e9ab15e490b376bc4cfc30d2b83a27b0812ad5e6da84c988315023","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-proposal-v2","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"architecture","version":1,"path":"docs/contracts/unit-architecture-v1.md","sha256":"e5f9fc925774138174b654dc8ace76fd7d2c548a7b1aa67ada4914a98b702478","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-architecture-v1","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"architecture","version":2,"path":"docs/contracts/unit-architecture","sha256":"cc0c72c8a6a0bf1379b71697ff468c67720b8f0a260d419f15722841f1eb7ba8","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-architecture-v2","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"roster","version":1,"path":"docs/proposals/unit-roster","sha256":"af7bb9f0477a476cd3c49e7183b3247928e8db200e6e059281d3287eaf5c3a9c","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-roster-v1","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"roster","version":2,"path":"docs/proposals/unit-roster","sha256":"53176c03a01b6dcb0142d52c63d979c1466821ba37997ad6090886110aa938ac","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-roster-v2","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"modules","version":1,"path":"docs/proposals/unit-modules","sha256":"36b2937382d5da2573e191ad3797930475ae0242334c97b335126756ba4b76a3","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"frozen","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-modules-v1","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}},{"v":1,"flowId":"unit","doc":"proposal","version":2,"path":"docs/proposals/unit-proposal","sha256":"af5b0e4bbfa5a829aa7b27846f7f2ac807c8c1ab0bcaf3565648e8f70120beb7","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"baseline"},{"v":1,"flowId":"unit","doc":"proposal","version":2,"path":"docs/proposals/unit-proposal","sha256":"1c73f37538ee2c15468c4a5b03fd1a665976b734497663c19ea68de158182735","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"draft-updated"},{"v":1,"flowId":"unit","doc":"roster","version":2,"path":"docs/proposals/unit-roster","sha256":"48ce4ce3cc80ebf98661321c07973846aa68af16f997bff39466da72f8d1bc6b","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"version-added"},{"v":1,"flowId":"unit","doc":"modules","version":1,"path":"docs/proposals/unit-modules","sha256":"ddb3d128de4a22b8ad05b7192c49ab2513af35faed045430ef1376e9af654c6c","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"draft-marker"},{"v":1,"flowId":"unit","doc":"intent","version":1,"path":"docs/product/unit-intent","sha256":"5f0fdf30f60398c0dbe8739a1067300ce7cd985835339aebc42b95d1668ef850","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"baseline"},{"v":1,"flowId":"unit","doc":"proposal","version":2,"path":"docs/proposals/unit-proposal","sha256":"af5b0e4bbfa5a829aa7b27846f7f2ac807c8c1ab0bcaf3565648e8f70120beb7","recordedAt":"2026-11-10T00:00:00.000Z","recordedBy":"app:session","event":"baseline","freeze":{"schema":"doc-freeze/v1","applicationId":"freeze-on-draft","reason":"bootstrap-vca-approved","origin":"application","frozenAt":"2026-11-10T00:00:00.000Z"}}],"result":{"allowed":false,"inputDigest":"30a8f7b491b76de23b55bdee0f052f2e20fe62e87594fef148f2316baa1429a7","code":"git-policy-app-freeze-closure"}}
+    + actual - expected
+    
+    + 'git-policy-app-freeze-closure'
+    - 'git-policy-app-freeze-source'
+                             ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'git-policy-app-freeze-source'
+  actual: 'git-policy-app-freeze-closure'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/freeze-closure.test.ts:165:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+not ok 5 - W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）
+  ---
+  duration_ms: 76.8321
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\freeze-closure.test.ts:171:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'git-policy-app-freeze-closure'
+    - 'git-policy-raw-write-scope'
+                  ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'git-policy-raw-write-scope'
+  actual: 'git-policy-app-freeze-closure'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/freeze-closure.test.ts:177:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+not ok 6 - W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）
+  ---
+  duration_ms: 39.3528
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\freeze-closure.test.ts:190:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"allowed":false,"inputDigest":"84f1ac213b1637e5a03c168f91eb4bab4c061db89a11ca1a47683471b02d65a2","code":"git-policy-app-freeze-closure"}
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/freeze-closure.test.ts:197:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+ok 7 - W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）
+  ---
+  duration_ms: 39.0146
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 1
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 542.0382
+EXIT=1

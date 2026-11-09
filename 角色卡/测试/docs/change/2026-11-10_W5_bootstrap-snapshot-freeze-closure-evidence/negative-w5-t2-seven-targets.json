@@ -1,0 +1,11 @@
+{
+  "operationId": "w5-t2-seven-targets",
+  "service": {
+    "code": "trunk-item-invalid",
+    "message": "Bootstrap accepts at most one target per document slot; historical versions are assembled from R9 and must not be declared as targets: doc:proposal (docs/proposals/demo-proposal-v2.md)"
+  },
+  "fullChain": {
+    "errorCode": "vca-target-invalid",
+    "message": "Bootstrap accepts at most one target per document slot; historical versions are assembled from R9 and must not be declared as targets: doc:proposal (docs/proposals/demo-proposal-v2.md)"
+  }
+}

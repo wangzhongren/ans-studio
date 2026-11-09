@@ -1,0 +1,7 @@
+== optional-acceptance ==
+before {"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0}
+after {"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0}
+fail only-before(0): []
+fail only-after(0): []
+skip only-before(0): []
+skip only-after(0): []

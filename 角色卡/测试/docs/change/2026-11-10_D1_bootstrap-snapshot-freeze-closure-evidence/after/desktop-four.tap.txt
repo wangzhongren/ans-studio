@@ -1,0 +1,801 @@
+TAP version 13
+# Subtest: M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+not ok 1 - M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+  ---
+  duration_ms: 43.49
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:340:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:353:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+not ok 2 - M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+  ---
+  duration_ms: 64.0573
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:413:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:426:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+not ok 3 - D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+  ---
+  duration_ms: 121.0769
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:527:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:580:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+not ok 4 - D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+  ---
+  duration_ms: 122.9021
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:601:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:620:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+not ok 5 - M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+  ---
+  duration_ms: 65.273
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:658:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:669:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: M11：D3 名单版本/hash 与最新名单不一致 ⇒ appointment-write 被拒（旧 D3 作废）
+ok 6 - M11：D3 名单版本/hash 与最新名单不一致 ⇒ appointment-write 被拒（旧 D3 作废）
+  ---
+  duration_ms: 69.3704
+  type: 'test'
+  ...
+# Subtest: M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 即可匹配 D3，并按名单版本拒绝旧 D3
+ok 7 - M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 即可匹配 D3，并按名单版本拒绝旧 D3
+  ---
+  duration_ms: 50.2994
+  type: 'test'
+  ...
+# Subtest: F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+not ok 8 - F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+  ---
+  duration_ms: 64.8237
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:797:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:808:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed
+ok 9 - R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed
+  ---
+  duration_ms: 264.707
+  type: 'test'
+  ...
+# Subtest: decision 开关关闭：应用 decision 卡呈现客户，客户手选；无 judge 审计
+ok 10 - decision 开关关闭：应用 decision 卡呈现客户，客户手选；无 judge 审计
+  ---
+  duration_ms: 2.831
+  type: 'test'
+  ...
+# Subtest: 开启委托但无真实chief上下文：保留原因，禁人工/旧judge/默认推荐；关闭后接管
+ok 11 - 开启委托但无真实chief上下文：保留原因，禁人工/旧judge/默认推荐；关闭后接管
+  ---
+  duration_ms: 2.3426
+  type: 'test'
+  ...
+# Subtest: 无chief时不以旧结果行充当业务决定
+ok 12 - 无chief时不以旧结果行充当业务决定
+  ---
+  duration_ms: 5.4326
+  type: 'test'
+  ...
+# Subtest: 应用自有 decision 卡通过共享校验且不扩大角色允许集；非法推荐数/非应用 chief 仍拒
+ok 13 - 应用自有 decision 卡通过共享校验且不扩大角色允许集；非法推荐数/非应用 chief 仍拒
+  ---
+  duration_ms: 0.2734
+  type: 'test'
+  ...
+# Subtest: 真实chief独立上下文可选非推荐项，结果可信来源且不伪装客户/judge
+ok 14 - 真实chief独立上下文可选非推荐项，结果可信来源且不伪装客户/judge
+  ---
+  duration_ms: 45.7834
+  type: 'test'
+  ...
+# Subtest: 真实chief拒绝/退修释放原工具Promise，原角色补材后新请求可独立决定
+ok 15 - 真实chief拒绝/退修释放原工具Promise，原角色补材后新请求可独立决定
+  ---
+  duration_ms: 82.7821
+  type: 'test'
+  ...
+# Subtest: 关闭再开启使在途真实chief旧revision无效；同请求不会无限自派
+ok 16 - 关闭再开启使在途真实chief旧revision无效；同请求不会无限自派
+  ---
+  duration_ms: 27.5479
+  type: 'test'
+  ...
+# Subtest: 真实chief提交时基线变化拒绝，原请求等待关闭接管
+ok 17 - 真实chief提交时基线变化拒绝，原请求等待关闭接管
+  ---
+  duration_ms: 22.7075
+  type: 'test'
+  ...
+# Subtest: 业务卡的旧@决策预设不能形成第三个自动执行者
+ok 18 - 业务卡的旧@决策预设不能形成第三个自动执行者
+  ---
+  duration_ms: 0.2896
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (a)：替我决策开启 ⇒ run-change 卡呈现客户、作答前不结算、无 judge 代批
+ok 19 - 2026-11-04 直修 (a)：替我决策开启 ⇒ run-change 卡呈现客户、作答前不结算、无 judge 代批
+  ---
+  duration_ms: 0.7627
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (b)：run-change 三模式分别由客户选择后原样结算
+ok 20 - 2026-11-04 直修 (b)：run-change 三模式分别由客户选择后原样结算
+  ---
+  duration_ms: 36.5095
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (b)：版本决策两动作均呈现客户、不代选；客户选择后原样交回
+ok 21 - 2026-11-04 直修 (b)：版本决策两动作均呈现客户、不代选；客户选择后原样交回
+  ---
+  duration_ms: 31.911
+  type: 'test'
+  ...
+# Subtest: 普通角色decision与应用decision同样禁用旧推荐兜底
+ok 22 - 普通角色decision与应用decision同样禁用旧推荐兜底
+  ---
+  duration_ms: 1.8152
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为与现状一致（原卡呈现、客户手选、无 judge）
+ok 23 - 2026-11-04 直修 (d)：开关关闭时 run-change / 版本决策卡行为与现状一致（原卡呈现、客户手选、无 judge）
+  ---
+  duration_ms: 14.375
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (a)：替我审批开启 + appointment-write ⇒ 呈现客户、judge 0 调用、0 结果行、无 judge 审计
+ok 24 - 2026-11-04 直修 (a)：替我审批开启 + appointment-write ⇒ 呈现客户、judge 0 调用、0 结果行、无 judge 审计
+  ---
+  duration_ms: 19.9371
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (b)：替审批关闭 + appointment-write ⇒ 呈现客户；客户拒绝语义不变
+ok 25 - 2026-11-04 直修 (b)：替审批关闭 + appointment-write ⇒ 呈现客户；客户拒绝语义不变
+  ---
+  duration_ms: 11.3508
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (c)：普通 confirm 卡在开关开启时行为不变（呈现客户、不调 judge）
+ok 26 - 2026-11-04 直修 (c)：普通 confirm 卡在开关开启时行为不变（呈现客户、不调 judge）
+  ---
+  duration_ms: 0.3863
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (d)：无 presenter ⇒ appointment-write 与治理卡均 unavailable（fail-closed 不变）
+ok 27 - 2026-11-04 直修 (d)：无 presenter ⇒ appointment-write 与治理卡均 unavailable（fail-closed 不变）
+  ---
+  duration_ms: 0.1908
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修 (e)：判断器异常与 ledger-unavailable 分支对写卡不再可达——仍原卡呈现客户
+ok 28 - 2026-11-04 直修 (e)：判断器异常与 ledger-unavailable 分支对写卡不再可达——仍原卡呈现客户
+  ---
+  duration_ms: 30.724
+  type: 'test'
+  ...
+# Subtest: 同真实requestId并发/重试复用一次结算，关闭不撤已提交来源，换origin/卡面拒绝
+ok 29 - 同真实requestId并发/重试复用一次结算，关闭不撤已提交来源，换origin/卡面拒绝
+  ---
+  duration_ms: 22.5485
+  type: 'test'
+  ...
+# Subtest: J12：judge 代批 intent-confirm ⇒ outcome 字段回归钉（operatorId/judge 审计；非客户）
+ok 30 - J12：judge 代批 intent-confirm ⇒ outcome 字段回归钉（operatorId/judge 审计；非客户）
+  ---
+  duration_ms: 0.8122
+  type: 'test'
+  ...
+# Subtest: J12：开关关闭 ⇒ intent-confirm 原卡呈现客户、judge 0 调用、无 judge 结算
+ok 31 - J12：开关关闭 ⇒ intent-confirm 原卡呈现客户、judge 0 调用、无 judge 结算
+  ---
+  duration_ms: 8.2257
+  type: 'test'
+  ...
+# Subtest: 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+not ok 32 - 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+  ---
+  duration_ms: 93.988
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:251:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:259:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+not ok 33 - 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 74.8721
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+not ok 34 - 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 74.038
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+not ok 35 - 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 80.3125
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+not ok 36 - stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+  ---
+  duration_ms: 80.4519
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:350:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:356:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+not ok 37 - 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+  ---
+  duration_ms: 76.744
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:399:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:403:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+not ok 38 - 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+  ---
+  duration_ms: 74.4572
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:424:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:430:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+not ok 39 - 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+  ---
+  duration_ms: 83.3664
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:453:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:459:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+not ok 40 - AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+  ---
+  duration_ms: 75.5957
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:511:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:519:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）
+ok 41 - J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）
+  ---
+  duration_ms: 111.441
+  type: 'test'
+  ...
+# Subtest: run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+not ok 42 - run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+  ---
+  duration_ms: 96.8055
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:194:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+not ok 43 - D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+  ---
+  duration_ms: 129.462
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:297:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+not ok 44 - run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+  ---
+  duration_ms: 64.4385
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:316:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:325:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等
+ok 45 - run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等
+  ---
+  duration_ms: 64.5901
+  type: 'test'
+  ...
+# Subtest: legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned
+ok 46 - legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned
+  ---
+  duration_ms: 5.1375
+  type: 'test'
+  ...
+# Subtest: P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝
+ok 47 - P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝
+  ---
+  duration_ms: 40.4322
+  type: 'test'
+  ...
+# Subtest: P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写
+ok 48 - P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写
+  ---
+  duration_ms: 57.0717
+  type: 'test'
+  ...
+# Subtest: P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+not ok 49 - P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+  ---
+  duration_ms: 41.7367
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:454:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:461:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2（P1.3）：legacy 任务验收 facts 标 runState=legacy
+ok 50 - R2（P1.3）：legacy 任务验收 facts 标 runState=legacy
+  ---
+  duration_ms: 176.1835
+  type: 'test'
+  ...
+# Subtest: contract_check session：pinned run/角色写区/legacy 明示（只读）
+ok 51 - contract_check session：pinned run/角色写区/legacy 明示（只读）
+  ---
+  duration_ms: 65.5146
+  type: 'test'
+  ...
+# Subtest: contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）
+ok 52 - contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）
+  ---
+  duration_ms: 38.7452
+  type: 'test'
+  ...
+# Subtest: contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）
+ok 53 - contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）
+  ---
+  duration_ms: 46.599
+  type: 'test'
+  ...
+# Subtest: F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+not ok 54 - F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+  ---
+  duration_ms: 70.2864
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:606:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:620:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出
+ok 55 - §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出
+  ---
+  duration_ms: 243.6478
+  type: 'test'
+  ...
+# Subtest: R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+not ok 56 - R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+  ---
+  duration_ms: 48.8622
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:723:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:730:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+not ok 57 - R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+  ---
+  duration_ms: 83.4405
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:745:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:755:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+not ok 58 - AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+  ---
+  duration_ms: 107.7741
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:770:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:782:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+not ok 59 - AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+  ---
+  duration_ms: 94.1956
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:796:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:814:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+not ok 60 - AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+  ---
+  duration_ms: 62.3885
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:829:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:849:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+not ok 61 - P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+  ---
+  duration_ms: 92.0022
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:864:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:878:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..61
+# tests 61
+# suites 0
+# pass 35
+# fail 26
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8313.1376

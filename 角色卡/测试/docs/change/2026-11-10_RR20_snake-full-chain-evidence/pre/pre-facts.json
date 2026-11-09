@@ -1,0 +1,281 @@
+{
+  "at": "2026-11-09T21:56:59.880Z",
+  "round": "RR20",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-snake-fullchain-run-2026-11-10\\round8\\target",
+  "construction": "re-clean same-root copy: .ans/sessions moved out, .ans/state/tasks.jsonl reset to empty (RR19 run state removed); repoId/init provenance preserved; original target untouched",
+  "head": "0ab25843a9b2e3e187c47a1c14ef51da187414b9",
+  "tree": "d6c2158da0547cb9028166eeda6c4be22686babb",
+  "branch": "feat/bootstrap-snapshot-freeze-closure",
+  "candidateStatus": [
+    " M src/common/门禁引擎/classify-shell.ts",
+    " M src/service/trunk/impl/apply-journal.ts",
+    "?? test/测试/bootstrap-frozen-closure-integration.test.ts",
+    "?? test/编排/bootstrap-frozen-closure.test.ts",
+    "?? test/门禁引擎/freeze-closure.test.ts"
+  ],
+  "candidateModified": 5,
+  "env": {
+    "ANS_CLAUDE_MODEL": "deepseek-v4-flash",
+    "ANTHROPIC_BASE_URL": "https://aiproxy2.abujlb.com/deepseek",
+    "ANS_CLAUDE_REASONING_EFFORT": "high"
+  },
+  "entry": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\app\\main.ts",
+    "bytes": 83599,
+    "sha256": "339fcfaa4d0daaf7b79fa8381743ce4ec2eb0f205bd9c5705cc4ac6f4d532bba"
+  },
+  "electronVersion": "44.7.0",
+  "nodeVersion": "v24.22.1",
+  "bindingRR19": {
+    "rel": "角色卡/测试/docs/change/2026-11-10_RR19_snake-full-chain.md",
+    "bytes": 23923,
+    "sha256": "a4a90ebed25102ba2bd9b3be3d3863a6980c5fc5064ce6cbc06d3665267f8820"
+  },
+  "candidate": {
+    "files": [
+      {
+        "path": "src/common/门禁引擎/classify-shell.ts",
+        "sha256": "b4b98a5a4e001f2294c65b04e119b34e7b7a369c69cede856e7458627d54ad1b"
+      },
+      {
+        "path": "src/service/trunk/impl/apply-journal.ts",
+        "sha256": "d0a3fdf27bcdada86258406d73e7ff630543f3f9c5b0585f14b9ef4629430cd4"
+      },
+      {
+        "path": "test/测试/bootstrap-frozen-closure-integration.test.ts",
+        "sha256": "f949bfa4cb4723344c7c87fd475d2d6d804c4019032f8e2d7b7f05c216373338"
+      },
+      {
+        "path": "test/编排/bootstrap-frozen-closure.test.ts",
+        "sha256": "3228020b35b6bb4eeb031e95f5fa5a09a9152bc525ce3a5ff8da15ebb622ca1f"
+      },
+      {
+        "path": "test/门禁引擎/freeze-closure.test.ts",
+        "sha256": "9109711ab1b3734935c3f7184d1028a62c5ae2b224e1c3aefadd96a25f5da039"
+      }
+    ],
+    "fileCount": 5,
+    "aggregate": "e99f7cb47355f2f7d61a85fee6cbd9d8ab1ba977f3cbfbcacd5461575ba44490",
+    "aggregateFormula": "SHA-256 over UTF-8-path-sorted concatenation of path + \"\\0\" + sha256(hex)",
+    "branch": "feat/bootstrap-snapshot-freeze-closure",
+    "head": "0ab25843a9b2e3e187c47a1c14ef51da187414b9",
+    "tree": "d6c2158da0547cb9028166eeda6c4be22686babb"
+  },
+  "bindings": {
+    "B1": {
+      "rel": "docs/acceptance/2026-11-10_bootstrap-snapshot-freeze-closure-criteria-v1.md",
+      "bytes": 49013,
+      "sha256": "9b7fa81cf4db2bb843691c88e929d49bd193a1f73d0944be3c329b41c6e0bc8b"
+    },
+    "B2": {
+      "rel": "docs/acceptance/2026-11-10_bootstrap-snapshot-freeze-closure-report-v1.md",
+      "bytes": 26898,
+      "sha256": "6a91eb14f3c3c9be173e8909c44ed193585729a77b3f29f0680e70d6562c1c98"
+    },
+    "D1": {
+      "rel": "角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure.md",
+      "bytes": 28540,
+      "sha256": "2d88b40d3848d80e9dc5a7cff3d8f695e7fcd4c96219bd2c472a18280595fa64"
+    },
+    "W1": {
+      "rel": "角色卡/编排/docs/change/2026-11-10_W1_bootstrap-snapshot-freeze-closure.md",
+      "bytes": 17898,
+      "sha256": "0ffe52c8e9a538fd318929adb41f37868aadcc200fbf7d183bec0acf25eb2308"
+    },
+    "W2": {
+      "rel": "角色卡/门禁引擎/docs/change/2026-11-10_W2_bootstrap-snapshot-freeze-closure.md",
+      "bytes": 18312,
+      "sha256": "37249c423db2d56615a892706ec213d6a30bce6878c722b39cf8fb42eaf2126b"
+    },
+    "W5": {
+      "rel": "角色卡/测试/docs/change/2026-11-10_W5_bootstrap-snapshot-freeze-closure.md",
+      "bytes": 21903,
+      "sha256": "66d831247a0006f17d9f1d137216bbb7f75e74b60d59cd54835d97ecdb6f5f56"
+    }
+  },
+  "portsPre": {
+    "listeners9222": 0,
+    "listeners9223": 0,
+    "rawLines": 0
+  },
+  "electronPre": [],
+  "ledgerPre": {
+    "bytes": 3383,
+    "lines": 1,
+    "sha256": "91946bf5df2711e9c43e6beb0c4535c5b32f03de9d3ed2dae07c0713e43e41b8"
+  },
+  "sessionsPre": {
+    "files": 15,
+    "bytes": 3524131
+  },
+  "targetPre": {
+    "files": 110,
+    "bytes": 4711159
+  },
+  "statePre": {
+    ".ans/state/versions.jsonl": {
+      "bytes": 7228,
+      "sha256": "3e87ad9f376b0f765b43a2b07ebdbe78c1981a19e3b4e5ae8393fd97394700a6"
+    },
+    ".ans/state/doc-freezes.json": {
+      "bytes": 2365,
+      "sha256": "7df9769913c03b70e3c94cad85d3ebd5ef40fba4b611500e21a76d2798c6f4cf"
+    },
+    ".ans/state/version-changes.json": {
+      "bytes": 5592,
+      "sha256": "6f44edd01b9091d5cc4831dbd527607fe341362241a0fbf86d3bb5b28ef74d8c"
+    },
+    ".ans/state/stable-writes.json": {
+      "bytes": 919,
+      "sha256": "7ffbdbba6843f197dec6bf09b1ab522058cf4036485e6623652c9a4eba2876bb"
+    },
+    ".ans/state/stable-write-permits.json": {
+      "bytes": 529,
+      "sha256": "3721590716a242ff63d2331384f34602054f6f4da1f1ac696939ee2779a8d100"
+    },
+    ".ans/state/versions.initialized": {
+      "bytes": 51,
+      "sha256": "88b8e31a0425e1fe3fbb98967ee9a111411f6d0c0f92593a9b7c61179c1df10b"
+    }
+  },
+  "gitInitProcessPre": {
+    "bytes": 1365,
+    "sha256": "9878db5b4e4356c90f1de986f4d41f0f7fa59dcad2a71e9f5104d12878d0442c",
+    "operationId": "op-gc-init-trunk-snake-game-t-mw9kn23f-496d1580"
+  },
+  "initOperationPre": {
+    "dir": ".ans/trunk/operations/83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90",
+    "initBytes": 1442,
+    "initSha256": "9ba058252670d30b1c52c33f4dd350733cc2e5289a24e8763cbd577e6c69518e",
+    "stage": "candidate-created",
+    "operationId": "op-gc-init-trunk-snake-game-t-mw9kn23f-496d1580",
+    "repoId": "6ac15756af5cccff72a882ebe2a418c72624f149e0e2cafb77837ee238d9437e",
+    "candidate": {
+      "objectFormat": "sha1",
+      "hex": "2214956bc9d72fb13be09751b58b2b584f17442e"
+    },
+    "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-snake-fullchain-run-2026-11-10\\round8\\target"
+  },
+  "trunkPre": {
+    "manifestExists": false,
+    "gitModeExists": false,
+    "gitDirExists": true,
+    "operations": [
+      "83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90"
+    ],
+    "snapshots": [
+      "decision-8231a86c6cc88812d7520f106f982067e1126e75491d0b661757ba448f793d0b.json",
+      "decision-a360e36c4a0e6f0f361401529bee69275a2a1d9b8be5a845cd608db918336ae2.json",
+      "s-06df6a8d9682dec4a319e926b752254eef796208696aa194891ddff8d4074505.json",
+      "s-555220948ae61b500da176aad0f3fdff0544f2e7c0e24277a38786694d01e4f3.json",
+      "s-6a881f9dbe39af162f6137f361fe1be964c61173f497792a1884601b2f742c12.json",
+      "s-9fbf9c81fe75b7d09f77f46c477b10ce68f1330597be51c2f0e1baa22802934e.json",
+      "s-intent-3704bd198dbf20c06f60832a9ca71d8e07b1b8db7505425905b596859cd63739.json",
+      "s-report-2f38ff74799e2cdc1a5e172d5bee7425a64b9ae6df09551bdb3f3d1da354a725.json",
+      "s-report-4652f3be5845edd76c010e03237392aeeba44b7473e4e07d861ece5f671a6f7e.json",
+      "s-report-a1774dce567f981a22fd2f09b9d3d267c8fab94aa74524b242620220dce9db01.json",
+      "s-report-b626f75b14fba0ea01830b18ff10b296cfe9bac04ce8ee781cb2132276105bcb.json"
+    ],
+    "initSources": [
+      "init-source-09834a0dbcf449c3747c8782f9d0d7b2c4495326672bf898174a2a547f811a92.json",
+      "init-source-207488eacaa5ee6f23c4260818dc860b763714f14a2f5072d9bfde38ff237c2d.json",
+      "init-source-327122a3007fcc8dfc86919e1311969d79e2e42b791d5a0db8d6e29f2f2b13e4.json",
+      "init-source-36a543fbf7f83245ebdf91f0c383ce81335b8120db19b062a3dff70866050d9a.json",
+      "init-source-3bc5afebbe2ce924891517a4958918c09f45676153826975a9839767f356a3d8.json",
+      "init-source-60da38c1f153593e0033a7c3312d1ff23494522b2788c8a78425d558ec419c8c.json",
+      "init-source-665782348e6119a0f369f770e3f0346ad35d0ca0482b264c8f25bcfd1d697f1a.json",
+      "init-source-811d05b4096e4339657c83b635b1e43482a5f529fbeeb95f02e7ff68de786740.json",
+      "init-source-853cc3ea658d169d1f12ce279480b3b53f499086cf4088acea3555b3d61ab3af.json",
+      "init-source-9ae7b307e490617a31f0d7e8fe6f79ef5a133569c934ab5fe3191b3dd799832f.json",
+      "init-source-a0497a73d80057741f07b47ccf071681fb75f3b922c844bc7598a14cf0e0a660.json",
+      "init-source-b03477f19b6ada53ab7ab53f5b6c0833065980ac5d90749bdb7bbed9a447ced7.json",
+      "init-source-b297f127fe9e76ea958edccd235d246072f19c2f3bd61443734b16f43bff6bef.json",
+      "init-source-b3d974fea83204767b6e4b050c042d52240cc90ddc93ea1fe50e05b154d5f9cc.json",
+      "init-source-b6963d693733b8eb200ee462260d35ff716b6e4dfd379a2b4299e563140fc3f0.json",
+      "init-source-be2b729c925097c5eb69b45d7b27f7ac324a7ad3687c439b6e4a5d7e4f719cd6.json",
+      "init-source-c923744ed86afe5f6dd676f69d5e760b59fdd64c56a1fc548bf908fe3fce99c6.json",
+      "init-source-cc869b60e2cce3d8466b8709956210bbbc45a12c36037c2c41b63eef09f34518.json",
+      "init-source-d501f67e2ef8cc31406b569debc41ead5ba29e2259d969c8e85105af48ed84b0.json",
+      "init-source-e193e7ed06e1c4778707b08859d542bf91f5674b3c84191756a3cbadb08e5ab2.json",
+      "init-source-edf52bdfc05b0cfb8e54062c319d618bff0e603f93189d16d6ee760ff3cd86fe.json"
+    ]
+  },
+  "gitPre": {
+    "head": "ref: refs/heads/ans-unpublished",
+    "candidateRefs": [
+      "83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90"
+    ],
+    "trunkRefExists": false
+  },
+  "gitRefsPre": [
+    "refs/ans/candidates/83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90 2214956bc9d72fb13be09751b58b2b584f17442e"
+  ],
+  "frozenDocs": [
+    {
+      "path": "docs/contracts/snake-game-architecture-v1.md",
+      "expected": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "actual": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "bytes": 7554,
+      "match": true
+    },
+    {
+      "path": "docs/contracts/snake-game-architecture-v2.md",
+      "expected": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+      "actual": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+      "bytes": 8269,
+      "match": true
+    },
+    {
+      "path": "docs/product/snake-game-intent-v1.md",
+      "expected": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "actual": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "bytes": 9630,
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-modules-v1.md",
+      "expected": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "actual": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "bytes": 1750,
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v1.md",
+      "expected": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "actual": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "bytes": 11973,
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v2.md",
+      "expected": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+      "actual": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+      "bytes": 15008,
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v1.md",
+      "expected": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "actual": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "bytes": 3286,
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v2.md",
+      "expected": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a",
+      "actual": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a",
+      "bytes": 5069,
+      "match": true
+    }
+  ],
+  "frozenDocsAllMatch": true,
+  "origTargetPre": {
+    "files": 114,
+    "bytes": 22041991
+  },
+  "origTargetHashCheck": {
+    "rows": 114,
+    "match": 114,
+    "mismatch": 0
+  }
+}

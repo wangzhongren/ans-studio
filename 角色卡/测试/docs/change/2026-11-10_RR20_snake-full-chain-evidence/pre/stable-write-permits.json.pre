@@ -1,0 +1,20 @@
+[
+  {
+    "v": 1,
+    "schema": "stable-write/v1",
+    "permitId": "swp-1",
+    "requestId": "sw-2",
+    "roleId": "convener",
+    "path": "docs/workflow.md",
+    "kind": "workflow",
+    "authority": {
+      "decisionId": "decision-sw-card-sw-2"
+    },
+    "baseSha256": "",
+    "targetSha256": "032e4d370296b9e3a59b6d689f112a12794ef337066f5b661f2bb605ac28aaf3",
+    "status": "approved",
+    "approvedAt": "2026-11-09T18:20:17.756Z",
+    "expiresAt": "2026-11-09T18:50:17.756Z",
+    "issuedAt": "2026-11-09T18:20:17.756Z"
+  }
+]

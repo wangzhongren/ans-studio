@@ -1,0 +1,5 @@
+ M src/common/门禁引擎/classify-shell.ts
+ M src/service/trunk/impl/apply-journal.ts
+?? test/测试/bootstrap-frozen-closure-integration.test.ts
+?? test/编排/bootstrap-frozen-closure.test.ts
+?? test/门禁引擎/freeze-closure.test.ts

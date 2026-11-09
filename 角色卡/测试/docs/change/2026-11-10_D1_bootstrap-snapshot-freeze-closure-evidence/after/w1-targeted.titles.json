@@ -1,0 +1,15 @@
+{
+  "file": "角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure-evidence/after/w1-targeted.tap.txt",
+  "summary": {
+    "tests": 14,
+    "pass": 14,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "failCount": 0,
+  "skipCount": 0,
+  "failTitles": [],
+  "skipTitles": []
+}

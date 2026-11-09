@@ -1,0 +1,267 @@
+diff --git "a/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts" "b/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+index f34249f..178e36e 100644
+--- "a/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
++++ "b/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+@@ -693,7 +693,7 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+     const row = table.get(file.path); return row?.sha256 === file.sha256
+       && ["snapshot-content", "frozen-application-evidence"].includes(row.kind);
+   }), "git-policy-app-snapshot-content-incomplete");
+-  const artifactPaths = new Set<string>();
++  const artifactPaths = new Set<string>(), frozenClosurePaths = new Set<string>();
+   const patterns: Record<string, RegExp> = { intent: /^docs\/product\/[^/]+-intent-v[1-9]\d*\.md$/, proposal: /^docs\/proposals\/[^/]+-proposal-v[1-9]\d*\.md$/,
+     roster: /^docs\/proposals\/[^/]+-roster-v[1-9]\d*\.md$/, modules: /^docs\/proposals\/[^/]+-modules-v[1-9]\d*\.md$/, topology: /^docs\/proposals\/[^/]+-topology-v[1-9]\d*\.md$/,
+     architecture: /^docs\/contracts\/[^/]+-architecture-v[1-9]\d*\.md$/, assets: /^docs\/contracts\/[^/]+-assets-v[1-9]\d*\.md$/ };
+@@ -721,13 +721,21 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+           && bytes.get(row.path)!.equals(Buffer.from(planMarker.bytes)), "git-policy-plan-marker"); allowed.add(row.path); continue;
+       }
+       policyRequire(row.path === ".ans/state/versions.jsonl" && primary.files.some(file => file.path === row.path && file.sha256 === row.sha256), "git-policy-app-evidence-path");
++      // 冻结闭包只针对真实冻结证据：`event:"frozen"` 行必须逐字节进入候选快照（强度不变）。
++      // 其余合法事件（baseline/version-added/draft-updated/draft-marker）是原位改写后的草稿历史行，
++      // 旧 sha 在磁盘/任何快照中都不存在，只保留既有形状/归属校验，不再要求快照携带其历史字节；
++      // 未知 `event` 仍由下方 `git-policy-app-freeze-source` 拒绝（不新增豁免）。
+       for (const line of bytes.get(row.path)!.toString("utf8").split(/\r?\n/).filter(line => line.trim())) {
+         const record: unknown = JSON.parse(line);
+         policyRequire(policyObject(record) && record.v === 1 && record.flowId === pub.flowId && typeof record.path === "string"
+           && Number.isSafeInteger(record.version) && Number(record.version) > 0 && typeof record.sha256 === "string", "git-policy-app-freeze-record");
++        const frozen = record.event === "frozen";
+         const file = /-v\d+\.md$/.test(record.path) ? record.path : `${record.path}-v${record.version}.md`;
+-        policyRequire(primary.files.some(item => item.path === file && item.sha256 === record.sha256), "git-policy-app-freeze-closure");
+-        policyRequire(record.event === "frozen" ? isValidDocFreezeRecord(record.freeze)
++        if (frozen) {
++          policyRequire(primary.files.some(item => item.path === file && item.sha256 === record.sha256), "git-policy-app-freeze-closure");
++          frozenClosurePaths.add(file);
++        }
++        policyRequire(frozen ? isValidDocFreezeRecord(record.freeze)
+           : ["baseline", "version-added", "draft-updated", "draft-marker"].includes(String(record.event)) && record.freeze === undefined, "git-policy-app-freeze-source");
+       }
+       allowed.add(row.path);
+@@ -736,6 +744,11 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+       if (artifactPaths.has(row.path)) allowed.add(row.path);
+     } else policyRequire(row.kind === "complete-snapshot" && allowed.has(row.path), "git-policy-app-file-kind");
+   }
++  // M2：把「经 frozen 闭包证明（`primary.files` 同 path 同 sha）且元数据行 kind=snapshot-content」的路径
++  // 加入 allowed，使 bootstrap 候选树接纳历史冻结文档（首建 trunk 时它们是新增文件，product 的
++  // gitRolePath 只覆盖 docs/product/）。仅此证明集：未被 frozen 记录证明的额外 snapshot-content
++  // 仍走 gitRolePath / git-policy-raw-write-scope；字节已由 frozen 记录 + 快照 digest + 账本在快照内三重钉死。
++  for (const file of frozenClosurePaths) if (table.get(file)?.kind === "snapshot-content") allowed.add(file);
+   if (teamPlan) for (const row of table.values()) if (row.kind === "snapshot-content" || row.kind === "frozen-application-evidence") {
+     if (row.path === planPath || row.path === planMarker!.path) continue;
+     policyRequire(before.get(row.path)?.mode === "100644" && sameGitOid(before.get(row.path)?.oid, row.oid), "git-policy-plan-unrelated-bytes");
+diff --git "a/test/\351\227\250\347\246\201\345\274\225\346\223\216/freeze-closure.test.ts" "b/test/\351\227\250\347\246\201\345\274\225\346\223\216/freeze-closure.test.ts"
+new file mode 100644
+index 0000000..a125f93
+--- /dev/null
++++ "b/test/\351\227\250\347\246\201\345\274\225\346\223\216/freeze-closure.test.ts"
+@@ -0,0 +1,212 @@
++// W2（2026-11-10）：bootstrap 快照/冻结闭包冲突修复 —— 门禁侧确定性用例（T10–T14/T17/T18/T19）。
++// 仅使用本角色私有 fixture + 真实临时 Git 对象（规划层证据）；不冒充生产批准/任务/运行记录，不发布任何 ref。
++import { test } from "node:test";
++import assert from "node:assert/strict";
++import { createHash } from "node:crypto";
++import fs from "node:fs/promises";
++import path from "node:path";
++import os from "node:os";
++import { checkGitPolicy, computeGitPolicyDigest, type GitPolicyFacts } from "../../src/service/gate/shell-rules.ts";
++import { initializeGitRepository, createGitCandidateStore } from "../../src/provider/trunk/public/trunk-store.ts";
++import type { CompleteSnapshot, TrunkManifest, TrunkApplyJournal } from "../../src/model/trunk.ts";
++
++const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
++const at = "2026-11-10T00:00:00.000Z";
++const prefix = ["--no-pager", "--no-optional-locks", "--literal-pathspecs", ...["core.fsmonitor=false", "core.hooksPath=NUL", "core.untrackedCache=false", "core.excludesFile=NUL", "core.pager=cat", "pager.status=false", "pager.diff=false", "maintenance.auto=false", "gc.auto=0", "protocol.allow=never", "diff.external=", "core.attributesFile=NUL"].flatMap(v => ["-c", v])];
++const command = (...body: string[]) => [...prefix, ...body];
++const zero = (format: "sha1" | "sha256") => "0".repeat(format === "sha1" ? 40 : 64);
++
++const testCanonical = (value: unknown): unknown => Array.isArray(value) ? value.map(testCanonical) : value && typeof value === "object"
++  ? Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, item]) => [key, testCanonical(item)])) : value;
++const testSnapshot = (snapshotId: string, files: CompleteSnapshot["files"], createdAt: string): CompleteSnapshot => ({ schema: "complete-snapshot/v1", snapshotId, createdAt, files,
++  digest: sha(JSON.stringify([...files].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0).map(file => [file.path, file.sha256, file.bytesBase64]))) });
++
++type LedgerRow = Record<string, unknown>;
++type Doc = { path: string; text: string; doc: string; canonical: string; version: number };
++
++/**
++ * bootstrap 冻结闭包 fixture（P1.1 §5.1 T10–T14/T17/T18/T19 的门禁层）。
++ * 快照 = 8 个 frozen 文档（含 intent v1）+ `.ans/state/versions.jsonl` = 9 文件（RR20 口径）；
++ * 账本 = 8 frozen 行 + 5 条旧 sha 已不可恢复的草稿行（baseline/version-added/draft-updated/draft-marker）。
++ * 历史 `docs/proposals/`、`docs/contracts/` 文件不在 pub.documents，product 的 gitRolePath 不放行——
++ * 它们只能经 frozen 证明集进入 allowed（M2/T19）。
++ */
++async function freezeClosureFixture(format: "sha1" | "sha256") {
++  const root = await fs.mkdtemp(path.join(os.tmpdir(), "w2-freeze-closure-"));
++  const identity = await initializeGitRepository(root, format);
++  const objects = createGitCandidateStore(root);
++  const operationId = "unit-freeze-closure-op", flowId = "unit", applicationId = "unit-freeze-application";
++  const digest = sha("W2 unit service-checked target digest");
++  const freeze = (id: string) => ({ schema: "doc-freeze/v1", applicationId: id, reason: "bootstrap-vca-approved", origin: "application", frozenAt: at });
++
++  const intentV1: Doc = { path: "docs/product/unit-intent-v1.md", text: "Unit intent v1 bytes\n", doc: "intent", canonical: "docs/product/unit-intent", version: 1 };
++  const proposalV1: Doc = { path: "docs/proposals/unit-proposal-v1.md", text: "Unit proposal v1 bytes\n", doc: "proposal", canonical: "docs/proposals/unit-proposal", version: 1 };
++  const proposalV2: Doc = { path: "docs/proposals/unit-proposal-v2.md", text: "Unit proposal v2 current bytes\n", doc: "proposal", canonical: "docs/proposals/unit-proposal", version: 2 };
++  const architectureV1: Doc = { path: "docs/contracts/unit-architecture-v1.md", text: "Unit architecture v1 bytes\n", doc: "architecture", canonical: "docs/contracts/unit-architecture", version: 1 };
++  const architectureV2: Doc = { path: "docs/contracts/unit-architecture-v2.md", text: "Unit architecture v2 bytes\n", doc: "architecture", canonical: "docs/contracts/unit-architecture", version: 2 };
++  const rosterV1: Doc = { path: "docs/proposals/unit-roster-v1.md", text: "Unit roster v1 bytes\n", doc: "roster", canonical: "docs/proposals/unit-roster", version: 1 };
++  const rosterV2: Doc = { path: "docs/proposals/unit-roster-v2.md", text: "Unit roster v2 bytes\n", doc: "roster", canonical: "docs/proposals/unit-roster", version: 2 };
++  const modulesV1: Doc = { path: "docs/proposals/unit-modules-v1.md", text: "Unit modules v1 bytes\n", doc: "modules", canonical: "docs/proposals/unit-modules", version: 1 };
++  const frozenDocs = [intentV1, proposalV1, proposalV2, architectureV1, architectureV2, rosterV1, rosterV2, modulesV1];
++  const frozenRow = (doc: Doc, actualPath = false): LedgerRow => ({ v: 1, flowId, doc: doc.doc, version: doc.version,
++    path: actualPath ? doc.path : doc.canonical, sha256: sha(doc.text), recordedAt: at, recordedBy: "app:session", event: "frozen",
++    freeze: freeze(`freeze-${doc.doc}-v${doc.version}`) });
++  // architecture v1 记录使用「path 已是实际 -vN.md」的旧口径（门禁 :728 原样使用路径）。
++  const frozenRows: LedgerRow[] = [frozenRow(intentV1), frozenRow(proposalV1), frozenRow(proposalV2), frozenRow(architectureV1, true),
++    frozenRow(architectureV2), frozenRow(rosterV1), frozenRow(rosterV2), frozenRow(modulesV1)];
++  // 5 条非 frozen 历史草稿行：旧 sha 从未冻结、已被原位覆盖，磁盘与快照均不存在（旧谓词不可满足）。
++  const draftRows: LedgerRow[] = [
++    { v: 1, flowId, doc: "proposal", version: 2, path: "docs/proposals/unit-proposal", sha256: sha("proposal baseline old bytes"), recordedAt: at, recordedBy: "app:session", event: "baseline" },
++    { v: 1, flowId, doc: "proposal", version: 2, path: "docs/proposals/unit-proposal", sha256: sha("proposal draft-updated old bytes"), recordedAt: at, recordedBy: "app:session", event: "draft-updated" },
++    { v: 1, flowId, doc: "roster", version: 2, path: "docs/proposals/unit-roster", sha256: sha("roster version-added old bytes"), recordedAt: at, recordedBy: "app:session", event: "version-added" },
++    { v: 1, flowId, doc: "modules", version: 1, path: "docs/proposals/unit-modules", sha256: sha("modules draft-marker old bytes"), recordedAt: at, recordedBy: "app:session", event: "draft-marker" },
++    { v: 1, flowId, doc: "intent", version: 1, path: "docs/product/unit-intent", sha256: sha("intent baseline old bytes"), recordedAt: at, recordedBy: "app:session", event: "baseline" },
++  ];
++  const baseRows: LedgerRow[] = [...frozenRows, ...draftRows];
++
++  type Options = {
++    rows?: readonly LedgerRow[];
++    versionsText?: string;
++    removePaths?: readonly string[];
++    extraFiles?: readonly { path: string; text: string }[];
++    drift?: { path: string; text: string };
++    executablePaths?: readonly string[];
++  };
++
++  async function facts(options: Options = {}): Promise<GitPolicyFacts> {
++    const contents = new Map<string, string>();
++    for (const doc of frozenDocs) if (!options.removePaths?.includes(doc.path)) contents.set(doc.path, doc.text);
++    for (const extra of options.extraFiles ?? []) contents.set(extra.path, extra.text);
++    if (options.drift) contents.set(options.drift.path, options.drift.text);
++    const versionsText = options.versionsText ?? `${(options.rows ?? baseRows).map(row => JSON.stringify(row)).join("\n")}\n`;
++    contents.set(".ans/state/versions.jsonl", versionsText);
++    const documents = { proposal: { path: proposalV2.path, sha256: sha(proposalV2.text), version: proposalV2.version } };
++    const execution = { teamPlan: null, flow: null };
++    const snapshotFiles = [...contents].map(([file, text]) => ({ path: file, sha256: sha(text), bytesBase64: Buffer.from(text).toString("base64") }));
++    const snapshot = testSnapshot(`s-${sha("unit-freeze-closure-snapshot")}`, snapshotFiles, at);
++    const snapshotRef = { snapshotId: snapshot.snapshotId, digest: snapshot.digest };
++    const source = { kind: "role-direct" as const, action: "version-upgrade" as const, actorRoleId: "product", operationId, applicationId, baseDigest: null, targetDigest: digest, at, journalId: "unit-freeze-journal" };
++    const manifest: TrunkManifest = { schema: "trunk/v1", trunkVersion: 1, source: "upgrade", previous: null, flowId, runId: null,
++      artifacts: { documents, execution, boundaries: {} }, digest, createdAt: at, updatedAt: at, snapshotRef, actionSource: source };
++    const journal: TrunkApplyJournal = { v: 1, schema: "trunk-apply-journal/v1", journalId: source.journalId, operationId, applicationId, flowId, phase: "prepared",
++      actionSource: source, targetSnapshot: snapshotRef, startedAt: at, updatedAt: at,
++      target: { trunkVersion: 1, runId: null, documents: { proposal: { path: proposalV2.path, sha256: sha(proposalV2.text) } }, execution },
++      before: { trunkVersion: 0, runId: null, documents: {}, execution } };
++    const { phase: _phase, updatedAt: _updated, result: _result, ...binding } = journal;
++    const manifestBytes = Buffer.from(JSON.stringify(manifest));
++    const content = new Map<string, Buffer>([...contents].map(([file, text]) => [file, Buffer.from(text)]));
++    content.set(".ans/trunk/manifest.json", manifestBytes);
++    content.set(`.ans/trunk/snapshots/${snapshot.snapshotId}.json`, Buffer.from(JSON.stringify(snapshot)));
++    const plan = await objects.plan({ operationId, base: null, timestamp: at, message: `ANS trunk 1 ${digest}`,
++      files: [...content].map(([file, bytes]) => ({ path: file, bytesBase64: bytes.toString("base64"), ...(options.executablePaths?.includes(file) ? { executable: true } : {}) })) });
++    return { repoId: identity.repoId, operationId, actorRoleId: "product", taskId: "w2-freeze-closure-task", authorizationRevision: 7, currentAuthorizationRevision: 7,
++      objectFormat: format, template: "commit", paths: [...content.keys()], readPaths: ["."], writePaths: ["docs/product/"], base: null,
++      candidate: plan.commit.candidate, ref: plan.ref, ownedCandidateRef: plan.ref, worksite: plan.worksite, rawObjectPlan: plan, argv: plan.commands[0]!, commands: plan.commands,
++      allDiff: { complete: true, base: null, candidate: plan.commit.candidate, entries: plan.diff },
++      businessPublication: { kind: "direct-document-publication", flowId, operationId, actorRoleId: "product", applicationId, action: "version-upgrade",
++        snapshot: snapshotRef, documents, execution },
++      appGeneratedFiles: [...content].map(([file, bytes]) => ({ path: file, sha256: sha(bytes), oid: plan.diff.find(row => row.newPath === file)!.newOid!,
++        kind: file === ".ans/trunk/manifest.json" ? "manifest" as const : file.startsWith(".ans/trunk/snapshots/") ? "complete-snapshot" as const
++          : file.startsWith(".ans/") ? "frozen-application-evidence" as const : "snapshot-content" as const })),
++      manifestSha256: sha(manifestBytes), journalDigest: sha(JSON.stringify(testCanonical(binding))), businessJournal: journal };
++  }
++
++  function publish(facts: GitPolicyFacts): GitPolicyFacts {
++    return { ...facts, template: "publish-documents", ref: "refs/ans/trunk", publicationRef: "refs/ans/trunk",
++      commands: [...facts.commands!, command("update-ref", "--no-deref", "refs/ans/trunk", facts.candidate!.hex, zero(format))] };
++  }
++
++  return { root, identity, objects, facts, publish, frozenRows, draftRows, baseRows, freeze,
++    docs: { intentV1, proposalV1, proposalV2, architectureV1, architectureV2, rosterV1, rosterV2, modulesV1 } };
++}
++
++for (const format of ["sha1", "sha256"] as const) test(`W2 actual ${format} bootstrap 9 文件快照（8 frozen 含 intent v1 + versions）：闭包只要求 frozen，candidate/publication 均 allowed（T10/T13）`, async t => {
++  const fixture = await freezeClosureFixture(format); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
++  const facts = await fixture.facts(), verdict = checkGitPolicy(facts);
++  assert.equal(verdict.allowed, true, JSON.stringify(verdict));
++  assert.equal(verdict.inputDigest, computeGitPolicyDigest(facts));
++  const snapshotRow = facts.rawObjectPlan!.input.files.find(file => file.path.startsWith(".ans/trunk/snapshots/"))!;
++  const snapshot = JSON.parse(Buffer.from(snapshotRow.bytesBase64!, "base64").toString("utf8")) as CompleteSnapshot;
++  assert.equal(snapshot.files.length, 9, "8 frozen 文档（含 intent v1）+ versions.jsonl = 9 文件");
++  assert.equal(snapshot.files.filter(file => file.path.startsWith("docs/")).length, 8);
++  // 5 条非 frozen 草稿行的旧 sha 均不在快照内：旧谓词必然 git-policy-app-freeze-closure；本变更只要求 frozen。
++  for (const row of fixture.draftRows) assert.ok(!snapshot.files.some(file => file.sha256 === row.sha256), String(row.path));
++  assert.equal(checkGitPolicy(fixture.publish(facts)).allowed, true, JSON.stringify(checkGitPolicy(fixture.publish(facts))));
++});
++
++test("W2 冻结保护不弱化：缺 frozen 文件 / frozen sha 漂移仍 git-policy-app-freeze-closure；无 frozen 证明的历史文件仍拒（T11/T19）", async t => {
++  const fixture = await freezeClosureFixture("sha1"); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
++  const missing = await fixture.facts({ removePaths: [fixture.docs.proposalV1.path] });
++  assert.equal(checkGitPolicy(missing).code, "git-policy-app-freeze-closure", "frozen 记录所指文件缺失仍拒绝");
++  const drift = await fixture.facts({ drift: { path: fixture.docs.architectureV1.path, text: "drifted frozen bytes\n" } });
++  assert.equal(checkGitPolicy(drift).code, "git-policy-app-freeze-closure", "frozen sha 漂移仍拒绝");
++  // 只剩草稿行（无任何 frozen 证明）时，历史 docs/proposals|contracts 文件重新落回 gitRolePath 之外的写范围拒绝。
++  const unproven = await fixture.facts({ rows: fixture.draftRows });
++  assert.equal(checkGitPolicy(unproven).code, "git-policy-raw-write-scope", "M2 允许集只接纳 frozen 证明路径");
++});
++
++test("W2 未知/非法 event/freeze、坏记录与异 flow 行仍 fail-closed，不静默过滤（T12/T17）", async t => {
++  const fixture = await freezeClosureFixture("sha1"); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
++  const architectureV1 = fixture.frozenRows.find(row => row.doc === "architecture" && row.version === 1)!;
++  const replaceFrozen = (patch: LedgerRow) => fixture.baseRows.map(row => row === architectureV1 ? { ...row, ...patch } : row);
++  const cases: [LedgerRow[], string][] = [
++    [replaceFrozen({ event: "future-event" }), "git-policy-app-freeze-source"],
++    [replaceFrozen({ freeze: undefined }), "git-policy-app-freeze-source"],
++    [replaceFrozen({ freeze: { schema: "doc-freeze/v1" } }), "git-policy-app-freeze-source"],
++    [[...fixture.baseRows, { ...fixture.draftRows[0]!, freeze: fixture.freeze("freeze-on-draft") }], "git-policy-app-freeze-source"],
++    [replaceFrozen({ version: 0 }), "git-policy-app-freeze-record"],
++    [[...fixture.baseRows, { ...architectureV1, flowId: "other-flow" }], "git-policy-app-freeze-record"],
++    // 同 path 两条 frozen 记录 sha 冲突：快照不可能同时满足两值（重复 path 在快照层即被拒），closure fail-closed。
++    [[...fixture.baseRows, { ...architectureV1, sha256: sha("conflicting frozen bytes") }], "git-policy-app-freeze-closure"],
++  ];
++  for (const [rows, code] of cases) {
++    const result = checkGitPolicy(await fixture.facts({ rows }));
++    assert.equal(result.allowed, false, JSON.stringify(result));
++    assert.equal(result.code, code, JSON.stringify({ rows, result }));
++  }
++  const malformed = await fixture.facts({ versionsText: "{not-json\n" });
++  assert.equal(checkGitPolicy(malformed).allowed, false, "坏行 fail-closed（既有行为，不跳过）");
++});
++
++test("W2 M2 允许集精确到 frozen 证明：额外未证明 snapshot-content 仍 raw-write-scope；证明后放行；executable 不放行（T19/N2）", async t => {
++  const fixture = await freezeClosureFixture("sha1"); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
++  // N2：必须选 gitRolePath（product 根仅 docs/product/）不放行的路径；docs/product/ 会被直接放行、不能钉住允许集。
++  const extra = { path: "docs/proposals/unit-proposal-v9.md", text: "Unproven extra proposal bytes\n" };
++  const unproven = await checkGitPolicy(await fixture.facts({ extraFiles: [extra] }));
++  assert.equal(unproven.allowed, false, JSON.stringify(unproven));
++  assert.equal(unproven.code, "git-policy-raw-write-scope");
++  const provenRow: LedgerRow = { v: 1, flowId: "unit", doc: "proposal", version: 9, path: "docs/proposals/unit-proposal", sha256: sha(extra.text),
++    recordedAt: at, recordedBy: "app:session", event: "frozen", freeze: fixture.freeze("freeze-proposal-v9") };
++  const provenFacts = await fixture.facts({ extraFiles: [extra], rows: [...fixture.baseRows, provenRow] });
++  const proven = checkGitPolicy(provenFacts);
++  assert.equal(proven.allowed, true, JSON.stringify(proven));
++  assert.equal(checkGitPolicy(fixture.publish(provenFacts)).allowed, true, "candidate 与 publication 两个 verdict 同一函数同时放行");
++  // 允许集不解除 candidate 模式约束：frozen 证明路径以 100755 写入仍被写范围拒绝。
++  const executable = await checkGitPolicy(await fixture.facts({ executablePaths: [fixture.docs.proposalV1.path] }));
++  assert.equal(executable.allowed, false, JSON.stringify(executable));
++  assert.equal(executable.code, "git-policy-raw-write-scope");
++});
++
++test("W2 门禁保持 :728 原样使用路径：-vN 后缀与 record.version 不一致不做门禁校验（服务侧防御，T18）", async t => {
++  const fixture = await freezeClosureFixture("sha1"); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
++  // path 已是实际 -vN.md：门禁原样使用该路径（不比对后缀版本 === record.version）；
++  // 服务侧装配的防御性校验（W1）在门禁之前拒绝此类记录——差异按 Q7/T18 保留并钉住。
++  const wrongSuffix: LedgerRow = { v: 1, flowId: "unit", doc: "architecture", version: 1, path: fixture.docs.architectureV2.path,
++    sha256: sha(fixture.docs.architectureV2.text), recordedAt: at, recordedBy: "app:session", event: "frozen", freeze: fixture.freeze("freeze-wrong-suffix") };
++  const accepted = checkGitPolicy(await fixture.facts({ rows: [...fixture.baseRows, wrongSuffix] }));
++  assert.equal(accepted.allowed, true, JSON.stringify(accepted));
++  // 对照：canonical path + version 解析到不存在的 -v3 文件仍按 closure 拒绝（路径解析规则不变）。
++  const missingV3: LedgerRow = { v: 1, flowId: "unit", doc: "architecture", version: 3, path: "docs/contracts/unit-architecture",
++    sha256: sha(fixture.docs.architectureV2.text), recordedAt: at, recordedBy: "app:session", event: "frozen", freeze: fixture.freeze("freeze-architecture-v3") };
++  const rejected = checkGitPolicy(await fixture.facts({ rows: [...fixture.baseRows, missingV3] }));
++  assert.equal(rejected.code, "git-policy-app-freeze-closure");
++});
++
++test("W2 普通候选不因本变更获得元数据/历史文件写权（非 businessPublication 路径不变）", async t => {
++  const fixture = await freezeClosureFixture("sha1"); t.after(() => fs.rm(fixture.root, { recursive: true, force: true }));
++  const facts = await fixture.facts();
++  const ordinary = { ...facts, businessPublication: undefined, appGeneratedFiles: undefined, businessJournal: undefined, manifestSha256: undefined, journalDigest: undefined };
++  const result = checkGitPolicy(ordinary);
++  assert.equal(result.allowed, false);
++  assert.equal(result.code, "git-policy-raw-write-scope", "frozen 证明集只在 direct-document-publication 分支内生效");
++});

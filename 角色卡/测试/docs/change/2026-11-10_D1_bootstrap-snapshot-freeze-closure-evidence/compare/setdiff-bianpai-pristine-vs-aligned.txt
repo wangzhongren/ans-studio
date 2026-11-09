@@ -1,0 +1,6 @@
+pristine-checkout {"tests":1164,"pass":1139,"fail":23,"cancelled":0,"skipped":2,"todo":0}
+aligned {"tests":1164,"pass":1140,"fail":22,"cancelled":0,"skipped":2,"todo":0}
+fail only-pristine(1): [
+ "wiring guards: append sits after current gate and before effects with the frozen R2 digest mapping; run-change/stop paths never append"
+]
+fail only-aligned(0): []

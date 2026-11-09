@@ -1,0 +1,2 @@
+b4b98a5a4e001f2294c65b04e119b34e7b7a369c69cede856e7458627d54ad1b  src/common/门禁引擎/classify-shell.ts
+9109711ab1b3734935c3f7184d1028a62c5ae2b224e1c3aefadd96a25f5da039  test/门禁引擎/freeze-closure.test.ts

@@ -1,0 +1,140 @@
+[
+  {
+    "v": 1,
+    "schema": "version-change/v1",
+    "applicationId": "vc-7556635137666",
+    "operationId": "op-product-snake-game-bootstrap-20261110-01",
+    "kind": "version-upgrade",
+    "initiatorRoleId": "product",
+    "flowId": "snake-game",
+    "baseTrunk": null,
+    "message": "direct-request:a2eb6feab811f7092e780d87e596acb1dddc4476e1d5fc10523f982033d09d2d",
+    "targets": [
+      {
+        "kind": "contract",
+        "path": "docs/proposals/snake-game-proposal-v2.md",
+        "action": "add",
+        "toSha256": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844"
+      },
+      {
+        "kind": "contract",
+        "path": "docs/proposals/snake-game-modules-v1.md",
+        "action": "add",
+        "toSha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53"
+      },
+      {
+        "kind": "contract",
+        "path": "docs/contracts/snake-game-architecture-v2.md",
+        "action": "add",
+        "toSha256": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f"
+      },
+      {
+        "kind": "roster",
+        "path": "docs/proposals/snake-game-roster-v1.md",
+        "action": "add",
+        "toSha256": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c"
+      }
+    ],
+    "bootstrap": true,
+    "summary": "版本升级（首个 trunk bootstrap）：以 baseTrunk=null 提交 snake-game 当前提案 v2、模块清单 v1、架构 v2 与名单 v1，作为初始文档基线；由应用整单校验后生效。未获客户批准前不视为通过。",
+    "status": "draft",
+    "at": "2026-11-09T18:35:54.544Z",
+    "updatedAt": "2026-11-09T18:35:54.544Z",
+    "snapshotRef": {
+      "snapshotId": "s-06df6a8d9682dec4a319e926b752254eef796208696aa194891ddff8d4074505",
+      "digest": "85f8ee6c62c78e758a1afe05a548b2d40df13639cc196c7b7184415622e8f8d0"
+    }
+  },
+  {
+    "v": 1,
+    "schema": "version-change/v1",
+    "applicationId": "vc-117132878528057",
+    "operationId": "op-vc-snake-game-bootstrap-20261110-r8",
+    "kind": "version-upgrade",
+    "initiatorRoleId": "product",
+    "flowId": "snake-game",
+    "baseTrunk": null,
+    "message": "direct-request:5f38e0bee3114aae743eb7629366bab7e6bbbfb4375d91a108a16e97999e9f51",
+    "targets": [
+      {
+        "kind": "contract",
+        "path": "docs/proposals/snake-game-proposal-v2.md",
+        "action": "add",
+        "toSha256": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844"
+      },
+      {
+        "kind": "contract",
+        "path": "docs/proposals/snake-game-modules-v1.md",
+        "action": "add",
+        "toSha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53"
+      },
+      {
+        "kind": "contract",
+        "path": "docs/contracts/snake-game-architecture-v2.md",
+        "action": "add",
+        "toSha256": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f"
+      },
+      {
+        "kind": "roster",
+        "path": "docs/proposals/snake-game-roster-v2.md",
+        "action": "add",
+        "toSha256": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a"
+      }
+    ],
+    "bootstrap": true,
+    "summary": "以提案 v2、模块 v1、架构 v2、名单 v2 完成 snake-game 首个 trunk bootstrap（名单版本链已修复为 proposal v2 / architecture v2，不再引用旧 v1）。",
+    "status": "draft",
+    "at": "2026-11-09T18:43:21.971Z",
+    "updatedAt": "2026-11-09T18:43:21.971Z",
+    "snapshotRef": {
+      "snapshotId": "s-6a881f9dbe39af162f6137f361fe1be964c61173f497792a1884601b2f742c12",
+      "digest": "fa807db6dfd9b3abc317d3b42f3bfa76fcadaf2ba3cec757e5f8f1218a8ebb4c"
+    }
+  },
+  {
+    "v": 1,
+    "schema": "version-change/v1",
+    "applicationId": "vc-93811222285030",
+    "operationId": "vc-op-snake-game-bootstrap-20261110-r8",
+    "kind": "version-upgrade",
+    "initiatorRoleId": "product",
+    "flowId": "snake-game",
+    "baseTrunk": null,
+    "message": "direct-request:cd902cf34f307daf0d3091f1b5ec3508c0aeae8044ff3a0be618d8582a613325",
+    "targets": [
+      {
+        "kind": "contract",
+        "path": "docs/proposals/snake-game-proposal-v2.md",
+        "action": "add",
+        "toSha256": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844"
+      },
+      {
+        "kind": "contract",
+        "path": "docs/proposals/snake-game-modules-v1.md",
+        "action": "add",
+        "toSha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53"
+      },
+      {
+        "kind": "roster",
+        "path": "docs/proposals/snake-game-roster-v2.md",
+        "action": "add",
+        "toSha256": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a"
+      },
+      {
+        "kind": "contract",
+        "path": "docs/contracts/snake-game-architecture-v2.md",
+        "action": "add",
+        "toSha256": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f"
+      }
+    ],
+    "bootstrap": true,
+    "summary": "产品按客户本轮唯一指令，为 flow snake-game 提交首个 trunk bootstrap（version-upgrade，baseTrunk=null）。目标为当前最新版本化文档集：proposal-v2、modules-v1、roster-v2、architecture-v2；不含 intent（非 VCA 目标）与 execution（version-upgrade 不允许）。不自行选定多活动 run。",
+    "status": "draft",
+    "at": "2026-11-09T18:52:16.807Z",
+    "updatedAt": "2026-11-09T18:52:16.807Z",
+    "snapshotRef": {
+      "snapshotId": "s-555220948ae61b500da176aad0f3fdff0544f2e7c0e24277a38786694d01e4f3",
+      "digest": "fa807db6dfd9b3abc317d3b42f3bfa76fcadaf2ba3cec757e5f8f1218a8ebb4c"
+    }
+  }
+]

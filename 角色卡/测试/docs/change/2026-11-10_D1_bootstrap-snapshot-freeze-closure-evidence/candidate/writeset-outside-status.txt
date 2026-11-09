@@ -1,0 +1,38 @@
+time=2026-11-09T21:40:52Z
+=== tracked status (untracked=no), full repo ===
+ M docs/communication/memo.md
+ M src/common/门禁引擎/classify-shell.ts
+ M src/service/trunk/impl/apply-journal.ts
+=== tracked status line count ===
+3
+=== git diff --stat -- src app test ===
+ .../classify-shell.ts"                             |  19 +++-
+ src/service/trunk/impl/apply-journal.ts            | 108 ++++++++++++++++++---
+ 2 files changed, 111 insertions(+), 16 deletions(-)
+=== git diff --stat -- app (expect empty) ===
+=== git status --porcelain -- app ===
+=== deletions/renames in src app test (expect none) ===
+deleted=0
+=== excluded path checks (numstat lines / status lines) ===
+src/common/编排/doc-format-specs.ts numstat_lines=0 status_lines=0
+src/provider/runtime/schema.ts numstat_lines=0 status_lines=0
+src/provider/runtime/tools.ts numstat_lines=0 status_lines=0
+src/model/runtime.ts numstat_lines=0 status_lines=0
+src/pipeline/orchestration/run-role.ts numstat_lines=0 status_lines=0
+src/pipeline/orchestration/trunk-runtime.ts numstat_lines=0 status_lines=0
+app/desktop/session.ts numstat_lines=0 status_lines=0
+app/desktop/customer-input.ts numstat_lines=0 status_lines=0
+src/common/roles/convener/index.ts numstat_lines=0 status_lines=0
+src/model/trunk.ts numstat_lines=0 status_lines=0
+src/model/version-change.ts numstat_lines=0 status_lines=0
+src/common/编排/run-manifest.ts numstat_lines=0 status_lines=0
+src/common/编排/evidence-check.ts numstat_lines=0 status_lines=0
+src/common/编排/workflow-preconditions.ts numstat_lines=0 status_lines=0
+src/service/trunk/impl/amendment-validate.ts numstat_lines=0 status_lines=0
+src/service/trunk/impl/upgrade-validate.ts numstat_lines=0 status_lines=0
+test/桌面应用/optional-acceptance.test.ts numstat_lines=0 status_lines=0
+test/桌面应用/chief-workflow.test.ts numstat_lines=0 status_lines=0
+test/桌面应用/session.test.ts numstat_lines=0 status_lines=0
+test/测试/git-write-chain-fixture.ts numstat_lines=0 status_lines=0
+=== role cards / boundaries / models / schema dirs (tracked status) ===
+(end)

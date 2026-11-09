@@ -1,0 +1,11 @@
+{
+  "operationId": "w5-t6-bad-line",
+  "service": {
+    "code": "trunk-item-invalid",
+    "message": "Error: baseline-corrupt"
+  },
+  "fullChain": {
+    "errorCode": "vca-target-invalid",
+    "message": "Error: baseline-corrupt"
+  }
+}

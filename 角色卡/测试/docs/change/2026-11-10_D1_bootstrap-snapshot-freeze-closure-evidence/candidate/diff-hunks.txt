@@ -1,0 +1,29 @@
+---hunks---
+diff --git "a/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts" "b/src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+@@ -696 +696 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+@@ -723,0 +724,4 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+@@ -727,0 +732 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+@@ -729,2 +734,5 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+@@ -738,0 +747,5 @@ function appMetadataPaths(f: GitPolicyFacts, bytes: Map<string, Buffer>, before:
+diff --git a/src/service/trunk/impl/apply-journal.ts b/src/service/trunk/impl/apply-journal.ts
+@@ -573,0 +574,54 @@ function targetSlots(target: TrunkApplySnapshot): Record<string, { path: string;
+@@ -691,0 +746,2 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
+@@ -697,0 +754 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
+@@ -699 +756 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
+@@ -701 +758,2 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
+@@ -736,0 +795,11 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
+@@ -739 +808 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
+@@ -1294,0 +1364 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1301,0 +1372 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1305 +1376 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1306,0 +1378 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1308 +1380 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1310 +1382 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1312 +1384 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1314 +1385,0 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1317 +1388 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1318,0 +1390,8 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1325 +1404 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1327,0 +1407 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1335,2 +1415,4 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
+@@ -1339 +1421 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
