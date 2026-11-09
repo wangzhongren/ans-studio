@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: 幕僚链：flow/intent/proposal/roster/modules/env/d3/cards 正负例
+ok 1 - 幕僚链：flow/intent/proposal/roster/modules/env/d3/cards 正负例
+  ---
+  duration_ms: 1.2082
+  type: 'test'
+  ...
+# Subtest: 运营链：handoff/module-required/missing/not-owned/path/nominated 正负例
+ok 2 - 运营链：handoff/module-required/missing/not-owned/path/nominated 正负例
+  ---
+  duration_ms: 0.2759
+  type: 'test'
+  ...
+# Subtest: 独立 run advisory：legacy/pin/roles/ledger/hash/roster 正负例
+ok 3 - 独立 run advisory：legacy/pin/roles/ledger/hash/roster 正负例
+  ---
+  duration_ms: 0.1598
+  type: 'test'
+  ...
+# Subtest: 链顺序：每个链只报首个未满足项
+ok 4 - 链顺序：每个链只报首个未满足项
+  ---
+  duration_ms: 0.1159
+  type: 'test'
+  ...
+# Subtest: 独立追加：链级 advisory 与 run 级 advisory 可同时存在
+ok 5 - 独立追加：链级 advisory 与 run 级 advisory 可同时存在
+  ---
+  duration_ms: 0.0773
+  type: 'test'
+  ...
+# Subtest: R2 组合：pinFailed + draft 同时产 run-pin-failed 与 run-pin-required，顺序固定
+ok 6 - R2 组合：pinFailed + draft 同时产 run-pin-failed 与 run-pin-required，顺序固定
+  ---
+  duration_ms: 0.0606
+  type: 'test'
+  ...
+# Subtest: legacy：run.state=legacy 仅产 run-legacy-readonly，不产 run-pin-required
+ok 7 - legacy：run.state=legacy 仅产 run-legacy-readonly，不产 run-pin-required
+  ---
+  duration_ms: 0.0497
+  type: 'test'
+  ...
+# Subtest: latest/pinned 分离：链级用 latest，run 专属用 run.roles/run.modules
+ok 8 - latest/pinned 分离：链级用 latest，run 专属用 run.roles/run.modules
+  ---
+  duration_ms: 0.089
+  type: 'test'
+  ...
+# Subtest: verifier 例外：模块存在即不要求属主，无 target-not-nominated/run-role-missing
+ok 9 - verifier 例外：模块存在即不要求属主，无 target-not-nominated/run-role-missing
+  ---
+  duration_ms: 0.1036
+  type: 'test'
+  ...
+# Subtest: 模块路径等价性：反斜杠/绝对路径/../通配/目录与文件尾斜杠
+ok 10 - 模块路径等价性：反斜杠/绝对路径/../通配/目录与文件尾斜杠
+  ---
+  duration_ms: 0.1588
+  type: 'test'
+  ...
+# Subtest: 独立 run advisory 顺序固定；链级 module-missing 已产出时不重复 run 专属同 code
+ok 11 - 独立 run advisory 顺序固定；链级 module-missing 已产出时不重复 run 专属同 code
+  ---
+  duration_ms: 0.4344
+  type: 'test'
+  ...
+# Subtest: verifier run 专属模块覆盖：pinned modules 不含 moduleId 时产 module-missing
+ok 12 - verifier run 专属模块覆盖：pinned modules 不含 moduleId 时产 module-missing
+  ---
+  duration_ms: 0.0555
+  type: 'test'
+  ...
+# Subtest: convener→chief：collector 不产状态提示（授权拒绝由硬矩阵覆盖）
+ok 13 - convener→chief：collector 不产状态提示（授权拒绝由硬矩阵覆盖）
+  ---
+  duration_ms: 0.0474
+  type: 'test'
+  ...
+# Subtest: 空 advisory 与永不返回拒绝
+ok 14 - 空 advisory 与永不返回拒绝
+  ---
+  duration_ms: 0.0452
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 95.7741

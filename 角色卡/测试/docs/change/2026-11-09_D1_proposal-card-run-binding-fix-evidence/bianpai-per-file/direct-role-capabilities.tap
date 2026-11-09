@@ -1,0 +1,278 @@
+TAP version 13
+# Subtest: Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority
+ok 1 - Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority
+  ---
+  duration_ms: 693.4806
+  type: 'test'
+  ...
+# Subtest: Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+not ok 2 - Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+  ---
+  duration_ms: 93.725
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\direct-role-capabilities.test.ts:67:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    A shape-shaped confirmation without the real request/decision cannot promote migration
+    + actual - expected
+    
+      {
+        code: 'conflict',
+    +   message: 'frozen-conflict: docs/product/demo-intent-v2.md',
+    -   message: 'frozen-conflict',
+        ok: false
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    ok: false
+    code: 'conflict'
+    message: 'frozen-conflict'
+  actual:
+    ok: false
+    code: 'conflict'
+    message: 'frozen-conflict: docs/product/demo-intent-v2.md'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:88:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk
+ok 3 - Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk
+  ---
+  duration_ms: 329.6316
+  type: 'test'
+  ...
+# Subtest: complete team plan / activation / new pin: actual planning-only basis and independent pointers
+ok 4 - complete team plan / activation / new pin: actual planning-only basis and independent pointers
+  ---
+  duration_ms: 1294.5544
+  type: 'test'
+  ...
+# Subtest: complete team plan / activation / new pin: actual existing workflow basis and independent pointers
+ok 5 - complete team plan / activation / new pin: actual existing workflow basis and independent pointers
+  ---
+  duration_ms: 1430.0762
+  type: 'test'
+  ...
+# Subtest: Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+ok 6 - Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+  ---
+  duration_ms: 320.4993
+  type: 'test'
+  ...
+# Subtest: Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+ok 7 - Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+  ---
+  duration_ms: 343.4367
+  type: 'test'
+  ...
+# Subtest: Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation
+ok 8 - Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation
+  ---
+  duration_ms: 36.7882
+  type: 'test'
+  ...
+# Subtest: Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs
+ok 9 - Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs
+  ---
+  duration_ms: 63.6791
+  type: 'test'
+  ...
+# Subtest: Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs
+ok 10 - Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs
+  ---
+  duration_ms: 426.251
+  type: 'test'
+  ...
+# Subtest: Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback
+ok 11 - Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback
+  ---
+  duration_ms: 18.8272
+  type: 'test'
+  ...
+# Subtest: Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history
+ok 12 - Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history
+  ---
+  duration_ms: 74.2382
+  type: 'test'
+  ...
+# Subtest: Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation
+ok 13 - Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation
+  ---
+  duration_ms: 36.1542
+  type: 'test'
+  ...
+# Subtest: Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer
+ok 14 - Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer
+  ---
+  duration_ms: 421.9568
+  type: 'test'
+  ...
+# Subtest: Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again
+ok 15 - Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again
+  ---
+  duration_ms: 200.1599
+  type: 'test'
+  ...
+# Subtest: Service: any invalid target/hash/role or precommit failure leaves the complete old baseline
+ok 16 - Service: any invalid target/hash/role or precommit failure leaves the complete old baseline
+  ---
+  duration_ms: 109.3858
+  type: 'test'
+  ...
+# Subtest: Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins
+ok 17 - Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins
+  ---
+  duration_ms: 92.7868
+  type: 'test'
+  ...
+# Subtest: Service: concurrent direct submissions with one base commit exactly once and retain both operation journals
+ok 18 - Service: concurrent direct submissions with one base commit exactly once and retain both operation journals
+  ---
+  duration_ms: 132.3542
+  type: 'test'
+  ...
+# Subtest: Service: lost CAS acknowledgement and metadata-write failure never claim a committed target was rejected
+ok 19 - Service: lost CAS acknowledgement and metadata-write failure never claim a committed target was rejected
+  ---
+  duration_ms: 85.3832
+  type: 'test'
+  ...
+# Subtest: Service: direct VCA metadata goes draft to applied with the real committed source; legacy approval cannot impersonate it
+ok 20 - Service: direct VCA metadata goes draft to applied with the real committed source; legacy approval cannot impersonate it
+  ---
+  duration_ms: 106.6089
+  type: 'test'
+  ...
+# Subtest: Service: first direct publication uses confirmed intent and null CAS, creates no workflow or execution authority
+ok 21 - Service: first direct publication uses confirmed intent and null CAS, creates no workflow or execution authority
+  ---
+  duration_ms: 117.1201
+  type: 'test'
+  ...
+# Subtest: Service: detail amendment binds all frozen items to the complete target; no partial apply and true no-op
+ok 22 - Service: detail amendment binds all frozen items to the complete target; no partial apply and true no-op
+  ---
+  duration_ms: 148.0303
+  type: 'test'
+  ...
+# Subtest: chief evidence: initial real target/request bytes produce a bounded immutable basis; isCurrent rechecks actual hashes
+ok 23 - chief evidence: initial real target/request bytes produce a bounded immutable basis; isCurrent rechecks actual hashes
+  ---
+  duration_ms: 27.751
+  type: 'test'
+  ...
+# Subtest: chief evidence: missing targets, secret paths, excessive bytes and unbound old pinned runs refuse automatic decisions
+ok 24 - chief evidence: missing targets, secret paths, excessive bytes and unbound old pinned runs refuse automatic decisions
+  ---
+  duration_ms: 12.1985
+  type: 'test'
+  ...
+# Subtest: chief evidence: pinned run uses its immutable bytes and remains current when live files or document trunk change
+ok 25 - chief evidence: pinned run uses its immutable bytes and remains current when live files or document trunk change
+  ---
+  duration_ms: 43.4103
+  type: 'test'
+  ...
+# Subtest: chief evidence: draft planning run needs bound document hashes and never requires future execution authorisation
+ok 26 - chief evidence: draft planning run needs bound document hashes and never requires future execution authorisation
+  ---
+  duration_ms: 19.4314
+  type: 'test'
+  ...
+# Subtest: chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest
+ok 27 - chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest
+  ---
+  duration_ms: 36.3806
+  type: 'test'
+  ...
+# Subtest: chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes
+ok 28 - chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes
+  ---
+  duration_ms: 34.2688
+  type: 'test'
+  ...
+# Subtest: chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot
+ok 29 - chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot
+  ---
+  duration_ms: 6.8561
+  type: 'test'
+  ...
+# Subtest: chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification
+ok 30 - chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification
+  ---
+  duration_ms: 40.453
+  type: 'test'
+  ...
+# Subtest: chief evidence (A5): manifest-bound draft refs keep their authority over request targets
+ok 31 - chief evidence (A5): manifest-bound draft refs keep their authority over request targets
+  ---
+  duration_ms: 4.7281
+  type: 'test'
+  ...
+# Subtest: chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version
+ok 32 - chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version
+  ---
+  duration_ms: 27.5394
+  type: 'test'
+  ...
+# Subtest: Service: committed chief-delegated freeze preserves its true source on reload without customer fields
+ok 33 - Service: committed chief-delegated freeze preserves its true source on reload without customer fields
+  ---
+  duration_ms: 19.0477
+  type: 'test'
+  ...
+# Subtest: Service: legacy pending requests stay unchanged and require an explicit direct resubmission link
+ok 34 - Service: legacy pending requests stay unchanged and require an explicit direct resubmission link
+  ---
+  duration_ms: 102.1305
+  type: 'test'
+  ...
+# Subtest: Service: legacy no-op materialises exact immutable bytes without upgrading or rewriting historical customer metadata
+ok 35 - Service: legacy no-op materialises exact immutable bytes without upgrading or rewriting historical customer metadata
+  ---
+  duration_ms: 160.5405
+  type: 'test'
+  ...
+# Subtest: Service: malformed execution document rejects the entire otherwise valid detail amendment
+ok 36 - Service: malformed execution document rejects the entire otherwise valid detail amendment
+  ---
+  duration_ms: 39.4866
+  type: 'test'
+  ...
+# Subtest: Pipeline: real direct submit persists a whole commit and truthful audit without cards, old approval or re-pin
+ok 37 - Pipeline: real direct submit persists a whole commit and truthful audit without cards, old approval or re-pin
+  ---
+  duration_ms: 177.3496
+  type: 'test'
+  ...
+# Subtest: Pipeline: lost notification acknowledgement returns pending, then recovers one keyed delivery and one version
+ok 38 - Pipeline: lost notification acknowledgement returns pending, then recovers one keyed delivery and one version
+  ---
+  duration_ms: 158.5365
+  type: 'test'
+  ...
+# Subtest: Parent source: real assignment, durable child reference and locked parent CAS reject stale or cancelled origins
+ok 39 - Parent source: real assignment, durable child reference and locked parent CAS reject stale or cancelled origins
+  ---
+  duration_ms: 1043.1607
+  type: 'test'
+  ...
+# Subtest: Provider strict scan: real non-ENOENT directory failure is never a complete empty TOFU scan
+ok 40 - Provider strict scan: real non-ENOENT directory failure is never a complete empty TOFU scan
+  ---
+  duration_ms: 5.228
+  type: 'test'
+  ...
+1..40
+# tests 40
+# suites 0
+# pass 39
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8853.8949

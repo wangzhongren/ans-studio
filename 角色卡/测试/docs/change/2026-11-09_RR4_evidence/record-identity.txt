@@ -1,0 +1,4 @@
+# Record identity (computed after final edits; B2 may cite these per B1 v1.1 RR-8)
+角色卡/测试/docs/change/2026-11-09_RR4_proposal-card-run-binding-real-run.md	231 lines	31494 bytes	e561c38e3a81571e8551d085ff1e57f180fa3bf82201ed0beb688288a485db1c
+角色卡/测试/docs/change/2026-11-09_D1_proposal-card-run-binding-fix.md	192 lines	18029 bytes	d627095667b994e0c540c216e4d3104b47a65d5390a8c8f8b8227d40fc8ca6a1
+docs/acceptance/2026-11-09_proposal-card-run-binding-fix-criteria-v1.md	294 lines	48124 bytes	682539ba619366ae11243ccb661503ab84873549fc66d5a4b4a23c6b694918c7

@@ -1,0 +1,89 @@
+TAP version 13
+# Subtest: NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association
+ok 1 - NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association
+  ---
+  duration_ms: 12.7307
+  type: 'test'
+  ...
+# Subtest: Git protection freshness: only the issued observation survives unchanged config/topology
+ok 2 - Git protection freshness: only the issued observation survives unchanged config/topology
+  ---
+  duration_ms: 51.7953
+  type: 'test'
+  ...
+# Subtest: Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+ok 3 - Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+  ---
+  duration_ms: 853.253
+  type: 'test'
+  ...
+# Subtest: Git init Provider: final real root/file hashes fence initialization and persist original operation process identity
+ok 4 - Git init Provider: final real root/file hashes fence initialization and persist original operation process identity
+  ---
+  duration_ms: 71.3554
+  type: 'test'
+  ...
+# Subtest: Git init journal: restart discovery binds the original operation and excludes FS/ref media
+ok 5 - Git init journal: restart discovery binds the original operation and excludes FS/ref media
+  ---
+  duration_ms: 30.6011
+  type: 'test'
+  ...
+# Subtest: Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent
+ok 6 - Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent
+  ---
+  duration_ms: 5.7824
+  type: 'test'
+  ...
+# Subtest: Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged
+ok 7 - Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged
+  ---
+  duration_ms: 7.927
+  type: 'test'
+  ...
+# Subtest: Git empty plan: computed sha1 object bytes match actual fixed-date Git readback
+ok 8 - Git empty plan: computed sha1 object bytes match actual fixed-date Git readback
+  ---
+  duration_ms: 286.722
+  type: 'test'
+  ...
+# Subtest: Git empty plan: computed sha256 object bytes match actual fixed-date Git readback
+ok 9 - Git empty plan: computed sha256 object bytes match actual fixed-date Git readback
+  ---
+  duration_ms: 284.9165
+  type: 'test'
+  ...
+# {"repoId":"caf4d3e97a4c357711df52e9647a43b8ef492f514a9788f983afeeca41a22491","executable":"C:\\\\Program Files\\\\Git\\\\cmd\\\\git.exe","argv":["--no-pager","--no-optional-locks","--literal-pathspecs","-c","core.fsmonitor=false","-c","core.hooksPath=NUL","-c","core.untrackedCache=false","-c","core.excludesFile=NUL","-c","core.pager=cat","-c","pager.status=false","-c","pager.diff=false","-c","maintenance.auto=false","-c","gc.auto=0","-c","protocol.allow=never","-c","diff.external=","-c","core.attributesFile=NUL","status","--porcelain=v1","-z","--untracked-files=normal","--ignore-submodules=all","--","actual.txt"],"termination":"exited"}
+# Subtest: Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config
+ok 10 - Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config
+  ---
+  duration_ms: 80.6177
+  type: 'test'
+  ...
+# Subtest: Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query
+ok 11 - Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query
+  ---
+  duration_ms: 179.7472
+  type: 'test'
+  ...
+# Subtest: Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported
+ok 12 - Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported
+  ---
+  duration_ms: 48.6907
+  type: 'test'
+  ...
+# Subtest: Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit
+ok 13 - Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit
+  ---
+  duration_ms: 367.9674
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2486.3666

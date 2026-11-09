@@ -1,0 +1,224 @@
+TAP version 13
+# Subtest: allow → 放行（**不产出 token**），by 为 ruleset:<id>，审计记 c-allow
+ok 1 - allow → 放行（**不产出 token**），by 为 ruleset:<id>，审计记 c-allow
+  ---
+  duration_ms: 2.6209
+  type: 'test'
+  ...
+# Subtest: deny → 拒绝（硬拒终结），审计记 c-deny
+ok 2 - deny → 拒绝（硬拒终结），审计记 c-deny
+  ---
+  duration_ms: 0.2371
+  type: 'test'
+  ...
+# Subtest: review → 第一步**默认拒绝**（未接入 (b)/(a)，绝不因缺下一闸而放行）
+ok 3 - review → 第一步**默认拒绝**（未接入 (b)/(a)，绝不因缺下一闸而放行）
+  ---
+  duration_ms: 0.2234
+  type: 'test'
+  ...
+# Subtest: review 对任意命令都默认拒绝（不因命令看似无害而放行）
+ok 4 - review 对任意命令都默认拒绝（不因命令看似无害而放行）
+  ---
+  duration_ms: 0.2637
+  type: 'test'
+  ...
+# Subtest: 审核超时 → 拒绝（超时包装；退路 3）
+ok 5 - 审核超时 → 拒绝（超时包装；退路 3）
+  ---
+  duration_ms: 34.5394
+  type: 'test'
+  ...
+# Subtest: 规则集加载失败 → 整条命令拒绝（绝不「规则没了就一律放行」）
+ok 6 - 规则集加载失败 → 整条命令拒绝（绝不「规则没了就一律放行」）
+  ---
+  duration_ms: 0.2841
+  type: 'test'
+  ...
+# Subtest: 未注入 classifyShell → 一律拒绝（能力缺席即 fail-closed）
+ok 7 - 未注入 classifyShell → 一律拒绝（能力缺席即 fail-closed）
+  ---
+  duration_ms: 0.1565
+  type: 'test'
+  ...
+# Subtest: classifyShell 抛错 → 拒绝（保守，不把异常当放行）
+ok 8 - classifyShell 抛错 → 拒绝（保守，不把异常当放行）
+  ---
+  duration_ms: 0.1912
+  type: 'test'
+  ...
+# Subtest: 审计记录被追加到 docs/audit/shell-gate.jsonl，含要求字段且声明 shell-gate 条件
+ok 9 - 审计记录被追加到 docs/audit/shell-gate.jsonl，含要求字段且声明 shell-gate 条件
+  ---
+  duration_ms: 13.9897
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：命中条件目录但缺少条件 `shell-gate`：任务未在 conditions 声明该条件（拒绝）：docs/audit/shell-gate.jsonl
+# Subtest: 审计是追加式：两条记录追加为两行（不改写既有）
+ok 10 - 审计是追加式：两条记录追加为两行（不改写既有）
+  ---
+  duration_ms: 14.8326
+  type: 'test'
+  ...
+# Subtest: 硬要求负例：审计写门禁 scope **不含** shell-gate → 被门禁拒绝、零副作用（不落盘）
+ok 11 - 硬要求负例：审计写门禁 scope **不含** shell-gate → 被门禁拒绝、零副作用（不落盘）
+  ---
+  duration_ms: 1.1691
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。
+# Subtest: F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁
+ok 12 - F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁
+  ---
+  duration_ms: 11.0145
+  type: 'test'
+  ...
+# Subtest: F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件）
+ok 13 - F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件）
+  ---
+  duration_ms: 0.6443
+  type: 'test'
+  ...
+# Subtest: F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因
+ok 14 - F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因
+  ---
+  duration_ms: 0.526
+  type: 'test'
+  ...
+# Subtest: F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用
+ok 15 - F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用
+  ---
+  duration_ms: 0.4867
+  type: 'test'
+  ...
+# Subtest: F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转
+ok 16 - F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转
+  ---
+  duration_ms: 0.2646
+  type: 'test'
+  ...
+# Subtest: F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」
+ok 17 - F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」
+  ---
+  duration_ms: 0.474
+  type: 'test'
+  ...
+# shell 闸审核结束回调异常（不影响判定）：回调崩溃
+# Subtest: buildShellGate（Pipeline 构造入口）→ 判定 + 自动审计落盘 docs/audit/shell-gate.jsonl
+ok 18 - buildShellGate（Pipeline 构造入口）→ 判定 + 自动审计落盘 docs/audit/shell-gate.jsonl
+  ---
+  duration_ms: 7.5348
+  type: 'test'
+  ...
+# Subtest: 注入路径：selectAdapterFactory 把编排构造的 shellGate 转发给 pi 工厂
+ok 19 - 注入路径：selectAdapterFactory 把编排构造的 shellGate 转发给 pi 工厂
+  ---
+  duration_ms: 0.1848
+  type: 'test'
+  ...
+# Subtest: 注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 将不注册，fail-closed）
+ok 20 - 注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 将不注册，fail-closed）
+  ---
+  duration_ms: 0.059
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：c=deny 硬拒不调用/不消费 takeGrant（授权不得越过硬地板）
+ok 21 - 授权顺序（script）：c=deny 硬拒不调用/不消费 takeGrant（授权不得越过硬地板）
+  ---
+  duration_ms: 0.2696
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：上下文重载成功后才查授权 → 授权放行（customer-escalation:allow-once，审计 customerGrant 无 judge）
+ok 22 - 授权顺序（script）：上下文重载成功后才查授权 → 授权放行（customer-escalation:allow-once，审计 customerGrant 无 judge）
+  ---
+  duration_ms: 0.2666
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：上下文不可读 + takeGrant 返回 stale ⇒ customer-escalation:stale-context 拒绝
+ok 23 - 授权顺序（script）：上下文不可读 + takeGrant 返回 stale ⇒ customer-escalation:stale-context 拒绝
+  ---
+  duration_ms: 0.141
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：c=allow 分类不消费授权（也不走授权分支）
+ok 24 - 授权顺序（script）：c=allow 分类不消费授权（也不走授权分支）
+  ---
+  duration_ms: 0.1865
+  type: 'test'
+  ...
+# Subtest: 授权顺序（非 script）：c=allow 不消费一次性授权（授权保留给目标命令）
+ok 25 - 授权顺序（非 script）：c=allow 不消费一次性授权（授权保留给目标命令）
+  ---
+  duration_ms: 0.1609
+  type: 'test'
+  ...
+# Subtest: 授权顺序（advisory）：review + 匹配 grant → 授权放行（allow-session），不调 operator
+ok 26 - 授权顺序（advisory）：review + 匹配 grant → 授权放行（allow-session），不调 operator
+  ---
+  duration_ms: 0.1068
+  type: 'test'
+  ...
+# Subtest: 授权顺序（advisory）：c=deny 不消费/不放行——仍按现状交 (a)，分支 c-deny→a-*
+ok 27 - 授权顺序（advisory）：c=deny 不消费/不放行——仍按现状交 (a)，分支 c-deny→a-*
+  ---
+  duration_ms: 0.0993
+  type: 'test'
+  ...
+# Subtest: 授权顺序（operatorOnly）：risky + grant → 授权放行；c=deny（approveDeny）不消费
+ok 28 - 授权顺序（operatorOnly）：risky + grant → 授权放行；c=deny（approveDeny）不消费
+  ---
+  duration_ms: 0.1643
+  type: 'test'
+  ...
+# Subtest: 授权顺序（三层链）：review + grant → 授权放行且不调 pm/operator；c=deny 不消费
+ok 29 - 授权顺序（三层链）：review + grant → 授权放行且不调 pm/operator；c=deny 不消费
+  ---
+  duration_ms: 0.1307
+  type: 'test'
+  ...
+# Subtest: 授权顺序（readonly）：readonlyOnly + takeGrant ⇒ 构造期抛错（只读拒绝不得被陈旧授权越过）
+ok 30 - 授权顺序（readonly）：readonlyOnly + takeGrant ⇒ 构造期抛错（只读拒绝不得被陈旧授权越过）
+  ---
+  duration_ms: 0.2111
+  type: 'test'
+  ...
+# Subtest: onReviewed：script 分支以带 approvalContext 的请求回调；非 script 用原请求
+ok 31 - onReviewed：script 分支以带 approvalContext 的请求回调；非 script 用原请求
+  ---
+  duration_ms: 0.2327
+  type: 'test'
+  ...
+# Subtest: onReviewed 抛错不影响判定（只做记录/清理，判定已完成且确定）
+ok 32 - onReviewed 抛错不影响判定（只做记录/清理，判定已完成且确定）
+  ---
+  duration_ms: 0.132
+  type: 'test'
+  ...
+# Subtest: readonly 裁定 A：例行白名单命中（分类器明细 ruleId）在只读档 readonly-deny，reason 模板与档位按 A2 之前
+ok 33 - readonly 裁定 A：例行白名单命中（分类器明细 ruleId）在只读档 readonly-deny，reason 模板与档位按 A2 之前
+  ---
+  duration_ms: 0.2859
+  type: 'test'
+  ...
+# Subtest: readonly 裁定 A：裸串分类器（生产四态封装不带 ruleId）⇒ 同一冻结谓词兜底；非 routine c-allow 仍放行
+ok 34 - readonly 裁定 A：裸串分类器（生产四态封装不带 ruleId）⇒ 同一冻结谓词兜底；非 routine c-allow 仍放行
+  ---
+  duration_ms: 1.4199
+  type: 'test'
+  ...
+# Subtest: readonly 裁定 A：非只读档的 c-allow（含 allow:routine:*）行为不变，且不消费升级授权
+ok 35 - readonly 裁定 A：非只读档的 c-allow（含 allow:routine:*）行为不变，且不消费升级授权
+  ---
+  duration_ms: 0.0998
+  type: 'test'
+  ...
+1..35
+# tests 35
+# suites 0
+# pass 35
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 383.3249

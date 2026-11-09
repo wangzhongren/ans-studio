@@ -14,7 +14,7 @@ import { configureDiagnostics, flushDiagnostics, disposeDiagnostics } from "../.
 import { SessionManager, type StopResult, type DesktopSessionInventoryFact } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { appendRoleLog } from "../../src/common/编排/role-log.ts";
-import { createCustomerInputChannel, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
+import { createCustomerInputChannel, type ChiefDecisionHost, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import { createDirectiveInputController, type DirectiveConfirmRequestPayload } from "../../app/desktop/directive-input.ts";
 import { mainT } from "../../app/desktop/i18n.ts";
 import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
@@ -25,7 +25,7 @@ import { inspectGitHostCoordinator, beginGitHostAction, endGitHostAction, record
 import { inspectRuntimeCoreRegistry } from "../../src/service/runtime/session.ts";
 import { createRuntimeAdapterFactory, openRoleSession, prepareChiefDecisionEvidence, readRoleCapabilityProtectionScope } from "../../src/pipeline/orchestration/run-role.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
-import type { RuntimeInputProvenanceV1, ChiefPendingDecisionRequest, RuntimeProviderOptions, ToolResult, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeSessionLifecycleFacts } from "../../src/model/runtime.ts";
+import type { RuntimeInputProvenanceV1, CustomerInputRequest, ChiefPendingDecisionRequest, RuntimeProviderOptions, ToolResult, RuntimeNativeToolSurfaceFacts, RuntimeNativeLifecycleFacts, RuntimeSessionLifecycleFacts } from "../../src/model/runtime.ts";
 // W4（P1.4 §3.2 C8/§3.7）：桌面 run-stop 终止判定与运行时中立 drain 谓词（只读消费运行时核心单一来源）。
 import { isRuntimeSessionDrained } from "../../src/model/runtime.ts";
 import { buildGovernedTools, createDemoRuntimeAdapter } from "../../src/provider/runtime/tools.ts";
@@ -284,13 +284,11 @@ async function realWaitingChiefLoop(dispositions: readonly ("select" | "reject" 
   let mainStarted!: () => void, releaseMain!: () => void;
   const mainEntered = new Promise<void>(resolve => { mainStarted = resolve; });
   const workerReturned = new Promise<void>(resolve => { releaseMain = resolve; });
-  let cardShown!: () => void;
-  const materialWait = new Promise<void>(resolve => { cardShown = resolve; });
   const materialErrors: string[] = [];
   const writeResults: ToolResult[] = [];
   const workerResults: ToolResult[] = [], chiefResults: ToolResult[] = [], actualRequests: ChiefPendingDecisionRequest[] = [];
   const channel = createCustomerInputChannel({ operatorId: "human", delegation,
-    presenter: payload => { shown.push(payload); cardShown(); }, emitJudgeResult: payload => results.push(payload),
+    presenter: payload => { shown.push(payload); }, emitJudgeResult: payload => results.push(payload),
     directive: {
       decisionFacts(projectRoot) { presetCalls++; return directiveController.decisionFacts(projectRoot); },
       async applyDecisionDirective(projectRoot, card, hooks) { presetCalls++; return directiveController.applyDecisionDirective(projectRoot, card, hooks); },
@@ -382,20 +380,16 @@ async function realWaitingChiefLoop(dispositions: readonly ("select" | "reject" 
     await mainEntered;
     const worker = manager.send("提交真实业务决定卡并等待结果", undefined, { projectRoot: root, roleId: originRoleId, runtime: "demo" });
     launched.push(worker);
-    if (missingEvidence) {
-      await Promise.race([materialWait, new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Missing material did not produce a visible wait state")), 2500);
-      })]);
-      if (timer !== undefined) clearTimeout(timer);
-      assert.equal(shown[0]!.judgeNotice, mainT("main.customerInput.chief.contextUnavailable"));
-      assert.equal(channel.respond({ id: shown[0]!.id, decision: { kind: "choice", selected: ["alternate"] } }).ok, false,
-        "On mode has exactly one chief executor even when material preparation fails");
-      delegation.set({ enabled: false });
-      assert.equal(channel.respond({ id: shown[0]!.id, decision: { kind: "choice", selected: ["alternate"] } }).ok, true);
-    }
+    // 2026-11-09 缺陷修复 B（fail-closed 呈现）：missingEvidence 时 materials 失败不得呈现卡；回合必须
+    // 自行继续（若阻塞，下方 `Promise.all([main, worker])` 的 2.5s 竞速会失败）。呈现/回执/账本断言在
+    // 测试体内按返回事实逐条检查（`shown`/`workerResults`/`audit`）。
     await Promise.race([Promise.all([main, worker]), new Promise<never>((_, reject) => {
       timer = setTimeout(() => reject(new Error(`Real chief loop did not settle: shown=${JSON.stringify(shown)} requests=${actualRequests.length} worker=${JSON.stringify(workerResults)} writes=${JSON.stringify(writeResults)} materials=${JSON.stringify(materialErrors)}`)), 2500);
     })]);
+    if (missingEvidence) {
+      assert.equal(shown.length, 0, "materials 失败不得在结算后呈现卡");
+      assert.equal(channel.pendingCount(), 0, "materials 失败结算后不得残留 pending/queued 请求");
+    }
     const audit = await readTaskState(root);
     const directiveState = await directiveController.list();
     assert.ok(directiveState.ok);
@@ -457,19 +451,172 @@ test("W1b 真实无退修选项：chief退修释放原request_choice→有权原
 });
 
 
-test("W1b 真实缺材料：不构造chief/ref/批准，明确等待且on禁人工，主动关闭后原请求可接管", async (t) => {
+test("W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托", async (t) => {
   if (await isolateUnknownCoreCase(t.name, "W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED " + t.name)) return;
   const result = await realWaitingChiefLoop(["select"], true);
   assert.equal(result.independentCalls, 0); assert.equal(result.actualRequests.length, 0);
   assert.equal(result.results.length, 0); assert.equal(result.presetCalls, 0);
   assert.equal(result.materialErrors.length, 1);
   assert.match(result.materialErrors[0]!, /actual target artifact paths/);
-  assert.equal(result.workerResults[0]?.ok, true);
-  assert.match(result.workerResults[0]?.message ?? "", /客户已选择/);
+  // B1（fail-closed 呈现）：presenter 从未被调用、无卡面；helper 已在回合结算后断言 shown/pending 清零。
+  assert.equal(result.shown.length, 0, "materials 失败不得呈现可重试/可提交卡");
+  // B1/B5（回执如实）：既有 cardNotPresented 语义，含真实原因；不得冒充「客户拒绝/未获客户同意」。
+  assert.equal(result.workerResults[0]?.ok, false, "未呈现卡必须如实回执失败");
+  const receipt = result.workerResults[0]?.message ?? "";
+  assert.match(receipt, /治理确认卡未发出/);
+  assert.match(receipt, /未向客户呈现/);
+  assert.match(receipt, /actual target artifact paths/);
+  assert.match(receipt, /请补齐后重新调用/);
+  assert.match(receipt, /不要写盘，也不要向客户声称其拒绝或同意/);
+  assert.doesNotMatch(receipt, /客户已选择|客户已确认|未获客户同意/);
+  // 回合不阻塞且不依赖关闭委托：helper 已在 2.5s 内等到 main+worker 双双结算；委托保持开启。
+  assert.equal(result.enabled, true, "materials fail-closed 不得自动关闭/依赖关闭替我决策");
+  // 账本（既有 lifecycle，D4(a)）：created → resolved(declined + reason)；不写 presented、无 operatorId/actionSource。
   const resolved = result.audit.events.filter(event => event.kind === "request.resolved");
-  assert.equal(resolved.length, 1); assert.equal(resolved[0]!.by, "customer");
+  assert.equal(resolved.length, 1);
+  assert.equal(resolved[0]!.choice, "declined");
+  assert.equal(resolved[0]!.by, "customer", "既有 lifecycle 约定（D4(a)，本轮不改枚举）");
+  assert.equal(resolved[0]!.operatorId, undefined, "notPresented 结算不得伪造 operatorId");
   assert.equal(resolved[0]!.actionSource, undefined);
+  assert.match(resolved[0]!.reason ?? "", /actual target artifact paths/);
+  assert.ok((resolved[0]!.reason ?? "").trim() !== "", "失败原因不得为空");
+  const created = result.audit.events.filter(event => event.kind === "request.created" && event.requestId === resolved[0]!.requestId);
+  assert.equal(created.length, 1, "request.created 仍在（既有 lifecycle），只是没有 presented");
+  const presented = result.audit.events.filter(event => event.kind === "request.presented" && event.requestId === resolved[0]!.requestId);
+  assert.equal(presented.length, 0, "不得写 request.presented");
   console.log("W52_UNKNOWN_CASE_ASSERTIONS_COMPLETED", t.name);
+});
+
+// ———————————————— 2026-11-09 缺陷修复 B：chief materials 失败 fail-closed 呈现（B1–B5） ————————————————
+// 通道/结算走真实 `createCustomerInputChannel`；chief 宿主为确定性测试桩（prepare/execute 行为由用例给定）。
+// B1/B5 的工具回执（cardNotPresented）另由上方真实 SessionManager 用例端到端覆盖。
+
+const chiefBCtx = (host: ChiefDecisionHost) => ({
+  roleId: "rapporteur", projectRoot: "/chief-b", runtime: "demo" as const, governanceModel: "trio" as const, chiefDecision: host,
+});
+function chiefBRequest(): CustomerInputRequest {
+  return { kind: "choice", title: "确认方案：B", cardKind: "proposal", flowId: "focus", sourceRoleId: "rapporteur",
+    options: [{ id: "accept", label: "通过" }, { id: "reject", label: "拒绝" }] };
+}
+function chiefBHarness(host: ChiefDecisionHost, enabled = true) {
+  const pushed: OperatorRequestPayload[] = [];
+  const results: OperatorJudgeResultPayload[] = [];
+  const delegation = createDecisionDelegationSwitch(enabled);
+  let n = 0;
+  const channel = createCustomerInputChannel({
+    delegation, presenter: payload => pushed.push(payload), operatorId: "tester",
+    nextId: () => `chief-b-op-${++n}`, emitJudgeResult: payload => results.push(payload),
+  });
+  return { channel, pushed, results, delegation };
+}
+
+test("B1 materials失败fail-closed：不呈现卡、declined+notPresented+真实原因、pending清零且旧id不可重试", async () => {
+  const diagDir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chief-b1-diag-"));
+  configureDiagnostics({ directory: diagDir });
+  try {
+    const host: ChiefDecisionHost = {
+      prepare: async () => { throw new Error("Draft request target is not bound to that run"); },
+      execute: async () => { throw new Error("materials 失败后不得进入 execution"); },
+    };
+    const h = chiefBHarness(host);
+    const out = await h.channel.customerInput(chiefBRequest(), chiefBCtx(host));
+    assert.equal(out?.outcome, "declined");
+    if (out?.outcome !== "declined") return;
+    assert.equal(out.notPresented, true, "既有 notPresented 契约：卡未向客户呈现");
+    assert.equal(out.operatorId, undefined, "不得伪造 operatorId（D4(a)）");
+    assert.equal(out.actionSource, undefined, "不得伪造 chief 裁决来源");
+    assert.match(out.reason ?? "", /Draft request target is not bound to that run/);
+    assert.match(out.reason ?? "", /本次未作批准/, "保留既有可操作指引");
+    assert.doesNotMatch(out.reason ?? "", /通道未受理/, "不得以 renderer 回退文案作为原因");
+    assert.equal(h.pushed.length, 0, "presenter 不得被调用");
+    assert.equal(h.channel.pendingCount(), 0, "不得残留 pending/queued 请求");
+    assert.equal(h.results.length, 0, "materials 失败不产生 judge 审计");
+    const retry = h.channel.respond({ id: "chief-b-op-1", decision: { kind: "choice", selected: ["accept"] } });
+    assert.equal(retry.ok, false);
+    assert.equal(retry.expired, true, "结算后同一 id 只余既有「无挂起请求」终态，不存在可重试循环");
+    // AC-13：诊断 chief-decision.failed 保留（requestId、stage、原始 error）。
+    await flushDiagnostics();
+    const files = await fs.readdir(diagDir);
+    const records = (await Promise.all(files.map(file => fs.readFile(path.join(diagDir, file), "utf8")))).join("")
+      .trim().split("\n").filter(line => line !== "").map(line => JSON.parse(line) as Record<string, unknown>);
+    const failure = records.find(record => record.event === "chief-decision.failed");
+    assert.ok(failure, "诊断 chief-decision.failed 必须保留");
+    assert.equal(failure.requestId, "chief-b-op-1");
+    assert.equal(failure.phase, "materials");
+    assert.match(String(failure.errorMessage ?? ""), /Draft request target is not bound to that run/);
+  } finally {
+    await disposeDiagnostics();
+    await fs.rm(diagDir, { recursive: true, force: true });
+  }
+});
+
+test("B2 materials失败竞争：prepare在途关闭委托⇒恰一次呈现，迟到失败不双结算，客户可接管", async () => {
+  let entered!: () => void;
+  const preparing = new Promise<void>(resolve => { entered = resolve; });
+  let rejectPrepare!: (error: Error) => void;
+  const gate = new Promise<never>((_, reject) => { rejectPrepare = reject; });
+  const host: ChiefDecisionHost = {
+    prepare: async () => { entered(); return gate; },
+    execute: async () => { throw new Error("materials 失败后不得进入 execution"); },
+  };
+  const h = chiefBHarness(host);
+  const pending = h.channel.customerInput(chiefBRequest(), chiefBCtx(host));
+  await preparing;
+  assert.equal(h.pushed.length, 0, "prepare 未完成前不呈现");
+  h.delegation.set({ enabled: false });
+  assert.equal(h.pushed.length, 1, "委托关闭 ⇒ 既有 chiefWaiting(modeChanged) 恰呈现一次");
+  assert.equal(h.pushed[0]!.judgeNotice, mainT("main.customerInput.chief.modeChanged"));
+  rejectPrepare(new Error("late materials failure"));
+  await tick(); await tick();
+  assert.equal(h.pushed.length, 1, "迟到失败不得再呈现/结算");
+  assert.equal(h.channel.pendingCount(), 1, "卡由客户接管，恰一次结算");
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  const out = await pending;
+  assert.equal(out?.outcome, "answered", "迟到 materials 失败不得覆盖客户接管结算");
+});
+
+test("B3/B4 execution无有效决定⇒既有chiefWaiting回退不变；respond闸manualTakeoverRequired且关闭后可结算", async () => {
+  const basis = { baseDigest: "a".repeat(64),
+    evidenceRefs: [{ snapshotId: "chief-b-snap", path: "docs/evidence.md", sha256: "b".repeat(64) }],
+    context: "# evidence", isCurrent: async () => true };
+  const host: ChiefDecisionHost = { prepare: async () => basis, execute: async () => { /* 未提交有效决定 */ } };
+  const h = chiefBHarness(host);
+  const pending = h.channel.customerInput(chiefBRequest(), chiefBCtx(host));
+  for (let i = 0; i < 100 && h.pushed.length === 0; i++) await tick();
+  assert.equal(h.pushed.length, 1, "execution 阶段无有效决定 ⇒ 既有回退卡呈现");
+  assert.equal(h.pushed[0]!.judgeNotice, mainT("main.customerInput.chief.noValidDecision"));
+  assert.equal(h.channel.pendingCount(), 1);
+  const blocked = h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["accept"] } });
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.error, mainT("main.customerInput.chief.manualTakeoverRequired"));
+  assert.ok((blocked.error ?? "").trim() !== "", "respond 闸文案非空且如实");
+  h.delegation.set({ enabled: false });
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["accept"] } }).ok, true);
+  const out = await pending;
+  assert.equal(out?.outcome, "answered");
+  assert.deepEqual(out?.outcome === "answered" ? out.value.selected : undefined, ["accept"]);
+});
+
+test("B5 materials失败原因非空且如实：保留prepare错误原文，空错误也不得退化为回退文案", async () => {
+  const distinctive: ChiefDecisionHost = {
+    prepare: async () => { throw new Error("Target evidence is unreadable: docs/proposals/focus-proposal-v1.md"); },
+    execute: async () => { throw new Error("must not execute"); },
+  };
+  const first = chiefBHarness(distinctive);
+  const out = await first.channel.customerInput(chiefBRequest(), chiefBCtx(distinctive));
+  assert.equal(out?.outcome, "declined");
+  const reason = out?.outcome === "declined" ? out.reason ?? "" : "";
+  assert.ok(reason.trim() !== "", "失败原因不得为空");
+  assert.match(reason, /Target evidence is unreadable: docs\/proposals\/focus-proposal-v1\.md/);
+  assert.doesNotMatch(reason, /通道未受理/, "不得以 renderer 回退文案代替真实原因");
+  const emptyError: ChiefDecisionHost = {
+    prepare: async () => { throw new Error(""); },
+    execute: async () => { throw new Error("must not execute"); },
+  };
+  const second = chiefBHarness(emptyError);
+  const out2 = await second.channel.customerInput(chiefBRequest(), chiefBCtx(emptyError));
+  const reason2 = out2?.outcome === "declined" ? out2.reason ?? "" : "";
+  assert.equal(reason2, mainT("main.customerInput.chief.contextUnavailable"), "无错误原文时回落到既有可操作指引，仍非空");
 });
 
 

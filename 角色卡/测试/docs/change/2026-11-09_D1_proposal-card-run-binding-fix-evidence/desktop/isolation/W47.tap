@@ -1,0 +1,26 @@
+TAP version 13
+# Subtest: W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+ok 1 - W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+  ---
+  duration_ms: 285.1843
+  type: 'test'
+  ...
+# Subtest: W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+not ok 2 - W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+  ---
+  duration_ms: 225.4627
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2146:3'
+  failureType: 'testCodeFailure'
+  error: "ENOTEMPTY: directory not empty, rmdir 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-w47-default-chief-uc0tOT\\.ans\\sessions\\chief\\codex\\ans'"
+  code: 'ENOTEMPTY'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 926.1051

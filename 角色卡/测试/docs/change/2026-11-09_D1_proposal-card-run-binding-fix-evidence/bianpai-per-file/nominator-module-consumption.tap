@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: X-R3 run-role：trio nominator 注入模块声明的 activateRoleDocuments（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+ok 1 - X-R3 run-role：trio nominator 注入模块声明的 activateRoleDocuments（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+  ---
+  duration_ms: 21.5999
+  type: 'test'
+  ...
+# Subtest: X-R3 卡种/工具切换点（源码锚点）：TRIO_CARD_KINDS.nominator 已删除；activateRoleDocuments 读模块声明并保留旧回退
+ok 2 - X-R3 卡种/工具切换点（源码锚点）：TRIO_CARD_KINDS.nominator 已删除；activateRoleDocuments 读模块声明并保留旧回退
+  ---
+  duration_ms: 1.72
+  type: 'test'
+  ...
+# Subtest: X-R3 D3 卡事实包：严格 api-spec 登记键；模块 allow；旧 validateAppointmentCardAgainstRoster 差分逐例一致
+ok 3 - X-R3 D3 卡事实包：严格 api-spec 登记键；模块 allow；旧 validateAppointmentCardAgainstRoster 差分逐例一致
+  ---
+  duration_ms: 6.7691
+  type: 'test'
+  ...
+# Subtest: X-R3 role-documents 事实包：严格 api-spec 登记键；模块 allow；事实不可得 ⇒ undefined（跳过而非误拒）
+ok 4 - X-R3 role-documents 事实包：严格 api-spec 登记键；模块 allow；事实不可得 ⇒ undefined（跳过而非误拒）
+  ---
+  duration_ms: 7.8817
+  type: 'test'
+  ...
+# Subtest: X-R3 切换点顺序与 Service 最终校验保留（源码锚点）
+ok 5 - X-R3 切换点顺序与 Service 最终校验保留（源码锚点）
+  ---
+  duration_ms: 2.6863
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 325.945

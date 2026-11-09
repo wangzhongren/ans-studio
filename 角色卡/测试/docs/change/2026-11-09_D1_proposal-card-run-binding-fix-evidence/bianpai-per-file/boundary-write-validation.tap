@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: 非法 boundary.yaml 顶层键（version/roleId/root）⇒ 拒绝写入且零文件
+ok 1 - 非法 boundary.yaml 顶层键（version/roleId/root）⇒ 拒绝写入且零文件
+  ---
+  duration_ms: 6.6712
+  type: 'test'
+  ...
+# Subtest: 合法 boundary.yaml 模板通过并落盘
+ok 2 - 合法 boundary.yaml 模板通过并落盘
+  ---
+  duration_ms: 10.3656
+  type: 'test'
+  ...
+# Subtest: 绝对路径指向 boundary.yaml 同样校验；role-card.md 与其他路径不校验内容
+ok 3 - 绝对路径指向 boundary.yaml 同样校验；role-card.md 与其他路径不校验内容
+  ---
+  duration_ms: 11.1922
+  type: 'test'
+  ...
+# Subtest: edit_file 把合法 boundary.yaml 改坏 ⇒ 拒绝且文件保持不变
+ok 4 - edit_file 把合法 boundary.yaml 改坏 ⇒ 拒绝且文件保持不变
+  ---
+  duration_ms: 8.1884
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 248.722

@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: request_requirement_change：rapporteur 提供能力 ⇒ 同一引用透传、工具注册；载荷原样路由并如实转达回执
+ok 1 - request_requirement_change：rapporteur 提供能力 ⇒ 同一引用透传、工具注册；载荷原样路由并如实转达回执
+  ---
+  duration_ms: 20.675
+  type: 'test'
+  ...
+# Subtest: request_requirement_change：convener（运营）同样注入同一引用并注册工具（2026-10-26 客户补充）
+ok 2 - request_requirement_change：convener（运营）同样注入同一引用并注册工具（2026-10-26 客户补充）
+  ---
+  duration_ms: 10.8308
+  type: 'test'
+  ...
+# Subtest: request_requirement_change：rapporteur 未提供 ⇒ provider options 缺席、工具不注册
+ok 3 - request_requirement_change：rapporteur 未提供 ⇒ provider options 缺席、工具不注册
+  ---
+  duration_ms: 8.6197
+  type: 'test'
+  ...
+# Subtest: request_requirement_change：项目角色与其它内置治理角色即便误给也不注入（只给报告员/运营）
+ok 4 - request_requirement_change：项目角色与其它内置治理角色即便误给也不注入（只给报告员/运营）
+  ---
+  duration_ms: 66.1067
+  type: 'test'
+  ...
+# Subtest: request_requirement_change：不改变既有能力矩阵；已撤除能力不入镜
+ok 5 - request_requirement_change：不改变既有能力矩阵；已撤除能力不入镜
+  ---
+  duration_ms: 8.0573
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 415.5859

@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: advisory：allow 直接放行、0 次 operator、branch c-allow
+ok 1 - advisory：allow 直接放行、0 次 operator、branch c-allow
+  ---
+  duration_ms: 2.6039
+  type: 'test'
+  ...
+# Subtest: advisory：deny → (a) allow（branch c-deny→a-allow；规则原因进 prompt）
+ok 2 - advisory：deny → (a) allow（branch c-deny→a-allow；规则原因进 prompt）
+  ---
+  duration_ms: 0.3124
+  type: 'test'
+  ...
+# Subtest: advisory：deny → (a) deny（branch c-deny→a-deny）
+ok 3 - advisory：deny → (a) deny（branch c-deny→a-deny）
+  ---
+  duration_ms: 0.1896
+  type: 'test'
+  ...
+# Subtest: advisory：risky/review 跳过 (b) 直接交 (a)
+ok 4 - advisory：risky/review 跳过 (b) 直接交 (a)
+  ---
+  duration_ms: 0.282
+  type: 'test'
+  ...
+# Subtest: advisory=false 旧路径：c-deny 终结硬拒、operator 0 次（回归）
+ok 5 - advisory=false 旧路径：c-deny 终结硬拒、operator 0 次（回归）
+  ---
+  duration_ms: 0.2047
+  type: 'test'
+  ...
+# Subtest: advisory 构造守卫：与 readonly/operatorOnly 互斥；必须有 operatorChannel
+ok 6 - advisory 构造守卫：与 readonly/operatorOnly 互斥；必须有 operatorChannel
+  ---
+  duration_ms: 0.2796
+  type: 'test'
+  ...
+# Subtest: assembleProjectShellGate 项目角色默认 advisory：risky 跳过 (b) 直接交 (a)
+ok 7 - assembleProjectShellGate 项目角色默认 advisory：risky 跳过 (b) 直接交 (a)
+  ---
+  duration_ms: 10.9498
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 311.9191

@@ -1,0 +1,48 @@
+TAP version 13
+# W52 init actual Core registry [{"sessionId":"5b25fb20-c55d-435e-bb0c-757b0bf3b66a","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"5d6fda85-25a6-43b2-ab10-b29ec67c799c","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+ok 1 - W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 6846.4524
+  type: 'test'
+  ...
+# W52 init actual Core registry [{"sessionId":"5b25fb20-c55d-435e-bb0c-757b0bf3b66a","roleId":"chief","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"5d6fda85-25a6-43b2-ab10-b29ec67c799c","roleId":"convener","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"43b504a7-2143-4093-ba2b-47c296ac92df","roleId":"product","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"2dd7fe6e-a65e-4752-8e80-71b360a2778c","roleId":"rapporteur","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"407eb122-d3ec-4708-adc8-4bd0ecd99b22","roleId":"convener","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"e9a6e59c-4c79-46e0-9de6-670b45c269a7","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"383240de-27a6-4c8e-83ea-323a71d0eac6","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+ok 2 - W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 6324.5191
+  type: 'test'
+  ...
+# W52 init actual Core registry [{"sessionId":"5b25fb20-c55d-435e-bb0c-757b0bf3b66a","roleId":"chief","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"5d6fda85-25a6-43b2-ab10-b29ec67c799c","roleId":"convener","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"43b504a7-2143-4093-ba2b-47c296ac92df","roleId":"product","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"2dd7fe6e-a65e-4752-8e80-71b360a2778c","roleId":"rapporteur","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"407eb122-d3ec-4708-adc8-4bd0ecd99b22","roleId":"convener","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"e9a6e59c-4c79-46e0-9de6-670b45c269a7","roleId":"chief","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"383240de-27a6-4c8e-83ea-323a71d0eac6","roleId":"convener","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"90a81657-7cc5-48d9-9b23-a7495fddb097","roleId":"product","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"6e386be4-1be8-42ac-90b7-ba3188abbefc","roleId":"rapporteur","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"a72031cc-00f5-400c-bc54-43b6f0ef2af7","roleId":"convener","state":"disposed","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"08cbe8eb-657a-4d92-bd9d-0d9417d89f6f","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"3351d8c6-c2e0-4d28-9eea-b36f5728bfe2","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+#   \#  C:\\Users\\51054\\AppData\\Local\\Programs\\nodejs\\node.exe[9756]: void __cdecl node::CleanupQueue::Add(Callback, void *) at src\\cleanup_queue-inl.h:24
+#   \#  Assertion failed: (insertion_info.second) == (true)
+# ----- Native stack trace -----
+#  1: 00007FF7B1006536 node::SetAbortHandler+54
+#  2: 00007FF7B10060E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+#  3: 00007FF7B111D5C3 node::SetCppgcReference+356435
+#  4: 00000236C5E4F77E 
+# ----- JavaScript stack trace -----
+# 1: destroyTracking (node:internal/async_hooks:344:3)
+# 2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+# 3: checkDirectoryChain (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/provider/runtime/session-store.ts:45:44)
+# Subtest: test\\桌面应用\\chief-workflow.test.ts
+not ok 1 - test\\桌面应用\\chief-workflow.test.ts
+  ---
+  duration_ms: 15719.0924
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 134
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 2
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15723.6452

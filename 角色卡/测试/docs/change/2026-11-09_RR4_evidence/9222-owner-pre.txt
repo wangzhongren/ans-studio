@@ -1,0 +1,11 @@
+
+
+ProcessId       : 26264
+ParentProcessId : 9764
+Name            : electron.exe
+CommandLine     : C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment\node_modules\electron\dist\e
+                  lectron.exe C:/Users/51054/Desktop/work/ans-game2d-snake-run-2026-11-09/rr/launcher.mjs --remote-debu
+                  gging-port=9222
+
+
+

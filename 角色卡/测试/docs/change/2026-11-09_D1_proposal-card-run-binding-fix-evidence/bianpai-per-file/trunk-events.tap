@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: C2a：六类新事件合法行可读；归属/生命周期字段保留；TaskRecord 语义不变
+ok 1 - C2a：六类新事件合法行可读；归属/生命周期字段保留；TaskRecord 语义不变
+  ---
+  duration_ms: 8.5325
+  type: 'test'
+  ...
+# Subtest: C2a：STABLE_WRITE_EVENT_KINDS 五个 kind 全部入白名单（归属分区互斥）
+ok 2 - C2a：STABLE_WRITE_EVENT_KINDS 五个 kind 全部入白名单（归属分区互斥）
+  ---
+  duration_ms: 6.8521
+  type: 'test'
+  ...
+# Subtest: C2a：逐 kind 负例——op/归属/状态/分区/必填字段非法成坏行，合法行仍可读
+ok 3 - C2a：逐 kind 负例——op/归属/状态/分区/必填字段非法成坏行，合法行仍可读
+  ---
+  duration_ms: 7.4728
+  type: 'test'
+  ...
+# Subtest: F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段——缺失可读、给出则校验 ISO
+ok 4 - F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段——缺失可读、给出则校验 ISO
+  ---
+  duration_ms: 2.3965
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 184.0852

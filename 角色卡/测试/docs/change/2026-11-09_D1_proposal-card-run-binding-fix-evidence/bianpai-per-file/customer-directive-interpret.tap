@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: 自然语言审批：解释成功 ⇒ 面板预填 AI 解释、cwd 恒为项目根；确认前绝不落账；确认后 durable 落账
+ok 1 - 自然语言审批：解释成功 ⇒ 面板预填 AI 解释、cwd 恒为项目根；确认前绝不落账；确认后 durable 落账
+  ---
+  duration_ms: 21.0991
+  type: 'test'
+  ...
+# Subtest: 结构化写法：确定性解析 confirmable ⇒ 沿用，解释器不被调用（向后兼容）
+ok 2 - 结构化写法：确定性解析 confirmable ⇒ 沿用，解释器不被调用（向后兼容）
+  ---
+  duration_ms: 2.6064
+  type: 'test'
+  ...
+# Subtest: 解释失败/抛错/低置信/非法候选 ⇒ 回退现有行为（原文 + 未识别片段、确认禁用），不落账
+ok 3 - 解释失败/抛错/低置信/非法候选 ⇒ 回退现有行为（原文 + 未识别片段、确认禁用），不落账
+  ---
+  duration_ms: 2.044
+  type: 'test'
+  ...
+# Subtest: 决策自然语言：以后都选推荐项 ⇒ 预填 select-recommended，确认后落账
+ok 4 - 决策自然语言：以后都选推荐项 ⇒ 预填 select-recommended，确认后落账
+  ---
+  duration_ms: 12.2371
+  type: 'test'
+  ...
+# Subtest: AI 预填 forever + flow 范围 ⇒ 高危原因复算；未勾选确认 ⇒ high-risk-unacknowledged（不落账）
+ok 5 - AI 预填 forever + flow 范围 ⇒ 高危原因复算；未勾选确认 ⇒ high-risk-unacknowledged（不落账）
+  ---
+  duration_ms: 6.6632
+  type: 'test'
+  ...
+# Subtest: 撤销正文（撤销 \#d-1 / 撤销）永不交解释器；B1 直调仍按现有面板原文 fail-closed
+ok 6 - 撤销正文（撤销 \#d-1 / 撤销）永不交解释器；B1 直调仍按现有面板原文 fail-closed
+  ---
+  duration_ms: 1.0547
+  type: 'test'
+  ...
+# Subtest: 未注入解释器：自然语言仍走现有面板（原文 + 未识别片段、确认禁用）
+ok 7 - 未注入解释器：自然语言仍走现有面板（原文 + 未识别片段、确认禁用）
+  ---
+  duration_ms: 0.5556
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 172.2672

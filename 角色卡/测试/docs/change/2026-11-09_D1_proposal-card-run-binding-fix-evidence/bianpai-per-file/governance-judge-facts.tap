@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: acceptance 缺 proposal（报告已给）⇒ missingPaths 恰为 docs/proposals/focus-proposal-v1.md
+ok 1 - acceptance 缺 proposal（报告已给）⇒ missingPaths 恰为 docs/proposals/focus-proposal-v1.md
+  ---
+  duration_ms: 0.8709
+  type: 'test'
+  ...
+# Subtest: proposal 卡缺 proposal ⇒ missingPaths 恰为 docs/proposals/focus-proposal-v1.md
+ok 2 - proposal 卡缺 proposal ⇒ missingPaths 恰为 docs/proposals/focus-proposal-v1.md
+  ---
+  duration_ms: 0.0886
+  type: 'test'
+  ...
+# Subtest: flowId 缺失 ⇒ 缺失文案为「提案」/「质检报告」，不编造路径
+ok 3 - flowId 缺失 ⇒ 缺失文案为「提案」/「质检报告」，不编造路径
+  ---
+  duration_ms: 0.0933
+  type: 'test'
+  ...
+# Subtest: expectedQualityReport 回归：仍为 docs/quality/<flowId>-report-v1.md
+ok 4 - expectedQualityReport 回归：仍为 docs/quality/<flowId>-report-v1.md
+  ---
+  duration_ms: 0.2515
+  type: 'test'
+  ...
+# Subtest: 不扫盘/不做版本选择：显式给出但磁盘不存在的路径视为已给（missing=false）
+ok 5 - 不扫盘/不做版本选择：显式给出但磁盘不存在的路径视为已给（missing=false）
+  ---
+  duration_ms: 0.1121
+  type: 'test'
+  ...
+# Subtest: 任何结果都不含旧错误约定 docs/proposals/focus-v1.md
+ok 6 - 任何结果都不含旧错误约定 docs/proposals/focus-v1.md
+  ---
+  duration_ms: 0.2268
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 104.6062

@@ -1,0 +1,85 @@
+TAP version 13
+# Subtest: I-1：项目角色给 (a) 通道 ⇒ 装配并注入 ShellGate（注入即注册）；不给 ⇒ 无；su 给了也不 arm
+ok 1 - I-1：项目角色给 (a) 通道 ⇒ 装配并注入 ShellGate（注入即注册）；不给 ⇒ 无；su 给了也不 arm
+  ---
+  duration_ms: 32.8518
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# Subtest: I-1（c）：硬拒（re-shell）→ 不执行、不打扰 (b)/(a)；白名单 → 直接放行
+ok 2 - I-1（c）：硬拒（re-shell）→ 不执行、不打扰 (b)/(a)；白名单 → 直接放行
+  ---
+  duration_ms: 9.8593
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# Subtest: I-1（b/a）：review + (b) allow → 可达执行且不经 (a)；risky + (b) allow → 必过 (a)；a 拒 → 不执行
+ok 3 - I-1（b/a）：review + (b) allow → 可达执行且不经 (a)；risky + (b) allow → 必过 (a)；a 拒 → 不执行
+  ---
+  duration_ms: 9.0714
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# Subtest: I-1（b 不可解析 → **直接拒绝**（M-2，不进 (a)）；b 拿不准 → 升 (a)；(a) 不可用/超时 → 不执行（关窗等价，fail-closed）
+ok 4 - I-1（b 不可解析 → **直接拒绝**（M-2，不进 (a)）；b 拿不准 → 升 (a)；(a) 不可用/超时 → 不执行（关窗等价，fail-closed）
+  ---
+  duration_ms: 49.5758
+  type: 'test'
+  ...
+# Subtest: I-1：留痕——审计 sink 收到每条请求（command/判定/branch/by）；事件流含 run_shell 的 tool_call 与 denied
+ok 5 - I-1：留痕——审计 sink 收到每条请求（command/判定/branch/by）；事件流含 run_shell 的 tool_call 与 denied
+  ---
+  duration_ms: 13.5276
+  type: 'test'
+  ...
+# Subtest: R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只读/测试类命令（review）放行、不打扰客户；审读会话不持久化
+ok 6 - R-1 端到端：夹具模型经 shellVerdict 交回结构化结论 → 只读/测试类命令（review）放行、不打扰客户；审读会话不持久化
+  ---
+  duration_ms: 7.5816
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。；已刷新边界快照重试一次，仍被拒：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。
+# shell 闸审计已恢复落盘（此前未落盘 1 条）
+# shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。
+# Subtest: F-6-T6 事故回归 E2E：创世过渡窗口内的未接受快照，在收尾落盘后自愈（审计刷新重试）
+ok 7 - F-6-T6 事故回归 E2E：创世过渡窗口内的未接受快照，在收尾落盘后自愈（审计刷新重试）
+  ---
+  duration_ms: 22.6329
+  type: 'test'
+  ...
+# Subtest: F-6-T6b（对照组·旧行为）：不注入刷新闭包时，收尾落盘后第二条仍不落盘
+ok 8 - F-6-T6b（对照组·旧行为）：不注入刷新闭包时，收尾落盘后第二条仍不落盘
+  ---
+  duration_ms: 2.8888
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。；已刷新边界快照重试一次，仍被拒：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。
+# shell 闸审计已恢复落盘（此前未落盘 1 条）
+# Subtest: F-6-T7（su 只读档同接线）：未接受快照在收尾落盘后同样自愈
+ok 9 - F-6-T7（su 只读档同接线）：未接受快照在收尾落盘后同样自愈
+  ---
+  duration_ms: 18.9596
+  type: 'test'
+  ...
+# Subtest: 升级注入点透传：assembleProjectShellGate/OperatorShellGate 把 onReviewed/onAuditSinkCreated 接到闸（共享 sink）
+ok 10 - 升级注入点透传：assembleProjectShellGate/OperatorShellGate 把 onReviewed/onAuditSinkCreated 接到闸（共享 sink）
+  ---
+  duration_ms: 4.4592
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 461.5278

@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: 卡片路径（客户批准）：presenter 判断上下文完整；审计 requested→decided→started→completed；B1 生成 downloadId
+ok 1 - 卡片路径（客户批准）：presenter 判断上下文完整；审计 requested→decided→started→completed；B1 生成 downloadId
+  ---
+  duration_ms: 5.4447
+  type: 'test'
+  ...
+# Subtest: 预授权 allow：不调 presenter、无 requestId、by:directive；deny：拒绝；once 消费失败回落审批
+ok 2 - 预授权 allow：不调 presenter、无 requestId、by:directive；deny：拒绝；once 消费失败回落审批
+  ---
+  duration_ms: 1.401
+  type: 'test'
+  ...
+# Subtest: epoch 不可读 ⇒ 不查预授权、直接客户卡；归属键真实/合成规则（F10）
+ok 3 - epoch 不可读 ⇒ 不查预授权、直接客户卡；归属键真实/合成规则（F10）
+  ---
+  duration_ms: 0.866
+  type: 'test'
+  ...
+# Subtest: 事实与钉扎：>8 个解析结果截断展示、校验/钉扎用全部；混合私网 ⇒ unsafe；DNS 失败
+ok 4 - 事实与钉扎：>8 个解析结果截断展示、校验/钉扎用全部；混合私网 ⇒ unsafe；DNS 失败
+  ---
+  duration_ms: 0.5784
+  type: 'test'
+  ...
+# Subtest: presenter 失败/缺 requestId/拒绝 ⇒ 稳定 code；拒绝写 decided+failed
+ok 5 - presenter 失败/缺 requestId/拒绝 ⇒ 稳定 code；拒绝写 decided+failed
+  ---
+  duration_ms: 0.4685
+  type: 'test'
+  ...
+# Subtest: 并发：每项目执行 ≤2，第三个 download-busy；不同项目独立
+ok 6 - 并发：每项目执行 ≤2，第三个 download-busy；不同项目独立
+  ---
+  duration_ms: 41.5832
+  type: 'test'
+  ...
+# Subtest: dispose：中止本运行时在途下载（download-aborted）
+ok 7 - dispose：中止本运行时在途下载（download-aborted）
+  ---
+  duration_ms: 31.095
+  type: 'test'
+  ...
+# Subtest: 生产工厂无测试缝（type-level）；B1 源码不写 request.*；app/** 不引用 ForTest
+ok 8 - 生产工厂无测试缝（type-level）；B1 源码不写 request.*；app/** 不引用 ForTest
+  ---
+  duration_ms: 23.8749
+  type: 'test'
+  ...
+# Subtest: run-role：requestDownload 能力位透传；未注入 ⇒ 缺席（结构 fail-closed）
+ok 9 - run-role：requestDownload 能力位透传；未注入 ⇒ 缺席（结构 fail-closed）
+  ---
+  duration_ms: 25.4052
+  type: 'test'
+  ...
+# Subtest: 错误码规则：17 个 download-* 全部登记；owner/retryable 符合方案 §3.3
+ok 10 - 错误码规则：17 个 download-* 全部登记；owner/retryable 符合方案 §3.3
+  ---
+  duration_ms: 0.3026
+  type: 'test'
+  ...
+# Subtest: 重定向策略：真实 Service 回调——同域 follow/跨域停止/降级拒绝（AC-8 B1 集成）
+ok 11 - 重定向策略：真实 Service 回调——同域 follow/跨域停止/降级拒绝（AC-8 B1 集成）
+  ---
+  duration_ms: 0.5616
+  type: 'test'
+  ...
+# Subtest: 执行时重新解析/判表：卡片前公网、执行时私网 ⇒ download-unsafe-url（不执行）
+ok 12 - 执行时重新解析/判表：卡片前公网、执行时私网 ⇒ download-unsafe-url（不执行）
+  ---
+  duration_ms: 0.1969
+  type: 'test'
+  ...
+# Subtest: 参数复核（防御）：purpose 空/超长、filename 含分隔符/控制符 ⇒ invalid-arguments；不发卡/不联网/不落账本
+ok 13 - 参数复核（防御）：purpose 空/超长、filename 含分隔符/控制符 ⇒ invalid-arguments；不发卡/不联网/不落账本
+  ---
+  duration_ms: 0.2002
+  type: 'test'
+  ...
+# Subtest: judge approve：approval 归属 judge、审计 decided.judge 保留 engine/reasonCode
+ok 14 - judge approve：approval 归属 judge、审计 decided.judge 保留 engine/reasonCode
+  ---
+  duration_ms: 0.2048
+  type: 'test'
+  ...
+# Subtest: AC-14：forever/session 预授权两次下载均命中（无卡片/无消费）；downloads.jsonl 两条/各 by directive+directiveId
+ok 15 - AC-14：forever/session 预授权两次下载均命中（无卡片/无消费）；downloads.jsonl 两条/各 by directive+directiveId
+  ---
+  duration_ms: 1.8428
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 465.9007

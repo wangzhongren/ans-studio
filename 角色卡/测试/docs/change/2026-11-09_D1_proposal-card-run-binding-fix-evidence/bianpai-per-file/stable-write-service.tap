@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: stable 文件路径映射 + F13 permit 唯一形状/四状态/TTL
+ok 1 - stable 文件路径映射 + F13 permit 唯一形状/四状态/TTL
+  ---
+  duration_ms: 0.935
+  type: 'test'
+  ...
+# Subtest: request：应用计算 base/target sha（不信任自报哈希）、路径由 kind/roleId 唯一映射、幂等
+ok 2 - request：应用计算 base/target sha（不信任自报哈希）、路径由 kind/roleId 唯一映射、幂等
+  ---
+  duration_ms: 0.7997
+  type: 'test'
+  ...
+# Subtest: approve/reject：客户确认 id 必备；一次性许可含 approvedAt/expiresAt；拒绝不写
+ok 3 - approve/reject：客户确认 id 必备；一次性许可含 approvedAt/expiresAt；拒绝不写
+  ---
+  duration_ms: 1.1872
+  type: 'test'
+  ...
+# Subtest: completeWrite → post-write 复核消费 + mini re-pin（不升 trunkVersion，绑定 decisionId；F16/AC-34）
+ok 4 - completeWrite → post-write 复核消费 + mini re-pin（不升 trunkVersion，绑定 decisionId；F16/AC-34）
+  ---
+  duration_ms: 0.5256
+  type: 'test'
+  ...
+# Subtest: 异常 fail-closed：哈希不符/过期 ⇒ failed + 许可作废（不可复用），不更新快照、无 drift（AC-35）
+ok 5 - 异常 fail-closed：哈希不符/过期 ⇒ failed + 许可作废（不可复用），不更新快照、无 drift（AC-35）
+  ---
+  duration_ms: 0.446
+  type: 'test'
+  ...
+# Subtest: fail() 异常恢复：记录/许可 failed 不可复用；已写入记录不能标失败（无 drift）
+ok 6 - fail() 异常恢复：记录/许可 failed 不可复用；已写入记录不能标失败（无 drift）
+  ---
+  duration_ms: 0.404
+  type: 'test'
+  ...
+# Subtest: F13/F16 联合契约：PermitFact 可作 StableWriteDecisionInput.permit；record 与 permit 分表；Service 无写盘入口
+ok 7 - F13/F16 联合契约：PermitFact 可作 StableWriteDecisionInput.permit；record 与 permit 分表；Service 无写盘入口
+  ---
+  duration_ms: 0.2011
+  type: 'test'
+  ...
+# Subtest: C2b/C2c 联合契约（F13/F16）：C2c 一次性许可经 C2b stableWriteDecision 判定（allowed/denied 映射）
+ok 8 - C2b/C2c 联合契约（F13/F16）：C2c 一次性许可经 C2b stableWriteDecision 判定（allowed/denied 映射）
+  ---
+  duration_ms: 4.2606
+  type: 'test'
+  ...
+# Subtest: readPermitSnapshot: real request join excludes expired/consumed/failed and mismatched permits without callbacks
+ok 9 - readPermitSnapshot: real request join excludes expired/consumed/failed and mismatched permits without callbacks
+  ---
+  duration_ms: 0.392
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 206.4613

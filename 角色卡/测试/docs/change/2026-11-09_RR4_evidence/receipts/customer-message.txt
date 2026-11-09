@@ -1,0 +1,13 @@
+请按 ANS 流程执行一个很小的验证步骤；除本条消息要求的派发外不要做别的事：不要运行 shell、不要写任何文件、不要发其它卡。
+
+步骤：用 dispatch_task 把下面【任务原文】逐字派发给策划（roleId=rapporteur，flowId=snake-game），完成后结束本轮。
+
+【任务原文】
+请先核查 docs/proposals/snake-game-proposal-v1.md，然后调用 request_choice 向客户发出提案确认卡，参数如下：
+- title: 确认「2D 贪吃蛇小游戏」实施提案（v1）
+- cardKind: proposal
+- flowId: snake-game
+- taskId: 本次任务号（即投递消息头部的 #t-…，原样填入）
+- question: 是否接受该提案？
+- options: [{"id":"accept","label":"接受"},{"id":"revise","label":"退修"}]
+不要写文件、不要运行 shell、不要调用其它工具；出卡后据实报告工具回执并结束回合。

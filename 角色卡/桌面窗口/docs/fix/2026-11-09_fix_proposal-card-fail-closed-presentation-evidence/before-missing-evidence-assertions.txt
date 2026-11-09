@@ -1,0 +1,11 @@
+    if (missingEvidence) {
+      await Promise.race([materialWait, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Missing material did not produce a visible wait state")), 2500);
+      })]);
+      if (timer !== undefined) clearTimeout(timer);
+      assert.equal(shown[0]!.judgeNotice, mainT("main.customerInput.chief.contextUnavailable"));
+      assert.equal(channel.respond({ id: shown[0]!.id, decision: { kind: "choice", selected: ["alternate"] } }).ok, false,
+        "On mode has exactly one chief executor even when material preparation fails");
+      delegation.set({ enabled: false });
+      assert.equal(channel.respond({ id: shown[0]!.id, decision: { kind: "choice", selected: ["alternate"] } }).ok, true);
+    }

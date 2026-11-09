@@ -1,0 +1,217 @@
+TAP version 13
+# Subtest: 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+not ok 1 - 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+  ---
+  duration_ms: 92.5271
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:248:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:256:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+not ok 2 - 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 72.105
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:288:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:300:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+not ok 3 - 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 97.1994
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:288:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:300:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+not ok 4 - 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 73.4983
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:288:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:300:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+not ok 5 - stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+  ---
+  duration_ms: 77.0245
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:347:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:353:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+not ok 6 - 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+  ---
+  duration_ms: 75.8225
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:396:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:400:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+not ok 7 - 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+  ---
+  duration_ms: 64.1465
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:421:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:427:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+not ok 8 - 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+  ---
+  duration_ms: 76.4596
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:450:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:456:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+not ok 9 - AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+  ---
+  duration_ms: 78.019
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:508:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:224:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:516:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 0
+# fail 9
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1090.8908

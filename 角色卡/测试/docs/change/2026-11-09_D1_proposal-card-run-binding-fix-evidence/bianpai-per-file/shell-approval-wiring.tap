@@ -1,0 +1,56 @@
+TAP version 13
+# Subtest: createShellGate：构造成功后唯一登记（inspect 可见、未登记 undefined、重复登记 fail-closed）
+ok 1 - createShellGate：构造成功后唯一登记（inspect 可见、未登记 undefined、重复登记 fail-closed）
+  ---
+  duration_ms: 1.4748
+  type: 'test'
+  ...
+# shell 闸审计未落盘：test-audit-fail
+# shell 闸审计未落盘：test-audit-fail
+# shell 闸审计未落盘：test-audit-fail
+# Subtest: file sink describe/probe：describe=file+durable；probe 纯判定不写盘；被拒 + refresh 一次重试；两次拒/刷新失败 ⇒ unavailable
+ok 2 - file sink describe/probe：describe=file+durable；probe 纯判定不写盘；被拒 + refresh 一次重试；两次拒/刷新失败 ⇒ unavailable
+  ---
+  duration_ms: 4.5719
+  type: 'test'
+  ...
+# Subtest: 测试私有 Symbol：仅非枚举挂 sink 时登记事实投影为 file+durable（测试模拟）；可枚举无效；buildShellGate/生产装配从不设置
+ok 3 - 测试私有 Symbol：仅非枚举挂 sink 时登记事实投影为 file+durable（测试模拟）；可枚举无效；buildShellGate/生产装配从不设置
+  ---
+  duration_ms: 1.1565
+  type: 'test'
+  ...
+# shell 闸审计未落盘：test-audit-fail
+# Subtest: auditFailurePolicy：observe 保持放行；deny-non-readonly 审批类 allow + 审计失败 ⇒ fail-closed；c-allow 只读不翻转
+ok 4 - auditFailurePolicy：observe 保持放行；deny-non-readonly 审批类 allow + 审计失败 ⇒ fail-closed；c-allow 只读不翻转
+  ---
+  duration_ms: 10.4543
+  type: 'test'
+  ...
+# Subtest: 只读 Git 审计：git status/log c-allow ⇒ branch:c-allow、by 前缀 ruleset:allow:readonly:git:<id>、readonlyGit.canonicalArgv 与 buildReadonlyGitBody 一致
+ok 5 - 只读 Git 审计：git status/log c-allow ⇒ branch:c-allow、by 前缀 ruleset:allow:readonly:git:<id>、readonlyGit.canonicalArgv 与 buildReadonlyGitBody 一致
+  ---
+  duration_ms: 1.4866
+  type: 'test'
+  ...
+# Subtest: writeGuard 入口透传：shell-gate 以 entry（缺省 run_shell）调用守卫，判定顺序不变
+ok 6 - writeGuard 入口透传：shell-gate 以 entry（缺省 run_shell）调用守卫，判定顺序不变
+  ---
+  duration_ms: 0.2513
+  type: 'test'
+  ...
+# Subtest: OperatorPrompt 透传：审批卡携带 entry/roleId（只拷贝、不默认；不参与判定）
+ok 7 - OperatorPrompt 透传：审批卡携带 entry/roleId（只拷贝、不默认；不参与判定）
+  ---
+  duration_ms: 0.2678
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 303.1345

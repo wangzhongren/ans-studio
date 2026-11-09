@@ -1,0 +1,78 @@
+TAP version 13
+# Subtest: deny 指令先于 c=allow：拒绝白名单命令；审计 by=directive:<id> + directive 字段
+ok 1 - deny 指令先于 c=allow：拒绝白名单命令；审计 by=directive:<id> + directive 字段
+  ---
+  duration_ms: 2.8591
+  type: 'test'
+  ...
+# Subtest: preblock / write-guard 在指令之前终结：不调用 takeDirective（不翻案硬地板）
+ok 2 - preblock / write-guard 在指令之前终结：不调用 takeDirective（不翻案硬地板）
+  ---
+  duration_ms: 0.3391
+  type: 'test'
+  ...
+# Subtest: c=deny / script 不消费 allow 指令；allow 只在 review/risky 应用
+ok 3 - c=deny / script 不消费 allow 指令；allow 只在 review/risky 应用
+  ---
+  duration_ms: 0.6019
+  type: 'test'
+  ...
+# Subtest: review/risky：既有 takeGrant 先；未命中 ⇒ 指令 allow（审计 directive，不写 judge/customerGrant）
+ok 4 - review/risky：既有 takeGrant 先；未命中 ⇒ 指令 allow（审计 directive，不写 judge/customerGrant）
+  ---
+  duration_ms: 0.4698
+  type: 'test'
+  ...
+# Subtest: once 消费语义：gate 只按回调返回放行；第二次回调返回 undefined ⇒ 回落既有路径
+ok 5 - once 消费语义：gate 只按回调返回放行；第二次回调返回 undefined ⇒ 回落既有路径
+  ---
+  duration_ms: 0.4187
+  type: 'test'
+  ...
+# Subtest: operatorOnly / advisory：指令 allow 在既有审批链之前放行（不调 operator）
+ok 6 - operatorOnly / advisory：指令 allow 在既有审批链之前放行（不调 operator）
+  ---
+  duration_ms: 0.2785
+  type: 'test'
+  ...
+# Subtest: readonlyOnly + takeDirective ⇒ 构造期抛错（只读拒绝不得被客户指令越过）
+ok 7 - readonlyOnly + takeDirective ⇒ 构造期抛错（只读拒绝不得被客户指令越过）
+  ---
+  duration_ms: 0.5751
+  type: 'test'
+  ...
+# Subtest: onReviewed：指令结果携带 directive（与 judge 互斥）；无指令结果保持旧形状
+ok 8 - onReviewed：指令结果携带 directive（与 judge 互斥）；无指令结果保持旧形状
+  ---
+  duration_ms: 0.1997
+  type: 'test'
+  ...
+# Subtest: buildShellGate：takeDirective 透传到闸
+ok 9 - buildShellGate：takeDirective 透传到闸
+  ---
+  duration_ms: 0.2458
+  type: 'test'
+  ...
+# Subtest: assembleProjectShellGate：审批指令注入点透传（项目三层链）
+ok 10 - assembleProjectShellGate：审批指令注入点透传（项目三层链）
+  ---
+  duration_ms: 10.0323
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# Subtest: openRoleSession：customerDirective 注入 ⇒ shell 闸命中审批指令；未注入 ⇒ 旧链不变
+ok 11 - openRoleSession：customerDirective 注入 ⇒ shell 闸命中审批指令；未注入 ⇒ 旧链不变
+  ---
+  duration_ms: 33.0764
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 363.8006

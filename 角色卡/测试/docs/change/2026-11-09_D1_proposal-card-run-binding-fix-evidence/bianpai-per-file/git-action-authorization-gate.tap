@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录
+ok 1 - gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录
+  ---
+  duration_ms: 20.538
+  type: 'test'
+  ...
+# Subtest: gate active-tool：expectedTool 缺失、actor Core/角色/任务不符 ⇒ git-actor-core-binding-unproven
+ok 2 - gate active-tool：expectedTool 缺失、actor Core/角色/任务不符 ⇒ git-actor-core-binding-unproven
+  ---
+  duration_ms: 15.2229
+  type: 'test'
+  ...
+# Subtest: gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）
+ok 3 - gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）
+  ---
+  duration_ms: 21.4047
+  type: 'test'
+  ...
+# Subtest: gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+ok 4 - gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+  ---
+  duration_ms: 6.2322
+  type: 'test'
+  ...
+# Subtest: W2 C1–C4/Q8：run-stop/controller-stop 成员身份=Core+可选 native；finalize 终止证据用 drain；native absent 允许、present-but-changed 拒绝
+ok 5 - W2 C1–C4/Q8：run-stop/controller-stop 成员身份=Core+可选 native；finalize 终止证据用 drain；native absent 允许、present-but-changed 拒绝
+  ---
+  duration_ms: 0.9243
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 357.2711

@@ -1,0 +1,62 @@
+diff --git a/app/desktop/customer-input.ts b/app/desktop/customer-input.ts
+index 5ace56e..fe2103c 100644
+--- a/app/desktop/customer-input.ts
++++ b/app/desktop/customer-input.ts
+@@ -1809,14 +1809,42 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
+     void (async () => {
+       let stage: "materials" | "execution" = "materials";
+       let failureReason: string | undefined;
++      // 2026-11-09 缺陷修复 B（fail-closed 呈现）：materials/绑定失败（`host.prepare` 抛错、`basis` 缺失/
++      // 非法、证据不可用/漂移/绑定不符）**不得**把卡呈现为可重试/可提交——不调用 presenter、不写
++      // `request.presented`。以既有 `declined + notPresented + reason` 结算，把真实原因（含 prepare
++      // 错误原文与既有可操作指引）交回发起角色/回合；工具回执走既有 `cardNotPresented`
++      // （「治理确认卡未发出（未向客户呈现；原因：…）→ 未获任何同意；请补齐后重新调用。不要写盘，
++      // 也不要向客户声称其拒绝或同意。」）。不写 operatorId/actionSource，不声称客户拒绝或同意。
++      // `host` 缺失与 required-acknowledgment 不属证据准备失败：保持既有「可接管」回退（下方 catch，
++      // 既有 decision-service 回归钉住），不在此 fail-closed。
++      const failClosedPresentation = (error: unknown): void => {
++        // `stage` 不在诊断落盘白名单（src/common/shared/diagnostics.ts `FIELD_NAMES`，本修复不越界改
++        // src/）；用既有白名单键 `phase` 一并落盘，保证诊断可区分 materials/execution（B1 AC-13）。
++        diagnostic.error("chief-decision.failed", error, { requestId: entry.payload.id, stage: "materials", phase: "materials" });
++        if (!valid()) return;
++        const detail = reasonOf(error).trim();
++        settleEntry(entry, {
++          outcome: "declined",
++          reason: detail === ""
++            ? mainT("main.customerInput.chief.contextUnavailable")
++            : `${mainT("main.customerInput.chief.contextUnavailable")}（${detail}）`,
++          notPresented: true,
++        }, "judging");
++      };
+       try {
+         const host = entry.ctx.chiefDecision;
+         if (host === undefined) throw new Error("幕僚决策上下文不可用");
+         if (entry.request.acknowledgments?.some(item => item.required)) throw new Error("本请求需专门确认勾选，幕僚不能代作客户确认");
+-        const basis = await host.prepare(entry.request, entry.metadata);
+-        if (!valid()) return;
+-        if (!/^[a-f0-9]{64}$/i.test(basis.baseDigest) || basis.evidenceRefs.length === 0 || !basis.context.trim()) {
+-          throw new Error("当前目标、基线或决策物证缺失");
++        let basis: ChiefDecisionBasis;
++        try {
++          basis = await host.prepare(entry.request, entry.metadata);
++          if (!valid()) return;
++          if (!/^[a-f0-9]{64}$/i.test(basis.baseDigest) || basis.evidenceRefs.length === 0 || !basis.context.trim()) {
++            throw new Error("当前目标、基线或决策物证缺失");
++          }
++        } catch (error) {
++          failClosedPresentation(error);
++          return;
+         }
+         const kind = cardKindOf(entry);
+         if (kind !== "appointment" && kind !== "acceptance" && kind !== "decision" && kind !== "proposal") return;
+@@ -1871,7 +1899,9 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
+         await host.execute(context, basis.context, decide, controller.signal);
+         if (valid()) chiefWaiting(entry, failureReason === undefined ? mainT("main.customerInput.chief.noValidDecision") : `${failureReason} ${mainT("main.customerInput.chief.noValidDecision")}`);
+       } catch (error) {
+-        diagnostic.error("chief-decision.failed", error, { requestId: entry.payload.id, stage });
++        // `stage` 不在诊断落盘白名单（src/common/shared/diagnostics.ts `FIELD_NAMES`，本修复不越界改 src/）；
++        // 用既有白名单键 `phase` 一并落盘，保证诊断可区分 materials/execution（B1 AC-13）。
++        diagnostic.error("chief-decision.failed", error, { requestId: entry.payload.id, stage, phase: stage });
+         if (valid()) chiefWaiting(entry, stage === "materials"
+           ? mainT("main.customerInput.chief.contextUnavailable")
+           : mainT("main.customerInput.chief.noValidDecision"));

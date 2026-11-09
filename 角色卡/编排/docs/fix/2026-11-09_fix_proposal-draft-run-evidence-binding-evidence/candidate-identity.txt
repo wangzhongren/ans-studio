@@ -1,0 +1,16 @@
+HEAD c1439ce57430ef783b80a01bb6e6437fcb20cabd
+TREE 262e7ba42ee646d055f65f92e640834a89addde1
+BRANCH feat/plan-escalation-card
+CHANGED-PATHS:
+src/service/trunk/impl/apply-journal.ts
+"test/\347\274\226\346\216\222/direct-role-capabilities.test.ts"
+PROTECTED-DIFF-STAT (must be empty):
+AGGREGATE-SHA256 bb24291eb6ba3adcaa7ceff5483fbfe73f8fb70cc9a8275b79ecfd9d04b6b8f0
+PROTECTED-BASELINE-SHA256 (unchanged, diff 0):
+a5bbb067557dfb59e24d01b99988ca587700d8f381c1bd522e4277fbb5a44e86 *src/common/编排/run-manifest.ts
+b4164765c47c8917d8a46e50a07ef28883d7ac6085eb29fc45bcd80cb932ff49 *src/model/runtime.ts
+5e466272dd90769f6472722887d702780d425ddfa1625e1cc3144406d582efd8 *src/model/trunk.ts
+53459ba43c51ef4c8c9086e7c6bbfa499028de7680c3f4d4acbbc5a93b556db3 *src/pipeline/orchestration/run-role.ts
+c37793ca24b88c21ede9b69c52ee3e6c26416095c187682318bf909698fbe8d8 *src/provider/runtime/tools.ts
+0132cd4e935ccd7f5eae05344991b818e072cf090f783d589c5541b13924cae5 *app/desktop/session.ts
+3e5760f1835db14404f4c6faca2a1f22f36d244b1499f330fc117b825b8822b8 *test/桌面应用/optional-acceptance.test.ts

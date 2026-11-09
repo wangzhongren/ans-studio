@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: X-R2 run-role：trio rapporteur 注入模块声明的三工具（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+ok 1 - X-R2 run-role：trio rapporteur 注入模块声明的三工具（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+  ---
+  duration_ms: 13.9418
+  type: 'test'
+  ...
+# Subtest: X-R2 卡种：rapporteur 模块 cards 与迁移前表逐项一致；默认卡走模块且 decision 不默认化（源码锚点）
+ok 2 - X-R2 卡种：rapporteur 模块 cards 与迁移前表逐项一致；默认卡走模块且 decision 不默认化（源码锚点）
+  ---
+  duration_ms: 1.5847
+  type: 'test'
+  ...
+# Subtest: X-R2/X-R4 run-role：requestRequirementChange 角色声明读模块（rapporteur/convener；旧内联谓词已删除）
+ok 3 - X-R2/X-R4 run-role：requestRequirementChange 角色声明读模块（rapporteur/convener；旧内联谓词已删除）
+  ---
+  duration_ms: 0.9411
+  type: 'test'
+  ...
+# Subtest: X-R2 VCA direct：rapporteur detail-amendment 事实包被模块接受；allow 不替代 Service（畸形目标仍按既有码拒绝）
+ok 4 - X-R2 VCA direct：rapporteur detail-amendment 事实包被模块接受；allow 不替代 Service（畸形目标仍按既有码拒绝）
+  ---
+  duration_ms: 26.6613
+  type: 'test'
+  ...
+# Subtest: X-R2 run-change：模块事实包；直接 wrapper 的 deny 与迁移前 Service 首检码/文案逐字一致（旧/新双跑）
+ok 5 - X-R2 run-change：模块事实包；直接 wrapper 的 deny 与迁移前 Service 首检码/文案逐字一致（旧/新双跑）
+  ---
+  duration_ms: 1.5701
+  type: 'test'
+  ...
+# Subtest: X-R2 run-change：stop/stop-and-restart 保留 Service `run-stop-unverified`；preflight 只做角色侧判定
+ok 6 - X-R2 run-change：stop/stop-and-restart 保留 Service `run-stop-unverified`；preflight 只做角色侧判定
+  ---
+  duration_ms: 0.9451
+  type: 'test'
+  ...
+# Subtest: X-R2 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 rapporteur 策略
+ok 7 - X-R2 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 rapporteur 策略
+  ---
+  duration_ms: 1.9249
+  type: 'test'
+  ...
+# Subtest: W2 C5 commitPreparedRunChange：run-stop 终止证据改运行时中立 drain（native/processCoverage 前提删除；direct-stop 拒绝与 host fence 不变；不写 sidecar）
+ok 8 - W2 C5 commitPreparedRunChange：run-stop 终止证据改运行时中立 drain（native/processCoverage 前提删除；direct-stop 拒绝与 host fence 不变；不写 sidecar）
+  ---
+  duration_ms: 0.7126
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 355.0905

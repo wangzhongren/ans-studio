@@ -1,0 +1,2 @@
+09130d02fd5a053883148fc4321110b0eeca89b9036cb0e2767b588346e77e41 *src/service/trunk/impl/apply-journal.ts
+4f98332f3a4c8258320e4f1f5316c34ca5a6cca8cf6596d53ee74ca07b67f4a1 *test/编排/direct-role-capabilities.test.ts

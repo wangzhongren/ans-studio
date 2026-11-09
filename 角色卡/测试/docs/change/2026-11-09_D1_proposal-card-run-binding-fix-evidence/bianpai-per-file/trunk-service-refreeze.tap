@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: refreeze：只更新 stable 快照（workflow/roleCards/boundaries）、不升 trunkVersion、客户审计
+ok 1 - refreeze：只更新 stable 快照（workflow/roleCards/boundaries）、不升 trunkVersion、客户审计
+  ---
+  duration_ms: 67.1066
+  type: 'test'
+  ...
+# Subtest: refreeze：拒绝版本化文档/execution、哈希不符、缺客户确认（失败不改指针）
+ok 2 - refreeze：拒绝版本化文档/execution、哈希不符、缺客户确认（失败不改指针）
+  ---
+  duration_ms: 38.0523
+  type: 'test'
+  ...
+# Subtest: abandonUpgrade：不 re-pin、不改指针、旧主干继续有效；缺客户确认拒绝
+ok 3 - abandonUpgrade：不 re-pin、不改指针、旧主干继续有效；缺客户确认拒绝
+  ---
+  duration_ms: 40.7245
+  type: 'test'
+  ...
+# Subtest: history：只读归档版本（升级后旧版本入 history；当前版本单列）
+ok 4 - history：只读归档版本（升级后旧版本入 history；当前版本单列）
+  ---
+  duration_ms: 78.4672
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 440.3726

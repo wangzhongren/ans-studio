@@ -1,0 +1,27 @@
+date: 2026-11-09T04:46:34Z
+worktree: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch: feat/plan-escalation-card
+HEAD: c1439ce57430ef783b80a01bb6e6437fcb20cabd
+TREE: 262e7ba42ee646d055f65f92e640834a89addde1
+index-staged-lines: 0
+status -- src app test:
+ M app/desktop/customer-input.ts
+ M src/service/trunk/impl/apply-journal.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/chief-workflow.test.ts"
+ M "test/\347\274\226\346\216\222/direct-role-capabilities.test.ts"
+
+candidate files (raw sha256 on disk):
+09130d02fd5a053883148fc4321110b0eeca89b9036cb0e2767b588346e77e41 *src/service/trunk/impl/apply-journal.ts
+4f98332f3a4c8258320e4f1f5316c34ca5a6cca8cf6596d53ee74ca07b67f4a1 *test/编排/direct-role-capabilities.test.ts
+71e0cc0bb7be44257312c3421f210a88376f3ca07efcf448be54de1b8f217fa0 *app/desktop/customer-input.ts
+f5dd81d64cefa707a0348f16be9b2fa2e8827976ded2ae87780364e61ba450fc *test/桌面应用/chief-workflow.test.ts
+
+A' 2-file aggregate (path\0sha256, LC_ALL=C byte sort): bb24291eb6ba3adcaa7ceff5483fbfe73f8fb70cc9a8275b79ecfd9d04b6b8f0 (recomputed, matches A' evidence)
+combination 4-file aggregate: bf12745676901055ccfcb98e3578205465c88a3ef8293faa91827dc5beb80986
+
+src app test manifest (1109 files, canonical: sha256 two-spaces path, LC_ALL=C byte sort, LF, trailing newline):
+file-sha256: 4958207f196109ef5c7d25e642f8846880236a94e6fe4fca6bb6af03e1cab064
+path-concat aggregate: a9e20d16bd4c33baf5fa5ee42275dceff71596aaa532b9f8825d63d82e2441d5
+
+owner cross-check: A' after hashes 09130d02(d5a)/4f98332f; B after hashes 71e0cc0b/f5dd81d6 — all match
+diff identity: current git diff for A' 2 files == 编排 evidence code-diff.patch (diff exit 0); for B 2 files == after-customer-input.diff + after-chief-workflow-test.diff (diff exit 0)

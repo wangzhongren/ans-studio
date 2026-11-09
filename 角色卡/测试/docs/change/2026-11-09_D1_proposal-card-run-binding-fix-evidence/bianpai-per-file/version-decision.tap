@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: validateVersionDecisionRequest：严格键集/slug/动作/reason/refs
+ok 1 - validateVersionDecisionRequest：严格键集/slug/动作/reason/refs
+  ---
+  duration_ms: 1.8946
+  type: 'test'
+  ...
+# Subtest: buildVersionDecisionCard：两选项、恰一 recommended=幕僚 action；application-owned 卡通过校验
+ok 2 - buildVersionDecisionCard：两选项、恰一 recommended=幕僚 action；application-owned 卡通过校验
+  ---
+  duration_ms: 0.6175
+  type: 'test'
+  ...
+# Subtest: computeTargetVersions：已有最新+1、缺失 kind→v1；topology 不单列
+ok 3 - computeTargetVersions：已有最新+1、缺失 kind→v1；topology 不单列
+  ---
+  duration_ms: 0.102
+  type: 'test'
+  ...
+# Subtest: validateVersionDecisionContext：pinned/多 run/pending 与 legacy
+ok 4 - validateVersionDecisionContext：pinned/多 run/pending 与 legacy
+  ---
+  duration_ms: 4.8323
+  type: 'test'
+  ...
+# Subtest: planVersionDecisionExecution：版本修改同 flow/run；legacy 锚点；pinned 双 action 统一 failed 零执行
+ok 5 - planVersionDecisionExecution：版本修改同 flow/run；legacy 锚点；pinned 双 action 统一 failed 零执行
+  ---
+  duration_ms: 0.215
+  type: 'test'
+  ...
+# Subtest: planVersionDecisionExecution：new-version-development 关闭全部活动 run；runId 仅上下文
+ok 6 - planVersionDecisionExecution：new-version-development 关闭全部活动 run；runId 仅上下文
+  ---
+  duration_ms: 0.1808
+  type: 'test'
+  ...
+# Subtest: R4/AC-5：closedRunIds 与 partial scan 一致；逐个 closeRun 后全部 closed + superseded-by 格式
+ok 7 - R4/AC-5：closedRunIds 与 partial scan 一致；逐个 closeRun 后全部 closed + superseded-by 格式
+  ---
+  duration_ms: 13.7605
+  type: 'test'
+  ...
+# Subtest: mapVersionDecisionAnswer（R2）：timeout/unavailable/resolved、aborted/orphaned、late/诊断、invalid/declined
+ok 8 - mapVersionDecisionAnswer（R2）：timeout/unavailable/resolved、aborted/orphaned、late/诊断、invalid/declined
+  ---
+  duration_ms: 0.2261
+  type: 'test'
+  ...
+# Subtest: Q9 A（2026-11-03）：mapVersionDecisionAnswer 接受 directive；collectResolvedWithoutExecution 保留 directive
+ok 9 - Q9 A（2026-11-03）：mapVersionDecisionAnswer 接受 directive；collectResolvedWithoutExecution 保留 directive
+  ---
+  duration_ms: 0.2195
+  type: 'test'
+  ...
+# Subtest: collectResolvedWithoutExecution（R3/F5）：排除 orphaned/已有 decision/invalid-selection；failed 不误判
+ok 10 - collectResolvedWithoutExecution（R3/F5）：排除 orphaned/已有 decision/invalid-selection；failed 不误判
+  ---
+  duration_ms: 0.1909
+  type: 'test'
+  ...
+# Subtest: requestId/attempt（F1）：有 run/无 run 两式；attempt 含拒绝/中止；前缀碰撞不误计
+ok 11 - requestId/attempt（F1）：有 run/无 run 两式；attempt 含拒绝/中止；前缀碰撞不误计
+  ---
+  duration_ms: 0.2243
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 192.8133

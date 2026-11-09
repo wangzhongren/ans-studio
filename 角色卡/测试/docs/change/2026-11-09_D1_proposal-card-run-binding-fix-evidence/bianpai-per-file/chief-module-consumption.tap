@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用
+ok 1 - X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用
+  ---
+  duration_ms: 18.0568
+  type: 'test'
+  ...
+# Subtest: X-R6 工具（源码接缝）：moduleToolsRole 含 chief；旧门控仅作回退；closeCreatedTask 保留 directGovernance
+ok 2 - X-R6 工具（源码接缝）：moduleToolsRole 含 chief；旧门控仅作回退；closeCreatedTask 保留 directGovernance
+  ---
+  duration_ms: 1.2347
+  type: 'test'
+  ...
+# Subtest: X-R6 卡种：TRIO_CARD_KINDS.chief 表项已删除；默认卡由模块卡数据驱动
+ok 3 - X-R6 卡种：TRIO_CARD_KINDS.chief 表项已删除；默认卡由模块卡数据驱动
+  ---
+  duration_ms: 0.9726
+  type: 'test'
+  ...
+# Subtest: X-R6 intent-confirm：准备分支与协调者 choice 守卫读模块卡数据；文案保持既有口径
+ok 4 - X-R6 intent-confirm：准备分支与协调者 choice 守卫读模块卡数据；文案保持既有口径
+  ---
+  duration_ms: 0.5984
+  type: 'test'
+  ...
+# Subtest: X-R6 apply-journal：hub 来源/目标/路由/purpose/schema 读模块；证据核验字面量保留
+ok 5 - X-R6 apply-journal：hub 来源/目标/路由/purpose/schema 读模块；证据核验字面量保留
+  ---
+  duration_ms: 1.3888
+  type: 'test'
+  ...
+# Subtest: X-R6 trunk-runtime：hub 目标集合读模块；documents/coordination/rolePreparation 引擎路由保留
+ok 6 - X-R6 trunk-runtime：hub 目标集合读模块；documents/coordination/rolePreparation 引擎路由保留
+  ---
+  duration_ms: 0.6893
+  type: 'test'
+  ...
+# Subtest: X-R6 version-decision：注入与矩阵发起读模块声明；迁移前谓词仅回退
+ok 7 - X-R6 version-decision：注入与矩阵发起读模块声明；迁移前谓词仅回退
+  ---
+  duration_ms: 0.7618
+  type: 'test'
+  ...
+# Subtest: X-R6 收尾：临时三态开关与 legacy 分支已删除（无残留）
+ok 8 - X-R6 收尾：临时三态开关与 legacy 分支已删除（无残留）
+  ---
+  duration_ms: 2.9881
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 323.5202

@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: URL：仅 http/https；拒绝 userinfo/空 host/超长
+ok 1 - URL：仅 http/https；拒绝 userinfo/空 host/超长
+  ---
+  duration_ms: 0.6695
+  type: 'test'
+  ...
+# Subtest: URL：主机归一化（小写/去尾点/punycode/IPv6 去括号）+ 显式端口
+ok 2 - URL：主机归一化（小写/去尾点/punycode/IPv6 去括号）+ 显式端口
+  ---
+  duration_ms: 4.2389
+  type: 'test'
+  ...
+# Subtest: IPv4 拒绝清单（含边界）与公网样本
+ok 3 - IPv4 拒绝清单（含边界）与公网样本
+  ---
+  duration_ms: 0.274
+  type: 'test'
+  ...
+# Subtest: IPv6：2000::/3 正向 + 特殊段排除；IPv4-mapped/NAT64 自动拒绝
+ok 4 - IPv6：2000::/3 正向 + 特殊段排除；IPv4-mapped/NAT64 自动拒绝
+  ---
+  duration_ms: 0.4207
+  type: 'test'
+  ...
+# Subtest: 同域：host 归一相等（端口可不同）；https→http 降级拒绝；子域跨域
+ok 5 - 同域：host 归一相等（端口可不同）；https→http 降级拒绝；子域跨域
+  ---
+  duration_ms: 0.1578
+  type: 'test'
+  ...
+# Subtest: 文件名净化真值表（穿越/非法字符/尾点空格/前导点/保留名/超长）
+ok 6 - 文件名净化真值表（穿越/非法字符/尾点空格/前导点/保留名/超长）
+  ---
+  duration_ms: 0.3269
+  type: 'test'
+  ...
+# Subtest: 卡片阶段文件名：URL basename → caller → 兜底；不返回 content-disposition
+ok 7 - 卡片阶段文件名：URL basename → caller → 兜底；不返回 content-disposition
+  ---
+  duration_ms: 0.5614
+  type: 'test'
+  ...
+# Subtest: 执行阶段文件名：Content-Disposition（filename* 优先）→ URL basename → caller → 兜底
+ok 8 - 执行阶段文件名：Content-Disposition（filename* 优先）→ URL basename → caller → 兜底
+  ---
+  duration_ms: 0.3351
+  type: 'test'
+  ...
+# Subtest: 配置：默认值来自 A1 常量；非法 env 回退并返回诊断；合法 env 覆盖
+ok 9 - 配置：默认值来自 A1 常量；非法 env 回退并返回诊断；合法 env 覆盖
+  ---
+  duration_ms: 0.2576
+  type: 'test'
+  ...
+# Subtest: judge facts ≤2KiB：只截断 url/purpose，校验字段不变
+ok 10 - judge facts ≤2KiB：只截断 url/purpose，校验字段不变
+  ---
+  duration_ms: 0.439
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 91.0696
