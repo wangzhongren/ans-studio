@@ -1,0 +1,148 @@
+TAP version 13
+# Subtest: G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope
+ok 1 - G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope
+  ---
+  duration_ms: 1.8889
+  type: 'test'
+  ...
+# Subtest: G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings
+ok 2 - G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings
+  ---
+  duration_ms: 0.5215
+  type: 'test'
+  ...
+# Subtest: G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed
+ok 3 - G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed
+  ---
+  duration_ms: 0.4842
+  type: 'test'
+  ...
+# Subtest: G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics
+ok 4 - G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics
+  ---
+  duration_ms: 1.2166
+  type: 'test'
+  ...
+# Subtest: G5 Git-selected missing effective ref never falls back to valid FS projection/live role
+ok 5 - G5 Git-selected missing effective ref never falls back to valid FS projection/live role
+  ---
+  duration_ms: 197.0931
+  type: 'test'
+  ...
+# Subtest: G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed
+ok 6 - G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed
+  ---
+  duration_ms: 6764.0334
+  type: 'test'
+  ...
+# Subtest: G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership
+ok 7 - G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership
+  ---
+  duration_ms: 2.7768
+  type: 'test'
+  ...
+# Subtest: G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion
+ok 8 - G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion
+  ---
+  duration_ms: 32.6349
+  type: 'test'
+  ...
+# Subtest: G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live
+ok 9 - G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live
+  ---
+  duration_ms: 19.46
+  type: 'test'
+  ...
+# Subtest: G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged
+ok 10 - G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged
+  ---
+  duration_ms: 86.869
+  type: 'test'
+  ...
+# Subtest: G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence
+ok 11 - G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence
+  ---
+  duration_ms: 19.5864
+  type: 'test'
+  ...
+# Subtest: G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)
+ok 12 - G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)
+  ---
+  duration_ms: 14.9177
+  type: 'test'
+  ...
+# Subtest: G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals
+ok 13 - G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals
+  ---
+  duration_ms: 0.3647
+  type: 'test'
+  ...
+# Subtest: 六角色明确未注入能力不得虚构或恢复取消卡
+ok 14 - 六角色明确未注入能力不得虚构或恢复取消卡
+  ---
+  duration_ms: 0.1647
+  type: 'test'
+  ...
+# Subtest: 产品/策划整单直接提交，来源和旧run冻结约束可见
+ok 15 - 产品/策划整单直接提交，来源和旧run冻结约束可见
+  ---
+  duration_ms: 0.1443
+  type: 'test'
+  ...
+# Subtest: 策划独占三模式，旧pin与停稳失败不能绕过
+ok 16 - 策划独占三模式，旧pin与停稳失败不能绕过
+  ---
+  duration_ms: 0.0658
+  type: 'test'
+  ...
+# Subtest: 人事保留真实D3，三文档整体激活，不再逐次写卡审批
+ok 17 - 人事保留真实D3，三文档整体激活，不再逐次写卡审批
+  ---
+  duration_ms: 0.0794
+  type: 'test'
+  ...
+# Subtest: 运营直接完成计划与主动环境卡，真实恢复条件先行
+ok 18 - 运营直接完成计划与主动环境卡，真实恢复条件先行
+  ---
+  duration_ms: 0.0746
+  type: 'test'
+  ...
+# Subtest: chief/convener收口必须为原创建者，报告不等于关闭
+ok 19 - chief/convener收口必须为原创建者，报告不等于关闭
+  ---
+  duration_ms: 0.0937
+  type: 'test'
+  ...
+# Subtest: 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束
+ok 20 - 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束
+  ---
+  duration_ms: 0.0739
+  type: 'test'
+  ...
+# Subtest: 提示变化不扩充工具布尔位、写区或派发权
+ok 21 - 提示变化不扩充工具布尔位、写区或派发权
+  ---
+  duration_ms: 0.1006
+  type: 'test'
+  ...
+# Subtest: Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实
+ok 22 - Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实
+  ---
+  duration_ms: 0.1997
+  type: 'test'
+  ...
+# Subtest: Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+ok 23 - Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+  ---
+  duration_ms: 0.0818
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7382.6469

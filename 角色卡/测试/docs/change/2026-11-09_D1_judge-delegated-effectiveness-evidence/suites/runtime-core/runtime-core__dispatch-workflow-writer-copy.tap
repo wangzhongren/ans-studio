@@ -1,0 +1,73 @@
+TAP version 13
+# Subtest: dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+not ok 1 - dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+  ---
+  duration_ms: 1.7921
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\dispatch-workflow-writer-copy.test.ts:10:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+    
+    '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:13:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+# Subtest: dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+not ok 2 - dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+  ---
+  duration_ms: 0.2194
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\dispatch-workflow-writer-copy.test.ts:29:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+    
+    '派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。\n' +
+      'Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。\n' +
+      'dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。\n' +
+      '跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。\n' +
+      '返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。\n' +
+      '最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。\n' +
+      'B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。
+    Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。
+    dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。
+    跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。
+    返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。
+    最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。
+    B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:32:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 105.2911

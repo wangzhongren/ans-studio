@@ -19,7 +19,7 @@ import { repinPinnedRun } from "../../common/编排/run-manifest.ts";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { parse as parseYaml } from "yaml";
-import { isDispatchTaskResumeController, isRuntimeSessionDrained } from "../../model/runtime.ts";
+import { isDispatchTaskResumeController, isJudgeD3Resolution, isRuntimeSessionDrained, requestResolvedD3DecisionId } from "../../model/runtime.ts";
 import type { TaskStateEvent, SelectRunChangeFn, SelectRunChangeInput, CompleteTeamPlanFn, CompleteTeamPlanInput, CloseCreatedTaskFn, ActivateRoleDocumentsFn } from "../../model/runtime.ts";
 import type { ProjectConfig, RolePolicyDecision } from "../../model/role.ts";
 import { listProject, builtInRoleModuleOf } from "../../service/role/resolve-role.ts";
@@ -724,12 +724,15 @@ export function nominatorRoleDocumentsFacts(value: PreparedRoleActivation): Reco
   const resolved = validateTaskStateEvent(resolvedValue);
   if (!resolved.ok || resolved.event.kind !== "request.resolved") return undefined;
   const d3 = resolved.event;
-  if (d3.by !== "customer" && d3.by !== "chief-delegated") return undefined;
+  // 2026-11-09 judge-delegated（W-J2/I-34/F11）：judge 来源经共享校验；d3By 事实如实为 "judge"；
+  // 参考值统一走共享纯函数（customer/judge => decisionId；chief-delegated => requestId）。
+  const judgeD3 = d3.by === "judge" && isJudgeD3Resolution(d3);
+  if (d3.by !== "customer" && d3.by !== "chief-delegated" && !judgeD3) return undefined;
   const d3TargetRoleIds = d3.targetRoleIds, d3RosterVersion = d3.rosterVersion, d3RosterSha256 = d3.rosterSha256;
   if (!Array.isArray(d3TargetRoleIds) || d3TargetRoleIds.length === 0
       || typeof d3RosterVersion !== "number" || !Number.isSafeInteger(d3RosterVersion) || d3RosterVersion < 1
       || typeof d3RosterSha256 !== "string") return undefined;
-  if ((d3.by === "customer" ? d3.decisionId : d3.requestId) !== input.d3DecisionId) return undefined;
+  if (requestResolvedD3DecisionId(d3) !== input.d3DecisionId) return undefined;
   return {
     stage: "role-documents",
     flowId: input.flowId,

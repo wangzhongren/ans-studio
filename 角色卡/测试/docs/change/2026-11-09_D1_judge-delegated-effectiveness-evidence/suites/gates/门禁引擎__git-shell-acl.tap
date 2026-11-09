@@ -1,0 +1,244 @@
+TAP version 13
+# Subtest: G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+ok 1 - G18 actual sha1 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+  ---
+  duration_ms: 3599.4167
+  type: 'test'
+  ...
+# Subtest: G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+ok 2 - G18 actual sha256 delivery code basis accepts canonical same/cross-flow refs and rejects unrelated refs or changed evidence
+  ---
+  duration_ms: 3512.9045
+  type: 'test'
+  ...
+# Subtest: G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+ok 3 - G17 actual sha1 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+  ---
+  duration_ms: 3774.1404
+  type: 'test'
+  ...
+# Subtest: G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+ok 4 - G17 actual sha256 ref-only first-null and existing delivery distinguish CAS diff from code-basis ACL
+  ---
+  duration_ms: 3757.7234
+  type: 'test'
+  ...
+# Subtest: G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands
+ok 5 - G17 ref-only denies wrong actor/ref/CAS/source/parents/commit bytes/tree/grants and extra commands
+  ---
+  duration_ms: 3695.2672
+  type: 'test'
+  ...
+# Subtest: G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes
+ok 6 - G17 recomputed real candidate plans still cannot alter inherited metadata/other owners/modes
+  ---
+  duration_ms: 8588.9234
+  type: 'test'
+  ...
+# Subtest: G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+ok 7 - G16 actual sha1 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+  ---
+  duration_ms: 2230.8812
+  type: 'test'
+  ...
+# Subtest: G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+ok 8 - G16 actual sha256 raw-object integrate recomputes full tree, ordered parents, deletion grants and commands
+  ---
+  duration_ms: 2244.6288
+  type: 'test'
+  ...
+# Subtest: G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit
+ok 9 - G16 integrate refuses wrong actor/run/grants/parents/ref/commands and cannot pretend to be commit
+  ---
+  duration_ms: 1753.412
+  type: 'test'
+  ...
+# Subtest: G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes
+ok 10 - G16 complete Provider replans cannot integrate metadata, controller-owned paths, ungranted deletes or mode changes
+  ---
+  duration_ms: 2432.6945
+  type: 'test'
+  ...
+# Subtest: G23 shared raw observations retain special modes and R/C without enabling unsupported revert
+ok 11 - G23 shared raw observations retain special modes and R/C without enabling unsupported revert
+  ---
+  duration_ms: 1663.3477
+  type: 'test'
+  ...
+# Subtest: revert actual sha1 inverse preserves unrelated current entries and rejects false observations
+ok 12 - revert actual sha1 inverse preserves unrelated current entries and rejects false observations
+  ---
+  duration_ms: 4485.6508
+  type: 'test'
+  ...
+# Subtest: revert actual sha256 inverse preserves unrelated current entries and rejects false observations
+ok 13 - revert actual sha256 inverse preserves unrelated current entries and rejects false observations
+  ---
+  duration_ms: 4578.9494
+  type: 'test'
+  ...
+# Subtest: G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority
+ok 14 - G11 actual sha1 approved-source/written-consumed initial workflow preserves active and document authority
+  ---
+  duration_ms: 3257.9471
+  type: 'test'
+  ...
+# Subtest: G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority
+ok 15 - G11 actual sha256 approved-source/written-consumed initial workflow preserves active and document authority
+  ---
+  duration_ms: 3186.3379
+  type: 'test'
+  ...
+# Subtest: G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport
+ok 16 - G11 full replans reject false source, unconsumed permission, changed mainline/active/history/workflow and transport
+  ---
+  duration_ms: 8318.6459
+  type: 'test'
+  ...
+# Subtest: G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source
+ok 17 - G10 actual sha1 independent eight-ref activation preserves document mainline and accepts historical D3 source
+  ---
+  duration_ms: 1849.6393
+  type: 'test'
+  ...
+# Subtest: G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source
+ok 18 - G10 actual sha256 independent eight-ref activation preserves document mainline and accepts historical D3 source
+  ---
+  duration_ms: 1846.1069
+  type: 'test'
+  ...
+# Subtest: G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId
+ok 19 - G10 actual sha1 judge-delegated D3 accepts honest judge audit with the real application decisionId
+  ---
+  duration_ms: 1744.9195
+  type: 'test'
+  ...
+# Subtest: G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId
+ok 20 - G10 actual sha256 judge-delegated D3 accepts honest judge audit with the real application decisionId
+  ---
+  duration_ms: 1813.039
+  type: 'test'
+  ...
+# Subtest: G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources
+ok 21 - G10 judge-delegated D3 variants reject malformed audit, mismatched operatorId/decisionId and mixed sources
+  ---
+  duration_ms: 3357.0547
+  type: 'test'
+  ...
+# Subtest: G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport
+ok 22 - G10 complete replans reject activation changes to authority, document bytes, role evidence, history and transport
+  ---
+  duration_ms: 3221.536
+  type: 'test'
+  ...
+# Subtest: G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op
+ok 23 - G9 actual sha1 existing-base team-plan completion preserves other authority and supports exact no-op
+  ---
+  duration_ms: 1709.3188
+  type: 'test'
+  ...
+# Subtest: G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op
+ok 24 - G9 actual sha256 existing-base team-plan completion preserves other authority and supports exact no-op
+  ---
+  duration_ms: 1613.7096
+  type: 'test'
+  ...
+# Subtest: G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes
+ok 25 - G9 fully re-planned team-plan tampering cannot change refs, authorization, marker, versions or unrelated bytes
+  ---
+  duration_ms: 2530.5675
+  type: 'test'
+  ...
+# Subtest: G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS
+ok 26 - G8 actual Provider sha1 full first-document tree/no-index plan and exact publication CAS
+  ---
+  duration_ms: 46.2905
+  type: 'test'
+  ...
+# Subtest: G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS
+ok 27 - G8 actual Provider sha256 full first-document tree/no-index plan and exact publication CAS
+  ---
+  duration_ms: 42.3523
+  type: 'test'
+  ...
+# Subtest: G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding
+ok 28 - G8 recomputed malicious metadata/content/modes remain rejected beyond object-hash binding
+  ---
+  duration_ms: 50.2831
+  type: 'test'
+  ...
+# Subtest: G6 actual Provider sha1 first-init/empty-candidate plans have honest no-repo/no-index policy
+ok 29 - G6 actual Provider sha1 first-init/empty-candidate plans have honest no-repo/no-index policy
+  ---
+  duration_ms: 2.2796
+  type: 'test'
+  ...
+# Subtest: G6 actual Provider sha256 first-init/empty-candidate plans have honest no-repo/no-index policy
+ok 30 - G6 actual Provider sha256 first-init/empty-candidate plans have honest no-repo/no-index policy
+  ---
+  duration_ms: 1.1319
+  type: 'test'
+  ...
+# Subtest: G6 narrow first-init facts cannot exempt an existing repo, actor, worksite, nonempty diff, root or command
+ok 31 - G6 narrow first-init facts cannot exempt an existing repo, actor, worksite, nonempty diff, root or command
+  ---
+  duration_ms: 2.5931
+  type: 'test'
+  ...
+# Subtest: pure ACL all six roles/worker may use an exactly planned readable query; digest binds every field
+ok 32 - pure ACL all six roles/worker may use an exactly planned readable query; digest binds every field
+  ---
+  duration_ms: 0.9488
+  type: 'test'
+  ...
+# Subtest: query refuses malicious config/argv, hidden paths, ungranted history, pathspec and stale revision
+ok 33 - query refuses malicious config/argv, hidden paths, ungranted history, pathspec and stale revision
+  ---
+  duration_ms: 0.2539
+  type: 'test'
+  ...
+# Subtest: candidate ACL gives each role a valid own-path case and rejects other-role content
+ok 34 - candidate ACL gives each role a valid own-path case and rejects other-role content
+  ---
+  duration_ms: 1.2581
+  type: 'test'
+  ...
+# Subtest: complete base→candidate diff checks deletion/rename both sides, mixed staged data, modes and revocation
+ok 35 - complete base→candidate diff checks deletion/rename both sides, mixed staged data, modes and revocation
+  ---
+  duration_ms: 0.4281
+  type: 'test'
+  ...
+# Subtest: publish roles and convener integration use full owner-bound diffs without granting chief decisions Git power
+ok 36 - publish roles and convener integration use full owner-bound diffs without granting chief decisions Git power
+  ---
+  duration_ms: 0.292
+  type: 'test'
+  ...
+# Subtest: raw Git：只读精确形态 allow/pass（固定传输）；别名/写形态/全局选项仍硬拒
+ok 37 - raw Git：只读精确形态 allow/pass（固定传输）；别名/写形态/全局选项仍硬拒
+  ---
+  duration_ms: 1.2248
+  type: 'test'
+  ...
+# Subtest: actual write_file/edit_file handlers protect .git, canonical host roots and directory-link aliases
+ok 38 - actual write_file/edit_file handlers protect .git, canonical host roots and directory-link aliases
+  ---
+  duration_ms: 7.6935
+  type: 'test'
+  ...
+# Subtest: real core handle inventory in an isolated unprotected fixture is per-session, never whole-team proof
+ok 39 - real core handle inventory in an isolated unprotected fixture is per-session, never whole-team proof
+  ---
+  duration_ms: 6.4649
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 39
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 81168.2185

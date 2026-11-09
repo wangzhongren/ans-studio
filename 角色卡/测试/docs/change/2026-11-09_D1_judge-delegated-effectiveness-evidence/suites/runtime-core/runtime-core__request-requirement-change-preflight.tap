@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: X-R2+X-R4/角色门控：rapporteur 与 convener 各走本角色模块；缺省/其他角色保持旧行为
+ok 1 - X-R2+X-R4/角色门控：rapporteur 与 convener 各走本角色模块；缺省/其他角色保持旧行为
+  ---
+  duration_ms: 1.0412
+  type: 'test'
+  ...
+# Subtest: X-R2/allow：rapporteur 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+ok 2 - X-R2/allow：rapporteur 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+  ---
+  duration_ms: 1.9471
+  type: 'test'
+  ...
+# Subtest: X-R2/deny：缺事实、未知键、批准声明 ⇒ 既有回执形状（未提交、申请≠批准、能力零调用）
+ok 3 - X-R2/deny：缺事实、未知键、批准声明 ⇒ 既有回执形状（未提交、申请≠批准、能力零调用）
+  ---
+  duration_ms: 0.2681
+  type: 'test'
+  ...
+# Subtest: X-R2/零差异：同一参数矩阵下，加 roleId=rapporteur 前后 ok/message/调用次数逐字一致
+ok 4 - X-R2/零差异：同一参数矩阵下，加 roleId=rapporteur 前后 ok/message/调用次数逐字一致
+  ---
+  duration_ms: 1.38
+  type: 'test'
+  ...
+# Subtest: X-R2/不弱化：模型不可自报批准/越权参数，仍在触达能力前拒绝
+ok 5 - X-R2/不弱化：模型不可自报批准/越权参数，仍在触达能力前拒绝
+  ---
+  duration_ms: 0.1989
+  type: 'test'
+  ...
+# Subtest: X-R2/接线守卫：handler 在构建 input 之后、调用能力之前走 requirement-change 前置
+ok 6 - X-R2/接线守卫：handler 在构建 input 之后、调用能力之前走 requirement-change 前置
+  ---
+  duration_ms: 1.2228
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 220.0206

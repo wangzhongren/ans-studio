@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: schema 常量与最小版本（trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1）
+ok 1 - schema 常量与最小版本（trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1）
+  ---
+  duration_ms: 1.3734
+  type: 'test'
+  ...
+# Subtest: 主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）
+not ok 2 - 主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）
+  ---
+  duration_ms: 0.7762
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\trunk-contract.test.ts:80:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'adopted',
+        'amendment',
+        'bootstrap',
+        'post-run-change',
+        'recovery',
+    +   'team-plan',
+        'upgrade'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'adopted'
+    1: 'amendment'
+    2: 'bootstrap'
+    3: 'post-run-change'
+    4: 'recovery'
+    5: 'upgrade'
+  actual:
+    0: 'adopted'
+    1: 'amendment'
+    2: 'bootstrap'
+    3: 'post-run-change'
+    4: 'recovery'
+    5: 'team-plan'
+    6: 'upgrade'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/trunk-contract.test.ts:81:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 修正案生命周期六值 + P1.3 legacy 映射全覆盖（AC-32）
+ok 3 - 修正案生命周期六值 + P1.3 legacy 映射全覆盖（AC-32）
+  ---
+  duration_ms: 0.1011
+  type: 'test'
+  ...
+# Subtest: item kind 收窄：新 detail 仅 contract/roster/execution；legacy workflow/boundary 不相交（AC-6/AC-28）
+ok 4 - item kind 收窄：新 detail 仅 contract/roster/execution；legacy workflow/boundary 不相交（AC-6/AC-28）
+  ---
+  duration_ms: 0.0913
+  type: 'test'
+  ...
+# Subtest: trunk.state op 分区：stable-repinned 属 customer；drift/unfrozen-expired 仅 legacy 读（AC-31/AC-34）
+ok 5 - trunk.state op 分区：stable-repinned 属 customer；drift/unfrozen-expired 仅 legacy 读（AC-31/AC-34）
+  ---
+  duration_ms: 0.1024
+  type: 'test'
+  ...
+# Subtest: trunk manifest / amendment doc·state / journal / view 最小正例（含 bootstrap/baseTrunk:null、roleCards、committed）
+ok 6 - trunk manifest / amendment doc·state / journal / view 最小正例（含 bootstrap/baseTrunk:null、roleCards、committed）
+  ---
+  duration_ms: 0.1765
+  type: 'test'
+  ...
+# Subtest: trunk.state(stable-repinned) 事件形状：customer、绑定 confirmationId/decisionId、trunkVersion 不变
+ok 7 - trunk.state(stable-repinned) 事件形状：customer、绑定 confirmationId/decisionId、trunkVersion 不变
+  ---
+  duration_ms: 0.0747
+  type: 'test'
+  ...
+# Subtest: trunk 错误码稳定、无重复、无 trunk-drift（并入 trunk-verify-failed）
+ok 8 - trunk 错误码稳定、无重复、无 trunk-drift（并入 trunk-verify-failed）
+  ---
+  duration_ms: 0.0473
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 99.8486

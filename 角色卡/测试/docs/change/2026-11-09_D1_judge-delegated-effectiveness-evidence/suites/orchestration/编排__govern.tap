@@ -1,0 +1,160 @@
+TAP version 13
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# 目标角色：X。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [settled] 会话结束
+# Subtest: 正例：客户确认（预览列出路径）→ 发行进 writeSet → 角色卡/X/… 可写；未确认路径仍 F4 拒
+ok 1 - 正例：客户确认（预览列出路径）→ 发行进 writeSet → 角色卡/X/… 可写；未确认路径仍 F4 拒
+  ---
+  duration_ms: 27.0056
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [settled] 完成
+# Subtest: 负例：治理会话写项目 src/ 或项目根以外 → 写之前被拒
+ok 2 - 负例：治理会话写项目 src/ 或项目根以外 → 写之前被拒
+  ---
+  duration_ms: 9.66
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# 目标角色：X。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（39 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-21UnGz\\proj\\角色卡\\X\\role-card.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（83 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-21UnGz\\proj\\角色卡\\X\\boundary.yaml）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/memo.md（14 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-21UnGz\\proj\\角色卡\\X\\memo.md）
+# [settled] 会话结束
+# Subtest: 正例：治理会话真落盘建 角色卡/X/ → listProject 能枚举到 X（无 parseError）
+ok 3 - 正例：治理会话真落盘建 角色卡/X/ → listProject 能枚举到 X（无 parseError）
+  ---
+  duration_ms: 43.6015
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# 目标角色：X。
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 目标路径未匹配任何边界条目（根：project）：src/evil.ts。下一步：若为 appointment-write/角色卡路径，属于应用可写根接线问题；否则按 boundary.yaml 修正声明路径。 谁来做：app。 修正后可原样重试。 [技术 code：path-outside-boundary]
+# 写入被拒绝：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: 角色卡, docs, .ans
+# [settled] 会话结束
+# Subtest: 负例：治理会话写项目 src/ → 写之前被拒、零副作用（不落盘、不建目录）
+ok 4 - 负例：治理会话写项目 src/ → 写之前被拒、零副作用（不落盘、不建目录）
+  ---
+  duration_ms: 9.1067
+  type: 'test'
+  ...
+# ans govern 失败：治理边界解析失败：边界未通过 SHA-256 pin 校验：边界文件的 SHA-256 与 pin 不符：角色卡/governance-boundary.yaml
+# 错误：缺少注入配置（ConfigInjection）。ans govern 需由装配入口（src/index.ts）注入 project/configSource；编排不自备配置副本（契约 §6 配置数据单一来源在装配）。
+# ans govern 用法错误：未知参数：--bogus
+# 用法：ans govern [<目录>] [--task <任务>] [--function proposal|nomination|schedule] [--role <角色id>]… [--runtime demo|pi|codex|claude]
+# ans govern 用法错误：选项 --task 缺少值
+# 用法：ans govern [<目录>] [--task <任务>] [--function proposal|nomination|schedule] [--role <角色id>]… [--runtime demo|pi|codex|claude]
+# Subtest: 负例：改治理边界文件致 pin 失配 → 拒写（命令非 0，不落盘）
+ok 5 - 负例：改治理边界文件致 pin 失配 → 拒写（命令非 0，不落盘）
+  ---
+  duration_ms: 8.1887
+  type: 'test'
+  ...
+# Subtest: governCommand：缺注入配置（ConfigInjection）→ 非 0
+ok 6 - governCommand：缺注入配置（ConfigInjection）→ 非 0
+  ---
+  duration_ms: 0.2999
+  type: 'test'
+  ...
+# Subtest: governCommand：用法错误（未知参数 / 缺值）→ 非 0
+ok 7 - governCommand：用法错误（未知参数 / 缺值）→ 非 0
+  ---
+  duration_ms: 0.0904
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# 目标角色：X。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-b5jS7F\\proj\\角色卡\\X\\role-card.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（83 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-b5jS7F\\proj\\角色卡\\X\\boundary.yaml）
+# [settled] 会话结束
+# Subtest: governCommand：接收并使用注入配置 + 适配器 → 运行治理会话并落盘
+ok 8 - governCommand：接收并使用注入配置 + 适配器 → 运行治理会话并落盘
+  ---
+  duration_ms: 21.9736
+  type: 'test'
+  ...
+# Subtest: parseGovernArgs：可选位置参数解析为目标目录；缺省 undefined；第二个裸词计用法错误
+ok 9 - parseGovernArgs：可选位置参数解析为目标目录；缺省 undefined；第二个裸词计用法错误
+  ---
+  duration_ms: 0.5956
+  type: 'test'
+  ...
+# Subtest: resolveGovernTargetDir：argv 位置参数优先，其次 deps.targetDir，都无则 undefined
+ok 10 - resolveGovernTargetDir：argv 位置参数优先，其次 deps.targetDir，都无则 undefined
+  ---
+  duration_ms: 0.1179
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）；目标目录 ./orders-service
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [settled] 完成
+# Subtest: 目标目录经 deps/会话输入传递：runGovernSession 原样带出 targetDir
+ok 11 - 目标目录经 deps/会话输入传递：runGovernSession 原样带出 targetDir
+  ---
+  duration_ms: 7.4385
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：test:fixture governance boundary）；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-QzN8Ae\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。（目标角色：X）
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# 目标角色：X。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「预览并请求确认」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-govern-QzN8Ae\\proj\\角色卡\\X\\role-card.md）
+# [settled] 会话结束
+# Subtest: governCommand：接受位置参数目标目录（argv）→ 解析不报错并驱动会话
+ok 12 - governCommand：接受位置参数目标目录（argv）→ 解析不报错并驱动会话
+  ---
+  duration_ms: 13.8243
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 456.5306

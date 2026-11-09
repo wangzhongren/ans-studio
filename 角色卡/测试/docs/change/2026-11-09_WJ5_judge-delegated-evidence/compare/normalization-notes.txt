@@ -1,0 +1,34 @@
+# W-J5 before/after normalization (2026-11-09)
+
+## Raw delta (post - pre)
+- files +2 (two new test files; expected)
+- tests +6, pass +3, fail +3, cancelled 0, skip 0
+- pre: 1 file with no summary (registered 90s hang: customer-authorization-plane-integration)
+- post: 0 no-summary; same file recorded as watchdog hang(90s) with one file-level synthetic "not ok"
+
+## Attribution of the +3 raw fails (all file-level runner artifacts, not test-level)
+1. test/测试/customer-authorization-plane-integration.test.ts
+   - pre: no summary (process killed by 90s watchdog before TAP flush; 88s)
+   - post: hang(90s) with file-level `not ok 1 - <file>` (exitCode 143)
+   - E3/W7 registered hang (E3 2026-11-08: 90s watchdog; W7 after-log: `✖ ... (90006ms)`).
+   - Imports none of the W-J5 changed files (fixture/new tests); same candidate behavior both sides.
+2. test/测试/git-action-activation-e2e.test.ts
+   - post suite: test body PASSED (46.9s) but process did not exit within 300s watchdog (file-level artifact)
+   - same-candidate isolated reruns with W-J5 fixture: PASS clean exit x2 (ab-mod-4, ab-mod-5)
+   - control: ORIGINAL (HEAD) fixture isolated reruns also flake in this environment:
+     5 samples => 2 clean pass, 1 process-exit hang (240s), 2 native CleanupQueue crashes
+     (Node v24.22.1 `node::CleanupQueue::Add` assertion, E3-registered native bug)
+   => environment/Node teardown flake, not candidate-caused; excluded per B1 BASE-3 isolated-rerun-pass rule.
+3. test/测试/git-action-delivery-claude-e2e.test.ts
+   - post suite: test body PASSED (91.3s) but process did not exit within 300s watchdog
+   - same-candidate isolated reruns with W-J5 fixture: PASS clean exit (mod-7)
+   - control: original fixture isolated continues to pass (88s EXIT=0) AND modified fixture also
+     showed the same intermittent teardown hang class under load (1 clean of 4, including the suite run);
+     no test-level assertion failed in any sample.
+   => same environment flake class.
+
+## Normalized comparison (removing the 3 file-level artifacts)
+- pre:  files 112, tests 686, pass 629, fail 38, cancelled 1, skip 18
+- post: files 114, tests 689, pass 632, fail 38, cancelled 1, skip 18
+- delta: files +2, tests +3, pass +3, fail 0, cancelled 0, skip 0
+- new deterministic test-level failures = 0; new skips = 0.

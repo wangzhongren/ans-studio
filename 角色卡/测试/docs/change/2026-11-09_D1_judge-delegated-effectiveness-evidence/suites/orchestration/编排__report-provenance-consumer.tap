@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: actual bound source saves only final outcome; safe report/accepted-memory/unknown task and query keep origin
+ok 1 - actual bound source saves only final outcome; safe report/accepted-memory/unknown task and query keep origin
+  ---
+  duration_ms: 76.2627
+  type: 'test'
+  ...
+# Subtest: source save failure preserves terminal and snapshot; concurrent save retries run storage once and never prompt
+ok 2 - source save failure preserves terminal and snapshot; concurrent save retries run storage once and never prompt
+  ---
+  duration_ms: 26.3789
+  type: 'test'
+  ...
+# Subtest: actual disabled source remains live and creates no store; persistence updates unsubscribe with original handle
+ok 3 - actual disabled source remains live and creates no store; persistence updates unsubscribe with original handle
+  ---
+  duration_ms: 20.7063
+  type: 'test'
+  ...
+# Subtest: governance target keeps raw SDK input/images but stores safe text; history repair has no second Provider call
+ok 4 - governance target keeps raw SDK input/images but stores safe text; history repair has no second Provider call
+  ---
+  duration_ms: 65.0424
+  type: 'test'
+  ...
+# Subtest: target input failure after real ACK and before Provider is preserved without automatic retry
+ok 5 - target input failure after real ACK and before Provider is preserved without automatic retry
+  ---
+  duration_ms: 39.8418
+  type: 'test'
+  ...
+# Subtest: A4 native-only pure wrapper keeps reader failure and actual facts protected with trusted custom key names
+ok 6 - A4 native-only pure wrapper keeps reader failure and actual facts protected with trusted custom key names
+  ---
+  duration_ms: 0.6388
+  type: 'test'
+  ...
+# Subtest: disabled live target preserves all-or-none optional delivery identity, safe input and no directories
+ok 7 - disabled live target preserves all-or-none optional delivery identity, safe input and no directories
+  ---
+  duration_ms: 21.2901
+  type: 'test'
+  ...
+# Subtest: custom adapter without bound persistence remains unknown-live and exposes only unsupported save proxies
+ok 8 - custom adapter without bound persistence remains unknown-live and exposes only unsupported save proxies
+  ---
+  duration_ms: 9.1956
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 565.9714

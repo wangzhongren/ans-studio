@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: node/python/bash 脚本：读取有界内容并标注写区归属
+ok 1 - node/python/bash 脚本：读取有界内容并标注写区归属
+  ---
+  duration_ms: 10.8476
+  type: 'test'
+  ...
+# Subtest: 内联代码 / npm run 脚本内容进入上下文
+ok 2 - 内联代码 / npm run 脚本内容进入上下文
+  ---
+  duration_ms: 5.7671
+  type: 'test'
+  ...
+# Subtest: fail-closed：脚本在项目外 / 不可读 / 超过上限 ⇒ ok:false
+ok 3 - fail-closed：脚本在项目外 / 不可读 / 超过上限 ⇒ ok:false
+  ---
+  duration_ms: 2.999
+  type: 'test'
+  ...
+# Subtest: 非脚本的不透明写命令（xargs/git/rsync 等）⇒ 提供说明 note（不伪造内容）
+ok 4 - 非脚本的不透明写命令（xargs/git/rsync 等）⇒ 提供说明 note（不伪造内容）
+  ---
+  duration_ms: 0.6451
+  type: 'test'
+  ...
+# Subtest: judge 提示词：包含脚本路径/内容与「必须核对脚本」要求
+ok 5 - judge 提示词：包含脚本路径/内容与「必须核对脚本」要求
+  ---
+  duration_ms: 0.2712
+  type: 'test'
+  ...
+# Subtest: node --test / npm 引用展开 / 构建配置：内容随上下文提供并含 sha256
+ok 6 - node --test / npm 引用展开 / 构建配置：内容随上下文提供并含 sha256
+  ---
+  duration_ms: 20.9186
+  type: 'test'
+  ...
+# Subtest: bounds：单文件 >2000 行 / 累计 >3 个文件 ⇒ fail-closed
+ok 7 - bounds：单文件 >2000 行 / 累计 >3 个文件 ⇒ fail-closed
+  ---
+  duration_ms: 13.3287
+  type: 'test'
+  ...
+# Subtest: 注入防护：脚本内含「忽略以上指令」类文本 → prompt 明确其为数据并 JSON 编码
+ok 8 - 注入防护：脚本内含「忽略以上指令」类文本 → prompt 明确其为数据并 JSON 编码
+  ---
+  duration_ms: 0.1906
+  type: 'test'
+  ...
+# Subtest: 复验 F3：npm 引用超过累计 3 文件 ⇒ fail-closed；构建工具无配置 ⇒ failClosed 上下文（开关开启拒绝/关闭客户卡）
+ok 9 - 复验 F3：npm 引用超过累计 3 文件 ⇒ fail-closed；构建工具无配置 ⇒ failClosed 上下文（开关开启拒绝/关闭客户卡）
+  ---
+  duration_ms: 9.8512
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 147.9293

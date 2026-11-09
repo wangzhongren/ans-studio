@@ -1,0 +1,4 @@
+dir	files	tests	pass	fail	cancelled	skipped
+pre	112	686	629	38	1	18
+post-normalized	114	689	632	38	1	18
+delta	+2	+3	+3	0	0	0

@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: P1.2-AC-27 Codex 创建期对照：responses（native 不可用）⇒ plan 省略 native 仍发 token；chat/off（observed）⇒ 记录可选强证明
+ok 1 - P1.2-AC-27 Codex 创建期对照：responses（native 不可用）⇒ plan 省略 native 仍发 token；chat/off（observed）⇒ 记录可选强证明
+  ---
+  duration_ms: 20.1888
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录
+ok 2 - AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录
+  ---
+  duration_ms: 484.0122
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 813.1999

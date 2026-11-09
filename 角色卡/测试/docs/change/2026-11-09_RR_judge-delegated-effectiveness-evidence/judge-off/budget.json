@@ -1,0 +1,9 @@
+{
+  "customerMessages": 1,
+  "intentConfirmCards": 1,
+  "modelTurnsByRole": {
+    "chief": 1
+  },
+  "wallClock": null,
+  "wallClockSec": 16
+}

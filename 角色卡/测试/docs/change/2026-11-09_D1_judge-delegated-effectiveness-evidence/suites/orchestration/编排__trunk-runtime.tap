@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: trunk-runtime：status/reconcile（无 journal）+ bootstrap t1 + 客户归属事件
+ok 1 - trunk-runtime：status/reconcile（无 journal）+ bootstrap t1 + 客户归属事件
+  ---
+  duration_ms: 85.4013
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：applyApproved（upgrade）经 S3 re-pin；事件与 verify 一致
+ok 2 - trunk-runtime：applyApproved（upgrade）经 S3 re-pin；事件与 verify 一致
+  ---
+  duration_ms: 138.7389
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认、拒绝版本化文档变更）
+ok 3 - trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认、拒绝版本化文档变更）
+  ---
+  duration_ms: 90.008
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 manifest 待续接
+ok 4 - trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 manifest 待续接
+  ---
+  duration_ms: 81.2966
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件
+ok 5 - trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件
+  ---
+  duration_ms: 82.6303
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）
+ok 6 - trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）
+  ---
+  duration_ms: 24.7283
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：reconcile 在提交点后 phase 滞后时识别 split，且不伪造客户事件（C2a 归属）
+ok 7 - trunk-runtime：reconcile 在提交点后 phase 滞后时识别 split，且不伪造客户事件（C2a 归属）
+  ---
+  duration_ms: 57.4314
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 873.2267

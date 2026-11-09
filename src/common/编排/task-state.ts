@@ -48,8 +48,10 @@ import {
   DETAIL_AMENDMENT_TARGET_KINDS,
   DOC_FREEZE_APPLICATION_REASONS,
   DOC_FREEZE_CUSTOMER_REASONS,
+  DOC_FREEZE_JUDGE_DELEGATED_REASONS,
   DOC_FREEZE_REASONS,
   DOC_FREEZE_SCHEMA,
+  isJudgeDelegatedSource,
   REFACTOR_FORBIDDEN_KINDS,
   REFACTOR_MANAGED_BY,
   REFACTOR_REASON_MAX,
@@ -836,6 +838,20 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       if (!isDirectActionSource(source) || source.kind !== origin || rec["decisionId"] !== undefined || rec["decidedBy"] !== undefined
         || (source.kind === "role-direct" ? reason !== "role-direct-applied" || source.applicationId !== rec["applicationId"] || source.actorRoleId !== rec["actorRoleId"]
           : !customerReason || source.disposition !== "select" || rec["actorRoleId"] !== "chief")) return { ok: false, message: "doc.freeze direct source binding invalid" };
+    } else if (origin === "judge-delegated") {
+      // 2026-11-09 judge-delegated（W-J2/I-24/F3）：judge 代批冻结账本行（防御/未来路径；当前无 doc.freeze 生产者）。
+      // 与 Model 分支同条件：reason 仅 proposal-confirmed/intent-confirmed；无客户字段；source 从 actionSource
+      // 读取且自洽；applicationId 按 requestId 派生；at === source.at（= 冻结 frozenAt）。
+      const source = rec["actionSource"];
+      if (!isOneOf(DOC_FREEZE_JUDGE_DELEGATED_REASONS, reason)) return { ok: false, message: "doc.freeze judge reason 非法" };
+      if (!isJudgeDelegatedSource(source)) return { ok: false, message: "doc.freeze judge source 非法" };
+      if (rec["decidedBy"] !== undefined || rec["decisionId"] !== undefined || rec["actorRoleId"] !== undefined) {
+        return { ok: false, message: "doc.freeze judge 不得携带客户字段" };
+      }
+      const expected = reason === "intent-confirmed" ? { prefix: "intent", cardKind: "intent-confirm" } : { prefix: "proposal", cardKind: "proposal" };
+      if (rec["applicationId"] !== `${expected.prefix}-${source.requestId}`) return { ok: false, message: "doc.freeze judge applicationId 不匹配" };
+      if (source.cardKind !== expected.cardKind) return { ok: false, message: "doc.freeze judge cardKind 与 reason 不匹配" };
+      if (rec["at"] !== source.at) return { ok: false, message: "doc.freeze judge at 与 source.at 不一致" };
     } else if (!customerReason && !applicationReason) return { ok: false, message: "doc.freeze.reason 归属未定义" };
     else if (origin !== "customer" && origin !== "application") return { ok: false, message: "doc.freeze.origin 非法" };
     else if (customerReason) {

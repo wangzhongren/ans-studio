@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: A：散文 boundary.md（存在、被读到、解析 0 条）→ parseError，文案含原因与出路（改写为 boundary.yaml）
+ok 1 - A：散文 boundary.md（存在、被读到、解析 0 条）→ parseError，文案含原因与出路（改写为 boundary.yaml）
+  ---
+  duration_ms: 5.421
+  type: 'test'
+  ...
+# Subtest: A：listProject 对散文边界角色记 warning（既有通道）并跳过；一切被列角色都无「0 条且无 parseError」
+ok 2 - A：listProject 对散文边界角色记 warning（既有通道）并跳过；一切被列角色都无「0 条且无 parseError」
+  ---
+  duration_ms: 3.2829
+  type: 'test'
+  ...
+# Subtest: A：闸链贯通——resolveBoundarySection(角色) 得 parseError；resolveWrite 拒绝理由与 format-denial 渲染均呈现原因
+ok 3 - A：闸链贯通——resolveBoundarySection(角色) 得 parseError；resolveWrite 拒绝理由与 format-denial 渲染均呈现原因
+  ---
+  duration_ms: 1.7111
+  type: 'test'
+  ...
+# Subtest: A 反向：代码合成边界（内置 / 治理种子 / 未知角色回退）一律无 parseError——修复只针对文件解析
+ok 4 - A 反向：代码合成边界（内置 / 治理种子 / 未知角色回退）一律无 parseError——修复只针对文件解析
+  ---
+  duration_ms: 0.4047
+  type: 'test'
+  ...
+# Subtest: A 反向：YAML 显式 entries: []（作者按声明格式明确表达空集）→ 无 parseError，角色仍可枚举（O1 角落语义）
+ok 5 - A 反向：YAML 显式 entries: []（作者按声明格式明确表达空集）→ 无 parseError，角色仍可枚举（O1 角落语义）
+  ---
+  duration_ms: 16.8097
+  type: 'test'
+  ...
+# Subtest: A 兼容：.md 带合法 legacy 表格仍解析出条目；散文写成 boundary.yaml 走严格 YAML 报错（既响亮路径）
+ok 6 - A 兼容：.md 带合法 legacy 表格仍解析出条目；散文写成 boundary.yaml 走严格 YAML 报错（既响亮路径）
+  ---
+  duration_ms: 6.3515
+  type: 'test'
+  ...
+# Subtest: C：su 内置卡文本写死「角色边界必须是 boundary.yaml（YAML）」+ 最小可抄示例 + 散文不会被解析
+ok 7 - C：su 内置卡文本写死「角色边界必须是 boundary.yaml（YAML）」+ 最小可抄示例 + 散文不会被解析
+  ---
+  duration_ms: 0.1444
+  type: 'test'
+  ...
+# Subtest: C：治理种子（governanceBoundaryEntries）的角色卡条目 purpose 明示 boundary.yaml（YAML：role+entries）
+ok 8 - C：治理种子（governanceBoundaryEntries）的角色卡条目 purpose 明示 boundary.yaml（YAML：role+entries）
+  ---
+  duration_ms: 0.0725
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 237.4224

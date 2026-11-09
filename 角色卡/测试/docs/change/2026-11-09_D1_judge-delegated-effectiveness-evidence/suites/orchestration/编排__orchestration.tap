@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: parseRoleRunArgs 解析角色与任务（带 role/run 前导词）
+ok 1 - parseRoleRunArgs 解析角色与任务（带 role/run 前导词）
+  ---
+  duration_ms: 1.0393
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 支持 --task= 形式且可省略前导词
+ok 2 - parseRoleRunArgs 支持 --task= 形式且可省略前导词
+  ---
+  duration_ms: 0.0874
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 解析 --runtime（两种写法），非法值记为用法错误
+ok 3 - parseRoleRunArgs 解析 --runtime（两种写法），非法值记为用法错误
+  ---
+  duration_ms: 0.16
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 缺角色与缺 --task 记为用法错误（不再回退演示值）
+ok 4 - parseRoleRunArgs 缺角色与缺 --task 记为用法错误（不再回退演示值）
+  ---
+  duration_ms: 0.0681
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 未知参数与多余裸词记为用法错误
+ok 5 - parseRoleRunArgs 未知参数与多余裸词记为用法错误
+  ---
+  duration_ms: 0.0708
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 选项缺值记为用法错误
+ok 6 - parseRoleRunArgs 选项缺值记为用法错误
+  ---
+  duration_ms: 0.0596
+  type: 'test'
+  ...
+# Subtest: parseTaskId 取 --task，缺省回退
+ok 7 - parseTaskId 取 --task，缺省回退
+  ---
+  duration_ms: 0.0651
+  type: 'test'
+  ...
+# Subtest: requireProjectConfig 有注入值即原样返回
+ok 8 - requireProjectConfig 有注入值即原样返回
+  ---
+  duration_ms: 0.1017
+  type: 'test'
+  ...
+# Subtest: requireProjectConfig 缺注入抛清晰错误（不回退演示副本）
+ok 9 - requireProjectConfig 缺注入抛清晰错误（不回退演示副本）
+  ---
+  duration_ms: 0.2377
+  type: 'test'
+  ...
+# Subtest: requireTaskScope 缺注入抛清晰错误（不回退演示副本）
+ok 10 - requireTaskScope 缺注入抛清晰错误（不回退演示副本）
+  ---
+  duration_ms: 0.1227
+  type: 'test'
+  ...
+# Subtest: 夹具（模拟装配演示配置）六个角色且边界路径用 .yaml
+ok 11 - 夹具（模拟装配演示配置）六个角色且边界路径用 .yaml
+  ---
+  duration_ms: 0.1576
+  type: 'test'
+  ...
+# Subtest: 夹具任务写集是编排边界的子集
+ok 12 - 夹具任务写集是编排边界的子集
+  ---
+  duration_ms: 0.0516
+  type: 'test'
+  ...
+# Subtest: formatEvent 拒绝事件按根分组列出允许路径
+ok 13 - formatEvent 拒绝事件按根分组列出允许路径
+  ---
+  duration_ms: 0.1298
+  type: 'test'
+  ...
+# Subtest: formatEvent 无 detail 时只输出一行
+ok 14 - formatEvent 无 detail 时只输出一行
+  ---
+  duration_ms: 0.0419
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 81.6096

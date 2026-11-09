@@ -1,0 +1,33 @@
+TAP version 13
+# Subtest: S5 Claude：SDK MCP registerTool 实际收到四个后台工具
+ok 1 - S5 Claude：SDK MCP registerTool 实际收到四个后台工具
+  ---
+  duration_ms: 20.0965
+  type: 'test'
+  ...
+# Subtest: S5 Codex：thread/start 的 dynamicTools 实际包含四个后台工具
+ok 2 - S5 Codex：thread/start 的 dynamicTools 实际包含四个后台工具
+  ---
+  duration_ms: 77.0824
+  type: 'test'
+  ...
+# [pi] 加载 Pi 包…
+# [pi] 构造显式 provider…
+# [pi] resourceLoader.reload…
+# [pi] createAgentSession…
+# [pi] bindRole 完成
+# Subtest: S5 Pi：生产入口（"tools" in adapterInput）把四个后台工具注册为 customTools
+ok 3 - S5 Pi：生产入口（"tools" in adapterInput）把四个后台工具注册为 customTools
+  ---
+  duration_ms: 590.2373
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1300.0433

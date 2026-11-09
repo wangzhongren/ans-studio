@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 1 - wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 6550.143
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6861.1694

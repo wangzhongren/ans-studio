@@ -1,0 +1,8 @@
+file	status	tests	pass	fail	cancelled	skipped	todo	exit	duration_s
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	natural	1	0	1	0	0	0	1	64
+test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts	natural	2	2	0	0	0	0	0	0
+test/测试/git-run-stop-host-continuation-e2e.test.ts	natural	1	1	0	0	0	0	0	49
+test/测试/git-action-delivery-claude-e2e.test.ts	natural	1	0	1	0	0	0	1	69
+test/测试/git-action-activation-e2e.test.ts	natural	1	1	0	0	0	0	0	48
+test/测试/git-action-commit-pi-e2e.test.ts	hang(300s)	2	1	1	0	0	0	124	300
+test/测试/git-action-commit-claude-e2e.test.ts	natural	1	1	0	0	0	0	0	56

@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: 未注入 viewImage ⇒ view_image 不注册（能力缺席 = fail-closed），基础工具集不变
+ok 1 - 未注入 viewImage ⇒ view_image 不注册（能力缺席 = fail-closed），基础工具集不变
+  ---
+  duration_ms: 2.1158
+  type: 'test'
+  ...
+# Subtest: 注入 viewImage ⇒ 只新增 view_image；既有工具 schema/描述/显示规则/执行模式零变化
+ok 2 - 注入 viewImage ⇒ 只新增 view_image；既有工具 schema/描述/显示规则/执行模式零变化
+  ---
+  duration_ms: 0.53
+  type: 'test'
+  ...
+# Subtest: view_image schema：仅 {path}、必填、拒绝未知参数，文案钉住同轮附图优先/下一轮回退/路径/类型/大小/不假装已看
+ok 3 - view_image schema：仅 {path}、必填、拒绝未知参数，文案钉住同轮附图优先/下一轮回退/路径/类型/大小/不假装已看
+  ---
+  duration_ms: 0.217
+  type: 'test'
+  ...
+# Subtest: 合法 png/jpeg（含大写扩展名）/webp/gif：读取二进制、base64 与 MIME 正确，能力收到 {path,image}
+ok 4 - 合法 png/jpeg（含大写扩展名）/webp/gif：读取二进制、base64 与 MIME 正确，能力收到 {path,image}
+  ---
+  duration_ms: 10.8504
+  type: 'test'
+  ...
+# Subtest: 能力成功回执的 message 附在固定文案之后（不破坏「已读取并排队」句）
+ok 5 - 能力成功回执的 message 附在固定文案之后（不破坏「已读取并排队」句）
+  ---
+  duration_ms: 1.4429
+  type: 'test'
+  ...
+# Subtest: 路径非法（缺 path/空/NUL/绝对/盘符/.. 越界/目录/不存在）⇒ 工具失败且不调用能力
+ok 6 - 路径非法（缺 path/空/NUL/绝对/盘符/.. 越界/目录/不存在）⇒ 工具失败且不调用能力
+  ---
+  duration_ms: 1.5429
+  type: 'test'
+  ...
+# Subtest: 不支持的类型与超过 10 MB 均失败且不调用能力
+ok 7 - 不支持的类型与超过 10 MB 均失败且不调用能力
+  ---
+  duration_ms: 5.6143
+  type: 'test'
+  ...
+# Subtest: 能力失败/抛错/契约外回执 ⇒ 工具失败并如实说明未排队（不谎报已提供）
+ok 8 - 能力失败/抛错/契约外回执 ⇒ 工具失败并如实说明未排队（不谎报已提供）
+  ---
+  duration_ms: 2.7281
+  type: 'test'
+  ...
+# Subtest: 本轮已中止（next-turn）：兜底文案保持「排队未获确认 / 下一轮以系统为准」，不调用能力
+ok 9 - 本轮已中止（next-turn）：兜底文案保持「排队未获确认 / 下一轮以系统为准」，不调用能力
+  ---
+  duration_ms: 1.1258
+  type: 'test'
+  ...
+# Subtest: 本轮已中止（tool-result）：兜底文案不声称排队/下一轮，不交付图片、不调用能力
+ok 10 - 本轮已中止（tool-result）：兜底文案不声称排队/下一轮，不交付图片、不调用能力
+  ---
+  duration_ms: 1.5475
+  type: 'test'
+  ...
+# Subtest: RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通过），demo 仍 next-turn；Claude 5 MB；数值与冻结状态
+ok 11 - RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通过），demo 仍 next-turn；Claude 5 MB；数值与冻结状态
+  ---
+  duration_ms: 0.1803
+  type: 'test'
+  ...
+# Subtest: policy next-turn（显式注入）：能力调用与成功回执逐字不变；结果不带 images；turnId 透传
+ok 12 - policy next-turn（显式注入）：能力调用与成功回执逐字不变；结果不带 images；turnId 透传
+  ---
+  duration_ms: 1.3291
+  type: 'test'
+  ...
+# Subtest: policy tool-result：成功结果带 images + imageDelivery；message 来自共享 i18n key；能力收到 turnId
+ok 13 - policy tool-result：成功结果带 images + imageDelivery；message 来自共享 i18n key；能力收到 turnId
+  ---
+  duration_ms: 1.5339
+  type: 'test'
+  ...
+# Subtest: 旧回执 {ok:true}（无 mode）按 next-turn 处理：policy tool-result 下也不交付图片（诚实回退）
+ok 14 - 旧回执 {ok:true}（无 mode）按 next-turn 处理：policy tool-result 下也不交付图片（诚实回退）
+  ---
+  duration_ms: 2.1098
+  type: 'test'
+  ...
+# Subtest: 交付契约一致性：policy next-turn + 回执 mode tool-result、非法 mode ⇒ fail-closed 无图不谎称
+ok 15 - 交付契约一致性：policy next-turn + 回执 mode tool-result、非法 mode ⇒ fail-closed 无图不谎称
+  ---
+  duration_ms: 1.4708
+  type: 'test'
+  ...
+# Subtest: tool-result 下校验失败不带图且不调用能力（路径/类型/大小矩阵保留）
+ok 16 - tool-result 下校验失败不带图且不调用能力（路径/类型/大小矩阵保留）
+  ---
+  duration_ms: 1.3103
+  type: 'test'
+  ...
+# Subtest: 每轮图片预算已移除：同一轮连续 6 张图片全部成功交付
+ok 17 - 每轮图片预算已移除：同一轮连续 6 张图片全部成功交付
+  ---
+  duration_ms: 6.2917
+  type: 'test'
+  ...
+# Subtest: 更严单图上限：超限失败且不触达能力
+ok 18 - 更严单图上限：超限失败且不触达能力
+  ---
+  duration_ms: 1.2492
+  type: 'test'
+  ...
+# Subtest: 审计：view_image.result 只记 path/mime/bytes/delivery/reason，不落 base64 或 data URL
+ok 19 - 审计：view_image.result 只记 path/mime/bytes/delivery/reason，不落 base64 或 data URL
+  ---
+  duration_ms: 7.0318
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 268.1748

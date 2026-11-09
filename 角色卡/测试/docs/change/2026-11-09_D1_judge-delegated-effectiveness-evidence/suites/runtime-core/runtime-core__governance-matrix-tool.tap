@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: AC-2 注册：未注入 ⇒ governance_matrix 不存在；注入 ⇒ 只新增这一只且既有工具零变化；构造不调用函数
+ok 1 - AC-2 注册：未注入 ⇒ governance_matrix 不存在；注入 ⇒ 只新增这一只且既有工具零变化；构造不调用函数
+  ---
+  duration_ms: 2.3894
+  type: 'test'
+  ...
+# Subtest: AC-2 schema/文案：参数仅 roleId+section、enum 三值、additionalProperties:false；只读/unknown/非批准
+ok 2 - AC-2 schema/文案：参数仅 roleId+section、enum 三值、additionalProperties:false；只读/unknown/非批准
+  ---
+  duration_ms: 0.2211
+  type: 'test'
+  ...
+# Subtest: AC-2 参数矩阵：合法值 trim 后透传；未知参数/非法类型/空 roleId/非法 section 在调用前拒绝
+ok 3 - AC-2 参数矩阵：合法值 trim 后透传；未知参数/非法类型/空 roleId/非法 section 在调用前拒绝
+  ---
+  duration_ms: 0.4961
+  type: 'test'
+  ...
+# Subtest: AC-2/AC-16 回执：ok/message 原样转达；抛错与畸形回执 fail-closed、不编造权限
+ok 4 - AC-2/AC-16 回执：ok/message 原样转达；抛错与畸形回执 fail-closed、不编造权限
+  ---
+  duration_ms: 0.5286
+  type: 'test'
+  ...
+# Subtest: AC-16 工具结果只有 ok/message，不含 allowed/denied/批准/验收字段
+ok 5 - AC-16 工具结果只有 ok/message，不含 allowed/denied/批准/验收字段
+  ---
+  duration_ms: 0.1704
+  type: 'test'
+  ...
+# Subtest: AC-2 中止：已中止的调用不触达函数并如实返回未完成
+ok 6 - AC-2 中止：已中止的调用不触达函数并如实返回未完成
+  ---
+  duration_ms: 0.2557
+  type: 'test'
+  ...
+# Subtest: AC-2/AC-11 无副作用：工具调用前后临时目录文件树不变（不写盘/不写账本）
+ok 7 - AC-2/AC-11 无副作用：工具调用前后临时目录文件树不变（不写盘/不写账本）
+  ---
+  duration_ms: 2.9091
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2/AC-15 Service 透传：注入⇒工具存在；未注入⇒不存在；判断会话结构性无该工具；contextSections 透传/缺省不下发
+ok 8 - AC-1/AC-2/AC-15 Service 透传：注入⇒工具存在；未注入⇒不存在；判断会话结构性无该工具；contextSections 透传/缺省不下发
+  ---
+  duration_ms: 12.4548
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 243.6152

@@ -1,0 +1,6 @@
+--- "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/fails-pre.txt"	2026-11-09 16:06:09.594205300 +0800
++++ "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-09_WJ5_judge-delegated-evidence/amendment/compare/fails-post.txt"	2026-11-09 16:06:09.897379900 +0800
+@@ -1,3 +1 @@
+-2026-11-09_judge-delegated-effectiveness	W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 激活 → pin/run；并钉住 nominator d3-by 缺口
+ git-action-commit-pi-e2e	test\\测试\\git-action-commit-pi-e2e.test.ts
+-git-action-delivery-claude-e2e	test\\测试\\git-action-delivery-claude-e2e.test.ts

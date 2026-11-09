@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: real fields survive projection; nonzero exit is not parsed from message, block is a separate fact
+ok 1 - real fields survive projection; nonzero exit is not parsed from message, block is a separate fact
+  ---
+  duration_ms: 2.025
+  type: 'test'
+  ...
+# Subtest: target selection is exactly the actual Core alias contract; custom names do not imply rules
+ok 2 - target selection is exactly the actual Core alias contract; custom names do not imply rules
+  ---
+  duration_ms: 0.1836
+  type: 'test'
+  ...
+# Subtest: native fallback only takes explicit text; native outcome wins and unsupported objects never serialize
+ok 3 - native fallback only takes explicit text; native outcome wins and unsupported objects never serialize
+  ---
+  duration_ms: 0.2881
+  type: 'test'
+  ...
+# Subtest: profile capture is required, custom actual credentials are registered in memory and cannot rebind
+ok 4 - profile capture is required, custom actual credentials are registered in memory and cannot rebind
+  ---
+  duration_ms: 0.3965
+  type: 'test'
+  ...
+# Subtest: known values and patterns are protected before truncation; IDs never pass through a redactor
+ok 5 - known values and patterns are protected before truncation; IDs never pass through a redactor
+  ---
+  duration_ms: 0.5058
+  type: 'test'
+  ...
+# Subtest: UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection
+ok 6 - UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection
+  ---
+  duration_ms: 3.2909
+  type: 'test'
+  ...
+# Subtest: projection faults and oversize identity produce messages without fabricated business conclusions
+ok 7 - projection faults and oversize identity produce messages without fabricated business conclusions
+  ---
+  duration_ms: 2.9585
+  type: 'test'
+  ...
+# Subtest: control characters use a visible replacement independently of Unicode clipping
+ok 8 - control characters use a visible replacement independently of Unicode clipping
+  ---
+  duration_ms: 0.101
+  type: 'test'
+  ...
+# Subtest: a source truncation flag alone is preserved without falsely attributing it to the display budget
+ok 9 - a source truncation flag alone is preserved without falsely attributing it to the display budget
+  ---
+  duration_ms: 0.1492
+  type: 'test'
+  ...
+# Subtest: F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged
+ok 10 - F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged
+  ---
+  duration_ms: 0.2814
+  type: 'test'
+  ...
+# Subtest: F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result
+ok 11 - F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result
+  ---
+  duration_ms: 0.131
+  type: 'test'
+  ...
+# Subtest: F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers
+ok 12 - F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers
+  ---
+  duration_ms: 0.1247
+  type: 'test'
+  ...
+# Subtest: F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording
+ok 13 - F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording
+  ---
+  duration_ms: 0.0846
+  type: 'test'
+  ...
+# Subtest: F-8-a re-projection keeps exitCode and timedOut through the persisted-event path
+ok 14 - F-8-a re-projection keeps exitCode and timedOut through the persisted-event path
+  ---
+  duration_ms: 0.1572
+  type: 'test'
+  ...
+# Subtest: cleanPatterns URL boundary (A-base): reproduction turns positive — 2nd title, entry-cap suffix and bracket tail stay complete
+ok 15 - cleanPatterns URL boundary (A-base): reproduction turns positive — 2nd title, entry-cap suffix and bracket tail stay complete
+  ---
+  duration_ms: 0.1203
+  type: 'test'
+  ...
+# Subtest: cleanPatterns URL boundary (A-base): adversarial zero-leak battery — CJK query values stay stripped across full-width separators
+ok 16 - cleanPatterns URL boundary (A-base): adversarial zero-leak battery — CJK query values stay stripped across full-width separators
+  ---
+  duration_ms: 0.1361
+  type: 'test'
+  ...
+# Subtest: cleanPatterns URL boundary (A-base): ASCII semicolon path params stay inside the URL; redacted/truncated markers unchanged
+ok 17 - cleanPatterns URL boundary (A-base): ASCII semicolon path params stay inside the URL; redacted/truncated markers unchanged
+  ---
+  duration_ms: 0.0745
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 95.7535

@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: 显式写目标：cp 目标越界 ⇒ deny（列出目标），边界内 ⇒ pass 且逐目标过 checkWrite
+ok 1 - 显式写目标：cp 目标越界 ⇒ deny（列出目标），边界内 ⇒ pass 且逐目标过 checkWrite
+  ---
+  duration_ms: 1.9671
+  type: 'test'
+  ...
+# Subtest: mv/rename 源也被删除 ⇒ 源+目标都判定；rm/touch/mkdir/tee 全部目标判定
+ok 2 - mv/rename 源也被删除 ⇒ 源+目标都判定；rm/touch/mkdir/tee 全部目标判定
+  ---
+  duration_ms: 0.4134
+  type: 'test'
+  ...
+# Subtest: sed -i / chmod / ln 目标解析；禁写前缀优先于 checkWrite（.ans/、角色卡/）
+ok 3 - sed -i / chmod / ln 目标解析；禁写前缀优先于 checkWrite（.ans/、角色卡/）
+  ---
+  duration_ms: 0.2402
+  type: 'test'
+  ...
+# Subtest: 逃逸防御：绝对路径越界 / `..` 逃出项目根 ⇒ deny；项目内绝对路径可判定
+ok 4 - 逃逸防御：绝对路径越界 / `..` 逃出项目根 ⇒ deny；项目内绝对路径可判定
+  ---
+  duration_ms: 0.6588
+  type: 'test'
+  ...
+# Subtest: 脚本审查（v2.3/R2）：解释器脚本/npm run（非例行）/npm install/构建工具 ⇒ script（携带内容）；只读命令 pass
+ok 5 - 脚本审查（v2.3/R2）：解释器脚本/npm run（非例行）/npm install/构建工具 ⇒ script（携带内容）；只读命令 pass
+  ---
+  duration_ms: 2.4314
+  type: 'test'
+  ...
+# Subtest: 例行命令确定性白名单（§5.1/§5.3）：命中 ⇒ pass（不进脚本审查），且与分类器同一谓词
+ok 6 - 例行命令确定性白名单（§5.1/§5.3）：命中 ⇒ pass（不进脚本审查），且与分类器同一谓词
+  ---
+  duration_ms: 1.2313
+  type: 'test'
+  ...
+# Subtest: mv/rename 源删除：源越界/目标越界都 deny；源与目标均在写区内 pass
+ok 7 - mv/rename 源删除：源越界/目标越界都 deny；源与目标均在写区内 pass
+  ---
+  duration_ms: 0.2552
+  type: 'test'
+  ...
+# Subtest: cwd 不在项目根（旧桩/异常）⇒ 以项目根为基准，不按外部目录解释后放行
+ok 8 - cwd 不在项目根（旧桩/异常）⇒ 以项目根为基准，不按外部目录解释后放行
+  ---
+  duration_ms: 0.0982
+  type: 'test'
+  ...
+# Subtest: TaskScope 收窄经由注入的 checkWrite 生效（守卫不另写路径判定）
+ok 9 - TaskScope 收窄经由注入的 checkWrite 生效（守卫不另写路径判定）
+  ---
+  duration_ms: 0.1101
+  type: 'test'
+  ...
+# Subtest: P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny；不可解析 ⇒ script（交审查）
+ok 10 - P6 返工（客户 Q1/Q2 口径修正）：静态可证明越界 ⇒ deny；不可解析 ⇒ script（交审查）
+  ---
+  duration_ms: 1.0755
+  type: 'test'
+  ...
+# Subtest: 只读 Git 入口规则：缺省/run_shell ⇒ pass；start_background_task ⇒ deny；写形态两入口都 deny
+ok 11 - 只读 Git 入口规则：缺省/run_shell ⇒ pass；start_background_task ⇒ deny；写形态两入口都 deny
+  ---
+  duration_ms: 0.6415
+  type: 'test'
+  ...
+# Subtest: C2b 冻结注入：frozen 拒绝 / draft 允许 / unknown fail-closed；缺省保留旧「存在即拒」
+ok 12 - C2b 冻结注入：frozen 拒绝 / draft 允许 / unknown fail-closed；缺省保留旧「存在即拒」
+  ---
+  duration_ms: 2.4509
+  type: 'test'
+  ...
+# Subtest: C2b shell 写 stable 一律拒绝（C7）；opaque 提及 stable 也拒绝；注入许可不放行
+ok 13 - C2b shell 写 stable 一律拒绝（C7）；opaque 提及 stable 也拒绝；注入许可不放行
+  ---
+  duration_ms: 1.5657
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 165.054

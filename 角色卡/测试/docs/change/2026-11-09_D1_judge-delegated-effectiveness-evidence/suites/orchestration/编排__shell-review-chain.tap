@@ -1,0 +1,148 @@
+TAP version 13
+# Subtest: (c) 白名单 → 放行，且**不经 (b)/(a)**（桩未被调用）
+ok 1 - (c) 白名单 → 放行，且**不经 (b)/(a)**（桩未被调用）
+  ---
+  duration_ms: 2.9351
+  type: 'test'
+  ...
+# Subtest: (c) 硬拒 → 拒绝、终结，**(b)/(a) 未被调用**（硬地板不可被翻案）
+ok 2 - (c) 硬拒 → 拒绝、终结，**(b)/(a) 未被调用**（硬地板不可被翻案）
+  ---
+  duration_ms: 0.2571
+  type: 'test'
+  ...
+# Subtest: (c) review → 进 (b)；(b) 放行 → 放行（审计 b-allow，by 记 pm 会话/模型）
+ok 3 - (c) review → 进 (b)；(b) 放行 → 放行（审计 b-allow，by 记 pm 会话/模型）
+  ---
+  duration_ms: 0.5132
+  type: 'test'
+  ...
+# Subtest: (c) review → (b) 拒绝 → 拒绝（审计 b-deny）
+ok 4 - (c) review → (b) 拒绝 → 拒绝（审计 b-deny）
+  ---
+  duration_ms: 0.3106
+  type: 'test'
+  ...
+# Subtest: (b) 拿不准 → 升级 (a) → (a) 放行 = 放行（升级链 b-unsure→a-allow 可辨识）
+ok 5 - (b) 拿不准 → 升级 (a) → (a) 放行 = 放行（升级链 b-unsure→a-allow 可辨识）
+  ---
+  duration_ms: 0.4122
+  type: 'test'
+  ...
+# Subtest: (b) 审读超时 → 升级 (a)（分支 b-timeout→…；绝不视为放行）
+ok 6 - (b) 审读超时 → 升级 (a)（分支 b-timeout→…；绝不视为放行）
+  ---
+  duration_ms: 29.1549
+  type: 'test'
+  ...
+# Subtest: (b) 无 pm 会话（未注入 pmAsk）→ 升级 (a)（分支 b-unavailable→…）
+ok 7 - (b) 无 pm 会话（未注入 pmAsk）→ 升级 (a)（分支 b-unavailable→…）
+  ---
+  duration_ms: 0.2933
+  type: 'test'
+  ...
+# Subtest: (b) 输出不可解析 → **直接拒绝**（M-2：fail-closed；**不升 (a)、不重试、不打扰客户**）
+ok 8 - (b) 输出不可解析 → **直接拒绝**（M-2：fail-closed；**不升 (a)、不重试、不打扰客户**）
+  ---
+  duration_ms: 0.2286
+  type: 'test'
+  ...
+# Subtest: (b) 围栏包裹的合法 JSON → 解析容错照旧生效（提示收紧之外的解析侧容错仍在）
+ok 9 - (b) 围栏包裹的合法 JSON → 解析容错照旧生效（提示收紧之外的解析侧容错仍在）
+  ---
+  duration_ms: 0.1993
+  type: 'test'
+  ...
+# Subtest: (b) 报错（会话打不开）→ 升级 (a)（分支 b-unavailable→…）
+ok 10 - (b) 报错（会话打不开）→ 升级 (a)（分支 b-unavailable→…）
+  ---
+  duration_ms: 0.3007
+  type: 'test'
+  ...
+# Subtest: (a) 拒绝 → 拒绝（分支 b-unsure→a-deny）
+ok 11 - (a) 拒绝 → 拒绝（分支 b-unsure→a-deny）
+  ---
+  duration_ms: 0.2061
+  type: 'test'
+  ...
+# Subtest: (a) 通道不可用 → 转达通道真实 reason（F-4-X1）且拒绝
+ok 12 - (a) 通道不可用 → 转达通道真实 reason（F-4-X1）且拒绝
+  ---
+  duration_ms: 0.2077
+  type: 'test'
+  ...
+# Subtest: (a) 确认超时 → 拒绝（分支 b-unsure→a-timeout）
+ok 13 - (a) 确认超时 → 拒绝（分支 b-unsure→a-timeout）
+  ---
+  duration_ms: 29.0911
+  type: 'test'
+  ...
+# Subtest: (a) 通道未接入（注入了 (b) 但无 (a)）→ 拒绝（绝不视为放行）
+ok 14 - (a) 通道未接入（注入了 (b) 但无 (a)）→ 拒绝（绝不视为放行）
+  ---
+  duration_ms: 0.5617
+  type: 'test'
+  ...
+# Subtest: 审计记录含 by 与 branch，且每层分支可辨识（c→b→a 逐层分别核对）
+ok 15 - 审计记录含 by 与 branch，且每层分支可辨识（c→b→a 逐层分别核对）
+  ---
+  duration_ms: 1.0643
+  type: 'test'
+  ...
+# Subtest: parsePmVerdict：合法/围栏/夹带文字/非法/缺字段/null 的解析
+ok 16 - parsePmVerdict：合法/围栏/夹带文字/非法/缺字段/null 的解析
+  ---
+  duration_ms: 1.2998
+  type: 'test'
+  ...
+# Subtest: createCliOperatorChannel：y→放行、n→拒绝、空/未识别→拒绝、EOF→不可用
+ok 17 - createCliOperatorChannel：y→放行、n→拒绝、空/未识别→拒绝、EOF→不可用
+  ---
+  duration_ms: 0.662
+  type: 'test'
+  ...
+# Subtest: createPmReviewer：注入 openSession 桩 → 返回 pm 回复原文、发审核提示、收口 dispose
+ok 18 - createPmReviewer：注入 openSession 桩 → 返回 pm 回复原文、发审核提示、收口 dispose
+  ---
+  duration_ms: 0.5919
+  type: 'test'
+  ...
+# Subtest: createPmReviewer：openSession 抛错 → 透传抛错（由 shell-gate 判 (b) 不可用 → 升级到 (a)）
+ok 19 - createPmReviewer：openSession 抛错 → 透传抛错（由 shell-gate 判 (b) 不可用 → 升级到 (a)）
+  ---
+  duration_ms: 0.5303
+  type: 'test'
+  ...
+# Subtest: defaultExtractReply：取最后一条 message（跳过「用户指令：」回显）；无 message → 空串
+ok 20 - defaultExtractReply：取最后一条 message（跳过「用户指令：」回显）；无 message → 空串
+  ---
+  duration_ms: 0.1063
+  type: 'test'
+  ...
+# Subtest: R-1：审读者调工具 → 闸读到结构化 verdict 并按结论走（review+allow 放行；deny 拒；unsure/risky 升 (a)）；审读会话不持久化
+ok 21 - R-1：审读者调工具 → 闸读到结构化 verdict 并按结论走（review+allow 放行；deny 拒；unsure/risky 升 (a)）；审读会话不持久化
+  ---
+  duration_ms: 1.0996
+  type: 'test'
+  ...
+# Subtest: R-1：工具参数非法（verdict 不在域内）→ 视同未调用；无正文兜底 → b-unparseable-deny（fail-closed，不升 (a)）
+ok 22 - R-1：工具参数非法（verdict 不在域内）→ 视同未调用；无正文兜底 → b-unparseable-deny（fail-closed，不升 (a)）
+  ---
+  duration_ms: 0.308
+  type: 'test'
+  ...
+# Subtest: R-1 降级路径：未调工具但正文写了 JSON → 文本宽松解析兜底仍生效（围栏亦可）
+ok 23 - R-1 降级路径：未调工具但正文写了 JSON → 文本宽松解析兜底仍生效（围栏亦可）
+  ---
+  duration_ms: 0.1638
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 375.7162

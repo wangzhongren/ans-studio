@@ -1,0 +1,150 @@
+TAP version 13
+# Subtest: R29 Core forwards only its validated cloned Chief decision context; ordinary and judge providers receive no field
+ok 1 - R29 Core forwards only its validated cloned Chief decision context; ordinary and judge providers receive no field
+  ---
+  duration_ms: 14.6318
+  type: 'test'
+  ...
+# Subtest: R28 real Node loads the full single-source Chief resource by application URL from an unrelated cwd
+ok 2 - R28 real Node loads the full single-source Chief resource by application URL from an unrelated cwd
+  ---
+  duration_ms: 201.0799
+  type: 'test'
+  ...
+# {"actualNode":"v24.22.1","cwd":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r28-unrelated-cwd-mDk6RK","sourceUrl":"file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/common/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/workflows/chief/chief-workflow.md","sha256":"9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346","bytes":8724,"resourceVersion":"chief-workflow/v1","applicationVersion":"1.9.2"}
+# Subtest: R28/R30 actual default runtime contexts isolate ordinary Chief workflow, bounded Chief and ordinary judges
+ok 3 - R28/R30 actual default runtime contexts isolate ordinary Chief workflow, bounded Chief and ordinary judges
+  ---
+  duration_ms: 57.7277
+  type: 'test'
+  ...
+# actual default Pi/Claude/Codex ordinary contexts; default Codex bounded Chief compose/prepare/bind with exact one tool and no workflow/MCP; non-Chief rejected; ordinary judge sets remain exact three
+# Subtest: R28 missing or corrupt resource fails before Chief factory creation and never falls back to project card text
+ok 4 - R28 missing or corrupt resource fails before Chief factory creation and never falls back to project card text
+  ---
+  duration_ms: 8.056
+  type: 'test'
+  ...
+# Subtest: R17 a real busy default Chat may finish Core drain after disposal and must refresh its retained terminal evidence
+ok 5 - R17 a real busy default Chat may finish Core drain after disposal and must refresh its retained terminal evidence
+  ---
+  duration_ms: 39.9285
+  type: 'test'
+  ...
+# Subtest: R17 genuine pure context preparation and a pre-native read failure have private never-started evidence
+ok 6 - R17 genuine pure context preparation and a pre-native read failure have private never-started evidence
+  ---
+  duration_ms: 13.3048
+  type: 'test'
+  ...
+# Subtest: R17 a custom factory with an actual effect stays possibly-started regardless of fake construction facts
+ok 7 - R17 a custom factory with an actual effect stays possibly-started regardless of fake construction facts
+  ---
+  duration_ms: 9.5546
+  type: 'test'
+  ...
+# Subtest: R17 timed-out custom construction keeps its real pending continuation and late effect unknown
+ok 8 - R17 timed-out custom construction keeps its real pending continuation and late effect unknown
+  ---
+  duration_ms: 37.5909
+  type: 'test'
+  ...
+# Subtest: R13 actual default Chat keeps HTTP coverage separate from drain and retains real terminal evidence across disposal
+ok 9 - R13 actual default Chat keeps HTTP coverage separate from drain and retains real terminal evidence across disposal
+  ---
+  duration_ms: 10.0956
+  type: 'test'
+  ...
+# Subtest: R13 disposal cannot promote missing raw settlement, missing native evidence, identity drift or a live owned process
+ok 10 - R13 disposal cannot promote missing raw settlement, missing native evidence, identity drift or a live owned process
+  ---
+  duration_ms: 15.0793
+  type: 'test'
+  ...
+# Subtest: R13 a still-running real injected capability remains in the disposed receipt
+ok 11 - R13 a still-running real injected capability remains in the disposed receipt
+  ---
+  duration_ms: 6.7328
+  type: 'test'
+  ...
+# Subtest: abort request without actual provider completion/settled cannot prove stop; late real completion can
+ok 12 - abort request without actual provider completion/settled cannot prove stop; late real completion can
+  ---
+  duration_ms: 93.3245
+  type: 'test'
+  ...
+# Subtest: stream end/Core synthetic settled and disposed empty lists never substitute real provider settled
+ok 13 - stream end/Core synthetic settled and disposed empty lists never substitute real provider settled
+  ---
+  duration_ms: 30.0747
+  type: 'test'
+  ...
+# Subtest: a raced tool handler does not hide its still-running injected capability
+ok 14 - a raced tool handler does not hide its still-running injected capability
+  ---
+  duration_ms: 78.4461
+  type: 'test'
+  ...
+# Subtest: owned synchronous child close is observed; unproven Windows descendant tree stays unknown
+ok 15 - owned synchronous child close is observed; unproven Windows descendant tree stays unknown
+  ---
+  duration_ms: 5567.7352
+  type: 'test'
+  ...
+# Subtest: owned background child is stopped with retained facts; missing tree proof is not empty success
+ok 16 - owned background child is stopped with retained facts; missing tree proof is not empty success
+  ---
+  duration_ms: 5527.0892
+  type: 'test'
+  ...
+# Subtest: native adapter without its own process evidence remains unknown despite a real terminal event
+ok 17 - native adapter without its own process evidence remains unknown despite a real terminal event
+  ---
+  duration_ms: 3.7253
+  type: 'test'
+  ...
+# Subtest: R6 one native hook binds instance/Core turn and returns copied transport/process facts
+ok 18 - R6 one native hook binds instance/Core turn and returns copied transport/process facts
+  ---
+  duration_ms: 27.3471
+  type: 'test'
+  ...
+# Subtest: R6 native proof rejects incomplete transport/children, activity and binding mismatches
+ok 19 - R6 native proof rejects incomplete transport/children, activity and binding mismatches
+  ---
+  duration_ms: 3.4202
+  type: 'test'
+  ...
+# Subtest: R6 unreadable native facts never fall back to a closed flag or legacy lifecycle receipt
+ok 20 - R6 unreadable native facts never fall back to a closed flag or legacy lifecycle receipt
+  ---
+  duration_ms: 27.176
+  type: 'test'
+  ...
+# Subtest: F7/P1.4 C9 stopAndInspect 活动排空循环 drain 即返回：Claude/Pi 覆盖 unknown 不耗满预算（custom-factory disposed 仍按 F6 阻断）
+ok 21 - F7/P1.4 C9 stopAndInspect 活动排空循环 drain 即返回：Claude/Pi 覆盖 unknown 不耗满预算（custom-factory disposed 仍按 F6 阻断）
+  ---
+  duration_ms: 31.7332
+  type: 'test'
+  ...
+# Subtest: F7/P1.4 C9 default-production Claude 未运行会话：disposed receipt 以中性 drain 返回（native 覆盖 unknown 不阻断）
+ok 22 - F7/P1.4 C9 default-production Claude 未运行会话：disposed receipt 以中性 drain 返回（native 覆盖 unknown 不阻断）
+  ---
+  duration_ms: 15.385
+  type: 'test'
+  ...
+# Subtest: F7/S1 非 idle Pi（native:pi-sdk-idle-not-observed）保持阻断：stop 预算耗尽、disposed 标记证据缺失
+ok 23 - F7/S1 非 idle Pi（native:pi-sdk-idle-not-observed）保持阻断：stop 预算耗尽、disposed 标记证据缺失
+  ---
+  duration_ms: 77.6325
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12147.5465

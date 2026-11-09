@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: E7：killProcessTree 只保留一份实现，run_shell 从 process-tree.ts 导入
+ok 1 - E7：killProcessTree 只保留一份实现，run_shell 从 process-tree.ts 导入
+  ---
+  duration_ms: 2.6977
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 115.6869

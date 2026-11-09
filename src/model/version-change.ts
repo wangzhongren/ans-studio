@@ -9,6 +9,9 @@
 // · 不改既有字段语义/不删除/不重命名；新增字段默认可选，旧读者忽略未知字段。
 // · 审计归属（P1.6 §5.5/AC-31）：VCA/修正案的批准/拒绝 = customer；提交/应用/冻结/迁移/bootstrap
 //   = application（不冒充客户）；refactor 无 customer decision。
+// · 2026-11-09 显式契约修订（judge-delegated）：客户开启「替我决策」后的 judge 代批以独立来源
+//   `judge-delegated` 冻结 proposal/intent-confirmed（无 decidedBy/decisionId，不冒充客户）；
+//   客户本人与 chief-delegated 路径逐字不变。
 
 import type { DirectActionReceipt, DirectActionSource, SnapshotRef, TrunkStableFileKind, TrunkVersionRef } from "./trunk.ts";
 import { isDirectActionSource, isSnapshotRef } from "./trunk.ts";
@@ -170,11 +173,14 @@ export type VersionChangeErrorCode = (typeof VERSION_CHANGE_ERROR_CODES)[number]
 // —————————————— doc-freeze/v1 ——————————————
 
 /**
- * 冻结原因（P1.6 §4.5）。归属按触发源区分（AC-31/F35）：
+ * 冻结原因（P1.6 §4.5）。归属按触发源区分（AC-31/F35；2026-11-09 judge-delegated 显式契约修订）：
  * · customer：`vca-approved`/`version-upgrade-approved`/`detail-item-applied`/`proposal-confirmed`/
  *   `intent-confirmed`（客户确认类；`decidedBy:"customer"`）；
  * · application：`amendment-submitted`/`handoff-pin-bootstrap`/`bootstrap-vca-approved`/
- *   `migrated-legacy`（提交/迁移/bootstrap；`decidedBy` 缺省，不冒充客户）。
+ *   `migrated-legacy`（提交/迁移/bootstrap；`decidedBy` 缺省，不冒充客户）；
+ * · judge-delegated（2026-11-09 显式修订）：客户开启「替我决策」且判断 agent 代批时，
+ *   `proposal-confirmed`/`intent-confirmed` 以 `origin:"judge-delegated"` 冻结——携带 judge 来源，
+ *   **无** `decidedBy`/`decisionId`；客户本人路径仍为 customer（见 `DOC_FREEZE_JUDGE_DELEGATED_REASONS`）。
  */
 export type DocFreezeReason =
   | "role-direct-applied"
@@ -213,7 +219,18 @@ export const DOC_FREEZE_APPLICATION_REASONS: readonly DocFreezeReason[] = Object
   "migrated-legacy",
 ]);
 
-export type DocFreezeOrigin = "customer" | "application" | "role-direct" | "chief-delegated";
+/**
+ * judge 代批（2026-11-09；「替我决策」开关开启时判断 agent 代选）可派生冻结的 reason 子集。
+ * 仅两个客户确认类 reason 允许 judge 来源；VCA/version-upgrade/detail/amendment/stable 等
+ * 保持客户本人（Q5 客户主权）。本常量是 `DOC_FREEZE_CUSTOMER_REASONS` 的子集约束，
+ * **不改变** `DOC_FREEZE_REASONS` 全集与 customer/application 两分区。
+ */
+export const DOC_FREEZE_JUDGE_DELEGATED_REASONS: readonly DocFreezeReason[] = Object.freeze([
+  "proposal-confirmed",
+  "intent-confirmed",
+]);
+
+export type DocFreezeOrigin = "customer" | "application" | "role-direct" | "chief-delegated" | "judge-delegated";
 /** New direct freezing never borrows a historical customer-approved reason. */
 export const DOC_FREEZE_DIRECT_REASONS: readonly DocFreezeReason[] = Object.freeze(["role-direct-applied"]);
 
@@ -229,24 +246,87 @@ export const DOC_FREEZE_BASELINE_EVENT_KINDS = Object.freeze([
   "draft-marker",
 ] as const);
 
+/**
+ * judge 代批来源（2026-11-09 judge-delegated；诚实委托来源）。客户开启「替我决策」后判断 agent
+ * 代选产生的冻结来源：**不携带任何客户字段**（无 `decidedBy`/`decisionId`/`actorRoleId`），
+ * 字段按账本 `request.resolved`（及其随行 `judge` 审计）**原值逐字段复制、不截断**（G1 单一策略）。
+ * `selected`（如有）与账本 `resolved.selectedOptionIds`、`confirmed`（如有）与 confirm 选择的
+ * 一致性由冻结生产方/账本重放校验，本类型不自行推断。
+ * 纪律：`engine` 用受限字符串而非 import `RuntimeKind`（本文件仅依赖 ./trunk.ts 的边界）；
+ * `RuntimeKind` 白名单由生产方与冻结/账本消费者交叉校验真实值。
+ */
+export interface JudgeDelegatedSource {
+  kind: "judge-delegated";
+  /** 真实 `request.resolved.requestId`。 */
+  requestId: string;
+  /** `GovernanceJudgeAudit.engine`（如 "claude"/"codex"/"pi"/"demo"）。 */
+  engine: string;
+  model?: string;
+  /** 必须等于 `judge:${engine}`。 */
+  operatorId: string;
+  reasonCode: string;
+  reason?: string;
+  selected?: readonly string[];
+  confirmed?: true;
+  /** "intent-confirm" | "proposal"（与冻结 reason 绑定）。 */
+  cardKind: string;
+  /** 等于 `request.resolved.at` / `freeze.frozenAt`。 */
+  at: string;
+}
+
+/** 冻结记录来源（2026-11-09 显式扩展）：应用内直连来源 + judge 代批来源；客户/幕僚来源不变。 */
+export type DocFreezeSource = DirectActionSource | JudgeDelegatedSource;
+
+/**
+ * judge 代批来源结构守卫（单一实现；冻结生产/校验共用）。只做类型/自洽校验：
+ * 不设长度上限、不截断（G1）；source 与账本的一致性（engine/operatorId/reasonCode/reason/
+ * selected/cardKind/at 逐字段）由冻结生产方与账本重放校验，本函数不读账本。
+ * 任何非法形状（null/非对象/缺字段/engine 空串/operatorId 与 engine 不符/客户字段混入）
+ * 一律 fail-closed、不抛错。
+ */
+export function isJudgeDelegatedSource(value: unknown): value is JudgeDelegatedSource {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const source = value as Partial<JudgeDelegatedSource>;
+  if (source.kind !== "judge-delegated") return false;
+  // judge 来源不得携带任何客户身份/审批字段（审计真实性）。
+  if ((source as Record<string, unknown>).decidedBy !== undefined
+      || (source as Record<string, unknown>).decisionId !== undefined
+      || (source as Record<string, unknown>).actorRoleId !== undefined) return false;
+  if (typeof source.requestId !== "string" || source.requestId.trim() === "") return false;
+  if (typeof source.engine !== "string" || source.engine === "") return false;
+  if (typeof source.operatorId !== "string" || source.operatorId !== `judge:${source.engine}`) return false;
+  if (typeof source.reasonCode !== "string" || source.reasonCode === "") return false;
+  if (source.model !== undefined && typeof source.model !== "string") return false;
+  if (source.reason !== undefined && typeof source.reason !== "string") return false;
+  if (source.selected !== undefined && (!Array.isArray(source.selected)
+      || !source.selected.every(part => typeof part === "string"))) return false;
+  if (source.confirmed !== undefined && source.confirmed !== true) return false;
+  if (typeof source.cardKind !== "string" || source.cardKind === "") return false;
+  if (typeof source.at !== "string" || source.at.trim() === "") return false;
+  return true;
+}
+
 export interface DocFreezeRecord {
   schema: typeof DOC_FREEZE_SCHEMA;
   /**
-   * VCA/amendment/bootstrap application。
-   * `proposal-confirmed`/`intent-confirmed` 无 VCA 时由应用合成非空
-   * `proposal-<decisionId>` / `intent-<decisionId>`（PM 裁决 §4.10-7）；**不得空串**。
+   * 两种历史口径（F4 勘误，2026-11-09）：
+   * · VCA/application 类按客户 `decisionId` 合成非空 `proposal-<decisionId>` /
+   *   `intent-<decisionId>`（PM 裁决 §4.10-7）；
+   * · `intent-confirmed` 的实际生产/复核按 `requestId` 合成 `intent-<requestId>`；
+   * judge-delegated 无客户 decisionId，统一按 `proposal-/intent-<source.requestId>`。**不得空串**。
    */
   applicationId: string;
   reason: DocFreezeReason;
   origin: DocFreezeOrigin;
-  /** 仅客户确认类 reason。 */
+  /** 仅客户确认类 reason（judge-delegated / chief-delegated 不得携带）。 */
   decidedBy?: "customer";
+  /** 客户确认类 reason 的客户 decision id；judge-delegated / chief-delegated 不得携带。 */
   decisionId?: string;
   frozenAt: string;
   /** amendment-submitted: rapporteur；其余按触发源。 */
   actorRoleId?: string;
-  /** Required for new direct-origin records; absent only on historical records. */
-  source?: DirectActionSource;
+  /** Required for new direct-origin records; absent only on historical records. judge-delegated 必带 `JudgeDelegatedSource`。 */
+  source?: DocFreezeSource;
   snapshotRef?: SnapshotRef;
 }
 
@@ -279,6 +359,21 @@ export function isValidDocFreezeRecord(value: unknown): value is DocFreezeRecord
     && record.decidedBy === undefined && record.decisionId === undefined && record.actorRoleId === "chief"
     && isDirectActionSource(record.source) && record.source.kind === "chief-delegated" && record.source.disposition === "select"
     && typeof record.frozenAt === "string" && record.frozenAt.trim() !== "";
+  if (record.origin === "judge-delegated") {
+    // 2026-11-09 judge-delegated：reason 限两值；禁止客户字段；source 自洽；
+    // applicationId/frozenAt 按 requestId 派生（不设长度上限、不截断——G1）。
+    if (!DOC_FREEZE_JUDGE_DELEGATED_REASONS.includes(record.reason as DocFreezeReason)) return false;
+    if (record.decidedBy !== undefined || record.decisionId !== undefined || record.actorRoleId !== undefined) return false;
+    if (!isJudgeDelegatedSource(record.source)) return false;
+    const source = record.source;
+    const expectedCardKind = record.reason === "intent-confirmed" ? "intent-confirm" : "proposal";
+    if (source.cardKind !== expectedCardKind) return false;
+    const applicationPrefix = record.reason === "intent-confirmed" ? "intent" : "proposal";
+    if (record.applicationId !== `${applicationPrefix}-${source.requestId}`) return false;
+    if (typeof record.frozenAt !== "string" || record.frozenAt.trim() === "" || record.frozenAt !== source.at) return false;
+    if (record.snapshotRef !== undefined && !isSnapshotRef(record.snapshotRef)) return false;
+    return true;
+  }
   if (record.origin !== "customer" && record.origin !== "application") return false;
   const customerReason = DOC_FREEZE_CUSTOMER_REASONS.includes(record.reason as DocFreezeReason);
   if (customerReason !== (record.origin === "customer")) return false;

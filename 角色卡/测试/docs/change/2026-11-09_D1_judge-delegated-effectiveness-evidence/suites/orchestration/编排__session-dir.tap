@@ -1,0 +1,79 @@
+TAP version 13
+# Subtest: D-1：项目角色会话传入约定路径 `<projectRoot>/.ans/sessions/<roleId>/`；编排**不预建**目录
+ok 1 - D-1：项目角色会话传入约定路径 `<projectRoot>/.ans/sessions/<roleId>/`；编排**不预建**目录
+  ---
+  duration_ms: 18.2469
+  type: 'test'
+  ...
+# Subtest: D-1：治理角色 su 的会话**同样**拿到 sessionDir（「对每个角色」）
+ok 2 - D-1：治理角色 su 的会话**同样**拿到 sessionDir（「对每个角色」）
+  ---
+  duration_ms: 8.1348
+  type: 'test'
+  ...
+# Subtest: D-1：projectRoot 为空 → 不传 sessionDir（旧行为）
+not ok 3 - D-1：projectRoot 为空 → 不传 sessionDir（旧行为）
+  ---
+  duration_ms: 0.4081
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\session-dir.test.ts:114:1'
+  failureType: 'testCodeFailure'
+  error: "ENOENT: no such file or directory, realpath ''"
+  code: 'ENOENT'
+  stack: |-
+    async realpath (node:internal/fs/promises:1896:10)
+    async readGitProtectionFacts (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/provider/trunk/impl/git-command.ts:576:16)
+    async openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1062:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/session-dir.test.ts:118:18)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D-1：roleId 不安全（含路径分隔符 / ..）→ 不传 sessionDir（防御，防目录逃逸）
+ok 4 - D-1：roleId 不安全（含路径分隔符 / ..）→ 不传 sessionDir（防御，防目录逃逸）
+  ---
+  duration_ms: 8.7263
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 未声明 scope（仅按角色边界，不做任务收窄）
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 会话结束
+# Subtest: D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）
+not ok 5 - D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）
+  ---
+  duration_ms: 9.8785
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\session-dir.test.ts:138:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    runRole（一次性路径）不传 AdapterCapabilities
+    + actual - expected
+    
+    + {
+    +   protectedGitRoots: [
+    +     'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-sessiondir-HJD6Qv\\.git'
+    +   ]
+    + }
+    - undefined
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  actual:
+    protectedGitRoots:
+      0: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-sessiondir-HJD6Qv\\.git'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/session-dir.test.ts:148:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 3
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 346.355

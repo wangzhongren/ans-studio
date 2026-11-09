@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: 好件：readMcpDeclaration 返回完整视图（七字段＋path；env 原文保存不展开；参数/日期/角色口径）
+ok 1 - 好件：readMcpDeclaration 返回完整视图（七字段＋path；env 原文保存不展开；参数/日期/角色口径）
+  ---
+  duration_ms: 30.9519
+  type: 'test'
+  ...
+# Subtest: 坏件（入口防御＋名非法＋保留名＋缺失）⇒ undefined，绝不抛
+ok 2 - 坏件（入口防御＋名非法＋保留名＋缺失）⇒ undefined，绝不抛
+  ---
+  duration_ms: 2.3878
+  type: 'test'
+  ...
+# Subtest: 坏件（解析失败面逐项）：必填缺失/空值/command 控制字符/env 校验/状态未知 ⇒ undefined，绝不抛
+ok 3 - 坏件（解析失败面逐项）：必填缺失/空值/command 控制字符/env 校验/状态未知 ⇒ undefined，绝不抛
+  ---
+  duration_ms: 67.7957
+  type: 'test'
+  ...
+# Subtest: listInstalledMcpServers：installed＋角色命中才收录（按 name 排序、InstalledMcpServerV1 形状）；过滤与诊断逐项
+ok 4 - listInstalledMcpServers：installed＋角色命中才收录（按 name 排序、InstalledMcpServerV1 形状）；过滤与诊断逐项
+  ---
+  duration_ms: 9.3068
+  type: 'test'
+  ...
+# Subtest: listInstalledMcpServers 防御：`docs/mcp` 不存在＝空数组零诊断；不可读（是文件）＝空数组＋mcp-root-unreadable；回调抛错被吞
+ok 5 - listInstalledMcpServers 防御：`docs/mcp` 不存在＝空数组零诊断；不可读（是文件）＝空数组＋mcp-root-unreadable；回调抛错被吞
+  ---
+  duration_ms: 5.0896
+  type: 'test'
+  ...
+# Subtest: 接线注入：Service providerFor 按角色注入 RuntimeProviderOptions.installedMcpServers（纯读、绝不建目录；新 bind 重读）
+ok 6 - 接线注入：Service providerFor 按角色注入 RuntimeProviderOptions.installedMcpServers（纯读、绝不建目录；新 bind 重读）
+  ---
+  duration_ms: 20.4197
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 363.3412

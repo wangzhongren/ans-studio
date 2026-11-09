@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: proposal：意图 + 提案物证 ⇒ ok；台账字段为空、intent.confirmed=true
+ok 1 - proposal：意图 + 提案物证 ⇒ ok；台账字段为空、intent.confirmed=true
+  ---
+  duration_ms: 20.2289
+  type: 'test'
+  ...
+# Subtest: 确定性：同一请求 + 同一盘面 ⇒ 同一 packetSha256
+ok 2 - 确定性：同一请求 + 同一盘面 ⇒ 同一 packetSha256
+  ---
+  duration_ms: 6.8585
+  type: 'test'
+  ...
+# Subtest: D 无 flow/team-plan 门槛：appointment 只靠 recommendedRoleIds；acceptance 不要求流程文件
+ok 3 - D 无 flow/team-plan 门槛：appointment 只靠 recommendedRoleIds；acceptance 不要求流程文件
+  ---
+  duration_ms: 10.9171
+  type: 'test'
+  ...
+# Subtest: 意图缺失 ⇒ intent-missing fail-closed（不得伪造客户确认）
+ok 4 - 意图缺失 ⇒ intent-missing fail-closed（不得伪造客户确认）
+  ---
+  duration_ms: 2.285
+  type: 'test'
+  ...
+# Subtest: §5A 显式 intentId 优先：请求携带 intent-focus-v1 ⇒ packet.source=request
+ok 5 - §5A 显式 intentId 优先：请求携带 intent-focus-v1 ⇒ packet.source=request
+  ---
+  duration_ms: 6.2223
+  type: 'test'
+  ...
+# Subtest: §5A proposal frontmatter 回退：请求未带 intentId ⇒ packet.source=proposal
+ok 6 - §5A proposal frontmatter 回退：请求未带 intentId ⇒ packet.source=proposal
+  ---
+  duration_ms: 2.8793
+  type: 'test'
+  ...
+# Subtest: §5A intentId 不一致 ⇒ intent-ambiguous，拒绝含同源模板与命名规则
+ok 7 - §5A intentId 不一致 ⇒ intent-ambiguous，拒绝含同源模板与命名规则
+  ---
+  duration_ms: 6.3268
+  type: 'test'
+  ...
+# Subtest: §5A 无 frontmatter 的纯 Markdown 意图 ⇒ fail-closed，拒绝含模板片段
+ok 8 - §5A 无 frontmatter 的纯 Markdown 意图 ⇒ fail-closed，拒绝含模板片段
+  ---
+  duration_ms: 5.0795
+  type: 'test'
+  ...
+# Subtest: §5A 两者都缺席时按 flow-id 回落，但证据保留 source=flow-id（不裸猜）
+ok 9 - §5A 两者都缺席时按 flow-id 回落，但证据保留 source=flow-id（不裸猜）
+  ---
+  duration_ms: 2.4693
+  type: 'test'
+  ...
+# Subtest: §5A 产品-only：intentIdSource=product 进入证据包并按 product 标注
+ok 10 - §5A 产品-only：intentIdSource=product 进入证据包并按 product 标注
+  ---
+  duration_ms: 2.4149
+  type: 'test'
+  ...
+# Subtest: §5A 解析冲突 fail-closed：intentResolutionError 进入问题且拒绝含同源模板
+ok 11 - §5A 解析冲突 fail-closed：intentResolutionError 进入问题且拒绝含同源模板
+  ---
+  duration_ms: 2.1599
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 232.3725

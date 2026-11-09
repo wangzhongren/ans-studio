@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: 差分：id/displayName/function/card/capabilities 与旧注册表逐字段一致
+ok 1 - 差分：id/displayName/function/card/capabilities 与旧注册表逐字段一致
+  ---
+  duration_ms: 0.8515
+  type: 'test'
+  ...
+# Subtest: 差分：cards 与 run-role.ts::TRIO_CARD_KINDS.nominator 冻结副本一致
+ok 2 - 差分：cards 与 run-role.ts::TRIO_CARD_KINDS.nominator 冻结副本一致
+  ---
+  duration_ms: 0.0934
+  type: 'test'
+  ...
+# Subtest: 差分：tools() 与旧 run-role 注入条件逐模型一致（trio 才有 activateRoleDocuments）
+ok 3 - 差分：tools() 与旧 run-role 注入条件逐模型一致（trio 才有 activateRoleDocuments）
+  ---
+  duration_ms: 0.1312
+  type: 'test'
+  ...
+# Subtest: 差分：派发硬身份/存在性——in-scope 用例与旧 evaluateDispatchAuthorization 同码
+ok 4 - 差分：派发硬身份/存在性——in-scope 用例与旧 evaluateDispatchAuthorization 同码
+  ---
+  duration_ms: 0.374
+  type: 'test'
+  ...
+# Subtest: 差分（列明）：旧 oracle 不查内置目标存在性；本模块按 E0 §3.5 要求 targetExists=true
+ok 5 - 差分（列明）：旧 oracle 不查内置目标存在性；本模块按 E0 §3.5 要求 targetExists=true
+  ---
+  duration_ms: 0.0831
+  type: 'test'
+  ...
+# Subtest: 差分（列明）：非 nominator 目标不属于本模块范围；旧 oracle 可能允许（由目标模块回答）
+ok 6 - 差分（列明）：非 nominator 目标不属于本模块范围；旧 oracle 可能允许（由目标模块回答）
+  ---
+  duration_ms: 0.0582
+  type: 'test'
+  ...
+# Subtest: 差分：D3 卡形状——与旧 validateAppointmentCardAgainstRoster 同 allow 结论
+ok 7 - 差分：D3 卡形状——与旧 validateAppointmentCardAgainstRoster 同 allow 结论
+  ---
+  duration_ms: 0.5741
+  type: 'test'
+  ...
+# Subtest: 差分（E2 D-1）：D3 卡阶段意图入口事实缺失/false 不拒绝——与旧 validateAppointmentCardAgainstRoster 同 allow
+ok 8 - 差分（E2 D-1）：D3 卡阶段意图入口事实缺失/false 不拒绝——与旧 validateAppointmentCardAgainstRoster 同 allow
+  ---
+  duration_ms: 0.1328
+  type: 'test'
+  ...
+# Subtest: 差分：名单未省略 env-bootstrap 但缺失——旧卡校验拒绝，本模块同样拒绝
+ok 9 - 差分：名单未省略 env-bootstrap 但缺失——旧卡校验拒绝，本模块同样拒绝
+  ---
+  duration_ms: 0.1195
+  type: 'test'
+  ...
+# Subtest: 差分：三文档结构——与旧 validateRoleDocumentsSnapshot 同 allow 结论
+ok 10 - 差分：三文档结构——与旧 validateRoleDocumentsSnapshot 同 allow 结论
+  ---
+  duration_ms: 7.662
+  type: 'test'
+  ...
+# Subtest: 差分（E2 D-1）：激活阶段意图入口事实缺失/false 不拒绝——旧三文档校验与 prepareRoleActivation 均不读取
+ok 11 - 差分（E2 D-1）：激活阶段意图入口事实缺失/false 不拒绝——旧三文档校验与 prepareRoleActivation 均不读取
+  ---
+  duration_ms: 0.5193
+  type: 'test'
+  ...
+# Subtest: 差分（source-transcribed）：D3/计划前置与旧 apply-journal::prepareRoleActivation 拒绝点对齐
+ok 12 - 差分（source-transcribed）：D3/计划前置与旧 apply-journal::prepareRoleActivation 拒绝点对齐
+  ---
+  duration_ms: 0.1986
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 151.9033

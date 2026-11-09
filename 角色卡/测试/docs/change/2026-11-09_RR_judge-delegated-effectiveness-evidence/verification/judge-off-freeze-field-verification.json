@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-11-09T08:54:04.603Z",
+  "requestId": "req-9a03babc4a474269",
+  "checks": {
+    "toggle_off_recorded": true,
+    "card_presented_to_customer": true,
+    "dialog_presented_with_confirm_revise": true,
+    "no_judge_events_after_start": true,
+    "resolved_by_customer": true,
+    "resolved_has_no_judge": true,
+    "resolved_decisionId_app_generated": true,
+    "resolved_selected_confirm": true,
+    "freeze_origin_customer": true,
+    "freeze_decisionId_matches": true,
+    "freeze_applicationId_from_requestId": true,
+    "freeze_source_customer_decision": true,
+    "frozenAt_eq_resolved_at": true,
+    "marker_in_context_and_snapshot": true,
+    "no_doc_freeze_events": true
+  },
+  "failed": [],
+  "pass": true,
+  "note": "toggle_off_recorded re-checked against evidence/judge-off/summary.json toggle.state.checked === false"
+}

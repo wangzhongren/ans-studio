@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-11-09T08:54:04.760Z",
+  "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-judge-delegated-run-2026-11-09\\target2",
+  "relPath": "docs/product/judge-demo2-intent-v1.md",
+  "result": {
+    "ok": true,
+    "value": {
+      "path": "docs/product/judge-demo2-intent-v1.md",
+      "version": 1,
+      "sha256": "1dc5979fcdf16b3ab42323db143605ef9fed0c71423c4ea403e966d22823541f",
+      "confirmationDigest": "b8013ea0e5090509e1cc7344cf552e4c968eee70bef963ee99b330b7350da71d",
+      "ledgerDigest": "3e70810b9ae4021c06d0498021d8b9807ac0e1a1e0e7d93729bd30c746214884"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts
+ok 1 - wiring retry: same operationId on a new lease/turn appends a sidecar row without replay/init conflicts
+  ---
+  duration_ms: 375.5948
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 686.633

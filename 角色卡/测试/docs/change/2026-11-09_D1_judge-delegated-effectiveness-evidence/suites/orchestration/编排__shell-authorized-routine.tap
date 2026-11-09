@@ -1,0 +1,179 @@
+TAP version 13
+# Subtest: 确定性白名单（原委托形态）：npm test → c-allow，0 卡且不调判断 agent
+ok 1 - 确定性白名单（原委托形态）：npm test → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 3.4424
+  type: 'test'
+  ...
+# Subtest: 确定性白名单（原委托形态）：npm run typecheck → c-allow，0 卡且不调判断 agent
+ok 2 - 确定性白名单（原委托形态）：npm run typecheck → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 0.3071
+  type: 'test'
+  ...
+# Subtest: 确定性白名单（原委托形态）：node --test → c-allow，0 卡且不调判断 agent
+ok 3 - 确定性白名单（原委托形态）：node --test → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 0.5157
+  type: 'test'
+  ...
+# Subtest: 确定性白名单（原委托形态）：node --test test/编排/handback.test.ts → c-allow，0 卡且不调判断 agent
+ok 4 - 确定性白名单（原委托形态）：node --test test/编排/handback.test.ts → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 1.1411
+  type: 'test'
+  ...
+# Subtest: 通配 test/**/*.test.ts 不命中谓词/不获委托：不是 c-allow，也未借政策免 a
+ok 5 - 通配 test/**/*.test.ts 不命中谓词/不获委托：不是 c-allow，也未借政策免 a
+  ---
+  duration_ms: 0.6675
+  type: 'test'
+  ...
+# Subtest: 委托策略只认原三 id：npm ci / tsc --noEmit / npm run test|lint|check 谓词命中但不委派
+ok 6 - 委托策略只认原三 id：npm ci / tsc --noEmit / npm run test|lint|check 谓词命中但不委派
+  ---
+  duration_ms: 0.1217
+  type: 'test'
+  ...
+# Subtest: c-allow 与宿主政策无关；委托的 cwd/项目根等值校验仍在单测层成立
+ok 7 - c-allow 与宿主政策无关；委托的 cwd/项目根等值校验仍在单测层成立
+  ---
+  duration_ms: 0.2912
+  type: 'test'
+  ...
+# Subtest: 分类为risky的非匹配node路径/flags不会借普通检查政策免a
+ok 8 - 分类为risky的非匹配node路径/flags不会借普通检查政策免a
+  ---
+  duration_ms: 0.6303
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm install
+ok 9 - 非精确常规检查不继承政策：npm install
+  ---
+  duration_ms: 0.7421
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm ci
+ok 10 - 非精确常规检查不继承政策：npm ci
+  ---
+  duration_ms: 0.3416
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm run arbitrary
+ok 11 - 非精确常规检查不继承政策：npm run arbitrary
+  ---
+  duration_ms: 0.2289
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm test -- --update
+ok 12 - 非精确常规检查不继承政策：npm test -- --update
+  ---
+  duration_ms: 0.1939
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：rm -rf test
+ok 13 - 非精确常规检查不继承政策：rm -rf test
+  ---
+  duration_ms: 0.2524
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test ../outside.test.ts
+ok 14 - 非精确常规检查不继承政策：node --test ../outside.test.ts
+  ---
+  duration_ms: 0.2195
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test /outside.test.ts
+ok 15 - 非精确常规检查不继承政策：node --test /outside.test.ts
+  ---
+  duration_ms: 0.1541
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test src/main.ts
+ok 16 - 非精确常规检查不继承政策：node --test src/main.ts
+  ---
+  duration_ms: 0.1485
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test --import src/execute.ts
+ok 17 - 非精确常规检查不继承政策：node --test --import src/execute.ts
+  ---
+  duration_ms: 0.1507
+  type: 'test'
+  ...
+# Subtest: c硬拒组合即终结；su只读档即使误注入政策也不免审核
+ok 18 - c硬拒组合即终结；su只读档即使误注入政策也不免审核
+  ---
+  duration_ms: 0.3528
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=deny 不会被宿主政策擅自允许
+ok 19 - 常规检查的b=deny 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1335
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=invalid 不会被宿主政策擅自允许
+ok 20 - 常规检查的b=invalid 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1324
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=unsure 不会被宿主政策擅自允许
+ok 21 - 常规检查的b=unsure 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1478
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=error 不会被宿主政策擅自允许
+ok 22 - 常规检查的b=error 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1355
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=timeout 不会被宿主政策擅自允许
+ok 23 - 常规检查的b=timeout 不会被宿主政策擅自允许
+  ---
+  duration_ms: 6.2909
+  type: 'test'
+  ...
+# Subtest: node test外指符号链接路径不获委托；项目内测试路径获委托
+not ok 24 - node test外指符号链接路径不获委托；项目内测试路径获委托
+  ---
+  duration_ms: 2.1615
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\shell-authorized-routine.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-routine-outside-s7k992\\outside.test.ts' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-routine-paths-WoSBW3\\test\\external.test.ts'"
+  code: 'EPERM'
+  stack: |-
+    Object.symlinkSync (node:fs:1937:11)
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/shell-authorized-routine.test.ts:191:8)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: openRoleSession真正把宿主政策传到shell装配，su仍只读（非白名单命令）
+ok 25 - openRoleSession真正把宿主政策传到shell装配，su仍只读（非白名单命令）
+  ---
+  duration_ms: 25.4647
+  type: 'test'
+  ...
+# Subtest: shell诊断明确委托来源与实际审核分支，不存命令/argv
+ok 26 - shell诊断明确委托来源与实际审核分支，不存命令/argv
+  ---
+  duration_ms: 12.7963
+  type: 'test'
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 25
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 344.55

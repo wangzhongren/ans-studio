@@ -1,0 +1,97 @@
+TAP version 13
+# Subtest: 注册表：convener Section 1 含 docs/workflow.md 精确文件条目，且列入 preauthorizedDirs
+ok 1 - 注册表：convener Section 1 含 docs/workflow.md 精确文件条目，且列入 preauthorizedDirs
+  ---
+  duration_ms: 0.5088
+  type: 'test'
+  ...
+# Subtest: 注册表：其他角色写集不被放宽——chief/product/verifier 仍禁写，rapporteur/nominator 不含该条目
+ok 2 - 注册表：其他角色写集不被放宽——chief/product/verifier 仍禁写，rapporteur/nominator 不含该条目
+  ---
+  duration_ms: 0.1136
+  type: 'test'
+  ...
+# Subtest: 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+not ok 3 - 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+  ---
+  duration_ms: 0.5293
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\convener-workflow-write.test.ts:42:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /项目工作流文件 `docs\/workflow\.md` 由运营落盘维护/. Input:
+    
+    '# 角色：幕僚（内置角色）\n' +
+      '\n' +
+      '职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。\n' +
+      '- 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。\n' +
+      '- 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。\n' +
+      '- 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。\n' +
+      '- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n' +
+      '- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n' +
+      '意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。\n' +
+      '命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。\n' +
+      '模板：\n' +
+      '---\n' +
+      'intentId: <小写 slug；全文唯一；不得用 flowId 代替>\n' +
+      'flowId: <flowId>\n' +
+      'goal: <目标；单行 key: value，长文本可用 | block scalar>\n' +
+      'scope: <范围>\n' +
+      'acceptance: <验收标准>\n' +
+      'nonGoals: <非目标（可选）>\n' +
+      'constraints: <约束（可选）>\n' +
+      '---\n' +
+      '可写：`docs/intents/`（Section 1，预授权直接写）。\n' +
+      '禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # 角色：幕僚（内置角色）
+    
+    职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。
+    - 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。
+    - 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。
+    - 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。
+    - 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。
+    - Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。
+    意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。
+    命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。
+    模板：
+    ---
+    intentId: <小写 slug；全文唯一；不得用 flowId 代替>
+    flowId: <flowId>
+    goal: <目标；单行 key: value，长文本可用 | block scalar>
+    scope: <范围>
+    acceptance: <验收标准>
+    nonGoals: <非目标（可选）>
+    constraints: <约束（可选）>
+    ---
+    可写：`docs/intents/`（Section 1，预授权直接写）。
+    禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/convener-workflow-write.test.ts:47:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 注册表完整性：仍恰为六角色，convener 能力位不变（写权恢复不扩张能力）
+ok 4 - 注册表完整性：仍恰为六角色，convener 能力位不变（写权恢复不扩张能力）
+  ---
+  duration_ms: 0.4223
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 3
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 120.6966

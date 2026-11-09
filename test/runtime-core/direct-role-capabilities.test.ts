@@ -11,12 +11,16 @@ import {
   type ActiveRoleEvidence,
 } from "../../src/model/trunk.ts";
 import {
-  isChiefDecisionExecutionContext, RUN_CHANGE_MODES,
+  isChiefDecisionExecutionContext, isJudgeD3Resolution, requestResolvedD3DecisionId, RUN_CHANGE_MODES,
   type ActivateRoleDocumentsInput, type ChiefDecisionExecutionContext, type CloseCreatedTaskInput,
   type CompleteTeamPlanInput, type DecidePendingRequestInput, type DirectSubmitVersionChangeInput,
-  type SelectRunChangeInput, type SubmitVersionChangeFn,
+  type GovernanceJudgeAudit, type SelectRunChangeInput, type SubmitVersionChangeFn,
+  type TaskStateEvent,
 } from "../../src/model/runtime.ts";
-import { DOC_FREEZE_DIRECT_REASONS, isValidDocFreezeRecord, type DirectDocFreezeRecord, type DocFreezeRecord } from "../../src/model/version-change.ts";
+import {
+  DOC_FREEZE_DIRECT_REASONS, DOC_FREEZE_JUDGE_DELEGATED_REASONS, isJudgeDelegatedSource,
+  isValidDocFreezeRecord, type DirectDocFreezeRecord, type DocFreezeRecord, type JudgeDelegatedSource,
+} from "../../src/model/version-change.ts";
 
 const digest = "a".repeat(64), next = "b".repeat(64), at = "2026-11-05T00:00:00Z";
 const ref = { snapshotId: "snapshot-1", path: "docs/evidence.md", sha256: digest };
@@ -211,4 +215,129 @@ test("R5 activation evidence does not fabricate a run/pin and freezes only when 
   assert.equal(JSON.parse(JSON.stringify(planning)).digest, digest);
   assert.equal(JSON.parse(JSON.stringify(planning)).trunkVersion, 1);
   assert.equal(JSON.parse(JSON.stringify(planning)).activeDigest, next);
+});
+
+// —————————————— 2026-11-09 judge-delegated（W-J1 Model/纯函数层；B1 J1/J2/J5-model/J9-helper） ——————————————
+
+const judgeSource: JudgeDelegatedSource = { kind: "judge-delegated", requestId: "req-judge-1", engine: "claude",
+  model: "claude-fable-5", operatorId: "judge:claude", reasonCode: "sufficient",
+  reason: "Recommendation matches the confirmed intent", selected: ["confirm"], cardKind: "intent-confirm", at };
+const judgeIntentFreeze: DocFreezeRecord = { schema: "doc-freeze/v1", applicationId: "intent-req-judge-1",
+  reason: "intent-confirmed", origin: "judge-delegated", source: judgeSource,
+  snapshotRef: { snapshotId: "snapshot-1", digest: next }, frozenAt: at };
+
+test("J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts", () => {
+  // 正例：intent-confirmed / proposal-confirmed，字段不被重写
+  assert.equal(isJudgeDelegatedSource(judgeSource), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(judgeSource)), judgeSource);
+  assert.equal(isValidDocFreezeRecord(judgeIntentFreeze), true);
+  const raw = JSON.stringify(judgeIntentFreeze);
+  assert.equal(isValidDocFreezeRecord(JSON.parse(raw)), true);
+  assert.equal(JSON.stringify(judgeIntentFreeze), raw, "pure validator never rewrites judge evidence");
+
+  const proposalSource: JudgeDelegatedSource = { ...judgeSource, cardKind: "proposal", requestId: "req-judge-2" };
+  const proposalFreeze: DocFreezeRecord = { ...judgeIntentFreeze, applicationId: "proposal-req-judge-2",
+    reason: "proposal-confirmed", source: proposalSource };
+  assert.equal(isValidDocFreezeRecord(proposalFreeze), true);
+
+  // 审计真实：judge 来源/记录不得携带任何客户字段（decidedBy/decisionId/actorRoleId）
+  for (const source of [{ ...judgeSource, decidedBy: "customer" }, { ...judgeSource, decisionId: "decision-req-judge-1" },
+    { ...judgeSource, actorRoleId: "judge" }]) {
+    assert.equal(isJudgeDelegatedSource(source), false, JSON.stringify(source));
+  }
+  const invalid: unknown[] = [
+    null, [], "judge-delegated", 7,
+    { ...judgeIntentFreeze, decidedBy: "customer" },
+    { ...judgeIntentFreeze, decisionId: "decision-req-judge-1" },
+    { ...judgeIntentFreeze, actorRoleId: "judge" },
+    { ...judgeIntentFreeze, applicationId: "intent-req-other" },
+    { ...judgeIntentFreeze, applicationId: "proposal-req-judge-1" },
+    { ...judgeIntentFreeze, reason: "vca-approved" },
+    { ...judgeIntentFreeze, reason: "version-upgrade-approved" },
+    { ...judgeIntentFreeze, reason: "detail-item-applied" },
+    { ...judgeIntentFreeze, reason: "amendment-submitted" },
+    { ...judgeIntentFreeze, frozenAt: "2026-11-05T00:00:01Z" },
+    { ...judgeIntentFreeze, frozenAt: "" },
+    { ...judgeIntentFreeze, source: undefined },
+    { ...judgeIntentFreeze, source: null },
+    { ...judgeIntentFreeze, source: "judge-delegated" },
+    { ...judgeIntentFreeze, source: { ...judgeSource, kind: "chief-delegated" } },
+    { ...judgeIntentFreeze, source: { ...judgeSource, operatorId: "judge:codex" } },
+    { ...judgeIntentFreeze, source: { ...judgeSource, engine: "" } },
+    { ...judgeIntentFreeze, source: { ...judgeSource, requestId: "" } },
+    { ...judgeIntentFreeze, source: { ...judgeSource, reasonCode: "" } },
+    { ...judgeIntentFreeze, source: { ...judgeSource, cardKind: "proposal" } }, // reason↔cardKind 绑定
+    { ...judgeIntentFreeze, source: { ...judgeSource, at: "" } },
+    { ...judgeIntentFreeze, source: { ...judgeSource, selected: "confirm" } },
+    { ...judgeIntentFreeze, snapshotRef: { snapshotId: "", digest: next } },
+  ];
+  for (const record of invalid) assert.equal(isValidDocFreezeRecord(record), false, JSON.stringify(record));
+
+  // 旧记录兼容：customer/application 记录不经新分支（R3 套件保留；此处钉住相邻正例）
+  const legacy: DocFreezeRecord = { schema: "doc-freeze/v1", applicationId: "vc-old", reason: "vca-approved",
+    origin: "customer", decidedBy: "customer", decisionId: "real-old", frozenAt: at };
+  assert.equal(isValidDocFreezeRecord(legacy), true);
+
+  // G1 单一策略：不设长度上限、按账本原值保留（不截断）
+  const longReason = "r".repeat(10_000);
+  const longModel = "m".repeat(4_096);
+  const longSource: JudgeDelegatedSource = { ...judgeSource, reason: longReason, model: longModel };
+  const longFreeze: DocFreezeRecord = { ...judgeIntentFreeze, source: longSource };
+  assert.equal(isJudgeDelegatedSource(longSource), true);
+  assert.equal(isValidDocFreezeRecord(longFreeze), true);
+  assert.equal((JSON.parse(JSON.stringify(longFreeze)).source as JudgeDelegatedSource).reason, longReason);
+  assert.equal((JSON.parse(JSON.stringify(longFreeze)).source as JudgeDelegatedSource).model, longModel);
+
+  assert.deepEqual([...DOC_FREEZE_JUDGE_DELEGATED_REASONS], ["proposal-confirmed", "intent-confirmed"]);
+});
+
+type ResolvedEvent = Extract<TaskStateEvent, { kind: "request.resolved" }>;
+
+test("J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers", () => {
+  const judgeAudit: GovernanceJudgeAudit = { group: "decision", cardKind: "appointment", engine: "claude",
+    model: "claude-fable-5", reasonCode: "sufficient", reason: "唯一推荐", selected: ["worker"] };
+  const judgeResolved: ResolvedEvent = { v: 1, at, kind: "request.resolved", requestId: "req-judge-1",
+    decisionId: "decision-req-judge-1", by: "judge", operatorId: "judge:claude", choice: "select",
+    cardKind: "appointment", targetRoleIds: ["worker"], selectedOptionIds: ["worker"], judge: judgeAudit };
+  assert.equal(isJudgeD3Resolution(judgeResolved), true);
+  assert.equal(requestResolvedD3DecisionId(judgeResolved), "decision-req-judge-1");
+
+  // customer / chief-delegated 既有语义不外溢
+  const customer: ResolvedEvent = { ...judgeResolved, by: "customer", judge: undefined, operatorId: "51054" };
+  assert.equal(isJudgeD3Resolution(customer), false);
+  assert.equal(requestResolvedD3DecisionId(customer), "decision-req-judge-1");
+  assert.equal(requestResolvedD3DecisionId({ ...customer, decisionId: undefined }), undefined);
+  const chief: ResolvedEvent = { ...judgeResolved, by: "chief-delegated", judge: undefined,
+    decisionId: undefined, actionSource: delegated };
+  assert.equal(isJudgeD3Resolution(chief), false);
+  assert.equal(requestResolvedD3DecisionId(chief), "req-judge-1");
+  const directive: ResolvedEvent = { ...judgeResolved, by: "directive", judge: undefined, directiveId: "d-1" };
+  assert.equal(isJudgeD3Resolution(directive), false);
+  assert.equal(requestResolvedD3DecisionId(directive), undefined);
+  assert.equal(requestResolvedD3DecisionId({ ...judgeResolved, by: "externally-unknown" } as unknown as ResolvedEvent), undefined);
+
+  // 非法形状 fail-closed、不抛错（judge:null/非对象/缺字段/审计不自洽/冻结外字段混入）
+  const invalid: unknown[] = [
+    null, undefined,
+    { ...judgeResolved, judge: null },
+    { ...judgeResolved, judge: "audit" },
+    { ...judgeResolved, judge: { ...judgeAudit, engine: "" } },
+    { ...judgeResolved, judge: { ...judgeAudit, engine: undefined } },
+    { ...judgeResolved, judge: { ...judgeAudit, reasonCode: "" } },
+    { ...judgeResolved, judge: { ...judgeAudit, cardKind: undefined } },
+    { ...judgeResolved, judge: { ...judgeAudit, group: undefined } },
+    { ...judgeResolved, judge: { ...judgeAudit, group: "approval" } },
+    { ...judgeResolved, judge: { ...judgeAudit, cardKind: "stable-write" } },
+    { ...judgeResolved, operatorId: "judge:codex" },
+    { ...judgeResolved, operatorId: undefined },
+    { ...judgeResolved, actionSource: delegated },
+    { ...judgeResolved, directiveId: "d-1" },
+    { ...judgeResolved, decisionId: "decision-other" },
+    { ...judgeResolved, decisionId: undefined },
+    { ...judgeResolved, requestId: "", decisionId: "decision-" },
+    { ...judgeResolved, requestId: undefined, decisionId: "decision-undefined" },
+    { ...judgeResolved, by: "customer" },
+  ];
+  for (const record of invalid) assert.equal(isJudgeD3Resolution(record as ResolvedEvent), false, JSON.stringify(record));
+  assert.equal(requestResolvedD3DecisionId(null as unknown as ResolvedEvent), undefined);
 });

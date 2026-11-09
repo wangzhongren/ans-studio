@@ -1,0 +1,3 @@
+file	status	tests	pass	fail	cancelled	skipped	todo	exit	duration_s
+test/roles/nominator/nominator-differential.test.ts	natural	12	12	0	0	0	0	0	1
+test/roles/nominator/nominator-module.test.ts	natural	15	15	0	0	0	0	0	0

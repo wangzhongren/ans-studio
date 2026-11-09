@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: 阈值：命令 2048B / 内联 >10 行 / 单行 >1024B（客户建议 2KB）
+ok 1 - 阈值：命令 2048B / 内联 >10 行 / 单行 >1024B（客户建议 2KB）
+  ---
+  duration_ms: 0.4802
+  type: 'test'
+  ...
+# Subtest: 长内联 node -e（>2KB）→ deny inline-too-large，理由含落盘脚本
+ok 2 - 长内联 node -e（>2KB）→ deny inline-too-large，理由含落盘脚本
+  ---
+  duration_ms: 0.8008
+  type: 'test'
+  ...
+# Subtest: 判断入口：长内联直接 deny，模型零调用（不建判断会话），不是 manual
+ok 3 - 判断入口：长内联直接 deny，模型零调用（不建判断会话），不是 manual
+  ---
+  duration_ms: 0.6477
+  type: 'test'
+  ...
+# Subtest: 判断入口：无界 grep 直接 deny unbounded-search，模型零调用
+ok 4 - 判断入口：无界 grep 直接 deny unbounded-search，模型零调用
+  ---
+  duration_ms: 0.4462
+  type: 'test'
+  ...
+# Subtest: 多行内联 sh -c（>10 行）→ deny；短内联 bash -c 放行
+ok 5 - 多行内联 sh -c（>10 行）→ deny；短内联 bash -c 放行
+  ---
+  duration_ms: 0.3152
+  type: 'test'
+  ...
+# Subtest: python -c 单行超长（>1024B）→ deny；短 python -c 放行
+ok 6 - python -c 单行超长（>1024B）→ deny；短 python -c 放行
+  ---
+  duration_ms: 0.2032
+  type: 'test'
+  ...
+# Subtest: 嵌套内联：bash -c 里再套长 node -e 也能识别
+ok 7 - 嵌套内联：bash -c 里再套长 node -e 也能识别
+  ---
+  duration_ms: 0.206
+  type: 'test'
+  ...
+# Subtest: 无界 grep：无路径 / . / 项目根 / / / ~ / $PWD → deny unbounded-search
+ok 8 - 无界 grep：无路径 / . / 项目根 / / / ~ / $PWD → deny unbounded-search
+  ---
+  duration_ms: 0.4943
+  type: 'test'
+  ...
+# Subtest: 有界 grep 放行：具体目录 + --include / 具体文件（不因本规则拒绝）
+ok 9 - 有界 grep 放行：具体目录 + --include / 具体文件（不因本规则拒绝）
+  ---
+  duration_ms: 0.2778
+  type: 'test'
+  ...
+# Subtest: Windows 路径回归：盘符/UNC 的反斜杠按分隔符保留 ⇒ 项目根仍判无界；具体子目录/文件放行
+ok 10 - Windows 路径回归：盘符/UNC 的反斜杠按分隔符保留 ⇒ 项目根仍判无界；具体子目录/文件放行
+  ---
+  duration_ms: 0.3543
+  type: 'test'
+  ...
+# Subtest: find：/ 与 . → deny；具体目录与 -maxdepth 有界 → 放行
+ok 11 - find：/ 与 . → deny；具体目录与 -maxdepth 有界 → 放行
+  ---
+  duration_ms: 0.2882
+  type: 'test'
+  ...
+# Subtest: rg：无路径全项目扫描 → deny；具体路径 / 管道喂入 / --version 放行
+ok 12 - rg：无路径全项目扫描 → deny；具体路径 / 管道喂入 / --version 放行
+  ---
+  duration_ms: 0.2333
+  type: 'test'
+  ...
+# Subtest: 包装器剥离：sudo / timeout / xargs 后的无界 grep 仍被拒绝
+ok 13 - 包装器剥离：sudo / timeout / xargs 后的无界 grep 仍被拒绝
+  ---
+  duration_ms: 0.1196
+  type: 'test'
+  ...
+# Subtest: 普通短命令/落盘脚本不受影响：npm test / node script.js / ls / git status
+ok 14 - 普通短命令/落盘脚本不受影响：npm test / node script.js / ls / git status
+  ---
+  duration_ms: 0.1301
+  type: 'test'
+  ...
+# Subtest: shell-gate：前置封堵先于 (c) 白名单与 (b)/(a)——classify/pm/operator 零调用，审计可辨识
+ok 15 - shell-gate：前置封堵先于 (c) 白名单与 (b)/(a)——classify/pm/operator 零调用，审计可辨识
+  ---
+  duration_ms: 2.3161
+  type: 'test'
+  ...
+# Subtest: shell-gate：只读档同样先被封堵（不因白名单放行无界 grep）
+ok 16 - shell-gate：只读档同样先被封堵（不因白名单放行无界 grep）
+  ---
+  duration_ms: 0.1521
+  type: 'test'
+  ...
+# Subtest: 系统提示：长内联/无界搜索属卡死风险，必须 deny 并给落盘脚本；有界搜索不拦
+ok 17 - 系统提示：长内联/无界搜索属卡死风险，必须 deny 并给落盘脚本；有界搜索不拦
+  ---
+  duration_ms: 0.1446
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 188.1041

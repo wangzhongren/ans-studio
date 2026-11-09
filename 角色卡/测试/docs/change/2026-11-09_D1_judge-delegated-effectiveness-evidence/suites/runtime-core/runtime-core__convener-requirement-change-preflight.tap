@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: X-R4/角色门控：convener 走 convener 模块；rapporteur 仍走 rapporteur 模块；其余角色保持旧行为
+ok 1 - X-R4/角色门控：convener 走 convener 模块；rapporteur 仍走 rapporteur 模块；其余角色保持旧行为
+  ---
+  duration_ms: 1.0782
+  type: 'test'
+  ...
+# Subtest: X-R4/allow：convener 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+ok 2 - X-R4/allow：convener 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+  ---
+  duration_ms: 1.9558
+  type: 'test'
+  ...
+# Subtest: X-R4/deny：缺事实、错误 actorRoleId、未知键、归属键缺失 ⇒ 既有回执形状（未提交、能力零调用）
+ok 3 - X-R4/deny：缺事实、错误 actorRoleId、未知键、归属键缺失 ⇒ 既有回执形状（未提交、能力零调用）
+  ---
+  duration_ms: 0.242
+  type: 'test'
+  ...
+# Subtest: X-R4/零差异：同一参数矩阵下，加 roleId=convener 前后 ok/message/调用次数逐字一致
+ok 4 - X-R4/零差异：同一参数矩阵下，加 roleId=convener 前后 ok/message/调用次数逐字一致
+  ---
+  duration_ms: 1.3167
+  type: 'test'
+  ...
+# Subtest: X-R4/不弱化：模型不可自报 actorRoleId/批准事实，仍在触达能力前拒绝
+ok 5 - X-R4/不弱化：模型不可自报 actorRoleId/批准事实，仍在触达能力前拒绝
+  ---
+  duration_ms: 0.202
+  type: 'test'
+  ...
+# Subtest: X-R4/接线守卫：convener 前置只经角色 public entry，且位于 input 构建之后、能力调用之前
+ok 6 - X-R4/接线守卫：convener 前置只经角色 public entry，且位于 input 构建之后、能力调用之前
+  ---
+  duration_ms: 1.2
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 229.9765

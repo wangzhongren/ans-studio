@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: F4：仍拒绝（fail-closed）；原头逐字保留；追加可操作指引（request_confirmation/preview/confirmed:true）
+ok 1 - F4：仍拒绝（fail-closed）；原头逐字保留；追加可操作指引（request_confirmation/preview/confirmed:true）
+  ---
+  duration_ms: 1.7163
+  type: 'test'
+  ...
+# Subtest: F4 分支 allowedByRoot：writeSet 空 ⇒ 两根皆空（如实呈现此刻什么也写不了）
+ok 2 - F4 分支 allowedByRoot：writeSet 空 ⇒ 两根皆空（如实呈现此刻什么也写不了）
+  ---
+  duration_ms: 0.7412
+  type: 'test'
+  ...
+# Subtest: F4 分支 allowedByRoot：恰列出经边界+条件过滤后的 writeSet 项（project）；边界目录本身不再出现
+ok 3 - F4 分支 allowedByRoot：恰列出经边界+条件过滤后的 writeSet 项（project）；边界目录本身不再出现
+  ---
+  duration_ms: 0.4144
+  type: 'test'
+  ...
+# Subtest: F4 分支 allowedByRoot：条件未激活的 writeSet 项不计入（与判定同源过滤）
+ok 4 - F4 分支 allowedByRoot：条件未激活的 writeSet 项不计入（与判定同源过滤）
+  ---
+  duration_ms: 0.6531
+  type: 'test'
+  ...
+# Subtest: 非 F4 分支语义回归：F5 缺条件分支与未匹配分支的列表仍为边界覆盖（用例期望不改）
+ok 5 - 非 F4 分支语义回归：F5 缺条件分支与未匹配分支的列表仍为边界覆盖（用例期望不改）
+  ---
+  duration_ms: 0.7735
+  type: 'test'
+  ...
+# Subtest: 渲染链：F4 决策渲染后项目行＝当前已发行可写集；指引与 reason 同现
+ok 6 - 渲染链：F4 决策渲染后项目行＝当前已发行可写集；指引与 reason 同现
+  ---
+  duration_ms: 0.407
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 158.4186

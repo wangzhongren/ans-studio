@@ -1,0 +1,104 @@
+TAP version 13
+# Subtest: 派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状态 derived
+ok 1 - 派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状态 derived
+  ---
+  duration_ms: 48.5997
+  type: 'test'
+  ...
+# Subtest: 派生 fail-closed：无 pinned/多 pinned/坏 manifest
+ok 2 - 派生 fail-closed：无 pinned/多 pinned/坏 manifest
+  ---
+  duration_ms: 64.3196
+  type: 'test'
+  ...
+# Subtest: 派生/应用支持 `path\#fragment` 引用：哈希/冻结按文件部分，引用串原样保留
+ok 3 - 派生/应用支持 `path\#fragment` 引用：哈希/冻结按文件部分，引用串原样保留
+  ---
+  duration_ms: 68.7883
+  type: 'test'
+  ...
+# Subtest: verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规
+ok 4 - verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规
+  ---
+  duration_ms: 65.7677
+  type: 'test'
+  ...
+# Subtest: executeApply：bootstrap t1、升级 t2（journal 两阶段/history/审计）、失败不改指针
+ok 5 - executeApply：bootstrap t1、升级 t2（journal 两阶段/history/审计）、失败不改指针
+  ---
+  duration_ms: 89.5273
+  type: 'test'
+  ...
+# Subtest: reconcileJournal：none/committed/prepared/相位滞后 split/corrupt
+ok 6 - reconcileJournal：none/committed/prepared/相位滞后 split/corrupt
+  ---
+  duration_ms: 59.3923
+  type: 'test'
+  ...
+# Subtest: recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/注册表损坏拒绝
+ok 7 - recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/注册表损坏拒绝
+  ---
+  duration_ms: 74.4558
+  type: 'test'
+  ...
+# Subtest: recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针
+ok 8 - recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针
+  ---
+  duration_ms: 68.7811
+  type: 'test'
+  ...
+# Subtest: applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+not ok 9 - applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+  ---
+  duration_ms: 55.9004
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-service.test.ts:507:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+        applied: false,
+    +   errorCode: 'stable-manifest-unavailable',
+    +   message: 'missing',
+        pendingReattach: true
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    applied: false
+    pendingReattach: true
+  actual:
+    applied: false
+    pendingReattach: true
+    errorCode: 'stable-manifest-unavailable'
+    message: 'missing'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-service.test.ts:584:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 修正案：解析/哈希定格/目标版本/边界扩大/生命周期映射与校验
+ok 10 - 修正案：解析/哈希定格/目标版本/边界扩大/生命周期映射与校验
+  ---
+  duration_ms: 74.5499
+  type: 'test'
+  ...
+# Subtest: status：存在未提交 journal ⇒ apply-uncertain
+ok 11 - status：存在未提交 journal ⇒ apply-uncertain
+  ---
+  duration_ms: 37.5745
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 10
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 936.0543

@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: 全一致：state=ok、files=[]、checked=pin 条数、digest 为 64 hex；哈希大小写不敏感
+ok 1 - 全一致：state=ok、files=[]、checked=pin 条数、digest 为 64 hex；哈希大小写不敏感
+  ---
+  duration_ms: 8.4941
+  type: 'test'
+  ...
+# Subtest: 单文件 modified：files 恰 1 条、actual 为当前盘上哈希、pinned 不等于 actual；其余一致项不进入 files
+ok 2 - 单文件 modified：files 恰 1 条、actual 为当前盘上哈希、pinned 不等于 actual；其余一致项不进入 files
+  ---
+  duration_ms: 8.9314
+  type: 'test'
+  ...
+# Subtest: missing：pin 目标不存在 → status=missing、actual=null；与 unreadable 分开
+ok 3 - missing：pin 目标不存在 → status=missing、actual=null；与 unreadable 分开
+  ---
+  duration_ms: 0.8725
+  type: 'test'
+  ...
+# Subtest: unreadable（目录）：pin 目标是目录 → status=unreadable、actual=null（非 missing）
+ok 4 - unreadable（目录）：pin 目标是目录 → status=unreadable、actual=null（非 missing）
+  ---
+  duration_ms: 0.5649
+  type: 'test'
+  ...
+# Subtest: unreadable（权限）：文件不可读 → status=unreadable、actual=null
+ok 5 - unreadable（权限）：文件不可读 → status=unreadable、actual=null # SKIP
+  ---
+  duration_ms: 0.1662
+  type: 'test'
+  ...
+# Subtest: pin 形状非法：非数组 / 非对象 / path 空 / sha256 非 64 位十六进制 → invalid，reason 指明第几项
+ok 6 - pin 形状非法：非数组 / 非对象 / path 空 / sha256 非 64 位十六进制 → invalid，reason 指明第几项
+  ---
+  duration_ms: 0.6537
+  type: 'test'
+  ...
+# Subtest: 空 pin：pins=[] → invalid（checked=0、files=[]、digest 为空串）
+ok 7 - 空 pin：pins=[] → invalid（checked=0、files=[]、digest 为空串）
+  ---
+  duration_ms: 0.2477
+  type: 'test'
+  ...
+# Subtest: 路径逃逸：.. 逃出项目根 / 绝对路径 → invalid
+ok 8 - 路径逃逸：.. 逃出项目根 / 绝对路径 → invalid
+  ---
+  duration_ms: 4.101
+  type: 'test'
+  ...
+# Subtest: requiredPath 未被任何 pin 覆盖 → invalid，reason 逐字点名；路径规范化后同一目标视为覆盖
+ok 9 - requiredPath 未被任何 pin 覆盖 → invalid，reason 逐字点名；路径规范化后同一目标视为覆盖
+  ---
+  duration_ms: 3.2444
+  type: 'test'
+  ...
+# Subtest: digest：重复调用稳定、公式可复算、任一目标内容变化即变化
+ok 10 - digest：重复调用稳定、公式可复算、任一目标内容变化即变化
+  ---
+  duration_ms: 12.3605
+  type: 'test'
+  ...
+# Subtest: 只读：检查前后目录树、文件大小与 mtime 完全不变，未创建任何文件
+ok 11 - 只读：检查前后目录树、文件大小与 mtime 完全不变，未创建任何文件
+  ---
+  duration_ms: 7.1686
+  type: 'test'
+  ...
+# Subtest: 公共出口 `resolve-boundary.ts` 再导出与私有实现为同一函数引用
+ok 12 - 公共出口 `resolve-boundary.ts` 再导出与私有实现为同一函数引用
+  ---
+  duration_ms: 0.1051
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 250.5738

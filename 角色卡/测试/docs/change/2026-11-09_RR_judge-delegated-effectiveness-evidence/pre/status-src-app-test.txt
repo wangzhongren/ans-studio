@@ -1,0 +1,25 @@
+ M src/common/roles/nominator/index.ts
+ M "src/common/\347\274\226\346\216\222/task-state.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+ M src/model/runtime.ts
+ M src/model/version-change.ts
+ M src/pipeline/orchestration/trunk-runtime.ts
+ M src/pipeline/orchestration/version-change-runtime.ts
+ M src/provider/version-change/impl/guard-freeze-registry.ts
+ M src/service/trunk/impl/apply-journal.ts
+ M src/service/version-change/abstract/version-change-service.ts
+ M src/service/version-change/impl/freeze-service.ts
+ M test/roles/nominator/nominator-module.test.ts
+ M test/runtime-core/direct-role-capabilities.test.ts
+ M test/runtime-core/version-change-contract.test.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/decision-service.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-trigger.test.ts"
+ M "test/\346\265\213\350\257\225/git-write-chain-fixture.ts"
+ M "test/\347\274\226\346\216\222/direct-role-capabilities.test.ts"
+ M "test/\347\274\226\346\216\222/task-state.test.ts"
+ M "test/\347\274\226\346\216\222/trunk-events.test.ts"
+ M "test/\347\274\226\346\216\222/version-change-service.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/direct-role-capabilities.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/git-shell-acl.test.ts"
+?? "test/\346\265\213\350\257\225/2026-11-09_judge-delegated-doc-freeze.test.ts"
+?? "test/\346\265\213\350\257\225/2026-11-09_judge-delegated-effectiveness.test.ts"

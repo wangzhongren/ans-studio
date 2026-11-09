@@ -1,0 +1,18 @@
+git-role-workflows-e2e	CHANGE actual v2 publication and frozen-run mode # SKIP
+git-role-workflows-e2e	CHANGE standalone replacement admission diagnostic, not creator-report continuity # SKIP
+git-role-workflows-e2e	Q22 explicit outer failure after real blocked cleanup # SKIP
+git-role-workflows-e2e	Q37 CHANGE existing-delivery entry to actual product draft creator-close # SKIP
+git-role-workflows-e2e	Q43 CHANGE real intent confirmation and version2 planning creator-close # SKIP
+git-role-workflows-e2e	Q48 hub ordinary no-Git product draft report and Chief typed close # SKIP
+git-role-workflows-e2e	Q59 Product same-candidate denied write recovers within original task # SKIP
+git-role-workflows-e2e	Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery # SKIP
+git-role-workflows-e2e	Q71 Nominator formal blocked Chief rework and customer-visible stop # SKIP
+git-role-workflows-e2e	Q72 Convener ordinary preparation formal blocked Chief rework and visible stop # SKIP
+git-role-workflows-e2e	Q75 persisted governance status pointer is information only and bound across Desktop rebuild # SKIP
+git-role-workflows-e2e	Q87 quality document filename version keeps schema and actual metadata bindings # SKIP
+lightweight-permission-repairs	D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute # SKIP
+lightweight-permission-repairs	D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives # SKIP
+lightweight-permission-repairs	D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking # SKIP
+lightweight-permission-repairs	D3 AC6: real write/edit preserve regular modes and new files use safe creation # SKIP
+lightweight-permission-repairs	D3 AC6: strict umask in isolated child cannot strip old executable mode # SKIP
+lightweight-permission-repairs	D3 AC7: chmod/fsync failure and abort do not commit or leave a temp # SKIP

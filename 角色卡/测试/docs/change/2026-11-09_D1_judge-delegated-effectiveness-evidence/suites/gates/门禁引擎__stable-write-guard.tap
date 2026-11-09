@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: stableWritePathOf：workflow / role-card / boundary 识别；内置角色与治理边界不匹配；规范化
+ok 1 - stableWritePathOf：workflow / role-card / boundary 识别；内置角色与治理边界不匹配；规范化
+  ---
+  duration_ms: 0.9858
+  type: 'test'
+  ...
+# Subtest: F13 形状：StableWritePermitView 是 C1 StableWritePermit 的类型别名（无第二套状态枚举）
+ok 2 - F13 形状：StableWritePermitView 是 C1 StableWritePermit 的类型别名（无第二套状态枚举）
+  ---
+  duration_ms: 0.3281
+  type: 'test'
+  ...
+# Subtest: 无许可 ⇒ permit-missing；denied 携带可直接返回的 WriteDecision（allowedByRoot 空集 + code/rejection）
+ok 3 - 无许可 ⇒ permit-missing；denied 携带可直接返回的 WriteDecision（allowedByRoot 空集 + code/rejection）
+  ---
+  duration_ms: 1.6485
+  type: 'test'
+  ...
+# Subtest: 许可放行：新文件 base="" ⇒ allowed，返回 permitId/requestId/decisionId
+ok 4 - 许可放行：新文件 base="" ⇒ allowed，返回 permitId/requestId/decisionId
+  ---
+  duration_ms: 1.2908
+  type: 'test'
+  ...
+# Subtest: 伪造/陈旧/未签发许可：不在快照或与快照字段不一致 ⇒ permit-invalid（不采信调用方对象）
+ok 5 - 伪造/陈旧/未签发许可：不在快照或与快照字段不一致 ⇒ permit-invalid（不采信调用方对象）
+  ---
+  duration_ms: 1.1287
+  type: 'test'
+  ...
+# Subtest: status / 一次性：consumed / failed / 过期 status / noteConsumed 后均拒绝
+ok 6 - status / 一次性：consumed / failed / 过期 status / noteConsumed 后均拒绝
+  ---
+  duration_ms: 1.1762
+  type: 'test'
+  ...
+# Subtest: 过期 / TTL 30 分钟：now ≥ expiresAt ⇒ expired；有效期超 TTL ⇒ invalid
+ok 7 - 过期 / TTL 30 分钟：now ≥ expiresAt ⇒ expired；有效期超 TTL ⇒ invalid
+  ---
+  duration_ms: 1.1294
+  type: 'test'
+  ...
+# Subtest: hash/base 绑定：写入 sha 必须等于 targetSha；baseSha 必须等于当前文件（""=不存在）
+ok 8 - hash/base 绑定：写入 sha 必须等于 targetSha；baseSha 必须等于当前文件（""=不存在）
+  ---
+  duration_ms: 12.3842
+  type: 'test'
+  ...
+# Subtest: 路径/kind/roleId 绑定：workflow 只允许 convener；role-card/boundary roleId 必须等于目录名
+ok 9 - 路径/kind/roleId 绑定：workflow 只允许 convener；role-card/boundary roleId 必须等于目录名
+  ---
+  duration_ms: 5.6589
+  type: 'test'
+  ...
+# Subtest: authority：decisionId / confirmationId 至少一个；空 authority 许可不入快照 ⇒ permit-invalid
+ok 10 - authority：decisionId / confirmationId 至少一个；空 authority 许可不入快照 ⇒ permit-invalid
+  ---
+  duration_ms: 1.1672
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 157.606

@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒不存在）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+ok 1 - G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒不存在）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+  ---
+  duration_ms: 2.2891
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/不改变写边界/失败文案枚举（含 not-customer-turn）
+ok 2 - schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/不改变写边界/失败文案枚举（含 not-customer-turn）
+  ---
+  duration_ms: 0.1914
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4/I1）：uninstall_skill 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/文件保留二分陈述/不改变写边界
+ok 3 - schema 文案（G-4/I1）：uninstall_skill 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/文件保留二分陈述/不改变写边界
+  ---
+  duration_ms: 0.0898
+  type: 'test'
+  ...
+# Subtest: G-4/I2：install_skill 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现 path/digest/生效态并重申写边界不变
+ok 4 - G-4/I2：install_skill 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现 path/digest/生效态并重申写边界不变
+  ---
+  duration_ms: 0.4866
+  type: 'test'
+  ...
+# Subtest: G-4/I2：失败如实——§3.3 文案枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+ok 5 - G-4/I2：失败如实——§3.3 文案枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+  ---
+  duration_ms: 0.778
+  type: 'test'
+  ...
+# Subtest: G-4/I2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已安装
+ok 6 - G-4/I2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已安装
+  ---
+  duration_ms: 0.4547
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 218.7782

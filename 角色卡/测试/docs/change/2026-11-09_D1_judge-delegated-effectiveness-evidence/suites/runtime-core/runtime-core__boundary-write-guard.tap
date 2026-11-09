@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: 非法顶层 version/roleId/root：write_file 拒写且零文件副作用（目录都不创建）
+ok 1 - 非法顶层 version/roleId/root：write_file 拒写且零文件副作用（目录都不创建）
+  ---
+  duration_ms: 7.865
+  type: 'test'
+  ...
+# Subtest: 合法模板放行并落盘；前置 ./ 与绝对路径同样受校验
+ok 2 - 合法模板放行并落盘；前置 ./ 与绝对路径同样受校验
+  ---
+  duration_ms: 17.1289
+  type: 'test'
+  ...
+# Subtest: role-card.md 与其他路径不校验内容（不受 boundary.yaml 规则波及）
+ok 3 - role-card.md 与其他路径不校验内容（不受 boundary.yaml 规则波及）
+  ---
+  duration_ms: 11.6232
+  type: 'test'
+  ...
+# Subtest: edit_file：编辑结果引入非法顶层键 ⇒ 拒绝且文件保持不变
+ok 4 - edit_file：编辑结果引入非法顶层键 ⇒ 拒绝且文件保持不变
+  ---
+  duration_ms: 8.0082
+  type: 'test'
+  ...
+# Subtest: Windows 反斜杠路径也识别为角色边界文件（平台条件）
+ok 5 - Windows 反斜杠路径也识别为角色边界文件（平台条件）
+  ---
+  duration_ms: 0.9333
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 271.9698

@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 自动收尾：创世 su 会话 settle 后**自动**写出治理边界文档 + .ans(pin) + manifest；pin 与实算一致
+ok 1 - 自动收尾：创世 su 会话 settle 后**自动**写出治理边界文档 + .ans(pin) + manifest；pin 与实算一致
+  ---
+  duration_ms: 40.4866
+  type: 'test'
+  ...
+# Subtest: trio 创世首次 settle：自动收尾写 .ans 且含 governanceModel:'trio'（应用边界 + 调用方传模型）
+ok 2 - trio 创世首次 settle：自动收尾写 .ans 且含 governanceModel:'trio'（应用边界 + 调用方传模型）
+  ---
+  duration_ms: 17.2113
+  type: 'test'
+  ...
+# Subtest: 自动收尾守卫：settle 但无可 pin 之物（无角色、无既存治理边界文档）→ 零副作用，不凭空转正
+ok 3 - 自动收尾守卫：settle 但无可 pin 之物（无角色、无既存治理边界文档）→ 零副作用，不凭空转正
+  ---
+  duration_ms: 7.3327
+  type: 'test'
+  ...
+# Subtest: 自动重 pin：首次收尾后再建角色 B → 下一轮 settle 自动纳入 pin（与磁盘重新一致）
+ok 4 - 自动重 pin：首次收尾后再建角色 B → 下一轮 settle 自动纳入 pin（与磁盘重新一致）
+  ---
+  duration_ms: 27.5555
+  type: 'test'
+  ...
+# Subtest: 负例（单元）：边界不接受 → finalizeBootstrap 拒绝且零副作用
+ok 5 - 负例（单元）：边界不接受 → finalizeBootstrap 拒绝且零副作用
+  ---
+  duration_ms: 2.6836
+  type: 'test'
+  ...
+# Subtest: finalizeBootstrap（单元）：写出治理边界文档 + .ans；pin 覆盖两者；无可 pin 之物 → 拒绝
+ok 6 - finalizeBootstrap（单元）：写出治理边界文档 + .ans；pin 覆盖两者；无可 pin 之物 → 拒绝
+  ---
+  duration_ms: 7.8733
+  type: 'test'
+  ...
+# Subtest: finalizeBootstrap：仅当给出 governanceModel 才写字段；trio 写出、不传保持旧 `.ans` 形状
+ok 7 - finalizeBootstrap：仅当给出 governanceModel 才写字段；trio 写出、不传保持旧 `.ans` 形状
+  ---
+  duration_ms: 25.2249
+  type: 'test'
+  ...
+# Subtest: repinIfBootstrapped：创世态由调用方传模型（trio 写出；不传旧形状）；非创世重 pin 保留既有 trio
+ok 8 - repinIfBootstrapped：创世态由调用方传模型（trio 写出；不传旧形状）；非创世重 pin 保留既有 trio
+  ---
+  duration_ms: 31.888
+  type: 'test'
+  ...
+# Subtest: isGenesisState：无 .ans 为创世态；有 .ans 为非创世态
+ok 9 - isGenesisState：无 .ans 为创世态；有 .ans 为非创世态
+  ---
+  duration_ms: 1.4043
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 454.1794

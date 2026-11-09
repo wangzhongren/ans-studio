@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: S1/S2：真实子进程启动立即返回任务号与 pid；list/read 可见；stop 后 stopped 且进程消失
+ok 1 - S1/S2：真实子进程启动立即返回任务号与 pid；list/read 可见；stop 后 stopped 且进程消失
+  ---
+  duration_ms: 188.3587
+  type: 'test'
+  ...
+# Subtest: S2.5：自然退出显示 exited 与真实退出码；read 默认 40 行、上限 200（如实标 tailClamped）
+ok 2 - S2.5：自然退出显示 exited 与真实退出码；read 默认 40 行、上限 200（如实标 tailClamped）
+  ---
+  duration_ms: 53.9716
+  type: 'test'
+  ...
+# Subtest: S2.3：单路超过 256 KiB → truncated，仅保留尾部，且不返回损坏的多字节字符
+ok 3 - S2.3：单路超过 256 KiB → truncated，仅保留尾部，且不返回损坏的多字节字符
+  ---
+  duration_ms: 92.2417
+  type: 'test'
+  ...
+# Subtest: F5：spawn 失败不保留半成品任务、名额释放，后续仍可启动
+ok 4 - F5：spawn 失败不保留半成品任务、名额释放，后续仍可启动
+  ---
+  duration_ms: 78.3798
+  type: 'test'
+  ...
+# Subtest: F4/S6.1：并发上限 8，第 9 个被拒且名额不被突破
+ok 5 - F4/S6.1：并发上限 8，第 9 个被拒且名额不被突破
+  ---
+  duration_ms: 1.0015
+  type: 'test'
+  ...
+# Subtest: F4.4：并行 start 不会一起突破 8 个名额
+ok 6 - F4.4：并行 start 不会一起突破 8 个名额
+  ---
+  duration_ms: 0.4647
+  type: 'test'
+  ...
+# Subtest: S6.2：保留上限 32，最老已结束任务优先淘汰；运行中任务永不淘汰；淘汰任务号返回未知
+ok 7 - S6.2：保留上限 32，最老已结束任务优先淘汰；运行中任务永不淘汰；淘汰任务号返回未知
+  ---
+  duration_ms: 1.4629
+  type: 'test'
+  ...
+# Subtest: F7：终止预算内未观察到 close → kill-timeout；诊断 background.stop.timeout（证明真实等待到期）
+ok 8 - F7：终止预算内未观察到 close → kill-timeout；诊断 background.stop.timeout（证明真实等待到期）
+  ---
+  duration_ms: 1276.4429
+  type: 'test'
+  ...
+# Subtest: S3：dispose 并行终止全部任务、幂等、清空任务并拒绝后续 start
+ok 9 - S3：dispose 并行终止全部任务、幂等、清空任务并拒绝后续 start
+  ---
+  duration_ms: 123.1346
+  type: 'test'
+  ...
+# Subtest: F6：任务不跨管理器/会话可见（另一个管理器读/停旧任务号均为未知）
+ok 10 - F6：任务不跨管理器/会话可见（另一个管理器读/停旧任务号均为未知）
+  ---
+  duration_ms: 123.7016
+  type: 'test'
+  ...
+# Subtest: S3.1：dispose 并行发起终止（两个任务的终止信号在同一批同步发出）
+ok 11 - S3.1：dispose 并行发起终止（两个任务的终止信号在同一批同步发出）
+  ---
+  duration_ms: 0.4174
+  type: 'test'
+  ...
+# Subtest: 启动后运行错误 → failed（启动失败不建任务）
+ok 12 - 启动后运行错误 → failed（启动失败不建任务）
+  ---
+  duration_ms: 0.2668
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2155.5603

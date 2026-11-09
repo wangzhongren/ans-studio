@@ -1,0 +1,16 @@
+{
+  "name": "s-intent-b6d7fb27ea1b8f4c3faacd8ef384c0022ccb51be58947b656626bc26481a186c.json",
+  "schema": "complete-snapshot/v1",
+  "snapshotId": "s-intent-b6d7fb27ea1b8f4c3faacd8ef384c0022ccb51be58947b656626bc26481a186c",
+  "digest": "519b860459a19256d46a9cbf9d1ab6d696ee7765e1b07cf64ebcbbd9448acc88",
+  "files": [
+    {
+      "path": "docs/product/judge-demo-intent-v1.md",
+      "embeddedBytes": 5336,
+      "embeddedSha256": "9f318d929577cde59bca5420a01f4049898e5543b9857dec47890dd4b3070dd5",
+      "targetExists": true,
+      "targetSha256": "9f318d929577cde59bca5420a01f4049898e5543b9857dec47890dd4b3070dd5",
+      "byteIdentical": true
+    }
+  ]
+}

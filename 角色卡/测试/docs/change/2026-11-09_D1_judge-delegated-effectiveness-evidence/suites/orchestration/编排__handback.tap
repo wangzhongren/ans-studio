@@ -1,0 +1,148 @@
+TAP version 13
+# Subtest: buildTaskHandback：形状正确（roleId/taskId/status/summary/evidence/at）
+ok 1 - buildTaskHandback：形状正确（roleId/taskId/status/summary/evidence/at）
+  ---
+  duration_ms: 1.5479
+  type: 'test'
+  ...
+# Subtest: buildTaskHandback：无写入被接受且有拒绝 → blocked；无 taskId 时省略该字段
+ok 2 - buildTaskHandback：无写入被接受且有拒绝 → blocked；无 taskId 时省略该字段
+  ---
+  duration_ms: 0.1022
+  type: 'test'
+  ...
+# Subtest: withHandback：透传 SessionEvent；在 settled **之前**发 handback 事件
+ok 3 - withHandback：透传 SessionEvent；在 settled **之前**发 handback 事件
+  ---
+  duration_ms: 0.4397
+  type: 'test'
+  ...
+# Subtest: openRoleSession：普通角色 settle → 发出 handback（形状正确）
+not ok 4 - openRoleSession：普通角色 settle → 发出 handback（形状正确）
+  ---
+  duration_ms: 24.2911
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\handback.test.ts:116:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'blocked'
+    - 'unreported'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'unreported'
+  actual: 'blocked'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/handback.test.ts:137:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: openRoleSession：内置治理角色（su）→ **不**自我回交（事件流无 handback）
+ok 5 - openRoleSession：内置治理角色（su）→ **不**自我回交（事件流无 handback）
+  ---
+  duration_ms: 9.8723
+  type: 'test'
+  ...
+# Subtest: buildTaskHandback（C-1 噪音修正）：证据只取写类 accepted；读事件（三种实际形状）一律不进证据
+ok 6 - buildTaskHandback（C-1 噪音修正）：证据只取写类 accepted；读事件（三种实际形状）一律不进证据
+  ---
+  duration_ms: 0.2338
+  type: 'test'
+  ...
+# Subtest: normalizeTaskReport / buildReportHandback：合法报告取报告值（evidence 缺省 []）；非法 → undefined（回退）
+ok 7 - normalizeTaskReport / buildReportHandback：合法报告取报告值（evidence 缺省 []）；非法 → undefined（回退）
+  ---
+  duration_ms: 0.1942
+  type: 'test'
+  ...
+# Subtest: withHandback（C-1）：收到报告 → 回交内容=报告值（即使与推导结论相反）；未见报告 → 回退推导
+ok 8 - withHandback（C-1）：收到报告 → 回交内容=报告值（即使与推导结论相反）；未见报告 → 回退推导
+  ---
+  duration_ms: 0.2124
+  type: 'test'
+  ...
+# Subtest: openRoleSession（C-1）：项目角色注入 reportHandback；交报告 → handback=报告值；未交 → 回退推导（读事件不进证据）
+ok 9 - openRoleSession（C-1）：项目角色注入 reportHandback；交报告 → handback=报告值；未交 → 回退推导（读事件不进证据）
+  ---
+  duration_ms: 26.3617
+  type: 'test'
+  ...
+# Subtest: openRoleSession（C-1）：治理角色 su 不注入 reportHandback（能力面为空；事件流无 handback）
+ok 10 - openRoleSession（C-1）：治理角色 su 不注入 reportHandback（能力面为空；事件流无 handback）
+  ---
+  duration_ms: 6.2264
+  type: 'test'
+  ...
+# Subtest: F-3-d：settle detail `truncation:length` → terminal-fallback 摘要附「（截断：stopReason=length）」；有报告/无截断字段不附
+ok 11 - F-3-d：settle detail `truncation:length` → terminal-fallback 摘要附「（截断：stopReason=length）」；有报告/无截断字段不附
+  ---
+  duration_ms: 0.3382
+  type: 'test'
+  ...
+# Subtest: renderHandbackPrompt（E-1）：字段逐条 + 明示请验收；无任务号/无证据时如实呈现；不夹带权限语义
+ok 12 - renderHandbackPrompt（E-1）：字段逐条 + 明示请验收；无任务号/无证据时如实呈现；不夹带权限语义
+  ---
+  duration_ms: 0.1527
+  type: 'test'
+  ...
+# Subtest: handbackKey（X-2 稳定键）：不含时间戳——同内容不同 at 恒等；角色/任务/轮次/内容任一不同即不同
+ok 13 - handbackKey（X-2 稳定键）：不含时间戳——同内容不同 at 恒等；角色/任务/轮次/内容任一不同即不同
+  ---
+  duration_ms: 0.1357
+  type: 'test'
+  ...
+# Subtest: withHandback（X-2）：一轮**双 settled** → 恰一份回交；第二份 settled 仅透传（次序保持）
+ok 14 - withHandback（X-2）：一轮**双 settled** → 恰一份回交；第二份 settled 仅透传（次序保持）
+  ---
+  duration_ms: 0.1342
+  type: 'test'
+  ...
+# Subtest: withHandback（X-2）：同轮三份 settled（其间无事件）→ 仍一份；真返工（两轮、文本逐字相同）→ 两份且键不同
+ok 15 - withHandback（X-2）：同轮三份 settled（其间无事件）→ 仍一份；真返工（两轮、文本逐字相同）→ 两份且键不同
+  ---
+  duration_ms: 0.1856
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（H-1）：逐行文案；task 原文逐字保留；无 reason 不写原因段；不夹带授权语义
+ok 16 - renderDispatchPrompt（H-1）：逐行文案；task 原文逐字保留；无 reason 不写原因段；不夹带授权语义
+  ---
+  duration_ms: 0.1426
+  type: 'test'
+  ...
+# Subtest: isDispatchableRoleId（H-1）：登记项目角色 → true；su 自身/未登记/空 → false（fail-closed；快照语义如实）
+ok 17 - isDispatchableRoleId（H-1）：登记项目角色 → true；su 自身/未登记/空 → false（fail-closed；快照语义如实）
+  ---
+  duration_ms: 1.2962
+  type: 'test'
+  ...
+# Subtest: openRoleSession（H-1）：dispatchTask **只给治理角色 su** 透传；项目角色会话不给；未给路由不注入
+ok 18 - openRoleSession（H-1）：dispatchTask **只给治理角色 su** 透传；项目角色会话不给；未给路由不注入
+  ---
+  duration_ms: 17.0616
+  type: 'test'
+  ...
+# Subtest: formatDispatchReceipt（L-1）：目标忙 → 明写入队与位置（受理 ≠ 完成）；空闲 → 现状文案（未开则如实提示将自动开启）
+ok 19 - formatDispatchReceipt（L-1）：目标忙 → 明写入队与位置（受理 ≠ 完成）；空闲 → 现状文案（未开则如实提示将自动开启）
+  ---
+  duration_ms: 0.1655
+  type: 'test'
+  ...
+# Subtest: L-1（到达序，假件驱动）：两条派发经同一目标队列 → 位置 1、2；出队按到达序
+ok 20 - L-1（到达序，假件驱动）：两条派发经同一目标队列 → 位置 1、2；出队按到达序
+  ---
+  duration_ms: 0.1066
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 19
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 395.347

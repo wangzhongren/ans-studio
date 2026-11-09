@@ -1,0 +1,39 @@
+# W-J5 candidate hashes (2026-11-09)
+branch: feat/plan-escalation-card
+HEAD: fb1aa39e787934f334b9c164e4221074f97f6147
+HEAD^{tree}: ee33c3e95d9b3fb61dc5d05eea66c2d0a2eb9583
+node: v24.22.1
+
+## write-set sha256 (before / after)
+test/测试/git-write-chain-fixture.ts | b1b43b1e44a26656c4effda341b47d8f5a38d42c6cc5f13162e62e812196dbd4 | 931948269f71fb8e8907cdedea12b668e843f62b079c08949f225a166e2c6de7
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts | (new) | 7b0bf988560e6284f3fa069fe08684e20d5b211d036fe92a6f15670175c96a7b
+test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts | (new) | 8ff9666272c4a85768393da8b4f1b802f606878c12d8848cfadf76471e96653f
+
+## untouched regression files (before==after)
+test/测试/direct-role-capabilities-e2e.test.ts | df73b205c156e7bebe6842876d26ad3a85ad4a6fe538287576f160bd66c1b574 | df73b205c156e7bebe6842876d26ad3a85ad4a6fe538287576f160bd66c1b574
+test/测试/version-change-integration.test.ts | dd0ec8a05f63b2544657c3a744bb3772b0bd8522daca41c4e823e8e93f01b8db | dd0ec8a05f63b2544657c3a744bb3772b0bd8522daca41c4e823e8e93f01b8db
+
+## git status --porcelain -- src app test
+ M "src/common/\347\274\226\346\216\222/task-state.ts"
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+ M src/model/runtime.ts
+ M src/model/version-change.ts
+ M src/pipeline/orchestration/trunk-runtime.ts
+ M src/pipeline/orchestration/version-change-runtime.ts
+ M src/provider/version-change/impl/guard-freeze-registry.ts
+ M src/service/trunk/impl/apply-journal.ts
+ M src/service/version-change/abstract/version-change-service.ts
+ M src/service/version-change/impl/freeze-service.ts
+ M test/runtime-core/direct-role-capabilities.test.ts
+ M test/runtime-core/version-change-contract.test.ts
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/decision-service.test.ts"
+ M "test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-trigger.test.ts"
+ M "test/\346\265\213\350\257\225/git-write-chain-fixture.ts"
+ M "test/\347\274\226\346\216\222/direct-role-capabilities.test.ts"
+ M "test/\347\274\226\346\216\222/task-state.test.ts"
+ M "test/\347\274\226\346\216\222/trunk-events.test.ts"
+ M "test/\347\274\226\346\216\222/version-change-service.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/direct-role-capabilities.test.ts"
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/git-shell-acl.test.ts"
+?? "test/\346\265\213\350\257\225/2026-11-09_judge-delegated-doc-freeze.test.ts"
+?? "test/\346\265\213\350\257\225/2026-11-09_judge-delegated-effectiveness.test.ts"

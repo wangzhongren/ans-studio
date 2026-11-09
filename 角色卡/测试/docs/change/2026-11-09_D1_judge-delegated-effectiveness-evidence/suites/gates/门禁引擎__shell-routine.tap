@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 正例矩阵：§5.1 精确形态全部命中（id 稳定，ruleId = allow:routine:<id>）
+ok 1 - 正例矩阵：§5.1 精确形态全部命中（id 稳定，ruleId = allow:routine:<id>）
+  ---
+  duration_ms: 2.3709
+  type: 'test'
+  ...
+# Subtest: id 冻结：原委托三 id 与新增形态 id 逐字固定（B1 委托策略按 id 过滤）
+ok 2 - id 冻结：原委托三 id 与新增形态 id 逐字固定（B1 委托策略按 id 过滤）
+  ---
+  duration_ms: 0.0812
+  type: 'test'
+  ...
+# Subtest: 谓词是纯函数：不依赖规则集即可判定；非法运行时输入 fail-closed 返回 undefined
+ok 3 - 谓词是纯函数：不依赖规则集即可判定；非法运行时输入 fail-closed 返回 undefined
+  ---
+  duration_ms: 0.0602
+  type: 'test'
+  ...
+# Subtest: 负例矩阵（§5.4）：不命中谓词，且分类不是 c-allow（落回既有链）
+ok 4 - 负例矩阵（§5.4）：不命中谓词，且分类不是 c-allow（落回既有链）
+  ---
+  duration_ms: 1.0428
+  type: 'test'
+  ...
+# Subtest: 负例分档与 §5.4 一致：npm install / npm run build 仍 risky；裸 tsc / node --test 越界仍 review；npx 仍 risky
+ok 5 - 负例分档与 §5.4 一致：npm install / npm run build 仍 risky；裸 tsc / node --test 越界仍 review；npx 仍 risky
+  ---
+  duration_ms: 0.2082
+  type: 'test'
+  ...
+# Subtest: 自定义规则集（P7/AC-16）：更严格的 risky 规则不能覆盖例行白名单——上表形态仍 allow
+ok 6 - 自定义规则集（P7/AC-16）：更严格的 risky 规则不能覆盖例行白名单——上表形态仍 allow
+  ---
+  duration_ms: 0.2118
+  type: 'test'
+  ...
+# Subtest: 自定义规则集（P7/AC-16）：硬拒仍优先于例行白名单（hardDenyPrograms 在谓词之前判定）
+ok 7 - 自定义规则集（P7/AC-16）：硬拒仍优先于例行白名单（hardDenyPrograms 在谓词之前判定）
+  ---
+  duration_ms: 0.1922
+  type: 'test'
+  ...
+# Subtest: 自定义规则集（P7/AC-16）：危险记号检查先于例行白名单（denyTokens 仍握优先）
+ok 8 - 自定义规则集（P7/AC-16）：危险记号检查先于例行白名单（denyTokens 仍握优先）
+  ---
+  duration_ms: 0.0876
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 154.3355

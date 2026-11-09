@@ -30,6 +30,7 @@ import type {
   DocFreezeErrorCode,
   DocFreezeLookup,
   DocFreezeRecord,
+  DocFreezeSource,
   DocMigrationMark,
   DocFreezeOrigin,
   DocFreezeReason,
@@ -48,7 +49,7 @@ import type {
   VersionChangeTarget,
   VersionChangeTargetKind,
 } from "../../../model/version-change.ts";
-import type { TrunkAmendmentItem, TrunkVersionRef, DirectActionReceipt, DirectActionSource, SnapshotRef, CompleteSnapshot } from "../../../model/trunk.ts";
+import type { TrunkAmendmentItem, TrunkVersionRef, DirectActionReceipt, SnapshotRef, CompleteSnapshot } from "../../../model/trunk.ts";
 
 // —————————————— 通用 ——————————————
 
@@ -249,7 +250,8 @@ export interface FreezeRegistryPort {
 
 /** 冻结写入输入（reason/origin/decidedBy 归属按 C1 常量推导，F35）。 */
 export interface DocFreezeInput {
-  source?: DirectActionSource;
+  /** 应用内直连来源或 judge 代批来源（2026-11-09 judge-delegated 放宽；客户/幕僚来源不变）。 */
+  source?: DocFreezeSource;
   snapshotRef?: SnapshotRef;
   path: string;
   version: number;

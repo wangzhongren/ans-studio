@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: 项目角色（无任务收窄）：Section 1 精确文件/目录子树直接放行，边界外与非条目仍拒（零确认）
+ok 1 - 项目角色（无任务收窄）：Section 1 精确文件/目录子树直接放行，边界外与非条目仍拒（零确认）
+  ---
+  duration_ms: 23.705
+  type: 'test'
+  ...
+# Subtest: 任务 writeSet 收窄：writeSet 内放行；边界内但不在 writeSet 的路径仍被 F4 拒（两种会话形态）
+ok 2 - 任务 writeSet 收窄：writeSet 内放行；边界内但不在 writeSet 的路径仍被 F4 拒（两种会话形态）
+  ---
+  duration_ms: 19.0212
+  type: 'test'
+  ...
+# Subtest: 运营（Convener）无任务收窄：docs/scheduling/ 与 docs/workflow.md 直接放行；他人写集/禁写路径仍拒
+ok 3 - 运营（Convener）无任务收窄：docs/scheduling/ 与 docs/workflow.md 直接放行；他人写集/禁写路径仍拒
+  ---
+  duration_ms: 7.1445
+  type: 'test'
+  ...
+# Subtest: 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒
+not ok 4 - 有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒
+  ---
+  duration_ms: 9.1872
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\section1-write-preauthorization.test.ts:248:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /不在任务 writeSet 内（F4）/. Input:
+    
+    'Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: 'Role drafts require the actual completed plan and current D3 selection; no old appointment-write card can substitute'
+  operator: 'match'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:265:14
+    async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:75:12)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:249:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 运营有任务 writeSet 时：docs/workflow.md 仍按既有 preauthorizedDirs 直接放行；他人写区仍拒
+ok 5 - 运营有任务 writeSet 时：docs/workflow.md 仍按既有 preauthorizedDirs 直接放行；他人写区仍拒
+  ---
+  duration_ms: 5.573
+  type: 'test'
+  ...
+# Subtest: 人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒
+not ok 6 - 人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒
+  ---
+  duration_ms: 7.7333
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\section1-write-preauthorization.test.ts:304:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    D 最小系统：角色卡在 Section 1 内直接写（appointment-write 卡由应用呈现）
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:315:14
+    async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:75:12)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/section1-write-preauthorization.test.ts:305:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 4
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 367.6634

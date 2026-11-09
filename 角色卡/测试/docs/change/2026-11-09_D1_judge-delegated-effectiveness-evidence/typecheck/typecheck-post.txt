@@ -1,0 +1,8 @@
+cmd: npm run typecheck
+date: 2026-11-09T08:12:37Z
+node: v24.22.1
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+exit=0

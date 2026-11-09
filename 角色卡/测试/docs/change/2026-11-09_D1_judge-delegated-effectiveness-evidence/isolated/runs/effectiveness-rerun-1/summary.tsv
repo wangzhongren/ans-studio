@@ -1,0 +1,2 @@
+file	status	tests	pass	fail	cancelled	skipped	todo	exit	duration_s
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts	natural	1	1	0	0	0	0	0	62

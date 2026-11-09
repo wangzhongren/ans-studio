@@ -1,0 +1,15 @@
+=== T1 three files (reference E3-F baseline check; not part of this candidate delta) ===
+afe70c622786a0a43da8831e3f8a0cd1618af254a21da59555191a780fe7f3b6  src/common/claude-adapter/schema.ts
+  in-write-set: no
+  git-hash-object: 748846e2243ce95fbe34fee1ff4774831e4734ab
+  HEAD-blob:       748846e2243ce95fbe34fee1ff4774831e4734ab
+6379bc8ef7a26a700b1dcd937bba7429dec3704fa11027f44c119fd5b8469e67  test/claude-adapter/session.test.ts
+  in-write-set: no
+  git-hash-object: 8d5887d039bff1466fa117759a3411b20c2c4a25
+  HEAD-blob:       8d5887d039bff1466fa117759a3411b20c2c4a25
+358ac967b271a4a026e38b2f463abc44e5086343bfc92fdfe934c79f3cc4f162  test/claude-adapter/schema.test.ts
+  in-write-set: no
+  git-hash-object: 9e8b877fd70443eadf6ce107b4b31615f80cbfef
+  HEAD-blob:       9e8b877fd70443eadf6ce107b4b31615f80cbfef
+
+note: reference E3-F T1 raw hashes afe70c62/f0db260e/358ac967; test/claude-adapter/session.test.ts content changed in HEAD by intermediate commit 6ab0d2d (not a working-tree change; not in candidate).

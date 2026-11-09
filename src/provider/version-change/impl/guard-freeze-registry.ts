@@ -9,9 +9,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { atomicWrite } from "../../../common/shared/atomic-write.ts";
 import { appendJsonlLine, readJsonlLedger } from "../../../common/shared/jsonl-ledger.ts";
-import type { TaskStateEvent } from "../../../model/runtime.ts";
+import { governanceCardGroup, type GovernanceCardKind, type TaskStateEvent } from "../../../model/runtime.ts";
 import { validateTaskStateEvent } from "../../../common/编排/task-state.ts";
-import { DOC_FREEZE_REASONS, DOC_FREEZE_CUSTOMER_REASONS, isValidDocFreezeRecord, type DocFreezeReason } from "../../../model/version-change.ts";
+import { DOC_FREEZE_REASONS, DOC_FREEZE_CUSTOMER_REASONS, isJudgeDelegatedSource, isValidDocFreezeRecord, type DocFreezeReason, type JudgeDelegatedSource } from "../../../model/version-change.ts";
 import { isDirectActionSource, isSnapshotRef, isCompleteSnapshot, isGitOid, type CompleteSnapshot } from "../../../model/trunk.ts";
 import path from "node:path";
 
@@ -399,13 +399,50 @@ export interface DocFreezeAppendRequest {
   recordedBy?: string;
 }
 
+/**
+ * 2026-11-09 judge-delegated（W-J2/§3.5）：冻结 source 与账本 `request.resolved` 的 `judge` 审计
+ * 逐字段一致（engine/model/operatorId/reasonCode/reason/selected/cardKind/at；G1 不截断、不设上界）。
+ * 任何非法形状 fail-closed、不抛错（账本为裸 JSON.parse）。
+ */
+function judgeIntentSourceMatches(event: Extract<TaskStateEvent, { kind: "request.resolved" }>, source: JudgeDelegatedSource): boolean {
+  if (event.by !== "judge") return false;
+  const judge: unknown = event.judge;
+  if (judge === null || typeof judge !== "object" || Array.isArray(judge)) return false;
+  const audit = judge as Record<string, unknown>;
+  const engine = audit["engine"], reasonCode = audit["reasonCode"], cardKind = audit["cardKind"], group = audit["group"];
+  const model = audit["model"], reason = audit["reason"], selected = audit["selected"], confirmed = audit["confirmed"];
+  if (typeof engine !== "string" || engine === "" || engine !== source.engine) return false;
+  if (typeof reasonCode !== "string" || reasonCode === "" || reasonCode !== source.reasonCode) return false;
+  if (typeof cardKind !== "string" || cardKind !== "intent-confirm" || source.cardKind !== "intent-confirm") return false;
+  if (typeof group !== "string" || group !== governanceCardGroup(cardKind as GovernanceCardKind)) return false;
+  if (event.operatorId !== source.operatorId || source.operatorId !== `judge:${source.engine}`) return false;
+  if ((model ?? undefined) !== (source.model ?? undefined)) return false;
+  if ((reason ?? undefined) !== (source.reason ?? undefined)) return false;
+  if (selected !== undefined && (!Array.isArray(selected) || selected.some(part => typeof part !== "string"))) return false;
+  const auditSelected = selected === undefined ? undefined : [...(selected as string[])];
+  const sourceSelected = source.selected === undefined ? undefined : [...source.selected];
+  if (JSON.stringify(auditSelected) !== JSON.stringify(sourceSelected)) return false;
+  if (auditSelected !== undefined && JSON.stringify(auditSelected) !== JSON.stringify(event.selectedOptionIds)) return false;
+  if (confirmed !== undefined && confirmed !== true) return false;
+  if ((confirmed === true) !== (source.confirmed === true)) return false;
+  if (event.actionSource !== undefined || event.directiveId !== undefined) return false;
+  if (typeof event.requestId !== "string" || event.requestId === "" || event.decisionId !== `decision-${event.requestId}`) return false;
+  return true;
+}
+
 /** Under the existing R9 lock, a retained migration receipt may gain actual confirmation evidence.
- * The old bytes/receipt remain immutable; the persisted decision and snapshot must prove this exact version. */
+ * The old bytes/receipt remain immutable; the persisted decision and snapshot must prove this exact version.
+ * 2026-11-09 judge-delegated（W-J2/I-12/I-13）：judge 代批冻结与 customer/chief 同路复核——
+ * source summary 与账本 `request.resolved`（及其 `judge` 审计）逐字段一致（G1 不截断），
+ * `applicationId === intent-<requestId>`，禁止客户字段（Model 不变量先行兜底）。 */
 async function confirmsMigratedIntent(projectRoot: string, rel: string, version: number, sha256: string, freeze: DocFreezeRecord): Promise<boolean> {
   if (freeze.reason !== "intent-confirmed" || !isSnapshotRef(freeze.snapshotRef)
-    || !/^[a-zA-Z0-9_-]{1,160}$/.test(freeze.snapshotRef.snapshotId) || !isDirectActionSource(freeze.source)
-    || (freeze.source.kind !== "customer-decision" && freeze.source.kind !== "chief-delegated")) return false;
-  const source = freeze.source, requestId = source.requestId;
+    || !/^[a-zA-Z0-9_-]{1,160}$/.test(freeze.snapshotRef.snapshotId)) return false;
+  const directSource = isDirectActionSource(freeze.source) && (freeze.source.kind === "customer-decision" || freeze.source.kind === "chief-delegated") ? freeze.source : undefined;
+  const judgeSource = freeze.source !== undefined && isJudgeDelegatedSource(freeze.source) ? freeze.source : undefined;
+  const source = directSource ?? judgeSource;
+  if (source === undefined) return false;
+  const requestId = source.requestId;
   if (!requestId || freeze.applicationId !== `intent-${requestId}`) return false;
   const read = await readOperationEvents(projectRoot); if (!read.ok) return false;
   const rows = read.records.filter(row => row.value.requestId === requestId);
@@ -416,11 +453,16 @@ async function confirmsMigratedIntent(projectRoot: string, rel: string, version:
     || created.event.sourceRoleId !== "chief" || created.event.cardKind !== "intent-confirm" || created.event.flowId !== flowIdOf(rel)
     || resolved.event.cardKind !== "intent-confirm" || !resolved.event.selectedOptionIds?.includes("confirm")
     || resolved.event.selectedOptionIds.includes("revise") || resolved.event.at !== freeze.frozenAt || source.at !== resolved.event.at) return false;
-  if (source.kind === "customer-decision") {
-    if (freeze.origin !== "customer" || resolved.event.by !== "customer" || resolved.event.decisionId !== source.decisionId
-      || freeze.decisionId !== source.decisionId || resolved.event.judge || resolved.event.directiveId) return false;
-  } else if (freeze.origin !== "chief-delegated" || resolved.event.by !== "chief-delegated" || resolved.event.decisionId !== undefined
-    || source.disposition !== "select" || JSON.stringify(resolved.event.actionSource) !== JSON.stringify(source)) return false;
+  if (directSource?.kind === "customer-decision") {
+    if (freeze.origin !== "customer" || resolved.event.by !== "customer" || resolved.event.decisionId !== directSource.decisionId
+      || freeze.decisionId !== directSource.decisionId || resolved.event.judge || resolved.event.directiveId) return false;
+  } else if (directSource?.kind === "chief-delegated") {
+    if (freeze.origin !== "chief-delegated" || resolved.event.by !== "chief-delegated" || resolved.event.decisionId !== undefined
+      || directSource.disposition !== "select" || JSON.stringify(resolved.event.actionSource) !== JSON.stringify(directSource)) return false;
+  } else if (judgeSource !== undefined) {
+    if (freeze.origin !== "judge-delegated" || freeze.decisionId !== undefined || freeze.decidedBy !== undefined || freeze.actorRoleId !== undefined
+      || !judgeIntentSourceMatches(resolved.event, judgeSource)) return false;
+  } else return false;
   const marker = `[ans-intent-evidence snapshot=${freeze.snapshotRef.snapshotId} path=${rel} sha256=${sha256} version=${version}]`;
   if (typeof created.event.context !== "string" || !created.event.context.includes(marker)) return false;
   try {

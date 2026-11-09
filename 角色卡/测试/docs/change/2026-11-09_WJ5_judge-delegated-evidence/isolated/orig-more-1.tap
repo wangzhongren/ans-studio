@@ -1,0 +1,29 @@
+TAP version 13
+# Subtest: P1.2-AC-31：activation 发布 E2E（真实 plan→D3→nominator 回合；sidecar {candidate,publication} 两键 + ref/journal + 发布回执；无 native）
+ok 1 - P1.2-AC-31：activation 发布 E2E（真实 plan→D3→nominator 回合；sidecar {candidate,publication} 两键 + ref/journal + 发布回执；无 native）
+  ---
+  duration_ms: 43928.6195
+  type: 'test'
+  ...
+# Subtest: test\\测试\\git-action-activation-e2e.test.ts
+not ok 1 - test\\测试\\git-action-activation-e2e.test.ts
+  ---
+  duration_ms: 240000.038
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\git-action-activation-e2e.test.ts:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 143
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 240005.0674
+EXIT=124

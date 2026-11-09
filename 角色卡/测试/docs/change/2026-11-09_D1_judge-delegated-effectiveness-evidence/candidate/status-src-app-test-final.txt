@@ -1,0 +1,25 @@
+ M src/common/roles/nominator/index.ts
+ M src/common/编排/task-state.ts
+ M src/common/门禁引擎/classify-shell.ts
+ M src/model/runtime.ts
+ M src/model/version-change.ts
+ M src/pipeline/orchestration/trunk-runtime.ts
+ M src/pipeline/orchestration/version-change-runtime.ts
+ M src/provider/version-change/impl/guard-freeze-registry.ts
+ M src/service/trunk/impl/apply-journal.ts
+ M src/service/version-change/abstract/version-change-service.ts
+ M src/service/version-change/impl/freeze-service.ts
+ M test/roles/nominator/nominator-module.test.ts
+ M test/runtime-core/direct-role-capabilities.test.ts
+ M test/runtime-core/version-change-contract.test.ts
+ M test/桌面应用/decision-service.test.ts
+ M test/桌面应用/run-change-trigger.test.ts
+ M test/测试/git-write-chain-fixture.ts
+ M test/编排/direct-role-capabilities.test.ts
+ M test/编排/task-state.test.ts
+ M test/编排/trunk-events.test.ts
+ M test/编排/version-change-service.test.ts
+ M test/门禁引擎/direct-role-capabilities.test.ts
+ M test/门禁引擎/git-shell-acl.test.ts
+?? test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts
+?? test/测试/2026-11-09_judge-delegated-effectiveness.test.ts

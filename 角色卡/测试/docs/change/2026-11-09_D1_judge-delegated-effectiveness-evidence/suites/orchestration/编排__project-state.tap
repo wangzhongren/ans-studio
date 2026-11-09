@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: flow 合并/focus：多候选不猜 -c；唯一候选 derived；chief 事件与 cleared 正反例
+ok 1 - flow 合并/focus：多候选不猜 -c；唯一候选 derived；chief 事件与 cleared 正反例
+  ---
+  duration_ms: 35.595
+  type: 'test'
+  ...
+# Subtest: focus derived：唯一活动 flow 派生；多活动 run 全部列出且不擅自选 runId
+ok 2 - focus derived：唯一活动 flow 派生；多活动 run 全部列出且不擅自选 runId
+  ---
+  duration_ms: 10.8309
+  type: 'test'
+  ...
+# Subtest: AC-1：坏账本行数准确进 errors；可读任务照常返回（不阻塞）
+ok 3 - AC-1：坏账本行数准确进 errors；可读任务照常返回（不阻塞）
+  ---
+  duration_ms: 6.7184
+  type: 'test'
+  ...
+# Subtest: R1：1 坏 + 1 好 manifest → 好 flow active 正确、errors 精确；源码不调用 all-or-nothing API
+ok 4 - R1：1 坏 + 1 好 manifest → 好 flow active 正确、errors 精确；源码不调用 all-or-nothing API
+  ---
+  duration_ms: 18.0782
+  type: 'test'
+  ...
+# Subtest: tasks/blockers/counts：blocked/failed 分离、rework-pending 机器事实、request-pending、redispatch、chief-note
+ok 5 - tasks/blockers/counts：blocked/failed 分离、rework-pending 机器事实、request-pending、redispatch、chief-note
+  ---
+  duration_ms: 14.3918
+  type: 'test'
+  ...
+# Subtest: versions/evidence/零写入：latest vs pinned/newerThanPinned；evidence 仅 present/missing；读前后哈希不变
+ok 6 - versions/evidence/零写入：latest vs pinned/newerThanPinned；evidence 仅 present/missing；读前后哈希不变
+  ---
+  duration_ms: 19.5874
+  type: 'test'
+  ...
+# Subtest: notes/nextStep/角色裁剪：chief 备注优先；其他角色只见自己的任务，不见他人正文
+ok 7 - notes/nextStep/角色裁剪：chief 备注优先；其他角色只见自己的任务，不见他人正文
+  ---
+  duration_ms: 10.3049
+  type: 'test'
+  ...
+# Subtest: 有界/truncated：50/500/20/50 可覆盖测试（小上限）且计数保留；工具文本 ≤8 KiB
+ok 8 - 有界/truncated：50/500/20/50 可覆盖测试（小上限）且计数保留；工具文本 ≤8 KiB
+  ---
+  duration_ms: 24.3624
+  type: 'test'
+  ...
+# Subtest: AC-8：轮转丢失 focus 事件后回退 derived/none（不伪造 focus）
+ok 9 - AC-8：轮转丢失 focus 事件后回退 derived/none（不伪造 focus）
+  ---
+  duration_ms: 7.9679
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 319.0622

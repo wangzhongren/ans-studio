@@ -1,0 +1,13 @@
+test/claude-adapter/session.test.ts	natural-exit	71	71	0	0	0	0	1455.9302
+test/roles/nominator/nominator-module.test.ts	natural-exit	15	15	0	0	0	0	105.5076
+test/runtime-core/direct-role-capabilities.test.ts	natural-exit	13	13	0	0	0	0	98.9191
+test/runtime-core/version-change-contract.test.ts	natural-exit	18	17	1	0	0	0	140.3846
+test/桌面应用/chief-workflow.test.ts	natural-exit	63	48	15	0	0	0	71582.7386
+test/桌面应用/decision-service.test.ts	natural-exit	22	22	0	0	0	0	770.9814
+test/桌面应用/run-change-trigger.test.ts	natural-exit	10	1	9	0	0	0	1204.3247
+test/编排/direct-role-capabilities.test.ts	natural-exit	43	42	1	0	0	0	9587.5155
+test/编排/task-state.test.ts	natural-exit	20	20	0	0	0	0	348.0276
+test/编排/trunk-events.test.ts	natural-exit	5	5	0	0	0	0	336.0509
+test/编排/version-change-service.test.ts	natural-exit	16	16	0	0	0	0	256.7169
+test/门禁引擎/direct-role-capabilities.test.ts	natural-exit	23	23	0	0	0	0	6923.9624
+test/门禁引擎/git-shell-acl.test.ts	natural-exit	39	39	0	0	0	0	88557.4318

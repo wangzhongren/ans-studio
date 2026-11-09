@@ -1,0 +1,12 @@
+== runtime-core (myself vs D1 540/503/33/4, 59 files)
+files=59 tests=540 pass=503 fail=33 cancelled=0 skipped=4 todo=0
+== 编排 (myself vs D1 1133/1109/22/2, 107 files)
+files=107 tests=1133 pass=1109 fail=22 cancelled=0 skipped=2 todo=0
+== 门禁引擎 (myself vs D1 453/447/5/1, 41 files)
+files=41 tests=453 pass=447 fail=5 cancelled=0 skipped=1 todo=0
+== desktop four (myself vs D1 61/35/26/0, 4 files)
+files=4 tests=61 pass=35 fail=26 cancelled=0 skipped=0 todo=0
+== nominator (myself vs D1 27/27/0/0, 2 files)
+files=2 tests=27 pass=27 fail=0 cancelled=0 skipped=0 todo=0
+== test-role 7 files (myself vs D1 raw 9/8/1; normalized 8/8/0)
+files=7 tests=8 pass=7 fail=1 cancelled=0 skipped=0 todo=0

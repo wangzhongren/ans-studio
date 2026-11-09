@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: version-change-runtime: fresh ordinary submit cannot recreate customer cards (bootstrap)
+ok 1 - version-change-runtime: fresh ordinary submit cannot recreate customer cards (bootstrap)
+  ---
+  duration_ms: 36.3514
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: fresh ordinary submit cannot recreate customer cards (existing trunk)
+ok 2 - version-change-runtime: fresh ordinary submit cannot recreate customer cards (existing trunk)
+  ---
+  duration_ms: 57.9068
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: actual old pending request is readable, cannot be re-presented or settled by stale replies
+ok 3 - version-change-runtime: actual old pending request is readable, cannot be re-presented or settled by stale replies
+  ---
+  duration_ms: 40.9008
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: no presenter or ordinary channel cannot turn an invalid request into approval
+ok 4 - version-change-runtime: no presenter or ordinary channel cannot turn an invalid request into approval
+  ---
+  duration_ms: 20.0313
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: a real persisted historical approval recovers original two-file quality without a new card or fabricated role evidence
+ok 5 - version-change-runtime: a real persisted historical approval recovers original two-file quality without a new card or fabricated role evidence
+  ---
+  duration_ms: 185.8786
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 658.1499

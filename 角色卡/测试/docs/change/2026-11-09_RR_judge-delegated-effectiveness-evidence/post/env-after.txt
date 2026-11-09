@@ -1,0 +1,4 @@
+date_utc: 2026-11-09T08:53:02Z
+branch: feat/plan-escalation-card
+HEAD: fb1aa39e787934f334b9c164e4221074f97f6147
+HEAD_tree: ee33c3e95d9b3fb61dc5d05eea66c2d0a2eb9583

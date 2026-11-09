@@ -1,0 +1,89 @@
+TAP version 13
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# Subtest: runRole 在事件流不自行结束时仍收敛返回（以 settled 为终止信号）
+ok 1 - runRole 在事件流不自行结束时仍收敛返回（以 settled 为终止信号）
+  ---
+  duration_ms: 18.1711
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# Subtest: runRole 事件流自然结束（含 settled）也收敛，并 dispose 一次
+ok 2 - runRole 事件流自然结束（含 settled）也收敛，并 dispose 一次
+  ---
+  duration_ms: 9.8715
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run 会话失败：prompt 故意失败
+# Subtest: runRole 异常路径（prompt 抛错）→ 非 0，且仍 dispose
+ok 3 - runRole 异常路径（prompt 抛错）→ 非 0，且仍 dispose
+  ---
+  duration_ms: 10.1135
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# ans role run 释放会话失败：dispose 故意失败
+# Subtest: runRole dispose 出错：如实报并非 0（原成功被翻为失败）
+ok 4 - runRole dispose 出错：如实报并非 0（原成功被翻为失败）
+  ---
+  duration_ms: 9.8256
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run 会话失败：prompt 故意失败
+# ans role run 释放会话失败：dispose 故意失败
+# Subtest: runRole dispose 出错不掩盖原始错误（原已失败仍为非 0）
+ok 5 - runRole dispose 出错不掩盖原始错误（原已失败仍为非 0）
+  ---
+  duration_ms: 8.4743
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# ans role run 会话失败：缺少 base URL：测试构造失败
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# Subtest: runRole 适配器构造期抛错（如缺 provider 配置）→ 非 0，无会话可释放
+ok 6 - runRole 适配器构造期抛错（如缺 provider 配置）→ 非 0，无会话可释放
+  ---
+  duration_ms: 7.557
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# Subtest: runRole 任务提示词含指向 writeSet 内文件的**具体改动要求**
+ok 7 - runRole 任务提示词含指向 writeSet 内文件的**具体改动要求**
+  ---
+  duration_ms: 8.3923
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 365.2509

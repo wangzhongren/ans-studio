@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: 无参数行为逐字不变：整文件回执、128KB 截断文案、统计与预算口径
+ok 1 - 无参数行为逐字不变：整文件回执、128KB 截断文案、统计与预算口径
+  ---
+  duration_ms: 10.1177
+  type: 'test'
+  ...
+# Subtest: 字节范围：offset/limit 定点读取、范围标注、恰好读完不算截断
+ok 2 - 字节范围：offset/limit 定点读取、范围标注、恰好读完不算截断
+  ---
+  duration_ms: 13.7719
+  type: 'test'
+  ...
+# Subtest: 字节范围：越过文件末尾如实拒绝、空文件返回空片段、结构化 range 事实
+ok 3 - 字节范围：越过文件末尾如实拒绝、空文件返回空片段、结构化 range 事实
+  ---
+  duration_ms: 3.0065
+  type: 'test'
+  ...
+# Subtest: 行范围：startLine/endLine 1 基含端点、缺省另一端、超 EOF 收敛如实标注
+ok 4 - 行范围：startLine/endLine 1 基含端点、缺省另一端、超 EOF 收敛如实标注
+  ---
+  duration_ms: 11.6454
+  type: 'test'
+  ...
+# Subtest: 行范围：大文件定点抽查不把整文件计入读取预算；请求范围超预算才截断
+ok 5 - 行范围：大文件定点抽查不把整文件计入读取预算；请求范围超预算才截断
+  ---
+  duration_ms: 13.3719
+  type: 'test'
+  ...
+# Subtest: 范围参数校验：负数/0/非整数/类型不符/混用/endLine<startLine 一律拒绝且不消耗调用预算
+ok 6 - 范围参数校验：负数/0/非整数/类型不符/混用/endLine<startLine 一律拒绝且不消耗调用预算
+  ---
+  duration_ms: 1.5115
+  type: 'test'
+  ...
+# Subtest: 敏感路径/二进制/realpath/项目根检查不因范围参数被绕过
+ok 7 - 敏感路径/二进制/realpath/项目根检查不因范围参数被绕过
+  ---
+  duration_ms: 8.1825
+  type: 'test'
+  ...
+# Subtest: 预算计数：范围读取的 calls/bytes/truncated 与总预算耗尽语义
+ok 8 - 预算计数：范围读取的 calls/bytes/truncated 与总预算耗尽语义
+  ---
+  duration_ms: 4.0356
+  type: 'test'
+  ...
+# Subtest: 治理 judge 复用同一范围实现（read 工具与 shell judge 同源）
+ok 9 - 治理 judge 复用同一范围实现（read 工具与 shell judge 同源）
+  ---
+  duration_ms: 11.484
+  type: 'test'
+  ...
+# Subtest: schema 同步：judge_read_file 暴露可选范围参数并写明「定点抽查」与「不得猜测」
+ok 10 - schema 同步：judge_read_file 暴露可选范围参数并写明「定点抽查」与「不得猜测」
+  ---
+  duration_ms: 0.2504
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 178.2077

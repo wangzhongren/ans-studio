@@ -1,0 +1,25 @@
+16	0	"src/common/\347\274\226\346\216\222/task-state.ts"
+8	2	"src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+90	0	"test/\346\241\214\351\235\242\345\272\224\347\224\250/decision-service.test.ts"
+102	4	"test/\346\241\214\351\235\242\345\272\224\347\224\250/run-change-trigger.test.ts"
+64	16	"test/\346\265\213\350\257\225/git-write-chain-fixture.ts"
+198	1	"test/\347\274\226\346\216\222/direct-role-capabilities.test.ts"
+47	0	"test/\347\274\226\346\216\222/task-state.test.ts"
+27	0	"test/\347\274\226\346\216\222/trunk-events.test.ts"
+54	0	"test/\347\274\226\346\216\222/version-change-service.test.ts"
+30	1	"test/\351\227\250\347\246\201\345\274\225\346\223\216/direct-role-capabilities.test.ts"
+55	3	"test/\351\227\250\347\246\201\345\274\225\346\223\216/git-shell-acl.test.ts"
+1	1	src/common/roles/nominator/index.ts
+56	3	src/model/runtime.ts
+104	9	src/model/version-change.ts
+6	3	src/pipeline/orchestration/trunk-runtime.ts
+7	1	src/pipeline/orchestration/version-change-runtime.ts
+53	11	src/provider/version-change/impl/guard-freeze-registry.ts
+109	15	src/service/trunk/impl/apply-journal.ts
+4	2	src/service/version-change/abstract/version-change-service.ts
+37	6	src/service/version-change/impl/freeze-service.ts
+29	0	test/roles/nominator/nominator-module.test.ts
+132	3	test/runtime-core/direct-role-capabilities.test.ts
+89	1	test/runtime-core/version-change-contract.test.ts
+new	99	0	test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts
+new	299	0	test/测试/2026-11-09_judge-delegated-effectiveness.test.ts

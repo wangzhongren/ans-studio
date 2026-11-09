@@ -12,7 +12,7 @@ import { syncBuiltinESMExports } from "node:module";
 import { createFsTrunkStore, createGitTrunkStore, createProjectTrunkStore, initializeGitRepository } from "../../src/provider/trunk/public/trunk-store.ts";
 import { completeSnapshotDigest, appendDocFreezeRecords as appendProviderFreeze } from "../../src/provider/version-change/public/version-change-store.ts";
 import { isValidDocFreezeRecord } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
-import { isValidDocFreezeRecord as modelFreezeValidator } from "../../src/model/version-change.ts";
+import { isValidDocFreezeRecord as modelFreezeValidator, type DocFreezeRecord } from "../../src/model/version-change.ts";
 import { invalidateVersionedDocFreezeSnapshot, versionedDocFreezeState, versionedDocOverwriteDecision } from "../../src/common/门禁引擎/versioned-doc-guard.ts";
 import { FROZEN_ROLE_REF_KEYS, TRUNK_MANIFEST_SCHEMA, type CompleteSnapshot, type FrozenRoleEvidence, type TrunkManifest } from "../../src/model/trunk.ts";
 import type { ProjectConfig } from "../../src/model/role.ts";
@@ -313,6 +313,24 @@ test("G3 awaited Service refresh installs real Provider confirmation freeze and 
   assert.equal(versionedDocOverwriteDecision({ relPath: rel, exists: true, operation: "edit", frozen: versionedDocFreezeState(root, rel, true) }).allowed, false);
 });
 
+test("G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)", async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "g3-judge-freeze-"));
+  t.after(async () => { invalidateVersionedDocFreezeSnapshot(root); await fs.rm(root, { recursive: true, force: true }); });
+  const rel = "docs/product/judge-intent-v1.md";
+  await fs.mkdir(path.join(root, "docs/product"), { recursive: true });
+  await fs.writeFile(path.join(root, rel), "version: 1\n# Judge-delegated intent bytes\n");
+  invalidateVersionedDocFreezeSnapshot(root);
+  const freeze: DocFreezeRecord = { schema: "doc-freeze/v1", applicationId: "intent-unit-judge-request", reason: "intent-confirmed", origin: "judge-delegated", frozenAt: at,
+    source: { kind: "judge-delegated", requestId: "unit-judge-request", engine: "claude", model: "claude-unit", operatorId: "judge:claude", reasonCode: "sufficient",
+      reason: "checked the intent evidence", selected: ["confirm"], cardKind: "intent-confirm", at } };
+  const persisted = await appendProviderFreeze([{ projectRoot: root, relPath: rel, freeze }]);
+  assert.equal(persisted.ok, true, JSON.stringify(persisted));
+  const installed = await refreshAndInstallVersionedDocFreezeSnapshot(root, { migrationCompleted: true });
+  assert.equal(installed.state, "ready");
+  assert.equal(versionedDocFreezeState(root, rel, true), "frozen");
+  assert.equal(versionedDocOverwriteDecision({ relPath: rel, exists: true, operation: "edit", frozen: versionedDocFreezeState(root, rel, true) }).allowed, false);
+});
+
 test("G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals", () => {
   assert.equal(isValidDocFreezeRecord, modelFreezeValidator, "G consumes the exact Model invariant without its own duplicate implementation");
   const direct = { schema: "doc-freeze/v1", applicationId: "vc-1", reason: "role-direct-applied", origin: "role-direct", actorRoleId: "product", frozenAt: at,
@@ -327,6 +345,17 @@ test("G2 freeze source validates real direct/delegated kinds and rejects fabrica
   assert.equal(isValidDocFreezeRecord({ ...delegated, decisionId: "fake-customer" }), false);
   assert.equal(isValidDocFreezeRecord({ ...delegated, source: { ...delegated.source, disposition: "revise", selected: undefined } }), false);
   assert.equal(isValidDocFreezeRecord({ schema: "doc-freeze/v1", applicationId: "legacy", reason: "proposal-confirmed", origin: "customer", decisionId: "real-old", decidedBy: "customer", frozenAt: at }), true);
+  // 2026-11-09 judge-delegated（W-J3 / 方案 J11 / AC-J9）：门禁经同一 Model 不变量接受诚实 judge 冻结记录。
+  const judged = { schema: "doc-freeze/v1", applicationId: "intent-unit-judge-request", reason: "intent-confirmed", origin: "judge-delegated", frozenAt: at,
+    source: { kind: "judge-delegated", requestId: "unit-judge-request", engine: "claude", model: "claude-unit", operatorId: "judge:claude", reasonCode: "sufficient",
+      reason: "checked the intent evidence", selected: ["confirm"], cardKind: "intent-confirm", at } };
+  assert.equal(isValidDocFreezeRecord(judged), true);
+  assert.equal(modelFreezeValidator(judged), true, "judge record acceptance is the exact Model branch, not a gate-local copy");
+  for (const patch of [{ decidedBy: "customer" }, { decisionId: "decision-unit-judge-request" }, { actorRoleId: "chief" }, { applicationId: "intent-other" },
+    { applicationId: "proposal-unit-judge-request" }, { frozenAt: "2026-11-05T00:00:01.000Z" }, { reason: "vca-approved" }, { source: null },
+    { source: { ...judged.source, engine: "" } }, { source: { ...judged.source, operatorId: "judge:codex" } }, { source: { ...judged.source, kind: "chief-delegated" } },
+    { source: { ...judged.source, cardKind: "proposal" } }])
+    assert.equal(isValidDocFreezeRecord({ ...judged, ...patch }), false, JSON.stringify(patch));
 });
 
 test("六角色明确未注入能力不得虚构或恢复取消卡", () => {

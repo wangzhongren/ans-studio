@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: 真实轮次事件交错仍分离文件证据；重复终局夹迟到事件也只回交一次
+ok 1 - 真实轮次事件交错仍分离文件证据；重复终局夹迟到事件也只回交一次
+  ---
+  duration_ms: 1.9492
+  type: 'test'
+  ...
+# Subtest: failed 压过同轮较早 completed 报告，并保留中断前证据
+ok 2 - failed 压过同轮较早 completed 报告，并保留中断前证据
+  ---
+  duration_ms: 0.1984
+  type: 'test'
+  ...
+# Subtest: aborted 压过同轮较早 completed 报告，并保留中断前证据
+ok 3 - aborted 压过同轮较早 completed 报告，并保留中断前证据
+  ---
+  duration_ms: 0.1091
+  type: 'test'
+  ...
+# Subtest: timed_out 压过同轮较早 completed 报告，并保留中断前证据
+ok 4 - timed_out 压过同轮较早 completed 报告，并保留中断前证据
+  ---
+  duration_ms: 0.1021
+  type: 'test'
+  ...
+# Subtest: 正常同轮正式报告原样优先，不混入工具事实；工具失败不形成fallback产物
+ok 5 - 正常同轮正式报告原样优先，不混入工具事实；工具失败不形成fallback产物
+  ---
+  duration_ms: 0.1778
+  type: 'test'
+  ...
+# Subtest: 无metadata旧替身每轮证据也清空；泛化写入完成不能充当成果
+ok 6 - 无metadata旧替身每轮证据也清空；泛化写入完成不能充当成果
+  ---
+  duration_ms: 0.263
+  type: 'test'
+  ...
+# Subtest: events延迟至两次send结束后消费，报告仍按metadata关联且非法/迟到报告不覆盖
+ok 7 - events延迟至两次send结束后消费，报告仍按metadata关联且非法/迟到报告不覆盖
+  ---
+  duration_ms: 20.6881
+  type: 'test'
+  ...
+# Subtest: 批次提示保留每份来源与完整证据，未知任务不冒充收齐；稳定key使用真实turnId
+ok 8 - 批次提示保留每份来源与完整证据，未知任务不冒充收齐；稳定key使用真实turnId
+  ---
+  duration_ms: 0.3228
+  type: 'test'
+  ...
+# Subtest: 回交诊断记录真实来源/状态，不记录任务正文与证据内容
+ok 9 - 回交诊断记录真实来源/状态，不记录任务正文与证据内容
+  ---
+  duration_ms: 7.0539
+  type: 'test'
+  ...
+# Subtest: A4完整成功写入路径形成兜底证据；隐藏/截断与新summary/raw别名不能绕过
+ok 10 - A4完整成功写入路径形成兜底证据；隐藏/截断与新summary/raw别名不能绕过
+  ---
+  duration_ms: 0.3482
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 324.3047

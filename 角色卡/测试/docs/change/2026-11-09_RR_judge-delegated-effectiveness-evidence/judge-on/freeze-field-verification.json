@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-11-09T08:52:09.934Z",
+  "requestId": "req-86b6b0640c4ba662",
+  "checks": {
+    "freeze_schema": true,
+    "reason_intent_confirmed": true,
+    "origin_judge_delegated": true,
+    "applicationId_from_requestId": true,
+    "frozenAt_eq_resolved_at": true,
+    "no_decidedBy": true,
+    "no_decisionId": true,
+    "no_actorRoleId": true,
+    "source_kind": true,
+    "source_requestId_eq_ledger": true,
+    "source_engine_eq_ledger": true,
+    "source_operatorId_eq_judge": true,
+    "source_reasonCode_eq_ledger": true,
+    "source_reason_eq_ledger": true,
+    "source_selected_eq_ledger": true,
+    "source_cardKind": true,
+    "source_model_omitted_when_ledger_omits": true,
+    "resolved_by_judge": true,
+    "resolved_decisionId_app_generated": true,
+    "resolved_no_actionSource": true,
+    "resolved_no_directiveId": true,
+    "marker_in_context": true,
+    "no_doc_freeze_events": true,
+    "requested_comment": true
+  },
+  "failed": [],
+  "pass": true
+}

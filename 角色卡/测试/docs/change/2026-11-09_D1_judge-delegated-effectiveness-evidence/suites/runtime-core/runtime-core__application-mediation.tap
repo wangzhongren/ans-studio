@@ -1,0 +1,59 @@
+TAP version 13
+# Subtest: P1-A guard accepts exactly the frozen application tool-surface fact shape
+ok 1 - P1-A guard accepts exactly the frozen application tool-surface fact shape
+  ---
+  duration_ms: 0.6661
+  type: 'test'
+  ...
+# Subtest: P1-A composition verifies Claude/Pi/Codex only under the exact reason whitelist and returns copied facts
+ok 2 - P1-A composition verifies Claude/Pi/Codex only under the exact reason whitelist and returns copied facts
+  ---
+  duration_ms: 0.7846
+  type: 'test'
+  ...
+# Subtest: P1-A composition rejects every blocked or unlisted wrapper reason (default deny)
+ok 3 - P1-A composition rejects every blocked or unlisted wrapper reason (default deny)
+  ---
+  duration_ms: 0.1927
+  type: 'test'
+  ...
+# Subtest: P1-A composition rejects missing, unknown, malformed or identity-mismatched adapter facts
+ok 4 - P1-A composition rejects missing, unknown, malformed or identity-mismatched adapter facts
+  ---
+  duration_ms: 0.2146
+  type: 'test'
+  ...
+# Subtest: P1-A Amendment-1: verified applicationMediation carries the bound nativeInstanceId (P1.6 §4.4 literal)
+ok 5 - P1-A Amendment-1: verified applicationMediation carries the bound nativeInstanceId (P1.6 §4.4 literal)
+  ---
+  duration_ms: 0.1849
+  type: 'test'
+  ...
+# Subtest: P1-A Codex application mediation additionally requires a bound native fact and no foreign MCP
+ok 6 - P1-A Codex application mediation additionally requires a bound native fact and no foreign MCP
+  ---
+  duration_ms: 0.1471
+  type: 'test'
+  ...
+# Subtest: P1-A wrapper keeps applicationMediation absent for custom factories, demo and strict observed sessions
+ok 7 - P1-A wrapper keeps applicationMediation absent for custom factories, demo and strict observed sessions
+  ---
+  duration_ms: 11.9682
+  type: 'test'
+  ...
+# Subtest: P1-A real default Codex session remains strict-observed and never gains the dual path
+ok 8 - P1-A real default Codex session remains strict-observed and never gains the dual path
+  ---
+  duration_ms: 17.6767
+  type: 'test'
+  ...
+# {"factoryProvenance":"default-production","status":"observed","nativeToolRegistry":"application-mediated"}
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 260.2582

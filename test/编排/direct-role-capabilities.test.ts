@@ -18,7 +18,8 @@ import { validateRunManifest } from "../../src/common/编排/run-manifest.ts";
 import { readTaskState, validateTaskStateEvent } from "../../src/common/编排/task-state.ts";
 import { createTrunkProject, PATHS } from "./fixtures/trunk-project.ts";
 import { createVersionChangeStack } from "../../app/desktop/version-change.ts";
-import type { CustomerInputRequest, CustomerInputMetadata, TaskCreatedEvent, TaskReportedEvent, RequestCreatedEvent, RequestResolvedEvent } from "../../src/model/runtime.ts";
+import type { CustomerInputRequest, CustomerInputMetadata, TaskCreatedEvent, TaskReportedEvent, RequestCreatedEvent, RequestResolvedEvent, CustomerInputOutcome, GovernanceJudgeAudit } from "../../src/model/runtime.ts";
+import { validateRoleDocumentsSnapshot, validateBoundaryYamlText } from "../../src/service/boundary/resolve-boundary.ts";
 import { TRUNK_MANIFEST_SCHEMA, COMPLETE_SNAPSHOT_SCHEMA, FROZEN_ROLE_REF_KEYS, type TrunkManifest, type SnapshotRef, type FrozenRoleEvidence, type ActiveRoleEvidence, type CompleteSnapshot } from "../../src/model/trunk.ts";
 
 const at = "2026-11-05T00:00:00.000Z";
@@ -127,6 +128,202 @@ test("Retained intent confirmation: real migration keeps history and only the ex
   assert.deepEqual(await readConfirmedIntentEvidence(root, pendingPath), { ok: false, reason: "intent-confirmation-missing" });
   await fs.writeFile(path.join(root, intentPath), `${intent}External bytes changed after confirmation.\n`);
   assert.deepEqual(await readConfirmedIntentEvidence(root, intentPath), { ok: false, reason: "intent-confirmation-bytes-changed" }, "A stored approval never validates different current bytes");
+});
+
+test("Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-judge-intent-"));
+  try {
+    const intentPath = "docs/product/demo-intent-v1.md";
+    const intent = "---\nschema: project-intent/v1\nflowId: demo\nversion: 1\n---\n# Judge delegated intent\nRetain these exact bytes.\n";
+    await fs.mkdir(path.join(root, "docs/product"), { recursive: true });
+    await fs.writeFile(path.join(root, intentPath), intent);
+    assert.ok((await createVersionChangeStack({ projectRoot: root }).ensureInitialized()).ok);
+    const service = createTrunkService({ projectRoot: root });
+    const prepared = await service.prepareIntentConfirmation("demo");
+    assert.ok(prepared.ok, JSON.stringify(prepared)); if (!prepared.ok) return;
+    // 真实迁移把既有版本化文档默认冻结为 migrated-legacy；judge 确认必须在同一路径上补真实证据。
+    const migrated = await createGuardFreezeRegistry(root, { migrationCompleted: () => true }).listFreezes();
+    assert.ok(migrated.some(entry => entry.path === intentPath && entry.freeze.reason === "migrated-legacy"), JSON.stringify(migrated));
+    const requestId = "judge-intent-request-1";
+    const longReason = `judge checked the retained intent evidence ${"r".repeat(4000)}`;
+    const longModel = `claude-${"m".repeat(400)}`;
+    const judgeAudit: GovernanceJudgeAudit = { group: "decision", cardKind: "intent-confirm", engine: "claude", model: longModel,
+      reasonCode: "sufficient", reason: longReason, selected: ["confirm"] };
+    const created: RequestCreatedEvent = { v: 1, at, kind: "request.created", requestId, flowId: "demo", sourceRoleId: "chief", cardKind: "intent-confirm",
+      title: "Confirm the exact intent", context: prepared.value.marker, options: [{ id: "confirm", label: "Confirm" }, { id: "revise", label: "Revise" }] };
+    const resolved: RequestResolvedEvent = { v: 1, at, kind: "request.resolved", requestId, cardKind: "intent-confirm", by: "judge",
+      operatorId: "judge:claude", decisionId: `decision-${requestId}`, judge: judgeAudit, selectedOptionIds: ["confirm"], choice: "confirm" };
+    assert.ok((await service.recordTaskObservation(created)).ok);
+    assert.ok((await service.recordTaskObservation(resolved)).ok);
+    const outcome: CustomerInputOutcome = { outcome: "answered", value: { selected: ["confirm"] }, decisionId: resolved.decisionId, judge: judgeAudit, operatorId: "judge:claude" };
+    const finalized = await service.finalizeIntentConfirmation(prepared.value, outcome);
+    assert.ok(finalized.ok, JSON.stringify(finalized));
+    const judgeFreeze = (await createGuardFreezeRegistry(root, { migrationCompleted: () => true }).listFreezes()).find(entry => entry.freeze.origin === "judge-delegated");
+    assert.ok(judgeFreeze); if (!judgeFreeze) return;
+    assert.equal(judgeFreeze.freeze.reason, "intent-confirmed");
+    assert.equal(judgeFreeze.freeze.applicationId, `intent-${requestId}`);
+    assert.equal(judgeFreeze.freeze.frozenAt, at);
+    assert.equal(judgeFreeze.freeze.decidedBy, undefined, "judge 冻结不冒充客户");
+    assert.equal(judgeFreeze.freeze.decisionId, undefined, "应用真实 decisionId 只留在账本/授权证据");
+    assert.equal(judgeFreeze.freeze.actorRoleId, undefined);
+    assert.deepEqual(judgeFreeze.freeze.source, { kind: "judge-delegated", requestId, engine: "claude", model: longModel, operatorId: "judge:claude",
+      reasonCode: "sufficient", reason: longReason, selected: ["confirm"], cardKind: "intent-confirm", at }, "G1：source 摘要按账本原值逐字复制、不截断");
+    const evidence = await readConfirmedIntentEvidence(root, intentPath);
+    assert.ok(evidence.ok, JSON.stringify(evidence));
+    const before = (await readVersionBaselineState(root)).text;
+    const replay = await service.finalizeIntentConfirmation(prepared.value, outcome);
+    assert.ok(replay.ok, JSON.stringify(replay));
+    assert.equal((await readVersionBaselineState(root)).text, before, "同一 outcome 重放不追加重复/冲突记录");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw", async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-judge-intent-negative-"));
+  try {
+    assert.ok((await createVersionChangeStack({ projectRoot: root }).ensureInitialized()).ok);
+    const intentPath = "docs/product/demo-intent-v1.md";
+    const intent = "---\nschema: project-intent/v1\nflowId: demo\nversion: 1\n---\n# Judge negative intent\n";
+    await fs.mkdir(path.join(root, "docs/product"), { recursive: true });
+    await fs.writeFile(path.join(root, intentPath), intent);
+    const service = createTrunkService({ projectRoot: root });
+    const prepared = await service.prepareIntentConfirmation("demo");
+    assert.ok(prepared.ok, JSON.stringify(prepared)); if (!prepared.ok) return;
+    const audit: GovernanceJudgeAudit = { group: "decision", cardKind: "intent-confirm", engine: "claude", model: "claude-unit",
+      reasonCode: "sufficient", reason: "唯一推荐 confirm", selected: ["confirm"] };
+    let sequence = 0;
+    const ledgerRow = async (patch: (base: RequestResolvedEvent) => RequestResolvedEvent, recordable = true): Promise<RequestResolvedEvent | undefined> => {
+      const requestId = `judge-negative-${++sequence}`;
+      const created: RequestCreatedEvent = { v: 1, at, kind: "request.created", requestId, flowId: "demo", sourceRoleId: "chief", cardKind: "intent-confirm",
+        title: "Confirm", context: prepared.value.marker, options: [{ id: "confirm", label: "Confirm" }, { id: "revise", label: "Revise" }] };
+      const base: RequestResolvedEvent = { v: 1, at, kind: "request.resolved", requestId, cardKind: "intent-confirm", by: "judge",
+        operatorId: "judge:claude", decisionId: `decision-${requestId}`, judge: audit, selectedOptionIds: ["confirm"], choice: "confirm" };
+      const resolved = patch(base);
+      assert.ok((await service.recordTaskObservation(created)).ok);
+      const appended = await service.recordTaskObservation(resolved);
+      if (!recordable) { assert.equal(appended.ok, false, "非法来源形状的账本行在追加时即被拒绝（fail-closed）"); return undefined; }
+      assert.ok(appended.ok, JSON.stringify(appended));
+      return resolved;
+    };
+    const answered = (patch: Partial<Extract<CustomerInputOutcome, { outcome: "answered" }>> = {}): CustomerInputOutcome =>
+      ({ outcome: "answered", value: { selected: ["confirm"] }, ...patch });
+    const invalidNoFreeze = async (label: string, outcome: CustomerInputOutcome): Promise<void> => {
+      const result = await service.finalizeIntentConfirmation(prepared.value, outcome);
+      assert.equal(result.ok, false, label);
+      if (!result.ok) assert.equal(result.code, "trunk-item-invalid", label);
+    };
+    await invalidNoFreeze("无匹配 judge resolved 行", answered({ decisionId: "decision-not-in-ledger", judge: audit, operatorId: "judge:claude" }));
+    await ledgerRow(base => ({ ...base, judge: null as unknown as GovernanceJudgeAudit }));
+    await invalidNoFreeze("judge 为 null", answered({ decisionId: `decision-judge-negative-${sequence}`, judge: audit, operatorId: "judge:claude" }));
+    const mismatched = await ledgerRow(base => base);
+    await invalidNoFreeze("outcome.judge 与 resolved.judge 不一致", answered({ decisionId: mismatched!.decisionId, judge: { ...audit, reasonCode: "different" }, operatorId: "judge:claude" }));
+    const operatorMismatch = await ledgerRow(base => ({ ...base, operatorId: "judge:codex" }));
+    await invalidNoFreeze("operatorId 不符", answered({ decisionId: operatorMismatch!.decisionId, judge: audit, operatorId: "judge:claude" }));
+    const badDecisionId = await ledgerRow(base => ({ ...base, decisionId: "decision-other-value" }));
+    await invalidNoFreeze("decisionId 非 decision-<requestId>", answered({ decisionId: badDecisionId!.decisionId, judge: audit, operatorId: "judge:claude" }));
+    const directiveRow = await ledgerRow(base => ({ ...base, directiveId: "d-1" }));
+    await invalidNoFreeze("directiveId 混入", answered({ decisionId: directiveRow!.decisionId, judge: audit, operatorId: "judge:claude" }));
+    await ledgerRow(base => ({ ...base, actionSource: { kind: "customer-decision", decisionId: base.decisionId!, requestId: base.requestId, at } }), false);
+    const selectedMismatch = await ledgerRow(base => ({ ...base, selectedOptionIds: ["confirm", "extra"] }));
+    await invalidNoFreeze("audit.selected 与 selectedOptionIds 不一致", answered({ decisionId: selectedMismatch!.decisionId, judge: audit, operatorId: "judge:claude" }));
+    const judgedRow = await ledgerRow(base => base);
+    await invalidNoFreeze("customer 形状 outcome 遇 judge 行", answered({ decisionId: judgedRow!.decisionId }));
+    // J14 回落：declined/unavailable/revise/directive 一律不产生冻结（既有回落不变）。
+    await invalidNoFreeze("declined 回落", { outcome: "declined" });
+    await invalidNoFreeze("unavailable 回落", { outcome: "unavailable" });
+    await invalidNoFreeze("revise 选择", answered({ value: { selected: ["revise"] }, judge: audit, operatorId: "judge:claude" }));
+    await invalidNoFreeze("指令结算", answered({ judge: audit, operatorId: "judge:claude", directive: { id: "d-1", action: "select-recommended" } }));
+    const judgeFreezes = (await createGuardFreezeRegistry(root, { migrationCompleted: () => true }).listFreezes()).filter(entry => entry.freeze.origin === "judge-delegated");
+    assert.equal(judgeFreezes.length, 0, "全部负例均未写 judge 冻结");
+  } finally {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 30 });
+  }
+});
+
+test("Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed", async () => {
+  const project = await createTrunkProject({ withRun: false });
+  const store = createFsTrunkStore(project.root), documents = project.snapshot().documents;
+  const captured = await store.captureSnapshot!({ snapshotId: "judge-planning-workflow", createdAt: at,
+    files: [...Object.values(documents), { path: PATHS.workflow, sha256: project.hashes[PATHS.workflow]! }] });
+  assert.ok(captured.ok); if (!captured.ok) return;
+  const initial: TrunkManifest = { schema: TRUNK_MANIFEST_SCHEMA, source: "bootstrap", trunkVersion: 1, previous: null, runId: null, flowId: "demo",
+    digest: sha("judge-d3-basis"), snapshotRef: captured.value, createdAt: at, updatedAt: at,
+    artifacts: { documents, execution: { teamPlan: null, flow: null }, boundaries: {}, workflow: { kind: "workflow" as const, path: PATHS.workflow, sha256: project.hashes[PATHS.workflow]! } } };
+  assert.ok((await store.compareAndSwapManifest!(null, initial, captured.value)).ok);
+  const planPath = "docs/scheduling/demo-team-v2.md";
+  const plan = { schema: "teamPlanSchema:3", flowId: "demo", version: 2, modules: documents.modules, roster: documents.roster,
+    roleRows: [{ roleId: "impl", modules: ["impl-core"], writesets: ["src/impl/"], dependsOn: [] }] };
+  const planText = `---\n${JSON.stringify(plan)}\n---\n# Real judge team plan\n`;
+  await fs.writeFile(path.join(project.root, planPath), planText);
+  const completed = await createDirectRoleRuntimeBase({ projectRoot: project.root, actorRoleId: "convener", notifyDirect: async () => {} }).completeTeamPlan(
+    { operationId: "judge-plan-completion", flowId: "demo", baseDigest: initial.digest, plan: { path: planPath, sha256: sha(planText), version: 2 } });
+  assert.equal(completed.status, "applied", JSON.stringify(completed));
+  assert.ok(completed.planRef && completed.rosterRef); if (!completed.planRef || !completed.rosterRef) return;
+  const requestId = "judge-d3-request", decisionId = `decision-${requestId}`;
+  const request: RequestCreatedEvent = { v: 1, at, kind: "request.created", requestId, flowId: "demo", sourceRoleId: "nominator", cardKind: "appointment",
+    title: "Select implementation capability", options: [{ id: "impl", label: "Implementation" }] };
+  const judgeAudit: GovernanceJudgeAudit = { group: "decision", cardKind: "appointment", engine: "claude", reasonCode: "sufficient", selected: ["impl"] };
+  const decision: RequestResolvedEvent = { v: 1, at, kind: "request.resolved", requestId, decisionId, by: "judge", operatorId: "judge:claude", judge: judgeAudit,
+    cardKind: "appointment", choice: "impl", targetRoleIds: ["impl"], rosterVersion: 1, rosterSha256: completed.rosterRef.sha256 };
+  assert.ok((await recordTaskObservation({ projectRoot: project.root, event: request })).ok);
+  assert.ok((await recordTaskObservation({ projectRoot: project.root, event: decision })).ok);
+  const card = "# Implementation\n" + ["组别", "工作立场", "能力描述", "职责与功能导航", "必读资料", "交接", "执行原则", "质量职责", "标准工作流", "交付物清单"].map(section => `## ${section}\nMaintain the assigned module.\n`).join("");
+  const md = "# Boundary\n## Section 1: 可修改文件与目录\n| 类型 | 可操作路径 | 用途 |\n| --- | --- | --- |\n| 目录（私有） | `src/impl/` | implementation |\n";
+  const yaml = "role: impl\nentries:\n  - kind: directory\n    path: src/impl/\n    purpose: implementation\n";
+  const paths = { card: PATHS.roleCard, boundaryMd: "角色卡/impl/boundary.md", boundaryYaml: PATHS.boundary };
+  await fs.writeFile(path.join(project.root, paths.card), card);
+  await fs.writeFile(path.join(project.root, paths.boundaryMd), md);
+  await fs.writeFile(path.join(project.root, paths.boundaryYaml), yaml);
+  const service = createTrunkService({ projectRoot: project.root });
+  const activate = { operationId: "judge-activation", flowId: "demo", targetRoleId: "impl", d3DecisionId: decisionId, planRef: completed.planRef, rosterRef: completed.rosterRef,
+    documents: { card: { path: paths.card, sha256: sha(card) }, boundaryMd: { path: paths.boundaryMd, sha256: sha(md) }, boundaryYaml: { path: paths.boundaryYaml, sha256: sha(yaml) } } };
+  const prepared = await service.prepareRoleActivation(activate, "nominator");
+  assert.ok(prepared.ok, JSON.stringify(prepared)); if (!prepared.ok) return;
+  const validated = validateRoleDocumentsSnapshot({ snapshot: prepared.value.snapshot, roles: [prepared.value.role] });
+  assert.ok(validated.ok, JSON.stringify(validated)); if (!validated.ok) return;
+  const yamlFile = prepared.value.snapshot.files.find(file => file.path === prepared.value.evidence.boundaryYamlRef.path);
+  assert.ok(yamlFile); if (!yamlFile) return;
+  const boundary = validateBoundaryYamlText(Buffer.from(yamlFile.bytesBase64, "base64").toString("utf8"));
+  assert.ok(boundary.ok, JSON.stringify(boundary)); if (!boundary.ok) return;
+  const activated = await service.activateRoleDocuments(prepared.value, validated.roleDocumentChecks, boundary.entries);
+  assert.equal(activated.status, "applied", JSON.stringify(activated));
+  const manifest = await store.readManifest(); assert.ok(manifest.ok); if (!manifest.ok) return;
+  const activeRef = manifest.value.activeRoles?.impl; assert.ok(activeRef); if (!activeRef) return;
+  const activeEvidence = await store.readActiveRoleEvidence!(activeRef); assert.ok(activeEvidence.ok); if (!activeEvidence.ok) return;
+  const authFile = activeEvidence.value.files.find(file => file.path === activeRef.authorizationRef.path); assert.ok(authFile); if (!authFile) return;
+  const authorization = JSON.parse(Buffer.from(authFile.bytesBase64, "base64").toString("utf8")) as Record<string, unknown>;
+  assert.equal(authorization["d3Source"], "judge", "授权证据如实记 judge 来源");
+  assert.equal(authorization["decisionId"], decisionId, "judge 授权证据用应用真实生成的 decisionId（不是客户 decisionId）");
+  assert.equal(authorization["actionSource"], undefined, "judge 授权不携带 actionSource");
+  // J10：pin 与后续 run/handoff 读取消费 judge D3 冻结证据（来源可区分）。
+  const runId = "run-judge-d3-pin";
+  assert.ok((await store.compareAndSwapRunRecord!(runId, null, { schema: "ans-run/v1", runId, flowId: "demo", state: "draft", createdAt: at, updatedAt: at,
+    schemas: {}, documents: {}, execution: { teamPlan: null, flow: null } })).ok);
+  const pin = await freezeExecutionRun({ projectRoot: project.root, runId, flowId: "demo", operationId: "judge-d3-pin" });
+  assert.ok(pin.ok, JSON.stringify(pin));
+  assert.ok((await readRunRoleContext({ projectRoot: project.root, runId, roleId: "impl" })).ok);
+  const scope = await service.prepareRoleDraftScope({ flowId: "demo" });
+  assert.ok(scope.ok, JSON.stringify(scope));
+  if (scope.ok) { assert.equal(scope.value.d3Reference, decisionId); assert.equal(scope.value.d3RequestId, requestId); }
+  // J9 负例：审计缺失 / operatorId 不符 / decisionId 异常 / targetRoleIds 不符 ⇒ 全部拒绝（fail-closed、不抛错）。
+  let badSequence = 0;
+  const badDecisionPair = async (patch: (base: RequestResolvedEvent) => RequestResolvedEvent): Promise<string> => {
+    const badRequestId = `judge-d3-bad-${++badSequence}`;
+    const base: RequestResolvedEvent = { ...decision, requestId: badRequestId, decisionId: `decision-${badRequestId}` };
+    const resolved = patch(base);
+    assert.ok((await recordTaskObservation({ projectRoot: project.root, event: { ...request, requestId: badRequestId } })).ok);
+    assert.ok((await recordTaskObservation({ projectRoot: project.root, event: resolved })).ok);
+    return resolved.decisionId!;
+  };
+  const attempt = async (id: string, label: string): Promise<void> => {
+    const preparation = await service.prepareRoleActivation({ ...activate, operationId: `judge-bad-activation-${badSequence}-${id}`, d3DecisionId: id }, "nominator");
+    assert.equal(preparation.ok, false, label);
+  };
+  await attempt(await badDecisionPair(base => ({ ...base, judge: undefined })), "judge 审计缺失");
+  await attempt(await badDecisionPair(base => ({ ...base, operatorId: "judge:codex" })), "operatorId 不符");
+  await attempt(await badDecisionPair(base => ({ ...base, decisionId: "decision-other" })), "decisionId 异常");
+  await attempt(await badDecisionPair(base => ({ ...base, targetRoleIds: ["other"] })), "targetRoleIds 不符");
 });
 
 test("Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk", async () => {

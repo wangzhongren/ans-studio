@@ -640,3 +640,93 @@ test("同真实requestId并发/重试复用一次结算，关闭不撤已提交�
     assert.equal(executions, 1);
   });
 });
+
+// ———————————————— 2026-11-09 judge 代批生效（W-J4/J12）：intent-confirm outcome 回归钉 ————————————————
+//
+// 客户裁定：开关开启 = 明确委托，judge 代批 `intent-confirm` 生效；审计如实记 judge
+// （`operatorId:"judge:<engine>"` + `judge` 结构），不得伪装客户；关闭开关 ⇒ 原卡呈现客户、不调 judge。
+// `by:"judge"` / `decisionId:"decision-<requestId>"` 由应用层在写 `request.resolved` 时回填
+// （`app/desktop/session.ts`），对应 session 级回归钉见 `run-change-trigger.test.ts` 同名批次用例。
+
+function intentConfirmRequest(): CustomerInputRequest {
+  return {
+    kind: "choice",
+    title: "确认意图：focus",
+    cardKind: "intent-confirm",
+    flowId: "focus",
+    sourceRoleId: "chief",
+    options: [
+      { id: "confirm", label: "确认" },
+      { id: "revise", label: "修订" },
+    ],
+  };
+}
+
+const intentConfirmCtx = { roleId: "chief", projectRoot: "/p", runtime: "demo" as const, governanceModel: "trio" as const };
+const intentConfirmMetadata: CustomerInputMetadata = {
+  cardKind: "intent-confirm",
+  flowId: "focus",
+  judgeContext: {
+    flowId: "focus",
+    facts: { governanceModel: "trio", flowId: "focus", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] },
+  },
+};
+
+test("J12：judge 代批 intent-confirm ⇒ outcome 字段回归钉（operatorId/judge 审计；非客户）", async () => {
+  const h = channelHarness(true, {
+    judge: (request) => ({
+      verdict: "approve",
+      group: request.group,
+      cardKind: request.cardKind,
+      engine: "demo",
+      model: "judge-model",
+      reasonCode: "sufficient",
+      reason: "意图与证据一致",
+      value: { selected: ["confirm"] },
+    }),
+  });
+  const outcome = await h.channel.customerInput(intentConfirmRequest(), intentConfirmCtx, intentConfirmMetadata);
+  assert.equal(h.judgeCalls(), 1, "开关开启 + judgeContext ⇒ 判断器恰调用一次");
+  assert.equal(h.pushed.length, 0, "judge 代批不弹客户卡");
+  assert.equal(h.results.length, 1, "approve 结果行如实投达（代批可见性条件）");
+  assert.equal(outcome?.outcome, "answered");
+  if (outcome?.outcome !== "answered") return;
+  assert.deepEqual(outcome.value.selected, ["confirm"]);
+  assert.equal(outcome.operatorId, "judge:demo", "归因判断引擎，不伪装客户");
+  assert.deepEqual(
+    outcome.judge,
+    {
+      group: "decision",
+      cardKind: "intent-confirm",
+      engine: "demo",
+      model: "judge-model",
+      reasonCode: "sufficient",
+      reason: "意图与证据一致",
+      selected: ["confirm"],
+    },
+    "judge 审计结构逐字段回归钉（group/cardKind/engine/model/reasonCode/selected）",
+  );
+  assert.equal(outcome.actionSource, undefined, "judge 路径不新增 actionSource（形状不变）");
+  assert.equal(outcome.directive, undefined, "judge 路径不是指令结算");
+  assert.equal(outcome.decisionId, undefined, "decisionId 由应用层写 request.resolved 时回填（session 级用例钉住）");
+});
+
+test("J12：开关关闭 ⇒ intent-confirm 原卡呈现客户、judge 0 调用、无 judge 结算", async () => {
+  const h = channelHarness(false);
+  let settled = false;
+  const pending = h.channel.customerInput(intentConfirmRequest(), intentConfirmCtx, intentConfirmMetadata);
+  Promise.resolve(pending).then(() => {
+    settled = true;
+  });
+  await tick();
+  assert.equal(h.pushed.length, 1, "原卡呈现客户");
+  assert.equal(h.judgeCalls(), 0, "开关关闭不调用判断器");
+  assert.equal(h.results.length, 0, "无 judge 结果行/审计");
+  assert.equal(settled, false, "客户作答前不结算");
+  assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["confirm"] } }).ok, true);
+  const outcome = await pending;
+  assert.equal(outcome?.outcome, "answered");
+  assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["confirm"]);
+  assert.equal(outcome?.outcome === "answered" ? outcome.operatorId : undefined, "tester", "客户本人作答（通道 operator）");
+  assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined, "无 judge 审计字段");
+});

@@ -1,0 +1,4 @@
+tracked_at_HEAD: 1105
+untracked_nonignored: 2
+manifest_entries: 1107
+manifest_bytes: 119685

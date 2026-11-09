@@ -1,0 +1,96 @@
+TAP version 13
+# Subtest: 人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集（judgeContext.recommendedRoleIds）
+ok 1 - 人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集（judgeContext.recommendedRoleIds）
+  ---
+  duration_ms: 34.923
+  type: 'test'
+  ...
+# Subtest: §5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed
+ok 2 - §5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed
+  ---
+  duration_ms: 47.6974
+  type: 'test'
+  ...
+# Subtest: 招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道
+ok 3 - 招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道
+  ---
+  duration_ms: 13.2332
+  type: 'test'
+  ...
+# Subtest: convener 发招人卡 ⇒ 被拒（不能发 appointment；只由人事发起）
+ok 4 - convener 发招人卡 ⇒ 被拒（不能发 appointment；只由人事发起）
+  ---
+  duration_ms: 7.8156
+  type: 'test'
+  ...
+# Subtest: appointment-write 目录校验：boundary 目录在名单授权目录内 ⇒ 发卡；越名单目录 ⇒ notPresented
+ok 5 - appointment-write 目录校验：boundary 目录在名单授权目录内 ⇒ 发卡；越名单目录 ⇒ notPresented
+  ---
+  duration_ms: 26.9475
+  type: 'test'
+  ...
+# Subtest: BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+not ok 6 - BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+  ---
+  duration_ms: 13.509
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\appointment-roster.test.ts:425:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    角色卡路径必须经同一 resolveWrite 探测为 allowed
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/appointment-roster.test.ts:438:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+not ok 7 - BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+  ---
+  duration_ms: 14.3233
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\appointment-roster.test.ts:445:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/appointment-roster.test.ts:452:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots 为名下模块目录并集
+ok 8 - 模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots 为名下模块目录并集
+  ---
+  duration_ms: 26.7634
+  type: 'test'
+  ...
+# Subtest: BUG-3：appointment-write 缺 targetRoleId ⇒ 结构校验拒绝，不触碰客户、无 judgeContext
+ok 9 - BUG-3：appointment-write 缺 targetRoleId ⇒ 结构校验拒绝，不触碰客户、无 judgeContext
+  ---
+  duration_ms: 11.148
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 7
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 499.0461

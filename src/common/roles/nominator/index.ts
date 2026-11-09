@@ -479,7 +479,7 @@ function matchesFactKind(value: unknown, kind: FactKind): boolean {
     case "non-empty-unique-string-array":
       return isUniqueStringArray(value) && value.length > 0;
     case "d3-by":
-      return value === "customer" || value === "chief-delegated";
+      return value === "customer" || value === "chief-delegated" || value === "judge";
   }
 }
 

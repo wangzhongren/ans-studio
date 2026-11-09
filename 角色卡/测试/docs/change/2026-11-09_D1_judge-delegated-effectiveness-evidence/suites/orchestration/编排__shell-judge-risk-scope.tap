@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: rubric 覆盖五类系统风险：系统/机器、卡死、越界、并发/数据完整性、端口/资源冲突
+ok 1 - rubric 覆盖五类系统风险：系统/机器、卡死、越界、并发/数据完整性、端口/资源冲突
+  ---
+  duration_ms: 0.6331
+  type: 'test'
+  ...
+# Subtest: fail-closed：缺关键证据 ⇒ manual；确认无风险 ⇒ allow（语义仍在 rubric 与输出契约）
+ok 2 - fail-closed：缺关键证据 ⇒ manual；确认无风险 ⇒ allow（语义仍在 rubric 与输出契约）
+  ---
+  duration_ms: 0.0913
+  type: 'test'
+  ...
+# Subtest: 明确排除业务必要性：不因看不懂业务/看不出必要而拦截项目内普通命令
+ok 3 - 明确排除业务必要性：不因看不懂业务/看不出必要而拦截项目内普通命令
+  ---
+  duration_ms: 0.0875
+  type: 'test'
+  ...
+# Subtest: 客户文案不再出现「业务不必要」：默认合成说明改为系统风险口径
+ok 4 - 客户文案不再出现「业务不必要」：默认合成说明改为系统风险口径
+  ---
+  duration_ms: 0.204
+  type: 'test'
+  ...
+# Subtest: 请求提示注入实际预算：maxCalls / maxBytes / maxFileBytes，数值与注入一致
+ok 5 - 请求提示注入实际预算：maxCalls / maxBytes / maxFileBytes，数值与注入一致
+  ---
+  duration_ms: 0.2021
+  type: 'test'
+  ...
+# Subtest: 预算字节格式：整 KiB 用 KiB，非整 KiB 如实显示字节（不臆造精度）
+ok 6 - 预算字节格式：整 KiB 用 KiB，非整 KiB 如实显示字节（不臆造精度）
+  ---
+  duration_ms: 0.0779
+  type: 'test'
+  ...
+# Subtest: 驱动：注入预算同时进入请求提示与只读工具（同一份解析值）
+ok 7 - 驱动：注入预算同时进入请求提示与只读工具（同一份解析值）
+  ---
+  duration_ms: 2.2312
+  type: 'test'
+  ...
+# Subtest: 驱动：未显式注入时预算来自运行时 env 解析，提示与实际生效值一致
+ok 8 - 驱动：未显式注入时预算来自运行时 env 解析，提示与实际生效值一致
+  ---
+  duration_ms: 0.8397
+  type: 'test'
+  ...
+# Subtest: 无系统风险 ⇒ allow（reasonCode 仍为 necessary，兼容既有消费方）
+ok 9 - 无系统风险 ⇒ allow（reasonCode 仍为 necessary，兼容既有消费方）
+  ---
+  duration_ms: 0.2737
+  type: 'test'
+  ...
+# Subtest: 有系统风险 ⇒ deny；客户说明含风险与标准出路，不含「业务不必要」
+ok 10 - 有系统风险 ⇒ deny；客户说明含风险与标准出路，不含「业务不必要」
+  ---
+  duration_ms: 0.3335
+  type: 'test'
+  ...
+# Subtest: 缺关键证据 ⇒ manual（模型自报）；不当作 deny 也不放行
+ok 11 - 缺关键证据 ⇒ manual（模型自报）；不当作 deny 也不放行
+  ---
+  duration_ms: 0.2377
+  type: 'test'
+  ...
+# Subtest: deny 无 reason ⇒ 兜底文案为「未能确认无系统风险」，不再写「不必要」
+ok 12 - deny 无 reason ⇒ 兜底文案为「未能确认无系统风险」，不再写「不必要」
+  ---
+  duration_ms: 0.2146
+  type: 'test'
+  ...
+# Subtest: 既有工具面与输出契约仍在；系统提示稳定
+ok 13 - 既有工具面与输出契约仍在；系统提示稳定
+  ---
+  duration_ms: 0.1144
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 98.5961

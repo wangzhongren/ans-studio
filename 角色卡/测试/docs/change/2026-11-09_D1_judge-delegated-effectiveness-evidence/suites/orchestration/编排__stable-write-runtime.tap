@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: stable-write-runtime：workflow 卡预览 + 许可安装 + stablePermitOf + completeWrite mini re-pin
+ok 1 - stable-write-runtime：workflow 卡预览 + 许可安装 + stablePermitOf + completeWrite mini re-pin
+  ---
+  duration_ms: 124.5071
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：completeWrite 哈希不符 ⇒ failed 事件 + 许可作废 + 快照不变
+ok 2 - stable-write-runtime：completeWrite 哈希不符 ⇒ failed 事件 + 许可作废 + 快照不变
+  ---
+  duration_ms: 90.0325
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：无卡通道 ⇒ 已记录请求但不发许可（fail-closed）
+ok 3 - stable-write-runtime：无卡通道 ⇒ 已记录请求但不发许可（fail-closed）
+  ---
+  duration_ms: 60.7276
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：appointment-write 钩子（role-card）→ 确认后许可 → written + mini re-pin
+ok 4 - stable-write-runtime：appointment-write 钩子（role-card）→ 确认后许可 → written + mini re-pin
+  ---
+  duration_ms: 95.1728
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：无 trunk manifest ⇒ written 但 mini re-pin 只记待续接（不发 stable-repinned）
+ok 5 - stable-write-runtime：无 trunk manifest ⇒ written 但 mini re-pin 只记待续接（不发 stable-repinned）
+  ---
+  duration_ms: 56.2054
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：真实消费后保留下游拒码和异常，不误报缺manifest或发布成功
+ok 6 - stable-write-runtime：真实消费后保留下游拒码和异常，不误报缺manifest或发布成功
+  ---
+  duration_ms: 98.6128
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime: a foreign service root cannot install its permit facts into this project
+ok 7 - stable-write-runtime: a foreign service root cannot install its permit facts into this project
+  ---
+  duration_ms: 34.721
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：git-old-core-programs-unproven 码保留、语义收窄为运行时中立 drain（Claude/Pi 形态可排空；live-work 仍阻断）
+ok 8 - stable-write-runtime：git-old-core-programs-unproven 码保留、语义收窄为运行时中立 drain（Claude/Pi 形态可排空；live-work 仍阻断）
+  ---
+  duration_ms: 0.7337
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 864.57

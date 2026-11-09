@@ -1,0 +1,4 @@
+test/桌面应用/decision-service.test.ts
+test/桌面应用/chain-enforcement.test.ts
+test/桌面应用/run-pin.test.ts
+test/桌面应用/run-change-trigger.test.ts

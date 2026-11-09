@@ -1,0 +1,49 @@
+{
+  "v": 1,
+  "schema": "doc-freezes/v1",
+  "state": "ready",
+  "baselineSha256": "22efc0af45c755e45941c3b231dab40a58ebf7ae1d66786351bac50a01a4f6e4",
+  "entries": [
+    {
+      "path": "docs/contracts/judge-demo2-architecture-v1.md",
+      "version": 1,
+      "sha256": "e4ade33e098720aa85dffb7fb82073fd97ef1eef37a422c885139ce929e66a3e",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/product/judge-demo2-intent-v1.md",
+      "version": 1,
+      "sha256": "1dc5979fcdf16b3ab42323db143605ef9fed0c71423c4ea403e966d22823541f",
+      "frozen": true,
+      "reason": "intent-confirmed",
+      "applicationId": "intent-req-9a03babc4a474269"
+    },
+    {
+      "path": "docs/proposals/judge-demo2-modules-v1.md",
+      "version": 1,
+      "sha256": "53f31c71852dbe9191a92a7d601fc328ac6d9a2e9504baf1fbe2aab2343b70d9",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/judge-demo2-proposal-v1.md",
+      "version": 1,
+      "sha256": "f4e81203c9f17a3a1ba00de168ab872dcef44d6f73cba7b2a11d66dd9c4b16fc",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/judge-demo2-roster-v1.md",
+      "version": 1,
+      "sha256": "d09990afcca7d0fc5e0266fdc8cbfc16ea268960f80f37ad811aa40f55ce00c5",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    }
+  ],
+  "builtAt": "2026-11-09T08:52:42.722Z"
+}

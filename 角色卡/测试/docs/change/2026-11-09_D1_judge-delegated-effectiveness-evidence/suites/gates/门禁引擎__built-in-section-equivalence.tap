@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: 等价性：builtInBoundarySection() 与内置分支的金标准字面量逐字段一致（含无 parseError）
+ok 1 - 等价性：builtInBoundarySection() 与内置分支的金标准字面量逐字段一致（含无 parseError）
+  ---
+  duration_ms: 0.7842
+  type: 'test'
+  ...
+# Subtest: 等价性：resolveBoundarySection 分支 3 与 builtInBoundarySection() 返回内容完全一致（su 与任意未知角色皆然）
+ok 2 - 等价性：resolveBoundarySection 分支 3 与 builtInBoundarySection() 返回内容完全一致（su 与任意未知角色皆然）
+  ---
+  duration_ms: 0.1911
+  type: 'test'
+  ...
+# Subtest: 等价性：accepted 恒为 false 且 source 为空串（fail-closed 的证据来源恒定）
+ok 3 - 等价性：accepted 恒为 false 且 source 为空串（fail-closed 的证据来源恒定）
+  ---
+  duration_ms: 0.0692
+  type: 'test'
+  ...
+# Subtest: 等价性：每次调用返回全新数组，互不共享可变状态（与改动前内联构造一致）
+ok 4 - 等价性：每次调用返回全新数组，互不共享可变状态（与改动前内联构造一致）
+  ---
+  duration_ms: 0.0972
+  type: 'test'
+  ...
+# Subtest: fail-closed 未被破坏：对内置角色 su 的边界，resolveWrite 拒绝一切写入（F6）
+ok 5 - fail-closed 未被破坏：对内置角色 su 的边界，resolveWrite 拒绝一切写入（F6）
+  ---
+  duration_ms: 0.464
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 145.8669

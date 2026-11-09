@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: Model：BoundarySection1 结构可构造且字段正确
+ok 1 - Model：BoundarySection1 结构可构造且字段正确
+  ---
+  duration_ms: 0.4552
+  type: 'test'
+  ...
+# Subtest: parse：抽取 Section 1 表格，遇后续标题停止；条件目录带合法 slug
+ok 2 - parse：抽取 Section 1 表格，遇后续标题停止；条件目录带合法 slug
+  ---
+  duration_ms: 0.5886
+  type: 'test'
+  ...
+# Subtest: parse：条件目录缺合法 slug（仅散文）→ 解析失败，条目被丢弃
+ok 3 - parse：条件目录缺合法 slug（仅散文）→ 解析失败，条目被丢弃
+  ---
+  duration_ms: 0.1232
+  type: 'test'
+  ...
+# Subtest: parse：条件目录 slug 格式非法 → 解析失败，条目被丢弃
+ok 4 - parse：条件目录 slug 格式非法 → 解析失败，条目被丢弃
+  ---
+  duration_ms: 0.0778
+  type: 'test'
+  ...
+# Subtest: resolveBoundary：项目覆盖（已接受）优先，用角色边界文件并标 project 根
+ok 5 - resolveBoundary：项目覆盖（已接受）优先，用角色边界文件并标 project 根
+  ---
+  duration_ms: 8.7507
+  type: 'test'
+  ...
+# Subtest: resolveBoundary：无治理接受证据 → 内置且未接受
+ok 6 - resolveBoundary：无治理接受证据 → 内置且未接受
+  ---
+  duration_ms: 3.83
+  type: 'test'
+  ...
+# Subtest: resolveRole：路径取自 project.roles（F8），含 cardText 与 boundary
+ok 7 - resolveRole：路径取自 project.roles（F8），含 cardText 与 boundary
+  ---
+  duration_ms: 5.2182
+  type: 'test'
+  ...
+# Subtest: resolveRole：未配置角色 → 内置治理角色
+ok 8 - resolveRole：未配置角色 → 内置治理角色
+  ---
+  duration_ms: 4.5525
+  type: 'test'
+  ...
+# Subtest: X-R1–X-R6 Service 公共出口：完整角色模块 map / lookup 与 D1 工具声明校验同一绑定再导出（消费方不直连私有 common）
+ok 9 - X-R1–X-R6 Service 公共出口：完整角色模块 map / lookup 与 D1 工具声明校验同一绑定再导出（消费方不直连私有 common）
+  ---
+  duration_ms: 0.6742
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 224.6713

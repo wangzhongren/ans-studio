@@ -1,0 +1,6 @@
+registered-hang-timeout	test/pi-adapter/write-sequencing.test.ts	exit=124	dur=90016.4787	watchdog=90s
+registered-hang-timeout	test/桌面应用/directive-decision.test.ts	exit=124	dur=90012.6538	watchdog=90s
+registered-hang-timeout	test/桌面应用/optional-acceptance.test.ts	exit=124	dur=89997.2155	watchdog=90s
+registered-hang-timeout	test/桌面应用/session-rebuild-race.test.ts	exit=124	dur=89976.599	watchdog=90s
+registered-hang-timeout	test/桌面应用/stuck-redispatch.test.ts	exit=124	dur=90001.585	watchdog=90s
+registered-hang-timeout	test/测试/customer-authorization-plane-integration.test.ts	exit=124	dur=90002.914	watchdog=90s
