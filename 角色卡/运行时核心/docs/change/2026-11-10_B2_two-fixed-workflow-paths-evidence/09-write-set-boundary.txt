@@ -1,0 +1,14 @@
+# write-set boundary (measured 2026-11-10T16:05:26+08:00)
+
+## git status --porcelain -- src app test
+ M src/model/runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/two-fixed-workflow-paths-b0.test.ts
+?? test/runtime-core/two-fixed-workflow-paths-b2.test.ts
+
+## guarded paths zero-diff check
+(empty above = zero diff)
+
+## guarded paths status check
+(empty above = clean)

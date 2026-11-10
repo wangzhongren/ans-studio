@@ -58,6 +58,7 @@ import type {
   PlanEscalationFn, PlanEscalationInput,
   VersionChangeTargetSubmission,
   SelectRunChangeInput, CompleteTeamPlanInput, ActivateRoleDocumentsInput, CloseCreatedTaskInput,
+  FixedCloseCreatedTaskInput, FixedActivateRoleDocumentsInput, TaskClosedOutcome,
   DecidePendingRequestInput, DecidePendingRequestFn, ChiefDecisionExecutionContext,
   WorkflowAction, WorkflowStage, WorkflowPath,
   RuntimeActiveToolFact, RuntimeOwnedProcessFact,
@@ -4448,24 +4449,99 @@ async function invokeDirectCapability(name: string, signal: AbortSignal | undefi
   try { return { value: await invoke() }; }
   catch { return directUnknownResult(name); }
 }
+// T3 B2（MF-IR-2/3 / AC-18 / AC-24）：close_created_task / activate_role_documents 的 fixed v2 模式。
+// 共享 schema 的 `required` 只保留两模式交集（见 schema.ts）；legacy 的完整必填仍在此按模式
+// fail-closed 核验——错误消息与 B2 前逐字一致（`invalid-arguments args.<field>: required`）。
+const LEGACY_MODE_REQUIRED: Record<string, readonly string[]> = {
+  [ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME]: ["operationId", "flowId", "planRef", "d3DecisionId", "rosterRef", "targetRoleId", "documents"],
+  [CLOSE_CREATED_TASK_TOOL_NAME]: ["operationId", "taskId", "runId", "basisDigest", "reportRef", "outcome"],
+};
+const FIXED_MODE_REQUIRED: Record<string, readonly string[]> = {
+  [ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME]: ["operationId", "flowId", "workflowId", "proposalDecisionId", "targetRoleId", "roster", "documents"],
+  [CLOSE_CREATED_TASK_TOOL_NAME]: ["operationId", "taskId", "outcome"],
+};
+/** 同一共享 schema，按实际模式套用该模式的完整 required（其它工具 = schema 原样）。 */
+function modeShapeSchema(name: string, fixedMode: boolean): Record<string, unknown> {
+  const parameters = describeTool(name).parameters;
+  const required = (fixedMode ? FIXED_MODE_REQUIRED : LEGACY_MODE_REQUIRED)[name];
+  return required !== undefined ? { ...parameters, required } : parameters;
+}
+/** fixed 分支只透传 v2 字段；legacy `runId/basisDigest/reportRef` 不采信、不透传（不触 trunk/CAS）。 */
+function fixedCloseInput(args: Record<string, unknown>): FixedCloseCreatedTaskInput {
+  return {
+    operationId: args.operationId as string,
+    taskId: args.taskId as string,
+    outcome: args.outcome as TaskClosedOutcome,
+    ...(args.note !== undefined ? { note: args.note as string } : {}),
+  };
+}
+function fixedActivateInput(args: Record<string, unknown>): FixedActivateRoleDocumentsInput {
+  return {
+    operationId: args.operationId as string,
+    flowId: args.flowId as string,
+    workflowId: args.workflowId as string,
+    proposalDecisionId: args.proposalDecisionId as string,
+    targetRoleId: args.targetRoleId as string,
+    roster: args.roster as FixedActivateRoleDocumentsInput["roster"],
+    documents: args.documents as FixedActivateRoleDocumentsInput["documents"],
+  };
+}
+function fixedFailureResult(name: string, value: Record<string, unknown>): ToolResult {
+  if (typeof value.code !== "string" || !value.code.trim() || typeof value.message !== "string" || !value.message.trim()) return directUnknownResult(name);
+  if (value.missing !== undefined && (!Array.isArray(value.missing) || value.missing.some(item => typeof item !== "string" || !item.trim()))) return directUnknownResult(name);
+  return { ok: false, message: `${name}: ${JSON.stringify(value)}` };
+}
+/** fixed close v2 回执独立校验：不复用 legacy `isDirectActionReceipt`/`taskStatus`；身份必须匹配输入。 */
+function fixedCloseReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
+  const name = CLOSE_CREATED_TASK_TOOL_NAME;
+  if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
+  if (!value.ok) return fixedFailureResult(name, value);
+  if (value.operationId !== args.operationId || value.taskId !== args.taskId || value.outcome !== args.outcome
+    || typeof value.eventId !== "string" || !value.eventId.trim()
+    || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean"
+    || (value.workflowId !== undefined && (typeof value.workflowId !== "string" || !value.workflowId.trim()))
+    || (value.stage !== undefined && !isWorkflowStage(value.stage))) return directUnknownResult(name);
+  return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
+}
+/** fixed activate v2 回执独立校验：workflow/role/roster 必须与输入一致；不回退 legacy activationDigest。 */
+function fixedActivateReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
+  const name = ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME;
+  if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
+  if (!value.ok) return fixedFailureResult(name, value);
+  const roster = args.roster as { sha256?: unknown };
+  if (value.workflowId !== args.workflowId || value.roleId !== args.targetRoleId
+    || value.rosterSha256 !== roster.sha256 || !directHash(value.rosterSha256)
+    || typeof value.activationKey !== "string" || !value.activationKey.trim()
+    || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean") return directUnknownResult(name);
+  return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
+}
 function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContext?: ChiefDecisionExecutionContext): ExecutableTool[] {
-  const entries: { name: string; roles: readonly string[]; invoke?: (input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> }[] = [
-    { name: SELECT_RUN_CHANGE_TOOL_NAME, roles: ["rapporteur"], ...(options.selectRunChange && { invoke: (input, signal) => options.selectRunChange!(input as unknown as SelectRunChangeInput, signal) }) },
-    { name: COMPLETE_TEAM_PLAN_TOOL_NAME, roles: ["convener"], ...(options.completeTeamPlan && { invoke: (input, signal) => options.completeTeamPlan!(input as unknown as CompleteTeamPlanInput, signal) }) },
-    { name: ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, roles: ["nominator"], ...(options.activateRoleDocuments && { invoke: (input, signal) => options.activateRoleDocuments!(input as unknown as ActivateRoleDocumentsInput, signal) }) },
-    { name: CLOSE_CREATED_TASK_TOOL_NAME, roles: ["chief", "convener"], ...(options.closeCreatedTask && { invoke: (input, signal) => options.closeCreatedTask!(input as unknown as CloseCreatedTaskInput, signal) }) },
-    { name: DECIDE_PENDING_REQUEST_TOOL_NAME, roles: ["chief"], ...(options.decidePendingRequest && { invoke: (input, signal) => options.decidePendingRequest!(input as unknown as DecidePendingRequestInput, signal) }) },
+  type DirectInvoke = (input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+  const entries: { name: string; roles: readonly string[]; legacy?: DirectInvoke; fixed?: DirectInvoke }[] = [
+    { name: SELECT_RUN_CHANGE_TOOL_NAME, roles: ["rapporteur"], ...(options.selectRunChange && { legacy: (input, signal) => options.selectRunChange!(input as unknown as SelectRunChangeInput, signal) }) },
+    { name: COMPLETE_TEAM_PLAN_TOOL_NAME, roles: ["convener"], ...(options.completeTeamPlan && { legacy: (input, signal) => options.completeTeamPlan!(input as unknown as CompleteTeamPlanInput, signal) }) },
+    // T3 B2（MF-IR-3）：fixed 依赖存在时以 fixed 为准（纵深防御；legacy 会话不注入 fixed）。
+    { name: ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, roles: ["nominator"],
+      ...(options.activateRoleDocuments && { legacy: (input, signal) => options.activateRoleDocuments!(input as unknown as ActivateRoleDocumentsInput, signal) }),
+      ...(options.activateRoleDocumentsFixed && { fixed: (input, signal) => options.activateRoleDocumentsFixed!(fixedActivateInput(input), signal) }) },
+    // T3 B2（MF-IR-2）：fixed 优先；legacy 字段路径/回执校验逐字保留于下方。
+    { name: CLOSE_CREATED_TASK_TOOL_NAME, roles: ["chief", "convener"],
+      ...(options.closeCreatedTask && { legacy: (input, signal) => options.closeCreatedTask!(input as unknown as CloseCreatedTaskInput, signal) }),
+      ...(options.closeCreatedTaskFixed && { fixed: (input, signal) => options.closeCreatedTaskFixed!(fixedCloseInput(input), signal) }) },
+    { name: DECIDE_PENDING_REQUEST_TOOL_NAME, roles: ["chief"], ...(options.decidePendingRequest && { legacy: (input, signal) => options.decidePendingRequest!(input as unknown as DecidePendingRequestInput, signal) }) },
   ];
-  return entries.filter(entry => entry.invoke !== undefined).map(entry => ({ name: entry.name, async handler(call) {
+  return entries.filter(entry => entry.legacy !== undefined || entry.fixed !== undefined).map(entry => ({ name: entry.name, async handler(call) {
     if (!entry.roles.includes(options.roleId ?? "")) return { ok: false, message: `${entry.name}: role-not-allowed（身份来自可信scope）。` };
-    const error = directShapeError(call.args, describeTool(entry.name).parameters);
+    const fixedMode = entry.fixed !== undefined;
+    const error = directShapeError(call.args, modeShapeSchema(entry.name, fixedMode));
     if (error) return { ok: false, message: `${entry.name}: invalid-arguments ${error}` };
     if (entry.name === DECIDE_PENDING_REQUEST_TOOL_NAME) {
       const selected = call.args.selected;
       if (call.args.disposition === "select" ? !Array.isArray(selected) : selected !== undefined)
         return { ok: false, message: `${entry.name}: invalid-arguments disposition/selected` };
     }
-    const invoked = await invokeDirectCapability(entry.name, call.signal, () => entry.invoke!(call.args, call.signal));
+    const invoke = fixedMode ? entry.fixed! : entry.legacy!;
+    const invoked = await invokeDirectCapability(entry.name, call.signal, () => invoke(call.args, call.signal));
     if (!("value" in invoked)) return invoked;
     const value = invoked.value;
     if (entry.name === DECIDE_PENDING_REQUEST_TOOL_NAME) {
@@ -4481,6 +4557,10 @@ function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContex
         || typeof value.errorCode !== "string" || !value.errorCode.trim() || typeof value.message !== "string" || !value.message.trim()) return directUnknownResult(entry.name);
       return { ok: value.ok, message: `${entry.name}: ${JSON.stringify(value)}` };
     }
+    // fixed v2 回执走独立校验（legacy direct 回执形状不适用）；结果如实直出。
+    if (fixedMode) return entry.name === CLOSE_CREATED_TASK_TOOL_NAME
+      ? fixedCloseReceiptResult(call.args, value)
+      : fixedActivateReceiptResult(call.args, value);
     if (directRecord(value) && value.ok === true) {
       if (entry.name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME && !directHash(value.activationDigest)) return directUnknownResult(entry.name);
       if (entry.name === CLOSE_CREATED_TASK_TOOL_NAME && (value.taskId !== call.args.taskId

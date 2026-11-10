@@ -1974,11 +1974,15 @@ export type WorkflowAction = "advance" | "stop";
 /**
  * 文档引用（应用计算 path+字节 SHA-256；kind 可选）。
  * 用于 `request.created`/`request.resolved` 的 `documentRefs`（裁决事件一次写入，不由模型自报）。
+ * T3 B2（MF-IR-5 / v1.3 §4.2 A3）：追加**可选** `version`（意图/提案文档版本号）；旧形状
+ * （无 version）仍合法——读取侧不得把缺省当任何具体版本。
  */
 export interface WorkflowDocumentRef {
   path: string;
   sha256: string;
   kind?: string;
+  /** 文档版本号（可选；A3 intent `documentRefs` 需要）。 */
+  version?: number;
 }
 
 /** 账本事件公共字段（`ans-workflow/v1`/`ans-basis/v1`/`ans-release/v1` 全部事件）。 */
@@ -3183,6 +3187,75 @@ export type CloseCreatedTaskResult = DirectActionReceipt & { taskId: string } & 
   | { ok: false; eventId?: string; taskStatus?: string });
 export type CloseCreatedTaskFn = (input: CloseCreatedTaskInput, signal?: AbortSignal) => Promise<CloseCreatedTaskResult>;
 
+/**
+ * T3 B2（MF-IR-2 / AC-18 / v1.3 §3.5）：fixed `close_created_task` v2 的**模型可见入参**。
+ * 可信身份（`projectRoot`/`actorRoleId`）由应用注入端绑定，**绝不来自模型参数**；形状不含
+ * `runId/basisDigest/reportRef`（legacy 走上方 `CloseCreatedTaskInput`，逐字保留）。真实创建者/
+ * 报告/状态/幂等由 fixed 服务核验，不触 trunk/CAS。
+ */
+export interface FixedCloseCreatedTaskInput {
+  operationId: string;
+  taskId: string;
+  outcome: TaskClosedOutcome;
+  note?: string;
+}
+
+/** fixed `close_created_task` v2 回执（`workflowService.closeTask` 直出；**不是** legacy `DirectActionReceipt`）。 */
+export type FixedCloseCreatedTaskResult =
+  | {
+    ok: true;
+    taskId: string;
+    outcome: TaskClosedOutcome;
+    workflowId?: string;
+    stage?: WorkflowStage;
+    eventId: string;
+    operationId: string;
+    replay: boolean;
+    stageCompleted: boolean;
+  }
+  | { ok: false; code: string; message: string; missing?: string[] };
+export type FixedCloseCreatedTaskFn = (
+  input: FixedCloseCreatedTaskInput,
+  signal?: AbortSignal,
+) => Promise<FixedCloseCreatedTaskResult>;
+
+/**
+ * T3 B2（MF-IR-3 / AC-24 / v1.3 §4.2 A8）：fixed `activate_role_documents` v2 的**模型可见入参**。
+ * 可信 `projectRoot` 由应用注入端绑定；roster/提案决定/三文档 hash 由 fixed 服务重算核验
+ * （`activation-hash-drift` 等 fail-closed），写 `role.activated`；不写 trunk、不发 appointment-write 卡。
+ * legacy 走上方 `ActivateRoleDocumentsInput`（逐字保留）。
+ */
+export interface FixedActivateRoleDocumentsInput {
+  operationId: string;
+  flowId: string;
+  workflowId: string;
+  proposalDecisionId: string;
+  targetRoleId: string;
+  roster: { path: string; sha256: string };
+  documents: {
+    card: { path: string; sha256: string };
+    boundaryMd: { path: string; sha256: string };
+    boundaryYaml: { path: string; sha256: string };
+  };
+}
+
+/** fixed `activate_role_documents` v2 回执（`workflowService.activateRoleDocumentsFixed` 直出）。 */
+export type FixedActivateRoleDocumentsResult =
+  | {
+    ok: true;
+    workflowId: string;
+    roleId: string;
+    rosterSha256: string;
+    activationKey: string;
+    replay: boolean;
+    stageCompleted: boolean;
+  }
+  | { ok: false; code: string; message: string; missing?: string[] };
+export type FixedActivateRoleDocumentsFn = (
+  input: FixedActivateRoleDocumentsInput,
+  signal?: AbortSignal,
+) => Promise<FixedActivateRoleDocumentsResult>;
+
 /** Trusted application request, not model-authored state. Retained business cards only. */
 export interface ChiefPendingDecisionRequest {
   requestId: string;
@@ -4333,6 +4406,15 @@ export interface GovernedToolsOptions {
   completeTeamPlan?: CompleteTeamPlanFn;
   activateRoleDocuments?: ActivateRoleDocumentsFn;
   closeCreatedTask?: CloseCreatedTaskFn;
+  /**
+   * T3 B2（MF-IR-2/3；仅 fixed 会话注入）：fixed `close_created_task`/`activate_role_documents` v2
+   * 依赖（身份/项目根由注入端绑定；形状单一来源＝编排 `workflow-service.ts` 的
+   * `FixedCloseCreatedTaskFn`/`FixedActivateRoleDocumentsFn`，此处为结构等价的本层契约）。
+   * 两者存在时 handler **以 fixed 字段为准**（纵深防御）；legacy 字段语义/必填/回执逐字不变。
+   * 未注入 ⇒ 对应工具不注册（能力缺席 = 最强 fail-closed）。
+   */
+  closeCreatedTaskFixed?: FixedCloseCreatedTaskFn;
+  activateRoleDocumentsFixed?: FixedActivateRoleDocumentsFn;
   decidePendingRequest?: DecidePendingRequestFn;
   /** Host-bound Git capabilities; schema never accepts host authorization or confinement receipts. */
   gitQuery?: GitQueryFn;

@@ -1,0 +1,410 @@
+TAP version 13
+# Subtest: three audit sources round-trip distinctly without fabricated customer facts
+ok 1 - three audit sources round-trip distinctly without fabricated customer facts
+  ---
+  duration_ms: 1.2123
+  type: 'test'
+  ...
+# Subtest: chief delegation requires revision, request, basis, reason and a real disposition
+ok 2 - chief delegation requires revision, request, basis, reason and a real disposition
+  ---
+  duration_ms: 0.1282
+  type: 'test'
+  ...
+# Subtest: direct receipts distinguish committed recovery from pre-commit failure and no-op
+ok 3 - direct receipts distinguish committed recovery from pre-commit failure and no-op
+  ---
+  duration_ms: 0.1586
+  type: 'test'
+  ...
+# Subtest: complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+ok 4 - complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+  ---
+  duration_ms: 0.2657
+  type: 'test'
+  ...
+# Subtest: run frozen evidence is all-or-nothing and never combines different snapshots
+ok 5 - run frozen evidence is all-or-nothing and never combines different snapshots
+  ---
+  duration_ms: 0.3373
+  type: 'test'
+  ...
+# Subtest: historical customer freeze remains unchanged while direct freeze has no customer credentials
+ok 6 - historical customer freeze remains unchanged while direct freeze has no customer credentials
+  ---
+  duration_ms: 0.0961
+  type: 'test'
+  ...
+# Subtest: bounded real-chief decision context has no production writer or alternate executor
+ok 7 - bounded real-chief decision context has no production writer or alternate executor
+  ---
+  duration_ms: 0.1765
+  type: 'test'
+  ...
+# Subtest: existing submit function remains callable and all three explicit run choices remain distinct
+ok 8 - existing submit function remains callable and all three explicit run choices remain distinct
+  ---
+  duration_ms: 0.0904
+  type: 'test'
+  ...
+# Subtest: R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+ok 9 - R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+  ---
+  duration_ms: 0.1582
+  type: 'test'
+  ...
+# Subtest: R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+ok 10 - R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+  ---
+  duration_ms: 0.3396
+  type: 'test'
+  ...
+# Subtest: R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+ok 11 - R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+  ---
+  duration_ms: 0.1563
+  type: 'test'
+  ...
+# Subtest: J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+ok 12 - J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+  ---
+  duration_ms: 0.3322
+  type: 'test'
+  ...
+# Subtest: J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+ok 13 - J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+  ---
+  duration_ms: 0.2127
+  type: 'test'
+  ...
+# Subtest: C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed）
+ok 14 - C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed）
+  ---
+  duration_ms: 2.0982
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入
+ok 15 - C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入
+  ---
+  duration_ms: 1.0676
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段
+ok 16 - C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段
+  ---
+  duration_ms: 0.3014
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用
+ok 17 - C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用
+  ---
+  duration_ms: 0.3192
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用
+ok 18 - C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用
+  ---
+  duration_ms: 0.4992
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准
+ok 19 - C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准
+  ---
+  duration_ms: 0.3887
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：convener 提交成功；输入身份恒为 convener
+ok 20 - C1d/submit_refactor：convener 提交成功；输入身份恒为 convener
+  ---
+  duration_ms: 0.3436
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码
+ok 21 - C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码
+  ---
+  duration_ms: 0.2703
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理
+ok 22 - C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理
+  ---
+  duration_ms: 0.243
+  type: 'test'
+  ...
+# Subtest: C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入
+ok 23 - C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入
+  ---
+  duration_ms: 0.286
+  type: 'test'
+  ...
+# Subtest: C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理
+ok 24 - C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理
+  ---
+  duration_ms: 1.4781
+  type: 'test'
+  ...
+# Subtest: C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+ok 25 - C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+  ---
+  duration_ms: 0.1454
+  type: 'test'
+  ...
+# Subtest: C1d/schema：三工具 schema 单一来源与冻结枚举一致
+ok 26 - C1d/schema：三工具 schema 单一来源与冻结枚举一致
+  ---
+  duration_ms: 0.0851
+  type: 'test'
+  ...
+# Subtest: R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal
+ok 27 - R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal
+  ---
+  duration_ms: 1.5875
+  type: 'test'
+  ...
+# Subtest: R2 rejects unknown identity/source/switch and nested malformed evidence before invocation
+ok 28 - R2 rejects unknown identity/source/switch and nested malformed evidence before invocation
+  ---
+  duration_ms: 1.3821
+  type: 'test'
+  ...
+# Subtest: R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状
+ok 29 - R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状
+  ---
+  duration_ms: 0.0688
+  type: 'test'
+  ...
+# Subtest: R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256
+ok 30 - R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256
+  ---
+  duration_ms: 0.1781
+  type: 'test'
+  ...
+# Subtest: R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力
+ok 31 - R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力
+  ---
+  duration_ms: 0.3889
+  type: 'test'
+  ...
+# Subtest: R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort
+ok 32 - R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort
+  ---
+  duration_ms: 0.4846
+  type: 'test'
+  ...
+# Subtest: R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result
+ok 33 - R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result
+  ---
+  duration_ms: 0.384
+  type: 'test'
+  ...
+# Subtest: R2 bounded chief tool binds request/revision/options and never substitutes recommended choice
+ok 34 - R2 bounded chief tool binds request/revision/options and never substitutes recommended choice
+  ---
+  duration_ms: 0.4095
+  type: 'test'
+  ...
+# Subtest: R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+not ok 35 - R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+  ---
+  duration_ms: 5.3774
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\submit-capability-tools.test.ts:503:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /trusted chief/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:510:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:510:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement
+ok 36 - R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement
+  ---
+  duration_ms: 0.6814
+  type: 'test'
+  ...
+# Subtest: R2 chief timeout is finite and normal sessions still receive injected narrow capabilities
+not ok 37 - R2 chief timeout is finite and normal sessions still receive injected narrow capabilities
+  ---
+  duration_ms: 0.6728
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\submit-capability-tools.test.ts:537:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:541:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary
+ok 38 - R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary
+  ---
+  duration_ms: 0.4137
+  type: 'test'
+  ...
+# Subtest: merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+ok 39 - merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+  ---
+  duration_ms: 0.8843
+  type: 'test'
+  ...
+# Subtest: TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+ok 40 - TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+  ---
+  duration_ms: 0.1185
+  type: 'test'
+  ...
+# Subtest: DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+ok 41 - DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+  ---
+  duration_ms: 0.0815
+  type: 'test'
+  ...
+# Subtest: 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+ok 42 - 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+  ---
+  duration_ms: 0.1122
+  type: 'test'
+  ...
+# Subtest: ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+ok 43 - ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+  ---
+  duration_ms: 0.3868
+  type: 'test'
+  ...
+# Subtest: ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+ok 44 - ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+  ---
+  duration_ms: 0.2455
+  type: 'test'
+  ...
+# Subtest: ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+ok 45 - ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+  ---
+  duration_ms: 0.2242
+  type: 'test'
+  ...
+# Subtest: dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+ok 46 - dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+  ---
+  duration_ms: 1.1049
+  type: 'test'
+  ...
+# Subtest: contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）
+ok 47 - contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）
+  ---
+  duration_ms: 0.1556
+  type: 'test'
+  ...
+# Subtest: dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+ok 48 - dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+  ---
+  duration_ms: 1.1428
+  type: 'test'
+  ...
+# Subtest: fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+ok 49 - fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+  ---
+  duration_ms: 2.8548
+  type: 'test'
+  ...
+# Subtest: fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+ok 50 - fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.4316
+  type: 'test'
+  ...
+# Subtest: legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+ok 51 - legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+  ---
+  duration_ms: 0.4988
+  type: 'test'
+  ...
+# Subtest: fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+ok 52 - fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.6605
+  type: 'test'
+  ...
+# Subtest: fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+ok 53 - fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+  ---
+  duration_ms: 0.2166
+  type: 'test'
+  ...
+# Subtest: fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+ok 54 - fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+  ---
+  duration_ms: 0.3831
+  type: 'test'
+  ...
+# Subtest: fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+ok 55 - fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.5359
+  type: 'test'
+  ...
+# Subtest: legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+ok 56 - legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+  ---
+  duration_ms: 0.3616
+  type: 'test'
+  ...
+# Subtest: fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+ok 57 - fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.498
+  type: 'test'
+  ...
+# Subtest: WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+ok 58 - WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+  ---
+  duration_ms: 0.125
+  type: 'test'
+  ...
+# Subtest: dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+ok 59 - dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+  ---
+  duration_ms: 0.7314
+  type: 'test'
+  ...
+# Subtest: merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+ok 60 - merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+  ---
+  duration_ms: 0.0767
+  type: 'test'
+  ...
+# Subtest: requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+ok 61 - requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+  ---
+  duration_ms: 1.8069
+  type: 'test'
+  ...
+1..61
+# tests 61
+# suites 0
+# pass 59
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 812.0826
+exit=1

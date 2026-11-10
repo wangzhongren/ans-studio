@@ -278,14 +278,16 @@ test("dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属�
   assert.match(text, /派发 ≠ 授权/, "既有派发纪律文案保留");
 });
 
-test("contract_check.taskKind 同步 stage-request；close_created_task 必填语义未在 B0 放宽", () => {
+test("contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）", () => {
   const cc = describeTool("contract_check");
   const ccProps = cc.parameters.properties as Record<string, Record<string, unknown>>;
   assert.deepEqual(ccProps["taskKind"]!.enum, ["dispatch", "appointment", "write", "acceptance", "shell", "stage-request"]);
 
   const close = describeTool("close_created_task");
-  assert.deepEqual(close.parameters.required, ["operationId", "taskId", "runId", "basisDigest", "reportRef", "outcome"],
-    "legacy 必填字段逐字保留（fixed v2 由 handler/编排按模式实现）");
+  // T3 B2（MF-IR-2）：共享 schema 的 required 收口为 fixed 3+1 公共子集（fixed 输入须能通过
+  // schema 层）；legacy 的 runId/basisDigest/reportRef 必填改由 handler 按模式 fail-closed 核验，
+  // 错误消息保持 `invalid-arguments args.<field>: required`（见 two-fixed-workflow-paths-b2.test.ts）。
+  assert.deepEqual(close.parameters.required, ["operationId", "taskId", "outcome"]);
   const closeProps = close.parameters.properties as Record<string, Record<string, unknown>>;
   assert.deepEqual(Object.keys(closeProps).sort(), ["basisDigest", "note", "operationId", "outcome", "reportRef", "runId", "taskId"]);
   assert.match(close.description ?? "", /runId\/basisDigest\/reportRef 必填不变/, "描述如实说明按模式核验、legacy 必填不变");
