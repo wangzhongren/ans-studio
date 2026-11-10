@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: 能力位白名单：缺省/空白/off=关；on=开；非法/大小写变体显式抛错（fail-closed，不静默）
+ok 1 - 能力位白名单：缺省/空白/off=关；on=开；非法/大小写变体显式抛错（fail-closed，不静默）
+  ---
+  duration_ms: 0.8832
+  type: 'test'
+  ...
+# Subtest: 三钉：默认关逐字节（键序/值全等）；开会三处同翻且格式与位置不变；回读期望双向 fail-closed
+ok 2 - 三钉：默认关逐字节（键序/值全等）；开会三处同翻且格式与位置不变；回读期望双向 fail-closed
+  ---
+  duration_ms: 0.7423
+  type: 'test'
+  ...
+# Subtest: webSearchRow：只投影真实字段（白名单逐字全等）；多余字段不携带；容错不抛
+ok 3 - webSearchRow：只投影真实字段（白名单逐字全等）；多余字段不携带；容错不抛
+  ---
+  duration_ms: 0.2623
+  type: 'test'
+  ...
+# Subtest: 全链（默认关）：进程覆盖 -c 与线程配置双落 disabled；turn/start 沙箱保持 readOnly+无网络；dispose 关停 engine
+ok 4 - 全链（默认关）：进程覆盖 -c 与线程配置双落 disabled；turn/start 沙箱保持 readOnly+无网络；dispose 关停 engine
+  ---
+  duration_ms: 128.9105
+  type: 'test'
+  ...
+# Subtest: 全链（开）：env on 与 options 显式两路都使三钉同翻 live；webSearch item 产出行＋settled.searchCalls；逐轮计数、不隔离
+ok 5 - 全链（开）：env on 与 options 显式两路都使三钉同翻 live；webSearch item 产出行＋settled.searchCalls；逐轮计数、不隔离
+  ---
+  duration_ms: 188.734
+  type: 'test'
+  ...
+# Subtest: 全链：零搜索轮 settled 不携带 searchCalls；item/started 不接（v1 最小面）；回读不符双向 fail-closed 且 engine 关停
+ok 6 - 全链：零搜索轮 settled 不携带 searchCalls；item/started 不接（v1 最小面）；回读不符双向 fail-closed 且 engine 关停
+  ---
+  duration_ms: 50.7407
+  type: 'test'
+  ...
+# Subtest: 全链：网关拒声明（error 通知）⇒ 本轮如实 failed 且 settled 如实；会话不隔离，下一轮正常；行文本与 URL 走既有脱敏
+ok 7 - 全链：网关拒声明（error 通知）⇒ 本轮如实 failed 且 settled 如实；会话不隔离，下一轮正常；行文本与 URL 走既有脱敏
+  ---
+  duration_ms: 71.6244
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 567.205

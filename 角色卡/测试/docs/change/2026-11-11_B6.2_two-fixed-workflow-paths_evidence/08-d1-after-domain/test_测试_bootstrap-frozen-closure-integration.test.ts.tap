@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交
+ok 1 - W5-T1 bootstrap 4-target 全链：9 文件快照 → vca.prepareDirect 接受 → candidate/publication allowed → 真实 t1 提交
+  ---
+  duration_ms: 3939.1537
+  type: 'test'
+  ...
+# Subtest: W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）
+ok 2 - W5-T2 7-target 同 kind 多版本单请求：service trunk-item-invalid / 全链 vca-target-invalid，无副作用（M1）
+  ---
+  duration_ms: 1253.2468
+  type: 'test'
+  ...
+# Subtest: W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot
+ok 3 - W5-T3 bootstrap 闭合 fail-closed：历史 frozen 文件缺失、漂移、不可读均拒绝且无 manifest/ref/snapshot
+  ---
+  duration_ms: 2720.6352
+  type: 'test'
+  ...
+# Subtest: W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）
+ok 4 - W5-T6 账本坏行、未知 event、非法 freeze 形状：真实注册表整体 fail-closed（不跳过、无副作用）
+  ---
+  duration_ms: 2823.7737
+  type: 'test'
+  ...
+# Subtest: W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径
+ok 5 - W5-T7 同 path 两种 sha（意图证据 vs frozen 记录）：fail-closed，消息含冲突路径
+  ---
+  duration_ms: 791.9367
+  type: 'test'
+  ...
+# Subtest: W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）
+ok 6 - W5-T17 异 flow 冻结行逐行 fail-closed（不静默过滤，消息含 flowId）
+  ---
+  duration_ms: 935.179
+  type: 'test'
+  ...
+# Subtest: W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝
+ok 7 - W5-T18 record.path 已是 -vN.md 且后缀 ≠ record.version：真实注册表拒绝；注入注册表下服务侧防御性拒绝
+  ---
+  duration_ms: 1785.1733
+  type: 'test'
+  ...
+# Subtest: W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行
+ok 8 - W5-T19 未证明 snapshot-content（docs/proposals 非槽位非 frozen）：candidate/publication 仍 git-policy-raw-write-scope；证明后放行
+  ---
+  duration_ms: 83.6573
+  type: 'test'
+  ...
+# Subtest: W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）
+ok 9 - W5-回归 t1 之后：非 bootstrap direct 快照仅含新 target；team-plan 快照仅 directRefs（不含 versions/历史）
+  ---
+  duration_ms: 5687.9499
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 20342.1601

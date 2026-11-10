@@ -1,5 +1,13 @@
 // test/测试/fixed-path-full-chain.test.ts
 // T3「两条固定工作流路径」B5（2026-11-10，测试）：**跨层假会话全链**（B1 T-16 / AC-28/AC-29）。
+// **B6.2（2026-11-11）：真实聊天入口并入全链**——路径 A 从空项目、无 taskId 的**真实幕僚聊天入口**
+// （真实 `SessionManager.open` 捕获 `openRoleSession` 入参；同一入参**镜像**交给真实编排
+// `openRoleSession`（假适配器，不发回合、立即 dispose）实际注入 fixed context/`chief-workflow-v2.md`）
+// 开始，再由该聊天会话经真实派发发出首个 stage-request（`ensureFixedPathStarted` 写 `workflowSchema`
+// 并启动 fixed workflow），随后既有 A1–A13 链照旧。路径 B/无仓库用例保留既有 open + routeDispatch
+// 入口并**披露**（只做应用层 fixed 断言；run-role 实际注入由路径 A 镜像打开与 B6.1/run-role 测试覆盖）。
+// 不直接 `routeDispatch` 绕过聊天入口作为唯一入口。聊天入口打开阶段零 legacy trunk/run 写入、不提前写
+// `workflowSchema`。
 //
 // 覆盖：
 //   1. 路径 A（空项目 → 幕僚 → 意图 → 方案 → 激活 → 团队计划+基线 → 任命 → A11 实现（真实 Git
@@ -36,6 +44,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
@@ -64,9 +73,9 @@ import { resolveTaskGitScope } from "../../src/pipeline/orchestration/run-role.t
 import { classifyShellDetailed, defaultShellRules, TASK_GIT_CODES, TASK_GIT_GATE_CODES } from "../../src/service/gate/shell-rules.ts";
 import { runTaskGitCommit } from "../../src/common/门禁引擎/task-git-gate.ts";
 import { governanceCardGroup, type CustomerInputOutcome, type CustomerInputRequest } from "../../src/model/runtime.ts";
-import type { BasisEvent, WorkflowEvent, WorkflowStage } from "../../src/model/runtime.ts";
+import type { BasisEvent, RoleSession, RuntimeAdapter, SessionEvent, WorkflowEvent, WorkflowStage, WriteGate } from "../../src/model/runtime.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
-import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
+import { openRoleSession as orchestrationOpenRoleSession, type AdapterCapabilities, type RoleSessionHandle, type RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 
 const FLOW = "snake";
@@ -409,6 +418,88 @@ async function assertNoLegacyWrites(root: string): Promise<void> {
   await assert.rejects(fs.stat(path.join(root, ".ans", "runs")), "fixed 路径不得写 .ans/runs");
 }
 
+// —————————————— B6.2：真实聊天入口（空项目、无 taskId）固定注入断言 ——————————————
+
+const FIXED_CHIEF_WORKFLOW_V2_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..", "..", "src", "common", "门禁引擎", "workflows", "chief", "chief-workflow-v2.md",
+);
+
+/**
+ * B6.2 应用层断言：**真实聊天入口**（`SessionManager.open`，空项目/无 taskId）捕获的
+ * `openRoleSession` 入参必须是 fixed——会话级常量 + fixed 工具注入位（legacy 治理型能力缺席）。
+ * 与 B6.1 桌面测试同口径（真实 SessionManager；本测试额外把同一入参交给真实编排，见下）。
+ */
+function assertFixedChiefChatEntry(input: CapturedInput): void {
+  assert.equal(input.workflowMode, "fixed", "空项目无 taskId 幕僚聊天必须向编排传 workflowMode:\"fixed\"（B6.1 聊天入口）");
+  assert.equal(typeof input.workflowModeForFlow, "function", "per-flow 回调与常量并存（legacy/混合项目路径不变）");
+  for (const legacyTool of ["gitQuery", "gitCandidate", "gitPublish", "requestVersionDecision"] as const) {
+    assert.equal(input[legacyTool], undefined, `fixed 聊天不得注入 legacy 能力 ${legacyTool}（AC-23）`);
+  }
+  for (const retained of ["closeCreatedTask", "closeCreatedTaskFixed", "docFormat", "contractCheck", "evidenceCheck", "projectState", "projectNote"] as const) {
+    assert.equal(input[retained] !== undefined, true, `fixed 聊天保留 ${retained}`);
+  }
+  assert.equal("requestReleaseMerge" in input, false, "G-IR：不新增 request_release_merge");
+}
+
+/**
+ * B6.2 编排层断言：把聊天入口捕获的**同一入参**原样交给真实编排 `openRoleSession`（假适配器；
+ * 不发送任何回合、立即 dispose）——断言 fixed context/`chief-workflow-v2.md` 确实由 run-role 消费注入
+ * （而不仅是入参文本），且编排能力面同样无 legacy 工具。镜像打开不启动模型、不写账本。
+ */
+async function assertFixedChiefChatInjection(input: CapturedInput): Promise<void> {
+  assertFixedChiefChatEntry(input);
+  const captured: { caps?: AdapterCapabilities } = {};
+  const handle = await orchestrationOpenRoleSession(
+    input as unknown as Parameters<typeof orchestrationOpenRoleSession>[0],
+    {
+      createAdapter: (_gate: WriteGate, caps?: AdapterCapabilities): RuntimeAdapter => {
+        captured.caps = caps;
+        return {
+          async composeContext() { return { systemPrompt: "" }; },
+          async bindRole(): Promise<RoleSession> {
+            return {
+              async prompt() {},
+              events(): AsyncIterable<SessionEvent> {
+                return (async function* () { yield { kind: "settled" as const, summary: "B6.2 镜像打开（不发回合）" }; })();
+              },
+              async dispose() {},
+            };
+          },
+        };
+      },
+    },
+  );
+  try {
+    const caps = captured.caps;
+    assert.ok(caps !== undefined, "编排必须构造适配器能力面");
+    const sections = caps.contextSections ?? [];
+    const v2 = sections.find((section) => section.includes("chief-workflow/v2"));
+    assert.ok(v2 !== undefined, "fixed chief 聊天必须注入 chief-workflow-v2.md");
+    assert.match(v2!, /^## 应用内置 Chief workflow v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）/);
+    assert.ok(v2!.includes("# Chief 工作流（两条固定路径 v2）"), "注入 v2 资源正文");
+    const v2Bytes = await fs.readFile(FIXED_CHIEF_WORKFLOW_V2_PATH);
+    const metadata = JSON.parse(v2!.split("\n")[1]!) as Record<string, unknown>;
+    assert.equal(metadata["resourceVersion"], "chief-workflow/v2");
+    assert.equal(metadata["sha256"], sha(v2Bytes), "v2 资源 SHA-256 必须是磁盘实测值");
+    assert.equal(metadata["bytes"], v2Bytes.length);
+    assert.ok(sections.some((section) => section.includes("固定路径产线调度")), "fixed chief 模块 context 段必须注入");
+    for (const legacyTool of ["gitQuery", "gitCandidate", "gitPublish", "requestVersionDecision", "submitVersionChange", "submitRefactor", "requestStableWrite", "selectRunChange"] as const) {
+      assert.equal(caps[legacyTool], undefined, `fixed 聊天编排能力面不得含 legacy ${legacyTool}`);
+    }
+    assert.notEqual(caps.closeCreatedTaskFixed, undefined, "fixed 聊天编排能力面保留 close_created_task v2 实现");
+  } finally {
+    await handle.dispose();
+  }
+}
+
+/** 聊天入口打开后、首条 stage-request 之前：不得写 legacy trunk/run，也不得提前写 `workflowSchema`。 */
+async function assertChatEntryNoStateWrites(root: string): Promise<void> {
+  await assert.rejects(fs.stat(path.join(root, ".ans", "trunk")), "聊天入口不得写 .ans/trunk");
+  await assert.rejects(fs.stat(path.join(root, ".ans", "runs")), "聊天入口不得写 .ans/runs");
+  await assert.rejects(fs.stat(path.join(root, ".ans", "project.json")), "聊天入口不得提前写 project.json（首次 fixed 启动仍在首条 stage-request）");
+}
+
 // —————————————— 路径 A：空项目 → delivered 全链 ——————————————
 
 test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered", async () => {
@@ -419,8 +510,15 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     await assert.rejects(fs.stat(path.join(root, ".git")));
     await assert.rejects(fs.stat(path.join(root, ".ans", "project.json")));
 
-    // 1) 幕僚首请求 A1（首次 fixed 启动顺序：先原子写 project.json workflowSchema 再路由）。
+    // 1) **真实聊天入口 + 首个 stage-request**（B6.2）：
+    //    (a) 空项目、无 taskId 打开幕僚聊天（真实 `SessionManager.open`）⇒ 会话级 fixed + fixed 工具面；
+    //        同一入参镜像交给真实编排 `openRoleSession`（假适配器）⇒ fixed context/chief-workflow-v2
+    //        实际注入。聊天打开阶段：不写 legacy `.ans/trunk`/`.ans/runs`、不提前写 workflowSchema。
+    //    (b) 由该聊天会话经真实派发发出首个 stage-request ⇒ `ensureFixedPathStarted` 原子写
+    //        project.json workflowSchema 并按 fixed 路由（旧路径不经过本测试的唯一入口）。
     let chief = await openRole(h, root, "chief");
+    await assertFixedChiefChatInjection(chief);
+    await assertChatEntryNoStateWrites(root);
     const turnA1 = "turn-customer-a1";
     const a1Text = "推进 A1：请运营派产品撰写意图";
     const liveA1 = liveSource(h.mgr, root, "chief", { turnId: turnA1 });
@@ -442,8 +540,13 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     assert.equal(srA1.created?.from, "chief");
     assert.equal(srA1.created?.sideEffect, "read-only");
     assert.equal(srA1.created?.runId, undefined, "fixed stage-request 不得带 runId");
-    // 幕僚首请求的投递会自动以 legacy 注入打开目标会话；先停止，再按 fixed 任务重开以取得 fixed 注入
-    // （close_created_task v2 / complete_team_plan v4 只在按 fixed 任务解析的会话中注入）。
+    // B6.2：投递自动打开的目标会话也走聊天入口按项目状态解析 ⇒ fixed（B6.1 修复；不再以 legacy 注入）。
+    // 路由在返回前已同步完成目标会话打开（routeFixedPathDispatch → openInternal），故此处可直接断言。
+    const convenerAutoOpen = h.inputs.filter((input) => input.roleId === "convener" && input.taskId === undefined).at(-1);
+    assert.ok(convenerAutoOpen !== undefined, "首个 stage-request 投递应自动打开运营会话");
+    assert.equal(convenerAutoOpen!.workflowMode, "fixed", "自动打开的目标会话同样注入 fixed（B6.1 聊天入口）");
+    // 仍需先停止、再按 fixed 任务重开：close_created_task v2 / complete_team_plan v4 只在 taskId 绑定的
+    // fixed 会话中注入（无 taskId 聊天入口只有 fixed 常量/工具面）。
     await h.mgr.stop("chief");
     await h.mgr.stop("convener");
     chief = await openRole(h, root, "chief", srA1.taskId);
@@ -928,7 +1031,11 @@ test("路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受
     await writeFile(root, "docs/governance/rapporteur/snake-impact-v1.md", "# 影响面\n\ncore 碰撞问题修复。\n");
 
     // 1) B1：幕僚 stage-request → 运营派策划影响面（无仓库? 有仓库；应用记 basis(reason:"path-b")）。
+    //    B6.2 披露：路径 B 保留既有 open + routeDispatch 入口（未做 run-role 镜像打开）；此处只断言
+    //    应用层聊天入口为 fixed——既有 Git 项目无 legacy trunk/run/显式 legacy ⇒ B6.1 解析为 fixed。
     let chief = await openRole(h, root, "chief");
+    assertFixedChiefChatEntry(chief);
+    await assertChatEntryNoStateWrites(root);
     const b1Text = "推进 B1：请运营派策划做影响面分析";
     const liveB1 = liveSource(h.mgr, root, "chief", { turnId: "turn-b1" });
     const b1Dispatch = await routeDispatch(h.mgr, root, "chief", {
@@ -1111,6 +1218,9 @@ test("路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init�
   const h = harness(root);
   try {
     const chief = await openRole(h, root, "chief");
+    // B6.2 披露：无仓库用例同样保留既有 open + routeDispatch 入口；只断言应用层聊天入口为 fixed。
+    assertFixedChiefChatEntry(chief);
+    await assertChatEntryNoStateWrites(root);
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-b-norepo" });
     const b1Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 B1：影响面分析（无仓库）", flowId: FLOW,

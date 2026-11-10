@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: 默认关：未设置/空串/纯空白/0/off/none（大小写与空白变体）一律 {enabled:[]}
+ok 1 - 默认关：未设置/空串/纯空白/0/off/none（大小写与空白变体）一律 {enabled:[]}
+  ---
+  duration_ms: 0.9973
+  type: 'test'
+  ...
+# Subtest: 开启面：声明逐字形状（type/name/max_uses）——web_search 与客户探针形状对齐，web_fetch 同族
+ok 2 - 开启面：声明逐字形状（type/name/max_uses）——web_search 与客户探针形状对齐，web_fetch 同族
+  ---
+  duration_ms: 0.1823
+  type: 'test'
+  ...
+# Subtest: 尾随逗号/多余分隔容忍且不产生半开项；重复 id 即便大小写不同也拒
+ok 3 - 尾随逗号/多余分隔容忍且不产生半开项；重复 id 即便大小写不同也拒
+  ---
+  duration_ms: 0.3622
+  type: 'test'
+  ...
+# Subtest: fail-closed 构造面：未知 id/非法 max_uses/空 id 一律抛错（绝不静默降级）
+ok 4 - fail-closed 构造面：未知 id/非法 max_uses/空 id 一律抛错（绝不静默降级）
+  ---
+  duration_ms: 0.3322
+  type: 'test'
+  ...
+# Subtest: 注册表审计：恰两项且不含 code_execution；code_execution type 串不进注册表
+ok 5 - 注册表审计：恰两项且不含 code_execution；code_execution type 串不进注册表
+  ---
+  duration_ms: 0.0915
+  type: 'test'
+  ...
+# Subtest: 启用行文案：含各工具与 max_uses、按次计费、外部不可信提示、关闭路径
+ok 6 - 启用行文案：含各工具与 max_uses、按次计费、外部不可信提示、关闭路径
+  ---
+  duration_ms: 0.1175
+  type: 'test'
+  ...
+# Subtest: 降级行文案：含 HTTP 状态、明示未自动重试/后续停用、绝不含响应体
+ok 7 - 降级行文案：含 HTTP 状态、明示未自动重试/后续停用、绝不含响应体
+  ---
+  duration_ms: 0.0806
+  type: 'test'
+  ...
+# Subtest: 追加：声明在 tools 尾部；返回新对象、原对象不动；tools 缺失时创建
+ok 8 - 追加：声明在 tools 尾部；返回新对象、原对象不动；tools 缺失时创建
+  ---
+  duration_ms: 0.1605
+  type: 'test'
+  ...
+# Subtest: 幂等对抗：已含同 type 跳过（部分在场只补缺项）；二次追加零改动且还是原引用
+ok 9 - 幂等对抗：已含同 type 跳过（部分在场只补缺项）；二次追加零改动且还是原引用
+  ---
+  duration_ms: 0.0855
+  type: 'test'
+  ...
+# Subtest: 对抗输入：非对象 payload / tools 非数组 / 数组 payload → 不动作（present=false、绝不半改）
+ok 10 - 对抗输入：非对象 payload / tools 非数组 / 数组 payload → 不动作（present=false、绝不半改）
+  ---
+  duration_ms: 0.1511
+  type: 'test'
+  ...
+# Subtest: requestRejectionStatus：>=400 且非 408/429 才认；取数字前缀、拒绝正文注入、3 位数严格
+ok 11 - requestRejectionStatus：>=400 且非 408/429 才认；取数字前缀、拒绝正文注入、3 位数严格
+  ---
+  duration_ms: 0.1342
+  type: 'test'
+  ...
+# Subtest: 形状一（start 即完整）：server_tool_use 内联 input + 结果块内联 content → 恰对 start/result、id 关联
+ok 12 - 形状一（start 即完整）：server_tool_use 内联 input + 结果块内联 content → 恰对 start/result、id 关联
+  ---
+  duration_ms: 0.5572
+  type: 'test'
+  ...
+# Subtest: 形状二（delta 增量）：input_json_delta 累积查询、结果 partial_json 增量解析；无结果块=无 result 命令
+ok 13 - 形状二（delta 增量）：input_json_delta 累积查询、结果 partial_json 增量解析；无结果块=无 result 命令
+  ---
+  duration_ms: 0.1296
+  type: 'test'
+  ...
+# Subtest: 错误变体对抗：非 max_uses_exceeded 的错误码（大写归一、未知码占位）→ denied 命令
+ok 14 - 错误变体对抗：非 max_uses_exceeded 的错误码（大写归一、未知码占位）→ denied 命令
+  ---
+  duration_ms: 0.1584
+  type: 'test'
+  ...
+# Subtest: usage 两来源与去重：message_start 携带 from-usage；同响应重复回传同值只记一次；无回传才 from-blocks
+ok 15 - usage 两来源与去重：message_start 携带 from-usage；同响应重复回传同值只记一次；无回传才 from-blocks
+  ---
+  duration_ms: 0.0881
+  type: 'test'
+  ...
+# Subtest: pause_turn 恰一次/响应内重置；未知 stop_reason 如实上报且不误报已知值
+ok 16 - pause_turn 恰一次/响应内重置；未知 stop_reason 如实上报且不误报已知值
+  ---
+  duration_ms: 0.0881
+  type: 'test'
+  ...
+# Subtest: 对抗输入：非对象事件/未知类型/index 缺失/未知索引 delta → 空结果且不抛
+ok 17 - 对抗输入：非对象事件/未知类型/index 缺失/未知索引 delta → 空结果且不抛
+  ---
+  duration_ms: 0.0695
+  type: 'test'
+  ...
+# Subtest: 备注对抗：message_start 回传 count=0、响应内确有调用块且无后续 usage ⇒ from-blocks 兜底被 0 条目抑制（如实登记）
+ok 18 - 备注对抗：message_start 回传 count=0、响应内确有调用块且无后续 usage ⇒ from-blocks 兜底被 0 条目抑制（如实登记）
+  ---
+  duration_ms: 0.0796
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 96.939

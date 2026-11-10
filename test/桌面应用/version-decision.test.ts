@@ -117,6 +117,9 @@ function makeManager(root: string, options: {
 }
 
 async function openChief(manager: SessionManager, root: string): Promise<Caps> {
+  // B6.1：聊天入口对空项目默认 fixed；本文件验证 legacy `request_version_decision` 能力/流程 ⇒ 显式 legacy 夹具。
+  await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+  await fs.writeFile(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const opened = await manager.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
   assert.equal(opened.ok, true, opened.ok ? "" : opened.error ?? "");
   await tick(20);

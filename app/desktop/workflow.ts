@@ -19,6 +19,7 @@ import path from "node:path";
 
 import { WORKFLOW_LEDGER_SCHEMA } from "../../src/model/runtime.ts";
 import type { DispatchTaskPayload, WorkflowEvent, WorkflowStage } from "../../src/model/runtime.ts";
+import { TRUNK_MANIFEST_SCHEMA } from "../../src/model/trunk.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
 import { FIXED_DISPATCH_MATRIX, stageRequestIdempotencyKey } from "../../src/common/编排/workflow-dispatch.ts";
 import { canDispatchStage, canRequestStage, deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
@@ -160,6 +161,113 @@ export async function sessionWorkflowModeForTask(
 export function dispatchFlowIdOf(payload: DispatchTaskPayload | undefined): string {
   const raw = payload !== undefined && typeof payload.flowId === "string" ? payload.flowId : "";
   return raw.trim();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// T3 B6.1（2026-11-11，桌面窗口）：**真实聊天入口**的会话级模式（无 taskId 的幕僚聊天）
+//
+// 依据：RR 失败记录 `fixed-path-not-activated-from-chief-chat`（空项目幕僚聊天无 taskId ⇒ 旧硬编码
+// legacy，固定路径未启动）；协调方授权：空项目/无 legacy run/trunk 且未显式 `legacy/v1` 时幕僚聊天
+// 默认 fixed；legacy 项目/在飞 run/显式 legacy 仍旧路径；v1.3 §4.1（per-flow / 首次启动）。
+// 纪律：本函数只决定**聊天会话初始模式**（只读、不缓存、不写盘、不授予写权/派发权）；首条 fixed
+// stage-request 仍由 `ensureFixedPathStarted` 原子写 `workflowSchema` 并按编排 per-flow `workflowMode`
+// 复核（本函数不替代它）。
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** 单个 JSON 对象文件读取事实：缺失（ENOENT）/存在但不能解析为对象（invalid）/有效对象（ok）。 */
+type JsonObjectFileFact =
+  | { kind: "missing" }
+  | { kind: "invalid" }
+  | { kind: "ok"; value: Record<string, unknown> };
+
+async function readJsonObjectFileFact(file: string): Promise<JsonObjectFileFact> {
+  let text: string;
+  try {
+    text = await fs.readFile(file, "utf8");
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "ENOENT" ? { kind: "missing" } : { kind: "invalid" };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { kind: "invalid" };
+  }
+  return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+    ? { kind: "ok", value: parsed as Record<string, unknown> }
+    : { kind: "invalid" };
+}
+
+/** 有效 trunk 判定（与编排 `validTrunkPointsToFlow` 同口径的 schema/版本部分：`trunk/v1` + 正整数版本）。 */
+function isValidTrunkManifestValue(manifest: Record<string, unknown>): boolean {
+  if (manifest["schema"] !== TRUNK_MANIFEST_SCHEMA) return false;
+  const version = manifest["trunkVersion"];
+  return typeof version === "number" && Number.isSafeInteger(version) && version >= 1;
+}
+
+/**
+ * 聊天项目是否带 legacy 项目状态（决定缺省模式的唯一事实）：
+ * - 有效 `.ans/trunk/manifest.json`（`trunk/v1` + 合法 `trunkVersion`；引用的 run 已 closed/cancelled
+ *   ⇒ 与编排同口径视为关闭，不强制 legacy；引用 run 缺失 ⇒ trunk 仍有效）⇒ true；
+ * - 任一 `.ans/runs/<runId>/manifest.json` 的 `state` ∈ {draft,pinned} ⇒ true（在飞 legacy run）；
+ * - 读失败/坏配置（project.json 以外的 manifest 不可读或 JSON 不合法）⇒ true（fail-closed，不猜 fixed）；
+ * - 无 `.ans` 旧状态（空项目/纯新项目）⇒ false。
+ */
+async function hasLegacyProjectState(projectRoot: string): Promise<boolean> {
+  const ansRoot = path.join(projectRoot, ".ans");
+  const trunkFact = await readJsonObjectFileFact(path.join(ansRoot, "trunk", "manifest.json"));
+  if (trunkFact.kind === "invalid") return true;
+  if (trunkFact.kind === "ok" && isValidTrunkManifestValue(trunkFact.value)) {
+    const runId = trunkFact.value["runId"];
+    if (typeof runId !== "string" || runId === "") return true;
+    const runFact = await readJsonObjectFileFact(path.join(ansRoot, "runs", runId, "manifest.json"));
+    if (runFact.kind === "invalid") return true;
+    const runClosed = runFact.kind === "ok"
+      && (runFact.value["state"] === "closed" || runFact.value["state"] === "cancelled");
+    if (!runClosed) return true; // 引用 run 缺失 ⇒ 与编排同口径：trunk 仍有效
+  }
+  let entries;
+  try {
+    entries = await fs.readdir(path.join(ansRoot, "runs"), { withFileTypes: true });
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ENOENT"; // 读失败（非缺失）⇒ fail-closed legacy
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const fact = await readJsonObjectFileFact(path.join(ansRoot, "runs", entry.name, "manifest.json"));
+    if (fact.kind === "missing") continue;
+    if (fact.kind === "invalid") return true; // 坏配置 ⇒ fail-closed legacy
+    const state = fact.value["state"];
+    if (state === "draft" || state === "pinned") return true;
+  }
+  return false;
+}
+
+/**
+ * **聊天（无 taskId）会话模式**（B6.1；每调用现场只读，不缓存）：
+ * 1. `.ans/project.json` 显式 `"legacy/v1"` ⇒ `legacy`；显式 `"two-fixed-paths/v1"` ⇒ `fixed`（显式优先）；
+ * 2. 缺省：存在有效 trunk 或任一在飞 legacy run ⇒ `legacy`（旧项目仍旧路径）；否则 ⇒ `fixed`
+ *    （空项目/纯新项目：首条客户消息即可进入固定路径）；
+ * 3. 读失败/坏配置（项目根/`.ans/project.json` 不可读或非法）⇒ `legacy`（fail-closed，不猜 fixed）。
+ *
+ * 有 taskId 时仍按任务 flow 用 `sessionWorkflowModeForTask`（本函数只管聊天入口）。
+ */
+export async function sessionWorkflowModeForChat(projectRoot: string): Promise<WorkflowMode> {
+  try {
+    let rootStat;
+    try {
+      rootStat = await fs.stat(projectRoot);
+    } catch {
+      return "legacy"; // 项目根不可读 ⇒ 不猜 fixed
+    }
+    if (!rootStat.isDirectory()) return "legacy";
+    const schema = await readProjectWorkflowSchemaValue(projectRoot);
+    if (schema === "two-fixed-paths/v1") return "fixed";
+    if (schema === "legacy/v1" || schema === "invalid") return "legacy";
+    return (await hasLegacyProjectState(projectRoot)) ? "legacy" : "fixed";
+  } catch {
+    return "legacy"; // 任意异常 ⇒ fail-closed legacy（与 resolveFixedPathMode 同口径）
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════════════

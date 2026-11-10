@@ -1,0 +1,54 @@
+TAP version 13
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.436Z","stage":"begin-owned-cleanup","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.436Z","stage":"before-desktop-stop-all","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.439Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.439Z","stage":"before-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.439Z","stage":"after-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.439Z","stage":"owned-http-server-closed","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:47:14.439Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-10T16:47:14.440Z","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_OWNED_BUSINESS_CHILD_SPAWN {"runNonce":"af20341e-116c-4399-8efa-68dc0eaca138","caseTag":"default-new-af20341e-116c-4399-8efa-68dc0eaca138","parentPid":19876,"childPid":2984,"deadlineAt":1794329534448,"outerDeadlineAt":1794329564448}
+# Subtest: Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface
+ok 1 - Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface
+  ---
+  duration_ms: 358.5216
+  type: 'test'
+  ...
+# Q_OWNED_BUSINESS_CHILD_START {"at":"2026-11-10T16:47:14.877Z","runNonce":"af20341e-116c-4399-8efa-68dc0eaca138","caseTag":"default-new-af20341e-116c-4399-8efa-68dc0eaca138","pid":2984,"parentPid":19876,"deadlineAt":1794329534448,"source":[{"file":"C:\\\\Users\\\\51054\\\\Desktop\\\\work\\\\ans-studio\\\\.claude\\\\worktrees\\\\trunk-amendment\\\\test\\\\测试\\\\git-role-workflows-e2e.test.ts","sha256":"b5d0dc61bc88a6363fae33e9a38085210a50c9fd58327f8f9d09ebfc5b18cf09"},{"file":"C:\\\\Users\\\\51054\\\\Desktop\\\\work\\\\ans-studio\\\\.claude\\\\worktrees\\\\trunk-amendment\\\\test\\\\测试\\\\git-role-workflows-driver.ts","sha256":"4ac85b7562a6b70f1884f047e483f77d311522b8f2ac7c7313d0e567ead3b326"}],"nodeTestRuntimeLoaded":false,"registeredTestCount":0}
+# Q_PERSISTED_CHILD_OBSERVED {"at":"2026-11-10T16:48:24.482Z","taskId":"t-mwaxc69k-a3b9b630","parentRef":{"kind":"assigned-task","taskId":"t-mwaxc1s9-13fa8c53","ledgerSha256":"d7cf216ad18b1ee25db964a7384f69fddc1b6dc17f6db7bae073ad687f2b5bd5"},"runId":"run-hub-622c2bab006b09142bc32a9438eef3f3977212cc1eac77de","state":"pinned"}
+# Q_WORKER_CANDIDATE_PREPARED {"at":"2026-11-10T16:48:43.688Z","candidate":{"objectFormat":"sha1","hex":"7648edb2421ef3496c26686eccb869ec091cd5e3"},"tree":{"objectFormat":"sha1","hex":"4da05c33b34628cf26085ee417d496981e0c91fd"},"journalId":".ans/trunk/operations/ff5b50a02d46a979e168c5c550050a7f104f0ec177b95ba19614c85900bccdea/git.json"}
+# Q_INTEGRATED_CANDIDATE_PREPARED {"at":"2026-11-10T16:48:57.633Z","candidate":{"objectFormat":"sha1","hex":"10f688e6c5f024017e61b958e270e4ffbc2f2e69"},"tree":{"objectFormat":"sha1","hex":"4da05c33b34628cf26085ee417d496981e0c91fd"},"parents":[{"objectFormat":"sha1","hex":"174b58ea42af14754641804ef3a31dad9a5140e2"},{"objectFormat":"sha1","hex":"7648edb2421ef3496c26686eccb869ec091cd5e3"}],"journalId":".ans/trunk/operations/5b9fc5f7a161b2ea8bfd4ed9bee889078540b1e7cad0f078ad1b88946d00c6bd/git.json"}
+# Q_VERIFIER_HTTP {"at":"2026-11-10T16:49:18.245Z","taskId":"t-mwaxd1na-3b370ae3","candidate":{"hex":"10f688e6c5f024017e61b958e270e4ffbc2f2e69","objectFormat":"sha1"},"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_request_confirmation","ans_request_choice","ans_submit_report","ans_contract_check","ans_doc_format","ans_evidence_check","ans_project_state","ans_governance_matrix","ans_git_query","ans_git_candidate","ans_git_publish"]}
+# Q_DELIVERY_PUBLISHED {"at":"2026-11-10T16:50:29.311Z","ref":"refs/ans/delivery/q2-new","oid":{"objectFormat":"sha1","hex":"10f688e6c5f024017e61b958e270e4ffbc2f2e69"},"journalId":".ans/trunk/operations/bb072d272b973f20532c595f542d7b5bced3d5f0c284637e27126ebe2616cb61/git.json"}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.087Z","stage":"begin-owned-cleanup","closed":true,"resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.087Z","stage":"begin-owned-cleanup","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.089Z","stage":"before-desktop-stop-all","closed":true,"resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.088Z","stage":"before-desktop-stop-all","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.109Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.109Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.110Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.110Z","stage":"before-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.111Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.111Z","stage":"after-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.113Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":1},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.112Z","stage":"owned-http-server-closed","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.114Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":29,"serverCloseCallbacks":1},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T16:50:44.113Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T16:50:44.115Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":30,"socketsClosed":30,"serverCloseCallbacks":1},"ownSockets":0}
+# Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-10T16:50:44.118Z","resources":["CloseReq","PipeWrap","PipeWrap"]}
+# Q_OWNED_BUSINESS_CHILD_RETURN {"runNonce":"af20341e-116c-4399-8efa-68dc0eaca138","caseTag":"default-new-af20341e-116c-4399-8efa-68dc0eaca138","pid":2984,"completed":true}
+# Subtest: Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+ok 2 - Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+  ---
+  duration_ms: 210071.2445
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 210879.985

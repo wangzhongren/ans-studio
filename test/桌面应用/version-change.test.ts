@@ -1078,6 +1078,9 @@ function fakeCapabilityStack(calls: {
 
 test("Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话角色（不信任工具自报）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-vc-capability-"));
+  // B6.1：聊天入口对空项目默认 fixed；本用例验证 legacy VCA/refactor/stable 注入矩阵 ⇒ 显式 legacy 夹具。
+  await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+  await fs.writeFile(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const calls = {
     vca: [] as SubmitVersionChangeInput[],
     refactor: [] as SubmitRefactorInput[],

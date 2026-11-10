@@ -101,8 +101,16 @@ interface Caps {
   requestVersionDecision?: RequestVersionDecisionFn;
 }
 
+/** B6.1（2026-11-11）：聊天入口对空项目默认 fixed。验证 legacy 能力/工具面的旧用例用显式
+ *  `legacy/v1` 夹具保持原断言（断言不改；只把「旧项目」写明，避免被新默认改变注入面）。 */
+async function markLegacyChatFixture(root: string): Promise<void> {
+  await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+  await fs.writeFile(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
+}
+
 test("能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 dispatch；项目角色零注入", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chief-"));
+  await markLegacyChatFixture(root);
   const caps: Record<string, Caps> = {};
   const makeHandle = (): RoleSessionHandle => ({
     async send() {},
@@ -625,6 +633,7 @@ test("B5 materials失败原因非空且如实：保留prepare错误原文，空�
 
 test("W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例surface库存；native旁路拒绝而FS仍unknown", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w3-native-query-"));
+  await markLegacyChatFixture(root); // B6.1：本用例验证 legacy git_query 工具面 ⇒ 显式 legacy 项目
   const priorWire = process.env.ANS_CODEX_WIRE_API, priorKey = process.env.ANS_W3_LOCAL_HTTP_KEY;
   process.env.ANS_CODEX_WIRE_API = "chat"; process.env.ANS_W3_LOCAL_HTTP_KEY = "fixture-only";
   let desktop: ReturnType<typeof createDesktopInterface> | undefined;
@@ -1490,7 +1499,8 @@ test("W19 实际Core回报与Git回调同assignment；报告续父/通知/新cha
 for (const contended of [false, true]) {
 test(`W20 默认Core/Chat产品真实报告落账并到chief ${contended ? "真实R9竞争" : "普通"}`, { timeout: 10000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w20-product-"));
-  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+  // B6.1：本用例验证 legacy 产品报告/回交链 ⇒ 显式 legacy 项目夹具（断言不变）。
+  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const oldWire = process.env.ANS_CODEX_WIRE_API, oldKey = process.env.ANS_W20_LOCAL_KEY;
   process.env.ANS_CODEX_WIRE_API = "chat"; process.env.ANS_W20_LOCAL_KEY = "owned-local-fixture";
   const trace: Array<{ role: string; user: string; tools: string[] }> = [], events: Parameters<Parameters<typeof createDesktopInterface>[0]["emitEvent"]>[0][] = [];
@@ -1568,7 +1578,8 @@ const documentChange = roleMissingPlan || teamPlanning || crossDocumentNotice ||
 test(roleMissingPlan ? "W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝" : teamPlanning ? "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope" : crossDocumentNotice ? "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续" : intentConfirmV2 ? `W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 ${intentConfirmRestart ? "真实重启迁移后" : "连续写入后"}` : documentChange ? `W29 默认Core/Chat真实既有文档基线后续 ${scenario} 保专业规划scope不授旧执行pin` : requestedRunMode ? `W28 默认Core/Chat真实受派策划缺不可变pin ${requestedRunMode} 拒绝且零停止` : `W21 默认Core/Chat应用生效通知 ${explicitNoticeReport ? "显式blocked保真任务" : "纯确认不覆盖真实完成报告"}`, { timeout: teamPlanning ? 18000 : 12000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w21-notice-"));
   if (intentConfirmV2 && process.env.ANS_W14_EVIDENCE_DIR) configureDiagnostics({ directory: process.env.ANS_W14_EVIDENCE_DIR });
-  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+  // B6.1：W21/W28/W29/W30/W33/W34/W35 验证 legacy 派发/run/意图链 ⇒ 显式 legacy 项目夹具（断言不变）。
+  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const proposal = "docs/proposals/w21-flow-proposal-v1.md";
   // Authored fixture bodies only; actual roles must write and publish these through their real tools.
   const teamDocuments = [{"path": "docs/proposals/w21-flow-proposal-v1.md", "content": "---\nschema: project-proposal/v2\nflowId: w21-flow\nintentId: w21-flow-intent\nversion: 1\nintent: docs/product/w21-flow-intent-v1.md\n---\n# One local text worker\nProduce src/impl/result.txt, preserve evidence and use creator closure.\n"}, {"path": "docs/proposals/w21-flow-modules-v1.md", "content": "---\nschema: project-modules/v2\nflowId: w21-flow\nversion: 1\nmodules:\n  - id: impl-core\n    name: Local text\n    purpose: One isolated local output\n    path: src/impl/\n    category: core\n    publicContract: src/impl/result.txt\n    architectureSource: docs/contracts/w21-flow-architecture-v1.md\n---\n# Modules\n"}, {"path": "docs/proposals/w21-flow-roster-v1.md", "content": "---\nschema: project-roster/v3\nflowId: w21-flow\nversion: 1\nintent: docs/product/w21-flow-intent-v1.md\nproposal: docs/proposals/w21-flow-proposal-v1.md\narchitecture: docs/contracts/w21-flow-architecture-v1.md\nenvBootstrap:\n  omitted: true\n  omissionReason: Pure local text task requires no environment setup\nroles:\n  - id: impl\n    displayName: Local implementation\n    purpose: Write the one text output\n    capability: Local file editing\n    modules: [impl-core]\nmodules:\n  - id: impl-core\n    name: Local text\n    purpose: One isolated local output\n    path: src/impl/\n    category: core\n    publicContract: src/impl/result.txt\n    architectureSource: docs/contracts/w21-flow-architecture-v1.md\n---\n# Roster\n## 人员+模块拓扑图\n```topology\nschema: project-topology/v2\nmanagement: [convener, impl]\nmodules:\n  - id: impl-core\n    path: src/impl/\n    roleId: impl\nroles:\n  - id: impl\n    modules: [impl-core]\n```\n"}, {"path": "docs/proposals/w21-flow-topology-v1.md", "content": "---\nschema: project-topology/v2\nflowId: w21-flow\nversion: 1\n---\n# Topology\nconvener delegates the local module to impl after actual D3 and activation.\n"}, {"path": "docs/contracts/w21-flow-architecture-v1.md", "content": "---\nschema: project-architecture/v1\nflowId: w21-flow\nversion: 1\n---\n# Local text architecture\nproposal: docs/proposals/w21-flow-proposal-v1.md\nModule impl-core writes only src/impl/.\n"}, {"path": "docs/contracts/w21-flow-assets-v1.md", "content": "---\nschema: project-assets/v1\nflowId: w21-flow\nversion: 1\n---\n# Assets\nNo external assets or network.\n"}];

@@ -1,0 +1,104 @@
+TAP version 13
+# Subtest: 范围①：su 预授权目录字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp）
+ok 1 - 范围①：su 预授权目录字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp）
+  ---
+  duration_ms: 1.8393
+  type: 'test'
+  ...
+# Subtest: 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su
+not ok 2 - 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su
+  ---
+  duration_ms: 3.5988
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\g4-skill-verify\\h-scope-audit.test.ts:41:1'
+  failureType: 'testCodeFailure'
+  error: 'installMcp 透传判据＝能力矩阵（唯一）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:65:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用
+ok 3 - 范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用
+  ---
+  duration_ms: 2.1276
+  type: 'test'
+  ...
+# Subtest: 范围③（行为）：真实装配 su 会话——install_skill 全链执行且客户通道零调用（无二次卡）
+ok 4 - 范围③（行为）：真实装配 su 会话——install_skill 全链执行且客户通道零调用（无二次卡）
+  ---
+  duration_ms: 53.7613
+  type: 'test'
+  ...
+# Subtest: 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册
+not ok 5 - 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册
+  ---
+  duration_ms: 0.7408
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\g4-skill-verify\\h-scope-audit.test.ts:167:1'
+  failureType: 'testCodeFailure'
+  error: 'installSkill 透传判据＝能力矩阵（唯一）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:169:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删除调用（文件保留——E 域行为侧互证）
+ok 6 - 范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删除调用（文件保留——E 域行为侧互证）
+  ---
+  duration_ms: 1.898
+  type: 'test'
+  ...
+# Subtest: 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用
+not ok 7 - 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用
+  ---
+  duration_ms: 3.8288
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\g4-skill-verify\\h-scope-audit.test.ts:203:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    test/claude-adapter/session.test.ts 不得引用任何 .probe 模块
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:232:12)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 4
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 486.7376

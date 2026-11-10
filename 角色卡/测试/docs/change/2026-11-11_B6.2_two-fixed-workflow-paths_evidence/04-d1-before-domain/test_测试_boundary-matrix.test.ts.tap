@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: 边界矩阵:项目管理
+ok 1 - 边界矩阵:项目管理
+  ---
+  duration_ms: 27.0477
+  type: 'test'
+  ...
+# Subtest: 边界矩阵:编排
+ok 2 - 边界矩阵:编排
+  ---
+  duration_ms: 21.803
+  type: 'test'
+  ...
+# Subtest: 边界矩阵:门禁引擎
+ok 3 - 边界矩阵:门禁引擎
+  ---
+  duration_ms: 15.8585
+  type: 'test'
+  ...
+# Subtest: 边界矩阵:Pi适配器
+ok 4 - 边界矩阵:Pi适配器
+  ---
+  duration_ms: 13.5523
+  type: 'test'
+  ...
+# Subtest: 边界矩阵:装配
+ok 5 - 边界矩阵:装配
+  ---
+  duration_ms: 15.024
+  type: 'test'
+  ...
+# Subtest: 边界矩阵:测试
+ok 6 - 边界矩阵:测试
+  ---
+  duration_ms: 13.2253
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 312.0371

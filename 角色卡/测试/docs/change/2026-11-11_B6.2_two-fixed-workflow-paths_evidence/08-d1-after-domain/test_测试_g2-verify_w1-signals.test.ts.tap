@@ -1,0 +1,95 @@
+TAP version 13
+# [watchdog] tick 失败（已暂停本 tick，下个 tick 重试）：夹具：快照读取失败
+# Subtest: W1\#1：恰 100% 边界——差 1ms 不报、恰 300000ms 报一条；每轮一次；到点不中止
+ok 1 - W1\#1：恰 100% 边界——差 1ms 不报、恰 300000ms 报一条；每轮一次；到点不中止
+  ---
+  duration_ms: 2.3883
+  type: 'test'
+  ...
+# Subtest: W1\#1 排除：带挂起确认卡的角色不触发；解除后按真实已耗触发
+ok 2 - W1\#1 排除：带挂起确认卡的角色不触发；解除后按真实已耗触发
+  ---
+  duration_ms: 0.2392
+  type: 'test'
+  ...
+# Subtest: W1\#1 排除：su 自身忙 ⇒ 关于 su 的告警不触发；项目角色照报
+ok 3 - W1\#1 排除：su 自身忙 ⇒ 关于 su 的告警不触发；项目角色照报
+  ---
+  duration_ms: 0.1371
+  type: 'test'
+  ...
+# Subtest: W1\#1 身份更替：旧轮次解除不投恢复行（到点检查不是故障），新一轮独立起算
+ok 4 - W1\#1 身份更替：旧轮次解除不投恢复行（到点检查不是故障），新一轮独立起算
+  ---
+  duration_ms: 0.2145
+  type: 'test'
+  ...
+# Subtest: W1\#2：age 恰 10min 边界——599999ms 不报、600000ms 报；depth 恰 5 辅判触发、depth 4 不触发
+ok 5 - W1\#2：age 恰 10min 边界——599999ms 不报、600000ms 报；depth 恰 5 辅判触发、depth 4 不触发
+  ---
+  duration_ms: 0.7246
+  type: 'test'
+  ...
+# Subtest: W1\#2：活跃期单报＋累计；恢复行 N/M 如实；冷却恰 10min 边界（自告警投出时刻起算）
+ok 6 - W1\#2：活跃期单报＋累计；恢复行 N/M 如实；冷却恰 10min 边界（自告警投出时刻起算）
+  ---
+  duration_ms: 0.2503
+  type: 'test'
+  ...
+# Subtest: W1\#2 排除：su 自身忙 ⇒ 关于 su 的目标队列不报；空目标队列跳过
+ok 7 - W1\#2 排除：su 自身忙 ⇒ 关于 su 的目标队列不报；空目标队列跳过
+  ---
+  duration_ms: 0.1092
+  type: 'test'
+  ...
+# Subtest: W1\#3：单次即报；冷却恰边界；su 忙抑制；无恢复行
+ok 8 - W1\#3：单次即报；冷却恰边界；su 忙抑制；无恢复行
+  ---
+  duration_ms: 0.2759
+  type: 'test'
+  ...
+# Subtest: W1\#4：15min 窗口恰 3 次边界；completed/aborted 不计；恰 15min 剪枝；冷却 30min 内不报
+ok 9 - W1\#4：15min 窗口恰 3 次边界；completed/aborted 不计；恰 15min 剪枝；冷却 30min 内不报
+  ---
+  duration_ms: 0.2701
+  type: 'test'
+  ...
+# Subtest: W1\#4：outcome 缺事实不猜（不计入）
+ok 10 - W1\#4：outcome 缺事实不猜（不计入）
+  ---
+  duration_ms: 0.1337
+  type: 'test'
+  ...
+# Subtest: 风暴护栏：15min 窗口 ≤5 条；第 6 条起只投「已抑制 N 条」通告恰一条；统计如实；窗口滑出恢复
+ok 11 - 风暴护栏：15min 窗口 ≤5 条；第 6 条起只投「已抑制 N 条」通告恰一条；统计如实；窗口滑出恢复
+  ---
+  duration_ms: 0.343
+  type: 'test'
+  ...
+# Subtest: 恢复行只在告警确实投出过时投：仅被风暴抑制（从未投出）的活跃期解除不产生恢复行
+ok 12 - 恢复行只在告警确实投出过时投：仅被风暴抑制（从未投出）的活跃期解除不产生恢复行
+  ---
+  duration_ms: 0.1672
+  type: 'test'
+  ...
+# Subtest: 看护器异常隔离：快照抛错 ⇒ tick 不抛；下一时机恢复工作
+ok 13 - 看护器异常隔离：快照抛错 ⇒ tick 不抛；下一时机恢复工作
+  ---
+  duration_ms: 0.3869
+  type: 'test'
+  ...
+# Subtest: 投递端抛错 ⇒ 该告警视为未投出（不崩）；条件仍在时重试投出（前次失败未占用冷却）
+ok 14 - 投递端抛错 ⇒ 该告警视为未投出（不崩）；条件仍在时重试投出（前次失败未占用冷却）
+  ---
+  duration_ms: 0.1222
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 110.233

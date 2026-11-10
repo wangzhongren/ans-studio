@@ -1,0 +1,8 @@
+# before unique: 98, after unique: 99, common: 97
+
+## only-after (new; both are linked-worktree environment items, proven pass in pristine copy)
+P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+
+## only-before (missing; non-deterministic ENOTEMPTY/timeout items)
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin

@@ -150,6 +150,7 @@ import {
   recordFixedStageDispatchForTask,
   resolveFixedPathMode,
   resolveProjectFixedPanelMode,
+  sessionWorkflowModeForChat,
   sessionWorkflowModeForTask,
   shouldRecordFixedStageDispatch,
   workflowModeForFlowResolver,
@@ -3625,10 +3626,15 @@ export class SessionManager {
     // single/su 不参与）。fixed 任务不使用 legacy trunk 的 assigned-task 绑定——否则在 fixed 任务
     // （无 runId）上会 fail-closed 为 `delivery-assignment-unavailable` 且永远到不了 fixed 注入面。
     // legacy/空任务路径逐字不变（模式解析失败 ⇒ legacy，不猜 fixed）。
-    const requestedSessionMode: WorkflowMode = req.taskId !== undefined
-      && (this.deps.getListing(req.projectRoot)?.governanceModel ?? "single") === "trio"
-      ? await sessionWorkflowModeForTask(req.projectRoot, req.taskId)
-      : "legacy";
+    // T3 B6.1（2026-11-11）：**真实聊天入口**（无 taskId 的 trio 幕僚聊天）不再硬编码 legacy——按项目
+    // 状态解析（空项目/纯新项目 ⇒ fixed；legacy 项目/在飞 run/显式 legacy/v1 ⇒ legacy；fail-closed）。
+    // 依据 RR 失败根因 `fixed-path-not-activated-from-chief-chat`；有 taskId 仍按任务 flow（`sessionWorkflowModeForTask`）。
+    const requestedSessionMode: WorkflowMode =
+      (this.deps.getListing(req.projectRoot)?.governanceModel ?? "single") === "trio"
+        ? req.taskId !== undefined
+          ? await sessionWorkflowModeForTask(req.projectRoot, req.taskId)
+          : await sessionWorkflowModeForChat(req.projectRoot)
+        : "legacy";
     let requestedAssignment: DeliveryAssignment | undefined;
     if (req.taskId && requestedSessionMode !== "fixed") {
       const actual = await resolveDeliveryAssignment({ projectRoot: req.projectRoot, recipientRoleId: req.roleId, source: { kind: "assigned-task", taskId: req.taskId } });
@@ -3799,9 +3805,9 @@ export class SessionManager {
     const governanceModel: GovernanceModel = project.governanceModel ?? "single";
     const governanceFunction = role.governanceFunction;
     // T3（2026-11-10 两条固定工作流路径，B1 AC-12/AC-23）：会话级 workflow 模式（与 run-role 同口径：
-    // 输入任务的真实 flowId ⇒ `workflowMode`；无常量/无任务 ⇒ legacy）。fixed 会话**不注入** legacy
-    // 治理型 Git/流程能力（下方注入 gate）；single/su 与 legacy 会话的注入集合/顺序逐字不变。
-    // 复用本函数前段的同一个解析结果（同一任务事实；不引入项目级缓存）。
+    // 输入任务的真实 flowId ⇒ `workflowMode`；B6.1 起无任务的 trio 聊天按项目状态解析）。fixed 会话
+    // **不注入** legacy 治理型 Git/流程能力（下方注入 gate）；single/su 与 legacy 会话的注入集合/顺序逐字不变。
+    // 复用本函数前段的同一个解析结果（同一任务/项目事实；不引入项目级缓存）。
     const sessionWorkflowMode: WorkflowMode = governanceModel === "trio" ? requestedSessionMode : "legacy";
     const legacyOnlyCapabilitiesAllowed = sessionWorkflowMode !== "fixed";
     const legacyBuiltIn = role.builtIn === true && governanceFunction === undefined && governanceModel === "single";
@@ -4387,6 +4393,11 @@ export class SessionManager {
           // 现场解析模式（回调不缓存项目级单值；fixed 会话的模块 context/工具注入由 run-role 同源执行）。
           // single/su 会话不注入（旧行为逐字不变；固定路径为 trio 产品流程）。
           ...(governanceModel === "trio" ? { workflowModeForFlow: workflowModeForFlowResolver(req.projectRoot) } : {}),
+          // T3 B6.1（2026-11-11）：fixed 会话另传**会话级常量**（run-role 的 `workflowMode` 优先级最高）——
+          // 无 taskId 的 fixed 聊天（空项目首条客户消息）也能注入 fixed 模块 context/`chief-workflow-v2.md`/
+          // fixed 工具面（RR 根因修复）。legacy/single 不传本键：per-flow `workflowModeForFlow` 现场解析与
+          // 旧注入面逐字不变（常量 legacy 会吞掉混合项目的 per-flow 判定，故不做无条件传入）。
+          ...(sessionWorkflowMode === "fixed" ? { workflowMode: sessionWorkflowMode } : {}),
           // T3 B4.2（2026-11-10，AC-21/T-09）：fixed 会话注入任务级 Git 写（分类器 + 真实端口）。
           // 仅「trio 项目 + 该任务真实 flow 解析为 fixed + 带真实 taskId」时注入；legacy/single 会话
           // 不传本字段（注入面/行为逐字不变）。桌面只给「实现」——**不传 scope/taskId 事实**：scope 由
@@ -10193,7 +10204,9 @@ ${formatted}` };
     const existingTarget = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime));
     if (!existingTarget) {
       // B1：fixed 任务不按 taskId 绑定打开目标会话（项目角色 fixed 任务作用域/内置 review 上下文属 B3）；
-      // 会话级 fixed 模式注入仍由显式带 taskId 的打开路径经 `workflowModeForFlow` 生效。
+      // 会话级 fixed 模式注入由聊天入口按项目状态解析（B6.1：`sessionWorkflowModeForChat`；首个
+      // stage-request 已先经 `ensureFixedPathStarted` 写回 `workflowSchema` ⇒ 目标会话为 fixed），
+      // 显式带 taskId 的打开路径仍经 `workflowModeForTask`/`workflowModeForFlow` 生效。
       const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime }, false);
       if (!opened.ok) {
         await this.recordTaskFailure(projectRoot, taskId, `delivery-target-open-failed: ${shortenSummary(opened.error ?? mainT("shared.common.unknownReason"))}`);

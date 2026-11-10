@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: B1 合法投影逐字形状：raw 事实 → DisplayTextV1 投影形（version/source/status/duration 结构恰等）
+ok 1 - B1 合法投影逐字形状：raw 事实 → DisplayTextV1 投影形（version/source/status/duration 结构恰等）
+  ---
+  duration_ms: 1.5219
+  type: 'test'
+  ...
+# Subtest: B2 脱敏：凭据真值替换 / api_key 形态 / Bearer / URL userinfo 剥离——投影形承载已脱敏文本
+ok 2 - B2 脱敏：凭据真值替换 / api_key 形态 / Bearer / URL userinfo 剥离——投影形承载已脱敏文本
+  ---
+  duration_ms: 0.2093
+  type: 'test'
+  ...
+# Subtest: B3 预算：超 16384 字节按 UTF-8 边界裁（不产生半截字符）＋truncated 标记；正文是原文前缀
+ok 3 - B3 预算：超 16384 字节按 UTF-8 边界裁（不产生半截字符）＋truncated 标记；正文是原文前缀
+  ---
+  duration_ms: 0.2828
+  type: 'test'
+  ...
+# Subtest: B4 omitted⇒正文恒空：载荷违规带正文（raw 串或投影形）一律清空——如实优先于保留违规内容
+ok 4 - B4 omitted⇒正文恒空：载荷违规带正文（raw 串或投影形）一律清空——如实优先于保留违规内容
+  ---
+  duration_ms: 0.1333
+  type: 'test'
+  ...
+# Subtest: B5 durationMs 防伪矩阵：有限≥0 才透传；负数/NaN/±Infinity/字符串/null/布尔一律丢弃
+ok 5 - B5 durationMs 防伪矩阵：有限≥0 才透传；负数/NaN/±Infinity/字符串/null/布尔一律丢弃
+  ---
+  duration_ms: 0.317
+  type: 'test'
+  ...
+# Subtest: B6 坏件 11 类 ⇒ 诊断形（PROJECTION_FAILED）且绝不抛
+ok 6 - B6 坏件 11 类 ⇒ 诊断形（PROJECTION_FAILED）且绝不抛
+  ---
+  duration_ms: 0.2417
+  type: 'test'
+  ...
+# Subtest: B7 重复投影幂等：project(project(x)) 与 project(x) 形状逐字相等（含截断/脱敏/omitted 三形态）
+ok 7 - B7 重复投影幂等：project(project(x)) 与 project(x) 形状逐字相等（含截断/脱敏/omitted 三形态）
+  ---
+  duration_ms: 0.2615
+  type: 'test'
+  ...
+# Subtest: B8 live emit：详细经过投影单点（脱敏＋summary 定格「已思考」）；随载荷 summary 绝不外流
+ok 8 - B8 live emit：详细经过投影单点（脱敏＋summary 定格「已思考」）；随载荷 summary 绝不外流
+  ---
+  duration_ms: 11.5669
+  type: 'test'
+  ...
+# Subtest: B8b live emit：违规/坏件经单点归一（omitted 带正文清空；坏件 ⇒ 诊断形＋诊断 summary）；durationMs 非法丢弃
+ok 9 - B8b live emit：违规/坏件经单点归一（omitted 带正文清空；坏件 ⇒ 诊断形＋诊断 summary）；durationMs 非法丢弃
+  ---
+  duration_ms: 2.8821
+  type: 'test'
+  ...
+# Subtest: B8c live＋持久化：落盘事件＝投影形（队列所见＝盘面所见，原始正文不落盘）
+ok 10 - B8c live＋持久化：落盘事件＝投影形（队列所见＝盘面所见，原始正文不落盘）
+  ---
+  duration_ms: 20.8777
+  type: 'test'
+  ...
+# Subtest: B9 历史读取：存量投影形幂等归一（形状不变）；原始形态过同单点（脱敏/违规清空/坏件→诊断）
+ok 11 - B9 历史读取：存量投影形幂等归一（形状不变）；原始形态过同单点（脱敏/违规清空/坏件→诊断）
+  ---
+  duration_ms: 8.0245
+  type: 'test'
+  ...
+# Subtest: B10 两路同单点：同输入 live 投影 == 历史投影 == 直接单点调用（形状逐字一致）
+ok 12 - B10 两路同单点：同输入 live 投影 == 历史投影 == 直接单点调用（形状逐字一致）
+  ---
+  duration_ms: 7.6519
+  type: 'test'
+  ...
+# Subtest: B11 Service 注入：set⇒恰值注入字段；unset⇒字段缺席；invalid⇒字段缺席＋诊断＋会话照开；跨键不串；demo 恒缺席
+ok 13 - B11 Service 注入：set⇒恰值注入字段；unset⇒字段缺席；invalid⇒字段缺席＋诊断＋会话照开；跨键不串；demo 恒缺席
+  ---
+  duration_ms: 14.9587
+  type: 'test'
+  ...
+# Subtest: B11b 重建重读（新会话生效语义）：env 改档 ⇒ 新适配器实例（新会话）读到新值；同实例同角色缓存不重读（既有语义）
+ok 14 - B11b 重建重读（新会话生效语义）：env 改档 ⇒ 新适配器实例（新会话）读到新值；同实例同角色缓存不重读（既有语义）
+  ---
+  duration_ms: 3.541
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 306.5437

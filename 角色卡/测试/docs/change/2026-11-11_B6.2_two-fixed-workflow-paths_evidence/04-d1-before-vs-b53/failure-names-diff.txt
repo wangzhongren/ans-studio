@@ -1,0 +1,6 @@
+before entries: 39
+after entries: 41
+added (after only): 2
++ test/测试/git-role-workflows-e2e.test.ts :: Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
++ test/测试/git-role-workflows-e2e.test.ts :: Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface
+removed (before only): 0

@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: AC-8/P1.2-AC-25：deferred run-stop 宿主继续 finalize（Claude requester + Pi 成员；host-continuation + drain + run transition journal；无 sidecar）
+ok 1 - AC-8/P1.2-AC-25：deferred run-stop 宿主继续 finalize（Claude requester + Pi 成员；host-continuation + drain + run transition journal；无 sidecar）
+  ---
+  duration_ms: 59522.6158
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 59873.3147

@@ -1,0 +1,29 @@
+B6.2（测试）证据索引 —— 2026-11-11
+====================================
+
+00-tool-hashes.txt               D1 runner/diff 工具 sha256（B5.3 同款）
+01-before-typecheck.txt          改动前 npm run typecheck（exit 0）
+02-d1-file-list-before.txt       test/测试 域 119 文件列表（与 B5.3 列表逐行一致）
+03-before-chain.tap              改动前全链 TAP（3/3 pass）
+04-d1-before-run.log.txt         D1 before 运行日志（711/652/40/1/18）
+04-d1-before-domain/             D1 before 原始语料（TAP/results.tsv/failing-names.json/totals.json）
+04-d1-before-vs-b53/             before 失败名 vs B5.3 冻结 known-red（added 2 = 两个 legacy e2e 夹具缺口）
+05-after-typecheck.txt           改动后 npm run typecheck（exit 0）
+06-q2-legacy-fixture-verified.tap 两个 legacy e2e 用例（显式 legacy 夹具后）2/2 pass
+07-after-chain.tap               改动后全链 TAP（3/3 pass，含真实聊天入口镜像注入断言）
+08-d1-after-run.log.txt          D1 after 运行日志（711/654/38/1/18）
+08-d1-after-domain/              D1 after 原始语料
+09-d1-diff/                      before→after 失败名 diff（added 0 / removed 2）与 flat 名单
+09b-after-vs-b53-knownred/       after 失败名 vs B5.3 冻结 known-red（added 0 / removed 0）
+10-after-chain-rerun.tap         全链 TAP 复跑（3/3 pass）
+11-after-chain-spec.txt          全链 spec 复跑（3/3 pass）
+12-write-set-boundary.txt        写集边界：B6.1 文件 hash 逐字一致；本批仅两 test/测试 文件
+13-candidate-hashes.txt          候选 before/after hash、git diff --numstat、blob id
+14-desktop-knownred-after.tap    B6.1 桌面 known-red 复跑（4 条逐名同数）
+15-skip-comparison.txt           before→after skip 对比（18→18，逐文件无增加）
+16-record-hash.txt               本记录 sha256
+run-tests.mjs / diff-failures.mjs / compare-skip.mjs  D1 scratch 工具（B5.3 同款）
+
+说明：测试运行会在既有未跟踪目录
+角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/
+写 e2e 证据（该目录本批开始前即为未跟踪，属测试角色既有证据区，非本批候选）。

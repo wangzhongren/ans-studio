@@ -1,0 +1,119 @@
+TAP version 13
+# Subtest: T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write
+not ok 1 - T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write
+  ---
+  duration_ms: 382.3079
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\t1-real-cli.test.ts:17:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+    [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+    [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T1 写集 1 项
+    [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+    ans role run 会话失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-real-cli.test.ts:28:14)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+# Subtest: T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write
+ok 2 - T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write
+  ---
+  duration_ms: 1029.822
+  type: 'test'
+  ...
+# Subtest: T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write
+not ok 3 - T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write
+  ---
+  duration_ms: 491.4897
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\t1-real-cli.test.ts:17:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+    [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+    [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T1 写集 1 项
+    [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+    ans role run 会话失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-real-cli.test.ts:28:14)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write
+ok 4 - T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write
+  ---
+  duration_ms: 594.649
+  type: 'test'
+  ...
+# Subtest: T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write
+not ok 5 - T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write
+  ---
+  duration_ms: 507.3486
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\t1-real-cli.test.ts:17:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+    [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+    [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T1 写集 1 项
+    [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+    ans role run 会话失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-real-cli.test.ts:28:14)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write
+ok 6 - T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write
+  ---
+  duration_ms: 532.2396
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 3
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3628.1788

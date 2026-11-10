@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: 复现转正：G-3 备注①最小复现（「；」连接的 Pi 搜索行）——第 2 条标题完整、秘密剥净、标志如实
+ok 1 - 复现转正：G-3 备注①最小复现（「；」连接的 Pi 搜索行）——第 2 条标题完整、秘密剥净、标志如实
+  ---
+  duration_ms: 0.98
+  type: 'test'
+  ...
+# Subtest: 后缀/括号变体（mojibake 消除）：`；…（共 N 条）` 与 `（URL）后文` 逐字保真、无 %EF%BC
+ok 2 - 后缀/括号变体（mojibake 消除）：`；…（共 N 条）` 与 `（URL）后文` 逐字保真、无 %EF%BC
+  ---
+  duration_ms: 0.1181
+  type: 'test'
+  ...
+# Subtest: 零泄漏 battery（对抗）：CJK 值＋全角标点紧贴全矩阵——秘密一律不可见（剥离口径只紧不松）
+ok 3 - 零泄漏 battery（对抗）：CJK 值＋全角标点紧贴全矩阵——秘密一律不可见（剥离口径只紧不松）
+  ---
+  duration_ms: 0.243
+  type: 'test'
+  ...
+# Subtest: ASCII `;` 路径参数不回归：`;jsessionid=` 完整留在 URL 内（排除集只增 CJK 块）
+ok 4 - ASCII `;` 路径参数不回归：`;jsessionid=` 完整留在 URL 内（排除集只增 CJK 块）
+  ---
+  duration_ms: 0.0733
+  type: 'test'
+  ...
+# Subtest: 显示预算不变：超限截断仍发生（truncated=true、前缀保留）；redacted 语义逐字沿用
+ok 5 - 显示预算不变：超限截断仍发生（truncated=true、前缀保留）；redacted 语义逐字沿用
+  ---
+  duration_ms: 0.102
+  type: 'test'
+  ...
+# Subtest: 控制字符清洗不变：\\u0000-\\u0008 等仍替换为 uFFFD（本条只带回显，不放松）
+ok 6 - 控制字符清洗不变：\\u0000-\\u0008 等仍替换为 uFFFD（本条只带回显，不放松）
+  ---
+  duration_ms: 0.1944
+  type: 'test'
+  ...
+# Subtest: Codex 诊断 redact 同口径：URL 紧贴全角标点不吞尾；userinfo/query 剥除；环境秘密值替换不变
+ok 7 - Codex 诊断 redact 同口径：URL 紧贴全角标点不吞尾；userinfo/query 剥除；环境秘密值替换不变
+  ---
+  duration_ms: 0.3683
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 134.3789
