@@ -88,6 +88,7 @@ import {
   type ProjectRoster,
 } from "./workflow-preconditions.ts";
 import {
+  basisIdFor,
   buildBasisRecordedEvent,
   discoverBasisDocuments,
   readBasisDocuments,
@@ -2235,42 +2236,395 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
   };
 }
 
-/** 关键门 drift 校验（A11/B3 派发前、A12a/A12b、A13/B4 发布前；AC-19）。 */
-export async function verifyBasisForWorkflow(input: {
+// —————————————— A9/B1 基线修正（basis.amended；AC-19/T-08 B2.1） ——————————————
+
+/** 同 workflow 的 basis 记录（`basis.recorded`/`basis.amended`；旧 basis 保留，修正链按追加顺序取最新）。 */
+type BasisRecordEvent = Extract<BasisEvent, { kind: "basis.recorded" | "basis.amended" }>;
+
+function basisRecordList(events: readonly BasisEvent[], workflowId: string): BasisRecordEvent[] {
+  return events.filter((event): event is BasisRecordEvent =>
+    (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === workflowId);
+}
+
+function basisDocumentViews(documents: readonly BasisDocumentRef[]): BasisDocumentView[] {
+  return documents.map((doc) => ({ kind: doc.kind, path: doc.path, version: doc.version, sha256: doc.sha256, bytes: doc.bytes }));
+}
+
+/** `basis.drift` 追加（detectedAt/path/expected/actual；同键 replay 不重复记账）。 */
+async function appendBasisDriftEvents(
+  projectRoot: string,
+  workflowId: string,
+  basisId: string,
+  drift: readonly { path: string; expectedSha256: string; actualSha256: string | null }[],
+  now: () => Date,
+): Promise<void> {
+  for (const entry of drift) {
+    const at = now().toISOString();
+    const event: BasisEvent = {
+      v: 1,
+      at,
+      schema: BASIS_LEDGER_SCHEMA,
+      kind: "basis.drift",
+      idempotencyKey: `basis-drift:${workflowId}:${entry.path}:${entry.actualSha256 ?? "missing"}`,
+      basisId,
+      path: entry.path,
+      expectedSha256: entry.expectedSha256,
+      actualSha256: entry.actualSha256,
+      detectedAt: at,
+    };
+    await appendBasisEvent(projectRoot, event);
+  }
+}
+
+export interface AmendBasisInput {
   projectRoot: string;
+  flowId: string;
   workflowId: string;
-  recordDrift?: boolean;
+  operationId: string;
+  /** 当前最新 basis 的 basisId；修正链只允许指向最新记录（不跳代）。 */
+  previousBasisId: string;
+  /** 新团队计划声明（可选断言）：路径须为磁盘最新 `docs/scheduling/<flowId>-team-vN.md`，hash/版本一致。 */
+  planPath?: string;
+  planVersion?: number;
+  planSha256?: string;
+  /** 新仓库快照（缺省沿用上一 basis 的 repo 记录；只读，不产生写权）。 */
+  repo?: WorkflowRepoSnapshot;
   now?: () => Date;
-}): Promise<{ ok: true; basisId: string } | WorkflowServiceFailure> {
+}
+
+export interface AmendBasisReceipt {
+  basisId: string;
+  previousBasisId: string;
+  reviewRoleId: string;
+  documents: BasisDocumentView[];
+  teamPlan?: { path: string; version: number; sha256: string };
+  /** 重复同幂等键 ⇒ replay 返回原 basisId（不追加第二行）。 */
+  replay: boolean;
+}
+
+export type AmendBasisResult = ({ ok: true } & AmendBasisReceipt) | WorkflowServiceFailure;
+
+/**
+ * 文档修正（v1.3 §5.3/§7.2）：同 workflow 新 basis ⇒ 追加 `basis.amended`（`previousBasisId` 指向
+ * 旧记录，旧 basis 保留）。修正须出新 `-vN` 文件——
+ *  · 同一路径的既有文档字节必须与 `previousBasisId` 记录一致；同路径改字节 ⇒ `basis.drift` + `basis-hash-mismatch`；
+ *  · 已记录 kind 消失且无新版本 ⇒ 同上；
+ *  · 基线型 basis（有团队计划）：按最新名单/模块清单重新校验团队计划结构（名单/模块出新版必须同步出新计划）；
+ *  · path-b 只读快照：重新快照现存文档（缺失允许），不接受团队计划声明。
+ * 重复同幂等键 replay；同 operationId 不同内容 ⇒ `baseline-operation-conflict`。
+ * **不产生写权、不视为客户/验收批准**：只追加 basis 账本记录，不写阶段推进/激活/发布事件。
+ */
+export async function amendBasis(input: AmendBasisInput): Promise<AmendBasisResult> {
+  const now = input.now ?? (() => new Date());
+  const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
+  if (!isWorkflowSlug(flowId)) return serviceFailure("basis-amend-invalid", `flowId 非法：${String(input.flowId)}`);
+  if (!isNonEmptyText(input.workflowId)) return serviceFailure("basis-amend-invalid", "workflowId 缺失。");
+  if (!isNonEmptyText(input.operationId)) return serviceFailure("basis-amend-invalid", "operationId 缺失。");
+  if (!isNonEmptyText(input.previousBasisId)) return serviceFailure("basis-amend-invalid", "previousBasisId 缺失。");
+
+  const wfLedger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(wfLedger.events, input.workflowId);
+  if (!wfEvents.some((event) => event.kind === "workflow.started")) {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) {
+    return serviceFailure("workflow-closed", `workflow ${input.workflowId} 已关闭（${view.closed.outcome}），不再接受 basis 修正。`);
+  }
+  if (view.flowId !== flowId) {
+    return serviceFailure("basis-amend-invalid", `flowId ${flowId} 与 workflow 记录 ${view.flowId} 不匹配。`);
+  }
+
   const ledger = await readBasisLedger(input.projectRoot);
-  const records = ledger.events.filter((event): event is Extract<BasisEvent, { kind: "basis.recorded" | "basis.amended" }> =>
-    (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === input.workflowId);
+  const records = basisRecordList(ledger.events, input.workflowId);
   const latest = records[records.length - 1];
-  if (latest === undefined) return serviceFailure("basis-missing", `workflow ${input.workflowId} 没有 basis 记录。`);
-  const verify = await verifyBasisDocuments(input.projectRoot, [
-    ...latest.documents.map((doc) => ({ path: doc.path, sha256: doc.sha256 })),
-    ...(latest.teamPlan !== null && latest.teamPlan !== undefined ? [latest.teamPlan] : []),
-  ]);
-  if (verify.ok) return { ok: true, basisId: latest.basisId };
-  if (input.recordDrift !== false) {
-    const now = input.now ?? (() => new Date());
-    for (const drift of verify.drift) {
-      const event: BasisEvent = {
-        v: 1,
-        at: now().toISOString(),
-        schema: BASIS_LEDGER_SCHEMA,
-        kind: "basis.drift",
-        idempotencyKey: `basis-drift:${input.workflowId}:${drift.path}:${drift.actualSha256 ?? "missing"}`,
-        basisId: latest.basisId,
-        path: drift.path,
-        expectedSha256: drift.expectedSha256,
-        actualSha256: drift.actualSha256,
-        detectedAt: now().toISOString(),
-      };
-      await appendBasisEvent(input.projectRoot, event);
+  if (latest === undefined) {
+    return serviceFailure("basis-missing", `workflow ${input.workflowId} 没有 basis 记录（先完成 A9/B1 basis 记录）。`);
+  }
+
+  // reviewRoleId 由应用从最新 roster 派生（不采信模型自报）；roster 不可读时沿用上一 basis。
+  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId });
+  const reviewRoleId = roster.ok ? reviewRoleIdOfRoster(roster.roster) : (latest.reviewRoleId ?? DEFAULT_REVIEW_ROLE_ID);
+
+  // 基线型 = 上一 basis 携带团队计划；否则为 path-b 只读快照型。
+  const baselineStyle = latest.teamPlan !== null && latest.teamPlan !== undefined;
+  let read: { ok: true; documents: BasisDocumentRef[]; teamPlan?: BasisTeamPlanRef };
+  if (baselineStyle) {
+    const docs = await recordBasisDocuments(input.projectRoot, flowId);
+    if (!docs.ok) return serviceFailure(docs.code, docs.message);
+    if (docs.teamPlan === undefined) {
+      return serviceFailure("basis-amend-invalid", `基线修正缺少团队计划 docs/scheduling/${flowId}-team-vN.md（fail-closed）。`);
+    }
+    read = docs;
+  } else {
+    if (input.planPath !== undefined || input.planVersion !== undefined || input.planSha256 !== undefined) {
+      return serviceFailure("basis-amend-invalid", "path-b 只读快照修正不接受团队计划声明（无团队计划）。");
+    }
+    const snapshot = await snapshotExistingBasisDocuments(input.projectRoot, flowId);
+    if (!snapshot.ok) return serviceFailure(snapshot.code, snapshot.message);
+    read = snapshot;
+  }
+
+  const planRef: BasisTeamPlanRef | null = read.teamPlan ?? null;
+  if (baselineStyle && planRef !== null) {
+    if (input.planPath !== undefined && input.planPath !== planRef.path) {
+      return serviceFailure("basis-amend-invalid", `planPath ${input.planPath} 不是磁盘最新团队计划 ${planRef.path}（修正须显式出新 -vN）。`);
+    }
+    if (input.planVersion !== undefined && input.planVersion !== planRef.version) {
+      return serviceFailure("basis-hash-mismatch", `planVersion=${input.planVersion} 与 ${planRef.path} 不一致。`);
+    }
+    if (input.planSha256 !== undefined) {
+      if (!isSha256Hex(input.planSha256)) {
+        return serviceFailure("basis-amend-invalid", "planSha256 形状非法（须 64 hex）。");
+      }
+      if (input.planSha256 !== planRef.sha256) {
+        return serviceFailure("basis-hash-mismatch", `plan.sha256 声明值与实际字节不一致：${planRef.path}。`);
+      }
+    }
+    // 团队计划结构校验（与 A9 基线同一判据）：名单/模块出新版本时必须同步出新计划。
+    let planText: string;
+    try {
+      planText = await fs.readFile(path.join(input.projectRoot, ...planRef.path.split("/")), "utf8");
+    } catch {
+      return serviceFailure("basis-document-missing", `团队计划不可读：${planRef.path}。`);
+    }
+    if (!roster.ok) return serviceFailure("basis-amend-invalid", `基线修正需要合法名单：${roster.reason}`);
+    const modules = await latestModulesRef(input.projectRoot, flowId);
+    if (modules === undefined) {
+      return serviceFailure("basis-document-missing", `未找到最新模块清单 docs/proposals/${flowId}-modules-vN.md。`);
+    }
+    const parsed = parseTeamPlan(planText, {
+      flowId,
+      version: planRef.version,
+      modules: { path: modules.path, sha256: modules.sha256 },
+      roster: { path: roster.path, sha256: roster.sha256 },
+      rosterFacts: roster.roster,
+    });
+    if (!parsed.ok) return serviceFailure("basis-amend-invalid", parsed.reason);
+  }
+
+  const digest = sha256Of(JSON.stringify({
+    documents: read.documents
+      .map((doc) => ({ kind: doc.kind, path: doc.path, version: doc.version, sha256: doc.sha256, bytes: doc.bytes }))
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
+    teamPlan: planRef,
+  }));
+  const idempotencyKey = `amend:${input.workflowId}:${input.previousBasisId}:${digest}`;
+
+  // 同幂等键 replay（须先于「指向最新 basis」与「无变化」判定：重试时最新已是本修正记录）。
+  const existing = records.find((event) => event.idempotencyKey === idempotencyKey);
+  if (existing !== undefined) {
+    if (existing.kind !== "basis.amended" || existing.previousBasisId !== input.previousBasisId) {
+      return serviceFailure("basis-amend-invalid", `幂等键 ${idempotencyKey} 已用于不同修正记录。`);
+    }
+    return {
+      ok: true,
+      basisId: existing.basisId,
+      previousBasisId: existing.previousBasisId,
+      reviewRoleId: existing.reviewRoleId ?? reviewRoleId,
+      documents: basisDocumentViews(existing.documents),
+      ...(existing.teamPlan !== null && existing.teamPlan !== undefined
+        ? { teamPlan: { path: existing.teamPlan.path, version: existing.teamPlan.version, sha256: existing.teamPlan.sha256 } }
+        : {}),
+      replay: true,
+    };
+  }
+  const priorOperation = records.find((event) =>
+    event.operationId === input.operationId && event.idempotencyKey !== idempotencyKey);
+  if (priorOperation !== undefined) {
+    return serviceFailure(
+      "baseline-operation-conflict",
+      `operationId ${input.operationId} 已用于不同的 basis 内容（${priorOperation.idempotencyKey}）；请用新 operationId 重试。`,
+    );
+  }
+  if (!records.some((event) => event.basisId === input.previousBasisId)) {
+    return serviceFailure("basis-missing", `previousBasisId ${input.previousBasisId} 不存在于 workflow ${input.workflowId} 的 basis 记录。`);
+  }
+  if (latest.basisId !== input.previousBasisId) {
+    return serviceFailure(
+      "basis-amend-invalid",
+      `previousBasisId ${input.previousBasisId} 不是当前最新 basis ${latest.basisId}（修正链不跳代）。`,
+    );
+  }
+
+  // 「documents 实际 bytes/hash 与 previousBasisId 一致」：同路径文档必须保持旧 hash；
+  // 已记录 kind 消失且无新版本 = 漂移。同路径改字节是漂移，必须出新 -vN，不得静默重记。
+  const drift: { path: string; expectedSha256: string; actualSha256: string | null }[] = [];
+  for (const previous of latest.documents) {
+    const samePath = read.documents.find((doc) => doc.path === previous.path);
+    if (samePath !== undefined) {
+      if (samePath.sha256 !== previous.sha256) {
+        drift.push({ path: previous.path, expectedSha256: previous.sha256, actualSha256: samePath.sha256 });
+      }
+      continue;
+    }
+    if (!read.documents.some((doc) => doc.kind === previous.kind)) {
+      drift.push({ path: previous.path, expectedSha256: previous.sha256, actualSha256: null });
     }
   }
-  return serviceFailure("basis-drift", `依据漂移：${verify.drift.map((entry) => entry.path).join("、")}（fail-closed）。`);
+  const previousPlan = latest.teamPlan;
+  if (previousPlan !== null && previousPlan !== undefined) {
+    if (planRef === null) {
+      drift.push({ path: previousPlan.path, expectedSha256: previousPlan.sha256, actualSha256: null });
+    } else if (planRef.path === previousPlan.path && planRef.sha256 !== previousPlan.sha256) {
+      drift.push({ path: previousPlan.path, expectedSha256: previousPlan.sha256, actualSha256: planRef.sha256 });
+    }
+  }
+  if (drift.length > 0) {
+    await appendBasisDriftEvents(input.projectRoot, input.workflowId, latest.basisId, drift, now);
+    return serviceFailure(
+      "basis-hash-mismatch",
+      `修正发现同路径字节漂移（须出新 -vN，不得原地改）：${drift.map((entry) => entry.path).join("、")}（fail-closed）。`,
+    );
+  }
+
+  const sameDocuments = read.documents.length === latest.documents.length
+    && read.documents.every((doc) => latest.documents.some((prev) => prev.path === doc.path && prev.sha256 === doc.sha256));
+  const samePlan = planRef === null
+    ? previousPlan === null || previousPlan === undefined
+    : previousPlan !== null && previousPlan !== undefined && previousPlan.path === planRef.path && previousPlan.sha256 === planRef.sha256;
+  if (sameDocuments && samePlan) {
+    return serviceFailure("basis-amend-invalid", "修正内容与当前 basis 相同（无新 -vN/无变化）；不追加记录。");
+  }
+
+  const at = now().toISOString();
+  const event: BasisEvent = {
+    v: 1,
+    at,
+    schema: BASIS_LEDGER_SCHEMA,
+    kind: "basis.amended",
+    basisId: basisIdFor(idempotencyKey),
+    previousBasisId: latest.basisId,
+    workflowId: input.workflowId,
+    flowId,
+    documents: read.documents.map((doc) => ({ ...doc })),
+    teamPlan: planRef,
+    ...(input.repo !== undefined ? { repo: input.repo } : latest.repo !== undefined ? { repo: latest.repo } : {}),
+    reviewRoleId,
+    operationId: input.operationId,
+    idempotencyKey,
+    recordedBy: "application",
+  };
+  const appended = await appendBasisEvent(input.projectRoot, event);
+  if (!appended.ok) return serviceFailure("baseline-ledger-write-failed", `basis.amended 写入失败：${appended.message}`);
+  return {
+    ok: true,
+    basisId: event.basisId,
+    previousBasisId: event.previousBasisId,
+    reviewRoleId,
+    documents: basisDocumentViews(read.documents),
+    ...(planRef !== null ? { teamPlan: { path: planRef.path, version: planRef.version, sha256: planRef.sha256 } } : {}),
+    replay: appended.replay,
+  };
+}
+
+// —————————————— 关键门 drift 校验 + basis.verified 节流（AC-19 / v1.3 §7.2 G-9） ——————————————
+
+/**
+ * 关键门阶段（v1.3 §7.2/G-9）：A11/B3 实现派发前、A12a/A12b 验收前后、A13/B4 发布前；
+ * B1 为路径 B 派发准备门（既有桌面调用点）。只有这些阶段的一致校验才节流入账 `basis.verified`。
+ */
+export const BASIS_KEY_GATE_STAGES: readonly WorkflowStage[] = Object.freeze(["A11", "B1", "B3", "A12a", "A12b", "A13", "B4"]);
+
+/** 关键门判定（只决定 `basis.verified` 是否入账；drift 校验本身对所有阶段一致）。 */
+export function isBasisKeyGateStage(stage: WorkflowStage | undefined): boolean {
+  return stage !== undefined && (BASIS_KEY_GATE_STAGES as readonly string[]).includes(stage);
+}
+
+/** 依据文档摘要（path+sha256 排序后 SHA-256；`basis.verified` 节流键：同 basis+同摘要只记一次）。 */
+export function basisDocumentsDigest(documents: readonly { path: string; sha256: string }[]): string {
+  return sha256Of(JSON.stringify(
+    [...documents]
+      .map((doc) => ({ path: doc.path, sha256: doc.sha256 }))
+      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)),
+  ));
+}
+
+export interface VerifyBasisForWorkflowInput {
+  projectRoot: string;
+  workflowId: string;
+  /** 关键门阶段（A11/B1/B3/A12a/A12b/A13/B4）：一致时按 v1.3 §7.1 摘要节流入账 `basis.verified`。 */
+  stage?: WorkflowStage;
+  /** 缺省 true：drift 必写 `basis.drift`（普通读取也不隐瞒漂移）。 */
+  recordDrift?: boolean;
+  now?: () => Date;
+}
+
+export type VerifyBasisForWorkflowResult =
+  | { ok: true; basisId: string; verifiedRecorded: boolean }
+  | WorkflowServiceFailure;
+
+/**
+ * 关键门 drift 校验（A11/B3 派发前、A12a/A12b、A13/B4 发布前；AC-19）。
+ * 一致时：仅关键门（且同 basis+同 documents digest 未记过）追加 `basis.verified` 摘要（G-9 节流，
+ * 普通读取不逐次入账）；漂移时：追加 `basis.drift`（path/expected/actual/detectedAt）并 fail-closed。
+ * `basis.verified` 只是校验记录，**不是批准/写权**。
+ */
+export async function verifyBasisForWorkflow(input: VerifyBasisForWorkflowInput): Promise<VerifyBasisForWorkflowResult> {
+  const now = input.now ?? (() => new Date());
+  const ledger = await readBasisLedger(input.projectRoot);
+  const records = basisRecordList(ledger.events, input.workflowId);
+  const latest = records[records.length - 1];
+  if (latest === undefined) return serviceFailure("basis-missing", `workflow ${input.workflowId} 没有 basis 记录。`);
+  const checked = [
+    ...latest.documents.map((doc) => ({ path: doc.path, sha256: doc.sha256 })),
+    ...(latest.teamPlan !== null && latest.teamPlan !== undefined ? [latest.teamPlan] : []),
+  ];
+  const verify = await verifyBasisDocuments(input.projectRoot, checked);
+  if (!verify.ok) {
+    if (input.recordDrift !== false) {
+      await appendBasisDriftEvents(input.projectRoot, input.workflowId, latest.basisId, verify.drift, now);
+    }
+    return serviceFailure("basis-drift", `依据漂移：${verify.drift.map((entry) => entry.path).join("、")}（fail-closed）。`);
+  }
+  // G-9：普通读取（无 stage）不写 basis.verified，避免账本膨胀。
+  if (!isBasisKeyGateStage(input.stage)) return { ok: true, basisId: latest.basisId, verifiedRecorded: false };
+  const digest = basisDocumentsDigest(checked);
+  const priorVerified = ledger.events.some((event) =>
+    event.kind === "basis.verified" && event.basisId === latest.basisId && basisDocumentsDigest(event.documents) === digest);
+  if (priorVerified) return { ok: true, basisId: latest.basisId, verifiedRecorded: false };
+  const at = now().toISOString();
+  const event: BasisEvent = {
+    v: 1,
+    at,
+    schema: BASIS_LEDGER_SCHEMA,
+    kind: "basis.verified",
+    idempotencyKey: `basis-verified:${latest.basisId}:${digest}`,
+    basisId: latest.basisId,
+    checkedAt: at,
+    ok: true,
+    documents: checked.map((doc) => ({ path: doc.path, sha256: doc.sha256, ok: true })),
+  };
+  const appended = await appendBasisEvent(input.projectRoot, event);
+  if (!appended.ok) return serviceFailure("baseline-ledger-write-failed", `basis.verified 写入失败：${appended.message}`);
+  return { ok: true, basisId: latest.basisId, verifiedRecorded: appended.replay === false };
+}
+
+/**
+ * 按阶段复核 basis（A12a/A12b 等调用方入口）：chief→verifier 直派不经 convener basis 门时，
+ * 桌面在 verifier close/report 前调用本函数；drift ⇒ `basis.drift` + `basis-drift` fail-closed，
+ * 阻塞 A12a/A12b 完成（不触 trunk/CAS）。关键门一致时按节流入账 `basis.verified`。
+ */
+export async function verifyBasisForStage(input: {
+  projectRoot: string;
+  workflowId: string;
+  stage: WorkflowStage;
+  recordDrift?: boolean;
+  now?: () => Date;
+}): Promise<VerifyBasisForWorkflowResult> {
+  if (!isWorkflowStage(input.stage)) {
+    return serviceFailure("stage-transition-invalid", `stage 非法：${String(input.stage)}。`);
+  }
+  return verifyBasisForWorkflow({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    stage: input.stage,
+    ...(input.recordDrift !== undefined ? { recordDrift: input.recordDrift } : {}),
+    ...(input.now !== undefined ? { now: input.now } : {}),
+  });
 }
 
 // —————————————— A12 验收归档（AC-20 / G-16） ——————————————
@@ -2779,8 +3133,8 @@ export async function prepareReleaseMerge(input: PrepareReleaseMergeInput): Prom
     );
   }
 
-  // basis drift 在呈卡前拒绝（AC-19/A13/B4）。
-  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, now });
+  // basis drift 在呈卡前拒绝（AC-19/A13/B4；关键门一致时按 G-9 节流入账 basis.verified）。
+  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, stage: targetStage, now });
   if (!basis.ok) return basis;
 
   const factsResult = await input.port.inspectRepository({ projectRoot: input.projectRoot });
@@ -3118,7 +3472,7 @@ export async function executeReleaseMerge(input: ExecuteReleaseMergeInput): Prom
   }
 
   // 呈卡后、执行前的最后复核：basis 漂移 / 分支或 tip 漂移 / 工作区 dirty ⇒ 拒绝（不合并）。
-  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, now });
+  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, stage: targetStage, now });
   if (!basis.ok) return basis;
   const factsResult = await input.port.inspectRepository({ projectRoot: input.projectRoot });
   if (!factsResult.ok) return factsResult;

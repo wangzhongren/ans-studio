@@ -1,0 +1,86 @@
+# B2 candidate/baseline evidence 2026-11-10T13:57:35Z
+
+## git identity
+branch: feat/two-fixed-workflow-paths
+HEAD: e28923cadf957df2ef9b9f88f25b6957d07da405
+origin/main: d9e3e99c160599e5b53a82e105939a359f69992f
+merge-base: d9e3e99c160599e5b53a82e105939a359f69992f
+
+## tags matching task
+(none)
+
+## merge commits since origin/main
+(end)
+
+## worktree status (src/app/test only)
+(end)
+
+## worktree status (all, truncated)
+ M 角色卡/chief-code/api-spec.md
+ M 角色卡/product-code/api-spec.md
+ M 角色卡/product-code/feature-map.md
+ M 角色卡/product-code/memo.md
+?? .commit-msg-d04.txt
+?? .commit-msg-demo-guard.txt
+?? .commit-msg-matrix.txt
+?? .commit-msg-report-suppression.txt
+?? .commit-msg-roster-rebind.txt
+?? .commit-msg-shell-audit.txt
+?? .commit-msg-trunk.txt
+?? .commit-msg-vca-kind.txt
+?? .commit-msg-vca-ux.txt
+?? .commit-msg-vca.txt
+?? .pr-body-bootstrap-fix.md
+?? .pr-body-d04.md
+?? .pr-body-demo-guard.md
+?? .pr-body-document-format.md
+?? .pr-body-matrix.md
+?? .pr-body-report-suppression.md
+?? .pr-body-roster-rebind.md
+?? .pr-body-shell-audit.md
+?? .pr-body-team-plan-run-binding.md
+?? .pr-body-trunk.md
+?? .pr-body-vca-ux.md
+?? .pr-body-vca.md
+?? .pr-payload-team-plan-run.json
+?? .tmp-app-shot.jpeg
+?? .tmp-app-shot2.jpeg
+?? .tmp-append-b11.mjs
+?? .tmp-append-g11-note.mjs
+?? .tmp-append-stable-freeze-decision.mjs
+?? .tmp-append-stable-write-ruling.mjs
+?? .tmp-check-panel.mjs
+?? .tmp-check-vc2-chain.mjs
+?? .tmp-copy-gates.mjs
+?? .tmp-read-audit.mjs
+?? .tmp-repair-vc1-baseline.mjs
+?? .tmp-repair-vc3-topology.mjs
+?? .tmp-repair-vc4-topology.mjs
+
+## commits origin/main..HEAD
+e28923c test(workflow): B5 full-chain deterministic validation and B5.1 production wiring
+e645e4e feat(desktop): B4.2 task-scoped git port injection
+1a646fc feat(shell): B4.1 task-scoped git wiring and service exports
+69096c4 feat(gates): B4 shell v5 task-scoped git add/commit with ordinary-git rejection
+ce3d56e feat(desktop): B3.1 auto-present customer-only merge-main and A10 source stamp
+1a383fb fix(workflow): B3.1 fixed intent and appointment card paths, team-plan/source fields
+d60d02c feat(desktop): B3 real git ports, customer-only merge-main card, baseline and fixed panels
+80bc3b6 feat(workflow): B3 release merge, acceptance archive and baseline/path-B services
+e104f12 feat(runtime): B2 fixed close/activate tool surfaces and document refs
+6a6d763 feat(orchestration): B2 fixed role card kinds, chief workflow v2 and fixed close/activate wiring
+d4bc79c feat(roles): B2 fixed-path module surfaces and gates views
+f72bafa feat(desktop): B1 fixed-path routing and capability filtering
+24af13d feat(workflow): B1 dispatch split, state machine and fixed-path services (orchestration)
+ff67bc0 docs(review): G-IR passes with 8 conditions; requestReleaseMerge rejected
+ee5b330 feat(workflow): B0 foundations for two fixed workflow paths
+ad22192 docs(scheduling): team plan for two fixed workflow paths (B1 frozen)
+2b5d208 docs(acceptance): freeze B1 for two fixed workflow paths after clean third review
+67b728f docs(planning): proposal v1.3 closes MF-9..MF-12 and residual G items
+b870b15 docs(scheduling): record v1.2 re-review needs-revision milestone
+3c8439c docs(review): re-review proposal v1.2 (MF-1..8 closed; MF-9..12 must-fix)
+b4c061a docs(planning): proposal v1.2 incorporates coordinator decisions and closes MF-1..MF-8
+4c344bd docs(scheduling): record coordinator decisions for two-fixed-paths proposal
+f177fd8 docs(scheduling): record review v1 needs-revision milestone
+8905a4a docs(review): independent review of two-fixed-paths proposal v1 (needs revision, 8 must-fix)
+88f5092 docs(planning): implementation proposal for two fixed workflow paths (v1)
+10f90c7 docs(governance): start two fixed workflow paths (design v2 + startup plan)

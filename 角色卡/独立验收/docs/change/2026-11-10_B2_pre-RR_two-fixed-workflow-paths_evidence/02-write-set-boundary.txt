@@ -1,0 +1,36 @@
+# B2 T-19 write-set/boundary evidence
+
+## diff name-stat vs code baseline 10f90c7 (top-level)
+      6 app
+      9 docs
+     40 src
+     60 test
+   1259 角色卡
+
+## src/common/gates diff vs baseline (expect 0)
+0
+
+## role card files changed outside docs/** (expect none)
+(none)
+
+## role card docs/change and docs/design changed (expected evidence records)
+   1246 change
+     13 design
+
+## dependency/config diffs (expect none)
+(end)
+
+## new src files
+src/common/编排/basis-guard.ts
+src/common/编排/workflow-dispatch.ts
+src/common/编排/workflow-service.ts
+src/common/编排/workflow-state.ts
+src/common/门禁引擎/task-git-gate.ts
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+
+## new app files
+app/desktop/workflow-git.ts
+app/desktop/workflow.ts
+
+## files changed vs baseline by area
+106

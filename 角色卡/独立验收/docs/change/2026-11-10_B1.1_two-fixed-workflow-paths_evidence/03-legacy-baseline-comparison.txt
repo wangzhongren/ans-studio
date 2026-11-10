@@ -1,0 +1,29 @@
+# 9 红基线对照（候选 HEAD e28923c 纯净解包 vs 代码基线 10f90c7 纯净解包；均 node --test --test-concurrency=1 --test-reporter=tap）
+
+## HEAD e28923c 失败（9）
+1. 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+2. convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务  ||  worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+3. BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+4. BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队  ||  The input did not match the regular expression /无法打开|未投递/. Input:
+5. BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+6. BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+7. AC-4.3：洁净派发无 advisory、无诊断噪声  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+8. 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域  ||  chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+9. F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发  ||  chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+
+## 基线 10f90c7 失败（9）
+1. 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+2. convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务  ||  worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+3. BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+4. BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队  ||  The input did not match the regular expression /无法打开|未投递/. Input:
+5. BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+6. BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+7. AC-4.3：洁净派发无 advisory、无诊断噪声  ||  document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+8. 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域  ||  chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+9. F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发  ||  chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+
+## set diff
+HEAD-only: NONE
+baseline-only: NONE
+名称 set: IDENTICAL (9/9)
+名称+首条错误串: IDENTICAL (9/9 同名同因)

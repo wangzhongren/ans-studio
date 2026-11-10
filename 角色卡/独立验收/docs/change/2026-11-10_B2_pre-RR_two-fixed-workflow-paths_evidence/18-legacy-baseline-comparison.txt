@@ -1,0 +1,32 @@
+# B2 T-14/AC-03 基线对照（代码基线 10f90c7 解包 + node_modules junction，只读；运行后清理）
+
+## baseline 10f90c7: star-routing + i-full-chain
+# tests 12
+# pass 3
+# fail 9
+# skipped 0
+
+## baseline failure names
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+AC-4.3：洁净派发无 advisory、无诊断噪声
+最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+
+## HEAD e28923c failure names
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+AC-4.3：洁净派发无 advisory、无诊断噪声
+最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+
+## set diff
+IDENTICAL (9/9 same names)

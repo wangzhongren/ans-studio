@@ -1,0 +1,206 @@
+TAP version 13
+# Subtest: C2a：六类新事件合法行可读；归属/生命周期字段保留；TaskRecord 语义不变
+ok 1 - C2a：六类新事件合法行可读；归属/生命周期字段保留；TaskRecord 语义不变
+  ---
+  duration_ms: 16.6616
+  type: 'test'
+  ...
+# Subtest: C2a：STABLE_WRITE_EVENT_KINDS 五个 kind 全部入白名单（归属分区互斥）
+ok 2 - C2a：STABLE_WRITE_EVENT_KINDS 五个 kind 全部入白名单（归属分区互斥）
+  ---
+  duration_ms: 11.227
+  type: 'test'
+  ...
+# Subtest: C2a：逐 kind 负例——op/归属/状态/分区/必填字段非法成坏行，合法行仍可读
+ok 3 - C2a：逐 kind 负例——op/归属/状态/分区/必填字段非法成坏行，合法行仍可读
+  ---
+  duration_ms: 8.3028
+  type: 'test'
+  ...
+# Subtest: F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段——缺失可读、给出则校验 ISO
+ok 4 - F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段——缺失可读、给出则校验 ISO
+  ---
+  duration_ms: 9.8157
+  type: 'test'
+  ...
+# Subtest: W-J2/J17：freezeEvents 防御镜像——无 source 的既有事件字节逐字不变；judge-delegated source 镜像 actionSource 且通过账本校验
+ok 5 - W-J2/J17：freezeEvents 防御镜像——无 source 的既有事件字节逐字不变；judge-delegated source 镜像 actionSource 且通过账本校验
+  ---
+  duration_ms: 0.7402
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：status/reconcile（无 journal）+ bootstrap t1 + 客户归属事件
+ok 6 - trunk-runtime：status/reconcile（无 journal）+ bootstrap t1 + 客户归属事件
+  ---
+  duration_ms: 83.7002
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：applyApproved（upgrade）经 S3 re-pin；事件与 verify 一致
+ok 7 - trunk-runtime：applyApproved（upgrade）经 S3 re-pin；事件与 verify 一致
+  ---
+  duration_ms: 110.6146
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认、拒绝版本化文档变更）
+ok 8 - trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认、拒绝版本化文档变更）
+  ---
+  duration_ms: 107.953
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 manifest 待续接
+ok 9 - trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 manifest 待续接
+  ---
+  duration_ms: 96.1493
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件
+ok 10 - trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件
+  ---
+  duration_ms: 92.7456
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）
+ok 11 - trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）
+  ---
+  duration_ms: 24.2026
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：reconcile 在提交点后 phase 滞后时识别 split，且不伪造客户事件（C2a 归属）
+ok 12 - trunk-runtime：reconcile 在提交点后 phase 滞后时识别 split，且不伪造客户事件（C2a 归属）
+  ---
+  duration_ms: 60.1478
+  type: 'test'
+  ...
+# Subtest: 派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状态 derived
+ok 13 - 派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状态 derived
+  ---
+  duration_ms: 54.246
+  type: 'test'
+  ...
+# Subtest: 派生 fail-closed：无 pinned/多 pinned/坏 manifest
+ok 14 - 派生 fail-closed：无 pinned/多 pinned/坏 manifest
+  ---
+  duration_ms: 63.4671
+  type: 'test'
+  ...
+# Subtest: 派生/应用支持 `path\#fragment` 引用：哈希/冻结按文件部分，引用串原样保留
+ok 15 - 派生/应用支持 `path\#fragment` 引用：哈希/冻结按文件部分，引用串原样保留
+  ---
+  duration_ms: 68.8384
+  type: 'test'
+  ...
+# Subtest: verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规
+ok 16 - verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规
+  ---
+  duration_ms: 78.165
+  type: 'test'
+  ...
+# Subtest: executeApply：bootstrap t1、升级 t2（journal 两阶段/history/审计）、失败不改指针
+ok 17 - executeApply：bootstrap t1、升级 t2（journal 两阶段/history/审计）、失败不改指针
+  ---
+  duration_ms: 111.0737
+  type: 'test'
+  ...
+# Subtest: reconcileJournal：none/committed/prepared/相位滞后 split/corrupt
+ok 18 - reconcileJournal：none/committed/prepared/相位滞后 split/corrupt
+  ---
+  duration_ms: 65.8203
+  type: 'test'
+  ...
+# Subtest: recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/注册表损坏拒绝
+ok 19 - recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/注册表损坏拒绝
+  ---
+  duration_ms: 77.4453
+  type: 'test'
+  ...
+# Subtest: recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针
+ok 20 - recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针
+  ---
+  duration_ms: 87.5539
+  type: 'test'
+  ...
+# Subtest: applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+not ok 21 - applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+  ---
+  duration_ms: 66.948
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-service.test.ts:507:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+        applied: false,
+    +   errorCode: 'stable-manifest-unavailable',
+    +   message: 'missing',
+        pendingReattach: true
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    applied: false
+    pendingReattach: true
+  actual:
+    applied: false
+    pendingReattach: true
+    errorCode: 'stable-manifest-unavailable'
+    message: 'missing'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-service.test.ts:584:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 修正案：解析/哈希定格/目标版本/边界扩大/生命周期映射与校验
+ok 22 - 修正案：解析/哈希定格/目标版本/边界扩大/生命周期映射与校验
+  ---
+  duration_ms: 84.6177
+  type: 'test'
+  ...
+# Subtest: status：存在未提交 journal ⇒ apply-uncertain
+ok 23 - status：存在未提交 journal ⇒ apply-uncertain
+  ---
+  duration_ms: 47.3929
+  type: 'test'
+  ...
+# Subtest: manifest：原子写/读回、未知字段保留、无临时文件残留
+ok 24 - manifest：原子写/读回、未知字段保留、无临时文件残留
+  ---
+  duration_ms: 17.8533
+  type: 'test'
+  ...
+# Subtest: 缺失/坏件判别：missing/corrupt、不自动重建/不覆盖
+ok 25 - 缺失/坏件判别：missing/corrupt、不自动重建/不覆盖
+  ---
+  duration_ms: 8.5883
+  type: 'test'
+  ...
+# Subtest: 并发写串行：25 路并发写最终一致且文件完整可解析
+ok 26 - 并发写串行：25 路并发写最终一致且文件完整可解析
+  ---
+  duration_ms: 280.6963
+  type: 'test'
+  ...
+# Subtest: amendment/journal：读写回、旧状态读兼容、legacy 状态写拒绝
+ok 27 - amendment/journal：读写回、旧状态读兼容、legacy 状态写拒绝
+  ---
+  duration_ms: 62.7649
+  type: 'test'
+  ...
+# Subtest: history：归档/列表/同版本幂等/不同内容拒绝/坏件跳过并诊断
+ok 28 - history：归档/列表/同版本幂等/不同内容拒绝/坏件跳过并诊断
+  ---
+  duration_ms: 44.4103
+  type: 'test'
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 27
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2912.1797

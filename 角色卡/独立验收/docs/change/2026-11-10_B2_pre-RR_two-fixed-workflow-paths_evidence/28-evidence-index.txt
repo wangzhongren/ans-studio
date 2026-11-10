@@ -1,0 +1,31 @@
+# B2 evidence index (SHA-256, 2026-11-10)
+# note: this index does not hash itself; all other evidence files listed.
+
+dceeaee6e7a1354043879cf57c134836390c2393f48b0f5033faba13efec66f9 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/01-candidate-and-baseline.txt
+3d59aeb6696f34858f03bdcd53c185fd0359e405009e50097afca9dff91e26d1 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/02-write-set-boundary.txt
+aec7cb8c43e658e7086c1d6271f17e5d7cfb6bf99bf4a76a4860dd8705e60216 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/03-basis-hashes.txt
+4561b7d5ffd6c03335bfc547323e1bc31b05a5f8034bc870e0739a448c73d4f1 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/04-mode-switch-and-b-change-scope.tap
+af58800667ce33530576508eddd1ed3c67a23a5ebfec8dee721cfa99076b0c99 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/05-full-chain.tap
+6572bc729bf2f6ebab98696c38676637102aaa0e77798d3c7fc507f972295992 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/06-dispatch-state-stage.tap
+2efac1d1a6ed47aadbd723260f77c9635e4a2b2527148e2ba02118e51fc8fecc *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/07-close-baseline-ledger-basis-mode.tap
+9f2e071a1fc6b9e3a3cb5820e4069985cf76f85d4c74b5bb0c6ef206fe0f1d66 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/08-release-pathb-archive-docfmt.tap
+0beededd9332f240ce9b70be204fb98d16cb0872adf444a586167b2a258a55d9 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/09-gates-suites.tap
+039802e7dd5cbbaee398b65d74e77acd050f3968931a7448f87865286581ba96 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/10-roles-fixed-suites.tap
+a8202290b8756dc61d82c55bdb70ea120561f997665a6c80f006e8618708eb56 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/11-orch-remaining-suites.tap
+e0b091fed3357c1a1c2cfbdf23b1121e4e83150c7c94c7132fa8d8cd6da39524 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/12-desktop-fixed-suites.tap
+f19431b79e7777383e1ba06fcffbfc87a603390c1e52f3ba46f375b29783b5e3 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/13-legacy-star-i-full-chain.tap
+3086f4d74f77a0f7d0a25447aa81db7ad457572164ed9000c6bf2b5ca32c96c2 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/14-trunk-legacy-suites.tap
+9db8e9cdf22fb17f315e75db6c1640d78ca4912149a99603b4e9c3287aa5dde5 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/15-version-change-knownred.tap
+e47d194e710acff652a5d4154ec761704ce6534ab40605a930726214bdda7c17 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/16-orch-domain-full.tap
+0fae6d30c9ddcf959a681c1d2f1c0d7a94d693ee2dedfaa5f39c1b9eca431073 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/17-optional-acceptance-knownred.tap
+a89b94dd3bb384e15449fbf2fa282c30e43829ec229fe49b649b2dc0248bed49 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/18-legacy-baseline-comparison.txt
+79280e4786962b0ed414f87eb6efd46af317bf369f40024ebea13e322729f659 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/19-legacy-preconditions-module-consumption.tap
+fa1e2a56f71b3ddd83c92c23ead0225f826085ed6750c889af83eacfaa0fc5cc *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/20-orch-knownred-comparison.txt
+10c49b6c214ff66da55ba79028ca6d79af249d20e06be90eac25f8a9997560d6 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/21-gates-domain-full.tap
+e8e2f67319e8887beb95ef97ac1b1b7272db38f9fd23248605576ac051f67a6c *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/22-candidate-hashes.txt
+46aebe4bb4a74bf404d83a816b970258bf1015bac06d07e15c8493c8edce663d *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/23-runtime-core-domain.tap
+50d8eca01588d13e1dca19975464ebe3a798055c1149efae205be94873e5af9b *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/24-roles-domain-full.tap
+7f707ce815575efcccbf6b4bf1297b5d6ec33b9a354698674778c87587406cbe *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/25-shared-domain.tap
+09444be89a1281caca9a361f0f26992ebe87f6a7fa03c76a0cf49626473becbd *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/26-domain-knownred-comparisons.txt
+22d52cc9fc6af45ff16ea0c9c37829064d4d00eac6d144007dc9166796b6a247 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/27-typecheck.txt
+bd54edab27f95c99c6649aeff38fd5baf8066ba2b907f8098a596a556b98b778 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths_evidence/29-ac19-code-scan.txt

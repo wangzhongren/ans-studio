@@ -1,0 +1,550 @@
+TAP version 13
+# Subtest: chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+ok 1 - chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+  ---
+  duration_ms: 1.2514
+  type: 'test'
+  ...
+# Subtest: legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+ok 2 - legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+  ---
+  duration_ms: 0.2841
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+ok 3 - chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+  ---
+  duration_ms: 0.5688
+  type: 'test'
+  ...
+# Subtest: v5 版本：SHELL_RULES_VERSION='5'、ans-default-v5；v4/v3 规则集整条拒绝（fail-closed）
+ok 4 - v5 版本：SHELL_RULES_VERSION='5'、ans-default-v5；v4/v3 规则集整条拒绝（fail-closed）
+  ---
+  duration_ms: 0.727
+  type: 'test'
+  ...
+# Subtest: v4 只读白名单保留：精确只读形态 allow；写形态/未列形态仍硬拒
+ok 5 - v4 只读白名单保留：精确只读形态 allow；写形态/未列形态仍硬拒
+  ---
+  duration_ms: 1.2197
+  type: 'test'
+  ...
+# Subtest: matchTaskGit 允许：add 单文件/多文件/目录、commit -m；摘要确定性且不依赖时钟/随机
+ok 6 - matchTaskGit 允许：add 单文件/多文件/目录、commit -m；摘要确定性且不依赖时钟/随机
+  ---
+  duration_ms: 1.0276
+  type: 'test'
+  ...
+# Subtest: matchTaskGit 拒绝：add flag/-A/--all/./glob/pathspec magic/绝对/..）/.git/路径外/治理写区
+ok 7 - matchTaskGit 拒绝：add flag/-A/--all/./glob/pathspec magic/绝对/..）/.git/路径外/治理写区
+  ---
+  duration_ms: 0.5864
+  type: 'test'
+  ...
+# Subtest: matchTaskGit 拒绝：commit 仅 -m 单形态（-F/amend/no-verify/-a/--author/空 message/多参）
+ok 8 - matchTaskGit 拒绝：commit 仅 -m 单形态（-F/amend/no-verify/-a/--author/空 message/多参）
+  ---
+  duration_ms: 1.0723
+  type: 'test'
+  ...
+# Subtest: taskGitScopeError：无 scope/坏 taskId/坏 workflowId/非任务分支/空写集/治理写集/重复项均拒
+ok 9 - taskGitScopeError：无 scope/坏 taskId/坏 workflowId/非任务分支/空写集/治理写集/重复项均拒
+  ---
+  duration_ms: 0.1837
+  type: 'test'
+  ...
+# Subtest: 分类器：无 taskGitScope 时 add/commit 一律拒（旧 2 参调用逐字保持硬拒）
+ok 10 - 分类器：无 taskGitScope 时 add/commit 一律拒（旧 2 参调用逐字保持硬拒）
+  ---
+  duration_ms: 0.2438
+  type: 'test'
+  ...
+# Subtest: 分类器：合法 scope 的 add/commit allow，规则 id 与审计描述稳定
+ok 11 - 分类器：合法 scope 的 add/commit allow，规则 id 与审计描述稳定
+  ---
+  duration_ms: 0.2984
+  type: 'test'
+  ...
+# Subtest: 普通 Git 拒绝面：push/fetch/pull/remote/tag/merge/rebase/reset/clean/checkout/switch/stash/worktree/submodule/config/update-ref 等硬拒
+ok 12 - 普通 Git 拒绝面：push/fetch/pull/remote/tag/merge/rebase/reset/clean/checkout/switch/stash/worktree/submodule/config/update-ref 等硬拒
+  ---
+  duration_ms: 1.4293
+  type: 'test'
+  ...
+# Subtest: 绕过面：sh -c / bash -c / cmd /c / node -e / awk 等仍硬拒（不经任务级白名单）
+ok 13 - 绕过面：sh -c / bash -c / cmd /c / node -e / awk 等仍硬拒（不经任务级白名单）
+  ---
+  duration_ms: 0.9129
+  type: 'test'
+  ...
+# Subtest: 写守卫 v5：任务级 add/commit 前台 pass（形状级）；无 scope/后台/路径外/普通 Git 硬拒
+ok 14 - 写守卫 v5：任务级 add/commit 前台 pass（形状级）；无 scope/后台/路径外/普通 Git 硬拒
+  ---
+  duration_ms: 0.9268
+  type: 'test'
+  ...
+# Subtest: 审计：ShellGate 对 task-git add/commit allow 与普通 Git deny 各写一行（既有字段不变）
+ok 15 - 审计：ShellGate 对 task-git add/commit allow 与普通 Git deny 各写一行（既有字段不变）
+  ---
+  duration_ms: 2.4889
+  type: 'test'
+  ...
+# Subtest: v4 旧规则回归：四档/硬拒/risky/例行白名单/元字符耦合不变
+ok 16 - v4 旧规则回归：四档/硬拒/risky/例行白名单/元字符耦合不变
+  ---
+  duration_ms: 0.2911
+  type: 'test'
+  ...
+# Subtest: B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状）
+ok 17 - B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状）
+  ---
+  duration_ms: 0.4049
+  type: 'test'
+  ...
+# Subtest: B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例）
+ok 18 - B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例）
+  ---
+  duration_ms: 1.2204
+  type: 'test'
+  ...
+# Subtest: B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变）
+ok 19 - B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变）
+  ---
+  duration_ms: 0.1504
+  type: 'test'
+  ...
+# Subtest: B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段
+ok 20 - B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段
+  ---
+  duration_ms: 0.1002
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy）
+ok 21 - MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy）
+  ---
+  duration_ms: 0.8436
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）
+ok 22 - MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）
+  ---
+  duration_ms: 0.2245
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变
+ok 23 - MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变
+  ---
+  duration_ms: 0.1055
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）
+ok 24 - MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）
+  ---
+  duration_ms: 0.1125
+  type: 'test'
+  ...
+# Subtest: fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed
+ok 25 - fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed
+  ---
+  duration_ms: 0.3021
+  type: 'test'
+  ...
+# Subtest: G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项
+ok 26 - G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项
+  ---
+  duration_ms: 3.6788
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O）
+ok 27 - MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O）
+  ---
+  duration_ms: 0.2777
+  type: 'test'
+  ...
+# Subtest: fixed/legacy 视图入口：缺省 ≡ 显式 legacy-v1（legacy 原样）；fixed 由显式模式选择
+ok 28 - fixed/legacy 视图入口：缺省 ≡ 显式 legacy-v1（legacy 原样）；fixed 由显式模式选择
+  ---
+  duration_ms: 7.3464
+  type: 'test'
+  ...
+# Subtest: fixed 文案：角色 duty/mainChain/约定来自 fixed 视图（不是 legacy `spec.matrix` 回退）
+ok 29 - fixed 文案：角色 duty/mainChain/约定来自 fixed 视图（不是 legacy `spec.matrix` 回退）
+  ---
+  duration_ms: 1.9667
+  type: 'test'
+  ...
+# Subtest: fixed 卡种路由：只读模块 `fixedCards`（缺失 ⇒ 空集 fail-closed；不读 Pipeline legacy 快照）
+ok 30 - fixed 卡种路由：只读模块 `fixedCards`（缺失 ⇒ 空集 fail-closed；不读 Pipeline legacy 快照）
+  ---
+  duration_ms: 0.3669
+  type: 'test'
+  ...
+# Subtest: fixed 派发视图：幕僚/运营分裂（stage-request + verifier；convener 生产线）不出现 legacy 派发/模型/发起路由
+ok 31 - fixed 派发视图：幕僚/运营分裂（stage-request + verifier；convener 生产线）不出现 legacy 派发/模型/发起路由
+  ---
+  duration_ms: 0.2571
+  type: 'test'
+  ...
+# Subtest: fixed 应用规则：客户决定三卡/产品意图/策划/下载可见；不新增客户门（只读展示）
+ok 32 - fixed 应用规则：客户决定三卡/产品意图/策划/下载可见；不新增客户门（只读展示）
+  ---
+  duration_ms: 0.4252
+  type: 'test'
+  ...
+# Subtest: fixed 视图只读：构建不改写注册表/模块；同一输入两次构建逐字一致（无缓存/时钟）
+ok 33 - fixed 视图只读：构建不改写注册表/模块；同一输入两次构建逐字一致（无缓存/时钟）
+  ---
+  duration_ms: 0.4606
+  type: 'test'
+  ...
+# Subtest: status：`[--porcelain[=v1]] [--short|-s] [-- <literal path>…]` → 规范体固定 porcelain=v1 -z
+ok 34 - status：`[--porcelain[=v1]] [--short|-s] [-- <literal path>…]` → 规范体固定 porcelain=v1 -z
+  ---
+  duration_ms: 1.6774
+  type: 'test'
+  ...
+# Subtest: log：`[-<N>] [--oneline] [<full-oid>|HEAD] [-- <literal path>…]`；无目标默认 HEAD（不是 --all）
+ok 35 - log：`[-<N>] [--oneline] [<full-oid>|HEAD] [-- <literal path>…]`；无目标默认 HEAD（不是 --all）
+  ---
+  duration_ms: 0.3612
+  type: 'test'
+  ...
+# Subtest: diff：`[--stat|--name-only|--name-status] [--no-ext-diff] [--no-textconv] [<oid> [<oid>]] [-- <path>…]`
+ok 36 - diff：`[--stat|--name-only|--name-status] [--no-ext-diff] [--no-textconv] [<oid> [<oid>]] [-- <path>…]`
+  ---
+  duration_ms: 0.2066
+  type: 'test'
+  ...
+# Subtest: show：`<full-oid>:<literal path>`（恰好一个）→ 规范体 cat-file blob
+ok 37 - show：`<full-oid>:<literal path>`（恰好一个）→ 规范体 cat-file blob
+  ---
+  duration_ms: 0.1803
+  type: 'test'
+  ...
+# Subtest: rev-parse：`--verify <full-oid|HEAD>` → 规范体补 ^{commit}
+ok 38 - rev-parse：`--verify <full-oid|HEAD>` → 规范体补 ^{commit}
+  ---
+  duration_ms: 0.1111
+  type: 'test'
+  ...
+# Subtest: ls-files：`[--stage] [-z] [-- <path>…]` → 规范体固定 --stage -z
+ok 39 - ls-files：`[--stage] [-z] [-- <path>…]` → 规范体固定 --stage -z
+  ---
+  duration_ms: 0.1235
+  type: 'test'
+  ...
+# Subtest: ls-tree：`[-r] [--full-tree] [<full-oid|HEAD>] [-- <path>…]`；无目标默认 HEAD
+ok 40 - ls-tree：`[-r] [--full-tree] [<full-oid|HEAD>] [-- <path>…]`；无目标默认 HEAD
+  ---
+  duration_ms: 0.1371
+  type: 'test'
+  ...
+# Subtest: merge-base：`<full-oid|HEAD> <full-oid|HEAD>`
+ok 41 - merge-base：`<full-oid|HEAD> <full-oid|HEAD>`
+  ---
+  duration_ms: 0.1396
+  type: 'test'
+  ...
+# Subtest: blame：`[-L <start>,<end>] -- <literal path>`；行号 1..2000、跨度 ≤2000
+ok 42 - blame：`[-L <start>,<end>] -- <literal path>`；行号 1..2000、跨度 ≤2000
+  ---
+  duration_ms: 0.2148
+  type: 'test'
+  ...
+# Subtest: cat-file：`(-t|-s|-e|-p) <oid>` 或 `(blob|commit|tree|tag) <oid>`
+ok 43 - cat-file：`(-t|-s|-e|-p) <oid>` 或 `(blob|commit|tree|tag) <oid>`
+  ---
+  duration_ms: 0.2379
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：全局选项/改变目录或仓库 → 拒（`git` 后第一项必须是子命令）
+ok 44 - 攻击矩阵：全局选项/改变目录或仓库 → 拒（`git` 后第一项必须是子命令）
+  ---
+  duration_ms: 0.7154
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：写盘/外部程序 flag → 拒（--output/-o/--ext-diff/--textconv/--filters/pager）
+ok 45 - 攻击矩阵：写盘/外部程序 flag → 拒（--output/-o/--ext-diff/--textconv/--filters/pager）
+  ---
+  duration_ms: 0.2104
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：任意路径/远程/子模块外部程序与网络子命令 → 拒
+ok 46 - 攻击矩阵：任意路径/远程/子模块外部程序与网络子命令 → 拒
+  ---
+  duration_ms: 0.2049
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：路径攻击（../、绝对路径、.git、:(glob)、通配、反斜杠、控制字符）→ 拒
+ok 47 - 攻击矩阵：路径攻击（../、绝对路径、.git、:(glob)、通配、反斜杠、控制字符）→ 拒
+  ---
+  duration_ms: 0.3357
+  type: 'test'
+  ...
+# Subtest: 边界：OID 必须完整 40/64 hex；短 SHA/revision 表达式/分支名一律拒绝
+ok 48 - 边界：OID 必须完整 40/64 hex；短 SHA/revision 表达式/分支名一律拒绝
+  ---
+  duration_ms: 0.4921
+  type: 'test'
+  ...
+# Subtest: 边界：HEAD 仅允许 log/rev-parse/ls-tree/merge-base 位置（diff/show/cat-file/blame 不接受）
+ok 49 - 边界：HEAD 仅允许 log/rev-parse/ls-tree/merge-base 位置（diff/show/cat-file/blame 不接受）
+  ---
+  duration_ms: 0.1336
+  type: 'test'
+  ...
+# Subtest: 边界：路径必须位于 `--` 之后且为字面项目相对路径；目录尾斜杠允许、重复分隔符拒绝
+ok 50 - 边界：路径必须位于 `--` 之后且为字面项目相对路径；目录尾斜杠允许、重复分隔符拒绝
+  ---
+  duration_ms: 0.1055
+  type: 'test'
+  ...
+# Subtest: 边界：log 行数 / blame 行号上限；重复 flag 与超界拒绝
+ok 51 - 边界：log 行数 / blame 行号上限；重复 flag 与超界拒绝
+  ---
+  duration_ms: 0.2027
+  type: 'test'
+  ...
+# Subtest: 规则集 v5：ans-default-v5、只读白名单保留、v4/v3 规则集整条拒绝（不静默放宽）
+ok 52 - 规则集 v5：ans-default-v5、只读白名单保留、v4/v3 规则集整条拒绝（不静默放宽）
+  ---
+  duration_ms: 0.1263
+  type: 'test'
+  ...
+# Subtest: 差分（重叠模板）：status/log(目标)/diff/show/rev-parse/ls-files/ls-tree(目标)/merge-base 同规范 argv
+ok 53 - 差分（重叠模板）：status/log(目标)/diff/show/rev-parse/ls-files/ls-tree(目标)/merge-base 同规范 argv
+  ---
+  duration_ms: 0.2995
+  type: 'test'
+  ...
+# Subtest: 差分（允许的分叉，逐条记录）：log 默认 HEAD≠--all、--oneline、diff 显示 flag、ls-tree 默认 HEAD、blame/cat-file 新面
+ok 54 - 差分（允许的分叉，逐条记录）：log 默认 HEAD≠--all、--oneline、diff 显示 flag、ls-tree 默认 HEAD、blame/cat-file 新面
+  ---
+  duration_ms: 0.1939
+  type: 'test'
+  ...
+# Subtest: BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状）
+ok 55 - BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状）
+  ---
+  duration_ms: 0.5401
+  type: 'test'
+  ...
+# Subtest: BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段
+ok 56 - BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段
+  ---
+  duration_ms: 0.4097
+  type: 'test'
+  ...
+# Subtest: tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具）
+ok 57 - tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具）
+  ---
+  duration_ms: 0.096
+  type: 'test'
+  ...
+# Subtest: dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望
+ok 58 - dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望
+  ---
+  duration_ms: 0.1002
+  type: 'test'
+  ...
+# Subtest: preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed）
+ok 59 - preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed）
+  ---
+  duration_ms: 0.0902
+  type: 'test'
+  ...
+# Subtest: context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘）
+ok 60 - context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘）
+  ---
+  duration_ms: 0.393
+  type: 'test'
+  ...
+# Subtest: 契约类型只读：运行时不改输入/模块（纯策略无副作用）
+ok 61 - 契约类型只读：运行时不改输入/模块（纯策略无副作用）
+  ---
+  duration_ms: 0.1089
+  type: 'test'
+  ...
+# Subtest: X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除
+ok 62 - X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除
+  ---
+  duration_ms: 0.5834
+  type: 'test'
+  ...
+# Subtest: X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 63 - X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1274
+  type: 'test'
+  ...
+# Subtest: X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 64 - X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1436
+  type: 'test'
+  ...
+# Subtest: X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 65 - X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1115
+  type: 'test'
+  ...
+# Subtest: X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 66 - X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.0736
+  type: 'test'
+  ...
+# Subtest: X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 67 - X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.0564
+  type: 'test'
+  ...
+# Subtest: X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变
+ok 68 - X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变
+  ---
+  duration_ms: 0.3299
+  type: 'test'
+  ...
+# Subtest: D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致
+ok 69 - D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致
+  ---
+  duration_ms: 0.18
+  type: 'test'
+  ...
+# Subtest: D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确
+ok 70 - D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确
+  ---
+  duration_ms: 0.2187
+  type: 'test'
+  ...
+# Subtest: D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id）
+ok 71 - D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id）
+  ---
+  duration_ms: 0.1376
+  type: 'test'
+  ...
+# Subtest: D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判）
+ok 72 - D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判）
+  ---
+  duration_ms: 0.0808
+  type: 'test'
+  ...
+# Subtest: D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环
+ok 73 - D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环
+  ---
+  duration_ms: 0.9088
+  type: 'test'
+  ...
+# Subtest: D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生
+ok 74 - D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生
+  ---
+  duration_ms: 0.0955
+  type: 'test'
+  ...
+# Subtest: B4 再导出同源：classifyShellDetailed/matchTaskGit/runTaskGitCommit 与常量均为同一引用
+ok 75 - B4 再导出同源：classifyShellDetailed/matchTaskGit/runTaskGitCommit 与常量均为同一引用
+  ---
+  duration_ms: 0.883
+  type: 'test'
+  ...
+# Subtest: 公开出口 classifyShellDetailed：注入 taskGitScope 后 add/commit 允许并携带审计描述
+ok 76 - 公开出口 classifyShellDetailed：注入 taskGitScope 后 add/commit 允许并携带审计描述
+  ---
+  duration_ms: 1.4266
+  type: 'test'
+  ...
+# Subtest: 公开出口 classifyShellDetailed：无/非法 scope、flag/非字面/越界/治理写区、commit 形态与普通 Git 均拒绝
+ok 77 - 公开出口 classifyShellDetailed：无/非法 scope、flag/非字面/越界/治理写区、commit 形态与普通 Git 均拒绝
+  ---
+  duration_ms: 0.471
+  type: 'test'
+  ...
+# Subtest: 公开出口 matchTaskGit：add/commit 命中受限描述；无 scope/非白名单恒 undefined；同输入确定性
+ok 78 - 公开出口 matchTaskGit：add/commit 命中受限描述；无 scope/非白名单恒 undefined；同输入确定性
+  ---
+  duration_ms: 0.1935
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：staged ⊆ writeSet ⇒ 同锁内检查并提交，finally 释放
+ok 79 - 公开出口 runTaskGitCommit：staged ⊆ writeSet ⇒ 同锁内检查并提交，finally 释放
+  ---
+  duration_ms: 0.2689
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：锁占用/分支不符/argv 非 commit 形态/scope 非法 ⇒ fail-closed 且不提交
+ok 80 - 公开出口 runTaskGitCommit：锁占用/分支不符/argv 非 commit 形态/scope 非法 ⇒ fail-closed 且不提交
+  ---
+  duration_ms: 0.1675
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：staged 空/非字面/治理写区/越界 ⇒ 不提交且释放锁
+ok 81 - 公开出口 runTaskGitCommit：staged 空/非字面/治理写区/越界 ⇒ 不提交且释放锁
+  ---
+  duration_ms: 0.1909
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：inspectStaged 异常 ⇒ 释放锁后如实抛出（不吞错）
+ok 82 - 公开出口 runTaskGitCommit：inspectStaged 异常 ⇒ 释放锁后如实抛出（不吞错）
+  ---
+  duration_ms: 0.3462
+  type: 'test'
+  ...
+# Subtest: staged 检查 argv 固定为 git diff --cached --name-only -z；NUL 输出解析
+ok 83 - staged 检查 argv 固定为 git diff --cached --name-only -z；NUL 输出解析
+  ---
+  duration_ms: 0.8208
+  type: 'test'
+  ...
+# Subtest: staged 校验：空/非字面/治理写区/越界逐项拒绝，合法子集通过
+ok 84 - staged 校验：空/非字面/治理写区/越界逐项拒绝，合法子集通过
+  ---
+  duration_ms: 0.4942
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：锁在 staged 检查与提交期间均被持有（同一临界区），成功后释放
+ok 85 - runTaskGitCommit：锁在 staged 检查与提交期间均被持有（同一临界区），成功后释放
+  ---
+  duration_ms: 0.7297
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：commit argv 非 -m 单形态/分支不符/scope 非法 ⇒ 取锁前拒绝
+ok 86 - runTaskGitCommit：commit argv 非 -m 单形态/分支不符/scope 非法 ⇒ 取锁前拒绝
+  ---
+  duration_ms: 0.293
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：项目级临界区被占用 ⇒ git-critical-section-busy，未检查/未提交
+ok 87 - runTaskGitCommit：项目级临界区被占用 ⇒ git-critical-section-busy，未检查/未提交
+  ---
+  duration_ms: 0.2377
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：staged 空/越界/治理写区/非字面 ⇒ 稳定码拒绝且不提交（锁释放）
+ok 88 - runTaskGitCommit：staged 空/越界/治理写区/非字面 ⇒ 稳定码拒绝且不提交（锁释放）
+  ---
+  duration_ms: 0.2759
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：inspectStaged/commit 抛错 ⇒ 释放锁后抛出原错误（不吞错）
+ok 89 - runTaskGitCommit：inspectStaged/commit 抛错 ⇒ 释放锁后抛出原错误（不吞错）
+  ---
+  duration_ms: 0.3924
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：并发提交同一项目 ⇒ 第二个 busy，第一个完成后释放
+ok 90 - runTaskGitCommit：并发提交同一项目 ⇒ 第二个 busy，第一个完成后释放
+  ---
+  duration_ms: 0.162
+  type: 'test'
+  ...
+1..90
+# tests 90
+# suites 0
+# pass 90
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1278.528

@@ -1,0 +1,3 @@
+# test/runtime-core known-red comparison (vs 独立验收 B2 pre-RR evidence 23)
+## diff (empty = identical)
+diff_exit=0
