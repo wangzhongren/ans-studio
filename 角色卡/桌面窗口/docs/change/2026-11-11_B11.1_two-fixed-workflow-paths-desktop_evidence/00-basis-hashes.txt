@@ -1,0 +1,12 @@
+# B11.1 依据 hash（实测 sha256）
+
+dda72a2c5f1af7e5a8a5892e0dd33580228d57341453817f33a4ca38be544792 *角色卡/桌面窗口/docs/change/2026-11-11_B8.2_two-fixed-workflow-paths-desktop.md
+a53b44ff3f0405c8632ae040c8a10efc762d769e710002319448c7989c612ad3 *角色卡/桌面窗口/docs/change/2026-11-11_B10.1_two-fixed-workflow-paths-desktop.md
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+
+# RR6 运行根证据（只读源）
+763c2998ce1ff8bd81a6bfec33866bf2d10f0d0e4f34bd2a4d6926605249593b *C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr6-2026-11-11/target/.ans/state/tasks.jsonl
+91e5e7e79f04874590ce36c1b8ac1f2cf512e7b00b7703cc4ca3a396dac7bad1 *C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr6-2026-11-11/userData/ans/diagnostics/ans-diagnostics-2026-11-10.jsonl
+
+注：该诊断文件仍可能被 RR6 运行中的应用追加；上述 hash 为 2026-11-10T23:10Z 取证时点。

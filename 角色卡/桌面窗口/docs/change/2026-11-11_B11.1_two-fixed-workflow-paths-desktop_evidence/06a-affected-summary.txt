@@ -1,0 +1,17 @@
+# affected desktop suite (13 files) before/after
+== before ==
+# tests 125
+# pass 112
+# fail 13
+# cancelled 0
+# skipped 0
+# todo 0
+== after ==
+# tests 125
+# pass 112
+# fail 13
+# cancelled 0
+# skipped 0
+# todo 0
+
+failure-name diff: before-only/after-only = none (09-affected-failnames-diff.txt empty)

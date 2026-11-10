@@ -1,0 +1,30 @@
+# new tests (after, 04/04b/04c)
+== 04 ==
+# tests 4
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+== 04b ==
+# tests 4
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+== 04c ==
+# tests 4
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+
+# before (baseline code, same test bytes)
+# tests 4
+# pass 2
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0

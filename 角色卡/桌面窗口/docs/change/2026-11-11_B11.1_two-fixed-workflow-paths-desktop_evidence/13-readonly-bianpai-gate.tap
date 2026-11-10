@@ -1,0 +1,934 @@
+TAP version 13
+# Subtest: 首次 fixed 启动顺序：B1 启用闸在显式写 workflowSchema 前不启用（死锁点）→ 助手写回后 fixed 放行
+ok 1 - 首次 fixed 启动顺序：B1 启用闸在显式写 workflowSchema 前不启用（死锁点）→ 助手写回后 fixed 放行
+  ---
+  duration_ms: 7.2199
+  type: 'test'
+  ...
+# Subtest: 显式 legacy/v1：助手不覆盖配置，返回 legacy（B3 不得按 fixed 派发）
+ok 2 - 显式 legacy/v1：助手不覆盖配置，返回 legacy（B3 不得按 fixed 派发）
+  ---
+  duration_ms: 6.1046
+  type: 'test'
+  ...
+# Subtest: project.json 坏文件：助手 fail-closed project-config-write-failed（不覆盖、不猜 fixed）
+ok 3 - project.json 坏文件：助手 fail-closed project-config-write-failed（不覆盖、不猜 fixed）
+  ---
+  duration_ms: 2.7852
+  type: 'test'
+  ...
+# Subtest: per-flow 不缓存：同一进程内按实际 flowId 逐次解析（legacy 在飞 flow 保持 legacy，新 flow fixed）
+ok 4 - per-flow 不缓存：同一进程内按实际 flowId 逐次解析（legacy 在飞 flow 保持 legacy，新 flow fixed）
+  ---
+  duration_ms: 18.5862
+  type: 'test'
+  ...
+# Subtest: 空项目：无 workflow、无 legacyStateIgnored 警告
+ok 5 - 空项目：无 workflow、无 legacyStateIgnored 警告
+  ---
+  duration_ms: 6.167
+  type: 'test'
+  ...
+# Subtest: 活动 fixed workflow：视图/阶段/reviewRoleId/activated + 旧 trunk/run 状态列为 legacyStateIgnored
+ok 6 - 活动 fixed workflow：视图/阶段/reviewRoleId/activated + 旧 trunk/run 状态列为 legacyStateIgnored
+  ---
+  duration_ms: 32.2852
+  type: 'test'
+  ...
+# Subtest: 坏账本（workflow-corrupt）⇒ 投影警告如实列出，不按成功处理
+ok 7 - 坏账本（workflow-corrupt）⇒ 投影警告如实列出，不按成功处理
+  ---
+  duration_ms: 10.7687
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 8 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 19.8239
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 9 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 13.607
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 10 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 10.123
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 11 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 3.6552
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 12 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 4.1116
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 13 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 0.8039
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 14 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 4.8371
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 15 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 24.228
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 16 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 9.0936
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 17 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 12.7862
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 18 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 9.9911
+  type: 'test'
+  ...
+# Subtest: fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+ok 19 - fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+  ---
+  duration_ms: 80.7043
+  type: 'test'
+  ...
+# Subtest: fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+ok 20 - fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+  ---
+  duration_ms: 29.0845
+  type: 'test'
+  ...
+# Subtest: legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+ok 21 - legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+  ---
+  duration_ms: 25.1757
+  type: 'test'
+  ...
+# Subtest: fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+ok 22 - fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+  ---
+  duration_ms: 16.6292
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+ok 23 - fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+  ---
+  duration_ms: 32.9371
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+ok 24 - legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+  ---
+  duration_ms: 27.0673
+  type: 'test'
+  ...
+# Subtest: fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+ok 25 - fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+  ---
+  duration_ms: 125.2104
+  type: 'test'
+  ...
+# Subtest: fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt
+ok 26 - fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt
+  ---
+  duration_ms: 33.471
+  type: 'test'
+  ...
+# Subtest: fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+ok 27 - fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+  ---
+  duration_ms: 9.2262
+  type: 'test'
+  ...
+# Subtest: legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+ok 28 - legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+  ---
+  duration_ms: 4.2525
+  type: 'test'
+  ...
+# Subtest: fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+ok 29 - fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+  ---
+  duration_ms: 11.4553
+  type: 'test'
+  ...
+# Subtest: fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+ok 30 - fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+  ---
+  duration_ms: 22.6842
+  type: 'test'
+  ...
+# Subtest: workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+ok 31 - workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+  ---
+  duration_ms: 6.1886
+  type: 'test'
+  ...
+# Subtest: 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+ok 32 - 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+  ---
+  duration_ms: 0.9518
+  type: 'test'
+  ...
+# Subtest: workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+ok 33 - workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+  ---
+  duration_ms: 10.0329
+  type: 'test'
+  ...
+# Subtest: 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+ok 34 - 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+  ---
+  duration_ms: 21.4843
+  type: 'test'
+  ...
+# Subtest: stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+ok 35 - stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+  ---
+  duration_ms: 7.1262
+  type: 'test'
+  ...
+# Subtest: review task data: the single Model host reference survives replay; forged authority fields fail shape validation
+ok 36 - review task data: the single Model host reference survives replay; forged authority fields fail shape validation
+  ---
+  duration_ms: 1.8565
+  type: 'test'
+  ...
+# Subtest: chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append
+ok 37 - chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append
+  ---
+  duration_ms: 13.7009
+  type: 'test'
+  ...
+# Subtest: append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed
+ok 38 - append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed
+  ---
+  duration_ms: 21.4009
+  type: 'test'
+  ...
+# Subtest: 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放
+ok 39 - 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放
+  ---
+  duration_ms: 12.8804
+  type: 'test'
+  ...
+# Subtest: 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行
+ok 40 - 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行
+  ---
+  duration_ms: 0.5141
+  type: 'test'
+  ...
+# Subtest: 副作用分类：缺填/非法⇒unknown；应用只升不降
+ok 41 - 副作用分类：缺填/非法⇒unknown；应用只升不降
+  ---
+  duration_ms: 0.85
+  type: 'test'
+  ...
+# Subtest: 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计）
+ok 42 - 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计）
+  ---
+  duration_ms: 5.1744
+  type: 'test'
+  ...
+# Subtest: 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务
+ok 43 - 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务
+  ---
+  duration_ms: 11.9603
+  type: 'test'
+  ...
+# Subtest: 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实
+ok 44 - 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实
+  ---
+  duration_ms: 0.5358
+  type: 'test'
+  ...
+# Subtest: task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读
+ok 45 - task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读
+  ---
+  duration_ms: 18.8602
+  type: 'test'
+  ...
+# Subtest: task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）
+ok 46 - task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）
+  ---
+  duration_ms: 16.8737
+  type: 'test'
+  ...
+# Subtest: doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读
+ok 47 - doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读
+  ---
+  duration_ms: 8.5449
+  type: 'test'
+  ...
+# Subtest: request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行
+ok 48 - request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行
+  ---
+  duration_ms: 18.1773
+  type: 'test'
+  ...
+# Subtest: task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝
+ok 49 - task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝
+  ---
+  duration_ms: 6.985
+  type: 'test'
+  ...
+# Subtest: R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放
+ok 50 - R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放
+  ---
+  duration_ms: 6.4836
+  type: 'test'
+  ...
+# Subtest: P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变
+ok 51 - P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变
+  ---
+  duration_ms: 9.1076
+  type: 'test'
+  ...
+# Subtest: P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞
+ok 52 - P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞
+  ---
+  duration_ms: 7.2766
+  type: 'test'
+  ...
+# Subtest: P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）
+ok 53 - P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）
+  ---
+  duration_ms: 10.5174
+  type: 'test'
+  ...
+# Subtest: Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）
+ok 54 - Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）
+  ---
+  duration_ms: 12.6741
+  type: 'test'
+  ...
+# Subtest: S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行
+ok 55 - S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行
+  ---
+  duration_ms: 9.4069
+  type: 'test'
+  ...
+# Subtest: recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+ok 56 - recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+  ---
+  duration_ms: 114.2758
+  type: 'test'
+  ...
+# Subtest: 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+ok 57 - 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+  ---
+  duration_ms: 116.7618
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+ok 58 - path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+  ---
+  duration_ms: 18.9689
+  type: 'test'
+  ...
+# Subtest: basis.amended：出新 -vN ⇒ 追加修正记录（previousBasisId 指向旧 basis，旧记录保留）；同幂等键 replay；verify 改用新版
+ok 59 - basis.amended：出新 -vN ⇒ 追加修正记录（previousBasisId 指向旧 basis，旧记录保留）；同幂等键 replay；verify 改用新版
+  ---
+  duration_ms: 72.4221
+  type: 'test'
+  ...
+# Subtest: amendBasis 负例：同路径改字节 ⇒ basis.drift + basis-hash-mismatch；plan hash 不符/未知或过期 previous/flowId 不符/无变化/关闭 ⇒ fail-closed
+ok 60 - amendBasis 负例：同路径改字节 ⇒ basis.drift + basis-hash-mismatch；plan hash 不符/未知或过期 previous/flowId 不符/无变化/关闭 ⇒ fail-closed
+  ---
+  duration_ms: 96.8046
+  type: 'test'
+  ...
+# Subtest: basis.verified 节流：关键门一致只记一次（同 basis+同 digest）；普通读取不记账；新 basis 追加；不是写权/批准
+ok 61 - basis.verified 节流：关键门一致只记一次（同 basis+同 digest）；普通读取不记账；新 basis 追加；不是写权/批准
+  ---
+  duration_ms: 51.474
+  type: 'test'
+  ...
+# Subtest: drift 阻断关键门 A11/B1/B3/A12a/A12b/A13/B4：fail-closed + basis.drift 只记一次；恢复后重新校验通过
+ok 62 - drift 阻断关键门 A11/B1/B3/A12a/A12b/A13/B4：fail-closed + basis.drift 只记一次；恢复后重新校验通过
+  ---
+  duration_ms: 44.5965
+  type: 'test'
+  ...
+# Subtest: A12a/A12b 直派（chief→verifier）可调用：verifyBasisForStage 一致 ⇒ verified；drift ⇒ 阻塞完成（不触 trunk/CAS）
+ok 63 - A12a/A12b 直派（chief→verifier）可调用：verifyBasisForStage 一致 ⇒ verified；drift ⇒ 阻塞完成（不触 trunk/CAS）
+  ---
+  duration_ms: 236.0338
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照修正：basis.amended 采用现存文档快照（缺失允许、无团队计划），不产生写权
+ok 64 - path-b 只读快照修正：basis.amended 采用现存文档快照（缺失允许、无团队计划），不产生写权
+  ---
+  duration_ms: 16.1944
+  type: 'test'
+  ...
+# Subtest: 非法 stage：verifyBasisForStage 拒绝（stage-transition-invalid），不读/写账本
+ok 65 - 非法 stage：verifyBasisForStage 拒绝（stage-transition-invalid），不读/写账本
+  ---
+  duration_ms: 27.5945
+  type: 'test'
+  ...
+# Subtest: closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+ok 66 - closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+  ---
+  duration_ms: 39.5284
+  type: 'test'
+  ...
+# Subtest: A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+ok 67 - A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+  ---
+  duration_ms: 105.4911
+  type: 'test'
+  ...
+# Subtest: prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+ok 68 - prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+  ---
+  duration_ms: 38.5094
+  type: 'test'
+  ...
+# Subtest: activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+ok 69 - activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+  ---
+  duration_ms: 35.4594
+  type: 'test'
+  ...
+# Subtest: archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+ok 70 - archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+  ---
+  duration_ms: 17.3404
+  type: 'test'
+  ...
+# Subtest: convener→product/rapporteur/nominator（内置，生产）允许；fixed 常量恰为三项
+ok 71 - convener→product/rapporteur/nominator（内置，生产）允许；fixed 常量恰为三项
+  ---
+  duration_ms: 0.9759
+  type: 'test'
+  ...
+# Subtest: convener→verifier 拒绝 convener-to-verifier-forbidden；convener→chief/su 拒绝 convener-target-forbidden（自身= self-dispatch）
+ok 72 - convener→verifier 拒绝 convener-to-verifier-forbidden；convener→chief/su 拒绝 convener-target-forbidden（自身= self-dispatch）
+  ---
+  duration_ms: 0.5291
+  type: 'test'
+  ...
+# Subtest: convener→项目角色：targetExists 时必须绑定 open stage-request；缺省/已关闭/错创建者均拒绝
+ok 73 - convener→项目角色：targetExists 时必须绑定 open stage-request；缺省/已关闭/错创建者均拒绝
+  ---
+  duration_ms: 0.0887
+  type: 'test'
+  ...
+# Subtest: convener 生产派发 Q6：无证据/来源已变/缺幂等/assigned-task 缺失或不匹配 ⇒ fail-closed
+ok 74 - convener 生产派发 Q6：无证据/来源已变/缺幂等/assigned-task 缺失或不匹配 ⇒ fail-closed
+  ---
+  duration_ms: 0.1613
+  type: 'test'
+  ...
+# Subtest: chief→verifier（前置/验收）允许；chief→product/rapporteur/nominator ⇒ chief-production-dispatch-forbidden
+ok 75 - chief→verifier（前置/验收）允许；chief→product/rapporteur/nominator ⇒ chief-production-dispatch-forbidden
+  ---
+  duration_ms: 0.1023
+  type: 'test'
+  ...
+# Subtest: chief→项目角色仅 MF-10 窄例外：reviewRoleId+roster review+basis 一致+已激活；其余 chief-to-project-forbidden
+ok 76 - chief→项目角色仅 MF-10 窄例外：reviewRoleId+roster review+basis 一致+已激活；其余 chief-to-project-forbidden
+  ---
+  duration_ms: 0.1493
+  type: 'test'
+  ...
+# Subtest: chief→convener 仅 stage-request：read-only、无 module/写集、sourceTaskId 必填；其余拒绝
+ok 77 - chief→convener 仅 stage-request：read-only、无 module/写集、sourceTaskId 必填；其余拒绝
+  ---
+  duration_ms: 0.1288
+  type: 'test'
+  ...
+# Subtest: self/unknown-source/目标类别缺失/目标不存在 ⇒ 稳定拒绝码
+ok 78 - self/unknown-source/目标类别缺失/目标不存在 ⇒ 稳定拒绝码
+  ---
+  duration_ms: 0.0728
+  type: 'test'
+  ...
+# Subtest: 幂等键形态：advance 统一 stage-request:<wf>:<stage>:<attempt>；stop 独立 stage-stop（G-4）
+ok 79 - 幂等键形态：advance 统一 stage-request:<wf>:<stage>:<attempt>；stop 独立 stage-stop（G-4）
+  ---
+  duration_ms: 0.6498
+  type: 'test'
+  ...
+# Subtest: append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+ok 80 - append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+  ---
+  duration_ms: 36.9865
+  type: 'test'
+  ...
+# Subtest: 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+ok 81 - 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+  ---
+  duration_ms: 7.6698
+  type: 'test'
+  ...
+# Subtest: 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+ok 82 - 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+  ---
+  duration_ms: 11.0454
+  type: 'test'
+  ...
+# Subtest: 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+ok 83 - 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+  ---
+  duration_ms: 2.4311
+  type: 'test'
+  ...
+# Subtest: 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+ok 84 - 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+  ---
+  duration_ms: 0.5429
+  type: 'test'
+  ...
+# Subtest: per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+ok 85 - per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+  ---
+  duration_ms: 15.8364
+  type: 'test'
+  ...
+# Subtest: legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+ok 86 - legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+  ---
+  duration_ms: 16.3758
+  type: 'test'
+  ...
+# Subtest: 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+ok 87 - 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+  ---
+  duration_ms: 11.3838
+  type: 'test'
+  ...
+# Subtest: 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+ok 88 - 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+  ---
+  duration_ms: 2.5626
+  type: 'test'
+  ...
+# Subtest: writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+ok 89 - writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+  ---
+  duration_ms: 26.6409
+  type: 'test'
+  ...
+# Subtest: ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+ok 90 - ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+  ---
+  duration_ms: 23.5567
+  type: 'test'
+  ...
+# Subtest: team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+ok 91 - team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+  ---
+  duration_ms: 7.0842
+  type: 'test'
+  ...
+# Subtest: 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+ok 92 - 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+  ---
+  duration_ms: 3.4473
+  type: 'test'
+  ...
+# Subtest: 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+ok 93 - 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+  ---
+  duration_ms: 1.2166
+  type: 'test'
+  ...
+# Subtest: 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+ok 94 - 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+  ---
+  duration_ms: 9.3234
+  type: 'test'
+  ...
+# Subtest: 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+ok 95 - 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+  ---
+  duration_ms: 25.6967
+  type: 'test'
+  ...
+# Subtest: 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+ok 96 - 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+  ---
+  duration_ms: 47.9173
+  type: 'test'
+  ...
+# Subtest: 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+ok 97 - 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+  ---
+  duration_ms: 0.5819
+  type: 'test'
+  ...
+# Subtest: D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+ok 98 - D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+  ---
+  duration_ms: 0.2641
+  type: 'test'
+  ...
+# Subtest: 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+ok 99 - 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+  ---
+  duration_ms: 0.7284
+  type: 'test'
+  ...
+# Subtest: 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+ok 100 - 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+  ---
+  duration_ms: 0.1745
+  type: 'test'
+  ...
+# Subtest: 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+ok 101 - 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+  ---
+  duration_ms: 0.0747
+  type: 'test'
+  ...
+# Subtest: 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+ok 102 - 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+  ---
+  duration_ms: 0.0732
+  type: 'test'
+  ...
+# Subtest: 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+ok 103 - 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+  ---
+  duration_ms: 2.0338
+  type: 'test'
+  ...
+# Subtest: env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+ok 104 - env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+  ---
+  duration_ms: 1.378
+  type: 'test'
+  ...
+# Subtest: 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+ok 105 - 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+  ---
+  duration_ms: 3.8178
+  type: 'test'
+  ...
+# Subtest: envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+ok 106 - envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+  ---
+  duration_ms: 1.3174
+  type: 'test'
+  ...
+# Subtest: 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+ok 107 - 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+  ---
+  duration_ms: 0.6358
+  type: 'test'
+  ...
+# Subtest: 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+ok 108 - 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+  ---
+  duration_ms: 0.1913
+  type: 'test'
+  ...
+# Subtest: R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+ok 109 - R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+  ---
+  duration_ms: 0.0624
+  type: 'test'
+  ...
+# Subtest: targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+ok 110 - targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+  ---
+  duration_ms: 0.0969
+  type: 'test'
+  ...
+# Subtest: evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+ok 111 - evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+  ---
+  duration_ms: 0.0938
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+ok 112 - AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+  ---
+  duration_ms: 0.8184
+  type: 'test'
+  ...
+# Subtest: AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+ok 113 - AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+  ---
+  duration_ms: 0.1398
+  type: 'test'
+  ...
+# Subtest: AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+ok 114 - AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+  ---
+  duration_ms: 0.1227
+  type: 'test'
+  ...
+# Subtest: AC-18：roster schema 文本含三条警告与占位 omissionReason
+ok 115 - AC-18：roster schema 文本含三条警告与占位 omissionReason
+  ---
+  duration_ms: 0.0475
+  type: 'test'
+  ...
+# Subtest: AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 116 - AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 7.429
+  type: 'test'
+  ...
+# Subtest: AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 117 - AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 3.7251
+  type: 'test'
+  ...
+# Subtest: AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+ok 118 - AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+  ---
+  duration_ms: 1.9624
+  type: 'test'
+  ...
+# Subtest: AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+ok 119 - AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+  ---
+  duration_ms: 46.0136
+  type: 'test'
+  ...
+# Subtest: 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+ok 120 - 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+  ---
+  duration_ms: 35.1649
+  type: 'test'
+  ...
+# Subtest: 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+ok 121 - 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+  ---
+  duration_ms: 1.8509
+  type: 'test'
+  ...
+# Subtest: open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+ok 122 - open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+  ---
+  duration_ms: 37.5895
+  type: 'test'
+  ...
+# Subtest: 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+ok 123 - 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+  ---
+  duration_ms: 108.0889
+  type: 'test'
+  ...
+# Subtest: A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+ok 124 - A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+  ---
+  duration_ms: 35.7226
+  type: 'test'
+  ...
+# Subtest: 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+ok 125 - 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+  ---
+  duration_ms: 7.2623
+  type: 'test'
+  ...
+# Subtest: stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+ok 126 - stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+  ---
+  duration_ms: 54.3207
+  type: 'test'
+  ...
+# Subtest: AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+ok 127 - AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+  ---
+  duration_ms: 19.7897
+  type: 'test'
+  ...
+# Subtest: 合法推进 A1→A10：逐阶段 requested+completed；A10 完成后 nextStages = A11/A12a
+ok 128 - 合法推进 A1→A10：逐阶段 requested+completed；A10 完成后 nextStages = A11/A12a
+  ---
+  duration_ms: 1.64
+  type: 'test'
+  ...
+# Subtest: A10 未完成发 A11 ⇒ workflow-corrupt（不猜、不推进）
+ok 129 - A10 未完成发 A11 ⇒ workflow-corrupt（不猜、不推进）
+  ---
+  duration_ms: 0.2735
+  type: 'test'
+  ...
+# Subtest: A12a（criteria 可先派）→A11→A12b（report）→A12 聚合→A13 顺序合法
+ok 130 - A12a（criteria 可先派）→A11→A12b（report）→A12 聚合→A13 顺序合法
+  ---
+  duration_ms: 0.1883
+  type: 'test'
+  ...
+# Subtest: A12b rework 回 A11（MF-IR-1：stage=A11、reworkOf=A12b）：新 attempt 合法，来源阶段标记 failed
+ok 131 - A12b rework 回 A11（MF-IR-1：stage=A11、reworkOf=A12b）：新 attempt 合法，来源阶段标记 failed
+  ---
+  duration_ms: 0.2164
+  type: 'test'
+  ...
+# Subtest: rework 方向错误（旧 B0 语义：stage=来源、reworkOf=目标）⇒ workflow-corrupt（不静默反转）
+ok 132 - rework 方向错误（旧 B0 语义：stage=来源、reworkOf=目标）⇒ workflow-corrupt（不静默反转）
+  ---
+  duration_ms: 0.1441
+  type: 'test'
+  ...
+# Subtest: 幂等键重复只计一次；形状非法事件计数跳过；身份不一致/缺失 started ⇒ workflow-corrupt
+ok 133 - 幂等键重复只计一次；形状非法事件计数跳过；身份不一致/缺失 started ⇒ workflow-corrupt
+  ---
+  duration_ms: 0.1993
+  type: 'test'
+  ...
+# Subtest: stop 骨架：stop-requested ⇒ stopping；stop-unconfirmed ⇒ blocked；closed stopped 终态且 nextStages 空
+ok 134 - stop 骨架：stop-requested ⇒ stopping；stop-unconfirmed ⇒ blocked；closed stopped 终态且 nextStages 空
+  ---
+  duration_ms: 0.2323
+  type: 'test'
+  ...
+# Subtest: 任务事件补充：fixed task.created 将 A1 标记完成（A1/A4/A7 完成于任务创建）
+ok 135 - 任务事件补充：fixed task.created 将 A1 标记完成（A1/A4/A7 完成于任务创建）
+  ---
+  duration_ms: 0.2328
+  type: 'test'
+  ...
+# Subtest: B 路径骨架：B1→B2（scope-decided）→B3→B4；B2 rework 回 B1
+ok 136 - B 路径骨架：B1→B2（scope-decided）→B3→B4；B2 rework 回 B1
+  ---
+  duration_ms: 0.2363
+  type: 'test'
+  ...
+# Subtest: stage.blocked 记录 code/summary 且不推进；未知阶段值不进入视图
+ok 137 - stage.blocked 记录 code/summary 且不推进；未知阶段值不进入视图
+  ---
+  duration_ms: 0.1895
+  type: 'test'
+  ...
+# Subtest: A3(revise)/A6(revise) rework：stage=回落目标、reworkOf=被返工阶段（MF-IR-1/G-17）
+ok 138 - A3(revise)/A6(revise) rework：stage=回落目标、reworkOf=被返工阶段（MF-IR-1/G-17）
+  ---
+  duration_ms: 0.1354
+  type: 'test'
+  ...
+# Subtest: stop 不变量：未 stop-requested 的 stop-unconfirmed ⇒ corrupt；重复 stop-requested ⇒ corrupt；阶段不匹配 ⇒ corrupt
+ok 139 - stop 不变量：未 stop-requested 的 stop-unconfirmed ⇒ corrupt；重复 stop-requested ⇒ corrupt；阶段不匹配 ⇒ corrupt
+  ---
+  duration_ms: 0.1079
+  type: 'test'
+  ...
+# Subtest: stopped 关闭必须有停稳证据（请求 closed + 运营报告 + 无 open 生产任务），否则 corrupt
+ok 140 - stopped 关闭必须有停稳证据（请求 closed + 运营报告 + 无 open 生产任务），否则 corrupt
+  ---
+  duration_ms: 0.093
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+ok 141 - chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+  ---
+  duration_ms: 1.7328
+  type: 'test'
+  ...
+# Subtest: legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+ok 142 - legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+  ---
+  duration_ms: 0.2704
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+ok 143 - chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+  ---
+  duration_ms: 0.3668
+  type: 'test'
+  ...
+# Subtest: T31：空项目 + 操作者 bootstrap → su 的边界为项目根治理种子（普通目录，accepted，source=操作者指令）
+ok 144 - T31：空项目 + 操作者 bootstrap → su 的边界为项目根治理种子（普通目录，accepted，source=操作者指令）
+  ---
+  duration_ms: 1.0126
+  type: 'test'
+  ...
+# Subtest: T15：创世只作用于**内置治理角色**；项目角色不受益（仍回退内置未接受）
+ok 145 - T15：创世只作用于**内置治理角色**；项目角色不受益（仍回退内置未接受）
+  ---
+  duration_ms: 0.1232
+  type: 'test'
+  ...
+# Subtest: T15：genesisBootstrap.source 为空 → 边界 accepted 但 F6 仍拒一切写（fail-closed）
+ok 146 - T15：genesisBootstrap.source 为空 → 边界 accepted 但 F6 仍拒一切写（fail-closed）
+  ---
+  duration_ms: 0.3934
+  type: 'test'
+  ...
+# Subtest: T31 要害：genesisBootstrap 设、scope:undefined → su 对 角色卡/<任意新角色>/…、docs/…、.ans/project.json 判 allowed
+ok 147 - T31 要害：genesisBootstrap 设、scope:undefined → su 对 角色卡/<任意新角色>/…、docs/…、.ans/project.json 判 allowed
+  ---
+  duration_ms: 2.2843
+  type: 'test'
+  ...
+# Subtest: T31 负面：scope:undefined → src/**、项目根外、README.md/package.json 一律拒
+ok 148 - T31 负面：scope:undefined → src/**、项目根外、README.md/package.json 一律拒
+  ---
+  duration_ms: 3.1041
+  type: 'test'
+  ...
+# Subtest: T31 回归：不设 genesisBootstrap → su 仍回退内置未接受边界（skill 根），拒一切写
+ok 149 - T31 回归：不设 genesisBootstrap → su 仍回退内置未接受边界（skill 根），拒一切写
+  ---
+  duration_ms: 0.2543
+  type: 'test'
+  ...
+# Subtest: T31 自终止：项目治理边界写出并 pin 后，genesisBootstrap 残留也不再生效（项目覆盖接管）
+ok 150 - T31 自终止：项目治理边界写出并 pin 后，genesisBootstrap 残留也不再生效（项目覆盖接管）
+  ---
+  duration_ms: 10.1594
+  type: 'test'
+  ...
+# Subtest: T31 自终止（对照）：同项目**不设** genesisBootstrap 时结果一致——证明创世非放行因素
+ok 151 - T31 自终止（对照）：同项目**不设** genesisBootstrap 时结果一致——证明创世非放行因素
+  ---
+  duration_ms: 1.5131
+  type: 'test'
+  ...
+# Subtest: T31 留痕：acceptance.source 携操作者指令，且 scope:undefined 下 docs/bootstrap-manifest.md 可写
+ok 152 - T31 留痕：acceptance.source 携操作者指令，且 scope:undefined 下 docs/bootstrap-manifest.md 可写
+  ---
+  duration_ms: 0.5409
+  type: 'test'
+  ...
+# Subtest: shell 审批：allow:true 才放行；false/缺字段拒绝；未知 id expired
+ok 153 - shell 审批：allow:true 才放行；false/缺字段拒绝；未知 id expired
+  ---
+  duration_ms: 1.7469
+  type: 'test'
+  ...
+# Subtest: shell 审批：rejectAllPending 全部拒绝；presenter 抛错抛给通道（不静默放行）
+ok 154 - shell 审批：rejectAllPending 全部拒绝；presenter 抛错抛给通道（不静默放行）
+  ---
+  duration_ms: 0.4884
+  type: 'test'
+  ...
+1..154
+# tests 154
+# suites 0
+# pass 154
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6086.9428

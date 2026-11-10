@@ -1,0 +1,1 @@
+6dbbd733373faf8c688544297a78eead39c9776b39bb86fd556771aed78e7881 *角色卡/桌面窗口/docs/change/2026-11-11_B11.1_two-fixed-workflow-paths-desktop.md

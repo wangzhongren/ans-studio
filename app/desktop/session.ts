@@ -5338,13 +5338,18 @@ export class SessionManager {
    * child `parentTaskRef`/run，会把 fixed 生产任务的回交误判 `delivery-child-source-invalid`）：
    * child 真实存在且带 `workflowId`、回交角色 = 受派人、创建者 = 回交目标、workflow 存在且未关闭。
    * 任一项不满足 ⇒ 不可投递（调用方 fail-closed 诊断，不误投）。
+   *
+   * T3 B11.1（2026-11-11，RR6 根因「已封口 child 的回交仍排队并反复阻塞」）：child **已收口**
+   * （`record.closed !== undefined`）是**可判定的终态**，不是「不可核验」——返回 `ok:true, closed:true`，
+   * 由调用方丢弃该回交成员并继续 drain（不投递、不阻塞后续回交；也不伪造 task.delivered/report）。
+   * 其余校验（存在性/角色/创建者/flowId/workflow 账本）逐字不变。
    */
   private async inspectFixedHandbackChild(
     projectRoot: string,
     handback: TaskHandback,
     recipientRoleId: string,
     expectedFlowId: string | undefined,
-  ): Promise<{ ok: true; taskId: string; workflowId: string } | { ok: false; message: string }> {
+  ): Promise<{ ok: true; taskId: string; workflowId: string; closed: boolean } | { ok: false; message: string }> {
     const taskId = typeof handback.taskId === "string" ? handback.taskId.trim() : "";
     if (taskId === "") return { ok: false, message: "回交缺少任务 id（无法按任务账本核对）" };
     const state = await this.readTasks(projectRoot);
@@ -5367,7 +5372,8 @@ export class SessionManager {
       return { ok: false, message: `任务 ${taskId} 的 flow（${created.flowId ?? "（无）"}）与投递条目（${expectedFlowId}）不一致` };
     }
     if (record.closed !== undefined) {
-      return { ok: false, message: `任务 ${taskId} 已收口（${record.closed.outcome}），不再投递回交` };
+      // T3 B11.1（RR6）：已收口固定子任务 = 可判定终态（丢弃该回交成员），不得误判为「不可投递」反复阻塞队列。
+      return { ok: true, taskId, workflowId: created.workflowId, closed: true };
     }
     const ledger = await readWorkflowLedger(projectRoot);
     const scoped = ledger.events.filter((event) => event.workflowId === created.workflowId);
@@ -5381,7 +5387,7 @@ export class SessionManager {
     if (view.closed !== undefined) {
       return { ok: false, message: `任务 ${taskId} 的 workflow ${created.workflowId} 已关闭（${view.closed.outcome}）` };
     }
-    return { ok: true, taskId, workflowId: created.workflowId };
+    return { ok: true, taskId, workflowId: created.workflowId, closed: false };
   }
 
   /** B 批：追加任务事件；失败只记诊断并返回 false（调用方决定是否 fail-closed）。 */
@@ -12883,10 +12889,15 @@ ${formatted}` };
       let selected: DeliveryAssignment | undefined;
       let sawFixedChild = false;
       let sawLegacyChild = false;
+      let droppedClosedFixed = 0;
+      const deliverable: DeliveryItem[] = [];
       // T3 B8.2（2026-11-11，RR3/B8.1 披露）：fixed 子任务回交（`task.created.workflowId` 命名空间）只按
       // tasks/workflows 账本事实校验并投递，**不调用** legacy `resolveDeliveryAssignment`（后者要求 child
       // `parentTaskRef`/run，会把 fixed 生产任务回交误判 `delivery-child-source-invalid`）。legacy 子任务
       // （无 workflowId）逐字走下方原解析（旧行为不变）。fixed 校验不通过 ⇒ fail-closed 诊断、不误投。
+      // T3 B11.1（2026-11-11，RR6 根因）：fixed 子任务**已收口**（`task.closed`）⇒ 该回交成员是确定终态，
+      // 丢弃并继续 drain（诊断 `delivery.skip.fixed-child-closed`；不投递、不阻塞后续条目、不伪造
+      // task.delivered/report）。open fixed child 照常投递；legacy 路径逐字不变。
       const childState = await this.readTasks(projectRoot);
       for (const member of members) {
         if (!member.handback?.taskId) {
@@ -12904,7 +12915,14 @@ ${formatted}` };
               `固定任务回交未投递（安全校验未通过，消息已保留）：${verified.message}。`);
             return false;
           }
+          if (verified.closed) {
+            // 已收口 fixed 子任务：跳过该成员（不投递、不写任何任务事件），继续处理其余成员/后续队列。
+            droppedClosedFixed += 1;
+            diagnostic.record("delivery.skip.fixed-child-closed", { taskId: verified.taskId, workflowId: verified.workflowId });
+            continue;
+          }
           sawFixedChild = true;
+          deliverable.push(member);
           continue;
         }
         sawLegacyChild = true;
@@ -12924,9 +12942,35 @@ ${formatted}` };
           return false;
         }
         selected = actual.value;
+        deliverable.push(member);
+      }
+      if (droppedClosedFixed > 0) {
+        if (deliverable.length === 0) {
+          // 整条回交的成员全部是已收口 fixed 子任务 ⇒ 丢弃队列项并继续 drain（不阻塞后续回交）。
+          const index = q.indexOf(item); if (index !== -1) q.splice(index, 1);
+          if (q.length === 0) this.deliveryQueues.delete(key);
+          this.notifyRoleState(projectRoot, resolvedTarget, runtime);
+          this.persistDeliveryQueues();
+          void this.drainQueue(projectRoot, resolvedTarget, runtime); // 继续处理后续条目（不因丢弃一条而停滞）
+          return false;
+        }
+        // 同一批 batchItems 混有 closed/open：只丢 closed 成员，open 成员继续投递（不整批阻塞、不误投）。
+        item.batchItems = deliverable;
+        const [only] = deliverable;
+        if (deliverable.length === 1 && only !== undefined) {
+          // 单条剩余：用该成员**入队时定格**的正文/摘要（已收口成员的正文绝不投出）。
+          if (typeof only.text === "string" && only.text !== "") item.text = only.text;
+          if (typeof only.summary === "string" && only.summary !== "") item.summary = only.summary;
+        } else {
+          const batchHandbacks = deliverable.map((member) => member.handback).filter((hb): hb is TaskHandback => hb !== undefined);
+          if (batchHandbacks.length === deliverable.length) {
+            item.text = renderHandbackBatchPrompt(batchHandbacks);
+            item.summary = mainT("main.session.delivery.handbackBatch", { count: deliverable.length, roles: deliverable.map((member) => member.sourceRoleId).join("、") });
+          }
+        }
       }
       if (!sawLegacyChild) {
-        // 全部成员都是 fixed 子任务：无 legacy assignment（不绑定 run/candidate；目标会话按 B8.1/下方 fixed 重绑）。
+        // 全部（剩余）成员都是 fixed 子任务：无 legacy assignment（不绑定 run/candidate；目标会话按 B8.1/下方 fixed 重绑）。
         pendingControllerAssignment = undefined;
         return sawFixedChild;
       }

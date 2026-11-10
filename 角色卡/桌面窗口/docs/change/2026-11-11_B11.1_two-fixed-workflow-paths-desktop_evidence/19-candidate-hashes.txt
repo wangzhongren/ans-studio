@@ -1,0 +1,17 @@
+# B11.1 候选文件 hash/行数（HEAD d345ae9 + 本批工作树）
+
+## app/desktop/session.ts
+0b6c684fe50f2ac51214af270e4a275f372e4e73c8b6b7b41eb7c8880dc2d7ab *app/desktop/session.ts
+bytes 862364
+lines 13401
+
+## test/桌面应用/b111-fixed-closed-handback-drain.test.ts
+938324648503d9bb1241f23c0864865c3b2bb979a9d302d5f02d728499ad956b *test/桌面应用/b111-fixed-closed-handback-drain.test.ts
+bytes 24589
+lines 450
+
+## aggregate sha256（两文件按序拼接）
+54f9f30045979a1cd17479c782e767301c4f6ac5e25e15f869c3d6e384d0e06f *-
+
+## git diff --numstat app/desktop/session.ts
+48	4	app/desktop/session.ts
