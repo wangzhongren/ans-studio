@@ -1,0 +1,22 @@
+# candidate raw SHA-256 / bytes / lines (path sha256 bytes lines)
+app/desktop/workflow-git.ts 5cb1381c1838e44c46a7d466d75704a81bc6baac946ebad0d6524f79ff667376 39272 882
+app/desktop/workflow.ts 90c517d7905ef518cd6cc03d9d41a43dfaec30c6c129155962f5cb728f8e8f9b 13198 248
+app/desktop/session.ts 78c7251fddda3b8c61b5b04c845daefe3db6d5be363da0f366be42ccfa89cc4e 800501 12541
+app/desktop/customer-input.ts 095a2d6402f801bc22ec30bbfcc49456a85728989f4f939b90711da3c9a17ef4 164068 2872
+app/desktop/version-change.ts c6ee909dcf62330205f9de2f4692ba49c1d288dd2989ae06b7341a1d16d4810e 69087 1591
+app/desktop/interface.ts 63a9631cde0b1fe74d2f962012f0fb0506d0e4adc473ac924271f2171e49ea09 198438 3355
+test/桌面应用/b3-workflow-git-real.test.ts 7b0f23506607c7350b4f36887ee2ecfca2e951ceeb1e7220040d39f61d1a016d 20701 408
+test/桌面应用/b3-release-merge-desktop.test.ts 8833887fe546206c11a95a557b5e9bfcd063d5f3783870f2f8c0bef0d480d3fd 29780 567
+test/桌面应用/b3-fixed-baseline-pathb.test.ts a891c5bef7a700501486394f8ae07345dd1a16305538bf72b6b487862381426f 37631 701
+test/桌面应用/b3-fixed-cards-panel.test.ts 360e28a4efca72a17746492d4fea3744f1e231ef8c1c6140197684802c4d1303 33047 622
+
+# git numstat (app):
+103	0	app/desktop/customer-input.ts
+26	0	app/desktop/interface.ts
+894	13	app/desktop/session.ts
+28	0	app/desktop/version-change.ts
+716	8	app/desktop/workflow-git.ts
+90	0	app/desktop/workflow.ts
+
+# aggregate (sha256sum lines sorted by path, then sha256):
+222e52d00ba0ece4079a82f089fa8c9abec3171c0a398d5d005b217797dcba68 *-

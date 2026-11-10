@@ -114,6 +114,34 @@ export const VERSION_CHANGE_FORBIDDEN_IPC_CHANNELS: readonly string[] = Object.f
   "stable-write:request",
 ]);
 
+// —————————————— T3 B3：fixed 模式面板隐藏/只读（AC-23；§6.5/§7.4） ——————————————
+//
+// 固定路径 compat-only：VCA/trunk/stable 机制默认路径不触达。fixed 项目里面板**只读**
+// （列表类 IPC 保留；mutation IPC 一律拒绝），UI 不做改版（渲染层隐藏/降级不在本批）。
+// legacy 项目 panel:"full" 且 all 行为逐字不变。
+
+/** fixed 面板 mutation 拒绝码（稳定；fail-closed，非客户门）。 */
+export const FIXED_PANEL_READONLY_CODE = "fixed-path-panel-readonly" as const;
+
+/** 面板形态：fixed ⇒ 只读；legacy ⇒ full（逐字不变）。 */
+export function versionChangePanelModeFor(mode: "fixed" | "legacy"): "read-only" | "full" {
+  return mode === "fixed" ? "read-only" : "full";
+}
+
+/** fixed 面板 mutation 是否允许（fixed ⇒ false）。 */
+export function versionChangePanelMutationAllowed(mode: "fixed" | "legacy"): boolean {
+  return mode !== "fixed";
+}
+
+/** 结构化只读拒绝回执（Interface mutation IPC 复用；不写盘、不弹卡）。 */
+export function fixedPanelReadonlyRejection(message?: string): { ok: false; code: typeof FIXED_PANEL_READONLY_CODE; error: string } {
+  return {
+    ok: false,
+    code: FIXED_PANEL_READONLY_CODE,
+    error: message ?? "固定工作流路径下 VCA/trunk/stable 面板只读：变更类操作已拒绝（legacy 机制 compat-only）。",
+  };
+}
+
 // —————————————— 只读视图（面板/IPC；有界） ——————————————
 
 export type CacheHealth = "ok" | "missing-migrated" | "corrupt-failclosed";

@@ -21,6 +21,7 @@ import { readTaskState } from "../../src/common/编排/task-state.ts";
 import { FIXED_DISPATCH_MATRIX } from "../../src/common/编排/workflow-dispatch.ts";
 import { readWorkflowLedger } from "../../src/common/编排/workflow-service.ts";
 import {
+  prepareFixedPathStart,
   workflowMode as orchestrationWorkflowMode,
   type WorkflowMode,
 } from "../../src/common/编排/workflow-service.ts";
@@ -155,4 +156,93 @@ export async function sessionWorkflowModeForTask(
 export function dispatchFlowIdOf(payload: DispatchTaskPayload | undefined): string {
   const raw = payload !== undefined && typeof payload.flowId === "string" ? payload.flowId : "";
   return raw.trim();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// T3 B3（2026-11-10，桌面窗口）：首次 fixed 启动顺序 / fixed 面板模式 / merge-main 应用通道薄层
+//
+// 依据：v1.3 §4.1 第 4 条（首次 fixed workflow 启动时应用原子写 `workflowSchema`）、§6.4/§8.4
+// （merge-main 应用自有非判断卡、客户本人）、§6.5/§7.4（fixed 模式 VCA/trunk/stable 面板隐藏/只读）；
+// B3 验收 AC-12/AC-14/AC-22/AC-23、T-05/T-10。
+// 纪律：本层只排序/投影/构造请求文本；模式判定与写回仍委托编排（单一实现），不复制业务。
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+export type FixedPathStartOutcome =
+  | { ok: true; mode: WorkflowMode; configChanged: boolean; explicitLegacy: boolean }
+  | { ok: false; code: "project-config-write-failed"; message: string };
+
+/**
+ * **首次 fixed 派发前的启动顺序**（B1 启用闸的鸡生蛋解法；v1.3 §4.1 第 4 条）：
+ * 1. 委托编排 `prepareFixedPathStart` 原子写 `.ans/project.json workflowSchema:"two-fixed-paths/v1"`
+ *    （保留既有键；已显式 `"legacy/v1"` **不覆盖**；坏文件 ⇒ `project-config-write-failed` fail-closed）；
+ * 2. 以启用闸 + 编排 `workflowMode` 复核该 flow 的实际模式（legacy 在飞 flow 仍 legacy）。
+ *
+ * 仅在 chief 首次发起 fixed 工作流（首个 stage-request 携带 `workflowPath`）时调用；其余派发路径不写配置。
+ * 不授予任何写权/派发权。
+ */
+export async function ensureFixedPathStarted(projectRoot: string, flowId: string): Promise<FixedPathStartOutcome> {
+  const flow = typeof flowId === "string" ? flowId.trim() : "";
+  if (flow === "") return { ok: true, mode: "legacy", configChanged: false, explicitLegacy: false };
+  let started: { ok: boolean; code?: string; message?: string; config?: { changed: boolean; skipped?: "explicit-legacy" }; workflowMode?: WorkflowMode };
+  try {
+    started = await prepareFixedPathStart({ projectRoot, flowId: flow });
+  } catch (error) {
+    return { ok: false, code: "project-config-write-failed", message: error instanceof Error ? error.message : String(error) };
+  }
+  if (!started.ok) {
+    return { ok: false, code: "project-config-write-failed", message: started.message ?? "首次 fixed 启动写回 `.ans/project.json` 失败。" };
+  }
+  const configChanged = started.config?.changed === true;
+  const explicitLegacy = started.config?.skipped === "explicit-legacy";
+  const mode = (await isFixedPathEnabledForFlow(projectRoot, flow)) ? await resolveFixedPathMode(projectRoot, flow) : "legacy";
+  return { ok: true, mode, configChanged, explicitLegacy };
+}
+
+/**
+ * 该 flow 的活动 fixed workflowId（最新 `workflow.started` 且未 `workflow.closed`）。
+ * 供固定卡 `request.created/resolved` 的 `workflowId/stage` 戳（应用写入，不采信模型自报）。
+ */
+export async function activeFixedWorkflowIdFor(projectRoot: string, flowId: string): Promise<string | undefined> {
+  const flow = typeof flowId === "string" ? flowId.trim() : "";
+  if (flow === "") return undefined;
+  try {
+    const ledger = await readWorkflowLedger(projectRoot);
+    const byWorkflow = new Map<string, { startedAt: string; closed: boolean; matchesFlow: boolean }>();
+    for (const event of ledger.events) {
+      const current = byWorkflow.get(event.workflowId);
+      if (event.kind === "workflow.started") {
+        byWorkflow.set(event.workflowId, {
+          startedAt: event.at,
+          closed: current?.closed === true,
+          matchesFlow: event.flowId === flow,
+        });
+      } else if (event.kind === "workflow.closed" && current !== undefined && current.matchesFlow) {
+        current.closed = true;
+      }
+    }
+    const active = [...byWorkflow.entries()]
+      .filter(([, value]) => value.matchesFlow && !value.closed)
+      .sort((a, b) => (a[1].startedAt < b[1].startedAt ? 1 : -1));
+    return active[0]?.[0];
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 项目级面板模式（VCA/trunk/stable 面板的显示面）：
+ * - 显式 `two-fixed-paths/v1` ⇒ `fixed`（面板**隐藏/只读**：mutation IPC 拒绝、只读列表保留）；
+ * - 显式 `legacy/v1` 或配置不可解析 ⇒ `legacy`（legacy 面板逐字不变）；
+ * - 缺省 ⇒ 有任一固定 workflow 账本事件 ⇒ `fixed`，否则 `legacy`（旧项目/旧夹具零变化）。
+ */
+export async function resolveProjectFixedPanelMode(projectRoot: string): Promise<WorkflowMode> {
+  const schema = await readProjectWorkflowSchemaValue(projectRoot);
+  if (schema === "two-fixed-paths/v1") return "fixed";
+  if (schema === "legacy/v1" || schema === "invalid") return "legacy";
+  try {
+    const ledger = await readWorkflowLedger(projectRoot);
+    return ledger.events.some((event) => event.kind === "workflow.started") ? "fixed" : "legacy";
+  } catch {
+    return "legacy";
+  }
 }

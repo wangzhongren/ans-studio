@@ -1,0 +1,18 @@
+# write-set status (git status --porcelain -- src app test)
+ M app/desktop/customer-input.ts
+ M app/desktop/interface.ts
+ M app/desktop/session.ts
+ M app/desktop/version-change.ts
+ M app/desktop/workflow-git.ts
+ M app/desktop/workflow.ts
+?? test/桌面应用/b3-fixed-baseline-pathb.test.ts
+?? test/桌面应用/b3-fixed-cards-panel.test.ts
+?? test/桌面应用/b3-release-merge-desktop.test.ts
+?? test/桌面应用/b3-workflow-git-real.test.ts
+
+# src/** diff (must be 0):
+0
+# app/main.ts / app/renderer diff (must be 0):
+0
+# package.json/package-lock diff (must be 0):
+0

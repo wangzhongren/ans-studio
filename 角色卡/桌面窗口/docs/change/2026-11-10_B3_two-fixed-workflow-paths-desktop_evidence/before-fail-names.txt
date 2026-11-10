@@ -1,0 +1,48 @@
+2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+C frozen batch retries keep members and delivery ID while later reports stay separate
+D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞
+M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）
+P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+显式入口（stop）：requestRunChangeDecision 三模式落账不变
+派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢

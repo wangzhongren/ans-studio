@@ -118,6 +118,7 @@ import { createPreferencesService, type JudgeSwitchesPreference, type Preference
 import type { StableWritePermit } from "../../src/model/version-change.ts";
 import {
   createVersionChangeStack,
+  fixedPanelReadonlyRejection,
   summarizeRefactor,
   summarizeStableWrite,
   summarizeVersionChange,
@@ -131,6 +132,8 @@ import {
   type VcaSummary,
   type VersionChangeStack,
 } from "./version-change.ts";
+// T3 B3（AC-23/§6.5）：fixed 项目的 VCA/trunk/stable 面板只读（mutation IPC 拒绝；列表仍可读）。
+import { resolveProjectFixedPanelMode } from "./workflow.ts";
 import type { TrunkListEntry, TrunkStatePayloadV1 } from "./trunk.ts";
 
 export interface RoleView {
@@ -2264,6 +2267,17 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     return { ok: true, projectRoot };
   };
   /**
+   * T3 B3（AC-23；v1.3 §6.5/§7.4）：fixed 项目的 VCA/trunk/stable 面板**只读**——mutation IPC
+   * 一律拒绝（列表/状态查询保留；不做 UI 改版）。legacy 项目 ⇒ undefined（逐字不变）。
+   * 纯读判定（workflowSchema/固定账本），不写盘、不弹卡。
+   */
+  const fixedPanelMutationRejection = async (
+    projectRoot: string,
+  ): Promise<ReturnType<typeof fixedPanelReadonlyRejection> | undefined> => {
+    const mode = await resolveProjectFixedPanelMode(projectRoot);
+    return mode === "fixed" ? fixedPanelReadonlyRejection() : undefined;
+  };
+  /**
    * detail-amendment 批准后的逐项确认闭环（S4 `runAmendmentItems` → `applyAmendmentItems`）：
    * 仅在 `version-change:present` 返回 `needsItems:true` 后后台驱动（不阻塞 IPC 回执）；
    * 每张卡客户本人作答；取消 ⇒ 保持 approved、不改 trunk；失败只诊断（面板/事件如实）。
@@ -2643,6 +2657,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async presentVersionChange(input): Promise<VersionChangePresentReply> {
       const root = versionChangeRoot(input);
       if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const fixedPanel = await fixedPanelMutationRejection(root.projectRoot);
+      if (fixedPanel !== undefined) return fixedPanel;
       const value = input as { applicationId?: unknown };
       const applicationId = typeof value.applicationId === "string" ? value.applicationId.trim() : "";
       if (applicationId === "") return { ok: false, code: "vca-invalid", error: mainT("main.interface.missingProjectRoot") };
@@ -2786,6 +2802,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async requestTrunkUpgrade(input): Promise<TrunkUpgradeRequestResult> {
       const root = versionChangeRoot(input);
       if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const fixedPanel = await fixedPanelMutationRejection(root.projectRoot);
+      if (fixedPanel !== undefined) return fixedPanel;
       const value = input as { reason?: unknown; scope?: unknown };
       const reason = value.reason === "emergency" || value.reason === "recovery" ? value.reason : undefined;
       if (reason === undefined) {
@@ -2807,6 +2825,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async confirmTrunkUpgrade(input): Promise<TrunkOperationResult> {
       const root = versionChangeRoot(input);
       if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const fixedPanel = await fixedPanelMutationRejection(root.projectRoot);
+      if (fixedPanel !== undefined) return fixedPanel;
       const value = input as { previewId?: unknown; acknowledged?: unknown };
       const previewId = typeof value.previewId === "string" ? value.previewId.trim() : "";
       if (previewId === "") {
@@ -2825,6 +2845,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async requestTrunkRefreeze(input): Promise<TrunkOperationResult> {
       const root = versionChangeRoot(input);
       if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const fixedPanel = await fixedPanelMutationRejection(root.projectRoot);
+      if (fixedPanel !== undefined) return fixedPanel;
       const value = input as { reason?: unknown; acknowledged?: unknown };
       const reason = typeof value.reason === "string" ? value.reason.trim() : "";
       if (reason === "") {
@@ -2843,6 +2865,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async abandonTrunkUpgrade(input): Promise<TrunkOperationResult> {
       const root = versionChangeRoot(input);
       if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const fixedPanel = await fixedPanelMutationRejection(root.projectRoot);
+      if (fixedPanel !== undefined) return fixedPanel;
       const value = input as { reason?: unknown; acknowledged?: unknown };
       const reason = typeof value.reason === "string" ? value.reason.trim() : "";
       if (reason === "") {
@@ -2861,6 +2885,8 @@ export function createDesktopInterface(deps: DesktopDeps): DesktopInterface {
     async requestTrunkRecover(input): Promise<TrunkOperationResult> {
       const root = versionChangeRoot(input);
       if (!root.ok) return { ok: false, code: "invalid-project", error: root.error };
+      const fixedPanel = await fixedPanelMutationRejection(root.projectRoot);
+      if (fixedPanel !== undefined) return fixedPanel;
       const value = input as { reason?: unknown; acknowledged?: unknown };
       const reason = typeof value.reason === "string" ? value.reason.trim() : "";
       if (reason === "") {

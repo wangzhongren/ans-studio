@@ -1,0 +1,4 @@
+# before typecheck (baseline HEAD 80bc3b6)
+command: npm run typecheck
+exit: 0
+note: 开工实测 exit 0（本轮未保存原始输出；终版输出见 03-after-typecheck.txt）

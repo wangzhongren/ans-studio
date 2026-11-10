@@ -1,0 +1,506 @@
+TAP version 13
+# Subtest: 未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfig 带 genesisBootstrap，source 含主入口
+ok 1 - 未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfig 带 genesisBootstrap，source 含主入口
+  ---
+  duration_ms: 2.9355
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap + 显式 single（旧项目）：仍 su 主入口、带 genesisBootstrap（迁移前 su 行为不变）
+ok 2 - 未 bootstrap + 显式 single（旧项目）：仍 su 主入口、带 genesisBootstrap（迁移前 su 行为不变）
+  ---
+  duration_ms: 1.6823
+  type: 'test'
+  ...
+# Subtest: 已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件）
+ok 3 - 已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件）
+  ---
+  duration_ms: 40.6255
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap（single）：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行）
+ok 4 - 未 bootstrap（single）：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行）
+  ---
+  duration_ms: 11.9625
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap（single）：su 的 gate 放行 docs/ 与 .ans/ 治理产物
+ok 5 - 未 bootstrap（single）：su 的 gate 放行 docs/ 与 .ans/ 治理产物
+  ---
+  duration_ms: 6.4177
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap（single）：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径
+ok 6 - 未 bootstrap（single）：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径
+  ---
+  duration_ms: 6.0817
+  type: 'test'
+  ...
+# Subtest: 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+not ok 7 - 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+  ---
+  duration_ms: 31.7029
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\genesis-bootstrap.test.ts:151:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-creation-prepared-api-unavailable'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    bindPreparedRuntimeRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:798:50)
+    async openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:2341:15)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/genesis-bootstrap.test.ts:159:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: describeShellCommand：命令原文逐字呈现（不加工、不截断），argv 逐项、cwd 原样
+ok 8 - describeShellCommand：命令原文逐字呈现（不加工、不截断），argv 逐项、cwd 原样
+  ---
+  duration_ms: 1.3538
+  type: 'test'
+  ...
+# Subtest: describeShellCommand：reason 有值时被展示（(b) 为何交人确认）
+ok 9 - describeShellCommand：reason 有值时被展示（(b) 为何交人确认）
+  ---
+  duration_ms: 0.1327
+  type: 'test'
+  ...
+# Subtest: describeShellCommand：对不可信输入稳健（argv 含非字符串项被过滤，缺字段不炸）
+ok 10 - describeShellCommand：对不可信输入稳健（argv 含非字符串项被过滤，缺字段不炸）
+  ---
+  duration_ms: 0.0894
+  type: 'test'
+  ...
+# Subtest: 操作者放行：presenter 返回 allow → {outcome:'allow', operatorId}，且 presenter 收到原文
+ok 11 - 操作者放行：presenter 返回 allow → {outcome:'allow', operatorId}，且 presenter 收到原文
+  ---
+  duration_ms: 0.5605
+  type: 'test'
+  ...
+# Subtest: 操作者拒绝：presenter 返回 deny → {outcome:'deny', operatorId}，reason 可读
+ok 12 - 操作者拒绝：presenter 返回 deny → {outcome:'deny', operatorId}，reason 可读
+  ---
+  duration_ms: 0.2267
+  type: 'test'
+  ...
+# Subtest: 拒绝带上 note（如操作者附言）时如实带出为 reason
+ok 13 - 拒绝带上 note（如操作者附言）时如实带出为 reason
+  ---
+  duration_ms: 0.1536
+  type: 'test'
+  ...
+# Subtest: 仅 outcome:'allow' 放行：presenter 返回非布尔/false → 一律 deny（绝不默认放行）
+ok 14 - 仅 outcome:'allow' 放行：presenter 返回非布尔/false → 一律 deny（绝不默认放行）
+  ---
+  duration_ms: 0.1375
+  type: 'test'
+  ...
+# Subtest: fail-closed·不可用：presenter 抛错 → unavailable（编排据此拒绝）
+ok 15 - fail-closed·不可用：presenter 抛错 → unavailable（编排据此拒绝）
+  ---
+  duration_ms: 0.1873
+  type: 'test'
+  ...
+# Subtest: fail-closed·未配置：无 presenter → unavailable（能力缺席即 fail-closed）
+ok 16 - fail-closed·未配置：无 presenter → unavailable（能力缺席即 fail-closed）
+  ---
+  duration_ms: 0.1118
+  type: 'test'
+  ...
+# Subtest: fail-closed·超时：presenter 不返回 → 超时即 unavailable（编排据此拒绝）
+ok 17 - fail-closed·超时：presenter 不返回 → 超时即 unavailable（编排据此拒绝）
+  ---
+  duration_ms: 26.3221
+  type: 'test'
+  ...
+# Subtest: 超时 env 可覆盖（非法值回退默认，不炸）
+ok 18 - 超时 env 可覆盖（非法值回退默认，不炸）
+  ---
+  duration_ms: 0.232
+  type: 'test'
+  ...
+# Subtest: arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 实件与 (a) 通道**同处接线**（两件同备才 arm）
+ok 19 - arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 实件与 (a) 通道**同处接线**（两件同备才 arm）
+  ---
+  duration_ms: 3.742
+  type: 'test'
+  ...
+# Subtest: I-1 补丁：(c) 实件构造——只读导入的两件**引用同一性**（classifyShell 同一函数引用；rules 原样透传）；失败 ⇒ 不 arm
+ok 20 - I-1 补丁：(c) 实件构造——只读导入的两件**引用同一性**（classifyShell 同一函数引用；rules 原样透传）；失败 ⇒ 不 arm
+  ---
+  duration_ms: 0.6545
+  type: 'test'
+  ...
+# Subtest: I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）
+not ok 21 - I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）
+  ---
+  duration_ms: 94.977
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\operator-channel.test.ts:271:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    会话应能开启（真实装配在此路径不触网）
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/operator-channel.test.ts:310:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: su 审批档（**真正接通**核查）：真实 openRoleSession + 真实装配——ls 免审批直放 / 显式越界写被写区守卫拒绝 / risky 网络命令出卡经客户批准或拒绝
+ok 22 - su 审批档（**真正接通**核查）：真实 openRoleSession + 真实装配——ls 免审批直放 / 显式越界写被写区守卫拒绝 / risky 网络命令出卡经客户批准或拒绝
+  ---
+  duration_ms: 90.0483
+  type: 'test'
+  ...
+# Subtest: M-1 数据面：白话摘要只取命令首词（不编意图）；升级原因译人话（行话不外露）；命令原文逐字
+ok 23 - M-1 数据面：白话摘要只取命令首词（不编意图）；升级原因译人话（行话不外露）；命令原文逐字
+  ---
+  duration_ms: 0.7247
+  type: 'test'
+  ...
+# Subtest: 审批档角色化（纯映射）：六内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名
+ok 24 - 审批档角色化（纯映射）：六内置治理角色显示其注册名；su/缺省保持 SU；项目角色不显示治理角色名
+  ---
+  duration_ms: 0.2057
+  type: 'test'
+  ...
+# Subtest: 审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ 卡片「质检 / Proof 审批档」；su ⇒ SU；项目角色不显示治理名
+ok 25 - 审批档角色化（presenter 接线）：metadata.roleId=verifier ⇒ 卡片「质检 / Proof 审批档」；su ⇒ SU；项目角色不显示治理名
+  ---
+  duration_ms: 0.5528
+  type: 'test'
+  ...
+# Subtest: 审批卡数据面（W5-D 加法）：entry/protectedScope 由构建参数写入；roleId 可选；缺省/未知值不出现
+ok 26 - 审批卡数据面（W5-D 加法）：entry/protectedScope 由构建参数写入；roleId 可选；缺省/未知值不出现
+  ---
+  duration_ms: 0.1107
+  type: 'test'
+  ...
+# Subtest: 审批卡 presenter（W5-D 接线）：prompt.entry/protectedScope 写入请求；roleId 以 prompt 优先、metadata 兜底；既有字段不变
+ok 27 - 审批卡 presenter（W5-D 接线）：prompt.entry/protectedScope 写入请求；roleId 以 prompt 优先、metadata 兜底；既有字段不变
+  ---
+  duration_ms: 0.2194
+  type: 'test'
+  ...
+# Subtest: M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行
+ok 28 - M-1 presenter：恰 allow:true 才放行；拒绝/缺字段 → 不放行；未知 id → expired；关窗 ⇒ 全部不放行
+  ---
+  duration_ms: 0.2884
+  type: 'test'
+  ...
+# Subtest: M-1 presenter 兜底与失败：清理兜底解析为不放行（无泄漏）；推送抛错（窗口已关）⇒ 上抛（通道归 unavailable）
+ok 29 - M-1 presenter 兜底与失败：清理兜底解析为不放行（无泄漏）；推送抛错（窗口已关）⇒ 上抛（通道归 unavailable）
+  ---
+  duration_ms: 43.3759
+  type: 'test'
+  ...
+# Subtest: M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡（通道两端齐备；旧文本墙路径退役）
+ok 30 - M-1：shell 确认**不再用原生对话框**——(a) 层为应用内卡（通道两端齐备；旧文本墙路径退役）
+  ---
+  duration_ms: 0.6036
+  type: 'test'
+  ...
+# Subtest: arm 接缝（历史形状）：不提供已装配 shellGate → pi 工厂收到 undefined（该接缝缺省即不合闸）
+ok 31 - arm 接缝（历史形状）：不提供已装配 shellGate → pi 工厂收到 undefined（该接缝缺省即不合闸）
+  ---
+  duration_ms: 1.3209
+  type: 'test'
+  ...
+# Subtest: arm 接缝（历史形状）：提供已装配 shellGate → 原样透传给 pi 工厂（保留给直接持 gate 的调用方）
+ok 32 - arm 接缝（历史形状）：提供已装配 shellGate → 原样透传给 pi 工厂（保留给直接持 gate 的调用方）
+  ---
+  duration_ms: 0.8786
+  type: 'test'
+  ...
+# Subtest: I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（三层链）；su（内置治理角色）不接 (b)/(a)——改收**只读档**（同一份 (c) 实件）
+ok 33 - I-1 注入判据：**项目角色**会话收到 (a) 通道 + (c) 实件（三层链）；su（内置治理角色）不接 (b)/(a)——改收**只读档**（同一份 (c) 实件）
+  ---
+  duration_ms: 1.8125
+  type: 'test'
+  ...
+# Subtest: I-1 补丁：未 arm（未配置两件）时**什么都不传**——输入里不出现两个字段（等同不注入）
+ok 34 - I-1 补丁：未 arm（未配置两件）时**什么都不传**——输入里不出现两个字段（等同不注入）
+  ---
+  duration_ms: 1.0543
+  type: 'test'
+  ...
+# Subtest: su 审批档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellOperatorOnly/shellOperatorChannel/shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽）
+ok 35 - su 审批档 fail-closed：deps.shellArming 缺省 ⇒ su 连 shellOperatorOnly/shellOperatorChannel/shellReadonly 都不注入（能力缺席 = 不 arm，绝不放宽）
+  ---
+  duration_ms: 1.1107
+  type: 'test'
+  ...
+# Subtest: arm 只影响 pi 路径：demo 路径不构造 pi 工厂（无 shell 入口）
+ok 36 - arm 只影响 pi 路径：demo 路径不构造 pi 工厂（无 shell 入口）
+  ---
+  duration_ms: 1.2787
+  type: 'test'
+  ...
+# Subtest: F-4-T1 超时取值链：专用 env 优先 → 未设时**跟随 ANS_PI_SHELL_REVIEW_TIMEOUT_MS**（注入小值断言实际等待随之变化）→ 都未设 120000；非法值沿链回退
+ok 37 - F-4-T1 超时取值链：专用 env 优先 → 未设时**跟随 ANS_PI_SHELL_REVIEW_TIMEOUT_MS**（注入小值断言实际等待随之变化）→ 都未设 120000；非法值沿链回退
+  ---
+  duration_ms: 163.5568
+  type: 'test'
+  ...
+# Subtest: F-4-T2 到期原因分流：超时中止的失效文案 = 如实超时文案（含时限与恢复指引，不再误报「本轮已结束」）；轮次中止保留原文案（组合信号 reason 驱动，Node 24 传播首验）
+ok 38 - F-4-T2 到期原因分流：超时中止的失效文案 = 如实超时文案（含时限与恢复指引，不再误报「本轮已结束」）；轮次中止保留原文案（组合信号 reason 驱动，Node 24 传播首验）
+  ---
+  duration_ms: 91.1924
+  type: 'test'
+  ...
+# Subtest: F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时限）；轮次中止 ⇒ shell-confirm.cancelled——presented 之后的每种去向都可判定
+ok 39 - F-4-T3 诊断补录（opt2）：超时 ⇒ shell-confirm.timeout（含时限）；轮次中止 ⇒ shell-confirm.cancelled——presented 之后的每种去向都可判定
+  ---
+  duration_ms: 85.8873
+  type: 'test'
+  ...
+# Subtest: F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起的 shell 确认卡；replayPending 只推仍挂起者
+ok 40 - F-4-opt1 接线钉与幂等行为：main.ts 在窗口 focus/show 时重推挂起的 shell 确认卡；replayPending 只推仍挂起者
+  ---
+  duration_ms: 0.7178
+  type: 'test'
+  ...
+# Subtest: G-2/W5 恢复卡：恰 allow:true 才为真；缺字段/取消 → false；未知 id → expired（未获执行文案）；id 前缀 rp-
+ok 41 - G-2/W5 恢复卡：恰 allow:true 才为真；缺字段/取消 → false；未知 id → expired（未获执行文案）；id 前缀 rp-
+  ---
+  duration_ms: 0.3523
+  type: 'test'
+  ...
+# Subtest: G-2/W5 恢复卡：等待不设限（零计时器）；关窗/中止 = 未获执行；replayPending 只推仍挂起者
+ok 42 - G-2/W5 恢复卡：等待不设限（零计时器）；关窗/中止 = 未获执行；replayPending 只推仍挂起者
+  ---
+  duration_ms: 0.35
+  type: 'test'
+  ...
+# Subtest: G-2/W5 shell 卡按角色 pending 视图（W1 依赖项）：metadata.roleId 聚合；无 metadata 不计角色
+ok 43 - G-2/W5 shell 卡按角色 pending 视图（W1 依赖项）：metadata.roleId 聚合；无 metadata 不计角色
+  ---
+  duration_ms: 0.1672
+  type: 'test'
+  ...
+# Subtest: 替我审·开关关：不调 judge，presenter 原路径逐字不变（默认手动）
+ok 44 - 替我审·开关关：不调 judge，presenter 原路径逐字不变（默认手动）
+  ---
+  duration_ms: 0.2068
+  type: 'test'
+  ...
+# Subtest: 替我审·开关开 + manualOnly（不透明执行类）：判断 agent 不代批，强制客户本人确认（Q1 A）
+ok 45 - 替我审·开关开 + manualOnly（不透明执行类）：判断 agent 不代批，强制客户本人确认（Q1 A）
+  ---
+  duration_ms: 0.1201
+  type: 'test'
+  ...
+# Subtest: 替我审·无 metadata.judge：不调判断，原 present 路径
+ok 46 - 替我审·无 metadata.judge：不调判断，原 present 路径
+  ---
+  duration_ms: 0.0881
+  type: 'test'
+  ...
+# Subtest: 替我审·signal 已中止：不调判断，原 present 路径（交回既有中止路径）
+ok 47 - 替我审·signal 已中止：不调判断，原 present 路径（交回既有中止路径）
+  ---
+  duration_ms: 0.1015
+  type: 'test'
+  ...
+# Subtest: 替我审·allow：请求字段完整、先发结果行，返回 allow + operatorId=judge:<engine> + 审计 judge
+ok 48 - 替我审·allow：请求字段完整、先发结果行，返回 allow + operatorId=judge:<engine> + 审计 judge
+  ---
+  duration_ms: 0.3009
+  type: 'test'
+  ...
+# Subtest: 替我审·allow 但结果行投达失败 ⇒ 按拒绝处理（row-failed），不弹卡；审计保留 row-failed 与模型 allow 事实
+ok 49 - 替我审·allow 但结果行投达失败 ⇒ 按拒绝处理（row-failed），不弹卡；审计保留 row-failed 与模型 allow 事实
+  ---
+  duration_ms: 0.2075
+  type: 'test'
+  ...
+# Subtest: 替我审·deny：不调用 presenter；结果行投达 + 格式化原因（说明/原因/替代方案/出路）
+ok 50 - 替我审·deny：不调用 presenter；结果行投达 + 格式化原因（说明/原因/替代方案/出路）
+  ---
+  duration_ms: 0.2241
+  type: 'test'
+  ...
+# Subtest: 替我审·deny 结果行投达失败 ⇒ 仍 deny（拒绝是安全方向），只记诊断、不弹卡
+ok 51 - 替我审·deny 结果行投达失败 ⇒ 仍 deny（拒绝是安全方向），只记诊断、不弹卡
+  ---
+  duration_ms: 0.1255
+  type: 'test'
+  ...
+# Subtest: 替我审·manual（context-too-large/budget/timeout）⇒ presenter 零调用、按 deny 处理；理由含具体人话，审计保留 manual 事实
+ok 52 - 替我审·manual（context-too-large/budget/timeout）⇒ presenter 零调用、按 deny 处理；理由含具体人话，审计保留 manual 事实
+  ---
+  duration_ms: 0.4066
+  type: 'test'
+  ...
+# Subtest: 替我审·manual/retry-capped ⇒ 仍拒绝不弹卡；审计保留 manual 事实；回执给出申请客户确认的新出路
+ok 53 - 替我审·manual/retry-capped ⇒ 仍拒绝不弹卡；审计保留 manual 事实；回执给出申请客户确认的新出路
+  ---
+  duration_ms: 0.2121
+  type: 'test'
+  ...
+# Subtest: 替我审·manual ⇒ deny 诊断保留原 reasonCode 与 manual 事实（不写模型主动 allow/deny 的 decision 诊断）
+ok 54 - 替我审·manual ⇒ deny 诊断保留原 reasonCode 与 manual 事实（不写模型主动 allow/deny 的 decision 诊断）
+  ---
+  duration_ms: 6.8575
+  type: 'test'
+  ...
+# Subtest: 替我审·read-denied ⇒ 拒绝理由带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18 口径保留）
+ok 55 - 替我审·read-denied ⇒ 拒绝理由带出具体路径；无记录如实说明；超长仍限 200（客户反馈 2026-10-18 口径保留）
+  ---
+  duration_ms: 0.4776
+  type: 'test'
+  ...
+# Subtest: 替我审·manual ⇒ deny 理由尾部标点归一（不出现「。；」/「。。」）
+ok 56 - 替我审·manual ⇒ deny 理由尾部标点归一（不出现「。；」/「。。」）
+  ---
+  duration_ms: 0.182
+  type: 'test'
+  ...
+# Subtest: 替我审·独立超时：judge 不返回 ⇒ manual/timeout 按拒绝处理（不占用确认超时、不弹卡）
+ok 57 - 替我审·独立超时：judge 不返回 ⇒ manual/timeout 按拒绝处理（不占用确认超时、不弹卡）
+  ---
+  duration_ms: 26.1346
+  type: 'test'
+  ...
+# Subtest: 替我审·通道超时同步：默认 135s（driver 120s+15s），env 派生/非法回 135s；确认超时仍 120s
+ok 58 - 替我审·通道超时同步：默认 135s（driver 120s+15s），env 派生/非法回 135s；确认超时仍 120s
+  ---
+  duration_ms: 0.262
+  type: 'test'
+  ...
+# Subtest: 替我审·deny 档：judge 放行**不转换**——outcome 仍 allow，只按 tier 置 hardDenyOverride/label（客户 D1）
+ok 59 - 替我审·deny 档：judge 放行**不转换**——outcome 仍 allow，只按 tier 置 hardDenyOverride/label（客户 D1）
+  ---
+  duration_ms: 0.4149
+  type: 'test'
+  ...
+# Subtest: 替我审·deny 档也进入 judge（第一层规则不拒绝）：judge deny ⇒ 0 卡、审计保留 tier 与 judge 结论
+ok 60 - 替我审·deny 档也进入 judge（第一层规则不拒绝）：judge deny ⇒ 0 卡、审计保留 tier 与 judge 结论
+  ---
+  duration_ms: 0.2738
+  type: 'test'
+  ...
+# Subtest: 替我审·项目角色 deny 类命令也进入 judge（规则不拒绝）：policy=project、judge 结论 0 卡
+ok 61 - 替我审·项目角色 deny 类命令也进入 judge（规则不拒绝）：policy=project、judge 结论 0 卡
+  ---
+  duration_ms: 0.1861
+  type: 'test'
+  ...
+# Subtest: 承接 2026-10-18 裁定：shell-judge.decision 诊断保留 c 规则判定（policy/tier）与 judge 结论
+ok 62 - 承接 2026-10-18 裁定：shell-judge.decision 诊断保留 c 规则判定（policy/tier）与 judge 结论
+  ---
+  duration_ms: 9.7001
+  type: 'test'
+  ...
+# Subtest: judgeNotice：buildShellConfirmRequest 原样拷贝、不进入 reasonRaw（§10.4）
+ok 63 - judgeNotice：buildShellConfirmRequest 原样拷贝、不进入 reasonRaw（§10.4）
+  ---
+  duration_ms: 0.1491
+  type: 'test'
+  ...
+# Subtest: 替我审·session：每会话构造 judge 闭包（同一份 runtimeOptions/createAdapter）；metadata 注入 turnText（≤4KB）与 judge；dispose 即清
+ok 64 - 替我审·session：每会话构造 judge 闭包（同一份 runtimeOptions/createAdapter）；metadata 注入 turnText（≤4KB）与 judge；dispose 即清
+  ---
+  duration_ms: 2.7403
+  type: 'test'
+  ...
+# Subtest: 替我审 + 脚本上下文：judge 收到脚本内容并据其裁决；开关关 ⇒ 客户卡展示内容
+ok 65 - 替我审 + 脚本上下文：judge 收到脚本内容并据其裁决；开关关 ⇒ 客户卡展示内容
+  ---
+  duration_ms: 0.3925
+  type: 'test'
+  ...
+# Subtest: approvalContext.failClosed：开关开 ⇒ 不调 judge 直接拒绝；开关关 ⇒ 客户卡
+ok 66 - approvalContext.failClosed：开关开 ⇒ 不调 judge 直接拒绝；开关关 ⇒ 客户卡
+  ---
+  duration_ms: 0.1251
+  type: 'test'
+  ...
+# Subtest: P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+not ok 67 - P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+  ---
+  duration_ms: 75.6827
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\p0-halt-and-images.test.ts:118:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/p0-halt-and-images.test.ts:134:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实
+ok 68 - P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实
+  ---
+  duration_ms: 5.5278
+  type: 'test'
+  ...
+# Subtest: P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实）
+not ok 69 - P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实）
+  ---
+  duration_ms: 7.3584
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\p0-halt-and-images.test.ts:199:1'
+  failureType: 'testCodeFailure'
+  error: '错误如实（图片未发送——本条未发出）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/p0-halt-and-images.test.ts:220:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源
+not ok 70 - P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源
+  ---
+  duration_ms: 3.5204
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\p0-halt-and-images.test.ts:231:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    合法图放行
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/p0-halt-and-images.test.ts:254:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图）
+ok 71 - P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图）
+  ---
+  duration_ms: 237.6365
+  type: 'test'
+  ...
+1..71
+# tests 71
+# suites 0
+# pass 66
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2263.3108
