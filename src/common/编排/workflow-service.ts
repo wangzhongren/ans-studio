@@ -397,6 +397,39 @@ export async function writeProjectConfigWorkflowSchema(
   return { ok: true, changed: true, path: file };
 }
 
+// —————————————— 首次 fixed workflow 启动顺序助手（编排 B2；B3 调用） ——————————————
+
+export type PrepareFixedPathStartResult =
+  | { ok: true; config: Extract<ProjectConfigWriteResult, { ok: true }>; workflowMode: WorkflowMode }
+  | { ok: false; code: "project-config-write-failed"; message: string };
+
+/**
+ * **首次 fixed workflow 启动顺序助手（编排 B2 提供；B3 桌面调用）**。
+ *
+ * 桌面 B1 启用闸（`app/desktop/workflow.ts::isFixedPathEnabledForFlow`）只在项目显式
+ * `workflowSchema:"two-fixed-paths/v1"` 或该 flow 已有 `workflow.started` 时启用 fixed——而
+ * `workflow.started` 只能由 fixed 派发产生。为避免**鸡生蛋死锁**，B3 在首次 fixed 派发**之前**
+ * 必须调用本助手完成顺序：
+ *
+ * 1. `writeProjectConfigWorkflowSchema` 原子写 `.ans/project.json workflowSchema`（保留既有键；
+ *    显式 `"legacy/v1"` **不覆盖** ⇒ `config.skipped:"explicit-legacy"`；坏文件 ⇒
+ *    `project-config-write-failed` fail-closed，不弹客户卡）；
+ * 2. 以 `workflowMode(projectRoot, flowId)` 复核该 flow 的实际模式（legacy 在飞 flow 仍为 legacy）。
+ *
+ * 返回 `workflowMode === "fixed"` 且桌面启用闸已可放行后，B3 才能派发首个 fixed workflow；
+ * 返回 `"legacy"`（显式 legacy 项目 / legacy 在飞 flow）⇒ B3 不得按 fixed 派发。
+ * **不改变** B1 闸语义、不授予任何写权/派发权：本函数只排序既有应用写回与模式判定。
+ */
+export async function prepareFixedPathStart(input: {
+  projectRoot: string;
+  flowId: string;
+}): Promise<PrepareFixedPathStartResult> {
+  const config = await writeProjectConfigWorkflowSchema(input.projectRoot);
+  if (!config.ok) return { ok: false, code: config.code, message: config.message };
+  const mode = await workflowMode(input.projectRoot, input.flowId);
+  return { ok: true, config, workflowMode: mode };
+}
+
 // —————————————— `.gitignore` ans-managed 块（v1.3 §5.2 MF-6；骨架） ——————————————
 
 export const ANS_GITIGNORE_BLOCK_START = "# >>> ans managed >>>";
@@ -1161,6 +1194,37 @@ export interface CloseTaskReceipt {
 
 export type CloseTaskResult = ({ ok: true } & CloseTaskReceipt) | WorkflowServiceFailure;
 
+/**
+ * fixed `close_created_task` v2 **模型可见入参**（v1.3 §3.5/§4.2；MF-IR-2；编排 B2 接线）。
+ * 可信身份（`projectRoot`/`actorRoleId`）由 `run-role` 以会话解析结果绑定，**绝不来自模型参数**；
+ * `evidence`（artifacts/branchTipOid/acceptanceArchive）只能由应用补入，不在模型可见入参中。
+ */
+export interface FixedCloseCreatedTaskToolInput {
+  operationId: string;
+  taskId: string;
+  outcome: TaskClosedOutcome;
+  note?: string;
+}
+
+/**
+ * `openRoleSession({ closeCreatedTaskFixed })` 可注入的**应用实现**（可选；仅 fixed 会话消费）：
+ * run-role 传入已绑定的可信身份；应用实现可补 `evidence` 后调用 `closeTask`（或自行完成同等校验）。
+ * 未注入 ⇒ run-role 默认直连 `closeTask`（无 evidence；适合非完成型收口）。
+ */
+export type FixedCloseCreatedTaskDep = (
+  input: FixedCloseCreatedTaskToolInput & { projectRoot: string; actorRoleId: string },
+  signal?: AbortSignal,
+) => Promise<CloseTaskResult>;
+
+/**
+ * run-role 注入给**运行时核心 B2 `close_created_task` fixed handler** 的工具依赖
+ * （身份/项目根已绑定；handler 只需传模型参数）。legacy 会话不注入本依赖。
+ */
+export type FixedCloseCreatedTaskFn = (
+  input: FixedCloseCreatedTaskToolInput,
+  signal?: AbortSignal,
+) => Promise<CloseTaskResult>;
+
 const CLOSE_COMPLETABLE_STAGES: ReadonlySet<WorkflowStage> = new Set<WorkflowStage>(["A2", "A5", "A11", "B1", "B3"]);
 const CLOSE_REVIEW_STAGES: ReadonlySet<WorkflowStage> = new Set<WorkflowStage>(["A12a", "A12b"]);
 
@@ -1665,6 +1729,31 @@ export type ActivateRoleDocumentsFixedResult =
     stageCompleted: boolean;
   }
   | WorkflowServiceFailure;
+
+/**
+ * fixed `activate_role_documents` v2 **模型可见入参**（v1.3 §4.2 A8；MF-IR-3；编排 B2 接线）：
+ * roster/提案决定/三文档 hash 均由应用在服务层重算核验（`activation-hash-drift` 等 fail-closed）。
+ * 可信 `projectRoot` 由 run-role 绑定，**绝不来自模型参数**。
+ */
+export type FixedActivateRoleDocumentsToolInput = Omit<ActivateRoleDocumentsFixedInput, "projectRoot" | "now">;
+
+/**
+ * `openRoleSession({ activateRoleDocumentsFixed })` 可注入的**应用实现**（可选；仅 fixed 会话消费）：
+ * 默认由 run-role 直连 `activateRoleDocumentsFixed`；应用实现可先做额外取证再调用同一服务。
+ */
+export type FixedActivateRoleDocumentsDep = (
+  input: FixedActivateRoleDocumentsToolInput & { projectRoot: string },
+  signal?: AbortSignal,
+) => Promise<ActivateRoleDocumentsFixedResult>;
+
+/**
+ * run-role 注入给**运行时核心 B2 `activate_role_documents` fixed handler** 的工具依赖
+ * （项目根已绑定；handler 只需传模型参数）。legacy 会话不注入本依赖。
+ */
+export type FixedActivateRoleDocumentsFn = (
+  input: FixedActivateRoleDocumentsToolInput,
+  signal?: AbortSignal,
+) => Promise<ActivateRoleDocumentsFixedResult>;
 
 async function readAndHash(projectRoot: string, rel: string): Promise<{ ok: true; sha256: string } | { ok: false }> {
   try {

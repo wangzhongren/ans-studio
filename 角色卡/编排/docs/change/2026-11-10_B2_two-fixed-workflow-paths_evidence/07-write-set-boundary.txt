@@ -1,0 +1,11 @@
+== git status --porcelain -- src app test ==
+ M src/common/编排/workflow-service.ts
+ M src/pipeline/orchestration/run-role.ts
+?? test/编排/fixed-path-start.test.ts
+?? test/编排/run-role-fixed-b2.test.ts
+
+== write-set-external zero-diff guards (git diff --stat) ==
+(empty above = zero diff)
+
+== forbidden directory status ==
+(empty above = clean)

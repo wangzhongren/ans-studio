@@ -56,7 +56,7 @@ import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 // C 批（方案 §6.4.1/C-06）：appointment-write 预览的 role-card 必填章节单一来源。
-import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governance-roles.ts";
+import { ROLE_CARD_REQUIRED_SECTIONS, cardKindsOf as governanceCardKindsOf } from "../../common/门禁引擎/governance-roles.ts";
 // X-R6（E2 S2）：intent-confirm 卡纯数据（固定选项/分组/代批范围）唯一真源 = chief 角色模块。
 // 本文件只消费数据做条件/默认卡判定，不复制第二份卡面数据、不构造卡、不写账本。
 import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
@@ -65,6 +65,16 @@ import { loadLatestRoster, nominationD3CardFacts, rosterDirectoriesFor, rosterTo
 // T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。
 import { readTaskState } from "../../common/编排/task-state.ts";
 import type { WorkflowMode } from "../../common/编排/workflow-service.ts";
+import {
+  activateRoleDocumentsFixed as workflowActivateRoleDocumentsFixed,
+  closeTask as workflowCloseTask,
+  type FixedActivateRoleDocumentsDep,
+  type FixedActivateRoleDocumentsFn,
+  type FixedActivateRoleDocumentsToolInput,
+  type FixedCloseCreatedTaskDep,
+  type FixedCloseCreatedTaskFn,
+  type FixedCloseCreatedTaskToolInput,
+} from "../../common/编排/workflow-service.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
 import {
@@ -364,6 +374,17 @@ export interface AdapterCapabilities {
   completeTeamPlan?: CompleteTeamPlanFn;
   activateRoleDocuments?: ActivateRoleDocumentsFn;
   closeCreatedTask?: CloseCreatedTaskFn;
+  /**
+   * T3 B2（MF-IR-2/3）：fixed `close_created_task`/`activate_role_documents` v2 工具依赖。
+   * **仅 fixed 会话注入**（legacy 会话字段缺席 = 结构性不可达；legacy `closeCreatedTask`/
+   * `activateRoleDocuments` 字段语义/注入面逐字不变）。身份与项目根已由 `openRoleSession` 以
+   * 会话解析结果绑定；运行时核心 B2 handler 只传模型可见字段（fixed close
+   * `{operationId,taskId,outcome,note?}`；fixed activate `{operationId,flowId,workflowId,
+   * proposalDecisionId,targetRoleId,roster,documents}`）。实现 = `workflowService.closeTask` /
+   * `workflowService.activateRoleDocumentsFixed`（或调用方注入的应用实现，可补 evidence）。
+   */
+  closeCreatedTaskFixed?: FixedCloseCreatedTaskFn;
+  activateRoleDocumentsFixed?: FixedActivateRoleDocumentsFn;
   gitQuery?: GitQueryFn;
   gitCandidate?: GitCandidateFn;
   gitPublish?: GitPublishFn;
@@ -877,6 +898,16 @@ export async function openRoleSession(
     completeTeamPlan?: CompleteTeamPlanFn;
     activateRoleDocuments?: ActivateRoleDocumentsFn;
     closeCreatedTask?: CloseCreatedTaskFn;
+    /**
+     * T3 B2（MF-IR-2/3）：fixed 收口/激活的**应用实现**（仅 fixed 会话消费；legacy 会话不触达、
+     * 也不接受 legacy `closeCreatedTask`/`activateRoleDocuments` 进入 fixed 注入面）。
+     * 未注入 ⇒ run-role 默认直连 `workflowService.closeTask` / `workflowService.activateRoleDocumentsFixed`
+     * （默认收口不带 evidence，适合非完成型收口；A2/A5/A11/B1/B3/A12a/A12b 的完成型收口需应用实现
+     * 补 artifacts/branchTipOid/acceptanceArchive 后调用同一服务）。应用实现接收 run-role 绑定的
+     * 可信身份（projectRoot / actorRoleId）——身份绝不来自模型参数。
+     */
+    closeCreatedTaskFixed?: FixedCloseCreatedTaskDep;
+    activateRoleDocumentsFixed?: FixedActivateRoleDocumentsDep;
     gitQuery?: GitQueryFn;
     gitCandidate?: GitCandidateFn;
     gitPublish?: GitPublishFn;
@@ -2017,6 +2048,10 @@ export async function openRoleSession(
     : moduleCompleteTeamPlan && directGovernance
       ? input.completeTeamPlan
       : undefined;
+  // T3 B2（MF-IR-2/3）：fixed 会话的收口/激活走 `workflowService` 固定实现（不触 trunk/CAS/
+  // appointment-write）；legacy 实现（`input.closeCreatedTask`/`input.activateRoleDocuments`）在
+  // fixed 会话**不注入**（结构性不可达）。会话级模式与 `resolveWorkflowMode` 同源（不缓存项目级单值）。
+  const fixedSessionTools = sessionWorkflowMode === "fixed";
   // X-R3（E2 S2）：nominator 的 activateRoleDocuments 角色声明改读模块 `tools()`（trio 声明
   // `activateRoleDocuments`；single/未装配回退旧角色 id 门控）。引擎仍保留既有 `directGovernance`
   // 会话模式门控——模块只声明最大允许集，实际注入由本层决定。
@@ -2027,6 +2062,31 @@ export async function openRoleSession(
     : moduleActivateRoleDocuments && directGovernance
       ? input.activateRoleDocuments
       : undefined;
+  // T3 B2（MF-IR-3）：fixed `activate_role_documents` v2 依赖（AC-24；项目根由本层绑定；服务层重算
+  // roster/提案决定/三文档实际字节 SHA-256 并写 `role.activated`）。legacy 会话字段缺席。
+  const fixedActivateRoleDocuments: FixedActivateRoleDocumentsFn | undefined = fixedSessionTools
+    && directGovernance && setup.role.id === "nominator" && moduleActivateRoleDocuments !== false
+    ? async (toolInput, signal) => {
+        if (signal?.aborted) {
+          return { ok: false, code: "activation-document-invalid", message: "本轮已中止，未执行激活。" };
+        }
+        const projectRoot = input.project.projectRoot;
+        if (input.activateRoleDocumentsFixed !== undefined) {
+          // 可信 projectRoot 放最后：模型参数即便夹带同名字段也不得覆盖宿主身份。
+          return await input.activateRoleDocumentsFixed({ ...toolInput, projectRoot }, signal);
+        }
+        return await workflowActivateRoleDocumentsFixed({
+          projectRoot,
+          operationId: toolInput.operationId,
+          flowId: toolInput.flowId,
+          workflowId: toolInput.workflowId,
+          proposalDecisionId: toolInput.proposalDecisionId,
+          targetRoleId: toolInput.targetRoleId,
+          roster: toolInput.roster,
+          documents: toolInput.documents,
+        });
+      }
+    : undefined;
   // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 的角色声明经模块 `tools()` 复核（`moduleDeclaresTool`
   // 在 trio + D1 校验后回答；single/su 以 `undefined` 保持旧路径）。**旧合并字面量逐字保留为回退值**：
   //   · convener（X-R4）与 chief（X-R6）的模块 trio 声明均含 closeCreatedTask；
@@ -2038,6 +2098,35 @@ export async function openRoleSession(
     : moduleCloseCreatedTask && directGovernance
       ? input.closeCreatedTask
       : undefined;
+  // T3 B2（MF-IR-2）：fixed `close_created_task` v2 依赖（AC-18）——`workflowService.closeTask` 校验
+  // 真实创建者（= 会话角色）/报告/状态/幂等并写 `task.closed` + 阶段事件；**不写** `.ans/runs`/
+  // `.ans/trunk`、不做 CAS/snapshot。可信身份（projectRoot/actorRoleId）由本层绑定，模型只给
+  // `{operationId,taskId,outcome,note?}`；legacy 会话字段缺席（legacy 实现逐字保留在上方）。
+  const fixedCloseCreatedTask: FixedCloseCreatedTaskFn | undefined = fixedSessionTools
+    && directGovernance && (setup.role.id === "chief" || setup.role.id === "convener")
+    && moduleCloseCreatedTask !== false
+    ? async (toolInput: FixedCloseCreatedTaskToolInput, signal) => {
+        if (signal?.aborted) {
+          return { ok: false, code: "close-task-invalid", message: "本轮已中止，未执行收口。" };
+        }
+        const projectRoot = input.project.projectRoot;
+        const actorRoleId = setup.role.id;
+        if (input.closeCreatedTaskFixed !== undefined) {
+          return await input.closeCreatedTaskFixed(
+            { projectRoot, actorRoleId, operationId: toolInput.operationId, taskId: toolInput.taskId, outcome: toolInput.outcome, ...(toolInput.note !== undefined ? { note: toolInput.note } : {}) },
+            signal,
+          );
+        }
+        return await workflowCloseTask({
+          projectRoot,
+          actorRoleId,
+          operationId: toolInput.operationId,
+          taskId: toolInput.taskId,
+          outcome: toolInput.outcome,
+          ...(toolInput.note !== undefined ? { note: toolInput.note } : {}),
+        });
+      }
+    : undefined;
   // X-R4（E2 S2）：submitRefactor / requestStableWrite 的角色声明改读模块 `tools()`；single/su/未装配
   // 回退旧角色 id 门控（旧谓词 `canRequestStableWrite` 已删除）。两项在旧代码中不以治理模型二次收窄，
   // 故不加 `directGovernance` 会话门控（与模块 single 声明保持一致）。
@@ -2098,7 +2187,10 @@ export async function openRoleSession(
         generatedAt: new Date().toISOString(),
         log,
       });
-      const matrix = buildGovernanceMatrix(matrixInput);
+      const matrix = buildGovernanceMatrix(
+        matrixInput,
+        sessionWorkflowMode === "fixed" ? "two-fixed-paths/v1" : "legacy-v1",
+      );
       if (matrix.status === "unavailable") {
         contextSections = [GOVERNANCE_MATRIX_UNAVAILABLE_NOTICE];
         log.record("governance.matrix.unavailable", { trigger: "session-start", status: matrix.status });
@@ -2123,7 +2215,12 @@ export async function openRoleSession(
   }
   // 六角色只读工具（含 chief）：注入才注册；五个非幕僚启动时不计算（闭包惰性）。
   const governanceMatrix = governanceMatrixEnabled
-    ? createGovernanceMatrixFn({ project: input.project, session: governanceMatrixSessionFlags, log })
+    ? createGovernanceMatrixFn({
+        project: input.project,
+        session: governanceMatrixSessionFlags,
+        log,
+        matrix: sessionWorkflowMode === "fixed" ? "two-fixed-paths/v1" : "legacy-v1",
+      })
     : undefined;
 
   if (assignedReview?.ok) contextSections = [...(contextSections ?? []), assignedReview.value.contextText];
@@ -2136,6 +2233,27 @@ export async function openRoleSession(
         .map((section) => section.text)
         .filter((textBlock) => textBlock.trim() !== "");
       if (fixedSections.length > 0) contextSections = [...(contextSections ?? []), ...fixedSections];
+    }
+    // T3 B2（AC-24/v1.3 §3.4）：fixed chief 注入 `chief-workflow-v2.md`（版本 `chief-workflow/v2`；
+    // 只读资源 + path/version/sha256/bytes/应用版本元数据）。legacy `chief-workflow.md` 不改；legacy
+    // 会话仍由运行时核心注入 v1（session.ts 既有行为，不在本批写集）。资源缺失/身份/版本/hash 不可核
+    // ⇒ 抛错 fail-closed（与 legacy loader 同口径；不猜正文、不静默降级）。
+    if (builtInGovernance && setup.role.id === "chief" && chiefDecisionContext === undefined) {
+      const fixedChiefWorkflow = await loadFixedChiefWorkflowResource();
+      contextSections = [...(contextSections ?? []),
+        `## 应用内置 Chief workflow v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）\n${JSON.stringify({
+          sourceUrl: fixedChiefWorkflow.sourceUrl,
+          moduleUrl: fixedChiefWorkflow.moduleUrl,
+          resourceVersion: fixedChiefWorkflow.version,
+          sha256: fixedChiefWorkflow.sha256,
+          bytes: fixedChiefWorkflow.bytes,
+          applicationVersion: fixedChiefWorkflow.applicationVersion,
+        })}\n\n${fixedChiefWorkflow.text}`];
+      log.record("chief.workflow.v2.loaded", {
+        version: fixedChiefWorkflow.version,
+        sha256: fixedChiefWorkflow.sha256,
+        bytes: fixedChiefWorkflow.bytes,
+      });
     }
   }
   // T3 B1（AC-23）：fixed 会话**不注入** legacy trunk/git/VCA/stable 工具（注入面 = 最强 fail-closed）。
@@ -2182,10 +2300,15 @@ export async function openRoleSession(
     ...(submitVersionChange !== undefined && legacyOnlyToolsAllowed ? { submitVersionChange } : {}),
     ...(selectRunChange !== undefined && legacyOnlyToolsAllowed ? { selectRunChange } : {}),
     ...(completeTeamPlan !== undefined ? { completeTeamPlan } : {}),
-    ...(activateRoleDocuments !== undefined ? { activateRoleDocuments } : {}),
+    // T3 B2（MF-IR-2/3）：fixed 会话注入 fixed 依赖（legacy 实现不触达）；legacy 会话注入面逐字不变。
+    ...(activateRoleDocuments !== undefined && !fixedSessionTools ? { activateRoleDocuments } : {}),
+    ...(fixedActivateRoleDocuments !== undefined ? { activateRoleDocumentsFixed: fixedActivateRoleDocuments } : {}),
     // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 经模块声明 + 既有 directGovernance 会话模式门控
-    // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。
-    ...(effectiveCloseCreatedTask !== undefined ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
+    // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。fixed 会话不注入 legacy
+    // 实现（B1 注入面兼容别名见下：同名能力位保留但值为 fixed 实现，供既有断言/旧 handler 路径复用）。
+    ...(effectiveCloseCreatedTask !== undefined && !fixedSessionTools ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
+    ...(fixedCloseCreatedTask !== undefined ? { closeCreatedTask: fixedCloseCreatedTask as unknown as CloseCreatedTaskFn } : {}),
+    ...(fixedCloseCreatedTask !== undefined ? { closeCreatedTaskFixed: fixedCloseCreatedTask } : {}),
     ...(legacyOnlyToolsAllowed && input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
     ...(legacyOnlyToolsAllowed && input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
     ...(legacyOnlyToolsAllowed && input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
@@ -2818,6 +2941,8 @@ function createGovernanceMatrixFn(deps: {
   project: ProjectConfig;
   session: GovernanceMatrixSessionFlags;
   log: DiagnosticLogger;
+  /** T3 B2（v1.3 §7.4）：fixed 会话展示 fixed 矩阵视图（只读、不判定）；缺省 `legacy-v1` 逐字不变。 */
+  matrix?: DispatchMatrixMode;
 }): GovernanceMatrixFn {
   return async (request = {}) => {
     const keys = Object.keys(request);
@@ -2835,7 +2960,7 @@ function createGovernanceMatrixFn(deps: {
         generatedAt: new Date().toISOString(),
         log: deps.log,
       });
-      const matrix = buildGovernanceMatrix(matrixInput);
+      const matrix = buildGovernanceMatrix(matrixInput, deps.matrix ?? "legacy-v1");
       if (matrix.status === "unavailable") {
         return { ok: false, message: "治理权力矩阵暂不可用；不得据此推断权限。" };
       }
@@ -3251,6 +3376,9 @@ const NO_CARD_KINDS: readonly GovernanceCardKind[] = Object.freeze([]);
 /**
  * legacy 卡种读取（X-R1–X-R6 实现**逐字保留**：先读已装配模块 `cards`，未装配回退迁移前表；
  * 两行顺序/文本不得改——module-consumption 源码锚点测试逐字断言）。
+ *
+ * T3 B2（MF-IR-4）：运行期 `cardKindsOf` 已改调门禁引擎门面（单一真源）；本函数与迁移前表
+ * （仅 product 行）按上述锚点/迁移前 oracle 原样保留，不再参与运行期判定。
  */
 function legacyCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
   const module = builtInRoleModuleOf(roleId);
@@ -3259,14 +3387,10 @@ function legacyCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly Governanc
 }
 
 function cardKindsOf(roleId: GovernanceRoleSpec["id"], matrix: DispatchMatrixMode = "legacy-v1"): readonly GovernanceCardKind[] {
-  if (matrix === "two-fixed-paths/v1") {
-    // T3 B1（MF-IR-4，B2 落地模块字段）：fixed 矩阵**只读模块 `fixedCards`**，不从 legacy `cards` 过滤；
-    // 字段缺失/模块未装配 ⇒ fail-closed 空集（不静默回退 legacy 白名单）。
-    const module = builtInRoleModuleOf(roleId);
-    const fixedCards = (module as { readonly fixedCards?: readonly GovernanceCardKind[] } | undefined)?.fixedCards;
-    return fixedCards ?? NO_CARD_KINDS;
-  }
-  return legacyCardKindsOf(roleId);
+  // T3 B2（MF-IR-4）：卡种唯一真源 = 门禁引擎门面 `cardKindsOf(roleId, matrix)`——legacy 只读模块
+  // `cards`（逐字不变），fixed 只读模块 `fixedCards`（字段缺失/未装配 ⇒ fail-closed 空集，
+  // 不回退 legacy `cards`）。本层不复制第二张表。
+  return governanceCardKindsOf(roleId, matrix);
 }
 
 /**
@@ -3561,6 +3685,54 @@ export async function registerVersionedDocumentAfterWrite(input: { projectRoot: 
   return registerVersionedDocument({ projectRoot: input.projectRoot, relPath, ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}) });
 }
 
+/** fixed chief-workflow 资源（`chief-workflow-v2.md`）只读观测结果（应用资源，非授权依据）。 */
+interface FixedChiefWorkflowResource {
+  text: string;
+  sourceUrl: string;
+  moduleUrl: string;
+  version: string;
+  sha256: string;
+  bytes: number;
+  applicationVersion: string;
+}
+
+/**
+ * T3 B2（AC-24/§3.4）：读取应用内置 fixed `chief-workflow-v2.md`（版本 `chief-workflow/v2`）。
+ *
+ * 与 legacy loader（`provider/runtime/tools.ts::loadBuiltinChiefWorkflow`）同口径：只读应用包内
+ * 资源；校验 Markdown 身份、唯一版本行（**恰 `chief-workflow/v2`**）、UTF-8/NUL/体积；计算
+ * SHA-256/bytes 并附应用版本。读取/校验失败 ⇒ 抛错 fail-closed（不猜正文、不静默降级）。
+ * legacy `chief-workflow.md`（v1）**不读、不改**；本函数只服务 fixed 会话注入。
+ */
+async function loadFixedChiefWorkflowResource(): Promise<Readonly<FixedChiefWorkflowResource>> {
+  const source = new URL("../../common/门禁引擎/workflows/chief/chief-workflow-v2.md", import.meta.url);
+  try {
+    const bytes = await readFile(source);
+    if (bytes.length === 0 || bytes.length > 256 * 1024) throw new Error("empty or oversized fixed Chief workflow resource");
+    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    if (text.includes("\0") || !/^\uFEFF?# Chief 工作流/.test(text)) throw new Error("invalid fixed Chief workflow Markdown identity");
+    const versions = [...text.matchAll(/^资源版本：(chief-workflow\/v[1-9][0-9]*)\r?$/gm)];
+    if (versions.length !== 1 || versions[0]![1] !== "chief-workflow/v2") {
+      throw new Error("fixed Chief workflow resource version must be chief-workflow/v2");
+    }
+    const application = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url), "utf8")) as { version?: unknown };
+    if (typeof application.version !== "string" || !/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(application.version)) {
+      throw new Error("application version unavailable");
+    }
+    return Object.freeze({
+      text,
+      sourceUrl: source.href,
+      moduleUrl: import.meta.url,
+      version: versions[0]![1]!,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      bytes: bytes.length,
+      applicationVersion: application.version,
+    });
+  } catch (error) {
+    throw new Error(`chief-workflow-v2-resource-unavailable: ${source.href} (${errText(error)})`, { cause: error });
+  }
+}
+
 /** Fixed engine, shared governed tools, exact project roots; no fallback engine. */
 export function createRuntimeAdapterFactory(
   project: ProjectConfig,
@@ -3598,6 +3770,11 @@ export function createRuntimeAdapterFactory(
     completeTeamPlan: capabilities?.completeTeamPlan,
     activateRoleDocuments: capabilities?.activateRoleDocuments,
     closeCreatedTask: capabilities?.closeCreatedTask,
+    // T3 B2（MF-IR-2/3）：fixed 收口/激活依赖透传给运行时核心（字段名 = 本层给出的接线契约；
+    // 运行时核心 B2 在 `GovernedToolsOptions` 加同名字段后由 handler 消费）。undefined ⇒ 字段缺席
+    // （legacy 会话不出现；fixed 会话由 openRoleSession 注入 fixed 实现，legacy 实现不可达）。
+    ...(capabilities?.closeCreatedTaskFixed !== undefined ? { closeCreatedTaskFixed: capabilities.closeCreatedTaskFixed } : {}),
+    ...(capabilities?.activateRoleDocumentsFixed !== undefined ? { activateRoleDocumentsFixed: capabilities.activateRoleDocumentsFixed } : {}),
     gitQuery: capabilities?.gitQuery,
     gitCandidate: capabilities?.gitCandidate,
     gitPublish: capabilities?.gitPublish,

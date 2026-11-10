@@ -1,0 +1,17 @@
+file | sha256 | bytes | lines
+src/common/编排/workflow-service.ts | d58ac39fcfd837563c5bcb9d6a991096ae1930a3d8e138a72b3e0ef61568a7e8 | 110095 | 2394
+src/pipeline/orchestration/run-role.ts | 55f99d7c129ef0914fb96b5d9cd9e6310e08be49b4d6be375873c6174b63cc9a | 255203 | 3912
+test/编排/run-role-fixed-b2.test.ts | d22aa29c7207e931b7a12a6150c563eef9783a34b3a0f65dc61e80efa7848ab9 | 22676 | 446
+test/编排/fixed-path-start.test.ts | dfe9bbdb541e968a7b6ea0be909d9ec9abeef97c41a6035bcdd19b6cda55a413 | 6049 | 128
+
+total bytes: 394023
+aggregate(sha256 of path:sha256 lines): ff54339b1be87cc5261ddceb38477af564e7170f4c7ebc350126c16efb781264
+
+== git diff --numstat -- src app test ==
+89	0	src/common/编排/workflow-service.ts
+192	15	src/pipeline/orchestration/run-role.ts
+
+== new files (untracked, line counts) ==
+  446 test/编排/run-role-fixed-b2.test.ts
+  128 test/编排/fixed-path-start.test.ts
+  574 total
