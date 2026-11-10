@@ -1,11 +1,14 @@
 # product 角色模块 public API（实现报告）
 
 - 模块：`src/common/roles/product/`（唯一 public entry `index.ts`）
-- 实现角色：product-code（开发侧 worker）；E1 greenfield
+- 实现角色：product-code（开发侧 worker）；E1 greenfield；**B2（T3 两条固定工作流路径）增补 fixed 面**
 - 契约：`docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md`（E0.3，685 行 /
   SHA-256 `067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3`）§3.1/§3.2/§3.3/§3.4/§3.5、
-  §10.2 D1/D8/D10；团队计划 §4.4②/§7.4；B1 §3.3 E1.1–E1.7
-- 证据：`docs/change/2026-11-07_E1_product-module-evidence.md`
+  §10.2 D1/D8/D10；团队计划 §4.4②/§7.4；B1 §3.3 E1.1–E1.7；
+  T3 B2 依据：`docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md` §3.2/§3.4（`ae737dcf…`）、
+  G-IR §5.7/MF-IR-4（`08e01726…`）、B1 验收 AC-24/T-13（`b607f100…`）
+- 证据：`docs/change/2026-11-07_E1_product-module-evidence.md`；
+  B2：`docs/change/2026-11-10_B2_two-fixed-workflow-paths.md` + `_evidence/`
 
 ## 1. 公开形状
 
@@ -16,7 +19,8 @@ export const productRoleModule: BuiltInRoleModule;
 ```
 
 `BuiltInRoleModule`（`src/model/role.ts`）＝ 规格数据 `id/displayName/function/card/capabilities/cards`
-＋ 四个纯策略面 `tools/dispatch/preflight?/context`。内部实现全部在 `internal/`（模块根只放 `index.ts`）。
+＋可选的 fixed 字段 `fixedCards`（MF-IR-4）＋四个纯策略面 `tools/dispatch/preflight?/context`。
+内部实现全部在 `internal/`（模块根只放 `index.ts`）。
 
 | 字段 | 值 / 语义 | 来源 |
 | --- | --- | --- |
@@ -28,9 +32,11 @@ export const productRoleModule: BuiltInRoleModule;
 | `card.preauthorizedDirs` | `["docs/product/"]` | 同上 |
 | `card.forbiddenWritePaths` | 旧规格逐字逐序（应用独占 3 项 + 共用 8 项） | 同上 |
 | `capabilities` | `customerInput=false, dispatchTask=false, roleStatus=false, sessionTail=false, installSkill=false, installMcp=false, shell="operator-approve"` | 同上（D10 唯一真源） |
-| `cards` | `[]`（product 不发起治理卡；旧 `TRIO_CARD_KINDS.product = []`；D8） | 旧 run-role 私有表 |
+| `cards` | `[]`（product 不发起治理卡；旧 `TRIO_CARD_KINDS.product = []`；D8；legacy 冻结） | 旧 run-role 私有表 |
+| `fixedCards` | `[]`（fixed 矩阵白名单；意图确认卡由幕僚呈；MF-IR-4 冻结值；固定路径**不新增卡**） | v1.3 §3.4 / G-IR §5.7 |
 
-模块对象与嵌套数据均 `Object.freeze`；不携带权限字段。
+模块对象与嵌套数据均 `Object.freeze`；不携带权限字段。`fixedCards` 只在
+`matrix:"two-fixed-paths/v1"` 下由门禁引擎门面 `cardKindsOf(id, matrix)` 读取；legacy 消费点不得改读。
 
 ## 2. `tools(input: TrustedToolPolicyInput): RoleToolPolicy`
 
@@ -63,7 +69,31 @@ R-2：只做硬身份/存在性判定。本模块只回答与 product 相关的�
 | 输入形状畸形（空 id/非法 kind/targetExists 非 boolean） | deny `dispatch-input-invalid` | — |
 
 messageKey 统一 `role.product.dispatch.<camelCase>`（`inputInvalid/selfDispatch/unknownSource/
-notInModuleScope/chiefToProjectForbidden/targetCardMissing/convenerTargetForbidden`）。
+notInModuleScope/chiefToProjectForbidden/targetCardMissing/convenerTargetForbidden/chiefProductionForbidden`）。
+
+### 3.1 fixed 矩阵分支（`matrix:"two-fixed-paths/v1"`；B2 新增）
+
+同一纯函数内按 `input.matrix` 分支；**缺省 / `"legacy-v1"` 走上表 legacy 逻辑逐字不变**（未传
+`matrix` 的旧调用点行为不变）。fixed 分支（v1.3 §3.2/§3.4）：
+
+| 输入条件 | 结果 | `reportToRoleId` |
+| --- | --- | --- |
+| 输入形状畸形（同 legacy 校验：空 id/非法 kind/targetExists 非 boolean） | deny `dispatch-input-invalid` | — |
+| `sourceRoleId === targetRoleId`（真实非空） | deny `self-dispatch` | — |
+| 来源缺失，或来源 ∉ {chief, convener} | deny `unknown-source` | — |
+| 目标 ≠ `"product"`（来源为 chief/convener） | deny `dispatch-not-in-module-scope` | — |
+| 目标 = product，声明 project 类别（内置 id 身份冲突） | deny `dispatch-input-invalid` | — |
+| 目标 = product，来源 chief，内置 | deny **`chief-production-dispatch-forbidden`**（fixed-only 稳定码） | — |
+| 目标 = product，来源 convener，内置、`targetExists !== true` | deny `target-card-missing`（fail-closed） | — |
+| 目标 = product，来源 convener，内置、存在 | **allow** | `"convener"`（fixed 生产线任务创建者） |
+
+- fixed-only 稳定码 `chief-production-dispatch-forbidden` 的 i18n 键为
+  `role.product.dispatch.chiefProductionForbidden`（v1.3 §3.2 第 8 条：登记在 api-spec/i18n/测试；
+  **legacy 从不返回**；不新增客户可见门）。
+- 本模块只回答目标=product 的判定；fixed 目标归属由 convener 模块
+  `fixedAllowedBuiltInRoleIds`/`isConvenerFixedBuiltInDispatchTarget` 表达（MF-IR-4）。
+- 报告期望只是差分口径，不驱动实际路由（实际路由/证据校验由编排
+  `workflow-dispatch.ts::evaluateFixedPathDispatchAuthorization` 与桌面完成）。
 
 与旧 `evaluateDispatchAuthorization` 的**已列明差异**（差分测试按编号断言）：
 
@@ -125,6 +155,10 @@ bootstrapMismatch/baseTrunkInvalid/targetsInvalid`）。
 
 ## 5. `context(input: RoleContextInput): readonly RoleContextSection[]`
 
+按 `input.matrix` 选择 legacy/fixed 段（缺省 `"legacy-v1"`；只读 `matrix`，不读 `facts`）。
+
+### 5.1 legacy（缺省 / `"legacy-v1"`；逐字冻结）
+
 返回 4 个静态提示块（顺序稳定、id 唯一、无 `resources`；宿主负责读取/脱敏）：
 
 | id | 内容 |
@@ -134,8 +168,19 @@ bootstrapMismatch/baseTrunkInvalid/targetsInvalid`）。
 | `product-version-upgrade` | version-upgrade 直接提交/不等待 VCA 批拒/旧 run 不自动重 pin |
 | `product-report` | 报告期望：`submit_report` 回真实任务创建者（幕僚/Chief），缺信息先报阻塞 |
 
-`context()` 不读取 `facts`（登记读取键：无）；返回值是同一份冻结静态数据。product 无应用资源文件，
-故不声明 `RoleContextResourceRef`（项目 `docs/workflow.md` 不是角色模块资源；E0 D5/Q4）。
+### 5.2 fixed（`matrix:"two-fixed-paths/v1"`；B2 新增）
+
+返回 3 个 fixed 静态提示块（legacy 4 段不混入；由编排在 fixed 会话追加注入，v1.3 §3.4）：
+
+| id | 内容 |
+| --- | --- |
+| `product-fixed-duty` | 按运营（convener）派发撰写/修订 `docs/product/<flowId>-intent-vN.md`（版本化、不原地改）；必含字段；不写实现方案；与旧卡文本冲突时以本段为准 |
+| `product-fixed-boundary` | 只写 `docs/product/`；不派发任务、不实现、不招人；不自行改方案/名单/架构/角色卡；意图确认卡由幕僚呈、product 不发卡；不注入 VCA/版本决策/结构化 Git 工具 |
+| `product-fixed-report` | 报告期望：`submit_report` 回真实任务创建者运营（convener）；缺信息先报阻塞 |
+
+`context()` 不读取 `facts`（登记读取键：无）；legacy/fixed 各自返回同一份冻结静态数据（同一引用）。
+product 无应用资源文件，故不声明 `RoleContextResourceRef`（项目 `docs/workflow.md` 不是角色模块资源；
+E0 D5/Q4）。fixed 段只在 `matrix:"two-fixed-paths/v1"` 下生效；legacy `context({})` 返回值逐字不变。
 
 ## 6. 依赖、纯度与模块纪律
 

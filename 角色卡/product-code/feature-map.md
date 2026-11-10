@@ -7,8 +7,9 @@
 | 关注点 | 位置 |
 | --- | --- |
 | 实际职责、交接与代码位置 | [functional-description.md](functional-description.md) |
-| 模块 public API（数据/工具/派发/preflight/context） | [api-spec.md](api-spec.md) |
+| 模块 public API（数据/工具/派发/preflight/context；含 fixed 面） | [api-spec.md](api-spec.md) |
 | E1 交付证据（差分/测试/哈希/遗留） | [docs/change/2026-11-07_E1_product-module-evidence.md](docs/change/2026-11-07_E1_product-module-evidence.md) |
+| T3 B2 交付记录（两条固定工作流路径；fixedCards/context/dispatch） | [docs/change/2026-11-10_B2_two-fixed-workflow-paths.md](docs/change/2026-11-10_B2_two-fixed-workflow-paths.md) |
 | 模块代码 | `src/common/roles/product/`（唯一 entry `index.ts`） |
 | 模块测试与差分夹具 | `test/roles/product/` |
 | 续接线索 | [memo.md](memo.md) |
