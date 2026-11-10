@@ -1,0 +1,105 @@
+# 复核证据（第三轮 / v1.3）：两条固定工作流路径实现级方案（2026-11-10）
+
+- 复核角色：独立验收（独立固定上下文）
+- 工作树：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+- 分支：feat/two-fixed-workflow-paths
+- HEAD（复核时）：67b728f11e63d35377ad276df3eb99ef3f969d31（方案 v1.3 提交；代码相对 10f90c7 无差异）
+- origin/main 基线：d9e3e99c160599e5b53a82e105939a359f69992f
+- 复核日期：2026-11-10
+- 结论：**建议提交（可进入 B1）**；无剩余 must-fix；B1 已同轮写入。
+- 说明：本文件为只读清点/命令输出记录；除本目录、本轮报告与 B1 外，本轮未写任何文件；未提交/推送/合并/发布；未修改前两轮报告。
+
+## 一、本轮目标与依据实测（sha256sum / wc）
+
+```
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+6ab9e1e9374899853836f1b0704ff619f68ee20a404a13d2a135ddd5fb9fc0b6 *docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.3.md
+08450af1b6be0cf893bea81cd73f73c990551b89c499430fd5a60d3c6cbbc215 *docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d *docs/planning/2026-11-10_design_two-fixed-workflow-paths.md
+259ecde7aad44550e29c2d018bc452d619ce3942b57625c4bfe9e5e66b93ecd1 *角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.2.md
+df1992df9c22af5fa915a128469fc0911c77493c21486367328a40bc35a00efc *角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md
+550872d772cfcf986231c5f0dfc504be83e4b67d78266db348574a648753860b *角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.3.md
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+045115160e4724bd1671bd38896469aa575d2c1143d7ea347fef5a43261715c1 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.1.md
+e34e60fad8d97e00c517efd6ee564fd61146a66108a87cb2c8035cc8f46cfff9 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.2.md
+279f55dcbf86b07f60fad62be30606758cfcd666cac83411a521609fb1446aeb *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.md
+24364c13cef088d85e7139efa04067bc67160b01d256e01c86f8309766c746ad *角色卡/rapporteur-code/docs/design/2026-11-10_impl_two-fixed-workflow-paths.md
+```
+
+行/字节：
+```
+1,392 / 184,391 docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+66 / 9,333      docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.3.md
+90 / 10,820     docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+156 / 20,635    角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.3.md
+197 / 33,722    docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+```
+
+六份架构/契约设计复核（与 v1.3 头部引用一致）：
+```
+241502075ff57d6534d7b2c807a2726f1a4c261381e3b0f968b6be468c64e9ce *docs/planning/2026-11-07_design_runtime-tool-surface-dispatch-gate.md (1,242 行)
+1f6518b898aa33b649c21124e26816cd05715a5eba6a147aed8b8cab9cfb26d6 *docs/planning/2026-11-05_design_governance-authority-matrix.md (1,056 行)
+067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3 *docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md (685 行)
+886fef84c3db34515a98f5874a33bb22134a3fc3b02f20aa3d185b828a3e7c54 *docs/planning/2026-11-09_design_document-format-specifications.md (979 行)
+1477a6e423a74a7007824b7db82cac4e0f6dbb9e48abaa60a7f452704672e6be *docs/planning/2026-11-09_design_judge-delegated-decision-effectiveness.md (686 行)
+2bb663fec3baee7b275ae7a8747bb3a31091304cd728b4329787d17bab86608b *docs/planning/2026-11-09_design_team-plan-run-binding.md (438 行)
+```
+
+## 二、代码清点实测（行数与方案一致）
+
+```
+1687 workflow-preconditions.ts; 1861 schema.ts; 253 gates/index.ts; 2242 classify-shell.ts; 1296 task-state.ts
+1171 run-manifest.ts; 3669 run-role.ts; 11225 session.ts; 4183 model/runtime.ts; 409 model/role.ts
+229 jsonl-ledger.ts; 4030 apply-journal.ts; 1156 project-state.ts; 2294 doc-format-specs.ts
+692 convener/index.ts; 847 nominator/index.ts; 409 verifier/index.ts
+test/**/*.test.ts = 555；doc-format-specs.ts 格式 id = 54
+```
+
+## 三、MF-9…MF-12 闭环抽查（v1.3 行锚点）
+
+1. **MF-9（A10/A11 时序）**：§4.2 A10（line 567）A10 仅任命确认、`request.resolved` ⇒ `stage.completed A10`、**不**在 A10 发派实现请求；§4.2 A11（line 568）chief 发 **A11 stage-request** 派实现、A11 完成于全部选中实现任务 `task.closed accepted` + 分支 tip、A10 未完成发 A11 ⇒ `stage-transition-invalid`；§4.4（line 658-659）`A6(accept)→A7→A8→A9→A10→A11` 与 `A10→A12a→A11→A12b→A13→closed`；§4.5（line 685-686）；§11.1（line 1139-1140）顺序/负例测试。→ 闭环。残留 G-1（A12a 与 A11 先后门，B1 AC-09 钉住）。
+2. **MF-10（项目验收角色窄例外）**：§3.1（line 304）；§3.2（line 326-345）谓词 `target project && purpose==review && targetExists && targetRoleId==workflowView.reviewRoleId → allow`，其余 project `chief-to-project-forbidden`；§3.6（line 468-469）Q6 证据第 5 条 + 负例；§5.4（line 805）`project-roster/v4 roles[].review`（至多一个 true；v3 兼容；默认 verifier），A9 basis 记录 `reviewRoleId`；§7.4（line 985）；§8.5（line 1027）；§9.2（line 1065）；§10.3（line 1128）；§11.1（line 1140）。→ 闭环。残留 G-9（roster v4 doc-format 兼容语义，B1 钉住）。
+3. **MF-11（发布前置按路径）**：§4.3 B4（line 626）「B3 accepted + 运营报告（不要求 A12b）」；§6.4（line 882-886）A13 额外 A12b+归档、B4 不要求 A12b、`release-workflow-not-ready` 附缺失项；§11.1（line 1148）。→ 闭环。
+4. **MF-12（路径 B 仓库/分支准备）**：§4.3 B1（line 623）既有 Git 仓库（`b-repository-required`）；§4.3「B 路径仓库/分支准备」（line 628-634）`.gitignore`/baseline commit/从当前 HEAD 创建或复用 `ans/task/<workflowId>`/dirty/`basis.recorded(reason:"path-b") repo 字段/“只读”仅文档；§5.2 item 6（line 763）；§5.5（line 817）；§11.1（line 1149）。→ 闭环。残留 G-2（分支基线非 main 的合并风险，B1 AC-22 钉住）。
+
+## 四、MF-1…MF-8 保持闭环（v1.3 抽查）
+
+- MF-1：§3.2 item 2（旧谓词/复合入口/allowlist/isConvenerBuiltInDispatchTarget 保持原样）、§3.2 会话层（routeStarDispatch 逐字不改）、§11.2（legacy 断言逐字保留）。
+- MF-2：§3.2 item 4（五内置/["verifier"] 不变；新增 fixed 目标集；legacy 消费点不改）。
+- MF-3：§7.1（line 947-957）fixed task.created 规则（workflowId 豁免 runId/runState；旧规则逐字保留）。
+- MF-4：§3.5 item 7、§4.2 A3/close v2（line 598-617）。
+- MF-5：§3.6 workflowModeForFlow、§4.1 per-flow、§9.4。
+- MF-6：§5.2（.gitignore/dirty）、§5.5、§6.1、§6.4。
+- MF-7：§4.2 A12、§8.5、§12.2 Q7。
+- MF-8：§4.3 B2/B3 写集来源、§6.3 item 3、§11.1。
+
+## 五、协调方决策 #1–#8 核对
+
+- 启动计划 §七 #1–#8 与 v1.3 正文（line 29-42 及全文引用）编号一致（G-1 已修正）。
+- **merge-main 残留检查**：全文 `grep "merge-main"`/`grep "judge"` 无 “approval 组/planJudge 纳入/judge 可代批” 表述；均为「应用自有非判断卡（进 `GOVERNANCE_APP_OWNED_CARD_KINDS`、不进 `GOVERNANCE_CARD_GROUP`）、必须客户本人、judge 只能转人工/拒绝、不得冒充客户、高风险清单不变」。
+- Q1/#5、Q2/#6、Q4/#3、Q6/#7、Q7/#2、纪律/#8、流程门/#1 均落入正文（§8.5/§12.2/§6.4/§3.6/§4.2/§12.3）。
+- 现状代码一致性：`GOVERNANCE_CARD_GROUP`（model/runtime.ts:944-985）不含 app-owned；`GOVERNANCE_APP_OWNED_CARD_KINDS` 派生进 `GOVERNANCE_CARD_KINDS`；`governanceCardGroup("merge-main")` 将为 undefined；`planJudge`（customer-input.ts:1320-1345）对无组卡种直接不判断。
+
+## 六、残留 G（非阻塞；与报告 §六 对应）
+
+G-1 A12a/A11 先后门；G-2 B 路径分支基线（当前 HEAD 非 main）合并风险；G-3 stop 收口顺序措辞（§3.3 close-first vs §4.4 stop→close）；G-4 Appendix E `governance-roles.ts "keep + matrix 文案"` 与 §7.4 legacy 文案不改；G-5 §6.1 分支规则未带 §5.2 复用例外；G-6 首请求幂等键（workflowId 可选 vs 键含 workflowId）；G-7 `requestReleaseMerge` 条件化；G-8 promptGuidelines fixed 文案可能进入 legacy；G-9 `project-roster/v4` 复用 doc-format id 的双字面量兼容；G-10 A11 `stage.dispatched` 语义；G-11 混合项目 legacy/fixed 共用工作区风险；G-12 启动计划提交引用（`4c344bd` 对应 hash `6cfee9e6…`；当前 `08450af1…` 来自 `b870b15`）。
+
+## 七、B1 写入记录（同轮）
+
+- 路径：`docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md`
+- 行数 / 字节：197 行 / 33,722 bytes
+- SHA-256：`b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb`
+- 判据初始状态：全部 `未取证`；绑定设计 v2/v1.3/三轮复核/协调方决策/启动计划 hash；包含 AC-01…AC-30、T-01…T-20、RR-01…RR-06、EV-01…EV-08、判定规则与 B1 钉住残余项。
+
+## 八、本轮报告与证据的实测（写盘后）
+
+- 报告：`角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.3.md`
+  - 156 行 / 20,635 bytes / SHA-256 `550872d772cfcf986231c5f0dfc504be83e4b67d78266db348574a648753860b`
+- 前两轮报告未改动：`df1992df…`（222 行 / 32,535 B）、`259ecde7…`（202 行 / 30,200 B）。
+
+## 九、限制与未提交声明
+
+- 未运行全量确定性测试（555 个 `*.test.ts`）；known red（version-change-integration 9 红、optional-acceptance 6/2/1/3/0、test/编排 22 fail/2 skip）未独立复测。
+- 未运行真实 Electron/真实模型；未验证 UI/judge 实际行为、merge-main 卡呈现、真实 Git 合并语义、CI/发布状态。
+- 未访问仓库外贪吃蛇 target 与其 `.ans` 状态。
+- 本轮未 commit / push / merge / tag / 发布；未写产品/测试代码；未改角色卡/边界；未占用 9222/9223。
