@@ -1,0 +1,46 @@
+# G-IR 证据 06：写集/依赖/客户门核对
+
+## 1. B0 提交（ee5b330）文件面
+
+- 代码/测试（20 文件）：
+  - src/model/runtime.ts（M）、src/model/role.ts（M）
+  - src/provider/runtime/schema.ts（M）、tools.ts（M）
+  - src/common/编排/task-state.ts（M）、workflow-state.ts（A）、workflow-service.ts（A）、basis-guard.ts（A）
+  - src/pipeline/orchestration/run-role.ts（M，+1 行；见 §4）
+  - src/common/shared/config-loader.ts（M）
+  - test/runtime-core/two-fixed-workflow-paths-b0.test.ts（A）、stable-write-card-kind.test.ts（M）
+  - test/门禁引擎/dispatch-matrix-mode.test.ts（A）、role-module-contract.test.ts（M）
+  - test/编排/{task-state-fixed,workflow-state,workflow-mode,workflow-ledger,basis-guard}.test.ts（A）
+  - test/项目管理/shared/config-loader.test.ts（M）
+- 角色记录/证据：四角色 `docs/change/2026-11-10_B0_*` + `_evidence/**`（D1 自证据，非产品代码）。
+
+## 2. 禁写/边界核对（相对代码基线 10f90c7）
+
+```
+git diff --name-only 10f90c7..ee5b330 -- src/common/gates src/common/roles app 角色卡/governance-boundary.yaml package.json package-lock.json
+```
+输出：空。
+
+- `src/common/gates/`：零 diff（H1=0；Q6 替代证据路线成立的基础）。
+- `app/**`：B0 零改动（桌面/卡通道属 B3）。
+- `src/common/roles/**`：零改动（legacy 数据冻结；fixed 字段属 B2）。
+- 边界文件/依赖清单：零改动；未新增依赖（package.json/lock 无 diff）。
+- 无新角色、无客户可见门、无边界模型变化；merge-main 为既有高风险确认机制具体化（类型/分组层）。
+
+## 3. 新增文件位置（既有 directory 授权）
+
+- `src/common/编排/{workflow-state,workflow-service,basis-guard}.ts` — 编排目录既有授权（v1.3 §10.3）。
+- 新测试文件位于既有测试目录。
+
+## 4. 写集偏差（如实披露）
+
+- `src/pipeline/orchestration/run-role.ts` +1 行（`CARD_KIND_ROUTE_HINTS["merge-main"]`）：
+  - 团队计划 §三 B0「编排」行未列 run-role.ts（B1 编排行才列）；
+  - 该行是运行时核心新增 `GovernanceCardKind` 后恢复 `Record<GovernanceCardKind,string>` 穷尽性、
+    typecheck=0 的最小修复；编排 B0 记录 §1.5 已披露；属同一 owner 的 B1 写集范围。
+  - 判定：非越权安全风险，但需 Scheduler/编排在 B1 记录中确认该 +1 行纳入批次写集（程序性条件）。
+
+## 5. 结论
+
+- B0 代码面未越出团队计划 §三 owner 写集（除上述已披露的 run-role.ts +1）；
+- 无依赖/客户门/角色/边界变化；B0 记录 hash 与代码一致（证据 02）。

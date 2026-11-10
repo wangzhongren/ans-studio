@@ -1,0 +1,99 @@
+# G-IR 证据 05：关键代码锚点（评审引用，HEAD ee5b330）
+
+> 行号 = 评审时 HEAD 工作树实测；仅引用，不修改。
+
+## 1. 矩阵/context/配置
+
+- src/model/role.ts:98 — `ProjectConfig.workflowSchema?: "two-fixed-paths/v1" | "legacy/v1"`（可选，缺省不声明）
+- src/model/role.ts:312 — `DispatchMatrixMode = "legacy-v1" | "two-fixed-paths/v1"`
+- src/model/role.ts:322 — `RoleDispatchPurpose = "production" | "stage-request" | "review" | "preparation"`
+- src/model/role.ts:336/338 — `RoleDispatchPolicyInput.matrix?` / `.purpose?`（可选）
+- src/model/role.ts:415 — `RoleContextInput.matrix?`（可选）
+- src/model/role.ts:426-435 — `BuiltInRoleModule`（`context(input: RoleContextInput)` 签名未变）
+- src/common/shared/config-loader.ts:98-110 — `isWorkflowSchema`（仅两字面量）
+- src/common/shared/config-loader.ts:306-315 — 非法值 ⇒ 整个配置 `ans-invalid`（fail-closed）；缺省不设字段
+- test/门禁引擎/dispatch-matrix-mode.test.ts:36-47 — 闭集/可选性编译期断言
+- test/门禁引擎/dispatch-matrix-mode.test.ts:107-129 — 缺省 ≡ 显式 legacy（六模块 dispatch/context）
+
+## 2. requestReleaseMerge（不新增）证据面
+
+- src/model/role.ts:252-266 — `RoleToolId` 闭集 14 项（无发布合并项）
+- src/common/门禁引擎/role-tool-registry.ts:52-67 — `ROLE_TOOL_CATALOG` 14 项映射与允许角色
+- src/provider/runtime/schema.ts:37-77 — direct capabilities 5 项（select_run_change/complete_team_plan/
+  activate_role_documents/close_created_task/decide_pending_request；无发布合并）
+- src/provider/runtime/tools.ts:4396-4399 — `DIRECT_CAPABILITY_NAMES` 5 项
+- src/provider/runtime/tools.ts:369/372 — request_choice/request_confirmation 卡种白名单（不含 merge-main）
+- src/provider/runtime/schema.ts:1801-1830 — `request_stable_write`（仅 convener；docs/workflow.md 专用；legacy stable-write 卡）
+- src/provider/runtime/schema.ts:79-108 — `git_publish`（legacy 结构化 Git 发布；非 main 合并；fixed 不注入）
+- src/common/roles/chief/internal/tools.ts:32-39 — chief 额外工具 6 项（无发布合并）
+- v1.3 §6.4（docs/proposals/...v1.3.md:868）— 备选「桌面 UI 动作/应用在 A13 自动呈卡」不改变安全语义
+
+## 3. merge-main 卡种 / judge 排除
+
+- src/model/runtime.ts:895-910 — `AppOwnedGovernanceCardKind = "stable-write" | "merge-main"`；
+  `GOVERNANCE_APP_OWNED_CARD_KINDS = ["stable-write","merge-main"]`
+- src/model/runtime.ts:924-928 — `GovernanceCardKind` 并入 app-owned
+- src/model/runtime.ts:952-967 — `GOVERNANCE_CARD_GROUP`（7 键/值逐字未变；merge-main 不在表）
+- src/model/runtime.ts:974-977 — `governanceCardGroup("merge-main") === undefined`
+- src/model/runtime.ts:986-989 — `GOVERNANCE_CARD_KINDS` 派生（7 分组键 + 2 app-owned = 9）
+- src/model/runtime.ts:2266-2278 — `release.confirmed.by: "customer"`；`release.rejected.by: "customer" | "judge"`
+- app/desktop/customer-input.ts:1320-1337 — `planJudge`：`governanceCardGroup` 未定义 ⇒ `return undefined`（不进判断器）
+- src/common/编排/governance-judge.ts:165-168 — judge 请求分组未定义 ⇒ `group-mismatch` 回落 manual
+- src/common/编排/governance-judge-verdict.ts:356/395 — approve/deny 均要求分组与卡种一致（merge-main 不可通过）
+- src/pipeline/orchestration/run-role.ts:3243 — `CARD_KIND_ROUTE_HINTS["merge-main"]`（B0 跨批 +1 行）
+- test/runtime-core/two-fixed-workflow-paths-b0.test.ts:50-83 — 卡种/分组/白名单/类型负例断言
+
+## 4. task.created 字段/豁免
+
+- src/model/runtime.ts:1375-1429 — `TaskCreatedEvent`：workflowId/stage/taskKind/workflowPath 可选
+- src/model/runtime.ts:1482-1549 — request.created/resolved：documentRefs/workflowId/stage 可选
+- src/common/编排/task-state.ts:370-400 — `validateFixedTaskCreatedBinding`（slug/flowId/stage/taskKind/workflowPath）
+- src/common/编排/task-state.ts:404-455 — fixed 分支：runId/runState 出现即 `fixed-task-run-forbidden`；
+  workflowPath 仅 stage-request 且仅首个（`workflow-path-not-stage-request` / `workflow-path-not-first`）；
+  无 workflowId 的旧 `run-required` 分支逐字保留（:447-455）
+- src/common/编排/task-state.ts:1102-1122 — 读侧固定字段 fail-closed；旧行无字段照常
+- src/common/编排/task-state.ts:1189 — replay：fixed 任务不再回填 `runState:"legacy"`
+- test/编排/task-state-fixed.test.ts — fixed 放行/旧拒/坏形状/replay 6 用例
+
+## 5. dispatch_task 字段
+
+- src/provider/runtime/schema.ts:698-735 — 6 个新可选属性；required 仍 `["roleId","task"]`；旧属性保留
+- src/provider/runtime/schema.ts:767-770 — promptGuidelines 追加 stage-request/stop 两条（旧条不变）
+- src/provider/runtime/schema.ts:840 — `contract_check.taskKind` 枚举 + `stage-request`
+- src/provider/runtime/tools.ts:2886-2935 — handler 形状校验 + 仅在存在时透传（旧载荷不追加键）
+- src/provider/runtime/tools.ts:3177 — contract_check handler 枚举同步
+- src/model/runtime.ts:2602-2655 — `DispatchTaskPayload` 6 个可选字段
+- src/model/runtime.ts:2728 — `ContractCheckInput.taskKind` 枚举 + `stage-request`
+- test/runtime-core/two-fixed-workflow-paths-b0.test.ts:256-321 — schema/handler 正负例
+
+## 6. close_created_task / activate_role_documents v2（B0 尚未扩展）
+
+- src/model/runtime.ts:3171-3180 — `CloseCreatedTaskInput`：runId/basisDigest/reportRef **仍必填**
+- src/provider/runtime/schema.ts:57-60 — close required 6 项未放宽；description 追加模式说明
+- src/provider/runtime/tools.ts:4461-4467 — directShapeError 按 schema.required 校验 ⇒ fixed 3 字段输入当前会被拒
+- src/model/runtime.ts:3152-3164 — `ActivateRoleDocumentsInput`：planRef/d3DecisionId/rosterRef（legacy），无 workflowId/proposalDecisionId
+- src/provider/runtime/schema.ts:53-56 — activate legacy 形状
+- test/runtime-core/two-fixed-workflow-paths-b0.test.ts:281-292 — 断言 close required 逐字保留（B0 有意不放宽）
+
+## 7. 角色模块新增导出（B0 尚未落地）
+
+- src/model/role.ts:186-198 — `GovernanceRoleSpec`（`cards` 等 legacy 字段）
+- src/model/role.ts:426-435 — `BuiltInRoleModule`（无 fixedCards/fixedTargetRoleIds/... 字段）
+- src/common/roles/chief/internal/dispatch.ts:48 — legacy `CHIEF_HUB_DISPATCH`（五内置）
+- src/common/roles/convener/index.ts:191 — legacy `CONVENER_WORKER_DISPATCH_TARGETS`
+- src/common/编排/workflow-preconditions.ts:1582 — legacy `isConvenerBuiltInDispatchTarget`
+- src/pipeline/orchestration/run-role.ts:3201-3206 — `cardKindsOf` 现读模块 `cards`（fixed 需按 matrix 分支）
+
+## 8. project-roster/v4
+
+- src/common/编排/workflow-preconditions.ts:30 — `PROJECT_ROSTER_SCHEMA = "project-roster/v3"`（仅 v3）
+- src/common/编排/workflow-preconditions.ts:686-712 — schema 必须恰为 v3；不做静默归一化
+- src/common/编排/workflow-preconditions.ts:730-770 — roles 解析（无 `review` 字段）
+- src/common/编排/doc-format-specs.ts:628 — 现有格式 id `project-roster/v3`（54 格式之一；不得新增 id）
+
+## 9. legacy/环境
+
+- src/common/编排/task-state.ts:404 — `appendTaskEvent` 由 `function` 改 `async function`（返回类型仍 `Promise<AppendResult>`；
+  旧分支返回 Promise.resolve 语义等价）
+- `git diff 10f90c7..ee5b330 -- src/common/gates`：空（零 diff）
+- `git diff 10f90c7..ee5b330 -- src/common/roles app 角色卡/governance-boundary.yaml package.json package-lock.json`：空

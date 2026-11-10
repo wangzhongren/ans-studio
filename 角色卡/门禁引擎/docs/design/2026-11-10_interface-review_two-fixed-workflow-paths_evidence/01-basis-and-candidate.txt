@@ -1,0 +1,32 @@
+# G-IR 证据 01：依据绑定与评审对象（只读实测）
+
+- 采集时间（UTC）：2026-11-10T05:07:05Z
+- 工作目录：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+- 分支：feat/two-fixed-workflow-paths
+- HEAD（评审对象）：ee5b330fceedf3eb82a42c1b878b0f3f410fd7b1（feat(workflow): B0 foundations for two fixed workflow paths）
+- 代码基线：10f90c769ce9c2a567cdd364def0037fe9019a05
+- 环境：Node v24.22.1；npm 11.19.1；git 2.55.0.windows.5；Windows 11
+- 评审时 `git status --porcelain -- src app test`：空（跟踪文件与 HEAD 一致）
+
+## 依依据文档实测（行 / 字节 / SHA-256）
+
+| 依据 | 路径 | 实测 |
+| --- | --- | --- |
+| B1 验收（冻结） | docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md | 197 行 / 33,722 B / b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb |
+| 实现级方案 v1.3（冻结） | docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md | 1,392 行 / 184,391 B / ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 |
+| 团队计划 | docs/scheduling/2026-11-10_team-plan_two-fixed-workflow-paths.md | 159 行 / 17,013 B / 4c63ccbc84990f00e772fb6e16cf0e9df9433a8bbe5c99dcd078b67bca036211 |
+| B0 记录（运行时核心） | 角色卡/运行时核心/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md | 146 行 / 0603ba8198cc303dba69c1024d987f83c684338e9e31fd21521627d0c3bb7f42 |
+| B0 记录（门禁引擎） | 角色卡/门禁引擎/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md | 115 行 / 1d846d351e4ead47af840bc718ac374c78e3c0c483224d4ff0561d766ec2c07f |
+| B0 记录（shared-code） | 角色卡/shared-code/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md | 157 行 / ab1383ca9f35a2e730ea2995faef5d19a58896e1408d26b1e8f2978ba0461afc |
+| B0 记录（编排） | 角色卡/编排/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md | 219 行 / b180e020f5fb7806a1d4dfe6d3479539908daf5378173606d68ae47df5df05c9 |
+
+## 差异面（评审对象）
+
+- `git diff --shortstat 10f90c7..ee5b330 -- src test`：20 files changed, 3,891 insertions(+), 28 deletions(-)
+- `git diff --shortstat 10f90c7..ee5b330`：80 files changed, 30,224 insertions(+), 32 deletions(-)（含 10f90c7 之后、B0 之前的 docs 提交）
+- `git show --shortstat ee5b330`：65 files changed, 24,889 insertions(+), 28 deletions(-)（代码/测试 + 四角色 B0 记录/证据）
+
+## 说明
+
+- 本节 hash 均为 `sha256sum` 对工作树原字节实测（Windows 工作树 CRLF）；与 B0 记录声明一致。
+- 评审对象按任务口径取 `git diff 10f90c7..ee5b330 -- src test`；B0 提交本身为 ee5b330。
