@@ -1,0 +1,3 @@
+# G-B5-1: recordStageDispatch production call sites (expect only workflow-service definition + tests)
+$ grep -rn "recordStageDispatch" src app --include=*.ts
+(no output above = no production call sites outside workflow-service.ts)

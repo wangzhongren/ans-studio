@@ -1,0 +1,22 @@
+=== date ===
+2026-11-10T12:32:34Z (UTC)
+=== branch/HEAD ===
+feat/two-fixed-workflow-paths
+e645e4ebe9b7444d4647ac74fb4f49a99030c354
+=== git status --porcelain -- src app test ===
+ M test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/测试/b-change-scope.test.ts
+?? test/测试/fixed-path-full-chain.test.ts
+?? test/测试/mode-switch.test.ts
+(expected: this batch's allowlist M + 3 pre-existing B5 untracked test files; no app/src changes)
+
+=== numstat vs HEAD (write-set file) ===
+16	0	test/项目管理/shared/i18n-guard-allowlist.ts
+=== sha256 (working-tree raw bytes) ===
+bad457a354b656b970c928b1000ae7134a8596dd69f80c64c7b396e88230b5b6 *test/项目管理/shared/i18n-guard-allowlist.ts
+91e8d14323628e9a8d16721f6b059258eb6e6aa312fe8b1d1e16125ca7c6c7b6 *test/项目管理/shared/i18n-guard.test.ts
+502fe5b4c828b8c76da0d0f1ff94083886f9931eeb56250ebe789a59cf8f8956 *test/项目管理/shared/i18n-guard-scanner.ts
+84dd9c14ce726d3e213b1ceb71125dd1b19230f6416f09f1739539126c0fe0d3 *app/desktop/workflow.ts
+d7cbdd7aec028728b8638b49ccc14171a4785348351bf4dfd908cfe9da361fb4 *app/desktop/workflow-git.ts
+=== line/byte counts ===
+  125 11093 test/项目管理/shared/i18n-guard-allowlist.ts

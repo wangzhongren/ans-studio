@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 首次 fixed 启动：首个 stage-request 携带 workflowPath ⇒ 写 workflowSchema 并走 fixed；显式 legacy 不覆盖；坏配置 fail-closed
+ok 1 - 首次 fixed 启动：首个 stage-request 携带 workflowPath ⇒ 写 workflowSchema 并走 fixed；显式 legacy 不覆盖；坏配置 fail-closed
+  ---
+  duration_ms: 118.6431
+  type: 'test'
+  ...
+# Subtest: fixed intent-confirm：documentRefs[intent]（含 version）+ marker + workflowId/stage 戳；confirm ⇒ stage.completed A3
+ok 2 - fixed intent-confirm：documentRefs[intent]（含 version）+ marker + workflowId/stage 戳；confirm ⇒ stage.completed A3
+  ---
+  duration_ms: 78.8957
+  type: 'test'
+  ...
+# Subtest: fixed proposal：五件 documentRefs + workflowId/stage A6；accept ⇒ stage.completed A6（不调用 legacy frozen 拒绝）
+ok 3 - fixed proposal：五件 documentRefs + workflowId/stage A6；accept ⇒ stage.completed A6（不调用 legacy frozen 拒绝）
+  ---
+  duration_ms: 76.0146
+  type: 'test'
+  ...
+# Subtest: fixed proposal：任一 documentRefs 缺失 ⇒ proposal-document-missing（notPresented、不写账本）
+ok 4 - fixed proposal：任一 documentRefs 缺失 ⇒ proposal-document-missing（notPresented、不写账本）
+  ---
+  duration_ms: 18.6116
+  type: 'test'
+  ...
+# Subtest: fixed appointment：选项=名单（multiple/推荐集由应用生成）+ workflowId/stage A10；裁决 ⇒ stage.completed A10；无 legacy roster 戳
+ok 5 - fixed appointment：选项=名单（multiple/推荐集由应用生成）+ workflowId/stage A10；裁决 ⇒ stage.completed A10；无 legacy roster 戳
+  ---
+  duration_ms: 111.6902
+  type: 'test'
+  ...
+# Subtest: fixed appointment：选项与名单不一致/非多选 ⇒ appointment-invalid（notPresented、不写账本）
+ok 6 - fixed appointment：选项与名单不一致/非多选 ⇒ appointment-invalid（notPresented、不写账本）
+  ---
+  duration_ms: 25.4919
+  type: 'test'
+  ...
+# Subtest: fixed 不发 acceptance 卡：acceptance-card-suppressed（notPresented、不写账本）；legacy D3 扫描忽略 fixed 决议
+ok 7 - fixed 不发 acceptance 卡：acceptance-card-suppressed（notPresented、不写账本）；legacy D3 扫描忽略 fixed 决议
+  ---
+  duration_ms: 17.9075
+  type: 'test'
+  ...
+# Subtest: fixed 面板：fixed ⇒ 只读（panel read-only、mutation 拒绝）；legacy 逐字不变；workflow 状态只读投影
+ok 8 - fixed 面板：fixed ⇒ 只读（panel read-only、mutation 拒绝）；legacy 逐字不变；workflow 状态只读投影
+  ---
+  duration_ms: 19.5926
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 879.6191

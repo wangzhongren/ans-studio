@@ -1,0 +1,17 @@
+gitignore: true
+preparePathBStart: true branch=ans/task/wf-af7f7c72c8543e5352f59eb4 base=ae04b1ea
+B1 close: true stageCompleted=true
+SR-B1 close: true
+after B1: B1 completed
+B2 scope: true [{"roleId":"worker","paths":["src/core/snake.ts"]}]
+after B2: B2 completed
+basis verify: true 
+B scope: true {"taskId":"t-b3","workflowId":"wf-af7f7c72c8543e5352f59eb4","branch":"ans/task/wf-af7f7c72c8543e5352f59eb4","paths":["src/core/snake.ts"]}
+add: 0
+commit: 0
+B3 close: true stageCompleted=true
+SR-B3 close: true
+after B3: B3 completed
+prepare B4: true stage=B4 kind=merge
+execute B4: true kind=merge
+closed: {"outcome":"delivered","reason":"release rel-d0abdafa5aeb2fbcbeaf4722 merged"} HEAD: main main was ae04b1ea

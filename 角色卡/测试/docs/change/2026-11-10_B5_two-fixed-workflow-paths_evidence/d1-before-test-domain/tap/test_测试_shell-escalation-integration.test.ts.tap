@@ -1,0 +1,106 @@
+TAP version 13
+# Subtest: A/AC-26：真实工具注册 + 判拒→申请→allow-once→原样重试执行→二次回正常链；审计 customerGrant 与 escalation-decision
+ok 1 - A/AC-26：真实工具注册 + 判拒→申请→allow-once→原样重试执行→二次回正常链；审计 customerGrant 与 escalation-decision
+  ---
+  duration_ms: 79.0051
+  type: 'test'
+  ...
+# Subtest: A2/AC-07：allow-session 原样重试可反复执行；会话 dispose 后授权失效（fail-closed）
+ok 2 - A2/AC-07：allow-session 原样重试可反复执行；会话 dispose 后授权失效（fail-closed）
+  ---
+  duration_ms: 118.1608
+  type: 'test'
+  ...
+# Subtest: B/AC-05/AC-06：客户拒绝与超时（expired）均按未获允许处理；回执如实、不可再申请、原样重试仍回正常链
+ok 3 - B/AC-05/AC-06：客户拒绝与超时（expired）均按未获允许处理；回执如实、不可再申请、原样重试仍回正常链
+  ---
+  duration_ms: 24.0018
+  type: 'test'
+  ...
+# Subtest: C/AC-08：会话总上限 5——第 6 次拒绝且不弹卡；同时最多 1 张待答（不排队、不消耗申请权）
+ok 4 - C/AC-08：会话总上限 5——第 6 次拒绝且不弹卡；同时最多 1 张待答（不排队、不消耗申请权）
+  ---
+  duration_ms: 12.2374
+  type: 'test'
+  ...
+# Subtest: C2/AC-08：同时最多 1 张待答卡——待答期间新申请直接拒绝且不消耗其申请权
+ok 5 - C2/AC-08：同时最多 1 张待答卡——待答期间新申请直接拒绝且不消耗其申请权
+  ---
+  duration_ms: 11.8299
+  type: 'test'
+  ...
+# Subtest: C3/AC-08：旧判拒记录在后续 allow 后立即清除 ⇒ 申请被拒（资格只认最近一次审核）
+ok 6 - C3/AC-08：旧判拒记录在后续 allow 后立即清除 ⇒ 申请被拒（资格只认最近一次审核）
+  ---
+  duration_ms: 13.3356
+  type: 'test'
+  ...
+# Subtest: D/AC-01/AC-02：start_background_task 判拒不写入/不清除 run_shell 台账、不消费 run_shell 授权
+ok 7 - D/AC-01/AC-02：start_background_task 判拒不写入/不清除 run_shell 台账、不消费 run_shell 授权
+  ---
+  duration_ms: 13.5786
+  type: 'test'
+  ...
+# Subtest: E/AC-07：脚本上下文 sha256 stale——授权作废、拒绝（customer-escalation:stale-context）、不可再申请
+ok 8 - E/AC-07：脚本上下文 sha256 stale——授权作废、拒绝（customer-escalation:stale-context）、不可再申请
+  ---
+  duration_ms: 0.6907
+  type: 'test'
+  ...
+# Subtest: F/AC-02/AC-12/AC-13：只读档不适用例行白名单——routine ⇒ readonly-deny（不调 operator/不弹卡），非 routine c-allow 仍放行
+ok 9 - F/AC-02/AC-12/AC-13：只读档不适用例行白名单——routine ⇒ readonly-deny（不调 operator/不弹卡），非 routine c-allow 仍放行
+  ---
+  duration_ms: 3.8535
+  type: 'test'
+  ...
+# Subtest: F2/AC-02：readonlyOnly 构造期禁止注入 takeGrant；只读拒绝不消费既有 run_shell 授权
+ok 10 - F2/AC-02：readonlyOnly 构造期禁止注入 takeGrant；只读拒绝不消费既有 run_shell 授权
+  ---
+  duration_ms: 3.5987
+  type: 'test'
+  ...
+# Subtest: G/AC-12/AC-13/AC-14：例行白名单形态在项目角色与内置审批档 c-allow、judge 调用=0；npm install 仍走既有判断
+ok 11 - G/AC-12/AC-13/AC-14：例行白名单形态在项目角色与内置审批档 c-allow、judge 调用=0；npm install 仍走既有判断
+  ---
+  duration_ms: 5.7086
+  type: 'test'
+  ...
+# Subtest: H/AC-22/AC-33：judge 放行 / 客户手批 / 客户升级授权 / escalation-decision 四类字段可区分；deny 档放行保留 tier+hardDenyOverride
+ok 12 - H/AC-22/AC-33：judge 放行 / 客户手批 / 客户升级授权 / escalation-decision 四类字段可区分；deny 档放行保留 tier+hardDenyOverride
+  ---
+  duration_ms: 0.8654
+  type: 'test'
+  ...
+# Subtest: I/AC-07：c=allow 不消费一次性授权；c=deny 分类不消费、不放行（授权保留到下一次 review 匹配）
+ok 13 - I/AC-07：c=allow 不消费一次性授权；c=deny 分类不消费、不放行（授权保留到下一次 review 匹配）
+  ---
+  duration_ms: 0.3368
+  type: 'test'
+  ...
+# Subtest: J/AC-20：暂停状态机 shell-only、非法输入不改状态；治理 approval 组不被暂停影响（按 main.ts 现有代码事实）
+ok 14 - J/AC-20：暂停状态机 shell-only、非法输入不改状态；治理 approval 组不被暂停影响（按 main.ts 现有代码事实）
+  ---
+  duration_ms: 0.4981
+  type: 'test'
+  ...
+# Subtest: K/AC-09（E2 R2）：presenter 返回 pending ⇒ 不消耗申请权/会话额度、record 保持 recorded、无 escalation-decision 审计、不创建授权；解除后再次申请可 allow-once
+ok 15 - K/AC-09（E2 R2）：presenter 返回 pending ⇒ 不消耗申请权/会话额度、record 保持 recorded、无 escalation-decision 审计、不创建授权；解除后再次申请可 allow-once
+  ---
+  duration_ms: 12.1987
+  type: 'test'
+  ...
+# Subtest: L/AC-19（E2 R2）：判拒结果行 retryHint 同时含新措辞「可让角色申请客户确认」与兜底「关闭「替我审批」后重试」（旧子串语义保留）
+ok 16 - L/AC-19（E2 R2）：判拒结果行 retryHint 同时含新措辞「可让角色申请客户确认」与兜底「关闭「替我审批」后重试」（旧子串语义保留）
+  ---
+  duration_ms: 0.3207
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 762.044

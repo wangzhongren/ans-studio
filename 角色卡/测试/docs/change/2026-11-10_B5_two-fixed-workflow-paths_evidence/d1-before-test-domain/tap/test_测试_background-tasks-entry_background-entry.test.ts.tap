@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源）
+ok 1 - B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源）
+  ---
+  duration_ms: 232.7328
+  type: 'test'
+  ...
+# Subtest: F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell）
+ok 2 - F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell）
+  ---
+  duration_ms: 12.6433
+  type: 'test'
+  ...
+# Subtest: F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具
+ok 3 - F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具
+  ---
+  duration_ms: 6.986
+  type: 'test'
+  ...
+# Subtest: F9：governanceJudge 判断会话（Service 装配）不含四后台工具
+ok 4 - F9：governanceJudge 判断会话（Service 装配）不含四后台工具
+  ---
+  duration_ms: 5.0648
+  type: 'test'
+  ...
+# Subtest: F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务
+ok 5 - F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务
+  ---
+  duration_ms: 318.1096
+  type: 'test'
+  ...
+# Subtest: F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务
+ok 6 - F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务
+  ---
+  duration_ms: 14.4147
+  type: 'test'
+  ...
+# Subtest: F6：未知任务号经真实入口 read/stop 均明确「未知任务」
+ok 7 - F6：未知任务号经真实入口 read/stop 均明确「未知任务」
+  ---
+  duration_ms: 13.5662
+  type: 'test'
+  ...
+# Subtest: S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符
+ok 8 - S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符
+  ---
+  duration_ms: 87.3907
+  type: 'test'
+  ...
+# Subtest: B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程）
+ok 9 - B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程）
+  ---
+  duration_ms: 185.2166
+  type: 'test'
+  ...
+# Subtest: S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务
+ok 10 - S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务
+  ---
+  duration_ms: 138.7833
+  type: 'test'
+  ...
+# Subtest: F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动
+ok 11 - F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动
+  ---
+  duration_ms: 126.1007
+  type: 'test'
+  ...
+# Subtest: F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止
+ok 12 - F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止
+  ---
+  duration_ms: 2530.4976
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3979.9302

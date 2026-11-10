@@ -1,0 +1,7 @@
+before entries: 40
+after entries: 41
+added (after only): 2
++ test/测试/2026-11-09_judge-delegated-effectiveness.test.ts :: test\\测试\\2026-11-09_judge-delegated-effectiveness.test.ts
++ test/测试/git-action-delivery-claude-e2e.test.ts :: test\\测试\\git-action-delivery-claude-e2e.test.ts
+removed (before only): 1
+- test/测试/fixed-path-full-chain.test.ts :: 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered

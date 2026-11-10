@@ -144,9 +144,13 @@ import {
   ensureFixedPathStarted,
   isFixedPathEnabledForFlow,
   isFixedReleaseTriggerStage,
+  markFixedProposalCardRequested,
+  recordFixedPathBScopeDecisionForDispatch,
+  recordFixedStageDispatchForTask,
   resolveFixedPathMode,
   resolveProjectFixedPanelMode,
   sessionWorkflowModeForTask,
+  shouldRecordFixedStageDispatch,
   workflowModeForFlowResolver,
   type FixedReleaseTriggerStage,
   type WorkflowMode,
@@ -5802,6 +5806,23 @@ export class SessionManager {
       } else if (request.cardKind === "proposal") {
         const refs = await this.collectFixedProposalDocumentRefs(projectRoot, fixedFlowId);
         if (!refs.ok) return rejectFixedCard(refs.code, refs.message);
+        // T3 B5.1（G-B5-3，AC-08/AC-13；v1.3 §4.2 A6）：**呈卡前**按 run-role A10 同构写
+        // `stage.requested A6`（幂等 `stage-request:<wf>:A6:1`，requestDigest=方案依据（proposal）
+        // 字节 sha256）——否则客户 accept 后 `stage.completed A6`（要求 view.stage==="A6"）无法落账，
+        // A7 stage-request 被 AC-09/状态机门拒绝。窗口不符/无活动 workflow ⇒ 不写；写入失败 fail-closed。
+        if (fixedWorkflowId !== undefined) {
+          const proposalRef = refs.refs.find((ref) => ref.kind === "proposal");
+          if (proposalRef?.sha256 === undefined) {
+            return rejectFixedCard("proposal-document-missing", "方案卡绑定缺少 proposal sha256（不发卡）。");
+          }
+          const marker = await markFixedProposalCardRequested({
+            projectRoot,
+            flowId: fixedFlowId,
+            workflowId: fixedWorkflowId,
+            proposalSha256: proposalRef.sha256,
+          });
+          if (marker !== undefined) return rejectFixedCard(marker.code, marker.message);
+        }
         fixedCardBinding = {
           ...(fixedWorkflowId !== undefined ? { workflowId: fixedWorkflowId } : {}),
           stage: "A6",
@@ -10061,6 +10082,19 @@ ${formatted}` };
     if (isStageRequest) {
       if (d.stage === undefined) return reject("stage-request-invalid", "stage-request 必须给出目标阶段（stage）。");
       const requestedAction = d.workflowAction ?? "advance";
+      // T3 B5.1（G-B5-2，AC-10；v1.3 §4.3 B2）：路径 B 的 B3 advance 请求受理**之前**，由应用校验
+      // 影响面报告字节 hash 并记录 B2 `change.scope-decided`（候选路径优先取 `requestedEvidence`，其次
+      // B1 生产任务 modulePaths；属主/有效写集由编排按名单/边界派生——不采信模型自报写集）。
+      // 失败 fail-closed：B3 请求不受理、不创建任务；B2 已记录 ⇒ 幂等 replay 不重复写。
+      if (requestedAction === "advance" && d.stage === "B3" && workflowId !== undefined) {
+        const scope = await recordFixedPathBScopeDecisionForDispatch({
+          projectRoot,
+          flowId: dispatchFlowId,
+          workflowId,
+          ...(requestedEvidence !== undefined ? { candidateFiles: requestedEvidence } : {}),
+        });
+        if (!scope.ok) return reject(scope.code, `B2 范围决定未记录：${scope.message}（B3 请求未受理）。`);
+      }
       const stageRequest = await requestStage({
         projectRoot,
         flowId: dispatchFlowId,
@@ -10103,6 +10137,28 @@ ${formatted}` };
       const appended = await appendTaskEvent(projectRoot, created);
       if (!appended.ok) return reject(appended.code ?? "task-ledger-write-failed", `任务未登记、未投递：${appended.message}`);
       taskId = newId;
+    }
+    // T3 B5.1（G-B5-1，AC-08/AC-09；v1.3 §4.5）：非 stage-request 的 fixed 任务创建 ⇒ 按真实
+    // task.created 记 `stage.dispatched`（A1/A4/A7 完成于任务创建；A8/A12a/A12b 在办；A11 已由
+    // `requestStage` 记录、B3 无此语义——集合单一来源 = `shouldRecordFixedStageDispatch`）。
+    // 状态机窗口外（既有 review 直派夹具）不写也不阻断；账本/服务失败 fail-closed：不回滚已创建任务、
+    // 不投递、如实回报（绝不伪造 stage.dispatched）。
+    if (!isStageRequest && workflowId !== undefined && shouldRecordFixedStageDispatch(d.stage)) {
+      const dispatched = await recordFixedStageDispatchForTask({
+        projectRoot,
+        workflowId,
+        stage: d.stage,
+        taskId,
+        targetRoleId,
+        ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
+      });
+      if (!dispatched.ok) {
+        await this.recordTaskFailure(projectRoot, taskId, `stage-dispatch-record-failed: ${dispatched.code}: ${shortenSummary(dispatched.message)}`);
+        return reject(
+          dispatched.code,
+          `stage.dispatched ${d.stage} 未记录：${dispatched.message}；任务 #${taskId} 已创建但未投递（不伪造派发，请运营/幕僚核对账本）。`,
+        );
+      }
     }
     this.starTaskIds.add(taskId);
     this.taskCreators.set(taskId, fromRoleId === convenerId ? "convener" : "chief");

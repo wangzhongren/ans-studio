@@ -1,0 +1,138 @@
+TAP version 13
+# Subtest: 四类 schema 常量 + ID 正则（C1 冻结）
+ok 1 - 四类 schema 常量 + ID 正则（C1 冻结）
+  ---
+  duration_ms: 1.2201
+  type: 'test'
+  ...
+# Subtest: VCA 发起角色唯一映射（AC-3）与目标 kind 收窄（AC-5/AC-19/AC-29/AC-30）
+ok 2 - VCA 发起角色唯一映射（AC-3）与目标 kind 收窄（AC-5/AC-19/AC-29/AC-30）
+  ---
+  duration_ms: 0.4743
+  type: 'test'
+  ...
+# Subtest: VCA 记录正例：baseTrunk:null + bootstrap:true（AC-25/F12）与提交定格字段
+ok 3 - VCA 记录正例：baseTrunk:null + bootstrap:true（AC-25/F12）与提交定格字段
+  ---
+  duration_ms: 0.2383
+  type: 'test'
+  ...
+# Subtest: 版本变更事件归属分区（AC-31/Q3）：approved/rejected=customer；submitted/applied/superseded=application
+ok 4 - 版本变更事件归属分区（AC-31/Q3）：approved/rejected=customer；submitted/applied/superseded=application
+  ---
+  duration_ms: 0.1171
+  type: 'test'
+  ...
+# Subtest: doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）
+not ok 5 - doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）
+  ---
+  duration_ms: 0.5036
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\version-change-contract.test.ts:176:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    10 !== 9
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 9
+  actual: 10
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/version-change-contract.test.ts:177:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: DocFreezeRecord / DocFreezeLookup 三态（F33 fail-closed）
+ok 6 - DocFreezeRecord / DocFreezeLookup 三态（F33 fail-closed）
+  ---
+  duration_ms: 0.1002
+  type: 'test'
+  ...
+# Subtest: StableWritePermit 唯一 permit 形状（F13）：v/permitId/authority/四态/approvedAt/expiresAt/baseSha256=""
+ok 7 - StableWritePermit 唯一 permit 形状（F13）：v/permitId/authority/四态/approvedAt/expiresAt/baseSha256=""
+  ---
+  duration_ms: 0.1102
+  type: 'test'
+  ...
+# Subtest: StableWriteRecord 与 permit 分表：record.permitId 关联；record 可镜像 expiresAt/consumedAt（F13）
+ok 8 - StableWriteRecord 与 permit 分表：record.permitId 关联；record 可镜像 expiresAt/consumedAt（F13）
+  ---
+  duration_ms: 0.0748
+  type: 'test'
+  ...
+# Subtest: StableWriteDecisionInput 对齐门禁输入（F13）：permit 可选、now 为 () => Date；C1 不实现判定
+ok 9 - StableWriteDecisionInput 对齐门禁输入（F13）：permit 可选、now 为 () => Date；C1 不实现判定
+  ---
+  duration_ms: 0.0821
+  type: 'test'
+  ...
+# Subtest: stable.write.* 事件五 kind + F14 可选 approvedAt/expiresAt/consumedAt + 归属分区
+ok 10 - stable.write.* 事件五 kind + F14 可选 approvedAt/expiresAt/consumedAt + 归属分区
+  ---
+  duration_ms: 0.1814
+  type: 'test'
+  ...
+# Subtest: stable kind 与 trunk 单一定义同源（无第二份枚举）
+ok 11 - stable kind 与 trunk 单一定义同源（无第二份枚举）
+  ---
+  duration_ms: 0.0705
+  type: 'test'
+  ...
+# Subtest: refactor-request/v1（F31/F40/Q10）：convener 发起、应用调度层管理、五态、五类禁止
+ok 12 - refactor-request/v1（F31/F40/Q10）：convener 发起、应用调度层管理、五态、五类禁止
+  ---
+  duration_ms: 0.0985
+  type: 'test'
+  ...
+# Subtest: version.change / doc.freeze 事件可赋给 TaskStateEvent；submitted=application、approved=customer
+ok 13 - version.change / doc.freeze 事件可赋给 TaskStateEvent；submitted=application、approved=customer
+  ---
+  duration_ms: 0.0821
+  type: 'test'
+  ...
+# Subtest: acknowledgments 对象数组（F1）：request 可选对象数组、answered 回传 string[]、旧卡零变化
+ok 14 - acknowledgments 对象数组（F1）：request 可选对象数组、answered 回传 string[]、旧卡零变化
+  ---
+  duration_ms: 0.0656
+  type: 'test'
+  ...
+# Subtest: 四组错误码稳定、无重复（含 vca-conflict；排除 trunk-drift）
+ok 15 - 四组错误码稳定、无重复（含 vca-conflict；排除 trunk-drift）
+  ---
+  duration_ms: 0.0527
+  type: 'test'
+  ...
+# Subtest: judge-delegated reason 子集：恰为 proposal/intent、是 customer 分区子集、不扩既有 reason 全集
+ok 16 - judge-delegated reason 子集：恰为 proposal/intent、是 customer 分区子集、不扩既有 reason 全集
+  ---
+  duration_ms: 0.0774
+  type: 'test'
+  ...
+# Subtest: DocFreezeOrigin/DocFreezeSource 扩展 judge-delegated：诚实来源可赋给记录，且不混入既有 DirectActionSource
+ok 17 - DocFreezeOrigin/DocFreezeSource 扩展 judge-delegated：诚实来源可赋给记录，且不混入既有 DirectActionSource
+  ---
+  duration_ms: 0.1342
+  type: 'test'
+  ...
+# Subtest: doc.freeze 事件 origin=judge-delegated + DocFreezeSource 可赋给 TaskStateEvent；customer 事件形状不变
+ok 18 - doc.freeze 事件 origin=judge-delegated + DocFreezeSource 可赋给 TaskStateEvent；customer 事件形状不变
+  ---
+  duration_ms: 0.0566
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 17
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 99.2115

@@ -1,0 +1,562 @@
+{
+  "test/gates/api-contract.test.ts": [],
+  "test/gates/differential-trunk-runtime.test.ts": [],
+  "test/gates/dispatch-parent.test.ts": [],
+  "test/gates/module-graph.test.ts": [],
+  "test/roles/chief/differential.test.ts": [],
+  "test/roles/chief/fixed.test.ts": [],
+  "test/roles/chief/imports.test.ts": [],
+  "test/roles/chief/module.test.ts": [],
+  "test/roles/convener/convener-differential.test.ts": [],
+  "test/roles/convener/convener-fixed.test.ts": [],
+  "test/roles/convener/convener-module.test.ts": [],
+  "test/roles/nominator/nominator-differential.test.ts": [],
+  "test/roles/nominator/nominator-fixed.test.ts": [],
+  "test/roles/nominator/nominator-module.test.ts": [],
+  "test/roles/product/product-differential.test.ts": [],
+  "test/roles/product/product-fixed.test.ts": [],
+  "test/roles/product/product-module.test.ts": [],
+  "test/roles/rapporteur/context.test.ts": [],
+  "test/roles/rapporteur/differential.test.ts": [],
+  "test/roles/rapporteur/dispatch.test.ts": [],
+  "test/roles/rapporteur/fixed-module.test.ts": [],
+  "test/roles/rapporteur/module-boundary.test.ts": [],
+  "test/roles/rapporteur/preflight.test.ts": [],
+  "test/roles/rapporteur/spec.test.ts": [],
+  "test/roles/rapporteur/tools.test.ts": [],
+  "test/roles/verifier/verifier-differential.test.ts": [],
+  "test/roles/verifier/verifier-fixed.test.ts": [],
+  "test/roles/verifier/verifier-module.test.ts": [],
+  "test/runtime-core/abort-failure-semantics.test.ts": [],
+  "test/runtime-core/abort-quarantine.test.ts": [
+    "abort rejection no longer quarantines forever once the underlying turn settles later",
+    "abort rejection keeps quarantine when the underlying turn never settles",
+    "normal abort without cleanup failure keeps its existing quarantine lifecycle"
+  ],
+  "test/runtime-core/application-mediation.test.ts": [],
+  "test/runtime-core/background-contract.test.ts": [],
+  "test/runtime-core/background-engines.test.ts": [],
+  "test/runtime-core/background-review.test.ts": [],
+  "test/runtime-core/background-session-access.test.ts": [],
+  "test/runtime-core/background-tasks.test.ts": [],
+  "test/runtime-core/boundary-write-guard.test.ts": [],
+  "test/runtime-core/codex-native-optional.test.ts": [],
+  "test/runtime-core/confirmation-paths.test.ts": [],
+  "test/runtime-core/convener-requirement-change-preflight.test.ts": [],
+  "test/runtime-core/customer-input-context.test.ts": [],
+  "test/runtime-core/direct-role-capabilities.test.ts": [],
+  "test/runtime-core/directive-contract.test.ts": [],
+  "test/runtime-core/directive-marker.test.ts": [],
+  "test/runtime-core/dispatch-workflow-writer-copy.test.ts": [
+    "dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行",
+    "dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」"
+  ],
+  "test/runtime-core/doc-format-specs-pin.test.ts": [],
+  "test/runtime-core/download-contract.test.ts": [],
+  "test/runtime-core/download-tool.test.ts": [],
+  "test/runtime-core/drain-predicate.test.ts": [],
+  "test/runtime-core/effective-timeouts.test.ts": [
+    "Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort",
+    "Service explicit Pi timing overrides env, including the legacy disabled-timer values",
+    "all runtimes read the same inspection env; Service still uses the fixed 1h last resort"
+  ],
+  "test/runtime-core/evidence-check-tool.test.ts": [],
+  "test/runtime-core/file-write-safety.test.ts": [
+    "D3 linked workspace root remains usable; linked target itself is not replaced"
+  ],
+  "test/runtime-core/git-capability-tools.test.ts": [
+    "R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible",
+    "R12 interruption during async factory preparation prevents the subsequent native bind",
+    "R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry",
+    "actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof",
+    "R8 a custom factory cannot self-report the default Codex Chat production provenance",
+    "R8 native registry/instance/role/runtime/activity mismatches remain unknown",
+    "R8 active HTTP inference alone is not treated as an uncontrolled execution program"
+  ],
+  "test/runtime-core/governance-matrix-tool.test.ts": [],
+  "test/runtime-core/install-mcp-tools.test.ts": [],
+  "test/runtime-core/install-skill-tools.test.ts": [],
+  "test/runtime-core/judge-read-range.test.ts": [],
+  "test/runtime-core/legacy-history-projection.test.ts": [],
+  "test/runtime-core/list-dir-tool.test.ts": [],
+  "test/runtime-core/mcp-declarations.test.ts": [],
+  "test/runtime-core/network-gate.test.ts": [],
+  "test/runtime-core/plan-escalation-tool.test.ts": [],
+  "test/runtime-core/prompt-start-acknowledgement.test.ts": [
+    "active and disposed prompt rejections have no turn acknowledgement",
+    "quarantined prompt rejection has no acknowledgement after one stopped actual turn",
+    "synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn",
+    "acknowledged turns keep aborted/timed_out outcomes and single matching terminal"
+  ],
+  "test/runtime-core/readonly-git-routing.test.ts": [],
+  "test/runtime-core/reasoning-effort.test.ts": [
+    "Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形）",
+    "未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席",
+    "非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话",
+    "诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响）"
+  ],
+  "test/runtime-core/reasoning-facts.test.ts": [],
+  "test/runtime-core/report-provenance.test.ts": [],
+  "test/runtime-core/request-requirement-change-preflight.test.ts": [],
+  "test/runtime-core/request-requirement-change-tool.test.ts": [],
+  "test/runtime-core/request-timeout.test.ts": [],
+  "test/runtime-core/session-admission-approval.test.ts": [],
+  "test/runtime-core/session-lifecycle.test.ts": [],
+  "test/runtime-core/session-store.test.ts": [
+    "store: traversal, mismatched scope and symlinked runtime directories rejected",
+    "store: native validation stays lazy and native symlink is rejected before effects"
+  ],
+  "test/runtime-core/session.test.ts": [
+    "outer timeout remains timed_out when abort cleanup emits inner aborted terminals",
+    "outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup",
+    "Core-managed binding rejects a provider that did not register its display profile before first prompt"
+  ],
+  "test/runtime-core/shell-escalation-contract.test.ts": [],
+  "test/runtime-core/shell-exec-timeout.test.ts": [],
+  "test/runtime-core/shell-guard.test.ts": [],
+  "test/runtime-core/shell-judge-budget-config.test.ts": [],
+  "test/runtime-core/shell-judge-risk-wording-contract.test.ts": [],
+  "test/runtime-core/shell-judge.test.ts": [],
+  "test/runtime-core/stable-write-card-kind.test.ts": [],
+  "test/runtime-core/submit-capability-tools.test.ts": [
+    "R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget",
+    "R2 chief timeout is finite and normal sessions still receive injected narrow capabilities"
+  ],
+  "test/runtime-core/tool-display.test.ts": [],
+  "test/runtime-core/trunk-contract.test.ts": [
+    "主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）"
+  ],
+  "test/runtime-core/two-fixed-workflow-paths-b0.test.ts": [],
+  "test/runtime-core/two-fixed-workflow-paths-b2.test.ts": [],
+  "test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts": [],
+  "test/runtime-core/version-change-contract.test.ts": [
+    "doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）"
+  ],
+  "test/runtime-core/view-image-policy.test.ts": [],
+  "test/runtime-core/view-image-tool.test.ts": [],
+  "test/runtime-core/write-gate-context.test.ts": [],
+  "test/桌面应用/abort-unwedge.test.ts": [],
+  "test/桌面应用/acceptance-evidence.test.ts": [],
+  "test/桌面应用/acceptance-proposal-path.test.ts": [],
+  "test/桌面应用/acceptance-return-card.test.ts": [],
+  "test/桌面应用/ans-wiring.test.ts": [],
+  "test/桌面应用/application-line.test.ts": [],
+  "test/桌面应用/b3-fixed-baseline-pathb.test.ts": [],
+  "test/桌面应用/b3-fixed-cards-panel.test.ts": [],
+  "test/桌面应用/b3-release-merge-desktop.test.ts": [],
+  "test/桌面应用/b3-workflow-git-real.test.ts": [],
+  "test/桌面应用/b31-fixed-release-auto-desktop.test.ts": [],
+  "test/桌面应用/b42-task-git-port-desktop.test.ts": [],
+  "test/桌面应用/boundary-refresh.test.ts": [
+    "G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞"
+  ],
+  "test/桌面应用/chain-enforcement.test.ts": [
+    "M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理",
+    "M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据",
+    "D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）",
+    "D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略",
+    "M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚",
+    "F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚"
+  ],
+  "test/桌面应用/chief-workflow.test.ts": [
+    "W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝",
+    "W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind",
+    "W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP",
+    "W23 Convener不能越Chief新建普通Verifier，零任务零HTTP",
+    "W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP",
+    "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+    "W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止",
+    "W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止",
+    "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+    "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope",
+    "W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用",
+    "W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用"
+  ],
+  "test/桌面应用/composer-images.test.ts": [],
+  "test/桌面应用/decision-service.test.ts": [],
+  "test/桌面应用/diagnostics.test.ts": [],
+  "test/桌面应用/directive-decision.test.ts": [],
+  "test/桌面应用/directive-input.test.ts": [
+    "sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道",
+    "sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）",
+    "sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）",
+    "sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账",
+    "sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂"
+  ],
+  "test/桌面应用/dispatch-fresh-enum.test.ts": [],
+  "test/桌面应用/download-decision.test.ts": [
+    "同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）"
+  ],
+  "test/桌面应用/download-request.test.ts": [
+    "一项目一卡：前一张未决时下载卡排队，不呈现"
+  ],
+  "test/桌面应用/fixed-path-routing.test.ts": [],
+  "test/桌面应用/genesis-bootstrap.test.ts": [
+    "已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）"
+  ],
+  "test/桌面应用/handback-delivery.test.ts": [
+    "E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入",
+    "连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢",
+    "真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**",
+    "C frozen batch retries keep members and delivery ID while later reports stay separate",
+    "2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发",
+    "B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported"
+  ],
+  "test/桌面应用/hot-path.test.ts": [],
+  "test/桌面应用/interface.test.ts": [],
+  "test/桌面应用/log-actions.test.ts": [
+    "listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执"
+  ],
+  "test/桌面应用/log-patrol.test.ts": [],
+  "test/桌面应用/log-stuck.test.ts": [],
+  "test/桌面应用/message-queue.test.ts": [],
+  "test/桌面应用/multi-runtime.test.ts": [
+    "D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly",
+    "D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly",
+    "D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly",
+    "D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly",
+    "D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged",
+    "D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text",
+    "D1R2 actual ack preserves a failed delayed terminal and the next aborted original client",
+    "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt"
+  ],
+  "test/桌面应用/network-monitor.test.ts": [],
+  "test/桌面应用/operator-channel.test.ts": [
+    "I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）"
+  ],
+  "test/桌面应用/optional-acceptance.test.ts": [
+    "幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚"
+  ],
+  "test/桌面应用/p0-halt-and-images.test.ts": [
+    "P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）",
+    "P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实）",
+    "P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源"
+  ],
+  "test/桌面应用/pending-card-restart.test.ts": [],
+  "test/桌面应用/pi-config.test.ts": [],
+  "test/桌面应用/project-document.test.ts": [],
+  "test/桌面应用/project-state.test.ts": [],
+  "test/桌面应用/project.test.ts": [
+    "buildProjectConfig：由枚举结果构造角色表，acceptance 透传"
+  ],
+  "test/桌面应用/queue-visibility.test.ts": [
+    "P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）"
+  ],
+  "test/桌面应用/queue-withdraw-lru.test.ts": [],
+  "test/桌面应用/rejection-copy.test.ts": [],
+  "test/桌面应用/replay-safe-retry.test.ts": [],
+  "test/桌面应用/request-timeout-wiring.test.ts": [],
+  "test/桌面应用/role-log.test.ts": [],
+  "test/桌面应用/run-change-entry.test.ts": [],
+  "test/桌面应用/run-change-trigger.test.ts": [
+    "派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0",
+    "显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变",
+    "显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变",
+    "显式入口（stop）：requestRunChangeDecision 三模式落账不变",
+    "stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色",
+    "显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）",
+    "宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change",
+    "提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发",
+    "AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留"
+  ],
+  "test/桌面应用/run-change.test.ts": [],
+  "test/桌面应用/run-pin.test.ts": [
+    "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+    "D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集",
+    "run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned",
+    "P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId",
+    "F2：版本化文档基线违规受理 + advisory；基线/文档未被改写",
+    "R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable",
+    "R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable",
+    "AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点",
+    "AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点",
+    "AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读",
+    "P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定"
+  ],
+  "test/桌面应用/session-history.test.ts": [],
+  "test/桌面应用/session-rebuild-race.test.ts": [
+    "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+    "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+    "重建 open 等待窗口：stop A 保持用户目标/关闭契约"
+  ],
+  "test/桌面应用/session.test.ts": [
+    "AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）"
+  ],
+  "test/桌面应用/shell-escalation.test.ts": [],
+  "test/桌面应用/star-routing.test.ts": [
+    "星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝",
+    "convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务",
+    "BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）",
+    "BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队",
+    "BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）",
+    "BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）",
+    "AC-4.3：洁净派发无 advisory、无诊断噪声"
+  ],
+  "test/桌面应用/stuck-redispatch-safety.test.ts": [],
+  "test/桌面应用/stuck-redispatch.test.ts": [
+    "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递",
+    "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+    "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）"
+  ],
+  "test/桌面应用/su-effective-boundary.test.ts": [],
+  "test/桌面应用/task-restart.test.ts": [
+    "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过"
+  ],
+  "test/桌面应用/trunk.test.ts": [],
+  "test/桌面应用/turn-lease.test.ts": [],
+  "test/桌面应用/version-change.test.ts": [
+    "Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）",
+    "VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）",
+    "VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）",
+    "SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常"
+  ],
+  "test/桌面应用/version-decision.test.ts": [],
+  "test/桌面应用/watchdog-reuse.test.ts": [],
+  "test/桌面应用/workflow-git-port.test.ts": [],
+  "test/桌面应用/write-safety.test.ts": [],
+  "test/编排/acceptance-archive.test.ts": [],
+  "test/编排/acceptance-judge-minimal.test.ts": [],
+  "test/编排/appointment-roster.test.ts": [
+    "BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针",
+    "BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed"
+  ],
+  "test/编排/baseline-service.test.ts": [],
+  "test/编排/basis-guard.test.ts": [],
+  "test/编排/bootstrap-frozen-closure.test.ts": [],
+  "test/编排/boundary-write-validation.test.ts": [],
+  "test/编排/chat-handback-scope.test.ts": [
+    "real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId"
+  ],
+  "test/编排/chief-module-consumption.test.ts": [],
+  "test/编排/cli-positioning.test.ts": [],
+  "test/编排/confirm-preview-completeness.test.ts": [],
+  "test/编排/confirmation-gated.test.ts": [],
+  "test/编排/convener-module-consumption.test.ts": [],
+  "test/编排/customer-directive-gate.test.ts": [],
+  "test/编排/customer-directive-interpret.test.ts": [],
+  "test/编排/customer-directive.test.ts": [],
+  "test/编排/decision-card.test.ts": [],
+  "test/编排/decision-evidence-packet.test.ts": [],
+  "test/编排/decision-intent-drift.test.ts": [],
+  "test/编排/direct-role-capabilities.test.ts": [
+    "Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation"
+  ],
+  "test/编排/directive-interpreter.test.ts": [],
+  "test/编排/dispatch-advisories.test.ts": [],
+  "test/编排/dispatch-reads.test.ts": [],
+  "test/编排/doc-format-specs.test.ts": [
+    "TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）"
+  ],
+  "test/编排/download-judge.test.ts": [],
+  "test/编排/download-pipeline.test.ts": [],
+  "test/编排/download-policy.test.ts": [],
+  "test/编排/download-provider.test.ts": [],
+  "test/编排/evidence-check.test.ts": [],
+  "test/编排/exit-codes.test.ts": [],
+  "test/编排/finalize.test.ts": [],
+  "test/编排/fixed-path-start.test.ts": [],
+  "test/编排/git-action-authorization-gate.test.ts": [],
+  "test/编排/git-action-authorization-sidecar.test.ts": [],
+  "test/编排/git-action-authorization-wiring-audit-failure.test.ts": [],
+  "test/编排/git-action-authorization-wiring-document-audit-failure.test.ts": [],
+  "test/编排/git-action-authorization-wiring-document.test.ts": [],
+  "test/编排/git-action-authorization-wiring-initial-workflow-audit-failure.test.ts": [],
+  "test/编排/git-action-authorization-wiring-initial-workflow.test.ts": [],
+  "test/编排/git-action-authorization-wiring-publication-audit-failure.test.ts": [],
+  "test/编排/git-action-authorization-wiring-publication.test.ts": [],
+  "test/编排/git-action-authorization-wiring-retry.test.ts": [],
+  "test/编排/git-action-authorization-wiring.test.ts": [
+    "wiring guards: append sits after current gate and before effects with the frozen R2 digest mapping; run-change/stop paths never append"
+  ],
+  "test/编排/git-capabilities.test.ts": [
+    "Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority"
+  ],
+  "test/编排/git-command.test.ts": [],
+  "test/编排/git-operation-sidecar-tolerance.test.ts": [],
+  "test/编排/git-trunk-store.test.ts": [],
+  "test/编排/govern-engine.test.ts": [],
+  "test/编排/govern.test.ts": [],
+  "test/编排/governance-judge-facts.test.ts": [],
+  "test/编排/governance-matrix-injection.test.ts": [
+    "A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）"
+  ],
+  "test/编排/governance-record.test.ts": [],
+  "test/编排/handback-lifecycle.test.ts": [],
+  "test/编排/handback.test.ts": [
+    "openRoleSession：普通角色 settle → 发出 handback（形状正确）"
+  ],
+  "test/编排/installed-skills.test.ts": [],
+  "test/编排/nominator-module-consumption.test.ts": [],
+  "test/编排/orchestration.test.ts": [],
+  "test/编排/path-b-baseline.test.ts": [],
+  "test/编排/product-module-consumption.test.ts": [],
+  "test/编排/project-state-workflow.test.ts": [],
+  "test/编排/project-state.test.ts": [],
+  "test/编排/rapporteur-module-consumption.test.ts": [],
+  "test/编排/readonly-git-transport.test.ts": [],
+  "test/编排/refactor-runtime.test.ts": [],
+  "test/编排/release-merge.test.ts": [],
+  "test/编排/report-provenance-consumer.test.ts": [],
+  "test/编排/request-requirement-change.test.ts": [],
+  "test/编排/roster-v4.test.ts": [],
+  "test/编排/run-manifest.test.ts": [],
+  "test/编排/run-role-admission.test.ts": [],
+  "test/编排/run-role-fixed-b2.test.ts": [],
+  "test/编排/run-role-fixed-b31.test.ts": [],
+  "test/编排/run-role-fixed.test.ts": [],
+  "test/编排/run-role-stable-write.test.ts": [],
+  "test/编排/run-role-submit-capabilities.test.ts": [],
+  "test/编排/run-role-task-git.test.ts": [],
+  "test/编排/runtime-orchestration.test.ts": [],
+  "test/编排/runtime-selection.test.ts": [],
+  "test/编排/section1-write-preauthorization.test.ts": [
+    "有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒",
+    "人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒"
+  ],
+  "test/编排/session-abort-images.test.ts": [],
+  "test/编排/session-dir.test.ts": [
+    "D-1：projectRoot 为空 → 不传 sessionDir（旧行为）",
+    "D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）"
+  ],
+  "test/编排/session-handle.test.ts": [],
+  "test/编排/session-lifecycle.test.ts": [],
+  "test/编排/shell-advisory-ruleset.test.ts": [],
+  "test/编排/shell-approval-context.test.ts": [],
+  "test/编排/shell-approval-wiring.test.ts": [],
+  "test/编排/shell-arming.test.ts": [],
+  "test/编排/shell-authorized-routine.test.ts": [
+    "node test外指符号链接路径不获委托；项目内测试路径获委托"
+  ],
+  "test/编排/shell-command-guard.test.ts": [],
+  "test/编排/shell-escalation.test.ts": [],
+  "test/编排/shell-gate.test.ts": [],
+  "test/编排/shell-judge-concurrency.test.ts": [],
+  "test/编排/shell-judge-read-discipline.test.ts": [],
+  "test/编排/shell-judge-risk-scope.test.ts": [],
+  "test/编排/shell-judge.test.ts": [],
+  "test/编排/shell-operator-only.test.ts": [
+    "P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界"
+  ],
+  "test/编排/shell-post-audit.test.ts": [],
+  "test/编排/shell-readonly.test.ts": [],
+  "test/编排/shell-review-chain.test.ts": [],
+  "test/编排/shell-risky-order.test.ts": [],
+  "test/编排/shell-task-git-execution.test.ts": [],
+  "test/编排/shell-task-git-gate.test.ts": [],
+  "test/编排/shell-write-guard-injection.test.ts": [],
+  "test/编排/stable-write-runtime.test.ts": [],
+  "test/编排/stable-write-service.test.ts": [],
+  "test/编排/task-state-fixed.test.ts": [],
+  "test/编排/task-state.test.ts": [],
+  "test/编排/trio-worker-report.test.ts": [
+    "卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report",
+    "v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力",
+    "卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡"
+  ],
+  "test/编排/trunk-dispatch-parent.test.ts": [],
+  "test/编排/trunk-events.test.ts": [],
+  "test/编排/trunk-runtime.test.ts": [],
+  "test/编排/trunk-service-refreeze.test.ts": [],
+  "test/编排/trunk-service.test.ts": [
+    "applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接"
+  ],
+  "test/编排/trunk-store.test.ts": [],
+  "test/编排/trunk-upgrade-validation.test.ts": [
+    "AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）",
+    "AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）",
+    "AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝",
+    "AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）",
+    "AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）"
+  ],
+  "test/编排/unverifiable-rejection.test.ts": [],
+  "test/编排/verifier-module-consumption.test.ts": [],
+  "test/编排/version-change-runtime.test.ts": [],
+  "test/编排/version-change-service-integration.test.ts": [],
+  "test/编排/version-change-service.test.ts": [],
+  "test/编排/version-change-store.test.ts": [],
+  "test/编排/version-decision.test.ts": [],
+  "test/编排/view-image.test.ts": [],
+  "test/编排/workflow-baseline.test.ts": [],
+  "test/编排/workflow-close-intent.test.ts": [],
+  "test/编排/workflow-dispatch-fixed.test.ts": [],
+  "test/编排/workflow-ledger.test.ts": [],
+  "test/编排/workflow-mode.test.ts": [],
+  "test/编排/workflow-preconditions.test.ts": [],
+  "test/编排/workflow-stage-request.test.ts": [],
+  "test/编排/workflow-state.test.ts": [],
+  "test/门禁引擎/archived-role.test.ts": [],
+  "test/门禁引擎/boundary-empty-and-builtin.test.ts": [],
+  "test/门禁引擎/boundary-yaml-validation.test.ts": [],
+  "test/门禁引擎/boundary-yaml.test.ts": [],
+  "test/门禁引擎/built-in-roles-field.test.ts": [],
+  "test/门禁引擎/built-in-section-equivalence.test.ts": [],
+  "test/门禁引擎/chief-workflow-v2-resource.test.ts": [],
+  "test/门禁引擎/classify-shell-v5.test.ts": [],
+  "test/门禁引擎/classify-shell.test.ts": [],
+  "test/门禁引擎/cold-start-genesis.test.ts": [],
+  "test/门禁引擎/convener-workflow-write.test.ts": [
+    "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者"
+  ],
+  "test/门禁引擎/decision-card.test.ts": [],
+  "test/门禁引擎/direct-role-capabilities.test.ts": [],
+  "test/门禁引擎/dispatch-after-landing-convention.test.ts": [],
+  "test/门禁引擎/dispatch-matrix-mode.test.ts": [],
+  "test/门禁引擎/doc-format-specs-pin.test.ts": [],
+  "test/门禁引擎/documentation-surface-convention.test.ts": [],
+  "test/门禁引擎/f4-denial-guidance.test.ts": [],
+  "test/门禁引擎/f6-denial-guidance.test.ts": [],
+  "test/门禁引擎/fixed-role-module-surface.test.ts": [],
+  "test/门禁引擎/freeze-closure.test.ts": [],
+  "test/门禁引擎/git-shell-acl.test.ts": [],
+  "test/门禁引擎/governance-matrix-fixed-view.test.ts": [],
+  "test/门禁引擎/governance-matrix-service.test.ts": [
+    "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中"
+  ],
+  "test/门禁引擎/governance-matrix.test.ts": [],
+  "test/门禁引擎/governance-seed-public-entry.test.ts": [],
+  "test/门禁引擎/list-project.test.ts": [
+    "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告"
+  ],
+  "test/门禁引擎/model-and-service.test.ts": [],
+  "test/门禁引擎/pin-acceptance.test.ts": [],
+  "test/门禁引擎/pin-evidence.test.ts": [],
+  "test/门禁引擎/readonly-git-matcher.test.ts": [],
+  "test/门禁引擎/resolve-write.test.ts": [],
+  "test/门禁引擎/role-card-sections.test.ts": [],
+  "test/门禁引擎/role-group-metadata.test.ts": [
+    "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留"
+  ],
+  "test/门禁引擎/role-module-contract.test.ts": [],
+  "test/门禁引擎/shell-approval.test.ts": [],
+  "test/门禁引擎/shell-routine.test.ts": [],
+  "test/门禁引擎/shell-rules-b4-reexport.test.ts": [],
+  "test/门禁引擎/shell-rules-public-reexport.test.ts": [],
+  "test/门禁引擎/shell-write-guard.test.ts": [],
+  "test/门禁引擎/stable-write-guard.test.ts": [],
+  "test/门禁引擎/stale-snapshot-hint.test.ts": [],
+  "test/门禁引擎/su-doc-surface-convention.test.ts": [],
+  "test/门禁引擎/su-shell-approval-convention.test.ts": [],
+  "test/门禁引擎/su-turn-watch-convention.test.ts": [],
+  "test/门禁引擎/task-git-critical-section.test.ts": [],
+  "test/门禁引擎/temp-staging-convention.test.ts": [],
+  "test/门禁引擎/versioned-doc-guard-assets.test.ts": [],
+  "test/门禁引擎/versioned-doc-guard.test.ts": [],
+  "test/门禁引擎/view-image-cards.test.ts": [
+    "D-10：质检卡保留可选质量核对与截图上限，不要求录屏"
+  ],
+  "test/项目管理/shared/argv-primitives.test.ts": [],
+  "test/项目管理/shared/atomic-write.test.ts": [],
+  "test/项目管理/shared/config-loader.test.ts": [],
+  "test/项目管理/shared/diagnostics.test.ts": [],
+  "test/项目管理/shared/env-file.test.ts": [],
+  "test/项目管理/shared/i18n-guard.test.ts": [
+    "硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过）"
+  ],
+  "test/项目管理/shared/i18n.test.ts": [],
+  "test/项目管理/shared/intent-entry-contract.test.ts": [],
+  "test/项目管理/shared/jsonl-ledger.test.ts": [],
+  "test/项目管理/shared/path-primitives.test.ts": [],
+  "test/项目管理/shared/runtime-settings.test.ts": [],
+  "test/项目管理/shared/runtime-shared.test.ts": [],
+  "test/项目管理/shared/shell-approval-binding.test.ts": []
+}

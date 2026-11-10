@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: T1：pinned run 的 manifest proposal 路径优先——磁盘更新版本/别名不覆盖
+ok 1 - T1：pinned run 的 manifest proposal 路径优先——磁盘更新版本/别名不覆盖
+  ---
+  duration_ms: 236.7661
+  type: 'test'
+  ...
+# Subtest: T1b：pinned 但 manifest 无 proposal（null/缺失/空串）⇒ undefined，不回退最新扫描/别名
+ok 2 - T1b：pinned 但 manifest 无 proposal（null/缺失/空串）⇒ undefined，不回退最新扫描/别名
+  ---
+  duration_ms: 481.7132
+  type: 'test'
+  ...
+# Subtest: T2：无 pin 取数字最大 -proposal-vN；别名 <flowId>-v1.md 不选
+ok 3 - T2：无 pin 取数字最大 -proposal-vN；别名 <flowId>-v1.md 不选
+  ---
+  duration_ms: 170.4582
+  type: 'test'
+  ...
+# Subtest: T2b：无 pin 且仅有别名 <flowId>-v1.md ⇒ undefined
+ok 4 - T2b：无 pin 且仅有别名 <flowId>-v1.md ⇒ undefined
+  ---
+  duration_ms: 154.0344
+  type: 'test'
+  ...
+# Subtest: T3：无提案 ⇒ undefined（继承旧值被覆盖）；证据包 artifact-missing 且指向正确约定路径
+ok 5 - T3：无提案 ⇒ undefined（继承旧值被覆盖）；证据包 artifact-missing 且指向正确约定路径
+  ---
+  duration_ms: 186.1249
+  type: 'test'
+  ...
+# Subtest: T4：试跑形状（pinned 真提案 + 别名）⇒ 证据包读取真路径/sha256，别名不进入 evidence
+ok 6 - T4：试跑形状（pinned 真提案 + 别名）⇒ 证据包读取真路径/sha256，别名不进入 evidence
+  ---
+  duration_ms: 172.3912
+  type: 'test'
+  ...
+# Subtest: T5：pinned 路径不可读（pin 后删除）⇒ artifact-missing「物证不可读：<pinned path>」，不回退 v2/别名
+ok 7 - T5：pinned 路径不可读（pin 后删除）⇒ artifact-missing「物证不可读：<pinned path>」，不回退 v2/别名
+  ---
+  duration_ms: 143.2889
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1980.0954

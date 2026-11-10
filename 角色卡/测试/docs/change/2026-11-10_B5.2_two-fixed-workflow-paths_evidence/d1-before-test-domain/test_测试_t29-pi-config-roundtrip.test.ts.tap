@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 token），且回报只含键名
+ok 1 - T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 token），且回报只含键名
+  ---
+  duration_ms: 6.5463
+  type: 'test'
+  ...
+# Subtest: T29 往返：载入后 resolvePiProviderConfig 成功构造（baseUrl/modelId/contextWindow/provider 正确）
+ok 2 - T29 往返：载入后 resolvePiProviderConfig 成功构造（baseUrl/modelId/contextWindow/provider 正确）
+  ---
+  duration_ms: 2.9865
+  type: 'test'
+  ...
+# Subtest: T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用系统默认值（新语义）
+ok 3 - T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用系统默认值（新语义）
+  ---
+  duration_ms: 7.8795
+  type: 'test'
+  ...
+# Subtest: T29 往返：savePiConfig 改值 → 立即重载生效 + 新开 env 重载生效 + 适配器构造取到新值
+ok 4 - T29 往返：savePiConfig 改值 → 立即重载生效 + 新开 env 重载生效 + 适配器构造取到新值
+  ---
+  duration_ms: 11.3855
+  type: 'test'
+  ...
+# Subtest: T29 往返：旧值仍在（只改相关键——载入不因保存而丢其它键）
+ok 5 - T29 往返：旧值仍在（只改相关键——载入不因保存而丢其它键）
+  ---
+  duration_ms: 10.758
+  type: 'test'
+  ...
+# Subtest: T29 G-5：ANS_PI_REASONING_EFFORT 往返（save→reload→get 视图）＋ 面板键与注册表逐键对齐（漂移守卫）
+ok 6 - T29 G-5：ANS_PI_REASONING_EFFORT 往返（save→reload→get 视图）＋ 面板键与注册表逐键对齐（漂移守卫）
+  ---
+  duration_ms: 8.5451
+  type: 'test'
+  ...
+# Subtest: T29 G-5：choices 元数据透传（注册表读取链）＋值域校验单一来源在注册表保存链（旧面板路径不复制判定，如实钉）
+ok 7 - T29 G-5：choices 元数据透传（注册表读取链）＋值域校验单一来源在注册表保存链（旧面板路径不复制判定，如实钉）
+  ---
+  duration_ms: 16.0763
+  type: 'test'
+  ...
+# Subtest: T29 单一来源：parse/merge/atomicWrite/read/save/loadEnvFileInto 只在 env-file.ts 定义
+ok 8 - T29 单一来源：parse/merge/atomicWrite/read/save/loadEnvFileInto 只在 env-file.ts 定义
+  ---
+  duration_ms: 34.1851
+  type: 'test'
+  ...
+# Subtest: T29 单一来源：桌面侧只读导入共享模块（无第二份实现）
+ok 9 - T29 单一来源：桌面侧只读导入共享模块（无第二份实现）
+  ---
+  duration_ms: 0.5505
+  type: 'test'
+  ...
+# Subtest: T29 签名：resolvePiProviderConfig 与 createPiAdapterFactory 形参未扩（均为 2 参）
+ok 10 - T29 签名：resolvePiProviderConfig 与 createPiAdapterFactory 形参未扩（均为 2 参）
+  ---
+  duration_ms: 0.1124
+  type: 'test'
+  ...
+# Subtest: T29 签名：默认 .env 路径指向仓库根（只取字符串，不读该文件）
+ok 11 - T29 签名：默认 .env 路径指向仓库根（只取字符串，不读该文件）
+  ---
+  duration_ms: 0.0837
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 401.3031

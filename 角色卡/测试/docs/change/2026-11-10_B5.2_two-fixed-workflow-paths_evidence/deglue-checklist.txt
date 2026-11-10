@@ -1,0 +1,36 @@
+B5.2 去宿主 glue 清单（test/测试/fixed-path-full-chain.test.ts）
+基线: 0c1530b79b6ba8cff4bd08d3dc7e4a0ed0e69c13f1c458627d472328d56ff80a（B5 原文件，glue 在）
+B5.1 参考: 角色卡/桌面窗口/docs/change/2026-11-10_B5.1_two-fixed-workflow-paths-desktop_evidence/chain-no-glue.diff
+  sha256 a5b8e01932150b98dc1f4bfa15209302859565ebe064b698c223834a68b04a19（scratch 3/3 绿）
+
+移除的 8 处宿主 glue（全部改为真实桌面路由/卡生命周期触发；测试不再直接调用应用服务）：
+1. A1 product task: 删除 recordStageDispatch({stage:"A1",taskId:a1Task})（+ok 断言）
+   生产触发: routeFixedPathDispatch → recordFixedStageDispatchForTask（B5.1 G-B5-1）
+   断言: assertStageDispatched(A1)（stage.dispatched 事件一次、taskId 绑定、幂等键 stage-dispatch:<wf>:A1:<taskId>）
+         + view.stages.A1.status==="completed"
+2. A4 rapporteur task: 删除 recordStageDispatch(A4)
+   生产触发: 同上；断言: assertStageDispatched(A4)
+3. A6 proposal card: 删除手写 stage.requested A6 marker（appendWorkflowEvent，requestDigest=sha("proposal-card")）
+   生产触发: withRequestLifecycle fixed proposal 分支 → markFixedProposalCardRequested（B5.1 G-B5-3）
+   断言: A6 stage.requested 一次、幂等键 stage-request:<wf>:A6:1、
+         requestDigest=proposal 文档字节 sha256、requestTaskId=proposal-card:<flow>:<sha12>；
+         A6 stage.completed 一次（cause.kind=request-resolved、artifacts=5 件）；view A6 completed
+4. A7 nominator task: 删除 recordStageDispatch(A7)
+   生产触发: 路由；断言: assertStageDispatched(A7)
+5. A8 activation task: 删除 recordStageDispatch(A8)
+   生产触发: 路由；断言: assertStageDispatched(A8)（完成仍由 role.activated 判定）
+6. A12a verifier task: 删除 recordStageDispatch(A12a)
+   生产触发: 路由；断言: assertStageDispatched(A12a)（A11 stage-request 受理依赖）
+7. A12b verifier task: 删除 recordStageDispatch(A12b)
+   生产触发: 路由；断言: assertStageDispatched(A12b)
+8. B2 scope decision（路径 B）: 删除直接 recordChangeScopeDecision({...}) 调用（app service glue）
+   生产触发: B3 advance stage-request 受理前 → recordFixedPathBScopeDecisionForDispatch（B5.1 G-B5-2）
+   fixture: B3 stage-request 增加 requestedEvidence:["src/core/snake.ts"]（文件级候选；属主/写集由编排派生）
+   断言: B3 受理前 view.stages.B2.status==="pending"（不得宿主伪造）；
+         B3 受理后 change.scope-decided 一次、impactReport path/sha 重算一致、
+         effectiveWritesets=[{roleId:"worker",paths:["src/core/snake.ts"]}]、decidedBy="chief"、
+         requestTaskId=B1 stage-request、幂等键 ^scope:<wf>:<impactSha>:；
+         view.stages.B2.status==="completed"；同一 B3 stage-request 重放不重复建任务/不重复写账本。
+
+未改动: A10 任命卡在办 marker（run-role 生产写入；假会话不跑 run-role，测试按同构事实补写——B5 基线既有，
+不属 G-B5-1/2/3 glue；B5.2 指令未要求移除）。

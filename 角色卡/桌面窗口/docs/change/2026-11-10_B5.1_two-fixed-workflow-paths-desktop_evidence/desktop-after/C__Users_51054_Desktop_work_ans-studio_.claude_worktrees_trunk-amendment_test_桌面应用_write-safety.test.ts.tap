@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: 通用 write 卡与 legacy 直调已删除；appointment-write 保留（审批路径）
+ok 1 - 通用 write 卡与 legacy 直调已删除；appointment-write 保留（审批路径）
+  ---
+  duration_ms: 2.7017
+  type: 'test'
+  ...
+# Subtest: 角色卡边界 YAML：缺 role/entries 或坏语法 ⇒ 校验失败；合法结构通过
+ok 2 - 角色卡边界 YAML：缺 role/entries 或坏语法 ⇒ 校验失败；合法结构通过
+  ---
+  duration_ms: 4.1472
+  type: 'test'
+  ...
+# Subtest: C-06 appointment-write 应用校验：D3 匹配才发卡；缺 decision/错配/内置/越界一律 declined+notPresented
+ok 3 - C-06 appointment-write 应用校验：D3 匹配才发卡；缺 decision/错配/内置/越界一律 declined+notPresented
+  ---
+  duration_ms: 269.5982
+  type: 'test'
+  ...
+# Subtest: C-06 appointment-write 归属键：intentId 与 D3 一致同样可发卡
+ok 4 - C-06 appointment-write 归属键：intentId 与 D3 一致同样可发卡
+  ---
+  duration_ms: 237.9809
+  type: 'test'
+  ...
+# Subtest: C-06 appointment-write 预览结构：role-card 必需章节 / boundary 顶层 role / 路径越界 / 内置目标
+ok 5 - C-06 appointment-write 预览结构：role-card 必需章节 / boundary 顶层 role / 路径越界 / 内置目标
+  ---
+  duration_ms: 7.0109
+  type: 'test'
+  ...
+# Subtest: 治理写卡客户主权（会话级 a）：替我审批开启 ⇒ 真实 SessionManager 呈现客户、judge 0 调用/0 结果行、approval.resolved by=customer
+ok 6 - 治理写卡客户主权（会话级 a）：替我审批开启 ⇒ 真实 SessionManager 呈现客户、judge 0 调用/0 结果行、approval.resolved by=customer
+  ---
+  duration_ms: 255.6937
+  type: 'test'
+  ...
+# Subtest: 治理写卡客户主权（会话级 b）：替审批关闭 ⇒ 呈现客户；客户拒绝落 approval.resolved by=customer
+ok 7 - 治理写卡客户主权（会话级 b）：替审批关闭 ⇒ 呈现客户；客户拒绝落 approval.resolved by=customer
+  ---
+  duration_ms: 295.6816
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1503.2477

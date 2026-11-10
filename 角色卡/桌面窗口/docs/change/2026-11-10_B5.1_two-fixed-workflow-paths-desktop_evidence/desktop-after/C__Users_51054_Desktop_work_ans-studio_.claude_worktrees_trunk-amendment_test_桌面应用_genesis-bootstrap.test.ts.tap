@@ -1,0 +1,62 @@
+TAP version 13
+# Subtest: 未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfig 带 genesisBootstrap，source 含主入口
+ok 1 - 未 bootstrap（hasRoles:false）：新空项目默认 trio，ProjectConfig 带 genesisBootstrap，source 含主入口
+  ---
+  duration_ms: 3.89
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap + 显式 single（旧项目）：仍 su 主入口、带 genesisBootstrap（迁移前 su 行为不变）
+ok 2 - 未 bootstrap + 显式 single（旧项目）：仍 su 主入口、带 genesisBootstrap（迁移前 su 行为不变）
+  ---
+  duration_ms: 5.6008
+  type: 'test'
+  ...
+# Subtest: 已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件）
+ok 3 - 已 bootstrap（hasRoles:true，真实仓库根）→ ProjectConfig **不带** genesisBootstrap（切换条件）
+  ---
+  duration_ms: 41.311
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap（single）：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行）
+ok 4 - 未 bootstrap（single）：su 的 gate 放行治理产物 角色卡/<新角色>/{role-card.md,boundary.yaml}（scope:undefined 下命中即放行）
+  ---
+  duration_ms: 14.0275
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap（single）：su 的 gate 放行 docs/ 与 .ans/ 治理产物
+ok 5 - 未 bootstrap（single）：su 的 gate 放行 docs/ 与 .ans/ 治理产物
+  ---
+  duration_ms: 9.2279
+  type: 'test'
+  ...
+# Subtest: 未 bootstrap（single）：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径
+ok 6 - 未 bootstrap（single）：su 的 gate **拒绝** src/**（非治理产物）与项目根之外的绝对路径
+  ---
+  duration_ms: 6.7587
+  type: 'test'
+  ...
+# Subtest: 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+not ok 7 - 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+  ---
+  duration_ms: 31.6351
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\genesis-bootstrap.test.ts:151:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-creation-prepared-api-unavailable'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    bindPreparedRuntimeRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:820:50)
+    async openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:2828:15)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/genesis-bootstrap.test.ts:159:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 421.7538

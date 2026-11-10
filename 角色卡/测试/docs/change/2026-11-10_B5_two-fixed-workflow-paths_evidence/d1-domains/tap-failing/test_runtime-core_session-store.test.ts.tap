@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: store: creation/read stay lazy; roles/runtimes never share index or replay
+ok 1 - store: creation/read stay lazy; roles/runtimes never share index or replay
+  ---
+  duration_ms: 24.97
+  type: 'test'
+  ...
+# Subtest: store: concurrent writes serialize; corrupt history fails honestly
+ok 2 - store: concurrent writes serialize; corrupt history fails honestly
+  ---
+  duration_ms: 44.0783
+  type: 'test'
+  ...
+# Subtest: store: traversal, mismatched scope and symlinked runtime directories rejected
+not ok 3 - store: traversal, mismatched scope and symlinked runtime directories rejected
+  ---
+  duration_ms: 2.5476
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session-store.test.ts:46:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-WufWGE' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-V3h3DD\\.ans\\sessions\\role\\codex'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session-store.test.ts:51:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: store: native validation stays lazy and native symlink is rejected before effects
+not ok 4 - store: native validation stays lazy and native symlink is rejected before effects
+  ---
+  duration_ms: 3.0127
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session-store.test.ts:58:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-jfUiaX' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-xfYImY\\.ans\\sessions\\core\\codex\\native'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session-store.test.ts:63:56)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 2
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 190.0716

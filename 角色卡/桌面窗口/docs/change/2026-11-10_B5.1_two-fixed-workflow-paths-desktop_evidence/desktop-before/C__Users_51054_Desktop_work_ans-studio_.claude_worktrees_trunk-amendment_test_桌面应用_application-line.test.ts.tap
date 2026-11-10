@@ -1,0 +1,56 @@
+TAP version 13
+# Subtest: 申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl
+not ok 1 - 申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl
+  ---
+  duration_ms: 134.1812
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\application-line.test.ts:53:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   'presented',
+        'created',
+    -   'presented',
+        'resolved'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'created'
+    1: 'presented'
+    2: 'resolved'
+  actual:
+    0: 'presented'
+    1: 'created'
+    2: 'resolved'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/application-line.test.ts:103:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 写侧卡种收口（2026-10-31）：decision 裁决写 selectedOptionIds、不写 targetRoleIds；appointment 仍写 targetRoleIds
+ok 2 - 写侧卡种收口（2026-10-31）：decision 裁决写 selectedOptionIds、不写 targetRoleIds；appointment 仍写 targetRoleIds
+  ---
+  duration_ms: 244.946
+  type: 'test'
+  ...
+# Subtest: 项目 worker 无申请线：不注入 customerInput；内置角色才注入
+ok 3 - 项目 worker 无申请线：不注入 customerInput；内置角色才注入
+  ---
+  duration_ms: 2.826
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 2
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 846.1834

@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: 敏感文件/目录读取全部被拒且不泄露内容；列表不列敏感项
+ok 1 - 敏感文件/目录读取全部被拒且不泄露内容；列表不列敏感项
+  ---
+  duration_ms: 23.865
+  type: 'test'
+  ...
+# Subtest: 项目外绝对路径 / `..` / 符号链接逃逸被拒，不回显项目外绝对路径
+ok 2 - 项目外绝对路径 / `..` / 符号链接逃逸被拒，不回显项目外绝对路径
+  ---
+  duration_ms: 2.5908
+  type: 'test'
+  ...
+# Subtest: 二进制拒绝、单文件超限截断标记、读取调用预算耗尽
+ok 3 - 二进制拒绝、单文件超限截断标记、读取调用预算耗尽
+  ---
+  duration_ms: 3.0966
+  type: 'test'
+  ...
+# Subtest: Prompt injection 文件只是不可信数据：系统提示禁止遵循，驱动不因文件内容改变裁决
+ok 4 - Prompt injection 文件只是不可信数据：系统提示禁止遵循，驱动不因文件内容改变裁决
+  ---
+  duration_ms: 6.2885
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 136.7124

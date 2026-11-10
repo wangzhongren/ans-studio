@@ -1,0 +1,4 @@
+file	code	signal	duration_ms	tests	pass	fail	cancelled	skipped	todo	failing_names
+test/测试/fixed-path-full-chain.test.ts	0		4957	3	3	0	0	0	0	0
+test/测试/mode-switch.test.ts	0		713	3	3	0	0	0	0	0
+test/测试/b-change-scope.test.ts	0		1968	2	2	0	0	0	0	0

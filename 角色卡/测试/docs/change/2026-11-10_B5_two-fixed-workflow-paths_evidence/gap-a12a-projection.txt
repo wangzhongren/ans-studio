@@ -1,0 +1,5 @@
+# G-B5-1 gap probe: desktop direct dispatch of A12a does not record stage.dispatched
+# command: node _evidence/probe-a12a-gap.mjs
+appendTaskEvent: true 
+stage: A10 A12a status: pending
+requestStage A11: false stage-transition-invalid: A11 派发前必须先创建 A12a criteria 任务（AC-09：实施前写标准）。

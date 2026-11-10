@@ -1,0 +1,6 @@
+[A8] view: A8 dispatched canDispatch: true
+[A8] record: true replay=false
+[A12a] view: A10 pending canDispatch: true
+[A12a] record: true replay=false
+[A11 after A12a] requestStage: true ok
+[A11 without record] requestStage: false stage-transition-invalid: A11 派发前必须先创建 A12a criteria 任务（AC-09：实施前写标准）。

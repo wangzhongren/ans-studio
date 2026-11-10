@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 触发窗口纯函数：A12b/B3 触发、其余不触发；merge-main requestId 确定性（同一 workflow/tip 幂等）
+ok 1 - 触发窗口纯函数：A12b/B3 触发、其余不触发；merge-main requestId 确定性（同一 workflow/tip 幂等）
+  ---
+  duration_ms: 0.8141
+  type: 'test'
+  ...
+# Subtest: 意图卡去重：run-role 已 prepareIntent/marker ⇒ 桌面幂等（A3 requested 单次、marker 单次、finalize 双调 replay）
+ok 2 - 意图卡去重：run-role 已 prepareIntent/marker ⇒ 桌面幂等（A3 requested 单次、marker 单次、finalize 双调 replay）
+  ---
+  duration_ms: 90.1329
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡：resolved 原样落 source:"stage-a10" + workflowId/stage A10；A10 requested 单次（桌面不双写）
+ok 3 - fixed 任命卡：resolved 原样落 source:"stage-a10" + workflowId/stage A10；A10 requested 单次（桌面不双写）
+  ---
+  duration_ms: 140.97
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ 自动呈 merge-main（客户卡/非判断）→ 客户本人 approve ⇒ 本地合并 + workflow.closed delivered；同 tip 不重复卡
+ok 4 - A12b accepted ⇒ 自动呈 merge-main（客户卡/非判断）→ 客户本人 approve ⇒ 本地合并 + workflow.closed delivered；同 tip 不重复卡
+  ---
+  duration_ms: 2168.4418
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ 客户拒绝：release.rejected by customer、不合并；同 workflow/tip 再触发不重复卡
+ok 5 - A12b accepted ⇒ 客户拒绝：release.rejected by customer、不合并；同 workflow/tip 再触发不重复卡
+  ---
+  duration_ms: 1150.9105
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；judge approve 尝试不写终态、不合并
+ok 6 - A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；judge approve 尝试不写终态、不合并
+  ---
+  duration_ms: 1632.9645
+  type: 'test'
+  ...
+# Subtest: 前置缺失不呈卡：A12b accepted 但无 basis ⇒ release-workflow-not-ready 回运营/幕僚；rework 收口不触发
+ok 7 - 前置缺失不呈卡：A12b accepted 但无 basis ⇒ release-workflow-not-ready 回运营/幕僚；rework 收口不触发
+  ---
+  duration_ms: 1164.117
+  type: 'test'
+  ...
+# Subtest: 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+ok 8 - 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+  ---
+  duration_ms: 1329.6231
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡不变：无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）
+ok 9 - legacy 任命卡不变：无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）
+  ---
+  duration_ms: 69.7879
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8166.5472

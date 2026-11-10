@@ -1,0 +1,48 @@
+B5.2 测试（2026-11-10）— 摘要（分支 feat/two-fixed-workflow-paths；HEAD e645e4e；未提交）
+
+基线（本批开始前工作树）：
+- HEAD e645e4e；B5 未提交测试 3 文件（fixed-path-full-chain 0c1530b7… / mode-switch b38596b8… /
+  b-change-scope a7f97744…）+ B5.1 桌面/shared-code 未提交修复
+  （app/desktop/session.ts 2b9f61b7…、app/desktop/workflow.ts 072b312d…、
+   test/桌面应用/b51-fixed-workflow-wiring.test.ts d3b97fff…、
+   test/项目管理/shared/i18n-guard-allowlist.ts bad457a3…）。
+- 过渡态基线（glue 仍在）跑全链：2/3（路径 A 在 glue 的 A1 双记处失败
+  「stage.dispatched 非法：当前 A1(completed) → A1」；路径 B/B 无仓库 2/3 绿）。
+
+本轮候选（仅 test/测试/** 增量；写集外 diff=0）：
+- test/测试/fixed-path-full-chain.test.ts（M）1142 行 / 73,748 B /
+  sha256 19fb866112d77e0b4a20ed9e5f6d4d711ce03fbe12b9a8370138c792ed1d06eb
+  （基线 0c1530b7… → 去 8 处宿主 glue）
+- 候选聚合（'<raw_sha256>  <path>' 行 LC_ALL=C sort 后 SHA-256）：
+  6defdfa73ed597d711b6af2c27df1ce5aab6aa892983cef2ac8dd0b24e6d98a6
+- mode-switch.test.ts / b-change-scope.test.ts hash 与基线一致（未改）。
+
+去 glue（B5.1 生产接线全链复跑）：
+- 删除 6 处 recordStageDispatch（A1/A4/A7/A8/A12a/A12b）、A6 手写 stage.requested 标记、
+  B2 直接 recordChangeScopeDecision；全部由真实桌面路由/卡生命周期触发。
+- 新增证据断言：stage.dispatched 事件按真实 taskId 一次 + 幂等键；A6 stage.requested
+  （幂等键/requestDigest=proposal 字节 sha/requestTaskId）+ stage.completed（cause/5 artifacts）；
+  B2 change.scope-decided（impactReport path+sha 重算、effectiveWritesets、decidedBy、
+  requestTaskId=B1 请求、幂等键）；B3 受理前 B2 仍 pending；B3 重放不重复写。
+- fixture：路径 B 的 B3 stage-request 提供 requestedEvidence:["src/core/snake.ts"]（文件级候选）。
+
+运行结果：
+- fixed-path-full-chain.test.ts：3/3 pass / 0 fail / 0 skip / 0 cancelled（TAP b52-chain.tap）。
+  路径 A 全链 delivered；路径 B 全链 delivered；路径 B 无仓库 b-repository-required。
+- mode-switch 3/3 pass；b-change-scope 2/2 pass。
+- npm run typecheck：before exit 0 / after exit 0。
+
+D1（test/测试 域，119 文件 = 116 既有 + 3 B5 测试；逐文件 TAP，同 B5 口径）：
+- before（glue 在）：711 / 653 / 39 / 1 / 18（1 登记挂起）；not-ok 40；
+  vs B5 冻结 known-red（39 条）：added 1（= glue 过渡态路径 A 失败）/ removed 0。
+- after 原始：709 / 650 / 40 / 1 / 18（3 挂起：1 登记 + 2 个 300s 超时）；
+  一次性环境异常：2 个 V8 原生 abort（exit 134，git-command.ts noLinks；judge-delegated-effectiveness
+  在域内第 2 个文件即崩溃，早于本批修改文件执行）+ 2 个 300s watchdog。
+- 隔离复跑（_evidence/d1-after-rerun/）：4 个异常文件全部 1/1 pass（judge-delegated-effectiveness
+  复跑 #1 再次原生 abort、#2 pass 1/1；其余 3 个一次通过）⇒ 补足后 after = 711 / 654 / 38 / 1 / 18
+  （= B5 after），失败名 diff（before→after 修正）added 0 / removed 1（仅去掉 glue 过渡态失败）；
+  after（修正）vs B5 冻结 known-red：added 0 / removed 0；新 skip = 0；known red 不恶化。
+- 结论：新增确定性失败 = 0；新增 skip = 0；known red 不恶化；无写集外改动。
+
+未提交：本记录与 _evidence/、测试文件均未 commit/push/merge/tag/发布。
+记录 sha256: 0ac3a0d9f937d0acb976d44529c852f60d9d5622da06aae0f9742e6cdd90de64

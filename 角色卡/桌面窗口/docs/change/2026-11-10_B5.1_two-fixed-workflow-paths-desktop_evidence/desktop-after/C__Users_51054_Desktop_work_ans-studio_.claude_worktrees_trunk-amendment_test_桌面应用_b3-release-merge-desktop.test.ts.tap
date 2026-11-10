@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: merge-main 卡构造：app-owned 非判断（application + 冻结选项 + 不进 GROUP）；preview 必含字段
+ok 1 - merge-main 卡构造：app-owned 非判断（application + 冻结选项 + 不进 GROUP）；preview 必含字段
+  ---
+  duration_ms: 1.1825
+  type: 'test'
+  ...
+# Subtest: toMergeMainCardDecision：客户本人唯一有效；judge answered 不代批；judge declined ⇒ judge-reject；中止 ⇒ timeout
+ok 2 - toMergeMainCardDecision：客户本人唯一有效；judge answered 不代批；judge declined ⇒ judge-reject；中止 ⇒ timeout
+  ---
+  duration_ms: 0.1814
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：客户本人确认 ⇒ 本地合并 main（confirm/merged/closed）；不 push/tag
+ok 3 - runFixedReleaseMerge：客户本人确认 ⇒ 本地合并 main（confirm/merged/closed）；不 push/tag
+  ---
+  duration_ms: 1497.6543
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：客户拒绝 ⇒ release.rejected.by=customer、不合并；judge 拒绝 ⇒ by=judge；judge approve 尝试不合并
+ok 4 - runFixedReleaseMerge：客户拒绝 ⇒ release.rejected.by=customer、不合并；judge 拒绝 ⇒ by=judge；judge approve 尝试不合并
+  ---
+  duration_ms: 2449.3829
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：超时/中止 ⇒ release.rejected（by judge，非客户确认）；前置不满足不发卡；无通道不合并
+ok 5 - runFixedReleaseMerge：超时/中止 ⇒ release.rejected（by judge，非客户确认）；前置不满足不发卡；无通道不合并
+  ---
+  duration_ms: 1556.7119
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：已合并 tip ⇒ release-already-merged（no-op 成功，不重复合并）
+ok 6 - runFixedReleaseMerge：已合并 tip ⇒ release-already-merged（no-op 成功，不重复合并）
+  ---
+  duration_ms: 1293.7842
+  type: 'test'
+  ...
+# Subtest: appendReleaseEvent 夹具：release 账本 schema/幂等（guard against silent format drift）
+ok 7 - appendReleaseEvent 夹具：release 账本 schema/幂等（guard against silent format drift）
+  ---
+  duration_ms: 7.7765
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7229.4634

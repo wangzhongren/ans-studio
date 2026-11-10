@@ -1,0 +1,170 @@
+TAP version 13
+# Subtest: Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority
+ok 1 - Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority
+  ---
+  duration_ms: 712.2969
+  type: 'test'
+  ...
+# Subtest: Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+not ok 2 - Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+  ---
+  duration_ms: 117.1891
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\direct-role-capabilities.test.ts:69:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    A shape-shaped confirmation without the real request/decision cannot promote migration
+    + actual - expected
+    
+      {
+        code: 'conflict',
+    +   message: 'frozen-conflict: docs/product/demo-intent-v2.md',
+    -   message: 'frozen-conflict',
+        ok: false
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    ok: false
+    code: 'conflict'
+    message: 'frozen-conflict'
+  actual:
+    ok: false
+    code: 'conflict'
+    message: 'frozen-conflict: docs/product/demo-intent-v2.md'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:90:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields
+ok 3 - Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields
+  ---
+  duration_ms: 104.1957
+  type: 'test'
+  ...
+# Subtest: Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw
+ok 4 - Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw
+  ---
+  duration_ms: 256.8742
+  type: 'test'
+  ...
+# Subtest: Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed
+ok 5 - Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed
+  ---
+  duration_ms: 668.2868
+  type: 'test'
+  ...
+# Subtest: Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk
+ok 6 - Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk
+  ---
+  duration_ms: 414.0558
+  type: 'test'
+  ...
+# Subtest: complete team plan / activation / new pin: actual planning-only basis and independent pointers
+ok 7 - complete team plan / activation / new pin: actual planning-only basis and independent pointers
+  ---
+  duration_ms: 1493.9288
+  type: 'test'
+  ...
+# Subtest: complete team plan / activation / new pin: actual existing workflow basis and independent pointers
+ok 8 - complete team plan / activation / new pin: actual existing workflow basis and independent pointers
+  ---
+  duration_ms: 1563.1134
+  type: 'test'
+  ...
+# Subtest: Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+ok 9 - Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+  ---
+  duration_ms: 398.6571
+  type: 'test'
+  ...
+# Subtest: Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+ok 10 - Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+  ---
+  duration_ms: 335.6369
+  type: 'test'
+  ...
+# Subtest: Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation
+ok 11 - Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation
+  ---
+  duration_ms: 32.5362
+  type: 'test'
+  ...
+# Subtest: Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs
+ok 12 - Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs
+  ---
+  duration_ms: 53.6107
+  type: 'test'
+  ...
+# Subtest: Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs
+ok 13 - Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs
+  ---
+  duration_ms: 407.0562
+  type: 'test'
+  ...
+# Subtest: Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback
+ok 14 - Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback
+  ---
+  duration_ms: 10.7702
+  type: 'test'
+  ...
+# Subtest: Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history
+ok 15 - Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history
+  ---
+  duration_ms: 105.3898
+  type: 'test'
+  ...
+# Subtest: Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation
+ok 16 - Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation
+  ---
+  duration_ms: 34.9244
+  type: 'test'
+  ...
+# Subtest: Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer
+ok 17 - Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer
+  ---
+  duration_ms: 485.5009
+  type: 'test'
+  ...
+# Subtest: Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again
+ok 18 - Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again
+  ---
+  duration_ms: 142.6924
+  type: 'test'
+  ...
+# Subtest: Service: any invalid target/hash/role or precommit failure leaves the complete old baseline
+ok 19 - Service: any invalid target/hash/role or precommit failure leaves the complete old baseline
+  ---
+  duration_ms: 120.3547
+  type: 'test'
+  ...
+# Subtest: Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins
+ok 20 - Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins
+  ---
+  duration_ms: 110.42
+  type: 'test'
+  ...
+#   \#  C:\\Users\\51054\\AppData\\Local\\Programs\\nodejs\\node.exe[25840]: void __cdecl node::CleanupQueue::Add(Callback, void *) at src\\cleanup_queue-inl.h:24
+#   \#  Assertion failed: (insertion_info.second) == (true)
+# ----- Native stack trace -----
+#  1: 00007FF7B1006536 node::SetAbortHandler+54
+#  2: 00007FF7B10060E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+#  3: 00007FF7B111D5C3 node::SetCppgcReference+356435
+#  4: 000001FCD158F77E 
+# ----- JavaScript stack trace -----
+# 1: destroyTracking (node:internal/async_hooks:344:3)
+# 2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+# 3: readFileHandle (node:internal/fs/promises:1214:30)
+# 4: readFile (node:internal/fs/promises:2004:24)
+1..20
+# tests 20
+# suites 0
+# pass 19
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7961.1942

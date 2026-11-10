@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: 块2/允许写：write_file→盘上文件存在且**字节等于** content；mkdir -p 父目录
+ok 1 - 块2/允许写：write_file→盘上文件存在且**字节等于** content；mkdir -p 父目录
+  ---
+  duration_ms: 28.3698
+  type: 'test'
+  ...
+# Subtest: 块2/允许编辑：edit_file 命中 old_string → 回写内容等于预期
+ok 2 - 块2/允许编辑：edit_file 命中 old_string → 回写内容等于预期
+  ---
+  duration_ms: 14.5433
+  type: 'test'
+  ...
+# Subtest: 块2/edit_file：old_string 未命中 → ok:false 且文件保持不变
+ok 3 - 块2/edit_file：old_string 未命中 → ok:false 且文件保持不变
+  ---
+  duration_ms: 8.767
+  type: 'test'
+  ...
+# Subtest: 块2/拒绝写：越界路径 → 文件不存在、父目录不建（零副作用）
+ok 4 - 块2/拒绝写：越界路径 → 文件不存在、父目录不建（零副作用）
+  ---
+  duration_ms: 6.3065
+  type: 'test'
+  ...
+# Subtest: 块2/拒绝编辑：对已存在但越界的文件 edit_file → 内容与 mtime 不变（零副作用）
+ok 5 - 块2/拒绝编辑：对已存在但越界的文件 edit_file → 内容与 mtime 不变（零副作用）
+  ---
+  duration_ms: 8.8965
+  type: 'test'
+  ...
+# Subtest: 块2/负例：gate 抛错 → 在任何副作用之前 fail-closed，无文件/目录产生
+ok 6 - 块2/负例：gate 抛错 → 在任何副作用之前 fail-closed，无文件/目录产生
+  ---
+  duration_ms: 5.1684
+  type: 'test'
+  ...
+# Subtest: 块2/负例：符号链接/junction 逃逸出写根 → 拒绝且链接目标未被触碰
+ok 7 - 块2/负例：符号链接/junction 逃逸出写根 → 拒绝且链接目标未被触碰
+  ---
+  duration_ms: 5.7685
+  type: 'test'
+  ...
+# Subtest: 块2/第二边界（§3.8）：gate 放行写根之外（skill 根）的写 → 写层仍拒、无文件产生
+ok 8 - 块2/第二边界（§3.8）：gate 放行写根之外（skill 根）的写 → 写层仍拒、无文件产生
+  ---
+  duration_ms: 4.8041
+  type: 'test'
+  ...
+# Subtest: 块2/同源（行为）：gate 收到的绝对路径 === 文件落盘的绝对路径（写根解释一致）
+ok 9 - 块2/同源（行为）：gate 收到的绝对路径 === 文件落盘的绝对路径（写根解释一致）
+  ---
+  duration_ms: 10.1711
+  type: 'test'
+  ...
+# Subtest: 块2/同源（静态）：写层与门禁引擎的路径原语来自**同一共享模块**（单一来源）
+ok 10 - 块2/同源（静态）：写层与门禁引擎的路径原语来自**同一共享模块**（单一来源）
+  ---
+  duration_ms: 0.5447
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 318.5321

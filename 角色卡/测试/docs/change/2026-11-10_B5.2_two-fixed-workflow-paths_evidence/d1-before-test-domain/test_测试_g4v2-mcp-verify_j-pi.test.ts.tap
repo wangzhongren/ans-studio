@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: J1 判据纯函数：清洗名命中/前缀边界负例（近似串不中）/空白名单不中；env 展开缺失即抛且空引用抛、不改输入
+ok 1 - J1 判据纯函数：清洗名命中/前缀边界负例（近似串不中）/空白名单不中；env 展开缺失即抛且空引用抛、不改输入
+  ---
+  duration_ms: 1.1184
+  type: 'test'
+  ...
+# Subtest: J2 声明驱动接通：rogue mcp.json 被无视；前缀面放行真实执行；资源工具（tools-only）放行面外 ⇒ 门禁拒不可执行
+ok 2 - J2 声明驱动接通：rogue mcp.json 被无视；前缀面放行真实执行；资源工具（tools-only）放行面外 ⇒ 门禁拒不可执行
+  ---
+  duration_ms: 734.2472
+  type: 'test'
+  ...
+# Subtest: J3 自持收窄：子进程 env 键＝PATH＋声明键（平台注入除外）；哨兵零泄漏；env:NAME 展开入子进程
+ok 3 - J3 自持收窄：子进程 env 键＝PATH＋声明键（平台注入除外）；哨兵零泄漏；env:NAME 展开入子进程
+  ---
+  duration_ms: 104.4937
+  type: 'test'
+  ...
+# Subtest: J4 env:NAME 缺失 ⇒ bindRole 构造期抛错，且子进程从未拉起（无 state 落盘）
+ok 4 - J4 env:NAME 缺失 ⇒ bindRole 构造期抛错，且子进程从未拉起（无 state 落盘）
+  ---
+  duration_ms: 306.3556
+  type: 'test'
+  ...
+# Subtest: J5 dispose 收口（真路径）：dispose 后 MCP 子进程 ≤5s 退出（session_shutdown 补发生效）
+ok 5 - J5 dispose 收口（真路径）：dispose 后 MCP 子进程 ≤5s 退出（session_shutdown 补发生效）
+  ---
+  duration_ms: 145.1363
+  type: 'test'
+  ...
+# Subtest: J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启用行在场）；门禁放行 MCP 工具；settled 恰 1
+ok 6 - J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启用行在场）；门禁放行 MCP 工具；settled 恰 1
+  ---
+  duration_ms: 157.3246
+  type: 'test'
+  ...
+# Subtest: J6 零声明：仅治理和默认思考保护、活动面为空、不调 MCP bindExtensions、轮次照常（settled 恰 1）
+ok 7 - J6 零声明：仅治理和默认思考保护、活动面为空、不调 MCP bindExtensions、轮次照常（settled 恰 1）
+  ---
+  duration_ms: 25.7708
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1597.614

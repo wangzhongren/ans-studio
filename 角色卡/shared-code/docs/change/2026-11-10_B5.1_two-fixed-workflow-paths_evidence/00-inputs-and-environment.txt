@@ -1,0 +1,41 @@
+=== 00 inputs & environment (B5.1, 2026-11-10) ===
+2026-11-10T12:32:43Z (UTC)
+v24.22.1
+11.19.1
+Version 7.0.2
+branch: feat/two-fixed-workflow-paths
+HEAD: e645e4ebe9b7444d4647ac74fb4f49a99030c354
+
+=== basis bindings (sha256) ===
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+6665b1cebd210e8df03f8187ad155d13fc05409708981f18b46e5266c1b258dd *角色卡/测试/docs/change/2026-11-10_B5_two-fixed-workflow-paths.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+4c63ccbc84990f00e772fb6e16cf0e9df9433a8bbe5c99dcd078b67bca036211 *docs/scheduling/2026-11-10_team-plan_two-fixed-workflow-paths.md
+
+=== input file hashes (before edit) ===
+3c231e8c937e9a82a618dd6a8b94d11e3db2b99654ce34497ec024b7d569de97  test/项目管理/shared/i18n-guard-allowlist.ts (before)
+91e8d14323628e9a8d16721f6b059258eb6e6aa312fe8b1d1e16125ca7c6c7b6  test/项目管理/shared/i18n-guard.test.ts (unchanged)
+502fe5b4c828b8c76da0d0f1ff94083886f9931eeb56250ebe789a59cf8f8956  test/项目管理/shared/i18n-guard-scanner.ts (unchanged)
+84dd9c14ce726d3e213b1ceb71125dd1b19230f6416f09f1739539126c0fe0d3  app/desktop/workflow.ts (unchanged; read-only)
+d7cbdd7aec028728b8638b49ccc14171a4785348351bf4dfd908cfe9da361fb4  app/desktop/workflow-git.ts (unchanged; read-only)
+
+=== offending import lines (before fix) ===
+-- workflow.ts:20 / :21 / :22 / :27
+import { readTaskState } from "../../src/common/编排/task-state.ts";
+import { FIXED_DISPATCH_MATRIX } from "../../src/common/编排/workflow-dispatch.ts";
+import { readWorkflowLedger } from "../../src/common/编排/workflow-service.ts";
+} from "../../src/common/编排/workflow-service.ts";
+-- workflow-git.ts:32 / :39 / :45
+} from "../../src/common/编排/workflow-service.ts";
+} from "../../src/common/编排/workflow-service.ts";
+import type { ShellTaskGitBudgets, ShellTaskGitCommandFacts } from "../../src/common/编排/shell-gate.ts";
+
+=== git status --porcelain -- src app test (at capture; allowlist M is this batch's edit) ===
+ M test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/测试/b-change-scope.test.ts
+?? test/测试/fixed-path-full-chain.test.ts
+?? test/测试/mode-switch.test.ts
+
+# 开工未编辑前的实测（本批开始时执行）：仅 `?? test/测试/b-change-scope.test.ts`、
+# `?? test/测试/fixed-path-full-chain.test.ts`、`?? test/测试/mode-switch.test.ts`（B5 既有未跟踪产物）；
+# 无任何 `M`。本批只新增对 i18n-guard-allowlist.ts 的 `M`（+16/−0），app/src 零改动（见 08）。

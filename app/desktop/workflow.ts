@@ -13,13 +13,17 @@
 //    `app/desktop/session.ts::routeFixedPathDispatch`；本层只提供模式选择与注入形态。
 //  · legacy 注入集合/顺序由 `session.ts` 原样保留；本模块的常量只供 fixed 过滤消费。
 
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import type { DispatchTaskPayload } from "../../src/model/runtime.ts";
+import { WORKFLOW_LEDGER_SCHEMA } from "../../src/model/runtime.ts";
+import type { DispatchTaskPayload, WorkflowEvent, WorkflowStage } from "../../src/model/runtime.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
-import { FIXED_DISPATCH_MATRIX } from "../../src/common/编排/workflow-dispatch.ts";
-import { readWorkflowLedger } from "../../src/common/编排/workflow-service.ts";
+import { FIXED_DISPATCH_MATRIX, stageRequestIdempotencyKey } from "../../src/common/编排/workflow-dispatch.ts";
+import { canDispatchStage, canRequestStage, deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
+import { appendWorkflowEvent, readWorkflowLedger, recordChangeScopeDecision, recordStageDispatch } from "../../src/common/编排/workflow-service.ts";
+import type { PathBWriteSet, WorkflowServiceFailure } from "../../src/common/编排/workflow-service.ts";
 import {
   prepareFixedPathStart,
   workflowMode as orchestrationWorkflowMode,
@@ -263,4 +267,290 @@ export type FixedReleaseTriggerStage = (typeof FIXED_RELEASE_TRIGGER_STAGES)[num
 /** 该阶段收口（accepted 且阶段完成）是否触发发布自动呈卡；其他阶段一律不触发。 */
 export function isFixedReleaseTriggerStage(stage: string | undefined): stage is FixedReleaseTriggerStage {
   return stage === "A12b" || stage === "B3";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// T3 B5.1（2026-11-10，桌面窗口）：fixed 生产接线修复（B5 全链发现的 G-B5-1/G-B5-2/G-B5-3）
+//
+// 依据：B1 验收 AC-08/AC-09/AC-10/AC-13/AC-18；v1.3 §4.2/§4.3/§4.5/§7.1；B5 记录 §4 修复清单。
+// 纪律：本层只做**应用接线**（按真实 task.created/卡事实调用已导出的编排服务/合法事件）；
+// 状态机/幂等/属主派生/写集派生仍在编排（单一实现），本层不复制、不伪造事件、不授予写权；
+// legacy 路径零变化（本段只被 fixed 路由/固定卡/路径 B 调用）。
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+// —————————————— G-B5-1：stage.dispatched 生产落账 ——————————————
+
+/**
+ * 直派/阶段任务的 `stage.dispatched` 记账集合（v1.3 §4.5；B5 §4 修复清单 1）：
+ * - A1/A4/A7：完成于目标任务创建（AC-08）——首条派发即 `stage.completed`（服务既有 `DISPATCH_COMPLETES`）；
+ * - A8：激活任务派发 ⇒ A8 在办（完成由 `role.activated`/收口判定）；
+ * - A12a/A12b：直派验收任务（AC-09 要求 A11 前 A12a 在办；A12b 在 A11 完成后派发）。
+ * **不含** A11（`requestStage` 创建请求任务时已写 `stage.dispatched A11`，不得重复）、
+ * A2/A5/A6/A9/A10（收口/卡/账本事件完成）与 B1/B3（B3 无 stage.dispatched 语义；B1 完成于收口）。
+ */
+export const FIXED_STAGE_DISPATCH_RECORD_STAGES = Object.freeze(["A1", "A4", "A7", "A8", "A12a", "A12b"] as const);
+export type FixedStageDispatchRecordStage = (typeof FIXED_STAGE_DISPATCH_RECORD_STAGES)[number];
+const FIXED_STAGE_DISPATCH_RECORD_SET: ReadonlySet<string> = new Set<string>(FIXED_STAGE_DISPATCH_RECORD_STAGES);
+
+export function shouldRecordFixedStageDispatch(stage: WorkflowStage | undefined): stage is FixedStageDispatchRecordStage {
+  return stage !== undefined && FIXED_STAGE_DISPATCH_RECORD_SET.has(stage);
+}
+
+export type FixedStageDispatchRecordOutcome =
+  | { ok: true; recorded: boolean; replay: boolean }
+  | WorkflowServiceFailure;
+
+/**
+ * fixed 任务创建后按真实 `task.created` 事实记 `stage.dispatched`（G-B5-1；服务 = `recordStageDispatch`）：
+ * - 同 `(workflow, stage, taskId)` 已有派发事件 ⇒ 幂等 replay（A1/A4/A7 已完成态不因重复调用报错）；
+ * - **状态机窗口外**（`canDispatchStage=false`，如 B1 既有夹具里 workflow 尚在 A1 的 A12a review 直派）
+ *   ⇒ 不写、不阻断本次投递：投影本就不能接受该事件，照旧行为（不伪造 stage.dispatched）；
+ * - 账本缺失/已关闭/损坏或服务写入失败 ⇒ fail-closed（如实返回稳定失败码，由调用方回报）。
+ */
+export async function recordFixedStageDispatchForTask(input: {
+  projectRoot: string;
+  workflowId: string;
+  stage: WorkflowStage;
+  taskId: string;
+  targetRoleId: string;
+  moduleId?: string;
+  now?: () => Date;
+}): Promise<FixedStageDispatchRecordOutcome> {
+  if (!shouldRecordFixedStageDispatch(input.stage)) return { ok: true, recorded: false, replay: false };
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = ledger.events.filter((event) => event.workflowId === input.workflowId);
+  if (wfEvents.length === 0) {
+    return { ok: false, code: "workflow-not-found", message: `workflow ${input.workflowId} 不存在（stage.dispatched ${input.stage} 未记录）。` };
+  }
+  const dispatchKey = `stage-dispatch:${input.workflowId}:${input.stage}:${input.taskId}`;
+  if (wfEvents.some((event) => event.kind === "stage.dispatched" && event.idempotencyKey === dispatchKey)) {
+    return { ok: true, recorded: true, replay: true };
+  }
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  if (view.closed !== undefined) {
+    return { ok: false, code: "workflow-closed", message: `workflow ${input.workflowId} 已关闭（${view.closed.outcome}），stage.dispatched ${input.stage} 未记录。` };
+  }
+  if (view.blocked?.code === "workflow-corrupt") {
+    return { ok: false, code: "workflow-corrupt", message: `工作流账本损坏：${view.blocked.summary}（stage.dispatched ${input.stage} 未记录）。` };
+  }
+  if (!canDispatchStage(view, input.stage)) return { ok: true, recorded: false, replay: false };
+  const recorded = await recordStageDispatch({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    stage: input.stage,
+    taskId: input.taskId,
+    targetRoleId: input.targetRoleId,
+    ...(input.moduleId !== undefined ? { moduleId: input.moduleId } : {}),
+    ...(input.now !== undefined ? { now: input.now } : {}),
+  });
+  if (!recorded.ok) return recorded;
+  return { ok: true, recorded: true, replay: recorded.replay };
+}
+
+// —————————————— G-B5-3：方案卡（A6）在办标记 ——————————————
+
+/**
+ * fixed proposal 卡（A6）**呈卡前**的在办标记（G-B5-3；与 run-role A10 `markFixedAppointmentCardRequested`
+ * 同构）：写 `stage.requested A6`（幂等 `stage-request:<wf>:A6:1`，requestDigest = 方案依据（proposal）
+ * 文档字节 sha256，requestTaskId = `proposal-card:<flowId>:<sha12>`），使客户 accept 后桌面
+ * `stage.completed A6`（要求 `view.stage === "A6"`）可按状态机落账。
+ *
+ * **不新增客户门**：无活动 workflow（调用方已解析）、账本缺该 workflow、view 已关闭/blocked、
+ * 当前不在「A5 已完成 → A6」窗口、或 A6 已在办/已完成（view.stage==="A6"）⇒ 不写、照常呈现卡；
+ * 只有真正尝试写入且失败才返回稳定失败码（fail-closed，调用方不发卡）。
+ * 同一幂等键重复调用由 `appendWorkflowEvent` replay 去重（不重复 marker）。
+ */
+export async function markFixedProposalCardRequested(input: {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  proposalSha256: string;
+  now?: () => Date;
+}): Promise<WorkflowServiceFailure | undefined> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = ledger.events.filter((event) => event.workflowId === input.workflowId);
+  const started = wfEvents.find((event) => event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started" || started.flowId !== input.flowId) return undefined;
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  if (view.closed !== undefined || view.blocked !== undefined) return undefined;
+  if (view.path !== "A") return undefined;
+  if (view.stage === "A6") return undefined;
+  if (!(view.stage === "A5" && view.stages.A5.status === "completed") || !canRequestStage(view, "A6")) return undefined;
+  const at = (input.now ?? (() => new Date()))().toISOString();
+  const event: WorkflowEvent = {
+    v: 1,
+    at,
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "stage.requested",
+    workflowId: input.workflowId,
+    flowId: input.flowId,
+    path: view.path,
+    idempotencyKey: stageRequestIdempotencyKey(input.workflowId, "A6", 1),
+    stage: "A6",
+    fromStage: "A5",
+    requestTaskId: `proposal-card:${input.flowId}:${input.proposalSha256.slice(0, 12)}`,
+    requestDigest: input.proposalSha256,
+    attempt: 1,
+  };
+  const appended = await appendWorkflowEvent(input.projectRoot, event);
+  if (!appended.ok) {
+    return { ok: false, code: "workflow-ledger-write-failed", message: `stage.requested A6 写入失败：${appended.message}` };
+  }
+  return undefined;
+}
+
+// —————————————— G-B5-2：B2 范围决定（change.scope-decided）生产写入 ——————————————
+
+/** 项目内文件字节 sha256（缺失/目录/非法路径 ⇒ undefined；不猜）。 */
+async function sha256OfProjectFile(projectRoot: string, relPath: string): Promise<string | undefined> {
+  const normalized = relPath.replace(/\\/g, "/").trim();
+  if (normalized === "" || normalized.startsWith("/") || normalized.includes("://")) return undefined;
+  if (normalized.split("/").some((segment) => segment === "..")) return undefined;
+  try {
+    const bytes = await fs.readFile(path.join(projectRoot, ...normalized.split("/")));
+    return createHash("sha256").update(bytes).digest("hex");
+  } catch {
+    return undefined;
+  }
+}
+
+/** scope 候选须为**文件**级项目相对路径（编排 `normalizeScopePath` 同口径：目录/空段/`.`/`..` 非法）。 */
+function isScopeFileCandidate(value: string): boolean {
+  const text = value.trim().replace(/\\/g, "/");
+  if (text === "" || text.startsWith("/") || /^[a-zA-Z]:/.test(text)) return false;
+  return text.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+}
+
+export type FixedPathBScopeDecisionOutcome =
+  | { ok: true; writesets: PathBWriteSet[]; replay: boolean; recorded: boolean }
+  | WorkflowServiceFailure;
+
+/**
+ * 路径 B **B2 范围决定** 的应用生产入口（G-B5-2；设计 §4.3 B2「幕僚发送 B3 stage-request 时应用校验
+ * impactReport hash 并记录事件」）：`routeFixedPathDispatch` 受理 B3 advance stage-request **之前**调用。
+ *
+ * 应用事实（不采信模型自报写集/属主）：
+ * - **影响面报告** = 最近一条 B1 生产任务（非 stage-request）done 报告的 evidence（倒序取第一个可读的
+ *   项目内文件）优先、其 `requestedEvidence` 次之；字节 sha256 由本层重算（服务再独立复核）。
+ * - **候选路径** = B3 stage-request 声明的 `requestedEvidence`（chief 依据 B1 建议给出的候选；≤5）优先，
+ *   其次 B1 生产任务的 `modulePaths`（应用记录的分析范围）；为空 ⇒ fail-closed。
+ * - **属主/有效写集** = 编排 `recordChangeScopeDecision` 按最新名单/角色边界派生（decidedBy:"chief"、
+ *   requestTaskId = 最近 B1 stage-request 任务）。
+ *
+ * 窗口：B1 已完成且 B2 未完成（B2 completed ⇒ 幂等 replay 不重复写）；非 B 路径 ⇒ 不写、不阻断。
+ * 失败（窗口不符/报告缺失/候选缺失/写集派生拒绝/账本写失败）⇒ 稳定失败码，调用方 fail-closed 拒绝 B3 请求。
+ */
+export async function recordFixedPathBScopeDecisionForDispatch(input: {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  candidateFiles?: readonly string[];
+  now?: () => Date;
+}): Promise<FixedPathBScopeDecisionOutcome> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = ledger.events.filter((event) => event.workflowId === input.workflowId);
+  const started = wfEvents.find((event) => event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started") {
+    return { ok: false, code: "workflow-not-found", message: `workflow ${input.workflowId} 不存在（B2 范围决定未记录）。` };
+  }
+  if (started.path !== "B") return { ok: true, writesets: [], replay: true, recorded: false };
+  if (started.flowId !== input.flowId) {
+    return { ok: false, code: "b-change-scope-invalid", message: `flowId 与 workflow 账本不一致（${started.flowId}）。` };
+  }
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  if (view.closed !== undefined) {
+    return { ok: false, code: "workflow-closed", message: `workflow ${input.workflowId} 已关闭（${view.closed.outcome}），B2 范围决定未记录。` };
+  }
+  if (view.blocked !== undefined) {
+    return { ok: false, code: "workflow-corrupt", message: `工作流账本损坏：${view.blocked.summary}（B2 范围决定未记录）。` };
+  }
+  if (view.stages.B2.status === "completed") {
+    const existing = [...wfEvents].reverse().find(
+      (event): event is Extract<WorkflowEvent, { kind: "change.scope-decided" }> => event.kind === "change.scope-decided",
+    );
+    return {
+      ok: true,
+      writesets: existing === undefined ? [] : existing.effectiveWritesets.map((set) => ({ roleId: set.roleId, paths: [...set.paths] })),
+      replay: true,
+      recorded: false,
+    };
+  }
+  if (!(view.stage === "B1" && view.stages.B1.status === "completed"
+    && (view.stages.B2.status === "pending" || view.stages.B2.status === "failed"))) {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `B2 范围决定非法：当前 ${view.stage}(${view.stages[view.stage].status})（要求 B1 已完成且 B2 未完成）。`,
+    };
+  }
+  const b1Production = [...tasks.records.values()].filter((record) =>
+    record.created?.workflowId === input.workflowId
+    && record.created.stage === "B1"
+    && record.created.taskKind !== "stage-request");
+  if (b1Production.length === 0) {
+    return { ok: false, code: "b-change-scope-invalid", message: "B2 范围决定缺少 B1 生产任务（不猜影响面报告）。" };
+  }
+  const withDoneReport = b1Production.filter((record) => record.reports.some((report) => report.status === "done"));
+  const ordered = withDoneReport.length > 0 ? withDoneReport : b1Production;
+  const latest = ordered[ordered.length - 1]!;
+  const latestReport = [...latest.reports].reverse().find((report) => report.status === "done");
+  const evidenceCandidates = [
+    ...[...(latestReport?.evidence ?? [])].reverse(),
+    ...(latest.created?.requestedEvidence ?? []),
+  ];
+  let impactReport: { path: string; sha256: string } | undefined;
+  for (const candidate of evidenceCandidates) {
+    const hash = await sha256OfProjectFile(input.projectRoot, candidate);
+    if (hash !== undefined) {
+      impactReport = { path: candidate.replace(/\\/g, "/").trim(), sha256: hash };
+      break;
+    }
+  }
+  if (impactReport === undefined) {
+    return {
+      ok: false,
+      code: "b-change-scope-invalid",
+      message: `B1 影响面报告不可用：任务 ${latest.taskId} 的 done 报告 evidence/requestedEvidence 未给出可读的项目内文件（不猜）。`,
+    };
+  }
+  const declared = (input.candidateFiles ?? []).map((item) => item.trim()).filter(isScopeFileCandidate);
+  const moduleFiles = b1Production
+    .flatMap((record) => record.created?.modulePaths ?? [])
+    .map((item) => item.trim())
+    .filter(isScopeFileCandidate);
+  const candidates = declared.length > 0 ? declared : moduleFiles;
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      code: "b-change-scope-invalid",
+      message: "B2 范围来源缺失：B3 stage-request 未声明候选路径且 B1 生产任务未记录 modulePaths（应用不采信模型自报写集）。",
+    };
+  }
+  const b1Requests = [...tasks.records.values()].filter((record) =>
+    record.created?.workflowId === input.workflowId
+    && record.created.taskKind === "stage-request"
+    && record.created.stage === "B1");
+  const requestTaskId = b1Requests[b1Requests.length - 1]?.taskId;
+  if (requestTaskId === undefined) {
+    return { ok: false, code: "b-change-scope-invalid", message: "B2 范围决定缺少 B1 stage-request 任务（审计绑定缺失）。" };
+  }
+  const decision = await recordChangeScopeDecision({
+    projectRoot: input.projectRoot,
+    flowId: input.flowId,
+    workflowId: input.workflowId,
+    operationId: `b2-scope:${input.workflowId}`,
+    impactReport,
+    scope: {
+      summary: `B2 范围决定（B1 影响面：${impactReport.path}）`,
+      files: candidates,
+      rationale: `依据 B1 任务 ${latest.taskId} 的 done 报告；候选路径由应用记录，属主/有效写集由应用按名单/边界派生`,
+    },
+    requestTaskId,
+    ...(input.now !== undefined ? { now: input.now } : {}),
+  });
+  if (!decision.ok) return decision;
+  return { ok: true, writesets: decision.writesets, replay: decision.replay, recorded: true };
 }

@@ -1,0 +1,85 @@
+TAP version 13
+# Subtest: Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort
+not ok 1 - Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort
+  ---
+  duration_ms: 3.3953
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\effective-timeouts.test.ts:36:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:44:21
+    async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:42:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: Service explicit Pi timing overrides env, including the legacy disabled-timer values
+not ok 2 - Service explicit Pi timing overrides env, including the legacy disabled-timer values
+  ---
+  duration_ms: 1.2726
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\effective-timeouts.test.ts:55:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:65:23
+    async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:61:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged
+ok 3 - Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged
+  ---
+  duration_ms: 0.7517
+  type: 'test'
+  ...
+# Subtest: turn last resort defaults to one hour without env and is overridable for injection
+ok 4 - turn last resort defaults to one hour without env and is overridable for injection
+  ---
+  duration_ms: 0.0991
+  type: 'test'
+  ...
+# Subtest: non-turn timeouts stay unchanged: shell exec 10min, review/confirmation 2min, construct 2min
+ok 5 - non-turn timeouts stay unchanged: shell exec 10min, review/confirmation 2min, construct 2min
+  ---
+  duration_ms: 0.0726
+  type: 'test'
+  ...
+# Subtest: inspection env applies to every runtime while explicit options win; construct stays runtime-scoped
+ok 6 - inspection env applies to every runtime while explicit options win; construct stays runtime-scoped
+  ---
+  duration_ms: 0.0883
+  type: 'test'
+  ...
+# Subtest: all runtimes read the same inspection env; Service still uses the fixed 1h last resort
+not ok 7 - all runtimes read the same inspection env; Service still uses the fixed 1h last resort
+  ---
+  duration_ms: 1.0552
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\effective-timeouts.test.ts:120:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:130:23
+    async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:126:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 4
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 244.5124

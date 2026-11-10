@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: D1-1 受保护 + 注册 shell + 真实 assemble*/createShellGate + file sink：准入 observed/token、bind 成功、session.open.ready、appTools 含 shell、plan.approvalChain
+ok 1 - D1-1 受保护 + 注册 shell + 真实 assemble*/createShellGate + file sink：准入 observed/token、bind 成功、session.open.ready、appTools 含 shell、plan.approvalChain
+  ---
+  duration_ms: 79.4074
+  type: 'test'
+  ...
+# Subtest: D1-2 裸函数 gate 无 binding ⇒ protected-scope-approval-chain-unproven；不 bind、无 session.open.ready、gate 零调用
+ok 2 - D1-2 裸函数 gate 无 binding ⇒ protected-scope-approval-chain-unproven；不 bind、无 session.open.ready、gate 零调用
+  ---
+  duration_ms: 56.1796
+  type: 'test'
+  ...
+# Subtest: D1-3 审计不可用：memory/custom/无 probe/真实 file sink 被边界拒 ⇒ protected-scope-audit-unavailable（不创建）
+ok 3 - D1-3 审计不可用：memory/custom/无 probe/真实 file sink 被边界拒 ⇒ protected-scope-audit-unavailable（不创建）
+  ---
+  duration_ms: 32.2066
+  type: 'test'
+  ...
+# Subtest: D1-4 既有拒绝保留：custom factory / demo / unknown scope 仍拒（reason 不变）
+ok 4 - D1-4 既有拒绝保留：custom factory / demo / unknown scope 仍拒（reason 不变）
+  ---
+  duration_ms: 14.9491
+  type: 'test'
+  ...
+# Subtest: D1-5 run_shell/start_background_task 端到端：allow/deny/timeout、entry 区分、拒绝/超时零执行
+ok 5 - D1-5 run_shell/start_background_task 端到端：allow/deny/timeout、entry 区分、拒绝/超时零执行
+  ---
+  duration_ms: 129.3376
+  type: 'test'
+  ...
+# Subtest: D1-6 只读 Git 路由：命中经注入能力 match+execute（不 spawn）；能力缺席/未命中 ⇒ readonly-git-runner-unavailable；非 git 正常 spawn
+ok 6 - D1-6 只读 Git 路由：命中经注入能力 match+execute（不 spawn）；能力缺席/未命中 ⇒ readonly-git-runner-unavailable；非 git 正常 spawn
+  ---
+  duration_ms: 37.7932
+  type: 'test'
+  ...
+# Subtest: D1-7 writeGuard 注入：接 (a) 装配路径硬拒裸 Git 写（不咨询审批）；只读档 c=deny 终结；后台入口 Git 拒绝
+ok 7 - D1-7 writeGuard 注入：接 (a) 装配路径硬拒裸 Git 写（不咨询审批）；只读档 c=deny 终结；后台入口 Git 拒绝
+  ---
+  duration_ms: 11.3754
+  type: 'test'
+  ...
+# Subtest: D1-8 PR \#72 契约：含 shell 会话 strict surface 仍 unknown；approvalChain/应用中介证据不被写/发布门消费
+ok 8 - D1-8 PR \#72 契约：含 shell 会话 strict surface 仍 unknown；approvalChain/应用中介证据不被写/发布门消费
+  ---
+  duration_ms: 14.9907
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 686.7687

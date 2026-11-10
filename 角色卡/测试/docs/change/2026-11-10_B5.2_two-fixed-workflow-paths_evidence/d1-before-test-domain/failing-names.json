@@ -1,0 +1,179 @@
+{
+  "test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts": [],
+  "test/测试/2026-11-09_judge-delegated-effectiveness.test.ts": [],
+  "test/测试/abort-cleanup-verify.test.ts": [
+    "abort 抛错但底层稍后 settle：隔离解除，后续 prompt 可再次进入，不永久卡在「中止清理中」",
+    "底层永不 settle：仍需拒绝后续 prompt（fail-closed），清理失败不等于放行"
+  ],
+  "test/测试/b-change-scope.test.ts": [],
+  "test/测试/background-tasks-entry/background-entry.test.ts": [],
+  "test/测试/bootstrap-frozen-closure-integration.test.ts": [],
+  "test/测试/boundary-matrix.test.ts": [],
+  "test/测试/chat-handback-integration.test.ts": [],
+  "test/测试/cli-genesis-boundary.test.ts": [],
+  "test/测试/conditions-f5.test.ts": [],
+  "test/测试/customer-authorization-plane-integration.test.ts": [],
+  "test/测试/direct-role-capabilities-e2e.test.ts": [
+    "Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze"
+  ],
+  "test/测试/doc-format-all-roles.test.ts": [],
+  "test/测试/download-requests-ac22.test.ts": [],
+  "test/测试/download-requests-integration.test.ts": [
+    "审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读"
+  ],
+  "test/测试/duplicate-input-identity.test.ts": [],
+  "test/测试/entry-role-minimal-d.test.ts": [
+    "D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）"
+  ],
+  "test/测试/evidence-sidecar-e2e.test.ts": [],
+  "test/测试/f7-symlink.test.ts": [],
+  "test/测试/fail-closed.test.ts": [],
+  "test/测试/fixed-path-full-chain.test.ts": [
+    "路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered"
+  ],
+  "test/测试/g1-verify/g1-copy-and-nails.test.ts": [],
+  "test/测试/g1-verify/g1-dispatch-wiring.test.ts": [],
+  "test/测试/g1-verify/g1-extraction-render.test.ts": [],
+  "test/测试/g2-verify/w1-signals.test.ts": [],
+  "test/测试/g2-verify/w3-closure.test.ts": [],
+  "test/测试/g3-search-verify/claude-websearch-verify.test.ts": [],
+  "test/测试/g3-search-verify/codex-websearch-verify.test.ts": [],
+  "test/测试/g3-search-verify/pi-loopback-verify.test.ts": [
+    "跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）"
+  ],
+  "test/测试/g3-search-verify/pi-parse-verify.test.ts": [],
+  "test/测试/g4-skill-verify/a-tools-surface.test.ts": [],
+  "test/测试/g4-skill-verify/b-render-double-check.test.ts": [
+    "读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛"
+  ],
+  "test/测试/g4-skill-verify/c-preauth.test.ts": [],
+  "test/测试/g4-skill-verify/d-card-guard.test.ts": [],
+  "test/测试/g4-skill-verify/e-handler.test.ts": [
+    "护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行"
+  ],
+  "test/测试/g4-skill-verify/f-fingerprint.test.ts": [],
+  "test/测试/g4-skill-verify/g-splicing.test.ts": [],
+  "test/测试/g4-skill-verify/h-scope-audit.test.ts": [
+    "范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su",
+    "范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册",
+    "范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用"
+  ],
+  "test/测试/g4-skill-verify/i-cleanpatterns.test.ts": [],
+  "test/测试/g4v2-mcp-verify/a-declarations.test.ts": [],
+  "test/测试/g4v2-mcp-verify/b-service-wiring.test.ts": [],
+  "test/测试/g4v2-mcp-verify/c-tools.test.ts": [],
+  "test/测试/g4v2-mcp-verify/d-orchestration.test.ts": [],
+  "test/测试/g4v2-mcp-verify/e-card-text.test.ts": [],
+  "test/测试/g4v2-mcp-verify/f-handler.test.ts": [
+    "F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行",
+    "F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖"
+  ],
+  "test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts": [],
+  "test/测试/g4v2-mcp-verify/h-claude-adapter.test.ts": [],
+  "test/测试/g4v2-mcp-verify/i-codex.test.ts": [],
+  "test/测试/g4v2-mcp-verify/j-pi.test.ts": [],
+  "test/测试/g5-reasoning-verify/a-contract.test.ts": [],
+  "test/测试/g5-reasoning-verify/b-projection.test.ts": [],
+  "test/测试/g5-reasoning-verify/c-claude.test.ts": [],
+  "test/测试/g5-reasoning-verify/compatibility-loopback.test.ts": [],
+  "test/测试/g5-reasoning-verify/d-codex.test.ts": [],
+  "test/测试/g5-reasoning-verify/e-pi.test.ts": [],
+  "test/测试/g5-reasoning-verify/f-settings.test.ts": [],
+  "test/测试/git-action-activation-e2e.test.ts": [],
+  "test/测试/git-action-commit-claude-e2e.test.ts": [],
+  "test/测试/git-action-commit-pi-e2e.test.ts": [],
+  "test/测试/git-action-cross-runtime-audit-failure.test.ts": [],
+  "test/测试/git-action-cross-runtime-codex-init.test.ts": [],
+  "test/测试/git-action-cross-runtime-init.test.ts": [],
+  "test/测试/git-action-cross-runtime-pi-init.test.ts": [],
+  "test/测试/git-action-delivery-claude-e2e.test.ts": [],
+  "test/测试/git-role-workflows-e2e.test.ts": [],
+  "test/测试/git-run-stop-host-continuation-e2e.test.ts": [],
+  "test/测试/governance-e2e-auto/i-full-chain.test.ts": [
+    "最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域",
+    "F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发"
+  ],
+  "test/测试/governance-liaison-verify/f-cli.test.ts": [],
+  "test/测试/governance-matrix-integration.test.ts": [],
+  "test/测试/i18n-integration.test.ts": [],
+  "test/测试/kanban-fixes-verify/f1-timeout.test.ts": [],
+  "test/测试/kanban-fixes-verify/f2-claim-release.test.ts": [],
+  "test/测试/kanban-fixes-verify/f3-length-followup.test.ts": [],
+  "test/测试/kanban-fixes-verify/f4-operator-channel.test.ts": [],
+  "test/测试/kanban-fixes-verify/f5-f6-verification.test.ts": [],
+  "test/测试/kanban-fixes-verify/f7-guard.test.ts": [],
+  "test/测试/lightweight-permission-repairs.test.ts": [],
+  "test/测试/mode-switch.test.ts": [],
+  "test/测试/network-state-e2e.test.ts": [],
+  "test/测试/p1p7-document-integration.test.ts": [],
+  "test/测试/p1p7-report-integration.test.ts": [],
+  "test/测试/p1p7-tool-display-integration.test.ts": [],
+  "test/测试/p1p7-window-provenance-integration.test.ts": [],
+  "test/测试/queue-recovery-e2e.test.ts": [],
+  "test/测试/real-entry.test.ts": [
+    "真实入口:ans role run 编排 --task T-1 以 0 结束",
+    "真实入口:演示输出含角色/边界来源、两笔写入、按根分组、settled",
+    "真实入口:演示**不产生新的** docs/scheduling 记录、也不改写既有管理记录(F3)",
+    "真实入口失败路径非 0:govern 缺真实 Pi 适配器 provider 配置（环境已擦洗：ANS_PI_*/凭据/ANS_RUNTIME 不入子进程）",
+    "真实入口:runCli 默认擦洗——跑测进程的 ANS_RUNTIME 与 Pi 凭据不传给子进程（哨兵值实测）"
+  ],
+  "test/测试/request-timeout-e2e.test.ts": [],
+  "test/测试/retry-safety-e2e.test.ts": [],
+  "test/测试/run-pin-e2e.test.ts": [],
+  "test/测试/run-stop-host-continuation-integration.test.ts": [],
+  "test/测试/runtime-dispatch-gate-integration.test.ts": [],
+  "test/测试/session-admission-approval-b2-gap-integration.test.ts": [],
+  "test/测试/session-admission-approval-integration.test.ts": [],
+  "test/测试/session-admission-approval-q9-integration.test.ts": [],
+  "test/测试/shell-escalation-integration.test.ts": [],
+  "test/测试/shell-judge-verify/a-allow-flow.test.ts": [],
+  "test/测试/shell-judge-verify/b-deny-flow.test.ts": [],
+  "test/测试/shell-judge-verify/c-manual-flow.test.ts": [],
+  "test/测试/shell-judge-verify/d-switch-pending.test.ts": [],
+  "test/测试/shell-judge-verify/e-deny-tier.test.ts": [],
+  "test/测试/shell-judge-verify/f-readonly-sandbox.test.ts": [],
+  "test/测试/shell-judge-verify/g-engine-matrix.test.ts": [],
+  "test/测试/su-shell-approval-verify/a-gate-policy.test.ts": [],
+  "test/测试/su-shell-approval-verify/b-arming-runrole.test.ts": [],
+  "test/测试/su-shell-approval-verify/c-desktop-injection.test.ts": [],
+  "test/测试/su-shell-approval-verify/e-zero-execution.test.ts": [],
+  "test/测试/t1-pipeline-integration.test.ts": [
+    "T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+    "T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report",
+    "T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report"
+  ],
+  "test/测试/t1-real-cli.test.ts": [
+    "T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write",
+    "T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write",
+    "T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write"
+  ],
+  "test/测试/t29-pi-config-roundtrip.test.ts": [],
+  "test/测试/t29-write-discipline.test.ts": [],
+  "test/测试/t9-block1-bootstrap.test.ts": [],
+  "test/测试/t9-block2-write-landing.test.ts": [],
+  "test/测试/t9-block3-pin-shell.test.ts": [],
+  "test/测试/trunk-stable-write-integration.test.ts": [
+    "stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift）",
+    "appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本）"
+  ],
+  "test/测试/turn-watch-verify/a-inspect.test.ts": [],
+  "test/测试/turn-watch-verify/b-last-resort.test.ts": [
+    "B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」"
+  ],
+  "test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts": [],
+  "test/测试/uiux-v2-replay-regression.test.ts": [],
+  "test/测试/version-change-integration.test.ts": [
+    "VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖",
+    "VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied",
+    "VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）",
+    "VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）",
+    "VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）",
+    "VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）",
+    "VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）",
+    "bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1",
+    "冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准"
+  ],
+  "test/测试/wiring.test.ts": [
+    "接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite)"
+  ]
+}

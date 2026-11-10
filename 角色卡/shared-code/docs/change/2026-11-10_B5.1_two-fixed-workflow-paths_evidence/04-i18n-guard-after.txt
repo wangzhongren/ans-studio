@@ -1,0 +1,15 @@
+[i18n-guard] scanned=148 allowlisted=25 violations=0
+✔ 守卫范围：包含入口与共享设置，排除测试/消息目录/治理角色文本/dist (10.258ms)
+✔ allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文） (57.4599ms)
+✔ 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过） (70.3896ms)
+✔ 合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；注释中文放行 (1.7562ms)
+✔ 去注释扫描：字符串/模板中的 URL 与内容不误删 (0.1133ms)
+✔ 去注释扫描：模板表达式内的注释被去除，模板原文保留 (0.0642ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 234.9051

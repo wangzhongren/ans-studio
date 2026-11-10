@@ -1,0 +1,191 @@
+TAP version 13
+# Subtest: Q30 fixture HTTP preserves split UTF8 and byte budget
+ok 1 - Q30 fixture HTTP preserves split UTF8 and byte budget
+  ---
+  duration_ms: 14.5498
+  type: 'test'
+  ...
+# Subtest: Q74 owned Git metadata observer atomic rename race remains bounded and strict
+ok 2 - Q74 owned Git metadata observer atomic rename race remains bounded and strict
+  ---
+  duration_ms: 75.0622
+  type: 'test'
+  ...
+# Subtest: Q75 persisted governance status pointer is information only and bound across Desktop rebuild
+ok 3 - Q75 persisted governance status pointer is information only and bound across Desktop rebuild # SKIP
+  ---
+  duration_ms: 0.1121
+  type: 'test'
+  ...
+# Subtest: Q87 quality document filename version keeps schema and actual metadata bindings
+ok 4 - Q87 quality document filename version keeps schema and actual metadata bindings # SKIP
+  ---
+  duration_ms: 0.0586
+  type: 'test'
+  ...
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.257Z","stage":"begin-owned-cleanup","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.257Z","stage":"begin-owned-cleanup","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.257Z","stage":"before-desktop-stop-all","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.257Z","stage":"before-desktop-stop-all","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.262Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.262Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.262Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.262Z","stage":"before-documents-dispose","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.262Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.262Z","stage":"after-documents-dispose","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.263Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.263Z","stage":"owned-http-server-closed","resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.263Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.263Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.265Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":1,"serverCloseCallbacks":1},"ownSockets":1}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.266Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":2,"serverCloseCallbacks":1},"ownSockets":0}
+# Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-10T13:15:40.269Z","resources":["CloseReq","PipeWrap","PipeWrap"]}
+# Subtest: Q18 minimal Desktop lifecycle runner diagnostic
+ok 5 - Q18 minimal Desktop lifecycle runner diagnostic
+  ---
+  duration_ms: 379.6476
+  type: 'test'
+  ...
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.528Z","stage":"begin-owned-cleanup","closed":true,"resources":["CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.527Z","stage":"begin-owned-cleanup","resources":["CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.528Z","stage":"before-desktop-stop-all","closed":true,"resources":["CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.528Z","stage":"before-desktop-stop-all","resources":["CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.539Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.539Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.539Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.539Z","stage":"before-documents-dispose","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.540Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.540Z","stage":"after-documents-dispose","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.540Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.540Z","stage":"owned-http-server-closed","resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.541Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.541Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.541Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":1,"serverCloseCallbacks":1},"ownSockets":1}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:15:40.542Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":2,"serverCloseCallbacks":1},"ownSockets":0}
+# Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-10T13:15:40.544Z","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap"]}
+# Subtest: Q22 minimal real denied write blocked report cleanup
+ok 6 - Q22 minimal real denied write blocked report cleanup
+  ---
+  duration_ms: 275.0082
+  type: 'test'
+  ...
+# Subtest: Q22 explicit outer failure after real blocked cleanup
+ok 7 - Q22 explicit outer failure after real blocked cleanup # SKIP
+  ---
+  duration_ms: 0.118
+  type: 'test'
+  ...
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.820Z","stage":"begin-owned-cleanup","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.821Z","stage":"before-desktop-stop-all","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.822Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.822Z","stage":"before-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.822Z","stage":"after-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.822Z","stage":"owned-http-server-closed","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:15:40.823Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-10T13:15:40.823Z","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q_OWNED_BUSINESS_CHILD_SPAWN {"runNonce":"ffabbcf4-78b1-438e-a670-988519b59767","caseTag":"default-new-ffabbcf4-78b1-438e-a670-988519b59767","parentPid":22264,"childPid":23128,"deadlineAt":1794316840829,"outerDeadlineAt":1794316870829}
+# Subtest: Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface
+ok 8 - Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface
+  ---
+  duration_ms: 277.3505
+  type: 'test'
+  ...
+# Q_OWNED_BUSINESS_CHILD_START {"at":"2026-11-10T13:15:41.258Z","runNonce":"ffabbcf4-78b1-438e-a670-988519b59767","caseTag":"default-new-ffabbcf4-78b1-438e-a670-988519b59767","pid":23128,"parentPid":22264,"deadlineAt":1794316840829,"source":[{"file":"C:\\\\Users\\\\51054\\\\Desktop\\\\work\\\\ans-studio\\\\.claude\\\\worktrees\\\\trunk-amendment\\\\test\\\\测试\\\\git-role-workflows-e2e.test.ts","sha256":"27bbb12f4c573b64c1dff6d7ca8d9376df0d5301a11a2bc0c2ff251f7665efa5"},{"file":"C:\\\\Users\\\\51054\\\\Desktop\\\\work\\\\ans-studio\\\\.claude\\\\worktrees\\\\trunk-amendment\\\\test\\\\测试\\\\git-role-workflows-driver.ts","sha256":"4ac85b7562a6b70f1884f047e483f77d311522b8f2ac7c7313d0e567ead3b326"}],"nodeTestRuntimeLoaded":false,"registeredTestCount":0}
+# Q_PERSISTED_CHILD_OBSERVED {"at":"2026-11-10T13:17:01.511Z","taskId":"t-mwapsbcr-ca2c7896","parentRef":{"kind":"assigned-task","taskId":"t-mwaps5j3-c5444fb0","ledgerSha256":"6fe5472df5a03b2870e720464c21d16349b1ccc5db995de85465740b17e75ec6"},"runId":"run-hub-d5fc25d17c215040b267f4f1ca8b41913ad40d28eea0b2e7","state":"pinned"}
+# Q_WORKER_CANDIDATE_PREPARED {"at":"2026-11-10T13:17:24.987Z","candidate":{"objectFormat":"sha1","hex":"88754c086c377d211a274b7b7671c9050f710d33"},"tree":{"objectFormat":"sha1","hex":"b14b3bb12896bad2a9b6a69a4a9be05da0cd827b"},"journalId":".ans/trunk/operations/ff5b50a02d46a979e168c5c550050a7f104f0ec177b95ba19614c85900bccdea/git.json"}
+# Q_INTEGRATED_CANDIDATE_PREPARED {"at":"2026-11-10T13:17:38.533Z","candidate":{"objectFormat":"sha1","hex":"f701a6777033fbc18f34782f84d951b460352eb2"},"tree":{"objectFormat":"sha1","hex":"b14b3bb12896bad2a9b6a69a4a9be05da0cd827b"},"parents":[{"objectFormat":"sha1","hex":"21db85fd681b90ce3c97a40162c2266a53b0f349"},{"objectFormat":"sha1","hex":"88754c086c377d211a274b7b7671c9050f710d33"}],"journalId":".ans/trunk/operations/5b9fc5f7a161b2ea8bfd4ed9bee889078540b1e7cad0f078ad1b88946d00c6bd/git.json"}
+# Q_VERIFIER_HTTP {"at":"2026-11-10T13:17:58.289Z","taskId":"t-mwapta92-8e81f7ae","candidate":{"hex":"f701a6777033fbc18f34782f84d951b460352eb2","objectFormat":"sha1"},"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_request_confirmation","ans_request_choice","ans_submit_report","ans_contract_check","ans_doc_format","ans_evidence_check","ans_project_state","ans_governance_matrix","ans_git_query","ans_git_candidate","ans_git_publish"]}
+# Q_DELIVERY_PUBLISHED {"at":"2026-11-10T13:19:01.176Z","ref":"refs/ans/delivery/q2-new","oid":{"objectFormat":"sha1","hex":"f701a6777033fbc18f34782f84d951b460352eb2"},"journalId":".ans/trunk/operations/bb072d272b973f20532c595f542d7b5bced3d5f0c284637e27126ebe2616cb61/git.json"}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.516Z","stage":"begin-owned-cleanup","closed":true,"resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.515Z","stage":"begin-owned-cleanup","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.517Z","stage":"before-desktop-stop-all","closed":true,"resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.517Z","stage":"before-desktop-stop-all","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.545Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.544Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.546Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.546Z","stage":"before-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.547Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":0},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.547Z","stage":"after-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.548Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":1},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.548Z","stage":"owned-http-server-closed","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.549Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":28,"serverCloseCallbacks":1},"ownSockets":1}
+# Q_DRIVER_TEARDOWN {"at":"2026-11-10T13:19:10.549Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+# Q18_DESKTOP_LIFECYCLE {"at":"2026-11-10T13:19:10.551Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":29,"socketsClosed":29,"serverCloseCallbacks":1},"ownSockets":0}
+# Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-10T13:19:10.554Z","resources":["CloseReq","PipeWrap","PipeWrap"]}
+# Q_OWNED_BUSINESS_CHILD_RETURN {"runNonce":"ffabbcf4-78b1-438e-a670-988519b59767","caseTag":"default-new-ffabbcf4-78b1-438e-a670-988519b59767","pid":23128,"completed":true}
+# Q65_BOUNDED_HANDOFF_PROTOCOL actual shortenSummary/200 boundary, exact code+reason+op, terminator, actual own task/run/target guards verified; no business/runtime/approval state created
+# Subtest: Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+ok 9 - Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards
+  ---
+  duration_ms: 210135.8961
+  type: 'test'
+  ...
+# Subtest: Q36 shared full business registration identity
+ok 10 - Q36 shared full business registration identity
+  ---
+  duration_ms: 3.8432
+  type: 'test'
+  ...
+# Subtest: Q37 CHANGE existing-delivery entry to actual product draft creator-close
+ok 11 - Q37 CHANGE existing-delivery entry to actual product draft creator-close # SKIP
+  ---
+  duration_ms: 0.1088
+  type: 'test'
+  ...
+# Subtest: Q43 CHANGE real intent confirmation and version2 planning creator-close
+ok 12 - Q43 CHANGE real intent confirmation and version2 planning creator-close # SKIP
+  ---
+  duration_ms: 0.0343
+  type: 'test'
+  ...
+# Subtest: CHANGE actual v2 publication and frozen-run mode
+ok 13 - CHANGE actual v2 publication and frozen-run mode # SKIP
+  ---
+  duration_ms: 0.02
+  type: 'test'
+  ...
+# Subtest: CHANGE standalone replacement admission diagnostic, not creator-report continuity
+ok 14 - CHANGE standalone replacement admission diagnostic, not creator-report continuity # SKIP
+  ---
+  duration_ms: 0.0151
+  type: 'test'
+  ...
+# Subtest: Q48 hub ordinary no-Git product draft report and Chief typed close
+ok 15 - Q48 hub ordinary no-Git product draft report and Chief typed close # SKIP
+  ---
+  duration_ms: 0.0162
+  type: 'test'
+  ...
+# Subtest: Q59 Product same-candidate denied write recovers within original task
+ok 16 - Q59 Product same-candidate denied write recovers within original task # SKIP
+  ---
+  duration_ms: 0.0144
+  type: 'test'
+  ...
+# Subtest: Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery
+ok 17 - Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery # SKIP
+  ---
+  duration_ms: 0.0126
+  type: 'test'
+  ...
+# Subtest: Q71 Nominator formal blocked Chief rework and customer-visible stop
+ok 18 - Q71 Nominator formal blocked Chief rework and customer-visible stop # SKIP
+  ---
+  duration_ms: 0.0156
+  type: 'test'
+  ...
+# Subtest: Q72 Convener ordinary preparation formal blocked Chief rework and visible stop
+ok 19 - Q72 Convener ordinary preparation formal blocked Chief rework and visible stop # SKIP
+  ---
+  duration_ms: 0.0178
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 12
+# todo 0
+# duration_ms 211622.6617

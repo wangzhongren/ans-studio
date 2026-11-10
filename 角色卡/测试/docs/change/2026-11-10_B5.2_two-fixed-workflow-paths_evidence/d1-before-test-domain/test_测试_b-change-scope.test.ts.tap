@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行）
+ok 1 - 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行）
+  ---
+  duration_ms: 720.8466
+  type: 'test'
+  ...
+# Subtest: 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed
+ok 2 - 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed
+  ---
+  duration_ms: 681.4973
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1824.5992

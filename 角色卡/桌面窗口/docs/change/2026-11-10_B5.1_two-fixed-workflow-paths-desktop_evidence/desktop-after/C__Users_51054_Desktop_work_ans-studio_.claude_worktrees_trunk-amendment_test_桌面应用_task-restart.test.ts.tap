@@ -1,0 +1,31 @@
+TAP version 13
+# Subtest: 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过
+not ok 1 - 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过
+  ---
+  duration_ms: 2033.4282
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\task-restart.test.ts:57:1'
+  failureType: 'testCodeFailure'
+  error: '等待超时'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:88:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 任务已收口：恢复不重投；列表显示 closed
+ok 2 - 任务已收口：恢复不重投；列表显示 closed
+  ---
+  duration_ms: 121.0901
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2566.8169

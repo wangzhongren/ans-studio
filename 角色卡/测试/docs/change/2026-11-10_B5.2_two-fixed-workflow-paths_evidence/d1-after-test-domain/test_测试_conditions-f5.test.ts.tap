@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: F5:声明条件 → 条件目录下路径放行(仍须过 writeSet)
+ok 1 - F5:声明条件 → 条件目录下路径放行(仍须过 writeSet)
+  ---
+  duration_ms: 12.73
+  type: 'test'
+  ...
+# Subtest: F5:未声明条件 → 拒绝,理由为独立'缺少条件'且 allowedByRoot 不含该目录
+ok 2 - F5:未声明条件 → 拒绝,理由为独立'缺少条件'且 allowedByRoot 不含该目录
+  ---
+  duration_ms: 5.3108
+  type: 'test'
+  ...
+# Subtest: F5:声明了**另一个**条件 → 仍拒绝
+ok 3 - F5:声明了**另一个**条件 → 仍拒绝
+  ---
+  duration_ms: 5.4492
+  type: 'test'
+  ...
+# Subtest: F5:条件目录激活但不在 writeSet → F4 收窄拒绝
+ok 4 - F5:条件目录激活但不在 writeSet → F4 收窄拒绝
+  ---
+  duration_ms: 4.6961
+  type: 'test'
+  ...
+# Subtest: F5 对照:普通 file 不受 conditions 影响
+ok 5 - F5 对照:普通 file 不受 conditions 影响
+  ---
+  duration_ms: 4.2138
+  type: 'test'
+  ...
+# Subtest: F6:边界未被接受(accepted=false) → 拒绝一切写入
+ok 6 - F6:边界未被接受(accepted=false) → 拒绝一切写入
+  ---
+  duration_ms: 4.5281
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 249.5522

@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: 版本决策前置：参数/flow/pinned/multi-run/pending/channel-unavailable，失败不发卡
+ok 1 - 版本决策前置：参数/flow/pinned/multi-run/pending/channel-unavailable，失败不发卡
+  ---
+  duration_ms: 100.029
+  type: 'test'
+  ...
+# Subtest: 版本决策前置：未决 decision-pending；无 chief 会话 ⇒ channel-unavailable
+ok 2 - 版本决策前置：未决 decision-pending；无 chief 会话 ⇒ channel-unavailable
+  ---
+  duration_ms: 43.35
+  type: 'test'
+  ...
+# Subtest: 版本修改（客户）：application-owned 卡、targetVersions、executing→executed；不改 run/文档/任务
+ok 3 - 版本修改（客户）：application-owned 卡、targetVersions、executing→executed；不改 run/文档/任务
+  ---
+  duration_ms: 122.7717
+  type: 'test'
+  ...
+# Subtest: 版本修改（客户指令 Q9 A）：request.resolved.by=directive + directiveId；version.decision 三值归属
+ok 4 - 版本修改（客户指令 Q9 A）：request.resolved.by=directive + directiveId；version.decision 三值归属
+  ---
+  duration_ms: 107.4807
+  type: 'test'
+  ...
+# Subtest: 新版本开发（judge 代批）：新 flow/run；旧 flow 全部活动 run 关闭；orphan 旧申请；旧任务不自动关闭
+ok 5 - 新版本开发（judge 代批）：新 flow/run；旧 flow 全部活动 run 关闭；orphan 旧申请；旧任务不自动关闭
+  ---
+  duration_ms: 191.6328
+  type: 'test'
+  ...
+# Subtest: 拒绝/重试/通知不吞；超时/不可用写 resolved 不写 version.decision
+ok 6 - 拒绝/重试/通知不吞；超时/不可用写 resolved 不写 version.decision
+  ---
+  duration_ms: 286.4154
+  type: 'test'
+  ...
+# Subtest: 发起轮次中止：orphaned(initiator-aborted)、无 resolved/version.decision；晚到答案丢弃
+ok 7 - 发起轮次中止：orphaned(initiator-aborted)、无 resolved/version.decision；晚到答案丢弃
+  ---
+  duration_ms: 170.688
+  type: 'test'
+  ...
+# Subtest: 重启恢复：第二未决独立 orphan；F5 resolved-without-execution → uncertain；已 orphaned 排除
+ok 8 - 重启恢复：第二未决独立 orphan；F5 resolved-without-execution → uncertain；已 orphaned 排除
+  ---
+  duration_ms: 74.5149
+  type: 'test'
+  ...
+# Subtest: 重启对账：executing→executed/uncertain；不重复创建新 flow；执行期 pinned failed 不误判
+ok 9 - 重启对账：executing→executed/uncertain；不重复创建新 flow；执行期 pinned failed 不误判
+  ---
+  duration_ms: 65.1825
+  type: 'test'
+  ...
+# Subtest: 执行期 pinned（发卡后 pin）：failed/run-change-required、零创建/零关闭/零 orphan
+ok 10 - 执行期 pinned（发卡后 pin）：failed/run-change-required、零创建/零关闭/零 orphan
+  ---
+  duration_ms: 98.4422
+  type: 'test'
+  ...
+# Subtest: 关闭阶段失败（部分失败）：停止关闭其余 run，failed 如实记录 closedRunIds；不切 focus
+ok 11 - 关闭阶段失败（部分失败）：停止关闭其余 run，failed 如实记录 closedRunIds；不切 focus
+  ---
+  duration_ms: 509.4178
+  type: 'test'
+  ...
+# Subtest: R1-e/执行侧坏 manifest：无关坏 manifest 不阻断前置；版本修改成功；新版本开发如实 execution-failed
+ok 12 - R1-e/执行侧坏 manifest：无关坏 manifest 不阻断前置；版本修改成功；新版本开发如实 execution-failed
+  ---
+  duration_ms: 194.1318
+  type: 'test'
+  ...
+# Subtest: requestId/pending 结构化匹配：一个 runId 是另一个前缀时互不串/attempt 正确
+ok 13 - requestId/pending 结构化匹配：一个 runId 是另一个前缀时互不串/attempt 正确
+  ---
+  duration_ms: 87.5908
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修：版本修改卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按 customer 执行
+ok 14 - 2026-11-04 直修：版本修改卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按 customer 执行
+  ---
+  duration_ms: 130.698
+  type: 'test'
+  ...
+# Subtest: 2026-11-04 直修：新建版本开发卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按既有语义执行
+ok 15 - 2026-11-04 直修：新建版本开发卡（真实通道 + 替我决策开启）呈现客户、不代选；客户选择后按既有语义执行
+  ---
+  duration_ms: 192.5024
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2791.6622
