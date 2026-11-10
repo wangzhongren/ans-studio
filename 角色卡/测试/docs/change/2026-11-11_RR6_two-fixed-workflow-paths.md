@@ -111,6 +111,7 @@
 运行根原件保留：`C:\Users\51054\Desktop\work\ans-two-fixed-paths-rr6-2026-11-11\evidence\`。
 
 **披露**：驱动在 `finalize()` 的 `Browser.close` 后再次出现 Node unsettled top-level await（退出码 13）；证据（final-report/budget/drive/账本）在关窗前已写盘，内容完整。驱动按 stall 规则停止（12 分钟无进度），无人工提前停止。
+- **工作树并发披露**：RR6 启动时工作树干净（git status tracked 修改=0，HEAD d345ae9）；运行期间另一会话于 2026-11-11 07:09:01 +0800（23:09:01 UTC）在共享工作树写入未提交的 app/desktop/session.ts（B11.1「已收口 fixed child 回交」修复，+48/−4）。运行中的 Electron 在启动时已加载 d345ae9 版本（on-disk 修改不改变已加载进程），RR6 判定基于 d345ae9；该修改随后由协调方以 012f491 提交（HEAD e965ef3），非本角色所写、未参与 RR6 运行。
 
 ---
 
