@@ -10,6 +10,11 @@
 //  - `"two-fixed-paths/v1"`：返回 fixed 段（意图撰写/修订、报告回运营；不派发/不实现/不自行改方案；
 //    意图确认卡由幕僚呈）。fixed 段由编排在 fixed 会话追加注入（run-role `context({matrix})`），
 //    legacy 会话不读本分支。纯数据、无 I/O、无时钟/随机数/可变状态。
+//
+// T3 B9.1（RR4 修复）：fixed 报告段补充交付/证据口径——完成后报告产物路径与内容/frontmatter 实际值；
+// 哈希/sha256 由应用计算并引用应用给出的值，**不得用 `run_shell`/`certutil`/`Get-FileHash`/PowerShell
+// 等 shell 计算 hash**（shell 属高风险审批动作，fixed 流程不需要为 hash 触发客户审批卡）；证据由
+// 应用/报告生成。legacy 4 段仍逐字冻结、不受本批影响。
 
 import type { RoleContextInput, RoleContextSection } from "../../../../model/role.ts";
 
@@ -40,7 +45,9 @@ export const PRODUCT_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.fr
  * - 按运营（convener）派发撰写/修订 `docs/product/<flowId>-intent-vN.md`（版本化，不原地改）；
  * - 不派发、不实现、不招人；不自行改方案/名单/架构/角色卡；
  * - 意图确认卡由幕僚（chief）呈，product 不发卡/不代客户确认；
- * - 报告回运营（fixed 生产线任务创建者）；固定路径不注入 VCA/版本决策/结构化 Git 工具。
+ * - 报告回运营（fixed 生产线任务创建者）；固定路径不注入 VCA/版本决策/结构化 Git 工具；
+ * - B9.1：交付报告写清路径与内容/frontmatter 实际值；hash/sha256 由应用计算，禁止 worker 用
+ *   shell（`run_shell`/`certutil`/`Get-FileHash`/PowerShell 等）计算 hash；证据由应用/报告生成。
  */
 export const PRODUCT_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   Object.freeze({
@@ -53,7 +60,7 @@ export const PRODUCT_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Obj
   }),
   Object.freeze({
     id: "product-fixed-report",
-    text: "固定路径报告期望：收到运营派发的任务，完成后必须用 `submit_report` 回短报（完成/阻塞/证据/遗留）到真实任务创建者运营（convener）；缺关键信息先报阻塞，由运营/幕僚发卡或转客户，不猜。",
+    text: "固定路径报告期望：收到运营派发的任务，完成文档/代码后只报告产物路径、内容/frontmatter 实际值与结论（如 intentId/flowId/version/goal/scope/acceptance/nonGoals 与检查/测试结论），不要自己算或转抄哈希——`sha256` 由应用计算：应用在任务收口（`close_created_task`/`closeTask`）、`docs/acceptance` 归档与 documentRefs/依据校验时按真实字节计算并重算比对，报告/证据只引用应用给出的值。不得用 shell 算 hash：不得为取 hash 调用 `run_shell` 或任何 shell/解释器命令，包括 `certutil -hashfile`、`Get-FileHash`、PowerShell/pwsh、`sha256sum`、`shasum`、`openssl dgst`、node/python 等；hash 不是 worker 产物。shell 属高风险审批动作，本流程不需要为 hash 触发任何客户卡。任务文本要求给出 sha256 时，按应用计算口径处理：改为「路径 + frontmatter 实际值；hash 由应用计算」，并在报告中注明来源与路径，不自行用 shell；任务文本不写「给出/附上 sha256」。证据由应用/报告生成。完成后必须用 `submit_report` 回短报（完成/阻塞/证据/遗留）到真实任务创建者运营（convener）；缺关键信息先报阻塞，由运营/幕僚发卡或转客户，不猜。",
   }),
 ]);
 

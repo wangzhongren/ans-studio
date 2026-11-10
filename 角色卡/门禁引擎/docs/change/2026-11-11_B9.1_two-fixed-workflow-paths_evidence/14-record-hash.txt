@@ -1,0 +1,29 @@
+## record file
+f88923054f3ddbcc11355d2775152331da12cb8fbe9caab3136d8898b25abc59 *角色卡/门禁引擎/docs/change/2026-11-11_B9.1_two-fixed-workflow-paths.md
+  209 17362 角色卡/门禁引擎/docs/change/2026-11-11_B9.1_two-fixed-workflow-paths.md
+
+## evidence files
+total 518
+drwxr-xr-x 1 51054 197609      0 Nov 11 04:43 .
+drwxr-xr-x 1 51054 197609      0 Nov 11 04:43 ..
+-rw-r--r-- 1 51054 197609     82 Nov 11 04:36 00-baseline-head.txt
+-rw-r--r-- 1 51054 197609    817 Nov 11 04:36 01-basis-hashes-before.txt
+-rw-r--r-- 1 51054 197609 200776 Nov 11 04:38 02-before-test-gate-engine.tap
+-rw-r--r-- 1 51054 197609   5363 Nov 11 04:39 03-targeted-v2-tests.tap
+-rw-r--r-- 1 51054 197609     43 Nov 11 04:39 04-after-typecheck.txt
+-rw-r--r-- 1 51054 197609    434 Nov 11 04:38 05-before-failure-names.txt
+-rw-r--r-- 1 51054 197609     77 Nov 11 04:38 05-before-skip-names.txt
+-rw-r--r-- 1 51054 197609 203046 Nov 11 04:41 06-after-test-gate-engine.tap
+-rw-r--r-- 1 51054 197609    434 Nov 11 04:41 07-after-failure-names.txt
+-rw-r--r-- 1 51054 197609     77 Nov 11 04:41 07-after-skip-names.txt
+-rw-r--r-- 1 51054 197609      0 Nov 11 04:41 08-failure-names-diff.txt
+-rw-r--r-- 1 51054 197609      0 Nov 11 04:41 08b-skip-names-diff.txt
+-rw-r--r-- 1 51054 197609   4204 Nov 11 04:42 09-v2-consumer-tests.tap
+-rw-r--r-- 1 51054 197609    711 Nov 11 04:42 10-candidate-hashes.txt
+-rw-r--r-- 1 51054 197609     65 Nov 11 04:42 10b-candidate-aggregate.txt
+-rw-r--r-- 1 51054 197609    249 Nov 11 04:42 10b-candidate-lines.txt
+-rw-r--r-- 1 51054 197609   3770 Nov 11 04:42 11-write-set-status.txt
+-rw-r--r-- 1 51054 197609    816 Nov 11 04:42 12-legacy-v2-frozen-after.txt
+-rw-r--r-- 1 51054 197609    527 Nov 11 04:42 13-suite-counts-and-no-new-skip.txt
+-rw-r--r-- 1 51054 197609    270 Nov 11 04:43 14-record-hash.txt
+-rw-r--r-- 1 51054 197609  17265 Nov 11 04:42 15-v2-resource-diff.patch

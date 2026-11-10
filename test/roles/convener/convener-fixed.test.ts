@@ -1,4 +1,6 @@
 // convener 角色模块 fixed 矩阵测试（T3「两条固定工作流路径」B2；MF-IR-4 / v1.3 §3.4）。
+// B9.1（RR4 `1bcdaf69…`）：fixed 段新增任务证据与哈希纪律（应用算 hash、禁止 worker shell hash）
+// 与卡预算段（3 确认卡 + merge-main；不诱导额外审批卡），本文件同步覆盖。
 //
 // 覆盖：
 //  - `fixedCards` / `fixedAllowedBuiltInRoleIds` 冻结值（与 legacy 数据独立）；
@@ -75,11 +77,17 @@ test("isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/�
 
 // —————————————————————— fixed context 段（仅显式 fixed 矩阵）——————————————————————
 
-test("context(fixed)：返回 fixed 段（生产线/团队计划与基线/集成汇总与报告期望），冻结且无 resources", () => {
+test("context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   assert.deepEqual(
     sections.map((section) => section.id),
-    ["convener-fixed-production-line", "convener-fixed-baseline", "convener-fixed-report"],
+    [
+      "convener-fixed-production-line",
+      "convener-fixed-evidence",
+      "convener-fixed-card-budget",
+      "convener-fixed-baseline",
+      "convener-fixed-report",
+    ],
   );
   assert.equal(Object.isFrozen(sections), true);
   for (const section of sections) {
@@ -115,6 +123,56 @@ test("context(fixed)：返回 fixed 段（生产线/团队计划与基线/集成
   }
 });
 
+test("B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text;
+  assert.ok(evidence !== undefined, "B9.1 必须提供任务证据与哈希段");
+
+  // 证据三要素：路径 / 内容/frontmatter / 结论（RR4：worker 不再被要求给出 sha256）。
+  for (const token of ["路径", "frontmatter", "结论"]) {
+    assert.equal(evidence.includes(token), true, `证据段缺要素：${token}`);
+  }
+  // 禁止 worker 用 shell/certutil/Get-FileHash 计算 hash/sha256（RR4 失败事实：certutil）。
+  for (const token of ["run_shell", "certutil", "Get-FileHash", "sha256", "hash"]) {
+    assert.equal(evidence.includes(token), true, `证据段缺禁令主体：${token}`);
+  }
+  assert.match(evidence, /不要要求 worker 用/);
+  // 哈希由应用在收口/归档/依据校验时计算（应用机器事实，非 worker 义务）。
+  assert.match(evidence, /应用/);
+  for (const token of ["close_created_task", "closeTask", "basis.recorded", "documentRefs", "归档"]) {
+    assert.equal(evidence.includes(token), true, `证据段缺应用计算时点：${token}`);
+  }
+  // 任务文本不得以「给出 sha256」作为完成/验收标准。
+  assert.match(evidence, /不得以「给出 sha256」/);
+  assert.match(evidence, /完成标准/);
+});
+
+test("B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const budget = sections.find((section) => section.id === "convener-fixed-card-budget")?.text;
+  assert.ok(budget !== undefined, "B9.1 必须提供卡预算段");
+  for (const token of [
+    "3 张确认卡",
+    "intent-confirm",
+    "proposal",
+    "appointment",
+    "merge-main",
+    "客户本人确认",
+    "acceptance",
+    "decision",
+  ]) {
+    assert.equal(budget.includes(token), true, `卡预算段缺：${token}`);
+  }
+  // 额外客户/操作员审批（shell/stable-write/trunk/run）不得由 worker 任务文本诱导。
+  assert.match(budget, /不得在 worker 任务文本中诱导额外/);
+  for (const token of ["shell", "stable-write", "trunk", "run"]) {
+    assert.equal(budget.includes(token), true, `卡预算段缺额外卡禁令：${token}`);
+  }
+  // decision 卡不计入固定 3 张确认卡（设计 v1.3 §4.2 说明）。
+  assert.match(budget, /decision 卡只用于材料性选择/);
+  assert.match(budget, /不计入 3 张确认卡/);
+});
+
 test("context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）", () => {
   const legacy = MODULE.context({ governanceModel: "trio" });
   assert.equal(MODULE.context({ governanceModel: "single" }), legacy);
@@ -127,6 +185,11 @@ test("context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy
   assert.equal(text.includes("request_choice(cardKind=decision)"), true);
   assert.equal(text.includes("reportTargetForTaskCreator"), true);
   assert.equal(text.includes("convener-fixed"), false, "legacy 返回值不得混入 fixed 段");
+  // B9.1 新增 fixed 文案只属于 fixed 段：legacy context 与 legacy card.text 逐字不变。
+  for (const fixedOnly of ["certutil", "Get-FileHash", "任务证据与哈希", "3 张确认卡", "convener-fixed-evidence"]) {
+    assert.equal(text.includes(fixedOnly), false, `legacy context 混入 fixed 文案：${fixedOnly}`);
+    assert.equal(MODULE.card.text.includes(fixedOnly), false, `legacy card.text 混入 fixed 文案：${fixedOnly}`);
+  }
   // 两矩阵隔离：fixed 返回值不含 legacy 段 id（run-role fixed 会话只追加 fixed 段）。
   assert.equal(
     MODULE.context({ governanceModel: "trio", matrix: FIXED }).some((section) => section.id === "decision-card"),

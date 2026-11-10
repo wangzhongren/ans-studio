@@ -1,0 +1,8 @@
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+1bcdaf6915b91975a9599a4540de1f1493e9adc2f5da79e2f6dde46c2b94d04c *角色卡/测试/docs/change/2026-11-11_RR4_two-fixed-workflow-paths.md
+9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 *src/common/门禁引擎/workflows/chief/chief-workflow.md
+f14845e2e15df454125fb186b8c66934a7769b2449211ec80943d58e0c4de049 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+   61  8724 src/common/门禁引擎/workflows/chief/chief-workflow.md
+  118 17289 src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+  179 26013 total

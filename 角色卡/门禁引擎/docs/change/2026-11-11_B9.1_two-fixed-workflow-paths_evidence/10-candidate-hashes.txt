@@ -1,0 +1,13 @@
+## candidate raw facts
+d0a778fef35adf7dc5cd13e9778ed45867e233a11803645b9d187c7e285bff62 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+7332789c4f41477b9eae96231982a7835efef464c6a4ffaecf335ab33ecf6ba8 *test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts
+  126 20528 src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+  148  9741 test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts
+  274 30269 total
+## git blobs
+73bbb8ef2723f443793acd3186fac6985bd2f4ba
+c554b91c77eaefc7bbf52ab7a0b35af3f66da560
+## numstat
+20	12	src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+new-test git numstat (untracked => stat)
+148 test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts

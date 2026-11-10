@@ -1,0 +1,18 @@
+B9.1 convener-code evidence summary (2026-11-11)
+- baseline HEAD: ffe8620643ac7c7b415a0d504a7aa699bf693f57 (ffe8620)
+- convener tests before: tests 40 / pass 40 / fail 0 / skipped 0 (convener-module + convener-differential + convener-fixed)
+- convener tests after:  tests 42 / pass 42 / fail 0 / skipped 0 (same 3 files; +2 B9.1 tests)
+- legacy fingerprint before/after: byte-identical (02 vs 06)
+  cardText sha256 808c25ec0bc4d5c2c9e0a13fd4bd9836e416c17a2a6d5b1069af7acf5967eb46 (3382 chars)
+  contextLegacy sha256 793dc34c6468ed39dcaa66b14c08982f6a78b98d1c6b425487032644ddd99b9c
+  dispatchMatrix sha256 ecbc423e3ce011a815bfca074bcb0c2de97d662ef7bdc5d6f62355729a6b20e6 (58 cases)
+- npm run typecheck: exit 0 (03-typecheck.log)
+- targeted consumers: test/编排/run-role-fixed.test.ts + test/编排/convener-module-consumption.test.ts = 11 / 11 pass (07)
+- fixed surface: test/门禁引擎/fixed-role-module-surface.test.ts = 7 / 7 pass (08)
+- fixed context sections: 5 (production-line, evidence, card-budget, baseline, report) (13)
+- candidate files: 2 (M src/common/roles/convener/index.ts +32/-4; M test/roles/convener/convener-fixed.test.ts +65/-2) (10/11)
+- candidate aggregate sha256: a7ea2427a2ba5181d3a6d81c1de02b9c117eb73204541a873bc59f9773802ec8 (11)
+- write-set status: only the 2 candidate files under src/common/roles/convener + test/roles/convener (09)
+- concurrent other-owner in-flight in same worktree (read-only for this batch, NOT written by convener-code):
+  src/common/roles/product/internal/context.ts, test/roles/product/product-fixed.test.ts,
+  src/common/门禁引擎/workflows/chief/chief-workflow-v2.md

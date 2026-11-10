@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: B9.2 A1/A2 分离：A1 产品受理任务写死 stage:"A1" 且完成于任务创建；A2 意图任务 stage:"A2" 在 A1 收口后另派、完成于收口 + 文档 hash
+ok 1 - B9.2 A1/A2 分离：A1 产品受理任务写死 stage:"A1" 且完成于任务创建；A2 意图任务 stage:"A2" 在 A1 收口后另派、完成于收口 + 文档 hash
+  ---
+  duration_ms: 0.8082
+  type: 'test'
+  ...
+# Subtest: B9.2 A1 精确 JSON：stage 仍为 A1；任务文本明确 A1 只受理/准备、A2 另派（B9.1 hash 口径保留）
+ok 2 - B9.2 A1 精确 JSON：stage 仍为 A1；任务文本明确 A1 只受理/准备、A2 另派（B9.1 hash 口径保留）
+  ---
+  duration_ms: 0.3368
+  type: 'test'
+  ...
+# Subtest: B9.2 A4/A5 分离：A4 受理任务 stage:"A4" 完成于创建；A5 方案任务 stage:"A5" 在 A4 收口后另派、完成于收口 + 文档证据
+ok 3 - B9.2 A4/A5 分离：A4 受理任务 stage:"A4" 完成于创建；A5 方案任务 stage:"A5" 在 A4 收口后另派、完成于收口 + 文档证据
+  ---
+  duration_ms: 0.5415
+  type: 'test'
+  ...
+# Subtest: B9.2 A7/A8 分离：A7 受理任务 stage:"A7" 完成于创建；A8 激活任务 stage:"A8" 在 A7 收口后另派、完成于 role.activated
+ok 4 - B9.2 A7/A8 分离：A7 受理任务 stage:"A7" 完成于创建；A8 激活任务 stage:"A8" 在 A7 收口后另派、完成于 role.activated
+  ---
+  duration_ms: 0.2899
+  type: 'test'
+  ...
+# Subtest: B9.2 stage.dispatched 记录集合：恰 A1/A4/A7/A8/A12a/A12b；A2/A5 不得误记；与桌面常量一致
+ok 5 - B9.2 stage.dispatched 记录集合：恰 A1/A4/A7/A8/A12a/A12b；A2/A5 不得误记；与桌面常量一致
+  ---
+  duration_ms: 1.0446
+  type: 'test'
+  ...
+# Subtest: B9.2 无合并回归：旧「A1/A4/A7 受理与 A2/A5/A8 产物同一任务」写法不得出现
+ok 6 - B9.2 无合并回归：旧「A1/A4/A7 受理与 A2/A5/A8 产物同一任务」写法不得出现
+  ---
+  duration_ms: 0.2644
+  type: 'test'
+  ...
+# Subtest: B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本行恰一处、≤256 KiB、无 BOM/NUL；B9.1 哈希口径保留
+ok 7 - B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本行恰一处、≤256 KiB、无 BOM/NUL；B9.1 哈希口径保留
+  ---
+  duration_ms: 1.0702
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 104.9191

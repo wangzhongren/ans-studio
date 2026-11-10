@@ -1,0 +1,2 @@
+=== legacy files: git diff --name-only (expect empty) ===
+=== legacy files: git status --porcelain (expect empty) ===

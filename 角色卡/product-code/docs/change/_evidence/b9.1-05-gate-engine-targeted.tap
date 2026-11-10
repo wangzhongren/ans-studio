@@ -1,0 +1,39 @@
+✔ B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状） (0.4093ms)
+✔ B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例） (1.2176ms)
+✔ B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变） (0.1525ms)
+✔ B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段 (0.0996ms)
+✔ MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy） (0.8722ms)
+✔ MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`） (0.213ms)
+✔ MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变 (0.1105ms)
+✔ MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed） (0.1031ms)
+✔ fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed (0.2608ms)
+✔ G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项 (3.4301ms)
+✔ MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O） (0.2839ms)
+✔ BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状） (0.5457ms)
+✔ BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段 (0.4171ms)
+✔ tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具） (0.0956ms)
+✔ dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望 (0.0977ms)
+✔ preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed） (0.0907ms)
+✔ context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘） (0.1253ms)
+✔ 契约类型只读：运行时不改输入/模块（纯策略无副作用） (0.0893ms)
+✔ X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除 (0.5714ms)
+✔ X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.129ms)
+✔ X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.1452ms)
+✔ X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.1089ms)
+✔ X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.0753ms)
+✔ X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.0641ms)
+✔ X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变 (0.2943ms)
+✔ D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致 (0.1406ms)
+✔ D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确 (0.2134ms)
+✔ D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id） (0.1159ms)
+✔ D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判） (0.0677ms)
+✔ D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环 (0.8826ms)
+✔ D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生 (0.098ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 139.5309

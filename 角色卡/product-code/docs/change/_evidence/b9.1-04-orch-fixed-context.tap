@@ -1,0 +1,19 @@
+✔ cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒） (21.1096ms)
+✔ cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达） (14.7543ms)
+✔ fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入 (11.1458ms)
+✔ fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入 (4.1619ms)
+✔ fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge (4.5225ms)
+✔ 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝） (0.7573ms)
+✔ fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入 (5.4275ms)
+✔ fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run） (20.0397ms)
+✔ fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达 (9.1089ms)
+✔ legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席 (14.1752ms)
+✔ governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图 (11.1826ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 427.8294

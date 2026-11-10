@@ -1,0 +1,12 @@
+## legacy unchanged
+9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 *src/common/门禁引擎/workflows/chief/chief-workflow.md
+8724 src/common/门禁引擎/workflows/chief/chief-workflow.md
+## v2 after
+d0a778fef35adf7dc5cd13e9778ed45867e233a11803645b9d187c7e285bff62 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+  126 20528 src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+## version lines
+src/common/门禁引擎/workflows/chief/chief-workflow.md:3:资源版本：chief-workflow/v1
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md:3:资源版本：chief-workflow/v2
+## BOM/NUL
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md BOM=false NUL=false size=20528
+src/common/门禁引擎/workflows/chief/chief-workflow.md BOM=false NUL=false size=8724

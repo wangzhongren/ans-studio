@@ -1,0 +1,61 @@
+## gate-engine role diff (only my v2 file must appear)
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts
+
+## full src/app/test status (parallel attribution)
+ M src/common/roles/convener/index.ts
+ M src/common/roles/product/internal/context.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/roles/convener/convener-fixed.test.ts
+ M test/roles/product/product-fixed.test.ts
+?? test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts
+
+## docs diff (must be empty for my role)
+?? docs/acceptance/2026-11-07_direct-role-capabilities-closeout-report-v1.md
+?? docs/acceptance/2026-11-10_initial-workflow-publication-completion-criteria-v1.md
+?? docs/acceptance/governance-authority-matrix-criteria-v1.md
+?? docs/acceptance/governance-authority-matrix-report-v1.md
+?? docs/acceptance/trunk-amendment-model-criteria-v1.md
+?? docs/acceptance/trunk-amendment-model-report-v1.md
+?? docs/communication/2026-11-04_authorization_trunk-amendment-ia.md
+?? docs/communication/2026-11-04_gate1_trunk-amendment-model.md
+?? docs/communication/2026-11-04_gate2-addendum_trunk-amendment-B5-B10.md
+?? docs/communication/2026-11-04_gate2_trunk-amendment-model.md
+?? docs/communication/2026-11-04_intent-change_freeze-and-refactor-ownership.md
+?? docs/communication/2026-11-04_intent_trunk-amendment-model.md
+?? docs/communication/2026-11-05_audit-disposition_i3-evidence-gap.md
+?? docs/communication/2026-11-05_audit-disposition_shell-post-audit-false-positive.md
+?? docs/communication/2026-11-05_authorization_trunk-amendment-merge.md
+?? docs/communication/2026-11-05_defect_demo-delivery-cascade.md
+?? docs/communication/2026-11-05_defect_vca-baseline-binding.md
+?? docs/communication/2026-11-05_gate_closure_batch-3.5.md
+?? docs/communication/2026-11-05_intent_capability-instead-of-cards.md
+?? docs/communication/2026-11-05_intent_governance-authority-matrix.md
+?? docs/communication/2026-11-07_authorization_claude-schema-fix.md
+?? docs/communication/2026-11-07_decision_closeout-suspended.md
+?? docs/communication/2026-11-07_intent_real-closed-loop-run.md
+?? docs/communication/2026-11-10_defect_git-init-inventory-byte-budget.md
+?? docs/communication/2026-11-10_defect_initial-workflow-publication-stuck.md
+?? docs/communication/2026-11-10_defect_stable-write-permit-selection-content-repro.md
+?? docs/planning/2026-11-04_design_trunk-amendment-model.md
+?? docs/planning/2026-11-04_review_trunk-amendment-model.md
+?? docs/planning/2026-11-04_trunk-amendment-p1.5R-consistency.md
+?? docs/planning/2026-11-05_design_governance-authority-matrix.md
+?? docs/planning/2026-11-10_design_initial-workflow-publication-completion.md
+?? docs/planning/2026-11-10_review_initial-workflow-publication-completion.md
+?? docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.1.md
+?? docs/scheduling/2026-11-04_team-plan_trunk-amendment-model-P1.5-increment.md
+?? docs/scheduling/2026-11-04_team-plan_trunk-amendment-model.md
+?? docs/scheduling/2026-11-05_governance-authority-matrix-E1-change-package.md
+?? docs/scheduling/2026-11-05_governance-authority-matrix-E3-release-record.md
+?? docs/scheduling/2026-11-05_team-plan_governance-authority-matrix.md
+?? docs/scheduling/2026-11-07_change-package_direct-role-capabilities-closeout.md
+?? docs/scheduling/2026-11-07_owner-write-set-mapping_direct-role-capabilities-closeout.md
+?? docs/scheduling/2026-11-10_team-plan_initial-workflow-publication-completion.md
+?? docs/scheduling/trunk-amendment-model-change-v1.md
+?? docs/scheduling/trunk-amendment-model-change-v2.md
+DOCS-STATUS-END
+
+## my write-set files only
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+UNTRACKED-NEW: test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts

@@ -1,0 +1,18 @@
+=== skip/force-exit literals in changed/new tests ===
+none
+
+=== before counts ===
+# tests 544
+# pass 538
+# fail 5
+# skipped 1
+=== after counts ===
+# tests 551
+# pass 545
+# fail 5
+# skipped 1
+
+failure names diff exit: (see 09-failure-names-diff.txt; empty=identical)
+0 角色卡/门禁引擎/docs/change/2026-11-11_B9.2_two-fixed-workflow-paths_evidence/09-failure-names-diff.txt
+0 角色卡/门禁引擎/docs/change/2026-11-11_B9.2_two-fixed-workflow-paths_evidence/09b-skip-names-diff.txt
+0 total

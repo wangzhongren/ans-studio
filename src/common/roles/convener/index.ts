@@ -22,6 +22,12 @@
 // fixed 矩阵数据（`fixedCards` / `fixedAllowedBuiltInRoleIds` / `isConvenerFixedBuiltInDispatchTarget`）
 // 与 `context({matrix:"two-fixed-paths/v1"})` fixed 段；fixed 字段只在显式 fixed 矩阵下被消费，
 // legacy 数据与 legacy 消费点（apply-journal / trunk-runtime）不改读取源。
+//
+// T3 B9.1（RR4 `1bcdaf69…` 失败事实）：fixed 段新增「任务证据与哈希」与「卡预算」两段——
+// 派发 worker 任务时证据只要求 path / 内容/frontmatter / 结论，**不得要求 worker 用
+// `run_shell`/`certutil`/`Get-FileHash` 计算 hash/sha256**（哈希是应用在收口/归档/依据校验时
+// 计算的机器事实），且任务文本不得诱导 fixed 3 确认卡 + merge-main 之外的 shell/stable-write
+// 等额外审批卡。legacy 数据/legacy context 逐字不变。
 
 import type { BoundaryEntry } from "../../../model/boundary.ts";
 import type {
@@ -710,11 +716,13 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   Object.freeze({ id: "report-expectation", text: REPORT_EXPECTATION_SECTION_TEXT }),
 ]);
 
-// —————————————————————— fixed context 段（T3 B2；仅显式 fixed 矩阵返回）——————————————————————
+// —————————————————————— fixed context 段（T3 B2 + B9.1；仅显式 fixed 矩阵返回）——————————————————————
 //
 // v1.3 §3.4 convener 行：fixed 段说明新职责（生产线唯一派发者 / 团队计划与基线 3 件小事 /
-// 集成汇总与报告期望 / 不派质检）。只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；
-// `context({})`（无 matrix）与 `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
+// 集成汇总与报告期望 / 不派质检）。B9.1 按 RR4 失败事实补两段：任务证据与哈希（应用算哈希、
+// 禁止 worker shell 算 hash）与卡预算（3 确认卡 + merge-main；不诱导额外审批卡）。
+// 只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；`context({})`（无 matrix）与
+// `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
 // run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（仅 fixed 会话）。
 // 纯静态文本（无资源引用、不读盘、不拼接运行时事实）。
 
@@ -722,9 +730,27 @@ const FIXED_PRODUCTION_LINE_SECTION: RoleContextSection = Object.freeze({
   id: "convener-fixed-production-line",
   text: [
     "## 固定路径运营：生产线唯一派发者（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）",
-    "- 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求，做属主校验并保持同工作区写任务串行；生产任务报告回你。",
+    "- 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求（证据只写路径、内容/frontmatter 与结论，见「任务证据与哈希」段），做属主校验并保持同工作区写任务串行；生产任务报告回你。",
     "- 幕僚不直接派生产线角色（chief-production-dispatch-forbidden）；`stage-request` 是只读、无 module/写集的产线调度请求，不是生产线派发。",
     "- 不派 verifier：独立验收由幕僚创建（默认 verifier；roster `roles[].review` 项目验收角色优先）；`convener→verifier` 拒绝（`convener-to-verifier-forbidden`）；你不派新质检、不发 acceptance 卡、不代客户验收。",
+  ].join("\n"),
+});
+
+const FIXED_EVIDENCE_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-evidence",
+  text: [
+    "## 固定路径任务证据与哈希（fixed）",
+    "- 派发 worker 任务时，证据要求只写三项：产物路径（path）、内容/frontmatter 要点（schema、flowId、version 等字段与正文内容）、结论（完成/未完成/阻塞）；不要要求 worker 用 `run_shell`、`certutil`、`Get-FileHash` 或其它 shell/脚本计算 hash/sha256；任务文本不得以「给出 sha256」「附哈希」作为完成标准或验收标准。",
+    "- 文档哈希是应用机器事实：由应用在任务收口（`close_created_task` / `closeTask`）、归档（A12 `docs/acceptance/`）与依据记录/校验（`basis.recorded` / documentRefs）时按实际字节计算与核验；worker 只交付文件与内容，哈希不由 worker 计算、也不写入任务完成条件。",
+  ].join("\n"),
+});
+
+const FIXED_CARD_BUDGET_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-card-budget",
+  text: [
+    "## 固定路径卡预算（fixed）",
+    "- 固定路径客户卡预算 = 3 张确认卡（A3 intent-confirm / A6 proposal / A10 appointment）+ A13/B4 高风险 merge-main（应用呈、仅客户本人确认）；acceptance 卡 fixed 抑制；decision 卡只用于材料性选择/需求变更审批，不计入 3 张确认卡。",
+    "- 不得在 worker 任务文本中诱导额外客户/操作员审批：不要求 worker 用 shell 计算哈希或执行审批类命令，不要求 stable-write / trunk / run 等 fixed 不注入的工具；真实环境阻塞由你按 decision 卡口径报告与处置，但不把「执行 shell / 审批」写成任务完成标准。",
   ].join("\n"),
 });
 
@@ -749,6 +775,8 @@ const FIXED_REPORT_SECTION: RoleContextSection = Object.freeze({
 
 const CONVENER_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   FIXED_PRODUCTION_LINE_SECTION,
+  FIXED_EVIDENCE_SECTION,
+  FIXED_CARD_BUDGET_SECTION,
   FIXED_BASELINE_SECTION,
   FIXED_REPORT_SECTION,
 ]);

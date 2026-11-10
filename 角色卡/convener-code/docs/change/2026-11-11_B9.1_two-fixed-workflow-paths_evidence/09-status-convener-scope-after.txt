@@ -1,0 +1,2 @@
+ M src/common/roles/convener/index.ts
+ M test/roles/convener/convener-fixed.test.ts

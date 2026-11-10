@@ -8,6 +8,9 @@
 //  - fixed 只在 `matrix:"two-fixed-paths/v1"`：`fixedCards=[]`；fixed context 段（意图撰写/修订、
 //    报告回运营；不派发/不实现/不自行改方案；意图确认卡由幕僚呈）；fixed dispatch
 //    （convener→product 允许、chief→product 拒绝 `chief-production-dispatch-forbidden`）；
+//  - B9.1（RR4 修复）：fixed 报告段要求交付报告写清产物路径与内容/frontmatter 实际值；hash/sha256
+//    由应用计算，禁止 worker 用 `run_shell`/`certutil`/`Get-FileHash`/PowerShell 等 shell 计算 hash
+//    （shell 属高风险审批动作；fixed 流程不需要为 hash 触发客户审批卡）；证据由应用/报告生成；
 //  - 不新增工具/卡：`tools()` 不变、无 `requestReleaseMerge`；不新增 skip/force-exit。
 //
 // 本文件只 import 模块唯一 public entry、Model 类型与 Node 内置；不深导 internal。
@@ -127,6 +130,51 @@ test("context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰�
     productRoleModule.context({ governanceModel: "trio" }).map((section) => section.id),
     ["product-duty", "product-intent", "product-version-upgrade", "product-report"],
   );
+});
+
+test("context(fixed, B9.1)：报告/证据口径——路径+frontmatter 实际值；hash 由应用计算，禁止 worker shell hash", () => {
+  const fixedSections = productRoleModule.context({ governanceModel: "trio", matrix: FIXED });
+  const report = fixedSections.find((section) => section.id === "product-fixed-report");
+  assert.ok(report !== undefined, "fixed context 必须保留 product-fixed-report 段");
+  const text = report.text;
+
+  // 完成文档/代码后：只报告产物路径、内容/frontmatter 实际值与结论。
+  assert.match(text, /只报告产物路径、内容\/frontmatter 实际值与结论/u);
+  // 哈希口径：不要自己算/转抄；sha256 由应用在收口/归档/依据校验时计算。
+  assert.match(text, /不要自己算或转抄哈希/u);
+  assert.match(text, /`sha256` 由应用计算/u);
+  assert.match(text, /任务收口/u);
+  assert.match(text, /归档/u);
+  assert.match(text, /documentRefs\/依据校验/u);
+  assert.match(text, /报告\/证据只引用应用给出的值/u);
+  // RR4 回归防线：明确禁止 worker 用 shell 算 hash，并点名实测诱导命令。
+  assert.match(text, /不得用 shell 算 hash/u);
+  assert.match(text, /`run_shell`/u);
+  assert.match(text, /`certutil -hashfile`/u);
+  assert.match(text, /`Get-FileHash`/u);
+  assert.match(text, /PowerShell\/pwsh/u);
+  assert.match(text, /`sha256sum`/u);
+  assert.match(text, /hash 不是 worker 产物/u);
+  // shell 属高风险审批动作；fixed 4 卡预算内不需要为 hash 触发任何客户卡。
+  assert.match(text, /shell 属高风险审批动作/u);
+  assert.match(text, /本流程不需要为 hash 触发任何客户卡/u);
+  // 任务文本仍要求给出 sha256 时：改为路径+frontmatter 实际值，注明来源/路径，不自行用 shell。
+  assert.match(text, /任务文本要求给出 sha256 时/u);
+  assert.match(text, /改为「路径 \+ frontmatter 实际值；hash 由应用计算」/u);
+  assert.match(text, /注明来源与路径，不自行用 shell/u);
+  assert.match(text, /任务文本不写「给出\/附上 sha256」/u);
+  // 证据由应用/报告生成。
+  assert.match(text, /证据由应用\/报告生成/u);
+  assert.match(text, /submit_report/u);
+
+  // fixed-only：legacy context 逐字保持旧口径，不混入 B9.1 的 shell/hash 策略。
+  const legacyText = productRoleModule.context({ governanceModel: "trio" }).map((section) => section.text).join("\n");
+  for (const token of ["run_shell", "certutil", "Get-FileHash", "PowerShell", "不要自己算或转抄哈希", "hash 不是 worker 产物"]) {
+    assert.equal(legacyText.includes(token), false, `legacy context 不得含 fixed-only 内容：${token}`);
+  }
+
+  // 确定性/纯函数：同输入同引用。
+  assert.equal(productRoleModule.context({ governanceModel: "trio", matrix: FIXED }), fixedSections);
 });
 
 // —————————————————————— dispatch：legacy 逐字不变 / fixed 新增语义 ——————————————————————

@@ -1,0 +1,2 @@
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md:d0a778fef35adf7dc5cd13e9778ed45867e233a11803645b9d187c7e285bff62
+test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts:7332789c4f41477b9eae96231982a7835efef464c6a4ffaecf335ab33ecf6ba8
