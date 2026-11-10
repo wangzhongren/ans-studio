@@ -1,0 +1,7 @@
+# 基线
+worktree: C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+branch: feat/two-fixed-workflow-paths
+HEAD: 1a383fbdc787898a0b2726d02691c8afec5d8711（1a383fb，B3 桌面 + B3.1 编排/运行时核心已提交）
+
+开工时（HEAD 1a383fb）git status --porcelain -- src app test：为空（无本角色写集内未提交变更）
+（本批完成后候选状态见 09-write-set-boundary.txt）

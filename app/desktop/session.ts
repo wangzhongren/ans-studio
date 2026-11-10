@@ -116,6 +116,7 @@ import {
   completeTeamPlanFixed,
   executeReleaseMerge,
   finalizeIntent as finalizeFixedIntent,
+  findAcceptanceArchive,
   inspectAssignedTask as inspectWorkflowAssignedTask,
   prepareIntent as prepareFixedIntent,
   preparePathBStart as prepareFixedPathBStart,
@@ -139,14 +140,16 @@ import {
   dispatchFlowIdOf,
   ensureFixedPathStarted,
   isFixedPathEnabledForFlow,
+  isFixedReleaseTriggerStage,
   resolveFixedPathMode,
   resolveProjectFixedPanelMode,
   sessionWorkflowModeForTask,
   workflowModeForFlowResolver,
+  type FixedReleaseTriggerStage,
   type WorkflowMode,
 } from "./workflow.ts";
 import { createDesktopBaselineGitPort, createDesktopReleaseGitPort } from "./workflow-git.ts";
-import { buildMergeMainCardRequest, toMergeMainCardDecision } from "./customer-input.ts";
+import { buildMergeMainCardRequest, mergeMainCardRequestId, toMergeMainCardDecision } from "./customer-input.ts";
 import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, validateRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 // 2026-11-02（全局任务状态/版本决策，A2）：只读复用 A1 的派生/纯逻辑；不复制 flow/run/账本状态机。
 import {
@@ -5766,8 +5769,15 @@ export class SessionManager {
           stage: "A3",
           documentRefs: prepared.documentRefs,
         };
-        const priorPreview = request.preview ?? "";
-        request = { ...request, preview: `${priorPreview}${priorPreview !== "" ? "\n\n" : ""}${prepared.marker}` };
+        // T3 B3.1（去重）：run-role 已在 fixed intent-confirm 调用同一个 `prepareIntent` 并把 marker
+        // 追加到 `question`（同一 marker 字符串）。桌面只在卡面尚未携带该 marker 时补一次——
+        // `prepareIntent` 本身幂等（A3 在办即跳过 `stage.requested`），但 marker 不得重复追加。
+        const requestQuestion = (request as { question?: unknown }).question;
+        const cardText = `${typeof requestQuestion === "string" ? requestQuestion : ""}\n${request.preview ?? ""}`;
+        if (!cardText.includes(prepared.marker)) {
+          const priorPreview = request.preview ?? "";
+          request = { ...request, preview: `${priorPreview}${priorPreview !== "" ? "\n\n" : ""}${prepared.marker}` };
+        }
       } else if (request.cardKind === "proposal") {
         const refs = await this.collectFixedProposalDocumentRefs(projectRoot, fixedFlowId);
         if (!refs.ok) return rejectFixedCard(refs.code, refs.message);
@@ -5785,6 +5795,9 @@ export class SessionManager {
           stage: "A10",
           documentRefs: [appointment.rosterRef],
         };
+        // T3 B3.1（A10 在办标记单一写入方）：`stage.requested A10` 由 run-role 在呈卡前经
+        // `stage-request:<wf>:A10:1` 幂等写入（编排 B3.1）；桌面**不重复写**任何 stage/事件——
+        // 这里只做卡面绑定，裁决后的 `stage.completed A10` 由 `recordFixedCardWorkflowResolution` 唯一追加。
       }
     }
     // 2026-10-31（run-change 触发）：冻结 run 上出现比 pin 更新的提案卡 ⇒ 先尝试 run-change 卡，
@@ -6024,6 +6037,10 @@ export class SessionManager {
       ...(fixedCardBinding?.documentRefs !== undefined ? { documentRefs: fixedCardBinding.documentRefs } : {}),
       ...(fixedCardBinding?.workflowId !== undefined ? { workflowId: fixedCardBinding.workflowId } : {}),
       ...(fixedCardBinding?.stage !== undefined ? { stage: fixedCardBinding.stage } : {}),
+      // T3 B3.1（AC-13/§8.3；运行时核心 B3.1 类型）：fixed 任命决议**原样**落 `source:"stage-a10"`。
+      // 应用写入（不信任模型/判断自报）；legacy 任命决议无此字段——legacy D3 读取方不接受该来源
+      // （`chainDispatchFacts` 显式排除；固定决议另有 `workflowId` 戳与省略 roster 戳双重隔离）。
+      ...(cardFixed && request.cardKind === "appointment" ? { source: "stage-a10" as const } : {}),
       ...(selected.length > 0 && request.cardKind === "appointment" ? { targetRoleIds: selected } : {}),
       ...(selected.length > 0 && request.cardKind !== "appointment" ? { selectedOptionIds: selected } : {}),
       ...(metadata?.intentId !== undefined ? { intentId: metadata.intentId } : {}),
@@ -9003,6 +9020,9 @@ export class SessionManager {
       // T3 B3（AC-13/G-10）：fixed 议程的任命决议（带 `workflowId` 戳）不是 legacy D3 证据——
       // legacy D3 读取方只接受旧 roster 戳/无 `workflowId` 的裁决；fixed 决议不得被当作 D3。
       if (event.workflowId !== undefined) continue;
+      // T3 B3.1：fixed appointment 决议的 `source:"stage-a10"`（运行时核心 B3.1 冻结字面）同属
+      // fixed 来源——legacy D3 读取方不接受；即便异常缺 `workflowId` 也不得退化为 D3 证据。
+      if (event.source === "stage-a10") continue;
       const targets = Array.isArray(event.targetRoleIds)
         ? event.targetRoleIds.filter((id): id is string => typeof id === "string" && id !== "")
         : [];
@@ -10249,7 +10269,29 @@ ${formatted}` };
       ...(input.note !== undefined ? { note: input.note } : {}),
       ...(evidence.evidence !== undefined ? { evidence: evidence.evidence } : {}),
     });
-    if (closed.ok) void this.drainAllQueuesFor(projectRoot);
+    if (closed.ok) {
+      void this.drainAllQueuesFor(projectRoot);
+      // T3 B3.1（AC-11/AC-14/AC-22；MF-IR-8）：fixed **A12b accepted（A13 前）/ B3 accepted（B4 前）**
+      // ⇒ 应用自动调用 `prepareReleaseMerge` 并呈 merge-main 客户卡（不新增工具/客户门）。
+      // 异步执行：收口工具立即返回；前置不满足 ⇒ 只回运营/幕僚（不弹注定失败卡）；同一 workflow/tip 幂等。
+      if (input.outcome === "accepted" && closed.stageCompleted && isFixedReleaseTriggerStage(closed.stage)
+        && closed.workflowId !== undefined) {
+        const triggerStage: FixedReleaseTriggerStage = closed.stage;
+        const triggerWorkflowId = closed.workflowId;
+        void this.autoPresentFixedReleaseMerge({
+          projectRoot,
+          workflowId: triggerWorkflowId,
+          stage: triggerStage,
+          taskId: input.taskId,
+        }).catch((error: unknown) => {
+          createDiagnosticLogger({ component: "desktop.workflow", projectRoot }).error(
+            "workflow.release.auto-present.unhandled",
+            error,
+            { workflowId: triggerWorkflowId, stage: triggerStage },
+          );
+        });
+      }
+    }
     return closed;
   }
 
@@ -10647,7 +10689,7 @@ ${formatted}` };
     return this.presentAppCard({
       projectRoot: input.projectRoot,
       request,
-      requestId: `merge-main-${input.preview.releaseId}`,
+      requestId: mergeMainCardRequestId(input.preview.releaseId),
       ...(input.signal !== undefined ? { signal: input.signal } : {}),
     });
   }
@@ -10659,6 +10701,9 @@ ${formatted}` };
    * 3. 客户本人 approve ⇒ `executeReleaseMerge`（fixed argv、只本地、不 push/tag）；
    *     客户拒绝 ⇒ `release.rejected`（by customer）；judge 转人工/拒绝或超时（应用中止）⇒ `release.rejected`
    *     （by judge；judge 不可 approve/冒充客户）；无通道/无效裁决 ⇒ 保持等待、不合并（fail-closed）。
+   *
+   * B3.1 起「A12b/B3 accepted ⇒ 自动呈卡」复用本入口的呈现/结算段（`settleMergeMainCard`）：唯一差异是
+   * 自动触发先做触发窗口/幂等守卫；发布前置仍由 `prepareReleaseMerge` 单点判定。
    */
   async runFixedReleaseMerge(input: {
     projectRoot: string;
@@ -10685,9 +10730,39 @@ ${formatted}` };
       port,
     });
     if (!prepared.ok) return { ok: false, code: prepared.code, message: prepared.message };
+    return this.settleMergeMainCard({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      preview: prepared.preview,
+      port,
+      ...(input.signal !== undefined ? { signal: input.signal } : {}),
+    });
+  }
+
+  /**
+   * merge-main 卡的呈现 + 裁决结算（应用自有通道；**客户本人唯一授权**）：
+   * approve ⇒ `executeReleaseMerge`；reject ⇒ `release.rejected by customer`；
+   * judge 转人工/拒绝/超时 ⇒ `release.rejected by judge`（绝不写成客户确认）；无效裁决/无通道 ⇒ 保持等待。
+   * 不含 `prepareReleaseMerge`（调用方负责前置与幂等）；release 终态只由本方法落账。
+   */
+  private async settleMergeMainCard(input: {
+    projectRoot: string;
+    workflowId: string;
+    preview: ReleaseMergePreview;
+    port: ReturnType<typeof createDesktopReleaseGitPort>;
+    signal?: AbortSignal;
+  }): Promise<{
+    ok: boolean;
+    code?: string;
+    message: string;
+    releaseId?: string;
+    merged?: boolean;
+    mergeOid?: string;
+  }> {
+    const releaseId = input.preview.releaseId;
     const presented = await this.presentMergeMainCard({
       projectRoot: input.projectRoot,
-      preview: prepared.preview,
+      preview: input.preview,
       ...(input.signal !== undefined ? { signal: input.signal } : {}),
     });
     if (presented === undefined) {
@@ -10695,7 +10770,7 @@ ${formatted}` };
         ok: false,
         code: "release-card-unavailable",
         message: "客户卡通道不可用（merge-main 未呈现）；保持等待、不合并（不默认通过）。",
-        releaseId: prepared.releaseId,
+        releaseId,
       };
     }
     const decision = toMergeMainCardDecision(presented);
@@ -10703,15 +10778,15 @@ ${formatted}` };
       const executed = await executeReleaseMerge({
         projectRoot: input.projectRoot,
         workflowId: input.workflowId,
-        releaseId: prepared.releaseId,
+        releaseId,
         confirmation: { by: "customer", ...(decision.decisionId !== undefined ? { decisionId: decision.decisionId } : {}) },
-        port,
+        port: input.port,
       });
-      if (!executed.ok) return { ok: false, code: executed.code, message: executed.message, releaseId: prepared.releaseId };
+      if (!executed.ok) return { ok: false, code: executed.code, message: executed.message, releaseId };
       return {
         ok: true,
         message: `已合并 main（${executed.mergeKind}；mergeOid ${executed.mergeOid.hex}）；工作区停在 main；不 push/tag。`,
-        releaseId: prepared.releaseId,
+        releaseId,
         merged: true,
         mergeOid: executed.mergeOid.hex,
       };
@@ -10720,7 +10795,7 @@ ${formatted}` };
       const rejected = await rejectReleaseMerge({
         projectRoot: input.projectRoot,
         workflowId: input.workflowId,
-        releaseId: prepared.releaseId,
+        releaseId,
         by: "customer",
         ...(decision.reason !== undefined ? { reason: decision.reason } : {}),
       });
@@ -10728,7 +10803,7 @@ ${formatted}` };
         ok: false,
         code: rejected.ok ? "release-rejected" : rejected.code,
         message: rejected.ok ? `客户拒绝合并（release.rejected；${rejected.replay ? "replay" : "已记账"}）。` : rejected.message,
-        releaseId: prepared.releaseId,
+        releaseId,
       };
     }
     if (decision.kind === "judge-reject" || decision.kind === "timeout") {
@@ -10737,7 +10812,7 @@ ${formatted}` };
       const rejected = await rejectReleaseMerge({
         projectRoot: input.projectRoot,
         workflowId: input.workflowId,
-        releaseId: prepared.releaseId,
+        releaseId,
         by: "judge",
         reason: decision.kind === "timeout" ? "timeout：客户未完成确认（转人工/未合并）" : decision.reason ?? "judge 转人工/拒绝",
       });
@@ -10745,15 +10820,188 @@ ${formatted}` };
         ok: false,
         code: rejected.ok ? "release-rejected" : rejected.code,
         message: rejected.ok ? "合并未获客户本人确认（release.rejected；不合并）。" : rejected.message,
-        releaseId: prepared.releaseId,
+        releaseId,
       };
     }
     return {
       ok: false,
       code: "release-unauthorized",
       message: `merge-main 裁决无效（${decision.reason ?? "fail-closed"}）；保持等待、不合并、不默认通过。`,
-      releaseId: prepared.releaseId,
+      releaseId,
     };
+  }
+
+  /**
+   * T3 B3.1（AC-11/AC-14/AC-22；MF-IR-8）：fixed **A12b/B3 accepted 后自动呈 merge-main 卡**。
+   *
+   * - 触发窗口：A12b completed 且 A13 未完成（路径 A）/ B3 completed 且 B4 未完成（路径 B）；
+   * - 证据由应用构造（不采信模型自报）：A12b ⇒ 应用验收归档 path+sha256；B3 ⇒ 该任务 done 报告证据
+   *   的真实文件（逐路径重算字节 SHA-256）；
+   * - `prepareReleaseMerge` 判定全部发布前置；不满足 ⇒ **不呈卡**，如实回运营/幕僚
+   *   （`release-workflow-not-ready` 等），不弹注定失败卡；
+   * - 幂等：同一 workflow/tip（`releaseId` 确定性派生）已呈过卡 ⇒ 不重复弹卡；已合并/已关闭 ⇒ no-op；
+   * - 客户卡经应用自有通道（客户本人）；approve ⇒ `executeReleaseMerge`；judge 只能转人工/拒绝。
+   */
+  private async autoPresentFixedReleaseMerge(input: {
+    projectRoot: string;
+    workflowId: string;
+    stage: FixedReleaseTriggerStage;
+    taskId: string;
+  }): Promise<{
+    status: "skipped" | "not-ready" | "already-merged" | "channel-unavailable" | "presented";
+    code?: string;
+    message: string;
+    releaseId?: string;
+    merged?: boolean;
+  }> {
+    const { projectRoot, workflowId, stage } = input;
+    const port = createDesktopReleaseGitPort();
+    try {
+      const ledger = await readWorkflowLedger(projectRoot);
+      const wfEvents = ledger.events.filter((event) => event.workflowId === workflowId);
+      if (wfEvents.length === 0) {
+        return { status: "skipped", message: `workflow ${workflowId} 不存在（不呈卡）。` };
+      }
+      const view = deriveWorkflowView(wfEvents, (await readTaskState(projectRoot)).events);
+      const expectedPath = stage === "A12b" ? "A" : "B";
+      const triggerCompleted = stage === "A12b"
+        ? view.stages.A12b.status === "completed"
+        : view.stages.B3.status === "completed";
+      const releaseCompleted = stage === "A12b"
+        ? view.stages.A13.status === "completed"
+        : view.stages.B4.status === "completed";
+      if (view.path !== expectedPath || view.closed !== undefined || view.stopping === true
+        || !triggerCompleted || releaseCompleted) {
+        return { status: "skipped", message: `workflow ${workflowId} 不在 ${stage} accepted 后的发布窗口（不呈卡）。` };
+      }
+      // 应用证据（A12b 归档 / B3 报告真实文件）；缺失 ⇒ 不呈卡、回运营/幕僚。
+      const evidence = await this.fixedReleaseAutoEvidence(projectRoot, workflowId, stage, input.taskId);
+      if (!evidence.ok) {
+        this.noteFixedReleaseAutoTrigger(projectRoot, workflowId, `merge-main 未呈卡（${evidence.code}）：${evidence.message}`);
+        return { status: "not-ready", code: evidence.code, message: evidence.message };
+      }
+      // `prepareReleaseMerge`：前置/漂移/preview + `release.requested`（同 tip 重放幂等）。
+      const prepared = await prepareReleaseMerge({
+        projectRoot,
+        workflowId,
+        operationId: `auto-release:${workflowId}:${stage}`,
+        summary: `fixed ${stage} 任务已 accepted：应用自动呈 merge-main 发布确认（workflow ${workflowId}）。`,
+        evidence: evidence.evidence,
+        port,
+      });
+      if (!prepared.ok) {
+        if (prepared.code === "release-already-merged" || prepared.code === "workflow-closed") {
+          return { status: "already-merged", code: prepared.code, message: prepared.message };
+        }
+        // 前置缺失/漂移：如实回运营/幕僚，不弹注定失败卡。
+        this.noteFixedReleaseAutoTrigger(projectRoot, workflowId, `merge-main 未呈卡（${prepared.code}）：${prepared.message}`);
+        return { status: "not-ready", code: prepared.code, message: prepared.message };
+      }
+      // 幂等（同一 workflow/tip 不重复卡）：requestId 由 releaseId 确定性派生；已有任何 request 事件 ⇒ 不再弹。
+      const requestId = mergeMainCardRequestId(prepared.releaseId);
+      const latest = await readTaskState(projectRoot);
+      const already = latest.events.some((event) =>
+        (event.kind === "request.created" || event.kind === "request.presented"
+          || event.kind === "request.resolved" || event.kind === "request.orphaned")
+        && event.requestId === requestId);
+      if (already) {
+        return {
+          status: "skipped",
+          message: `同一 workflow/tip 的 merge-main 卡已呈过（${requestId}）；不重复。`,
+          releaseId: prepared.releaseId,
+        };
+      }
+      const settled = await this.settleMergeMainCard({
+        projectRoot,
+        workflowId,
+        preview: prepared.preview,
+        port,
+      });
+      if (settled.code === "release-card-unavailable") {
+        this.noteFixedReleaseAutoTrigger(projectRoot, workflowId, settled.message);
+        return { status: "channel-unavailable", code: settled.code, message: settled.message, releaseId: prepared.releaseId };
+      }
+      return {
+        status: "presented",
+        ...(settled.code !== undefined ? { code: settled.code } : {}),
+        message: settled.message,
+        releaseId: prepared.releaseId,
+        ...(settled.merged !== undefined ? { merged: settled.merged } : {}),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      createDiagnosticLogger({ component: "desktop.workflow", projectRoot }).error(
+        "workflow.release.auto-present.failed",
+        error,
+        { workflowId, stage },
+      );
+      this.noteFixedReleaseAutoTrigger(projectRoot, workflowId, `merge-main 自动呈卡失败：${message}（未合并；请运营/幕僚核对）。`);
+      return { status: "not-ready", code: "release-auto-present-failed", message };
+    }
+  }
+
+  /**
+   * 自动呈卡的应用证据（不采信模型自报）：
+   * - A12b：应用验收归档 `docs/acceptance/<flowId>-acceptance-vN.md`（`archiveAcceptance` 生成）path+sha256；
+   * - B3：该 B3 任务最后一份 done 报告 `evidence[]` 中真实存在的项目相对文件（逐路径重算字节 SHA-256）。
+   */
+  private async fixedReleaseAutoEvidence(
+    projectRoot: string,
+    workflowId: string,
+    stage: FixedReleaseTriggerStage,
+    taskId: string,
+  ): Promise<{ ok: true; evidence: { path: string; sha256: string }[] } | WorkflowServiceFailure> {
+    if (stage === "A12b") {
+      const ledger = await readWorkflowLedger(projectRoot);
+      const started = ledger.events.find((event): event is Extract<WorkflowEvent, { kind: "workflow.started" }> =>
+        event.kind === "workflow.started" && event.workflowId === workflowId);
+      if (started === undefined) {
+        return { ok: false, code: "release-workflow-not-ready", message: `workflow ${workflowId} 不存在。` };
+      }
+      const archive = await findAcceptanceArchive({ projectRoot, flowId: started.flowId, workflowId });
+      if (archive === undefined) {
+        return {
+          ok: false,
+          code: "release-workflow-not-ready",
+          message: `A12 验收归档缺失（docs/acceptance/${started.flowId}-acceptance-vN.md）；不呈发布卡。`,
+        };
+      }
+      return { ok: true, evidence: [{ path: archive.path, sha256: archive.sha256 }] };
+    }
+    const state = await readTaskState(projectRoot);
+    const record = state.records.get(taskId);
+    const report = record?.reports[record.reports.length - 1];
+    if (report?.status !== "done") {
+      return { ok: false, code: "release-workflow-not-ready", message: `B3 任务 ${taskId} 缺 done 报告；不呈发布卡。` };
+    }
+    const evidence: { path: string; sha256: string }[] = [];
+    for (const rel of (report.evidence ?? []).filter(
+      (item): item is string => typeof item === "string" && isProjectRelativeFileRef(item),
+    )) {
+      try {
+        const bytes = await fs.promises.readFile(path.join(projectRoot, ...rel.split("/")));
+        evidence.push({ path: rel, sha256: createHash("sha256").update(bytes).digest("hex") });
+      } catch {
+        return {
+          ok: false,
+          code: "release-workflow-not-ready",
+          message: `B3 报告证据不可读：${rel}；不呈发布卡。`,
+        };
+      }
+    }
+    return { ok: true, evidence };
+  }
+
+  /** 自动呈卡失败/未呈卡时如实回运营（convener）与幕僚（chief）：只通知、不改状态、不伪造客户决定。 */
+  private noteFixedReleaseAutoTrigger(projectRoot: string, workflowId: string, summary: string): void {
+    const targets = new Set<string>([
+      this.handbackOwnerRoleId(projectRoot) ?? "convener",
+      this.chiefTaskRoleIdOf(projectRoot) ?? "chief",
+    ]);
+    for (const roleId of targets) {
+      const runtime = this.findLiveRuntime(projectRoot, roleId) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
+      this.emitDeliveryNote(projectRoot, runtime, roleId, roleId, `[工作流发布] ${workflowId}：${summary}`);
+    }
   }
 
   /**

@@ -246,3 +246,21 @@ export async function resolveProjectFixedPanelMode(projectRoot: string): Promise
     return "legacy";
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// T3 B3.1（2026-11-10，桌面窗口）：fixed 发布自动呈卡触发窗口（merge-main）
+//
+// 依据：v1.3 §4.2 A12/A13、§4.3 B4、§6.4/§8.4；B1 AC-11/AC-14/AC-22；G-IR MF-IR-8。
+// 纪律：触发只认**两个收口阶段**（A12b accepted / 路径 B B3 accepted）；是否真正可发布仍由编排
+// `prepareReleaseMerge` 判定（前置缺失 ⇒ `release-workflow-not-ready`，不弹注定失败卡）。本层只表达
+// 触发窗口，不复制发布前置/状态机业务、不授予任何确认/执行权。
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** fixed 路径「阶段 accepted ⇒ 应用自动呈 merge-main 卡」的触发阶段（A12b → A13 前；B3 → B4 前）。 */
+export const FIXED_RELEASE_TRIGGER_STAGES = Object.freeze(["A12b", "B3"] as const);
+export type FixedReleaseTriggerStage = (typeof FIXED_RELEASE_TRIGGER_STAGES)[number];
+
+/** 该阶段收口（accepted 且阶段完成）是否触发发布自动呈卡；其他阶段一律不触发。 */
+export function isFixedReleaseTriggerStage(stage: string | undefined): stage is FixedReleaseTriggerStage {
+  return stage === "A12b" || stage === "B3";
+}

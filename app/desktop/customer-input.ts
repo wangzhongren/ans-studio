@@ -387,6 +387,14 @@ export interface MergeMainCardPreviewFacts {
   highRiskNotes: readonly string[];
 }
 
+/**
+ * `merge-main` 卡的应用侧 requestId（确定性 = `merge-main-<releaseId>`；releaseId 由 workflowId+tip
+ * 确定性派生）。应用自动触发据此判定「同一 workflow/tip 已呈过卡」，不重复弹卡（B3.1）。
+ */
+export function mergeMainCardRequestId(releaseId: string): string {
+  return `merge-main-${releaseId}`;
+}
+
 /** merge-main preview 文本（应用构造；模型不可自报；客户据此核对 base/tip/diff/高风险）。 */
 export function mergeMainCardPreviewText(preview: MergeMainCardPreviewFacts): string {
   const lines = [
