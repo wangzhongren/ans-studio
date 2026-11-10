@@ -1,0 +1,13 @@
+# parallel B0 baseline files (must be byte-identical; measured before and after this batch)
+# after (same as before):
+17c5d7a40cc8a725fddeb615845a92abcbee29df9870bb91ff146f82232ab8fc *src/model/runtime.ts
+ea01d09387e26f889f15116933cb41a0b5244a3a906c5b2b1ce74b914538f195 *src/model/role.ts
+061fd80c791d6794b09d9976983cbdd31aeeba8b6c820898fe41f99a7a5e50fc *src/provider/runtime/schema.ts
+d30b7f65a117d852cae9bc478dafc48c60c9202c9660c28f7c716545e2e15635 *src/provider/runtime/tools.ts
+2d6a22fd5311f67a92c1211d84177cd0e059e587583bfaf25e7de2c4cdcad425 *src/common/shared/config-loader.ts
+# parallel B0 test files (not in this role's write set; untouched):
+2504b5073fa31d874897edac674ed826f3f2b68db5316a4abf24fee2c23e79af *test/runtime-core/stable-write-card-kind.test.ts
+566eea7c79d7de4fb270aa7fb95f6b265fcec607ae9c50f04d54e27411b01f43 *test/门禁引擎/role-module-contract.test.ts
+07e271570692e1ab4dacd3ee7c573aa619a304ce75af0a2f3c2449eb2cb8a6ad *test/项目管理/shared/config-loader.test.ts
+b82c84c16e137465be171826bf5298f8f836f68affb6bc6ef8640b9efeb0a717 *test/runtime-core/two-fixed-workflow-paths-b0.test.ts
+0a08bcad2484ca8c06f234fc42f9a0b277e3b89bb531171a095c0c74c07ac0c4 *test/门禁引擎/dispatch-matrix-mode.test.ts

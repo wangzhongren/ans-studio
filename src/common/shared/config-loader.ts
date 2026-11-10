@@ -56,9 +56,9 @@ export interface ConfigSource {
 }
 
 /**
- * 载入后的项目配置：`.ans` 显式治理模型作为**纯值**带出（评审 5.5）。
- * 缺失/非法 → 不填，消费方按 `single`（旧项目逐字兼容）；不改变 acceptance/pin 语义。
- * 模型类型单一来源＝门禁引擎 `src/model/role.ts::GovernanceModel`（只读导入）。
+ * 载入后的项目配置：`.ans` 显式治理模型（评审 5.5）与工作流模式（B0）作为**纯值**带出。
+ * 缺失/非法 → 不填，消费方按 `single` / per-flow 自动判定（旧项目逐字兼容）；
+ * 不改变 acceptance/pin 语义。模型类型单一来源＝门禁引擎 `src/model/role.ts`（只读导入）。
  */
 export interface LoadedConfig {
   project: ProjectConfig;
@@ -90,6 +90,23 @@ export function ansProjectPath(projectRoot: string, ansDirName: string = ANS_DIR
 /** `.ans` 治理模型值域（评审 5.5：只允许 single/trio；其它值不猜测）。 */
 function isGovernanceModel(value: unknown): value is GovernanceModel {
   return value === "single" || value === "trio";
+}
+
+/**
+ * `.ans/project.json` 的 `workflowSchema` 值域（B0 两条固定工作流路径，方案 v1.3 §4.1/§9.4）。
+ *
+ * 语义：**只作默认/强制值**——`"legacy/v1"` ⇒ 该项目所有 flow 强制 legacy；
+ * `"two-fixed-paths/v1"` ⇒ 新 flow 默认 fixed；缺省 ⇒ 由编排按 flow 自动判定
+ * （`workflowMode(projectRoot, flowId)`，`workflow-service.ts` 属主）。本模块只做**载入/校验**，
+ * 不解释模式、不写回 `.ans/project.json`（写回由编排 workflow-service 原子执行）。
+ *
+ * 值域类型单一来源＝门禁引擎 `src/model/role.ts::ProjectConfig.workflowSchema`（只读导入）；
+ * 本别名不复制字面量，字段值域变更时本文件跟随（赋值处由编译器校验）。
+ */
+type WorkflowSchema = NonNullable<ProjectConfig["workflowSchema"]>;
+
+function isWorkflowSchema(value: unknown): value is WorkflowSchema {
+  return value === "two-fixed-paths/v1" || value === "legacy/v1";
 }
 
 /**
@@ -281,10 +298,28 @@ function buildFromAns(raw: Record<string, unknown>, file: string, opts: LoadConf
   const skillRoot = typeof raw.skillRoot === "string" && raw.skillRoot !== "" ? raw.skillRoot : opts.skillRoot;
   const roles = parseRoles(raw.roles);
 
+  // B0（两条固定工作流路径）：`workflowSchema` 是可选字段，只作默认/强制值。
+  //  - 键缺省 ⇒ 不设字段（旧项目行为逐字不变；per-flow 判定由编排负责）；
+  //  - 显式两值之一 ⇒ 作为纯值带出；
+  //  - 其它任何值（含 null/类型不符/未知字面量）⇒ **整个配置 fail-closed**（ans-invalid），
+  //    不得静默按缺省处理——一个拼错的模式值不应悄悄退回自动判定。
+  const workflowSchemaRaw = raw.workflowSchema;
+  if (workflowSchemaRaw !== undefined && !isWorkflowSchema(workflowSchemaRaw)) {
+    return invalidConfig(
+      opts,
+      file,
+      `.ans/project.json 的 workflowSchema 非法：${JSON.stringify(workflowSchemaRaw)} —— ` +
+        '只允许 "two-fixed-paths/v1" | "legacy/v1"（fail-closed，不静默按缺省处理）',
+    );
+  }
+
   const project: ProjectConfig = { projectRoot, skillRoot, roles };
   // 评审 5.5：显式模型作为纯值带出；缺失/非法不填（消费方默认 single），
   // 不改变下面的 acceptance/pin 终态规则与降级语义。
   if (isGovernanceModel(raw.governanceModel)) project.governanceModel = raw.governanceModel;
+  // 字段由门禁引擎属主在 `src/model/role.ts::ProjectConfig` 定义（B0 并行）；本模块只读导入并赋值，
+  // 上层任何消费方均可直接按 `ProjectConfig.workflowSchema` 读取。校验已在上方 fail-closed 完成。
+  if (isWorkflowSchema(workflowSchemaRaw)) project.workflowSchema = workflowSchemaRaw;
 
   const govRaw = raw.governanceBoundary;
   let acceptance: Acceptance = { accepted: false, source: "" };

@@ -1,0 +1,19 @@
+# 工作树状态快照（最终复核时点；src app test）
+
+```
+ M src/common/shared/config-loader.ts
+ M src/model/role.ts
+ M src/model/runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/stable-write-card-kind.test.ts
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/role-module-contract.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/config-loader.test.ts"
+?? test/runtime-core/two-fixed-workflow-paths-b0.test.ts
+?? "test/\351\227\250\347\246\201\345\274\225\346\223\216/dispatch-matrix-mode.test.ts"
+```
+
+- 本角色（shared-code）写盘：`src/common/shared/config-loader.ts`（M）、`test/项目管理/shared/config-loader.test.ts`（M）。
+- 并行门禁引擎 B0 写盘：`src/model/role.ts`（M）、`test/门禁引擎/role-module-contract.test.ts`（M）、`test/门禁引擎/dispatch-matrix-mode.test.ts`（??）。
+- 并行运行时核心 B0 写盘：`src/model/runtime.ts`（M）、`src/provider/runtime/schema.ts`（M）、`src/provider/runtime/tools.ts`（M）、`test/runtime-core/*`（M/??）——**非本角色改动，未触碰**。
+- 本批记录/证据：`角色卡/shared-code/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md` 与同名 `_evidence/`（未跟踪；仓库既有未跟踪文件不属本批）。

@@ -3240,6 +3240,7 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> &
   proposal: "请改为请幕僚调度策划（rapporteur）发起提案卡",
   decision: "请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡",
   "intent-confirm": "请改为请幕僚（chief）发起需求确认卡",
+  "merge-main": "merge-main 为应用合并通道发起的高风险确认卡，必须客户本人确认、judge 不可代批；不得用 request_choice/request_confirmation 发该卡",
   "stable-write": "stable 写入确认卡由应用自有通道（stable-write-runtime）发起；不得用 request_choice/request_confirmation 发 stable 写入确认卡",
 };
 

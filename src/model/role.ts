@@ -89,6 +89,13 @@ export interface ProjectConfig {
    *  由共享载入器 `readGovernanceModel`（PM 属主）与 `listProject().governanceModel` 填充；
    *  门禁引擎只读消费，不写 `.ans`。 */
   governanceModel?: GovernanceModel;
+  /** 工作流模式默认/强制值（T3「两条固定工作流路径」v1.3 §4.1；**缺省＝不声明**，按 per-flow 自动判定）：
+   *  - `"legacy/v1"`：该项目所有 flow 强制 legacy（兼容项目；显式）；
+   *  - `"two-fixed-paths/v1"`：新 flow 默认 fixed。
+   *  实际模式由 `workflowMode(projectRoot, flowId)` 按 flow 解析（MF-5），本字段**只作默认/强制值**，
+   *  不是项目级单值缓存。载入/写回属 shared-code 与应用侧（原子写回、保留既有键）；
+   *  本字段是纯配置数据，不承载权限，门禁引擎只读消费、不写 `.ans`。 */
+  workflowSchema?: "two-fixed-paths/v1" | "legacy/v1";
   governanceBoundary?: { path: string; acceptance: Acceptance };
   /** 冷启动「**有界创世例外**」的触发与证据（设计 §10.1 / §12.2，任务 T31）。
    *
@@ -292,6 +299,28 @@ export interface RoleToolPolicy {
   readonly reasons: readonly RolePolicyReason[];
 }
 
+/**
+ * 派发矩阵模式（T3「两条固定工作流路径」v1.3 §3.1/§3.2；接口评审项，见 B1 AC-24/EV-05）。
+ *
+ * - `"legacy-v1"`：现网/在飞 run/旧测试的派发矩阵——**缺省**；未显式传 `matrix` 的调用方行为
+ *   逐字不变（legacy 矩阵冻结，MF-1/MF-2）。
+ * - `"two-fixed-paths/v1"`：设计 v2 的新派发矩阵，仅 fixed 路由使用；fixed 谓词由编排与角色模块
+ *   按本值分支实现（本批 B0 只立类型，不含 fixed 业务逻辑）。
+ *
+ * 本类型只是**纯策略输入**的选择器：不授权任何派发；实际派发仍由门禁/会话层全部安全边界判定。
+ */
+export type DispatchMatrixMode = "legacy-v1" | "two-fixed-paths/v1";
+
+/**
+ * 派发目的（T3 v1.3 §3.2；fixed 矩阵的判据之一）：
+ * `production`（生产线派发）/ `stage-request`（幕僚→运营产线调度请求）/
+ * `review`（验收）/ `preparation`（准备）。
+ *
+ * **缺省 `"production"`**（旧调用点不传即旧行为）。与 `DispatchMatrixMode` 相同，只是**纯策略输入**，
+ * 不授权限；`stage-request` 的只读/无 module/无写集语义由会话层与编排服务另行强制，本类型不承载。
+ */
+export type RoleDispatchPurpose = "production" | "stage-request" | "review" | "preparation";
+
 /** `dispatch()` 的输入：派发来源/目标的**宿主可信事实**（不做 I/O、不猜测、不补造）。 */
 export interface RoleDispatchPolicyInput {
   /** 派发来源角色 id（真实发起者；未知时缺席 ⇒ fail-closed）。 */
@@ -302,6 +331,11 @@ export interface RoleDispatchPolicyInput {
   readonly targetKind: RoleKind;
   /** 目标是否真实存在/已枚举（宿主核验；缺省 false ⇒ 拒绝）。 */
   readonly targetExists?: boolean;
+  /** 派发矩阵模式（T3 v1.3 §3.2；**缺省 `"legacy-v1"`**——旧调用点不传即旧行为，逐字兼容）。
+   *  纯策略输入，不授权限；fixed 谓词/角色模块 fixed 分支按本值选择（B1/B2 实现）。 */
+  readonly matrix?: DispatchMatrixMode;
+  /** 派发目的（T3 v1.3 §3.2；**缺省 `"production"`**——旧调用点不传即旧行为）。纯策略输入，不授权限。 */
+  readonly purpose?: RoleDispatchPurpose;
 }
 
 /** `dispatch()` 的输出：纯判定 + 报告期望（收到报告必须回到的真实创建者）。 */
@@ -375,6 +409,10 @@ export interface RoleContextInput {
    * 按 fail-closed 处理（不得静默当作空值）。角色模块不得复制 Service 校验或携带权限。
    */
   readonly facts?: Readonly<Record<string, unknown>>;
+  /** 派发矩阵模式（T3 v1.3 §3.4；**缺省 `"legacy-v1"`**——未传时模块返回 legacy 段，
+   *  `context()` 现有返回值逐字不变，向后兼容）。纯策略输入，不授权限；
+   *  fixed 段数据由角色模块在 B2 批次按本值新增（legacy 数据冻结，MF-2）。 */
+  readonly matrix?: DispatchMatrixMode;
 }
 
 /**

@@ -1,0 +1,23 @@
+# 写集文件统计（写盘后原字节复算；Windows 工作树为 CRLF，git blob 为 LF 归一化）
+
+```
+  374 17575 src/common/shared/config-loader.ts
+  558 24837 test/项目管理/shared/config-loader.test.ts
+  932 42412 total
+
+raw sha256（工作树原字节）:
+2d6a22fd5311f67a92c1211d84177cd0e059e587583bfaf25e7de2c4cdcad425 *src/common/shared/config-loader.ts
+07e271570692e1ab4dacd3ee7c573aa619a304ce75af0a2f3c2449eb2cb8a6ad *test/项目管理/shared/config-loader.test.ts
+
+git blob oid（git hash-object，LF 归一化）:
+65e2100e0b582985e31997c08ca46b4ca5a08565
+393d7159166048658da0ef50f7cdd12b74d05d12
+
+numstat（add del path，对 HEAD ad22192）:
+38	3	src/common/shared/config-loader.ts
+149	0	"test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/config-loader.test.ts"
+
+status（本角色写集）:
+ M src/common/shared/config-loader.ts
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/config-loader.test.ts"
+```

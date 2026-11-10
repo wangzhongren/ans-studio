@@ -1,0 +1,922 @@
+diff --git a/src/model/runtime.ts b/src/model/runtime.ts
+index 4269a65..9a1c428 100644
+--- a/src/model/runtime.ts
++++ b/src/model/runtime.ts
+@@ -894,14 +894,20 @@ export type GovernanceConfirmCardKind = "appointment-write";
+ 
+ /**
+  * 应用自有、**永不进入判断分组**的治理卡种（2026-11-04 trunk-amendment C1b；PM 复审 §4.5 F2）：
+- * `stable-write` = P1.6 §4.5.1 的 stable 文件（workflow）轻量写入确认卡，项目级、无 flowId；
+- * 只由应用自有通道（stable-write-runtime）构造，客户本人回答，**永不进判断器/委托/指令**；
+- * 不是 `request_choice`/`request_confirmation` 可发卡种（两个工具卡种联合均不含它）。
++ * - `stable-write` = P1.6 §4.5.1 的 stable 文件（workflow）轻量写入确认卡，项目级、无 flowId；
++ * - `merge-main`（2026-11-10 T3 两条固定工作流路径；v1.3 §8.4 / B1 AC-14）= A13/B4 高风险
++ *   **合并 main** 确认卡：应用构造，preview 必含 workflowId/flowId、main base OID、branch tip OID、
++ *   变更文件数、diff stat、合并方式与高风险提示；**必须客户本人 approve/reject，judge 不可代批**
++ *   （只能转人工/拒绝，不得 approve、不得冒充客户；协调方决策 #4）。合并由应用执行，不经角色
++ *   工具/shell，不 push/tag。
++ * 两者都只由应用自有通道构造，客户本人回答，**永不进判断器/委托/指令**；都不是
++ * `request_choice`/`request_confirmation` 可发卡种（两个工具卡种联合均不含它们），
++ * 也都**不进 `GOVERNANCE_CARD_GROUP`**（`governanceCardGroup(...) === undefined`）。
+  */
+-export type AppOwnedGovernanceCardKind = "stable-write";
++export type AppOwnedGovernanceCardKind = "stable-write" | "merge-main";
+ 
+ /** 应用自有、非判断分组的卡种清单（与 `GOVERNANCE_CARD_GROUP` 键集互斥；`GOVERNANCE_CARD_KINDS` 派生来源）。 */
+-export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze(["stable-write"]);
++export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKind[] = Object.freeze(["stable-write", "merge-main"]);
+ 
+ /**
+  * 治理决定卡种类（两交互工具的并集；非法/缺席不能解锁任何治理门禁）。
+@@ -911,6 +917,8 @@ export const GOVERNANCE_APP_OWNED_CARD_KINDS: readonly AppOwnedGovernanceCardKin
+  * `cardKind:"download"` 调用 `request_confirmation`（结构测试 AC-23）。
+  * `stable-write`（2026-11-04 trunk-amendment C1b）同属应用自有卡：只由 stable-write-runtime
+  * 构造，`governanceCardGroup("stable-write") === undefined` ⇒ 永不判断/代选；
++ * `merge-main`（2026-11-10 T3 两条固定工作流路径；v1.3 §8.4）同属应用自有非判断卡：只由应用合并
++ * 通道构造，客户本人确认、judge 不可代批，`governanceCardGroup("merge-main") === undefined`；
+  * 账本 cardKind 白名单见 `GOVERNANCE_CARD_KINDS`。
+  */
+ export type GovernanceCardKind =
+@@ -953,6 +961,8 @@ export const GOVERNANCE_CARD_GROUP: Readonly<Partial<Record<GovernanceCardKind,
+   decision: "decision",
+   // 2026-11-04 trunk-amendment C1b：`stable-write`（应用自有 stable 写入确认卡）**故意不在此表**——
+   // app-owned、客户本人，永不判断/代选（`governanceCardGroup("stable-write") === undefined`）。
++  // 2026-11-10 T3：`merge-main`（高风险合并 main 确认卡）同样**故意不在此表**——必须客户本人
++  // approve/reject，judge 不可代批（协调方决策 #4）。
+   // 账本 cardKind 白名单已拆分为 `GOVERNANCE_CARD_KINDS`（本表键集 + app-owned 非判断卡种）。
+ });
+ 
+@@ -970,8 +980,8 @@ export function governanceCardGroup(kind: GovernanceCardKind | undefined): Gover
+  * 账本 `cardKind` 白名单单一来源（2026-11-04 trunk-amendment C1b；PM 复审 §4.5 F2）：
+  * 判断分组键集 + app-owned 非判断卡种（**派生**，不手抄复制，避免白名单与分组表漂移）。
+  * 编排 C2a 的 `isGovernanceCardKind` 改读本白名单（S3 同批）；桌面 D1/U1 只消费冻结 token。
+- * 本白名单**不表达权限**：`stable-write` 虽在白名单内，但不在 `GOVERNANCE_CARD_GROUP`
+- * ⇒ `governanceCardGroup("stable-write") === undefined` ⇒ 永不判断/代选。
++ * 本白名单**不表达权限**：`stable-write`/`merge-main` 虽在白名单内，但不在 `GOVERNANCE_CARD_GROUP`
++ * ⇒ `governanceCardGroup(kind) === undefined` ⇒ 永不判断/代选。
+  */
+ export const GOVERNANCE_CARD_KINDS: readonly GovernanceCardKind[] = Object.freeze([
+   ...(Object.keys(GOVERNANCE_CARD_GROUP) as GovernanceCardKind[]),
+@@ -1402,6 +1412,18 @@ export interface TaskCreatedEvent extends TaskStateEventBase {
+   runId?: string;
+   runState?: "draft" | "pinned" | "legacy";
+   runStage?: string;
++  /**
++   * T3（2026-11-10 两条固定工作流路径，v1.3 §7.1）：fixed 工作流绑定。workflowId 存在即豁免
++   * runId/runState（fixed 任务不带 run）；无 workflowId 的旧 run-required 规则逐字保留（判定在编排
++   * task-state，不在本模块）。旧事件无这些字段（兼容读取）。
++   */
++  workflowId?: string;
++  /** fixed 阶段（A1–A13 含 A12a/A12b；B1–B4）。 */
++  stage?: WorkflowStage;
++  /** fixed 任务种类：`"stage-request"`＝幕僚→运营的产线调度请求；普通生产任务缺省。 */
++  taskKind?: "stage-request" | string;
++  /** fixed 路径（A/B）；首次 stage-request 写入，后续可省略（从账本解析）。 */
++  workflowPath?: WorkflowPath;
+ }
+ 
+ export interface TaskDeliveredEvent extends TaskStateEventBase {
+@@ -1468,6 +1490,14 @@ export interface RequestCreatedEvent extends TaskStateEventBase {
+   cardKind?: GovernanceCardKind;
+   intentId?: string;
+   taskId?: string;
++  /**
++   * T3（2026-11-10，v1.3 §7.1）：fixed 卡绑定的文档引用（应用计算 path+字节 SHA-256；裁决事件一次写入，
++   * 不由模型自报）。旧事件无此字段（兼容读取）。
++   */
++  documentRefs?: WorkflowDocumentRef[];
++  /** T3：fixed 工作流/阶段绑定；旧事件无此字段（兼容读取）。 */
++  workflowId?: string;
++  stage?: WorkflowStage;
+   sourceRoleId: string;
+   title: string;
+   context?: string;
+@@ -1505,6 +1535,14 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
+   selectedOptionIds?: string[];
+   intentId?: string;
+   taskId?: string;
++  /**
++   * T3（2026-11-10，v1.3 §7.1）：fixed 卡绑定的文档引用（应用计算 path+字节 SHA-256；裁决时一次写入，
++   * finalize 只校验不重写）。旧事件无此字段（兼容读取）。
++   */
++  documentRefs?: WorkflowDocumentRef[];
++  /** T3：fixed 工作流/阶段绑定；旧事件无此字段（兼容读取）。 */
++  workflowId?: string;
++  stage?: WorkflowStage;
+   /**
+    * 2026-10-29（方案 v2.1 §5.4，F3）：仅 appointment（D3 招人）卡——名单 frontmatter `version` 与
+    * 名单文件字节 sha256（应用计算，模型不可自报）。M11 用它判断旧 D3 是否仍对应最新名单。
+@@ -1900,6 +1938,589 @@ export type TaskStateEvent =
+   | RefactorRequestEvent
+   | StableWriteEvent;
+ 
++// —————————————— T3 B0：两条固定工作流路径（workflow/basis/release 账本类型，2026-11-10） ——————————————
++//
++// 依据：实现级方案 v1.3 §3.3/§4.1/§5.3/§6.4/§7.1；B1 AC-05/AC-13/AC-14/AC-17/AC-24/AC-25。
++// 形状单一来源＝本模块：编排 `workflow-state.ts`/`workflow-service.ts`/`basis-guard.ts` 与桌面路由
++// 只 import 本段类型，不得另立第二份字段名。事件为**纯数据、只增不改**：
++// - 全部事件带 `v:1`/`at`/`schema`/幂等键；同幂等键不追加（replay，判定在应用/编排）。
++// - 读取侧对坏行/未知额外字段容忍（旧行照常读；坏行计数后跳过或 fail-closed，不猜——判定在编排）。
++// - 本段只声明类型与最小形状守卫；**不含**状态机/投影/账本 I/O/业务判定（编排 B0/B1 属主）。
++
++export const WORKFLOW_LEDGER_SCHEMA = "ans-workflow/v1";
++export const BASIS_LEDGER_SCHEMA = "ans-basis/v1";
++export const RELEASE_LEDGER_SCHEMA = "ans-release/v1";
++
++/** 固定路径：A＝新建产品全链（A1–A13）；B＝既有项目修改/修复（B1–B4）。 */
++export type WorkflowPath = "A" | "B";
++
++/** 固定路径阶段（v1.3 §4.1 完整集合；A12a/A12b 为 A12 的实施前标准/实施后报告两个子步）。 */
++export type WorkflowStage =
++  | "A1" | "A2" | "A3" | "A4" | "A5" | "A6" | "A7" | "A8" | "A9" | "A10" | "A11" | "A12" | "A12a" | "A12b" | "A13"
++  | "B1" | "B2" | "B3" | "B4";
++
++/** 阶段全集（只读；写入/校验单一来源）。 */
++export const WORKFLOW_STAGES: readonly WorkflowStage[] = Object.freeze([
++  "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A12a", "A12b", "A13",
++  "B1", "B2", "B3", "B4",
++]);
++
++/** 阶段投影状态（v1.3 §4.1；投影实现属编排 workflow-state.ts，不在本模块）。 */
++export type StageStatus = "pending" | "requested" | "dispatched" | "in-progress" | "completed" | "blocked" | "failed" | "skipped";
++
++/** 工作流推进动作（v1.3 §3.3）：`advance`＝推进；`stop`＝请求暂停/改道（由运营执行停稳）。 */
++export type WorkflowAction = "advance" | "stop";
++
++/**
++ * 文档引用（应用计算 path+字节 SHA-256；kind 可选）。
++ * 用于 `request.created`/`request.resolved` 的 `documentRefs`（裁决事件一次写入，不由模型自报）。
++ */
++export interface WorkflowDocumentRef {
++  path: string;
++  sha256: string;
++  kind?: string;
++}
++
++/** 账本事件公共字段（`ans-workflow/v1`/`ans-basis/v1`/`ans-release/v1` 全部事件）。 */
++export interface WorkflowLedgerEventBase {
++  v: 1;
++  at: string;
++  /** 幂等键（v1.3 §7.1 各事件表）；同键重复不追加（replay）。 */
++  idempotencyKey: string;
++}
++
++/** workflow 账本事件公共字段（v1.3 §4.1：每个事件都带 schema/workflowId/flowId/path/kind）。 */
++export interface WorkflowEventBase extends WorkflowLedgerEventBase {
++  schema: typeof WORKFLOW_LEDGER_SCHEMA;
++  workflowId: string;
++  flowId: string;
++  path: WorkflowPath;
++}
++
++/** `workflow.started`（幂等键 `workflow-start:<flowId>:<path>:<sourceTaskId>`）。 */
++export interface WorkflowStartedEvent extends WorkflowEventBase {
++  kind: "workflow.started";
++  trigger: { by: "chief"; reason: string; customerOverride?: boolean };
++  /** chief 当前真实客户轮次 id（host 捕获，不可模型自报）。 */
++  sourceTaskId: string;
++  /** 旧 trunk/run 历史存在但被忽略时为 true（如实记录，不迁移）。 */
++  legacyStateIgnored?: boolean;
++}
++
++/** `stage.requested`（幂等键 `stage-request:<workflowId>:<stage>:<attempt>`）。 */
++export interface StageRequestedEvent extends WorkflowEventBase {
++  kind: "stage.requested";
++  stage: WorkflowStage;
++  fromStage?: WorkflowStage;
++  requestTaskId: string;
++  requestDigest: string;
++  attempt: number;
++}
++
++/** `stage.dispatched`（幂等键 `stage-dispatch:<workflowId>:<stage>:<taskId>`）。 */
++export interface StageDispatchedEvent extends WorkflowEventBase {
++  kind: "stage.dispatched";
++  stage: WorkflowStage;
++  taskId: string;
++  targetRoleId: string;
++  moduleId?: string;
++}
++
++/** 阶段完成产物引用（path 必填；sha256/kind 由应用附）。 */
++export interface WorkflowArtifactRef {
++  path: string;
++  sha256?: string;
++  kind?: string;
++}
++
++/** `stage.completed`（幂等键 `stage-complete:<workflowId>:<stage>:<causeRef>`；同一完成条件重复只追加一次）。 */
++export interface StageCompletedEvent extends WorkflowEventBase {
++  kind: "stage.completed";
++  stage: WorkflowStage;
++  cause: { kind: string; ref: string };
++  artifacts: WorkflowArtifactRef[];
++}
++
++/** `stage.blocked`（幂等键 `stage-block:<workflowId>:<stage>:<attempt>:<code>`）。 */
++export interface StageBlockedEvent extends WorkflowEventBase {
++  kind: "stage.blocked";
++  stage: WorkflowStage;
++  code: string;
++  summary: string;
++  taskId?: string;
++  attempt: number;
++}
++
++/** `stage.reworked`（幂等键 `stage-rework:<workflowId>:<stage>:<attempt>`）。 */
++export interface StageReworkedEvent extends WorkflowEventBase {
++  kind: "stage.reworked";
++  stage: WorkflowStage;
++  /** 被打回的具体阶段（A12b→A11、A6→A5、A3→A2、B2→B1）。 */
++  reworkOf: WorkflowStage;
++  reason: string;
++  attempt: number;
++}
++
++/** `change.scope-decided`（B2；幂等键 `scope:<workflowId>:<impactSha>:<scopeDigest>`）。 */
++export interface ChangeScopeDecidedEvent extends WorkflowEventBase {
++  kind: "change.scope-decided";
++  impactReport: { path: string; sha256: string };
++  scope: { summary: string; files?: string[]; rationale?: string };
++  /** 应用据 scope.files 派生的每角色有效写集（不采信模型自报）。 */
++  effectiveWritesets: { roleId: string; paths: string[] }[];
++  decidedBy: "chief";
++  requestTaskId: string;
++}
++
++/** `role.activated`（A8；幂等键 `role-activation:<workflowId>:<role>:<rosterSha>`）。 */
++export interface RoleActivatedEvent extends WorkflowEventBase {
++  kind: "role.activated";
++  roleId: string;
++  decisionRef: string;
++  roster: { path: string; sha256: string };
++  documents: { path: string; sha256: string }[];
++}
++
++/** `workflow.stop-requested`（幂等键 `stage-stop:<workflowId>:<stage>:<attempt>`）。 */
++export interface WorkflowStopRequestedEvent extends WorkflowEventBase {
++  kind: "workflow.stop-requested";
++  stage: WorkflowStage;
++  requestTaskId: string;
++  reason: string;
++  requestedBy: "chief";
++}
++
++/** `workflow.stop-unconfirmed`（幂等键 `stage-stop-unconfirmed:<workflowId>:<stage>:<attempt>`）；停稳不明不写 stopped。 */
++export interface WorkflowStopUnconfirmedEvent extends WorkflowEventBase {
++  kind: "workflow.stop-unconfirmed";
++  stage: WorkflowStage;
++  requestTaskId: string;
++  /** 缺失项（open 任务/live 会话/停稳证据）；应用核验后如实列出。 */
++  missing: string[];
++}
++
++/** 停稳证据（应用核验：请求已 closed + 运营报告 + 无 open 生产任务）。 */
++export interface WorkflowStopEvidence {
++  requestClosed: boolean;
++  operatorReported: boolean;
++  openProductionTaskIds?: string[];
++}
++
++/** 工作流关闭结论（v1.3 §7.1）。 */
++export type WorkflowClosedOutcome = "delivered" | "delivered-unmerged" | "stopped" | "failed" | "no-change" | "reclassified";
++
++/** `workflow.closed`（幂等键 `workflow-close:<workflowId>:<outcome>:<reasonDigest>`）。 */
++export interface WorkflowClosedEvent extends WorkflowEventBase {
++  kind: "workflow.closed";
++  outcome: WorkflowClosedOutcome;
++  reason: string;
++  releaseId?: string;
++  stopEvidence?: WorkflowStopEvidence;
++}
++
++/** `ans-workflow/v1`（`.ans/state/workflows.jsonl`）事件联合；只追加、不改旧行。 */
++export type WorkflowEvent =
++  | WorkflowStartedEvent
++  | StageRequestedEvent
++  | StageDispatchedEvent
++  | StageCompletedEvent
++  | StageBlockedEvent
++  | StageReworkedEvent
++  | ChangeScopeDecidedEvent
++  | RoleActivatedEvent
++  | WorkflowStopRequestedEvent
++  | WorkflowStopUnconfirmedEvent
++  | WorkflowClosedEvent;
++
++/** `ans-workflow/v1` 合法事件 kind（读取/测试用；写入侧由应用追加）。 */
++export const WORKFLOW_EVENT_KINDS = Object.freeze([
++  "workflow.started", "stage.requested", "stage.dispatched", "stage.completed", "stage.blocked",
++  "stage.reworked", "change.scope-decided", "role.activated", "workflow.stop-requested",
++  "workflow.stop-unconfirmed", "workflow.closed",
++] as const);
++export type WorkflowEventKind = (typeof WORKFLOW_EVENT_KINDS)[number];
++
++/** basis 文档引用（v1.3 §5.3：kind/path/version/sha256/bytes 由应用实测，8 MiB 读取预算内）。 */
++export interface BasisDocumentRef {
++  kind: string;
++  path: string;
++  version: number;
++  sha256: string;
++  bytes: number;
++}
++
++/** 团队计划引用（`docs/scheduling/<flowId>-team-vN.md`）。 */
++export interface BasisTeamPlanRef {
++  path: string;
++  version: number;
++  sha256: string;
++}
++
++/** 仓库快照（v1.3 §5.2/§5.3；path-b 记 `state:"existing"` 与 baseOid，只读快照不产生写权）。 */
++export interface WorkflowRepoSnapshot {
++  state: "initialized" | "existing";
++  branch: string;
++  baseOid?: string | null;
++  headOid?: string | null;
++  mainUnborn?: boolean;
++  initialBranch?: string;
++  objectFormat?: "sha1" | "sha256";
++  ignorePolicy: "ans-v1";
++  gitignoreSha256: string;
++  identityDefaultsApplied?: boolean;
++}
++
++/** `basis.recorded`（v1.3 §5.3；`recordedBy:"application"`，不信任模型自报）。 */
++export interface BasisRecordedEvent extends WorkflowLedgerEventBase {
++  schema: typeof BASIS_LEDGER_SCHEMA;
++  kind: "basis.recorded";
++  basisId: string;
++  workflowId: string;
++  flowId: string;
++  documents: BasisDocumentRef[];
++  /** path-b 记录为 null（不写团队计划）；baseline/amendment 给出计划引用。 */
++  teamPlan?: BasisTeamPlanRef | null;
++  repo?: WorkflowRepoSnapshot;
++  /** 验收角色：默认 "verifier"；roster roles[].review=true 的项目角色优先（应用核验）。 */
++  reviewRoleId?: string;
++  operationId: string;
++  reason: "baseline" | "path-b" | "amendment";
++  recordedBy: "application";
++}
++
++/** `basis.amended`：同 workflow 新 basis（文档修正）；`previousBasisId` 指向旧记录，旧 basis 保留。 */
++export interface BasisAmendedEvent extends WorkflowLedgerEventBase {
++  schema: typeof BASIS_LEDGER_SCHEMA;
++  kind: "basis.amended";
++  basisId: string;
++  previousBasisId: string;
++  workflowId: string;
++  flowId: string;
++  documents: BasisDocumentRef[];
++  teamPlan?: BasisTeamPlanRef | null;
++  repo?: WorkflowRepoSnapshot;
++  reviewRoleId?: string;
++  operationId: string;
++  recordedBy: "application";
++}
++
++/** `basis.verified`（关键门节流记录；字段按 v1.3 §7.1）。 */
++export interface BasisVerifiedEvent extends WorkflowLedgerEventBase {
++  schema: typeof BASIS_LEDGER_SCHEMA;
++  kind: "basis.verified";
++  basisId: string;
++  checkedAt: string;
++  ok: boolean;
++  documents: { path: string; sha256: string; ok: boolean }[];
++}
++
++/** `basis.drift`（不一致 ⇒ 消费方 fail-closed `basis-drift`；字段按 v1.3 §7.1）。 */
++export interface BasisDriftEvent extends WorkflowLedgerEventBase {
++  schema: typeof BASIS_LEDGER_SCHEMA;
++  kind: "basis.drift";
++  basisId: string;
++  path: string;
++  expectedSha256: string;
++  actualSha256: string | null;
++  detectedAt: string;
++}
++
++/** `ans-basis/v1`（`.ans/state/basis.jsonl`）事件联合。 */
++export type BasisEvent = BasisRecordedEvent | BasisAmendedEvent | BasisVerifiedEvent | BasisDriftEvent;
++
++/** `ans-basis/v1` 合法事件 kind。 */
++export const BASIS_EVENT_KINDS = Object.freeze([
++  "basis.recorded", "basis.amended", "basis.verified", "basis.drift",
++] as const);
++export type BasisEventKind = (typeof BASIS_EVENT_KINDS)[number];
++
++/** 合并方式（v1.3 §6.4）：`initial`＝main unborn 时以任务分支 tip 建 main；`merge`＝`git merge --no-ff`。 */
++export type ReleaseMergeKind = "merge" | "initial";
++
++/** 合并文件变更（status 沿用 Git 变更字母，如 A/M/D）。 */
++export interface ReleaseFileChange {
++  path: string;
++  status: string;
++}
++
++/** release 账本事件公共字段（`ans-release/v1`；字段按 v1.3 §6.4/§7.1）。 */
++export interface ReleaseEventBase extends WorkflowLedgerEventBase {
++  schema: typeof RELEASE_LEDGER_SCHEMA;
++  releaseId: string;
++  workflowId: string;
++  flowId: string;
++}
++
++/** `release.requested`：应用受理发布合并请求（tipOid 由应用从任务分支实际读取；evidence 逐路径重算比对）。 */
++export interface ReleaseRequestedEvent extends ReleaseEventBase {
++  kind: "release.requested";
++  operationId: string;
++  summary: string;
++  evidence: { path: string; sha256: string }[];
++  baseOid: GitOid | null;
++  tipOid: GitOid;
++  mergeKind: ReleaseMergeKind;
++}
++
++/** `release.confirmed`：**仅客户本人** approve（judge 不可代批，无 judge-delegated 来源）。 */
++export interface ReleaseConfirmedEvent extends ReleaseEventBase {
++  kind: "release.confirmed";
++  by: "customer";
++  decisionId?: string;
++}
++
++/** `release.rejected`：客户本人拒绝，或 judge 转人工/拒绝（judge 不得 approve/冒充客户）。 */
++export interface ReleaseRejectedEvent extends ReleaseEventBase {
++  kind: "release.rejected";
++  by: "customer" | "judge";
++  reason?: string;
++}
++
++/** `release.merged`：应用本地合并成功回执（不 push/tag；工作区停在 main）。 */
++export interface ReleaseMergedEvent extends ReleaseEventBase {
++  kind: "release.merged";
++  baseOid: GitOid | null;
++  tipOid: GitOid;
++  mergeOid: GitOid;
++  mergeKind: ReleaseMergeKind;
++  files: ReleaseFileChange[];
++  diffDigest: string;
++}
++
++/** `release.failed`：合并/切换失败（如 release-merge-conflict；不 force/reset/clean）。 */
++export interface ReleaseFailedEvent extends ReleaseEventBase {
++  kind: "release.failed";
++  code: string;
++  summary: string;
++  baseOid?: GitOid | null;
++  tipOid?: GitOid;
++}
++
++/** `ans-release/v1`（`.ans/state/releases.jsonl`）事件联合。 */
++export type ReleaseEvent = ReleaseRequestedEvent | ReleaseConfirmedEvent | ReleaseRejectedEvent | ReleaseMergedEvent | ReleaseFailedEvent;
++
++/** `ans-release/v1` 合法事件 kind。 */
++export const RELEASE_EVENT_KINDS = Object.freeze([
++  "release.requested", "release.confirmed", "release.rejected", "release.merged", "release.failed",
++] as const);
++export type ReleaseEventKind = (typeof RELEASE_EVENT_KINDS)[number];
++
++/** 三份固定路径账本事件的并集（通用读取用；具体账本由调用方按 schema 选择）。 */
++export type FixedPathLedgerEvent = WorkflowEvent | BasisEvent | ReleaseEvent;
++
++function ledgerRecord(value: unknown): value is Record<string, unknown> {
++  return value !== null && typeof value === "object" && !Array.isArray(value);
++}
++function ledgerText(value: unknown): value is string {
++  return typeof value === "string" && value.length > 0 && value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
++}
++function ledgerDigest(value: unknown): value is string {
++  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
++}
++function ledgerAttempt(value: unknown): value is number {
++  return Number.isSafeInteger(value) && (value as number) >= 1;
++}
++function ledgerKindSet(kinds: readonly string[]): ReadonlySet<string> {
++  return new Set(kinds);
++}
++const WORKFLOW_STAGE_SET = ledgerKindSet(WORKFLOW_STAGES);
++const WORKFLOW_EVENT_KIND_SET = ledgerKindSet(WORKFLOW_EVENT_KINDS);
++const BASIS_EVENT_KIND_SET = ledgerKindSet(BASIS_EVENT_KINDS);
++const RELEASE_EVENT_KIND_SET = ledgerKindSet(RELEASE_EVENT_KINDS);
++
++/** 固定路径标记（`"A"`/`"B"`）。 */
++export function isWorkflowPath(value: unknown): value is WorkflowPath {
++  return value === "A" || value === "B";
++}
++
++/** 阶段 id（A1–A13 含 A12a/A12b；B1–B4）。坏 stage ⇒ false（读取侧计数跳过，不猜）。 */
++export function isWorkflowStage(value: unknown): value is WorkflowStage {
++  return typeof value === "string" && WORKFLOW_STAGE_SET.has(value);
++}
++
++/** 阶段投影状态（枚举白名单）。 */
++export function isStageStatus(value: unknown): value is StageStatus {
++  return value === "pending" || value === "requested" || value === "dispatched" || value === "in-progress"
++    || value === "completed" || value === "blocked" || value === "failed" || value === "skipped";
++}
++
++function isWorkflowEventBase(value: Record<string, unknown>): boolean {
++  return value["v"] === 1 && ledgerText(value["at"]) && value["schema"] === WORKFLOW_LEDGER_SCHEMA
++    && ledgerText(value["workflowId"]) && ledgerText(value["flowId"]) && isWorkflowPath(value["path"])
++    && ledgerText(value["idempotencyKey"]);
++}
++
++function isWorkflowEventBody(value: Record<string, unknown>): boolean {
++  const kind = value["kind"];
++  if (typeof kind !== "string") return false;
++  switch (kind) {
++    case "workflow.started": {
++      const trigger = value["trigger"];
++      return ledgerRecord(trigger) && trigger["by"] === "chief" && typeof trigger["reason"] === "string"
++        && (trigger["customerOverride"] === undefined || typeof trigger["customerOverride"] === "boolean")
++        && ledgerText(value["sourceTaskId"])
++        && (value["legacyStateIgnored"] === undefined || typeof value["legacyStateIgnored"] === "boolean");
++    }
++    case "stage.requested":
++      return isWorkflowStage(value["stage"])
++        && (value["fromStage"] === undefined || isWorkflowStage(value["fromStage"]))
++        && ledgerText(value["requestTaskId"]) && ledgerDigest(value["requestDigest"]) && ledgerAttempt(value["attempt"]);
++    case "stage.dispatched":
++      return isWorkflowStage(value["stage"]) && ledgerText(value["taskId"]) && ledgerText(value["targetRoleId"])
++        && (value["moduleId"] === undefined || ledgerText(value["moduleId"]));
++    case "stage.completed": {
++      const cause = value["cause"], artifacts = value["artifacts"];
++      return isWorkflowStage(value["stage"]) && ledgerRecord(cause) && ledgerText(cause["kind"]) && ledgerText(cause["ref"])
++        && Array.isArray(artifacts) && artifacts.every((item: unknown) => ledgerRecord(item) && ledgerText(item["path"])
++          && (item["sha256"] === undefined || ledgerDigest(item["sha256"])) && (item["kind"] === undefined || typeof item["kind"] === "string"));
++    }
++    case "stage.blocked":
++      return isWorkflowStage(value["stage"]) && ledgerText(value["code"]) && typeof value["summary"] === "string"
++        && (value["taskId"] === undefined || ledgerText(value["taskId"])) && ledgerAttempt(value["attempt"]);
++    case "stage.reworked":
++      return isWorkflowStage(value["stage"]) && isWorkflowStage(value["reworkOf"])
++        && typeof value["reason"] === "string" && ledgerAttempt(value["attempt"]);
++    case "change.scope-decided": {
++      const report = value["impactReport"], scope = value["scope"], writesets = value["effectiveWritesets"];
++      return ledgerRecord(report) && ledgerText(report["path"]) && ledgerDigest(report["sha256"])
++        && ledgerRecord(scope) && typeof scope["summary"] === "string"
++        && (scope["files"] === undefined || (Array.isArray(scope["files"]) && scope["files"].every((item: unknown) => ledgerText(item))))
++        && (scope["rationale"] === undefined || typeof scope["rationale"] === "string")
++        && Array.isArray(writesets) && writesets.every((item: unknown) => ledgerRecord(item) && ledgerText(item["roleId"])
++          && Array.isArray(item["paths"]) && item["paths"].every((path: unknown) => ledgerText(path)))
++        && value["decidedBy"] === "chief" && ledgerText(value["requestTaskId"]);
++    }
++    case "role.activated": {
++      const roster = value["roster"], documents = value["documents"];
++      return ledgerText(value["roleId"]) && ledgerText(value["decisionRef"])
++        && ledgerRecord(roster) && ledgerText(roster["path"]) && ledgerDigest(roster["sha256"])
++        && Array.isArray(documents)
++        && documents.every((item: unknown) => ledgerRecord(item) && ledgerText(item["path"]) && ledgerDigest(item["sha256"]));
++    }
++    case "workflow.stop-requested":
++      return isWorkflowStage(value["stage"]) && ledgerText(value["requestTaskId"])
++        && typeof value["reason"] === "string" && value["requestedBy"] === "chief";
++    case "workflow.stop-unconfirmed":
++      return isWorkflowStage(value["stage"]) && ledgerText(value["requestTaskId"])
++        && Array.isArray(value["missing"]) && value["missing"].every((item: unknown) => typeof item === "string");
++    case "workflow.closed": {
++      const outcome = value["outcome"], evidence = value["stopEvidence"];
++      return (outcome === "delivered" || outcome === "delivered-unmerged" || outcome === "stopped" || outcome === "failed"
++        || outcome === "no-change" || outcome === "reclassified")
++        && typeof value["reason"] === "string" && (value["releaseId"] === undefined || ledgerText(value["releaseId"]))
++        && (evidence === undefined || (ledgerRecord(evidence) && typeof evidence["requestClosed"] === "boolean"
++          && typeof evidence["operatorReported"] === "boolean"
++          && (evidence["openProductionTaskIds"] === undefined || (Array.isArray(evidence["openProductionTaskIds"])
++            && evidence["openProductionTaskIds"].every((item: unknown) => typeof item === "string")))));
++    }
++    default:
++      return false;
++  }
++}
++
++/**
++ * `ans-workflow/v1` 事件的最小形状守卫（纯数据、零 I/O）：schema/v/kind/stage/幂等键等；未知额外字段允许
++ * （事件只增不改）。坏行/旧行 ⇒ false（调用方计数后跳过或 fail-closed，不猜）。
++ */
++export function isWorkflowEvent(value: unknown): value is WorkflowEvent {
++  if (!ledgerRecord(value) || typeof value["kind"] !== "string" || !WORKFLOW_EVENT_KIND_SET.has(value["kind"])) return false;
++  return isWorkflowEventBase(value) && isWorkflowEventBody(value);
++}
++
++function isBasisEventBase(value: Record<string, unknown>): boolean {
++  return value["v"] === 1 && ledgerText(value["at"]) && value["schema"] === BASIS_LEDGER_SCHEMA
++    && ledgerText(value["idempotencyKey"]);
++}
++
++function isBasisDocumentArray(value: unknown): boolean {
++  return Array.isArray(value) && value.every((item: unknown) => ledgerRecord(item) && ledgerText(item["kind"]) && ledgerText(item["path"])
++    && Number.isSafeInteger(item["version"]) && (item["version"] as number) >= 1
++    && ledgerDigest(item["sha256"]) && Number.isSafeInteger(item["bytes"]) && (item["bytes"] as number) >= 0);
++}
++
++function isBasisEventBody(value: Record<string, unknown>): boolean {
++  const kind = value["kind"];
++  if (typeof kind !== "string") return false;
++  const teamPlan = value["teamPlan"];
++  const teamPlanOk = teamPlan === undefined || teamPlan === null
++    || (ledgerRecord(teamPlan) && ledgerText(teamPlan["path"]) && Number.isSafeInteger(teamPlan["version"])
++      && ledgerDigest(teamPlan["sha256"]));
++  const repo = value["repo"];
++  const repoOk = repo === undefined || (ledgerRecord(repo) && (repo["state"] === "initialized" || repo["state"] === "existing")
++    && ledgerText(repo["branch"]) && repo["ignorePolicy"] === "ans-v1" && ledgerDigest(repo["gitignoreSha256"]));
++  const common = () => ledgerText(value["workflowId"]) && ledgerText(value["flowId"]) && ledgerText(value["basisId"])
++    && isBasisDocumentArray(value["documents"]) && teamPlanOk && repoOk
++    && (value["reviewRoleId"] === undefined || ledgerText(value["reviewRoleId"]))
++    && ledgerText(value["operationId"]) && value["recordedBy"] === "application";
++  switch (kind) {
++    case "basis.recorded":
++      return common() && (value["reason"] === "baseline" || value["reason"] === "path-b" || value["reason"] === "amendment");
++    case "basis.amended":
++      return common() && ledgerText(value["previousBasisId"]);
++    case "basis.verified": {
++      const documents = value["documents"];
++      return ledgerText(value["basisId"]) && ledgerText(value["checkedAt"]) && typeof value["ok"] === "boolean"
++        && Array.isArray(documents) && documents.every((item: unknown) => ledgerRecord(item) && ledgerText(item["path"])
++          && ledgerDigest(item["sha256"]) && typeof item["ok"] === "boolean");
++    }
++    case "basis.drift":
++      return ledgerText(value["basisId"]) && ledgerText(value["path"]) && ledgerDigest(value["expectedSha256"])
++        && (value["actualSha256"] === null || ledgerDigest(value["actualSha256"])) && ledgerText(value["detectedAt"]);
++    default:
++      return false;
++  }
++}
++
++/** `ans-basis/v1` 事件的最小形状守卫（纯数据、零 I/O）。 */
++export function isBasisEvent(value: unknown): value is BasisEvent {
++  if (!ledgerRecord(value) || typeof value["kind"] !== "string" || !BASIS_EVENT_KIND_SET.has(value["kind"])) return false;
++  return isBasisEventBase(value) && isBasisEventBody(value);
++}
++
++function isReleaseOid(value: unknown): value is GitOid {
++  return ledgerRecord(value) && (value["objectFormat"] === "sha1" || value["objectFormat"] === "sha256")
++    && typeof value["hex"] === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i.test(value["hex"]);
++}
++
++function isReleaseEventBody(value: Record<string, unknown>): boolean {
++  const kind = value["kind"];
++  if (typeof kind !== "string") return false;
++  switch (kind) {
++    case "release.requested": {
++      const evidence = value["evidence"];
++      return ledgerText(value["operationId"]) && typeof value["summary"] === "string" && value["summary"].length <= 4000
++        && Array.isArray(evidence) && evidence.every((item: unknown) => ledgerRecord(item) && ledgerText(item["path"]) && ledgerDigest(item["sha256"]))
++        && (value["baseOid"] === null || isReleaseOid(value["baseOid"])) && isReleaseOid(value["tipOid"])
++        && (value["mergeKind"] === "merge" || value["mergeKind"] === "initial");
++    }
++    case "release.confirmed":
++      return value["by"] === "customer" && (value["decisionId"] === undefined || ledgerText(value["decisionId"]));
++    case "release.rejected":
++      return (value["by"] === "customer" || value["by"] === "judge") && (value["reason"] === undefined || typeof value["reason"] === "string");
++    case "release.merged": {
++      const files = value["files"];
++      return (value["baseOid"] === null || isReleaseOid(value["baseOid"])) && isReleaseOid(value["tipOid"]) && isReleaseOid(value["mergeOid"])
++        && (value["mergeKind"] === "merge" || value["mergeKind"] === "initial")
++        && Array.isArray(files) && files.every((item: unknown) => ledgerRecord(item) && ledgerText(item["path"]) && ledgerText(item["status"]))
++        && ledgerDigest(value["diffDigest"]);
++    }
++    case "release.failed":
++      return ledgerText(value["code"]) && typeof value["summary"] === "string"
++        && (value["baseOid"] === undefined || value["baseOid"] === null || isReleaseOid(value["baseOid"]))
++        && (value["tipOid"] === undefined || isReleaseOid(value["tipOid"]));
++    default:
++      return false;
++  }
++}
++
++/** `ans-release/v1` 事件的最小形状守卫（纯数据、零 I/O）。 */
++export function isReleaseEvent(value: unknown): value is ReleaseEvent {
++  if (!ledgerRecord(value) || typeof value["kind"] !== "string" || !RELEASE_EVENT_KIND_SET.has(value["kind"])) return false;
++  return value["v"] === 1 && ledgerText(value["at"]) && value["schema"] === RELEASE_LEDGER_SCHEMA
++    && ledgerText(value["idempotencyKey"]) && ledgerText(value["releaseId"]) && ledgerText(value["workflowId"]) && ledgerText(value["flowId"])
++    && isReleaseEventBody(value);
++}
++
+ /** 每角色运行日志条目（B-04；字段白名单，写入侧脱敏/截断）。 */
+ export interface RoleLogEntry {
+   v: 1;
+@@ -2017,6 +2638,23 @@ export interface DispatchTaskPayload {
+   moduleId?: string;
+   /** v2.20：模块路径数组（普通模块单元素；固定 env/entry 模块可多路径）。 */
+   modulePaths?: string[];
++  /**
++   * T3（2026-11-10 两条固定工作流路径，v1.3 §3.3）：以下为**可选**字段，纯载荷骨架——
++   * 字段本身不构成授权；来源/目标/字段/副作用由应用按实际工作流模式校验（handler/编排）。
++   * 缺省/未知值不得放宽任何既有派发语义；旧调用不传 = 旧行为。
++   */
++  /** `"stage-request"`＝产线调度请求（固定 read-only、无 module/写集）；缺省/其它值按普通派发。 */
++  taskKind?: "stage-request" | string;
++  /** 缺省 `"advance"`；`"stop"`＝请求暂停/改道（由运营执行停稳，不自动回滚 Git）。 */
++  workflowAction?: WorkflowAction;
++  /** 首次 advance 请求必填；后续可省略（应用从账本解析）。 */
++  workflowPath?: WorkflowPath;
++  /** 首次可省略（应用确定性生成并回执）；后续必填。 */
++  workflowId?: string;
++  /** 目标阶段（stop 时为当前阶段）；stage-request 必填。 */
++  stage?: WorkflowStage;
++  /** 返工时指向被打回的具体阶段（A12b→A11、A6→A5、A3→A2、B2→B1）。 */
++  reworkOf?: WorkflowStage;
+ }
+ 
+ export interface DispatchReceipt {
+@@ -2086,7 +2724,8 @@ export type ContractSchemaTopic = (typeof CONTRACT_SCHEMA_TOPICS)[number];
+ export interface ContractCheckInput {
+   flowId?: string;
+   roleId?: string;
+-  taskKind?: "dispatch" | "appointment" | "write" | "acceptance" | "shell";
++  /** 任务种类（T3 增 `"stage-request"`，与 `contract_check` schema 枚举同步；legacy 五项不变）。 */
++  taskKind?: "dispatch" | "appointment" | "write" | "acceptance" | "shell" | "stage-request";
+   moduleId?: string;
+   /** 只读 schema 主题；给出时只返回该文档的字段表与最小合法 YAML 示例（不混入 run 摘要）。 */
+   topic?: ContractSchemaTopic;
+diff --git a/src/provider/runtime/schema.ts b/src/provider/runtime/schema.ts
+index 385b0f3..ac4994f 100644
+--- a/src/provider/runtime/schema.ts
++++ b/src/provider/runtime/schema.ts
+@@ -1,5 +1,5 @@
+ // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
+-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX } from "../../model/runtime.ts";
++import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX, WORKFLOW_STAGES } from "../../model/runtime.ts";
+ import {
+   AMENDMENT_ID_PATTERN,
+   REFACTOR_REASON_MAX,
+@@ -57,7 +57,7 @@ function directCapabilityDescription(name: string): ToolDescription | undefined
+     close_created_task: { parameters: object({ operationId: text, taskId: text, runId: text, basisDigest: digest,
+       reportRef: snapshot, outcome: { type: "string", enum: ["accepted", "rework", "rejected"] }, note: reason },
+       ["operationId", "taskId", "runId", "basisDigest", "reportRef", "outcome"]),
+-      description: "chief/convener仅能收口本人创建的任务；应用核task.created.from、当前报告/run/依据与合法状态后写真实收口事件。取消不属于收口判定。" },
++      description: "chief/convener仅能收口本人创建的任务；应用核task.created.from、当前报告/run/依据与合法状态后写真实收口事件。取消不属于收口判定。应用按实际工作流模式核验必填字段：未启用固定路径时 runId/basisDigest/reportRef 必填不变；固定路径模式（由编排启用后）只要求 operationId/taskId/outcome，真实创建者/报告/状态/幂等仍由应用核验。" },
+     decide_pending_request: { parameters: object({ requestId: text, baseDigest: digest,
+       delegationRevision: { type: "integer", minimum: 0 }, reason,
+       disposition: { type: "string", enum: ["select", "reject", "revise"] },
+@@ -692,6 +692,45 @@ export function describeTool(name: string): ToolDescription {
+             maxItems: 20,
+             description: "2026-10-29 (v2.20): module path array (normal modules single-element; fixed env/entry modules may be multi-path). The application derives canonical paths from the roster and verifies target ownership.",
+           },
++          // T3（2026-11-10 两条固定工作流路径，v1.3 §3.3/§3.5）：以下为**可选**字段，schema 文案保持模式中立
++          // （固定路径特有的来源/目标纪律由角色 context / chief-workflow-v2 提供）；字段本身不构成授权，
++          // 缺省 = 旧行为，实际校验在应用 handler/编排。
++          taskKind: {
++            type: "string",
++            enum: ["stage-request"],
++            description:
++              "Optional task-kind sub-mode. `stage-request` is a workflow coordination request: read-only, no module/write set; " +
++              "the receiving side must dispatch the actual production task in its own assigned turn. Missing/other values mean a normal dispatch; " +
++              "the application verifies source/target/fields/side effect.",
++          },
++          workflowAction: {
++            type: "string",
++            enum: ["advance", "stop"],
++            description:
++              "Optional workflow action (default `advance`). `stop` only requests pausing/redirecting the workflow; the receiving side stops dispatching, " +
++              "closes open production tasks and reports; it does not roll back Git or documents.",
++          },
++          workflowPath: {
++            type: "string",
++            enum: ["A", "B"],
++            description: "Optional workflow path. Give it on the first advance request; later requests may omit it (the application resolves it from the ledger).",
++          },
++          workflowId: {
++            type: "string",
++            minLength: 1,
++            maxLength: 200,
++            description: "Optional workflow id. May be omitted on the first request (the application generates it deterministically and returns it); required on subsequent requests.",
++          },
++          stage: {
++            type: "string",
++            enum: [...WORKFLOW_STAGES],
++            description: "Optional target stage (A1–A13 incl. A12a/A12b, B1–B4); required for `stage-request`. The application verifies the actual stage transition.",
++          },
++          reworkOf: {
++            type: "string",
++            enum: [...WORKFLOW_STAGES],
++            description: "Optional: the specific stage being reworked (A12b→A11, A6→A5, A3→A2, B2→B1).",
++          },
+         },
+         required: ["roleId", "task"],
+         not: { anyOf: ["workSourceRef", "parentTaskRef", "reviewBasisRef", "reviewControllerRef", "hubRouting", "criteria", "ref", "approved", "approval", "passed"].map(key => ({ required: [key] })) },
+@@ -728,6 +767,8 @@ export function describeTool(name: string): ToolDescription {
+         "返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。",
+         "最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。",
+         "B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。",
++        "`taskKind:\"stage-request\"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。",
++        "`workflowAction:\"stop\"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。",
+       ],
+     };
+   }
+@@ -796,7 +837,7 @@ export function describeTool(name: string): ToolDescription {
+         properties: {
+           flowId: { type: "string", description: "Optional flow id; defaults to the active run flow" },
+           roleId: { type: "string", description: "Optional role id; only the caller's own role is visible" },
+-          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell"], description: "Optional task kind for required schema/fields" },
++          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell", "stage-request"], description: "Optional task kind for required schema/fields" },
+           moduleId: { type: "string", description: "Optional module id for path/write-root detail" },
+           topic: { type: "string", enum: [...CONTRACT_SCHEMA_TOPICS], description: "Optional schema topic; returns that document's field table and minimal valid YAML example (read-only; no run summary)" },
+         },
+diff --git a/src/provider/runtime/tools.ts b/src/provider/runtime/tools.ts
+index a6440a2..3f2b635 100644
+--- a/src/provider/runtime/tools.ts
++++ b/src/provider/runtime/tools.ts
+@@ -59,10 +59,12 @@ import type {
+   VersionChangeTargetSubmission,
+   SelectRunChangeInput, CompleteTeamPlanInput, ActivateRoleDocumentsInput, CloseCreatedTaskInput,
+   DecidePendingRequestInput, DecidePendingRequestFn, ChiefDecisionExecutionContext,
++  WorkflowAction, WorkflowStage, WorkflowPath,
+   RuntimeActiveToolFact, RuntimeOwnedProcessFact,
+   GitQueryRequest, GitCandidateRequest, GitPublishRequest,
+ } from "../../model/runtime.ts";
+ import { isDirectActionReceipt, isDirectActionSource, isGitOid, isGitBasis, isGitLiteralPath, isGitCapabilityResult } from "../../model/trunk.ts";
++import { isWorkflowPath, isWorkflowStage } from "../../model/runtime.ts";
+ import {
+   PLAN_ESCALATION_CATEGORIES,
+   PLAN_ESCALATION_SUMMARY_MAX,
+@@ -2881,6 +2883,37 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
+         }
+         modulePaths = modulePathsRaw.map((item) => item.trim());
+       }
++      // T3（2026-11-10，v1.3 §3.3）：stage-request 载荷骨架——本层只做形状校验与透传，
++      // **不做**来源/目标/阶段转移/副作用等业务校验（由应用 handler/编排按实际工作流模式执行）。
++      // 缺省 = 旧行为；未知/非法值 fail-closed（不猜、不放宽）。
++      const taskKind = readStringArg(call.args, ["taskKind", "task_kind"]);
++      if (taskKind !== undefined && taskKind.trim() === "") {
++        return { ok: false, message: `${name}: taskKind 不能为空字符串` };
++      }
++      const workflowActionRaw = call.args["workflowAction"] ?? call.args["workflow_action"];
++      if (workflowActionRaw !== undefined && workflowActionRaw !== null && workflowActionRaw !== "advance" && workflowActionRaw !== "stop") {
++        return { ok: false, message: `${name}: workflowAction 参数非法（应为 advance/stop）` };
++      }
++      const workflowAction: WorkflowAction | undefined = workflowActionRaw === "advance" || workflowActionRaw === "stop" ? workflowActionRaw : undefined;
++      const workflowPathRaw = call.args["workflowPath"] ?? call.args["workflow_path"];
++      if (workflowPathRaw !== undefined && workflowPathRaw !== null && !isWorkflowPath(workflowPathRaw)) {
++        return { ok: false, message: `${name}: workflowPath 参数非法（应为 A/B）` };
++      }
++      const workflowPath: WorkflowPath | undefined = isWorkflowPath(workflowPathRaw) ? workflowPathRaw : undefined;
++      const workflowId = readStringArg(call.args, ["workflowId", "workflow_id"]);
++      if (workflowId !== undefined && (workflowId.trim() === "" || workflowId.length > 200)) {
++        return { ok: false, message: `${name}: workflowId 参数非法（应为 1–200 字符的非空字符串）` };
++      }
++      const stageRaw = call.args["stage"];
++      if (stageRaw !== undefined && stageRaw !== null && !isWorkflowStage(stageRaw)) {
++        return { ok: false, message: `${name}: stage 参数非法（应为 A1–A13（含 A12a/A12b）或 B1–B4）` };
++      }
++      const stage: WorkflowStage | undefined = isWorkflowStage(stageRaw) ? stageRaw : undefined;
++      const reworkOfRaw = call.args["reworkOf"] ?? call.args["rework_of"];
++      if (reworkOfRaw !== undefined && reworkOfRaw !== null && !isWorkflowStage(reworkOfRaw)) {
++        return { ok: false, message: `${name}: reworkOf 参数非法（应为被打回的具体阶段 A1–A13（含 A12a/A12b）或 B1–B4）` };
++      }
++      const reworkOf: WorkflowStage | undefined = isWorkflowStage(reworkOfRaw) ? reworkOfRaw : undefined;
+       const payload: DispatchTaskPayload = {
+         ...(expectedResume ? { resumeController: expectedResume } : {}),
+         ...(expectedReview !== undefined ? { reviewTarget: expectedReview } : {}),
+@@ -2893,6 +2926,12 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
+         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+         ...(moduleId !== undefined ? { moduleId } : {}),
+         ...(modulePaths !== undefined ? { modulePaths } : {}),
++        ...(taskKind !== undefined ? { taskKind } : {}),
++        ...(workflowAction !== undefined ? { workflowAction } : {}),
++        ...(workflowPath !== undefined ? { workflowPath } : {}),
++        ...(workflowId !== undefined ? { workflowId } : {}),
++        ...(stage !== undefined ? { stage } : {}),
++        ...(reworkOf !== undefined ? { reworkOf } : {}),
+         ...governance.value,
+       };
+ 
+@@ -3135,7 +3174,7 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
+         }
+       }
+       const taskKindRaw = readStringArg(call.args, ["taskKind", "task_kind"]);
+-      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell"
++      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell" || taskKindRaw === "stage-request"
+         ? taskKindRaw
+         : undefined;
+       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
+diff --git a/test/runtime-core/stable-write-card-kind.test.ts b/test/runtime-core/stable-write-card-kind.test.ts
+index 132bcaf..96ba86b 100644
+--- a/test/runtime-core/stable-write-card-kind.test.ts
++++ b/test/runtime-core/stable-write-card-kind.test.ts
+@@ -84,16 +84,20 @@ test("判断分组不变：GROUP 精确键集不变；stable-write 永不判断/
+ });
+ 
+ test("白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏", () => {
+-  assert.deepEqual([...GOVERNANCE_APP_OWNED_CARD_KINDS], ["stable-write"]);
++  // 2026-11-10 T3（v1.3 §8.4/AC-14）：app-owned 增 `merge-main`（客户本人合并 main 确认卡）；
++  // GROUP 键集仍逐字不变，`merge-main` 不进判断分组（下方断言）。
++  assert.deepEqual([...GOVERNANCE_APP_OWNED_CARD_KINDS], ["stable-write", "merge-main"]);
+   assert.equal(Object.isFrozen(GOVERNANCE_APP_OWNED_CARD_KINDS), true);
+   assert.equal(Object.isFrozen(GOVERNANCE_CARD_KINDS), true);
+-  assert.deepEqual([...GOVERNANCE_CARD_KINDS].sort(), [...OLD_GROUP_KEYS, "stable-write"].sort());
+-  assert.equal(GOVERNANCE_CARD_KINDS.length, 8, "GROUP 7 键 + app-owned 1 键");
++  assert.deepEqual([...GOVERNANCE_CARD_KINDS].sort(), [...OLD_GROUP_KEYS, "stable-write", "merge-main"].sort());
++  assert.equal(GOVERNANCE_CARD_KINDS.length, 9, "GROUP 7 键 + app-owned 2 键");
+   assert.equal(new Set(GOVERNANCE_CARD_KINDS).size, GOVERNANCE_CARD_KINDS.length, "白名单不得重复");
+   assert.equal(GOVERNANCE_CARD_KINDS.includes("stable-write"), true);
++  assert.equal(GOVERNANCE_CARD_KINDS.includes("merge-main"), true);
+   for (const key of Object.keys(GOVERNANCE_CARD_GROUP) as GovernanceCardKind[]) {
+     assert.equal(GOVERNANCE_CARD_KINDS.includes(key), true, `GROUP 键 ${key} 必须在白名单内`);
+   }
+-  // 白名单只用于账本卡种校验，不表达判断分组：stable-write 仍在 GROUP 外
++  // 白名单只用于账本卡种校验，不表达判断分组：stable-write/merge-main 仍在 GROUP 外
+   assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "stable-write"), false);
++  assert.equal(Object.prototype.hasOwnProperty.call(GOVERNANCE_CARD_GROUP, "merge-main"), false);
+ });

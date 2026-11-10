@@ -1,0 +1,20 @@
+ M src/common/shared/config-loader.ts
+ M "src/common/\347\274\226\346\216\222/task-state.ts"
+ M src/model/role.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/stable-write-card-kind.test.ts
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/role-module-contract.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/config-loader.test.ts"
+?? "src/common/\347\274\226\346\216\222/basis-guard.ts"
+?? "src/common/\347\274\226\346\216\222/workflow-service.ts"
+?? "src/common/\347\274\226\346\216\222/workflow-state.ts"
+?? test/runtime-core/two-fixed-workflow-paths-b0.test.ts
+?? "test/\347\274\226\346\216\222/basis-guard.test.ts"
+?? "test/\347\274\226\346\216\222/task-state-fixed.test.ts"
+?? "test/\347\274\226\346\216\222/workflow-ledger.test.ts"
+?? "test/\347\274\226\346\216\222/workflow-mode.test.ts"
+?? "test/\347\274\226\346\216\222/workflow-state.test.ts"
+?? "test/\351\227\250\347\246\201\345\274\225\346\223\216/dispatch-matrix-mode.test.ts"

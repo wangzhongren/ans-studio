@@ -1,0 +1,46 @@
+✔ 卡种联合（F2）：GovernanceCardKind 接受 app-owned stable-write；两交互工具联合均不含它 (0.6876ms)
+✔ request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appointment-write (0.0864ms)
+✔ 判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选 (0.485ms)
+✔ 白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏 (0.108ms)
+✔ merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined (0.8703ms)
+✔ TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选 (0.1218ms)
+✔ DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄 (0.0887ms)
+✔ 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed (0.127ms)
+✔ ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍 (0.4149ms)
+✔ ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false (0.2563ms)
+✔ ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false (0.26ms)
+✔ dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变 (1.2078ms)
+✔ contract_check.taskKind 同步 stage-request；close_created_task 必填语义未在 B0 放宽 (0.1734ms)
+✔ dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn (1.1522ms)
+✔ B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状） (0.413ms)
+✔ B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例） (1.2018ms)
+✔ B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变） (0.1357ms)
+✔ B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段 (0.1035ms)
+✔ BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状） (0.5569ms)
+✔ BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段 (0.445ms)
+✔ tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具） (0.0961ms)
+✔ dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望 (0.1139ms)
+✔ preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed） (0.0906ms)
+✔ context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘） (0.0891ms)
+✔ 契约类型只读：运行时不改输入/模块（纯策略无副作用） (0.0773ms)
+✔ X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除 (0.5778ms)
+✔ X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.1326ms)
+✔ X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.1565ms)
+✔ X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.1144ms)
+✔ X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.0825ms)
+✔ X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变 (0.3899ms)
+✔ X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变 (0.3413ms)
+✔ D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致 (0.1444ms)
+✔ D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确 (0.2203ms)
+✔ D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id） (0.1244ms)
+✔ D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判） (0.0768ms)
+✔ D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环 (0.8596ms)
+✔ D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生 (0.0905ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 552.458

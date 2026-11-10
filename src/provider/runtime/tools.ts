@@ -59,10 +59,12 @@ import type {
   VersionChangeTargetSubmission,
   SelectRunChangeInput, CompleteTeamPlanInput, ActivateRoleDocumentsInput, CloseCreatedTaskInput,
   DecidePendingRequestInput, DecidePendingRequestFn, ChiefDecisionExecutionContext,
+  WorkflowAction, WorkflowStage, WorkflowPath,
   RuntimeActiveToolFact, RuntimeOwnedProcessFact,
   GitQueryRequest, GitCandidateRequest, GitPublishRequest,
 } from "../../model/runtime.ts";
 import { isDirectActionReceipt, isDirectActionSource, isGitOid, isGitBasis, isGitLiteralPath, isGitCapabilityResult } from "../../model/trunk.ts";
+import { isWorkflowPath, isWorkflowStage } from "../../model/runtime.ts";
 import {
   PLAN_ESCALATION_CATEGORIES,
   PLAN_ESCALATION_SUMMARY_MAX,
@@ -2881,6 +2883,37 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         }
         modulePaths = modulePathsRaw.map((item) => item.trim());
       }
+      // T3（2026-11-10，v1.3 §3.3）：stage-request 载荷骨架——本层只做形状校验与透传，
+      // **不做**来源/目标/阶段转移/副作用等业务校验（由应用 handler/编排按实际工作流模式执行）。
+      // 缺省 = 旧行为；未知/非法值 fail-closed（不猜、不放宽）。
+      const taskKind = readStringArg(call.args, ["taskKind", "task_kind"]);
+      if (taskKind !== undefined && taskKind.trim() === "") {
+        return { ok: false, message: `${name}: taskKind 不能为空字符串` };
+      }
+      const workflowActionRaw = call.args["workflowAction"] ?? call.args["workflow_action"];
+      if (workflowActionRaw !== undefined && workflowActionRaw !== null && workflowActionRaw !== "advance" && workflowActionRaw !== "stop") {
+        return { ok: false, message: `${name}: workflowAction 参数非法（应为 advance/stop）` };
+      }
+      const workflowAction: WorkflowAction | undefined = workflowActionRaw === "advance" || workflowActionRaw === "stop" ? workflowActionRaw : undefined;
+      const workflowPathRaw = call.args["workflowPath"] ?? call.args["workflow_path"];
+      if (workflowPathRaw !== undefined && workflowPathRaw !== null && !isWorkflowPath(workflowPathRaw)) {
+        return { ok: false, message: `${name}: workflowPath 参数非法（应为 A/B）` };
+      }
+      const workflowPath: WorkflowPath | undefined = isWorkflowPath(workflowPathRaw) ? workflowPathRaw : undefined;
+      const workflowId = readStringArg(call.args, ["workflowId", "workflow_id"]);
+      if (workflowId !== undefined && (workflowId.trim() === "" || workflowId.length > 200)) {
+        return { ok: false, message: `${name}: workflowId 参数非法（应为 1–200 字符的非空字符串）` };
+      }
+      const stageRaw = call.args["stage"];
+      if (stageRaw !== undefined && stageRaw !== null && !isWorkflowStage(stageRaw)) {
+        return { ok: false, message: `${name}: stage 参数非法（应为 A1–A13（含 A12a/A12b）或 B1–B4）` };
+      }
+      const stage: WorkflowStage | undefined = isWorkflowStage(stageRaw) ? stageRaw : undefined;
+      const reworkOfRaw = call.args["reworkOf"] ?? call.args["rework_of"];
+      if (reworkOfRaw !== undefined && reworkOfRaw !== null && !isWorkflowStage(reworkOfRaw)) {
+        return { ok: false, message: `${name}: reworkOf 参数非法（应为被打回的具体阶段 A1–A13（含 A12a/A12b）或 B1–B4）` };
+      }
+      const reworkOf: WorkflowStage | undefined = isWorkflowStage(reworkOfRaw) ? reworkOfRaw : undefined;
       const payload: DispatchTaskPayload = {
         ...(expectedResume ? { resumeController: expectedResume } : {}),
         ...(expectedReview !== undefined ? { reviewTarget: expectedReview } : {}),
@@ -2893,6 +2926,12 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
         ...(moduleId !== undefined ? { moduleId } : {}),
         ...(modulePaths !== undefined ? { modulePaths } : {}),
+        ...(taskKind !== undefined ? { taskKind } : {}),
+        ...(workflowAction !== undefined ? { workflowAction } : {}),
+        ...(workflowPath !== undefined ? { workflowPath } : {}),
+        ...(workflowId !== undefined ? { workflowId } : {}),
+        ...(stage !== undefined ? { stage } : {}),
+        ...(reworkOf !== undefined ? { reworkOf } : {}),
         ...governance.value,
       };
 
@@ -3135,7 +3174,7 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
         }
       }
       const taskKindRaw = readStringArg(call.args, ["taskKind", "task_kind"]);
-      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell"
+      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell" || taskKindRaw === "stage-request"
         ? taskKindRaw
         : undefined;
       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);

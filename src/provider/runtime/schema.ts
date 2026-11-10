@@ -1,5 +1,5 @@
 // Public ANS JSON Schema and descriptions. No SDK imports. Owner: 运行时核心.
-import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX } from "../../model/runtime.ts";
+import { CONTRACT_SCHEMA_TOPICS, GOVERNANCE_SLUG_PATTERN, PLAN_ESCALATION_CATEGORIES, PLAN_ESCALATION_SUMMARY_MAX, REFACTOR_SCOPE_ITEMS_MAX, RUN_CHANGE_MODES, STABLE_WRITE_CONTENT_MAX_CHARS, VCA_SUBMISSION_PATH_MAX_CHARS, VCA_SUBMISSION_TARGETS_MAX, WORKFLOW_STAGES } from "../../model/runtime.ts";
 import {
   AMENDMENT_ID_PATTERN,
   REFACTOR_REASON_MAX,
@@ -57,7 +57,7 @@ function directCapabilityDescription(name: string): ToolDescription | undefined 
     close_created_task: { parameters: object({ operationId: text, taskId: text, runId: text, basisDigest: digest,
       reportRef: snapshot, outcome: { type: "string", enum: ["accepted", "rework", "rejected"] }, note: reason },
       ["operationId", "taskId", "runId", "basisDigest", "reportRef", "outcome"]),
-      description: "chief/convener仅能收口本人创建的任务；应用核task.created.from、当前报告/run/依据与合法状态后写真实收口事件。取消不属于收口判定。" },
+      description: "chief/convener仅能收口本人创建的任务；应用核task.created.from、当前报告/run/依据与合法状态后写真实收口事件。取消不属于收口判定。应用按实际工作流模式核验必填字段：未启用固定路径时 runId/basisDigest/reportRef 必填不变；固定路径模式（由编排启用后）只要求 operationId/taskId/outcome，真实创建者/报告/状态/幂等仍由应用核验。" },
     decide_pending_request: { parameters: object({ requestId: text, baseDigest: digest,
       delegationRevision: { type: "integer", minimum: 0 }, reason,
       disposition: { type: "string", enum: ["select", "reject", "revise"] },
@@ -692,6 +692,45 @@ export function describeTool(name: string): ToolDescription {
             maxItems: 20,
             description: "2026-10-29 (v2.20): module path array (normal modules single-element; fixed env/entry modules may be multi-path). The application derives canonical paths from the roster and verifies target ownership.",
           },
+          // T3（2026-11-10 两条固定工作流路径，v1.3 §3.3/§3.5）：以下为**可选**字段，schema 文案保持模式中立
+          // （固定路径特有的来源/目标纪律由角色 context / chief-workflow-v2 提供）；字段本身不构成授权，
+          // 缺省 = 旧行为，实际校验在应用 handler/编排。
+          taskKind: {
+            type: "string",
+            enum: ["stage-request"],
+            description:
+              "Optional task-kind sub-mode. `stage-request` is a workflow coordination request: read-only, no module/write set; " +
+              "the receiving side must dispatch the actual production task in its own assigned turn. Missing/other values mean a normal dispatch; " +
+              "the application verifies source/target/fields/side effect.",
+          },
+          workflowAction: {
+            type: "string",
+            enum: ["advance", "stop"],
+            description:
+              "Optional workflow action (default `advance`). `stop` only requests pausing/redirecting the workflow; the receiving side stops dispatching, " +
+              "closes open production tasks and reports; it does not roll back Git or documents.",
+          },
+          workflowPath: {
+            type: "string",
+            enum: ["A", "B"],
+            description: "Optional workflow path. Give it on the first advance request; later requests may omit it (the application resolves it from the ledger).",
+          },
+          workflowId: {
+            type: "string",
+            minLength: 1,
+            maxLength: 200,
+            description: "Optional workflow id. May be omitted on the first request (the application generates it deterministically and returns it); required on subsequent requests.",
+          },
+          stage: {
+            type: "string",
+            enum: [...WORKFLOW_STAGES],
+            description: "Optional target stage (A1–A13 incl. A12a/A12b, B1–B4); required for `stage-request`. The application verifies the actual stage transition.",
+          },
+          reworkOf: {
+            type: "string",
+            enum: [...WORKFLOW_STAGES],
+            description: "Optional: the specific stage being reworked (A12b→A11, A6→A5, A3→A2, B2→B1).",
+          },
         },
         required: ["roleId", "task"],
         not: { anyOf: ["workSourceRef", "parentTaskRef", "reviewBasisRef", "reviewControllerRef", "hubRouting", "criteria", "ref", "approved", "approval", "passed"].map(key => ({ required: [key] })) },
@@ -728,6 +767,8 @@ export function describeTool(name: string): ToolDescription {
         "返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。",
         "最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。",
         "B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。",
+        "`taskKind:\"stage-request\"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。",
+        "`workflowAction:\"stop\"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。",
       ],
     };
   }
@@ -796,7 +837,7 @@ export function describeTool(name: string): ToolDescription {
         properties: {
           flowId: { type: "string", description: "Optional flow id; defaults to the active run flow" },
           roleId: { type: "string", description: "Optional role id; only the caller's own role is visible" },
-          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell"], description: "Optional task kind for required schema/fields" },
+          taskKind: { type: "string", enum: ["dispatch", "appointment", "write", "acceptance", "shell", "stage-request"], description: "Optional task kind for required schema/fields" },
           moduleId: { type: "string", description: "Optional module id for path/write-root detail" },
           topic: { type: "string", enum: [...CONTRACT_SCHEMA_TOPICS], description: "Optional schema topic; returns that document's field table and minimal valid YAML example (read-only; no run summary)" },
         },
