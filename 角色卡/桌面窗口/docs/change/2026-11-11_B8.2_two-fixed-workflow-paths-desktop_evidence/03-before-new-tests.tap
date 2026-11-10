@@ -1,0 +1,207 @@
+TAP version 13
+# Subtest: B8.2 自动绑定：convener 缺 workflowId/stage ⇒ 从真实受派 stage-request 任务绑定并创建 fixed 任务（不写 trunk/run）
+not ok 1 - B8.2 自动绑定：convener 缺 workflowId/stage ⇒ 从真实受派 stage-request 任务绑定并创建 fixed 任务（不写 trunk/run）
+  ---
+  duration_ms: 31.1286
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:248:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:266:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: B8.2 自动绑定：convener 连 flowId 都不报 ⇒ workflowId/stage/flowId 全部由受派任务绑定
+not ok 2 - B8.2 自动绑定：convener 连 flowId 都不报 ⇒ workflowId/stage/flowId 全部由受派任务绑定
+  ---
+  duration_ms: 11.773
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:290:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:307:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 真实投递链：stage-request 投递后运营 origin 绑定真实任务，生产派发据其自动绑定 workflowId
+not ok 3 - B8.2 真实投递链：stage-request 投递后运营 origin 绑定真实任务，生产派发据其自动绑定 workflowId
+  ---
+  duration_ms: 84.6641
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:322:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    fixed 派发投递的运营 origin 绑定真实 stage-request 任务
+    + actual - expected
+    
+    + undefined
+    - 't-mwb4l3zc-58d9ef80'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-mwb4l3zc-58d9ef80'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:348:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 绑定失败：无受派任务/伪造 taskId/legacy 受派任务/受派任务 workflow 不在账本 ⇒ workflow-binding-unavailable（零写盘、不回落 legacy）
+not ok 4 - B8.2 绑定失败：无受派任务/伪造 taskId/legacy 受派任务/受派任务 workflow 不在账本 ⇒ workflow-binding-unavailable（零写盘、不回落 legacy）
+  ---
+  duration_ms: 3.8451
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:367:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /workflow-binding-unavailable/. Input:
+    
+    'stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: 'stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:381:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 自报不一致：显式 workflowId 与父任务不一致 ⇒ stage-request-invalid（不采信模型自报）
+not ok 5 - B8.2 自报不一致：显式 workflowId 与父任务不一致 ⇒ stage-request-invalid（不采信模型自报）
+  ---
+  duration_ms: 19.494
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:470:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /stage-request-invalid/. Input:
+    
+    'stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: 'stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:493:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 自报 flowId 不可信：绑定路径以受派任务账本 flowId 为准（不因自报不同拒绝合法派发）
+not ok 6 - B8.2 自报 flowId 不可信：绑定路径以受派任务账本 flowId 为准（不因自报不同拒绝合法派发）
+  ---
+  duration_ms: 9.2559
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:507:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:525:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 回归钉：幕僚 fixed 聊天缺字段负例仍 fail-closed（stage-request 缺 workflowPath / 普通派发缺 workflowId+stage）
+ok 7 - B8.2 回归钉：幕僚 fixed 聊天缺字段负例仍 fail-closed（stage-request 缺 workflowPath / 普通派发缺 workflowId+stage）
+  ---
+  duration_ms: 16.6758
+  type: 'test'
+  ...
+# Subtest: B8.2 fixed 回交：worker→convener 不经 legacy resolve，成功投递（含 convener 忙时续投）；不出现 delivery-child-source-invalid
+not ok 8 - B8.2 fixed 回交：worker→convener 不经 legacy resolve，成功投递（含 convener 忙时续投）；不出现 delivery-child-source-invalid
+  ---
+  duration_ms: 12.934
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:608:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:625:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 fixed 回交自动打开 convener 会话：forced fixed（不按项目聊天解析/不落 legacy 注入）
+not ok 9 - B8.2 fixed 回交自动打开 convener 会话：forced fixed（不按项目聊天解析/不落 legacy 注入）
+  ---
+  duration_ms: 5012.8789
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:661:1'
+  failureType: 'testCodeFailure'
+  error: '等待超时：convener 自动打开并收到回交'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:42:47)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:678:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B8.2 legacy 回交旧路径不变：legacy 子任务（无 workflowId、无 parentTaskRef）仍按旧解析拒绝 delivery-child-source-invalid
+ok 10 - B8.2 legacy 回交旧路径不变：legacy 子任务（无 workflowId、无 parentTaskRef）仍按旧解析拒绝 delivery-child-source-invalid
+  ---
+  duration_ms: 61.7862
+  type: 'test'
+  ...
+# Subtest: B8.2 fixed 回交安全校验失败：角色不匹配 / workflow 已关闭 ⇒ fail-closed 诊断、不误投
+not ok 11 - B8.2 fixed 回交安全校验失败：角色不匹配 / workflow 已关闭 ⇒ fail-closed 诊断、不误投
+  ---
+  duration_ms: 5050.745
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b82\\before-head\\test\\桌面应用\\b82-fixed-workflow-binding-handback.test.ts:715:1'
+  failureType: 'testCodeFailure'
+  error: '等待超时：workflow 关闭诊断'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:42:47)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b82/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b82-fixed-workflow-binding-handback.test.ts:770:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 2
+# fail 9
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10777.2721

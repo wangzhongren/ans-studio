@@ -1,0 +1,6 @@
+# 写集边界（基线 HEAD c38b171；本批只写角色写集 + 记录/测试）
+# git status --porcelain -- src app test
+ M app/desktop/session.ts
+?? test/桌面应用/b82-fixed-workflow-binding-handback.test.ts
+# src diff: 0 行（0 = 零 diff）
+# test/测试 diff: 0 行（0 = 零改动）

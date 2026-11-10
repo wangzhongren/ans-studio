@@ -1,0 +1,17 @@
+# 全量桌面套件失败名 diff（before = HEAD c38b171 / after = 本批工作树；同一命令、同环境并行运行）
+# 计数：before 800 tests/692 pass/98 fail/10 cancelled/0 skipped；after 811 tests/701 pass/100 fail/10 cancelled/0 skipped（after 含新测试 11 条，全 pass）
+
+## after-only（本批新增失败名）
+P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+
+## before-only（after 未出现）
+W20 默认Core/Chat产品真实报告落账并到chief 普通
+W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+
+## 说明
+- W14：Windows 临时目录清理竞态（ENOTEMPTY），HEAD 与本批在隔离复跑中同样失败（before-head 与 after-copy 均复现），非本批引入。
+- P0-2 abort 三态（demo）/ 已 bootstrap（有角色）su 的 gate：二者以仓库根（REPO_ROOT）为项目根；after 全量在 git worktree 中运行 ⇒ run-role 的 git-host 保护要求非 unmanaged ⇒ `runtime-creation-prepared-api-unavailable`（未改动的 src/pipeline/orchestration/run-role.ts:820）；在非 git 的 after-code 副本中两例均 pass（.tmp-b82/after-head 隔离复跑）。属运行目录差异（before 在非 git 归档、after 在 git worktree），非本批代码引入。
+- W20 普通 / W47 select：环境非确定项（W20 在 after 全量通过；W47 在 before 归档与 after 隔离复跑中均出现过），与 B8.1 记录的 12 条环境非确定项同口径，非本批引入。
+- known red #VCA×3 / SessionManager blocked：before/after 同名同数各 1（见 07/08）。
