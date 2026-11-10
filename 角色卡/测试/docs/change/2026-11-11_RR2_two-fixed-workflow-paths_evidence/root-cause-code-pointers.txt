@@ -1,0 +1,5 @@
+Observed: taskKind=stage-request WITHOUT workflowPath/stage from fixed chief chat was accepted and routed as legacy star dispatch.
+app/desktop/session.ts:8846-8860: first-fixed-start exception requires d.taskKind==='stage-request' AND d.workflowPath!==undefined; missing workflowPath ⇒ dispatchMode stays legacy ⇒ routeStarDispatch.
+app/desktop/session.ts:3628-3636 (B6.1): chat session mode fixed (fix verified: chief.workflow.v2.loaded present).
+design v1.3 附录 A §384: workflowPath '首次 advance 请求必填'; dispatch_task JSON schema does not enforce conditional required (model omitted it; app accepted).
+test/桌面应用/b61-chat-entry-fixed.test.ts:380: B6.2 first stage-request test always supplies workflowPath:'A', stage:'A1' ⇒ missing-field fail-open path not covered.
