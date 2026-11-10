@@ -571,6 +571,60 @@ function targetSlots(target: TrunkApplySnapshot): Record<string, { path: string;
     ...Object.entries(target.execution).filter((entry): entry is [string, { path: string; sha256: string }] => entry[1] !== null)
       .map(([key, value]) => [`execution:${key}`, value] as const)]);
 }
+
+// bootstrap 闭合证据装配（T3 W1；P1.1 §3.1）：
+//   files = directRefs(target)（每 kind 至多一个当前版本 target）× versions.jsonl 中全部 event:"frozen"
+//   记录解析出的文件（记录 sha 必须等于磁盘字节）× 已确认意图 × versions.jsonl 本身。
+// manifest 单槽位语义不变；历史冻结版本由账本自动装配、不作为 targets 声明。
+// fail-closed（trunk-item-invalid；全链经 version-change-runtime 映射 vca-target-invalid）：账本坏行/未知 event/
+// 非法 freeze 形状/异 flow 行/`-vN` 后缀与记录版本不符/冻结文件缺失/不可读/漂移/同 path 冲突一律拒绝；
+// 不吞行、不跳过、不从猜测来源补 hash。非 bootstrap 路径不调用本函数（行为逐字不变）。
+const BOOTSTRAP_BASELINE_PATH = ".ans/state/versions.jsonl";
+const BOOTSTRAP_LEDGER_EVENTS: ReadonlySet<string> = new Set(["baseline", "version-added", "frozen", "draft-updated", "draft-marker"]);
+type ProjectFileRef = { path: string; sha256: string };
+type ProjectFileReader = NonNullable<TrunkServiceDeps["store"]["readProjectFile"]>;
+
+async function bootstrapClosureFiles(
+  readProjectFile: ProjectFileReader,
+  input: { flowId: string; direct: ProjectFileRef[]; extras: ProjectFileRef[]; baseline: { bytesBase64: string; sha256: string } },
+): Promise<TrunkServiceResult<ProjectFileRef[]>> {
+  const invalid = (message: string) => fail<ProjectFileRef[]>("trunk-item-invalid", message);
+  const ledger = Buffer.from(input.baseline.bytesBase64, "base64").toString("utf8");
+  const files: ProjectFileRef[] = [...input.direct, ...input.extras, { path: BOOTSTRAP_BASELINE_PATH, sha256: input.baseline.sha256 }];
+  for (const [index, line] of ledger.split(/\r?\n/).entries()) {
+    if (line.trim() === "") continue;
+    let record: unknown;
+    try { record = JSON.parse(line); } catch { return invalid(`Frozen closure record is unreadable/invalid: line ${index + 1}`); }
+    if (!evidenceObject(record) || record.v !== 1 || typeof record.flowId !== "string"
+      || typeof record.path !== "string" || record.path.trim() === ""
+      || !Number.isSafeInteger(record.version) || (record.version as number) < 1
+      || typeof record.sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(record.sha256)
+      || typeof record.event !== "string" || !BOOTSTRAP_LEDGER_EVENTS.has(record.event))
+      return invalid(`Frozen closure record is unreadable/invalid: line ${index + 1}`);
+    if (record.flowId !== input.flowId)
+      return invalid(`Frozen closure record belongs to another flow: ${record.flowId} (line ${index + 1})`);
+    if (record.event !== "frozen") continue;
+    if (!isValidDocFreezeRecord(record.freeze)) return invalid(`Frozen closure record is unreadable/invalid: line ${index + 1}`);
+    const version = record.version as number;
+    // 与门禁 classify-shell 同一路径解析规则（`-vN.md` 原样，否则 `${path}-v${version}.md`）；
+    // 服务侧防御性要求路径后缀版本 === 记录 version（Q7/T18；门禁保持原样使用路径）。
+    const file = /-v\d+\.md$/.test(record.path) ? record.path : `${record.path}-v${version}.md`;
+    if (docVersionOfPath(file) !== version) return invalid(`Frozen closure record version differs from its path: ${file}`);
+    const bytes = await readProjectFile(file);
+    if (!bytes.ok) return invalid(`Frozen closure file is missing/unreadable: ${file}`);
+    if (bytes.value.sha256.toLowerCase() !== record.sha256.toLowerCase()) return invalid(`Frozen closure hash drift: ${file}`);
+    files.push({ path: file, sha256: bytes.value.sha256 });
+  }
+  // 同 path（大小写不敏感，与 captureSnapshot 同口径）多来源必须同 sha；按 path 排序保证重放确定性。
+  const merged = new Map<string, ProjectFileRef>();
+  for (const ref of files) {
+    const path = filePathOfRef(ref.path), key = path.toLowerCase(), sha256 = ref.sha256.toLowerCase();
+    const prior = merged.get(key);
+    if (prior === undefined) { merged.set(key, { path, sha256 }); continue; }
+    if (prior.path !== path || prior.sha256 !== sha256) return invalid(`Frozen closure path conflict: ${path}`);
+  }
+  return { ok: true, value: [...merged.values()].sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0) };
+}
 export async function readEffectiveSnapshot(deps: TrunkServiceDeps): Promise<TrunkServiceResult<{ manifest: TrunkManifest; snapshot: CompleteSnapshot }>> {
   const read = await deps.store.readManifest();
   if (!read.ok) return fail("trunk-unavailable", `effective-manifest-${read.reason}`);
@@ -689,16 +743,20 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
     return reject("direct-bootstrap-evidence-missing", "Initial publication needs real proposal/confirmed-intent bytes, and cannot invent an old run");
   let confirmedIntent: { path: string; sha256: string } | undefined;
   let baselineRef: { path: string; sha256: string } | undefined;
+  let bootstrapBaseline: { bytesBase64: string; sha256: string } | undefined;
+  let readProjectFile: ProjectFileReader | undefined;
   if (!current) {
     await deps.freezeRegistry.refreshSnapshot();
     const intents = (await deps.freezeRegistry.listFreezes()).filter(entry => entry.freeze.reason === "intent-confirmed"
       && (entry.freeze.origin === "customer" || entry.freeze.origin === "chief-delegated" || entry.freeze.origin === "judge-delegated")
       && entry.path.startsWith(`docs/product/${input.flowId}-intent-v`)).sort((a, b) => b.version - a.version);
     if (!intents[0] || !store.readProjectFile) return reject("direct-bootstrap-evidence-missing", "No actual confirmed-intent record");
+    readProjectFile = store.readProjectFile;
     confirmedIntent = { path: intents[0].path, sha256: intents[0].sha256 };
-    const baseline = await store.readProjectFile(".ans/state/versions.jsonl");
+    const baseline = await readProjectFile(BOOTSTRAP_BASELINE_PATH);
     if (!baseline.ok) return reject("direct-bootstrap-evidence-missing", "Confirmed-intent baseline bytes unavailable");
-    baselineRef = { path: ".ans/state/versions.jsonl", sha256: baseline.value.sha256 };
+    baselineRef = { path: BOOTSTRAP_BASELINE_PATH, sha256: baseline.value.sha256 };
+    bootstrapBaseline = baseline.value;
   }
   const target = mergeTarget({ ...input, source: input.kind === "version-upgrade" ? "upgrade" : "amendment",
     baseTrunkVersion: current?.trunkVersion ?? null, runId: current?.runId ?? null }, current, (current?.trunkVersion ?? 0) + 1);
@@ -734,9 +792,20 @@ async function executeDirectInternal(deps: TrunkServiceDeps, input: TrunkDirectA
       amendmentRef = { path: input.amendmentDocPath, sha256: amendmentBytes.value.sha256 };
     }
   }
+  // bootstrap 的完整快照按闭合证据集合装配（P1.1 §3.1.3）；两处捕获共用 bootstrapClosureFiles。
+  // 非 bootstrap 路径保持逐字不变（仅 directRefs + 修正案/意图/baseline 原样）。
+  const extras: ProjectFileRef[] = [...(amendmentRef ? [amendmentRef] : []), ...(confirmedIntent ? [confirmedIntent] : [])];
+  let bootstrapFiles: ProjectFileRef[] | undefined;
+  if (input.preparedSnapshotRef === undefined && !current) {
+    if (readProjectFile === undefined || bootstrapBaseline === undefined)
+      return reject("direct-bootstrap-evidence-missing", "Confirmed-intent baseline bytes unavailable");
+    const closure = await bootstrapClosureFiles(readProjectFile, { flowId: input.flowId, direct: directRefs(target), extras, baseline: bootstrapBaseline });
+    if (!closure.ok) return reject("vca-target-invalid", closure.message ?? closure.code);
+    bootstrapFiles = closure.value;
+  }
   const captured = input.preparedSnapshotRef !== undefined ? { ok: true as const, value: input.preparedSnapshotRef }
     : await store.captureSnapshot({ snapshotId: `s-${directHash([input.flowId, input.operationId])}`, createdAt: input.at,
-    files: [...directRefs(target), ...(amendmentRef ? [amendmentRef] : []), ...(confirmedIntent ? [confirmedIntent] : []), ...(baselineRef ? [baselineRef] : [])], ...(current?.snapshotRef ? { baseSnapshotRef: current.snapshotRef } : {}) });
+    files: bootstrapFiles ?? [...directRefs(target), ...extras, ...(baselineRef ? [baselineRef] : [])], ...(current?.snapshotRef ? { baseSnapshotRef: current.snapshotRef } : {}) });
   if (!captured.ok) return reject("vca-hash-drift", captured.message ?? captured.reason);
   const complete = await store.readSnapshot(captured.value);
   if (!complete.ok) return reject("direct-evidence-missing", complete.message ?? complete.reason);
@@ -1292,6 +1361,7 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
     || actor !== (input.kind === "version-upgrade" ? "product" : input.kind === "detail-amendment" ? "rapporteur" : undefined))
     return invalid("Direct submission requires a trusted action owner, operation id and explicit expected base");
   if (!store.readProjectFile || !store.captureSnapshot || !store.readSnapshot) return invalid("Complete storage is unavailable");
+  const readProjectFile = store.readProjectFile;
   try {
     const read = await readDirectPublicationManifest(store, input.flowId, input.baseTrunk);
     if (!read.ok && read.reason !== "missing") return invalid(`effective-manifest-${read.reason}`);
@@ -1299,32 +1369,42 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
     // The first run remains absent; legacy run data is never materialised from live role files.
     const target: TrunkApplySnapshot = current ? snapshotOfManifest(current) : { trunkVersion: 1, runId: null, documents: {}, execution: { teamPlan: null, flow: null }, roleCards: {}, boundaries: {} };
     const oldSlots = targetSlots(target), expectedFrom: Array<{ path: string; sha256: string | null }> = [], seen = new Set<string>();
+    const bootstrapSlots = new Set<string>();
     for (const draft of input.targets) {
       if (seen.has(draft.path) || draft.expectedFromSha256 === undefined || (draft.action !== "add" && draft.action !== "modify")) return invalid("Duplicate target or missing expected original hash");
       seen.add(draft.path);
-      const bytes = await store.readProjectFile(draft.path);
+      const bytes = await readProjectFile(draft.path);
       if (!bytes.ok) return invalid(`Target is unreadable: ${draft.path}`);
+      const ref = { path: draft.path, sha256: bytes.value.sha256 };
       const doc = /-(proposal|modules|topology|architecture|assets|roster)-v[1-9]\d*\.md$/i.exec(draft.path)?.[1]?.toLowerCase() as TrunkDocKind | undefined;
-      let slot: string;
+      let slot: string, docSlot: TrunkDocKind | undefined, flowVersion: number | undefined;
       if (doc !== undefined && (doc === "roster" ? draft.kind === "roster" : draft.kind === "contract")) {
-        slot = `doc:${doc}`; target.documents[doc] = { path: draft.path, sha256: bytes.value.sha256 };
+        slot = `doc:${doc}`; docSlot = doc;
       } else if (draft.kind === "execution" && /^docs\/scheduling\//.test(draft.path)) {
-        slot = "execution:teamPlan"; target.execution.teamPlan = { path: draft.path, sha256: bytes.value.sha256 };
+        slot = "execution:teamPlan";
       } else if (draft.kind === "execution" && /^docs\/flows\//.test(draft.path)) {
-        slot = "execution:flow";
         let flow: unknown; try { flow = parseYaml(Buffer.from(bytes.value.bytesBase64, "base64").toString("utf8")); } catch { flow = undefined; }
         if (!evidenceObject(flow) || !Number.isSafeInteger(flow.version) || (flow.version as number) < 1) return invalid("Flow document has no actual valid version");
-        target.execution.flow = { path: draft.path, sha256: bytes.value.sha256, version: flow.version as number };
+        slot = "execution:flow"; flowVersion = flow.version as number;
       } else return invalid("Target kind/path differs from the author responsibility");
+      // M1（P1.1 §3.1.1）：bootstrap 只接受每 kind 一个当前版本 target；历史冻结版本由 R9 账本自动装配，
+      // 不得作为 targets 声明。明确拒绝，不 last-wins、不静默取最高（非 bootstrap 仍由既有槽位/expectedFrom 计数拒绝）。
+      if (!current && bootstrapSlots.has(slot))
+        return invalid(`Bootstrap accepts at most one target per document slot; historical versions are assembled from R9 and must not be declared as targets: ${slot} (${draft.path})`);
+      bootstrapSlots.add(slot);
+      if (docSlot !== undefined) target.documents[docSlot] = ref;
+      else if (slot === "execution:teamPlan") target.execution.teamPlan = ref;
+      else target.execution.flow = { ...ref, version: flowVersion! };
       const old = oldSlots[slot];
       if (draft.expectedFromSha256 !== (old?.sha256 ?? null) || (draft.from !== undefined && draft.from !== old?.path)) return invalid("Expected original reference differs from the actual effective baseline");
       if (!old || old.path !== draft.path || old.sha256 !== bytes.value.sha256) expectedFrom.push({ path: draft.path, sha256: draft.expectedFromSha256 });
     }
     const extra: Array<{ path: string; sha256: string }> = [];
     if (input.amendmentDocPath !== undefined) {
-      const bytes = await store.readProjectFile(input.amendmentDocPath); if (!bytes.ok) return invalid("Amendment is unreadable");
+      const bytes = await readProjectFile(input.amendmentDocPath); if (!bytes.ok) return invalid("Amendment is unreadable");
       extra.push({ path: input.amendmentDocPath, sha256: bytes.value.sha256 });
     }
+    let bootstrapFiles: Array<{ path: string; sha256: string }> | undefined;
     if (!current) {
       await deps.freezeRegistry.refreshSnapshot();
       const intent = (await deps.freezeRegistry.listFreezes()).filter(entry => entry.freeze.reason === "intent-confirmed"
@@ -1332,11 +1412,13 @@ export async function prepareDirectSubmission(deps: TrunkServiceDeps, input: Sub
         .sort((a, b) => b.version - a.version)[0];
       if (!intent) return invalid("Initial publication lacks actual confirmed-intent evidence");
       extra.push({ path: intent.path, sha256: intent.sha256 });
-      const baseline = await store.readProjectFile(".ans/state/versions.jsonl"); if (!baseline.ok) return invalid("Intent baseline bytes are unavailable");
-      extra.push({ path: ".ans/state/versions.jsonl", sha256: baseline.value.sha256 });
+      const baseline = await readProjectFile(BOOTSTRAP_BASELINE_PATH); if (!baseline.ok) return invalid("Intent baseline bytes are unavailable");
+      const closure = await bootstrapClosureFiles(readProjectFile, { flowId: input.flowId, direct: directRefs(target), extras: extra, baseline: baseline.value });
+      if (!closure.ok) return invalid(closure.message ?? closure.code);
+      bootstrapFiles = closure.value;
     }
     const captured = await store.captureSnapshot({ snapshotId: `s-${directHash([input.flowId, input.operationId])}`, createdAt: (deps.now ?? (() => new Date()))().toISOString(),
-      files: [...directRefs(target), ...extra], ...(current?.snapshotRef ? { baseSnapshotRef: current.snapshotRef } : {}) });
+      files: bootstrapFiles ?? [...directRefs(target), ...extra], ...(current?.snapshotRef ? { baseSnapshotRef: current.snapshotRef } : {}) });
     if (!captured.ok) return invalid(captured.message ?? captured.reason);
     const snapshot = await store.readSnapshot(captured.value); if (!snapshot.ok) return invalid(snapshot.message ?? snapshot.reason);
     let amendmentItems;

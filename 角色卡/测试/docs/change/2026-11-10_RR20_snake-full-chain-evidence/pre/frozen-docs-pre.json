@@ -1,0 +1,58 @@
+[
+  {
+    "path": "docs/contracts/snake-game-architecture-v1.md",
+    "expected": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+    "actual": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+    "bytes": 7554,
+    "match": true
+  },
+  {
+    "path": "docs/contracts/snake-game-architecture-v2.md",
+    "expected": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+    "actual": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+    "bytes": 8269,
+    "match": true
+  },
+  {
+    "path": "docs/product/snake-game-intent-v1.md",
+    "expected": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+    "actual": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+    "bytes": 9630,
+    "match": true
+  },
+  {
+    "path": "docs/proposals/snake-game-modules-v1.md",
+    "expected": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+    "actual": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+    "bytes": 1750,
+    "match": true
+  },
+  {
+    "path": "docs/proposals/snake-game-proposal-v1.md",
+    "expected": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+    "actual": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+    "bytes": 11973,
+    "match": true
+  },
+  {
+    "path": "docs/proposals/snake-game-proposal-v2.md",
+    "expected": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+    "actual": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+    "bytes": 15008,
+    "match": true
+  },
+  {
+    "path": "docs/proposals/snake-game-roster-v1.md",
+    "expected": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+    "actual": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+    "bytes": 3286,
+    "match": true
+  },
+  {
+    "path": "docs/proposals/snake-game-roster-v2.md",
+    "expected": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a",
+    "actual": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a",
+    "bytes": 5069,
+    "match": true
+  }
+]

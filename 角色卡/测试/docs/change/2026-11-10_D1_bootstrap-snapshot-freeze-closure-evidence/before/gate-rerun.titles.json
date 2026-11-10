@@ -1,0 +1,23 @@
+{
+  "file": "角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure-evidence/before/gate-rerun.tap.txt",
+  "summary": {
+    "tests": 472,
+    "pass": 466,
+    "fail": 5,
+    "cancelled": 0,
+    "skipped": 1,
+    "todo": 0
+  },
+  "failCount": 5,
+  "skipCount": 1,
+  "failTitles": [
+    "D-10：质检卡保留可选质量核对与截图上限，不要求录屏",
+    "listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留",
+    "listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告",
+    "卡文本：运营负责落盘工作流，幕僚不再被暗示为写者",
+    "渲染过滤：section=roles/routing 与注册表展示字段出现在文本中"
+  ],
+  "skipTitles": [
+    "unreadable（权限）：文件不可读 → status=unreadable、actual=null"
+  ]
+}

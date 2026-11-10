@@ -1,0 +1,30 @@
+{
+  "at": "2026-11-09T21:57:00.245Z",
+  "ledgerCopy": {
+    "path": "evidence/pre/source-ledger-tasks.jsonl",
+    "bytes": 3383,
+    "lines": 1,
+    "sha256": "91946bf5df2711e9c43e6beb0c4535c5b32f03de9d3ed2dae07c0713e43e41b8",
+    "equalsSource": true
+  },
+  "sessionsMove": {
+    "from": "../round8/target/.ans/sessions",
+    "to": "evidence/pre/sessions-source",
+    "filesBefore": 15,
+    "bytesBefore": 3524131,
+    "filesAfter": 15,
+    "bytesAfter": 3524131,
+    "allHashesMatch": true,
+    "sourceDirStillExists": false
+  },
+  "ledgerReset": {
+    "sourceBytes": 3383,
+    "sourceLines": 1,
+    "sourceSha256": "91946bf5df2711e9c43e6beb0c4535c5b32f03de9d3ed2dae07c0713e43e41b8",
+    "newBytes": 0,
+    "newSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "disclosure": "re-done ledger reset to empty pre-run fixture for RR20 clean-copy construction"
+  },
+  "frozenDocsAllMatch": true,
+  "under16MiB": true
+}

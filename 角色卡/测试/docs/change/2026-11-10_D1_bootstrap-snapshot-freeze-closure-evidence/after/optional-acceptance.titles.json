@@ -1,0 +1,20 @@
+{
+  "file": "角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure-evidence/after/optional-acceptance.tap.txt",
+  "summary": {
+    "tests": 6,
+    "pass": 2,
+    "fail": 1,
+    "cancelled": 3,
+    "skipped": 0,
+    "todo": 0
+  },
+  "failCount": 4,
+  "skipCount": 0,
+  "failTitles": [
+    "§5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底",
+    "§5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板",
+    "幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚",
+    "开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发"
+  ],
+  "skipTitles": []
+}

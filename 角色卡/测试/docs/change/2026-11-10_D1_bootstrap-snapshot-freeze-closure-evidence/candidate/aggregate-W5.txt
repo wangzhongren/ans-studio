@@ -1,0 +1,1 @@
+f949bfa4cb4723344c7c87fd475d2d6d804c4019032f8e2d7b7f05c216373338  test/测试/bootstrap-frozen-closure-integration.test.ts

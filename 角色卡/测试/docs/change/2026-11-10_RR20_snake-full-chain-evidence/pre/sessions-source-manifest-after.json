@@ -1,0 +1,81 @@
+{
+  "files": 15,
+  "bytes": 3524131,
+  "entries": [
+    {
+      "rel": "chief/claude/ans/index.json",
+      "bytes": 253,
+      "sha256": "3d743df06e7718ebb31eb047a54615b5891dfd633e547b2964ab5b3229b1a37c"
+    },
+    {
+      "rel": "chief/claude/ans/replay.jsonl",
+      "bytes": 59819,
+      "sha256": "d4d79ea6be321c9ea4a71db72d492bb8d8f149f128efc9333f7cb9668859177d"
+    },
+    {
+      "rel": "chief/claude/native/.claude.json",
+      "bytes": 62910,
+      "sha256": "5542ce28e57d20a37663bf0f653d7c15c1c2708c2b5289a1a60b7f85d10b5313"
+    },
+    {
+      "rel": "chief/claude/native/.last-cleanup",
+      "bytes": 24,
+      "sha256": "7f682ef1c52f9b5aa40762b35aa038d731934c2e9f755214d7c5ad2b510352ad"
+    },
+    {
+      "rel": "chief/claude/native/backups/.claude.json.backup.1794253294243",
+      "bytes": 84,
+      "sha256": "320d9bb481abaf51ef709227ef0ac3508622bc8c9d8d85ef46240a2d1b8c8dfd"
+    },
+    {
+      "rel": "chief/claude/native/projects/C--Users-51054-Desktop-work-ans-snake-fullchain-run-2026-11-10-round8-target/26490aa4-b241-4dce-85e8-f3c8bfbfb037.jsonl",
+      "bytes": 303128,
+      "sha256": "48c8761357ecbbfcec71d4e93c2ebda934475ca11fb4250f296042ed3330e76e"
+    },
+    {
+      "rel": "product/claude/ans/index.json",
+      "bytes": 198,
+      "sha256": "8039b453e7a03a073e6ad6d1fb7ad5a0fa56d6cf6d35dbf9cb6275af747afb94"
+    },
+    {
+      "rel": "product/claude/ans/replay.jsonl",
+      "bytes": 83713,
+      "sha256": "2f7c9a9e5bd03a5c7226aee9fe5028eced53a85fd4e3d912f7a64137e48be5d8"
+    },
+    {
+      "rel": "product/claude/native/.claude.json",
+      "bytes": 62909,
+      "sha256": "352a9158773a9c8067ba55df0869f6d43f16b85d3637c5f81bd96a7ba1045c6c"
+    },
+    {
+      "rel": "product/claude/native/.last-cleanup",
+      "bytes": 24,
+      "sha256": "219d12cffe08177f9cb140ce0b42a811fc9e38e4c2dbd77c55bde19f93c95c84"
+    },
+    {
+      "rel": "product/claude/native/backups/.claude.json.backup.1794253325694",
+      "bytes": 84,
+      "sha256": "1bca91f4b7a23cfce2758d2c92fc93d930369fee24d850d1c6b5eda8a052eb08"
+    },
+    {
+      "rel": "product/claude/native/plugins/plugin-directory-cache-v2.json",
+      "bytes": 2725500,
+      "sha256": "0ee8a58021a7a9559e2fad787b860ad9ed2c4ae7fb84f32da8678c2033da08c4"
+    },
+    {
+      "rel": "product/claude/native/projects/C--Users-51054-Desktop-work-ans-snake-fullchain-run-2026-11-10-round8-target/1a90b30e-49d5-46df-a074-010d5902d5ed.jsonl",
+      "bytes": 224761,
+      "sha256": "595e05be9a260de76a1a5ceee26a3070764457790168153caa6cee18b922ce0d"
+    },
+    {
+      "rel": "product/claude/native/sessions/11376.1ab7c25c0beb83ccfc479a16ac8f47dfa09af400741b956f89c155dbe4503e00.key",
+      "bytes": 119,
+      "sha256": "19bbd72247f6d103943bafdf5b1656b22930f3083bdcfbef6bae3bda787a1ccb"
+    },
+    {
+      "rel": "product/claude/native/sessions/11376.json",
+      "bytes": 605,
+      "sha256": "8eaea8cf57ac3ce1aab32edb2f45996ee030a1bcd16506912dffd9cdc297997e"
+    }
+  ]
+}

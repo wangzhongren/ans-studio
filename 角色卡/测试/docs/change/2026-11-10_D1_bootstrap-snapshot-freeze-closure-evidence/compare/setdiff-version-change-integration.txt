@@ -1,0 +1,7 @@
+== version-change-integration ==
+before summary {"tests":12,"pass":3,"fail":9,"cancelled":0,"skipped":0,"todo":0}
+after summary {"tests":12,"pass":3,"fail":9,"cancelled":0,"skipped":0,"todo":0}
+fail only-before(0): []
+fail only-after(0): []
+skip only-before(0): []
+skip only-after(0): []

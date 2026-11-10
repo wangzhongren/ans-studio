@@ -1,0 +1,3 @@
+manifest_initial_vs_final=IDENTICAL
+aggregate_initial_vs_final=IDENTICAL
+baseline_vs_worktree_manifest_cmp_exit=1 (expected nonzero: 5 candidate rows)

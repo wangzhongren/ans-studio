@@ -1,0 +1,14 @@
+== git status --porcelain -- src app test (at evidence collection) ==
+ M "src/common/\351\227\250\347\246\201\345\274\225\346\223\216/classify-shell.ts"
+ M src/service/trunk/impl/apply-journal.ts
+?? "test/\347\274\226\346\216\222/bootstrap-frozen-closure.test.ts"
+?? "test/\351\227\250\347\246\201\345\274\225\346\223\216/freeze-closure.test.ts"
+
+== sha256 apply-journal.ts (W1 编排 concurrent in-flight; NOT this batch) ==
+d0a3fdf27bcdada86258406d73e7ff630543f3f9c5b0585f14b9ef4629430cd4 *src/service/trunk/impl/apply-journal.ts
+
+== sha256 test/编排/bootstrap-frozen-closure.test.ts (W1 concurrent; NOT this batch) ==
+3228020b35b6bb4eeb031e95f5fa5a09a9152bc525ce3a5ff8da15ebb622ca1f *test/编排/bootstrap-frozen-closure.test.ts
+
+== sha256 test/门禁引擎/git-shell-acl.test.ts (this batch: unchanged) ==
+7652d171c3c5e1fc32d85fbf3d9c5bc0c6a8cbd224d7c581a62d17fdbc19a6e4 *test/门禁引擎/git-shell-acl.test.ts

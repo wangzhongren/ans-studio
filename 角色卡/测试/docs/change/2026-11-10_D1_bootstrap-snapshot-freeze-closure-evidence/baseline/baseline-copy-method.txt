@@ -1,0 +1,9 @@
+Baseline copy method (BASE-3 before side)
+1) git worktree add --detach C:/Users/51054/AppData/Local/Temp/ans-d1-baseline-0ab2584 0ab2584 (same autocrlf=true checkout filters as worktree)
+2) node_modules: mklink /J junction to worktree node_modules; .env copied
+3) Pristine checkout classify-shell.ts raw SHA-256 = a98f09e42b10d88a8d18ad26a1f37284a1435880be11df3e3f18babafdc9e7c1 = W2 record pre value (match)
+4) Pristine checkout apply-journal.ts raw SHA-256 = 4060decd5357ab7d54ab4f94228d38212c3a5e4d9c0241a9af6719371d25ee45
+5) Per-file EOL replication (prior D1 method): all files under src/app/test EXCEPT the 5 candidate files were overwritten with worktree bytes; the 2 modified product files stay at pristine HEAD checkout; 3 new test files absent (verified).
+6) Manifest diff baseline-aligned vs worktree = exactly 5 candidate rows (2 hash changes + 3 additions); see compare/manifest-baseline-vs-worktree.diff
+7) Pristine-checkout full 编排 run produced 1 extra failure ('wiring guards ...') because the test slices trunk-runtime.ts with a literal \n anchor and the pristine checkout is CRLF; aligned copy is authoritative (matches W1 before 1164/1140/22/2). See compare/setdiff-bianpai-pristine-vs-aligned.txt.
+8) Note: baseline worktree 'git status' shows stat-dirty entries for replicated files (LF bytes vs autocrlf stat cache); content verification: git hash-object == HEAD blob and git diff --quiet exit 0 for sampled files; test runtime reads the replicated worktree bytes.

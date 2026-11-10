@@ -1,0 +1,26 @@
+RR20 授权原文（协调方 2026-11-10，经 ae5cbccceecf802dd 送达）
+
+协调方已授权 RR20（bootstrap 快照/冻结闭包修复后的真实运行，按 B1 建议预算）。请在同一 round8 target 再次清理并运行，写新记录/证据，不覆盖 RR19。
+
+## 再次清理（同根，保留 repoId/init operation）
+- 将当前 `.ans/sessions` 移到 `round20/evidence/pre/sessions-source/`（不删除；记录前后 fileCount/bytes/hash）。
+- 当前账本（RR19 后）另存 `round20/evidence/pre/source-ledger-tasks.jsonl`（bytes/lines/hash），随后 `round8/target/.ans/state/tasks.jsonl` 重置为空（0 B / `e3b0c442…`）。
+- 保留 docs（roster-v2/team-v2/冻结 v1 等）、`.ans/trunk` git init 产物/operations/git-init-process、versions.jsonl/doc-freezes/init-source；核对冻结文档/init/repoId/候选 ref 未变；原 target 只读；披露「再次账本重置/会话剥离」；RR19 残留 draft run/`s-9fbf9c81…` 保留并披露，不复用。
+- 清理后清单 <16 MiB、账本空、无 legacy moduleDirectory；避免全树递归大哈希。
+
+## 真实运行（关键）
+- 真实 Electron（本 worktree `app/main.ts`，含修复候选 W1/W2/W5）+ 真实模型（deepseek-v4-flash，非 Anthropic）+ 真实 UI；隔离 `round20/userData`；CDP **仅 9223**；9222/其它根零触碰。
+- 1 条客户消息必须含：
+  - run_shell 强禁令（Git 信息只用 `git_query`；status/log 优先，例行查询 ≤3，避免不必要 rev-parse/branch-list）。
+  - **4-target 标准 bootstrap VCA**：`submit_version_change`（version-upgrade/detail-amendment，`baseTrunk:null`；targets 仅 proposal v2/modules v1/roster v2/architecture v2；**expectedFromSha256 全部 null**；**新 operationId `…-02`**，不得复用 RR19 `s-9fbf9c81…`）；应用自动装配 9 文件（8 frozen 含 intent v1 + versions）；candidate/publication allowed；t1。
+  - 成功后：effective trunk → `request_stable_write`（`docs/workflow.md`，stable-write 卡显式 approve）→ 初始 workflow 发布 → 团队计划（`docs/scheduling/snake-game-team-v2.md`，无 base/sha/runId）→ run pin → 任命 D3（客户确认名单）→ nominator 角色卡/激活 → 工作流 → 实现 → **出游戏或下一门**。
+- 驱动规则：run_shell 0；只读 git_query 不停止；变更/门工具（submit_version_change/request_stable_write/complete_team_plan/git_candidate/git_publish/activate_role_documents/select_run_change/submit_report）blocked/failed 立即停止；stable-write 显式 approve；不按 recommended 代选；真实卡 ≤4；不预置/不篡改。
+- 预算：客户消息 1（+1 仅合法客户决策）；卡 ≤4；派发 ≤8；chief ≤8；convener ≤3；product/impl ≤4；其它角色各 ≤3；Git ≤8；墙钟 ≤45 分钟；首果即停；不自动重试、不追加。
+- 严禁伪造：不手写 trunk/manifest、不造角色卡/激活、不绕过门、不手改冻结/run manifest；账本重置/会话移动仅副本准备并如实披露；无受支持路径则停门如实回报。
+
+## 记录/证据（attestation）
+- 新记录 `角色卡/测试/docs/change/2026-11-10_RR20_snake-full-chain.md`（行数/字节/SHA-256）+ 新证据目录 `2026-11-10_RR20_snake-full-chain-evidence/`（`evidence-manifest.txt` 可复算）；绑定 RR19 `a4a90ebe…`、B1 `9b7fa81c…`、B2 `6a91eb14…`、D1 `2d88b40d…`、W1/W2/W5、协调方授权原文、prepare-report/manifest、原 target 114/114。
+- 证据：再次清理/源账本/会话/重置披露；VCA targets/expectedFrom:null/新 op/9 文件快照/candidate+publication allowed/t1 原件；stable-write/发布/团队计划/run pin/任命 D3/角色卡激活/工作流/实现/游戏或下一门回执原文；卡/消息/Git/run_shell（应 0）/预算；原 target/9222/9223/其它根零触碰；worktree HEAD/候选稳定（5 文件聚合 `e99f7cb4…`）；模型实际名。
+
+## 交付
+回报：走到哪一步、bootstrap/trunk/发布/团队计划/任命/实现/游戏或下一门的回执原文、预算偏差、隔离/零触碰、模型、记录/证据 hash、限制。只取证；不改仓库代码/测试/角色卡/其它文档；不提交/推送。

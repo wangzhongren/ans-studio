@@ -1,0 +1,13 @@
+371:  check(Array.isArray(records) && Array.isArray(permits) && records.length <= 2048 && permits.length <= 2048
+752:    check(fact && gitOid(fact.commit, format) && gitOid(fact.tree, format) && Array.isArray(fact.entries) && fact.entries.length <= 2048, "git-policy-revert-object");
+801:    && sameGitOid(grant.candidate, observation.target) && /^[a-f0-9]{64}$/i.test(grant.evidenceDigest) && Array.isArray(grant.paths) && grant.paths.length > 0 && grant.paths.length <= 128
+816:      && gitOid(plan.commit.tree, format) && Array.isArray(plan.baseTree) && plan.baseTree.length <= 2048 && (input.base !== null || plan.baseTree.length === 0), "git-policy-raw-basis");
+833:          && Array.isArray(grant.paths) && grant.paths.length > 0 && grant.paths.length <= 128
+837:    policyRequire(Array.isArray(input.files) && input.files.length <= 128 && typeof input.message === "string" && input.message.trim().length > 0 && input.message.length <= 4000, "git-policy-raw-input");
+850:      const content = policyBytes(file.bytesBase64); total += content.length; policyRequire(content.length <= 1024 * 1024 && total <= 4 * 1024 * 1024, "git-policy-raw-byte-budget");
+854:    policyRequire(after.size <= 2048, "git-policy-raw-tree-budget");
+931:    const validFiles = (files: GitDeliveryTaskSource["files"]) => Array.isArray(files) && files.length > 0 && files.length <= 128
+961:      check(Array.isArray(entries) && entries.length <= 2048, "git-policy-delivery-tree");
+1086:        || !Array.isArray(facts.allDiff.entries) || facts.allDiff.entries.length > 2048) return deny("git-policy-incomplete-diff");
+1162:// `shell-command-guard.ts` 的 inline-too-large 同口径（2048B / 10 行 / 单行 1024B）。
+1163:export const SHELL_INLINE_SHORT_MAX_COMMAND_BYTES = 2048;

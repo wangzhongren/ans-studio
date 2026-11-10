@@ -1,0 +1,11 @@
+{
+  "operationId": "w5-t3-missing",
+  "service": {
+    "code": "trunk-item-invalid",
+    "message": "Frozen closure file is missing/unreadable: docs/proposals/demo-proposal-v1.md"
+  },
+  "fullChain": {
+    "errorCode": "vca-target-invalid",
+    "message": "Frozen closure file is missing/unreadable: docs/proposals/demo-proposal-v1.md"
+  }
+}

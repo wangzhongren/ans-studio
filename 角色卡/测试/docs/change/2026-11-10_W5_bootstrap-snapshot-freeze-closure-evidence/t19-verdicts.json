@@ -1,0 +1,13 @@
+{
+  "unproven": {
+    "allowed": false,
+    "candidateCode": "git-policy-raw-write-scope",
+    "publicationCode": "git-policy-raw-write-scope"
+  },
+  "proven": {
+    "candidateAllowed": true,
+    "publicationAllowed": true,
+    "candidateInputDigest": "cfa1f90aa08b7decf27739aa399aa0033752639f433ccdbb0d4c0cf94ec1833c",
+    "publicationInputDigest": "4638fdd76e7c2be079cbce40c21bb0c030f6d2190a65b28c1eaa0549da403172"
+  }
+}

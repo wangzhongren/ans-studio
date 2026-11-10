@@ -1,0 +1,4 @@
+record: 角色卡/测试/docs/change/2026-11-10_RR20_snake-full-chain.md
+lines: 201
+bytes: 30990
+sha256: bf6a941574317973e08ddb833b811b24ddc20f210eea05ed3b6b99e7f16e23cf

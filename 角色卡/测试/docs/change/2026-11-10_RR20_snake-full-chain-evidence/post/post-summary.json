@@ -1,0 +1,497 @@
+{
+  "at": "2026-11-09T21:59:59.468Z",
+  "round": "RR20",
+  "portsPost": {
+    "listeners9222": 0,
+    "listeners9223": 0,
+    "established9223": 0,
+    "timeWait9223": 1,
+    "rawLines": 1
+  },
+  "electronPost": [],
+  "targetDiff": {
+    "fileCountPre": 95,
+    "bytesPre": 1183645,
+    "fileCountPost": 172,
+    "bytesPost": 3016676,
+    "added": [
+      {
+        "rel": ".ans/runs/run-hub-f52fc1a02848ff517e1c651a526b6999ba46c7b8100d0b8d/manifest.json",
+        "bytes": 400
+      },
+      {
+        "rel": ".ans/sessions/chief/claude/ans/index.json",
+        "bytes": 253
+      },
+      {
+        "rel": ".ans/sessions/chief/claude/ans/replay.jsonl",
+        "bytes": 131746
+      },
+      {
+        "rel": ".ans/sessions/chief/claude/native/.claude.json",
+        "bytes": 63012
+      },
+      {
+        "rel": ".ans/sessions/chief/claude/native/.last-cleanup",
+        "bytes": 24
+      },
+      {
+        "rel": ".ans/sessions/chief/claude/native/backups/.claude.json.backup.1794261455559",
+        "bytes": 84
+      },
+      {
+        "rel": ".ans/sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-snake-fullchain-run-2026-11-10-round8-target/c79835d1-86af-41d0-bd28-bf313503a817.jsonl",
+        "bytes": 448181
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/ans/index.json",
+        "bytes": 199
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/ans/replay.jsonl",
+        "bytes": 69088
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/native/.claude.json",
+        "bytes": 63013
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/native/.last-cleanup",
+        "bytes": 24
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/native/backups/.claude.json.backup.1794261540833",
+        "bytes": 84
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/native/projects/C--Users-51054-Desktop-work-ans-snake-fullchain-run-2026-11-10-round8-target/6c13cba7-d2ff-4449-be43-5970b478afba.jsonl",
+        "bytes": 269336
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/native/sessions/6384.cc910fb1d4cc6c031754b8dd53fc7df903c49e8fc5414927086def747caf8d7c.key",
+        "bytes": 119
+      },
+      {
+        "rel": ".ans/sessions/convener/claude/native/sessions/6384.json",
+        "bytes": 604
+      },
+      {
+        "rel": ".ans/sessions/product/claude/ans/index.json",
+        "bytes": 198
+      },
+      {
+        "rel": ".ans/sessions/product/claude/ans/replay.jsonl",
+        "bytes": 138030
+      },
+      {
+        "rel": ".ans/sessions/product/claude/native/.claude.json",
+        "bytes": 63011
+      },
+      {
+        "rel": ".ans/sessions/product/claude/native/.last-cleanup",
+        "bytes": 24
+      },
+      {
+        "rel": ".ans/sessions/product/claude/native/backups/.claude.json.backup.1794261525515",
+        "bytes": 84
+      },
+      {
+        "rel": ".ans/sessions/product/claude/native/projects/C--Users-51054-Desktop-work-ans-snake-fullchain-run-2026-11-10-round8-target/9dfe2197-9884-4dff-83b4-9abf1596bcbf.jsonl",
+        "bytes": 329549
+      },
+      {
+        "rel": ".ans/sessions/product/claude/native/sessions/19556.c755abfc2c9250501a2b7aa846ed5c318b7ebce7a70fd093f6c0cff5fbf400fa.key",
+        "bytes": 119
+      },
+      {
+        "rel": ".ans/sessions/product/claude/native/sessions/19556.json",
+        "bytes": 605
+      },
+      {
+        "rel": ".ans/trunk/deliveries/2a7bd1bd75c218e46f367eaa51376c0cf58a1ced2bf5d155d6e2a788f159c65c.json",
+        "bytes": 140
+      },
+      {
+        "rel": ".ans/trunk/deliveries/30db2b752e0863db72120bb9a19ab2a184c4ccc1d9b49e1e9dfc01e59ef951ad.json",
+        "bytes": 142
+      },
+      {
+        "rel": ".ans/trunk/deliveries/a5e2d870a2fa75608a9069af24759d4bfbf136bb849210a5fc1b5236fb5c97ee.json",
+        "bytes": 143
+      },
+      {
+        "rel": ".ans/trunk/git-mode.json",
+        "bytes": 231
+      },
+      {
+        "rel": ".ans/trunk/initialization-sources/init-source-a42d46c84ef12631983bd592d2add2506c2bb76c909c8ade5de2da393fe08b06.json",
+        "bytes": 1061
+      },
+      {
+        "rel": ".ans/trunk/operations/fddd168d54403c3586d69c9e8eef0eaa5b05fef83c2c7376460fdcd29992ae27/authorization.jsonl",
+        "bytes": 1202
+      },
+      {
+        "rel": ".ans/trunk/operations/fddd168d54403c3586d69c9e8eef0eaa5b05fef83c2c7376460fdcd29992ae27/git.json",
+        "bytes": 3241
+      },
+      {
+        "rel": ".ans/trunk/snapshots/s-4f9b6762576a427420f56f676d71f54aa6ed888461a8edf9da9c3139384c789a.json",
+        "bytes": 94896
+      },
+      {
+        "rel": ".git/ans/processes/02ab3260-5221-4637-a260-4b7ea241f50c.json",
+        "bytes": 987
+      },
+      {
+        "rel": ".git/ans/processes/0a8464e4-0eb0-4007-94e2-2ecdfc997719.json",
+        "bytes": 1040
+      },
+      {
+        "rel": ".git/ans/processes/0c8d1c7e-dba6-4dba-a898-7cd2f768c584.json",
+        "bytes": 1075
+      },
+      {
+        "rel": ".git/ans/processes/17111ed5-de19-4757-a35f-a2f6efb90233.json",
+        "bytes": 988
+      },
+      {
+        "rel": ".git/ans/processes/1971434a-9bb0-47ee-96d5-1426ab378270.json",
+        "bytes": 1018
+      },
+      {
+        "rel": ".git/ans/processes/395c8742-ec00-4388-b4e4-165998b32ba4.json",
+        "bytes": 1018
+      },
+      {
+        "rel": ".git/ans/processes/3c3acf23-1040-41b2-8c8b-c7b6640bcd01.json",
+        "bytes": 1017
+      },
+      {
+        "rel": ".git/ans/processes/44836f30-8cce-4839-ba5a-01f9850e5aca.json",
+        "bytes": 988
+      },
+      {
+        "rel": ".git/ans/processes/4c3f99d7-80ef-4a90-9e0a-74b946bd4556.json",
+        "bytes": 987
+      },
+      {
+        "rel": ".git/ans/processes/5ce23d42-76db-462a-8c7d-3ca2b8fea86d.json",
+        "bytes": 987
+      },
+      {
+        "rel": ".git/ans/processes/6ece21dd-6e0e-457b-a4f5-cd6570710f5b.json",
+        "bytes": 1017
+      },
+      {
+        "rel": ".git/ans/processes/8c2bc301-16a4-47eb-a68f-c8c57b371f2f.json",
+        "bytes": 1017
+      },
+      {
+        "rel": ".git/ans/processes/97d7085d-8fd9-4135-8ff1-145bd31fa36e.json",
+        "bytes": 988
+      },
+      {
+        "rel": ".git/ans/processes/98e16de5-ea03-4c82-91e1-3f95248dfde0.json",
+        "bytes": 1017
+      },
+      {
+        "rel": ".git/ans/processes/aa63e195-8103-4931-b3f1-f4318481db05.json",
+        "bytes": 1018
+      },
+      {
+        "rel": ".git/ans/processes/be2248a1-5d4c-4a79-a47a-54b197d55a8d.json",
+        "bytes": 1018
+      },
+      {
+        "rel": ".git/ans/processes/be33b51c-a26c-4b87-9fcf-b1559a88c353.json",
+        "bytes": 1005
+      },
+      {
+        "rel": ".git/ans/processes/bf776dfd-be77-4ae5-9e49-1021c1d22abc.json",
+        "bytes": 988
+      },
+      {
+        "rel": ".git/ans/processes/d2675ed3-a286-4303-a036-a0e88de35ffb.json",
+        "bytes": 1017
+      },
+      {
+        "rel": ".git/ans/processes/d4ce4f0a-64ae-444e-b7bf-b10db365f74a.json",
+        "bytes": 1018
+      },
+      {
+        "rel": ".git/ans/processes/db265729-5609-4523-a4a1-4915f7a4372a.json",
+        "bytes": 988
+      },
+      {
+        "rel": ".git/ans/processes/ec825c43-7b2d-4ff6-a0e1-0813b9986310.json",
+        "bytes": 1017
+      },
+      {
+        "rel": ".git/ans/processes/f4ed105d-52bf-4f67-8e15-abdfe3660afa.json",
+        "bytes": 987
+      },
+      {
+        "rel": ".git/objects/10/0a6621ce8ae19c976054d1e3fb26ecdc850ef8",
+        "bytes": 221
+      },
+      {
+        "rel": ".git/objects/19/d825bdad39b08c1a06b23a917091e6eefc4107",
+        "bytes": 186
+      },
+      {
+        "rel": ".git/objects/34/62172ede4147ce6c2d4c05340a1f44aa1591ad",
+        "bytes": 74
+      },
+      {
+        "rel": ".git/objects/46/4fbe1fdf661e98ab0d71e580b2b1885990db37",
+        "bytes": 1472
+      },
+      {
+        "rel": ".git/objects/61/c49318334598cff59b03ebbb76e54efa63200c",
+        "bytes": 68
+      },
+      {
+        "rel": ".git/objects/62/19a128afa60fcc3a8d7096a4ed0a683b413ab1",
+        "bytes": 114
+      },
+      {
+        "rel": ".git/objects/63/8c1814d9d75a0ee3aec76963002f03ffaaa6ce",
+        "bytes": 6160
+      },
+      {
+        "rel": ".git/objects/63/cd2fa56f3fe7d08ca461da37112446a6855746",
+        "bytes": 36789
+      },
+      {
+        "rel": ".git/objects/73/920ecaf27365caef4b50cc4fca2f0cb12f5938",
+        "bytes": 1615
+      },
+      {
+        "rel": ".git/objects/7d/1db67b16ef276b31d17e493c3e884871941747",
+        "bytes": 102
+      },
+      {
+        "rel": ".git/objects/7f/b672fa7e3066e13e80e68dca190bd8a9a4ff67",
+        "bytes": 4688
+      },
+      {
+        "rel": ".git/objects/80/46f39c822bf797d1f0cf3702e64ec9c5b35fcf",
+        "bytes": 3413
+      },
+      {
+        "rel": ".git/objects/97/f3babc0c4eec5d4756d68ed924fe091784f134",
+        "bytes": 93
+      },
+      {
+        "rel": ".git/objects/b6/cd3a837a47a0498ea7d35712d660ad1b131906",
+        "bytes": 767
+      },
+      {
+        "rel": ".git/objects/bc/193ea0095dd837c5ccf5aec15729b02c3b4360",
+        "bytes": 76
+      },
+      {
+        "rel": ".git/objects/bd/66b6edd7bd688d32099d85ffd2c6a6771ef775",
+        "bytes": 2470
+      },
+      {
+        "rel": ".git/objects/c0/64aea9b7241f98e518abb5f3da3d357ae8495e",
+        "bytes": 3832
+      },
+      {
+        "rel": ".git/objects/c0/f41d8c1536448ca19f118d0551203bd9aa0144",
+        "bytes": 7230
+      },
+      {
+        "rel": ".git/objects/c3/b6093b8a6fa3acdde082260e30c426bc2d16ef",
+        "bytes": 113
+      },
+      {
+        "rel": ".git/objects/c8/7b50a28dd4ccbdca13de49f14768811556aaf0",
+        "bytes": 1056
+      },
+      {
+        "rel": ".git/objects/cd/90a17214309964e2ef8245f7b91a5b6e5aaeb4",
+        "bytes": 59
+      },
+      {
+        "rel": ".git/refs/ans/candidates/fddd168d54403c3586d69c9e8eef0eaa5b05fef83c2c7376460fdcd29992ae27",
+        "bytes": 41
+      },
+      {
+        "rel": ".git/refs/ans/trunk",
+        "bytes": 41
+      }
+    ],
+    "removed": [],
+    "changed": [
+      {
+        "rel": ".ans/state/doc-freezes.json",
+        "bytes": 2413
+      },
+      {
+        "rel": ".ans/state/logs/chief.jsonl",
+        "bytes": 240255
+      },
+      {
+        "rel": ".ans/state/logs/convener.jsonl",
+        "bytes": 90722
+      },
+      {
+        "rel": ".ans/state/logs/product.jsonl",
+        "bytes": 110505
+      },
+      {
+        "rel": ".ans/state/tasks.jsonl",
+        "bytes": 10468
+      },
+      {
+        "rel": ".ans/state/version-changes.json",
+        "bytes": 8767
+      },
+      {
+        "rel": ".ans/state/versions.jsonl",
+        "bytes": 11130
+      }
+    ]
+  },
+  "frozenDocsPost": [
+    {
+      "path": "docs/contracts/snake-game-architecture-v1.md",
+      "sha256": "20157fa9b05f10c2979374772778bad8de4747de8e715ee6adc7ce6f06dbea68",
+      "match": true
+    },
+    {
+      "path": "docs/contracts/snake-game-architecture-v2.md",
+      "sha256": "5c38b0dc783e5521be5c0ec0ce5bbacd6462c944c94380d93b37cf7fd306061f",
+      "match": true
+    },
+    {
+      "path": "docs/product/snake-game-intent-v1.md",
+      "sha256": "ae80808b03a9a41bbded047774d2f77414a3f6d89d508d9187d29a9b10efb11f",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-modules-v1.md",
+      "sha256": "824371eb3408903740e82f01800341fccd1db7aa431044d07c2d4580929c1e53",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v1.md",
+      "sha256": "3a97646477d06e209539a7e7efb4b8c35d722e5836a7094f97eb7bd17b384111",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v2.md",
+      "sha256": "e6d9b03384d7eede97591f559f15652fae536a60a0e21a4313d5c5d3dc4c1844",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v1.md",
+      "sha256": "e745283fd8d2d4b95bd79a4b9c36db4a2d75996a8bcef266e4c694e3bac6fe7c",
+      "match": true
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v2.md",
+      "sha256": "782d6bcd623f8c7e81aa5e6e8a89e540efe9b7278737307c41f0b335d21bea8a",
+      "match": true
+    }
+  ],
+  "frozenDocsAllMatch": true,
+  "gitInitProcessPost": {
+    "bytes": 1365,
+    "sha256": "9878db5b4e4356c90f1de986f4d41f0f7fa59dcad2a71e9f5104d12878d0442c"
+  },
+  "initOperationPost": {
+    "initSha256": "9ba058252670d30b1c52c33f4dd350733cc2e5289a24e8763cbd577e6c69518e",
+    "operationId": "op-gc-init-trunk-snake-game-t-mw9kn23f-496d1580",
+    "repoId": "6ac15756af5cccff72a882ebe2a418c72624f149e0e2cafb77837ee238d9437e"
+  },
+  "statePost": {
+    ".ans/state/versions.jsonl": {
+      "bytes": 11130,
+      "sha256": "b5d0b8406add763de97b5ab1d7ea6d28a359e6101b5cb813f6b0b889842e0e03"
+    },
+    ".ans/state/doc-freezes.json": {
+      "bytes": 2413,
+      "sha256": "a19573085c071efed37b66e4a83460511f7d33477e2d166ef5055c3f05ae5cf6"
+    },
+    ".ans/state/version-changes.json": {
+      "bytes": 8767,
+      "sha256": "5095766f6a43f6ce19e284b742784cd1ce9031cda9137da3eed94b36382bc0da"
+    },
+    ".ans/state/stable-writes.json": {
+      "bytes": 919,
+      "sha256": "7ffbdbba6843f197dec6bf09b1ab522058cf4036485e6623652c9a4eba2876bb"
+    },
+    ".ans/state/stable-write-permits.json": {
+      "bytes": 529,
+      "sha256": "3721590716a242ff63d2331384f34602054f6f4da1f1ac696939ee2779a8d100"
+    }
+  },
+  "trunkPost": {
+    "manifestExists": false,
+    "gitModeExists": true,
+    "operations": [
+      "83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90",
+      "fddd168d54403c3586d69c9e8eef0eaa5b05fef83c2c7376460fdcd29992ae27"
+    ],
+    "snapshots": [
+      "decision-8231a86c6cc88812d7520f106f982067e1126e75491d0b661757ba448f793d0b.json",
+      "decision-a360e36c4a0e6f0f361401529bee69275a2a1d9b8be5a845cd608db918336ae2.json",
+      "s-06df6a8d9682dec4a319e926b752254eef796208696aa194891ddff8d4074505.json",
+      "s-4f9b6762576a427420f56f676d71f54aa6ed888461a8edf9da9c3139384c789a.json",
+      "s-555220948ae61b500da176aad0f3fdff0544f2e7c0e24277a38786694d01e4f3.json",
+      "s-6a881f9dbe39af162f6137f361fe1be964c61173f497792a1884601b2f742c12.json",
+      "s-9fbf9c81fe75b7d09f77f46c477b10ce68f1330597be51c2f0e1baa22802934e.json",
+      "s-intent-3704bd198dbf20c06f60832a9ca71d8e07b1b8db7505425905b596859cd63739.json",
+      "s-report-2f38ff74799e2cdc1a5e172d5bee7425a64b9ae6df09551bdb3f3d1da354a725.json",
+      "s-report-4652f3be5845edd76c010e03237392aeeba44b7473e4e07d861ece5f671a6f7e.json",
+      "s-report-a1774dce567f981a22fd2f09b9d3d267c8fab94aa74524b242620220dce9db01.json",
+      "s-report-b626f75b14fba0ea01830b18ff10b296cfe9bac04ce8ee781cb2132276105bcb.json"
+    ]
+  },
+  "gitPost": {
+    "head": "ref: refs/heads/ans-unpublished",
+    "candidateRefs": [
+      "83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90",
+      "fddd168d54403c3586d69c9e8eef0eaa5b05fef83c2c7376460fdcd29992ae27"
+    ],
+    "trunkRef": "100a6621ce8ae19c976054d1e3fb26ecdc850ef8"
+  },
+  "gitLogPostError": "Error: Command failed: git -C C:\\Users\\51054\\Desktop\\work\\ans-snake-fullchain-run-2026-11-10\\round8\\target --no-optional-locks log --format=%H %s\nfatal: your current branch 'ans-unpublished' does not have any commits yet\n",
+  "gitRefsPost": [
+    "refs/ans/candidates/83ca5888f7d9e4b1e97c2aa8044be183b2fc20cd4951d09de6d6d78ed233cf90 2214956bc9d72fb13be09751b58b2b584f17442e",
+    "refs/ans/candidates/fddd168d54403c3586d69c9e8eef0eaa5b05fef83c2c7376460fdcd29992ae27 100a6621ce8ae19c976054d1e3fb26ecdc850ef8",
+    "refs/ans/trunk 100a6621ce8ae19c976054d1e3fb26ecdc850ef8"
+  ],
+  "origTargetPost": {
+    "files": 114,
+    "bytes": 22041991
+  },
+  "origTargetHashCheck": {
+    "rows": 114,
+    "match": 114,
+    "mismatch": 0
+  },
+  "head": "0ab25843a9b2e3e187c47a1c14ef51da187414b9",
+  "tree": "d6c2158da0547cb9028166eeda6c4be22686babb",
+  "branch": "feat/bootstrap-snapshot-freeze-closure",
+  "candidateStatus": [
+    " M src/common/门禁引擎/classify-shell.ts",
+    " M src/service/trunk/impl/apply-journal.ts",
+    "?? test/测试/bootstrap-frozen-closure-integration.test.ts",
+    "?? test/编排/bootstrap-frozen-closure.test.ts",
+    "?? test/门禁引擎/freeze-closure.test.ts"
+  ],
+  "statusPorcelain": " M docs/communication/memo.md\n M src/common/门禁引擎/classify-shell.ts\n M src/service/trunk/impl/apply-journal.ts\n?? .commit-msg-d04.txt\n?? .commit-msg-demo-guard.txt\n?? .commit-msg-matrix.txt\n?? .commit-msg-report-suppression.txt\n?? .commit-msg-roster-rebind.txt\n?? .commit-msg-shell-audit.txt\n?? .commit-msg-trunk.txt\n?? .commit-msg-vca-kind.txt\n?? .commit-msg-vca-ux.txt\n?? .commit-msg-vca.txt\n?? .pr-body-d04.md\n?? .pr-body-demo-guard.md\n?? .pr-body-document-format.md\n?? .pr-body-matrix.md\n?? .pr-body-report-suppression.md\n?? .pr-body-roster-rebind.md\n?? .pr-body-shell-audit.md\n?? .pr-body-team-plan-run-binding.md\n?? .pr-body-trunk.md\n?? .pr-body-vca-ux.md\n?? .pr-body-vca.md\n?? .pr-payload-team-plan-run.json\n?? .tmp-app-shot.jpeg\n?? .tmp-app-shot2.jpeg\n?? .tmp-append-b11.mjs\n?? .tmp-append-g11-note.mjs\n?? .tmp-append-stable-freeze-decision.mjs\n?? .tmp-append-stable-write-ruling.mjs\n?? .tmp-check-panel.mjs\n?? .tmp-check-vc2-chain.mjs\n?? .tmp-copy-gates.mjs\n?? .tmp-read-audit.mjs\n?? .tmp-repair-vc1-baseline.mjs\n?? .tmp-repair-vc3-topology.mjs\n?? .tmp-repair-vc4-topology.mjs\n?? .tmp-shot.mjs\n?? .tmp-w1b-post-fails.txt\n?? .tmp-w1b-pre-fails.txt\n?? .tmp-w2/\n?? .tmp-wj1-final-fails.txt\n?? .tmp-wj1-final.txt\n?? .tmp-wj1-post-fails.txt\n?? .tmp-wj1-post-fails2.txt\n?? .tmp-wj1-post-targeted.txt\n?? .tmp-wj1-post-targeted2.txt\n?? .tmp-wj1-post-targeted3.txt\n?? .tmp-wj1-post.txt\n?? .tmp-wj1-post2.txt\n?? .tmp-wj1-pre-fails-norm.txt\n?? .tmp-wj1-pre-fails.txt\n?? .tmp-wj1-pre-targeted.txt\n?? .tmp-wj1-pre.txt\n?? .tmp-wj1-typecheck.txt\n?? .tmp-wj1-typecheck2.txt\n?? .tmp-wj2/\n?? .tmp-wj5/\n?? docs/acceptance/2026-11-07_direct-role-capabilities-closeout-report-v1.md\n?? docs/acceptance/2026-11-10_bootstrap-snapshot-freeze-closure-criteria-v1.md\n?? docs/acceptance/2026-11-10_bootstrap-snapshot-freeze-closure-report-v1.md\n?? docs/acceptance/governance-authority-matrix-criteria-v1.md\n?? docs/acceptance/governance-authority-matrix-report-v1.md\n?? docs/acceptance/trunk-amendment-model-criteria-v1.md\n?? docs/acceptance/trunk-amendment-model-report-v1.md\n?? docs/communication/2026-11-04_authorization_trunk-amendment-ia.md\n?? docs/communication/2026-11-04_gate1_trunk-amendment-model.md\n?? docs/communication/2026-11-04_gate2-addendum_trunk-amendment-B5-B10.md\n?? docs/communication/2026-11-04_gate2_trunk-amendment-model.md\n?? docs/communication/2026-11-04_intent-change_freeze-and-refactor-ownership.md\n?? docs/communication/2026-11-04_intent_trunk-amendment-model.md\n?? docs/communication/2026-11-05_audit-disposition_i3-evidence-gap.md\n?? docs/communication/2026-11-05_audit-disposition_shell-post-audit-false-positive.md\n?? docs/communication/2026-11-05_authorization_trunk-amendment-merge.md\n?? docs/communication/2026-11-05_defect_demo-delivery-cascade.md\n?? docs/communication/2026-11-05_defect_vca-baseline-binding.md\n?? docs/communication/2026-11-05_gate_closure_batch-3.5.md\n?? docs/communication/2026-11-05_intent_capability-instead-of-cards.md\n?? docs/communication/2026-11-05_intent_governance-authority-matrix.md\n?? docs/communication/2026-11-07_authorization_claude-schema-fix.md\n?? docs/communication/2026-11-07_decision_closeout-suspended.md\n?? docs/communication/2026-11-07_intent_real-closed-loop-run.md\n?? docs/communication/2026-11-10_defect_bootstrap-snapshot-freeze-closure-conflict.md\n?? docs/communication/2026-11-10_defect_git-init-inventory-byte-budget.md\n?? docs/planning/2026-11-04_design_trunk-amendment-model.md\n?? docs/planning/2026-11-04_review_trunk-amendment-model.md\n?? docs/planning/2026-11-04_trunk-amendment-p1.5R-consistency.md\n?? docs/planning/2026-11-05_design_governance-authority-matrix.md\n?? docs/planning/2026-11-10_design_bootstrap-snapshot-freeze-closure.md\n?? docs/planning/2026-11-10_review_bootstrap-snapshot-freeze-closure.md\n?? docs/scheduling/2026-11-04_team-plan_trunk-amendment-model-P1.5-increment.md\n?? docs/scheduling/2026-11-04_team-plan_trunk-amendment-model.md\n?? docs/scheduling/2026-11-05_governance-authority-matrix-E1-change-package.md\n?? docs/scheduling/2026-11-05_governance-authority-matrix-E3-release-record.md\n?? docs/scheduling/2026-11-05_team-plan_governance-authority-matrix.md\n?? docs/scheduling/2026-11-07_change-package_direct-role-capabilities-closeout.md\n?? docs/scheduling/2026-11-07_owner-write-set-mapping_direct-role-capabilities-closeout.md\n?? docs/scheduling/2026-11-10_team-plan_bootstrap-snapshot-freeze-closure.md\n?? docs/scheduling/trunk-amendment-model-change-v1.md\n?? docs/scheduling/trunk-amendment-model-change-v2.md\n?? test/测试/bootstrap-frozen-closure-integration.test.ts\n?? test/编排/bootstrap-frozen-closure.test.ts\n?? test/门禁引擎/freeze-closure.test.ts\n?? 角色卡/Claude适配器/docs/change/2026-11-05_native-stop-evidence/\n?? 角色卡/Claude适配器/docs/change/2026-11-07_E0_contract-assessment_claude-adapter.md\n?? 角色卡/Claude适配器/docs/change/2026-11-07_P1-B_claude-application-surface-evidence.md\n?? 角色卡/Claude适配器/docs/change/2026-11-07_claude-application-surface-evidence/\n?? 角色卡/Claude适配器/docs/fix/2026-11-07_claude-schema-fix-evidence/\n?? 角色卡/Claude适配器/docs/fix/2026-11-09_fix_claude-git-candidate-call-context-evidence/\n?? 角色卡/Codex适配器/docs/change/2026-11-05_native-stop-evidence/\n?? 角色卡/Codex适配器/docs/change/2026-11-07-P1-B-codex-application-surface-evidence/\n?? 角色卡/Codex适配器/docs/change/2026-11-07_E0_contract-assessment_codex-adapter.md\n?? 角色卡/Codex适配器/docs/change/2026-11-07_P1-B_codex-application-surface-evidence.md\n?? 角色卡/Pi适配器/docs/change/2026-11-05_native-stop-evidence/\n?? 角色卡/Pi适配器/docs/change/2026-11-07_E0_pi-server-tools-and-wrap-session-evidence.md\n?? 角色卡/Pi适配器/docs/change/2026-11-07_E0_pi-server-tools-and-wrap-session-evidence/\n?? 角色卡/Pi适配器/docs/change/2026-11-07_P1-B_pi-application-surface-evidence.md\n?? 角色卡/Pi适配器/docs/change/2026-11-07_P1-B_pi-application-surface-evidence/\n?? 角色卡/gates-code/docs/change/2026-11-07_E1_gates-module-evidence/\n?? 角色卡/nominator-code/docs/change/2026-11-09_WJ2b_judge-d3-by-evidence/\n?? 角色卡/nominator-code/docs/change/2026-11-09_WJ2b_judge-d3-by.md\n?? 角色卡/shared-code/docs/change/2026-11-07_E1_shared-catalog-and-maintenance-evidence/\n?? 角色卡/桌面窗口/docs/change/2026-11-05_direct-role-capabilities-evidence/\n?? 角色卡/桌面窗口/docs/change/2026-11-07_E2-XR1_desktop-product-evidence.md\n?? 角色卡/桌面窗口/docs/change/2026-11-07_E2-XR2_desktop-rapporteur-evidence.md\n?? 角色卡/桌面窗口/docs/change/2026-11-07_E2-XR3_desktop-nominator-evidence.md\n?? 角色卡/桌面窗口/docs/change/2026-11-07_E2-XR4_desktop-convener-evidence.md\n?? 角色卡/桌面窗口/docs/change/2026-11-07_E2-XR5_desktop-verifier-evidence.md\n?? 角色卡/桌面窗口/docs/change/2026-11-07_E2-XR6_desktop-chief-evidence.md\n?? 角色卡/桌面窗口/docs/change/2026-11-07_ui-main-bootstrap-evidence/\n?? 角色卡/桌面窗口/docs/change/2026-11-09_WJ4_judge-delegated-evidence/\n?? 角色卡/桌面窗口/docs/change/2026-11-09_WJ4_judge-delegated.md\n?? 角色卡/测试/docs/change/2026-11-05_direct-role-capabilities-evidence/\n?? 角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XG_integration-update-and-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XG_integration-update-and-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XG_pre-switch-baseline-evidence/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XG_pre-switch-baseline.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XG_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XG_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR1_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR1_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR2_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR2_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR3_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR3_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR4_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR4_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR5_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR5_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR6_unit-exit-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_E2-XR6_unit-exit-verification/\n?? 角色卡/测试/docs/change/2026-11-07_E2_switch-gate-checklist.md\n?? 角色卡/测试/docs/change/2026-11-07_E3-T3-full-regression-evidence/\n?? 角色卡/测试/docs/change/2026-11-07_E3-T3-full-regression.md\n?? 角色卡/测试/docs/change/2026-11-07_E3_scan-tooling.md\n?? 角色卡/测试/docs/change/2026-11-07_E3_scan-tooling/\n?? 角色卡/测试/docs/change/2026-11-07_P1-D_combined-candidate-verification.md\n?? 角色卡/测试/docs/change/2026-11-07_P1-D_combined-candidate-verification/\n?? 角色卡/测试/docs/change/2026-11-07_P1-RR_real-claude-minimal-dispatch-evidence.md\n?? 角色卡/测试/docs/change/2026-11-07_runtime-gate-role-modularization-B0-baseline.md\n?? 角色卡/测试/docs/change/2026-11-07_runtime-gate-role-modularization-B0-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_B2-gap-integration-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_D1_cross-role-integration-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_D1_evidence/\n?? 角色卡/测试/docs/change/2026-11-08_E3-F_evidence/\n?? 角色卡/测试/docs/change/2026-11-08_E3-T3-full-regression-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_E3-scans-and-checks.md\n?? 角色卡/测试/docs/change/2026-11-08_E3-scans-and-checks/\n?? 角色卡/测试/docs/change/2026-11-08_E3-scans-and-checks_session-admission-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_RR_evidence/\n?? 角色卡/测试/docs/change/2026-11-08_RR_real-claude-minimal-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_W5_evidence/\n?? 角色卡/测试/docs/change/2026-11-08_W7_b2-gap-e2e-evidence/\n?? 角色卡/测试/docs/change/2026-11-08_session-admission-approval-B0-evidence/\n?? 角色卡/测试/docs/change/2026-11-09_RR5_evidence/\n?? 角色卡/测试/docs/change/2026-11-09_RR5_snake-restore-proposal-flow.md\n?? 角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_D1_bootstrap-snapshot-freeze-closure.md\n?? 角色卡/测试/docs/change/2026-11-10_RR10_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR10_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR11_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR11_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR12_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR12_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR13_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR13_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR14_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR14_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR15_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR15_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR16_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR16_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR17_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR17_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR18_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR18_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR19_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR19_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR7_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR7_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR8_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR8_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_RR9_snake-full-chain-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_RR9_snake-full-chain.md\n?? 角色卡/测试/docs/change/2026-11-10_W5_bootstrap-snapshot-freeze-closure-evidence/\n?? 角色卡/测试/docs/change/2026-11-10_W5_bootstrap-snapshot-freeze-closure.md\n?? 角色卡/编排/docs/change/2026-11-05_direct-role-capabilities-evidence/\n?? 角色卡/编排/docs/change/2026-11-05_git-role-permissions-evidence/\n?? 角色卡/编排/docs/change/2026-11-07_E0_contract-assessment_orchestration.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XG_gate-switch-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XG_gate-switch-evidence/\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR1_orchestration-product-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR1_orchestration-product-evidence/\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR2_orchestration-rapporteur-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR2_orchestration-rapporteur-evidence/\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR3_orchestration-nominator-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR4_orchestration-convener-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR4_orchestration-convener-evidence/\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR5_orchestration-verifier-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2-XR6_orchestration-chief-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_E2_interface-review_orchestration.md\n?? 角色卡/编排/docs/change/2026-11-07_P1-C_dispatch-parent-d-minimal-evidence.md\n?? 角色卡/编排/docs/change/2026-11-07_P1-C_dispatch-parent-d-minimal-evidence/\n?? 角色卡/编排/docs/change/2026-11-08_W2_evidence/\n?? 角色卡/编排/docs/change/2026-11-08_W3a_evidence/\n?? 角色卡/编排/docs/change/2026-11-08_W3b_evidence/\n?? 角色卡/编排/docs/change/2026-11-09_WJ2_judge-delegated-evidence/\n?? 角色卡/编排/docs/change/2026-11-09_WJ2_judge-delegated.md\n?? 角色卡/编排/docs/change/2026-11-10_W1_bootstrap-snapshot-freeze-closure.md\n?? 角色卡/装配/docs/change/2026-11-07_packaged-chief-workflow-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-05_git-role-permissions-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_E0_contract-assessment_runtime-core.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR1_runtime-core-product-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR1_runtime-core-product-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR2_runtime-core-rapporteur-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR2_runtime-core-rapporteur-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR3_runtime-core-nominator-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR3_runtime-core-nominator-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR4_runtime-core-convener-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR4_runtime-core-convener-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR5_runtime-core-verifier-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR5_runtime-core-verifier-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR6_runtime-core-chief-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_E2-XR6_runtime-core-chief-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-07_P1-A_application-mediation-contract-evidence.md\n?? 角色卡/运行时核心/docs/change/2026-11-07_P1-A_application-mediation-contract-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-09_WJ1_judge-delegated-evidence/\n?? 角色卡/运行时核心/docs/change/2026-11-09_WJ1_judge-delegated.md\n?? 角色卡/门禁引擎/docs/change/2026-11-05_direct-role-capabilities-evidence/\n?? 角色卡/门禁引擎/docs/change/2026-11-05_git-role-permissions-evidence/\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence/\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_gate-facade-product-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_oracle-product.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_oracle-script.mjs\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_post-switch-snapshot.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_gate-facade-rapporteur-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_oracle-rapporteur.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_oracle-script.mjs\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_post-switch-snapshot.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_gate-facade-nominator-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_oracle-nominator.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_oracle-script.mjs\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_post-switch-snapshot.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_gate-facade-convener-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_oracle-convener.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_oracle-script.mjs\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_post-switch-snapshot.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_gate-facade-verifier-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_oracle-script.mjs\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_oracle-verifier.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_post-switch-snapshot.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_gate-facade-chief-and-closure-evidence.md\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_oracle-chief.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_oracle-script.mjs\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_post-switch-snapshot.json\n?? 角色卡/门禁引擎/docs/change/2026-11-07_E2_interface-review_gate-engine.md\n?? 角色卡/门禁引擎/docs/change/2026-11-09_WJ3_judge-delegated-evidence/\n?? 角色卡/门禁引擎/docs/change/2026-11-09_WJ3_judge-delegated.md\n?? 角色卡/门禁引擎/docs/change/2026-11-10_W2_bootstrap-snapshot-freeze-closure-evidence/\n?? 角色卡/门禁引擎/docs/change/2026-11-10_W2_bootstrap-snapshot-freeze-closure.md\n?? 角色卡/项目管理/docs/change/2026-11-07_E1_shared-catalog-handover-evidence.md\n",
+  "sessionsPost": {
+    "dirs": [
+      "chief",
+      "convener",
+      "product"
+    ],
+    "fileCount": 22
+  }
+}

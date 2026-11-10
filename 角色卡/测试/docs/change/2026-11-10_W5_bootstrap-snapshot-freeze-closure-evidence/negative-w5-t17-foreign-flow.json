@@ -1,0 +1,11 @@
+{
+  "operationId": "w5-t17-foreign-flow",
+  "service": {
+    "code": "trunk-item-invalid",
+    "message": "Frozen closure record belongs to another flow: other (line 14)"
+  },
+  "fullChain": {
+    "errorCode": "vca-target-invalid",
+    "message": "Frozen closure record belongs to another flow: other (line 14)"
+  }
+}

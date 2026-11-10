@@ -1,0 +1,86 @@
+[
+  {
+    "path": "docs/product/demo-intent",
+    "version": 1,
+    "sha256": "0525fcfbd7baf331761afeb92cbce6fbf1fd0b5df20badefbe7a918dd7636886",
+    "reason": "intent-confirmed",
+    "origin": "customer"
+  },
+  {
+    "path": "docs/proposals/demo-proposal",
+    "version": 1,
+    "sha256": "9c6e198d021e7a05f97ab42f4ca1d336cae210dfd6bdb3152a27779d81ca6bce",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/proposals/demo-proposal",
+    "version": 2,
+    "sha256": "62063725cb18c308413dc068f0ccf914e9d6b485fb94e192aac9c739480eaa80",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/contracts/demo-architecture",
+    "version": 1,
+    "sha256": "65e00a251f298a5bd815b4bad1b1cc3e7315e3f51d606b9826a052cc60b8310a",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/contracts/demo-architecture",
+    "version": 2,
+    "sha256": "59e2ac90d354cadd7aa30cc8f8936fff0c23cf338f63f5a1c6879eaa6e8a2075",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/proposals/demo-roster",
+    "version": 1,
+    "sha256": "45060cb8036004eb8e8a583ae143501b2525df63f93f41caf51832b028b71d42",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/proposals/demo-roster",
+    "version": 2,
+    "sha256": "0194795b56bcfe46c6e486062cc1cb99c49bd6993a88d4115760f59b56892524",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/proposals/demo-modules",
+    "version": 1,
+    "sha256": "506c8a73f0698ff96b77101fba31aff9dd91000e2d175acf37896fcfbabfdbb0",
+    "reason": "migrated-legacy",
+    "origin": "application"
+  },
+  {
+    "path": "docs/proposals/demo-proposal",
+    "version": 2,
+    "sha256": "62063725cb18c308413dc068f0ccf914e9d6b485fb94e192aac9c739480eaa80",
+    "reason": "role-direct-applied",
+    "origin": "role-direct"
+  },
+  {
+    "path": "docs/contracts/demo-architecture",
+    "version": 2,
+    "sha256": "59e2ac90d354cadd7aa30cc8f8936fff0c23cf338f63f5a1c6879eaa6e8a2075",
+    "reason": "role-direct-applied",
+    "origin": "role-direct"
+  },
+  {
+    "path": "docs/proposals/demo-roster",
+    "version": 2,
+    "sha256": "0194795b56bcfe46c6e486062cc1cb99c49bd6993a88d4115760f59b56892524",
+    "reason": "role-direct-applied",
+    "origin": "role-direct"
+  },
+  {
+    "path": "docs/proposals/demo-modules",
+    "version": 1,
+    "sha256": "506c8a73f0698ff96b77101fba31aff9dd91000e2d175acf37896fcfbabfdbb0",
+    "reason": "role-direct-applied",
+    "origin": "role-direct"
+  }
+]

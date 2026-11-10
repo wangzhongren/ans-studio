@@ -1,0 +1,7 @@
+== judge-delegated-effectiveness ==
+before summary {"tests":1,"pass":1,"fail":0,"cancelled":0,"skipped":0,"todo":0}
+after summary {"tests":1,"pass":1,"fail":0,"cancelled":0,"skipped":0,"todo":0}
+fail only-before(0): []
+fail only-after(0): []
+skip only-before(0): []
+skip only-after(0): []

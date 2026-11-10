@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: T1 bootstrap closure: 4 current-version targets + 8 frozen records assemble the exact 9-file sorted snapshot and pass vca.prepareDirect
+ok 1 - T1 bootstrap closure: 4 current-version targets + 8 frozen records assemble the exact 9-file sorted snapshot and pass vca.prepareDirect
+  ---
+  duration_ms: 47.5117
+  type: 'test'
+  ...
+# Subtest: T2 bootstrap same-kind multi-version targets are rejected explicitly (M1), never last-wins, with no side effects
+ok 2 - T2 bootstrap same-kind multi-version targets are rejected explicitly (M1), never last-wins, with no side effects
+  ---
+  duration_ms: 7.0081
+  type: 'test'
+  ...
+# Subtest: T3 bootstrap closure fails closed when a frozen record file is missing, drifted or unreadable
+ok 3 - T3 bootstrap closure fails closed when a frozen record file is missing, drifted or unreadable
+  ---
+  duration_ms: 27.8572
+  type: 'test'
+  ...
+# Subtest: T6 ledger negative cases fail closed without skipping: bad line, unknown event, invalid freeze shape
+ok 4 - T6 ledger negative cases fail closed without skipping: bad line, unknown event, invalid freeze shape
+  ---
+  duration_ms: 51.8318
+  type: 'test'
+  ...
+# Subtest: T7 same-path sources with different sha fail closed with the conflicting path
+ok 5 - T7 same-path sources with different sha fail closed with the conflicting path
+  ---
+  duration_ms: 10.9324
+  type: 'test'
+  ...
+# Subtest: T8 no-history bootstrap keeps the original snapshot content (targets + confirmed intent + versions only)
+ok 6 - T8 no-history bootstrap keeps the original snapshot content (targets + confirmed intent + versions only)
+  ---
+  duration_ms: 25.1541
+  type: 'test'
+  ...
+# Subtest: T9 non-bootstrap upgrade does not collect the freeze ledger (snapshot bytes unchanged)
+ok 7 - T9 non-bootstrap upgrade does not collect the freeze ledger (snapshot bytes unchanged)
+  ---
+  duration_ms: 86.1836
+  type: 'test'
+  ...
+# Subtest: T13 scale: many frozen records assemble linearly in path order with a deterministic digest
+ok 8 - T13 scale: many frozen records assemble linearly in path order with a deterministic digest
+  ---
+  duration_ms: 88.8277
+  type: 'test'
+  ...
+# Subtest: T14 legacy call: non-bootstrap executeDirect without preparedSnapshotRef keeps the old capture set
+ok 9 - T14 legacy call: non-bootstrap executeDirect without preparedSnapshotRef keeps the old capture set
+  ---
+  duration_ms: 185.0953
+  type: 'test'
+  ...
+# Subtest: T15 FS media: direct bootstrap executeDirect (no preparedSnapshotRef) assembles the frozen closure and applies
+ok 10 - T15 FS media: direct bootstrap executeDirect (no preparedSnapshotRef) assembles the frozen closure and applies
+  ---
+  duration_ms: 63.0365
+  type: 'test'
+  ...
+# Subtest: T15 negative: bootstrap executeDirect fallback fails closed on closure drift with no manifest/journal/freeze effects
+ok 11 - T15 negative: bootstrap executeDirect fallback fails closed on closure drift with no manifest/journal/freeze effects
+  ---
+  duration_ms: 11.1531
+  type: 'test'
+  ...
+# Subtest: T16 replay: same operationId produces a stable digest; a different file set fails snapshot-immutable-conflict
+ok 12 - T16 replay: same operationId produces a stable digest; a different file set fails snapshot-immutable-conflict
+  ---
+  duration_ms: 51.1986
+  type: 'test'
+  ...
+# Subtest: T17 another-flow ledger row fails closed without silent filtering
+ok 13 - T17 another-flow ledger row fails closed without silent filtering
+  ---
+  duration_ms: 16.463
+  type: 'test'
+  ...
+# Subtest: T18 frozen record whose -vN suffix differs from record.version fails closed service-side
+ok 14 - T18 frozen record whose -vN suffix differs from record.version fails closed service-side
+  ---
+  duration_ms: 9.0206
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 924.6986
