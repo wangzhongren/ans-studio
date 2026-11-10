@@ -1,0 +1,9 @@
+✔ W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用 (282.8873ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 706.1631

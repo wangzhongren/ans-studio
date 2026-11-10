@@ -1,0 +1,29 @@
+▶ W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  ✔ enumerated (110.2596ms)
+  ✔ selected (607.0383ms)
+  ✔ cancelled (38.4417ms)
+  ✔ changed (40.4922ms)
+  ✔ model-source (36.6202ms)
+  ✖ commit-race (552.2454ms)
+✖ W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝 (1386.8535ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1810.2176
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:778:15
+✖ commit-race (552.2454ms)
+  Error [AggregateError]: W5 primary/owned cleanup failures retained
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:919:41)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:778:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    [errors]: [ [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\51054\AppData\Local\Temp\ans-w4-commit-race-KF0FSh\.ans\sessions\convener\codex\ans'] ]
+  }

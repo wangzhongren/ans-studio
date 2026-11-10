@@ -1,0 +1,19 @@
+{
+  "at": "2026-11-09T16:52:09.395Z",
+  "elapsedSec": 61,
+  "budget": {
+    "customerMessages": 1,
+    "cards": 0,
+    "cardsByTitle": {},
+    "operatorProjectMessages": 0,
+    "productDocFormatCalls": 0,
+    "projectRoleDocFormatCalls": 0,
+    "modelTurns": {},
+    "wallClockStartUtc": "2026-11-09T16:51:01.756Z"
+  },
+  "intentCardSeen": false,
+  "productReadDone": false,
+  "projectQueryStarted": false,
+  "projectReadDone": false,
+  "gate": null
+}

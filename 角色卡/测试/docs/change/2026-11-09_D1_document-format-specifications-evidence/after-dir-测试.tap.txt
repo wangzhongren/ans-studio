@@ -1,0 +1,2841 @@
+===== FILE: test/测试/2026-11-09_judge-delegated-doc-freeze.test.ts =====
+✔ J17：无 source 的既有冻结 entry 事件字节逐字不变；judge-delegated source 如实镜像 actionSource (1.6053ms)
+✔ J16：judge-delegated doc.freeze 经真实账本追加/读取正例通过；缺失/伪造/客户字段负例 fail-closed (20.6333ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 330.5003
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/2026-11-09_judge-delegated-effectiveness.test.ts =====
+✔ W-J5/J15：judge 代批 intent 冻结 → verifyReviewIntent → judge D3 经 Runtime 包装层激活 → pin/run；非法 d3-by 仍负例 (66838.7986ms)
+
+
+#
+# Fatal error in , line 0
+# Check failed: node->IsInUse().
+#
+#
+#
+#FailureMessage Object: 0000008D381FF320
+----- Native stack trace -----
+
+ 1: 00007FF7B0F492DD node::MultiIsolatePlatform::DisposeIsolate+7741
+ 2: 00007FF7B038DF4F V8_Fatal+287
+ 3: 00007FF7AFA602EA v8::ResourceConstraints::ResourceConstraints+2986
+ 4: 00007FF7B111B161 node::SetCppgcReference+347121
+ 5: 00007FF7B1102DD2 node::SetCppgcReference+247906
+ 6: 00007FF7B10DAED4 node::SetCppgcReference+84324
+ 7: 00007FF7B112B43B node::FreeEnvironment+235
+ 8: 00007FF7B0F91816 node::MultiIsolatePlatform::DisposeIsolate+303990
+ 9: 00007FF7B10698E9 node::Start+3897
+10: 00007FF7B11329C2 node::AsyncResource::CallbackScope::CallbackScope+610
+11: 00007FF7B1342B94 node::AsyncResource::CallbackScope::CallbackScope+2163764
+12: 00007FF97B72DDA7 BaseThreadInitThunk+23
+13: 00007FF97CF9EE4C RtlUserThreadStart+44
+✖ test\测试\2026-11-09_judge-delegated-effectiveness.test.ts (67194.1247ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 67198.7231
+
+✖ failing tests:
+
+test at test\测试\2026-11-09_judge-delegated-effectiveness.test.ts:1:1
+✖ test\测试\2026-11-09_judge-delegated-effectiveness.test.ts (67194.1247ms)
+  'test failed'
+===== EXIT 1 WALL 68s =====
+===== FILE: test/测试/abort-cleanup-verify.test.ts =====
+✖ abort 抛错但底层稍后 settle：隔离解除，后续 prompt 可再次进入，不永久卡在「中止清理中」 (3.5906ms)
+✖ 底层永不 settle：仍需拒绝后续 prompt（fail-closed），清理失败不等于放行 (1.1237ms)
+✔ Claude 已关闭查询：Query closed before response received 视为已中止，abort 不抛错 (15.6624ms)
+✔ Claude 其他 interrupt 错误：abort 如实上抛（清理失败可见，不被吞掉） (14.2348ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 2
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 345.5821
+
+✖ failing tests:
+
+test at test\测试\abort-cleanup-verify.test.ts:104:1
+✖ abort 抛错但底层稍后 settle：隔离解除，后续 prompt 可再次进入，不永久卡在「中止清理中」 (3.5906ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/abort-cleanup-verify.test.ts:107:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test\测试\abort-cleanup-verify.test.ts:151:1
+✖ 底层永不 settle：仍需拒绝后续 prompt（fail-closed），清理失败不等于放行 (1.1237ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/abort-cleanup-verify.test.ts:154:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+===== EXIT 1 WALL 0s =====
+===== FILE: test/测试/background-tasks-entry/background-entry.test.ts =====
+✔ B1/S1/S2/S4：openRoleSession 真实装配下四工具可启动→跨轮存活→list/read/stop（含 cwd/凭据同源） (253.7631ms)
+✔ F9：无 ShellGate 的项目角色会话在真实装配中看不到四后台工具（也没有 run_shell） (11.8473ms)
+✔ F9：shellJudge 判断会话（createShellJudge 真实构造路径）不含四后台工具 (5.2299ms)
+✔ F9：governanceJudge 判断会话（Service 装配）不含四后台工具 (3.6952ms)
+✔ F4/CC1：第 9 个并发启动在 ShellGate 之前被拒——分类器零调用、零 spawn、无任务 (303.6128ms)
+✔ F2/F3：真实只读档 ShellGate 分类 deny ⇒ 未启动、哨兵文件未创建、无任务 (13.2139ms)
+✔ F6：未知任务号经真实入口 read/stop 均明确「未知任务」 (12.5436ms)
+✔ S2.3：日志超过 256 KiB 时工具读取标 truncated，只保留尾部且不返回损坏的多字节字符 (73.7999ms)
+✔ B3/S2.4（Windows/POSIX）：stop 收掉整棵进程树（父进程与孙进程） (172.3406ms)
+✔ S3/S4：回合中止不杀后台任务；dispose 幂等且清理运行中任务 (144.7181ms)
+✔ F5：真实入口 spawn 失败不保留半成品任务，之后仍可正常启动 (138.4773ms)
+✔ F7：终止预算内未观察 close ⇒ 工具如实 kill-timeout「可能仍在运行」，不谎称已停止 (2550.9455ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3982.868
+===== EXIT 0 WALL 4s =====
+===== FILE: test/测试/boundary-matrix.test.ts =====
+✔ 边界矩阵:项目管理 (25.9186ms)
+✔ 边界矩阵:编排 (19.9417ms)
+✔ 边界矩阵:门禁引擎 (15.508ms)
+✔ 边界矩阵:Pi适配器 (14.8848ms)
+✔ 边界矩阵:装配 (14.4685ms)
+✔ 边界矩阵:测试 (12.3421ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 299.3703
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/chat-handback-integration.test.ts =====
+✔ independent pi: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (83.9965ms)
+✔ independent codex: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (69.0607ms)
+✔ independent claude: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports (66.995ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 605.9669
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/cli-genesis-boundary.test.ts =====
+✔ 创世判定面：空目录注入的 su 边界恰 3 条；src/**、词法/真实路径逃逸、根外绝对路径全拒 (6.1947ms)
+[message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\Users\51054\AppData\Local\Temp\ans-cli-genesis-rIIXCr\chain-myt1QX
+[message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+[message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+[tool_call] 模型请求调用 write_file
+[denied] 拒绝：缺少 目标路径未匹配任何边界条目（根：project）：src/evil.ts。下一步：若为 appointment-write/角色卡路径，属于应用可写根接线问题；否则按 boundary.yaml 修正声明路径。 谁来做：app。 修正后可原样重试。 [技术 code：path-outside-boundary]
+写入被拒绝：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+允许写入的路径（按根分组）：
+  skill: （无）
+  project: 角色卡, docs, .ans
+[tool_call] 模型请求调用 request_confirmation
+[accepted] request_confirmation：客户已确认「创建角色 X（预览）」（confirmed:true；操作者：test:测试确认桩）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\Users\51054\AppData\Local\Temp\ans-cli-genesis-rIIXCr\chain-myt1QX\角色卡\X\role-card.md）
+[tool_call] 模型请求调用 write_file
+[accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 C:\Users\51054\AppData\Local\Temp\ans-cli-genesis-rIIXCr\chain-myt1QX\角色卡\X\boundary.yaml）
+[settled] 会话结束
+✔ 创世链路面（确认制）：governCommand + 假适配器 + 确认桩——越界写入不落盘、确认后的治理产物真落盘并经自动收尾转正、命令以 0 结束 (50.7125ms)
+✔ 角落（O1，客户 2026-10-12 裁定维持现状）：有 角色卡/ 但无 .ans → CLI 仍 arm 创世；可写面仍只落三处治理产物 (7.7802ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 377.635
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/conditions-f5.test.ts =====
+✔ F5:声明条件 → 条件目录下路径放行(仍须过 writeSet) (12.4274ms)
+✔ F5:未声明条件 → 拒绝,理由为独立'缺少条件'且 allowedByRoot 不含该目录 (5.634ms)
+✔ F5:声明了**另一个**条件 → 仍拒绝 (5.2115ms)
+✔ F5:条件目录激活但不在 writeSet → F4 收窄拒绝 (4.7925ms)
+✔ F5 对照:普通 file 不受 conditions 影响 (4.617ms)
+✔ F6:边界未被接受(accepted=false) → 拒绝一切写入 (4.0218ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 239.2824
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/direct-role-capabilities-e2e.test.ts =====
+✔ Q driver: legal external waits stay distinct from orphan/circular waits; repeated facts exhaust a fixed budget (0.9566ms)
+✔ Q six-identity driver opens real sessions from an empty project; unknown scripts never fall back to SDK (103.8993ms)
+Q1_EARLY_CHAIN {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\q-direct-empty-w9N8dh","trace":[{"step":1,"at":1794240707249,"actor":"chief","action":"model-turn","detail":{"turn":0}},{"step":2,"at":1794240707249,"actor":"chief","action":"production-tool-inventory","detail":["write_file","edit_file","read_file","list_dir","view_image","request_confirmation","request_choice","dispatch_task","role_status","contract_check","doc_format","evidence_check","session_tail","role_activity_log","terminate_role_run","redispatch_task","project_state","governance_matrix","project_note","request_version_decision","close_created_task","git_query","git_candidate","git_publish"]},{"step":3,"at":1794240707250,"actor":"chief","action":"tool-call","detail":{"name":"write_file","args":{"path":"docs/intents/direct-e2e.md","content":"---\nschema: project-intent-entry/v1\nintentId: direct-e2e\nflowId: direct-e2e\nversion: 1\n---\n# Build a bounded local example\nGoal: implement one local worker output.\n"}}},{"step":4,"at":1794240707263,"actor":"chief","action":"tool-result","detail":{"name":"write_file","result":{"ok":true,"message":"write_file 已获准并落盘：docs/intents/direct-e2e.md（164 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\q-direct-empty-w9N8dh\\docs\\intents\\direct-e2e.md）"}}},{"step":5,"at":1794240707263,"actor":"chief","action":"tool-call","detail":{"name":"request_choice","args":{"title":"确认本轮意图","question":"建立有界本地示例？","cardKind":"intent-confirm","flowId":"direct-e2e","intentId":"direct-e2e","options":[{"id":"confirm","label":"确认","recommended":true},{"id":"revise","label":"修订"}]}}},{"step":6,"at":1794240707265,"actor":"chief","action":"tool-result","detail":{"name":"request_choice","result":{"ok":false,"message":"request_choice：治理确认卡未发出（未向客户呈现；原因：Write the actual versioned intent document before asking for confirmation）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。"}}}],"observation":{"ledgerErrors":[],"tasks":[],"trunk":{"unavailable":{"ok":false,"code":"trunk-unavailable","message":"effective-manifest-missing"}}},"customer":[],"errors":["AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：Write the actual versioned intent document before asking for confirmation）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。\n\nfalse !== true\n"]}
+✖ Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze (81.7675ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 640.1733
+
+✖ failing tests:
+
+test at test\测试\direct-role-capabilities-e2e.test.ts:43:1
+✖ Q normal-new early chain: actual chief customer request -> formal product dispatch -> product write/report; no seeded freeze (81.7675ms)
+  Error: AssertionError [ERR_ASSERTION]: Q1_FIRST_BLOCK real intent-confirm tool: request_choice：治理确认卡未发出（未向客户呈现；原因：Write the actual versioned intent document before asking for confirmation）→ 未获任何同意；请补齐后重新调用。不要写盘，也不要向客户声称其拒绝或同意。
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/direct-role-capabilities-e2e.test.ts:69:51
+      at async ScriptBudget.bounded (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/direct-role-capabilities-driver.ts:63:14)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/direct-role-capabilities-e2e.test.ts:67:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/doc-format-all-roles.test.ts =====
+✔ B5/TM-13/AC-9 注册矩阵：6 内置治理角色 + 旧 su + 动态项目角色经真实 openRoleSession 均注册 doc_format (109.9519ms)
+ℹ 注册矩阵 8/8：chief,product,rapporteur,nominator,convener,verifier,su,worker-doc-format-b5
+✔ B5 注入才注册（动态项目角色）：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只且其它工具定义/顺序逐字不变 (22.4285ms)
+✔ B5/AC-9 judge 与有界 Chief 隔离：judge 恰三只无 doc_format；有界 Chief 恰 decide_pending_request（提供 docFormat 也不注册） (6.1353ms)
+✔ B5/TM-13 数据源：全部角色返回同一静态索引（无角色裁剪）；索引/详情零 getListing/refresh/文件 IO、不含项目/角色事实 (78.6745ms)
+ℹ 数据源 8/8 同源：索引 5223 B；已知 id 54 个
+✔ B5/TM-13 可调用：8 个角色会话的 doc_format 经真实轮次可调用（索引/详情 ok:true、未知 ok:false）；同输入同文本、目录不变、无额外事件/落盘 (350.2125ms)
+ℹ 可调用 8/8 角色 × 5 次 = 40 次工具调用；未知 ok:false 与注册表未知文本一致
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 962.8646
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/download-requests-ac22.test.ts =====
+✔ AC-22（裁定 A）：决策卡在前 → 下载卡 waiting → 决策卡作答后下载卡呈现 → 各自结算 (36.371ms)
+✔ AC-22（裁定 A）反向：下载卡在前 → 决策卡 waiting → 下载卡作答后决策卡呈现并各自结算 (13.8353ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 379.0968
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/download-requests-integration.test.ts =====
+✔ G8 A：真实 epoch 文件；旧 domain 指令不授权（卡片路径）、新指令 allow/deny 生效；面板投影 none/download (53.8449ms)
+✔ 预授权 once：首次命中并消费、第二次回审批；执行失败也算已消费 (32.7157ms)
+✔ once durable 消费失败 ⇒ 回落普通审批，指令不被消费 (10.2919ms)
+✔ 卡片路径审计：request.created/presented/resolved（by customer）+ downloads.jsonl（含 requestId） (108.4347ms)
+✖ 审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读 (22.9904ms)
+✔ 预授权路径审计：零 request.*；downloads.jsonl 无 requestId、by directive+directiveId (17.3425ms)
+✔ judge approve：无客户卡、presented.to judge、downloads.jsonl by judge（含判据） (81.4964ms)
+✔ judge manual ⇒ 客户卡 + judgeNotice；resolved.by customer (131.3855ms)
+✔ unavailableReason 防御：下载卡转客户卡、judge 不调用、不消耗预授权 (0.6121ms)
+✔ 跨域重定向 ⇒ download-redirect-cross-host；随后对目标重新申请成功 (16.3ms)
+✔ 大小超限与超时：稳定 code 且清理占位/临时文件（download/ 为空） (190.221ms)
+✔ 一项目一卡：真实通道排队，第二张在首张结算后才呈现 (192.5361ms)
+✔ 每项目执行并发 ≤2（跨会话共享）且并发同名不覆盖（后缀唯一） (30.957ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1299.4123
+
+✖ failing tests:
+
+test at test\测试\download-requests-integration.test.ts:760:1
+✖ 审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读 (22.9904ms)
+  AssertionError [ERR_ASSERTION]: 坏行不得影响 request.* 读取
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/download-requests-integration.test.ts:784:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 2s =====
+===== FILE: test/测试/duplicate-input-identity.test.ts =====
+✔ independent pi: one input per real turn, same-text turns and genuine assistant quote survive history merge (61.9079ms)
+✔ independent codex: one input per real turn, same-text turns and genuine assistant quote survive history merge (44.6487ms)
+✔ independent claude: one input per real turn, same-text turns and genuine assistant quote survive history merge (41.1291ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 446.6341
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/entry-role-minimal-d.test.ts =====
+✔ D 写区切换：六角色 Section 1 与能力矩阵按目标态生效 (1.047ms)
+✔ §5A 意图入口契约：四卡含模板/命名规则，其他内置角色不携带 (0.2175ms)
+✔ D 工具面：flow/gate/账本/分诊/交接/产物汇报工具不注册 (1.5796ms)
+✔ D judge facts：只读任务/申请上下文；旧账本快照参数被忽略 (0.1361ms)
+✖ D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules） (69.8103ms)
+✔ D-03/D-10：强制工程质量/证据基线常量与文本不得存在 (32.6887ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 346.7864
+
+✖ failing tests:
+
+test at test\测试\entry-role-minimal-d.test.ts:260:1
+✖ D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules） (69.8103ms)
+  AssertionError [ERR_ASSERTION]: D-04 撤除残留
+  + actual - expected
+  
+  + [
+  +   'src/common/roles/convener/index.ts:246: team-plan @ // 覆盖动作（契约 §3.4 convener 行）：`team-plan` / `git-action` / `stable-write` /',
+  +   'src/common/roles/convener/index.ts:253: team-plan @ "team-plan",',
+  +   'src/common/roles/convener/index.ts:412: team-plan @ return deny("facts-unknown", "role.convener.preflight.factsUnknown", { action: "team-plan", key: unknown });',
+  +   'src/common/roles/convener/index.ts:421: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });',
+  +   'src/common/roles/convener/index.ts:421: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });',
+  +   'src/common/roles/convener/index.ts:431: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", {',
+  +   'src/common/roles/convener/index.ts:432: team-plan @ action: "team-plan",',
+  +   'src/common/roles/convener/index.ts:438: team-plan @ return deny("team-plan-path-invalid", "role.convener.preflight.teamPlanPathInvalid", {',
+  +   'src/common/roles/convener/index.ts:439: team-plan @ action: "team-plan",',
+  +   'src/common/roles/convener/index.ts:621: team-plan @ case "team-plan":',
+  +   'src/common/编排/doc-format-specs.ts:800: team-plan @ id: "team-plan/v3",',
+  +   'src/common/编排/doc-format-specs.ts:852: docs/flows/ @ pathPattern: "docs/flows/<flowId>.yaml",',
+  +   'src/common/编排/doc-format-specs.ts:1475: team-plan @ id: "team-plan-completion/v1",',
+  +   'src/common/编排/doc-format-specs.ts:1480: team-plan @ schemaLiteral: "team-plan-completion/v1",',
+  +   'src/common/编排/doc-format-specs.ts:1488: team-plan @ vf("schema", "string", "required", "字面量 team-plan-completion/v1"),',
+  +   'src/common/编排/doc-format-specs.ts:1525: team-plan @ vf("source", "枚举", "required", "adopted/post-run-change/amendment/upgrade/bootstrap/recovery/team-plan"),',
+  +   'src/common/门禁引擎/classify-shell.ts:582: team-plan @ || (pub.action === "complete-team-plan" && f.actorRoleId === "convener")), "git-policy-business-source");',
+  +   'src/common/门禁引擎/classify-shell.ts:583: team-plan @ const teamPlan = pub.action === "complete-team-plan";',
+  +   'src/common/门禁引擎/classify-shell.ts:653: team-plan @ : manifest.source === "team-plan" && manifest.digest !== previous.digest',
+  +   'src/common/门禁引擎/classify-shell.ts:656: team-plan @ const marker = { schema: "team-plan-completion/v1", operationId: f.operationId, actorRoleId: "convener", flowId: pub.flowId,',
+  +   'src/common/门禁引擎/classify-shell.ts:710: docs/flows/ @ policyRequire((kind === "teamPlan" ? file.startsWith("docs/scheduling/") : file.startsWith("docs/flows/"))',
+  +   'src/model/role.ts:323: team-plan @ | "team-plan"',
+  +   'src/model/trunk.ts:36: team-plan @ export type TrunkSource = "adopted" | "post-run-change" | "amendment" | "upgrade" | "bootstrap" | "recovery" | "team-plan";',
+  +   'src/model/trunk.ts:44: team-plan @ "team-plan",',
+  +   'src/model/trunk.ts:547: team-plan @ | "complete-team-plan" | "activate-role-documents" | "close-created-task";',
+  +   'src/model/trunk.ts:549: team-plan @ "version-upgrade", "detail-amendment", "select-run-change", "complete-team-plan",',
+  +   'src/model/trunk.ts:554: team-plan @ "select-run-change": Object.freeze(["rapporteur"]), "complete-team-plan": Object.freeze(["convener"]),',
+  +   'src/pipeline/orchestration/trunk-runtime.ts:540: team-plan @ return value.preparationKind === "team-plan-commit" ? await service.commitPreparedTeamPlan(value, commitAuthority) : value.preparationKind === "active-role-commit" ? await service.commitPreparedActivation(value, commitAuthority) : await service.commitPreparedDirect(value, commitAuthority);',
+  +   'src/pipeline/orchestration/trunk-runtime.ts:548: flow-service @ if (!service.prepareInitialWorkflowCommit || !service.prepareDirectAuthority || !service.commitPreparedInitialWorkflow) return fail("initial-workflow-service-unavailable", "Bound initial workflow service is unavailable");',
+  +   'src/pipeline/orchestration/trunk-runtime.ts:625: team-plan @ * X-R4（E2 S4）：convener 模块 `preflight.checkAction("team-plan", …)` 的事实包（api-spec §5.1：',
+  +   'src/pipeline/orchestration/trunk-runtime.ts:645: team-plan @ if (decision.code === "team-plan-path-invalid") {',
+  +   'src/pipeline/orchestration/trunk-runtime.ts:827: team-plan @ // X-R4（E2 S4）：team-plan 角色侧前置——在 abort 之后、Git/Service 最终校验之前调用 convener 模块',
+  +   'src/pipeline/orchestration/trunk-runtime.ts:834: team-plan @ const decision = preflight.checkAction({ action: "team-plan", facts: convenerTeamPlanFacts(request) });',
+  +   'src/provider/trunk/abstract/trunk-store.ts:251: team-plan @ kind: "team-plan-completion"; flowId: string; taskId: string; runId: string; operationId: string;',
+  +   'src/provider/trunk/impl/git-trunk-store.ts:364: team-plan @ if (!work || typeof work !== "object" || !("purpose" in work) || !["team-planning", "builtin-preparation"].includes(String(work.purpose)) || !("planningRunId" in work) || work.planningRunId !== input.runId',
+  +   'src/provider/trunk/impl/git-trunk-store.ts:372: team-plan @ && row.publicationTask.runId === input.runId && row.businessJournal?.actionSource?.kind === "role-direct" && row.businessJournal.actionSource.action === "complete-team-plan"',
+  +   'src/provider/trunk/impl/git-trunk-store.ts:382: team-plan @ if (!planFile || !marker || typeof marker !== "object" || !("schema" in marker) || marker.schema !== "team-plan-completion/v1"',
+  +   'src/provider/trunk/impl/git-trunk-store.ts:388: team-plan @ return { ok: true, value: { basis: { kind: "team-plan-completion", ...input, sourceSha256: source.value.sha256, operationId: journal.operationId,',
+  +   'src/service/trunk/abstract/trunk-service.ts:219: team-plan @ purpose?: "repository-initialization" | "document-preparation" | "team-planning" | "role-preparation" | "builtin-preparation";',
+  +   'src/service/trunk/abstract/trunk-service.ts:346: team-plan @ preparationKind: "team-plan-commit";',
+  +   'src/service/trunk/impl/apply-journal.ts:725: docs/flows/ @ : key === "execution:flow" && new RegExp(`^docs/flows/${input.flowId}\\\\.ya?ml$`).test(ref.path));',
+  +   'src/service/trunk/impl/apply-journal.ts:1070: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Action source belongs to another task purpose/run/actor");',
+  +   'src/service/trunk/impl/apply-journal.ts:1122: team-plan @ if (value.preparationKind === "team-plan-commit" && value.input.runId && value.input.runId !== event.event.runId) return invalid("Plan input run differs from the actual assigned task run");',
+  +   'src/service/trunk/impl/apply-journal.ts:1136: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Publication source belongs to another actual task purpose/run/actor");',
+  +   'src/service/trunk/impl/apply-journal.ts:2171: team-plan @ if (source.kind !== "role-direct" || !["activate-role-documents", "complete-team-plan"].includes(source.action)',
+  +   'src/service/trunk/impl/apply-journal.ts:2190: team-plan @ return invalid("The actual team-plan publication target differs");',
+  +   'src/service/trunk/impl/apply-journal.ts:2436: team-plan @ if (plans.length !== 1) return invalid("Role preparation requires one actual same-flow team-plan task accepted by its original chief creator");',
+  +   'src/service/trunk/impl/apply-journal.ts:2504: team-plan @ if ((value.purpose === "document-preparation" && task.to === "rapporteur") || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+  +   'src/service/trunk/impl/apply-journal.ts:2516: team-plan @ if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+  +   'src/service/trunk/impl/apply-journal.ts:2517: team-plan @ const coordinatedPin = value.purpose === "team-planning" && run.value.value.state === "pinned" ? await readRunEvidence(deps, task.runId!) : undefined;',
+  +   'src/service/trunk/impl/apply-journal.ts:2518: team-plan @ if (task.from !== "chief" || !(value.purpose === "role-preparation" ? task.to === "nominator" : value.purpose === "team-planning" ? task.to === "convener" : ["product", "rapporteur"].includes(task.to)) || value.targetRoleId !== task.to || value.planningRunId !== task.runId',
+  +   'src/service/trunk/impl/apply-journal.ts:2610: team-plan @ if (created.event.from === "chief" && created.event.to === "convener" && workPurpose !== undefined && workPurpose !== "team-planning" && workPurpose !== "builtin-preparation")',
+  +   'src/service/trunk/impl/apply-journal.ts:2611: team-plan @ return invalid("This convener source has no supported initialization or team-planning completion purpose");',
+  +   'src/service/trunk/impl/apply-journal.ts:2620: team-plan @ if (created.event.workSourceRef && created.event.from === "chief" && created.event.to === "convener" && (workPurpose === "team-planning" || hubPlan?.ok)',
+  +   'src/service/trunk/impl/apply-journal.ts:2629: team-plan @ basisDigest = directHash({ kind: "team-plan-completion", planCommit, runSha256: record.value.sha256, materials: materialFiles.map(({ path, sha256 }) => ({ path, sha256 })) });',
+  +   'src/service/trunk/impl/apply-journal.ts:2879: team-plan @ if (prior.value.message !== `team-plan:${requestDigest}` || prior.value.actionSource?.kind !== "role-direct"',
+  +   'src/service/trunk/impl/apply-journal.ts:2880: team-plan @ || prior.value.actionSource.action !== "complete-team-plan" || !prior.value.targetSnapshot) return reject("plan-operation-conflict", "Operation id is already bound to another request");',
+  +   'src/service/trunk/impl/apply-journal.ts:2922: team-plan @ const marker = canonicalJson({ schema: "team-plan-completion/v1", operationId: input.operationId, actorRoleId: actor, flowId: input.flowId,',
+  +   'src/service/trunk/impl/apply-journal.ts:2928: team-plan @ const next: TrunkManifest = { ...current, source: noOp ? current.source : "team-plan", trunkVersion: noOp ? current.trunkVersion : current.trunkVersion + 1,',
+  +   'src/service/trunk/impl/apply-journal.ts:2932: team-plan @ const source: RoleDirectSource = { kind: "role-direct", actorRoleId: actor, action: "complete-team-plan", operationId: input.operationId,',
+  +   'src/service/trunk/impl/apply-journal.ts:2937: team-plan @ journalId: source.journalId!, flowId: input.flowId, phase: "prepared", message: `team-plan:${requestDigest}`, target: { ...target, trunkVersion: next.trunkVersion },',
+  +   'src/service/trunk/impl/apply-journal.ts:2942: team-plan @ return { preparationKind: "team-plan-commit", input: structuredClone(input), actorRoleId: "convener",',
+  +   'src/service/trunk/impl/apply-journal.ts:3028: team-plan @ } else if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+  +   'src/service/trunk/impl/apply-journal.ts:3030: team-plan @ if (event.from !== "chief" || !(value.purpose === "role-preparation" ? event.to === "nominator" : value.purpose === "team-planning" ? event.to === "convener" : ["product", "rapporteur"].includes(event.to)) || value.targetRoleId !== event.to || value.planningRunId !== event.runId || event.runState !== "draft"',
+  +   'src/service/trunk/impl/apply-journal.ts:3041: team-plan @ if (event.to === "rapporteur" || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+  +   'src/service/trunk/impl/apply-journal.ts:3210: team-plan @ if (!evidenceObject(completed) || completed.schema !== "team-plan-completion/v1" || completed.actorRoleId !== "convener"',
+  +   'src/service/trunk/impl/apply-journal.ts:3215: team-plan @ || planOperation.value.journal.actionSource.action !== "complete-team-plan" || planOperation.value.snapshot.snapshotId !== input.planRef.snapshotId)',
+  +   'src/service/trunk/impl/apply-journal.ts:3650: team-plan @ && operation.actionSource.action === "complete-team-plan" && operation.actionSource.actorRoleId === "convener"',
+  +   'src/service/trunk/impl/apply-journal.ts:3702: team-plan @ *    角色侧策略前置（team-plan/stable-write/requirement-change）由 Pipeline/能力注入层调用，',
+  +   'src/service/trunk/impl/apply-journal.ts:3832: team-plan @ const purpose = rolePreparation ? "role-preparation" : teamPlanning ? "team-planning" : "document-preparation";'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/entry-role-minimal-d.test.ts:262:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/common/roles/convener/index.ts:246: team-plan @ // 覆盖动作（契约 §3.4 convener 行）：`team-plan` / `git-action` / `stable-write` /', 'src/common/roles/convener/index.ts:253: team-plan @ "team-plan",', 'src/common/roles/convener/index.ts:412: team-plan @ return deny("facts-unknown", "role.convener.preflight.factsUnknown", { action: "team-plan", key: unknown });', 'src/common/roles/convener/index.ts:421: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });', 'src/common/roles/convener/index.ts:421: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });', 'src/common/roles/convener/index.ts:431: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", {', 'src/common/roles/convener/index.ts:432: team-plan @ action: "team-plan",', 'src/common/roles/convener/index.ts:438: team-plan @ return deny("team-plan-path-invalid", "role.convener.preflight.teamPlanPathInvalid", {', 'src/common/roles/convener/index.ts:439: team-plan @ action: "team-plan",', 'src/common/roles/convener/index.ts:621: team-plan @ case "team-plan":', 'src/common/编排/doc-format-specs.ts:800: team-plan @ id: "team-plan/v3",', 'src/common/编排/doc-format-specs.ts:852: docs/flows/ @ pathPattern: "docs/flows/<flowId>.yaml",', 'src/common/编排/doc-format-specs.ts:1475: team-plan @ id: "team-plan-completion/v1",', 'src/common/编排/doc-format-specs.ts:1480: team-plan @ schemaLiteral: "team-plan-completion/v1",', 'src/common/编排/doc-format-specs.ts:1488: team-plan @ vf("schema", "string", "required", "字面量 team-plan-completion/v1"),', 'src/common/编排/doc-format-specs.ts:1525: team-plan @ vf("source", "枚举", "required", "adopted/post-run-change/amendment/upgrade/bootstrap/recovery/team-plan"),', 'src/common/门禁引擎/classify-shell.ts:582: team-plan @ || (pub.action === "complete-team-plan" && f.actorRoleId === "convener")), "git-policy-business-source");', 'src/common/门禁引擎/classify-shell.ts:583: team-plan @ const teamPlan = pub.action === "complete-team-plan";', 'src/common/门禁引擎/classify-shell.ts:653: team-plan @ : manifest.source === "team-plan" && manifest.digest !== previous.digest', 'src/common/门禁引擎/classify-shell.ts:656: team-plan @ const marker = { schema: "team-plan-completion/v1", operationId: f.operationId, actorRoleId: "convener", flowId: pub.flowId,', 'src/common/门禁引擎/classify-shell.ts:710: docs/flows/ @ policyRequire((kind === "teamPlan" ? file.startsWith("docs/scheduling/") : file.startsWith("docs/flows/"))', 'src/model/role.ts:323: team-plan @ | "team-plan"', 'src/model/trunk.ts:36: team-plan @ export type TrunkSource = "adopted" | "post-run-change" | "amendment" | "upgrade" | "bootstrap" | "recovery" | "team-plan";', 'src/model/trunk.ts:44: team-plan @ "team-plan",', 'src/model/trunk.ts:547: team-plan @ | "complete-team-plan" | "activate-role-documents" | "close-created-task";', 'src/model/trunk.ts:549: team-plan @ "version-upgrade", "detail-amendment", "select-run-change", "complete-team-plan",', 'src/model/trunk.ts:554: team-plan @ "select-run-change": Object.freeze(["rapporteur"]), "complete-team-plan": Object.freeze(["convener"]),', 'src/pipeline/orchestration/trunk-runtime.ts:540: team-plan @ return value.preparationKind === "team-plan-commit" ? await service.commitPreparedTeamPlan(value, commitAuthority) : value.preparationKind === "active-role-commit" ? await service.commitPreparedActivation(value, commitAuthority) : await service.commitPreparedDirect(value, commitAuthority);', 'src/pipeline/orchestration/trunk-runtime.ts:548: flow-service @ if (!service.prepareInitialWorkflowCommit || !service.prepareDirectAuthority || !service.commitPreparedInitialWorkflow) return fail("initial-workflow-service-unavailable", "Bound initial workflow service is unavailable");', 'src/pipeline/orchestration/trunk-runtime.ts:625: team-plan @ * X-R4（E2 S4）：convener 模块 `preflight.checkAction("team-plan", …)` 的事实包（api-spec §5.1：', 'src/pipeline/orchestration/trunk-runtime.ts:645: team-plan @ if (decision.code === "team-plan-path-invalid") {', 'src/pipeline/orchestration/trunk-runtime.ts:827: team-plan @ // X-R4（E2 S4）：team-plan 角色侧前置——在 abort 之后、Git/Service 最终校验之前调用 convener 模块', 'src/pipeline/orchestration/trunk-runtime.ts:834: team-plan @ const decision = preflight.checkAction({ action: "team-plan", facts: convenerTeamPlanFacts(request) });', 'src/provider/trunk/abstract/trunk-store.ts:251: team-plan @ kind: "team-plan-completion"; flowId: string; taskId: string; runId: string; operationId: string;', 'src/provider/trunk/impl/git-trunk-store.ts:364: team-plan @ if (!work || typeof work !== "object" || !("purpose" in work) || !["team-planning", "builtin-preparation"].includes(String(work.purpose)) || !("planningRunId" in work) || work.planningRunId !== input.runId', 'src/provider/trunk/impl/git-trunk-store.ts:372: team-plan @ && row.publicationTask.runId === input.runId && row.businessJournal?.actionSource?.kind === "role-direct" && row.businessJournal.actionSource.action === "complete-team-plan"', 'src/provider/trunk/impl/git-trunk-store.ts:382: team-plan @ if (!planFile || !marker || typeof marker !== "object" || !("schema" in marker) || marker.schema !== "team-plan-completion/v1"', 'src/provider/trunk/impl/git-trunk-store.ts:388: team-plan @ return { ok: true, value: { basis: { kind: "team-plan-completion", ...input, sourceSha256: source.value.sha256, operationId: journal.operationId,', 'src/service/trunk/abstract/trunk-service.ts:219: team-plan @ purpose?: "repository-initialization" | "document-preparation" | "team-planning" | "role-preparation" | "builtin-preparation";', 'src/service/trunk/abstract/trunk-service.ts:346: team-plan @ preparationKind: "team-plan-commit";', 'src/service/trunk/impl/apply-journal.ts:725: docs/flows/ @ : key === "execution:flow" && new RegExp(`^docs/flows/${input.flowId}\\\\.ya?ml$`).test(ref.path));', 'src/service/trunk/impl/apply-journal.ts:1070: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Action source belongs to another task purpose/run/actor");', 'src/service/trunk/impl/apply-journal.ts:1122: team-plan @ if (value.preparationKind === "team-plan-commit" && value.input.runId && value.input.runId !== event.event.runId) return invalid("Plan input run differs from the actual assigned task run");', 'src/service/trunk/impl/apply-journal.ts:1136: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Publication source belongs to another actual task purpose/run/actor");', 'src/service/trunk/impl/apply-journal.ts:2171: team-plan @ if (source.kind !== "role-direct" || !["activate-role-documents", "complete-team-plan"].includes(source.action)', 'src/service/trunk/impl/apply-journal.ts:2190: team-plan @ return invalid("The actual team-plan publication target differs");', 'src/service/trunk/impl/apply-journal.ts:2436: team-plan @ if (plans.length !== 1) return invalid("Role preparation requires one actual same-flow team-plan task accepted by its original chief creator");', 'src/service/trunk/impl/apply-journal.ts:2504: team-plan @ if ((value.purpose === "document-preparation" && task.to === "rapporteur") || value.purpose === "team-planning" || value.purpose === "role-preparation") {', 'src/service/trunk/impl/apply-journal.ts:2516: team-plan @ if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {', 'src/service/trunk/impl/apply-journal.ts:2517: team-plan @ const coordinatedPin = value.purpose === "team-planning" && run.value.value.state === "pinned" ? await readRunEvidence(deps, task.runId!) : undefined;', 'src/service/trunk/impl/apply-journal.ts:2518: team-plan @ if (task.from !== "chief" || !(value.purpose === "role-preparation" ? task.to === "nominator" : value.purpose === "team-planning" ? task.to === "convener" : ["product", "rapporteur"].includes(task.to)) || value.targetRoleId !== task.to || value.planningRunId !== task.runId', 'src/service/trunk/impl/apply-journal.ts:2610: team-plan @ if (created.event.from === "chief" && created.event.to === "convener" && workPurpose !== undefined && workPurpose !== "team-planning" && workPurpose !== "builtin-preparation")', 'src/service/trunk/impl/apply-journal.ts:2611: team-plan @ return invalid("This convener source has no supported initialization or team-planning completion purpose");', 'src/service/trunk/impl/apply-journal.ts:2620: team-plan @ if (created.event.workSourceRef && created.event.from === "chief" && created.event.to === "convener" && (workPurpose === "team-planning" || hubPlan?.ok)', 'src/service/trunk/impl/apply-journal.ts:2629: team-plan @ basisDigest = directHash({ kind: "team-plan-completion", planCommit, runSha256: record.value.sha256, materials: materialFiles.map(({ path, sha256 }) => ({ path, sha256 })) });', 'src/service/trunk/impl/apply-journal.ts:2879: team-plan @ if (prior.value.message !== `team-plan:${requestDigest}` || prior.value.actionSource?.kind !== "role-direct"', 'src/service/trunk/impl/apply-journal.ts:2880: team-plan @ || prior.value.actionSource.action !== "complete-team-plan" || !prior.value.targetSnapshot) return reject("plan-operation-conflict", "Operation id is already bound to another request");', 'src/service/trunk/impl/apply-journal.ts:2922: team-plan @ const marker = canonicalJson({ schema: "team-plan-completion/v1", operationId: input.operationId, actorRoleId: actor, flowId: input.flowId,', 'src/service/trunk/impl/apply-journal.ts:2928: team-plan @ const next: TrunkManifest = { ...current, source: noOp ? current.source : "team-plan", trunkVersion: noOp ? current.trunkVersion : current.trunkVersion + 1,', 'src/service/trunk/impl/apply-journal.ts:2932: team-plan @ const source: RoleDirectSource = { kind: "role-direct", actorRoleId: actor, action: "complete-team-plan", operationId: input.operationId,', 'src/service/trunk/impl/apply-journal.ts:2937: team-plan @ journalId: source.journalId!, flowId: input.flowId, phase: "prepared", message: `team-plan:${requestDigest}`, target: { ...target, trunkVersion: next.trunkVersion },', 'src/service/trunk/impl/apply-journal.ts:2942: team-plan @ return { preparationKind: "team-plan-commit", input: structuredClone(input), actorRoleId: "convener",', 'src/service/trunk/impl/apply-journal.ts:3028: team-plan @ } else if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {', 'src/service/trunk/impl/apply-journal.ts:3030: team-plan @ if (event.from !== "chief" || !(value.purpose === "role-preparation" ? event.to === "nominator" : value.purpose === "team-planning" ? event.to === "convener" : ["product", "rapporteur"].includes(event.to)) || value.targetRoleId !== event.to || value.planningRunId !== event.runId || event.runState !== "draft"', 'src/service/trunk/impl/apply-journal.ts:3041: team-plan @ if (event.to === "rapporteur" || value.purpose === "team-planning" || value.purpose === "role-preparation") {', 'src/service/trunk/impl/apply-journal.ts:3210: team-plan @ if (!evidenceObject(completed) || completed.schema !== "team-plan-completion/v1" || completed.actorRoleId !== "convener"', 'src/service/trunk/impl/apply-journal.ts:3215: team-plan @ || planOperation.value.journal.actionSource.action !== "complete-team-plan" || planOperation.value.snapshot.snapshotId !== input.planRef.snapshotId)', 'src/service/trunk/impl/apply-journal.ts:3650: team-plan @ && operation.actionSource.action === "complete-team-plan" && operation.actionSource.actorRoleId === "convener"', 'src/service/trunk/impl/apply-journal.ts:3702: team-plan @ *    角色侧策略前置（team-plan/stable-write/requirement-change）由 Pipeline/能力注入层调用，', 'src/service/trunk/impl/apply-journal.ts:3832: team-plan @ const purpose = rolePreparation ? "role-preparation" : teamPlanning ? "team-planning" : "document-preparation";' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/evidence-sidecar-e2e.test.ts =====
+✔ evidence sidecar E2E：criteria ref + artifact + sidecar 全链路通过 (30.1635ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 141.4857
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/f7-symlink.test.ts =====
+✔ F7:经 junction/符号链接逃逸出根 → 拒绝 (1.6108ms)
+✔ F7 对照:根内的普通路径仍允许 (0.5044ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 156.4926
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/fail-closed.test.ts =====
+✔ fail-closed:未知顶层键 → 整份解析失败且一切写入被拒 (12.4339ms)
+✔ fail-closed:entries 非数组 → 整份解析失败且一切写入被拒 (4.8643ms)
+✔ fail-closed:缺必填 purpose → 整份解析失败且一切写入被拒 (5.8748ms)
+✔ fail-closed:条目含未知键 → 整份解析失败且一切写入被拒 (4.5611ms)
+✔ fail-closed:kind 非法 → 整份解析失败且一切写入被拒 (4.4808ms)
+✔ fail-closed:root 非法 → 整份解析失败且一切写入被拒 (4.7473ms)
+✔ fail-closed:conditional-directory 缺 condition → 整份解析失败且一切写入被拒 (4.1934ms)
+✔ fail-closed:condition 格式非法 → 整份解析失败且一切写入被拒 (4.7063ms)
+✔ fail-closed:YAML 语法错误 → 整份解析失败且一切写入被拒 (5.2122ms)
+✔ fail-closed 对照:同样含 src/good.ts 的**合法**边界 → src/good.ts 允许 (13.398ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 268.3086
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g1-verify/g1-copy-and-nails.test.ts =====
+✔ 代码级钉子（独立）：session.ts 无本地副本实现/调用、无内嵌派发模板；接线走编排三件套 (5.5506ms)
+✔ 代码级钉子（独立）：su 预授权写目录恰为四棵（docs/su + docs/contracts + docs/skills + docs/mcp）——workflow.md 不在其中 (1.669ms)
+✔ 卡文本独立反向断言（含非空洞验证）：含 docs/workflow.md 的小句不得声称免确认/直接写/预授权 (0.4288ms)
+✔ 卡文本独立复核（J-1 守卫语义）：含 授权/获准/放行 的小句全部为否定式；「原地改」小句全部为否定式（各带非空洞验证） (0.479ms)
+✔ 卡文本正向在场性（独立短语清单）：G-1/A3 关键纪律逐字落卡 (0.1358ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 162.6094
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g1-verify/g1-dispatch-wiring.test.ts =====
+✔ 对抗-接线：无引用派发（含原因段）逐字 = 独立金文本；单来源无 opts 输出与之一致（f2 收口同源） (203.6387ms)
+✔ 对抗-接线（关键）：拒投 → 补齐契约 → 重派**同一任务文本**必须受理且恰投一次（拒投不污染去重键） (375.6174ms)
+✔ 对抗-接线：常规队列期去重未受 G-1 接线影响（目标忙 ⇒ 入队；同文重派 ⇒ 去重回执；恰投一次） (341.2072ms)
+✔ 对抗-接线：排队期间契约变更 ⇒ 已入队条目按**派发那一刻**的旧哈希投递；送达后同文再派才用新哈希 (764.6177ms)
+✔ 对抗-接线：workflow 缺失 ⇒ 降级照投逐字（标注在场；契约照常带哈希；不拒投） (203.2018ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2292.4379
+===== EXIT 0 WALL 2s =====
+===== FILE: test/测试/g1-verify/g1-extraction-render.test.ts =====
+✔ 对抗-提取：嵌套契约路径捕捉（契约目录整树）；`docs/contracts/.md` 空名防串 (1.0536ms)
+✔ 对抗-提取：产物路径/目录式/URL/绝对路径/contracts2 前缀/中文紧贴——一律不误捕 (0.1816ms)
+✔ 对抗-提取：workflow 恒置首（文本后段出现亦然）；契约首现序；重复引用去重 (0.0887ms)
+✔ 对抗-渲染：无引用派发逐字 = 无引用旧格式三行（我的独立金文本；含原因段/多行任务对照组） (0.1634ms)
+✔ 对抗-渲染：引用仅来自 opts（本函数不提取/不触盘）——任务文本提到契约而 opts 缺省 ⇒ 不注入块 (0.0663ms)
+✔ 对抗-渲染：必读块逐字金文本（workflow 第 1、契约第 2、哈希逐字、「任务：」前缀、完成口令指向第 2 节） (0.361ms)
+✔ 对抗-渲染：完成句变体仅在 workflow 引用在场——仅契约 ⇒ 全文不出现 workflow.md / 第 2 节 (0.1097ms)
+✔ 对抗-渲染：workflow 缺失降级逐字（标注在场/该行缺席/编号重排/不指向不在场文件——两形态） (0.1018ms)
+✔ 对抗-渲染：矛盾输入（引用在场 + 缺失标注）→ 引用为准（抑制标注、完成句指回第 2 节） (0.103ms)
+✔ 对抗-判据：契约缺失（含 <missing>/空/非法/大写 hex）一律拒投——回执逐字、结构上无投递文本 (0.2744ms)
+✔ 对抗-判据：多缺报首现序第一个；契约缺失优先于 workflow（即便 workflow 在场仍拒） (0.1097ms)
+✔ 对抗-判据：workflow 缺失降级照投（编号重排/标注在场）；多余探测项被忽略——不触发拒投 (0.091ms)
+✔ 对抗-判据：全齐放行——文本逐字等于独立手写的完整金文本（plan 与 render 无第二份渲染） (0.0975ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 182.9761
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g2-verify/w1-signals.test.ts =====
+[watchdog] tick 失败（已暂停本 tick，下个 tick 重试）：夹具：快照读取失败
+✔ W1#1：恰 100% 边界——差 1ms 不报、恰 300000ms 报一条；每轮一次；到点不中止 (2.4207ms)
+✔ W1#1 排除：带挂起确认卡的角色不触发；解除后按真实已耗触发 (0.231ms)
+✔ W1#1 排除：su 自身忙 ⇒ 关于 su 的告警不触发；项目角色照报 (0.134ms)
+✔ W1#1 身份更替：旧轮次解除不投恢复行（到点检查不是故障），新一轮独立起算 (0.2219ms)
+✔ W1#2：age 恰 10min 边界——599999ms 不报、600000ms 报；depth 恰 5 辅判触发、depth 4 不触发 (0.353ms)
+✔ W1#2：活跃期单报＋累计；恢复行 N/M 如实；冷却恰 10min 边界（自告警投出时刻起算） (0.2305ms)
+✔ W1#2 排除：su 自身忙 ⇒ 关于 su 的目标队列不报；空目标队列跳过 (0.1038ms)
+✔ W1#3：单次即报；冷却恰边界；su 忙抑制；无恢复行 (0.2822ms)
+✔ W1#4：15min 窗口恰 3 次边界；completed/aborted 不计；恰 15min 剪枝；冷却 30min 内不报 (0.259ms)
+✔ W1#4：outcome 缺事实不猜（不计入） (0.1497ms)
+✔ 风暴护栏：15min 窗口 ≤5 条；第 6 条起只投「已抑制 N 条」通告恰一条；统计如实；窗口滑出恢复 (0.3178ms)
+✔ 恢复行只在告警确实投出过时投：仅被风暴抑制（从未投出）的活跃期解除不产生恢复行 (0.1694ms)
+✔ 看护器异常隔离：快照抛错 ⇒ tick 不抛；下一时机恢复工作 (0.3975ms)
+✔ 投递端抛错 ⇒ 该告警视为未投出（不崩）；条件仍在时重试投出（前次失败未占用冷却） (0.132ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112.3564
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g2-verify/w3-closure.test.ts =====
+✔ 完成态收束已移除：预热/多窗口/真实活动后静默再久也不投 [系统·收束] (1.7486ms)
+✔ 告警仍保留：队列积压仍投 [系统·看护告警]（收束移除 ≠ 看护失效） (1.1698ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 107.7799
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g3-search-verify/claude-websearch-verify.test.ts =====
+✔ 隔离：ANS_CLAUDE_WEB_SEARCH 未设/0/off/非法值 ⇒ tools=[]、allowedTools 无 WebSearch、绑定轮 WebSearch 仍 deny、帧零消费 (28.5477ms)
+✔ 开启面：1/on（含大小写与空白变体）⇒ tools=[WebSearch] 且 allowedTools 追加 WebSearch；canUseTool 兜底仍 deny (8.4447ms)
+✔ 放行分支对抗：恰 allow 且**无 updatedInput**（原文 query 不改写）；伪造名/mcp_server/未绑定/跨轮延后/中止信号必须仍 deny (2.3366ms)
+✔ ANS 工具分支不回退：WebSearch 开启时合法 mcp__ans__ 工具仍得 updatedInput 请求上下文令牌并真实执行 (4.4654ms)
+✔ 消息泵映射：native-start/result 恰对、toolCallId 关联、四类 content 归一（text/unsupported 省略标注/字符串）；非 WebSearch 与未跟踪 id 零消费 (3.7647ms)
+✔ 跨轮未配对收尾：首轮 tool_use 无结果帧 ⇒ 只有 start；次轮迟到的旧 id tool_result 不再消费、不串行 (3.5362ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 339.3908
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g3-search-verify/codex-websearch-verify.test.ts =====
+✔ 能力位白名单：缺省/空白/off=关；on=开；非法/大小写变体显式抛错（fail-closed，不静默） (0.8796ms)
+✔ 三钉：默认关逐字节（键序/值全等）；开会三处同翻且格式与位置不变；回读期望双向 fail-closed (0.7329ms)
+✔ webSearchRow：只投影真实字段（白名单逐字全等）；多余字段不携带；容错不抛 (0.2678ms)
+✔ 全链（默认关）：进程覆盖 -c 与线程配置双落 disabled；turn/start 沙箱保持 readOnly+无网络；dispose 关停 engine (137.5937ms)
+✔ 全链（开）：env on 与 options 显式两路都使三钉同翻 live；webSearch item 产出行＋settled.searchCalls；逐轮计数、不隔离 (183.3954ms)
+✔ 全链：零搜索轮 settled 不携带 searchCalls；item/started 不接（v1 最小面）；回读不符双向 fail-closed 且 engine 关停 (49.4924ms)
+✔ 全链：网关拒声明（error 通知）⇒ 本轮如实 failed 且 settled 如实；会话不隔离，下一轮正常；行文本与 URL 走既有脱敏 (60.1345ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 548.4066
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g3-search-verify/pi-loopback-verify.test.ts =====
+✔ 隔离：ANS_PI_SERVER_TOOLS=off / 0（显式关）⇒ 请求体零声明、零 server_tool 诊断、零工具行（逐字旧行为） (749.2624ms)
+✔ 构造期 fail-closed：未知 id（code_execution/伪造名）⇒ bindRole 抛错且抛错先于任何网络（loopback 零请求） (3.5885ms)
+✔ 开启成功往返：声明尾部上 wire、恰一对 start/result、查询/标题会话内可见、URL query 剥除、诱饵零泄漏 (38.6949ms)
+✔ 错误变体对抗（自选 error_code=unavailable）：denied 如实、非运行错误、轮次 completed、诊断类别归一 (46.8818ms)
+✖ 跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串） (13.5724ms)
+✔ 降级链：网关对含声明请求回 400 ⇒ 本轮如实失败＋降级恰一次＋后续（含第 2 轮）不再附声明且轮次正常完成 (39.0432ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1060.8566
+
+✖ failing tests:
+
+test at test\测试\g3-search-verify\pi-loopback-verify.test.ts:315:1
+✖ 跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串） (13.5724ms)
+  AssertionError [ERR_ASSERTION]: 轮次归属应恰为 g3-turn-1/2：,g3-turn-1,g3-turn-3
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:336:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async withEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:78:16)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:317:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/g3-search-verify/pi-parse-verify.test.ts =====
+✔ 默认关：未设置/空串/纯空白/0/off/none（大小写与空白变体）一律 {enabled:[]} (0.9921ms)
+✔ 开启面：声明逐字形状（type/name/max_uses）——web_search 与客户探针形状对齐，web_fetch 同族 (0.1251ms)
+✔ 尾随逗号/多余分隔容忍且不产生半开项；重复 id 即便大小写不同也拒 (0.2919ms)
+✔ fail-closed 构造面：未知 id/非法 max_uses/空 id 一律抛错（绝不静默降级） (0.3599ms)
+✔ 注册表审计：恰两项且不含 code_execution；code_execution type 串不进注册表 (0.0844ms)
+✔ 启用行文案：含各工具与 max_uses、按次计费、外部不可信提示、关闭路径 (0.1574ms)
+✔ 降级行文案：含 HTTP 状态、明示未自动重试/后续停用、绝不含响应体 (0.0813ms)
+✔ 追加：声明在 tools 尾部；返回新对象、原对象不动；tools 缺失时创建 (0.1641ms)
+✔ 幂等对抗：已含同 type 跳过（部分在场只补缺项）；二次追加零改动且还是原引用 (0.0862ms)
+✔ 对抗输入：非对象 payload / tools 非数组 / 数组 payload → 不动作（present=false、绝不半改） (0.1381ms)
+✔ requestRejectionStatus：>=400 且非 408/429 才认；取数字前缀、拒绝正文注入、3 位数严格 (0.1402ms)
+✔ 形状一（start 即完整）：server_tool_use 内联 input + 结果块内联 content → 恰对 start/result、id 关联 (0.4936ms)
+✔ 形状二（delta 增量）：input_json_delta 累积查询、结果 partial_json 增量解析；无结果块=无 result 命令 (0.1226ms)
+✔ 错误变体对抗：非 max_uses_exceeded 的错误码（大写归一、未知码占位）→ denied 命令 (0.1374ms)
+✔ usage 两来源与去重：message_start 携带 from-usage；同响应重复回传同值只记一次；无回传才 from-blocks (0.1359ms)
+✔ pause_turn 恰一次/响应内重置；未知 stop_reason 如实上报且不误报已知值 (0.0948ms)
+✔ 对抗输入：非对象事件/未知类型/index 缺失/未知索引 delta → 空结果且不抛 (0.0694ms)
+✔ 备注对抗：message_start 回传 count=0、响应内确有调用块且无后续 usage ⇒ from-blocks 兜底被 0 条目抑制（如实登记） (0.0874ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 93.2646
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4-skill-verify/a-tools-surface.test.ts =====
+✔ 注入才注册（对抗四组合）：两工具各自独立，未注入即结构性不存在 (2.1483ms)
+✔ 回执（rebuilt）：载荷逐字路由 {roleId,name}；呈现 path＋digest 前 12 位＋即刻生效＋写边界不变句 (0.7427ms)
+✔ 回执（next-session 如实延迟态）：如实「在跑不打断」，绝不称即刻生效 (0.1593ms)
+✔ 回执（params 别名与缺参）：roleId 别名 role_id/role 可用；name 无别名；缺参不触达能力 (0.2743ms)
+✔ 契约外回执一律 fail-closed：action 不符/缺 digest/effective 非法/null/抛错——绝不称已安装/已卸载 (0.6245ms)
+✔ 卸载工具同名同形：expectedAction=uninstalled；成功文案含「效果已撤；文件保留于」（二分陈述） (0.1849ms)
+✔ 护栏拒绝原样转达：reason=not-customer-turn ⇒ 未执行、零副作用、原文逐字 (0.1649ms)
+✔ schema 冻结文案逐字（独立重打锚点）：install_skill / uninstall_skill 失败枚举与纪律句 (0.1595ms)
+✔ 零写盘（结构性）：makeSkillReceiptTool 源码切片不含任何写盘原语 (0.866ms)
+✔ 零写盘（行为）：真实盘快照前后逐字节一致——成功与失败两路 (7.5658ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 243.8877
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4-skill-verify/b-render-double-check.test.ts =====
+✔ 金文本独立构造：双技能按 name 排序编号 1/2；digest＝当刻字节 sha256 独立复算；日期取 ISO 段 (11.6401ms)
+✔ digest 原始字节对抗：BOM＋非法 UTF-8 字节的 SKILL.md——sha256 按原始字节算（不解码/不剥 BOM） (8.6031ms)
+✔ 双向核（自建逐目录表）：登记级坏件集＝读取器 undefined 集＝渲染器诊断集；非坏件原样返回视图 (12.7467ms)
+✔ 坏件集对抗矩阵（逐条 reason 与 detail 如实）＋ onDiagnostic 抛错被吞、默认两参调用绝不抛 (6.318ms)
+✔ 零技能 ∅：无目录/空目录/仅有直接文件条目——全部空串零诊断；文件条目不是技能 (1.1273ms)
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (7.0444ms)
+✔ 解析宽容但有界（对抗变体）：全角/半角冒号、无横线、BOM、CRLF 均可；缺任一字段即坏件；同键首现为准 (8.3413ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 140.2916
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\b-render-double-check.test.ts:182:1
+✖ 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛 (7.0444ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\g4-outside-OzZsCd' -> 'C:\Users\51054\AppData\Local\Temp\g4-render-cZs4Or\docs\skills\link'
+      at Object.symlinkSync (node:fs:1937:11)
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:197:10
+      at temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:24:5)
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:183:3)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\g4-outside-OzZsCd',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\g4-render-cZs4Or\\docs\\skills\\link'
+  }
+===== EXIT 1 WALL 0s =====
+===== FILE: test/测试/g4-skill-verify/c-preauth.test.ts =====
+✔ su 预授权矩阵：docs/skills 与 docs/mcp 树内免确认直写；树外/前缀负例/穿越注释拒绝 (35.7825ms)
+✔ 非 su 角色不变：项目角色写自己的边界可以、写 docs/skills 被拒（预授权不扩散） (16.1901ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 450.1029
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4-skill-verify/d-card-guard.test.ts =====
+✔ 安装纪律四要点在场（自建关键词清单）：仅客户明示/不自主发起＋轮次护栏/先落盘再激活/如实二分＋不改变写边界 (0.4954ms)
+✔ 四棵树话术：确认制要点段列全 docs/su＋docs/contracts＋docs/skills＋docs/mcp；workflow 不在预置内（反向） (0.2455ms)
+✔ J-1 守卫零违规：全文小句级（含守卫词必带否定）；安装纪律段段级零命中守卫三词 (1.3528ms)
+✔ 非空洞验证（变异必须被谓词捕获）：反向断言与守卫谓词对内存变异真实敏感 (0.1988ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 143.6044
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4-skill-verify/e-handler.test.ts =====
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (35.2531ms)
+✔ 拒绝分支矩阵：role-not-found / not-registered / role-not-listed / registration-unchanged——回执如实、零副作用 (40.8344ms)
+✔ 成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 会话已重建；[系统·安装] 真投递且不可撤回 (157.685ms)
+✔ 成功路径（next-session 两支）：在跑不打断（无 note）；无会话（note 如实、不自动开） (18.1274ms)
+✔ rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/不假装已生效；不投系统行 (8.571ms)
+✔ 卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:true/uninstalled；系统行「效果已撤，文件保留」二分 (82.362ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 746.3477
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\e-handler.test.ts:29:1
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (35.2531ms)
+  AssertionError [ERR_ASSERTION]: 无轮次 ⇒ 护栏拒绝
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/e-handler.test.ts:40:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/g4-skill-verify/f-fingerprint.test.ts =====
+✔ ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开） (46.0887ms)
+✔ ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件） (6.6255ms)
+✔ ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建） (11.8956ms)
+✔ ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致） (12.4222ms)
+✔ ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色 (13.4501ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 487.154
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4-skill-verify/g-splicing.test.ts =====
+✔ 拼接 ×3＋假适配器：零技能＝基线（无节）；有技能＝基线＋恰一段（独立重打对照、digest 独立复算、只追加不改写） (13.9146ms)
+✔ 多技能/排序/坏件：命中两条按 name 排序编号；坏件（缺 SKILL.md/解析失败）跳过且不拒会话 (15.6755ms)
+✔ 空/别角色：空 projectRoot（假适配器缺省）⇒ 零渲染；技能只列别角色 ⇒ 该角色零渲染 (4.719ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 277.6299
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4-skill-verify/h-scope-audit.test.ts =====
+✔ 范围①：su 预授权目录字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp） (1.7622ms)
+✖ 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su (3.356ms)
+✔ 范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用 (2.0465ms)
+✔ 范围③（行为）：真实装配 su 会话——install_skill 全链执行且客户通道零调用（无二次卡） (57.2074ms)
+✖ 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册 (0.6885ms)
+✔ 范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删除调用（文件保留——E 域行为侧互证） (1.655ms)
+✖ 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用 (4.1903ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 4
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 490.25
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:41:1
+✖ 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su (3.356ms)
+  AssertionError [ERR_ASSERTION]: installMcp 透传判据＝能力矩阵（唯一）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:65:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:167:1
+✖ 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册 (0.6885ms)
+  AssertionError [ERR_ASSERTION]: installSkill 透传判据＝能力矩阵（唯一）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:169:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:203:1
+✖ 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用 (4.1903ms)
+  AssertionError [ERR_ASSERTION]: test/claude-adapter/session.test.ts 不得引用任何 .probe 模块
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:232:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 0s =====
+===== FILE: test/测试/g4-skill-verify/i-cleanpatterns.test.ts =====
+✔ 复现转正：G-3 备注①最小复现（「；」连接的 Pi 搜索行）——第 2 条标题完整、秘密剥净、标志如实 (1.0215ms)
+✔ 后缀/括号变体（mojibake 消除）：`；…（共 N 条）` 与 `（URL）后文` 逐字保真、无 %EF%BC (0.1158ms)
+✔ 零泄漏 battery（对抗）：CJK 值＋全角标点紧贴全矩阵——秘密一律不可见（剥离口径只紧不松） (0.2299ms)
+✔ ASCII `;` 路径参数不回归：`;jsessionid=` 完整留在 URL 内（排除集只增 CJK 块） (0.0671ms)
+✔ 显示预算不变：超限截断仍发生（truncated=true、前缀保留）；redacted 语义逐字沿用 (0.095ms)
+✔ 控制字符清洗不变：\u0000-\u0008 等仍替换为 uFFFD（本条只带回显，不放松） (0.1778ms)
+✔ Codex 诊断 redact 同口径：URL 紧贴全角标点不吞尾；userinfo/query 剥除；环境秘密值替换不变 (0.3487ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 88.084
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4v2-mcp-verify/a-declarations.test.ts =====
+✔ A1 契约符号冻结：读取器两函数导出可用（两参调用）、编译期符号逐名在场 (1.8358ms)
+✔ A2 好件全字段：文件名定名（标题不权威）、七键解析、args 分隔/trim、env:NAME 原样保存不展开 (15.1879ms)
+✔ A2b 读取器不写诊断、不触回调；坏件/缺失/名非法/保留名/根不可读 ⇒ undefined 绝不抛 (7.1021ms)
+✔ A3 判据表：缺失必填/未知状态/env 坏项/控制字符/重复 env/命令引用 ⇒ undefined，且与列表坏件集同口径 (96.3266ms)
+✔ A4 静默过滤：uninstalled 与角色不命中——不算坏件、不产诊断、不收录 (5.5311ms)
+✔ A5 扫描集合与排序：只收 *.md 普通文件；子目录/其它扩展名/符号链接静默忽略；按 name 字典序 (9.6326ms)
+✔ A6 顺序无关与宽容解析：BOM 剥离、CRLF、键序任意、首现为准、无根目录=静默空且绝不建目录 (7.6527ms)
+✔ A7 onDiagnostic 回调抛错被吞（观察面不得影响会话开启）；重复调用稳定 (1.9803ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 241.3469
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4v2-mcp-verify/b-service-wiring.test.ts =====
+✔ B1 按角色注入：本角色命中的声明按名收录（stdin 形式完整）；别角色声明不注入；空盘＝零声明 (19.9386ms)
+✔ B2 空盘零副作用：无 docs/mcp ⇒ 空数组且不建任何目录；坏件为主的项目照常装配 (11.9088ms)
+✔ B3 重建重读：同一盘面上新开会话读到当刻声明；声明改为 uninstalled 后新会话语义更新 (17.2733ms)
+✔ B4 同适配器内按角色冻结（一次读取随会话冻结）：中途改盘不影响已构造的角色选项 (13.5391ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 291.8936
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4v2-mcp-verify/c-tools.test.ts =====
+✔ C1 注入才注册：四组合矩阵，两能力互不搭车；未注入的名字结构性不存在 (2.2627ms)
+✔ C2 回执冻形逐字段：path/digest 前 12 位/生效态两分支/note 透传/诚实面在文案 (0.4228ms)
+✔ C3 契约外回执/抛错/预中止全 fail-closed：绝不称已安装/已卸载 (0.6677ms)
+✔ C4 失败透传与 schema 互核：能力 reason+message 原样进回执；schema 枚举句在桌面实现里逐字出现（跨源） (0.3732ms)
+✔ C5 零写盘两路：源码切片无写盘原语；fs 写原语 spy 下成功与失败两路恰零调用 (2.2719ms)
+✔ C6 描述诚实面在场且无正向受审表述：能力级授予/门禁之外/非逐调用受审/写边界不变/仅客户明示 (0.2531ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 242.2687
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4v2-mcp-verify/d-orchestration.test.ts =====
+✔ D1 第四棵树矩阵：docs/mcp 树内免确认直写（相对/子路径/绝对）、前缀负例、穿越归一；全程零确认 (17.3197ms)
+✔ D2 非 su 不变：项目角色写 docs/mcp 仍拒（预授权不扩散）；重建（新开会话）后 su 树仍免确认 (26.501ms)
+✔ D3 透传链（仅 su）：su 会话两能力原样透传；项目角色即便误给也零注入 (13.7428ms)
+✔ D4 行为侧收口：捕获的能力面喂给生产适配器工厂——su 注册两工具、项目角色零注册（注入才注册） (20.17ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 378.2283
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4v2-mcp-verify/e-card-text.test.ts =====
+✔ E1 四棵树：确认制要点段写明四棵（docs/su/contracts/skills/mcp）免逐次确认；重建不受影响 (0.4666ms)
+✔ E2 MCP 段四要点全检：仅客户明示/无二次卡/先落盘再激活+凭据不入文件/卸载二分+副作用不可撤 (0.1299ms)
+✔ E3 工具纪律与如实话术：装/卸如实报告 path/digest（回执为准）＋生效态两分支 (0.0772ms)
+✔ E4 J-1 守卫全检：全文小句级零违规；MCP 段同样零违规；「受审」类小句必须否定式 (0.7184ms)
+✔ E5 谓词非空洞（变异捕获）：注入肯定式「授权/放行」与「即逐调用受审」必须被同款谓词猎出 (0.2539ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 148.9464
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4v2-mcp-verify/f-handler.test.ts =====
+✔ F1 成功链（rebuilt）：校验→激活重建→冻形回执→[系统·安装] 真投递（含诚实面）→不可撤回→诊断 (173.6473ms)
+✔ F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零重建/无系统行）；文案与 schema 模板同代入后互核 (28.8888ms)
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (6.445ms)
+✔ F4 激活三态：busy ⇒ next-session 不打断；无会话 ⇒ next-session＋note（绝不自动开）；重建失败 ⇒ rebuild-failed 如实 (152.0652ms)
+✔ F5 卸载链：先改声明→校验通过→重建→回执二分（效果已撤/声明保留/副作用不可撤）＋系统行；已发生副作用不可撤入文案 (23.5544ms)
+✔ F6 排队客户消息轮：su 忙时再发客户消息处于队列（active kind=message）⇒ 安装仍放行；护栏先判不消耗队列 (13.4334ms)
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (19.6099ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 813.8146
+
+✖ failing tests:
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:130:1
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (6.445ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:140:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:266:1
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (19.6099ms)
+  AssertionError [ERR_ASSERTION]: 诊断含 mcp.refused
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:278:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts =====
+✔ G1a 收窄洽等：子进程 env 键＝基线键（在场者）∪ 声明名单键；哨兵/PASSTHROUGH/ELECTRON 绝不转发 (87.4636ms)
+✔ G1b 名单损坏宁窄：非法 JSON/非数组/混入非字符串 ⇒ 仅基线键（或仅合格项），哨兵仍不泄漏 (213.7254ms)
+✔ G1c 退出码与错误路径：真命令退出码原样；缺命令/不可执行 ⇒ 127＋stderr 一行 (160.8329ms)
+✔ G1d 信号与性态：stdout 直通（JSON-RPC 通道）；SIGTERM 转发真命令并以其死因退出；真命令自然死因回传 (364.6525ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 902.8907
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4v2-mcp-verify/h-claude-adapter.test.ts =====
+✔ H1 装配：launcher 包装命令/alwaysLoad/工具级 timeout；allowedTools 加 server 级名；env:NAME 展开（缺失省略） (50.4651ms)
+✔ H2 hook 放行五条件对抗：名错位/近似前缀/未绑定轮/非 dynamic/未安装名 ⇒ deny；合法 ⇒ allow 且**无 updatedInput** (3.4686ms)
+✔ H3 审计两行配对：hook start 行（native-start）＋消息泵 tool_result 行（result）均以 mcp__ 名在场；非文本块标 unsupported (2.0146ms)
+✔ H3b 生产投影路径：required-v1（projectToolEvent）下 MCP 两行事实含 native 内容与工具名（同 G-3 WebSearch 形） (2.8738ms)
+✔ H4 status 行：failed/needs-auth 类别化一行（无正文）；connected/未安装静默；每引擎一次；status 查询失败不毁轮 (2.5613ms)
+✔ H5 零安装零变化：未注入 installedMcpServers ⇒ allowedTools/mcpServers/放行面与旧行为一致（无 mcp__ 外来前缀行） (1.6686ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 203.0931
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g4v2-mcp-verify/i-codex.test.ts =====
+✔ I1 mcpServersOverride：单条 root map（转义往返含引号/空格/反斜杠/注入串）；定义＋禁用同一图；零条目 ⇒ 不产覆盖 (1.1345ms)
+✔ I2 prepareInstalledMcpServers：名集恰判/保留名/清洗碰撞拒绝；env:NAME 快照展开（缺失⇒不带入不拦会话）；坏形状抛错 (0.5662ms)
+✔ I3 协议纯函数：mcpToolName 清洗桥形；mcpToolCallNative 字段全集三态（文本/非文本/失败/error） (0.1903ms)
+✔ I4 会话级：白名单定义＋禁用集编入恰一条 `-c`（approve/超时/env 展开）；线程级 enabled 恰等；目录名字集恰等 (141.8038ms)
+✔ I5 三处恰等负例：外来残留 enabled（进程级）⇒ 拒开工；白名单缺席读回（CLI 未应用）⇒ 拒；目录多一名/少一名 ⇒ 拒 (8.6525ms)
+✔ I6 降级行：目录 failed/cancelled 白名单条目如实一行（类别化、error 进 detail 截断）；startupStatus 慢路径去重不双报；不毁轮次 (36.4302ms)
+✔ I7 mcpToolCall 使用行映射：字段全集（server/tool→mcp__ 名/status/args/result/error/durationMs）；三态如实；不进隔离 (30.6398ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 335.8187
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g4v2-mcp-verify/j-pi.test.ts =====
+✔ J1 判据纯函数：清洗名命中/前缀边界负例（近似串不中）/空白名单不中；env 展开缺失即抛且空引用抛、不改输入 (1.2084ms)
+✔ J2 声明驱动接通：rogue mcp.json 被无视；前缀面放行真实执行；资源工具（tools-only）放行面外 ⇒ 门禁拒不可执行 (763.5765ms)
+✔ J3 自持收窄：子进程 env 键＝PATH＋声明键（平台注入除外）；哨兵零泄漏；env:NAME 展开入子进程 (107.8309ms)
+✔ J4 env:NAME 缺失 ⇒ bindRole 构造期抛错，且子进程从未拉起（无 state 落盘） (307.6216ms)
+✔ J5 dispose 收口（真路径）：dispose 后 MCP 子进程 ≤5s 退出（session_shutdown 补发生效） (96.6614ms)
+✔ J7 治理回归（MCP 激活下）：server-tools 声明照常启用（启用行在场）；门禁放行 MCP 工具；settled 恰 1 (158.4372ms)
+✔ J6 零声明：仅治理和默认思考保护、活动面为空、不调 MCP bindExtensions、轮次照常（settled 恰 1） (24.9832ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1581.0286
+===== EXIT 0 WALL 2s =====
+===== FILE: test/测试/g5-reasoning-verify/a-contract.test.ts =====
+✔ A1 五值冻结：恰 off/low/medium/high/xhigh 五枚，顺序即产品档位梯，数组本体冻结（写入抛错） (0.9932ms)
+✔ A2 env 键逐字：三键三名恰等冻结符号；键面不含 demo；跨键读取不串 (0.1607ms)
+✔ A3 纯读快照：resolve 按传入 env 快照读（不偷看 process.env）；缺键＝unset 而非 undefined 异常 (0.0928ms)
+✔ A4 未设态：undefined/null/空串/纯空白（空格/tab/换行/混排）一律 unset——静默合法默认态 (0.0868ms)
+✔ A5 合法态：五值原样、大小写混合、前后空白、全大写（trim+忽略大小写）⇒ set（规范小写形） (0.1998ms)
+✔ A6 非法 10 类：平台侧档/中文标签/数字/布尔/组合串/全角/emoji/URL 样——一律 invalid，绝不猜档 (0.0976ms)
+✔ A7 invalid.raw 截断：>64 字符按前 64 字符截断（诊断素材有界）；恰 64 不截 (0.0706ms)
+✔ A8 三态互斥完备：任意输入恰归一种态（无二义、无漏网） (0.0911ms)
+✔ A9 isReasoningEffortV1：逐字（大小写敏感）判定；非字符串一律 false (0.1046ms)
+✔ A10 文案常量：事件 summary「已思考」与诊断 summary「推理内容无法安全显示」逐字冻结 (0.1138ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 77.4406
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g5-reasoning-verify/b-projection.test.ts =====
+✔ B1 合法投影逐字形状：raw 事实 → DisplayTextV1 投影形（version/source/status/duration 结构恰等） (1.4362ms)
+✔ B2 脱敏：凭据真值替换 / api_key 形态 / Bearer / URL userinfo 剥离——投影形承载已脱敏文本 (0.2145ms)
+✔ B3 预算：超 16384 字节按 UTF-8 边界裁（不产生半截字符）＋truncated 标记；正文是原文前缀 (0.3028ms)
+✔ B4 omitted⇒正文恒空：载荷违规带正文（raw 串或投影形）一律清空——如实优先于保留违规内容 (0.1373ms)
+✔ B5 durationMs 防伪矩阵：有限≥0 才透传；负数/NaN/±Infinity/字符串/null/布尔一律丢弃 (0.279ms)
+✔ B6 坏件 11 类 ⇒ 诊断形（PROJECTION_FAILED）且绝不抛 (0.2382ms)
+✔ B7 重复投影幂等：project(project(x)) 与 project(x) 形状逐字相等（含截断/脱敏/omitted 三形态） (0.2855ms)
+✔ B8 live emit：详细经过投影单点（脱敏＋summary 定格「已思考」）；随载荷 summary 绝不外流 (10.7994ms)
+✔ B8b live emit：违规/坏件经单点归一（omitted 带正文清空；坏件 ⇒ 诊断形＋诊断 summary）；durationMs 非法丢弃 (2.6893ms)
+✔ B8c live＋持久化：落盘事件＝投影形（队列所见＝盘面所见，原始正文不落盘） (18.7361ms)
+✔ B9 历史读取：存量投影形幂等归一（形状不变）；原始形态过同单点（脱敏/违规清空/坏件→诊断） (7.4636ms)
+✔ B10 两路同单点：同输入 live 投影 == 历史投影 == 直接单点调用（形状逐字一致） (10.7167ms)
+✔ B11 Service 注入：set⇒恰值注入字段；unset⇒字段缺席；invalid⇒字段缺席＋诊断＋会话照开；跨键不串；demo 恒缺席 (15.2801ms)
+✔ B11b 重建重读（新会话生效语义）：env 改档 ⇒ 新适配器实例（新会话）读到新值；同实例同角色缓存不重读（既有语义） (4.2616ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 358.6321
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g5-reasoning-verify/c-claude.test.ts =====
+✔ C1 映射：未设零参数（无 thinking/effort 键）；off⇒thinking disabled；四档⇒effort 直通；max 不收编（零参数） (17.0412ms)
+✔ C2 捕获：thinking 正文⇒complete 原始事实（不预脱敏）；空串⇒omitted；redacted_thinking⇒omitted；durationMs 恒不携带 (1.6619ms)
+✔ C3 降级正向：4xx＋参数词元 ⇒ 恰一次去参数重发（新引擎无参数）、同输入原地重推、本轮继续；此后零参数 (2.5192ms)
+✔ C3b 负例：5xx/无参数词元/错误模型/鉴权/运输错误不误触发兼容 (6.2991ms)
+✔ C3c 兼容失败恢复配置：每轮最多一次尝试，下一轮重施原 off，绝不记忆未成功候选 (3.8642ms)
+✔ C4 默认也能兼容；已有真实输出时不重放用户任务 (2.8039ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 234.8949
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/g5-reasoning-verify/compatibility-loopback.test.ts =====
+✔ 独立真实 Claude：low 被拒后 HTTP 真正无 thinking/output_config，同任务及下一轮 completed (893.4564ms)
+ℹ {"runtime":"claude","wire":[{"model":"claude-sonnet-4-6","thinking":{"type":"adaptive","display":"updates"},"outputConfig":{"effort":"low"}},{"model":"claude-sonnet-4-6","thinking":null,"outputConfig":null},{"model":"claude-sonnet-4-6","thinking":null,"outputConfig":null}],"configurations":[{"effort":"low","effortEnv":null,"thinkingEnv":null},{"effort":null,"effortEnv":"unset","thinkingEnv":"1"}]}
+✔ 独立真实 Codex：目录内 gpt-5.5 仅拒 effort 字段必须真正去参，同任务及下一轮完成 (870.4757ms)
+ℹ {"runtime":"codex","wire":[{"model":"gpt-5.5","reasoning":{"effort":"high"}},{"model":"gpt-5.5","reasoning":{}},{"model":"gpt-5.5","reasoning":{}}],"outcomes":["completed","completed"]}
+✔ 独立真实 Pi：工具完成后下一请求兼容保留 tool_result，工具与原生 prompt 各执行一次 (659.1479ms)
+ℹ {"runtime":"pi","promptCalls":1,"toolCalls":1,"wire":[{"model":"independent-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"toolResultPresent":false},{"model":"independent-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"toolResultPresent":true},{"model":"independent-model","thinking":null,"toolResultPresent":true}]}
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2664.0628
+===== EXIT 0 WALL 3s =====
+===== FILE: test/测试/g5-reasoning-verify/d-codex.test.ts =====
+✔ D1 五值校验：越界值（max/minimal/none/大小写/数字/空串）一律装配前抛错且零副作用；五合法值可装配 (193.8264ms)
+✔ D2 注入：四档恰一条独立顶层标量 `-c model_reasoning_effort="<值>"`（不与 mcp_servers 同条）；未设/off 零注入 (75.6956ms)
+✔ D2b off 与未设不注入参数；配置提示只在 active prompt 内，不声称推理已关闭 (31.0509ms)
+✔ D3 事件面：完成态恰一行；content 优先、仅摘要回退、全空/仅空串⇒omitted；非字符串项过滤；durationMs 仅双信号 (30.7266ms)
+✔ D3b 增量帧零行：三个 reasoning 增量方法只消费不产行、不误报工具行 (32.6447ms)
+✔ D4 字段拒绝后去覆盖重建：新 native ID、同输入、completed 后才提示成功 (18.0294ms)
+✔ D4b 精确默认档同线程继续；兼容失败/取消后下一轮仍用 high (122.635ms)
+✔ D4c 精确字段也不得重放已有输出或已开始工具；普通错误与错误模型不兼容 (139.6594ms)
+✔ D4d 去覆盖仍失败：不伪成功、不无界重试，下一轮恢复原 high (47.2602ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 818.028
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/g5-reasoning-verify/e-pi.test.ts =====
+✔ E1 off 前置修复：克隆模型 thinkingLevelMap.off 由 null 收窄为 undefined（clamp 真返回 off）；修复前对照＝minimal 假关闭；xhigh 原样 (541.7998ms)
+✔ E2 请求接线：未设重施 SDK 默认 medium；显式档映射保留；off 真关闭，所有档均有请求保护 (156.8028ms)
+✔ E3 R1 修复（自证网关）：两修复窗（cw=5000 转 disabled / 5700 钳入合法区间）＋第三窗（9000：SDK 自合法或修复后合法）全部放行；修复诊断如实 (82.0643ms)
+✔ E4 默认预算保护：未设 cw=5000 在 HTTP 前关闭非法 thinking，提示且同轮完成 (30.5741ms)
+✔ E5 捕获：思考正文进事实（raw 形态、时长真实信号）、text 行零改动；thinking 先于 text；redacted⇒omitted；text-only 零推理行 (24.19ms)
+✔ E5b extractReasoningFacts 对抗单元：坏形状/非串正文/非对象块/混合 redacted——不抛、如实 (0.1753ms)
+✔ E6 请求级兼容：思考参数 400 后同输入重发，正常结果后提示成功；prompt 不重放 (37.9937ms)
+✔ E6b 兼容失败不记忆：每轮最多一次请求切换，次轮恢复保存的 low (13.0996ms)
+✔ E6b-negative 普通 400 不去参，不污染下一轮保存策略 (9.3394ms)
+✔ E6c 429 排除窗：瞬时态不归拒绝类 ⇒ 零降级（SDK 层重试原样携带思考；ANS 不发去参数重发、无通知、无诊断） (14069.8043ms)
+✔ E6d 中断守卫：prompt 包装层不重放已中止用户输入 (0.4477ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15098.9448
+===== EXIT 0 WALL 16s =====
+===== FILE: test/测试/g5-reasoning-verify/f-settings.test.ts =====
+✔ F1 三字段：键＝冻结 env 键逐字；labelKey 经目录解析回「推理强度」；可选非机密；choices 值域与冻结五值单一来源（Codex 无 off） (1.0695ms)
+✔ F2 help 文案：三平台同一 helpKey 经目录解析为「维持平台默认／档位梯／思考计入输出 tokens」（计费如实在位） (0.1301ms)
+✔ F3 choices 拒：非法值如实拒绝、零落盘、错误不回显提交值原文、错误列出值域；值域按运行时（codex 拒 off；claude 收 off） (35.6119ms)
+✔ F4 trim 规范形：带空白提交按 trim 后规范形写盘；非规范大小写如实拒绝（写侧只收规范值，读侧宽松属读取态） (8.257ms)
+✔ F5 空串/纯空白清除合法：写盘清除、读取回落未设态（source=default） (22.2045ms)
+✔ F6 批量原子：同批含非法档位 ⇒ 整批拒绝（合法键也不落盘）；未知键静默过滤（现状）；URL 校验现状不动 (12.6392ms)
+✔ F7 读取链：choices 元数据经视图透传（控件数据源）；推理键来源五态（unset/default/file/environment）如实 (19.9097ms)
+✔ F8 pi-config 与注册表逐键对齐（漂移守卫现值）；旧面板路径无值域校验（如实钉，不复制第二份判定） (21.4673ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 227.3478
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/git-action-activation-e2e.test.ts =====
+✔ P1.2-AC-31：activation 发布 E2E（真实 plan→D3→nominator 回合；sidecar {candidate,publication} 两键 + ref/journal + 发布回执；无 native） (42740.6267ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43075.5212
+===== EXIT 0 WALL 43s =====
+===== FILE: test/测试/git-action-commit-claude-e2e.test.ts =====
+✔ AC-1：Claude product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中） (51059.7746ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51383.7483
+===== EXIT 0 WALL 52s =====
+===== FILE: test/测试/git-action-commit-pi-e2e.test.ts =====
+✔ AC-2：Pi product 角色在受保护项目内完成 git_candidate commit 完整链（sidecar {candidate}/journal/ref/对象，无 native 前提、旧注册表级码零命中） (52338.4362ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 52664.0571
+===== EXIT 0 WALL 52s =====
+===== FILE: test/测试/git-action-cross-runtime-audit-failure.test.ts =====
+✔ AC-16 集成：sidecar 写入失败 ⇒ git-action-audit-unavailable，无 .git/init.json/ref 副作用（write-ahead 失败即不执行） (141.1103ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 438.6462
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/git-action-cross-runtime-codex-init.test.ts =====
+✔ P1.2-AC-27 Codex actor：native 事实不可用仍可 init（动作时授权）；sidecar 无 nativeStatus、init.json 真实存在 (523.4191ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 829.5959
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/git-action-cross-runtime-init.test.ts =====
+✔ P1.2-AC-27 Codex 创建期对照：responses（native 不可用）⇒ plan 省略 native 仍发 token；chat/off（observed）⇒ 记录可选强证明 (19.4366ms)
+✔ AC-1/AC-6/AC-7/P1.2-AC-28 Claude actor：多 active 会话（Pi/Claude）与 foreign MCP 不阻断 init；sidecar 两键 digest、optionalEvidence 记录 (482.3574ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 799.9935
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/git-action-cross-runtime-pi-init.test.ts =====
+✔ AC-2 Pi actor：受保护 + 角色 ACL 内 git_candidate init 动作时授权通过；sidecar/template/optionalEvidence 正确 (500.5472ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 796.9475
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/git-action-delivery-claude-e2e.test.ts =====
+
+  #  C:\Users\51054\AppData\Local\Programs\nodejs\node.exe[25124]: void __cdecl node::CleanupQueue::Add(Callback, void *) at src\cleanup_queue-inl.h:24
+  #  Assertion failed: (insertion_info.second) == (true)
+
+----- Native stack trace -----
+
+ 1: 00007FF7B1006536 node::SetAbortHandler+54
+ 2: 00007FF7B10060E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+ 3: 00007FF7B111D5C3 node::SetCppgcReference+356435
+ 4: 000001D9EC48F77E 
+
+----- JavaScript stack trace -----
+
+1: destroyTracking (node:internal/async_hooks:344:3)
+2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+3: readdir (node:internal/fs/promises:1669:13)
+4: noLinks (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/provider/trunk/impl/git-command.ts:506:31)
+5: noLinks (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/provider/trunk/impl/git-command.ts:510:37)
+
+
+✖ test\测试\git-action-delivery-claude-e2e.test.ts (62084.1175ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 62088.6508
+
+✖ failing tests:
+
+test at test\测试\git-action-delivery-claude-e2e.test.ts:1:1
+✖ test\测试\git-action-delivery-claude-e2e.test.ts (62084.1175ms)
+  'test failed'
+===== EXIT 1 WALL 62s =====
+===== FILE: test/测试/git-role-workflows-e2e.test.ts =====
+✔ Q30 fixture HTTP preserves split UTF8 and byte budget (13.2192ms)
+✔ Q74 owned Git metadata observer atomic rename race remains bounded and strict (76.7914ms)
+﹣ Q75 persisted governance status pointer is information only and bound across Desktop rebuild (0.1198ms) # SKIP
+﹣ Q87 quality document filename version keeps schema and actual metadata bindings (0.0572ms) # SKIP
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.355Z","stage":"begin-owned-cleanup","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.355Z","stage":"begin-owned-cleanup","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.355Z","stage":"before-desktop-stop-all","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.355Z","stage":"before-desktop-stop-all","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.360Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.360Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.360Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.360Z","stage":"before-documents-dispose","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.361Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.361Z","stage":"after-documents-dispose","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.361Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.361Z","stage":"owned-http-server-closed","resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.361Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.361Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.363Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":1,"serverCloseCallbacks":1},"ownSockets":1}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.364Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":2,"serverCloseCallbacks":1},"ownSockets":0}
+Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-09T16:16:02.367Z","resources":["CloseReq","PipeWrap","PipeWrap"]}
+✔ Q18 minimal Desktop lifecycle runner diagnostic (366.4025ms)
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.617Z","stage":"begin-owned-cleanup","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.616Z","stage":"begin-owned-cleanup","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap","Timeout"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.617Z","stage":"before-desktop-stop-all","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.617Z","stage":"before-desktop-stop-all","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.621Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.621Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.622Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.622Z","stage":"before-documents-dispose","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.622Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":0},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.622Z","stage":"after-documents-dispose","resources":["FSReqPromise","CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.622Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.622Z","stage":"owned-http-server-closed","resources":["FSReqPromise","CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.623Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":0,"serverCloseCallbacks":1},"ownSockets":2}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.623Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","CloseReq","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.623Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPSocketWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":1,"serverCloseCallbacks":1},"ownSockets":1}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:16:02.624Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap"],"http":{"requests":6,"handlersActive":0,"responsesFinished":6,"responsesClosed":6,"responsesInflight":0,"socketsOpened":2,"socketsClosed":2,"serverCloseCallbacks":1},"ownSockets":0}
+Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-09T16:16:02.627Z","resources":["CloseReq","PipeWrap","PipeWrap"]}
+✔ Q22 minimal real denied write blocked report cleanup (260.6901ms)
+﹣ Q22 explicit outer failure after real blocked cleanup (0.1299ms) # SKIP
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.863Z","stage":"begin-owned-cleanup","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"]}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.863Z","stage":"before-desktop-stop-all","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.865Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.865Z","stage":"before-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.865Z","stage":"after-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.865Z","stage":"owned-http-server-closed","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:16:02.865Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-09T16:16:02.865Z","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q_OWNED_BUSINESS_CHILD_SPAWN {"runNonce":"31ba4ea5-bf0c-498f-8eea-1d927b2d9017","caseTag":"default-new-31ba4ea5-bf0c-498f-8eea-1d927b2d9017","parentPid":9268,"childPid":24696,"deadlineAt":1794241262872,"outerDeadlineAt":1794241292872}
+✔ Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface (236.7793ms)
+Q_OWNED_BUSINESS_CHILD_START {"at":"2026-11-09T16:16:03.279Z","runNonce":"31ba4ea5-bf0c-498f-8eea-1d927b2d9017","caseTag":"default-new-31ba4ea5-bf0c-498f-8eea-1d927b2d9017","pid":24696,"parentPid":9268,"deadlineAt":1794241262872,"source":[{"file":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\git-role-workflows-e2e.test.ts","sha256":"27bbb12f4c573b64c1dff6d7ca8d9376df0d5301a11a2bc0c2ff251f7665efa5"},{"file":"C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\git-role-workflows-driver.ts","sha256":"4ac85b7562a6b70f1884f047e483f77d311522b8f2ac7c7313d0e567ead3b326"}],"nodeTestRuntimeLoaded":false,"registeredTestCount":0}
+Q_PERSISTED_CHILD_OBSERVED {"at":"2026-11-09T16:17:12.988Z","taskId":"t-mw9gs7l7-5f730b9c","parentRef":{"kind":"assigned-task","taskId":"t-mw9gs38c-4ddc2916","ledgerSha256":"208b50f69b4ff65a80fabdb7dece43f214a973eb3136d08142122de8d76d6dd5"},"runId":"run-hub-812b05b49a120b94cc81c09103e73428492549febad84cd3","state":"pinned"}
+Q_WORKER_CANDIDATE_PREPARED {"at":"2026-11-09T16:17:32.215Z","candidate":{"objectFormat":"sha1","hex":"bdc548f1d6b03d8acabea00b14b36d2185355a07"},"tree":{"objectFormat":"sha1","hex":"0a7240dc59231ad2365d4fc7927462b97aa0b5e6"},"journalId":".ans/trunk/operations/ff5b50a02d46a979e168c5c550050a7f104f0ec177b95ba19614c85900bccdea/git.json"}
+Q_INTEGRATED_CANDIDATE_PREPARED {"at":"2026-11-09T16:17:47.444Z","candidate":{"objectFormat":"sha1","hex":"d9bc357f8e6f9d9a6f5067957a1ba31427cd8bbf"},"tree":{"objectFormat":"sha1","hex":"0a7240dc59231ad2365d4fc7927462b97aa0b5e6"},"parents":[{"objectFormat":"sha1","hex":"1829586c0167ed8ab718fcf45a97302145c588f2"},{"objectFormat":"sha1","hex":"bdc548f1d6b03d8acabea00b14b36d2185355a07"}],"journalId":".ans/trunk/operations/5b9fc5f7a161b2ea8bfd4ed9bee889078540b1e7cad0f078ad1b88946d00c6bd/git.json"}
+Q_VERIFIER_HTTP {"at":"2026-11-09T16:18:07.628Z","taskId":"t-mw9gt4gv-087cb111","candidate":{"hex":"d9bc357f8e6f9d9a6f5067957a1ba31427cd8bbf","objectFormat":"sha1"},"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_request_confirmation","ans_request_choice","ans_submit_report","ans_contract_check","ans_doc_format","ans_evidence_check","ans_project_state","ans_governance_matrix","ans_git_query","ans_git_candidate","ans_git_publish"]}
+Q_DELIVERY_PUBLISHED {"at":"2026-11-09T16:19:09.193Z","ref":"refs/ans/delivery/q2-new","oid":{"objectFormat":"sha1","hex":"d9bc357f8e6f9d9a6f5067957a1ba31427cd8bbf"},"journalId":".ans/trunk/operations/bb072d272b973f20532c595f542d7b5bced3d5f0c284637e27126ebe2616cb61/git.json"}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.508Z","stage":"begin-owned-cleanup","closed":true,"resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":0},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.507Z","stage":"begin-owned-cleanup","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap","Timeout"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.509Z","stage":"before-desktop-stop-all","closed":true,"resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":0},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.509Z","stage":"before-desktop-stop-all","resources":["CloseReq","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.537Z","stage":"all-desktop-sessions-stopped","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":0},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.537Z","stage":"all-desktop-sessions-stopped","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.538Z","stage":"before-documents-dispose","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":0},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.538Z","stage":"before-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.539Z","stage":"after-documents-dispose","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":0},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.539Z","stage":"after-documents-dispose","resources":["FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.541Z","stage":"owned-http-server-closed","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":1},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.541Z","stage":"owned-http-server-closed","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.542Z","stage":"owned-cleanup-returned","closed":true,"resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":30,"serverCloseCallbacks":1},"ownSockets":1}
+Q_DRIVER_TEARDOWN {"at":"2026-11-09T16:19:18.542Z","stage":"owned-cleanup-returned","resources":["FSReqPromise","FSReqPromise","PipeWrap","PipeWrap","TCPServerWrap","TCPSocketWrap"]}
+Q18_DESKTOP_LIFECYCLE {"at":"2026-11-09T16:19:18.544Z","stage":"owned-socket-close-after-stop","closed":true,"resources":["FSReqPromise","PipeWrap","PipeWrap"],"http":{"requests":94,"handlersActive":0,"responsesFinished":94,"responsesClosed":94,"responsesInflight":0,"socketsOpened":31,"socketsClosed":31,"serverCloseCallbacks":1},"ownSockets":0}
+Q_DRIVER_DISPOSE_AWAITED {"at":"2026-11-09T16:19:18.547Z","resources":["CloseReq","PipeWrap","PipeWrap"]}
+Q_OWNED_BUSINESS_CHILD_RETURN {"runNonce":"31ba4ea5-bf0c-498f-8eea-1d927b2d9017","caseTag":"default-new-31ba4ea5-bf0c-498f-8eea-1d927b2d9017","pid":24696,"completed":true}
+Q65_BOUNDED_HANDOFF_PROTOCOL actual shortenSummary/200 boundary, exact code+reason+op, terminator, actual own task/run/target guards verified; no business/runtime/approval state created
+✔ Q2 P2 first new project: empty public chief -> formal convener bootstrap before future planning/D3/cards (196087.7966ms)
+✔ Q36 shared full business registration identity (3.3275ms)
+﹣ Q37 CHANGE existing-delivery entry to actual product draft creator-close (0.0909ms) # SKIP
+﹣ Q43 CHANGE real intent confirmation and version2 planning creator-close (0.0261ms) # SKIP
+﹣ CHANGE actual v2 publication and frozen-run mode (0.0198ms) # SKIP
+﹣ CHANGE standalone replacement admission diagnostic, not creator-report continuity (0.0151ms) # SKIP
+﹣ Q48 hub ordinary no-Git product draft report and Chief typed close (0.0167ms) # SKIP
+﹣ Q59 Product same-candidate denied write recovers within original task (0.0137ms) # SKIP
+﹣ Q70 workflow formal Product blocked Chief rework and real same-goal draft recovery (0.0134ms) # SKIP
+﹣ Q71 Nominator formal blocked Chief rework and customer-visible stop (0.0134ms) # SKIP
+﹣ Q72 Convener ordinary preparation formal blocked Chief rework and visible stop (0.0133ms) # SKIP
+ℹ tests 19
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 12
+ℹ todo 0
+ℹ duration_ms 197479.6756
+===== EXIT 0 WALL 198s =====
+===== FILE: test/测试/git-run-stop-host-continuation-e2e.test.ts =====
+✔ AC-8/P1.2-AC-25：deferred run-stop 宿主继续 finalize（Claude requester + Pi 成员；host-continuation + drain + run transition journal；无 sidecar） (49085.7712ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 49413.245
+===== EXIT 0 WALL 49s =====
+===== FILE: test/测试/governance-e2e-auto/i-full-chain.test.ts =====
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (49.9644ms)
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (45.1271ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1995.0162
+
+✖ failing tests:
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:131:1
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (49.9644ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:149:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:187:1
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (45.1271ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:201:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 2s =====
+===== FILE: test/测试/governance-liaison-verify/f-cli.test.ts =====
+✔ AC21：ans govern 的 --function 仍只接受 proposal|nomination|schedule，liaison 明确拒绝 (0.8079ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 87.1282
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/governance-matrix-integration.test.ts =====
+✔ T1-01/02/03/06 真实 openRoleSession + 三真实适配器：chief 必读块固定位置；五非幕僚/worker 无段；六角色工具注入才注册 (130.3016ms)
+✔ T1-04 真实 single/su：无提示段、无工具（与无矩阵能力基线一致） (17.8841ms)
+✔ T1-05 判断会话（真实 createGovernanceJudge 入口）：不注入矩阵能力/提示段 (10.5879ms)
+✔ T1-07 工具参数矩阵（经 Provider 工具 handler）：roleId/section 过滤、未知 roleId 不回显、非法参数拒绝 (52.9771ms)
+✔ T1-08 只读 + 零账本 + gate 判定不变（Provider handler → Pipeline 注入函数 → 真实 listProject） (28.4449ms)
+✔ T1-09 内置六角色字段完整且与真实注册表/Model 常量逐字段相等（chief/convener dispatch=true、shell=operator-approve、硬拒只含 forbiddenWritePaths） (2.7388ms)
+✔ T1-10/11/12 worker 行、issue、归档/保留 id：真实 listProject + 共享解析 + 矩阵渲染 (38.6893ms)
+✔ T1-13 acceptance 只来自 resolveBoundary；listing 的 acceptance 是占位；中途新增角色 acceptance-unavailable (44.1564ms)
+✔ T1-14/15 派发导航：Model 常量实时相等、卡种快照来源、target:"application"（R-9）、无编造角色；源码单一来源 (16.7714ms)
+✔ T1-16/17 启动快照不自动改写；工具刷新 generatedAt；中途新增角色 acceptance-unavailable；跨会话无缓存 (51.3181ms)
+✔ T1-18 枚举失败（项目根异常）：会话仍开、degraded、worker 段不可用、不误报未 bootstrap (7.0044ms)
+✔ T1-19 未 bootstrap / 全坏目录 / 单角色失败隔离 / 归档不出行 (48.4422ms)
+✖ T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入 (32.3585ms)
+✔ T1-22 矩阵计算与工具调用不写项目文件/账本/trunk/VCA/冻结/stable-write (29.4538ms)
+✔ T1-23 有界渲染：16,000/48,000/1,500 与单字段上限、截断标注、不注入执行原则长文 (351.8954ms)
+✔ T1-24 恶意/超长/含指令角色卡：数据化包裹、固定声明、清洗、[marker removed]、无未转义块边界 (27.9686ms)
+✔ T1-25/26 i18n messages 不含矩阵 key（模型可见文本不进 i18n）；摘要声明/固定句逐字、无授权字段 (20.3171ms)
+✔ T1-27 桌面端到端：真实 openRoleSession + 只读导入 buildProjectConfig（幕僚含矩阵、worker 无矩阵、无新增 IPC 依赖） (29.5008ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 17
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1244.3402
+
+✖ failing tests:
+
+test at test\测试\governance-matrix-integration.test.ts:1116:1
+✖ T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入 (32.3585ms)
+  AssertionError [ERR_ASSERTION]: 矩阵模块不得被非授权消费方导入：src/common/编排/doc-format-specs.ts
+  + actual - expected
+  
+  + [
+  +   'src/common/编排/doc-format-specs.ts'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-matrix-integration.test.ts:1166:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/common/编排/doc-format-specs.ts' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 2s =====
+===== FILE: test/测试/i18n-integration.test.ts =====
+✔ 共享目录：parity、插值、复数、回退与稳定诊断码（唯一实现） (4.1408ms)
+✔ 偏好文件：形状、缺失不写、原子写、损坏/版本/非法 locale 与不可写降级 (24.905ms)
+✔ preferences IPC：通道名、get 形状、成功广播/失败不广播、失败文案按当前 locale (5.6252ms)
+✔ locale store：首屏镜像、文件权威、广播、失败回滚、IPC 降级、非法镜像诊断 (0.4669ms)
+✔ locale store + 真实 preferences 服务：切换 → 文件 → 重启保持；项目切换不改变 locale (14.457ms)
+✔ 主进程/渲染层消费同一 shared key；RUNTIME_SETTINGS key 解析回 label/help/choiceLabels（zh/en） (1.2993ms)
+✔ 单一目录/单一实现：无第二份 messages/resolver/插值；facade 只再导出 shared (156.2646ms)
+✔ 旧 zh 输出逐字不变、locale 白名单/机器标识不翻译 (0.3026ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 624.0892
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/kanban-fixes-verify/f1-timeout.test.ts =====
+✔ F-1 env 2000ms：到期终止、如实文案、execution.timedOut；轮次信号不受影响、后续命令照常 (2172.0302ms)
+✔ F-1 孙进程终止：超时后进程组一并收口（孙进程 pid 消失） (2113.5912ms)
+✔ F-1 SIGKILL 升级：SIGTERM 免疫子进程不再有机会写入 late 文件 (4925.41ms)
+✔ F-1 解析链与不误杀：显式选项优先于 env；快命令在大时限下照常完成 (52.085ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9484.0241
+===== EXIT 0 WALL 9s =====
+===== FILE: test/测试/kanban-fixes-verify/f2-claim-release.test.ts =====
+✔ F-2 场景 1（跨目标不阻塞）：A 的 send 挂起期间派发 B ⇒ B 立即收到（不待 A 轮结束） (245.696ms)
+✔ F-2 场景 2（同目标仍排队）：投递进行中再派同目标 ⇒ 排队不并发；settled 后按序放行 (645.608ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1274.8868
+===== EXIT 0 WALL 2s =====
+===== FILE: test/测试/kanban-fixes-verify/f3-length-followup.test.ts =====
+✔ F-3 截断→恰一次补发：第二轮文本=常量；截断行与补发通知行各恰一条；settled 恰一次 (1.4526ms)
+✔ F-3 env 关闭即不补：显式关闭值解析为关；enabled:false → 恰一轮、无补发通知；settled 携截断事实 (0.194ms)
+✔ F-3 已成功交报告不催交：wasReportSubmitted=true → 恰一轮、无补发行 (0.1405ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 127.8179
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/kanban-fixes-verify/f4-operator-channel.test.ts =====
+✔ F-4-M1：未设专用 env 时确认超时**跟随** ANS_PI_SHELL_REVIEW_TIMEOUT_MS（不再被静默钉在 120s） (207.9614ms)
+✔ F-4-M1 专用覆盖优先：ANS_DESKTOP_OPERATOR_CONFIRM_TIMEOUT_MS 压过 shell 审核预算 (166.1012ms)
+✔ F-4-M2：超时以带标记原因经组合信号传播到呈现侧（presenter 可据此分流文案） (186.8891ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 866.4604
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/kanban-fixes-verify/f5-f6-verification.test.ts =====
+✔ F-5 F4：拒绝如实 + 可操作指引；「允许写入的路径」= 当前已发行可写集（多 issued + 越界滤除） (2.2013ms)
+✔ F-5 F4：条件未激活的已发行项不计入「当前可写」；条件激活后计入并可真实放行 (0.8983ms)
+✔ F-5 非 F4 分支回归：未匹配为目标拒绝时列表仍为边界覆盖（语义未被 F4 修改波及） (0.5483ms)
+✔ F-6-1 刷新恢复：首查拒 → 刷新一次 → 重试放行落盘；恢复后直走新门禁（不再刷新） (25.6395ms)
+✔ F-6-1 仍拒：链式原因两段事实（原判 + 重试仍拒）、零副作用；刷新失败/无闭包同样如实 (0.7706ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 170.7011
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/kanban-fixes-verify/f7-guard.test.ts =====
+✔ F-7 阻断：独立操作符与紧贴重定向 token 一律「未执行」拒绝、不调 gate、不 spawn (5.0083ms)
+✔ F-7 放行并真实执行：引号内 `\|` 与未加引号反斜杠前导 `\|` 的 grep（真机证据命令口径） (46.023ms)
+✔ F-7-opt1：内嵌未加引号 `x|sort` 拒绝（附加引号指引）；词中 &（URL）不判 (0.4395ms)
+✔ F-7-opt2：未加引号 $HOME / $(...) 拒绝；'$HOME' 引号态放行并真实执行出字面量 (25.334ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 289.134
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/lightweight-permission-repairs.test.ts =====
+✔ D3 AC1/2: real handler refuses cross-role aliases and real-target writeSet omissions before any write (8.509ms)
+✔ D3 AC2: complete alias authorization and a symlink project root still write; root escape and file symlink stay denied (26.3323ms)
+✔ D3 AC7: second real gate observes revoked task scope after mkdir and stops before file commit (3.2898ms)
+✔ D3 AC3: Windows-shaped paths and script suffixes review without claiming Windows native execution (1.0994ms)
+﹣ D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute (0.0585ms) # SKIP
+﹣ D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives (0.0641ms) # SKIP
+﹣ D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking (0.0339ms) # SKIP
+﹣ D3 AC6: real write/edit preserve regular modes and new files use safe creation (0.0412ms) # SKIP
+﹣ D3 AC6: strict umask in isolated child cannot strip old executable mode (0.0383ms) # SKIP
+﹣ D3 AC7: chmod/fsync failure and abort do not commit or leave a temp (0.1052ms) # SKIP
+ℹ tests 10
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 6
+ℹ todo 0
+ℹ duration_ms 298.5754
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/network-state-e2e.test.ts =====
+✔ e2e 离线暂停：deadline 跨 idle 时限不超时；恢复后 resume 并正常完成；恰一条 settled、无 handback (231.3957ms)
+✔ e2e 离线超窗：network-offline-timeout 终态 failed；人话短报、detail errorCode；无额外 settled/handback (125.8491ms)
+✔ e2e F1：已知离线 + 探针异常 ⇒ 保持离线、不 resume deadline/不超时；真正恢复后正常完成 (258.8489ms)
+✔ e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次 (254.2114ms)
+✔ e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞、不 drain；真正恢复后恰投递一次 (315.1747ms)
+✔ e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ 恰一条人话 delivery-note，无技术 code (78.4394ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1755.3687
+===== EXIT 0 WALL 2s =====
+===== FILE: test/测试/p1p7-document-integration.test.ts =====
+✔ independent B: native grant, opaque reference, actual bounded file reads, revocation and project switch (16.4657ms)
+✔ independent B: accepted Windows restriction refuses native grants without issuing refs or reading bytes (5.3803ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 116.3059
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/p1p7-report-integration.test.ts =====
+✔ independent C pi: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (66.2429ms)
+✔ independent C codex: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (65.0289ms)
+✔ independent C claude: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt (66.4521ms)
+✔ independent C: failure after real ACK but before input save invokes no model and cannot repair by prompting (38.1528ms)
+✔ independent C: history failure after a real model call cannot turn storage retry into another prompt (32.2735ms)
+✔ independent C: an injected report storage failure retries the frozen member once without rerunning its model (21.5424ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 623.2696
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/p1p7-tool-display-integration.test.ts =====
+✔ independent pi: real shell effects, failures and protected details survive Core to Window history (178.1699ms)
+✔ independent codex: real shell effects, failures and protected details survive Core to Window history (170.1517ms)
+✔ independent claude: real shell effects, failures and protected details survive Core to Window history (161.8102ms)
+✔ independent A: a real non-tool engine failure must not become a tool display diagnostic (19.5307ms)
+✔ independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts (6.8993ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 852.8426
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/p1p7-window-provenance-integration.test.ts =====
+✔ independent C Window: failed source save and concurrent recovery continue one original delivery without source replay or raw IPC (118.7422ms)
+✔ independent C Window: initial source save and its notification continue one original delivery without source replay or raw IPC (70.3448ms)
+✔ independent C Window: failed target receipt and history-only recovery continue one original delivery without source replay or raw IPC (85.9972ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 674.8885
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/queue-recovery-e2e.test.ts =====
+✔ P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 restore 后自动续投一次（重启不排空不复现） (439.2135ms)
+✔ 2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久队列里的 demo 项不自动开会话、不投递 (352.0861ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1195.9295
+===== EXIT 0 WALL 2s =====
+===== FILE: test/测试/real-entry.test.ts =====
+✖ 真实入口:ans role run 编排 --task T-1 以 0 结束 (315.6188ms)
+✖ 真实入口:演示输出含角色/边界来源、两笔写入、按根分组、settled (319.9934ms)
+✖ 真实入口:演示**不产生新的** docs/scheduling 记录、也不改写既有管理记录(F3) (328.3771ms)
+✔ 真实入口失败路径非 0:未知角色 (311.6589ms)
+✔ 真实入口失败路径非 0:缺角色 id (82.2439ms)
+✔ 真实入口失败路径非 0:缺 --task (69.7591ms)
+✔ 真实入口失败路径非 0:--task 缺值 (86.3392ms)
+✔ 真实入口失败路径非 0:多余参数 (291.5846ms)
+✔ 真实入口失败路径非 0:未知命令 (77.465ms)
+✔ 真实入口失败路径非 0:未知 role 子命令 (70.537ms)
+✖ 真实入口失败路径非 0:govern 缺真实 Pi 适配器 provider 配置（环境已擦洗：ANS_PI_*/凭据/ANS_RUNTIME 不入子进程） (355.039ms)
+✔ 真实入口:help/doctor 以 0 结束 (152.5246ms)
+✔ 真实入口:ans init 已废除(作为未知命令以非 0 结束,且不再生成骨架) (143.5487ms)
+✔ 真实入口:doctor 打印装配自检与六个角色 (75.8427ms)
+✔ 真实入口:ans govern <空目录> → 非 0、不再报治理边界解析失败、如实报缺 provider 配置、目标目录零残留 (310.7887ms)
+✖ 真实入口:runCli 默认擦洗——跑测进程的 ANS_RUNTIME 与 Pi 凭据不传给子进程（哨兵值实测） (401.2757ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 11
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3485.2042
+
+✖ failing tests:
+
+test at test\测试\real-entry.test.ts:15:1
+✖ 真实入口:ans role run 编排 --task T-1 以 0 结束 (315.6188ms)
+  AssertionError [ERR_ASSERTION]: stderr=ans role run 会话失败：runtime-creation-prepared-api-unavailable
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/real-entry.test.ts:17:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\real-entry.test.ts:20:1
+✖ 真实入口:演示输出含角色/边界来源、两笔写入、按根分组、settled (319.9934ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /runtime 请求 write_file -> src\/evil\.ts/. Input:
+  
+  '[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md\n' +
+    '[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）\n' +
+    '[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项\n' +
+    '[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。\n'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/real-entry.test.ts:27:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md\n[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）\n[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项\n[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。\n',
+    expected: /runtime 请求 write_file -> src\/evil\.ts/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\测试\real-entry.test.ts:66:1
+✖ 真实入口:演示**不产生新的** docs/scheduling 记录、也不改写既有管理记录(F3) (328.3771ms)
+  AssertionError [ERR_ASSERTION]: 演示应成功；stderr=ans role run 会话失败：runtime-creation-prepared-api-unavailable
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/real-entry.test.ts:69:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\real-entry.test.ts:120:3
+✖ 真实入口失败路径非 0:govern 缺真实 Pi 适配器 provider 配置（环境已擦洗：ANS_PI_*/凭据/ANS_RUNTIME 不入子进程） (355.039ms)
+  AssertionError [ERR_ASSERTION]: 失败原因应如实报出；stderr=ans govern 失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/real-entry.test.ts:127:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'ans govern 失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown\n',
+    expected: /缺少 base URL/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\测试\real-entry.test.ts:197:1
+✖ 真实入口:runCli 默认擦洗——跑测进程的 ANS_RUNTIME 与 Pi 凭据不传给子进程（哨兵值实测） (401.2757ms)
+  AssertionError [ERR_ASSERTION]: 默认擦洗后应仍走演示路径；stderr=ans role run 会话失败：runtime-creation-prepared-api-unavailable
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/real-entry.test.ts:219:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 3s =====
+===== FILE: test/测试/request-timeout-e2e.test.ts =====
+✔ e2e 首字节超时：service+编排透传 failed/errorCode；恰一条 settled、无 handback、人话短报 (113.3214ms)
+✔ e2e 流空闲超时：请求已活动后静默 ⇒ request-timeout-idle；仍恰一条 settled、无 handback (100.207ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 607.2541
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/retry-safety-e2e.test.ts =====
+✔ e2e 首字节前流失败 ⇒ 自动重试至成功：恰一条 settled(completed)、恰一个 handback、不重复文本 (91.575ms)
+✔ e2e 重试耗尽：failed + MODEL_REQUEST_RETRY_EXHAUSTED、恰一条 settled、人话短报、恰一个 failed handback (89.805ms)
+✔ e2e 已输出文本后空闲超时 ⇒ 不重试：failed、attempts=1、replaySafe=false、无 request.retry (554.1006ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1156.6827
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/run-pin-e2e.test.ts =====
+✔ run-pin E2E：draft → pinned 同 runId；任务卡读回 pinned run (51.5673ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 212.5836
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/run-stop-host-continuation-integration.test.ts =====
+✔ host-continuation：真实 rapporteur 回合结束并 dispose（disposed+drain）⇒ gate ok；taskId/唯一性/turn 不符 ⇒ git-actor-core-binding-unproven (18.9789ms)
+✔ B1-EV3 drain：Claude/Pi 形态（status/processCoverage unknown、native absent）⇒ drained；非 idle Pi/活动面/清理失败/未知 reason ⇒ 阻断 (0.2276ms)
+✔ AC-8/AC-20 run-stop/controller-stop：成员=Core+可选 native；finalize 用 drain；present-but-changed 拒绝；host fence 保留；不写 sidecar (1.7511ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 335.201
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/runtime-dispatch-gate-integration.test.ts =====
+✔ P1-D：Claude/Pi 无 native 证据但应用面 verified 通过；Codex 受控 shell 走受限路径（P4/P6/P7 的跨层判定） (1.3327ms)
+✔ P1-D：nativeInstanceId 字面绑定——组合值传入派发父门后逐字比对（P1-A Amendment-1/N27） (0.2437ms)
+✔ P1-D：双路径互斥——observed + verified 拒绝；组合规则在严格 observed 时不产证据（N20/F15） (0.1452ms)
+✔ P1-D：应用中介证据的负例经真实组合规则缺席，派发父门拒绝（N11/N12/N22/N23/N26） (0.2524ms)
+✔ P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10） (43.1705ms)
+✔ P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧） (14.1444ms)
+✔ P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17） (74.3125ms)
+✔ P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19） (40.0516ms)
+✔ P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5） (34.2501ms)
+✔ P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段 (2.2708ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 524.6237
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/session-admission-approval-b2-gap-integration.test.ts =====
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ B2-AC2 Pi + 项目角色 + shellOperatorChannel：真实 openRoleSession 装配（file sink 审批链）⇒ prepareRole observed+token+approvalChain、真实 bind 成功、session.open.ready、appTools 含 shell (686.5192ms)
+✔ B2-AC4 claude 无 shell 工具：受保护会话 session.open.ready 且 appTools 不含 run_shell/start_background_task（无 approvalChain、无 native-factory-* 阻断） (43.9861ms)
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ B2-AC4 pi 无 shell 工具：受保护会话 session.open.ready 且 appTools 不含 run_shell/start_background_task（无 approvalChain、无 native-factory-* 阻断） (65.6636ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1090.983
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/session-admission-approval-integration.test.ts =====
+✔ D1-1 受保护 + 注册 shell + 真实 assemble*/createShellGate + file sink：准入 observed/token、bind 成功、session.open.ready、appTools 含 shell、plan.approvalChain (85.6048ms)
+✔ D1-2 裸函数 gate 无 binding ⇒ protected-scope-approval-chain-unproven；不 bind、无 session.open.ready、gate 零调用 (40.8433ms)
+✔ D1-3 审计不可用：memory/custom/无 probe/真实 file sink 被边界拒 ⇒ protected-scope-audit-unavailable（不创建） (34.1895ms)
+✔ D1-4 既有拒绝保留：custom factory / demo / unknown scope 仍拒（reason 不变） (17.8724ms)
+✔ D1-5 run_shell/start_background_task 端到端：allow/deny/timeout、entry 区分、拒绝/超时零执行 (155.8871ms)
+✔ D1-6 只读 Git 路由：命中经注入能力 match+execute（不 spawn）；能力缺席/未命中 ⇒ readonly-git-runner-unavailable；非 git 正常 spawn (32.5999ms)
+✔ D1-7 writeGuard 注入：接 (a) 装配路径硬拒裸 Git 写（不咨询审批）；只读档 c=deny 终结；后台入口 Git 拒绝 (11.9088ms)
+✔ D1-8 PR #72 契约：含 shell 会话 strict surface 仍 unknown；approvalChain/应用中介证据不被写/发布门消费 (19.0975ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 697.2108
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/session-admission-approval-q9-integration.test.ts =====
+✔ Q16 取代 P1.3-B1-AC-26：受保护 + 真实 Codex shell 会话在进程内时 actor init 动作时授权通过、旧注册表级拒绝码零产生；身份不符负例仍 fail-closed (554.4681ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 882.5278
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/shell-escalation-integration.test.ts =====
+✔ A/AC-26：真实工具注册 + 判拒→申请→allow-once→原样重试执行→二次回正常链；审计 customerGrant 与 escalation-decision (79.5367ms)
+✔ A2/AC-07：allow-session 原样重试可反复执行；会话 dispose 后授权失效（fail-closed） (218.9691ms)
+✔ B/AC-05/AC-06：客户拒绝与超时（expired）均按未获允许处理；回执如实、不可再申请、原样重试仍回正常链 (23.1514ms)
+✔ C/AC-08：会话总上限 5——第 6 次拒绝且不弹卡；同时最多 1 张待答（不排队、不消耗申请权） (12.0728ms)
+✔ C2/AC-08：同时最多 1 张待答卡——待答期间新申请直接拒绝且不消耗其申请权 (10.8596ms)
+✔ C3/AC-08：旧判拒记录在后续 allow 后立即清除 ⇒ 申请被拒（资格只认最近一次审核） (10.4662ms)
+✔ D/AC-01/AC-02：start_background_task 判拒不写入/不清除 run_shell 台账、不消费 run_shell 授权 (12.0305ms)
+✔ E/AC-07：脚本上下文 sha256 stale——授权作废、拒绝（customer-escalation:stale-context）、不可再申请 (0.6793ms)
+✔ F/AC-02/AC-12/AC-13：只读档不适用例行白名单——routine ⇒ readonly-deny（不调 operator/不弹卡），非 routine c-allow 仍放行 (4.8504ms)
+✔ F2/AC-02：readonlyOnly 构造期禁止注入 takeGrant；只读拒绝不消费既有 run_shell 授权 (3.8285ms)
+✔ G/AC-12/AC-13/AC-14：例行白名单形态在项目角色与内置审批档 c-allow、judge 调用=0；npm install 仍走既有判断 (5.1376ms)
+✔ H/AC-22/AC-33：judge 放行 / 客户手批 / 客户升级授权 / escalation-decision 四类字段可区分；deny 档放行保留 tier+hardDenyOverride (0.7602ms)
+✔ I/AC-07：c=allow 不消费一次性授权；c=deny 分类不消费、不放行（授权保留到下一次 review 匹配） (0.3192ms)
+✔ J/AC-20：暂停状态机 shell-only、非法输入不改状态；治理 approval 组不被暂停影响（按 main.ts 现有代码事实） (0.4885ms)
+✔ K/AC-09（E2 R2）：presenter 返回 pending ⇒ 不消耗申请权/会话额度、record 保持 recorded、无 escalation-decision 审计、不创建授权；解除后再次申请可 allow-once (11.1438ms)
+✔ L/AC-19（E2 R2）：判拒结果行 retryHint 同时含新措辞「可让角色申请客户确认」与兜底「关闭「替我审批」后重试」（旧子串语义保留） (0.3325ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 821.5573
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/shell-judge-verify/a-allow-flow.test.ts =====
+✔ 开关默认关：请求走原确认卡，判断 agent 0 次调用，审计人工且无 judge 字段 (10.2177ms)
+✔ 开启后 judge allow：0 卡、1 行、审计 operator:judge:<引擎> + judge 字段、诊断 allow 一条 (6.0578ms)
+✔ 项目角色链路（policy=project、tier=null）：judge allow 同样 0 卡并正确归因 (3.6453ms)
+✔ 关闭开关后恢复手动：后续请求重新弹卡，判断 agent 不再调用 (3.0776ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 460.746
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/shell-judge-verify/b-deny-flow.test.ts =====
+✔ judge deny + 替代方案：0 卡、结果行、请求角色收到原因+替代方案、审计 deny + judge (12.7126ms)
+✔ judge deny 无替代方案：0 卡、合成 customerMessage + 标准出路、仍 deny (5.0949ms)
+✔ deny 结果行投达失败：仍 deny、0 卡、审计仍归判断 agent (2.9576ms)
+✔ deny 后应用不自动重试：一次 gate 调用只产生一次判断与一条结论 (2.827ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 451.4363
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/shell-judge-verify/c-manual-flow.test.ts =====
+✔ 判断会话不可用：按拒绝处理、presenter 零调用、理由「判断服务不可用」、审计保留 manual (10.4788ms)
+✔ 判断超时：按拒绝处理、presenter 零调用、理由「判断超时」，底层会话被 abort/dispose (35.102ms)
+✔ 输出无法解析：模型散文不猜结论 ⇒ 按拒绝处理、理由「判断结果无法解析」 (4.4805ms)
+✔ allow + 读取被拒：真实驱动按「allow 必须无损」降级 manual/read-denied ⇒ 拒绝并带具体路径 (3.8169ms)
+✔ allow + 读取预算耗尽：真实驱动降级 manual/budget ⇒ 拒绝、理由「读取预算已用尽」 (4.1091ms)
+✔ allow + 读取截断：真实驱动降级 manual/read-truncated ⇒ 拒绝、理由「读取内容被截断」 (10.7797ms)
+✔ 防循环：同一命令连续 deny 达上限后不再调用模型 ⇒ 按拒绝处理、理由「已达重试上限」 (3.4622ms)
+✔ 引擎不支持（demo）：manual/unsupported-engine ⇒ 拒绝、不调用任何适配器、不跨引擎 (2.8199ms)
+✔ allow 结果行投达失败：按拒绝处理（不自动放行、不弹卡），审计保留 row-failed 与模型 allow 事实 (3.1745ms)
+✔ 判断请求超上限：命令 >16KB 直接 manual/context-too-large ⇒ 拒绝（不截断后猜） (4.9165ms)
+✔ 模型自报 manual：按拒绝处理、理由「自动代理自报无法判断」 (2.5621ms)
+✔ 对照：judge allow/deny 正常路径不变（manual 改造未波及模型主动结论） (5.7152ms)
+✔ 开关关闭：presenter 仍被调用（旧手动确认卡保留），判断 agent 0 次调用、审计归人工 (2.7271ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 538.1575
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/shell-judge-verify/d-switch-pending.test.ts =====
+✔ 已挂起卡：勾选开关不影响该卡，判断 agent 0 次调用；随后新请求才走判断 (27.4702ms)
+✔ 判断进行中关闭开关：以通道调用时点为准，本次结果仍生效；之后恢复手动 (11.3388ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 464.5686
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/shell-judge-verify/e-deny-tier.test.ts =====
+✔ deny 档 + judge allow：放行、0 卡、审计/诊断/结果行三处可辨识 (11.6578ms)
+✔ deny 档 + judge deny：仍 deny、0 卡、审计 tier:deny 但不带 hardDenyOverride (3.7533ms)
+✔ 普通 risky/review 放行不带 deny 档标记（防止标记泛化） (3.6176ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 438.7439
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/shell-judge-verify/f-readonly-sandbox.test.ts =====
+✔ 敏感文件/目录读取全部被拒且不泄露内容；列表不列敏感项 (19.7488ms)
+✔ 项目外绝对路径 / `..` / 符号链接逃逸被拒，不回显项目外绝对路径 (2.5268ms)
+✔ 二进制拒绝、单文件超限截断标记、读取调用预算耗尽 (3.6711ms)
+✔ Prompt injection 文件只是不可信数据：系统提示禁止遵循，驱动不因文件内容改变裁决 (6.5921ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 142.5685
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/shell-judge-verify/g-engine-matrix.test.ts =====
+✔ 运行时核心只读工具集：恰三项，无写/编辑/shell/交互/回交/派发/网络 (7.6225ms)
+✔ 判断驱动：适配器收到 deny-all 写门禁（判断会话结构性无写权限） (5.1794ms)
+✔ Service 装配：三引擎都只拿到三只 judge 工具、judgeMode:true、MCP 置空、不持久化 (13.0999ms)
+✔ Pi 假适配器判断模式：写/编辑/shell/交互/回交/派发不存在；judge 读取与 report 正常 (4.3629ms)
+✔ Pi 真实适配器 judgeMode：只注册三只 judge 工具、原生/服务端/MCP 关闭、不持久化 (626.257ms)
+✔ Claude 判断模式：原生工具面清空、allowedTools 恰三只、WebSearch/写/shell 显式禁用 (9.6718ms)
+✔ Claude 判断模式：误注入写/编辑工具在 SDK 加载前抛错（零副作用） (0.3945ms)
+✔ Codex 判断模式：仅注册三只 ans_ 判断工具、只读沙箱、网络关闭、写/shell 不存在 (20.7463ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1175.3706
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/su-shell-approval-verify/a-gate-policy.test.ts =====
+✔ A1 allow：直接放行、operator 0 次、branch c-allow、by 含（su 审批档）；审计字段齐备 (2.8662ms)
+✔ A2 risky × 批准：恰 1 次请求；branch c-risky→a-allow；allow=true (0.3757ms)
+✔ A2 risky × 拒绝：恰 1 次请求；branch c-risky→a-deny；allow=false (0.2103ms)
+✔ A2 risky × 不可用：恰 1 次请求；branch c-risky→a-unavailable；allow=false (0.1606ms)
+✔ A3 risky × 超时：恰 1 次请求；branch c-risky→a-timeout；deny (32.9334ms)
+✔ A2 review × 批准：恰 1 次请求；branch c-review→a-allow；allow=true (0.3207ms)
+✔ A2 review × 拒绝：恰 1 次请求；branch c-review→a-deny；allow=false (0.2487ms)
+✔ A2 review × 不可用：恰 1 次请求；branch c-review→a-unavailable；allow=false (0.1695ms)
+✔ A3 review × 超时：恰 1 次请求；branch c-review→a-timeout；deny (30.1154ms)
+✔ A2 deny × 批准：恰 1 次请求；branch c-deny→a-allow；allow=true (0.3006ms)
+✔ A2 deny × 拒绝：恰 1 次请求；branch c-deny→a-deny；allow=false (0.1406ms)
+✔ A2 deny × 不可用：恰 1 次请求；branch c-deny→a-unavailable；allow=false (0.0836ms)
+✔ A3 deny × 超时：恰 1 次请求；branch c-deny→a-timeout；deny (39.382ms)
+✔ A4 deny + approveDeny=false：既有硬拒 c-deny，0 次请求（回归） (0.4883ms)
+✔ A5 构造守卫四组：互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk 或 routineShellPolicy (0.3502ms)
+✔ A6 规则集加载失败 / 分类器抛错：fail-closed 且有稳定 branch（非审批放行） (0.2141ms)
+✔ A8 旧只读档回归：allow 直放；risky/review → readonly-deny、deny → 既有硬拒 c-deny；0 次 operator (0.2547ms)
+✔ A7 renderSuApprovalReason：前缀/档位 token/写边界风险披露为固定文本；detail 逐字进入 (0.0826ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 280.233
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/su-shell-approval-verify/b-arming-runrole.test.ts =====
+✔ B1 assembleOperatorShellGate：allow 0 卡；risky 出卡；审计落 sink；缺件 fail-closed (19.4309ms)
+✔ B2 assembleOperatorShellGate：无通道 ⇒ 装配抛错（不 arm） (3.9358ms)
+✔ B3 openRoleSession：su arm；项目角色误传 / 与 shellReadonly 互斥 / 装配失败 ⇒ 不 arm (29.0472ms)
+✔ B4 选项面 type 守卫：AssembleOperatorShellGateOptions 不含 pmAsk/pmRoleId/openSession/sessionDeps/routineShellPolicy (0.4876ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 351.588
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/su-shell-approval-verify/c-desktop-injection.test.ts =====
+✔ C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变 (14.1583ms)
+✔ C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly (7.2011ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 430.8099
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/su-shell-approval-verify/e-zero-execution.test.ts =====
+✔ E1 review（真实规则短 node -e）：批准 → 真实执行并产生哨兵；审计结论 allow (52.8844ms)
+✔ E2 review × 拒绝：零执行（哨兵不存在）；审计 branch=c-review→a-deny (2.2109ms)
+✔ E2 review × 不可用：零执行（哨兵不存在）；审计 branch=c-review→a-unavailable (1.6393ms)
+✔ E2b review × 超时：零执行（哨兵不存在）；审计 branch=c-review→a-timeout (47.8494ms)
+✔ E3 risky（测试分类器）：批准 → 执行；拒绝 → 零执行；branch 对应 (50.7089ms)
+✔ E4 review（不存在的程序）：批准 → 判定已放行但 spawn 失败如实（不假成功） (3.863ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 385.2384
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/t1-pipeline-integration.test.ts =====
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (73.1231ms)
+✔ T1 pi: the same controlled Core clock triggers the 100ms last resort outside customer waiting (15.2711ms)
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (48.6277ms)
+✔ T1 codex: the same controlled Core clock triggers the 100ms last resort outside customer waiting (12.4575ms)
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (50.4625ms)
+✔ T1 claude: the same controlled Core clock triggers the 100ms last resort outside customer waiting (12.0866ms)
+✔ T1 real outer failed remains one terminal and truthful handback after external cleanup completion (27.0932ms)
+✔ T1 real outer timed_out remains one terminal and truthful handback after external cleanup completion (62.6048ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 5
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 608.5837
+
+✖ failing tests:
+
+test at test\测试\t1-pipeline-integration.test.ts:54:3
+✖ T1 pi: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (73.1231ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      true,
+  -   true,
+      false,
+  +   false,
+      true
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:88:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true, false, false, true ],
+    expected: [ true, true, false, true ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\t1-pipeline-integration.test.ts:54:3
+✖ T1 codex: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (48.6277ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      true,
+  -   true,
+      false,
+  +   false,
+      true
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:88:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true, false, false, true ],
+    expected: [ true, true, false, true ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\t1-pipeline-integration.test.ts:54:3
+✖ T1 claude: real Pipeline confirmation pause → abort → stale yes → next write denied → current yes permits exact path/report (50.4625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      true,
+  -   true,
+      false,
+  +   false,
+      true
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-pipeline-integration.test.ts:88:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ true, false, false, true ],
+    expected: [ true, true, false, true ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/t1-real-cli.test.ts =====
+✖ T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write (327.2799ms)
+✔ T1 actual bin govern/pi: actual adapter and registered handler reject an out-of-boundary write (1048.6722ms)
+✖ T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write (537.2704ms)
+✔ T1 actual bin govern/codex: actual adapter and registered handler reject an out-of-boundary write (546.9963ms)
+✖ T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write (502.918ms)
+✔ T1 actual bin govern/claude: actual adapter and registered handler reject an out-of-boundary write (545.359ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 3
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3585.8329
+
+✖ failing tests:
+
+test at test\测试\t1-real-cli.test.ts:17:3
+✖ T1 actual bin role/pi: actual adapter and registered handler reject an out-of-boundary write (327.2799ms)
+  AssertionError [ERR_ASSERTION]: [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+  [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+  [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T1 写集 1 项
+  [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+  ans role run 会话失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-real-cli.test.ts:28:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\t1-real-cli.test.ts:17:3
+✖ T1 actual bin role/codex: actual adapter and registered handler reject an out-of-boundary write (537.2704ms)
+  AssertionError [ERR_ASSERTION]: [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+  [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+  [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T1 写集 1 项
+  [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+  ans role run 会话失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-real-cli.test.ts:28:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\t1-real-cli.test.ts:17:3
+✖ T1 actual bin role/claude: actual adapter and registered handler reject an out-of-boundary write (502.918ms)
+  AssertionError [ERR_ASSERTION]: [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+  [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+  [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T1 写集 1 项
+  [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+  ans role run 会话失败：runtime-creation-admission-unproven:runtime-protection-scope-unknown
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/t1-real-cli.test.ts:28:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 4s =====
+===== FILE: test/测试/t29-pi-config-roundtrip.test.ts =====
+✔ T29 往返：临时 .env 载入后，进程 env 拿到正确值（含 token），且回报只含键名 (9.9369ms)
+✔ T29 往返：载入后 resolvePiProviderConfig 成功构造（baseUrl/modelId/contextWindow/provider 正确） (1.7263ms)
+✔ T29 往返：ANS_PI_CONTEXT_WINDOW 缺失 → 不硬失败，采用系统默认值（新语义） (6.1483ms)
+✔ T29 往返：savePiConfig 改值 → 立即重载生效 + 新开 env 重载生效 + 适配器构造取到新值 (11.2677ms)
+✔ T29 往返：旧值仍在（只改相关键——载入不因保存而丢其它键） (9.2913ms)
+✔ T29 G-5：ANS_PI_REASONING_EFFORT 往返（save→reload→get 视图）＋ 面板键与注册表逐键对齐（漂移守卫） (10.1459ms)
+✔ T29 G-5：choices 元数据透传（注册表读取链）＋值域校验单一来源在注册表保存链（旧面板路径不复制判定，如实钉） (20.5628ms)
+✔ T29 单一来源：parse/merge/atomicWrite/read/save/loadEnvFileInto 只在 env-file.ts 定义 (34.1431ms)
+✔ T29 单一来源：桌面侧只读导入共享模块（无第二份实现） (1.6294ms)
+✔ T29 签名：resolvePiProviderConfig 与 createPiAdapterFactory 形参未扩（均为 2 参） (0.1241ms)
+✔ T29 签名：默认 .env 路径指向仓库根（只取字符串，不读该文件） (0.0921ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 415.4916
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/t29-write-discipline.test.ts =====
+✔ T29 纪律①：只改相关键——除目标键的值外，其余内容逐字节不变（自比对） (21.634ms)
+✔ T29 纪律②：已存在 → 就地替换值，键名/`=`/两侧空白/内联注释均不变 (11.6104ms)
+✔ T29 纪律②：键不存在 → 追加到末尾（前文逐字节不变；沿用原行尾符） (11.5463ms)
+✔ T29 纪律②：CRLF 原文 → 追加沿用 CRLF 行尾（不混行尾） (14.0408ms)
+✔ T29 纪律③：值含 = 空格 引号 # 反斜杠 → 写后读回逐字一致 (10.1054ms)
+✔ T29 纪律③：ANS_PI_PROVIDER 不是面板键——提交被忽略（不采纳、不落盘、已存在行原样保留） (15.2751ms)
+✔ T29 纪律④：写入后目录内无 temp 残留，目标内容完整（非半写） (13.6622ms)
+✔ T29 纪律④：atomicWriteText 直接调用——内容完整、无 temp 残留、覆盖原子 (23.0433ms)
+✔ T29 纪律⑤：目标目录不存在 → savePiConfig 显式失败，且不创建任何文件 (1.3939ms)
+✔ T29 纪律⑤：saveEnvFile 目标目录不存在 → 抛错（不静默） (1.0953ms)
+✔ T29 纪律⑤：readEnvFile 目标不存在 → 抛错（读取失败显式，不返回空） (0.6765ms)
+✔ T29 纪律⑤：目标是一个目录 → 抛错，且该目录不被损坏 (6.7714ms)
+✔ T29 纪律⑥：哨兵 token —— 只进 env；回报/错误/视图文本一律不含其值 (8.7082ms)
+✔ T29 纪律⑥：非面板键被忽略——不越界写入（哨兵值不得落盘） (10.4334ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 239.8857
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/t9-block1-bootstrap.test.ts =====
+✔ 用户入口/空文件夹：IPC listProject 不抛错，新空项目默认三权（6 内置 / chief 主入口） (6.5148ms)
+✔ 用户入口/空文件夹对照：项目根不存在 / 是文件 → 仍是**真错误**（抛错），不伪装成空项目 (1.9485ms)
+✔ 用户入口/创世边界：未 bootstrap 时 su 的 gate **放行** 治理产物（角色卡//docs//.ans/） (19.462ms)
+✔ 用户入口/创世边界：未 bootstrap 时 su 的 gate **拒绝** src/** 与项目根外（非治理产物） (10.0761ms)
+✔ 用户入口/切回：项目一有角色（hasRoles:true）→ 桌面**不再设** genesisBootstrap，su 回普通边界（拒一切） (40.8215ms)
+✔ 用户入口/自终止：项目治理边界就位并 pin 后，创世放行**结构性**失效（即便 genesisBootstrap 残留） (6.6427ms)
+✔ 旧形态退场：openGovernanceSession **不预先创建** 角色卡//docs//.ans/（空脚本 → 无任何骨架落盘） (5.8569ms)
+✔ 新形态：su **直接写出**角色（经创世边界）→ 真实落盘且字节相等；越界写被拒零副作用；可被 listProject 枚举 (36.2729ms)
+✔ 用户入口/确认制未获同意：客户**拒绝** / 通道**不可用** → 未确认路径被 F4 拒、零副作用（.ans / 治理边界文档 / manifest 都不写） (15.6492ms)
+✔ 用户入口/确认制确认通过：su 先经 request_confirmation 预览并获确认 → 写入真落盘并经**自动收尾**转正（治理边界文档 + .ans + manifest）；pin 与我独立重算一致；载入器验为 pin-backed accepted (35.9485ms)
+✔ 用户入口/收尾负例：**把授权拿掉**（边界未接受）→ su 写入被 F6 拒、自动收尾被门禁拒且零副作用（不凭代码身份绕门） (11.5936ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 609.3541
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/t9-block2-write-landing.test.ts =====
+✔ 块2/允许写：write_file→盘上文件存在且**字节等于** content；mkdir -p 父目录 (40.079ms)
+✔ 块2/允许编辑：edit_file 命中 old_string → 回写内容等于预期 (21.0262ms)
+✔ 块2/edit_file：old_string 未命中 → ok:false 且文件保持不变 (11.8414ms)
+✔ 块2/拒绝写：越界路径 → 文件不存在、父目录不建（零副作用） (7.083ms)
+✔ 块2/拒绝编辑：对已存在但越界的文件 edit_file → 内容与 mtime 不变（零副作用） (10.4238ms)
+✔ 块2/负例：gate 抛错 → 在任何副作用之前 fail-closed，无文件/目录产生 (5.8605ms)
+✔ 块2/负例：符号链接/junction 逃逸出写根 → 拒绝且链接目标未被触碰 (6.4934ms)
+✔ 块2/第二边界（§3.8）：gate 放行写根之外（skill 根）的写 → 写层仍拒、无文件产生 (5.6969ms)
+✔ 块2/同源（行为）：gate 收到的绝对路径 === 文件落盘的绝对路径（写根解释一致） (10.5563ms)
+✔ 块2/同源（静态）：写层与门禁引擎的路径原语来自**同一共享模块**（单一来源） (0.661ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 354.8296
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/t9-block3-pin-shell.test.ts =====
+✔ 块3/pin 匹配 → accepted，src/a.ts 可写 (23.4568ms)
+✔ 块3/pin 不匹配（篡改边界文件）→ 未接受 → 拒一切写 (11.597ms)
+✔ 块3/.ans 存在但 accepted:true 无 pin → 载入方置未接受（fail-closed）→ 拒一切写 (5.7287ms)
+✔ 块3/无 .ans → 回退内置（未接受）→ 拒一切写 (0.7407ms)
+✔ 块3/调度记录（boundary 级）：pm 边界覆盖 docs/scheduling/；审计 docs/audit/ 须声明 shell-gate (16.8836ms)
+✔ 块3/V3(c) 白名单 → 放行，且 (b)/(a) **未被调用** (2.8945ms)
+✔ 块3/V3(c) 硬拒（sh -c）→ 拒绝、终结，**且 (b)/(a) 未被调用**（硬地板不可翻案：桩本会放行） (0.4875ms)
+✔ 块3/V3(c) risky + (b) 放行 + (a) 放行 → 放行（走 b-allow→a-allow） (0.6743ms)
+✔ 块3/V3(c) risky + (b) 放行 + (a) 拒绝 → **拒绝**（★ 最要害：pm 不是终审，客户才是） (0.3329ms)
+✔ 块3/V3(c) risky + (b) 拒绝 → 拒绝、终结，**且 (a) 未被调用**（pm 说不该跑就不打扰人） (0.3441ms)
+✔ 块3/V3(c) risky 且 (b)/(a) 均未接入 → 拒绝（fail-closed：risky 必过 (a)，a 缺席即拒） (0.2006ms)
+✔ 块3/V3 (c) review → (b) 放行即终结；(b) 拒绝亦终结 (0.3823ms)
+✔ 块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升 (a)；JSON 非法（不可解析）→ **直接拒绝、不升 (a)** (24.5544ms)
+✔ 块3/V3 (a) 超时 / 不可用 → 一律拒绝（只往更严的层退） (30.4892ms)
+✔ 块3/V3 (c)-only（未接 (b)/(a)）：review 默认拒绝（不因缺下一闸而放行） (0.2296ms)
+✔ 块3/fail-closed：规则集加载失败 → 整条拒绝（绝不「没规则就放行」） (0.1537ms)
+✔ 块3/fail-closed：classifyShell 收到版本未知的规则集 → deny（不因未知而放行） (0.1209ms)
+✔ 块3/未 arm → run_shell 根本不被注册（能力缺席 = 最强 fail-closed） (1.6429ms)
+✔ 块3/run_shell：审核未返回 allow:true → **绝不执行**；恰好 allow:true → 才执行 (32.9772ms)
+✔ 块3/shellKillSwitch：未 arm 的 run_shell → block；已 arm / 其它工具 → 放行 (0.3106ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 531.7184
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/trunk-stable-write-integration.test.ts =====
+✖ stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift） (104.2185ms)
+✔ stable 异常：无客户通道不发许可；拒绝不写；哈希不符 failed + 许可作废 + 快照不变；过期许可拒绝 (234.2661ms)
+✖ appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本） (81.0455ms)
+✔ trunk apply-journal：提交点/幂等重放/base 不一致/内容哈希不符不改指针；derive/verify/history 一致 (162.0331ms)
+✔ trunk 对账：phase 滞后可识别分裂态（内容已过提交点），且补写事件必须通过 C2a 账本校验 (64.401ms)
+✔ trunk 客户动作：refreeze 只续接 stable 快照（不升版本、客户归属）；abandon 不改指针；history 归档 (163.8758ms)
+✔ trunk 恢复：manifest 损坏 ⇒ 客户确认后 tN+1（recovered）；冻结注册表 corrupt ⇒ 恢复拒绝 (115.7808ms)
+✔ 栈初始化：missing 基线 ⇒ 迁移后 ready；corrupt 基线 ⇒ corrupt-failclosed 且入口禁用 (47.6068ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 6
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1300.1147
+
+✖ failing tests:
+
+test at test\测试\trunk-stable-write-integration.test.ts:303:1
+✖ stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift） (104.2185ms)
+  Error: 角色/边界解析失败：active-role-evidence-missing-or-mismatched
+      at openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1031:11)
+      at async openGate (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:288:18)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:328:31)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test\测试\trunk-stable-write-integration.test.ts:506:1
+✖ appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本） (81.0455ms)
+  Error: 角色/边界解析失败：active-role-evidence-missing-or-mismatched
+      at openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1031:11)
+      at async openGate (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:288:18)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:524:31)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+===== EXIT 1 WALL 2s =====
+===== FILE: test/测试/turn-watch-verify/a-inspect.test.ts =====
+✔ A1 到点检查：299999ms 不发、300000ms 恰一条；文案合规；每轮一次 (2.4315ms)
+✔ A2 检查时限可由 env 调整（Pi）：60000ms 到点 (0.1744ms)
+✔ A3 排除：挂起确认卡不报；解除后按真实已耗报 (0.1572ms)
+✔ A4 排除：su 自身忙 ⇒ 关于 su 不报；项目角色照报（消息排队由投递机负责） (0.1127ms)
+✔ A5 到点不中止：看护只有消息投递面，没有任何轮次中止/恢复执行钩子 (0.1123ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 100.5854
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/turn-watch-verify/b-last-resort.test.ts =====
+✖ B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」 (10008.3362ms)
+✔ B2 确认卡挂起期间暂停兜底（同一 withPausableTimeout 原语）：挂起 2× 时限不中止，解除后继续计 (391.8126ms)
+✔ B3 常量与非整轮时限不变：检查默认 300000、兜底 3600000、shell 600000、审核/确认 120000、构造 120000 (0.6056ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 1
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11594.7741
+
+✖ failing tests:
+
+test at test\测试\turn-watch-verify\b-last-resort.test.ts:41:1
+✖ B1 检查时限到点不中止；turnLastResortMs 到点才中止，文案明确「最后兜底」 (10008.3362ms)
+  'test timed out after 10000ms'
+===== EXIT 1 WALL 11s =====
+===== FILE: test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts =====
+✔ C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env (0.4822ms)
+✔ C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露 (0.6779ms)
+✔ C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查 (0.1134ms)
+✔ C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止） (1.3788ms)
+✔ C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」 (15.9767ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 400.66
+===== EXIT 0 WALL 1s =====
+===== FILE: test/测试/uiux-v2-replay-regression.test.ts =====
+✔ 独立UI2：正文声称成功不把缺状态的历史结果变成成功 (1.1823ms)
+✔ 独立UI2：交错调用结果按callId保持目标 (0.8807ms)
+✔ 独立UI2：可靠失败保留异常和目标；toolStatus 对失败/未知一致 (0.2155ms)
+✔ 独立UI2：交互调用和结论保留同一锚点，特殊工具独立生命周期 (0.6972ms)
+✔ 独立UI2：回放计划 skip/append/full 与行签名一致 (0.238ms)
+✔ 独立UI2：系统通知/注入分类仍识别，伪形态不误伤 (0.2909ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 237.8356
+===== EXIT 0 WALL 0s =====
+===== FILE: test/测试/version-change-integration.test.ts =====
+✖ VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖 (63.3686ms)
+✖ VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied (62.5656ms)
+✖ VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用） (70.6593ms)
+✖ VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码） (65.0185ms)
+✖ VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin） (62.2559ms)
+✖ VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变） (49.2191ms)
+✖ VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试） (57.6096ms)
+✔ bootstrap：首次 handoff pin 写 handoff-pin-bootstrap 冻结（pin 只 pin 冻结文档） (72.9791ms)
+✖ bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1 (10.7097ms)
+✖ 冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准 (25.967ms)
+✔ 重构：convener 发起/应用调度层管理/机械写集/无客户决定/不产生 trunk 版本；越界提示转 VCA (34.4969ms)
+✔ 客户主权与旧入口：VCA 卡不被 @决策/判断器代选；低层 run-change 保留；F15 roleCards；F17 无 refactor:request (60.6503ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 3
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 959.9223
+
+✖ failing tests:
+
+test at test\测试\version-change-integration.test.ts:315:1
+✖ VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖 (63.3686ms)
+  AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:332:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:402:1
+✖ VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied (62.5656ms)
+  AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:448:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:520:1
+✖ VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用） (70.6593ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:555:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:590:1
+✖ VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码） (65.0185ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:721:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:747:1
+✖ VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin） (62.2559ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:763:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:836:1
+✖ VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变） (49.2191ms)
+  AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:863:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:924:1
+✖ VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试） (57.6096ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:940:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:1049:1
+✖ bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1 (10.7097ms)
+  AssertionError [ERR_ASSERTION]: vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:1066:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\version-change-integration.test.ts:1092:1
+✖ 冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准 (25.967ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'unknown'
+  - 'frozen'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/version-change-integration.test.ts:1118:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'unknown',
+    expected: 'frozen',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====
+===== FILE: test/测试/wiring.test.ts =====
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/注入角色/role-card.md
+[message] 已解析边界，来源：角色卡/注入角色/boundary.yaml；acceptance=accepted（来源：test:injected）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+✔ 接线:编排使用装配**注入**的 project/scope(注入一份不同的边界,判定随之改变) (18.915ms)
+✔ 接线:runRoleCommand 缺 project 注入 → 非 0(EXIT_USAGE),不自回退第二份配置 (0.2979ms)
+[message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+[message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+[message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 0 项
+[message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+ans role run 会话失败：runtime-creation-prepared-api-unavailable
+✖ 接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite) (26.589ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 353.6673
+
+✖ failing tests:
+
+test at test\测试\wiring.test.ts:112:1
+✖ 接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite) (26.589ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/wiring.test.ts:119:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+===== EXIT 1 WALL 1s =====

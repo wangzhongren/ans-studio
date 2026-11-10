@@ -1,0 +1,29 @@
+{
+  "at": "2026-11-09T16:56:59.119Z",
+  "gitStatusFullSha256": "5338683309451360c7c83f67153f960f1784f01bf8f011e191cb2ce78bbff31c",
+  "gitStatusWithoutOurEvidenceSha256": "47f306060a22e6e09aa1e040b3975319c3a67d767d841d8cb640fd37365ed64c",
+  "preGitStatusSha256": "47f306060a22e6e09aa1e040b3975319c3a67d767d841d8cb640fd37365ed64c",
+  "onlyOurEvidenceAdded": true,
+  "ourEvidenceLines": 2,
+  "candidate": {
+    "count": 11,
+    "aggregate": "bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3"
+  },
+  "manifest": {
+    "count": 1113,
+    "aggregate": "fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f"
+  },
+  "ports": [],
+  "electron": [],
+  "ourEvidenceStatusLines": [
+    "?? 角色卡/测试/docs/change/2026-11-10_RR_document-format-specifications-evidence/",
+    "?? 角色卡/测试/docs/change/2026-11-10_RR_document-format-specifications.md"
+  ],
+  "note": "ourEvidenceLines corrected: git status collapses the evidence dir into one untracked line + one record file = 2; onlyOurEvidenceAdded compares filtered full status to pre and is true",
+  "record": {
+    "lines": 179,
+    "bytes": 27708,
+    "sha256": "7e95ea07c6284935836ee5be9e72ddec512559b63b34426ed56030be524dfa42"
+  },
+  "auditRecordedAt": "2026-11-09T16:57:22.104Z"
+}

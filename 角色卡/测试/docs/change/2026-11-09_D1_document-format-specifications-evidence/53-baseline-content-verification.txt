@@ -1,0 +1,11 @@
+=== baseline copy candidates: normalize CRLF->LF and compare to HEAD blob content ===
+MATCH-HEAD  app/desktop/session.ts
+MATCH-HEAD  src/model/runtime.ts
+MATCH-HEAD  src/pipeline/orchestration/run-role.ts
+MATCH-HEAD  src/provider/runtime/schema.ts
+MATCH-HEAD  src/provider/runtime/tools.ts
+
+=== non-candidate spot files: copy bytes vs worktree bytes ===
+SAME  test/编排/workflow-preconditions.test.ts
+SAME  test/桌面应用/optional-acceptance.test.ts
+SAME  src/common/编排/workflow-preconditions.ts

@@ -1,0 +1,10 @@
+=== package/build config status (expect empty) ===
+(end)
+
+=== staged changes (expect empty) ===
+(end)
+
+=== HEAD/tree/branch now ===
+3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1
+e05d68ad26d768297cb076af4f8e24316c7d71b7
+feat/document-format-specifications

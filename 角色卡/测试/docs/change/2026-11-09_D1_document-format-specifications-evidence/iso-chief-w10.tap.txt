@@ -1,0 +1,14 @@
+▶ W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  ✔ unmanaged (217.2412ms)
+  ✔ unmanaged-system (84.3873ms)
+  ✔ required (266.6658ms)
+  ✔ unknown (16.3386ms)
+✔ W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind (585.6056ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1016.7148

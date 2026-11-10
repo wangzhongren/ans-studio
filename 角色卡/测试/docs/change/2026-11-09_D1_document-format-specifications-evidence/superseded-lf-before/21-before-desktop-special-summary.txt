@@ -1,0 +1,9 @@
+=== optional-acceptance (documented BASE-3 command: --test-timeout=6000 --test-reporter=tap) ===
+exit=1
+# tests 6 # pass 2 # fail 1 # cancelled 3 # skipped 0 # todo 0 
+not ok 1 - 幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚
+not ok 4 - 开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发
+not ok 5 - §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底
+not ok 6 - §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板
+
+=== chief-workflow (documented command, no timeout) ===

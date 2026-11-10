@@ -1,0 +1,14 @@
+✔ 好件：readMcpDeclaration 返回完整视图（七字段＋path；env 原文保存不展开；参数/日期/角色口径） (26.7785ms)
+✔ 坏件（入口防御＋名非法＋保留名＋缺失）⇒ undefined，绝不抛 (2.0537ms)
+✔ 坏件（解析失败面逐项）：必填缺失/空值/command 控制字符/env 校验/状态未知 ⇒ undefined，绝不抛 (77.6542ms)
+✔ listInstalledMcpServers：installed＋角色命中才收录（按 name 排序、InstalledMcpServerV1 形状）；过滤与诊断逐项 (9.3526ms)
+✔ listInstalledMcpServers 防御：`docs/mcp` 不存在＝空数组零诊断；不可读（是文件）＝空数组＋mcp-root-unreadable；回调抛错被吞 (5.9446ms)
+✔ 接线注入：Service providerFor 按角色注入 RuntimeProviderOptions.installedMcpServers（纯读、绝不建目录；新 bind 重读） (22.1548ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 373.923

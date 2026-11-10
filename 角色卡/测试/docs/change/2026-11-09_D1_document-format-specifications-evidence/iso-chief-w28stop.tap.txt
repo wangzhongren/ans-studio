@@ -1,0 +1,15 @@
+✖ W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止 (718.5094ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1153.0316
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:1568:1
+✖ W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止 (718.5094ms)
+  [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\51054\AppData\Local\Temp\ans-w21-notice-IPjIOz\.ans\sessions\rapporteur\codex\ans'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-w21-notice-IPjIOz\\.ans\\sessions\\rapporteur\\codex\\ans' }

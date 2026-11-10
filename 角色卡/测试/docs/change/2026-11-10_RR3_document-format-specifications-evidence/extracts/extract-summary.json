@@ -1,0 +1,91 @@
+{
+  "chief": {
+    "files": 1,
+    "toolNames": {
+      "mcp__ans__project_state": 1,
+      "mcp__ans__contract_check": 1,
+      "mcp__ans__dispatch_task": 1,
+      "mcp__ans__role_status": 1,
+      "mcp__ans__list_dir": 1,
+      "mcp__ans__read_file": 1,
+      "mcp__ans__request_choice": 1
+    },
+    "docCalls": 0,
+    "docResults": 0,
+    "dispatchCalls": 1,
+    "dispatchResults": 1,
+    "promptSnapshots": [
+      {
+        "ts": "2026-11-09T17:07:43.303Z",
+        "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/6ae8a725-5f59-4656-b153-d5e56977caed.jsonl",
+        "bytes": 58145,
+        "sha256": "5eda2ded200aa91a59a814b152b9b234ddb88d995c7925cbc5a0e621e1b02370"
+      },
+      {
+        "ts": "2026-11-09T17:07:47.017Z",
+        "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/6ae8a725-5f59-4656-b153-d5e56977caed.jsonl",
+        "bytes": 58145,
+        "sha256": "5eda2ded200aa91a59a814b152b9b234ddb88d995c7925cbc5a0e621e1b02370"
+      }
+    ],
+    "docReceipts": [],
+    "dispatchInputs": [
+      {
+        "ts": "2026-11-09T17:07:52.373Z",
+        "roleId": "product",
+        "moduleId": null,
+        "modulePaths": null,
+        "moduleDirectory": null
+      }
+    ],
+    "dispatchReceipts": [
+      {
+        "ts": "2026-11-09T17:07:52.705Z",
+        "isError": null,
+        "head": "dispatch_task：任务已派发给「product」（status 由对方经回交报告回报）。 已受理：任务将投递给角色 产品 的会话；投递结果/失败会在其聊天流与 幕僚 的聊天流如实显示（受理≠已完成）。任务编号：#t-mw9ileu9-53e94663（sideEffect=code；受理 ≠ 完成）。注意：**派发 ≠ 授权**——对方只在自己已接受边界内执行已授权任务，普通操作无需逐次确认；新建或扩张边界、治理写集仍由内置治理角色请求客户确认；你不得代为授权，也不能承诺对方一定会写。"
+      }
+    ]
+  },
+  "product": {
+    "files": 1,
+    "toolNames": {
+      "mcp__ans__doc_format": 1,
+      "mcp__ans__list_dir": 2,
+      "mcp__ans__read_file": 2,
+      "mcp__ans__write_file": 1,
+      "mcp__ans__edit_file": 5,
+      "mcp__ans__run_shell": 3,
+      "mcp__ans__submit_report": 1
+    },
+    "docCalls": 1,
+    "docResults": 1,
+    "dispatchCalls": 0,
+    "dispatchResults": 0,
+    "promptSnapshots": [
+      {
+        "ts": "2026-11-09T17:07:53.757Z",
+        "file": "sessions/product/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/94598c7d-1102-4aec-91c0-a458588eb3b6.jsonl",
+        "bytes": 15526,
+        "sha256": "1a1c07401d847294949fbd444a8cb4f24d6073aa8e6ba7795faa5acee264308a"
+      },
+      {
+        "ts": "2026-11-09T17:07:54.516Z",
+        "file": "sessions/product/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/94598c7d-1102-4aec-91c0-a458588eb3b6.jsonl",
+        "bytes": 15526,
+        "sha256": "1a1c07401d847294949fbd444a8cb4f24d6073aa8e6ba7795faa5acee264308a"
+      }
+    ],
+    "docReceipts": [
+      {
+        "ts": "2026-11-09T17:07:54.514Z",
+        "bytes": 2162,
+        "head": "doc_format（只读；不构成放行/授权；doc-format-specs/v1）\n格式：project-intent/v1 — 产品意图文档（意图确认门 / run pin / 意图入口链）\naudience：role-authored\nstage：意图\n路径：docs/product/<flowId>-intent-vN.md\nschema：project-intent/v1\n校验器：shape-check；src/service/trunk/impl/apply-journal.ts#prepareIntentConfirmation；意图确认门必填 schema；run pin 层"
+      }
+    ],
+    "dispatchInputs": [],
+    "dispatchReceipts": []
+  },
+  "test-dev": {
+    "files": 0
+  }
+}

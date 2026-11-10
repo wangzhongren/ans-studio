@@ -1,0 +1,5 @@
+# suite: dir-门禁引擎
+before: {"tests":453,"pass":447,"fail":5,"cancelled":0,"skipped":1,"todo":0} failures=5 skips=1
+after : {"tests":472,"pass":466,"fail":5,"cancelled":0,"skipped":1,"todo":0} failures=5 skips=1
+failures common=5 before-only=0 after-only=0
+skips before-only=0 after-only=0

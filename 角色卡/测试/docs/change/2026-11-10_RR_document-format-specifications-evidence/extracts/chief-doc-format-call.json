@@ -1,0 +1,12 @@
+[
+  {
+    "ts": "2026-11-09T16:51:13.535Z",
+    "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-target/60a57f9e-5bce-42aa-98e9-5b06d3f1ee0d.jsonl",
+    "toolUseId": "call_00_uPnHnKYIy9D26bvpdaPG7907",
+    "toolName": "mcp__ans__doc_format",
+    "input": {
+      "format": "project-intent/v1"
+    },
+    "model": "deepseek-v4-flash"
+  }
+]

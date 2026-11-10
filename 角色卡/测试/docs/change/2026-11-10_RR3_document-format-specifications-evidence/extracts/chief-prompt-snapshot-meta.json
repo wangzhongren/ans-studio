@@ -1,0 +1,14 @@
+[
+  {
+    "ts": "2026-11-09T17:07:43.303Z",
+    "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/6ae8a725-5f59-4656-b153-d5e56977caed.jsonl",
+    "bytes": 58145,
+    "sha256": "5eda2ded200aa91a59a814b152b9b234ddb88d995c7925cbc5a0e621e1b02370"
+  },
+  {
+    "ts": "2026-11-09T17:07:47.017Z",
+    "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round3-target/6ae8a725-5f59-4656-b153-d5e56977caed.jsonl",
+    "bytes": 58145,
+    "sha256": "5eda2ded200aa91a59a814b152b9b234ddb88d995c7925cbc5a0e621e1b02370"
+  }
+]

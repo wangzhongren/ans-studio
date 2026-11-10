@@ -1,0 +1,9 @@
+tracked files under src/app/test at HEAD: 1107
+copied verbatim from worktree: 1102
+materialized from HEAD blob (candidates): 5
+EOL class distribution (non-candidates): {"mixed(crlf=1,lf=4689)":2,"mixed(crlf=1,lf=1787)":1,"mixed(crlf=1,lf=109)":1,"mixed(crlf=1,lf=113)":1,"mixed(crlf=1,lf=133)":1,"mixed(crlf=3,lf=128)":1,"mixed(crlf=2,lf=182)":2,"mixed(crlf=2,lf=125)":1,"mixed(crlf=2,lf=121)":1,"mixed(crlf=2,lf=113)":1,"mixed(crlf=1,lf=3483)":1,"crlf":897,"lf":191,"mixed(crlf=137,lf=56)":1}
+candidate baseline: app/desktop/session.ts eol=lf bytes=725409
+candidate baseline: src/model/runtime.ts eol=crlf bytes=210268
+candidate baseline: src/pipeline/orchestration/run-role.ts eol=lf bytes=237639
+candidate baseline: src/provider/runtime/schema.ts eol=crlf bytes=145715
+candidate baseline: src/provider/runtime/tools.ts eol=crlf bytes=330259

@@ -1,0 +1,22 @@
+=== v1.1 run-pin vs before ===
+before: {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} failures=11 skips=0
+after : {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} failures=11 skips=0
+failures common=11 before-only=0 after-only=0
+skips before-only=0 after-only=0
+=== v1.1 optional-acceptance vs before ===
+before: {"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0} failures=4 skips=0
+after : {"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0} failures=4 skips=0
+failures common=4 before-only=0 after-only=0
+skips before-only=0 after-only=0
+=== optional vs v1 after ===
+# suite: optional-v11
+before: {"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0} failures=4 skips=0
+after : {"tests":6,"pass":2,"fail":1,"cancelled":3,"skipped":0,"todo":0} failures=4 skips=0
+failures common=4 before-only=0 after-only=0
+skips before-only=0 after-only=0
+=== run-pin vs v1 after ===
+# suite: run-pin-v11
+before: {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} failures=11 skips=0
+after : {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0} failures=11 skips=0
+failures common=11 before-only=0 after-only=0
+skips before-only=0 after-only=0

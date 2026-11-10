@@ -1,0 +1,63 @@
+{
+  "chief": {
+    "files": 1,
+    "toolNames": {
+      "mcp__ans__project_state": 1,
+      "mcp__ans__read_file": 1,
+      "mcp__ans__dispatch_task": 2
+    },
+    "docCalls": 0,
+    "docResults": 0,
+    "dispatchCalls": 2,
+    "dispatchResults": 2,
+    "promptSnapshots": [
+      {
+        "ts": "2026-11-09T17:01:12.533Z",
+        "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round2-target/fefa9944-fac5-4067-82b9-4abe0490dd29.jsonl",
+        "bytes": 58145,
+        "sha256": "80ddaf5d6e7cfd1109cc60b963efe91dc737dd528eddaa10bff199ce738d5ebf"
+      },
+      {
+        "ts": "2026-11-09T17:01:15.169Z",
+        "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round2-target/fefa9944-fac5-4067-82b9-4abe0490dd29.jsonl",
+        "bytes": 58145,
+        "sha256": "80ddaf5d6e7cfd1109cc60b963efe91dc737dd528eddaa10bff199ce738d5ebf"
+      }
+    ],
+    "docReceipts": [],
+    "dispatchInputs": [
+      {
+        "ts": "2026-11-09T17:01:23.884Z",
+        "roleId": null,
+        "moduleId": "combat-entities",
+        "modulePaths": null,
+        "moduleDirectory": null
+      },
+      {
+        "ts": "2026-11-09T17:01:27.980Z",
+        "roleId": "product",
+        "moduleId": "combat-entities",
+        "modulePaths": null,
+        "moduleDirectory": null
+      }
+    ],
+    "dispatchReceipts": [
+      {
+        "ts": "2026-11-09T17:01:23.895Z",
+        "isError": true,
+        "head": "MCP error -32602: Input validation error: Invalid arguments for tool dispatch_task: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"roleId\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  },\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"task\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  },\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"read-only\",\n      \"docs\",\n"
+      },
+      {
+        "ts": "2026-11-09T17:01:28.023Z",
+        "isError": true,
+        "head": "dispatch_task：任务**未能派发**（回执：document-planning-module-forbidden：文档准备不授实现模块写区。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+      }
+    ]
+  },
+  "product": {
+    "files": 0
+  },
+  "test-dev": {
+    "files": 0
+  }
+}

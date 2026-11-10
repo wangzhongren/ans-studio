@@ -1,0 +1,5 @@
+# suite: dir-编排
+before: {"tests":1139,"pass":1115,"fail":22,"cancelled":0,"skipped":2,"todo":0} failures=22 skips=2
+after : {"tests":1163,"pass":1139,"fail":22,"cancelled":0,"skipped":2,"todo":0} failures=22 skips=2
+failures common=22 before-only=0 after-only=0
+skips before-only=0 after-only=0

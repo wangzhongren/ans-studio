@@ -1,0 +1,25 @@
+✔ 三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code (1.0012ms)
+✔ BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因 (0.5287ms)
+✔ BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试） (0.8114ms)
+✔ code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc） (0.1814ms)
+✔ contract_check 工具：只读、按角色裁剪、≤4KB、缺失数据如实报错 (1.8215ms)
+✔ contract_check 输出超长由工具层截断到 4KB 内 (0.3192ms)
+✔ contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02） (0.1929ms)
+✔ contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07） (0.2422ms)
+✔ contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6） (0.2099ms)
+✔ contract_check topic：null/空串/空白串走 legacy（AC-16） (0.3059ms)
+✔ contract_check topic：角色隔离先于 topic（AC-7） (0.1469ms)
+✔ contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8） (0.2943ms)
+✔ contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9） (0.0781ms)
+✔ 旧 code 别名可读：canonical code + legacyCode 保留 (0.1265ms)
+✔ 真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段） (0.7353ms)
+✔ 真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code (0.2425ms)
+✔ F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留 (5.7907ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 239.4807

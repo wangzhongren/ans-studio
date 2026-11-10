@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: ans-criteria/v1 正例：唯一 block、优先级派生、CRLF 归一化
+ok 1 - ans-criteria/v1 正例：唯一 block、优先级派生、CRLF 归一化
+  ---
+  duration_ms: 5.1395
+  type: 'test'
+  ...
+# Subtest: AC 归一化：NFKC/全半角/空白/前导零；非法形态拒绝
+ok 2 - AC 归一化：NFKC/全半角/空白/前导零；非法形态拒绝
+  ---
+  duration_ms: 0.1432
+  type: 'test'
+  ...
+# Subtest: criteria 负例：重复 canonical id、非法 priority、无/多 block、draft、版本不符
+ok 3 - criteria 负例：重复 canonical id、非法 priority、无/多 block、draft、版本不符
+  ---
+  duration_ms: 2.6358
+  type: 'test'
+  ...
+# Subtest: criteria ref：显式 path+sha+version 才加载；无 ref 不取 latest；draft ref 拒绝
+ok 4 - criteria ref：显式 path+sha+version 才加载；无 ref 不取 latest；draft ref 拒绝
+  ---
+  duration_ms: 21.046
+  type: 'test'
+  ...
+# Subtest: P0 sidecar：实际 lines/bytes/sha256 与 sidecar 一致才通过；p0 自报忽略并标记
+ok 5 - P0 sidecar：实际 lines/bytes/sha256 与 sidecar 一致才通过；p0 自报忽略并标记
+  ---
+  duration_ms: 10.6678
+  type: 'test'
+  ...
+# Subtest: AC-28：artifact 自述 223/实际 234、历史 pass 198/最终 214 ⇒ evidence-mismatch；修正后通过
+ok 6 - AC-28：artifact 自述 223/实际 234、历史 pass 198/最终 214 ⇒ evidence-mismatch；修正后通过
+  ---
+  duration_ms: 16.8776
+  type: 'test'
+  ...
+# Subtest: P0 缺 sidecar fail；P1 缺 sidecar 标未校验；stale/acIds 缺失 mismatch
+ok 7 - P0 缺 sidecar fail；P1 缺 sidecar 标未校验；stale/acIds 缺失 mismatch
+  ---
+  duration_ms: 18.8108
+  type: 'test'
+  ...
+# Subtest: collection：多文件 sidecar 逐文件 hash/bytes/lines 校验
+ok 8 - collection：多文件 sidecar 逐文件 hash/bytes/lines 校验
+  ---
+  duration_ms: 12.2935
+  type: 'test'
+  ...
+# Subtest: P4.3/F3/F4：collection generatedAt/mtime stale、item 自述、路径越界、角色范围拒绝
+ok 9 - P4.3/F3/F4：collection generatedAt/mtime stale、item 自述、路径越界、角色范围拒绝
+  ---
+  duration_ms: 26.1404
+  type: 'test'
+  ...
+# Subtest: F3：单文件 metaPath 越界/绝对/.ans/.env 一律 evidence-path-invalid
+ok 10 - F3：单文件 metaPath 越界/绝对/.ans/.env 一律 evidence-path-invalid
+  ---
+  duration_ms: 2.5153
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 235.3176

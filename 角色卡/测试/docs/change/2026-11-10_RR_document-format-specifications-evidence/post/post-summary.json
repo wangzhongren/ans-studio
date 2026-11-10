@@ -1,0 +1,119 @@
+{
+  "at": "2026-11-09T16:53:40.263Z",
+  "repo": "C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-doc-format-run-2026-11-10\\target",
+  "portsPost": {
+    "lines": [
+      "  TCP    127.0.0.1:9223         127.0.0.1:62596        TIME_WAIT       0",
+      "  TCP    127.0.0.1:62595        127.0.0.1:9223         TIME_WAIT       0"
+    ],
+    "listeners9222": 0,
+    "listeners9223": 0
+  },
+  "processesPost": {
+    "electron": []
+  },
+  "head": "3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1",
+  "tree": "e05d68ad26d768297cb076af4f8e24316c7d71b7",
+  "branch": "feat/document-format-specifications",
+  "fullStatusLines": 262,
+  "fullStatusSha256Post": "47f306060a22e6e09aa1e040b3975319c3a67d767d841d8cb640fd37365ed64c",
+  "fullStatusSha256Pre": "47f306060a22e6e09aa1e040b3975319c3a67d767d841d8cb640fd37365ed64c",
+  "fullStatusIdentical": true,
+  "candidateFileCount": 11,
+  "candidateAggregate": "bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3",
+  "candidateRows": [
+    {
+      "path": "app/desktop/session.ts",
+      "bytes": 728423,
+      "sha256": "df5bf7b0315410791e4c58a6c3e3caaac6f1d4312ff4751957d454e7a569fe14"
+    },
+    {
+      "path": "src/common/编排/doc-format-specs.ts",
+      "bytes": 100605,
+      "sha256": "3c0c9c63ba99ad09adb379858595618b833ff20406429d46bc8160514e49bf86"
+    },
+    {
+      "path": "src/model/runtime.ts",
+      "bytes": 212397,
+      "sha256": "89e5fbc97b3a3f6994cf858696750fe6d3acfbe45ed1d0cf571b8a35037f4959"
+    },
+    {
+      "path": "src/pipeline/orchestration/run-role.ts",
+      "bytes": 239233,
+      "sha256": "d754d767298de61b956b29e6fe8873640d53359765c9dfce45abc548f6003258"
+    },
+    {
+      "path": "src/provider/runtime/schema.ts",
+      "bytes": 147921,
+      "sha256": "fd3ee646e07e6d6beb3ba006a5f3079de5fb92c2fc08909dc6c9f4322e7a13a6"
+    },
+    {
+      "path": "src/provider/runtime/tools.ts",
+      "bytes": 335868,
+      "sha256": "b07c3f805ab9eb88f13d4a6d4098b001d101e04b59b6162f57eda1e47a06ba79"
+    },
+    {
+      "path": "test/runtime-core/doc-format-specs-pin.test.ts",
+      "bytes": 19754,
+      "sha256": "f05471e38ca83f626856352ce85d914ec0ff85a1035c111eadc5e43659592003"
+    },
+    {
+      "path": "test/桌面应用/session.test.ts",
+      "bytes": 26853,
+      "sha256": "23bc19a723ef6c3c0c19259fee58179e779578ed6fbd726e6b094f1d8ef9085e"
+    },
+    {
+      "path": "test/测试/doc-format-all-roles.test.ts",
+      "bytes": 35241,
+      "sha256": "d992b164fcd0e36d8eea0646d0736a3b5da08e16922d6e248d828a0de543b2e5"
+    },
+    {
+      "path": "test/编排/doc-format-specs.test.ts",
+      "bytes": 101313,
+      "sha256": "54e5b01ab47c59f091ec2c9617b5209b6e3b254fe2aa757ec211455166aa2e94"
+    },
+    {
+      "path": "test/门禁引擎/doc-format-specs-pin.test.ts",
+      "bytes": 33709,
+      "sha256": "45b1ce34ed2d06f460264b252d2d702bebd78d55bf155c2922af1b39f520d369"
+    }
+  ],
+  "candidateAggregatePre": "bcd3255392fb0e5e311c6dcec81bdfa2a0a0158af3573ac1d47f186ca4fef5b3",
+  "candidateAggregateMatch": true,
+  "candidateFilesMatch": true,
+  "manifestFileCount": 1113,
+  "manifestTextSha256": "ff671d50fb7cd206a94b0fb2477a7aaa3a94b78b7fbb22f313bb0d7e587e021b",
+  "manifestAggregate": "fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f",
+  "manifestFileCountPre": 1113,
+  "manifestAggregatePre": "fc296e9582c3a7cfd759cb7844f90778d79847afcf696ccc1146e8cd852c532f",
+  "manifestMatch": true,
+  "manifestTotalBytes": 25907278,
+  "targetPostFileCount": 471,
+  "targetDiff": {
+    "addedCount": 9,
+    "changedCount": 4,
+    "removedCount": 0,
+    "added": [
+      ".ans/runs/run-hub-37aca786d0019df9914fd2a7e2fdeb8591a0ec4006600b24/manifest.json",
+      ".ans/sessions/chief/claude/ans/index.json",
+      ".ans/sessions/chief/claude/ans/replay.jsonl",
+      ".ans/sessions/chief/claude/native/.claude.json",
+      ".ans/sessions/chief/claude/native/.last-cleanup",
+      ".ans/sessions/chief/claude/native/backups/.claude.json.backup.1794243067461",
+      ".ans/sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-target/60a57f9e-5bce-42aa-98e9-5b06d3f1ee0d.jsonl",
+      ".ans/state/doc-freezes.json",
+      ".ans/trunk/initialization-sources/init-source-baef4b456e2942d92608369574edf607fffa10fe75774e528e3904b553e53d02.json"
+    ],
+    "changed": [
+      ".ans/state/logs/chief.jsonl",
+      ".ans/state/tasks.jsonl",
+      ".ans/state/versions.jsonl",
+      "docs/bootstrap-manifest.md"
+    ],
+    "removed": []
+  },
+  "diagFiles": [
+    "ans-diagnostics-2026-11-09.jsonl"
+  ]
+}

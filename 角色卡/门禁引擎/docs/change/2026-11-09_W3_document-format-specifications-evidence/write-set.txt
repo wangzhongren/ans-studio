@@ -1,0 +1,2 @@
+test/门禁引擎/doc-format-specs-pin.test.ts
+角色卡/门禁引擎/docs/change/2026-11-09_W3_document-format-specifications.md

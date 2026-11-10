@@ -1,0 +1,23 @@
+=== after test/测试 (114 files) ===
+TOTAL files=114 tests=695 pass=635 fail=41 cancelled=1 skipped=18
+nonzero/exit!=0 files=20
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts | exit=1 wall=68 | {"tests":2,"pass":1,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/abort-cleanup-verify.test.ts | exit=1 wall=0 | {"tests":4,"pass":2,"fail":2,"cancelled":0,"skipped":0,"todo":0}
+test/测试/direct-role-capabilities-e2e.test.ts | exit=1 wall=1 | {"tests":3,"pass":2,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/download-requests-integration.test.ts | exit=1 wall=2 | {"tests":13,"pass":12,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/entry-role-minimal-d.test.ts | exit=1 wall=1 | {"tests":6,"pass":5,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/g3-search-verify/pi-loopback-verify.test.ts | exit=1 wall=1 | {"tests":6,"pass":5,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/g4-skill-verify/b-render-double-check.test.ts | exit=1 wall=0 | {"tests":7,"pass":6,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/g4-skill-verify/e-handler.test.ts | exit=1 wall=1 | {"tests":6,"pass":5,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/g4-skill-verify/h-scope-audit.test.ts | exit=1 wall=0 | {"tests":7,"pass":4,"fail":3,"cancelled":0,"skipped":0,"todo":0}
+test/测试/g4v2-mcp-verify/f-handler.test.ts | exit=1 wall=1 | {"tests":7,"pass":5,"fail":2,"cancelled":0,"skipped":0,"todo":0}
+test/测试/git-action-delivery-claude-e2e.test.ts | exit=1 wall=62 | {"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/governance-e2e-auto/i-full-chain.test.ts | exit=1 wall=2 | {"tests":2,"pass":0,"fail":2,"cancelled":0,"skipped":0,"todo":0}
+test/测试/governance-matrix-integration.test.ts | exit=1 wall=2 | {"tests":18,"pass":17,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/测试/real-entry.test.ts | exit=1 wall=3 | {"tests":16,"pass":11,"fail":5,"cancelled":0,"skipped":0,"todo":0}
+test/测试/t1-pipeline-integration.test.ts | exit=1 wall=1 | {"tests":8,"pass":5,"fail":3,"cancelled":0,"skipped":0,"todo":0}
+test/测试/t1-real-cli.test.ts | exit=1 wall=4 | {"tests":6,"pass":3,"fail":3,"cancelled":0,"skipped":0,"todo":0}
+test/测试/trunk-stable-write-integration.test.ts | exit=1 wall=2 | {"tests":8,"pass":6,"fail":2,"cancelled":0,"skipped":0,"todo":0}
+test/测试/turn-watch-verify/b-last-resort.test.ts | exit=1 wall=11 | {"tests":3,"pass":2,"fail":0,"cancelled":1,"skipped":0,"todo":0}
+test/测试/version-change-integration.test.ts | exit=1 wall=1 | {"tests":12,"pass":3,"fail":9,"cancelled":0,"skipped":0,"todo":0}
+test/测试/wiring.test.ts | exit=1 wall=1 | {"tests":3,"pass":2,"fail":1,"cancelled":0,"skipped":0,"todo":0}

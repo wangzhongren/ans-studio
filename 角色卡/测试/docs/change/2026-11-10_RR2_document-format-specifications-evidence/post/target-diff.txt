@@ -1,0 +1,13 @@
+added 7
++ .ans/sessions/chief/claude/ans/index.json
++ .ans/sessions/chief/claude/ans/replay.jsonl
++ .ans/sessions/chief/claude/native/.claude.json
++ .ans/sessions/chief/claude/native/.last-cleanup
++ .ans/sessions/chief/claude/native/backups/.claude.json.backup.1794243671611
++ .ans/sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-round2-target/fefa9944-fac5-4067-82b9-4abe0490dd29.jsonl
++ .ans/state/doc-freezes.json
+changed 3
+~ .ans/state/logs/chief.jsonl
+~ .ans/state/versions.jsonl
+~ docs/bootstrap-manifest.md
+removed 0

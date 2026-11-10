@@ -1,0 +1,5 @@
+at=2026-11-09T17:03:48Z
+--- netstat 9222/9223:
+  TCP    127.0.0.1:9223         127.0.0.1:58964        TIME_WAIT       0
+--- tasklist electron:
+(none)

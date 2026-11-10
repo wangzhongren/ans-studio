@@ -1,0 +1,328 @@
+TAP version 13
+# Subtest: TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+ok 1 - TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+  ---
+  duration_ms: 1.1757
+  type: 'test'
+  ...
+# Subtest: TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+ok 2 - TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+  ---
+  duration_ms: 0.4003
+  type: 'test'
+  ...
+# Subtest: TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+ok 3 - TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+  ---
+  duration_ms: 0.1535
+  type: 'test'
+  ...
+# Subtest: TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+ok 4 - TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+  ---
+  duration_ms: 2.0389
+  type: 'test'
+  ...
+# Subtest: TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+ok 5 - TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+  ---
+  duration_ms: 3.1259
+  type: 'test'
+  ...
+# Subtest: TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+ok 6 - TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+  ---
+  duration_ms: 0.2062
+  type: 'test'
+  ...
+# Subtest: TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+ok 7 - TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+  ---
+  duration_ms: 0.1499
+  type: 'test'
+  ...
+# Subtest: TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+ok 8 - TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+  ---
+  duration_ms: 0.6356
+  type: 'test'
+  ...
+# Subtest: TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+ok 9 - TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+  ---
+  duration_ms: 68.29
+  type: 'test'
+  ...
+# Subtest: TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+ok 10 - TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+  ---
+  duration_ms: 1.5525
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+ok 11 - TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+  ---
+  duration_ms: 1.6171
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+ok 12 - TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+  ---
+  duration_ms: 35.4887
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+ok 13 - TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+  ---
+  duration_ms: 3.8008
+  type: 'test'
+  ...
+# Subtest: TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+ok 14 - TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+  ---
+  duration_ms: 376.0073
+  type: 'test'
+  ...
+# Subtest: TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+ok 15 - TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+  ---
+  duration_ms: 28.5562
+  type: 'test'
+  ...
+# Subtest: TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+ok 16 - TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+  ---
+  duration_ms: 7.2989
+  type: 'test'
+  ...
+# Subtest: TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+ok 17 - TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+  ---
+  duration_ms: 51.8569
+  type: 'test'
+  ...
+# Subtest: TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+ok 18 - TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+  ---
+  duration_ms: 35.4644
+  type: 'test'
+  ...
+# Subtest: TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+ok 19 - TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+  ---
+  duration_ms: 39.957
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+ok 20 - TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+  ---
+  duration_ms: 67.5593
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+ok 21 - TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+  ---
+  duration_ms: 18.2204
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+ok 22 - TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+  ---
+  duration_ms: 0.5594
+  type: 'test'
+  ...
+# Subtest: TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+ok 23 - TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+  ---
+  duration_ms: 1.3737
+  type: 'test'
+  ...
+# Subtest: TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+ok 24 - TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+  ---
+  duration_ms: 0.1697
+  type: 'test'
+  ...
+# Subtest: team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+ok 25 - team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+  ---
+  duration_ms: 6.9697
+  type: 'test'
+  ...
+# Subtest: 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+ok 26 - 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+  ---
+  duration_ms: 3.3499
+  type: 'test'
+  ...
+# Subtest: 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+ok 27 - 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+  ---
+  duration_ms: 1.323
+  type: 'test'
+  ...
+# Subtest: 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+ok 28 - 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+  ---
+  duration_ms: 9.5178
+  type: 'test'
+  ...
+# Subtest: 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+ok 29 - 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+  ---
+  duration_ms: 15.3002
+  type: 'test'
+  ...
+# Subtest: 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+ok 30 - 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+  ---
+  duration_ms: 21.1972
+  type: 'test'
+  ...
+# Subtest: 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+ok 31 - 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+  ---
+  duration_ms: 0.6213
+  type: 'test'
+  ...
+# Subtest: D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+ok 32 - D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+  ---
+  duration_ms: 0.2829
+  type: 'test'
+  ...
+# Subtest: 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+ok 33 - 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+  ---
+  duration_ms: 0.8409
+  type: 'test'
+  ...
+# Subtest: 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+ok 34 - 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+  ---
+  duration_ms: 0.1487
+  type: 'test'
+  ...
+# Subtest: 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+ok 35 - 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+  ---
+  duration_ms: 0.0596
+  type: 'test'
+  ...
+# Subtest: 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+ok 36 - 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+  ---
+  duration_ms: 0.0743
+  type: 'test'
+  ...
+# Subtest: 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+ok 37 - 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+  ---
+  duration_ms: 2.2008
+  type: 'test'
+  ...
+# Subtest: env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+ok 38 - env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+  ---
+  duration_ms: 1.2721
+  type: 'test'
+  ...
+# Subtest: 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+ok 39 - 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+  ---
+  duration_ms: 3.7188
+  type: 'test'
+  ...
+# Subtest: envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+ok 40 - envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+  ---
+  duration_ms: 1.3571
+  type: 'test'
+  ...
+# Subtest: 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+ok 41 - 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+  ---
+  duration_ms: 0.5855
+  type: 'test'
+  ...
+# Subtest: 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+ok 42 - 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+  ---
+  duration_ms: 0.183
+  type: 'test'
+  ...
+# Subtest: R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+ok 43 - R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+  ---
+  duration_ms: 0.0566
+  type: 'test'
+  ...
+# Subtest: targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+ok 44 - targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+  ---
+  duration_ms: 0.09
+  type: 'test'
+  ...
+# Subtest: evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+ok 45 - evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+  ---
+  duration_ms: 0.0827
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+ok 46 - AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+  ---
+  duration_ms: 0.6078
+  type: 'test'
+  ...
+# Subtest: AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+ok 47 - AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+  ---
+  duration_ms: 0.1363
+  type: 'test'
+  ...
+# Subtest: AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+ok 48 - AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+  ---
+  duration_ms: 0.1084
+  type: 'test'
+  ...
+# Subtest: AC-18：roster schema 文本含三条警告与占位 omissionReason
+ok 49 - AC-18：roster schema 文本含三条警告与占位 omissionReason
+  ---
+  duration_ms: 0.0416
+  type: 'test'
+  ...
+# Subtest: AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 50 - AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 7.7684
+  type: 'test'
+  ...
+# Subtest: AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 51 - AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 3.5081
+  type: 'test'
+  ...
+# Subtest: AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+ok 52 - AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+  ---
+  duration_ms: 2.1147
+  type: 'test'
+  ...
+# Subtest: AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+ok 53 - AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+  ---
+  duration_ms: 41.2439
+  type: 'test'
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 53
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1000.0092

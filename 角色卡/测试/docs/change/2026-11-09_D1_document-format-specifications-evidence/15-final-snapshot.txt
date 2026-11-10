@@ -1,0 +1,43 @@
+=== FINAL snapshot ===
+date: 2026-11-09T16:27:10Z
+branch: feat/document-format-specifications
+HEAD: 3cd55dc6ed7a67f29a827e7f633aa0afed5e29b1
+HEAD^{tree}: e05d68ad26d768297cb076af4f8e24316c7d71b7
+staged: 0 files
+status -- src app test:
+ M app/desktop/session.ts
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? src/common/编排/doc-format-specs.ts
+?? test/runtime-core/doc-format-specs-pin.test.ts
+?? test/桌面应用/session.test.ts
+?? test/测试/doc-format-all-roles.test.ts
+?? test/编排/doc-format-specs.test.ts
+?? test/门禁引擎/doc-format-specs-pin.test.ts
+count: 11
+
+=== final primary manifest ===
+files: 1113
+total bytes: 25904972
+manifest digest (sorted "path\0sha256" concat, SHA-256): 4535a943aaa4a0767ad1c2e299d3a408a1ba4723495b7d0df415022d6410bbae
+
+=== final disk-all manifest ===
+files: 1117
+total bytes: 27563321
+manifest digest (sorted "path\0sha256" concat, SHA-256): 5142fe1d09005e6f65bc6b770b8fe005862d37af39f13e7a6e788b9d2865d683
+
+=== final candidate hashes recompute ===
+test/门禁引擎/doc-format-specs-pin.test.ts	B3/W3	33709	45b1ce34ed2d06f460264b252d2d702bebd78d55bf155c2922af1b39f520d369	45b1ce34ed2d06f460264b252d2d702bebd78d55bf155c2922af1b39f520d369	YES
+
+11/11 equal: true
+
+combined aggregate (sorted "path\0sha256" concatenated, SHA-256): d08009461a8fffeeab662a6917b434972319c7f3d4a89560148562724d91b53c
+
+per-batch aggregate cross-check (batch records):
+B1/W1	d1ad15629cc2d6cc371763798ee07be74c1c39331470d472573fa69f9c67b4f6	expected d1ad15629cc2d6cc371763798ee07be74c1c39331470d472573fa69f9c67b4f6	MATCH
+B2/W2	16a5fadf3da013d8536177dd762630f654952ffdf11a2c090cfa78d1c606e043	expected 16a5fadf3da013d8536177dd762630f654952ffdf11a2c090cfa78d1c606e043	MATCH
+B3/W3	2e9fb006258d2401ca6d603785a77cfcc72296c67330b1d97d5b88b388d5d765	expected 2e9fb006258d2401ca6d603785a77cfcc72296c67330b1d97d5b88b388d5d765	MATCH
+B4b/W4b	266f526da1226ac1eed56394a618e5d4abd68f1efbf99c7e309d0cd9402a4219	expected 266f526da1226ac1eed56394a618e5d4abd68f1efbf99c7e309d0cd9402a4219	MATCH
+B5/W5	6b1e48919697d0922de9c9b7cd081dec9ea69c5dc8d7b3548d875fbf330d2caf	expected 6b1e48919697d0922de9c9b7cd081dec9ea69c5dc8d7b3548d875fbf330d2caf	MATCH

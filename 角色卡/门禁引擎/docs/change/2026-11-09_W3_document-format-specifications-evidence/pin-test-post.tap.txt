@@ -1,0 +1,27 @@
+✔ 规范锚点：A17/A18/A19/A21 的 validator 指向真实实现文件与导出符号 (1.2263ms)
+✔ A17：ROLE_CARD_REQUIRED_SECTIONS 冻结 10 章节，与任务/B1 口径逐项相等 (0.4071ms)
+✔ A17：spec 章节字段逐项/按序包含 10 章节，并披露 #{1,6} 空白匹配口径 (0.1352ms)
+✔ A17：三文件规范路径与 boundary-core 校验一致（正例 + role-document-path-mismatch 负例） (5.0655ms)
+✔ A17：10 章节逐章节缺失 ⇒ role-card-section-missing:<label>；完整模板正例 ok (1.666ms)
+✔ A18/A19：boundary-yaml 私有常量 KINDS/ROOTS/TOP_KEYS/ENTRY_KEYS 源码字面量冻结 (0.3332ms)
+✔ A18/A19：spec 字段逐项包含 kind/root/entry 键/顶层键与条件目录 slug 口径 (0.2436ms)
+✔ A19：validateBoundaryYamlText 正例（spec example 与归档布尔），及条件目录 slug 正例 (1.4951ms)
+✔ A19：严格 YAML 负例 —— 未知顶层键/entry 键/kind/root/condition/archived 非布尔 (2.6963ms)
+✔ A19：条件目录 slug 走 model CONDITION_SLUG_PATTERN（正例/负例一致） (0.1366ms)
+✔ A17/A18/A19：spec 三文件样例经 parseSnapshotRoleDocuments/validateRoleDocumentsSnapshot 为 ok (0.8258ms)
+✔ A17/A18/A19：boundary.md↔yaml 不一致 ⇒ boundary-md-yaml-mismatch（条目多/少/重复/空集） (1.3017ms)
+✔ A17/A18/A19：archived:true ⇒ frozen-role-archived；role 标签不一致 ⇒ boundary-role-mismatch (0.5704ms)
+✔ A17/A18/A19：项目角色范围负例 ⇒ invalid-role-boundary-scope（条件目录/路径逃逸） (0.912ms)
+✔ A21：七键与源码解析键集逐项相等；NAME_PATTERN/RESERVED_NAMES/ENV_NAME_PATTERN 源码字面量冻结 (0.9458ms)
+✔ A21：spec 文本包含名字符集/保留名/env 形态，pathPattern 与状态口径冻结 (0.4881ms)
+✔ A21：spec example 经真实 readMcpDeclaration/listInstalledMcpServers 为 ok（七键视图/env 原文） (2.3124ms)
+✔ A21：负例 —— name-invalid/reserved-name/env 名非法/! 前缀/状态未知/必填缺失（readMcpDeclaration 不抛错） (4.295ms)
+✔ 既有片段：角色卡/编排/boundary.md、角色卡/产品/boundary.yaml 与本角色边界经真实 parser 为 ok (4.2594ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 201.6027

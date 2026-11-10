@@ -1,0 +1,18 @@
+✔ ans-criteria/v1 正例：唯一 block、优先级派生、CRLF 归一化 (5.1476ms)
+✔ AC 归一化：NFKC/全半角/空白/前导零；非法形态拒绝 (0.148ms)
+✔ criteria 负例：重复 canonical id、非法 priority、无/多 block、draft、版本不符 (2.7423ms)
+✔ criteria ref：显式 path+sha+version 才加载；无 ref 不取 latest；draft ref 拒绝 (19.9823ms)
+✔ P0 sidecar：实际 lines/bytes/sha256 与 sidecar 一致才通过；p0 自报忽略并标记 (9.2911ms)
+✔ AC-28：artifact 自述 223/实际 234、历史 pass 198/最终 214 ⇒ evidence-mismatch；修正后通过 (19.5103ms)
+✔ P0 缺 sidecar fail；P1 缺 sidecar 标未校验；stale/acIds 缺失 mismatch (15.5532ms)
+✔ collection：多文件 sidecar 逐文件 hash/bytes/lines 校验 (16.6041ms)
+✔ P4.3/F3/F4：collection generatedAt/mtime stale、item 自述、路径越界、角色范围拒绝 (32.3964ms)
+✔ F3：单文件 metaPath 越界/绝对/.ans/.env 一律 evidence-path-invalid (2.6993ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 261.6078

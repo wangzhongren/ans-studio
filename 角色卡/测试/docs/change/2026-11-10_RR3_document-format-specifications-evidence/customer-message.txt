@@ -1,0 +1,8 @@
+请为既有 flow `jinyong-rogue-2d` 做一个小需求：在现有「2D 金庸武侠 roguelike」（本项目）中增加战斗暂停/继续（按 Esc 暂停与继续，暂停时冻结战斗输入与计时）。本轮只做第一步「产品意图 v4」，请按以下步骤执行：
+
+1. 由幕僚把任务派给产品（product）：dispatch_task 只用 roleId=product + 任务文本，任务文本写明 flowId=jinyong-rogue-2d 与规范产出路径 docs/product/jinyong-rogue-2d-intent-v4.md（新版本；严禁修改 docs/product/jinyong-rogue-2d-intent-v1.md/-v2.md/-v3.md 或任何其它既有文档）。文档准备任务不要携带 moduleId/modulePaths/moduleDirectory（应用会以 document-planning-module-forbidden 拒绝）。
+2. 产品在写文档前必须先调用 doc_format（format="project-intent/v1"）读权威字段表与最小合法样例；再用一次写入把 docs/product/jinyong-rogue-2d-intent-v4.md 写对。frontmatter 必须含 schema: project-intent/v1、flowId: jinyong-rogue-2d、version: 4、intentId: jinyong-rogue-2d；正文含目标/范围/验收/客户原话。不试错重写。
+3. 产品写完后，幕僚用 request_choice（cardKind=intent-confirm）发起意图确认卡；卡须正常呈现（应用会调用 prepareIntentConfirmation 绑定真实字节）。
+4. 本轮不要出提案/任命/验收/其它卡，不要写实现代码，不使用 run_shell，不伪造或代填任何工具结果。遇到门禁拒绝、schema 拒绝或阻塞时，如实记录回执原文后停止，不要重试，不要自填应用派生值。
+
+本消息是唯一客户指令。

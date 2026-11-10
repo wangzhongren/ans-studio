@@ -1,0 +1,6 @@
+w10 | pattern=^W10  | exit=0 wall=1s | ℹ tests 5 ℹ pass 5 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 
+w5 | pattern=^W5 专字段 | exit=1 wall=2s | ℹ tests 7 ℹ pass 5 ℹ fail 2 ℹ cancelled 0 ℹ skipped 0 
+w20 | pattern=W20 默认Core/Chat | exit=0 wall=1s | ℹ tests 2 ℹ pass 2 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 
+w28stop | pattern=W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝 | exit=1 wall=2s | ℹ tests 1 ℹ pass 0 ℹ fail 1 ℹ cancelled 0 ℹ skipped 0 
+w30 | pattern=W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后 | exit=0 wall=8s | ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 
+w47revise | pattern=W47 默认Core/Codex本地HTTP：忙Chief独立revise | exit=0 wall=1s | ℹ tests 1 ℹ pass 1 ℹ fail 0 ℹ cancelled 0 ℹ skipped 0 

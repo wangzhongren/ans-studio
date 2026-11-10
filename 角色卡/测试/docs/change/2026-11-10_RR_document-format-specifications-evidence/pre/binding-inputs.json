@@ -1,0 +1,51 @@
+{
+  "b1v1": {
+    "rel": "docs/acceptance/2026-11-09_document-format-specifications-criteria-v1.md",
+    "exists": true,
+    "bytes": 69121,
+    "lines": 483,
+    "sha256": "bec45edfa47dd54229e1f37faac540db7ae9773e967b61004e47f65902c15dbe"
+  },
+  "teamPlan": {
+    "rel": "docs/scheduling/2026-11-09_team-plan_document-format-specifications.md",
+    "exists": true,
+    "bytes": 15475,
+    "lines": 102,
+    "sha256": "4d99586f6b32d884ab461307541e7f01f82cc092f0e5c9eaaeabc42f615ebdc2"
+  },
+  "dispatchLog": {
+    "rel": "docs/scheduling/2026-11-09_dispatch-log_document-format-specifications.md",
+    "exists": true,
+    "bytes": 7762,
+    "lines": 56,
+    "sha256": "afce6546723ee0c8ace5eda2b8941ca7369c626acd9eb95efece30300dee0c8f"
+  },
+  "designP12": {
+    "rel": "docs/planning/2026-11-09_design_document-format-specifications.md",
+    "exists": true,
+    "bytes": 146555,
+    "lines": 980,
+    "sha256": "886fef84c3db34515a98f5874a33bb22134a3fc3b02f20aa3d185b828a3e7c54"
+  },
+  "reviewR11": {
+    "rel": "docs/planning/2026-11-09_review_document-format-specifications.md",
+    "exists": true,
+    "bytes": 82067,
+    "lines": 500,
+    "sha256": "2cbe69195f75a700ccdb747cdbdcb9343c1bfc20fb6d011367a1b39c60daee05"
+  },
+  "d1Record": {
+    "rel": "角色卡/测试/docs/change/2026-11-09_D1_document-format-specifications.md",
+    "exists": true,
+    "bytes": 42274,
+    "lines": 228,
+    "sha256": "adc23f45f56f8cd16251e41756f9fce1b56430fadbf10b6add6e2cef3aec090f"
+  },
+  "w5Record": {
+    "rel": "角色卡/测试/docs/change/2026-11-09_W5_document-format-specifications.md",
+    "exists": true,
+    "bytes": 10883,
+    "lines": 100,
+    "sha256": "3fde941afc910793823faf2589c739b5ea6f363cbec92279b1227bb0e91dda81"
+  }
+}

@@ -1,0 +1,32 @@
+✖ T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入 (55.3111ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 374.7243
+
+✖ failing tests:
+
+test at test\测试\governance-matrix-integration.test.ts:1116:1
+✖ T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入 (55.3111ms)
+  AssertionError [ERR_ASSERTION]: 矩阵模块不得被非授权消费方导入：src/common/编排/doc-format-specs.ts
+  + actual - expected
+  
+  + [
+  +   'src/common/编排/doc-format-specs.ts'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-matrix-integration.test.ts:1166:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'src/common/编排/doc-format-specs.ts' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

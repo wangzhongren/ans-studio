@@ -1,0 +1,16 @@
+=== tracked changes outside src app test (excluding the 5 candidates) ===
+ M docs/communication/memo.md
+(end tracked list)
+
+=== untracked dir written by git-role-workflows e2e (outside src/app/test) ===
+?? "\350\247\222\350\211\262\345\215\241/\346\265\213\350\257\225/docs/change/2026-11-05_git-role-permissions-evidence/"
+count: 1
+
+=== newest files in that dir ===
+q36-node-test-registration-check.json
+default-new-31ba4ea5-bf0c-498f-8eea-1d927b2d9017-clean-delivery-seed.json
+default-new-31ba4ea5-bf0c-498f-8eea-1d927b2d9017-parent-verified-child.json
+default-new-31ba4ea5-bf0c-498f-8eea-1d927b2d9017-child-lifecycle.json
+
+=== src app test untracked outside candidate (expect none) ===
+none

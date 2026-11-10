@@ -1,0 +1,20 @@
+✔ manifest 形状：draft/pinned 合法；schema/state/runId 非法拒绝 (0.7774ms)
+✔ pending draft：M1 无 flow 先建 pending；真实 flow 到达时领养同一 runId (28.0286ms)
+✔ F5：非法 manifest 不静默跳过——findActiveRun fail-closed (4.3019ms)
+✔ F5：verifyPinnedRun 要求七类文档键齐备（assets 可为 null，但键必须存在） (1.2287ms)
+✔ P2.4：静态 quickref 由 manifest 生成，逐项与 manifest 文档/hash 一致 (0.3129ms)
+✔ R4：closeRun 记录 supersede closeReason/幂等；多 draft 逐个关闭；listRunManifestsResult 语义不变 (21.3992ms)
+✔ R1：listRunManifestsResult 保持 all-or-nothing（坏 manifest 整体失败；run-manifest.ts 零改动） (3.4265ms)
+✔ Q9 A：applyRunChange 接受 directive + directiveId 并写入 manifest；缺/非法 id 拒绝 (8.1169ms)
+✔ S3：首次 handoff pin 先写 handoff-pin-bootstrap 冻结再 pin；repin 追加 repins/幂等/未冻结拒绝 (94.8952ms)
+✔ S3：re-pin 名单文档时 run rosterVersion 跟随文档版本（不再滞后） (66.4532ms)
+✔ S3：prepareRunPin 在 ready 语义（已有冻结记录）下拒绝未冻结的最新版本化文档 (37.5717ms)
+✔ S3：legacy baseline（无冻结记录）按 F29 默认冻结允许 pin、不写 bootstrap；baseline corrupt ⇒ pin fail-closed 指针不变 (56.6212ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 541.3108

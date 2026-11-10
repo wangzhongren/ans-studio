@@ -1,0 +1,9 @@
+[
+  {
+    "ts": "2026-11-09T16:51:13.545Z",
+    "file": "sessions/chief/claude/native/projects/C--Users-51054-Desktop-work-ans-doc-format-run-2026-11-10-target/60a57f9e-5bce-42aa-98e9-5b06d3f1ee0d.jsonl",
+    "toolUseId": "call_00_uPnHnKYIy9D26bvpdaPG7907",
+    "isError": null,
+    "text": "doc_format（只读；不构成放行/授权；doc-format-specs/v1）\n格式：project-intent/v1 — 产品意图文档（意图确认门 / run pin / 意图入口链）\naudience：role-authored\nstage：意图\n路径：docs/product/<flowId>-intent-vN.md\nschema：project-intent/v1\n校验器：shape-check；src/service/trunk/impl/apply-journal.ts#prepareIntentConfirmation；意图确认门必填 schema；run pin 层 run-manifest.ts schemaMatches 缺失不拒；意图入口链 intent-entry-contract.ts\n【字段】\n强制（校验器会拒绝缺省/非法值）：\n- schema：string；conditional；约束：字面量 project-intent/v1；说明：意图确认门必填；run pin 缺失不拒（分层口径）\n- flowId：string；optional；约束：给出即必须等于本次 flowId\n- version：正整数；optional；约束：给出即必须等于文件名 -vN 的 N\n约定（仅写作约定；校验器不强制）：\n- intentId：string；optional；说明：意图入口契约要求写小写 slug 并三处一致；确认门/pin 不校验（缺省回落 flowId）\n- 正文：任意；optional；说明：目标/范围/验收/客户原话等为写作约定，解析器不校验\n【加载级约束与错误码】\n- trunk-item-invalid：意图确认门：schema/flowId/version 与实际文档不符即拒绝（卡不呈现）\n- run-pin-schema-mismatch：run pin：frontmatter schema 存在且 ≠ 期望\n- intent-ambiguous：意图入口链：产品意图/提案/入口文件名三处 intentId 不一致\n【最小合法样例】（full-document）\n```text\n---\nschema: project-intent/v1\nflowId: demo\nversion: 1\nintentId: demo-intent\n---\n# 意图\n目标：交付一个可玩的小游戏。\n```\n【常见错误与修复】\n- trunk-item-invalid：缺 schema 或 schema/flowId/version 与文档不符 → 按样例补 schema: project-intent/v1，并核对 flowId/version\n- run-pin-schema-mismatch：frontmatter schema 写错 → schema 必须恰为 project-intent/v1\n- intent-ambiguous：intentId 与提案/入口文件名不一致 → 三处原样复制同一 intentId\n- intent-missing：意图入口缺 goal/scope/acceptance → 补必填要素\nspecRevision：1"
+  }
+]

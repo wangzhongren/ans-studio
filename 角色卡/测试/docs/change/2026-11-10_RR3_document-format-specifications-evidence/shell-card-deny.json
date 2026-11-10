@@ -1,0 +1,8 @@
+{
+  "at": "2026-11-09T17:09:54.195Z",
+  "before": "命令审批 · 产品\n治理审批\n前台命令\ncertutil -hashfile docs\\product\\jinyong-rogue-2d-intent-v4.md SHA256\n\n硬拒类（deny） · 它会在项目里执行：certutil\n\n产品 审批档：硬拒类（deny）——须逐条客户批准才执行；批准后可能绕过 ANS 文件写边界（命令以当前 OS 用户权限运行）。拒绝/超时/通道不可用 = 拒绝；默认拒绝、无「记住」，不自动通过。 命中原因：su-审批档[deny]：命中 c 硬拒规则（ruleset:default）；批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界。\n\n详情（argv / cwd）\n放行执行\n拒绝\n\n批准后命令以当前 OS 用户权限执行，可能绕过 ANS 文件写边界；请逐字核对命令原文。 点「拒绝」、按 Esc 或关闭本框 = 不放行（不会执行）。",
+  "click": "clicked",
+  "after": {
+    "hidden": true
+  }
+}

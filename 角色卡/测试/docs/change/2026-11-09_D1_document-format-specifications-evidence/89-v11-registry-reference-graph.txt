@@ -1,0 +1,15 @@
+=== test/测试 files referencing registry text/ids ===
+test/测试/doc-format-all-roles.test.ts
+
+=== test/桌面应用 files referencing registry text/ids ===
+test/桌面应用/session.test.ts
+
+=== production importers of registry (unchanged bridge files) ===
+src/common/编排/doc-format-specs.ts
+src/provider/runtime/tools.ts
+app/desktop/session.ts
+
+=== hash check of bridges (expect SAME/unchanged since v1) ===
+b07c3f805ab9eb88f13d4a6d4098b001d101e04b59b6162f57eda1e47a06ba79 *src/provider/runtime/tools.ts
+df5bf7b0315410791e4c58a6c3e3caaac6f1d4312ff4751957d454e7a569fe14 *app/desktop/session.ts
+89e5fbc97b3a3f6994cf858696750fe6d3acfbe45ed1d0cf571b8a35037f4959 *src/model/runtime.ts

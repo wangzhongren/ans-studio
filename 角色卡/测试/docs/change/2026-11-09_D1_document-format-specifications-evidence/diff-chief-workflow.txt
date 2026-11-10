@@ -1,0 +1,14 @@
+# suite: chief-workflow(rerun authoritative)
+before: {"tests":66,"pass":59,"fail":7,"cancelled":0,"skipped":0,"todo":0} failures=7 skips=0
+after : {"tests":66,"pass":50,"fail":16,"cancelled":0,"skipped":0,"todo":0} failures=16 skips=0
+failures common=7 before-only=0 after-only=9
+  AFTER-ONLY FAIL: W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  AFTER-ONLY FAIL: W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+  AFTER-ONLY FAIL: W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+  AFTER-ONLY FAIL: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+  AFTER-ONLY FAIL: W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+  AFTER-ONLY FAIL: W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  AFTER-ONLY FAIL: commit-race
+  AFTER-ONLY FAIL: selected
+  AFTER-ONLY FAIL: unmanaged
+skips before-only=0 after-only=0

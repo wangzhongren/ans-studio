@@ -1,0 +1,19 @@
+== git status --porcelain -- src app test ==
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? "src/common/\347\274\226\346\216\222/doc-format-specs.ts"
+?? test/runtime-core/doc-format-specs-pin.test.ts
+?? "test/\347\274\226\346\216\222/doc-format-specs.test.ts"
+?? "test/\351\227\250\347\246\201\345\274\225\346\223\216/doc-format-specs-pin.test.ts"
+
+== run-role.ts tracked? ==
+tracked
+
+== RoleSessionDeps region (unchanged) ==
+3486:export interface RoleSessionDeps {
+3487-  createAdapter?: RuntimeAdapterFactory;
+3488-  runtimeOptions?: RuntimeAdapterFactoryOptions;
+3489-}
+3490-

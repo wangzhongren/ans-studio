@@ -1,0 +1,37 @@
+✔ team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution (9.0424ms)
+✔ 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验 (2.2846ms)
+✔ 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集） (1.3625ms)
+✔ 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑 (9.1271ms)
+✔ 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错 (21.1733ms)
+✔ 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错 (31.3365ms)
+✔ 版本格式：引用必须带 -vN.md；非版本化路径拒绝 (0.5649ms)
+✔ D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项） (0.2626ms)
+✔ 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝 (0.7141ms)
+✔ 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝 (0.1474ms)
+✔ 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜 (0.0652ms)
+✔ 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required (0.0673ms)
+✔ 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例 (2.0467ms)
+✔ env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引） (1.3169ms)
+✔ 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例） (6.9212ms)
+✔ envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由 (1.3275ms)
+✔ 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出 (0.5936ms)
+✔ 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory (0.1794ms)
+✔ R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory (0.0544ms)
+✔ targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填 (0.0901ms)
+✔ evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性） (0.0972ms)
+✔ AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源 (0.8093ms)
+✔ AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId (0.135ms)
+✔ AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行 (0.1166ms)
+✔ AC-18：roster schema 文本含三条警告与占位 omissionReason (0.0414ms)
+✔ AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义 (8.2333ms)
+✔ AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义 (3.3269ms)
+✔ AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示 (2.0318ms)
+✔ AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例 (30.0235ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 333.0943

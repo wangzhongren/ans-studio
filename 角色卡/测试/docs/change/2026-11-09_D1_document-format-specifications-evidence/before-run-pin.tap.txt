@@ -1,0 +1,217 @@
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (104.8097ms)
+✖ D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集 (141.053ms)
+✖ run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned (79.1246ms)
+✔ run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等 (43.8016ms)
+✔ legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned (12.6169ms)
+✔ P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝 (64.1187ms)
+✔ P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写 (64.6355ms)
+✖ P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId (44.7037ms)
+✔ R2（P1.3）：legacy 任务验收 facts 标 runState=legacy (125.7566ms)
+✔ contract_check session：pinned run/角色写区/legacy 明示（只读） (69.8064ms)
+✔ contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12） (38.5381ms)
+✔ contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8） (32.9611ms)
+✖ F2：版本化文档基线违规受理 + advisory；基线/文档未被改写 (84.579ms)
+✔ §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出 (229.1488ms)
+✖ R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable (33.8742ms)
+✖ R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable (70.3509ms)
+✖ AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点 (73.6298ms)
+✖ AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点 (97.4084ms)
+✖ AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读 (57.3638ms)
+✖ P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定 (93.7182ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 9
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3478.631
+
+✖ failing tests:
+
+test at test\桌面应用\run-pin.test.ts:184:1
+✖ run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned (104.8097ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:194:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:268:1
+✖ D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集 (141.053ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:297:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:316:1
+✖ run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned (79.1246ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:325:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:454:1
+✖ P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId (44.7037ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:461:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:606:1
+✖ F2：版本化文档基线违规受理 + advisory；基线/文档未被改写 (84.579ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:620:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:723:1
+✖ R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable (33.8742ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:730:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:745:1
+✖ R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable (70.3509ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:755:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:770:1
+✖ AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点 (73.6298ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:782:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:796:1
+✖ AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点 (97.4084ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:814:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:829:1
+✖ AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读 (57.3638ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:849:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\run-pin.test.ts:864:1
+✖ P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定 (93.7182ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc-v2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:878:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

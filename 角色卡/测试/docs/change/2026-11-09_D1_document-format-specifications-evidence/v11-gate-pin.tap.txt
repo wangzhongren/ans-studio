@@ -1,0 +1,124 @@
+TAP version 13
+# Subtest: 规范锚点：A17/A18/A19/A21 的 validator 指向真实实现文件与导出符号
+ok 1 - 规范锚点：A17/A18/A19/A21 的 validator 指向真实实现文件与导出符号
+  ---
+  duration_ms: 1.2172
+  type: 'test'
+  ...
+# Subtest: A17：ROLE_CARD_REQUIRED_SECTIONS 冻结 10 章节，与任务/B1 口径逐项相等
+ok 2 - A17：ROLE_CARD_REQUIRED_SECTIONS 冻结 10 章节，与任务/B1 口径逐项相等
+  ---
+  duration_ms: 0.4161
+  type: 'test'
+  ...
+# Subtest: A17：spec 章节字段逐项/按序包含 10 章节，并披露 \#{1,6} 空白匹配口径
+ok 3 - A17：spec 章节字段逐项/按序包含 10 章节，并披露 \#{1,6} 空白匹配口径
+  ---
+  duration_ms: 0.131
+  type: 'test'
+  ...
+# Subtest: A17：三文件规范路径与 boundary-core 校验一致（正例 + role-document-path-mismatch 负例）
+ok 4 - A17：三文件规范路径与 boundary-core 校验一致（正例 + role-document-path-mismatch 负例）
+  ---
+  duration_ms: 4.9797
+  type: 'test'
+  ...
+# Subtest: A17：10 章节逐章节缺失 ⇒ role-card-section-missing:<label>；完整模板正例 ok
+ok 5 - A17：10 章节逐章节缺失 ⇒ role-card-section-missing:<label>；完整模板正例 ok
+  ---
+  duration_ms: 1.6761
+  type: 'test'
+  ...
+# Subtest: A18/A19：boundary-yaml 私有常量 KINDS/ROOTS/TOP_KEYS/ENTRY_KEYS 源码字面量冻结
+ok 6 - A18/A19：boundary-yaml 私有常量 KINDS/ROOTS/TOP_KEYS/ENTRY_KEYS 源码字面量冻结
+  ---
+  duration_ms: 0.3513
+  type: 'test'
+  ...
+# Subtest: A18/A19：spec 字段逐项包含 kind/root/entry 键/顶层键与条件目录 slug 口径
+ok 7 - A18/A19：spec 字段逐项包含 kind/root/entry 键/顶层键与条件目录 slug 口径
+  ---
+  duration_ms: 0.2602
+  type: 'test'
+  ...
+# Subtest: A19：validateBoundaryYamlText 正例（spec example 与归档布尔），及条件目录 slug 正例
+ok 8 - A19：validateBoundaryYamlText 正例（spec example 与归档布尔），及条件目录 slug 正例
+  ---
+  duration_ms: 1.4313
+  type: 'test'
+  ...
+# Subtest: A19：严格 YAML 负例 —— 未知顶层键/entry 键/kind/root/condition/archived 非布尔
+ok 9 - A19：严格 YAML 负例 —— 未知顶层键/entry 键/kind/root/condition/archived 非布尔
+  ---
+  duration_ms: 2.641
+  type: 'test'
+  ...
+# Subtest: A19：条件目录 slug 走 model CONDITION_SLUG_PATTERN（正例/负例一致）
+ok 10 - A19：条件目录 slug 走 model CONDITION_SLUG_PATTERN（正例/负例一致）
+  ---
+  duration_ms: 0.1367
+  type: 'test'
+  ...
+# Subtest: A17/A18/A19：spec 三文件样例经 parseSnapshotRoleDocuments/validateRoleDocumentsSnapshot 为 ok
+ok 11 - A17/A18/A19：spec 三文件样例经 parseSnapshotRoleDocuments/validateRoleDocumentsSnapshot 为 ok
+  ---
+  duration_ms: 0.8345
+  type: 'test'
+  ...
+# Subtest: A17/A18/A19：boundary.md↔yaml 不一致 ⇒ boundary-md-yaml-mismatch（条目多/少/重复/空集）
+ok 12 - A17/A18/A19：boundary.md↔yaml 不一致 ⇒ boundary-md-yaml-mismatch（条目多/少/重复/空集）
+  ---
+  duration_ms: 1.3097
+  type: 'test'
+  ...
+# Subtest: A17/A18/A19：archived:true ⇒ frozen-role-archived；role 标签不一致 ⇒ boundary-role-mismatch
+ok 13 - A17/A18/A19：archived:true ⇒ frozen-role-archived；role 标签不一致 ⇒ boundary-role-mismatch
+  ---
+  duration_ms: 0.6161
+  type: 'test'
+  ...
+# Subtest: A17/A18/A19：项目角色范围负例 ⇒ invalid-role-boundary-scope（条件目录/路径逃逸）
+ok 14 - A17/A18/A19：项目角色范围负例 ⇒ invalid-role-boundary-scope（条件目录/路径逃逸）
+  ---
+  duration_ms: 0.9059
+  type: 'test'
+  ...
+# Subtest: A21：七键与源码解析键集逐项相等；NAME_PATTERN/RESERVED_NAMES/ENV_NAME_PATTERN 源码字面量冻结
+ok 15 - A21：七键与源码解析键集逐项相等；NAME_PATTERN/RESERVED_NAMES/ENV_NAME_PATTERN 源码字面量冻结
+  ---
+  duration_ms: 0.4561
+  type: 'test'
+  ...
+# Subtest: A21：spec 文本包含名字符集/保留名/env 形态，pathPattern 与状态口径冻结
+ok 16 - A21：spec 文本包含名字符集/保留名/env 形态，pathPattern 与状态口径冻结
+  ---
+  duration_ms: 1.0598
+  type: 'test'
+  ...
+# Subtest: A21：spec example 经真实 readMcpDeclaration/listInstalledMcpServers 为 ok（七键视图/env 原文）
+ok 17 - A21：spec example 经真实 readMcpDeclaration/listInstalledMcpServers 为 ok（七键视图/env 原文）
+  ---
+  duration_ms: 2.28
+  type: 'test'
+  ...
+# Subtest: A21：负例 —— name-invalid/reserved-name/env 名非法/! 前缀/状态未知/必填缺失（readMcpDeclaration 不抛错）
+ok 18 - A21：负例 —— name-invalid/reserved-name/env 名非法/! 前缀/状态未知/必填缺失（readMcpDeclaration 不抛错）
+  ---
+  duration_ms: 8.887
+  type: 'test'
+  ...
+# Subtest: 既有片段：角色卡/编排/boundary.md、角色卡/产品/boundary.yaml 与本角色边界经真实 parser 为 ok
+ok 19 - 既有片段：角色卡/编排/boundary.md、角色卡/产品/boundary.yaml 与本角色边界经真实 parser 为 ok
+  ---
+  duration_ms: 4.4014
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 19
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 208.9135

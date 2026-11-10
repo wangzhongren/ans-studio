@@ -51,6 +51,7 @@ import type {
   RoleActivityLogFn, RoleActivityLogPayload, TaskSideEffect,
   TerminateRoleRunFn, TerminateRoleRunPayload, RedispatchTaskFn, RedispatchTaskPayload,
   ContractCheckFn, ContractCheckInput, EvidenceCheckFn, EvidenceCheckInput, CriteriaRef,
+  DocFormatFn, DocFormatInput,
   ProjectStateFn, ProjectNoteFn, RequestVersionDecisionFn,
   SubmitVersionChangeFn, SubmitRefactorFn, RequestStableWriteFn,
   SubmitVersionChangeInput, SubmitRefactorInput, RequestStableWriteInput,
@@ -137,6 +138,7 @@ import { formatDenialMessage } from "../../common/runtime-core/format-denial.ts"
 import { formatMechanicalRejection, makeMechanicalRejection, type MechanicalRejection } from "../../common/编排/mechanical-rejection.ts";
 import { recordToolWrite } from "../../common/编排/write-journal.ts";
 import { validateEvidencePath } from "../../common/编排/evidence-check.ts";
+import { docFormatKnownIds } from "../../common/编排/doc-format-specs.ts";
 // 2026-10-18 真机修复：写前校验角色 boundary.yaml 内容（**只经 Service 公共出口**——Provider 不直接
 // import 门禁引擎私有 `common/门禁引擎/boundary-yaml.ts`；该出口再导出**同一函数引用**，单一来源不变，
 // 与运行时边界解析同一实现，避免「写得进、枚举不了」）。
@@ -229,6 +231,14 @@ export const ROLE_STATUS_TOOL_NAME = "role_status";
 /** contract_check 工具名（2026-10-30 / 方案 v3 §3.2；只读契约速查，不改变任何门禁）。 */
 export const CONTRACT_CHECK_TOOL_NAME = "contract_check";
 const CONTRACT_CHECK_MAX_BYTES = 4096;
+
+/** doc_format 工具名（2026-11-09 文档格式权威说明；注入 `docFormat` 能力才注册）。 */
+export const DOC_FORMAT_TOOL_NAME = "doc_format";
+/** doc_format 输出上限（索引/详情均为 8 KiB；数据源已按预算渲染，本层再防御性截断）。 */
+const DOC_FORMAT_MAX_BYTES = 8 * 1024;
+const DOC_FORMAT_TRUNCATED_MARKER = "\n…（已截断；用 part=fields|example|errors 缩小范围）";
+/** 未知 format 的回显上限（与注册表未知-id 提示同口径；AC-8：回显 ≤40 字符）。 */
+const DOC_FORMAT_ECHO_MAX = 40;
 
 /** evidence_check 工具名（3.4；只读证据重算，不执行项目脚本、不授予写权）。 */
 export const EVIDENCE_CHECK_TOOL_NAME = "evidence_check";
@@ -3167,6 +3177,85 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
   };
 }
 
+/**
+ * `doc_format` 只读格式说明（2026-11-09 文档格式权威说明，方案 P1.2 §4.1；B1 TM-11 / AC-8）。
+ * 模式对齐 `makeContractCheckTool`：参数形状/未知 id/非字符串在**本层**拒绝（不猜、不读盘）；
+ * 数据源只提供纯文本，本层统一 `{ok:true,message}`/`{ok:false,message}` 信封并按 8 KiB 防御性截断。
+ * 数据源契约（`DocFormatFn`）：纯读、静态公开文本、零磁盘 I/O；缺省 `format` ⇒ 索引。
+ */
+function makeDocFormatTool(fn: DocFormatFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
+  const name = DOC_FORMAT_TOOL_NAME;
+  return {
+    name,
+    async handler(call) {
+      // format：null/undefined/空串/仅空白串视为缺省（索引模式）；非字符串拒绝且不调用数据源
+      // （readStringArg 会吞掉非字符串，导致 format:123 静默走索引，故直接读原始值）。
+      const formatRaw = call.args["format"];
+      let format: string | undefined;
+      if (formatRaw !== undefined && formatRaw !== null) {
+        if (typeof formatRaw !== "string") {
+          return { ok: false, message: `${name}：format 参数非法（应为字符串格式 id；缺省＝格式索引）。` };
+        }
+        const trimmed = formatRaw.trim();
+        if (trimmed !== "") {
+          // 未知 id 在本层 fail-closed 拒绝，消息与注册表未知-id 纯文本同口径（B1 AC-8-3：
+          // 「未知格式 …；可用：…」、回显 ≤40 字符）；数据源仍对未知 id 防御性返回同一文本（B1 TM-1）。
+          const known = docFormatKnownIds();
+          if (!known.includes(trimmed)) {
+            const chars = Array.from(trimmed);
+            const echo = chars.length <= DOC_FORMAT_ECHO_MAX ? trimmed : `${chars.slice(0, DOC_FORMAT_ECHO_MAX).join("")}…`;
+            return { ok: false, message: `未知格式 ${echo}；可用：${known.join("、")}` };
+          }
+          format = trimmed;
+        }
+      }
+      // part：null/undefined/空串视为缺省（全部）；非字符串/未知值拒绝且不调用数据源。
+      const partRaw = call.args["part"];
+      let part: DocFormatInput["part"];
+      if (partRaw !== undefined && partRaw !== null) {
+        if (typeof partRaw !== "string") {
+          return { ok: false, message: `${name}：part 参数非法（应为字符串：fields|example|errors）。` };
+        }
+        const trimmed = partRaw.trim();
+        if (trimmed !== "") {
+          if (trimmed !== "fields" && trimmed !== "example" && trimmed !== "errors") {
+            return { ok: false, message: `${name}：未知 part=${JSON.stringify(trimmed.slice(0, DOC_FORMAT_ECHO_MAX))}；可用 part：fields|example|errors。` };
+          }
+          part = trimmed;
+        }
+      }
+      const input: DocFormatInput = {
+        ...(format !== undefined ? { format } : {}),
+        ...(part !== undefined ? { part } : {}),
+      };
+      let text: string | null | undefined | void;
+      try {
+        const turnId = currentTurnId?.();
+        text = await raceAbort(
+          Promise.resolve().then(() => fn(input, {
+            ...(scope?.roleId !== undefined ? { roleId: scope.roleId } : {}),
+            ...(turnId !== undefined ? { turnId } : {}),
+            ...(scope?.runtime !== undefined ? { runtime: scope.runtime } : {}),
+          })),
+          call.signal,
+          `${name} 读取格式说明`,
+        );
+      } catch (err) {
+        return { ok: false, message: `${name}：格式说明读取未完成（原因：${reasonOf(err)}）——不要据此猜测格式；可稍后重试。` };
+      }
+      if (typeof text !== "string" || text.trim() === "") {
+        return { ok: false, message: `${name}：数据源未返回格式说明（结果不明）——不要据此猜测。` };
+      }
+      return {
+        ok: true,
+        message: Buffer.byteLength(text, "utf8") <= DOC_FORMAT_MAX_BYTES
+          ? text
+          : `${truncateUtf8(text, DOC_FORMAT_MAX_BYTES - Buffer.byteLength(DOC_FORMAT_TRUNCATED_MARKER, "utf8")).text}${DOC_FORMAT_TRUNCATED_MARKER}`,
+      };
+    },
+  };
+}
+
 function makeRoleStatusTool(fn: RoleStatusFn, currentTurnId?: () => string | undefined, scope?: Pick<GovernedToolsOptions, "roleId" | "runtime">): ExecutableTool {
   const name = ROLE_STATUS_TOOL_NAME;
   return {
@@ -5205,6 +5294,12 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   if (roleStatus !== undefined) tools.push(makeRoleStatusTool(roleStatus, options?.currentTurnId, { roleId: options?.roleId, runtime: options?.runtime }));
   if (options?.contractCheck !== undefined) {
     tools.push(makeContractCheckTool(options.contractCheck, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));
+  }
+  // 结构性保证（2026-11-09 文档格式权威说明，同 contract_check 先例）：**未注入 docFormat 能力时
+  // `doc_format` 不存在**（能力缺席 = 最强 fail-closed；未注入 ⇒ 既有行为逐字不变）。只读：数据源
+  // 提供静态公开文本；本层只做参数形状/已知 id 校验、8 KiB 预算截断与 `{ok,message}` 信封。
+  if (options?.docFormat !== undefined) {
+    tools.push(makeDocFormatTool(options.docFormat, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));
   }
   if (options?.evidenceCheck !== undefined) {
     tools.push(makeEvidenceCheckTool(options.evidenceCheck, options?.currentTurnId, { ...(options.roleId !== undefined ? { roleId: options.roleId } : {}), ...(options.runtime !== undefined ? { runtime: options.runtime } : {}) }));

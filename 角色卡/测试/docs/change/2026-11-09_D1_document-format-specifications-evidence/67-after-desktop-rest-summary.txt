@@ -1,0 +1,24 @@
+=== after desktop rest (57 files) ===
+TOTAL files=57 tests=605 pass=529 fail=76 cancelled=0 skipped=0
+test/桌面应用/application-line.test.ts | exit=1 wall=1 | {"tests":3,"pass":2,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/boundary-refresh.test.ts | exit=1 wall=4 | {"tests":14,"pass":13,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/chain-enforcement.test.ts | exit=1 wall=3 | {"tests":9,"pass":3,"fail":6,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/directive-decision.test.ts | exit=124 wall=121 | {"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/directive-input.test.ts | exit=1 wall=9 | {"tests":19,"pass":14,"fail":5,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/download-decision.test.ts | exit=1 wall=4 | {"tests":8,"pass":7,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/download-request.test.ts | exit=1 wall=4 | {"tests":8,"pass":7,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/genesis-bootstrap.test.ts | exit=1 wall=0 | {"tests":7,"pass":6,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/handback-delivery.test.ts | exit=1 wall=10 | {"tests":18,"pass":12,"fail":6,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/log-actions.test.ts | exit=1 wall=6 | {"tests":1,"pass":0,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/multi-runtime.test.ts | exit=1 wall=5 | {"tests":39,"pass":31,"fail":8,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/operator-channel.test.ts | exit=1 wall=1 | {"tests":59,"pass":58,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/p0-halt-and-images.test.ts | exit=1 wall=7 | {"tests":5,"pass":2,"fail":3,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/project.test.ts | exit=1 wall=0 | {"tests":23,"pass":22,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/queue-visibility.test.ts | exit=1 wall=1 | {"tests":2,"pass":1,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/run-change-trigger.test.ts | exit=1 wall=1 | {"tests":10,"pass":1,"fail":9,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/run-pin.test.ts | exit=1 wall=4 | {"tests":20,"pass":9,"fail":11,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/session-rebuild-race.test.ts | exit=124 wall=120 | {"tests":17,"pass":14,"fail":3,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/star-routing.test.ts | exit=1 wall=2 | {"tests":10,"pass":3,"fail":7,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/stuck-redispatch.test.ts | exit=124 wall=120 | {"tests":7,"pass":4,"fail":3,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/task-restart.test.ts | exit=1 wall=3 | {"tests":2,"pass":1,"fail":1,"cancelled":0,"skipped":0,"todo":0}
+test/桌面应用/version-change.test.ts | exit=1 wall=9 | {"tests":46,"pass":42,"fail":4,"cancelled":0,"skipped":0,"todo":0}

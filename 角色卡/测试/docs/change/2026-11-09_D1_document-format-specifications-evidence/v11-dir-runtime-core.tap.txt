@@ -1,0 +1,1010 @@
+✔ pre-aborted public tools retain specific failure semantics and invoke no capability (2.2926ms)
+✔ abort during public capability waits keeps actual handler failure wording instead of generic cancellation (85.2753ms)
+✔ success received as cancellation arrives is still converted to the tool-specific failure (4.2437ms)
+✖ abort rejection no longer quarantines forever once the underlying turn settles later (2.9607ms)
+✖ abort rejection keeps quarantine when the underlying turn never settles (1.0905ms)
+✖ normal abort without cleanup failure keeps its existing quarantine lifecycle (0.6943ms)
+✔ P1-A guard accepts exactly the frozen application tool-surface fact shape (0.5929ms)
+✔ P1-A composition verifies Claude/Pi/Codex only under the exact reason whitelist and returns copied facts (0.7257ms)
+✔ P1-A composition rejects every blocked or unlisted wrapper reason (default deny) (0.1863ms)
+✔ P1-A composition rejects missing, unknown, malformed or identity-mismatched adapter facts (0.2027ms)
+✔ P1-A Amendment-1: verified applicationMediation carries the bound nativeInstanceId (P1.6 §4.4 literal) (0.1747ms)
+✔ P1-A Codex application mediation additionally requires a bound native fact and no foreign MCP (0.1413ms)
+✔ P1-A wrapper keeps applicationMediation absent for custom factories, demo and strict observed sessions (12.3761ms)
+✔ P1-A real default Codex session remains strict-observed and never gains the dual path (16.9927ms)
+ℹ {"factoryProvenance":"default-production","status":"observed","nativeToolRegistry":"application-mediated"}
+✔ E7：killProcessTree 只保留一份实现，run_shell 从 process-tree.ts 导入 (2.5957ms)
+✔ S5 Claude：SDK MCP registerTool 实际收到四个后台工具 (23.0922ms)
+✔ S5 Codex：thread/start 的 dynamicTools 实际包含四个后台工具 (93.8036ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ S5 Pi：生产入口（"tools" in adapterInput）把四个后台工具注册为 customTools (537.229ms)
+✔ F9/B1：四工具只在 ShellGate 与管理器同时注入时注册；显示规则与判断会话隔离（结构面） (2.5262ms)
+✔ F1/F2：空命令与 F-7 守卫在审核之前拒绝，零 spawn、无任务 (0.9588ms)
+✔ F3：审核拒绝/undefined/抛错/超时四类均零 spawn、无任务、无日志 (40.0437ms)
+✔ F4/CC1：第 9 个在 ShellGate 之前被拒，无审核请求、零 spawn、诊断 background.limit (5.5009ms)
+✔ S1/S2：启动立即返回并含任务号/pid；list/read/stop 可用；再次 stop 如实返回已结束 (257.2396ms)
+✔ S2.5/F10：自然退出如实显示 exited 与退出码；对已结束任务 stop 不谎报刚刚停止 (78.7331ms)
+✔ F6/O3：未知任务、非法参数与 schema 边界；tailLines 超上限如实钳制 (1.2301ms)
+✔ F8：后台进程 cwd=会话 shellCwd，凭据环境变量被剥离；schema 不接受调用方指定 cwd (44.8543ms)
+✔ S4：轮次中止不杀后台任务；启动成功结果不因信号中止被改写成「未启动」 (1085.1276ms)
+✔ S3：管理器已关闭后 start 明确失败且零 spawn（审核通过后才发现会话关闭的竞态） (0.5795ms)
+✔ B4/CC3：background.* 诊断事件齐全且字段全部落在共享白名单内（不含 taskId） (1.0016ms)
+✔ Service：仅 ShellGate 会话注入四工具；判断会话与无 ShellGate 会话不可见 (11.0823ms)
+✔ Service dispose：终止运行中任务、管理器失效、dispose 幂等 (76.3058ms)
+✔ Service：bindRole 失败如实拒绝（管理器释放在无回合时为空操作；释放接线见代码/构造失败路径） (3.7914ms)
+✔ Service：assertReady 失败如实拒绝并关闭已绑定 inner 会话（管理器释放路径已接线） (3.5712ms)
+✔ 无管理器：list 为空、read 未找到、stop 明确失败且不抛（含判断会话） (11.8611ms)
+✔ 有管理器：list/read/stop 与选项转调当前会话管理器 (134.8331ms)
+✔ dispose 后：运行中任务终止，list/read/stop 明确失效且不复活管理器 (96.1704ms)
+✔ S1/S2：真实子进程启动立即返回任务号与 pid；list/read 可见；stop 后 stopped 且进程消失 (156.4089ms)
+✔ S2.5：自然退出显示 exited 与真实退出码；read 默认 40 行、上限 200（如实标 tailClamped） (62.2883ms)
+✔ S2.3：单路超过 256 KiB → truncated，仅保留尾部，且不返回损坏的多字节字符 (62.8409ms)
+✔ F5：spawn 失败不保留半成品任务、名额释放，后续仍可启动 (46.4818ms)
+✔ F4/S6.1：并发上限 8，第 9 个被拒且名额不被突破 (0.9604ms)
+✔ F4.4：并行 start 不会一起突破 8 个名额 (0.4422ms)
+✔ S6.2：保留上限 32，最老已结束任务优先淘汰；运行中任务永不淘汰；淘汰任务号返回未知 (1.4557ms)
+✔ F7：终止预算内未观察到 close → kill-timeout；诊断 background.stop.timeout（证明真实等待到期） (1273.2546ms)
+✔ S3：dispose 并行终止全部任务、幂等、清空任务并拒绝后续 start (110.3014ms)
+✔ F6：任务不跨管理器/会话可见（另一个管理器读/停旧任务号均为未知） (96.8785ms)
+✔ S3.1：dispose 并行发起终止（两个任务的终止信号在同一批同步发出） (0.4517ms)
+✔ 启动后运行错误 → failed（启动失败不建任务） (0.231ms)
+✔ 非法顶层 version/roleId/root：write_file 拒写且零文件副作用（目录都不创建） (7.8217ms)
+✔ 合法模板放行并落盘；前置 ./ 与绝对路径同样受校验 (17.0537ms)
+✔ role-card.md 与其他路径不校验内容（不受 boundary.yaml 规则波及） (11.3431ms)
+✔ edit_file：编辑结果引入非法顶层键 ⇒ 拒绝且文件保持不变 (7.1226ms)
+✔ Windows 反斜杠路径也识别为角色边界文件（平台条件） (0.7531ms)
+✔ F5/P1.2-AC-27 Codex native 不可用（responses）仍可准入：plan 省略 native、无 native-factory-* 拒绝、ensureAdapter 回落工厂构造 (28.8223ms)
+✔ F5 Codex native 不可用（WebSearch）在受保护 + shell + 审批链下仍可准入：plan 省略 native 且审批链成立 (23.9355ms)
+✔ F5 native observed ⇒ plan 记录可选强证明并可绑定；present-but-changed 逐字段拒绝 (13.4169ms)
+✔ A9/D6 official-pure-preparation-unproven 退役：纯准备/丢弃只按真实边界决定 construction.status，trustedPurePreparation 仅证据 (8.4144ms)
+✔ schema：request_confirmation 增可选 paths（项目相对、逐文件、≤64、不得含仅引用文件） (1.8106ms)
+✔ 合法 paths：posix 化后原样透传到卡片请求与 metadata (1.1898ms)
+✔ 非法 paths：工具错误且不向客户发卡（零卡片副作用） (0.8515ms)
+✔ 缺省 paths：旧卡逐字兼容（请求/metadata 不出现该键） (0.2241ms)
+✔ 64 项边界合法（上限含 64） (0.222ms)
+✔ R4 choice/confirmation show chief rejection or revision, retaining typed reason/source without task cancellation (0.8455ms)
+✔ R4 chief answered receipts show the actual non-recommended selection/confirmation and original provenance (0.3727ms)
+✔ R4 malformed source or contradictory chief outcome cannot fall through to customer approval (0.6076ms)
+✔ R4 historical customer, judge and directive outcomes keep their existing receipt wording (0.3631ms)
+✔ X-R4/角色门控：convener 走 convener 模块；rapporteur 仍走 rapporteur 模块；其余角色保持旧行为 (1.2273ms)
+✔ X-R4/allow：convener 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键） (1.9099ms)
+✔ X-R4/deny：缺事实、错误 actorRoleId、未知键、归属键缺失 ⇒ 既有回执形状（未提交、能力零调用） (0.2387ms)
+✔ X-R4/零差异：同一参数矩阵下，加 roleId=convener 前后 ok/message/调用次数逐字一致 (1.3248ms)
+✔ X-R4/不弱化：模型不可自报 actorRoleId/批准事实，仍在触达能力前拒绝 (0.1983ms)
+✔ X-R4/接线守卫：convener 前置只经角色 public entry，且位于 input 构建之后、能力调用之前 (1.1696ms)
+✔ confirmation passes original cancellation context; late yes cannot issue next-turn write permission (30.7931ms)
+✔ choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid (14.0007ms)
+✔ request_choice 回执携带应用生成的 decisionId（appointment-write 的必要凭据） (1.1827ms)
+✔ three audit sources round-trip distinctly without fabricated customer facts (1.3656ms)
+✔ chief delegation requires revision, request, basis, reason and a real disposition (0.1342ms)
+✔ direct receipts distinguish committed recovery from pre-commit failure and no-op (0.1693ms)
+✔ complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates (0.6795ms)
+✔ run frozen evidence is all-or-nothing and never combines different snapshots (0.3527ms)
+✔ historical customer freeze remains unchanged while direct freeze has no customer credentials (0.0902ms)
+✔ bounded real-chief decision context has no production writer or alternate executor (0.1743ms)
+✔ existing submit function remains callable and all three explicit run choices remain distinct (0.0848ms)
+✔ R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite (0.1486ms)
+✔ R3 single freeze invariant accepts historical customer/application and bound direct/delegated records (0.3367ms)
+✔ R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound (0.1491ms)
+✔ J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts (0.3493ms)
+✔ J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers (0.2367ms)
+✔ A1/Q9 A：RequestResolvedEvent 支持 directive 归属，旧事件无 directiveId 仍可读 (0.9557ms)
+✔ A1/Q9 A + P3.1：VersionDecisionEvent 保留旧来源并增加 chief-delegated (0.1223ms)
+✔ A1/W-6：RequestPresentedEvent.to 仍为 customer|judge（不新增 directive 通道） (0.0642ms)
+✔ A1/§5.2：事件联合 JSON 往返形状稳定（created/consumed/revoked/expired） (0.1369ms)
+✔ A1/§5.2：CustomerDirectiveView 形状与 JSON 往返 (0.1166ms)
+✔ A1/§6.4 I-1：target-scoped facts 快照只含本 target（运行时映射） (0.1148ms)
+✔ A1/P1-CAP-13：ID/路径/字段上限常量值冻结且为正整数 (0.0945ms)
+✔ A1/§5.2：指令 ID 模式接受 d-1/d-999，拒绝 d-0/d-01/D-1/前缀 (0.0898ms)
+✔ A1/§5.2：flowId 校验仍来自 runtime.ts 的 GOVERNANCE_SLUG_PATTERN (0.1142ms)
+✔ A1/P1-CAP-13：常量/解析器/枚举在 A1 文件内单一来源，runtime/project-state 不反向依赖 (5.5742ms)
+✔ A1/§4.3 高危：reason 码表顺序冻结（稳定持久值） (0.105ms)
+✔ A1/§4.3 高危：forever 对所有 target 成立 (0.1365ms)
+✔ A1/§4.3 高危：项目级 decision reject/select-option 与 flow 收窄 (0.0782ms)
+✔ A1/§4.3 高危：通配域名（空/*/*. 前缀） (0.1025ms)
+✔ A1/§4.3 高危：宽路径（盘符根/根/ ** /项目根/项目根祖先） (0.1938ms)
+✔ A1/§4.3 高危：宽命令（shell 元字符逐项） (0.1081ms)
+✔ A1/§4.3/Q7 A：开关关闭时项目级 select-recommended 属高危 (0.0393ms)
+✔ A1/§4.3 非高危示例：精确命令/具体域名/具体目录 + once|session；单 flow 选择偏好 (0.0495ms)
+✔ A1/§4.3 高危：多原因按表序返回且不重复 (0.036ms)
+✔ A1/§3.1 示例表：命中 target 与 body 逐条符合 (0.5916ms)
+✔ A1/§3.1 边界：标记后必须是空白或文本结束，近失配一律不命中 (0.0969ms)
+✔ A1/§3.1 前导空白：空格/制表符/换行/全角空格/BOM 均被跳过 (0.4376ms)
+✔ A1/§3.1 多行与正文：只检查开头，其余全部为正文且不二次识别 (0.0964ms)
+✔ A1/§3.1 空正文：命中且 body 为空（面板留空、确认禁用） (0.0852ms)
+✔ A1/§3.1 空文本/仅空白不命中 (0.0639ms)
+✔ A1/§3.1 非字符串入参返回 undefined 且不抛错 (0.5286ms)
+✔ A1/§3.1 零依赖：marker 源文件无 import/require、无 Node 全局 (2.7976ms)
+✖ dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行 (1.9463ms)
+✖ dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」 (0.2257ms)
+✔ TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf (2.034ms)
+✔ TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变 (0.8551ms)
+✔ TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision） (0.8129ms)
+✔ TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源 (0.2387ms)
+✔ TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源 (0.1898ms)
+✔ TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true} (0.3709ms)
+✔ TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型） (0.1863ms)
+✔ TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传） (0.1366ms)
+✔ TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源 (0.1537ms)
+✔ TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住 (11.8387ms)
+✔ TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注 (1.0686ms)
+ℹ 预算实测：索引 5223 B；最大详情 4089 B（project-roster/v3）
+✔ 常量冻结：上限/超时/错误码与 P1.1 §3.3/§4.1/§5.4/§6.2 一致 (0.8139ms)
+✔ 卡种边界（AC-23 类型侧）：GovernanceCardKind 接受 download；ConfirmCardKind 仍仅 appointment-write (0.0895ms)
+✔ 分组单一来源：download → approval；既有卡种映射不变 (0.1087ms)
+✔ 指令视图 consumer 增 download；既有值与 PR #57 解释器类型不回归 (0.1053ms)
+✔ judge 字段（AC-25 Model 侧）：Context/Request 可选 download 且双向同形；GovernanceJudgeFacts 无 download (0.1108ms)
+✔ 能力位与回执类型：GovernedToolsOptions.requestDownload 可省略/可赋值；判别联合锁成功/失败形状 (0.1176ms)
+✔ AC-1 注册：未注入 requestDownload ⇒ request_download 不注册；注入 ⇒ 只新增这一只且既有工具不变 (2.3323ms)
+✔ schema：url/purpose 必填、filename 可选、additionalProperties:false、sequential；描述钉关键语义 (0.2167ms)
+✔ 合法参数：trim 后交给能力一次、filename 缺省不造键、metadata 完整 (0.535ms)
+✔ AC-2 参数校验：非法形状 ⇒ ok:false + download-invalid-arguments，能力调用 0；边界值合法 (0.5172ms)
+✔ AC-15 回执：成功原样转达；17 个失败码带 code；契约外回执与抛错 fail-closed；单次调用无重试 (1.2234ms)
+✔ AC-23：request_confirmation 以 cardKind:"download" 调用被拒绝且不触达客户通道；schema enum 不变 (0.4315ms)
+✔ 中止：不假设已下载/未下载（能力不触达） (0.1823ms)
+✔ W-1 Service 透传：注入 requestDownload ⇒ 普通会话含 request_download；未注入与两种判断会话均不含 (14.2895ms)
+✔ drain I0-3 白名单逐字冻结：仅两个包装层 reason + 四个 native 覆盖/传输关闭 reason (0.9167ms)
+✔ drain 基础真值表：providerFinished/activeTools/tracked processes (0.1757ms)
+✔ drain 不要求 status quiescent / processCoverage complete / native 存在（Claude/Pi 形态） (0.087ms)
+✔ drain 显式白名单 reason 单独与组合均不阻断 (0.0953ms)
+✔ drain 未列/未知 reason 一律阻断（F6/R7/S1 清单） (0.097ms)
+✖ Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort (3.4124ms)
+✖ Service explicit Pi timing overrides env, including the legacy disabled-timer values (1.2083ms)
+✔ Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged (0.7544ms)
+✔ turn last resort defaults to one hour without env and is overridable for injection (0.1111ms)
+✔ non-turn timeouts stay unchanged: shell exec 10min, review/confirmation 2min, construct 2min (0.0716ms)
+✔ inspection env applies to every runtime while explicit options win; construct stays runtime-scoped (0.0872ms)
+✖ all runtimes read the same inspection env; Service still uses the fixed 1h last resort (1.0863ms)
+✔ evidence_check：注入才注册；参数透传；≤4KB 截断 (2.5992ms)
+✔ evidence_check：工具层拒绝越界路径与跨角色查询（伪数据源也不放行） (0.4308ms)
+✔ D3 actual write gate rejects unauthorized real targets and permits fully authorized aliases (18.4949ms)
+✔ D3 final gate deny prevents commit after parent creation and during edit (4.2585ms)
+✔ D3 final gate throw prevents commit after parent creation and during edit (3.7086ms)
+✔ D3 final gate abort prevents commit after parent creation and during edit (3.8903ms)
+✔ D3 parent recheck rejects a changed in-root directory even if gate allows (3.1715ms)
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (6.4303ms)
+✔ D3 lstat ENOTDIR is a status error, never a new-file fallback (2.4639ms)
+﹣ D3 write and edit preserve existing ordinary modes and strip special bits (0.1086ms) # SKIP
+﹣ D3 handler under strict umask retains existing mode and keeps new files private (0.0475ms) # SKIP
+﹣ D3 chmod failure reaches the handler without committing file or mode (0.0601ms) # SKIP
+﹣ D3 sync failure reaches the handler without committing file or mode (0.034ms) # SKIP
+✔ R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference (1.0541ms)
+✔ R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments (2.5543ms)
+✔ R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success (1.2588ms)
+✔ R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks (0.3935ms)
+✔ R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded (0.9844ms)
+✔ R24 malformed apply replies never become committed and delegated selection retains its real source (0.9649ms)
+✔ R24 model host result fields are rejected before the real choice callback and never enter request schema (0.4572ms)
+✔ R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field (0.9713ms)
+✔ R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks (0.8687ms)
+✔ R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis (0.5995ms)
+✔ R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs (0.7512ms)
+✔ R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages (140.8413ms)
+ℹ {"actualDefaultCoreAndChat":true,"roots":["C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r20-default-chat-1w7Tnj","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r20-default-chat-1w7Tnj\\actual-skills-root"],"sourceBasisDigest":"e6803d80bd0befd4c308c7e4fc21f886d0257e503aa39728013137551e032e63","http":4,"stages":["write:lexical-read","write:canonical-read","write:final-write","edit:lexical-read","edit:canonical-read","edit:final-write"],"modelHostInjection":"rejected-before-gate"}
+✔ R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent (0.3241ms)
+✔ R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload (0.4016ms)
+✔ R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch (14.602ms)
+ℹ {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r18-parent-tool-C5PlS5","actualDefaultChat":true,"http":3,"normalDispatchCallbacks":1,"forgedParentCallbacks":0}
+✔ R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight (28.233ms)
+✔ R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write (8.2275ms)
+✔ R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt (10.6883ms)
+✔ R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission (33.4627ms)
+ℹ {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r15-required-HBKv5O","actualRegisteredTools":["install_skill","uninstall_skill","install_mcp","uninstall_mcp"],"blockedResults":4,"oldEffects":0,"nativeConstructions":1,"http":2,"filesAndRegistrationsUnchanged":true}
+✔ R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties (2.4915ms)
+✔ R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work (137.9974ms)
+ℹ {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r14-required-YuvgGK","unmanaged":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r14-unmanaged-cx996J","requiredScripts":["run_shell","start_background_task","list_background_tasks","read_background_task","stop_background_task"],"rejectedNativeConstructions":0,"rejectedHttp":0,"rejectedMarkerWrites":0,"admittedNativeConstructions":3,"actualHttp":5,"ownedMarker":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r14-unmanaged-cx996J\\owned-node-marker.txt"}
+✔ R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind (0.999ms)
+✔ R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write (1.629ms)
+✔ R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction (6.012ms)
+✖ R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible (0.7378ms)
+✖ R12 interruption during async factory preparation prevents the subsequent native bind (0.8106ms)
+✖ R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry (0.6145ms)
+✔ R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation (12.6725ms)
+✔ R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary (0.445ms)
+✔ R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task (0.2773ms)
+✔ R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source (0.1813ms)
+✔ Git capabilities register only when injected; all six roles/worker may query a host-bound template (0.3968ms)
+✔ Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields (1.0252ms)
+✔ full object-format OIDs and literal paths replace short revisions/pathspecs/user refs (0.437ms)
+✔ candidate actions have exact shapes and trusted scope; prepared is not published (0.3357ms)
+✔ publish scope and actual expected-ref/OID result are checked; no raw success on mismatch (0.4113ms)
+✔ Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit (0.3718ms)
+✔ Git schema declarations are strict nested templates, with no host-only fields (0.1309ms)
+✖ actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof (3.0084ms)
+✖ R8 a custom factory cannot self-report the default Codex Chat production provenance (0.5926ms)
+✖ R8 native registry/instance/role/runtime/activity mismatches remain unknown (0.4966ms)
+✖ R8 active HTTP inference alone is not treated as an uncontrolled execution program (0.5113ms)
+✔ R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate (200.2701ms)
+ℹ {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k","commands":[["git","init","--quiet","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\repo"],["git","-C","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\repo","-c","user.name=R9 fixture","-c","user.email=r9@example.invalid","commit","--quiet","--allow-empty","-m","owned fixture"],["git","-C","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\repo","worktree","add","--quiet","--detach","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\other-worktree","HEAD"],["git","init","--quiet","--separate-git-dir","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\common-dir","C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\separate-repo"]],"gateCalls":18,"evidence":[{"target":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\repo\\.git\\config","alias":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\hardlink-0.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\common-dir\\config","alias":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\hardlink-1.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\other-worktree\\owned.txt","alias":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\hardlink-2.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9","afterSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9"},{"target":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\repo\\.git\\single-link.txt","alias":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\junction-0\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\common-dir\\single-link.txt","alias":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\junction-1\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\other-worktree\\single-link.txt","alias":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-files-El6P9k\\junction-2\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"}]}
+✔ R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots (19.6334ms)
+ℹ {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r9-final-fv4fzg","ordinary":"write+edit succeeded","lateHardlink":"both rejected","newRepo":"no .git created"}
+✔ R9 Service binds defensive host roots without claiming FS confinement or complete discovery (2.6655ms)
+✔ AC-2 注册：未注入 ⇒ governance_matrix 不存在；注入 ⇒ 只新增这一只且既有工具零变化；构造不调用函数 (2.3529ms)
+✔ AC-2 schema/文案：参数仅 roleId+section、enum 三值、additionalProperties:false；只读/unknown/非批准 (0.2298ms)
+✔ AC-2 参数矩阵：合法值 trim 后透传；未知参数/非法类型/空 roleId/非法 section 在调用前拒绝 (0.4928ms)
+✔ AC-2/AC-16 回执：ok/message 原样转达；抛错与畸形回执 fail-closed、不编造权限 (0.5261ms)
+✔ AC-16 工具结果只有 ok/message，不含 allowed/denied/批准/验收字段 (0.1642ms)
+✔ AC-2 中止：已中止的调用不触达函数并如实返回未完成 (0.2391ms)
+✔ AC-2/AC-11 无副作用：工具调用前后临时目录文件树不变（不写盘/不写账本） (2.7049ms)
+✔ AC-1/AC-2/AC-15 Service 透传：注入⇒工具存在；未注入⇒不存在；判断会话结构性无该工具；contextSections 透传/缺省不下发 (12.7586ms)
+✔ G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不存在、与技能对互不搭车）；schema 形状（必填 roleId+name、无 executionMode 覆盖） (2.5321ms)
+✔ schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/门禁之外执行＝能力级授予（非逐调用受审）/不改变写边界/失败文案枚举（含 not-customer-turn） (0.2034ms)
+✔ schema 文案（G-4 V2）：uninstall_mcp 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/卸载＝下次会话摘除/声明保留二分/已发生副作用不可撤 (0.0982ms)
+✔ G-4 V2：install_mcp 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现声明 path/digest/生效态并重申写边界与门禁外执行面 (0.4914ms)
+✔ G-4 V2：失败如实——枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸 (0.7719ms)
+✔ G-4 V2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已装 (0.4558ms)
+✔ G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒不存在）；schema 形状（必填 roleId+name、无 executionMode 覆盖） (2.3017ms)
+✔ schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/不改变写边界/失败文案枚举（含 not-customer-turn） (0.2054ms)
+✔ schema 文案（G-4/I1）：uninstall_skill 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/文件保留二分陈述/不改变写边界 (0.0915ms)
+✔ G-4/I2：install_skill 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现 path/digest/生效态并重申写边界不变 (0.4849ms)
+✔ G-4/I2：失败如实——§3.3 文案枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸 (0.8117ms)
+✔ G-4/I2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已安装 (0.4358ms)
+✔ 无参数行为逐字不变：整文件回执、128KB 截断文案、统计与预算口径 (9.4762ms)
+✔ 字节范围：offset/limit 定点读取、范围标注、恰好读完不算截断 (17.0357ms)
+✔ 字节范围：越过文件末尾如实拒绝、空文件返回空片段、结构化 range 事实 (2.9325ms)
+✔ 行范围：startLine/endLine 1 基含端点、缺省另一端、超 EOF 收敛如实标注 (6.8698ms)
+✔ 行范围：大文件定点抽查不把整文件计入读取预算；请求范围超预算才截断 (21.8529ms)
+✔ 范围参数校验：负数/0/非整数/类型不符/混用/endLine<startLine 一律拒绝且不消耗调用预算 (1.3995ms)
+✔ 敏感路径/二进制/realpath/项目根检查不因范围参数被绕过 (10.6604ms)
+✔ 预算计数：范围读取的 calls/bytes/truncated 与总预算耗尽语义 (4.362ms)
+✔ 治理 judge 复用同一范围实现（read 工具与 shell judge 同源） (4.6095ms)
+✔ schema 同步：judge_read_file 暴露可选范围参数并写明「定点抽查」与「不得猜测」 (0.2322ms)
+✔ native-only values are protected without a provider, retain real IDs/token and keep reader counts separate (1.2361ms)
+✔ raw title anchors and invalid dates are omitted; no turn/call or execution is inferred from body (0.4635ms)
+✔ return budget selects a continuous recent suffix, preserves order and reports omissions (72.1574ms)
+✔ reader failure and malformed bridge are distinct and cannot raw-fallback (0.5927ms)
+✔ list_dir 默认注册（无需注入能力），schema 严格：path 可选字符串 (2.1062ms)
+✔ 列目录：默认根、项目相对路径、只列一层、目录名带 `/` (11.404ms)
+✔ 敏感项不列名：.env/密钥/凭据/.git/审计/会话；敏感目录本身拒绝 (10.7805ms)
+✔ 越界拒绝：`..`、项目外绝对路径、符号链接逃逸；不存在/非目录明确报错 (3.5504ms)
+✔ 条目上限 200：超出截断并如实标记 (59.5862ms)
+✔ 中止信号 ⇒ 未执行（不触碰文件系统） (0.7272ms)
+✔ 好件：readMcpDeclaration 返回完整视图（七字段＋path；env 原文保存不展开；参数/日期/角色口径） (24.442ms)
+✔ 坏件（入口防御＋名非法＋保留名＋缺失）⇒ undefined，绝不抛 (2.3103ms)
+✔ 坏件（解析失败面逐项）：必填缺失/空值/command 控制字符/env 校验/状态未知 ⇒ undefined，绝不抛 (79.764ms)
+✔ listInstalledMcpServers：installed＋角色命中才收录（按 name 排序、InstalledMcpServerV1 形状）；过滤与诊断逐项 (7.6282ms)
+✔ listInstalledMcpServers 防御：`docs/mcp` 不存在＝空数组零诊断；不可读（是文件）＝空数组＋mcp-root-unreadable；回调抛错被吞 (6.3ms)
+✔ 接线注入：Service providerFor 按角色注入 RuntimeProviderOptions.installedMcpServers（纯读、绝不建目录；新 bind 重读） (26.083ms)
+✔ 默认窗口 5min；门默认 online，只在 online 变化时通知（去重），监听异常不影响状态 (1.1938ms)
+✔ 离线窗口：首个离线状态起窗；重复 offline 不重开；到点 onExpire(offlineMs) (0.206ms)
+✔ 离线窗口：恢复立即取消；dispose 取消；非正窗口只暂停不失败 (0.1147ms)
+✔ 网络失败形状：NetworkOfflineError / code / attempts / replaySafe / offlineMs；短报人话无技术 code (0.2943ms)
+✔ PLAN-ESC/未注入能力：report_plan_escalation 不注册（能力缺席 = 最强 fail-closed） (1.7501ms)
+✔ PLAN-ESC/convener 成功：能力恰调用一次、身份由工具填入、回执 presented 且文案含「申请≠批准」 (0.9191ms)
+✔ PLAN-ESC/summary 边界：恰为上限的码点长度接受；超 1 个码点拒绝且不调用 (0.344ms)
+✔ PLAN-ESC/角色门控：非 convener 或身份缺失 ⇒ plan-escalation-role-not-allowed 且能力不被调用 (0.2416ms)
+✔ PLAN-ESC/形状非法 ⇒ plan-escalation-invalid 且能力不被调用（未知参数/category/flowId/summary） (0.7234ms)
+✔ PLAN-ESC/能力失败：ok:false 回执如实转达、恰一次调用；抛错按未提交处理 (0.3019ms)
+✔ PLAN-ESC/越权或契约外回执（approved、坏/缺 requestId、坏 errorCode）⇒ ok:false 且恰一次调用 (0.5062ms)
+✔ PLAN-ESC/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交 (0.1883ms)
+✔ PLAN-ESC/schema：required/enum/additionalProperties/maxLength/executionMode 与 Model 单一来源一致 (0.1132ms)
+✔ actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities (34.6814ms)
+✖ active and disposed prompt rejections have no turn acknowledgement (0.6624ms)
+✖ quarantined prompt rejection has no acknowledgement after one stopped actual turn (0.9996ms)
+✖ synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn (0.5899ms)
+✖ acknowledged turns keep aborted/timed_out outcomes and single matching terminal (0.5695ms)
+✔ W4 只读 Git 命中 ⇒ execute(match, budgets)，回执与 spawn 同形且零 spawn (5.3391ms)
+✔ W4 无能力/未命中 ⇒ readonly-git-runner-unavailable，零 spawn、零 execute、绝无通用回退 (0.8328ms)
+✔ W4 审核先于路由：gate 拒绝 / F-7 守卫命中 ⇒ match/execute 均不调用、零 spawn (0.6283ms)
+✔ W4 非 git 命令维持现状 spawn (31.9351ms)
+✔ W4 后台入口不做只读 Git 路由：命令仍交管理器 spawn，能力不经手 (1.738ms)
+✔ W4 roleId（适配器 options，非模型输入）与 entry 透传审核与执行后审计 (0.6976ms)
+✔ W4 真实 Service 入口：run_shell 携带会话 roleId（demo 适配器闭环） (37.8619ms)
+✔ W4 真实 Service 入口：readonlyGit 注入可达（demo 适配器闭环，零 spawn） (3.1033ms)
+✔ W4 只读 Git 执行事实映射：超时/错误/抛错/非法回执与 spawn 分支同形 (0.9713ms)
+✔ W4 工具说明补充只读 Git 白名单与 git_query 指引（输入字段不变：run_shell 仍只有 command） (0.2141ms)
+✔ 冻结值集与环境键：五值恰序（关/低/中/高/极高）；三键逐字；demo 无键面 (0.8521ms)
+✔ 归一：合法五值＋大小写/空白变体 ⇒ set（规范小写形）；未设/空串/纯空白 ⇒ unset（静默，留空＝平台默认） (0.1556ms)
+✔ 归一：非法 ⇒ invalid（绝不猜档——minimal/max/ultra/中文标签/任意串均不近似；原值如实带回） (0.0994ms)
+✔ resolve：按运行时各取各键（互不串）；键未设＝unset (0.0796ms)
+✖ Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形） (3.763ms)
+✖ 未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席 (1.0586ms)
+✖ 非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话 (0.6793ms)
+✖ 诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响） (0.7056ms)
+✔ 文案常量定格：投影 summary 两条（消费方回退标签；措辞变化须显式改契约） (0.4666ms)
+✔ 形状钉：原始事实 → 呈现详情（text 为 DisplayTextV1 三字段；status/durationMs 透传；无多余字段） (1.1186ms)
+✔ 如实面：omitted＝平台省略正文（违规随载荷带正文也按省略归一为空、不呈现）；status 未知＝诊断（不发明新态） (0.1554ms)
+✔ 如实面：durationMs 仅真实信号（0＝真实保留；负数/NaN/Infinity/非数字一律丢弃——绝不发明时间） (0.2004ms)
+✔ 保护面：凭据值替换（redacted:true）＋清洁管道（Bearer/URL）＋UTF-8 字节预算（truncated:true、无截断鬼影） (0.4403ms)
+✔ 幂等：已投影形再投影，形状与标记不变（历史读取路径的再投影即此性质） (0.116ms)
+✔ 坏件 ⇒ 如实诊断形（绝不抛、绝不假内容）：版本/source/status/text 形状逐项 (0.1125ms)
+✔ Service 单点：原始推理事实在 emit 恰一次投影（summary 定格、turnId 保留、原始正文与随载荷 summary 绝不外流）；坏件走如实诊断行；非推理事件逐字现状 (10.4111ms)
+✔ 持久化/回放同形：存储面只见投影形且无原始凭据；历史读取对存量投影（幂等）与手编原始事实（同管道）都过同一单点 (24.1427ms)
+✔ actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution (48.788ms)
+✔ source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it (17.9211ms)
+✔ target stores safe text but Provider receives original model text and images; final receipt survives a new handle (42.5939ms)
+✔ ACK is not delivery: user failure has exact Provider count and history retry never invokes it (42.6859ms)
+✔ ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it (51.5837ms)
+✔ ACK is not delivery: index failure has exact Provider count and history retry never invokes it (41.7858ms)
+✔ partial replay is not silently repaired or replayed; later foreign records also block repair (47.5372ms)
+✔ disabled bound mode does not create directories; live-only views do not become durable report snapshots (2.7671ms)
+✔ live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories (2.364ms)
+✔ foreign later replay records block history repair without altering the replay or invoking Provider again (42.453ms)
+✔ no final receipt cannot be reconstructed from boundary or nearby settled after reopening (36.913ms)
+✔ 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction (11.1113ms)
+✔ 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material (1825.7162ms)
+✔ an ambiguously successful final receipt write is idempotently confirmed, not appended twice (43.4431ms)
+✔ unknown persisted C versions do not become a final receipt or permit a new automatic attempt (13.3409ms)
+✔ unknown report file versions are listed as read errors and not silently upgraded (21.057ms)
+✔ public live and report projections whitelist values rather than carrying arbitrary sidecars (0.1745ms)
+✔ same-attempt known execution is monotonic even if the replay becomes an unreadable directory (24.8645ms)
+✔ reopened live-only delivery uses its actual user/turn record for inputSaved without claiming durable source reports (24.0093ms)
+✔ X-R2+X-R4/角色门控：rapporteur 与 convener 各走本角色模块；缺省/其他角色保持旧行为 (1.0456ms)
+✔ X-R2/allow：rapporteur 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键） (1.9963ms)
+✔ X-R2/deny：缺事实、未知键、批准声明 ⇒ 既有回执形状（未提交、申请≠批准、能力零调用） (0.2693ms)
+✔ X-R2/零差异：同一参数矩阵下，加 roleId=rapporteur 前后 ok/message/调用次数逐字一致 (1.2994ms)
+✔ X-R2/不弱化：模型不可自报批准/越权参数，仍在触达能力前拒绝 (0.2082ms)
+✔ X-R2/接线守卫：handler 在构建 input 之后、调用能力之前走 requirement-change 前置 (1.1925ms)
+✔ 未注入 requestRequirementChange ⇒ request_requirement_change 不注册（能力缺席 = fail-closed） (1.7772ms)
+✔ 注入后注册 request_requirement_change；changeKind/summary/rationale 必填，flowId/intentId 至少一个由 handler 保证 (1.0663ms)
+✔ 载荷原样交给注入能力：flowId/intentId 至少一个、changeKind 五值、可选字段缺省不造键 (0.7663ms)
+✔ 非法参数在触达能力前拒绝（归属缺失、changeKind 非法、summary/rationale 空或超界、未知参数、slug 非法） (0.6037ms)
+✔ 回执原样转达 ok/code/message（成功不夸大、失败不伪装、不把申请说成批准、不把审批归给产品或发起方） (0.6448ms)
+✔ rejected 回执原样转达：应用退回、不代表客户拒绝、不报成已提交 (0.1651ms)
+✔ 能力抛错 / 契约外回执（含看似成功的未知 code）⇒ fail-closed，绝不说成已提交 (0.4927ms)
+✔ 会话中止：不假设已提交（能力不触达，文案如实） (0.2227ms)
+✔ Service 透传：注入 requestRequirementChange 后 provider 工具面包含 request_requirement_change；未注入则不出现 (10.7984ms)
+✔ 默认值：首字节 90000ms / 流空闲 300000ms；错误码与短报为人话且不泄露技术 code (0.5644ms)
+✔ 首字节：到点触发 first-byte，有效耗时如实；错误名不是 TimeoutError（终态 failed） (0.674ms)
+✔ isRequestFailureCode：已知请求失败码包含 P3 重试耗尽；未知码不误收 (0.0908ms)
+✔ 流空闲：首条消息关闭首字节；后续每条消息重置 idle；未超时（长回合）不被误杀 (0.1548ms)
+✔ 暂停：交互/工具/abort 清理期间计时停走，恢复后按剩余时间继续（引用计数） (0.1362ms)
+✔ stop：停止后不再触发；首字节已到达后的空闲阶段同样可停 (0.0753ms)
+✔ 首字节时限关闭（0/非有限）时：首条消息前不超时；活动后仍按 idle 计时 (0.0707ms)
+✔ 暂停中收到首条消息：首字节标记生效，恢复后只按剩余 idle 计时 (0.084ms)
+✔ W2 prepareRole：unknown 保护范围拒绝；required 下 unknown 不静默放行 (14.4075ms)
+✔ W2 prepareRole 真值表：required × runtime × shell × binding × provenance × guards (32.9836ms)
+ℹ {"root":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-w2-truth-CpkFcn","verifiedChainMode":"rules-advisory","codexNative":"observed","demoRejected":true}
+✔ W2 mode 可接受集合：readonly / operator-approve / rules-advisory / three-layer 均准入 (16.2052ms)
+✔ W2 审计三态：非持久/非 file/探针缺失/抛错/unknown 一律 protected-scope-audit-unavailable (14.1026ms)
+✔ W2 项目根：注册根与 Core 根不一致 ⇒ unproven；规范化等值（尾斜杠/Windows 大小写）⇒ 准入 (16.2436ms)
+✔ W2 approvalChain 稳定投影（无时间戳/凭据）且 configDigest 计入 approvalChain (22.2989ms)
+✔ W2 matchesRuntimeApprovalChain：模块级一致性判据逐字段 fail-closed (0.2977ms)
+✔ W2 bindPreparedRole：受保护 + shell + 已登记审批链 ⇒ token 成立并绑定（appTools 含 shell） (15.8798ms)
+✔ W2 composeContext：受保护 + shell + 已登记审批链 ⇒ token 成立后设置 admittedPlan 并返回上下文 (11.4613ms)
+✔ W2 无 token 的受保护 shell 会话不得构造适配器：bindRole/composeContext 均拒绝 (8.1639ms)
+✔ W2 AC-27：prepare→bind 之间 gate 替换先被 isCurrent 拦为 runtime-prepared-configuration-changed (5.0666ms)
+✔ R29 Core forwards only its validated cloned Chief decision context; ordinary and judge providers receive no field (16.0077ms)
+✔ R28 real Node loads the full single-source Chief resource by application URL from an unrelated cwd (220.3435ms)
+ℹ {"actualNode":"v24.22.1","cwd":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-r28-unrelated-cwd-H9uhrV","sourceUrl":"file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/common/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/workflows/chief/chief-workflow.md","sha256":"9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346","bytes":8724,"resourceVersion":"chief-workflow/v1","applicationVersion":"1.9.2"}
+✔ R28/R30 actual default runtime contexts isolate ordinary Chief workflow, bounded Chief and ordinary judges (53.3241ms)
+ℹ actual default Pi/Claude/Codex ordinary contexts; default Codex bounded Chief compose/prepare/bind with exact one tool and no workflow/MCP; non-Chief rejected; ordinary judge sets remain exact three
+✔ R28 missing or corrupt resource fails before Chief factory creation and never falls back to project card text (6.3383ms)
+✔ R17 a real busy default Chat may finish Core drain after disposal and must refresh its retained terminal evidence (40.2829ms)
+✔ R17 genuine pure context preparation and a pre-native read failure have private never-started evidence (12.4201ms)
+✔ R17 a custom factory with an actual effect stays possibly-started regardless of fake construction facts (10.6397ms)
+✔ R17 timed-out custom construction keeps its real pending continuation and late effect unknown (40.2788ms)
+✔ R13 actual default Chat keeps HTTP coverage separate from drain and retains real terminal evidence across disposal (12.5713ms)
+✔ R13 disposal cannot promote missing raw settlement, missing native evidence, identity drift or a live owned process (13.7211ms)
+✔ R13 a still-running real injected capability remains in the disposed receipt (19.4356ms)
+✔ abort request without actual provider completion/settled cannot prove stop; late real completion can (93.0378ms)
+✔ stream end/Core synthetic settled and disposed empty lists never substitute real provider settled (31.3689ms)
+✔ a raced tool handler does not hide its still-running injected capability (77.8773ms)
+✔ owned synchronous child close is observed; unproven Windows descendant tree stays unknown (5559.7573ms)
+✔ owned background child is stopped with retained facts; missing tree proof is not empty success (5519.8121ms)
+✔ native adapter without its own process evidence remains unknown despite a real terminal event (11.1626ms)
+✔ R6 one native hook binds instance/Core turn and returns copied transport/process facts (34.1577ms)
+✔ R6 native proof rejects incomplete transport/children, activity and binding mismatches (7.6087ms)
+✔ R6 unreadable native facts never fall back to a closed flag or legacy lifecycle receipt (39.2544ms)
+✔ F7/P1.4 C9 stopAndInspect 活动排空循环 drain 即返回：Claude/Pi 覆盖 unknown 不耗满预算（custom-factory disposed 仍按 F6 阻断） (31.4897ms)
+✔ F7/P1.4 C9 default-production Claude 未运行会话：disposed receipt 以中性 drain 返回（native 覆盖 unknown 不阻断） (15.7777ms)
+✔ F7/S1 非 idle Pi（native:pi-sdk-idle-not-observed）保持阻断：stop 预算耗尽、disposed 标记证据缺失 (77.6947ms)
+✔ store: creation/read stay lazy; roles/runtimes never share index or replay (21.3697ms)
+✔ store: concurrent writes serialize; corrupt history fails honestly (44.9291ms)
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (3.8329ms)
+✖ store: native validation stays lazy and native symlink is rejected before effects (2.9616ms)
+✔ Service history operation returns scoped Model records/replay through the existing Provider (24.594ms)
+✔ each actual runtime turn publishes one typed original input before native work and retains real assistant text (156.8641ms)
+✔ input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer (2.9005ms)
+✔ Service selects exactly chosen injected factory and executes real governed handler (7.9536ms)
+✔ Service failure never selects another engine and unknown runtime rejected (3.8464ms)
+✔ Service persists replay and adapter-confirmed deferred context result after prompt (22.0434ms)
+✔ customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works (71.3697ms)
+✔ throw, native failed outcome and last-resort timeout each have one explicit terminal (30.7277ms)
+✔ inspection deadline never aborts a progressing turn; the turn completes normally (79.2059ms)
+✔ last resort aborts at the injected deadline with distinct last-resort wording (31.2594ms)
+✔ adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort (6.1048ms)
+✔ corrupt ANS index is rejected before native bind allocates a session (9.9439ms)
+✔ transient persistence failure is reported and repaired next prompt can succeed (24.5197ms)
+✔ Service event top/detail identity and report metadata share the captured turn (2.2417ms)
+✔ hanging native abort is bounded, called once, and leaves the session quarantined (1031.3404ms)
+✔ Service configured custom API key is stripped from the actual governed shell child (54.7545ms)
+✖ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (0.6614ms)
+✖ outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup (1.0538ms)
+✖ Core-managed binding rejects a provider that did not register its display profile before first prompt (0.7381ms)
+✔ ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections (20.1345ms)
+✔ history does not resurrect an old empty-name synthetic tool phase on an engine failure (7.7467ms)
+✔ A1/AC-03：request_shell_escalation 只在 shell 已 arm 且注入 shellEscalation 时注册（能力缺席=不注册） (2.1533ms)
+✔ A1/AC-03：argv 由工具侧 splitCommand 生成，模型提供的 argv/授权字段被忽略；command/necessity 原样转交 (0.849ms)
+✔ A1/§4.3：necessity 双上限（500 字符 / 1KB 字节）超限拒绝不截断，非法类型拒绝，空命令不提交 (0.5293ms)
+✔ A1/AC-05：回执如实转达；异常/契约外回执按未获客户允许处理，绝不谎报批准 (0.3319ms)
+✔ A1/AC-01：run_shell 与 start_background_task 在 ShellReviewRequest 中填 entry（拒绝⇒零 spawn） (1.0517ms)
+✔ A1：run_shell 的执行后写审计请求同样携带 entry=run_shell (45.6424ms)
+✔ A1/§6.3：授权放行结果按 grant 附「客户已允许一次/本会话」说明；无 grant 时文案不含授权说明 (130.0658ms)
+✔ A1/AC-03：schema 只含 command + 可选 necessity，不暴露 argv/授权字段；说明含精确命令/每会话一次/不执行 (0.2138ms)
+✔ E2 R2：ShellEscalationDecision 增 pending 支（reason 可选）；既有三支形状不变 (0.106ms)
+✔ A1：模型加法字段兼容——旧形状原样可用，新字段按 §6.3/§7.1 契约接受 (0.1492ms)
+✔ F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（2000 ms）」+ timedOut/timeoutMs，耗时短收口 (2130.0063ms)
+✔ F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据 (2114.1239ms)
+✔ F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实 (4919.0966ms)
+✔ F-1：快命令 + 大时限不误杀（ok:true、无 timedOut） (48.4606ms)
+✔ F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env (2367.3755ms)
+✔ F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果 (2379.1245ms)
+✔ F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例） (128.8571ms)
+✔ F-7 阻断集：未加引号的独立操作符/紧贴重定向在审核之前被拒，正文含命中 token，零副作用 (5.2297ms)
+✔ F-7 放行集：引号内与反斜杠前导的操作符照旧可用（含证据命令），普通 argv 不受影响 (46.3832ms)
+✔ F-7-opt1：内嵌未加引号操作符与结尾 & 阻断；词中 &（URL 查询串）不判 (0.6235ms)
+✔ F-7-opt2：未加引号的变量展开/命令替换阻断；引号内与常规 argv 放行 (0.4986ms)
+✔ F-7-c 守卫先于审核且不 spawn：diagnostics 记 shell.guard.blocked，normalize 不产生 shell.exec.start (0.1581ms)
+✔ 默认预算放宽为 12 次 / 512KB 总量 / 128KB 单文件（有限值，超限仍 fail-closed） (9.174ms)
+✔ env 覆盖生效：ANS_SHELL_JUDGE_MAX_CALLS / MAX_FILE_BYTES / MAX_BYTES (10.694ms)
+✔ env 校验：正整数且在上下限内生效；非法/越界回落缺省（不静默夹取） (0.6944ms)
+✔ 显式 budget 优先于 env（宿主注入不被环境变量意外覆盖） (1.8479ms)
+✔ 会话内读取缓存：同路径+同范围复用结果不再读盘，预算/统计口径不变 (9.2362ms)
+✔ 缓存按判断会话隔离：不跨 buildShellJudgeTools 实例 (4.6176ms)
+✔ 缓存命中不得绕过剩余总预算：不足时回落真实读取并按 remaining 截断 (4.5274ms)
+✔ 拒绝结果不缓存：会话中途新建的文件可被后续读取（无负缓存） (6.0198ms)
+✔ 缓存有界：超过条目上限按插入顺序淘汰最旧结果 (23.7939ms)
+✔ report_shell_judgement 的 verdict 参数为系统风险口径，三值枚举/required 不变 (1.9969ms)
+✔ report_shell_judgement 描述与 promptGuidelines 含完整风险口径，且不含「不必要」 (0.1796ms)
+✔ 判断会话装配的 report 工具与 describeTool 同源（模型不会同时看到新旧两套描述） (0.4446ms)
+✔ 读取预算契约可从编排既有导入路径与中立契约家导入，且为同一符号/同一解析值 (0.1228ms)
+✔ 只读工具集恰为三项：judge_read_file / judge_list_dir / report_shell_judgement (1.8829ms)
+✔ 项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸一律拒绝且不回显绝对路径 (12.0246ms)
+✔ 敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计与会话目录；列表不列敏感项 (15.788ms)
+✔ 二进制拒绝、128KB 截断标记、12 次调用与 512KB 总预算 (15.696ms)
+✔ 第 13 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated (6.8005ms)
+✔ report_shell_judgement 原样回调模型参数，不做裁决规范化 (0.5023ms)
+✔ Service 装配：注入 shellJudge 时只构造三只只读工具、judgeMode=true、外来 MCP 置空 (6.0225ms)
+✔ judge_list_dir 单层列举、默认项目根、根外拒绝 (2.986ms)
+✔ 卡种联合（F2）：GovernanceCardKind 接受 app-owned stable-write；两交互工具联合均不含它 (0.9094ms)
+✔ request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appointment-write (0.0991ms)
+✔ 判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选 (0.4609ms)
+✔ 白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏 (0.1021ms)
+✔ C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed） (2.0758ms)
+✔ C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入 (1.0251ms)
+✔ C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段 (0.3268ms)
+✔ C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用 (0.3228ms)
+✔ C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用 (0.4749ms)
+✔ C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准 (0.3811ms)
+✔ C1d/submit_refactor：convener 提交成功；输入身份恒为 convener (0.332ms)
+✔ C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码 (0.2674ms)
+✔ C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理 (0.2447ms)
+✔ C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入 (0.3278ms)
+✔ C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理 (1.4783ms)
+✔ C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交 (0.1583ms)
+✔ C1d/schema：三工具 schema 单一来源与冻结枚举一致 (0.0921ms)
+✔ R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal (1.4817ms)
+✔ R2 rejects unknown identity/source/switch and nested malformed evidence before invocation (1.5342ms)
+✔ R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状 (0.0709ms)
+✔ R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256 (0.1824ms)
+✔ R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力 (0.4035ms)
+✔ R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort (0.4631ms)
+✔ R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result (0.338ms)
+✔ R2 bounded chief tool binds request/revision/options and never substitutes recommended choice (0.3761ms)
+✖ R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget (5.0961ms)
+✔ R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement (0.7257ms)
+✖ R2 chief timeout is finite and normal sessions still receive injected narrow capabilities (0.656ms)
+✔ R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary (0.4025ms)
+✔ real fields survive projection; nonzero exit is not parsed from message, block is a separate fact (1.7994ms)
+✔ target selection is exactly the actual Core alias contract; custom names do not imply rules (0.1625ms)
+✔ native fallback only takes explicit text; native outcome wins and unsupported objects never serialize (0.1688ms)
+✔ profile capture is required, custom actual credentials are registered in memory and cannot rebind (0.3799ms)
+✔ known values and patterns are protected before truncation; IDs never pass through a redactor (0.5119ms)
+✔ UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection (3.1657ms)
+✔ projection faults and oversize identity produce messages without fabricated business conclusions (2.6157ms)
+✔ control characters use a visible replacement independently of Unicode clipping (0.0974ms)
+✔ a source truncation flag alone is preserved without falsely attributing it to the display budget (0.1363ms)
+✔ F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged (0.2672ms)
+✔ F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result (0.1313ms)
+✔ F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers (0.1212ms)
+✔ F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording (0.0838ms)
+✔ F-8-a re-projection keeps exitCode and timedOut through the persisted-event path (0.1589ms)
+✔ cleanPatterns URL boundary (A-base): reproduction turns positive — 2nd title, entry-cap suffix and bracket tail stay complete (0.1199ms)
+✔ cleanPatterns URL boundary (A-base): adversarial zero-leak battery — CJK query values stay stripped across full-width separators (0.1337ms)
+✔ cleanPatterns URL boundary (A-base): ASCII semicolon path params stay inside the URL; redacted/truncated markers unchanged (0.0722ms)
+✔ schema 常量与最小版本（trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1） (0.8229ms)
+✖ 主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3） (0.7556ms)
+✔ 修正案生命周期六值 + P1.3 legacy 映射全覆盖（AC-32） (0.1065ms)
+✔ item kind 收窄：新 detail 仅 contract/roster/execution；legacy workflow/boundary 不相交（AC-6/AC-28） (0.0911ms)
+✔ trunk.state op 分区：stable-repinned 属 customer；drift/unfrozen-expired 仅 legacy 读（AC-31/AC-34） (0.0995ms)
+✔ trunk manifest / amendment doc·state / journal / view 最小正例（含 bootstrap/baseTrunk:null、roleCards、committed） (0.1719ms)
+✔ trunk.state(stable-repinned) 事件形状：customer、绑定 confirmationId/decisionId、trunkVersion 不变 (0.0723ms)
+✔ trunk 错误码稳定、无重复、无 trunk-drift（并入 trunk-verify-failed） (0.0465ms)
+✔ 四类 schema 常量 + ID 正则（C1 冻结） (0.6637ms)
+✔ VCA 发起角色唯一映射（AC-3）与目标 kind 收窄（AC-5/AC-19/AC-29/AC-30） (0.4721ms)
+✔ VCA 记录正例：baseTrunk:null + bootstrap:true（AC-25/F12）与提交定格字段 (0.1029ms)
+✔ 版本变更事件归属分区（AC-31/Q3）：approved/rejected=customer；submitted/applied/superseded=application (0.1051ms)
+✖ doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6） (0.9219ms)
+✔ DocFreezeRecord / DocFreezeLookup 三态（F33 fail-closed） (0.1047ms)
+✔ StableWritePermit 唯一 permit 形状（F13）：v/permitId/authority/四态/approvedAt/expiresAt/baseSha256="" (0.1203ms)
+✔ StableWriteRecord 与 permit 分表：record.permitId 关联；record 可镜像 expiresAt/consumedAt（F13） (0.0797ms)
+✔ StableWriteDecisionInput 对齐门禁输入（F13）：permit 可选、now 为 () => Date；C1 不实现判定 (0.1729ms)
+✔ stable.write.* 事件五 kind + F14 可选 approvedAt/expiresAt/consumedAt + 归属分区 (0.1856ms)
+✔ stable kind 与 trunk 单一定义同源（无第二份枚举） (0.0675ms)
+✔ refactor-request/v1（F31/F40/Q10）：convener 发起、应用调度层管理、五态、五类禁止 (0.099ms)
+✔ version.change / doc.freeze 事件可赋给 TaskStateEvent；submitted=application、approved=customer (0.0684ms)
+✔ acknowledgments 对象数组（F1）：request 可选对象数组、answered 回传 string[]、旧卡零变化 (0.0565ms)
+✔ 四组错误码稳定、无重复（含 vca-conflict；排除 trunk-drift） (0.0552ms)
+✔ judge-delegated reason 子集：恰为 proposal/intent、是 customer 分区子集、不扩既有 reason 全集 (0.07ms)
+✔ DocFreezeOrigin/DocFreezeSource 扩展 judge-delegated：诚实来源可赋给记录，且不混入既有 DirectActionSource (0.1417ms)
+✔ doc.freeze 事件 origin=judge-delegated + DocFreezeSource 可赋给 TaskStateEvent；customer 事件形状不变 (0.0543ms)
+✔ Service：四个运行时的 view_image 注册门不变——注入 viewImage 才注册；未注入 ⇒ 工具不存在（fail-closed） (19.2359ms)
+✔ Service + demo（仍 next-turn）：工具调用注入能力并透传 turnId；ToolResult 无 images、交付为 next-turn（零行为变化） (8.1839ms)
+✔ Service + pi（Gate 3 已翻 tool-result）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key (14.1067ms)
+✔ Service + claude（Gate 3 已翻 tool-result；5 MB 上限）：同轮附图、不触达桌面能力、超限失败无图 (8.5625ms)
+✔ Service + codex（Gate 3 已翻 tool-result，Chat/Pi 证据）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key (3.7177ms)
+✔ 未注入 viewImage ⇒ view_image 不注册（能力缺席 = fail-closed），基础工具集不变 (2.1792ms)
+✔ 注入 viewImage ⇒ 只新增 view_image；既有工具 schema/描述/显示规则/执行模式零变化 (0.5407ms)
+✔ view_image schema：仅 {path}、必填、拒绝未知参数，文案钉住同轮附图优先/下一轮回退/路径/类型/大小/不假装已看 (0.2048ms)
+✔ 合法 png/jpeg（含大写扩展名）/webp/gif：读取二进制、base64 与 MIME 正确，能力收到 {path,image} (17.466ms)
+✔ 能力成功回执的 message 附在固定文案之后（不破坏「已读取并排队」句） (1.7188ms)
+✔ 路径非法（缺 path/空/NUL/绝对/盘符/.. 越界/目录/不存在）⇒ 工具失败且不调用能力 (1.2566ms)
+✔ 不支持的类型与超过 10 MB 均失败且不调用能力 (5.4919ms)
+✔ 能力失败/抛错/契约外回执 ⇒ 工具失败并如实说明未排队（不谎报已提供） (2.7347ms)
+✔ 本轮已中止（next-turn）：兜底文案保持「排队未获确认 / 下一轮以系统为准」，不调用能力 (1.0418ms)
+✔ 本轮已中止（tool-result）：兜底文案不声称排队/下一轮，不交付图片、不调用能力 (1.5627ms)
+✔ RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通过），demo 仍 next-turn；Claude 5 MB；数值与冻结状态 (0.1487ms)
+✔ policy next-turn（显式注入）：能力调用与成功回执逐字不变；结果不带 images；turnId 透传 (1.2975ms)
+✔ policy tool-result：成功结果带 images + imageDelivery；message 来自共享 i18n key；能力收到 turnId (1.5932ms)
+✔ 旧回执 {ok:true}（无 mode）按 next-turn 处理：policy tool-result 下也不交付图片（诚实回退） (2.147ms)
+✔ 交付契约一致性：policy next-turn + 回执 mode tool-result、非法 mode ⇒ fail-closed 无图不谎称 (1.5047ms)
+✔ tool-result 下校验失败不带图且不调用能力（路径/类型/大小矩阵保留） (1.316ms)
+✔ 每轮图片预算已移除：同一轮连续 6 张图片全部成功交付 (7.6541ms)
+✔ 更严单图上限：超限失败且不触达能力 (1.2736ms)
+✔ 审计：view_image.result 只记 path/mime/bytes/delivery/reason，不落 base64 或 data URL (7.9135ms)
+✔ F6/write_file：首次与写前复核均收到真实最终字节 sha256 与 operation=write (15.1957ms)
+✔ F6/edit_file：写前复核 gate 收到编辑后最终字节（BOM 保留）sha256 与 operation=edit (14.917ms)
+✔ F6/向后兼容：旧单参数 WriteGate 实现与直接单参调用零变化 (5.56ms)
+✔ F6/写前复核拒绝：携带内容上下文时拒绝 ⇒ write/edit 均不落盘 (2.7067ms)
+✔ F6/类型形状：纯phase型不是读取/写入权限，最终hash与operation保持 (0.1684ms)
+✔ R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy (13.4015ms)
+✔ R20 authorized stable edit preserves BOM, exact current SHA and permit base/final SHA policy (14.2531ms)
+✔ R20 unapproved lexical/canonical paths, unknown coverage, legacy consumers and I/O failures never read unauthorized bytes (6.4371ms)
+✔ R20 host drift, final base drift, hardlinks and canonical parent replacement fail without commit (28.672ms)
+✔ R20 final deny and real rename failure preserve target bytes and remove only the owned temp (21.5699ms)
+✔ R20 production schema/raw refuse staged host fields before gate, while legacy nonmanaged calls keep old behavior (17.7081ms)
+ℹ tests 554
+ℹ suites 0
+ℹ pass 517
+ℹ fail 33
+ℹ cancelled 0
+ℹ skipped 4
+ℹ todo 0
+ℹ duration_ms 48521.1337
+
+✖ failing tests:
+
+test at test\runtime-core\abort-quarantine.test.ts:26:1
+✖ abort rejection no longer quarantines forever once the underlying turn settles later (2.9607ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async bound (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:18:19)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:30:37)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test\runtime-core\abort-quarantine.test.ts:59:1
+✖ abort rejection keeps quarantine when the underlying turn never settles (1.0905ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async bound (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:18:19)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:62:29)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\abort-quarantine.test.ts:81:1
+✖ normal abort without cleanup failure keeps its existing quarantine lifecycle (0.6943ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async bound (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:18:19)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:85:37)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\dispatch-workflow-writer-copy.test.ts:10:1
+✖ dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行 (1.9463ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+  
+  '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:13:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。',
+    expected: /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\dispatch-workflow-writer-copy.test.ts:29:1
+✖ dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」 (0.2257ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+  
+  '派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。\n' +
+    'Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。\n' +
+    'dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。\n' +
+    '跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。\n' +
+    '返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。\n' +
+    '最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。\n' +
+    'B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:32:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。\nChief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。\ndispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。\n跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。\n返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。\n最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。\nB 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。',
+    expected: /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\effective-timeouts.test.ts:36:1
+✖ Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort (3.4124ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:44:21
+      at async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:42:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test\runtime-core\effective-timeouts.test.ts:55:1
+✖ Service explicit Pi timing overrides env, including the legacy disabled-timer values (1.2083ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:65:23
+      at async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:61:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\effective-timeouts.test.ts:120:1
+✖ all runtimes read the same inspection env; Service still uses the fixed 1h last resort (1.0863ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:130:23
+      at async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:126:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\file-write-safety.test.ts:97:1
+✖ D3 linked workspace root remains usable; linked target itself is not replaced (6.4303ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-core-d3-jbt84l\actual\nested\file.txt' -> 'C:\Users\51054\AppData\Local\Temp\ans-core-d3-jbt84l\actual\link.txt'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/file-write-safety.test.ts:105:5
+      at async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/file-write-safety.test.ts:19:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/file-write-safety.test.ts:98:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-jbt84l\\actual\\nested\\file.txt',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-jbt84l\\actual\\link.txt'
+  }
+
+test at test\runtime-core\git-capability-tools.test.ts:739:1
+✖ R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible (0.7378ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /coordinator-busy/. Input:
+  
+  'Error: runtime-protection-scope-unknown'
+  
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:747:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: runtime-protection-scope-unknown
+        at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:747:9)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:974:7),
+    expected: /coordinator-busy/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\git-capability-tools.test.ts:770:1
+✖ R12 interruption during async factory preparation prevents the subsequent native bind (0.8106ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /lease-interrupted/. Input:
+  
+  'Error: runtime-protection-scope-unknown'
+  
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:779:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: runtime-protection-scope-unknown
+        at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:779:3)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:974:7),
+    expected: /lease-interrupted/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\git-capability-tools.test.ts:783:1
+✖ R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry (0.6145ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:791:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\git-capability-tools.test.ts:985:1
+✖ actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof (3.0084ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:987:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\git-capability-tools.test.ts:1022:1
+✖ R8 a custom factory cannot self-report the default Codex Chat production provenance (0.5926ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1023:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\git-capability-tools.test.ts:1039:1
+✖ R8 native registry/instance/role/runtime/activity mismatches remain unknown (0.4966ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1056:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\git-capability-tools.test.ts:1068:1
+✖ R8 active HTTP inference alone is not treated as an uncontrolled execution program (0.5113ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1069:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\prompt-start-acknowledgement.test.ts:69:1
+✖ active and disposed prompt rejections have no turn acknowledgement (0.6624ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:76:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\prompt-start-acknowledgement.test.ts:85:1
+✖ quarantined prompt rejection has no acknowledgement after one stopped actual turn (0.9996ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:95:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\prompt-start-acknowledgement.test.ts:104:1
+✖ synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn (0.5899ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:111:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\prompt-start-acknowledgement.test.ts:123:1
+✖ acknowledged turns keep aborted/timed_out outcomes and single matching terminal (0.5695ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:131:21)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\reasoning-effort.test.ts:87:1
+✖ Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形） (3.763ms)
+  Error: runtime-protection-scope-unknown
+      at Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+      at async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:89:19
+      at async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:88:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\reasoning-effort.test.ts:99:1
+✖ 未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席 (1.0586ms)
+  Error: runtime-protection-scope-unknown
+      at Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+      at async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:102:55
+      at async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:100:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\reasoning-effort.test.ts:111:1
+✖ 非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话 (0.6793ms)
+  Error: runtime-protection-scope-unknown
+      at Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+      at async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:115:21
+      at async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:113:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\reasoning-effort.test.ts:128:1
+✖ 诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响） (0.7056ms)
+  Error: runtime-protection-scope-unknown
+      at Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+      at async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:131:21
+      at async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:130:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\session-store.test.ts:46:1
+✖ store: traversal, mismatched scope and symlinked runtime directories rejected (3.8329ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-store-YfuRqI' -> 'C:\Users\51054\AppData\Local\Temp\ans-store-1YlWrU\.ans\sessions\role\codex'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session-store.test.ts:51:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-YfuRqI',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-1YlWrU\\.ans\\sessions\\role\\codex'
+  }
+
+test at test\runtime-core\session-store.test.ts:58:1
+✖ store: native validation stays lazy and native symlink is rejected before effects (2.9616ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\ans-store-r4502w' -> 'C:\Users\51054\AppData\Local\Temp\ans-store-cincrm\.ans\sessions\core\codex\native'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session-store.test.ts:63:56)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-r4502w',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-cincrm\\.ans\\sessions\\core\\codex\\native'
+  }
+
+test at test\runtime-core\session.test.ts:377:1
+✖ outer timeout remains timed_out when abort cleanup emits inner aborted terminals (0.6614ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:395:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\session.test.ts:404:1
+✖ outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup (1.0538ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:424:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\session.test.ts:439:1
+✖ Core-managed binding rejects a provider that did not register its display profile before first prompt (0.7381ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /profile was not registered/. Input:
+  
+  'Error: runtime-protection-scope-unknown'
+  
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:445:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: runtime-protection-scope-unknown
+        at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:445:3)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:974:7),
+    expected: /profile was not registered/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\submit-capability-tools.test.ts:503:1
+✖ R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget (5.0961ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /trusted chief/. Input:
+  
+  'Error: runtime-protection-scope-unknown'
+  
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:510:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: Error: runtime-protection-scope-unknown
+        at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+        at async waitForActual (node:assert:646:5)
+        at async strict.rejects (node:assert:769:25)
+        at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:510:3)
+        at async Test.run (node:internal/test_runner/test:1409:7)
+        at async Test.processPendingSubtests (node:internal/test_runner/test:974:7),
+    expected: /trusted chief/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\submit-capability-tools.test.ts:537:1
+✖ R2 chief timeout is finite and normal sessions still receive injected narrow capabilities (0.656ms)
+  Error: runtime-protection-scope-unknown
+      at Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:541:19)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at test\runtime-core\trunk-contract.test.ts:80:1
+✖ 主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3） (0.7556ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    [
+      'adopted',
+      'amendment',
+      'bootstrap',
+      'post-run-change',
+      'recovery',
+  +   'team-plan',
+      'upgrade'
+    ]
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/trunk-contract.test.ts:81:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [ 'adopted', 'amendment', 'bootstrap', 'post-run-change', 'recovery', 'team-plan', 'upgrade' ],
+    expected: [ 'adopted', 'amendment', 'bootstrap', 'post-run-change', 'recovery', 'upgrade' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at test\runtime-core\version-change-contract.test.ts:176:1
+✖ doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6） (0.9219ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  10 !== 9
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/version-change-contract.test.ts:177:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 10,
+    expected: 9,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

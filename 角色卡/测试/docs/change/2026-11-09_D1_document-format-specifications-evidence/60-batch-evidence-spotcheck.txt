@@ -1,0 +1,26 @@
+=== W1 evidence dir ===
+evidence-check.tap.txt
+run-manifest.tap.txt
+test-doc-format-specs.run2.tap.txt
+test-doc-format-specs.tap.txt
+typecheck.txt
+workflow-preconditions.tap.txt
+4d8ac81a0e036a097f685baf25252b8ac3df49306ad8485afa72703b40105f3e *角色卡/编排/docs/change/2026-11-09_W1_document-format-specifications/test-doc-format-specs.tap.txt
+58ff4b2ba09b9c4514f3dd12b724370ecd65c66bde4c8f9ccfe5c55762d40b1f *角色卡/编排/docs/change/2026-11-09_W1_document-format-specifications/test-doc-format-specs.run2.tap.txt
+
+=== W2 evidence files ===
+514686663d5133326d7ab47e85c6b35a0e860019ae736b26be857ba9b03d6ba9 *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/01-pin-tap.txt
+bf79cf15ee2c6095575374843aee51289ee67e934c5a63ab48ca34bdd2108cef *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/02-runtime-core-dir-tap.txt
+4e87a522a2ba50c301c1d071975537b9301e0217203d2f49d133aa98f3c67871 *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/03-mcp-declarations-tap.txt
+f481bf54ad4959d72d3afb573c39a4c5ed98ae189202e99196b4bf33bdf09a32 *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/04-doc-format-specs-registry-tap.txt
+d528c1c339b3ef8b21dd90fbe4608ebdf72a4ae4084e3a5ac9ac90efc2e3f48f *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/05-workflow-preconditions-tap.txt
+fe58d6a35bf64f0a5e2a68528df4e8bce75fc17e7972ac9a6dfd58a661ad3643 *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/06-rejection-copy-tap.txt
+22d52cc9fc6af45ff16ea0c9c37829064d4d00eac6d144007dc9166796b6a247 *角色卡/运行时核心/docs/change/2026-11-09_W2_document-format-specifications/07-typecheck.txt
+
+=== W3 evidence ===
+43b096ca017a9b6124fc3d58d29ac6110ae2481d868ccb533fd4cfbfd12cdc5a *角色卡/门禁引擎/docs/change/2026-11-09_W3_document-format-specifications-evidence/pin-test-post.tap.txt
+45c88818f8ab54ad969fc536ff764db53a47d505503025b71524e2c4f7caf198 *角色卡/门禁引擎/docs/change/2026-11-09_W3_document-format-specifications-evidence/boundary-yaml-regression.tap.txt
+22d52cc9fc6af45ff16ea0c9c37829064d4d00eac6d144007dc9166796b6a247 *角色卡/门禁引擎/docs/change/2026-11-09_W3_document-format-specifications-evidence/typecheck-post.txt
+
+=== W5 log ===
+5160727f430418195a387288c7cbfee65c0981d86aa763cf05e655a68e059d9d *角色卡/测试/docs/change/2026-11-09_W5_doc-format-all-roles.log.txt

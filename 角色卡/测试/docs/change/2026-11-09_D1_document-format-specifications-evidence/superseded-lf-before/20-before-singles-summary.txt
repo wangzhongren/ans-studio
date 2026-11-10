@@ -1,0 +1,10 @@
+baseline copy: C:/Users/51054/AppData/Local/Temp/d1-baseline-3cd55dc (git archive 3cd55dc)
+node: v24.22.1
+
+workflow-preconditions | exit=0 | 
+run-manifest | exit=0 | 
+evidence-check | exit=0 | 
+boundary-yaml | exit=0 | 
+mcp-declarations | exit=0 | 
+run-pin | exit=1 | 
+rejection-copy | exit=0 | 

@@ -1,0 +1,7 @@
+version: doc-format-specs/v1
+specs: 54 knownIds: 54
+index bytes: 5223 <=8192: true
+max full detail bytes: 4089 id: project-roster/v3 <=8192: true
+max part detail bytes: 4089 id: project-roster/v3 part: fields <=8192: true
+index first line: doc_format（只读；不构成放行/授权；doc-format-specs/v1）
+detail contains specRevision: true
