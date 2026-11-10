@@ -1,0 +1,10 @@
+✔ 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行） (790.6639ms)
+✔ 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed (715.3937ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1916.4125

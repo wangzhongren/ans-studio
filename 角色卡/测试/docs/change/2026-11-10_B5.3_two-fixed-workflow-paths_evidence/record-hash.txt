@@ -1,0 +1,5 @@
+record: 角色卡/测试/docs/change/2026-11-10_B5.3_two-fixed-workflow-paths.md
+sha256: c69d469cd4cf4707a6116b684a5ec60ba0f9c4ff83f2a1099cff173a905bc88f
+HEAD: 89e0ed6162619a7f86a5d0a4b4f5d2e43c7f96a6
+branch: feat/two-fixed-workflow-paths
+computed_at: 2026-11-10T15:23:07Z

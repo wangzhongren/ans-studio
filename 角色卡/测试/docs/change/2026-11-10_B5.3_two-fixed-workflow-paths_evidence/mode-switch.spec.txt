@@ -1,0 +1,11 @@
+✔ 混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存） (74.7134ms)
+✔ 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场） (48.4539ms)
+✔ 配置写回失败（坏 .ans/project.json）⇒ project-config-write-failed fail-closed；不派发、不弹卡、不改文件 (15.3313ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 562.4831

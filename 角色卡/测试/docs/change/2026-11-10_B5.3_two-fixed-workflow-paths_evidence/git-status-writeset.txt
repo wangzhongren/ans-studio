@@ -1,0 +1,16 @@
+# B5.3 write-set check (final) 2026-11-10T15:23:14Z
+HEAD: 89e0ed6162619a7f86a5d0a4b4f5d2e43c7f96a6
+Branch: feat/two-fixed-workflow-paths
+
+## git status --porcelain -- src app test
+(empty above = no changes in src/app/test)
+
+## git status --porcelain -- test/测试
+(empty above = test/测试 unchanged)
+
+## git diff --stat e28923c..HEAD -- test/测试
+(empty above = domain untouched by B2/B2.1)
+
+## B5.3 writes (role write-set only)
+- 角色卡/测试/docs/change/2026-11-10_B5.3_two-fixed-workflow-paths.md (new)
+- 角色卡/测试/docs/change/2026-11-10_B5.3_two-fixed-workflow-paths_evidence/** (new)

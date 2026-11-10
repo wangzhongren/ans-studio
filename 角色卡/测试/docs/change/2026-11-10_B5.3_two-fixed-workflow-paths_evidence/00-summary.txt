@@ -1,0 +1,34 @@
+B5.3 测试（2026-11-10）— 摘要（分支 feat/two-fixed-workflow-paths；HEAD 89e0ed6；未提交）
+
+任务：B2.1 后全链/D1 复跑（两条固定工作流路径 T3）。
+基线：HEAD 89e0ed6（B5.2 测试+B5.1 接线已由 e28923c 提交；B2.1 已由 5820fe4/b203e98 提交）；
+`git status --porcelain -- src app test` 空；域内 119 文件（域树与 e28923c 逐 blob 一致）。
+候选：无（本批 test/测试/** 零改动，纯复跑取证）——三个 fixed-path 测试文件 hash 与 B5.2 候选/
+e28923c 提交逐字一致。
+
+全链（HEAD 89e0ed6；B2.1 后）：
+- fixed-path-full-chain.test.ts 3/3 pass × 4 次运行（TAP 两次：b53-chain.tap / b53-chain-rerun.tap；
+  spec 两次：b53-chain.spec.txt / b53-chain-rerun.spec.txt）。
+- 路径 A 全链 delivered；路径 B 全链 delivered；路径 B 无仓库 b-repository-required（fail-closed）。
+- 链上 B2.1 门（A11/B1/B3 派发 verifyBasisForWorkflow+stage；A12a 收口 verifyBasisForStage；
+  A13/B4 prepare/executeReleaseMerge+stage）均放行合法 basis，无 basis-drift/basis-missing。
+- 边界披露：链内 A12b 收口按既有夹具走服务直连 closeTask（不经桌面 fixed close handler），
+  B2.1 桌面 A12b 收口门不在链上；由 B2.1 桌面单测（b21-basis-gate-desktop 6/6）/桌面域回归覆盖。
+
+回归/类型：
+- mode-switch 3/3 pass；b-change-scope 2/2 pass。
+- npm run typecheck：before exit 0；after exit 0（同树；本批无改动）。
+
+D1（test/测试 域，119 文件，逐文件 TAP，B5.2 同口径）：
+- before 参照 = B5.2 验收态冻结 known-red 39 条（ref-knownred-b52-flat.txt；711/654/38/1/18）。
+- after（本批运行 HEAD 89e0ed6）原始语料 = 711 / 654 / 38 / 1 / 18（1 登记挂起
+  customer-authorization-plane-integration 90s watchdog），与 B5.2 验收态逐项相等。
+- 失败名 diff（参照 → after）：added 0 / removed 0（39/39 逐名一致，含 1 条 cancelled 用例）。
+- 新 skip = 0（18/18；git-role-workflows 12 + lightweight-permission-repairs 6，逐文件无增加）。
+- 环境抖动：本批无一次性异常——B5.2 after 的 4 个一次性异常文件本批均直接通过
+  （judge-delegated-effectiveness 66.4s、git-action-delivery-claude 87.9s、
+  git-action-commit-pi 54.2s、git-run-stop 45.1s）；无需隔离复跑。
+- 判定：known red 不恶化；新增确定性失败=0；新 skip=0。
+
+未提交：本记录与 _evidence/ 未 commit/push/merge/tag/发布；HEAD 仍为 89e0ed6；写集外 diff=0。
+记录 sha256: c69d469cd4cf4707a6116b684a5ec60ba0f9c4ff83f2a1099cff173a905bc88f

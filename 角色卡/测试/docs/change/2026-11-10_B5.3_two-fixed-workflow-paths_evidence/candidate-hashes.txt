@@ -1,0 +1,25 @@
+# B5.3 candidate (2026-11-10)
+candidate: NONE — this batch made no test/测试/** changes (pure re-run evidence batch).
+HEAD: 89e0ed6162619a7f86a5d0a4b4f5d2e43c7f96a6
+
+## fixed-path test files (unchanged since B5.2 candidate / e28923c commit)
+19fb866112d77e0b4a20ed9e5f6d4d711ce03fbe12b9a8370138c792ed1d06eb *test/测试/fixed-path-full-chain.test.ts
+b38596b8b886c86111f2102d5be17cc0c53ae58ca4eb83e97c7f25df1addeca2 *test/测试/mode-switch.test.ts
+a7f97744e23a05d0b26383ca3f7247aa512dec28355f03a15eff067c000e4d31 *test/测试/b-change-scope.test.ts
+
+## B5.2 candidate hash for fixed-path-full-chain.test.ts (recorded in B5.2 _evidence/candidate-hashes.txt)
+19fb866112d77e0b4a20ed9e5f6d4d711ce03fbe12b9a8370138c792ed1d06eb *test/测试/fixed-path-full-chain.test.ts
+
+## B2/B2.1 scope check (git diff --stat e28923c..HEAD)
+-- test/测试/:
+-- src app:
+ app/desktop/session.ts              |  40 +++-
+ src/common/编排/workflow-service.ts | 410 +++++++++++++++++++++++++++++++++---
+ 2 files changed, 421 insertions(+), 29 deletions(-)
+
+## Git blob identity with e28923c (B5.2 accepted commit)
+test/测试/fixed-path-full-chain.test.ts committed@e28923c=60b044b9b69050514af8955df556dc7d697730dc current=60b044b9b69050514af8955df556dc7d697730dc
+test/测试/mode-switch.test.ts committed@e28923c=4bd0ec0878fb3b2c55ed3eb1d03bbbfde571fd86 current=4bd0ec0878fb3b2c55ed3eb1d03bbbfde571fd86
+test/测试/b-change-scope.test.ts committed@e28923c=550caf0d671146a7612411dda4c1a4a036702093 current=550caf0d671146a7612411dda4c1a4a036702093
+
+## Domain tree diff (git ls-tree -r e28923c vs HEAD -- test/测试): 0 diff lines (0 = identical)

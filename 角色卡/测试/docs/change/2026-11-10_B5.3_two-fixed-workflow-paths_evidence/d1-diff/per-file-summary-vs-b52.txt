@@ -1,0 +1,18 @@
+compared 119/119 files; not-ok so far: 39; summary diffs: 17
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts :: pass ref=0 cur=1
+test/测试/2026-11-09_judge-delegated-effectiveness.test.ts :: fail ref=1 cur=0
+test/测试/customer-authorization-plane-integration.test.ts :: ref was watchdog; current completed tests=∅
+test/测试/git-action-commit-pi-e2e.test.ts :: tests ref=∅ cur=1
+test/测试/git-action-commit-pi-e2e.test.ts :: pass ref=∅ cur=1
+test/测试/git-action-commit-pi-e2e.test.ts :: fail ref=∅ cur=0
+test/测试/git-action-commit-pi-e2e.test.ts :: cancelled ref=∅ cur=0
+test/测试/git-action-commit-pi-e2e.test.ts :: skipped ref=∅ cur=0
+test/测试/git-action-commit-pi-e2e.test.ts :: ref was watchdog; current completed tests=1
+test/测试/git-action-delivery-claude-e2e.test.ts :: pass ref=0 cur=1
+test/测试/git-action-delivery-claude-e2e.test.ts :: fail ref=1 cur=0
+test/测试/git-run-stop-host-continuation-e2e.test.ts :: tests ref=∅ cur=1
+test/测试/git-run-stop-host-continuation-e2e.test.ts :: pass ref=∅ cur=1
+test/测试/git-run-stop-host-continuation-e2e.test.ts :: fail ref=∅ cur=0
+test/测试/git-run-stop-host-continuation-e2e.test.ts :: cancelled ref=∅ cur=0
+test/测试/git-run-stop-host-continuation-e2e.test.ts :: skipped ref=∅ cur=0
+test/测试/git-run-stop-host-continuation-e2e.test.ts :: ref was watchdog; current completed tests=1
