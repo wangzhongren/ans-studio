@@ -1,0 +1,50 @@
+# 纯净基线 `10f90c7` `test/编排` 全域 vs 候选域 失败名对照（B1 v1.2 D1 取证，2026-11-10）
+
+## 方法
+
+- **基线侧**：`git archive 10f90c7 | tar -x` 到系统临时目录（`%TEMP%`），
+  `mklink /J <tmp>\node_modules <worktree>\node_modules` 只读挂接；在临时目录内运行
+  `node --test --test-concurrency=1 --test-reporter=tap "test/编排/**/*.test.ts"`；
+  原始 TAP 见 `06-orch-baseline-10f90c7.tap`；运行后删除 junction 与临时目录，`node_modules` 未改动。
+- **候选侧**：B2 复判证据 `08-orch-domain-full.tap`（候选 `79e16a1`；代码与 HEAD `95f9cdb` 零差异；
+  1,335 tests / 1,309 pass / 24 fail / 2 skip）。
+- **对照口径**：仅比较失败名集合（TAP `not ok N - <name>`）；计数巧合单独说明。
+
+## 结果（对照脚本输出，逐字）
+
+```
+## baseline(10f90c7 pristine)
+{"tests":1177,"pass":1151,"fail":24,"cancelled":0,"skipped":2,"todo":0}
+fail unique names: 24
+## candidate(79e16a1/HEAD 95f9cdb code)
+{"tests":1335,"pass":1309,"fail":24,"cancelled":0,"skipped":2,"todo":0}
+fail unique names: 24
+## comparison
+common: 23
+baseline-only: 1
+  - test\\编排\\git-trunk-store.test.ts
+candidate-only: 1
+  + TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+```
+
+## 解读
+
+1. 两侧 fail 计数均为 24，但**名集并非逐名一致**：23 名相同。
+2. 基线侧第 24 名 = **文件级失败** `test\编排\git-trunk-store.test.ts`（TAP：`failureType: testCodeFailure`、
+   `exitCode: 134`（SIGABRT）、`duration_ms` 65,113，整个测试文件崩溃）。该崩溃**非基线特有**：
+   对纯净基线与候选工作树**单跑该文件均复现**同一 Node 原生断言
+   （`node::CleanupQueue::Add ... Assertion failed: (insertion_info.second) == (true)`，exit 134；
+   见 `10-git-trunk-store-baseline-retry.tap`、`11-git-trunk-store-candidate-head.tap`），
+   而两侧**全域**运行中仅基线侧命中、候选侧未命中——属**运行时/执行顺序相关伪影**，不是可归因于
+   基线提交的确定性失败；B0 before 冻结清单亦不含此项。
+3. 候选侧第 24 名 = **TM-5**（同名 known-red，内容字面量 5→7）；**纯净基线 TM-5 pass**
+   （`05-tm5-baseline-10f90c7.tap`；该提交 `src/**/*.ts` 不含 7 字面量中任一个）。
+4. 结论：
+   - B0 before TAP 冻结的 24 名清单与候选 24/24 逐名一致（B2 复判 `09-orch-knownred-comparison.txt`）；
+   - 但该 24 名清单**不等于纯净 `10f90c7` 的确定性失败名集合**：纯净基线 24 fail = 23 名相同 +
+     1 个运行方式相关的文件级 Node 崩溃（两侧单跑均复现，非基线特有）；TM-5 不在纯净基线失败集中
+     （TM-5 为特性引入，协调方确认 #2 已按 known-red 披露接受）。
+   - 因此 B1 v1.1 §二「代码基线 `10f90c7` 与本候选 HEAD `e28923c` 均为 24 fail，失败名集合与基线逐名一致、未变」
+     若按「纯净 10f90c7 名集逐名一致」理解不成立（数字 24 两侧巧合相同；确定性 named fail 差异为 TM-5，
+     另有非确定性文件崩溃）；若按 B0 before 冻结口径理解则成立（候选 24/24 一致）。
+     此为 D1 披露；不影响 B1 v1.2 判据与协调方确认 #2。

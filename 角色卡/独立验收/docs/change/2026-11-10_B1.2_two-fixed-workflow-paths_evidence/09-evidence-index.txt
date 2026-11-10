@@ -1,0 +1,26 @@
+# B1.2 证据索引（SHA-256；2026-11-10T15:58Z UTC）
+
+## 产出
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+fc729c4c02e29c8dd284b53be80f32c1e6cc5bb8b3ff13d440b617f12673a098 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths.md
+
+## 前版/依据（只读，未改）
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+e2ad4701b1bda9a994616d4543fcab8b05de2f8bfcd4c9f6ee0fcc0873e0b749 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md
+eaa6af41522ce38f2cceb74e45cea7c488c6a158083d5e31c8e573b91d75277e *角色卡/独立验收/docs/change/2026-11-10_B2_re-review_two-fixed-workflow-paths.md
+5958ba3879aa6ad5df2be0e27f43ec74c7067644576a074f5d94f169dc206888 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths.md
+83dfe814e6520c4918324768999214dff7d9d3dd2070861101f52044f78e4fde *docs/scheduling/2026-11-10_RR_two-fixed-workflow-paths-plan.md
+
+## 证据文件
+95d01d98b8f51dec352f5c175db190e23b87709e70b9a2a3c3d40f752a51c6f9 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/01-v1.1-v1.2-diff.txt
+8547efa8480ebe76523a55d0eb6e1323221875dddf15ff0663592a8da9de28ed *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/02-coordinator-approval-and-three-confirmations.txt
+a3befd2a9a5eec9af5ba2dd9e0326fc848614fc8b889721a2f480aa5f2e7d3a3 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/03-unchanged-entries-check.txt
+1afe8ce4ee7b9f0fcb1cac78abf64471b0d13f0425f3fb0314f4e61b74892cea *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/04-tm5-candidate-head.tap
+393145feeb07416cab516dae24017c867fe2e499b0aba7f9645817e1b2dfd6e8 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/05-tm5-baseline-10f90c7.tap
+b53b3311910463e22b0ef169c3f63820b36d2f57b1f2201758ee65a91a316292 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/06-orch-baseline-10f90c7.tap
+9dafc5554ef0a358ce88739213f60f66c932329ac9de816602eb5b9c30dc4da5 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/07-orch-baseline-comparison.txt
+264457174b926d7466a9e36dafaf13dd04301123cefd15705541f5ebaae26a68 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/08-basis-and-candidate.txt
+417d0222b1bc0e50456ad95df507779b7d6eb211b31461b15d8cc4d39918f188 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/10-git-trunk-store-baseline-retry.tap
+dff67a816c6b9469a1b8466502f8291e885b14f816a5aa421a027032d64a5d34 *角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/11-git-trunk-store-candidate-head.tap
+
+（09 本文件因自引用不含自身 hash。）

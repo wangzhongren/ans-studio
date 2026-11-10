@@ -1,0 +1,49 @@
+TAP version 13
+# Subtest: TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+not ok 1 - TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+  ---
+  duration_ms: 47.3393
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\doc-format-specs.test.ts:1312:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1
+    + actual - expected
+    
+    + [
+    +   'ans-basis/v1',
+    +   'ans-release/v1',
+    +   'ans-task-git-shell/v1',
+    +   'ans-workflow/v1',
+    +   'chief-workflow/v2',
+    +   'legacy/v1',
+    +   'two-fixed-paths/v1'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'ans-basis/v1'
+    1: 'ans-release/v1'
+    2: 'ans-task-git-shell/v1'
+    3: 'ans-workflow/v1'
+    4: 'chief-workflow/v2'
+    5: 'legacy/v1'
+    6: 'two-fixed-paths/v1'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/doc-format-specs.test.ts:1326:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 297.604

@@ -1,0 +1,38 @@
+diff --git a/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md b/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+index 0b7ce35..87f6af6 100644
+--- a/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md
++++ b/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+@@ -1 +1 @@
+-# B1 验收标准：两条固定工作流路径（T3，v1.1）
++# B1 验收标准：两条固定工作流路径（T3，v1.2）
+@@ -7,2 +7,2 @@
+-- 版本：**v1.1**（2026-11-10）。依据：B1 v1（`b607f100…`，逐字保留不改）+ B2 预验收（`5958ba38…`，MF-B2-01）+ 基线实测（本角色独立复跑）。**本版变更仅为 known-red 事实更正**：§二 增列 9 条 star-routing/i-full-chain 基线红（代码基线 `10f90c7` 同名同因、非候选回归）、`test/编排` 22 fail 更正为 **24 fail**（失败名集合不变）；AC-03 明确 legacy 断言逐字保留与 known-red 判定口径；§三/§八/T-14/T-18/EV-03 同步 known-red 引用。其余 AC/T/RR/EV 条目与 v1 逐字相同；不 de-scope、不新增客户口径。
+-- 状态：**B1 v1.1 生效（冻结）**；实现所有判据初始为 **`未取证`**；B2 按本 v1.1 全量判定。
++- 版本：**v1.2**（2026-11-10）。依据：B1 v1.1（`e2ad4701…`，逐字保留不改，本版底稿）+ B2 复判（`eaa6af41…`，预 RR 放行门通过）+ 协调方批准（2026-11-10：RR 预算批准 + 三项确认）。**本版变更仅为协调方确认的三项**：① AC-26 增列角色自有记录例外（`角色卡/<role>-code/docs/` 下 `api-spec.md`/`memo.md`/`feature-map.md` 属角色自有记录，允许；`89e0ed6` 中 chief/product 的记录文档按此处理、不移除）；② §二 增列 **TM-5 同名 known-red**（内容字面量 5→7，按 known-red 披露接受、不要求 pass、不得弱化断言/新增格式 id）；③ §八/§九 钉住 **`amendBasis` 使用约束**（RR 不做治理文档修正；无生产调用点；如确需使用须协调方书面授权并记录，不得绕过 basis 账本/不得由模型自报）。其余 AC/T/RR/EV 条目与 v1.1 逐字相同；不 de-scope、不新增客户口径。
++- 状态：**B1 v1.2 生效（冻结）**；实现所有判据初始为 **`未取证`**；最终 B2（含 RR 证据）按本 v1.2 全量判定；确定性范围已按 v1.1 由 B2 复判（`eaa6af41…`）判定为「可进入 RR」。
+@@ -17,0 +18,4 @@
++| B1 v1.1（前版判据，逐字保留不改；本版底稿） | `docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md` | 214 / 38,065 / `e2ad4701b1bda9a994616d4543fcab8b05de2f8bfcd4c9f6ee0fcc0873e0b749` |
++| B2 复判（预 RR 放行门；本版修订依据） | `角色卡/独立验收/docs/change/2026-11-10_B2_re-review_two-fixed-workflow-paths.md` | 354 / 41,291 / `eaa6af41522ce38f2cceb74e45cea7c488c6a158083d5e31c8e573b91d75277e` |
++| RR 执行计划（§二 预算申请值；§六 三项预 RR 确认） | `docs/scheduling/2026-11-10_RR_two-fixed-workflow-paths-plan.md` | 47 / 4,854 / `83dfe814e6520c4918324768999214dff7d9d3dd2070861101f52044f78e4fde` |
++| 协调方批准（2026-11-10：RR 预算 + 三项确认；会话批复） | （无文件；批复原文引用于 `角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths.md` §2） | — |
+@@ -48,0 +53 @@
++- TM-5 同名 known-red（v1.2 协调方确认）：`test/编排/doc-format-specs.test.ts`「TM-5 schema 字面量全仓扫描」为同名 known-red（含于上述 `test/编排` 24 fail 清单）；失败内容字面量 **5→7**（+`chief-workflow/v2`、+`ans-task-git-shell/v1`，均为本特性 schema id；测试名/数量不变、无新增失败）；按 known-red 披露接受、**不要求 pass**；不得弱化断言、不得新增格式 id（AC-25 的 doc_format 54 格式不变）。
+@@ -123 +128 @@
+-| **AC-26** | 边界/H1/非目标：H1=0（无边界修订；新文件均在既有 directory 授权；`src/common/gates/` 不改）；**无新角色**；无客户可见门（merge-main 为既有高风险确认机制具体化）；不改五层架构/依赖方向/边界文件格式；不改 `角色卡/**` 文件；UI 不做改版 | T-19 | 未取证 |
++| **AC-26** | 边界/H1/非目标：H1=0（无边界修订；新文件均在既有 directory 授权；`src/common/gates/` 不改）；**无新角色**；无客户可见门（merge-main 为既有高风险确认机制具体化）；不改五层架构/依赖方向/边界文件格式；不改 `角色卡/**` 文件——**角色自有记录例外（v1.2 协调方确认）：`角色卡/<role>-code/docs/` 下 `api-spec.md`/`memo.md`/`feature-map.md` 属角色自有记录（非角色卡/边界/权限/roster），允许；须保持 H1=0、纯文档、不改变写权；其它 `角色卡/**`（role-card/boundary/boundary.yaml/changelog/其它角色）仍不得改；`89e0ed6` 中 chief/product 的 api-spec/memo/feature-map 按本例外记录处理，不移除**；UI 不做改版 | T-19 | 未取证 |
+@@ -193 +198 @@
+-## 八、B1 钉住的残余项（来自第三轮复核 G/Q）
++## 八、B1 钉住的残余项（来自第三轮复核 G/Q 与协调方预 RR 确认）
+@@ -202 +207 @@
+-8. **接口评审与 known red**：见 EV-03/EV-05；known red 按 §二 列名清单不恶化（v1.1：含 9 条 star-routing/i-full-chain 基线红与 `test/编排` 24 fail；known-red 不要求 pass）。
++8. **接口评审与 known red**：见 EV-03/EV-05；known red 按 §二 列名清单不恶化（v1.2：含 9 条 star-routing/i-full-chain 基线红、`test/编排` 24 fail 与 TM-5 同名 known-red；known-red 不要求 pass）。
+@@ -204,0 +210,3 @@
++11. **角色自有记录例外（v1.2 协调方确认）**：AC-26 的「不改 `角色卡/**`」按此解释——`角色卡/<role>-code/docs/` 下 `api-spec.md`/`memo.md`/`feature-map.md` 属角色自有记录（非角色卡/边界/权限/roster），允许；须保持 H1=0、纯文档、不改变写权；`89e0ed6` 中 chief/product 的 4 个记录文档按此处理、不移除；其它 `角色卡/**` 仍不得改。
++12. **TM-5 同名 known-red 接受（v1.2 协调方确认）**：`test/编排/doc-format-specs.test.ts` TM-5 schema 字面量扫描内容字面量 5→7（+`chief-workflow/v2`、+`ans-task-git-shell/v1`），测试名/数量不变、无新增失败；按 known-red 披露接受、不要求 pass；不得弱化断言/新增格式 id（见 §二）。
++13. **`amendBasis` 使用约束（v1.2 协调方确认）**：RR 不做治理文档修正；`amendBasis` 当前无生产调用点；如 RR 确需使用，须协调方书面授权服务调用并记录授权/调用点，不得绕过 basis 账本，不得由模型自报（AC-19 机制与证据要求不变）。
+@@ -210 +218 @@
+-- 本 B1 v1.1 基于只读清点、三轮独立复核（v1 继承）与 B2 预验收/基线实测（v1.1）；未运行实现、未运行真实 Electron/真实模型；所有判据初始 `未取证`，不得以方案/记录自述替代证据。v1.1 仅对 known-red 基线事实做独立复跑取证（9 红基线对照、`test/编排` 24 fail 实测），见 `角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths.md`。
++- 本 B1 v1.2 基于只读清点、三轮独立复核与 known-red 实测（v1/v1.1 继承）、B2 复判（`eaa6af41…`）与协调方 2026-11-10 批准（RR 预算 + 三项确认）；未运行实现、未运行真实 Electron/真实模型；所有判据初始 `未取证`，不得以方案/记录自述替代证据。v1.2 仅落实协调方确认的三项（AC-26 例外、TM-5 known-red、`amendBasis` 约束）；RR 预算批准事实见版本头/§一；独立取证与协调方批复引用见 `角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths.md`。
+@@ -212 +220 @@
+-- 真机全链预算另报；本 B1 不构成预算批准、实施授权或客户批准。
++- 真机全链预算已由协调方于 2026-11-10 批准（申请值见 RR 执行计划 §二；本 B1 记录该事实，不替代批复原件）；本 B1 不构成实施授权或客户批准。

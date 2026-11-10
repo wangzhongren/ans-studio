@@ -1,0 +1,91 @@
+# B1 v1.2 依据、候选与环境（2026-11-10）
+
+- 采集角色：ANS「独立验收」（独立固定上下文）
+- 采集时间：2026-11-10T15:40Z–15:55Z（本地 23:40–23:55）
+- 工作区：`C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment`
+
+## 1. 候选身份
+
+| 项 | 实测 |
+| --- | --- |
+| 分支 | `feat/two-fixed-workflow-paths` |
+| HEAD | `95f9cdb4e36982f8dbf4e58b9b43816bf90d17e7`（`docs(acceptance): B2 re-review passes deterministic scope; RR pending budget`） |
+| 基线 | `origin/main` `d9e3e99c160599e5b53a82e105939a359f69992f` |
+| 距基线 | `git rev-list --left-right --count origin/main...HEAD` = `0	31`（0 落后 / 31 领先） |
+| 合并提交 | `git log --merges --oneline origin/main..HEAD` = 0 |
+| tag | `git tag --points-at HEAD` = 0；`git tag --list '*two-fixed*'` = 0 |
+| 远端分支 | `git ls-remote --heads origin feat/two-fixed-workflow-paths` = 0 行（未推送） |
+| 旧分支 | `4a0bafd`、`882d84b` 均**不是** HEAD 祖先 |
+| 代码候选等价 | `git diff --stat 79e16a14bd3467219ecb861c38a48ab47b993038..HEAD -- src app test package.json package-lock.json tsconfig.json .gitignore` = **空** |
+| 全部差异 | `79e16a1..HEAD` = 25 文件、+22,222/−0，全部为 `docs/**` 与 `角色卡/**/docs/change/**` 证据（B2 复判记录与证据） |
+| 工作树（代码/测试） | `git status --porcelain -- src app test` = **空** |
+
+- 结论：本版测量基于**提交态候选 HEAD `95f9cdb`**；其代码/测试与 B2 复判候选 `79e16a1` **零差异**，
+  仅 docs/证据提交不同（B1 v1.2 的文档修订不改变候选定义）。
+
+## 2. 依据 hash（写盘实测；2026-11-10）
+
+```
+e2ad4701b1bda9a994616d4543fcab8b05de2f8bfcd4c9f6ee0fcc0873e0b749 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md  (214 / 38,065)
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md  (197 / 33,722)
+eaa6af41522ce38f2cceb74e45cea7c488c6a158083d5e31c8e573b91d75277e *角色卡/独立验收/docs/change/2026-11-10_B2_re-review_two-fixed-workflow-paths.md  (354 / 41,291)
+5958ba3879aa6ad5df2be0e27f43ec74c7067644576a074f5d94f169dc206888 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths.md  (267 / 40,790)
+83dfe814e6520c4918324768999214dff7d9d3dd2070861101f52044f78e4fde *docs/scheduling/2026-11-10_RR_two-fixed-workflow-paths-plan.md  (47 / 4,854)
+b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d *docs/planning/2026-11-10_design_two-fixed-workflow-paths.md  (95 / 8,476)
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md  (1,392 / 184,391)
+6ab9e1e9374899853836f1b0704ff619f68ee20a404a13d2a135ddd5fb9fc0b6 *docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.3.md  (66 / 9,333)
+a66c47d746ddf65720e27c77268a9069ceb13fc500c2a71419ad413c4d20a3d9 *docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md  (90 / 11,018；与 B1.1 记录一致)
+4c63ccbc84990f00e772fb6e16cf0e9df9433a8bbe5c99dcd078b67bca036211 *docs/scheduling/2026-11-10_team-plan_two-fixed-workflow-paths.md  (159 / 17,013)
+08e017269c86d92b68e83c25377ccdf7e86d352391a285b635d9a517b48ca571 *角色卡/门禁引擎/docs/design/2026-11-10_interface-review_two-fixed-workflow-paths.md  (344 / 35,665)
+```
+
+- 与 B1 v1.1 / B2 复判引用值全部一致（启动计划为 B1.1 记录的当前盘上实测态；B1 v1.2 §一 保留 v1 引用态）。
+
+## 3. 环境
+
+- Node v24.22.1；npm 11.19.1；Windows 11 Pro 10.0.26300；Git Bash。
+- 未启动 Electron / 真实模型 / 真实 UI；未占用 9222/9223/9224。
+- 基线侧复跑方法：`git archive 10f90c7 | tar -x` 到系统临时目录（`%TEMP%`），
+  `mklink /J <tmp>\node_modules <worktree>\node_modules` 只读挂接，命令在临时目录内运行；
+  运行后删除 junction 与临时目录，`node_modules` 未改动，分支/工作树代码未触碰。
+
+## 4. TM-5 取证（同名 known-red 内容 5→7）
+
+| 侧 | 命令 | 结果 | 证据 |
+| --- | --- | --- | --- |
+| 候选 HEAD `95f9cdb`（代码同 `79e16a1`；worktree 洁净） | `node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern "TM-5 schema 字面量全仓扫描" test/编排/doc-format-specs.test.ts` | **1 test / fail**；未登记字面量 7 个：`ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1` | `04-tm5-candidate-head.tap` |
+| 代码基线 `10f90c7`（纯净解包） | 同上 | **1 test / pass**（该提交 src 不含上述任一字面量） | `05-tm5-baseline-10f90c7.tap` |
+
+- 与 B0 before 冻结清单（`角色卡/编排/docs/change/2026-11-10_B0_two-fixed-workflow-paths_evidence/fails-before.txt`）
+  的同名项对照：B0 before 失败内容 5 字面量、候选 7 字面量，+`chief-workflow/v2`、+`ans-task-git-shell/v1`，
+  测试名/数量不变 → 协调方确认 #2 所述「同名 known-red 内容 5→7、无新增失败」成立。
+- 旁证：`git grep -l '"<literal>"' 10f90c7 -- src` 对 7 个字面量均无命中（纯净基线 src 不存在这些字面量）。
+- **采集口径披露**：B0 记录 §4 自述其基线为「本批开始，同一工作树含并行 B0 改动」；因此 B0 before 的
+  24 fail 名集**不是纯净 `10f90c7` 的实测**。纯净 `10f90c7` 的 `test/编排` 全域实测见 `06`/`07`。
+
+## 5. 纯净基线 `test/编排` 全域（D1 取证）
+
+- 命令：`node --test --test-concurrency=1 --test-reporter=tap "test/编排/**/*.test.ts"`（纯净 `10f90c7`）。
+- 结果：**1,177 tests / 1,151 pass / 24 fail / 2 skip**（`06-orch-baseline-10f90c7.tap`，node_exit=1）。
+- 与候选侧（B2 复判证据 `08-orch-domain-full.tap`，1,335 tests / 1,309 pass / 24 fail / 2 skip）
+  失败名对照（`07-orch-baseline-comparison.txt`）：
+  - 共同失败名 **23**；基线侧独有 1 名 = 文件级崩溃 `test\\编排\\git-trunk-store.test.ts`
+    （`failureType: testCodeFailure`、`exitCode: 134`（SIGABRT）、65s）。该崩溃**非基线特有**：
+    纯净基线与候选工作树**单跑该文件均复现**同一 Node 原生断言
+    （`node::CleanupQueue::Add ... Assertion failed: (insertion_info.second) == (true)`，exit 134；
+    见 `10-git-trunk-store-baseline-retry.tap`、`11-git-trunk-store-candidate-head.tap`），
+    两侧**全域**运行仅基线侧命中——属运行时/执行顺序相关伪影，不是可归因于基线的确定性失败；
+    B0 before 冻结清单亦不含此项；
+  - 候选侧独有 1 名 = **TM-5**（纯净基线该用例 pass）。
+- 用途：仅用于 D1 披露（B0 before 口径 vs 纯净基线），不改变 B1 v1.2 判据、不替代 B2 复判。
+  结论：B0 before 冻结 24 名与候选 24/24 一致；但纯净 `10f90c7` 的失败名集与候选仅 23 名相同
+  （数字 24 两侧巧合相同），TM-5 系特性引入、按协调方确认 #2 作为同名 known-red 披露接受。
+
+## 6. 工作树并发披露
+
+- 工作树存在其它会话的未跟踪文件（`.tmp-*`、部分未跟踪 docs 与角色卡记录）；
+  本角色未读写/未触碰非本写集文件。
+- `src`/`app`/`test` 与 HEAD 零 diff（§1）；本角色产出仅：
+  `docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md`、
+  `角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths.md`、
+  `角色卡/独立验收/docs/change/2026-11-10_B1.2_two-fixed-workflow-paths_evidence/`。

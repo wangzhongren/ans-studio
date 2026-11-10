@@ -1,0 +1,37 @@
+TAP version 13
+# execution-bases:first-document-source-captured
+# execution-bases:delivered-code-newer-document-selected
+# execution-bases:old-source-and-stale-cas-verified
+#   \#  C:\\Users\\51054\\AppData\\Local\\Programs\\nodejs\\node.exe[23784]: void __cdecl node::CleanupQueue::Add(Callback, void *) at src\\cleanup_queue-inl.h:24
+#   \#  Assertion failed: (insertion_info.second) == (true)
+# ----- Native stack trace -----
+#  1: 00007FF7B1006536 node::SetAbortHandler+54
+#  2: 00007FF7B10060E7 node::MultiIsolatePlatform::DisposeIsolate+781383
+#  3: 00007FF7B111D5C3 node::SetCppgcReference+356435
+#  4: 00000275DCA4F77E 
+# ----- JavaScript stack trace -----
+# 1: destroyTracking (node:internal/async_hooks:344:3)
+# 2: promiseInitHookWithDestroyTracking (node:internal/async_hooks:338:3)
+# 3: lstat (node:internal/fs/promises:1741:24)
+# 4: noLinks (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/provider/trunk/impl/git-command.ts:508:61)
+# Subtest: test\\编排\\git-trunk-store.test.ts
+not ok 1 - test\\编排\\git-trunk-store.test.ts
+  ---
+  duration_ms: 25385.4687
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\git-trunk-store.test.ts:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 134
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 25390.5171
