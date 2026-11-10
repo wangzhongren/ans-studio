@@ -1,0 +1,117 @@
+# 复核证据：两条固定工作流路径实现级方案 v1（2026-11-10）
+
+- 复核角色：独立验收（独立固定上下文）
+- 工作树：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+- 分支：feat/two-fixed-workflow-paths
+- HEAD（复核时）：88f5092ab87c68d3f4c8e4fc829dde3866500cfe（docs 提交；代码相对 10f90c7 无差异）
+- origin/main 基线：d9e3e99c160599e5b53a82e105939a359f69992f
+- 复核日期：2026-11-10
+- 说明：本文件为只读清点/命令输出记录；除本目录与本报告外，本轮未写任何文件；未提交/推送/合并/发布。
+
+## 一、依据实测（sha256sum / wc）
+
+```
+b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d *docs/planning/2026-11-10_design_two-fixed-workflow-paths.md
+279f55dcbf86b07f60fad62be30606758cfcd666cac83411a521609fb1446aeb *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.md
+7f4599f3ee1a4ad7fcd970892862c9b61413661ea660813a7979a4469e9b1533 *docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record.md
+8b207d246b8977e5965aa30a5397f667f89726e3c5701bd4f73e54bf5c910b1b *docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+24364c13cef088d85e7139efa04067bc67160b01d256e01c86f8309766c746ad *角色卡/rapporteur-code/docs/design/2026-11-10_impl_two-fixed-workflow-paths.md
+241502075ff57d6534d7b2c807a2726f1a4c261381e3b0f968b6be468c64e9ce *docs/planning/2026-11-07_design_runtime-tool-surface-dispatch-gate.md
+1f6518b898aa33b649c21124e26816cd05715a5eba6a147aed8b8cab9cfb26d6 *docs/planning/2026-11-05_design_governance-authority-matrix.md
+067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3 *docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md
+886fef84c3db34515a98f5874a33bb22134a3fc3b02f20aa3d185b828a3e7c54 *docs/planning/2026-11-09_design_document-format-specifications.md
+1477a6e423a74a7007824b7db82cac4e0f6dbb9e48abaa60a7f452704672e6be *docs/planning/2026-11-09_design_judge-delegated-decision-effectiveness.md
+2bb663fec3baee7b275ae7a8747bb3a31091304cd728b4329787d17bab86608b *docs/planning/2026-11-09_design_team-plan-run-binding.md
+df1992df9c22af5fa915a128469fc0911c77493c21486367328a40bc35a00efc *角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md
+```
+
+行/字节：
+
+```
+95 docs/planning/2026-11-10_design_two-fixed-workflow-paths.md (8,476 B)
+1,110 docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.md (122,470 B)
+96 docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record.md (13,787 B)
+75 docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md (8,913 B)
+86 角色卡/rapporteur-code/docs/design/2026-11-10_impl_two-fixed-workflow-paths.md (12,447 B)
+1,242 / 1,056 / 685 / 979 / 686 / 438（六份架构/契约设计，行数，与方案引用一致）
+222 角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md (32,535 B)
+```
+
+## 二、代码清点实测（行数）
+
+```
+1687 src/common/编排/workflow-preconditions.ts
+1861 src/provider/runtime/schema.ts
+ 253 src/common/gates/index.ts
+2242 src/common/门禁引擎/classify-shell.ts
+1296 src/common/编排/task-state.ts
+1171 src/common/编排/run-manifest.ts
+3669 src/pipeline/orchestration/run-role.ts
+11225 app/desktop/session.ts
+4183 src/model/runtime.ts
+ 409 src/model/role.ts
+ 229 src/common/shared/jsonl-ledger.ts
+4030 src/service/trunk/impl/apply-journal.ts
+1156 src/common/编排/project-state.ts
+2294 src/common/编排/doc-format-specs.ts
+ 692 src/common/roles/convener/index.ts
+ 139 src/common/roles/chief/internal/dispatch.ts
+  72 src/common/roles/chief/internal/spec.ts
+  79 src/common/roles/chief/internal/tools.ts
+ 108 src/common/roles/rapporteur/internal/spec.ts
+ 847 src/common/roles/nominator/index.ts
+ 409 src/common/roles/verifier/index.ts
+  40 src/common/roles/product/index.ts
+```
+
+- `test/**/*.test.ts` 计数：555（与方案一致）。
+- `doc-format-specs.ts` 中 `id: "` 计数：54（与方案一致）。
+
+## 三、关键代码锚点抽查（符号级核实，全部只读）
+
+已核实与方案一致（摘要）：
+- `workflow-preconditions.ts`：`CHIEF_DISPATCHABLE_BUILT_INS` :1560-1566；`evaluateDispatchAuthorization` :1590（重写对象）；`evaluateDispatchPreflight` :1651；`reportTargetForTaskCreator` :1674；`parseTeamPlan` :60-112；`nominationD3CardFacts` :1434；`loadLatestRoster` :1171；`validateAppointmentCardAgainstRoster` :1372；`isConvenerBuiltInDispatchTarget` :1582-1584。
+- `gates/index.ts`：18 项 `DispatchParentReason` 闭集 :82-100；`evaluateChiefDispatchParent` :228；调用方仅 `trunk-runtime.ts`（:1148/:1224）→ 方案"普通星形派发不直接调用"属实。
+- `task-state.ts`：`TASKS_STATE_REL` :109；`taskIdempotencyKey` :337；`appendTaskEvent` :365；**run-required 规则 :377-380**（`task.created && flowId!==undefined` 必须带 runId+runState，`allowLegacyRun` 除外）——MF-3 证据。
+- `run-manifest.ts`：`prepareRunPin` :478；`pinRun` :634；`verifyPinnedRun` :856。
+- `model/runtime.ts`：task.created 字段 :1365-1405（含 runId/runState/runStage，无 workflowId/stage/taskKind）；request.created/resolved :1460-1533；`GOVERNANCE_CARD_GROUP` :944；`GOVERNANCE_CARD_KINDS` :976；`DispatchTaskPayload` :1981-2018（**无 taskKind**）；`ContractCheckInput.taskKind` :2089。
+- `model/role.ts`：`RoleToolId` 14 项 :245；`RoleToolName` :262；`RoleDispatchPolicyInput` :300 附近；`ProjectConfig` :77（无 workflowSchema）。
+- `role-tool-registry.ts`：`ROLE_TOOL_CATALOG` 14 项 :52-68。
+- `governance-roles.ts`：`BUILT_IN_ROLE_MATRIX` :138-218（chief 文案"五builtin"）；`isBuiltInGovernanceRoleId` :336。
+- `classify-shell.ts`：`checkGitPolicy` :1046；`SHELL_RULES_VERSION="4"` :1134（v4 注释 :1128-1133）；`matchReadonlyGit` :1551；`defaultShellRules` :2153。
+- `jsonl-ledger.ts`：`DEFAULT_JSONL_MAX_BYTES=5 MiB` / `DEFAULT_JSONL_ROTATIONS=3` :31-33。
+- `run-role.ts`：写门禁/scope :1090-1116；appointment 卡分支 :1310-1371；intent-confirm 分支（trunk `prepareIntentConfirmation`/`finalizeIntentConfirmation`）约 :1625-1665；dispatchTask 注入 :1759-1764；模块工具 :1930-1962；卡种白名单 `cardKindsOf`/`TRIO_CARD_ORIGINATORS` :3065-3225。
+- `session.ts`：`routeDispatch` :8557；`routeStarDispatch` :8912；`evaluateDispatchAuthorization` 调用 :8982-8992；convener→verifier 内联拒绝 :8993-8994；`hubPreparation` 五内置 :9000-9008；run pin/freeze（`freezeExecutionRun`+`prepareRoleDispatch`）:9163-9183；`proposalCardFrozenRejection` :3261；direct 能力装配 :4359-4371。
+- `apply-journal.ts`：`prepareAssignedTaskWriteScope` :2631；`completeTeamPlan` :2938；`closeCreatedTask` :3182（要求 runId/basisDigest/reportRef + `prepareCreatedTaskClose`）；:3052「task.closed 必须走真实创建者 closeCreatedTask」；`prepareRoleActivation` :3267；`activateRoleDocuments` :3358；`prepareIntentConfirmation` :3445；`finalizeIntentConfirmation` :3541；`prepareRoleDraftScope` :3714；`isChiefHubDispatchTarget` :3766-3771。
+- `trunk-runtime.ts`：`createDirectRoleRuntime`（activateRoleDocuments/closeCreatedTask/completeTeamPlan/selectRunChange 实现）:770；`prepareRoleDispatch` 中 `review`/`documents`/`coordination`/`rolePreparation`/`hub` 判定 :1186-1200 → `CHIEF_HUB_DISPATCH`/`CONVENER_WORKER_DISPATCH_TARGETS` 的 legacy 消费点（MF-2 证据）。
+- `resolve-role.ts`：`listProject` :341+（按 `角色卡/` 磁盘目录枚举）。
+- `verifier/index.ts`：卡片文本 :46、:57；边界条目 :65-88（写区 `docs/quality/`、`docs/verification/`、`docs/governance/verifier/`；无 `docs/acceptance/`）。
+- `convener/index.ts`：`CONVENER_CARDS=["decision"]` :97；`CONVENER_WORKER_DISPATCH_TARGETS` :191-198（`["verifier"]`）；`dispatch` :204-238；`CONVENER_ENTRIES`（`docs/workflow.md`、`docs/scheduling/`、`docs/governance/convener/`）。
+- `chief/internal/dispatch.ts`：`CHIEF_HUB_DISPATCH.targetRoleIds` 五内置 :54-60；`chiefDispatch` :88-139。
+- `chief/internal/spec.ts`：`CHIEF_CARDS=["intent-confirm"]` :72；chief 写区 `docs/intents/`。
+- `rapporteur/internal/spec.ts`：`RAPPORTEUR_CARDS=["proposal","decision"]` :105-108；写区 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`。
+- `nominator/index.ts`：`NOMINATOR_CARDS=["appointment","appointment-write"]` :156-158；写区 `角色卡/`、`docs/skills/`、`docs/mcp/`、`docs/governance/nominator/`。
+- `product/internal/dispatch.ts`：chief/convener 来源规则与 `convener-target-forbidden`（现状）。
+- 高风险清单：`task-state.ts` `EXTERNAL_RE` :301-314；`watchdog.ts::evaluateRedispatchSafety` :227-232；`model/directive.ts::DIRECTIVE_HIGH_RISK_REASONS` :217-226。
+- 角色卡边界：`src/model/runtime.ts`=运行时核心、`src/model/role.ts`=门禁引擎、`src/common/shared/`=shared-code、`src/common/编排/`=编排、`app/desktop/`=桌面窗口、`src/provider/runtime/`=运行时核心、六个 `src/common/roles/<role>/`=六个 code 角色（H1=0 依据）。
+
+## 四、与方案不符 / 需更正项（抽查发现）
+
+1. `dispatch_task`（schema.ts:614-800）**没有** `taskKind` 字段；方案 §2.1 所称 :799 的 `["dispatch","appointment","write","acceptance","shell"]` 枚举属于 `contract_check`（`ContractCheckInput.taskKind`，model/runtime.ts:2089）；`DispatchTaskPayload` 亦无该字段。→ G-1。
+2. `test/编排/shell-audit.test.ts` 不存在；现有相关文件为 `test/编排/shell-post-audit.test.ts`。→ G-6。
+3. 设计 v2 第 50 行 A12 产物为 `docs/acceptance/*`，方案 A12 使用 `docs/quality/*`，方案 §1.4 未登记该偏差。→ MF-7。
+4. `docs/planning` 六份架构/契约文件 hash 与方案引用逐一相符（见 §一）。
+
+## 五、报告自身实测（写盘后）
+
+- 路径：`角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md`
+- 行数 / 字节：222 行 / 32,535 bytes
+- SHA-256：`df1992df9c22af5fa915a128469fc0911c77493c21486367328a40bc35a00efc`
+- 本证据文件为复核附件；报告正文不嵌入自身 hash（避免自指）。
+
+## 六、限制与未提交声明
+
+- 未运行全量确定性测试（555 个 `*.test.ts`）；方案引用的 known red（version-change-integration 9 红、optional-acceptance 6/2/1/3/0、test/编排 22 fail/2 skip）未独立复测。
+- 未运行真实 Electron/真实模型；未验证 UI/judge 实际行为、真实 Git 合并语义、CI/发布状态。
+- 未访问仓库外贪吃蛇 target 与其 `.ans` 状态。
+- 本轮未 commit / push / merge / tag / 发布；未写产品/测试代码；未改角色卡/边界；未占用 9222/9223。
