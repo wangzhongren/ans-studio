@@ -1,0 +1,180 @@
+{
+  "at": "2026-11-10T21:02:18.282Z",
+  "candidate": "966696e1536e23adf310168a2a26289e6c7ac700",
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-10T20:56:34.399Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-bcc993de8e5de70f7c2b8c39",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:c817a99b-60a8-4278-9693-6edd5682b16a",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "c817a99b-60a8-4278-9693-6edd5682b16a",
+    "legacyStateIgnored": true
+  },
+  "workflowEvents": [
+    {
+      "at": "2026-11-10T20:56:34.399Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T20:56:34.399Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T20:57:01.105Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwb67xyh-1f142c4d"
+    },
+    {
+      "at": "2026-11-10T20:58:20.736Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T20:59:18.797Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-10T20:56:34.405Z",
+      "taskId": "t-mwb67dcv-ca10e381",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39"
+    },
+    {
+      "at": "2026-11-10T20:57:01.097Z",
+      "taskId": "t-mwb67xyh-1f142c4d",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39"
+    },
+    {
+      "at": "2026-11-10T20:58:20.737Z",
+      "taskId": "t-mwb69neo-109db8db",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39"
+    },
+    {
+      "at": "2026-11-10T20:58:37.250Z",
+      "taskId": "t-mwb6a05e-6c608618",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39"
+    },
+    {
+      "at": "2026-11-10T20:58:51.389Z",
+      "taskId": "t-mwb6ab25-4b0eedc5",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39"
+    },
+    {
+      "at": "2026-11-10T20:59:18.798Z",
+      "taskId": "t-mwb6aw7h-fd5bb97c",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39"
+    }
+  ],
+  "taskClosed": [
+    {
+      "at": "2026-11-10T20:58:16.518Z",
+      "taskId": "t-mwb67dcv-ca10e381",
+      "by": "chief",
+      "outcome": "rework",
+      "note": "A1 调度请求收口尝试：运营已创建 A1 产品受理/准备任务 #t-mwb67xyh-1f142c4d 并两次提交报告（report.received），但报告未关联本任务（任务关联未知）。此处以 rework 收口以解除 open advance 阻塞。"
+    },
+    {
+      "at": "2026-11-10T20:59:14.669Z",
+      "taskId": "t-mwb69neo-109db8db",
+      "by": "chief",
+      "outcome": "rework",
+      "note": "A2 阶段的实际产出已就绪（docs/product/snake-game-intent-v1.md，frontmatter 与正文经幕僚只读复核一致），但运营/产品的报告未关联本调度请求（账本「任务关联未知」），accepted 收口被 close-report-missing 拒绝。为解除 open advance 阻塞，先以 rework 收口本请求，随即携带“报告须携带本任务 taskId”要求重发 A2 调度请求；不推翻已产出的意图文档。"
+    }
+  ],
+  "requestCreated": [
+    {
+      "at": "2026-11-10T21:00:33.315Z",
+      "requestId": "req-c4c4589c531dffc3",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-bcc993de8e5de70f7c2b8c39",
+      "stage": "A3",
+      "documentRefs": [
+        {
+          "kind": "intent",
+          "path": "docs/product/snake-game-intent-v1.md",
+          "sha256": "718e6044c3a195fa482e65a3a134be3a52a23533a71e63bbaf163b9362b6704a",
+          "intentId": "snake-classic-game",
+          "version": 1
+        }
+      ],
+      "title": "确认产品意图 v1（贪吃蛇 · 键盘控制/计分/重开/边界碰撞）"
+    }
+  ],
+  "requestPresented": [
+    {
+      "at": "2026-11-10T21:00:33.327Z",
+      "requestId": "req-c4c4589c531dffc3"
+    }
+  ],
+  "requestResolved": [
+    {
+      "at": "2026-11-10T21:00:33.426Z",
+      "requestId": "req-c4c4589c531dffc3",
+      "by": "customer",
+      "choice": "unavailable"
+    }
+  ],
+  "reportLinkBlockerNote": [
+    "应用侧报告-任务关联缺陷：product/convener 的 submit_report 均以「任务关联未知」到达，task 无 task.reported(status=done)，导致 close_created_task accepted 一律 close-report-missing（A1/A2 调度请求、产品 A1/A2 任务、运营自建任务均命中）。已尝试：按 rework 收口解除 open-advance、重发 A2 明确要求携带关联键、terminate_role_run（controller-stop-source-unproven）、redispatch_task（safety=unsafe）。产物本身有效：docs/product/snake-game-intent-v1.md（intentId=snake-classic-game）。"
+  ],
+  "taskReportedRows": 0,
+  "intentDoc": {
+    "path": "docs/product/snake-game-intent-v1.md",
+    "bytes": 9391,
+    "sha256": "718e6044c3a195fa482e65a3a134be3a52a23533a71e63bbaf163b9362b6704a"
+  },
+  "shellGateAuditAbsent": true,
+  "productRunShellCalls": 0,
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "testerStopDisclosure": "Driver was stopped by the tester at 21:00:32-33 based on the chief's report-link blocker note; the A3 intent-confirm card was created/presented at 21:00:33.315-.327 and resolved 'unavailable' at .426 during finalize halt (NOT answered by the customer/driver). The chain had reached A3."
+}

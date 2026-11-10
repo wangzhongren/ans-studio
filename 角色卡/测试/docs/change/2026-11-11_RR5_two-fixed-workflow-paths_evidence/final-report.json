@@ -1,0 +1,212 @@
+{
+  "at": "2026-11-10T21:00:35.654Z",
+  "stopCause": null,
+  "gate": null,
+  "workflowStarted": null,
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "budget": {
+    "customerMessages": 0,
+    "cardsTotal": 0,
+    "cardsByKind": {},
+    "dispatches": 0,
+    "dispatchesByFrom": {},
+    "writeTasks": 0,
+    "implementationWriteTasks": 0,
+    "turnsByRole": {}
+  },
+  "summary": {
+    "stages": {},
+    "milestones": []
+  },
+  "git": {
+    "branch": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "head": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "log": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "status": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "branches": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "tags": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "remotes": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "mainLog": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n"
+  },
+  "docs": {
+    "docs": [
+      {
+        "rel": "docs/governance",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/convener",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/convener/snake-game-a1-dispatch.md",
+        "bytes": 1812,
+        "sha256": "4a604618b7c2634f55a5061008e4678a142877736135dc82144e64762a57cf41"
+      },
+      {
+        "rel": "docs/governance/convener/snake-game-a2-dispatch.md",
+        "bytes": 4927,
+        "sha256": "adfde65a9f773ac1d15fb4a074d3f7eea734211c4f0bb5c1840bb3980cdaf061"
+      },
+      {
+        "rel": "docs/intents",
+        "dir": true
+      },
+      {
+        "rel": "docs/intents/snake-classic-game.md",
+        "bytes": 3525,
+        "sha256": "98774f3ad53ba9cb503feaa8f5c30facfba715e85bbf9008511a07416805b322"
+      },
+      {
+        "rel": "docs/product",
+        "dir": true
+      },
+      {
+        "rel": "docs/product/snake-game-a1-intake.md",
+        "bytes": 4979,
+        "sha256": "a8c8b1342ec517e2f81ba829a721ea4555dc9ce48072921674b13b77de78871e"
+      },
+      {
+        "rel": "docs/product/snake-game-intent-v1.md",
+        "bytes": 9391,
+        "sha256": "718e6044c3a195fa482e65a3a134be3a52a23533a71e63bbaf163b9362b6704a"
+      }
+    ]
+  },
+  "topLevel": [
+    ".ans",
+    "docs"
+  ],
+  "sessions": {
+    "chief": {
+      "bytes": 300868
+    },
+    "convener": {
+      "bytes": 212856
+    },
+    "product": {
+      "bytes": 168951
+    }
+  },
+  "ports": {
+    "lines9222": [],
+    "lines9223": [],
+    "lines9224": [
+      "  TCP    127.0.0.1:9224         0.0.0.0:0              LISTENING       2624",
+      "  TCP    127.0.0.1:9224         127.0.0.1:64373        ESTABLISHED     2624",
+      "  TCP    127.0.0.1:9224         127.0.0.1:64374        ESTABLISHED     2624",
+      "  TCP    127.0.0.1:64373        127.0.0.1:9224         ESTABLISHED     2984",
+      "  TCP    127.0.0.1:64374        127.0.0.1:9224         ESTABLISHED     2984"
+    ]
+  },
+  "oldRunRootPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+    "exists": true,
+    "entries": [
+      {
+        "name": "evidence",
+        "mtime": 1794247136435.3418
+      },
+      {
+        "name": "round10",
+        "mtime": 1794248323109.7388
+      },
+      {
+        "name": "round11",
+        "mtime": 1794248959545.2583
+      },
+      {
+        "name": "round12",
+        "mtime": 1794249232305.3015
+      },
+      {
+        "name": "round13",
+        "mtime": 1794249490950.5813
+      },
+      {
+        "name": "round14",
+        "mtime": 1794249732100.8677
+      },
+      {
+        "name": "round15",
+        "mtime": 1794249988039.9426
+      },
+      {
+        "name": "round16",
+        "mtime": 1794250169724.0994
+      },
+      {
+        "name": "round17",
+        "mtime": 1794250566337.3135
+      },
+      {
+        "name": "round18",
+        "mtime": 1794252829477.4497
+      },
+      {
+        "name": "round19",
+        "mtime": 1794253209658.652
+      },
+      {
+        "name": "round20",
+        "mtime": 1794261345627.0393
+      },
+      {
+        "name": "round21",
+        "mtime": 1794261805971.9543
+      },
+      {
+        "name": "round22",
+        "mtime": 1794262253668.7983
+      },
+      {
+        "name": "round23",
+        "mtime": 1794262693084.7214
+      },
+      {
+        "name": "round24",
+        "mtime": 1794263327768.893
+      },
+      {
+        "name": "round25",
+        "mtime": 1794264715770.8784
+      },
+      {
+        "name": "round26",
+        "mtime": 1794265159753.918
+      },
+      {
+        "name": "round8",
+        "mtime": 1794247470341.858
+      },
+      {
+        "name": "round9",
+        "mtime": 1794247940931.3174
+      },
+      {
+        "name": "rr",
+        "mtime": 1794247132796.088
+      },
+      {
+        "name": "userData",
+        "mtime": 1794246925742.7854
+      }
+    ]
+  },
+  "oldSnakeTargetPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+    "exists": true,
+    "entries": [
+      {
+        "name": "target",
+        "mtime": 1794192309257.867
+      }
+    ]
+  },
+  "oldRootsUntouched": {
+    "runRoot": false,
+    "snakeTarget": false
+  },
+  "turns": {}
+}
