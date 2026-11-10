@@ -214,6 +214,20 @@ async function started(root: string, base: typeof BASE_A | typeof BASE_B): Promi
   }]);
 }
 
+/**
+ * T3 B2.1（AC-19/T-08）：A12a/A12b accepted 收口前 basis 复核（`verifyBasisForStage`）已在桌面接线，
+ * 既有 A12 夹具预置一份不漂移的 basis（空文档集/无团队计划；本文件不验证漂移，见 b21 专测）。
+ */
+async function seedBasis(root: string, workflowId: string): Promise<void> {
+  const appended = await appendBasisEvent(root, {
+    v: 1, at: AT, schema: "ans-basis/v1", kind: "basis.recorded",
+    idempotencyKey: `baseline:${workflowId}:seed`, basisId: `bas-${workflowId}`, workflowId, flowId: FLOW,
+    documents: [], teamPlan: null,
+    reviewRoleId: "verifier", operationId: "op-basis-seed", reason: "baseline", recordedBy: "application",
+  });
+  assert.equal(appended.ok, true, appended.ok === false ? appended.message : "");
+}
+
 const MODULES_DOC = [
   "---",
   "schema: project-modules/v2",
@@ -425,6 +439,7 @@ test("A12：fixed close_created_task v2 accepted ⇒ 应用归档 docs/acceptanc
   try {
     await writeFile(root, ".ans/project.json", JSON.stringify({ workflowSchema: "two-fixed-paths/v1", governanceModel: "trio" }));
     await started(root, BASE_A);
+    await seedBasis(root, WF);
     const events: WorkflowEvent[] = [];
     // A1..A10 完成后先派 A12a（criteria 先于实现；G-1），A12a 收口后再推进 A11 → A12b。
     for (const stage of ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"] as WorkflowStage[]) {
@@ -506,6 +521,7 @@ test("A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（
   try {
     await writeFile(root, ".ans/project.json", JSON.stringify({ workflowSchema: "two-fixed-paths/v1", governanceModel: "trio" }));
     await started(root, BASE_A);
+    await seedBasis(root, WF);
     const events: WorkflowEvent[] = [];
     for (const stage of ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11"] as WorkflowStage[]) {
       events.push(requested(BASE_A, WF, stage), completed(BASE_A, WF, stage));
@@ -563,6 +579,9 @@ test("路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basi
       }, live);
       releaseSource(h.mgr, live);
       assert.equal(receipt.ok, true, receipt.message ?? "");
+      // T3 B2.1（AC-19/T-08）：B1 派发前复核补 `stage` ⇒ 关键门一致时节流入账 `basis.verified`。
+      const verified = (await readBasisLedger(root)).events.filter((event) => event.kind === "basis.verified");
+      assert.equal(verified.length, 1, "B1 关键门一致 ⇒ basis.verified 入账一次");
       // basis.recorded(reason:"path-b")：只读快照；repo.branch=任务分支；不写团队计划。
       const basis = (await readBasisLedger(root)).events.filter((event) =>
       (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === WF);

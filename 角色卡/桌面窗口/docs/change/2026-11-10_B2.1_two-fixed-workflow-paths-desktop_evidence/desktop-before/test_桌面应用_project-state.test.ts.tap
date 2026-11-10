@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: project-state:get：IPC 形状/计数/版本/备注/零写入；空 root 返回空视图+errors
+ok 1 - project-state:get：IPC 形状/计数/版本/备注/零写入；空 root 返回空视图+errors
+  ---
+  duration_ms: 30.8004
+  type: 'test'
+  ...
+# Subtest: project-state:get：chief 完整、convener 裁剪、worker 无 project_state 工具；项目状态工具文本 ≤8 KiB
+ok 2 - project-state:get：chief 完整、convener 裁剪、worker 无 project_state 工具；项目状态工具文本 ≤8 KiB
+  ---
+  duration_ms: 67.8463
+  type: 'test'
+  ...
+# Subtest: IPC 面：只新增 project-state:get；不注册/不暴露 project:note、version-decision:request 写桥
+ok 3 - IPC 面：只新增 project-state:get；不注册/不暴露 project:note、version-decision:request 写桥
+  ---
+  duration_ms: 1.3337
+  type: 'test'
+  ...
+# Subtest: project_note：set-focus/blocker/next-step 校验、幂等、解除、重启重建；不改任务/run/文档
+ok 4 - project_note：set-focus/blocker/next-step 校验、幂等、解除、重启重建；不改任务/run/文档
+  ---
+  duration_ms: 113.9809
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 639.6486

@@ -1,0 +1,16 @@
+TAP version 13
+# Subtest: 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等
+ok 1 - 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等
+  ---
+  duration_ms: 93.2755
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 519.2624

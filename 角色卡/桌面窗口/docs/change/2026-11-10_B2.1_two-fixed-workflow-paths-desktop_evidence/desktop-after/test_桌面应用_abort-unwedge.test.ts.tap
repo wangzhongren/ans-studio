@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续
+ok 1 - P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续
+  ---
+  duration_ms: 93.065
+  type: 'test'
+  ...
+# Subtest: P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态
+ok 2 - P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态
+  ---
+  duration_ms: 374.0633
+  type: 'test'
+  ...
+# Subtest: P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断）
+ok 3 - P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断）
+  ---
+  duration_ms: 43.6842
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 949.4992

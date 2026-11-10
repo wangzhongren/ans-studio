@@ -1,0 +1,7 @@
+# tests 6 # pass 6 # fail 0 # skipped 0  <- b21-basis-gate-desktop
+# tests 6 # pass 6 # fail 0 # skipped 0  <- b3-fixed-baseline-pathb
+# tests 9 # pass 9 # fail 0 # skipped 0  <- b31-fixed-release-auto-desktop
+# tests 13 # pass 13 # fail 0 # skipped 0  <- b51-fixed-workflow-wiring
+# tests 7 # pass 7 # fail 0 # skipped 0  <- b3-release-merge-desktop
+# tests 13 # pass 13 # fail 0 # skipped 0  <- fixed-path-routing
+# tests 8 # pass 8 # fail 0 # skipped 0  <- b3-fixed-cards-panel

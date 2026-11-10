@@ -1,0 +1,69 @@
+TAP version 13
+# Subtest: W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡
+ok 1 - W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡
+  ---
+  duration_ms: 114.8152
+  type: 'test'
+  ...
+# Subtest: judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正）
+ok 2 - judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正）
+  ---
+  duration_ms: 65.3672
+  type: 'test'
+  ...
+# Subtest: 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework
+ok 3 - 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework
+  ---
+  duration_ms: 231.8394
+  type: 'test'
+  ...
+# Subtest: unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用）
+ok 4 - unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用）
+  ---
+  duration_ms: 0.4195
+  type: 'test'
+  ...
+# Subtest: 开关关：下载卡直接客户卡（judge 零调用）
+ok 5 - 开关关：下载卡直接客户卡（judge 零调用）
+  ---
+  duration_ms: 162.363
+  type: 'test'
+  ...
+# Subtest: single 治理模型：不构造 judge、下载卡直接客户卡
+ok 6 - single 治理模型：不构造 judge、下载卡直接客户卡
+  ---
+  duration_ms: 81.5538
+  type: 'test'
+  ...
+# Subtest: 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput
+ok 7 - 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput
+  ---
+  duration_ms: 1.1912
+  type: 'test'
+  ...
+# Subtest: 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）
+not ok 8 - 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）
+  ---
+  duration_ms: 3077.4436
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\download-decision.test.ts:445:1'
+  failureType: 'testCodeFailure'
+  error: 'timeout waiting for 第二次 deny 升级客户卡'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/download-decision.test.ts:271:39)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/download-decision.test.ts:457:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4174.5574

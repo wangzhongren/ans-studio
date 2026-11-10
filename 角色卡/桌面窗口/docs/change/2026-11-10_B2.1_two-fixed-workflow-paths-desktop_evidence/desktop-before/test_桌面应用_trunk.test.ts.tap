@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: trunk:state 载荷：F15 workflow/roleCards/boundaries 三类；禁用原因与冻结健康派生
+ok 1 - trunk:state 载荷：F15 workflow/roleCards/boundaries 三类；禁用原因与冻结健康派生
+  ---
+  duration_ms: 0.739
+  type: 'test'
+  ...
+# Subtest: Interface 版本变更/重构/冻结只读：空项目根结构化失败；有栈件时返回摘要
+ok 2 - Interface 版本变更/重构/冻结只读：空项目根结构化失败；有栈件时返回摘要
+  ---
+  duration_ms: 2.8383
+  type: 'test'
+  ...
+# Subtest: Interface VCA 重发卡：submitted 重发回执 answered/recordStatus；不提供 submit 通道
+ok 3 - Interface VCA 重发卡：submitted 重发回执 answered/recordStatus；不提供 submit 通道
+  ---
+  duration_ms: 4.7959
+  type: 'test'
+  ...
+# Subtest: detail VCA 批准后：后台驱动逐项卡收集 → apply（needsItems；不新增 IPC）
+ok 4 - detail VCA 批准后：后台驱动逐项卡收集 → apply（needsItems；不新增 IPC）
+  ---
+  duration_ms: 31.2679
+  type: 'test'
+  ...
+# Subtest: Interface trunk：state 单一载荷、list、升级预览→同一 previewId 二次确认、恢复/重冻结构
+ok 5 - Interface trunk：state 单一载荷、list、升级预览→同一 previewId 二次确认、恢复/重冻结构
+  ---
+  duration_ms: 4.0929
+  type: 'test'
+  ...
+# Subtest: 接线源码钉：main.ts 注册冻结 IPC 集；无 submit/refactor:request/stable-write:request；preload 白名单
+ok 6 - 接线源码钉：main.ts 注册冻结 IPC 集；无 submit/refactor:request/stable-write:request；preload 白名单
+  ---
+  duration_ms: 0.8334
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 494.5361

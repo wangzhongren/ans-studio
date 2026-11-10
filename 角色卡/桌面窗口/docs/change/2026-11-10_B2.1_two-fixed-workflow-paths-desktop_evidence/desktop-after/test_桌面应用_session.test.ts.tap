@@ -1,0 +1,72 @@
+TAP version 13
+# Subtest: TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format
+ok 1 - TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format
+  ---
+  duration_ms: 99.7957
+  type: 'test'
+  ...
+# Subtest: AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变
+ok 2 - AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变
+  ---
+  duration_ms: 19.122
+  type: 'test'
+  ...
+# Subtest: AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定
+ok 3 - AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定
+  ---
+  duration_ms: 3.2669
+  type: 'test'
+  ...
+# Subtest: AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变
+ok 4 - AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变
+  ---
+  duration_ms: 48.8034
+  type: 'test'
+  ...
+# Subtest: AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用）
+ok 5 - AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用）
+  ---
+  duration_ms: 2.6803
+  type: 'test'
+  ...
+# Subtest: AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变
+ok 6 - AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变
+  ---
+  duration_ms: 70.5407
+  type: 'test'
+  ...
+# Subtest: AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+not ok 7 - AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+  ---
+  duration_ms: 0.5569
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\session.test.ts:570:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    索引字节（B1 实测 pin）
+    
+    5244 !== 5223
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 5223
+  actual: 5244
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session.test.ts:572:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 662.6329

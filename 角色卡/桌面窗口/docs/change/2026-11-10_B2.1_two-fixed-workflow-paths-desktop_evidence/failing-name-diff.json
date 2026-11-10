@@ -1,0 +1,22 @@
+{
+  "excluded": {
+    "files": [
+      "chief-workflow.test.ts",
+      "genesis-bootstrap.test.ts"
+    ],
+    "names": [
+      {
+        "fileSuffix": "p0-halt-and-images.test.ts",
+        "namePrefix": "P0-2 abort 三态：demo 替身"
+      }
+    ]
+  },
+  "before_files": 21,
+  "after_files": 21,
+  "before_failing_names": 74,
+  "after_failing_names": 74,
+  "before_environment_excluded_names": 10,
+  "after_environment_excluded_names": 15,
+  "added": [],
+  "removed": []
+}

@@ -1,0 +1,157 @@
+TAP version 13
+# Subtest: 并发作废重建（settle 触发的 refreshStaleBoundaries × 用户 send）——身份守卫下：恰一次作废/重建、条目保活、轮次不被误删
+ok 1 - 并发作废重建（settle 触发的 refreshStaleBoundaries × 用户 send）——身份守卫下：恰一次作废/重建、条目保活、轮次不被误删
+  ---
+  duration_ms: 126.6391
+  type: 'test'
+  ...
+# Subtest: 在跑轮次不被作废重建打断：busy 期间 refreshStaleBoundaries/send 的陈旧检查都跳过（不误删、不误复位）
+ok 2 - 在跑轮次不被作废重建打断：busy 期间 refreshStaleBoundaries/send 的陈旧检查都跳过（不误删、不误复位）
+  ---
+  duration_ms: 109.0739
+  type: 'test'
+  ...
+# Subtest: 后台重建完成后再发送：恢复活动目标，消息恰一次送达重建后的句柄
+ok 3 - 后台重建完成后再发送：恢复活动目标，消息恰一次送达重建后的句柄
+  ---
+  duration_ms: 6.9483
+  type: 'test'
+  ...
+# Subtest: 非活动角色后台重建不抢位
+ok 4 - 非活动角色后台重建不抢位
+  ---
+  duration_ms: 6.0294
+  type: 'test'
+  ...
+# Subtest: 重建 dispose 等待窗口：select B 保持用户目标/关闭契约
+ok 5 - 重建 dispose 等待窗口：select B 保持用户目标/关闭契约
+  ---
+  duration_ms: 6.5464
+  type: 'test'
+  ...
+# Subtest: 重建 dispose 等待窗口：failed select 保持用户目标/关闭契约
+ok 6 - 重建 dispose 等待窗口：failed select 保持用户目标/关闭契约
+  ---
+  duration_ms: 5.8305
+  type: 'test'
+  ...
+# Subtest: 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约
+not ok 7 - 重建 dispose 等待窗口：stop A 保持用户目标/关闭契约
+  ---
+  duration_ms: 6.1692
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\session-rebuild-race.test.ts:278:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session-rebuild-race.test.ts:323:18)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约
+not ok 8 - 重建 dispose 等待窗口：stop all 保持用户目标/关闭契约
+  ---
+  duration_ms: 8.6312
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\session-rebuild-race.test.ts:278:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    新项目的新句柄接收，旧重建句柄已释放
+    + actual - expected
+    
+      [
+    +   3
+    -   4
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 4
+  actual:
+    0: 3
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session-rebuild-race.test.ts:336:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 重建 dispose 等待窗口：stop B 保持用户目标/关闭契约
+ok 9 - 重建 dispose 等待窗口：stop B 保持用户目标/关闭契约
+  ---
+  duration_ms: 7.9114
+  type: 'test'
+  ...
+# Subtest: 重建 open 等待窗口：select B 保持用户目标/关闭契约
+ok 10 - 重建 open 等待窗口：select B 保持用户目标/关闭契约
+  ---
+  duration_ms: 6.275
+  type: 'test'
+  ...
+# Subtest: 重建 open 等待窗口：failed select 保持用户目标/关闭契约
+ok 11 - 重建 open 等待窗口：failed select 保持用户目标/关闭契约
+  ---
+  duration_ms: 5.9844
+  type: 'test'
+  ...
+# Subtest: 重建 open 等待窗口：stop A 保持用户目标/关闭契约
+not ok 12 - 重建 open 等待窗口：stop A 保持用户目标/关闭契约
+  ---
+  duration_ms: 5.8987
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\session-rebuild-race.test.ts:278:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session-rebuild-race.test.ts:323:18)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 重建 open 等待窗口：stop all 保持用户目标/关闭契约
+ok 13 - 重建 open 等待窗口：stop all 保持用户目标/关闭契约
+  ---
+  duration_ms: 8.4219
+  type: 'test'
+  ...
+# Subtest: 重建 open 等待窗口：stop B 保持用户目标/关闭契约
+ok 14 - 重建 open 等待窗口：stop B 保持用户目标/关闭契约
+  ---
+  duration_ms: 8.0988
+  type: 'test'
+  ...
+# Subtest: 夹具守卫（O-1 缓存口径）：makeProject 初始边界**比重写长**——(mtimeMs,size) 缓存下陈旧触发确定性检出，不落时间戳粒度合并窗
+ok 15 - 夹具守卫（O-1 缓存口径）：makeProject 初始边界**比重写长**——(mtimeMs,size) 缓存下陈旧触发确定性检出，不落时间戳粒度合并窗
+  ---
+  duration_ms: 1.8004
+  type: 'test'
+  ...
+# Subtest: 陈旧检出对平台 mtime 粒度合并免疫（尺寸可判）：即便 stat 报告与冻结完全相同的 mtime，陈旧仍被检出并如实失败
+ok 16 - 陈旧检出对平台 mtime 粒度合并免疫（尺寸可判）：即便 stat 报告与冻结完全相同的 mtime，陈旧仍被检出并如实失败
+  ---
+  duration_ms: 4.0279
+  type: 'test'
+  ...
+# Subtest: 重开失败保留原错误，不恢复假活动目标、不发送消息
+ok 17 - 重开失败保留原错误，不恢复假活动目标、不发送消息
+  ---
+  duration_ms: 6.0657
+  type: 'test'
+  ...

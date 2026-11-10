@@ -7,8 +7,9 @@
 //     并经应用自有通道呈现 `merge-main` 客户卡（客户卡、非判断、judge 只能转人工/拒绝）；
 //     客户本人 approve ⇒ `executeReleaseMerge`（本地合并、不 push/tag）；拒绝/超时 ⇒ `release.rejected`；
 //     已合并/已关闭幂等；同一 workflow/tip 不重复卡；
-//   · 前置缺失（无 basis / A12b 尚未 accepted）⇒ `release-workflow-not-ready` 如实回运营/幕僚，
-//     **不呈卡**、不写 release.requested（不弹注定失败卡）；
+//   · 前置缺失：无 basis ⇒ B2.1（AC-19/T-08）A12a/A12b accepted 收口前 basis 复核 `basis-missing`
+//     fail-closed（拒绝收口/完成，不写 task.closed/不归档）；归档缺失等前置缺失 ⇒
+//     `release-workflow-not-ready` 如实回运营/幕僚，**不呈卡**、不写 release.requested（不弹注定失败卡）；
 //   · fixed appointment `request.resolved` 原样落 `source:"stage-a10"` + `workflowId`/`stage:"A10"`；
 //     legacy 任命决议无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）；
 //   · 去重：run-role 已 prepareIntent/finalizeIntent 时桌面复用/幂等（A3 requested 单次、意图 marker 单次、
@@ -681,8 +682,9 @@ test("A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；j
   }
 });
 
-test("前置缺失不呈卡：A12b accepted 但无 basis ⇒ release-workflow-not-ready 回运营/幕僚；rework 收口不触发", async () => {
-  // 无 basis：prepareReleaseMerge 失败 ⇒ 不呈卡、不写 release.requested、如实回运营/幕僚。
+test("前置缺失不呈卡：A12b accepted 但无 basis ⇒ basis-missing 拒绝收口/完成；归档缺失触发仍如实回运营/幕僚；rework 收口不触发", async () => {
+  // 无 basis：B2.1（AC-19/T-08）A12a/A12b accepted 收口前 basis 复核 fail-closed ⇒ 拒绝收口/完成
+  // （不写 task.closed、不归档、不弹卡）；直接触发自动呈卡时前置缺失（归档缺失）仍如实回运营/幕僚。
   {
     const root = await tempRoot("ans-b31-notready-");
     const h = harness(root, () => customerApprove());
@@ -708,7 +710,22 @@ test("前置缺失不呈卡：A12b accepted 但无 basis ⇒ release-workflow-no
       await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo", taskId: "t-a12b" });
       const chief = h.inputs.find((input) => input.roleId === "chief");
       const closed = await chief!.closeCreatedTaskFixed!({ operationId: "op-close-a12b-nobasis-1", taskId: "t-a12b", outcome: "accepted" });
-      assert.equal((closed as { ok: boolean }).ok, true, JSON.stringify(closed));
+      assert.equal((closed as { ok: boolean }).ok, false, "无 basis 不得 accepted 收口");
+      assert.equal((closed as { code?: string }).code, "basis-missing", JSON.stringify(closed));
+      const taskState = await readTaskState(root);
+      assert.equal(taskState.events.some((event) => event.kind === "task.closed" && event.taskId === "t-a12b"), false, "拒绝收口不得写 task.closed");
+      const view = deriveWorkflowView(
+        (await readWorkflowLedger(root)).events.filter((event) => event.workflowId === WF),
+        taskState.events,
+      );
+      assert.equal(view.stages.A12b.status, "requested", "A12b 保持未完成");
+      assert.equal(h.requests.length, 0, "拒绝收口不得呈卡");
+      assert.equal((await readReleaseLedger(root)).events.filter((event) => event.workflowId === WF).length, 0, "不写 release.requested");
+      // 直接触发自动呈卡（模拟已 accepted）：归档缺失 ⇒ release-workflow-not-ready，如实回运营/幕僚、不呈卡。
+      await appendEvents(root, [completed(BASE_A, WF, "A12b")]);
+      const trigger = await autoTriggerOf(h.mgr)({ projectRoot: root, workflowId: WF, stage: "A12b", taskId: "t-a12b" });
+      assert.equal(trigger.status, "not-ready", JSON.stringify(trigger));
+      assert.equal(trigger.code, "release-workflow-not-ready");
       await until(() => h.events.some((envelope) =>
         envelope.event.kind === "message"
         && typeof (envelope.event as { summary?: unknown }).summary === "string"

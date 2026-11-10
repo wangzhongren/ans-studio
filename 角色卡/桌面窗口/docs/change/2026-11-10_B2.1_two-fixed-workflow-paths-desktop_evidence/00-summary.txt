@@ -1,0 +1,15 @@
+# B2.1 desktop summary (2026-11-10)
+HEAD: 5820fe4737bc979a7288fdaea346004269bce781
+branch: feat/two-fixed-workflow-paths
+writes: app/desktop/session.ts (M); test/桌面应用/{b3-fixed-baseline-pathb,b31-fixed-release-auto-desktop}.test.ts (M); test/桌面应用/b21-basis-gate-desktop.test.ts (new)
+new tests: 6 (b21-basis-gate-desktop.test.ts)
+before (69 files): {"tests":730,"pass":652,"fail":78,"cancelled":0,"skipped":0,"todo":0,"hangs":4}
+read-only orchestration: # tests 1335 # pass 1309 # fail 24 # skipped 2 
+read-only gates: # tests 528 # pass 522 # fail 5 # skipped 1 
+read-only runtime-core: # tests 586 # pass 549 # fail 33 # skipped 4 
+read-only roles: # tests 275 # pass 275 # fail 0 # skipped 0 
+after (70 files): {"tests":670,"pass":601,"fail":69,"cancelled":0,"skipped":0,"todo":0,"hangs":5}
+failing-name diff: added 0 / removed 0 (before 74 names vs after 74 names; environment/non-deterministic excluded: before 10 / after 15)
+known red #29/#30/#31/#49 after hits: 4
+b21 tests: 6/6 pass (b21-new-tests.tap)
+typecheck: exit 0

@@ -129,6 +129,7 @@ import {
   rejectReleaseMerge,
   requestStage,
   taskBranchName,
+  verifyBasisForStage,
   verifyBasisForWorkflow,
   workflowIdFor,
   type FixedCloseCreatedTaskToolInput,
@@ -10064,9 +10065,11 @@ ${formatted}` };
     }
     // T3 B3（AC-19/§7.2）：A11/B1/B3 实现派发前复核 basis（文档/计划 hash 漂移 ⇒ `basis-drift`，
     // `basis-missing`；不派实现）。B1 由上面的路径 B 准备先写 basis，再复核。
+    // T3 B2.1（AC-19/T-08；MF-B2-02）：补 `stage` ⇒ 关键门一致时按 v1.3 §7.2 G-9 节流入账
+    // `basis.verified`（同 basis+同文档摘要只记一次）；drift/缺失仍 fail-closed 拒绝派发。
     if (!isStageRequest && workflowId !== undefined && fromRoleId === convenerId
       && (d.stage === "A11" || d.stage === "B1" || d.stage === "B3")) {
-      const basis = await verifyBasisForWorkflow({ projectRoot, workflowId });
+      const basis = await verifyBasisForWorkflow({ projectRoot, workflowId, stage: d.stage });
       if (!basis.ok) return reject(basis.code, basis.message);
     }
     // T3 B3（AC-10/§4.3 MF-8）：B3 写集 = B2 `change.scope-decided.scope.files` ∩ roster/边界派生；
@@ -10333,6 +10336,12 @@ ${formatted}` };
     if (signal?.aborted) {
       return { ok: false, code: "close-task-invalid", message: "本轮已中止，未执行收口。" };
     }
+    // T3 B2.1（AC-19/T-08；MF-B2-02）：fixed verifier 的 A12a/A12b accepted 收口（criteria/report
+    // 收口，含 A12b 应用验收归档）前 basis drift 复核——A12a/A12b 为 chief→verifier 直派，
+    // 不经 convener 派发 basis 门。drift/缺失 ⇒ `basis-drift`/`basis-missing` fail-closed：
+    // 拒绝收口/完成（不写 task.closed、不生成归档、不伪造 verified）；一致 ⇒ 按节流入账 basis.verified。
+    const basisGate = await this.verifyFixedReviewCloseBasis(projectRoot, input);
+    if (!basisGate.ok) return basisGate;
     const evidence = input.outcome === "accepted"
       ? await this.buildFixedCloseEvidence(projectRoot, input.taskId, input.note)
       : { ok: true as const, evidence: undefined };
@@ -10370,6 +10379,35 @@ ${formatted}` };
       }
     }
     return closed;
+  }
+
+  /**
+   * T3 B2.1（AC-19/T-08；MF-B2-02）：A12a/A12b accepted 收口前 basis 复核（`verifyBasisForStage`）。
+   * - 只对真实任务的 fixed A12a/A12b 收口生效（按 `task.created` 的 workflowId/stage 判定，不认自报）；
+   * - 仅 `accepted` 收口会触发阶段完成/归档 ⇒ 只在 accepted 时复核（rework/rejected 不推进完成）；
+   * - 同 operationId 已收口的重试交给 `closeTask` 原样 replay（不在 replay 上重复复核）；
+   * - 服务返回 `basis-drift`/`basis-missing` 等原样透传：拒绝收口/完成，如实回报（不伪造 verified）。
+   */
+  private async verifyFixedReviewCloseBasis(
+    projectRoot: string,
+    input: FixedCloseCreatedTaskToolInput,
+  ): Promise<{ ok: true } | WorkflowServiceFailure> {
+    if (input.outcome !== "accepted") return { ok: true };
+    const state = await readTaskState(projectRoot);
+    const record = state.records.get(input.taskId);
+    const created = record?.created;
+    if (created === undefined || created.workflowId === undefined || created.stage === undefined) {
+      return { ok: true }; // 非 fixed 任务/形状不全：交给 closeTask 的既有校验如实失败
+    }
+    if (created.stage !== "A12a" && created.stage !== "A12b") return { ok: true };
+    if (record?.closed?.operationId === input.operationId) return { ok: true }; // closeTask replay 语义
+    const basis = await verifyBasisForStage({
+      projectRoot,
+      workflowId: created.workflowId,
+      stage: created.stage,
+    });
+    if (!basis.ok) return basis;
+    return { ok: true };
   }
 
   /**

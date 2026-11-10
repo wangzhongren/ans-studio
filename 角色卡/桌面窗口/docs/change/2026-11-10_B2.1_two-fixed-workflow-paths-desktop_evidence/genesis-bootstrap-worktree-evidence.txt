@@ -1,0 +1,21 @@
+# genesis-bootstrap worktree-environment evidence (2026-11-10)
+Test: 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+Cause: test opens a session with projectRoot = REPO_ROOT (real repo root); readGitHostProtectionRequirement
+fails closed to "unknown" when .git is a FILE (linked worktree) and the fake adapter lacks prepareRole/bindPreparedRole
+=> runtime-creation-prepared-api-unavailable (src/pipeline/orchestration/run-role.ts:820).
+
+Reproduction A (baseline git-archive tree, no .git): pass 7/7
+Reproduction B (same baseline tree + created .git FILE): fail 1/7 same test name
+Reproduction C (linked worktree, after): fail 1/7 same test name
+B5.1 evidence (same worktree, before AND after): same failing name in both
+=> environment artifact of git-archive baseline vs linked-worktree after; not in candidate execution path
+(genesis-bootstrap.test.ts imports app/desktop/project.ts only; no session.ts).
+
+--- worktree after TAP excerpt ---
+not ok 7 - 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+  ---
+  duration_ms: 33.9639
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\genesis-bootstrap.test.ts:151:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-creation-prepared-api-unavailable'

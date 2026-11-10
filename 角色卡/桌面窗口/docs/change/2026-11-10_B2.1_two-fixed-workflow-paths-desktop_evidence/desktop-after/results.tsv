@@ -1,0 +1,71 @@
+file	code	signal	duration_ms	tests	pass	fail	cancelled	skipped	todo	failing_names
+test/桌面应用/abort-unwedge.test.ts	0		1001	3	3	0	0	0	0	0
+test/桌面应用/acceptance-evidence.test.ts	0		614	3	3	0	0	0	0	0
+test/桌面应用/acceptance-proposal-path.test.ts	0		2069	7	7	0	0	0	0	0
+test/桌面应用/acceptance-return-card.test.ts	0		1448	10	10	0	0	0	0	0
+test/桌面应用/ans-wiring.test.ts	0		706	7	7	0	0	0	0	0
+test/桌面应用/application-line.test.ts	0		1023	3	3	0	0	0	0	0
+test/桌面应用/b21-basis-gate-desktop.test.ts	0		1103	6	6	0	0	0	0	0
+test/桌面应用/b3-fixed-baseline-pathb.test.ts	0		3063	6	6	0	0	0	0	0
+test/桌面应用/b3-fixed-cards-panel.test.ts	0		1022	8	8	0	0	0	0	0
+test/桌面应用/b3-release-merge-desktop.test.ts	0		6706	7	7	0	0	0	0	0
+test/桌面应用/b3-workflow-git-real.test.ts	0		6415	9	9	0	0	0	0	0
+test/桌面应用/b31-fixed-release-auto-desktop.test.ts	0		7542	9	9	0	0	0	0	0
+test/桌面应用/b42-task-git-port-desktop.test.ts	0		3007	8	8	0	0	0	0	0
+test/桌面应用/b51-fixed-workflow-wiring.test.ts	0		2072	13	13	0	0	0	0	0
+test/桌面应用/boundary-refresh.test.ts	1		3687	14	13	1	0	0	0	1
+test/桌面应用/chain-enforcement.test.ts	1		2887	9	3	6	0	0	0	6
+test/桌面应用/chief-workflow.test.ts		watchdog	300014							13
+test/桌面应用/composer-images.test.ts	0		483	3	3	0	0	0	0	0
+test/桌面应用/decision-service.test.ts	0		873	22	22	0	0	0	0	0
+test/桌面应用/diagnostics.test.ts	0		404	8	8	0	0	0	0	0
+test/桌面应用/directive-decision.test.ts		watchdog	90020							0
+test/桌面应用/directive-input.test.ts	1		9086	19	14	5	0	0	0	5
+test/桌面应用/dispatch-fresh-enum.test.ts	0		1019	2	2	0	0	0	0	0
+test/桌面应用/download-decision.test.ts	1		4222	8	7	1	0	0	0	1
+test/桌面应用/download-request.test.ts	1		3630	8	7	1	0	0	0	1
+test/桌面应用/fixed-path-routing.test.ts	0		1514	13	13	0	0	0	0	0
+test/桌面应用/genesis-bootstrap.test.ts	1		487	7	6	1	0	0	0	1
+test/桌面应用/handback-delivery.test.ts	1		10186	18	12	6	0	0	0	6
+test/桌面应用/hot-path.test.ts	0		718	3	3	0	0	0	0	0
+test/桌面应用/interface.test.ts	0		787	8	8	0	0	0	0	0
+test/桌面应用/log-actions.test.ts	1		5520	1	0	1	0	0	0	1
+test/桌面应用/log-patrol.test.ts	0		162	4	4	0	0	0	0	0
+test/桌面应用/log-stuck.test.ts	0		155	5	5	0	0	0	0	0
+test/桌面应用/message-queue.test.ts	0		5595	20	20	0	0	0	0	0
+test/桌面应用/multi-runtime.test.ts	1		5702	39	31	8	0	0	0	8
+test/桌面应用/network-monitor.test.ts	0		253	11	11	0	0	0	0	0
+test/桌面应用/operator-channel.test.ts	1		1146	59	58	1	0	0	0	1
+test/桌面应用/optional-acceptance.test.ts		watchdog	90022							1
+test/桌面应用/p0-halt-and-images.test.ts	1		6887	5	2	3	0	0	0	3
+test/桌面应用/pending-card-restart.test.ts	0		571	1	1	0	0	0	0	0
+test/桌面应用/pi-config.test.ts	0		596	17	17	0	0	0	0	0
+test/桌面应用/project-document.test.ts	0		274	20	20	0	0	0	0	0
+test/桌面应用/project-state.test.ts	0		758	4	4	0	0	0	0	0
+test/桌面应用/project.test.ts	1		438	23	22	1	0	0	0	1
+test/桌面应用/queue-visibility.test.ts	1		648	2	1	1	0	0	0	1
+test/桌面应用/queue-withdraw-lru.test.ts	0		2443	5	5	0	0	0	0	0
+test/桌面应用/rejection-copy.test.ts	0		291	17	17	0	0	0	0	0
+test/桌面应用/replay-safe-retry.test.ts	0		959	4	4	0	0	0	0	0
+test/桌面应用/request-timeout-wiring.test.ts	0		1034	3	3	0	0	0	0	0
+test/桌面应用/role-log.test.ts	0		2140	5	5	0	0	0	0	0
+test/桌面应用/run-change-entry.test.ts	0		656	5	5	0	0	0	0	0
+test/桌面应用/run-change-trigger.test.ts	1		1250	10	1	9	0	0	0	9
+test/桌面应用/run-change.test.ts	0		615	4	4	0	0	0	0	0
+test/桌面应用/run-pin.test.ts	1		3447	20	9	11	0	0	0	11
+test/桌面应用/session-history.test.ts	0		314	9	9	0	0	0	0	0
+test/桌面应用/session-rebuild-race.test.ts		watchdog	90019							3
+test/桌面应用/session.test.ts	1		712	7	6	1	0	0	0	1
+test/桌面应用/shell-escalation.test.ts	0		1029	22	22	0	0	0	0	0
+test/桌面应用/star-routing.test.ts	1		2455	10	3	7	0	0	0	7
+test/桌面应用/stuck-redispatch-safety.test.ts	0		220	5	5	0	0	0	0	0
+test/桌面应用/stuck-redispatch.test.ts		watchdog	90013							3
+test/桌面应用/su-effective-boundary.test.ts	0		563	4	4	0	0	0	0	0
+test/桌面应用/task-restart.test.ts	1		2645	2	1	1	0	0	0	1
+test/桌面应用/trunk.test.ts	0		525	6	6	0	0	0	0	0
+test/桌面应用/turn-lease.test.ts	0		1302	4	4	0	0	0	0	0
+test/桌面应用/version-change.test.ts	1		8961	46	42	4	0	0	0	4
+test/桌面应用/version-decision.test.ts	0		2866	15	15	0	0	0	0	0
+test/桌面应用/watchdog-reuse.test.ts	0		162	4	4	0	0	0	0	0
+test/桌面应用/workflow-git-port.test.ts	0		362	4	4	0	0	0	0	0
+test/桌面应用/write-safety.test.ts	0		1592	7	7	0	0	0	0	0

@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: A12a/A12b accepted 收口：basis 一致 ⇒ 阶段完成/归档 + basis.verified 关键门节流（同 basis 只记一次）
+ok 1 - A12a/A12b accepted 收口：basis 一致 ⇒ 阶段完成/归档 + basis.verified 关键门节流（同 basis 只记一次）
+  ---
+  duration_ms: 225.1019
+  type: 'test'
+  ...
+# Subtest: A12a drift ⇒ 拒绝收口/完成（basis-drift + basis.drift 落账；不写 task.closed）；恢复后可收口；rework 收口不在本门范围
+ok 2 - A12a drift ⇒ 拒绝收口/完成（basis-drift + basis.drift 落账；不写 task.closed）；恢复后可收口；rework 收口不在本门范围
+  ---
+  duration_ms: 204.2475
+  type: 'test'
+  ...
+# Subtest: A12a/A12b 缺失 basis ⇒ basis-missing 拒绝收口/完成（不写 task.closed、不生成归档）
+ok 3 - A12a/A12b 缺失 basis ⇒ basis-missing 拒绝收口/完成（不写 task.closed、不生成归档）
+  ---
+  duration_ms: 38.6066
+  type: 'test'
+  ...
+# Subtest: A11 派发前 basis 复核：一致 ⇒ basis.verified 落账（关键门节流）；drift/缺失 ⇒ 拒绝派发、不建任务
+ok 4 - A11 派发前 basis 复核：一致 ⇒ basis.verified 落账（关键门节流）；drift/缺失 ⇒ 拒绝派发、不建任务
+  ---
+  duration_ms: 95.791
+  type: 'test'
+  ...
+# Subtest: B3 派发前 basis 复核：一致 ⇒ basis.verified 落账（stage 关键门）；drift ⇒ basis-drift 拒绝派发
+ok 5 - B3 派发前 basis 复核：一致 ⇒ basis.verified 落账（stage 关键门）；drift ⇒ basis-drift 拒绝派发
+  ---
+  duration_ms: 54.7368
+  type: 'test'
+  ...
+# Subtest: legacy 不变：legacy 会话不注入 fixed close（新门不触达 legacy），legacy close 照旧注入、不写 basis 账本
+ok 6 - legacy 不变：legacy 会话不注入 fixed close（新门不触达 legacy），legacy close 照旧注入、不写 basis 账本
+  ---
+  duration_ms: 8.0188
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1057.5666

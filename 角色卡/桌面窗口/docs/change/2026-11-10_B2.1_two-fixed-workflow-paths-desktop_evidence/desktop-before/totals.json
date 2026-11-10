@@ -1,0 +1,9 @@
+{
+  "tests": 730,
+  "pass": 652,
+  "fail": 78,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "hangs": 4
+}

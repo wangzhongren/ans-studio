@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文
+ok 1 - 窄诊断桥：关键节点落入统一sink，拒任意事件/路径，凭据净化且不存正文
+  ---
+  duration_ms: 22.5546
+  type: 'test'
+  ...
+# Subtest: dev 回退 hook：被接管的主帧加载失败不显示恢复页，未接管/-3/子帧仍按既有语义
+ok 2 - dev 回退 hook：被接管的主帧加载失败不显示恢复页，未接管/-3/子帧仍按既有语义
+  ---
+  duration_ms: 0.2047
+  type: 'test'
+  ...
+# Subtest: 导航兜底策略：只放行同 URL/允许入口，http(s) 外开，file/data/javascript 阻止且不执行
+ok 3 - 导航兜底策略：只放行同 URL/允许入口，http(s) 外开，file/data/javascript 阻止且不执行
+  ---
+  duration_ms: 10.8162
+  type: 'test'
+  ...
+# Subtest: 主进程导航守卫接线：https 外开一次、窗口 URL 不变；恶意协议不导航/不外开；window.open 一律拒绝
+ok 4 - 主进程导航守卫接线：https 外开一次、窗口 URL 不变；恶意协议不导航/不外开；window.open 一律拒绝
+  ---
+  duration_ms: 1.2076
+  type: 'test'
+  ...
+# Subtest: 窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道
+ok 5 - 窗口关闭只释放自有IPC，再建窗可注册同名handler，不删其他通道
+  ---
+  duration_ms: 0.1933
+  type: 'test'
+  ...
+# Subtest: 客户请求恢复：重放同id不作答，仍可答旧请求，已结束请求不复活
+ok 6 - 客户请求恢复：重放同id不作答，仍可答旧请求，已结束请求不复活
+  ---
+  duration_ms: 2.518
+  type: 'test'
+  ...
+# Subtest: shell确认恢复：不重置时限、不代答，失效请求不能复活
+ok 7 - shell确认恢复：不重置时限、不代答，失效请求不能复活
+  ---
+  duration_ms: 14.8269
+  type: 'test'
+  ...
+# Subtest: C actual preload saving/query bridges and typed subscriptions are cancellable and do not send model text
+ok 8 - C actual preload saving/query bridges and typed subscriptions are cancellable and do not send model text
+  ---
+  duration_ms: 1.4101
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 401.4143

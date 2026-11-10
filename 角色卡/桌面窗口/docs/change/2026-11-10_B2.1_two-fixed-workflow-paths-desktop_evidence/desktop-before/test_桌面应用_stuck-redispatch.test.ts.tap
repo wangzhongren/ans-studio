@@ -1,0 +1,89 @@
+TAP version 13
+# Subtest: safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递
+not ok 1 - safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递
+  ---
+  duration_ms: 95.0273
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\stuck-redispatch.test.ts:112:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'rework'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'rework'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:129:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: unsafe：external 副作用 0 次自动重派；原任务保持未收口并如实给原因
+ok 2 - unsafe：external 副作用 0 次自动重派；原任务保持未收口并如实给原因
+  ---
+  duration_ms: 140.7024
+  type: 'test'
+  ...
+# Subtest: needs-review：部分写入 ⇒ 不自动重派；终止未确认 ⇒ unsafe
+ok 3 - needs-review：部分写入 ⇒ 不自动重派；终止未确认 ⇒ unsafe
+  ---
+  duration_ms: 66.1299
+  type: 'test'
+  ...
+# Subtest: 重派上限：同链已 2 次仍卡死 ⇒ 第 3 次不自动重派（升级）
+ok 4 - 重派上限：同链已 2 次仍卡死 ⇒ 第 3 次不自动重派（升级）
+  ---
+  duration_ms: 13.6603
+  type: 'test'
+  ...
+# Subtest: B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务
+not ok 5 - B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务
+  ---
+  duration_ms: 230.1849
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\stuck-redispatch.test.ts:232:1'
+  failureType: 'testCodeFailure'
+  error: '替代角色收到重派任务'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:252:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）
+not ok 6 - B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）
+  ---
+  duration_ms: 85.9639
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\stuck-redispatch.test.ts:260:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'rejected'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'rejected'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:292:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，客户选 continue ⇒ 任务保持未收口并留人工处置
+ok 7 - C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，客户选 continue ⇒ 任务保持未收口并留人工处置
+  ---
+  duration_ms: 114.8608
+  type: 'test'
+  ...

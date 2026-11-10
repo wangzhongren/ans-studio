@@ -1,0 +1,223 @@
+TAP version 13
+# Subtest: 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+not ok 1 - 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+  ---
+  duration_ms: 87.63
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:251:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:259:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+not ok 2 - 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 70.2132
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+not ok 3 - 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 77.5383
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+not ok 4 - 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 77.5211
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+not ok 5 - stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+  ---
+  duration_ms: 63.009
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:350:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:356:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+not ok 6 - 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+  ---
+  duration_ms: 79.9956
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:399:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:403:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+not ok 7 - 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+  ---
+  duration_ms: 76.2856
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:424:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:430:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+not ok 8 - 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+  ---
+  duration_ms: 77.4228
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:453:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:459:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+not ok 9 - AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+  ---
+  duration_ms: 62.8578
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\run-change-trigger.test.ts:511:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:519:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）
+ok 10 - J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）
+  ---
+  duration_ms: 115.7003
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 1
+# fail 9
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1198.1894

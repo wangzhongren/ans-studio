@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: ensureRepository：git init -b main（新仓库）/既有仓库 no-op/父仓库检测/路径 B 无仓库不 init
+ok 1 - ensureRepository：git init -b main（新仓库）/既有仓库 no-op/父仓库检测/路径 B 无仓库不 init
+  ---
+  duration_ms: 391.5032
+  type: 'test'
+  ...
+# Subtest: ensureGitignore：ans-managed 块 + 仅 .gitignore 的 baseline commit；幂等；dirty/malformed fail-closed
+ok 2 - ensureGitignore：ans-managed 块 + 仅 .gitignore 的 baseline commit；幂等；dirty/malformed fail-closed
+  ---
+  duration_ms: 746.7608
+  type: 'test'
+  ...
+# Subtest: inspectWorktree：dirty 只算 tracked 修改/删除 + 非忽略 untracked（.ans/node_modules 被 ignore 不计）
+ok 3 - inspectWorktree：dirty 只算 tracked 修改/删除 + 非忽略 untracked（.ans/node_modules 被 ignore 不计）
+  ---
+  duration_ms: 404.2623
+  type: 'test'
+  ...
+# Subtest: prepareTaskBranch：从 main 建/同名冲突 baseline-branch-exists/同 workflow 复用/路径 B 从 HEAD
+ok 4 - prepareTaskBranch：从 main 建/同名冲突 baseline-branch-exists/同 workflow 复用/路径 B 从 HEAD
+  ---
+  duration_ms: 907.5911
+  type: 'test'
+  ...
+# Subtest: inspectRepository/previewMerge：分支/HEAD/main OID、dirty 事实、files/fileCount/diffStat/diffDigest
+ok 5 - inspectRepository/previewMerge：分支/HEAD/main OID、dirty 事实、files/fileCount/diffStat/diffDigest
+  ---
+  duration_ms: 706.2555
+  type: 'test'
+  ...
+# Subtest: mergeMain（main 已存在）：merge --no-ff 合并到 main；工作区停在 main；不 push/tag
+ok 6 - mergeMain（main 已存在）：merge --no-ff 合并到 main；工作区停在 main；不 push/tag
+  ---
+  duration_ms: 825.9071
+  type: 'test'
+  ...
+# Subtest: mergeMain（main unborn）：initial ⇒ main 创建于任务分支 tip
+ok 7 - mergeMain（main unborn）：initial ⇒ main 创建于任务分支 tip
+  ---
+  duration_ms: 668.3199
+  type: 'test'
+  ...
+# Subtest: mergeMain 冲突：release-merge-conflict + merge --abort + 切回任务分支（不 force/reset/clean）
+ok 8 - mergeMain 冲突：release-merge-conflict + merge --abort + 切回任务分支（不 force/reset/clean）
+  ---
+  duration_ms: 1023.4773
+  type: 'test'
+  ...
+# Subtest: mergeMain：项目级临界区被占用 ⇒ release-main-busy（不并发合并）
+ok 9 - mergeMain：项目级临界区被占用 ⇒ release-main-busy（不并发合并）
+  ---
+  duration_ms: 876.8222
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6740.824

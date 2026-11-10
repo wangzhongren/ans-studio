@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: per-flow 路由：混合项目按被派 flowId 分别走 legacy/fixed；不缓存项目级单值
+ok 1 - per-flow 路由：混合项目按被派 flowId 分别走 legacy/fixed；不缓存项目级单值
+  ---
+  duration_ms: 32.3036
+  type: 'test'
+  ...
+# Subtest: B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入
+ok 2 - B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入
+  ---
+  duration_ms: 8.9726
+  type: 'test'
+  ...
+# Subtest: workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy）
+ok 3 - workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy）
+  ---
+  duration_ms: 5.0773
+  type: 'test'
+  ...
+# Subtest: fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状
+ok 4 - fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状
+  ---
+  duration_ms: 9.0144
+  type: 'test'
+  ...
+# Subtest: fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务
+ok 5 - fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务
+  ---
+  duration_ms: 33.952
+  type: 'test'
+  ...
+# Subtest: fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话
+ok 6 - fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话
+  ---
+  duration_ms: 30.9302
+  type: 'test'
+  ...
+# Subtest: fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键
+ok 7 - fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键
+  ---
+  duration_ms: 48.085
+  type: 'test'
+  ...
+# Subtest: fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId）
+ok 8 - fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId）
+  ---
+  duration_ms: 92.1211
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝
+ok 9 - MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝
+  ---
+  duration_ms: 70.5113
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过）
+ok 10 - MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过）
+  ---
+  duration_ms: 11.4298
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid
+ok 11 - MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid
+  ---
+  duration_ms: 30.466
+  type: 'test'
+  ...
+# Subtest: direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge
+ok 12 - direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge
+  ---
+  duration_ms: 42.6017
+  type: 'test'
+  ...
+# Subtest: single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变）
+ok 13 - single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变）
+  ---
+  duration_ms: 13.6751
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1463.1956
