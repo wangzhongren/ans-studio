@@ -39,6 +39,11 @@ import type {
 } from "../../src/common/编排/workflow-service.ts";
 import type { GitOid } from "../../src/model/trunk.ts";
 import type { ReleaseFileChange, ReleaseMergeKind } from "../../src/model/runtime.ts";
+// B4.2（2026-11-10）：固定 staged 检查 argv 的唯一合法来源（门禁引擎经 Service 出口再导出；
+// 消费者不得另抄一份）。桌面端口只读消费，不复制规则/门禁实现。
+import { TASK_GIT_STAGED_INSPECTION_ARGV } from "../../src/service/gate/shell-rules.ts";
+import type { ShellTaskGitBudgets, ShellTaskGitCommandFacts } from "../../src/common/编排/shell-gate.ts";
+import type { TaskGitShellPort } from "../../src/pipeline/orchestration/run-role.ts";
 
 /** 端口失败码（v1.3 §5.5/§6.4/附录 C；AC-14/AC-16/AC-22）。 */
 export type WorkflowGitFailureCode =
@@ -298,10 +303,12 @@ async function sanitizedGitEnv(projectRoot: string): Promise<NodeJS.ProcessEnv> 
 async function runGit(
   projectRoot: string,
   argv: readonly string[],
-  options: { input?: string; timeoutMs?: number } = {},
+  options: { input?: string; timeoutMs?: number; outputLimit?: number } = {},
 ): Promise<GitRunResult> {
   const env = await sanitizedGitEnv(projectRoot);
   const hooksDir = path.join(projectRoot, ".ans", "git-home", "hooks-empty");
+  // B4.2：调用方可给更小的输出预算；硬上限仍是本模块的 `GIT_OUTPUT_LIMIT`（绝不放大）。
+  const outputLimit = Math.max(1, Math.min(Math.floor(options.outputLimit ?? GIT_OUTPUT_LIMIT), GIT_OUTPUT_LIMIT));
   // `-c core.hooksPath` 把用户/仓库 hooks 关在门外（不做副作用）；其余参数由调用方固定给出。
   const args = ["-c", `core.hooksPath=${hooksDir}`, ...argv];
   return await new Promise<GitRunResult>((resolve) => {
@@ -339,12 +346,12 @@ async function runGit(
       child.kill();
     }, options.timeoutMs ?? GIT_TIMEOUT_MS);
     const append = (current: string, chunk: Buffer): string => {
-      if (current.length >= GIT_OUTPUT_LIMIT) return current;
+      if (current.length >= outputLimit) return current;
       const next = current + chunk.toString("utf8");
-      if (next.length > GIT_OUTPUT_LIMIT) {
+      if (next.length > outputLimit) {
         killedForLimit = true;
         child.kill();
-        return next.slice(0, GIT_OUTPUT_LIMIT);
+        return next.slice(0, outputLimit);
       }
       return next;
     };
@@ -878,5 +885,203 @@ export function createDesktopBaselineGitPort(): BaselineGitPort {
     ensureGitignore: async (request) => ensureGitignoreReal(request),
     inspectWorktree: async (request) => inspectWorktreeReal(request),
     prepareTaskBranch: async (request) => prepareTaskBranchReal(request),
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// T3 B4.2（2026-11-10，桌面窗口）：任务级 Git 写端口（`TaskGitPort` 真实实现）
+//
+// 依据：实现级方案 v1.3 §6.2（Shell v5 任务级 Git 写）/§6.3（项目级临界区提交门）；
+// B1 验收 AC-21、T-09；编排 B4.1 契约 `openRoleSession({ taskGit: { classifyShellDetailed, port } })`。
+//
+// 分工边界（单一实现，本层不复制门禁）：
+//  · **写资格与命令形状判定 = 门禁引擎**（编排经 Service 出口 `classifyShellDetailed` / `matchTaskGit`
+//    消费唯一实现）；桌面端口**不做写权判定**，只执行规则层已允许的固定 argv。
+//  · **staged ⊆ writeSet 内容复核 + 「检查与提交同一项目级临界区」= 门禁引擎 `runTaskGitCommit`**
+//    （编排执行路径在 spawn 前调用）；桌面端口只提供取锁（B3 同一把项目级锁）、当前分支、
+//    锁内 staged 读取与锁内提交。
+//  · 端口自身的形状校验只做**运输防御**（fail-closed，只能更严、绝不新增放行）：add 拒绝 flag/glob/`.`/
+//    绝对路径/`..` 等非字面形式；commit 只接受固定 `git commit -m <message>`（拒绝 -F/--amend/-a/
+//    --author/--no-verify 等）；staged 检查只执行固定的 `TASK_GIT_STAGED_INSPECTION_ARGV`。
+//  · 固定 argv + sanitized env（复用 B3 `runGit`：不经 shell、清空继承 `GIT_*`、隔离 HOME/全局 config、
+//    关闭 hooks、输出/时限有界）；**不 push/tag/amend/no-verify/-a/--author/-F**。
+//  · 失败真实码/fail-closed：add/commit 返回真实 `ShellTaskGitCommandFacts`（保留 exitCode/stderr）；
+//    staged 读取失败**抛错**（不伪装空集合），由编排执行路径转成失败事实。
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 任务级 Git 写端口（请求式真实实现；`projectRoot` 由调用方给出）。
+ * 生产注入形态见 `createDesktopTaskGitShellPort`（绑定项目根为编排 `TaskGitShellPort`）。
+ */
+export interface TaskGitPort {
+  /**
+   * 项目级临界区取锁——**与 B3 发布合并同一把锁**（`acquireProjectGitCriticalSection` 同一实现）。
+   * 占用 ⇒ `undefined`（fail-closed、不排队）；返回的释放函数幂等。
+   */
+  acquireCriticalSection(projectRoot: string, owner: string): (() => void) | undefined;
+  /** 应用读取的当前分支（只读；sanitized env；detached ⇒ `"(detached)"`，与门禁分支核对不符即拒）。 */
+  currentBranch(request: { readonly projectRoot: string }): Promise<string>;
+  /**
+   * 执行固定 argv `git add -- <literal paths…>`（无锁；staged 内容检查只属 commit 门）。
+   * 不接受任何 flag（`-A`/`--all`/…）、glob、`.`/`./x`、绝对路径、反斜杠、`..`/`.git` 段。
+   */
+  add(
+    request: { readonly projectRoot: string; readonly paths: readonly string[] },
+    budgets?: ShellTaskGitBudgets,
+  ): Promise<ShellTaskGitCommandFacts>;
+  /**
+   * 在（调用方已持有的）项目级临界区内执行固定 `git diff --cached --name-only -z`，
+   * 按 NUL 分隔解析为**字面项目相对路径数组**（丢弃空段）。读取失败 ⇒ 抛错（fail-closed）。
+   */
+  inspectStaged(request: { readonly projectRoot: string }): Promise<readonly string[]>;
+  /** 在（调用方已持有的）项目级临界区内执行固定 `git commit -m <message>`（sanitized env）。 */
+  commit(
+    request: { readonly projectRoot: string; readonly message: string },
+    budgets?: ShellTaskGitBudgets,
+  ): Promise<ShellTaskGitCommandFacts>;
+}
+
+/**
+ * 任务级字面路径判定（运输防御；与门禁引擎 `isTaskGitLiteralPath`/只读 Git 同一口径的**只读副本**）。
+ * 权威写资格判定仍是门禁引擎 `matchTaskGit`（Service 出口唯一实现）；本函数只拒绝更多、绝不放行更多。
+ * 口径：非空/≤1024/无控制字符/非 flag/非绝对或盘符/无反斜杠、路径规范 magic、glob、`..`/`.`/`.git` 段。
+ */
+function isTaskGitPortLiteralPath(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 1024) return false;
+  if (/[\x00-\x1f\x7f]/.test(value)) return false;
+  if (value.startsWith("-")) return false;
+  if (value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:/.test(value)) return false;
+  if (/[\\:*?\[\]]/.test(value)) return false;
+  const body = value.endsWith("/") ? value.slice(0, -1) : value;
+  if (body.length === 0) return false;
+  return body.split("/").every((segment) => segment !== "" && segment !== "." && segment !== ".." && segment.toLowerCase() !== ".git");
+}
+
+/** add 的运输防御（返回稳定码前缀的拒绝消息；undefined ⇒ 可执行）。 */
+function taskGitAddTransportError(paths: unknown): string | undefined {
+  if (!Array.isArray(paths) || paths.length === 0 || paths.length > 128) {
+    return "git-task-add-not-literal: add 路径为空或超出上限（128），未执行。";
+  }
+  for (const value of paths) {
+    if (typeof value !== "string") {
+      return "git-task-add-not-literal: add 路径含非字符串，未执行。";
+    }
+    if (value.startsWith("-")) {
+      return "git-task-add-flag-forbidden: add 不接受任何 flag（如 -A/--all/-u），未执行。";
+    }
+    if (!isTaskGitPortLiteralPath(value)) {
+      return "git-task-add-not-literal: add 仅接受字面项目相对路径（拒绝 glob/`.`/绝对路径/`..`），未执行。";
+    }
+  }
+  return undefined;
+}
+
+/** commit message 的运输防御（空/非字符串 ⇒ `git-commit-message-empty`）。 */
+function taskGitCommitTransportError(message: unknown): string | undefined {
+  if (typeof message !== "string" || message.trim() === "") {
+    return "git-commit-message-empty: commit message 缺失，未执行。";
+  }
+  return undefined;
+}
+
+/** 只接受固定 commit argv `["git","commit","-m",message]`；其余形态（-F/--amend/-a/--author/多参）⇒ 拒绝码。 */
+function readFixedCommitMessage(argv: readonly string[]): { ok: true; message: string } | { ok: false; error: string } {
+  const shapeOk = Array.isArray(argv) && argv.length === 4
+    && argv[0] === "git" && argv[1] === "commit" && argv[2] === "-m";
+  if (!shapeOk) {
+    return {
+      ok: false,
+      error: "git-commit-form-forbidden: commit argv 不是固定 git commit -m <message>（拒绝 -F/--amend/-a/--author 等），未执行。",
+    };
+  }
+  const message = argv[3];
+  if (typeof message !== "string" || message.trim() === "") {
+    return { ok: false, error: "git-commit-message-empty: commit message 缺失，未执行。" };
+  }
+  return { ok: true, message };
+}
+
+/** staged 检查 argv 必须逐字等于门禁引擎的固定 argv（唯一合法来源；不另抄一份）。 */
+function isFixedStagedInspectionArgv(argv: readonly string[]): boolean {
+  return Array.isArray(argv)
+    && argv.length === TASK_GIT_STAGED_INSPECTION_ARGV.length
+    && argv.every((token, index) => token === TASK_GIT_STAGED_INSPECTION_ARGV[index]);
+}
+
+/** 执行预算（调用方给的更小上限生效；输出硬上限仍是 `GIT_OUTPUT_LIMIT`）。 */
+function taskGitRunOptionsOf(budgets: ShellTaskGitBudgets | undefined): { timeoutMs?: number; outputLimit?: number } {
+  const timeout = budgets?.timeoutMs;
+  const output = budgets?.outputLimit;
+  return {
+    ...(typeof timeout === "number" && Number.isFinite(timeout) && timeout > 0 ? { timeoutMs: timeout } : {}),
+    ...(typeof output === "number" && Number.isFinite(output) && output > 0 ? { outputLimit: Math.min(output, GIT_OUTPUT_LIMIT) } : {}),
+  };
+}
+
+/** `runGit` 结果 → 任务级命令事实（非零退出保留真实 exitCode/stderr；内部错误/超时带 error）。 */
+function taskGitFactsOf(result: GitRunResult): ShellTaskGitCommandFacts {
+  if (result.ok) {
+    return { exitCode: 0, stdout: result.stdout, stderr: result.stderr };
+  }
+  return {
+    ...(result.exitCode !== null ? { exitCode: result.exitCode } : {}),
+    stdout: result.stdout,
+    stderr: result.stderr,
+    ...(result.error !== undefined ? { error: result.error } : {}),
+  };
+}
+
+/** 构造**真实**任务级 Git 端口（请求式；每条命令现场构造 sanitized env，零进程内缓存）。 */
+export function createDesktopTaskGitPort(): TaskGitPort {
+  return {
+    acquireCriticalSection: (projectRoot, owner) => acquireProjectGitCriticalSection(projectRoot, owner),
+    currentBranch: async ({ projectRoot }) => currentBranchOf(projectRoot),
+    add: async ({ projectRoot, paths }, budgets) => {
+      const rejected = taskGitAddTransportError(paths);
+      if (rejected !== undefined) return { stdout: "", stderr: rejected, error: rejected };
+      return taskGitFactsOf(await runGit(projectRoot, ["add", "--", ...paths], taskGitRunOptionsOf(budgets)));
+    },
+    inspectStaged: async ({ projectRoot }) => {
+      const result = await runGit(projectRoot, [...TASK_GIT_STAGED_INSPECTION_ARGV]);
+      if (!result.ok) {
+        throw new Error(`git diff --cached --name-only -z 读取失败（fail-closed）：${asMessage(result)}`);
+      }
+      return result.stdout.split("\0").filter((segment) => segment !== "");
+    },
+    commit: async ({ projectRoot, message }, budgets) => {
+      const rejected = taskGitCommitTransportError(message);
+      if (rejected !== undefined) return { stdout: "", stderr: rejected, error: rejected };
+      return taskGitFactsOf(await runGit(projectRoot, ["commit", "-m", message], taskGitRunOptionsOf(budgets)));
+    },
+  };
+}
+
+/**
+ * 绑定项目根为编排 `openRoleSession` 的注入形态（`TaskGitShellPort`；B4.1 契约）。
+ * run-role 以固定 argv 调用 `inspectStaged`/`commit`；本适配器再复核 argv 形状后转给真实端口
+ * （形态外的 argv ⇒ 失败事实/抛错，不执行）。`acquireCriticalSection` 与 B3 发布合并共用同一把锁。
+ */
+export function createDesktopTaskGitShellPort(projectRoot: string): TaskGitShellPort {
+  const root = path.resolve(projectRoot);
+  const port = createDesktopTaskGitPort();
+  return {
+    acquireCriticalSection: (owner) => port.acquireCriticalSection(root, owner),
+    currentBranch: () => port.currentBranch({ projectRoot: root }),
+    add: (paths, budgets) => port.add({ projectRoot: root, paths }, budgets),
+    inspectStaged: (argv) => {
+      if (!isFixedStagedInspectionArgv(argv)) {
+        throw new Error(
+          "git-staged-inspection-argv-invalid: staged 检查 argv 不是应用固定的 git diff --cached --name-only -z，未执行。",
+        );
+      }
+      return port.inspectStaged({ projectRoot: root });
+    },
+    commit: (argv, budgets) => {
+      const verdict = readFixedCommitMessage(argv);
+      if (!verdict.ok) {
+        return { stdout: "", stderr: verdict.error, error: verdict.error };
+      }
+      return port.commit({ projectRoot: root, message: verdict.message }, budgets);
+    },
   };
 }

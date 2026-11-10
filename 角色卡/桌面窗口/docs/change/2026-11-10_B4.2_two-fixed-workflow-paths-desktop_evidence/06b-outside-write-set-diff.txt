@@ -1,0 +1,6 @@
+== outside write-set status (src/main/renderer/package) ==
+(empty above = no outside changes)
+== outside write-set diff --stat ==
+(empty above = zero diff)
+== other app/desktop files status (should be none) ==
+(none)

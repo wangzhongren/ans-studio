@@ -1,0 +1,14 @@
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+a2340256e93aa0318a3ef03726215d5b56a9855d547b85fe60376ea325dcbb38 *角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md
+f72f8fcd5c9ba8b002afb386535777e92d4ba97df2a4f0c7dda73076feaf640c *角色卡/编排/docs/change/2026-11-10_B4.1_two-fixed-workflow-paths.md
+fa6f8cd9b930702baabe5d7be3eb936ed4498990b5c61b647bbf588c8435ded5 *角色卡/门禁引擎/docs/change/2026-11-10_B4.1_two-fixed-workflow-paths.md
+--- lines ---
+   197 docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+  1392 docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+   247 角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md
+   249 角色卡/编排/docs/change/2026-11-10_B4.1_two-fixed-workflow-paths.md
+   201 角色卡/门禁引擎/docs/change/2026-11-10_B4.1_two-fixed-workflow-paths.md
+  2286 total
+--- service exit ---
+e6a8e5cfe3ed5fda40ae7f714018c638cfda9bcfabce28e3602f7531de39d9ec *src/service/gate/shell-rules.ts

@@ -1,0 +1,2576 @@
+TAP version 13
+# Subtest: 有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，边界内写入被接受
+ok 1 - 有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，边界内写入被接受
+  ---
+  duration_ms: 85.1406
+  type: 'test'
+  ...
+# Subtest: .ans 的 pin 与文件 hash 不符 → 门禁判未接受（fail-closed，会话被拒）
+ok 2 - .ans 的 pin 与文件 hash 不符 → 门禁判未接受（fail-closed，会话被拒）
+  ---
+  duration_ms: 18.4306
+  type: 'test'
+  ...
+# Subtest: .ans 存在但不可解析 → 未接受、不回退运行期同意（界面据 config 如实呈现）
+ok 3 - .ans 存在但不可解析 → 未接受、不回退运行期同意（界面据 config 如实呈现）
+  ---
+  duration_ms: 74.0661
+  type: 'test'
+  ...
+# Subtest: 无 .ans → 回退运行期同意（登记的非-pin 例外，行为不变）
+ok 4 - 无 .ans → 回退运行期同意（登记的非-pin 例外，行为不变）
+  ---
+  duration_ms: 62.524
+  type: 'test'
+  ...
+# Subtest: D 批治理记录撤除：preload 不暴露治理记录/迁移方法，main.ts 不注册对应通道
+ok 5 - D 批治理记录撤除：preload 不暴露治理记录/迁移方法，main.ts 不注册对应通道
+  ---
+  duration_ms: 3.9511
+  type: 'test'
+  ...
+# Subtest: Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写死渲染入口
+ok 6 - Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写死渲染入口
+  ---
+  duration_ms: 2.6449
+  type: 'test'
+  ...
+# Subtest: E 批任务/日志接线：preload 白名单与 main.ts 通道逐字对上
+ok 7 - E 批任务/日志接线：preload 白名单与 main.ts 通道逐字对上
+  ---
+  duration_ms: 0.6091
+  type: 'test'
+  ...
+# Subtest: A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/branch/basis）+ stage.completed A9；不弹客户卡
+ok 8 - A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/branch/basis）+ stage.completed A9；不弹客户卡
+  ---
+  duration_ms: 1142.2457
+  type: 'test'
+  ...
+# Subtest: A9 失败面（AC-16）：dirty 工作区 ⇒ status blocked（baseline-repository-dirty）、stage.blocked A9、不弹卡、不写 basis
+ok 9 - A9 失败面（AC-16）：dirty 工作区 ⇒ status blocked（baseline-repository-dirty）、stage.blocked A9、不弹卡、不写 basis
+  ---
+  duration_ms: 667.248
+  type: 'test'
+  ...
+# Subtest: A12：fixed close_created_task v2 accepted ⇒ 应用归档 docs/acceptance + stage.completed A12b/A12；幂等 replay
+ok 10 - A12：fixed close_created_task v2 accepted ⇒ 应用归档 docs/acceptance + stage.completed A12b/A12；幂等 replay
+  ---
+  duration_ms: 915.2808
+  type: 'test'
+  ...
+# Subtest: A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（不写 task.closed、无归档）
+ok 11 - A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（不写 task.closed、无归档）
+  ---
+  duration_ms: 40.7577
+  type: 'test'
+  ...
+# Subtest: 路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basis reason=path-b）；无仓库 b-repository-required 不 init
+ok 12 - 路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basis reason=path-b）；无仓库 b-repository-required 不 init
+  ---
+  duration_ms: 1244.3006
+  type: 'test'
+  ...
+# Subtest: 路径 B B3 写集门：modulePaths ⊆ change.scope-decided.effectiveWritesets；越界/无写集 b-change-scope-invalid
+ok 13 - 路径 B B3 写集门：modulePaths ⊆ change.scope-decided.effectiveWritesets；越界/无写集 b-change-scope-invalid
+  ---
+  duration_ms: 598.1298
+  type: 'test'
+  ...
+# Subtest: 首次 fixed 启动：首个 stage-request 携带 workflowPath ⇒ 写 workflowSchema 并走 fixed；显式 legacy 不覆盖；坏配置 fail-closed
+ok 14 - 首次 fixed 启动：首个 stage-request 携带 workflowPath ⇒ 写 workflowSchema 并走 fixed；显式 legacy 不覆盖；坏配置 fail-closed
+  ---
+  duration_ms: 130.4285
+  type: 'test'
+  ...
+# Subtest: fixed intent-confirm：documentRefs[intent]（含 version）+ marker + workflowId/stage 戳；confirm ⇒ stage.completed A3
+ok 15 - fixed intent-confirm：documentRefs[intent]（含 version）+ marker + workflowId/stage 戳；confirm ⇒ stage.completed A3
+  ---
+  duration_ms: 114.2107
+  type: 'test'
+  ...
+# Subtest: fixed proposal：五件 documentRefs + workflowId/stage A6；accept ⇒ stage.completed A6（不调用 legacy frozen 拒绝）
+ok 16 - fixed proposal：五件 documentRefs + workflowId/stage A6；accept ⇒ stage.completed A6（不调用 legacy frozen 拒绝）
+  ---
+  duration_ms: 95.9326
+  type: 'test'
+  ...
+# Subtest: fixed proposal：任一 documentRefs 缺失 ⇒ proposal-document-missing（notPresented、不写账本）
+ok 17 - fixed proposal：任一 documentRefs 缺失 ⇒ proposal-document-missing（notPresented、不写账本）
+  ---
+  duration_ms: 17.2697
+  type: 'test'
+  ...
+# Subtest: fixed appointment：选项=名单（multiple/推荐集由应用生成）+ workflowId/stage A10；裁决 ⇒ stage.completed A10；无 legacy roster 戳
+ok 18 - fixed appointment：选项=名单（multiple/推荐集由应用生成）+ workflowId/stage A10；裁决 ⇒ stage.completed A10；无 legacy roster 戳
+  ---
+  duration_ms: 124.8249
+  type: 'test'
+  ...
+# Subtest: fixed appointment：选项与名单不一致/非多选 ⇒ appointment-invalid（notPresented、不写账本）
+ok 19 - fixed appointment：选项与名单不一致/非多选 ⇒ appointment-invalid（notPresented、不写账本）
+  ---
+  duration_ms: 25.7043
+  type: 'test'
+  ...
+# Subtest: fixed 不发 acceptance 卡：acceptance-card-suppressed（notPresented、不写账本）；legacy D3 扫描忽略 fixed 决议
+ok 20 - fixed 不发 acceptance 卡：acceptance-card-suppressed（notPresented、不写账本）；legacy D3 扫描忽略 fixed 决议
+  ---
+  duration_ms: 27.7647
+  type: 'test'
+  ...
+# Subtest: fixed 面板：fixed ⇒ 只读（panel read-only、mutation 拒绝）；legacy 逐字不变；workflow 状态只读投影
+ok 21 - fixed 面板：fixed ⇒ 只读（panel read-only、mutation 拒绝）；legacy 逐字不变；workflow 状态只读投影
+  ---
+  duration_ms: 18.6711
+  type: 'test'
+  ...
+# Subtest: merge-main 卡构造：app-owned 非判断（application + 冻结选项 + 不进 GROUP）；preview 必含字段
+ok 22 - merge-main 卡构造：app-owned 非判断（application + 冻结选项 + 不进 GROUP）；preview 必含字段
+  ---
+  duration_ms: 1.1764
+  type: 'test'
+  ...
+# Subtest: toMergeMainCardDecision：客户本人唯一有效；judge answered 不代批；judge declined ⇒ judge-reject；中止 ⇒ timeout
+ok 23 - toMergeMainCardDecision：客户本人唯一有效；judge answered 不代批；judge declined ⇒ judge-reject；中止 ⇒ timeout
+  ---
+  duration_ms: 0.1835
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：客户本人确认 ⇒ 本地合并 main（confirm/merged/closed）；不 push/tag
+ok 24 - runFixedReleaseMerge：客户本人确认 ⇒ 本地合并 main（confirm/merged/closed）；不 push/tag
+  ---
+  duration_ms: 2342.1501
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：客户拒绝 ⇒ release.rejected.by=customer、不合并；judge 拒绝 ⇒ by=judge；judge approve 尝试不合并
+ok 25 - runFixedReleaseMerge：客户拒绝 ⇒ release.rejected.by=customer、不合并；judge 拒绝 ⇒ by=judge；judge approve 尝试不合并
+  ---
+  duration_ms: 4045.0378
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：超时/中止 ⇒ release.rejected（by judge，非客户确认）；前置不满足不发卡；无通道不合并
+ok 26 - runFixedReleaseMerge：超时/中止 ⇒ release.rejected（by judge，非客户确认）；前置不满足不发卡；无通道不合并
+  ---
+  duration_ms: 2281.091
+  type: 'test'
+  ...
+# Subtest: runFixedReleaseMerge：已合并 tip ⇒ release-already-merged（no-op 成功，不重复合并）
+ok 27 - runFixedReleaseMerge：已合并 tip ⇒ release-already-merged（no-op 成功，不重复合并）
+  ---
+  duration_ms: 2107.564
+  type: 'test'
+  ...
+# Subtest: appendReleaseEvent 夹具：release 账本 schema/幂等（guard against silent format drift）
+ok 28 - appendReleaseEvent 夹具：release 账本 schema/幂等（guard against silent format drift）
+  ---
+  duration_ms: 10.3993
+  type: 'test'
+  ...
+# Subtest: ensureRepository：git init -b main（新仓库）/既有仓库 no-op/父仓库检测/路径 B 无仓库不 init
+ok 29 - ensureRepository：git init -b main（新仓库）/既有仓库 no-op/父仓库检测/路径 B 无仓库不 init
+  ---
+  duration_ms: 625.6729
+  type: 'test'
+  ...
+# Subtest: ensureGitignore：ans-managed 块 + 仅 .gitignore 的 baseline commit；幂等；dirty/malformed fail-closed
+ok 30 - ensureGitignore：ans-managed 块 + 仅 .gitignore 的 baseline commit；幂等；dirty/malformed fail-closed
+  ---
+  duration_ms: 1136.3914
+  type: 'test'
+  ...
+# Subtest: inspectWorktree：dirty 只算 tracked 修改/删除 + 非忽略 untracked（.ans/node_modules 被 ignore 不计）
+ok 31 - inspectWorktree：dirty 只算 tracked 修改/删除 + 非忽略 untracked（.ans/node_modules 被 ignore 不计）
+  ---
+  duration_ms: 655.5967
+  type: 'test'
+  ...
+# Subtest: prepareTaskBranch：从 main 建/同名冲突 baseline-branch-exists/同 workflow 复用/路径 B 从 HEAD
+ok 32 - prepareTaskBranch：从 main 建/同名冲突 baseline-branch-exists/同 workflow 复用/路径 B 从 HEAD
+  ---
+  duration_ms: 1461.5684
+  type: 'test'
+  ...
+# Subtest: inspectRepository/previewMerge：分支/HEAD/main OID、dirty 事实、files/fileCount/diffStat/diffDigest
+ok 33 - inspectRepository/previewMerge：分支/HEAD/main OID、dirty 事实、files/fileCount/diffStat/diffDigest
+  ---
+  duration_ms: 1089.0282
+  type: 'test'
+  ...
+# Subtest: mergeMain（main 已存在）：merge --no-ff 合并到 main；工作区停在 main；不 push/tag
+ok 34 - mergeMain（main 已存在）：merge --no-ff 合并到 main；工作区停在 main；不 push/tag
+  ---
+  duration_ms: 1336.7511
+  type: 'test'
+  ...
+# Subtest: mergeMain（main unborn）：initial ⇒ main 创建于任务分支 tip
+ok 35 - mergeMain（main unborn）：initial ⇒ main 创建于任务分支 tip
+  ---
+  duration_ms: 1112.3412
+  type: 'test'
+  ...
+# Subtest: mergeMain 冲突：release-merge-conflict + merge --abort + 切回任务分支（不 force/reset/clean）
+ok 36 - mergeMain 冲突：release-merge-conflict + merge --abort + 切回任务分支（不 force/reset/clean）
+  ---
+  duration_ms: 1759.3508
+  type: 'test'
+  ...
+# Subtest: mergeMain：项目级临界区被占用 ⇒ release-main-busy（不并发合并）
+ok 37 - mergeMain：项目级临界区被占用 ⇒ release-main-busy（不并发合并）
+  ---
+  duration_ms: 1342.4976
+  type: 'test'
+  ...
+# Subtest: 触发窗口纯函数：A12b/B3 触发、其余不触发；merge-main requestId 确定性（同一 workflow/tip 幂等）
+ok 38 - 触发窗口纯函数：A12b/B3 触发、其余不触发；merge-main requestId 确定性（同一 workflow/tip 幂等）
+  ---
+  duration_ms: 0.8252
+  type: 'test'
+  ...
+# Subtest: 意图卡去重：run-role 已 prepareIntent/marker ⇒ 桌面幂等（A3 requested 单次、marker 单次、finalize 双调 replay）
+ok 39 - 意图卡去重：run-role 已 prepareIntent/marker ⇒ 桌面幂等（A3 requested 单次、marker 单次、finalize 双调 replay）
+  ---
+  duration_ms: 110.8127
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡：resolved 原样落 source:"stage-a10" + workflowId/stage A10；A10 requested 单次（桌面不双写）
+ok 40 - fixed 任命卡：resolved 原样落 source:"stage-a10" + workflowId/stage A10；A10 requested 单次（桌面不双写）
+  ---
+  duration_ms: 120.3764
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ 自动呈 merge-main（客户卡/非判断）→ 客户本人 approve ⇒ 本地合并 + workflow.closed delivered；同 tip 不重复卡
+ok 41 - A12b accepted ⇒ 自动呈 merge-main（客户卡/非判断）→ 客户本人 approve ⇒ 本地合并 + workflow.closed delivered；同 tip 不重复卡
+  ---
+  duration_ms: 2184.9986
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ 客户拒绝：release.rejected by customer、不合并；同 workflow/tip 再触发不重复卡
+ok 42 - A12b accepted ⇒ 客户拒绝：release.rejected by customer、不合并；同 workflow/tip 再触发不重复卡
+  ---
+  duration_ms: 1523.0987
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；judge approve 尝试不写终态、不合并
+ok 43 - A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；judge approve 尝试不写终态、不合并
+  ---
+  duration_ms: 2572.7421
+  type: 'test'
+  ...
+# Subtest: 前置缺失不呈卡：A12b accepted 但无 basis ⇒ release-workflow-not-ready 回运营/幕僚；rework 收口不触发
+ok 44 - 前置缺失不呈卡：A12b accepted 但无 basis ⇒ release-workflow-not-ready 回运营/幕僚；rework 收口不触发
+  ---
+  duration_ms: 1608.3481
+  type: 'test'
+  ...
+# Subtest: 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+ok 45 - 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+  ---
+  duration_ms: 2459.5501
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡不变：无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）
+ok 46 - legacy 任命卡不变：无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）
+  ---
+  duration_ms: 65.9994
+  type: 'test'
+  ...
+# Subtest: TaskGitPort：真实 add/currentBranch/inspectStaged（NUL）/commit；只本地、不 push/tag
+ok 47 - TaskGitPort：真实 add/currentBranch/inspectStaged（NUL）/commit；只本地、不 push/tag
+  ---
+  duration_ms: 699.4796
+  type: 'test'
+  ...
+# Subtest: TaskGitPort.add 运输防御：flag/glob/`.`/绝对/反斜杠/`..`/空一律拒绝且不执行
+ok 48 - TaskGitPort.add 运输防御：flag/glob/`.`/绝对/反斜杠/`..`/空一律拒绝且不执行
+  ---
+  duration_ms: 376.4074
+  type: 'test'
+  ...
+# Subtest: TaskGitShellPort.commit：只接受固定 git commit -m；-F -/--amend/-a/--author/--no-verify/多参拒绝
+ok 49 - TaskGitShellPort.commit：只接受固定 git commit -m；-F -/--amend/-a/--author/--no-verify/多参拒绝
+  ---
+  duration_ms: 496.3323
+  type: 'test'
+  ...
+# Subtest: TaskGitShellPort.inspectStaged：只执行固定 argv（其他 argv 抛错、不执行）
+ok 50 - TaskGitShellPort.inspectStaged：只执行固定 argv（其他 argv 抛错、不执行）
+  ---
+  duration_ms: 368.0116
+  type: 'test'
+  ...
+# Subtest: acquireCriticalSection：与 B3 发布合并同一把项目锁；占用 ⇒ undefined；释放幂等
+ok 51 - acquireCriticalSection：与 B3 发布合并同一把项目锁；占用 ⇒ undefined；释放幂等
+  ---
+  duration_ms: 0.5451
+  type: 'test'
+  ...
+# Subtest: sanitized env：commit 不读宿主 GIT_*（全局 gpg/身份隔离；身份固定 ANS Application）
+ok 52 - sanitized env：commit 不读宿主 GIT_*（全局 gpg/身份隔离；身份固定 ANS Application）
+  ---
+  duration_ms: 348.9544
+  type: 'test'
+  ...
+# Subtest: 门禁组合：无 scope/-A/-F -/普通 Git 拒绝；staged 越界/空/治理写区、分支不符、锁占用均不提交
+ok 53 - 门禁组合：无 scope/-A/-F -/普通 Git 拒绝；staged 越界/空/治理写区、分支不符、锁占用均不提交
+  ---
+  duration_ms: 1098.9571
+  type: 'test'
+  ...
+# Subtest: Session 注入：fixed 会话注入 taskGit（同一分类器引用 + 同一项目锁、不传 scope）；legacy/single 不注入
+ok 54 - Session 注入：fixed 会话注入 taskGit（同一分类器引用 + 同一项目锁、不传 scope）；legacy/single 不注入
+  ---
+  duration_ms: 67.9294
+  type: 'test'
+  ...
+# Subtest: O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文）
+ok 55 - O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文）
+  ---
+  duration_ms: 374.0956
+  type: 'test'
+  ...
+# Subtest: O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建
+ok 56 - O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建
+  ---
+  duration_ms: 219.4584
+  type: 'test'
+  ...
+# Subtest: O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发）
+ok 57 - O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发）
+  ---
+  duration_ms: 507.7854
+  type: 'test'
+  ...
+# Subtest: O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重
+ok 58 - O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重
+  ---
+  duration_ms: 467.3689
+  type: 'test'
+  ...
+# Subtest: O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次
+ok 59 - O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次
+  ---
+  duration_ms: 404.3037
+  type: 'test'
+  ...
+# Subtest: O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支
+ok 60 - O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支
+  ---
+  duration_ms: 1.9133
+  type: 'test'
+  ...
+# Subtest: F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话）
+ok 61 - F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话）
+  ---
+  duration_ms: 97.6864
+  type: 'test'
+  ...
+# Subtest: F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装）
+ok 62 - F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装）
+  ---
+  duration_ms: 45.6087
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡
+ok 63 - G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡
+  ---
+  duration_ms: 209.6119
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建
+ok 64 - G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建
+  ---
+  duration_ms: 212.5967
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md
+ok 65 - G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md
+  ---
+  duration_ms: 202.2741
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对）
+ok 66 - G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对）
+  ---
+  duration_ms: 213.0235
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响
+ok 67 - G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响
+  ---
+  duration_ms: 214.6166
+  type: 'test'
+  ...
+# Subtest: G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞
+not ok 68 - G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞
+  ---
+  duration_ms: 2.3762
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\boundary-refresh.test.ts:491:1'
+  failureType: 'testCodeFailure'
+  error: '两工具同名同形（共用 handler）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/boundary-refresh.test.ts:498:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+not ok 69 - M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+  ---
+  duration_ms: 40.4639
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:340:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:353:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+not ok 70 - M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+  ---
+  duration_ms: 77.1275
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:413:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:426:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+not ok 71 - D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+  ---
+  duration_ms: 117.5372
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:527:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:580:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+not ok 72 - D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+  ---
+  duration_ms: 113.2118
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:601:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:620:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+not ok 73 - M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+  ---
+  duration_ms: 62.3234
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:658:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:669:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: M11：D3 名单版本/hash 与最新名单不一致 ⇒ appointment-write 被拒（旧 D3 作废）
+ok 74 - M11：D3 名单版本/hash 与最新名单不一致 ⇒ appointment-write 被拒（旧 D3 作废）
+  ---
+  duration_ms: 69.3211
+  type: 'test'
+  ...
+# Subtest: M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 即可匹配 D3，并按名单版本拒绝旧 D3
+ok 75 - M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 即可匹配 D3，并按名单版本拒绝旧 D3
+  ---
+  duration_ms: 68.5159
+  type: 'test'
+  ...
+# Subtest: F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+not ok 76 - F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+  ---
+  duration_ms: 45.9541
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chain-enforcement.test.ts:797:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chain-enforcement.test.ts:808:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed
+ok 77 - R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed
+  ---
+  duration_ms: 300.2113
+  type: 'test'
+  ...
+# Subtest: 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实
+ok 78 - 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实
+  ---
+  duration_ms: 270.6905
+  type: 'test'
+  ...
+# Subtest: 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存）
+ok 79 - 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存）
+  ---
+  duration_ms: 263.2906
+  type: 'test'
+  ...
+# Subtest: per-flow 路由：混合项目按被派 flowId 分别走 legacy/fixed；不缓存项目级单值
+ok 80 - per-flow 路由：混合项目按被派 flowId 分别走 legacy/fixed；不缓存项目级单值
+  ---
+  duration_ms: 35.5896
+  type: 'test'
+  ...
+# Subtest: B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入
+ok 81 - B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入
+  ---
+  duration_ms: 20.801
+  type: 'test'
+  ...
+# Subtest: workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy）
+ok 82 - workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy）
+  ---
+  duration_ms: 8.6877
+  type: 'test'
+  ...
+# Subtest: fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状
+ok 83 - fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状
+  ---
+  duration_ms: 9.753
+  type: 'test'
+  ...
+# Subtest: fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务
+ok 84 - fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务
+  ---
+  duration_ms: 36.4775
+  type: 'test'
+  ...
+# Subtest: fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话
+ok 85 - fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话
+  ---
+  duration_ms: 97.9707
+  type: 'test'
+  ...
+# Subtest: fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键
+ok 86 - fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键
+  ---
+  duration_ms: 95.451
+  type: 'test'
+  ...
+# Subtest: fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId）
+ok 87 - fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId）
+  ---
+  duration_ms: 91.8788
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝
+ok 88 - MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝
+  ---
+  duration_ms: 87.5063
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过）
+ok 89 - MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过）
+  ---
+  duration_ms: 20.9423
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid
+ok 90 - MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid
+  ---
+  duration_ms: 78.0645
+  type: 'test'
+  ...
+# Subtest: direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge
+ok 91 - direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge
+  ---
+  duration_ms: 52.2811
+  type: 'test'
+  ...
+# Subtest: single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变）
+ok 92 - single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变）
+  ---
+  duration_ms: 10.1757
+  type: 'test'
+  ...
+# Subtest: E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）
+ok 93 - E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）
+  ---
+  duration_ms: 209.0857
+  type: 'test'
+  ...
+# Subtest: E-1 去重：同一条回交重复到达（重放）→ **只投递一次**
+ok 94 - E-1 去重：同一条回交重复到达（重放）→ **只投递一次**
+  ---
+  duration_ms: 201.4071
+  type: 'test'
+  ...
+# Subtest: E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+not ok 95 - E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+  ---
+  duration_ms: 391.7168
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:253:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    settle 后同一输入含两份报告且顺序保持
+    + actual - expected
+    
+      [
+    +   '[回交] 来自 A 的报告（任务 T1）\n' +
+    -   '[回交] 已收到2份角色结果，请核对后向客户汇总。\n' +
+    -     '[回交] 来自 A 的报告（任务 T1）\n' +
+          '结论：completed\n' +
+          '摘要：改完了 role-card\n' +
+          '证据：\n' +
+          '  - 角色卡/A/role-card.md\n' +
+    -     '[回交] 来自 A 的报告（任务 T2）\n' +
+    -     '结论：completed\n' +
+    -     '摘要：改完了 role-card\n' +
+    -     '证据：\n' +
+    -     '  - 角色卡/A/role-card.md\n' +
+          '请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n' +
+          '只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n' +
+          '没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n' +
+          '已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: |-
+      [回交] 已收到2份角色结果，请核对后向客户汇总。
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      [回交] 来自 A 的报告（任务 T2）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  actual:
+    0: |-
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:269:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投
+ok 96 - P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投
+  ---
+  duration_ms: 468.2271
+  type: 'test'
+  ...
+# Subtest: 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+not ok 97 - 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+  ---
+  duration_ms: 74.1838
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:329:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   '[回交] 来自 A 的报告（任务 T1）\n' +
+    -   '[回交] 已收到2份角色结果，请核对后向客户汇总。\n' +
+    -     '[回交] 来自 A 的报告（任务 T1）\n' +
+          '结论：completed\n' +
+          '摘要：改完了 role-card\n' +
+          '证据：\n' +
+          '  - 角色卡/A/role-card.md\n' +
+    -     '[回交] 来自 A 的报告（任务 T2）\n' +
+    -     '结论：completed\n' +
+    -     '摘要：改完了 role-card\n' +
+    -     '证据：\n' +
+    -     '  - 角色卡/A/role-card.md\n' +
+          '请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n' +
+          '只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n' +
+          '没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n' +
+          '已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: |-
+      [回交] 已收到2份角色结果，请核对后向客户汇总。
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      [回交] 来自 A 的报告（任务 T2）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  actual:
+    0: |-
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:343:12)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序
+ok 98 - 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序
+  ---
+  duration_ms: 126.3732
+  type: 'test'
+  ...
+# Subtest: 常规检查宿主政策实际注入项目角色，su不接委托免确认
+ok 99 - 常规检查宿主政策实际注入项目角色，su不接委托免确认
+  ---
+  duration_ms: 3.3657
+  type: 'test'
+  ...
+# Subtest: E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）
+ok 100 - E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）
+  ---
+  duration_ms: 357.7915
+  type: 'test'
+  ...
+# Subtest: 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+not ok 101 - 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+  ---
+  duration_ms: 308.2999
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:409:1'
+  failureType: 'testCodeFailure'
+  error: '坏形状应如实系统行（不崩、不静默）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:431:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损）
+ok 102 - E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损）
+  ---
+  duration_ms: 362.6385
+  type: 'test'
+  ...
+# Subtest: C Window merges source saved-before-business and retry Promise/change orders into one enqueue
+ok 103 - C Window merges source saved-before-business and retry Promise/change orders into one enqueue
+  ---
+  duration_ms: 57.4991
+  type: 'test'
+  ...
+# Subtest: C frozen batch retries keep members and delivery ID while later reports stay separate
+not ok 104 - C frozen batch retries keep members and delivery ID while later reports stay separate
+  ---
+  duration_ms: 80.9376
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:495:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'one',
+    -   'two'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'one'
+    1: 'two'
+  actual:
+    0: 'one'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:508:10)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: C possible provider start and unknown failure do not automatically prompt again
+ok 105 - C possible provider start and unknown failure do not automatically prompt again
+  ---
+  duration_ms: 186.3162
+  type: 'test'
+  ...
+# Subtest: C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire
+ok 106 - C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire
+  ---
+  duration_ms: 33.4865
+  type: 'test'
+  ...
+# Subtest: C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs
+ok 107 - C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs
+  ---
+  duration_ms: 58.2431
+  type: 'test'
+  ...
+# Subtest: F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次
+ok 108 - F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次
+  ---
+  duration_ms: 455.4005
+  type: 'test'
+  ...
+# Subtest: 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+not ok 109 - 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+  ---
+  duration_ms: 3242.4031
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:588:1'
+  failureType: 'testCodeFailure'
+  error: '等待实际事件超时'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:30:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:600:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+not ok 110 - B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+  ---
+  duration_ms: 3140.6119
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:629:1'
+  failureType: 'testCodeFailure'
+  error: '等待实际事件超时'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:30:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:667:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状）
+ok 111 - 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状）
+  ---
+  duration_ms: 51.5633
+  type: 'test'
+  ...
+# Subtest: 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变
+ok 112 - 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变
+  ---
+  duration_ms: 20.3016
+  type: 'test'
+  ...
+# Subtest: 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子
+ok 113 - 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子
+  ---
+  duration_ms: 0.5003
+  type: 'test'
+  ...
+# Subtest: requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用
+ok 114 - requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用
+  ---
+  duration_ms: 167.7821
+  type: 'test'
+  ...
+# Subtest: 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型
+ok 115 - 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型
+  ---
+  duration_ms: 2.1915
+  type: 'test'
+  ...
+# Subtest: decision权威revision只由主进程推进，非法set不变，重开旧revision失效
+ok 116 - decision权威revision只由主进程推进，非法set不变，重开旧revision失效
+  ---
+  duration_ms: 0.2829
+  type: 'test'
+  ...
+# Subtest: W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留
+ok 117 - W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留
+  ---
+  duration_ms: 60.1725
+  type: 'test'
+  ...
+# Subtest: W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变
+ok 118 - W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变
+  ---
+  duration_ms: 9.9023
+  type: 'test'
+  ...
+# Subtest: listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执
+not ok 119 - listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执
+  ---
+  duration_ms: 79.9306
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\log-actions.test.ts:34:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'rework'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'rework'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/log-actions.test.ts:82:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递
+ok 120 - 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递
+  ---
+  duration_ms: 0.5789
+  type: 'test'
+  ...
+# Subtest: L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照
+ok 121 - L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照
+  ---
+  duration_ms: 355.4073
+  type: 'test'
+  ...
+# Subtest: L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文）
+ok 122 - L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文）
+  ---
+  duration_ms: 47.3837
+  type: 'test'
+  ...
+# Subtest: L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达
+ok 123 - L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达
+  ---
+  duration_ms: 358.0226
+  type: 'test'
+  ...
+# Subtest: L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态）
+ok 124 - L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态）
+  ---
+  duration_ms: 49.8828
+  type: 'test'
+  ...
+# Subtest: 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts
+ok 125 - 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts
+  ---
+  duration_ms: 730.4856
+  type: 'test'
+  ...
+# Subtest: 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts
+ok 126 - 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts
+  ---
+  duration_ms: 49.3109
+  type: 'test'
+  ...
+# Subtest: 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测
+ok 127 - 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测
+  ---
+  duration_ms: 1.6418
+  type: 'test'
+  ...
+# Subtest: F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递
+ok 128 - F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递
+  ---
+  duration_ms: 826.2772
+  type: 'test'
+  ...
+# Subtest: G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回
+ok 129 - G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回
+  ---
+  duration_ms: 386.5331
+  type: 'test'
+  ...
+# Subtest: P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型
+ok 130 - P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型
+  ---
+  duration_ms: 177.7678
+  type: 'test'
+  ...
+# Subtest: G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）
+ok 131 - G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）
+  ---
+  duration_ms: 386.9615
+  type: 'test'
+  ...
+# Subtest: G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn
+ok 132 - G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn
+  ---
+  duration_ms: 296.0234
+  type: 'test'
+  ...
+# Subtest: 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime
+ok 133 - 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime
+  ---
+  duration_ms: 330.2696
+  type: 'test'
+  ...
+# Subtest: 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投
+ok 134 - 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投
+  ---
+  duration_ms: 277.0875
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用）
+ok 135 - 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用）
+  ---
+  duration_ms: 183.764
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供
+ok 136 - 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供
+  ---
+  duration_ms: 32.6428
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写）
+ok 137 - 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写）
+  ---
+  duration_ms: 30.7354
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色
+ok 138 - 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色
+  ---
+  duration_ms: 300.4709
+  type: 'test'
+  ...
+# Subtest: 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离
+ok 139 - 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离
+  ---
+  duration_ms: 287.8475
+  type: 'test'
+  ...
+# Subtest: D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset
+ok 140 - D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset
+  ---
+  duration_ms: 14.4715
+  type: 'test'
+  ...
+# Subtest: D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure
+ok 141 - D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure
+  ---
+  duration_ms: 14.9537
+  type: 'test'
+  ...
+# Subtest: G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 file 来源＋choices 元数据）；非法值如实拒绝、不落盘、不回显；codex 无 off 档（值域按运行时）；空串清除合法
+ok 142 - G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 file 来源＋choices 元数据）；非法值如实拒绝、不落盘、不回显；codex 无 off 档（值域按运行时）；空串清除合法
+  ---
+  duration_ms: 25.5153
+  type: 'test'
+  ...
+# Subtest: 档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查时限非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices
+ok 143 - 档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查时限非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices
+  ---
+  duration_ms: 21.8502
+  type: 'test'
+  ...
+# Subtest: i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 key 解析（en-US）；字段集/必填/choices 不变；demo 走共享 key；切回 zh 逐字
+ok 144 - i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 key 解析（en-US）；字段集/必填/choices 不变；demo 走共享 key；切回 zh 逐字
+  ---
+  duration_ms: 2.3136
+  type: 'test'
+  ...
+# Subtest: D1 same role and project across engines and same role across projects keep distinct handles and exact input targets
+ok 145 - D1 same role and project across engines and same role across projects keep distinct handles and exact input targets
+  ---
+  duration_ms: 22.3456
+  type: 'test'
+  ...
+# Subtest: D1 background dispatch, queued customer input and handback pin the source engine after selection switches
+ok 146 - D1 background dispatch, queued customer input and handback pin the source engine after selection switches
+  ---
+  duration_ms: 46.6197
+  type: 'test'
+  ...
+# Subtest: D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+not ok 147 - D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 34.7043
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+not ok 148 - D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 17.156
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+not ok 149 - D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 15.1716
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+not ok 150 - D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 15.8231
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+not ok 151 - D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+  ---
+  duration_ms: 7.6378
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:429:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'next-session'
+    - 'after-active-turn'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'after-active-turn'
+  actual: 'next-session'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:445:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card
+ok 152 - D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card
+  ---
+  duration_ms: 2.044
+  type: 'test'
+  ...
+# Subtest: D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired
+ok 153 - D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired
+  ---
+  duration_ms: 17.734
+  type: 'test'
+  ...
+# Subtest: D1 state debouncing and constrained bridges preserve project/runtime identity
+ok 154 - D1 state debouncing and constrained bridges preserve project/runtime identity
+  ---
+  duration_ms: 3.1693
+  type: 'test'
+  ...
+# Subtest: D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn
+ok 155 - D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn
+  ---
+  duration_ms: 13.6905
+  type: 'test'
+  ...
+# Subtest: D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card
+ok 156 - D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card
+  ---
+  duration_ms: 102.1904
+  type: 'test'
+  ...
+# Subtest: D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof
+ok 157 - D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof
+  ---
+  duration_ms: 12.8025
+  type: 'test'
+  ...
+# Subtest: D1R ANS history preserves authoritative turn/event identity, independent same text and delta order
+ok 158 - D1R ANS history preserves authoritative turn/event identity, independent same text and delta order
+  ---
+  duration_ms: 7.597
+  type: 'test'
+  ...
+# Subtest: G-5 wave 2：推理行回放载体——reasoning message 事件的回放行携带投影形 row.reasoning（逐字/幂等）；坏件与旧数据无该字段 ⇒ 原行为逐字
+ok 159 - G-5 wave 2：推理行回放载体——reasoning message 事件的回放行携带投影形 row.reasoning（逐字/幂等）；坏件与旧数据无该字段 ⇒ 原行为逐字
+  ---
+  duration_ms: 7.0344
+  type: 'test'
+  ...
+# Subtest: D1R legacy Pi rows keep optional turn/event metadata absent
+ok 160 - D1R legacy Pi rows keep optional turn/event metadata absent
+  ---
+  duration_ms: 11.6936
+  type: 'test'
+  ...
+# Subtest: D1R2 direct and queued identical inputs retain original client ID through delayed old settled
+ok 161 - D1R2 direct and queued identical inputs retain original client ID through delayed old settled
+  ---
+  duration_ms: 42.6094
+  type: 'test'
+  ...
+# Subtest: D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client
+ok 162 - D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client
+  ---
+  duration_ms: 31.6154
+  type: 'test'
+  ...
+# Subtest: D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+not ok 163 - D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+  ---
+  duration_ms: 1534.1242
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:745:1'
+  failureType: 'testCodeFailure'
+  error: 'D1 test wait expired'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:770:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+not ok 164 - D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+  ---
+  duration_ms: 1528.7659
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:787:1'
+  failureType: 'testCodeFailure'
+  error: 'D1 test wait expired'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:829:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call
+ok 165 - D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call
+  ---
+  duration_ms: 14.7781
+  type: 'test'
+  ...
+# Subtest: typed prompt input history joins only actual same-turn input sources and preserves legacy facts
+ok 166 - typed prompt input history joins only actual same-turn input sources and preserves legacy facts
+  ---
+  duration_ms: 12.6387
+  type: 'test'
+  ...
+# Subtest: operator payload preserves original call identity and leaves absent legacy IDs absent
+ok 167 - operator payload preserves original call identity and leaves absent legacy IDs absent
+  ---
+  duration_ms: 0.4054
+  type: 'test'
+  ...
+# Subtest: history preserves canonical start/blocked/result phases for the same failed tool call
+ok 168 - history preserves canonical start/blocked/result phases for the same failed tool call
+  ---
+  duration_ms: 6.5764
+  type: 'test'
+  ...
+# Subtest: F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留）
+ok 169 - F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留）
+  ---
+  duration_ms: 6.9476
+  type: 'test'
+  ...
+# Subtest: A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts
+ok 170 - A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts
+  ---
+  duration_ms: 12.2464
+  type: 'test'
+  ...
+# Subtest: A legacy provenance and authoritative metadata omissions survive the protected Window mapping
+ok 171 - A legacy provenance and authoritative metadata omissions survive the protected Window mapping
+  ---
+  duration_ms: 18.7597
+  type: 'test'
+  ...
+# Subtest: stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session
+ok 172 - stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session
+  ---
+  duration_ms: 35.3843
+  type: 'test'
+  ...
+# Subtest: send rejection before public events remains unknown; later same-client different turns do not borrow outcomes
+ok 173 - send rejection before public events remains unknown; later same-client different turns do not borrow outcomes
+  ---
+  duration_ms: 15.4893
+  type: 'test'
+  ...
+# Subtest: no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome
+ok 174 - no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome
+  ---
+  duration_ms: 15.9088
+  type: 'test'
+  ...
+# Subtest: send result reports the original handle is no longer current after replacement while its turn rejects
+ok 175 - send result reports the original handle is no longer current after replacement while its turn rejects
+  ---
+  duration_ms: 17.2494
+  type: 'test'
+  ...
+# Subtest: actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+not ok 176 - actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+  ---
+  duration_ms: 1520.5125
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\multi-runtime.test.ts:1048:1'
+  failureType: 'testCodeFailure'
+  error: 'D1 test wait expired'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:1054:109)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: same client IDs across sequential actual turns retain separate first public outcomes
+ok 177 - same client IDs across sequential actual turns retain separate first public outcomes
+  ---
+  duration_ms: 26.6658
+  type: 'test'
+  ...
+# Subtest: foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn
+ok 178 - foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn
+  ---
+  duration_ms: 4.521
+  type: 'test'
+  ...
+# Subtest: 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等
+ok 179 - 重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等
+  ---
+  duration_ms: 49.7919
+  type: 'test'
+  ...
+# Subtest: P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）
+not ok 180 - P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）
+  ---
+  duration_ms: 98.3633
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\queue-visibility.test.ts:167:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    回交合批后队列清空
+    
+    8 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 8
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/queue-visibility.test.ts:210:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启）
+ok 181 - P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启）
+  ---
+  duration_ms: 87.2662
+  type: 'test'
+  ...
+# Subtest: 三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code
+ok 182 - 三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code
+  ---
+  duration_ms: 0.9975
+  type: 'test'
+  ...
+# Subtest: BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因
+ok 183 - BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因
+  ---
+  duration_ms: 0.475
+  type: 'test'
+  ...
+# Subtest: BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试）
+ok 184 - BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试）
+  ---
+  duration_ms: 0.7564
+  type: 'test'
+  ...
+# Subtest: code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc）
+ok 185 - code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc）
+  ---
+  duration_ms: 0.1747
+  type: 'test'
+  ...
+# Subtest: contract_check 工具：只读、按角色裁剪、≤4KB、缺失数据如实报错
+ok 186 - contract_check 工具：只读、按角色裁剪、≤4KB、缺失数据如实报错
+  ---
+  duration_ms: 2.1035
+  type: 'test'
+  ...
+# Subtest: contract_check 输出超长由工具层截断到 4KB 内
+ok 187 - contract_check 输出超长由工具层截断到 4KB 内
+  ---
+  duration_ms: 0.2957
+  type: 'test'
+  ...
+# Subtest: contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02）
+ok 188 - contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02）
+  ---
+  duration_ms: 0.1921
+  type: 'test'
+  ...
+# Subtest: contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07）
+ok 189 - contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07）
+  ---
+  duration_ms: 0.2833
+  type: 'test'
+  ...
+# Subtest: contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6）
+ok 190 - contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6）
+  ---
+  duration_ms: 0.2247
+  type: 'test'
+  ...
+# Subtest: contract_check topic：null/空串/空白串走 legacy（AC-16）
+ok 191 - contract_check topic：null/空串/空白串走 legacy（AC-16）
+  ---
+  duration_ms: 0.3736
+  type: 'test'
+  ...
+# Subtest: contract_check topic：角色隔离先于 topic（AC-7）
+ok 192 - contract_check topic：角色隔离先于 topic（AC-7）
+  ---
+  duration_ms: 0.158
+  type: 'test'
+  ...
+# Subtest: contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8）
+ok 193 - contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8）
+  ---
+  duration_ms: 0.3125
+  type: 'test'
+  ...
+# Subtest: contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9）
+ok 194 - contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9）
+  ---
+  duration_ms: 0.0691
+  type: 'test'
+  ...
+# Subtest: 旧 code 别名可读：canonical code + legacyCode 保留
+ok 195 - 旧 code 别名可读：canonical code + legacyCode 保留
+  ---
+  duration_ms: 0.1142
+  type: 'test'
+  ...
+# Subtest: 真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段）
+ok 196 - 真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段）
+  ---
+  duration_ms: 0.7502
+  type: 'test'
+  ...
+# Subtest: 真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code
+ok 197 - 真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code
+  ---
+  duration_ms: 0.2364
+  type: 'test'
+  ...
+# Subtest: F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留
+ok 198 - F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留
+  ---
+  duration_ms: 5.8688
+  type: 'test'
+  ...
+# Subtest: 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+not ok 199 - 派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+  ---
+  duration_ms: 91.9944
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:251:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:259:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+not ok 200 - 显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 75.4508
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+not ok 201 - 显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 96.6658
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+not ok 202 - 显式入口（stop）：requestRunChangeDecision 三模式落账不变
+  ---
+  duration_ms: 70.668
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:291:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:303:24)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+not ok 203 - stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+  ---
+  duration_ms: 82.1847
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:350:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:356:22)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+not ok 204 - 显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+  ---
+  duration_ms: 80.4172
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:399:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:403:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+not ok 205 - 宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+  ---
+  duration_ms: 81.0821
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:424:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:430:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+not ok 206 - 提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+  ---
+  duration_ms: 72.9303
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:453:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:459:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+not ok 207 - AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+  ---
+  duration_ms: 79.5103
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-change-trigger.test.ts:511:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    setupPinnedRun (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:227:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-change-trigger.test.ts:519:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）
+ok 208 - J12：judge 代批 intent-confirm ⇒ request.resolved 字段回归钉（by/operatorId/decisionId/judge）
+  ---
+  duration_ms: 143.5835
+  type: 'test'
+  ...
+# Subtest: run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+not ok 209 - run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+  ---
+  duration_ms: 97.4484
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:194:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+not ok 210 - D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+  ---
+  duration_ms: 125.6945
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:297:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+not ok 211 - run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+  ---
+  duration_ms: 67.7511
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:316:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:325:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等
+ok 212 - run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等
+  ---
+  duration_ms: 53.5593
+  type: 'test'
+  ...
+# Subtest: legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned
+ok 213 - legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned
+  ---
+  duration_ms: 5.0467
+  type: 'test'
+  ...
+# Subtest: P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝
+ok 214 - P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝
+  ---
+  duration_ms: 46.3668
+  type: 'test'
+  ...
+# Subtest: P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写
+ok 215 - P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写
+  ---
+  duration_ms: 45.3008
+  type: 'test'
+  ...
+# Subtest: P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+not ok 216 - P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+  ---
+  duration_ms: 48.0887
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:454:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:461:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2（P1.3）：legacy 任务验收 facts 标 runState=legacy
+ok 217 - R2（P1.3）：legacy 任务验收 facts 标 runState=legacy
+  ---
+  duration_ms: 134.6344
+  type: 'test'
+  ...
+# Subtest: contract_check session：pinned run/角色写区/legacy 明示（只读）
+ok 218 - contract_check session：pinned run/角色写区/legacy 明示（只读）
+  ---
+  duration_ms: 71.7515
+  type: 'test'
+  ...
+# Subtest: contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）
+ok 219 - contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）
+  ---
+  duration_ms: 40.0898
+  type: 'test'
+  ...
+# Subtest: contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）
+ok 220 - contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）
+  ---
+  duration_ms: 43.5095
+  type: 'test'
+  ...
+# Subtest: F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+not ok 221 - F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+  ---
+  duration_ms: 89.4357
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:606:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:620:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出
+ok 222 - §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出
+  ---
+  duration_ms: 262.7031
+  type: 'test'
+  ...
+# Subtest: R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+not ok 223 - R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+  ---
+  duration_ms: 41.7137
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:723:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:730:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+not ok 224 - R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+  ---
+  duration_ms: 63.0026
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:745:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:755:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+not ok 225 - AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+  ---
+  duration_ms: 92.4192
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:770:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:782:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+not ok 226 - AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+  ---
+  duration_ms: 76.8022
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:796:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:814:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+not ok 227 - AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+  ---
+  duration_ms: 64.1606
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:829:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:849:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+not ok 228 - P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+  ---
+  duration_ms: 76.1888
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\run-pin.test.ts:864:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:878:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format
+ok 229 - TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format
+  ---
+  duration_ms: 101.5052
+  type: 'test'
+  ...
+# Subtest: AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变
+ok 230 - AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变
+  ---
+  duration_ms: 20.4782
+  type: 'test'
+  ...
+# Subtest: AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定
+ok 231 - AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定
+  ---
+  duration_ms: 3.7105
+  type: 'test'
+  ...
+# Subtest: AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变
+ok 232 - AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变
+  ---
+  duration_ms: 46.178
+  type: 'test'
+  ...
+# Subtest: AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用）
+ok 233 - AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用）
+  ---
+  duration_ms: 2.6168
+  type: 'test'
+  ...
+# Subtest: AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变
+ok 234 - AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变
+  ---
+  duration_ms: 77.0424
+  type: 'test'
+  ...
+# Subtest: AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+not ok 235 - AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+  ---
+  duration_ms: 0.5744
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\session.test.ts:570:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    索引字节（B1 实测 pin）
+    
+    5244 !== 5223
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 5223
+  actual: 5244
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session.test.ts:572:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: VCA 卡：application-owned decision、真实 flowId、推荐 reject、目标/hash/语义齐全
+ok 236 - VCA 卡：application-owned decision、真实 flowId、推荐 reject、目标/hash/语义齐全
+  ---
+  duration_ms: 1.7427
+  type: 'test'
+  ...
+# Subtest: stable 卡：app-owned `stable-write`、无 flowId、恰一推荐；独立结构校验；decision 校验不适用
+ok 237 - stable 卡：app-owned `stable-write`、无 flowId、恰一推荐；独立结构校验；decision 校验不适用
+  ---
+  duration_ms: 0.3334
+  type: 'test'
+  ...
+# Subtest: 修正案逐项卡：item-apply/item-keep/item-cancel-amendment + acknowledgments 透传；none 不发卡
+ok 238 - 修正案逐项卡：item-apply/item-keep/item-cancel-amendment + acknowledgments 透传；none 不发卡
+  ---
+  duration_ms: 0.2037
+  type: 'test'
+  ...
+# Subtest: 客户端三态映射：只认 customer；judge/directive 一律 unavailable；acknowledgments 回传
+ok 239 - 客户端三态映射：只认 customer；judge/directive 一律 unavailable；acknowledgments 回传
+  ---
+  duration_ms: 0.2523
+  type: 'test'
+  ...
+# Subtest: 客户主权：VCA 卡 @决策 指令不消费（不写 directive、不结算），原卡呈现客户
+ok 240 - 客户主权：VCA 卡 @决策 指令不消费（不写 directive、不结算），原卡呈现客户
+  ---
+  duration_ms: 24.4193
+  type: 'test'
+  ...
+# Subtest: acknowledgments：required 缺失/多余/非数组 ⇒ 拒收且 pending 保留；齐全 ⇒ settlement 带 acknowledged
+ok 241 - acknowledgments：required 缺失/多余/非数组 ⇒ 拒收且 pending 保留；齐全 ⇒ settlement 带 acknowledged
+  ---
+  duration_ms: 0.4753
+  type: 'test'
+  ...
+# Subtest: customer-input 最后防线：主权卡 judge/directive 结算被拒绝（pending 保留）
+ok 242 - customer-input 最后防线：主权卡 judge/directive 结算被拒绝（pending 保留）
+  ---
+  duration_ms: 0.1854
+  type: 'test'
+  ...
+# Subtest: SessionManager VCA 卡：经 convener 会话呈现；request.* 生命周期客户归属；notify:none
+ok 243 - SessionManager VCA 卡：经 convener 会话呈现；request.* 生命周期客户归属；notify:none
+  ---
+  duration_ms: 95.7361
+  type: 'test'
+  ...
+# Subtest: SessionManager：无治理会话/通道 ⇒ VCA/stable 卡 unavailable（fail-closed；不伪造批准）
+ok 244 - SessionManager：无治理会话/通道 ⇒ VCA/stable 卡 unavailable（fail-closed；不伪造批准）
+  ---
+  duration_ms: 0.7832
+  type: 'test'
+  ...
+# Subtest: SessionManager 修正案逐项卡：acknowledgments 对象数组呈现并回传
+ok 245 - SessionManager 修正案逐项卡：acknowledgments 对象数组呈现并回传
+  ---
+  duration_ms: 88.7201
+  type: 'test'
+  ...
+# Subtest: stable workflow：确认卡 → 一次性许可 → completeWrite 复核/消费/mini re-pin（trunkVersion 不变）
+ok 246 - stable workflow：确认卡 → 一次性许可 → completeWrite 复核/消费/mini re-pin（trunkVersion 不变）
+  ---
+  duration_ms: 90.4292
+  type: 'test'
+  ...
+# Subtest: stable 拒绝：不签发许可、不写记录为 written
+ok 247 - stable 拒绝：不签发许可、不写记录为 written
+  ---
+  duration_ms: 50.7213
+  type: 'test'
+  ...
+# Subtest: stable 写入哈希不符：completeWrite fail-closed、许可作废、不更新快照
+ok 248 - stable 写入哈希不符：completeWrite fail-closed、许可作废、不更新快照
+  ---
+  duration_ms: 82.2873
+  type: 'test'
+  ...
+# Subtest: 重启重建许可快照：新栈从磁盘恢复 approved 许可并安装 C2b 快照
+ok 249 - 重启重建许可快照：新栈从磁盘恢复 approved 许可并安装 C2b 快照
+  ---
+  duration_ms: 57.8174
+  type: 'test'
+  ...
+# Subtest: appointment-write 钩子（F16）：只提取 preview 正文/签发许可；桌面不写盘
+ok 250 - appointment-write 钩子（F16）：只提取 preview 正文/签发许可；桌面不写盘
+  ---
+  duration_ms: 66.7884
+  type: 'test'
+  ...
+# Subtest: 冻结迁移/损坏：ready ⇒ cacheHealth ok；baseline 损坏 ⇒ fail-closed 且不自动重建
+ok 251 - 冻结迁移/损坏：ready ⇒ cacheHealth ok；baseline 损坏 ⇒ fail-closed 且不自动重建
+  ---
+  duration_ms: 29.8108
+  type: 'test'
+  ...
+# Subtest: trunk:state（F15）：workflow / roleCards / boundaries 三类 stable 快照齐全；单一来源摘要
+ok 252 - trunk:state（F15）：workflow / roleCards / boundaries 三类 stable 快照齐全；单一来源摘要
+  ---
+  duration_ms: 46.9497
+  type: 'test'
+  ...
+# Subtest: 主干升级（仅紧急/恢复）：预览变更 → 同一 previewId 客户确认 → t2；重复确认/常规理由拒绝
+ok 253 - 主干升级（仅紧急/恢复）：预览变更 → 同一 previewId 客户确认 → t2；重复确认/常规理由拒绝
+  ---
+  duration_ms: 89.1681
+  type: 'test'
+  ...
+# Subtest: refactor：convener 提交（能力层）/只读列表；非 convener 拒绝；无 trunk 版本
+ok 254 - refactor：convener 提交（能力层）/只读列表；非 convener 拒绝；无 trunk 版本
+  ---
+  duration_ms: 33.8992
+  type: 'test'
+  ...
+# Subtest: IPC 冻结集：无 submit/refactor:request/stable-write:request；只保留一条 trunk:state 推送
+ok 255 - IPC 冻结集：无 submit/refactor:request/stable-write:request；只保留一条 trunk:state 推送
+  ---
+  duration_ms: 0.1546
+  type: 'test'
+  ...
+# Subtest: 只读列表面：VCA/stable/冻结摘要有界、无 drift 字段；cacheHealth 如实
+ok 256 - 只读列表面：VCA/stable/冻结摘要有界、无 drift 字段；cacheHealth 如实
+  ---
+  duration_ms: 61.2406
+  type: 'test'
+  ...
+# Subtest: Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话角色（不信任工具自报）
+ok 257 - Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话角色（不信任工具自报）
+  ---
+  duration_ms: 131.0573
+  type: 'test'
+  ...
+# Subtest: Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+not ok 258 - Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+  ---
+  duration_ms: 48.032
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:1140:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1168:14
+    async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1141:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+not ok 259 - VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+  ---
+  duration_ms: 27.4316
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:1201:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1223:14
+    async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1202:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+not ok 260 - VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+  ---
+  duration_ms: 39.1482
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:1238:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1262:14
+    async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1239:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Batch 3.5 request_stable_write：客户拒绝 ⇒ 回执失败且不签发许可
+ok 261 - Batch 3.5 request_stable_write：客户拒绝 ⇒ 回执失败且不签发许可
+  ---
+  duration_ms: 66.3387
+  type: 'test'
+  ...
+# Subtest: Batch 3.5 trunk 客户动作：refreeze 只 stable、不升版本；abandon 不改指针；history 只读
+ok 262 - Batch 3.5 trunk 客户动作：refreeze 只 stable、不升版本；abandon 不改指针；history 只读
+  ---
+  duration_ms: 119.3576
+  type: 'test'
+  ...
+# Subtest: AC-13：buildStableBoundaryRisk 生成横幅/required ack；不可解析标记 fail-closed
+ok 263 - AC-13：buildStableBoundaryRisk 生成横幅/required ack；不可解析标记 fail-closed
+  ---
+  duration_ms: 0.2385
+  type: 'test'
+  ...
+# Subtest: AC-13：boundary 扩大（新增目录）⇒ 卡面横幅 + required ack；勾选后可签发许可
+ok 264 - AC-13：boundary 扩大（新增目录）⇒ 卡面横幅 + required ack；勾选后可签发许可
+  ---
+  duration_ms: 188.9003
+  type: 'test'
+  ...
+# Subtest: AC-13：扩大未勾选 ⇒ 不签发许可（最后防线，fail-closed）
+ok 265 - AC-13：扩大未勾选 ⇒ 不签发许可（最后防线，fail-closed）
+  ---
+  duration_ms: 210.3357
+  type: 'test'
+  ...
+# Subtest: AC-13：收窄/无变化 ⇒ 不误报；正常签发许可
+ok 266 - AC-13：收窄/无变化 ⇒ 不误报；正常签发许可
+  ---
+  duration_ms: 401.2675
+  type: 'test'
+  ...
+# Subtest: AC-13：预览不可解析 ⇒ 拒绝且不呈现卡/不签发许可
+ok 267 - AC-13：预览不可解析 ⇒ 拒绝且不呈现卡/不签发许可
+  ---
+  duration_ms: 54.4596
+  type: 'test'
+  ...
+# Subtest: D4 confirm 回执：required ack 合法 ⇒ answered/acknowledged；缺失/多余/非数组 ⇒ 拒收且 pending
+ok 268 - D4 confirm 回执：required ack 合法 ⇒ answered/acknowledged；缺失/多余/非数组 ⇒ 拒收且 pending
+  ---
+  duration_ms: 0.2824
+  type: 'test'
+  ...
+# Subtest: D4 confirm：confirmed:false 不要求/不校验 ack，不回传 acknowledged
+ok 269 - D4 confirm：confirmed:false 不要求/不校验 ack，不回传 acknowledged
+  ---
+  duration_ms: 0.1539
+  type: 'test'
+  ...
+# Subtest: D4 confirm：请求无 required ack ⇒ 旧行为零变化（不要求/不回传）
+ok 270 - D4 confirm：请求无 required ack ⇒ 旧行为零变化（不要求/不回传）
+  ---
+  duration_ms: 0.1204
+  type: 'test'
+  ...
+# Subtest: D4 端到端：appointment-write 扩大 boundary 经真实确认通道回传 ack ⇒ 签发许可
+ok 271 - D4 端到端：appointment-write 扩大 boundary 经真实确认通道回传 ack ⇒ 签发许可
+  ---
+  duration_ms: 163.8624
+  type: 'test'
+  ...
+# Subtest: 方案升级卡：application-owned decision、真实 flowId、四选项固定顺序 + escalation-continue 推荐、preview 语义
+ok 272 - 方案升级卡：application-owned decision、真实 flowId、四选项固定顺序 + escalation-continue 推荐、preview 语义
+  ---
+  duration_ms: 0.4611
+  type: 'test'
+  ...
+# Subtest: 客户主权：方案升级整卡排除代选/判断/@决策；application 非 true 或选项子集 ⇒ 不排除
+ok 273 - 客户主权：方案升级整卡排除代选/判断/@决策；application 非 true 或选项子集 ⇒ 不排除
+  ---
+  duration_ms: 15.8023
+  type: 'test'
+  ...
+# Subtest: SessionManager 方案升级：仅 convener 注入/提交；在途同 flow 至多一张；裁定后如实通知且不派发/不写文档
+ok 274 - SessionManager 方案升级：仅 convener 注入/提交；在途同 flow 至多一张；裁定后如实通知且不派发/不写文档
+  ---
+  duration_ms: 83.0491
+  type: 'test'
+  ...
+# Subtest: SessionManager 方案升级：未获客户裁定 ⇒ 如实通知 convener（不宣称已变更）
+ok 275 - SessionManager 方案升级：未获客户裁定 ⇒ 如实通知 convener（不宣称已变更）
+  ---
+  duration_ms: 60.1618
+  type: 'test'
+  ...
+# Subtest: SessionManager 方案升级：客户选「修订方案」⇒ 向 rapporteur 投递重做消息（不派发、不改需求）
+ok 276 - SessionManager 方案升级：客户选「修订方案」⇒ 向 rapporteur 投递重做消息（不派发、不改需求）
+  ---
+  duration_ms: 65.7313
+  type: 'test'
+  ...
+# Subtest: SessionManager blocked 提示：首次 blocked 即提示运营自行选择（不是客户卡）；在途卡/已提示节流；done/failed 与提交升级卡后清除
+ok 277 - SessionManager blocked 提示：首次 blocked 即提示运营自行选择（不是客户卡）；在途卡/已提示节流；done/failed 与提交升级卡后清除
+  ---
+  duration_ms: 933.2363
+  type: 'test'
+  ...
+# Subtest: SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+not ok 278 - SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+  ---
+  duration_ms: 4770.7807
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:2176:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /\[工作结果\]/. Input:
+    
+    ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: ''
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:2196:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 规划trunk缺workflow诚实可读，升级/refreeze执行分支明确拒绝且不合成workflow
+ok 279 - 规划trunk缺workflow诚实可读，升级/refreeze执行分支明确拒绝且不合成workflow
+  ---
+  duration_ms: 63.0951
+  type: 'test'
+  ...
+# Subtest: W2 ordinary submit uses real direct validation and never revives the former approval card
+ok 280 - W2 ordinary submit uses real direct validation and never revives the former approval card
+  ---
+  duration_ms: 0.8156
+  type: 'test'
+  ...
+# Subtest: W46 Pipeline许可恢复投影：无效/未答保有效许可，真实读错清旧且修复可恢复
+ok 281 - W46 Pipeline许可恢复投影：无效/未答保有效许可，真实读错清旧且修复可恢复
+  ---
+  duration_ms: 73.4863
+  type: 'test'
+  ...
+# Subtest: workflow-git 端口骨架：缺省实现全部 fail-closed（workflow-git-unavailable），零文件副作用
+ok 282 - workflow-git 端口骨架：缺省实现全部 fail-closed（workflow-git-unavailable），零文件副作用
+  ---
+  duration_ms: 3.5394
+  type: 'test'
+  ...
+# Subtest: mergeMainConfirmationError：客户本人唯一有效；缺省/judge ⇒ release-unauthorized（judge 不可代批）
+ok 283 - mergeMainConfirmationError：客户本人唯一有效；缺省/judge ⇒ release-unauthorized（judge 不可代批）
+  ---
+  duration_ms: 0.1453
+  type: 'test'
+  ...
+# Subtest: workflow-git 端口：注入实现生效；未提供的操作仍 fail-closed（不回落 shell/默认 git）
+ok 284 - workflow-git 端口：注入实现生效；未提供的操作仍 fail-closed（不回落 shell/默认 git）
+  ---
+  duration_ms: 0.724
+  type: 'test'
+  ...
+# Subtest: merge-main 客户主权：app-owned 卡命中保留面；非应用/缺选项不命中；不进判断分组
+ok 285 - merge-main 客户主权：app-owned 卡命中保留面；非应用/缺选项不命中；不进判断分组
+  ---
+  duration_ms: 0.2655
+  type: 'test'
+  ...
+1..285
+# tests 285
+# suites 0
+# pass 237
+# fail 48
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 87353.2447

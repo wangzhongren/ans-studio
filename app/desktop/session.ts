@@ -64,12 +64,15 @@ import type { GovernanceModel, ProjectConfig, RoleDispatchPurpose } from "../../
 // 三权（评审 §5.1/§5.6）：内置治理角色 id 判定 / 注册表统一来自门禁引擎的 Service 公开出口
 // （桌面**不复制**第二份 id 列表，也不直接导入 `src/common/门禁引擎/` 私有模块）。
 import { governanceRoleOf, isBuiltInGovernanceRoleId, resolveBoundary, trioGovernanceSource } from "../../src/service/boundary/resolve-boundary.ts";
+// T3 B4.2（2026-11-10，AC-21/T-09）：任务级 Git 写出明细分类器——Service 公开出口同一函数引用
+// （fixed 会话经 `openRoleSession({taskGit})` 注入；本层不复制规则、不建第二份判定）。
+import { classifyShellDetailed } from "../../src/service/gate/shell-rules.ts";
 // O-1（2026-10-12）：边界快照的**可信信号** = 读盘内容哈希（sha256）——本层只读、不复制门禁解析。
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import type { ChiefDecisionExecutionContext, DecidePendingRequestFn, SelectRunChangeFn, CompleteTeamPlanFn, ActivateRoleDocumentsFn, CloseCreatedTaskFn, FixedCloseCreatedTaskFn, GitQueryFn, GitCandidateFn, GitPublishFn, RuntimeSessionLifecycleFacts, RuntimeSessionToolSurfaceFacts, TaskWorkSourceRef } from "../../src/model/runtime.ts";
-import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSessionHandle, RoleSessionAbortResult, RoleSessionSendOptions, TaskGitShellRuntimeInput } from "../../src/pipeline/orchestration/run-role.ts";
 import { readRoleCapabilityProtectionScope, inspectRoleSessionOpenFailure, registerVersionedDocumentAfterWrite } from "../../src/pipeline/orchestration/run-role.ts";
 import type { GitHostOpenFailureRef } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import { createGitRoleRuntime, createDirectRoleRuntime, recordTaskObservation, prepareCreatedTaskClose, freezeExecutionRun, readRunRoleContext, prepareRoleDispatch, beginGitHostAction, endGitHostAction, recordGitHostInventory, inspectAssignedTask, recordGitHostInterruption, prepareAssignedTaskWriteScope, prepareParentTaskRef, collectDispatchBaselineFacts, resolveDeliveryAssignment, classifyClosedTaskNotice, prepareRunChange, finalizeRunChange, prepareControllerResume, inspectQueuedControllerResume, prepareControllerStop, finalizeControllerStop, type ControllerStopHostPlan, type RunChangeHostPlan } from "../../src/pipeline/orchestration/trunk-runtime.ts";
@@ -148,7 +151,7 @@ import {
   type FixedReleaseTriggerStage,
   type WorkflowMode,
 } from "./workflow.ts";
-import { createDesktopBaselineGitPort, createDesktopReleaseGitPort } from "./workflow-git.ts";
+import { createDesktopBaselineGitPort, createDesktopReleaseGitPort, createDesktopTaskGitShellPort } from "./workflow-git.ts";
 import { buildMergeMainCardRequest, mergeMainCardRequestId, toMergeMainCardDecision } from "./customer-input.ts";
 import { applyRunChange, buildRunChangeCard, closeRun, ensureDraftRun, findActiveRun, findNewerContractDocs, loadPinnedRoster, listRunManifestsResult, mapRunChangeAnswer, pinRun, pinnedDocsSummary, readRunManifest, validateRunManifest, verifyPinnedRun, RUN_PENDING_FLOW_ID, type NewerContractDoc, type RunManifest, type RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 // 2026-11-02（全局任务状态/版本决策，A2）：只读复用 A1 的派生/纯逻辑；不复制 flow/run/账本状态机。
@@ -699,6 +702,15 @@ export interface SessionManagerDeps {
       routineShellPolicy?: RoutineShellPolicy;
       taskId?: string;
       scope?: undefined;
+      /**
+       * **T3 B4.2（2026-11-10，AC-21 / T-09）：fixed 会话的任务级 Git 写注入位**——
+       * `{ classifyShellDetailed, port }`（分类器 = 门禁引擎 Service 出口同一函数引用；端口 = 桌面真实
+       * Git，`acquireCriticalSection` 与 B3 发布合并同一把项目级锁）。**仅 fixed 会话**由本层注入；
+       * legacy 会话不传（字段缺席、行为逐字不变）。本层**不传** taskId/写集事实——scope 由编排从
+       * `task.created` + basis/`change.scope-decided` 解析（桌面不采信模型自报）；不可解析 ⇒ 编排不注入
+       * scope ⇒ Git 写一律拒（fail-closed）。
+       */
+      taskGit?: TaskGitShellRuntimeInput;
       /** **客户确认制交互通道**（A-1/A-3）：仅内置治理角色（su）会话注入（见 SessionManager.open）。 */
       customerInput?: CustomerInputFn;
       /** **下载申请能力**（2026-11-04 download-requests W-1）：每会话注入；未注入 ⇒ `request_download` 不注册。 */
@@ -4370,6 +4382,15 @@ export class SessionManager {
           // 现场解析模式（回调不缓存项目级单值；fixed 会话的模块 context/工具注入由 run-role 同源执行）。
           // single/su 会话不注入（旧行为逐字不变；固定路径为 trio 产品流程）。
           ...(governanceModel === "trio" ? { workflowModeForFlow: workflowModeForFlowResolver(req.projectRoot) } : {}),
+          // T3 B4.2（2026-11-10，AC-21/T-09）：fixed 会话注入任务级 Git 写（分类器 + 真实端口）。
+          // 仅「trio 项目 + 该任务真实 flow 解析为 fixed + 带真实 taskId」时注入；legacy/single 会话
+          // 不传本字段（注入面/行为逐字不变）。桌面只给「实现」——**不传 scope/taskId 事实**：scope 由
+          // 编排从 task.created + basis/`change.scope-decided` 解析（桌面不采信模型自报），不可解析 ⇒
+          // 编排不注入 scope ⇒ `git add`/`git commit` 一律拒（fail-closed）。端口 `acquireCriticalSection`
+          // 与 B3 发布合并共用同一把项目级锁（`acquireProjectGitCriticalSection` 同一实现）。
+          ...(sessionWorkflowMode === "fixed" && req.taskId !== undefined
+            ? { taskGit: { classifyShellDetailed, port: createDesktopTaskGitShellPort(req.projectRoot) } }
+            : {}),
           ...(routineShellPolicy ? { routineShellPolicy } : {}),
           // 客户交互通道（A-5）：仅内置治理角色（su / trio 三人）会话注入；Liaison 不注入（§4.3）。
           // **每会话闭包绑定 roleId**（请求本体不带角色标识——渲染侧据它把交互卡落到该角色的聊天流、
