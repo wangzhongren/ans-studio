@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: 完成态收束已移除：预热/多窗口/真实活动后静默再久也不投 [系统·收束]
+ok 1 - 完成态收束已移除：预热/多窗口/真实活动后静默再久也不投 [系统·收束]
+  ---
+  duration_ms: 2.0144
+  type: 'test'
+  ...
+# Subtest: 告警仍保留：队列积压仍投 [系统·看护告警]（收束移除 ≠ 看护失效）
+ok 2 - 告警仍保留：队列积压仍投 [系统·看护告警]（收束移除 ≠ 看护失效）
+  ---
+  duration_ms: 1.0544
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 109.2153

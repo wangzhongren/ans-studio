@@ -1,0 +1,15 @@
+# B10.1 只读套件（`src/**` 零改动；这些目录零改动）
+
+命令（工作树 = 本批 after；同一 Node v24.22.1）：
+
+1. `01-bianpai-desktop-gate.tap`：`test/编排/{fixed-path-start,run-role-fixed,run-role-fixed-b2,run-role-fixed-b31,workflow-mode,workflow-stage-request,workflow-dispatch-fixed,workflow-ledger,workflow-state,workflow-preconditions,workflow-baseline,workflow-basis-b21,workflow-close-intent,task-state,task-state-fixed,project-state-workflow}.test.ts` + `test/门禁引擎/{cold-start-genesis,shell-approval,chief-workflow-v2-resource}.test.ts` —— **154 tests / 154 pass / 0 fail / 0 skipped**。
+2. `02-roles.tap`：`test/roles/**/*.test.ts` —— **278 tests / 278 pass / 0 fail / 0 skipped**（当前 HEAD 基线数量；B8.2 记录时为 275，目录本身零改动）。
+3. `03-runtime-core-fixed.tap`：`test/runtime-core/two-fixed-workflow-paths-{b0,b2,b3-1}.test.ts` —— **32 tests / 32 pass / 0 fail / 0 skipped**。
+4. `04-fixed-path-full-chain.tap`：`test/测试/fixed-path-full-chain.test.ts`（B5/B6.2 跨层假会话全链；**B10.2 写域，本批只读运行**）—— **3 tests / 2 pass / 1 fail**：
+   - 失败 = `路径 A 全链…`，断言行 `test/测试/fixed-path-full-chain.test.ts:545`：
+     `h.inputs.filter(input => input.roleId === "convener" && input.taskId === undefined)` 找不到目标会话。
+   - **原因（预期中的规格变更，非产品回归）**：B10.1 按任务书让 fixed stage-request 的自动打开目标会话携带
+     **真实 taskId**；该测试仍钉「自动打开 = 无 taskId 聊天会话」（B6.2 旧口径）。**需 B10.2 在同一文件把
+     filter 改为 `taskId === srA1.taskId`（断言 fixed 语义可保留）**；本批不改 `test/测试/**`。
+   - 路径 B / 路径 B 无仓库两用例仍 pass。
+5. `test/编排`/`test/门禁引擎`/`test/roles`/`test/runtime-core` 只运行上列文件（这些目录与 `src/**` 零 diff）。

@@ -2191,8 +2191,21 @@ export class SessionManager {
     // Task identity remains fresh for explicit reports/tools. An application receipt notice is not
     // another assigned work round; its acknowledgement alone must not manufacture a fallback report.
     // Ordinary system continuations and real child reports retain their work/report obligation.
+    // T3 B10.1（2026-11-11，RR5 根因 `report-task-link-broken`）：fixed 派发按 B1 不解析 legacy
+    // assignment——但本轮 origin 已由 B8.2 绑定真实 fixed 任务（`origin.taskId`，task.created 账本事实）。
+    // handback intent 必须带上该 taskId：run-role 的 `withHandback` 只用 intent.taskId 构造回交事件，
+    // 缺它时 convener/product/verifier 的 `submit_report` 一律以「任务关联未知」到达、`task.reported`
+    // 不写、close accepted 报 `close-report-missing`（RR5 实测）。legacy 路径中 `origin.taskId` 恒等于
+    // `assignment.taskId`，行为逐字不变；无任务聊天/回交条目不带 taskId（沿用旧语义）。
+    // fixed 回交回合（worker→convener 等）：目标会话自身已绑定真实受派任务（`assignedTaskId`）时，
+    // 创建者在该回合向幕僚的进度/阻塞报告同样关联到自己的任务（否则又会是「任务关联未知」）。
+    // 该回合 intent.required=false（无自动回交）；只有模型显式 submit_report 才会产生关联报告。
+    const handbackIntentTaskId = assignment?.taskId
+      ?? (typeof origin.taskId === "string" && origin.taskId !== "" ? origin.taskId
+        : origin.kind === "handback" && entry.sessionWorkflowMode === "fixed"
+          && typeof entry.assignedTaskId === "string" && entry.assignedTaskId !== "" ? entry.assignedTaskId : undefined);
     let promptOptions: RoleSessionSendOptions = { ...opts, handback: { required: requiresHandback || assignment !== undefined && !applicationNotice,
-      ...(assignment ? { taskId: assignment.taskId } : {}) } };
+      ...(handbackIntentTaskId !== undefined ? { taskId: handbackIntentTaskId } : {}) } };
     const handbackInput = origin.kind === "handback" && opts?.inputProvenance?.kind === "handback" ? opts.inputProvenance : undefined;
     const creatorReports = handbackInput?.target.roleId === entry.roleId && handbackInput.target.runtime === entry.runtime &&
       handbackInput.reports.length > 0 && handbackInput.reports.length <= 16 && handbackInput.reports.every(report =>
@@ -3697,20 +3710,31 @@ export class SessionManager {
     // （混合项目聊天解析/早期自动打开等），先安全关闭再按 fixed 新建；busy（含在跑 origin）或关闭失败 ⇒
     // fail-closed `fixed-session-rebind-blocked`——**绝不把 fixed 投递进 legacy 会话**（RR3 的 legacy
     // stable-write 卡）。该重绑只发生在 forced fixed 的内部打开上；用户/legacy 打开路径逐字不变。
+    // T3 B10.1（2026-11-11，RR5 根因 `report-task-link-broken`）：fixed 任务的目标会话还必须绑定
+    // **本次真实任务**（`assignedTaskId`）——否则 run-role 的 handback intent 没有 taskId，
+    // `submit_report` 以「任务关联未知」到达、`task.reported` 缺失、`close_created_task accepted`
+    // 报 `close-report-missing`（RR5 实测 convener/product 全中）。既有 fixed 条目未绑定本次任务
+    // （聊天打开/上一任务）时同样按 B8.1 口径安全重开；busy/关闭失败 ⇒ fail-closed。O-1 重建续段
+    // （`internalReopen`）不参与任务重绑：其 taskId 取自被重建条目自身，不能反过来打断并发新会话。
     const forcedExisting = this.sessions.get(key);
+    const fixedTaskRebindPending = forcedSessionWorkflowMode === "fixed" && !internalReopen
+      && typeof req.taskId === "string" && req.taskId !== ""
+      && forcedExisting !== undefined && forcedExisting.projectRoot === req.projectRoot
+      && forcedExisting.sessionWorkflowMode === "fixed"
+      && forcedExisting.assignedTaskId !== req.taskId;
     if (forcedSessionWorkflowMode === "fixed" && forcedExisting && forcedExisting.projectRoot === req.projectRoot
-        && forcedExisting.sessionWorkflowMode !== "fixed") {
+        && (forcedExisting.sessionWorkflowMode !== "fixed" || fixedTaskRebindPending)) {
       const rebindDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
       if (forcedExisting.busy || forcedExisting.origins.running !== undefined) {
-        rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "target-busy", previousWorkflowMode: forcedExisting.sessionWorkflowMode });
-        return { ok: false, error: "fixed-session-rebind-blocked：目标会话正在执行轮次，无法以固定模式重开（未向 legacy 会话投递）。" };
+        rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "target-busy", previousWorkflowMode: forcedExisting.sessionWorkflowMode, taskBinding: fixedTaskRebindPending ? "different-task" : "not-fixed" });
+        return { ok: false, error: "fixed-session-rebind-blocked：目标会话正在执行轮次，无法以本次固定任务重开（未向该会话投递，待其空闲后重试）。" };
       }
       const rebound = await this.disposeEntry(key, forcedExisting);
       if (rebound !== null) {
         rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "close-failed", detail: rebound });
         return { ok: false, error: `fixed-session-rebind-blocked：目标旧会话关闭失败（${rebound}），未以固定模式重开。` };
       }
-      rebindDiagnostic.record("session.fixed-rebind", { previousWorkflowMode: forcedExisting.sessionWorkflowMode });
+      rebindDiagnostic.record("session.fixed-rebind", { previousWorkflowMode: forcedExisting.sessionWorkflowMode, taskRebind: fixedTaskRebindPending });
     }
     // B-2：该角色已有**同项目**的保活会话 → 续接（句柄与模型上下文原样保留）。
     const existing = this.sessions.get(key);
@@ -4641,7 +4665,10 @@ export class SessionManager {
     if (stopped()) { await this.disposeObservedHandle(handle); return stoppedResult(); }
     const entry: LiveSession = {
       handle,
-      ...(req.taskId && (role.builtIn !== true || req.roleId === "verifier") ? { assignedTaskId: req.taskId } : {}),
+      // T3 B10.1（2026-11-11，RR5）：fixed 任务会话（convener/product/verifier 等内置角色同样）必须记录
+      // 真实受派任务 id——目标会话重绑判定、投递机同任务判定与执行清单的会话任务事实都依赖它。
+      // legacy 条件的旧语义逐字不变（内置治理角色仅 verifier 记录；fixed 会话例外）。
+      ...(req.taskId && (role.builtIn !== true || req.roleId === "verifier" || sessionWorkflowMode === "fixed") ? { assignedTaskId: req.taskId } : {}),
       ...(requestedAssignment ? { boundAssignment: requestedAssignment } : {}),
       origins: { byTurn: new Map() },
       roleId: req.roleId, runtime: req.runtime, profileRevision, interactionState,
@@ -10442,17 +10469,30 @@ ${formatted}` };
       return reject("dispatch-delivery-rejected", plan.message);
     }
     let deliveryRuntime = this.findLiveRuntime(projectRoot, targetRoleId) ?? runtime;
+    // T3 B10.1（2026-11-11，RR5 根因 `report-task-link-broken`）：固定派发必须让目标会话绑定**本次真实
+    // 任务**——open 入参携带 `taskId`（→ `openRoleSession` 的 input.taskId 与 `LiveSession.assignedTaskId`）。
+    // 否则 run-role 的 handback intent 无任务事实：convener/product/verifier 的 `submit_report` 以
+    // 「任务关联未知」到达、`task.reported` 缺失、`close_created_task accepted` 报
+    // `close-report-missing`（RR5 实测，A1/A2 调度请求被 rework 收口并重复派发）。
+    // B8.1（RR3）的强制 fixed 语义保留：目标未开、非 fixed、或 fixed 但未绑定本次任务（聊天打开/上一
+    // 任务）⇒ 以 taskId+`forcedWorkflowMode:"fixed"` 打开。`openInternalUnsafe` 对空闲的既有 fixed
+    // 会话安全 dispose 重开；busy/不可关闭 ⇒ `fixed-session-rebind-blocked` fail-closed（不清理在跑轮次）。
+    // 唯一例外 = 目标已是 fixed 且忙：本段不打开（避免把正常的「忙时入队」变成拒绝），任务入队保留，
+    // 由 drain 在目标空闲后按 taskId+forced 重绑再投——无论哪条路径，**未绑定本次任务的会话绝不会收到
+    // 该任务**（不投递、不伪造投递成功）。
     const existingTarget = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime));
-    if (!existingTarget || existingTarget.sessionWorkflowMode !== "fixed") {
-      // B1：fixed 任务不按 taskId 绑定打开目标会话（项目角色 fixed 任务作用域/内置 review 上下文属 B3）；
-      // B8.1（RR3）：固定派发的目标会话**强制 fixed**——不再依赖聊天入口按项目状态解析（混合项目/在飞
-      // legacy run 时聊天解析为 legacy；RR3 实测 convener 以 legacy 打开、收到 request_stable_write）。
-      // 既有非 fixed 条目由 `openInternalUnsafe` 安全重开（busy/不可关闭 ⇒ `fixed-session-rebind-blocked`
-      // fail-closed，任务已登记但不投递）。显式带 taskId 的打开路径仍经 `workflowModeForTask`/`workflowModeForFlow` 生效。
-      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime, forcedWorkflowMode: "fixed" }, false);
+    const existingTargetFixed = existingTarget !== undefined && existingTarget.projectRoot === projectRoot
+      && existingTarget.sessionWorkflowMode === "fixed";
+    const targetBoundToTask = existingTargetFixed && existingTarget.assignedTaskId === taskId;
+    // 忙时入队不丢（角色卡会话纪律）：fixed 目标忙时不在受理段强开/重绑——条目保留，drain 在目标空闲后
+    // 按 taskId+forced 安全重绑再投（`openInternalUnsafe` 对 busy 会话本身 fail-closed，绝不清掉在跑轮次）。
+    // 非 fixed（legacy 风险面）仍立即打开走 B8.1 的 fail-closed 拒绝（绝不把 fixed 任务留在 legacy 队列里）。
+    const targetBusy = existingTarget !== undefined && (existingTarget.busy || existingTarget.origins.running !== undefined);
+    if (!targetBoundToTask && !(existingTargetFixed && targetBusy)) {
+      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime, taskId, forcedWorkflowMode: "fixed" }, false);
       if (!opened.ok) {
         await this.recordTaskFailure(projectRoot, taskId, `delivery-target-open-failed: ${shortenSummary(opened.error ?? mainT("shared.common.unknownReason"))}`);
-        if (opened.error !== undefined && opened.error.startsWith("fixed-session-rebind-blocked")) {
+        if (opened.error !== undefined && (opened.error.startsWith("fixed-session-rebind-blocked") || opened.error.startsWith("worker-task-session-busy"))) {
           return reject("fixed-session-rebind-blocked", `${opened.error}（fixed 任务未投递；目标会话保持原状，待其空闲后重试。）`);
         }
         return reject(
@@ -12947,11 +12987,21 @@ ${formatted}` };
       : item.kind === "handback" ? item.handback?.taskId : undefined;
     const forcedDeliveryMode: WorkflowMode | undefined =
       deliveryFixedTaskId !== undefined && await this.isFixedTask(projectRoot, deliveryFixedTaskId) ? "fixed" : undefined;
+    // T3 B10.1（2026-11-11，RR5 根因 `report-task-link-broken`）：fixed **派发**条目（dispatch）的
+    // `taskId` 是目标角色本次真实受派任务——自动打开/重绑时传入（会话 `assignedTaskId` 与 run-role
+    // `input.taskId`，`submit_report` 关联的来源）。已打开但未绑定本次任务（聊天/上一任务）⇒ 安全重绑。
+    // 回交条目的 `taskId` 是**子任务**（创建者要收口的对象，不是目标会话自己的受派任务），不用于会话
+    // 绑定（误绑会让创建者自己的报告关联到子任务）；B8.2 的 forced fixed 重绑照旧。
+    const fixedOpenTaskId = forcedDeliveryMode === "fixed" && item.kind === "dispatch"
+      && typeof item.taskId === "string" && item.taskId !== "" ? item.taskId : undefined;
     const needsFixedRebind = forcedDeliveryMode === "fixed" && entry !== undefined && entry.projectRoot === projectRoot &&
       entry.sessionWorkflowMode !== "fixed";
-    if (taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId && entry?.busy) return;
+    const needsFixedTaskBind = fixedOpenTaskId !== undefined && entry !== undefined && entry.projectRoot === projectRoot
+      && entry.sessionWorkflowMode === "fixed" && boundTaskOf(entry) !== fixedOpenTaskId;
+    // 目标忙且尚未绑定本次任务 ⇒ 保持排队（settle 后重试再安全重开）；绝不把任务投进未绑定/别的任务的会话。
+    if (entry?.busy && (taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedTaskBind)) return;
     if (stopped()) return;
-    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind) {
+    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind || needsFixedTaskBind) {
       // 2026-11-05（真机缺陷「又卡住」）：生产宿主（Interface）把 `demoRuntimeAutoDeliver` 置 false ⇒
       // **演示运行时（demo）不自动开会话**。demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，
       // 用于演示"写前被拒"），自动唤醒只会得到被门禁拒绝的回合，失败结果再经回交/派发级联成 blocked
@@ -12961,11 +13011,12 @@ ${formatted}` };
         diagnostic.record("delivery.skip.demo-not-opened", { state: item.kind, targetRoleId: resolvedTarget, queueDepth: q.length });
         return;
       }
-      // 目标会话**未开**（或属于别的项目/需 fixed 重绑）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
-      // 后台开启（`userInitiated=false`）：**不抢活动角色**——用户正在看的会话不因投递而易主。
-      // B8.1：固定任务来源携带 forced fixed（legacy 任务不传）。
+      // 目标会话**未开**（或属于别的项目/需 fixed 重绑/未绑定本次任务）→ 自动开启再投（su=治理主入口；
+      // 派发目标=被派角色）。后台开启（`userInitiated=false`）：**不抢活动角色**。
+      // B8.1/B10.1：固定派发条目携带 taskId + forced fixed（legacy 任务不传）。
+      const openTaskId = taskBoundSession ? assignedDeliveryId : fixedOpenTaskId;
       const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime,
-        ...(taskBoundSession ? { taskId: assignedDeliveryId } : {}),
+        ...(openTaskId !== undefined ? { taskId: openTaskId } : {}),
         ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}) }, false);
       if (!opened.ok) {
         item.lastAttempt = { state: "blocked", code: "unknown", at: new Date(this.now()).toISOString() };

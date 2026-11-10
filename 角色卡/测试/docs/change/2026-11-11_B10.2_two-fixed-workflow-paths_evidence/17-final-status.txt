@@ -1,0 +1,22 @@
+== git status --porcelain -- src app test ==
+ M app/desktop/session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+?? test/桌面应用/b101-fixed-dispatch-task-binding.test.ts
+?? test/编排/run-role-fixed-task-context.test.ts
+
+== git diff --numstat -- test/测试 ==
+20	7	test/测试/fixed-path-full-chain.test.ts
+
+== final candidate hash ==
+826e0ccb728fcdcbabcfa6bcdb9be832fda2ade94343c4ace2c540caea3707a4 *test/测试/fixed-path-full-chain.test.ts
+39a8d0f3de04eae576369e05241ccf7b59bcf26c0a31969e407ac20458ed5a18 *test/测试/mode-switch.test.ts
+e85006ef0b4d1c4435fe28f100c477b37ea3e842b16138408dc2bf8b46e55ce7 *test/测试/b-change-scope.test.ts
+
+== frozen product hashes ==
+6539fabaf7cef81ab6103e5eab3632b855e5aca8fa40194042066d502f081a6d *app/desktop/session.ts
+0177fbe356cdf40a0181e8988709b7c1d6f94c44770df134095a34b3fec11f81 *src/pipeline/orchestration/run-role.ts
+
+== HEAD ==
+e51dbdbf0c5b4c4ae8bcc3d94f345beffa149220

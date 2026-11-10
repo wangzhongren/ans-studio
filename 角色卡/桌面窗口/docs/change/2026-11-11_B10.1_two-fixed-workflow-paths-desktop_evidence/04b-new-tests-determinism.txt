@@ -1,0 +1,4 @@
+# 新测试确定性复跑（同一文件 3 次，连续）
+run1: 9 subtests / 0 fail / 0 skipped-lines
+run2: 9 subtests / 0 fail / 0 skipped-lines
+run3: 9 subtests / 0 fail / 0 skipped-lines

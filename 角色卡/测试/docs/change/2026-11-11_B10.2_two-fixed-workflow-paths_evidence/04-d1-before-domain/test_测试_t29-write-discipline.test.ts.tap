@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: T29 纪律①：只改相关键——除目标键的值外，其余内容逐字节不变（自比对）
+ok 1 - T29 纪律①：只改相关键——除目标键的值外，其余内容逐字节不变（自比对）
+  ---
+  duration_ms: 14.0812
+  type: 'test'
+  ...
+# Subtest: T29 纪律②：已存在 → 就地替换值，键名/`=`/两侧空白/内联注释均不变
+ok 2 - T29 纪律②：已存在 → 就地替换值，键名/`=`/两侧空白/内联注释均不变
+  ---
+  duration_ms: 18.2824
+  type: 'test'
+  ...
+# Subtest: T29 纪律②：键不存在 → 追加到末尾（前文逐字节不变；沿用原行尾符）
+ok 3 - T29 纪律②：键不存在 → 追加到末尾（前文逐字节不变；沿用原行尾符）
+  ---
+  duration_ms: 10.772
+  type: 'test'
+  ...
+# Subtest: T29 纪律②：CRLF 原文 → 追加沿用 CRLF 行尾（不混行尾）
+ok 4 - T29 纪律②：CRLF 原文 → 追加沿用 CRLF 行尾（不混行尾）
+  ---
+  duration_ms: 10.1993
+  type: 'test'
+  ...
+# Subtest: T29 纪律③：值含 = 空格 引号 \# 反斜杠 → 写后读回逐字一致
+ok 5 - T29 纪律③：值含 = 空格 引号 \# 反斜杠 → 写后读回逐字一致
+  ---
+  duration_ms: 14.9712
+  type: 'test'
+  ...
+# Subtest: T29 纪律③：ANS_PI_PROVIDER 不是面板键——提交被忽略（不采纳、不落盘、已存在行原样保留）
+ok 6 - T29 纪律③：ANS_PI_PROVIDER 不是面板键——提交被忽略（不采纳、不落盘、已存在行原样保留）
+  ---
+  duration_ms: 20.1134
+  type: 'test'
+  ...
+# Subtest: T29 纪律④：写入后目录内无 temp 残留，目标内容完整（非半写）
+ok 7 - T29 纪律④：写入后目录内无 temp 残留，目标内容完整（非半写）
+  ---
+  duration_ms: 7.6362
+  type: 'test'
+  ...
+# Subtest: T29 纪律④：atomicWriteText 直接调用——内容完整、无 temp 残留、覆盖原子
+ok 8 - T29 纪律④：atomicWriteText 直接调用——内容完整、无 temp 残留、覆盖原子
+  ---
+  duration_ms: 12.1662
+  type: 'test'
+  ...
+# Subtest: T29 纪律⑤：目标目录不存在 → savePiConfig 显式失败，且不创建任何文件
+ok 9 - T29 纪律⑤：目标目录不存在 → savePiConfig 显式失败，且不创建任何文件
+  ---
+  duration_ms: 1.2984
+  type: 'test'
+  ...
+# Subtest: T29 纪律⑤：saveEnvFile 目标目录不存在 → 抛错（不静默）
+ok 10 - T29 纪律⑤：saveEnvFile 目标目录不存在 → 抛错（不静默）
+  ---
+  duration_ms: 1.1196
+  type: 'test'
+  ...
+# Subtest: T29 纪律⑤：readEnvFile 目标不存在 → 抛错（读取失败显式，不返回空）
+ok 11 - T29 纪律⑤：readEnvFile 目标不存在 → 抛错（读取失败显式，不返回空）
+  ---
+  duration_ms: 0.6485
+  type: 'test'
+  ...
+# Subtest: T29 纪律⑤：目标是一个目录 → 抛错，且该目录不被损坏
+ok 12 - T29 纪律⑤：目标是一个目录 → 抛错，且该目录不被损坏
+  ---
+  duration_ms: 4.1927
+  type: 'test'
+  ...
+# Subtest: T29 纪律⑥：哨兵 token —— 只进 env；回报/错误/视图文本一律不含其值
+ok 13 - T29 纪律⑥：哨兵 token —— 只进 env；回报/错误/视图文本一律不含其值
+  ---
+  duration_ms: 13.6822
+  type: 'test'
+  ...
+# Subtest: T29 纪律⑥：非面板键被忽略——不越界写入（哨兵值不得落盘）
+ok 14 - T29 纪律⑥：非面板键被忽略——不越界写入（哨兵值不得落盘）
+  ---
+  duration_ms: 9.7978
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 219.6944

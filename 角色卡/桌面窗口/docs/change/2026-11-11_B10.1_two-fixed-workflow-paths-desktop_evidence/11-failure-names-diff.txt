@@ -1,0 +1,9 @@
+before-unique 98
+after-unique 102
+shared 98
+after-only 4
++ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
++ W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
++ 已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
++ 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+before-only 0

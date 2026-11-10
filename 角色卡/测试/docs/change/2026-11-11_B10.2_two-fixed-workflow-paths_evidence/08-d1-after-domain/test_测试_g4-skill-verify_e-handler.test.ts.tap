@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行
+not ok 1 - 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行
+  ---
+  duration_ms: 25.2206
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\g4-skill-verify\\e-handler.test.ts:29:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    无轮次 ⇒ 护栏拒绝
+    + actual - expected
+    
+    + 'effect-scope-unproven'
+    - 'not-customer-turn'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'not-customer-turn'
+  actual: 'effect-scope-unproven'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/e-handler.test.ts:40:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 拒绝分支矩阵：role-not-found / not-registered / role-not-listed / registration-unchanged——回执如实、零副作用
+ok 2 - 拒绝分支矩阵：role-not-found / not-registered / role-not-listed / registration-unchanged——回执如实、零副作用
+  ---
+  duration_ms: 39.0336
+  type: 'test'
+  ...
+# Subtest: 成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 会话已重建；[系统·安装] 真投递且不可撤回
+ok 3 - 成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 会话已重建；[系统·安装] 真投递且不可撤回
+  ---
+  duration_ms: 149.1408
+  type: 'test'
+  ...
+# Subtest: 成功路径（next-session 两支）：在跑不打断（无 note）；无会话（note 如实、不自动开）
+ok 4 - 成功路径（next-session 两支）：在跑不打断（无 note）；无会话（note 如实、不自动开）
+  ---
+  duration_ms: 16.9177
+  type: 'test'
+  ...
+# Subtest: rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/不假装已生效；不投系统行
+ok 5 - rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/不假装已生效；不投系统行
+  ---
+  duration_ms: 8.7533
+  type: 'test'
+  ...
+# Subtest: 卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:true/uninstalled；系统行「效果已撤，文件保留」二分
+ok 6 - 卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:true/uninstalled；系统行「效果已撤，文件保留」二分
+  ---
+  duration_ms: 84.5241
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 745.5557

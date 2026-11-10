@@ -1,0 +1,202 @@
+TAP version 13
+# Subtest: merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+ok 1 - merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+  ---
+  duration_ms: 0.9132
+  type: 'test'
+  ...
+# Subtest: TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+ok 2 - TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+  ---
+  duration_ms: 0.1357
+  type: 'test'
+  ...
+# Subtest: DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+ok 3 - DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+  ---
+  duration_ms: 0.099
+  type: 'test'
+  ...
+# Subtest: 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+ok 4 - 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+  ---
+  duration_ms: 0.1247
+  type: 'test'
+  ...
+# Subtest: ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+ok 5 - ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+  ---
+  duration_ms: 0.4123
+  type: 'test'
+  ...
+# Subtest: ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+ok 6 - ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+  ---
+  duration_ms: 0.2691
+  type: 'test'
+  ...
+# Subtest: ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+ok 7 - ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+  ---
+  duration_ms: 0.2468
+  type: 'test'
+  ...
+# Subtest: dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+ok 8 - dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+  ---
+  duration_ms: 1.1834
+  type: 'test'
+  ...
+# Subtest: contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）
+ok 9 - contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）
+  ---
+  duration_ms: 0.177
+  type: 'test'
+  ...
+# Subtest: dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+ok 10 - dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+  ---
+  duration_ms: 1.2223
+  type: 'test'
+  ...
+# Subtest: fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+ok 11 - fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+  ---
+  duration_ms: 3.4885
+  type: 'test'
+  ...
+# Subtest: fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+ok 12 - fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.4764
+  type: 'test'
+  ...
+# Subtest: legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+ok 13 - legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+  ---
+  duration_ms: 0.5359
+  type: 'test'
+  ...
+# Subtest: fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+ok 14 - fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.6632
+  type: 'test'
+  ...
+# Subtest: fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+ok 15 - fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+  ---
+  duration_ms: 0.2141
+  type: 'test'
+  ...
+# Subtest: fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+ok 16 - fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+  ---
+  duration_ms: 0.4017
+  type: 'test'
+  ...
+# Subtest: fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+ok 17 - fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.6154
+  type: 'test'
+  ...
+# Subtest: legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+ok 18 - legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+  ---
+  duration_ms: 0.4263
+  type: 'test'
+  ...
+# Subtest: fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+ok 19 - fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.5299
+  type: 'test'
+  ...
+# Subtest: WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+ok 20 - WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+  ---
+  duration_ms: 0.1523
+  type: 'test'
+  ...
+# Subtest: dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+ok 21 - dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+  ---
+  duration_ms: 0.892
+  type: 'test'
+  ...
+# Subtest: merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+ok 22 - merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+  ---
+  duration_ms: 0.0838
+  type: 'test'
+  ...
+# Subtest: requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+ok 23 - requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+  ---
+  duration_ms: 2.0259
+  type: 'test'
+  ...
+# Subtest: complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+ok 24 - complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+  ---
+  duration_ms: 1.9108
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传
+ok 25 - complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传
+  ---
+  duration_ms: 1.1928
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+ok 26 - complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+  ---
+  duration_ms: 0.4256
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+ok 27 - complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+  ---
+  duration_ms: 0.2994
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+ok 28 - complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+  ---
+  duration_ms: 0.4467
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+ok 29 - complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+  ---
+  duration_ms: 0.2851
+  type: 'test'
+  ...
+# Subtest: complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+ok 30 - complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+  ---
+  duration_ms: 0.2038
+  type: 'test'
+  ...
+# Subtest: RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+ok 31 - RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+  ---
+  duration_ms: 0.1282
+  type: 'test'
+  ...
+# Subtest: request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+ok 32 - request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+  ---
+  duration_ms: 0.1341
+  type: 'test'
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 741.3898

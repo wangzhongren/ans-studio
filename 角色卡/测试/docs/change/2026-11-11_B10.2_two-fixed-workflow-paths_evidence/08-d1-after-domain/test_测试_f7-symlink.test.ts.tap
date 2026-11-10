@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: F7:经 junction/符号链接逃逸出根 → 拒绝
+ok 1 - F7:经 junction/符号链接逃逸出根 → 拒绝
+  ---
+  duration_ms: 1.6056
+  type: 'test'
+  ...
+# Subtest: F7 对照:根内的普通路径仍允许
+ok 2 - F7 对照:根内的普通路径仍允许
+  ---
+  duration_ms: 1.5022
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 151.9408

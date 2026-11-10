@@ -9,11 +9,11 @@
 //   1. 混合项目（在飞 legacy run + fixed workflow）：聊天入口解析为 legacy、workflow 账本按 per-flow 为
 //      fixed ⇒ fixed stage-request 派发自动打开的目标 convener 会话仍**强制 fixed**（open 入参带
 //      `workflowMode:"fixed"`、无 legacy 工具面尤其 `request_stable_write`、fixed context 与 fixed
-//      `contract_check` 视图）；打开不按 taskId 绑定（无 taskId 也 fixed——账本可见性与聊天解析不一致的竞态）。
+//      `contract_check` 视图）；同时（B10.1 起：RR5 报告关联缺陷）目标会话携带本次真实任务 taskId。
 //   2. 已存在的 legacy convener 会话 ⇒ 安全关闭（旧句柄 dispose）并以 fixed 重开；投递落在新会话。
 //   3. 已存在的 legacy convener 会话 busy ⇒ fail-closed `fixed-session-rebind-blocked`：不关闭、不投递
 //      （任务已登记但如实记失败；绝不向 legacy 会话投递）。
-//   4. 投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（固定任务来源；任务条目无 taskId 绑定也生效）。
+//   4. 投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed 且携带真实任务 taskId（固定任务来源）。
 //   5. legacy（非固定）任务投递自动打开目标 ⇒ 不传强制模式，目标仍 legacy 注入（旧路径逐字不变）。
 //   6. forced fixed 打开触发的 O-1 边界陈旧重建 ⇒ 重建后的会话仍 fixed（强制模式透传内部重开）。
 // 不新增 skip/force-exit；旧断言不变。
@@ -283,7 +283,11 @@ test("混合项目（聊天 legacy / flow fixed）：fixed stage-request 派发�
     const convener = h.inputs.find((input) => input.roleId === "convener");
     assert.ok(convener !== undefined, "目标 convener 会话应被自动打开");
     assert.equal(convener!.workflowMode, "fixed", "目标会话必须强制 fixed（RR3：legacy 打开 ⇒ request_stable_write 卡）");
-    assert.equal(convener!.taskId, undefined, "fixed 派发不按 taskId 绑定打开（无 taskId 也 fixed）");
+    // T3 B10.1（2026-11-11，RR5 根因 `report-task-link-broken`）：固定派发的目标会话必须绑定本次真实
+    // stage-request 任务 id（`submit_report` 关联来源）；旧断言「不按 taskId 绑定」已被本批取代。
+    const requestTask = [...(await readTaskState(root)).records.values()].find((item) => item.created?.taskKind === "stage-request");
+    assert.ok(requestTask?.created, "stage-request 任务应已创建");
+    assert.equal(convener!.taskId, requestTask!.taskId, "fixed 派发目标会话携带真实 stage-request taskId（B10.1）");
     // legacy 工具面缺席（尤其 request_stable_write / legacy Git / VCA / stable 许可）。
     for (const tool of ["requestStableWrite", "submitRefactor", "submitVersionChange", "requestVersionDecision",
       "stablePermitOf", "gitQuery", "gitCandidate", "gitPublish"]) {
@@ -379,7 +383,7 @@ test("已存在 legacy convener 会话 busy ⇒ fixed-session-rebind-blocked fai
 
 // ══════════════════════════ 4. 投递机 drain 自动打开固定任务目标 ⇒ 强制 fixed ══════════════════════════
 
-test("投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（无 taskId 绑定、无 legacy 工具）", async () => {
+test("投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（B10.1：携带真实任务 taskId、无 legacy 工具）", async () => {
   const root = await makeRoot("ans-b81-drain-fixed-");
   const h = harness(root);
   try {
@@ -396,7 +400,7 @@ test("投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（�
     const convener = h.inputs.find((input) => input.roleId === "convener");
     assert.ok(convener !== undefined, "drain 应自动打开目标会话");
     assert.equal(convener!.workflowMode, "fixed", "固定任务来源 ⇒ drain 自动打开也强制 fixed");
-    assert.equal(convener!.taskId, undefined, "内置目标不按 taskId 绑定打开（仍 fixed）");
+    assert.equal(convener!.taskId, taskId, "B10.1：drain 自动打开同样携带真实任务 taskId");
     assert.equal(convener!.requestStableWrite, undefined, "drain 打开的 fixed 会话无 request_stable_write");
     assert.equal(convener!.closeCreatedTaskFixed !== undefined, true, "fixed context/应用能力在场");
     await waitUntil(() => (h.sent.convener?.length ?? 0) > 0);

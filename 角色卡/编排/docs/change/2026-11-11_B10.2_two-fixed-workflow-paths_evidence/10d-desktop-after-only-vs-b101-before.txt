@@ -1,0 +1,4 @@
+P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）

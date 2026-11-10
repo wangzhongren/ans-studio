@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: A1 五值冻结：恰 off/low/medium/high/xhigh 五枚，顺序即产品档位梯，数组本体冻结（写入抛错）
+ok 1 - A1 五值冻结：恰 off/low/medium/high/xhigh 五枚，顺序即产品档位梯，数组本体冻结（写入抛错）
+  ---
+  duration_ms: 0.9791
+  type: 'test'
+  ...
+# Subtest: A2 env 键逐字：三键三名恰等冻结符号；键面不含 demo；跨键读取不串
+ok 2 - A2 env 键逐字：三键三名恰等冻结符号；键面不含 demo；跨键读取不串
+  ---
+  duration_ms: 0.1624
+  type: 'test'
+  ...
+# Subtest: A3 纯读快照：resolve 按传入 env 快照读（不偷看 process.env）；缺键＝unset 而非 undefined 异常
+ok 3 - A3 纯读快照：resolve 按传入 env 快照读（不偷看 process.env）；缺键＝unset 而非 undefined 异常
+  ---
+  duration_ms: 0.0942
+  type: 'test'
+  ...
+# Subtest: A4 未设态：undefined/null/空串/纯空白（空格/tab/换行/混排）一律 unset——静默合法默认态
+ok 4 - A4 未设态：undefined/null/空串/纯空白（空格/tab/换行/混排）一律 unset——静默合法默认态
+  ---
+  duration_ms: 0.465
+  type: 'test'
+  ...
+# Subtest: A5 合法态：五值原样、大小写混合、前后空白、全大写（trim+忽略大小写）⇒ set（规范小写形）
+ok 5 - A5 合法态：五值原样、大小写混合、前后空白、全大写（trim+忽略大小写）⇒ set（规范小写形）
+  ---
+  duration_ms: 0.1756
+  type: 'test'
+  ...
+# Subtest: A6 非法 10 类：平台侧档/中文标签/数字/布尔/组合串/全角/emoji/URL 样——一律 invalid，绝不猜档
+ok 6 - A6 非法 10 类：平台侧档/中文标签/数字/布尔/组合串/全角/emoji/URL 样——一律 invalid，绝不猜档
+  ---
+  duration_ms: 0.0957
+  type: 'test'
+  ...
+# Subtest: A7 invalid.raw 截断：>64 字符按前 64 字符截断（诊断素材有界）；恰 64 不截
+ok 7 - A7 invalid.raw 截断：>64 字符按前 64 字符截断（诊断素材有界）；恰 64 不截
+  ---
+  duration_ms: 0.0664
+  type: 'test'
+  ...
+# Subtest: A8 三态互斥完备：任意输入恰归一种态（无二义、无漏网）
+ok 8 - A8 三态互斥完备：任意输入恰归一种态（无二义、无漏网）
+  ---
+  duration_ms: 0.0899
+  type: 'test'
+  ...
+# Subtest: A9 isReasoningEffortV1：逐字（大小写敏感）判定；非字符串一律 false
+ok 9 - A9 isReasoningEffortV1：逐字（大小写敏感）判定；非字符串一律 false
+  ---
+  duration_ms: 0.103
+  type: 'test'
+  ...
+# Subtest: A10 文案常量：事件 summary「已思考」与诊断 summary「推理内容无法安全显示」逐字冻结
+ok 10 - A10 文案常量：事件 summary「已思考」与诊断 summary「推理内容无法安全显示」逐字冻结
+  ---
+  duration_ms: 0.1096
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 77.035

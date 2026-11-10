@@ -1,0 +1,46 @@
+// B10.1 写集外依赖探针（只读）：真实 run-role 在 fixed verifier 任务带 taskId 打开时的行为。
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { taskEvent, appendTaskEvent } from "../../src/common/编排/task-state.ts";
+import { openRoleSession, type AdapterCapabilities } from "../../src/pipeline/orchestration/run-role.ts";
+import type { RoleSession, SessionEvent } from "../../src/model/runtime.ts";
+import type { ProjectConfig } from "../../src/model/role.ts";
+
+const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-b101-verifier-probe-"));
+try {
+  await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+  const appended = await appendTaskEvent(root, taskEvent("task.created", {
+    taskId: "t-probe-fixed-review", from: "chief", to: "verifier", text: "A12a review", flowId: "snake",
+    workflowId: "wf-probeverifier000000000000001", stage: "A12a", sideEffect: "read-only", idempotencyKey: "probe-verifier-1",
+  }));
+  console.log("append:", JSON.stringify(appended));
+  const project: ProjectConfig = {
+    projectRoot: root, skillRoot: root, roles: {}, governanceModel: "trio", builtInRoles: ["verifier"],
+    governanceBoundary: { path: "角色卡/governance-boundary.yaml", acceptance: { accepted: true, source: "test:b101-probe" } },
+  };
+  const factory = (_gate: unknown, _caps?: AdapterCapabilities) => {
+    const session: RoleSession = {
+      async prompt(): Promise<void> {},
+      events(): AsyncIterable<SessionEvent> {
+        return (async function* () { yield { kind: "settled" as const, summary: "完成" }; })();
+      },
+      async dispose(): Promise<void> {},
+    };
+    return {
+      session,
+      async dispose(): Promise<void> {},
+      capabilities(): AdapterCapabilities { return {}; },
+    } as never;
+  };
+  try {
+    const handle = await openRoleSession(
+      { roleId: "verifier", project, taskId: "t-probe-fixed-review", workflowMode: "fixed" } as never,
+      { createAdapter: factory as never },
+    );
+    console.log("OPEN_OK", typeof handle);
+    await handle.dispose();
+  } catch (error) {
+    console.log("OPEN_THROW:", error instanceof Error ? error.message : String(error));
+  }
+} finally { await fs.rm(root, { recursive: true, force: true, maxRetries: 10 }); }

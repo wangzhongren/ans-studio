@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: E1 四棵树：确认制要点段写明四棵（docs/su/contracts/skills/mcp）免逐次确认；重建不受影响
+ok 1 - E1 四棵树：确认制要点段写明四棵（docs/su/contracts/skills/mcp）免逐次确认；重建不受影响
+  ---
+  duration_ms: 0.4467
+  type: 'test'
+  ...
+# Subtest: E2 MCP 段四要点全检：仅客户明示/无二次卡/先落盘再激活+凭据不入文件/卸载二分+副作用不可撤
+ok 2 - E2 MCP 段四要点全检：仅客户明示/无二次卡/先落盘再激活+凭据不入文件/卸载二分+副作用不可撤
+  ---
+  duration_ms: 0.1206
+  type: 'test'
+  ...
+# Subtest: E3 工具纪律与如实话术：装/卸如实报告 path/digest（回执为准）＋生效态两分支
+ok 3 - E3 工具纪律与如实话术：装/卸如实报告 path/digest（回执为准）＋生效态两分支
+  ---
+  duration_ms: 0.0696
+  type: 'test'
+  ...
+# Subtest: E4 J-1 守卫全检：全文小句级零违规；MCP 段同样零违规；「受审」类小句必须否定式
+ok 4 - E4 J-1 守卫全检：全文小句级零违规；MCP 段同样零违规；「受审」类小句必须否定式
+  ---
+  duration_ms: 0.5866
+  type: 'test'
+  ...
+# Subtest: E5 谓词非空洞（变异捕获）：注入肯定式「授权/放行」与「即逐调用受审」必须被同款谓词猎出
+ok 5 - E5 谓词非空洞（变异捕获）：注入肯定式「授权/放行」与「即逐调用受审」必须被同款谓词猎出
+  ---
+  duration_ms: 0.244
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 158.1685

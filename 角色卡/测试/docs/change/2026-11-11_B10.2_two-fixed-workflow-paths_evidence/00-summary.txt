@@ -1,0 +1,13 @@
+B10.2（测试）两条固定工作流路径——全链自动打开 taskId 断言同步
+日期：2026-11-11
+工作区：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+分支/HEAD：feat/two-fixed-workflow-paths / e51dbdb（未提交）
+冻结产品树：app/desktop/session.ts 6539fabaf7cef81ab6103e5eab3632b855e5aca8fa40194042066d502f081a6d
+             src/pipeline/orchestration/run-role.ts 0177fbe356cdf40a0181e8988709b7c1d6f94c44770df134095a34b3fec11f81
+候选：test/测试/fixed-path-full-chain.test.ts（9ae80c57… -> 826e0ccb…，+20/-7）
+测试：全链 3/3（06/06b/06c；编排并行复跑 3/3）；mode-switch 3/3 + b-change-scope 2/2；typecheck before/after exit 0
+D1：before 711/653/39/1/18（40 失败名 = known-red 39 + 路径 A）
+    after 原始 700/642/39/1/18 + 2 watchdog；归一化 711/654/38/1/18（39 = B5.3 known-red）
+    diff 归一化 added 0 / removed 1；after vs B5.3 known-red added 0 / removed 0；skip 18->18
+结论：known red 39/39 不恶化；新增确定性失败 = 0；新 skip = 0；写集外 diff = 0；写集外需求 = 0
+未提交/未推送/未合并/未发布；未改产品代码（src/app 零本批 diff）

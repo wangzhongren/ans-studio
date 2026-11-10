@@ -1,0 +1,9 @@
+== sha256/bytes/lines (B10.2 write set) ==
+0177fbe356cdf40a0181e8988709b7c1d6f94c44770df134095a34b3fec11f81  src/pipeline/orchestration/run-role.ts bytes=293086 lines=4514
+9307b5abc4352d2fbf09f054d1417aa7c98e2dd6d7a34b7401097f57fd87844d  test/编排/run-role-fixed-task-context.test.ts bytes=12795 lines=316
+
+== git diff --numstat (B10.2 src) ==
+61	1	src/pipeline/orchestration/run-role.ts
+
+== aggregate sha256 (concatenated sha256 lines, sorted) ==
+10b3932e09af5fe30650975d59354e41bb6d04edb521fec3fb6b055656874ffe *-

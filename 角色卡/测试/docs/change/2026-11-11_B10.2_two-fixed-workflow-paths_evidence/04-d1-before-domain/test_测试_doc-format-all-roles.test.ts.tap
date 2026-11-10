@@ -1,0 +1,43 @@
+TAP version 13
+# Subtest: B5/TM-13/AC-9 注册矩阵：6 内置治理角色 + 旧 su + 动态项目角色经真实 openRoleSession 均注册 doc_format
+ok 1 - B5/TM-13/AC-9 注册矩阵：6 内置治理角色 + 旧 su + 动态项目角色经真实 openRoleSession 均注册 doc_format
+  ---
+  duration_ms: 116.3533
+  type: 'test'
+  ...
+# 注册矩阵 8/8：chief,product,rapporteur,nominator,convener,verifier,su,worker-doc-format-b5
+# Subtest: B5 注入才注册（动态项目角色）：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只且其它工具定义/顺序逐字不变
+ok 2 - B5 注入才注册（动态项目角色）：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只且其它工具定义/顺序逐字不变
+  ---
+  duration_ms: 24.1129
+  type: 'test'
+  ...
+# Subtest: B5/AC-9 judge 与有界 Chief 隔离：judge 恰三只无 doc_format；有界 Chief 恰 decide_pending_request（提供 docFormat 也不注册）
+ok 3 - B5/AC-9 judge 与有界 Chief 隔离：judge 恰三只无 doc_format；有界 Chief 恰 decide_pending_request（提供 docFormat 也不注册）
+  ---
+  duration_ms: 7.1245
+  type: 'test'
+  ...
+# Subtest: B5/TM-13 数据源：全部角色返回同一静态索引（无角色裁剪）；索引/详情零 getListing/refresh/文件 IO、不含项目/角色事实
+ok 4 - B5/TM-13 数据源：全部角色返回同一静态索引（无角色裁剪）；索引/详情零 getListing/refresh/文件 IO、不含项目/角色事实
+  ---
+  duration_ms: 88.2025
+  type: 'test'
+  ...
+# 数据源 8/8 同源：索引 5244 B；已知 id 54 个
+# Subtest: B5/TM-13 可调用：8 个角色会话的 doc_format 经真实轮次可调用（索引/详情 ok:true、未知 ok:false）；同输入同文本、目录不变、无额外事件/落盘
+ok 5 - B5/TM-13 可调用：8 个角色会话的 doc_format 经真实轮次可调用（索引/详情 ok:true、未知 ok:false）；同输入同文本、目录不变、无额外事件/落盘
+  ---
+  duration_ms: 343.1719
+  type: 'test'
+  ...
+# 可调用 8/8 角色 × 5 次 = 40 次工具调用；未知 ok:false 与注册表未知文本一致
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1002.2646

@@ -1,0 +1,198 @@
+TAP version 13
+# Subtest: B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed；submit_report 关联 task.reported；close accepted 由 close-report-missing 转成功
+not ok 1 - B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed；submit_report 关联 task.reported；close accepted 由 close-report-missing 转成功
+  ---
+  duration_ms: 30.6628
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:358:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    目标会话 open 入参必须携带真实 stage-request taskId
+    + actual - expected
+    
+    + undefined
+    - 't-mwb75g54-01977649'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-mwb75g54-01977649'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:375:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: B10.1 生产派发：内置 product 目标会话带生产任务 taskId；product 报告关联；convener close accepted 成功
+not ok 2 - B10.1 生产派发：内置 product 目标会话带生产任务 taskId；product 报告关联；convener close accepted 成功
+  ---
+  duration_ms: 31.3165
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:416:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    内置 product 目标会话同样带真实生产任务 taskId
+    + actual - expected
+    
+    + undefined
+    - 't-mwb75g63-707843e0'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-mwb75g63-707843e0'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:440:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B10.1 drain：fixed 派发条目自动打开目标会话传真实 taskId + forced fixed
+not ok 3 - B10.1 drain：fixed 派发条目自动打开目标会话传真实 taskId + forced fixed
+  ---
+  duration_ms: 9.9731
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:472:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    drain 自动打开同样携带真实 taskId
+    + actual - expected
+    
+    + undefined
+    - 't-b101-drain-fixed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-b101-drain-fixed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:491:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B10.1 重绑：既有固定 chat 会话无任务绑定 ⇒ dispose + 以 taskId 重开，投递落新会话
+not ok 4 - B10.1 重绑：既有固定 chat 会话无任务绑定 ⇒ dispose + 以 taskId 重开，投递落新会话
+  ---
+  duration_ms: 21.5399
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:504:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    无任务绑定的固定 chat 会话应安全关闭一次
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:521:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B10.1 busy：未绑定的固定会话 busy ⇒ openInternal fail-closed（fixed-session-rebind-blocked），受理后不投递；空闲后 drain 以 taskId 重绑续投
+not ok 5 - B10.1 busy：未绑定的固定会话 busy ⇒ openInternal fail-closed（fixed-session-rebind-blocked），受理后不投递；空闲后 drain 以 taskId 重绑续投
+  ---
+  duration_ms: 3.6534
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:537:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    busy 会话的 taskId+fixed 重绑必须 fail-closed
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:549:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B10.1 busy：固定会话已绑定另一任务 ⇒ 受理后不投递，空闲后重绑到本次任务（不投进绑定别的任务的会话）
+not ok 6 - B10.1 busy：固定会话已绑定另一任务 ⇒ 受理后不投递，空闲后重绑到本次任务（不投进绑定别的任务的会话）
+  ---
+  duration_ms: 3.8868
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:584:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 't-b101-other-task'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-b101-other-task'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:595:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B10.1 verifier：A12a 直派目标会话带真实 review 任务 taskId + forced fixed
+not ok 7 - B10.1 verifier：A12a 直派目标会话带真实 review 任务 taskId + forced fixed
+  ---
+  duration_ms: 39.6825
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:623:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    verifier 目标会话带真实 review 任务 taskId
+    + actual - expected
+    
+    + undefined
+    - 't-mwb75g8f-4617a519'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-mwb75g8f-4617a519'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:643:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B10.1 legacy 不变：legacy 任务自动打开目标不带 taskId/forced；fixed chat（chief 无 taskId）仍 forced fixed
+ok 8 - B10.1 legacy 不变：legacy 任务自动打开目标不带 taskId/forced；fixed chat（chief 无 taskId）仍 forced fixed
+  ---
+  duration_ms: 31.8457
+  type: 'test'
+  ...
+# Subtest: B10.1 fixed 回交回合：目标会话已绑定真实任务 ⇒ handback intent 沿用该 taskId（创建者显式进度报告可关联）
+not ok 9 - B10.1 fixed 回交回合：目标会话已绑定真实任务 ⇒ handback intent 沿用该 taskId（创建者显式进度报告可关联）
+  ---
+  duration_ms: 12.5631
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b101\\before-head\\test\\桌面应用\\b101-fixed-dispatch-task-binding.test.ts:698:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 't-b101-hb-parent'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 't-b101-hb-parent'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b101/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b101-fixed-dispatch-task-binding.test.ts:719:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 1
+# fail 8
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 637.014

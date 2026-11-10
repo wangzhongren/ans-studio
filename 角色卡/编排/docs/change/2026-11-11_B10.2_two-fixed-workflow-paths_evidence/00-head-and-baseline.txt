@@ -1,0 +1,14 @@
+worktree: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch: feat/two-fixed-workflow-paths
+HEAD: e51dbdbf0c5b4c4ae8bcc3d94f345beffa149220
+HEAD short: e51dbdb docs(test): RR5 reaches A3 but exposes report-task-link defect; test-side early stop disclosed
+node: v24.22.1
+baseline: HEAD e51dbdb + B10.1 working-tree changes (app/desktop/session.ts, test/桌面应用/b81..., new b101 test)
+b10.2 src baseline blob: 3a2c44e8d843a6c9a24e9d8f546599e4ba48b52a
+--- git status (write-set relevant) ---
+ M app/desktop/session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+?? test/桌面应用/b101-fixed-dispatch-task-binding.test.ts
+?? test/编排/run-role-fixed-task-context.test.ts

@@ -1,0 +1,5 @@
+before entries: 39
+after entries: 40
+added (after only): 1
++ test/测试/fixed-path-full-chain.test.ts :: 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered
+removed (before only): 0

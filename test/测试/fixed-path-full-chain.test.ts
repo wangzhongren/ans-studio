@@ -33,6 +33,11 @@
 // `change.scope-decided` 由 B3 advance stage-request 受理生产接线写入（fixture 提供文件级候选路径）。
 // 测试只断言账本/状态（生产接线证据见 B5.2 记录与 `_evidence/`）。
 //
+// **B10.2 断言同步（2026-11-11）**：B10.1 起 fixed 派发的**自动打开目标会话携带本次真实任务 taskId**
+// （`input.taskId === srA1.taskId`，即 run-role `submit_report` 的任务关联来源）；B6.2 旧断言「自动打开 =
+// 无 taskId 聊天会话」按 B10.1 规格同步。固定 chat（chief 无 taskId）仍无任务绑定；legacy 自动打开不带
+// taskId（旧路径，桌面 b101/b81 覆盖，本域未改）。
+//
 // 夹具：真实临时 Git 仓库 + 真实应用服务/账本 + 假 openRoleSession/模型回执/客户作答；
 // 不启动 Electron/真实模型/网络；确定性（无 setTimeout 竞争断言；事件迭代器仅维持会话存活）。
 // 无新增 skip/force-exit。
@@ -431,6 +436,7 @@ const FIXED_CHIEF_WORKFLOW_V2_PATH = path.resolve(
  * 与 B6.1 桌面测试同口径（真实 SessionManager；本测试额外把同一入参交给真实编排，见下）。
  */
 function assertFixedChiefChatEntry(input: CapturedInput): void {
+  assert.equal(input.taskId, undefined, "固定 chat 入口不携带 taskId（B10.1 保留旧语义：聊天无任务绑定）");
   assert.equal(input.workflowMode, "fixed", "空项目无 taskId 幕僚聊天必须向编排传 workflowMode:\"fixed\"（B6.1 聊天入口）");
   assert.equal(typeof input.workflowModeForFlow, "function", "per-flow 回调与常量并存（legacy/混合项目路径不变）");
   for (const legacyTool of ["gitQuery", "gitCandidate", "gitPublish", "requestVersionDecision"] as const) {
@@ -541,12 +547,15 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     assert.equal(srA1.created?.sideEffect, "read-only");
     assert.equal(srA1.created?.runId, undefined, "fixed stage-request 不得带 runId");
     // B6.2：投递自动打开的目标会话也走聊天入口按项目状态解析 ⇒ fixed（B6.1 修复；不再以 legacy 注入）。
-    // 路由在返回前已同步完成目标会话打开（routeFixedPathDispatch → openInternal），故此处可直接断言。
-    const convenerAutoOpen = h.inputs.filter((input) => input.roleId === "convener" && input.taskId === undefined).at(-1);
-    assert.ok(convenerAutoOpen !== undefined, "首个 stage-request 投递应自动打开运营会话");
+    // T3 B10.1（2026-11-11）：fixed 派发的自动打开还必须携带**本次真实 stage-request taskId**（目标会话
+    // `assignedTaskId` / run-role `input.taskId`；`submit_report` 的任务关联来源）。B6.2 旧断言「自动打开 =
+    // 无 taskId 聊天会话」已被本批取代；路由在返回前已同步完成目标会话打开，故此处可直接断言。
+    const convenerAutoOpen = h.inputs.filter((input) => input.roleId === "convener" && input.taskId === srA1.taskId).at(-1);
+    assert.ok(convenerAutoOpen !== undefined, "首个 stage-request 投递应自动打开运营会话（B10.1：携带真实 taskId）");
     assert.equal(convenerAutoOpen!.workflowMode, "fixed", "自动打开的目标会话同样注入 fixed（B6.1 聊天入口）");
-    // 仍需先停止、再按 fixed 任务重开：close_created_task v2 / complete_team_plan v4 只在 taskId 绑定的
-    // fixed 会话中注入（无 taskId 聊天入口只有 fixed 常量/工具面）。
+    assert.equal(convenerAutoOpen!.taskId, srA1.taskId, "自动打开的目标会话绑定本次真实 stage-request taskId（B10.1）");
+    // B10.1 起自动打开已绑定本次任务；此处仍显式停止后按同一 taskId 重开，延续既有显式入口覆盖
+    // （close_created_task v2 / complete_team_plan v4 于 taskId 绑定会话注入；重开续接同一任务事实）。
     await h.mgr.stop("chief");
     await h.mgr.stop("convener");
     chief = await openRole(h, root, "chief", srA1.taskId);
@@ -769,9 +778,13 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     releaseSource(h.mgr, live);
     assert.equal(a9Dispatch.ok, true, a9Dispatch.message ?? "");
     const srA9 = await findOpenStageRequest(root, "A9");
-    assert.equal(typeof convener.completeTeamPlan, "function", "fixed 会话应注入 complete_team_plan v4");
+    // B10.1：fixed 派发按本次任务安全重绑目标会话 ⇒ 应用工具实现绑定**当前**会话句柄；测试须取 A9 重绑
+    // 后的最新 convener 入参（旧聊天/上一任务的句柄已 dispose，complete_team_plan 的句柄一致性检查会拒绝）。
+    const convenerA9 = h.inputs.filter((input) => input.roleId === "convener" && input.taskId === srA9.taskId).at(-1);
+    assert.ok(convenerA9 !== undefined, "A9 派发应以本次任务重绑并打开运营会话（B10.1）");
+    assert.equal(typeof convenerA9!.completeTeamPlan, "function", "fixed 会话应注入 complete_team_plan v4");
     convenerLive = liveSource(h.mgr, root, "convener", { taskId: srA9.taskId });
-    const planReceipt = await convener.completeTeamPlan!({
+    const planReceipt = await convenerA9!.completeTeamPlan!({
       operationId: "op-a9-baseline", flowId: FLOW,
       plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(TEAM_PLAN_TEXT) },
     }) as { ok: boolean; status?: string; errorCode?: string; message?: string };

@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: I1 mcpServersOverride：单条 root map（转义往返含引号/空格/反斜杠/注入串）；定义＋禁用同一图；零条目 ⇒ 不产覆盖
+ok 1 - I1 mcpServersOverride：单条 root map（转义往返含引号/空格/反斜杠/注入串）；定义＋禁用同一图；零条目 ⇒ 不产覆盖
+  ---
+  duration_ms: 1.0748
+  type: 'test'
+  ...
+# Subtest: I2 prepareInstalledMcpServers：名集恰判/保留名/清洗碰撞拒绝；env:NAME 快照展开（缺失⇒不带入不拦会话）；坏形状抛错
+ok 2 - I2 prepareInstalledMcpServers：名集恰判/保留名/清洗碰撞拒绝；env:NAME 快照展开（缺失⇒不带入不拦会话）；坏形状抛错
+  ---
+  duration_ms: 0.6131
+  type: 'test'
+  ...
+# Subtest: I3 协议纯函数：mcpToolName 清洗桥形；mcpToolCallNative 字段全集三态（文本/非文本/失败/error）
+ok 3 - I3 协议纯函数：mcpToolName 清洗桥形；mcpToolCallNative 字段全集三态（文本/非文本/失败/error）
+  ---
+  duration_ms: 0.1911
+  type: 'test'
+  ...
+# Subtest: I4 会话级：白名单定义＋禁用集编入恰一条 `-c`（approve/超时/env 展开）；线程级 enabled 恰等；目录名字集恰等
+ok 4 - I4 会话级：白名单定义＋禁用集编入恰一条 `-c`（approve/超时/env 展开）；线程级 enabled 恰等；目录名字集恰等
+  ---
+  duration_ms: 141.9541
+  type: 'test'
+  ...
+# Subtest: I5 三处恰等负例：外来残留 enabled（进程级）⇒ 拒开工；白名单缺席读回（CLI 未应用）⇒ 拒；目录多一名/少一名 ⇒ 拒
+ok 5 - I5 三处恰等负例：外来残留 enabled（进程级）⇒ 拒开工；白名单缺席读回（CLI 未应用）⇒ 拒；目录多一名/少一名 ⇒ 拒
+  ---
+  duration_ms: 8.7225
+  type: 'test'
+  ...
+# Subtest: I6 降级行：目录 failed/cancelled 白名单条目如实一行（类别化、error 进 detail 截断）；startupStatus 慢路径去重不双报；不毁轮次
+ok 6 - I6 降级行：目录 failed/cancelled 白名单条目如实一行（类别化、error 进 detail 截断）；startupStatus 慢路径去重不双报；不毁轮次
+  ---
+  duration_ms: 38.0173
+  type: 'test'
+  ...
+# Subtest: I7 mcpToolCall 使用行映射：字段全集（server/tool→mcp__ 名/status/args/result/error/durationMs）；三态如实；不进隔离
+ok 7 - I7 mcpToolCall 使用行映射：字段全集（server/tool→mcp__ 名/status/args/result/error/durationMs）；三态如实；不进隔离
+  ---
+  duration_ms: 31.7128
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 350.3143

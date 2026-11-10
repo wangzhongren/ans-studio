@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: F-3 截断→恰一次补发：第二轮文本=常量；截断行与补发通知行各恰一条；settled 恰一次
+ok 1 - F-3 截断→恰一次补发：第二轮文本=常量；截断行与补发通知行各恰一条；settled 恰一次
+  ---
+  duration_ms: 1.6031
+  type: 'test'
+  ...
+# Subtest: F-3 env 关闭即不补：显式关闭值解析为关；enabled:false → 恰一轮、无补发通知；settled 携截断事实
+ok 2 - F-3 env 关闭即不补：显式关闭值解析为关；enabled:false → 恰一轮、无补发通知；settled 携截断事实
+  ---
+  duration_ms: 0.1919
+  type: 'test'
+  ...
+# Subtest: F-3 已成功交报告不催交：wasReportSubmitted=true → 恰一轮、无补发行
+ok 3 - F-3 已成功交报告不催交：wasReportSubmitted=true → 恰一轮、无补发行
+  ---
+  duration_ms: 0.1373
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 118.8651

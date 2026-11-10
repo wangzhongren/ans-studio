@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: D1 五值校验：越界值（max/minimal/none/大小写/数字/空串）一律装配前抛错且零副作用；五合法值可装配
+ok 1 - D1 五值校验：越界值（max/minimal/none/大小写/数字/空串）一律装配前抛错且零副作用；五合法值可装配
+  ---
+  duration_ms: 188.8039
+  type: 'test'
+  ...
+# Subtest: D2 注入：四档恰一条独立顶层标量 `-c model_reasoning_effort="<值>"`（不与 mcp_servers 同条）；未设/off 零注入
+ok 2 - D2 注入：四档恰一条独立顶层标量 `-c model_reasoning_effort="<值>"`（不与 mcp_servers 同条）；未设/off 零注入
+  ---
+  duration_ms: 75.1735
+  type: 'test'
+  ...
+# Subtest: D2b off 与未设不注入参数；配置提示只在 active prompt 内，不声称推理已关闭
+ok 3 - D2b off 与未设不注入参数；配置提示只在 active prompt 内，不声称推理已关闭
+  ---
+  duration_ms: 32.5161
+  type: 'test'
+  ...
+# Subtest: D3 事件面：完成态恰一行；content 优先、仅摘要回退、全空/仅空串⇒omitted；非字符串项过滤；durationMs 仅双信号
+ok 4 - D3 事件面：完成态恰一行；content 优先、仅摘要回退、全空/仅空串⇒omitted；非字符串项过滤；durationMs 仅双信号
+  ---
+  duration_ms: 32.4481
+  type: 'test'
+  ...
+# Subtest: D3b 增量帧零行：三个 reasoning 增量方法只消费不产行、不误报工具行
+ok 5 - D3b 增量帧零行：三个 reasoning 增量方法只消费不产行、不误报工具行
+  ---
+  duration_ms: 28.2457
+  type: 'test'
+  ...
+# Subtest: D4 字段拒绝后去覆盖重建：新 native ID、同输入、completed 后才提示成功
+ok 6 - D4 字段拒绝后去覆盖重建：新 native ID、同输入、completed 后才提示成功
+  ---
+  duration_ms: 30.1147
+  type: 'test'
+  ...
+# Subtest: D4b 精确默认档同线程继续；兼容失败/取消后下一轮仍用 high
+ok 7 - D4b 精确默认档同线程继续；兼容失败/取消后下一轮仍用 high
+  ---
+  duration_ms: 126.2921
+  type: 'test'
+  ...
+# Subtest: D4c 精确字段也不得重放已有输出或已开始工具；普通错误与错误模型不兼容
+ok 8 - D4c 精确字段也不得重放已有输出或已开始工具；普通错误与错误模型不兼容
+  ---
+  duration_ms: 136.7077
+  type: 'test'
+  ...
+# Subtest: D4d 去覆盖仍失败：不伪成功、不无界重试，下一轮恢复原 high
+ok 9 - D4d 去覆盖仍失败：不伪成功、不无界重试，下一轮恢复原 high
+  ---
+  duration_ms: 47.1382
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 833.6938

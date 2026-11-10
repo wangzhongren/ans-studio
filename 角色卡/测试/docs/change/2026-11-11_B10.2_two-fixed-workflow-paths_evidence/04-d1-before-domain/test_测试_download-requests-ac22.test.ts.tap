@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: AC-22（裁定 A）：决策卡在前 → 下载卡 waiting → 决策卡作答后下载卡呈现 → 各自结算
+ok 1 - AC-22（裁定 A）：决策卡在前 → 下载卡 waiting → 决策卡作答后下载卡呈现 → 各自结算
+  ---
+  duration_ms: 33.0469
+  type: 'test'
+  ...
+# Subtest: AC-22（裁定 A）反向：下载卡在前 → 决策卡 waiting → 下载卡作答后决策卡呈现并各自结算
+ok 2 - AC-22（裁定 A）反向：下载卡在前 → 决策卡 waiting → 下载卡作答后决策卡呈现并各自结算
+  ---
+  duration_ms: 14.5915
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 391.5939

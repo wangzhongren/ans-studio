@@ -1,0 +1,5 @@
+HEAD: e51dbdbf0c5b4c4ae8bcc3d94f345beffa149220
+branch: feat/two-fixed-workflow-paths
+baseline git status --porcelain -- src app test: (empty; observed before edits at 2026-11-11)
+node: v24.22.1
+typecheck baseline: tsc --noEmit exit 0 (HEAD archive)

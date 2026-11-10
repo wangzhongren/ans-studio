@@ -74,10 +74,13 @@ import {
   closeTask as workflowCloseTask,
   derivePathBWriteSets,
   finalizeIntent as workflowFinalizeIntent,
+  // T3 B10.2（2026-11-11）：fixed 任务会话上下文经 fixed 账本事实校验（不要求 runId、不写 trunk/run）。
+  inspectAssignedTask as workflowInspectAssignedTask,
   prepareIntent as workflowPrepareIntent,
   readBasisLedger,
   readWorkflowLedger as workflowReadLedger,
   taskBranchName,
+  type AssignedTaskFacts,
   type PreparedFixedIntent,
   type WorkflowServiceFailure,
   type FixedActivateRoleDocumentsDep,
@@ -1513,8 +1516,40 @@ export async function openRoleSession(
     if (actual.ok) assignedTaskWritePaths.push(...actual.value.paths);
   };
   await refreshAssignedTaskScope();
+  // T3 B10.2（2026-11-11）：**fixed 任务会话上下文**。
+  // `task.created.workflowId` 存在 = fixed 任务（v1.3 §7.1：fixed 任务不带 runId/runState）。
+  // 此前 verifier 的受派检查走 legacy trunk `inspectAssignedTask`（要求 runId）⇒ fixed review 任务
+  // 会在会话打开时抛 `review-task-assignment-unavailable`，A12a/A12b 无法打开（B10.1 写集外依赖）。
+  // 现在：fixed 任务改读 fixed 任务账本事实（`workflowService.inspectAssignedTask`：只读 tasks 账本，
+  // 不要求 runId、不写 trunk/run），校验 taskId 存在 / to=角色 / open / workflowId-stage-flowId，
+  // 并构造会话 assignment 上下文（下方注入为纯事实段）。适用范围 = 内置治理角色（convener/verifier/
+  // product 等 fixed 任务目标会话）；legacy 任务（无 workflowId）仍走原路径逐字不变；无 taskId 的
+  // chat 不触达本块。
+  let fixedTaskAssignment: AssignedTaskFacts | undefined;
+  if (input.taskId && setup.role.kind === "built-in-governance") {
+    const taskStateForAssignment = await readTaskState(input.project.projectRoot);
+    const createdForAssignment = taskStateForAssignment.records.get(input.taskId)?.created;
+    if (createdForAssignment?.workflowId !== undefined) {
+      const inspected = await workflowInspectAssignedTask({
+        projectRoot: input.project.projectRoot,
+        taskId: input.taskId,
+        actorRoleId: setup.role.id,
+      });
+      if (!inspected.ok) throw new Error(`fixed-task-assignment-unavailable:${inspected.message ?? inspected.code}`);
+      const facts = inspected.task;
+      if (!facts.open) throw new Error(`fixed-task-assignment-unavailable:任务 ${input.taskId} 已收口（fixed 受派任务必须 open）`);
+      if (facts.workflowId === undefined || facts.flowId === undefined || facts.stage === undefined) {
+        throw new Error(`fixed-task-assignment-unavailable:fixed 任务 ${input.taskId} 缺少 workflowId/flowId/stage`);
+      }
+      fixedTaskAssignment = facts;
+      log.record("fixed.task.assignment.ready", {
+        taskId: facts.taskId, from: facts.from, to: facts.to,
+        workflowId: facts.workflowId, flowId: facts.flowId, stage: facts.stage,
+      });
+    }
+  }
   let assignedReview: Awaited<ReturnType<ReturnType<typeof createTrunkService>["readAssignedReviewContext"]>> | undefined;
-  if (input.taskId && setup.role.kind === "built-in-governance" && setup.role.id === "verifier") {
+  if (input.taskId && setup.role.kind === "built-in-governance" && setup.role.id === "verifier" && fixedTaskAssignment === undefined) {
     const task = await createTrunkService({ projectRoot: input.project.projectRoot }).inspectAssignedTask({ taskId: input.taskId, actorRoleId: setup.role.id });
     if (!task.ok) throw new Error(`review-task-assignment-unavailable:${task.message ?? task.code}`);
     if (task.value.kind === "review") {
@@ -2710,6 +2745,10 @@ export async function openRoleSession(
       })
     : undefined;
 
+  // T3 B10.2：fixed 任务会话的 assignment 上下文（应用账本事实；与 legacy assignedReview 互斥）。
+  if (fixedTaskAssignment !== undefined) {
+    contextSections = [...(contextSections ?? []), fixedTaskAssignmentContextText(fixedTaskAssignment)];
+  }
   if (assignedReview?.ok) contextSections = [...(contextSections ?? []), assignedReview.value.contextText];
   // T3 B1（AC-12/§3.4）：fixed 会话注入模块 `context({matrix:"two-fixed-paths/v1"})` 段（纯文本；
   // legacy 数据/context 返回值逐字不变——只在 fixed 模式追加）。
@@ -4184,6 +4223,27 @@ function buildTaskPrompt(taskId: string | undefined, scope: TaskScope | undefine
     `具体改动要求：请编辑文件 ${target}，在其顶部新增一行注释「// [${taskId}] 受治理会话运行时确认」，` +
     `并**用 write_file 或 edit_file 实际发起这次写入**（这是本任务可判定的验收点；不要只回答计划）。`
   );
+}
+
+/**
+ * T3 B10.2（2026-11-11）：fixed 任务会话的 assignment 上下文纯文本段。
+ * 只渲染应用从 `tasks.jsonl` 读到的事实（taskId/from/to/workflowId/flowId/stage/taskKind/open），
+ * 不携带权限/证据/运行时秘密，也不是模型自报；legacy 会话不构造本段（旧注入面逐字不变）。
+ */
+function fixedTaskAssignmentContextText(task: AssignedTaskFacts): string {
+  return [
+    "固定任务上下文（应用账本事实，非模型自报）：",
+    JSON.stringify({
+      taskId: task.taskId,
+      from: task.from,
+      to: task.to,
+      workflowId: task.workflowId,
+      flowId: task.flowId,
+      stage: task.stage,
+      ...(task.taskKind !== undefined ? { taskKind: task.taskKind } : {}),
+      open: task.open,
+    }),
+  ].join("\n");
 }
 
 /** Fresh host-derived ordinary scope facts. This is not a permission or an effect capability. */

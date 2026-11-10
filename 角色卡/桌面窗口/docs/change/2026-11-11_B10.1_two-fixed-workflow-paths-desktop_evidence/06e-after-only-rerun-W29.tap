@@ -1,0 +1,17 @@
+TAP version 13
+# W52 init actual Core registry [{"sessionId":"92cedba2-b498-43e6-9ba8-f69509921016","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"21e214c9-e4fb-4a60-b27f-de0444ba8f9f","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+ok 1 - W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 8094.1442
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8534.1566

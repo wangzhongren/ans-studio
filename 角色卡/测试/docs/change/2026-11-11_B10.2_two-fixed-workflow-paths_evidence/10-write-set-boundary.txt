@@ -1,0 +1,16 @@
+== git status --porcelain -- src app test ==
+ M app/desktop/session.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+?? test/桌面应用/b101-fixed-dispatch-task-binding.test.ts
+?? test/编排/run-role-fixed-task-context.test.ts
+
+== git diff --stat -- src app test/测试 ==
+ app/desktop/session.ts                  | 91 +++++++++++++++++++++++++--------
+ src/pipeline/orchestration/run-role.ts  | 62 +++++++++++++++++++++-
+ test/测试/fixed-path-full-chain.test.ts | 27 +++++++---
+ 3 files changed, 152 insertions(+), 28 deletions(-)
+
+== untracked test/测试 (should be none) ==
+ M test/测试/fixed-path-full-chain.test.ts
