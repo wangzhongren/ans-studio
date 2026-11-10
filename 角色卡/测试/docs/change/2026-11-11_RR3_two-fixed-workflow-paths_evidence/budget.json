@@ -1,0 +1,17 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 1,
+  "cardsByKind": {
+    "stable-write": 1
+  },
+  "dispatches": 1,
+  "dispatchesByFrom": {
+    "chief": 1
+  },
+  "writeTasks": 0,
+  "implementationWriteTasks": 0,
+  "turnsByRole": {
+    "chief": 1,
+    "convener": 1
+  }
+}
