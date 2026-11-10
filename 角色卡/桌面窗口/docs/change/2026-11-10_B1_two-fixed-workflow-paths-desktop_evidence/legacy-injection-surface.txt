@@ -1,0 +1,13 @@
+HEAD keys: ["roleId","runtime","project","gitQuery","gitCandidate","gitPublish","closeCreatedTask","dispatchTask","viewImage","projectState","projectNote","requestVersionDecision","roleStatus","contractCheck","docFormat","evidenceCheck","sessionTail","roleActivityLog","terminateRoleRun","redispatchTask"]
+CUR  keys: ["roleId","runtime","project","workflowModeForFlow","gitQuery","gitCandidate","gitPublish","closeCreatedTask","dispatchTask","viewImage","projectState","projectNote","requestVersionDecision","roleStatus","contractCheck","docFormat","evidenceCheck","sessionTail","roleActivityLog","terminateRoleRun","redispatchTask"]
+key order identical: false
+gitQuery: head=true cur=true SAME
+gitCandidate: head=true cur=true SAME
+gitPublish: head=true cur=true SAME
+selectRunChange: head=false cur=false SAME
+requestStableWrite: head=false cur=false SAME
+submitRefactor: head=false cur=false SAME
+submitVersionChange: head=false cur=false SAME
+requestVersionDecision: head=true cur=true SAME
+stablePermitOf: head=false cur=false SAME
+workflowModeForFlow: head=false cur=true DIFF

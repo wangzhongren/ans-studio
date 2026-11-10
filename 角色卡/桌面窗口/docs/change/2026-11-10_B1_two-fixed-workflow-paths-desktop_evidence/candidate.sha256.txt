@@ -1,0 +1,7 @@
+# candidate (B1 desktop write set) raw SHA-256 / bytes / lines
+ac3a5924f494e83b6e9a25c1393961619f9c8fafb58728ef96750ad501c87d57  756118  11660  app/desktop/session.ts
+a60c7f00227a32f1ef51ffac9a0c8eb1fc3f12994fc27002cd8f8c26dff58fa9  7815  158  app/desktop/workflow.ts
+1d9ab3ee30ee053ce54401cd1f1566860a6e67903488af909d3c475a083d13c8  7781  174  app/desktop/workflow-git.ts
+f6bb5f3327eb41c99be4db73020d10556f1a73de8d42a1791f1c4bef0ab1ea4f  158297  2769  app/desktop/customer-input.ts
+a274eb1b251709bb1f777918d8e6e85ff35a35f2a2ff8f3d21fe843decb25eee  47323  859  test/桌面应用/fixed-path-routing.test.ts
+abb1231f498c7767d59f6b51158f3836a6cd35d319392c67d451ab58a5f4ce2d  6765  132  test/桌面应用/workflow-git-port.test.ts

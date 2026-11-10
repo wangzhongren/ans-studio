@@ -359,6 +359,14 @@ const AMENDMENT_FINAL_OPTION_IDS: readonly string[] = ["apply-amendment", "defer
 /** stable workflow 轻量确认卡（app-owned 卡种；P1.6 §4.5.1；PM 复审 F2）。 */
 const STABLE_WRITE_CARD_KIND = "stable-write" as const;
 const STABLE_WRITE_OPTION_IDS: readonly string[] = ["approve-stable-write", "reject-stable-write"];
+/**
+ * T3（2026-11-10 两条固定工作流路径，B1 AC-14/AC-27 Q1；v1.3 §8.4）：`merge-main`＝A13/B4 高风险
+ * 合并 main 的**应用自有非判断卡**（不进 `GOVERNANCE_CARD_GROUP`，judge 只可转人工/拒绝）。
+ * B1 只预留**识别骨架**（客户主权排除面 + 冻结选项词汇）；卡的构造/呈现/preview/执行在 B3，且
+ * **不新增客户可见门**（既有高风险确认机制的具体化）。judge 永不代批、永不冒充客户。
+ */
+export const MERGE_MAIN_CARD_KIND = "merge-main" as const;
+export const MERGE_MAIN_OPTION_IDS: readonly string[] = Object.freeze(["approve-merge-main", "reject-merge-main"]);
 
 export function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
   if (request.kind !== "choice") return false;
@@ -368,6 +376,14 @@ export function isApplicationDecisionReservedForCustomer(request: CustomerInputR
     if ((request as { application?: unknown }).application !== true) return false;
     const offered = new Set(request.options.map((option) => option.id));
     return STABLE_WRITE_OPTION_IDS.every((id) => offered.has(id));
+  }
+  // merge-main（高风险合并 main）：app-owned、客户本人；judge 不可代批/不冒充客户。
+  // 只接受应用发行（`application:true`）且携带冻结 approve/reject 选项词汇的卡——角色工具层
+  // 卡种白名单本就不含 `merge-main`（G-IR），此处是结算/代选/指令面的第二道 fail-closed。
+  if (cardKind === MERGE_MAIN_CARD_KIND) {
+    if ((request as { application?: unknown }).application !== true) return false;
+    const offered = new Set(request.options.map((option) => option.id));
+    return MERGE_MAIN_OPTION_IDS.every((id) => offered.has(id));
   }
   if (cardKind !== DECISION_CARD_KIND) return false;
   if ((request as { application?: unknown }).application !== true) return false;

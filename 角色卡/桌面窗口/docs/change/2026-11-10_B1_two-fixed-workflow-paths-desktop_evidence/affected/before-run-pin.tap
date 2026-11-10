@@ -1,0 +1,306 @@
+TAP version 13
+# Subtest: run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+not ok 1 - run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+  ---
+  duration_ms: 101.914
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:194:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+not ok 2 - D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+  ---
+  duration_ms: 125.5951
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:268:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:297:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+not ok 3 - run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+  ---
+  duration_ms: 62.7758
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:316:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:325:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等
+ok 4 - run-pin：assets 可选第七类（存在才 pin）；并发 pin 幂等
+  ---
+  duration_ms: 53.5084
+  type: 'test'
+  ...
+# Subtest: legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned
+ok 5 - legacy：无 runId 的旧 task.created 仍可读取；legacy 项目不伪造 pinned
+  ---
+  duration_ms: 2.419
+  type: 'test'
+  ...
+# Subtest: P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝
+ok 6 - P1.5：无 flow/teamPlan 源时 pin 为 null；存在时钉 path/version/hash；manifest 漏钉可被 verify 拒绝
+  ---
+  duration_ms: 44.6989
+  type: 'test'
+  ...
+# Subtest: P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写
+ok 7 - P1.3：文档 schema 不符/缺文档 pin 拒绝；pin 后 hash 漂移 verify 拒绝且不自动重写
+  ---
+  duration_ms: 47.2679
+  type: 'test'
+  ...
+# Subtest: P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+not ok 8 - P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+  ---
+  duration_ms: 35.9062
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:454:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:461:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2（P1.3）：legacy 任务验收 facts 标 runState=legacy
+ok 9 - R2（P1.3）：legacy 任务验收 facts 标 runState=legacy
+  ---
+  duration_ms: 137.1856
+  type: 'test'
+  ...
+# Subtest: contract_check session：pinned run/角色写区/legacy 明示（只读）
+ok 10 - contract_check session：pinned run/角色写区/legacy 明示（只读）
+  ---
+  duration_ms: 72.3906
+  type: 'test'
+  ...
+# Subtest: contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）
+ok 11 - contract_check topic：session 首句早退——无 run/无项目文档也返回 schema，且无 legacy 行（AC-8/12）
+  ---
+  duration_ms: 40.0176
+  type: 'test'
+  ...
+# Subtest: contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）
+ok 12 - contract_check topic：session 层 topic + flowId + taskKind 并存时 topic 优先（AC-8）
+  ---
+  duration_ms: 33.7026
+  type: 'test'
+  ...
+# Subtest: F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+not ok 13 - F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+  ---
+  duration_ms: 70.629
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:606:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:620:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出
+ok 14 - §5A contract_check：四角色按裁剪输出意图入口契约与当前事实；其他角色不输出
+  ---
+  duration_ms: 238.4631
+  type: 'test'
+  ...
+# Subtest: R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+not ok 15 - R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+  ---
+  duration_ms: 48.1217
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:723:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:730:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+not ok 16 - R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+  ---
+  duration_ms: 67.07
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:745:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:755:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+not ok 17 - AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+  ---
+  duration_ms: 73.0487
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:770:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:782:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+not ok 18 - AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+  ---
+  duration_ms: 109.6357
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:796:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:814:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+not ok 19 - AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+  ---
+  duration_ms: 58.2669
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:829:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:849:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+not ok 20 - P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+  ---
+  duration_ms: 96.8492
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b1-head\\test\\桌面应用\\run-pin.test.ts:864:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b1-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/run-pin.test.ts:878:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 9
+# fail 11
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3422.1865

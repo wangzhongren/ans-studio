@@ -1,0 +1,49 @@
+# covered desktop suites (before/after)
+## batch A (affected core)
+chain-enforcement
+session
+interface
+dispatch-fresh-enum
+handback-delivery
+run-pin
+multi-runtime
+message-queue
+ans-wiring
+boundary-refresh
+log-actions
+run-change-trigger
+star-routing
+i-full-chain
+version-change
+## batch B (SessionManager-importing remaining; plus known-red partial)
+abort-unwedge
+acceptance-evidence
+acceptance-proposal-path
+acceptance-return-card
+application-line
+chief-workflow
+directive-input
+download-decision
+download-request
+hot-path
+operator-channel
+p0-halt-and-images
+pending-card-restart
+project-state
+queue-visibility
+queue-withdraw-lru
+replay-safe-retry
+request-timeout-wiring
+role-log
+run-change-entry
+run-change
+session-rebuild-race
+task-restart
+turn-lease
+version-decision
+write-safety
+optional-acceptance
+stuck-redispatch
+## new/target
+fixed-path-routing
+workflow-git-port

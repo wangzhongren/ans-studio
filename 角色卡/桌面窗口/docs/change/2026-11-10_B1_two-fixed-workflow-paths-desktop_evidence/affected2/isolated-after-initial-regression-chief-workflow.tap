@@ -1,0 +1,1279 @@
+TAP version 13
+# Subtest: 能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 dispatch；项目角色零注入
+ok 1 - 能力矩阵（2026-10-29 v4.1）：chief 六能力；convener 仅获 dispatch；项目角色零注入
+  ---
+  duration_ms: 11.6919
+  type: 'test'
+  ...
+# Subtest: role_activity_log 数据面：只读、脱敏、字段/坏行如实；role_status 带 lastActivityAt
+ok 2 - role_activity_log 数据面：只读、脱敏、字段/坏行如实；role_status 带 lastActivityAt
+  ---
+  duration_ms: 60.2602
+  type: 'test'
+  ...
+# Subtest: 工具注册面：幕僚注入 role_activity_log/terminate_role_run/redispatch_task；未注入即不存在
+ok 3 - 工具注册面：幕僚注入 role_activity_log/terminate_role_run/redispatch_task；未注入即不存在
+  ---
+  duration_ms: 1.5213
+  type: 'test'
+  ...
+# Subtest: 工具注册面（2026-11-02）：project_state/project_note/request_version_decision 注入才注册
+ok 4 - 工具注册面（2026-11-02）：project_state/project_note/request_version_decision 注入才注册
+  ---
+  duration_ms: 0.2826
+  type: 'test'
+  ...
+# W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":false,"originRoleId":"convener","entries":[{"sessionId":"f3ea44a5-3a19-43aa-ade4-f63a02d4e758","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"20d42374-5621-4696-ad64-ec98a9ea1596","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+# ✖ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (103.9651ms)
+# ℹ tests 1
+# ℹ suites 0
+# ℹ pass 0
+# ℹ fail 1
+# ℹ cancelled 0
+# ℹ skipped 0
+# ℹ todo 0
+# ℹ duration_ms 538.0162
+# ✖ failing tests:
+# test at test\\桌面应用\\chief-workflow.test.ts:414:1
+# ✖ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (103.9651ms)
+#   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+#   
+#   0 !== 1
+#   
+#       at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:417:10)
+#       at async Test.run (node:internal/test_runner/test:1409:7)
+#       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+#     generatedMessage: true,
+#     code: 'ERR_ASSERTION',
+#     actual: 0,
+#     expected: 1,
+#     operator: 'strictEqual',
+#     diff: 'simple'
+#   }
+# Subtest: W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流
+not ok 5 - W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流
+  ---
+  duration_ms: 586.205
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:414:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":false,"originRoleId":"convener","entries":[{"sessionId":"f3ea44a5-3a19-43aa-ade4-f63a02d4e758","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"20d42374-5621-4696-ad64-ec98a9ea1596","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+    ✖ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (103.9651ms)
+    ℹ tests 1
+    ℹ suites 0
+    ℹ pass 0
+    ℹ fail 1
+    ℹ cancelled 0
+    ℹ skipped 0
+    ℹ todo 0
+    ℹ duration_ms 538.0162
+    
+    ✖ failing tests:
+    
+    test at test\桌面应用\chief-workflow.test.ts:414:1
+    ✖ W1b 真实SessionManager：主chief等待worker时独立chief选非推荐，原工具/来源审计同链且旧@预设不截流 (103.9651ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      
+      0 !== 1
+      
+          at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:417:10)
+          at async Test.run (node:internal/test_runner/test:1409:7)
+          at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+        generatedMessage: true,
+        code: 'ERR_ASSERTION',
+        actual: 0,
+        expected: 1,
+        operator: 'strictEqual',
+        diff: 'simple'
+      }
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    isolateUnknownCoreCase (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:61:60)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:415:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"df66ad2a-e270-40b2-9700-e91c2cf780d2","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"05e550e1-7c18-4151-9f02-6e5baffb4e1d","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+# ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (2596.5293ms)
+# ℹ tests 1
+# ℹ suites 0
+# ℹ pass 0
+# ℹ fail 1
+# ℹ cancelled 0
+# ℹ skipped 0
+# ℹ todo 0
+# ℹ duration_ms 3035.1164
+# ✖ failing tests:
+# test at test\\桌面应用\\chief-workflow.test.ts:436:1
+# ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (2596.5293ms)
+#   Error: Real chief loop did not settle: shown=[] requests=0 worker=[{"ok":false,"message":"request_choice：未获客户同意（原因：客户拒绝（治理角色 rapporteur 不允许 cardKind=decision（该类卡由策划 rapporteur / 运营 convener 发起）；允许：无。请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡；本次未向客户发卡、未写任何记录。））→ 不要写盘；如实告知客户，不得假设同意。"}] writes=[] materials=[]
+#       at Timeout.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:390:39)
+#       at listOnTimeout (node:internal/timers:685:17)
+#       at process.processTimers (node:internal/timers:618:7)
+# Subtest: W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场
+not ok 6 - W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场
+  ---
+  duration_ms: 3115.0396
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:436:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    W52 legacy custom case actual Core binding {"dispositions":["revise","select"],"missingEvidence":false,"originRoleId":"rapporteur","entries":[{"sessionId":"df66ad2a-e270-40b2-9700-e91c2cf780d2","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"05e550e1-7c18-4151-9f02-6e5baffb4e1d","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+    ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (2596.5293ms)
+    ℹ tests 1
+    ℹ suites 0
+    ℹ pass 0
+    ℹ fail 1
+    ℹ cancelled 0
+    ℹ skipped 0
+    ℹ todo 0
+    ℹ duration_ms 3035.1164
+    
+    ✖ failing tests:
+    
+    test at test\桌面应用\chief-workflow.test.ts:436:1
+    ✖ W1b 真实无退修选项：chief退修释放原request_choice→有权原角色write_file补材→同flow新卡独立决定，无客户关开救场 (2596.5293ms)
+      Error: Real chief loop did not settle: shown=[] requests=0 worker=[{"ok":false,"message":"request_choice：未获客户同意（原因：客户拒绝（治理角色 rapporteur 不允许 cardKind=decision（该类卡由策划 rapporteur / 运营 convener 发起）；允许：无。请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡；本次未向客户发卡、未写任何记录。））→ 不要写盘；如实告知客户，不得假设同意。"}] writes=[] materials=[]
+          at Timeout.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:390:39)
+          at listOnTimeout (node:internal/timers:685:17)
+          at process.processTimers (node:internal/timers:618:7)
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    isolateUnknownCoreCase (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:61:60)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:437:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 isolated unknown actor child output W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":true,"originRoleId":"convener","entries":[{"sessionId":"2b270e20-0dff-4768-b912-2b572046c128","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"a9d3ba84-108b-4672-adf5-2941356414d2","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+# ✖ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (82.5732ms)
+# ℹ tests 1
+# ℹ suites 0
+# ℹ pass 0
+# ℹ fail 1
+# ℹ cancelled 0
+# ℹ skipped 0
+# ℹ todo 0
+# ℹ duration_ms 523.8401
+# ✖ failing tests:
+# test at test\\桌面应用\\chief-workflow.test.ts:457:1
+# ✖ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (82.5732ms)
+#   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+#   
+#   0 !== 1
+#   
+#       at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:462:10)
+#       at async Test.run (node:internal/test_runner/test:1409:7)
+#       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+#     generatedMessage: true,
+#     code: 'ERR_ASSERTION',
+#     actual: 0,
+#     expected: 1,
+#     operator: 'strictEqual',
+#     diff: 'simple'
+#   }
+# Subtest: W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托
+not ok 7 - W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托
+  ---
+  duration_ms: 570.5873
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:457:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    W52 legacy custom case actual Core binding {"dispositions":["select"],"missingEvidence":true,"originRoleId":"convener","entries":[{"sessionId":"2b270e20-0dff-4768-b912-2b572046c128","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"},{"sessionId":"a9d3ba84-108b-4672-adf5-2941356414d2","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","providerFinished":true,"processCoverage":"unknown"}]}
+    ✖ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (82.5732ms)
+    ℹ tests 1
+    ℹ suites 0
+    ℹ pass 0
+    ℹ fail 1
+    ℹ cancelled 0
+    ℹ skipped 0
+    ℹ todo 0
+    ℹ duration_ms 523.8401
+    
+    ✖ failing tests:
+    
+    test at test\桌面应用\chief-workflow.test.ts:457:1
+    ✖ W1b 真实缺材料（B）：materials失败fail-closed——不呈现卡、无presented、回执notPresented含真实原因、回合不阻塞且不依赖关闭委托 (82.5732ms)
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+      
+      0 !== 1
+      
+          at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:462:10)
+          at async Test.run (node:internal/test_runner/test:1409:7)
+          at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+        generatedMessage: true,
+        code: 'ERR_ASSERTION',
+        actual: 0,
+        expected: 1,
+        operator: 'strictEqual',
+        diff: 'simple'
+      }
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    isolateUnknownCoreCase (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:61:60)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:458:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B1 materials失败fail-closed：不呈现卡、declined+notPresented+真实原因、pending清零且旧id不可重试
+ok 8 - B1 materials失败fail-closed：不呈现卡、declined+notPresented+真实原因、pending清零且旧id不可重试
+  ---
+  duration_ms: 17.5347
+  type: 'test'
+  ...
+# Subtest: B2 materials失败竞争：prepare在途关闭委托⇒恰一次呈现，迟到失败不双结算，客户可接管
+ok 9 - B2 materials失败竞争：prepare在途关闭委托⇒恰一次呈现，迟到失败不双结算，客户可接管
+  ---
+  duration_ms: 48.6719
+  type: 'test'
+  ...
+# Subtest: B3/B4 execution无有效决定⇒既有chiefWaiting回退不变；respond闸manualTakeoverRequired且关闭后可结算
+ok 10 - B3/B4 execution无有效决定⇒既有chiefWaiting回退不变；respond闸manualTakeoverRequired且关闭后可结算
+  ---
+  duration_ms: 26.6799
+  type: 'test'
+  ...
+# Subtest: B5 materials失败原因非空且如实：保留prepare错误原文，空错误也不得退化为回退文案
+ok 11 - B5 materials失败原因非空且如实：保留prepare错误原文，空错误也不得退化为回退文案
+  ---
+  duration_ms: 0.4569
+  type: 'test'
+  ...
+# Subtest: W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例surface库存；native旁路拒绝而FS仍unknown
+ok 12 - W3 默认Core→默认CodexChat本地HTTP：真实git_query与同实例surface库存；native旁路拒绝而FS仍unknown
+  ---
+  duration_ms: 298.683
+  type: 'test'
+  ...
+# W52 isolated unknown actor child output W52_W3_ACTUAL_UNKNOWN_ASSERTIONS_COMPLETED {"coreSessionId":"d3cddd79-3b2f-47ef-ab01-fa5b1595eaf3","phase":"disposed","coverage":"unknown","factoryProvenance":"custom-override","nativeToolRegistry":"unknown"}
+# ✔ W3 创建中普通库存与实际revision可见；custom工厂伪CodexChat来源经真实Core仍unknown (43.185ms)
+# ℹ tests 1
+# ℹ suites 0
+# ℹ pass 1
+# ℹ fail 0
+# ℹ cancelled 0
+# ℹ skipped 0
+# ℹ todo 0
+# ℹ duration_ms 483.1017
+# Subtest: W3 创建中普通库存与实际revision可见；custom工厂伪CodexChat来源经真实Core仍unknown
+ok 13 - W3 创建中普通库存与实际revision可见；custom工厂伪CodexChat来源经真实Core仍unknown
+  ---
+  duration_ms: 526.368
+  type: 'test'
+  ...
+# Subtest: W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+    # Subtest: enumerated
+    ok 1 - enumerated
+      ---
+      duration_ms: 50.3038
+      type: 'test'
+      ...
+# W52 W5 primary failure selected AssertionError [ERR_ASSERTION]: [{"role":"chief","step":0,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_request_version_decision","ans_close_created_task","ans_git_query","ans_git_candidate","ans_git_publish"],"toolResponses":[]},{"role":"chief","step":1,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_request_version_decision","ans_close_created_task","ans_git_query","ans_git_candidate","ans_git_publish"],"toolResponses":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]
+# 0 !== 1
+#     at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:869:18)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:778:7)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: 0,
+#   expected: 1,
+#   operator: 'strictEqual',
+#   diff: 'simple'
+# }
+    # Subtest: selected
+    not ok 2 - selected
+      ---
+      duration_ms: 6070.1475
+      type: 'test'
+      location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:778:15'
+      failureType: 'testCodeFailure'
+      error: |-
+        [{"role":"chief","step":0,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_request_version_decision","ans_close_created_task","ans_git_query","ans_git_candidate","ans_git_publish"],"toolResponses":[]},{"role":"chief","step":1,"tools":["ans_write_file","ans_edit_file","ans_read_file","ans_list_dir","ans_view_image","ans_dispatch_task","ans_role_status","ans_contract_check","ans_doc_format","ans_evidence_check","ans_session_tail","ans_role_activity_log","ans_terminate_role_run","ans_redispatch_task","ans_project_state","ans_governance_matrix","ans_project_note","ans_request_version_decision","ans_close_created_task","ans_git_query","ans_git_candidate","ans_git_publish"],"toolResponses":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]
+        
+        0 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 0
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:869:18)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:778:7)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    # Subtest: cancelled
+    ok 3 - cancelled
+      ---
+      duration_ms: 45.2498
+      type: 'test'
+      ...
+    # Subtest: changed
+    ok 4 - changed
+      ---
+      duration_ms: 44.387
+      type: 'test'
+      ...
+    # Subtest: model-source
+    ok 5 - model-source
+      ---
+      duration_ms: 41.0701
+      type: 'test'
+      ...
+# W52 W5 primary failure commit-race AssertionError [ERR_ASSERTION]: Observed the actual dispatch/ledger await lease, without stubbing the append
+# false !== true
+#     at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:850:20)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:778:7)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: 'strictEqual',
+#   diff: 'simple'
+# }
+    # Subtest: commit-race
+    not ok 6 - commit-race
+      ---
+      duration_ms: 50.2784
+      type: 'test'
+      location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:778:15'
+      failureType: 'testCodeFailure'
+      error: |-
+        Observed the actual dispatch/ledger await lease, without stubbing the append
+        
+        false !== true
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      actual: false
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:850:20)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:778:7)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    1..6
+not ok 14 - W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  ---
+  duration_ms: 6302.5953
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:771:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+    # Subtest: unmanaged
+    not ok 1 - unmanaged
+      ---
+      duration_ms: 156.635
+      type: 'test'
+      location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:935:97'
+      failureType: 'testCodeFailure'
+      error: 'W10 primary/owned cleanup failures retained'
+      code: 'ERR_TEST_FAILURE'
+      name: 'AggregateError'
+      stack: |-
+        TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1076:37)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:935:89)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    # Subtest: unmanaged-system
+    ok 2 - unmanaged-system
+      ---
+      duration_ms: 89.0293
+      type: 'test'
+      ...
+# W52 W10 primary failure before cleanup required AssertionError [ERR_ASSERTION]: The required scope comes from an actual accepted customer turn and child ledger, not a fixture marker
+#     at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:984:14)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:935:89)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: undefined,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+    # Subtest: required
+    not ok 3 - required
+      ---
+      duration_ms: 39.0032
+      type: 'test'
+      location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:935:97'
+      failureType: 'testCodeFailure'
+      error: 'The required scope comes from an actual accepted customer turn and child ledger, not a fixture marker'
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: true
+      operator: '=='
+      stack: |-
+        TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:984:14)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:935:89)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+      ...
+    # Subtest: unknown
+    ok 4 - unknown
+      ---
+      duration_ms: 13.3764
+      type: 'test'
+      ...
+    1..4
+not ok 15 - W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  ---
+  duration_ms: 298.774
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:934:1'
+  failureType: 'subtestsFailed'
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# W52 original worker/review primary failure AssertionError [ERR_ASSERTION]: Actual constructor observation must exist
+#     at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1150:12)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+not ok 16 - W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+  ---
+  duration_ms: 3558.8227
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1083:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual constructor observation must exist'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1150:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 original worker/review primary failure AssertionError [ERR_ASSERTION]: Actual constructor observation must exist
+#     at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1150:12)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+not ok 17 - W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+  ---
+  duration_ms: 3567.6684
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1083:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual constructor observation must exist'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1150:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 original worker/review primary failure AssertionError [ERR_ASSERTION]: Actual constructor observation must exist
+#     at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1150:12)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+not ok 18 - W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+  ---
+  duration_ms: 3565.3594
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1083:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual constructor observation must exist'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1150:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W16 打开拒绝保队列不自旋；stop后的晚到通知不重开，显式open恢复
+ok 19 - W16 打开拒绝保队列不自旋；stop后的晚到通知不重开，显式open恢复
+  ---
+  duration_ms: 218.3053
+  type: 'test'
+  ...
+# Subtest: W16 在途open跨stop不安装晚到handle，真实dispose后保队列等待显式重试
+ok 20 - W16 在途open跨stop不安装晚到handle，真实dispose后保队列等待显式重试
+  ---
+  duration_ms: 2.4469
+  type: 'test'
+  ...
+# Subtest: W17 写后fallback经公开Pipeline登记实际字节；既有hook false保原拒绝
+ok 21 - W17 写后fallback经公开Pipeline登记实际字节；既有hook false保原拒绝
+  ---
+  duration_ms: 41.7163
+  type: 'test'
+  ...
+# W52 isolated unknown actor child output W52 W19 actual custom Core binding [{"sessionId":"64384830-86c1-412a-8be6-2b4e9a233598","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"edaae251-c7bf-4ade-989e-60a511da0512","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"3a2518e7-b541-47d0-8ba0-ef103df1a8a4","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+# ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (403.9691ms)
+# ℹ tests 1
+# ℹ suites 0
+# ℹ pass 0
+# ℹ fail 1
+# ℹ cancelled 0
+# ℹ skipped 0
+# ℹ todo 0
+# ℹ duration_ms 841.0604
+# ✖ failing tests:
+# test at test\\桌面应用\\chief-workflow.test.ts:1323:1
+# ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (403.9691ms)
+#   [Error: ENOTEMPTY: directory not empty, rmdir 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-w19-assignment-kfistU\\.ans\\sessions\\convener\\codex\\ans'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-w19-assignment-kfistU\\\\.ans\\\\sessions\\\\convener\\\\codex\\\\ans' }
+# Subtest: W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+not ok 22 - W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+  ---
+  duration_ms: 885.8066
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1323:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    W52 W19 actual custom Core binding [{"sessionId":"64384830-86c1-412a-8be6-2b4e9a233598","roleId":"convener","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"edaae251-c7bf-4ade-989e-60a511da0512","roleId":"rapporteur","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"},{"sessionId":"3a2518e7-b541-47d0-8ba0-ef103df1a8a4","roleId":"chief","state":"disposed","lifecycleStatus":"unknown","processCoverage":"unknown"}]
+    ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (403.9691ms)
+    ℹ tests 1
+    ℹ suites 0
+    ℹ pass 0
+    ℹ fail 1
+    ℹ cancelled 0
+    ℹ skipped 0
+    ℹ todo 0
+    ℹ duration_ms 841.0604
+    
+    ✖ failing tests:
+    
+    test at test\桌面应用\chief-workflow.test.ts:1323:1
+    ✖ W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界 (403.9691ms)
+      [Error: ENOTEMPTY: directory not empty, rmdir 'C:\Users\51054\AppData\Local\Temp\ans-w19-assignment-kfistU\.ans\sessions\convener\codex\ans'] { errno: -4051, code: 'ENOTEMPTY', syscall: 'rmdir', path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-w19-assignment-kfistU\\.ans\\sessions\\convener\\codex\\ans' }
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    isolateUnknownCoreCase (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:61:60)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1324:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 普通
+not ok 23 - W20 默认Core/Chat产品真实报告落账并到chief 普通
+  ---
+  duration_ms: 3062.8086
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1491:1'
+  failureType: 'testCodeFailure'
+  error: '[{"role":"chief","user":"W20 draft product","tools":[]},{"role":"chief","user":"W20 draft product","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1544:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+not ok 24 - W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+  ---
+  duration_ms: 2070.1048
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1491:1'
+  failureType: 'testCodeFailure'
+  error: '[{"role":"chief","user":"W20 draft product","tools":[]},{"role":"chief","user":"W20 draft product","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1527:120)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+not ok 25 - W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+  ---
+  duration_ms: 3559.0972
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W21 默认Core/Chat应用生效通知 显式blocked保真任务
+not ok 26 - W21 默认Core/Chat应用生效通知 显式blocked保真任务
+  ---
+  duration_ms: 3547.7615
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+not ok 27 - W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+  ---
+  duration_ms: 3546.6764
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止
+not ok 28 - W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止
+  ---
+  duration_ms: 3553.6656
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+not ok 29 - W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 6554.6656
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+not ok 30 - W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 6568.2039
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+not ok 31 - W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 6545.5054
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin
+not ok 32 - W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin
+  ---
+  duration_ms: 6561.3986
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+not ok 33 - W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+  ---
+  duration_ms: 6562.9876
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+not ok 34 - W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+  ---
+  duration_ms: 6551.6649
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+not ok 35 - W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+  ---
+  duration_ms: 6551.5403
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual retained intent card must appear[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1726:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+not ok 36 - W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+  ---
+  duration_ms: 6555.2834
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+#     at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+#     at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+#     at async Test.run (node:internal/test_runner/test:1409:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+#   generatedMessage: false,
+#   code: 'ERR_ASSERTION',
+#   actual: false,
+#   expected: true,
+#   operator: '==',
+#   diff: 'simple'
+# }
+# Subtest: W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+not ok 37 - W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+  ---
+  duration_ms: 6566.5513
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1568:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual init report and creator basis must arrive[{"role":"chief","user":"W29 initialize owned repository","tools":[],"lastRole":"user"},{"role":"chief","user":"W29 initialize owned repository","tools":["dispatch_task：任务**未能派发**（回执：target-card-missing：派发未受理：幕僚→运营只允许 stage-request（产线调度请求）；生产线派发归运营。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1661:220)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1673:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W27 stop等待真实队列写有限barrier 无会话/定向/未来新事件
+ok 38 - W27 stop等待真实队列写有限barrier 无会话/定向/未来新事件
+  ---
+  duration_ms: 50.8368
+  type: 'test'
+  ...
+# Subtest: W27 stop等待真实队列写有限barrier 实际IO失败可见并恢复
+ok 39 - W27 stop等待真实队列写有限barrier 实际IO失败可见并恢复
+  ---
+  duration_ms: 6.9364
+  type: 'test'
+  ...
+# Subtest: W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+not ok 40 - W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+  ---
+  duration_ms: 6041.1653
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:1970:1'
+  failureType: 'testCodeFailure'
+  error: 'Actual product report must be persisted[{"role":"chief","text":"W36 prepare product","tools":[]},{"role":"chief","text":"W36 prepare product","tools":["dispatch_task：任务**未能派发**（回执：chief-production-dispatch-forbidden：派发未受理：fixed 路径的幕僚不派生产线角色（产品/策划/人事由运营派发）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1997:190)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2008:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W38 恢复的未受理resume回执出队前拒绝；缺metadata不降普通任务
+ok 41 - W38 恢复的未受理resume回执出队前拒绝；缺metadata不降普通任务
+  ---
+  duration_ms: 41.4572
+  type: 'test'
+  ...
+# Subtest: W42 同步入队发布完整persistence事实后释放自己的dispatch lease
+ok 42 - W42 同步入队发布完整persistence事实后释放自己的dispatch lease
+  ---
+  duration_ms: 7.5941
+  type: 'test'
+  ...
+# Subtest: W45 claim barrier affected
+ok 43 - W45 claim barrier affected
+  ---
+  duration_ms: 33.6225
+  type: 'test'
+  ...
+# Subtest: W45 claim barrier same-root-other
+ok 44 - W45 claim barrier same-root-other
+  ---
+  duration_ms: 32.507
+  type: 'test'
+  ...
+# Subtest: W45 claim barrier unknown
+ok 45 - W45 claim barrier unknown
+  ---
+  duration_ms: 32.4024
+  type: 'test'
+  ...
+# Subtest: W45 claim barrier cancel
+ok 46 - W45 claim barrier cancel
+  ---
+  duration_ms: 44.9919
+  type: 'test'
+  ...
+# Subtest: W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+not ok 47 - W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+  ---
+  duration_ms: 129.5054
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2149:3'
+  failureType: 'testCodeFailure'
+  error: "ENOTEMPTY: directory not empty, rmdir 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-w47-default-chief-JRCIyR\\.ans\\sessions\\chief\\codex\\ans'"
+  code: 'ENOTEMPTY'
+  ...
+# Subtest: W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+not ok 48 - W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+  ---
+  duration_ms: 101.6341
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2149:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2216:108)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+not ok 49 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+  ---
+  duration_ms: 3561.8154
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2237:1'
+  failureType: 'testCodeFailure'
+  error: 'The actual controller report must be persisted'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2272:194)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2282:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+not ok 50 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+  ---
+  duration_ms: 3574.557
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2237:1'
+  failureType: 'testCodeFailure'
+  error: 'The actual controller report must be persisted'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2272:194)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2282:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+not ok 51 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+  ---
+  duration_ms: 3551.0402
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2237:1'
+  failureType: 'testCodeFailure'
+  error: 'The actual controller report must be persisted'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2272:194)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2282:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source
+not ok 52 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source
+  ---
+  duration_ms: 3569.5795
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\chief-workflow.test.ts:2237:1'
+  failureType: 'testCodeFailure'
+  error: 'The actual controller report must be persisted'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2272:194)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2282:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、present-but-changed 拒绝
+ok 53 - W4 桌面run-stop：Claude/Pi drain 可推进；native absent 允许、present-but-changed 拒绝
+  ---
+  duration_ms: 5.1462
+  type: 'test'
+  ...
+# Subtest: W6/T5 团队计划宿主绑定：省略 runId 注入受派任务 run；自报不一致/flow 不符拒绝；成功回执 source.runId=任务 run
+ok 54 - W6/T5 团队计划宿主绑定：省略 runId 注入受派任务 run；自报不一致/flow 不符拒绝；成功回执 source.runId=任务 run
+  ---
+  duration_ms: 324.4302
+  type: 'test'
+  ...
+# Subtest: W6/T5 团队计划宿主绑定拒绝分层：plan-task-unavailable/plan-task-changed 本地前置、inspect 失败直通 trunk-item-invalid
+ok 55 - W6/T5 团队计划宿主绑定拒绝分层：plan-task-unavailable/plan-task-changed 本地前置、inspect 失败直通 trunk-item-invalid
+  ---
+  duration_ms: 86.2444
+  type: 'test'
+  ...
+# Subtest: W6/T5 团队计划宿主绑定：普通消息回合无受派任务 ⇒ host-local plan-task-unavailable
+ok 56 - W6/T5 团队计划宿主绑定：普通消息回合无受派任务 ⇒ host-local plan-task-unavailable
+  ---
+  duration_ms: 6.5068
+  type: 'test'
+  ...
+1..56
+# tests 66
+# suites 0
+# pass 31
+# fail 35
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 123760.3756

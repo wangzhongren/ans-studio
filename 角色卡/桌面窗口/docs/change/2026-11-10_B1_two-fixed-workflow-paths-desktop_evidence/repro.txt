@@ -1,0 +1,14 @@
+# reproduction (B1 desktop)
+candidate: branch feat/two-fixed-workflow-paths @ 24af13d + working-tree changes (uncommitted)
+node v24.22.1; commands run from the worktree root:
+  npm run typecheck
+  node --test --test-concurrency=1 --test-reporter=tap "test/桌面应用/fixed-path-routing.test.ts"
+  node --test --test-concurrency=1 --test-reporter=tap "test/桌面应用/workflow-git-port.test.ts"
+  node --test --test-concurrency=1 --test-reporter=tap "test/桌面应用/<suite>.test.ts"        # after
+before baselines (pristine HEAD, identical src/test to 24af13d):
+  git archive HEAD | tar -x -C "$TEMP/ans-b1-head"
+  <junction> "$TEMP/ans-b1-head/node_modules" -> <worktree>/node_modules
+  cd "$TEMP/ans-b1-head" && node --test --test-concurrency=1 --test-reporter=tap "test/桌面应用/<suite>.test.ts"
+per-file timeout used for the batch loops: timeout 120-180 s (files hanging at baseline are killed by the
+same timeout in before and after; see affected/ and affected2/ partial TAPs).
+failure-name diff = set of "not ok N - <name>" lines after stripping the ordinal; identical in before/after.

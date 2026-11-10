@@ -1,0 +1,12 @@
+# legacy anchors (B1 desktop): routeStarDispatch byte-identical + old predicate/inline rejection
+routeStarDispatch HEAD bytes=49853 sha256=1beea23b70b5c3d357ef208a20cbb2f6410ea7f92f93ab7440b9dbc7ca065a4f
+routeStarDispatch CUR  bytes=49853 sha256=1beea23b70b5c3d357ef208a20cbb2f6410ea7f92f93ab7440b9dbc7ca065a4f
+identical=true
+anchor head=true cur=true :: const authorization = evaluateDispatchAuthorization({
+anchor head=true cur=true :: fromRoleId,
+      targetRoleId,
+      targetBuiltIn,
+      targetExists,
+      c
+anchor head=true cur=true :: if (fromRoleId === convenerRoleId && targetRoleId === "verifier")
+anchor head=true cur=true :: chief-hub-review-owner-required：新的质检任务须由幕僚创建，未登记任务。

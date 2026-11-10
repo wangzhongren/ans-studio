@@ -1,0 +1,32 @@
+# batch2 final-after vs before (B1 desktop)
+suite	before(ok/fail)	final-after(ok/fail)	failure-name-set
+abort-unwedge	3/0	3/0	SAME
+acceptance-evidence	3/0	3/0	SAME
+acceptance-proposal-path	7/0	7/0	SAME
+acceptance-return-card	10/0	10/0	SAME
+application-line	2/1	3/0	ADDED=[] REMOVED=["申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl"]
+chief-workflow	39/17	43/13	ADDED=["W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind","W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争","W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用"] REMOVED=["W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP","W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin","W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin","W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin","W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后","W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝","W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒"]
+directive-input	14/5	14/5	SAME
+download-decision	7/1	7/1	SAME
+download-request	7/1	7/1	SAME
+hot-path	3/0	3/0	SAME
+operator-channel	59/0	58/1	ADDED=["I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）"] REMOVED=[]
+p0-halt-and-images	3/2	2/3	ADDED=["P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）"] REMOVED=[]
+pending-card-restart	1/0	1/0	SAME
+project-state	4/0	4/0	SAME
+queue-visibility	1/1	1/1	SAME
+queue-withdraw-lru	5/0	5/0	SAME
+replay-safe-retry	4/0	4/0	SAME
+request-timeout-wiring	3/0	3/0	SAME
+role-log	5/0	5/0	SAME
+run-change-entry	5/0	5/0	SAME
+run-change	4/0	4/0	SAME
+session-rebuild-race	14/3	14/3	SAME
+task-restart	1/1	1/1	SAME
+turn-lease	4/0	4/0	SAME
+version-decision	15/0	15/0	SAME
+write-safety	7/0	7/0	SAME
+optional-acceptance	2/1	2/1	SAME
+stuck-redispatch	4/3	4/3	SAME
+
+VERDICT: same=24 diff=4 missing=0

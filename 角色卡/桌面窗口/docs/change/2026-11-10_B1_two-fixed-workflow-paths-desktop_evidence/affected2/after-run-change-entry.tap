@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: listProject 附带 activeRuns（pinned/draft 摘要；draft 不算可发起）
+ok 1 - listProject 附带 activeRuns（pinned/draft 摘要；draft 不算可发起）
+  ---
+  duration_ms: 22.0336
+  type: 'test'
+  ...
+# Subtest: requestRunChange：无 pinned run / 多 pinned run / 无可呈现会话 ⇒ 如实失败（不伪造成功）
+ok 2 - requestRunChange：无 pinned run / 多 pinned run / 无可呈现会话 ⇒ 如实失败（不伪造成功）
+  ---
+  duration_ms: 11.5472
+  type: 'test'
+  ...
+# Subtest: requestRunChange（真实链路）：convener 会话呈现 run-change 卡，客户答 continue-frozen 后落账
+ok 3 - requestRunChange（真实链路）：convener 会话呈现 run-change 卡，客户答 continue-frozen 后落账
+  ---
+  duration_ms: 54.7978
+  type: 'test'
+  ...
+# Subtest: 跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按钮已移除（低层 API 保留）/ 触发点接线
+ok 4 - 跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按钮已移除（低层 API 保留）/ 触发点接线
+  ---
+  duration_ms: 3.235
+  type: 'test'
+  ...
+# Subtest: requestRunChange（真实客户卡通道 + 替我决策开启）：三模式卡呈现客户、不代选；客户作答后按 customer 落账
+ok 5 - requestRunChange（真实客户卡通道 + 替我决策开启）：三模式卡呈现客户、不代选；客户作答后按 customer 落账
+  ---
+  duration_ms: 69.7139
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 597.6528

@@ -1,0 +1,19 @@
+# consumed orchestration exports (read-only) — B1 desktop
+- workflow-dispatch.ts: evaluateFixedPathDispatchAuthorization, FIXED_DISPATCH_MATRIX,
+  stageRequestIdempotencyKey, stageStopIdempotencyKey  => shapes match; no change requested.
+- workflow-service.ts: workflowMode (delegate), requestStage (stage-request creation),
+  inspectAssignedTask (convener parent evidence + delivery-machine fixed facts),
+  readWorkflowLedger/readBasisLedger/appendBasisEvent(test), workflowIdFor (first-request
+  evidence key) => exports exist and behave as documented; no change requested.
+- workflow-state.ts: deriveWorkflowView (stage/activatedRoleIds/closed/blocked-corrupt);
+  NOTE: projection does NOT derive reviewRoleId -> desktop uses basis.recorded.reviewRoleId
+  as the single trusted source (matches B1 orchestration record §1.9); no change requested.
+- workflow-preconditions.ts: loadLatestRoster / reviewRoleIdOfRoster (roster original
+  roles[].review; MF-IR-7) => used as-is.
+- run-role.ts: openRoleSession input.workflowModeForFlow (injected by desktop; trio only);
+  fixed tool filtering/context stays in run-role (single source); no desktop duplication.
+- task-state.ts: appendTaskEvent (fixed write-side rules; bypasses legacy trunk
+  recordTaskObservation intentionally), taskEvent/taskIdempotencyKey/classifyTaskSideEffect.
+- model/runtime.ts: DispatchTaskPayload fixed fields (taskKind/workflowAction/workflowPath/
+  workflowId/stage/reworkOf), WorkflowEvent/BasisEvent guards, GovernanceCardKind merge-main.
+Conclusion: no interface mismatch; no write-set-outside requirement (no stop report).
