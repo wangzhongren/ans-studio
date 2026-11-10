@@ -235,3 +235,36 @@ test("收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskById
     await cleanup(root);
   }
 });
+
+test("stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）", async () => {
+  const root = await tempRoot();
+  try {
+    const codeSideEffect = await appendTaskEvent(root, fixedTask("t-code", { sideEffect: "code" }));
+    assert.equal(codeSideEffect.ok, false);
+    if (!codeSideEffect.ok) assert.equal(codeSideEffect.code, "invalid-task-binding");
+    const withModule = await appendTaskEvent(root, fixedTask("t-module", { moduleId: "core" }));
+    assert.equal(withModule.ok, false);
+    if (!withModule.ok) assert.equal(withModule.code, "invalid-task-binding");
+    const wrongFrom = await appendTaskEvent(root, fixedTask("t-from", { from: "convener" }));
+    assert.equal(wrongFrom.ok, false);
+    if (!wrongFrom.ok) assert.equal(wrongFrom.code, "invalid-task-binding");
+    const wrongTo = await appendTaskEvent(root, fixedTask("t-to", { to: "worker" }));
+    assert.equal(wrongTo.ok, false);
+    if (!wrongTo.ok) assert.equal(wrongTo.code, "invalid-task-binding");
+
+    // 读侧：账本已有坏行（stage-request+module）⇒ 坏行计数、不重放（不猜）。
+    const file = path.join(root, ...TASKS_STATE_REL.split("/"));
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const badLine = JSON.stringify({
+      v: 1, at: AT, kind: "task.created", taskId: "t-bad-stage-request", from: "chief", to: "convener",
+      text: "x", sideEffect: "read-only", idempotencyKey: "k-bad-sr", flowId: "snake",
+      workflowId: WF, stage: "A1", taskKind: "stage-request", moduleId: "core",
+    });
+    await fs.writeFile(file, `${badLine}\n`, "utf8");
+    const read = await readTaskState(root);
+    assert.equal(read.records.has("t-bad-stage-request"), false);
+    assert.ok(read.errors.some((error) => error.message.includes("module/写集")));
+  } finally {
+    await cleanup(root);
+  }
+});

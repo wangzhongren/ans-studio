@@ -388,6 +388,18 @@ function validateFixedTaskCreatedBinding(
   if (event.workflowPath !== undefined && !isWorkflowPath(event.workflowPath)) {
     return fail("task.created.workflowPath 非法：只允许 A/B");
   }
+  // AC-05（B1 收口）：stage-request 只允许 chief→convener、sideEffect 固定 read-only、无 module/写集。
+  if (event.taskKind === "stage-request") {
+    if (event.from !== "chief" || event.to !== "convener") {
+      return fail("task.created stage-request 只允许 chief→convener（产线调度请求，不是生产线派发）");
+    }
+    if (event.sideEffect !== "read-only") {
+      return fail("task.created stage-request 必须为 sideEffect=read-only（文本升类豁免后固定只读）");
+    }
+    if (event.moduleId !== undefined || event.modulePaths !== undefined || event.moduleDirectory !== undefined) {
+      return fail("task.created stage-request 不得携带 moduleId/modulePaths/moduleDirectory（无写集）");
+    }
+  }
   return { ok: true };
 }
 
@@ -1112,6 +1124,18 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
       if (rec["taskKind"] !== undefined
         && (typeof rec["taskKind"] !== "string" || rec["taskKind"].trim() === "" || rec["taskKind"] !== "stage-request")) {
         return { ok: false, message: "task.created.taskKind 非法" };
+      }
+      if (rec["taskKind"] === "stage-request") {
+        // AC-05：stage-request 只允许 chief→convener、sideEffect=read-only、无 module/写集（读侧同 fail-closed）。
+        if (rec["from"] !== "chief" || rec["to"] !== "convener") {
+          return { ok: false, message: "task.created stage-request 只允许 chief→convener" };
+        }
+        if (sideEffect !== "read-only") {
+          return { ok: false, message: "task.created stage-request 必须为 sideEffect=read-only" };
+        }
+        if (rec["moduleId"] !== undefined || rec["modulePaths"] !== undefined || rec["moduleDirectory"] !== undefined) {
+          return { ok: false, message: "task.created stage-request 不得携带 module/写集" };
+        }
       }
       if (rec["workflowPath"] !== undefined && !isWorkflowPath(rec["workflowPath"])) {
         return { ok: false, message: "task.created.workflowPath 非法" };

@@ -626,11 +626,12 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
   },
   {
     id: "project-roster/v3",
-    title: "项目名单（角色与模块归属；含拓扑图块）",
+    title: "项目名单（角色与模块归属；含拓扑图块；v3/v4 双字面量）",
     audience: "role-authored",
     stage: "名单",
     pathPattern: "docs/proposals/<flowId>-roster-vN.md",
     schemaLiteral: PROJECT_ROSTER_SCHEMA,
+    schemaLiteralNote: "同时接受 project-roster/v3 与 project-roster/v4（v4 仅追加可选 roles[].review；不新增格式 id）",
     validator: {
       kind: "strict-parser",
       file: "src/common/编排/workflow-preconditions.ts",
@@ -638,7 +639,7 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
       note: "loadLatestRoster 加载链（版本/引用/拓扑）；loadPinnedRoster 校验 pinned 字节",
     },
     fields: [
-      vf("schema", "string", "required", "字面量 project-roster/v3"),
+      vf("schema", "string", "required", "字面量 project-roster/v3 或 project-roster/v4"),
       vf("flowId", "string", "required", "非空；与派发一致"),
       vf("version", "正整数", "required", "= 文件名 -vN 的 N"),
       vf("intent", "string", "required", "完整版本化意图路径（最新版）"),
@@ -653,6 +654,7 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
       vf("roles[].purpose", "string", "required", "非空"),
       vf("roles[].capability", "string", "required", "非空"),
       vf("roles[].modules", "string[]", "required", "非空 string[]；引用已定义模块 id；角色内不重复"),
+      vf("roles[].review", "boolean", "optional", "仅 v4；至多一个 true；该项目角色为验收角色（reviewRoleId，A12）；无标记默认内置 verifier；v3 出现即拒"),
       vf("正文", "任意", "required", "必须含「人员+模块拓扑图」章节 + ```topology 块，且与 frontmatter 完全一致"),
     ],
     loadChecks: [
@@ -669,7 +671,7 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
     commonErrors: [
       err("roster-frontmatter-missing", "缺 frontmatter/未闭合", "文件以 --- 开始并闭合"),
       err("roster-yaml-invalid", "YAML 非法", "修正 YAML"),
-      err("roster-schema-invalid", "schema/flowId 非法或 envBootstrap 形状非法", "schema 必须恰为 project-roster/v3"),
+      err("roster-schema-invalid", "schema/flowId 非法或 envBootstrap 形状非法", "schema 必须为 project-roster/v3 或 project-roster/v4"),
       err("roster-flow-mismatch", "flowId 与期望不一致", "与派发 flowId 一致"),
       err("roster-version-invalid", "version 非正整数/与文件名不一致", "写正整数并与 -vN 一致"),
       err("roster-reference-invalid", "引用路径形状非法", "使用完整版本化路径"),
@@ -677,6 +679,7 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
       err("roster-role-fields-missing", "角色 displayName/purpose/capability 缺失", "全部非空"),
       err("roster-role-id-invalid", "角色 id 非法", "小写 slug 2–64"),
       err("roster-role-modules-invalid", "角色 modules 缺失/重复/非字符串", "非空 string[]，引用已定义模块"),
+      err("roster-role-review-invalid", "roles[].review 非法（非 boolean/多个 true/v3 出现）", "仅 v4 允许，至多一个 true"),
       err("roster-role-builtin", "角色 id 为内置治理角色", "项目角色不得占用内置 id"),
       err("roster-role-duplicate", "角色 id 重复", "唯一"),
       err("roster-role-without-module", "角色未绑定模块", "每角色至少一模块"),
@@ -802,7 +805,7 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
     stage: "规划",
     pathPattern: "docs/scheduling/<flowId>-team-vN.md",
     schemaLiteral: TEAM_PLAN_SCHEMA,
-    schemaLiteralNote: "文档字面量为 teamPlanSchema:3（不是斜杠 schema）；run pin 仅识别 -team-v1.md（既有事实）",
+    schemaLiteralNote: "文档字面量为 teamPlanSchema:3（不是斜杠 schema）；run pin 仅识别 -team-v1.md（既有事实）；固定路径 complete_team_plan v4 输入无 runId/baseDigest（出现即 baseline-legacy-field-forbidden），legacy 字段逐字保留",
     validator: {
       kind: "strict-parser",
       file: "src/common/编排/workflow-preconditions.ts",

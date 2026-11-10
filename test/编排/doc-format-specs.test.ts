@@ -1306,6 +1306,7 @@ const SCHEMA_WHITELIST: ReadonlyArray<{ literal: string; reason: string }> = [
   { literal: "version-change-service/v1", reason: "服务契约版本常量（service/version-change/public/version-change-service.ts）；非文档格式" },
   { literal: "chief-hub-resume/v1", reason: "apply-journal.ts 的 directHash 哈希域分隔标签；非 schema" },
   { literal: "doc-format-specs/v1", reason: "规范模块契约版本（doc-format-specs.ts DOC_FORMAT_SPEC_VERSION）；非文档格式" },
+  { literal: "project-roster/v4", reason: "T3 名单 v4 字面量（G-9/MF-IR-7）：与 project-roster/v3 同一条 doc-format 条目双字面量兼容；不新增格式 id" },
 ];
 
 test("TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）", async () => {
@@ -1355,6 +1356,7 @@ const CODE_WHITELIST: ReadonlyArray<{ code: string; reason: string }> = [
     "plan-operation-conflict", "plan-preparation-only", "plan-run-conflict", "plan-snapshot-invalid",
     "plan-store-unavailable"].map((code) => ({ code, reason: "团队计划执行/账本生命周期码（journal/CAS/escalation）；非 A8 文档解析码（A8 的 plan-* 已入规范）" })),
   { code: "role-activation-publication", reason: "激活发布值/card kind" },
+  { code: "role-activation-unrecorded", reason: "T3 fixed 工作流 A10 前置码（AC-19/G-8：角色卡在盘但账本无 role.activated）；工作流账本为应用维护，不在 doc_format 范围" },
   { code: "role-authored", reason: "DOC_FORMAT audience 枚举值（本模块）；非稳定 code" },
   { code: "role-capability-callback-guard-unverified", reason: "角色激活能力证据码" },
   { code: "role-card", reason: "文件/kind 值名（非 code）" },

@@ -10,11 +10,15 @@
 //    `isWorkflowEvent`/`WORKFLOW_STAGES`），不复制第二份枚举。
 //  · 事件只增：同 `idempotencyKey` 重复事件忽略（first wins，计 `duplicate`）；形状非法事件计数跳过
 //    （计 `invalid`）。**关键事件缺失/顺序非法 ⇒ `workflow-corrupt`（blocked），不猜、不自动推进**。
-//  · B0 只覆盖合法转移骨架 + A10→A11（A10 未完成发 A11 拒绝）+ A12a/A12b + stop 骨架；
-//    完整 A/B 完成判定（artifact/hash/角色激活齐全等）在 B1 补齐（本模块保持纯函数可扩展）。
+// B1（2026-11-10）补齐：A1–A13/B1–B4 完整合法/非法转移、A10→A11 时序、A12a/A12b、stop/open
+// 不变量（投影层）、关闭证据 fail-closed；**MF-IR-1 rework 语义**按冻结判据：
+// `stage.reworked.stage` = 回落目标阶段，`reworkOf` = 被返工的来源阶段（A12b→A11 时
+// `reworkOf:"A12b"`、`stage:"A11"`）；投影把 `reworkOf` 标记 failed、当前阶段置 `stage`。
+// 阶段完成的 artifact/hash/角色激活齐全等**应用事实**由 `workflow-service` 在写事件前校验；
+// 本模块仍是纯投影：缺事件/坏行/顺序非法 ⇒ `workflow-corrupt`，不猜、不自动推进。
 //
 // 与 v1.3 §4.1 的差异：`WorkflowView` 在冻结形状之上**仅追加可选字段**（stopping/closed/
-// activatedRoleIds/skippedEvents）；必需字段与语义不变，B1 可继续使用。
+// activatedRoleIds/skippedEvents）；必需字段与语义不变。
 
 import type {
   StageStatus,
@@ -62,8 +66,9 @@ export interface WorkflowView {
 }
 
 /**
- * B0 骨架：阶段 → 合法下一阶段（v1.3 §4.4）。
- * 返工边（A3→A2、A6→A5、A12b→A11、B2→B1）由 `stage.reworked.reworkOf` 表达，不在此静态表。
+ * 阶段 → 合法下一阶段（v1.3 §4.4）。
+ * 返工边（A3→A2、A6→A5、A12b→A11、B2→B1）由 `stage.reworked` 表达（`stage`=回落目标、
+ * `reworkOf`=被返工来源，MF-IR-1），不在此静态表。
  * A10→A12a 允许（criteria 可先派）；A12a→A11（criteria 在办时即可推进实现，G-1）；
  * A12b→A12/A13（A12 聚合完成或直接发布）；A13/B4 无后继（由 `workflow.closed` 结束）。
  */
@@ -91,6 +96,17 @@ export const WORKFLOW_STAGE_TRANSITIONS: Readonly<Record<WorkflowStage, readonly
 
 /** v1.3 §4.5：这些阶段在任务创建（stage.dispatched）时即视为完成（A1/A4/A7 完成于目标任务创建）。 */
 const DISPATCH_COMPLETES: ReadonlySet<WorkflowStage> = new Set<WorkflowStage>(["A1", "A4", "A7"]);
+
+/**
+ * MF-IR-1 / G-17：返工映射——`reworkOf`（被返工来源）→ `stage`（回落目标）。
+ * A3(revise)→A2、A6(revise)→A5、A12b(rework)→A11、B2(rework)→B1。
+ */
+export const WORKFLOW_REWORK_FALLBACKS: Readonly<Partial<Record<WorkflowStage, WorkflowStage>>> = Object.freeze({
+  A3: "A2",
+  A6: "A5",
+  A12b: "A11",
+  B2: "B1",
+});
 
 const STAGE_SET: ReadonlySet<string> = new Set<string>(WORKFLOW_STAGES);
 
@@ -127,7 +143,7 @@ function canRequest(view: WorkflowView, target: WorkflowStage): boolean {
   const current = view.stages[view.stage];
   if (target === view.stage) {
     return current.status === "pending" || current.status === "requested"
-      || current.status === "dispatched" || current.status === "blocked";
+      || current.status === "dispatched" || current.status === "blocked" || current.status === "failed";
   }
   if (current.status === "completed" && WORKFLOW_STAGE_TRANSITIONS[view.stage].includes(target)) return true;
   // G-1：A12a（criteria）可在实现期间完成；A11 的 stage-request 不等待 A12a 收口。
@@ -143,10 +159,12 @@ function canDispatch(view: WorkflowView, target: WorkflowStage): boolean {
     const status = view.stages[target].status;
     return status === "requested" || status === "dispatched";
   }
-  // 已先 stage.requested（A11 在 A12a 在办时已请求）的阶段，其 task.created 派发同样合法。
+  // 已先 stage.requested（A11 在 A12a 在办时已请求）的阶段，其 task.created 派发同样合法；
+  // 返工后的重试（target 曾在上一 attempt 失败）也允许重新派发。
   return view.stages[view.stage].status === "completed"
     && WORKFLOW_STAGE_TRANSITIONS[view.stage].includes(target)
-    && (view.stages[target].status === "pending" || view.stages[target].status === "requested");
+    && (view.stages[target].status === "pending" || view.stages[target].status === "requested"
+      || view.stages[target].status === "failed");
 }
 
 /** 合法完成：任意“在办”阶段可被完成（A12a 可在 A11 期间完成）；A12 聚合完成要求 A12b 已完成。 */
@@ -213,24 +231,37 @@ function applyWorkflowEvent(view: WorkflowView, event: WorkflowEvent): string | 
       return undefined;
     }
     case "stage.reworked": {
-      // v1.3 §4.4：stage = 触发返工的业务阶段；reworkOf = 返回执行的具体阶段（A12b→A11、A6→A5…）。
-      if (event.stage !== view.stage) {
-        return `stage.reworked 触发阶段不匹配：${event.stage} != ${view.stage}`;
+      // MF-IR-1（冻结判据）：`stage` = 回落目标（A11），`reworkOf` = 被返工来源（A12b）。
+      // 合法性：`reworkOf` 必须是当前阶段（被返工者）且处于在办/已完成/阻塞；`stage` 必须等于
+      // 冻结的回落映射（A3→A2 / A6→A5 / A12b→A11 / B2→B1）。
+      if (event.reworkOf !== view.stage) {
+        return `stage.reworked 来源阶段不匹配：reworkOf=${event.reworkOf} != 当前 ${view.stage}`;
       }
-      const trigger = view.stages[event.stage];
+      const fallback = WORKFLOW_REWORK_FALLBACKS[event.reworkOf];
+      if (fallback === undefined || event.stage !== fallback) {
+        return `stage.reworked 回落目标非法：${event.reworkOf} → ${event.stage}（应为 ${fallback ?? "无" }）`;
+      }
+      const trigger = view.stages[event.reworkOf];
+      if (trigger.status !== "requested" && trigger.status !== "dispatched" && trigger.status !== "in-progress"
+        && trigger.status !== "blocked" && trigger.status !== "completed") {
+        return `stage.reworked 来源阶段状态非法：${event.reworkOf}(${trigger.status})`;
+      }
       trigger.status = "failed";
       trigger.lastEventId = event.idempotencyKey;
-      const target = view.stages[event.reworkOf];
+      const target = view.stages[event.stage];
       target.status = "pending";
       target.attempt = Math.max(target.attempt, event.attempt);
-      view.stage = event.reworkOf;
+      view.stage = event.stage;
       view.status = "pending";
+      view.blocked = undefined;
       return undefined;
     }
     case "change.scope-decided": {
-      // B2 完成于 scope 决议事件（v1.3 §4.5）；允许 B2 在办时完成，或 B1 completed 后直接决议（无 stage.requested）。
+      // B2 完成于 scope 决议事件（v1.3 §4.5）；允许 B2 在办时完成，或 B1 completed 后直接决议
+      // （无 stage.requested），或 B2 rework 回 B1 并再次完成后重试决议（B2 failed）。
       const allowed = canComplete(view, "B2")
-        || (view.stage === "B1" && view.stages.B1.status === "completed" && view.stages.B2.status === "pending");
+        || (view.stage === "B1" && view.stages.B1.status === "completed"
+          && (view.stages.B2.status === "pending" || view.stages.B2.status === "failed"));
       if (!allowed) return "change.scope-decided 发生在 B2 非法阶段";
       const state = view.stages.B2;
       state.status = "completed";
@@ -240,16 +271,29 @@ function applyWorkflowEvent(view: WorkflowView, event: WorkflowEvent): string | 
       return undefined;
     }
     case "role.activated": {
+      // A8 执行角色激活（v1.3 §4.5/G-8）：只允许发生在 A8 在办（requested/dispatched/in-progress）。
+      if (view.stage !== "A8") {
+        return `role.activated 发生在 A8 之外（当前 ${view.stage}）`;
+      }
       const roles = view.activatedRoleIds ?? [];
       if (!roles.includes(event.roleId)) roles.push(event.roleId);
       view.activatedRoleIds = roles;
       return undefined;
     }
     case "workflow.stop-requested": {
+      if (view.stopping === true) return "重复 workflow.stop-requested（stop 已在办）";
+      if (event.stage !== view.stage) {
+        return `workflow.stop-requested 阶段不匹配：${event.stage} != ${view.stage}`;
+      }
+      // stop 请求本身不是失败：只置 stopping（nextStages 为空），不设置 blocked。
       view.stopping = true;
       return undefined;
     }
     case "workflow.stop-unconfirmed": {
+      if (view.stopping !== true) return "workflow.stop-unconfirmed 发生在未 stop 请求的 workflow";
+      if (event.stage !== view.stage) {
+        return `workflow.stop-unconfirmed 阶段不匹配：${event.stage} != ${view.stage}`;
+      }
       view.stopping = true;
       view.status = "blocked";
       view.blocked = {
@@ -259,6 +303,16 @@ function applyWorkflowEvent(view: WorkflowView, event: WorkflowEvent): string | 
       return undefined;
     }
     case "workflow.closed": {
+      // AC-07：停稳不明（请求已 closed + 运营报告 + 无 open 生产任务）⇒ 不写 stopped；
+      // 投影对缺失证据的 stopped 关闭 fail-closed（corrupt），不按成功处理。
+      if (event.outcome === "stopped") {
+        const evidence = event.stopEvidence;
+        const confirmed = evidence !== undefined && evidence.requestClosed === true && evidence.operatorReported === true
+          && (evidence.openProductionTaskIds === undefined || evidence.openProductionTaskIds.length === 0);
+        if (!confirmed) {
+          return "workflow.closed stopped 缺少停稳证据（请求已 closed + 运营报告 + 无 open 生产任务）";
+        }
+      }
       view.closed = { outcome: event.outcome, reason: event.reason };
       view.stopping = false;
       view.status = event.outcome === "failed" ? "failed" : "completed";
@@ -361,4 +415,22 @@ export function nextStages(view: WorkflowView): readonly WorkflowStage[] {
 /** 便捷断言：事件阶段值域（消费方传入可疑值时用；不改变投影状态）。 */
 export function isKnownWorkflowStage(value: unknown): value is WorkflowStage {
   return isWorkflowStage(value);
+}
+
+/**
+ * 写事件前的纯校验（`workflow-service` 复用同一谓词；不读取/不写账本）：
+ * 与 `deriveWorkflowView` 内部判定同源，避免服务层另写第二份顺序规则。
+ */
+export function canRequestStage(view: WorkflowView, stage: WorkflowStage): boolean {
+  return canRequest(view, stage);
+}
+
+/** 写 `stage.dispatched` 前校验（同源）。 */
+export function canDispatchStage(view: WorkflowView, stage: WorkflowStage): boolean {
+  return canDispatch(view, stage);
+}
+
+/** 写 `stage.completed` 前校验（同源）。 */
+export function canCompleteStage(view: WorkflowView, stage: WorkflowStage): boolean {
+  return canComplete(view, stage);
 }

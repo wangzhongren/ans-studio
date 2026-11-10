@@ -1,0 +1,24 @@
+# B1 candidate raw SHA-256 / bytes / lines (2026-11-10T05:45:20Z)
+# HEAD ff67bc0384ca01da6df1246a50e16e7ee8b46564 + working tree (uncommitted)
+src/common/编排/workflow-preconditions.ts  bytes=94720 lines=1753 sha256=43ab705cb7ac9011b3840e71f373ebc29e8176c0ef790df2d87631c5dde07206
+src/common/编排/workflow-dispatch.ts  bytes=17855 lines=373 sha256=6890ebb2f9434588dec93b3079c2a4576c9ca880c17ac974f5252e250e162502
+src/common/编排/workflow-state.ts  bytes=20633 lines=436 sha256=c45a9f104a6e61e72224ee5c52c5e25bf9265741b8f6780c1e3179a7755d38cc
+src/common/编排/workflow-service.ts  bytes=105476 lines=2305 sha256=99fcc0fafd948ac2d13ee62e4d26f790bd9c1f424447358d650c9c016789897c
+src/common/编排/task-state.ts  bytes=82473 lines=1428 sha256=4f2ea9a26811ef51ce54caf3c9c16516380a962aaf3950909e38894c380145ae
+src/common/编排/project-state.ts  bytes=57381 lines=1312 sha256=9a7c4a9703b330b1797b15e07f54511a9eeac28ca3c0c7f8692225865adf0b95
+src/common/编排/doc-format-specs.ts  bytes=101276 lines=2297 sha256=f35cc25dccb73c605a92fda2c1c48e16aa58fd95d02c8f8b9843f32455cf3774
+src/common/编排/governance-judge.ts  bytes=28360 lines=611 sha256=333b0446e472f528dba5099edd7c9a702ee16d80eeb48242c3c51ca88858e52b
+src/common/编排/governance-judge-verdict.ts  bytes=40678 lines=769 sha256=d93cc3436466c0c17388f86250de1dc01042d615b65903249a7a984300cb43b7
+src/pipeline/orchestration/run-role.ts  bytes=243967 lines=3735 sha256=471deafc7819576002e376d7d8310cbd4e22802ee58c7e6fd416e04cda8d623a
+test/编排/workflow-dispatch-fixed.test.ts  bytes=13324 lines=301 sha256=41534cd96157b351de0538e70e5c38f2d1f273040087fb5f80d1a8c1cbc8f552
+test/编排/workflow-stage-request.test.ts  bytes=17217 lines=367 sha256=dfcde90e7468dd4ba64d78a826a10fe4d0385b31c5231fcf5172ba9042be8ad4
+test/编排/workflow-close-intent.test.ts  bytes=18016 lines=373 sha256=f738baa3ba737c7d8235dd7591c0dfbbd09e58039bd6b9a99ad482ec59ae13b8
+test/编排/roster-v4.test.ts  bytes=5653 lines=134 sha256=1eb1b80bde0eb4c113c5a0d67942700ebfa87ac7285503cace123eed8a4535d7
+test/编排/workflow-baseline.test.ts  bytes=11870 lines=282 sha256=6f9bbedfd4ce7bfb56406c0239a231ddbc3f92e86a9d01a2f8cd55c4aacb9648
+test/编排/project-state-workflow.test.ts  bytes=6337 lines=119 sha256=ac0e138a50b312ba754a8cbbeff99139562447bfdbd73459fcf79aec3604454f
+test/编排/run-role-fixed.test.ts  bytes=4345 lines=106 sha256=02c19df59a8ab89b9fe09c72dfb7370ba583050275fd665466b7bd902b4fffd3
+test/编排/workflow-state.test.ts  bytes=16529 lines=326 sha256=8370210f60a15f8a51fe65d7efdc5a97bac5fc37fb57cae4e040fe7cbcc879b4
+test/编排/task-state-fixed.test.ts  bytes=11363 lines=270 sha256=c2a4d4fa046f252d4475ffd654209fc52b0bcdeb7213c046b7ac145f42563dca
+test/编排/acceptance-judge-minimal.test.ts  bytes=5981 lines=167 sha256=063ce10113f2b6cd6e9ce7445f39b45589fe1c58857b10749c22491cf84e8980
+test/编排/workflow-preconditions.test.ts  bytes=65599 lines=1331 sha256=05cd27126f0afe3beba0b283d077c125f808f79a09aaead2af30b8be6019c8a8
+test/编排/doc-format-specs.test.ts  bytes=101697 lines=1695 sha256=cf5b03ed485503f7617f6492465e2ea673fd0999283e417c03bd043c757b2bcf

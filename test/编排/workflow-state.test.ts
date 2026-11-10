@@ -143,14 +143,14 @@ test("A12a（criteria 可先派）→A11→A12b（report）→A12 聚合→A13 �
   assert.equal(view.status, "requested");
 });
 
-test("A12b rework 回 A11（reworkOf:A12b）：新 attempt 合法，触发阶段标记 failed", () => {
+test("A12b rework 回 A11（MF-IR-1：stage=A11、reworkOf=A12b）：新 attempt 合法，来源阶段标记 failed", () => {
   const events = throughA10();
   events.push(dispatched("A12a"));
   events.push(requested("A11"));
   events.push(completed("A11"));
   events.push(dispatched("A12b"));
   events.push(completed("A12b"));
-  events.push(reworked("A12b", "A11", 2));
+  events.push(reworked("A11", "A12b", 2));
   const view = deriveWorkflowView(events);
   assert.equal(view.blocked, undefined, view.blocked?.summary ?? "");
   assert.equal(view.stage, "A11");
@@ -163,6 +163,19 @@ test("A12b rework 回 A11（reworkOf:A12b）：新 attempt 合法，触发阶段
   assert.equal(retried.stage, "A11");
   assert.equal(retried.status, "requested");
   assert.equal(retried.stages.A11.attempt, 2);
+});
+
+test("rework 方向错误（旧 B0 语义：stage=来源、reworkOf=目标）⇒ workflow-corrupt（不静默反转）", () => {
+  const events = throughA10();
+  events.push(dispatched("A12a"));
+  events.push(requested("A11"));
+  events.push(completed("A11"));
+  events.push(dispatched("A12b"));
+  events.push(completed("A12b"));
+  // 旧语义写法：stage=A12b（来源）、reworkOf=A11（目标）——按 MF-IR-1 必须拒绝。
+  const view = deriveWorkflowView([...events, reworked("A12b", "A11", 2)]);
+  assert.equal(view.blocked?.code, WORKFLOW_CORRUPT_CODE);
+  assert.match(view.blocked?.summary ?? "", /stage\.reworked/);
 });
 
 test("幂等键重复只计一次；形状非法事件计数跳过；身份不一致/缺失 started ⇒ workflow-corrupt", () => {
@@ -246,9 +259,10 @@ test("B 路径骨架：B1→B2（scope-decided）→B3→B4；B2 rework 回 B1",
   assert.equal(view.stage, "B4");
   assert.equal(view.stages.B2.status, "completed");
 
-  const rework = deriveWorkflowView([bstart, bReq("B1"), bDone("B1"), bReq("B2"), { ...reworked("B2", "B1", 2), path: "B" }]);
+  const rework = deriveWorkflowView([bstart, bReq("B1"), bDone("B1"), bReq("B2"), { ...reworked("B1", "B2", 2), path: "B" }]);
   assert.equal(rework.blocked, undefined, rework.blocked?.summary ?? "");
   assert.equal(rework.stage, "B1");
+  assert.equal(rework.stages.B2.status, "failed");
   assert.equal(rework.status, "pending");
 });
 
@@ -265,4 +279,48 @@ test("stage.blocked 记录 code/summary 且不推进；未知阶段值不进入�
   // 未 requested 的阶段被 blocked ⇒ 阶段不匹配 ⇒ corrupt。
   const illegal = deriveWorkflowView([started(), requested("A1"), completed("A1"), { ...blocked, stage: "A5" }]);
   assert.equal(illegal.blocked?.code, WORKFLOW_CORRUPT_CODE);
+});
+
+test("A3(revise)/A6(revise) rework：stage=回落目标、reworkOf=被返工阶段（MF-IR-1/G-17）", () => {
+  const base: WorkflowEvent[] = [started(), requested("A1"), completed("A1"), requested("A2"), completed("A2"), requested("A3")];
+  const a3Rework = deriveWorkflowView([...base, reworked("A2", "A3", 2)]);
+  assert.equal(a3Rework.blocked, undefined, a3Rework.blocked?.summary ?? "");
+  assert.equal(a3Rework.stage, "A2");
+  assert.equal(a3Rework.status, "pending");
+  assert.equal(a3Rework.stages.A3.status, "failed");
+  assert.equal(a3Rework.stages.A2.attempt, 2);
+  assert.deepEqual([...nextStages(a3Rework)], ["A2"]);
+
+  const throughA6: WorkflowEvent[] = [
+    started(), requested("A1"), completed("A1"), requested("A2"), completed("A2"), requested("A3"), completed("A3"),
+    requested("A4"), completed("A4"), requested("A5"), completed("A5"), requested("A6"),
+  ];
+  const a6Rework = deriveWorkflowView([...throughA6, reworked("A5", "A6", 2)]);
+  assert.equal(a6Rework.blocked, undefined, a6Rework.blocked?.summary ?? "");
+  assert.equal(a6Rework.stage, "A5");
+  assert.equal(a6Rework.stages.A6.status, "failed");
+  assert.equal(a6Rework.stages.A5.attempt, 2);
+});
+
+test("stop 不变量：未 stop-requested 的 stop-unconfirmed ⇒ corrupt；重复 stop-requested ⇒ corrupt；阶段不匹配 ⇒ corrupt", () => {
+  const base: WorkflowEvent[] = [started(), requested("A1")];
+  const orphanUnconfirmed = deriveWorkflowView([...base, stopUnconfirmed("A1")]);
+  assert.equal(orphanUnconfirmed.blocked?.code, WORKFLOW_CORRUPT_CODE);
+  const duplicateStop = deriveWorkflowView([...base, stopRequested("A1"), { ...stopRequested("A1"), idempotencyKey: "stage-stop:second" }]);
+  assert.equal(duplicateStop.blocked?.code, WORKFLOW_CORRUPT_CODE);
+  const wrongStage = deriveWorkflowView([...base, stopRequested("A2")]);
+  assert.equal(wrongStage.blocked?.code, WORKFLOW_CORRUPT_CODE);
+});
+
+test("stopped 关闭必须有停稳证据（请求 closed + 运营报告 + 无 open 生产任务），否则 corrupt", () => {
+  const base: WorkflowEvent[] = [started(), requested("A1"), stopRequested("A1")];
+  const missingEvidence: WorkflowClosedEvent = {
+    v: 1, at: AT, schema: "ans-workflow/v1", kind: "workflow.closed", workflowId: WF, flowId: FLOW, path: "A",
+    idempotencyKey: `workflow-close:${WF}:stopped:missing`, outcome: "stopped", reason: "客户停止",
+  };
+  const view = deriveWorkflowView([...base, missingEvidence]);
+  assert.equal(view.blocked?.code, WORKFLOW_CORRUPT_CODE);
+  assert.equal(view.closed, undefined, "不写 stopped 成功态");
+  const withOpen = deriveWorkflowView([...base, closed("stopped")]);
+  assert.equal(withOpen.closed?.outcome, "stopped");
 });

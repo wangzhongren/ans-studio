@@ -1079,8 +1079,8 @@ test("AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期
       topic: "roster" as const,
       constant: PROJECT_ROSTER_SCHEMA,
       expected: [
-        `文档：docs/proposals/<flowId>-roster-vN.md（schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
-        `- schema: 字面量 ${PROJECT_ROSTER_SCHEMA}`,
+        `文档：docs/proposals/<flowId>-roster-vN.md（schema 须为 ${PROJECT_ROSTER_SCHEMA} 或 project-roster/v4；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
+        `- schema: ${PROJECT_ROSTER_SCHEMA} 或 project-roster/v4（v4 仅增可选 roles[].review）`,
         `schema: ${PROJECT_ROSTER_SCHEMA}`,
       ],
     },

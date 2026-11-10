@@ -1,0 +1,11 @@
+# B1 test/编排 before/after 汇总
+before TAP: before-test-orch.tap（B0 证据 test-orch-before.tap 复制；代码态 ee5b330==HEAD 的 src/test；sha256 8bdd0fb9ecade4a09b555adcd12c22ae02609a79ea899899b93ea968d9e8f4b6）
+before: tests 1178 / pass 1152 / fail 24 / skipped 2
+after（3 chunk 汇总）: tests 1250 / pass 1224 / fail 24 / skipped 2
+after chunk0: tests 359 / pass 354 / fail 5 / skipped 0
+after chunk1: tests 363 / pass 353 / fail 8 / skipped 2
+after chunk2: tests 528 / pass 517 / fail 11 / skipped 0
+失败名集合 diff:
+  after - before (新增确定性失败): 0
+  before - after (既有失败消失): 0
+  => 24 known-red 名称逐名一致（无新增、无消失、无新 skip；新增 72 用例全部 pass）

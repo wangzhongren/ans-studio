@@ -162,6 +162,14 @@ function contextProblem(request: GovernanceJudgeRequest): { reasonCode: string; 
   if (!isGovernanceJudgeFlowId(request.flowId)) {
     return { reasonCode: "context-missing", reason: "判断请求缺少合法的 flowId；请修正后重新提交。" };
   }
+  // T3（2026-11-10，协调方决策 #4 / AC-14）：`merge-main` 是应用合并通道的高风险确认卡——
+  // 必须客户本人确认；judge 只能转人工/拒绝，**不得 approve、不得冒充客户**。
+  if (request.cardKind === "merge-main") {
+    return {
+      reasonCode: "merge-main-customer-only",
+      reason: "merge-main 是应用合并通道的高风险确认卡，必须客户本人确认；判断 agent 只能转人工或拒绝，不得代批。",
+    };
+  }
   const derivedGroup = governanceCardGroup(request.cardKind);
   if (derivedGroup === undefined) {
     return { reasonCode: "group-mismatch", reason: "判断请求的卡种未知；请修正后重新提交。" };

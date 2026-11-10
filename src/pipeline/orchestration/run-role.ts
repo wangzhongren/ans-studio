@@ -47,7 +47,7 @@
 // 此时**不做任务级收窄**，只用角色边界；编排把 undefined 原样传给 resolveWrite，绝不伪造全量 writeSet。
 // （确认制会话例外：其 writeSet 由发行器动态持有；其中 Section 1 预授权/旧 su 预授权目录见上。）
 
-import type { GovernanceFunction, GovernanceModel, ProjectConfig, ResolvedRole } from "../../model/role.ts";
+import type { DispatchMatrixMode, GovernanceFunction, GovernanceModel, ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { BoundaryEntry } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
 import type { TaskScope, WriteDecision } from "../../model/decision.ts";
@@ -62,6 +62,9 @@ import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governanc
 import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
 import { loadLatestRoster, nominationD3CardFacts, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+// T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。
+import { readTaskState } from "../../common/编排/task-state.ts";
+import type { WorkflowMode } from "../../common/编排/workflow-service.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
 import {
@@ -791,6 +794,14 @@ export async function openRoleSession(
     runtime?: RuntimeKind;
     project: ProjectConfig;
     taskId?: string;
+    /**
+     * T3（2026-11-10 两条固定工作流路径，B1 AC-12）：per-flow 工作流模式。
+     * `workflowModeForFlow` 由桌面/CLI 注入——每次卡/任务/写门禁**按实际 flowId 解析**（不缓存项目级单值；
+     * 混合项目 legacy 在飞 flow 与新 fixed flow 并存）。`workflowMode` 为单 flow/显式常量兼容；
+     * 两者均缺省 ⇒ `legacy`（旧行为逐字不变）。纯选择器，不授权任何写权。
+     */
+    workflowMode?: WorkflowMode;
+    workflowModeForFlow?: (flowId: string) => WorkflowMode | Promise<WorkflowMode>;
     scope?: TaskScope;
     /** 宿主按客户委托注入的本项目常规检查政策；项目角色三层链专用。 */
     routineShellPolicy?: RoutineShellPolicy;
@@ -1098,6 +1109,30 @@ export async function openRoleSession(
 
   let boundSessionForEvidence: RoleSession | undefined;
   let currentFlowId: string | undefined;
+  // T3 B1（AC-12）：per-flow 模式解析——**不缓存项目级单值**。无常量/回调 ⇒ legacy（旧行为逐字不变）。
+  const resolveWorkflowMode = async (flowId?: string): Promise<WorkflowMode> => {
+    if (input.workflowMode !== undefined) return input.workflowMode;
+    const flow = typeof flowId === "string" ? flowId.trim() : "";
+    if (flow === "" || input.workflowModeForFlow === undefined) return "legacy";
+    try {
+      return await input.workflowModeForFlow(flow);
+    } catch {
+      return "legacy"; // 回调失败 ⇒ fail-closed legacy（不猜 fixed）
+    }
+  };
+  const matrixForFlow = async (flowId?: string): Promise<DispatchMatrixMode> =>
+    (await resolveWorkflowMode(flowId)) === "fixed" ? "two-fixed-paths/v1" : "legacy-v1";
+  // 会话级模式（上下文段/工具注入在会话打开时确定）：常量优先；否则按输入任务的真实 flowId 解析。
+  let sessionWorkflowMode: WorkflowMode = input.workflowMode ?? "legacy";
+  if (input.workflowMode === undefined && input.workflowModeForFlow !== undefined && input.taskId !== undefined) {
+    try {
+      const taskStateForMode = await readTaskState(input.project.projectRoot);
+      const taskFlowId = taskStateForMode.records.get(input.taskId)?.created?.flowId;
+      if (taskFlowId !== undefined) sessionWorkflowMode = await resolveWorkflowMode(taskFlowId);
+    } catch {
+      sessionWorkflowMode = "legacy";
+    }
+  }
   const roleDraftWritePaths: string[] = [];
   const refreshRoleDraftScope = async () => {
     roleDraftWritePaths.splice(0);
@@ -1275,7 +1310,8 @@ export async function openRoleSession(
               trioSpec!.id,
               req.options.map((option) => option.id),
             );
-            if (defaulted !== undefined && cardKindsOf(trioSpec!.id).includes(defaulted)) {
+            const defaultMatrix = await matrixForFlow(req.flowId ?? originalMetadata?.flowId);
+            if (defaulted !== undefined && cardKindsOf(trioSpec!.id, defaultMatrix).includes(defaulted)) {
               cardKind = defaulted;
               effectiveReq = { ...req, cardKind: defaulted };
               effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
@@ -1414,8 +1450,9 @@ export async function openRoleSession(
             }
           }
           if (isTrio) {
-            const allowed = cardKindsOf(trioSpec!.id);
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            // T3 B1（AC-12）：卡种白名单按**本卡实际 flowId** 解析矩阵（per-flow，不缓存项目级单值）。
+            const allowed = cardKindsOf(trioSpec!.id, await matrixForFlow(flowId));
             // C 批（方案 §6.4.1/R2）：归属键由 `flowId` 放宽为 `flowId | intentId | taskId` 至少一个；
             // 旧调用（只带 flowId）逐字仍有效。优先 flowId，其次 intentId，最后 taskId。
             const attributionId = isGovernanceFlowId(flowId)
@@ -2090,6 +2127,19 @@ export async function openRoleSession(
     : undefined;
 
   if (assignedReview?.ok) contextSections = [...(contextSections ?? []), assignedReview.value.contextText];
+  // T3 B1（AC-12/§3.4）：fixed 会话注入模块 `context({matrix:"two-fixed-paths/v1"})` 段（纯文本；
+  // legacy 数据/context 返回值逐字不变——只在 fixed 模式追加）。
+  if (sessionWorkflowMode === "fixed") {
+    const fixedContextModule = builtInRoleModuleOf(setup.role.id);
+    if (fixedContextModule !== undefined) {
+      const fixedSections = fixedContextModule.context({ governanceModel, matrix: "two-fixed-paths/v1" })
+        .map((section) => section.text)
+        .filter((textBlock) => textBlock.trim() !== "");
+      if (fixedSections.length > 0) contextSections = [...(contextSections ?? []), ...fixedSections];
+    }
+  }
+  // T3 B1（AC-23）：fixed 会话**不注入** legacy trunk/git/VCA/stable 工具（注入面 = 最强 fail-closed）。
+  const legacyOnlyToolsAllowed = sessionWorkflowMode !== "fixed";
   const capabilities: AdapterCapabilities = chiefDecisionContext !== undefined ? {
     chiefDecisionContext: structuredClone(chiefDecisionContext), decidePendingRequest: input.decidePendingRequest,
     persistSession: false, ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
@@ -2111,7 +2161,7 @@ export async function openRoleSession(
     ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
     ...(projectState !== undefined ? { projectState } : {}),
     ...(effectiveProjectNote !== undefined ? { projectNote: effectiveProjectNote } : {}),
-    ...(effectiveRequestVersionDecision !== undefined ? { requestVersionDecision: effectiveRequestVersionDecision } : {}),
+    ...(legacyOnlyToolsAllowed && effectiveRequestVersionDecision !== undefined ? { requestVersionDecision: effectiveRequestVersionDecision } : {}),
     // D 批：验收产物汇报能力已撤除（不注入 reportArtifact）；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
     // 不调用、不写盘/flow、不伪造接受或决定。
@@ -2129,19 +2179,19 @@ export async function openRoleSession(
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
     ...(installMcp !== undefined ? { installMcp } : {}),
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
-    ...(submitVersionChange !== undefined ? { submitVersionChange } : {}),
-    ...(selectRunChange !== undefined ? { selectRunChange } : {}),
+    ...(submitVersionChange !== undefined && legacyOnlyToolsAllowed ? { submitVersionChange } : {}),
+    ...(selectRunChange !== undefined && legacyOnlyToolsAllowed ? { selectRunChange } : {}),
     ...(completeTeamPlan !== undefined ? { completeTeamPlan } : {}),
     ...(activateRoleDocuments !== undefined ? { activateRoleDocuments } : {}),
     // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 经模块声明 + 既有 directGovernance 会话模式门控
     // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。
     ...(effectiveCloseCreatedTask !== undefined ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
-    ...(input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
-    ...(input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
-    ...(input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
+    ...(legacyOnlyToolsAllowed && input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
+    ...(legacyOnlyToolsAllowed && input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
+    ...(legacyOnlyToolsAllowed && input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
     ...(isTrio && setup.role.id === "nominator" ? { roleDraftWritePaths } : {}),
-    ...(submitRefactor !== undefined ? { submitRefactor } : {}),
-    ...(requestStableWrite !== undefined ? { requestStableWrite } : {}),
+    ...(submitRefactor !== undefined && legacyOnlyToolsAllowed ? { submitRefactor } : {}),
+    ...(requestStableWrite !== undefined && legacyOnlyToolsAllowed ? { requestStableWrite } : {}),
     // 治理权力矩阵（C3）：仅 chief 有提示段（单段、非空）；六角色有工具能力（未启用/未注入 ⇒ 缺席）。
     ...(contextSections !== undefined ? { contextSections } : {}),
     ...(governanceMatrix !== undefined ? { governanceMatrix } : {}),
@@ -3198,10 +3248,25 @@ const NO_CARD_KINDS: readonly GovernanceCardKind[] = Object.freeze([]);
  * 仅保留 product 行（product-code 迁移前源码 fixture；运行期模块已装配、优先命中模块）。
  * 模块 `cards` 是冻结只读数组，直接返回同一引用，不复制第二份表。
  */
-function cardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
+/**
+ * legacy 卡种读取（X-R1–X-R6 实现**逐字保留**：先读已装配模块 `cards`，未装配回退迁移前表；
+ * 两行顺序/文本不得改——module-consumption 源码锚点测试逐字断言）。
+ */
+function legacyCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
   const module = builtInRoleModuleOf(roleId);
   if (module !== undefined) return module.cards;
   return TRIO_CARD_KINDS[roleId] ?? NO_CARD_KINDS;
+}
+
+function cardKindsOf(roleId: GovernanceRoleSpec["id"], matrix: DispatchMatrixMode = "legacy-v1"): readonly GovernanceCardKind[] {
+  if (matrix === "two-fixed-paths/v1") {
+    // T3 B1（MF-IR-4，B2 落地模块字段）：fixed 矩阵**只读模块 `fixedCards`**，不从 legacy `cards` 过滤；
+    // 字段缺失/模块未装配 ⇒ fail-closed 空集（不静默回退 legacy 白名单）。
+    const module = builtInRoleModuleOf(roleId);
+    const fixedCards = (module as { readonly fixedCards?: readonly GovernanceCardKind[] } | undefined)?.fixedCards;
+    return fixedCards ?? NO_CARD_KINDS;
+  }
+  return legacyCardKindsOf(roleId);
 }
 
 /**

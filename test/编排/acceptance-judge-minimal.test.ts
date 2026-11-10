@@ -143,3 +143,25 @@ test("物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）", (
   assert.equal(notRead.verdict, "manual");
   assert.equal(notRead.reasonCode, "artifact-not-read");
 });
+
+test("merge-main 高风险合并卡：judge 不可代批 ⇒ 一律 manual（merge-main-customer-only）", () => {
+  for (const candidate of [verdict(["accept"]), verdict(["reject"]), undefined]) {
+    const outcome = evaluateGovernanceJudgeVerdict({
+      request: request({
+        cardKind: "merge-main",
+        card: {
+          kind: "confirm",
+          title: "合并 main（高风险；客户本人确认）",
+          cardKind: "merge-main",
+          flowId: "focus",
+        },
+      }),
+      verdict: candidate,
+      stats,
+      engine: "pi",
+    });
+    assert.equal(outcome.verdict, "manual");
+    assert.equal(outcome.reasonCode, "merge-main-customer-only");
+    assert.equal(outcome.cardKind, "merge-main", "manual 如实回显卡种；verdict=manual 表示未代批");
+  }
+});

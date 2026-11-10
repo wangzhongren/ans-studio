@@ -1,0 +1,29 @@
+# B1 write-set audit (2026-11-10T05:45:08Z)
+HEAD: ff67bc0384ca01da6df1246a50e16e7ee8b46564
+## src/app/test changes
+ M src/common/编排/doc-format-specs.ts
+ M src/common/编排/governance-judge-verdict.ts
+ M src/common/编排/governance-judge.ts
+ M src/common/编排/project-state.ts
+ M src/common/编排/task-state.ts
+ M src/common/编排/workflow-preconditions.ts
+ M src/common/编排/workflow-service.ts
+ M src/common/编排/workflow-state.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/编排/acceptance-judge-minimal.test.ts
+ M test/编排/doc-format-specs.test.ts
+ M test/编排/task-state-fixed.test.ts
+ M test/编排/workflow-preconditions.test.ts
+ M test/编排/workflow-state.test.ts
+?? src/common/编排/workflow-dispatch.ts
+?? test/编排/project-state-workflow.test.ts
+?? test/编排/roster-v4.test.ts
+?? test/编排/run-role-fixed.test.ts
+?? test/编排/workflow-baseline.test.ts
+?? test/编排/workflow-close-intent.test.ts
+?? test/编排/workflow-dispatch-fixed.test.ts
+?? test/编排/workflow-stage-request.test.ts
+## outside-write-set check
+OUTSIDE: NONE
+## src/model / provider / roles / gates / 门禁引擎 / app diff (must be empty)
+(end)

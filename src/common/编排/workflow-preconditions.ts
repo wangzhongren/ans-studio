@@ -26,8 +26,16 @@ import { convenerRoleModule, CONVENER_WORKER_DISPATCH_TARGETS } from "../roles/c
 
 export type { DispatchAdvisory, DispatchAdvisoryCode } from "./dispatch-advisories.ts";
 
-/** 名单 schema 标识（client 2026-10-29 方案 §5.2；v2.6 模块先行升级为 v2）。 */
+/**
+ * 名单 schema 标识（client 2026-10-29 方案 §5.2；v2.6 模块先行升级为 v2）。
+ * T3（2026-11-10，MF-IR-7）：parser 同时接受 v3 与 v4 双字面量；**v3 语义逐字不变**，
+ * v4 仅追加可选 `roles[].review?: boolean`（至多一个 true）。
+ */
 export const PROJECT_ROSTER_SCHEMA = "project-roster/v3" as const;
+/** v4 字面量（增加可选 `roles[].review`；不新增 doc-format 格式 id）。 */
+export const PROJECT_ROSTER_SCHEMA_V4 = "project-roster/v4" as const;
+/** 接受的名单字面量（v3/v4）。 */
+export const PROJECT_ROSTER_SCHEMAS: readonly string[] = Object.freeze([PROJECT_ROSTER_SCHEMA, PROJECT_ROSTER_SCHEMA_V4]);
 /** 2026-10-29（v2.18）：模块清单文档是唯一权威源；roster modules[] 是派生快照。 */
 export const PROJECT_MODULES_SCHEMA = "project-modules/v2" as const;
 export const PROJECT_TOPOLOGY_SCHEMA = "project-topology/v2" as const;
@@ -204,9 +212,9 @@ const CONTRACT_MODULES_SCHEMA_TEXT = [
 const CONTRACT_ROSTER_SCHEMA_TEXT = [
   "contract_check topic=roster（只读 schema；查询不构成放行/授权）",
   "（仅 schema 与示例；不含 run/写区；其余参数被忽略）",
-  `文档：docs/proposals/<flowId>-roster-vN.md（schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
+  `文档：docs/proposals/<flowId>-roster-vN.md（schema 须为 ${PROJECT_ROSTER_SCHEMA} 或 ${PROJECT_ROSTER_SCHEMA_V4}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
   "frontmatter 顶层（必填项的值不可为 null；可选项见下）：",
-  `- schema: 字面量 ${PROJECT_ROSTER_SCHEMA}`,
+  `- schema: ${PROJECT_ROSTER_SCHEMA} 或 ${PROJECT_ROSTER_SCHEMA_V4}（v4 仅增可选 roles[].review）`,
   "- flowId: 非空 string（与派发一致）；version: 正整数（=文件名 -vN 的 N）",
   "- intent: docs/product/<flowId>-intent-vM.md；proposal: docs/proposals/<flowId>-proposal-vM.md；architecture: docs/contracts/<flowId>-architecture-vM.md（均完整路径，M≥1）",
   "- modulesDoc: 可选；docs/proposals/<flowId>-modules-vM.md",
@@ -216,6 +224,7 @@ const CONTRACT_ROSTER_SCHEMA_TEXT = [
   "  - id: 小写 slug（同模块 id）；唯一；不得为内置 id（chief/product/rapporteur/nominator/convener/verifier/su/liaison）",
   "  - displayName/purpose/capability: 非空 string",
   "  - modules: 非空 string[]；引用已定义模块 id；角色内不重复",
+  `  - review: 可选 boolean；仅 v4；至多一个 true=验收角色`,
   "绑定：roles[].modules[] 唯一来源；每模块恰一属主、每角色至少一模块；env/entry 只能归 env-bootstrap。",
   "正文：必须有「人员+模块拓扑图」章节含 ```topology 块（见 topic=topology），与 frontmatter modules/roles 一致。",
   "加载校验（硬拒绝；解析器之外）：",
@@ -321,6 +330,8 @@ export interface ProjectRosterRole {
   capability: string;
   /** 该角色名下的模块 id（一模块一属主；角色可多模块；授权目录由模块派生）。 */
   modules: string[];
+  /** project-roster/v4 可选验收角色标记（至多一个 true；v3 文档不得出现本字段）。 */
+  review?: boolean;
 }
 
 /**
@@ -344,7 +355,7 @@ export interface ProjectRosterModule {
 }
 
 export interface ProjectRoster {
-  schema: typeof PROJECT_ROSTER_SCHEMA;
+  schema: typeof PROJECT_ROSTER_SCHEMA | typeof PROJECT_ROSTER_SCHEMA_V4;
   flowId: string;
   version: number;
   /** 版本化引用（必须指向最新版本文件；旧版只读）。 */
@@ -386,6 +397,7 @@ export interface RosterParseError {
     | "roster-role-builtin"
     | "roster-role-duplicate"
     | "roster-role-fields-missing"
+    | "roster-role-review-invalid"
     | "roster-role-modules-invalid"
     | "roster-directory-invalid"
     | "roster-directory-governance"
@@ -704,9 +716,14 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
     return rosterError("roster-schema-invalid", "名单 frontmatter 必须是对象。");
   }
   const record = parsed as Record<string, unknown>;
-  if (record.schema !== PROJECT_ROSTER_SCHEMA) {
-    return rosterError("roster-schema-invalid", `名单 schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；旧 v1/v2 请按 v3 重出名单（modules[].path/paths + 必填 category + envBootstrap 对象），不做静默归一化。`);
+  const schemaValue = record.schema;
+  if (schemaValue !== PROJECT_ROSTER_SCHEMA && schemaValue !== PROJECT_ROSTER_SCHEMA_V4) {
+    return rosterError(
+      "roster-schema-invalid",
+      `名单 schema 必须为 ${PROJECT_ROSTER_SCHEMA} 或 ${PROJECT_ROSTER_SCHEMA_V4}；旧 v1/v2 请按 v3/v4 重出名单（modules[].path/paths + 必填 category + envBootstrap 对象），不做静默归一化。`,
+    );
   }
+  const rosterSchema = schemaValue === PROJECT_ROSTER_SCHEMA_V4 ? PROJECT_ROSTER_SCHEMA_V4 : PROJECT_ROSTER_SCHEMA;
   const flowId = typeof record.flowId === "string" ? record.flowId.trim() : "";
   if (flowId === "") return rosterError("roster-schema-invalid", "名单缺少 flowId。");
   if (expectedFlowId !== undefined && flowId !== expectedFlowId) {
@@ -767,7 +784,22 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
       }
       roleModules.push(moduleId);
     }
-    roles.push({ id, displayName, purpose, capability, modules: roleModules });
+    // project-roster/v4（MF-IR-7）：可选 roles[].review（boolean）；**至多一个 true**。
+    // v3 文档出现本字段 ⇒ 确定性拒绝（不静默忽略）；v4 非布尔 ⇒ 拒绝。
+    let review: boolean | undefined;
+    if (role.review !== undefined) {
+      if (rosterSchema !== PROJECT_ROSTER_SCHEMA_V4) {
+        return rosterError("roster-role-review-invalid", `名单角色 ${id} 携带 roles[].review，但 schema 为 ${PROJECT_ROSTER_SCHEMA}（仅 v4 允许，不得静默忽略）。`);
+      }
+      if (typeof role.review !== "boolean") {
+        return rosterError("roster-role-review-invalid", `名单角色 ${id} 的 roles[].review 必须为 boolean（收到 ${describeContractValue(role.review)}）。`);
+      }
+      review = role.review;
+    }
+    roles.push({ id, displayName, purpose, capability, modules: roleModules, ...(review !== undefined ? { review } : {}) });
+  }
+  if (rosterSchema === PROJECT_ROSTER_SCHEMA_V4 && roles.filter((role) => role.review === true).length > 1) {
+    return rosterError("roster-role-review-invalid", "名单 roles[].review 至多一个角色为 true（验收角色唯一）。");
   }
 
   // 2026-10-29（客户追加口径 v2.6/R1/R4/R5）：模块清单——先写模块，再把模块安排给人。
@@ -966,7 +998,7 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   return {
     ok: true,
     roster: {
-      schema: PROJECT_ROSTER_SCHEMA,
+      schema: rosterSchema,
       flowId,
       version,
       intent: intentRef.path,
@@ -1684,4 +1716,38 @@ export function reportTargetForTaskCreator(input: {
 /** 报告者是否与接收者相同（防御：不自我投递）。 */
 export function isSelfReport(reporterRoleId: string, targetRoleId: string | null): boolean {
   return targetRoleId !== null && reporterRoleId === targetRoleId;
+}
+
+// —————————————————————— T3 B1：fixed 谓词再导出（单一实现 = workflow-dispatch.ts） ——————————————————————
+
+/**
+ * fixed 派发硬授权（`matrix:"two-fixed-paths/v1"`）：**单一实现**在 `workflow-dispatch.ts`；
+ * 本文件只做公共出口再导出（不复制第二份矩阵；legacy 谓词/常量逐字未改）。
+ */
+export {
+  FIXED_DISPATCH_MATRIX,
+  FIXED_CONVENER_BUILT_IN_TARGETS,
+  FIXED_CHIEF_BUILT_IN_TARGETS,
+  evaluateFixedPathDispatchAuthorization,
+  stageRequestIdempotencyKey,
+  stageStopIdempotencyKey,
+} from "./workflow-dispatch.ts";
+export type {
+  FixedDispatchEvidence,
+  FixedDispatchFailureCode,
+  FixedDispatchPolicyInput,
+  FixedDispatchPolicyResult,
+  FixedStageRequestFacts,
+} from "./workflow-dispatch.ts";
+
+/** 验收角色默认值（v1.3 §5.4 / MF-10）：名单无 `roles[].review=true` 项目角色时使用内置 verifier。 */
+export const DEFAULT_REVIEW_ROLE_ID = "verifier" as const;
+
+/**
+ * A9/固定谓词验收角色绑定（MF-IR-7）：`project-roster/v4` 有 `roles[].review===true` 的项目角色 ⇒
+ * 返回该角色 id；否则默认 `"verifier"`。解析器已保证至多一个 true；本函数不采信模型自报。
+ */
+export function reviewRoleIdOfRoster(roster: Pick<ProjectRoster, "roles">): string {
+  const review = roster.roles.find((role) => role.review === true);
+  return review !== undefined ? review.id : DEFAULT_REVIEW_ROLE_ID;
 }
