@@ -26,3 +26,15 @@ export const PRODUCT_CAPABILITIES: GovernanceCapabilities = Object.freeze({
 export const PRODUCT_CARDS: readonly GovernanceCardKind[] = Object.freeze(
   [] as GovernanceCardKind[],
 );
+
+/**
+ * fixed 派发矩阵（`matrix:"two-fixed-paths/v1"`）的卡种白名单（T3 v1.3 §3.4 / MF-IR-4 冻结值）。
+ *
+ * - 冻结值：product fixed = `[]`——固定路径的意图确认卡由幕僚（chief）呈，product 不发起任何卡；
+ *   fixed 矩阵**只读本字段**（门禁引擎门面 `cardKindsOf(id,"two-fixed-paths/v1")`），**不从 legacy
+ *   `cards` 过滤/推导**（G-2）；
+ * - 纯数据、冻结、无 I/O；legacy `PRODUCT_CARDS` 逐字不变，legacy 消费点不得改读本字段。
+ */
+export const PRODUCT_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze(
+  [] as GovernanceCardKind[],
+);

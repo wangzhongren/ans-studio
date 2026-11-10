@@ -1,0 +1,220 @@
+TAP version 13
+# Subtest: 差分：id/displayName/function/card/capabilities 与旧注册表逐字段一致
+ok 1 - 差分：id/displayName/function/card/capabilities 与旧注册表逐字段一致
+  ---
+  duration_ms: 0.8498
+  type: 'test'
+  ...
+# Subtest: 差分：cards 与 run-role.ts::TRIO_CARD_KINDS.nominator 冻结副本一致
+ok 2 - 差分：cards 与 run-role.ts::TRIO_CARD_KINDS.nominator 冻结副本一致
+  ---
+  duration_ms: 0.0826
+  type: 'test'
+  ...
+# Subtest: 差分：tools() 与旧 run-role 注入条件逐模型一致（trio 才有 activateRoleDocuments）
+ok 3 - 差分：tools() 与旧 run-role 注入条件逐模型一致（trio 才有 activateRoleDocuments）
+  ---
+  duration_ms: 0.1176
+  type: 'test'
+  ...
+# Subtest: 差分：派发硬身份/存在性——in-scope 用例与旧 evaluateDispatchAuthorization 同码
+ok 4 - 差分：派发硬身份/存在性——in-scope 用例与旧 evaluateDispatchAuthorization 同码
+  ---
+  duration_ms: 0.3762
+  type: 'test'
+  ...
+# Subtest: 差分（列明）：旧 oracle 不查内置目标存在性；本模块按 E0 §3.5 要求 targetExists=true
+ok 5 - 差分（列明）：旧 oracle 不查内置目标存在性；本模块按 E0 §3.5 要求 targetExists=true
+  ---
+  duration_ms: 0.0908
+  type: 'test'
+  ...
+# Subtest: 差分（列明）：非 nominator 目标不属于本模块范围；旧 oracle 可能允许（由目标模块回答）
+ok 6 - 差分（列明）：非 nominator 目标不属于本模块范围；旧 oracle 可能允许（由目标模块回答）
+  ---
+  duration_ms: 0.0633
+  type: 'test'
+  ...
+# Subtest: 差分：D3 卡形状——与旧 validateAppointmentCardAgainstRoster 同 allow 结论
+ok 7 - 差分：D3 卡形状——与旧 validateAppointmentCardAgainstRoster 同 allow 结论
+  ---
+  duration_ms: 0.5856
+  type: 'test'
+  ...
+# Subtest: 差分（E2 D-1）：D3 卡阶段意图入口事实缺失/false 不拒绝——与旧 validateAppointmentCardAgainstRoster 同 allow
+ok 8 - 差分（E2 D-1）：D3 卡阶段意图入口事实缺失/false 不拒绝——与旧 validateAppointmentCardAgainstRoster 同 allow
+  ---
+  duration_ms: 0.1261
+  type: 'test'
+  ...
+# Subtest: 差分：名单未省略 env-bootstrap 但缺失——旧卡校验拒绝，本模块同样拒绝
+ok 9 - 差分：名单未省略 env-bootstrap 但缺失——旧卡校验拒绝，本模块同样拒绝
+  ---
+  duration_ms: 0.1976
+  type: 'test'
+  ...
+# Subtest: 差分：三文档结构——与旧 validateRoleDocumentsSnapshot 同 allow 结论
+ok 10 - 差分：三文档结构——与旧 validateRoleDocumentsSnapshot 同 allow 结论
+  ---
+  duration_ms: 8.4852
+  type: 'test'
+  ...
+# Subtest: 差分（E2 D-1）：激活阶段意图入口事实缺失/false 不拒绝——旧三文档校验与 prepareRoleActivation 均不读取
+ok 11 - 差分（E2 D-1）：激活阶段意图入口事实缺失/false 不拒绝——旧三文档校验与 prepareRoleActivation 均不读取
+  ---
+  duration_ms: 0.5148
+  type: 'test'
+  ...
+# Subtest: 差分（source-transcribed）：D3/计划前置与旧 apply-journal::prepareRoleActivation 拒绝点对齐
+ok 12 - 差分（source-transcribed）：D3/计划前置与旧 apply-journal::prepareRoleActivation 拒绝点对齐
+  ---
+  duration_ms: 0.1871
+  type: 'test'
+  ...
+# Subtest: fixedCards：恒为空集且冻结——任命卡归幕僚、appointment-write 仅 legacy（G-3）
+ok 13 - fixedCards：恒为空集且冻结——任命卡归幕僚、appointment-write 仅 legacy（G-3）
+  ---
+  duration_ms: 0.8662
+  type: 'test'
+  ...
+# Subtest: legacy context 冻结：缺省/未传 matrix/显式 legacy-v1 逐字返回旧段（同一引用，3 sections）
+ok 14 - legacy context 冻结：缺省/未传 matrix/显式 legacy-v1 逐字返回旧段（同一引用，3 sections）
+  ---
+  duration_ms: 0.1603
+  type: 'test'
+  ...
+# Subtest: fixed context：matrix=two-fixed-paths/v1 返回固定段（3 sections；无 legacy 段、无资源引用）
+ok 15 - fixed context：matrix=two-fixed-paths/v1 返回固定段（3 sections；无 legacy 段、无资源引用）
+  ---
+  duration_ms: 0.1145
+  type: 'test'
+  ...
+# Subtest: fixed context 口径：按运营派发、按名单机械建卡/激活、不自行增删角色、不发起任命卡/不派发
+ok 16 - fixed context 口径：按运营派发、按名单机械建卡/激活、不自行增删角色、不发起任命卡/不派发
+  ---
+  duration_ms: 0.1751
+  type: 'test'
+  ...
+# Subtest: 不新增工具/卡：fixed 批次不改 tools/cards/capabilities/card.text（legacy 冻结）
+ok 17 - 不新增工具/卡：fixed 批次不改 tools/cards/capabilities/card.text（legacy 冻结）
+  ---
+  duration_ms: 0.1303
+  type: 'test'
+  ...
+# Subtest: fixed 矩阵不改变本模块 legacy dispatch 判定（fixed 派发权威在编排 workflow-dispatch.ts，不在角色模块）
+ok 18 - fixed 矩阵不改变本模块 legacy dispatch 判定（fixed 派发权威在编排 workflow-dispatch.ts，不在角色模块）
+  ---
+  duration_ms: 0.2299
+  type: 'test'
+  ...
+# Subtest: preflight 不因 fixed 批次改变：appointment 动作集与 stage 语义保持 legacy
+ok 19 - preflight 不因 fixed 批次改变：appointment 动作集与 stage 语义保持 legacy
+  ---
+  duration_ms: 0.1357
+  type: 'test'
+  ...
+# Subtest: 纯策略：fixed context 读取不改写模块数据与调用输入
+ok 20 - 纯策略：fixed context 读取不改写模块数据与调用输入
+  ---
+  duration_ms: 0.1045
+  type: 'test'
+  ...
+# Subtest: 模块身份与卡/边界/capabilities/cards 为纯数据且与旧规格一致
+ok 21 - 模块身份与卡/边界/capabilities/cards 为纯数据且与旧规格一致
+  ---
+  duration_ms: 0.9469
+  type: 'test'
+  ...
+# Subtest: tools()：trio 声明 activateRoleDocuments；single 为空；未知模型 fail-closed
+ok 22 - tools()：trio 声明 activateRoleDocuments；single 为空；未知模型 fail-closed
+  ---
+  duration_ms: 0.1399
+  type: 'test'
+  ...
+# Subtest: dispatch()：chief→nominator 通过并给报告期望 chief；其余组合 fail-closed
+ok 23 - dispatch()：chief→nominator 通过并给报告期望 chief；其余组合 fail-closed
+  ---
+  duration_ms: 0.2268
+  type: 'test'
+  ...
+# Subtest: preflight：非 appointment 动作一律 action-not-covered
+ok 24 - preflight：非 appointment 动作一律 action-not-covered
+  ---
+  duration_ms: 0.1275
+  type: 'test'
+  ...
+# Subtest: preflight d3-card：合法事实 allow（纯策略不反对，不是权限票）
+ok 25 - preflight d3-card：合法事实 allow（纯策略不反对，不是权限票）
+  ---
+  duration_ms: 0.3111
+  type: 'test'
+  ...
+# Subtest: preflight：缺键/未知键/类型不符/stage 非法 fail-closed
+ok 26 - preflight：缺键/未知键/类型不符/stage 非法 fail-closed
+  ---
+  duration_ms: 0.194
+  type: 'test'
+  ...
+# Subtest: preflight d3-card：名单/卡形负例
+ok 27 - preflight d3-card：名单/卡形负例
+  ---
+  duration_ms: 0.1621
+  type: 'test'
+  ...
+# Subtest: preflight：intentEntryConsistent 为可选诊断事实——缺失/false/true 均 allow（E2 D-1）
+ok 28 - preflight：intentEntryConsistent 为可选诊断事实——缺失/false/true 均 allow（E2 D-1）
+  ---
+  duration_ms: 0.3204
+  type: 'test'
+  ...
+# Subtest: preflight role-documents：合法事实 allow
+ok 29 - preflight role-documents：合法事实 allow
+  ---
+  duration_ms: 0.1057
+  type: 'test'
+  ...
+# Subtest: preflight role-documents：Runtime 包装层 judge D3 事实包被接受；customer/chief-delegated 回归（W-J2b）
+ok 30 - preflight role-documents：Runtime 包装层 judge D3 事实包被接受；customer/chief-delegated 回归（W-J2b）
+  ---
+  duration_ms: 0.2885
+  type: 'test'
+  ...
+# Subtest: preflight role-documents：d3By 非法值仍 fail-closed（model/空串/非字符串）
+ok 31 - preflight role-documents：d3By 非法值仍 fail-closed（model/空串/非字符串）
+  ---
+  duration_ms: 0.5868
+  type: 'test'
+  ...
+# Subtest: preflight role-documents：目标/D3 负例
+ok 32 - preflight role-documents：目标/D3 负例
+  ---
+  duration_ms: 0.1815
+  type: 'test'
+  ...
+# Subtest: preflight role-documents：计划/三文档/边界负例
+ok 33 - preflight role-documents：计划/三文档/边界负例
+  ---
+  duration_ms: 0.1371
+  type: 'test'
+  ...
+# Subtest: context()：appointment 卡数据与报告期望为静态纯数据
+ok 34 - context()：appointment 卡数据与报告期望为静态纯数据
+  ---
+  duration_ms: 0.1216
+  type: 'test'
+  ...
+# Subtest: 纯策略：不修改输入、结果确定、无权限字段
+ok 35 - 纯策略：不修改输入、结果确定、无权限字段
+  ---
+  duration_ms: 0.3342
+  type: 'test'
+  ...
+1..35
+# tests 35
+# suites 0
+# pass 35
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 414.2515

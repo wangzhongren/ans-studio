@@ -1,0 +1,4 @@
+src/common/roles/chief/internal/context.ts 343d234945e0ae6e38f48a076b1a0117250320e9fe40ef9754c6a682a2dcaa8d bytes=8956 lines=122
+src/common/roles/chief/internal/module.ts c3204927a5da12d6c0120b1fb92759730beef8f05ac74a1c1cffe5f8118ab269 bytes=1538 lines=38
+src/common/roles/chief/internal/spec.ts d2ec7b2728784909a68e74125a8e613731eae5128515181d9ea7bf4f84f9c964 bytes=4772 lines=106
+test/roles/chief/fixed.test.ts 55971528694f3a793e160b4321bae394e65c77d7071bc1bea0bcb4f5f943f65c bytes=14989 lines=258

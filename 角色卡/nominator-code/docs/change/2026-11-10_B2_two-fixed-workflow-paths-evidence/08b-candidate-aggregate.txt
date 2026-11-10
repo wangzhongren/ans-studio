@@ -1,0 +1,7 @@
+# 候选聚合哈希（路径排序后逐行 path:sha256 连接，再 SHA-256）
+# 候选 = 本批变更文件（2）：src/common/roles/nominator/index.ts、test/roles/nominator/nominator-fixed.test.ts
+src/common/roles/nominator/index.ts:af89a85e93ac0c18421fcef746673048adc72b78e77efeee6fca1380d16fd288
+test/roles/nominator/nominator-fixed.test.ts:fb610051d5b213c9fa202cfca26240e315f86f41d73efa8583f5fb8f8f8ebabd
+
+aggregate_sha256=019bc20bc0aa6b56430da83282ee1c5cd09915bd3d8bda032d57d12f2d78dd0b
+total_bytes=53001

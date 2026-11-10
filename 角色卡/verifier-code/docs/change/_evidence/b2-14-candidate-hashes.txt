@@ -1,0 +1,9 @@
+src/common/roles/verifier/index.ts | 93a65837b4edccefcabcad11b0beceeed977272585f11ceaf1e5337637b4fc51 | 29198 B | 476 lines
+test/roles/verifier/verifier-fixed.test.ts | 675547e22b6720b8fe0e8b9ee6db47850dadcc18097942c6274f8795227fe11c | 11620 B | 225 lines
+TOTAL bytes=40818
+AGGREGATE(sha256 of sorted path:sha256 lines)=c575d44fd3d731d42694538b61e8ce3088653ba20fb48b6c8db204b3a83e2538
+AGG-INPUT:
+  src/common/roles/verifier/index.ts:93a65837b4edccefcabcad11b0beceeed977272585f11ceaf1e5337637b4fc51
+  test/roles/verifier/verifier-fixed.test.ts:675547e22b6720b8fe0e8b9ee6db47850dadcc18097942c6274f8795227fe11c
+--- git numstat (module M) ---
+68	2	src/common/roles/verifier/index.ts

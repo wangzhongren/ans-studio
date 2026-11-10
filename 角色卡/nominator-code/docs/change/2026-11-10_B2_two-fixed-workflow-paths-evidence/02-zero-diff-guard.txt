@@ -1,0 +1,59 @@
+# 写集外零 diff 守卫（相对 HEAD f72bafa；本角色未触达路径）
+# 说明：本工作树被六个代码角色 B2 批次共享；product/rapporteur/verifier 与门禁引擎的文件由并行批次写入，
+#       不属于本角色写集（本角色写集 = src/common/roles/nominator/**、test/roles/nominator/**、本记录目录）。
+
+src/common/gates: CLEAN (diff=0)
+app: CLEAN (diff=0)
+src/pipeline: CLEAN (diff=0)
+src/provider: CLEAN (diff=0)
+src/service: DIRTY
+     M src/service/governance-matrix/impl/builder.ts
+     M src/service/governance-matrix/impl/routing.ts
+     M src/service/governance-matrix/public.ts
+src/common/编排: CLEAN (diff=0)
+package.json: CLEAN (diff=0)
+package-lock.json: CLEAN (diff=0)
+src/common/roles/chief: CLEAN (diff=0)
+src/common/roles/convener: DIRTY
+     M src/common/roles/convener/index.ts
+
+# 全量 src/app/test 状态（归属：其余路径均为并行 B2 批次/门禁引擎基线，不在本角色写集）：
+ M src/common/roles/convener/index.ts
+ M src/common/roles/nominator/index.ts
+ M src/common/roles/product/index.ts
+ M src/common/roles/product/internal/capabilities.ts
+ M src/common/roles/product/internal/context.ts
+ M src/common/roles/product/internal/dispatch.ts
+ M src/common/roles/rapporteur/index.ts
+ M src/common/roles/rapporteur/internal/context.ts
+ M src/common/roles/rapporteur/internal/spec.ts
+ M src/common/roles/verifier/index.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/role.ts
+ M src/service/governance-matrix/impl/builder.ts
+ M src/service/governance-matrix/impl/routing.ts
+ M src/service/governance-matrix/public.ts
+ M test/roles/rapporteur/spec.test.ts
+?? src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/roles/nominator/nominator-fixed.test.ts
+?? test/roles/product/product-fixed.test.ts
+?? test/roles/rapporteur/fixed-module.test.ts
+?? test/roles/verifier/verifier-fixed.test.ts
+?? test/门禁引擎/chief-workflow-v2-resource.test.ts
+?? test/门禁引擎/fixed-role-module-surface.test.ts
+?? test/门禁引擎/governance-matrix-fixed-view.test.ts
+
+# 收尾快照（2026-11-10 15:20 后；共享工作树并发推进中）
+# 说明：以下守卫路径出现改动，均为并行 code 角色 B2 批次（chief-code 等）写入，不属于本角色写集；
+#       本角色未触碰这些路径（本角色写集见 08-candidate-hashes.txt）。
+src/common/gates: CLEAN (diff=0)
+app: CLEAN (diff=0)
+src/pipeline: CLEAN (diff=0)
+src/provider: CLEAN (diff=0)
+src/common/编排: CLEAN (diff=0)
+package.json: CLEAN (diff=0)
+package-lock.json: CLEAN (diff=0)
+src/common/roles/chief: DIRTY (并行批次)
+     M src/common/roles/chief/internal/context.ts
+     M src/common/roles/chief/internal/module.ts
+     M src/common/roles/chief/internal/spec.ts

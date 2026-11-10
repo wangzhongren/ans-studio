@@ -17,6 +17,11 @@
 //
 // E1 过渡期权威：旧引擎（`governance-roles.ts` / `run-role.ts` / `apply-journal.ts`）仍是
 // 差分 oracle；本模块不复写 Git 执行/ACL/证据闭包、Service 事务或桌面路由。
+//
+// T3「两条固定工作流路径」B2（MF-IR-4 / v1.3 §3.4）：在 legacy 数据**逐字冻结**的前提下新增
+// fixed 矩阵数据（`fixedCards` / `fixedAllowedBuiltInRoleIds` / `isConvenerFixedBuiltInDispatchTarget`）
+// 与 `context({matrix:"two-fixed-paths/v1"})` fixed 段；fixed 字段只在显式 fixed 矩阵下被消费，
+// legacy 数据与 legacy 消费点（apply-journal / trunk-runtime）不改读取源。
 
 import type { BoundaryEntry } from "../../../model/boundary.ts";
 import type {
@@ -95,6 +100,15 @@ const CONVENER_CAPABILITIES: GovernanceCapabilities = Object.freeze({
 
 /** 当前有效卡种（D8）：convener 只发 decision 卡；appointment 只归人事。 */
 const CONVENER_CARDS: readonly GovernanceCardKind[] = Object.freeze(["decision"]);
+
+/**
+ * fixed 派发矩阵卡种白名单（T3「两条固定工作流路径」B2；MF-IR-4 / v1.3 §3.4 convener 行）。
+ *
+ * 冻结值恰 `["decision"]`：固定路径运营只发 decision 卡（任命确认卡由幕僚呈；acceptance 卡
+ * fixed 抑制）。fixed 矩阵**只读本字段**（门禁引擎门面 `cardKindsOf(id,"two-fixed-paths/v1")`），
+ * **不从 legacy `cards` 过滤/推导**；legacy `cards` 逐字不动。纯数据、无 I/O。
+ */
+const CONVENER_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze(["decision"]);
 
 const CONVENER_CARD_ENTRIES: readonly BoundaryEntry[] = Object.freeze([
   Object.freeze({
@@ -196,6 +210,36 @@ export const CONVENER_WORKER_DISPATCH_TARGETS = Object.freeze({
   /** 报告期望（差分 oracle 期望创建者；实际路由由 reportTargetForTaskCreator 决定）。 */
   reportToRoleId: "convener" as const,
 });
+
+// —————————————————————— fixed 矩阵派发数据（T3 B2；MF-IR-4 / v1.3 §3.2/§3.4）——————————————————————
+//
+// legacy 目标常量 `CONVENER_WORKER_DISPATCH_TARGETS`（`["verifier"]`）**逐字冻结**；fixed 目标集
+// 是独立新数据，只在 fixed 谓词/矩阵视图中消费，legacy 消费点（apply-journal / trunk-runtime /
+// 编排 legacy 谓词）不改读取源。
+
+/**
+ * fixed 矩阵下 convener 可派发的内置生产线目标（T3 B2；MF-IR-4 / v1.3 §3.2/§3.4）。
+ *
+ * 冻结值恰 `["product","rapporteur","nominator"]`：运营是生产线唯一派发者；verifier 由幕僚创建
+ * （fixed 谓词对 convener→verifier 拒绝 `convener-to-verifier-forbidden`），不在此表。项目生产
+ * 角色另按 `targetKind:"project"` 允许（目标存在性由宿主核验）。纯数据、无 I/O。
+ */
+const CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS: readonly string[] = Object.freeze([
+  "product",
+  "rapporteur",
+  "nominator",
+]);
+
+/**
+ * fixed 矩阵下「该内置角色是否可作为 convener 的生产线派发目标」纯函数（MF-IR-4）。
+ *
+ * 与 `CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS` **同源**（直接 `includes` 同一冻结数组，不复制
+ * 第二张表）；大小写敏感（角色 id 逐字），空串/未知 id 恒 false。纯函数、无 I/O、不修改任何数据。
+ * legacy `isConvenerBuiltInDispatchTarget`（`["verifier"]`）在编排侧**逐字冻结**，本谓词不得替换它。
+ */
+function isConvenerFixedBuiltInDispatchTarget(roleId: string): boolean {
+  return CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS.includes(roleId);
+}
 
 function denyDispatch(code: string, messageKey: string): RoleDispatchPolicy {
   return { decision: { allow: false, code, messageKey } };
@@ -666,7 +710,54 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   Object.freeze({ id: "report-expectation", text: REPORT_EXPECTATION_SECTION_TEXT }),
 ]);
 
-function context(_input: RoleContextInput): readonly RoleContextSection[] {
+// —————————————————————— fixed context 段（T3 B2；仅显式 fixed 矩阵返回）——————————————————————
+//
+// v1.3 §3.4 convener 行：fixed 段说明新职责（生产线唯一派发者 / 团队计划与基线 3 件小事 /
+// 集成汇总与报告期望 / 不派质检）。只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；
+// `context({})`（无 matrix）与 `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
+// run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（仅 fixed 会话）。
+// 纯静态文本（无资源引用、不读盘、不拼接运行时事实）。
+
+const FIXED_PRODUCTION_LINE_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-production-line",
+  text: [
+    "## 固定路径运营：生产线唯一派发者（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）",
+    "- 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求，做属主校验并保持同工作区写任务串行；生产任务报告回你。",
+    "- 幕僚不直接派生产线角色（chief-production-dispatch-forbidden）；`stage-request` 是只读、无 module/写集的产线调度请求，不是生产线派发。",
+    "- 不派 verifier：独立验收由幕僚创建（默认 verifier；roster `roles[].review` 项目验收角色优先）；`convener→verifier` 拒绝（`convener-to-verifier-forbidden`）；你不派新质检、不发 acceptance 卡、不代客户验收。",
+  ].join("\n"),
+});
+
+const FIXED_BASELINE_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-baseline",
+  text: [
+    "## 固定路径团队计划与基线（fixed）",
+    "- 团队计划：以 `complete_team_plan` v4 提交版本化团队计划 `docs/scheduling/<flowId>-team-v<version>.md`（path/version；无 runId/baseDigest，出现即 `baseline-legacy-field-forbidden`）；应用核模块属主/写区/分工/依赖后直接完成。完成计划不等于 D3，不授权名单外角色。",
+    "- 基线 3 件小事（A9）：团队计划 v4 / `git init -b main`（应用执行）/ `.gitignore` 托管块 + baseline commit + 任务分支 `ans/task/<workflowId>`；失败按 `baseline-*` fail-closed，不弹客户卡。",
+  ].join("\n"),
+});
+
+const FIXED_REPORT_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-report",
+  text: [
+    "## 固定路径集成汇总与报告期望（fixed）",
+    "- 集成汇总：汇总各生产线任务与实现任务的进度/阻塞/真实提交（任务分支 `ans/task/<workflowId>` 的普通 Git add/commit）；冲突或返工交回原 owner 责任链，不代写实现、不伪造完成。",
+    "- 报告期望：汇总后向幕僚 `submit_report`（完成/未完成/证据/遗留）；收到幕僚派发的任务必须用 `submit_report` 回短报，不要只结束回合；不转发客户、不批准、不验收、不代客户选择。",
+    "- 发布合并：由应用呈 merge-main 卡、仅客户本人确认；你不代批、不冒充客户、不自行合并 main。",
+  ].join("\n"),
+});
+
+const CONVENER_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
+  FIXED_PRODUCTION_LINE_SECTION,
+  FIXED_BASELINE_SECTION,
+  FIXED_REPORT_SECTION,
+]);
+
+function context(input: RoleContextInput): readonly RoleContextSection[] {
+  // T3 B2 矩阵分支：只有显式 `matrix:"two-fixed-paths/v1"` 返回 fixed 段；
+  // 缺省 / `"legacy-v1"` / `context({})` 一律返回同一 legacy 引用（逐字冻结）。
+  // 可选链：历史调用方即使传畸形输入也保持 legacy 行为（不抛错）。
+  if (input?.matrix === "two-fixed-paths/v1") return CONVENER_FIXED_CONTEXT_SECTIONS;
   return CONVENER_CONTEXT_SECTIONS;
 }
 
@@ -685,6 +776,11 @@ export const convenerRoleModule: BuiltInRoleModule = Object.freeze({
   }),
   capabilities: CONVENER_CAPABILITIES,
   cards: CONVENER_CARDS,
+  // T3 B2 fixed 矩阵数据（MF-IR-4）：只在 `matrix:"two-fixed-paths/v1"` 下被消费；
+  // legacy 数据/消费点逐字冻结，不改读取源。
+  fixedCards: CONVENER_FIXED_CARDS,
+  fixedAllowedBuiltInRoleIds: CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS,
+  isConvenerFixedBuiltInDispatchTarget,
   tools,
   dispatch,
   preflight,

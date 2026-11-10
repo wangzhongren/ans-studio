@@ -1,0 +1,9 @@
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/role.ts
+ M src/service/governance-matrix/impl/builder.ts
+ M src/service/governance-matrix/impl/routing.ts
+ M src/service/governance-matrix/public.ts
+?? src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/门禁引擎/chief-workflow-v2-resource.test.ts
+?? test/门禁引擎/fixed-role-module-surface.test.ts
+?? test/门禁引擎/governance-matrix-fixed-view.test.ts

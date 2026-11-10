@@ -1,0 +1,5 @@
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+test/roles/verifier/verifier-fixed.test.ts(96,26): error TS2339: Property 'resources' does not exist on type '{ readonly id: string; readonly text: string; }'.

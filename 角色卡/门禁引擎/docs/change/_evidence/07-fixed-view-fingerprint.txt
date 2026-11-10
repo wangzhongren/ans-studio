@@ -1,0 +1,11 @@
+fixed-matrix-json-sha256=700c0ad8e85724fe80f5ee479f235ef7a73ed6ea925410691f1c99aa3952d3b5
+fixed-routing-rows=4
+fixed-card-kind-rows=0
+fixed-dispatch-rows=0
+fixed-routing-works=["产品意图文档","方案/名单/模块/架构/契约","客户决定（意图/方案/任命三卡）","下载"]
+fixed-chief-duty=固定路径幕僚：唯一客户入口；两条固定路径（路径 A 新建 / 路径 B 修改）与三张客户确认卡的发起者。
+fixed-render-contains-fixed-duty=true
+cards-fixed-chief=[]
+cards-fixed-convener=[]
+summary-fixed-chief-duty=固定路径幕僚：唯一客户入口；两条固定路径（路径 A 新建 / 路径 B 修改）与三张客户确认卡的发起者。
+summary-legacy-same-ref=true

@@ -22,10 +22,13 @@ import type {
   MatrixWarning,
   WorkerRoleInput,
 } from "../../../model/governance-matrix.ts";
+import type { DispatchMatrixMode } from "../../../model/role.ts";
 import {
   BUILT_IN_GOVERNANCE_ROLES,
+  builtInRoleMatrixSummaryOf,
 } from "../../../common/门禁引擎/governance-roles.ts";
 import type {
+  BuiltInGovernanceMatrixSummary,
   BuiltInGovernanceRoleSpec,
 } from "../../../common/门禁引擎/governance-roles.ts";
 import {
@@ -173,8 +176,11 @@ function builtInCustomerInteraction(
   };
 }
 
-function builtInForce(spec: BuiltInGovernanceRoleSpec): MatrixForce {
-  const discipline = spec.matrix.cardDiscipline;
+function builtInForce(
+  spec: BuiltInGovernanceRoleSpec,
+  summary: BuiltInGovernanceMatrixSummary | undefined,
+): MatrixForce {
+  const discipline = summary?.cardDiscipline;
   let conventions: MatrixForce["conventions"];
   if (discipline !== undefined && discipline.length > 0) {
     conventions = {
@@ -208,8 +214,14 @@ function builtInForce(spec: BuiltInGovernanceRoleSpec): MatrixForce {
 function buildBuiltInRole(
   spec: BuiltInGovernanceRoleSpec,
   input: GovernanceMatrixInput,
+  matrix: DispatchMatrixMode,
 ): GovernanceMatrixRole {
-  const dutyText = spec.matrix.duty.trim();
+  // T3 B2（MF-IR-4）：fixed 视图只读 fixed 摘要；缺失 ⇒ unknown（fail-closed，**不回退** legacy 摘要）。
+  // legacy 模式沿用传入注册表 spec 自身的 `matrix`（`buildGovernanceMatrixWith` seam 语义不变）。
+  const summary = matrix === "two-fixed-paths/v1"
+    ? builtInRoleMatrixSummaryOf(spec.id, matrix)
+    : spec.matrix;
+  const dutyText = summary?.duty.trim() ?? "";
   let duty: MatrixField<string>;
   if (dutyText === "") {
     duty = unknownField("not-declared-in-source", "builtin-registry", "注册表未提供 duty 摘要");
@@ -217,10 +229,10 @@ function buildBuiltInRole(
     duty = knownField(dutyText, "builtin-registry");
   }
   let mainChain: MatrixField<readonly string[]>;
-  if (spec.matrix.mainChain.length === 0) {
+  if (summary === undefined || summary.mainChain.length === 0) {
     mainChain = unknownField("not-declared-in-source", "builtin-registry", "注册表未提供 mainChain 摘要");
   } else {
-    mainChain = knownField([...spec.matrix.mainChain], "builtin-registry");
+    mainChain = knownField([...summary.mainChain], "builtin-registry");
   }
   return {
     roleId: spec.id,
@@ -247,7 +259,7 @@ function buildBuiltInRole(
         acceptance: acceptanceOf(input, spec.id),
       },
     },
-    force: { state: "known", value: builtInForce(spec) },
+    force: { state: "known", value: builtInForce(spec, summary) },
     dispatchTask: knownField(spec.capabilities.dispatchTask, "builtin-registry"),
     customerInteraction: {
       state: "known",
@@ -501,10 +513,15 @@ function buildStatus(
 /**
  * 组装矩阵（impl 层；测试 seam）。生产调用方必须经 `public.ts` 的 `buildGovernanceMatrix`，
  * 它固定传真实注册表；本函数不进入 public 导出（G-5c）。
+ *
+ * `matrix`（T3 B2；**缺省 `"legacy-v1"`**）：legacy 模式逐字等价旧行为（legacy 摘要/路由不变）；
+ * `"two-fixed-paths/v1"` 只影响**只读展示视图**（fixed 摘要 + fixedCards/fixed targets 路由），
+ * 不参与任何判定；由编排 B2 在 fixed 会话按 `workflowMode` 传入。
  */
 export function buildGovernanceMatrixWith(
   input: GovernanceMatrixInput,
   builtins: readonly BuiltInGovernanceRoleSpec[],
+  matrix: DispatchMatrixMode = "legacy-v1",
 ): GovernanceMatrix {
   let builtinSpecs: BuiltInGovernanceRoleSpec[];
   try {
@@ -517,7 +534,7 @@ export function buildGovernanceMatrixWith(
   const roles: GovernanceMatrixRole[] = [];
   try {
     for (const spec of builtinSpecs) {
-      roles.push(buildBuiltInRole(spec, input));
+      roles.push(buildBuiltInRole(spec, input, matrix));
     }
   } catch (error) {
     return unavailableMatrix(input, (error as Error).message);
@@ -546,13 +563,20 @@ export function buildGovernanceMatrixWith(
     governanceModel: input.governanceModel,
     status: buildStatus(input, warnings),
     roles,
-    routing: buildRouting(input, roles),
+    routing: buildRouting(input, roles, matrix),
     warnings,
     render: initialRenderInfo(),
   };
 }
 
-/** 生产入口（impl 内部）：固定使用真实内置注册表，不向调用方暴露注册表参数（G-5c）。 */
-export function buildGovernanceMatrix(input: GovernanceMatrixInput): GovernanceMatrix {
-  return buildGovernanceMatrixWith(input, BUILT_IN_GOVERNANCE_ROLES);
+/**
+ * 生产入口（impl 内部）：固定使用真实内置注册表，不向调用方暴露注册表参数（G-5c）。
+ * `matrix` 缺省 `"legacy-v1"`（旧调用点逐字兼容）；fixed 会话由编排 B2 显式传
+ * `"two-fixed-paths/v1"` 以展示 fixed 视图。
+ */
+export function buildGovernanceMatrix(
+  input: GovernanceMatrixInput,
+  matrix: DispatchMatrixMode = "legacy-v1",
+): GovernanceMatrix {
+  return buildGovernanceMatrixWith(input, BUILT_IN_GOVERNANCE_ROLES, matrix);
 }

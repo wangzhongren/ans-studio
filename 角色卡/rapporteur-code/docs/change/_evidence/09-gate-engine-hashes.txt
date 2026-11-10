@@ -1,0 +1,5 @@
+src/model/role.ts | 960edbebb8b5768e3d9682efbbf1db59d83e2004cf3dad7010e0eac6dd93d3d5
+src/common/门禁引擎/governance-roles.ts | d58a1b80eec00272690931b1b4aa8876446ffd843c7df69bed874a52b106cc5b
+src/service/governance-matrix/impl/builder.ts | ea0e04a0c13fb7e820f5d8f5cc7cac22eac6ffdc3633a5daba7e190e274fd6ec
+src/service/governance-matrix/impl/routing.ts | c74ef6d2e5b7bc7fb42689f93e4b7d5801db9fb2c64445b929ab1b45c8af1d60
+src/service/governance-matrix/public.ts | 2411bcf36f158f42f883bcd55f5f18096eb33850e74389d37113e1ba686e9e6b

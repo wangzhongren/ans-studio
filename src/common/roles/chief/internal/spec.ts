@@ -68,5 +68,39 @@ export const CHIEF_CAPABILITIES: GovernanceCapabilities = Object.freeze({
   shell: "operator-approve" as const,
 });
 
-/** 当前有效卡种（旧 `TRIO_CARD_KINDS.chief`；D8：不含 legacy `"write"`）。 */
+/**
+ * 当前有效卡种（旧 `TRIO_CARD_KINDS.chief`；D8：不含 legacy `"write"`）。
+ *
+ * legacy 数据逐字冻结（T3 B2；`MF-IR-4` / v1.3 §3.4）：fixed 矩阵**不读**本字段，也不就地改值；
+ * fixed 卡种见 `CHIEF_FIXED_CARDS`。legacy 消费点（`run-role.ts::legacyCardKindsOf` 等）不变。
+ */
 export const CHIEF_CARDS: readonly GovernanceCardKind[] = Object.freeze(["intent-confirm"]);
+
+/**
+ * fixed 矩阵（`two-fixed-paths/v1`）可发起卡种白名单（T3 v1.3 §3.4 / G-IR §5.7 MF-IR-4 冻结值）：
+ * 恰 `["intent-confirm","proposal","appointment"]`——固定路径的 3 张客户确认卡（意图/方案/任命，
+ * 不合并；固定路径不发 acceptance 卡）。
+ *
+ * 只从本字段读取，**不从 legacy `cards`（`["intent-confirm"]`）过滤/推导**；缺失/非法由消费方
+ * （门禁引擎门面 `cardKindsOf(id,"two-fixed-paths/v1")`、编排 B2）fail-closed 空集。纯数据、无 I/O；
+ * legacy 数据与 legacy 消费点逐字冻结、不得改读本字段。
+ */
+export const CHIEF_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze([
+  "intent-confirm",
+  "proposal",
+  "appointment",
+]);
+
+/**
+ * fixed 矩阵下 chief 可派发的内置目标（T3 v1.3 §3.2/§3.4 / G-IR §5.7 MF-IR-4 冻结值）：
+ * 恰 `["convener","verifier"]`——convener 仅 `purpose:"stage-request"`（产线调度请求；
+ * read-only、无 module/写集），verifier 为 review/preparation（独立验收）。
+ *
+ * 仅 fixed 谓词/矩阵视图消费；legacy `CHIEF_HUB_DISPATCH.targetRoleIds`（五内置）
+ * **逐字冻结**、消费点（apply-journal / trunk-runtime）不改读取源。缺失 ⇒ fixed 消费方
+ * fail-closed（不回退 legacy 五内置）。纯数据、无 I/O。
+ */
+export const CHIEF_FIXED_TARGET_ROLE_IDS: readonly string[] = Object.freeze([
+  "convener",
+  "verifier",
+]);

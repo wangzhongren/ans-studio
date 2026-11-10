@@ -432,6 +432,45 @@ export interface BuiltInRoleModule extends GovernanceRoleSpec {
   preflight?: RolePreflightHooks;
   /** 提示块/资源引用（纯函数；不读盘）。 */
   context(input: RoleContextInput): readonly RoleContextSection[];
+  /**
+   * fixed 派发矩阵的卡种白名单（T3「两条固定工作流路径」v1.3 §3.4；**MF-IR-4 冻结接口**）。
+   *
+   * - 六模块均提供；fixed 矩阵**只读本字段**（门禁引擎门面 `cardKindsOf(id,"two-fixed-paths/v1")`；
+   *   编排 `run-role` 应改调该门面函数），**不得**从 legacy `cards` 过滤/推导；
+   * - 冻结值（v1.3 §3.4）：chief＝`["intent-confirm","proposal","appointment"]`、
+   *   rapporteur/convener＝`["decision"]`、product/nominator/verifier＝`[]`；
+   * - **缺失/非法 ⇒ 消费方 fail-closed 空集**（不静默回退 legacy `cards`）；本字段可选只为兼容
+   *   B2 六角色并行落地前的过渡期（契约测试逐角色钉住上述值）；
+   * - 纯策略/纯数据：无 I/O、无账本、无会话、无时钟/随机数/可变状态；只在
+   *   `matrix:"two-fixed-paths/v1"` 下消费。legacy 数据（`card.text`/`cards`/`capabilities`）与
+   *   legacy 消费点（apply-journal/trunk-runtime）**逐字冻结、不得改读本字段**。
+   */
+  readonly fixedCards?: readonly GovernanceCardKind[];
+  /**
+   * fixed 矩阵下 chief 的可派发内置目标（v1.3 §3.2/§3.4；MF-IR-4）。恰为
+   * `["convener","verifier"]`：convener 仅 `purpose:"stage-request"`；verifier 为 review/preparation。
+   *
+   * 仅 fixed 谓词/矩阵视图消费；legacy `CHIEF_HUB_DISPATCH.targetRoleIds`（五内置）**逐字冻结**、
+   * 消费点不改读取源。**缺失 ⇒ 消费方 fail-closed**（不得回退 legacy 五内置）。纯数据、无 I/O。
+   */
+  readonly fixedTargetRoleIds?: readonly string[];
+  /**
+   * fixed 矩阵下 convener 可派发的内置生产线目标（v1.3 §3.2/§3.4；MF-IR-4）。恰为
+   * `["product","rapporteur","nominator"]`（verifier 拒绝 `convener-to-verifier-forbidden`；
+   * 项目角色另按 production 允许）。
+   *
+   * 仅 fixed 谓词/矩阵视图消费；legacy `CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds`
+   * （`["verifier"]`）**逐字冻结**、消费点不改读取源。**缺失 ⇒ 消费方 fail-closed**。纯数据、无 I/O。
+   */
+  readonly fixedAllowedBuiltInRoleIds?: readonly string[];
+  /**
+   * convener 模块的 fixed 内置派发目标纯函数（MF-IR-4；与 `fixedAllowedBuiltInRoleIds` **同源**）：
+   * `true` ⇔ 该内置角色在 fixed 矩阵下可作为 convener 的生产线派发目标。
+   *
+   * 纯函数、无 I/O；legacy `isConvenerBuiltInDispatchTarget`（`["verifier"]`）**逐字冻结**，
+   * 本谓词不得替换/改写它。**缺失 ⇒ fixed 派发消费方 fail-closed**（不得回退 legacy 谓词）。
+   */
+  isConvenerFixedBuiltInDispatchTarget?(roleId: string): boolean;
 }
 
 /**

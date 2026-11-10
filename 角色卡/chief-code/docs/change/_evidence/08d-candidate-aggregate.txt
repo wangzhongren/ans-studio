@@ -1,0 +1,4 @@
+candidate_files=4
+total_bytes=30255
+aggregate_sha256=e09d7c07f43860dab8e8cce8c97286e50a9c1759f237690f3fbe222bf63bf9d5
+aggregate_method=path-sorted 'path:sha256' lines joined by newline, SHA-256

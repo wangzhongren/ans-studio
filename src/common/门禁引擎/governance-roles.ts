@@ -16,7 +16,9 @@ import type {
   BuiltInRoleId,
   BuiltInRoleModule,
   BuiltInRoleModuleMap,
+  DispatchMatrixMode,
   GovernanceCapabilities as ModelGovernanceCapabilities,
+  GovernanceCardKind,
   GovernanceFunction,
 } from "../../model/role.ts";
 // E2 X-R1–X-R6（数据门面切换 + 收口）：六角色规格全部由角色模块经 `specOf` 零复制投影装配，
@@ -215,6 +217,108 @@ const BUILT_IN_ROLE_MATRIX: Readonly<Partial<Record<BuiltInRoleId, BuiltInGovern
   });
 
 /**
+ * fixed 派发矩阵的**只读展示摘要**（T3「两条固定工作流路径」B2；`matrix:"two-fixed-paths/v1"` 专用）。
+ *
+ * - **不参与任何判定**：与 legacy 表同口径——只供 `governance_matrix` 工具/幕僚快照展示；
+ *   与卡文本/模块 fixed 数据冲突时以卡文本/注册表为准并修正摘要。
+ * - legacy 表 `BUILT_IN_ROLE_MATRIX` **逐字不变**（MF-IR-4/G-4）；fixed 视图只从本表生成，
+ *   由 `governance-matrix` 服务按 `matrix` 参数选择（routing builder 生成 fixed 路由）。
+ * - 文案口径对齐 v1.3 §3.4 fixed 分工：两条固定路径、派发分裂（幕僚只派 verifier 与
+ *   stage-request；运营派生产线）、三张客户卡、固定路径不发 acceptance 卡、merge-main
+ *   应用自有且仅客户本人确认、基线 3 件小事、Git 普通用法、A10→A11、A12a→A12b。
+ */
+const BUILT_IN_ROLE_MATRIX_FIXED: Readonly<Partial<Record<BuiltInRoleId, BuiltInGovernanceMatrixSummary>>> =
+  Object.freeze({
+    chief: Object.freeze({
+      duty: "固定路径幕僚：唯一客户入口；两条固定路径（路径 A 新建 / 路径 B 修改）与三张客户确认卡的发起者。",
+      mainChain: [
+        "两条固定路径 A1–A13 / B1–B4：按真实缺口选路；只经 taskKind:\"stage-request\" 向运营发产线调度请求，不直接派生产线角色。",
+        "三卡：意图确认/方案确认/任命确认由幕僚发起；固定路径不发 acceptance 卡；merge-main 由应用呈卡、仅客户本人确认，judge 不可代批。",
+        "A10 任命确认完成后发 A11 stage-request 派实现；A12 独立验收＝A12a criteria（实施前）→ A12b report（实施后）+ 应用 docs/acceptance 归档。",
+      ],
+      cardDiscipline: [
+        "不得直接派 product/rapporteur/nominator 生产任务（chief-production-dispatch-forbidden）；不得代客户批 merge-main。",
+      ],
+      dispatchScope: "fixed：chief→verifier（review/preparation）与 workflow.reviewRoleId 项目验收角色（仅 review）；chief→convener 仅 purpose=stage-request（read-only、无 module/写集）；生产线由 convener 派发。",
+    }),
+    product: Object.freeze({
+      duty: "固定路径产品：按意图撰写/修订 docs/product/<flowId>-intent-vN.md；报告回运营。",
+      mainChain: [
+        "按 convener 派发撰写/修订意图（版本化，不原地改）；不写方案/名单/架构/角色卡。",
+        "升级/变更走普通版本化文档与方案卡；固定路径不注入 VCA/版本决策工具。",
+      ],
+      cardDiscipline: [
+        "只写 docs/product/；不发起提案卡（方案卡由幕僚呈）；不实现、不招人。",
+      ],
+      dispatchScope: "fixed：convener→product 允许（production，报告回 convener）；chief→product 拒绝（chief-production-dispatch-forbidden）。",
+    }),
+    rapporteur: Object.freeze({
+      duty: "固定路径策划：出方案、名单、模块与架构/契约；不发起方案卡。",
+      mainChain: [
+        "按 convener 派发出 docs/proposals/<flowId>-{proposal,modules,roster}-vN.md 与 docs/contracts/<flowId>-architecture-vN.md；roster 用 project-roster/v4（roles[].review 可选）。",
+        "文档一律新 -vN，不原地改；方案卡由幕僚发起；固定路径不发 appointment-write。",
+      ],
+      cardDiscipline: [
+        "名单是人事建卡的唯一依据；不写角色卡、不招人、不实现、不改产品意图。",
+      ],
+      dispatchScope: "fixed：convener→rapporteur 允许；chief→rapporteur 拒绝。",
+    }),
+    nominator: Object.freeze({
+      duty: "固定路径人事：任命卡由幕僚呈；人事按名单/提案决定机械建卡并激活（activate_role_documents v2）。",
+      mainChain: [
+        "不发起 appointment/appointment-write 卡（fixedCards 空）；按 A7 任务与 roster/提案决定写三文档并整单激活。",
+        "激活由应用重算三文档实际字节 SHA-256（activation-hash-drift）；不写 trunk、不发 appointment-write。",
+      ],
+      cardDiscipline: [
+        "无名单不得写卡；不招名单外角色；不批准提案/验收，不代客户决定。",
+      ],
+      dispatchScope: "fixed：convener→nominator 允许；chief→nominator 拒绝。",
+    }),
+    convener: Object.freeze({
+      duty: "固定路径运营：生产线唯一派发者；执行基线 3 件小事与团队计划；不派质检。",
+      mainChain: [
+        "收到 chief stage-request 后在真实回合内派 product/rapporteur/nominator 与项目实现角色（production）；不得派 verifier。",
+        "A9 基线 3 件小事：团队计划 v4 / git init -b main（应用执行）/ .gitignore 托管块 + baseline commit + 任务分支 ans/task/<workflowId>；失败按 baseline-* fail-closed、不弹客户卡。",
+        "实现任务写集按团队计划 / 路径 B scope 派生；写任务串行；收口自己创建的任务（fixed close_created_task v2）。",
+      ],
+      cardDiscipline: [
+        "不写卡、不招人、不改名单、不写项目源码；不批准、不验收；不得创建质检任务。",
+      ],
+      dispatchScope: "fixed：convener→product/rapporteur/nominator 内置与项目角色允许；convener→verifier 拒绝（convener-to-verifier-forbidden）。",
+    }),
+    verifier: Object.freeze({
+      duty: "固定路径质检：独立验收执行者（默认；roster roles[].review 项目验收角色优先）。",
+      mainChain: [
+        "A12 由幕僚直派：A12a criteria（实施前写标准）→ A12b report（实施后）；报告写 docs/quality/、证据写 docs/verification/。",
+        "固定路径不发 acceptance 卡；docs/acceptance/<flowId>-acceptance-vN.md 归档由应用生成。",
+        "缺证或失败正式 blocked/failed 回幕僚，不静默等待；不代运营发布。",
+      ],
+      cardDiscipline: [
+        "不批准、不代客户验收；不写实现；证据最多真实运行截图，不要求录屏。",
+      ],
+      dispatchScope: "fixed：chief→verifier（review/preparation）允许；convener→verifier 拒绝。",
+    }),
+  });
+
+/**
+ * 按矩阵取内置角色的只读展示摘要（T3 B2；不参与判定）：
+ *
+ * - `"legacy-v1"`（缺省）⇒ 返回 legacy 表 `BUILT_IN_ROLE_MATRIX` 的**同一引用**（legacy 文案逐字不变，
+ *   `specOf`/既有消费点不受影响）；
+ * - `"two-fixed-paths/v1"` ⇒ 返回 fixed 表 `BUILT_IN_ROLE_MATRIX_FIXED`（六角色均提供）；
+ * - 非 trio 内置 id（`su`/项目角色/未知）⇒ `undefined`（调用方必须 fail-closed，不兜底成任一摘要）。
+ */
+export function builtInRoleMatrixSummaryOf(
+  roleId: string,
+  matrix: DispatchMatrixMode = "legacy-v1",
+): BuiltInGovernanceMatrixSummary | undefined {
+  if (!isTrioGovernanceRoleId(roleId)) return undefined;
+  const id = roleId as BuiltInRoleId;
+  if (matrix === "two-fixed-paths/v1") return BUILT_IN_ROLE_MATRIX_FIXED[id];
+  return BUILT_IN_ROLE_MATRIX[id];
+}
+
+/**
  * 角色模块 → 门面规格的零复制投影（E0.3 §10.2 D2/D6；E2 接口评审 §4.1）：数据字段直接复用
  * 模块引用（`card.text/entries/preauthorizedDirs/forbiddenWritePaths`、`capabilities` 同一对象），
  * 只附加门禁引擎私有的 `matrix` 展示摘要；不复制第二份数据。
@@ -288,6 +392,29 @@ export const BUILT_IN_GOVERNANCE_ROLES: readonly BuiltInGovernanceRoleSpec[] = O
  */
 export function builtInRoleModuleOf(id: string): BuiltInRoleModule | undefined {
   return isTrioGovernanceRoleId(id) ? builtInRoleModules[id as BuiltInRoleId] : undefined;
+}
+
+/** fixed 卡种读取的 fail-closed 空集（冻结；不伪造第二份白名单）。 */
+const NO_CARD_KINDS_FIXED: readonly GovernanceCardKind[] = Object.freeze([]);
+
+/**
+ * 各角色允许发起的卡种（T3「两条固定工作流路径」B2；**MF-IR-4 冻结 helper**，单一来源）。
+ *
+ * - 唯一真源 = 角色模块：legacy-v1（缺省）读模块 `cards`（逐字，legacy 消费点不变）；
+ *   `two-fixed-paths/v1` **只读模块 `fixedCards`**——不从 legacy `cards` 过滤/推导；
+ * - 缺失 fixed 字段或模块未装配 ⇒ **fail-closed 空集**（不静默回退 legacy `cards`）；
+ *   `su`/项目角色/未知 id 恒空集（调用方必须 fail-closed，不得自行兜底）；
+ * - 纯只读：无 I/O、无缓存、无判定副作用；不复制第二张硬编码表。
+ *   fixed 矩阵的编排消费点（`run-role.ts::cardKindsOf`）应由编排 B2 改调本函数。
+ */
+export function cardKindsOf(
+  roleId: string,
+  matrix: DispatchMatrixMode = "legacy-v1",
+): readonly GovernanceCardKind[] {
+  const module = builtInRoleModuleOf(roleId);
+  if (module === undefined) return NO_CARD_KINDS_FIXED;
+  if (matrix === "two-fixed-paths/v1") return module.fixedCards ?? NO_CARD_KINDS_FIXED;
+  return module.cards;
 }
 
 /** 旧 su（single）的预授权目录（角色模型/入口保留；共享 flow/gate/ledger 机器已撤除）。 */

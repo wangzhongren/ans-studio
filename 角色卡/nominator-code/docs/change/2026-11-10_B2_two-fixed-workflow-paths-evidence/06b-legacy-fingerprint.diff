@@ -1,0 +1,4 @@
+27c27
+< module.keys=["capabilities","card","cards","context","dispatch","displayName","function","id","preflight","tools"]
+---
+> module.keys=["capabilities","card","cards","context","dispatch","displayName","fixedCards","function","id","preflight","tools"]

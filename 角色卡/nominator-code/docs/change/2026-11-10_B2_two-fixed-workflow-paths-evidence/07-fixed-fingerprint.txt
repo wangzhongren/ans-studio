@@ -1,0 +1,39 @@
+node v24.22.1
+fixedCards.exists=true
+fixedCards.value=[]
+fixedCards.frozen=true
+fixedCards.sameReferenceAsLegacyCards=false
+legacyCards.value=["appointment","appointment-write"]
+fixedContext.ids=["nominator-fixed-duty","nominator-fixed-activation","nominator-fixed-report"]
+fixedContext.frozen=true
+fixedContext.sameReferenceAsLegacy=false
+legacyContext.sameReferenceExplicitLegacy=true
+fixedContext.hash=520de3e3a901c76c4e1318c87a57a123915aee30233c19da9e927d71ad1e29e1
+fixedContext[nominator-fixed-duty].frozen=true resources=true
+fixedContext[nominator-fixed-duty].hash=e5912e38256542a324fb5d83797c3483146ca63aa88fa39498a212ddc8556015
+--- nominator-fixed-duty ---
+## 固定路径人事（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）
+派发：固定路径的人事任务由运营（convener）派发（幕僚 stage-request → 运营生产线派发，A7）；完成后报告回 `task.created.from`（运营）。
+卡：任命确认卡由幕僚（chief）在 A10 呈交；固定路径不发起 appointment / appointment-write 卡（fixedCards 空；appointment-write 仅 legacy 兼容通道）。
+纪律：人事不派发任何任务；不自行增删角色；不招名单外的角色；不改名单/方案；不批准提案/验收、不代客户决定。
+--- /nominator-fixed-duty ---
+fixedContext[nominator-fixed-activation].frozen=true resources=true
+fixedContext[nominator-fixed-activation].hash=f1fc746354f88cb2d2119ff09b282e9f694c6f76852c60904f4036a8d51e0cb0
+--- nominator-fixed-activation ---
+## A7/A8 建卡与激活（fixed）
+接到 A7/A8 激活任务后，按最新名单 `docs/proposals/<flowId>-roster-vN.md`（path+sha256）与 A6 提案决定（proposalDecisionId）机械处理；写卡前先核验名单/决定与任务事实一致。
+逐名单角色写 `角色卡/<roleId>/role-card.md`、`boundary.md`、`boundary.yaml`：角色卡必填章节齐备，boundary.md 与 boundary.yaml 同步，边界只能取该角色名下模块的文件/目录并集，模块属主唯一。
+对每个名单角色调用 `activate_role_documents` v2（targetRoleId、roster{path,sha256}、documents{card,boundaryMd,boundaryYaml}）；应用重算三文档实际字节 SHA-256（不一致 ⇒ `activation-hash-drift`），校验通过后记录 `role.activated` 并激活。
+名单/提案决定缺失或非法 ⇒ 不写卡，如实阻塞回运营；激活失败保留旧有效卡，不伪造激活或完成。
+--- /nominator-fixed-activation ---
+fixedContext[nominator-fixed-report].frozen=true resources=true
+fixedContext[nominator-fixed-report].hash=6884d9bcffa2ff448ffba659be9ae39a2d512fa1c2c7e3ecff7f32de879834e1
+--- nominator-fixed-report ---
+## 报告期望（fixed）
+任务完成后必须用 `submit_report` 回短报，报告回 `task.created.from`（固定路径通常为运营 convener）。
+报告至少含：完成/阻塞状态、真实证据（名单/提案决定、三文档摘要、`activate_role_documents` 回执与 activationDigest）、遗留项。
+阻塞先报原创建者，不猜、不伪造批准/激活/完成；不要只结束回合。
+--- /nominator-fixed-report ---
+legacyContext.hash=50d5dfa943a4c6f6bd987e7b4f0fd34c6ecac13d233074ef956d9aaf75dc1d31
+legacyContext.containsFixedMarker=false
+fixedContext.containsLegacyIds=false

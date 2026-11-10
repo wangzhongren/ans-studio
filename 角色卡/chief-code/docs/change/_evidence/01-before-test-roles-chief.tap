@@ -1,0 +1,262 @@
+TAP version 13
+# Subtest: 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+ok 1 - 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+  ---
+  duration_ms: 3.1696
+  type: 'test'
+  ...
+# Subtest: 差分：card/entries/preauthorized/forbidden/capabilities/displayName/function/cards 与冻结金样逐字段一致（差异 0）
+ok 2 - 差分：card/entries/preauthorized/forbidden/capabilities/displayName/function/cards 与冻结金样逐字段一致（差异 0）
+  ---
+  duration_ms: 0.4875
+  type: 'test'
+  ...
+# Subtest: 差分：卡文本 sha256 / 长度 / 行数零差异
+ok 3 - 差分：卡文本 sha256 / 长度 / 行数零差异
+  ---
+  duration_ms: 0.1058
+  type: 'test'
+  ...
+# Subtest: 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结，不含 legacy write）
+ok 4 - 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结，不含 legacy write）
+  ---
+  duration_ms: 0.0667
+  type: 'test'
+  ...
+# Subtest: 差分：6 个工具 id 全部通过旧 D1 装配校验，映射名/顺序与冻结结果一致（含 closeCreatedTask）
+ok 5 - 差分：6 个工具 id 全部通过旧 D1 装配校验，映射名/顺序与冻结结果一致（含 closeCreatedTask）
+  ---
+  duration_ms: 0.1637
+  type: 'test'
+  ...
+# Subtest: 差分（E2 C-1 处置）：closeCreatedTask 已纳入模块声明；decidePendingRequest 仍不由普通会话声明
+ok 6 - 差分（E2 C-1 处置）：closeCreatedTask 已纳入模块声明；decidePendingRequest 仍不由普通会话声明
+  ---
+  duration_ms: 0.179
+  type: 'test'
+  ...
+# Subtest: D10：tools().capabilities 与 spec capabilities 一致（单一真源）
+ok 7 - D10：tools().capabilities 与 spec capabilities 一致（单一真源）
+  ---
+  duration_ms: 0.075
+  type: 'test'
+  ...
+# Subtest: 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+ok 8 - 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+  ---
+  duration_ms: 0.2404
+  type: 'test'
+  ...
+# Subtest: 差分（documented）：契约明文差异逐条单列（targetExists 收紧 / 只回答 chief 来源）
+ok 9 - 差分（documented）：契约明文差异逐条单列（targetExists 收紧 / 只回答 chief 来源）
+  ---
+  duration_ms: 0.1668
+  type: 'test'
+  ...
+# Subtest: 差分（preflight，zero）：请求形状与旧 validateVersionDecisionRequest 判定一致（差异 0 子集）
+ok 10 - 差分（preflight，zero）：请求形状与旧 validateVersionDecisionRequest 判定一致（差异 0 子集）
+  ---
+  duration_ms: 0.4335
+  type: 'test'
+  ...
+# Subtest: 差分（列明方案差异）：runId/refs 的路径形状由宿主最终校验，preflight 只做存在/类型/上限
+ok 11 - 差分（列明方案差异）：runId/refs 的路径形状由宿主最终校验，preflight 只做存在/类型/上限
+  ---
+  duration_ms: 0.1105
+  type: 'test'
+  ...
+# Subtest: 差分：chief-workflow 资源 path/version/sha256/bytes 与宿主 loader 捕获值一致（按现状）
+ok 12 - 差分：chief-workflow 资源 path/version/sha256/bytes 与宿主 loader 捕获值一致（按现状）
+  ---
+  duration_ms: 0.1192
+  type: 'test'
+  ...
+# Subtest: 差分：hub 目标五内置与 apply-journal 新内置任务允许集一致（捕获期金样）
+ok 13 - 差分：hub 目标五内置与 apply-journal 新内置任务允许集一致（捕获期金样）
+  ---
+  duration_ms: 0.0607
+  type: 'test'
+  ...
+# Subtest: 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+ok 14 - 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+  ---
+  duration_ms: 3.0785
+  type: 'test'
+  ...
+# Subtest: 模块图：模块根只有 index.ts；内部实现在 internal/
+ok 15 - 模块图：模块根只有 index.ts；内部实现在 internal/
+  ---
+  duration_ms: 0.972
+  type: 'test'
+  ...
+# Subtest: 模块图：模块源 import 仅 Model/shared public entry 与自身内部文件（零越界、零跨角色）
+ok 16 - 模块图：模块源 import 仅 Model/shared public entry 与自身内部文件（零越界、零跨角色）
+  ---
+  duration_ms: 1.4565
+  type: 'test'
+  ...
+# Subtest: 模块图：模块源无 I/O/时钟/随机数/控制台/进程/网络调用（纯数据/纯函数）
+ok 17 - 模块图：模块源无 I/O/时钟/随机数/控制台/进程/网络调用（纯数据/纯函数）
+  ---
+  duration_ms: 0.864
+  type: 'test'
+  ...
+# Subtest: 模块图：index.ts 是唯一 public entry（导出面集中）
+ok 18 - 模块图：index.ts 是唯一 public entry（导出面集中）
+  ---
+  duration_ms: 0.2806
+  type: 'test'
+  ...
+# Subtest: spec：id/displayName/function/cards 与模块形状
+ok 19 - spec：id/displayName/function/cards 与模块形状
+  ---
+  duration_ms: 1.044
+  type: 'test'
+  ...
+# Subtest: spec：card 字段形状（text 非空；entries/preauthorized/forbidden 只读数据）
+ok 20 - spec：card 字段形状（text 非空；entries/preauthorized/forbidden 只读数据）
+  ---
+  duration_ms: 0.1419
+  type: 'test'
+  ...
+# Subtest: spec：capabilities 七字段（D10 唯一真源）
+ok 21 - spec：capabilities 七字段（D10 唯一真源）
+  ---
+  duration_ms: 0.0624
+  type: 'test'
+  ...
+# Subtest: tools：trio 返回 6 个 chief 专属 id（含 E2 C-1 的 closeCreatedTask），顺序与旧 run-role 一致，capabilities 同 spec 引用
+ok 22 - tools：trio 返回 6 个 chief 专属 id（含 E2 C-1 的 closeCreatedTask），顺序与旧 run-role 一致，capabilities 同 spec 引用
+  ---
+  duration_ms: 0.1048
+  type: 'test'
+  ...
+# Subtest: tools：single 不装配 trio 工具（空集 + 结构化原因，非 deny）
+ok 23 - tools：single 不装配 trio 工具（空集 + 结构化原因，非 deny）
+  ---
+  duration_ms: 0.0927
+  type: 'test'
+  ...
+# Subtest: tools：未知治理模型 fail-closed（空集 + 原因，不猜测）
+ok 24 - tools：未知治理模型 fail-closed（空集 + 原因，不猜测）
+  ---
+  duration_ms: 0.079
+  type: 'test'
+  ...
+# Subtest: dispatch：chief → 五个内置角色允许，reportToRoleId=chief（真实创建者）
+ok 25 - dispatch：chief → 五个内置角色允许，reportToRoleId=chief（真实创建者）
+  ---
+  duration_ms: 0.139
+  type: 'test'
+  ...
+# Subtest: dispatch：自派拒绝（稳定码 self-dispatch，不返回报告期望）
+ok 26 - dispatch：自派拒绝（稳定码 self-dispatch，不返回报告期望）
+  ---
+  duration_ms: 0.065
+  type: 'test'
+  ...
+# Subtest: dispatch：幕僚不得直接派项目 worker（chief-to-project-forbidden）
+ok 27 - dispatch：幕僚不得直接派项目 worker（chief-to-project-forbidden）
+  ---
+  duration_ms: 0.0601
+  type: 'test'
+  ...
+# Subtest: dispatch：闭集外内置目标 / 目标不存在 / targetExists 缺省 = 拒绝（fail-closed）
+ok 28 - dispatch：闭集外内置目标 / 目标不存在 / targetExists 缺省 = 拒绝（fail-closed）
+  ---
+  duration_ms: 0.1293
+  type: 'test'
+  ...
+# Subtest: dispatch：来源缺失/非 chief/目标类别未知 = 拒绝（fail-closed）
+ok 29 - dispatch：来源缺失/非 chief/目标类别未知 = 拒绝（fail-closed）
+  ---
+  duration_ms: 0.0884
+  type: 'test'
+  ...
+# Subtest: preflight：覆盖 version-decision；其他动作 action-not-covered
+ok 30 - preflight：覆盖 version-decision；其他动作 action-not-covered
+  ---
+  duration_ms: 0.0836
+  type: 'test'
+  ...
+# Subtest: preflight：合法 version-decision 请求 allow
+ok 31 - preflight：合法 version-decision 请求 allow
+  ---
+  duration_ms: 0.1787
+  type: 'test'
+  ...
+# Subtest: preflight：缺事实 / facts 非对象 = fact-missing（fail-closed）
+ok 32 - preflight：缺事实 / facts 非对象 = fact-missing（fail-closed）
+  ---
+  duration_ms: 0.0824
+  type: 'test'
+  ...
+# Subtest: preflight：未知 fact 键 / 非法值 = fact-invalid
+ok 33 - preflight：未知 fact 键 / 非法值 = fact-invalid
+  ---
+  duration_ms: 0.1619
+  type: 'test'
+  ...
+# Subtest: preflight：pinned run 拒绝（应走既有 run-change）
+ok 34 - preflight：pinned run 拒绝（应走既有 run-change）
+  ---
+  duration_ms: 0.0468
+  type: 'test'
+  ...
+# Subtest: preflight：已有未决版本决策请求拒绝（不重复发卡）
+ok 35 - preflight：已有未决版本决策请求拒绝（不重复发卡）
+  ---
+  duration_ms: 0.0371
+  type: 'test'
+  ...
+# Subtest: preflight：draft/legacy 与非零 pending 边界
+ok 36 - preflight：draft/legacy 与非零 pending 边界
+  ---
+  duration_ms: 0.073
+  type: 'test'
+  ...
+# Subtest: context：返回 chief-workflow / 决策上下文 / intent-confirm 三段（顺序固定）
+ok 37 - context：返回 chief-workflow / 决策上下文 / intent-confirm 三段（顺序固定）
+  ---
+  duration_ms: 0.1251
+  type: 'test'
+  ...
+# Subtest: context：不读取 facts（任意 facts 输出一致；不读盘）
+ok 38 - context：不读取 facts（任意 facts 输出一致；不读盘）
+  ---
+  duration_ms: 0.051
+  type: 'test'
+  ...
+# Subtest: 纯数据：模块对象/数据/卡数据/资源引用冻结（不可变状态）
+ok 39 - 纯数据：模块对象/数据/卡数据/资源引用冻结（不可变状态）
+  ---
+  duration_ms: 0.0413
+  type: 'test'
+  ...
+# Subtest: 纯函数：输入深冻结也可调用，且不修改调用方数据
+ok 40 - 纯函数：输入深冻结也可调用，且不修改调用方数据
+  ---
+  duration_ms: 0.1632
+  type: 'test'
+  ...
+# Subtest: hub 数据：routing/source/report/purpose/schema/目标五内置（与 Model 单一来源一致）
+ok 41 - hub 数据：routing/source/report/purpose/schema/目标五内置（与 Model 单一来源一致）
+  ---
+  duration_ms: 0.0384
+  type: 'test'
+  ...
+# Subtest: intent-confirm 数据：固定 confirm/revise；decision 分组；仅 confirm 可被判断代理代批
+ok 42 - intent-confirm 数据：固定 confirm/revise；decision 分组；仅 confirm 可被判断代理代批
+  ---
+  duration_ms: 0.3407
+  type: 'test'
+  ...
+1..42
+# tests 42
+# suites 0
+# pass 42
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 289.0109

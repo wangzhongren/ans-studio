@@ -1,0 +1,2 @@
+--- diff (B1 known-red list vs B2 verifier-code after run) ---
+FAILURE-NAME-SET-IDENTICAL (24/24)

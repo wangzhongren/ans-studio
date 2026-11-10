@@ -1,0 +1,202 @@
+TAP version 13
+# Subtest: 差分/规格：模块规格与冻结金样逐字段一致
+ok 1 - 差分/规格：模块规格与冻结金样逐字段一致
+  ---
+  duration_ms: 0.8204
+  type: 'test'
+  ...
+# Subtest: 差分/卡文本：sha256 / 长度 / 行数零差异
+ok 2 - 差分/卡文本：sha256 / 长度 / 行数零差异
+  ---
+  duration_ms: 0.3411
+  type: 'test'
+  ...
+# Subtest: 差分/cards：模块 cards 与金样一致（D8 无 legacy token）
+ok 3 - 差分/cards：模块 cards 与金样一致（D8 无 legacy token）
+  ---
+  duration_ms: 0.1432
+  type: 'test'
+  ...
+# Subtest: 差分/tools：trio/single 集合与冻结金样逐项同序
+ok 4 - 差分/tools：trio/single 集合与冻结金样逐项同序
+  ---
+  duration_ms: 0.161
+  type: 'test'
+  ...
+# Subtest: 差分/dispatch：allow 位/稳定码/reportToRoleId 与金样逐组合一致
+ok 5 - 差分/dispatch：allow 位/稳定码/reportToRoleId 与金样逐组合一致
+  ---
+  duration_ms: 0.2563
+  type: 'test'
+  ...
+# Subtest: 差分/team-plan：allow 位与旧角色侧身份/依据/路径谓词金样一致
+ok 6 - 差分/team-plan：allow 位与旧角色侧身份/依据/路径谓词金样一致
+  ---
+  duration_ms: 0.3936
+  type: 'test'
+  ...
+# Subtest: 差分/stable-write：allow 位与旧 canRequestStableWrite/kind 门控金样一致
+ok 7 - 差分/stable-write：allow 位与旧 canRequestStableWrite/kind 门控金样一致
+  ---
+  duration_ms: 0.1099
+  type: 'test'
+  ...
+# Subtest: 差分/requirement-change：allow 位与旧工具侧事实/归属谓词金样一致
+ok 8 - 差分/requirement-change：allow 位与旧工具侧事实/归属谓词金样一致
+  ---
+  duration_ms: 0.1331
+  type: 'test'
+  ...
+# Subtest: 差分/git-action：模块行为与冻结金样一致（旧实现无纯函数 oracle）
+ok 9 - 差分/git-action：模块行为与冻结金样一致（旧实现无纯函数 oracle）
+  ---
+  duration_ms: 0.354
+  type: 'test'
+  ...
+# Subtest: 差分/已知差异清单：分类齐备且与用例登记一致
+ok 10 - 差分/已知差异清单：分类齐备且与用例登记一致
+  ---
+  duration_ms: 0.2037
+  type: 'test'
+  ...
+# Subtest: 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+ok 11 - 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+  ---
+  duration_ms: 4.5313
+  type: 'test'
+  ...
+# Subtest: E1 模块纪律：模块根只有 index.ts（内部文件只在子目录），唯一 public entry
+ok 12 - E1 模块纪律：模块根只有 index.ts（内部文件只在子目录），唯一 public entry
+  ---
+  duration_ms: 0.2939
+  type: 'test'
+  ...
+# Subtest: E1 模块纪律：只 import Model 公开入口（type-only），无引擎/门控/其他角色/Node I/O
+ok 13 - E1 模块纪律：只 import Model 公开入口（type-only），无引擎/门控/其他角色/Node I/O
+  ---
+  duration_ms: 0.5678
+  type: 'test'
+  ...
+# Subtest: 规格数据：id/displayName/function/capabilities/cards 与旧 convener 规格一致（D8/D10）
+ok 14 - 规格数据：id/displayName/function/capabilities/cards 与旧 convener 规格一致（D8/D10）
+  ---
+  duration_ms: 0.9347
+  type: 'test'
+  ...
+# Subtest: tools()：trio 返回 convener 五个允许工具；capabilities 与 spec 同源（D10）
+ok 15 - tools()：trio 返回 convener 五个允许工具；capabilities 与 spec 同源（D10）
+  ---
+  duration_ms: 0.1159
+  type: 'test'
+  ...
+# Subtest: tools()：single 只保留旧角色门控两项；未知治理模型 fail-closed
+ok 16 - tools()：single 只保留旧角色门控两项；未知治理模型 fail-closed
+  ---
+  duration_ms: 0.1292
+  type: 'test'
+  ...
+# Subtest: dispatch()：真实 convener → 真实项目 worker（宿主显式存在）允许，报告期望 convener
+ok 17 - dispatch()：真实 convener → 真实项目 worker（宿主显式存在）允许，报告期望 convener
+  ---
+  duration_ms: 0.1141
+  type: 'test'
+  ...
+# Subtest: dispatch()：内置目标只允许质检（verifier）；其它内置目标拒绝
+ok 18 - dispatch()：内置目标只允许质检（verifier）；其它内置目标拒绝
+  ---
+  duration_ms: 0.1353
+  type: 'test'
+  ...
+# Subtest: dispatch()：来源非 convener、空目标、自派、项目目标不存在、内置矛盾事实一律 fail-closed
+ok 19 - dispatch()：来源非 convener、空目标、自派、项目目标不存在、内置矛盾事实一律 fail-closed
+  ---
+  duration_ms: 0.1117
+  type: 'test'
+  ...
+# Subtest: preflight：非本角色动作与非法 facts 默认拒绝（action-not-covered / facts-invalid）
+ok 20 - preflight：非本角色动作与非法 facts 默认拒绝（action-not-covered / facts-invalid）
+  ---
+  duration_ms: 0.1612
+  type: 'test'
+  ...
+# Subtest: preflight：未知 fact 键 deny（只读 api-spec 登记的键，fail-closed）
+ok 21 - preflight：未知 fact 键 deny（只读 api-spec 登记的键，fail-closed）
+  ---
+  duration_ms: 0.2819
+  type: 'test'
+  ...
+# Subtest: preflight/team-plan：合法事实允许；baseDigest/plan.sha256 可缺省；路径/版本/形状/身份错误拒绝
+ok 22 - preflight/team-plan：合法事实允许；baseDigest/plan.sha256 可缺省；路径/版本/形状/身份错误拒绝
+  ---
+  duration_ms: 0.3291
+  type: 'test'
+  ...
+# Subtest: preflight/stable-write：仅 convener 的 workflow 内容写入允许
+ok 23 - preflight/stable-write：仅 convener 的 workflow 内容写入允许
+  ---
+  duration_ms: 0.1637
+  type: 'test'
+  ...
+# Subtest: preflight/requirement-change：至少一个归属键；changeKind/必填文本非法拒绝
+ok 24 - preflight/requirement-change：至少一个归属键；changeKind/必填文本非法拒绝
+  ---
+  duration_ms: 0.1288
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/init：真实客户来源 + 仓库不存在才允许
+ok 25 - preflight/git-action/init：真实客户来源 + 仓库不存在才允许
+  ---
+  duration_ms: 0.1345
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/commit：base/paths 与本人 scope 事实
+ok 26 - preflight/git-action/commit：base/paths 与本人 scope 事实
+  ---
+  duration_ms: 0.1662
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/integrate：只收已授权且已收口的 owner 候选
+ok 27 - preflight/git-action/integrate：只收已授权且已收口的 owner 候选
+  ---
+  duration_ms: 0.1529
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/revert：controller/review/OID 重新核验事实
+ok 28 - preflight/git-action/revert：controller/review/OID 重新核验事实
+  ---
+  duration_ms: 0.1383
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/publish：仅 delivery + 最终候选/收口/证据事实
+ok 29 - preflight/git-action/publish：仅 delivery + 最终候选/收口/证据事实
+  ---
+  duration_ms: 0.1928
+  type: 'test'
+  ...
+# Subtest: preflight/git-action：未知动作拒绝（git-action-invalid）
+ok 30 - preflight/git-action：未知动作拒绝（git-action-invalid）
+  ---
+  duration_ms: 0.0467
+  type: 'test'
+  ...
+# Subtest: context()：decision 卡 / 项目 workflow / 报告期望三段稳定文本
+ok 31 - context()：decision 卡 / 项目 workflow / 报告期望三段稳定文本
+  ---
+  duration_ms: 0.1014
+  type: 'test'
+  ...
+# Subtest: context()：不同治理模型返回同一静态模板（无运行时事实拼接、无 I/O）
+ok 32 - context()：不同治理模型返回同一静态模板（无运行时事实拼接、无 I/O）
+  ---
+  duration_ms: 0.0317
+  type: 'test'
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 177.6642

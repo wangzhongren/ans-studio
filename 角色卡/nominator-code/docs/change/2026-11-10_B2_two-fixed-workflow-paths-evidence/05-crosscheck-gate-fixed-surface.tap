@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy）
+ok 1 - MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy）
+  ---
+  duration_ms: 0.8388
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）
+ok 2 - MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）
+  ---
+  duration_ms: 0.2139
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变
+ok 3 - MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变
+  ---
+  duration_ms: 0.1001
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）
+ok 4 - MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）
+  ---
+  duration_ms: 0.1009
+  type: 'test'
+  ...
+# Subtest: fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed
+ok 5 - fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed
+  ---
+  duration_ms: 0.258
+  type: 'test'
+  ...
+# Subtest: G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项
+ok 6 - G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项
+  ---
+  duration_ms: 3.2536
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O）
+ok 7 - MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O）
+  ---
+  duration_ms: 0.2695
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 139.9914
