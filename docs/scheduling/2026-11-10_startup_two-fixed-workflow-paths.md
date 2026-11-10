@@ -29,14 +29,15 @@
 | 阶段 | 产物 | 作者（角色） | 路径 |
 | --- | --- | --- | --- |
 | 依据 | 设计 v2（客户确认） | 客户/策划 | `docs/planning/2026-11-10_design_two-fixed-workflow-paths.md` |
-| 方案 | 实现级方案（工具面/状态机/账本/基线/卡片/迁移） | 策划（rapporteur-code） | `docs/planning/2026-11-10_design_impl_two-fixed-workflow-paths.md` |
-| 复核 | 独立复核（must-fix/G 项/限制） | 独立验收（verifier-code） | `docs/planning/2026-11-10_review_two-fixed-workflow-paths.md` |
-| 判据 | B1 验收标准（AC/T/RR/EV） | 独立验收（verifier-code） | `docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md` |
+| 方案 | 实现级方案（工具面/状态机/账本/基线/卡片/迁移） | 策划（业务内置 rapporteur；模块维护 rapporteur-code） | `docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.md` |
+| 复核 | 独立复核（must-fix/G 项/限制） | 独立验收 | `角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md` |
+| 判据 | B1 验收标准（AC/T/RR/EV） | 独立验收 | `docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md`（任务精确范围授权） |
 | 计划 | 团队计划（角色/模块/写集/批次/证据） | 统筹调度/运营 | `docs/scheduling/2026-11-10_team-plan_two-fixed-workflow-paths.md` |
 | 实施 | 各角色变更记录 | 各 owner | `角色卡/<role>/docs/change/2026-11-10_*two-fixed-workflow-paths*.md` + `_evidence/` |
 | 验收 | D1/B2/真机全链记录 | 编排/测试/独立验收 | 各角色记录 + `docs/acceptance/` |
 
 - 所有实现/复核/B1 文档必须绑定上表依据的字节数与 SHA-256；未落盘不视为完成。
+- **边界口径（2026-11-10 实测校正）**：`rapporteur-code` 是角色模块维护角色，角色卡明确禁写 `docs/planning/`；业务策划（内置 `rapporteur`）的合法写区是 `docs/proposals/`、`docs/contracts/`、`docs/governance/rapporteur/`（`src/common/roles/rapporteur/internal/spec.ts`）。因此实现级方案落 `docs/proposals/`，不由 rapporteur-code 写 `docs/planning/`；独立验收写自己的 `角色卡/独立验收/docs/design/`；B1 落 `docs/acceptance/` 由任务精确范围授权（既有先例）。不修改角色卡/边界；若后续确需扩写区，走人事边界修订+客户确认，不得自行扩围。
 - 团队计划只能在 B1 冻结后写；写集按现有开发侧角色分工认领模块，单一 owner、零重叠。
 
 ## 四、工作流与角色分工（按设计 v2）
