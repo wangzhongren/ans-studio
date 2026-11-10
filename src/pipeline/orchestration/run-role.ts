@@ -61,13 +61,22 @@ import { ROLE_CARD_REQUIRED_SECTIONS, cardKindsOf as governanceCardKindsOf } fro
 // 本文件只消费数据做条件/默认卡判定，不复制第二份卡面数据、不构造卡、不写账本。
 import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
-import { loadLatestRoster, nominationD3CardFacts, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { loadLatestRoster, nominationD3CardFacts, rosterContainsBuiltInRoleIds, rosterDirectoriesFor, rosterRoleIds, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+// T3 B3.1（2026-11-10，AC-08/AC-13）：fixed A10 卡在办标记（stage.requested A10）经 fixed 账本公共原语写入。
+import { stageRequestIdempotencyKey } from "../../common/编排/workflow-dispatch.ts";
+import { canRequestStage, deriveWorkflowView } from "../../common/编排/workflow-state.ts";
 // T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。
 import { readTaskState } from "../../common/编排/task-state.ts";
 import type { WorkflowMode } from "../../common/编排/workflow-service.ts";
 import {
   activateRoleDocumentsFixed as workflowActivateRoleDocumentsFixed,
+  appendWorkflowEvent as workflowAppendEvent,
   closeTask as workflowCloseTask,
+  finalizeIntent as workflowFinalizeIntent,
+  prepareIntent as workflowPrepareIntent,
+  readWorkflowLedger as workflowReadLedger,
+  type PreparedFixedIntent,
+  type WorkflowServiceFailure,
   type FixedActivateRoleDocumentsDep,
   type FixedActivateRoleDocumentsFn,
   type FixedActivateRoleDocumentsToolInput,
@@ -199,10 +208,12 @@ import type {
   ShellJudgeToolOptions,
   GovernanceJudgeContext,
   GovernanceJudgeToolOptions,
+  RequestResolvedEvent,
+  WorkflowEvent,
   ShellEscalationFn,
   ShellEscalationPresentFn,
 } from "../../model/runtime.ts";
-import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, WORKFLOW_LEDGER_SCHEMA, governanceCardGroup } from "../../model/runtime.ts";
 import { createRuntimeAdapter, createBlockedRoleCapabilityCallbacks, isRuntimeEditReadProbe, inspectRuntimeFileGateContext, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, inspectRuntimeConstructionFailure, recheckRuntimeConstructionFailure, discardRuntimeRolePreparation, inspectRuntimeCoreRegistry, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { createTrunkService, type DecisionEvidenceInput, type PreparedIntentConfirmation } from "../../service/trunk/public/trunk-service.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
@@ -1371,8 +1382,12 @@ export async function openRoleSession(
                 "请显式携带 cardKind（如 decision）后重试。",
             };
           }
-          // 2026-10-29（方案 v2.1 §5.1/M3）：招人决定卡（appointment）——只有人事可发；选项必须恰为
+          // 2026-10-29（方案 v2.1 §5.1/M3）：招人决定卡（appointment）——legacy 只有人事可发；选项必须恰为
           // 最新名单角色（多选）；推荐集由应用从名单生成（不采信模型自报）。不满足 ⇒ 不发卡。
+          // T3 B3.1（2026-11-10，AC-13/G-10）：fixed 矩阵（v1.3 §8.3）改由幕僚（chief）发起任命卡
+          // （`fixedCards` 含 appointment；nominator fixedCards 为空）；选项=名单角色、multiple、推荐集=
+          // 名单顺序由应用重建（`targetRoleIds`/workflowId 戳由应用通道/桌面 B3 落账）。legacy 发起人/
+          // 校验/文案逐字不变。
           let appointmentRecommendedRoleIds: string[] | undefined;
           if (cardKind === "appointment") {
             const rejectAppointment = (reason: string) => {
@@ -1383,12 +1398,22 @@ export async function openRoleSession(
               });
               return { outcome: "declined" as const, notPresented: true as const, reason };
             };
-            if (!isTrio || trioSpec?.id !== "nominator") {
+            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            // 按本卡实际 flowId 解析矩阵（per-flow；缺省 legacy）。fixed 只允许模块 `fixedCards` 含
+            // appointment 的角色（恰 chief）；legacy 仍只允许 nominator（逐字不变）。
+            const appointmentMatrix = await matrixForFlow(appointmentFlowId);
+            const fixedAppointment = appointmentMatrix === "two-fixed-paths/v1";
+            if (fixedAppointment) {
+              if (!isTrio || trioSpec === undefined || !cardKindsOf(trioSpec.id, appointmentMatrix).includes("appointment")) {
+                return rejectAppointment(
+                  "固定路径的任命卡（appointment）只能由幕僚（chief）发起（fixedCards 矩阵）；本次未向客户发卡、未写任何记录。",
+                );
+              }
+            } else if (!isTrio || trioSpec?.id !== "nominator") {
               return rejectAppointment(
                 "招人决定卡（appointment）只能由人事（nominator）发起；本次未向客户发卡、未写任何记录。",
               );
             }
-            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if (typeof appointmentFlowId !== "string" || appointmentFlowId.trim() === "") {
               return rejectAppointment("招人决定卡缺少 flowId（用于定位最新人员名单）；本次未向客户发卡。");
             }
@@ -1399,33 +1424,80 @@ export async function openRoleSession(
             if (!roster.ok) {
               return rejectAppointment(`招人决定卡前置不满足：${roster.reason} 请先让策划产出合法名单。`);
             }
-            const rosterCard = validateAppointmentCardAgainstRoster({
-              roster: roster.roster,
-              optionIds: effectiveReq.options.map((option) => option.id),
-              multiple: effectiveReq.multiple === true,
-            });
-            if (!rosterCard.ok) {
-              return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
-            }
-            appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
-            // X-R3（E2 S4）：D3 卡角色侧前置——在既有名单/选项/推荐集/env-bootstrap 校验之后调用
-            // nominator 模块 `preflight.checkAction("appointment", stage:"d3-card")`。事实只取自已校验的
-            // `loadLatestRoster` 产物与 `rosterCard` 结果（严格 api-spec 登记键；`intentEntryConsistent`
-            // 是可选诊断事实且旧路径不校验 ⇒ 不传）。allow 不替代应用/Service 校验；deny 走既有
-            // `appointment-invalid` 回执（`rejectAppointment`），不发卡、不写账本。
-            const nominatorPreflight = builtInRoleModuleOf("nominator")?.preflight;
-            const nominatorFacts = nominationD3CardFacts({
-              roster,
-              multiple: effectiveReq.multiple === true,
-              optionIds: effectiveReq.options.map((option) => option.id),
-              recommendedRoleIds: rosterCard.recommendedRoleIds,
-            });
-            if (nominatorPreflight !== undefined && nominatorFacts !== undefined) {
-              const decision = nominatorPreflight.checkAction({ action: "appointment", facts: nominatorFacts });
-              if (!decision.allow) {
+            if (fixedAppointment) {
+              // v1.3 §8.3：选项集合=名单、multiple、推荐集=名单顺序（应用从 roster 重建，不采信模型
+              // 自报的选项/推荐 flags）；不得含内置角色 id。fixed 不套用 legacy D3 的 env-bootstrap/
+              // 人事模块 preflight（fixed 无 D3 阶段），结构口径与桌面 B3
+              // `prepareFixedAppointmentCardRequest` 一致。
+              const rosterIds = rosterRoleIds(roster.roster);
+              const optionIds = effectiveReq.options.map((option) => option.id);
+              if (effectiveReq.multiple !== true) {
+                return rejectAppointment("固定路径任命卡必须是多选（multiple=true，名单角色）；本次未向客户发卡。");
+              }
+              if (new Set(optionIds).size !== optionIds.length) {
+                return rejectAppointment("固定路径任命卡选项 id 重复；本次未向客户发卡。");
+              }
+              if (rosterContainsBuiltInRoleIds(roster.roster)) {
+                return rejectAppointment("固定路径任命卡名单含内置治理角色；本次未向客户发卡。");
+              }
+              const optionSet = new Set(optionIds);
+              const rosterSet = new Set(rosterIds);
+              const missing = rosterIds.filter((id) => !optionSet.has(id));
+              const extra = optionIds.filter((id) => !rosterSet.has(id));
+              if (missing.length > 0 || extra.length > 0) {
                 return rejectAppointment(
-                  `招人决定卡未通过人事角色策略前置（诊断码：${decision.code}）；本次未向客户发卡、未写任何记录。`,
+                  `固定路径任命卡选项必须与最新名单角色完全一致（缺：${missing.join("、") || "无"}；多：${extra.join("、") || "无"}）。本次未向客户发卡。`,
                 );
+              }
+              appointmentRecommendedRoleIds = rosterIds;
+              effectiveReq = {
+                ...effectiveReq,
+                multiple: true,
+                options: roster.roster.roles.map((role) => ({ id: role.id, label: role.displayName, recommended: true })),
+              };
+              // A10 在办标记（stage.requested A10；幂等）；失败 fail-closed、不发卡。
+              const appointmentMarker = await markFixedAppointmentCardRequested({
+                projectRoot: input.project.projectRoot,
+                flowId: appointmentFlowId.trim(),
+                rosterSha256: roster.sha256,
+              });
+              if (appointmentMarker !== undefined) {
+                log.record("governance.card.rejected", {
+                  state: "not-presented",
+                  reasonCode: appointmentMarker.code,
+                  ok: false,
+                });
+                return rejectAppointment(`${appointmentMarker.message}；本次未向客户发卡。`);
+              }
+            } else {
+              const rosterCard = validateAppointmentCardAgainstRoster({
+                roster: roster.roster,
+                optionIds: effectiveReq.options.map((option) => option.id),
+                multiple: effectiveReq.multiple === true,
+              });
+              if (!rosterCard.ok) {
+                return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
+              }
+              appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
+              // X-R3（E2 S4）：D3 卡角色侧前置——在既有名单/选项/推荐集/env-bootstrap 校验之后调用
+              // nominator 模块 `preflight.checkAction("appointment", stage:"d3-card")`。事实只取自已校验的
+              // `loadLatestRoster` 产物与 `rosterCard` 结果（严格 api-spec 登记键；`intentEntryConsistent`
+              // 是可选诊断事实且旧路径不校验 ⇒ 不传）。allow 不替代应用/Service 校验；deny 走既有
+              // `appointment-invalid` 回执（`rejectAppointment`），不发卡、不写账本。
+              const nominatorPreflight = builtInRoleModuleOf("nominator")?.preflight;
+              const nominatorFacts = nominationD3CardFacts({
+                roster,
+                multiple: effectiveReq.multiple === true,
+                optionIds: effectiveReq.options.map((option) => option.id),
+                recommendedRoleIds: rosterCard.recommendedRoleIds,
+              });
+              if (nominatorPreflight !== undefined && nominatorFacts !== undefined) {
+                const decision = nominatorPreflight.checkAction({ action: "appointment", facts: nominatorFacts });
+                if (!decision.allow) {
+                  return rejectAppointment(
+                    `招人决定卡未通过人事角色策略前置（诊断码：${decision.code}）；本次未向客户发卡、未写任何记录。`,
+                  );
+                }
               }
             }
             // 2026-10-29（客户追加口径）：D3 卡 preview 必须带上「人员+模块拓扑图」（应用依据已校验名单生成）。
@@ -1606,9 +1678,13 @@ export async function openRoleSession(
             return { outcome: "declined", notPresented: true, reason: appointmentPreviewError };
           }
           // D 批：judgeContext 只从申请上下文构造（无账本/flow 事实）；Q4 A rubric 保留。
+          // T3 B3.1（AC-13）：卡种白名单按本卡实际 flowId 的矩阵判定——fixed 会话的 chief proposal/
+          // appointment 卡同样生成 judgeContext（含推荐集）；legacy 矩阵结果与旧 `cardKindsOf(roleId)`
+          // 逐字一致（缺省 legacy-v1），旧卡路径零变化。
           let judgeMetadata = effectiveMetadata;
-          if (isTrio && cardKind !== undefined && cardKindsOf(trioSpec!.id).includes(cardKind)) {
-            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+          const judgeCardFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+          if (isTrio && cardKind !== undefined && cardKindsOf(trioSpec!.id, await matrixForFlow(judgeCardFlowId)).includes(cardKind)) {
+            const flowId = judgeCardFlowId;
             const judgeAttribution = isGovernanceFlowId(flowId)
               ? flowId
               : isGovernanceFlowId(effectiveMetadata?.intentId)
@@ -1690,15 +1766,36 @@ export async function openRoleSession(
             }
           }
           let intentConfirmation: PreparedIntentConfirmation | undefined;
+          // T3 B3.1（2026-11-10，AC-18/MF-4）：fixed 意图确认卡——run-role 调 `workflowService.prepareIntent`
+          // /`finalizeIntent`（应用算 intent hash/documentRefs/marker、`docs/intents` 校验、`stage.completed`），
+          // **不调用** legacy trunk `prepareIntentConfirmation/finalizeIntentConfirmation`/doc-freeze；
+          // 卡事实（marker/path/sha256/正文）与 legacy 同等语义。legacy 分支逐字不变。
+          let fixedIntentConfirmation: PreparedFixedIntent | undefined;
           // X-R6（E2 S2）：intent-confirm 卡种读 chief 模块卡数据（`CHIEF_INTENT_CONFIRM_CARD.cardKind`）；
           // 其余流程（prepareIntentConfirmation / 冻结 / 标记）仍按 Service 事务与真实客户回执。
           if (isTrio && setup.role.id === "chief" && cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind && effectiveReq.kind === "choice") {
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
-            const prepared = flowId ? await createTrunkService({ projectRoot: input.project.projectRoot }).prepareIntentConfirmation(flowId) : undefined;
-            if (!prepared?.ok) return { outcome: "declined", notPresented: true, reason: prepared && !prepared.ok ? prepared.message ?? prepared.code : "Intent confirmation has no actual flow" };
-            intentConfirmation = prepared.value;
-            effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.value.marker}`,
-              preview: `${effectiveReq.preview ?? ""}\n\n${prepared.value.path}\nsha256: ${prepared.value.sha256}\n\n${prepared.value.text}` };
+            if ((await matrixForFlow(flowId)) === "two-fixed-paths/v1") {
+              // fixed：无 trunk/run。缺 flowId ⇒ 不发卡（无法定位最新意图；fail-closed）。
+              if (typeof flowId !== "string" || flowId.trim() === "") {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: "intent-decision-invalid", ok: false });
+                return { outcome: "declined", notPresented: true, reason: "固定路径意图确认卡缺少 flowId（无法定位最新意图）；本次未向客户发卡。" };
+              }
+              const prepared = await workflowPrepareIntent({ projectRoot: input.project.projectRoot, flowId });
+              if (!prepared.ok) {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: prepared.code, ok: false });
+                return { outcome: "declined", notPresented: true, reason: prepared.message ?? prepared.code };
+              }
+              fixedIntentConfirmation = prepared;
+              effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.marker}`,
+                preview: `${effectiveReq.preview ?? ""}\n\n${prepared.path}\nsha256: ${prepared.sha256}\n\n${prepared.text}` };
+            } else {
+              const prepared = flowId ? await createTrunkService({ projectRoot: input.project.projectRoot }).prepareIntentConfirmation(flowId) : undefined;
+              if (!prepared?.ok) return { outcome: "declined", notPresented: true, reason: prepared && !prepared.ok ? prepared.message ?? prepared.code : "Intent confirmation has no actual flow" };
+              intentConfirmation = prepared.value;
+              effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.value.marker}`,
+                preview: `${effectiveReq.preview ?? ""}\n\n${prepared.value.path}\nsha256: ${prepared.value.sha256}\n\n${prepared.value.text}` };
+            }
           }
           let out = await raw(effectiveReq, judgeMetadata);
           if (isTrio && setup.role.id === "nominator" && cardKind === "appointment") await refreshRoleDraftScope();
@@ -1723,6 +1820,46 @@ export async function openRoleSession(
               await refreshAndInstallVersionedDocFreezeSnapshot(input.project.projectRoot, { migrationCompleted: true });
               out = { ...out, intentConfirmation: { status: "committed" } };
             }
+          }
+          // T3 B3.1（AC-18/§4.2 A3/G-15）：fixed 意图确认最终化——`request.resolved` 由应用通道在裁决时
+          // **一次写入**（含 documentRefs），`finalizeIntent` 只校验该事件并追加 `stage.completed A3`；
+          // 不重写事件、不写 doc-freeze/trunk/CAS。事件缺失/不可读或校验失败 ⇒ 如实 pending-recovery
+          // （与 legacy 冻结失败同语义：真实决定已记录，阶段完成待恢复，不发行任何写权）。
+          if (fixedIntentConfirmation && out?.outcome === "answered" && out.value.selected?.includes("confirm")) {
+            const delegatedRequestId = out.actionSource?.kind === "customer-decision" || out.actionSource?.kind === "chief-delegated"
+              ? out.actionSource.requestId : undefined;
+            const decisionRequestId = typeof out.decisionId === "string" && out.decisionId.startsWith("decision-")
+              ? out.decisionId.slice("decision-".length) : undefined;
+            const requestId = delegatedRequestId ?? decisionRequestId;
+            let resolvedEvent: RequestResolvedEvent | undefined;
+            if (requestId !== undefined) {
+              try {
+                const taskState = await readTaskState(input.project.projectRoot);
+                resolvedEvent = taskState.events.find((event): event is RequestResolvedEvent =>
+                  event.kind === "request.resolved" && event.requestId === requestId);
+              } catch {
+                resolvedEvent = undefined;
+              }
+            }
+            if (resolvedEvent === undefined) {
+              const message = `request.resolved（${requestId ?? "<unknown>"}）账本事件缺失或不可读`;
+              pendingModelNotice = `The actual intent decision was recorded; its fixed workflow A3 completion is pending: ${message}. 请核对账本后按幂等重试。`;
+              log.record("intent.confirmation.fixed-finalize-pending", { path: fixedIntentConfirmation.path, requestId, phase: "pending-recovery", errorCode: "intent-decision-invalid", errorMessage: message });
+              return { ...out, intentConfirmation: { status: "pending-recovery", code: "intent-decision-invalid", message } };
+            }
+            log.record("intent.confirmation.fixed-finalize-start", { path: fixedIntentConfirmation.path, turnId: effectiveMetadata?.turnId, toolCallId: effectiveMetadata?.toolCallId, requestId, phase: "prepared" });
+            const finalized = await workflowFinalizeIntent({
+              projectRoot: input.project.projectRoot,
+              event: resolvedEvent,
+              ...(fixedIntentConfirmation.flowId !== "" ? { flowId: fixedIntentConfirmation.flowId } : {}),
+            });
+            if (!finalized.ok) {
+              pendingModelNotice = `The actual intent decision was recorded; its fixed workflow A3 completion is pending: ${finalized.message ?? finalized.code}. 请按提示修复后重试（幂等）。`;
+              log.record("intent.confirmation.fixed-finalize-pending", { path: fixedIntentConfirmation.path, requestId, phase: "pending-recovery", errorCode: finalized.code, errorMessage: finalized.message });
+              return { ...out, intentConfirmation: { status: "pending-recovery", code: finalized.code, message: finalized.message } };
+            }
+            log.record("intent.confirmation.fixed-finalize-committed", { path: fixedIntentConfirmation.path, requestId, phase: "committed" });
+            out = { ...out, intentConfirmation: { status: "committed" } };
           }
           // 发行「已确认且在边界内」的实际写入路径（D 批无账本；发行器仍按同一份校验）。
           issue(effectiveReq, out ?? null, effectiveMetadata);
@@ -3305,6 +3442,61 @@ function defaultChoiceKindFromModule(
     if (cards.includes("acceptance")) return "acceptance";
   }
   if (looksLikeAppointmentChoice(optionIds) && cards.includes("appointment")) return "appointment";
+  return undefined;
+}
+
+/**
+ * T3 B3.1（2026-11-10，AC-08/AC-13，v1.3 §4.2 A10/MF-9(a)）：fixed 任命卡在办标记。
+ *
+ * A10 只任命确认、不派实现：呈卡前把当前活动 fixed workflow 推进到 `stage.requested A10`
+ * （幂等键 `stage-request:<wf>:A10:1`，requestDigest=名单字节 sha256，requestTaskId=
+ * `appointment-card:<flowId>:<rosterSha12>`——与 `prepareIntent` 的 `stage.requested A3` 同构），
+ * 使 `request.resolved`（appointment，含 `targetRoleIds`/workflowId 戳）后的 `stage.completed A10`
+ * （应用通道/桌面 B3 唯一实现）可按状态机落账，之后 chief 才能发 A11 stage-request。
+ *
+ * **不新增客户门**：无活动 workflow、view 已关闭/blocked、当前不在「A9 已完成 → A10」窗口、
+ * 或 A10 已在办/已完成 ⇒ 不写、照常呈现卡。只有真正尝试写入且失败才返回稳定失败码（fail-closed）。
+ * 全部经 fixed 账本公共原语（`readWorkflowLedger`/`appendWorkflowEvent`/`deriveWorkflowView`/
+ * `canRequestStage`），不复制状态机、不触 legacy trunk/run。
+ */
+async function markFixedAppointmentCardRequested(input: {
+  projectRoot: string;
+  flowId: string;
+  rosterSha256: string;
+  now?: () => Date;
+}): Promise<WorkflowServiceFailure | undefined> {
+  const ledger = await workflowReadLedger(input.projectRoot);
+  const activeIds = [...new Set(ledger.events
+    .filter((event) => event.kind === "workflow.started")
+    .map((event) => event.workflowId))]
+    .filter((workflowId) => !ledger.events.some((event) => event.workflowId === workflowId && event.kind === "workflow.closed"));
+  const workflowId = activeIds.find((id) => ledger.events.some((event) => event.workflowId === id && event.flowId === input.flowId));
+  if (workflowId === undefined) return undefined;
+  const wfEvents = ledger.events.filter((event) => event.workflowId === workflowId);
+  const taskState = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, taskState.events);
+  if (view.closed !== undefined || view.blocked !== undefined) return undefined;
+  // 已到 A10（requested/dispatched/blocked/in-progress/completed）⇒ 在办或已完成，不重复标记。
+  if (view.stage === "A10") return undefined;
+  if (!(view.stage === "A9" && view.stages.A9.status === "completed") || !canRequestStage(view, "A10")) return undefined;
+  const now = input.now ?? (() => new Date());
+  const event: WorkflowEvent = {
+    v: 1,
+    at: now().toISOString(),
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "stage.requested",
+    workflowId,
+    flowId: input.flowId,
+    path: view.path,
+    idempotencyKey: stageRequestIdempotencyKey(workflowId, "A10", 1),
+    stage: "A10",
+    fromStage: "A9",
+    requestTaskId: `appointment-card:${input.flowId}:${input.rosterSha256.slice(0, 12)}`,
+    requestDigest: input.rosterSha256,
+    attempt: 1,
+  };
+  const appended = await workflowAppendEvent(input.projectRoot, event);
+  if (!appended.ok) return { ok: false, code: "workflow-ledger-write-failed", message: `stage.requested A10 写入失败：${appended.message}` };
   return undefined;
 }
 

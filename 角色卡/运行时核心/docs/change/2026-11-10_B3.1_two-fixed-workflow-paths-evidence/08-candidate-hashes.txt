@@ -1,0 +1,27 @@
+== 本批候选（运行时核心 B3.1；只含本角色写集） ==
+
+-- git status --porcelain -- src app test（同时列出并行编排 B3.1 在飞文件，非本候选） --
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts
+?? test/编排/run-role-fixed-b31.test.ts
+
+-- numstat（已跟踪 M） --
+17	0	src/model/runtime.ts
+5	1	src/provider/runtime/schema.ts
+4	0	src/provider/runtime/tools.ts
+
+-- raw SHA-256 / bytes / lines --
+1373f22f65099bbdd355126bbe545a50fcd664df95157de17ed6568b5b7e4cc7  src/model/runtime.ts  248832 bytes  4921 lines
+42e63fbe769cdf1061ee924c5a1f11b17a0176c1e0fa2b01995a6f6db5f3a3ca  src/provider/runtime/schema.ts  152765 bytes  1912 lines
+f98ee51b3095ea5e399a338678ef64c5cf188d2f1e2168fe4aacabbb0aff263a  src/provider/runtime/tools.ts  345274 bytes  5605 lines
+410bd49d6edaa4a893844747e18710299b195c1c199ab693cc8e1266ee3c51c6  test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts  12282 bytes  197 lines
+
+-- 聚合哈希（按路径排序，逐文件串联 path + NUL + sha256 后再 SHA-256；可复算） --
+09dda6d9741dbb381553ca8f8a135ce816296271514583838659366c2d1db5e2
+
+-- 并行批次归属（非本候选；本角色未触碰） --
+M src/pipeline/orchestration/run-role.ts   # 编排 B3.1 在飞（mtime 17:46:42，晚于本批 before/after 测量）
+?? test/编排/run-role-fixed-b31.test.ts     # 编排 B3.1 在飞（mtime 17:47:58）

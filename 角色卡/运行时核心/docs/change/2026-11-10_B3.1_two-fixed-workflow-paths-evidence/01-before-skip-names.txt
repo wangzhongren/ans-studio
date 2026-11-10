@@ -1,0 +1,4 @@
+D3 chmod failure reaches the handler without committing file or mode # SKIP
+D3 handler under strict umask retains existing mode and keeps new files private # SKIP
+D3 sync failure reaches the handler without committing file or mode # SKIP
+D3 write and edit preserve existing ordinary modes and strip special bits # SKIP

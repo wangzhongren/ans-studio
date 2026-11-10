@@ -1,0 +1,2 @@
+开工基线：git status --porcelain -- src app test ⇒ 空（无输出）。
+工作期间出现非本批（并行运行时核心 B3.1）变更：src/model/runtime.ts、src/provider/runtime/schema.ts、src/provider/runtime/tools.ts、test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts；本批未触碰（见 06-write-set-status.txt）。

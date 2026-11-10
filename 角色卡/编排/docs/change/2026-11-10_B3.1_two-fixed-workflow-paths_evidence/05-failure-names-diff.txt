@@ -1,0 +1,8 @@
+== 失败名集合 diff（before vs after）==
+-- after − before --
+-- before − after --
+-- 结论 --
+IDENTICAL：失败名集合逐名一致（24/24）；新增确定性失败=0；新 skip=0（before/after 均 2 skip）；既有失败无消失。
+
+before: tests 1291 / pass 1265 / fail 24 / skipped 2
+after:  tests 1299 / pass 1273 / fail 24 / skipped 2

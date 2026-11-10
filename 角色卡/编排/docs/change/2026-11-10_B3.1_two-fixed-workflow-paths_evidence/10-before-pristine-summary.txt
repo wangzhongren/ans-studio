@@ -1,0 +1,9 @@
+== 纯净 HEAD（d60d02c）解包 test/编排 ==
+命令：node --test --test-concurrency=1 --test-force-exit --test-reporter=tap "test/编排/**/*.test.ts"
+结果：# tests 1291 / pass 1265 / fail 24 / skipped 2
+
+== 失败名集合对照 ==
+pristine − worktree-before：0
+worktree-before − after：0（24 名逐名一致）
+
+结论：纯净 HEAD 基线、工作树 before、after 三方失败名集合完全一致（24 known-red）；本批新增确定性失败=0、新 skip=0。

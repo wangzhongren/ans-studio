@@ -48,8 +48,12 @@ function directCapabilityDescription(name: string): ToolDescription | undefined 
       targetTrunk: commit, mode: { type: "string", enum: [...RUN_CHANGE_MODES] }, reason }),
       description: "仅策划 rapporteur 显式选择冻结run时机。continue-frozen只登记；stop/restart由应用核停稳与权限，不回滚文档或自动重pin。" },
     complete_team_plan: { parameters: object({ operationId: text, flowId: text, runId: text, baseDigest: digest,
+      // T3 B3.1（v1.3 §5.1 `complete_team_plan` v4）：fixed 路径 workflowId——可选属性；fixed 模式必需、
+      // 权威值由应用按当前真实受派任务绑定（模型自报仅为断言），legacy 不要求/不消费。共享 schema 的
+      // required 仍为 legacy 原三项（旧必填逐字不变）；模式差异由 handler/应用按实际模式核验。
+      workflowId: { ...text, maxLength: 200 },
       plan: object({ path, sha256: digest, version: { type: "integer", minimum: 1 } }, ["path", "version"]) }, ["operationId", "flowId", "plan"]),
-      description: "仅运营 convener/schedule 直接完成团队计划；baseDigest（effective trunk manifest digest）与 plan.sha256（计划实际字节 SHA-256）由应用派生，可省略，给出时必须与实际值匹配（断言）；未知/不可读/漂移一律拒绝。runId 由应用按当前实际受派任务绑定，勿猜。应用重核属主、写集与依赖，不代替D3任命。" },
+      description: "仅运营 convener/schedule 直接完成团队计划；baseDigest（effective trunk manifest digest）与 plan.sha256（计划实际字节 SHA-256）由应用派生，可省略，给出时必须与实际值匹配（断言）；未知/不可读/漂移一律拒绝。runId 由应用按当前实际受派任务绑定，勿猜。应用重核属主、写集与依赖，不代替D3任命。应用按实际工作流模式核验字段：未启用固定路径时 runId/baseDigest 为 legacy 兼容字段（语义逐字不变）；固定路径模式（由编排启用后）要求 workflowId（由应用按当前真实受派任务绑定，模型自报仅为断言、不被采信），且 runId/baseDigest 出现即由应用拒绝（baseline-legacy-field-forbidden）。" },
     activate_role_documents: { parameters: object({ operationId: text, flowId: text, planRef: snapshot,
       d3DecisionId: text, rosterRef: snapshot, targetRoleId: text,
       documents: object({ card: file, boundaryMd: file, boundaryYaml: file }),

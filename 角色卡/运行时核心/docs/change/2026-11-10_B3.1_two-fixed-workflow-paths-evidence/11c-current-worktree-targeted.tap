@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+ok 1 - complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+  ---
+  duration_ms: 1.9167
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传
+ok 2 - complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传
+  ---
+  duration_ms: 1.1878
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+ok 3 - complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+  ---
+  duration_ms: 0.3543
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+ok 4 - complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+  ---
+  duration_ms: 0.2975
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+ok 5 - complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+  ---
+  duration_ms: 0.4293
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+ok 6 - complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+  ---
+  duration_ms: 0.3093
+  type: 'test'
+  ...
+# Subtest: complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+ok 7 - complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+  ---
+  duration_ms: 0.2286
+  type: 'test'
+  ...
+# Subtest: RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+ok 8 - RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+  ---
+  duration_ms: 0.1154
+  type: 'test'
+  ...
+# Subtest: request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+ok 9 - request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+  ---
+  duration_ms: 0.1074
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 262.1833

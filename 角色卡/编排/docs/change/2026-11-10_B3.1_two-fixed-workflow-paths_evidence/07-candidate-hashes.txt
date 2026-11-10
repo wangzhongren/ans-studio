@@ -1,0 +1,14 @@
+== B3.1 编排写集候选（raw SHA-256 / bytes / lines）==
+d29d4e6f5b00df3e43f80345900a9cf265dad60967f7db56a0be247a9b85008b  bytes=268944  lines=4104  src/pipeline/orchestration/run-role.ts
+d19a8be065257930e141fa28e22570dde89cfb0c4a7e6b982d2760b79d1c6f63  bytes=31957  lines=749  test/编排/run-role-fixed-b31.test.ts
+
+== git numstat（相对 HEAD）==
+229	37	src/pipeline/orchestration/run-role.ts
+(new test file: 749 lines, untracked)
+
+== 聚合哈希（路径排序后逐行 path:sha256 连接再 SHA-256）==
+465435ee0650d45a65ab608ea9a5b29fca585eb47a5dca4520646d9c1a14a6a4
+
+== 聚合输入 ==
+src/pipeline/orchestration/run-role.ts:d29d4e6f5b00df3e43f80345900a9cf265dad60967f7db56a0be247a9b85008b
+test/编排/run-role-fixed-b31.test.ts:d19a8be065257930e141fa28e22570dde89cfb0c4a7e6b982d2760b79d1c6f63

@@ -1,0 +1,25 @@
+== 写集外 diff=0 核对（本角色 B3.1） ==
+
+-- app/**（桌面） --
+(空=零 diff)
+
+-- src/common/**（编排/角色模块/门禁引擎/gates/shared） --
+(空=零 diff)
+
+-- src/service/** --
+(空=零 diff)
+
+-- src/model/role.ts（门禁引擎） --
+(空=零 diff)
+
+-- src/pipeline/orchestration/run-role.ts（编排写集；并行批次在飞，本角色未改） --
+ M src/pipeline/orchestration/run-role.ts
+
+-- package.json / package-lock.json（无新依赖） --
+(空=零 diff)
+
+-- 本角色写集文件（恰好 4 个） --
+ M src/model/runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts

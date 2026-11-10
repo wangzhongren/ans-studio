@@ -1544,6 +1544,15 @@ export interface RequestResolvedEvent extends TaskStateEventBase {
   workflowId?: string;
   stage?: WorkflowStage;
   /**
+   * T3 B3.1（2026-11-10，v1.3 §8.3 / B1 AC-13）：fixed 任命卡（A10）裁决的**冻结来源字面戳**。
+   * - 只允许冻结字面 `"stage-a10"`（不放宽其它值）；应用在写入 fixed appointment 决议时原样落账，
+   *   不信任模型/判断 agent 自报。
+   * - 旧事件/legacy 决议**无此字段**（兼容读取；不得把缺省当任何具体来源）。
+   * - legacy D3 读取方不接受带此字段的 fixed 决议作为 D3 证据（隔离由桌面/编排的 roster 戳与
+   *   workflowId 扫描实现；本字段只承载事实，不改变既有读取路径）。
+   */
+  source?: "stage-a10";
+  /**
    * 2026-10-29（方案 v2.1 §5.4，F3）：仅 appointment（D3 招人）卡——名单 frontmatter `version` 与
    * 名单文件字节 sha256（应用计算，模型不可自报）。M11 用它判断旧 D3 是否仍对应最新名单。
    */
@@ -3147,6 +3156,14 @@ export type SelectRunChangeFn = (input: SelectRunChangeInput, signal?: AbortSign
 export interface CompleteTeamPlanInput {
   operationId: string;
   flowId: string;
+  /**
+   * T3 B3.1（2026-11-10，v1.3 §5.1 `complete_team_plan` v4）：fixed 路径的 workflowId。
+   * - fixed 模式**必需**：权威值由应用按当前真实受派任务绑定（宿主可信身份），模型自报仅为断言、
+   *   不被采信；legacy 模式不要求、不消费（旧形状逐字合法）。
+   * - `runId`/`baseDigest` 是 **legacy 字段**：fixed 路径出现即由应用服务拒绝
+   *   （`baseline-legacy-field-forbidden`；由服务/编排校验，本层不代做业务判定）。
+   */
+  workflowId?: string;
   runId?: string;
   baseDigest?: string;
   plan: { path: string; sha256?: string; version: number };

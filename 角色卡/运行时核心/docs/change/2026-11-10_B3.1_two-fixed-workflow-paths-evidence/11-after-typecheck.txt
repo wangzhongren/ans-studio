@@ -1,0 +1,5 @@
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+exit=0（17:50 实测；工作树含并行编排 B3.1 在飞改动）

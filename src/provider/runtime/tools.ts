@@ -4519,6 +4519,10 @@ function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContex
   type DirectInvoke = (input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
   const entries: { name: string; roles: readonly string[]; legacy?: DirectInvoke; fixed?: DirectInvoke }[] = [
     { name: SELECT_RUN_CHANGE_TOOL_NAME, roles: ["rapporteur"], ...(options.selectRunChange && { legacy: (input, signal) => options.selectRunChange!(input as unknown as SelectRunChangeInput, signal) }) },
+    // T3 B3.1（v1.3 §5.1 `complete_team_plan` v4）：fixed 形状 `{operationId,flowId,workflowId,plan}` 与
+    // legacy 形状共用同一注入位；本层只按共享 schema 做形状校验并**原样透传**（不派生/不改写 workflowId，
+    // 不代做 runId/baseDigest 的 fixed 拒绝——权威 workflowId 绑定与 `baseline-legacy-field-forbidden`
+    // 均由应用服务/编排按实际模式执行）。legacy 输入面（required/旧字段/回执）逐字不变。
     { name: COMPLETE_TEAM_PLAN_TOOL_NAME, roles: ["convener"], ...(options.completeTeamPlan && { legacy: (input, signal) => options.completeTeamPlan!(input as unknown as CompleteTeamPlanInput, signal) }) },
     // T3 B2（MF-IR-3）：fixed 依赖存在时以 fixed 为准（纵深防御；legacy 会话不注入 fixed）。
     { name: ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, roles: ["nominator"],
