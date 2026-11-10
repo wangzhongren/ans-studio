@@ -1,0 +1,2 @@
+--- outside write set (should be empty) ---
+--- end ---

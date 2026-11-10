@@ -1,0 +1,5 @@
+record: 角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md
+a2340256e93aa0318a3ef03726215d5b56a9855d547b85fe60376ea325dcbb38 *角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md
+  247 19974 角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md
+
+candidate aggregate: aggregate:f01f9fb5ea37349dd085d10a68e495735d406b72b8ae062669521064cf3fb0a2

@@ -15,16 +15,19 @@
 //   `matchReadonlyGit` 命中**且**入口不是 `start_background_task` ⇒ pass；其余 Git 维持硬拒
 //   （`shell-write-hard-deny`）。本守卫与分类器**共用同一 matcher 函数引用**（防「只改分类器、
 //   写守卫仍拒」的经典陷阱）。
+//   2026-11-10（B4/v5）：同一原则延伸至任务级 Git 写——`matchTaskGit` 命中（需应用注入
+//   `taskGitScope`）且前台 ⇒ pass（形状级）；staged ⊆ writeSet 与提交由 `task-git-gate.ts::
+//   runTaskGitCommit` 在同一项目级临界区内复核。无 scope 的 add/commit 仍硬拒。
 //   ★ 硬地板依赖：**接 (a) 的装配路径（项目三层链 / 内置角色审批档）必须注入本守卫**——因为
 //     classifier 的 `deny` 在 advisory/operatorOnly+approveDeny 模式下会交 (a) 审批，不能当硬地板；
 //     只读档不接 (a)、classifier `c=deny` 即终结，不依赖本守卫（R5/AC-30）。
-//   ★ 后台入口不享受只读 Git 放行（AC-22）；`entry` 缺省按前台处理（既有调用方兼容）。
+//   ★ 后台入口不享受只读/任务级 Git 放行（AC-22）；`entry` 缺省按前台处理（既有调用方兼容）。
 
 import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import type { DocFreezeLookupState, StableWritePermit } from "../../model/version-change.ts";
 import path from "node:path";
-import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchReadonlyGit, matchRoutineShellCommand } from "./classify-shell.ts";
+import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchReadonlyGit, matchRoutineShellCommand, matchTaskGit, type TaskGitScope } from "./classify-shell.ts";
 import {
   isVersionedDocPath,
   protectedVersionedPathsSync,
@@ -69,6 +72,14 @@ export interface ShellWriteGuardInput {
    * start_background_task 两条路径分别传入真实入口）。
    */
   entry?: "run_shell" | "start_background_task";
+  /**
+   * v5（2026-11-10，B4；T3 方案 §6.2/§6.3）：固定路径**任务级 Git 写事实**（应用注入，
+   * 模型不可自报；A 路径 = 团队计划 writesets，B 路径 = B2 派生写集）。
+   * 命中 `matchTaskGit`（`git add <literal ⊆ writeSet>` / `git commit -m`）且入口非后台 ⇒ pass
+   * （形状级；staged ⊆ writeSet 与提交仍由 `task-git-gate.ts::runTaskGitCommit` 在临界区内复核）。
+   * 缺省/非法 ⇒ 裸 Git 写维持硬拒（v4 行为不变）。
+   */
+  taskGitScope?: TaskGitScope;
 }
 
 /** stable 文件路径出现在命令文本（opaque/ambiguous/脚本审查前）——写能力命令提及即拒（C7）。 */
@@ -565,15 +576,23 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
 
   if (program !== "") {
     if (program === "git") {
-      // 2026-11-08（W3-G）：只读 Git 精确白名单命中（与分类器同一函数引用）且**非后台入口** ⇒ pass；
-      // 其余 Git 一律硬拒。接 (a) 的装配路径必须注入本守卫（classifier deny 在 advisory/operatorOnly
-      // 下可交 (a)，不是硬地板）；只读档不接 (a)、c=deny 即终结（R5）。
+      // 2026-11-08（W3-G）/ 2026-11-10（v5）：只读 Git 精确白名单命中（与分类器同一函数引用）且**非后台入口**
+      // ⇒ pass；v5 追加固定路径任务级写（`matchTaskGit`，同样与分类器同一函数引用）——
+      // `git add <literal ⊆ writeSet>` / `git commit -m` 形状级放行（staged 内容与临界区由
+      // `task-git-gate.ts::runTaskGitCommit` 复核）。其余 Git（push/merge/reset/…）一律硬拒。
+      // 接 (a) 的装配路径必须注入本守卫（classifier deny 在 advisory/operatorOnly 下可交 (a)，不是硬地板）；
+      // 只读档不接 (a)、c=deny 即终结（R5）。
       const readonlyGit = matchReadonlyGit(argv);
       if (readonlyGit !== undefined && input.entry !== "start_background_task") return { kind: "pass" };
+      const taskGit = matchTaskGit(argv, input.taskGitScope);
+      if (taskGit !== undefined && input.entry !== "start_background_task") return { kind: "pass" };
+      const taskGitShaped = taskGit !== undefined || (argv[1] === "add" || argv[1] === "commit");
       return { kind: "deny", code: "shell-write-hard-deny", targets: [],
-        reason: readonlyGit !== undefined
-          ? "只读 Git 仅允许经 run_shell 前台执行；start_background_task 入口一律拒绝，请改用前台只读命令。"
-          : "裸 Git 硬拒：只读精确白名单之外可能执行仓库 fsmonitor/alias/外部配置；必须使用受控 git_query / git_candidate / git_publish，shell批准不能覆盖Git角色拒绝。" };
+        reason: readonlyGit !== undefined || taskGit !== undefined
+          ? "只读/任务级 Git 仅允许经 run_shell 前台执行；start_background_task 入口一律硬拒，请改用前台命令（legacy 受控入口 git_query 不承接 shell 写）。"
+          : taskGitShaped
+            ? "任务级 Git 写被硬拒：需应用注入有效 taskGitScope（taskId/workflowId/branch/writeSet）且路径 ⊆ 写集；裸 Git 写不得绕过任务写事实（fail-closed；legacy git_query 不承接 fixed shell 写）。"
+            : "裸 Git 硬拒：只读精确白名单与任务级 add/commit 之外一律拒绝（push/merge/reset/checkout/update-ref 等）；legacy git_query / git_candidate / git_publish 工具 fixed 不注入，shell 批准不能覆盖 Git 角色拒绝。" };
     }
     // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
     const inlineEvalPrograms = new Set(["eval", "exec", "source", "command", "."]);

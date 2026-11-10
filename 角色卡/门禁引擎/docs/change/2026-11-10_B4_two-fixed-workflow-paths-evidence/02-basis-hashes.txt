@@ -1,0 +1,11 @@
+HEAD ce3d56e8396756cb80c22609613e6139cb19fe15 (feat(desktop): B3.1 auto-present customer-only merge-main and A10 source stamp)
+分支 feat/two-fixed-workflow-paths
+
+依据（写盘实测）：
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+08e017269c86d92b68e83c25377ccdf7e86d352391a285b635d9a517b48ca571 *角色卡/门禁引擎/docs/design/2026-11-10_interface-review_two-fixed-workflow-paths.md
+   197 docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+  1392 docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+   344 角色卡/门禁引擎/docs/design/2026-11-10_interface-review_two-fixed-workflow-paths.md
+  1933 total
