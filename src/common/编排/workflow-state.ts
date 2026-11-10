@@ -216,6 +216,10 @@ function applyWorkflowEvent(view: WorkflowView, event: WorkflowEvent): string | 
       view.status = "completed";
       // A9 完成事件可携带 basis 引用（cause.kind = "basis-recorded"），投影只读记录。
       if (event.stage === "A9" && event.cause.kind === "basis-recorded") view.basisId = event.cause.ref;
+      // B3（AC-22/§4.5）：A13/B4 由 `release.merged` 完成时记录 releaseId（与 release 账本对齐）。
+      if ((event.stage === "A13" || event.stage === "B4") && event.cause.kind === "release-merged") {
+        view.releaseId = event.cause.ref;
+      }
       return undefined;
     }
     case "stage.blocked": {
@@ -317,6 +321,8 @@ function applyWorkflowEvent(view: WorkflowView, event: WorkflowEvent): string | 
       view.stopping = false;
       view.status = event.outcome === "failed" ? "failed" : "completed";
       view.blocked = undefined;
+      // B3：交付关闭（release.merged → workflow.closed delivered）记录 releaseId，供 project_state 展示。
+      if (event.releaseId !== undefined) view.releaseId = event.releaseId;
       return undefined;
     }
   }

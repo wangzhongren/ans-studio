@@ -1,0 +1,19 @@
+# 06 write-set boundary evidence (B3 编排)
+
+## git status --porcelain -- src app test (本批写集；应恰为 6 文件)
+ M src/common/编排/workflow-service.ts
+ M src/common/编排/workflow-state.ts
+?? test/编排/acceptance-archive.test.ts
+?? test/编排/baseline-service.test.ts
+?? test/编排/path-b-baseline.test.ts
+?? test/编排/release-merge.test.ts
+
+## forbidden dirs diff (src/model src/provider src/common/roles src/common/门禁引擎 src/common/gates app) — 应为空
+
+## package.json / package-lock.json diff — 应为空
+
+## 本批记录文件（记录 + 证据目录）
+?? 角色卡/编排/docs/change/2026-11-10_B3_two-fixed-workflow-paths.md
+?? 角色卡/编排/docs/change/2026-11-10_B3_two-fixed-workflow-paths_evidence/
+
+## 说明：git status 全仓存在会话开始前即有的其它角色未跟踪文档；本批未写入其它角色路径。

@@ -25,7 +25,14 @@ import type {
   BasisDocumentRef,
   BasisEvent,
   BasisTeamPlanRef,
+  ReleaseConfirmedEvent,
   ReleaseEvent,
+  ReleaseFailedEvent,
+  ReleaseFileChange,
+  ReleaseMergeKind,
+  ReleaseMergedEvent,
+  ReleaseRejectedEvent,
+  ReleaseRequestedEvent,
   RequestResolvedEvent,
   TaskClosedOutcome,
   TaskStateEvent,
@@ -48,7 +55,11 @@ import {
   isWorkflowPath,
   isWorkflowStage,
 } from "../../model/runtime.ts";
-import { TRUNK_MANIFEST_SCHEMA } from "../../model/trunk.ts";
+import type { BoundaryEntry } from "../../model/boundary.ts";
+import type { GitOid } from "../../model/trunk.ts";
+import { TRUNK_MANIFEST_SCHEMA, isGitOid } from "../../model/trunk.ts";
+import { parseBoundarySection1 } from "../门禁引擎/boundary-parse.ts";
+import { parseBoundaryYaml } from "../门禁引擎/boundary-yaml.ts";
 import {
   DEFAULT_JSONL_MAX_BYTES,
   DEFAULT_JSONL_ROTATIONS,
@@ -1941,8 +1952,16 @@ export interface RecordBasisInput {
   /** 团队计划路径 `docs/scheduling/<flowId>-team-vN.md`（baseline 必填；path-b 忽略）。 */
   planPath?: string;
   planVersion?: number;
+  /** 声明即断言（v1.3 §5.1 `plan.sha256`；不一致 ⇒ `baseline-plan-hash-drift`）。 */
+  planSha256?: string;
   repo?: WorkflowRepoSnapshot;
   reason?: "baseline" | "path-b";
+  /**
+   * B3：基线/路径 B 的最小 Git 准备端口（git init/.gitignore+baseline commit/任务分支/dirty）。
+   * 注入后在文档校验通过、`basis.recorded` 写入之前执行（v1.3 §5.2/§4.3 MF-12）；
+   * 缺省 = 只读记录（B1 兼容；调用方须自行提供 `repo` 快照）。
+   */
+  port?: BaselineGitPort;
   now?: () => Date;
 }
 
@@ -1950,6 +1969,10 @@ export interface RecordBasisReceipt {
   basisId: string;
   reviewRoleId: string;
   documents: BasisDocumentView[];
+  /** baseline 团队计划事实（path-b 为 undefined）；应用回执用。 */
+  teamPlan?: { path: string; version: number; sha256: string };
+  /** B3：注入端口时的 Git 准备回执（state/branch/headOid/gitignoreSha256/…）。 */
+  git?: BaselineGitReceipt;
   replay: boolean;
   stageCompleted: boolean;
 }
@@ -2052,7 +2075,8 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
       event.kind === "basis.recorded" && event.workflowId === input.workflowId);
     if (!priorBasis) {
       const a9 = view.stages.A9.status;
-      if (view.stage !== "A9" || (a9 !== "requested" && a9 !== "dispatched" && a9 !== "in-progress")) {
+      // B3/AC-16：失败事件 stage.blocked A9 后允许同阶段重试（blocked 不计为终态；不猜完成）。
+      if (view.stage !== "A9" || (a9 !== "requested" && a9 !== "dispatched" && a9 !== "in-progress" && a9 !== "blocked")) {
         return serviceFailure("stage-transition-invalid", `A9 基线非法：当前 ${view.stage}(${view.stages[view.stage].status})；要求 A9 在办。`);
       }
     }
@@ -2089,6 +2113,14 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
       return serviceFailure("baseline-document-missing", `团队计划不可读：${planPath}。`);
     }
     planSha = sha256Of(Buffer.from(planText, "utf8"));
+    if (input.planSha256 !== undefined) {
+      if (!isSha256Hex(input.planSha256)) {
+        return serviceFailure("baseline-identity-invalid", "plan.sha256 形状非法（须 64 hex）。");
+      }
+      if (input.planSha256 !== planSha) {
+        return serviceFailure("baseline-plan-hash-drift", `plan.sha256 声明值与实际字节不一致：${planPath}。`);
+      }
+    }
     if (!roster.ok) return serviceFailure("baseline-roster-drift", `A9 基线需要合法名单：${roster.reason}`);
     const modules = await latestModulesRef(input.projectRoot, flowId);
     if (modules === undefined) {
@@ -2118,12 +2150,41 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
   const idempotencyKey = reason === "baseline"
     ? `baseline:${input.workflowId}:${read.teamPlan?.sha256 ?? "none"}`
     : `path-b:${input.workflowId}:${sha256Of(JSON.stringify(read.documents)).slice(0, 24)}`;
+  // AC-16 `baseline-operation-conflict`：同 operationId 指向不同幂等键（内容不同）⇒ 冲突拒绝；
+  // 同幂等键重复 ⇒ 下方 append replay 返回原回执。
+  const priorOperation = (await readBasisLedger(input.projectRoot)).events.find((event) =>
+    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+    && event.workflowId === input.workflowId
+    && event.operationId === input.operationId
+    && event.idempotencyKey !== idempotencyKey);
+  if (priorOperation !== undefined) {
+    return serviceFailure(
+      "baseline-operation-conflict",
+      `operationId ${input.operationId} 已用于不同的基线内容（${priorOperation.idempotencyKey}）；请用新 operationId 重试。`,
+    );
+  }
+  // B3（§5.2/§4.3 MF-12）：注入端口时在文档校验通过之后、basis.recorded 写入之前执行最小 Git 准备
+  // （git init -b main / ans-managed `.gitignore` + baseline commit / 任务分支 / dirty 判定）。
+  // 失败即 fail-closed（真实原因码），不写 basis、不产生客户卡；path-b 不自动 init（b-repository-required）。
+  let repoSnapshot = input.repo;
+  let gitReceipt: BaselineGitReceipt | undefined;
+  if (input.port !== undefined) {
+    const prepared = await prepareBaselineGit({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      reason,
+      port: input.port,
+    });
+    if (!prepared.ok) return prepared;
+    repoSnapshot = prepared.repo;
+    gitReceipt = prepared.receipt;
+  }
   const recorded = buildBasisRecordedEvent({
     workflowId: input.workflowId,
     flowId,
     documents: read.documents,
     teamPlan: reason === "baseline" ? (read.teamPlan ?? null) : null,
-    ...(input.repo !== undefined ? { repo: input.repo } : {}),
+    ...(repoSnapshot !== undefined ? { repo: repoSnapshot } : {}),
     reviewRoleId,
     operationId: input.operationId,
     idempotencyKey,
@@ -2165,6 +2226,10 @@ export async function recordBasis(input: RecordBasisInput): Promise<RecordBasisR
     basisId,
     reviewRoleId,
     documents: read.documents.map((doc) => ({ ...doc })),
+    ...(read.teamPlan !== undefined
+      ? { teamPlan: { path: read.teamPlan.path, version: read.teamPlan.version, sha256: read.teamPlan.sha256 } }
+      : {}),
+    ...(gitReceipt !== undefined ? { git: gitReceipt } : {}),
     replay: appended.replay,
     stageCompleted,
   };
@@ -2225,6 +2290,11 @@ export type ArchiveAcceptanceResult =
   | { ok: true; path: string; sha256: string; version: number; replay: boolean }
   | WorkflowServiceFailure;
 
+/** A12 归档幂等键（AC-20：`acceptance:<workflowId>:<reportSha>`；应用独占写）。 */
+export function acceptanceIdempotencyKey(workflowId: string, reportSha256: string): string {
+  return `acceptance:${workflowId}:${reportSha256}`;
+}
+
 /**
  * A12 应用归档：生成 `docs/acceptance/<flowId>-acceptance-vN.md`（N 随 report 版本）；
  * 幂等 `acceptance:<workflowId>:<reportSha>`（文件已含同一 report hash ⇒ replay，不覆盖）；
@@ -2247,6 +2317,7 @@ export async function archiveAcceptance(input: ArchiveAcceptanceInput): Promise<
   if (!report.ok) return serviceFailure("acceptance-record-invalid", `report 不可读：${input.reportPath}。`);
   const relPath = `docs/acceptance/${flowId}-acceptance-v${version}.md`;
   const abs = path.join(input.projectRoot, ...relPath.split("/"));
+  const archiveKey = acceptanceIdempotencyKey(input.workflowId, report.sha256);
   const body = [
     "---",
     `flowId: ${flowId}`,
@@ -2255,6 +2326,7 @@ export async function archiveAcceptance(input: ArchiveAcceptanceInput): Promise<
     `criteriaSha256: ${criteria.sha256}`,
     `report: ${input.reportPath}`,
     `reportSha256: ${report.sha256}`,
+    `idempotencyKey: ${archiveKey}`,
     `conclusion: ${JSON.stringify(input.conclusion)}`,
     ...(input.staffDecision !== undefined ? [`staffDecision: ${JSON.stringify(input.staffDecision)}`] : []),
     `archivedAt: ${now().toISOString()}`,
@@ -2271,7 +2343,7 @@ export async function archiveAcceptance(input: ArchiveAcceptanceInput): Promise<
   ].join("\n");
   try {
     const existing = await fs.readFile(abs, "utf8");
-    if (existing.includes(`reportSha256: ${report.sha256}`)) {
+    if (existing.includes(`reportSha256: ${report.sha256}`) || existing.includes(`idempotencyKey: ${archiveKey}`)) {
       return { ok: true, path: relPath, sha256: sha256Of(Buffer.from(existing, "utf8")), version, replay: true };
     }
     return serviceFailure("acceptance-archive-failed", `归档 ${relPath} 已存在且 report hash 不同；不覆盖（fail-closed）。`);
@@ -2392,3 +2464,1528 @@ export async function confirmStop(input: ConfirmStopInput): Promise<ConfirmStopR
   if (!appended.ok) return serviceFailure("workflow-ledger-write-failed", `workflow.closed 写入失败：${appended.message}`);
   return { ok: true, workflowId: input.workflowId, outcome, reason: input.reason, eventId: appended.event.idempotencyKey, replay: appended.replay };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+// T3 B3：发布合并 / 验收归档查询 / 基线-路径B 准备与写集派生（2026-11-10，编排）
+//
+// 依据：实现级方案 v1.3 §6.4（合并 main）、§8.4（merge-main 高风险卡）、§5.1–§5.5（基线 3 件小事）、
+// §4.3（路径 B 最小准备与 B3 写集派生）、§4.5（A13/B4 完成）；G-IR **MF-IR-8**（不新增
+// `requestReleaseMerge`；应用自有自动呈卡/UI 动作）；B1 验收 AC-09/AC-10/AC-11/AC-14/AC-15/AC-16/
+// AC-20/AC-22、T-07/T-10/T-11/T-12/T-15。
+//
+// 纪律：
+//  · merge-main 是**应用自有非判断卡**：本段只提供应用服务（前置校验 / preview 事实 / 账本事件 /
+//    客户本人确认校验 / 固定 argv 执行端口），不新增角色工具、不进 judge 分组、不提供 judge 代批。
+//  · `release.confirmed.by` 只能 "customer"；judge 只能 `release.rejected`（转人工/拒绝）。
+//  · 不 push / tag / 发布产物：端口只有本地 inspect/preview/mergeMain；冲突只 `merge --abort` 回任务分支，
+//    不 force/reset/clean。
+//  · 基线/路径 B 的真实 Git 由桌面 B3 注入 `BaselineGitPort`/`ReleaseGitPort`（固定 argv/sanitized env）；
+//    服务层负责顺序、前置、幂等与账本；失败不产生客户卡。
+// ══════════════════════════════════════════════════════════════════════════════════════════════════
+
+// —————————————— 发布合并（AC-11/AC-14/AC-22/T-10；MF-IR-8） ——————————————
+
+/** merge-main 高风险提示（preview 必含；AC-14）。 */
+export const HIGH_RISK_MERGE_NOTES: readonly string[] = Object.freeze([
+  "合并 main 属发布高风险动作：必须客户本人在 merge-main 卡确认；judge 只能转人工/拒绝，不得代批。",
+  "只做本地合并（应用固定 argv，不经 shell）：不 push、不打 tag、不发布产物；push/tag 需客户逐次授权。",
+  "合并会把任务分支变更整体带入 main；请在预览中核对 base OID、tip OID、文件数与 diff stat。",
+]);
+
+/** 任务分支名（`ans/task/<workflowId>`；v1.3 §6.1）。 */
+export function taskBranchName(workflowId: string): string {
+  return `ans/task/${workflowId}`;
+}
+
+/** 逻辑幂等键（v1.3 §6.4：`release:<workflowId>:<tipOid>`；重复调用返回原 release 回执）。 */
+export function releaseIdempotencyKey(workflowId: string, tipOid: GitOid): string {
+  return `release:${workflowId}:${tipOid.hex}`;
+}
+
+/** 发布 releaseId（确定性；无时钟/随机）。 */
+export function releaseIdFor(workflowId: string, tipOid: GitOid): string {
+  return `rel-${sha256Of(`release:${workflowId}:${tipOid.hex}`).slice(0, 24)}`;
+}
+
+/** 单事件幂等键（requested/confirmed/rejected/merged/failed 各一；同键重复 append ⇒ replay）。 */
+export function releaseEventIdempotencyKey(
+  kind: "requested" | "confirmed" | "rejected" | "merged" | "failed",
+  workflowId: string,
+  tipOid: GitOid,
+  suffix?: string,
+): string {
+  return `release-${kind}:${workflowId}:${tipOid.hex}${suffix !== undefined ? `:${suffix}` : ""}`;
+}
+
+/** 仓库事实（应用 Git 端口读取；模型不可自报；不 push/tag）。 */
+export interface WorkflowGitRepositoryFacts {
+  /** 当前分支（发布前置要求 = `ans/task/<workflowId>`）。 */
+  branch: string;
+  /** 当前分支 HEAD（任务分支 tip，应用实际读取）。 */
+  headOid: GitOid;
+  /** main tip；main unborn ⇒ null（`mergeKind:"initial"`）。 */
+  mainOid: GitOid | null;
+  objectFormat: "sha1" | "sha256";
+  /** tracked 修改/删除数（0 = clean；治理文档被 `.gitignore` 忽略不计）。 */
+  trackedChanges: number;
+  /** 非忽略 untracked 路径（`.gitignore` 过滤后）。 */
+  untracked: string[];
+  /** `.gitignore` 当前字节 SHA-256（不存在 ⇒ null；与 basis.repo 记录比对）。 */
+  gitignoreSha256: string | null;
+  /** `.gitignore` 被跟踪且有未提交修改（`baseline-gitignore-dirty`）。 */
+  gitignoreTrackedDirty: boolean;
+}
+
+/** 发布合并 Git 端口（桌面 B3 注入真实实现；测试注入 fake）。**只做本地操作。** */
+export interface ReleaseGitPort {
+  /** 只读仓库事实（分支/HEAD/main/dirty/.gitignore hash）。 */
+  inspectRepository(request: { projectRoot: string }): Promise<
+    { ok: true; facts: WorkflowGitRepositoryFacts } | WorkflowServiceFailure
+  >;
+  /** 只读预览：base=main OID（unborn ⇒ 空树）↔ tip=任务分支 tip 的文件/diff stat。 */
+  previewMerge(request: { projectRoot: string; mainOid: GitOid | null; tipOid: GitOid }): Promise<
+    | { ok: true; files: ReleaseFileChange[]; fileCount: number; diffStat: string; diffDigest: string }
+    | WorkflowServiceFailure
+  >;
+  /**
+   * 本地合并（固定 argv/sanitized env；**不 push/tag**）：
+   * main unborn ⇒ `git switch -c main <tipOid>`/update-ref（`mergeKind:"initial"`）；
+   * main 存在 ⇒ switch main + `git merge --no-ff <branch>`；冲突 ⇒ `git merge --abort` + 切回任务分支后
+   * 返回 `release-merge-conflict`（不 force/reset/clean）；占用/切换失败 ⇒ `release-main-busy`。
+   */
+  mergeMain(request: {
+    projectRoot: string;
+    workflowId: string;
+    flowId: string;
+    branch: string;
+    baseOid: GitOid | null;
+    tipOid: GitOid;
+    mergeKind: ReleaseMergeKind;
+  }): Promise<ReleaseGitMergeOutcome>;
+}
+
+export type ReleaseGitMergeOutcome =
+  | {
+      ok: true;
+      mergeKind: ReleaseMergeKind;
+      baseOid: GitOid | null;
+      tipOid: GitOid;
+      mergeOid: GitOid;
+      files: ReleaseFileChange[];
+      diffDigest: string;
+    }
+  | WorkflowServiceFailure;
+
+/** `merge-main` preview（AC-14：workflowId/flowId、main base OID、branch tip OID、文件数、diff stat、合并方式、高风险提示）。 */
+export interface ReleaseMergePreview {
+  workflowId: string;
+  flowId: string;
+  releaseId: string;
+  mainBaseOid: GitOid | null;
+  branchTipOid: GitOid;
+  /** 任务分支基点 OID（basis.repo.baseOid；路径 B 可能基于非 main HEAD——AC-22/G-2 披露）。 */
+  branchBaseOid: string | null;
+  /** 分支基点 ≠ main base ⇒ true（preview 必须标注非 main 基线；diff stat 为分支↔main）。 */
+  nonMainBaseline: boolean;
+  fileCount: number;
+  diffStat: string;
+  files: ReleaseFileChange[];
+  diffDigest: string;
+  mergeKind: ReleaseMergeKind;
+  highRiskNotes: readonly string[];
+}
+
+export interface PrepareReleaseMergeInput {
+  projectRoot: string;
+  workflowId: string;
+  /** 应用操作 id（审计）；同一 tip 的重复 prepare 幂等（replay）。 */
+  operationId: string;
+  /** 交付说明（≤4000 字符）。 */
+  summary: string;
+  /** 交付证据（应用逐路径重算实际字节 SHA-256 并与入参比对；不一致 ⇒ release-unauthorized，不发卡）。 */
+  evidence: readonly { path: string; sha256: string }[];
+  port: ReleaseGitPort;
+  now?: () => Date;
+}
+
+export type PrepareReleaseMergeResult =
+  | {
+      ok: true;
+      releaseId: string;
+      releaseKey: string;
+      stage: "A13" | "B4";
+      preview: ReleaseMergePreview;
+      replay: boolean;
+    }
+  | WorkflowServiceFailure;
+
+/** 最新 basis 记录的 repo 快照（A13/B4 发布前 `.gitignore` hash 比对）。 */
+async function latestBasisRepoSnapshot(projectRoot: string, workflowId: string): Promise<WorkflowRepoSnapshot | undefined> {
+  const ledger = await readBasisLedger(projectRoot);
+  const records = ledger.events.filter((event): event is Extract<BasisEvent, { kind: "basis.recorded" | "basis.amended" }> =>
+    (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === workflowId);
+  return records[records.length - 1]?.repo;
+}
+
+/** 运营报告在案（AC-11 B4）：任一本 workflow 任务上有 convener 的 done 报告（不认模型自报）。 */
+function operatorReportedForWorkflow(records: Iterable<TaskRecord>, workflowId: string): boolean {
+  for (const record of records) {
+    if (record.created?.workflowId !== workflowId) continue;
+    if (record.reports.some((report) => report.from === "convener" && report.status === "done")) return true;
+  }
+  return false;
+}
+
+/** A12 应用归档事实（`docs/acceptance/<flowId>-acceptance-vN.md`；应用自有、角色只读）。 */
+export interface AcceptanceArchiveFacts {
+  path: string;
+  sha256: string;
+  version: number;
+  reportPath?: string;
+  reportSha256?: string;
+}
+
+/**
+ * 查找该 workflow 的验收归档（版本最高、且归档内 `workflowId` 匹配）。
+ * 应用归档由 `archiveAcceptance` 生成；不存在/不匹配 ⇒ undefined（发布前置缺项，不猜）。
+ */
+export async function findAcceptanceArchive(input: {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+}): Promise<AcceptanceArchiveFacts | undefined> {
+  const dir = path.join(input.projectRoot, "docs", "acceptance");
+  let names: string[];
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return undefined;
+  }
+  const escaped = input.flowId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`^${escaped}-acceptance-v(\\d+)\\.md$`);
+  const candidates = names
+    .map((name) => ({ name, version: Number(pattern.exec(name)?.[1] ?? Number.NaN) }))
+    .filter((item) => Number.isSafeInteger(item.version) && item.version >= 1)
+    .sort((a, b) => b.version - a.version);
+  for (const candidate of candidates) {
+    let text: string;
+    try {
+      text = await fs.readFile(path.join(dir, candidate.name), "utf8");
+    } catch {
+      continue;
+    }
+    const workflowLine = /^workflowId: (.+)$/m.exec(text);
+    if (workflowLine === null || workflowLine[1]!.trim() !== input.workflowId) continue;
+    const reportPath = /^report: (.+)$/m.exec(text)?.[1]?.trim();
+    const reportSha = /^reportSha256: ([a-f0-9]{64})$/im.exec(text)?.[1];
+    return {
+      path: `docs/acceptance/${candidate.name}`,
+      sha256: sha256Of(Buffer.from(text, "utf8")),
+      version: candidate.version,
+      ...(reportPath !== undefined && reportPath !== "" ? { reportPath } : {}),
+      ...(reportSha !== undefined ? { reportSha256: reportSha } : {}),
+    };
+  }
+  return undefined;
+}
+
+/**
+ * A13/B4 发布前置 + preview + `release.requested`（应用自有 merge-main 通道的**呈卡前**服务）。
+ *
+ * 前置（MF-IR-8 / §6.4）：
+ *  - 公共：workflow 在 A13/B4（或在 A12b→A13 / B3→B4 合法推进处）、basis 未漂移、当前分支=任务分支、
+ *    工作区 clean（tracked 修改/删除=0；非忽略 untracked=0）、`.gitignore` hash = basis.repo 记录、
+ *    同一 workflow 无开放 release；
+ *  - A13：A12b accepted + `docs/acceptance/<flowId>-acceptance-vN.md` 归档已写入（**不要求** B3）；
+ *  - B4：B3 accepted + 运营报告（**不要求 A12b**）；
+ *  - 任一缺失 ⇒ `release-workflow-not-ready`（附路径与缺失项），**不发卡**。
+ *
+ * 返回 preview（应用据此构造 merge-main 非判断卡）；**本函数不构成客户确认**，执行须 `executeReleaseMerge`。
+ */
+export async function prepareReleaseMerge(input: PrepareReleaseMergeInput): Promise<PrepareReleaseMergeResult> {
+  const now = input.now ?? (() => new Date());
+  if (!isNonEmptyText(input.workflowId)) return serviceFailure("release-workflow-not-ready", "workflowId 缺失。");
+  if (!isNonEmptyText(input.operationId)) return serviceFailure("release-workflow-not-ready", "operationId 缺失。");
+  if (typeof input.summary !== "string" || input.summary.length > 4000) {
+    return serviceFailure("release-workflow-not-ready", "summary 非法（须 ≤4000 字符的字符串）。");
+  }
+  for (const item of input.evidence) {
+    if (!isProjectRelativePath(item.path) || !isSha256Hex(item.sha256)) {
+      return serviceFailure("release-unauthorized", `evidence 条目形状非法（须项目相对路径 + 64 hex SHA-256）：${JSON.stringify(item)}`);
+    }
+    const actual = await readAndHash(input.projectRoot, item.path);
+    if (!actual.ok || actual.sha256 !== item.sha256) {
+      return serviceFailure("release-unauthorized", `证据字节 hash 不一致或不可读：${item.path}（呈卡前拒绝）。`);
+    }
+  }
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  if (!wfEvents.some((event) => event.kind === "workflow.started")) {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) {
+    // 已合并交付后重复 prepare ⇒ `release-already-merged`（no-op；AC-22），其余关闭如实回报。
+    const mergedBefore = (await readReleaseLedger(input.projectRoot)).events.some((event) =>
+      event.kind === "release.merged" && event.workflowId === input.workflowId);
+    if (mergedBefore) {
+      return serviceFailure("release-already-merged", `workflow ${input.workflowId} 已合并交付（${view.closed.outcome}）；no-op。`);
+    }
+    return serviceFailure("workflow-closed", `workflow ${input.workflowId} 已关闭（${view.closed.outcome}），不再接受发布。`);
+  }
+  if (view.stopping === true) {
+    return serviceFailure("release-workflow-not-ready", "workflow 处于 stop 流程，不发布。", ["workflow-stopping"]);
+  }
+
+  const missing: string[] = [];
+  let targetStage: "A13" | "B4";
+  if (view.path === "A") {
+    targetStage = "A13";
+    // 以**投影状态**判定（返工后旧 stage.completed 事件不代表当前 accepted；不猜）。
+    if (view.stages.A12b.status !== "completed") {
+      missing.push("A12b-accepted");
+    }
+    const archive = await findAcceptanceArchive({
+      projectRoot: input.projectRoot,
+      flowId: view.flowId,
+      workflowId: input.workflowId,
+    });
+    if (archive === undefined) {
+      missing.push(`docs/acceptance/${view.flowId}-acceptance-vN.md`);
+    } else if (archive.reportPath !== undefined && archive.reportSha256 !== undefined) {
+      // AC-19/A13：发布前复核归档绑定的 report 字节（漂移 ⇒ basis-drift fail-closed）。
+      const report = await readAndHash(input.projectRoot, archive.reportPath);
+      if (!report.ok || report.sha256 !== archive.reportSha256) {
+        return serviceFailure("basis-drift", `验收报告字节与归档记录不一致：${archive.reportPath}（发布前 fail-closed）。`);
+      }
+    }
+    if (view.stage !== targetStage && !canRequestStage(view, targetStage)) missing.push(`stage:${targetStage}`);
+  } else {
+    targetStage = "B4";
+    if (view.stages.B3.status !== "completed") {
+      missing.push("B3-accepted");
+    }
+    if (!operatorReportedForWorkflow(tasks.records.values(), input.workflowId)) missing.push("operator-report");
+    if (view.stage !== targetStage && !canRequestStage(view, targetStage)) missing.push(`stage:${targetStage}`);
+  }
+  if (missing.length > 0) {
+    return serviceFailure(
+      "release-workflow-not-ready",
+      `发布前置不满足（路径 ${view.path}）：${missing.join("、")}（不发卡）。`,
+      missing,
+    );
+  }
+
+  // basis drift 在呈卡前拒绝（AC-19/A13/B4）。
+  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, now });
+  if (!basis.ok) return basis;
+
+  const factsResult = await input.port.inspectRepository({ projectRoot: input.projectRoot });
+  if (!factsResult.ok) return factsResult;
+  const facts = factsResult.facts;
+  if (!isGitOid(facts.headOid) || (facts.mainOid !== null && !isGitOid(facts.mainOid))) {
+    return serviceFailure("release-workflow-not-ready", "Git 端口返回的 OID 形状非法（fail-closed）。");
+  }
+  const expectedBranch = taskBranchName(input.workflowId);
+  const gitMissing: string[] = [];
+  if (facts.branch !== expectedBranch) gitMissing.push(`branch:${facts.branch}!==${expectedBranch}`);
+  if (facts.trackedChanges > 0) gitMissing.push(`worktree-tracked-dirty:${facts.trackedChanges}`);
+  if (facts.untracked.length > 0) gitMissing.push(`worktree-untracked:${facts.untracked.join(",")}`);
+  if (facts.gitignoreTrackedDirty) gitMissing.push("gitignore-tracked-dirty");
+  if (gitMissing.length > 0) {
+    return serviceFailure(
+      "release-workflow-not-ready",
+      `发布前置不满足（路径 ${view.path}）：任务分支/工作区不 clean（${gitMissing.join("；")}）。`,
+      gitMissing,
+    );
+  }
+  const basisRepo = await latestBasisRepoSnapshot(input.projectRoot, input.workflowId);
+  const recordedGitignore = basisRepo?.gitignoreSha256;
+  if (recordedGitignore !== undefined && facts.gitignoreSha256 !== recordedGitignore) {
+    return serviceFailure(
+      "basis-drift",
+      `.gitignore 字节 hash 与 basis.repo 记录不一致：${facts.gitignoreSha256 ?? "missing"} != ${recordedGitignore}（发布前 fail-closed）。`,
+    );
+  }
+  // AC-22/G-2：路径 B 分支可能基于非 main HEAD；preview 披露分支基点与分支↔main diff stat。
+  const branchBaseOidHex = basisRepo?.baseOid ?? null;
+  const nonMainBaseline = branchBaseOidHex !== null
+    && (facts.mainOid === null || branchBaseOidHex !== facts.mainOid.hex);
+
+  const tipOid = facts.headOid;
+  const mainOid = facts.mainOid;
+  const mergeKind: ReleaseMergeKind = mainOid === null ? "initial" : "merge";
+  const releaseId = releaseIdFor(input.workflowId, tipOid);
+
+  // 同一 workflow 无开放 release；已合并 ⇒ release-already-merged；同 tip 重复 prepare ⇒ replay。
+  const releases = await readReleaseLedger(input.projectRoot);
+  const releaseEvents = releases.events.filter((event) => event.workflowId === input.workflowId);
+  const isTerminal = (id: string): boolean => releaseEvents.some((event) =>
+    event.releaseId === id && (event.kind === "release.merged" || event.kind === "release.rejected" || event.kind === "release.failed"));
+  const merged = releaseEvents.find((event): event is ReleaseMergedEvent =>
+    event.kind === "release.merged" && event.tipOid.hex === tipOid.hex);
+  if (merged !== undefined) {
+    return serviceFailure("release-already-merged", `tip ${tipOid.hex} 已合并（no-op；不重复发布）。`);
+  }
+  const sameRequest = releaseEvents.find((event): event is ReleaseRequestedEvent =>
+    event.kind === "release.requested" && event.releaseId === releaseId);
+  const replay = sameRequest !== undefined && !isTerminal(releaseId);
+  if (!replay) {
+    const open = releaseEvents.find((event): event is ReleaseRequestedEvent =>
+      event.kind === "release.requested" && !isTerminal(event.releaseId));
+    if (open !== undefined) {
+      return serviceFailure(
+        "release-workflow-not-ready",
+        `同一 workflow 已有开放 release（${open.releaseId}）；先处理（合并/拒绝）再发起新发布。`,
+        [`open-release:${open.releaseId}`],
+      );
+    }
+  }
+
+  const previewResult = await input.port.previewMerge({ projectRoot: input.projectRoot, mainOid, tipOid });
+  if (!previewResult.ok) return previewResult;
+  const preview: ReleaseMergePreview = {
+    workflowId: input.workflowId,
+    flowId: view.flowId,
+    releaseId,
+    mainBaseOid: mainOid,
+    branchTipOid: tipOid,
+    branchBaseOid: branchBaseOidHex,
+    nonMainBaseline,
+    fileCount: previewResult.fileCount,
+    diffStat: previewResult.diffStat,
+    files: [...previewResult.files],
+    diffDigest: previewResult.diffDigest,
+    mergeKind,
+    highRiskNotes: HIGH_RISK_MERGE_NOTES,
+  };
+
+  const at = now().toISOString();
+  if (!replay) {
+    if (view.stage !== targetStage) {
+      const requestEvent: WorkflowEvent = {
+        v: 1,
+        at,
+        schema: WORKFLOW_LEDGER_SCHEMA,
+        kind: "stage.requested",
+        workflowId: input.workflowId,
+        flowId: view.flowId,
+        path: view.path,
+        idempotencyKey: stageRequestIdempotencyKey(input.workflowId, targetStage, 1),
+        stage: targetStage,
+        fromStage: view.stage,
+        requestTaskId: `release-card:${releaseId}`,
+        requestDigest: sha256Of(`release|${input.workflowId}|${tipOid.hex}`),
+        attempt: 1,
+      };
+      const advanced = await appendWorkflowEvent(input.projectRoot, requestEvent);
+      if (!advanced.ok) return serviceFailure("workflow-ledger-write-failed", `stage.requested ${targetStage} 写入失败：${advanced.message}`);
+    }
+    const requested: ReleaseRequestedEvent = {
+      v: 1,
+      at,
+      schema: RELEASE_LEDGER_SCHEMA,
+      kind: "release.requested",
+      idempotencyKey: releaseEventIdempotencyKey("requested", input.workflowId, tipOid),
+      releaseId,
+      workflowId: input.workflowId,
+      flowId: view.flowId,
+      operationId: input.operationId,
+      summary: input.summary,
+      evidence: input.evidence.map((item) => ({ path: item.path, sha256: item.sha256 })),
+      baseOid: mainOid,
+      tipOid,
+      mergeKind,
+    };
+    const appended = await appendReleaseEvent(input.projectRoot, requested);
+    if (!appended.ok) return serviceFailure("release-ledger-write-failed", `release.requested 写入失败：${appended.message}`);
+  }
+  return {
+    ok: true,
+    releaseId,
+    releaseKey: releaseIdempotencyKey(input.workflowId, tipOid),
+    stage: targetStage,
+    preview,
+    replay,
+  };
+}
+
+/** 客户本人确认（AC-14：`by` 只允许 customer；judge 只能转人工/拒绝，不得代批/冒充客户）。 */
+export interface ReleaseConfirmation {
+  by: "customer" | "judge";
+  decisionId?: string;
+}
+
+export interface ExecuteReleaseMergeInput {
+  projectRoot: string;
+  workflowId: string;
+  releaseId: string;
+  /** 客户本人确认（缺失/`by:"judge"` ⇒ `release-unauthorized`，不进入执行、不写 confirmed）。 */
+  confirmation?: ReleaseConfirmation;
+  port: ReleaseGitPort;
+  now?: () => Date;
+}
+
+export type ExecuteReleaseMergeResult =
+  | {
+      ok: true;
+      releaseId: string;
+      releaseKey: string;
+      mergeKind: ReleaseMergeKind;
+      baseOid: GitOid | null;
+      tipOid: GitOid;
+      mergeOid: GitOid;
+      files: ReleaseFileChange[];
+      diffDigest: string;
+      replay: boolean;
+      alreadyMerged: boolean;
+      /** 已合并 no-op 成功时给出 `release-already-merged`。 */
+      code?: "release-already-merged";
+    }
+  | WorkflowServiceFailure;
+
+/** 发布失败/拒绝后记 `stage.blocked`（A13/B4 保持 blocked；不关闭 workflow）。 */
+async function appendReleaseStageBlocked(input: {
+  projectRoot: string;
+  workflowId: string;
+  stage: "A13" | "B4";
+  code: string;
+  summary: string;
+  now: () => Date;
+}): Promise<void> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  if (wfEvents.length === 0) return;
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  if (view.blocked?.code === WORKFLOW_CORRUPT_CODE || view.closed !== undefined) return;
+  if (view.stage !== input.stage || view.stages[input.stage].status === "completed") return;
+  const attempt = Math.max(1, view.stages[input.stage].attempt ?? 1);
+  const event: WorkflowEvent = {
+    v: 1,
+    at: input.now().toISOString(),
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "stage.blocked",
+    workflowId: input.workflowId,
+    flowId: view.flowId,
+    path: view.path,
+    idempotencyKey: `stage-block:${input.workflowId}:${input.stage}:${attempt}:${input.code}`,
+    stage: input.stage,
+    code: input.code,
+    summary: input.summary,
+    attempt,
+  };
+  await appendWorkflowEvent(input.projectRoot, event);
+}
+
+/** 成功合并后的 A13/B4 完成 + workflow.closed delivered（§4.5：release.merged → 交付关闭）。 */
+async function completeReleaseWorkflow(input: {
+  projectRoot: string;
+  workflowId: string;
+  stage: "A13" | "B4";
+  releaseId: string;
+  now: () => Date;
+}): Promise<WorkflowServiceFailure | undefined> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) {
+    return view.closed.outcome === "delivered"
+      ? undefined
+      : serviceFailure("workflow-closed", `workflow ${input.workflowId} 已关闭（${view.closed.outcome}）。`);
+  }
+  if (view.stage !== input.stage) {
+    return serviceFailure(
+      "release-workflow-not-ready",
+      `发布完成前置不满足：当前阶段 ${view.stage}(${view.stages[view.stage].status})，要求 ${input.stage}。`,
+      [`stage:${input.stage}`],
+    );
+  }
+  const at = input.now().toISOString();
+  if (view.stage === input.stage && view.stages[input.stage].status !== "completed" && canCompleteStage(view, input.stage)) {
+    const completion: WorkflowEvent = {
+      v: 1,
+      at,
+      schema: WORKFLOW_LEDGER_SCHEMA,
+      kind: "stage.completed",
+      workflowId: input.workflowId,
+      flowId: view.flowId,
+      path: view.path,
+      idempotencyKey: `stage-complete:${input.workflowId}:${input.stage}:${input.releaseId}`,
+      stage: input.stage,
+      cause: { kind: "release-merged", ref: input.releaseId },
+      artifacts: [{ path: RELEASES_STATE_REL, kind: "release-ledger" }],
+    };
+    const appended = await appendWorkflowEvent(input.projectRoot, completion);
+    if (!appended.ok) return serviceFailure("workflow-ledger-write-failed", `stage.completed ${input.stage} 写入失败：${appended.message}`);
+  }
+  const reason = `release ${input.releaseId} merged`;
+  const closed: WorkflowEvent = {
+    v: 1,
+    at,
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "workflow.closed",
+    workflowId: input.workflowId,
+    flowId: view.flowId,
+    path: view.path,
+    idempotencyKey: `workflow-close:${input.workflowId}:delivered:${reasonDigest(reason)}`,
+    outcome: "delivered",
+    reason,
+    releaseId: input.releaseId,
+  };
+  const appended = await appendWorkflowEvent(input.projectRoot, closed);
+  if (!appended.ok) return serviceFailure("workflow-ledger-write-failed", `workflow.closed delivered 写入失败：${appended.message}`);
+  return undefined;
+}
+
+/**
+ * 执行合并 main（AC-22）：**必须先有客户本人确认**（judge/缺失 ⇒ `release-unauthorized`）。
+ *
+ * - 应用执行固定 argv（端口实现）；main unborn ⇒ `mergeKind:"initial"`；main 存在 ⇒ `merge --no-ff`；
+ * - 冲突/失败 ⇒ `release.failed` + `stage.blocked`，返回 `release-merge-conflict` 等；**不 force/reset/clean**；
+ * - 成功 ⇒ `release.merged`（baseOid/tipOid/mergeOid/files/diffDigest）+ `stage.completed A13|B4` +
+ *   `workflow.closed delivered`；**不 push/tag/发布产物**；
+ * - 幂等 `release:<workflowId>:<tipOid>`；已合并 ⇒ no-op 成功（`release-already-merged`）。
+ */
+export async function executeReleaseMerge(input: ExecuteReleaseMergeInput): Promise<ExecuteReleaseMergeResult> {
+  const now = input.now ?? (() => new Date());
+  if (!isNonEmptyText(input.workflowId)) return serviceFailure("release-workflow-not-ready", "workflowId 缺失。");
+  if (!isNonEmptyText(input.releaseId)) return serviceFailure("release-workflow-not-ready", "releaseId 缺失。");
+  const releases = await readReleaseLedger(input.projectRoot);
+  const releaseEvents = releases.events.filter((event) =>
+    event.workflowId === input.workflowId && event.releaseId === input.releaseId);
+  const mergedEvent = releaseEvents.find((event): event is ReleaseMergedEvent => event.kind === "release.merged");
+  if (mergedEvent !== undefined) {
+    return {
+      ok: true,
+      releaseId: mergedEvent.releaseId,
+      releaseKey: releaseIdempotencyKey(input.workflowId, mergedEvent.tipOid),
+      mergeKind: mergedEvent.mergeKind,
+      baseOid: mergedEvent.baseOid,
+      tipOid: mergedEvent.tipOid,
+      mergeOid: mergedEvent.mergeOid,
+      files: mergedEvent.files,
+      diffDigest: mergedEvent.diffDigest,
+      replay: true,
+      alreadyMerged: true,
+      code: "release-already-merged",
+    };
+  }
+  const rejectedEvent = releaseEvents.find((event): event is ReleaseRejectedEvent => event.kind === "release.rejected");
+  if (rejectedEvent !== undefined) {
+    return serviceFailure("release-rejected", `release ${input.releaseId} 已被拒绝（${rejectedEvent.by}），不执行合并。`);
+  }
+  const requested = releaseEvents.find((event): event is ReleaseRequestedEvent => event.kind === "release.requested");
+  if (requested === undefined) {
+    return serviceFailure("release-workflow-not-ready", `release ${input.releaseId} 无 release.requested（先 prepare）。`, ["release.requested"]);
+  }
+  // AC-14/MF-IR-8：客户本人唯一有效来源；judge 不得 approve/代批/冒充客户。
+  const confirmation = input.confirmation;
+  if (confirmation === undefined || confirmation.by !== "customer") {
+    return serviceFailure(
+      "release-unauthorized",
+      "合并 main 未被授权：必须由客户本人在 merge-main 高风险确认卡确认；judge 只能转人工/拒绝，不得代批。",
+      ["customer-confirmation"],
+    );
+  }
+
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  if (wfEvents.length === 0) return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) {
+    return serviceFailure("workflow-closed", `workflow ${input.workflowId} 已关闭（${view.closed.outcome}），不执行合并。`);
+  }
+  if (view.stopping === true) {
+    return serviceFailure("release-workflow-not-ready", "workflow 处于 stop 流程，不执行合并。", ["workflow-stopping"]);
+  }
+  const targetStage: "A13" | "B4" = view.path === "A" ? "A13" : "B4";
+  if (view.stage !== targetStage) {
+    return serviceFailure(
+      "release-workflow-not-ready",
+      `发布当前阶段为 ${view.stage}(${view.stages[view.stage].status})，要求 ${targetStage}（先 prepareReleaseMerge 推进）。`,
+      [`stage:${targetStage}`],
+    );
+  }
+
+  // 呈卡后、执行前的最后复核：basis 漂移 / 分支或 tip 漂移 / 工作区 dirty ⇒ 拒绝（不合并）。
+  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, now });
+  if (!basis.ok) return basis;
+  const factsResult = await input.port.inspectRepository({ projectRoot: input.projectRoot });
+  if (!factsResult.ok) return factsResult;
+  const facts = factsResult.facts;
+  const branch = taskBranchName(input.workflowId);
+  const drift: string[] = [];
+  if (facts.branch !== branch) drift.push(`branch:${facts.branch}!==${branch}`);
+  if (facts.headOid.hex !== requested.tipOid.hex) drift.push(`tip:${facts.headOid.hex}!==${requested.tipOid.hex}`);
+  if (facts.trackedChanges > 0) drift.push(`worktree-tracked-dirty:${facts.trackedChanges}`);
+  if (facts.untracked.length > 0) drift.push(`worktree-untracked:${facts.untracked.join(",")}`);
+  if (drift.length > 0) {
+    return serviceFailure("release-workflow-not-ready", `执行前复核失败（分支/tip/工作区漂移）：${drift.join("；")}`, drift);
+  }
+
+  const at = now().toISOString();
+  const confirmed: ReleaseConfirmedEvent = {
+    v: 1,
+    at,
+    schema: RELEASE_LEDGER_SCHEMA,
+    kind: "release.confirmed",
+    idempotencyKey: releaseEventIdempotencyKey("confirmed", input.workflowId, requested.tipOid),
+    releaseId: requested.releaseId,
+    workflowId: input.workflowId,
+    flowId: requested.flowId,
+    by: "customer",
+    ...(confirmation.decisionId !== undefined ? { decisionId: confirmation.decisionId } : {}),
+  };
+  const confirmedWrite = await appendReleaseEvent(input.projectRoot, confirmed);
+  if (!confirmedWrite.ok) return serviceFailure("release-ledger-write-failed", `release.confirmed 写入失败：${confirmedWrite.message}`);
+
+  const outcome = await input.port.mergeMain({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    flowId: requested.flowId,
+    branch,
+    baseOid: requested.baseOid,
+    tipOid: requested.tipOid,
+    mergeKind: requested.mergeKind,
+  });
+  if (!outcome.ok) {
+    const failureCode = outcome.code !== "" ? outcome.code : "release-merge-failed";
+    const failed: ReleaseFailedEvent = {
+      v: 1,
+      at: now().toISOString(),
+      schema: RELEASE_LEDGER_SCHEMA,
+      kind: "release.failed",
+      idempotencyKey: releaseEventIdempotencyKey("failed", input.workflowId, requested.tipOid, failureCode),
+      releaseId: requested.releaseId,
+      workflowId: input.workflowId,
+      flowId: requested.flowId,
+      code: failureCode,
+      summary: outcome.message,
+      baseOid: requested.baseOid,
+      tipOid: requested.tipOid,
+    };
+    const failedWrite = await appendReleaseEvent(input.projectRoot, failed);
+    if (!failedWrite.ok) return serviceFailure("release-ledger-write-failed", `release.failed 写入失败：${failedWrite.message}`);
+    await appendReleaseStageBlocked({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      stage: targetStage,
+      code: failureCode,
+      summary: outcome.message,
+      now,
+    });
+    return serviceFailure(failureCode, outcome.message, outcome.missing);
+  }
+  // 端口回执 fail-closed 校验（tip/kind/base 必须与请求一致）。
+  const receiptIssue = ((): string | undefined => {
+    if (!isGitOid(outcome.tipOid) || !isGitOid(outcome.mergeOid) || (outcome.baseOid !== null && !isGitOid(outcome.baseOid))) {
+      return "Git 端口返回的 OID 形状非法";
+    }
+    if (outcome.tipOid.hex !== requested.tipOid.hex) return `合并回执 tip OID 不一致（${outcome.tipOid.hex} != ${requested.tipOid.hex}）`;
+    if (outcome.mergeKind !== requested.mergeKind) return `合并回执 mergeKind 不一致（${outcome.mergeKind} != ${requested.mergeKind}）`;
+    if (requested.mergeKind === "initial" && outcome.baseOid !== null) return "initial 合并回执 baseOid 应为 null";
+    if (requested.mergeKind === "merge" && (outcome.baseOid === null || outcome.baseOid.hex !== requested.baseOid?.hex)) {
+      return "merge 合并回执 baseOid 与请求不一致";
+    }
+    return undefined;
+  })();
+  if (receiptIssue !== undefined) {
+    const failed: ReleaseFailedEvent = {
+      v: 1,
+      at: now().toISOString(),
+      schema: RELEASE_LEDGER_SCHEMA,
+      kind: "release.failed",
+      idempotencyKey: releaseEventIdempotencyKey("failed", input.workflowId, requested.tipOid, "release-merge-failed"),
+      releaseId: requested.releaseId,
+      workflowId: input.workflowId,
+      flowId: requested.flowId,
+      code: "release-merge-failed",
+      summary: receiptIssue,
+      baseOid: requested.baseOid,
+      tipOid: requested.tipOid,
+    };
+    const failedWrite = await appendReleaseEvent(input.projectRoot, failed);
+    if (!failedWrite.ok) return serviceFailure("release-ledger-write-failed", `release.failed 写入失败：${failedWrite.message}`);
+    await appendReleaseStageBlocked({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      stage: targetStage,
+      code: "release-merge-failed",
+      summary: receiptIssue,
+      now,
+    });
+    return serviceFailure("release-merge-failed", receiptIssue);
+  }
+
+  const merged: ReleaseMergedEvent = {
+    v: 1,
+    at: now().toISOString(),
+    schema: RELEASE_LEDGER_SCHEMA,
+    kind: "release.merged",
+    idempotencyKey: releaseEventIdempotencyKey("merged", input.workflowId, requested.tipOid),
+    releaseId: requested.releaseId,
+    workflowId: input.workflowId,
+    flowId: requested.flowId,
+    baseOid: outcome.baseOid,
+    tipOid: outcome.tipOid,
+    mergeOid: outcome.mergeOid,
+    mergeKind: outcome.mergeKind,
+    files: outcome.files.map((file) => ({ path: file.path, status: file.status })),
+    diffDigest: outcome.diffDigest,
+  };
+  const mergedWrite = await appendReleaseEvent(input.projectRoot, merged);
+  if (!mergedWrite.ok) return serviceFailure("release-ledger-write-failed", `release.merged 写入失败：${mergedWrite.message}`);
+  const completion = await completeReleaseWorkflow({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    stage: targetStage,
+    releaseId: requested.releaseId,
+    now,
+  });
+  if (completion !== undefined) return completion;
+  return {
+    ok: true,
+    releaseId: requested.releaseId,
+    releaseKey: releaseIdempotencyKey(input.workflowId, requested.tipOid),
+    mergeKind: merged.mergeKind,
+    baseOid: merged.baseOid,
+    tipOid: merged.tipOid,
+    mergeOid: merged.mergeOid,
+    files: merged.files,
+    diffDigest: merged.diffDigest,
+    replay: mergedWrite.replay,
+    alreadyMerged: mergedWrite.replay,
+    ...(mergedWrite.replay ? { code: "release-already-merged" as const } : {}),
+  };
+}
+
+export interface RejectReleaseMergeInput {
+  projectRoot: string;
+  workflowId: string;
+  releaseId: string;
+  /** 客户本人拒绝，或 judge 转人工/拒绝（judge 不得 approve/冒充客户）。 */
+  by: "customer" | "judge";
+  reason?: string;
+  now?: () => Date;
+}
+
+export type RejectReleaseMergeResult =
+  | { ok: true; releaseId: string; by: "customer" | "judge"; replay: boolean; eventId: string }
+  | WorkflowServiceFailure;
+
+/** 拒绝发布（客户本人或 judge 转人工/拒绝）：写 `release.rejected`；A13/B4 保持 blocked；不合并。 */
+export async function rejectReleaseMerge(input: RejectReleaseMergeInput): Promise<RejectReleaseMergeResult> {
+  const now = input.now ?? (() => new Date());
+  if (input.by !== "customer" && input.by !== "judge") {
+    return serviceFailure("release-unauthorized", `拒绝来源非法：${String(input.by)}（只允许 customer/judge）。`);
+  }
+  if (!isNonEmptyText(input.workflowId) || !isNonEmptyText(input.releaseId)) {
+    return serviceFailure("release-workflow-not-ready", "workflowId/releaseId 缺失。");
+  }
+  const releases = await readReleaseLedger(input.projectRoot);
+  const releaseEvents = releases.events.filter((event) =>
+    event.workflowId === input.workflowId && event.releaseId === input.releaseId);
+  const mergedEvent = releaseEvents.find((event) => event.kind === "release.merged");
+  if (mergedEvent !== undefined) {
+    return serviceFailure("release-already-merged", `release ${input.releaseId} 已合并，不能拒绝。`);
+  }
+  const requested = releaseEvents.find((event): event is ReleaseRequestedEvent => event.kind === "release.requested");
+  if (requested === undefined) {
+    return serviceFailure("release-workflow-not-ready", `release ${input.releaseId} 无 release.requested。`, ["release.requested"]);
+  }
+  const existing = releaseEvents.find((event) => event.kind === "release.rejected");
+  if (existing !== undefined) {
+    return { ok: true, releaseId: input.releaseId, by: input.by, replay: true, eventId: existing.idempotencyKey };
+  }
+  const rejected: ReleaseRejectedEvent = {
+    v: 1,
+    at: now().toISOString(),
+    schema: RELEASE_LEDGER_SCHEMA,
+    kind: "release.rejected",
+    idempotencyKey: releaseEventIdempotencyKey("rejected", input.workflowId, requested.tipOid),
+    releaseId: input.releaseId,
+    workflowId: input.workflowId,
+    flowId: requested.flowId,
+    by: input.by,
+    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+  };
+  const appended = await appendReleaseEvent(input.projectRoot, rejected);
+  if (!appended.ok) return serviceFailure("release-ledger-write-failed", `release.rejected 写入失败：${appended.message}`);
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  const started = wfEvents.find((event) => event.kind === "workflow.started");
+  const targetStage: "A13" | "B4" = started !== undefined && started.kind === "workflow.started" && started.path === "B" ? "B4" : "A13";
+  await appendReleaseStageBlocked({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    stage: targetStage,
+    code: "release-rejected",
+    summary: input.reason ?? `release ${input.releaseId} 被拒绝（${input.by}）`,
+    now,
+  });
+  return { ok: true, releaseId: input.releaseId, by: input.by, replay: appended.replay, eventId: appended.event.idempotencyKey };
+}
+
+// —————————————— 基线 / 路径 B（AC-10/AC-15/AC-16/T-07/T-12） ——————————————
+
+/** 基线 Git 端口（桌面 B3 注入真实实现；固定 argv/sanitized env；测试注入 fake）。 */
+export interface BaselineGitPort {
+  /**
+   * A9：`.git` 不存在 ⇒ `git init -b main`（allowInit=true）/ 路径 B ⇒ 缺失返回 `b-repository-required`
+   * （allowInit=false，不自动 init）；父仓库 ⇒ `baseline-parent-repository-detected`；
+   * worktree `.git` 文件 ⇒ existing（不修改）。
+   */
+  ensureRepository(request: { projectRoot: string; allowInit: boolean }): Promise<
+    { ok: true; repository: BaselineGitRepositoryState } | WorkflowServiceFailure
+  >;
+  /** `.gitignore` ans-managed 块 + 仅该文件的 baseline commit；被跟踪且 dirty ⇒ `baseline-gitignore-dirty`。 */
+  ensureGitignore(request: { projectRoot: string }): Promise<
+    { ok: true; changed: boolean; committed: boolean; sha256: string } | WorkflowServiceFailure
+  >;
+  /** 工作区 dirty：tracked 修改/删除数 + 非忽略 untracked（`.gitignore` 过滤后）。 */
+  inspectWorktree(request: { projectRoot: string; branch?: string }): Promise<
+    { ok: true; branch: string; trackedChanges: number; untracked: string[] } | WorkflowServiceFailure
+  >;
+  /** 任务分支 `ans/task/<workflowId>` 创建/复用/切换（base=head|main）；同名他属分支 ⇒ `baseline-branch-exists`。 */
+  prepareTaskBranch(request: { projectRoot: string; workflowId: string; base: "head" | "main"; allowReuse: boolean }): Promise<
+    { ok: true; branch: string; baseOid: GitOid | null; reused: boolean } | WorkflowServiceFailure
+  >;
+}
+
+export interface BaselineGitRepositoryState {
+  state: "initialized" | "existing";
+  branch: string;
+  baseOid: GitOid | null;
+  mainUnborn: boolean;
+  initialBranch: string;
+  objectFormat?: "sha1" | "sha256";
+  identityDefaultsApplied?: boolean;
+}
+
+/** 基线 Git 准备回执（应用 `complete_team_plan` v4 回执与 basis.repo 来源）。 */
+export interface BaselineGitReceipt {
+  state: "initialized" | "existing";
+  branch: string;
+  headOid: GitOid | null;
+  mainUnborn: boolean;
+  gitignoreSha256: string;
+  gitignoreChanged: boolean;
+  gitignoreCommitted: boolean;
+  branchReused: boolean;
+  identityDefaultsApplied?: boolean;
+}
+
+/** 该 workflow 是否已在 basis 记录中拥有任务分支（§5.2 G-8：允许复用自有分支）。 */
+async function workflowOwnsTaskBranch(projectRoot: string, workflowId: string, branch: string): Promise<boolean> {
+  const ledger = await readBasisLedger(projectRoot);
+  return ledger.events.some((event) =>
+    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+    && event.workflowId === workflowId
+    && event.repo?.branch === branch);
+}
+
+/** 基线/路径 B 的最小 Git 准备（§5.2/§4.3 MF-12；由 `recordBasis` 在文档校验后调用）。 */
+async function prepareBaselineGit(input: {
+  projectRoot: string;
+  workflowId: string;
+  reason: "baseline" | "path-b" | "amendment";
+  port: BaselineGitPort;
+}): Promise<{ ok: true; repo: WorkflowRepoSnapshot; receipt: BaselineGitReceipt } | WorkflowServiceFailure> {
+  const repository = await input.port.ensureRepository({
+    projectRoot: input.projectRoot,
+    allowInit: input.reason === "baseline",
+  });
+  if (!repository.ok) return repository;
+  const gitignore = await input.port.ensureGitignore({ projectRoot: input.projectRoot });
+  if (!gitignore.ok) return gitignore;
+  const worktree = await input.port.inspectWorktree({ projectRoot: input.projectRoot });
+  if (!worktree.ok) return worktree;
+  const dirty: string[] = [];
+  if (worktree.trackedChanges > 0) dirty.push(`tracked:${worktree.trackedChanges}`);
+  if (worktree.untracked.length > 0) dirty.push(`untracked:${worktree.untracked.join(",")}`);
+  if (dirty.length > 0) {
+    return serviceFailure(
+      "baseline-repository-dirty",
+      `工作区 dirty（${dirty.join("；")}）；不 stash/reset/clean，请人工处理（治理文档/.ans/node_modules 被 ignore 不计）。`,
+      dirty,
+    );
+  }
+  const expectedBranch = taskBranchName(input.workflowId);
+  const allowReuse = await workflowOwnsTaskBranch(input.projectRoot, input.workflowId, expectedBranch);
+  const branchResult = await input.port.prepareTaskBranch({
+    projectRoot: input.projectRoot,
+    workflowId: input.workflowId,
+    base: input.reason === "baseline" ? "main" : "head",
+    allowReuse,
+  });
+  if (!branchResult.ok) return branchResult;
+  if (branchResult.branch !== expectedBranch) {
+    return serviceFailure(
+      "baseline-branch-exists",
+      `任务分支名不一致（${branchResult.branch} != ${expectedBranch}）；不删除/不强推，要求新 workflowId 或人工核对。`,
+    );
+  }
+  const baseOidHex = branchResult.baseOid !== null ? branchResult.baseOid.hex : null;
+  const repo: WorkflowRepoSnapshot = {
+    state: repository.repository.state,
+    branch: branchResult.branch,
+    baseOid: baseOidHex,
+    headOid: baseOidHex,
+    mainUnborn: repository.repository.mainUnborn,
+    initialBranch: repository.repository.initialBranch,
+    ignorePolicy: "ans-v1",
+    gitignoreSha256: gitignore.sha256,
+    ...(repository.repository.objectFormat !== undefined ? { objectFormat: repository.repository.objectFormat } : {}),
+    ...(repository.repository.identityDefaultsApplied === true ? { identityDefaultsApplied: true } : {}),
+  };
+  const receipt: BaselineGitReceipt = {
+    state: repository.repository.state,
+    branch: branchResult.branch,
+    headOid: branchResult.baseOid,
+    mainUnborn: repository.repository.mainUnborn,
+    gitignoreSha256: gitignore.sha256,
+    gitignoreChanged: gitignore.changed,
+    gitignoreCommitted: gitignore.committed,
+    branchReused: branchResult.reused,
+    ...(repository.repository.identityDefaultsApplied === true ? { identityDefaultsApplied: true } : {}),
+  };
+  return { ok: true, repo, receipt };
+}
+
+/** 基线失败事件：`stage.blocked` A9（带 code/summary/attempt；AC-16）。 */
+async function appendBaselineBlocked(input: {
+  projectRoot: string;
+  workflowId: string;
+  code: string;
+  summary: string;
+  now: () => Date;
+}): Promise<void> {
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  if (wfEvents.length === 0) return;
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  if (view.blocked?.code === WORKFLOW_CORRUPT_CODE || view.closed !== undefined) return;
+  const stage: WorkflowStage = view.path === "B" ? "B1" : "A9";
+  if (view.stage !== stage || view.stages[stage].status === "completed") return;
+  const attempt = Math.max(1, view.stages[stage].attempt ?? 1);
+  const event: WorkflowEvent = {
+    v: 1,
+    at: input.now().toISOString(),
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "stage.blocked",
+    workflowId: input.workflowId,
+    flowId: view.flowId,
+    path: view.path,
+    idempotencyKey: `stage-block:${input.workflowId}:${stage}:${attempt}:${input.code}`,
+    stage,
+    code: input.code,
+    summary: input.summary,
+    attempt,
+  };
+  await appendWorkflowEvent(input.projectRoot, event);
+}
+
+/** `complete_team_plan` v4 fixed 输入（v1.3 §5.1；运营专属；应用执行顺序编排）。 */
+export interface CompleteTeamPlanFixedInput {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  operationId: string;
+  plan: { path: string; version?: number; sha256?: string };
+  /** 真实 Git 端口（桌面 B3 注入；不注入则只做文档校验+记账，不满足基线 3 件小事）。 */
+  port: BaselineGitPort;
+  /** host 绑定的调用角色（complete_team_plan 为运营专属；提供且非 convener ⇒ `baseline-identity-invalid`）。 */
+  actorRoleId?: string;
+  /** legacy 字段：fixed 路径出现即 `baseline-legacy-field-forbidden`（§5.1）。 */
+  runId?: string;
+  baseDigest?: string;
+  now?: () => Date;
+}
+
+export type CompleteTeamPlanFixedResult =
+  | {
+      ok: true;
+      operationId: string;
+      flowId: string;
+      workflowId: string;
+      basisId: string;
+      plan: { path: string; version: number; sha256: string };
+      git?: BaselineGitReceipt;
+      documents: BasisDocumentView[];
+      replay: boolean;
+      stageCompleted: boolean;
+    }
+  | WorkflowServiceFailure;
+
+/**
+ * `complete_team_plan` v4（A9）应用服务：legacy 字段拒绝 → 文档/团队计划校验 → Git 最小准备
+ * （git init -b main/.gitignore+baseline commit/任务分支/dirty）→ `basis.recorded` → `stage.completed A9`。
+ * 失败写 `stage.blocked A9`（code/summary/attempt）、不产生客户卡；同幂等键 replay 返回原回执。
+ */
+export async function completeTeamPlanFixed(input: CompleteTeamPlanFixedInput): Promise<CompleteTeamPlanFixedResult> {
+  const now = input.now ?? (() => new Date());
+  const fail = async (failure: WorkflowServiceFailure): Promise<CompleteTeamPlanFixedResult> => {
+    await appendBaselineBlocked({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      code: failure.code,
+      summary: failure.message,
+      now,
+    });
+    return failure;
+  };
+  if (input.runId !== undefined || input.baseDigest !== undefined) {
+    return fail(serviceFailure(
+      "baseline-legacy-field-forbidden",
+      "fixed 路径不接受 legacy 字段 runId/baseDigest（出现即拒绝；旧字段仅 legacy 兼容）。",
+      ["runId/baseDigest"],
+    ));
+  }
+  if (input.actorRoleId !== undefined && input.actorRoleId !== "convener") {
+    return fail(serviceFailure(
+      "baseline-identity-invalid",
+      `complete_team_plan 为运营（convener）专属；调用角色 ${input.actorRoleId} 不允许。`,
+    ));
+  }
+  if (input.plan === undefined || !isProjectRelativePath(input.plan.path)) {
+    return fail(serviceFailure("baseline-team-plan-invalid", "plan.path 非法（须项目相对 docs/scheduling/<flowId>-team-vN.md）。"));
+  }
+  const recorded = await recordBasis({
+    projectRoot: input.projectRoot,
+    flowId: input.flowId,
+    workflowId: input.workflowId,
+    operationId: input.operationId,
+    planPath: input.plan.path,
+    ...(input.plan.version !== undefined ? { planVersion: input.plan.version } : {}),
+    ...(input.plan.sha256 !== undefined ? { planSha256: input.plan.sha256 } : {}),
+    port: input.port,
+    reason: "baseline",
+    now,
+  });
+  if (!recorded.ok) {
+    await appendBaselineBlocked({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      code: recorded.code,
+      summary: recorded.message,
+      now,
+    });
+    return recorded;
+  }
+  if (recorded.teamPlan === undefined) {
+    return serviceFailure("baseline-team-plan-invalid", "团队计划发现结果缺失（baseline 必须记录 teamPlan）。");
+  }
+  return {
+    ok: true,
+    operationId: input.operationId,
+    flowId: input.flowId,
+    workflowId: input.workflowId,
+    basisId: recorded.basisId,
+    plan: recorded.teamPlan,
+    ...(recorded.git !== undefined ? { git: recorded.git } : {}),
+    documents: recorded.documents,
+    replay: recorded.replay,
+    stageCompleted: recorded.stageCompleted,
+  };
+}
+
+export interface PreparePathBStartInput {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  operationId: string;
+  /** 既有仓库端口（路径 B 不自动 init；无仓库 ⇒ `b-repository-required`）。 */
+  port: BaselineGitPort;
+  now?: () => Date;
+}
+
+export type PreparePathBStartResult =
+  | {
+      ok: true;
+      workflowId: string;
+      basisId: string;
+      repository: BaselineGitReceipt;
+      documents: BasisDocumentView[];
+      replay: boolean;
+    }
+  | WorkflowServiceFailure;
+
+/**
+ * 路径 B 最小准备（B1 派发时；v1.3 §4.3 MF-12）：**既有 Git 仓库**（无仓库 ⇒ `b-repository-required`，
+ * 不自动 init）、`.gitignore` 托管块/baseline commit、从当前 HEAD 创建/复用 `ans/task/<workflowId>`、
+ * dirty 检查，`basis.recorded(reason:"path-b")`（只读文档快照、不产生写权、不写团队计划、不弹卡）。
+ */
+export async function preparePathBStart(input: PreparePathBStartInput): Promise<PreparePathBStartResult> {
+  const now = input.now ?? (() => new Date());
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  const started = wfEvents.find((event) => event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started") {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  if (started.path !== "B") {
+    return serviceFailure("stage-transition-invalid", "preparePathBStart 只适用于路径 B workflow。");
+  }
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) return serviceFailure("workflow-closed", `workflow ${input.workflowId} 已关闭。`);
+  if (view.stage !== "B1" && view.stage !== "B2") {
+    return serviceFailure("stage-transition-invalid", `路径 B 准备非法阶段：当前 ${view.stage}；要求 B1/B2。`);
+  }
+  const recorded = await recordBasis({
+    projectRoot: input.projectRoot,
+    flowId: input.flowId,
+    workflowId: input.workflowId,
+    operationId: input.operationId,
+    port: input.port,
+    reason: "path-b",
+    now,
+  });
+  if (!recorded.ok) {
+    await appendBaselineBlocked({
+      projectRoot: input.projectRoot,
+      workflowId: input.workflowId,
+      code: recorded.code,
+      summary: recorded.message,
+      now,
+    });
+    return recorded;
+  }
+  if (recorded.git === undefined) {
+    return serviceFailure("b-repository-required", "路径 B 需要既有 Git 仓库与端口回执（不自动 init）。");
+  }
+  return {
+    ok: true,
+    workflowId: input.workflowId,
+    basisId: recorded.basisId,
+    repository: recorded.git,
+    documents: recorded.documents,
+    replay: recorded.replay,
+  };
+}
+
+/** 每角色有效写集（B3 派发/提交门禁用；来源 = scope.files ∩ roster 模块属主 / 边界）。 */
+export interface PathBWriteSet {
+  roleId: string;
+  paths: string[];
+}
+
+const GOVERNANCE_DOC_PREFIXES: readonly string[] = Object.freeze([
+  "docs/product/", "docs/proposals/", "docs/contracts/", "docs/scheduling/", "docs/intents/",
+  "docs/governance/", "docs/audit/", "docs/quality/", "docs/verification/", "docs/acceptance/",
+  "docs/skills/", "docs/mcp/",
+]);
+
+function isGovernanceDocPath(candidate: string): boolean {
+  return GOVERNANCE_DOC_PREFIXES.some((prefix) => candidate.startsWith(prefix));
+}
+
+function normalizeScopePath(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.trim().replace(/\\/g, "/");
+  if (text === "") return undefined;
+  if (text.startsWith("/") || /^[a-zA-Z]:/.test(text)) return undefined;
+  const segments = text.split("/");
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) return undefined;
+  return segments.join("/");
+}
+
+function moduleContainsPath(modulePath: string, candidate: string): boolean {
+  if (modulePath.endsWith("/")) {
+    const root = modulePath.slice(0, -1);
+    return candidate === root || candidate.startsWith(modulePath);
+  }
+  return candidate === modulePath;
+}
+
+function boundaryContainsPath(entries: readonly BoundaryEntry[], candidate: string): boolean {
+  return entries.some((entry) => {
+    if (entry.root !== "project" || entry.kind === "conditional-directory") return false;
+    if (entry.kind === "directory") {
+      return candidate === entry.path || candidate.startsWith(`${entry.path}/`);
+    }
+    return candidate === entry.path;
+  });
+}
+
+/** 无 roster 旧项目：从 `角色卡/<role>/boundary.yaml|md` 读取项目边界（只读）。 */
+async function loadProjectRoleBoundaries(projectRoot: string): Promise<Map<string, BoundaryEntry[]>> {
+  const result = new Map<string, BoundaryEntry[]>();
+  let names: string[];
+  try {
+    names = await fs.readdir(path.join(projectRoot, "角色卡"));
+  } catch {
+    return result;
+  }
+  for (const roleId of names) {
+    if (roleId === "governance-boundary.yaml" || roleId.startsWith(".")) continue;
+    const yamlRel = `角色卡/${roleId}/boundary.yaml`;
+    try {
+      const text = await fs.readFile(path.join(projectRoot, ...yamlRel.split("/")), "utf8");
+      result.set(roleId, parseBoundaryYaml(text));
+      continue;
+    } catch {
+      /* 无 yaml ⇒ 尝试 md */
+    }
+    const mdRel = `角色卡/${roleId}/boundary.md`;
+    try {
+      const text = await fs.readFile(path.join(projectRoot, ...mdRel.split("/")), "utf8");
+      result.set(roleId, parseBoundarySection1(text, "project"));
+    } catch {
+      /* 无边界文件 ⇒ 不列 */
+    }
+  }
+  return result;
+}
+
+export interface DerivePathBWriteSetsInput {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  /** B2 `change.scope-decided.scope.files`（候选路径；应用解析属主，不采信模型自报模块/属主）。 */
+  scopeFiles: readonly string[];
+}
+
+export type DerivePathBWriteSetsResult =
+  | {
+      ok: true;
+      writesets: PathBWriteSet[];
+      source: "roster" | "boundary";
+      roster?: { path: string; sha256: string };
+    }
+  | WorkflowServiceFailure;
+
+/**
+ * 派生 B3 每角色有效写集（v1.3 §4.3 MF-8）：
+ *  - 有 roster：scope.files → 名单模块路径前缀匹配 → 模块属主角色（一模块一属主；无/多属主 ⇒
+ *    `b-change-scope-invalid`）；治理文档仅允许策划/产品属主（否则 `b-change-scope-requires-rapporteur`）；
+ *  - 无 roster：按 `角色卡/<role>/boundary.*` 项目边界解析（唯一属主；无法唯一归属 ⇒ `b-change-scope-invalid`，
+ *    要求走路径 A）；`.ans/**`、`角色卡/**` 永不进入实现写集。
+ */
+export async function derivePathBWriteSets(input: DerivePathBWriteSetsInput): Promise<DerivePathBWriteSetsResult> {
+  const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
+  if (!isWorkflowSlug(flowId)) return serviceFailure("b-change-scope-invalid", `flowId 非法：${String(input.flowId)}`);
+  if (!isNonEmptyText(input.workflowId)) return serviceFailure("b-change-scope-invalid", "workflowId 缺失。");
+  if (!Array.isArray(input.scopeFiles) || input.scopeFiles.length === 0) {
+    return serviceFailure("b-change-scope-invalid", "scope.files 为空：B3 写集来源缺失（要求至少一个候选路径）。", ["scope.files"]);
+  }
+  const normalized: string[] = [];
+  for (const raw of input.scopeFiles) {
+    const candidate = normalizeScopePath(raw);
+    if (candidate === undefined) return serviceFailure("b-change-scope-invalid", `scope 路径非法：${String(raw)}`);
+    if (candidate === ".ans" || candidate.startsWith(".ans/")) {
+      return serviceFailure("b-change-scope-invalid", `.ans/** 属应用写区，不得纳入实现写集：${candidate}`);
+    }
+    if (candidate === "角色卡" || candidate.startsWith("角色卡/")) {
+      return serviceFailure("b-change-scope-invalid", `角色卡/** 属角色/人事写区，不得纳入实现写集：${candidate}`);
+    }
+    if (!normalized.includes(candidate)) normalized.push(candidate);
+  }
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  const started = wfEvents.find((event) => event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started") {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  if (started.path !== "B") {
+    return serviceFailure("b-change-scope-invalid", "B3 写集派生只适用于路径 B workflow（A 路径用团队计划 writesets）。");
+  }
+  const roster = await loadLatestRoster({ projectRoot: input.projectRoot, flowId });
+  if (roster.ok) {
+    const byRole = new Map<string, string[]>();
+    for (const candidate of normalized) {
+      const owners = new Set<string>();
+      let matchedModule = false;
+      for (const module of roster.roster.modules) {
+        if (module.paths.some((modulePath) => moduleContainsPath(modulePath, candidate))) {
+          matchedModule = true;
+          for (const role of roster.roster.roles) {
+            if (role.modules.includes(module.id)) owners.add(role.id);
+          }
+        }
+      }
+      if (!matchedModule || owners.size !== 1) {
+        return serviceFailure(
+          "b-change-scope-invalid",
+          `${matchedModule ? `路径属主不唯一（${[...owners].join("、") || "无"}）` : "路径不属于任何名单模块"}：${candidate}（不得猜属主）。`,
+        );
+      }
+      const owner = [...owners][0]!;
+      if (isGovernanceDocPath(candidate) && owner !== "rapporteur" && owner !== "product") {
+        return serviceFailure(
+          "b-change-scope-requires-rapporteur",
+          `治理文档修改须由策划/产品出新 -vN 并 basis.amended（属主 ${owner}）：${candidate}。`,
+        );
+      }
+      const list = byRole.get(owner) ?? [];
+      list.push(candidate);
+      byRole.set(owner, list);
+    }
+    const writesets = [...byRole.entries()]
+      .map(([roleId, paths]) => ({ roleId, paths: [...paths].sort() }))
+      .sort((a, b) => a.roleId.localeCompare(b.roleId));
+    return { ok: true, writesets, source: "roster", roster: { path: roster.path, sha256: roster.sha256 } };
+  }
+  const boundaries = await loadProjectRoleBoundaries(input.projectRoot);
+  if (boundaries.size === 0) {
+    return serviceFailure(
+      "b-change-scope-invalid",
+      "无名单且未找到 角色卡/<role>/boundary.*：无法派生属主（要求走路径 A 补名单/团队计划）。",
+    );
+  }
+  const byRole = new Map<string, string[]>();
+  for (const candidate of normalized) {
+    const owners = [...boundaries.entries()]
+      .filter(([, entries]) => boundaryContainsPath(entries, candidate))
+      .map(([roleId]) => roleId);
+    if (owners.length !== 1) {
+      return serviceFailure(
+        "b-change-scope-invalid",
+        `边界属主不唯一（${owners.join("、") || "无"}）：${candidate}；无法唯一归属时要求走路径 A。`,
+      );
+    }
+    const owner = owners[0]!;
+    if (isGovernanceDocPath(candidate) && owner !== "rapporteur" && owner !== "product") {
+      return serviceFailure(
+        "b-change-scope-requires-rapporteur",
+        `治理文档修改须由策划/产品出新 -vN 并 basis.amended（属主 ${owner}）：${candidate}。`,
+      );
+    }
+    const list = byRole.get(owner) ?? [];
+    list.push(candidate);
+    byRole.set(owner, list);
+  }
+  const writesets = [...byRole.entries()]
+    .map(([roleId, paths]) => ({ roleId, paths: [...paths].sort() }))
+    .sort((a, b) => a.roleId.localeCompare(b.roleId));
+  return { ok: true, writesets, source: "boundary" };
+}
+
+export interface RecordChangeScopeDecisionInput {
+  projectRoot: string;
+  flowId: string;
+  workflowId: string;
+  operationId?: string;
+  /** B1 影响面报告（应用重算字节 hash；不一致 ⇒ b-change-scope-invalid）。 */
+  impactReport: { path: string; sha256: string };
+  scope: { summary: string; files?: string[]; rationale?: string };
+  /** 触发 B1/B2 的 stage-request 任务 id（审计绑定）。 */
+  requestTaskId: string;
+  now?: () => Date;
+}
+
+export type RecordChangeScopeDecisionResult =
+  | {
+      ok: true;
+      workflowId: string;
+      writesets: PathBWriteSet[];
+      eventId: string;
+      replay: boolean;
+    }
+  | WorkflowServiceFailure;
+
+/**
+ * B2 范围决定（`change.scope-decided`；v1.3 §4.3/§7.1）：校验影响面报告字节 hash、派生 B3 有效写集
+ * （`derivePathBWriteSets`）、写账本事件（幂等 `scope:<wf>:<impactSha>:<scopeDigest>`）。
+ * 投影据此完成 B2；scope 越界/无法唯一归属 ⇒ `b-change-scope-invalid`（要求走 A/新 basis）。
+ */
+export async function recordChangeScopeDecision(input: RecordChangeScopeDecisionInput): Promise<RecordChangeScopeDecisionResult> {
+  const now = input.now ?? (() => new Date());
+  if (!isNonEmptyText(input.workflowId)) return serviceFailure("b-change-scope-invalid", "workflowId 缺失。");
+  if (!isNonEmptyText(input.requestTaskId)) return serviceFailure("b-change-scope-invalid", "requestTaskId 缺失。");
+  if (!isProjectRelativePath(input.impactReport.path) || !isSha256Hex(input.impactReport.sha256)) {
+    return serviceFailure("b-change-scope-invalid", "impactReport 形状非法（path + 64 hex sha256）。");
+  }
+  if (typeof input.scope.summary !== "string" || input.scope.summary.trim() === "") {
+    return serviceFailure("b-change-scope-invalid", "scope.summary 缺失。");
+  }
+  const impact = await readAndHash(input.projectRoot, input.impactReport.path);
+  if (!impact.ok || impact.sha256 !== input.impactReport.sha256) {
+    return serviceFailure("b-change-scope-invalid", `影响面报告不可读或字节 hash 不一致：${input.impactReport.path}。`);
+  }
+  const ledger = await readWorkflowLedger(input.projectRoot);
+  const wfEvents = workflowEventList(ledger.events, input.workflowId);
+  const started = wfEvents.find((event) => event.kind === "workflow.started");
+  if (started === undefined || started.kind !== "workflow.started") {
+    return serviceFailure("workflow-not-found", `workflow ${input.workflowId} 不存在。`);
+  }
+  if (started.path !== "B") return serviceFailure("b-change-scope-invalid", "change.scope-decided 只适用于路径 B workflow。");
+  const derived = await derivePathBWriteSets({
+    projectRoot: input.projectRoot,
+    flowId: input.flowId,
+    workflowId: input.workflowId,
+    scopeFiles: input.scope.files ?? [],
+  });
+  if (!derived.ok) return derived;
+  const files = [...new Set((input.scope.files ?? []).map((raw) => normalizeScopePath(raw)!))].sort();
+  const scopeDigest = sha256Of(JSON.stringify({
+    summary: input.scope.summary,
+    files,
+    rationale: input.scope.rationale ?? null,
+  })).slice(0, 24);
+  const idempotencyKey = `scope:${input.workflowId}:${input.impactReport.sha256}:${scopeDigest}`;
+  const existing = wfEvents.find((event) => event.kind === "change.scope-decided" && event.idempotencyKey === idempotencyKey);
+  if (existing !== undefined && existing.kind === "change.scope-decided") {
+    return {
+      ok: true,
+      workflowId: input.workflowId,
+      writesets: existing.effectiveWritesets.map((set) => ({ roleId: set.roleId, paths: [...set.paths] })),
+      eventId: existing.idempotencyKey,
+      replay: true,
+    };
+  }
+  const tasks = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, tasks.events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) return serviceFailure("workflow-closed", `workflow ${input.workflowId} 已关闭。`);
+  const b2Allowed = (view.stage === "B2" && canCompleteStage(view, "B2"))
+    || (view.stage === "B1" && view.stages.B1.status === "completed"
+      && (view.stages.B2.status === "pending" || view.stages.B2.status === "failed"));
+  if (!b2Allowed) {
+    return serviceFailure("stage-transition-invalid", `B2 范围决定非法：当前 ${view.stage}(${view.stages[view.stage].status})。`);
+  }
+  const at = now().toISOString();
+  const event: WorkflowEvent = {
+    v: 1,
+    at,
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "change.scope-decided",
+    workflowId: input.workflowId,
+    flowId: view.flowId,
+    path: "B",
+    idempotencyKey,
+    impactReport: { path: input.impactReport.path, sha256: input.impactReport.sha256 },
+    scope: {
+      summary: input.scope.summary,
+      files,
+      ...(input.scope.rationale !== undefined ? { rationale: input.scope.rationale } : {}),
+    },
+    effectiveWritesets: derived.writesets.map((set) => ({ roleId: set.roleId, paths: [...set.paths] })),
+    decidedBy: "chief",
+    requestTaskId: input.requestTaskId,
+  };
+  const appended = await appendWorkflowEvent(input.projectRoot, event);
+  if (!appended.ok) return serviceFailure("workflow-ledger-write-failed", `change.scope-decided 写入失败：${appended.message}`);
+  return {
+    ok: true,
+    workflowId: input.workflowId,
+    writesets: derived.writesets,
+    eventId: appended.event.idempotencyKey,
+    replay: appended.replay,
+  };
+}
+
