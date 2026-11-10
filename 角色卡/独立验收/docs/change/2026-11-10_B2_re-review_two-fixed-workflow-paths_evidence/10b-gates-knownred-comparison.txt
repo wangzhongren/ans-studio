@@ -1,0 +1,3 @@
+# test/门禁引擎 domain on candidate 79e16a1: 528 tests / 522 pass / 5 fail / 1 skip
+# compare vs B2 pre-review evidence 21-gates-domain-full.tap (HEAD e28923c) failing names:
+# diff (empty = identical):

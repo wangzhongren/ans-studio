@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行）
+ok 1 - 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行）
+  ---
+  duration_ms: 741.555
+  type: 'test'
+  ...
+# Subtest: 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed
+ok 2 - 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed
+  ---
+  duration_ms: 689.8007
+  type: 'test'
+  ...
+# Subtest: 混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）
+ok 3 - 混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）
+  ---
+  duration_ms: 52.8376
+  type: 'test'
+  ...
+# Subtest: 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场）
+ok 4 - 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场）
+  ---
+  duration_ms: 67.605
+  type: 'test'
+  ...
+# Subtest: 配置写回失败（坏 .ans/project.json）⇒ project-config-write-failed fail-closed；不派发、不弹卡、不改文件
+ok 5 - 配置写回失败（坏 .ans/project.json）⇒ project-config-write-failed fail-closed；不派发、不弹卡、不改文件
+  ---
+  duration_ms: 4.218
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2388.4307

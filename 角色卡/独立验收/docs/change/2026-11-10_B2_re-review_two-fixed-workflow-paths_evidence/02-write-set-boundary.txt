@@ -1,0 +1,56 @@
+# B2 re-review write-set/boundary checks (HEAD 79e16a1)
+
+## git status --porcelain -- src app test (expect empty)
+
+## src/common/gates diff vs 10f90c7 (expect empty)
+
+## package/config diff vs 10f90c7 (expect empty)
+
+## legacy test files diff vs 10f90c7
+### star-routing.test.ts + i-full-chain.test.ts (expect empty)
+### module-consumption 6 files (expect empty)
+### roles differential/oracle (expect empty)
+### workflow-preconditions.test.ts (2-line doc-text sync; see diff)
+diff --git a/test/编排/workflow-preconditions.test.ts b/test/编排/workflow-preconditions.test.ts
+index faf9cf1..ac7cf0c 100644
+--- a/test/编排/workflow-preconditions.test.ts
++++ b/test/编排/workflow-preconditions.test.ts
+@@ -1079,8 +1079,8 @@ test("AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期
+       topic: "roster" as const,
+       constant: PROJECT_ROSTER_SCHEMA,
+       expected: [
+-        `文档：docs/proposals/<flowId>-roster-vN.md（schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
+-        `- schema: 字面量 ${PROJECT_ROSTER_SCHEMA}`,
++        `文档：docs/proposals/<flowId>-roster-vN.md（schema 须为 ${PROJECT_ROSTER_SCHEMA} 或 project-roster/v4；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
++        `- schema: ${PROJECT_ROSTER_SCHEMA} 或 project-roster/v4（v4 仅增可选 roles[].review）`,
+         `schema: ${PROJECT_ROSTER_SCHEMA}`,
+       ],
+     },
+
+## 角色卡 non-record file changes vs 10f90c7 (commit 89e0ed6, role-owned docs; boundary-authorized)
+ 角色卡/chief-code/api-spec.md      | 45 +++++++++++++++++++++++++--
+ 角色卡/product-code/api-spec.md    | 63 ++++++++++++++++++++++++++++++++------
+ 角色卡/product-code/feature-map.md |  3 +-
+ 角色卡/product-code/memo.md        | 33 ++++++++++++++++++++
+ 4 files changed, 131 insertions(+), 13 deletions(-)
+
+## 角色卡 boundary/role-card files diff vs 10f90c7 (expect empty)
+(check glob support separately)
+
+## commit 89e0ed6 stat
+89e0ed6 docs(roles): B2 api-spec and memo updates
+ 角色卡/chief-code/api-spec.md      | 45 +++++++++++++++++++++++++--
+ 角色卡/product-code/api-spec.md    | 63 ++++++++++++++++++++++++++++++++------
+ 角色卡/product-code/feature-map.md |  3 +-
+ 角色卡/product-code/memo.md        | 33 ++++++++++++++++++++
+ 4 files changed, 131 insertions(+), 13 deletions(-)
+
+## role-card/boundary/changelog functional file changes vs 10f90c7 (expect none)
+(none)
+
+## all non-docs/change|docs/design 角色卡 changes vs 10f90c7
+角色卡/chief-code/api-spec.md
+角色卡/product-code/api-spec.md
+角色卡/product-code/feature-map.md
+角色卡/product-code/memo.md
+(end)

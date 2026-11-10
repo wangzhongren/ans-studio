@@ -1,0 +1,1357 @@
+TAP version 13
+# Subtest: 空数组 → []
+ok 1 - 空数组 → []
+  ---
+  duration_ms: 0.7681
+  type: 'test'
+  ...
+# Subtest: 非数组入参一律 → []（null/undefined/标量/对象；绝不抛错）
+ok 2 - 非数组入参一律 → []（null/undefined/标量/对象；绝不抛错）
+  ---
+  duration_ms: 0.1167
+  type: 'test'
+  ...
+# Subtest: 只保留字符串项，丢弃数字/布尔/null/undefined/对象/嵌套数组
+ok 3 - 只保留字符串项，丢弃数字/布尔/null/undefined/对象/嵌套数组
+  ---
+  duration_ms: 0.1196
+  type: 'test'
+  ...
+# Subtest: 保序：字符串项按出现顺序保留
+ok 4 - 保序：字符串项按出现顺序保留
+  ---
+  duration_ms: 0.056
+  type: 'test'
+  ...
+# Subtest: 空串是合法字符串项，**保留**（不丢弃、不视为非字符串）
+ok 5 - 空串是合法字符串项，**保留**（不丢弃、不视为非字符串）
+  ---
+  duration_ms: 0.059
+  type: 'test'
+  ...
+# Subtest: 含空格/引号的项**逐字保留**（不裁剪空白、不加转义）
+ok 6 - 含空格/引号的项**逐字保留**（不裁剪空白、不加转义）
+  ---
+  duration_ms: 0.0495
+  type: 'test'
+  ...
+# Subtest: Windows 与 POSIX 路径**原样保留**（不规范化分隔符/大小写）
+ok 7 - Windows 与 POSIX 路径**原样保留**（不规范化分隔符/大小写）
+  ---
+  duration_ms: 0.1063
+  type: 'test'
+  ...
+# Subtest: **不去重**：重复项全部保留（每次出现都留）
+ok 8 - **不去重**：重复项全部保留（每次出现都留）
+  ---
+  duration_ms: 0.0781
+  type: 'test'
+  ...
+# Subtest: 选项/旗标形态（含前导 - 与 --）逐字保留
+ok 9 - 选项/旗标形态（含前导 - 与 --）逐字保留
+  ---
+  duration_ms: 0.077
+  type: 'test'
+  ...
+# Subtest: Unicode 与 emoji 逐字保留
+ok 10 - Unicode 与 emoji 逐字保留
+  ---
+  duration_ms: 0.0975
+  type: 'test'
+  ...
+# Subtest: 不修改入参数组（纯函数；不改可变入参的长度或元素）
+ok 11 - 不修改入参数组（纯函数；不改可变入参的长度或元素）
+  ---
+  duration_ms: 0.0615
+  type: 'test'
+  ...
+# Subtest: 返回值是新数组（与入参非同一引用）
+ok 12 - 返回值是新数组（与入参非同一引用）
+  ---
+  duration_ms: 0.0658
+  type: 'test'
+  ...
+# Subtest: ① 瞬时 EPERM 连续 5 次后被兜住：op 第 6 次成功即返回
+ok 13 - ① 瞬时 EPERM 连续 5 次后被兜住：op 第 6 次成功即返回
+  ---
+  duration_ms: 2.1205
+  type: 'test'
+  ...
+# Subtest: ① 同一瞬时集合：EBUSY / EACCES 亦被重试（非只认 EPERM）
+ok 14 - ① 同一瞬时集合：EBUSY / EACCES 亦被重试（非只认 EPERM）
+  ---
+  duration_ms: 0.4743
+  type: 'test'
+  ...
+# Subtest: ① 非瞬时错**立即抛**、绝不重试（ENOENT/EISDIR/EROFS/无 code）
+ok 15 - ① 非瞬时错**立即抛**、绝不重试（ENOENT/EISDIR/EROFS/无 code）
+  ---
+  duration_ms: 0.409
+  type: 'test'
+  ...
+# Subtest: ① 有界：持续瞬时错耗尽上界后**照抛**（不吞、不伪装成功）
+ok 16 - ① 有界：持续瞬时错耗尽上界后**照抛**（不吞、不伪装成功）
+  ---
+  duration_ms: 0.3484
+  type: 'test'
+  ...
+# Subtest: ① 边界：上界-1 次瞬时后成功（恰好用满上界即返回，非超界）
+ok 17 - ① 边界：上界-1 次瞬时后成功（恰好用满上界即返回，非超界）
+  ---
+  duration_ms: 0.2959
+  type: 'test'
+  ...
+# Subtest: ① 次数之间**让出事件循环**（setImmediate），非忙等 / 非固定 sleep
+ok 18 - ① 次数之间**让出事件循环**（setImmediate），非忙等 / 非固定 sleep
+  ---
+  duration_ms: 0.6061
+  type: 'test'
+  ...
+# Subtest: ② atomicWrite 写 string：内容完整、目录内**无 temp 残留**
+ok 19 - ② atomicWrite 写 string：内容完整、目录内**无 temp 残留**
+  ---
+  duration_ms: 11.1884
+  type: 'test'
+  ...
+# Subtest: ② atomicWrite 写 Buffer：内容逐字节完整（供 Pi适配器复用字节语义）
+ok 20 - ② atomicWrite 写 Buffer：内容逐字节完整（供 Pi适配器复用字节语义）
+  ---
+  duration_ms: 7.4408
+  type: 'test'
+  ...
+# Subtest: ② atomicWrite **覆盖已存在目标**：整体替换、无残留（真实经历 rename 覆盖分支）
+ok 21 - ② atomicWrite **覆盖已存在目标**：整体替换、无残留（真实经历 rename 覆盖分支）
+  ---
+  duration_ms: 10.2635
+  type: 'test'
+  ...
+# Subtest: ② atomicWrite 目标目录不存在 → 显式抛错、不创建目录、无残留
+ok 22 - ② atomicWrite 目标目录不存在 → 显式抛错、不创建目录、无残留
+  ---
+  duration_ms: 0.8672
+  type: 'test'
+  ...
+# Subtest: ② renameReplacingExisting 覆盖已存在目标成功（原语直测）
+ok 23 - ② renameReplacingExisting 覆盖已存在目标成功（原语直测）
+  ---
+  duration_ms: 7.4626
+  type: 'test'
+  ...
+# Subtest: ② 已中止的原子写与 rename 不产生临时文件或替换目标
+ok 24 - ② 已中止的原子写与 rename 不产生临时文件或替换目标
+  ---
+  duration_ms: 1.9639
+  type: 'test'
+  ...
+# Subtest: ② temp fsync 后中止：保留旧目标，清理未提交的完整 temp
+ok 25 - ② temp fsync 后中止：保留旧目标，清理未提交的完整 temp
+  ---
+  duration_ms: 4.8322
+  type: 'test'
+  ...
+# Subtest: ③ 并发自争用：多路 atomicWrite 反复覆盖**同一目标**，全部成功、无 temp 残留
+ok 26 - ③ 并发自争用：多路 atomicWrite 反复覆盖**同一目标**，全部成功、无 temp 残留
+  ---
+  duration_ms: 4183.6874
+  type: 'test'
+  ...
+# Subtest: ③ 失败路径安全：目标不可被替换时 atomicWrite 显式抛出、temp 已清、目标未受损
+ok 27 - ③ 失败路径安全：目标不可被替换时 atomicWrite 显式抛出、temp 已清、目标未受损
+  ---
+  duration_ms: 23.2529
+  type: 'test'
+  ...
+# Subtest: ③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=200，由实测尾部≈63 留 ~3x 余量）
+ok 28 - ③ 上界常量与实测一致（RENAME_MAX_ATTEMPTS=200，由实测尾部≈63 留 ~3x 余量）
+  ---
+  duration_ms: 0.0979
+  type: 'test'
+  ...
+# Subtest: D3 finalMode 非法时不创建临时文件或替换目标
+ok 29 - D3 finalMode 非法时不创建临时文件或替换目标
+  ---
+  duration_ms: 2.481
+  type: 'test'
+  ...
+# Subtest: D3 finalMode 应用普通权限位，未传时保持既有安全创建行为
+ok 30 - D3 finalMode 应用普通权限位，未传时保持既有安全创建行为 # SKIP
+  ---
+  duration_ms: 0.0619
+  type: 'test'
+  ...
+# Subtest: D3 严格 umask 下 finalMode 不丢执行位（独立子进程）
+ok 31 - D3 严格 umask 下 finalMode 不丢执行位（独立子进程） # SKIP
+  ---
+  duration_ms: 0.0207
+  type: 'test'
+  ...
+# Subtest: D3 chmod 失败不提交内容或权限，并清理临时文件
+ok 32 - D3 chmod 失败不提交内容或权限，并清理临时文件 # SKIP
+  ---
+  duration_ms: 0.0141
+  type: 'test'
+  ...
+# Subtest: D3 sync 失败不提交内容或权限，并清理临时文件
+ok 33 - D3 sync 失败不提交内容或权限，并清理临时文件 # SKIP
+  ---
+  duration_ms: 0.013
+  type: 'test'
+  ...
+# Subtest: D3 chmod 完成后中止仍保留原文件及权限
+ok 34 - D3 chmod 完成后中止仍保留原文件及权限 # SKIP
+  ---
+  duration_ms: 0.013
+  type: 'test'
+  ...
+# Subtest: ansProjectPath：项目根下 .ans/project.json；常量导出不变
+ok 35 - ansProjectPath：项目根下 .ans/project.json；常量导出不变
+  ---
+  duration_ms: 0.6156
+  type: 'test'
+  ...
+# Subtest: .ans 合法（带 pin）→ 注入 roles/governanceBoundary/acceptance，pin 保留
+ok 36 - .ans 合法（带 pin）→ 注入 roles/governanceBoundary/acceptance，pin 保留
+  ---
+  duration_ms: 17.9938
+  type: 'test'
+  ...
+# Subtest: .ans 声明 accepted:true 无 pin → 未接受且 source 清空（fail-closed，§3.3）
+ok 37 - .ans 声明 accepted:true 无 pin → 未接受且 source 清空（fail-closed，§3.3）
+  ---
+  duration_ms: 4.6477
+  type: 'test'
+  ...
+# Subtest: 终态规则纯函数：accepted:true 无 pin → 降级并清空 source；有 pin / accepted:false → 不变
+ok 38 - 终态规则纯函数：accepted:true 无 pin → 降级并清空 source；有 pin / accepted:false → 不变
+  ---
+  duration_ms: 0.1388
+  type: 'test'
+  ...
+# Subtest: 终态规则：pin 为空数组（声明了但无条目）同样降级（无有效证据）
+ok 39 - 终态规则：pin 为空数组（声明了但无条目）同样降级（无有效证据）
+  ---
+  duration_ms: 0.0702
+  type: 'test'
+  ...
+# Subtest: pin 与 hash 不符 → 载入层保留（pin 存在），引擎 verifyPins 判未接受
+ok 40 - pin 与 hash 不符 → 载入层保留（pin 存在），引擎 verifyPins 判未接受
+  ---
+  duration_ms: 8.6794
+  type: 'test'
+  ...
+# Subtest: .ans 合法且 pin 匹配 → 引擎解析后仍 accepted=true（对照）
+ok 41 - .ans 合法且 pin 匹配 → 引擎解析后仍 accepted=true（对照）
+  ---
+  duration_ms: 5.8458
+  type: 'test'
+  ...
+# Subtest: 无 .ans/project.json → 回退入参 fallback（原样、不崩）
+ok 42 - 无 .ans/project.json → 回退入参 fallback（原样、不崩）
+  ---
+  duration_ms: 0.5803
+  type: 'test'
+  ...
+# Subtest: 无 .ans 且回退配置自称 accepted:true（演示路径）→ 原样带出、不崩
+ok 43 - 无 .ans 且回退配置自称 accepted:true（演示路径）→ 原样带出、不崩
+  ---
+  duration_ms: 0.4695
+  type: 'test'
+  ...
+# Subtest: .ans 存在但 JSON 不可解析 → fail-closed 未接受，不回退演示 acceptance
+ok 44 - .ans 存在但 JSON 不可解析 → fail-closed 未接受，不回退演示 acceptance
+  ---
+  duration_ms: 4.1758
+  type: 'test'
+  ...
+# Subtest: .ans 存在但顶层非对象（如数组）→ fail-closed 未接受，不回退
+ok 45 - .ans 存在但顶层非对象（如数组）→ fail-closed 未接受，不回退
+  ---
+  duration_ms: 9.81
+  type: 'test'
+  ...
+# Subtest: ansDirName 覆盖：从自定义目录载入（不影响默认 .ans）
+ok 46 - ansDirName 覆盖：从自定义目录载入（不影响默认 .ans）
+  ---
+  duration_ms: 5.5587
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：无 .ans → absent（不建文件、不猜测）
+ok 47 - readGovernanceModel：无 .ans → absent（不建文件、不猜测）
+  ---
+  duration_ms: 0.5182
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：显式 single / trio → explicit
+ok 48 - readGovernanceModel：显式 single / trio → explicit
+  ---
+  duration_ms: 17.992
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：字段缺失/非法值 → absent（不猜测）
+ok 49 - readGovernanceModel：字段缺失/非法值 → absent（不猜测）
+  ---
+  duration_ms: 50.5089
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：JSON 不可解析 → unreadable（不崩）
+ok 50 - readGovernanceModel：JSON 不可解析 → unreadable（不崩）
+  ---
+  duration_ms: 1.0367
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：顶层非对象 → unreadable
+ok 51 - readGovernanceModel：顶层非对象 → unreadable
+  ---
+  duration_ms: 1.0016
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：文件不可读（目录占位）→ unreadable
+ok 52 - readGovernanceModel：文件不可读（目录占位）→ unreadable
+  ---
+  duration_ms: 0.8241
+  type: 'test'
+  ...
+# Subtest: readGovernanceModel：ansDirName 覆盖读取自定义目录
+ok 53 - readGovernanceModel：ansDirName 覆盖读取自定义目录
+  ---
+  duration_ms: 4.2005
+  type: 'test'
+  ...
+# Subtest: loadEffectiveConfig：显式 trio 注入 project.governanceModel，acceptance/pin 语义不变
+ok 54 - loadEffectiveConfig：显式 trio 注入 project.governanceModel，acceptance/pin 语义不变
+  ---
+  duration_ms: 5.0419
+  type: 'test'
+  ...
+# Subtest: loadEffectiveConfig：governanceModel 不改变『accepted:true 无 pin』降级
+ok 55 - loadEffectiveConfig：governanceModel 不改变『accepted:true 无 pin』降级
+  ---
+  duration_ms: 16.0312
+  type: 'test'
+  ...
+# Subtest: loadEffectiveConfig：缺失/非法 governanceModel 不填（旧项目默认 single）
+ok 56 - loadEffectiveConfig：缺失/非法 governanceModel 不填（旧项目默认 single）
+  ---
+  duration_ms: 3.8467
+  type: 'test'
+  ...
+# Subtest: loadEffectiveConfig：.ans 不可解析 → ans-invalid，模型不填（不崩）
+ok 57 - loadEffectiveConfig：.ans 不可解析 → ans-invalid，模型不填（不崩）
+  ---
+  duration_ms: 0.9997
+  type: 'test'
+  ...
+# Subtest: loadEffectiveConfig：未知迁移标记字段被忽略，不改变模型/acceptance
+ok 58 - loadEffectiveConfig：未知迁移标记字段被忽略，不改变模型/acceptance
+  ---
+  duration_ms: 6.5074
+  type: 'test'
+  ...
+# Subtest: workflowSchema 缺省 ⇒ 不设字段，governanceModel/roles/acceptance 逐字保留（旧行为不变）
+ok 59 - workflowSchema 缺省 ⇒ 不设字段，governanceModel/roles/acceptance 逐字保留（旧行为不变）
+  ---
+  duration_ms: 5.6991
+  type: 'test'
+  ...
+# Subtest: workflowSchema 合法两值均被载入，其它键（governanceModel/roles/acceptance/pin）保留
+ok 60 - workflowSchema 合法两值均被载入，其它键（governanceModel/roles/acceptance/pin）保留
+  ---
+  duration_ms: 12.9364
+  type: 'test'
+  ...
+# Subtest: workflowSchema 非法值 ⇒ fail-closed（ans-invalid），不得静默当缺省
+ok 61 - workflowSchema 非法值 ⇒ fail-closed（ans-invalid），不得静默当缺省
+  ---
+  duration_ms: 72.8552
+  type: 'test'
+  ...
+# Subtest: workflowSchema 与既有终态规则互不影响：合法值 + accepted:true 无 pin ⇒ 仍降级且 schema 保留
+ok 62 - workflowSchema 与既有终态规则互不影响：合法值 + accepted:true 无 pin ⇒ 仍降级且 schema 保留
+  ---
+  duration_ms: 7.9143
+  type: 'test'
+  ...
+# Subtest: 无 .ans ⇒ 回退 fallback 原样；不凭空设置 workflowSchema
+ok 63 - 无 .ans ⇒ 回退 fallback 原样；不凭空设置 workflowSchema
+  ---
+  duration_ms: 0.4438
+  type: 'test'
+  ...
+# Subtest: workflowSchema：ansDirName 覆盖同样生效（自定义目录载入两值）
+ok 64 - workflowSchema：ansDirName 覆盖同样生效（自定义目录载入两值）
+  ---
+  duration_ms: 5.7826
+  type: 'test'
+  ...
+# Subtest: 未配置不写盘，配置后门面记录有序元数据
+ok 65 - 未配置不写盘，配置后门面记录有序元数据
+  ---
+  duration_ms: 18.4579
+  type: 'test'
+  ...
+# Subtest: 执行时限元数据落盘：timeoutMs 有限数值保留、非有限丢弃；命令正文摘要不入白名单
+ok 66 - 执行时限元数据落盘：timeoutMs 有限数值保留、非有限丢弃；命令正文摘要不入白名单
+  ---
+  duration_ms: 11.3445
+  type: 'test'
+  ...
+# Subtest: view_image 审计字段落盘：mimeType/bytes/mode 保留；图片内容与非法字段值丢弃
+ok 67 - view_image 审计字段落盘：mimeType/bytes/mode 保留；图片内容与非法字段值丢弃
+  ---
+  duration_ms: 15.1048
+  type: 'test'
+  ...
+# Subtest: 精确滚动24h边界：旧行清除，边界行保留，不碰非诊断文件
+ok 68 - 精确滚动24h边界：旧行清除，边界行保留，不碰非诊断文件
+  ---
+  duration_ms: 12.5373
+  type: 'test'
+  ...
+# Subtest: 写入时清除24h前的最后一条旧日志
+ok 69 - 写入时清除24h前的最后一条旧日志
+  ---
+  duration_ms: 10.1774
+  type: 'test'
+  ...
+# Subtest: 清理和日志追加串行，不丢并发事件
+ok 70 - 清理和日志追加串行，不丢并发事件
+  ---
+  duration_ms: 38.4754
+  type: 'test'
+  ...
+# Subtest: 错误日志净化凭据和Bearer，不存原对象或源内容
+ok 71 - 错误日志净化凭据和Bearer，不存原对象或源内容
+  ---
+  duration_ms: 5.8218
+  type: 'test'
+  ...
+# [ans-diagnostics] Error: EEXIST: file already exists, mkdir 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-diagnostics-E2u727\\occupied'
+# [ans-diagnostics] Error: EEXIST: file already exists, mkdir 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-diagnostics-E2u727\\occupied'
+# Subtest: 存储失败不抛业务异常，状态可查且仍固定24h
+ok 72 - 存储失败不抛业务异常，状态可查且仍固定24h
+  ---
+  duration_ms: 3.0553
+  type: 'test'
+  ...
+# Subtest: 维护定时器自动清理24h前记录
+ok 73 - 维护定时器自动清理24h前记录
+  ---
+  duration_ms: 86.6556
+  type: 'test'
+  ...
+# Subtest: 真实维护定时器不阻止进程正常退出
+ok 74 - 真实维护定时器不阻止进程正常退出
+  ---
+  duration_ms: 65.7656
+  type: 'test'
+  ...
+# Subtest: ① 只改相关键：仅目标值行变化，其余（注释/空行/未知键/无关键）逐字节保留
+ok 75 - ① 只改相关键：仅目标值行变化，其余（注释/空行/未知键/无关键）逐字节保留
+  ---
+  duration_ms: 1.0378
+  type: 'test'
+  ...
+# Subtest: ① 一次更新多个键：只改这些键的行，其余不变（顺序不变）
+ok 76 - ① 一次更新多个键：只改这些键的行，其余不变（顺序不变）
+  ---
+  duration_ms: 0.2147
+  type: 'test'
+  ...
+# Subtest: ① 更新为空 → 恒等（返回原文）
+ok 77 - ① 更新为空 → 恒等（返回原文）
+  ---
+  duration_ms: 0.0749
+  type: 'test'
+  ...
+# Subtest: ② 键不存在 → 追加到末尾，原有内容逐字节不变
+ok 78 - ② 键不存在 → 追加到末尾，原有内容逐字节不变
+  ---
+  duration_ms: 0.1157
+  type: 'test'
+  ...
+# Subtest: ② 键不存在 → 追加；原文件无尾随换行时先补行尾，不粘连
+ok 79 - ② 键不存在 → 追加；原文件无尾随换行时先补行尾，不粘连
+  ---
+  duration_ms: 0.1053
+  type: 'test'
+  ...
+# Subtest: ② 已存在 → 就地替换（行序不变）；同键多行 → 全部替换保持一致
+ok 80 - ② 已存在 → 就地替换（行序不变）；同键多行 → 全部替换保持一致
+  ---
+  duration_ms: 0.0627
+  type: 'test'
+  ...
+# Subtest: ② 空文件 → 直接写出新键
+ok 81 - ② 空文件 → 直接写出新键
+  ---
+  duration_ms: 0.467
+  type: 'test'
+  ...
+# Subtest: ② 保留 `export ` 前缀与 `=` 两侧空白格式
+ok 82 - ② 保留 `export ` 前缀与 `=` 两侧空白格式
+  ---
+  duration_ms: 0.0816
+  type: 'test'
+  ...
+# Subtest: ③ 值含 `=`：不加引号即可，读回原样（值取自首个 `=` 之后）
+ok 83 - ③ 值含 `=`：不加引号即可，读回原样（值取自首个 `=` 之后）
+  ---
+  duration_ms: 0.09
+  type: 'test'
+  ...
+# Subtest: ③ 值含 空格 / `\#` / 双引号 / 单引号 / 反斜杠：加引号转义，读回**逐字**一致
+ok 84 - ③ 值含 空格 / `\#` / 双引号 / 单引号 / 反斜杠：加引号转义，读回**逐字**一致
+  ---
+  duration_ms: 0.195
+  type: 'test'
+  ...
+# Subtest: ③ 替换已存在的带引号值：保留原引号风格，且可读回
+ok 85 - ③ 替换已存在的带引号值：保留原引号风格，且可读回
+  ---
+  duration_ms: 0.1065
+  type: 'test'
+  ...
+# Subtest: ③ 保留内联注释（替换值时注释不丢）
+ok 86 - ③ 保留内联注释（替换值时注释不丢）
+  ---
+  duration_ms: 0.0578
+  type: 'test'
+  ...
+# Subtest: ③ parse：基本形态（注释/空行/export/引号/内联注释/重复后者胜）
+ok 87 - ③ parse：基本形态（注释/空行/export/引号/内联注释/重复后者胜）
+  ---
+  duration_ms: 0.0653
+  type: 'test'
+  ...
+# Subtest: ③ 空值往返：`KEY=` 与原样 `KEY=` 保持一致
+ok 88 - ③ 空值往返：`KEY=` 与原样 `KEY=` 保持一致
+  ---
+  duration_ms: 0.0378
+  type: 'test'
+  ...
+# Subtest: ③ CRLF 行尾保留（不把 \\r\\n 变成 \\n）
+ok 89 - ③ CRLF 行尾保留（不把 \\r\\n 变成 \\n）
+  ---
+  duration_ms: 0.0397
+  type: 'test'
+  ...
+# Subtest: ④ atomicWriteText 写入内容完整，且目录内无临时文件残留
+ok 90 - ④ atomicWriteText 写入内容完整，且目录内无临时文件残留
+  ---
+  duration_ms: 8.87
+  type: 'test'
+  ...
+# Subtest: ④ 原子写覆盖已存在文件：内容整体替换、无残留
+ok 91 - ④ 原子写覆盖已存在文件：内容整体替换、无残留
+  ---
+  duration_ms: 4.5432
+  type: 'test'
+  ...
+# Subtest: ④ saveEnvFile 新建 / 覆盖均原子落盘，且无 temp 残留
+ok 92 - ④ saveEnvFile 新建 / 覆盖均原子落盘，且无 temp 残留
+  ---
+  duration_ms: 16.1638
+  type: 'test'
+  ...
+# Subtest: ④ 并发自争用：多路 atomicWriteText 反复覆盖同一目标，全部成功、无 temp 残留（瞬时 EPERM 由共享原语有界重试兜住）
+ok 93 - ④ 并发自争用：多路 atomicWriteText 反复覆盖同一目标，全部成功、无 temp 残留（瞬时 EPERM 由共享原语有界重试兜住）
+  ---
+  duration_ms: 2420.2799
+  type: 'test'
+  ...
+# Subtest: ⑤ 目标目录不存在 → saveEnvFile 抛错（显式），不创建任何文件
+ok 94 - ⑤ 目标目录不存在 → saveEnvFile 抛错（显式），不创建任何文件
+  ---
+  duration_ms: 1.1609
+  type: 'test'
+  ...
+# Subtest: ⑤ 读取失败（目标是目录）→ saveEnvFile 抛错（显式），原目标（目录）不受损
+ok 95 - ⑤ 读取失败（目标是目录）→ saveEnvFile 抛错（显式），原目标（目录）不受损
+  ---
+  duration_ms: 1.2769
+  type: 'test'
+  ...
+# Subtest: ⑤ readEnvFile 对不存在的文件明确抛错（不静默返回空）
+ok 96 - ⑤ readEnvFile 对不存在的文件明确抛错（不静默返回空）
+  ---
+  duration_ms: 0.5124
+  type: 'test'
+  ...
+# Subtest: ⑤ saveEnvFile 失败时原 `.env` 内容完全不变
+ok 97 - ⑤ saveEnvFile 失败时原 `.env` 内容完全不变
+  ---
+  duration_ms: 1.0381
+  type: 'test'
+  ...
+# Subtest: ⑥ 写入失败的错误信息**不含** sentinel 值（只含键名/路径）
+ok 98 - ⑥ 写入失败的错误信息**不含** sentinel 值（只含键名/路径）
+  ---
+  duration_ms: 0.8368
+  type: 'test'
+  ...
+# Subtest: ⑥ loadEnvFileInto 回报**只含键名**、不含值（哨兵不回显）
+ok 99 - ⑥ loadEnvFileInto 回报**只含键名**、不含值（哨兵不回显）
+  ---
+  duration_ms: 5.1384
+  type: 'test'
+  ...
+# Subtest: ⑥ readEnvFile 的错误信息不含文件内任何值
+ok 100 - ⑥ readEnvFile 的错误信息不含文件内任何值
+  ---
+  duration_ms: 0.4902
+  type: 'test'
+  ...
+# Subtest: ⑦ loadEnvFileInto：文件不存在 → 无操作、不抛错、applied 为空
+ok 101 - ⑦ loadEnvFileInto：文件不存在 → 无操作、不抛错、applied 为空
+  ---
+  duration_ms: 0.4339
+  type: 'test'
+  ...
+# Subtest: ⑦ loadEnvFileInto：同名键以 `.env` 覆盖（保存后重载即生效，设计 §11.3）
+ok 102 - ⑦ loadEnvFileInto：同名键以 `.env` 覆盖（保存后重载即生效，设计 §11.3）
+  ---
+  duration_ms: 4.1373
+  type: 'test'
+  ...
+# Subtest: ⑧ 机密键名单含 ANTHROPIC_AUTH_TOKEN；isSecretKey 判定一致
+ok 103 - ⑧ 机密键名单含 ANTHROPIC_AUTH_TOKEN；isSecretKey 判定一致
+  ---
+  duration_ms: 0.1159
+  type: 'test'
+  ...
+# Subtest: ⑨ 往返：只改一个键后，其余内容完整无损（读回校验）
+ok 104 - ⑨ 往返：只改一个键后，其余内容完整无损（读回校验）
+  ---
+  duration_ms: 10.5974
+  type: 'test'
+  ...
+# Subtest: ⑨ 往返：修改已存在键，未知键/注释/顺序全保留
+ok 105 - ⑨ 往返：修改已存在键，未知键/注释/顺序全保留
+  ---
+  duration_ms: 8.6921
+  type: 'test'
+  ...
+# [i18n-guard] scanned=148 allowlisted=25 violations=0
+# Subtest: 守卫范围：包含入口与共享设置，排除测试/消息目录/治理角色文本/dist
+ok 106 - 守卫范围：包含入口与共享设置，排除测试/消息目录/治理角色文本/dist
+  ---
+  duration_ms: 9.9637
+  type: 'test'
+  ...
+# Subtest: allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文）
+ok 107 - allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文）
+  ---
+  duration_ms: 60.2424
+  type: 'test'
+  ...
+# Subtest: 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过）
+ok 108 - 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过）
+  ---
+  duration_ms: 74.1722
+  type: 'test'
+  ...
+# Subtest: 合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；注释中文放行
+ok 109 - 合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；注释中文放行
+  ---
+  duration_ms: 7.6815
+  type: 'test'
+  ...
+# Subtest: 去注释扫描：字符串/模板中的 URL 与内容不误删
+ok 110 - 去注释扫描：字符串/模板中的 URL 与内容不误删
+  ---
+  duration_ms: 0.1294
+  type: 'test'
+  ...
+# Subtest: 去注释扫描：模板表达式内的注释被去除，模板原文保留
+ok 111 - 去注释扫描：模板表达式内的注释被去除，模板原文保留
+  ---
+  duration_ms: 0.0635
+  type: 'test'
+  ...
+# Subtest: locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN
+ok 112 - locale：SUPPORTED_LOCALES 只有 zh-CN/en-US，默认 zh-CN
+  ---
+  duration_ms: 0.8096
+  type: 'test'
+  ...
+# Subtest: key 分区计数：ui 1212 / main 640 / shared 62 / preferences 3，总计 1917
+ok 113 - key 分区计数：ui 1212 / main 640 / shared 62 / preferences 3，总计 1917
+  ---
+  duration_ms: 0.4379
+  type: 'test'
+  ...
+# Subtest: 下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han
+ok 114 - 下载申请 key 契约：37 key 中英成对、家族计数、精确文案/占位符一致、英文零 Han
+  ---
+  duration_ms: 1.073
+  type: 'test'
+  ...
+# Subtest: 验收回交卡 key 契约：14 key 中英成对、精确文案与占位符一致
+ok 115 - 验收回交卡 key 契约：14 key 中英成对、精确文案与占位符一致
+  ---
+  duration_ms: 0.3054
+  type: 'test'
+  ...
+# Subtest: 全局任务状态/版本决策 key 契约：98 key 中英成对、分组数量、占位符一致
+ok 116 - 全局任务状态/版本决策 key 契约：98 key 中英成对、分组数量、占位符一致
+  ---
+  duration_ms: 0.4041
+  type: 'test'
+  ...
+# Subtest: 客户指令 key 契约：104 key 中英成对、家族计数、占位符一致、en-US 零 Han
+ok 117 - 客户指令 key 契约：104 key 中英成对、家族计数、占位符一致、en-US 零 Han
+  ---
+  duration_ms: 0.5967
+  type: 'test'
+  ...
+# Subtest: 全局任务状态复用既有 key：run 状态/通用短词/任务中心计数不新建别名
+ok 118 - 全局任务状态复用既有 key：run 状态/通用短词/任务中心计数不新建别名
+  ---
+  duration_ms: 0.3737
+  type: 'test'
+  ...
+# Subtest: key parity：zh-CN 与 en-US 全集一致（顺序无关）
+ok 119 - key parity：zh-CN 与 en-US 全集一致（顺序无关）
+  ---
+  duration_ms: 1.1561
+  type: 'test'
+  ...
+# Subtest: 英文泄漏计数：en-US 所有模板值零 Han 字符
+ok 120 - 英文泄漏计数：en-US 所有模板值零 Han 字符
+  ---
+  duration_ms: 0.7911
+  type: 'test'
+  ...
+# Subtest: 旧治理 key 零命中：flow/triage/gate/ledger/acceptance/liaison
+ok 121 - 旧治理 key 零命中：flow/triage/gate/ledger/acceptance/liaison
+  ---
+  duration_ms: 0.706
+  type: 'test'
+  ...
+# Subtest: 关键 key 清单：B0 与 D 保留能力 key 全部存在且中英成对
+ok 122 - 关键 key 清单：B0 与 D 保留能力 key 全部存在且中英成对
+  ---
+  duration_ms: 0.111
+  type: 'test'
+  ...
+# Subtest: shell 升级 key 契约：§7.3 清单中英成对且回执保留兜底子串
+ok 123 - shell 升级 key 契约：§7.3 清单中英成对且回执保留兜底子串
+  ---
+  duration_ms: 0.0854
+  type: 'test'
+  ...
+# Subtest: 主干/冻结与版本变更 C3 冻结：101 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han
+ok 124 - 主干/冻结与版本变更 C3 冻结：101 key 中英成对、家族计数、精确文案/占位符一致、en-US 零 Han
+  ---
+  duration_ms: 1.4411
+  type: 'test'
+  ...
+# Subtest: 解析优先级：请求显式 intentId 优先，与提案/产品一致 → source=request
+ok 125 - 解析优先级：请求显式 intentId 优先，与提案/产品一致 → source=request
+  ---
+  duration_ms: 0.9993
+  type: 'test'
+  ...
+# Subtest: 解析优先级：请求缺省、提案存在 → source=proposal（产品一致或缺省均可）
+ok 126 - 解析优先级：请求缺省、提案存在 → source=proposal（产品一致或缺省均可）
+  ---
+  duration_ms: 0.0884
+  type: 'test'
+  ...
+# Subtest: 解析优先级：请求/提案缺省、产品存在 → source=product
+ok 127 - 解析优先级：请求/提案缺省、产品存在 → source=product
+  ---
+  duration_ms: 0.059
+  type: 'test'
+  ...
+# Subtest: 解析优先级：三者皆缺 → flowId 回落，source=flow-id（证据如实标注）
+ok 128 - 解析优先级：三者皆缺 → flowId 回落，source=flow-id（证据如实标注）
+  ---
+  duration_ms: 0.0559
+  type: 'test'
+  ...
+# Subtest: 冲突 fail-closed：请求显式与提案不一致 → intent-ambiguous
+ok 129 - 冲突 fail-closed：请求显式与提案不一致 → intent-ambiguous
+  ---
+  duration_ms: 0.1602
+  type: 'test'
+  ...
+# Subtest: 冲突 fail-closed：请求显式与产品不一致 → intent-ambiguous
+ok 130 - 冲突 fail-closed：请求显式与产品不一致 → intent-ambiguous
+  ---
+  duration_ms: 0.0724
+  type: 'test'
+  ...
+# Subtest: 冲突 fail-closed：提案与产品不一致 → intent-ambiguous（不得任选其一）
+ok 131 - 冲突 fail-closed：提案与产品不一致 → intent-ambiguous（不得任选其一）
+  ---
+  duration_ms: 0.0593
+  type: 'test'
+  ...
+# Subtest: 非法 slug fail-closed：请求/提案/产品任一处不符合规则 → intent-unconfirmed
+ok 132 - 非法 slug fail-closed：请求/提案/产品任一处不符合规则 → intent-unconfirmed
+  ---
+  duration_ms: 0.0905
+  type: 'test'
+  ...
+# Subtest: 空白裁剪：前后空白视为同一 intentId；全空白视为缺省
+ok 133 - 空白裁剪：前后空白视为同一 intentId；全空白视为缺省
+  ---
+  duration_ms: 0.076
+  type: 'test'
+  ...
+# Subtest: flowId 为空且无意图 id → intent-unconfirmed（不猜）
+ok 134 - flowId 为空且无意图 id → intent-unconfirmed（不猜）
+  ---
+  duration_ms: 0.1009
+  type: 'test'
+  ...
+# Subtest: isValidIntentId：小写 slug 通过；大写/首尾连字符/单字符/非字符串拒绝
+ok 135 - isValidIntentId：小写 slug 通过；大写/首尾连字符/单字符/非字符串拒绝
+  ---
+  duration_ms: 0.1224
+  type: 'test'
+  ...
+# Subtest: intentIdFromFrontmatter：读取顶层 intentId；引号剥离、BOM、CRLF 容忍
+ok 136 - intentIdFromFrontmatter：读取顶层 intentId；引号剥离、BOM、CRLF 容忍
+  ---
+  duration_ms: 0.1743
+  type: 'test'
+  ...
+# Subtest: intentIdFromFrontmatter：无 frontmatter/空值/无值/非字符串 → undefined（不推断）
+ok 137 - intentIdFromFrontmatter：无 frontmatter/空值/无值/非字符串 → undefined（不推断）
+  ---
+  duration_ms: 0.0467
+  type: 'test'
+  ...
+# Subtest: 契约文本：四角色共用同一命名规则与模板；角色职责各自不同且可定位
+ok 138 - 契约文本：四角色共用同一命名规则与模板；角色职责各自不同且可定位
+  ---
+  duration_ms: 0.1317
+  type: 'test'
+  ...
+# Subtest: 拒绝提示与角色卡同源：命名规则 + 模板（不含角色职责）
+ok 139 - 拒绝提示与角色卡同源：命名规则 + 模板（不含角色职责）
+  ---
+  duration_ms: 0.0431
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：自动发现最新版本、注入解析器、核对入口文件
+ok 140 - readIntentEntryFacts：自动发现最新版本、注入解析器、核对入口文件
+  ---
+  duration_ms: 0.4815
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：显式路径优先，不触发目录发现
+ok 141 - readIntentEntryFacts：显式路径优先，不触发目录发现
+  ---
+  duration_ms: 0.1261
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：产品/提案冲突 → 记录 resolutionError，不拼入口路径、不读入口文件
+ok 142 - readIntentEntryFacts：产品/提案冲突 → 记录 resolutionError，不拼入口路径、不读入口文件
+  ---
+  duration_ms: 0.1078
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：非法 slug → resolutionError=intent-unconfirmed
+ok 143 - readIntentEntryFacts：非法 slug → resolutionError=intent-unconfirmed
+  ---
+  duration_ms: 0.1057
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：无意图文档 → flowId 回落；入口文件缺失如实标注 false
+ok 144 - readIntentEntryFacts：无意图文档 → flowId 回落；入口文件缺失如实标注 false
+  ---
+  duration_ms: 0.1112
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：入口文件 intentId 与解析结果不一致 → entryMatches=false
+ok 145 - readIntentEntryFacts：入口文件 intentId 与解析结果不一致 → entryMatches=false
+  ---
+  duration_ms: 0.0872
+  type: 'test'
+  ...
+# Subtest: readIntentEntryFacts：flowId 为空 → 空事实对象（不猜、不读盘）
+ok 146 - readIntentEntryFacts：flowId 为空 → 空事实对象（不猜、不读盘）
+  ---
+  duration_ms: 0.0449
+  type: 'test'
+  ...
+# Subtest: 追加：递归建目录、单行精确、多行保序
+ok 147 - 追加：递归建目录、单行精确、多行保序
+  ---
+  duration_ms: 13.6705
+  type: 'test'
+  ...
+# Subtest: 并发追加：串行链保证 32 行全部落盘、逐行完整且无交错
+ok 148 - 并发追加：串行链保证 32 行全部落盘、逐行完整且无交错
+  ---
+  duration_ms: 20.838
+  type: 'test'
+  ...
+# Subtest: 轮转边界：恰好等于上限不轮转，跨阈值才轮转
+ok 149 - 轮转边界：恰好等于上限不轮转，跨阈值才轮转
+  ---
+  duration_ms: 12.2075
+  type: 'test'
+  ...
+# Subtest: 轮转命名：当前→.1、原 .i-1→.i；.1 最新、.N 最旧
+ok 150 - 轮转命名：当前→.1、原 .i-1→.i；.1 最新、.N 最旧
+  ---
+  duration_ms: 9.1371
+  type: 'test'
+  ...
+# Subtest: 轮转：预置越界份 .N+1 在轮转时被清理
+ok 151 - 轮转：预置越界份 .N+1 在轮转时被清理
+  ---
+  duration_ms: 3.075
+  type: 'test'
+  ...
+# Subtest: 轮转：rotations=1 只保留 .1，不产生 .2
+ok 152 - 轮转：rotations=1 只保留 .1，不产生 .2
+  ---
+  duration_ms: 3.4261
+  type: 'test'
+  ...
+# Subtest: 读取顺序：.N→…→.1→当前 为旧→新，files 仅含存在段
+ok 153 - 读取顺序：.N→…→.1→当前 为旧→新，files 仅含存在段
+  ---
+  duration_ms: 9.3027
+  type: 'test'
+  ...
+# Subtest: 读取：不存在/空文件/仅轮转段/尾随换行/空行/CRLF
+ok 154 - 读取：不存在/空文件/仅轮转段/尾随换行/空行/CRLF
+  ---
+  duration_ms: 13.8238
+  type: 'test'
+  ...
+# Subtest: 读取坏行：坏 JSON、parser 拒绝、ignore 计数、空行跳过、basename+行号
+ok 155 - 读取坏行：坏 JSON、parser 拒绝、ignore 计数、空行跳过、basename+行号
+  ---
+  duration_ms: 4.8235
+  type: 'test'
+  ...
+# Subtest: 读取坏段：文件级读失败记 line=0 并继续读当前段
+ok 156 - 读取坏段：文件级读失败记 line=0 并继续读当前段
+  ---
+  duration_ms: 4.7054
+  type: 'test'
+  ...
+# Subtest: 路径参数化：两本账各自串行/轮转，互不影响
+ok 157 - 路径参数化：两本账各自串行/轮转，互不影响
+  ---
+  duration_ms: 13.2755
+  type: 'test'
+  ...
+# Subtest: limits：maxBytes/rotations 参数化；默认常量与 task-state 现状一致
+ok 158 - limits：maxBytes/rotations 参数化；默认常量与 task-state 现状一致
+  ---
+  duration_ms: 3.9075
+  type: 'test'
+  ...
+# Subtest: multiline 防御：含裸换行的 jsonText 拒绝且不落盘
+ok 159 - multiline 防御：含裸换行的 jsonText 拒绝且不落盘
+  ---
+  duration_ms: 0.5507
+  type: 'test'
+  ...
+# Subtest: 追加失败：不抛，返回结构化错误（cause 保留原错误）
+ok 160 - 追加失败：不抛，返回结构化错误（cause 保留原错误）
+  ---
+  duration_ms: 1.3973
+  type: 'test'
+  ...
+# Subtest: jsonlSegmentFiles：.N→…→.1→当前（绝对路径）
+ok 161 - jsonlSegmentFiles：.N→…→.1→当前（绝对路径）
+  ---
+  duration_ms: 0.1189
+  type: 'test'
+  ...
+# Subtest: 并发+轮转：串行链下每行完整，保留份数内旧→新顺序正确
+ok 162 - 并发+轮转：串行链下每行完整，保留份数内旧→新顺序正确
+  ---
+  duration_ms: 58.4218
+  type: 'test'
+  ...
+# Subtest: toPosix：反斜杠统一为正斜杠（Windows 分隔符）
+ok 163 - toPosix：反斜杠统一为正斜杠（Windows 分隔符）
+  ---
+  duration_ms: 0.5392
+  type: 'test'
+  ...
+# Subtest: normalizeLexical：折叠重复斜杠、解析 . 与 ..，不触碰文件系统
+ok 164 - normalizeLexical：折叠重复斜杠、解析 . 与 ..，不触碰文件系统
+  ---
+  duration_ms: 0.1472
+  type: 'test'
+  ...
+# Subtest: normalizeLexical：绝对路径越过根的多余 .. 被丢弃；相对路径开头的 .. 保留
+ok 165 - normalizeLexical：绝对路径越过根的多余 .. 被丢弃；相对路径开头的 .. 保留
+  ---
+  duration_ms: 0.08
+  type: 'test'
+  ...
+# Subtest: normalizeLexical：Windows 盘符保留且不越过盘根
+ok 166 - normalizeLexical：Windows 盘符保留且不越过盘根
+  ---
+  duration_ms: 0.0601
+  type: 'test'
+  ...
+# Subtest: normalizeLexical：尾点/空格是**词法保留**的（剥离是写入层 checkRelativePathSafe 的职责，不在此）
+ok 167 - normalizeLexical：尾点/空格是**词法保留**的（剥离是写入层 checkRelativePathSafe 的职责，不在此）
+  ---
+  duration_ms: 0.0578
+  type: 'test'
+  ...
+# Subtest: normalizeLexical：保留内部空格与中文段
+ok 168 - normalizeLexical：保留内部空格与中文段
+  ---
+  duration_ms: 0.0869
+  type: 'test'
+  ...
+# Subtest: compareKey：Windows 折叠大小写、POSIX 原样（与平台一致）
+ok 169 - compareKey：Windows 折叠大小写、POSIX 原样（与平台一致）
+  ---
+  duration_ms: 0.0669
+  type: 'test'
+  ...
+# Subtest: absRel：在 base 之下返回相对路径；相等返回空串；不在其下返回 null
+ok 170 - absRel：在 base 之下返回相对路径；相等返回空串；不在其下返回 null
+  ---
+  duration_ms: 0.0691
+  type: 'test'
+  ...
+# Subtest: absRel：前缀陷阱——/r/bc 不在 /r/b 之下（必须按路径段边界，非字符串前缀）
+ok 171 - absRel：前缀陷阱——/r/bc 不在 /r/b 之下（必须按路径段边界，非字符串前缀）
+  ---
+  duration_ms: 0.0584
+  type: 'test'
+  ...
+# Subtest: absRel：Windows 大小写不敏感匹配（大小写不同仍算在根内）
+ok 172 - absRel：Windows 大小写不敏感匹配（大小写不同仍算在根内）
+  ---
+  duration_ms: 0.1025
+  type: 'test'
+  ...
+# Subtest: isWithinReal：等于 root 或在其下为真，否则假
+ok 173 - isWithinReal：等于 root 或在其下为真，否则假
+  ---
+  duration_ms: 0.0973
+  type: 'test'
+  ...
+# Subtest: isUnderOrEqual：空 base 恒真；按段边界判定
+ok 174 - isUnderOrEqual：空 base 恒真；按段边界判定
+  ---
+  duration_ms: 0.0668
+  type: 'test'
+  ...
+# Subtest: isAbsoluteAny：POSIX 前导斜杠、Windows 盘符为真；相对/UNC 裸形为假
+ok 175 - isAbsoluteAny：POSIX 前导斜杠、Windows 盘符为真；相对/UNC 裸形为假
+  ---
+  duration_ms: 0.0691
+  type: 'test'
+  ...
+# Subtest: 逐字同源：normalizeLexical / toPosix / compareKey 与门禁引擎旧实现逐字相同
+ok 176 - 逐字同源：normalizeLexical / toPosix / compareKey 与门禁引擎旧实现逐字相同
+  ---
+  duration_ms: 0.1823
+  type: 'test'
+  ...
+# Subtest: 逐字同源：absRel 与门禁引擎 absRel 逐字相同
+ok 177 - 逐字同源：absRel 与门禁引擎 absRel 逐字相同
+  ---
+  duration_ms: 0.0847
+  type: 'test'
+  ...
+# Subtest: 逐字同源：isUnderOrEqual 与门禁引擎逐字相同
+ok 178 - 逐字同源：isUnderOrEqual 与门禁引擎逐字相同
+  ---
+  duration_ms: 0.0632
+  type: 'test'
+  ...
+# Subtest: 逐字同源：absRel == Pi适配器旧实现 absRelLexical（同一函数、两处曾各自维护）
+ok 179 - 逐字同源：absRel == Pi适配器旧实现 absRelLexical（同一函数、两处曾各自维护）
+  ---
+  duration_ms: 0.0608
+  type: 'test'
+  ...
+# Subtest: 逐字同源：shared.realResolve == 门禁引擎旧 realResolve（同输入同答案）
+ok 180 - 逐字同源：shared.realResolve == 门禁引擎旧 realResolve（同输入同答案）
+  ---
+  duration_ms: 1.0258
+  type: 'test'
+  ...
+# Subtest: 逐字同源：shared.realResolveAsync == Pi适配器旧 realResolveAsync（同输入同答案）
+ok 181 - 逐字同源：shared.realResolveAsync == Pi适配器旧 realResolveAsync（同输入同答案）
+  ---
+  duration_ms: 4.7235
+  type: 'test'
+  ...
+# Subtest: 两处旧实现同答案（要害）：门禁 realResolve(sync) 与 Pi适配器 realResolveAsync(async) 对同输入同输出
+ok 182 - 两处旧实现同答案（要害）：门禁 realResolve(sync) 与 Pi适配器 realResolveAsync(async) 对同输入同输出
+  ---
+  duration_ms: 2.2814
+  type: 'test'
+  ...
+# Subtest: realResolve 解析 junction 逃逸：经链接到达的真实路径落在链接目标之下
+ok 183 - realResolve 解析 junction 逃逸：经链接到达的真实路径落在链接目标之下
+  ---
+  duration_ms: 0.3875
+  type: 'test'
+  ...
+# Subtest: 真实引擎的设置秘密键全部由同一掩码名单覆盖，别名亦不回显
+ok 184 - 真实引擎的设置秘密键全部由同一掩码名单覆盖，别名亦不回显
+  ---
+  duration_ms: 0.5502
+  type: 'test'
+  ...
+# Subtest: 设置需求忠于真实适配器：Pi 显式 endpoint/model，Claude 可用 SDK 默认模型
+ok 185 - 设置需求忠于真实适配器：Pi 显式 endpoint/model，Claude 可用 SDK 默认模型
+  ---
+  duration_ms: 0.435
+  type: 'test'
+  ...
+# Subtest: 推理强度：三平台逐键在场，label 逐字「推理强度」，可选、非机密
+ok 186 - 推理强度：三平台逐键在场，label 逐字「推理强度」，可选、非机密
+  ---
+  duration_ms: 0.2394
+  type: 'test'
+  ...
+# Subtest: 推理强度 choices ＝平台真实档位：Codex 无 off（平台无该档，如实不假装）
+ok 187 - 推理强度 choices ＝平台真实档位：Codex 无 off（平台无该档，如实不假装）
+  ---
+  duration_ms: 0.1095
+  type: 'test'
+  ...
+# Subtest: 推理强度改回下拉：三字段不挂 control，choiceLabels 与 choices 逐档对齐
+ok 188 - 推理强度改回下拉：三字段不挂 control，choiceLabels 与 choices 逐档对齐
+  ---
+  duration_ms: 0.101
+  type: 'test'
+  ...
+# Subtest: 推理强度 help 三平台统一口径（逐字：留空＝维持平台默认；档位梯；思考计入输出 tokens）
+ok 189 - 推理强度 help 三平台统一口径（逐字：留空＝维持平台默认；档位梯；思考计入输出 tokens）
+  ---
+  duration_ms: 0.0694
+  type: 'test'
+  ...
+# Subtest: choices 元数据纪律：非空值域、选项为字符串、空串仅作默认/清除档、机密字段不出选项
+ok 190 - choices 元数据纪律：非空值域、选项为字符串、空串仅作默认/清除档、机密字段不出选项
+  ---
+  duration_ms: 0.1161
+  type: 'test'
+  ...
+# Subtest: choiceLabels/control 元数据纪律：标签与 choices 等长且非空；range 必须有 choices
+ok 191 - choiceLabels/control 元数据纪律：标签与 choices 等长且非空；range 必须有 choices
+  ---
+  duration_ms: 0.1513
+  type: 'test'
+  ...
+# Subtest: Pi 上下文窗口：离散档位滑块、可选、非机密、正整数元数据；help 逐字
+ok 192 - Pi 上下文窗口：离散档位滑块、可选、非机密、正整数元数据；help 逐字
+  ---
+  duration_ms: 0.1514
+  type: 'test'
+  ...
+# Subtest: Pi 看护检查时限：离散档位滑块、可选、非机密、正整数元数据；help 逐字
+ok 193 - Pi 看护检查时限：离散档位滑块、可选、非机密、正整数元数据；help 逐字
+  ---
+  duration_ms: 0.1482
+  type: 'test'
+  ...
+# Subtest: integer 元数据纪律：边界为整数且 min ≤ max
+ok 194 - integer 元数据纪律：边界为整数且 min ≤ max
+  ---
+  duration_ms: 0.0861
+  type: 'test'
+  ...
+# Subtest: B4 零变化：字段集/顺序/必填/secret/fallbackKeys/choices/control/integer 与迁移前基线逐项一致
+ok 195 - B4 零变化：字段集/顺序/必填/secret/fallbackKeys/choices/control/integer 与迁移前基线逐项一致
+  ---
+  duration_ms: 0.117
+  type: 'test'
+  ...
+# Subtest: B4 key 映射：每字段 label/help/choice 的 key 可解析回迁移前中文（逐字段覆盖，无孤儿/无遗漏）
+ok 196 - B4 key 映射：每字段 label/help/choice 的 key 可解析回迁移前中文（逐字段覆盖，无孤儿/无遗漏）
+  ---
+  duration_ms: 0.1632
+  type: 'test'
+  ...
+# Subtest: B4 key 契约：每个 labelKey/helpKey/choiceLabelKey 在 zh-CN 与 en-US 目录均可解析，且 key 为 ASCII 静态标识
+ok 197 - B4 key 契约：每个 labelKey/helpKey/choiceLabelKey 在 zh-CN 与 en-US 目录均可解析，且 key 为 ASCII 静态标识
+  ---
+  duration_ms: 0.3535
+  type: 'test'
+  ...
+# Subtest: RuntimeKind 取值单一来源：shared 与编排旧副本一致
+ok 198 - RuntimeKind 取值单一来源：shared 与编排旧副本一致
+  ---
+  duration_ms: 0.7923
+  type: 'test'
+  ...
+# Subtest: B4：demo 标签语言中性、显示文案只存在于 i18n 目录；Pi/Codex/Claude 品牌名不变
+ok 199 - B4：demo 标签语言中性、显示文案只存在于 i18n 目录；Pi/Codex/Claude 品牌名不变
+  ---
+  duration_ms: 0.3064
+  type: 'test'
+  ...
+# Subtest: RuntimeKind 取值单一来源：shared 与装配旧副本（RUNTIME_VALUES / DEFAULT_RUNTIME）一致
+ok 200 - RuntimeKind 取值单一来源：shared 与装配旧副本（RUNTIME_VALUES / DEFAULT_RUNTIME）一致
+  ---
+  duration_ms: 0.0733
+  type: 'test'
+  ...
+# Subtest: PI_CREDENTIAL_ENV_VARS：shared 与装配、Pi适配器两处旧副本**逐条相同**（安全相关，不得分叉）
+ok 201 - PI_CREDENTIAL_ENV_VARS：shared 与装配、Pi适配器两处旧副本**逐条相同**（安全相关，不得分叉）
+  ---
+  duration_ms: 0.1012
+  type: 'test'
+  ...
+# Subtest: resolveSkillRoot：优先 ANS_SKILL_ROOT（取非空值）
+ok 202 - resolveSkillRoot：优先 ANS_SKILL_ROOT（取非空值）
+  ---
+  duration_ms: 0.078
+  type: 'test'
+  ...
+# Subtest: 跨引擎秘密键包含旧 Pi 凭据与 SDK CODEX_API_KEY，保持 Pi 旧名单兼容
+ok 203 - 跨引擎秘密键包含旧 Pi 凭据与 SDK CODEX_API_KEY，保持 Pi 旧名单兼容
+  ---
+  duration_ms: 0.0649
+  type: 'test'
+  ...
+# Subtest: resolveSkillRoot：缺省回退默认技能目录，且与桌面旧副本同值
+ok 204 - resolveSkillRoot：缺省回退默认技能目录，且与桌面旧副本同值
+  ---
+  duration_ms: 0.2026
+  type: 'test'
+  ...
+# Subtest: resolveSkillRoot：空串视为未设置（回退默认），与桌面旧副本同值
+ok 205 - resolveSkillRoot：空串视为未设置（回退默认），与桌面旧副本同值
+  ---
+  duration_ms: 0.0825
+  type: 'test'
+  ...
+# Subtest: 未登记 gate：inspect 与 probe 均返回 undefined（fail-closed 上游判据）
+ok 206 - 未登记 gate：inspect 与 probe 均返回 undefined（fail-closed 上游判据）
+  ---
+  duration_ms: 0.5463
+  type: 'test'
+  ...
+# Subtest: 登记后 inspect 同步返回白名单事实，probe 恒为 unknown
+ok 207 - 登记后 inspect 同步返回白名单事实，probe 恒为 unknown
+  ---
+  duration_ms: 0.5998
+  type: 'test'
+  ...
+# Subtest: 身份隔离：不同 gate 的事实互不串用；同形不同函数即不同身份
+ok 208 - 身份隔离：不同 gate 的事实互不串用；同形不同函数即不同身份
+  ---
+  duration_ms: 0.0874
+  type: 'test'
+  ...
+# Subtest: 同一 gate 重复登记被拒绝（登记点唯一在 createShellGate 构造成功后）
+ok 209 - 同一 gate 重复登记被拒绝（登记点唯一在 createShellGate 构造成功后）
+  ---
+  duration_ms: 0.2339
+  type: 'test'
+  ...
+# Subtest: gate 非函数 ⇒ TypeError；失败的登记不写入
+ok 210 - gate 非函数 ⇒ TypeError；失败的登记不写入
+  ---
+  duration_ms: 0.1123
+  type: 'test'
+  ...
+# Subtest: 事实深度冻结：外层与 audit 都不可变，赋值/删除在严格模式抛 TypeError
+ok 211 - 事实深度冻结：外层与 audit 都不可变，赋值/删除在严格模式抛 TypeError
+  ---
+  duration_ms: 0.1216
+  type: 'test'
+  ...
+# Subtest: 登记保存白名单副本：登记后再改调用方原 facts/audit 不影响已登记事实
+ok 212 - 登记保存白名单副本：登记后再改调用方原 facts/audit 不影响已登记事实
+  ---
+  duration_ms: 0.0725
+  type: 'test'
+  ...
+# Subtest: 白名单投影：白名单外字段（如凭据/环境）被拒绝，不静默携带
+ok 213 - 白名单投影：白名单外字段（如凭据/环境）被拒绝，不静默携带
+  ---
+  duration_ms: 0.094
+  type: 'test'
+  ...
+# Subtest: 登记拒绝调用方回填 probe 结果：audit.probe 必须为 unknown（ok/unavailable 均拒绝）
+ok 214 - 登记拒绝调用方回填 probe 结果：audit.probe 必须为 unknown（ok/unavailable 均拒绝）
+  ---
+  duration_ms: 0.1038
+  type: 'test'
+  ...
+# Subtest: 非法事实形状 fail-closed：source/version/mode/boolean/projectRoot/audit.sink 均拒绝
+ok 215 - 非法事实形状 fail-closed：source/version/mode/boolean/projectRoot/audit.sink 均拒绝
+  ---
+  duration_ms: 0.1915
+  type: 'test'
+  ...
+# Subtest: probeShellApproval 无值入参：签名只接收 gate；调用方附带的 probe 值被忽略
+ok 216 - probeShellApproval 无值入参：签名只接收 gate；调用方附带的 probe 值被忽略
+  ---
+  duration_ms: 0.1524
+  type: 'test'
+  ...
+# Subtest: 并发共享同一 promise：sink.probe 只执行一次，结果冻结 memoize（后续调用同 promise）
+ok 217 - 并发共享同一 promise：sink.probe 只执行一次，结果冻结 memoize（后续调用同 promise）
+  ---
+  duration_ms: 0.1107
+  type: 'test'
+  ...
+# Subtest: probe 结果另成冻结事实：inspect 仍返回基础事实（probe:unknown）
+ok 218 - probe 结果另成冻结事实：inspect 仍返回基础事实（probe:unknown）
+  ---
+  duration_ms: 0.1049
+  type: 'test'
+  ...
+# Subtest: sink 三态：memory 事实透明传、custom 缺 probe / 无 sink / 抛错 / 非法返回值 ⇒ unavailable
+ok 219 - sink 三态：memory 事实透明传、custom 缺 probe / 无 sink / 抛错 / 非法返回值 ⇒ unavailable
+  ---
+  duration_ms: 0.2137
+  type: 'test'
+  ...
+# Subtest: 非持久 sink 的事实由登记方投影（memory/durable:false）并如实透传探针结果；准入策略不在本模块
+ok 220 - 非持久 sink 的事实由登记方投影（memory/durable:false）并如实透传探针结果；准入策略不在本模块
+  ---
+  duration_ms: 0.0857
+  type: 'test'
+  ...
+# Subtest: 测试私有 Symbol：载体是 sink 对象的非枚举属性；可枚举设置不被认可
+ok 221 - 测试私有 Symbol：载体是 sink 对象的非枚举属性；可枚举设置不被认可
+  ---
+  duration_ms: 0.107
+  type: 'test'
+  ...
+# Subtest: 静态断言：测试私有 Symbol 不得经生产公共出口导出，生产装配不得设置
+ok 222 - 静态断言：测试私有 Symbol 不得经生产公共出口导出，生产装配不得设置
+  ---
+  duration_ms: 33.1632
+  type: 'test'
+  ...
+# Subtest: 模块公开 API 面固定：不存在接受 probe 结果值的入口（无 finalize 类 API）
+ok 223 - 模块公开 API 面固定：不存在接受 probe 结果值的入口（无 finalize 类 API）
+  ---
+  duration_ms: 0.0823
+  type: 'test'
+  ...
+# Subtest: 依赖方向：共享模块自包含（零 import，含动态 import 与 from 导入）
+ok 224 - 依赖方向：共享模块自包含（零 import，含动态 import 与 from 导入）
+  ---
+  duration_ms: 0.2293
+  type: 'test'
+  ...
+1..224
+# tests 224
+# suites 0
+# pass 219
+# fail 0
+# cancelled 0
+# skipped 5
+# todo 0
+# duration_ms 8939.8877
