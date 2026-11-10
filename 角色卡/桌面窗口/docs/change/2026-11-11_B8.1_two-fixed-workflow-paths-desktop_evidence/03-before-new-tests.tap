@@ -1,0 +1,129 @@
+TAP version 13
+# Subtest: 混合项目（聊天 legacy / flow fixed）：fixed stage-request 派发自动打开 convener ⇒ 强制 fixed、无 legacy 工具、fixed 契约
+not ok 1 - 混合项目（聊天 legacy / flow fixed）：fixed stage-request 派发自动打开 convener ⇒ 强制 fixed、无 legacy 工具、fixed 契约
+  ---
+  duration_ms: 34.3918
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b81\\before-head\\test\\桌面应用\\b81-fixed-dispatch-forced-session.test.ts:267:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    目标会话必须强制 fixed（RR3：legacy 打开 ⇒ request_stable_write 卡）
+    + actual - expected
+    
+    + undefined
+    - 'fixed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'fixed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b81/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b81-fixed-dispatch-forced-session.test.ts:285:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 已存在 legacy convener 会话 ⇒ dispose + 以 fixed 重开；投递落在新 fixed 会话
+not ok 2 - 已存在 legacy convener 会话 ⇒ dispose + 以 fixed 重开；投递落在新 fixed 会话
+  ---
+  duration_ms: 5.8862
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b81\\before-head\\test\\桌面应用\\b81-fixed-dispatch-forced-session.test.ts:317:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    既有条目记录为 legacy
+    + actual - expected
+    
+    + undefined
+    - 'legacy'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'legacy'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b81/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b81-fixed-dispatch-forced-session.test.ts:327:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 已存在 legacy convener 会话 busy ⇒ fixed-session-rebind-blocked fail-closed：不关闭、不投递 legacy
+not ok 3 - 已存在 legacy convener 会话 busy ⇒ fixed-session-rebind-blocked fail-closed：不关闭、不投递 legacy
+  ---
+  duration_ms: 16.7887
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b81\\before-head\\test\\桌面应用\\b81-fixed-dispatch-forced-session.test.ts:352:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    busy 的 legacy 目标无法以 fixed 重开 ⇒ fail-closed
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b81/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b81-fixed-dispatch-forced-session.test.ts:363:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（无 taskId 绑定、无 legacy 工具）
+not ok 4 - 投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（无 taskId 绑定、无 legacy 工具）
+  ---
+  duration_ms: 12.0024
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b81\\before-head\\test\\桌面应用\\b81-fixed-dispatch-forced-session.test.ts:382:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    固定任务来源 ⇒ drain 自动打开也强制 fixed
+    + actual - expected
+    
+    + undefined
+    - 'fixed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'fixed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b81/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b81-fixed-dispatch-forced-session.test.ts:398:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: legacy（非固定）任务投递自动打开目标 ⇒ 不传强制模式，目标仍 legacy 注入
+ok 5 - legacy（非固定）任务投递自动打开目标 ⇒ 不传强制模式，目标仍 legacy 注入
+  ---
+  duration_ms: 20.3893
+  type: 'test'
+  ...
+# Subtest: forced fixed 打开触发 O-1 边界陈旧重建 ⇒ 重建后的会话仍 fixed（强制模式透传内部重开）
+not ok 6 - forced fixed 打开触发 O-1 边界陈旧重建 ⇒ 重建后的会话仍 fixed（强制模式透传内部重开）
+  ---
+  duration_ms: 6.2925
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\.tmp-b81\\before-head\\test\\桌面应用\\b81-fixed-dispatch-forced-session.test.ts:441:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    legacy 首开 + forced fixed 重开
+    
+    1 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/.tmp-b81/before-head/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/b81-fixed-dispatch-forced-session.test.ts:456:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 1
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2950.3213

@@ -1,0 +1,18 @@
+readonly suite notes (B8.1):
+- These suites are read-only for this batch: src/** and test/编排|门禁引擎|roles|runtime-core have zero modifications.
+- fixed-path-start.test.ts: 4/4 pass (fixed-path-start.tap)
+- run-role-fixed-b2.test.ts: 11/11 pass (run-role-fixed-b2.tap)
+- run-role-fixed-b31.test.ts: 8/8 pass (run-role-fixed-b31.tap)
+- workflow-stage-request.test.ts + workflow-mode.test.ts: 14/14 pass (workflow-stage-request-mode.tap)
+- workflow-dispatch-fixed.test.ts + workflow-ledger.test.ts + workflow-state.test.ts: 27/27 pass
+  (workflow-dispatch-ledger-state.tap)
+- workflow-preconditions + workflow-baseline + workflow-basis-b21 + workflow-close-intent: 44/44 pass
+  (workflow-preconditions-baseline-basis-close.tap)
+- task-state-fixed + task-state: 27/27 pass (task-state.tap)
+- project-state-workflow: 3/3 pass (project-state-workflow.tap)
+- gate consumers (cold-start-genesis + shell-approval): 11/11 pass (gate-consumers.tap)
+- gate chief-workflow-v2-resource.test.ts: 3/3 pass (gate-chief-workflow-v2-resource.tap)
+- runtime-core two-fixed-workflow-paths-b2.test.ts: 13/13 pass (runtime-core-fixed-b2.tap)
+- roles (全量 test/roles/**): 275/275 pass (roles.tap)
+- 备注：运行时核心/门禁引擎套件不 import app/desktop/session.ts（B7.1 已核实）；以上为 fixed 消费面定向
+  子集 + roles 全量，均在同一工作树、同一 Node（v24.22.1）下运行。未新增 skip/force-exit。

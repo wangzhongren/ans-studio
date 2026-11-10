@@ -291,7 +291,7 @@ test("O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递
   assert.ok(SESSION_SRC.includes("private async boundaryDiff("), "差异检查（逐文件比对）");
   assert.ok(SESSION_SRC.includes("await this.rebuildIfBoundaryStale(targetRoleId, !background);"), "发言前检查（send 路径；目标角色入口定格——2026-10-13 竞态修复；后台治理派发按非用户发起——2026-10-18）");
   assert.ok(SESSION_SRC.includes("const background = metadata?.background === true;"), "后台投递标记只在显式 metadata.background 时成立（应用代客户派发，不抢 pane）");
-  assert.ok(SESSION_SRC.includes("this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion);"), "续接（点角色）路径检查保持本次选择版本");
+  assert.ok(SESSION_SRC.includes("this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion, forcedSessionWorkflowMode);"), "续接（点角色）路径检查保持本次选择版本（T3 B8.1：fixed 派发的强制模式透传陈旧重建，重建后仍 fixed）");
   assert.ok(
     SESSION_SRC.includes("const rebuilt = await this.rebuildIfBoundaryStale(this.sessionKey(projectRoot, resolvedTarget, runtime), false);"),
     "投递前检查（后台路径同样适用）"

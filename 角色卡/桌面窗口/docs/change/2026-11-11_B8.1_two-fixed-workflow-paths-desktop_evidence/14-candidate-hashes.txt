@@ -1,0 +1,12 @@
+# B8.1 candidate hashes (raw working-tree bytes)
+app/desktop/session.ts	6c06f3408b425bc2caad447acd63c25d6dc1d987dd69d0bb644aef1571eb7eb4	bytes=840360	lines=13130
+test/桌面应用/b81-fixed-dispatch-forced-session.test.ts	371c97830a56cffe7ccbddc19b8c50f252f5f4e1c4b31707e87f710430594b01	bytes=25953	lines=473
+test/桌面应用/boundary-refresh.test.ts	ae5f0c49d9371f10b9e8216fb0b50c17988f61ed1b1e9b33bcbf2bf5edf5427c	bytes=33348	lines=508
+角色卡/桌面窗口/docs/change/2026-11-11_B8.1_two-fixed-workflow-paths-desktop.md	dcba71a866861aca8f529cfd5749c34470b8059e7ae36ac59e27ce53b8d80c83	bytes=16158	lines=208
+
+# git diff --numstat (tracked; untracked new test excluded)
+76	15	app/desktop/session.ts
+1	1	test/桌面应用/boundary-refresh.test.ts
+
+# aggregate sha256 over sorted candidate lines (3 code/test files + record)
+3aa06df613b71235a041be25ea7ef4b0e00e7385949f9efeb966630f9324a6bf *-

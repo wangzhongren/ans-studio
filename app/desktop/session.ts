@@ -410,6 +410,17 @@ export interface SessionOpenRequest {
 }
 
 /**
+ * T3 B8.1（2026-11-11，RR3 根因 `fixed-dispatch-target-opened-legacy`）：**进程内部**的打开请求扩展。
+ * `forcedWorkflowMode` 只供固定路径/投递机在内部打开**固定任务**的目标会话时强制会话级 workflow 模式
+ * （fixed 派发的目标会话必须是 fixed）。它不是公共 `SessionOpenRequest`/IPC 契约的一部分——`openSession`
+ * 仍只透传 projectRoot/roleId/runtime，渲染侧无法携带；用户点角色打开/legacy 调用不传，行为逐字不变。
+ */
+interface InternalSessionOpenRequest extends SessionOpenRequest {
+  /** 仅内部投递/固定路由使用；仅 `"fixed"` 在 trio 项目生效（否则忽略，走既有 task/chat 解析）。 */
+  forcedWorkflowMode?: WorkflowMode;
+}
+
+/**
  * 2026-10-31（run-change 触发）：active run 的只读摘要（`activeRunViews` 返回；UI「契约变更 · 重开 run」
  * 入口据此启用/禁用并显示原因）。字段全部来自 manifest，不读正文、不伪装 pinned。
  */
@@ -1076,6 +1087,9 @@ interface LiveSession {
   /** 建会话时的项目根——换项目重开同一角色前须先释放旧句柄（角色 id 可能跨项目同名）。 */
   readonly projectRoot: string;
   readonly config: EffectiveConfigInfo;
+  /** T3 B8.1（2026-11-11）：建会话时定格的会话级 workflow 模式（fixed/legacy）。固定派发据此判断既有
+   *  目标会话是否需要安全重绑（`openInternalUnsafe` 的 forced fixed 分支）；用户/legacy 打开只记录，不改变行为。 */
+  readonly sessionWorkflowMode: WorkflowMode;
   /** LRU 使用序号（越大越近；open/续接时刷新）。 */
   lastUsed: number;
   /**
@@ -2416,9 +2430,12 @@ export class SessionManager {
     roleId: string,
     userInitiated: boolean,
     selectionVersion = this.selectionVersion,
+    // T3 B8.1：由 fixed 派发/投递的 forced 打开透传——陈旧重建后的会话仍按 fixed 重开（不会被聊天解析
+    // 在混合项目里换回 legacy）。settle 扫描/手动重建等调用不传，行为逐字不变。
+    forcedWorkflowMode?: WorkflowMode,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
     const prev = this.rebuildChains.get(roleId) ?? Promise.resolve();
-    const run = prev.then(() => this.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated, selectionVersion));
+    const run = prev.then(() => this.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated, selectionVersion, forcedWorkflowMode));
     const tail = run.then(
       () => undefined,
       () => undefined
@@ -2434,6 +2451,7 @@ export class SessionManager {
     roleId: string,
     userInitiated: boolean,
     selectionVersion: number,
+    forcedWorkflowMode?: WorkflowMode,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
     const entry = this.sessions.get(roleId);
     if (!entry) return undefined;
@@ -2465,7 +2483,7 @@ export class SessionManager {
     // **F-2-opt2 防死锁**：本重开是**持锁方（openInternal 的续接前查陈旧）所等待的那条链**内的续段——
     // 必须直调 `openInternalUnsafe`（不再入 openChains）并带 `internalReopen`（不再查陈旧/不再入 rebuild 链，
     // 防「链内等待自身尾」的自死锁）；此处旧条目已 dispose（或纯新建），不会再触发任何 reopen 预检。
-    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime, ...((entry.boundAssignment?.taskId ?? entry.assignedTaskId) ? { taskId: entry.boundAssignment?.taskId ?? entry.assignedTaskId } : {}) }, false, this.selectionVersion, true);
+    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime, ...((entry.boundAssignment?.taskId ?? entry.assignedTaskId) ? { taskId: entry.boundAssignment?.taskId ?? entry.assignedTaskId } : {}), ...(forcedWorkflowMode !== undefined ? { forcedWorkflowMode } : {}) }, false, this.selectionVersion, true);
     if (reopened.ok) this.queueRebuildWritePermitsNotice(roleId); // 入参＝会话键（本函数参数即键）
     if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
       const current = this.sessions.get(roleId);
@@ -3587,7 +3605,7 @@ export class SessionManager {
     });
   }
 
-  private async openInternal(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
+  private async openInternal(req: InternalSessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion): Promise<OpenResult> {
     if (req.taskId && this.runTaskIsFenced(req.projectRoot, req.taskId)) return { ok: false, error: "run-stop-host-fenced:原运行任务已暂停，未重新开启。" };
     const key = this.sessionKey(req.projectRoot, req.roleId, req.runtime);
     const lifecycle = this.deliveryLifecycle(key);
@@ -3612,7 +3630,7 @@ export class SessionManager {
    *  **不再查陈旧、不再入 rebuild 链**——① 防「链内等待自身尾」的自死锁（rebuildIfBoundaryStaleUnsafe 的
    * 重开处于该角色的 rebuild 链内，再入链会等自己）；② 此时旧条目已被本链 dispose；若并发方已重建出新会话，
    *  如实按续接返回（不重复重建——重开目标已达成）。 */
-  private async openInternalUnsafe(req: SessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion, internalReopen = false,
+  private async openInternalUnsafe(req: InternalSessionOpenRequest, userInitiated: boolean, selectionVersion = this.selectionVersion, internalReopen = false,
     lifecycle = this.deliveryLifecycle(this.sessionKey(req.projectRoot, req.roleId, req.runtime))): Promise<OpenResult> {
     if (!req.projectRoot || !req.roleId) {
       return { ok: false, error: mainT("main.session.missingProjectOrRole") };
@@ -3629,12 +3647,21 @@ export class SessionManager {
     // T3 B6.1（2026-11-11）：**真实聊天入口**（无 taskId 的 trio 幕僚聊天）不再硬编码 legacy——按项目
     // 状态解析（空项目/纯新项目 ⇒ fixed；legacy 项目/在飞 run/显式 legacy/v1 ⇒ legacy；fail-closed）。
     // 依据 RR 失败根因 `fixed-path-not-activated-from-chief-chat`；有 taskId 仍按任务 flow（`sessionWorkflowModeForTask`）。
+    // T3 B8.1（2026-11-11，RR3 根因 `fixed-dispatch-target-opened-legacy`）：固定派发/投递机在内部打开
+    // 目标会话时可携带 `forcedWorkflowMode:"fixed"`——不再依赖聊天入口按项目状态的现场解析（混合项目
+    // 「在飞 legacy run + fixed workflow」时聊天解析为 legacy；RR3 实测 convener 会话以 legacy 打开并
+    // 收到 `request_stable_write`）。强制只在 trio 生效（固定路径为 trio 产品流程）；未携带时下面
+    // task/chat 逻辑逐字不变。
+    const listingGovernanceModel = this.deps.getListing(req.projectRoot)?.governanceModel ?? "single";
+    const forcedSessionWorkflowMode: WorkflowMode | undefined =
+      req.forcedWorkflowMode === "fixed" && listingGovernanceModel === "trio" ? "fixed" : undefined;
     const requestedSessionMode: WorkflowMode =
-      (this.deps.getListing(req.projectRoot)?.governanceModel ?? "single") === "trio"
+      forcedSessionWorkflowMode ??
+      (listingGovernanceModel === "trio"
         ? req.taskId !== undefined
           ? await sessionWorkflowModeForTask(req.projectRoot, req.taskId)
           : await sessionWorkflowModeForChat(req.projectRoot)
-        : "legacy";
+        : "legacy");
     let requestedAssignment: DeliveryAssignment | undefined;
     if (req.taskId && requestedSessionMode !== "fixed") {
       const actual = await resolveDeliveryAssignment({ projectRoot: req.projectRoot, recipientRoleId: req.roleId, source: { kind: "assigned-task", taskId: req.taskId } });
@@ -3649,6 +3676,25 @@ export class SessionManager {
         return { ok: false, error: "worker-task-session-busy：目标正在执行另一真实任务，保持排队。" };
       const disposed = await this.disposeEntry(key, previousTaskSession);
       if (disposed !== null) return { ok: false, error: disposed };
+    }
+    // T3 B8.1（2026-11-11，RR3）：fixed 任务的目标会话必须是 **fixed 会话**。既有条目若为 legacy 注入
+    // （混合项目聊天解析/早期自动打开等），先安全关闭再按 fixed 新建；busy（含在跑 origin）或关闭失败 ⇒
+    // fail-closed `fixed-session-rebind-blocked`——**绝不把 fixed 投递进 legacy 会话**（RR3 的 legacy
+    // stable-write 卡）。该重绑只发生在 forced fixed 的内部打开上；用户/legacy 打开路径逐字不变。
+    const forcedExisting = this.sessions.get(key);
+    if (forcedSessionWorkflowMode === "fixed" && forcedExisting && forcedExisting.projectRoot === req.projectRoot
+        && forcedExisting.sessionWorkflowMode !== "fixed") {
+      const rebindDiagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot: req.projectRoot, roleId: req.roleId });
+      if (forcedExisting.busy || forcedExisting.origins.running !== undefined) {
+        rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "target-busy", previousWorkflowMode: forcedExisting.sessionWorkflowMode });
+        return { ok: false, error: "fixed-session-rebind-blocked：目标会话正在执行轮次，无法以固定模式重开（未向 legacy 会话投递）。" };
+      }
+      const rebound = await this.disposeEntry(key, forcedExisting);
+      if (rebound !== null) {
+        rebindDiagnostic.record("session.fixed-rebind.blocked", { reasonCode: "close-failed", detail: rebound });
+        return { ok: false, error: `fixed-session-rebind-blocked：目标旧会话关闭失败（${rebound}），未以固定模式重开。` };
+      }
+      rebindDiagnostic.record("session.fixed-rebind", { previousWorkflowMode: forcedExisting.sessionWorkflowMode });
     }
     // B-2：该角色已有**同项目**的保活会话 → 续接（句柄与模型上下文原样保留）。
     const existing = this.sessions.get(key);
@@ -3671,7 +3717,7 @@ export class SessionManager {
       }
       // O-1（2026-10-12）：续接前先查**边界快照**——陈旧 ⇒ 作废并按下方**新建**路径重开（历史按 D-1 恢复）；
       // 未陈旧 ⇒ 逐字续接（**绝不**误重开丢上下文）。在跑的轮次不打断（busy 时跳过，下一时机再查）。
-      const rebuilt = await this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion);
+      const rebuilt = await this.rebuildIfBoundaryStale(key, userInitiated, selectionVersion, forcedSessionWorkflowMode);
       if (rebuilt === undefined) {
         // 串行等待期间后台可能已替换旧条目，续接必须取当前句柄。
         const current = this.sessions.get(key);
@@ -4585,6 +4631,7 @@ export class SessionManager {
       roleId: req.roleId, runtime: req.runtime, profileRevision, interactionState,
       projectRoot: req.projectRoot,
       config,
+      sessionWorkflowMode,
       lastUsed: ++this.lruClock,
       busy: false,
       // F-5-opt1：确认制判据与 `customerInput` 注入判据同处定格（仅内置治理角色且通道已接）。
@@ -10252,14 +10299,18 @@ ${formatted}` };
     }
     let deliveryRuntime = this.findLiveRuntime(projectRoot, targetRoleId) ?? runtime;
     const existingTarget = this.sessions.get(this.sessionKey(projectRoot, targetRoleId, deliveryRuntime));
-    if (!existingTarget) {
+    if (!existingTarget || existingTarget.sessionWorkflowMode !== "fixed") {
       // B1：fixed 任务不按 taskId 绑定打开目标会话（项目角色 fixed 任务作用域/内置 review 上下文属 B3）；
-      // 会话级 fixed 模式注入由聊天入口按项目状态解析（B6.1：`sessionWorkflowModeForChat`；首个
-      // stage-request 已先经 `ensureFixedPathStarted` 写回 `workflowSchema` ⇒ 目标会话为 fixed），
-      // 显式带 taskId 的打开路径仍经 `workflowModeForTask`/`workflowModeForFlow` 生效。
-      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime }, false);
+      // B8.1（RR3）：固定派发的目标会话**强制 fixed**——不再依赖聊天入口按项目状态解析（混合项目/在飞
+      // legacy run 时聊天解析为 legacy；RR3 实测 convener 以 legacy 打开、收到 request_stable_write）。
+      // 既有非 fixed 条目由 `openInternalUnsafe` 安全重开（busy/不可关闭 ⇒ `fixed-session-rebind-blocked`
+      // fail-closed，任务已登记但不投递）。显式带 taskId 的打开路径仍经 `workflowModeForTask`/`workflowModeForFlow` 生效。
+      const opened = await this.openInternal({ projectRoot, roleId: targetRoleId, runtime: deliveryRuntime, forcedWorkflowMode: "fixed" }, false);
       if (!opened.ok) {
         await this.recordTaskFailure(projectRoot, taskId, `delivery-target-open-failed: ${shortenSummary(opened.error ?? mainT("shared.common.unknownReason"))}`);
+        if (opened.error !== undefined && opened.error.startsWith("fixed-session-rebind-blocked")) {
+          return reject("fixed-session-rebind-blocked", `${opened.error}（fixed 任务未投递；目标会话保持原状，待其空闲后重试。）`);
+        }
         return reject(
           "dispatch-target-open-failed",
           mainT("main.session.dispatchTargetOpenFailed", {
@@ -12714,9 +12765,17 @@ ${formatted}` };
       return false;
     };
     if (!await inspectQueuedChild()) return;
+    // T3 B8.1（2026-11-11，RR3）：投递**固定任务**时自动开启的目标会话同样强制 fixed（与
+    // `routeFixedPathDispatch` 同口径：任务账本 `task.created.workflowId` 命名空间）；legacy 任务
+    // 不传（旧路径逐字不变）。既有非 fixed 条目也走安全重绑（busy/不可关闭 ⇒
+    // `fixed-session-rebind-blocked`，条目保留待重试——绝不把 fixed 任务投进 legacy 会话）。
+    const forcedDeliveryMode: WorkflowMode | undefined =
+      item.taskId !== undefined && await this.isFixedTask(projectRoot, item.taskId) ? "fixed" : undefined;
+    const needsFixedRebind = forcedDeliveryMode === "fixed" && entry !== undefined && entry.projectRoot === projectRoot &&
+      entry.sessionWorkflowMode !== "fixed";
     if (taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId && entry?.busy) return;
     if (stopped()) return;
-    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId) {
+    if (!entry || entry.projectRoot !== projectRoot || taskBoundSession && boundTaskOf(entry) !== assignedDeliveryId || needsFixedRebind) {
       // 2026-11-05（真机缺陷「又卡住」）：生产宿主（Interface）把 `demoRuntimeAutoDeliver` 置 false ⇒
       // **演示运行时（demo）不自动开会话**。demo 适配器执行内置演示脚本（对 `src/evil.ts` 的越界写，
       // 用于演示"写前被拒"），自动唤醒只会得到被门禁拒绝的回合，失败结果再经回交/派发级联成 blocked
@@ -12726,10 +12785,12 @@ ${formatted}` };
         diagnostic.record("delivery.skip.demo-not-opened", { state: item.kind, targetRoleId: resolvedTarget, queueDepth: q.length });
         return;
       }
-      // 目标会话**未开**（或属于别的项目）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
+      // 目标会话**未开**（或属于别的项目/需 fixed 重绑）→ 自动开启再投（su=治理主入口；派发目标=被派角色）。
       // 后台开启（`userInitiated=false`）：**不抢活动角色**——用户正在看的会话不因投递而易主。
+      // B8.1：固定任务来源携带 forced fixed（legacy 任务不传）。
       const opened = await this.openInternal({ projectRoot, roleId: resolvedTarget, runtime,
-        ...(taskBoundSession ? { taskId: assignedDeliveryId } : {}) }, false);
+        ...(taskBoundSession ? { taskId: assignedDeliveryId } : {}),
+        ...(forcedDeliveryMode !== undefined ? { forcedWorkflowMode: forcedDeliveryMode } : {}) }, false);
       if (!opened.ok) {
         item.lastAttempt = { state: "blocked", code: "unknown", at: new Date(this.now()).toISOString() };
         this.emitDeliveryNote(projectRoot, runtime,
