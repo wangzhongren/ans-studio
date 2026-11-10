@@ -1,0 +1,6 @@
+app/desktop/session.ts:3628-3631 requestedSessionMode = req.taskId!==undefined && trio ? sessionWorkflowModeForTask(...) : "legacy" -> chief chat (no taskId) opens legacy
+app/desktop/session.ts:3805 sessionWorkflowMode = trio ? requestedSessionMode : "legacy"
+src/pipeline/orchestration/run-role.ts:1463-1470 sessionWorkflowMode default "legacy"; only taskId-bound flow resolves fixed
+src/pipeline/orchestration/run-role.ts:2714-2744 fixed context + chief-workflow-v2.md injected only when sessionWorkflowMode==="fixed"
+app/desktop/session.ts:8843-8853 first fixed start (ensureFixedPathStarted) only when a chief dispatch already carries taskKind="stage-request" + workflowPath; legacy-instructed chief never produces it
+test/测试/fixed-path-full-chain.test.ts:428-446 deterministic chain injects the first stage-request by direct routeDispatch; comment acknowledges first delivery opens target sessions in legacy injection before re-opening with taskId

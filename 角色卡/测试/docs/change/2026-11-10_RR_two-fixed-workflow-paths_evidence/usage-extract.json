@@ -1,0 +1,17 @@
+{
+  "model": "deepseek-v4-flash",
+  "chief": {
+    "assistantMessages": 22,
+    "inputTokens": 96025,
+    "outputTokens": 18522,
+    "cacheReadTokens": 638720,
+    "costUsd": null
+  },
+  "product": {
+    "assistantMessages": 0,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "costUsd": null
+  },
+  "note": "usage 取自 Claude 原生 transcript 的 message.usage；无 cost_usd 字段，未估算费用；未读取 .env"
+}
