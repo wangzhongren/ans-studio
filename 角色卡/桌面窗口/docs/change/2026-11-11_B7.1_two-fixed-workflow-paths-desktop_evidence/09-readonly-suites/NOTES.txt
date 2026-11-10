@@ -1,0 +1,12 @@
+readonly suite notes (B7.1):
+- run-role-fixed-b2.test.ts: 11/11 pass (parallel v2 resource change tolerated; test recomputes disk SHA)
+- fixed-path-start.test.ts: 4/4 pass
+- gate consumers (cold-start-genesis + shell-approval): 11/11 pass
+- orchestration consumers (direct-role-capabilities + git-capabilities + run-role-submit-capabilities): 77 tests / 73 pass / 2 fail / 2 skipped
+  failures = Retained intent confirmation… / Git team plan publication… : same names as B6.1 pristine consumer baseline (pre-existing linked-worktree env items)
+- roles: 275/275 pass
+- runtime-core: 纯净 HEAD 基线 586/574/8/4（runtime-core-before-pristine.tap）；工作树 cwd（git worktree 的 .git 为文件）直跑 586/549/33/4——25 个额外失败均为测试以 process.cwd() 为 projectRoot 时 readGitHostProtectionRequirement 判 .git 文件 ⇒ runtime-protection-scope-unknown（linked-worktree 环境项，非本批改动；单测证明见 runtime-core-one-test-neutral-cwd.tap）。改用无 .git 的中性 cwd 运行同一工作树代码：586/574/8/4，失败名与纯净基线逐名一致（runtime-core-neutral-cwd.tap）。
+- test/测试/fixed-path-full-chain.test.ts (B7.2 scope, read-only here): 3/3 fail with stage-request-invalid workflowAction missing (see b72-full-chain-current.tap; B7.2 must add workflowAction:"advance" (+ workflowPath) to stage-request payloads)
+- extras (read-only, fixed-relevant): workflow-stage-request 8/8; workflow-preconditions 29/29; workflow-dispatch-fixed+workflow-mode+workflow-ledger 20/20; workflow-baseline+workflow-basis-b21+workflow-close-intent 15/15; task-state 20/20; project-state-workflow 3/3
+- extras with pre-existing failures (confirmed identical in pristine HEAD): handback 19/20 (openRoleSession 普通角色 settle), trio-worker-report 3/6 (3 card-text names)
+- gate-engine full (worktree snapshot): 536/530/5/1; the 5 failures are gate-engine known-red per parallel 门禁 B7.1 record (528/522/5/1 → 536/530/5/1, failure/skip names unchanged; that suite does not import app/desktop/session.ts). This batch only claims the consumer subset 11/11.

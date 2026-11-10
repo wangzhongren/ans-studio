@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: 已挂起卡：勾选开关不影响该卡，判断 agent 0 次调用；随后新请求才走判断
+ok 1 - 已挂起卡：勾选开关不影响该卡，判断 agent 0 次调用；随后新请求才走判断
+  ---
+  duration_ms: 11.0936
+  type: 'test'
+  ...
+# Subtest: 判断进行中关闭开关：以通道调用时点为准，本次结果仍生效；之后恢复手动
+ok 2 - 判断进行中关闭开关：以通道调用时点为准，本次结果仍生效；之后恢复手动
+  ---
+  duration_ms: 19.742
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 470.6826

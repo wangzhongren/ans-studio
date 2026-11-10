@@ -1,5 +1,5 @@
 import { isDirectActionSource } from "../../src/model/trunk.ts";
-import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN, WORKFLOW_LEDGER_SCHEMA, isRuntimeSessionDrained, isTaskWorkSourceRef, isDispatchTaskResumeController } from "../../src/model/runtime.ts";
+import { RuntimeDeliveryError, REQUEST_TIMEOUT_ERROR_CODES, MODEL_REQUEST_RETRY_EXHAUSTED, GOVERNANCE_SLUG_PATTERN, WORKFLOW_LEDGER_SCHEMA, isRuntimeSessionDrained, isTaskWorkSourceRef, isDispatchTaskResumeController, isWorkflowPath, isWorkflowStage } from "../../src/model/runtime.ts";
 import { isRequestFailureCode } from "../../src/common/runtime-core/request-timeout.ts";
 import { isNetworkOfflineFailureCode } from "../../src/common/runtime-core/network-gate.ts";
 import { createToolDisplayContext } from "../../src/common/runtime-core/tool-display.ts";
@@ -3977,7 +3977,9 @@ export class SessionManager {
     const roleStatus: RoleStatusFn | undefined =
       canObserve ? (query: RoleStatusPayload) => this.roleStatusText(req.projectRoot, query) : undefined;
     const contractCheck: ContractCheckFn | undefined =
-      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input);
+      // B7.1：契约速查按**本会话**的 workflow 模式分流（fixed 视图不含 legacy run/pin 口径；
+      // legacy/single 模式参数缺省路径逐字不变）。
+      (input: ContractCheckInput) => this.contractCheckText(req.projectRoot, req.roleId, input, sessionWorkflowMode);
     // 2026-11-09（文档格式权威说明，方案 P1.2 §3.1/§4.1；B1 AC-9/AC-10）：`doc_format` 只读数据源——
     // **所有角色会话**（6 个内置治理角色 + 项目角色）与 `contractCheck` 同位无条件注入（项目角色走同一条
     // `openRoleSession` 路径，不依赖技能安装/动态 id 登记）。数据源 `docFormatText` 第一条语句静态早退到
@@ -8840,7 +8842,55 @@ export class SessionManager {
       // `workflowPath` 且启用闸未开时，先经 `ensureFixedPathStarted` 原子写 `.ans/project.json
       // workflowSchema:"two-fixed-paths/v1"`（显式 legacy/v1 不覆盖；写失败 ⇒ `project-config-write-failed`
       // fail-closed、不弹卡），再按复核后的模式路由。其余派发路径不写配置（旧项目/旧夹具零变化）。
+      // T3 B7.1（2026-11-11，RR2 根因 `fixed-stage-request-fail-open`）：fixed 聊天会话**先按会话模式
+      // fail-closed**——缺 `flowId/workflowPath/stage/workflowAction/roleId` 的 stage-request 与无
+      // `workflowId/stage` 的普通派发一律拒绝：不创建任务、不写 `.ans/runs`/`.ans/trunk`、绝不回落
+      // legacy 星形派发（RR2 实测 legacy 受理写盘的偏航路径就此关闭）。
+      // legacy 聊天会话（旧项目/在飞 legacy run/显式 legacy/v1）的既有 flowId→fixed/星形路径逐字不变。
+      const chatMode = await sessionWorkflowModeForChat(projectRoot);
       const dispatchFlowId = dispatchFlowIdOf(d);
+      if (chatMode === "fixed") {
+        if (d.taskKind === "stage-request") {
+          const convenerRoleId = this.handbackOwnerRoleId(projectRoot) ?? "convener";
+          const invalid: string[] = [];
+          if (dispatchFlowId === "") invalid.push("flowId");
+          if (!isWorkflowPath(d.workflowPath)) invalid.push('workflowPath:"A"|"B"');
+          if (!isWorkflowStage(d.stage)) invalid.push("stage（A1–A13 含 A12a/A12b，或 B1–B4）");
+          if (d.workflowAction !== "advance") invalid.push('workflowAction:"advance"');
+          if (targetRoleId !== convenerRoleId) invalid.push(`roleId（运营 ${convenerRoleId}）`);
+          if (invalid.length > 0) {
+            const detail = `固定路径的 stage-request 缺少或非法：${invalid.join("、")}。stage-request 必须同时给出非空 flowId、workflowPath:"A"|"B"、合法 stage、workflowAction:"advance"、roleId（运营 ${convenerRoleId}）；本次未创建任务、未写 legacy 账本。`;
+            return fail(`stage-request-invalid：${detail}`, `stage-request-invalid：${detail}`);
+          }
+          // 首个 stage-request 的 fixed 启动顺序（B3 既有逻辑）：启用闸未开先原子写 workflowSchema；
+          // 失败 fail-closed。启动后仍不是 fixed（如该 flow 有在飞 legacy run）⇒ 拒绝，不回落星形。
+          let dispatchMode: WorkflowMode;
+          if (await isFixedPathEnabledForFlow(projectRoot, dispatchFlowId)) {
+            dispatchMode = await resolveFixedPathMode(projectRoot, dispatchFlowId);
+          } else {
+            const started = await ensureFixedPathStarted(projectRoot, dispatchFlowId);
+            if (!started.ok) {
+              return fail(`${started.code}：${started.message}`, started.message);
+            }
+            dispatchMode = started.mode;
+          }
+          if (dispatchMode !== "fixed") {
+            const detail = "固定会话的 stage-request 未能解析为 fixed workflow（该 flow 仍为 legacy）；按 fail-closed 拒绝，不回落 legacy 星形派发。";
+            return fail(`stage-request-invalid：${detail}`, `stage-request-invalid：${detail}`);
+          }
+          return this.routeFixedPathDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source, dispatchFlowId);
+        }
+        // A12a/A12b/verifier 直派等 fixed 任务：必须携带账本绑定证据（workflowId+stage）。
+        const fixedWorkflowId = typeof d.workflowId === "string" ? d.workflowId.trim() : "";
+        if (fixedWorkflowId !== "" && d.stage !== undefined) {
+          return this.routeFixedPathDispatch(projectRoot, runtime, fromRoleId, d, targetRoleId, task, source, dispatchFlowId);
+        }
+        const requiredDetail = "固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。";
+        return fail(
+          `stage-request-required：${requiredDetail}`,
+          `stage-request-required：已拒绝 legacy 星形派发（${targetRoleId}）；${requiredDetail}`,
+        );
+      }
       if (dispatchFlowId !== "") {
         let dispatchMode = await resolveFixedPathMode(projectRoot, dispatchFlowId);
         if (
@@ -11957,9 +12007,13 @@ ${formatted}` };
    * 2026-10-30（3.2）：`contract_check` 只读契约速查。不写盘、不放行；只返回调用角色可见信息。
    * 2026-11-03（contract schema query）：`topic` 模式**第一句早退**到静态 schema 文本——
    * 早退前不读 listing/run、不写盘；legacy 路径逐字不变。
+   * 2026-11-11（T3 B7.1，RR2 根因）：按**调用会话的 workflow 模式**分流——fixed 会话走
+   * `contractCheckTextFixed`（无 legacy run/pin 口径、stage-request 必填项）；topic 早退对两模式
+   * 都逐字不变；legacy/single（缺省 mode）输出逐字不变。
    */
-  private async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput): Promise<string> {
+  private async contractCheckText(projectRoot: string, callerRoleId: string, input: ContractCheckInput, mode: WorkflowMode = "legacy"): Promise<string> {
     if (input.topic !== undefined) return contractSchemaText(input.topic);
+    if (mode === "fixed") return this.contractCheckTextFixed(projectRoot, callerRoleId, input);
     let listing = this.deps.getListing(projectRoot);
     if (!listing) await this.refreshListingNow(projectRoot);
     listing = this.deps.getListing(projectRoot);
@@ -12054,10 +12108,108 @@ ${formatted}` };
       acceptance: ["flowId", "runId/pinnedDocs", "moduleId/modulePaths", "证据按模块归档"],
       shell: ["command/argv", "cwd", "显式写目标在角色边界", "执行后审计"],
     };
-    if (kind !== undefined) lines.push(`taskKind ${kind} 必填：${required[kind].join("；")}`);
-    else lines.push("taskKind：可传 dispatch/appointment/write/acceptance/shell 获取对应必填项");
+    if (kind !== undefined) {
+      // B7.1：`stage-request` 是 fixed 专用 code（legacy 五项输出逐字不变；未知 kind 不再抛）。
+      const items = required[kind];
+      lines.push(items !== undefined
+        ? `taskKind ${kind} 必填：${items.join("；")}`
+        : `taskKind ${kind}：fixed 路径专用（当前项目按 legacy 解析）；legacy 请用 dispatch/appointment/write/acceptance/shell`);
+    } else lines.push("taskKind：可传 dispatch/appointment/write/acceptance/shell 获取对应必填项");
     lines.push("常见拒绝 → 下一步：");
     for (const item of rejectionMapSnapshot().slice(0, 14)) lines.push(`- ${item.code} → ${item.owner}${item.retryable ? "（可重试）" : "（不可原样重试）"}`);
+    const text = lines.join("\n");
+    const max = 4096;
+    if (Buffer.byteLength(text, "utf8") <= max) return text;
+    const marker = "\n…（已截断）";
+    let truncated = text;
+    while (Buffer.byteLength(truncated, "utf8") > max - Buffer.byteLength(marker, "utf8") && truncated.length > 0) {
+      truncated = truncated.slice(0, -1);
+    }
+    return `${truncated}${marker}`;
+  }
+
+  /**
+   * T3 B7.1（2026-11-11，RR2 根因 `contract-check-legacy-wording-in-fixed`）：**fixed 会话的契约速查**。
+   * 固定路径**没有 legacy run/pin**：不读取、不输出 `.ans/runs` manifest/pin 状态（RR2 中固定幕僚拿到的
+   * `run：legacy`/`runId(pinned)` 口径是误导根因）；`taskKind dispatch` 必填改为 stage-request 口径
+   * （A12a/A12b/verifier 直派按 workflowId/stage）；常见拒绝补充 fixed 稳定码。
+   * 只读、不写盘、不授予放行/派发权；`topic` 早退与 4 KiB 截断与 legacy 同型。
+   */
+  private async contractCheckTextFixed(projectRoot: string, callerRoleId: string, input: ContractCheckInput): Promise<string> {
+    let listing = this.deps.getListing(projectRoot);
+    if (!listing) await this.refreshListingNow(projectRoot);
+    listing = this.deps.getListing(projectRoot);
+    const requestedRole = typeof input.roleId === "string" && input.roleId.trim() !== "" ? input.roleId.trim() : callerRoleId;
+    const roleId = callerRoleId !== "" ? callerRoleId : requestedRole;
+    const role = listing?.roles.find((item) => item.roleId === roleId);
+    const flowId = typeof input.flowId === "string" ? input.flowId.trim() : "";
+    const lines: string[] = ["contract_check（只读速查；查询不构成放行/授权）"];
+    lines.push("run：fixed（无 run；固定路径由 stage-request 驱动）");
+    // fixed 角色/模块事实：只读名单文档（不读 `.ans/runs` manifest；pin 状态不适用）。
+    const roster = flowId !== "" ? await loadLatestRoster({ projectRoot, flowId }) : undefined;
+    if (roster !== undefined && !roster.ok) lines.push(`roster：不可用（${roster.reason}）`);
+    const roleModules = roster !== undefined && roster.ok && role !== undefined
+      ? roster.roster.roles.find((entry) => entry.id === roleId)?.modules ?? []
+      : [];
+    const moduleId = typeof input.moduleId === "string" ? input.moduleId.trim() : "";
+    const module = roster !== undefined && roster.ok && moduleId !== "" ? roster.roster.modules.find((entry) => entry.id === moduleId) : undefined;
+    lines.push(`角色：${roleId || "（未指定）"}${role !== undefined ? `｜builtIn=${role.builtIn === true}` : ""}`);
+    if (roleModules.length > 0) lines.push(`名下模块：${roleModules.join("、")}`);
+    if (module !== undefined) lines.push(`指定模块：${module.id}｜paths=${module.paths.join("、")}｜category=${module.category}`);
+    const boundaryEntries = role?.boundary?.entries ?? [];
+    if (boundaryEntries.length > 0) {
+      lines.push(`可写边界：${boundaryEntries.map((entry) => `${entry.path}（${entry.kind}）`).slice(0, 12).join("、")}`);
+    } else {
+      lines.push("可写边界：（未枚举/内置治理角色按既有拓扑与治理规则）");
+    }
+    lines.push("禁止：角色卡/、其他角色模块、.ans/、治理/版本化文档覆盖、docs/product|proposals|contracts|scheduling|quality|verification（越界拒绝）");
+    // 意图入口契约：与 legacy 同源（只读文档事实；不依赖 run 的 documents.intent/proposal 钉）。
+    const intentContractRoles = new Set<IntentContractRole>(["chief", "product", "rapporteur", "nominator"]);
+    if (intentContractRoles.has(roleId as IntentContractRole)) {
+      lines.push("意图入口契约（与角色卡/判断拒绝文案同源）：");
+      lines.push(intentEntryContractText(roleId as IntentContractRole));
+      if (flowId !== "") {
+        const intentFacts = await readIntentEntryFacts({ projectRoot, flowId });
+        const idsMatch = intentFacts.intentIdsMatch === undefined ? "无法核对" : intentFacts.intentIdsMatch ? "yes" : "no";
+        if (intentFacts.resolutionError !== undefined) {
+          lines.push(`意图入口解析：${intentFacts.resolutionError.code}｜${intentFacts.resolutionError.detail}`);
+        } else if (intentFacts.resolvedIntentId === undefined) {
+          lines.push("意图入口事实：未解析到 intentId（产品意图/提案 frontmatter 缺 intentId）");
+        } else {
+          const entryMatch = intentFacts.entryMatches === undefined ? "无法核对" : intentFacts.entryMatches ? "yes" : "no";
+          lines.push(
+            `意图入口事实：intentId=${intentFacts.resolvedIntentId}｜来源=${intentFacts.resolutionSource ?? "未知"}｜入口 ${intentFacts.intentEntryPath}｜存在=${intentFacts.intentEntryExists === true ? "yes" : "no"}｜intentId 匹配=${entryMatch}`,
+          );
+        }
+        if (intentFacts.productIntentId !== undefined || intentFacts.proposalIntentId !== undefined) {
+          lines.push(
+            `意图来源：产品意图=${intentFacts.productIntentId ?? "缺失"}｜提案=${intentFacts.proposalIntentId ?? "缺失"}｜一致性=${idsMatch}`,
+          );
+        }
+      }
+    }
+    const kind = input.taskKind;
+    if (kind === "dispatch" || kind === "stage-request") {
+      lines.push('taskKind dispatch 必填：flowId；roleId；taskKind:"stage-request"；workflowAction:"advance"；workflowPath:"A"|"B"；stage；sideEffect:"read-only"；task（A12a/A12b/verifier 直派任务按 workflowId/stage）');
+    } else if (kind !== undefined) {
+      lines.push(`taskKind ${kind}：legacy 专属（fixed 路径不使用；fixed 请用 dispatch 的 stage-request 或带 workflowId/stage 的 fixed 任务）`);
+    } else {
+      lines.push("taskKind：可传 dispatch 获取固定路径必填项（stage-request 或带 workflowId/stage 的 fixed 任务）");
+    }
+    lines.push("常见拒绝 → 下一步：");
+    // fixed 稳定码先列（截断时也不丢；legacy 快照随后补充，与 legacy 视图同一 code→owner 格式）。
+    const fixedRejections: ReadonlyArray<readonly [string, string, boolean]> = [
+      ["stage-request-invalid", "chief", true],
+      ["stage-request-required", "convener", false],
+      ["workflow-path-required", "chief", true],
+      ["stage-transition-invalid", "chief", true],
+    ];
+    const snapshot = rejectionMapSnapshot();
+    for (const [code, owner, retryable] of fixedRejections) {
+      if (snapshot.some((item) => item.code === code)) continue;
+      lines.push(`- ${code} → ${owner}${retryable ? "（可重试）" : "（不可原样重试）"}`);
+    }
+    for (const item of snapshot.slice(0, 14)) lines.push(`- ${item.code} → ${item.owner}${item.retryable ? "（可重试）" : "（不可原样重试）"}`);
     const text = lines.join("\n");
     const max = 4096;
     if (Buffer.byteLength(text, "utf8") <= max) return text;

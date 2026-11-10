@@ -811,7 +811,7 @@ test("G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-b3" });
     const receipt = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 B3：修复 core 碰撞", flowId: FLOW, workflowId,
-      taskKind: "stage-request", stage: "B3", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "B", stage: "B3", workflowAction: "advance", sideEffect: "read-only",
       requestedEvidence: ["src/core/snake.ts"],
     }, live);
     releaseSource(h.mgr, live);
@@ -934,7 +934,7 @@ test("G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B
       const live = liveSource(h.mgr, root, "chief", { turnId: "turn-b3" });
       const receipt = await routeDispatch(h.mgr, root, "chief", {
         roleId: "convener", task: "推进 B3", flowId: FLOW, workflowId,
-        taskKind: "stage-request", stage: "B3", sideEffect: "read-only",
+        taskKind: "stage-request", workflowPath: "B", stage: "B3", workflowAction: "advance", sideEffect: "read-only",
       }, live);
       releaseSource(h.mgr, live);
       assert.equal(receipt.ok, false, "无候选路径不得受理 B3 请求");

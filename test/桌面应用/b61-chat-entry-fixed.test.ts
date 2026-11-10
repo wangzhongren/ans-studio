@@ -377,7 +377,7 @@ test("空项目首个 stage-request：fixed 聊天 ⇒ ensureFixedPathStarted �
     const live = liveSource(h.mgr, root, "chief", "demo", { turnId: "turn-customer-b61" });
     const payload: DispatchTaskPayload = {
       roleId: "convener", task: "推进 A1：请派产品撰写意图", flowId: "snake",
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     };
     const receipt = await routeDispatch(h.mgr, root, "chief", payload, live);
     releaseSource(h.mgr, live);

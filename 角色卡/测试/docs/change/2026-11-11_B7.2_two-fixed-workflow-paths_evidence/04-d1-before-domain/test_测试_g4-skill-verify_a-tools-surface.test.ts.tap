@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: 注入才注册（对抗四组合）：两工具各自独立，未注入即结构性不存在
+ok 1 - 注入才注册（对抗四组合）：两工具各自独立，未注入即结构性不存在
+  ---
+  duration_ms: 2.2158
+  type: 'test'
+  ...
+# Subtest: 回执（rebuilt）：载荷逐字路由 {roleId,name}；呈现 path＋digest 前 12 位＋即刻生效＋写边界不变句
+ok 2 - 回执（rebuilt）：载荷逐字路由 {roleId,name}；呈现 path＋digest 前 12 位＋即刻生效＋写边界不变句
+  ---
+  duration_ms: 0.7036
+  type: 'test'
+  ...
+# Subtest: 回执（next-session 如实延迟态）：如实「在跑不打断」，绝不称即刻生效
+ok 3 - 回执（next-session 如实延迟态）：如实「在跑不打断」，绝不称即刻生效
+  ---
+  duration_ms: 0.1576
+  type: 'test'
+  ...
+# Subtest: 回执（params 别名与缺参）：roleId 别名 role_id/role 可用；name 无别名；缺参不触达能力
+ok 4 - 回执（params 别名与缺参）：roleId 别名 role_id/role 可用；name 无别名；缺参不触达能力
+  ---
+  duration_ms: 0.2778
+  type: 'test'
+  ...
+# Subtest: 契约外回执一律 fail-closed：action 不符/缺 digest/effective 非法/null/抛错——绝不称已安装/已卸载
+ok 5 - 契约外回执一律 fail-closed：action 不符/缺 digest/effective 非法/null/抛错——绝不称已安装/已卸载
+  ---
+  duration_ms: 0.6001
+  type: 'test'
+  ...
+# Subtest: 卸载工具同名同形：expectedAction=uninstalled；成功文案含「效果已撤；文件保留于」（二分陈述）
+ok 6 - 卸载工具同名同形：expectedAction=uninstalled；成功文案含「效果已撤；文件保留于」（二分陈述）
+  ---
+  duration_ms: 0.1874
+  type: 'test'
+  ...
+# Subtest: 护栏拒绝原样转达：reason=not-customer-turn ⇒ 未执行、零副作用、原文逐字
+ok 7 - 护栏拒绝原样转达：reason=not-customer-turn ⇒ 未执行、零副作用、原文逐字
+  ---
+  duration_ms: 0.1516
+  type: 'test'
+  ...
+# Subtest: schema 冻结文案逐字（独立重打锚点）：install_skill / uninstall_skill 失败枚举与纪律句
+ok 8 - schema 冻结文案逐字（独立重打锚点）：install_skill / uninstall_skill 失败枚举与纪律句
+  ---
+  duration_ms: 0.1534
+  type: 'test'
+  ...
+# Subtest: 零写盘（结构性）：makeSkillReceiptTool 源码切片不含任何写盘原语
+ok 9 - 零写盘（结构性）：makeSkillReceiptTool 源码切片不含任何写盘原语
+  ---
+  duration_ms: 0.8451
+  type: 'test'
+  ...
+# Subtest: 零写盘（行为）：真实盘快照前后逐字节一致——成功与失败两路
+ok 10 - 零写盘（行为）：真实盘快照前后逐字节一致——成功与失败两路
+  ---
+  duration_ms: 13.5357
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 243.9328

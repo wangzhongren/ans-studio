@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: e2e 首字节超时：service+编排透传 failed/errorCode；恰一条 settled、无 handback、人话短报
+ok 1 - e2e 首字节超时：service+编排透传 failed/errorCode；恰一条 settled、无 handback、人话短报
+  ---
+  duration_ms: 103.6178
+  type: 'test'
+  ...
+# Subtest: e2e 流空闲超时：请求已活动后静默 ⇒ request-timeout-idle；仍恰一条 settled、无 handback
+ok 2 - e2e 流空闲超时：请求已活动后静默 ⇒ request-timeout-idle；仍恰一条 settled、无 handback
+  ---
+  duration_ms: 100.1562
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 613.6643

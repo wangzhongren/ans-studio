@@ -1,0 +1,53 @@
+TAP version 13
+# Subtest: fixed 聊天 stage-request 缺 workflowPath/stage/flowId/workflowAction/roleId ⇒ stage-request-invalid 且零写盘
+ok 1 - fixed 聊天 stage-request 缺 workflowPath/stage/flowId/workflowAction/roleId ⇒ stage-request-invalid 且零写盘
+  ---
+  duration_ms: 28.9189
+  type: 'test'
+  ...
+# Subtest: fixed 聊天完整 stage-request ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由（无 run 写盘）
+ok 2 - fixed 聊天完整 stage-request ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由（无 run 写盘）
+  ---
+  duration_ms: 86.1355
+  type: 'test'
+  ...
+# Subtest: fixed 聊天非 stage-request 且无 workflowId/stage ⇒ stage-request-required（不回落 legacy 星形）
+ok 3 - fixed 聊天非 stage-request 且无 workflowId/stage ⇒ stage-request-required（不回落 legacy 星形）
+  ---
+  duration_ms: 14.3899
+  type: 'test'
+  ...
+# Subtest: fixed 聊天带 workflowId/stage 的 verifier 直派 ⇒ routeFixed（任务带 workflowId/stage、无 runId）
+ok 4 - fixed 聊天带 workflowId/stage 的 verifier 直派 ⇒ routeFixed（任务带 workflowId/stage、无 runId）
+  ---
+  duration_ms: 24.3334
+  type: 'test'
+  ...
+# Subtest: legacy 项目普通派发仍 routeStar（不落入 fixed fail-closed）；fixed 聊天同样形状被 stage-request-required 拦截
+ok 5 - legacy 项目普通派发仍 routeStar（不落入 fixed fail-closed）；fixed 聊天同样形状被 stage-request-required 拦截
+  ---
+  duration_ms: 6.2388
+  type: 'test'
+  ...
+# Subtest: contract_check fixed 视图：无 legacy run/pin 误导、含 stage-request 固定字段与 fixed 稳定码
+ok 6 - contract_check fixed 视图：无 legacy run/pin 误导、含 stage-request 固定字段与 fixed 稳定码
+  ---
+  duration_ms: 3.6061
+  type: 'test'
+  ...
+# Subtest: contract_check legacy 视图逐字不变（显式 legacy 项目 / single），stage-request kind 不抛
+ok 7 - contract_check legacy 视图逐字不变（显式 legacy 项目 / single），stage-request kind 不抛
+  ---
+  duration_ms: 5.1746
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 581.8079
+exit=0

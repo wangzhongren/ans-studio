@@ -1,0 +1,16 @@
+# B7.2 candidate hashes (raw working-tree bytes)
+# generated 2026-11-11T02:43:22+08:00
+
+## before (HEAD 976092e) -> after
+test/测试/fixed-path-full-chain.test.ts	before=ce2b647332267647a3e247281b262f37a4291481909f42575d91b59b341835fd	after=9ae80c579ee4b0bf306378ceaab2bca851e7b9fef8b149a8797ae10ff25a3832	bytes=82174	lines=1252
+test/测试/mode-switch.test.ts	before=b38596b8b886c86111f2102d5be17cc0c53ae58ca4eb83e97c7f25df1addeca2	after=39a8d0f3de04eae576369e05241ccf7b59bcf26c0a31969e407ac20458ed5a18	bytes=17235	lines=287
+test/测试/b-change-scope.test.ts	before=a7f97744e23a05d0b26383ca3f7247aa512dec28355f03a15eff067c000e4d31	after=e85006ef0b4d1c4435fe28f100c477b37ea3e842b16138408dc2bf8b46e55ce7	bytes=24693	lines=420
+test/测试/git-role-workflows-driver.ts	before=4ac85b7562a6b70f1884f047e483f77d311522b8f2ac7c7313d0e567ead3b326	after=60fa89f0690927c7aa79be732e0900f3d33655f0aca179e5f6dd3979184bc041	bytes=66153	lines=807
+test/测试/git-role-workflows-e2e.test.ts	before=b5d0dc61bc88a6363fae33e9a38085210a50c9fd58327f8f9d09ebfc5b18cf09	after=2d3cabadf92e4a87cea9eb8d5eaceebab60a1a82948ff8bc05c62f6796b18874	bytes=425447	lines=3632
+
+## git diff --numstat (test/测试 only)
+2	2	test/测试/b-change-scope.test.ts
+11	11	test/测试/fixed-path-full-chain.test.ts
+2	2	test/测试/git-role-workflows-driver.ts
+6	3	test/测试/git-role-workflows-e2e.test.ts
+15	12	test/测试/mode-switch.test.ts

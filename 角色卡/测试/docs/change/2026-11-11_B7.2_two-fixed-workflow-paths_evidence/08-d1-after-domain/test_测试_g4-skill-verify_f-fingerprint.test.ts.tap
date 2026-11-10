@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开）
+ok 1 - ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开）
+  ---
+  duration_ms: 30.9739
+  type: 'test'
+  ...
+# Subtest: ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件）
+ok 2 - ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件）
+  ---
+  duration_ms: 5.8925
+  type: 'test'
+  ...
+# Subtest: ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建）
+ok 3 - ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建）
+  ---
+  duration_ms: 16.92
+  type: 'test'
+  ...
+# Subtest: ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致）
+ok 4 - ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致）
+  ---
+  duration_ms: 10.4986
+  type: 'test'
+  ...
+# Subtest: ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色
+ok 5 - ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色
+  ---
+  duration_ms: 12.0082
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 499.8384

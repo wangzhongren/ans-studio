@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: E1 review（真实规则短 node -e）：批准 → 真实执行并产生哨兵；审计结论 allow
+ok 1 - E1 review（真实规则短 node -e）：批准 → 真实执行并产生哨兵；审计结论 allow
+  ---
+  duration_ms: 52.8835
+  type: 'test'
+  ...
+# Subtest: E2 review × 拒绝：零执行（哨兵不存在）；审计 branch=c-review→a-deny
+ok 2 - E2 review × 拒绝：零执行（哨兵不存在）；审计 branch=c-review→a-deny
+  ---
+  duration_ms: 2.2099
+  type: 'test'
+  ...
+# Subtest: E2 review × 不可用：零执行（哨兵不存在）；审计 branch=c-review→a-unavailable
+ok 3 - E2 review × 不可用：零执行（哨兵不存在）；审计 branch=c-review→a-unavailable
+  ---
+  duration_ms: 1.6545
+  type: 'test'
+  ...
+# Subtest: E2b review × 超时：零执行（哨兵不存在）；审计 branch=c-review→a-timeout
+ok 4 - E2b review × 超时：零执行（哨兵不存在）；审计 branch=c-review→a-timeout
+  ---
+  duration_ms: 40.8432
+  type: 'test'
+  ...
+# Subtest: E3 risky（测试分类器）：批准 → 执行；拒绝 → 零执行；branch 对应
+ok 5 - E3 risky（测试分类器）：批准 → 执行；拒绝 → 零执行；branch 对应
+  ---
+  duration_ms: 47.7171
+  type: 'test'
+  ...
+# Subtest: E4 review（不存在的程序）：批准 → 判定已放行但 spawn 失败如实（不假成功）
+ok 6 - E4 review（不存在的程序）：批准 → 判定已放行但 spawn 失败如实（不假成功）
+  ---
+  duration_ms: 3.9293
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 384.1776

@@ -1,0 +1,13 @@
+before entries: 48
+after entries: 39
+added (after only): 0
+removed (before only): 9
+- test/测试/b-change-scope.test.ts :: 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行）
+- test/测试/b-change-scope.test.ts :: 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed
+- test/测试/fixed-path-full-chain.test.ts :: 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered
+- test/测试/fixed-path-full-chain.test.ts :: 路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受理生产接线）→ B3 写集/真实提交 → B4 发布（不要求 A12b）→ delivered
+- test/测试/fixed-path-full-chain.test.ts :: 路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init；零任务/零 basis/零卡）
+- test/测试/git-role-workflows-e2e.test.ts :: Q18 minimal Desktop lifecycle runner diagnostic
+- test/测试/git-role-workflows-e2e.test.ts :: Q22 minimal real denied write blocked report cleanup
+- test/测试/mode-switch.test.ts :: 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场）
+- test/测试/mode-switch.test.ts :: 混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）

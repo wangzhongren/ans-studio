@@ -1,0 +1,12 @@
+grep -rl 'app/desktop' test/runtime-core test/编排 test/门禁引擎 test/roles --include=*.test.ts:
+test/runtime-core/two-fixed-workflow-paths-b2.test.ts
+test/编排/direct-role-capabilities.test.ts
+test/编排/fixed-path-start.test.ts
+test/编排/git-capabilities.test.ts
+test/编排/run-role-submit-capabilities.test.ts
+test/门禁引擎/cold-start-genesis.test.ts
+test/门禁引擎/shell-approval.test.ts
+
+# 注：test/runtime-core/two-fixed-workflow-paths-b2.test.ts 仅在注释中提及 app/desktop，无 import。
+# test/runtime-core 实际不导入 app/desktop ⇒ 本批（app/desktop/session.ts）零影响；其失败为既有环境项。
+# 该文件单独复跑：13/13 pass（09-readonly-suites/runtime-core-b2.tap）。

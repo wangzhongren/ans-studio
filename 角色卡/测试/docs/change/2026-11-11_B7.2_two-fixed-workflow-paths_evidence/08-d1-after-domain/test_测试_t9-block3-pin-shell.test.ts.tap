@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: 块3/pin 匹配 → accepted，src/a.ts 可写
+ok 1 - 块3/pin 匹配 → accepted，src/a.ts 可写
+  ---
+  duration_ms: 28.1344
+  type: 'test'
+  ...
+# Subtest: 块3/pin 不匹配（篡改边界文件）→ 未接受 → 拒一切写
+ok 2 - 块3/pin 不匹配（篡改边界文件）→ 未接受 → 拒一切写
+  ---
+  duration_ms: 6.7472
+  type: 'test'
+  ...
+# Subtest: 块3/.ans 存在但 accepted:true 无 pin → 载入方置未接受（fail-closed）→ 拒一切写
+ok 3 - 块3/.ans 存在但 accepted:true 无 pin → 载入方置未接受（fail-closed）→ 拒一切写
+  ---
+  duration_ms: 2.2821
+  type: 'test'
+  ...
+# Subtest: 块3/无 .ans → 回退内置（未接受）→ 拒一切写
+ok 4 - 块3/无 .ans → 回退内置（未接受）→ 拒一切写
+  ---
+  duration_ms: 0.6757
+  type: 'test'
+  ...
+# Subtest: 块3/调度记录（boundary 级）：pm 边界覆盖 docs/scheduling/；审计 docs/audit/ 须声明 shell-gate
+ok 5 - 块3/调度记录（boundary 级）：pm 边界覆盖 docs/scheduling/；审计 docs/audit/ 须声明 shell-gate
+  ---
+  duration_ms: 15.9581
+  type: 'test'
+  ...
+# Subtest: 块3/V3(c) 白名单 → 放行，且 (b)/(a) **未被调用**
+ok 6 - 块3/V3(c) 白名单 → 放行，且 (b)/(a) **未被调用**
+  ---
+  duration_ms: 2.8524
+  type: 'test'
+  ...
+# Subtest: 块3/V3(c) 硬拒（sh -c）→ 拒绝、终结，**且 (b)/(a) 未被调用**（硬地板不可翻案：桩本会放行）
+ok 7 - 块3/V3(c) 硬拒（sh -c）→ 拒绝、终结，**且 (b)/(a) 未被调用**（硬地板不可翻案：桩本会放行）
+  ---
+  duration_ms: 0.5264
+  type: 'test'
+  ...
+# Subtest: 块3/V3(c) risky + (b) 放行 + (a) 放行 → 放行（走 b-allow→a-allow）
+ok 8 - 块3/V3(c) risky + (b) 放行 + (a) 放行 → 放行（走 b-allow→a-allow）
+  ---
+  duration_ms: 0.6869
+  type: 'test'
+  ...
+# Subtest: 块3/V3(c) risky + (b) 放行 + (a) 拒绝 → **拒绝**（★ 最要害：pm 不是终审，客户才是）
+ok 9 - 块3/V3(c) risky + (b) 放行 + (a) 拒绝 → **拒绝**（★ 最要害：pm 不是终审，客户才是）
+  ---
+  duration_ms: 0.3363
+  type: 'test'
+  ...
+# Subtest: 块3/V3(c) risky + (b) 拒绝 → 拒绝、终结，**且 (a) 未被调用**（pm 说不该跑就不打扰人）
+ok 10 - 块3/V3(c) risky + (b) 拒绝 → 拒绝、终结，**且 (a) 未被调用**（pm 说不该跑就不打扰人）
+  ---
+  duration_ms: 0.389
+  type: 'test'
+  ...
+# Subtest: 块3/V3(c) risky 且 (b)/(a) 均未接入 → 拒绝（fail-closed：risky 必过 (a)，a 缺席即拒）
+ok 11 - 块3/V3(c) risky 且 (b)/(a) 均未接入 → 拒绝（fail-closed：risky 必过 (a)，a 缺席即拒）
+  ---
+  duration_ms: 0.2008
+  type: 'test'
+  ...
+# Subtest: 块3/V3 (c) review → (b) 放行即终结；(b) 拒绝亦终结
+ok 12 - 块3/V3 (c) review → (b) 放行即终结；(b) 拒绝亦终结
+  ---
+  duration_ms: 0.3527
+  type: 'test'
+  ...
+# Subtest: 块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升 (a)；JSON 非法（不可解析）→ **直接拒绝、不升 (a)**
+ok 13 - 块3/V3 (b) 拿不准 → 升 (a)；无会话 → 升 (a)；超时 → 升 (a)；JSON 非法（不可解析）→ **直接拒绝、不升 (a)**
+  ---
+  duration_ms: 29.6379
+  type: 'test'
+  ...
+# Subtest: 块3/V3 (a) 超时 / 不可用 → 一律拒绝（只往更严的层退）
+ok 14 - 块3/V3 (a) 超时 / 不可用 → 一律拒绝（只往更严的层退）
+  ---
+  duration_ms: 31.7537
+  type: 'test'
+  ...
+# Subtest: 块3/V3 (c)-only（未接 (b)/(a)）：review 默认拒绝（不因缺下一闸而放行）
+ok 15 - 块3/V3 (c)-only（未接 (b)/(a)）：review 默认拒绝（不因缺下一闸而放行）
+  ---
+  duration_ms: 0.686
+  type: 'test'
+  ...
+# Subtest: 块3/fail-closed：规则集加载失败 → 整条拒绝（绝不「没规则就放行」）
+ok 16 - 块3/fail-closed：规则集加载失败 → 整条拒绝（绝不「没规则就放行」）
+  ---
+  duration_ms: 0.7474
+  type: 'test'
+  ...
+# Subtest: 块3/fail-closed：classifyShell 收到版本未知的规则集 → deny（不因未知而放行）
+ok 17 - 块3/fail-closed：classifyShell 收到版本未知的规则集 → deny（不因未知而放行）
+  ---
+  duration_ms: 0.3835
+  type: 'test'
+  ...
+# Subtest: 块3/未 arm → run_shell 根本不被注册（能力缺席 = 最强 fail-closed）
+ok 18 - 块3/未 arm → run_shell 根本不被注册（能力缺席 = 最强 fail-closed）
+  ---
+  duration_ms: 3.9669
+  type: 'test'
+  ...
+# Subtest: 块3/run_shell：审核未返回 allow:true → **绝不执行**；恰好 allow:true → 才执行
+ok 19 - 块3/run_shell：审核未返回 allow:true → **绝不执行**；恰好 allow:true → 才执行
+  ---
+  duration_ms: 37.1936
+  type: 'test'
+  ...
+# Subtest: 块3/shellKillSwitch：未 arm 的 run_shell → block；已 arm / 其它工具 → 放行
+ok 20 - 块3/shellKillSwitch：未 arm 的 run_shell → block；已 arm / 其它工具 → 放行
+  ---
+  duration_ms: 0.3014
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 541.8364

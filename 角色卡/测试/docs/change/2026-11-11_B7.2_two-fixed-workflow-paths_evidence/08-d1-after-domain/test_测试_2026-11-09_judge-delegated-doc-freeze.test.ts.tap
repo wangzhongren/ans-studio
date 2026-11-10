@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: J17：无 source 的既有冻结 entry 事件字节逐字不变；judge-delegated source 如实镜像 actionSource
+ok 1 - J17：无 source 的既有冻结 entry 事件字节逐字不变；judge-delegated source 如实镜像 actionSource
+  ---
+  duration_ms: 2.0804
+  type: 'test'
+  ...
+# Subtest: J16：judge-delegated doc.freeze 经真实账本追加/读取正例通过；缺失/伪造/客户字段负例 fail-closed
+ok 2 - J16：judge-delegated doc.freeze 经真实账本追加/读取正例通过；缺失/伪造/客户字段负例 fail-closed
+  ---
+  duration_ms: 14.5915
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 337.516

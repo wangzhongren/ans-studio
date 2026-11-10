@@ -1,0 +1,38 @@
+== B7.1 写集文件当前 sha256（应与 B7.1 11-candidate-hashes.txt 逐字一致；B7.2 未触碰）==
+807f5be5993965bc4d940deb030d656180a0379484c74d1903e52dbed5cfb4cc *app/desktop/session.ts
+eb1e2f3b378c3cca362a7c15f08617d61c8870ea4dfed3c9efd708637c20e93b *test/桌面应用/b3-fixed-cards-panel.test.ts
+855e1416a65e7b1731a066eee6d883d58a21156c098d1ec22df2b66927491054 *test/桌面应用/b51-fixed-workflow-wiring.test.ts
+bd81c740ddc287346929731b4f4d8d3ac00ad6007d1b945be6dcbca907f587e3 *test/桌面应用/b61-chat-entry-fixed.test.ts
+cee0bf42e78157018511fff114db5363c8f0bf66d08cc126dfeb56c068f72874 *test/桌面应用/fixed-path-routing.test.ts
+a28a2d140b83d0d1db3cc90b41d18db1186b6a89695ef5ea61437698e5b12172 *test/桌面应用/star-routing.test.ts
+c42ae53abbbbf36f0c21aa5687a696bc0bf0819026cb369858988912da84182e *test/桌面应用/run-pin.test.ts
+3604abbefd29c9d91fd5f1b99887faa11b330e554eca845dad7cf2b78edefa07 *test/桌面应用/chief-workflow.test.ts
+d9e87a4d35f3ddbad2190f9dd0be930cb0b3783c09eea89055b94c5de47e02e9 *test/桌面应用/chain-enforcement.test.ts
+0d228dbf972a974222fe230a7dafd7fcdc1657615eabc79013af74cb66201472 *test/桌面应用/run-change-trigger.test.ts
+c4426b301748f17907b94b4c11dab0436b2a1472ea9adce05f7e0be98c815604 *test/桌面应用/optional-acceptance.test.ts
+edd3de5463fd573af0a2177e2c9b3a99228ccb6b5b4d442bb554ad32032dd7e7 *test/桌面应用/session.test.ts
+
+== B7.2 写集（test/测试 增量）==
+warning: in the working copy of 'test/测试/b-change-scope.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/fixed-path-full-chain.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/git-role-workflows-driver.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/git-role-workflows-e2e.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/测试/mode-switch.test.ts', LF will be replaced by CRLF the next time Git touches it
+2	2	test/测试/b-change-scope.test.ts
+11	11	test/测试/fixed-path-full-chain.test.ts
+2	2	test/测试/git-role-workflows-driver.ts
+6	3	test/测试/git-role-workflows-e2e.test.ts
+15	12	test/测试/mode-switch.test.ts
+9ae80c579ee4b0bf306378ceaab2bca851e7b9fef8b149a8797ae10ff25a3832 *test/测试/fixed-path-full-chain.test.ts
+39a8d0f3de04eae576369e05241ccf7b59bcf26c0a31969e407ac20458ed5a18 *test/测试/mode-switch.test.ts
+e85006ef0b4d1c4435fe28f100c477b37ea3e842b16138408dc2bf8b46e55ce7 *test/测试/b-change-scope.test.ts
+60fa89f0690927c7aa79be732e0900f3d33655f0aca179e5f6dd3979184bc041 *test/测试/git-role-workflows-driver.ts
+2d3cabadf92e4a87cea9eb8d5eaceebab60a1a82948ff8bc05c62f6796b18874 *test/测试/git-role-workflows-e2e.test.ts
+
+== 其余未提交（B7.1 并行门禁写集，非本角色）==
+f14845e2e15df454125fb186b8c66934a7769b2449211ec80943d58e0c4de049 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+65c17f3a7404f8d53170a4f38eb4a238aa373e97e7934802ed3a433d8f4a8712 *test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts
+
+== 写集外目录 diff 计数（src/app/其它 test 子域）==
+ M app/desktop/session.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md

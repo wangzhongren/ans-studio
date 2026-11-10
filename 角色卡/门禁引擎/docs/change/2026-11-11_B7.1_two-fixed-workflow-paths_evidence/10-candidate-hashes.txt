@@ -1,0 +1,16 @@
+== raw SHA-256 / bytes / lines(wc -l) / git blob ==
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md | f14845e2e15df454125fb186b8c66934a7769b2449211ec80943d58e0c4de049 | bytes=17289 | lines=118 | blob=a2eadf9d76f66c3605178c2bbff863554a2f45e0
+test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts | 65c17f3a7404f8d53170a4f38eb4a238aa373e97e7934802ed3a433d8f4a8712 | bytes=8958 | lines=144 | blob=7cf48914742af0cf481387db0d5c4118fb930507
+
+== git numstat (src app test, 含并行桌面改动) ==
+155	5	app/desktop/session.ts
+48	3	src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+1	1	test/桌面应用/b3-fixed-cards-panel.test.ts
+2	2	test/桌面应用/b51-fixed-workflow-wiring.test.ts
+1	1	test/桌面应用/b61-chat-entry-fixed.test.ts
+
+== new test file (untracked) ==
+test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts | lines=144 | 新文件
+
+NOTE: numstat 中 app/desktop/session.ts 与 test/桌面应用/* 为桌面 B7.1 并行改动（写集外，非本批候选）；
+本批候选仅 chief-workflow-v2.md（+48/-3）与新增 test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts。

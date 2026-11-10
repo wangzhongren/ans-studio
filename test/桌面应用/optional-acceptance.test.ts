@@ -12,6 +12,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readFileSync } from "node:fs";
@@ -65,7 +66,17 @@ function listing(root: string): ProjectListing {
   };
 }
 
+/**
+ * B7.1（2026-11-11）：本套件验证 **legacy 可选验收链路**旧行为；空 trio 项目聊天自 B6.1 起默认为 fixed，
+ * 而 B7.1 起 fixed 聊天拒绝普通星形派发 ⇒ 夹具显式写明「旧项目」（断言不改，仅固定项目模式）。
+ */
+function markLegacyProject(root: string): void {
+  mkdirSync(path.join(root, ".ans"), { recursive: true });
+  writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
+}
+
 function harness(root: string) {
+  markLegacyProject(root);
   const streams: Record<string, OrchestrationEvent[]> = {};
   const sent: Record<string, string[]> = {};
   const sendOptions: Record<string, RoleSessionSendOptions[]> = {};

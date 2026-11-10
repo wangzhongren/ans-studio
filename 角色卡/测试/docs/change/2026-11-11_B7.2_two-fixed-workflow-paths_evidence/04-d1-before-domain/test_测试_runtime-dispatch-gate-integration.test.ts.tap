@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: P1-D：Claude/Pi 无 native 证据但应用面 verified 通过；Codex 受控 shell 走受限路径（P4/P6/P7 的跨层判定）
+ok 1 - P1-D：Claude/Pi 无 native 证据但应用面 verified 通过；Codex 受控 shell 走受限路径（P4/P6/P7 的跨层判定）
+  ---
+  duration_ms: 1.3214
+  type: 'test'
+  ...
+# Subtest: P1-D：nativeInstanceId 字面绑定——组合值传入派发父门后逐字比对（P1-A Amendment-1/N27）
+ok 2 - P1-D：nativeInstanceId 字面绑定——组合值传入派发父门后逐字比对（P1-A Amendment-1/N27）
+  ---
+  duration_ms: 0.2316
+  type: 'test'
+  ...
+# Subtest: P1-D：双路径互斥——observed + verified 拒绝；组合规则在严格 observed 时不产证据（N20/F15）
+ok 3 - P1-D：双路径互斥——observed + verified 拒绝；组合规则在严格 observed 时不产证据（N20/F15）
+  ---
+  duration_ms: 0.1356
+  type: 'test'
+  ...
+# Subtest: P1-D：应用中介证据的负例经真实组合规则缺席，派发父门拒绝（N11/N12/N22/N23/N26）
+ok 4 - P1-D：应用中介证据的负例经真实组合规则缺席，派发父门拒绝（N11/N12/N22/N23/N26）
+  ---
+  duration_ms: 0.2587
+  type: 'test'
+  ...
+# Subtest: P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10）
+ok 5 - P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10）
+  ---
+  duration_ms: 43.8898
+  type: 'test'
+  ...
+# Subtest: P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧）
+ok 6 - P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧）
+  ---
+  duration_ms: 15.0151
+  type: 'test'
+  ...
+# Subtest: P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17）
+ok 7 - P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17）
+  ---
+  duration_ms: 62.4658
+  type: 'test'
+  ...
+# Subtest: P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19）
+ok 8 - P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19）
+  ---
+  duration_ms: 41.7412
+  type: 'test'
+  ...
+# Subtest: P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5）
+ok 9 - P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5）
+  ---
+  duration_ms: 32.9384
+  type: 'test'
+  ...
+# Subtest: P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段
+ok 10 - P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段
+  ---
+  duration_ms: 2.3991
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 520.6605

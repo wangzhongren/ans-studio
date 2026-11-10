@@ -270,7 +270,7 @@ test("首次 fixed 启动：首个 stage-request 携带 workflowPath ⇒ 写 wor
       entry!.origins.running = origin;
       const receipt = await manager.routeDispatch(root, "demo", "chief", {
         roleId: "convener", task: "推进 A1：请派产品撰写意图", flowId: FLOW,
-        taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+        taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
       }, { entry, origin });
       assert.equal(receipt.ok, true, receipt.message ?? "");
       const config = JSON.parse(await fs.readFile(path.join(root, ".ans", "project.json"), "utf8")) as Record<string, unknown>;

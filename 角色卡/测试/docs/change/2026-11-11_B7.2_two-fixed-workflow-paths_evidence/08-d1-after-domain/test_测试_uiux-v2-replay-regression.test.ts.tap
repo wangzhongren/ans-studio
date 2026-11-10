@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: 独立UI2：正文声称成功不把缺状态的历史结果变成成功
+ok 1 - 独立UI2：正文声称成功不把缺状态的历史结果变成成功
+  ---
+  duration_ms: 1.2268
+  type: 'test'
+  ...
+# Subtest: 独立UI2：交错调用结果按callId保持目标
+ok 2 - 独立UI2：交错调用结果按callId保持目标
+  ---
+  duration_ms: 0.6171
+  type: 'test'
+  ...
+# Subtest: 独立UI2：可靠失败保留异常和目标；toolStatus 对失败/未知一致
+ok 3 - 独立UI2：可靠失败保留异常和目标；toolStatus 对失败/未知一致
+  ---
+  duration_ms: 0.2028
+  type: 'test'
+  ...
+# Subtest: 独立UI2：交互调用和结论保留同一锚点，特殊工具独立生命周期
+ok 4 - 独立UI2：交互调用和结论保留同一锚点，特殊工具独立生命周期
+  ---
+  duration_ms: 0.4309
+  type: 'test'
+  ...
+# Subtest: 独立UI2：回放计划 skip/append/full 与行签名一致
+ok 5 - 独立UI2：回放计划 skip/append/full 与行签名一致
+  ---
+  duration_ms: 0.2188
+  type: 'test'
+  ...
+# Subtest: 独立UI2：系统通知/注入分类仍识别，伪形态不误伤
+ok 6 - 独立UI2：系统通知/注入分类仍识别，伪形态不误伤
+  ---
+  duration_ms: 0.3085
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 231.9626

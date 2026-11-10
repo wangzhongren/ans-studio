@@ -1,0 +1,13 @@
+== test/门禁引擎 before/after（同一命令：node --test --test-concurrency=1 --test-force-exit --test-reporter=tap test/门禁引擎/*.test.ts） ==
+before: files=50 tests=528 pass=522 fail=5 skipped=1 (evidence 02)
+after:  files=51 tests=536 pass=530 fail=5 skipped=1 (evidence 06)
+delta:  files=+1 tests=+8 pass=+8 fail=0 skipped=0（新增 8 tests 全绿）
+
+== failure names before/after ==
+FAILURE-NAME-SET-IDENTICAL（5 个既有 known-red 同名；证据 05/07/08）
+
+== skip names before/after ==
+SKIP-NAME-SET-IDENTICAL（1 个既有 skip 同名；证据 05/07/08b）
+
+== 测试内 skip/force-exit 新增检查 ==
+none（仅文件头注释声明，无实际 skip/force-exit/process.exit 调用）

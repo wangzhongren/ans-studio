@@ -524,7 +524,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     const liveA1 = liveSource(h.mgr, root, "chief", { turnId: turnA1 });
     const a1Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: a1Text, flowId: FLOW,
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     }, liveA1);
     releaseSource(h.mgr, liveA1);
     assert.equal(a1Dispatch.ok, true, a1Dispatch.message ?? "");
@@ -585,7 +585,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     let live = liveSource(h.mgr, root, "chief", { turnId: "turn-a2" });
     const a2Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A2：产品撰写意图", flowId: FLOW, workflowId: WF, stage: "A2",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(a2Dispatch.ok, true, a2Dispatch.message ?? "");
@@ -626,7 +626,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     live = liveSource(h.mgr, root, "chief", { turnId: "turn-a4" });
     const a4Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A4：请运营派策划", flowId: FLOW, workflowId: WF, stage: "A4",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(a4Dispatch.ok, true, a4Dispatch.message ?? "");
@@ -647,7 +647,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     live = liveSource(h.mgr, root, "chief", { turnId: "turn-a5" });
     const a5Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A5：策划出方案/模块/名单/架构", flowId: FLOW, workflowId: WF, stage: "A5",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(a5Dispatch.ok, true, a5Dispatch.message ?? "");
@@ -701,7 +701,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     live = liveSource(h.mgr, root, "chief", { turnId: "turn-a7" });
     const a7Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A7：请运营派人事建卡/激活", flowId: FLOW, workflowId: WF, stage: "A7",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(a7Dispatch.ok, true, a7Dispatch.message ?? "");
@@ -764,7 +764,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     live = liveSource(h.mgr, root, "chief", { turnId: "turn-a9" });
     const a9Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A9：团队计划 + 基线", flowId: FLOW, workflowId: WF, stage: "A9",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(a9Dispatch.ok, true, a9Dispatch.message ?? "");
@@ -838,7 +838,7 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     const a11RequestText = `推进 A11：派实现 worker`;
     const a11Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: a11RequestText, flowId: FLOW, workflowId: WF, stage: "A11",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(a11Dispatch.ok, true, `A12a 在办后 A11 stage-request 应成功：${a11Dispatch.message ?? ""}`);
@@ -1040,7 +1040,7 @@ test("路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受
     const liveB1 = liveSource(h.mgr, root, "chief", { turnId: "turn-b1" });
     const b1Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: b1Text, flowId: FLOW,
-      taskKind: "stage-request", workflowPath: "B", stage: "B1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "B", stage: "B1", workflowAction: "advance", sideEffect: "read-only",
     }, liveB1);
     releaseSource(h.mgr, liveB1);
     assert.equal(b1Dispatch.ok, true, b1Dispatch.message ?? "");
@@ -1091,7 +1091,7 @@ test("路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受
     const b3Text = "推进 B3：修复 core 碰撞";
     const b3Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: b3Text, flowId: FLOW, workflowId: WF, stage: "B3",
-      taskKind: "stage-request", sideEffect: "read-only", requestedEvidence: ["src/core/snake.ts"],
+      taskKind: "stage-request", workflowPath: "B", workflowAction: "advance", sideEffect: "read-only", requestedEvidence: ["src/core/snake.ts"],
     }, liveB3);
     releaseSource(h.mgr, liveB3);
     assert.equal(b3Dispatch.ok, true, b3Dispatch.message ?? "");
@@ -1112,7 +1112,7 @@ test("路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受
     const replayLiveB3 = liveSource(h.mgr, root, "chief", { turnId: "turn-b3" });
     const b3Replay = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: b3Text, flowId: FLOW, workflowId: WF, stage: "B3",
-      taskKind: "stage-request", sideEffect: "read-only", requestedEvidence: ["src/core/snake.ts"],
+      taskKind: "stage-request", workflowPath: "B", workflowAction: "advance", sideEffect: "read-only", requestedEvidence: ["src/core/snake.ts"],
     }, replayLiveB3);
     releaseSource(h.mgr, replayLiveB3);
     assert.equal(b3Replay.ok, true, b3Replay.message ?? "");
@@ -1224,7 +1224,7 @@ test("路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init�
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-b-norepo" });
     const b1Dispatch = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 B1：影响面分析（无仓库）", flowId: FLOW,
-      taskKind: "stage-request", workflowPath: "B", stage: "B1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "B", stage: "B1", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(b1Dispatch.ok, true, b1Dispatch.message ?? "");

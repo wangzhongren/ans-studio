@@ -331,14 +331,17 @@ test("Q87 quality document filename version keeps schema and actual metadata bin
     cases, boundedLastFactsProtocol: { entryAndByteBounds: true, controlledPromptAndSecretBodiesAbsent: true, noRuntimeOrWorkflowStateCreated: true }, revertMaterialProtocol: { actualLogControlSource: "Actual Q87 public publish CID/parents rendered only as a log-format parser control, not a fresh query receipt", revertPacketBoundaries, malformedLogOrSupportRejected: true }, deliveredSourcePacketProtocol: { actualPublishedSource: parsedSource, packetBoundaries, truncatedDuplicateOrFinalCidAsWorkerRejected: true, source: "Actual Q87 public publish receipt; format boundary controls are not real commits or business handbacks" }, unchangedTaskRunCandidateCriteriaAndChecks: true, oldRootBytesUnchanged: true, modificationMainWaitClippedToExistingPhaseOnly: true, originalHttpToolWaitUnchanged: true, noBusinessOrAuthorityState: true, scope: "Pure report-version protocol; no quality acceptance, publication or future v3 task invented" }, null, 2), { flag: "wx" });
 });
 
+// B7.2（2026-11-11，测试）：Q18/Q22 是 **legacy 能力**探针（chief `dispatch_task` → 星形任务链）。
+// B7.1 起 fixed 聊天对无 workflowId/stage 的普通派发 fail-closed（stage-request-required），故与
+// B6.2 的 Q2 同口径显式声明旧项目状态（合法在飞 legacy run）；**断言与产品代码零修改**。
 test("Q18 minimal Desktop lifecycle runner diagnostic", { timeout: 30000 }, async () => {
-  await runDesktopLifecycleProbe(path.join(evidence, "q18-desktop-runner-probe.json"));
+  await runDesktopLifecycleProbe(path.join(evidence, "q18-desktop-runner-probe.json"), "completed", seedLegacyChatFixture);
 });
 test("Q22 minimal real denied write blocked report cleanup", { timeout: 30000 }, async () => {
-  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-desktop-probe.json"), "denied-write-blocked");
+  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-desktop-probe.json"), "denied-write-blocked", seedLegacyChatFixture);
 });
 test("Q22 explicit outer failure after real blocked cleanup", { timeout: 30000, skip: process.env.ANS_Q22_ASSERTION_CONTROL !== "1" }, async () => {
-  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-outer-failure-probe.json"), "denied-write-blocked");
+  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-outer-failure-probe.json"), "denied-write-blocked", seedLegacyChatFixture);
   assert.fail("Q22_DIAGNOSTIC_OUTER_FAILURE_AFTER_REAL_BLOCKED_CLEANUP");
 });
 

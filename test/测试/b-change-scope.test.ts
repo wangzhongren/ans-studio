@@ -271,7 +271,7 @@ test("无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePa
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-b3" });
     const b3Request = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 B3：修复 main", flowId: FLOW, workflowId, stage: "B3",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "B", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(b3Request.ok, true, b3Request.message ?? "");
@@ -393,7 +393,7 @@ test("有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope �
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-b3-roster" });
     const b3Request = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 B3：修复", flowId: FLOW, workflowId, stage: "B3",
-      taskKind: "stage-request", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "B", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(b3Request.ok, true, b3Request.message ?? "");

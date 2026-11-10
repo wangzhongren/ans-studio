@@ -1,0 +1,9 @@
+909a780f5d6b16b6512da7b1c89141ed17ae9459be6e8dcedd75af0a661eac85 *角色卡/测试/docs/change/2026-11-11_RR2_two-fixed-workflow-paths.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+072ea76a35a8977f27307459e65e30125fe85a70afe63950b20260352135222d *角色卡/桌面窗口/docs/change/2026-11-11_B6.1_two-fixed-workflow-paths-desktop.md
+bb60a77f4a3127b983f3b06e264ba0e371442e4cb7fcfd42ee6d16576a68153b *角色卡/测试/docs/change/2026-11-11_B6.2_two-fixed-workflow-paths.md
+cee0bf42e78157018511fff114db5363c8f0bf66d08cc126dfeb56c068f72874 *test/桌面应用/fixed-path-routing.test.ts
+855e1416a65e7b1731a066eee6d883d58a21156c098d1ec22df2b66927491054 *test/桌面应用/b51-fixed-workflow-wiring.test.ts
+bd81c740ddc287346929731b4f4d8d3ac00ad6007d1b945be6dcbca907f587e3 *test/桌面应用/b61-chat-entry-fixed.test.ts
+eb1e2f3b378c3cca362a7c15f08617d61c8870ea4dfed3c9efd708637c20e93b *test/桌面应用/b3-fixed-cards-panel.test.ts

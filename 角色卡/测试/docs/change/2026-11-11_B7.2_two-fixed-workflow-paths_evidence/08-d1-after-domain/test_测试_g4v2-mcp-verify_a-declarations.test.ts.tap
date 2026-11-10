@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: A1 契约符号冻结：读取器两函数导出可用（两参调用）、编译期符号逐名在场
+ok 1 - A1 契约符号冻结：读取器两函数导出可用（两参调用）、编译期符号逐名在场
+  ---
+  duration_ms: 1.8508
+  type: 'test'
+  ...
+# Subtest: A2 好件全字段：文件名定名（标题不权威）、七键解析、args 分隔/trim、env:NAME 原样保存不展开
+ok 2 - A2 好件全字段：文件名定名（标题不权威）、七键解析、args 分隔/trim、env:NAME 原样保存不展开
+  ---
+  duration_ms: 10.3936
+  type: 'test'
+  ...
+# Subtest: A2b 读取器不写诊断、不触回调；坏件/缺失/名非法/保留名/根不可读 ⇒ undefined 绝不抛
+ok 3 - A2b 读取器不写诊断、不触回调；坏件/缺失/名非法/保留名/根不可读 ⇒ undefined 绝不抛
+  ---
+  duration_ms: 3.217
+  type: 'test'
+  ...
+# Subtest: A3 判据表：缺失必填/未知状态/env 坏项/控制字符/重复 env/命令引用 ⇒ undefined，且与列表坏件集同口径
+ok 4 - A3 判据表：缺失必填/未知状态/env 坏项/控制字符/重复 env/命令引用 ⇒ undefined，且与列表坏件集同口径
+  ---
+  duration_ms: 57.1966
+  type: 'test'
+  ...
+# Subtest: A4 静默过滤：uninstalled 与角色不命中——不算坏件、不产诊断、不收录
+ok 5 - A4 静默过滤：uninstalled 与角色不命中——不算坏件、不产诊断、不收录
+  ---
+  duration_ms: 8.7016
+  type: 'test'
+  ...
+# Subtest: A5 扫描集合与排序：只收 *.md 普通文件；子目录/其它扩展名/符号链接静默忽略；按 name 字典序
+ok 6 - A5 扫描集合与排序：只收 *.md 普通文件；子目录/其它扩展名/符号链接静默忽略；按 name 字典序
+  ---
+  duration_ms: 6.9619
+  type: 'test'
+  ...
+# Subtest: A6 顺序无关与宽容解析：BOM 剥离、CRLF、键序任意、首现为准、无根目录=静默空且绝不建目录
+ok 7 - A6 顺序无关与宽容解析：BOM 剥离、CRLF、键序任意、首现为准、无根目录=静默空且绝不建目录
+  ---
+  duration_ms: 7.842
+  type: 'test'
+  ...
+# Subtest: A7 onDiagnostic 回调抛错被吞（观察面不得影响会话开启）；重复调用稳定
+ok 8 - A7 onDiagnostic 回调抛错被吞（观察面不得影响会话开启）；重复调用稳定
+  ---
+  duration_ms: 1.9886
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 230.6512

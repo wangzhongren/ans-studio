@@ -1,0 +1,33 @@
+B7.2（测试）证据索引 —— 2026-11-11
+====================================
+
+00-tool-hashes.txt               D1 runner/diff 工具 sha256（B5.3/B6.2 同款）
+00-after-source/                 本批 after 版三目标测试源文件备份（before 语料运行期间保管）
+01-before-typecheck.txt          before npm run typecheck（exit 0）
+02-d1-file-list-before.txt       test/测试 域 119 文件列表（与 B6.2 逐行一致）
+03-field-completion-diff.txt     17 处 stage-request 字段补齐逐行 diff（HEAD->after）
+04-d1-before-run.log.txt         D1 before 运行日志（711/645/47/1/18）
+04-d1-before-domain/             D1 before 原始语料（TAP/results.tsv/failing-names.json/totals.json）
+05-after-typecheck.txt           after npm run typecheck（exit 0）
+06-after-chain.tap               全链 TAP（3/3 pass）
+06b-q18-q22-targeted.tap         Q18/Q22 legacy 夹具定向（2 pass + 1 设计内 skip）
+07-after-mode-switch-change-scope.tap  mode-switch + b-change-scope TAP（5/5 pass）
+08-d1-after-run.log.txt          D1 after 原始语料日志（711/653/39/1/18）
+08-d1-after-domain/              D1 after 原始语料（含 1 条 Node 原生 teardown 崩溃抖动 TAP）
+08b-d1-after-rerun.log.txt       D1 after 稳定性全量复跑日志（受机器负载 2 watchdog，不用于判定）
+08b-d1-after-rerun-domain/       上述复跑原始语料
+09-before-vs-b53-knownred/       before 失败名 vs B5.3 冻结 known-red（added 9 / removed 0）
+09-d1-diff/                      before->after 原始失败名 diff（added 1 环境抖动 / removed 9）
+09-d1-diff-normalized/           剔除 Node teardown 环境抖动后的 before->after diff（added 0 / removed 9）
+09b-after-vs-b53-knownred/       after(归一化) vs B5.3 冻结 known-red（added 0 / removed 0）
+10-write-set-boundary.txt        写集边界：B7.1 文件 hash 逐字一致；本批仅 5 个 test/测试 文件
+11-flake-judge-delegated-effectiveness-rerun.tap  抖动文件 3 次单文件复跑（1 崩溃 + 2 全绿）
+11b/11c-flake-clean-rerun*.tap   上述两次全绿复跑单独存档
+13-candidate-hashes.txt          候选 before/after sha256、bytes/lines、git diff --numstat
+15-skip-comparison.txt           before->after skip 对比（18->18，逐文件无增加）
+16-record-hash.txt               本记录 sha256
+17-final-status.txt              终态（git status 快照）
+
+说明：测试运行会在既有未跟踪目录
+角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/ 写 e2e 证据
+（该目录本批开始前即为未跟踪，属测试角色既有证据区，非本批候选）。

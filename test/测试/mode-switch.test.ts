@@ -142,7 +142,7 @@ function legacyRejection(message: string | undefined): boolean {
   return /document-planning-source-unavailable|缺少当前客户输入与真实项目选择/.test(message ?? "");
 }
 
-test("混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）", async () => {
+test("混合项目 per-flow 解析 + B7.1 fixed fail-closed：legacy 在飞 flow 仍 legacy、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）", async () => {
   const root = await tempRoot("ans-b5-modeswitch-");
   const h = harness(root);
   try {
@@ -158,21 +158,23 @@ test("混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走�
     assert.equal(await chief.workflowModeForFlow!("legacy-flow"), "legacy");
     assert.equal(await chief.workflowModeForFlow!("fixed-flow"), "fixed");
 
-    // legacy flow：旧星形路由（缺真实项目选择 ⇒ legacy 专属拒绝；不得进入 fixed 矩阵）。
+    // B7.1：显式 fixed 项目的聊天会话为 fixed——普通派发（无 workflowId/stage）一律 fail-closed，
+    // 不因被派 flow 的 per-flow 模式而回落 legacy 星形（RR2 fail-open 关闭）；per-flow 解析断言保留在上。
     const legacy = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图", flowId: "legacy-flow" });
     assert.equal(legacy.ok, false);
-    assert.equal(legacyRejection(legacy.message), true, legacy.message ?? "");
-    assert.equal((legacy.message ?? "").includes("chief-production-dispatch-forbidden"), false, "legacy flow 不得走 fixed 矩阵");
-    // fixed flow：固定矩阵拒绝幕僚派生产线角色。
+    assert.match(legacy.message ?? "", /stage-request-required/);
+    assert.equal((legacy.message ?? "").includes("document-planning-source-unavailable"), false, "不得回落 legacy 星形");
+    assert.equal((legacy.message ?? "").includes("chief-production-dispatch-forbidden"), false, "legacy flow 不得进入 fixed 矩阵");
+    // fixed flow：同一 pre-check 先拒绝普通派发（fixed 硬授权矩阵由 fixed-path-routing 覆盖）。
     const fixed = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图", flowId: "fixed-flow" });
     assert.equal(fixed.ok, false);
-    assert.match(fixed.message ?? "", /chief-production-dispatch-forbidden/);
+    assert.match(fixed.message ?? "", /stage-request-required/);
 
     // fixed 新 flow 启动：只写固定账本；legacy run 原样保留（只读忽略，不删除/不迁移）。
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-mixed-1" });
     const started = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A1：派产品", flowId: "fixed-flow",
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(started.ok, true, started.message ?? "");
@@ -185,15 +187,15 @@ test("混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走�
     await assert.rejects(fs.stat(path.join(root, ".ans", "trunk")));
     assert.deepEqual((await fs.readdir(path.join(root, ".ans", "runs"))).sort(), ["run-20261110-legacy-11111111"]);
 
-    // fixed workflow 在飞期间，legacy flow 仍走旧路（per-flow 并存）。
+    // fixed workflow 在飞期间，fixed 聊天仍对普通派发 fail-closed（per-flow 解析不因项目固定工作流而变）。
     const legacyAfter = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图 v2", flowId: "legacy-flow" });
     assert.equal(legacyAfter.ok, false);
-    assert.equal(legacyRejection(legacyAfter.message), true, legacyAfter.message ?? "");
+    assert.match(legacyAfter.message ?? "", /stage-request-required/);
     // 每项目至多一个活动 fixed workflow：新 fixed flow 请求 ⇒ workflow-workspace-busy（legacy 不占位）。
     const live2 = liveSource(h.mgr, root, "chief", { turnId: "turn-mixed-2" });
     const busy = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A1（另一 flow）", flowId: "another-fixed-flow",
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     }, live2);
     releaseSource(h.mgr, live2);
     assert.equal(busy.ok, false);
@@ -205,6 +207,7 @@ test("混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走�
     const afterSwitch = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图 v3", flowId: "fixed-flow" });
     assert.equal(afterSwitch.ok, false);
     assert.equal(legacyRejection(afterSwitch.message), true, afterSwitch.message ?? "");
+    assert.equal((afterSwitch.message ?? "").includes("stage-request-required"), false, "legacy 聊天不得套用 fixed fail-closed");
     assert.equal((afterSwitch.message ?? "").includes("chief-production-dispatch-forbidden"), false, "显式 legacy 项目不得按 fixed 矩阵路由");
     assert.equal((await readWorkflowLedger(root)).events.length, fixedLedger.events.length, "切换配置不写/不删固定账本");
   } finally {
@@ -226,7 +229,7 @@ test("会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入�
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-mode-session" });
     const started = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A1：派产品", flowId: "fixed-flow",
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(started.ok, true, started.message ?? "");
@@ -270,7 +273,7 @@ test("配置写回失败（坏 .ans/project.json）⇒ project-config-write-fail
     const live = liveSource(h.mgr, root, "chief", { turnId: "turn-badcfg" });
     const receipt = await routeDispatch(h.mgr, root, "chief", {
       roleId: "convener", task: "推进 A1", flowId: "bad-cfg-flow",
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     }, live);
     releaseSource(h.mgr, live);
     assert.equal(receipt.ok, false);

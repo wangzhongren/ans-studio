@@ -364,7 +364,7 @@ async function cleanup(root: string): Promise<void> {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 }
 
-test("per-flow 路由：混合项目按被派 flowId 分别走 legacy/fixed；不缓存项目级单值", async () => {
+test("per-flow 解析 + B7.1 fail-closed：fixed 聊天普通派发不回落星形；切 legacy/v1 后同一形状走旧路", async () => {
   const root = await makeRoot("ans-fixed-route-");
   const h = harness(root);
   try {
@@ -372,27 +372,28 @@ test("per-flow 路由：混合项目按被派 flowId 分别走 legacy/fixed；�
     await writeJson(root, ".ans/runs/run-20261110-legacy-11111111/manifest.json", {
       schema: "ans-run/v1", runId: "run-20261110-legacy-11111111", flowId: "legacy-flow", state: "draft",
     });
+    // per-flow 解析本身不变（单一实现 = 编排）：legacy 在飞 flow 仍 legacy、新 flow fixed。
     assert.equal(await resolveWorkflowMode(root, "legacy-flow"), "legacy");
     assert.equal(await resolveWorkflowMode(root, "fixed-flow"), "fixed");
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
 
-    // legacy 在飞 flow ⇒ 旧星形路由（本夹具缺真实项目选择，旧路以 legacy 专属码如实拒绝，而非 fixed 矩阵码）。
+    // B7.1：显式 fixed 项目的聊天会话为 fixed——**普通派发（无 workflowId/stage）一律 fail-closed**，
+    // 不因被派 flow 的 per-flow 模式而回落 legacy 星形（RR2 fail-open 关闭）。
     const legacy = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "legacy-flow" });
     assert.equal(legacy.ok, false);
-    assert.match(legacy.message ?? "", /document-planning-source-unavailable|缺少当前客户输入与真实项目选择/);
-    assert.equal((legacy.message ?? "").includes("chief-production-dispatch-forbidden"), false, "legacy flow 不得进入 fixed 矩阵");
-
-    // 新 flow ⇒ fixed 矩阵：幕僚不派生产线角色。
+    assert.match(legacy.message ?? "", /stage-request-required/);
+    assert.equal((legacy.message ?? "").includes("document-planning-source-unavailable"), false, "不得进入 legacy 星形");
     const fixed = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "fixed-flow" });
     assert.equal(fixed.ok, false);
-    assert.match(fixed.message ?? "", /chief-production-dispatch-forbidden/);
+    assert.match(fixed.message ?? "", /stage-request-required/);
 
-    // 不缓存：项目级配置切到 legacy/v1 后，同一 flow 立即改走旧路（无需重开会话）。
+    // 不缓存：项目级配置切到 legacy/v1 后，同一形状立即改走旧路（legacy 专属码如实拒绝，而非 fixed 码）。
     await writeJson(root, ".ans/project.json", { workflowSchema: "legacy/v1", governanceModel: "trio" });
     assert.equal(await resolveWorkflowMode(root, "fixed-flow"), "legacy");
     const afterSwitch = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图文档 v2", sideEffect: "docs", flowId: "fixed-flow" });
     assert.equal(afterSwitch.ok, false);
     assert.match(afterSwitch.message ?? "", /document-planning-source-unavailable|缺少当前客户输入与真实项目选择/);
+    assert.equal((afterSwitch.message ?? "").includes("stage-request-required"), false, "legacy 聊天不得套用 fixed fail-closed");
 
     assert.equal((await readTaskState(root)).records.size, 0, "拒绝不产生 task.created 行");
   } finally {
@@ -405,7 +406,9 @@ test("B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fi
   const root = await makeRoot("ans-fixed-gate-");
   const h = harness(root);
   try {
-    // 旧夹具形态：trio 项目、无 workflowSchema、无 run/trunk/固定账本 ⇒ 一律 legacy（AC-03 旧断言不改）。
+    // 旧夹具形态：trio 项目、无 workflowSchema、无 run/trunk/固定账本 ⇒ 该 flow 不得按 fixed 解析
+    // （AC-03 旧断言不改）。B7.1：空 trio 项目聊天按 B6.1 为 fixed，普通派发 fail-closed（stage-request-required），
+    // 既不进 fixed 矩阵、也不回落 legacy 星形。
     await writeJson(root, ".ans/project.json", { governanceModel: "trio" });
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     const chiefInput = h.inputs.find((input) => input.roleId === "chief");
@@ -413,8 +416,9 @@ test("B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fi
     assert.equal(await chiefInput!.workflowModeForFlow!("focus"), "legacy", "未启用 fixed 的旧项目 flow 不得按 fixed 解析");
     const compat = await routeDispatch(h.mgr, root, "chief", { roleId: "product", task: "写产品意图文档", sideEffect: "docs", flowId: "focus" });
     assert.equal(compat.ok, false);
-    assert.match(compat.message ?? "", /document-planning-source-unavailable|缺少当前客户输入与真实项目选择/);
-    assert.equal((compat.message ?? "").includes("chief-production-dispatch-forbidden"), false, "未启用闸的 flow 走 legacy 路由");
+    assert.match(compat.message ?? "", /stage-request-required/);
+    assert.equal((compat.message ?? "").includes("chief-production-dispatch-forbidden"), false, "未启用闸的 flow 不得进入 fixed 矩阵");
+    assert.equal((compat.message ?? "").includes("document-planning-source-unavailable"), false, "不得回落 legacy 星形");
     // 该 flow 已有 fixed workflow（workflow.started）⇒ 闸启用，按编排 workflowMode 解析为 fixed。
     const workflowId = "wf-gate000000000000000000001";
     await seedWorkflow(root, workflowId, "snake");
@@ -452,23 +456,31 @@ test("workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无�
   }
 });
 
-test("fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状", async () => {
+test("fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状（B7.1 fail-closed）", async () => {
   const root = await makeRoot("ans-fixed-matrix-");
   const h = harness(root);
   try {
     await writeJson(root, ".ans/project.json", { workflowSchema: "two-fixed-paths/v1", governanceModel: "trio" });
+    // B7.1：fixed 聊天只路由 stage-request 或带 workflowId+stage 的 fixed 任务；矩阵负例改为携带账本绑定，
+    // 以继续验证 fixed 硬授权矩阵（缺 workflowId/stage 的形状已由 pre-check fail-closed，见文末两例）。
+    const matrixWorkflowId = "wf-b71matrix0000000000000001";
+    await seedWorkflow(root, matrixWorkflowId, "snake");
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    const bound = { workflowId: matrixWorkflowId, stage: "A1" as const };
     const cases: Array<{ from: string; payload: DispatchTaskPayload; code: RegExp }> = [
-      { from: "chief", payload: { roleId: "product", task: "写意图", flowId: "snake" }, code: /chief-production-dispatch-forbidden/ },
-      { from: "chief", payload: { roleId: "rapporteur", task: "出方案", flowId: "snake" }, code: /chief-production-dispatch-forbidden/ },
-      { from: "chief", payload: { roleId: "worker", task: "实现 X", flowId: "snake" }, code: /chief-to-project-forbidden/ },
-      { from: "chief", payload: { roleId: "chief", task: "自派", flowId: "snake" }, code: /self-dispatch/ },
-      { from: "convener", payload: { roleId: "verifier", task: "验收核对", flowId: "snake" }, code: /convener-to-verifier-forbidden/ },
-      { from: "convener", payload: { roleId: "ghost-dev", task: "幽灵实现", flowId: "snake" }, code: /target-card-missing/ },
-      { from: "chief", payload: { roleId: "convener", task: "把项目交付运营", flowId: "snake" }, code: /target-card-missing/ },
-      { from: "chief", payload: { roleId: "convener", task: "推进 A1", flowId: "snake", taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only", moduleId: "core" }, code: /stage-request-invalid/ },
-      { from: "chief", payload: { roleId: "worker", task: "实现 X", flowId: "snake", workflowPath: "A" }, code: /workflow-path-not-stage-request/ },
+      { from: "chief", payload: { roleId: "product", task: "写意图", flowId: "snake", ...bound }, code: /chief-production-dispatch-forbidden/ },
+      { from: "chief", payload: { roleId: "rapporteur", task: "出方案", flowId: "snake", ...bound }, code: /chief-production-dispatch-forbidden/ },
+      { from: "chief", payload: { roleId: "worker", task: "实现 X", flowId: "snake", ...bound }, code: /chief-to-project-forbidden/ },
+      { from: "chief", payload: { roleId: "chief", task: "自派", flowId: "snake", ...bound }, code: /self-dispatch/ },
+      { from: "convener", payload: { roleId: "verifier", task: "验收核对", flowId: "snake", ...bound }, code: /convener-to-verifier-forbidden/ },
+      { from: "convener", payload: { roleId: "ghost-dev", task: "幽灵实现", flowId: "snake", ...bound }, code: /target-card-missing/ },
+      { from: "chief", payload: { roleId: "convener", task: "把项目交付运营", flowId: "snake", ...bound }, code: /target-card-missing/ },
+      { from: "chief", payload: { roleId: "convener", task: "推进 A1", flowId: "snake", taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only", moduleId: "core" }, code: /stage-request-invalid/ },
+      { from: "chief", payload: { roleId: "worker", task: "实现 X", flowId: "snake", workflowPath: "A", ...bound }, code: /workflow-path-not-stage-request/ },
+      // B7.1 pre-check：stage-request 缺 workflowAction / 普通派发无 workflowId+stage ⇒ 路由前 fail-closed。
+      { from: "chief", payload: { roleId: "convener", task: "推进 A1", flowId: "snake", taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only" }, code: /stage-request-invalid/ },
+      { from: "chief", payload: { roleId: "product", task: "写意图", flowId: "snake" }, code: /stage-request-required/ },
     ];
     for (const item of cases) {
       const receipt = await routeDispatch(h.mgr, root, item.from, item.payload);
@@ -476,7 +488,7 @@ test("fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生�
       assert.match(receipt.message ?? "", item.code);
     }
     // 来源防御（trio 会话层，旧行为不变）：非 chief/convener 直接调用被拒。
-    const wrongSource = await routeDispatch(h.mgr, root, "worker", { roleId: "product", task: "越权", flowId: "snake" });
+    const wrongSource = await routeDispatch(h.mgr, root, "worker", { roleId: "product", task: "越权", flowId: "snake", ...bound });
     assert.equal(wrongSource.ok, false);
     assert.match(wrongSource.message ?? "", /幕僚|运营|来源/);
     assert.equal((await readTaskState(root)).records.size, 0, "矩阵拒绝不产生 task.created 行");
@@ -620,7 +632,7 @@ test("fixed stage-request：首请求经编排 requestStage 建只读任务 + wo
     const live = liveSource(h.mgr, root, "chief", "demo", { turnId: "turn-customer-1" });
     const payload: DispatchTaskPayload = {
       roleId: "convener", task: "推进 A1：请派产品撰写意图", flowId: "snake",
-      taskKind: "stage-request", workflowPath: "A", stage: "A1", sideEffect: "read-only",
+      taskKind: "stage-request", workflowPath: "A", stage: "A1", workflowAction: "advance", sideEffect: "read-only",
     };
     const receipt = await routeDispatch(h.mgr, root, "chief", payload, live);
     releaseSource(h.mgr, live);

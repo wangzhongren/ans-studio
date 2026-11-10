@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: 对抗-提取：嵌套契约路径捕捉（契约目录整树）；`docs/contracts/.md` 空名防串
+ok 1 - 对抗-提取：嵌套契约路径捕捉（契约目录整树）；`docs/contracts/.md` 空名防串
+  ---
+  duration_ms: 0.9459
+  type: 'test'
+  ...
+# Subtest: 对抗-提取：产物路径/目录式/URL/绝对路径/contracts2 前缀/中文紧贴——一律不误捕
+ok 2 - 对抗-提取：产物路径/目录式/URL/绝对路径/contracts2 前缀/中文紧贴——一律不误捕
+  ---
+  duration_ms: 0.1582
+  type: 'test'
+  ...
+# Subtest: 对抗-提取：workflow 恒置首（文本后段出现亦然）；契约首现序；重复引用去重
+ok 3 - 对抗-提取：workflow 恒置首（文本后段出现亦然）；契约首现序；重复引用去重
+  ---
+  duration_ms: 0.089
+  type: 'test'
+  ...
+# Subtest: 对抗-渲染：无引用派发逐字 = 无引用旧格式三行（我的独立金文本；含原因段/多行任务对照组）
+ok 4 - 对抗-渲染：无引用派发逐字 = 无引用旧格式三行（我的独立金文本；含原因段/多行任务对照组）
+  ---
+  duration_ms: 0.1545
+  type: 'test'
+  ...
+# Subtest: 对抗-渲染：引用仅来自 opts（本函数不提取/不触盘）——任务文本提到契约而 opts 缺省 ⇒ 不注入块
+ok 5 - 对抗-渲染：引用仅来自 opts（本函数不提取/不触盘）——任务文本提到契约而 opts 缺省 ⇒ 不注入块
+  ---
+  duration_ms: 0.0578
+  type: 'test'
+  ...
+# Subtest: 对抗-渲染：必读块逐字金文本（workflow 第 1、契约第 2、哈希逐字、「任务：」前缀、完成口令指向第 2 节）
+ok 6 - 对抗-渲染：必读块逐字金文本（workflow 第 1、契约第 2、哈希逐字、「任务：」前缀、完成口令指向第 2 节）
+  ---
+  duration_ms: 0.3295
+  type: 'test'
+  ...
+# Subtest: 对抗-渲染：完成句变体仅在 workflow 引用在场——仅契约 ⇒ 全文不出现 workflow.md / 第 2 节
+ok 7 - 对抗-渲染：完成句变体仅在 workflow 引用在场——仅契约 ⇒ 全文不出现 workflow.md / 第 2 节
+  ---
+  duration_ms: 0.0991
+  type: 'test'
+  ...
+# Subtest: 对抗-渲染：workflow 缺失降级逐字（标注在场/该行缺席/编号重排/不指向不在场文件——两形态）
+ok 8 - 对抗-渲染：workflow 缺失降级逐字（标注在场/该行缺席/编号重排/不指向不在场文件——两形态）
+  ---
+  duration_ms: 0.1103
+  type: 'test'
+  ...
+# Subtest: 对抗-渲染：矛盾输入（引用在场 + 缺失标注）→ 引用为准（抑制标注、完成句指回第 2 节）
+ok 9 - 对抗-渲染：矛盾输入（引用在场 + 缺失标注）→ 引用为准（抑制标注、完成句指回第 2 节）
+  ---
+  duration_ms: 0.0875
+  type: 'test'
+  ...
+# Subtest: 对抗-判据：契约缺失（含 <missing>/空/非法/大写 hex）一律拒投——回执逐字、结构上无投递文本
+ok 10 - 对抗-判据：契约缺失（含 <missing>/空/非法/大写 hex）一律拒投——回执逐字、结构上无投递文本
+  ---
+  duration_ms: 0.2682
+  type: 'test'
+  ...
+# Subtest: 对抗-判据：多缺报首现序第一个；契约缺失优先于 workflow（即便 workflow 在场仍拒）
+ok 11 - 对抗-判据：多缺报首现序第一个；契约缺失优先于 workflow（即便 workflow 在场仍拒）
+  ---
+  duration_ms: 0.1278
+  type: 'test'
+  ...
+# Subtest: 对抗-判据：workflow 缺失降级照投（编号重排/标注在场）；多余探测项被忽略——不触发拒投
+ok 12 - 对抗-判据：workflow 缺失降级照投（编号重排/标注在场）；多余探测项被忽略——不触发拒投
+  ---
+  duration_ms: 0.0885
+  type: 'test'
+  ...
+# Subtest: 对抗-判据：全齐放行——文本逐字等于独立手写的完整金文本（plan 与 render 无第二份渲染）
+ok 13 - 对抗-判据：全齐放行——文本逐字等于独立手写的完整金文本（plan 与 render 无第二份渲染）
+  ---
+  duration_ms: 0.0973
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 151.8175

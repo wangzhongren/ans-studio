@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: independent pi: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports
+ok 1 - independent pi: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports
+  ---
+  duration_ms: 98.5769
+  type: 'test'
+  ...
+# Subtest: independent codex: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports
+ok 2 - independent codex: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports
+  ---
+  duration_ms: 73.4488
+  type: 'test'
+  ...
+# Subtest: independent claude: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports
+ok 3 - independent claude: real Desktop → Pipeline → Core separates chat, queued chat, dispatch and explicit reports
+  ---
+  duration_ms: 62.5658
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 639.4095

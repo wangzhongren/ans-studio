@@ -269,7 +269,7 @@ async function realWaitingChiefLoop(dispositions: readonly ("select" | "reject" 
   await fs.writeFile(path.join(root, boundaryRel), "role: governance\nentries:\n  - kind: directory\n    path: docs/proposals/\n    purpose: authored planning documents\n");
   const boundarySha = createHash("sha256").update(await fs.readFile(path.join(root, boundaryRel))).digest("hex");
   await fs.mkdir(path.join(root, ".ans"), { recursive: true });
-  await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio", roles: {},
+  await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio", roles: {},
     governanceBoundary: { path: boundaryRel, acceptance: { accepted: true, source: "test: previously accepted project with actual pin",
       pin: [{ path: boundaryRel, sha256: boundarySha }] } } }));
   const versionStack = createVersionChangeStack({ projectRoot: root });
@@ -996,7 +996,8 @@ test("W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私�
       await preparationDesktop.stopSession(); phase = "callbacks"; bodies.length = 0;
     }
     await fs.mkdir(path.join(root, ".ans"), { recursive: true });
-    await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+    // B7.1：W10 验证 legacy 派发/scope 旧行为 ⇒ 显式 legacy 项目（空 trio 聊天自 B6.1 起默认 fixed）。
+    await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
     // Raw legacy role/configuration fixtures grant no acceptance, D3, active state or execution task.
     await fs.mkdir(path.join(root, "角色卡/worker"), { recursive: true });
     await fs.writeFile(path.join(root, "角色卡/worker/role-card.md"), "# Worker\nOwned inactive legacy fixture.\n");
@@ -1137,7 +1138,8 @@ test(target === "worker" ? "W14 convener按本次真实任务冻结；缺完整�
     // Only raw owned role material exists: no accepted/D3/Active/run/pin is seeded.
     await fs.mkdir(path.join(root, "角色卡/worker"), { recursive: true });
     await fs.mkdir(path.join(root, ".ans"));
-    await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+    // B7.1：W14/W23/W22 验证 legacy 派发矩阵旧行为 ⇒ 显式 legacy 项目（断言不改）。
+    await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
     await fs.writeFile(path.join(root, "角色卡/worker/role-card.md"), "# Worker\nInactive owned fixture.\n");
     await fs.writeFile(path.join(root, "角色卡/worker/boundary.yaml"), "role: worker\nentries:\n  - kind: directory\n    path: src/worker/\n    purpose: owned fixture\n");
     await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
@@ -1980,7 +1982,7 @@ test(`W27 stop等待真实队列写有限barrier ${obstructed ? "实际IO失败�
 
 test("W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒", { timeout: 20000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w36-hub-"));
-  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const oldWire = process.env.ANS_CODEX_WIRE_API, oldKey = process.env.ANS_W36_LOCAL_KEY;
   process.env.ANS_CODEX_WIRE_API = "chat"; process.env.ANS_W36_LOCAL_KEY = "owned-local-only";
   const events: Parameters<Parameters<typeof createDesktopInterface>[0]["emitEvent"]>[0][] = [], cards: OperatorRequestPayload[] = [];
@@ -2162,7 +2164,8 @@ for (const disposition of ["select", "revise"] as const) {
     await fs.mkdir(path.join(root, "docs/proposals"), { recursive: true });
     const materialPath = "docs/proposals/focus-proposal-v1.md", material = "---\nversion: 1\nflowId: focus\n---\n# Observed recovery evidence\nThe alternate path has the current diagnostic evidence; no execution approval is granted.\n";
     await fs.writeFile(path.join(root, materialPath), material);
-    await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+    await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
+    // B7.1：W47/W48 验证 legacy Core/Chat 派发与 controller 停止旧行为 ⇒ 显式 legacy 项目（断言不改）。
     const oldWire = process.env.ANS_CODEX_WIRE_API, oldKey = process.env.ANS_W47_LOCAL_KEY;
     process.env.ANS_CODEX_WIRE_API = "chat"; process.env.ANS_W47_LOCAL_KEY = "owned-loopback-only";
     const delegation = createDecisionDelegationSwitch(false), cards: OperatorRequestPayload[] = [];
@@ -2247,7 +2250,8 @@ for (const disposition of ["select", "revise"] as const) {
 for (const stopMode of ["normal", "foreign-lease", "new-interrupt", "late-chief-source"] as const) {
 test(`W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 ${stopMode}`, { timeout: 18000 }, async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w48-controller-stop-"));
-  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ governanceModel: "trio" }));
+  // B7.1：W48 验证 legacy Core/Chat controller 停止旧行为 ⇒ 显式 legacy 项目（断言不改）。
+  await fs.mkdir(path.join(root, ".ans")); await fs.writeFile(path.join(root, ".ans/project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const oldWire = process.env.ANS_CODEX_WIRE_API, oldKey = process.env.ANS_W48_LOCAL_KEY;
   process.env.ANS_CODEX_WIRE_API = "chat"; process.env.ANS_W48_LOCAL_KEY = "owned-loopback-only";
   const trace: Array<{ chief: boolean; text: string; toolMessages: string[]; lastToolCallId?: string; lastToolMessage?: string }> = [], errors: string[] = [];

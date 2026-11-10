@@ -1,0 +1,131 @@
+TAP version 13
+# Subtest: convener→product/rapporteur/nominator（内置，生产）允许；fixed 常量恰为三项
+ok 1 - convener→product/rapporteur/nominator（内置，生产）允许；fixed 常量恰为三项
+  ---
+  duration_ms: 1.3575
+  type: 'test'
+  ...
+# Subtest: convener→verifier 拒绝 convener-to-verifier-forbidden；convener→chief/su 拒绝 convener-target-forbidden（自身= self-dispatch）
+ok 2 - convener→verifier 拒绝 convener-to-verifier-forbidden；convener→chief/su 拒绝 convener-target-forbidden（自身= self-dispatch）
+  ---
+  duration_ms: 0.135
+  type: 'test'
+  ...
+# Subtest: convener→项目角色：targetExists 时必须绑定 open stage-request；缺省/已关闭/错创建者均拒绝
+ok 3 - convener→项目角色：targetExists 时必须绑定 open stage-request；缺省/已关闭/错创建者均拒绝
+  ---
+  duration_ms: 0.0908
+  type: 'test'
+  ...
+# Subtest: convener 生产派发 Q6：无证据/来源已变/缺幂等/assigned-task 缺失或不匹配 ⇒ fail-closed
+ok 4 - convener 生产派发 Q6：无证据/来源已变/缺幂等/assigned-task 缺失或不匹配 ⇒ fail-closed
+  ---
+  duration_ms: 0.1599
+  type: 'test'
+  ...
+# Subtest: chief→verifier（前置/验收）允许；chief→product/rapporteur/nominator ⇒ chief-production-dispatch-forbidden
+ok 5 - chief→verifier（前置/验收）允许；chief→product/rapporteur/nominator ⇒ chief-production-dispatch-forbidden
+  ---
+  duration_ms: 0.0995
+  type: 'test'
+  ...
+# Subtest: chief→项目角色仅 MF-10 窄例外：reviewRoleId+roster review+basis 一致+已激活；其余 chief-to-project-forbidden
+ok 6 - chief→项目角色仅 MF-10 窄例外：reviewRoleId+roster review+basis 一致+已激活；其余 chief-to-project-forbidden
+  ---
+  duration_ms: 0.1487
+  type: 'test'
+  ...
+# Subtest: chief→convener 仅 stage-request：read-only、无 module/写集、sourceTaskId 必填；其余拒绝
+ok 7 - chief→convener 仅 stage-request：read-only、无 module/写集、sourceTaskId 必填；其余拒绝
+  ---
+  duration_ms: 0.1287
+  type: 'test'
+  ...
+# Subtest: self/unknown-source/目标类别缺失/目标不存在 ⇒ 稳定拒绝码
+ok 8 - self/unknown-source/目标类别缺失/目标不存在 ⇒ 稳定拒绝码
+  ---
+  duration_ms: 0.0808
+  type: 'test'
+  ...
+# Subtest: 幂等键形态：advance 统一 stage-request:<wf>:<stage>:<attempt>；stop 独立 stage-stop（G-4）
+ok 9 - 幂等键形态：advance 统一 stage-request:<wf>:<stage>:<attempt>；stop 独立 stage-stop（G-4）
+  ---
+  duration_ms: 0.6283
+  type: 'test'
+  ...
+# Subtest: append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+ok 10 - append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+  ---
+  duration_ms: 37.7993
+  type: 'test'
+  ...
+# Subtest: 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+ok 11 - 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+  ---
+  duration_ms: 6.5913
+  type: 'test'
+  ...
+# Subtest: 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+ok 12 - 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+  ---
+  duration_ms: 14.5123
+  type: 'test'
+  ...
+# Subtest: 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+ok 13 - 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+  ---
+  duration_ms: 2.7012
+  type: 'test'
+  ...
+# Subtest: 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+ok 14 - 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+  ---
+  duration_ms: 0.6255
+  type: 'test'
+  ...
+# Subtest: per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+ok 15 - per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+  ---
+  duration_ms: 15.8182
+  type: 'test'
+  ...
+# Subtest: legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+ok 16 - legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+  ---
+  duration_ms: 18.5456
+  type: 'test'
+  ...
+# Subtest: 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+ok 17 - 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+  ---
+  duration_ms: 18.2596
+  type: 'test'
+  ...
+# Subtest: 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+ok 18 - 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+  ---
+  duration_ms: 5.2789
+  type: 'test'
+  ...
+# Subtest: writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+ok 19 - writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+  ---
+  duration_ms: 27.7999
+  type: 'test'
+  ...
+# Subtest: ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+ok 20 - ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+  ---
+  duration_ms: 14.8144
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 577.7011
+exit=0
