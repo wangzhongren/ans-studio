@@ -1,0 +1,11 @@
+=== forbidden paths diff vs HEAD (expect empty) ===
+--- src/common/门禁引擎
+--- src/model
+--- src/provider/runtime
+--- src/common/roles
+--- src/common/gates
+--- src/service/gate/shell-rules.ts
+ M src/service/gate/shell-rules.ts
+--- app
+
+=== package files diff (expect empty) ===

@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: B4 再导出同源：classifyShellDetailed/matchTaskGit/runTaskGitCommit 与常量均为同一引用
+ok 1 - B4 再导出同源：classifyShellDetailed/matchTaskGit/runTaskGitCommit 与常量均为同一引用
+  ---
+  duration_ms: 0.7861
+  type: 'test'
+  ...
+# Subtest: 公开出口 classifyShellDetailed：注入 taskGitScope 后 add/commit 允许并携带审计描述
+ok 2 - 公开出口 classifyShellDetailed：注入 taskGitScope 后 add/commit 允许并携带审计描述
+  ---
+  duration_ms: 1.294
+  type: 'test'
+  ...
+# Subtest: 公开出口 classifyShellDetailed：无/非法 scope、flag/非字面/越界/治理写区、commit 形态与普通 Git 均拒绝
+ok 3 - 公开出口 classifyShellDetailed：无/非法 scope、flag/非字面/越界/治理写区、commit 形态与普通 Git 均拒绝
+  ---
+  duration_ms: 0.4687
+  type: 'test'
+  ...
+# Subtest: 公开出口 matchTaskGit：add/commit 命中受限描述；无 scope/非白名单恒 undefined；同输入确定性
+ok 4 - 公开出口 matchTaskGit：add/commit 命中受限描述；无 scope/非白名单恒 undefined；同输入确定性
+  ---
+  duration_ms: 0.1885
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：staged ⊆ writeSet ⇒ 同锁内检查并提交，finally 释放
+ok 5 - 公开出口 runTaskGitCommit：staged ⊆ writeSet ⇒ 同锁内检查并提交，finally 释放
+  ---
+  duration_ms: 0.268
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：锁占用/分支不符/argv 非 commit 形态/scope 非法 ⇒ fail-closed 且不提交
+ok 6 - 公开出口 runTaskGitCommit：锁占用/分支不符/argv 非 commit 形态/scope 非法 ⇒ fail-closed 且不提交
+  ---
+  duration_ms: 0.1601
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：staged 空/非字面/治理写区/越界 ⇒ 不提交且释放锁
+ok 7 - 公开出口 runTaskGitCommit：staged 空/非字面/治理写区/越界 ⇒ 不提交且释放锁
+  ---
+  duration_ms: 0.1763
+  type: 'test'
+  ...
+# Subtest: 公开出口 runTaskGitCommit：inspectStaged 异常 ⇒ 释放锁后如实抛出（不吞错）
+ok 8 - 公开出口 runTaskGitCommit：inspectStaged 异常 ⇒ 释放锁后如实抛出（不吞错）
+  ---
+  duration_ms: 0.3342
+  type: 'test'
+  ...
+# Subtest: 公开再导出与私有源同源：五符号均为同一函数引用（逐字转出，非复制实现）
+ok 9 - 公开再导出与私有源同源：五符号均为同一函数引用（逐字转出，非复制实现）
+  ---
+  duration_ms: 0.4911
+  type: 'test'
+  ...
+# Subtest: 公开出口冒烟：matchReadonlyGit / buildReadonlyGitBody 经公开入口命中精确形态（审计 ruleId/canonicalArgv 口径）
+ok 10 - 公开出口冒烟：matchReadonlyGit / buildReadonlyGitBody 经公开入口命中精确形态（审计 ruleId/canonicalArgv 口径）
+  ---
+  duration_ms: 0.8106
+  type: 'test'
+  ...
+# Subtest: 公开出口可用冒烟：matchRoutineShellCommand 经公开入口命中 §5.1 精确形态
+ok 11 - 公开出口可用冒烟：matchRoutineShellCommand 经公开入口命中 §5.1 精确形态
+  ---
+  duration_ms: 0.3564
+  type: 'test'
+  ...
+# Subtest: 公开入口可用冒烟：classifyShell(argv, defaultShellRules()) 恒返回四态之一，且样本覆盖多种判定
+ok 12 - 公开入口可用冒烟：classifyShell(argv, defaultShellRules()) 恒返回四态之一，且样本覆盖多种判定
+  ---
+  duration_ms: 0.9022
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 350.3949

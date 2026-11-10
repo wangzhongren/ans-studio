@@ -1,0 +1,6 @@
+=== before/after counts ===
+before: 1299 subtests; # tests 1299 # pass 1273 # fail 24 # skipped 2 
+after:  1328 subtests; # tests 1328 # pass 1302 # fail 24 # skipped 2 
+
+=== failure-name diff (before vs after) ===
+(empty = identical)

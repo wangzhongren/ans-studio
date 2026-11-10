@@ -94,6 +94,7 @@ import {
   SHELL_GATE_CONDITION,
   type ShellAuditRecord,
   type ShellAuditSink,
+  type ShellAuditTaskGit,
 } from "./shell-audit.ts";
 // 2026-11-08（会话创建准入按操作审批 P1.3 §2.3 / I0-1）；`createShellGate` 构造成功后**唯一登记点**。
 // 登记事实只做白名单投影；测试私有 Symbol 仅在此内部只读检查（生产装配不得设置）。
@@ -133,6 +134,13 @@ export interface ShellClassifyDetail {
   decision: ShellClass;
   ruleId?: string;
   reason?: string;
+  /** v5 加法（B4.1）：门禁稳定码（Git 写/拒绝面；旧读者忽略）。 */
+  code?: string;
+  /**
+   * v5 加法（B4.1）：任务级 Git 写审计描述（`git add`/`git commit`，允许或拒绝）。
+   * 由 `buildShellGate` 的详细分类器（或 run-role 的详细分类封装）携带；审计行投影为 `taskGit`。
+   */
+  taskGit?: TaskGitAuditFacts;
 }
 
 /** 门禁引擎的纯函数 `classifyShell(argv, rules)`；返回裸串或带明细的对象。 */
@@ -140,6 +148,97 @@ export type ClassifyShellFn = (
   argv: string[],
   rules: ShellRules,
 ) => ShellClass | ShellClassifyDetail;
+
+/**
+ * **v5（2026-11-10 B4.1，T3 方案 v1.3 §6.2/§6.3 / AC-21 / T-09）**：带上下文的明细分类器
+ * （Service 出口 `classifyShellDetailed` 同一函数引用）。`context.taskGitScope` 由应用注入
+ * （A 路径团队计划 writesets / B 路径派生写集），**模型不可自报**；缺省/非法 ⇒ 任务级 Git 写一律拒。
+ *
+ * 本模块在 `classifyShellDetailed` 注入时**优先**使用它（并把 `taskGitScope` 作为第三参传入）；
+ * 只注入 2 参 `classifyShell` 时逐字保持 v4/旧行为（无上下文 ⇒ `git add`/`git commit` 恒拒）。
+ */
+export type ClassifyShellDetailedFn = (
+  argv: string[],
+  rules: ShellRules,
+  context?: ShellClassifyContext,
+) => ShellVerdict | ShellClass | ShellClassifyDetail;
+
+// —————————————— v5 任务级 Git 提交门（B4.1；注入全部 IO，顺序/锁在本模块）——————————————
+
+/** 任务级 Git 命令执行事实（与运行时只读 Git 传输的 `ReadonlyGitExecutionFacts` 同形）。 */
+export interface ShellTaskGitCommandFacts {
+  exitCode?: number;
+  signal?: string;
+  stdout: string;
+  stderr: string;
+  error?: string;
+  timedOut?: boolean;
+  timeoutMs?: number;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
+}
+
+/** 任务级 Git 命令的执行预算（透传适配器给出的时限/输出上限）。 */
+export interface ShellTaskGitBudgets {
+  timeoutMs?: number;
+  outputLimit?: number;
+}
+
+/**
+ * `createTaskGitCommitRunner` 的注入端口（生产 = 桌面 B3/B4 的真实 Git 端口）：
+ * - `acquire`：项目级临界区取锁——**必须**是 desktop B3 `acquireProjectGitCriticalSection`
+ *   同一把锁（发布合并与 shell 提交互斥；占用 ⇒ `undefined` ⇒ `git-critical-section-busy`）；
+ * - `currentBranch`：应用读取的当前分支（`runTaskGitCommit` 在取锁前核对 `ans/task/<workflowId>`）；
+ * - `inspectStaged`：在锁内执行传入的**固定 argv**（`TASK_GIT_STAGED_INSPECTION_ARGV`）并返回
+ *   staged 路径（NUL 分隔输出的解析由端口按同一契约完成；返回 `readonly string[]`）；
+ * - `commit`：在锁内执行传入的**固定 commit argv**（规则层允许的 `git commit -m <message>`）。
+ */
+export interface ShellTaskGitCommitPort {
+  acquire: TaskGitCriticalSectionAcquire;
+  currentBranch: () => Promise<string> | string;
+  inspectStaged: (argv: readonly string[]) => Promise<readonly string[]> | readonly string[];
+  commit: (argv: readonly string[], budgets?: ShellTaskGitBudgets) => Promise<ShellTaskGitCommandFacts> | ShellTaskGitCommandFacts;
+}
+
+export type ShellTaskGitCommitRun =
+  | { ok: true; value: ShellTaskGitCommandFacts; stagedPaths: readonly string[] }
+  | { ok: false; code: string; message: string };
+
+/** 任务级 Git 提交执行器（`run_shell` 执行路径在 **spawn 之前**调用 `run`）。 */
+export interface ShellTaskGitCommitRunner {
+  /** `commitArgv` 必须是规则层允许的 `["git","commit","-m",message]`（`runTaskGitCommit` 纵深复核）。 */
+  run(commitArgv: readonly string[], budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommitRun>;
+}
+
+/**
+ * **v5 任务级 Git 提交门装配（B4.1）**：把注入的端口与门禁引擎 `runTaskGitCommit` 绑成执行器。
+ *
+ * 顺序（全部在 `runTaskGitCommit` 内，fail-closed）：scope/argv/分支校验 → **取项目级临界区**
+ * （占用 ⇒ `git-critical-section-busy`，不排队、不提交）→ **同一锁内**读 `git diff --cached
+ * --name-only -z`（固定 argv `TASK_GIT_STAGED_INSPECTION_ARGV`）并校验 staged ⊆ writeSet →
+ * **同一锁内**执行 commit（检查与提交之间无释放点）→ `finally` 释放（成功/失败/异常三路）。
+ * **绝不在锁外先检查后提交**。提交/检查异常释放锁后如实抛出（执行路径负责转成失败事实）。
+ */
+export function createTaskGitCommitRunner(input: {
+  scope: TaskGitScope;
+  port: ShellTaskGitCommitPort;
+}): ShellTaskGitCommitRunner {
+  return {
+    async run(commitArgv, budgets) {
+      const currentBranch = await input.port.currentBranch();
+      const result: TaskGitCommitGateResult<ShellTaskGitCommandFacts> = await runTaskGitCommit<ShellTaskGitCommandFacts>({
+        scope: input.scope,
+        currentBranch,
+        commitArgv,
+        acquire: input.port.acquire,
+        inspectStaged: () => input.port.inspectStaged(TASK_GIT_STAGED_INSPECTION_ARGV),
+        commit: () => input.port.commit(commitArgv, budgets),
+      });
+      if (!result.ok) return { ok: false, code: result.code, message: result.message };
+      return { ok: true, value: result.value, stagedPaths: result.stagedPaths };
+    },
+  };
+}
 
 // —————————————————————— (b) pm 角色模型审读 —— 注入点 ——————————————————————
 //
@@ -197,7 +296,17 @@ import { matchesDelegatedRoutineCheck, type RoutineShellPolicy } from "./routine
 // `classifyShell` 四态封装不带 ruleId），用**同一个**冻结谓词判定 routine 命中——单一实现，不复制第二份。
 // 2026-11-08（只读 Git）：matcher/规范体同样经 `src/service/gate/shell-rules.ts` 公共出口**同一函数引用**
 // 消费（设计 P1.3 §2.4.3 / I0-7；不得在本文件复制 matcher/规范体逻辑）。
-import { matchRoutineShellCommand, matchReadonlyGit, buildReadonlyGitBody } from "../../service/gate/shell-rules.ts";
+import { matchRoutineShellCommand, matchReadonlyGit, buildReadonlyGitBody, runTaskGitCommit, TASK_GIT_STAGED_INSPECTION_ARGV } from "../../service/gate/shell-rules.ts";
+// 2026-11-10（B4.1，T3 方案 v1.3 §6.2/§6.3 / AC-21 / T-09）：任务级 Git 写的公开出口（Service 再导出；
+// 本角色不导入门禁引擎私有 `common/`）。类型/函数/常量均为**同一函数引用/同一常量**的逐字转出。
+import type {
+  ShellClassifyContext,
+  ShellVerdict,
+  TaskGitAuditFacts,
+  TaskGitCommitGateResult,
+  TaskGitCriticalSectionAcquire,
+  TaskGitScope,
+} from "../../service/gate/shell-rules.ts";
 import { createDiagnosticLogger } from "../shared/diagnostics.ts";
 // **确定性前置封堵**（客户 2026-10-19：「grep/长内联命令 这个应该让判断AI 做好封堵」）：
 // 在 (c) 分类、模型判断与客户通道**之前**拒绝长内联命令与无界递归搜索（不调模型、不弹卡）。
@@ -389,6 +498,21 @@ export interface CreateShellGateOptions {
   projectRoot?: string;
   /** 门禁引擎的纯函数 `classifyShell`（注入）。缺失 → 一律拒绝（能力缺席即 fail-closed）。 */
   classifyShell?: ClassifyShellFn;
+  /**
+   * **v5（2026-11-10 B4.1，T3 方案 §6.2/§6.3 / AC-21 / T-09）**：带上下文的明细分类器
+   * （Service 出口 `classifyShellDetailed` 同一函数引用）。给出时**优先于 `classifyShell`**，
+   * 并以 `{ taskGitScope }` 作为第三参调用——fixed 任务 `git add`/`git commit` 因此可按任务写集判定。
+   * 缺省 ⇒ 逐字走 2 参 `classifyShell`（v4/旧行为；Git 写一律拒）。
+   */
+  classifyShellDetailed?: ClassifyShellDetailedFn;
+  /**
+   * **v5**：任务级 Git 写事实（应用注入；模型不可自报；A 路径团队计划 writesets / B 路径派生写集）。
+   * 仅随 `classifyShellDetailed` 生效：注入 ⇒ 分类器据此放行 `git add <literal ⊆ writeSet>` /
+   * `git commit -m`；缺省/非法 ⇒ 任务级 Git 写一律拒（fail-closed）。
+   * **本闸只做分类与审计**：`commit` 的实际执行必须由执行路径在 spawn 前经
+   * `createTaskGitCommitRunner`（同一 `runTaskGitCommit` 临界区门）完成。
+   */
+  taskGitScope?: TaskGitScope;
   /** 规则集本体，或加载器（可为异步、可抛错）。加载器抛错 → 整条命令拒绝。 */
   rules: ShellRules | (() => ShellRules | Promise<ShellRules>);
   /** 审计落盘（注入）。 */
@@ -565,6 +689,11 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   if (opts.readonlyOnly === true && typeof opts.takeDirective === "function") {
     throw new Error("shell 闸配置错误：readonlyOnly 不得注入 takeDirective（避免授权越过只读拒绝），拒绝装配");
   }
+  // 8) 只读档不得注入任务级 Git 写上下文（2026-11-10 B4.1）：v5 的 `git add`/`git commit` 放行
+  //    会直接绕过 `readonly-deny`（只读档只映射 (c) 白名单）。调用点不传；构造期再守卫一次。
+  if (opts.readonlyOnly === true && (typeof opts.classifyShellDetailed === "function" || opts.taskGitScope !== undefined)) {
+    throw new Error("shell 闸配置错误：readonlyOnly 不得注入 classifyShellDetailed/taskGitScope（避免任务级 Git 写越过只读拒绝），拒绝装配");
+  }
 
   const log = createDiagnosticLogger({ component: "orchestration.shell-gate", projectRoot: opts.projectRoot ?? opts.routineShellPolicy?.projectRoot });
   const env = opts.env ?? process.env;
@@ -587,6 +716,10 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
   // 打印一行「已恢复落盘」（含本轮累计未落盘条数）。判定不受影响（「审计失败不翻转判定」语义不变）。
   // （声明须在 `return` 之前——闭包在 createShellGate 返回后才执行，声明后置会落 TDZ。）
   let auditFailure: { reason: string; total: number; suppressed: number } | undefined;
+
+  // **v5（B4.1）**：本次请求的任务级 Git 审计事实（由分类明细携带；审计行追加 `taskGit` 用）。
+  // 按请求对象键存（工具层每次调用构造新对象）；审计完成后不主动清理（WeakMap，自动回收）。
+  const taskGitAuditByRequest = new WeakMap<ShellGateRequest, ShellAuditTaskGit>();
 
   // 规则集来源：包装为可 await 的加载器（加载失败由 decide 捕获 → 拒绝）。
   const loadRules = async (): Promise<ShellRules> =>
@@ -625,7 +758,8 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
 
   async function decide(req: ShellGateRequest): Promise<ReviewOutcome> {
     // 退路 2：分类函数缺失 → 能力缺席即拒绝（不注册 run_shell 的等价物在此层也兜住）。
-    if (typeof opts.classifyShell !== "function") {
+    // v5（B4.1）：带上下文的 `classifyShellDetailed` 是 2 参分类器的**可选升级**——两者都缺席才拒。
+    if (typeof opts.classifyShell !== "function" && typeof opts.classifyShellDetailed !== "function") {
       return {
         result: { allow: false, reason: "未注入 c 分类函数（classifyShell），拒绝执行", by: "ruleset:unavailable" },
         conclusion: "error",
@@ -710,9 +844,19 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
     const scriptDecision = writeGuardDecision !== undefined && writeGuardDecision.kind === "script" ? writeGuardDecision : undefined;
 
     // 分类：门禁引擎的纯函数。抛错 → 拒绝（保守）。
+    // v5（B4.1）：`classifyShellDetailed` 给出时优先，并把应用注入的 `taskGitScope` 作为上下文传入
+    // （fixed 任务 `git add`/`git commit` 的唯一放行来源）；否则逐字走 2 参 `classifyShell`（旧行为）。
     let detail: ShellClassifyDetail;
     try {
-      detail = normalizeClassification(opts.classifyShell(argv, rules));
+      detail = normalizeClassification(
+        typeof opts.classifyShellDetailed === "function"
+          ? opts.classifyShellDetailed(
+              argv,
+              rules,
+              opts.taskGitScope !== undefined ? { taskGitScope: opts.taskGitScope } : undefined,
+            )
+          : opts.classifyShell!(argv, rules),
+      );
     } catch (err) {
       return {
         result: { allow: false, reason: `c 分类异常，拒绝执行：${reasonOf(err)}`, by: `ruleset:${rulesId}` },
@@ -720,6 +864,10 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
         branch: BRANCH_CLASSIFY_ERROR,
       };
     }
+    // v5（B4.1）：把分类明细携带的任务级 Git 审计事实**白名单投影**后暂存——审计行追加 `taskGit`
+    // （允许与拒绝都记；既有字段不减少）。非法形状 ⇒ 丢弃（不放大任意模型输入进审计）。
+    const taskGitAudit = normalizeTaskGitAudit(detail.taskGit);
+    if (taskGitAudit !== undefined) taskGitAuditByRequest.set(req, taskGitAudit);
 
     // 只读 Git 审计（2026-11-08 P1.3 §2.4.3 / I0-7）：分类结果为 `allow` 且命中只读 Git 白名单时，
     // 用**同一函数引用**的 matcher 取得受限描述并记录规范执行体（`canonicalArgv` 与实际执行体同源
@@ -1276,6 +1424,8 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
       ...(outcome.directive !== undefined
         ? { directive: { id: outcome.directive.id, scope: outcome.directive.scope } }
         : {}),
+      // 2026-11-10（B4.1，v5 加法）：任务级 Git 写审计（允许与拒绝都记；既有字段不减少）。
+      ...(taskGitAuditByRequest.has(req) ? { taskGit: taskGitAuditByRequest.get(req)! } : {}),
     };
     try {
       const res = await opts.audit.append(record);
@@ -1319,6 +1469,10 @@ export function createShellGate(opts: CreateShellGateOptions): ShellGate {
 export interface ShellGateBuildDeps {
   /** 门禁引擎的纯函数 `classifyShell`（注入）；缺失 → 产出的 gate 一律拒绝。 */
   classifyShell?: ClassifyShellFn;
+  /** **v5（B4.1）**：带上下文的明细分类器（优先于 `classifyShell`；见 `CreateShellGateOptions`）。 */
+  classifyShellDetailed?: ClassifyShellDetailedFn;
+  /** **v5（B4.1）**：任务级 Git 写事实（应用注入；缺省 ⇒ 任务级 Git 写一律拒）。 */
+  taskGitScope?: TaskGitScope;
   /** 规则集本体或加载器（门禁引擎的数据）。 */
   rules: ShellRules | (() => ShellRules | Promise<ShellRules>);
   /** (b) 问 pm 角色模型的注入点（§7.3）。缺省 → (b) 不可用，升级到 (a)。 */
@@ -1404,6 +1558,8 @@ export function buildShellGate(deps: ShellGateBuildDeps): ShellGate {
   return createShellGate({
     projectRoot: deps.projectRoot,
     classifyShell: deps.classifyShell,
+    ...(deps.classifyShellDetailed !== undefined ? { classifyShellDetailed: deps.classifyShellDetailed } : {}),
+    ...(deps.taskGitScope !== undefined ? { taskGitScope: deps.taskGitScope } : {}),
     rules: deps.rules,
     audit,
     pmAsk: deps.pmAsk,
@@ -1502,6 +1658,45 @@ function normalizeClassification(v: ShellClass | ShellClassifyDetail): ShellClas
   }
   // 非法返回值 → 保守当作 review（第一步 review 即拒绝）。
   return { decision: "review" };
+}
+
+/**
+ * **v5（B4.1）**：分类明细 → 审计行 `taskGit` 的**白名单投影**（防御注入分类器返回任意对象）：
+ * 只接受有界字符串事实与有界路径数组；非法形状 ⇒ `undefined`（该行不追加 taskGit，既有字段照旧）。
+ */
+function normalizeTaskGitAudit(value: TaskGitAuditFacts | undefined): ShellAuditTaskGit | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as unknown as Record<string, unknown>;
+  const template = rec["template"];
+  const result = rec["result"];
+  if (template !== "add" && template !== "commit" && template !== "other") return undefined;
+  if (result !== "allowed" && result !== "denied") return undefined;
+  const argvDigest = rec["argvDigest"];
+  if (typeof argvDigest !== "string" || !/^[a-f0-9]{64}$/i.test(argvDigest)) return undefined;
+  const rawPaths = rec["paths"];
+  if (!Array.isArray(rawPaths) || rawPaths.length > 512 || rawPaths.some((p) => typeof p !== "string" || p.length > 1024)) {
+    return undefined;
+  }
+  const bounded = (v: unknown, max: number): string | undefined =>
+    typeof v === "string" && v.length <= max && !/[\x00-\x1f\x7f]/.test(v) ? v : undefined;
+  const code = bounded(rec["code"], 200);
+  const taskId = bounded(rec["taskId"], 200);
+  const workflowId = bounded(rec["workflowId"], 200);
+  const branch = bounded(rec["branch"], 300);
+  const messageSha256 = typeof rec["messageSha256"] === "string" && /^[a-f0-9]{64}$/i.test(rec["messageSha256"])
+    ? rec["messageSha256"]
+    : undefined;
+  return {
+    template,
+    result,
+    ...(code !== undefined ? { code } : {}),
+    ...(taskId !== undefined ? { taskId } : {}),
+    ...(workflowId !== undefined ? { workflowId } : {}),
+    ...(branch !== undefined ? { branch } : {}),
+    paths: (rawPaths as string[]).slice(0, 128),
+    ...(messageSha256 !== undefined ? { messageSha256 } : {}),
+    argvDigest,
+  };
 }
 
 function reasonOf(err: unknown): string {

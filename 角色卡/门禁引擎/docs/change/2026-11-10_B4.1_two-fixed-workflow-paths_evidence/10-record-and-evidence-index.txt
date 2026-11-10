@@ -1,0 +1,22 @@
+# B4.1 记录与证据索引（落盘实测；2026-11-10T19:02:28+08:00）
+
+RECORD  fa6f8cd9b930702baabe5d7be3eb936ed4498990b5c61b647bbf588c8435ded5  bytes=14869 lines=201  角色卡/门禁引擎/docs/change/2026-11-10_B4.1_two-fixed-workflow-paths.md
+
+# _evidence/ 文件（文件名升序）：
+8f26cb8bb297265bd954e39fd3fadb30e5cc5e4a68c765073d51bd290eab17e6  bytes=71  00-baseline-head.txt
+69b205516bbf6af5694672411d60c59a1f1f5262e106e3f86f94aadd6aa48d04  bytes=434  01-before-failure-names.txt
+def1b13a1d8fa0015cc5dbc1b8e82976283ef1df693d4ddf41de01e0597e2d92  bytes=196397  01-before-test-门禁引擎.tap
+902ace737639e40cbfa0ca1e2655269d374c037c7a27970a4cee316a51c41af1  bytes=966  02-basis-hashes.txt
+1ad13963e7a82cb75612c19dbd376afab1f36b148017b84417d14106c3bb671b  bytes=50  03-after-typecheck.txt
+341dd9fcac27f8612c62cfb7e0483f0ec5ae936bb780a6460cf02003c5018ef5  bytes=3557  04-targeted-tests.tap
+b236ff5db7c4a095cd9e0222b63d36cace33397693422f967797c59dea5a1a43  bytes=2377  04b-final-targeted.tap
+d835df3c173427179dab9484206f3d87869d1dd7e47cfde7cbf3b8ca932210c2  bytes=198661  05-after-test-门禁引擎.tap
+6f74f6408c3640ed02b3290df2f8df2ea8c5806ec7309e3067d71f11d2e65c01  bytes=886  06-write-set-status.txt
+c95a9742510fae25e230fe34f0ccce796d82c4279a9a911edfa2763201fdf224  bytes=749  06b-outside-write-set-diff.txt
+546a270736f80219b5a6e8a252afa49570eb2b3b3766f0da22c8b6ed934c2ca5  bytes=2819  07-outlet-diff.txt
+a6510291b36bbb54f0e3a8938170f707e624d3f8c160ea6963e7dd51a99abb87  bytes=3010  07b-reexport-surface.txt
+cdf0e6e8f07e4ef20f31dbd71e9ffbfc65f26e8f766f9d895335a338a9ddd6b1  bytes=516  08-candidate-hashes.txt
+c43ab87c0be8f67505fb83d9fd08864c69dcd977a76db1647b9b58806f748107  bytes=167  08b-candidate-aggregate.txt
+31e12d08719bf6195cb14028f381ded3f10e9b9db703c3e7de52ee4a11665451  bytes=212  08b-candidate-lines.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  bytes=0  09-after-failure-names-diff.txt
+69b205516bbf6af5694672411d60c59a1f1f5262e106e3f86f94aadd6aa48d04  bytes=434  09-after-failure-names.txt

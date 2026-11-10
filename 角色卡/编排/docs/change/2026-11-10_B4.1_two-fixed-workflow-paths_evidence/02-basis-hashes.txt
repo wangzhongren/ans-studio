@@ -1,0 +1,3 @@
+docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md  197 lines  b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb
+docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md  1392 lines  ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8
+角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md  247 lines  a2340256e93aa0318a3ef03726215d5b56a9855d547b85fe60376ea325dcbb38

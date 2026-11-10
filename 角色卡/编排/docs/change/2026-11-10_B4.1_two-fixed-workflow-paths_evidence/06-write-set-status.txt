@@ -1,0 +1,13 @@
+=== git status --porcelain -- src app test ===
+ M src/common/编排/shell-audit.ts
+ M src/common/编排/shell-gate.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/service/gate/shell-rules.ts
+?? test/编排/run-role-task-git.test.ts
+?? test/编排/shell-task-git-execution.test.ts
+?? test/编排/shell-task-git-gate.test.ts
+?? test/门禁引擎/shell-rules-b4-reexport.test.ts
+
+=== HEAD / branch ===
+69096c40d47d2c142e1b5abacf4a2d47b4a71e6e
+feat/two-fixed-workflow-paths

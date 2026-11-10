@@ -1,0 +1,7 @@
+# 依据写盘实测 SHA-256 / bytes / lines
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb  bytes=33722 lines=197  docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+a2340256e93aa0318a3ef03726215d5b56a9855d547b85fe60376ea325dcbb38  bytes=19974 lines=247  角色卡/门禁引擎/docs/change/2026-11-10_B4_two-fixed-workflow-paths.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8  bytes=184391 lines=1392  docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+08e017269c86d92b68e83c25377ccdf7e86d352391a285b635d9a517b48ca571  bytes=35665 lines=344  角色卡/门禁引擎/docs/design/2026-11-10_interface-review_two-fixed-workflow-paths.md
+ea72fe6c6c634b32590d336fd63f0d2ec5a863a9ed885ac44827c94d21022081  bytes=185782 lines=2508  src/common/门禁引擎/classify-shell.ts
+2446bf1107ef986c5c04ee04d55b83d28ebf8699422df747f4c8271b02181980  bytes=7770 lines=141  src/common/门禁引擎/task-git-gate.ts

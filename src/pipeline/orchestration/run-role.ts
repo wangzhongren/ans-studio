@@ -50,7 +50,7 @@
 import type { DispatchMatrixMode, GovernanceFunction, GovernanceModel, ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { BoundaryEntry } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
-import type { TaskScope, WriteDecision } from "../../model/decision.ts";
+import type { ShellRules, TaskScope, WriteDecision } from "../../model/decision.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -61,7 +61,7 @@ import { ROLE_CARD_REQUIRED_SECTIONS, cardKindsOf as governanceCardKindsOf } fro
 // 本文件只消费数据做条件/默认卡判定，不复制第二份卡面数据、不构造卡、不写账本。
 import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
-import { loadLatestRoster, nominationD3CardFacts, rosterContainsBuiltInRoleIds, rosterDirectoriesFor, rosterRoleIds, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { loadLatestRoster, nominationD3CardFacts, parseProjectModules, parseProjectRoster, parseTeamPlan, rosterContainsBuiltInRoleIds, rosterDirectoriesFor, rosterRoleIds, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
 // T3 B3.1（2026-11-10，AC-08/AC-13）：fixed A10 卡在办标记（stage.requested A10）经 fixed 账本公共原语写入。
 import { stageRequestIdempotencyKey } from "../../common/编排/workflow-dispatch.ts";
 import { canRequestStage, deriveWorkflowView } from "../../common/编排/workflow-state.ts";
@@ -72,9 +72,12 @@ import {
   activateRoleDocumentsFixed as workflowActivateRoleDocumentsFixed,
   appendWorkflowEvent as workflowAppendEvent,
   closeTask as workflowCloseTask,
+  derivePathBWriteSets,
   finalizeIntent as workflowFinalizeIntent,
   prepareIntent as workflowPrepareIntent,
+  readBasisLedger,
   readWorkflowLedger as workflowReadLedger,
+  taskBranchName,
   type PreparedFixedIntent,
   type WorkflowServiceFailure,
   type FixedActivateRoleDocumentsDep,
@@ -117,7 +120,9 @@ import { resolveWrite, resolveWriteReadPreflight, resolveWriteFinal, stableWrite
 import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProtectionRequirement, beginGitHostAction, endGitHostAction, inspectGitHostCoordinator, executeReadonlyGit, type GitProtectionFacts, type GitHostOpenFailureRef, type GitHostInventory } from "../../provider/trunk/public/trunk-store.ts";
 // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git matcher 经 Service 公共出口**同一函数引用**
 // （门禁引擎单一实现；不复制白名单/解析逻辑）。
-import { matchReadonlyGit } from "../../service/gate/shell-rules.ts";
+// 2026-11-10（B4.1）：任务级 Git 写 matcher 同经 Service 出口消费（同一函数引用；生产不导入私有 common/）。
+import { matchReadonlyGit, matchTaskGit } from "../../service/gate/shell-rules.ts";
+import type { TaskGitMatch, TaskGitScope } from "../../service/gate/shell-rules.ts";
 import {
   GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
   GOVERNANCE_MATRIX_PROMPT_MAX_CHARS,
@@ -241,6 +246,12 @@ import { formatEvent } from "../../common/编排/output.ts";
 import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIntent, type HandbackEvent, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
+import {
+  createTaskGitCommitRunner,
+  type ClassifyShellDetailedFn,
+  type ShellTaskGitBudgets,
+  type ShellTaskGitCommandFacts,
+} from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
 import {
@@ -820,6 +831,279 @@ export function inspectManagedRoleSessionEvidence(input: { projectRoot: string; 
     lifecycle, toolSurface: record.handle.inspectToolSurface?.(), ...(record.turnInput?.turnId === lifecycle?.turnId ? { turnInput: record.turnInput } : {}) }); } catch { return undefined; }
 }
 
+// —————————————— T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写（add/commit）——————————————
+//
+// 分工（任务给定）：
+//   · shell-gate（本角色 `common/编排/shell-gate.ts`）只做**分类 + 审计**：任务级 Git 命令经注入的
+//     `classifyShellDetailed(argv, rules, { taskGitScope })` 判定（scope 由本文件解析），`taskGit` 审计
+//     字段随既有 `docs/audit/shell-gate.jsonl` 行追加（允许与拒绝都记、既有字段不减少）；
+//   · `run_shell` 的**执行路径**（本文件 `ReadonlyGitCapability` 的 task-git 分支）在 **spawn 之前**
+//     调用 `createTaskGitCommitRunner`（= 门禁引擎 `runTaskGitCommit` 临界区门）：项目级锁贯穿
+//     `git diff --cached --name-only -z` 检查与 commit；锁占用 ⇒ `git-critical-section-busy`（不排队）。
+//
+// 事实来源（模型不可自报）：
+//   · 真实受派任务 = `tasks.jsonl` 的 `task.created`（`to` = 本会话角色；`stage` ∈ A11/B3）；
+//   · A 路径写集 = `basis.jsonl` 最新 `basis.recorded/amended.teamPlan`（字节 hash 复核）→
+//     `parseTeamPlan` 的 `roleRows[].writesets`（与 A9 落盘时同一解析器/校验器）；
+//   · B 路径写集 = 最新 `change.scope-decided.scope.files` → `derivePathBWriteSets`（B3 已实现）→
+//     本角色条目；
+//   · 分支 = `taskBranchName(workflowId)`（`ans/task/<workflowId>`；单一来源 workflow-service）。
+
+/** `run_shell` 执行路径的任务级 Git 端口（桌面 B3/B4 注入真实 Git；测试注入假件）。 */
+export interface TaskGitShellPort {
+  /**
+   * 项目级临界区取锁（**必须**是 desktop B3 `acquireProjectGitCriticalSection` 同一把锁——
+   * 发布合并与 shell 提交互斥）。占用 ⇒ `undefined`（fail-closed，不排队）。
+   */
+  acquireCriticalSection(owner: string): (() => void) | undefined;
+  /** 应用读取的当前分支（`runTaskGitCommit` 在取锁前核对 `ans/task/<workflowId>`）。 */
+  currentBranch(): Promise<string> | string;
+  /** 执行规则层允许的 `git add <literal paths>`（无锁；staged 内容检查只属 commit 门）。 */
+  add(paths: readonly string[], budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommandFacts> | ShellTaskGitCommandFacts;
+  /**
+   * 在 commit 临界区内执行传入的固定 staged 检查 argv（`TASK_GIT_STAGED_INSPECTION_ARGV`，
+   * `git diff --cached --name-only -z`）并返回 staged 路径（NUL 分隔解析按同一契约）。
+   */
+  inspectStaged(argv: readonly string[]): Promise<readonly string[]> | readonly string[];
+  /** 在 commit 临界区内执行传入的固定 commit argv（仅 `git commit -m <message>`）。 */
+  commit(argv: readonly string[], budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommandFacts> | ShellTaskGitCommandFacts;
+}
+
+/**
+ * `openRoleSession` 的任务级 Git 注入位（**仅 fixed 会话**；legacy 会话逐字忽略本字段）：
+ * 两个字段**同时**给出且真实受派实现任务的写集可解析时，才向 shell 闸注入任务级分类上下文；
+ * 缺一/不可解析 ⇒ 不注入（v5 分类器无 scope ⇒ `git add`/`git commit` 一律拒，fail-closed）。
+ */
+export interface TaskGitShellRuntimeInput {
+  /** 门禁引擎明细分类器（Service 出口 `classifyShellDetailed` 同一函数引用）。 */
+  classifyShellDetailed?: ClassifyShellDetailedFn;
+  /** 执行端口（桌面注入；`acquireCriticalSection` 与发布合并同一把项目级锁）。 */
+  port?: TaskGitShellPort;
+}
+
+/** 任务级 Git 写集解析结果（稳定码复用 v5 `git-task-scope-*`；本层只做诊断/不注入）。 */
+export type ResolveTaskGitScopeResult =
+  | { ok: true; scope: TaskGitScope }
+  | { ok: false; code: "git-task-scope-missing" | "git-task-scope-invalid"; message: string };
+
+const TASK_GIT_SCOPE_MISSING = "git-task-scope-missing";
+const TASK_GIT_SCOPE_INVALID = "git-task-scope-invalid";
+
+function taskGitScopeMissing(message: string): ResolveTaskGitScopeResult {
+  return { ok: false, code: TASK_GIT_SCOPE_MISSING, message };
+}
+function taskGitScopeInvalid(message: string): ResolveTaskGitScopeResult {
+  return { ok: false, code: TASK_GIT_SCOPE_INVALID, message };
+}
+function sha256HexOfBytes(bytes: Uint8Array | string): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+async function readProjectFileBytes(projectRoot: string, rel: string): Promise<Buffer | undefined> {
+  if (typeof rel !== "string" || rel.trim() === "" || path.isAbsolute(rel)) return undefined;
+  try {
+    return await readFile(path.join(projectRoot, ...rel.split("/")));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 从**真实受派任务 + fixed 账本**解析任务级 Git 写事实（taskId/workflowId/branch/writeSet）。
+ * 纯读、fail-closed：任何一步缺失/漂移/不匹配都返回稳定码，调用方**不注入** scope（Git 写拒绝）。
+ * **模型不可自报**：taskId 来自会话绑定；角色 = 会话解析结果；写集来自团队计划/派生账本。
+ */
+export async function resolveTaskGitScope(input: {
+  projectRoot: string;
+  taskId: string;
+  roleId: string;
+}): Promise<ResolveTaskGitScopeResult> {
+  if (typeof input.taskId !== "string" || input.taskId.trim() === "") return taskGitScopeMissing("任务 id 缺失");
+  const taskState = await readTaskState(input.projectRoot);
+  const record = taskState.records.get(input.taskId);
+  const created = record?.created;
+  if (created === undefined) return taskGitScopeMissing(`任务 ${input.taskId} 不存在（无 task.created）`);
+  if (created.to !== input.roleId) {
+    return taskGitScopeInvalid(`任务受派人 ${created.to} 与本会话角色 ${input.roleId} 不一致`);
+  }
+  if (typeof created.workflowId !== "string" || created.workflowId.trim() === "") {
+    return taskGitScopeMissing("任务未绑定 fixed workflowId");
+  }
+  if (created.stage !== "A11" && created.stage !== "B3") {
+    return taskGitScopeInvalid(`任务阶段 ${created.stage ?? "<none>"} 不是实现提交阶段（仅 A11/B3）`);
+  }
+  const workflowId = created.workflowId;
+  const branch = taskBranchName(workflowId);
+  const ledger = await workflowReadLedger(input.projectRoot);
+  const events = ledger.events.filter((event) => event.workflowId === workflowId);
+  const started = events.find((event) => event.kind === "workflow.started");
+  if (started === undefined) return taskGitScopeMissing(`workflow ${workflowId} 缺 workflow.started`);
+  const flowId = created.flowId ?? started.flowId;
+  if (started.path === "B") {
+    const scopeEvent = [...events].reverse().find((event) => event.kind === "change.scope-decided");
+    if (scopeEvent === undefined || scopeEvent.kind !== "change.scope-decided") {
+      return taskGitScopeMissing(`workflow ${workflowId} 缺 B2 change.scope-decided（无 B 写集来源）`);
+    }
+    const derived = await derivePathBWriteSets({
+      projectRoot: input.projectRoot,
+      flowId: scopeEvent.flowId,
+      workflowId,
+      scopeFiles: scopeEvent.scope.files ?? [],
+    });
+    if (!derived.ok) return taskGitScopeInvalid(`B 写集派生失败（${derived.code}）：${derived.message}`);
+    const writeset = derived.writesets.find((set) => set.roleId === input.roleId);
+    if (writeset === undefined || writeset.paths.length === 0) {
+      return taskGitScopeInvalid(`B 写集不含本角色 ${input.roleId}`);
+    }
+    return { ok: true, scope: { taskId: input.taskId, workflowId, branch, paths: [...writeset.paths] } };
+  }
+  // —— A 路径：basis.teamPlan → parseTeamPlan roleRows（同一解析器/校验器；字节 hash 复核）——
+  const basisLedger = await readBasisLedger(input.projectRoot);
+  const basis = [...basisLedger.events].reverse().find((event) =>
+    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+    && event.workflowId === workflowId
+    && event.teamPlan !== undefined && event.teamPlan !== null);
+  if (basis === undefined || (basis.kind !== "basis.recorded" && basis.kind !== "basis.amended")) {
+    return taskGitScopeMissing(`workflow ${workflowId} 缺 basis.teamPlan（无 A 写集来源）`);
+  }
+  const planRef = basis.teamPlan!;
+  const planBytes = await readProjectFileBytes(input.projectRoot, planRef.path);
+  if (planBytes === undefined) return taskGitScopeMissing(`团队计划不可读：${planRef.path}`);
+  if (sha256HexOfBytes(planBytes) !== planRef.sha256) {
+    return taskGitScopeInvalid(`团队计划字节 hash 与 basis 记录不一致（basis-drift）：${planRef.path}`);
+  }
+  const rosterDoc = basis.documents.find((doc) => doc.kind === "roster");
+  const modulesDoc = basis.documents.find((doc) => doc.kind === "modules");
+  if (rosterDoc === undefined || modulesDoc === undefined) {
+    return taskGitScopeInvalid("basis 记录缺 roster/modules 文档引用");
+  }
+  const rosterBytes = await readProjectFileBytes(input.projectRoot, rosterDoc.path);
+  const modulesBytes = await readProjectFileBytes(input.projectRoot, modulesDoc.path);
+  if (rosterBytes === undefined || modulesBytes === undefined) return taskGitScopeMissing("名单/模块清单不可读");
+  if (sha256HexOfBytes(rosterBytes) !== rosterDoc.sha256 || sha256HexOfBytes(modulesBytes) !== modulesDoc.sha256) {
+    return taskGitScopeInvalid("名单/模块清单字节 hash 与 basis 记录不一致");
+  }
+  const rosterParsed = parseProjectRoster(rosterBytes.toString("utf8"), flowId);
+  if (!rosterParsed.ok) return taskGitScopeInvalid(`名单解析失败（${rosterParsed.code}）：${rosterParsed.reason}`);
+  const modulesParsed = parseProjectModules(modulesBytes.toString("utf8"), flowId);
+  if (!modulesParsed.ok) return taskGitScopeInvalid(`模块清单解析失败（${modulesParsed.code}）：${modulesParsed.reason}`);
+  const planParsed = parseTeamPlan(planBytes.toString("utf8"), {
+    flowId,
+    version: planRef.version,
+    modules: { path: modulesDoc.path, sha256: modulesDoc.sha256 },
+    roster: { path: rosterDoc.path, sha256: rosterDoc.sha256 },
+    rosterFacts: rosterParsed.roster,
+  });
+  if (!planParsed.ok) return taskGitScopeInvalid(`团队计划校验失败：${planParsed.reason}`);
+  const row = planParsed.plan.roleRows.find((roleRow) => roleRow.roleId === input.roleId);
+  if (row === undefined || row.writesets.length === 0) {
+    return taskGitScopeInvalid(`团队计划不含本角色 ${input.roleId} 的写集`);
+  }
+  return { ok: true, scope: { taskId: input.taskId, workflowId, branch, paths: [...row.writesets] } };
+}
+
+const TASK_GIT_SHELL_MATCH_KIND = "ans-task-git-shell/v1" as const;
+
+interface TaskGitShellMatch {
+  readonly kind: typeof TASK_GIT_SHELL_MATCH_KIND;
+  readonly template: "add" | "commit";
+  readonly match: TaskGitMatch;
+}
+
+/** 判别本层 task-git match（`ReadonlyGitCapability.execute` 路由用；形状细节由 execute 再防御解析）。 */
+function isTaskGitShellMatchObject(value: object): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && (value as Record<string, unknown>)["kind"] === TASK_GIT_SHELL_MATCH_KIND;
+}
+
+/** 防御性读取 task-git match（只接受 match() 产出的受限描述；伪造/越 scope ⇒ undefined）。 */
+function readTaskGitShellMatch(value: object, scope: TaskGitScope): TaskGitShellMatch | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  if (rec["kind"] !== TASK_GIT_SHELL_MATCH_KIND) return undefined;
+  const template = rec["template"];
+  if (template !== "add" && template !== "commit") return undefined;
+  const match = rec["match"];
+  if (match === null || typeof match !== "object" || Array.isArray(match)) return undefined;
+  const m = match as Record<string, unknown>;
+  if (m["template"] !== template) return undefined;
+  if (m["taskId"] !== scope.taskId || m["workflowId"] !== scope.workflowId || m["branch"] !== scope.branch) return undefined;
+  if (!Array.isArray(m["paths"]) || m["paths"].some((p) => typeof p !== "string")) return undefined;
+  if (m["message"] !== undefined && typeof m["message"] !== "string") return undefined;
+  if (typeof m["argvDigest"] !== "string" || !/^[a-f0-9]{64}$/i.test(m["argvDigest"])) return undefined;
+  return { kind: TASK_GIT_SHELL_MATCH_KIND, template, match: match as TaskGitMatch };
+}
+
+/** 失败事实（不 spawn；工具层按「未执行」如实回给模型）。 */
+function taskGitFailureFacts(code: string, message: string): ShellTaskGitCommandFacts {
+  return { stdout: "", stderr: message, error: `${code}: ${message}` };
+}
+
+export interface TaskGitShellExecution {
+  /** `ReadonlyGitCapability.match` 的任务级分支：命中 ⇒ 不透明受限描述；否则 undefined。 */
+  match(argv: readonly string[]): object | undefined;
+  /** `ReadonlyGitCapability.execute` 的任务级分支：add 经端口；commit **必须**经 runTaskGitCommit。 */
+  execute(match: object, budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommandFacts>;
+}
+
+/**
+ * 构造 `run_shell` 的任务级 Git 执行路径（run-role 的 `ReadonlyGitCapability` 消费）：
+ * - `match`：`matchTaskGit(argv, scope)`（Service 出口同一函数引用）命中 ⇒ 打上本层判别标签；
+ * - `execute`（add）：复核 argv 形状（`["git","add",...paths]` 再命中）后经端口执行；
+ * - `execute`（commit）：重建固定 argv `["git","commit","-m",message]`，**在 spawn 前**调用
+ *   `createTaskGitCommitRunner`（同一项目级锁贯穿 staged 检查与提交；不满足 ⇒ 不提交）。
+ */
+export function createTaskGitShellExecution(input: {
+  scope: TaskGitScope;
+  port: TaskGitShellPort;
+}): TaskGitShellExecution {
+  const runner = createTaskGitCommitRunner({
+    scope: input.scope,
+    port: {
+      acquire: (owner) => input.port.acquireCriticalSection(owner),
+      currentBranch: () => input.port.currentBranch(),
+      inspectStaged: (argv) => input.port.inspectStaged(argv),
+      commit: (argv, budgets) => input.port.commit(argv, budgets),
+    },
+  });
+  return {
+    match(argv) {
+      const matched = matchTaskGit(argv, input.scope);
+      if (matched === undefined) return undefined;
+      const out: TaskGitShellMatch = { kind: TASK_GIT_SHELL_MATCH_KIND, template: matched.template, match: matched };
+      return out;
+    },
+    async execute(match, budgets) {
+      const tagged = readTaskGitShellMatch(match, input.scope);
+      if (tagged === undefined) {
+        return taskGitFailureFacts("git-task-match-invalid", "任务级 Git 执行请求形状非法或超出任务范围，未执行。");
+      }
+      if (tagged.template === "add") {
+        const addArgv = ["git", "add", ...tagged.match.paths];
+        if (matchTaskGit(addArgv, input.scope) === undefined) {
+          return taskGitFailureFacts("git-task-add-not-literal", "git add argv 未通过任务级写白名单复核，未执行。");
+        }
+        try {
+          return await input.port.add([...tagged.match.paths], budgets);
+        } catch (err) {
+          return taskGitFailureFacts("git-task-add-failed", `git add 执行异常：${errText(err)}`);
+        }
+      }
+      const message = tagged.match.message;
+      if (typeof message !== "string" || message.trim() === "") {
+        return taskGitFailureFacts("git-commit-message-empty", "commit message 缺失，未执行。");
+      }
+      const commitArgv = ["git", "commit", "-m", message];
+      try {
+        const run = await runner.run(commitArgv, budgets);
+        if (!run.ok) return taskGitFailureFacts(run.code, run.message);
+        return run.value;
+      } catch (err) {
+        return taskGitFailureFacts("git-task-commit-failed", `git commit 执行异常：${errText(err)}`);
+      }
+    },
+  };
+}
+
 export async function openRoleSession(
   input: {
     roleId: string;
@@ -1024,6 +1308,17 @@ export async function openRoleSession(
      */
     shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
     /**
+     * **T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写（`git add`/`git commit`）注入位**。
+     * `classifyShellDetailed` 来自门禁引擎 Service 出口（`classifyShellDetailed` 同一函数引用）；
+     * `port` 由桌面注入真实 Git（`acquireCriticalSection` 必须是 desktop B3
+     * `acquireProjectGitCriticalSection` 同一把项目级锁）。两者同时给出、且**真实受派实现任务**
+     * （`task.created.to` = 本会话角色、stage ∈ A11/B3）的写集可从团队计划（A）/ B2 派生写集（B）
+     * 解析时，才向 shell 闸注入 `taskGitScope` 并启用执行路径；缺一/不可解析 ⇒ **不注入**
+     * （v5 分类器无 scope ⇒ Git 写一律拒，fail-closed）。**legacy 会话忽略本字段（逐字不变）**。
+     * **模型不可自报**：taskId/角色/写集全部来自应用事实。
+     */
+    taskGit?: TaskGitShellRuntimeInput;
+    /**
      * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
      * `pm-reviewer` 注入；一般调用方不传。
      */
@@ -1173,6 +1468,32 @@ export async function openRoleSession(
       if (taskFlowId !== undefined) sessionWorkflowMode = await resolveWorkflowMode(taskFlowId);
     } catch {
       sessionWorkflowMode = "legacy";
+    }
+  }
+  // T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写事实（应用注入；模型不可自报）。
+  // 只在「fixed 会话 + 真实受派实现任务（A11/B3）+ 应用完整注入（明细分类器 + 执行端口）」同时成立时
+  // 解析并注入；任一步不成立 ⇒ **不注入**（v5 分类器无 scope ⇒ Git 写一律拒，fail-closed）。
+  // legacy 会话完全不触达本块（旧注入/行为逐字不变）。
+  let taskGitRuntime: { scope: TaskGitScope; execution: TaskGitShellExecution } | undefined;
+  if (sessionWorkflowMode === "fixed" && input.taskId !== undefined
+    && input.taskGit?.port !== undefined && input.taskGit.classifyShellDetailed !== undefined) {
+    const resolved = await resolveTaskGitScope({
+      projectRoot: input.project.projectRoot,
+      taskId: input.taskId,
+      roleId: setup.role.id,
+    });
+    if (resolved.ok) {
+      taskGitRuntime = {
+        scope: resolved.scope,
+        execution: createTaskGitShellExecution({ scope: resolved.scope, port: input.taskGit.port }),
+      };
+      log.record("taskGit.scope.ready", {
+        taskId: resolved.scope.taskId,
+        workflowId: resolved.scope.workflowId,
+        paths: resolved.scope.paths.length,
+      });
+    } else {
+      log.record("taskGit.scope.unavailable", { reasonCode: resolved.code });
     }
   }
   const roleDraftWritePaths: string[] = [];
@@ -1887,6 +2208,8 @@ export async function openRoleSession(
       skillRoot: input.project.skillRoot,
       boundary: setup.role.boundary,
       ...(input.scope !== undefined ? { scope: input.scope } : {}),
+      // 2026-11-10（B4.1/v5）：任务级 Git 写事实（仅 fixed 真实受派任务解析成功时注入；缺省 ⇒ 裸 Git 写硬拒）。
+      ...(taskGitRuntime !== undefined ? { taskGitScope: taskGitRuntime.scope } : {}),
       conditions,
       forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
       checkWrite: shellCheckWrite,
@@ -2042,6 +2365,20 @@ export async function openRoleSession(
       ? { takeDirective: (req, intent) => input.customerDirective!.takeDirective(req, intent) }
       : {};
 
+  // T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 项目角色的任务级 Git 分类上下文——只经三层链注入，
+  // 复用既有 `shellArming.classifyShell` 通道：把 2 参分类器替换为「带 `taskGitScope` 的明细分类」
+  // 封装（Service 出口 `classifyShellDetailed` 同一函数引用；明细携带 `taskGit` 审计事实）。
+  // 未解析出 scope / 调用方未给 shellArming ⇒ 原样透传（legacy 注入/行为逐字不变）。
+  const projectShellArming = taskGitRuntime !== undefined
+    && input.taskGit?.classifyShellDetailed !== undefined
+    && input.shellArming !== undefined
+    ? {
+        ...input.shellArming,
+        classifyShell: (argv: string[], rules: ShellRules) =>
+          input.taskGit!.classifyShellDetailed!(argv, rules, { taskGitScope: taskGitRuntime!.scope }),
+      }
+    : input.shellArming;
+
   let shellGate: ShellGate | undefined;
   if (chiefDecisionContext !== undefined) {
     // Independent real-chief contexts never construct a normal shell surface.
@@ -2082,7 +2419,7 @@ export async function openRoleSession(
         project: input.project,
         operatorChannel: input.shellOperatorChannel,
         sessionDeps: { ...deps, createAdapter: deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions) },
-        ...(input.shellArming ?? {}),
+        ...(projectShellArming ?? {}),
         ...escalationWiring,
         ...directiveWiring,
         runtime: input.runtime,
@@ -2103,9 +2440,22 @@ export async function openRoleSession(
   // matcher 经 Service 公共出口**同一函数引用**（门禁引擎单一实现）；执行经 trunk Provider 固定传输
   // （绝对可执行 + 固定 config/env + 规范 argv 体，不接受任意 argv）。`run_shell` 在 gate 放行后对
   // `git` 只能经本能力执行；无能力/未命中 ⇒ `readonly-git-runner-unavailable`（绝不回退通用 spawn）。
+  // 2026-11-10（B4.1，AC-21 / T-09）：fixed 任务级 Git 写——`match` 追加任务级 matcher（同一函数引用）；
+  // `execute` 的任务级分支：add 经注入端口执行，commit **必须**在 spawn 前经 `runTaskGitCommit`
+  // 临界区门（`createTaskGitCommitRunner`；项目级锁贯穿 staged 检查与提交）。未解析出 scope ⇒ 该分支不存在
+  // （任务级 Git 写一律拒；只读 Git 路由逐字保留）。
   const readonlyGit: ReadonlyGitCapability = {
-    match: (argv) => matchReadonlyGit(argv),
-    execute: (match, budgets) => executeReadonlyGit(input.project.projectRoot, match, budgets),
+    match: (argv) => {
+      const readonlyMatch = matchReadonlyGit(argv);
+      if (readonlyMatch !== undefined) return readonlyMatch;
+      return taskGitRuntime?.execution.match(argv);
+    },
+    execute: (match, budgets) => {
+      if (taskGitRuntime !== undefined && isTaskGitShellMatchObject(match)) {
+        return taskGitRuntime.execution.execute(match, budgets);
+      }
+      return executeReadonlyGit(input.project.projectRoot, match, budgets);
+    },
   };
 
   // 需求变更申请：只给内置治理角色中的报告员/统筹注入（沿用 C 批发起方规则）。

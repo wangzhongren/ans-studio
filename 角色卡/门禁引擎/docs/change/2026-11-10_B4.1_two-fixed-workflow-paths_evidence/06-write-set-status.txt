@@ -1,0 +1,13 @@
+# command: git status --porcelain -- src app test
+# snapshot: 2026-11-10T19:02:07+08:00；工作树与编排 B4.1 并行 worker 共享
+ M src/common/编排/shell-audit.ts
+ M src/common/编排/shell-gate.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/service/gate/shell-rules.ts
+?? test/门禁引擎/shell-rules-b4-reexport.test.ts
+# attribution:
+#   M src/service/gate/shell-rules.ts                = 本角色 B4.1（写集内 M，+17/−0）
+#   ?? test/门禁引擎/shell-rules-b4-reexport.test.ts = 本角色 B4.1（写集内 新，311 行）
+#   M src/common/编排/shell-audit.ts                 = 编排 B4.1 并行（写集外；本角色未触碰）
+#   M src/common/编排/shell-gate.ts                  = 编排 B4.1 并行（写集外；本角色未触碰）
+#   M src/pipeline/orchestration/run-role.ts         = 编排 B4.1 并行（写集外；本角色未触碰）
