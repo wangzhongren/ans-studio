@@ -1588,6 +1588,27 @@ export async function openRoleSession(
   const refreshRoleDraftScope = async () => {
     roleDraftWritePaths.splice(0);
     if (!isTrio || setup.role.id !== "nominator") return;
+    // B16（2026-11-11，RR11 失败修复）：fixed A8 会话（真实受派任务带 workflowId/flowId、stage=A8、
+    // 非 stage-request）的角色草稿写权来自**固定 roster（A6 决定）**，不再要求 legacy「actual
+    // completed plan + current D3 selection」。legacy（无 workflowId）会话仍走 trunk
+    // `prepareRoleDraftScope` 逐字不变；roster 不可读/非法/含内置角色 ⇒ 空集 fail-closed
+    // （**不**回退 legacy D3）。写入门禁只放开名单角色的三文件；激活时
+    // `activate_role_documents` v2 仍复核 A6 proposalDecisionId + roster/三文档 hash。
+    const fixedA8 = await fixedRoleDraftTaskOf(input.project.projectRoot, input.taskId);
+    if (fixedA8 !== undefined) {
+      const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: fixedA8.flowId });
+      if (roster.ok && !rosterContainsBuiltInRoleIds(roster.roster)) {
+        for (const role of roster.roster.roles) {
+          if (!/^[a-z0-9][a-z0-9-]{0,62}$/i.test(role.id)) continue;
+          roleDraftWritePaths.push(
+            `角色卡/${role.id}/role-card.md`,
+            `角色卡/${role.id}/boundary.md`,
+            `角色卡/${role.id}/boundary.yaml`,
+          );
+        }
+      }
+      return;
+    }
     const scope = await createTrunkService({ projectRoot: input.project.projectRoot }).prepareRoleDraftScope({
       ...(currentFlowId ? { flowId: currentFlowId } : {}), ...(input.taskId ? { taskId: input.taskId } : {}) });
     if (scope.ok) roleDraftWritePaths.push(...scope.value.paths);
@@ -3932,6 +3953,38 @@ function defaultChoiceKindFromModule(
   }
   if (looksLikeAppointmentChoice(optionIds) && cards.includes("appointment")) return "appointment";
   return undefined;
+}
+
+/**
+ * B16（2026-11-11，RR11 失败修复）：会话是否绑定**真实 fixed A8 任务**（task.created.to=nominator、
+ * workflowId 存在、stage=A8、非 stage-request）。是 ⇒ 返回 flowId/workflowId（task.created.flowId
+ * 优先，缺省从 workflow 账本 `workflow.started` 解析）；legacy/其它阶段/任务形状不全 ⇒ undefined
+ * （调用方走 legacy `prepareRoleDraftScope`，fail-closed 不回退）。
+ */
+async function fixedRoleDraftTaskOf(
+  projectRoot: string,
+  taskId: string | undefined,
+): Promise<{ flowId: string; workflowId: string } | undefined> {
+  if (taskId === undefined) return undefined;
+  let state: Awaited<ReturnType<typeof readTaskState>>;
+  try {
+    state = await readTaskState(projectRoot);
+  } catch {
+    return undefined;
+  }
+  const created = state.records.get(taskId)?.created;
+  if (created === undefined || created.to !== "nominator" || created.taskKind === "stage-request"
+    || created.stage !== "A8" || created.workflowId === undefined) {
+    return undefined;
+  }
+  let flowId = created.flowId;
+  if (flowId === undefined || flowId.trim() === "") {
+    const ledger = await workflowReadLedger(projectRoot);
+    const started = ledger.events.find((event) => event.kind === "workflow.started" && event.workflowId === created.workflowId);
+    flowId = started?.kind === "workflow.started" ? started.flowId : undefined;
+  }
+  if (flowId === undefined || flowId.trim() === "") return undefined;
+  return { flowId: flowId.trim(), workflowId: created.workflowId };
 }
 
 /**

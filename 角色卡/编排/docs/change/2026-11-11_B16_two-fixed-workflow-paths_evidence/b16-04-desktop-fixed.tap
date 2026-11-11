@@ -1,0 +1,496 @@
+TAP version 13
+# Subtest: B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed；submit_report 关联 task.reported；close accepted 由 close-report-missing 转成功
+ok 1 - B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed；submit_report 关联 task.reported；close accepted 由 close-report-missing 转成功
+  ---
+  duration_ms: 75.0013
+  type: 'test'
+  ...
+# Subtest: B10.1 生产派发：内置 product 目标会话带生产任务 taskId；product 报告关联；convener close accepted 成功
+ok 2 - B10.1 生产派发：内置 product 目标会话带生产任务 taskId；product 报告关联；convener close accepted 成功
+  ---
+  duration_ms: 63.1017
+  type: 'test'
+  ...
+# Subtest: B10.1 drain：fixed 派发条目自动打开目标会话传真实 taskId + forced fixed
+ok 3 - B10.1 drain：fixed 派发条目自动打开目标会话传真实 taskId + forced fixed
+  ---
+  duration_ms: 37.5511
+  type: 'test'
+  ...
+# Subtest: B10.1 重绑：既有固定 chat 会话无任务绑定 ⇒ dispose + 以 taskId 重开，投递落新会话
+ok 4 - B10.1 重绑：既有固定 chat 会话无任务绑定 ⇒ dispose + 以 taskId 重开，投递落新会话
+  ---
+  duration_ms: 93.8073
+  type: 'test'
+  ...
+# Subtest: B10.1 busy：未绑定的固定会话 busy ⇒ openInternal fail-closed（fixed-session-rebind-blocked），受理后不投递；空闲后 drain 以 taskId 重绑续投
+ok 5 - B10.1 busy：未绑定的固定会话 busy ⇒ openInternal fail-closed（fixed-session-rebind-blocked），受理后不投递；空闲后 drain 以 taskId 重绑续投
+  ---
+  duration_ms: 36.4523
+  type: 'test'
+  ...
+# Subtest: B10.1 busy：固定会话已绑定另一任务 ⇒ 受理后不投递，空闲后重绑到本次任务（不投进绑定别的任务的会话）
+ok 6 - B10.1 busy：固定会话已绑定另一任务 ⇒ 受理后不投递，空闲后重绑到本次任务（不投进绑定别的任务的会话）
+  ---
+  duration_ms: 42.4196
+  type: 'test'
+  ...
+# Subtest: B10.1 verifier：A12a 直派目标会话带真实 review 任务 taskId + forced fixed
+ok 7 - B10.1 verifier：A12a 直派目标会话带真实 review 任务 taskId + forced fixed
+  ---
+  duration_ms: 133.1849
+  type: 'test'
+  ...
+# Subtest: B10.1 legacy 不变：legacy 任务自动打开目标不带 taskId/forced；fixed chat（chief 无 taskId）仍 forced fixed
+ok 8 - B10.1 legacy 不变：legacy 任务自动打开目标不带 taskId/forced；fixed chat（chief 无 taskId）仍 forced fixed
+  ---
+  duration_ms: 21.8473
+  type: 'test'
+  ...
+# Subtest: B10.1 fixed 回交回合：目标会话已绑定真实任务 ⇒ handback intent 沿用该 taskId（创建者显式进度报告可关联）
+ok 9 - B10.1 fixed 回交回合：目标会话已绑定真实任务 ⇒ handback intent 沿用该 taskId（创建者显式进度报告可关联）
+  ---
+  duration_ms: 49.9872
+  type: 'test'
+  ...
+# Subtest: B11.1 RR6：已收口 fixed 回交（A1）被丢弃并继续投递后续 open fixed 回交（A2），不再反复阻塞 convener
+ok 10 - B11.1 RR6：已收口 fixed 回交（A1）被丢弃并继续投递后续 open fixed 回交（A2），不再反复阻塞 convener
+  ---
+  duration_ms: 139.5957
+  type: 'test'
+  ...
+# Subtest: B11.1 open fixed 回交照常投递：不产生 delivery.skip.fixed-child-closed 诊断
+ok 11 - B11.1 open fixed 回交照常投递：不产生 delivery.skip.fixed-child-closed 诊断
+  ---
+  duration_ms: 63.707
+  type: 'test'
+  ...
+# Subtest: B11.1 混合 batchItems：只丢已收口成员，open 成员照常投递（不整批阻塞/不误投）
+ok 12 - B11.1 混合 batchItems：只丢已收口成员，open 成员照常投递（不整批阻塞/不误投）
+  ---
+  duration_ms: 49.628
+  type: 'test'
+  ...
+# Subtest: B11.1 legacy 回交旧路径不变：closed legacy child 仍走旧解析（不被 fixed closed 分支丢弃）
+ok 13 - B11.1 legacy 回交旧路径不变：closed legacy child 仍走旧解析（不被 fixed closed 分支丢弃）
+  ---
+  duration_ms: 104.7847
+  type: 'test'
+  ...
+# Subtest: A12a/A12b accepted 收口：basis 一致 ⇒ 阶段完成/归档 + basis.verified 关键门节流（同 basis 只记一次）
+ok 14 - A12a/A12b accepted 收口：basis 一致 ⇒ 阶段完成/归档 + basis.verified 关键门节流（同 basis 只记一次）
+  ---
+  duration_ms: 211.1801
+  type: 'test'
+  ...
+# Subtest: A12a drift ⇒ 拒绝收口/完成（basis-drift + basis.drift 落账；不写 task.closed）；恢复后可收口；rework 收口不在本门范围
+ok 15 - A12a drift ⇒ 拒绝收口/完成（basis-drift + basis.drift 落账；不写 task.closed）；恢复后可收口；rework 收口不在本门范围
+  ---
+  duration_ms: 181.7493
+  type: 'test'
+  ...
+# Subtest: A12a/A12b 缺失 basis ⇒ basis-missing 拒绝收口/完成（不写 task.closed、不生成归档）
+ok 16 - A12a/A12b 缺失 basis ⇒ basis-missing 拒绝收口/完成（不写 task.closed、不生成归档）
+  ---
+  duration_ms: 37.6645
+  type: 'test'
+  ...
+# Subtest: A11 派发前 basis 复核：一致 ⇒ basis.verified 落账（关键门节流）；drift/缺失 ⇒ 拒绝派发、不建任务
+ok 17 - A11 派发前 basis 复核：一致 ⇒ basis.verified 落账（关键门节流）；drift/缺失 ⇒ 拒绝派发、不建任务
+  ---
+  duration_ms: 80.305
+  type: 'test'
+  ...
+# Subtest: B3 派发前 basis 复核：一致 ⇒ basis.verified 落账（stage 关键门）；drift ⇒ basis-drift 拒绝派发
+ok 18 - B3 派发前 basis 复核：一致 ⇒ basis.verified 落账（stage 关键门）；drift ⇒ basis-drift 拒绝派发
+  ---
+  duration_ms: 52.9219
+  type: 'test'
+  ...
+# Subtest: legacy 不变：legacy 会话不注入 fixed close（新门不触达 legacy），legacy close 照旧注入、不写 basis 账本
+ok 19 - legacy 不变：legacy 会话不注入 fixed close（新门不触达 legacy），legacy close 照旧注入、不写 basis 账本
+  ---
+  duration_ms: 6.0524
+  type: 'test'
+  ...
+# Subtest: A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/branch/basis）+ stage.completed A9；不弹客户卡
+ok 20 - A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/branch/basis）+ stage.completed A9；不弹客户卡
+  ---
+  duration_ms: 604.1223
+  type: 'test'
+  ...
+# Subtest: A9 失败面（AC-16）：dirty 工作区 ⇒ status blocked（baseline-repository-dirty）、stage.blocked A9、不弹卡、不写 basis
+ok 21 - A9 失败面（AC-16）：dirty 工作区 ⇒ status blocked（baseline-repository-dirty）、stage.blocked A9、不弹卡、不写 basis
+  ---
+  duration_ms: 377.7506
+  type: 'test'
+  ...
+# Subtest: A12：fixed close_created_task v2 accepted ⇒ 应用归档 docs/acceptance + stage.completed A12b/A12；幂等 replay
+ok 22 - A12：fixed close_created_task v2 accepted ⇒ 应用归档 docs/acceptance + stage.completed A12b/A12；幂等 replay
+  ---
+  duration_ms: 621.3642
+  type: 'test'
+  ...
+# Subtest: A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（不写 task.closed、无归档）
+ok 23 - A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（不写 task.closed、无归档）
+  ---
+  duration_ms: 84.6722
+  type: 'test'
+  ...
+# Subtest: 路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basis reason=path-b）；无仓库 b-repository-required 不 init
+ok 24 - 路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basis reason=path-b）；无仓库 b-repository-required 不 init
+  ---
+  duration_ms: 651.3481
+  type: 'test'
+  ...
+# Subtest: 路径 B B3 写集门：modulePaths ⊆ change.scope-decided.effectiveWritesets；越界/无写集 b-change-scope-invalid
+ok 25 - 路径 B B3 写集门：modulePaths ⊆ change.scope-decided.effectiveWritesets；越界/无写集 b-change-scope-invalid
+  ---
+  duration_ms: 402.2755
+  type: 'test'
+  ...
+# Subtest: 触发窗口纯函数：A12b/B3 触发、其余不触发；merge-main requestId 确定性（同一 workflow/tip 幂等）
+ok 26 - 触发窗口纯函数：A12b/B3 触发、其余不触发；merge-main requestId 确定性（同一 workflow/tip 幂等）
+  ---
+  duration_ms: 0.8246
+  type: 'test'
+  ...
+# Subtest: 意图卡去重：run-role 已 prepareIntent/marker ⇒ 桌面幂等（A3 requested 单次、marker 单次、finalize 双调 replay）
+ok 27 - 意图卡去重：run-role 已 prepareIntent/marker ⇒ 桌面幂等（A3 requested 单次、marker 单次、finalize 双调 replay）
+  ---
+  duration_ms: 113.5301
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡：resolved 原样落 source:"stage-a10" + workflowId/stage A10；A10 requested 单次（桌面不双写）
+ok 28 - fixed 任命卡：resolved 原样落 source:"stage-a10" + workflowId/stage A10；A10 requested 单次（桌面不双写）
+  ---
+  duration_ms: 190.3828
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ 自动呈 merge-main（客户卡/非判断）→ 客户本人 approve ⇒ 本地合并 + workflow.closed delivered；同 tip 不重复卡
+ok 29 - A12b accepted ⇒ 自动呈 merge-main（客户卡/非判断）→ 客户本人 approve ⇒ 本地合并 + workflow.closed delivered；同 tip 不重复卡
+  ---
+  duration_ms: 1343.2081
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ 客户拒绝：release.rejected by customer、不合并；同 workflow/tip 再触发不重复卡
+ok 30 - A12b accepted ⇒ 客户拒绝：release.rejected by customer、不合并；同 workflow/tip 再触发不重复卡
+  ---
+  duration_ms: 994.0508
+  type: 'test'
+  ...
+# Subtest: A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；judge approve 尝试不写终态、不合并
+ok 31 - A12b accepted ⇒ judge 转人工/拒绝 ⇒ release.rejected by judge；judge approve 尝试不写终态、不合并
+  ---
+  duration_ms: 1676.3483
+  type: 'test'
+  ...
+# Subtest: 前置缺失不呈卡：A12b accepted 但无 basis ⇒ basis-missing 拒绝收口/完成；归档缺失触发仍如实回运营/幕僚；rework 收口不触发
+ok 32 - 前置缺失不呈卡：A12b accepted 但无 basis ⇒ basis-missing 拒绝收口/完成；归档缺失触发仍如实回运营/幕僚；rework 收口不触发
+  ---
+  duration_ms: 1188.6236
+  type: 'test'
+  ...
+# Subtest: 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+ok 33 - 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+  ---
+  duration_ms: 1396.3527
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡不变：无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）
+ok 34 - legacy 任命卡不变：无 source/workflowId 戳、保留 legacy roster 戳（legacy D3 读取方不接受 fixed 来源）
+  ---
+  duration_ms: 48.2412
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A1 任务创建 ⇒ stage.dispatched A1 落账（完成于任务创建）且同任务幂等 replay
+ok 35 - G-B5-1：fixed 直派 A1 任务创建 ⇒ stage.dispatched A1 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 40.5696
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A4 任务创建 ⇒ stage.dispatched A4 落账（完成于任务创建）且同任务幂等 replay
+ok 36 - G-B5-1：fixed 直派 A4 任务创建 ⇒ stage.dispatched A4 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 31.9057
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A7 任务创建 ⇒ stage.dispatched A7 落账（完成于任务创建）且同任务幂等 replay
+ok 37 - G-B5-1：fixed 直派 A7 任务创建 ⇒ stage.dispatched A7 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 43.9802
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A8 激活任务创建 ⇒ stage.dispatched A8（A7 完成后下一阶段；在办供 role.activated）
+ok 38 - G-B5-1：A8 激活任务创建 ⇒ stage.dispatched A8（A7 完成后下一阶段；在办供 role.activated）
+  ---
+  duration_ms: 46.1112
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A12a 直派 ⇒ stage.dispatched A12a；A11 stage-request 不再被 AC-09 门拒绝（未记录时拒绝的对照）
+ok 39 - G-B5-1：A12a 直派 ⇒ stage.dispatched A12a；A11 stage-request 不再被 AC-09 门拒绝（未记录时拒绝的对照）
+  ---
+  duration_ms: 91.5811
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A12b 直派 ⇒ stage.dispatched A12b（A11 完成后窗口）
+ok 40 - G-B5-1：A12b 直派 ⇒ stage.dispatched A12b（A11 完成后窗口）
+  ---
+  duration_ms: 41.862
+  type: 'test'
+  ...
+# Subtest: G-B5-1：窗口外 review 直派不写账本也不阻断（B1 既有夹具语义）；服务失败 fail-closed（workflow-not-found / workflow-closed）
+ok 41 - G-B5-1：窗口外 review 直派不写账本也不阻断（B1 既有夹具语义）；服务失败 fail-closed（workflow-not-found / workflow-closed）
+  ---
+  duration_ms: 44.1602
+  type: 'test'
+  ...
+# Subtest: G-B5-1：stage 集合不含 A11/B1/B3（A11 由 requestStage 记录；B3 无 stage.dispatched 语义）
+ok 42 - G-B5-1：stage 集合不含 A11/B1/B3（A11 由 requestStage 记录；B3 无 stage.dispatched 语义）
+  ---
+  duration_ms: 0.7298
+  type: 'test'
+  ...
+# Subtest: G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方案依据 hash/requestTaskId）；accept ⇒ stage.completed A6
+ok 43 - G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方案依据 hash/requestTaskId）；accept ⇒ stage.completed A6
+  ---
+  duration_ms: 64.3462
+  type: 'test'
+  ...
+# Subtest: G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等
+ok 44 - G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等
+  ---
+  duration_ms: 71.5364
+  type: 'test'
+  ...
+# Subtest: G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）
+ok 45 - G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）
+  ---
+  duration_ms: 36.3796
+  type: 'test'
+  ...
+# Subtest: G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候选路径派生写集）；B3 生产派发通过写集门
+ok 46 - G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候选路径派生写集）；B3 生产派发通过写集门
+  ---
+  duration_ms: 363.6964
+  type: 'test'
+  ...
+# Subtest: G-B5-2：候选路径缺省时从 B1 生产任务 modulePaths 派生；B2 窗口/路径守卫
+ok 47 - G-B5-2：候选路径缺省时从 B1 生产任务 modulePaths 派生；B2 窗口/路径守卫
+  ---
+  duration_ms: 33.0639
+  type: 'test'
+  ...
+# Subtest: G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B3 请求不受理、无任务（fail-closed）
+ok 48 - G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B3 请求不受理、无任务（fail-closed）
+  ---
+  duration_ms: 34.9233
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：空项目 ⇒ fixed；显式 legacy/v1 / two-fixed-paths/v1 优先且不缓存
+ok 49 - sessionWorkflowModeForChat：空项目 ⇒ fixed；显式 legacy/v1 / two-fixed-paths/v1 优先且不缓存
+  ---
+  duration_ms: 18.4916
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：在飞 legacy run（draft/pinned）⇒ legacy；closed/cancelled ⇒ fixed
+ok 50 - sessionWorkflowModeForChat：在飞 legacy run（draft/pinned）⇒ legacy；closed/cancelled ⇒ fixed
+  ---
+  duration_ms: 13.7652
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：有效 trunk ⇒ legacy；trunk 引用已关闭 run / 非有效 trunk ⇒ fixed
+ok 51 - sessionWorkflowModeForChat：有效 trunk ⇒ legacy；trunk 引用已关闭 run / 非有效 trunk ⇒ fixed
+  ---
+  duration_ms: 28.0873
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：坏配置/读失败 ⇒ legacy（fail-closed，不猜 fixed）
+ok 52 - sessionWorkflowModeForChat：坏配置/读失败 ⇒ legacy（fail-closed，不猜 fixed）
+  ---
+  duration_ms: 22.1502
+  type: 'test'
+  ...
+# Subtest: trio 空项目幕僚聊天（无 taskId）⇒ workflowMode=fixed + fixed 工具面；legacy Git/VCA/stable 不注入
+ok 53 - trio 空项目幕僚聊天（无 taskId）⇒ workflowMode=fixed + fixed 工具面；legacy Git/VCA/stable 不注入
+  ---
+  duration_ms: 7.0464
+  type: 'test'
+  ...
+# Subtest: legacy 项目（在飞 run/有效 trunk/显式 legacy/v1）幕僚聊天 ⇒ 不传常量、legacy 注入逐项仍在
+ok 54 - legacy 项目（在飞 run/有效 trunk/显式 legacy/v1）幕僚聊天 ⇒ 不传常量、legacy 注入逐项仍在
+  ---
+  duration_ms: 13.8637
+  type: 'test'
+  ...
+# Subtest: single/su 聊天：不注入 workflowMode/workflowModeForFlow，注入仍为 legacy（旧行为逐字不变）
+ok 55 - single/su 聊天：不注入 workflowMode/workflowModeForFlow，注入仍为 legacy（旧行为逐字不变）
+  ---
+  duration_ms: 1.2394
+  type: 'test'
+  ...
+# Subtest: 空项目首个 stage-request：fixed 聊天 ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由；投递目标会话亦 fixed
+ok 56 - 空项目首个 stage-request：fixed 聊天 ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由；投递目标会话亦 fixed
+  ---
+  duration_ms: 25.5202
+  type: 'test'
+  ...
+# Subtest: legacy 在飞 run 不被首条 stage-request 覆盖：仍走 legacy（无 workflow.started、无 fixed 任务）
+ok 57 - legacy 在飞 run 不被首条 stage-request 覆盖：仍走 legacy（无 workflow.started、无 fixed 任务）
+  ---
+  duration_ms: 18.858
+  type: 'test'
+  ...
+# Subtest: fixed 聊天 stage-request 缺 workflowPath/stage/flowId/workflowAction/roleId ⇒ stage-request-invalid 且零写盘
+ok 58 - fixed 聊天 stage-request 缺 workflowPath/stage/flowId/workflowAction/roleId ⇒ stage-request-invalid 且零写盘
+  ---
+  duration_ms: 28.2896
+  type: 'test'
+  ...
+# Subtest: fixed 聊天完整 stage-request ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由（无 run 写盘）
+ok 59 - fixed 聊天完整 stage-request ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由（无 run 写盘）
+  ---
+  duration_ms: 47.7599
+  type: 'test'
+  ...
+# Subtest: fixed 聊天非 stage-request 且无 workflowId/stage ⇒ stage-request-required（不回落 legacy 星形）
+ok 60 - fixed 聊天非 stage-request 且无 workflowId/stage ⇒ stage-request-required（不回落 legacy 星形）
+  ---
+  duration_ms: 5.4127
+  type: 'test'
+  ...
+# Subtest: fixed 聊天带 workflowId/stage 的 verifier 直派 ⇒ routeFixed（任务带 workflowId/stage、无 runId）
+ok 61 - fixed 聊天带 workflowId/stage 的 verifier 直派 ⇒ routeFixed（任务带 workflowId/stage、无 runId）
+  ---
+  duration_ms: 27.6314
+  type: 'test'
+  ...
+# Subtest: legacy 项目普通派发仍 routeStar（不落入 fixed fail-closed）；fixed 聊天同样形状被 stage-request-required 拦截
+ok 62 - legacy 项目普通派发仍 routeStar（不落入 fixed fail-closed）；fixed 聊天同样形状被 stage-request-required 拦截
+  ---
+  duration_ms: 5.5476
+  type: 'test'
+  ...
+# Subtest: contract_check fixed 视图：无 legacy run/pin 误导、含 stage-request 固定字段与 fixed 稳定码
+ok 63 - contract_check fixed 视图：无 legacy run/pin 误导、含 stage-request 固定字段与 fixed 稳定码
+  ---
+  duration_ms: 3.0163
+  type: 'test'
+  ...
+# Subtest: contract_check legacy 视图逐字不变（显式 legacy 项目 / single），stage-request kind 不抛
+ok 64 - contract_check legacy 视图逐字不变（显式 legacy 项目 / single），stage-request kind 不抛
+  ---
+  duration_ms: 4.5778
+  type: 'test'
+  ...
+# Subtest: 混合项目（聊天 legacy / flow fixed）：fixed stage-request 派发自动打开 convener ⇒ 强制 fixed、无 legacy 工具、fixed 契约
+ok 65 - 混合项目（聊天 legacy / flow fixed）：fixed stage-request 派发自动打开 convener ⇒ 强制 fixed、无 legacy 工具、fixed 契约
+  ---
+  duration_ms: 64.5048
+  type: 'test'
+  ...
+# Subtest: 已存在 legacy convener 会话 ⇒ dispose + 以 fixed 重开；投递落在新 fixed 会话
+ok 66 - 已存在 legacy convener 会话 ⇒ dispose + 以 fixed 重开；投递落在新 fixed 会话
+  ---
+  duration_ms: 79.9368
+  type: 'test'
+  ...
+# Subtest: 已存在 legacy convener 会话 busy ⇒ fixed-session-rebind-blocked fail-closed：不关闭、不投递 legacy
+ok 67 - 已存在 legacy convener 会话 busy ⇒ fixed-session-rebind-blocked fail-closed：不关闭、不投递 legacy
+  ---
+  duration_ms: 41.1407
+  type: 'test'
+  ...
+# Subtest: 投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（B10.1：携带真实任务 taskId、无 legacy 工具）
+ok 68 - 投递机 drain 自动打开固定任务目标 ⇒ 同样强制 fixed（B10.1：携带真实任务 taskId、无 legacy 工具）
+  ---
+  duration_ms: 36.247
+  type: 'test'
+  ...
+# Subtest: legacy（非固定）任务投递自动打开目标 ⇒ 不传强制模式，目标仍 legacy 注入
+ok 69 - legacy（非固定）任务投递自动打开目标 ⇒ 不传强制模式，目标仍 legacy 注入
+  ---
+  duration_ms: 22.9223
+  type: 'test'
+  ...
+# Subtest: forced fixed 打开触发 O-1 边界陈旧重建 ⇒ 重建后的会话仍 fixed（强制模式透传内部重开）
+ok 70 - forced fixed 打开触发 O-1 边界陈旧重建 ⇒ 重建后的会话仍 fixed（强制模式透传内部重开）
+  ---
+  duration_ms: 20.7597
+  type: 'test'
+  ...
+# Subtest: B8.2 自动绑定：convener 缺 workflowId/stage ⇒ 从真实受派 stage-request 任务绑定并创建 fixed 任务（不写 trunk/run）
+ok 71 - B8.2 自动绑定：convener 缺 workflowId/stage ⇒ 从真实受派 stage-request 任务绑定并创建 fixed 任务（不写 trunk/run）
+  ---
+  duration_ms: 45.3932
+  type: 'test'
+  ...
+# Subtest: B8.2 自动绑定：convener 连 flowId 都不报 ⇒ workflowId/stage/flowId 全部由受派任务绑定
+ok 72 - B8.2 自动绑定：convener 连 flowId 都不报 ⇒ workflowId/stage/flowId 全部由受派任务绑定
+  ---
+  duration_ms: 31.8868
+  type: 'test'
+  ...
+# Subtest: B8.2 真实投递链：stage-request 投递后运营 origin 绑定真实任务，生产派发据其自动绑定 workflowId
+ok 73 - B8.2 真实投递链：stage-request 投递后运营 origin 绑定真实任务，生产派发据其自动绑定 workflowId
+  ---
+  duration_ms: 44.0848
+  type: 'test'
+  ...
+# Subtest: B8.2 绑定失败：无受派任务/伪造 taskId/legacy 受派任务/受派任务 workflow 不在账本 ⇒ workflow-binding-unavailable（零写盘、不回落 legacy）
+ok 74 - B8.2 绑定失败：无受派任务/伪造 taskId/legacy 受派任务/受派任务 workflow 不在账本 ⇒ workflow-binding-unavailable（零写盘、不回落 legacy）
+  ---
+  duration_ms: 24.8867
+  type: 'test'
+  ...
+# Subtest: B8.2 自报不一致：显式 workflowId 与父任务不一致 ⇒ stage-request-invalid（不采信模型自报）
+ok 75 - B8.2 自报不一致：显式 workflowId 与父任务不一致 ⇒ stage-request-invalid（不采信模型自报）
+  ---
+  duration_ms: 22.3664
+  type: 'test'
+  ...
+# Subtest: B8.2 自报 flowId 不可信：绑定路径以受派任务账本 flowId 为准（不因自报不同拒绝合法派发）
+ok 76 - B8.2 自报 flowId 不可信：绑定路径以受派任务账本 flowId 为准（不因自报不同拒绝合法派发）
+  ---
+  duration_ms: 21.7572
+  type: 'test'
+  ...
+# Subtest: B8.2 回归钉：幕僚 fixed 聊天缺字段负例仍 fail-closed（stage-request 缺 workflowPath / 普通派发缺 workflowId+stage）
+ok 77 - B8.2 回归钉：幕僚 fixed 聊天缺字段负例仍 fail-closed（stage-request 缺 workflowPath / 普通派发缺 workflowId+stage）
+  ---
+  duration_ms: 18.3817
+  type: 'test'
+  ...
+# Subtest: B8.2 fixed 回交：worker→convener 不经 legacy resolve，成功投递（含 convener 忙时续投）；不出现 delivery-child-source-invalid
+ok 78 - B8.2 fixed 回交：worker→convener 不经 legacy resolve，成功投递（含 convener 忙时续投）；不出现 delivery-child-source-invalid
+  ---
+  duration_ms: 233.3078
+  type: 'test'
+  ...
+# Subtest: B8.2 fixed 回交自动打开 convener 会话：forced fixed（不按项目聊天解析/不落 legacy 注入）
+ok 79 - B8.2 fixed 回交自动打开 convener 会话：forced fixed（不按项目聊天解析/不落 legacy 注入）
+  ---
+  duration_ms: 61.8992
+  type: 'test'
+  ...
+# Subtest: B8.2 legacy 回交旧路径不变：legacy 子任务（无 workflowId、无 parentTaskRef）仍按旧解析拒绝 delivery-child-source-invalid
+ok 80 - B8.2 legacy 回交旧路径不变：legacy 子任务（无 workflowId、无 parentTaskRef）仍按旧解析拒绝 delivery-child-source-invalid
+  ---
+  duration_ms: 47.2495
+  type: 'test'
+  ...
+# Subtest: B8.2 fixed 回交安全校验失败：角色不匹配 / workflow 已关闭 ⇒ fail-closed 诊断、不误投
+ok 81 - B8.2 fixed 回交安全校验失败：角色不匹配 / workflow 已关闭 ⇒ fail-closed 诊断、不误投
+  ---
+  duration_ms: 110.6691
+  type: 'test'
+  ...
+1..81
+# tests 81
+# suites 0
+# pass 81
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 18350.9083

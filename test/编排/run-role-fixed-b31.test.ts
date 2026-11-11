@@ -186,12 +186,16 @@ function cleanup(root: string): void {
 function stubAdapter(): {
   createAdapter: (gate: WriteGate, capabilities?: AdapterCapabilities) => RuntimeAdapter;
   caps: () => AdapterCapabilities | undefined;
+  gate: () => WriteGate | undefined;
 } {
   let captured: AdapterCapabilities | undefined;
+  let capturedGate: WriteGate | undefined;
   return {
     caps: () => captured,
-    createAdapter: (_gate, capabilities) => {
+    gate: () => capturedGate,
+    createAdapter: (gate, capabilities) => {
       captured = capabilities;
+      capturedGate = gate;
       return {
         async composeContext() {
           return { systemPrompt: "" };
@@ -218,8 +222,9 @@ async function withSession<T>(
     project: ProjectConfig;
     customerInput: CustomerInputFn;
     workflowModeForFlow?: (flowId: string) => "fixed" | "legacy";
+    taskId?: string;
   },
-  fn: (caps: AdapterCapabilities) => Promise<T>,
+  fn: (caps: AdapterCapabilities, gate: WriteGate | undefined) => Promise<T>,
 ): Promise<T> {
   const stub = stubAdapter();
   const handle = await openRoleSession(
@@ -228,13 +233,14 @@ async function withSession<T>(
       project: options.project,
       customerInput: options.customerInput,
       ...(options.workflowModeForFlow !== undefined ? { workflowModeForFlow: options.workflowModeForFlow } : {}),
+      ...(options.taskId !== undefined ? { taskId: options.taskId } : {}),
     },
     { createAdapter: stub.createAdapter },
   );
   try {
     assert.ok(stub.caps() !== undefined, "适配器必须收到能力对象");
     assert.ok(stub.caps()!.customerInput !== undefined, "确认制会话必须注入 customerInput 包装器");
-    return await fn(stub.caps()!);
+    return await fn(stub.caps()!, stub.gate());
   } finally {
     await handle.dispose();
   }
@@ -786,6 +792,55 @@ test("fixed A10 未到窗口：A9 未完成时任命卡 fail-closed（stage-tran
     );
     const ledger = await readWorkflowLedger(root);
     assert.equal(ledger.events.filter((event) => event.workflowId === workflowId && event.kind === "stage.requested" && event.stage === "A10").length, 0);
+  } finally {
+    cleanup(root);
+  }
+});
+
+// ————————————————— ③ B16：fixed A8 角色草稿写权（RR11 失败修复） —————————————————
+
+test("B16 fixed A8：nominator 角色草稿写权来自 fixed roster；未知角色/非 A8/legacy 无 D3 仍拒", async () => {
+  const { root, project } = fixedProject();
+  try {
+    const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
+    await seedWorkflowThrough(root, workflowId, ["A1", "A2", "A3", "A4", "A5", "A6", "A7"]);
+    assert.equal((await appendWorkflowEvent(root, requestedEvent(workflowId, "A8"))).ok, true);
+    const created = taskEvent("task.created", {
+      taskId: "t-b16-a8", from: "convener", to: "nominator", text: "A8 建卡/激活",
+      sideEffect: "docs", idempotencyKey: "work:b16:a8", flowId: FLOW, workflowId, stage: "A8",
+    });
+    assert.equal((await appendTaskEvent(root, created)).ok, true);
+    const raw: CustomerInputFn = async () => ({ outcome: "declined", reason: "no-card" });
+    await withSession(
+      { roleId: "nominator", project, customerInput: raw, workflowModeForFlow: (flowId) => (flowId === FLOW ? "fixed" : "legacy"), taskId: "t-b16-a8" },
+      async (_caps, gate) => {
+        assert.ok(gate !== undefined);
+        // fixed roster roles implementer/qa ⇒ 三文件写权；未知角色/其它写区仍拒。
+        for (const rel of [
+          "角色卡/implementer/role-card.md",
+          "角色卡/implementer/boundary.md",
+          "角色卡/qa/boundary.yaml",
+        ]) {
+          const decision = gate!(rel);
+          assert.equal(decision.allowed, true, decision.allowed === false ? decision.reason : "");
+        }
+        const unknownRole = gate!("角色卡/evil/role-card.md");
+        assert.equal(unknownRole.allowed, false, "非 roster 角色不得获得角色草稿写权");
+        assert.match(unknownRole.allowed === false ? unknownRole.reason : "", /Role drafts require/u);
+        const otherWrite = gate!("docs/product/x.md");
+        assert.equal(otherWrite.allowed, false, "角色卡之外写区不因 B16 放开");
+      },
+    );
+    // legacy/无 fixed A8 任务：仍走 trunk prepareRoleDraftScope（无 D3 ⇒ 空集 fail-closed）。
+    await withSession(
+      { roleId: "nominator", project, customerInput: raw, workflowModeForFlow: (flowId) => (flowId === FLOW ? "fixed" : "legacy") },
+      async (_caps, gate) => {
+        assert.ok(gate !== undefined);
+        const denied = gate!("角色卡/implementer/role-card.md");
+        assert.equal(denied.allowed, false, "legacy（无 fixed A8 任务）不得授予角色草稿写权");
+        assert.match(denied.allowed === false ? denied.reason : "", /Role drafts require/u);
+      },
+    );
   } finally {
     cleanup(root);
   }

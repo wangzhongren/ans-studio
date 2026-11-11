@@ -1,0 +1,6 @@
+suite=1
+# tests 1362
+# pass 1336
+# fail 24
+# skipped 2
+diff=0
