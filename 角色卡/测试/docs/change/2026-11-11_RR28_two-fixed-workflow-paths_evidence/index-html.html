@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>贪吃蛇</title>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="hud">
+      <h1 class="hud__title">贪吃蛇</h1>
+      <div class="hud__score">分数：<span id="score">0</span></div>
+    </header>
+
+    <div class="game-stage">
+      <canvas id="game" width="400" height="400" aria-label="贪吃蛇游戏画布"></canvas>
+      <div id="overlay" class="overlay" hidden>
+        <p class="overlay__title">游戏结束</p>
+        <p class="overlay__score">最终分数：<span id="final-score">0</span></p>
+        <button id="restart" type="button">重新开始</button>
+      </div>
+    </div>
+
+    <p id="status" class="status">就绪</p>
+    <p class="help">方向键 / WASD 控制移动；游戏结束后按 Space 或 Enter 重新开始。</p>
+  </main>
+
+  <script src="src/game.js"></script>
+</body>
+</html>
