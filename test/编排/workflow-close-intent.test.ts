@@ -174,7 +174,7 @@ test("A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11
   }
 });
 
-test("prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk", async () => {
+test("prepareIntent/finalizeIntent：B24 入口门、documentRefs（含 version）一次写入、幂等 replay、不写 doc-freeze/trunk", async () => {
   const root = await tempRoot();
   try {
     const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
@@ -185,7 +185,11 @@ test("prepareIntent/finalizeIntent：documentRefs（含 version）一次写入�
     const intentText = "---\nschema: project-intent/v1\nflowId: snake\nversion: 1\nintentId: snake-intent\ngoal: 贪吃蛇\n---\n# Intent\n";
     await writeFile(root, "docs/product/snake-intent-v1.md", intentText);
 
-    // 缺 docs/intents 入口 ⇒ prepare 仍可用（只做证据），finalize 报 intent-entry-missing。
+    // B24.1（RR20 失败修复）：缺 docs/intents 入口 ⇒ prepare 即 fail-closed（不呈卡、不写 stage.requested A3）。
+    const refused = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
+    assert.equal(refused.ok, false);
+    if (!refused.ok) assert.equal(refused.code, "intent-entry-missing");
+    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: snake-intent\n---\n# Entry\n");
     const prepared = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
     assert.equal(prepared.ok, true, prepared.ok === false ? prepared.code : "");
     if (!prepared.ok) return;
@@ -202,11 +206,6 @@ test("prepareIntent/finalizeIntent：documentRefs（含 version）一次写入�
       cardKind: "intent-confirm", choice: "confirm", by: "customer", decisionId: "dec-intent-1",
       documentRefs: [{ kind: "intent", path: "docs/product/snake-intent-v1.md", sha256: sha(intentText) }],
     };
-    const missingEntry = await finalizeIntent({ projectRoot: root, event: decision, workflowId, flowId: FLOW, now: NOW });
-    assert.equal(missingEntry.ok, false);
-    if (!missingEntry.ok) assert.equal(missingEntry.code, "intent-entry-missing");
-
-    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: snake-intent\n---\n# Entry\n");
     const finalized = await finalizeIntent({ projectRoot: root, event: decision, workflowId, flowId: FLOW, now: NOW });
     assert.equal(finalized.ok, true, finalized.ok === false ? finalized.code : "");
     const replay = await finalizeIntent({ projectRoot: root, event: decision, workflowId, flowId: FLOW, now: NOW });

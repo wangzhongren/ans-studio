@@ -1608,6 +1608,17 @@ export async function prepareIntent(input: { projectRoot: string; flowId: string
         `A3 意图卡不可呈：当前 ${view.stage}(${view.stages[view.stage].status})；要求 A2 completed。`,
       );
     }
+    // B24（2026-11-11，RR20 失败修复）：呈卡前校验意图入口——`docs/intents/<intentId>.md` 必须存在且
+    // intentId 与产品意图一致；否则 fail-closed，不写 stage.requested A3、不呈卡（chief 写后重试，幂等）。
+    // RR20：入口在客户 confirm 之后才落盘，finalize 报 intent-entry-missing 且无恢复路径 ⇒ A3 死锁。
+    const entryFacts = await readIntentEntryFacts({ projectRoot: input.projectRoot, flowId, productIntentPath: rel });
+    if (intentId === undefined || entryFacts.intentEntryExists !== true || entryFacts.intentEntryIntentId !== intentId) {
+      return serviceFailure(
+        "intent-entry-missing",
+        `意图入口缺失或 intentId 不一致：docs/intents/${intentId ?? "<intentId>"}.md（chief 写后重试；幂等）。`,
+        ["docs/intents/<intentId>.md"],
+      );
+    }
     const now = input.now ?? (() => new Date());
     const requestEvent: WorkflowEvent = {
       v: 1,

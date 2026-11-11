@@ -429,31 +429,82 @@ test("fixed A3 幂等：首次发卡一次（1 张 request.created、A3 complete
   }
 });
 
-test("fixed A3 幂等：同意图已 confirm 裁决但 A3 未完成（finalize pending-recovery）⇒ notPresented already-resolved，不补发卡", async () => {
+test("B24.1 fixed A3 入口门：docs/intents 缺失 ⇒ prepare 即 notPresented intent-entry-missing（不调 raw、不写 request.created/A3）", async () => {
   const { root, project } = fixedProject({ intentEntry: false });
   try {
     const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
     await seedWorkflowThrough(root, workflowId, ["A1", "A2"]);
     const roundTrip = browserRoundTrip(root, { requestId: "req-b121-resolved", workflowId, intentSha256: INTENT_SHA });
     await withSession({ roleId: "chief", project, customerInput: roundTrip.raw, workflowModeForFlow: fixedModeFor }, async (caps) => {
+      // RR20：入口晚于卡落盘 ⇒ finalize pending-recovery 死锁；B24.1 起呈卡前即 fail-closed。
+      const first = await caps.customerInput!(intentCard(), { flowId: FLOW });
+      assert.equal(first?.outcome, "declined");
+      assert.equal(first?.outcome === "declined" ? first.notPresented : undefined, true);
+      assert.match(first?.outcome === "declined" ? first.reason ?? "" : "", /意图入口缺失/u);
+      assert.match(first?.outcome === "declined" ? first.reason ?? "" : "", /写后重试/u);
+      assert.equal(roundTrip.calls(), 0, "缺入口不得呈卡（不调 raw）");
+      // 仍缺入口：再次请求同样 fail-closed，不产生任何卡/裁决事件。
+      const second = await caps.customerInput!(intentCard(), { flowId: FLOW });
+      assert.equal(second?.outcome, "declined");
+      assert.match(second?.outcome === "declined" ? second.reason ?? "" : "", /意图入口缺失/u);
+    });
+    assert.equal(await countIntentCreated(root), 0, "request.created 不得产生");
+    assert.equal(await hasA3Completed(root), false, "不得伪造 A3 完成");
+    const state = await readTaskState(root);
+    assert.equal(state.events.some((event) => event.kind === "request.resolved"), false, "客户未作答");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("B24.2 fixed A3 恢复：已 confirm 裁决 + 入口后补 ⇒ 重试幂等补记 stage.completed A3，不重复发卡/不重复事件", async () => {
+  const { root, project } = fixedProject();
+  try {
+    const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
+    await seedWorkflowThrough(root, workflowId, ["A1", "A2"]);
+    const roundTrip = browserRoundTrip(root, { requestId: "req-b24-recover", workflowId, intentSha256: INTENT_SHA });
+    const entryPath = path.join(root, "docs", "intents", "focus-intent.md");
+    let removed = false;
+    const raw: CustomerInputFn = async (request, metadata) => {
+      // 复现 RR20 竞态：卡已呈、客户决议前入口尚未落盘（这里以删除模拟"决议时入口缺失"）。
+      if (!removed && request.kind === "choice") {
+        removed = true;
+        await fs.promises.rm(entryPath, { force: true });
+      }
+      return roundTrip.raw(request, metadata);
+    };
+    await withSession({ roleId: "chief", project, customerInput: raw, workflowModeForFlow: fixedModeFor }, async (caps) => {
       const first = await caps.customerInput!(intentCard(), { flowId: FLOW });
       assert.equal(first?.outcome, "answered");
       const confirmation = first?.outcome === "answered" ? first.intentConfirmation : undefined;
-      assert.equal(confirmation?.status, "pending-recovery", "docs/intents 缺失 ⇒ finalize pending-recovery");
+      assert.equal(confirmation?.status, "pending-recovery", "决议时入口缺失 ⇒ finalize pending-recovery");
       assert.equal(confirmation?.code, "intent-entry-missing");
-      // A3 未完成，但同意图已 confirm 裁决：仍不发第二张卡（RR6 重复卡的根因场景）。
+      assert.equal(await hasA3Completed(root), false);
+
+      // chief 写后重试：补写入口后再次请求同一意图卡 ⇒ 应用幂等重跑 finalize 并恢复 A3。
+      await fs.promises.writeFile(entryPath, "---\nintentId: focus-intent\n---\n# 意图入口\n", "utf8");
       const second = await caps.customerInput!(intentCard(), { flowId: FLOW });
       assert.equal(second?.outcome, "declined");
       assert.equal(second?.outcome === "declined" ? second.notPresented : undefined, true);
-      assert.match(
-        second?.outcome === "declined" ? second.reason ?? "" : "",
-        /intent-confirm-already-resolved/,
-        "同意图已裁决 ⇒ 稳定 notPresented 文案",
-      );
+      const reason = second?.outcome === "declined" ? second.reason ?? "" : "";
+      assert.match(reason, /intent-confirm-already-resolved/);
+      assert.match(reason, /A3 已完成恢复/u);
       assert.equal(roundTrip.calls(), 1, "已裁决后不得再调 raw");
+
+      // 恢复后再请求：A3 已完成 ⇒ 稳定 already-completed，不重复发卡。
+      const third = await caps.customerInput!(intentCard(), { flowId: FLOW });
+      assert.equal(third?.outcome, "declined");
+      assert.match(third?.outcome === "declined" ? third.reason ?? "" : "", /intent-confirm-already-completed/);
+      assert.equal(roundTrip.calls(), 1);
     });
     assert.equal(await countIntentCreated(root), 1, "request.created 不增");
-    assert.equal(await hasA3Completed(root), false, "本场景 A3 仍未完成（不得伪造完成）");
+    assert.equal(await hasA3Completed(root), true, "B24.2 恢复补记 stage.completed A3");
+    const ledger = await readWorkflowLedger(root);
+    assert.equal(
+      ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A3").length,
+      1,
+      "幂等：stage.completed A3 恰好一次（不重复事件）",
+    );
   } finally {
     cleanup(root);
   }

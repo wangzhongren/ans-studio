@@ -391,49 +391,34 @@ test("fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.comp
   }
 });
 
-test("fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）", async () => {
+test("fixed A3：docs/intents 入口缺失 ⇒ prepare 阶段 fail-closed（不呈卡、不写 request/stage、不静默通过）", async () => {
   const { root, project } = fixedProject({ intentEntry: false });
   try {
     const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
     await seedWorkflowThrough(root, workflowId, ["A1", "A2"]);
-    const requestId = "req-intent-b31-missing";
     let rawCalls = 0;
-    const raw: CustomerInputFn = async (request) => {
+    const raw: CustomerInputFn = async () => {
       rawCalls += 1;
-      assert.equal(request.kind, "choice");
-      const created = taskEvent("request.created", {
-        requestId,
-        flowId: FLOW,
-        cardKind: "intent-confirm",
-        sourceRoleId: "chief",
-        title: request.title,
-        options: request.kind === "choice" ? request.options.map((option) => ({ id: option.id, label: option.label })) : [],
-      });
-      assert.equal((await appendTaskEvent(root, created)).ok, true);
-      const resolved = taskEvent("request.resolved", {
-        requestId,
-        cardKind: "intent-confirm",
-        decisionId: `decision-${requestId}`,
-        selectedOptionIds: ["confirm"],
-        documentRefs: [{ kind: "intent", path: "docs/product/focus-intent-v1.md", sha256: sha(INTENT_TEXT), version: 1 }],
-        by: "customer",
-        choice: "confirm",
-      });
-      assert.equal((await appendTaskEvent(root, resolved)).ok, true);
-      return { outcome: "answered", value: { selected: ["confirm"] }, decisionId: `decision-${requestId}` } satisfies CustomerInputOutcome;
+      return { outcome: "declined", reason: "stub-channel-declined" } satisfies CustomerInputOutcome;
     };
     await withSession(
       { roleId: "chief", project, customerInput: raw, workflowModeForFlow: (flowId) => (flowId === FLOW ? "fixed" : "legacy") },
       async (caps) => {
         const outcome = await caps.customerInput!(intentCard(), { flowId: FLOW });
-        assert.equal(rawCalls, 1);
-        assert.equal(outcome?.outcome, "answered");
-        const confirmation = outcome?.outcome === "answered" ? outcome.intentConfirmation : undefined;
-        assert.equal(confirmation?.status, "pending-recovery", "finalize 失败 ⇒ pending-recovery");
-        assert.equal(confirmation?.code, "intent-entry-missing");
+        // B24.1（RR20 修复）：入口未落盘时不得先呈卡（否则客户 confirm 后 finalize pending-recovery 死锁）。
+        assert.equal(rawCalls, 0, "入口缺失 ⇒ 不呈卡/不调 raw");
+        assert.equal(outcome?.outcome, "declined");
+        assert.equal(outcome?.outcome === "declined" ? outcome.notPresented : undefined, true);
+        assert.match(outcome?.outcome === "declined" ? outcome.reason ?? "" : "", /意图入口缺失/u);
+        assert.match(outcome?.outcome === "declined" ? outcome.reason ?? "" : "", /写后重试/u);
       },
     );
     const ledger = await readWorkflowLedger(root);
+    assert.equal(
+      ledger.events.some((event) => event.kind === "stage.requested" && event.stage === "A3"),
+      false,
+      "intent entry 缺失时不得写 stage.requested A3",
+    );
     assert.equal(
       ledger.events.some((event) => event.kind === "stage.completed" && event.stage === "A3"),
       false,

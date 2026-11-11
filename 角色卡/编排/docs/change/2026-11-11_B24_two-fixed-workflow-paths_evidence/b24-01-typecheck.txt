@@ -1,0 +1,5 @@
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+typecheck-exit:0

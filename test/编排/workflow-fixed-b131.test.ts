@@ -152,6 +152,8 @@ test("prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（�
       requested(workflowId, "A2"), completed(workflowId, "A2"),
     ]);
     await writeFile(root, "docs/product/snake-intent-v1.md", INTENT_TEXT);
+    // B24.1：呈卡前要求意图入口存在且 intentId 一致（RR20：入口晚写导致 finalize 死锁）。
+    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: snake-intent\n---\n# Entry\n");
     const first = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
     assert.equal(first.ok, true, first.ok === false ? first.code : "");
     let ledger = await readWorkflowLedger(root);
@@ -167,6 +169,41 @@ test("prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（�
       1,
       "A3 在办时不得重复写 stage.requested",
     );
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test("B24.1 prepareIntent：A2 completed 但意图入口缺失/intentId 不一致 ⇒ intent-entry-missing，不写 stage.requested A3（RR20 回归）", async () => {
+  const root = await tempRoot();
+  try {
+    const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
+    await appendEvents(root, workflowId, [
+      ...seedEvent(workflowId), requested(workflowId, "A1"), completed(workflowId, "A1"),
+      requested(workflowId, "A2"), completed(workflowId, "A2"),
+    ]);
+    await writeFile(root, "docs/product/snake-intent-v1.md", INTENT_TEXT);
+    // RR20：入口在客户 confirm 后才落盘 ⇒ finalize pending-recovery 且无恢复；B24.1 在呈卡前 fail-closed。
+    const missing = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
+    assert.equal(missing.ok, false);
+    if (!missing.ok) {
+      assert.equal(missing.code, "intent-entry-missing");
+      assert.match(missing.message, /docs\/intents\/snake-intent\.md/u);
+      assert.match(missing.message, /写后重试/u);
+    }
+    let ledger = await readWorkflowLedger(root);
+    assert.equal(ledger.events.some((event) => event.kind === "stage.requested" && event.stage === "A3"), false, "不得写 stage.requested A3");
+    // intentId 不一致同样 fail-closed（不猜路径、不发卡）。
+    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: other-intent\n---\n# Entry\n");
+    const mismatched = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
+    assert.equal(mismatched.ok, false);
+    if (!mismatched.ok) assert.equal(mismatched.code, "intent-entry-missing");
+    // 补写正确入口 ⇒ 幂等补记一次 A3（chief 写后重试）。
+    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: snake-intent\n---\n# Entry\n");
+    const prepared = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
+    assert.equal(prepared.ok, true, prepared.ok === false ? prepared.message : "");
+    ledger = await readWorkflowLedger(root);
+    assert.equal(ledger.events.filter((event) => event.kind === "stage.requested" && event.stage === "A3").length, 1);
   } finally {
     await cleanup(root);
   }
@@ -196,6 +233,7 @@ test("prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view
       ...seedEvent(workflowId), requested(workflowId, "A1"), completed(workflowId, "A1"), requested(workflowId, "A2"),
     ]);
     await writeFile(root, "docs/product/snake-intent-v1.md", INTENT_TEXT);
+    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: snake-intent\n---\n# Entry\n");
     const blocked: WorkflowEvent = {
       ...BASE, kind: "stage.blocked", workflowId, flowId: FLOW,
       idempotencyKey: `stage-block:${workflowId}:A2:1:task-report-blocked`, stage: "A2",
@@ -267,8 +305,9 @@ test("closeTask：A2 accepted + 证据即完成（不等待 open 兄弟）；原
     const after = await viewOf(root, workflowId);
     assert.notEqual(after.blocked?.code, "workflow-corrupt");
     assert.equal(after.stages.A2.status, "completed");
-    // A3 卡路径可正常补记 stage.requested A3（B13.1 门）。
+    // A3 卡路径可正常补记 stage.requested A3（B13.1 门；B24.1 起须先有意图入口）。
     await writeFile(root, "docs/product/snake-intent-v1.md", INTENT_TEXT);
+    await writeFile(root, "docs/intents/snake-intent.md", "---\nintentId: snake-intent\n---\n# Entry\n");
     const prepared = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
     assert.equal(prepared.ok, true, prepared.ok === false ? prepared.message : "");
   } finally {

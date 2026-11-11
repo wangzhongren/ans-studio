@@ -1122,7 +1122,7 @@ async function fixedIntentCardDuplicateReason(
   projectRoot: string,
   flowId: string,
   currentIntentSha256?: string,
-): Promise<{ code: string; reason: string } | undefined> {
+): Promise<{ code: string; reason: string; resolvedEvent?: RequestResolvedEvent } | undefined> {
   // 当前活动 fixed workflow（该 flow 最新 workflow.started 且未 closed）。
   let activeWorkflowId: string | undefined;
   let workflowEvents: WorkflowEvent[] = [];
@@ -1187,6 +1187,8 @@ async function fixedIntentCardDuplicateReason(
       return {
         code: "intent-confirm-already-resolved",
         reason: `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${String(confirmed.requestId)}）；A3 完成待恢复，不重复发卡。`,
+        // B24.2（RR20 失败修复）：把已持久化的 confirm 裁决事件交给调用方幂等重跑 finalize。
+        resolvedEvent: confirmed as unknown as RequestResolvedEvent,
       };
     }
   }
@@ -2261,8 +2263,27 @@ export async function openRoleSession(
               // 多待决 fail-closed；不同意图版本或 orphaned 终态允许新卡。只读账本，不写 request/stage。
               const duplicate = await fixedIntentCardDuplicateReason(input.project.projectRoot, flowId, prepared.sha256);
               if (duplicate !== undefined) {
+                // B24.2（2026-11-11，RR20 失败修复）：同意图已 confirm 裁决但 A3 未完成时，chief 的
+                // 「写后重试」在这里幂等重跑 finalizeIntent——入口已补写则补记 stage.completed A3，
+                // 幕僚可继续 A4；仍缺入口则维持 fail-closed（不伪造完成、不重复发卡）。
+                let reason = duplicate.reason;
+                if (duplicate.code === "intent-confirm-already-resolved" && duplicate.resolvedEvent !== undefined) {
+                  const recovered = await workflowFinalizeIntent({ projectRoot: input.project.projectRoot, event: duplicate.resolvedEvent });
+                  if (recovered.ok) {
+                    reason = `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${recovered.requestId}）；A3 已完成恢复（stage.completed A3，replay=${recovered.replay}）；可继续 A4。`;
+                    log.record("intent.confirmation.fixed-finalize-recovered", { requestId: recovered.requestId, replay: recovered.replay, phase: "recovered" });
+                  } else {
+                    log.record("intent.confirmation.fixed-finalize-pending", {
+                      requestId: String(duplicate.resolvedEvent.requestId),
+                      phase: "pending-recovery",
+                      errorCode: recovered.code,
+                      errorMessage: recovered.message,
+                    });
+                    reason = `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${String(duplicate.resolvedEvent.requestId)}）；A3 恢复仍失败（${recovered.code}: ${recovered.message ?? ""}），不重复发卡。`;
+                  }
+                }
                 log.record("governance.card.rejected", { state: "not-presented", reasonCode: duplicate.code, ok: false });
-                return { outcome: "declined", notPresented: true, reason: duplicate.reason };
+                return { outcome: "declined", notPresented: true, reason };
               }
               fixedIntentConfirmation = prepared;
               effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.marker}`,
