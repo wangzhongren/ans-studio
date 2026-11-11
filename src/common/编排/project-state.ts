@@ -1140,7 +1140,8 @@ export function renderProjectStateSummary(
   if (view.versions.length === 0) push(`- ${text.none}`);
   for (const version of view.versions.slice(0, 20)) {
     if (!push(`- ${text.flow}=${version.flowId} kind=${version.docKind} latest=${version.latest?.version ?? text.none} ` +
-      `path=${version.latest?.path ?? text.none} pinned=${version.pinned?.version ?? version.pinned?.path ?? text.none} ` +
+      `path=${version.latest?.path ?? text.none} sha256=${version.latest?.sha256 ?? text.none} ` +
+      `pinned=${version.pinned?.version ?? version.pinned?.path ?? text.none} ` +
       `newerThanPinned=${version.newerThanPinned}${version.referenceIssue !== undefined ? ` referenceIssue=${shortenSummary(version.referenceIssue, 120)}` : ""}`)) break;
   }
 

@@ -1,0 +1,7 @@
+e45c706 docs(test): RR19 stops at A9 on convener shell hash gate
+ M src/common/roles/convener/index.ts
+ M src/common/编排/doc-format-specs.ts
+ M src/common/编排/project-state.ts
+ M test/roles/convener/convener-fixed.test.ts
+ M test/编排/doc-format-specs.test.ts
+ M test/编排/project-state.test.ts

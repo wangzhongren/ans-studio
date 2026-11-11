@@ -837,9 +837,9 @@ export const DOC_FORMAT_SPECS: readonly DocFormatSpec[] = Object.freeze([
     commonErrors: [
       err("plan-structure-invalid", "结构/属主/写集/依赖非法", "按样例并对照 roster"),
       err("plan-path-invalid", "路径非法", "项目相对、版本与文件名一致"),
-      err("plan-base-conflict", "modules/roster 引用不等于基线", "使用当前权威路径与哈希"),
+      err("plan-base-conflict", "modules/roster 引用不等于基线", "哈希取应用 project_state [versions]（sha256=）或 .ans/state/versions.jsonl，不得用 shell 计算/核验"),
       err("plan-owner-invalid", "writeset 超出属主模块根", "写集限定在属主模块根内"),
-      err("plan-hash-drift", "哈希漂移", "重新读取权威文件哈希"),
+      err("plan-hash-drift", "哈希漂移", "按应用记录读取权威哈希（project_state [versions] / .ans/state/versions.jsonl），不得用 shell 计算"),
       err("plan-identity-invalid", "flowId/version 不一致", "与上下文一致"),
     ],
     example: A8_EXAMPLE,

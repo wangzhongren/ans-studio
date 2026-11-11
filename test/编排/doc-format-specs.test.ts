@@ -1693,3 +1693,18 @@ test("TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理�
   assert.ok(NEGATIVE_CODES.has("role-card-section-missing"));
   assert.ok(NEGATIVE_CODES.has("boundary-md-yaml-mismatch"));
 });
+
+test("B23 team-plan/v3 指引：权威哈希取应用记录（project_state [versions]/versions.jsonl），不得用 shell 计算", () => {
+  const spec = specOf("team-plan/v3");
+  for (const code of ["plan-base-conflict", "plan-hash-drift"]) {
+    const item = spec.commonErrors.find((entry) => entry.code === code);
+    assert.ok(item !== undefined, `team-plan/v3 缺常见错误：${code}`);
+    assert.match(item.fix, /project_state/);
+    assert.match(item.fix, /versions\.jsonl/);
+    assert.match(item.fix, /不得用 shell/);
+  }
+  // 模型实际读到的 doc_format 文本同步携带应用来源（不是只改数据、不改投影）。
+  const rendered = docFormatSpecText("team-plan/v3");
+  assert.match(rendered, /project_state \[versions\]/);
+  assert.match(rendered, /\.ans\/state\/versions\.jsonl/);
+});

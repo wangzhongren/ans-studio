@@ -369,6 +369,19 @@ test("versions/evidence/零写入：latest vs pinned/newerThanPinned；evidence 
     assert.equal(missing?.latest, undefined, "缺失文档 latest:undefined，不误报 reference-invalid");
     assert.equal(missing?.referenceIssue, undefined);
 
+    // B23.1：文本投影 [versions] 行必须携带应用按真实字节计算的 sha256（有则输出、无则 none），
+    // 供 fixed convener 写团队计划 modules/roster 字段时直接读取，不再用 shell/certutil 自算。
+    const summary = renderProjectStateSummary(view);
+    const proposalLine = summary.split("\n").find((line) => line.includes("kind=proposal"));
+    const expectedProposalSha = await hashFile(path.join(root, "docs", "proposals", "focus-proposal-v2.md"));
+    assert.equal(
+      proposalLine?.includes(`latest=2 path=docs/proposals/focus-proposal-v2.md sha256=${expectedProposalSha}`),
+      true,
+      `proposal 行缺真实 sha256：${proposalLine ?? "<missing>"}`,
+    );
+    const modulesLine = summary.split("\n").find((line) => line.includes("kind=modules"));
+    assert.match(modulesLine ?? "", /latest=none path=none sha256=none/, "缺失文档 sha256 输出 none（不猜 hash）");
+
     const evidenceStatuses = view.evidence.map((item) => `${item.kind}:${item.status}`);
     assert.equal(evidenceStatuses.includes("verifier-report:present"), true);
     assert.equal(evidenceStatuses.includes("task-evidence:present"), true);

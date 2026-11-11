@@ -748,6 +748,7 @@ const FIXED_EVIDENCE_SECTION: RoleContextSection = Object.freeze({
     "- 派发 worker 任务时，证据要求只写三项：产物路径（path）、内容/frontmatter 要点（schema、flowId、version 等字段与正文内容）、结论（完成/未完成/阻塞）；不要要求 worker 用 `run_shell`、`certutil`、`Get-FileHash` 或其它 shell/脚本计算 hash/sha256；任务文本不得以「给出 sha256」「附哈希」作为完成标准或验收标准。",
     "- 任务文本须写明：worker `submit_report` 的 `evidence[]` 每项为**纯项目相对文件路径**（如 `docs/product/<flowId>-intent-vN.md`），不得写描述句、冒号说明或正文；描述与 frontmatter 实际值写在报告 summary 正文。收口（`close_created_task accepted`）按纯路径逐项核验文件字节，描述文本不计为证据（`close-report-missing` 时按此要求返工）。",
     "- 文档哈希是应用机器事实：由应用在任务收口（`close_created_task` / `closeTask`）、归档（A12 `docs/acceptance/`）与依据记录/校验（`basis.recorded` / documentRefs）时按实际字节计算与核验；worker 只交付文件与内容，哈希不由 worker 计算、也不写入任务完成条件。",
+    "- 需要文档/名单/模块的权威哈希（如团队计划 `modules`/`roster` 字段）时，只取应用机器记录：`project_state` 的 `[versions]` 行（`sha256=`，应用按真实字节计算）或 `.ans/state/versions.jsonl`；**你自身同样禁止**用 `run_shell`、`certutil`、`Get-FileHash`、PowerShell 等计算/核验 hash（会触发 shell 审批卡，属 fixed 卡预算之外的额外门，RR19 实测）。",
   ].join("\n"),
 });
 
@@ -765,6 +766,7 @@ const FIXED_BASELINE_SECTION: RoleContextSection = Object.freeze({
   text: [
     "## 固定路径团队计划与基线（fixed）",
     "- 团队计划：以 `complete_team_plan` v4 提交版本化团队计划 `docs/scheduling/<flowId>-team-v<version>.md`（path/version；无 runId/baseDigest，出现即 `baseline-legacy-field-forbidden`）；应用核模块属主/写区/分工/依赖后直接完成。完成计划不等于 D3，不授权名单外角色。",
+    "- 团队计划中的 `modules`/`roster` 哈希取应用记录（`project_state` `[versions]` 的 `sha256=` 或 `.ans/state/versions.jsonl`）；不得用 `run_shell`/`certutil`/`Get-FileHash` 等 shell 计算或核验。",
     "- 基线 3 件小事（A9）：团队计划 v4 / `git init -b main`（应用执行）/ `.gitignore` 托管块 + baseline commit + 任务分支 `ans/task/<workflowId>`；失败按 `baseline-*` fail-closed，不弹客户卡。",
   ].join("\n"),
 });

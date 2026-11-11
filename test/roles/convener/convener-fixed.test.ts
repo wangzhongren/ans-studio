@@ -147,6 +147,26 @@ test("B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论�
   assert.match(evidence, /完成标准/);
 });
 
+test("B23 fixed 哈希来源：权威哈希取应用记录（project_state [versions]/versions.jsonl）；自身禁止 shell 计算/核验", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text ?? "";
+  const baseline = sections.find((section) => section.id === "convener-fixed-baseline")?.text ?? "";
+
+  // RR19 回归：convener 在 A9 缺哈希来源，试图 certutil 计算 roster hash 触发 shell 审批卡。
+  for (const token of ["project_state", "[versions]", "sha256=", ".ans/state/versions.jsonl"]) {
+    assert.equal(evidence.includes(token), true, `证据段缺应用哈希来源：${token}`);
+  }
+  assert.match(evidence, /你自身同样禁止/);
+  for (const token of ["run_shell", "certutil", "Get-FileHash", "PowerShell"]) {
+    assert.equal(evidence.includes(token), true, `证据段缺自身 shell 禁令：${token}`);
+  }
+
+  // A9 团队计划字段（modules/roster）的哈希来源必须写进基线段。
+  for (const token of ["project_state", "[versions]", "sha256=", ".ans/state/versions.jsonl", "run_shell", "certutil"]) {
+    assert.equal(baseline.includes(token), true, `基线段缺团队计划哈希来源/禁令：${token}`);
+  }
+});
+
 test("B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text;
