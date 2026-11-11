@@ -721,6 +721,8 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
 // v1.3 §3.4 convener 行：fixed 段说明新职责（生产线唯一派发者 / 团队计划与基线 3 件小事 /
 // 集成汇总与报告期望 / 不派质检）。B9.1 按 RR4 失败事实补两段：任务证据与哈希（应用算哈希、
 // 禁止 worker shell 算 hash）与卡预算（3 确认卡 + merge-main；不诱导额外审批卡）。
+// B13.2（2026-11-11，RR8 修复）：证据段补一条任务文本要求——worker `submit_report.evidence[]`
+// 每项为纯项目相对文件路径（描述文本不计为证据；RR8 因此 close-report-missing 并触发返工循环）。
 // 只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；`context({})`（无 matrix）与
 // `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
 // run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（仅 fixed 会话）。
@@ -741,6 +743,7 @@ const FIXED_EVIDENCE_SECTION: RoleContextSection = Object.freeze({
   text: [
     "## 固定路径任务证据与哈希（fixed）",
     "- 派发 worker 任务时，证据要求只写三项：产物路径（path）、内容/frontmatter 要点（schema、flowId、version 等字段与正文内容）、结论（完成/未完成/阻塞）；不要要求 worker 用 `run_shell`、`certutil`、`Get-FileHash` 或其它 shell/脚本计算 hash/sha256；任务文本不得以「给出 sha256」「附哈希」作为完成标准或验收标准。",
+    "- 任务文本须写明：worker `submit_report` 的 `evidence[]` 每项为**纯项目相对文件路径**（如 `docs/product/<flowId>-intent-vN.md`），不得写描述句、冒号说明或正文；描述与 frontmatter 实际值写在报告 summary 正文。收口（`close_created_task accepted`）按纯路径逐项核验文件字节，描述文本不计为证据（`close-report-missing` 时按此要求返工）。",
     "- 文档哈希是应用机器事实：由应用在任务收口（`close_created_task` / `closeTask`）、归档（A12 `docs/acceptance/`）与依据记录/校验（`basis.recorded` / documentRefs）时按实际字节计算与核验；worker 只交付文件与内容，哈希不由 worker 计算、也不写入任务完成条件。",
   ].join("\n"),
 });

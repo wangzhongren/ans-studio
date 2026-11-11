@@ -177,6 +177,30 @@ test("context(fixed, B9.1)：报告/证据口径——路径+frontmatter 实际�
   assert.equal(productRoleModule.context({ governanceModel: "trio", matrix: FIXED }), fixedSections);
 });
 
+test("context(fixed, B13.2)：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（描述文本不计为证据）", () => {
+  const fixedSections = productRoleModule.context({ governanceModel: "trio", matrix: FIXED });
+  const report = fixedSections.find((section) => section.id === "product-fixed-report");
+  assert.ok(report !== undefined);
+  const text = report.text;
+
+  // RR8 回归：产品把描述句写进 evidence[] ⇒ 运营 close_created_task accepted 持续
+  // close-report-missing。fixed 报告段必须明确 evidence[] 的纯路径形状与描述的去处。
+  assert.match(text, /`submit_report` 的 `evidence\[\]` 每项必须是纯项目相对文件路径/u);
+  assert.match(text, /`docs\/product\/<flowId>-intent-vN\.md`/u);
+  assert.match(text, /不得写描述句、冒号说明或正文/u);
+  assert.match(text, /描述、frontmatter 实际值与结论写在报告 summary 正文/u);
+  assert.match(text, /任务收口按纯路径逐项核验文件字节/u);
+  assert.match(text, /描述文本不计为证据/u);
+
+  // fixed-only：legacy 报告段不混入 evidence[] 纯路径口径。
+  const legacyText = productRoleModule.context({ governanceModel: "trio" }).map((section) => section.text).join("\n");
+  for (const token of ["evidence[]", "纯项目相对文件路径", "描述文本不计为证据"]) {
+    assert.equal(legacyText.includes(token), false, `legacy context 不得含 fixed-only B13.2 内容：${token}`);
+  }
+  // 确定性/纯函数：同输入同引用。
+  assert.equal(productRoleModule.context({ governanceModel: "trio", matrix: FIXED }), fixedSections);
+});
+
 // —————————————————————— dispatch：legacy 逐字不变 / fixed 新增语义 ——————————————————————
 
 const LEGACY_DISPATCH_CASES: readonly RoleDispatchPolicyInput[] = Object.freeze([

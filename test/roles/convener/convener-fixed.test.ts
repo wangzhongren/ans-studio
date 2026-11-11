@@ -147,6 +147,29 @@ test("B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论�
   assert.match(evidence, /完成标准/);
 });
 
+test("B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text;
+  assert.ok(evidence !== undefined, "B13.2 必须在任务证据段补 evidence[] 纯路径要求");
+
+  // RR8 回归：产品把描述句写进 evidence[] ⇒ close-report-missing 返工循环。
+  assert.match(evidence, /`submit_report` 的 `evidence\[\]` 每项为\*\*纯项目相对文件路径\*\*/u);
+  assert.match(evidence, /`docs\/product\/<flowId>-intent-vN\.md`/u);
+  assert.match(evidence, /不得写描述句、冒号说明或正文/u);
+  assert.match(evidence, /描述与 frontmatter 实际值写在报告 summary 正文/u);
+  assert.match(evidence, /收口（`close_created_task accepted`）按纯路径逐项核验文件字节/u);
+  assert.match(evidence, /描述文本不计为证据/u);
+  assert.match(evidence, /`close-report-missing` 时按此要求返工/u);
+
+  // fixed-only：legacy context 不混入该口径。
+  const legacyText = MODULE.context({ governanceModel: "trio" }).map((section) => section.text).join("\n");
+  for (const token of ["evidence[]", "纯项目相对文件路径", "描述文本不计为证据"]) {
+    assert.equal(legacyText.includes(token), false, `legacy context 不得含 fixed-only B13.2 内容：${token}`);
+  }
+  // 确定性/纯函数：同输入同引用。
+  assert.equal(MODULE.context({ governanceModel: "trio", matrix: FIXED }), sections);
+});
+
 test("B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   const budget = sections.find((section) => section.id === "convener-fixed-card-budget")?.text;

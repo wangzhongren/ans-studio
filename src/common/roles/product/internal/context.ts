@@ -15,6 +15,9 @@
 // 哈希/sha256 由应用计算并引用应用给出的值，**不得用 `run_shell`/`certutil`/`Get-FileHash`/PowerShell
 // 等 shell 计算 hash**（shell 属高风险审批动作，fixed 流程不需要为 hash 触发客户审批卡）；证据由
 // 应用/报告生成。legacy 4 段仍逐字冻结、不受本批影响。
+// T3 B13.2（2026-11-11，RR8 修复）：fixed 报告段补 `submit_report.evidence[]` 必须为纯项目相对文件
+// 路径（描述句/冒号说明不得作为证据；描述与 frontmatter 值写 summary）——RR8 产品用描述文本当
+// evidence，运营 `close_created_task accepted` 持续 `close-report-missing`，A2 无法完成。
 
 import type { RoleContextInput, RoleContextSection } from "../../../../model/role.ts";
 
@@ -60,7 +63,7 @@ export const PRODUCT_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Obj
   }),
   Object.freeze({
     id: "product-fixed-report",
-    text: "固定路径报告期望：收到运营派发的任务，完成文档/代码后只报告产物路径、内容/frontmatter 实际值与结论（如 intentId/flowId/version/goal/scope/acceptance/nonGoals 与检查/测试结论），不要自己算或转抄哈希——`sha256` 由应用计算：应用在任务收口（`close_created_task`/`closeTask`）、`docs/acceptance` 归档与 documentRefs/依据校验时按真实字节计算并重算比对，报告/证据只引用应用给出的值。不得用 shell 算 hash：不得为取 hash 调用 `run_shell` 或任何 shell/解释器命令，包括 `certutil -hashfile`、`Get-FileHash`、PowerShell/pwsh、`sha256sum`、`shasum`、`openssl dgst`、node/python 等；hash 不是 worker 产物。shell 属高风险审批动作，本流程不需要为 hash 触发任何客户卡。任务文本要求给出 sha256 时，按应用计算口径处理：改为「路径 + frontmatter 实际值；hash 由应用计算」，并在报告中注明来源与路径，不自行用 shell；任务文本不写「给出/附上 sha256」。证据由应用/报告生成。完成后必须用 `submit_report` 回短报（完成/阻塞/证据/遗留）到真实任务创建者运营（convener）；缺关键信息先报阻塞，由运营/幕僚发卡或转客户，不猜。",
+    text: "固定路径报告期望：收到运营派发的任务，完成文档/代码后只报告产物路径、内容/frontmatter 实际值与结论（如 intentId/flowId/version/goal/scope/acceptance/nonGoals 与检查/测试结论），不要自己算或转抄哈希——`sha256` 由应用计算：应用在任务收口（`close_created_task`/`closeTask`）、`docs/acceptance` 归档与 documentRefs/依据校验时按真实字节计算并重算比对，报告/证据只引用应用给出的值。**`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径**（例如 `docs/product/<flowId>-intent-vN.md`），不得写描述句、冒号说明或正文；描述、frontmatter 实际值与结论写在报告 summary 正文。任务收口按纯路径逐项核验文件字节（描述文本不计为证据）；需要提交的产物每个文件一条路径。不得用 shell 算 hash：不得为取 hash 调用 `run_shell` 或任何 shell/解释器命令，包括 `certutil -hashfile`、`Get-FileHash`、PowerShell/pwsh、`sha256sum`、`shasum`、`openssl dgst`、node/python 等；hash 不是 worker 产物。shell 属高风险审批动作，本流程不需要为 hash 触发任何客户卡。任务文本要求给出 sha256 时，按应用计算口径处理：改为「路径 + frontmatter 实际值；hash 由应用计算」，并在报告中注明来源与路径，不自行用 shell；任务文本不写「给出/附上 sha256」。证据由应用/报告生成。完成后必须用 `submit_report` 回短报（完成/阻塞/证据/遗留）到真实任务创建者运营（convener）；缺关键信息先报阻塞，由运营/幕僚发卡或转客户，不猜。",
   }),
 ]);
 
