@@ -1,0 +1,21 @@
+✔ per-flow 解析 + B7.1 fail-closed：fixed 聊天普通派发不回落星形；切 legacy/v1 后同一形状走旧路 (19.0289ms)
+✔ B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入 (23.1649ms)
+✔ workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy） (21.0714ms)
+✔ fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状（B7.1 fail-closed） (14.9029ms)
+✔ fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务 (39.7783ms)
+✔ fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话 (44.0409ms)
+✔ fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键 (36.4132ms)
+✔ fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId） (98.2585ms)
+✔ MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝 (109.2576ms)
+✔ MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过） (20.8644ms)
+✔ MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid (106.4888ms)
+✔ direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge (42.5444ms)
+✔ single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变） (10.2261ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1650.6608

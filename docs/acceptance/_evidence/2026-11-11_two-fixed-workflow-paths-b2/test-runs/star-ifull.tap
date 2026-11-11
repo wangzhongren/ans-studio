@@ -1,0 +1,175 @@
+✔ 星形派发（2026-10-29 v4.1，M8）：chief → 项目 worker 被拒，拒绝发生在 task.created 之前（不写任务行） (57.4609ms)
+✖ 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝 (42.3524ms)
+✖ convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务 (46.7511ms)
+✖ BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递） (53.2643ms)
+✖ BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队 (45.0417ms)
+✖ BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断） (62.0899ms)
+✖ BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递） (44.8887ms)
+✔ R1/P1-R-05：convener→chief 归矩阵；convener→不存在 worker 硬拒；硬拒无任务/会话/run (45.2862ms)
+✔ AC-1.2：wrong-source 桌面证据——非 chief/convener 直接调用 routeDispatch 被拒 (3.3034ms)
+✖ AC-4.3：洁净派发无 advisory、无诊断噪声 (41.4562ms)
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (42.2572ms)
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (48.2187ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 3
+ℹ fail 9
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4407.0982
+
+✖ failing tests:
+
+test at test\桌面应用\star-routing.test.ts:161:1
+✖ 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝 (42.3524ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:169:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:190:1
+✖ convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务 (46.7511ms)
+  AssertionError [ERR_ASSERTION]: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:198:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:209:1
+✖ BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递） (53.2643ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:218:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:249:1
+✖ BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队 (45.0417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /无法打开|未投递/. Input:
+  
+  'document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:257:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。',
+    expected: /无法打开|未投递/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:270:1
+✖ BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断） (62.0899ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:280:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:299:1
+✖ BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递） (44.8887ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:306:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\star-routing.test.ts:382:1
+✖ AC-4.3：洁净派发无 advisory、无诊断噪声 (41.4562ms)
+  AssertionError [ERR_ASSERTION]: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/star-routing.test.ts:391:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:131:1
+✖ 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域 (42.2572ms)
+  AssertionError [ERR_ASSERTION]: stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:149:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\governance-e2e-auto\i-full-chain.test.ts:187:1
+✖ F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发 (48.2187ms)
+  AssertionError [ERR_ASSERTION]: stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:201:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -1,0 +1,65 @@
+# RR28 真机现场核验（B2 独立只读，2026-11-11）
+
+## 运行根与隔离
+run root: C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr28-2026-11-11 (target/userData/evidence/rr 四目录)
+evidence manifest: 63 files, sha256sum -c => 63/63 OK（sha256sums.txt sha256 72c7b4e3…）
+record-file.json: sha256 dde4ecce… (17,137 bytes) 与 RR28 记录一致
+
+## target Git（真实仓库）
+*   152448a ANS release merge ans/task/wf-7fcce8656a9bfb7fca73f124 (wf-7fcce8656a9bfb7fca73f124)
+|\  
+| * 5428a28 feat(game-core): implement core game loop, input, scoring, collision and rendering
+| * 9ecc566 feat(game-entry): implement page entry
+|/  
+* 2b9ef04 ANS baseline: ans-managed .gitignore
+branches:
+  ans/task/wf-7fcce8656a9bfb7fca73f124
+* main
+tracked files:
+.gitignore
+index.html
+src/game.js
+src/styles.css
+status:
+
+## 交付文件哈希（target 实测 = _evidence 副本）
+c498a5e63ba69ebc578ef61ccd92f58b3545b4e23b682cb3df6a230379a07de9 *index.html
+407e54d508fc532229f16803cacc7b977b4a00b6ef789f632ca405f589a171d6 *src/game.js
+aaa23cf3f17cf4c834ab6574d32c6d830c8389e1877eb1214e758238fe0a8805 *src/styles.css
+evidence copies: index-html.html c498a5e6… / src-game.js 407e54d5… / src-styles.css aaa23cf3…
+
+## 验收档案与报告哈希（差异：归档记录的是归档时字节）
+82186182896b34de0bb009593ed799a359fe6cc5951b812d4c75fd94b12ba3b5 *docs/acceptance/snake-game-acceptance-v1.md
+deb88ab270d0a31e062a708268167467ed6d8d39be18451b830de1bcedf9e50e *docs/quality/snake-game-report-v1.md
+b2a2d29976b5c7a111ef1b79aefa499e8cdbdb15e025ecb008813d0d300fde47 *docs/quality/snake-game-criteria-v1.md
+归档内 reportSha256: 6ddf838f896ef3c321f3c09fc1b7851c677c5d442166ac99eb352710b6eeab65
+最终 report 文件 sha256: deb88ab270d0a31e062a708268167467ed6d8d39be18451b830de1bcedf9e50e
+mtime: acceptance 19:19:58.304 (+0800) < report 19:19:59.428 (+0800)；verifier 11:19:59.418 edit_file 追加第 6 条（重复派发复核）后 14,860 字节
+
+## 旧账本探测（RR-04 / AC-23）
+ABSENT  .ans/trunk
+ABSENT  .ans/runs
+ABSENT  .ans/state/version-changes.json
+ABSENT  .ans/state/stable-writes.json
+ABSENT  .ans/state/stable-write-permits.json
+PRESENT .ans/state/versions.jsonl
+PRESENT .ans/state/versions.initialized
+PRESENT .ans/state/doc-freezes.json
+versions.jsonl 行数（固定路径运行期写入 7 条：intent baseline 11:05:14；proposal/modules/architecture/roster/draft-updated 11:08:00–11:08:38）:
+7 .ans/state/versions.jsonl
+{"v":1,"flowId":"snake-game","doc":"intent","version":1,"path":"docs/product/snake-game-intent","sha256":"9e8f8687076c7bea8de3f8d3f54b0e989b61335c6094cd176129018238cb72be","event":"baseline","recordedAt":"2026-11-11T11:05:14.988Z","recordedBy":"app:session"}
+{"v":1,"flowId":"snake-game","doc":"proposal","version":1,"path":"docs/proposals/snake-game-proposal","sha256":"6434a4d5c74e5f9f3673d2de01533c61fafb62ea87791d9f892861e47938fbc4","event":"version-added","recordedAt":"2026-11-11T11:08:00.143Z","recordedBy":"app:session"}
+versions.initialized mtime 19:05:14；doc-freezes.json mtime 19:09:18（运行期刷新）
+
+## 账本与审计
+workflows.jsonl: A1–A13 completed（A12 聚合）+ workflow.closed delivered；role.activated；
+tasks.jsonl: 4 卡各一次（intent-confirm/proposal/appointment/merge-main）；A12b close note 含 acceptanceIntensity=lightweight + 运行期未验证；
+releases.jsonl: release.requested/confirmed(customer)/merged（base 2b9ef04，tip 5428a28，merge 152448a，files 3）；
+basis.jsonl（target 内）：basis.recorded bas-68e8…（reviewRoleId verifier）+ basis.verified ok；
+shell-gate.jsonl: 20 行（allow 12 / deny 3 / 无审批卡）；commit 两次 argv 单 token allow；
+
+## 证据归档缺口/不一致（如实记录）
+1) _evidence 目录未含 basis.jsonl（target 内存在；记录 §二 引用）；sha256sums 无该条目；
+2) _evidence 未含 merge-main/appointment 卡截图（ui-card-03/04 在原始运行根 evidence/；本报告已复制至 screenshots/）；
+3) RR28 记录 §六 写「共 62 文件」，实测 sha256sums 63 条（含 63 文件）；
+4) 归档 reportSha256 与最终 report 文件不一致（见上；A12b 收口后重复投递会话于 11:19:59.418 编辑报告）。

@@ -1,0 +1,45 @@
+# B2 实跑 known-red 对照（2026-11-11）
+
+## 三套件计数（本角色实跑；node --test --test-concurrency=1）
+runtime-core: tests 592 / pass 555 / fail 33 / skipped 4
+gates: tests 570 / pass 564 / fail 5 / skipped 1
+orchestration: tests 1378 / pass 1352 / fail 24 / skipped 2
+typecheck: exit 0
+
+## 失败名 diff（已剔除输出表头 'failing tests:'）
+### runtime-core vs B30 冻结 b30-05（sha256 973c918f…）
+diff: EMPTY (33/33 逐名一致)
+
+### gates vs B30 冻结 b30-07（sha256 8325f9d8…）
+diff: EMPTY (5/5 逐名一致)
+
+### orchestration vs B32 冻结 baseline（sha256 f9513fb0…）
+diff: EMPTY (24/24 逐名一致)
+
+## B1 v1.1 9 红 star-routing/i-full-chain（12 tests / 3 pass / 9 fail / 0 skip；失败名与冻结 9 名单逐名一致）
+AC-4.3：洁净派发无 advisory、无诊断噪声
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+
+## version-change-integration（12 tests / 3 pass / 9 fail / 0 skip；9 名与 B1 §二 9 红基线逐名一致；首错含 vca-channel-unavailable）
+VCA AC-5：apply 前重验（批准后链损坏 ⇒ vca-apply-failed，不 re-pin；修复后可重试）
+VCA AC-5：无效 roster / D3 越界 / 版本链不匹配 ⇒ 批准前 fail-closed（不冻结/不 re-pin/trunk 不变）
+VCA：detail-amendment 提交冻结修正案 → 批准 → 逐项 apply/keep + acknowledgments → 只冻结 applied
+VCA：product version-upgrade 经真实客户卡提交/批准 → 冻结+R9+trunk t2；冻结后守卫拒绝同版本覆盖
+VCA：发起角色、目标范围、base 匹配、并发与幂等（真实错误码）
+VCA：客户拒绝 ⇒ 目标保持草稿、不 re-pin；修正案保持冻结（不可原地复用）
+VCA：批准前 toSha256 重验（提交后目标漂移 ⇒ vca-hash-drift，不冻结/不 re-pin）
+bootstrap：无 trunk VCA（baseTrunk:null + bootstrap:true）批准 → 冻结目标并建立 trunk v1
+冻结：missing ⇒ 既有文档一律冻结；corrupt ⇒ fail-closed；doc-freezes 派生缓存可重建且以 R9 为准
+
+## 定向套件（本角色实跑）
+mode-switch + fixed-path-full-chain + b-change-scope: 8 tests / 8 pass / 0 fail
+b3-release-merge-desktop + b3-fixed-baseline-pathb: 17 tests / 17 pass / 0 fail
+test/roles/**: 285 tests / 285 pass / 0 fail
+fixed-path-routing（Q6 负例）: 13 tests / 13 pass / 0 fail
