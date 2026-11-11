@@ -1,0 +1,26 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 2,
+  "cardsByKind": {
+    "intent-confirm": 1,
+    "decision": 1
+  },
+  "dispatches": 8,
+  "dispatchesByFrom": {
+    "chief": 5,
+    "convener": 3
+  },
+  "tasksByTo": {
+    "convener": 5,
+    "product": 2,
+    "rapporteur": 1
+  },
+  "writeTasks": 3,
+  "implementationWriteTasks": 0,
+  "turnsByRole": {
+    "chief": 13,
+    "convener": 10,
+    "product": 4,
+    "rapporteur": 2
+  }
+}

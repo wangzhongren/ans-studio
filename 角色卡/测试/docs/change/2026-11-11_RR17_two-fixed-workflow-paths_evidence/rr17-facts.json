@@ -1,0 +1,463 @@
+{
+  "at": "2026-11-11T04:46:32.120Z",
+  "candidate": "e1c3c8b29c808be17592ff71bcbedcd4a548f3da",
+  "msgMark": "2026-11-11T04:41:04.075Z",
+  "stopCause": "gate:unexpected-card-kind (tester-side driver gate: decision card not in the driver allowlist; run invalid, not a product verdict)",
+  "gate": {
+    "kind": "unexpected-card-kind",
+    "requestId": "req-fef63615d93579a9",
+    "cardKind": "decision",
+    "title": "贪吃蛇游戏运行平台选择（材料性决策）"
+  },
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-11T04:41:12.778Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-8803d3c9427603899feb3fe9",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:ff2ed072-4ba0-4f47-aea5-b1f5e1584721",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "ff2ed072-4ba0-4f47-aea5-b1f5e1584721",
+    "legacyStateIgnored": true
+  },
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "workflowEvents": [
+    {
+      "at": "2026-11-11T04:41:12.778Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:41:12.778Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:41:25.503Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwbmt69i-addbe46e",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:41:56.141Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:42:48.696Z",
+      "kind": "stage.completed",
+      "stage": "A2",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.061Z",
+      "kind": "stage.requested",
+      "stage": "A3",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.550Z",
+      "kind": "stage.completed",
+      "stage": "A3",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:43:03.446Z",
+      "kind": "stage.requested",
+      "stage": "A4",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:43:14.633Z",
+      "kind": "stage.dispatched",
+      "stage": "A4",
+      "taskId": "t-mwbmvih0-5f1452a9",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:44:00.602Z",
+      "kind": "stage.requested",
+      "stage": "A5",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:44:17.314Z",
+      "kind": "stage.requested",
+      "stage": "A5",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-11T04:41:12.784Z",
+      "taskId": "t-mwbmswga-75460269",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:41:25.494Z",
+      "taskId": "t-mwbmt69i-addbe46e",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:41:56.144Z",
+      "taskId": "t-mwbmttwt-3d05af1a",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:42:09.811Z",
+      "taskId": "t-mwbmu4gj-ead08877",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:43:03.447Z",
+      "taskId": "t-mwbmv9ue-266646b8",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A4",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:43:14.628Z",
+      "taskId": "t-mwbmvih0-5f1452a9",
+      "from": "convener",
+      "to": "rapporteur",
+      "taskKind": null,
+      "stage": "A4",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:44:00.603Z",
+      "taskId": "t-mwbmwhy2-2e47da2f",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A5",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    },
+    {
+      "at": "2026-11-11T04:44:17.315Z",
+      "taskId": "t-mwbmwuua-218252f9",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A5",
+      "workflowId": "wf-8803d3c9427603899feb3fe9"
+    }
+  ],
+  "taskReported": 8,
+  "taskClosed": [
+    {
+      "at": "2026-11-11T04:41:45.030Z",
+      "taskId": "t-mwbmswga-75460269",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:41:48.914Z",
+      "taskId": "t-mwbmt69i-addbe46e",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:42:19.333Z",
+      "taskId": "t-mwbmttwt-3d05af1a",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:42:48.696Z",
+      "taskId": "t-mwbmu4gj-ead08877",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:43:23.591Z",
+      "taskId": "t-mwbmv9ue-266646b8",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:43:46.736Z",
+      "taskId": "t-mwbmvih0-5f1452a9",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:44:12.375Z",
+      "taskId": "t-mwbmwhy2-2e47da2f",
+      "outcome": "rejected"
+    }
+  ],
+  "requestRows": [
+    {
+      "at": "2026-11-11T04:42:58.069Z",
+      "kind": "request.created",
+      "requestId": "req-78f56da0e2c989e2",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-8803d3c9427603899feb3fe9",
+      "stage": "A3",
+      "taskId": null,
+      "sourceRoleId": "chief",
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.081Z",
+      "kind": "request.presented",
+      "requestId": "req-78f56da0e2c989e2",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.094Z",
+      "kind": "request.notified",
+      "requestId": "req-78f56da0e2c989e2",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.081Z",
+      "kind": "request.notified",
+      "requestId": "req-78f56da0e2c989e2",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.532Z",
+      "kind": "request.resolved",
+      "requestId": "req-78f56da0e2c989e2",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-8803d3c9427603899feb3fe9",
+      "stage": "A3",
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": "customer",
+      "choice": "confirm",
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:42:58.550Z",
+      "kind": "request.notified",
+      "requestId": "req-78f56da0e2c989e2",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:44:22.684Z",
+      "kind": "request.created",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": "decision",
+      "workflowId": null,
+      "stage": null,
+      "taskId": "t-mwbmwuua-218252f9",
+      "sourceRoleId": "convener",
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:44:22.701Z",
+      "kind": "request.notified",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:44:22.701Z",
+      "kind": "request.presented",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:44:22.775Z",
+      "kind": "request.orphaned",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": "restart"
+    },
+    {
+      "at": "2026-11-11T04:44:22.800Z",
+      "kind": "request.notified",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:44:22.781Z",
+      "kind": "request.orphaned",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": "restart"
+    },
+    {
+      "at": "2026-11-11T04:44:22.784Z",
+      "kind": "request.notified",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T04:44:23.921Z",
+      "kind": "request.resolved",
+      "requestId": "req-fef63615d93579a9",
+      "cardKind": "decision",
+      "workflowId": null,
+      "stage": null,
+      "taskId": "t-mwbmwuua-218252f9",
+      "sourceRoleId": null,
+      "by": "customer",
+      "choice": "unavailable",
+      "reason": null
+    }
+  ],
+  "projectNotes": [
+    "snake-game 路径 A：A1 stage-request 已派发给运营（#t-mwbmswga-75460269），等待运营在其回合派发 A1 产品受理任务；A1 收口后再发 A2 意图撰写 stage-request。",
+    "snake-game 路径 A（workflowId=wf-8803d3c9427603899feb3fe9）：A1 已收口（A1 产品受理任务 #t-mwbmt69i-addbe46e 已创建）；A2 stage-request #t-mwbmttwt-3d05af1a 已派发，等待运营派 A2 产品撰写 docs/product/snake-game-intent-v1.md（intentId≠snake-game）。产品回报后我写 docs/intents/<intentId>.md 并呈意图确认卡（A3）。",
+    "snake-game 路径 A：A3 意图确认已由客户 confirm（committed，decisionId=decision-req-78f56da0e2c989e2），意图入口 docs/intents/snake-classic-play.md 已写。A4 stage-request #t-mwbmv9ue-266646b8 已派发，等待运营派 A4 策划受理任务；A4 收口后另发 A5 出方案/模块/名单/架构，再呈方案确认卡（A6）。",
+    "snake-game 路径 A：A4 已完成（受理记录 docs/governance/rapporteur/snake-game-a4-intake-v1.md）。A5 stage-request #t-mwbmwuua-218252f9 已派发（前一次 #t-mwbmwhy2-2e47da2f 因任务文本引用不存在的契约路径被投递拒绝，已按 rejected 收口后重发）。A5 前置：运营先发 decision 卡让客户选运行平台（浏览器单页/桌面窗口/终端 TUI），客户选择后再派策划出 proposal/modules/roster/architecture，随后我呈方案确认卡（A6）。"
+  ],
+  "docs": [
+    "governance",
+    "intents",
+    "product"
+  ],
+  "roleCards": [],
+  "roleActivatedEvents": [],
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "shellGateAuditAbsent": true,
+  "git": {
+    "branch": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "head": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "log": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "status": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "branches": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "tags": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "remotes": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "mainLog": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n"
+  },
+  "note": "RR17 is INVALID as a product verdict: the tester driver did not implement the fixed-path decision card. The fixed chief workflow v2 (line 79) and acceptance criteria AC-13 allow decision cards for material choices (convener/rapporteur; not counted among the three confirmation cards), and the A5 stage-request task explicitly instructed the convener to raise a decision card for the run platform and not choose for the customer. The convener did so at 04:44:22.684 (request req-fef63615d93579a9, sourceRoleId=convener, exactly one recommended option browser-spa, options browser-spa/desktop-window/terminal-tui; task t-mwbmwuua-218252f9). The app presented it to the customer; the driver's CARD_ALLOWLIST had only intent-confirm/proposal/appointment/merge-main, so it stopped with gate unexpected-card-kind at 04:44:22.894 without answering. The request had been marked request.orphaned (reason restart) at 04:44:22.775/.781 while the dialog was still visible, and it was later resolved by customer choice 'unavailable' at 04:44:23.921 (after the driver halt). B19 works (A2 completed and the A3 intent card req-78f56da0e2c989e2 was confirmed by the customer, A3 completed); B18 works (A5 first dispatch delivery-rejected and retried). A5 did not complete; A6-A13 and B21/B22 were not exercised. This run must not be counted as a product failure; the coordinator has authorized RR18 with driver-side decision-card support (answer by the exactly-one recommended option; decisions counted separately with <=2)."
+}
