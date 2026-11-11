@@ -1,0 +1,17 @@
+# B2 v2 增补证据：协调方 R9 应用账本裁定（L-1 复判）
+
+## 身份
+- 文件：docs/acceptance/2026-11-11_ruling_app-ledger-R9.md
+- 实测：24 行 / 1,970 B / sha256 9d43cc392dd0f1701e79e0583cebb03bda8dc1afc23de77e5f7161099c5b8010
+- 提交：87fff42 docs(acceptance): rule R9 versions ledger is the app hash ledger
+
+## 裁定要点（原文摘要，不替代原文）
+- R9（.ans/state/versions.jsonl、versions.initialized、doc-freezes.json；内容为应用计算的治理文档 SHA-256）属设计要求的应用哈希账本；依据设计 v2 §核心原则 2 / §一.2 与 v1.3 行 267。
+- AC-23「旧账本只读忽略、不写」指 trunk 时代旧治理机制账本（.ans/trunk、.ans/runs、VCA/stable 许可、run pin、stable-write）；这些在 fixed 默认路径未被触达（RR28 账本核验 0 命中）。
+- versions.jsonl 以应用哈希账本身份复用同一文件形态，不属该禁止清单。
+- 结论：AC-23 判据不变；fixed 路径写 R9 应用哈希账本不构成 AC-23 违反。
+
+## B2 v2 复判（L-1）
+- AC-23 维持通过（与 v1 报告一致）；v1 报告 L-1 的「字面冲突」条件性提示由本裁定闭合为解释性口径。
+- 设计 §6.5/§9.4.5 的「旧账本不写」文本与实现的表面张力，按裁定解释为：R9 以应用哈希账本复用，非 trunk 时代旧治理账本；如未来要彻底分开文件名，另立变更（不在本裁定范围）。
+- 本报告不修改 B1 任何条目；AC-23 判据文本不变。

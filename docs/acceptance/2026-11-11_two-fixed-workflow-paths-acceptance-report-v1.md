@@ -1,5 +1,7 @@
 # B2 最终独立验收报告：两条固定工作流路径（T3，v1）
 
+> **历史版本说明（2026-11-11 补判）**：本 v1 报告的最终结论（整体不通过，RR-03/AC-30/EV-06 未取证）已由 **v2 报告** `docs/acceptance/2026-11-11_two-fixed-workflow-paths-acceptance-report-v2.md` 取代：RR29 补齐真实浏览器可玩性验证（RR-03/AC-30/EV-06 改判通过），协调方 R9 裁定闭合 L-1/AC-23；v1 保留为历史，逐条矩阵与证据指针继续有效。最终判定以 v2 为准。
+
 - 日期：2026-11-11
 - 角色：ANS「独立验收」（B2 最终独立验收，独立固定上下文；本文件与 `docs/acceptance/_evidence/2026-11-11_two-fixed-workflow-paths-b2/` 为本轮授权写区）
 - 任务 ID：`2026-11-10-two-fixed-workflow-paths`（T3 产品级重构）
