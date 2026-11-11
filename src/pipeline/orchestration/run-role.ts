@@ -1107,6 +1107,91 @@ export function createTaskGitShellExecution(input: {
   };
 }
 
+/**
+ * B12.1（2026-11-11，RR6 重复 A3 卡）：fixed 意图确认卡的**应用侧幂等**。
+ * 同一活动 workflow 的 A3 intent-confirm 只允许一张：
+ * - 已有 1 张未 resolved/orphaned 的卡 ⇒ `intent-confirm-pending`（不调 raw、不写新 request/stage）；
+ * - 多张未决（异常）⇒ `intent-confirm-multiple-pending`（列 requestId，不猜）；
+ * - A3 已完成 ⇒ `intent-confirm-already-completed`；
+ * - 同意图（documentRefs intent sha 相同）已 confirm 裁决但 A3 仍在恢复 ⇒ `intent-confirm-already-resolved`；
+ * - 不同意图 hash（A2 新版本）或 request.orphaned 终态 ⇒ 不拦，允许重新发卡。
+ * 只读 tasks/workflows 账本；legacy 路径不调用本函数。
+ */
+async function fixedIntentCardDuplicateReason(
+  projectRoot: string,
+  flowId: string,
+  currentIntentSha256?: string,
+): Promise<{ code: string; reason: string } | undefined> {
+  // 当前活动 fixed workflow（该 flow 最新 workflow.started 且未 closed）。
+  let activeWorkflowId: string | undefined;
+  let workflowEvents: WorkflowEvent[] = [];
+  try {
+    const ledger = await workflowReadLedger(projectRoot);
+    workflowEvents = ledger.events;
+    const flowEvents = ledger.events.filter((event) => event.flowId === flowId);
+    const closed = new Set(flowEvents.filter((event) => event.kind === "workflow.closed").map((event) => event.workflowId));
+    const started = [...flowEvents].reverse().find((event) => event.kind === "workflow.started" && !closed.has(event.workflowId));
+    activeWorkflowId = started?.workflowId;
+  } catch {
+    // 账本不可读 ⇒ 不在此处猜测；后续 prepareIntent/finalize 仍 fail-closed。
+    return undefined;
+  }
+  let state: Awaited<ReturnType<typeof readTaskState>>;
+  try {
+    state = await readTaskState(projectRoot);
+  } catch {
+    return undefined;
+  }
+  const events = state.events as readonly any[];
+  const sameWorkflow = (event: any): boolean => activeWorkflowId === undefined || event.workflowId === activeWorkflowId;
+  const created = events.filter((event) => event.kind === "request.created"
+    && event.cardKind === "intent-confirm" && event.stage === "A3" && event.flowId === flowId && sameWorkflow(event));
+  if (created.length === 0) return undefined;
+  const createdIds = new Set<string>(created.map((event) => String(event.requestId)));
+  const resolved = events.filter((event) => event.kind === "request.resolved" && createdIds.has(String(event.requestId)));
+  const resolvedIds = new Set<string>(resolved.map((event) => String(event.requestId)));
+  const orphanedIds = new Set<string>(events
+    .filter((event) => event.kind === "request.orphaned" && createdIds.has(String(event.requestId)))
+    .map((event) => String(event.requestId)));
+  const pending = created.filter((event) => !resolvedIds.has(String(event.requestId)) && !orphanedIds.has(String(event.requestId)));
+  if (pending.length > 1) {
+    return {
+      code: "intent-confirm-multiple-pending",
+      reason: `intent-confirm-multiple-pending: 存在多张待决意图确认卡（requestId=${pending.map((event) => String(event.requestId)).join("、")}）；异常，不猜测、不发新卡。`,
+    };
+  }
+  if (pending.length === 1) {
+    return {
+      code: "intent-confirm-pending",
+      reason: `intent-confirm-pending: 已有待决意图确认卡（requestId=${String(pending[0].requestId)}）；请客户/驱动作答既有卡，不重复发卡。`,
+    };
+  }
+  const a3Completed = workflowEvents.some((event) => event.kind === "stage.completed" && event.stage === "A3"
+    && (activeWorkflowId === undefined || event.workflowId === activeWorkflowId)
+    && (event.flowId === undefined || event.flowId === flowId));
+  if (a3Completed) {
+    return { code: "intent-confirm-already-completed", reason: "intent-confirm-already-completed: A3 意图确认已完成；不重复发卡。" };
+  }
+  // 调用方在 prepareIntent 之前先用无 hash 形态检查 pending/multiple/completed（不产生 workflow 事件）；
+  // 只有需要区分「同意图已裁决 vs 旧意图版本」时才用当前 intent sha 再查一次。
+  if (currentIntentSha256 === undefined) return undefined;
+  const confirmed = resolved.find((event) => event.choice === "confirm"
+    || (Array.isArray(event.selectedOptionIds) && event.selectedOptionIds.includes("confirm")));
+  if (confirmed !== undefined) {
+    const refs = Array.isArray(confirmed.documentRefs) ? confirmed.documentRefs as readonly any[] : [];
+    const intentRef = refs.find((ref) => ref?.kind === "intent");
+    const resolvedSha = typeof intentRef?.sha256 === "string" ? intentRef.sha256 : undefined;
+    // 旧意图版本（A2 revise 后的新 hash）不误伤；缺 documentRefs 时保守视为同一意图。
+    if (resolvedSha === undefined || resolvedSha === currentIntentSha256) {
+      return {
+        code: "intent-confirm-already-resolved",
+        reason: `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${String(confirmed.requestId)}）；A3 完成待恢复，不重复发卡。`,
+      };
+    }
+  }
+  return undefined;
+}
+
 export async function openRoleSession(
   input: {
     roleId: string;
@@ -2137,10 +2222,25 @@ export async function openRoleSession(
                 log.record("governance.card.rejected", { state: "not-presented", reasonCode: "intent-decision-invalid", ok: false });
                 return { outcome: "declined", notPresented: true, reason: "固定路径意图确认卡缺少 flowId（无法定位最新意图）；本次未向客户发卡。" };
               }
+              // B12.1（2026-11-11）：先做**无副作用**幂等检查（pending/multiple/已完成），命中即不发卡、
+              // 不调用 prepareIntent、不写任何 workflow 事件；只有需要区分旧意图版本时才在 prepare 后用
+              // 当前 intent sha 复核。
+              const earlyDuplicate = await fixedIntentCardDuplicateReason(input.project.projectRoot, flowId);
+              if (earlyDuplicate !== undefined) {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: earlyDuplicate.code, ok: false });
+                return { outcome: "declined", notPresented: true, reason: earlyDuplicate.reason };
+              }
               const prepared = await workflowPrepareIntent({ projectRoot: input.project.projectRoot, flowId });
               if (!prepared.ok) {
                 log.record("governance.card.rejected", { state: "not-presented", reasonCode: prepared.code, ok: false });
                 return { outcome: "declined", notPresented: true, reason: prepared.message ?? prepared.code };
+              }
+              // B12.1（2026-11-11）：A3 intent-confirm 每活动 workflow 只发一次——待决复用/已裁决不重发；
+              // 多待决 fail-closed；不同意图版本或 orphaned 终态允许新卡。只读账本，不写 request/stage。
+              const duplicate = await fixedIntentCardDuplicateReason(input.project.projectRoot, flowId, prepared.sha256);
+              if (duplicate !== undefined) {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: duplicate.code, ok: false });
+                return { outcome: "declined", notPresented: true, reason: duplicate.reason };
               }
               fixedIntentConfirmation = prepared;
               effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.marker}`,
