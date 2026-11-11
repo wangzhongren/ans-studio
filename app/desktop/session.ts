@@ -10738,6 +10738,12 @@ ${formatted}` };
     }
     const created = record.created;
     if (created.workflowId === undefined || created.stage === undefined) return { ok: true, evidence: undefined };
+    // B18（2026-11-11，RR13 失败修复）：stage-request 只是产线调度请求，不参与阶段完成
+    // （`workflowService.closeTask` 对 `taskKind:"stage-request"` 同样跳过阶段事件）。accepted 收口
+    // 不要求产物证据/分支 tip/验收归档；否则 A2/A5 等阶段的 stage-request 会因报告 evidence 为
+    // 描述文本而 `close-report-missing`，open advance 请求无法收口，后续 stage-request 被
+    // `stage-request-open` 拒绝（RR13 A4 卡死）。
+    if (created.taskKind === "stage-request") return { ok: true, evidence: undefined };
     const stage = created.stage;
     const lastReport = record.reports[record.reports.length - 1];
     if (lastReport?.status !== "done") return { ok: true, evidence: undefined }; // 服务层按 close-report-missing fail-closed

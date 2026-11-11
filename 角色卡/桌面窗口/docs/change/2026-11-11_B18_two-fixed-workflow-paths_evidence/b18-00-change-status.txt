@@ -1,0 +1,2 @@
+ M app/desktop/session.ts
+ M test/桌面应用/b101-fixed-dispatch-task-binding.test.ts

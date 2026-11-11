@@ -38,7 +38,7 @@ import path from "node:path";
 import { SessionManager, type DesktopOrchestrationEvent } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
-import { appendWorkflowEvent, requestStage } from "../../src/common/编排/workflow-service.ts";
+import { appendWorkflowEvent, readWorkflowLedger, requestStage } from "../../src/common/编排/workflow-service.ts";
 import { type OrchestrationEvent, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
@@ -405,6 +405,63 @@ test("B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed�
     assert.equal((closed as { ok: boolean }).ok, true, JSON.stringify(closed));
     assert.equal((closed as { code?: string }).code, undefined, "报告关联后 accepted 收口不再 close-report-missing");
     assert.equal((await readTaskState(root)).records.get(stageRequest!.taskId)?.closed?.outcome, "accepted");
+  } finally {
+    await h.mgr.stop(null);
+    await cleanup(root);
+  }
+});
+
+// ══════════════ 1b. B18 stage-request 收口不要求产物证据（RR13 修复） ══════════════
+
+test("B18 stage-request：A2 stage-request + 描述 evidence ⇒ accepted（不推进阶段）；同阶段生产任务仍 close-report-missing", async () => {
+  const root = await makeRoot("ans-b18-stage-request-");
+  const h = harness(root);
+  const workflowId = "wf-b18-stage-request-0001";
+  try {
+    await fixedProject(root);
+    await seedStartedWorkflow(root, workflowId);
+    const stageRequestTaskId = "t-b18-a2-sr";
+    const created = taskEvent("task.created", {
+      taskId: stageRequestTaskId, from: "chief", to: "convener", text: "推进 A2",
+      sideEffect: "read-only", idempotencyKey: `stage-request:${workflowId}:A2:1`,
+      flowId: FIXED_FLOW, workflowId, stage: "A2", taskKind: "stage-request",
+    });
+    assert.equal((await appendTaskEvent(root, created)).ok, true);
+    const reported = taskEvent("task.reported", {
+      taskId: stageRequestTaskId, from: "convener", status: "done", summary: "A2 派发完成",
+      evidence: ["A2 产品任务已派发（描述文本，非纯路径）"],
+    });
+    assert.equal((await appendTaskEvent(root, reported)).ok, true);
+    const chief = await openRole(h, root, "chief");
+    assert.ok(chief.closeCreatedTaskFixed, "fixed 幕僚会话应注入 close_created_task v2");
+    const closed = await chief.closeCreatedTaskFixed!({ operationId: "op-b18-sr-close", taskId: stageRequestTaskId, outcome: "accepted" });
+    assert.equal((closed as { ok: boolean }).ok, true, JSON.stringify(closed));
+    assert.equal((closed as { stageCompleted?: boolean }).stageCompleted, false, "stage-request 收口不推进阶段");
+    const ledger = await readWorkflowLedger(root);
+    assert.equal(
+      ledger.events.some((event) => event.kind === "stage.completed" && event.stage === "A2"),
+      false,
+      "stage-request accepted 不得写 stage.completed A2",
+    );
+    assert.equal((await readTaskState(root)).records.get(stageRequestTaskId)?.closed?.outcome, "accepted");
+
+    // 负例：同阶段生产任务（非 stage-request）报告描述 evidence 仍必须 close-report-missing（不放松）。
+    const prodTaskId = "t-b18-a2-prod";
+    const prodCreated = taskEvent("task.created", {
+      taskId: prodTaskId, from: "convener", to: "product", text: "写意图", sideEffect: "docs",
+      idempotencyKey: `work:${workflowId}:A2:product:1`, flowId: FIXED_FLOW, workflowId, stage: "A2",
+    });
+    assert.equal((await appendTaskEvent(root, prodCreated)).ok, true);
+    const prodReported = taskEvent("task.reported", {
+      taskId: prodTaskId, from: "product", status: "done", summary: "意图完成",
+      evidence: ["意图文档已写好（描述文本，非纯路径）"],
+    });
+    assert.equal((await appendTaskEvent(root, prodReported)).ok, true);
+    const convener = await openRole(h, root, "convener");
+    assert.ok(convener.closeCreatedTaskFixed, "fixed 运营会话应注入 close_created_task v2");
+    const prodClosed = await convener.closeCreatedTaskFixed!({ operationId: "op-b18-prod-close", taskId: prodTaskId, outcome: "accepted" });
+    assert.equal((prodClosed as { ok: boolean }).ok, false);
+    assert.equal((prodClosed as { code?: string }).code, "close-report-missing", "生产任务描述 evidence 仍 fail-closed");
   } finally {
     await h.mgr.stop(null);
     await cleanup(root);
