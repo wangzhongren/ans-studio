@@ -1,0 +1,32 @@
+diff --git a/game/app/app.js b/game/app/app.js
+index bb9a735..4ed1dde 100644
+--- a/game/app/app.js
++++ b/game/app/app.js
+@@ -817,21 +817,23 @@
+ 
+     function pollFrameInput() {
+       if (!engine || !engine.input || typeof engine.input.wasPressed !== 'function') { return; }
+-      var pressed = engine.input.wasPressed;
++      /* 保留宿主对象以方法形式调用：wasPressed 读取 this.pressed，
++       * 裸函数引用（var pressed = engine.input.wasPressed; pressed(...)）会丢 this。 */
++      var input = engine.input;
+ 
+       if (state === STATES.PLAYING || state === STATES.PAUSED) {
+-        if (pressed('escape') || pressed('p')) { togglePause(); }
++        if (input.wasPressed('escape') || input.wasPressed('p')) { togglePause(); }
+         return;
+       }
+ 
+       /* 无 UI（或结果屏不可用）时的键盘兜底，便于静态走查/无界面运行。 */
+       var hasResultUi = ui && typeof ui.showResult === 'function';
+-      if (!ui && state === STATES.MENU && (pressed('enter') || pressed(' '))) {
++      if (!ui && state === STATES.MENU && (input.wasPressed('enter') || input.wasPressed(' '))) {
+         startGame();
+         return;
+       }
+       if (!hasResultUi && (state === STATES.GAME_OVER || state === STATES.VICTORY) &&
+-          (pressed('r') || pressed('enter'))) {
++          (input.wasPressed('r') || input.wasPressed('enter'))) {
+         restartRun();
+       }
+     }

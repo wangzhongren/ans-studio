@@ -1,0 +1,25 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 1,
+  "cardsByKind": {
+    "merge-main": 1
+  },
+  "decisions": 0,
+  "dispatches": 6,
+  "dispatchesByFrom": {
+    "chief": 4,
+    "convener": 2
+  },
+  "tasksByTo": {
+    "convener": 4,
+    "loop-engine": 2
+  },
+  "writeTasks": 2,
+  "implementationWriteTasks": 1,
+  "turnsByRole": {
+    "chief": 10,
+    "convener": 6,
+    "loop-engine": 2
+  },
+  "gitTargetNewCommits": 2
+}

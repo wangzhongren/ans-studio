@@ -1,0 +1,177 @@
+{
+  "verdict": {
+    "menuRender": true,
+    "start": true,
+    "movement": false,
+    "waveSpawn": true,
+    "kills": false,
+    "exp": false,
+    "levelUpChoice": false,
+    "pickup": false,
+    "death": false,
+    "restart": true,
+    "consoleClean": true
+  },
+  "allPass": false,
+  "summary": {
+    "fileUrl": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr34-2026-11-12/target/index.html",
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Edg/157.0.4341.46",
+      "revision": "@a0c6bd61d7884b3c402a34c67d05100107a9e5e4",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+      "jsVersion": "15.7.11.4"
+    },
+    "boot": {
+      "snap": {
+        "state": "MENU",
+        "hp": 100,
+        "maxHp": 100,
+        "level": 1,
+        "exp": 0,
+        "expToNext": 8,
+        "wave": 0,
+        "timeLeft": 210,
+        "elapsed": 0,
+        "kills": 0,
+        "upgradeChoices": [],
+        "result": null,
+        "stats": null
+      },
+      "menu": true,
+      "bootError": false
+    },
+    "startOk": true,
+    "start": {
+      "state": "PLAYING",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "movement": {
+      "pos0": {
+        "x": 640,
+        "y": 360
+      },
+      "posD": {
+        "x": 640,
+        "y": 360,
+        "hp": 100,
+        "maxHp": 100,
+        "level": 1,
+        "exp": 0,
+        "dead": false
+      },
+      "posW": {
+        "x": 640,
+        "y": 360,
+        "hp": 100,
+        "maxHp": 100,
+        "level": 1,
+        "exp": 0,
+        "dead": false
+      },
+      "posArrow": {
+        "x": 640,
+        "y": 360,
+        "hp": 100,
+        "maxHp": 100,
+        "level": 1,
+        "exp": 0,
+        "dead": false
+      },
+      "dxRight": 0,
+      "dyUp": 0,
+      "dxArrow": 0,
+      "moveOk": false
+    },
+    "wave1": {
+      "enemyCount": 1
+    },
+    "combat": {
+      "killsSeen": 0,
+      "expSeen": 0,
+      "snap": {
+        "state": "PLAYING",
+        "hp": 100,
+        "maxHp": 100,
+        "level": 1,
+        "exp": 0,
+        "expToNext": 8,
+        "wave": 1,
+        "timeLeft": 209.6,
+        "elapsed": 0.4,
+        "kills": 0,
+        "upgradeChoices": [],
+        "result": null,
+        "stats": null
+      }
+    },
+    "levelup": {
+      "seen": false,
+      "snap": null,
+      "cards": null,
+      "after": null
+    },
+    "waves": {
+      "waveMax": 1
+    },
+    "pickup": {
+      "pickupSeen": false,
+      "weaponPickupSeen": false,
+      "result": null
+    },
+    "death": {
+      "state": "PLAYING",
+      "result": null,
+      "shot": false,
+      "usedApi": false
+    },
+    "restart": {
+      "state": "PLAYING",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 209.16666666666666,
+      "elapsed": 0.8333333333333334,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "finalSnap": {
+      "state": "PLAYING",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 209.03333333333333,
+      "elapsed": 0.9666666666666667,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "console": {
+      "total": 0,
+      "errors": 0,
+      "warnings": 0,
+      "clean": true
+    },
+    "at": "2026-11-11T16:39:56.721Z"
+  }
+}

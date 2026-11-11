@@ -1,0 +1,1757 @@
+{
+  "startedUtc": "2026-11-11T16:19:23.372Z",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr34-2026-11-12\\target",
+  "userData": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr34-2026-11-12\\userData",
+  "port": 9224,
+  "customerMessage": "打开游戏点「踏入江湖」开始后马上崩溃：浏览器控制台每帧报 Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')，游戏完全无法进行；请修复到可玩（移动/自动攻击/波次/经验升级/拾取/死亡重开都要正常）。",
+  "customerMessageBytes": 288,
+  "expectedPath": "B",
+  "steps": [
+    {
+      "step": "customer-message-sent",
+      "at": "2026-11-11T16:19:30.354Z"
+    }
+  ],
+  "roles": [
+    {
+      "roleId": "chief",
+      "builtIn": true,
+      "governanceFunction": "chief"
+    },
+    {
+      "roleId": "product",
+      "builtIn": true,
+      "governanceFunction": "product"
+    },
+    {
+      "roleId": "rapporteur",
+      "builtIn": true,
+      "governanceFunction": "proposal"
+    },
+    {
+      "roleId": "nominator",
+      "builtIn": true,
+      "governanceFunction": "nomination"
+    },
+    {
+      "roleId": "convener",
+      "builtIn": true,
+      "governanceFunction": "schedule"
+    },
+    {
+      "roleId": "verifier",
+      "builtIn": true,
+      "governanceFunction": "verification"
+    },
+    {
+      "roleId": "arsenal",
+      "builtIn": false
+    },
+    {
+      "roleId": "config-data",
+      "builtIn": false
+    },
+    {
+      "roleId": "enemy-systems",
+      "builtIn": false
+    },
+    {
+      "roleId": "env-bootstrap",
+      "builtIn": false
+    },
+    {
+      "roleId": "loop-engine",
+      "builtIn": false
+    },
+    {
+      "roleId": "player-combat",
+      "builtIn": false
+    },
+    {
+      "roleId": "progression",
+      "builtIn": false
+    },
+    {
+      "roleId": "qa-verifier",
+      "builtIn": false
+    },
+    {
+      "roleId": "ui-hud",
+      "builtIn": false
+    }
+  ],
+  "sessionOpens": {
+    "chief": {
+      "at": "2026-11-11T16:19:29.299Z",
+      "opened": true
+    }
+  },
+  "taskRows": [
+    {
+      "at": "2026-11-11T16:21:00.103Z",
+      "kind": "task.created",
+      "taskId": "t-mwcbsu2q-32509e8e",
+      "from": "chief",
+      "to": "convener",
+      "flowId": "wuxia-roguelike",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "taskKind": "stage-request",
+      "sideEffect": "read-only",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:21:04.500Z",
+      "kind": "project.focus",
+      "flowId": "wuxia-roguelike",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:21:07.019Z",
+      "kind": "project.note",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:23:22.933Z",
+      "kind": "task.delivered",
+      "taskId": "t-mwcbsu2q-32509e8e",
+      "to": "convener",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:23:22.909Z",
+      "kind": "task.reported",
+      "taskId": "t-mwcbsu2q-32509e8e",
+      "from": "convener",
+      "status": "done",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null,
+      "summary": "B1 只读影响面分析已完成并落盘 `docs/scheduling/wuxia-roguelike-b1-impact-v2.md`（未覆盖 v1）：根因唯一——`game/app/app.js` 的 `pollFrameInput()` 把 `engine.input.wasPressed` 解引用为裸函数后以 `pressed('escape')` 调用，`input.js` 在 `'use…"
+    },
+    {
+      "at": "2026-11-11T16:23:51.391Z",
+      "kind": "task.closed",
+      "taskId": "t-mwcbsu2q-32509e8e",
+      "outcome": "accepted",
+      "by": "chief",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:25:30.431Z",
+      "kind": "task.created",
+      "taskId": "t-mwcbymny-4ac78b50",
+      "from": "chief",
+      "to": "convener",
+      "flowId": "wuxia-roguelike",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "taskKind": "stage-request",
+      "sideEffect": "read-only",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:25:39.347Z",
+      "kind": "task.created",
+      "taskId": "t-mwcbytjn-92613679",
+      "from": "convener",
+      "to": "loop-engine",
+      "flowId": "wuxia-roguelike",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "sideEffect": "code",
+      "application": null,
+      "moduleId": "loop-app",
+      "modulePaths": [
+        "game/app/"
+      ]
+    },
+    {
+      "at": "2026-11-11T16:26:11.285Z",
+      "kind": "task.delivered",
+      "taskId": "t-mwcbymny-4ac78b50",
+      "to": "convener",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:26:11.262Z",
+      "kind": "task.reported",
+      "taskId": "t-mwcbymny-4ac78b50",
+      "from": "convener",
+      "status": "done",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null,
+      "summary": "B1 影响面报告已作为本任务证据落盘并回报：`docs/scheduling/wuxia-roguelike-b1-impact-v2.md`（结论报告）+ `docs/scheduling/wuxia-roguelike-b1-impact-v3.md`（仅更正派发记录，结论不变，不覆盖 v2）。本轮按普通 dispatch_task（roleId=loop-engine、stage=B1、w…"
+    },
+    {
+      "at": "2026-11-11T16:26:25.961Z",
+      "kind": "task.closed",
+      "taskId": "t-mwcbymny-4ac78b50",
+      "outcome": "accepted",
+      "by": "chief",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:26:47.587Z",
+      "kind": "task.delivered",
+      "taskId": "t-mwcbytjn-92613679",
+      "to": "loop-engine",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:26:47.562Z",
+      "kind": "task.reported",
+      "taskId": "t-mwcbytjn-92613679",
+      "from": "loop-engine",
+      "status": "done",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null,
+      "summary": "只读根因复核（未改任何文件、未提交、未运行浏览器/DevTools/任何 shell，纯静态读码）：真实缺陷唯一，位于 game/app/app.js 的 pollFrameInput()。它 `var pressed = engine.input.wasPressed;` 把原型方法解引用为裸函数后以 `pressed('escape')` 等普通调用；两个文件均为 'use strict'，…"
+    },
+    {
+      "at": "2026-11-11T16:27:22.174Z",
+      "kind": "task.created",
+      "taskId": "t-mwcc10vy-b0abb370",
+      "from": "chief",
+      "to": "convener",
+      "flowId": "wuxia-roguelike",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "taskKind": "stage-request",
+      "sideEffect": "read-only",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:27:25.909Z",
+      "kind": "task.closed",
+      "taskId": "t-mwcbytjn-92613679",
+      "outcome": "accepted",
+      "by": "convener",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:27:45.853Z",
+      "kind": "task.delivered",
+      "taskId": "t-mwcc10vy-b0abb370",
+      "to": "convener",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:27:45.834Z",
+      "kind": "task.reported",
+      "taskId": "t-mwcc10vy-b0abb370",
+      "from": "convener",
+      "status": "done",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null,
+      "summary": "已收口本人创建的 loop-engine 只读复核任务 `#t-mwcbytjn-92613679`：`close_created_task` 回执 ok:true、outcome=accepted、eventId=`event-d10d94977e7dfae0c673beb7`、replay=false、**stageCompleted=true**（note 已写明唯一缺陷在 `game/a…"
+    },
+    {
+      "at": "2026-11-11T16:27:49.671Z",
+      "kind": "task.closed",
+      "taskId": "t-mwcc10vy-b0abb370",
+      "outcome": "accepted",
+      "by": "chief",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:28:28.257Z",
+      "kind": "task.created",
+      "taskId": "t-mwcc2fvk-d8ef7983",
+      "from": "chief",
+      "to": "convener",
+      "flowId": "wuxia-roguelike",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B3",
+      "taskKind": "stage-request",
+      "sideEffect": "read-only",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:28:44.826Z",
+      "kind": "task.created",
+      "taskId": "t-mwcc2snu-9d0ba155",
+      "from": "convener",
+      "to": "loop-engine",
+      "flowId": "wuxia-roguelike",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B3",
+      "sideEffect": "code",
+      "application": null,
+      "moduleId": "loop-app",
+      "modulePaths": [
+        "game/app/"
+      ]
+    },
+    {
+      "at": "2026-11-11T16:28:55.838Z",
+      "kind": "task.delivered",
+      "taskId": "t-mwcc2fvk-d8ef7983",
+      "to": "convener",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:28:55.817Z",
+      "kind": "task.reported",
+      "taskId": "t-mwcc2fvk-d8ef7983",
+      "from": "convener",
+      "status": "done",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null,
+      "summary": "B3 实现修复任务已按普通 dispatch_task 派发给 loop-engine：roleId=loop-engine、stage=B3、workflowId=wf-08a64bc64db25ab9650a5372、moduleId=loop-app、modulePaths=[\"game/app/\"]、sideEffect=code（应用枚举只接受 code/read-only 等，拒绝字…"
+    },
+    {
+      "at": "2026-11-11T16:29:08.994Z",
+      "kind": "task.closed",
+      "taskId": "t-mwcc2fvk-d8ef7983",
+      "outcome": "accepted",
+      "by": "chief",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:29:28.047Z",
+      "kind": "task.delivered",
+      "taskId": "t-mwcc2snu-9d0ba155",
+      "to": "loop-engine",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:29:28.025Z",
+      "kind": "task.reported",
+      "taskId": "t-mwcc2snu-9d0ba155",
+      "from": "loop-engine",
+      "status": "done",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null,
+      "summary": "已完成 game/app/app.js 的最小修复并提交。变更仅限 pollFrameInput()：原 `var pressed = engine.input.wasPressed;` 改为 `var input = engine.input;`，随后 5 处裸调用 `pressed('escape') / pressed('p') / pressed('enter') / pressed('…"
+    },
+    {
+      "at": "2026-11-11T16:30:55.122Z",
+      "kind": "task.closed",
+      "taskId": "t-mwcc2snu-9d0ba155",
+      "outcome": "accepted",
+      "by": "convener",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:30:55.308Z",
+      "kind": "request.created",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "flowId": "wuxia-roguelike",
+      "title": "合并 main（高风险发布确认）",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:30:55.319Z",
+      "kind": "request.presented",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "to": "customer",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:30:55.777Z",
+      "kind": "request.resolved",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "by": "customer",
+      "choice": "approve-merge-main",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    },
+    {
+      "at": "2026-11-11T16:31:52.495Z",
+      "kind": "project.note",
+      "application": null,
+      "moduleId": null,
+      "modulePaths": null
+    }
+  ],
+  "requestRows": [
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:55.308Z",
+      "kind": "request.created",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "flowId": "wuxia-roguelike",
+      "cardKind": "merge-main",
+      "sourceRoleId": "application",
+      "title": "合并 main（高风险发布确认）",
+      "context": "是否由应用在本地把任务分支合并进 main？只本地合并：不 push、不打 tag、不发布产物；必须由客户本人确认。",
+      "options": [
+        {
+          "id": "approve-merge-main",
+          "label": "确认合并 main"
+        },
+        {
+          "id": "reject-merge-main",
+          "label": "拒绝合并"
+        }
+      ]
+    }
+  ],
+  "workflowRows": [
+    {
+      "v": 1,
+      "at": "2026-11-11T16:21:00.098Z",
+      "schema": "ans-workflow/v1",
+      "kind": "workflow.started",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "workflow-start:wuxia-roguelike:B:6632adb1-9df0-4ab3-a75e-32d943524e07",
+      "trigger": {
+        "by": "chief",
+        "reason": "chief stage request"
+      },
+      "sourceTaskId": "6632adb1-9df0-4ab3-a75e-32d943524e07",
+      "legacyStateIgnored": true
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:21:00.098Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.requested",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-request:wf-08a64bc64db25ab9650a5372:B1:1",
+      "stage": "B1",
+      "requestTaskId": "t-mwcbsu2q-32509e8e",
+      "requestDigest": "148a085375d149b22e7bcf85773291397e403a991748a43488950c82615f1a7f",
+      "attempt": 1
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:25:30.430Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.requested",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-request:wf-08a64bc64db25ab9650a5372:B1:2",
+      "stage": "B1",
+      "fromStage": "B1",
+      "requestTaskId": "t-mwcbymny-4ac78b50",
+      "requestDigest": "6472e4edefd3c5f921bb60d42e2f53691432e405916f358a60d325fcd7a30a3b",
+      "attempt": 2
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:27:22.174Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.requested",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-request:wf-08a64bc64db25ab9650a5372:B1:3",
+      "stage": "B1",
+      "fromStage": "B1",
+      "requestTaskId": "t-mwcc10vy-b0abb370",
+      "requestDigest": "aaa395fd82bb0d99fc6d8207fea166f45f8162a06af067971524ba7b4a204c34",
+      "attempt": 3
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:27:25.909Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.completed",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-complete:wf-08a64bc64db25ab9650a5372:B1:t-mwcbytjn-92613679",
+      "stage": "B1",
+      "cause": {
+        "kind": "task-closed",
+        "ref": "t-mwcbytjn-92613679"
+      },
+      "artifacts": [
+        {
+          "path": "game/app/app.js",
+          "sha256": "35211a894cafc72da33ed0dfec0e36b7f7262a5553d7d2df4b8240ef7a82322d",
+          "kind": "report-evidence"
+        },
+        {
+          "path": "game/engine/input.js",
+          "sha256": "b38d00127d7d748c89d03c49b9447f826e1c467141d62cba3ceb4e6e7531e471",
+          "kind": "report-evidence"
+        },
+        {
+          "path": "game/engine/engine.js",
+          "sha256": "5e472fbbe8978176756dadfca444d546918c681f9ae218b981d8d710366efcf5",
+          "kind": "report-evidence"
+        },
+        {
+          "path": "game/app/bus.js",
+          "sha256": "181a2c09c874b4a0f46543d10c7d0132224465d6583990fab5331ba00497a5b7",
+          "kind": "report-evidence"
+        },
+        {
+          "path": "game/app/integrations.js",
+          "sha256": "c57c5b71862fb10796f0f9e75e6e9fe49ea2d48aa31e77ed4586bd49e2174c7e",
+          "kind": "report-evidence"
+        }
+      ]
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:28:28.251Z",
+      "schema": "ans-workflow/v1",
+      "kind": "change.scope-decided",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "scope:wf-08a64bc64db25ab9650a5372:c57c5b71862fb10796f0f9e75e6e9fe49ea2d48aa31e77ed4586bd49e2174c7e:fc9dcca09e038011dc38932f",
+      "impactReport": {
+        "path": "game/app/integrations.js",
+        "sha256": "c57c5b71862fb10796f0f9e75e6e9fe49ea2d48aa31e77ed4586bd49e2174c7e"
+      },
+      "scope": {
+        "summary": "B2 范围决定（B1 影响面：game/app/integrations.js）",
+        "files": [
+          "game/app/app.js"
+        ],
+        "rationale": "依据 B1 任务 t-mwcbytjn-92613679 的 done 报告；候选路径由应用记录，属主/有效写集由应用按名单/边界派生"
+      },
+      "effectiveWritesets": [
+        {
+          "roleId": "loop-engine",
+          "paths": [
+            "game/app/app.js"
+          ]
+        }
+      ],
+      "decidedBy": "chief",
+      "requestTaskId": "t-mwcc10vy-b0abb370"
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:28:28.256Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.requested",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-request:wf-08a64bc64db25ab9650a5372:B3:1",
+      "stage": "B3",
+      "fromStage": "B2",
+      "requestTaskId": "t-mwcc2fvk-d8ef7983",
+      "requestDigest": "8eb442d478341ad6699a84b9c41ec17b38b4438fd2811487488cf7d25995cc86",
+      "attempt": 1
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:55.122Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.completed",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-complete:wf-08a64bc64db25ab9650a5372:B3:t-mwcc2snu-9d0ba155",
+      "stage": "B3",
+      "cause": {
+        "kind": "task-closed",
+        "ref": "t-mwcc2snu-9d0ba155"
+      },
+      "artifacts": [
+        {
+          "path": "game/app/app.js",
+          "sha256": "d1203dff0120b5899f869a41b832853a39fe75894384554c7543c41cbc917d2d",
+          "kind": "report-evidence"
+        }
+      ]
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:55.305Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.requested",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-request:wf-08a64bc64db25ab9650a5372:B4:1",
+      "stage": "B4",
+      "fromStage": "B3",
+      "requestTaskId": "release-card:rel-f0c24880f055b129770a8184",
+      "requestDigest": "ccb7135b235922dfc655ba4f6fbc7e4f2ab976c9522a05a0b32245002e7443a6",
+      "attempt": 1
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:56.318Z",
+      "schema": "ans-workflow/v1",
+      "kind": "stage.completed",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "stage-complete:wf-08a64bc64db25ab9650a5372:B4:rel-f0c24880f055b129770a8184",
+      "stage": "B4",
+      "cause": {
+        "kind": "release-merged",
+        "ref": "rel-f0c24880f055b129770a8184"
+      },
+      "artifacts": [
+        {
+          "path": ".ans/state/releases.jsonl",
+          "kind": "release-ledger"
+        }
+      ]
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:56.318Z",
+      "schema": "ans-workflow/v1",
+      "kind": "workflow.closed",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B",
+      "idempotencyKey": "workflow-close:wf-08a64bc64db25ab9650a5372:delivered:5464704a94dab78c796fc163",
+      "outcome": "delivered",
+      "reason": "release rel-f0c24880f055b129770a8184 merged",
+      "releaseId": "rel-f0c24880f055b129770a8184"
+    }
+  ],
+  "basisRows": [
+    {
+      "v": 1,
+      "at": "2026-11-11T16:25:39.340Z",
+      "schema": "ans-basis/v1",
+      "kind": "basis.recorded",
+      "basisId": "bas-ce1c2c83bf75a4508d744b48",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "documents": [
+        {
+          "kind": "intent",
+          "path": "docs/product/wuxia-roguelike-intent-v1.md",
+          "version": 1,
+          "sha256": "68b46c92b9fa2a7eec9f3391c90373e4bce3a3e5e274e5ba7533c9226fea957f",
+          "bytes": 7621
+        },
+        {
+          "kind": "proposal",
+          "path": "docs/proposals/wuxia-roguelike-proposal-v1.md",
+          "version": 1,
+          "sha256": "661dc03b6605c3765eaf4ee3b4657284bdd66c4c6b7c7f8428e9ad648669cac9",
+          "bytes": 7988
+        },
+        {
+          "kind": "modules",
+          "path": "docs/proposals/wuxia-roguelike-modules-v1.md",
+          "version": 1,
+          "sha256": "86b43d9a09cdf9a5202303db87cf7e4b2177802f1febcb450cdbf8457d094239",
+          "bytes": 5039
+        },
+        {
+          "kind": "roster",
+          "path": "docs/proposals/wuxia-roguelike-roster-v1.md",
+          "version": 1,
+          "sha256": "50b08cba0eeb1bea6101122a0c304a0506eb687fb043bed2aea1189094e9216c",
+          "bytes": 9800
+        },
+        {
+          "kind": "architecture",
+          "path": "docs/contracts/wuxia-roguelike-architecture-v1.md",
+          "version": 1,
+          "sha256": "3e9984174fee83424d57328025e85dfa765863ed36bfe550f32559a213e6b945",
+          "bytes": 10248
+        }
+      ],
+      "teamPlan": null,
+      "repo": {
+        "state": "existing",
+        "branch": "ans/task/wf-08a64bc64db25ab9650a5372",
+        "baseOid": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+        "headOid": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+        "mainUnborn": false,
+        "initialBranch": "ans/task/wf-739312023202ee992b7c8955",
+        "ignorePolicy": "ans-v1",
+        "gitignoreSha256": "d9f36f22353e9f98e3d7d231679010fd2c3d00cfc2a47a9e50984a61ea9768f6",
+        "objectFormat": "sha1"
+      },
+      "reviewRoleId": "qa-verifier",
+      "operationId": "path-b:wf-08a64bc64db25ab9650a5372",
+      "idempotencyKey": "path-b:wf-08a64bc64db25ab9650a5372:029da0caa6a2eda74434f9aa",
+      "reason": "path-b",
+      "recordedBy": "application"
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:25:39.346Z",
+      "schema": "ans-basis/v1",
+      "kind": "basis.verified",
+      "idempotencyKey": "basis-verified:bas-ce1c2c83bf75a4508d744b48:04db143c9b0150aa6c2630676507c9a6216e4b1a478ca76f01ed295e67641fce",
+      "basisId": "bas-ce1c2c83bf75a4508d744b48",
+      "checkedAt": "2026-11-11T16:25:39.346Z",
+      "ok": true,
+      "documents": [
+        {
+          "path": "docs/product/wuxia-roguelike-intent-v1.md",
+          "sha256": "68b46c92b9fa2a7eec9f3391c90373e4bce3a3e5e274e5ba7533c9226fea957f",
+          "ok": true
+        },
+        {
+          "path": "docs/proposals/wuxia-roguelike-proposal-v1.md",
+          "sha256": "661dc03b6605c3765eaf4ee3b4657284bdd66c4c6b7c7f8428e9ad648669cac9",
+          "ok": true
+        },
+        {
+          "path": "docs/proposals/wuxia-roguelike-modules-v1.md",
+          "sha256": "86b43d9a09cdf9a5202303db87cf7e4b2177802f1febcb450cdbf8457d094239",
+          "ok": true
+        },
+        {
+          "path": "docs/proposals/wuxia-roguelike-roster-v1.md",
+          "sha256": "50b08cba0eeb1bea6101122a0c304a0506eb687fb043bed2aea1189094e9216c",
+          "ok": true
+        },
+        {
+          "path": "docs/contracts/wuxia-roguelike-architecture-v1.md",
+          "sha256": "3e9984174fee83424d57328025e85dfa765863ed36bfe550f32559a213e6b945",
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "releaseRows": [
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:55.305Z",
+      "schema": "ans-release/v1",
+      "kind": "release.requested",
+      "idempotencyKey": "release-requested:wf-08a64bc64db25ab9650a5372:66fae06a1535e6ef4ec96c130166e5a6c4c9dff1",
+      "releaseId": "rel-f0c24880f055b129770a8184",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "operationId": "auto-release:wf-08a64bc64db25ab9650a5372:B3",
+      "summary": "fixed B3 任务已 accepted：应用自动呈 merge-main 发布确认（workflow wf-08a64bc64db25ab9650a5372）。",
+      "evidence": [
+        {
+          "path": "game/app/app.js",
+          "sha256": "d1203dff0120b5899f869a41b832853a39fe75894384554c7543c41cbc917d2d"
+        }
+      ],
+      "baseOid": {
+        "objectFormat": "sha1",
+        "hex": "8724c076b05104dcfb8e34e0f1fe55dd36302424"
+      },
+      "tipOid": {
+        "objectFormat": "sha1",
+        "hex": "66fae06a1535e6ef4ec96c130166e5a6c4c9dff1"
+      },
+      "mergeKind": "merge"
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:55.987Z",
+      "schema": "ans-release/v1",
+      "kind": "release.confirmed",
+      "idempotencyKey": "release-confirmed:wf-08a64bc64db25ab9650a5372:66fae06a1535e6ef4ec96c130166e5a6c4c9dff1",
+      "releaseId": "rel-f0c24880f055b129770a8184",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "by": "customer",
+      "decisionId": "decision-merge-main-rel-f0c24880f055b129770a8184"
+    },
+    {
+      "v": 1,
+      "at": "2026-11-11T16:30:56.316Z",
+      "schema": "ans-release/v1",
+      "kind": "release.merged",
+      "idempotencyKey": "release-merged:wf-08a64bc64db25ab9650a5372:66fae06a1535e6ef4ec96c130166e5a6c4c9dff1",
+      "releaseId": "rel-f0c24880f055b129770a8184",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "baseOid": {
+        "objectFormat": "sha1",
+        "hex": "8724c076b05104dcfb8e34e0f1fe55dd36302424"
+      },
+      "tipOid": {
+        "objectFormat": "sha1",
+        "hex": "66fae06a1535e6ef4ec96c130166e5a6c4c9dff1"
+      },
+      "mergeOid": {
+        "objectFormat": "sha1",
+        "hex": "87db6a7c489f60cf4e77f5bd538e31f83693f25b"
+      },
+      "mergeKind": "merge",
+      "files": [
+        {
+          "path": "game/app/app.js",
+          "status": "M"
+        }
+      ],
+      "diffDigest": "3a85e24766e97e9d29cdb28021e2e2097ca691056adde5b5c57c2e137ea06f13"
+    }
+  ],
+  "stages": {
+    "B1": {
+      "stage.requested": "2026-11-11T16:27:22.174Z",
+      "status": "completed",
+      "completedAt": "2026-11-11T16:27:25.909Z"
+    },
+    "B3": {
+      "stage.requested": "2026-11-11T16:28:28.256Z",
+      "status": "completed",
+      "completedAt": "2026-11-11T16:30:55.122Z"
+    },
+    "B4": {
+      "stage.requested": "2026-11-11T16:30:55.305Z",
+      "status": "completed",
+      "completedAt": "2026-11-11T16:30:56.318Z"
+    }
+  },
+  "cards": [
+    {
+      "at": "2026-11-11T16:30:55.772Z",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "ledgerWorkflowId": null,
+      "ledgerStage": null
+    }
+  ],
+  "dialogs": [
+    {
+      "seq": 1,
+      "at": "2026-11-11T16:30:55.699Z",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "title": "合并 main（高风险发布确认）",
+      "options": [
+        {
+          "id": "approve-merge-main",
+          "checked": false,
+          "type": "radio"
+        },
+        {
+          "id": "reject-merge-main",
+          "checked": false,
+          "type": "radio"
+        }
+      ],
+      "labels": [
+        "确认合并 main",
+        "拒绝合并"
+      ],
+      "acks": [],
+      "submitDisabled": true,
+      "confirmDisabled": null,
+      "error": null,
+      "more": null,
+      "ledger": {
+        "workflowId": null,
+        "stage": null,
+        "flowId": "wuxia-roguelike",
+        "source": null,
+        "application": null
+      }
+    }
+  ],
+  "dialogActions": [
+    {
+      "at": "2026-11-11T16:30:55.778Z",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "selectIds": [
+        "approve-merge-main"
+      ],
+      "action": {
+        "result": "submitted",
+        "selected": [
+          "approve-merge-main"
+        ]
+      }
+    }
+  ],
+  "dispatches": [
+    {
+      "at": "2026-11-11T16:21:00.103Z",
+      "taskId": "t-mwcbsu2q-32509e8e",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "flowId": "wuxia-roguelike",
+      "moduleId": null,
+      "sideEffect": "read-only"
+    },
+    {
+      "at": "2026-11-11T16:25:30.431Z",
+      "taskId": "t-mwcbymny-4ac78b50",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "flowId": "wuxia-roguelike",
+      "moduleId": null,
+      "sideEffect": "read-only"
+    },
+    {
+      "at": "2026-11-11T16:25:39.347Z",
+      "taskId": "t-mwcbytjn-92613679",
+      "from": "convener",
+      "to": "loop-engine",
+      "taskKind": null,
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "flowId": "wuxia-roguelike",
+      "moduleId": "loop-app",
+      "sideEffect": "code"
+    },
+    {
+      "at": "2026-11-11T16:27:22.174Z",
+      "taskId": "t-mwcc10vy-b0abb370",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1",
+      "flowId": "wuxia-roguelike",
+      "moduleId": null,
+      "sideEffect": "read-only"
+    },
+    {
+      "at": "2026-11-11T16:28:28.257Z",
+      "taskId": "t-mwcc2fvk-d8ef7983",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B3",
+      "flowId": "wuxia-roguelike",
+      "moduleId": null,
+      "sideEffect": "read-only"
+    },
+    {
+      "at": "2026-11-11T16:28:44.826Z",
+      "taskId": "t-mwcc2snu-9d0ba155",
+      "from": "convener",
+      "to": "loop-engine",
+      "taskKind": null,
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B3",
+      "flowId": "wuxia-roguelike",
+      "moduleId": "loop-app",
+      "sideEffect": "code"
+    }
+  ],
+  "diagnosticsOfInterest": [
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:19:28.318Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:19:28.323Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "chief.workflow.v2.loaded",
+      "at": "2026-11-11T16:19:29.250Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:19:29.267Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.end",
+      "at": "2026-11-11T16:19:29.271Z",
+      "roleId": "chief",
+      "ok": true,
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:21:00.107Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "taskGit.scope.unavailable",
+      "at": "2026-11-11T16:21:00.127Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": "git-task-scope-invalid",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:21:00.141Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:21:12.772Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "chief.workflow.v2.loaded",
+      "at": "2026-11-11T16:21:13.656Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:21:13.663Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open-background.start",
+      "at": "2026-11-11T16:23:22.937Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open-background.end",
+      "at": "2026-11-11T16:23:22.940Z",
+      "roleId": "chief",
+      "ok": true,
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "delivery.blocked",
+      "at": "2026-11-11T16:23:22.985Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": "target-busy",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "delivery.blocked",
+      "at": "2026-11-11T16:23:51.396Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": "target-busy",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:25:30.435Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "taskGit.scope.unavailable",
+      "at": "2026-11-11T16:25:30.459Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": "git-task-scope-invalid",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:25:30.471Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:25:39.349Z",
+      "roleId": "loop-engine",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "taskGit.scope.unavailable",
+      "at": "2026-11-11T16:25:39.447Z",
+      "roleId": "loop-engine",
+      "errorMessage": null,
+      "code": "git-task-scope-invalid",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:25:39.458Z",
+      "roleId": "loop-engine",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:27:22.180Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "taskGit.scope.unavailable",
+      "at": "2026-11-11T16:27:22.202Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": "git-task-scope-invalid",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:27:22.214Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open-background.start",
+      "at": "2026-11-11T16:27:45.858Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open-background.end",
+      "at": "2026-11-11T16:27:45.861Z",
+      "roleId": "chief",
+      "ok": true,
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "delivery.blocked",
+      "at": "2026-11-11T16:27:45.894Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": "target-busy",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "delivery.blocked",
+      "at": "2026-11-11T16:27:49.676Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": "target-busy",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:28:28.263Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "taskGit.scope.unavailable",
+      "at": "2026-11-11T16:28:28.289Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": "git-task-scope-invalid",
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:28:28.301Z",
+      "roleId": "convener",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:28:44.831Z",
+      "roleId": "loop-engine",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "taskGit.scope.ready",
+      "at": "2026-11-11T16:28:44.934Z",
+      "roleId": "loop-engine",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:28:44.949Z",
+      "roleId": "loop-engine",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    }
+  ],
+  "milestones": [
+    {
+      "at": "2026-11-11T16:19:29.250Z",
+      "milestone": "chief-workflow-v2-injected",
+      "sha256": null
+    },
+    {
+      "at": "2026-11-11T16:21:00.103Z",
+      "milestone": "dispatch",
+      "taskId": "t-mwcbsu2q-32509e8e",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1"
+    },
+    {
+      "at": "2026-11-11T16:21:00.098Z",
+      "milestone": "workflow-started",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "flowId": "wuxia-roguelike",
+      "path": "B"
+    },
+    {
+      "at": "2026-11-11T16:21:13.656Z",
+      "milestone": "chief-workflow-v2-injected",
+      "sha256": null
+    },
+    {
+      "at": "2026-11-11T16:25:30.431Z",
+      "milestone": "dispatch",
+      "taskId": "t-mwcbymny-4ac78b50",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1"
+    },
+    {
+      "at": "2026-11-11T16:25:39.347Z",
+      "milestone": "dispatch",
+      "taskId": "t-mwcbytjn-92613679",
+      "from": "convener",
+      "to": "loop-engine",
+      "taskKind": null,
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1"
+    },
+    {
+      "at": "2026-11-11T16:25:39.340Z",
+      "milestone": "basis-recorded",
+      "basisId": "bas-ce1c2c83bf75a4508d744b48",
+      "reason": "path-b"
+    },
+    {
+      "at": "2026-11-11T16:27:22.174Z",
+      "milestone": "dispatch",
+      "taskId": "t-mwcc10vy-b0abb370",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B1"
+    },
+    {
+      "at": "2026-11-11T16:27:25.909Z",
+      "milestone": "stage-completed",
+      "stage": "B1"
+    },
+    {
+      "at": "2026-11-11T16:28:28.257Z",
+      "milestone": "dispatch",
+      "taskId": "t-mwcc2fvk-d8ef7983",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B3"
+    },
+    {
+      "at": "2026-11-11T16:28:28.251Z",
+      "milestone": "change-scope-decided",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "files": [
+        "game/app/app.js"
+      ],
+      "writesets": [
+        {
+          "roleId": "loop-engine",
+          "paths": [
+            "game/app/app.js"
+          ]
+        }
+      ]
+    },
+    {
+      "at": "2026-11-11T16:28:44.826Z",
+      "milestone": "dispatch",
+      "taskId": "t-mwcc2snu-9d0ba155",
+      "from": "convener",
+      "to": "loop-engine",
+      "taskKind": null,
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "stage": "B3"
+    },
+    {
+      "at": "2026-11-11T16:30:55.122Z",
+      "milestone": "stage-completed",
+      "stage": "B3"
+    },
+    {
+      "at": "2026-11-11T16:30:55.308Z",
+      "milestone": "card-created",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "workflowId": null,
+      "stage": null,
+      "title": "合并 main（高风险发布确认）",
+      "options": [
+        {
+          "id": "approve-merge-main",
+          "recommended": null
+        },
+        {
+          "id": "reject-merge-main",
+          "recommended": null
+        }
+      ]
+    },
+    {
+      "at": "2026-11-11T16:30:55.777Z",
+      "milestone": "card-resolved",
+      "requestId": "merge-main-rel-f0c24880f055b129770a8184",
+      "cardKind": "merge-main",
+      "by": "customer",
+      "choice": "approve-merge-main",
+      "source": null,
+      "workflowId": null
+    },
+    {
+      "at": "2026-11-11T16:30:56.318Z",
+      "milestone": "stage-completed",
+      "stage": "B4"
+    },
+    {
+      "at": "2026-11-11T16:30:56.318Z",
+      "milestone": "workflow-closed",
+      "outcome": "delivered"
+    },
+    {
+      "at": "2026-11-11T16:30:56.316Z",
+      "milestone": "release-merged",
+      "workflowId": "wf-08a64bc64db25ab9650a5372",
+      "mergeOid": {
+        "objectFormat": "sha1",
+        "hex": "87db6a7c489f60cf4e77f5bd538e31f83693f25b"
+      }
+    },
+    {
+      "at": "2026-11-11T16:30:57.068Z",
+      "milestone": "release-merged-and-delivered"
+    }
+  ],
+  "toolNotices": [],
+  "stop": null,
+  "error": null,
+  "portsDuringRun": [
+    {
+      "at": "2026-11-11T16:19:31.964Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:19:52.054Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:20:12.439Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:20:32.457Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:20:52.592Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:21:12.662Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:21:32.758Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:21:52.934Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:22:13.119Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:22:33.280Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:22:53.490Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:23:13.729Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:23:33.964Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:23:54.149Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:24:14.367Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:24:34.655Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:24:54.838Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:25:15.074Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:25:35.243Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:25:55.374Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:26:15.622Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:26:35.821Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:26:55.991Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:27:16.269Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:27:36.556Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:27:56.730Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:28:16.903Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:28:37.199Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:28:57.368Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:29:17.585Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:29:37.783Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:29:58.144Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:30:18.214Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:30:38.391Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:30:58.763Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:31:19.069Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:31:39.335Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    }
+  ],
+  "preTarget": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr34-2026-11-12\\target",
+    "branch": "ans/task/wf-739312023202ee992b7c8955",
+    "head": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "main": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "status": "",
+    "branches": "* ans/task/wf-739312023202ee992b7c8955 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n  ans/task/wf-e6a70e9eace7a4f6d16e7ad9 9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\n  main                                 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)",
+    "log3": "8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules",
+    "allOids": [
+      "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+      "9ee4afe2f87c9504992c616f23340f1438843edb",
+      "ddaf2a4f0ed77f4d211020991db3901fcef16a2e",
+      "6c9b068848ba40794c4b22d949b7a670c680e6e1",
+      "a993794ee8afef9b2dab22475ef99500125b9ecb",
+      "d201ad3f5c003cfc5bc2baf56b4aa3a80045e9dc",
+      "b27766ca3938526bee38a48908d7707087b9befd",
+      "163c8fc410caba8076d42d1a6d997f90b82bff1e",
+      "5e1219f024bfe0206456242ce7b145e96cf6df22",
+      "d5e61776faf3ac0edfeca3382f8dcd595bb015d6",
+      "9380d42f202f04a17c740ce60bb1cb0122dda8ea",
+      "da75dc61e207ffe2dd41b471b1c323a4201c5b97",
+      "baaba97bf399f84b0b8493be7582e136465c9140",
+      "22b9920d897800559aad867bf0962426d96a7e9d",
+      "4a3f07ca3c5a8f8b9a68ecf3afda0515b790f584",
+      "cd7b6c49d7a504d46028d8b93109faf3c0294845",
+      "277e4a02f87fb0fdd2e767c1914b12362725859a"
+    ],
+    "hasAns": true,
+    "hasProject": true,
+    "hasRoster": true,
+    "topLevel": [
+      ".ans",
+      ".git",
+      ".gitignore",
+      "assets",
+      "docs",
+      "game",
+      "index.html",
+      "README.md",
+      "角色卡"
+    ]
+  },
+  "scopeDecided": {
+    "at": "2026-11-11T16:28:28.251Z",
+    "workflowId": "wf-08a64bc64db25ab9650a5372",
+    "impactReport": {
+      "path": "game/app/integrations.js",
+      "sha256": "c57c5b71862fb10796f0f9e75e6e9fe49ea2d48aa31e77ed4586bd49e2174c7e"
+    },
+    "scope": {
+      "summary": "B2 范围决定（B1 影响面：game/app/integrations.js）",
+      "files": [
+        "game/app/app.js"
+      ],
+      "rationale": "依据 B1 任务 t-mwcbytjn-92613679 的 done 报告；候选路径由应用记录，属主/有效写集由应用按名单/边界派生"
+    },
+    "effectiveWritesets": [
+      {
+        "roleId": "loop-engine",
+        "paths": [
+          "game/app/app.js"
+        ]
+      }
+    ],
+    "decidedBy": "chief"
+  },
+  "gitNewCommits": [
+    "87db6a7c489f60cf4e77f5bd538e31f83693f25b",
+    "66fae06a1535e6ef4ec96c130166e5a6c4c9dff1"
+  ]
+}

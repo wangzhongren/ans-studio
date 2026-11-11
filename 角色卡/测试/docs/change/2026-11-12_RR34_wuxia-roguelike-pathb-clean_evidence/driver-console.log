@@ -1,0 +1,6 @@
+Warning: Detected unsettled top-level await at file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr34-2026-11-12/rr/drive-rr34.mjs:741
+  await finalize();
+  ^
+
+
+

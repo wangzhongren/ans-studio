@@ -1,0 +1,30 @@
+4x	git status --short
+2x	git log --oneline -10
+1x	git add game/app/app.js
+2x	git commit -m "fix(loop-app): pollFrameInput 以方法形式调用 wasPressed"
+1x	git rev-parse HEAD
+2x	git log -5
+1x	git show 66fae06a1535e6ef4ec96c130166e5a6c4c9dff1
+3x	git status
+2x	git log --oneline -5
+1x	git rev-parse --abbrev-ref HEAD
+--- raw rows ---
+2026-11-11T16:19:37.927Z		git status --short
+2026-11-11T16:19:38.068Z	exit=0	git status --short
+2026-11-11T16:19:38.076Z		git log --oneline -10
+2026-11-11T16:19:38.193Z	exit=0	git log --oneline -10
+2026-11-11T16:29:04.776Z		git add game/app/app.js
+2026-11-11T16:29:06.711Z		git commit -m "fix(loop-app): pollFrameInput 以方法形式调用 wasPressed"
+2026-11-11T16:29:06.885Z	exit=0	git commit -m "fix(loop-app): pollFrameInput 以方法形式调用 wasPressed"
+2026-11-11T16:29:11.748Z		git rev-parse HEAD
+2026-11-11T16:29:16.092Z		git log -5
+2026-11-11T16:29:39.220Z		git log -5
+2026-11-11T16:29:42.692Z		git show 66fae06a1535e6ef4ec96c130166e5a6c4c9dff1
+2026-11-11T16:29:48.758Z		git status
+2026-11-11T16:29:59.197Z		git log --oneline -5
+2026-11-11T16:29:59.320Z	exit=0	git log --oneline -5
+2026-11-11T16:29:59.327Z		git status --short
+2026-11-11T16:29:59.452Z	exit=0	git status --short
+2026-11-11T16:31:42.171Z		git rev-parse --abbrev-ref HEAD
+2026-11-11T16:31:42.181Z		git status
+2026-11-11T16:31:42.365Z	exit=0	git status

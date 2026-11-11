@@ -1,0 +1,27 @@
+{
+  "at": "2026-11-11T16:44:53.200Z",
+  "snap": {
+    "state": "LEVEL_UP",
+    "hp": 100,
+    "maxHp": 100,
+    "level": 2,
+    "exp": 1,
+    "expToNext": 10,
+    "wave": 1,
+    "timeLeft": 198.98333333333335,
+    "elapsed": 11.033333333333333,
+    "kills": 4,
+    "upgradeChoices": [
+      "hui-xin-yi-ji",
+      "ling-bo-wei-bu",
+      "po-jia-jue"
+    ],
+    "result": null,
+    "stats": null
+  },
+  "cards": [
+    "1会心一击稀有 · 权重 7看破破绽，暴击概率增一成。可叠 3 层",
+    "2凌波微步常见 · 权重 10步法飘忽，移速增一成二。可叠 4 层",
+    "3破甲诀常见 · 权重 10剑走偏锋，每击多伤六分。可叠 5 层"
+  ]
+}
