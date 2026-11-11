@@ -4,6 +4,8 @@
 // 幕僚决策/时间）、幂等 `acceptance:<wf>:<reportSha>`、同版本不同 report 不覆盖（acceptance-archive-failed）、
 // 归档写失败 ⇒ acceptance-archive-failed 且阻塞 A12（A12b accepted 但无 A12 聚合）、
 // 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合。
+// T3 B31（2026-11-11，RR26）：A12b 轻量验收——最后报告 blocked 时，仅当 accepted + 应用归档证据
+// （acceptanceArchive）+ 非空幕僚决策 note 才允许收口/完成；其余阶段/缺归档/缺 note 仍 fail-closed。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -222,6 +224,228 @@ test("归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.com
     const view = deriveWorkflowView(ledger.events, (await readTaskState(root)).events);
     assert.equal(view.stage, "A12");
     assert.equal(view.stages.A12.status, "completed");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+// ———————————————— T3 B31（2026-11-11，RR26）：A12b 轻量验收 ————————————————
+
+const LIGHTWEIGHT_NOTE = "acceptanceIntensity=lightweight；运行期未验证（静态证据接受）";
+
+function a12bTask(taskId: string): ReturnType<typeof taskEvent> {
+  return taskEvent("task.created", {
+    taskId, from: "chief", to: "verifier", text: "验收报告", sideEffect: "docs",
+    idempotencyKey: `review-report:${WORKFLOW}:${taskId}:1`, flowId: FLOW, workflowId: WORKFLOW, stage: "A12b",
+  }, NOW);
+}
+
+test("B31 A12b 轻量验收：blocked 报告 + acceptanceArchive + 非空 note + accepted ⇒ A12b/A12 完成、note 留痕、幂等 replay", async () => {
+  const root = await tempRoot();
+  try {
+    await appendEvents(root, seedA12bDispatched(WORKFLOW));
+    const criteriaText = "# criteria\n";
+    const reportText = "# report（运行期未验证）\n";
+    await writeFile(root, "docs/quality/snake-criteria-v1.md", criteriaText);
+    await writeFile(root, "docs/quality/snake-report-v1.md", reportText);
+    const archived = await archiveAcceptance({
+      projectRoot: root, flowId: FLOW, workflowId: WORKFLOW,
+      criteriaPath: "docs/quality/snake-criteria-v1.md", reportPath: "docs/quality/snake-report-v1.md",
+      conclusion: "运行期未验证", staffDecision: LIGHTWEIGHT_NOTE, now: NOW,
+    });
+    assert.equal(archived.ok, true, archived.ok === false ? archived.code : "");
+    if (!archived.ok) return;
+
+    assert.equal((await appendTaskEvent(root, a12bTask("t-a12b-light"))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a12b-light", from: "verifier", status: "blocked", summary: "运行期未验证",
+    }, NOW))).ok, true);
+
+    const closed = await closeTask({
+      projectRoot: root, operationId: "op-a12b-light", taskId: "t-a12b-light", outcome: "accepted", actorRoleId: "chief",
+      note: LIGHTWEIGHT_NOTE,
+      evidence: {
+        artifacts: [{ path: "docs/quality/snake-report-v1.md", sha256: sha(reportText), kind: "report" }],
+        acceptanceArchive: { path: archived.path, sha256: archived.sha256 },
+      },
+      now: NOW,
+    });
+    assert.equal(closed.ok, true, closed.ok === false ? `${closed.code}: ${closed.message}` : "");
+    if (closed.ok) {
+      assert.equal(closed.stageCompleted, true);
+      assert.equal(closed.replay, false);
+      assert.equal(closed.stage, "A12b");
+    }
+
+    const state = await readTaskState(root);
+    assert.equal(state.records.get("t-a12b-light")?.closed?.outcome, "accepted");
+    assert.equal(state.records.get("t-a12b-light")?.closed?.note, LIGHTWEIGHT_NOTE, "task.closed.note 保留幕僚决策标记");
+
+    let ledger = await readWorkflowLedger(root);
+    assert.equal(ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A12b").length, 1);
+    assert.equal(ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A12").length, 1);
+    assert.equal(
+      ledger.events.some((event) => event.kind === "stage.blocked" && event.stage === "A12b"),
+      false,
+      "轻量验收不得再追加 stage.blocked",
+    );
+    const aggregate = ledger.events.find((event) => event.kind === "stage.completed" && event.stage === "A12");
+    assert.ok(aggregate !== undefined && aggregate.kind === "stage.completed" && aggregate.cause.kind === "acceptance-archive");
+    let view = deriveWorkflowView(ledger.events, state.events);
+    assert.equal(view.stages.A12b.status, "completed");
+    assert.equal(view.stages.A12.status, "completed");
+
+    // 幂等 replay：返回原回执（原 eventId），不重复写阶段事件、不改 note。
+    const replay = await closeTask({
+      projectRoot: root, operationId: "op-a12b-light", taskId: "t-a12b-light", outcome: "accepted", actorRoleId: "chief",
+      note: LIGHTWEIGHT_NOTE, now: NOW,
+    });
+    assert.equal(replay.ok, true);
+    if (replay.ok) {
+      assert.equal(replay.replay, true);
+      assert.equal(replay.eventId, closed.ok ? closed.eventId : "");
+      assert.equal(replay.stageCompleted, false);
+    }
+    ledger = await readWorkflowLedger(root);
+    assert.equal(ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A12b").length, 1);
+    assert.equal(ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A12").length, 1);
+    view = deriveWorkflowView(ledger.events, (await readTaskState(root)).events);
+    assert.equal(view.stages.A12.status, "completed");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test("B31 轻量验收 fail-closed：A12b 缺归档/缺 note/空白 note ⇒ close-report-missing；非 A12b 阶段不放宽", async () => {
+  const root = await tempRoot();
+  try {
+    await appendEvents(root, seedA12bDispatched(WORKFLOW));
+    const reportText = "# report\n";
+    await writeFile(root, "docs/quality/snake-report-v1.md", reportText);
+    assert.equal((await appendTaskEvent(root, a12bTask("t-a12b-neg"))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a12b-neg", from: "verifier", status: "blocked", summary: "运行期未验证",
+    }, NOW))).ok, true);
+
+    const artifacts = [{ path: "docs/quality/snake-report-v1.md", sha256: sha(reportText), kind: "report" as const }];
+    const acceptanceArchive = { path: "docs/acceptance/snake-acceptance-v1.md", sha256: D };
+    const base = { projectRoot: root, taskId: "t-a12b-neg", outcome: "accepted" as const, actorRoleId: "chief", now: NOW };
+
+    // 缺归档：即使 note 非空也不放宽。
+    const noArchive = await closeTask({ ...base, operationId: "op-neg-1", note: LIGHTWEIGHT_NOTE, evidence: { artifacts } });
+    assert.equal(noArchive.ok, false);
+    if (!noArchive.ok) {
+      assert.equal(noArchive.code, "close-report-missing");
+      assert.match(noArchive.message, /acceptanceArchive/u, "消息应区分轻量验收前置（缺归档）");
+    }
+    // 缺 note：应用归档存在也不放宽（显式幕僚决策必需）。
+    const noNote = await closeTask({ ...base, operationId: "op-neg-2", evidence: { artifacts, acceptanceArchive } });
+    assert.equal(noNote.ok, false);
+    if (!noNote.ok) {
+      assert.equal(noNote.code, "close-report-missing");
+      assert.match(noNote.message, /note/u, "消息应区分轻量验收前置（缺 note）");
+    }
+    // 空白 note 等同缺 note。
+    const blankNote = await closeTask({ ...base, operationId: "op-neg-3", note: "   ", evidence: { artifacts, acceptanceArchive } });
+    assert.equal(blankNote.ok, false);
+    if (!blankNote.ok) assert.equal(blankNote.code, "close-report-missing");
+
+    // 失败均未写 task.closed / 阶段事件（fail-closed）。
+    const state = await readTaskState(root);
+    assert.equal(state.records.get("t-a12b-neg")?.closed, undefined);
+    const ledgerAfterNegatives = await readWorkflowLedger(root);
+    assert.equal(
+      ledgerAfterNegatives.events.some((event) => event.kind === "stage.completed" && (event.stage === "A12b" || event.stage === "A12")),
+      false,
+      "轻量验收前置缺失时不得写 A12b/A12 完成",
+    );
+
+    // 非 A12b：A12a blocked + note + 归档 ⇒ 仍走通用门拒绝（轻量验收只限 A12b）。
+    assert.equal((await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-a12a-neg", from: "chief", to: "verifier", text: "复验报告", sideEffect: "docs",
+      idempotencyKey: `review-report:${WORKFLOW}:t-a12a-neg:1`, flowId: FLOW, workflowId: WORKFLOW, stage: "A12a",
+    }, NOW))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a12a-neg", from: "verifier", status: "blocked", summary: "运行期未验证",
+    }, NOW))).ok, true);
+    const nonA12b = await closeTask({
+      projectRoot: root, operationId: "op-neg-a12a", taskId: "t-a12a-neg", outcome: "accepted", actorRoleId: "chief",
+      note: LIGHTWEIGHT_NOTE, evidence: { artifacts, acceptanceArchive }, now: NOW,
+    });
+    assert.equal(nonA12b.ok, false);
+    if (!nonA12b.ok) {
+      assert.equal(nonA12b.code, "close-report-missing");
+      assert.match(nonA12b.message, /status=done/u, "非 A12b 阶段仍要求 done 报告（不放宽）");
+    }
+
+    // 非 A12b：A2 blocked + note + 归档 ⇒ 同样拒绝。
+    assert.equal((await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-a2-neg", from: "convener", to: "product", text: "意图", sideEffect: "docs",
+      idempotencyKey: `work:${WORKFLOW}:A2:product:1`, flowId: FLOW, workflowId: WORKFLOW, stage: "A2",
+    }, NOW))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a2-neg", from: "product", status: "blocked", summary: "阻塞",
+    }, NOW))).ok, true);
+    const a2 = await closeTask({
+      projectRoot: root, operationId: "op-neg-a2", taskId: "t-a2-neg", outcome: "accepted", actorRoleId: "convener",
+      note: LIGHTWEIGHT_NOTE, evidence: { artifacts, acceptanceArchive }, now: NOW,
+    });
+    assert.equal(a2.ok, false);
+    if (!a2.ok) assert.equal(a2.code, "close-report-missing");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+test("B31 未放宽路径：A12b rework 与 blocked 报告的 rejected 收口不经 note/归档；legacy（无 workflowId）逐字拒绝", async () => {
+  const root = await tempRoot();
+  try {
+    // A12b rework：blocked 报告 + 无 note/归档仍可返工（MF-IR-1 不变）。
+    const workflowId = WORKFLOW;
+    await appendEvents(root, seedA12bDispatched(workflowId));
+    assert.equal((await appendTaskEvent(root, a12bTask("t-a12b-rework"))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a12b-rework", from: "verifier", status: "blocked", summary: "验收不通过",
+    }, NOW))).ok, true);
+    const reworked = await closeTask({
+      projectRoot: root, operationId: "op-a12b-rework", taskId: "t-a12b-rework", outcome: "rework", actorRoleId: "chief",
+      now: NOW,
+    });
+    assert.equal(reworked.ok, true, reworked.ok === false ? reworked.code : "");
+    const ledger = await readWorkflowLedger(root);
+    assert.ok(ledger.events.some((event) => event.kind === "stage.reworked" && event.reworkOf === "A12b"));
+
+    // rejected：blocked 报告 + 无 note/归档仍可拒绝收口（不新增前置）。
+    assert.equal((await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-a2-reject", from: "convener", to: "product", text: "意图", sideEffect: "docs",
+      idempotencyKey: `work:${workflowId}:A2:product:reject`, flowId: FLOW, workflowId, stage: "A2",
+    }, NOW))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a2-reject", from: "product", status: "blocked", summary: "阻塞",
+    }, NOW))).ok, true);
+    const rejected = await closeTask({
+      projectRoot: root, operationId: "op-a2-reject", taskId: "t-a2-reject", outcome: "rejected", actorRoleId: "convener",
+      now: NOW,
+    });
+    assert.equal(rejected.ok, true, rejected.ok === false ? rejected.code : "");
+
+    // legacy（无 workflowId）：逐字拒绝，不进入 fixed 收口/轻量验收门。
+    assert.equal((await appendTaskEvent(root, taskEvent("task.created", {
+      taskId: "t-legacy", from: "convener", to: "product", text: "legacy", sideEffect: "docs",
+      idempotencyKey: "work:legacy:1",
+    }, NOW))).ok, true);
+    assert.equal((await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-legacy", from: "product", status: "blocked", summary: "legacy",
+    }, NOW))).ok, true);
+    const legacy = await closeTask({
+      projectRoot: root, operationId: "op-legacy", taskId: "t-legacy", outcome: "accepted", actorRoleId: "convener",
+      note: LIGHTWEIGHT_NOTE, now: NOW,
+    });
+    assert.equal(legacy.ok, false);
+    if (!legacy.ok) {
+      assert.equal(legacy.code, "close-task-invalid");
+      assert.match(legacy.message, /legacy/u);
+    }
   } finally {
     await cleanup(root);
   }

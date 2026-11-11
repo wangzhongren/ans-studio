@@ -10777,7 +10777,17 @@ ${formatted}` };
     if (created.taskKind === "stage-request") return { ok: true, evidence: undefined };
     const stage = created.stage;
     const lastReport = record.reports[record.reports.length - 1];
-    if (lastReport?.status !== "done") return { ok: true, evidence: undefined }; // 服务层按 close-report-missing fail-closed
+    // B31（2026-11-11，RR26）：A12b 轻量验收——verifier 无受认可运行期验证通道时以 `status:"blocked"`
+    // 交回复验报告；`accepted` 收口（调用点已保证）且 `note` 非空时**继续生成应用归档证据**（归档
+    // `staffDecision` 即 note）。**只限 A12b**：非 A12b / blocked 无 note / failed / 无报告仍返回
+    // `evidence: undefined`，由服务层 `close-report-missing` fail-closed（应用不解析 note 文案，
+    // 措辞由 chief v2 约束；不放宽其它阶段语义）。
+    const lightweightBlockedA12b = stage === "A12b"
+      && lastReport?.status === "blocked"
+      && typeof note === "string" && note.trim() !== "";
+    if (lastReport?.status !== "done" && !lightweightBlockedA12b) {
+      return { ok: true, evidence: undefined }; // 服务层按 close-report-missing fail-closed
+    }
     const evidencePaths = (lastReport.evidence ?? []).filter(
       (item): item is string => typeof item === "string" && isProjectRelativeFileRef(item),
     );

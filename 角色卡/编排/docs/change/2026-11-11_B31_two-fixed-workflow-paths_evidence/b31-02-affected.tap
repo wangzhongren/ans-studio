@@ -1,0 +1,334 @@
+TAP version 13
+# Subtest: 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered
+ok 1 - 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered
+  ---
+  duration_ms: 4781.9321
+  type: 'test'
+  ...
+# Subtest: 路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受理生产接线）→ B3 写集/真实提交 → B4 发布（不要求 A12b）→ delivered
+ok 2 - 路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受理生产接线）→ B3 写集/真实提交 → B4 发布（不要求 A12b）→ delivered
+  ---
+  duration_ms: 3636.4337
+  type: 'test'
+  ...
+# Subtest: 路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init；零任务/零 basis/零卡）
+ok 3 - 路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init；零任务/零 basis/零卡）
+  ---
+  duration_ms: 34.066
+  type: 'test'
+  ...
+# Subtest: 归档版本随 report 递增（v2）且 frontmatter 完整；幂等 replay；同版本不同 report 不覆盖
+ok 4 - 归档版本随 report 递增（v2）且 frontmatter 完整；幂等 replay；同版本不同 report 不覆盖
+  ---
+  duration_ms: 35.9764
+  type: 'test'
+  ...
+# Subtest: 归档写失败 ⇒ acceptance-archive-failed；缺归档时 A12b accepted 不聚合 A12（归档阻塞 A12）
+ok 5 - 归档写失败 ⇒ acceptance-archive-failed；缺归档时 A12b accepted 不聚合 A12（归档阻塞 A12）
+  ---
+  duration_ms: 154.9001
+  type: 'test'
+  ...
+# Subtest: 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合（幂等）
+ok 6 - 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合（幂等）
+  ---
+  duration_ms: 58.8379
+  type: 'test'
+  ...
+# Subtest: B31 A12b 轻量验收：blocked 报告 + acceptanceArchive + 非空 note + accepted ⇒ A12b/A12 完成、note 留痕、幂等 replay
+ok 7 - B31 A12b 轻量验收：blocked 报告 + acceptanceArchive + 非空 note + accepted ⇒ A12b/A12 完成、note 留痕、幂等 replay
+  ---
+  duration_ms: 70.8171
+  type: 'test'
+  ...
+# Subtest: B31 轻量验收 fail-closed：A12b 缺归档/缺 note/空白 note ⇒ close-report-missing；非 A12b 阶段不放宽
+ok 8 - B31 轻量验收 fail-closed：A12b 缺归档/缺 note/空白 note ⇒ close-report-missing；非 A12b 阶段不放宽
+  ---
+  duration_ms: 67.6246
+  type: 'test'
+  ...
+# Subtest: B31 未放宽路径：A12b rework 与 blocked 报告的 rejected 收口不经 note/归档；legacy（无 workflowId）逐字拒绝
+ok 9 - B31 未放宽路径：A12b rework 与 blocked 报告的 rejected 收口不经 note/归档；legacy（无 workflowId）逐字拒绝
+  ---
+  duration_ms: 64.943
+  type: 'test'
+  ...
+# Subtest: A13 前置：A12b accepted + 归档已写入 ⇒ prepare 成功；release.requested + stage.requested A13；重复 prepare replay
+ok 10 - A13 前置：A12b accepted + 归档已写入 ⇒ prepare 成功；release.requested + stage.requested A13；重复 prepare replay
+  ---
+  duration_ms: 177.8334
+  type: 'test'
+  ...
+# Subtest: A13 前置缺失：无归档 ⇒ release-workflow-not-ready（附缺项），不发卡不写 release.requested
+ok 11 - A13 前置缺失：无归档 ⇒ release-workflow-not-ready（附缺项），不发卡不写 release.requested
+  ---
+  duration_ms: 133.7015
+  type: 'test'
+  ...
+# Subtest: A13 前置缺失：A12b 未 accepted ⇒ release-workflow-not-ready
+ok 12 - A13 前置缺失：A12b 未 accepted ⇒ release-workflow-not-ready
+  ---
+  duration_ms: 114.259
+  type: 'test'
+  ...
+# Subtest: B4 前置（不要求 A12b）：B3 accepted + 运营报告 ⇒ prepare 成功并推进 B4
+ok 13 - B4 前置（不要求 A12b）：B3 accepted + 运营报告 ⇒ prepare 成功并推进 B4
+  ---
+  duration_ms: 44.5204
+  type: 'test'
+  ...
+# Subtest: B4 前置缺失：无运营报告 ⇒ release-workflow-not-ready（operator-report）
+ok 14 - B4 前置缺失：无运营报告 ⇒ release-workflow-not-ready（operator-report）
+  ---
+  duration_ms: 24.2899
+  type: 'test'
+  ...
+# Subtest: 呈卡前拒绝：basis 文档漂移 ⇒ basis-drift；.gitignore hash 漂移 ⇒ basis-drift；分支漂移 ⇒ release-workflow-not-ready
+ok 15 - 呈卡前拒绝：basis 文档漂移 ⇒ basis-drift；.gitignore hash 漂移 ⇒ basis-drift；分支漂移 ⇒ release-workflow-not-ready
+  ---
+  duration_ms: 144.2403
+  type: 'test'
+  ...
+# Subtest: 执行：main unborn ⇒ mergeKind initial；客户本人确认 ⇒ release.merged + stage.completed A13 + workflow.closed delivered（releaseId 投影）
+ok 16 - 执行：main unborn ⇒ mergeKind initial；客户本人确认 ⇒ release.merged + stage.completed A13 + workflow.closed delivered（releaseId 投影）
+  ---
+  duration_ms: 148.4669
+  type: 'test'
+  ...
+# Subtest: 执行：main 已存在 ⇒ mergeKind merge；冲突 ⇒ release.failed + stage.blocked，返回 release-merge-conflict，workflow 不关闭
+ok 17 - 执行：main 已存在 ⇒ mergeKind merge；冲突 ⇒ release.failed + stage.blocked，返回 release-merge-conflict，workflow 不关闭
+  ---
+  duration_ms: 149.8751
+  type: 'test'
+  ...
+# Subtest: 仅客户本人：judge 确认 / 缺失确认 ⇒ release-unauthorized，不写 release.confirmed/merged
+ok 18 - 仅客户本人：judge 确认 / 缺失确认 ⇒ release-unauthorized，不写 release.confirmed/merged
+  ---
+  duration_ms: 144.6903
+  type: 'test'
+  ...
+# Subtest: 客户拒绝：release.rejected(customer) + stage.blocked；replay 幂等
+ok 19 - 客户拒绝：release.rejected(customer) + stage.blocked；replay 幂等
+  ---
+  duration_ms: 145.044
+  type: 'test'
+  ...
+# Subtest: 审计：无 requestReleaseMerge 导出；端口无 push/tag；release.merged 含 baseOid/tipOid/mergeOid/files/diffDigest
+ok 20 - 审计：无 requestReleaseMerge 导出；端口无 push/tag；release.merged 含 baseOid/tipOid/mergeOid/files/diffDigest
+  ---
+  duration_ms: 145.987
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 21 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 27.9511
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 22 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 17.9556
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 23 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 13.9293
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 24 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 6.8713
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 25 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 6.0401
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 26 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 0.9786
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 27 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 8.4151
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 28 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 21.47
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 29 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 21.1952
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 30 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 20.9356
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 31 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 14.2612
+  type: 'test'
+  ...
+# Subtest: closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+ok 32 - closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+  ---
+  duration_ms: 42.5031
+  type: 'test'
+  ...
+# Subtest: A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+ok 33 - A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+  ---
+  duration_ms: 132.5817
+  type: 'test'
+  ...
+# Subtest: prepareIntent/finalizeIntent：B24 入口门、documentRefs（含 version）一次写入、幂等 replay、不写 doc-freeze/trunk
+ok 34 - prepareIntent/finalizeIntent：B24 入口门、documentRefs（含 version）一次写入、幂等 replay、不写 doc-freeze/trunk
+  ---
+  duration_ms: 27.8796
+  type: 'test'
+  ...
+# Subtest: activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+ok 35 - activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+  ---
+  duration_ms: 45.0263
+  type: 'test'
+  ...
+# Subtest: archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+ok 36 - archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+  ---
+  duration_ms: 15.6572
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+ok 37 - prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+  ---
+  duration_ms: 28.9587
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+ok 38 - prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+  ---
+  duration_ms: 24.2162
+  type: 'test'
+  ...
+# Subtest: B24.1 prepareIntent：A2 completed 但意图入口缺失/intentId 不一致 ⇒ intent-entry-missing，不写 stage.requested A3（RR20 回归）
+ok 39 - B24.1 prepareIntent：A2 completed 但意图入口缺失/intentId 不一致 ⇒ intent-entry-missing，不写 stage.requested A3（RR20 回归）
+  ---
+  duration_ms: 25.1115
+  type: 'test'
+  ...
+# Subtest: prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+ok 40 - prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+  ---
+  duration_ms: 3.8337
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+ok 41 - prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+  ---
+  duration_ms: 32.6354
+  type: 'test'
+  ...
+# Subtest: closeTask：A2 accepted + 证据即完成（不等待 open 兄弟）；原任务迟到 rework 不再写 stage.blocked（RR8/RR10 回归）
+ok 42 - closeTask：A2 accepted + 证据即完成（不等待 open 兄弟）；原任务迟到 rework 不再写 stage.blocked（RR8/RR10 回归）
+  ---
+  duration_ms: 37.9971
+  type: 'test'
+  ...
+# Subtest: closeTask A5：accepted + 证据完成，不等待 open 的 failed 投递兄弟；其 rejected 收口不写 stage.blocked（RR10 回归）
+ok 43 - closeTask A5：accepted + 证据完成，不等待 open 的 failed 投递兄弟；其 rejected 收口不写 stage.blocked（RR10 回归）
+  ---
+  duration_ms: 46.3687
+  type: 'test'
+  ...
+# Subtest: closeTask A11：两个实现任务须全部 accepted 才完成 A11
+ok 44 - closeTask A11：两个实现任务须全部 accepted 才完成 A11
+  ---
+  duration_ms: 84.5079
+  type: 'test'
+  ...
+# Subtest: closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+ok 45 - closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+  ---
+  duration_ms: 51.1279
+  type: 'test'
+  ...
+# Subtest: closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+ok 46 - closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+  ---
+  duration_ms: 29.6095
+  type: 'test'
+  ...
+# Subtest: 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+ok 47 - 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+  ---
+  duration_ms: 25.6844
+  type: 'test'
+  ...
+# Subtest: 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+ok 48 - 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+  ---
+  duration_ms: 2.4271
+  type: 'test'
+  ...
+# Subtest: open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+ok 49 - open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+  ---
+  duration_ms: 39.7057
+  type: 'test'
+  ...
+# Subtest: 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+ok 50 - 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+  ---
+  duration_ms: 72.4842
+  type: 'test'
+  ...
+# Subtest: A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+ok 51 - A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+  ---
+  duration_ms: 50.9855
+  type: 'test'
+  ...
+# Subtest: 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+ok 52 - 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+  ---
+  duration_ms: 11.2112
+  type: 'test'
+  ...
+# Subtest: stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+ok 53 - stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+  ---
+  duration_ms: 49.0148
+  type: 'test'
+  ...
+# Subtest: AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+ok 54 - AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+  ---
+  duration_ms: 23.5236
+  type: 'test'
+  ...
+1..54
+# tests 54
+# suites 0
+# pass 54
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8940.2156

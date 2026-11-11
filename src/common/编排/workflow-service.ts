@@ -1306,7 +1306,23 @@ export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult>
     return serviceFailure("close-task-invalid", `任务 ${input.taskId} 已被收口（${record.closed.outcome}），不得重复收口。`);
   }
   const lastReport = record.reports[record.reports.length - 1];
-  if (input.outcome === "accepted" && lastReport?.status !== "done") {
+  // B31（2026-11-11，RR26）：A12b 轻量验收——verifier 无受认可运行期验证通道时以 `status:"blocked"`
+  // 交回复验报告；幕僚可显式选择“静态证据接受”，但**只限 A12b**，且必须同时具备应用归档证据
+  // （`acceptanceArchive`，由应用 `archiveAcceptance` 生成）与非空幕僚决策 `note`（note 文案由
+  // chief v2 约束，应用只要求非空、不解析）。其它阶段、缺归档、缺 note、报告 failed/缺报告 ⇒
+  // 仍按 `close-report-missing` fail-closed（不放宽既有语义）。
+  const lightweightA12bAcceptance = created.stage === "A12b"
+    && input.outcome === "accepted"
+    && input.evidence?.acceptanceArchive !== undefined
+    && isNonEmptyText(input.note)
+    && lastReport?.status === "blocked";
+  if (input.outcome === "accepted" && lastReport?.status !== "done" && !lightweightA12bAcceptance) {
+    if (created.stage === "A12b" && lastReport?.status === "blocked") {
+      return serviceFailure(
+        "close-report-missing",
+        "A12b 轻量验收（blocked 报告 + accepted）需要应用归档证据（acceptanceArchive）与非空幕僚决策 note；缺一即 fail-closed。",
+      );
+    }
     return serviceFailure("close-report-missing", "accepted 收口要求已有 task.reported(status=done)；报告只是报告，不是收口。");
   }
 
@@ -1435,7 +1451,10 @@ export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult>
       }
     }
     const blockedByOutcome = input.outcome !== "accepted" && !(input.outcome === "rework" && stage === "A12b");
-    const blockedByReport = input.outcome === "accepted" && (lastReport?.status === "failed" || lastReport?.status === "blocked");
+    // B31：A12b 轻量验收的 blocked 报告已由 accepted 收口完成阶段（stage.completed），不得再追加
+    // `stage.blocked`（否则投影会看到已完成阶段又 blocked ⇒ workflow-corrupt）。
+    const blockedByReport = input.outcome === "accepted" && !lightweightA12bAcceptance
+      && (lastReport?.status === "failed" || lastReport?.status === "blocked");
     // B13.1（RR8）：只有**仍在办**的阶段才能被阻塞——阶段已完成/已推进后，迟到的旧兄弟任务收口
     // 不得再追加 `stage.blocked`（否则投影看到 blocked 的阶段 ≠ 当前阶段，会判 `workflow-corrupt`）。
     const stageCanBlock = view.stage === stage

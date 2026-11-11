@@ -620,6 +620,164 @@ test("A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（
   }
 });
 
+/**
+ * B31（2026-11-11，RR26）：A12b 轻量验收夹具——工作流推进到 A12b；A12a 报告 done（criteria 证据），
+ * A12b 报告 `status:"blocked"`（静态验收完成、运行期未验证）；真实仓库 + 质量文档真实字节。
+ */
+async function seedBlockedA12bWorld(root: string): Promise<{ criteriaPath: string; reportPath: string }> {
+  await writeFile(root, ".ans/project.json", JSON.stringify({ workflowSchema: "two-fixed-paths/v1", governanceModel: "trio" }));
+  await started(root, BASE_A);
+  await seedBasis(root, WF);
+  const events: WorkflowEvent[] = [];
+  for (const stage of ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"] as WorkflowStage[]) {
+    events.push(requested(BASE_A, WF, stage), completed(BASE_A, WF, stage));
+  }
+  events.push(requested(BASE_A, WF, "A12a"));
+  await appendEvents(root, events);
+  // 真实仓库 + 报告证据文件（`.gitignore` 忽略 docs/quality ⇒ 工作区 clean）。
+  initRepo(root);
+  await writeFile(root, "src/core/index.ts", "export const core = 1;\n");
+  const ensured = await createDesktopBaselineGitPort().ensureGitignore({ projectRoot: root });
+  assert.equal(ensured.ok, true);
+  commitAll(root, "baseline");
+  git(root, "switch", "-c", taskBranchName(WF));
+  await writeFile(root, "src/core/index.ts", "export const core = 2;\n");
+  commitAll(root, "A11 implementation");
+  const criteriaPath = "docs/quality/snake-criteria-v1.md";
+  const reportPath = "docs/quality/snake-report-v1.md";
+  await writeFile(root, criteriaPath, "# Criteria\n\n- AC-1\n");
+  await writeFile(root, reportPath, "# Report\n\n结论：静态证据可接受；运行期 AC 未验证。\n");
+  // A12a task：报告 done + criteria 证据（A12b 归档的 criteria 来源）。
+  await seedTask(root, { taskId: "t-a12a", from: "chief", to: "verifier", flowId: FLOW, workflowId: WF, stage: "A12a", sideEffect: "read-only" });
+  await appendTaskEvent(root, taskEvent("task.reported", {
+    taskId: "t-a12a", from: "verifier", status: "done", summary: "criteria 完成", evidence: [criteriaPath],
+  }, () => new Date(AT)));
+  // A12b task：报告 blocked（verifier 无受认可运行期验证通道）+ report 证据。
+  await seedTask(root, { taskId: "t-a12b", from: "chief", to: "verifier", flowId: FLOW, workflowId: WF, stage: "A12b", sideEffect: "read-only" });
+  await appendTaskEvent(root, taskEvent("task.reported", {
+    taskId: "t-a12b", from: "verifier", status: "blocked", summary: "静态验收完成；运行期未验证", evidence: [reportPath],
+  }, () => new Date(AT)));
+  return { criteriaPath, reportPath };
+}
+
+/** B31：打开 chief 会话（fixed close 注入）→ A12a accepted 收口 → 推进 A11 完成 + A12b 请求。 */
+async function openChiefAndAdvanceToA12b(h: H, root: string): Promise<{ chief: CapturedInput; live: LiveSource }> {
+  const opened = await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo", taskId: "t-a12b" });
+  assert.equal(opened.ok, true, opened.ok === false ? (opened.error ?? "") : "");
+  const chief = h.inputs.find((input) => input.roleId === "chief");
+  assert.equal(typeof chief?.closeCreatedTaskFixed, "function", "fixed 会话应注入 close_created_task v2 应用实现");
+  const live = liveSource(h.mgr, root, "chief");
+  const criteriaClosed = await chief!.closeCreatedTaskFixed!({ operationId: "op-b31-a12a", taskId: "t-a12a", outcome: "accepted" });
+  assert.equal((criteriaClosed as { ok: boolean }).ok, true, JSON.stringify(criteriaClosed));
+  await appendEvents(root, [requested(BASE_A, WF, "A11"), completed(BASE_A, WF, "A11"), requested(BASE_A, WF, "A12b")]);
+  return { chief: chief!, live };
+}
+
+interface DesktopCloseEvidence {
+  ok: boolean;
+  evidence?: { artifacts?: unknown[]; branchTipOid?: string; acceptanceArchive?: { path: string; sha256: string } };
+}
+/** 直接核对桌面证据构建（私有方法在运行时可达；只读，无收口副作用）。 */
+function buildCloseEvidence(mgr: SessionManager, root: string, taskId: string, note: string | undefined): Promise<DesktopCloseEvidence> {
+  const manager = mgr as unknown as {
+    buildFixedCloseEvidence(projectRoot: string, taskId: string, note: string | undefined): Promise<DesktopCloseEvidence>;
+  };
+  return manager.buildFixedCloseEvidence(root, taskId, note);
+}
+
+const B31_LIGHTWEIGHT_NOTE = "acceptanceIntensity=lightweight；运行期未验证（静态证据接受）";
+
+test("B31：A12b blocked 报告 + accepted + note ⇒ 应用归档证据生效；stage.completed A12b 恰一次 + A12 聚合", async () => {
+  const root = await tempRoot("ans-b31-lightweight-");
+  const h = harness(root);
+  try {
+    await seedBlockedA12bWorld(root);
+    const { chief, live } = await openChiefAndAdvanceToA12b(h, root);
+    // 桌面证据：blocked 报告（仅 A12b + 非空 note）也走归档分支，生成 acceptanceArchive（真实字节）。
+    const evidence = await buildCloseEvidence(h.mgr, root, "t-a12b", B31_LIGHTWEIGHT_NOTE);
+    assert.equal(evidence.ok, true);
+    assert.ok(evidence.evidence?.acceptanceArchive !== undefined, "blocked A12b + note ⇒ 桌面生成 acceptanceArchive");
+    assert.equal(evidence.evidence!.acceptanceArchive!.path, "docs/acceptance/snake-acceptance-v1.md");
+    const closed = await chief.closeCreatedTaskFixed!({ operationId: "op-b31-lightweight", taskId: "t-a12b", outcome: "accepted", note: B31_LIGHTWEIGHT_NOTE });
+    releaseSource(h.mgr, live);
+    assert.equal((closed as { ok: boolean }).ok, true, JSON.stringify(closed));
+    assert.equal((closed as { stageCompleted?: boolean }).stageCompleted, true);
+    // 应用归档：staffDecision=note（逐字留痕）、conclusion=最后 blocked 报告 summary（不伪造通过）。
+    const archiveText = await fs.readFile(path.join(root, "docs", "acceptance", "snake-acceptance-v1.md"), "utf8");
+    assert.ok(archiveText.includes(`staffDecision: ${JSON.stringify(B31_LIGHTWEIGHT_NOTE)}`), "归档 staffDecision 逐字留痕");
+    assert.ok(archiveText.includes(`conclusion: ${JSON.stringify("静态验收完成；运行期未验证")}`), "conclusion 取最后报告 summary");
+    // 账本：task.closed accepted 恰一次；stage.completed A12b 恰一次 + A12 聚合恰一次；不追加 stage.blocked。
+    const state = await readTaskState(root);
+    const closedEvents = state.events.filter((event) => event.kind === "task.closed" && event.taskId === "t-a12b");
+    assert.equal(closedEvents.length, 1, "task.closed 恰一次");
+    assert.equal(closedEvents[0]!.kind === "task.closed" ? closedEvents[0]!.outcome : "", "accepted");
+    const wfEvents = (await readWorkflowLedger(root)).events.filter((event) => event.workflowId === WF);
+    assert.equal(wfEvents.filter((event) => event.kind === "stage.completed" && event.stage === "A12b").length, 1, "stage.completed A12b 恰一次");
+    assert.equal(wfEvents.filter((event) => event.kind === "stage.completed" && event.stage === "A12").length, 1, "stage.completed A12 聚合恰一次");
+    assert.equal(wfEvents.some((event) => event.kind === "stage.blocked" && event.stage === "A12b"), false, "轻量验收不追加 stage.blocked");
+    const view = deriveWorkflowView(wfEvents, state.events);
+    assert.equal(view.stages.A12b.status, "completed");
+    assert.equal(view.stages.A12.status, "completed");
+    assert.equal(h.requests.length, 0, "fixed 不发客户卡");
+  } finally {
+    await h.mgr.stop(null);
+    await cleanup(root);
+  }
+});
+
+test("B31：A12b blocked 报告 + 无 note ⇒ 桌面证据 undefined（不建归档），服务 close-report-missing", async () => {
+  const root = await tempRoot("ans-b31-note-missing-");
+  const h = harness(root);
+  try {
+    await seedBlockedA12bWorld(root);
+    const { chief, live } = await openChiefAndAdvanceToA12b(h, root);
+    const noNote = await buildCloseEvidence(h.mgr, root, "t-a12b", undefined);
+    assert.equal(noNote.ok, true);
+    assert.equal(noNote.evidence, undefined, "blocked + 无 note：桌面不生成任何证据");
+    const blankNote = await buildCloseEvidence(h.mgr, root, "t-a12b", "   ");
+    assert.equal(blankNote.evidence, undefined, "note 仅空白（trim 后为空）仍不放宽");
+    const closed = await chief.closeCreatedTaskFixed!({ operationId: "op-b31-note-missing", taskId: "t-a12b", outcome: "accepted" });
+    releaseSource(h.mgr, live);
+    assert.equal((closed as { ok: boolean }).ok, false);
+    assert.equal((closed as { code?: string }).code, "close-report-missing");
+    const state = await readTaskState(root);
+    assert.equal(state.events.some((event) => event.kind === "task.closed" && event.taskId === "t-a12b"), false, "不得写 task.closed");
+    await assert.rejects(fs.stat(path.join(root, "docs", "acceptance", "snake-acceptance-v1.md")), "不得生成归档");
+    const view = deriveWorkflowView((await readWorkflowLedger(root)).events.filter((event) => event.workflowId === WF), state.events);
+    assert.equal(view.stages.A12b.status, "requested", "A12b 保持阻塞（未完成）");
+  } finally {
+    await h.mgr.stop(null);
+    await cleanup(root);
+  }
+});
+
+test("B31：非 A12b blocked 报告不放宽——桌面证据 undefined，服务 close-report-missing", async () => {
+  const root = await tempRoot("ans-b31-non-a12b-");
+  const h = harness(root);
+  try {
+    await writeFile(root, ".ans/project.json", JSON.stringify({ workflowSchema: "two-fixed-paths/v1", governanceModel: "trio" }));
+    await seedTask(root, { taskId: "t-a11-blocked", from: "chief", to: "worker", flowId: FLOW, workflowId: WF, stage: "A11", sideEffect: "code" });
+    await appendTaskEvent(root, taskEvent("task.reported", {
+      taskId: "t-a11-blocked", from: "worker", status: "blocked", summary: "静态自检阻塞", evidence: [],
+    }, () => new Date(AT)));
+    const opened = await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo", taskId: "t-a11-blocked" });
+    assert.equal(opened.ok, true, opened.ok === false ? (opened.error ?? "") : "");
+    const chief = h.inputs.find((input) => input.roleId === "chief");
+    assert.equal(typeof chief?.closeCreatedTaskFixed, "function");
+    const evidence = await buildCloseEvidence(h.mgr, root, "t-a11-blocked", B31_LIGHTWEIGHT_NOTE);
+    assert.equal(evidence.ok, true);
+    assert.equal(evidence.evidence, undefined, "非 A12b 不放宽：即使有 note 也不生成证据");
+    const closed = await chief!.closeCreatedTaskFixed!({ operationId: "op-b31-non-a12b", taskId: "t-a11-blocked", outcome: "accepted", note: B31_LIGHTWEIGHT_NOTE });
+    assert.equal((closed as { ok: boolean }).ok, false);
+    assert.equal((closed as { code?: string }).code, "close-report-missing");
+    assert.equal((await readTaskState(root)).events.some((event) => event.kind === "task.closed" && event.taskId === "t-a11-blocked"), false);
+    await assert.rejects(fs.stat(path.join(root, "docs", "acceptance")), "不生成归档目录");
+  } finally {
+    await h.mgr.stop(null);
+    await cleanup(root);
+  }
+});
+
 test("路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basis reason=path-b）；无仓库 b-repository-required 不 init", async () => {
   // 有仓库
   {

@@ -1,0 +1,4 @@
+HEAD: 9cce9279b95a50bdb52bb8aee548006c101112cd
+Subject: fix(runtime-core): B30 allow repo-local [user] name/email in readonly git config
+Branch: feat/two-fixed-workflow-paths
+Captured at: 2026-11-11T09:56:21Z

@@ -1,0 +1,6 @@
+HEAD 9cce9279b95a50bdb52bb8aee548006c101112cd
+9cce927 fix(runtime-core): B30 allow repo-local [user] name/email in readonly git config
+--- git status (B31 write zone)
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/门禁引擎/chief-workflow-v2-a12b-blocked-decision.test.ts
+?? 角色卡/门禁引擎/docs/change/2026-11-11_B31_two-fixed-workflow-paths_evidence/

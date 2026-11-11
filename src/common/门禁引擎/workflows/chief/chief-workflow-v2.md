@@ -53,8 +53,8 @@
 - **A10**：A9 完成后你呈任命确认卡 `appointment`（选项=名单角色、多选、推荐集=名单顺序，`source:"stage-a10"`/`workflowId` 戳）；**A10 只任命、不派实现**，`request.resolved`（appointment）即完成。
 - **A11**：A10 完成后你发 `stage:"A11"` stage-request（携客户选中的角色/子集，`workflowId` 必填）；运营再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`、`sideEffect` 按实际声明，写任务串行）。**一模块一任务**：`moduleId` 权威，`modulePaths` 只写该模块路径；应用从模块表派生写集，跨模块/未知 moduleId ⇒ `module-paths-mismatch` 拒绝。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。实现任务文本须写明：完成后只报告路径、commit OID、变更要点与**静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担）**；hash 由应用计算，不得用 shell 算 hash。**实现 worker 只写本模块文件 + 字面 `git add`/`git commit`；不得运行任何 shell 命令（含 `node`/`npm`/自测脚本）。**
 - **A12a（先于 A11 实现派发）**：你在 A11 派发实现前**直接**创建验收标准任务（不经运营 stage-request；应用按目标派生 review 目的）：`roleId` 默认 `"verifier"`（或 `workflow.reviewRoleId` 项目验收角色）、`flowId`、`workflowId`、`stage:"A12a"`、`sideEffect:"docs"`；verifier 写 `docs/quality/<flowId>-criteria-vN.md`。**项目验收角色（`workflow.reviewRoleId`）必须在任务上绑定其 roster 模块（moduleId + modulePaths，取自模块清单），验收文件路径写在该模块内**（未绑定 ⇒ 写集为空、write_file 被拒，RR25 实测）；review 任务文本须写明：**不得运行任何 shell 命令（含 mkdir/目录创建）**，`write_file`/`edit_file` 会自动创建目录；`docs/acceptance/` 的应用归档由应用完成，不由 review worker 创建。
-- **A12b（A11 之后）**：A11 实现 accepted 后你直接创建验收报告任务（同上字段，`stage:"A12b"`；项目验收角色同样必须绑定其 roster 模块 moduleId + modulePaths，报告路径在模块内；review 任务文本同样禁止任何 shell（含 mkdir），`write_file`/`edit_file` 自动建目录）；verifier 写 `docs/quality/<flowId>-report-vN.md`。**A12 完成 = A12b accepted + report hash（应用计算）+ 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`**（幂等 `acceptance:<wf>:<reportSha>`；归档失败阻塞 A12）。不通过 ⇒ 回 A11（新 attempt，`reworkOf:"A12b"`）。
-- **A13**：A12b accepted + 运营最终报告后进入交付/发布；高风险合并卡 `merge-main` 由应用构造、你走应用卡通道呈交客户。
+- **A12b（A11 之后）**：A11 实现 accepted 后你直接创建验收报告任务（同上字段，`stage:"A12b"`；项目验收角色同样必须绑定其 roster 模块 moduleId + modulePaths，报告路径在模块内；review 任务文本同样禁止任何 shell（含 mkdir），`write_file`/`edit_file` 自动建目录）；verifier 写 `docs/quality/<flowId>-report-vN.md`。**A12 完成 = A12b accepted + report hash（应用计算）+ 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`**（幂等 `acceptance:<wf>:<reportSha>`；归档失败阻塞 A12）。不通过 ⇒ 回 A11（新 attempt，`reworkOf:"A12b"`）。**A12b 报告以 `status=blocked` 交回时（如 verifier 无受认可运行期验证通道），你必须在当回合三选一并留痕，禁止空转**（轻量验收 / 有限返工 / 停止上报；细则见「A12 独立验收」段）。
+- **A13**：A12b accepted + 运营最终报告后进入交付/发布；高风险合并卡 `merge-main` 由应用构造、你走应用卡通道呈交客户。**若 A12b 以轻量验收（`acceptanceIntensity=lightweight`）收口，A13 交付说明中必须向客户披露「运行期未验证」**。
 
 ## 任务文本与哈希口径（worker 不用 shell 算 hash）
 
@@ -107,6 +107,10 @@
 - **A12b（实施后）**：A11 后创建验收报告任务（report；`docs/quality/<flowId>-report-vN.md`；同上字段，`stage:"A12b"`）。A12 完成 = A12b accepted + report hash（应用计算）+ 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`（幂等 `acceptance:<wf>:<reportSha>`；归档失败阻塞 A12）。
 - 验收派发由你直接创建（不经运营 stage-request）；默认内置 verifier，roster `roles[].review===true` 的项目验收角色优先（`workflow.reviewRoleId`，应用核验，不采信模型自报）。
 - 不通过 ⇒ 回 A11（新 attempt，`reworkOf:"A12b"`）；缺证 ⇒ blocked；验收角色不可用 ⇒ `professional-role-unavailable`。验收强度由你调节并在任务文本中记录。
+- **A12b blocked 报告的当回合处置（禁止空转）**：verifier 以 `status=blocked` 交回 A12b 报告（典型：fixed 任务无 shell、无浏览器/运行器通道，运行期 AC 未验证）后，你必须在**同一回合**完成三选一并留痕，不得只结束回合、不得等待再次唤醒、不得静默推进 A13：
+  1. **轻量验收通过**：接受静态证据 + 如实记录「运行期未验证」——对 A12b 调 `close_created_task`，`outcome:"accepted"`，`note` 必须写明 `acceptanceIntensity=lightweight；运行期未验证（静态证据接受）`；应用归档 `docs/acceptance/` 会把 `note` 记为 `staffDecision`，A12b 完成并推进 A13；**A13 交付说明中必须向客户披露「运行期未验证」**。该收口是受支持动作而非放宽：**A12b 最后报告为 blocked 时，`accepted` 必须同时有应用归档证据（`acceptanceArchive`）与非空 `note`；其余阶段、缺归档或缺 note 仍 fail-closed（`close-report-missing`），不伪造通过**。
+  2. **返工/补证**：给出可执行的有限补证要求——**不得要求 shell 自测**（`run_shell`/`node`/`npm`/测试脚本一律不得写入要求），可要求静态证据（具体文件与字段、逐条 AC 的静态核对结论）；以 `outcome:"rework"` 收口并回 A11（新 attempt，`reworkOf:"A12b"`）。
+  3. **停止并如实上报客户**：说明阻塞事实（缺什么验证通道、哪些 AC 未验证、已有静态证据是什么）与所需客户决策；按停止流程先收口 open advance 请求，再发 `workflowAction:"stop"` 的 stage-request，由运营执行停稳；**不伪造通过、不静默归档**。
 
 ## 路径 B 要点
 

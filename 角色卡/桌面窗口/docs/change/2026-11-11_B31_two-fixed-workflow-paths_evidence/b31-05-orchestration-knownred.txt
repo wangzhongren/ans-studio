@@ -1,0 +1,16 @@
+# B31 编排 known-red 交叉引用（桌面窗口，2026-11-11）
+
+本角色（桌面窗口）B31 写区为 `app/desktop/session.ts` + `test/桌面应用/b3-fixed-baseline-pathb.test.ts`，
+不包含 `test/编排/**`。编排侧 24 条冻结 known-red 由编排角色在 B31 记录中实测，本文件按调度允许的
+“与编排记录交叉引用”方式登记，不重复运行：
+
+- 记录：`角色卡/编排/docs/change/2026-11-11_B31_two-fixed-workflow-paths.md`（§三 验证）
+- 证据：
+  - `角色卡/编排/docs/change/2026-11-11_B31_two-fixed-workflow-paths_evidence/b31-04-orchestration-suite.tap`
+  - `角色卡/编排/docs/change/2026-11-11_B31_two-fixed-workflow-paths_evidence/b31-04-orchestration-knownred-failnames.txt`
+  - `角色卡/编排/docs/change/2026-11-11_B31_two-fixed-workflow-paths_evidence/b31-04-orchestration-knownred-diff.txt`（0 字节，diff 空）
+- 编排记录结论：全量 `test/编排/*.test.ts` 1352 pass / 24 fail / 2 skip（1378 tests）；24 条与 B17
+  冻结 known-red **逐名一致**（diff 空），本批未新增/消失 known-red。
+- 本角色交叉核对：`b31-04-orchestration-knownred-diff.txt` 实测字节数为 0（空 diff），与编排记录一致。
+- 桌面侧本轮不新增 `test/编排/**` 断言；桌面受影响集（119/119 pass）与桌面既有 known-red（4 条逐名
+  一致）见 `b31-04-knownred.txt`。
