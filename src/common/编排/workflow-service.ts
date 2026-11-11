@@ -1239,6 +1239,8 @@ export type FixedCloseCreatedTaskFn = (
 
 const CLOSE_COMPLETABLE_STAGES: ReadonlySet<WorkflowStage> = new Set<WorkflowStage>(["A2", "A5", "A11", "B1", "B3"]);
 const CLOSE_REVIEW_STAGES: ReadonlySet<WorkflowStage> = new Set<WorkflowStage>(["A12a", "A12b"]);
+/** v1.3 §4.2 A11/B3：完成要求“全部选中实现任务 accepted”（其余阶段以单个 accepted 收口为准）。 */
+const CLOSE_ALL_TASKS_STAGES: ReadonlySet<WorkflowStage> = new Set<WorkflowStage>(["A11", "B3"]);
 
 /** 阶段在**收口**时完成的机械条件（服务层只校验账本事实；artifact/hash 由应用提供）。 */
 function closeStageCompletionCheck(
@@ -1353,11 +1355,21 @@ export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult>
         sibling.created?.workflowId === workflowId
         && sibling.created.stage === stage
         && sibling.created.taskKind !== "stage-request");
-      const allAccepted = siblings.every((sibling) =>
+      // B13.1（2026-11-11，RR8 失败修复）：阶段完成不得被**已返工/已拒绝的旧 attempt** 永久阻塞
+      // （RR8 A2：原任务按 rework 关闭后，补交/返工任务的 accepted 收口永远无法满足“所有兄弟任务
+      // accepted”，A2 永久停在 requested）。规则：
+      //  ① 阶段内不得还有未收口任务——open 兄弟仍阻塞完成（完成时不得仍有任务可改产物）；
+      //  ② A11/B3（v1.3 §4.2：全部选中实现任务 accepted）要求其余已收口任务均 accepted，
+      //     rework 视为被新 attempt 取代、不再阻塞；rejected 仍阻塞（缺一次 accepted 重派）；
+      //  ③ 其余阶段（A2/A5/A12a/A12b/B1）以本 accepted 任务 + 应用证据完成（v1.3 §4.5：
+      //     创建者 task.closed accepted + 文档/hash 可算 ⇒ stage.completed）。
+      const noOpenSiblings = siblings.every((sibling) =>
+        sibling.taskId === input.taskId || sibling.closed !== undefined);
+      const allRequiredAccepted = !CLOSE_ALL_TASKS_STAGES.has(stage) || siblings.every((sibling) =>
         sibling.taskId === input.taskId
-          ? input.outcome === "accepted"
-          : sibling.closed?.outcome === "accepted");
-      if (allAccepted && canCompleteStage(view, stage)) {
+          ? true
+          : sibling.closed?.outcome === "accepted" || sibling.closed?.outcome === "rework");
+      if (noOpenSiblings && allRequiredAccepted && canCompleteStage(view, stage)) {
         const artifacts = input.evidence?.artifacts ?? [];
         const completion: WorkflowEvent = {
           v: 1,
@@ -1424,7 +1436,12 @@ export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult>
     }
     const blockedByOutcome = input.outcome !== "accepted" && !(input.outcome === "rework" && stage === "A12b");
     const blockedByReport = input.outcome === "accepted" && (lastReport?.status === "failed" || lastReport?.status === "blocked");
-    if (blockedByOutcome || blockedByReport) {
+    // B13.1（RR8）：只有**仍在办**的阶段才能被阻塞——阶段已完成/已推进后，迟到的旧兄弟任务收口
+    // 不得再追加 `stage.blocked`（否则投影看到 blocked 的阶段 ≠ 当前阶段，会判 `workflow-corrupt`）。
+    const stageCanBlock = view.stage === stage
+      && (view.stages[stage].status === "requested" || view.stages[stage].status === "dispatched"
+        || view.stages[stage].status === "in-progress" || view.stages[stage].status === "blocked");
+    if ((blockedByOutcome || blockedByReport) && stageCanBlock) {
       const code = input.outcome === "rework"
         ? "task-report-blocked"
         : lastReport?.status === "failed" ? "task-report-failed" : "task-closed-rejected";
@@ -1555,35 +1572,60 @@ export async function prepareIntent(input: { projectRoot: string; flowId: string
     { kind: "intent", path: rel, sha256, ...(intentId !== undefined ? { intentId } : {}), version: latest.version },
   ];
   // 活动 workflow 的 A3 卡在办：记录 stage.requested A3（幂等；不创建任务——A3 由 chief 呈卡）。
+  // B13.1（2026-11-11，RR8 失败修复）：A3 卡呈现以**账本状态**为前置——RR8 中幕僚在
+  // `A2(requested)` 时呈卡、客户 confirm 后 `stage.completed A3` 被 `stage-transition-invalid`
+  // 拒绝（卡已结算但阶段无法完成）。prepareIntent 不得在不能推进 A3 时静默返回证据：
+  // 无活动 workflow / workflow 已关闭或 blocked / 当前阶段不是 A2 completed（或 A3 在办）
+  // ⇒ fail-closed 拒绝，调用方不得发卡。A3 在办（卡已 request、待结算/恢复）时仍返回证据，
+  // 供 B12.1 幂等判定与 pending-recovery 复核，但不重复写 stage.requested。
   const ledger = await readWorkflowLedger(input.projectRoot);
   const workflowId = input.workflowId
     ?? activeWorkflowIdsOf(ledger.events).find((id) => workflowEventList(ledger.events, id).some((event) => event.flowId === flowId));
-  if (workflowId !== undefined) {
-    const wfEvents = workflowEventList(ledger.events, workflowId);
-    const view = deriveWorkflowView(wfEvents, (await readTaskState(input.projectRoot)).events);
-    const a3InFlight = view.stage === "A3"
-      && (view.stages.A3.status === "requested" || view.stages.A3.status === "dispatched" || view.stages.A3.status === "in-progress");
-    if (view.closed === undefined && view.blocked === undefined && !a3InFlight
-      && (view.stage === "A2" || view.stage === "A3") && canRequestStage(view, "A3")) {
-      const now = input.now ?? (() => new Date());
-      const requestEvent: WorkflowEvent = {
-        v: 1,
-        at: now().toISOString(),
-        schema: WORKFLOW_LEDGER_SCHEMA,
-        kind: "stage.requested",
-        workflowId,
-        flowId,
-        path: view.path,
-        idempotencyKey: stageRequestIdempotencyKey(workflowId, "A3", 1),
-        stage: "A3",
-        fromStage: "A2",
-        requestTaskId: `intent-card:${flowId}:${sha256.slice(0, 12)}`,
-        requestDigest: sha256,
-        attempt: 1,
-      };
-      const appended = await appendWorkflowEvent(input.projectRoot, requestEvent);
-      if (!appended.ok) return serviceFailure("workflow-ledger-write-failed", `stage.requested A3 写入失败：${appended.message}`);
+  if (workflowId === undefined) {
+    return serviceFailure("workflow-not-found", `flow ${flowId} 没有活动 fixed workflow；A3 意图确认卡无法绑定 workflow（不发卡）。`);
+  }
+  const wfEvents = workflowEventList(ledger.events, workflowId);
+  const view = deriveWorkflowView(wfEvents, (await readTaskState(input.projectRoot)).events);
+  const vf = viewFailure(view);
+  if (vf !== undefined) return vf;
+  if (view.closed !== undefined) {
+    return serviceFailure("workflow-closed", `workflow ${workflowId} 已关闭（${view.closed.outcome}）；不发 A3 意图卡。`);
+  }
+  const a3InFlight = view.stage === "A3"
+    && (view.stages.A3.status === "requested" || view.stages.A3.status === "dispatched" || view.stages.A3.status === "in-progress");
+  if (!a3InFlight) {
+    // 只认**当前阶段仍在办且被阻塞**（view.blocked 是历史字段：stage.requested/completed 不会清除它，
+    // 返工恢复后仍可能残留旧 code；按 current status 判定，避免误拦已恢复的 A2）。
+    if (view.stages[view.stage].status === "blocked") {
+      return serviceFailure(
+        "stage-transition-invalid",
+        `A3 意图卡不可呈：workflow 当前 blocked（${view.blocked?.code ?? "blocked"}）；要求 A2 completed。`,
+      );
     }
+    if ((view.stage !== "A2" && view.stage !== "A3") || !canRequestStage(view, "A3")) {
+      return serviceFailure(
+        "stage-transition-invalid",
+        `A3 意图卡不可呈：当前 ${view.stage}(${view.stages[view.stage].status})；要求 A2 completed。`,
+      );
+    }
+    const now = input.now ?? (() => new Date());
+    const requestEvent: WorkflowEvent = {
+      v: 1,
+      at: now().toISOString(),
+      schema: WORKFLOW_LEDGER_SCHEMA,
+      kind: "stage.requested",
+      workflowId,
+      flowId,
+      path: view.path,
+      idempotencyKey: stageRequestIdempotencyKey(workflowId, "A3", 1),
+      stage: "A3",
+      fromStage: "A2",
+      requestTaskId: `intent-card:${flowId}:${sha256.slice(0, 12)}`,
+      requestDigest: sha256,
+      attempt: 1,
+    };
+    const appended = await appendWorkflowEvent(input.projectRoot, requestEvent);
+    if (!appended.ok) return serviceFailure("workflow-ledger-write-failed", `stage.requested A3 写入失败：${appended.message}`);
   }
   return {
     ok: true,
