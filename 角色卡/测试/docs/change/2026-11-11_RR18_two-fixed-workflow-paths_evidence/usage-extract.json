@@ -1,0 +1,115 @@
+{
+  "model": "deepseek-v4-flash",
+  "roles": {
+    "chief": {
+      "assistantMessages": 163,
+      "inputTokens": 139778,
+      "outputTokens": 69236,
+      "cacheCreate": 0,
+      "cacheRead": 9915904,
+      "models": [
+        "deepseek-v4-flash",
+        "<synthetic>"
+      ]
+    },
+    "convener": {
+      "assistantMessages": 269,
+      "inputTokens": 239899,
+      "outputTokens": 147869,
+      "cacheCreate": 0,
+      "cacheRead": 21207168,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "game-implementer": {
+      "assistantMessages": 13,
+      "inputTokens": 67570,
+      "outputTokens": 13930,
+      "cacheCreate": 0,
+      "cacheRead": 129024,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "nominator": {
+      "assistantMessages": 59,
+      "inputTokens": 133341,
+      "outputTokens": 33045,
+      "cacheCreate": 0,
+      "cacheRead": 2045696,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "product": {
+      "assistantMessages": 38,
+      "inputTokens": 65851,
+      "outputTokens": 19839,
+      "cacheCreate": 0,
+      "cacheRead": 626944,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "rapporteur": {
+      "assistantMessages": 78,
+      "inputTokens": 167695,
+      "outputTokens": 188450,
+      "cacheCreate": 0,
+      "cacheRead": 3256576,
+      "models": [
+        "deepseek-v4-flash",
+        "<synthetic>"
+      ]
+    },
+    "verifier": {
+      "assistantMessages": 33,
+      "inputTokens": 115552,
+      "outputTokens": 34401,
+      "cacheCreate": 0,
+      "cacheRead": 846336,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "turns": {
+    "chief": {
+      "settled": 32,
+      "completed": 30,
+      "aborted": 2
+    },
+    "convener": {
+      "settled": 25,
+      "completed": 24,
+      "aborted": 1
+    },
+    "game-implementer": {
+      "settled": 1,
+      "completed": 0,
+      "aborted": 1
+    },
+    "nominator": {
+      "settled": 3,
+      "completed": 3,
+      "aborted": 0
+    },
+    "product": {
+      "settled": 3,
+      "completed": 3,
+      "aborted": 0
+    },
+    "rapporteur": {
+      "settled": 3,
+      "completed": 3,
+      "aborted": 0
+    },
+    "verifier": {
+      "settled": 2,
+      "completed": 1,
+      "aborted": 1
+    }
+  },
+  "note": "message.usage from native transcripts; no cost_usd field"
+}
