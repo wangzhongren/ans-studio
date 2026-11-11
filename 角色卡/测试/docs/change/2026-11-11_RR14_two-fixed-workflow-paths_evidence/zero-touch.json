@@ -1,0 +1,830 @@
+{
+  "at": "2026-11-11T03:47:16.218Z",
+  "rr13Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr13-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794367118069.0605
+        },
+        {
+          "name": "rr",
+          "mtime": 1794366658397.5166
+        },
+        {
+          "name": "target",
+          "mtime": 1794366137762.3333
+        },
+        {
+          "name": "userData",
+          "mtime": 1794367118101.1863
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr13-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794367118069.0605
+        },
+        {
+          "name": "rr",
+          "mtime": 1794366658397.5166
+        },
+        {
+          "name": "target",
+          "mtime": 1794366137762.3333
+        },
+        {
+          "name": "userData",
+          "mtime": 1794367118101.1863
+        }
+      ]
+    }
+  },
+  "rr12Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr12-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794365563674.908
+        },
+        {
+          "name": "rr",
+          "mtime": 1794365621895.6553
+        },
+        {
+          "name": "target",
+          "mtime": 1794364276398.8271
+        },
+        {
+          "name": "userData",
+          "mtime": 1794365563705.7322
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr12-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794365563674.908
+        },
+        {
+          "name": "rr",
+          "mtime": 1794365621895.6553
+        },
+        {
+          "name": "target",
+          "mtime": 1794364276398.8271
+        },
+        {
+          "name": "userData",
+          "mtime": 1794365563705.7322
+        }
+      ]
+    }
+  },
+  "rr11Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr11-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794362467966.8765
+        },
+        {
+          "name": "rr",
+          "mtime": 1794362553047.7212
+        },
+        {
+          "name": "target",
+          "mtime": 1794361685217.7217
+        },
+        {
+          "name": "userData",
+          "mtime": 1794362468021.2668
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr11-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794362467966.8765
+        },
+        {
+          "name": "rr",
+          "mtime": 1794362553047.7212
+        },
+        {
+          "name": "target",
+          "mtime": 1794361685217.7217
+        },
+        {
+          "name": "userData",
+          "mtime": 1794362468021.2668
+        }
+      ]
+    }
+  },
+  "rr10Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr10-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794359965807.776
+        },
+        {
+          "name": "rr",
+          "mtime": 1794360041125.3284
+        },
+        {
+          "name": "target",
+          "mtime": 1794359241744.5085
+        },
+        {
+          "name": "userData",
+          "mtime": 1794359965837.2854
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr10-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794359965807.776
+        },
+        {
+          "name": "rr",
+          "mtime": 1794360041125.3284
+        },
+        {
+          "name": "target",
+          "mtime": 1794359241744.5085
+        },
+        {
+          "name": "userData",
+          "mtime": 1794359965837.2854
+        }
+      ]
+    }
+  },
+  "rr9Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr9-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794358774502.562
+        },
+        {
+          "name": "rr",
+          "mtime": 1794358827974.8486
+        },
+        {
+          "name": "target",
+          "mtime": 1794358771869.134
+        },
+        {
+          "name": "userData",
+          "mtime": 1794358774528.606
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr9-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794358774502.562
+        },
+        {
+          "name": "rr",
+          "mtime": 1794358827974.8486
+        },
+        {
+          "name": "target",
+          "mtime": 1794358771869.134
+        },
+        {
+          "name": "userData",
+          "mtime": 1794358774528.606
+        }
+      ]
+    }
+  },
+  "rr8Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr8-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794357475165.4985
+        },
+        {
+          "name": "rr",
+          "mtime": 1794357634748.6853
+        },
+        {
+          "name": "target",
+          "mtime": 1794357070752.7615
+        },
+        {
+          "name": "userData",
+          "mtime": 1794357475211.2815
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr8-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794357475165.4985
+        },
+        {
+          "name": "rr",
+          "mtime": 1794357634748.6853
+        },
+        {
+          "name": "target",
+          "mtime": 1794357070752.7615
+        },
+        {
+          "name": "userData",
+          "mtime": 1794357475211.2815
+        }
+      ]
+    }
+  },
+  "rr7Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr7-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794352678166.3381
+        },
+        {
+          "name": "rr",
+          "mtime": 1794352916906.3318
+        },
+        {
+          "name": "target",
+          "mtime": 1794352527395.021
+        },
+        {
+          "name": "userData",
+          "mtime": 1794352678224.2998
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr7-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794352678166.3381
+        },
+        {
+          "name": "rr",
+          "mtime": 1794352916906.3318
+        },
+        {
+          "name": "target",
+          "mtime": 1794352527395.021
+        },
+        {
+          "name": "userData",
+          "mtime": 1794352678224.2998
+        }
+      ]
+    }
+  },
+  "rr6Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr6-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794352228241.602
+        },
+        {
+          "name": "rr",
+          "mtime": 1794352467187.2944
+        },
+        {
+          "name": "target",
+          "mtime": 1794350731680.9546
+        },
+        {
+          "name": "userData",
+          "mtime": 1794352228273.6462
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr6-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794352228241.602
+        },
+        {
+          "name": "rr",
+          "mtime": 1794352467187.2944
+        },
+        {
+          "name": "target",
+          "mtime": 1794350731680.9546
+        },
+        {
+          "name": "userData",
+          "mtime": 1794352228273.6462
+        }
+      ]
+    }
+  },
+  "rr5Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr5-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794344435888.902
+        },
+        {
+          "name": "rr",
+          "mtime": 1794344534934.0396
+        },
+        {
+          "name": "target",
+          "mtime": 1794344228182.3447
+        },
+        {
+          "name": "userData",
+          "mtime": 1794344435916.6047
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr5-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794344435888.902
+        },
+        {
+          "name": "rr",
+          "mtime": 1794344534934.0396
+        },
+        {
+          "name": "target",
+          "mtime": 1794344228182.3447
+        },
+        {
+          "name": "userData",
+          "mtime": 1794344435916.6047
+        }
+      ]
+    }
+  },
+  "rr4Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr4-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794342717778.3962
+        },
+        {
+          "name": "rr",
+          "mtime": 1794342837030.7935
+        },
+        {
+          "name": "target",
+          "mtime": 1794342713985.4097
+        },
+        {
+          "name": "userData",
+          "mtime": 1794342717807.2385
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr4-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794342717778.3962
+        },
+        {
+          "name": "rr",
+          "mtime": 1794342837030.7935
+        },
+        {
+          "name": "target",
+          "mtime": 1794342713985.4097
+        },
+        {
+          "name": "userData",
+          "mtime": 1794342717807.2385
+        }
+      ]
+    }
+  },
+  "rr3Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr3-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794337655249.5679
+        },
+        {
+          "name": "rr",
+          "mtime": 1794337702730.4175
+        },
+        {
+          "name": "target",
+          "mtime": 1794337490418.442
+        },
+        {
+          "name": "userData",
+          "mtime": 1794337655297.296
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr3-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794337655249.5679
+        },
+        {
+          "name": "rr",
+          "mtime": 1794337702730.4175
+        },
+        {
+          "name": "target",
+          "mtime": 1794337490418.442
+        },
+        {
+          "name": "userData",
+          "mtime": 1794337655297.296
+        }
+      ]
+    }
+  },
+  "rr2Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr2-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794330567745.8574
+        },
+        {
+          "name": "rr",
+          "mtime": 1794330664923.348
+        },
+        {
+          "name": "target",
+          "mtime": 1794330533337.3438
+        },
+        {
+          "name": "userData",
+          "mtime": 1794330567791.1804
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr2-2026-11-11",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794330567745.8574
+        },
+        {
+          "name": "rr",
+          "mtime": 1794330664923.348
+        },
+        {
+          "name": "target",
+          "mtime": 1794330533337.3438
+        },
+        {
+          "name": "userData",
+          "mtime": 1794330567791.1804
+        }
+      ]
+    }
+  },
+  "rr1Root": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr-2026-11-10",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794326201500.053
+        },
+        {
+          "name": "rr",
+          "mtime": 1794326369597.8206
+        },
+        {
+          "name": "target",
+          "mtime": 1794326160164.8445
+        },
+        {
+          "name": "userData",
+          "mtime": 1794326201526.415
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr-2026-11-10",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794326201500.053
+        },
+        {
+          "name": "rr",
+          "mtime": 1794326369597.8206
+        },
+        {
+          "name": "target",
+          "mtime": 1794326160164.8445
+        },
+        {
+          "name": "userData",
+          "mtime": 1794326201526.415
+        }
+      ]
+    }
+  },
+  "snakeRunRoot": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794247136435.3418
+        },
+        {
+          "name": "round10",
+          "mtime": 1794248323109.7388
+        },
+        {
+          "name": "round11",
+          "mtime": 1794248959545.2583
+        },
+        {
+          "name": "round12",
+          "mtime": 1794249232305.3015
+        },
+        {
+          "name": "round13",
+          "mtime": 1794249490950.5813
+        },
+        {
+          "name": "round14",
+          "mtime": 1794249732100.8677
+        },
+        {
+          "name": "round15",
+          "mtime": 1794249988039.9426
+        },
+        {
+          "name": "round16",
+          "mtime": 1794250169724.0994
+        },
+        {
+          "name": "round17",
+          "mtime": 1794250566337.3135
+        },
+        {
+          "name": "round18",
+          "mtime": 1794252829477.4497
+        },
+        {
+          "name": "round19",
+          "mtime": 1794253209658.652
+        },
+        {
+          "name": "round20",
+          "mtime": 1794261345627.0393
+        },
+        {
+          "name": "round21",
+          "mtime": 1794261805971.9543
+        },
+        {
+          "name": "round22",
+          "mtime": 1794262253668.7983
+        },
+        {
+          "name": "round23",
+          "mtime": 1794262693084.7214
+        },
+        {
+          "name": "round24",
+          "mtime": 1794263327768.893
+        },
+        {
+          "name": "round25",
+          "mtime": 1794264715770.8784
+        },
+        {
+          "name": "round26",
+          "mtime": 1794265159753.918
+        },
+        {
+          "name": "round8",
+          "mtime": 1794247470341.858
+        },
+        {
+          "name": "round9",
+          "mtime": 1794247940931.3174
+        },
+        {
+          "name": "rr",
+          "mtime": 1794247132796.088
+        },
+        {
+          "name": "userData",
+          "mtime": 1794246925742.7854
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+      "exists": true,
+      "entries": [
+        {
+          "name": "evidence",
+          "mtime": 1794247136435.3418
+        },
+        {
+          "name": "round10",
+          "mtime": 1794248323109.7388
+        },
+        {
+          "name": "round11",
+          "mtime": 1794248959545.2583
+        },
+        {
+          "name": "round12",
+          "mtime": 1794249232305.3015
+        },
+        {
+          "name": "round13",
+          "mtime": 1794249490950.5813
+        },
+        {
+          "name": "round14",
+          "mtime": 1794249732100.8677
+        },
+        {
+          "name": "round15",
+          "mtime": 1794249988039.9426
+        },
+        {
+          "name": "round16",
+          "mtime": 1794250169724.0994
+        },
+        {
+          "name": "round17",
+          "mtime": 1794250566337.3135
+        },
+        {
+          "name": "round18",
+          "mtime": 1794252829477.4497
+        },
+        {
+          "name": "round19",
+          "mtime": 1794253209658.652
+        },
+        {
+          "name": "round20",
+          "mtime": 1794261345627.0393
+        },
+        {
+          "name": "round21",
+          "mtime": 1794261805971.9543
+        },
+        {
+          "name": "round22",
+          "mtime": 1794262253668.7983
+        },
+        {
+          "name": "round23",
+          "mtime": 1794262693084.7214
+        },
+        {
+          "name": "round24",
+          "mtime": 1794263327768.893
+        },
+        {
+          "name": "round25",
+          "mtime": 1794264715770.8784
+        },
+        {
+          "name": "round26",
+          "mtime": 1794265159753.918
+        },
+        {
+          "name": "round8",
+          "mtime": 1794247470341.858
+        },
+        {
+          "name": "round9",
+          "mtime": 1794247940931.3174
+        },
+        {
+          "name": "rr",
+          "mtime": 1794247132796.088
+        },
+        {
+          "name": "userData",
+          "mtime": 1794246925742.7854
+        }
+      ]
+    }
+  },
+  "snakeTarget": {
+    "pre": {
+      "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+      "exists": true,
+      "entries": [
+        {
+          "name": "target",
+          "mtime": 1794192309257.867
+        }
+      ]
+    },
+    "post": {
+      "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+      "exists": true,
+      "entries": [
+        {
+          "name": "target",
+          "mtime": 1794192309257.867
+        }
+      ]
+    }
+  },
+  "untouched": {
+    "rr13Root": true,
+    "rr12Root": true,
+    "rr11Root": true,
+    "rr10Root": true,
+    "rr9Root": true,
+    "rr8Root": true,
+    "rr7Root": true,
+    "rr6Root": true,
+    "rr5Root": true,
+    "rr4Root": true,
+    "rr3Root": true,
+    "rr2Root": true,
+    "rr1Root": true,
+    "snakeRunRoot": true,
+    "snakeTarget": true
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "at": "2026-11-11T03:47:16.211Z",
+  "candidate": "82d592f625c27e2696775c72cb732a5a9eab24ec",
+  "msgMark": "2026-11-11T03:31:34.897Z",
+  "stopCause": "stalled-no-progress-12min (A2 completed; convener completion report did not wake the chief; no A3 card)",
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-11T03:31:44.810Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-f667bf7b9176d59bea6fc957",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:f519006e-44c6-4dda-af8b-cf5dd675ec37",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "f519006e-44c6-4dda-af8b-cf5dd675ec37",
+    "legacyStateIgnored": true
+  },
+  "workflowEvents": [
+    {
+      "at": "2026-11-11T03:31:44.810Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:31:44.810Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:32:12.345Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwbkc5o1-accf7668",
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:33:05.758Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:33:48.521Z",
+      "kind": "stage.completed",
+      "stage": "A2",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-11T03:31:44.818Z",
+      "taskId": "t-mwbkbkfe-7e6ed894",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-f667bf7b9176d59bea6fc957"
+    },
+    {
+      "at": "2026-11-11T03:32:12.337Z",
+      "taskId": "t-mwbkc5o1-accf7668",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-f667bf7b9176d59bea6fc957"
+    },
+    {
+      "at": "2026-11-11T03:33:05.759Z",
+      "taskId": "t-mwbkdavy-fa9a0cd4",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-f667bf7b9176d59bea6fc957"
+    },
+    {
+      "at": "2026-11-11T03:33:15.328Z",
+      "taskId": "t-mwbkdi9s-c7924e92",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-f667bf7b9176d59bea6fc957"
+    }
+  ],
+  "taskReported": 8,
+  "taskClosed": [
+    {
+      "at": "2026-11-11T03:32:42.462Z",
+      "taskId": "t-mwbkc5o1-accf7668",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T03:32:52.203Z",
+      "taskId": "t-mwbkbkfe-7e6ed894",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T03:33:31.597Z",
+      "taskId": "t-mwbkdavy-fa9a0cd4",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T03:33:48.521Z",
+      "taskId": "t-mwbkdi9s-c7924e92",
+      "outcome": "accepted"
+    }
+  ],
+  "requestRows": [],
+  "projectNotes": [],
+  "docs": [
+    "product",
+    "workflow.md"
+  ],
+  "roleCards": [],
+  "roleActivatedEvents": 0,
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "shellGateAuditAbsent": true,
+  "note": "B18 works: A1 dispatched; A2 stage-request task closed accepted at 03:33:31 (no production evidence required); product A2 task closed accepted 03:33:48 and stage.completed A2 recorded. But after the convener's A2 completion report (03:33:55) the chief was not re-woken; no A3 intent card was created; both chief and convener idle; 12 min no ledger progress -> driver stalled. No A3+; no role cards; no git; no legacy."
+}
