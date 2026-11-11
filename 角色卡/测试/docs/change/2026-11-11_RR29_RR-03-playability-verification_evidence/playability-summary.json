@@ -1,0 +1,207 @@
+{
+  "fileUrl": "file:///C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr28-2026-11-11/target/index.html",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Edg/157.0.4341.46",
+    "revision": "@a0c6bd61d7884b3c402a34c67d05100107a9e5e4",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "jsVersion": "15.7.11.4"
+  },
+  "init": {
+    "score": "0",
+    "status": "就绪",
+    "overlayHidden": true,
+    "finalScore": "0",
+    "hasGame": true,
+    "canvas": {
+      "width": 400,
+      "height": 400,
+      "head": {
+        "x": 10,
+        "y": 10
+      },
+      "body": [
+        {
+          "x": 8,
+          "y": 10
+        },
+        {
+          "x": 9,
+          "y": 10
+        }
+      ],
+      "food": {
+        "x": 13,
+        "y": 8
+      }
+    }
+  },
+  "direction": {
+    "movedUp": true,
+    "heads": [
+      {
+        "x": 11,
+        "y": 10
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 9
+      },
+      {
+        "x": 11,
+        "y": 8
+      },
+      {
+        "x": 11,
+        "y": 8
+      }
+    ]
+  },
+  "attempts": 1,
+  "scoreReached": true,
+  "scoreState": {
+    "score": "1",
+    "status": "进行中",
+    "overlayHidden": true,
+    "finalScore": "0",
+    "hasGame": true,
+    "canvas": {
+      "width": 400,
+      "height": 400,
+      "head": {
+        "x": 13,
+        "y": 8
+      },
+      "body": [
+        {
+          "x": 12,
+          "y": 6
+        },
+        {
+          "x": 12,
+          "y": 7
+        },
+        {
+          "x": 13,
+          "y": 7
+        }
+      ],
+      "food": {
+        "x": 6,
+        "y": 3
+      }
+    }
+  },
+  "gameOver": false,
+  "overState": {
+    "score": "1",
+    "status": "进行中",
+    "overlayHidden": true,
+    "finalScore": "0",
+    "hasGame": true,
+    "canvas": {
+      "width": 400,
+      "height": 400,
+      "head": {
+        "x": 2,
+        "y": 0
+      },
+      "body": [
+        {
+          "x": 3,
+          "y": 0
+        },
+        {
+          "x": 4,
+          "y": 0
+        },
+        {
+          "x": 5,
+          "y": 0
+        }
+      ],
+      "food": {
+        "x": 6,
+        "y": 3
+      }
+    }
+  },
+  "restarted": {
+    "score": "1",
+    "status": "游戏结束",
+    "overlayHidden": false,
+    "finalScore": "1",
+    "hasGame": true,
+    "canvas": {
+      "width": 400,
+      "height": 400,
+      "head": {
+        "x": 0,
+        "y": 0
+      },
+      "body": [
+        {
+          "x": 1,
+          "y": 0
+        },
+        {
+          "x": 2,
+          "y": 0
+        },
+        {
+          "x": 3,
+          "y": 0
+        }
+      ],
+      "food": {
+        "x": 6,
+        "y": 3
+      }
+    }
+  },
+  "console": {
+    "total": 2,
+    "errors": [],
+    "warnings": [
+      {
+        "at": "2026-11-11T11:52:25.262Z",
+        "kind": "log.warning",
+        "source": "rendering",
+        "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently",
+        "url": null
+      },
+      {
+        "at": "2026-11-11T11:52:25.393Z",
+        "kind": "log.warning",
+        "source": "rendering",
+        "text": "Canvas2D: Multiple readback operations using getImageData are faster with the willReadFrequently attribute set to true. See: https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently",
+        "url": null
+      }
+    ]
+  },
+  "at": "2026-11-11T11:52:59.897Z"
+}

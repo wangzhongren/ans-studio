@@ -1,0 +1,5 @@
+RR29 playability target artifacts (RR28 merged target, main 152448a):
+c498a5e63ba69ebc578ef61ccd92f58b3545b4e23b682cb3df6a230379a07de9 *C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr28-2026-11-11/target/index.html
+407e54d508fc532229f16803cacc7b977b4a00b6ef789f632ca405f589a171d6 *C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr28-2026-11-11/target/src/game.js
+aaa23cf3f17cf4c834ab6574d32c6d830c8389e1877eb1214e758238fe0a8805 *C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr28-2026-11-11/target/src/styles.css
+---claimed in RR28 record: index.html c498a5e63ba69ebc578ef61ccd92f58b3545b4e23b682cb3df6a230379a07de9; src/game.js 407e54d508fc532229f16803cacc7b977b4a00b6ef789f632ca405f589a171d6; src/styles.css aaa23cf3f17cf4c834ab6574d32c6d830c8389e1877eb1214e758238fe0a8805

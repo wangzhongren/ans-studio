@@ -1,0 +1,73 @@
+{
+  "gameOverState": {
+    "score": "1",
+    "status": "游戏结束",
+    "overlayHidden": false,
+    "finalScore": "1",
+    "hasGame": true,
+    "canvas": {
+      "head": {
+        "x": 0,
+        "y": 0
+      },
+      "food": {
+        "x": 6,
+        "y": 3
+      }
+    }
+  },
+  "restartedState": {
+    "score": "0",
+    "status": "就绪",
+    "overlayHidden": true,
+    "finalScore": "0",
+    "hasGame": true,
+    "canvas": {
+      "head": {
+        "x": 10,
+        "y": 10
+      },
+      "food": {
+        "x": 10,
+        "y": 8
+      }
+    }
+  },
+  "postRestartMoves": [
+    {
+      "x": 12,
+      "y": 10
+    },
+    {
+      "x": 12,
+      "y": 10
+    },
+    {
+      "x": 12,
+      "y": 10
+    },
+    {
+      "x": 12,
+      "y": 9
+    },
+    {
+      "x": 12,
+      "y": 9
+    },
+    {
+      "x": 12,
+      "y": 9
+    },
+    {
+      "x": 12,
+      "y": 9
+    },
+    {
+      "x": 12,
+      "y": 9
+    }
+  ],
+  "consoleErrors": 0,
+  "consoleTotal": 1,
+  "at": "2026-11-11T11:53:49.037Z"
+}
