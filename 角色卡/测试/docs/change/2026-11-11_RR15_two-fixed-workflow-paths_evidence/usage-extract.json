@@ -1,0 +1,83 @@
+{
+  "model": "deepseek-v4-flash",
+  "roles": {
+    "chief": {
+      "assistantMessages": 184,
+      "inputTokens": 195312,
+      "outputTokens": 91240,
+      "cacheCreate": 0,
+      "cacheRead": 12826752,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "convener": {
+      "assistantMessages": 254,
+      "inputTokens": 231321,
+      "outputTokens": 132958,
+      "cacheCreate": 0,
+      "cacheRead": 16393088,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "nominator": {
+      "assistantMessages": 83,
+      "inputTokens": 178763,
+      "outputTokens": 89298,
+      "cacheCreate": 0,
+      "cacheRead": 3490688,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "product": {
+      "assistantMessages": 37,
+      "inputTokens": 57792,
+      "outputTokens": 17929,
+      "cacheCreate": 0,
+      "cacheRead": 640000,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "rapporteur": {
+      "assistantMessages": 59,
+      "inputTokens": 117825,
+      "outputTokens": 49022,
+      "cacheCreate": 0,
+      "cacheRead": 1943424,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "turns": {
+    "chief": {
+      "settled": 28,
+      "completed": 28,
+      "aborted": 0
+    },
+    "convener": {
+      "settled": 24,
+      "completed": 24,
+      "aborted": 0
+    },
+    "nominator": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    },
+    "product": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    },
+    "rapporteur": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    }
+  },
+  "note": "message.usage from native transcripts; no cost_usd field"
+}
