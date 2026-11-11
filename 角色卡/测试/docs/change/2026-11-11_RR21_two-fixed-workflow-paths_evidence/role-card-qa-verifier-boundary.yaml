@@ -1,0 +1,5 @@
+role: qa-verifier
+entries:
+  - kind: directory
+    path: test/
+    purpose: e2e-verification：AC1–AC5 端到端脚本、夹具与验收证据

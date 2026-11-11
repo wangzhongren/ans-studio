@@ -1,0 +1,17 @@
+role: env-bootstrap
+entries:
+  - kind: file
+    path: package.json
+    purpose: env-resources：构建与运行脚本、依赖声明
+  - kind: file
+    path: tsconfig.json
+    purpose: env-resources：TypeScript 编译配置
+  - kind: file
+    path: vite.config.ts
+    purpose: env-resources：构建/开发服务器配置
+  - kind: file
+    path: index.html
+    purpose: env-resources：静态宿主页
+  - kind: file
+    path: src/main.ts
+    purpose: entry-index：应用入口装配（只接线）

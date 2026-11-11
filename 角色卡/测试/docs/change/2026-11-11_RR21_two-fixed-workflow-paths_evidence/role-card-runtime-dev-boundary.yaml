@@ -1,0 +1,8 @@
+role: runtime-dev
+entries:
+  - kind: directory
+    path: src/loop/
+    purpose: game-loop：固定 tick 主循环、命令消费与阶段切换
+  - kind: directory
+    path: src/restart/
+    purpose: restart-flow：结束态重开编排
