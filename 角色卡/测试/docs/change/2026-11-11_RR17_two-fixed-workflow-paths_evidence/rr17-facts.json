@@ -1,5 +1,5 @@
 {
-  "at": "2026-11-11T04:46:32.120Z",
+  "at": "2026-11-11T05:00:38.887Z",
   "candidate": "e1c3c8b29c808be17592ff71bcbedcd4a548f3da",
   "msgMark": "2026-11-11T04:41:04.075Z",
   "stopCause": "gate:unexpected-card-kind (tester-side driver gate: decision card not in the driver allowlist; run invalid, not a product verdict)",

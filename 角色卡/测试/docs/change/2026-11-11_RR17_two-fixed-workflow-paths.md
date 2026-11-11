@@ -104,9 +104,9 @@
 | `drive.jsonl` | `a0c45413ad1bf0e50c0cfe9c4772680f5a4b03a29bb4ba9251aabd924f671441` |
 | `tasks.jsonl`（8 任务；decision 请求行） | `6364f428c52aa392f098a9f96b5550159245da424d10eac4b450c0b8a00ffa7f` |
 | `workflows.jsonl`（A1–A5） | `9bcef62f58be3eaafcc67d8c4823af0bf6720138daddaea237ef1cdd4414d2c0` |
-| `rr17-facts.json` | `e2bfad6be41e40a17bacf8d68d6d83a819b7ca6263b289b593820deaca8e85b4` |
+| `rr17-facts.json` | `ef2d925203aa54f68ad9d4fd98afd2b0536df5a96fb03a2010bab240bff8bf24` |
 | `root-cause-code-pointers.txt` | `4d923dcf610092019b91b4441c057d14dcc90baa40224ff2f46e3c0a87c078fe` |
-| `zero-touch.json`（18 旧根全 true） | `645bcb34975ab056bc13cca7a75dab17202a325475744301f030b8b65409afb9` |
+| `zero-touch.json`（18 旧根全 true） | `29f92278e52310b7e3e3157fe7c220684e33ff831eff2ef8dc2bda395000e065` |
 | `usage-extract.json` | `1bdefe71dfb984aca8ca216a4229b4a55000b7e161f4ba6e77f6d8263076da0a` |
 | `native-chief-transcript.jsonl` / `native-convener-transcript.jsonl` / `native-product-transcript.jsonl` / `native-rapporteur-transcript.jsonl` | `aa7c7e79…` / `ee8d836f…` / `e742dbdb…` / `f1951757…` |
 
