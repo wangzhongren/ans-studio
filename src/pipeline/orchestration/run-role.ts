@@ -1621,6 +1621,29 @@ export async function openRoleSession(
   const refreshAssignedTaskScope = async () => {
     if (!assignedTaskWritePaths || !input.taskId) return;
     assignedTaskWritePaths.splice(0);
+    // B26（2026-11-11，RR23 失败修复）：fixed 任务（task.created.workflowId）的受派写集**不读 legacy trunk**
+    // ——`prepareAssignedTaskWriteScope` 要求 runId，fixed 任务必然失败 ⇒ 空交集、worker 全部写入被拒。
+    // 写集 = 应用派发时记录的 modulePaths（B21 派生）∩ 团队计划角色写集（resolveTaskGitScope 同一权威）；
+    // 文件精确、目录前缀；`to` 必须等于当前角色。无 modulePaths 的 fixed 任务保持现状（空集 fail-closed，不扩权）。
+    const taskStateForScope = await readTaskState(input.project.projectRoot);
+    const createdForScope = taskStateForScope.records.get(input.taskId)?.created;
+    if (createdForScope?.workflowId !== undefined) {
+      if (createdForScope.to !== setup.role.id) return;
+      const modulePaths = createdForScope.modulePaths;
+      if (modulePaths === undefined || modulePaths.length === 0) return;
+      const gitScope = await resolveTaskGitScope({ projectRoot: input.project.projectRoot, taskId: input.taskId, roleId: setup.role.id });
+      if (!gitScope.ok) return;
+      const within = (path: string, root: string): boolean => path === root || (root.endsWith("/") && path.startsWith(root));
+      const paths = new Set<string>();
+      for (const modulePath of modulePaths) {
+        for (const rolePath of gitScope.scope.paths) {
+          if (within(modulePath, rolePath)) paths.add(modulePath);
+          else if (within(rolePath, modulePath)) paths.add(rolePath);
+        }
+      }
+      assignedTaskWritePaths.push(...[...paths].sort());
+      return;
+    }
     const actual = await createTrunkService({ projectRoot: input.project.projectRoot }).prepareAssignedTaskWriteScope({ taskId: input.taskId, actorRoleId: setup.role.id });
     if (actual.ok) assignedTaskWritePaths.push(...actual.value.paths);
   };

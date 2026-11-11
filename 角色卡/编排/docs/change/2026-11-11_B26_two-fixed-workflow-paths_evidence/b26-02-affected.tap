@@ -1,0 +1,442 @@
+TAP version 13
+# Subtest: G-B5-1：fixed 直派 A1 任务创建 ⇒ stage.dispatched A1 落账（完成于任务创建）且同任务幂等 replay
+ok 1 - G-B5-1：fixed 直派 A1 任务创建 ⇒ stage.dispatched A1 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 50.8769
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A4 任务创建 ⇒ stage.dispatched A4 落账（完成于任务创建）且同任务幂等 replay
+ok 2 - G-B5-1：fixed 直派 A4 任务创建 ⇒ stage.dispatched A4 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 60.6447
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A7 任务创建 ⇒ stage.dispatched A7 落账（完成于任务创建）且同任务幂等 replay
+ok 3 - G-B5-1：fixed 直派 A7 任务创建 ⇒ stage.dispatched A7 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 84.4877
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A8 激活任务创建 ⇒ stage.dispatched A8（A7 完成后下一阶段；在办供 role.activated）
+ok 4 - G-B5-1：A8 激活任务创建 ⇒ stage.dispatched A8（A7 完成后下一阶段；在办供 role.activated）
+  ---
+  duration_ms: 138.7332
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A12a 直派 ⇒ stage.dispatched A12a；A11 stage-request 不再被 AC-09 门拒绝（未记录时拒绝的对照）
+ok 5 - G-B5-1：A12a 直派 ⇒ stage.dispatched A12a；A11 stage-request 不再被 AC-09 门拒绝（未记录时拒绝的对照）
+  ---
+  duration_ms: 134.2861
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A12b 直派 ⇒ stage.dispatched A12b（A11 完成后窗口）
+ok 6 - G-B5-1：A12b 直派 ⇒ stage.dispatched A12b（A11 完成后窗口）
+  ---
+  duration_ms: 104.4901
+  type: 'test'
+  ...
+# Subtest: G-B5-1：窗口外 review 直派不写账本也不阻断（B1 既有夹具语义）；服务失败 fail-closed（workflow-not-found / workflow-closed）
+ok 7 - G-B5-1：窗口外 review 直派不写账本也不阻断（B1 既有夹具语义）；服务失败 fail-closed（workflow-not-found / workflow-closed）
+  ---
+  duration_ms: 49.9608
+  type: 'test'
+  ...
+# Subtest: G-B5-1：stage 集合不含 A11/B1/B3（A11 由 requestStage 记录；B3 无 stage.dispatched 语义）
+ok 8 - G-B5-1：stage 集合不含 A11/B1/B3（A11 由 requestStage 记录；B3 无 stage.dispatched 语义）
+  ---
+  duration_ms: 0.8888
+  type: 'test'
+  ...
+# Subtest: G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方案依据 hash/requestTaskId）；accept ⇒ stage.completed A6
+ok 9 - G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方案依据 hash/requestTaskId）；accept ⇒ stage.completed A6
+  ---
+  duration_ms: 110.774
+  type: 'test'
+  ...
+# Subtest: G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等
+ok 10 - G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等
+  ---
+  duration_ms: 120.2637
+  type: 'test'
+  ...
+# Subtest: G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）
+ok 11 - G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）
+  ---
+  duration_ms: 70.9401
+  type: 'test'
+  ...
+# Subtest: G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候选路径派生写集）；B3 生产派发通过写集门
+ok 12 - G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候选路径派生写集）；B3 生产派发通过写集门
+  ---
+  duration_ms: 433.4319
+  type: 'test'
+  ...
+# Subtest: G-B5-2：候选路径缺省时从 B1 生产任务 modulePaths 派生；B2 窗口/路径守卫
+ok 13 - G-B5-2：候选路径缺省时从 B1 生产任务 modulePaths 派生；B2 窗口/路径守卫
+  ---
+  duration_ms: 62.0086
+  type: 'test'
+  ...
+# Subtest: G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B3 请求不受理、无任务（fail-closed）
+ok 14 - G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B3 请求不受理、无任务（fail-closed）
+  ---
+  duration_ms: 57.2599
+  type: 'test'
+  ...
+# Subtest: per-flow 解析 + B7.1 fail-closed：fixed 聊天普通派发不回落星形；切 legacy/v1 后同一形状走旧路
+ok 15 - per-flow 解析 + B7.1 fail-closed：fixed 聊天普通派发不回落星形；切 legacy/v1 后同一形状走旧路
+  ---
+  duration_ms: 33.8433
+  type: 'test'
+  ...
+# Subtest: B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入
+ok 16 - B1 启用闸（legacy 兼容）：项目未显式 fixed 且该 flow 无 fixed workflow ⇒ 不启用 fixed 路由/注入
+  ---
+  duration_ms: 14.0507
+  type: 'test'
+  ...
+# Subtest: workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy）
+ok 17 - workflowModeForFlow 注入：run-role 每次按 flowId 现场解析（无缓存；异常/空 flow fail-closed legacy）
+  ---
+  duration_ms: 10.8784
+  type: 'test'
+  ...
+# Subtest: fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状（B7.1 fail-closed）
+ok 18 - fixed 矩阵负例：拒绝先于 task.created；self/unknown/target/生产派发/stage-request 形状（B7.1 fail-closed）
+  ---
+  duration_ms: 19.0255
+  type: 'test'
+  ...
+# Subtest: fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务
+ok 19 - fixed 证据负例（AC-04）：无 live-turn/settled/fenced/伪造或已关闭父任务 ⇒ 拒绝且零任务
+  ---
+  duration_ms: 39.843
+  type: 'test'
+  ...
+# Subtest: fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话
+ok 20 - fixed 正例：chief→verifier（A12a）建 fixed 任务、不写 .ans/runs、投递目标会话
+  ---
+  duration_ms: 92.1178
+  type: 'test'
+  ...
+# Subtest: fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键
+ok 21 - fixed stage-request：首请求经编排 requestStage 建只读任务 + workflow.started + 幂等键
+  ---
+  duration_ms: 94.4479
+  type: 'test'
+  ...
+# Subtest: fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId）
+ok 22 - fixed 正例：convener 绑定真实 open stage-request 后派生产角色（fixed 任务无 runId）
+  ---
+  duration_ms: 93.1643
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝
+ok 23 - MF-10 窄例外：chief→项目验收角色（roster review + basis 一致 + role.activated）允许；缺证据/非验收角色拒绝
+  ---
+  duration_ms: 103.7302
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过）
+ok 24 - MF-10 窄例外负例：角色未 role.activated ⇒ review-role-invalid（不默认通过）
+  ---
+  duration_ms: 14.8944
+  type: 'test'
+  ...
+# Subtest: MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid
+ok 25 - MF-10 窄例外负例：basis 指定 reviewRoleId 但 roster 未标记 review ⇒ review-role-invalid
+  ---
+  duration_ms: 69.8288
+  type: 'test'
+  ...
+# Subtest: direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge
+ok 26 - direct 能力过滤（AC-23）：fixed 会话不注入 legacy Git/run-change/stable/VCA/版本决策；legacy 逐项仍在；不新增 requestReleaseMerge
+  ---
+  duration_ms: 40.7211
+  type: 'test'
+  ...
+# Subtest: single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变）
+ok 27 - single/su 模型不受 fixed 过滤影响：即使任务 flow 按 workflowMode 判 fixed，注入仍为 legacy（旧行为逐字不变）
+  ---
+  duration_ms: 12.1844
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：首次发卡一次（1 张 request.created、A3 completed）；A3 完成后再次调用 notPresented、不再调 raw
+ok 28 - fixed A3 幂等：首次发卡一次（1 张 request.created、A3 completed）；A3 完成后再次调用 notPresented、不再调 raw
+  ---
+  duration_ms: 95.0631
+  type: 'test'
+  ...
+# Subtest: B24.1 fixed A3 入口门：docs/intents 缺失 ⇒ prepare 即 notPresented intent-entry-missing（不调 raw、不写 request.created/A3）
+ok 29 - B24.1 fixed A3 入口门：docs/intents 缺失 ⇒ prepare 即 notPresented intent-entry-missing（不调 raw、不写 request.created/A3）
+  ---
+  duration_ms: 27.9068
+  type: 'test'
+  ...
+# Subtest: B24.2 fixed A3 恢复：已 confirm 裁决 + 入口后补 ⇒ 重试幂等补记 stage.completed A3，不重复发卡/不重复事件
+ok 30 - B24.2 fixed A3 恢复：已 confirm 裁决 + 入口后补 ⇒ 重试幂等补记 stage.completed A3，不重复发卡/不重复事件
+  ---
+  duration_ms: 59.3142
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：已有 1 张未 resolved 卡 ⇒ intent-confirm-pending（不调 raw、不写新 request/stage 事件）
+ok 31 - fixed A3 幂等：已有 1 张未 resolved 卡 ⇒ intent-confirm-pending（不调 raw、不写新 request/stage 事件）
+  ---
+  duration_ms: 20.9305
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：多个待决（异常）⇒ fail-closed intent-confirm-multiple-pending，列 requestId、不发卡
+ok 32 - fixed A3 幂等：多个待决（异常）⇒ fail-closed intent-confirm-multiple-pending，列 requestId、不发卡
+  ---
+  duration_ms: 20.0567
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：既往 confirm 决议对应不同意图 hash（新版本）⇒ 不误伤，照常发新卡
+ok 33 - fixed A3 幂等：既往 confirm 决议对应不同意图 hash（新版本）⇒ 不误伤，照常发新卡
+  ---
+  duration_ms: 44.7536
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：request.orphaned（重启终态）不计待决 ⇒ 照常发卡
+ok 34 - fixed A3 幂等：request.orphaned（重启终态）不计待决 ⇒ 照常发卡
+  ---
+  duration_ms: 38.2879
+  type: 'test'
+  ...
+# Subtest: legacy A3：存在 fixed 形态待决记录也不拦（仍走 trunk prepareIntentConfirmation，marker 带 snapshot=）
+ok 35 - legacy A3：存在 fixed 形态待决记录也不拦（仍走 trunk prepareIntentConfirmation，marker 带 snapshot=）
+  ---
+  duration_ms: 32.0489
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 36 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 27.2707
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 37 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 21.2154
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 38 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 15.2871
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 39 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 5.8289
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 40 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 6.0932
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 41 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 1.0449
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 42 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 8.0806
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 43 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 24.7733
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 44 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 21.4106
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 45 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 19.2073
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 46 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 15.1604
+  type: 'test'
+  ...
+# Subtest: B26 fixed A11 写集：模块内（目录前缀/文件精确）允许，模块外拒绝
+ok 47 - B26 fixed A11 写集：模块内（目录前缀/文件精确）允许，模块外拒绝
+  ---
+  duration_ms: 77.0574
+  type: 'test'
+  ...
+# Subtest: B26 fixed A11 写集：无 modulePaths 的 fixed 任务保持拒绝（不扩权）
+ok 48 - B26 fixed A11 写集：无 modulePaths 的 fixed 任务保持拒绝（不扩权）
+  ---
+  duration_ms: 24.688
+  type: 'test'
+  ...
+# Subtest: B26 fixed A11 写集：task.to 与当前角色不一致 ⇒ 空集拒绝
+ok 49 - B26 fixed A11 写集：task.to 与当前角色不一致 ⇒ 空集拒绝
+  ---
+  duration_ms: 22.8662
+  type: 'test'
+  ...
+# Subtest: B26 fixed A11 写集：无 workflowId 的 legacy 形状仍走 legacy trunk 路径（不启用 fixed 分支）
+ok 50 - B26 fixed A11 写集：无 workflowId 的 legacy 形状仍走 legacy trunk 路径（不启用 fixed 分支）
+  ---
+  duration_ms: 27.9596
+  type: 'test'
+  ...
+# Subtest: fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+ok 51 - fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+  ---
+  duration_ms: 91.2924
+  type: 'test'
+  ...
+# Subtest: fixed A3：docs/intents 入口缺失 ⇒ prepare 阶段 fail-closed（不呈卡、不写 request/stage、不静默通过）
+ok 52 - fixed A3：docs/intents 入口缺失 ⇒ prepare 阶段 fail-closed（不呈卡、不写 request/stage、不静默通过）
+  ---
+  duration_ms: 24.9342
+  type: 'test'
+  ...
+# Subtest: legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+ok 53 - legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+  ---
+  duration_ms: 33.3179
+  type: 'test'
+  ...
+# Subtest: fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+ok 54 - fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+  ---
+  duration_ms: 71.5187
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+ok 55 - fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+  ---
+  duration_ms: 39.829
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+ok 56 - legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+  ---
+  duration_ms: 34.2279
+  type: 'test'
+  ...
+# Subtest: fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+ok 57 - fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+  ---
+  duration_ms: 66.9381
+  type: 'test'
+  ...
+# Subtest: fixed A10 在办标记幂等：同一 workflow 再次呈卡被拒（appointment-card-pending）、不重复写 stage.requested A10、不产生 corrupt
+ok 58 - fixed A10 在办标记幂等：同一 workflow 再次呈卡被拒（appointment-card-pending）、不重复写 stage.requested A10、不产生 corrupt
+  ---
+  duration_ms: 36.7299
+  type: 'test'
+  ...
+# Subtest: fixed A10 未到窗口：A9 未完成时任命卡 fail-closed（stage-transition-invalid，不发卡）
+ok 59 - fixed A10 未到窗口：A9 未完成时任命卡 fail-closed（stage-transition-invalid，不发卡）
+  ---
+  duration_ms: 28.6517
+  type: 'test'
+  ...
+# Subtest: B16 fixed A8：nominator 角色草稿写权来自 fixed roster；未知角色/非 A8/legacy 无 D3 仍拒
+ok 60 - B16 fixed A8：nominator 角色草稿写权来自 fixed roster；未知角色/非 A8/legacy 无 D3 仍拒
+  ---
+  duration_ms: 36.997
+  type: 'test'
+  ...
+# Subtest: fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+ok 61 - fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+  ---
+  duration_ms: 58.0525
+  type: 'test'
+  ...
+# Subtest: 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+ok 62 - 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+  ---
+  duration_ms: 24.5478
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+ok 63 - prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+  ---
+  duration_ms: 35.7936
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+ok 64 - prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+  ---
+  duration_ms: 30.7994
+  type: 'test'
+  ...
+# Subtest: B24.1 prepareIntent：A2 completed 但意图入口缺失/intentId 不一致 ⇒ intent-entry-missing，不写 stage.requested A3（RR20 回归）
+ok 65 - B24.1 prepareIntent：A2 completed 但意图入口缺失/intentId 不一致 ⇒ intent-entry-missing，不写 stage.requested A3（RR20 回归）
+  ---
+  duration_ms: 26.6139
+  type: 'test'
+  ...
+# Subtest: prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+ok 66 - prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+  ---
+  duration_ms: 4.8392
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+ok 67 - prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+  ---
+  duration_ms: 26.0875
+  type: 'test'
+  ...
+# Subtest: closeTask：A2 accepted + 证据即完成（不等待 open 兄弟）；原任务迟到 rework 不再写 stage.blocked（RR8/RR10 回归）
+ok 68 - closeTask：A2 accepted + 证据即完成（不等待 open 兄弟）；原任务迟到 rework 不再写 stage.blocked（RR8/RR10 回归）
+  ---
+  duration_ms: 42.2892
+  type: 'test'
+  ...
+# Subtest: closeTask A5：accepted + 证据完成，不等待 open 的 failed 投递兄弟；其 rejected 收口不写 stage.blocked（RR10 回归）
+ok 69 - closeTask A5：accepted + 证据完成，不等待 open 的 failed 投递兄弟；其 rejected 收口不写 stage.blocked（RR10 回归）
+  ---
+  duration_ms: 57.2778
+  type: 'test'
+  ...
+# Subtest: closeTask A11：两个实现任务须全部 accepted 才完成 A11
+ok 70 - closeTask A11：两个实现任务须全部 accepted 才完成 A11
+  ---
+  duration_ms: 60.213
+  type: 'test'
+  ...
+# Subtest: closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+ok 71 - closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+  ---
+  duration_ms: 52.1346
+  type: 'test'
+  ...
+# Subtest: closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+ok 72 - closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+  ---
+  duration_ms: 20.6661
+  type: 'test'
+  ...
+1..72
+# tests 72
+# suites 0
+# pass 72
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2002.4812

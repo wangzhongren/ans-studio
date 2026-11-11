@@ -1,0 +1,2 @@
+f4e6a97 docs(test): RR23 exercises B25 and hits empty A11 write authorization
+ M src/pipeline/orchestration/run-role.ts
