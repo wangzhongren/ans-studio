@@ -178,3 +178,19 @@ test("B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本�
   assert.match(policy, /`sha256` 由应用计算/, "B9.1 应用计算 hash 口径须保留");
   assert.match(policy, /卡预算：3 张确认卡 \+ merge-main/, "B9.1 卡预算口径须保留");
 });
+
+test("B28 A12a/A12b 项目验收角色必须绑定 roster 模块；review 任务禁止 shell/mkdir，write_file 自动建目录", () => {
+  const section = sectionOf(readV2(), STAGE_HEADING);
+  const a12a = bulletLine(section, "- **A12a");
+  // RR25：A12a 首派未绑定模块 ⇒ 写集为空、write_file 被拒；review 角色又以 cmd /c mkdir 触发 shell 卡。
+  assert.match(a12a, /项目验收角色（`workflow\.reviewRoleId`）必须在任务上绑定其 roster 模块/, "A12a 项目验收角色须绑定模块");
+  assert.match(a12a, /moduleId \+ modulePaths/, "A12a 须点名 moduleId + modulePaths");
+  assert.match(a12a, /验收文件路径写在该模块内/, "A12a 验收文件路径须在模块内");
+  assert.match(a12a, /不得运行任何 shell 命令（含 mkdir\/目录创建）/, "A12a 须禁止 shell/mkdir");
+  assert.match(a12a, /`write_file`\/`edit_file` 会自动创建目录/, "A12a 须写明写工具自动建目录");
+  assert.match(a12a, /`docs\/acceptance\/` 的应用归档由应用完成/, "A12a 须写明应用归档 docs/acceptance");
+  const a12b = bulletLine(section, "- **A12b");
+  assert.match(a12b, /项目验收角色同样必须绑定其 roster 模块 moduleId \+ modulePaths/, "A12b 同须绑定模块");
+  assert.match(a12b, /review 任务文本同样禁止任何 shell（含 mkdir）/, "A12b 同须禁止 shell/mkdir");
+  assert.match(a12b, /`write_file`\/`edit_file` 自动建目录/, "A12b 须写明写工具自动建目录");
+});

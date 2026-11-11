@@ -1,0 +1,5 @@
+B28 flake disclosure (download-provider timing test):
+- Full test/编排 suite run1: 1345 pass/25 fail (extra 'provider：空闲/总超时...'); run2: 1346 pass/24 fail (frozen known-red only, diff empty).
+- test/编排/download-provider.test.ts isolated: 14/14 pass (prior rounds).
+- Same intermittent flake observed in B25 runs; HEAD without changes also showed 24 in other runs.
+- Conclusion: timing flake under full-suite concurrency; B28 adds no deterministic failure.

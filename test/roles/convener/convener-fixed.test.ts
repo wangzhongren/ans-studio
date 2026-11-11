@@ -188,6 +188,26 @@ test("B27 fixed A11 任务文本：不得建议自测脚本/运行；报告只�
   assert.match(production, /不得以「如何自测」「测试结论」作为报告项/u);
 });
 
+test("B28 fixed 生产/评审任务禁止 shell（含 mkdir）；write_file 自动建目录；docs/acceptance 由应用归档", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const production = sections.find((section) => section.id === "convener-fixed-production-line")?.text ?? "";
+  // RR25：review 角色为建目录执行 `cmd /c mkdir docs\acceptance` ⇒ shell 审批卡早停。
+  for (const token of [
+    "所有 fixed 生产/评审任务文本",
+    "不得要求或建议 worker 运行任何 shell 命令",
+    "mkdir",
+    "cp",
+    "mv",
+    "write_file",
+    "edit_file",
+    "自动创建目录",
+    "docs/acceptance",
+    "cmd /c mkdir docs\\acceptance",
+  ]) {
+    assert.equal(production.includes(token), true, `生产线段缺 B28 口径：${token}`);
+  }
+});
+
 test("B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text;
