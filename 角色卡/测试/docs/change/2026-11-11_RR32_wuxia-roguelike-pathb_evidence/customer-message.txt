@@ -1,0 +1,1 @@
+打开游戏点「踏入江湖」开始后马上崩溃：浏览器控制台每帧报 Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')，游戏完全无法进行；请修复到可玩（移动/自动攻击/波次/经验升级/拾取/死亡重开都要正常）。

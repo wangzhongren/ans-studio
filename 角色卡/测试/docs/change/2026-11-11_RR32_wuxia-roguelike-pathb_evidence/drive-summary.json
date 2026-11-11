@@ -1,0 +1,287 @@
+{
+  "startedUtc": "2026-11-11T16:00:02.953Z",
+  "target": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr30-2026-11-11\\target",
+  "userData": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr30-2026-11-11\\userData-rr32",
+  "port": 9224,
+  "customerMessage": "打开游戏点「踏入江湖」开始后马上崩溃：浏览器控制台每帧报 Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')，游戏完全无法进行；请修复到可玩（移动/自动攻击/波次/经验升级/拾取/死亡重开都要正常）。",
+  "customerMessageBytes": 288,
+  "expectedPath": "B",
+  "steps": [
+    {
+      "step": "customer-message-sent",
+      "at": "2026-11-11T16:00:09.928Z"
+    }
+  ],
+  "roles": [
+    {
+      "roleId": "chief",
+      "builtIn": true,
+      "governanceFunction": "chief"
+    },
+    {
+      "roleId": "product",
+      "builtIn": true,
+      "governanceFunction": "product"
+    },
+    {
+      "roleId": "rapporteur",
+      "builtIn": true,
+      "governanceFunction": "proposal"
+    },
+    {
+      "roleId": "nominator",
+      "builtIn": true,
+      "governanceFunction": "nomination"
+    },
+    {
+      "roleId": "convener",
+      "builtIn": true,
+      "governanceFunction": "schedule"
+    },
+    {
+      "roleId": "verifier",
+      "builtIn": true,
+      "governanceFunction": "verification"
+    },
+    {
+      "roleId": "arsenal",
+      "builtIn": false
+    },
+    {
+      "roleId": "config-data",
+      "builtIn": false
+    },
+    {
+      "roleId": "enemy-systems",
+      "builtIn": false
+    },
+    {
+      "roleId": "env-bootstrap",
+      "builtIn": false
+    },
+    {
+      "roleId": "loop-engine",
+      "builtIn": false
+    },
+    {
+      "roleId": "player-combat",
+      "builtIn": false
+    },
+    {
+      "roleId": "progression",
+      "builtIn": false
+    },
+    {
+      "roleId": "qa-verifier",
+      "builtIn": false
+    },
+    {
+      "roleId": "ui-hud",
+      "builtIn": false
+    }
+  ],
+  "sessionOpens": {
+    "chief": {
+      "at": "2026-11-11T16:00:08.838Z",
+      "opened": true
+    }
+  },
+  "taskRows": [],
+  "requestRows": [],
+  "workflowRows": [],
+  "basisRows": [],
+  "releaseRows": [],
+  "stages": {},
+  "cards": [],
+  "dialogs": [],
+  "dialogActions": [],
+  "dispatches": [],
+  "diagnosticsOfInterest": [
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:00:07.934Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.start",
+      "at": "2026-11-11T16:00:07.939Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "chief.workflow.v2.loaded",
+      "at": "2026-11-11T16:00:08.760Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.ready",
+      "at": "2026-11-11T16:00:08.778Z",
+      "roleId": "chief",
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    },
+    {
+      "event": "session.open.end",
+      "at": "2026-11-11T16:00:08.781Z",
+      "roleId": "chief",
+      "ok": true,
+      "errorMessage": null,
+      "code": null,
+      "workflowId": null,
+      "stage": null
+    }
+  ],
+  "milestones": [
+    {
+      "at": "2026-11-11T16:00:08.760Z",
+      "milestone": "chief-workflow-v2-injected",
+      "sha256": null
+    }
+  ],
+  "toolNotices": [],
+  "stop": null,
+  "error": null,
+  "portsDuringRun": [
+    {
+      "at": "2026-11-11T16:00:11.648Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:00:32.039Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:00:52.328Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:01:12.745Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:01:33.217Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:01:53.263Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:02:13.326Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:02:33.371Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:02:53.807Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:03:13.912Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:03:33.973Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:03:54.021Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:04:14.098Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    },
+    {
+      "at": "2026-11-11T16:04:34.144Z",
+      "l9222": 0,
+      "l9223": 0,
+      "l9224": 1
+    }
+  ],
+  "preTarget": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr30-2026-11-11\\target",
+    "branch": "ans/task/wf-739312023202ee992b7c8955",
+    "head": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "main": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "status": "",
+    "branches": "* ans/task/wf-739312023202ee992b7c8955 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n  ans/task/wf-e6a70e9eace7a4f6d16e7ad9 9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\n  main                                 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)",
+    "log3": "8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules",
+    "allOids": [
+      "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+      "9ee4afe2f87c9504992c616f23340f1438843edb",
+      "ddaf2a4f0ed77f4d211020991db3901fcef16a2e",
+      "6c9b068848ba40794c4b22d949b7a670c680e6e1",
+      "a993794ee8afef9b2dab22475ef99500125b9ecb",
+      "d201ad3f5c003cfc5bc2baf56b4aa3a80045e9dc",
+      "b27766ca3938526bee38a48908d7707087b9befd",
+      "163c8fc410caba8076d42d1a6d997f90b82bff1e",
+      "5e1219f024bfe0206456242ce7b145e96cf6df22",
+      "d5e61776faf3ac0edfeca3382f8dcd595bb015d6",
+      "9380d42f202f04a17c740ce60bb1cb0122dda8ea",
+      "da75dc61e207ffe2dd41b471b1c323a4201c5b97",
+      "baaba97bf399f84b0b8493be7582e136465c9140",
+      "22b9920d897800559aad867bf0962426d96a7e9d",
+      "4a3f07ca3c5a8f8b9a68ecf3afda0515b790f584",
+      "cd7b6c49d7a504d46028d8b93109faf3c0294845",
+      "277e4a02f87fb0fdd2e767c1914b12362725859a"
+    ],
+    "hasAns": true,
+    "hasProject": true,
+    "hasRoster": true,
+    "topLevel": [
+      ".ans",
+      ".git",
+      ".gitignore",
+      "assets",
+      "docs",
+      "game",
+      "index.html",
+      "README.md",
+      "角色卡"
+    ]
+  },
+  "scopeDecided": null,
+  "gitNewCommits": []
+}

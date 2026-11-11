@@ -1,0 +1,731 @@
+{
+  "at": "2026-11-11T16:04:42.604Z",
+  "stopCause": "gate:shell-confirm-card",
+  "gate": {
+    "kind": "shell-confirm-card",
+    "title": "命令审批 · 幕僚",
+    "command": "node -e \"const fs=require('fs'),p='C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/common/编排/workflow-service.ts',l=fs.readFileSync(p,'utf8').split(/\\r?\\n/);console.log(l.slice(889,1010).map((s,i)=>(890+i)+': '+s).join('\\n'))\""
+  },
+  "workflowStarted": null,
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "scopeDecided": null,
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 0,
+    "cardsByKind": {},
+    "decisions": 0,
+    "dispatches": 0,
+    "dispatchesByFrom": {},
+    "tasksByTo": {},
+    "writeTasks": 0,
+    "implementationWriteTasks": 0,
+    "turnsByRole": {
+      "chief": 1
+    },
+    "gitTargetNewCommits": 0
+  },
+  "gitNewCommits": [],
+  "summary": {
+    "stages": {},
+    "milestones": [
+      {
+        "at": "2026-11-11T16:00:08.760Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      }
+    ]
+  },
+  "git": {
+    "branch": "ans/task/wf-739312023202ee992b7c8955",
+    "head": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "main": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "log": "8724c07 (HEAD -> ans/task/wf-739312023202ee992b7c8955, main) ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe (ans/task/wf-e6a70e9eace7a4f6d16e7ad9) fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules\n6c9b068 fix(ui): restore readable upgrade card colors\na993794 fix(ui): remove duplicated iife terminator\nd201ad3 feat(app): implement fixed-step loop/state machine/bus\nb27766c feat(ui): implement menu/hud/levelup/result overlays\n163c8fc feat(progression): implement exp/leveling/upgrade choice\n5e1219f feat(arsenal): implement weapons/items acquisition\nd5e6177 feat(enemies): implement spawn/wave scaling/elite\n9380d42 feat(combat): implement auto targeting/cooldown/damage\nda75dc6 docs(env): add README and assets policy\nbaaba97 feat(entry): add index.html with script load order\n22b9920 feat(player): implement movement/hp/invuln/death\n4a3f07c feat(engine): implement canvas2d render/input/math/collision/pool\ncd7b6c4 feat(data): add WX.Config wuxia roguelike data constants\n277e4a0 ANS baseline: ans-managed .gitignore",
+    "status": "",
+    "branches": "* ans/task/wf-739312023202ee992b7c8955 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n  ans/task/wf-e6a70e9eace7a4f6d16e7ad9 9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\n  main                                 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)",
+    "tags": "",
+    "remotes": "",
+    "mainLog": "8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules\n6c9b068 fix(ui): restore readable upgrade card colors\na993794 fix(ui): remove duplicated iife terminator\nd201ad3 feat(app): implement fixed-step loop/state machine/bus\nb27766c feat(ui): implement menu/hud/levelup/result overlays\n163c8fc feat(progression): implement exp/leveling/upgrade choice\n5e1219f feat(arsenal): implement weapons/items acquisition\nd5e6177 feat(enemies): implement spawn/wave scaling/elite\n9380d42 feat(combat): implement auto targeting/cooldown/damage\nda75dc6 docs(env): add README and assets policy\nbaaba97 feat(entry): add index.html with script load order\n22b9920 feat(player): implement movement/hp/invuln/death\n4a3f07c feat(engine): implement canvas2d render/input/math/collision/pool\ncd7b6c4 feat(data): add WX.Config wuxia roguelike data constants\n277e4a0 ANS baseline: ans-managed .gitignore"
+  },
+  "docs": {
+    "docs": [
+      {
+        "rel": "docs/acceptance",
+        "dir": true
+      },
+      {
+        "rel": "docs/acceptance/wuxia-roguelike-acceptance-v3.md",
+        "bytes": 3174,
+        "sha256": "af863590f273c7e1521b859517b94f68cbd42abf0a9a9f1028db9900bbbba2c1"
+      },
+      {
+        "rel": "docs/audit",
+        "dir": true
+      },
+      {
+        "rel": "docs/audit/shell-gate.jsonl",
+        "bytes": 93435,
+        "sha256": "c8ac9a318c8536380f3f999d62e002026481501c6e1196fff36f0410931268bc"
+      },
+      {
+        "rel": "docs/bootstrap-manifest.md",
+        "bytes": 4203,
+        "sha256": "a1776124b90ad5008f836fd0df451c723544606631963fca2118d089b96b1909"
+      },
+      {
+        "rel": "docs/contracts",
+        "dir": true
+      },
+      {
+        "rel": "docs/contracts/wuxia-roguelike-architecture-v1.md",
+        "bytes": 10248,
+        "sha256": "3e9984174fee83424d57328025e85dfa765863ed36bfe550f32559a213e6b945"
+      },
+      {
+        "rel": "docs/governance",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/nominator",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/nominator/wuxia-roguelike-a7-roster-review.md",
+        "bytes": 13027,
+        "sha256": "902fd0b073d94409587da52fb46281d24a6f0baf5855369628b26585f79d6aae"
+      },
+      {
+        "rel": "docs/governance/nominator/wuxia-roguelike-a8-role-activation.md",
+        "bytes": 4296,
+        "sha256": "584de3acc363ff79dbae9a040ca05742d221f070dec9572325fa86b45c070843"
+      },
+      {
+        "rel": "docs/governance/rapporteur",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/rapporteur/wuxia-roguelike-a4-preparation.md",
+        "bytes": 13449,
+        "sha256": "325110a6f97fadaa52ae19e3ed3ae449ec02a4274b6f48c9cadf20e1d972278f"
+      },
+      {
+        "rel": "docs/intents",
+        "dir": true
+      },
+      {
+        "rel": "docs/intents/wuxia-roguelike.md",
+        "bytes": 2983,
+        "sha256": "a4d640d0fc67ec81733e0faa666851d94e864388b845a1b322feab3273a55823"
+      },
+      {
+        "rel": "docs/product",
+        "dir": true
+      },
+      {
+        "rel": "docs/product/wuxia-roguelike-intent-v1.md",
+        "bytes": 7621,
+        "sha256": "68b46c92b9fa2a7eec9f3391c90373e4bce3a3e5e274e5ba7533c9226fea957f"
+      },
+      {
+        "rel": "docs/proposals",
+        "dir": true
+      },
+      {
+        "rel": "docs/proposals/wuxia-roguelike-modules-v1.md",
+        "bytes": 5039,
+        "sha256": "86b43d9a09cdf9a5202303db87cf7e4b2177802f1febcb450cdbf8457d094239"
+      },
+      {
+        "rel": "docs/proposals/wuxia-roguelike-proposal-v1.md",
+        "bytes": 7988,
+        "sha256": "661dc03b6605c3765eaf4ee3b4657284bdd66c4c6b7c7f8428e9ad648669cac9"
+      },
+      {
+        "rel": "docs/proposals/wuxia-roguelike-roster-v1.md",
+        "bytes": 9800,
+        "sha256": "50b08cba0eeb1bea6101122a0c304a0506eb687fb043bed2aea1189094e9216c"
+      },
+      {
+        "rel": "docs/quality",
+        "dir": true
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-criteria-v1.md",
+        "bytes": 28913,
+        "sha256": "dbb03fe913d3039347537b558453e33214537bc141ba9d69c5dd1af07ada132d"
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-report-v1.md",
+        "bytes": 18975,
+        "sha256": "159bc09bf484cde08fff4b523f883584692efe5ff9f057d3ba6a984f14010ebe"
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-report-v2.md",
+        "bytes": 21078,
+        "sha256": "b087984077f0a9cd5468d2e22d4ec19bb6a2ce1381028ac9afae2bce1e2928da"
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-report-v3.md",
+        "bytes": 22349,
+        "sha256": "17582299905276685ea2c087640dd56ffc82ae1cf482235a9f5e6d8062585533"
+      },
+      {
+        "rel": "docs/scheduling",
+        "dir": true
+      },
+      {
+        "rel": "docs/scheduling/wuxia-roguelike-b1-impact-v1.md",
+        "bytes": 7086,
+        "sha256": "609b1fcbade8ca1b12254be23f0dfea47a6a804026a00f2bfd877acae14677b9"
+      },
+      {
+        "rel": "docs/scheduling/wuxia-roguelike-schedule-v1.md",
+        "bytes": 43236,
+        "sha256": "fe91665c6ad3862e08690226320ce4f23c565474e59c2f2c2922990c3a8aad36"
+      },
+      {
+        "rel": "docs/scheduling/wuxia-roguelike-team-v1.md",
+        "bytes": 8704,
+        "sha256": "91a17e4e6828270d65655183c3f85c0068a8492d97bf1d97d99b910a252686c0"
+      },
+      {
+        "rel": "docs/verification",
+        "dir": true
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t2-static-v1.txt",
+        "bytes": 1003,
+        "sha256": "3841573f61896537cb5e3f763ad0ab0031e83e48c794ceb4f4807b9460aeadcd"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t3-static-v1.txt",
+        "bytes": 1229,
+        "sha256": "332c7bfb6170c6436c5177eb874f5343491cd5b07fe56c0f6c472f6d5eff7a8c"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t4-static-v1.txt",
+        "bytes": 841,
+        "sha256": "08c6a9d4e153ad2d324c66cbe08ab493703dc35687fa44fe05a67b572e858dca"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t5-static-v1.txt",
+        "bytes": 853,
+        "sha256": "d1c81de5cebd96a940f9ed663c132984079d6d4c5fe48b397c11dba2a1bd595d"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t7-static-v1.txt",
+        "bytes": 1268,
+        "sha256": "15827b58186d68b8fef4bc54a1883573732f4cbccd7a66562418ebee8167575b"
+      },
+      {
+        "rel": "docs/workflow.md",
+        "bytes": 6053,
+        "sha256": "c2c21c15382ef3a4c07fc6915e64c6f6baac168908c1f505712f081c862259f3"
+      }
+    ],
+    "角色卡": [
+      {
+        "rel": "角色卡/arsenal",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/arsenal/boundary.md",
+        "bytes": 487,
+        "sha256": "e6e6870e200b84c5a9e1cc12e972c9c747888057dc51bd2f3305e1e38d6f8a34"
+      },
+      {
+        "rel": "角色卡/arsenal/boundary.yaml",
+        "bytes": 133,
+        "sha256": "d4d4a77e848c72441c54c177aaf7a363c7f5d0fcc25a8acebe50e3affc492d19"
+      },
+      {
+        "rel": "角色卡/arsenal/role-card.md",
+        "bytes": 3045,
+        "sha256": "a88ce13804d0e1bf5fae3842a3b69aeb1f1a8209f89f1021177c3351fea8a3e5"
+      },
+      {
+        "rel": "角色卡/config-data",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/config-data/boundary.md",
+        "bytes": 458,
+        "sha256": "451374e16fa38e0ba2b938bbd3151a76682d11fda714bd799b22a868bf113162"
+      },
+      {
+        "rel": "角色卡/config-data/boundary.yaml",
+        "bytes": 126,
+        "sha256": "b4bdbe230c91c57d9c82cc830a747ed2a3f632de84765df78e4d062192c619bc"
+      },
+      {
+        "rel": "角色卡/config-data/role-card.md",
+        "bytes": 2965,
+        "sha256": "98f80d2590f67ef0b2f48444d924c7ff17b7b23eda045e59e4ea5d5f8495f94a"
+      },
+      {
+        "rel": "角色卡/enemy-systems",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/enemy-systems/boundary.md",
+        "bytes": 484,
+        "sha256": "0e45f208c696a0130054bd367cb796eb35b37ce78db33013e1b59d71ad2ef681"
+      },
+      {
+        "rel": "角色卡/enemy-systems/boundary.yaml",
+        "bytes": 137,
+        "sha256": "147306d1089ac8961ef92935602d9a9788420851114d41abaee1e0a7ed38d14a"
+      },
+      {
+        "rel": "角色卡/enemy-systems/role-card.md",
+        "bytes": 2940,
+        "sha256": "2c880fb4e17bb15a5ae90ecc49035276084ce163c7dab768ebc7be08f3822cbf"
+      },
+      {
+        "rel": "角色卡/env-bootstrap",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/env-bootstrap/boundary.md",
+        "bytes": 571,
+        "sha256": "8877f5b78eacef6e1dfc97eb79b6cccc42107c720aae83506d5fde6d6fb4b747"
+      },
+      {
+        "rel": "角色卡/env-bootstrap/boundary.yaml",
+        "bytes": 274,
+        "sha256": "a9e5fcb7c689e3de7288b0714a68ca2d1cee16188028101caa7302b400ea2c0b"
+      },
+      {
+        "rel": "角色卡/env-bootstrap/role-card.md",
+        "bytes": 3099,
+        "sha256": "ef0652e8b84766aaac2fb08c862bbde8a1502956892b23b077f4a2cecdd441fa"
+      },
+      {
+        "rel": "角色卡/loop-engine",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/loop-engine/boundary.md",
+        "bytes": 578,
+        "sha256": "d3cb98ef5e19e8a28fd7e4cdea05aa6e44a62be1927c3dca74c210ba799da1db"
+      },
+      {
+        "rel": "角色卡/loop-engine/boundary.yaml",
+        "bytes": 239,
+        "sha256": "ac797bd344233685552c005fee8d6beab51e0c328c3e1626f957599bac5d99f3"
+      },
+      {
+        "rel": "角色卡/loop-engine/role-card.md",
+        "bytes": 3298,
+        "sha256": "e6125e59e310f01de0eb3d0ceaa47f6e32d8ced421a750de74fa0516c48022c3"
+      },
+      {
+        "rel": "角色卡/player-combat",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/player-combat/boundary.md",
+        "bytes": 540,
+        "sha256": "9a78ae14472887eb49a43eaf659a5ef1879cedf293aa90f2a815e4fbc53bb7ee"
+      },
+      {
+        "rel": "角色卡/player-combat/boundary.yaml",
+        "bytes": 231,
+        "sha256": "842baf30d569e7b07cf3368bca1e7acfcb6a2f7cf13354d188f950cb828b3e55"
+      },
+      {
+        "rel": "角色卡/player-combat/role-card.md",
+        "bytes": 3217,
+        "sha256": "16618b776efdfd79a9d5201cb30728a48edb2184d61ae2766911b7dd362005e0"
+      },
+      {
+        "rel": "角色卡/progression",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/progression/boundary.md",
+        "bytes": 501,
+        "sha256": "ff75ffa0d5923fda9226d2ea1384230e2e95f5447caece061aea36cba0c8a44f"
+      },
+      {
+        "rel": "角色卡/progression/boundary.yaml",
+        "bytes": 143,
+        "sha256": "f4e12987878d042fc45465f486a52c16ea49829952a9d3ca1bf511baaa516cfc"
+      },
+      {
+        "rel": "角色卡/progression/role-card.md",
+        "bytes": 3164,
+        "sha256": "9d9c9da59730cbe3c0339e39f921852255aee0aab5bfdf0a268051795550e122"
+      },
+      {
+        "rel": "角色卡/qa-verifier",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/qa-verifier/boundary.md",
+        "bytes": 489,
+        "sha256": "9e5955b0d485f6a34698586188b25d8f8a1966943bacb9ecb6ebd6f21eb61036"
+      },
+      {
+        "rel": "角色卡/qa-verifier/boundary.yaml",
+        "bytes": 131,
+        "sha256": "beccee303ff0d7f0e970e792ebfa54a88cb1bb947c13b7bf47ff944e0279e3dc"
+      },
+      {
+        "rel": "角色卡/qa-verifier/role-card.md",
+        "bytes": 2950,
+        "sha256": "7c1227b997cda2e085b31d19861f57c0f1c2fc308dea631005117939fa531812"
+      },
+      {
+        "rel": "角色卡/ui-hud",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/ui-hud/boundary.md",
+        "bytes": 485,
+        "sha256": "81d6ed919d047c0ffc1ed0529b9566ef7de6a18db398c7455d1059fefc8e8683"
+      },
+      {
+        "rel": "角色卡/ui-hud/boundary.yaml",
+        "bytes": 131,
+        "sha256": "99685ad2623717d40970e35b6291c7a5450adba226745432f794a10d32a64d53"
+      },
+      {
+        "rel": "角色卡/ui-hud/role-card.md",
+        "bytes": 3201,
+        "sha256": "933e5a3490f6f816dafd64d85a6f21087064c4e910f89d443a2a61a26ded4ed7"
+      }
+    ],
+    "game": [
+      {
+        "rel": "game/app",
+        "dir": true
+      },
+      {
+        "rel": "game/app/app.js",
+        "bytes": 50324,
+        "sha256": "35211a894cafc72da33ed0dfec0e36b7f7262a5553d7d2df4b8240ef7a82322d"
+      },
+      {
+        "rel": "game/app/bus.js",
+        "bytes": 4156,
+        "sha256": "181a2c09c874b4a0f46543d10c7d0132224465d6583990fab5331ba00497a5b7"
+      },
+      {
+        "rel": "game/app/integrations.js",
+        "bytes": 6867,
+        "sha256": "c57c5b71862fb10796f0f9e75e6e9fe49ea2d48aa31e77ed4586bd49e2174c7e"
+      },
+      {
+        "rel": "game/app/README.md",
+        "bytes": 12904,
+        "sha256": "fb29ac5a410ef9e9e90b1ef870040d8f04f2d40512f617c3398b1251695abedf"
+      },
+      {
+        "rel": "game/app/wave-scheduler.js",
+        "bytes": 5755,
+        "sha256": "7af03477ecbb58fd3f9aa0312d944664d66a442cd8e33b99679f7769dc6616e6"
+      },
+      {
+        "rel": "game/combat",
+        "dir": true
+      },
+      {
+        "rel": "game/combat/combat.js",
+        "bytes": 31440,
+        "sha256": "adf0bf8f17ed287a491210989fc469c1cec5b38ce0f83883028101d42c0001b0"
+      },
+      {
+        "rel": "game/combat/README.md",
+        "bytes": 5586,
+        "sha256": "ac2607d73c5af254bb256a4fb5167d6194a58529b12c34a0b76986ea398c6d21"
+      },
+      {
+        "rel": "game/data",
+        "dir": true
+      },
+      {
+        "rel": "game/data/config.js",
+        "bytes": 13745,
+        "sha256": "e8e749e59d7c3d5697f864b0853b3498ddbc9921e103bc542ac36a3480a07864"
+      },
+      {
+        "rel": "game/enemies",
+        "dir": true
+      },
+      {
+        "rel": "game/enemies/enemies.js",
+        "bytes": 31664,
+        "sha256": "5078fc418b5ca76e999db9473bdb2f005e42b10b0a3b148a616fa995393d523f"
+      },
+      {
+        "rel": "game/enemies/README.md",
+        "bytes": 5652,
+        "sha256": "9fae3449831e03bd26b33e903b0568fd364d0403918ad2cfd069f36daedddfb5"
+      },
+      {
+        "rel": "game/engine",
+        "dir": true
+      },
+      {
+        "rel": "game/engine/camera.js",
+        "bytes": 5372,
+        "sha256": "bedd1b4a826c8cbd829e260598adf3df24bf510998b345854ee181ae58dd0284"
+      },
+      {
+        "rel": "game/engine/collision.js",
+        "bytes": 8761,
+        "sha256": "cffa4ae2ea23c6abd00773a85579fd0e94205f0482c0a2c08ecd500d32f3c264"
+      },
+      {
+        "rel": "game/engine/engine.js",
+        "bytes": 7168,
+        "sha256": "5e472fbbe8978176756dadfca444d546918c681f9ae218b981d8d710366efcf5"
+      },
+      {
+        "rel": "game/engine/input.js",
+        "bytes": 12938,
+        "sha256": "b38d00127d7d748c89d03c49b9447f826e1c467141d62cba3ceb4e6e7531e471"
+      },
+      {
+        "rel": "game/engine/math.js",
+        "bytes": 8506,
+        "sha256": "032808fe400896a366d155f823ae44dfcc8cd96833995dafee841b36e03ad352"
+      },
+      {
+        "rel": "game/engine/pool.js",
+        "bytes": 4661,
+        "sha256": "08a46e9c6d861b6d39620240ddc3f009239431a324b2be934588793b2ff17c15"
+      },
+      {
+        "rel": "game/engine/README.md",
+        "bytes": 6515,
+        "sha256": "e7f8bd186a03b6cd81d2c6589f26904d026349f5a459b91476cddf3293a696fd"
+      },
+      {
+        "rel": "game/engine/renderer.js",
+        "bytes": 21640,
+        "sha256": "c802e18f12a256e79da0f4834d617c8c9a43b20dc5dbdf223097465e28491a67"
+      },
+      {
+        "rel": "game/items",
+        "dir": true
+      },
+      {
+        "rel": "game/items/arsenal.js",
+        "bytes": 38133,
+        "sha256": "105c029e064feeb8a71db40bc1b426f60cb55fdcb9fdc2e53f106a63b20247db"
+      },
+      {
+        "rel": "game/items/README.md",
+        "bytes": 8249,
+        "sha256": "61228405a07910b56b533829f074f4f569290e812219975d23820eb9451cc894"
+      },
+      {
+        "rel": "game/player",
+        "dir": true
+      },
+      {
+        "rel": "game/player/player.js",
+        "bytes": 19472,
+        "sha256": "21638a54437bd52bc4bbc75d2e5bdcc47a0fb8402a6e2287fa9eae16162bbd39"
+      },
+      {
+        "rel": "game/player/README.md",
+        "bytes": 4464,
+        "sha256": "c67cfad7895b820e2b0e1105d7f1ee1982fabeae2a2836fa825bebe74eae17a3"
+      },
+      {
+        "rel": "game/progression",
+        "dir": true
+      },
+      {
+        "rel": "game/progression/progression.js",
+        "bytes": 42793,
+        "sha256": "e99009dd27606a06f5e774ba29147dd7d411380020c24e3472f9e5631507fefe"
+      },
+      {
+        "rel": "game/progression/README.md",
+        "bytes": 10255,
+        "sha256": "50fce7c66a0536ce453851d3dbf4d948e834107adb5fdf7f42513a8716138540"
+      },
+      {
+        "rel": "game/ui",
+        "dir": true
+      },
+      {
+        "rel": "game/ui/styles.css",
+        "bytes": 16790,
+        "sha256": "45693a49f57911932dbfe67df5d5d5612f824d66eb43a16d61a69b8de350c3a8"
+      },
+      {
+        "rel": "game/ui/ui.js",
+        "bytes": 47300,
+        "sha256": "6623ba4421a168f9df49a200b799c46eed18bf0edc46e9c5ef0ca5ecb153dc42"
+      }
+    ],
+    "index.html": []
+  },
+  "topLevel": [
+    ".ans",
+    ".git",
+    ".gitignore",
+    "assets",
+    "docs",
+    "game",
+    "index.html",
+    "README.md",
+    "角色卡"
+  ],
+  "sessions": {
+    "arsenal": {
+      "bytes": 262755
+    },
+    "chief": {
+      "bytes": 2191362
+    },
+    "config-data": {
+      "bytes": 109406
+    },
+    "convener": {
+      "bytes": 2012698
+    },
+    "enemy-systems": {
+      "bytes": 210886
+    },
+    "env-bootstrap": {
+      "bytes": 229516
+    },
+    "loop-engine": {
+      "bytes": 1047390
+    },
+    "nominator": {
+      "bytes": 321885
+    },
+    "player-combat": {
+      "bytes": 304677
+    },
+    "product": {
+      "bytes": 139639
+    },
+    "progression": {
+      "bytes": 331819
+    },
+    "qa-verifier": {
+      "bytes": 193987
+    },
+    "rapporteur": {
+      "bytes": 192328
+    },
+    "ui-hud": {
+      "bytes": 261930
+    },
+    "verifier": {
+      "bytes": 813062
+    }
+  },
+  "ports": {
+    "lines9222": [],
+    "lines9223": [],
+    "lines9224": [
+      "  TCP    127.0.0.1:9224         0.0.0.0:0              LISTENING       21876",
+      "  TCP    127.0.0.1:9224         127.0.0.1:53455        ESTABLISHED     21876",
+      "  TCP    127.0.0.1:53455        127.0.0.1:9224         ESTABLISHED     35004"
+    ]
+  },
+  "preTarget": {
+    "path": "C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr30-2026-11-11\\target",
+    "branch": "ans/task/wf-739312023202ee992b7c8955",
+    "head": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "main": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "status": "",
+    "branches": "* ans/task/wf-739312023202ee992b7c8955 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n  ans/task/wf-e6a70e9eace7a4f6d16e7ad9 9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\n  main                                 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)",
+    "log3": "8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules",
+    "allOids": [
+      "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+      "9ee4afe2f87c9504992c616f23340f1438843edb",
+      "ddaf2a4f0ed77f4d211020991db3901fcef16a2e",
+      "6c9b068848ba40794c4b22d949b7a670c680e6e1",
+      "a993794ee8afef9b2dab22475ef99500125b9ecb",
+      "d201ad3f5c003cfc5bc2baf56b4aa3a80045e9dc",
+      "b27766ca3938526bee38a48908d7707087b9befd",
+      "163c8fc410caba8076d42d1a6d997f90b82bff1e",
+      "5e1219f024bfe0206456242ce7b145e96cf6df22",
+      "d5e61776faf3ac0edfeca3382f8dcd595bb015d6",
+      "9380d42f202f04a17c740ce60bb1cb0122dda8ea",
+      "da75dc61e207ffe2dd41b471b1c323a4201c5b97",
+      "baaba97bf399f84b0b8493be7582e136465c9140",
+      "22b9920d897800559aad867bf0962426d96a7e9d",
+      "4a3f07ca3c5a8f8b9a68ecf3afda0515b790f584",
+      "cd7b6c49d7a504d46028d8b93109faf3c0294845",
+      "277e4a02f87fb0fdd2e767c1914b12362725859a"
+    ],
+    "hasAns": true,
+    "hasProject": true,
+    "hasRoster": true,
+    "topLevel": [
+      ".ans",
+      ".git",
+      ".gitignore",
+      "assets",
+      "docs",
+      "game",
+      "index.html",
+      "README.md",
+      "角色卡"
+    ]
+  },
+  "zeroTouch": {
+    "roots": {
+      "rr29Root": true,
+      "rr28Root": true,
+      "rr27Root": true,
+      "rr26Root": true,
+      "rr25Root": true,
+      "rr24Root": true,
+      "rr23Root": true,
+      "rr22Root": true,
+      "rr21Root": true,
+      "rr20Root": true,
+      "rr19Root": true,
+      "rr18Root": true,
+      "rr17Root": true,
+      "rr16Root": true,
+      "rr15Root": true,
+      "rr14Root": true,
+      "rr13Root": true,
+      "rr12Root": true,
+      "rr11Root": true,
+      "rr10Root": true,
+      "rr9Root": true,
+      "rr8Root": true,
+      "rr7Root": true,
+      "rr6Root": true,
+      "rr5Root": true,
+      "rr4Root": true,
+      "rr3Root": true,
+      "rr2Root": true,
+      "rr1Root": true,
+      "oldSnakeTarget": true,
+      "oldSnakeTarget2": true
+    },
+    "rr30": {
+      "evidence": true,
+      "rr": true,
+      "playEvidence": true,
+      "playProfile": true,
+      "userData": true,
+      "browserOutLog": true,
+      "rr31": true,
+      "evidenceRr31": true,
+      "userDataRr31": true
+    }
+  },
+  "oldRootsUntouched": {
+    "allOldRoots": true,
+    "allRr30UntouchedDirs": true
+  },
+  "turns": {
+    "chief": 1
+  }
+}
