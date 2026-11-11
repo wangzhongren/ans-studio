@@ -1,0 +1,8 @@
+role: game-ui-dev
+entries:
+  - kind: file
+    path: src/ui.js
+    purpose: Canvas 渲染与输入交互
+  - kind: file
+    path: styles.css
+    purpose: 页面与游戏区域样式

@@ -1,0 +1,5 @@
+role: game-core-dev
+entries:
+  - kind: file
+    path: src/game.js
+    purpose: 游戏规则与状态机核心
