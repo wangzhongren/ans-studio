@@ -1,0 +1,5 @@
+role: app-shell
+entries:
+  - kind: directory
+    path: src/app/
+    purpose: 装配与固定 tick 主循环模块（模块 app-entry）
