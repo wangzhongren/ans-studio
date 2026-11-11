@@ -1,0 +1,14 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+Warning: Detected unsettled top-level await at file:///C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr11-2026-11-11/rr/drive-rr11.mjs:631
+  await finalize();
+  ^
+
+
+
