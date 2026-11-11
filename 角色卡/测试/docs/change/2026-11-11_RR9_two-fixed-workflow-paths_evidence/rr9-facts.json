@@ -1,0 +1,104 @@
+{
+  "at": "2026-11-11T01:00:35.218Z",
+  "candidate": "507d515eb77e5355bc9a7fd3bcc322777573abb2",
+  "msgMark": "2026-11-11T00:59:18.459Z",
+  "stopCause": "gate:shell-confirm-card (命令审批 · 运营 / python --version)",
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-11T00:59:27.427Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-c9619b75a46cb06facfb16ca",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:b222b9ab-8090-4ec0-87e0-4da216752094",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "b222b9ab-8090-4ec0-87e0-4da216752094",
+    "legacyStateIgnored": true
+  },
+  "workflowEvents": [
+    {
+      "at": "2026-11-11T00:59:27.427Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null,
+      "code": null
+    },
+    {
+      "at": "2026-11-11T00:59:27.427Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "code": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-11T00:59:27.432Z",
+      "taskId": "t-mwbevpz7-e8b6bb93",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-c9619b75a46cb06facfb16ca"
+    }
+  ],
+  "shellAudit": [
+    {
+      "timestamp": "2026-11-11T00:59:31.868Z",
+      "toolCallId": "c81320f5-0cec-4f04-bcb6-386f95d03f50:call_00_2OtXtzPdigFVabDi506p9186",
+      "command": "node -v",
+      "argv": [
+        "node",
+        "-v"
+      ],
+      "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr9-2026-11-11\\target",
+      "conclusion": "allow",
+      "branch": "c-allow",
+      "by": "ruleset:default（su 审批档）",
+      "conditions": [
+        "shell-gate"
+      ],
+      "execution": "未执行",
+      "entry": "run_shell",
+      "roleId": "convener"
+    },
+    {
+      "timestamp": "2026-11-11T00:59:33.053Z",
+      "toolCallId": "c81320f5-0cec-4f04-bcb6-386f95d03f50:call_01_7pvtvXKKvKUtoAgoavbD3488",
+      "command": "python --version",
+      "argv": [
+        "python",
+        "--version"
+      ],
+      "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr9-2026-11-11\\target",
+      "conclusion": "deny",
+      "branch": "c-review→a-deny",
+      "by": "ruleset:default（su 审批档） → operator:51054",
+      "conditions": [
+        "shell-gate"
+      ],
+      "execution": "未执行",
+      "entry": "run_shell",
+      "roleId": "convener"
+    }
+  ],
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "docs": [
+    "audit"
+  ],
+  "note": "Convener ran run_shell environment probes after A1 dispatch: `node -v` (ruleset allow, execution 未执行) and `python --version` (ruleset default -> operator deny, execution 未执行); shell approval surface 命令审批 · 运营 appeared; driver gated per fixed-card policy (shell overlay is outside the 3 confirmations + merge-main) and stopped. A1 stage-request had been created; no product dispatch yet."
+}
