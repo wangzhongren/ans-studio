@@ -167,6 +167,27 @@ test("B23 fixed 哈希来源：权威哈希取应用记录（project_state [vers
   }
 });
 
+test("B27 fixed A11 任务文本：不得建议自测脚本/运行；报告只要求静态自检结论（执行/验证归 A12）", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const production = sections.find((section) => section.id === "convener-fixed-production-line")?.text ?? "";
+
+  // RR24：convener 任务文本「可加最小单测/自测脚本」+「如何自测」⇒ worker 执行 node self-test ⇒ shell 卡早停。
+  for (const token of [
+    "不得建议或要求 worker 添加后运行自测脚本",
+    "静态自检结论",
+    "不运行 shell/node/npm",
+    "不执行测试脚本",
+    "执行/验证归 A12",
+    "git add",
+    "git commit",
+    "run_shell",
+    "node src/core/self-test.js",
+  ]) {
+    assert.equal(production.includes(token), true, `生产线段缺 B27 口径：${token}`);
+  }
+  assert.match(production, /不得以「如何自测」「测试结论」作为报告项/u);
+});
+
 test("B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text;
@@ -252,7 +273,7 @@ test("context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy
   assert.equal(text.includes("reportTargetForTaskCreator"), true);
   assert.equal(text.includes("convener-fixed"), false, "legacy 返回值不得混入 fixed 段");
   // B9.1 新增 fixed 文案只属于 fixed 段：legacy context 与 legacy card.text 逐字不变。
-  for (const fixedOnly of ["certutil", "Get-FileHash", "任务证据与哈希", "3 张确认卡", "convener-fixed-evidence"]) {
+  for (const fixedOnly of ["certutil", "Get-FileHash", "任务证据与哈希", "3 张确认卡", "convener-fixed-evidence", "静态自检结论"]) {
     assert.equal(text.includes(fixedOnly), false, `legacy context 混入 fixed 文案：${fixedOnly}`);
     assert.equal(MODULE.card.text.includes(fixedOnly), false, `legacy card.text 混入 fixed 文案：${fixedOnly}`);
   }

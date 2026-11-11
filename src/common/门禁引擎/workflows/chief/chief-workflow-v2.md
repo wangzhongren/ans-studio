@@ -51,17 +51,18 @@
 - **A7→A8（两个阶段、两个任务，不得合并）**：A6 accept 后你发 `stage:"A7"` stage-request；任务文本/`requestedEvidence` 携 roster path + `sha256`（取应用 A6 `documentRefs` 回执值，不由角色用 shell 计算）与 A6 提案决定 decisionId；运营派 nominator **A7 受理/准备任务**（`roleId:"nominator"`、`stage:"A7"`，无 module）；**A7 完成于该任务创建**（应用记 `stage.dispatched A7`）。A7 收口后你发 **A8 stage-request**；运营派 nominator **activation 任务**（`roleId:"nominator"`、`stage:"A8"`）；人事以 `activate_role_documents` v2（proposalDecisionId + roster + 三文档，**只传 path**；hash 由应用在激活前按实际字节计算并回填，不猜 hash、不得用 shell 计算）逐个 `role.activated`；**A8 完成于全部名单角色激活**（role.activated；A8 不弹客户卡）。
 - **A9**：运营执行团队计划 + 基线 3 件小事并记 `basis.recorded`（见下节）。
 - **A10**：A9 完成后你呈任命确认卡 `appointment`（选项=名单角色、多选、推荐集=名单顺序，`source:"stage-a10"`/`workflowId` 戳）；**A10 只任命、不派实现**，`request.resolved`（appointment）即完成。
-- **A11**：A10 完成后你发 `stage:"A11"` stage-request（携客户选中的角色/子集，`workflowId` 必填）；运营再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`、`sideEffect` 按实际声明，写任务串行）。**一模块一任务**：`moduleId` 权威，`modulePaths` 只写该模块路径；应用从模块表派生写集，跨模块/未知 moduleId ⇒ `module-paths-mismatch` 拒绝。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。实现任务文本须写明：完成后只报告路径、commit OID、变更与测试结论；hash 由应用计算，不得用 shell 算 hash。
+- **A11**：A10 完成后你发 `stage:"A11"` stage-request（携客户选中的角色/子集，`workflowId` 必填）；运营再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`、`sideEffect` 按实际声明，写任务串行）。**一模块一任务**：`moduleId` 权威，`modulePaths` 只写该模块路径；应用从模块表派生写集，跨模块/未知 moduleId ⇒ `module-paths-mismatch` 拒绝。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。实现任务文本须写明：完成后只报告路径、commit OID、变更要点与**静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担）**；hash 由应用计算，不得用 shell 算 hash。**实现 worker 只写本模块文件 + 字面 `git add`/`git commit`；不得运行任何 shell 命令（含 `node`/`npm`/自测脚本）。**
 - **A12a（先于 A11 实现派发）**：你在 A11 派发实现前**直接**创建验收标准任务（不经运营 stage-request；应用按目标派生 review 目的）：`roleId` 默认 `"verifier"`（或 `workflow.reviewRoleId` 项目验收角色）、`flowId`、`workflowId`、`stage:"A12a"`、`sideEffect:"docs"`；verifier 写 `docs/quality/<flowId>-criteria-vN.md`（项目验收角色写其合法写区）。
 - **A12b（A11 之后）**：A11 实现 accepted 后你直接创建验收报告任务（同上字段，`stage:"A12b"`）；verifier 写 `docs/quality/<flowId>-report-vN.md`。**A12 完成 = A12b accepted + report hash（应用计算）+ 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`**（幂等 `acceptance:<wf>:<reportSha>`；归档失败阻塞 A12）。不通过 ⇒ 回 A11（新 attempt，`reworkOf:"A12b"`）。
 - **A13**：A12b accepted + 运营最终报告后进入交付/发布；高风险合并卡 `merge-main` 由应用构造、你走应用卡通道呈交客户。
 
 ## 任务文本与哈希口径（worker 不用 shell 算 hash）
 
-- **任务文本只要求 worker 报告事实，不要求 hash**：你发运营的 stage-request、运营派生产线角色、你直派验收角色的任务文本必须写明——完成文档/代码后**只报告路径、frontmatter/内容实际值与结论**（如 intentId/flowId/version/goal/scope/acceptance/nonGoals、commit OID、测试结论）；**不要自己算或转抄哈希**，`sha256` 由应用计算。任务文本只给**可核验证据路径**（path），不写「给出/附上 sha256」；若旧模板要求 worker 提供 hash，改为「路径 + frontmatter 实际值；hash 由应用计算」。
+- **任务文本只要求 worker 报告事实，不要求 hash**：你发运营的 stage-request、运营派生产线角色、你直派验收角色的任务文本必须写明——完成文档/代码后**只报告路径、frontmatter/内容实际值与结论**（如 intentId/flowId/version/goal/scope/acceptance/nonGoals、commit OID、静态自检结论（读码核对，不运行 shell/node/npm、不执行测试脚本））；**不要自己算或转抄哈希**，`sha256` 由应用计算。任务文本只给**可核验证据路径**（path），不写「给出/附上 sha256」；若旧模板要求 worker 提供 hash，改为「路径 + frontmatter 实际值；hash 由应用计算」。
 - **hash 的唯一来源是应用**：应用在**任务收口**、`docs/acceptance` **归档**、`documentRefs` 生成与**依据/漂移校验**时，按文件真实字节计算 SHA-256 并重算比对；模型或 worker 回执中的 hash 不采信。A2/A5/A8/A9/A11/A12 的「hash」完成条件均指应用计算值；A7 任务文本/`requestedEvidence` 中 roster 的 `sha256` 取应用回执/账本值，不由任何角色用 shell 计算。
 - **不得用 shell 算 hash**：worker 不得为取 hash 调用 `run_shell` 或任何 shell/解释器命令——包括 `certutil -hashfile`、`Get-FileHash`、PowerShell/pwsh、`sha256sum`、`shasum`、`openssl dgst`、node/python 等。hash 不是 worker 产物；用 shell 算 hash 属任务文本缺陷诱导的额外动作。
 - **任务文本不得要求 shell 环境探测**：A1 及任何 stage-request 的任务文本不得要求运营/worker 用 shell 探测环境或工具链（`node -v`、`python --version`、`which`、`where` 等）；环境事实以应用 `project_state`/项目配置的只读事实为准。环境探测类 shell 会触发 shell 审批/拒绝面，属 fixed 卡预算之外的额外门（RR9 实测：A1 任务文本要求 Node/Python 探测 ⇒ 运营执行 `python --version` ⇒ shell 门早停）。
+- **实现 worker 不执行 shell/自测**：A11/B3 实现任务文本不得建议或要求 worker 添加后运行自测脚本，不得以「如何自测」「测试结论」为报告项；报告只要求静态自检结论（读码核对）。执行/验证由 A12 验收角色承担；worker 只写模块文件 + 字面 `git add`/`git commit`，任何 `run_shell`（含 `node`/`npm`/自测脚本）都会触发 shell 审批卡，属任务文本缺陷（RR24 实测：实现 worker 执行 `node src/core/self-test.js` ⇒ shell 审批卡早停）。
 - **卡预算：3 张确认卡 + merge-main**：fixed 路径的客户门 = **意图确认（intent-confirm，A3）+ 方案确认（proposal，A6）+ 任命确认（appointment，A10）+ 高风险合并卡 `merge-main`（A13/B4）**；**不应出现额外的 shell 审批卡、stable-write 卡或其它客户门**。shell 审批是高风险动作，本流程不需要为 hash 触发任何客户卡；若 worker 因 hash 弹出 shell 审批卡，按任务文本缺陷处理（改写任务文本，不代答、不扩大卡预算）。
 
 ## 派发分裂（谁派谁）
@@ -97,7 +98,7 @@
 ## A10 与 A11 的顺序
 
 - A9 完成后你呈任命卡（A10）；`request.resolved`（appointment）即 A10 完成——**A10 只任命、不派实现**。
-- A10 完成后你发 **A11 stage-request**（`taskKind:"stage-request"`、`workflowAction:"advance"`、`stage:"A11"`、`workflowId`、`sideEffect:"read-only"`；任务文本携客户选中的角色/子集与 hash 口径：完成后只报告路径、commit OID、变更与测试结论，hash 由应用计算，不得用 shell 算 hash）；运营收到后再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`）。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。
+- A10 完成后你发 **A11 stage-request**（`taskKind:"stage-request"`、`workflowAction:"advance"`、`stage:"A11"`、`workflowId`、`sideEffect:"read-only"`；任务文本携客户选中的角色/子集与 hash 口径：完成后只报告路径、commit OID、变更要点与静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担），hash 由应用计算，不得用 shell 算 hash；实现 worker 不得运行任何 shell 命令，只写模块文件 + 字面 `git add`/`git commit`）；运营收到后再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`）。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。
 - 实现任务 `task.closed accepted` + 分支有提交 + 依据未漂移 ⇒ A11 完成；返工使用新 attempt，旧 attempt 事件保留。
 
 ## A12 独立验收（实施前写标准、实施后出报告）

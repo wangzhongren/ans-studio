@@ -117,7 +117,7 @@ test("B9.2 A7/A8 分离：A7 受理任务 stage:\"A7\" 完成于创建；A8 激�
   assert.match(bullet, /A7 收口后你发 \*\*A8 stage-request\*\*/, "A7 收口后须另发 A8 stage-request");
   assert.match(bullet, /`roleId:"nominator"`、`stage:"A8"`/, "A8 须另派 nominator activation 任务 stage A8");
   assert.match(bullet, /activate_role_documents` v2/, "A8 须写死 activate_role_documents v2");
-  assert.match(bullet, /proposalDecisionId \+ roster \+ 三文档 hash/, "A8 入参须携 proposalDecisionId + roster + 三文档 hash");
+  assert.match(bullet, /proposalDecisionId \+ roster \+ 三文档，\*\*只传 path\*\*；hash 由应用在激活前按实际字节计算并回填/, "A8 入参须携 proposalDecisionId + roster + 三文档 path（hash 由应用回填；B17 口径）");
   assert.match(bullet, /A8 完成于全部名单角色激活/, "A8 完成于全部名单角色激活");
   assert.match(bullet, /role\.activated/, "A8 完成事件须点名 role.activated");
   assert.match(bullet, /A8 不弹客户卡/, "A8 不弹客户卡");

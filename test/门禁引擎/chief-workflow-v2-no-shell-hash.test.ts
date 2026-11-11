@@ -99,9 +99,13 @@ test("B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应�
     /roster path \+ `sha256`（取应用 A6 `documentRefs` 回执值，不由角色用 shell 计算）/,
     "A7 任务文本的 roster sha256 须取应用回执值，不由角色 shell 计算",
   );
-  assert.match(stages, /实现任务文本须写明：完成后只报告路径、commit OID、变更与测试结论；hash 由应用计算，不得用 shell 算 hash/, "A11 实现任务文本须带 hash 口径");
+  assert.match(
+    stages,
+    /实现任务文本须写明：完成后只报告路径、commit OID、变更要点与\*\*静态自检结论.*hash 由应用计算，不得用 shell 算 hash/,
+    "A11 实现任务文本须带静态自检结论与 hash 口径（B27）",
+  );
   const order = sectionOf(readV2(), "## A10 与 A11 的顺序");
-  assert.match(order, /hash 口径：完成后只报告路径、commit OID、变更与测试结论，hash 由应用计算，不得用 shell 算 hash/, "A11 stage-request 任务文本须携 hash 口径");
+  assert.match(order, /hash 口径：完成后只报告路径、commit OID、变更要点与静态自检结论.*hash 由应用计算，不得用 shell 算 hash/, "A11 stage-request 任务文本须携静态自检结论与 hash 口径（B27）");
 });
 
 test("B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷", () => {
@@ -163,4 +167,17 @@ test("B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB�
   assert.match(text, /## 派发分裂（谁派谁）/, "既有派发分裂段须保留");
   assert.match(text, /## 3 张客户卡/, "既有 3 张客户卡段须保留");
   assert.match(text, /## Git 普通用法（实现角色）/, "既有 Git 普通用法段须保留（本批不放宽 shell/提交门禁）");
+});
+
+test("B27 A11 实现 worker 不执行 shell/自测：报告静态自检结论，旧「变更与测试结论」措辞移除", () => {
+  const text = readV2();
+  // RR24：实现 worker 为「自测结论」执行 `node src/core/self-test.js` ⇒ shell 审批卡早停。
+  assert.match(text, /静态自检结论/, "须写死静态自检结论");
+  assert.match(text, /不运行 shell\/node\/npm、不执行测试脚本/, "须写死不运行 shell/node/npm、不执行测试脚本");
+  assert.match(text, /执行\/验证由 A12 验收承担/, "须说明执行/验证由 A12 验收承担");
+  assert.match(text, /实现 worker 只写本模块文件 \+ 字面 `git add`\/`git commit`/, "须写死 worker 只写文件 + 字面 git add/commit");
+  assert.match(text, /不得运行任何 shell 命令（含 `node`\/`npm`\/自测脚本）/, "须写死不得运行任何 shell 命令");
+  assert.match(text, /实现 worker 不执行 shell\/自测/, "策略段须有实现 worker 不执行 shell/自测条");
+  assert.match(text, /不得以「如何自测」「测试结论」为报告项/, "须禁止把如何自测/测试结论作为报告项");
+  assert.equal(text.includes("变更与测试结论"), false, "旧「变更与测试结论」措辞须移除（避免诱导自测执行）");
 });
