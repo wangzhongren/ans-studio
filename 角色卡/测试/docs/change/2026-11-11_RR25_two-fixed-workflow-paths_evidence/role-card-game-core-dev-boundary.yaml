@@ -1,0 +1,5 @@
+role: game-core-dev
+entries:
+  - kind: directory
+    path: src/core/
+    purpose: 游戏状态机与规则实现（模块 game-core）

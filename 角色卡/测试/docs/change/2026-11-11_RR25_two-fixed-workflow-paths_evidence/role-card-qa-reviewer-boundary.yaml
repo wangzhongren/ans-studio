@@ -1,0 +1,5 @@
+role: qa-reviewer
+entries:
+  - kind: directory
+    path: docs/acceptance/
+    purpose: AC1–AC4 验收演示步骤、结论与截图证据归档（模块 acceptance-record）

@@ -1,0 +1,5 @@
+role: app-integrator
+entries:
+  - kind: file
+    path: index.html
+    purpose: 页面骨架、内联样式、按序加载脚本与启动装配（模块 app-entry）
