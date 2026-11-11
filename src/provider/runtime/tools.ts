@@ -5561,7 +5561,13 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const viewImageDelivery = (options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY).delivery;
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);
-    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file",VIEW_IMAGE_TOOL_NAME].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
+    // B17（2026-11-11，RR15 实测）：fixed activate 的 **MCP 可见 inputSchema** 也必须允许 path-only；
+    // 否则模型按提示只传 path 时会在 MCP 输入校验层被 `sha256 expected string` 拒绝（工具 handler
+    // 的 modeShapeSchema 放宽不足以覆盖 schema 暴露面）。legacy 注入面仍用共享 schema。
+    const inputSchema = tool.name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME && options?.activateRoleDocumentsFixed !== undefined
+      ? modeShapeSchema(tool.name, true)
+      : parameters;
+    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file",VIEW_IMAGE_TOOL_NAME].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema, async handler(call) {
       if (call.signal?.aborted) return abortedToolResult(tool.name, viewImageDelivery);
       const result = await tool.handler(call);
       // 后台任务成功结果带结构化事实（任务已启动/已停止是已发生的真实事件）：即使信号在 handler 返回前

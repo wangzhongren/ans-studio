@@ -322,6 +322,36 @@ test("B17 fixed activate：path-only（roster/documents 省略 sha256）放行�
   assert.match(legacy.message, /invalid-arguments args\.documents\.card\.sha256: required/u);
 });
 
+test("B17 fixed activate MCP inputSchema：roster/documents 的 sha256 不 required；legacy documents 仍 required", () => {
+  type ActivateSchema = {
+    properties: {
+      roster?: { required?: string[] };
+      documents: { properties: Record<string, { required?: string[] }> };
+    };
+  };
+  const fixed = buildGovernedTools(allow, {
+    roleId: "nominator",
+    activateRoleDocumentsFixed: async () => ({ ok: false, code: "fixture", message: "fixture" }),
+  });
+  const fixedTool = fixed.find((tool) => tool.name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME);
+  assert.ok(fixedTool !== undefined);
+  const fixedSchema = fixedTool!.inputSchema as unknown as ActivateSchema;
+  assert.equal((fixedSchema.properties.roster?.required ?? []).includes("sha256"), false, "fixed roster sha256 可省略");
+  for (const key of ["card", "boundaryMd", "boundaryYaml"]) {
+    assert.equal((fixedSchema.properties.documents.properties[key]?.required ?? []).includes("sha256"), false, `fixed ${key}.sha256 可省略`);
+  }
+  const legacy = buildGovernedTools(allow, {
+    roleId: "nominator",
+    activateRoleDocuments: async () => ({ ok: false, status: "blocked", message: "fixture" } as never),
+  });
+  const legacyTool = legacy.find((tool) => tool.name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME);
+  assert.ok(legacyTool !== undefined);
+  const legacySchema = legacyTool!.inputSchema as unknown as ActivateSchema;
+  for (const key of ["card", "boundaryMd", "boundaryYaml"]) {
+    assert.equal((legacySchema.properties.documents.properties[key]?.required ?? []).includes("sha256"), true, `legacy ${key}.sha256 仍必填`);
+  }
+});
+
 // —————————————————————— 3. WorkflowDocumentRef.version（MF-IR-5） ——————————————————————
 
 test("WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version", () => {
