@@ -73,6 +73,7 @@ import {
   appendWorkflowEvent as workflowAppendEvent,
   closeTask as workflowCloseTask,
   derivePathBWriteSets,
+  fillFixedActivationHashes,
   finalizeIntent as workflowFinalizeIntent,
   // T3 B10.2（2026-11-11）：fixed 任务会话上下文经 fixed 账本事实校验（不要求 runId、不写 trunk/run）。
   inspectAssignedTask as workflowInspectAssignedTask,
@@ -2707,6 +2708,8 @@ export async function openRoleSession(
       : undefined;
   // T3 B2（MF-IR-3）：fixed `activate_role_documents` v2 依赖（AC-24；项目根由本层绑定；服务层重算
   // roster/提案决定/三文档实际字节 SHA-256 并写 `role.activated`）。legacy 会话字段缺席。
+  // B17（2026-11-11，RR12 失败修复）：模型只传 path；应用在调用前按真实字节计算并**覆盖**四份 hash
+  // （不采信模型自报；不可读 fail-closed）。服务层仍复核 roster 与 A6 documentRefs 一致性。
   const fixedActivateRoleDocuments: FixedActivateRoleDocumentsFn | undefined = fixedSessionTools
     && directGovernance && setup.role.id === "nominator" && moduleActivateRoleDocuments !== false
     ? async (toolInput, signal) => {
@@ -2714,19 +2717,21 @@ export async function openRoleSession(
           return { ok: false, code: "activation-document-invalid", message: "本轮已中止，未执行激活。" };
         }
         const projectRoot = input.project.projectRoot;
+        const hashed = await fillFixedActivationHashes({ projectRoot, input: toolInput });
+        if (!hashed.ok) return hashed;
         if (input.activateRoleDocumentsFixed !== undefined) {
           // 可信 projectRoot 放最后：模型参数即便夹带同名字段也不得覆盖宿主身份。
-          return await input.activateRoleDocumentsFixed({ ...toolInput, projectRoot }, signal);
+          return await input.activateRoleDocumentsFixed({ ...hashed.input, projectRoot }, signal);
         }
         return await workflowActivateRoleDocumentsFixed({
           projectRoot,
-          operationId: toolInput.operationId,
-          flowId: toolInput.flowId,
-          workflowId: toolInput.workflowId,
-          proposalDecisionId: toolInput.proposalDecisionId,
-          targetRoleId: toolInput.targetRoleId,
-          roster: toolInput.roster,
-          documents: toolInput.documents,
+          operationId: hashed.input.operationId,
+          flowId: hashed.input.flowId,
+          workflowId: hashed.input.workflowId,
+          proposalDecisionId: hashed.input.proposalDecisionId,
+          targetRoleId: hashed.input.targetRoleId,
+          roster: hashed.input.roster,
+          documents: hashed.input.documents,
         });
       }
     : undefined;

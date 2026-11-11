@@ -4463,6 +4463,28 @@ const FIXED_MODE_REQUIRED: Record<string, readonly string[]> = {
 /** 同一共享 schema，按实际模式套用该模式的完整 required（其它工具 = schema 原样）。 */
 function modeShapeSchema(name: string, fixedMode: boolean): Record<string, unknown> {
   const parameters = describeTool(name).parameters;
+  // B17（2026-11-11，RR12）：fixed 激活允许 path-only（roster/documents 文件的 sha256 可省略），
+  // hash 由应用在激活前按实际字节计算并回填；legacy 仍要求 sha256（共享 schema 原样）。
+  if (fixedMode && name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME) {
+    const cloned = structuredClone(parameters) as {
+      properties?: Record<string, Record<string, unknown>>;
+      required?: string[];
+    };
+    const props = cloned.properties;
+    const relaxFile = (rel: Record<string, unknown> | undefined): void => {
+      if (rel !== undefined && Array.isArray(rel.required)) {
+        rel.required = (rel.required as string[]).filter((key) => key !== "sha256");
+      }
+    };
+    if (props !== undefined) {
+      relaxFile(props["roster"]);
+      const documents = props["documents"];
+      const docProps = documents?.["properties"] as Record<string, Record<string, unknown>> | undefined;
+      if (docProps !== undefined) for (const key of ["card", "boundaryMd", "boundaryYaml"]) relaxFile(docProps[key]);
+    }
+    const required = FIXED_MODE_REQUIRED[name];
+    return required !== undefined ? { ...cloned, required } : cloned;
+  }
   const required = (fixedMode ? FIXED_MODE_REQUIRED : LEGACY_MODE_REQUIRED)[name];
   return required !== undefined ? { ...parameters, required } : parameters;
 }
@@ -4503,14 +4525,14 @@ function fixedCloseReceiptResult(args: Record<string, unknown>, value: unknown):
     || (value.stage !== undefined && !isWorkflowStage(value.stage))) return directUnknownResult(name);
   return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
 }
-/** fixed activate v2 回执独立校验：workflow/role/roster 必须与输入一致；不回退 legacy activationDigest。 */
+/** fixed activate v2 回执独立校验：workflow/role 与输入一致；B17 起 rosterSha256 由应用计算（形状校验，
+ * 不再与模型入参比较——模型不采信自报 hash）。不回退 legacy activationDigest。 */
 function fixedActivateReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
   const name = ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME;
   if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
   if (!value.ok) return fixedFailureResult(name, value);
-  const roster = args.roster as { sha256?: unknown };
   if (value.workflowId !== args.workflowId || value.roleId !== args.targetRoleId
-    || value.rosterSha256 !== roster.sha256 || !directHash(value.rosterSha256)
+    || !directHash(value.rosterSha256)
     || typeof value.activationKey !== "string" || !value.activationKey.trim()
     || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean") return directUnknownResult(name);
   return { ok: true, message: `${name}: ${JSON.stringify(value)}` };

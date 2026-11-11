@@ -121,7 +121,11 @@ test("fixed context 口径：按运营派发、按名单机械建卡/激活、�
   assert.match(activation, /模块的文件\/目录并集/);
   assert.match(activation, /activate_role_documents/);
   assert.match(activation, /role\.activated/);
-  assert.match(activation, /activation-hash-drift/);
+  // B17：roster/三文档只传 path；hash 由应用在激活前按实际字节计算并回填（不猜/不用 shell）。
+  assert.match(activation, /只传 path/);
+  assert.match(activation, /hash 由应用在激活前按实际字节计算并回填/);
+  assert.match(activation, /不猜 hash、不得用 shell 计算/);
+  assert.match(activation, /A6 documentRefs 一致性/);
   // 报告回任务真实创建者（固定路径 = 运营）。
   assert.match(report, /task\.created\.from/);
   assert.match(report, /submit_report/);

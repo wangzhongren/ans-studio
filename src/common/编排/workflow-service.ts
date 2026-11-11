@@ -25,6 +25,7 @@ import type {
   BasisDocumentRef,
   BasisEvent,
   BasisTeamPlanRef,
+  FixedActivateRoleDocumentsInput,
   ReleaseConfirmedEvent,
   ReleaseEvent,
   ReleaseFailedEvent,
@@ -1786,9 +1787,52 @@ export type ActivateRoleDocumentsFixedResult =
 /**
  * fixed `activate_role_documents` v2 **模型可见入参**（v1.3 §4.2 A8；MF-IR-3；编排 B2 接线）：
  * roster/提案决定/三文档 hash 均由应用在服务层重算核验（`activation-hash-drift` 等 fail-closed）。
- * 可信 `projectRoot` 由 run-role 绑定，**绝不来自模型参数**。
+ * **B17（2026-11-11，RR12）**：fixed 模式下 roster/三文档的 sha256 可省略——应用在激活前按实际
+ * 字节重算并回填（`fillFixedActivationHashes`）；模型自报 sha256 不采信。可信 `projectRoot`
+ * 由 run-role 绑定，**绝不来自模型参数**。
  */
-export type FixedActivateRoleDocumentsToolInput = Omit<ActivateRoleDocumentsFixedInput, "projectRoot" | "now">;
+export type FixedActivateRoleDocumentsToolInput = FixedActivateRoleDocumentsInput;
+
+/**
+ * B17（2026-11-11，RR12 失败修复）：fixed A8 激活前由**应用**读取 roster 与三文档真实字节并计算
+ * SHA-256（覆盖模型入参，不采信自报；文件不可读 ⇒ `activation-document-invalid` fail-closed）。
+ * 返回的服务入参仍供 `activateRoleDocumentsFixed` 复核（roster 与 A6 documentRefs 一致性等）。
+ */
+export async function fillFixedActivationHashes(input: {
+  projectRoot: string;
+  input: FixedActivateRoleDocumentsToolInput;
+}): Promise<{ ok: true; input: Omit<ActivateRoleDocumentsFixedInput, "projectRoot" | "now"> } | WorkflowServiceFailure> {
+  const roster = await readAndHash(input.projectRoot, input.input.roster.path);
+  if (!roster.ok) {
+    return serviceFailure("activation-document-invalid", `roster 不可读：${input.input.roster.path}。`);
+  }
+  const documents = input.input.documents;
+  const filled: { card?: string; boundaryMd?: string; boundaryYaml?: string } = {};
+  for (const kind of ["card", "boundaryMd", "boundaryYaml"] as const) {
+    const ref = documents[kind];
+    const actual = await readAndHash(input.projectRoot, ref.path);
+    if (!actual.ok) {
+      return serviceFailure("activation-document-invalid", `${kind} 文档不可读：${ref.path}。`);
+    }
+    filled[kind] = actual.sha256;
+  }
+  return {
+    ok: true,
+    input: {
+      operationId: input.input.operationId,
+      flowId: input.input.flowId,
+      workflowId: input.input.workflowId,
+      proposalDecisionId: input.input.proposalDecisionId,
+      targetRoleId: input.input.targetRoleId,
+      roster: { path: input.input.roster.path, sha256: roster.sha256 },
+      documents: {
+        card: { path: documents.card.path, sha256: filled.card! },
+        boundaryMd: { path: documents.boundaryMd.path, sha256: filled.boundaryMd! },
+        boundaryYaml: { path: documents.boundaryYaml.path, sha256: filled.boundaryYaml! },
+      },
+    },
+  };
+}
 
 /**
  * `openRoleSession({ activateRoleDocumentsFixed })` 可注入的**应用实现**（可选；仅 fixed 会话消费）：

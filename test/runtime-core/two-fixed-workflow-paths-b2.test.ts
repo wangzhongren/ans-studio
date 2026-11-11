@@ -265,12 +265,11 @@ test("legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义�
   assert.equal(calls, 1);
 });
 
-test("fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出", async () => {
+test("fixed activate 回执独立校验：workflow/role 不匹配或坏形状 ⇒ 结果未知；B17 rosterSha256 由应用计算（不再与模型入参比较）；业务失败如实直出", async () => {
   const succeed = (receipt: unknown): FixedActivateRoleDocumentsFn => async () => receipt as never;
   for (const receipt of [
     { ...fixedActivateReceipt, workflowId: "wf-other" },
     { ...fixedActivateReceipt, roleId: "worker-other" },
-    { ...fixedActivateReceipt, rosterSha256: D2 },
     { ...fixedActivateReceipt, activationKey: "" },
     { ...fixedActivateReceipt, stageCompleted: "yes" },
     { ...fixedActivateReceipt, rosterSha256: "not-hex" },
@@ -280,11 +279,47 @@ test("fixed activate 回执独立校验：workflow/role/roster 不匹配或坏�
     assert.equal(result.ok, false, JSON.stringify(receipt));
     assert.match(result.message, /结果未知/, JSON.stringify(receipt));
   }
+  // B17：应用计算的 rosterSha256 与模型入参不同 ⇒ 仍接受（模型 hash 不采信）。
+  const appComputed = await run(
+    { roleId: "nominator", activateRoleDocumentsFixed: succeed({ ...fixedActivateReceipt, rosterSha256: D2 }) },
+    ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME,
+    structuredClone(fixedActivateArgs),
+  );
+  assert.equal(appComputed.ok, true, appComputed.message);
   const failure = { ok: false, code: "activation-hash-drift", message: "三文档实际字节 SHA-256 与声明不一致。", missing: ["documents.card"] };
   const failed = await run({ roleId: "nominator", activateRoleDocumentsFixed: succeed(failure) }, ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, structuredClone(fixedActivateArgs));
   assert.equal(failed.ok, false);
   assert.match(failed.message, /activation-hash-drift/);
   assert.doesNotMatch(failed.message, /结果未知/);
+});
+
+test("B17 fixed activate：path-only（roster/documents 省略 sha256）放行并原样调用 fixed 回调；legacy 仍要求 sha256", async () => {
+  const calls: unknown[] = [];
+  const fixed: FixedActivateRoleDocumentsFn = async (input) => { calls.push(input); return fixedActivateReceipt; };
+  const pathOnly = {
+    operationId: "op-act-1", flowId: "snake", workflowId: WF, proposalDecisionId: "decision-6", targetRoleId: "worker",
+    roster: { path: "docs/proposals/snake-roster-v1.md" },
+    documents: {
+      card: { path: "角色卡/worker/role-card.md" },
+      boundaryMd: { path: "角色卡/worker/boundary.md" },
+      boundaryYaml: { path: "角色卡/worker/boundary.yaml" },
+    },
+  };
+  const ok = await run({ roleId: "nominator", activateRoleDocumentsFixed: fixed }, ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, pathOnly);
+  assert.equal(ok.ok, true, ok.message);
+  assert.deepEqual(calls, [pathOnly], "fixed 回调原样收到 path-only 输入（hash 由应用在激活前回填）");
+  // legacy 模式共享 schema 仍要求嵌套 sha256（逐字保留）。
+  const legacyPathOnly = {
+    ...structuredClone(legacyActivateArgs),
+    documents: {
+      card: { path: "角色卡/worker/role-card.md" },
+      boundaryMd: structuredClone(legacyActivateArgs.documents.boundaryMd),
+      boundaryYaml: structuredClone(legacyActivateArgs.documents.boundaryYaml),
+    },
+  };
+  const legacy = await run({ roleId: "nominator", activateRoleDocuments: async () => legacyActivateReceipt }, ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, legacyPathOnly);
+  assert.equal(legacy.ok, false);
+  assert.match(legacy.message, /invalid-arguments args\.documents\.card\.sha256: required/u);
 });
 
 // —————————————————————— 3. WorkflowDocumentRef.version（MF-IR-5） ——————————————————————

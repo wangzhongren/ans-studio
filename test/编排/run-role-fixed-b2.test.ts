@@ -385,17 +385,32 @@ test("fixed activate：nominator 应用实现收到绑定 projectRoot；legacy �
     async ({ caps, root }) => {
       assert.ok(caps.activateRoleDocumentsFixed !== undefined);
       assert.equal(caps.activateRoleDocuments, undefined, "fixed 会话不得注入 legacy activateRoleDocuments");
+      // B17：模型只传 path；应用在调用实现前按真实字节计算并回填四份 hash。
+      const rosterText = "---\nschema: project-roster/v4\nflowId: snake\nversion: 1\n---\n";
+      const cardText = "# card\n";
+      const boundaryMdText = "## Section 1\n- src/\n";
+      const boundaryYamlText = "role: worker-a\nentries: []\n";
+      for (const [rel, text] of [
+        ["docs/proposals/snake-roster-v1.md", rosterText],
+        ["角色卡/worker-a/role-card.md", cardText],
+        ["角色卡/worker-a/boundary.md", boundaryMdText],
+        ["角色卡/worker-a/boundary.yaml", boundaryYamlText],
+      ] as const) {
+        const abs = path.join(root, ...rel.split("/"));
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        fs.writeFileSync(abs, text, "utf8");
+      }
       const result = await caps.activateRoleDocumentsFixed!({
         operationId: "op-activate-1",
         flowId: "snake",
         workflowId: WF,
         proposalDecisionId: "decision-1",
         targetRoleId: "worker-a",
-        roster: { path: "docs/proposals/snake-roster-v1.md", sha256: "a".repeat(64) },
+        roster: { path: "docs/proposals/snake-roster-v1.md" },
         documents: {
-          card: { path: "角色卡/worker-a/role-card.md", sha256: "b".repeat(64) },
-          boundaryMd: { path: "角色卡/worker-a/boundary.md", sha256: "c".repeat(64) },
-          boundaryYaml: { path: "角色卡/worker-a/boundary.yaml", sha256: "d".repeat(64) },
+          card: { path: "角色卡/worker-a/role-card.md" },
+          boundaryMd: { path: "角色卡/worker-a/boundary.md" },
+          boundaryYaml: { path: "角色卡/worker-a/boundary.yaml" },
         },
       });
       assert.equal(result.ok, false);
@@ -403,6 +418,9 @@ test("fixed activate：nominator 应用实现收到绑定 projectRoot；legacy �
       assert.equal(seen[0]!["projectRoot"], root);
       assert.equal(seen[0]!["flowId"], "snake");
       assert.equal(seen[0]!["targetRoleId"], "worker-a");
+      const seenRoster = seen[0]!["roster"] as { sha256?: string };
+      assert.equal(seenRoster.sha256, createHash("sha256").update(rosterText, "utf8").digest("hex"), "应用按真实字节回填 roster hash");
+      assert.equal(seen[0]!["documents"] !== undefined, true);
     },
   );
 });

@@ -3248,11 +3248,12 @@ export interface FixedActivateRoleDocumentsInput {
   workflowId: string;
   proposalDecisionId: string;
   targetRoleId: string;
-  roster: { path: string; sha256: string };
+  /** B17（2026-11-11，RR12）：fixed 模式 hash 可省略——应用在激活前按实际字节重算并回填。 */
+  roster: { path: string; sha256?: string };
   documents: {
-    card: { path: string; sha256: string };
-    boundaryMd: { path: string; sha256: string };
-    boundaryYaml: { path: string; sha256: string };
+    card: { path: string; sha256?: string };
+    boundaryMd: { path: string; sha256?: string };
+    boundaryYaml: { path: string; sha256?: string };
   };
 }
 

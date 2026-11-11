@@ -849,9 +849,9 @@ const FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
     id: "nominator-fixed-activation",
     text: [
       "## A7/A8 建卡与激活（fixed）",
-      "接到 A7/A8 激活任务后，按最新名单 `docs/proposals/<flowId>-roster-vN.md`（path+sha256）与 A6 提案决定（proposalDecisionId）机械处理；写卡前先核验名单/决定与任务事实一致。",
+      "接到 A7/A8 激活任务后，按最新名单 `docs/proposals/<flowId>-roster-vN.md`（只传 path；roster hash 由应用在激活时按实际字节计算）与 A6 提案决定（proposalDecisionId）机械处理；写卡前先核验名单/决定与任务事实一致。",
       "逐名单角色写 `角色卡/<roleId>/role-card.md`、`boundary.md`、`boundary.yaml`：角色卡必填章节齐备，boundary.md 与 boundary.yaml 同步，边界只能取该角色名下模块的文件/目录并集，模块属主唯一。",
-      "对每个名单角色调用 `activate_role_documents` v2（targetRoleId、roster{path,sha256}、documents{card,boundaryMd,boundaryYaml}）；应用重算三文档实际字节 SHA-256（不一致 ⇒ `activation-hash-drift`），校验通过后记录 `role.activated` 并激活。",
+      "对每个名单角色调用 `activate_role_documents` v2（targetRoleId、roster{path}、documents{card,boundaryMd,boundaryYaml}，**只传 path**）；roster/三文档 hash 由应用在激活前按实际字节计算并回填，模型不猜 hash、不得用 shell 计算；应用复核 roster 与 A6 documentRefs 一致性并记录真实 `role.activated`。",
       "名单/提案决定缺失或非法 ⇒ 不写卡，如实阻塞回运营；激活失败保留旧有效卡，不伪造激活或完成。",
     ].join("\n"),
   }),
