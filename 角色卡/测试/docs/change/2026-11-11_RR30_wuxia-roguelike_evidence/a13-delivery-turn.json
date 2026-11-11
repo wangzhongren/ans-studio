@@ -1,0 +1,227 @@
+[
+  {
+    "ts": "2026-11-11T14:40:31.734Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:40:31.491Z",
+    "turnId": "7f3b3819-56c6-415b-a296-88d80662d679",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:40:52.788Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:40:52.599Z",
+    "turnId": "d759e6be-bd0f-4ab2-80c1-8d54d92d2c9b",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:44:55.924Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:44:55.580Z",
+    "turnId": "c246a53c-a9ce-4d61-81df-943b50382dde",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:46:50.737Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:46:50.549Z",
+    "turnId": "ece53d40-38f8-4686-88e9-19116d895be0",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:47:54.174Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:47:53.738Z",
+    "turnId": "95d845e3-d1b9-4dab-833e-4fb3b3203d77",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:48:16.492Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:48:16.106Z",
+    "turnId": "73d14c5a-96dc-4339-8e29-25c1918dd169",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:48:55.026Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:48:54.583Z",
+    "turnId": "35f06dd6-31fe-45e1-8c60-dc90aae7d1b6",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:50:53.518Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:50:53.380Z",
+    "turnId": "60f98e56-7cb7-4fae-8b12-564850e6f021",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:56:01.620Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:56:01.490Z",
+    "turnId": "4837bdec-e8fb-45cc-99bf-3f2fccbccc73",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:58:34.122Z",
+    "type": "success.signal",
+    "at": "2026-11-11T14:58:34.122Z",
+    "releaseMerged": {
+      "at": "2026-11-11T14:58:33.466Z",
+      "releaseId": "rel-5db3929cb393d05e3e4562c9",
+      "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+      "baseOid": {
+        "objectFormat": "sha1",
+        "hex": "277e4a02f87fb0fdd2e767c1914b12362725859a"
+      },
+      "tipOid": {
+        "objectFormat": "sha1",
+        "hex": "9ee4afe2f87c9504992c616f23340f1438843edb"
+      },
+      "mergeOid": {
+        "objectFormat": "sha1",
+        "hex": "8724c076b05104dcfb8e34e0f1fe55dd36302424"
+      },
+      "files": [
+        {
+          "path": "README.md",
+          "status": "A"
+        },
+        {
+          "path": "assets/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/app/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/app/app.js",
+          "status": "A"
+        },
+        {
+          "path": "game/app/bus.js",
+          "status": "A"
+        },
+        {
+          "path": "game/app/integrations.js",
+          "status": "A"
+        },
+        {
+          "path": "game/app/wave-scheduler.js",
+          "status": "A"
+        },
+        {
+          "path": "game/combat/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/combat/combat.js",
+          "status": "A"
+        },
+        {
+          "path": "game/data/config.js",
+          "status": "A"
+        },
+        {
+          "path": "game/enemies/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/enemies/enemies.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/camera.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/collision.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/engine.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/input.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/math.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/pool.js",
+          "status": "A"
+        },
+        {
+          "path": "game/engine/renderer.js",
+          "status": "A"
+        },
+        {
+          "path": "game/items/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/items/arsenal.js",
+          "status": "A"
+        },
+        {
+          "path": "game/player/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/player/player.js",
+          "status": "A"
+        },
+        {
+          "path": "game/progression/README.md",
+          "status": "A"
+        },
+        {
+          "path": "game/progression/progression.js",
+          "status": "A"
+        },
+        {
+          "path": "game/ui/styles.css",
+          "status": "A"
+        },
+        {
+          "path": "game/ui/ui.js",
+          "status": "A"
+        },
+        {
+          "path": "index.html",
+          "status": "A"
+        }
+      ]
+    },
+    "workflowClosed": {
+      "at": "2026-11-11T14:58:33.469Z",
+      "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+      "outcome": "delivered"
+    }
+  },
+  {
+    "ts": "2026-11-11T14:59:03.867Z",
+    "type": "chief.turn.settled",
+    "at": "2026-11-11T14:59:03.637Z",
+    "turnId": "847a75f6-5c0b-47d4-927d-7f9004716b49",
+    "outcome": "completed"
+  },
+  {
+    "ts": "2026-11-11T14:59:03.903Z",
+    "type": "a13.delivery.turn.settled",
+    "settled": {
+      "at": "2026-11-11T14:59:03.637Z",
+      "turnId": "847a75f6-5c0b-47d4-927d-7f9004716b49",
+      "outcome": "completed"
+    },
+    "waitMs": 29781
+  }
+]

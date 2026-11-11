@@ -1,0 +1,196 @@
+{
+  "fileUrl": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/index.html",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Edg/157.0.4341.46",
+    "revision": "@a0c6bd61d7884b3c402a34c67d05100107a9e5e4",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "jsVersion": "15.7.11.4"
+  },
+  "boot": {
+    "snap": {
+      "state": "MENU",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 0,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "menu": true,
+    "bootError": false
+  },
+  "start": {
+    "state": "PLAYING",
+    "hp": 100,
+    "maxHp": 100,
+    "level": 1,
+    "exp": 0,
+    "expToNext": 8,
+    "wave": 1,
+    "timeLeft": 210,
+    "elapsed": 0,
+    "kills": 0,
+    "upgradeChoices": [],
+    "result": null,
+    "stats": null
+  },
+  "movement": {
+    "pos0": null,
+    "posD": null,
+    "posW": null
+  },
+  "combat": {
+    "killsSeen": 0,
+    "snap": {
+      "state": "PLAYING",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    }
+  },
+  "levelup": {
+    "snap": {
+      "state": "PLAYING",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "cards": [],
+    "chose": false
+  },
+  "kite": {
+    "waveMax": 1,
+    "pickupObserved": false,
+    "arsenal": null,
+    "snap": {
+      "state": "PAUSED",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    }
+  },
+  "death": {
+    "snap": {
+      "state": "PAUSED",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "usedApi": true
+  },
+  "restart": {
+    "state": "PAUSED",
+    "hp": 100,
+    "maxHp": 100,
+    "level": 1,
+    "exp": 0,
+    "expToNext": 8,
+    "wave": 1,
+    "timeLeft": 210,
+    "elapsed": 0,
+    "kills": 0,
+    "upgradeChoices": [],
+    "result": null,
+    "stats": null
+  },
+  "console": {
+    "total": 41586,
+    "errorsSample": [
+      {
+        "at": "2026-11-11T15:02:50.973Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":1,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:50.980Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":2,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:50.987Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":3,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:50.994Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":4,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:51.001Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":5,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:51.008Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":6,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:51.015Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":7,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:51.022Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":8,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:51.029Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":9,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game"
+      },
+      {
+        "at": "2026-11-11T15:02:51.036Z",
+        "kind": "exception",
+        "text": "{\"exceptionId\":10,\"text\":\"Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')\",\"lineNumber\":238,\"columnNumber\":18,\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"Input.wasPressed\",\"scriptId\":\"7\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js\",\"lineNumber\":238,\"columnNumber\":18},{\"functionName\":\"pollFrameInput\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/app/app.js\",\"lineNumber\":822,\"columnNumber\":12},{\"functionName\":\"frame\",\"scriptId\":\"20\",\"url\":\"file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/gam"
+      }
+    ],
+    "warnings": []
+  },
+  "at": "2026-11-11T15:07:41.953Z"
+}

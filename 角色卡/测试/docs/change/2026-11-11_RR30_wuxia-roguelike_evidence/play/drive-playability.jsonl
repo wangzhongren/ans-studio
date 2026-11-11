@@ -1,0 +1,26 @@
+{"ts":"2026-11-11T15:02:49.968Z","type":"browser.version","protocolVersion":"1.3","product":"Edg/157.0.4341.46","revision":"@a0c6bd61d7884b3c402a34c67d05100107a9e5e4","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0","jsVersion":"15.7.11.4"}
+{"ts":"2026-11-11T15:02:50.190Z","type":"boot","snap":{"state":"MENU","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":0,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"menu":true,"bootError":false}
+{"ts":"2026-11-11T15:02:50.890Z","type":"screenshot","name":"01-menu.png","bytes":564441}
+{"ts":"2026-11-11T15:02:50.973Z","type":"mouse.click","selector":".wx-menu__start","rect":{"x":620.5,"y":710.046875,"w":213.125,"h":46,"text":"踏入江湖"}}
+{"ts":"2026-11-11T15:02:51.675Z","type":"start.result","startClick":{"ok":true,"rect":{"x":620.5,"y":710.046875,"w":213.125,"h":46,"text":"踏入江湖"}},"snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null}}
+{"ts":"2026-11-11T15:02:51.838Z","type":"screenshot","name":"02-playing.png","bytes":565685}
+{"ts":"2026-11-11T15:02:53.654Z","type":"move.result","pos0":null,"posD":null,"posW":null,"dx":null,"dy":null}
+{"ts":"2026-11-11T15:02:53.823Z","type":"screenshot","name":"03-move.png","bytes":565685}
+{"ts":"2026-11-11T15:03:23.849Z","type":"combat.result","killsSeen":0,"snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"enemyCount":0,"enemiesSample":[]}
+{"ts":"2026-11-11T15:03:24.013Z","type":"screenshot","name":"04-combat.png","bytes":565685}
+{"ts":"2026-11-11T15:04:54.063Z","type":"levelup.result","state":"PLAYING","level":1,"exp":0,"expToNext":8,"choices":[],"cards":[]}
+{"ts":"2026-11-11T15:04:54.235Z","type":"screenshot","name":"05-levelup.png","bytes":565685}
+{"ts":"2026-11-11T15:06:24.703Z","type":"kite.result","waveMax":1,"pickupObserved":false,"arsenal":null,"snap":{"state":"PAUSED","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"enemyCount":0}
+{"ts":"2026-11-11T15:06:24.871Z","type":"screenshot","name":"08-after-kite.png","bytes":565685}
+{"ts":"2026-11-11T15:07:25.051Z","type":"damage.api.error","error":"Error: eval-exception {\"exceptionId\":39173,\"text\":\"Uncaught\",\"lineNumber\":0,\"columnNumber\":23,\"scriptId\":\"60\",\"stackTrace\":{\"callFrames\":[{\"functionName\":\"\",\"scriptId\":\"60\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":23},{\"functionName\":\"\",\"scriptId\":\"60\",\"url\":\"\",\"lineNumber\":0,\"columnNumber\":64}]},\"exception\":{\"type\":\"object\",\"subtype\":\"error\",\"className\":\"TypeError\",\"description\":\"TypeError: window.WX.App.damagePlayer is not a function\\n    at <anonymous>:1:24\\n    at <anonymous>:1:65\",\"objectId\":\"2118121066977525431.3"}
+{"ts":"2026-11-11T15:07:33.105Z","type":"death.api.used","deathSnap":{"state":"PAUSED","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"usedApi":true}
+{"ts":"2026-11-11T15:07:33.105Z","type":"death.result","state":"PAUSED","result":null,"hp":100,"usedApi":true,"resultBtn":true}
+{"ts":"2026-11-11T15:07:33.272Z","type":"screenshot","name":"09-gameover.png","bytes":565685}
+{"ts":"2026-11-11T15:07:33.341Z","type":"mouse.click","selector":".wx-result__restart","rect":{"x":0,"y":0,"w":0,"h":0,"text":"再战江湖"}}
+{"ts":"2026-11-11T15:07:41.785Z","type":"restart.result","click":{"ok":true,"rect":{"x":0,"y":0,"w":0,"h":0,"text":"再战江湖"}},"snap":{"state":"PAUSED","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null}}
+{"ts":"2026-11-11T15:07:41.950Z","type":"screenshot","name":"10-restart.png","bytes":564441}
+{"ts":"2026-11-11T15:07:41.953Z","type":"console.summary","total":41586,"errors":41586,"warnings":0}
+{"ts":"2026-11-11T15:08:56.530Z","type":"repro.boot","step":"repro","hasApp":true,"snap":{"state":"MENU","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":0,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"ps":null,"psErr":"TypeError: app.getPlayerState is not a function","enemyCount":null,"enErr":"TypeError: app.getEnemies is not a function","menu":true}
+{"ts":"2026-11-11T15:08:57.035Z","type":"screenshot","step":"repro","name":"p1-menu.png","bytes":564441}
+{"ts":"2026-11-11T15:08:57.107Z","type":"repro.startClick","step":"repro","rect":{"x":620.5,"y":710.046875}}
+{"ts":"2026-11-11T15:08:59.777Z","type":"screenshot","step":"repro","name":"p2-start-crash.png","bytes":565685}
