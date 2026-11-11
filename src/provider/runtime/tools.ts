@@ -4525,6 +4525,24 @@ function fixedCloseReceiptResult(args: Record<string, unknown>, value: unknown):
     || (value.stage !== undefined && !isWorkflowStage(value.stage))) return directUnknownResult(name);
   return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
 }
+/** B25（2026-11-11，RR22 失败修复）：fixed `complete_team_plan` v4 回执独立校验——不复用 legacy
+ * `isDirectActionReceipt`（服务成功回执是 `{ok, operationId, flowId, workflowId, basisId, plan,
+ * documents, replay, stageCompleted}`）。身份/形状不符仍 unknown（fail-closed），失败回执透出
+ * code/message；legacy 回执路径不经过本函数。 */
+function fixedCompleteTeamPlanReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
+  const name = COMPLETE_TEAM_PLAN_TOOL_NAME;
+  if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
+  if (!value.ok) return fixedFailureResult(name, value);
+  const plan = value.plan;
+  if (value.operationId !== args.operationId || value.flowId !== args.flowId
+    || value.workflowId !== args.workflowId
+    || typeof value.basisId !== "string" || !value.basisId.trim()
+    || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean"
+    || !Array.isArray(value.documents)
+    || !directRecord(plan) || typeof plan.path !== "string" || !plan.path.trim()
+    || !Number.isSafeInteger(plan.version) || !directHash(plan.sha256)) return directUnknownResult(name);
+  return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
+}
 /** fixed activate v2 回执独立校验：workflow/role 与输入一致；B17 起 rosterSha256 由应用计算（形状校验，
  * 不再与模型入参比较——模型不采信自报 hash）。不回退 legacy activationDigest。 */
 function fixedActivateReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
@@ -4582,6 +4600,12 @@ function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContex
       } else if (!["pending", "stale", "rejected"].includes(String(value.status))
         || typeof value.errorCode !== "string" || !value.errorCode.trim() || typeof value.message !== "string" || !value.message.trim()) return directUnknownResult(entry.name);
       return { ok: value.ok, message: `${entry.name}: ${JSON.stringify(value)}` };
+    }
+    // B25（2026-11-11，RR22）：fixed `complete_team_plan` 与 legacy 共用注入位，按入参形状
+    // （workflowId + plan）路由到 fixed 回执校验；legacy 回执路径逐字不变。
+    if (entry.name === COMPLETE_TEAM_PLAN_TOOL_NAME
+      && typeof call.args.workflowId === "string" && directRecord(call.args.plan)) {
+      return fixedCompleteTeamPlanReceiptResult(call.args, value);
     }
     // fixed v2 回执走独立校验（legacy direct 回执形状不适用）；结果如实直出。
     if (fixedMode) return entry.name === CLOSE_CREATED_TASK_TOOL_NAME

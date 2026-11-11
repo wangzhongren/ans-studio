@@ -14,6 +14,7 @@ import {
   type RequestResolvedEvent,
   requestResolvedD3DecisionId,
 } from "../../src/model/runtime.ts";
+import type { DirectActionReceipt } from "../../src/model/trunk.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
 import {
   COMPLETE_TEAM_PLAN_TOOL_NAME,
@@ -73,16 +74,57 @@ test("complete_team_plan schema v4：新增可选 workflowId（1–200、无控�
   assert.equal(description.includes("two-fixed-paths"), false, "schema 文案保持模式中立");
 });
 
-test("complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传", async () => {
+test("complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传；B25 fixed 回执被接受", async () => {
   const calls: { input: unknown; signal?: AbortSignal }[] = [];
   const controller = new AbortController();
-  const receipt = { ...appliedReceipt, workflowId: WF };
+  // B25（RR22）：fixed 服务成功回执形状（非 legacy DirectActionReceipt）。
+  const receipt = {
+    ok: true as const, operationId: "op-plan-1", flowId: "snake", workflowId: WF,
+    basisId: "bas-0123456789abcdef01234567",
+    plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: D },
+    documents: [{ kind: "intent", path: "docs/product/snake-intent-v1.md", version: 1, sha256: D2 }],
+    replay: false, stageCompleted: true,
+  };
   const result = await run({ roleId: "convener", completeTeamPlan: async (input, signal) => {
-    calls.push({ input, signal }); return receipt;
+    calls.push({ input, signal }); return receipt as unknown as DirectActionReceipt;
   } }, COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(fixedPlanArgs), controller.signal);
   assert.equal(result.ok, true, result.message);
   assert.deepEqual(calls, [{ input: fixedPlanArgs, signal: controller.signal }], "工具层只做形状校验并原样透传（权威绑定在应用）");
   assert.deepEqual(JSON.parse(result.message.slice(COMPLETE_TEAM_PLAN_TOOL_NAME.length + 2)), receipt);
+});
+
+test("B25 fixed complete_team_plan：失败回执透出 code/message（不按 unknown 处理）", async () => {
+  const failure = { ok: false as const, code: "baseline-team-plan-invalid", message: "团队计划校验失败" };
+  const result = await run({ roleId: "convener", completeTeamPlan: async () => failure as unknown as DirectActionReceipt },
+    COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(fixedPlanArgs));
+  assert.equal(result.ok, false);
+  assert.match(result.message, /baseline-team-plan-invalid/);
+  assert.match(result.message, /团队计划校验失败/);
+  assert.equal(result.message.includes("结果未知或回执不完整"), false, "真实失败不得被降级为 unknown");
+});
+
+test("B25 fixed complete_team_plan：成功回执形状不符/身份不一致 ⇒ unknown（fail-closed，不伪造成功）", async () => {
+  const base = {
+    ok: true as const, operationId: "op-plan-1", flowId: "snake", workflowId: WF,
+    basisId: "bas-0123456789abcdef01234567",
+    plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: D },
+    documents: [] as unknown[], replay: false, stageCompleted: true,
+  };
+  const cases: Array<[string, Record<string, unknown>]> = [
+    ["缺 basisId", { ...base, basisId: "" }],
+    ["workflowId 不一致", { ...base, workflowId: "wf-other" }],
+    ["flowId 不一致", { ...base, flowId: "other" }],
+    ["plan sha256 非法", { ...base, plan: { ...base.plan, sha256: "x" } }],
+    ["documents 非数组", { ...base, documents: "nope" }],
+    ["stageCompleted 非布尔", { ...base, stageCompleted: "yes" }],
+    ["legacy 形状回执", { ...appliedReceipt, workflowId: WF }],
+  ];
+  for (const [label, receipt] of cases) {
+    const result = await run({ roleId: "convener", completeTeamPlan: async () => receipt as unknown as DirectActionReceipt },
+      COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(fixedPlanArgs));
+    assert.equal(result.ok, false, label);
+    assert.match(result.message, /结果未知或回执不完整/, label);
+  }
 });
 
 test("complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId", async () => {
@@ -136,13 +178,16 @@ test("complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并�
   assert.deepEqual(calls, [legacyWithDigestArgs], "legacy 断言字段原样透传（旧语义不变）");
 
   // fixed 形状同时夹带 legacy 字段：schema 容忍（服务必须能读到并以 `baseline-legacy-field-forbidden`
-  // 拒绝），工具层不改写/不丢弃——应用服务/编排是业务判定的唯一属主。
+  // 拒绝），工具层不改写/不丢弃——应用服务/编排是业务判定的唯一属主；fixed 失败回执原样透出。
   const mixed = { ...fixedPlanArgs, runId: "run-1", baseDigest: D };
   const mixedCalls: CompleteTeamPlanInput[] = [];
+  const mixedFailure = { ok: false as const, code: "baseline-legacy-field-forbidden", message: "fixed 路径不接受 legacy 字段 runId/baseDigest" };
   const mixedResult = await run({ roleId: "convener", completeTeamPlan: async (input) => {
-    mixedCalls.push(input); return appliedReceipt;
+    mixedCalls.push(input); return mixedFailure as unknown as DirectActionReceipt;
   } }, COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(mixed));
-  assert.equal(mixedResult.ok, true, "服务层拒绝前工具层不改判");
+  assert.equal(mixedResult.ok, false, "服务层拒绝原样透出（不降级 unknown）");
+  assert.match(mixedResult.message, /baseline-legacy-field-forbidden/, "真实拒绝码可达");
+  assert.equal(mixedResult.message.includes("结果未知或回执不完整"), false, "服务拒绝不得被改写为 unknown");
   assert.deepEqual(mixedCalls, [mixed], "runId/baseDigest 原样透传，服务拒绝可达");
 });
 

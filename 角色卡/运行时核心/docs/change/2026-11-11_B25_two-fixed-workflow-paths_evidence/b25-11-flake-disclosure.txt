@@ -1,0 +1,5 @@
+B25 flake disclosure (download-provider timing test):
+- Full test/编排 suite with B25: run1 1341 pass/25 fail (extra 'provider：空闲/总超时…'), run2 1341/25 (same extra), run3 1342/24 (frozen known-red only, diff empty).
+- Same file isolated with B25: test/编排/download-provider.test.ts 14/14 pass.
+- Full suite at HEAD tools.ts (no B25): 1342 pass/24 fail, frozen known-red only.
+- Conclusion: timing flake under full-suite concurrency; B25 adds no deterministic failure.
