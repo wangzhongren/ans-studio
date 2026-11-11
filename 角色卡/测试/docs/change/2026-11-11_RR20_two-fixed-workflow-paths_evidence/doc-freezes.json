@@ -1,0 +1,15 @@
+{
+  "v": 1,
+  "schema": "doc-freezes/v1",
+  "state": "ready",
+  "baselineSha256": "33183587bfad170f5d56389b48eec773b13da3f44202dbd721380f47a63d7bf9",
+  "entries": [
+    {
+      "path": "docs/product/snake-game-intent-v1.md",
+      "version": 1,
+      "sha256": "b16131c5929a54ac4bf6839a047d5a02c8fdcb033912992b86f519209abc6c4a",
+      "frozen": false
+    }
+  ],
+  "builtAt": "2026-11-11T05:28:56.743Z"
+}

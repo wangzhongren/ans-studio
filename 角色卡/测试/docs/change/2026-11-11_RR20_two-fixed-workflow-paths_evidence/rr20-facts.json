@@ -1,0 +1,254 @@
+{
+  "at": "2026-11-11T05:42:53.186Z",
+  "candidate": "6482387e03f4d09775c9bae7e96a87207ebbe563 (B23)",
+  "msgMark": "2026-11-11T05:26:50.464Z",
+  "stopCause": "stalled-no-progress-12min (A3 intent card confirmed but stage A3 never completed: fixed finalize failed with intent-entry-missing and entered pending-recovery; the chief then wrote docs/intents/snake-game-mvp.md, but the app did not retry the finalize; no further ledger progress for 12 min)",
+  "gate": null,
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-11T05:26:57.938Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-0a6130b23466c6fb41dd0cfe",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:5f51cb92-8ac6-420f-a078-0237a07dd8fb",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "5f51cb92-8ac6-420f-a078-0237a07dd8fb",
+    "legacyStateIgnored": true
+  },
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "workflowEvents": [
+    {
+      "at": "2026-11-11T05:26:57.938Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T05:26:57.938Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T05:27:37.145Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwbogkvf-e2252a63",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T05:28:13.234Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T05:29:01.053Z",
+      "kind": "stage.completed",
+      "stage": "A2",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T05:29:17.528Z",
+      "kind": "stage.requested",
+      "stage": "A3",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-11T05:26:57.946Z",
+      "taskId": "t-mwbofqmq-9519659d",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-0a6130b23466c6fb41dd0cfe"
+    },
+    {
+      "at": "2026-11-11T05:27:37.131Z",
+      "taskId": "t-mwbogkvf-e2252a63",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-0a6130b23466c6fb41dd0cfe"
+    },
+    {
+      "at": "2026-11-11T05:28:13.234Z",
+      "taskId": "t-mwbohcqa-44a24fe5",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-0a6130b23466c6fb41dd0cfe"
+    },
+    {
+      "at": "2026-11-11T05:28:29.256Z",
+      "taskId": "t-mwbohp3c-90248b74",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-0a6130b23466c6fb41dd0cfe"
+    }
+  ],
+  "taskReported": 8,
+  "taskClosed": [
+    {
+      "at": "2026-11-11T05:28:03.978Z",
+      "taskId": "t-mwbofqmq-9519659d",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T05:28:09.521Z",
+      "taskId": "t-mwbogkvf-e2252a63",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T05:29:01.053Z",
+      "taskId": "t-mwbohp3c-90248b74",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T05:29:12.497Z",
+      "taskId": "t-mwbohcqa-44a24fe5",
+      "outcome": "accepted"
+    }
+  ],
+  "requestRows": [
+    {
+      "at": "2026-11-11T05:29:17.546Z",
+      "kind": "request.created",
+      "requestId": "req-6ac2c05bb4d06126",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-0a6130b23466c6fb41dd0cfe",
+      "stage": "A3",
+      "taskId": null,
+      "sourceRoleId": "chief",
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T05:29:17.559Z",
+      "kind": "request.presented",
+      "requestId": "req-6ac2c05bb4d06126",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T05:29:17.574Z",
+      "kind": "request.notified",
+      "requestId": "req-6ac2c05bb4d06126",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T05:29:17.559Z",
+      "kind": "request.notified",
+      "requestId": "req-6ac2c05bb4d06126",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T05:29:17.782Z",
+      "kind": "request.resolved",
+      "requestId": "req-6ac2c05bb4d06126",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-0a6130b23466c6fb41dd0cfe",
+      "stage": "A3",
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": "customer",
+      "choice": "confirm",
+      "reason": null
+    },
+    {
+      "at": "2026-11-11T05:29:17.807Z",
+      "kind": "request.notified",
+      "requestId": "req-6ac2c05bb4d06126",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "taskId": null,
+      "sourceRoleId": null,
+      "by": null,
+      "choice": null,
+      "reason": null
+    }
+  ],
+  "projectNotes": [
+    "A3 停在 requested/pending-recovery：意图确认卡已 confirm（req-6ac2c05bb4d06126），docs/intents/snake-game-mvp.md 已写且 intentId 匹配（contract_check 存在=yes、匹配=yes），但 A4 stage-request 仍被 stage-transition-invalid 拒绝（当前 A3(requested) 不允许推进 A4）；重复 request_choice 被拒（intent-confirm-already-resolved）。恢复动作在应用侧。owner=app。"
+  ],
+  "docs": [
+    "intents",
+    "product"
+  ],
+  "roleCards": [],
+  "roleActivatedEvents": [],
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "shellGateAuditAbsent": true,
+  "git": {
+    "branch": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "head": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "log": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "status": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "branches": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "tags": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "remotes": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "mainLog": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n"
+  },
+  "note": "B19/B18 positives and B23 not exercised: A2 completed and the chief presented the A3 intent card req-6ac2c05bb4d06126; the customer confirmed (request.resolved confirm 05:29:17.782, by customer). The fixed A3 finalize then failed: workflow.card.stage-event.failed errorCode intent-entry-missing ('意图入口缺失或 intentId 不一致：docs/intents/snake-game-mvp.md（chief 写后重试；幂等）') at 05:29:17.805, and orchestrator logged intent.confirmation.fixed-finalize-pending with phase pending-recovery at 05:29:17.821. The chief's finalize turn then wrote docs/intents/snake-game-mvp.md at 05:29:55.261 and its turn settled completed at 05:30:10.653. Both docs (docs/product/snake-game-intent-v1.md and docs/intents/snake-game-mvp.md) carry intentId=snake-game-mvp and flowId=snake-game. No stage.completed A3 and no retry of the pending finalize followed; the workflow stayed at A3, the chief idled, and the driver stopped after 12 minutes without ledger progress (05:41:2x). The target has no .git, no role cards, no scheduling/quality docs; A4-A13 and merge not reached. B23 (project_state hash surfacing / convener ban) was not exercised because the run never reached A9. No legacy trunk/runs/stable; no shell audit (no shell attempt); decision cards 0; cards 1 (intent-confirm only); dispatches 4 (chief 2, convener 2)."
+}
