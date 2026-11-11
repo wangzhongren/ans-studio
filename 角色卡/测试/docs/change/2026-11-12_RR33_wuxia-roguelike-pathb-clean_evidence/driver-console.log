@@ -1,0 +1,6 @@
+Warning: Detected unsettled top-level await at file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr33-2026-11-12/rr/drive-rr33.mjs:630
+  if (!summary.roles.some((r) => r.roleId === "chief" && r.builtIn === true)) { detectGate({ kind: "chief-role-missing", roles: summary.roles }); await finalize(); }
+                                                                                                                                                  ^
+
+
+
