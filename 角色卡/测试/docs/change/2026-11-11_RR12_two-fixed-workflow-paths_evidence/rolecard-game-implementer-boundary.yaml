@@ -1,0 +1,14 @@
+role: game-implementer
+entries:
+  - kind: directory
+    path: src/core/
+    purpose: 游戏核心规则与状态机（game-core）
+  - kind: directory
+    path: src/input/
+    purpose: 键盘输入控制（input-controller）
+  - kind: directory
+    path: src/render/
+    purpose: 画面渲染与状态展示（renderer）
+  - kind: directory
+    path: src/app/
+    purpose: 主循环与装配调度（game-shell）

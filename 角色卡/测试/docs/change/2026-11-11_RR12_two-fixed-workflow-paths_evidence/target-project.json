@@ -1,0 +1,32 @@
+{
+  "projectRoot": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr12-2026-11-11/target",
+  "skillRoot": "C:/Users/51054/.claude/skills/ans-governed-construction",
+  "governanceModel": "trio",
+  "roles": {
+    "env-bootstrap": {
+      "card": "角色卡/env-bootstrap/role-card.md",
+      "boundary": "角色卡/env-bootstrap/boundary.yaml"
+    },
+    "game-implementer": {
+      "card": "角色卡/game-implementer/role-card.md",
+      "boundary": "角色卡/game-implementer/boundary.yaml"
+    }
+  },
+  "governanceBoundary": {
+    "path": "角色卡/governance-boundary.yaml",
+    "acceptance": {
+      "accepted": true,
+      "source": "desktop-app:操作者导入空文件夹并开启 chief 对话 = 发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/）",
+      "pin": [
+        {
+          "path": "角色卡/env-bootstrap/boundary.yaml",
+          "sha256": "f70d5984d1978152f4b26b97261b800fa146dcb5996a800d586e8b10a3de97ad"
+        },
+        {
+          "path": "角色卡/game-implementer/boundary.yaml",
+          "sha256": "6b3f22b37804c066b87e1d1449e7c5e4ac5cbf7a3a42cb166a6cce93009aff7e"
+        }
+      ]
+    }
+  }
+}
