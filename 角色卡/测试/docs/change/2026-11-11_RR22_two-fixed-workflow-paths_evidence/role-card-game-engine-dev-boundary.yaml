@@ -1,0 +1,11 @@
+role: game-engine-dev
+entries:
+  - kind: directory
+    path: src/core/
+    purpose: 游戏规则与状态机
+  - kind: directory
+    path: src/input/
+    purpose: 输入控制与键位映射
+  - kind: directory
+    path: src/score/
+    purpose: 最高分持久化
