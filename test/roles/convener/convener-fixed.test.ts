@@ -170,6 +170,29 @@ test("B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 
   assert.equal(MODULE.context({ governanceModel: "trio", matrix: FIXED }), sections);
 });
 
+test("B14 fixed 环境探测纪律：不得为环境/工具链探测运行 shell；环境事实从应用只读事实读取", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const production = sections.find((section) => section.id === "convener-fixed-production-line")?.text;
+  assert.ok(production !== undefined, "B14 必须在生产线段补环境探测禁令");
+
+  // RR9 实测：运营执行 python --version 触发 shell 审批/拒绝面，超出 fixed 卡预算。
+  assert.match(production, /不得为探测环境运行 shell/u);
+  assert.match(production, /`node -v`/u);
+  assert.match(production, /`python --version`/u);
+  assert.match(production, /shell 审批\/拒绝面/u);
+  assert.match(production, /fixed 卡预算之外的额外门/u);
+  assert.match(production, /`project_state`/u);
+  assert.match(production, /按应用事实报告并如实说明，不运行 shell/u);
+
+  // fixed-only：legacy context 不混入该口径。
+  const legacyText = MODULE.context({ governanceModel: "trio" }).map((section) => section.text).join("\n");
+  for (const token of ["不得为探测环境运行 shell", "node -v", "python --version", "fixed 卡预算之外的额外门"]) {
+    assert.equal(legacyText.includes(token), false, `legacy context 不得含 fixed-only B14 内容：${token}`);
+  }
+  // 确定性/纯函数：同输入同引用。
+  assert.equal(MODULE.context({ governanceModel: "trio", matrix: FIXED }), sections);
+});
+
 test("B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   const budget = sections.find((section) => section.id === "convener-fixed-card-budget")?.text;

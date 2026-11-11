@@ -37,7 +37,7 @@
 - 不得在 stage-request 中携带 `runId`/`pinned`/`baseDigest` 等 legacy run 概念，不请求写 `.ans/trunk`/`.ans/runs`——fixed 路径无 run/trunk；出现这些概念即视为路由或模型错误。
 - 每个活动 workflow 至多一个 open advance 请求；发下一请求前先收口当前请求（否则 `stage-request-open`）。
 - **任务文本须带 hash 口径**：完成后**只报告路径、frontmatter/内容实际值与结论**；**hash/SHA-256 由应用计算**；**不得用 `run_shell`/`certutil`/`Get-FileHash`/PowerShell 等 shell 计算 hash**（见「任务文本与哈希口径」）。
-- **A1 生产任务用 `stage:"A1"`（不是 A2）**：运营受理后派的是 **A1 产品受理/准备任务**（`stage:"A1"`、`sideEffect:"docs"`、无 module），A1 完成于该任务创建（应用记 `stage.dispatched A1`）；**A2 意图撰写另派**：A1 收口后你发 A2 stage-request，运营再派 `stage:"A2"` 的 product 任务。A1/A2 不得合并为单个 `stage:"A2"` 任务（否则 A1 无 `stage.dispatched`，账本停在 A1 requested）。
+- **A1 生产任务用 `stage:"A1"`（不是 A2）**：运营受理后派的是 **A1 产品受理/准备任务**（`stage:"A1"`、`sideEffect:"docs"`、无 module），A1 完成于该任务创建（应用记 `stage.dispatched A1`）；**A2 意图撰写另派**：A1 收口后你发 A2 stage-request，运营再派 `stage:"A2"` 的 product 任务。A1/A2 不得合并为单个 `stage:"A2"` 任务（否则 A1 无 `stage.dispatched`，账本停在 A1 requested）。**A1 任务文本不得要求运营用 shell 做环境/工具链探测**：`node -v`、`python --version`、`which node` 等会触发 shell 审批/拒绝面（fixed 卡预算之外的额外门，RR9 实测）；环境事实以应用 `project_state`/项目配置的只读事实为准，不运行 shell。
 
 ## 各阶段 fixed 任务字段与卡节奏
 
@@ -61,6 +61,7 @@
 - **任务文本只要求 worker 报告事实，不要求 hash**：你发运营的 stage-request、运营派生产线角色、你直派验收角色的任务文本必须写明——完成文档/代码后**只报告路径、frontmatter/内容实际值与结论**（如 intentId/flowId/version/goal/scope/acceptance/nonGoals、commit OID、测试结论）；**不要自己算或转抄哈希**，`sha256` 由应用计算。任务文本只给**可核验证据路径**（path），不写「给出/附上 sha256」；若旧模板要求 worker 提供 hash，改为「路径 + frontmatter 实际值；hash 由应用计算」。
 - **hash 的唯一来源是应用**：应用在**任务收口**、`docs/acceptance` **归档**、`documentRefs` 生成与**依据/漂移校验**时，按文件真实字节计算 SHA-256 并重算比对；模型或 worker 回执中的 hash 不采信。A2/A5/A8/A9/A11/A12 的「hash」完成条件均指应用计算值；A7 任务文本/`requestedEvidence` 中 roster 的 `sha256` 取应用回执/账本值，不由任何角色用 shell 计算。
 - **不得用 shell 算 hash**：worker 不得为取 hash 调用 `run_shell` 或任何 shell/解释器命令——包括 `certutil -hashfile`、`Get-FileHash`、PowerShell/pwsh、`sha256sum`、`shasum`、`openssl dgst`、node/python 等。hash 不是 worker 产物；用 shell 算 hash 属任务文本缺陷诱导的额外动作。
+- **任务文本不得要求 shell 环境探测**：A1 及任何 stage-request 的任务文本不得要求运营/worker 用 shell 探测环境或工具链（`node -v`、`python --version`、`which`、`where` 等）；环境事实以应用 `project_state`/项目配置的只读事实为准。环境探测类 shell 会触发 shell 审批/拒绝面，属 fixed 卡预算之外的额外门（RR9 实测：A1 任务文本要求 Node/Python 探测 ⇒ 运营执行 `python --version` ⇒ shell 门早停）。
 - **卡预算：3 张确认卡 + merge-main**：fixed 路径的客户门 = **意图确认（intent-confirm，A3）+ 方案确认（proposal，A6）+ 任命确认（appointment，A10）+ 高风险合并卡 `merge-main`（A13/B4）**；**不应出现额外的 shell 审批卡、stable-write 卡或其它客户门**。shell 审批是高风险动作，本流程不需要为 hash 触发任何客户卡；若 worker 因 hash 弹出 shell 审批卡，按任务文本缺陷处理（改写任务文本，不代答、不扩大卡预算）。
 
 ## 派发分裂（谁派谁）

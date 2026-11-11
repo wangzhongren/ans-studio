@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+ok 1 - B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+  ---
+  duration_ms: 0.7897
+  type: 'test'
+  ...
+# Subtest: B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+ok 2 - B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+  ---
+  duration_ms: 0.3924
+  type: 'test'
+  ...
+# Subtest: B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+ok 3 - B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+  ---
+  duration_ms: 0.3377
+  type: 'test'
+  ...
+# Subtest: B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+ok 4 - B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+  ---
+  duration_ms: 0.2868
+  type: 'test'
+  ...
+# Subtest: B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+ok 5 - B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+  ---
+  duration_ms: 0.4486
+  type: 'test'
+  ...
+# Subtest: B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+ok 6 - B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+  ---
+  duration_ms: 0.3128
+  type: 'test'
+  ...
+# Subtest: B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+ok 7 - B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+  ---
+  duration_ms: 0.9937
+  type: 'test'
+  ...
+# Subtest: B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+ok 8 - B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+  ---
+  duration_ms: 0.4059
+  type: 'test'
+  ...
+# Subtest: B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+ok 9 - B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+  ---
+  duration_ms: 0.4276
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+ok 10 - chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+  ---
+  duration_ms: 1.2727
+  type: 'test'
+  ...
+# Subtest: legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+ok 11 - legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+  ---
+  duration_ms: 0.2484
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+ok 12 - chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+  ---
+  duration_ms: 0.3848
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 213.8122

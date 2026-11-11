@@ -1,0 +1,514 @@
+TAP version 13
+# Subtest: fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+ok 1 - fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+  ---
+  duration_ms: 0.829
+  type: 'test'
+  ...
+# Subtest: fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+ok 2 - fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+  ---
+  duration_ms: 0.0872
+  type: 'test'
+  ...
+# Subtest: isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+ok 3 - isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+  ---
+  duration_ms: 0.1677
+  type: 'test'
+  ...
+# Subtest: context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+ok 4 - context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+  ---
+  duration_ms: 0.1379
+  type: 'test'
+  ...
+# Subtest: B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash
+ok 5 - B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash
+  ---
+  duration_ms: 0.1441
+  type: 'test'
+  ...
+# Subtest: B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）
+ok 6 - B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）
+  ---
+  duration_ms: 0.107
+  type: 'test'
+  ...
+# Subtest: B14 fixed 环境探测纪律：不得为环境/工具链探测运行 shell；环境事实从应用只读事实读取
+ok 7 - B14 fixed 环境探测纪律：不得为环境/工具链探测运行 shell；环境事实从应用只读事实读取
+  ---
+  duration_ms: 0.0969
+  type: 'test'
+  ...
+# Subtest: B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导
+ok 8 - B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导
+  ---
+  duration_ms: 0.0852
+  type: 'test'
+  ...
+# Subtest: context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+ok 9 - context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+  ---
+  duration_ms: 0.1404
+  type: 'test'
+  ...
+# Subtest: legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+ok 10 - legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+  ---
+  duration_ms: 0.2174
+  type: 'test'
+  ...
+# Subtest: 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+ok 11 - 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+  ---
+  duration_ms: 3.0834
+  type: 'test'
+  ...
+# Subtest: 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+ok 12 - 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+  ---
+  duration_ms: 0.9241
+  type: 'test'
+  ...
+# Subtest: fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+ok 13 - fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+  ---
+  duration_ms: 0.8182
+  type: 'test'
+  ...
+# Subtest: context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+ok 14 - context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+  ---
+  duration_ms: 0.1687
+  type: 'test'
+  ...
+# Subtest: context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+ok 15 - context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+  ---
+  duration_ms: 0.206
+  type: 'test'
+  ...
+# Subtest: context(fixed, B9.1)：报告/证据口径——路径+frontmatter 实际值；hash 由应用计算，禁止 worker shell hash
+ok 16 - context(fixed, B9.1)：报告/证据口径——路径+frontmatter 实际值；hash 由应用计算，禁止 worker shell hash
+  ---
+  duration_ms: 0.1471
+  type: 'test'
+  ...
+# Subtest: context(fixed, B13.2)：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（描述文本不计为证据）
+ok 17 - context(fixed, B13.2)：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（描述文本不计为证据）
+  ---
+  duration_ms: 0.1234
+  type: 'test'
+  ...
+# Subtest: dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+ok 18 - dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+  ---
+  duration_ms: 0.27
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+ok 19 - dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+  ---
+  duration_ms: 0.0737
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+ok 20 - dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+  ---
+  duration_ms: 0.0706
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+ok 21 - dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+  ---
+  duration_ms: 0.1353
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+ok 22 - dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+  ---
+  duration_ms: 0.1193
+  type: 'test'
+  ...
+# Subtest: 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+ok 23 - 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+  ---
+  duration_ms: 1.4944
+  type: 'test'
+  ...
+# Subtest: legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+ok 24 - legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+  ---
+  duration_ms: 0.2571
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：首次发卡一次（1 张 request.created、A3 completed）；A3 完成后再次调用 notPresented、不再调 raw
+ok 25 - fixed A3 幂等：首次发卡一次（1 张 request.created、A3 completed）；A3 完成后再次调用 notPresented、不再调 raw
+  ---
+  duration_ms: 74.467
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：同意图已 confirm 裁决但 A3 未完成（finalize pending-recovery）⇒ notPresented already-resolved，不补发卡
+ok 26 - fixed A3 幂等：同意图已 confirm 裁决但 A3 未完成（finalize pending-recovery）⇒ notPresented already-resolved，不补发卡
+  ---
+  duration_ms: 31.8151
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：已有 1 张未 resolved 卡 ⇒ intent-confirm-pending（不调 raw、不写新 request/stage 事件）
+ok 27 - fixed A3 幂等：已有 1 张未 resolved 卡 ⇒ intent-confirm-pending（不调 raw、不写新 request/stage 事件）
+  ---
+  duration_ms: 16.1032
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：多个待决（异常）⇒ fail-closed intent-confirm-multiple-pending，列 requestId、不发卡
+ok 28 - fixed A3 幂等：多个待决（异常）⇒ fail-closed intent-confirm-multiple-pending，列 requestId、不发卡
+  ---
+  duration_ms: 19.443
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：既往 confirm 决议对应不同意图 hash（新版本）⇒ 不误伤，照常发新卡
+ok 29 - fixed A3 幂等：既往 confirm 决议对应不同意图 hash（新版本）⇒ 不误伤，照常发新卡
+  ---
+  duration_ms: 38.9669
+  type: 'test'
+  ...
+# Subtest: fixed A3 幂等：request.orphaned（重启终态）不计待决 ⇒ 照常发卡
+ok 30 - fixed A3 幂等：request.orphaned（重启终态）不计待决 ⇒ 照常发卡
+  ---
+  duration_ms: 30.0271
+  type: 'test'
+  ...
+# Subtest: legacy A3：存在 fixed 形态待决记录也不拦（仍走 trunk prepareIntentConfirmation，marker 带 snapshot=）
+ok 31 - legacy A3：存在 fixed 形态待决记录也不拦（仍走 trunk prepareIntentConfirmation，marker 带 snapshot=）
+  ---
+  duration_ms: 28.5689
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 32 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 20.2944
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 33 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 13.6496
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 34 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 9.5022
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 35 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 5.2367
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 36 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 5.3492
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 37 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 0.7987
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 38 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 4.7121
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 39 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 18.6033
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 40 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 7.61
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 41 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 10.6226
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 42 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 9.9361
+  type: 'test'
+  ...
+# Subtest: fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+ok 43 - fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+  ---
+  duration_ms: 81.0115
+  type: 'test'
+  ...
+# Subtest: fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+ok 44 - fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+  ---
+  duration_ms: 38.3447
+  type: 'test'
+  ...
+# Subtest: legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+ok 45 - legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+  ---
+  duration_ms: 24.0643
+  type: 'test'
+  ...
+# Subtest: fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+ok 46 - fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+  ---
+  duration_ms: 15.0527
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+ok 47 - fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+  ---
+  duration_ms: 30.9753
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+ok 48 - legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+  ---
+  duration_ms: 25.659
+  type: 'test'
+  ...
+# Subtest: fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+ok 49 - fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+  ---
+  duration_ms: 65.2482
+  type: 'test'
+  ...
+# Subtest: fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt
+ok 50 - fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt
+  ---
+  duration_ms: 34.1768
+  type: 'test'
+  ...
+# Subtest: fixed verifier A12a：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+ok 51 - fixed verifier A12a：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+  ---
+  duration_ms: 14.4005
+  type: 'test'
+  ...
+# Subtest: fixed verifier A12b：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+ok 52 - fixed verifier A12b：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+  ---
+  duration_ms: 10.7402
+  type: 'test'
+  ...
+# Subtest: fixed convener stage-request：带真实 taskId 可打开，assignment 事实含 taskKind=stage-request
+ok 53 - fixed convener stage-request：带真实 taskId 可打开，assignment 事实含 taskKind=stage-request
+  ---
+  duration_ms: 8.3667
+  type: 'test'
+  ...
+# Subtest: fixed product 生产任务：带真实 taskId 可打开，assignment 事实含 convener→product/A11
+ok 54 - fixed product 生产任务：带真实 taskId 可打开，assignment 事实含 convener→product/A11
+  ---
+  duration_ms: 7.3831
+  type: 'test'
+  ...
+# Subtest: fixed 任务按账本事实判定：未传 workflowMode（会话默认 legacy）仍走 fixed 任务分支、不抛 legacy 错误
+ok 55 - fixed 任务按账本事实判定：未传 workflowMode（会话默认 legacy）仍走 fixed 任务分支、不抛 legacy 错误
+  ---
+  duration_ms: 7.7708
+  type: 'test'
+  ...
+# Subtest: legacy verifier taskId（无 workflowId）：仍走 legacy trunk 原路径，review-task-assignment-unavailable 逐字保留
+ok 56 - legacy verifier taskId（无 workflowId）：仍走 legacy trunk 原路径，review-task-assignment-unavailable 逐字保留
+  ---
+  duration_ms: 7.4747
+  type: 'test'
+  ...
+# Subtest: fail-closed 不放宽：fixed 任务受派人非本角色 ⇒ fixed-task-assignment-unavailable（非 legacy 码）
+ok 57 - fail-closed 不放宽：fixed 任务受派人非本角色 ⇒ fixed-task-assignment-unavailable（非 legacy 码）
+  ---
+  duration_ms: 9.2431
+  type: 'test'
+  ...
+# Subtest: fail-closed 不放宽：fixed 任务已收口 ⇒ fixed-task-assignment-unavailable（不得带已关闭任务开会话）
+ok 58 - fail-closed 不放宽：fixed 任务已收口 ⇒ fixed-task-assignment-unavailable（不得带已关闭任务开会话）
+  ---
+  duration_ms: 12.1842
+  type: 'test'
+  ...
+# Subtest: 无 taskId 的 fixed chat 不受影响：不构造 fixed assignment 上下文（chief/convener 聊天口径）
+ok 59 - 无 taskId 的 fixed chat 不受影响：不构造 fixed assignment 上下文（chief/convener 聊天口径）
+  ---
+  duration_ms: 3.6783
+  type: 'test'
+  ...
+# Subtest: closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+ok 60 - closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+  ---
+  duration_ms: 44.4224
+  type: 'test'
+  ...
+# Subtest: A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+ok 61 - A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+  ---
+  duration_ms: 56.1201
+  type: 'test'
+  ...
+# Subtest: prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+ok 62 - prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+  ---
+  duration_ms: 22.5456
+  type: 'test'
+  ...
+# Subtest: activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+ok 63 - activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+  ---
+  duration_ms: 42.5428
+  type: 'test'
+  ...
+# Subtest: archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+ok 64 - archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+  ---
+  duration_ms: 5.4966
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+ok 65 - prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+  ---
+  duration_ms: 14.9466
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+ok 66 - prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+  ---
+  duration_ms: 12.9932
+  type: 'test'
+  ...
+# Subtest: prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+ok 67 - prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+  ---
+  duration_ms: 3.3493
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+ok 68 - prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+  ---
+  duration_ms: 39.2551
+  type: 'test'
+  ...
+# Subtest: closeTask：open 兄弟阻塞 A2 完成；原任务 rework 后，补交+返工任务 accepted ⇒ A2 完成（RR8 死锁回归）
+ok 69 - closeTask：open 兄弟阻塞 A2 完成；原任务 rework 后，补交+返工任务 accepted ⇒ A2 完成（RR8 死锁回归）
+  ---
+  duration_ms: 33.8094
+  type: 'test'
+  ...
+# Subtest: closeTask A11：两个实现任务须全部 accepted 才完成 A11
+ok 70 - closeTask A11：两个实现任务须全部 accepted 才完成 A11
+  ---
+  duration_ms: 51.1143
+  type: 'test'
+  ...
+# Subtest: closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+ok 71 - closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+  ---
+  duration_ms: 28.5651
+  type: 'test'
+  ...
+# Subtest: closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+ok 72 - closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+  ---
+  duration_ms: 9.4187
+  type: 'test'
+  ...
+# Subtest: B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+ok 73 - B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+  ---
+  duration_ms: 0.7585
+  type: 'test'
+  ...
+# Subtest: B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+ok 74 - B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+  ---
+  duration_ms: 0.2682
+  type: 'test'
+  ...
+# Subtest: B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+ok 75 - B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+  ---
+  duration_ms: 0.2513
+  type: 'test'
+  ...
+# Subtest: B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+ok 76 - B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+  ---
+  duration_ms: 0.4758
+  type: 'test'
+  ...
+# Subtest: B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+ok 77 - B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+  ---
+  duration_ms: 0.3869
+  type: 'test'
+  ...
+# Subtest: B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+ok 78 - B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+  ---
+  duration_ms: 0.3435
+  type: 'test'
+  ...
+# Subtest: B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+ok 79 - B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+  ---
+  duration_ms: 1.2159
+  type: 'test'
+  ...
+# Subtest: B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+ok 80 - B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+  ---
+  duration_ms: 0.4268
+  type: 'test'
+  ...
+# Subtest: B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+ok 81 - B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+  ---
+  duration_ms: 0.4585
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+ok 82 - chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+  ---
+  duration_ms: 1.2493
+  type: 'test'
+  ...
+# Subtest: legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+ok 83 - legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+  ---
+  duration_ms: 0.2523
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+ok 84 - chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+  ---
+  duration_ms: 0.3554
+  type: 'test'
+  ...
+1..84
+# tests 84
+# suites 0
+# pass 84
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3056.4859

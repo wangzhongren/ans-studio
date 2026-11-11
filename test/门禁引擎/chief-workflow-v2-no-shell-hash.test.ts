@@ -60,6 +60,24 @@ test("B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShel
   assert.match(section, /hash 不是 worker 产物/, "须写死 hash 不是 worker 产物");
 });
 
+test("B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）", () => {
+  const text = readV2();
+  const a1 = sectionOf(text, "## 首个动作：A1 精确 stage-request");
+  assert.match(a1, /A1 任务文本不得要求运营用 shell 做环境\/工具链探测/u, "A1 段须写死环境探测禁令");
+  assert.match(a1, /`node -v`/u, "须点名 node -v");
+  assert.match(a1, /`python --version`/u, "须点名 python --version（RR9 实测诱导命令）");
+  assert.match(a1, /shell 审批\/拒绝面/u, "须说明会触发 shell 审批/拒绝面");
+  assert.match(a1, /fixed 卡预算之外的额外门/u, "须说明属 fixed 卡预算之外的额外门");
+  assert.match(a1, /`project_state`/u, "环境事实须以应用 project_state 只读事实为准");
+
+  const policy = sectionOf(text, POLICY_HEADING);
+  assert.match(policy, /任务文本不得要求 shell 环境探测/u, "政策段须重申 shell 环境探测禁令");
+  assert.match(policy, /`node -v`/u);
+  assert.match(policy, /`python --version`/u);
+  assert.match(policy, /fixed 卡预算之外的额外门/u);
+  assert.match(policy, /`project_state`/u);
+});
+
 test("B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）", () => {
   const section = sectionOf(readV2(), "## 首个动作：A1 精确 stage-request");
   const block = section.match(/```json\n([\s\S]*?)\n```/);

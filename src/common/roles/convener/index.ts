@@ -723,6 +723,8 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
 // 禁止 worker shell 算 hash）与卡预算（3 确认卡 + merge-main；不诱导额外审批卡）。
 // B13.2（2026-11-11，RR8 修复）：证据段补一条任务文本要求——worker `submit_report.evidence[]`
 // 每项为纯项目相对文件路径（描述文本不计为证据；RR8 因此 close-report-missing 并触发返工循环）。
+// B14（2026-11-11，RR9 修复）：生产线段补环境探测禁令——不得为探测环境运行 shell
+// （`node -v`/`python --version` 等会触发 shell 审批/拒绝面，超出 fixed 卡预算；环境事实从应用读）。
 // 只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；`context({})`（无 matrix）与
 // `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
 // run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（仅 fixed 会话）。
@@ -735,6 +737,7 @@ const FIXED_PRODUCTION_LINE_SECTION: RoleContextSection = Object.freeze({
     "- 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求（证据只写路径、内容/frontmatter 与结论，见「任务证据与哈希」段），做属主校验并保持同工作区写任务串行；生产任务报告回你。",
     "- 幕僚不直接派生产线角色（chief-production-dispatch-forbidden）；`stage-request` 是只读、无 module/写集的产线调度请求，不是生产线派发。",
     "- 不派 verifier：独立验收由幕僚创建（默认 verifier；roster `roles[].review` 项目验收角色优先）；`convener→verifier` 拒绝（`convener-to-verifier-forbidden`）；你不派新质检、不发 acceptance 卡、不代客户验收。",
+    "- 环境/工具链事实以应用只读事实（`project_state`/项目配置）为准；**不得为探测环境运行 shell**（`node -v`、`python --version`、`which`、`where` 等会触发 shell 审批/拒绝面，属 fixed 卡预算之外的额外门，RR9 实测）。任务文本要求环境探测时，按应用事实报告并如实说明，不运行 shell。",
   ].join("\n"),
 });
 
