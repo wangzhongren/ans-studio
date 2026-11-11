@@ -28,6 +28,12 @@
 // `run_shell`/`certutil`/`Get-FileHash` 计算 hash/sha256**（哈希是应用在收口/归档/依据校验时
 // 计算的机器事实），且任务文本不得诱导 fixed 3 确认卡 + merge-main 之外的 shell/stable-write
 // 等额外审批卡。legacy 数据/legacy context 逐字不变。
+//
+// T3 B32.3（RR27 `daf8690` 失败事实）：生产线段补 A11/B3 提交语法——`git commit -m "<message>"`
+// 含空格的提交消息必须整体加引号、`-m` 后必须恰一个带引号的单消息参数（未加引号会被拆成多
+// argv 并被 shell 写门拒绝）；返工任务只纠正提交语法、不重写实现；运营不得代 worker 执行
+// `git add`/`git commit`（stage-request 会话无实现任务 taskGitScope），按真实回执
+// （code 与 argv 形状）rework/re-dispatch 并在任务文本复述正确提交语法。legacy 逐字不变。
 
 import type { BoundaryEntry } from "../../../model/boundary.ts";
 import type {
@@ -740,6 +746,7 @@ const FIXED_PRODUCTION_LINE_SECTION: RoleContextSection = Object.freeze({
     "- 环境/工具链事实以应用只读事实（`project_state`/项目配置）为准；**不得为探测环境运行 shell**（`node -v`、`python --version`、`which`、`where` 等会触发 shell 审批/拒绝面，属 fixed 卡预算之外的额外门，RR9 实测）。任务文本要求环境探测时，按应用事实报告并如实说明，不运行 shell。",
     "- A11/B3 实现任务文本：**不得建议或要求 worker 添加后运行自测脚本**，不得以「如何自测」「测试结论」作为报告项；报告只要求**静态自检结论（读码核对，不运行 shell/node/npm、不执行测试脚本）**；执行/验证归 A12 验收角色承担，worker 只写本模块文件 + 字面 `git add`/`git commit`，任何 `run_shell`（含 `node`/`npm`/自测脚本）都会触发 shell 审批卡（RR24 实测：`node src/core/self-test.js` ⇒ shell 门早停）。",
     "- **所有 fixed 生产/评审任务文本：不得要求或建议 worker 运行任何 shell 命令（含 `mkdir`/`cp`/`mv` 等目录/文件操作）**；`write_file`/`edit_file` 会自动创建目录；`docs/acceptance/` 归档由应用完成。任何 `run_shell` 都会触发 shell 审批卡（RR25 实测：review 角色 `cmd /c mkdir docs\\acceptance` ⇒ shell 门早停）。",
+    "- A11/B3 实现与返工任务文本的提交语法（RR27 实测）：worker 提交只写 `git add <paths>` 与 `git commit -m \"<message>\"`——**含空格的提交消息必须整体加引号**，`-m` 后必须恰一个带引号的单消息参数（未加引号会被拆成多 argv 并被 shell 写门拒绝；RR27 实测 `git commit -m feat(game-core): implement …` ⇒ `[\"git\",\"commit\",\"-m\",\"feat(game-core):\",\"implement\",…]`）；返工任务只纠正提交语法（复述正确的 `git commit -m \"<message>\"` 写法），**不得重写已完成的实现**；**你不得代 worker 执行 `git commit`/`git add`（不得代提交）**——convener 为 stage-request 会话，按设计无实现任务 taskGitScope，代提交必被拒（RR27 实测）；worker 提交被拒时按真实回执（code 与 argv 形状）rework/re-dispatch，并在任务文本复述正确提交语法，不得把「缺少 taskGitScope」当唯一解释。",
   ].join("\n"),
 });
 

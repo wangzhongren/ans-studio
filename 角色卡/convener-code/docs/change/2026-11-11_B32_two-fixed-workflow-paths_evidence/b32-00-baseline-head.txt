@@ -1,0 +1,6 @@
+HEAD: daf8690f99ea81236d1966ab1d7b12fd96f08e2f
+branch: feat/two-fixed-workflow-paths
+node: v24.22.1
+date: 2026-11-11T18:46:09+08:00
+--- git status (src test app 角色卡/convener-code, tracked) ---
+?? 角色卡/convener-code/docs/change/2026-11-11_B32_two-fixed-workflow-paths_evidence/

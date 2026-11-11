@@ -208,6 +208,61 @@ test("B28 fixed 生产/评审任务禁止 shell（含 mkdir）；write_file 自�
   }
 });
 
+test("B32 fixed A11/B3 提交语法：git commit -m \"<message>\" 整体引号单参数；返工只纠语法；不得代 worker 提交", () => {
+  const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
+  const production = sections.find((section) => section.id === "convener-fixed-production-line")?.text ?? "";
+
+  // RR27：worker 以未加引号的 `git commit -m feat(game-core): …` 提交 ⇒ argv 被拆（-m 后多
+  // token），shell 写门拒绝；任务文本须写明正确提交语法：含空格消息整体加引号、-m 后恰一个
+  // 带引号的单消息参数。
+  assert.equal(production.includes('git commit -m "<message>"'), true, "生产线段须给出引号化提交模板");
+  for (const token of [
+    "含空格的提交消息必须整体加引号",
+    "`-m` 后必须恰一个带引号的单消息参数",
+    "未加引号会被拆成多 argv",
+    "shell 写门拒绝",
+    "RR27 实测",
+    "git\",\"commit\",\"-m\"",
+  ]) {
+    assert.equal(production.includes(token), true, `生产线段缺 B32 提交语法口径：${token}`);
+  }
+
+  // 返工只纠正提交语法，不重写实现；被拒按真实回执（code/argv 形状）rework/re-dispatch 并复述语法。
+  for (const token of [
+    "返工任务只纠正提交语法",
+    "不得重写已完成的实现",
+    "按真实回执（code 与 argv 形状）rework/re-dispatch",
+    "在任务文本复述正确提交语法",
+    "不得把「缺少 taskGitScope」当唯一解释",
+  ]) {
+    assert.equal(production.includes(token), true, `生产线段缺 B32 返工口径：${token}`);
+  }
+
+  // RR27：convener 代 worker 提交亦被拒（stage-request 无实现任务 taskGitScope）⇒ 明令不得代提交。
+  assert.equal(production.includes("你不得代 worker 执行 `git commit`/`git add`（不得代提交）"), true);
+  for (const token of ["不得代 worker 执行", "不得代提交", "stage-request 会话", "按设计无实现任务 taskGitScope"]) {
+    assert.equal(production.includes(token), true, `生产线段缺 B32 代提交禁令：${token}`);
+  }
+
+  // fixed-only：legacy context / legacy card.text 不混入 B32 文案（legacy 逐字冻结）。
+  const legacyText = MODULE.context({ governanceModel: "trio" }).map((section) => section.text).join("\n");
+  for (const token of [
+    "git commit -m",
+    "不得代 worker 执行",
+    "不得代提交",
+    "返工任务只纠正提交语法",
+    "单消息参数",
+    "rework/re-dispatch",
+    "taskGitScope",
+  ]) {
+    assert.equal(legacyText.includes(token), false, `legacy context 不得含 fixed-only B32 内容：${token}`);
+    assert.equal(MODULE.card.text.includes(token), false, `legacy card.text 不得含 fixed-only B32 内容：${token}`);
+  }
+
+  // 确定性/纯函数：同输入同引用。
+  assert.equal(MODULE.context({ governanceModel: "trio", matrix: FIXED }), sections);
+});
+
 test("B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）", () => {
   const sections = MODULE.context({ governanceModel: "trio", matrix: FIXED });
   const evidence = sections.find((section) => section.id === "convener-fixed-evidence")?.text;

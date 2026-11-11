@@ -18,6 +18,9 @@
 //   2026-11-10（B4/v5）：同一原则延伸至任务级 Git 写——`matchTaskGit` 命中（需应用注入
 //   `taskGitScope`）且前台 ⇒ pass（形状级）；staged ⊆ writeSet 与提交由 `task-git-gate.ts::
 //   runTaskGitCommit` 在同一项目级临界区内复核。无 scope 的 add/commit 仍硬拒。
+//   2026-11-11（B32.2，RR27）：add/commit 的拒绝区分「scope 缺失/非法」（既有文案与硬拒码不变）与
+//   「scope 有效但 argv 形状不符」（稳定码 `task-git-argv-shape`，点明 `-m` 后须恰一个带引号单消息
+//   参数 / `git add` 需字面路径）；形状判定复用 `matchTaskGit`/`taskGitScopeError`，不复制规则。
 //   ★ 硬地板依赖：**接 (a) 的装配路径（项目三层链 / 内置角色审批档）必须注入本守卫**——因为
 //     classifier 的 `deny` 在 advisory/operatorOnly+approveDeny 模式下会交 (a) 审批，不能当硬地板；
 //     只读档不接 (a)、classifier `c=deny` 即终结，不依赖本守卫（R5/AC-30）。
@@ -27,7 +30,7 @@ import type { BoundarySection1 } from "../../model/boundary.ts";
 import type { TaskScope } from "../../model/decision.ts";
 import type { DocFreezeLookupState, StableWritePermit } from "../../model/version-change.ts";
 import path from "node:path";
-import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchReadonlyGit, matchRoutineShellCommand, matchTaskGit, type TaskGitScope } from "./classify-shell.ts";
+import { inlineCodeOf, isOpaqueShellExecution, isShortInlineCode, matchReadonlyGit, matchRoutineShellCommand, matchTaskGit, TASK_GIT_CODES, taskGitScopeError, type TaskGitScope } from "./classify-shell.ts";
 import {
   isVersionedDocPath,
   protectedVersionedPathsSync,
@@ -586,13 +589,33 @@ function evaluateShellWriteTargetsUnsafe(input: ShellWriteGuardInput): ShellWrit
       if (readonlyGit !== undefined && input.entry !== "start_background_task") return { kind: "pass" };
       const taskGit = matchTaskGit(argv, input.taskGitScope);
       if (taskGit !== undefined && input.entry !== "start_background_task") return { kind: "pass" };
-      const taskGitShaped = taskGit !== undefined || (argv[1] === "add" || argv[1] === "commit");
+      // 2026-11-11（B32.2，RR27）：任务级 Git 写的拒绝须区分两种情况——
+      //   ① scope 缺失/非法（`taskGitScopeError` 命中）⇒ 保持既有「需注入有效 taskGitScope」文案与
+      //      `shell-write-hard-deny` 码（不得放宽）；
+      //   ② scope 有效但 argv 形状不匹配（如提交消息未加引号被拆成多 token、`git add` 非字面路径）⇒
+      //      返回可区分稳定码 `task-git-argv-shape`，点明提交/暂存命令的允许形态；不得误报缺 scope。
+      // 判定复用 `matchTaskGit`/`taskGitScopeError`（classify-shell 同一实现），不另写第二份规则。
+      const taskGitCommand = argv[1] === "add" || argv[1] === "commit";
+      if (readonlyGit !== undefined || taskGit !== undefined) {
+        return { kind: "deny", code: "shell-write-hard-deny", targets: [],
+          reason: "只读/任务级 Git 仅允许经 run_shell 前台执行；start_background_task 入口一律硬拒，请改用前台命令（legacy 受控入口 git_query 不承接 shell 写）。" };
+      }
+      if (taskGitCommand && taskGitScopeError(input.taskGitScope) === undefined) {
+        const rejection = makeMechanicalRejection(
+          TASK_GIT_CODES.argvShape,
+          ["任务级 Git 写命令的允许 argv 形态（`git commit -m \"<message>\"`：`-m` 后必须恰一个带引号的单消息参数，含空格须整体加引号；`git add` 需字面路径且 ⊆ 任务写集，不得 -A/--all/./glob）"],
+          {
+            owner: "convener",
+            action: "按上述形态改写该条 Git 命令后重试（taskGitScope 已有效，不是缺少 taskGitScope）；仅纠正提交/暂存命令语法时无需重写实现。",
+            retryable: true,
+          },
+        );
+        return { kind: "deny", code: rejection.code, targets: [], rejection, reason: formatMechanicalRejection(rejection) };
+      }
       return { kind: "deny", code: "shell-write-hard-deny", targets: [],
-        reason: readonlyGit !== undefined || taskGit !== undefined
-          ? "只读/任务级 Git 仅允许经 run_shell 前台执行；start_background_task 入口一律硬拒，请改用前台命令（legacy 受控入口 git_query 不承接 shell 写）。"
-          : taskGitShaped
-            ? "任务级 Git 写被硬拒：需应用注入有效 taskGitScope（taskId/workflowId/branch/writeSet）且路径 ⊆ 写集；裸 Git 写不得绕过任务写事实（fail-closed；legacy git_query 不承接 fixed shell 写）。"
-            : "裸 Git 硬拒：只读精确白名单与任务级 add/commit 之外一律拒绝（push/merge/reset/checkout/update-ref 等）；legacy git_query / git_candidate / git_publish 工具 fixed 不注入，shell 批准不能覆盖 Git 角色拒绝。" };
+        reason: taskGitCommand
+          ? "任务级 Git 写被硬拒：需应用注入有效 taskGitScope（taskId/workflowId/branch/writeSet）且路径 ⊆ 写集；裸 Git 写不得绕过任务写事实（fail-closed；legacy git_query 不承接 fixed shell 写）。"
+          : "裸 Git 硬拒：只读精确白名单与任务级 add/commit 之外一律拒绝（push/merge/reset/checkout/update-ref 等）；legacy git_query / git_candidate / git_publish 工具 fixed 不注入，shell 批准不能覆盖 Git 角色拒绝。" };
     }
     // 2026-10-29（v2.3 §6.4 / 复验 F1）：re-shell/内联求值仍是硬拒（不进入脚本审查）。
     const inlineEvalPrograms = new Set(["eval", "exec", "source", "command", "."]);

@@ -51,7 +51,7 @@
 - **A7→A8（两个阶段、两个任务，不得合并）**：A6 accept 后你发 `stage:"A7"` stage-request；任务文本/`requestedEvidence` 携 roster path + `sha256`（取应用 A6 `documentRefs` 回执值，不由角色用 shell 计算）与 A6 提案决定 decisionId；运营派 nominator **A7 受理/准备任务**（`roleId:"nominator"`、`stage:"A7"`，无 module）；**A7 完成于该任务创建**（应用记 `stage.dispatched A7`）。A7 收口后你发 **A8 stage-request**；运营派 nominator **activation 任务**（`roleId:"nominator"`、`stage:"A8"`）；人事以 `activate_role_documents` v2（proposalDecisionId + roster + 三文档，**只传 path**；hash 由应用在激活前按实际字节计算并回填，不猜 hash、不得用 shell 计算）逐个 `role.activated`；**A8 完成于全部名单角色激活**（role.activated；A8 不弹客户卡）。
 - **A9**：运营执行团队计划 + 基线 3 件小事并记 `basis.recorded`（见下节）。
 - **A10**：A9 完成后你呈任命确认卡 `appointment`（选项=名单角色、多选、推荐集=名单顺序，`source:"stage-a10"`/`workflowId` 戳）；**A10 只任命、不派实现**，`request.resolved`（appointment）即完成。
-- **A11**：A10 完成后你发 `stage:"A11"` stage-request（携客户选中的角色/子集，`workflowId` 必填）；运营再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`、`sideEffect` 按实际声明，写任务串行）。**一模块一任务**：`moduleId` 权威，`modulePaths` 只写该模块路径；应用从模块表派生写集，跨模块/未知 moduleId ⇒ `module-paths-mismatch` 拒绝。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。实现任务文本须写明：完成后只报告路径、commit OID、变更要点与**静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担）**；hash 由应用计算，不得用 shell 算 hash。**实现 worker 只写本模块文件 + 字面 `git add`/`git commit`；不得运行任何 shell 命令（含 `node`/`npm`/自测脚本）。**
+- **A11**：A10 完成后你发 `stage:"A11"` stage-request（携客户选中的角色/子集，`workflowId` 必填）；运营再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`、`sideEffect` 按实际声明，写任务串行）。**一模块一任务**：`moduleId` 权威，`modulePaths` 只写该模块路径；应用从模块表派生写集，跨模块/未知 moduleId ⇒ `module-paths-mismatch` 拒绝。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。实现任务文本须写明：完成后只报告路径、commit OID、变更要点与**静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担）**；hash 由应用计算，不得用 shell 算 hash。**实现 worker 只写本模块文件 + 字面 `git add`/`git commit`；不得运行任何 shell 命令（含 `node`/`npm`/自测脚本）。提交命令必须写成 `git commit -m "<message>"`——含空格的提交消息必须整体加引号，`-m` 后必须是单个带引号的 argv 参数（未加引号会把消息拆成多 token 而被 shell 写门拒绝，RR27 实测）。**
 - **A12a（先于 A11 实现派发）**：你在 A11 派发实现前**直接**创建验收标准任务（不经运营 stage-request；应用按目标派生 review 目的）：`roleId` 默认 `"verifier"`（或 `workflow.reviewRoleId` 项目验收角色）、`flowId`、`workflowId`、`stage:"A12a"`、`sideEffect:"docs"`；verifier 写 `docs/quality/<flowId>-criteria-vN.md`。**项目验收角色（`workflow.reviewRoleId`）必须在任务上绑定其 roster 模块（moduleId + modulePaths，取自模块清单），验收文件路径写在该模块内**（未绑定 ⇒ 写集为空、write_file 被拒，RR25 实测）；review 任务文本须写明：**不得运行任何 shell 命令（含 mkdir/目录创建）**，`write_file`/`edit_file` 会自动创建目录；`docs/acceptance/` 的应用归档由应用完成，不由 review worker 创建。
 - **A12b（A11 之后）**：A11 实现 accepted 后你直接创建验收报告任务（同上字段，`stage:"A12b"`；项目验收角色同样必须绑定其 roster 模块 moduleId + modulePaths，报告路径在模块内；review 任务文本同样禁止任何 shell（含 mkdir），`write_file`/`edit_file` 自动建目录）；verifier 写 `docs/quality/<flowId>-report-vN.md`。**A12 完成 = A12b accepted + report hash（应用计算）+ 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`**（幂等 `acceptance:<wf>:<reportSha>`；归档失败阻塞 A12）。不通过 ⇒ 回 A11（新 attempt，`reworkOf:"A12b"`）。**A12b 报告以 `status=blocked` 交回时（如 verifier 无受认可运行期验证通道），你必须在当回合三选一并留痕，禁止空转**（轻量验收 / 有限返工 / 停止上报；细则见「A12 独立验收」段）。
 - **A13**：A12b accepted + 运营最终报告后进入交付/发布；高风险合并卡 `merge-main` 由应用构造、你走应用卡通道呈交客户。**若 A12b 以轻量验收（`acceptanceIntensity=lightweight`）收口，A13 交付说明中必须向客户披露「运行期未验证」**。
@@ -90,7 +90,7 @@
 
 ## Git 普通用法（实现角色）
 
-- 实现角色只在自己的真实回合用 `run_shell` 执行 `git add <literal paths ⊆ 任务 writeSet>` 与 `git commit -m <msg>`；拒绝 `-A/--all/./glob`、`-F -` / `-F <file>`、`--amend` / `--no-verify` / `-a` / `--author`。
+- 实现角色只在自己的真实回合用 `run_shell` 执行 `git add <literal paths ⊆ 任务 writeSet>` 与 `git commit -m "<msg>"`（**含空格的提交消息必须整体加引号，`-m` 后必须是单个带引号的单消息参数**）；拒绝 `-A/--all/./glob`、`-F -` / `-F <file>`、`--amend` / `--no-verify` / `-a` / `--author`。
 - push / fetch / pull / remote / tag / merge / rebase / cherry-pick / revert / reset / clean / checkout / switch / stash / worktree / submodule / config / update-ref 等一律硬拒（`git-command-not-ordinary`）；提交只记录任务分支，不授予发布/验收/激活。
 - 合并 main 只经应用 merge-main 通道（固定 argv、不经 shell、sanitized env）；冲突 ⇒ `git merge --abort` + 切回任务分支（`release-merge-conflict`），不 force/reset/clean。报告 evidence 记录 commit OID、变更路径与测试结论。
 - 固定路径**不注入** legacy Git/trunk/VCA/stable 工具（`git_query` / `git_candidate` / `git_publish` / `select_run_change` / `request_stable_write` / `request_version_decision` / `submit_version_change` / `submit_refactor` 等）；不得请求或假报这些能力。
@@ -98,8 +98,8 @@
 ## A10 与 A11 的顺序
 
 - A9 完成后你呈任命卡（A10）；`request.resolved`（appointment）即 A10 完成——**A10 只任命、不派实现**。
-- A10 完成后你发 **A11 stage-request**（`taskKind:"stage-request"`、`workflowAction:"advance"`、`stage:"A11"`、`workflowId`、`sideEffect:"read-only"`；任务文本携客户选中的角色/子集与 hash 口径：完成后只报告路径、commit OID、变更要点与静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担），hash 由应用计算，不得用 shell 算 hash；实现 worker 不得运行任何 shell 命令，只写模块文件 + 字面 `git add`/`git commit`）；运营收到后再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`）。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。
-- 实现任务 `task.closed accepted` + 分支有提交 + 依据未漂移 ⇒ A11 完成；返工使用新 attempt，旧 attempt 事件保留。
+- A10 完成后你发 **A11 stage-request**（`taskKind:"stage-request"`、`workflowAction:"advance"`、`stage:"A11"`、`workflowId`、`sideEffect:"read-only"`；任务文本携客户选中的角色/子集与 hash 口径：完成后只报告路径、commit OID、变更要点与静态自检结论（读码核对；不运行 shell/node/npm、不执行测试脚本，执行/验证由 A12 验收承担），hash 由应用计算，不得用 shell 算 hash；实现 worker 不得运行任何 shell 命令，只写模块文件 + 字面 `git add`/`git commit`）。**实现任务文本必须写明提交命令形态：`git commit -m "<message>"`——含空格的提交消息必须整体加引号，`-m` 后必须是单个带引号的 argv 参数（不得把消息写成未加引号的多个 token，否则被 shell 写门拒绝，RR27 实测）。** 运营收到后再派实现任务（`workflowId`、`stage:"A11"`、`moduleId`+`modulePaths`）。A10 未完成就发 A11 ⇒ `stage-transition-invalid`。
+- 实现任务 `task.closed accepted` + 分支有提交 + 依据未漂移 ⇒ A11 完成；返工使用新 attempt，旧 attempt 事件保留。**若返工仅因提交命令语法（提交消息未加引号导致 argv 被拆多 token，RR27 实测），返工只纠正提交语法**（按 `git commit -m "<message>"` 重发：含空格整体加引号、`-m` 后单个带引号 argv 参数），**不重写实现、不新增实现改动**。
 
 ## A12 独立验收（实施前写标准、实施后出报告）
 

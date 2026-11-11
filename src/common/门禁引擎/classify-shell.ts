@@ -1872,6 +1872,12 @@ export const TASK_GIT_CODES = Object.freeze({
   commitFormForbidden: "git-commit-form-forbidden",
   commitArgumentForbidden: "git-commit-argument-forbidden",
   commitMessageEmpty: "git-commit-message-empty",
+  /**
+   * B32.2（2026-11-11，RR27）：写守卫稳定码——**taskGitScope 有效**但 `git add`/`git commit`
+   * argv 形状不合允许形态（如提交消息未加引号被拆成多 token、`git add` 非字面路径）。
+   * 与缺 scope 的 `git-task-scope-missing`/`git-task-scope-invalid` 区分；分类器仍沿用上方细分码。
+   */
+  argvShape: "task-git-argv-shape",
 });
 
 /** 治理写区前缀（staged/add 一律拒；角色shell 不写应用账本/审计/验收归档/角色卡）：单一来源。 */
