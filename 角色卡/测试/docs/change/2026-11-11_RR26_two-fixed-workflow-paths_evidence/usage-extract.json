@@ -1,0 +1,128 @@
+{
+  "model": "deepseek-v4-flash",
+  "roles": {
+    "chief": {
+      "assistantMessages": 236,
+      "inputTokens": 234080,
+      "outputTokens": 112958,
+      "cacheCreate": 0,
+      "cacheRead": 21067776,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "convener": {
+      "assistantMessages": 281,
+      "inputTokens": 299799,
+      "outputTokens": 205756,
+      "cacheCreate": 0,
+      "cacheRead": 23758720,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "env-bootstrap": {
+      "assistantMessages": 39,
+      "inputTokens": 56646,
+      "outputTokens": 12111,
+      "cacheCreate": 0,
+      "cacheRead": 521984,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "game-owner": {
+      "assistantMessages": 54,
+      "inputTokens": 124227,
+      "outputTokens": 68563,
+      "cacheCreate": 0,
+      "cacheRead": 1958272,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "nominator": {
+      "assistantMessages": 81,
+      "inputTokens": 156782,
+      "outputTokens": 45691,
+      "cacheCreate": 0,
+      "cacheRead": 3184000,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "product": {
+      "assistantMessages": 38,
+      "inputTokens": 65192,
+      "outputTokens": 22023,
+      "cacheCreate": 0,
+      "cacheRead": 696704,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "rapporteur": {
+      "assistantMessages": 52,
+      "inputTokens": 121606,
+      "outputTokens": 97721,
+      "cacheCreate": 0,
+      "cacheRead": 1886976,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "verifier": {
+      "assistantMessages": 53,
+      "inputTokens": 219262,
+      "outputTokens": 120612,
+      "cacheCreate": 0,
+      "cacheRead": 2862336,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "turns": {
+    "chief": {
+      "settled": 38,
+      "completed": 38,
+      "aborted": 0
+    },
+    "convener": {
+      "settled": 27,
+      "completed": 27,
+      "aborted": 0
+    },
+    "env-bootstrap": {
+      "settled": 2,
+      "completed": 2,
+      "aborted": 0
+    },
+    "game-owner": {
+      "settled": 2,
+      "completed": 2,
+      "aborted": 0
+    },
+    "nominator": {
+      "settled": 3,
+      "completed": 3,
+      "aborted": 0
+    },
+    "product": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    },
+    "rapporteur": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    },
+    "verifier": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    }
+  },
+  "note": "message.usage from native transcripts; no cost_usd field"
+}

@@ -1,0 +1,8 @@
+role: env-bootstrap
+entries:
+  - kind: file
+    path: styles.css
+    purpose: env-resources 模块：纯色几何样式与布局（不含规则逻辑）
+  - kind: file
+    path: index.html
+    purpose: entry-index 模块：单页入口与 DOM 契约结构
