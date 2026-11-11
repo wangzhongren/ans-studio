@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "schema": "doc-freezes/v1",
+  "state": "ready",
+  "baselineSha256": "b6a134a9a484808c59c3fd5dc1f564f9cdee02674c9b80d3541e1bdb09268742",
+  "entries": [
+    {
+      "path": "docs/contracts/snake-game-architecture-v1.md",
+      "version": 1,
+      "sha256": "0c2fba120be4894f9df9260829f0061528eda882388456d7da9780881929aefe",
+      "frozen": false
+    },
+    {
+      "path": "docs/product/snake-game-intent-v1.md",
+      "version": 1,
+      "sha256": "49b9b8020417f5f809469c89ca820aad1a249902ddce02d85499824a3247c6ea",
+      "frozen": false
+    },
+    {
+      "path": "docs/proposals/snake-game-modules-v1.md",
+      "version": 1,
+      "sha256": "e8954f5edd6cddf2c5d9d8e0d78277a85cc9d651f909dedf8572a31a86a1df94",
+      "frozen": false
+    },
+    {
+      "path": "docs/proposals/snake-game-proposal-v1.md",
+      "version": 1,
+      "sha256": "f7aa1a525cc3afa666d8f0fd4c906898591738948fd4c2dfba0b8e131e602680",
+      "frozen": false
+    },
+    {
+      "path": "docs/proposals/snake-game-roster-v1.md",
+      "version": 1,
+      "sha256": "d1f57638b31c8504226a8c5a1cdc5b1f81601c53095303eb2309bd3cfa4f9198",
+      "frozen": false
+    }
+  ],
+  "builtAt": "2026-11-11T07:16:14.338Z"
+}
