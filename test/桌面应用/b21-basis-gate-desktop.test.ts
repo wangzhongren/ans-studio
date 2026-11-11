@@ -258,6 +258,38 @@ async function seedBasis(
   return event;
 }
 
+/** B21：fixed A11 派发需要最新名单模块表（moduleId → 模块路径派生）；最小合法 roster/modules 夹具。 */
+async function seedFixedRoster(root: string): Promise<void> {
+  await writeFile(root, "docs/product/snake-intent-v1.md", "---\nschema: project-intent/v1\nflowId: snake\nversion: 1\nintentId: snake\n---\n# intent\n");
+  await writeFile(root, "docs/proposals/snake-proposal-v1.md", "---\nschema: project-proposal/v2\nflowId: snake\nversion: 1\nintent: docs/product/snake-intent-v1.md\n---\n# proposal\n");
+  await writeFile(root, "docs/contracts/snake-architecture-v1.md", "---\nschema: project-architecture/v1\nflowId: snake\nversion: 1\nproposal: docs/proposals/snake-proposal-v1.md\n---\n# architecture\n");
+  await writeFile(root, "docs/proposals/snake-modules-v1.md", [
+    "---", "schema: project-modules/v2", "flowId: snake", "version: 1", "modules:",
+    "  - id: core", "    name: Core", "    purpose: Core module", "    path: src/core/",
+    "    category: core", "    publicContract: src/core/index.ts",
+    "    architectureSource: docs/contracts/snake-architecture-v1.md",
+    "---", "# Modules", "",
+  ].join("\n"));
+  await writeFile(root, "docs/proposals/snake-roster-v1.md", [
+    "---", "schema: project-roster/v4", "flowId: snake", "version: 1",
+    "intent: docs/product/snake-intent-v1.md",
+    "proposal: docs/proposals/snake-proposal-v1.md",
+    "architecture: docs/contracts/snake-architecture-v1.md",
+    "envBootstrap:", "  omitted: true", "  omissionReason: test fixture",
+    "roles:",
+    "  - id: worker", "    displayName: Worker", "    purpose: Implementation",
+    "    capability: TS", "    modules: [core]",
+    "modules:",
+    "  - id: core", "    name: Core", "    purpose: Core module", "    path: src/core/",
+    "    category: core", "    publicContract: src/core/index.ts",
+    "    architectureSource: docs/contracts/snake-architecture-v1.md",
+    "---", "# Roster", "## 人员+模块拓扑图", "```topology",
+    "schema: project-topology/v2", "management: [convener, worker]", "modules:",
+    "  - id: core", "    path: src/core/", "    roleId: worker", "roles:",
+    "  - id: worker", "    modules: [core]", "```", "",
+  ].join("\n"));
+}
+
 async function seedTask(root: string, input: {
   taskId: string;
   from: "chief" | "convener";
@@ -511,6 +543,7 @@ test("A11 派发前 basis 复核：一致 ⇒ basis.verified 落账（关键门�
       await writeFile(root, basisDoc, "# Basis\n\n冻结依据。\n");
       const docSha = sha(await fs.readFile(path.join(root, ...basisDoc.split("/"))));
       await seedBasis(root, WF, [basisDoc]);
+      await seedFixedRoster(root);
       await seedStarted(root, WF, "A");
       const events: WorkflowEvent[] = [];
       for (const stage of ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"] as WorkflowStage[]) {

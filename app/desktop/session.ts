@@ -137,7 +137,7 @@ import {
   type WorkflowServiceFailure,
 } from "../../src/common/编排/workflow-service.ts";
 import { deriveWorkflowView, canCompleteStage, type WorkflowView } from "../../src/common/编排/workflow-state.ts";
-import { loadLatestRoster as loadLatestWorkflowRoster, reviewRoleIdOfRoster } from "../../src/common/编排/workflow-preconditions.ts";
+import { deriveFixedModuleWriteSet, loadLatestRoster as loadLatestWorkflowRoster, reviewRoleIdOfRoster } from "../../src/common/编排/workflow-preconditions.ts";
 // 桌面侧薄层：per-flow 模式解析（单一实现仍在编排 workflow-service；本层只委托/注入/常量）。
 import {
   activeFixedWorkflowIdFor,
@@ -10373,6 +10373,20 @@ ${formatted}` };
       const writeSet = await this.checkPathBWriteSetForDispatch(projectRoot, workflowId, effectiveFlowId, targetRoleId, requestedModulePaths);
       if (!writeSet.ok) return reject(writeSet.code, writeSet.message);
     }
+    // B21（2026-11-11，RR16 失败修复）：fixed A11 实现任务的模块写集以 `moduleId` 为权威——应用从
+    // 最新名单模块表派生该模块路径并写入任务；模型 `modulePaths` 仅作断言，跨模块/未知 moduleId
+    // ⇒ `module-paths-mismatch` fail-closed（不把空交集留到 worker 写门）。一模块一任务。
+    let effectiveModulePaths = requestedModulePaths;
+    if (!isStageRequest && fromRoleId === convenerId && effectiveStage === "A11"
+      && requestedModuleId !== undefined && workflowId !== undefined) {
+      const roster = await loadLatestWorkflowRoster({ projectRoot, flowId: effectiveFlowId });
+      if (!roster.ok) {
+        return reject("module-paths-mismatch", `A11 模块授权无法核验：最新名单不可读（${roster.reason}）。`);
+      }
+      const moduleWriteSet = deriveFixedModuleWriteSet(roster.roster, requestedModuleId, requestedModulePaths);
+      if (!moduleWriteSet.ok) return reject(moduleWriteSet.code, moduleWriteSet.message);
+      effectiveModulePaths = moduleWriteSet.paths;
+    }
     // 核验期间来源变化 ⇒ 不创建（fail-closed；与 legacy worker-dispatch 同方向）。
     if (!sourceIsCurrent()) return reject("dispatch-source-changed", "核验期间来源轮次已变化，未创建任务。");
     const sideEffect = isStageRequest ? "read-only" as const : classifyTaskSideEffect(d?.sideEffect, task);
@@ -10428,7 +10442,7 @@ ${formatted}` };
         ...(expectedOutput !== undefined ? { expectedOutput } : {}),
         ...(requestedEvidence !== undefined ? { requestedEvidence } : {}),
         ...(requestedModuleId !== undefined ? { moduleId: requestedModuleId } : {}),
-        ...(requestedModulePaths !== undefined && requestedModulePaths.length > 0 ? { modulePaths: requestedModulePaths } : {}),
+        ...(effectiveModulePaths !== undefined && effectiveModulePaths.length > 0 ? { modulePaths: effectiveModulePaths } : {}),
         sideEffect,
         idempotencyKey,
       }, () => createdAt);
@@ -10725,6 +10739,29 @@ ${formatted}` };
   }
 
   /**
+   * B22（2026-11-11，RR16 失败修复）：A12a/A12b 收口证据回退——报告 evidence[] 漏写纯路径时，按
+   * 应用质量路径取最新 `docs/quality/<flowId>-{criteria|report}-vN.md` 的实际字节 SHA-256；
+   * 文件缺失/不可读 ⇒ undefined（调用方仍 close-report-missing fail-closed，不伪造）。
+   */
+  private async findFixedReviewArtifact(
+    projectRoot: string,
+    flowId: string | undefined,
+    stage: "A12a" | "A12b",
+  ): Promise<WorkflowArtifactRef | undefined> {
+    if (flowId === undefined || flowId.trim() === "") return undefined;
+    const suffix = stage === "A12a" ? "criteria" : "report";
+    const latest = await latestVersionedDoc(projectRoot, "docs/quality", flowId, suffix);
+    if (latest === undefined) return undefined;
+    const rel = `docs/quality/${latest.name}`;
+    try {
+      const bytes = await fs.promises.readFile(path.join(projectRoot, ...rel.split("/")));
+      return { path: rel, sha256: createHash("sha256").update(bytes).digest("hex"), kind: suffix };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * fixed 收口证据（应用计算）：`accepted` 收口时：
    * - artifacts = 任务最后一份 done 报告 `evidence[]` 中**真实存在**的项目相对文件（path+字节 SHA-256）；
    * - A11/B3：`branchTipOid` = 当前任务分支真实 tip（分支必须 = `ans/task/<workflowId>`）；
@@ -10768,6 +10805,12 @@ ${formatted}` };
         /* 缺失文件不猜：不计入 artifacts（阶段完成前置会 fail-closed） */
       }
     }
+    // B22（2026-11-11，RR16）：A12a/A12b 的报告 evidence[] 若漏写纯路径，应用按质量路径回退——
+    // 取最新 docs/quality/<flowId>-{criteria|report}-vN.md 的实际字节（应用计算 hash）；文件缺失仍 fail-closed。
+    if (artifacts.length === 0 && (stage === "A12a" || stage === "A12b")) {
+      const fallback = await this.findFixedReviewArtifact(projectRoot, created.flowId, stage);
+      if (fallback !== undefined) artifacts.push(fallback);
+    }
     const needsArtifacts = ["A2", "A5", "A11", "A12a", "A12b", "B1", "B3"].includes(stage);
     if (needsArtifacts && artifacts.length === 0) {
       return {
@@ -10793,12 +10836,15 @@ ${formatted}` };
     }
     if (stage === "A12b") {
       const flowId = created.flowId;
-      const reportPath = evidencePaths.find((item) => /-report-v\d+\.md$/.test(item));
+      // B22：报告/标准路径优先取报告 evidence[] 的纯路径；缺失时按应用质量路径回退（真实字节）。
+      const reportPath = evidencePaths.find((item) => /-report-v\d+\.md$/.test(item))
+        ?? (await this.findFixedReviewArtifact(projectRoot, flowId, "A12b"))?.path;
       const criteriaPath = [...state.records.values()]
         .filter((sibling) => sibling.created?.workflowId === created.workflowId && sibling.created?.stage === "A12a")
         .flatMap((sibling) => sibling.reports.filter((report) => report.status === "done"))
         .flatMap((report) => report.evidence ?? [])
-        .find((item): item is string => typeof item === "string" && /-criteria-v\d+\.md$/.test(item));
+        .find((item): item is string => typeof item === "string" && /-criteria-v\d+\.md$/.test(item))
+        ?? (await this.findFixedReviewArtifact(projectRoot, flowId, "A12a"))?.path;
       if (flowId === undefined || reportPath === undefined || criteriaPath === undefined) {
         return {
           ok: false,

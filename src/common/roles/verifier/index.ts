@@ -423,6 +423,7 @@ const FIXED_REVIEW_ROLE_SECTION: RoleContextSection = Object.freeze({
     "- A12b（实施后）：按冻结 criteria 与任务指定的最终完整 OID 执行真实核对（真实运行/测试/查证据），报告写 docs/quality/<flowId>-report-vN.md，证据附件写 docs/verification/。",
     "- 验收强度按任务文本调节（轻量：核对指定写集与关键证据；完整：逐条核对全部冻结 criteria）；调节的是核对深度，不是如实性：缺证据写 insufficient evidence，不代造通过。",
     "- 结论/证据如实回幕僚：submit_report 写明报告路径、指定 OID/criteria、结论与证据；不通过按新 attempt 回 A11 返工，缺证或失败正式 blocked/failed 回幕僚，不静默等待。",
+    "- **报告证据格式**：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（A12a 的 `docs/quality/<flowId>-criteria-vN.md`、A12b 的 `docs/quality/<flowId>-report-vN.md`、附件 `docs/verification/...`）；描述、结论与 hash 引用写在 summary 正文。收口按纯路径核验文件字节，描述文本不计为证据（应用在缺失时按质量路径回退核验，但不得依赖回退）。",
     "- 本段仅用于固定路径会话；与旧角色卡文本冲突时以本段为准。",
   ].join("\n"),
 });

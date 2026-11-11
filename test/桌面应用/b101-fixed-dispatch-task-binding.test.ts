@@ -38,11 +38,11 @@ import path from "node:path";
 import { SessionManager, type DesktopOrchestrationEvent } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
-import { appendWorkflowEvent, readWorkflowLedger, requestStage } from "../../src/common/编排/workflow-service.ts";
+import { appendBasisEvent, appendWorkflowEvent, readWorkflowLedger, requestStage } from "../../src/common/编排/workflow-service.ts";
 import { type OrchestrationEvent, type TaskHandback } from "../../src/common/编排/handback.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
-import type { DispatchReceipt, DispatchTaskPayload, WorkflowEvent, WorkflowStage } from "../../src/model/runtime.ts";
+import type { BasisEvent, DispatchReceipt, DispatchTaskPayload, WorkflowEvent, WorkflowStage } from "../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
 async function waitUntil(check: () => boolean | Promise<boolean>, label = "实际事件", timeoutMs = 5000): Promise<void> {
@@ -462,6 +462,67 @@ test("B18 stage-request：A2 stage-request + 描述 evidence ⇒ accepted（不�
     const prodClosed = await convener.closeCreatedTaskFixed!({ operationId: "op-b18-prod-close", taskId: prodTaskId, outcome: "accepted" });
     assert.equal((prodClosed as { ok: boolean }).ok, false);
     assert.equal((prodClosed as { code?: string }).code, "close-report-missing", "生产任务描述 evidence 仍 fail-closed");
+  } finally {
+    await h.mgr.stop(null);
+    await cleanup(root);
+  }
+});
+
+// ══════════════ 1c. B22 A12a 收口证据回退（RR16 修复） ══════════════
+
+test("B22 A12a 收口：报告无纯路径 evidence 时按 docs/quality criteria 实际字节回退；文件缺失仍 close-report-missing", async () => {
+  const root = await makeRoot("ans-b22-a12a-");
+  const h = harness(root);
+  const workflowId = "wf-b22-a12a-0001";
+  try {
+    await fixedProject(root);
+    await seedA10Completed(root, workflowId);
+    // A12a/A12b 收口前的 basis 门（B21 既有语义）：最小 basis 记录（空文档）使测试聚焦证据回退。
+    const basis: BasisEvent = {
+      v: 1, at: BASE_AT, schema: "ans-basis/v1", kind: "basis.recorded",
+      idempotencyKey: `basis-seed:${workflowId}`, basisId: `bas-${workflowId}`, workflowId, flowId: FIXED_FLOW,
+      documents: [], teamPlan: null,
+      repo: { state: "existing", branch: "main", baseOid: null, ignorePolicy: "ans-v1", gitignoreSha256: "a".repeat(64) },
+      reviewRoleId: "verifier", operationId: "op-b22-basis", reason: "baseline", recordedBy: "application",
+    };
+    assert.equal((await appendBasisEvent(root, basis)).ok, true);
+    assert.equal((await appendWorkflowEvent(root, stageRequested(workflowId, "A12a"))).ok, true);
+    assert.equal((await appendWorkflowEvent(root, stageDispatched(workflowId, "A12a", "t-b22-a12a"))).ok, true);
+    const taskId = "t-b22-a12a";
+    const created = taskEvent("task.created", {
+      taskId, from: "chief", to: "verifier", text: "A12a 验收标准", sideEffect: "docs",
+      idempotencyKey: "key-t-b22-a12a", flowId: FIXED_FLOW, workflowId, stage: "A12a",
+    });
+    assert.equal((await appendTaskEvent(root, created)).ok, true);
+    const reported = taskEvent("task.reported", {
+      taskId, from: "verifier", status: "done", summary: "criteria 完成（描述证据，无纯路径）",
+      evidence: ["criteria 已写（描述文本）"],
+    });
+    assert.equal((await appendTaskEvent(root, reported)).ok, true);
+    const chief = await openRole(h, root, "chief");
+    assert.ok(chief.closeCreatedTaskFixed);
+    const before = await chief.closeCreatedTaskFixed!({ operationId: "op-b22-a12a-before", taskId, outcome: "accepted" });
+    assert.equal((before as { ok: boolean }).ok, false);
+    assert.equal((before as { code?: string }).code, "close-report-missing", "无 criteria 文件仍 fail-closed");
+    await fs.mkdir(path.join(root, "docs", "quality"), { recursive: true });
+    await fs.writeFile(
+      path.join(root, "docs", "quality", "snake-criteria-v1.md"),
+      "---\nschema: ans-criteria/v1\nflowId: snake-game\nversion: 1\n---\n# criteria\n",
+      "utf8",
+    );
+    const closed = await chief.closeCreatedTaskFixed!({ operationId: "op-b22-a12a-after", taskId, outcome: "accepted" });
+    assert.equal((closed as { ok: boolean }).ok, true, JSON.stringify(closed));
+    assert.equal((closed as { stageCompleted?: boolean }).stageCompleted, true);
+    const ledger = await readWorkflowLedger(root);
+    const completion = ledger.events.find((event) => event.kind === "stage.completed" && event.stage === "A12a");
+    assert.ok(completion !== undefined, "A12a 完成事件应写入");
+    if (completion?.kind === "stage.completed") {
+      assert.equal(
+        completion.artifacts.some((artifact) => artifact.path === "docs/quality/snake-criteria-v1.md"),
+        true,
+        "回退 artifact 使用应用质量路径",
+      );
+    }
   } finally {
     await h.mgr.stop(null);
     await cleanup(root);

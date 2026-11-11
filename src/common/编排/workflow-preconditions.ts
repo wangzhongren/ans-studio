@@ -1012,6 +1012,38 @@ export function parseProjectRoster(text: string, expectedFlowId?: string): Roste
   };
 }
 
+/**
+ * B21（2026-11-11，RR16 失败修复）：fixed A11 实现任务的模块写集以 `moduleId` 为权威——从最新名单
+ * 模块表派生该模块的 paths；模型提供的 `modulePaths` 只作断言（必须落在模块 paths 内；跨模块/未知
+ * moduleId ⇒ `module-paths-mismatch` fail-closed，不把空交集留到 worker 写门）。一模块一任务。
+ */
+export function deriveFixedModuleWriteSet(
+  roster: Pick<ProjectRoster, "modules">,
+  moduleId: string,
+  requestedPaths?: readonly string[],
+): { ok: true; paths: string[] } | { ok: false; code: "module-paths-mismatch"; message: string } {
+  const module = roster.modules.find((item) => item.id === moduleId);
+  if (module === undefined) {
+    return {
+      ok: false,
+      code: "module-paths-mismatch",
+      message: `moduleId ${moduleId} 不在最新名单模块表；不派发（一模块一任务）。`,
+    };
+  }
+  const canonical = [...module.paths];
+  const within = (candidate: string): boolean => canonical.some((root) =>
+    root.endsWith("/") ? candidate === root.slice(0, -1) || candidate.startsWith(root) : candidate === root);
+  const invalid = (requestedPaths ?? []).filter((candidate) => !within(candidate));
+  if (invalid.length > 0) {
+    return {
+      ok: false,
+      code: "module-paths-mismatch",
+      message: `moduleId=${moduleId} 的 modulePaths 超出模块路径 ${canonical.join("、")}：${invalid.join("、")}（跨模块；一模块一任务）。`,
+    };
+  }
+  return { ok: true, paths: canonical };
+}
+
 /** 解析模块清单文档 `<flowId>-modules-vN.md`（frontmatter：schema/flowId/version/modules[]）。 */
 export function parseProjectModules(
   text: string,
