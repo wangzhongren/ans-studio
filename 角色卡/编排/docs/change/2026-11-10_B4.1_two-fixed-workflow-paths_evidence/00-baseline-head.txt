@@ -1,0 +1,9 @@
+baseline HEAD: 69096c40d47d2c142e1b5abacf4a2d47b4a71e6e
+branch: feat/two-fixed-workflow-paths
+task baseline: 69096c4 (B4 gate shell v5 committed; B0-B4 already on branch)
+
+=== baseline-tree status note ===
+NOTE: 共享工作树在会话开始前已含并行 门禁 B4.1 出口改动（非本角色写集）：
+  M src/service/gate/shell-rules.ts
+  ?? test/门禁引擎/shell-rules-b4-reexport.test.ts
+本角色基线测量（before TAP）在保留该并行改动、回退本角色 3 个源文件后取得。

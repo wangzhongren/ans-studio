@@ -1,0 +1,244 @@
+TAP version 13
+# Subtest: 差分：card/displayName/function/capabilities 与旧 product 规格逐字段一致（差异=0）
+ok 1 - 差分：card/displayName/function/capabilities 与旧 product 规格逐字段一致（差异=0）
+  ---
+  duration_ms: 0.8359
+  type: 'test'
+  ...
+# Subtest: 差分（D8）：cards 与旧私有 TRIO_CARD_KINDS.product 一致（源码文本提取 oracle）
+ok 2 - 差分（D8）：cards 与旧私有 TRIO_CARD_KINDS.product 一致（源码文本提取 oracle）
+  ---
+  duration_ms: 0.799
+  type: 'test'
+  ...
+# Subtest: 差分：tools() trio 与旧 run-role 注入门控一致；D1 装配表整单放行且映射正确
+ok 3 - 差分：tools() trio 与旧 run-role 注入门控一致；D1 装配表整单放行且映射正确
+  ---
+  duration_ms: 0.2049
+  type: 'test'
+  ...
+# Subtest: 差分（D1）：product 对每个未授权 catalog id 声明均整单拒绝（越权 fail-closed）
+ok 4 - 差分（D1）：product 对每个未授权 catalog id 声明均整单拒绝（越权 fail-closed）
+  ---
+  duration_ms: 0.1881
+  type: 'test'
+  ...
+# Subtest: 差分（dispatch）：product 相关夹具 allow/deny 与旧谓词一致；差异按编号列明
+ok 5 - 差分（dispatch）：product 相关夹具 allow/deny 与旧谓词一致；差异按编号列明
+  ---
+  duration_ms: 0.4355
+  type: 'test'
+  ...
+# Subtest: 差分（dispatch）：拒绝结果始终带稳定 code/messageKey，且不返回 reportToRoleId
+ok 6 - 差分（dispatch）：拒绝结果始终带稳定 code/messageKey，且不返回 reportToRoleId
+  ---
+  duration_ms: 0.1554
+  type: 'test'
+  ...
+# Subtest: 差分（preflight）：version-upgrade 角色侧条件与旧 VCA/trunk 镜像一致；差异按编号列明
+ok 7 - 差分（preflight）：version-upgrade 角色侧条件与旧 VCA/trunk 镜像一致；差异按编号列明
+  ---
+  duration_ms: 0.4098
+  type: 'test'
+  ...
+# Subtest: 差分（preflight）：合法基线事实确实允许（正例锚点），并保持 JSON 可序列化 details
+ok 8 - 差分（preflight）：合法基线事实确实允许（正例锚点），并保持 JSON 可序列化 details
+  ---
+  duration_ms: 0.095
+  type: 'test'
+  ...
+# Subtest: fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+ok 9 - fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+  ---
+  duration_ms: 0.8417
+  type: 'test'
+  ...
+# Subtest: context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+ok 10 - context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+  ---
+  duration_ms: 0.1841
+  type: 'test'
+  ...
+# Subtest: context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+ok 11 - context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+  ---
+  duration_ms: 0.205
+  type: 'test'
+  ...
+# Subtest: dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+ok 12 - dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+  ---
+  duration_ms: 0.2797
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+ok 13 - dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+  ---
+  duration_ms: 0.0776
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+ok 14 - dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+  ---
+  duration_ms: 0.0824
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+ok 15 - dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+  ---
+  duration_ms: 0.2314
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+ok 16 - dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+  ---
+  duration_ms: 0.1297
+  type: 'test'
+  ...
+# Subtest: 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+ok 17 - 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+  ---
+  duration_ms: 1.3394
+  type: 'test'
+  ...
+# Subtest: legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+ok 18 - legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+  ---
+  duration_ms: 0.333
+  type: 'test'
+  ...
+# Subtest: 规格：id/displayName/function 与 E0.3 §3.2 product 行一致
+ok 19 - 规格：id/displayName/function 与 E0.3 §3.2 product 行一致
+  ---
+  duration_ms: 0.5566
+  type: 'test'
+  ...
+# Subtest: 规格：card 文本/条目/预授权/禁写逐项固定（迁移前旧规格的冻结副本）
+ok 20 - 规格：card 文本/条目/预授权/禁写逐项固定（迁移前旧规格的冻结副本）
+  ---
+  duration_ms: 0.4577
+  type: 'test'
+  ...
+# Subtest: 规格：capabilities 七字段固定；cards 为空（D8，无 governance 卡）
+ok 21 - 规格：capabilities 七字段固定；cards 为空（D8，无 governance 卡）
+  ---
+  duration_ms: 0.0767
+  type: 'test'
+  ...
+# Subtest: 规格：模块与嵌套数据冻结（无可变状态），且不携带权限字段
+ok 22 - 规格：模块与嵌套数据冻结（无可变状态），且不携带权限字段
+  ---
+  duration_ms: 0.1154
+  type: 'test'
+  ...
+# Subtest: tools()：trio 只声明 submitVersionChange；capabilities 同引用（D10）
+ok 23 - tools()：trio 只声明 submitVersionChange；capabilities 同引用（D10）
+  ---
+  duration_ms: 0.1183
+  type: 'test'
+  ...
+# Subtest: tools()：single 不装配 trio 角色工具；运行期未知模型 fail-closed（空表 + reason）
+ok 24 - tools()：single 不装配 trio 角色工具；运行期未知模型 fail-closed（空表 + reason）
+  ---
+  duration_ms: 0.0954
+  type: 'test'
+  ...
+# Subtest: dispatch()：chief→product（内置、存在）允许，报告期望=chief；deny 不返回报告期望
+ok 25 - dispatch()：chief→product（内置、存在）允许，报告期望=chief；deny 不返回报告期望
+  ---
+  duration_ms: 0.1676
+  type: 'test'
+  ...
+# Subtest: dispatch()：来源/目标硬身份负例（self/unknown/chief-to-project/target-missing）
+ok 26 - dispatch()：来源/目标硬身份负例（self/unknown/chief-to-project/target-missing）
+  ---
+  duration_ms: 0.0898
+  type: 'test'
+  ...
+# Subtest: dispatch()：非 product 目标不在模块范围；畸形输入 fail-closed
+ok 27 - dispatch()：非 product 目标不在模块范围；畸形输入 fail-closed
+  ---
+  duration_ms: 0.1037
+  type: 'test'
+  ...
+# Subtest: dispatch()：拒绝带稳定 code + i18n key；不修改冻结输入
+ok 28 - dispatch()：拒绝带稳定 code + i18n key；不修改冻结输入
+  ---
+  duration_ms: 0.2383
+  type: 'test'
+  ...
+# Subtest: preflight：只覆盖 version-upgrade；其他动作 action-not-covered
+ok 29 - preflight：只覆盖 version-upgrade；其他动作 action-not-covered
+  ---
+  duration_ms: 0.6738
+  type: 'test'
+  ...
+# Subtest: preflight：合法直接提交/首建 bootstrap 均为 allow
+ok 30 - preflight：合法直接提交/首建 bootstrap 均为 allow
+  ---
+  duration_ms: 0.1182
+  type: 'test'
+  ...
+# Subtest: preflight：缺键/未知键/类型不符 fail-closed
+ok 31 - preflight：缺键/未知键/类型不符 fail-closed
+  ---
+  duration_ms: 0.1521
+  type: 'test'
+  ...
+# Subtest: preflight：角色/kind/修正案引用负例
+ok 32 - preflight：角色/kind/修正案引用负例
+  ---
+  duration_ms: 0.1063
+  type: 'test'
+  ...
+# Subtest: preflight：operationId/baseTrunk/bootstrap/targets 形状负例
+ok 33 - preflight：operationId/baseTrunk/bootstrap/targets 形状负例
+  ---
+  duration_ms: 0.1318
+  type: 'test'
+  ...
+# Subtest: preflight：details 只含普通可序列化数据；不修改冻结输入
+ok 34 - preflight：details 只含普通可序列化数据；不修改冻结输入
+  ---
+  duration_ms: 0.3545
+  type: 'test'
+  ...
+# Subtest: context()：返回稳定、唯一 id 的静态提示块；不读盘/不声明资源
+ok 35 - context()：返回稳定、唯一 id 的静态提示块；不读盘/不声明资源
+  ---
+  duration_ms: 0.1338
+  type: 'test'
+  ...
+# Subtest: 模块图（E1.4）：根目录只有 index.ts + internal/；外部只能经 index
+ok 36 - 模块图（E1.4）：根目录只有 index.ts + internal/；外部只能经 index
+  ---
+  duration_ms: 0.588
+  type: 'test'
+  ...
+# Subtest: 模块图（E1.5）：零跨角色/引擎 import；只依赖 Model 与 shared public entry
+ok 37 - 模块图（E1.5）：零跨角色/引擎 import；只依赖 Model 与 shared public entry
+  ---
+  duration_ms: 1.0628
+  type: 'test'
+  ...
+# Subtest: 纯度：模块源码无 I/O/时钟/随机数/环境/可变全局
+ok 38 - 纯度：模块源码无 I/O/时钟/随机数/环境/可变全局
+  ---
+  duration_ms: 1.3854
+  type: 'test'
+  ...
+# Subtest: 纯策略：重复调用结果稳定，输入不被改写（tools/dispatch/preflight/context）
+ok 39 - 纯策略：重复调用结果稳定，输入不被改写（tools/dispatch/preflight/context）
+  ---
+  duration_ms: 0.1102
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 39
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 170.4146

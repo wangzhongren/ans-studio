@@ -1,0 +1,17 @@
+# B1 v1.2 未改项机器校验（v1.1 vs v1.2；2026-11-10T15:45Z）
+
+## 行级 diff 统计（git diff --no-index -U0，见 01）
+16 insertions(+) / 8 deletions(-)；hunk 全部位于授权修订点（标题/版本头/状态、§一 依据表插入、§二 known-red 插入、AC-26、§八 标题/第 8 条/第 10 条后插入、§九 两条限制）。
+
+## 条目集合比对（按行前缀）
+- AC: v1.1=30 v1.2=30 only_v1.1=1 only_v1.2=1
+  - v1.1-only: | **AC-26** | 边界/H1/非目标：H1=0（无边界修订；新文件均在既有 directory 授权；`src
+  + v1.2-only: | **AC-26** | 边界/H1/非目标：H1=0（无边界修订；新文件均在既有 directory 授权；`src
+- T: v1.1=20 v1.2=20 only_v1.1=0 only_v1.2=0
+- RR: v1.1=6 v1.2=6 only_v1.1=0 only_v1.2=0
+- EV: v1.1=8 v1.2=8 only_v1.1=0 only_v1.2=0
+- ACother: v1.1=30 v1.2=30 only_v1.1=1 only_v1.2=1
+  - v1.1-only: | **AC-26** | 边界/H1/非目标：H1=0（无边界修订；新文件均在既有 directory 授权；`src
+  + v1.2-only: | **AC-26** | 边界/H1/非目标：H1=0（无边界修订；新文件均在既有 directory 授权；`src
+- 非表格行: v1.1=119 v1.2=123
+  non-table only_v1.1=7 only_v1.2=11

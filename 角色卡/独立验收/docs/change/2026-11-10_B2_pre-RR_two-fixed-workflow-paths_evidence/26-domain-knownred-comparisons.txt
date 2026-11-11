@@ -1,0 +1,10 @@
+# B2 domain known-red comparisons (HEAD e28923c)
+
+## gates engine: 528 tests / 522 pass / 5 fail / 1 skip (B4.1 baseline identical)
+5/5 identical
+
+## runtime-core: 586 tests / 549 pass / 33 fail / 4 skip (B3.1 baseline identical)
+33/33 identical
+
+## roles domain: # tests 275 # pass 275 # fail 0 # skipped 0 
+## shared domain: # tests 224 # pass 219 # fail 0 # skipped 5 

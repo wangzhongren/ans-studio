@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: TaskGitPort：真实 add/currentBranch/inspectStaged（NUL）/commit；只本地、不 push/tag
+ok 1 - TaskGitPort：真实 add/currentBranch/inspectStaged（NUL）/commit；只本地、不 push/tag
+  ---
+  duration_ms: 543.6055
+  type: 'test'
+  ...
+# Subtest: TaskGitPort.add 运输防御：flag/glob/`.`/绝对/反斜杠/`..`/空一律拒绝且不执行
+ok 2 - TaskGitPort.add 运输防御：flag/glob/`.`/绝对/反斜杠/`..`/空一律拒绝且不执行
+  ---
+  duration_ms: 291.7922
+  type: 'test'
+  ...
+# Subtest: TaskGitShellPort.commit：只接受固定 git commit -m；-F -/--amend/-a/--author/--no-verify/多参拒绝
+ok 3 - TaskGitShellPort.commit：只接受固定 git commit -m；-F -/--amend/-a/--author/--no-verify/多参拒绝
+  ---
+  duration_ms: 419.5954
+  type: 'test'
+  ...
+# Subtest: TaskGitShellPort.inspectStaged：只执行固定 argv（其他 argv 抛错、不执行）
+ok 4 - TaskGitShellPort.inspectStaged：只执行固定 argv（其他 argv 抛错、不执行）
+  ---
+  duration_ms: 247.6662
+  type: 'test'
+  ...
+# Subtest: acquireCriticalSection：与 B3 发布合并同一把项目锁；占用 ⇒ undefined；释放幂等
+ok 5 - acquireCriticalSection：与 B3 发布合并同一把项目锁；占用 ⇒ undefined；释放幂等
+  ---
+  duration_ms: 0.6623
+  type: 'test'
+  ...
+# Subtest: sanitized env：commit 不读宿主 GIT_*（全局 gpg/身份隔离；身份固定 ANS Application）
+ok 6 - sanitized env：commit 不读宿主 GIT_*（全局 gpg/身份隔离；身份固定 ANS Application）
+  ---
+  duration_ms: 269.1415
+  type: 'test'
+  ...
+# Subtest: 门禁组合：无 scope/-A/-F -/普通 Git 拒绝；staged 越界/空/治理写区、分支不符、锁占用均不提交
+ok 7 - 门禁组合：无 scope/-A/-F -/普通 Git 拒绝；staged 越界/空/治理写区、分支不符、锁占用均不提交
+  ---
+  duration_ms: 854.6169
+  type: 'test'
+  ...
+# Subtest: Session 注入：fixed 会话注入 taskGit（同一分类器引用 + 同一项目锁、不传 scope）；legacy/single 不注入
+ok 8 - Session 注入：fixed 会话注入 taskGit（同一分类器引用 + 同一项目锁、不传 scope）；legacy/single 不注入
+  ---
+  duration_ms: 51.3484
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3088.92

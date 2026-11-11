@@ -1,0 +1,29 @@
+# B2 依据实测（2026-11-11，独立验收；命令在报告 §二）
+
+## B1 冻结标准族（v1 为任务书钉住的冻结标准；v1.1/v1.2 为后续冻结修订，逐字保留 v1 条目）
+docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md | lines=197 bytes=33722 | sha256=b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb
+docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md | lines=214 bytes=38065 | sha256=e2ad4701b1bda9a994616d4543fcab8b05de2f8bfcd4c9f6ee0fcc0873e0b749
+docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md | lines=222 bytes=41725 | sha256=e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7
+
+## 实现依据与策划/启动
+docs/planning/2026-11-10_design_two-fixed-workflow-paths.md | lines=95 bytes=8476 | sha256=b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d
+docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md | lines=1392 bytes=184391 | sha256=ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8
+docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.3.md | lines=66 bytes=9333 | sha256=6ab9e1e9374899853836f1b0704ff619f68ee20a404a13d2a135ddd5fb9fc0b6
+docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md | lines=90 bytes=11018 | sha256=a66c47d746ddf65720e27c77268a9069ceb13fc500c2a71419ad413c4d20a3d9
+
+## 启动计划原 blob（B1 表记录值；ad22192 仅改 1 行进展）
+git blob 160ca2a | lines=90 bytes=10820 | sha256=08450af1b6be0cf893bea81cd73f73c990551b89c499430fd5a60d3c6cbbc215
+
+## 独立复核记录
+角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md | lines=222 bytes=32535 | sha256=df1992df9c22af5fa915a128469fc0911c77493c21486367328a40bc35a00efc
+角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.2.md | lines=202 bytes=30200 | sha256=259ecde7aad44550e29c2d018bc452d619ce3942b57625c4bfe9e5e66b93ecd1
+角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.3.md | lines=156 bytes=20635 | sha256=550872d772cfcf986231c5f0dfc504be83e4b67d78266db348574a648753860b
+
+## RR28 记录与证据清单
+角色卡/测试/docs/change/2026-11-11_RR28_two-fixed-workflow-paths.md | lines=138 bytes=17137 | sha256=dde4ecceccca348a778760f076f42e9fd0e9205ada5312fcf0a757ddabd93103
+_evidence/sha256sums.txt | files=63 | sha256=72c7b4e31e2c498a30bd863d788f35d763c976f81ea8fb5c3ac7499b67063476
+
+## 候选
+branch=feat/two-fixed-workflow-paths HEAD=8adb8fafcf419da13a220483201e8e5e8bd8f31d
+merge-base(origin/main)=d9e3e99c160599e5b53a82e105939a359f69992f origin/main=d9e3e99c160599e5b53a82e105939a359f69992f
+commits since origin/main=92

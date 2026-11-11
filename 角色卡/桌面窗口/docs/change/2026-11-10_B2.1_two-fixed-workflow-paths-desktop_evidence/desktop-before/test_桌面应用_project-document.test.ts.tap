@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes
+ok 1 - B Model budget is raw bytes; Provider reads a checked local descriptor without changing bytes
+  ---
+  duration_ms: 13.45
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Provider refuses unsupported platforms, lexical escapes, directories and symlinks
+ok 2 - B Provider refuses unsupported platforms, lexical escapes, directories and symlinks
+  ---
+  duration_ms: 3.6134
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Provider detects check/open and opened/read file replacement and closes the original handle
+ok 3 - B Provider detects check/open and opened/read file replacement and closes the original handle
+  ---
+  duration_ms: 3.5607
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests
+ok 4 - B Service issues opaque refs only after native grant, refresh revokes refs and scope switch rejects old requests
+  ---
+  duration_ms: 9.7659
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Service fatal UTF8, binary, BOM, absent file and bounded failure classification
+ok 5 - B Service fatal UTF8, binary, BOM, absent file and bounded failure classification
+  ---
+  duration_ms: 3.8296
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Service late read never returns content after scope revoke; provider failures are fixed safe messages
+ok 6 - B Service late read never returns content after scope revoke; provider failures are fixed safe messages
+  ---
+  duration_ms: 0.7516
+  type: 'test'
+  ...
+# Subtest: B Pipeline preserves trusted native grant and close sequencing over the real Service
+ok 7 - B Pipeline preserves trusted native grant and close sequencing over the real Service
+  ---
+  duration_ms: 4.2689
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Provider rejects symlink parents, escaped links and root replacement after grant
+ok 8 - B Provider rejects symlink parents, escaped links and root replacement after grant
+  ---
+  duration_ms: 8.6973
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B Provider detects in-place growth and parent directory replacement around a descriptor read
+ok 9 - B Provider detects in-place growth and parent directory replacement around a descriptor read
+  ---
+  duration_ms: 4.0409
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B refs cannot be minted for hidden, unknown formats or lexical escape listing entries
+ok 10 - B refs cannot be minted for hidden, unknown formats or lexical escape listing entries
+  ---
+  duration_ms: 3.8947
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B actual preload exports only the restricted document invoke shape
+ok 11 - B actual preload exports only the restricted document invoke shape
+  ---
+  duration_ms: 1.433
+  type: 'test'
+  ...
+# Subtest: B out-of-order listings and root-grant failure cannot publish stale or unsupported refs
+ok 12 - B out-of-order listings and root-grant failure cannot publish stale or unsupported refs
+  ---
+  duration_ms: 0.1584
+  type: 'test'
+  ...
+# Subtest: B failed/cancelled native imports retain active refs until a successful listing commits
+ok 13 - B failed/cancelled native imports retain active refs until a successful listing commits
+  ---
+  duration_ms: 6.1989
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted; POSIX read/race assertions remain active on supported platforms.
+# Subtest: B a newer native selection invalidates an older listing without revoking the active project
+ok 14 - B a newer native selection invalidates an older listing without revoking the active project
+  ---
+  duration_ms: 0.2882
+  type: 'test'
+  ...
+# Subtest: B Service mints opaque refs only for exact role-root candidates and appends them after existing refs
+ok 15 - B Service mints opaque refs only for exact role-root candidates and appends them after existing refs
+  ---
+  duration_ms: 5.7377
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted for role-root candidates; POSIX read assertions remain active on supported platforms.
+# Subtest: B Service silently rejects non-whitelist role-root candidates, de-duplicates legal paths and rejects empty roleDir
+ok 16 - B Service silently rejects non-whitelist role-root candidates, de-duplicates legal paths and rejects empty roleDir
+  ---
+  duration_ms: 4.6553
+  type: 'test'
+  ...
+# Windows B2 fail-closed asserted for rejected role-root candidates; POSIX rejection assertions remain active on supported platforms.
+# Subtest: B Windows fail-closed: role-root candidates mint no refs and read no bytes on every host
+ok 17 - B Windows fail-closed: role-root candidates mint no refs and read no bytes on every host
+  ---
+  duration_ms: 3.3774
+  type: 'test'
+  ...
+# Subtest: B Service role-root whitelist, de-duplication and ref ordering are platform-independent (injected reader)
+ok 18 - B Service role-root whitelist, de-duplication and ref ordering are platform-independent (injected reader)
+  ---
+  duration_ms: 0.3775
+  type: 'test'
+  ...
+# Subtest: B Service diagnostics record listing availability and rejected root candidates without content or paths
+ok 19 - B Service diagnostics record listing availability and rejected root candidates without content or paths
+  ---
+  duration_ms: 15.4707
+  type: 'test'
+  ...
+# Subtest: B Windows fail-closed Provider and Service reject without minting references or reading content on every host
+ok 20 - B Windows fail-closed Provider and Service reject without minting references or reading content on every host
+  ---
+  duration_ms: 3.969
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 186.452

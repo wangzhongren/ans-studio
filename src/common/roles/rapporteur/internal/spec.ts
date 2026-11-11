@@ -101,8 +101,23 @@ export const RAPPORTEUR_CAPABILITIES: GovernanceCapabilities = Object.freeze({
 /**
  * 可发起卡种（D8：只列当前有效卡种；旧 `"write"` 等 legacy token 不进入模块数据）。
  * 与旧编排 `TRIO_CARD_KINDS.rapporteur` 一致：proposal + decision（decision 仅限需求变更审批）。
+ *
+ * legacy 数据冻结（T3 B2；`MF-IR-4` / v1.3 §3.4）：fixed 矩阵**不读**本字段，也不就地改值；
+ * fixed 卡种见 `RAPPORTEUR_FIXED_CARDS`。
  */
 export const RAPPORTEUR_CARDS: readonly GovernanceCardKind[] = Object.freeze([
   "proposal",
+  "decision",
+]);
+
+/**
+ * fixed 矩阵（`two-fixed-paths/v1`）可发起卡种白名单（T3 v1.3 §3.4 / G-IR §5.7 MF-IR-4 冻结值）：
+ * 恰 `["decision"]`（材料性选择/需求变更审批）。方案/意图/任命三张客户确认卡由幕僚呈报；
+ * 固定路径不发 acceptance 卡——legacy `proposal`/`acceptance` 等**不从 legacy `cards` 过滤推导**。
+ *
+ * 纯数据、无 I/O；只在 `matrix:"two-fixed-paths/v1"` 下经门禁引擎门面 `cardKindsOf` 消费；
+ * 缺失/非法由消费方 fail-closed 空集（本模块始终提供）。legacy 消费点不得改读本字段。
+ */
+export const RAPPORTEUR_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze([
   "decision",
 ]);

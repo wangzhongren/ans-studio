@@ -1,0 +1,101 @@
+TAP version 13
+# Subtest: recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+ok 1 - recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+  ---
+  duration_ms: 155.1408
+  type: 'test'
+  ...
+# Subtest: 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+ok 2 - 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+  ---
+  duration_ms: 105.1021
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+ok 3 - path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+  ---
+  duration_ms: 15.1833
+  type: 'test'
+  ...
+# Subtest: basis.amended：出新 -vN ⇒ 追加修正记录（previousBasisId 指向旧 basis，旧记录保留）；同幂等键 replay；verify 改用新版
+ok 4 - basis.amended：出新 -vN ⇒ 追加修正记录（previousBasisId 指向旧 basis，旧记录保留）；同幂等键 replay；verify 改用新版
+  ---
+  duration_ms: 66.0602
+  type: 'test'
+  ...
+# Subtest: amendBasis 负例：同路径改字节 ⇒ basis.drift + basis-hash-mismatch；plan hash 不符/未知或过期 previous/flowId 不符/无变化/关闭 ⇒ fail-closed
+ok 5 - amendBasis 负例：同路径改字节 ⇒ basis.drift + basis-hash-mismatch；plan hash 不符/未知或过期 previous/flowId 不符/无变化/关闭 ⇒ fail-closed
+  ---
+  duration_ms: 77.9098
+  type: 'test'
+  ...
+# Subtest: basis.verified 节流：关键门一致只记一次（同 basis+同 digest）；普通读取不记账；新 basis 追加；不是写权/批准
+ok 6 - basis.verified 节流：关键门一致只记一次（同 basis+同 digest）；普通读取不记账；新 basis 追加；不是写权/批准
+  ---
+  duration_ms: 58.327
+  type: 'test'
+  ...
+# Subtest: drift 阻断关键门 A11/B1/B3/A12a/A12b/A13/B4：fail-closed + basis.drift 只记一次；恢复后重新校验通过
+ok 7 - drift 阻断关键门 A11/B1/B3/A12a/A12b/A13/B4：fail-closed + basis.drift 只记一次；恢复后重新校验通过
+  ---
+  duration_ms: 50.3377
+  type: 'test'
+  ...
+# Subtest: A12a/A12b 直派（chief→verifier）可调用：verifyBasisForStage 一致 ⇒ verified；drift ⇒ 阻塞完成（不触 trunk/CAS）
+ok 8 - A12a/A12b 直派（chief→verifier）可调用：verifyBasisForStage 一致 ⇒ verified；drift ⇒ 阻塞完成（不触 trunk/CAS）
+  ---
+  duration_ms: 276.7083
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照修正：basis.amended 采用现存文档快照（缺失允许、无团队计划），不产生写权
+ok 9 - path-b 只读快照修正：basis.amended 采用现存文档快照（缺失允许、无团队计划），不产生写权
+  ---
+  duration_ms: 14.9939
+  type: 'test'
+  ...
+# Subtest: 非法 stage：verifyBasisForStage 拒绝（stage-transition-invalid），不读/写账本
+ok 10 - 非法 stage：verifyBasisForStage 拒绝（stage-transition-invalid），不读/写账本
+  ---
+  duration_ms: 27.2591
+  type: 'test'
+  ...
+# Subtest: closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+ok 11 - closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+  ---
+  duration_ms: 34.5372
+  type: 'test'
+  ...
+# Subtest: A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+ok 12 - A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+  ---
+  duration_ms: 141.4762
+  type: 'test'
+  ...
+# Subtest: prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+ok 13 - prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+  ---
+  duration_ms: 32.498
+  type: 'test'
+  ...
+# Subtest: activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+ok 14 - activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+  ---
+  duration_ms: 47.6318
+  type: 'test'
+  ...
+# Subtest: archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+ok 15 - archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+  ---
+  duration_ms: 26.4129
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1629.4428
+exit=0

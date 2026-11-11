@@ -1,0 +1,15 @@
+# B6.2 candidate hashes (raw working-tree bytes)
+ce2b647332267647a3e247281b262f37a4291481909f42575d91b59b341835fd *test/测试/fixed-path-full-chain.test.ts
+b5d0dc61bc88a6363fae33e9a38085210a50c9fd58327f8f9d09ebfc5b18cf09 *test/测试/git-role-workflows-e2e.test.ts
+
+# before (HEAD f3bffaf) blobs
+test/测试/fixed-path-full-chain.test.ts  19fb866112d77e0b4a20ed9e5f6d4d711ce03fbe12b9a8370138c792ed1d06eb
+test/测试/git-role-workflows-e2e.test.ts  27bbb12f4c573b64c1dff6d7ca8d9376df0d5301a11a2bc0c2ff251f7665efa5
+
+# git diff --numstat (tracked)
+115	5	test/测试/fixed-path-full-chain.test.ts
+23	0	test/测试/git-role-workflows-e2e.test.ts
+
+# git blob ids
+100644 60b044b9b69050514af8955df556dc7d697730dc 0	test/测试/fixed-path-full-chain.test.ts
+100644 e80a6d1016636707edb5d76f8a14ca9afef2f75b 0	test/测试/git-role-workflows-e2e.test.ts

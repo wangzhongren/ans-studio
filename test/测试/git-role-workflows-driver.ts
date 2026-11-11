@@ -215,7 +215,7 @@ export async function runSingleCoreLifecycleProbe(evidenceFile: string) {
 }
 
 /** Minimal real Desktop queue lifecycle diagnostic, not a Git/business acceptance case. */
-export async function runDesktopLifecycleProbe(evidenceFile: string, variant: "completed" | "denied-write-blocked" = "completed") {
+export async function runDesktopLifecycleProbe(evidenceFile: string, variant: "completed" | "denied-write-blocked" = "completed", prepareFixture?: (root: string) => Promise<void>) {
   const flowId = "q18-life", document = "docs/product/q18-life-intent-v1.md";
   const blockedVariant = variant === "denied-write-blocked", attemptedPath = blockedVariant ? "src/forbidden.txt" : document;
   const expectedStatus = blockedVariant ? "blocked" : "done";
@@ -258,7 +258,7 @@ export async function runDesktopLifecycleProbe(evidenceFile: string, variant: "c
     }],
   };
   try {
-    driver = await createRealHttpDriver(scripts, { tag: "q18-desktop-life", requestLimit: 10, timeoutMs: 10000, lifecycleDiagnosticFile: `${evidenceFile}.lifecycle.jsonl` });
+    driver = await createRealHttpDriver(scripts, { tag: "q18-desktop-life", requestLimit: 10, timeoutMs: 10000, lifecycleDiagnosticFile: `${evidenceFile}.lifecycle.jsonl`, ...(prepareFixture !== undefined ? { prepareFixture } : {}) });
     await driver.openChief(); await driver.sendChief("仅作真实产品草稿与报告，用于Desktop队列生命周期诊断；不确认或执行项目。" );
     const deadline = Date.now() + 20000;
     for (;;) {

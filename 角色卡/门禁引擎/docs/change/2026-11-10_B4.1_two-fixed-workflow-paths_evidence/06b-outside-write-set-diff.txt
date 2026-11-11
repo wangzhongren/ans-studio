@@ -1,0 +1,14 @@
+# 本角色写集外 diff 实测（排除本角色两文件后，仅剩编排 B4.1 并行改动；本角色未触碰）
+# command: git status --porcelain -- src app test | grep -v <本角色两文件>
+ M src/common/编排/shell-audit.ts
+ M src/common/编排/shell-gate.ts
+ M src/pipeline/orchestration/run-role.ts
+
+# 零 diff 守卫（本角色私有 common / provider / app 零 diff）:
+# command: git status --porcelain -- src/common/门禁引擎 src/provider app
+# (以上为空 = 零 diff)
+
+# src/pipeline 仅有编排 B4.1 并行的 run-role.ts（本角色未触碰）:
+# command: git diff --stat -- src/pipeline
+ src/pipeline/orchestration/run-role.ts | 362 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 356 insertions(+), 6 deletions(-)

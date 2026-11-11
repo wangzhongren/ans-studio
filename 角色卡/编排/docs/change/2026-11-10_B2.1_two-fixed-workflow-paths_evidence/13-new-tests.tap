@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: basis.amended：出新 -vN ⇒ 追加修正记录（previousBasisId 指向旧 basis，旧记录保留）；同幂等键 replay；verify 改用新版
+ok 1 - basis.amended：出新 -vN ⇒ 追加修正记录（previousBasisId 指向旧 basis，旧记录保留）；同幂等键 replay；verify 改用新版
+  ---
+  duration_ms: 132.1335
+  type: 'test'
+  ...
+# Subtest: amendBasis 负例：同路径改字节 ⇒ basis.drift + basis-hash-mismatch；plan hash 不符/未知或过期 previous/flowId 不符/无变化/关闭 ⇒ fail-closed
+ok 2 - amendBasis 负例：同路径改字节 ⇒ basis.drift + basis-hash-mismatch；plan hash 不符/未知或过期 previous/flowId 不符/无变化/关闭 ⇒ fail-closed
+  ---
+  duration_ms: 89.465
+  type: 'test'
+  ...
+# Subtest: basis.verified 节流：关键门一致只记一次（同 basis+同 digest）；普通读取不记账；新 basis 追加；不是写权/批准
+ok 3 - basis.verified 节流：关键门一致只记一次（同 basis+同 digest）；普通读取不记账；新 basis 追加；不是写权/批准
+  ---
+  duration_ms: 50.2758
+  type: 'test'
+  ...
+# Subtest: drift 阻断关键门 A11/B1/B3/A12a/A12b/A13/B4：fail-closed + basis.drift 只记一次；恢复后重新校验通过
+ok 4 - drift 阻断关键门 A11/B1/B3/A12a/A12b/A13/B4：fail-closed + basis.drift 只记一次；恢复后重新校验通过
+  ---
+  duration_ms: 47.443
+  type: 'test'
+  ...
+# Subtest: A12a/A12b 直派（chief→verifier）可调用：verifyBasisForStage 一致 ⇒ verified；drift ⇒ 阻塞完成（不触 trunk/CAS）
+ok 5 - A12a/A12b 直派（chief→verifier）可调用：verifyBasisForStage 一致 ⇒ verified；drift ⇒ 阻塞完成（不触 trunk/CAS）
+  ---
+  duration_ms: 223.8338
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照修正：basis.amended 采用现存文档快照（缺失允许、无团队计划），不产生写权
+ok 6 - path-b 只读快照修正：basis.amended 采用现存文档快照（缺失允许、无团队计划），不产生写权
+  ---
+  duration_ms: 17.4127
+  type: 'test'
+  ...
+# Subtest: 非法 stage：verifyBasisForStage 拒绝（stage-transition-invalid），不读/写账本
+ok 7 - 非法 stage：verifyBasisForStage 拒绝（stage-transition-invalid），不读/写账本
+  ---
+  duration_ms: 28.8719
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 768.5508

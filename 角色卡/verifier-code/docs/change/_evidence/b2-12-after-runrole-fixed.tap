@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+ok 1 - fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+  ---
+  duration_ms: 8.9959
+  type: 'test'
+  ...
+# Subtest: legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+ok 2 - legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+  ---
+  duration_ms: 4.7276
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 309.093

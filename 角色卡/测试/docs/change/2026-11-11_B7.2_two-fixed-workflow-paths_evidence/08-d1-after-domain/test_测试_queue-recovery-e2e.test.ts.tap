@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 restore 后自动续投一次（重启不排空不复现）
+ok 1 - P0 队列恢复端到端：忙时入队的回交持久化 → 新实例 restore 后自动续投一次（重启不排空不复现）
+  ---
+  duration_ms: 423.6409
+  type: 'test'
+  ...
+# Subtest: 2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久队列里的 demo 项不自动开会话、不投递
+ok 2 - 2026-11-05 修复：生产宿主 demoRuntimeAutoDeliver:false ⇒ 持久队列里的 demo 项不自动开会话、不投递
+  ---
+  duration_ms: 368.9977
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1207.4225

@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+ok 1 - fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+  ---
+  duration_ms: 0.8277
+  type: 'test'
+  ...
+# Subtest: context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+ok 2 - context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+  ---
+  duration_ms: 0.1611
+  type: 'test'
+  ...
+# Subtest: context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+ok 3 - context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+  ---
+  duration_ms: 0.2054
+  type: 'test'
+  ...
+# Subtest: context(fixed, B9.1)：报告/证据口径——路径+frontmatter 实际值；hash 由应用计算，禁止 worker shell hash
+ok 4 - context(fixed, B9.1)：报告/证据口径——路径+frontmatter 实际值；hash 由应用计算，禁止 worker shell hash
+  ---
+  duration_ms: 0.1453
+  type: 'test'
+  ...
+# Subtest: context(fixed, B13.2)：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（描述文本不计为证据）
+ok 5 - context(fixed, B13.2)：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（描述文本不计为证据）
+  ---
+  duration_ms: 0.1164
+  type: 'test'
+  ...
+# Subtest: dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+ok 6 - dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+  ---
+  duration_ms: 0.2834
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+ok 7 - dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+  ---
+  duration_ms: 0.0729
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+ok 8 - dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+  ---
+  duration_ms: 0.072
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+ok 9 - dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+  ---
+  duration_ms: 0.1387
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+ok 10 - dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+  ---
+  duration_ms: 0.1119
+  type: 'test'
+  ...
+# Subtest: 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+ok 11 - 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+  ---
+  duration_ms: 0.9484
+  type: 'test'
+  ...
+# Subtest: legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+ok 12 - legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+  ---
+  duration_ms: 0.236
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 101.3321

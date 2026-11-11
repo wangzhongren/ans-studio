@@ -1,0 +1,4 @@
+e90c99123476b8587196ae0d37d4a0199d5c9821ba82414b2c6871db1ca4ce05 *角色卡/测试/docs/change/2026-11-11_RR3_two-fixed-workflow-paths.md
+dcba71a866861aca8f529cfd5749c34470b8059e7ae36ac59e27ce53b8d80c83 *角色卡/桌面窗口/docs/change/2026-11-11_B8.1_two-fixed-workflow-paths-desktop.md
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md

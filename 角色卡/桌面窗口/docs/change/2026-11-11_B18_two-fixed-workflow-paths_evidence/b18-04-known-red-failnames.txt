@@ -1,0 +1,16 @@
+A5 runRole 一次性 CLI：createAdapter 不收到 capabilities（矩阵不注入）
+BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+D-1：projectRoot 为空 → 不传 sessionDir（旧行为）
+D-1：一次性路径 runRole **不传**能力面（一局即止，无持久化/恢复语义）
+Git team plan publication and active-only activation: real tasks and structured bytes preserve document/execution authority
+Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+node test外指符号链接路径不获委托；项目内测试路径获委托
+openRoleSession：普通角色 settle → 发出 handback（形状正确）
+real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+test\\编排\\git-trunk-store.test.ts
+test\\编排\\shell-judge.test.ts
+wiring guards: append sits after current gate and before effects with the frozen R2 digest mapping; run-change/stop paths never append
+人事（Nominator）：无任务收窄时 Section 1 条目直接放行；他人写区/应用目录仍拒
+有任务 writeSet 时 trio 不并入 Section 1：Nominator 角色卡条目仍被 F4 收窄拒

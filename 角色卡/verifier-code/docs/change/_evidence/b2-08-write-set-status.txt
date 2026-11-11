@@ -1,0 +1,55 @@
+SNAPSHOT (UTC): 2026-11-10T07:25:43Z
+--- git status --porcelain -- src app test ---
+ M src/common/roles/chief/internal/context.ts
+ M src/common/roles/chief/internal/module.ts
+ M src/common/roles/chief/internal/spec.ts
+ M src/common/roles/convener/index.ts
+ M src/common/roles/nominator/index.ts
+ M src/common/roles/product/index.ts
+ M src/common/roles/product/internal/capabilities.ts
+ M src/common/roles/product/internal/context.ts
+ M src/common/roles/product/internal/dispatch.ts
+ M src/common/roles/rapporteur/index.ts
+ M src/common/roles/rapporteur/internal/context.ts
+ M src/common/roles/rapporteur/internal/spec.ts
+ M src/common/roles/verifier/index.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/role.ts
+ M src/service/governance-matrix/impl/builder.ts
+ M src/service/governance-matrix/impl/routing.ts
+ M src/service/governance-matrix/public.ts
+ M test/roles/rapporteur/spec.test.ts
+?? src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/roles/chief/fixed.test.ts
+?? test/roles/convener/convener-fixed.test.ts
+?? test/roles/nominator/nominator-fixed.test.ts
+?? test/roles/product/product-fixed.test.ts
+?? test/roles/rapporteur/fixed-module.test.ts
+?? test/roles/verifier/verifier-fixed.test.ts
+?? test/门禁引擎/chief-workflow-v2-resource.test.ts
+?? test/门禁引擎/fixed-role-module-surface.test.ts
+?? test/门禁引擎/governance-matrix-fixed-view.test.ts
+--- my verifier write set (git diff --stat) ---
+ src/common/roles/verifier/index.ts | 70 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 68 insertions(+), 2 deletions(-)
+--- untracked in test/roles/verifier ---
+?? test/roles/verifier/verifier-fixed.test.ts
+--- peer/concurrent B2 owners diff stat (NOT this role write set) ---
+ src/common/roles/chief/internal/context.ts        |  76 +++++++++-
+ src/common/roles/chief/internal/module.ts         |   6 +
+ src/common/roles/chief/internal/spec.ts           |  36 ++++-
+ src/common/roles/convener/index.ts                |  98 +++++++++++-
+ src/common/roles/nominator/index.ts               |  65 +++++++-
+ src/common/roles/product/index.ts                 |  13 +-
+ src/common/roles/product/internal/capabilities.ts |  12 ++
+ src/common/roles/product/internal/context.ts      |  45 +++++-
+ src/common/roles/product/internal/dispatch.ts     |  67 ++++++++-
+ src/common/roles/rapporteur/index.ts              |   8 +-
+ src/common/roles/rapporteur/internal/context.ts   |  67 ++++++++-
+ src/common/roles/rapporteur/internal/spec.ts      |  15 ++
+ src/common/门禁引擎/governance-roles.ts           | 127 ++++++++++++++++
+ src/model/role.ts                                 |  39 +++++
+ src/service/governance-matrix/impl/builder.ts     |  46 ++++--
+ src/service/governance-matrix/impl/routing.ts     | 172 ++++++++++++++++++++--
+ src/service/governance-matrix/public.ts           |   2 +
+ 17 files changed, 847 insertions(+), 47 deletions(-)

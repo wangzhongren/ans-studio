@@ -1,0 +1,19 @@
+=== candidate files (sha256 / bytes / lines) ===
+src/common/编排/shell-gate.ts  e7c365367f07def6b66fa9a51036b2f533dfb1f98c01392f5b2f56dc7952794a  106800 bytes  1825 lines
+src/common/编排/shell-audit.ts  437eb77946386f73aff74d4868713592aea7adaf9888732b8231f388c8f9d2c7  16641 bytes  331 lines
+src/pipeline/orchestration/run-role.ts  c35ed511af99149ae939ab2040b79902c70216eb71dd760083723bf20e17c996  289507 bytes  4454 lines
+test/编排/shell-task-git-gate.test.ts  d9834381d9b74bc05ab4bf16fcd266d4fa8e91f01801d9753f7b58b8c58e80a0  13286 bytes  273 lines
+test/编排/shell-task-git-execution.test.ts  9561654179c8e369e301964ae389ff1b910f086fa58a484ff207669ca62678f3  25623 bytes  614 lines
+test/编排/run-role-task-git.test.ts  cc381e51f74f4ec5ed6a37bb5e79803a3fb097a44cb48d6f43692f6969928b19  14265 bytes  341 lines
+
+=== numstat (M files) ===
+warning: in the working copy of 'src/pipeline/orchestration/run-role.ts', LF will be replaced by CRLF the next time Git touches it
+27	0	src/common/编排/shell-audit.ts
+198	3	src/common/编排/shell-gate.ts
+356	6	src/pipeline/orchestration/run-role.ts
+
+=== new files numstat ===
+273 lines  test/编排/shell-task-git-gate.test.ts
+614 lines  test/编排/shell-task-git-execution.test.ts
+341 lines  test/编排/run-role-task-git.test.ts
+record: f72f8fcd5c9ba8b002afb386535777e92d4ba97df2a4f0c7dda73076feaf640c  20625 bytes  249 lines

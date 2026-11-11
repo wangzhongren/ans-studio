@@ -1,0 +1,11 @@
+role: game-core-dev
+entries:
+  - kind: directory
+    path: src/core/state/
+    purpose: game-state：状态模型、初始状态、方向应用与 reset
+  - kind: directory
+    path: src/core/collision/
+    purpose: collision-boundary：边界与食物判定纯函数
+  - kind: directory
+    path: src/core/scoring/
+    purpose: scoring：计分与食物再生成

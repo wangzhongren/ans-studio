@@ -1,0 +1,3 @@
+9ae80c579ee4b0bf306378ceaab2bca851e7b9fef8b149a8797ae10ff25a3832 *test/测试/fixed-path-full-chain.test.ts
+39a8d0f3de04eae576369e05241ccf7b59bcf26c0a31969e407ac20458ed5a18 *test/测试/mode-switch.test.ts
+e85006ef0b4d1c4435fe28f100c477b37ea3e842b16138408dc2bf8b46e55ce7 *test/测试/b-change-scope.test.ts

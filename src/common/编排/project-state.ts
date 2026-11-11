@@ -62,6 +62,13 @@ import {
   parseProjectModules,
 } from "./workflow-preconditions.ts";
 import { shortenSummary, readTaskState, taskCardOf, taskCards, type TaskRecord } from "./task-state.ts";
+import {
+  detectLegacyStateIgnored,
+  readBasisLedger,
+  readReleaseLedger,
+  readWorkflowLedger,
+} from "./workflow-service.ts";
+import { deriveWorkflowView, nextStages } from "./workflow-state.ts";
 import { isVersionedDocPath, versionedDocVersionOf } from "../门禁引擎/versioned-doc-guard.ts";
 
 const FLOW_ID_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
@@ -1087,6 +1094,7 @@ function defaultDerivedNextStepText(code: ProjectStateDerivedNextStepCode): stri
 export function renderProjectStateSummary(
   view: ProjectStateView,
   labels: Partial<ProjectStateSummaryLabels> = {},
+  workflow?: ProjectStateWorkflowSummary,
 ): string {
   const text = { ...DEFAULT_SUMMARY_LABELS, ...labels };
   const marker = `\n[${text.truncated}]`;
@@ -1132,7 +1140,8 @@ export function renderProjectStateSummary(
   if (view.versions.length === 0) push(`- ${text.none}`);
   for (const version of view.versions.slice(0, 20)) {
     if (!push(`- ${text.flow}=${version.flowId} kind=${version.docKind} latest=${version.latest?.version ?? text.none} ` +
-      `path=${version.latest?.path ?? text.none} pinned=${version.pinned?.version ?? version.pinned?.path ?? text.none} ` +
+      `path=${version.latest?.path ?? text.none} sha256=${version.latest?.sha256 ?? text.none} ` +
+      `pinned=${version.pinned?.version ?? version.pinned?.path ?? text.none} ` +
       `newerThanPinned=${version.newerThanPinned}${version.referenceIssue !== undefined ? ` referenceIssue=${shortenSummary(version.referenceIssue, 120)}` : ""}`)) break;
   }
 
@@ -1142,6 +1151,24 @@ export function renderProjectStateSummary(
     if (!push(`- ${text.flow}=${item.flowId} kind=${item.kind} ref=${item.ref} status=${item.status}`)) break;
   }
 
+  // T3 fixed 工作流视图（只读投影；`legacyStateIgnored` 作为警告展示，不静默——G-18）。
+  if (workflow !== undefined) {
+    if (workflow.workflow !== undefined) {
+      const wf = workflow.workflow;
+      push(`[workflow] ${wf.workflowId} flow=${wf.flowId} path=${wf.path} stage=${wf.stage} status=${wf.status}` +
+        `${wf.basisId !== undefined ? ` basis=${wf.basisId}` : ""}${wf.releaseId !== undefined ? ` release=${wf.releaseId}` : ""}` +
+        `${wf.reviewRoleId !== undefined ? ` reviewRole=${wf.reviewRoleId}` : ""}` +
+        `${wf.blocked !== undefined ? ` blocked=${wf.blocked.code}` : ""}` +
+        `${wf.closed !== undefined ? ` closed=${wf.closed.outcome}` : ""}`);
+      if (wf.nextStages.length > 0) push(`- next=${wf.nextStages.join(",")}`);
+    } else {
+      push(`[workflow] ${text.none}`);
+    }
+    if (workflow.legacyStateIgnored.length > 0) {
+      push(`- legacyStateIgnored=${workflow.legacyStateIgnored.join(",")}`);
+    }
+    for (const warning of workflow.warnings.slice(0, 10)) push(`- warning=${shortenSummary(warning, 160)}`);
+  }
   if (view.nextStep !== undefined) {
     push(`[${text.nextStep}] ${text.source}=${view.nextStep.source} text=${shortenSummary(view.nextStep.text, 200)}`);
   }
@@ -1153,4 +1180,134 @@ export function renderProjectStateSummary(
   }
   if (truncated) lines.push(marker.trim());
   return lines.join("\n");
+}
+
+// —————————————— T3 B1：fixed 工作流只读投影（AC-19/G-18；project_state 附加段） ——————————————
+//
+// 形状保持**加法可选**：`ProjectStateView`（Model 属主）不在此改动；本段另提供
+// `ProjectStateWorkflowSummary`，由 `renderProjectStateSummary(view, labels, workflow)` 追加展示。
+// `legacyStateIgnored` 作为警告/审计字段展示（存在旧 trunk/run/versions 状态时如实列出，不静默）。
+
+export interface ProjectStateWorkflowStage {
+  stage: string;
+  status: string;
+  attempt: number;
+}
+
+export interface ProjectStateWorkflowEntry {
+  workflowId: string;
+  flowId: string;
+  path: "A" | "B";
+  stage: string;
+  status: string;
+  basisId?: string;
+  releaseId?: string;
+  reviewRoleId?: string;
+  blocked?: { code: string; summary: string };
+  stopping?: boolean;
+  closed?: { outcome: string; reason: string };
+  activatedRoleIds: string[];
+  nextStages: string[];
+  stages: ProjectStateWorkflowStage[];
+}
+
+export interface ProjectStateRoleActivation {
+  workflowId: string;
+  roleId: string;
+  rosterPath: string;
+  rosterSha256: string;
+  documents: { path: string; sha256: string }[];
+}
+
+export interface ProjectStateWorkflowSummary {
+  /** 活动（或最近）fixed workflow 的单条视图；无 workflow 时缺席。 */
+  workflow?: ProjectStateWorkflowEntry;
+  /** 全部 workflow（按启动顺序；有界读取由账本轮转承担）。 */
+  workflows: ProjectStateWorkflowEntry[];
+  activeWorkflowId?: string;
+  /** 被忽略的旧治理状态（存在即列出；只读忽略、不删除/不迁移）。 */
+  legacyStateIgnored: string[];
+  roleActivations: ProjectStateRoleActivation[];
+  warnings: string[];
+}
+
+/**
+ * 构建 fixed 工作流只读投影（纯读、零写入、不缓存）：
+ * - workflow 视图由 `deriveWorkflowView`（纯投影）派生；坏账本 ⇒ `workflow-corrupt` 警告；
+ * - basis/release 引用与 `reviewRoleId` 从 basis 账本读取；
+ * - `legacyStateIgnored` 探测 `.ans/trunk`/`.ans/runs`/旧 state 文件，如实列出（G-18）。
+ */
+export async function buildWorkflowStateProjection(input: {
+  projectRoot: string;
+}): Promise<ProjectStateWorkflowSummary> {
+  const warnings: string[] = [];
+  const workflowLedger = await readWorkflowLedger(input.projectRoot);
+  const basisLedger = await readBasisLedger(input.projectRoot);
+  const releaseLedger = await readReleaseLedger(input.projectRoot);
+  const taskState = await readTaskState(input.projectRoot);
+  const legacy = await detectLegacyStateIgnored(input.projectRoot);
+  if (legacy.present) warnings.push(`legacyStateIgnored: ${legacy.ignored.join(",")}（只读忽略，不删除/不迁移）`);
+  if (workflowLedger.badLines > 0) warnings.push(`workflow-ledger-bad-lines: ${workflowLedger.badLines}`);
+  if (basisLedger.badLines > 0) warnings.push(`basis-ledger-bad-lines: ${basisLedger.badLines}`);
+
+  const workflowIds: string[] = [];
+  for (const event of workflowLedger.events) if (!workflowIds.includes(event.workflowId)) workflowIds.push(event.workflowId);
+  const workflows: ProjectStateWorkflowEntry[] = [];
+  const roleActivations: ProjectStateRoleActivation[] = [];
+  for (const workflowId of workflowIds) {
+    const events = workflowLedger.events.filter((event) => event.workflowId === workflowId);
+    const view = deriveWorkflowView(events, taskState.events);
+    if (view.blocked?.code === "workflow-corrupt") warnings.push(`workflow-corrupt: ${workflowId}（${view.blocked.summary}）`);
+    const basis = [...basisLedger.events]
+      .reverse()
+      .find((event) => (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === workflowId);
+    const release = [...releaseLedger.events]
+      .reverse()
+      .find((event) => event.kind === "release.merged" && event.workflowId === workflowId);
+    for (const event of events) {
+      if (event.kind === "role.activated") {
+        roleActivations.push({
+          workflowId,
+          roleId: event.roleId,
+          rosterPath: event.roster.path,
+          rosterSha256: event.roster.sha256,
+          documents: event.documents.map((doc) => ({ ...doc })),
+        });
+      }
+    }
+    workflows.push({
+      workflowId,
+      flowId: view.flowId,
+      path: view.path,
+      stage: view.stage,
+      status: view.status,
+      ...(view.basisId !== undefined
+        ? { basisId: view.basisId }
+        : basis !== undefined && (basis.kind === "basis.recorded" || basis.kind === "basis.amended")
+          ? { basisId: basis.basisId }
+          : {}),
+      ...(release !== undefined && release.kind === "release.merged" ? { releaseId: release.releaseId } : {}),
+      ...(basis !== undefined && (basis.kind === "basis.recorded" || basis.kind === "basis.amended")
+        ? (basis.reviewRoleId !== undefined ? { reviewRoleId: basis.reviewRoleId } : {})
+        : {}),
+      ...(view.blocked !== undefined ? { blocked: { ...view.blocked } } : {}),
+      ...(view.stopping === true ? { stopping: true } : {}),
+      ...(view.closed !== undefined ? { closed: { ...view.closed } } : {}),
+      activatedRoleIds: [...(view.activatedRoleIds ?? [])],
+      nextStages: [...nextStages(view)],
+      stages: Object.entries(view.stages)
+        .filter(([, state]) => state.status !== "pending")
+        .map(([stage, state]) => ({ stage, status: state.status, attempt: state.attempt })),
+    });
+  }
+  const activeWorkflowId = [...workflows].reverse().find((workflow) => workflow.closed === undefined)?.workflowId;
+  const active = workflows.find((workflow) => workflow.workflowId === activeWorkflowId) ?? workflows[workflows.length - 1];
+  return {
+    ...(active !== undefined ? { workflow: active } : {}),
+    workflows,
+    ...(activeWorkflowId !== undefined ? { activeWorkflowId } : {}),
+    legacyStateIgnored: [...legacy.ignored],
+    roleActivations,
+    warnings,
+  };
 }

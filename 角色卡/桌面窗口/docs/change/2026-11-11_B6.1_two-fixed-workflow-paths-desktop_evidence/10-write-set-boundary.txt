@@ -1,0 +1,19 @@
+# git status --porcelain -- src app test
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+ M test/桌面应用/chief-workflow.test.ts
+ M test/桌面应用/version-change.test.ts
+ M test/桌面应用/version-decision.test.ts
+?? test/桌面应用/b61-chat-entry-fixed.test.ts
+
+# git status --porcelain -- package.json package-lock.json app/main.ts app/renderer
+
+# git diff --stat -- src app test
+warning: in the working copy of 'app/desktop/workflow.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/chief-workflow.test.ts', LF will be replaced by CRLF the next time Git touches it
+ app/desktop/session.ts                 |  29 ++++++---
+ app/desktop/workflow.ts                | 108 +++++++++++++++++++++++++++++++++
+ test/桌面应用/chief-workflow.test.ts   |  15 ++++-
+ test/桌面应用/version-change.test.ts   |   3 +
+ test/桌面应用/version-decision.test.ts |   3 +
+ 5 files changed, 148 insertions(+), 10 deletions(-)

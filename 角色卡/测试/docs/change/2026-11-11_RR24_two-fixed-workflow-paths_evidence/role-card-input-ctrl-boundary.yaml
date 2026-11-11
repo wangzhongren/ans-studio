@@ -1,0 +1,5 @@
+role: input-ctrl
+entries:
+  - kind: directory
+    path: src/input/
+    purpose: 键盘输入适配模块（模块 input-control）

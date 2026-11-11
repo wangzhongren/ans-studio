@@ -1,0 +1,8 @@
+# B10.1 写集边界（git status --porcelain -- src app test）
+ M app/desktop/session.ts
+ M test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+?? test/桌面应用/b101-fixed-dispatch-task-binding.test.ts
+
+# src/** diff（应为空）
+
+# test/测试/** diff（应为空）

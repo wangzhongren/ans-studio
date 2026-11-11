@@ -1,0 +1,158 @@
+{
+  "model": "deepseek-v4-flash",
+  "roles": {
+    "chief": {
+      "assistantMessages": 204,
+      "inputTokens": 153524,
+      "outputTokens": 101534,
+      "cacheCreate": 0,
+      "cacheRead": 14745088,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "convener": {
+      "assistantMessages": 222,
+      "inputTokens": 186901,
+      "outputTokens": 113336,
+      "cacheCreate": 0,
+      "cacheRead": 14930560,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "env-bootstrap": {
+      "assistantMessages": 27,
+      "inputTokens": 72824,
+      "outputTokens": 20037,
+      "cacheCreate": 0,
+      "cacheRead": 405888,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "game-core-dev": {
+      "assistantMessages": 19,
+      "inputTokens": 64752,
+      "outputTokens": 3863,
+      "cacheCreate": 0,
+      "cacheRead": 230016,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "nominator": {
+      "assistantMessages": 87,
+      "inputTokens": 147843,
+      "outputTokens": 79524,
+      "cacheCreate": 0,
+      "cacheRead": 4148736,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "product": {
+      "assistantMessages": 29,
+      "inputTokens": 50820,
+      "outputTokens": 20448,
+      "cacheCreate": 0,
+      "cacheRead": 503296,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "qa-verifier": {
+      "assistantMessages": 38,
+      "inputTokens": 68862,
+      "outputTokens": 33277,
+      "cacheCreate": 0,
+      "cacheRead": 730368,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "rapporteur": {
+      "assistantMessages": 73,
+      "inputTokens": 159368,
+      "outputTokens": 96939,
+      "cacheCreate": 0,
+      "cacheRead": 2811136,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "runtime-dev": {
+      "assistantMessages": 10,
+      "inputTokens": 52049,
+      "outputTokens": 1101,
+      "cacheCreate": 0,
+      "cacheRead": 62976,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "verifier": {
+      "assistantMessages": 22,
+      "inputTokens": 110649,
+      "outputTokens": 17525,
+      "cacheCreate": 0,
+      "cacheRead": 457344,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "turns": {
+    "chief": {
+      "settled": 33,
+      "completed": 33,
+      "aborted": 0
+    },
+    "convener": {
+      "settled": 24,
+      "completed": 23,
+      "aborted": 1
+    },
+    "env-bootstrap": {
+      "settled": 1,
+      "completed": 0,
+      "aborted": 1
+    },
+    "game-core-dev": {
+      "settled": 1,
+      "completed": 0,
+      "aborted": 1
+    },
+    "nominator": {
+      "settled": 3,
+      "completed": 3,
+      "aborted": 0
+    },
+    "product": {
+      "settled": 3,
+      "completed": 3,
+      "aborted": 0
+    },
+    "qa-verifier": {
+      "settled": 1,
+      "completed": 1,
+      "aborted": 0
+    },
+    "rapporteur": {
+      "settled": 4,
+      "completed": 4,
+      "aborted": 0
+    },
+    "runtime-dev": {
+      "settled": 1,
+      "completed": 0,
+      "aborted": 1
+    },
+    "verifier": {
+      "settled": 2,
+      "completed": 2,
+      "aborted": 0
+    }
+  },
+  "note": "message.usage from native transcripts; no cost_usd field"
+}

@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: independent C pi: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt
+ok 1 - independent C pi: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt
+  ---
+  duration_ms: 76.1409
+  type: 'test'
+  ...
+# Subtest: independent C codex: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt
+ok 2 - independent C codex: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt
+  ---
+  duration_ms: 53.9754
+  type: 'test'
+  ...
+# Subtest: independent C claude: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt
+ok 3 - independent C claude: one durable member, safe input history, raw model text, real target receipt and no duplicate prompt
+  ---
+  duration_ms: 61.6061
+  type: 'test'
+  ...
+# Subtest: independent C: failure after real ACK but before input save invokes no model and cannot repair by prompting
+ok 4 - independent C: failure after real ACK but before input save invokes no model and cannot repair by prompting
+  ---
+  duration_ms: 25.2452
+  type: 'test'
+  ...
+# Subtest: independent C: history failure after a real model call cannot turn storage retry into another prompt
+ok 5 - independent C: history failure after a real model call cannot turn storage retry into another prompt
+  ---
+  duration_ms: 36.6412
+  type: 'test'
+  ...
+# Subtest: independent C: an injected report storage failure retries the frozen member once without rerunning its model
+ok 6 - independent C: an injected report storage failure retries the frozen member once without rerunning its model
+  ---
+  duration_ms: 21.3998
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 586.2306

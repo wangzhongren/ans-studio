@@ -1,0 +1,17 @@
+# before unique: 110, after unique: 98
+
+## only-after
+
+## only-before
+W20 默认Core/Chat产品真实报告落账并到chief 普通
+W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin
+W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl

@@ -1,0 +1,31 @@
+# B7.1 candidate hashes (raw working-tree bytes)
+app/desktop/session.ts	807f5be5993965bc4d940deb030d656180a0379484c74d1903e52dbed5cfb4cc	bytes=834649	lines=13069
+test/桌面应用/b71-fixed-fail-closed.test.ts	0f02b6bf249a286e000b5e02adf5e8175ed17b58b3fcaf704e522ca98932dabb	bytes=26573	lines=500
+test/桌面应用/b3-fixed-cards-panel.test.ts	eb1e2f3b378c3cca362a7c15f08617d61c8870ea4dfed3c9efd708637c20e93b	bytes=33074	lines=622
+test/桌面应用/b51-fixed-workflow-wiring.test.ts	855e1416a65e7b1731a066eee6d883d58a21156c098d1ec22df2b66927491054	bytes=49036	lines=970
+test/桌面应用/b61-chat-entry-fixed.test.ts	bd81c740ddc287346929731b4f4d8d3ac00ad6007d1b945be6dcbca907f587e3	bytes=24974	lines=439
+test/桌面应用/fixed-path-routing.test.ts	cee0bf42e78157018511fff114db5363c8f0bf66d08cc126dfeb56c068f72874	bytes=48892	lines=871
+test/桌面应用/star-routing.test.ts	a28a2d140b83d0d1db3cc90b41d18db1186b6a89695ef5ea61437698e5b12172	bytes=21300	lines=402
+test/桌面应用/run-pin.test.ts	c42ae53abbbbf36f0c21aa5687a696bc0bf0819026cb369858988912da84182e	bytes=50479	lines=900
+test/桌面应用/chief-workflow.test.ts	3604abbefd29c9d91fd5f1b99887faa11b330e554eca845dad7cf2b78edefa07	bytes=263258	lines=2662
+test/桌面应用/chain-enforcement.test.ts	d9e87a4d35f3ddbad2190f9dd0be930cb0b3783c09eea89055b94c5de47e02e9	bytes=49990	lines=1047
+test/桌面应用/run-change-trigger.test.ts	0d228dbf972a974222fe230a7dafd7fcdc1657615eabc79013af74cb66201472	bytes=36521	lines=673
+test/桌面应用/optional-acceptance.test.ts	c4426b301748f17907b94b4c11dab0436b2a1472ea9adce05f7e0be98c815604	bytes=15929	lines=319
+test/桌面应用/session.test.ts	edd3de5463fd573af0a2177e2c9b3a99228ccb6b5b4d442bb554ad32032dd7e7	bytes=27274	lines=592
+角色卡/桌面窗口/docs/change/2026-11-11_B7.1_two-fixed-workflow-paths-desktop.md	1a0cf3779a2b76ce129564dc701efbcd4d3c331d4f5129669b473ffb006954b0	bytes=19497	lines=225
+
+# git diff --numstat (tracked; untracked new test excluded)
+157	5	app/desktop/session.ts
+1	1	test/桌面应用/b3-fixed-cards-panel.test.ts
+2	2	test/桌面应用/b51-fixed-workflow-wiring.test.ts
+1	1	test/桌面应用/b61-chat-entry-fixed.test.ts
+11	0	test/桌面应用/chain-enforcement.test.ts
+10	6	test/桌面应用/chief-workflow.test.ts
+35	23	test/桌面应用/fixed-path-routing.test.ts
+11	0	test/桌面应用/optional-acceptance.test.ts
+11	0	test/桌面应用/run-change-trigger.test.ts
+11	0	test/桌面应用/run-pin.test.ts
+5	1	test/桌面应用/session.test.ts
+11	0	test/桌面应用/star-routing.test.ts
+
+# aggregate sha256 over sorted candidate lines (session.ts + 12 test files + record): d127538d1368045c21cb93a905346e028435a38d63ae0a8a6adb3090a0982bf7

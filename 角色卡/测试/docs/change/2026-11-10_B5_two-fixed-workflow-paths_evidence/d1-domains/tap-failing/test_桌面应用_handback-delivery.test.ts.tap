@@ -1,0 +1,298 @@
+TAP version 13
+# Subtest: E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）
+ok 1 - E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源）
+  ---
+  duration_ms: 200.9152
+  type: 'test'
+  ...
+# Subtest: E-1 去重：同一条回交重复到达（重放）→ **只投递一次**
+ok 2 - E-1 去重：同一条回交重复到达（重放）→ **只投递一次**
+  ---
+  duration_ms: 199.7496
+  type: 'test'
+  ...
+# Subtest: E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+not ok 3 - E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+  ---
+  duration_ms: 404.2025
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:253:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    settle 后同一输入含两份报告且顺序保持
+    + actual - expected
+    
+      [
+    +   '[回交] 来自 A 的报告（任务 T1）\n' +
+    -   '[回交] 已收到2份角色结果，请核对后向客户汇总。\n' +
+    -     '[回交] 来自 A 的报告（任务 T1）\n' +
+          '结论：completed\n' +
+          '摘要：改完了 role-card\n' +
+          '证据：\n' +
+          '  - 角色卡/A/role-card.md\n' +
+    -     '[回交] 来自 A 的报告（任务 T2）\n' +
+    -     '结论：completed\n' +
+    -     '摘要：改完了 role-card\n' +
+    -     '证据：\n' +
+    -     '  - 角色卡/A/role-card.md\n' +
+          '请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n' +
+          '只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n' +
+          '没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n' +
+          '已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: |-
+      [回交] 已收到2份角色结果，请核对后向客户汇总。
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      [回交] 来自 A 的报告（任务 T2）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  actual:
+    0: |-
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:269:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投
+ok 4 - P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投
+  ---
+  duration_ms: 454.5441
+  type: 'test'
+  ...
+# Subtest: 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+not ok 5 - 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+  ---
+  duration_ms: 75.6681
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:329:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   '[回交] 来自 A 的报告（任务 T1）\n' +
+    -   '[回交] 已收到2份角色结果，请核对后向客户汇总。\n' +
+    -     '[回交] 来自 A 的报告（任务 T1）\n' +
+          '结论：completed\n' +
+          '摘要：改完了 role-card\n' +
+          '证据：\n' +
+          '  - 角色卡/A/role-card.md\n' +
+    -     '[回交] 来自 A 的报告（任务 T2）\n' +
+    -     '结论：completed\n' +
+    -     '摘要：改完了 role-card\n' +
+    -     '证据：\n' +
+    -     '  - 角色卡/A/role-card.md\n' +
+          '请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n' +
+          '只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n' +
+          '没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n' +
+          '已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: |-
+      [回交] 已收到2份角色结果，请核对后向客户汇总。
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      [回交] 来自 A 的报告（任务 T2）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  actual:
+    0: |-
+      [回交] 来自 A 的报告（任务 T1）
+      结论：completed
+      摘要：改完了 role-card
+      证据：
+        - 角色卡/A/role-card.md
+      请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。
+      只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。
+      没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。
+      已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:343:12)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序
+ok 6 - 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序
+  ---
+  duration_ms: 126.9694
+  type: 'test'
+  ...
+# Subtest: 常规检查宿主政策实际注入项目角色，su不接委托免确认
+ok 7 - 常规检查宿主政策实际注入项目角色，su不接委托免确认
+  ---
+  duration_ms: 4.9177
+  type: 'test'
+  ...
+# Subtest: E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）
+ok 8 - E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢）
+  ---
+  duration_ms: 356.7808
+  type: 'test'
+  ...
+# Subtest: 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+not ok 9 - 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+  ---
+  duration_ms: 311.6901
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:409:1'
+  failureType: 'testCodeFailure'
+  error: '坏形状应如实系统行（不崩、不静默）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:431:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损）
+ok 10 - E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损）
+  ---
+  duration_ms: 360.512
+  type: 'test'
+  ...
+# Subtest: C Window merges source saved-before-business and retry Promise/change orders into one enqueue
+ok 11 - C Window merges source saved-before-business and retry Promise/change orders into one enqueue
+  ---
+  duration_ms: 61.3903
+  type: 'test'
+  ...
+# Subtest: C frozen batch retries keep members and delivery ID while later reports stay separate
+not ok 12 - C frozen batch retries keep members and delivery ID while later reports stay separate
+  ---
+  duration_ms: 79.96
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:495:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'one',
+    -   'two'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'one'
+    1: 'two'
+  actual:
+    0: 'one'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:508:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: C possible provider start and unknown failure do not automatically prompt again
+ok 13 - C possible provider start and unknown failure do not automatically prompt again
+  ---
+  duration_ms: 187.5648
+  type: 'test'
+  ...
+# Subtest: C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire
+ok 14 - C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire
+  ---
+  duration_ms: 31.3393
+  type: 'test'
+  ...
+# Subtest: C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs
+ok 15 - C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs
+  ---
+  duration_ms: 60.8456
+  type: 'test'
+  ...
+# Subtest: F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次
+ok 16 - F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次
+  ---
+  duration_ms: 456.5233
+  type: 'test'
+  ...
+# Subtest: 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+not ok 17 - 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+  ---
+  duration_ms: 3229.8569
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:588:1'
+  failureType: 'testCodeFailure'
+  error: '等待实际事件超时'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:30:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:600:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+not ok 18 - B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+  ---
+  duration_ms: 3120.7896
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\handback-delivery.test.ts:629:1'
+  failureType: 'testCodeFailure'
+  error: '等待实际事件超时'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  operator: 'fail'
+  stack: |-
+    waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:30:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:667:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 12
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10147.6571

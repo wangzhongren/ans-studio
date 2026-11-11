@@ -624,8 +624,8 @@ test("默认规则集每次返回全新对象（无共享可变状态）；带 i
   assert.notEqual(a.readOnly, b.readOnly);
   assert.notEqual(a.riskyPrograms, b.riskyPrograms);
   assert.equal(a.version, SHELL_RULES_VERSION);
-  assert.equal(a.version, "4");
-  assert.equal(a.id, "ans-default-v4");
+  assert.equal(a.version, "5");
+  assert.equal(a.id, "ans-default-v5");
   assert.equal(a.executionModel, "argv-noshell");
   assert.equal(typeof a.id, "string");
   assert.notEqual(a.id, "");

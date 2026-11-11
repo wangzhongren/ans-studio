@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: A1 allow：直接放行、operator 0 次、branch c-allow、by 含（su 审批档）；审计字段齐备
+ok 1 - A1 allow：直接放行、operator 0 次、branch c-allow、by 含（su 审批档）；审计字段齐备
+  ---
+  duration_ms: 2.6974
+  type: 'test'
+  ...
+# Subtest: A2 risky × 批准：恰 1 次请求；branch c-risky→a-allow；allow=true
+ok 2 - A2 risky × 批准：恰 1 次请求；branch c-risky→a-allow；allow=true
+  ---
+  duration_ms: 0.3423
+  type: 'test'
+  ...
+# Subtest: A2 risky × 拒绝：恰 1 次请求；branch c-risky→a-deny；allow=false
+ok 3 - A2 risky × 拒绝：恰 1 次请求；branch c-risky→a-deny；allow=false
+  ---
+  duration_ms: 0.1849
+  type: 'test'
+  ...
+# Subtest: A2 risky × 不可用：恰 1 次请求；branch c-risky→a-unavailable；allow=false
+ok 4 - A2 risky × 不可用：恰 1 次请求；branch c-risky→a-unavailable；allow=false
+  ---
+  duration_ms: 0.1595
+  type: 'test'
+  ...
+# Subtest: A3 risky × 超时：恰 1 次请求；branch c-risky→a-timeout；deny
+ok 5 - A3 risky × 超时：恰 1 次请求；branch c-risky→a-timeout；deny
+  ---
+  duration_ms: 32.2076
+  type: 'test'
+  ...
+# Subtest: A2 review × 批准：恰 1 次请求；branch c-review→a-allow；allow=true
+ok 6 - A2 review × 批准：恰 1 次请求；branch c-review→a-allow；allow=true
+  ---
+  duration_ms: 0.3234
+  type: 'test'
+  ...
+# Subtest: A2 review × 拒绝：恰 1 次请求；branch c-review→a-deny；allow=false
+ok 7 - A2 review × 拒绝：恰 1 次请求；branch c-review→a-deny；allow=false
+  ---
+  duration_ms: 0.1447
+  type: 'test'
+  ...
+# Subtest: A2 review × 不可用：恰 1 次请求；branch c-review→a-unavailable；allow=false
+ok 8 - A2 review × 不可用：恰 1 次请求；branch c-review→a-unavailable；allow=false
+  ---
+  duration_ms: 0.1486
+  type: 'test'
+  ...
+# Subtest: A3 review × 超时：恰 1 次请求；branch c-review→a-timeout；deny
+ok 9 - A3 review × 超时：恰 1 次请求；branch c-review→a-timeout；deny
+  ---
+  duration_ms: 30.6085
+  type: 'test'
+  ...
+# Subtest: A2 deny × 批准：恰 1 次请求；branch c-deny→a-allow；allow=true
+ok 10 - A2 deny × 批准：恰 1 次请求；branch c-deny→a-allow；allow=true
+  ---
+  duration_ms: 0.3524
+  type: 'test'
+  ...
+# Subtest: A2 deny × 拒绝：恰 1 次请求；branch c-deny→a-deny；allow=false
+ok 11 - A2 deny × 拒绝：恰 1 次请求；branch c-deny→a-deny；allow=false
+  ---
+  duration_ms: 0.1554
+  type: 'test'
+  ...
+# Subtest: A2 deny × 不可用：恰 1 次请求；branch c-deny→a-unavailable；allow=false
+ok 12 - A2 deny × 不可用：恰 1 次请求；branch c-deny→a-unavailable；allow=false
+  ---
+  duration_ms: 0.1003
+  type: 'test'
+  ...
+# Subtest: A3 deny × 超时：恰 1 次请求；branch c-deny→a-timeout；deny
+ok 13 - A3 deny × 超时：恰 1 次请求；branch c-deny→a-timeout；deny
+  ---
+  duration_ms: 30.0482
+  type: 'test'
+  ...
+# Subtest: A4 deny + approveDeny=false：既有硬拒 c-deny，0 次请求（回归）
+ok 14 - A4 deny + approveDeny=false：既有硬拒 c-deny，0 次请求（回归）
+  ---
+  duration_ms: 0.2528
+  type: 'test'
+  ...
+# Subtest: A5 构造守卫四组：互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk 或 routineShellPolicy
+ok 15 - A5 构造守卫四组：互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk 或 routineShellPolicy
+  ---
+  duration_ms: 0.3889
+  type: 'test'
+  ...
+# Subtest: A6 规则集加载失败 / 分类器抛错：fail-closed 且有稳定 branch（非审批放行）
+ok 16 - A6 规则集加载失败 / 分类器抛错：fail-closed 且有稳定 branch（非审批放行）
+  ---
+  duration_ms: 0.2004
+  type: 'test'
+  ...
+# Subtest: A8 旧只读档回归：allow 直放；risky/review → readonly-deny、deny → 既有硬拒 c-deny；0 次 operator
+ok 17 - A8 旧只读档回归：allow 直放；risky/review → readonly-deny、deny → 既有硬拒 c-deny；0 次 operator
+  ---
+  duration_ms: 0.1677
+  type: 'test'
+  ...
+# Subtest: A7 renderSuApprovalReason：前缀/档位 token/写边界风险披露为固定文本；detail 逐字进入
+ok 18 - A7 renderSuApprovalReason：前缀/档位 token/写边界风险披露为固定文本；detail 逐字进入
+  ---
+  duration_ms: 0.0581
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 269.461

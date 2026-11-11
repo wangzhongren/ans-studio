@@ -1,0 +1,9 @@
+# B8.2 只读套件（`src/**` 零改动；这些目录零改动）
+
+命令（工作树 = 本批 after；同一 Node v24.22.1）：
+
+1. `01-bianpai-desktop-gate.tap`：`test/编排/{fixed-path-start,run-role-fixed,run-role-fixed-b2,run-role-fixed-b31,workflow-mode,workflow-stage-request,workflow-dispatch-fixed,workflow-ledger,workflow-state,workflow-preconditions,workflow-baseline,workflow-basis-b21,workflow-close-intent,task-state,task-state-fixed,project-state-workflow}.test.ts` + `test/门禁引擎/{cold-start-genesis,shell-approval,chief-workflow-v2-resource}.test.ts` —— **154 tests / 154 pass / 0 fail / 0 skipped**。
+2. `02-roles.tap`：`test/roles/**/*.test.ts` —— **275 tests / 275 pass / 0 fail / 0 skipped**（与 B8.1 记录同口径）。
+3. `03-runtime-core-fixed.tap`：`test/runtime-core/two-fixed-workflow-paths-{b0,b2,b3-1}.test.ts` —— **32 tests / 32 pass / 0 fail / 0 skipped**。
+4. `04-fixed-path-full-chain.tap`：`test/测试/fixed-path-full-chain.test.ts`（B5/B6.2 跨层假会话全链；B8.3 写域，本批**只读运行**）—— **3 tests / 3 pass / 0 fail / 0 skipped**（路径 A 全链/路径 B/无仓库）。
+5. `test/编排` 全目录含 B1 §二列明的 known-red（24 fail / 2 skip 基线）与其它非本批测试；本批只运行上列 fixed/workflow/task-state 相关文件（`src/**` 零 diff，逻辑上不受影响）。`test/测试` 其余文件属 B8.3 范围，未运行。

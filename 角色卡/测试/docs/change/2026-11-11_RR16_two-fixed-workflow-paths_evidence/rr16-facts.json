@@ -1,0 +1,921 @@
+{
+  "at": "2026-11-11T04:31:48.007Z",
+  "candidate": "12e9102ec9f3ebc9219845130e55604d1d072144",
+  "msgMark": "2026-11-11T04:17:52.664Z",
+  "stopCause": "gate:budget-chief-dispatches (count 13 > approved 12; third A11 stage request after dispatch-side write-authorization rework)",
+  "gate": {
+    "kind": "budget-chief-dispatches",
+    "count": 13
+  },
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-11T04:17:59.427Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:7c81538d-86c8-4e78-9022-e3e67065b07e",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "7c81538d-86c8-4e78-9022-e3e67065b07e",
+    "legacyStateIgnored": true
+  },
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "workflowEvents": [
+    {
+      "at": "2026-11-11T04:17:59.427Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:17:59.427Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:18:19.275Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwblzgn7-fb977d34",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:18:37.961Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:19:30.629Z",
+      "kind": "stage.completed",
+      "stage": "A2",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:19:44.006Z",
+      "kind": "stage.requested",
+      "stage": "A3",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:19:44.218Z",
+      "kind": "stage.completed",
+      "stage": "A3",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:19:51.701Z",
+      "kind": "stage.requested",
+      "stage": "A4",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:19:58.467Z",
+      "kind": "stage.dispatched",
+      "stage": "A4",
+      "taskId": "t-mwbm1l6n-6ced70a6",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:20:13.430Z",
+      "kind": "stage.requested",
+      "stage": "A5",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:20:31.544Z",
+      "kind": "stage.requested",
+      "stage": "A5",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:22:13.037Z",
+      "kind": "stage.completed",
+      "stage": "A5",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.333Z",
+      "kind": "stage.requested",
+      "stage": "A6",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.776Z",
+      "kind": "stage.completed",
+      "stage": "A6",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:22:35.213Z",
+      "kind": "stage.requested",
+      "stage": "A7",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:22:41.818Z",
+      "kind": "stage.dispatched",
+      "stage": "A7",
+      "taskId": "t-mwbm5385-e659623f",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:23:18.384Z",
+      "kind": "stage.requested",
+      "stage": "A8",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:23:31.549Z",
+      "kind": "stage.dispatched",
+      "stage": "A8",
+      "taskId": "t-mwbm65lk-7e36cac8",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:24:05.768Z",
+      "kind": "role.activated",
+      "stage": null,
+      "taskId": null,
+      "roleId": "env-bootstrap",
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:24:07.583Z",
+      "kind": "role.activated",
+      "stage": null,
+      "taskId": null,
+      "roleId": "game-core-dev",
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:24:09.385Z",
+      "kind": "role.activated",
+      "stage": null,
+      "taskId": null,
+      "roleId": "game-ui-dev",
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:24:10.889Z",
+      "kind": "role.activated",
+      "stage": null,
+      "taskId": null,
+      "roleId": "game-qa",
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:24:10.894Z",
+      "kind": "stage.completed",
+      "stage": "A8",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:24:58.812Z",
+      "kind": "stage.requested",
+      "stage": "A9",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:25:28.638Z",
+      "kind": "stage.blocked",
+      "stage": "A9",
+      "taskId": null,
+      "roleId": null,
+      "code": "baseline-document-missing",
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:25:48.511Z",
+      "kind": "stage.blocked",
+      "stage": "A9",
+      "taskId": null,
+      "roleId": null,
+      "code": "baseline-team-plan-invalid",
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:26:14.337Z",
+      "kind": "stage.completed",
+      "stage": "A9",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.236Z",
+      "kind": "stage.requested",
+      "stage": "A10",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.478Z",
+      "kind": "stage.completed",
+      "stage": "A10",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:28:13.805Z",
+      "kind": "stage.dispatched",
+      "stage": "A12a",
+      "taskId": "t-mwbmc7dz-1618a28d",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:28:19.956Z",
+      "kind": "stage.requested",
+      "stage": "A11",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:28:19.956Z",
+      "kind": "stage.dispatched",
+      "stage": "A11",
+      "taskId": "t-mwbmcc50-ed6710f7",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:29:39.502Z",
+      "kind": "stage.requested",
+      "stage": "A11",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:29:39.502Z",
+      "kind": "stage.dispatched",
+      "stage": "A11",
+      "taskId": "t-mwbme1im-ae76a89c",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:30:52.038Z",
+      "kind": "stage.blocked",
+      "stage": "A11",
+      "taskId": "t-mwbmeeqm-a96c5bf8",
+      "roleId": null,
+      "code": "task-report-blocked",
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:31:31.500Z",
+      "kind": "stage.requested",
+      "stage": "A11",
+      "taskId": null,
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    },
+    {
+      "at": "2026-11-11T04:31:31.500Z",
+      "kind": "stage.dispatched",
+      "stage": "A11",
+      "taskId": "t-mwbmgfxo-e6a86b1a",
+      "roleId": null,
+      "code": null,
+      "outcome": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-11T04:17:59.433Z",
+      "taskId": "t-mwblz1c3-3886f765",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:18:19.267Z",
+      "taskId": "t-mwblzgn7-fb977d34",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:18:37.962Z",
+      "taskId": "t-mwblzv2h-8d88f272",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:18:55.936Z",
+      "taskId": "t-mwbm08xs-4969505c",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:19:51.702Z",
+      "taskId": "t-mwbm1fyt-6c6740de",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A4",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:19:58.463Z",
+      "taskId": "t-mwbm1l6n-6ced70a6",
+      "from": "convener",
+      "to": "rapporteur",
+      "taskKind": null,
+      "stage": "A4",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:20:13.431Z",
+      "taskId": "t-mwbm1wqe-7494a3e6",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A5",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:20:31.544Z",
+      "taskId": "t-mwbm2apk-df885267",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A5",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:20:39.062Z",
+      "taskId": "t-mwbm2gie-410fcf63",
+      "from": "convener",
+      "to": "rapporteur",
+      "taskKind": null,
+      "stage": "A5",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:20:46.411Z",
+      "taskId": "t-mwbm2m6j-00a152dd",
+      "from": "convener",
+      "to": "rapporteur",
+      "taskKind": null,
+      "stage": "A5",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:22:35.214Z",
+      "taskId": "t-mwbm4y4t-93f869c0",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A7",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:22:41.813Z",
+      "taskId": "t-mwbm5385-e659623f",
+      "from": "convener",
+      "to": "nominator",
+      "taskKind": null,
+      "stage": "A7",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:23:18.384Z",
+      "taskId": "t-mwbm5vg0-077bf61f",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A8",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:23:31.544Z",
+      "taskId": "t-mwbm65lk-7e36cac8",
+      "from": "convener",
+      "to": "nominator",
+      "taskKind": null,
+      "stage": "A8",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:24:58.812Z",
+      "taskId": "t-mwbm80xo-05f10d9b",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A9",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:28:13.799Z",
+      "taskId": "t-mwbmc7dz-1618a28d",
+      "from": "chief",
+      "to": "verifier",
+      "taskKind": null,
+      "stage": "A12a",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:28:19.956Z",
+      "taskId": "t-mwbmcc50-ed6710f7",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A11",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:29:39.502Z",
+      "taskId": "t-mwbme1im-ae76a89c",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A11",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:29:56.638Z",
+      "taskId": "t-mwbmeeqm-a96c5bf8",
+      "from": "convener",
+      "to": "env-bootstrap",
+      "taskKind": null,
+      "stage": "A11",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:29:59.668Z",
+      "taskId": "t-mwbmeh2s-77f12919",
+      "from": "convener",
+      "to": "game-qa",
+      "taskKind": null,
+      "stage": "A11",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:30:00.692Z",
+      "taskId": "t-mwbmehv8-0e1e0f03",
+      "from": "chief",
+      "to": "verifier",
+      "taskKind": null,
+      "stage": "A12a",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    },
+    {
+      "at": "2026-11-11T04:31:31.501Z",
+      "taskId": "t-mwbmgfxo-e6a86b1a",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A11",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938"
+    }
+  ],
+  "taskReported": 26,
+  "taskClosed": [
+    {
+      "at": "2026-11-11T04:18:32.629Z",
+      "taskId": "t-mwblz1c3-3886f765",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:18:40.522Z",
+      "taskId": "t-mwblzgn7-fb977d34",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:19:06.482Z",
+      "taskId": "t-mwblzv2h-8d88f272",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:19:30.629Z",
+      "taskId": "t-mwbm08xs-4969505c",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:20:06.621Z",
+      "taskId": "t-mwbm1fyt-6c6740de",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:20:27.314Z",
+      "taskId": "t-mwbm1wqe-7494a3e6",
+      "outcome": "rejected"
+    },
+    {
+      "at": "2026-11-11T04:20:55.580Z",
+      "taskId": "t-mwbm2apk-df885267",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:20:58.427Z",
+      "taskId": "t-mwbm1l6n-6ced70a6",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:22:13.037Z",
+      "taskId": "t-mwbm2m6j-00a152dd",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:22:49.852Z",
+      "taskId": "t-mwbm4y4t-93f869c0",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:23:16.369Z",
+      "taskId": "t-mwbm5385-e659623f",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:23:35.649Z",
+      "taskId": "t-mwbm2gie-410fcf63",
+      "outcome": "rejected"
+    },
+    {
+      "at": "2026-11-11T04:24:37.653Z",
+      "taskId": "t-mwbm65lk-7e36cac8",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:24:53.750Z",
+      "taskId": "t-mwbm5vg0-077bf61f",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T04:27:46.867Z",
+      "taskId": "t-mwbm80xo-05f10d9b",
+      "outcome": "rework"
+    },
+    {
+      "at": "2026-11-11T04:28:52.972Z",
+      "taskId": "t-mwbmcc50-ed6710f7",
+      "outcome": "rework"
+    },
+    {
+      "at": "2026-11-11T04:29:56.518Z",
+      "taskId": "t-mwbmc7dz-1618a28d",
+      "outcome": "rework"
+    },
+    {
+      "at": "2026-11-11T04:30:52.038Z",
+      "taskId": "t-mwbmeeqm-a96c5bf8",
+      "outcome": "rework"
+    },
+    {
+      "at": "2026-11-11T04:31:23.138Z",
+      "taskId": "t-mwbme1im-ae76a89c",
+      "outcome": "rework"
+    },
+    {
+      "at": "2026-11-11T04:31:28.196Z",
+      "taskId": "t-mwbmeh2s-77f12919",
+      "outcome": "rework"
+    }
+  ],
+  "requestRows": [
+    {
+      "at": "2026-11-11T04:19:44.013Z",
+      "kind": "request.created",
+      "requestId": "req-7a6cca3b6a286459",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+      "stage": "A3",
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:19:44.023Z",
+      "kind": "request.presented",
+      "requestId": "req-7a6cca3b6a286459",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:19:44.036Z",
+      "kind": "request.notified",
+      "requestId": "req-7a6cca3b6a286459",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:19:44.023Z",
+      "kind": "request.notified",
+      "requestId": "req-7a6cca3b6a286459",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:19:44.199Z",
+      "kind": "request.resolved",
+      "requestId": "req-7a6cca3b6a286459",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+      "stage": "A3",
+      "by": "customer",
+      "choice": "confirm"
+    },
+    {
+      "at": "2026-11-11T04:19:44.219Z",
+      "kind": "request.notified",
+      "requestId": "req-7a6cca3b6a286459",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.334Z",
+      "kind": "request.created",
+      "requestId": "req-dd7923679393cfc9",
+      "cardKind": "proposal",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+      "stage": "A6",
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.349Z",
+      "kind": "request.presented",
+      "requestId": "req-dd7923679393cfc9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.362Z",
+      "kind": "request.notified",
+      "requestId": "req-dd7923679393cfc9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.349Z",
+      "kind": "request.notified",
+      "requestId": "req-dd7923679393cfc9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:22:29.760Z",
+      "kind": "request.resolved",
+      "requestId": "req-dd7923679393cfc9",
+      "cardKind": "proposal",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+      "stage": "A6",
+      "by": "customer",
+      "choice": "accept"
+    },
+    {
+      "at": "2026-11-11T04:22:29.778Z",
+      "kind": "request.notified",
+      "requestId": "req-dd7923679393cfc9",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.245Z",
+      "kind": "request.created",
+      "requestId": "req-33769db1f55a33dd",
+      "cardKind": "appointment",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+      "stage": "A10",
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.255Z",
+      "kind": "request.notified",
+      "requestId": "req-33769db1f55a33dd",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.256Z",
+      "kind": "request.presented",
+      "requestId": "req-33769db1f55a33dd",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.298Z",
+      "kind": "request.notified",
+      "requestId": "req-33769db1f55a33dd",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T04:28:02.464Z",
+      "kind": "request.resolved",
+      "requestId": "req-33769db1f55a33dd",
+      "cardKind": "appointment",
+      "workflowId": "wf-51b3f2f1cb476297dbcfd938",
+      "stage": "A10",
+      "by": "customer",
+      "choice": "env-bootstrap,game-core-dev,game-ui-dev,game-qa"
+    },
+    {
+      "at": "2026-11-11T04:28:02.479Z",
+      "kind": "request.notified",
+      "requestId": "req-33769db1f55a33dd",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    }
+  ],
+  "projectNotes": [
+    "等待产品 A2 意图文档 docs/product/snake-game-intent-v1.md 落盘并以 accepted 收口；随后写 docs/intents/snake-game.md 并呈 A3 意图确认卡",
+    "A3 已 confirm（decision-req-7a6cca3b6a286459）；等待运营派发策划 A4 准备任务；A4 收口后发 A5 stage-request 产出 proposal/modules/roster/architecture，随后呈 A6 方案确认卡",
+    "等待策划 A5 产出 proposal/modules/roster/architecture 四份 v1 文档并 closed accepted；随后核对 documentRefs 并呈 A6 方案确认卡",
+    "等待内置 verifier 落盘 docs/quality/snake-game-criteria-v1.md（A12a）；标准存在后重发 A11 stage-request 派实现（env-bootstrap → game-core-dev → game-ui-dev → game-qa）",
+    "等待 A11 实现串行完成：env-bootstrap(README/index.html) → game-core-dev(src 五个文件) → game-ui-dev(input/render) → game-qa 清单；全部 accepted 后派 A12b 验收报告任务"
+  ],
+  "docs": [
+    "audit",
+    "bootstrap-manifest.md",
+    "contracts",
+    "governance",
+    "intents",
+    "product",
+    "proposals",
+    "quality",
+    "scheduling"
+  ],
+  "roleCards": [
+    "env-bootstrap",
+    "game-core-dev",
+    "game-qa",
+    "game-ui-dev"
+  ],
+  "roleActivatedEvents": [
+    {
+      "at": "2026-11-11T04:24:05.768Z",
+      "roleId": "env-bootstrap",
+      "roleName": null,
+      "taskId": null
+    },
+    {
+      "at": "2026-11-11T04:24:07.583Z",
+      "roleId": "game-core-dev",
+      "roleName": null,
+      "taskId": null
+    },
+    {
+      "at": "2026-11-11T04:24:09.385Z",
+      "roleId": "game-ui-dev",
+      "roleName": null,
+      "taskId": null
+    },
+    {
+      "at": "2026-11-11T04:24:10.889Z",
+      "roleId": "game-qa",
+      "roleName": null,
+      "taskId": null
+    }
+  ],
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": true,
+    "releases": false
+  },
+  "gitRepoAbsent": false,
+  "shellGateAuditAbsent": false,
+  "git": {
+    "branch": "ans/task/wf-51b3f2f1cb476297dbcfd938",
+    "head": "8347781ae7a4d2b712cc1beecedfe2b946bde39a",
+    "log": "8347781 (HEAD -> ans/task/wf-51b3f2f1cb476297dbcfd938, main) ANS baseline: ans-managed .gitignore",
+    "status": "",
+    "branches": "* ans/task/wf-51b3f2f1cb476297dbcfd938 8347781 ANS baseline: ans-managed .gitignore\n  main                                 8347781 ANS baseline: ans-managed .gitignore",
+    "tags": "",
+    "remotes": "",
+    "mainLog": "8347781 ANS baseline: ans-managed .gitignore"
+  },
+  "note": "B18/B19/B20/B16 positives: A2 completed and B19 woke the chief to present the A3 intent card (customer confirm, stage.completed A3); A5 completed after a duplicate delivery-rejected retry; A6 single proposal card customer accept + completed; A7; A8 role docs written (B16) and path-only activate_role_documents accepted (B20) -> 4 role.activated (env-bootstrap, game-core-dev, game-ui-dev, game-qa), stage.completed A8. A9 team plan completed after two blocks (baseline-document-missing, baseline-team-plan-invalid); basis recorded bas-ba529b1e400941d756d0956a and verified. A10 appointment card presented and customer multi-selected all 4 roster roles; stage.completed A10. A12a criteria dispatched in parallel (G-1) and docs/quality/snake-game-criteria-v1.md written. A11 implementation dispatched but blocked: env-bootstrap README.md/index.html writes and game-qa qa/ checklist write were rejected by the write gate: 'Target is outside the actual assigned task's frozen module/current authorization intersection', allowed write paths 'project:(none)'; convener judged dispatch-side write authorization not frozen and re-dispatched by module with explicit writeSet (tasks closed as rework). The third A11 stage request raised chief dispatches to 13 > 12, so the approved budget gate stopped the run. No implementation commits: git has only the app baseline commit 8347781 'ANS baseline: ans-managed .gitignore' (branches main and ans/task/wf-51b3f2f1cb476297dbcfd938 at the same commit); A12a not completed; A12b/A13/merge not reached. Target repo initialized by the app; no legacy trunk/runs/stable writes. Shell-gate audit exists: run_shell attempts were policy-decided (allow readonly git ruleset / deny write-guard) with execution '未执行' for all rows; no interactive shell card appeared. Cards 3/4; customer messages 1."
+}

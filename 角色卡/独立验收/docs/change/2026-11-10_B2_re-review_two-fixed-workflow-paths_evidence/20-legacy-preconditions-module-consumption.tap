@@ -1,0 +1,424 @@
+TAP version 13
+# Subtest: X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用
+ok 1 - X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用
+  ---
+  duration_ms: 19.2341
+  type: 'test'
+  ...
+# Subtest: X-R6 工具（源码接缝）：moduleToolsRole 含 chief；旧门控仅作回退；closeCreatedTask 保留 directGovernance
+ok 2 - X-R6 工具（源码接缝）：moduleToolsRole 含 chief；旧门控仅作回退；closeCreatedTask 保留 directGovernance
+  ---
+  duration_ms: 1.2958
+  type: 'test'
+  ...
+# Subtest: X-R6 卡种：TRIO_CARD_KINDS.chief 表项已删除；默认卡由模块卡数据驱动
+ok 3 - X-R6 卡种：TRIO_CARD_KINDS.chief 表项已删除；默认卡由模块卡数据驱动
+  ---
+  duration_ms: 1.0632
+  type: 'test'
+  ...
+# Subtest: X-R6 intent-confirm：准备分支与协调者 choice 守卫读模块卡数据；文案保持既有口径
+ok 4 - X-R6 intent-confirm：准备分支与协调者 choice 守卫读模块卡数据；文案保持既有口径
+  ---
+  duration_ms: 0.6887
+  type: 'test'
+  ...
+# Subtest: X-R6 apply-journal：hub 来源/目标/路由/purpose/schema 读模块；证据核验字面量保留
+ok 5 - X-R6 apply-journal：hub 来源/目标/路由/purpose/schema 读模块；证据核验字面量保留
+  ---
+  duration_ms: 1.3562
+  type: 'test'
+  ...
+# Subtest: X-R6 trunk-runtime：hub 目标集合读模块；documents/coordination/rolePreparation 引擎路由保留
+ok 6 - X-R6 trunk-runtime：hub 目标集合读模块；documents/coordination/rolePreparation 引擎路由保留
+  ---
+  duration_ms: 0.6926
+  type: 'test'
+  ...
+# Subtest: X-R6 version-decision：注入与矩阵发起读模块声明；迁移前谓词仅回退
+ok 7 - X-R6 version-decision：注入与矩阵发起读模块声明；迁移前谓词仅回退
+  ---
+  duration_ms: 0.7103
+  type: 'test'
+  ...
+# Subtest: X-R6 收尾：临时三态开关与 legacy 分支已删除（无残留）
+ok 8 - X-R6 收尾：临时三态开关与 legacy 分支已删除（无残留）
+  ---
+  duration_ms: 1.8675
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+ok 9 - X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+  ---
+  duration_ms: 16.4232
+  type: 'test'
+  ...
+# Subtest: X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+ok 10 - X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+  ---
+  duration_ms: 6.3864
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+ok 11 - X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+  ---
+  duration_ms: 3.8875
+  type: 'test'
+  ...
+# Subtest: X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+ok 12 - X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+  ---
+  duration_ms: 4.2272
+  type: 'test'
+  ...
+# Subtest: X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+ok 13 - X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+  ---
+  duration_ms: 1.0692
+  type: 'test'
+  ...
+# Subtest: X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+ok 14 - X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+  ---
+  duration_ms: 0.3087
+  type: 'test'
+  ...
+# Subtest: X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+ok 15 - X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+  ---
+  duration_ms: 1.3194
+  type: 'test'
+  ...
+# Subtest: X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+ok 16 - X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+  ---
+  duration_ms: 1.0675
+  type: 'test'
+  ...
+# Subtest: team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+ok 17 - team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+  ---
+  duration_ms: 234.8293
+  type: 'test'
+  ...
+# Subtest: X-R3 run-role：trio nominator 注入模块声明的 activateRoleDocuments（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+ok 18 - X-R3 run-role：trio nominator 注入模块声明的 activateRoleDocuments（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+  ---
+  duration_ms: 20.651
+  type: 'test'
+  ...
+# Subtest: X-R3 卡种/工具切换点（源码锚点）：TRIO_CARD_KINDS.nominator 已删除；activateRoleDocuments 读模块声明并保留旧回退
+ok 19 - X-R3 卡种/工具切换点（源码锚点）：TRIO_CARD_KINDS.nominator 已删除；activateRoleDocuments 读模块声明并保留旧回退
+  ---
+  duration_ms: 1.5889
+  type: 'test'
+  ...
+# Subtest: X-R3 D3 卡事实包：严格 api-spec 登记键；模块 allow；旧 validateAppointmentCardAgainstRoster 差分逐例一致
+ok 20 - X-R3 D3 卡事实包：严格 api-spec 登记键；模块 allow；旧 validateAppointmentCardAgainstRoster 差分逐例一致
+  ---
+  duration_ms: 6.7156
+  type: 'test'
+  ...
+# Subtest: X-R3 role-documents 事实包：严格 api-spec 登记键；模块 allow；事实不可得 ⇒ undefined（跳过而非误拒）
+ok 21 - X-R3 role-documents 事实包：严格 api-spec 登记键；模块 allow；事实不可得 ⇒ undefined（跳过而非误拒）
+  ---
+  duration_ms: 9.3781
+  type: 'test'
+  ...
+# Subtest: X-R3 切换点顺序与 Service 最终校验保留（源码锚点）
+ok 22 - X-R3 切换点顺序与 Service 最终校验保留（源码锚点）
+  ---
+  duration_ms: 2.4456
+  type: 'test'
+  ...
+# Subtest: X-R1 run-role：trio product 注入 submitVersionChange；single+product 结构不可达（P-6 旧口径）
+ok 23 - X-R1 run-role：trio product 注入 submitVersionChange；single+product 结构不可达（P-6 旧口径）
+  ---
+  duration_ms: 9.8527
+  type: 'test'
+  ...
+# Subtest: X-R1 VCA direct：product preflight allow 不替代 Service——合法提交仍由既有 direct 链路落盘
+ok 24 - X-R1 VCA direct：product preflight allow 不替代 Service——合法提交仍由既有 direct 链路落盘
+  ---
+  duration_ms: 157.3577
+  type: 'test'
+  ...
+# Subtest: X-R1 VCA direct：product 模块 deny 映射既有回执码，且拒绝不落盘
+ok 25 - X-R1 VCA direct：product 模块 deny 映射既有回执码，且拒绝不落盘
+  ---
+  duration_ms: 39.0921
+  type: 'test'
+  ...
+# Subtest: X-R1 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 product 策略
+ok 26 - X-R1 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 product 策略
+  ---
+  duration_ms: 2.1712
+  type: 'test'
+  ...
+# Subtest: X-R2 run-role：trio rapporteur 注入模块声明的三工具（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+ok 27 - X-R2 run-role：trio rapporteur 注入模块声明的三工具（同一引用）；未提供 ⇒ 缺席；single 结构不可达
+  ---
+  duration_ms: 14.0347
+  type: 'test'
+  ...
+# Subtest: X-R2 卡种：rapporteur 模块 cards 与迁移前表逐项一致；默认卡走模块且 decision 不默认化（源码锚点）
+ok 28 - X-R2 卡种：rapporteur 模块 cards 与迁移前表逐项一致；默认卡走模块且 decision 不默认化（源码锚点）
+  ---
+  duration_ms: 1.7974
+  type: 'test'
+  ...
+# Subtest: X-R2/X-R4 run-role：requestRequirementChange 角色声明读模块（rapporteur/convener；旧内联谓词已删除）
+ok 29 - X-R2/X-R4 run-role：requestRequirementChange 角色声明读模块（rapporteur/convener；旧内联谓词已删除）
+  ---
+  duration_ms: 1.009
+  type: 'test'
+  ...
+# Subtest: X-R2 VCA direct：rapporteur detail-amendment 事实包被模块接受；allow 不替代 Service（畸形目标仍按既有码拒绝）
+ok 30 - X-R2 VCA direct：rapporteur detail-amendment 事实包被模块接受；allow 不替代 Service（畸形目标仍按既有码拒绝）
+  ---
+  duration_ms: 45.869
+  type: 'test'
+  ...
+# Subtest: X-R2 run-change：模块事实包；直接 wrapper 的 deny 与迁移前 Service 首检码/文案逐字一致（旧/新双跑）
+ok 31 - X-R2 run-change：模块事实包；直接 wrapper 的 deny 与迁移前 Service 首检码/文案逐字一致（旧/新双跑）
+  ---
+  duration_ms: 1.7071
+  type: 'test'
+  ...
+# Subtest: X-R2 run-change：stop/stop-and-restart 保留 Service `run-stop-unverified`；preflight 只做角色侧判定
+ok 32 - X-R2 run-change：stop/stop-and-restart 保留 Service `run-stop-unverified`；preflight 只做角色侧判定
+  ---
+  duration_ms: 0.9124
+  type: 'test'
+  ...
+# Subtest: X-R2 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 rapporteur 策略
+ok 33 - X-R2 接缝守卫：消费点经 Service 公共出口；apply-journal 不接 rapporteur 策略
+  ---
+  duration_ms: 1.8167
+  type: 'test'
+  ...
+# Subtest: W2 C5 commitPreparedRunChange：run-stop 终止证据改运行时中立 drain（native/processCoverage 前提删除；direct-stop 拒绝与 host fence 不变；不写 sidecar）
+ok 34 - W2 C5 commitPreparedRunChange：run-stop 终止证据改运行时中立 drain（native/processCoverage 前提删除；direct-stop 拒绝与 host fence 不变；不写 sidecar）
+  ---
+  duration_ms: 0.7425
+  type: 'test'
+  ...
+# Subtest: X-R5 run-role：verifier 工具声明为空（D1 allow/[]），trio 不注入任何 RoleToolId 专属工具
+ok 35 - X-R5 run-role：verifier 工具声明为空（D1 allow/[]），trio 不注入任何 RoleToolId 专属工具
+  ---
+  duration_ms: 15.4712
+  type: 'test'
+  ...
+# Subtest: X-R5 卡种：TRIO_CARD_KINDS.verifier 表项已删除；cardKindsOf 读模块 cards；默认卡种按模块数据
+ok 36 - X-R5 卡种：TRIO_CARD_KINDS.verifier 表项已删除；cardKindsOf 读模块 cards；默认卡种按模块数据
+  ---
+  duration_ms: 1.5346
+  type: 'test'
+  ...
+# Subtest: X-R5 apply-journal：review 前置事实键严格按 api-spec（恰好 reviewTarget/criteria）；未登记键 deny
+ok 37 - X-R5 apply-journal：review 前置事实键严格按 api-spec（恰好 reviewTarget/criteria）；未登记键 deny
+  ---
+  duration_ms: 0.5418
+  type: 'test'
+  ...
+# Subtest: X-R5 apply-journal：review 前置在 prepareReviewTask 材料产出后、返回前；指派读取不调用；deny 映射既有回执
+ok 38 - X-R5 apply-journal：review 前置在 prepareReviewTask 材料产出后、返回前；指派读取不调用；deny 映射既有回执
+  ---
+  duration_ms: 1.1107
+  type: 'test'
+  ...
+# Subtest: X-R5 路由核对：不调用 verifier dispatch（diff-only）；convener review 路由读来源模块数据；Service 证据核验保留
+ok 39 - X-R5 路由核对：不调用 verifier dispatch（diff-only）；convener review 路由读来源模块数据；Service 证据核验保留
+  ---
+  duration_ms: 1.5745
+  type: 'test'
+  ...
+# Subtest: X-R5 收尾：临时三态开关与 legacy 分支已删除（无残留）
+ok 40 - X-R5 收尾：临时三态开关与 legacy 分支已删除（无残留）
+  ---
+  duration_ms: 1.1996
+  type: 'test'
+  ...
+# Subtest: team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+ok 41 - team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+  ---
+  duration_ms: 8.1854
+  type: 'test'
+  ...
+# Subtest: 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+ok 42 - 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+  ---
+  duration_ms: 2.2646
+  type: 'test'
+  ...
+# Subtest: 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+ok 43 - 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+  ---
+  duration_ms: 1.211
+  type: 'test'
+  ...
+# Subtest: 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+ok 44 - 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+  ---
+  duration_ms: 9.4222
+  type: 'test'
+  ...
+# Subtest: 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+ok 45 - 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+  ---
+  duration_ms: 17.5701
+  type: 'test'
+  ...
+# Subtest: 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+ok 46 - 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+  ---
+  duration_ms: 31.6003
+  type: 'test'
+  ...
+# Subtest: 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+ok 47 - 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+  ---
+  duration_ms: 0.6367
+  type: 'test'
+  ...
+# Subtest: D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+ok 48 - D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+  ---
+  duration_ms: 0.2684
+  type: 'test'
+  ...
+# Subtest: 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+ok 49 - 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+  ---
+  duration_ms: 0.7258
+  type: 'test'
+  ...
+# Subtest: 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+ok 50 - 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+  ---
+  duration_ms: 0.1506
+  type: 'test'
+  ...
+# Subtest: 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+ok 51 - 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+  ---
+  duration_ms: 0.071
+  type: 'test'
+  ...
+# Subtest: 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+ok 52 - 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+  ---
+  duration_ms: 0.076
+  type: 'test'
+  ...
+# Subtest: 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+ok 53 - 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+  ---
+  duration_ms: 2.0636
+  type: 'test'
+  ...
+# Subtest: env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+ok 54 - env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+  ---
+  duration_ms: 1.4108
+  type: 'test'
+  ...
+# Subtest: 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+ok 55 - 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+  ---
+  duration_ms: 3.9477
+  type: 'test'
+  ...
+# Subtest: envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+ok 56 - envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+  ---
+  duration_ms: 1.3132
+  type: 'test'
+  ...
+# Subtest: 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+ok 57 - 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+  ---
+  duration_ms: 0.6093
+  type: 'test'
+  ...
+# Subtest: 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+ok 58 - 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+  ---
+  duration_ms: 0.1746
+  type: 'test'
+  ...
+# Subtest: R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+ok 59 - R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+  ---
+  duration_ms: 0.0556
+  type: 'test'
+  ...
+# Subtest: targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+ok 60 - targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+  ---
+  duration_ms: 0.0937
+  type: 'test'
+  ...
+# Subtest: evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+ok 61 - evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+  ---
+  duration_ms: 0.0882
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+ok 62 - AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+  ---
+  duration_ms: 0.8556
+  type: 'test'
+  ...
+# Subtest: AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+ok 63 - AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+  ---
+  duration_ms: 0.1464
+  type: 'test'
+  ...
+# Subtest: AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+ok 64 - AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+  ---
+  duration_ms: 0.1171
+  type: 'test'
+  ...
+# Subtest: AC-18：roster schema 文本含三条警告与占位 omissionReason
+ok 65 - AC-18：roster schema 文本含三条警告与占位 omissionReason
+  ---
+  duration_ms: 0.0451
+  type: 'test'
+  ...
+# Subtest: AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 66 - AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 7.9644
+  type: 'test'
+  ...
+# Subtest: AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 67 - AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 3.6218
+  type: 'test'
+  ...
+# Subtest: AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+ok 68 - AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+  ---
+  duration_ms: 1.9476
+  type: 'test'
+  ...
+# Subtest: AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+ok 69 - AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+  ---
+  duration_ms: 46.0504
+  type: 'test'
+  ...
+1..69
+# tests 69
+# suites 0
+# pass 69
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2775.235

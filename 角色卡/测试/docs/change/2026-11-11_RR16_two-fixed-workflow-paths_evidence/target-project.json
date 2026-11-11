@@ -1,0 +1,48 @@
+{
+  "projectRoot": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr16-2026-11-11/target",
+  "skillRoot": "C:/Users/51054/.claude/skills/ans-governed-construction",
+  "governanceModel": "trio",
+  "roles": {
+    "env-bootstrap": {
+      "card": "角色卡/env-bootstrap/role-card.md",
+      "boundary": "角色卡/env-bootstrap/boundary.yaml"
+    },
+    "game-core-dev": {
+      "card": "角色卡/game-core-dev/role-card.md",
+      "boundary": "角色卡/game-core-dev/boundary.yaml"
+    },
+    "game-qa": {
+      "card": "角色卡/game-qa/role-card.md",
+      "boundary": "角色卡/game-qa/boundary.yaml"
+    },
+    "game-ui-dev": {
+      "card": "角色卡/game-ui-dev/role-card.md",
+      "boundary": "角色卡/game-ui-dev/boundary.yaml"
+    }
+  },
+  "governanceBoundary": {
+    "path": "角色卡/governance-boundary.yaml",
+    "acceptance": {
+      "accepted": true,
+      "source": "desktop-app:操作者导入空文件夹并开启 chief 对话 = 发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/）",
+      "pin": [
+        {
+          "path": "角色卡/env-bootstrap/boundary.yaml",
+          "sha256": "db7f16ce349c54f3317a2957f4b49cf539bcd960e198853d59bd821f214a12a3"
+        },
+        {
+          "path": "角色卡/game-core-dev/boundary.yaml",
+          "sha256": "be07841ab341b39958c41643dc419e1b55de376e9a5adee66e14592fcdadced2"
+        },
+        {
+          "path": "角色卡/game-qa/boundary.yaml",
+          "sha256": "31cc8879f67098340d9c90f2b3d4647d8647163e275c8263964ce601ae96bc0e"
+        },
+        {
+          "path": "角色卡/game-ui-dev/boundary.yaml",
+          "sha256": "6e625c3127e79368f2556963ba939ffe975e5cd8a99eb18f9cb9a88deaa61b2d"
+        }
+      ]
+    }
+  }
+}

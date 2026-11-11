@@ -1,0 +1,324 @@
+TAP version 13
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+ok 1 - 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+  ---
+  duration_ms: 401.7411
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+ok 2 - 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+  ---
+  duration_ms: 369.4937
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+ok 3 - alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+  ---
+  duration_ms: 265.9256
+  type: 'test'
+  ...
+# Subtest: 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+ok 4 - 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+  ---
+  duration_ms: 176.9582
+  type: 'test'
+  ...
+# Subtest: 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+ok 5 - 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+  ---
+  duration_ms: 0.4811
+  type: 'test'
+  ...
+# Subtest: createShellGate：构造成功后唯一登记（inspect 可见、未登记 undefined、重复登记 fail-closed）
+ok 6 - createShellGate：构造成功后唯一登记（inspect 可见、未登记 undefined、重复登记 fail-closed）
+  ---
+  duration_ms: 1.4867
+  type: 'test'
+  ...
+# shell 闸审计未落盘：test-audit-fail
+# shell 闸审计未落盘：test-audit-fail
+# shell 闸审计未落盘：test-audit-fail
+# Subtest: file sink describe/probe：describe=file+durable；probe 纯判定不写盘；被拒 + refresh 一次重试；两次拒/刷新失败 ⇒ unavailable
+ok 7 - file sink describe/probe：describe=file+durable；probe 纯判定不写盘；被拒 + refresh 一次重试；两次拒/刷新失败 ⇒ unavailable
+  ---
+  duration_ms: 4.4126
+  type: 'test'
+  ...
+# Subtest: 测试私有 Symbol：仅非枚举挂 sink 时登记事实投影为 file+durable（测试模拟）；可枚举无效；buildShellGate/生产装配从不设置
+ok 8 - 测试私有 Symbol：仅非枚举挂 sink 时登记事实投影为 file+durable（测试模拟）；可枚举无效；buildShellGate/生产装配从不设置
+  ---
+  duration_ms: 1.2427
+  type: 'test'
+  ...
+# shell 闸审计未落盘：test-audit-fail
+# Subtest: auditFailurePolicy：observe 保持放行；deny-non-readonly 审批类 allow + 审计失败 ⇒ fail-closed；c-allow 只读不翻转
+ok 9 - auditFailurePolicy：observe 保持放行；deny-non-readonly 审批类 allow + 审计失败 ⇒ fail-closed；c-allow 只读不翻转
+  ---
+  duration_ms: 11.1021
+  type: 'test'
+  ...
+# Subtest: 只读 Git 审计：git status/log c-allow ⇒ branch:c-allow、by 前缀 ruleset:allow:readonly:git:<id>、readonlyGit.canonicalArgv 与 buildReadonlyGitBody 一致
+ok 10 - 只读 Git 审计：git status/log c-allow ⇒ branch:c-allow、by 前缀 ruleset:allow:readonly:git:<id>、readonlyGit.canonicalArgv 与 buildReadonlyGitBody 一致
+  ---
+  duration_ms: 1.891
+  type: 'test'
+  ...
+# Subtest: writeGuard 入口透传：shell-gate 以 entry（缺省 run_shell）调用守卫，判定顺序不变
+ok 11 - writeGuard 入口透传：shell-gate 以 entry（缺省 run_shell）调用守卫，判定顺序不变
+  ---
+  duration_ms: 0.2606
+  type: 'test'
+  ...
+# Subtest: OperatorPrompt 透传：审批卡携带 entry/roleId（只拷贝、不默认；不参与判定）
+ok 12 - OperatorPrompt 透传：审批卡携带 entry/roleId（只拷贝、不默认；不参与判定）
+  ---
+  duration_ms: 0.2551
+  type: 'test'
+  ...
+# Subtest: 快照 diff：新增/修改/删除；mtime 或 size 变化即 modified
+ok 13 - 快照 diff：新增/修改/删除；mtime 或 size 变化即 modified
+  ---
+  duration_ms: 5.5323
+  type: 'test'
+  ...
+# Subtest: 越界判定：边界内通过；边界外/禁写前缀进入 violations
+ok 14 - 越界判定：边界内通过；边界外/禁写前缀进入 violations
+  ---
+  duration_ms: 0.1728
+  type: 'test'
+  ...
+# Subtest: createShellPostAudit：执行前后快照对比 → 越界写入返回并写审计（仅越界时）；写审计失败不影响回执
+ok 15 - createShellPostAudit：执行前后快照对比 → 越界写入返回并写审计（仅越界时）；写审计失败不影响回执
+  ---
+  duration_ms: 3.0779
+  type: 'test'
+  ...
+# Subtest: 真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修改/删除可见
+ok 16 - 真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修改/删除可见
+  ---
+  duration_ms: 5.935
+  type: 'test'
+  ...
+# Subtest: R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）
+ok 17 - R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）
+  ---
+  duration_ms: 22.9236
+  type: 'test'
+  ...
+# Subtest: R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）
+ok 18 - R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）
+  ---
+  duration_ms: 3.9488
+  type: 'test'
+  ...
+# Subtest: P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入
+ok 19 - P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入
+  ---
+  duration_ms: 3.0346
+  type: 'test'
+  ...
+# Subtest: 归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界
+ok 20 - 归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界
+  ---
+  duration_ms: 0.2741
+  type: 'test'
+  ...
+# Subtest: 归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界
+ok 21 - 归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界
+  ---
+  duration_ms: 11.8238
+  type: 'test'
+  ...
+# Subtest: v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底
+ok 22 - v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底
+  ---
+  duration_ms: 2.8337
+  type: 'test'
+  ...
+# Subtest: 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny
+ok 23 - 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny
+  ---
+  duration_ms: 13.2381
+  type: 'test'
+  ...
+# Subtest: 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖）
+ok 24 - 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖）
+  ---
+  duration_ms: 0.4199
+  type: 'test'
+  ...
+# Subtest: 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝
+ok 25 - 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝
+  ---
+  duration_ms: 5.6572
+  type: 'test'
+  ...
+# Subtest: 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」）
+ok 26 - 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」）
+  ---
+  duration_ms: 12.7414
+  type: 'test'
+  ...
+# Subtest: W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit
+ok 27 - W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit
+  ---
+  duration_ms: 26.5274
+  type: 'test'
+  ...
+# Subtest: 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny
+ok 28 - 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny
+  ---
+  duration_ms: 3.9432
+  type: 'test'
+  ...
+# Subtest: run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变）
+ok 29 - run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变）
+  ---
+  duration_ms: 16.3255
+  type: 'test'
+  ...
+# Subtest: run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用）
+ok 30 - run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用）
+  ---
+  duration_ms: 11.4372
+  type: 'test'
+  ...
+# Subtest: run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑
+ok 31 - run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑
+  ---
+  duration_ms: 11.8047
+  type: 'test'
+  ...
+# Subtest: 次序表行 1：`allow` → **放行**，**不进 (b)/(a)**（桩未被调用）
+ok 32 - 次序表行 1：`allow` → **放行**，**不进 (b)/(a)**（桩未被调用）
+  ---
+  duration_ms: 2.7068
+  type: 'test'
+  ...
+# Subtest: 次序表行 2：`deny` → **终结拒**，**不进 (b)/(a)**（硬拒不可被翻案）
+ok 33 - 次序表行 2：`deny` → **终结拒**，**不进 (b)/(a)**（硬拒不可被翻案）
+  ---
+  duration_ms: 0.1855
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 判放行 → **终结放行，(a) 未被调用**（不打扰人）
+ok 34 - 次序表行 3（review）：(b) 判放行 → **终结放行，(a) 未被调用**（不打扰人）
+  ---
+  duration_ms: 0.4804
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 判拒绝 → **终结拒绝，(a) 未被调用**（不打扰人）
+ok 35 - 次序表行 3（review）：(b) 判拒绝 → **终结拒绝，(a) 未被调用**（不打扰人）
+  ---
+  duration_ms: 0.2988
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行
+ok 36 - 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行
+  ---
+  duration_ms: 0.3898
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 拒绝 → 拒绝
+ok 37 - 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 拒绝 → 拒绝
+  ---
+  duration_ms: 0.2317
+  type: 'test'
+  ...
+# Subtest: ★次序表行 4（risky）要害：**(b) 判放行 + (a) 拒绝 → 最终拒绝**（pm 不是终审，客户才是）
+ok 38 - ★次序表行 4（risky）要害：**(b) 判放行 + (a) 拒绝 → 最终拒绝**（pm 不是终审，客户才是）
+  ---
+  duration_ms: 0.2526
+  type: 'test'
+  ...
+# Subtest: ★次序表行 4（risky）：(b) 放行 + (a) 放行 → **放行，且 (a) 被调用过**
+ok 39 - ★次序表行 4（risky）：(b) 放行 + (a) 放行 → **放行，且 (a) 被调用过**
+  ---
+  duration_ms: 0.1773
+  type: 'test'
+  ...
+# Subtest: ★次序表行 4（risky）：**(b) 判拒绝 → 终结拒绝，且 (a) 未被调用**（pm 说不该跑就不打扰人）
+ok 40 - ★次序表行 4（risky）：**(b) 判拒绝 → 终结拒绝，且 (a) 未被调用**（pm 说不该跑就不打扰人）
+  ---
+  duration_ms: 0.2032
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行 / (a) 拒绝 → 拒绝
+ok 41 - 次序表行 4（risky）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行 / (a) 拒绝 → 拒绝
+  ---
+  duration_ms: 0.2725
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky）：(b) **无会话**（未注入 pmAsk）→ 升 (a)；(a) 放行 → 放行
+ok 42 - 次序表行 4（risky）：(b) **无会话**（未注入 pmAsk）→ 升 (a)；(a) 放行 → 放行
+  ---
+  duration_ms: 0.1395
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky）：(b) 审读**超时** → 升 (a)；(a) 拒绝 → 拒绝
+ok 43 - 次序表行 4（risky）：(b) 审读**超时** → 升 (a)；(a) 拒绝 → 拒绝
+  ---
+  duration_ms: 26.9499
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky，M-2 改判）：(b) 输出**不可解析** → **直接拒绝**（fail-closed；**不升 (a)、不打扰客户**）
+ok 44 - 次序表行 4（risky，M-2 改判）：(b) 输出**不可解析** → **直接拒绝**（fail-closed；**不升 (a)、不打扰客户**）
+  ---
+  duration_ms: 0.2223
+  type: 'test'
+  ...
+# Subtest: (a) 不可用 / 通道未接 / 确认超时 → **拒绝**（fail-closed，risky 亦不例外）
+ok 45 - (a) 不可用 / 通道未接 / 确认超时 → **拒绝**（fail-closed，risky 亦不例外）
+  ---
+  duration_ms: 30.9386
+  type: 'test'
+  ...
+# Subtest: (c)=risky 且 (b)/(a) 均未接入 → 默认拒绝（fail-closed，分支 risky-default-deny）
+ok 46 - (c)=risky 且 (b)/(a) 均未接入 → 默认拒绝（fail-closed，分支 risky-default-deny）
+  ---
+  duration_ms: 0.7161
+  type: 'test'
+  ...
+# Subtest: (c)=review 且 (b)/(a) 均未接入 → 默认拒绝（分支 review-default-deny，未因本轮改动而变）
+ok 47 - (c)=review 且 (b)/(a) 均未接入 → 默认拒绝（分支 review-default-deny，未因本轮改动而变）
+  ---
+  duration_ms: 0.4462
+  type: 'test'
+  ...
+# Subtest: ★差别证明：同「(b) 判放行」下——review **不打扰人**；risky **必过 (a)**（唯一差别）
+ok 48 - ★差别证明：同「(b) 判放行」下——review **不打扰人**；risky **必过 (a)**（唯一差别）
+  ---
+  duration_ms: 0.5253
+  type: 'test'
+  ...
+# Subtest: 集成：门禁引擎真判 `rm -rf build`=risky → (b) 放行 + (a) 拒绝 → **最终拒绝**
+ok 49 - 集成：门禁引擎真判 `rm -rf build`=risky → (b) 放行 + (a) 拒绝 → **最终拒绝**
+  ---
+  duration_ms: 2.7089
+  type: 'test'
+  ...
+# Subtest: 集成：`sh -c "…"`（re-shell）门禁真判=deny → **终结拒，(b)/(a) 未被调用**
+ok 50 - 集成：`sh -c "…"`（re-shell）门禁真判=deny → **终结拒，(b)/(a) 未被调用**
+  ---
+  duration_ms: 0.9924
+  type: 'test'
+  ...
+# Subtest: 集成：`ls -la` 门禁真判=allow → 放行，**不进 (b)/(a)**
+ok 51 - 集成：`ls -la` 门禁真判=allow → 放行，**不进 (b)/(a)**
+  ---
+  duration_ms: 0.8034
+  type: 'test'
+  ...
+1..51
+# tests 51
+# suites 0
+# pass 51
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2540.2502

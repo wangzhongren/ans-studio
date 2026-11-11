@@ -1,0 +1,356 @@
+TAP version 13
+# Subtest: VCA 卡：application-owned decision、真实 flowId、推荐 reject、目标/hash/语义齐全
+ok 1 - VCA 卡：application-owned decision、真实 flowId、推荐 reject、目标/hash/语义齐全
+  ---
+  duration_ms: 1.5312
+  type: 'test'
+  ...
+# Subtest: stable 卡：app-owned `stable-write`、无 flowId、恰一推荐；独立结构校验；decision 校验不适用
+ok 2 - stable 卡：app-owned `stable-write`、无 flowId、恰一推荐；独立结构校验；decision 校验不适用
+  ---
+  duration_ms: 0.3994
+  type: 'test'
+  ...
+# Subtest: 修正案逐项卡：item-apply/item-keep/item-cancel-amendment + acknowledgments 透传；none 不发卡
+ok 3 - 修正案逐项卡：item-apply/item-keep/item-cancel-amendment + acknowledgments 透传；none 不发卡
+  ---
+  duration_ms: 0.1906
+  type: 'test'
+  ...
+# Subtest: 客户端三态映射：只认 customer；judge/directive 一律 unavailable；acknowledgments 回传
+ok 4 - 客户端三态映射：只认 customer；judge/directive 一律 unavailable；acknowledgments 回传
+  ---
+  duration_ms: 0.262
+  type: 'test'
+  ...
+# Subtest: 客户主权：VCA 卡 @决策 指令不消费（不写 directive、不结算），原卡呈现客户
+ok 5 - 客户主权：VCA 卡 @决策 指令不消费（不写 directive、不结算），原卡呈现客户
+  ---
+  duration_ms: 19.7404
+  type: 'test'
+  ...
+# Subtest: acknowledgments：required 缺失/多余/非数组 ⇒ 拒收且 pending 保留；齐全 ⇒ settlement 带 acknowledged
+ok 6 - acknowledgments：required 缺失/多余/非数组 ⇒ 拒收且 pending 保留；齐全 ⇒ settlement 带 acknowledged
+  ---
+  duration_ms: 0.4835
+  type: 'test'
+  ...
+# Subtest: customer-input 最后防线：主权卡 judge/directive 结算被拒绝（pending 保留）
+ok 7 - customer-input 最后防线：主权卡 judge/directive 结算被拒绝（pending 保留）
+  ---
+  duration_ms: 0.1831
+  type: 'test'
+  ...
+# Subtest: SessionManager VCA 卡：经 convener 会话呈现；request.* 生命周期客户归属；notify:none
+ok 8 - SessionManager VCA 卡：经 convener 会话呈现；request.* 生命周期客户归属；notify:none
+  ---
+  duration_ms: 93.4678
+  type: 'test'
+  ...
+# Subtest: SessionManager：无治理会话/通道 ⇒ VCA/stable 卡 unavailable（fail-closed；不伪造批准）
+ok 9 - SessionManager：无治理会话/通道 ⇒ VCA/stable 卡 unavailable（fail-closed；不伪造批准）
+  ---
+  duration_ms: 0.9865
+  type: 'test'
+  ...
+# Subtest: SessionManager 修正案逐项卡：acknowledgments 对象数组呈现并回传
+ok 10 - SessionManager 修正案逐项卡：acknowledgments 对象数组呈现并回传
+  ---
+  duration_ms: 90.2237
+  type: 'test'
+  ...
+# Subtest: stable workflow：确认卡 → 一次性许可 → completeWrite 复核/消费/mini re-pin（trunkVersion 不变）
+ok 11 - stable workflow：确认卡 → 一次性许可 → completeWrite 复核/消费/mini re-pin（trunkVersion 不变）
+  ---
+  duration_ms: 89.9014
+  type: 'test'
+  ...
+# Subtest: stable 拒绝：不签发许可、不写记录为 written
+ok 12 - stable 拒绝：不签发许可、不写记录为 written
+  ---
+  duration_ms: 50.8442
+  type: 'test'
+  ...
+# Subtest: stable 写入哈希不符：completeWrite fail-closed、许可作废、不更新快照
+ok 13 - stable 写入哈希不符：completeWrite fail-closed、许可作废、不更新快照
+  ---
+  duration_ms: 63.4562
+  type: 'test'
+  ...
+# Subtest: 重启重建许可快照：新栈从磁盘恢复 approved 许可并安装 C2b 快照
+ok 14 - 重启重建许可快照：新栈从磁盘恢复 approved 许可并安装 C2b 快照
+  ---
+  duration_ms: 62.1815
+  type: 'test'
+  ...
+# Subtest: appointment-write 钩子（F16）：只提取 preview 正文/签发许可；桌面不写盘
+ok 15 - appointment-write 钩子（F16）：只提取 preview 正文/签发许可；桌面不写盘
+  ---
+  duration_ms: 65.1988
+  type: 'test'
+  ...
+# Subtest: 冻结迁移/损坏：ready ⇒ cacheHealth ok；baseline 损坏 ⇒ fail-closed 且不自动重建
+ok 16 - 冻结迁移/损坏：ready ⇒ cacheHealth ok；baseline 损坏 ⇒ fail-closed 且不自动重建
+  ---
+  duration_ms: 40.808
+  type: 'test'
+  ...
+# Subtest: trunk:state（F15）：workflow / roleCards / boundaries 三类 stable 快照齐全；单一来源摘要
+ok 17 - trunk:state（F15）：workflow / roleCards / boundaries 三类 stable 快照齐全；单一来源摘要
+  ---
+  duration_ms: 63.7086
+  type: 'test'
+  ...
+# Subtest: 主干升级（仅紧急/恢复）：预览变更 → 同一 previewId 客户确认 → t2；重复确认/常规理由拒绝
+ok 18 - 主干升级（仅紧急/恢复）：预览变更 → 同一 previewId 客户确认 → t2；重复确认/常规理由拒绝
+  ---
+  duration_ms: 90.2768
+  type: 'test'
+  ...
+# Subtest: refactor：convener 提交（能力层）/只读列表；非 convener 拒绝；无 trunk 版本
+ok 19 - refactor：convener 提交（能力层）/只读列表；非 convener 拒绝；无 trunk 版本
+  ---
+  duration_ms: 31.15
+  type: 'test'
+  ...
+# Subtest: IPC 冻结集：无 submit/refactor:request/stable-write:request；只保留一条 trunk:state 推送
+ok 20 - IPC 冻结集：无 submit/refactor:request/stable-write:request；只保留一条 trunk:state 推送
+  ---
+  duration_ms: 0.1407
+  type: 'test'
+  ...
+# Subtest: 只读列表面：VCA/stable/冻结摘要有界、无 drift 字段；cacheHealth 如实
+ok 21 - 只读列表面：VCA/stable/冻结摘要有界、无 drift 字段；cacheHealth 如实
+  ---
+  duration_ms: 63.4827
+  type: 'test'
+  ...
+# Subtest: Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话角色（不信任工具自报）
+ok 22 - Batch 3.5 三能力注入：仅对应角色注入；身份强制为会话角色（不信任工具自报）
+  ---
+  duration_ms: 134.6807
+  type: 'test'
+  ...
+# Subtest: Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+not ok 23 - Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+  ---
+  duration_ms: 41.6911
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:1143:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1171:14
+    async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1144:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+not ok 24 - VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+  ---
+  duration_ms: 28.9116
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:1204:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1226:14
+    async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1205:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+not ok 25 - VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+  ---
+  duration_ms: 41.3464
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:1241:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-role-not-allowed: Direct submit requires the real session role, operation id and explicit expected base
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1265:14
+    async withProject (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:575:5)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:1242:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Batch 3.5 request_stable_write：客户拒绝 ⇒ 回执失败且不签发许可
+ok 26 - Batch 3.5 request_stable_write：客户拒绝 ⇒ 回执失败且不签发许可
+  ---
+  duration_ms: 50.7838
+  type: 'test'
+  ...
+# Subtest: Batch 3.5 trunk 客户动作：refreeze 只 stable、不升版本；abandon 不改指针；history 只读
+ok 27 - Batch 3.5 trunk 客户动作：refreeze 只 stable、不升版本；abandon 不改指针；history 只读
+  ---
+  duration_ms: 69.8059
+  type: 'test'
+  ...
+# Subtest: AC-13：buildStableBoundaryRisk 生成横幅/required ack；不可解析标记 fail-closed
+ok 28 - AC-13：buildStableBoundaryRisk 生成横幅/required ack；不可解析标记 fail-closed
+  ---
+  duration_ms: 0.2376
+  type: 'test'
+  ...
+# Subtest: AC-13：boundary 扩大（新增目录）⇒ 卡面横幅 + required ack；勾选后可签发许可
+ok 29 - AC-13：boundary 扩大（新增目录）⇒ 卡面横幅 + required ack；勾选后可签发许可
+  ---
+  duration_ms: 182.5421
+  type: 'test'
+  ...
+# Subtest: AC-13：扩大未勾选 ⇒ 不签发许可（最后防线，fail-closed）
+ok 30 - AC-13：扩大未勾选 ⇒ 不签发许可（最后防线，fail-closed）
+  ---
+  duration_ms: 175.4763
+  type: 'test'
+  ...
+# Subtest: AC-13：收窄/无变化 ⇒ 不误报；正常签发许可
+ok 31 - AC-13：收窄/无变化 ⇒ 不误报；正常签发许可
+  ---
+  duration_ms: 337.9493
+  type: 'test'
+  ...
+# Subtest: AC-13：预览不可解析 ⇒ 拒绝且不呈现卡/不签发许可
+ok 32 - AC-13：预览不可解析 ⇒ 拒绝且不呈现卡/不签发许可
+  ---
+  duration_ms: 55.9927
+  type: 'test'
+  ...
+# Subtest: D4 confirm 回执：required ack 合法 ⇒ answered/acknowledged；缺失/多余/非数组 ⇒ 拒收且 pending
+ok 33 - D4 confirm 回执：required ack 合法 ⇒ answered/acknowledged；缺失/多余/非数组 ⇒ 拒收且 pending
+  ---
+  duration_ms: 0.3464
+  type: 'test'
+  ...
+# Subtest: D4 confirm：confirmed:false 不要求/不校验 ack，不回传 acknowledged
+ok 34 - D4 confirm：confirmed:false 不要求/不校验 ack，不回传 acknowledged
+  ---
+  duration_ms: 0.1644
+  type: 'test'
+  ...
+# Subtest: D4 confirm：请求无 required ack ⇒ 旧行为零变化（不要求/不回传）
+ok 35 - D4 confirm：请求无 required ack ⇒ 旧行为零变化（不要求/不回传）
+  ---
+  duration_ms: 0.1114
+  type: 'test'
+  ...
+# Subtest: D4 端到端：appointment-write 扩大 boundary 经真实确认通道回传 ack ⇒ 签发许可
+ok 36 - D4 端到端：appointment-write 扩大 boundary 经真实确认通道回传 ack ⇒ 签发许可
+  ---
+  duration_ms: 175.9733
+  type: 'test'
+  ...
+# Subtest: 方案升级卡：application-owned decision、真实 flowId、四选项固定顺序 + escalation-continue 推荐、preview 语义
+ok 37 - 方案升级卡：application-owned decision、真实 flowId、四选项固定顺序 + escalation-continue 推荐、preview 语义
+  ---
+  duration_ms: 0.4362
+  type: 'test'
+  ...
+# Subtest: 客户主权：方案升级整卡排除代选/判断/@决策；application 非 true 或选项子集 ⇒ 不排除
+ok 38 - 客户主权：方案升级整卡排除代选/判断/@决策；application 非 true 或选项子集 ⇒ 不排除
+  ---
+  duration_ms: 20.3839
+  type: 'test'
+  ...
+# Subtest: SessionManager 方案升级：仅 convener 注入/提交；在途同 flow 至多一张；裁定后如实通知且不派发/不写文档
+ok 39 - SessionManager 方案升级：仅 convener 注入/提交；在途同 flow 至多一张；裁定后如实通知且不派发/不写文档
+  ---
+  duration_ms: 98.6711
+  type: 'test'
+  ...
+# Subtest: SessionManager 方案升级：未获客户裁定 ⇒ 如实通知 convener（不宣称已变更）
+ok 40 - SessionManager 方案升级：未获客户裁定 ⇒ 如实通知 convener（不宣称已变更）
+  ---
+  duration_ms: 72.9993
+  type: 'test'
+  ...
+# Subtest: SessionManager 方案升级：客户选「修订方案」⇒ 向 rapporteur 投递重做消息（不派发、不改需求）
+ok 41 - SessionManager 方案升级：客户选「修订方案」⇒ 向 rapporteur 投递重做消息（不派发、不改需求）
+  ---
+  duration_ms: 46.8994
+  type: 'test'
+  ...
+# Subtest: SessionManager blocked 提示：首次 blocked 即提示运营自行选择（不是客户卡）；在途卡/已提示节流；done/failed 与提交升级卡后清除
+ok 42 - SessionManager blocked 提示：首次 blocked 即提示运营自行选择（不是客户卡）；在途卡/已提示节流；done/failed 与提交升级卡后清除
+  ---
+  duration_ms: 931.8123
+  type: 'test'
+  ...
+# Subtest: SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+not ok 43 - SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+  ---
+  duration_ms: 4779.7928
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\version-change.test.ts:2179:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /\[工作结果\]/. Input:
+    
+    ''
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: ''
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/version-change.test.ts:2199:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 规划trunk缺workflow诚实可读，升级/refreeze执行分支明确拒绝且不合成workflow
+ok 44 - 规划trunk缺workflow诚实可读，升级/refreeze执行分支明确拒绝且不合成workflow
+  ---
+  duration_ms: 63.8558
+  type: 'test'
+  ...
+# Subtest: W2 ordinary submit uses real direct validation and never revives the former approval card
+ok 45 - W2 ordinary submit uses real direct validation and never revives the former approval card
+  ---
+  duration_ms: 0.7446
+  type: 'test'
+  ...
+# Subtest: W46 Pipeline许可恢复投影：无效/未答保有效许可，真实读错清旧且修复可恢复
+ok 46 - W46 Pipeline许可恢复投影：无效/未答保有效许可，真实读错清旧且修复可恢复
+  ---
+  duration_ms: 65.4948
+  type: 'test'
+  ...
+1..46
+# tests 46
+# suites 0
+# pass 42
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8625.9703

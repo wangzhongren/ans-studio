@@ -1,0 +1,15 @@
+# B2.1 desktop writeset boundary (final, 2026-11-10T15:04:43Z)
+HEAD: 5820fe4737bc979a7288fdaea346004269bce781
+--- git status --porcelain -- src app test ---
+ M app/desktop/session.ts
+ M test/桌面应用/b3-fixed-baseline-pathb.test.ts
+ M test/桌面应用/b31-fixed-release-auto-desktop.test.ts
+?? test/桌面应用/b21-basis-gate-desktop.test.ts
+--- git diff --stat -- src app test ---
+warning: in the working copy of 'test/桌面应用/b3-fixed-baseline-pathb.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/桌面应用/b31-fixed-release-auto-desktop.test.ts', LF will be replaced by CRLF the next time Git touches it
+ app/desktop/session.ts                             | 40 +++++++++++++++++++++-
+ test/桌面应用/b3-fixed-baseline-pathb.test.ts      | 19 ++++++++++
+ .../b31-fixed-release-auto-desktop.test.ts         | 27 ++++++++++++---
+ 3 files changed, 80 insertions(+), 6 deletions(-)
+--- src diff (should be empty) ---

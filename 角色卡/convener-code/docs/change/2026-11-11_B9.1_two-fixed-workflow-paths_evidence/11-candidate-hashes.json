@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "path": "src/common/roles/convener/index.ts",
+      "sha256": "e3bd63f0355dc2e40526a72d518afcb7230da00bcccaa78c3e02e6350f77009d",
+      "bytes": 45392,
+      "lines": 816,
+      "cr": 0
+    },
+    {
+      "path": "test/roles/convener/convener-fixed.test.ts",
+      "sha256": "e3ea37fd28c4168ca8691a8b13949642a5eb4ac4f4695a71604b9fda183c0c65",
+      "bytes": 15042,
+      "lines": 275,
+      "cr": 0
+    }
+  ],
+  "aggregateSha256": "a7ea2427a2ba5181d3a6d81c1de02b9c117eb73204541a873bc59f9773802ec8",
+  "totalBytes": 60434
+}

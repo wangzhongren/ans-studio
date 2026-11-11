@@ -1,0 +1,8 @@
+role: env-bootstrap
+entries:
+  - kind: file
+    path: README.md
+    purpose: 运行环境与操作说明（env-resources）
+  - kind: file
+    path: index.html
+    purpose: 页面入口与脚本装配（entry-index）

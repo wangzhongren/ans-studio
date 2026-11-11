@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: H1 装配：launcher 包装命令/alwaysLoad/工具级 timeout；allowedTools 加 server 级名；env:NAME 展开（缺失省略）
+ok 1 - H1 装配：launcher 包装命令/alwaysLoad/工具级 timeout；allowedTools 加 server 级名；env:NAME 展开（缺失省略）
+  ---
+  duration_ms: 50.1736
+  type: 'test'
+  ...
+# Subtest: H2 hook 放行五条件对抗：名错位/近似前缀/未绑定轮/非 dynamic/未安装名 ⇒ deny；合法 ⇒ allow 且**无 updatedInput**
+ok 2 - H2 hook 放行五条件对抗：名错位/近似前缀/未绑定轮/非 dynamic/未安装名 ⇒ deny；合法 ⇒ allow 且**无 updatedInput**
+  ---
+  duration_ms: 2.4005
+  type: 'test'
+  ...
+# Subtest: H3 审计两行配对：hook start 行（native-start）＋消息泵 tool_result 行（result）均以 mcp__ 名在场；非文本块标 unsupported
+ok 3 - H3 审计两行配对：hook start 行（native-start）＋消息泵 tool_result 行（result）均以 mcp__ 名在场；非文本块标 unsupported
+  ---
+  duration_ms: 1.8804
+  type: 'test'
+  ...
+# Subtest: H3b 生产投影路径：required-v1（projectToolEvent）下 MCP 两行事实含 native 内容与工具名（同 G-3 WebSearch 形）
+ok 4 - H3b 生产投影路径：required-v1（projectToolEvent）下 MCP 两行事实含 native 内容与工具名（同 G-3 WebSearch 形）
+  ---
+  duration_ms: 2.6939
+  type: 'test'
+  ...
+# Subtest: H4 status 行：failed/needs-auth 类别化一行（无正文）；connected/未安装静默；每引擎一次；status 查询失败不毁轮
+ok 5 - H4 status 行：failed/needs-auth 类别化一行（无正文）；connected/未安装静默；每引擎一次；status 查询失败不毁轮
+  ---
+  duration_ms: 2.635
+  type: 'test'
+  ...
+# Subtest: H5 零安装零变化：未注入 installedMcpServers ⇒ allowedTools/mcpServers/放行面与旧行为一致（无 mcp__ 外来前缀行）
+ok 6 - H5 零安装零变化：未注入 installedMcpServers ⇒ allowedTools/mcpServers/放行面与旧行为一致（无 mcp__ 外来前缀行）
+  ---
+  duration_ms: 1.4406
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 177.0529

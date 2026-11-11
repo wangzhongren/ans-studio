@@ -1,0 +1,22 @@
+# B5.2 baseline (before edits) 2026-11-10T13:07:07Z
+
+HEAD: e645e4ebe9b7444d4647ac74fb4f49a99030c354
+Branch: feat/two-fixed-workflow-paths
+
+## git status --porcelain -- src app test
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+ M test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/桌面应用/b51-fixed-workflow-wiring.test.ts
+?? test/测试/b-change-scope.test.ts
+?? test/测试/fixed-path-full-chain.test.ts
+?? test/测试/mode-switch.test.ts
+
+## sha256 of baseline files
+0c1530b79b6ba8cff4bd08d3dc7e4a0ed0e69c13f1c458627d472328d56ff80a *test/测试/fixed-path-full-chain.test.ts
+b38596b8b886c86111f2102d5be17cc0c53ae58ca4eb83e97c7f25df1addeca2 *test/测试/mode-switch.test.ts
+a7f97744e23a05d0b26383ca3f7247aa512dec28355f03a15eff067c000e4d31 *test/测试/b-change-scope.test.ts
+2b9f61b78e63fd9029f2dc8bb6ed7f848b2f8cf0c478d160c711d06c36b86523 *app/desktop/session.ts
+072b312d59be1e19c6c40cd1056a5f6439bde53a161aeb4ffd88b99f554d6327 *app/desktop/workflow.ts
+bad457a354b656b970c928b1000ae7134a8596dd69f80c64c7b396e88230b5b6 *test/项目管理/shared/i18n-guard-allowlist.ts
+d3b97fffa606cbbeb91de1acb6cb11c1696a2c99ec3912847b7decfa24c2bdd2 *test/桌面应用/b51-fixed-workflow-wiring.test.ts

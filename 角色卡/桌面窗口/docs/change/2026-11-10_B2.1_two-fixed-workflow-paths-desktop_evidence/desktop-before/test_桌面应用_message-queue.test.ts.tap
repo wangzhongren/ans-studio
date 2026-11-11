@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递
+ok 1 - 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递
+  ---
+  duration_ms: 0.6424
+  type: 'test'
+  ...
+# Subtest: L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照
+ok 2 - L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照
+  ---
+  duration_ms: 354.0086
+  type: 'test'
+  ...
+# Subtest: L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文）
+ok 3 - L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文）
+  ---
+  duration_ms: 31.9328
+  type: 'test'
+  ...
+# Subtest: L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达
+ok 4 - L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达
+  ---
+  duration_ms: 360.8116
+  type: 'test'
+  ...
+# Subtest: L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态）
+ok 5 - L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态）
+  ---
+  duration_ms: 47.6021
+  type: 'test'
+  ...
+# Subtest: 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts
+ok 6 - 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts
+  ---
+  duration_ms: 746.243
+  type: 'test'
+  ...
+# Subtest: 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts
+ok 7 - 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts
+  ---
+  duration_ms: 47.8307
+  type: 'test'
+  ...
+# Subtest: 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测
+ok 8 - 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测
+  ---
+  duration_ms: 1.4942
+  type: 'test'
+  ...
+# Subtest: F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递
+ok 9 - F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递
+  ---
+  duration_ms: 817.1854
+  type: 'test'
+  ...
+# Subtest: G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回
+ok 10 - G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回
+  ---
+  duration_ms: 391.2481
+  type: 'test'
+  ...
+# Subtest: P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型
+ok 11 - P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型
+  ---
+  duration_ms: 170.5181
+  type: 'test'
+  ...
+# Subtest: G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）
+ok 12 - G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）
+  ---
+  duration_ms: 387.9591
+  type: 'test'
+  ...
+# Subtest: G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn
+ok 13 - G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn
+  ---
+  duration_ms: 284.8371
+  type: 'test'
+  ...
+# Subtest: 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime
+ok 14 - 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime
+  ---
+  duration_ms: 331.8798
+  type: 'test'
+  ...
+# Subtest: 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投
+ok 15 - 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投
+  ---
+  duration_ms: 275.1208
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用）
+ok 16 - 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用）
+  ---
+  duration_ms: 190.9826
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供
+ok 17 - 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供
+  ---
+  duration_ms: 28.9034
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写）
+ok 18 - 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写）
+  ---
+  duration_ms: 29.3427
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色
+ok 19 - 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色
+  ---
+  duration_ms: 288.7068
+  type: 'test'
+  ...
+# Subtest: 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离
+ok 20 - 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离
+  ---
+  duration_ms: 283.4197
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5485.3447

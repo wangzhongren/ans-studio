@@ -46,6 +46,16 @@ entries:
   - kind: directory
     path: test/runtime-core/
     purpose: 本角色单元测试与契约夹具
+  # --- Delta-B2930-2（2026-11-11，客户 B29/B30 授权）：B30 只读 Git `[user]` 白名单——补登 1 个实现单文件与 2 个精确测试文件，逐文件授权，无目录级授权 ---
+  - kind: file
+    path: src/provider/trunk/impl/git-command.ts
+    purpose: 只读 Git 配置/命令解析与白名单（B30）
+  - kind: file
+    path: test/编排/git-command.test.ts
+    purpose: git-command 配置白名单/安全拒绝测试（B30）
+  - kind: file
+    path: test/编排/readonly-git-transport.test.ts
+    purpose: 只读 Git 传输/执行测试（B30）
   - kind: file
     path: 角色卡/运行时核心/feature-map.md
     purpose: 本角色实现与功能资料

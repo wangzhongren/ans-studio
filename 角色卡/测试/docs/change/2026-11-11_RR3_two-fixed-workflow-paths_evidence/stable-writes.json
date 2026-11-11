@@ -1,0 +1,15 @@
+[
+  {
+    "v": 1,
+    "schema": "stable-write/v1",
+    "requestId": "sw-1",
+    "roleId": "convener",
+    "path": "docs/workflow.md",
+    "kind": "workflow",
+    "baseSha256": "",
+    "targetSha256": "b8be4cbb1a4c2e0222aae9f9899929486af8e591d2afd3999179e662577aa3ba",
+    "diffPreview": "",
+    "status": "requested",
+    "at": "2026-11-10T19:07:32.377Z"
+  }
+]

@@ -1,0 +1,26 @@
+{
+  "model": "deepseek-v4-flash",
+  "roles": {
+    "chief": {
+      "assistantMessages": 10,
+      "inputTokens": 63584,
+      "outputTokens": 4178,
+      "cacheCreate": 0,
+      "cacheRead": 258048,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "convener": {
+      "assistantMessages": 42,
+      "inputTokens": 86504,
+      "outputTokens": 59872,
+      "cacheCreate": 0,
+      "cacheRead": 1353856,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "note": "message.usage from native transcripts; no cost_usd field"
+}

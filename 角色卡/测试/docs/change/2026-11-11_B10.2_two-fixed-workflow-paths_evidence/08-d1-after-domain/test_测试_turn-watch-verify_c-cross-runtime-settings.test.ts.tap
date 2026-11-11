@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env
+ok 1 - C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env
+  ---
+  duration_ms: 0.4387
+  type: 'test'
+  ...
+# Subtest: C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露
+ok 2 - C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露
+  ---
+  duration_ms: 0.6139
+  type: 'test'
+  ...
+# Subtest: C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查
+ok 3 - C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查
+  ---
+  duration_ms: 0.1031
+  type: 'test'
+  ...
+# Subtest: C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止）
+ok 4 - C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止）
+  ---
+  duration_ms: 1.3327
+  type: 'test'
+  ...
+# Subtest: C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」
+ok 5 - C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」
+  ---
+  duration_ms: 16.371
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 428.6441

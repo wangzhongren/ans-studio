@@ -1,0 +1,8 @@
+# G-B5-3: stage.requested A6 writers in production (expect only tests/fixtures, none in src/app)
+$ grep -rn "\"A6\"\|\x27A6\x27" src app --include=*.ts | grep -i "stage"
+---
+# stage-request idempotency key writers (run-role A10 / workflow-service A3+A13/B4 only)
+src/pipeline/orchestration/run-role.ts:3841:    idempotencyKey: stageRequestIdempotencyKey(workflowId, "A10", 1),
+src/common/编排/workflow-service.ts:915:    idempotencyKey = stageRequestIdempotencyKey(resolvedWorkflowId, input.stage, attempt);
+src/common/编排/workflow-service.ts:1576:        idempotencyKey: stageRequestIdempotencyKey(workflowId, "A3", 1),
+src/common/编排/workflow-service.ts:2877:        idempotencyKey: stageRequestIdempotencyKey(input.workflowId, targetStage, 1),

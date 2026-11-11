@@ -1,0 +1,220 @@
+TAP version 13
+# Subtest: complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+ok 1 - complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+  ---
+  duration_ms: 2.0499
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传；B25 fixed 回执被接受
+ok 2 - complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传；B25 fixed 回执被接受
+  ---
+  duration_ms: 1.1882
+  type: 'test'
+  ...
+# Subtest: B25 fixed complete_team_plan：失败回执透出 code/message（不按 unknown 处理）
+ok 3 - B25 fixed complete_team_plan：失败回执透出 code/message（不按 unknown 处理）
+  ---
+  duration_ms: 0.3104
+  type: 'test'
+  ...
+# Subtest: B25 fixed complete_team_plan：成功回执形状不符/身份不一致 ⇒ unknown（fail-closed，不伪造成功）
+ok 4 - B25 fixed complete_team_plan：成功回执形状不符/身份不一致 ⇒ unknown（fail-closed，不伪造成功）
+  ---
+  duration_ms: 0.5527
+  type: 'test'
+  ...
+# Subtest: B29 配套：fixed 服务成功回执（CompleteTeamPlanFixedResult，含可选 git）被工具层识别 ok:true 并逐字透出
+ok 5 - B29 配套：fixed 服务成功回执（CompleteTeamPlanFixedResult，含可选 git）被工具层识别 ok:true 并逐字透出
+  ---
+  duration_ms: 0.2295
+  type: 'test'
+  ...
+# Subtest: B29 配套：fixed 服务失败回执（WorkflowServiceFailure，含 missing）透出 code/message；身份不符仍 unknown
+ok 6 - B29 配套：fixed 服务失败回执（WorkflowServiceFailure，含 missing）透出 code/message；身份不符仍 unknown
+  ---
+  duration_ms: 0.2392
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+ok 7 - complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+  ---
+  duration_ms: 0.2522
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+ok 8 - complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+  ---
+  duration_ms: 0.1957
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+ok 9 - complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+  ---
+  duration_ms: 0.3092
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+ok 10 - complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+  ---
+  duration_ms: 0.3203
+  type: 'test'
+  ...
+# Subtest: complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+ok 11 - complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+  ---
+  duration_ms: 0.2032
+  type: 'test'
+  ...
+# Subtest: RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+ok 12 - RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+  ---
+  duration_ms: 0.0916
+  type: 'test'
+  ...
+# Subtest: request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+ok 13 - request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+  ---
+  duration_ms: 0.0812
+  type: 'test'
+  ...
+# Subtest: NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association
+ok 14 - NoGit protection absence: private issued facts protect potential metadata and reject a new ancestor association
+  ---
+  duration_ms: 14.2438
+  type: 'test'
+  ...
+# Subtest: Git protection freshness: only the issued observation survives unchanged config/topology
+ok 15 - Git protection freshness: only the issued observation survives unchanged config/topology
+  ---
+  duration_ms: 215.8771
+  type: 'test'
+  ...
+# Subtest: Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+ok 16 - Git final spawn fence: real pending-record interruption records no launch and permits a later genuine retry
+  ---
+  duration_ms: 1057.0976
+  type: 'test'
+  ...
+# Subtest: Git init Provider: final real root/file hashes fence initialization and persist original operation process identity
+ok 17 - Git init Provider: final real root/file hashes fence initialization and persist original operation process identity
+  ---
+  duration_ms: 77.2272
+  type: 'test'
+  ...
+# Subtest: Git init journal: restart discovery binds the original operation and excludes FS/ref media
+ok 18 - Git init journal: restart discovery binds the original operation and excludes FS/ref media
+  ---
+  duration_ms: 37.8459
+  type: 'test'
+  ...
+# Subtest: Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent
+ok 19 - Git init process fence: a previous unknown instance cannot be overwritten even while .git is absent
+  ---
+  duration_ms: 4.6038
+  type: 'test'
+  ...
+# Subtest: Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged
+ok 20 - Git protection requirement: actual source binds scope; deleting evidence cannot clear it; an unknown association is not unmanaged
+  ---
+  duration_ms: 9.8634
+  type: 'test'
+  ...
+# Subtest: Git empty plan: computed sha1 object bytes match actual fixed-date Git readback
+ok 21 - Git empty plan: computed sha1 object bytes match actual fixed-date Git readback
+  ---
+  duration_ms: 554.451
+  type: 'test'
+  ...
+# Subtest: Git empty plan: computed sha256 object bytes match actual fixed-date Git readback
+ok 22 - Git empty plan: computed sha256 object bytes match actual fixed-date Git readback
+  ---
+  duration_ms: 396.9992
+  type: 'test'
+  ...
+# {"repoId":"45c06e8deffa7bd8930f46301488c6e12e74a32fa70668c0d89eb1e900190acf","executable":"C:\\\\Program Files\\\\Git\\\\cmd\\\\git.exe","argv":["--no-pager","--no-optional-locks","--literal-pathspecs","-c","core.fsmonitor=false","-c","core.hooksPath=NUL","-c","core.untrackedCache=false","-c","core.excludesFile=NUL","-c","core.pager=cat","-c","pager.status=false","-c","pager.diff=false","-c","maintenance.auto=false","-c","gc.auto=0","-c","protocol.allow=never","-c","diff.external=","-c","core.attributesFile=NUL","status","--porcelain=v1","-z","--untracked-files=normal","--ignore-submodules=all","--","actual.txt"],"termination":"exited"}
+# Subtest: Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config
+ok 23 - Git transport: real fixed executable, identity and literal query ignore inherited GIT execution config
+  ---
+  duration_ms: 87.9998
+  type: 'test'
+  ...
+# Subtest: Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query
+ok 24 - Git transport: executable local fsmonitor is a real unsafe control and is rejected before the product query
+  ---
+  duration_ms: 191.2108
+  type: 'test'
+  ...
+# Subtest: B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status
+ok 25 - B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status
+  ---
+  duration_ms: 156.8545
+  type: 'test'
+  ...
+# Subtest: B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject
+ok 26 - B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject
+  ---
+  duration_ms: 485.5992
+  type: 'test'
+  ...
+# Subtest: Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported
+ok 27 - Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported
+  ---
+  duration_ms: 49.3595
+  type: 'test'
+  ...
+# Subtest: Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit
+ok 28 - Git protection facts: actual independent roots, hardlink identity and linked common-dir stay explicit
+  ---
+  duration_ms: 454.9954
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+ok 29 - 固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher 后经固定传输执行
+  ---
+  duration_ms: 394.9422
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）
+ok 30 - B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）
+  ---
+  duration_ms: 286.6187
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+ok 31 - 不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）
+  ---
+  duration_ms: 205.5757
+  type: 'test'
+  ...
+# warning: in the working copy of 'alpha.txt', LF will be replaced by CRLF the next time Git touches it
+# Subtest: alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+ok 32 - alias 防线：repo-local alias 在传输前 fail-closed；固定 env/config 构造为静态单一来源
+  ---
+  duration_ms: 232.8742
+  type: 'test'
+  ...
+# Subtest: 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+ok 33 - 预算有界：outputLimit 生效并如实标记 stdoutTruncated
+  ---
+  duration_ms: 252.6059
+  type: 'test'
+  ...
+# Subtest: 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+ok 34 - 执行面静态断言：executeReadonlyGit 经 buildReadonlyGitBody + executeGit（固定传输），不自行 spawn/拼 argv
+  ---
+  duration_ms: 0.4668
+  type: 'test'
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4011.9943

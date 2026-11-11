@@ -1,0 +1,52 @@
+{
+  "at": "2026-11-10T17:11:07.461Z",
+  "candidate": "f725c2d487ab0ebd83d5c43f289460c2ed172505",
+  "chiefWorkflowV2Loaded": {
+    "at": "2026-11-10T17:08:57.391Z",
+    "level": "info",
+    "pid": 20944,
+    "component": "orchestration.session",
+    "event": "chief.workflow.v2.loaded",
+    "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr2-2026-11-11\\target",
+    "roleId": "chief",
+    "bytes": 10206
+  },
+  "taskCreated": {
+    "at": "2026-11-10T17:09:25.333Z",
+    "taskId": "t-mway393p-4fe3fc52",
+    "from": "chief",
+    "to": "convener",
+    "flowId": "snake-game",
+    "stepId": "project-handoff",
+    "sideEffect": "docs",
+    "taskKind": null,
+    "workflowId": null,
+    "stage": null,
+    "runId": "run-hub-92d8ecf984fa1be340c01fe2ccc6d21f4fe61af6f1ebba25"
+  },
+  "projectJsonAbsent": true,
+  "fixedLedgersAbsent": [
+    {
+      "path": ".ans/state/workflows.jsonl",
+      "exists": false
+    },
+    {
+      "path": ".ans/state/basis.jsonl",
+      "exists": false
+    },
+    {
+      "path": ".ans/state/releases.jsonl",
+      "exists": false
+    }
+  ],
+  "gitRepoAbsent": true,
+  "gitignoreAbsent": true,
+  "shellGateAuditAbsent": true,
+  "legacyWritten": {
+    "trunk": true,
+    "runs": true
+  },
+  "topLevel": [
+    ".ans"
+  ]
+}

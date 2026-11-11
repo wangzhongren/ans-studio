@@ -1,0 +1,15 @@
+=== git status --porcelain -- src app test ===
+ M src/common/roles/convener/index.ts
+ M src/common/roles/product/internal/context.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/roles/convener/convener-fixed.test.ts
+ M test/roles/product/product-fixed.test.ts
+?? test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts
+?? test/门禁引擎/chief-workflow-v2-stage-task-separation.test.ts
+
+=== git diff --name-only -- src/common/门禁引擎 ===
+warning: in the working copy of 'src/common/门禁引擎/workflows/chief/chief-workflow-v2.md', LF will be replaced by CRLF the next time Git touches it
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+
+=== app diff lines ===
+0

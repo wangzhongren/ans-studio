@@ -1,0 +1,180 @@
+TAP version 13
+# Subtest: fixed verifier A12a：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+not ok 1 - fixed verifier A12a：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+  ---
+  duration_ms: 13.6627
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:165:3'
+  failureType: 'testCodeFailure'
+  error: 'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1519:25)
+    async openWithTask (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:79:18)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:170:32)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: fixed verifier A12b：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+not ok 2 - fixed verifier A12b：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+  ---
+  duration_ms: 6.5504
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:165:3'
+  failureType: 'testCodeFailure'
+  error: 'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1519:25)
+    async openWithTask (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:79:18)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:170:32)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: fixed convener stage-request：带真实 taskId 可打开，assignment 事实含 taskKind=stage-request
+not ok 3 - fixed convener stage-request：带真实 taskId 可打开，assignment 事实含 taskKind=stage-request
+  ---
+  duration_ms: 6.1981
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:186:1'
+  failureType: 'testCodeFailure'
+  error: 'fixed 任务 assignment 上下文段应注入'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    ## 固定路径运营：生产线唯一派发者（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）
+    - 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求（证据只写路径、内容/frontmatter 与结论，见「任务证据与哈希」段），做属主校验并保持同工作区写任务串行；生产任务报告回你。
+    - 幕僚不直接派生产线角色（chief-production-dispatch-forbidden）；`stage-request` 是只读、无 module/写集的产线调度请求，不是生产线派发。
+    - 不派 verifier：独立验收由幕僚创建（默认 verifier；roster `roles[].review` 项目验收角色优先）；`convener→verifier` 拒绝（`convener-to-verifier-forbidden`）；你不派新质检、不发 acceptance 卡、不代客户验收。
+    ## 固定路径任务证据与哈希（fixed）
+    - 派发 worker 任务时，证据要求只写三项：产物路径（path）、内容/frontmatter 要点（schema、flowId、version 等字段与正文内容）、结论（完成/未完成/阻塞）；不要要求 worker 用 `run_shell`、`certutil`、`Get-FileHash` 或其它 shell/脚本计算 hash/sha256；任务文本不得以「给出 sha256」「附哈希」作为完成标准或验收标准。
+    - 文档哈希是应用机器事实：由应用在任务收口（`close_created_task` / `closeTask`）、归档（A12 `docs/acceptance/`）与依据记录/校验（`basis.recorded` / documentRefs）时按实际字节计算与核验；worker 只交付文件与内容，哈希不由 worker 计算、也不写入任务完成条件。
+    ## 固定路径卡预算（fixed）
+    - 固定路径客户卡预算 = 3 张确认卡（A3 intent-confirm / A6 proposal / A10 appointment）+ A13/B4 高风险 merge-main（应用呈、仅客户本人确认）；acceptance 卡 fixed 抑制；decision 卡只用于材料性选择/需求变更审批，不计入 3 张确认卡。
+    - 不得在 worker 任务文本中诱导额外客户/操作员审批：不要求 worker 用 shell 计算哈希或执行审批类命令，不要求 stable-write / trunk / run 等 fixed 不注入的工具；真实环境阻塞由你按 decision 卡口径报告与处置，但不把「执行 shell / 审批」写成任务完成标准。
+    ## 固定路径团队计划与基线（fixed）
+    - 团队计划：以 `complete_team_plan` v4 提交版本化团队计划 `docs/scheduling/<flowId>-team-v<version>.md`（path/version；无 runId/baseDigest，出现即 `baseline-legacy-field-forbidden`）；应用核模块属主/写区/分工/依赖后直接完成。完成计划不等于 D3，不授权名单外角色。
+    - 基线 3 件小事（A9）：团队计划 v4 / `git init -b main`（应用执行）/ `.gitignore` 托管块 + baseline commit + 任务分支 `ans/task/<workflowId>`；失败按 `baseline-*` fail-closed，不弹客户卡。
+    ## 固定路径集成汇总与报告期望（fixed）
+    - 集成汇总：汇总各生产线任务与实现任务的进度/阻塞/真实提交（任务分支 `ans/task/<workflowId>` 的普通 Git add/commit）；冲突或返工交回原 owner 责任链，不代写实现、不伪造完成。
+    - 报告期望：汇总后向幕僚 `submit_report`（完成/未完成/证据/遗留）；收到幕僚派发的任务必须用 `submit_report` 回短报，不要只结束回合；不转发客户、不批准、不验收、不代客户选择。
+    - 发布合并：由应用呈 merge-main 卡、仅客户本人确认；你不代批、不冒充客户、不自行合并 main。
+  operator: 'match'
+  stack: |-
+    assertAssignmentFacts (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:104:10)
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:197:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: fixed product 生产任务：带真实 taskId 可打开，assignment 事实含 convener→product/A11
+not ok 4 - fixed product 生产任务：带真实 taskId 可打开，assignment 事实含 convener→product/A11
+  ---
+  duration_ms: 5.5939
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:207:1'
+  failureType: 'testCodeFailure'
+  error: 'fixed 任务 assignment 上下文段应注入'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    固定路径产品：按运营（convener）派发的任务撰写/修订产品意图 `docs/product/<flowId>-intent-vN.md`（版本化：新需求/变更出新版本，不原地改，旧版只读）。必含目标用户与场景、要解决的问题、范围与非目标、成功/验收标准、客户原话与约束、质量档位；不写实现方案。本段仅用于固定路径；与旧角色卡文本冲突时以本段为准。
+    固定路径边界：只写 `docs/product/`；不派发任务、不实现、不招人；不自行改方案/名单/架构/角色卡（方案与名单由策划产出，方案卡由幕僚呈）。意图确认卡由幕僚呈，product 不发卡、不代客户确认。固定路径不注入 VCA/版本决策/结构化 Git 等 legacy 工具；升级/变更走普通版本化文档与方案卡。
+    固定路径报告期望：收到运营派发的任务，完成文档/代码后只报告产物路径、内容/frontmatter 实际值与结论（如 intentId/flowId/version/goal/scope/acceptance/nonGoals 与检查/测试结论），不要自己算或转抄哈希——`sha256` 由应用计算：应用在任务收口（`close_created_task`/`closeTask`）、`docs/acceptance` 归档与 documentRefs/依据校验时按真实字节计算并重算比对，报告/证据只引用应用给出的值。不得用 shell 算 hash：不得为取 hash 调用 `run_shell` 或任何 shell/解释器命令，包括 `certutil -hashfile`、`Get-FileHash`、PowerShell/pwsh、`sha256sum`、`shasum`、`openssl dgst`、node/python 等；hash 不是 worker 产物。shell 属高风险审批动作，本流程不需要为 hash 触发任何客户卡。任务文本要求给出 sha256 时，按应用计算口径处理：改为「路径 + frontmatter 实际值；hash 由应用计算」，并在报告中注明来源与路径，不自行用 shell；任务文本不写「给出/附上 sha256」。证据由应用/报告生成。完成后必须用 `submit_report` 回短报（完成/阻塞/证据/遗留）到真实任务创建者运营（convener）；缺关键信息先报阻塞，由运营/幕僚发卡或转客户，不猜。
+  operator: 'match'
+  stack: |-
+    assertAssignmentFacts (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:104:10)
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:216:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: fixed 任务按账本事实判定：未传 workflowMode（会话默认 legacy）仍走 fixed 任务分支、不抛 legacy 错误
+not ok 5 - fixed 任务按账本事实判定：未传 workflowMode（会话默认 legacy）仍走 fixed 任务分支、不抛 legacy 错误
+  ---
+  duration_ms: 5.3212
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:225:1'
+  failureType: 'testCodeFailure'
+  error: 'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1519:25)
+    async openWithTask (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:79:18)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:230:30)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: legacy verifier taskId（无 workflowId）：仍走 legacy trunk 原路径，review-task-assignment-unavailable 逐字保留
+ok 6 - legacy verifier taskId（无 workflowId）：仍走 legacy trunk 原路径，review-task-assignment-unavailable 逐字保留
+  ---
+  duration_ms: 5.5625
+  type: 'test'
+  ...
+# Subtest: fail-closed 不放宽：fixed 任务受派人非本角色 ⇒ fixed-task-assignment-unavailable（非 legacy 码）
+not ok 7 - fail-closed 不放宽：fixed 任务受派人非本角色 ⇒ fixed-task-assignment-unavailable（非 legacy 码）
+  ---
+  duration_ms: 5.0957
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:262:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /^fixed-task-assignment-unavailable:/. Input:
+    
+    'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: 'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+  operator: 'match'
+  stack: |-
+    Object.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:271:16)
+    expectedException (node:assert:578:17)
+    expectsError (node:assert:703:21)
+    strict.rejects (node:assert:769:3)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:267:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: fail-closed 不放宽：fixed 任务已收口 ⇒ fixed-task-assignment-unavailable（不得带已关闭任务开会话）
+not ok 8 - fail-closed 不放宽：fixed 任务已收口 ⇒ fixed-task-assignment-unavailable（不得带已关闭任务开会话）
+  ---
+  duration_ms: 26.7885
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\run-role-fixed-task-context.test.ts:281:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /^fixed-task-assignment-unavailable:/. Input:
+    
+    'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: 'review-task-assignment-unavailable:The actual assigned child task is absent, closed or belongs to another role'
+  operator: 'match'
+  stack: |-
+    Object.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:292:16)
+    expectedException (node:assert:578:17)
+    expectsError (node:assert:703:21)
+    strict.rejects (node:assert:769:3)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/run-role-fixed-task-context.test.ts:288:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 无 taskId 的 fixed chat 不受影响：不构造 fixed assignment 上下文（chief/convener 聊天口径）
+ok 9 - 无 taskId 的 fixed chat 不受影响：不构造 fixed assignment 上下文（chief/convener 聊天口径）
+  ---
+  duration_ms: 6.9626
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 2
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 395.2368

@@ -1,0 +1,8 @@
+role: input-ui-dev
+entries:
+  - kind: directory
+    path: src/input/
+    purpose: input-control：键位→Direction 映射与反向抑制
+  - kind: directory
+    path: src/render/
+    purpose: rendering：只读 StateSnapshot 绘制

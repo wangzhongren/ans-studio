@@ -1,0 +1,8 @@
+role: env-bootstrap
+entries:
+  - kind: directory
+    path: styles/
+    purpose: 静态资源与样式目录（模块 env-resources）
+  - kind: file
+    path: index.html
+    purpose: 唯一浏览器入口页（模块 entry-index）

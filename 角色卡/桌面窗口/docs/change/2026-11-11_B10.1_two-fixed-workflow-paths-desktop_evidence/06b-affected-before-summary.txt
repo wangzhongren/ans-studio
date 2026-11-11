@@ -1,0 +1,15 @@
+{"tests":116,"pass":103,"fail":13,"cancelled":0,"skipped":0,"todo":0}
+unique-fail-names 13
+2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+AC-4.3：洁净派发无 advisory、无诊断噪声
+B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+C frozen batch retries keep members and delivery ID while later reports stay separate
+E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢

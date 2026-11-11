@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: 首次 fixed 启动顺序：B1 启用闸在显式写 workflowSchema 前不启用（死锁点）→ 助手写回后 fixed 放行
+ok 1 - 首次 fixed 启动顺序：B1 启用闸在显式写 workflowSchema 前不启用（死锁点）→ 助手写回后 fixed 放行
+  ---
+  duration_ms: 8.8096
+  type: 'test'
+  ...
+# Subtest: 显式 legacy/v1：助手不覆盖配置，返回 legacy（B3 不得按 fixed 派发）
+ok 2 - 显式 legacy/v1：助手不覆盖配置，返回 legacy（B3 不得按 fixed 派发）
+  ---
+  duration_ms: 3.2852
+  type: 'test'
+  ...
+# Subtest: project.json 坏文件：助手 fail-closed project-config-write-failed（不覆盖、不猜 fixed）
+ok 3 - project.json 坏文件：助手 fail-closed project-config-write-failed（不覆盖、不猜 fixed）
+  ---
+  duration_ms: 2.4102
+  type: 'test'
+  ...
+# Subtest: per-flow 不缓存：同一进程内按实际 flowId 逐次解析（legacy 在飞 flow 保持 legacy，新 flow fixed）
+ok 4 - per-flow 不缓存：同一进程内按实际 flowId 逐次解析（legacy 在飞 flow 保持 legacy，新 flow fixed）
+  ---
+  duration_ms: 5.6018
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 5 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 22.5406
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 6 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 15.668
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 7 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 10.97
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 8 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 4.3711
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 9 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 4.6138
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 10 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 0.7864
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 11 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 5.7278
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 12 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 22.2325
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 13 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 9.9596
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 14 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 13.4303
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 15 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 13.1715
+  type: 'test'
+  ...
+# Subtest: fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+ok 16 - fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+  ---
+  duration_ms: 9.678
+  type: 'test'
+  ...
+# Subtest: legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+ok 17 - legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+  ---
+  duration_ms: 5.5917
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 940.442

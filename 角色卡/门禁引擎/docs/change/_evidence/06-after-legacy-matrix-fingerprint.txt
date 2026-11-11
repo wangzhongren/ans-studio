@@ -1,0 +1,4 @@
+legacy-matrix-json-sha256=0a161fbdab87a64b392fc9f9cdd12e6d5aa456340de60bbd5e4ba66c69ce4e70
+legacy-matrix-render-sha256=b062416fabe812a86783357abf8ca187af2724402eb5d835129db6af15f003f5
+legacy-routing-rows=20
+legacy-render-chars=10822

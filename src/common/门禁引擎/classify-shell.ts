@@ -1130,14 +1130,35 @@ export function checkGitPolicy(facts: GitPolicyFacts): GitPolicyResult {
  *  "4"：W3-G（2026-11-08，设计 P1.3 §2.4.3/§4.4）起裸 Git 改为「只读精确白名单（`matchReadonlyGit`）
  *       ⇒ allow / 其余硬拒」；删除 `defaultReadOnly()` 中不可达的 `readonly:git` 死条目（规则数据变化，
  *       bump）。**不兼容读 v3**：v3 规则集/项目级 pin 一律因版本不符整条拒绝（fail-closed，不静默放宽）；
- *       迁移须改用 `defaultShellRules()`（`ans-default-v4`）。 */
-export const SHELL_RULES_VERSION = "4";
+ *       迁移须改用 `defaultShellRules()`（`ans-default-v4`）。
+ *  "5"：B4（2026-11-10，T3 方案 v1.3 §6.2/§6.3）固定路径任务级 Git 写：**保留** v4 只读精确白名单；
+ *       新增 `matchTaskGit`——仅 `git add <literal paths ⊆ task writeSet>` 与 `git commit -m <message>`
+ *       两个精确写形态（需应用注入 `taskGitScope`，模型不可自报；无 scope/无 writeSet 来源 ⇒ 写 Git 一律拒）；
+ *       其余裸 Git 子命令硬拒（稳定码 `git-command-not-ordinary`，ruleId 仍为
+ *       `deny:raw-git-controlled-tools-required` 以保持旧断言）。`git commit` 的 staged ⊆ writeSet 检查与
+ *       提交必须在**同一项目级临界区**内完成（`task-git-gate.ts::runTaskGitCommit`；锁占用 ⇒
+ *       `git-critical-section-busy`，不提交）。**不兼容读 v4**：v4 规则集/项目级 pin 一律因版本不符整条
+ *       拒绝（fail-closed，不静默放宽）；迁移用 `defaultShellRules()`（`ans-default-v5`）。 */
+export const SHELL_RULES_VERSION = "5";
+
+/**
+ * `classifyShellDetailed` 的**可选**调用上下文（v5 加法；缺省逐字保持 v4 行为）。
+ * 纯事实注入：`taskGitScope` 来自应用（A 路径：团队计划 writesets ∩ 模块属主；B 路径：B2 派生写集），
+ * **绝不采信模型自报**。缺省/非法 ⇒ `git add`/`git commit` 一律拒（fail-closed）。
+ */
+export interface ShellClassifyContext {
+  readonly taskGitScope?: TaskGitScope;
+}
 
 /** 带原因的判定结果；classifyShell 只取其中的 decision（冻结契约是四态字符串）。 */
 export interface ShellVerdict {
   decision: ShellClass;
   reason: string;
-  ruleId: string; // deny:rules-invalid / deny:argv-invalid / deny:opaque-command / deny:program:<id> / deny:token:<t> / risky:program:<id> / allow:readonly:<id> / review
+  ruleId: string; // deny:rules-invalid / deny:argv-invalid / deny:opaque-command / deny:program:<id> / deny:token:<t> / risky:program:<id> / allow:readonly:<id> / allow:task-git:<add|commit> / review
+  /** v5 加法：稳定失败码（仅 Git 判定；旧读者忽略）。 */
+  code?: string;
+  /** v5 加法：Git 写命令审计描述（含拒绝；供 shell-gate 追加到既有审计行，旧字段不变）。 */
+  taskGit?: TaskGitAuditFacts;
 }
 
 const EXE_SUFFIX = /\.(exe|cmd|bat|ps1|com)$/i;
@@ -1771,6 +1792,238 @@ export function buildReadonlyGitBody(match: ReadonlyGitMatch): string[] {
   }
 }
 
+// —————————————— 固定路径任务级 Git 写（v5，2026-11-10，T3 方案 v1.3 §6.2/§6.3）——————————————
+//
+// v5 在 v4「裸 Git = 只读精确白名单 allow / 其余硬拒」之上，为**固定路径实现任务**只开两个**精确写形态**
+// （判据只增不减；v4 只读白名单逐字保留）：
+//   1. `git add <literal paths…>`：每个路径必须是**字面**项目相对路径（无 flag、无 `-A/--all/-u`、无
+//      `.`/`./x`、无通配/`:(…)` pathspec magic、无绝对/`..`/`.git`），且 ⊆ 任务 writeSet（目录范围以 `/` 结尾）；
+//   2. `git commit -m <message>`：**只允许** `-m` 单形态；拒绝 `-F -`/`-F <file>`/`--amend`/`--no-verify`/
+//      `-a`/`--author`/多 flag/空 message。staged ⊆ writeSet 的**内容检查不在本纯函数**——由执行层
+//      `task-git-gate.ts::runTaskGitCommit` 在**项目级临界区**内先跑 `git diff --cached --name-only -z`
+//      再提交（检查-提交无间隙；锁占用 ⇒ `git-critical-section-busy`）。
+// 其余 Git 子命令（push/fetch/pull/remote/tag/merge/rebase/cherry-pick/revert/reset/clean/checkout/
+//   switch/stash/worktree/submodule/config/update-ref/init/…）仍硬拒（稳定码 `git-command-not-ordinary`）。
+// `git init` 只经应用 `BaselineGitPort`（shell 不允许）。
+// **无 taskGitScope / 无 writeSet 来源 ⇒ 写 Git 一律拒**（fail-closed；事实由应用注入，模型不可自报）。
+
+/** 固定路径任务分支前缀（v1.3 §6.1：`ans/task/<workflowId>`；与编排 `taskBranchName` 同一冻结命名）。 */
+export const TASK_GIT_BRANCH_PREFIX = "ans/task/";
+
+/**
+ * 任务级 Git 写事实（应用注入；A 路径 = 团队计划 `roleRows[].writesets` ∩ 模块属主，
+ * B 路径 = B2 `change.scope-decided.scope.files` 派生写集；模型不可自报）。
+ */
+export interface TaskGitScope {
+  readonly taskId: string;
+  readonly workflowId: string;
+  /** 必须恰为 `ans/task/<workflowId>`（非任务分支 ⇒ 拒）。 */
+  readonly branch: string;
+  /** 字面文件路径或以 `/` 结尾的目录范围；空/非法/含治理写区 ⇒ scope 非法（fail-closed）。 */
+  readonly paths: readonly string[];
+}
+
+/** 任务级 Git 写的两个允许模板（冻结 id；ruleId 为 `allow:task-git:<template>`）。 */
+export type TaskGitTemplate = "add" | "commit";
+
+/** `matchTaskGit` 的匹配结果（受限描述；执行层据此构造固定 argv / 复核 staged）。 */
+export interface TaskGitMatch {
+  template: TaskGitTemplate;
+  /** add：字面路径（⊆ writeSet）；commit：空数组。 */
+  paths: readonly string[];
+  /** commit：message 原文（只用于审计 sha256，不落审计明文以外的衍生）。 */
+  message?: string;
+  taskId: string;
+  workflowId: string;
+  branch: string;
+  /** 规范化命令摘要（`["git", ...argv.slice(1)]` 的 SHA-256；审计用，确定性）。 */
+  argvDigest: string;
+}
+
+/**
+ * 审计描述（v5 加法）：每条 `git add`/`git commit`（允许或拒绝）都给出本形状，
+ * 供 shell-gate 在既有 `docs/audit/shell-gate.jsonl` 行上**追加** `taskGit` 字段
+ * （命令、taskId、branch、paths、结果、sha256；既有字段不减少、不改写）。
+ */
+export interface TaskGitAuditFacts {
+  template: TaskGitTemplate | "other";
+  result: "allowed" | "denied";
+  /** 拒绝时的稳定码（允许时缺省）。 */
+  code?: string;
+  taskId?: string;
+  workflowId?: string;
+  branch?: string;
+  paths: readonly string[];
+  /** commit message 的 SHA-256（有 message 时出现；不落明文派生以外的内容）。 */
+  messageSha256?: string;
+  argvDigest: string;
+}
+
+/** v5 稳定失败码（Git 写/拒绝面；与 AC-21 对齐；新增/改名走接口评审）。 */
+export const TASK_GIT_CODES = Object.freeze({
+  commandNotOrdinary: "git-command-not-ordinary",
+  scopeMissing: "git-task-scope-missing",
+  scopeInvalid: "git-task-scope-invalid",
+  scopeGovernancePath: "git-task-scope-governance-path",
+  addFlagForbidden: "git-task-add-flag-forbidden",
+  addNotLiteral: "git-task-add-not-literal",
+  pathOutsideWriteSet: "git-task-path-outside-writeset",
+  pathGovernance: "git-task-path-governance",
+  commitFormForbidden: "git-commit-form-forbidden",
+  commitArgumentForbidden: "git-commit-argument-forbidden",
+  commitMessageEmpty: "git-commit-message-empty",
+  /**
+   * B32.2（2026-11-11，RR27）：写守卫稳定码——**taskGitScope 有效**但 `git add`/`git commit`
+   * argv 形状不合允许形态（如提交消息未加引号被拆成多 token、`git add` 非字面路径）。
+   * 与缺 scope 的 `git-task-scope-missing`/`git-task-scope-invalid` 区分；分类器仍沿用上方细分码。
+   */
+  argvShape: "task-git-argv-shape",
+});
+
+/** 治理写区前缀（staged/add 一律拒；角色shell 不写应用账本/审计/验收归档/角色卡）：单一来源。 */
+export const TASK_GIT_GOVERNANCE_PREFIXES: readonly string[] = Object.freeze([
+  ".ans/",
+  "角色卡/",
+  "docs/audit/",
+  "docs/acceptance/",
+]);
+
+/** 固定路径 workflowId slug（与编排 `WORKFLOW_SLUG_RE` 同口径的冻结命名；分支名安全）。 */
+const TASK_GIT_WORKFLOW_ID_RE = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/;
+
+/** commit 拒绝参数（形状外的一切 flag；按 token 精确/前缀匹配，fail-closed）。 */
+const TASK_GIT_COMMIT_FORBIDDEN_ARGV = new Set([
+  "-F", "--file", "--amend", "--no-verify", "-a", "--all", "--author", "-am", "-S", "--gpg-sign",
+  "-c", "-C", "--reuse-message", "--fixup", "--squash", "--reset-author", "--date", "--edit", "-e",
+]);
+
+/** 路径是否落在治理写区（`.ans/**`、`角色卡/**`、`docs/audit/**`、`docs/acceptance/**`）。 */
+export function isTaskGitGovernancePath(value: string): boolean {
+  const rel = value.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+  return TASK_GIT_GOVERNANCE_PREFIXES.some((prefix) => prefix.endsWith("/")
+    ? rel === prefix.slice(0, -1) || rel.startsWith(prefix)
+    : rel === prefix);
+}
+
+/** writeSet 覆盖判定（与仓库既有 `gitCovered` 同一口径；目录范围以 `/` 结尾，大小写不敏感）。 */
+export function taskGitPathCovered(file: string, scopes: readonly string[]): boolean {
+  return gitCovered(file, scopes);
+}
+
+/**
+ * 任务级字面路径判定（与只读 Git 的 `isReadonlyGitPath` **同一实现**）：非空/非绝对/无 `..`/`.git`
+ * 段/无通配或 pathspec magic/无控制字符/无反斜杠。用于 add/staged 的逐路径校验。
+ */
+export function isTaskGitLiteralPath(value: unknown): value is string {
+  return isReadonlyGitPath(value);
+}
+
+function taskGitArgvDigest(args: readonly string[]): string {
+  return createHash("sha256").update(JSON.stringify(["git", ...args.slice(1)])).digest("hex");
+}
+
+function taskGitMessageSha256(message: string): string {
+  return createHash("sha256").update(message, "utf8").digest("hex");
+}
+
+/** 任务事实校验：返回 v5 稳定码；合法返回 undefined。纯函数、fail-closed。 */
+export function taskGitScopeError(facts: unknown): string | undefined {
+  if (facts === null || typeof facts !== "object" || Array.isArray(facts)) return TASK_GIT_CODES.scopeMissing;
+  const f = facts as Partial<TaskGitScope>;
+  if (typeof f.taskId !== "string" || f.taskId.trim() === "" || f.taskId.length > 200 || /[\x00-\x1f\x7f]/.test(f.taskId)) {
+    return TASK_GIT_CODES.scopeInvalid;
+  }
+  if (typeof f.workflowId !== "string" || !TASK_GIT_WORKFLOW_ID_RE.test(f.workflowId)) return TASK_GIT_CODES.scopeInvalid;
+  if (typeof f.branch !== "string" || f.branch !== `${TASK_GIT_BRANCH_PREFIX}${f.workflowId}`) return TASK_GIT_CODES.scopeInvalid;
+  if (!Array.isArray(f.paths) || f.paths.length === 0 || f.paths.length > 512) return TASK_GIT_CODES.scopeInvalid;
+  const seen = new Set<string>();
+  for (const value of f.paths) {
+    if (!isReadonlyGitPath(value)) return TASK_GIT_CODES.scopeInvalid;
+    if (isTaskGitGovernancePath(value)) return TASK_GIT_CODES.scopeGovernancePath;
+    const key = value.toLowerCase();
+    if (seen.has(key)) return TASK_GIT_CODES.scopeInvalid;
+    seen.add(key);
+  }
+  return undefined;
+}
+
+type TaskGitEvaluation = { ok: true; match: TaskGitMatch } | { ok: false; code: string };
+
+/** 纯判定：`git add`/`git commit` 的 v5 写形态（不含 staged 内容检查；后者在临界区门内）。 */
+function evaluateTaskGit(args: readonly string[], facts: unknown): TaskGitEvaluation {
+  const sub = args[1];
+  if (sub !== "add" && sub !== "commit") return { ok: false, code: TASK_GIT_CODES.commandNotOrdinary };
+  const scopeErr = taskGitScopeError(facts);
+  if (scopeErr !== undefined) return { ok: false, code: scopeErr };
+  const scope = facts as TaskGitScope;
+  if (sub === "add") {
+    const tokens = args.slice(2);
+    if (tokens.length === 0 || tokens.length > 128) return { ok: false, code: TASK_GIT_CODES.addNotLiteral };
+    const paths: string[] = [];
+    for (const token of tokens) {
+      if (token.startsWith("-")) return { ok: false, code: TASK_GIT_CODES.addFlagForbidden };
+      if (!isReadonlyGitPath(token)) return { ok: false, code: TASK_GIT_CODES.addNotLiteral };
+      if (isTaskGitGovernancePath(token)) return { ok: false, code: TASK_GIT_CODES.pathGovernance };
+      if (!gitCovered(token, scope.paths)) return { ok: false, code: TASK_GIT_CODES.pathOutsideWriteSet };
+      paths.push(token);
+    }
+    return {
+      ok: true,
+      match: { template: "add", paths, taskId: scope.taskId, workflowId: scope.workflowId, branch: scope.branch, argvDigest: taskGitArgvDigest(args) },
+    };
+  }
+  const rest = args.slice(2);
+  if (rest.length === 2 && rest[0] === "-m") {
+    const message = rest[1]!;
+    if (message.trim() === "") return { ok: false, code: TASK_GIT_CODES.commitMessageEmpty };
+    return {
+      ok: true,
+      match: {
+        template: "commit", paths: [], message, taskId: scope.taskId, workflowId: scope.workflowId,
+        branch: scope.branch, argvDigest: taskGitArgvDigest(args),
+      },
+    };
+  }
+  const forbidden = rest.some((token) => TASK_GIT_COMMIT_FORBIDDEN_ARGV.has(token)
+    || token.startsWith("--author=") || token.startsWith("-F"));
+  return { ok: false, code: forbidden ? TASK_GIT_CODES.commitArgumentForbidden : TASK_GIT_CODES.commitFormForbidden };
+}
+
+/**
+ * 固定路径任务级 Git 写谓词（v5；**唯一实现**）。命中返回受限描述 `TaskGitMatch`；否则 `undefined`。
+ * 纯函数：无 IO、无副作用；`facts` 缺失/非法 ⇒ 恒 `undefined`（调用方维持硬拒）。
+ * ★ staged ⊆ writeSet 的**内容**不在本函数判定——执行层必须再跑 `runTaskGitCommit`（临界区门）。
+ */
+export function matchTaskGit(argv: readonly unknown[], facts: unknown): TaskGitMatch | undefined {
+  if (!Array.isArray(argv) || argv.length < 2 || !argv.every((value) => typeof value === "string")) return undefined;
+  const args = argv as readonly string[];
+  if (!isRawGitProgramName(args[0])) return undefined;
+  const evaluated = evaluateTaskGit(args, facts);
+  return evaluated.ok ? evaluated.match : undefined;
+}
+
+/** 审计描述构造（允许/拒绝共用；仅接受有界字符串事实，避免把任意模型输入放大进审计）。 */
+function taskGitAudit(args: readonly string[], facts: unknown, result: "allowed" | "denied", code?: string, match?: TaskGitMatch): TaskGitAuditFacts {
+  const f = facts !== null && typeof facts === "object" && !Array.isArray(facts) ? (facts as Partial<TaskGitScope>) : undefined;
+  const template: TaskGitAuditFacts["template"] = args[1] === "add" || args[1] === "commit" ? args[1] : "other";
+  const paths = match?.paths ?? (template === "add"
+    ? args.slice(2).filter((token) => typeof token === "string" && !token.startsWith("-")).slice(0, 128)
+    : []);
+  const message = match?.message ?? (template === "commit" && args[2] === "-m" && typeof args[3] === "string" ? args[3] : undefined);
+  return {
+    template,
+    result,
+    ...(code !== undefined ? { code } : {}),
+    ...(typeof f?.taskId === "string" && f.taskId.length <= 200 ? { taskId: f.taskId } : {}),
+    ...(typeof f?.workflowId === "string" && f.workflowId.length <= 200 ? { workflowId: f.workflowId } : {}),
+    ...(typeof f?.branch === "string" && f.branch.length <= 300 ? { branch: f.branch } : {}),
+    paths: [...paths],
+    ...(message !== undefined ? { messageSha256: taskGitMessageSha256(message) } : {}),
+    argvDigest: taskGitArgvDigest(args),
+  };
+}
+
+
 // rg 的带值选项仅用于跳过参数值（例如 -e --pre 是模式），不是新的安全白名单。
 // D3 只识别显式 --pre；隐藏配置、其他间接执行能力沿用已接受的风险取舍。
 const RG_VALUE_OPTIONS = new Set([
@@ -1826,8 +2079,9 @@ function reviewExplicitExecution(args: string[], program: string): ShellVerdict 
 /**
  * 带原因的判定。参数取 unknown 是为了**强制走运行时校验**——任何调用方传错形状都得到 deny，
  * 而不会因为 TS 类型擦除而静默退化。classifyShell（冻结契约）只是它的四态封装。
+ * `context` 为 v5 可选加法（旧 2 参调用逐字保持 v4 行为；缺省 ⇒ 任务级 Git 写一律拒）。
  */
-export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdict {
+export function classifyShellDetailed(argv: unknown, rules: unknown, context?: ShellClassifyContext): ShellVerdict {
   // 1) 规则集：缺失/非法/版本未知 → 硬拒（fail-closed，§7.5 第一条）
   const rulesErr = validateRules(rules);
   if (rulesErr !== null) {
@@ -1848,18 +2102,36 @@ export function classifyShellDetailed(argv: unknown, rules: unknown): ShellVerdi
     return { decision: "deny", reason: "argv 含非字符串元素（fail-closed）", ruleId: "deny:argv-invalid" };
   }
   const args = argv as string[];
-  // 2) 裸 Git（2026-11-08，W3-G）：**只读精确白名单**命中 ⇒ allow（供 run_shell；执行侧经固定传输，
-  //    见 `executeReadonlyGit`）；未命中 ⇒ 维持硬拒（写/发布只走结构化 git_query / git_candidate /
-  //    git_publish）。本判定位置仍在 hardDeny/denyTokens/risky/readonly 分支**之前**：
-  //    只读 Git 不受自定义硬拒/risky 规则误伤；非白名单形态也绝不会落入 (b)/(a) 被批准。
+  // 2) 裸 Git（v5，2026-11-10，T3 方案 §6.2/§6.3）：
+  //    · 只读精确白名单（`matchReadonlyGit`，v4 逐字保留）命中 ⇒ allow（执行侧经固定传输 `executeReadonlyGit`）；
+  //    · 固定路径任务级写（`matchTaskGit`）命中 ⇒ allow（仅 `git add <literal ⊆ writeSet>` / `git commit -m`；
+  //      staged 内容检查与提交由执行层在同一项目级临界区内完成，见 `task-git-gate.ts`）；
+  //    · 其余一律硬拒（ruleId 维持 `deny:raw-git-controlled-tools-required` 以保持旧断言；v5 稳定码在 `code`）。
+  //    本判定位置仍在 hardDeny/denyTokens/risky/readonly 分支**之前**：非白名单形态绝不会落入 (b)/(a) 被批准。
   //    分类器本身不区分入口——`start_background_task` 不享受放行由写目标守卫按 `entry` 拒绝。
   if (isRawGitProgramName(args[0])) {
     const readonlyGit = matchReadonlyGit(args);
     if (readonlyGit !== undefined) {
       return { decision: "allow", reason: `命中只读 Git 精确白名单：${readonlyGit.id}`, ruleId: `allow:readonly:git:${readonlyGit.id}` };
     }
-    return { decision: "deny", ruleId: "deny:raw-git-controlled-tools-required",
-      reason: "裸 Git 只读白名单之外一律硬拒：未经受控配置/env/完整模板与角色ACL；请使用 git_query / git_candidate / git_publish，旧shell审批不能替代该边界。" };
+    const taskGit = matchTaskGit(args, context?.taskGitScope);
+    if (taskGit !== undefined) {
+      return {
+        decision: "allow",
+        reason: `命中固定路径任务级 Git 写白名单：${taskGit.template}（staged ⊆ writeSet 由执行层临界区门复核）`,
+        ruleId: `allow:task-git:${taskGit.template}`,
+        taskGit: taskGitAudit(args, context?.taskGitScope, "allowed", undefined, taskGit),
+      };
+    }
+    const evaluated = evaluateTaskGit(args, context?.taskGitScope);
+    const code = evaluated.ok ? TASK_GIT_CODES.commandNotOrdinary : evaluated.code;
+    return {
+      decision: "deny",
+      ruleId: "deny:raw-git-controlled-tools-required",
+      code,
+      reason: `裸 Git 只读白名单与任务级写白名单之外一律硬拒（${code}）：v5 仅允许只读精确形态与任务内 git add/commit -m；push/merge/reset/checkout/update-ref 等一律拒绝，旧shell审批不能替代该边界。`,
+      taskGit: taskGitAudit(args, context?.taskGitScope, "denied", code),
+    };
   }
 
   // 3) 结构性硬拒：换行/回车（多命令拼接）——**仅当执行模型会经 shell 解释时**成立（§7.10）。
@@ -2119,9 +2391,9 @@ function defaultRisky(): ShellRiskyRule[] {
       ],
     },
     // git 的「危险 flag」写开关：`--output`/`--output=<file>` 会把结果写盘（§7.10「危险 flag」）。
-    // 2026-11-08（W3-G/v4）：裸 Git 已在分类器第 2 步终结（只读白名单 allow / 其余硬拒），本规则在
-    // 默认规则集下**不可达**——保留为数据纵深（若未来有人把 Git 分支挪到 risky 之后，写形态仍按 risky
-    // 交 (b)+(a)，而不是静默 review）；它不是只读白名单的一部分，也不得被用作放行依据。
+    // 2026-11-10（v5）：裸 Git 仍在分类器第 2 步终结（只读白名单 / 任务级 add+commit allow；其余硬拒），
+    // 本规则在默认规则集下**不可达**——保留为数据纵深（若未来有人把 Git 分支挪到 risky 之后，写形态仍按 risky
+    // 交 (b)+(a)，而不是静默 review）；它不是白名单的一部分，也不得被用作放行依据。
     { id: "risky:git-output-write", programs: ["git"], onlyWithFlag: ["--output"] },
     // git 的写子命令（同上：默认规则集下不可达的数据纵深，列出会改盘/改历史的子命令）
     {
@@ -2153,7 +2425,7 @@ function defaultDenyTokens(): string[] {
 export function defaultShellRules(): ShellRules {
   return {
     version: SHELL_RULES_VERSION,
-    id: "ans-default-v4", // 规则集 id（审计 / §7.6 归属；装配方可取它，不必另传 rulesId）；v4 起删除死 readonly:git
+    id: "ans-default-v5", // 规则集 id（审计 / §7.6 归属；装配方可取它，不必另传 rulesId）；v5 起保留只读 Git 白名单 + 任务级 add/commit
     // 执行模型（§7.10）：本规则集按「程序 + argv」分类，绑定 `spawn(shell:false)`。
     // ★ 若执行层改回 shell 字符串 / shell:true，必须改为 "shell-string"（或删字段），否则元字符规则空转。
     executionModel: "argv-noshell",

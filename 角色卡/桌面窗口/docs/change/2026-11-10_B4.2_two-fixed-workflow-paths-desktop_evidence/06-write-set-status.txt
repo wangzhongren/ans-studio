@@ -1,0 +1,10 @@
+HEAD: 1a646fc95e0bd274858cc6addc54e58d2617f60d
+BRANCH: feat/two-fixed-workflow-paths
+== git status --porcelain -- src app test ==
+ M app/desktop/session.ts
+ M app/desktop/workflow-git.ts
+?? test/桌面应用/b42-task-git-port-desktop.test.ts
+== git diff --stat -- src app test ==
+ app/desktop/session.ts      |  25 +++++-
+ app/desktop/workflow-git.ts | 213 +++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 232 insertions(+), 6 deletions(-)

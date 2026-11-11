@@ -84,9 +84,24 @@ test("规格：模块数据冻结（模块 / card / entries / 各数组不可变
   for (const entry of rapporteurRoleModule.card.entries) assert.ok(Object.isFrozen(entry));
 });
 
-test("规格：模块只暴露约定字段（无私有 cardText/matrix 泄漏）", () => {
+test("规格：模块只暴露约定字段（含 T3 B2 fixedCards；无私有 cardText/matrix 泄漏）", () => {
   const keys = Object.keys(rapporteurRoleModule).sort();
-  assert.deepEqual(keys, ["capabilities", "card", "cards", "context", "dispatch", "displayName", "function", "id", "preflight", "tools"]);
+  assert.deepEqual(keys, [
+    "capabilities",
+    "card",
+    "cards",
+    "context",
+    "dispatch",
+    "displayName",
+    "fixedCards",
+    "function",
+    "id",
+    "preflight",
+    "tools",
+  ]);
   assert.equal("cardText" in rapporteurRoleModule, false);
   assert.equal("matrix" in rapporteurRoleModule, false);
+  assert.equal("fixedTargetRoleIds" in rapporteurRoleModule, false, "rapporteur 不是 chief");
+  assert.equal("fixedAllowedBuiltInRoleIds" in rapporteurRoleModule, false, "rapporteur 不是 convener");
+  assert.equal("isConvenerFixedBuiltInDispatchTarget" in rapporteurRoleModule, false, "rapporteur 不是 convener");
 });

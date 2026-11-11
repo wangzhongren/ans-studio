@@ -1,0 +1,364 @@
+TAP version 13
+# Subtest: fixedCards：恰 [intent-confirm, proposal, appointment]（3 张客户确认卡；顺序冻结、只读）
+ok 1 - fixedCards：恰 [intent-confirm, proposal, appointment]（3 张客户确认卡；顺序冻结、只读）
+  ---
+  duration_ms: 0.8889
+  type: 'test'
+  ...
+# Subtest: fixedTargetRoleIds：恰 [convener, verifier]；legacy CHIEF_HUB_DISPATCH 五内置逐字冻结
+ok 2 - fixedTargetRoleIds：恰 [convener, verifier]；legacy CHIEF_HUB_DISPATCH 五内置逐字冻结
+  ---
+  duration_ms: 0.1108
+  type: 'test'
+  ...
+# Subtest: fixed context：matrix=two-fixed-paths/v1 返回 4 个 fixed 段（顺序固定、冻结、与 legacy 引用不同）
+ok 3 - fixed context：matrix=two-fixed-paths/v1 返回 4 个 fixed 段（顺序固定、冻结、与 legacy 引用不同）
+  ---
+  duration_ms: 0.1224
+  type: 'test'
+  ...
+# Subtest: fixed context 内容：产线调度 / 3 张卡 / 独立验收 / 依据专业建议决定 / 不派生产线角色 / 不自行做专业判断
+ok 4 - fixed context 内容：产线调度 / 3 张卡 / 独立验收 / 依据专业建议决定 / 不派生产线角色 / 不自行做专业判断
+  ---
+  duration_ms: 0.2061
+  type: 'test'
+  ...
+# Subtest: context 矩阵缺省/显式 legacy-v1/空输入：返回同一 legacy 冻结表（逐字不变，含 legacy 资源引用）
+ok 5 - context 矩阵缺省/显式 legacy-v1/空输入：返回同一 legacy 冻结表（逐字不变，含 legacy 资源引用）
+  ---
+  duration_ms: 0.1194
+  type: 'test'
+  ...
+# Subtest: tools：fixed 批次不新增发布合并工具；trio 声明仍为冻结的 6 项（含 closeCreatedTask）
+ok 6 - tools：fixed 批次不新增发布合并工具；trio 声明仍为冻结的 6 项（含 closeCreatedTask）
+  ---
+  duration_ms: 0.1669
+  type: 'test'
+  ...
+# Subtest: 模块源零出现被拒工具 token（G-IR §六：不得新增；模型/注册表由门禁引擎测试另证）
+ok 7 - 模块源零出现被拒工具 token（G-IR §六：不得新增；模型/注册表由门禁引擎测试另证）
+  ---
+  duration_ms: 0.8526
+  type: 'test'
+  ...
+# Subtest: 纯数据：fixed 读取不改写模块/legacy 数据（重复调用同值；模块 JSON 不变）
+ok 8 - 纯数据：fixed 读取不改写模块/legacy 数据（重复调用同值；模块 JSON 不变）
+  ---
+  duration_ms: 0.1342
+  type: 'test'
+  ...
+# Subtest: fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+ok 9 - fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+  ---
+  duration_ms: 0.7992
+  type: 'test'
+  ...
+# Subtest: fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+ok 10 - fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+  ---
+  duration_ms: 0.0863
+  type: 'test'
+  ...
+# Subtest: isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+ok 11 - isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+  ---
+  duration_ms: 0.1173
+  type: 'test'
+  ...
+# Subtest: context(fixed)：返回 fixed 段（生产线/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+ok 12 - context(fixed)：返回 fixed 段（生产线/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+  ---
+  duration_ms: 0.1375
+  type: 'test'
+  ...
+# Subtest: context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+ok 13 - context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+  ---
+  duration_ms: 0.0983
+  type: 'test'
+  ...
+# Subtest: legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+ok 14 - legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+  ---
+  duration_ms: 0.1799
+  type: 'test'
+  ...
+# Subtest: 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+ok 15 - 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+  ---
+  duration_ms: 3.1513
+  type: 'test'
+  ...
+# Subtest: 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+ok 16 - 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+  ---
+  duration_ms: 0.9512
+  type: 'test'
+  ...
+# Subtest: fixedCards：恒为空集且冻结——任命卡归幕僚、appointment-write 仅 legacy（G-3）
+ok 17 - fixedCards：恒为空集且冻结——任命卡归幕僚、appointment-write 仅 legacy（G-3）
+  ---
+  duration_ms: 0.8922
+  type: 'test'
+  ...
+# Subtest: legacy context 冻结：缺省/未传 matrix/显式 legacy-v1 逐字返回旧段（同一引用，3 sections）
+ok 18 - legacy context 冻结：缺省/未传 matrix/显式 legacy-v1 逐字返回旧段（同一引用，3 sections）
+  ---
+  duration_ms: 0.1769
+  type: 'test'
+  ...
+# Subtest: fixed context：matrix=two-fixed-paths/v1 返回固定段（3 sections；无 legacy 段、无资源引用）
+ok 19 - fixed context：matrix=two-fixed-paths/v1 返回固定段（3 sections；无 legacy 段、无资源引用）
+  ---
+  duration_ms: 0.1944
+  type: 'test'
+  ...
+# Subtest: fixed context 口径：按运营派发、按名单机械建卡/激活、不自行增删角色、不发起任命卡/不派发
+ok 20 - fixed context 口径：按运营派发、按名单机械建卡/激活、不自行增删角色、不发起任命卡/不派发
+  ---
+  duration_ms: 0.1851
+  type: 'test'
+  ...
+# Subtest: 不新增工具/卡：fixed 批次不改 tools/cards/capabilities/card.text（legacy 冻结）
+ok 21 - 不新增工具/卡：fixed 批次不改 tools/cards/capabilities/card.text（legacy 冻结）
+  ---
+  duration_ms: 0.1354
+  type: 'test'
+  ...
+# Subtest: fixed 矩阵不改变本模块 legacy dispatch 判定（fixed 派发权威在编排 workflow-dispatch.ts，不在角色模块）
+ok 22 - fixed 矩阵不改变本模块 legacy dispatch 判定（fixed 派发权威在编排 workflow-dispatch.ts，不在角色模块）
+  ---
+  duration_ms: 0.2227
+  type: 'test'
+  ...
+# Subtest: preflight 不因 fixed 批次改变：appointment 动作集与 stage 语义保持 legacy
+ok 23 - preflight 不因 fixed 批次改变：appointment 动作集与 stage 语义保持 legacy
+  ---
+  duration_ms: 0.1378
+  type: 'test'
+  ...
+# Subtest: 纯策略：fixed context 读取不改写模块数据与调用输入
+ok 24 - 纯策略：fixed context 读取不改写模块数据与调用输入
+  ---
+  duration_ms: 0.1047
+  type: 'test'
+  ...
+# Subtest: fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+ok 25 - fixedCards：product fixed=[]（冻结；legacy cards 逐字不变仍为空）
+  ---
+  duration_ms: 0.8315
+  type: 'test'
+  ...
+# Subtest: context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+ok 26 - context(legacy)：缺省与显式 `legacy-v1` 返回同一冻结旧段（id/顺序/文本逐字冻结）
+  ---
+  duration_ms: 0.1767
+  type: 'test'
+  ...
+# Subtest: context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+ok 27 - context(fixed)：只在 matrix=fixed 返回新段；内容覆盖意图撰写/报告回运营/边界；legacy 不混入
+  ---
+  duration_ms: 0.1965
+  type: 'test'
+  ...
+# Subtest: dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+ok 28 - dispatch(legacy)：缺省与显式 `legacy-v1` 逐例同判定（legacy 分支未因 fixed 改动）
+  ---
+  duration_ms: 0.2841
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+ok 29 - dispatch(fixed)：convener→product（内置、存在）允许，报告期望=convener
+  ---
+  duration_ms: 0.0917
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+ok 30 - dispatch(fixed)：chief→product 拒绝 fixed-only 稳定码 `chief-production-dispatch-forbidden`
+  ---
+  duration_ms: 0.1868
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+ok 31 - dispatch(fixed)：存在性/身份冲突/自我/来源/范围负例均 fail-closed
+  ---
+  duration_ms: 0.2488
+  type: 'test'
+  ...
+# Subtest: dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+ok 32 - dispatch(fixed)：纯函数/输入只读/确定性（同一输入同判定，不修改冻结输入）
+  ---
+  duration_ms: 0.0805
+  type: 'test'
+  ...
+# Subtest: 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+ok 33 - 不新增工具/卡：tools() 仍只声明 submitVersionChange；fixedCards 空；无 requestReleaseMerge
+  ---
+  duration_ms: 1.1644
+  type: 'test'
+  ...
+# Subtest: legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+ok 34 - legacy preflight 不变：version-upgrade 合法事实仍 allow（fixed 未改 preflight）
+  ---
+  duration_ms: 0.3301
+  type: 'test'
+  ...
+# Subtest: fixed：fixedCards 恰为 ['decision']（冻结、去重、无新卡种）
+ok 35 - fixed：fixedCards 恰为 ['decision']（冻结、去重、无新卡种）
+  ---
+  duration_ms: 0.8918
+  type: 'test'
+  ...
+# Subtest: fixed：legacy cards / card.text / capabilities 逐字冻结（fixed 字段不改变 legacy 数据）
+ok 36 - fixed：legacy cards / card.text / capabilities 逐字冻结（fixed 字段不改变 legacy 数据）
+  ---
+  duration_ms: 0.3734
+  type: 'test'
+  ...
+# Subtest: fixed context：显式矩阵返回 fixed 段（职责/decision 卡/报告），覆盖固定路径职责
+ok 37 - fixed context：显式矩阵返回 fixed 段（职责/decision 卡/报告），覆盖固定路径职责
+  ---
+  duration_ms: 0.1563
+  type: 'test'
+  ...
+# Subtest: fixed context：缺省/legacy/未知矩阵返回 legacy 4 段（同引用，逐字不变）
+ok 38 - fixed context：缺省/legacy/未知矩阵返回 legacy 4 段（同引用，逐字不变）
+  ---
+  duration_ms: 0.1106
+  type: 'test'
+  ...
+# Subtest: fixed context：非 trio 与未登记 facts 仍 fail-closed（先于 fixed 段）
+ok 39 - fixed context：非 trio 与未登记 facts 仍 fail-closed（先于 fixed 段）
+  ---
+  duration_ms: 0.1097
+  type: 'test'
+  ...
+# Subtest: fixed context：纯函数——重复调用同引用且 section 冻结、无资源引用
+ok 40 - fixed context：纯函数——重复调用同引用且 section 冻结、无资源引用
+  ---
+  duration_ms: 0.1478
+  type: 'test'
+  ...
+# Subtest: fixed：本批不新增 fixed dispatch 分支——模块 dispatch/tools/preflight 返回与 legacy 相同
+ok 41 - fixed：本批不新增 fixed dispatch 分支——模块 dispatch/tools/preflight 返回与 legacy 相同
+  ---
+  duration_ms: 0.4331
+  type: 'test'
+  ...
+# Subtest: fixed：不新增 requestReleaseMerge；模块/本角色测试无 skip/force-exit
+ok 42 - fixed：不新增 requestReleaseMerge；模块/本角色测试无 skip/force-exit
+  ---
+  duration_ms: 2.7938
+  type: 'test'
+  ...
+# Subtest: 规格：id / displayName / function 与旧注册表一致
+ok 43 - 规格：id / displayName / function 与旧注册表一致
+  ---
+  duration_ms: 0.4789
+  type: 'test'
+  ...
+# Subtest: 规格：Section 1 条目逐字段一致（root 恒为 project）
+ok 44 - 规格：Section 1 条目逐字段一致（root 恒为 project）
+  ---
+  duration_ms: 0.5113
+  type: 'test'
+  ...
+# Subtest: 规格：预授权目录与禁写前缀逐项一致
+ok 45 - 规格：预授权目录与禁写前缀逐项一致
+  ---
+  duration_ms: 0.1641
+  type: 'test'
+  ...
+# Subtest: 规格：capabilities 七字段与旧矩阵一致（D10 唯一真源）
+ok 46 - 规格：capabilities 七字段与旧矩阵一致（D10 唯一真源）
+  ---
+  duration_ms: 0.0825
+  type: 'test'
+  ...
+# Subtest: 规格：cards 只列当前有效卡种（proposal + decision；无 legacy write）
+ok 47 - 规格：cards 只列当前有效卡种（proposal + decision；无 legacy write）
+  ---
+  duration_ms: 0.0771
+  type: 'test'
+  ...
+# Subtest: 规格：卡文本逐字节一致（sha256/长度/行数）
+ok 48 - 规格：卡文本逐字节一致（sha256/长度/行数）
+  ---
+  duration_ms: 0.4375
+  type: 'test'
+  ...
+# Subtest: 规格：卡文本不含运行时秘密/账本占位或模型原始输出
+ok 49 - 规格：卡文本不含运行时秘密/账本占位或模型原始输出
+  ---
+  duration_ms: 0.0852
+  type: 'test'
+  ...
+# Subtest: 规格：意图入口共享文本与 fixture 一致（共享单一来源，不复制 12 行契约）
+ok 50 - 规格：意图入口共享文本与 fixture 一致（共享单一来源，不复制 12 行契约）
+  ---
+  duration_ms: 0.1504
+  type: 'test'
+  ...
+# Subtest: 规格：模块数据冻结（模块 / card / entries / 各数组不可变）
+ok 51 - 规格：模块数据冻结（模块 / card / entries / 各数组不可变）
+  ---
+  duration_ms: 0.2376
+  type: 'test'
+  ...
+# Subtest: 规格：模块只暴露约定字段（含 T3 B2 fixedCards；无私有 cardText/matrix 泄漏）
+ok 52 - 规格：模块只暴露约定字段（含 T3 B2 fixedCards；无私有 cardText/matrix 泄漏）
+  ---
+  duration_ms: 0.1939
+  type: 'test'
+  ...
+# Subtest: fixedCards：[] 冻结值（v1.3 §3.4），与 legacy cards 不同引用且不回退/过滤
+ok 53 - fixedCards：[] 冻结值（v1.3 §3.4），与 legacy cards 不同引用且不回退/过滤
+  ---
+  duration_ms: 0.7971
+  type: 'test'
+  ...
+# Subtest: fixed context：仅 matrix="two-fixed-paths/v1" 返回 fixed 两段（含 A12a/A12b/归档/边界纪律）
+ok 54 - fixed context：仅 matrix="two-fixed-paths/v1" 返回 fixed 两段（含 A12a/A12b/归档/边界纪律）
+  ---
+  duration_ms: 0.1983
+  type: 'test'
+  ...
+# Subtest: fixed context：治理模型/事实不影响输出；输入不被修改；与 legacy 段互不混入
+ok 55 - fixed context：治理模型/事实不影响输出；输入不被修改；与 legacy 段互不混入
+  ---
+  duration_ms: 0.1556
+  type: 'test'
+  ...
+# Subtest: legacy context：context({})/缺省/显式 legacy-v1 同一引用且 JSON 哈希逐字冻结
+ok 56 - legacy context：context({})/缺省/显式 legacy-v1 同一引用且 JSON 哈希逐字冻结
+  ---
+  duration_ms: 0.5111
+  type: 'test'
+  ...
+# Subtest: legacy 规格数据逐字冻结：card.text/cards/capabilities/边界不受 B2 改动影响
+ok 57 - legacy 规格数据逐字冻结：card.text/cards/capabilities/边界不受 B2 改动影响
+  ---
+  duration_ms: 0.2043
+  type: 'test'
+  ...
+# Subtest: 无 release 合并请求工具：模块源码零出现（G-IR §六；RoleToolId 仍 14 项）
+ok 58 - 无 release 合并请求工具：模块源码零出现（G-IR §六；RoleToolId 仍 14 项）
+  ---
+  duration_ms: 0.322
+  type: 'test'
+  ...
+# Subtest: 测试纪律：test/roles/verifier 无跳过/强制退出 token（不新增，B2 回归照常执行）
+ok 59 - 测试纪律：test/roles/verifier 无跳过/强制退出 token（不新增，B2 回归照常执行）
+  ---
+  duration_ms: 0.5329
+  type: 'test'
+  ...
+1..59
+# tests 59
+# suites 0
+# pass 59
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 700.6291

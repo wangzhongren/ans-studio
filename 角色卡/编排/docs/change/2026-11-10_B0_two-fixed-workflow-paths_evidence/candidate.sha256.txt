@@ -1,0 +1,21 @@
+029a9a89a7ef75e5da149c96765cfdad53667303f8a4b08ec18fa0d6296be6f8 *src/common/编排/task-state.ts
+863a3164f018087e27d8043e0928f116dc243a9a8a8407a3f354531f53be41a7 *src/common/编排/workflow-state.ts
+0c76ea1f28066add523279747de981fd49c43648b9873ab8fb5720c8d4e6ae2f *src/common/编排/workflow-service.ts
+3874925bd134d757bcc63ec965192e87d9de827d1f9344ddbc1043cc84a5175e *src/common/编排/basis-guard.ts
+aafb1a07f8498d03a544ec6491ba59b0f3dc1604a4d4c6052eb7ce0e5e67b9b9 *src/pipeline/orchestration/run-role.ts
+fe5f9978593f9431cd2181efa67f8f0d01601c6c8fe861ea38da9641788db9ed *test/编排/task-state-fixed.test.ts
+78eae4ff3560e6b8b47ba8a1365d587e8aa279fe40afe446f6f757306d28d9b4 *test/编排/workflow-state.test.ts
+dde12f1abd114bd95c0397239b9c63ad07eace3778b41520200178f435d5736b *test/编排/workflow-mode.test.ts
+65890706ced87da8890f5c986ccc046b902301e0c5b3e62d9144214ca7916b12 *test/编排/workflow-ledger.test.ts
+b536cffdbf3eb397aedcef5c1bffd6411629ebaccda377aee76e3b436e87f735 *test/编排/basis-guard.test.ts
+---bytes/lines---
+src/common/编排/task-state.ts	1404 lines	80937 bytes
+src/common/编排/workflow-state.ts	364 lines	16527 bytes
+src/common/编排/workflow-service.ts	442 lines	19379 bytes
+src/common/编排/basis-guard.ts	370 lines	14912 bytes
+src/pipeline/orchestration/run-role.ts	3670 lines	239418 bytes
+test/编排/task-state-fixed.test.ts	237 lines	9472 bytes
+test/编排/workflow-state.test.ts	268 lines	13118 bytes
+test/编排/workflow-mode.test.ts	225 lines	10282 bytes
+test/编排/workflow-ledger.test.ts	200 lines	9097 bytes
+test/编排/basis-guard.test.ts	216 lines	10012 bytes

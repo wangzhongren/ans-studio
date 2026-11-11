@@ -1,0 +1,37 @@
+B5 测试（2026-11-10）— 摘要（候选 HEAD e645e4e；分支 feat/two-fixed-workflow-paths；未提交）
+
+候选（本批仅 test/测试/** 3 新文件 + 本角色记录/证据）：
+- test/测试/fixed-path-full-chain.test.ts  1125 行 / 71,800 B / sha256 0c1530b79b6ba8cff4bd08d3dc7e4a0ed0e69c13f1c458627d472328d56ff80a
+- test/测试/mode-switch.test.ts            284 行 / 16,631 B / sha256 b38596b8b886c86111f2102d5be17cc0c53ae58ca4eb83e97c7f25df1addeca2
+- test/测试/b-change-scope.test.ts         420 行 / 24,601 B / sha256 a7f97744e23a05d0b26383ca3f7247aa512dec28355f03a15eff067c000e4d31
+- 候选聚合（<raw_sha256>  <path> 行 LC_ALL=C sort 后 SHA-256）：d80d180084b84885e23d2a92dc53f450509e7b87a92ae722222ae8e265e2669a
+- 写集外 diff=0（git status --porcelain -- src app test 仅上述 3 文件）
+
+新测试：8/8 pass（0 fail / 0 skip / 0 cancelled）：
+- fixed-path-full-chain: 3/3（路径 A A1→A13 delivered；路径 B B1→B4 delivered；B 无仓库 fail-closed）
+- mode-switch: 3/3；b-change-scope: 2/2
+
+D1：
+- npm run typecheck exit 0（含新文件）。
+- test/测试 before 116 文件 703/646/38/1/18 → after 119 文件 711/654/38/1/18；
+  失败名集合 diff added 0 / removed 0（39 条逐名一致）；新 skip = 0。
+- known-red 域：编排 24/24、门禁 5/5、runtime-core 33/33 逐名一致；桌面 88 vs 并集 80
+  （8 条差集全属已登记非确定/挂起套件）；roles 275/275；gates 29/29；项目管理 1 红 = G-B5-4。
+- 编排 direct-role-capabilities 一次性 V8 原生 abort（20/47），隔离复跑 47/46/1（同 known-red 名）；
+  补足后编排 1,328/1,302/24/2 = B4.2 参照。
+- 4 个登记挂起文件（directive-decision/optional-acceptance/session-rebuild-race/stuck-redispatch）
+  90s watchdog；无未登记挂起。
+
+阻塞缺口（交 owner；B5 未改产品代码）：
+- G-B5-1 recordStageDispatch 无生产调用点（A12a pending ⇒ A11 被 AC-09 拒；A12b/A12/A13 不可达；
+  A1/A4/A7 未在任务创建时完成）— 桌面窗口/编排。
+- G-B5-2 recordChangeScopeDecision 无生产调用点（B2 无写入者 ⇒ B3 被 b-change-scope-invalid 拒）
+  — 编排/桌面窗口。
+- G-B5-3 proposal 卡（A6）无 stage.requested A6 写入者（accept 不产生 stage.completed A6 ⇒ A7 被拒）
+  — 桌面窗口/编排。
+- G-B5-4 i18n 硬编码守卫（app/desktop/workflow.ts:20、workflow-git.ts:32 中文 import 路径未入
+  allowlist；B1 基线为绿）— 桌面窗口。
+⇒ 真机全链 RR-02/RR-03 当前不可自然完成（B5 全链以宿主 glue 证明机制可通，不构成修复/验收）。
+
+证据索引与复现：_evidence/index.md（工具哈希/命令）；缺口复现：probe-a12a-gap.mjs、
+probe-chain-a.mjs、probe-chain-b.mjs；D1：run-tests.mjs + d1-*。

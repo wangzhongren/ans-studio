@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: 判断会话不可用：按拒绝处理、presenter 零调用、理由「判断服务不可用」、审计保留 manual
+ok 1 - 判断会话不可用：按拒绝处理、presenter 零调用、理由「判断服务不可用」、审计保留 manual
+  ---
+  duration_ms: 13.3914
+  type: 'test'
+  ...
+# Subtest: 判断超时：按拒绝处理、presenter 零调用、理由「判断超时」，底层会话被 abort/dispose
+ok 2 - 判断超时：按拒绝处理、presenter 零调用、理由「判断超时」，底层会话被 abort/dispose
+  ---
+  duration_ms: 37.9467
+  type: 'test'
+  ...
+# Subtest: 输出无法解析：模型散文不猜结论 ⇒ 按拒绝处理、理由「判断结果无法解析」
+ok 3 - 输出无法解析：模型散文不猜结论 ⇒ 按拒绝处理、理由「判断结果无法解析」
+  ---
+  duration_ms: 4.9192
+  type: 'test'
+  ...
+# Subtest: allow + 读取被拒：真实驱动按「allow 必须无损」降级 manual/read-denied ⇒ 拒绝并带具体路径
+ok 4 - allow + 读取被拒：真实驱动按「allow 必须无损」降级 manual/read-denied ⇒ 拒绝并带具体路径
+  ---
+  duration_ms: 3.8978
+  type: 'test'
+  ...
+# Subtest: allow + 读取预算耗尽：真实驱动降级 manual/budget ⇒ 拒绝、理由「读取预算已用尽」
+ok 5 - allow + 读取预算耗尽：真实驱动降级 manual/budget ⇒ 拒绝、理由「读取预算已用尽」
+  ---
+  duration_ms: 4.1329
+  type: 'test'
+  ...
+# Subtest: allow + 读取截断：真实驱动降级 manual/read-truncated ⇒ 拒绝、理由「读取内容被截断」
+ok 6 - allow + 读取截断：真实驱动降级 manual/read-truncated ⇒ 拒绝、理由「读取内容被截断」
+  ---
+  duration_ms: 11.9259
+  type: 'test'
+  ...
+# Subtest: 防循环：同一命令连续 deny 达上限后不再调用模型 ⇒ 按拒绝处理、理由「已达重试上限」
+ok 7 - 防循环：同一命令连续 deny 达上限后不再调用模型 ⇒ 按拒绝处理、理由「已达重试上限」
+  ---
+  duration_ms: 3.44
+  type: 'test'
+  ...
+# Subtest: 引擎不支持（demo）：manual/unsupported-engine ⇒ 拒绝、不调用任何适配器、不跨引擎
+ok 8 - 引擎不支持（demo）：manual/unsupported-engine ⇒ 拒绝、不调用任何适配器、不跨引擎
+  ---
+  duration_ms: 2.8003
+  type: 'test'
+  ...
+# Subtest: allow 结果行投达失败：按拒绝处理（不自动放行、不弹卡），审计保留 row-failed 与模型 allow 事实
+ok 9 - allow 结果行投达失败：按拒绝处理（不自动放行、不弹卡），审计保留 row-failed 与模型 allow 事实
+  ---
+  duration_ms: 2.9572
+  type: 'test'
+  ...
+# Subtest: 判断请求超上限：命令 >16KB 直接 manual/context-too-large ⇒ 拒绝（不截断后猜）
+ok 10 - 判断请求超上限：命令 >16KB 直接 manual/context-too-large ⇒ 拒绝（不截断后猜）
+  ---
+  duration_ms: 4.0921
+  type: 'test'
+  ...
+# Subtest: 模型自报 manual：按拒绝处理、理由「自动代理自报无法判断」
+ok 11 - 模型自报 manual：按拒绝处理、理由「自动代理自报无法判断」
+  ---
+  duration_ms: 3.6799
+  type: 'test'
+  ...
+# Subtest: 对照：judge allow/deny 正常路径不变（manual 改造未波及模型主动结论）
+ok 12 - 对照：judge allow/deny 正常路径不变（manual 改造未波及模型主动结论）
+  ---
+  duration_ms: 4.9893
+  type: 'test'
+  ...
+# Subtest: 开关关闭：presenter 仍被调用（旧手动确认卡保留），判断 agent 0 次调用、审计归人工
+ok 13 - 开关关闭：presenter 仍被调用（旧手动确认卡保留），判断 agent 0 次调用、审计归人工
+  ---
+  duration_ms: 2.8429
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 535.5419

@@ -1,0 +1,80 @@
+# B2 AC-19 code scan: basis.amended / basis.verified / A12a-A12b drift (2026-11-10, HEAD e28923c)
+
+## grep -rn "basis.verified|BasisVerifiedEvent" src app test
+src/common/编排/basis-guard.ts:7:// `basis.amended` 修正流程、`basis.verified` 节流写入（B1）。
+src/model/runtime.ts:2220:/** `basis.verified`（关键门节流记录；字段按 v1.3 §7.1）。 */
+src/model/runtime.ts:2221:export interface BasisVerifiedEvent extends WorkflowLedgerEventBase {
+src/model/runtime.ts:2223:  kind: "basis.verified";
+src/model/runtime.ts:2242:export type BasisEvent = BasisRecordedEvent | BasisAmendedEvent | BasisVerifiedEvent | BasisDriftEvent;
+src/model/runtime.ts:2246:  "basis.recorded", "basis.amended", "basis.verified", "basis.drift",
+src/model/runtime.ts:2473:    case "basis.verified": {
+
+## grep -rn "basis.amended|BasisAmendedEvent|previousBasisId" src app test (first 40)
+src/common/编排/basis-guard.ts:7:// `basis.amended` 修正流程、`basis.verified` 节流写入（B1）。
+src/common/编排/project-state.ts:1262:      .find((event) => (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === workflowId);
+src/common/编排/project-state.ts:1285:        : basis !== undefined && (basis.kind === "basis.recorded" || basis.kind === "basis.amended")
+src/common/编排/project-state.ts:1289:      ...(basis !== undefined && (basis.kind === "basis.recorded" || basis.kind === "basis.amended")
+src/common/编排/workflow-service.ts:2156:    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+src/common/编排/workflow-service.ts:2246:  const records = ledger.events.filter((event): event is Extract<BasisEvent, { kind: "basis.recorded" | "basis.amended" }> =>
+src/common/编排/workflow-service.ts:2247:    (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === input.workflowId);
+src/common/编排/workflow-service.ts:2625:  const records = ledger.events.filter((event): event is Extract<BasisEvent, { kind: "basis.recorded" | "basis.amended" }> =>
+src/common/编排/workflow-service.ts:2626:    (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === workflowId);
+src/common/编排/workflow-service.ts:3392:    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+src/common/编排/workflow-service.ts:3830:          `治理文档修改须由策划/产品出新 -vN 并 basis.amended（属主 ${owner}）：${candidate}。`,
+src/common/编排/workflow-service.ts:3864:        `治理文档修改须由策划/产品出新 -vN 并 basis.amended（属主 ${owner}）：${candidate}。`,
+src/model/runtime.ts:2204:/** `basis.amended`：同 workflow 新 basis（文档修正）；`previousBasisId` 指向旧记录，旧 basis 保留。 */
+src/model/runtime.ts:2205:export interface BasisAmendedEvent extends WorkflowLedgerEventBase {
+src/model/runtime.ts:2207:  kind: "basis.amended";
+src/model/runtime.ts:2209:  previousBasisId: string;
+src/model/runtime.ts:2242:export type BasisEvent = BasisRecordedEvent | BasisAmendedEvent | BasisVerifiedEvent | BasisDriftEvent;
+src/model/runtime.ts:2246:  "basis.recorded", "basis.amended", "basis.verified", "basis.drift",
+src/model/runtime.ts:2471:    case "basis.amended":
+src/model/runtime.ts:2472:      return common() && ledgerText(value["previousBasisId"]);
+src/pipeline/orchestration/run-role.ts:962:    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+src/pipeline/orchestration/run-role.ts:965:  if (basis === undefined || (basis.kind !== "basis.recorded" && basis.kind !== "basis.amended")) {
+Binary file app/desktop/session.ts matches
+test/runtime-core/two-fixed-workflow-paths-b0.test.ts:220:  assert.equal(isBasisEvent({ ...recorded, kind: "basis.amended" }), false, "amended 缺 previousBasisId");
+test/runtime-core/two-fixed-workflow-paths-b0.test.ts:221:  assert.equal(isBasisEvent({ ...recorded, kind: "basis.amended", previousBasisId: "bas-0" }), true);
+test/桌面应用/b3-fixed-baseline-pathb.test.ts:363:      (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === WF);
+test/桌面应用/b3-fixed-baseline-pathb.test.ts:411:      (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === WF).length, 0, "失败不写 basis");
+test/桌面应用/b3-fixed-baseline-pathb.test.ts:568:      (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === WF);
+test/桌面应用/b3-fixed-baseline-pathb.test.ts:611:        (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === WF).length, 0, "失败不写 basis");
+test/编排/basis-guard.test.ts:212:  assert.equal(isBasisRecordedEvent({ ...event, kind: "basis.amended" }), false);
+
+## grep -rn "await appendBasisEvent" src app
+src/common/编排/workflow-service.ts:2194:  const appended = await appendBasisEvent(input.projectRoot, recorded);
+src/common/编排/workflow-service.ts:2270:      await appendBasisEvent(input.projectRoot, event);
+
+## recordBasis reason union
+1958:  reason?: "baseline" | "path-b";
+
+## basis drift call sites (verifyBasisForWorkflow)
+src/common/编排/workflow-service.ts:2239:export async function verifyBasisForWorkflow(input: {
+src/common/编排/workflow-service.ts:2783:  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, now });
+src/common/编排/workflow-service.ts:3121:  const basis = await verifyBasisForWorkflow({ projectRoot: input.projectRoot, workflowId: input.workflowId, now });
+app/desktop/session.ts:132:  verifyBasisForWorkflow,
+Binary file app/desktop/session.ts matches
+
+## desktop dispatch basis gate condition (session.ts ~10066-10072)
+    // `basis-missing`；不派实现）。B1 由上面的路径 B 准备先写 basis，再复核。
+    if (!isStageRequest && workflowId !== undefined && fromRoleId === convenerId
+      && (d.stage === "A11" || d.stage === "B1" || d.stage === "B3")) {
+      const basis = await verifyBasisForWorkflow({ projectRoot, workflowId });
+      if (!basis.ok) return reject(basis.code, basis.message);
+    }
+    // T3 B3（AC-10/§4.3 MF-8）：B3 写集 = B2 `change.scope-decided.scope.files` ∩ roster/边界派生；
+    // 派发任务声明的模块路径必须落在该角色有效写集内（越界 ⇒ `b-change-scope-invalid`）。
+
+## A12a/A12b + basis in workflow-service (expect none)
+2696: *  - 公共：workflow 在 A13/B4（或在 A12b→A13 / B3→B4 合法推进处）、basis 未漂移、当前分支=任务分支、
+
+## archiveAcceptance: only recomputes current bytes (no basis.recorded comparison)
+
+## design v1.3 §7.2 requirement
+796:- 同 workflow 新 basis（文档修正）⇒ `basis.amended`，`previousBasisId` 指向旧记录；旧 basis 保留。
+965:  2. A12a/A12b 验收前后：复核 basis（criteria/report 绑定 hash）。
+968:- **`basis.verified` 节流（G-9）**：只在 A11/A12b/A13 关键门写摘要或 drift；drift 必写 `basis.drift`；普通读取不逐次入账，避免账本膨胀。
+971:- **文档修正**：新 `-vN` + `basis.amended`（`previousBasisId`）；如修改的是已确认的方案/意图，按现有 `request_requirement_change` 审批卡（decision 卡）或示意客户；不改固定 3 卡口径。
+1146:| 账本/依据 | basis 记录/漂移/修正；workflows/releases 事件 schema；basis.verified 节流；坏行计数；不写旧账本 | `test/编排/workflow-ledger.test.ts`（新） |
+
+## conclusion: (1) no basis.amended writer; (2) no basis.verified writer (model only); (3) no A12a/A12b basis drift check; appendBasisEvent callers = recordBasis(recorded) + verifyBasisForWorkflow(drift).

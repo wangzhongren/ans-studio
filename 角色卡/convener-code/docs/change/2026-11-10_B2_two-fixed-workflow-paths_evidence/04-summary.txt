@@ -1,0 +1,6 @@
+# before/after summary
+before convener: # tests 32 # pass 32 # fail 0 # skipped 0 
+after convener: # tests 40 # pass 40 # fail 0 # skipped 0 
+after 门禁引擎: # tests 499 # pass 493 # fail 5 # skipped 1 
+targeted consumers: # tests 11 # pass 11 # fail 0 # skipped 0 
+readonly test/roles: # tests 275 # pass 275 # fail 0 # skipped 0 

@@ -1,0 +1,60 @@
+TAP version 13
+# Subtest: 隔离：ANS_PI_SERVER_TOOLS=off / 0（显式关）⇒ 请求体零声明、零 server_tool 诊断、零工具行（逐字旧行为）
+ok 1 - 隔离：ANS_PI_SERVER_TOOLS=off / 0（显式关）⇒ 请求体零声明、零 server_tool 诊断、零工具行（逐字旧行为）
+  ---
+  duration_ms: 778.5029
+  type: 'test'
+  ...
+# Subtest: 构造期 fail-closed：未知 id（code_execution/伪造名）⇒ bindRole 抛错且抛错先于任何网络（loopback 零请求）
+ok 2 - 构造期 fail-closed：未知 id（code_execution/伪造名）⇒ bindRole 抛错且抛错先于任何网络（loopback 零请求）
+  ---
+  duration_ms: 3.6906
+  type: 'test'
+  ...
+# Subtest: 开启成功往返：声明尾部上 wire、恰一对 start/result、查询/标题会话内可见、URL query 剥除、诱饵零泄漏
+ok 3 - 开启成功往返：声明尾部上 wire、恰一对 start/result、查询/标题会话内可见、URL query 剥除、诱饵零泄漏
+  ---
+  duration_ms: 39.6645
+  type: 'test'
+  ...
+# Subtest: 错误变体对抗（自选 error_code=unavailable）：denied 如实、非运行错误、轮次 completed、诊断类别归一
+ok 4 - 错误变体对抗（自选 error_code=unavailable）：denied 如实、非运行错误、轮次 completed、诊断类别归一
+  ---
+  duration_ms: 41.236
+  type: 'test'
+  ...
+# Subtest: 跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）
+not ok 5 - 跨轮配对：两轮各一次检索 ⇒ 每轮恰一对、turnId 归各自轮、结果文本各自对应（id 不串）
+  ---
+  duration_ms: 13.6724
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\g3-search-verify\\pi-loopback-verify.test.ts:315:1'
+  failureType: 'testCodeFailure'
+  error: '轮次归属应恰为 g3-turn-1/2：,g3-turn-1,g3-turn-3'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  operator: '=='
+  stack: |-
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:336:14
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async withEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:78:16)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g3-search-verify/pi-loopback-verify.test.ts:317:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 降级链：网关对含声明请求回 400 ⇒ 本轮如实失败＋降级恰一次＋后续（含第 2 轮）不再附声明且轮次正常完成
+ok 6 - 降级链：网关对含声明请求回 400 ⇒ 本轮如实失败＋降级恰一次＋后续（含第 2 轮）不再附声明且轮次正常完成
+  ---
+  duration_ms: 54.8806
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1063.0633

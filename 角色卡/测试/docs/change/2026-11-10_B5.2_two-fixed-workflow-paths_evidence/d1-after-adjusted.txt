@@ -1,0 +1,16 @@
+B5.2 D1 after (raw corpus): tests 709 / pass 650 / fail 40 / cancelled 1 / skip 18 / hangs 3
+raw not-ok entries: 41
+transient native-crash file-level entries excluded:
+  test/测试/2026-11-09_judge-delegated-effectiveness.test.ts (V8 native abort exit 134 in corpus; isolated re-run #2 pass 1/1, 62,969ms; re-run #1 also aborted exit 134)
+  test/测试/git-action-delivery-claude-e2e.test.ts (V8 native abort exit 134 in corpus; isolated re-run pass 1/1, 82,730ms)
+corpus 300s watchdogs (isolated re-run pass 1/1):
+  test/测试/git-action-commit-pi-e2e.test.ts (isolated 1/1 pass, 50,571ms)
+  test/测试/git-run-stop-host-continuation-e2e.test.ts (isolated 1/1 pass, 44,953ms)
+registered hang (unchanged): customer-authorization-plane-integration 90s watchdog
+
+adjusted totals (isolated re-runs substitute corpus anomalies): tests 711 / pass 654 / fail 38 / cancelled 1 / skip 18 / hangs 1
+adjusted not-ok entries: 39
+
+adjusted after vs B5 frozen known-red flat (39 entries):
+added: 0
+removed: 0

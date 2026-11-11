@@ -47,21 +47,50 @@
 // 此时**不做任务级收窄**，只用角色边界；编排把 undefined 原样传给 resolveWrite，绝不伪造全量 writeSet。
 // （确认制会话例外：其 writeSet 由发行器动态持有；其中 Section 1 预授权/旧 su 预授权目录见上。）
 
-import type { GovernanceFunction, GovernanceModel, ProjectConfig, ResolvedRole } from "../../model/role.ts";
+import type { DispatchMatrixMode, GovernanceFunction, GovernanceModel, ProjectConfig, ResolvedRole } from "../../model/role.ts";
 import type { BoundaryEntry } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
-import type { TaskScope, WriteDecision } from "../../model/decision.ts";
+import type { ShellRules, TaskScope, WriteDecision } from "../../model/decision.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 // C 批（方案 §6.4.1/C-06）：appointment-write 预览的 role-card 必填章节单一来源。
-import { ROLE_CARD_REQUIRED_SECTIONS } from "../../common/门禁引擎/governance-roles.ts";
+import { ROLE_CARD_REQUIRED_SECTIONS, cardKindsOf as governanceCardKindsOf } from "../../common/门禁引擎/governance-roles.ts";
 // X-R6（E2 S2）：intent-confirm 卡纯数据（固定选项/分组/代批范围）唯一真源 = chief 角色模块。
 // 本文件只消费数据做条件/默认卡判定，不复制第二份卡面数据、不构造卡、不写账本。
 import { CHIEF_INTENT_CONFIRM_CARD } from "../../common/roles/chief/index.ts";
 import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write-guard.ts";
-import { loadLatestRoster, nominationD3CardFacts, rosterDirectoriesFor, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+import { loadLatestRoster, nominationD3CardFacts, parseProjectModules, parseProjectRoster, parseTeamPlan, rosterContainsBuiltInRoleIds, rosterDirectoriesFor, rosterRoleIds, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
+// T3 B3.1（2026-11-10，AC-08/AC-13）：fixed A10 卡在办标记（stage.requested A10）经 fixed 账本公共原语写入。
+import { stageRequestIdempotencyKey } from "../../common/编排/workflow-dispatch.ts";
+import { canRequestStage, deriveWorkflowView, WORKFLOW_CORRUPT_CODE } from "../../common/编排/workflow-state.ts";
+// T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。
+import { readTaskState } from "../../common/编排/task-state.ts";
+import type { WorkflowMode } from "../../common/编排/workflow-service.ts";
+import {
+  activateRoleDocumentsFixed as workflowActivateRoleDocumentsFixed,
+  appendWorkflowEvent as workflowAppendEvent,
+  closeTask as workflowCloseTask,
+  derivePathBWriteSets,
+  fillFixedActivationHashes,
+  finalizeIntent as workflowFinalizeIntent,
+  // T3 B10.2（2026-11-11）：fixed 任务会话上下文经 fixed 账本事实校验（不要求 runId、不写 trunk/run）。
+  inspectAssignedTask as workflowInspectAssignedTask,
+  prepareIntent as workflowPrepareIntent,
+  readBasisLedger,
+  readWorkflowLedger as workflowReadLedger,
+  taskBranchName,
+  type AssignedTaskFacts,
+  type PreparedFixedIntent,
+  type WorkflowServiceFailure,
+  type FixedActivateRoleDocumentsDep,
+  type FixedActivateRoleDocumentsFn,
+  type FixedActivateRoleDocumentsToolInput,
+  type FixedCloseCreatedTaskDep,
+  type FixedCloseCreatedTaskFn,
+  type FixedCloseCreatedTaskToolInput,
+} from "../../common/编排/workflow-service.ts";
 import { createShellPostAudit } from "../../common/编排/shell-post-audit.ts";
 import { buildShellApprovalContext } from "../../common/编排/shell-approval-context.ts";
 import {
@@ -95,7 +124,9 @@ import { resolveWrite, resolveWriteReadPreflight, resolveWriteFinal, stableWrite
 import { readGitProtectionFacts, checkGitProtectionFactsCurrent, readGitHostProtectionRequirement, beginGitHostAction, endGitHostAction, inspectGitHostCoordinator, executeReadonlyGit, type GitProtectionFacts, type GitHostOpenFailureRef, type GitHostInventory } from "../../provider/trunk/public/trunk-store.ts";
 // 2026-11-08（W3b，设计 P1.3 §2.4.3 / I0-4）：只读 Git matcher 经 Service 公共出口**同一函数引用**
 // （门禁引擎单一实现；不复制白名单/解析逻辑）。
-import { matchReadonlyGit } from "../../service/gate/shell-rules.ts";
+// 2026-11-10（B4.1）：任务级 Git 写 matcher 同经 Service 出口消费（同一函数引用；生产不导入私有 common/）。
+import { matchReadonlyGit, matchTaskGit } from "../../service/gate/shell-rules.ts";
+import type { TaskGitMatch, TaskGitScope } from "../../service/gate/shell-rules.ts";
 import {
   GOVERNANCE_MATRIX_PER_ROLE_MAX_CHARS,
   GOVERNANCE_MATRIX_PROMPT_MAX_CHARS,
@@ -186,10 +217,12 @@ import type {
   ShellJudgeToolOptions,
   GovernanceJudgeContext,
   GovernanceJudgeToolOptions,
+  RequestResolvedEvent,
+  WorkflowEvent,
   ShellEscalationFn,
   ShellEscalationPresentFn,
 } from "../../model/runtime.ts";
-import { GOVERNANCE_SLUG_PATTERN, governanceCardGroup } from "../../model/runtime.ts";
+import { GOVERNANCE_SLUG_PATTERN, WORKFLOW_LEDGER_SCHEMA, governanceCardGroup } from "../../model/runtime.ts";
 import { createRuntimeAdapter, createBlockedRoleCapabilityCallbacks, isRuntimeEditReadProbe, inspectRuntimeFileGateContext, projectRuntimeLiveHandback, projectRuntimeLegacyHistory, inspectRuntimeConstructionFailure, recheckRuntimeConstructionFailure, discardRuntimeRolePreparation, inspectRuntimeCoreRegistry, type RuntimeSessionOptions } from "../../service/runtime/session.ts";
 import { createTrunkService, type DecisionEvidenceInput, type PreparedIntentConfirmation } from "../../service/trunk/public/trunk-service.ts";
 import { RUNTIME_KINDS } from "../../common/shared/runtime-shared.ts";
@@ -217,6 +250,12 @@ import { formatEvent } from "../../common/编排/output.ts";
 import { withHandback, type OrchestrationEvent, type TaskReport, type HandbackIntent, type HandbackEvent, normalizeTaskReport } from "../../common/编排/handback.ts";
 import { EXIT_OK, EXIT_USAGE, EXIT_FAILURE } from "../../common/编排/exit-codes.ts";
 import type { ShellVerdictFn } from "../../common/编排/shell-gate.ts";
+import {
+  createTaskGitCommitRunner,
+  type ClassifyShellDetailedFn,
+  type ShellTaskGitBudgets,
+  type ShellTaskGitCommandFacts,
+} from "../../common/编排/shell-gate.ts";
 import { repinIfBootstrapped, DEFAULT_GOVERNANCE_BOUNDARY_REL } from "../../common/编排/finalize.ts";
 import { conditionSlugsOf, declaredPathBodies, createConfirmedWriteIssuer, explicitConfirmPaths, validateConfirmPreviewCompleteness } from "../../common/编排/confirmed-writes.ts";
 import {
@@ -361,6 +400,17 @@ export interface AdapterCapabilities {
   completeTeamPlan?: CompleteTeamPlanFn;
   activateRoleDocuments?: ActivateRoleDocumentsFn;
   closeCreatedTask?: CloseCreatedTaskFn;
+  /**
+   * T3 B2（MF-IR-2/3）：fixed `close_created_task`/`activate_role_documents` v2 工具依赖。
+   * **仅 fixed 会话注入**（legacy 会话字段缺席 = 结构性不可达；legacy `closeCreatedTask`/
+   * `activateRoleDocuments` 字段语义/注入面逐字不变）。身份与项目根已由 `openRoleSession` 以
+   * 会话解析结果绑定；运行时核心 B2 handler 只传模型可见字段（fixed close
+   * `{operationId,taskId,outcome,note?}`；fixed activate `{operationId,flowId,workflowId,
+   * proposalDecisionId,targetRoleId,roster,documents}`）。实现 = `workflowService.closeTask` /
+   * `workflowService.activateRoleDocumentsFixed`（或调用方注入的应用实现，可补 evidence）。
+   */
+  closeCreatedTaskFixed?: FixedCloseCreatedTaskFn;
+  activateRoleDocumentsFixed?: FixedActivateRoleDocumentsFn;
   gitQuery?: GitQueryFn;
   gitCandidate?: GitCandidateFn;
   gitPublish?: GitPublishFn;
@@ -785,12 +835,380 @@ export function inspectManagedRoleSessionEvidence(input: { projectRoot: string; 
     lifecycle, toolSurface: record.handle.inspectToolSurface?.(), ...(record.turnInput?.turnId === lifecycle?.turnId ? { turnInput: record.turnInput } : {}) }); } catch { return undefined; }
 }
 
+// —————————————— T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写（add/commit）——————————————
+//
+// 分工（任务给定）：
+//   · shell-gate（本角色 `common/编排/shell-gate.ts`）只做**分类 + 审计**：任务级 Git 命令经注入的
+//     `classifyShellDetailed(argv, rules, { taskGitScope })` 判定（scope 由本文件解析），`taskGit` 审计
+//     字段随既有 `docs/audit/shell-gate.jsonl` 行追加（允许与拒绝都记、既有字段不减少）；
+//   · `run_shell` 的**执行路径**（本文件 `ReadonlyGitCapability` 的 task-git 分支）在 **spawn 之前**
+//     调用 `createTaskGitCommitRunner`（= 门禁引擎 `runTaskGitCommit` 临界区门）：项目级锁贯穿
+//     `git diff --cached --name-only -z` 检查与 commit；锁占用 ⇒ `git-critical-section-busy`（不排队）。
+//
+// 事实来源（模型不可自报）：
+//   · 真实受派任务 = `tasks.jsonl` 的 `task.created`（`to` = 本会话角色；`stage` ∈ A11/B3）；
+//   · A 路径写集 = `basis.jsonl` 最新 `basis.recorded/amended.teamPlan`（字节 hash 复核）→
+//     `parseTeamPlan` 的 `roleRows[].writesets`（与 A9 落盘时同一解析器/校验器）；
+//   · B 路径写集 = 最新 `change.scope-decided.scope.files` → `derivePathBWriteSets`（B3 已实现）→
+//     本角色条目；
+//   · 分支 = `taskBranchName(workflowId)`（`ans/task/<workflowId>`；单一来源 workflow-service）。
+
+/** `run_shell` 执行路径的任务级 Git 端口（桌面 B3/B4 注入真实 Git；测试注入假件）。 */
+export interface TaskGitShellPort {
+  /**
+   * 项目级临界区取锁（**必须**是 desktop B3 `acquireProjectGitCriticalSection` 同一把锁——
+   * 发布合并与 shell 提交互斥）。占用 ⇒ `undefined`（fail-closed，不排队）。
+   */
+  acquireCriticalSection(owner: string): (() => void) | undefined;
+  /** 应用读取的当前分支（`runTaskGitCommit` 在取锁前核对 `ans/task/<workflowId>`）。 */
+  currentBranch(): Promise<string> | string;
+  /** 执行规则层允许的 `git add <literal paths>`（无锁；staged 内容检查只属 commit 门）。 */
+  add(paths: readonly string[], budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommandFacts> | ShellTaskGitCommandFacts;
+  /**
+   * 在 commit 临界区内执行传入的固定 staged 检查 argv（`TASK_GIT_STAGED_INSPECTION_ARGV`，
+   * `git diff --cached --name-only -z`）并返回 staged 路径（NUL 分隔解析按同一契约）。
+   */
+  inspectStaged(argv: readonly string[]): Promise<readonly string[]> | readonly string[];
+  /** 在 commit 临界区内执行传入的固定 commit argv（仅 `git commit -m <message>`）。 */
+  commit(argv: readonly string[], budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommandFacts> | ShellTaskGitCommandFacts;
+}
+
+/**
+ * `openRoleSession` 的任务级 Git 注入位（**仅 fixed 会话**；legacy 会话逐字忽略本字段）：
+ * 两个字段**同时**给出且真实受派实现任务的写集可解析时，才向 shell 闸注入任务级分类上下文；
+ * 缺一/不可解析 ⇒ 不注入（v5 分类器无 scope ⇒ `git add`/`git commit` 一律拒，fail-closed）。
+ */
+export interface TaskGitShellRuntimeInput {
+  /** 门禁引擎明细分类器（Service 出口 `classifyShellDetailed` 同一函数引用）。 */
+  classifyShellDetailed?: ClassifyShellDetailedFn;
+  /** 执行端口（桌面注入；`acquireCriticalSection` 与发布合并同一把项目级锁）。 */
+  port?: TaskGitShellPort;
+}
+
+/** 任务级 Git 写集解析结果（稳定码复用 v5 `git-task-scope-*`；本层只做诊断/不注入）。 */
+export type ResolveTaskGitScopeResult =
+  | { ok: true; scope: TaskGitScope }
+  | { ok: false; code: "git-task-scope-missing" | "git-task-scope-invalid"; message: string };
+
+const TASK_GIT_SCOPE_MISSING = "git-task-scope-missing";
+const TASK_GIT_SCOPE_INVALID = "git-task-scope-invalid";
+
+function taskGitScopeMissing(message: string): ResolveTaskGitScopeResult {
+  return { ok: false, code: TASK_GIT_SCOPE_MISSING, message };
+}
+function taskGitScopeInvalid(message: string): ResolveTaskGitScopeResult {
+  return { ok: false, code: TASK_GIT_SCOPE_INVALID, message };
+}
+function sha256HexOfBytes(bytes: Uint8Array | string): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+async function readProjectFileBytes(projectRoot: string, rel: string): Promise<Buffer | undefined> {
+  if (typeof rel !== "string" || rel.trim() === "" || path.isAbsolute(rel)) return undefined;
+  try {
+    return await readFile(path.join(projectRoot, ...rel.split("/")));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 从**真实受派任务 + fixed 账本**解析任务级 Git 写事实（taskId/workflowId/branch/writeSet）。
+ * 纯读、fail-closed：任何一步缺失/漂移/不匹配都返回稳定码，调用方**不注入** scope（Git 写拒绝）。
+ * **模型不可自报**：taskId 来自会话绑定；角色 = 会话解析结果；写集来自团队计划/派生账本。
+ */
+export async function resolveTaskGitScope(input: {
+  projectRoot: string;
+  taskId: string;
+  roleId: string;
+}): Promise<ResolveTaskGitScopeResult> {
+  if (typeof input.taskId !== "string" || input.taskId.trim() === "") return taskGitScopeMissing("任务 id 缺失");
+  const taskState = await readTaskState(input.projectRoot);
+  const record = taskState.records.get(input.taskId);
+  const created = record?.created;
+  if (created === undefined) return taskGitScopeMissing(`任务 ${input.taskId} 不存在（无 task.created）`);
+  if (created.to !== input.roleId) {
+    return taskGitScopeInvalid(`任务受派人 ${created.to} 与本会话角色 ${input.roleId} 不一致`);
+  }
+  if (typeof created.workflowId !== "string" || created.workflowId.trim() === "") {
+    return taskGitScopeMissing("任务未绑定 fixed workflowId");
+  }
+  if (created.stage !== "A11" && created.stage !== "B3") {
+    return taskGitScopeInvalid(`任务阶段 ${created.stage ?? "<none>"} 不是实现提交阶段（仅 A11/B3）`);
+  }
+  const workflowId = created.workflowId;
+  const branch = taskBranchName(workflowId);
+  const ledger = await workflowReadLedger(input.projectRoot);
+  const events = ledger.events.filter((event) => event.workflowId === workflowId);
+  const started = events.find((event) => event.kind === "workflow.started");
+  if (started === undefined) return taskGitScopeMissing(`workflow ${workflowId} 缺 workflow.started`);
+  const flowId = created.flowId ?? started.flowId;
+  if (started.path === "B") {
+    const scopeEvent = [...events].reverse().find((event) => event.kind === "change.scope-decided");
+    if (scopeEvent === undefined || scopeEvent.kind !== "change.scope-decided") {
+      return taskGitScopeMissing(`workflow ${workflowId} 缺 B2 change.scope-decided（无 B 写集来源）`);
+    }
+    const derived = await derivePathBWriteSets({
+      projectRoot: input.projectRoot,
+      flowId: scopeEvent.flowId,
+      workflowId,
+      scopeFiles: scopeEvent.scope.files ?? [],
+    });
+    if (!derived.ok) return taskGitScopeInvalid(`B 写集派生失败（${derived.code}）：${derived.message}`);
+    const writeset = derived.writesets.find((set) => set.roleId === input.roleId);
+    if (writeset === undefined || writeset.paths.length === 0) {
+      return taskGitScopeInvalid(`B 写集不含本角色 ${input.roleId}`);
+    }
+    return { ok: true, scope: { taskId: input.taskId, workflowId, branch, paths: [...writeset.paths] } };
+  }
+  // —— A 路径：basis.teamPlan → parseTeamPlan roleRows（同一解析器/校验器；字节 hash 复核）——
+  const basisLedger = await readBasisLedger(input.projectRoot);
+  const basis = [...basisLedger.events].reverse().find((event) =>
+    (event.kind === "basis.recorded" || event.kind === "basis.amended")
+    && event.workflowId === workflowId
+    && event.teamPlan !== undefined && event.teamPlan !== null);
+  if (basis === undefined || (basis.kind !== "basis.recorded" && basis.kind !== "basis.amended")) {
+    return taskGitScopeMissing(`workflow ${workflowId} 缺 basis.teamPlan（无 A 写集来源）`);
+  }
+  const planRef = basis.teamPlan!;
+  const planBytes = await readProjectFileBytes(input.projectRoot, planRef.path);
+  if (planBytes === undefined) return taskGitScopeMissing(`团队计划不可读：${planRef.path}`);
+  if (sha256HexOfBytes(planBytes) !== planRef.sha256) {
+    return taskGitScopeInvalid(`团队计划字节 hash 与 basis 记录不一致（basis-drift）：${planRef.path}`);
+  }
+  const rosterDoc = basis.documents.find((doc) => doc.kind === "roster");
+  const modulesDoc = basis.documents.find((doc) => doc.kind === "modules");
+  if (rosterDoc === undefined || modulesDoc === undefined) {
+    return taskGitScopeInvalid("basis 记录缺 roster/modules 文档引用");
+  }
+  const rosterBytes = await readProjectFileBytes(input.projectRoot, rosterDoc.path);
+  const modulesBytes = await readProjectFileBytes(input.projectRoot, modulesDoc.path);
+  if (rosterBytes === undefined || modulesBytes === undefined) return taskGitScopeMissing("名单/模块清单不可读");
+  if (sha256HexOfBytes(rosterBytes) !== rosterDoc.sha256 || sha256HexOfBytes(modulesBytes) !== modulesDoc.sha256) {
+    return taskGitScopeInvalid("名单/模块清单字节 hash 与 basis 记录不一致");
+  }
+  const rosterParsed = parseProjectRoster(rosterBytes.toString("utf8"), flowId);
+  if (!rosterParsed.ok) return taskGitScopeInvalid(`名单解析失败（${rosterParsed.code}）：${rosterParsed.reason}`);
+  const modulesParsed = parseProjectModules(modulesBytes.toString("utf8"), flowId);
+  if (!modulesParsed.ok) return taskGitScopeInvalid(`模块清单解析失败（${modulesParsed.code}）：${modulesParsed.reason}`);
+  const planParsed = parseTeamPlan(planBytes.toString("utf8"), {
+    flowId,
+    version: planRef.version,
+    modules: { path: modulesDoc.path, sha256: modulesDoc.sha256 },
+    roster: { path: rosterDoc.path, sha256: rosterDoc.sha256 },
+    rosterFacts: rosterParsed.roster,
+  });
+  if (!planParsed.ok) return taskGitScopeInvalid(`团队计划校验失败：${planParsed.reason}`);
+  const row = planParsed.plan.roleRows.find((roleRow) => roleRow.roleId === input.roleId);
+  if (row === undefined || row.writesets.length === 0) {
+    return taskGitScopeInvalid(`团队计划不含本角色 ${input.roleId} 的写集`);
+  }
+  return { ok: true, scope: { taskId: input.taskId, workflowId, branch, paths: [...row.writesets] } };
+}
+
+const TASK_GIT_SHELL_MATCH_KIND = "ans-task-git-shell/v1" as const;
+
+interface TaskGitShellMatch {
+  readonly kind: typeof TASK_GIT_SHELL_MATCH_KIND;
+  readonly template: "add" | "commit";
+  readonly match: TaskGitMatch;
+}
+
+/** 判别本层 task-git match（`ReadonlyGitCapability.execute` 路由用；形状细节由 execute 再防御解析）。 */
+function isTaskGitShellMatchObject(value: object): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && (value as Record<string, unknown>)["kind"] === TASK_GIT_SHELL_MATCH_KIND;
+}
+
+/** 防御性读取 task-git match（只接受 match() 产出的受限描述；伪造/越 scope ⇒ undefined）。 */
+function readTaskGitShellMatch(value: object, scope: TaskGitScope): TaskGitShellMatch | undefined {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  if (rec["kind"] !== TASK_GIT_SHELL_MATCH_KIND) return undefined;
+  const template = rec["template"];
+  if (template !== "add" && template !== "commit") return undefined;
+  const match = rec["match"];
+  if (match === null || typeof match !== "object" || Array.isArray(match)) return undefined;
+  const m = match as Record<string, unknown>;
+  if (m["template"] !== template) return undefined;
+  if (m["taskId"] !== scope.taskId || m["workflowId"] !== scope.workflowId || m["branch"] !== scope.branch) return undefined;
+  if (!Array.isArray(m["paths"]) || m["paths"].some((p) => typeof p !== "string")) return undefined;
+  if (m["message"] !== undefined && typeof m["message"] !== "string") return undefined;
+  if (typeof m["argvDigest"] !== "string" || !/^[a-f0-9]{64}$/i.test(m["argvDigest"])) return undefined;
+  return { kind: TASK_GIT_SHELL_MATCH_KIND, template, match: match as TaskGitMatch };
+}
+
+/** 失败事实（不 spawn；工具层按「未执行」如实回给模型）。 */
+function taskGitFailureFacts(code: string, message: string): ShellTaskGitCommandFacts {
+  return { stdout: "", stderr: message, error: `${code}: ${message}` };
+}
+
+export interface TaskGitShellExecution {
+  /** `ReadonlyGitCapability.match` 的任务级分支：命中 ⇒ 不透明受限描述；否则 undefined。 */
+  match(argv: readonly string[]): object | undefined;
+  /** `ReadonlyGitCapability.execute` 的任务级分支：add 经端口；commit **必须**经 runTaskGitCommit。 */
+  execute(match: object, budgets?: ShellTaskGitBudgets): Promise<ShellTaskGitCommandFacts>;
+}
+
+/**
+ * 构造 `run_shell` 的任务级 Git 执行路径（run-role 的 `ReadonlyGitCapability` 消费）：
+ * - `match`：`matchTaskGit(argv, scope)`（Service 出口同一函数引用）命中 ⇒ 打上本层判别标签；
+ * - `execute`（add）：复核 argv 形状（`["git","add",...paths]` 再命中）后经端口执行；
+ * - `execute`（commit）：重建固定 argv `["git","commit","-m",message]`，**在 spawn 前**调用
+ *   `createTaskGitCommitRunner`（同一项目级锁贯穿 staged 检查与提交；不满足 ⇒ 不提交）。
+ */
+export function createTaskGitShellExecution(input: {
+  scope: TaskGitScope;
+  port: TaskGitShellPort;
+}): TaskGitShellExecution {
+  const runner = createTaskGitCommitRunner({
+    scope: input.scope,
+    port: {
+      acquire: (owner) => input.port.acquireCriticalSection(owner),
+      currentBranch: () => input.port.currentBranch(),
+      inspectStaged: (argv) => input.port.inspectStaged(argv),
+      commit: (argv, budgets) => input.port.commit(argv, budgets),
+    },
+  });
+  return {
+    match(argv) {
+      const matched = matchTaskGit(argv, input.scope);
+      if (matched === undefined) return undefined;
+      const out: TaskGitShellMatch = { kind: TASK_GIT_SHELL_MATCH_KIND, template: matched.template, match: matched };
+      return out;
+    },
+    async execute(match, budgets) {
+      const tagged = readTaskGitShellMatch(match, input.scope);
+      if (tagged === undefined) {
+        return taskGitFailureFacts("git-task-match-invalid", "任务级 Git 执行请求形状非法或超出任务范围，未执行。");
+      }
+      if (tagged.template === "add") {
+        const addArgv = ["git", "add", ...tagged.match.paths];
+        if (matchTaskGit(addArgv, input.scope) === undefined) {
+          return taskGitFailureFacts("git-task-add-not-literal", "git add argv 未通过任务级写白名单复核，未执行。");
+        }
+        try {
+          return await input.port.add([...tagged.match.paths], budgets);
+        } catch (err) {
+          return taskGitFailureFacts("git-task-add-failed", `git add 执行异常：${errText(err)}`);
+        }
+      }
+      const message = tagged.match.message;
+      if (typeof message !== "string" || message.trim() === "") {
+        return taskGitFailureFacts("git-commit-message-empty", "commit message 缺失，未执行。");
+      }
+      const commitArgv = ["git", "commit", "-m", message];
+      try {
+        const run = await runner.run(commitArgv, budgets);
+        if (!run.ok) return taskGitFailureFacts(run.code, run.message);
+        return run.value;
+      } catch (err) {
+        return taskGitFailureFacts("git-task-commit-failed", `git commit 执行异常：${errText(err)}`);
+      }
+    },
+  };
+}
+
+/**
+ * B12.1（2026-11-11，RR6 重复 A3 卡）：fixed 意图确认卡的**应用侧幂等**。
+ * 同一活动 workflow 的 A3 intent-confirm 只允许一张：
+ * - 已有 1 张未 resolved/orphaned 的卡 ⇒ `intent-confirm-pending`（不调 raw、不写新 request/stage）；
+ * - 多张未决（异常）⇒ `intent-confirm-multiple-pending`（列 requestId，不猜）；
+ * - A3 已完成 ⇒ `intent-confirm-already-completed`；
+ * - 同意图（documentRefs intent sha 相同）已 confirm 裁决但 A3 仍在恢复 ⇒ `intent-confirm-already-resolved`；
+ * - 不同意图 hash（A2 新版本）或 request.orphaned 终态 ⇒ 不拦，允许重新发卡。
+ * 只读 tasks/workflows 账本；legacy 路径不调用本函数。
+ */
+async function fixedIntentCardDuplicateReason(
+  projectRoot: string,
+  flowId: string,
+  currentIntentSha256?: string,
+): Promise<{ code: string; reason: string; resolvedEvent?: RequestResolvedEvent } | undefined> {
+  // 当前活动 fixed workflow（该 flow 最新 workflow.started 且未 closed）。
+  let activeWorkflowId: string | undefined;
+  let workflowEvents: WorkflowEvent[] = [];
+  try {
+    const ledger = await workflowReadLedger(projectRoot);
+    workflowEvents = ledger.events;
+    const flowEvents = ledger.events.filter((event) => event.flowId === flowId);
+    const closed = new Set(flowEvents.filter((event) => event.kind === "workflow.closed").map((event) => event.workflowId));
+    const started = [...flowEvents].reverse().find((event) => event.kind === "workflow.started" && !closed.has(event.workflowId));
+    activeWorkflowId = started?.workflowId;
+  } catch {
+    // 账本不可读 ⇒ 不在此处猜测；后续 prepareIntent/finalize 仍 fail-closed。
+    return undefined;
+  }
+  let state: Awaited<ReturnType<typeof readTaskState>>;
+  try {
+    state = await readTaskState(projectRoot);
+  } catch {
+    return undefined;
+  }
+  const events = state.events as readonly any[];
+  const sameWorkflow = (event: any): boolean => activeWorkflowId === undefined || event.workflowId === activeWorkflowId;
+  const created = events.filter((event) => event.kind === "request.created"
+    && event.cardKind === "intent-confirm" && event.stage === "A3" && event.flowId === flowId && sameWorkflow(event));
+  if (created.length === 0) return undefined;
+  const createdIds = new Set<string>(created.map((event) => String(event.requestId)));
+  const resolved = events.filter((event) => event.kind === "request.resolved" && createdIds.has(String(event.requestId)));
+  const resolvedIds = new Set<string>(resolved.map((event) => String(event.requestId)));
+  const orphanedIds = new Set<string>(events
+    .filter((event) => event.kind === "request.orphaned" && createdIds.has(String(event.requestId)))
+    .map((event) => String(event.requestId)));
+  const pending = created.filter((event) => !resolvedIds.has(String(event.requestId)) && !orphanedIds.has(String(event.requestId)));
+  if (pending.length > 1) {
+    return {
+      code: "intent-confirm-multiple-pending",
+      reason: `intent-confirm-multiple-pending: 存在多张待决意图确认卡（requestId=${pending.map((event) => String(event.requestId)).join("、")}）；异常，不猜测、不发新卡。`,
+    };
+  }
+  if (pending.length === 1) {
+    return {
+      code: "intent-confirm-pending",
+      reason: `intent-confirm-pending: 已有待决意图确认卡（requestId=${String(pending[0].requestId)}）；请客户/驱动作答既有卡，不重复发卡。`,
+    };
+  }
+  const a3Completed = workflowEvents.some((event) => event.kind === "stage.completed" && event.stage === "A3"
+    && (activeWorkflowId === undefined || event.workflowId === activeWorkflowId)
+    && (event.flowId === undefined || event.flowId === flowId));
+  if (a3Completed) {
+    return { code: "intent-confirm-already-completed", reason: "intent-confirm-already-completed: A3 意图确认已完成；不重复发卡。" };
+  }
+  // 调用方在 prepareIntent 之前先用无 hash 形态检查 pending/multiple/completed（不产生 workflow 事件）；
+  // 只有需要区分「同意图已裁决 vs 旧意图版本」时才用当前 intent sha 再查一次。
+  if (currentIntentSha256 === undefined) return undefined;
+  const confirmed = resolved.find((event) => event.choice === "confirm"
+    || (Array.isArray(event.selectedOptionIds) && event.selectedOptionIds.includes("confirm")));
+  if (confirmed !== undefined) {
+    const refs = Array.isArray(confirmed.documentRefs) ? confirmed.documentRefs as readonly any[] : [];
+    const intentRef = refs.find((ref) => ref?.kind === "intent");
+    const resolvedSha = typeof intentRef?.sha256 === "string" ? intentRef.sha256 : undefined;
+    // 旧意图版本（A2 revise 后的新 hash）不误伤；缺 documentRefs 时保守视为同一意图。
+    if (resolvedSha === undefined || resolvedSha === currentIntentSha256) {
+      return {
+        code: "intent-confirm-already-resolved",
+        reason: `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${String(confirmed.requestId)}）；A3 完成待恢复，不重复发卡。`,
+        // B24.2（RR20 失败修复）：把已持久化的 confirm 裁决事件交给调用方幂等重跑 finalize。
+        resolvedEvent: confirmed as unknown as RequestResolvedEvent,
+      };
+    }
+  }
+  return undefined;
+}
+
 export async function openRoleSession(
   input: {
     roleId: string;
     runtime?: RuntimeKind;
     project: ProjectConfig;
     taskId?: string;
+    /**
+     * T3（2026-11-10 两条固定工作流路径，B1 AC-12）：per-flow 工作流模式。
+     * `workflowModeForFlow` 由桌面/CLI 注入——每次卡/任务/写门禁**按实际 flowId 解析**（不缓存项目级单值；
+     * 混合项目 legacy 在飞 flow 与新 fixed flow 并存）。`workflowMode` 为单 flow/显式常量兼容；
+     * 两者均缺省 ⇒ `legacy`（旧行为逐字不变）。纯选择器，不授权任何写权。
+     */
+    workflowMode?: WorkflowMode;
+    workflowModeForFlow?: (flowId: string) => WorkflowMode | Promise<WorkflowMode>;
     scope?: TaskScope;
     /** 宿主按客户委托注入的本项目常规检查政策；项目角色三层链专用。 */
     routineShellPolicy?: RoutineShellPolicy;
@@ -866,6 +1284,16 @@ export async function openRoleSession(
     completeTeamPlan?: CompleteTeamPlanFn;
     activateRoleDocuments?: ActivateRoleDocumentsFn;
     closeCreatedTask?: CloseCreatedTaskFn;
+    /**
+     * T3 B2（MF-IR-2/3）：fixed 收口/激活的**应用实现**（仅 fixed 会话消费；legacy 会话不触达、
+     * 也不接受 legacy `closeCreatedTask`/`activateRoleDocuments` 进入 fixed 注入面）。
+     * 未注入 ⇒ run-role 默认直连 `workflowService.closeTask` / `workflowService.activateRoleDocumentsFixed`
+     * （默认收口不带 evidence，适合非完成型收口；A2/A5/A11/B1/B3/A12a/A12b 的完成型收口需应用实现
+     * 补 artifacts/branchTipOid/acceptanceArchive 后调用同一服务）。应用实现接收 run-role 绑定的
+     * 可信身份（projectRoot / actorRoleId）——身份绝不来自模型参数。
+     */
+    closeCreatedTaskFixed?: FixedCloseCreatedTaskDep;
+    activateRoleDocumentsFixed?: FixedActivateRoleDocumentsDep;
     gitQuery?: GitQueryFn;
     gitCandidate?: GitCandidateFn;
     gitPublish?: GitPublishFn;
@@ -970,6 +1398,17 @@ export async function openRoleSession(
      * 装配失败/缺件 ⇒ 不 arm（`run_shell` 不注册，fail-closed）。优先级：operatorOnly → readonly → 三层链。
      */
     shellOperatorOnly?: Omit<AssembleOperatorShellGateOptions, "project">;
+    /**
+     * **T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写（`git add`/`git commit`）注入位**。
+     * `classifyShellDetailed` 来自门禁引擎 Service 出口（`classifyShellDetailed` 同一函数引用）；
+     * `port` 由桌面注入真实 Git（`acquireCriticalSection` 必须是 desktop B3
+     * `acquireProjectGitCriticalSection` 同一把项目级锁）。两者同时给出、且**真实受派实现任务**
+     * （`task.created.to` = 本会话角色、stage ∈ A11/B3）的写集可从团队计划（A）/ B2 派生写集（B）
+     * 解析时，才向 shell 闸注入 `taskGitScope` 并启用执行路径；缺一/不可解析 ⇒ **不注入**
+     * （v5 分类器无 scope ⇒ Git 写一律拒，fail-closed）。**legacy 会话忽略本字段（逐字不变）**。
+     * **模型不可自报**：taskId/角色/写集全部来自应用事实。
+     */
+    taskGit?: TaskGitShellRuntimeInput;
     /**
      * **R-1：审读结论工具的能力**（`report_shell_verdict`「注入才注册」）——审读会话专用，由
      * `pm-reviewer` 注入；一般调用方不传。
@@ -1098,10 +1537,81 @@ export async function openRoleSession(
 
   let boundSessionForEvidence: RoleSession | undefined;
   let currentFlowId: string | undefined;
+  // T3 B1（AC-12）：per-flow 模式解析——**不缓存项目级单值**。无常量/回调 ⇒ legacy（旧行为逐字不变）。
+  const resolveWorkflowMode = async (flowId?: string): Promise<WorkflowMode> => {
+    if (input.workflowMode !== undefined) return input.workflowMode;
+    const flow = typeof flowId === "string" ? flowId.trim() : "";
+    if (flow === "" || input.workflowModeForFlow === undefined) return "legacy";
+    try {
+      return await input.workflowModeForFlow(flow);
+    } catch {
+      return "legacy"; // 回调失败 ⇒ fail-closed legacy（不猜 fixed）
+    }
+  };
+  const matrixForFlow = async (flowId?: string): Promise<DispatchMatrixMode> =>
+    (await resolveWorkflowMode(flowId)) === "fixed" ? "two-fixed-paths/v1" : "legacy-v1";
+  // 会话级模式（上下文段/工具注入在会话打开时确定）：常量优先；否则按输入任务的真实 flowId 解析。
+  let sessionWorkflowMode: WorkflowMode = input.workflowMode ?? "legacy";
+  if (input.workflowMode === undefined && input.workflowModeForFlow !== undefined && input.taskId !== undefined) {
+    try {
+      const taskStateForMode = await readTaskState(input.project.projectRoot);
+      const taskFlowId = taskStateForMode.records.get(input.taskId)?.created?.flowId;
+      if (taskFlowId !== undefined) sessionWorkflowMode = await resolveWorkflowMode(taskFlowId);
+    } catch {
+      sessionWorkflowMode = "legacy";
+    }
+  }
+  // T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 任务级 Git 写事实（应用注入；模型不可自报）。
+  // 只在「fixed 会话 + 真实受派实现任务（A11/B3）+ 应用完整注入（明细分类器 + 执行端口）」同时成立时
+  // 解析并注入；任一步不成立 ⇒ **不注入**（v5 分类器无 scope ⇒ Git 写一律拒，fail-closed）。
+  // legacy 会话完全不触达本块（旧注入/行为逐字不变）。
+  let taskGitRuntime: { scope: TaskGitScope; execution: TaskGitShellExecution } | undefined;
+  if (sessionWorkflowMode === "fixed" && input.taskId !== undefined
+    && input.taskGit?.port !== undefined && input.taskGit.classifyShellDetailed !== undefined) {
+    const resolved = await resolveTaskGitScope({
+      projectRoot: input.project.projectRoot,
+      taskId: input.taskId,
+      roleId: setup.role.id,
+    });
+    if (resolved.ok) {
+      taskGitRuntime = {
+        scope: resolved.scope,
+        execution: createTaskGitShellExecution({ scope: resolved.scope, port: input.taskGit.port }),
+      };
+      log.record("taskGit.scope.ready", {
+        taskId: resolved.scope.taskId,
+        workflowId: resolved.scope.workflowId,
+        paths: resolved.scope.paths.length,
+      });
+    } else {
+      log.record("taskGit.scope.unavailable", { reasonCode: resolved.code });
+    }
+  }
   const roleDraftWritePaths: string[] = [];
   const refreshRoleDraftScope = async () => {
     roleDraftWritePaths.splice(0);
     if (!isTrio || setup.role.id !== "nominator") return;
+    // B16（2026-11-11，RR11 失败修复）：fixed A8 会话（真实受派任务带 workflowId/flowId、stage=A8、
+    // 非 stage-request）的角色草稿写权来自**固定 roster（A6 决定）**，不再要求 legacy「actual
+    // completed plan + current D3 selection」。legacy（无 workflowId）会话仍走 trunk
+    // `prepareRoleDraftScope` 逐字不变；roster 不可读/非法/含内置角色 ⇒ 空集 fail-closed
+    // （**不**回退 legacy D3）。写入门禁只放开名单角色的三文件；激活时
+    // `activate_role_documents` v2 仍复核 A6 proposalDecisionId + roster/三文档 hash。
+    const fixedA8 = await fixedRoleDraftTaskOf(input.project.projectRoot, input.taskId);
+    if (fixedA8 !== undefined) {
+      const roster = await loadLatestRoster({ projectRoot: input.project.projectRoot, flowId: fixedA8.flowId });
+      if (roster.ok && !rosterContainsBuiltInRoleIds(roster.roster)) {
+        for (const role of roster.roster.roles) {
+          if (!/^[a-z0-9][a-z0-9-]{0,62}$/i.test(role.id)) continue;
+          roleDraftWritePaths.push(
+            `角色卡/${role.id}/role-card.md`,
+            `角色卡/${role.id}/boundary.md`,
+            `角色卡/${role.id}/boundary.yaml`,
+          );
+        }
+      }
+      return;
+    }
     const scope = await createTrunkService({ projectRoot: input.project.projectRoot }).prepareRoleDraftScope({
       ...(currentFlowId ? { flowId: currentFlowId } : {}), ...(input.taskId ? { taskId: input.taskId } : {}) });
     if (scope.ok) roleDraftWritePaths.push(...scope.value.paths);
@@ -1111,12 +1621,67 @@ export async function openRoleSession(
   const refreshAssignedTaskScope = async () => {
     if (!assignedTaskWritePaths || !input.taskId) return;
     assignedTaskWritePaths.splice(0);
+    // B26（2026-11-11，RR23 失败修复）：fixed 任务（task.created.workflowId）的受派写集**不读 legacy trunk**
+    // ——`prepareAssignedTaskWriteScope` 要求 runId，fixed 任务必然失败 ⇒ 空交集、worker 全部写入被拒。
+    // 写集 = 应用派发时记录的 modulePaths（B21 派生）∩ 团队计划角色写集（resolveTaskGitScope 同一权威）；
+    // 文件精确、目录前缀；`to` 必须等于当前角色。无 modulePaths 的 fixed 任务保持现状（空集 fail-closed，不扩权）。
+    const taskStateForScope = await readTaskState(input.project.projectRoot);
+    const createdForScope = taskStateForScope.records.get(input.taskId)?.created;
+    if (createdForScope?.workflowId !== undefined) {
+      if (createdForScope.to !== setup.role.id) return;
+      const modulePaths = createdForScope.modulePaths;
+      if (modulePaths === undefined || modulePaths.length === 0) return;
+      const gitScope = await resolveTaskGitScope({ projectRoot: input.project.projectRoot, taskId: input.taskId, roleId: setup.role.id });
+      if (!gitScope.ok) return;
+      const within = (path: string, root: string): boolean => path === root || (root.endsWith("/") && path.startsWith(root));
+      const paths = new Set<string>();
+      for (const modulePath of modulePaths) {
+        for (const rolePath of gitScope.scope.paths) {
+          if (within(modulePath, rolePath)) paths.add(modulePath);
+          else if (within(rolePath, modulePath)) paths.add(rolePath);
+        }
+      }
+      assignedTaskWritePaths.push(...[...paths].sort());
+      return;
+    }
     const actual = await createTrunkService({ projectRoot: input.project.projectRoot }).prepareAssignedTaskWriteScope({ taskId: input.taskId, actorRoleId: setup.role.id });
     if (actual.ok) assignedTaskWritePaths.push(...actual.value.paths);
   };
   await refreshAssignedTaskScope();
+  // T3 B10.2（2026-11-11）：**fixed 任务会话上下文**。
+  // `task.created.workflowId` 存在 = fixed 任务（v1.3 §7.1：fixed 任务不带 runId/runState）。
+  // 此前 verifier 的受派检查走 legacy trunk `inspectAssignedTask`（要求 runId）⇒ fixed review 任务
+  // 会在会话打开时抛 `review-task-assignment-unavailable`，A12a/A12b 无法打开（B10.1 写集外依赖）。
+  // 现在：fixed 任务改读 fixed 任务账本事实（`workflowService.inspectAssignedTask`：只读 tasks 账本，
+  // 不要求 runId、不写 trunk/run），校验 taskId 存在 / to=角色 / open / workflowId-stage-flowId，
+  // 并构造会话 assignment 上下文（下方注入为纯事实段）。适用范围 = 内置治理角色（convener/verifier/
+  // product 等 fixed 任务目标会话）；legacy 任务（无 workflowId）仍走原路径逐字不变；无 taskId 的
+  // chat 不触达本块。
+  let fixedTaskAssignment: AssignedTaskFacts | undefined;
+  if (input.taskId && setup.role.kind === "built-in-governance") {
+    const taskStateForAssignment = await readTaskState(input.project.projectRoot);
+    const createdForAssignment = taskStateForAssignment.records.get(input.taskId)?.created;
+    if (createdForAssignment?.workflowId !== undefined) {
+      const inspected = await workflowInspectAssignedTask({
+        projectRoot: input.project.projectRoot,
+        taskId: input.taskId,
+        actorRoleId: setup.role.id,
+      });
+      if (!inspected.ok) throw new Error(`fixed-task-assignment-unavailable:${inspected.message ?? inspected.code}`);
+      const facts = inspected.task;
+      if (!facts.open) throw new Error(`fixed-task-assignment-unavailable:任务 ${input.taskId} 已收口（fixed 受派任务必须 open）`);
+      if (facts.workflowId === undefined || facts.flowId === undefined || facts.stage === undefined) {
+        throw new Error(`fixed-task-assignment-unavailable:fixed 任务 ${input.taskId} 缺少 workflowId/flowId/stage`);
+      }
+      fixedTaskAssignment = facts;
+      log.record("fixed.task.assignment.ready", {
+        taskId: facts.taskId, from: facts.from, to: facts.to,
+        workflowId: facts.workflowId, flowId: facts.flowId, stage: facts.stage,
+      });
+    }
+  }
   let assignedReview: Awaited<ReturnType<ReturnType<typeof createTrunkService>["readAssignedReviewContext"]>> | undefined;
-  if (input.taskId && setup.role.kind === "built-in-governance" && setup.role.id === "verifier") {
+  if (input.taskId && setup.role.kind === "built-in-governance" && setup.role.id === "verifier" && fixedTaskAssignment === undefined) {
     const task = await createTrunkService({ projectRoot: input.project.projectRoot }).inspectAssignedTask({ taskId: input.taskId, actorRoleId: setup.role.id });
     if (!task.ok) throw new Error(`review-task-assignment-unavailable:${task.message ?? task.code}`);
     if (task.value.kind === "review") {
@@ -1275,7 +1840,8 @@ export async function openRoleSession(
               trioSpec!.id,
               req.options.map((option) => option.id),
             );
-            if (defaulted !== undefined && cardKindsOf(trioSpec!.id).includes(defaulted)) {
+            const defaultMatrix = await matrixForFlow(req.flowId ?? originalMetadata?.flowId);
+            if (defaulted !== undefined && cardKindsOf(trioSpec!.id, defaultMatrix).includes(defaulted)) {
               cardKind = defaulted;
               effectiveReq = { ...req, cardKind: defaulted };
               effectiveMetadata = { ...(originalMetadata ?? {}), cardKind: defaulted };
@@ -1304,8 +1870,12 @@ export async function openRoleSession(
                 "请显式携带 cardKind（如 decision）后重试。",
             };
           }
-          // 2026-10-29（方案 v2.1 §5.1/M3）：招人决定卡（appointment）——只有人事可发；选项必须恰为
+          // 2026-10-29（方案 v2.1 §5.1/M3）：招人决定卡（appointment）——legacy 只有人事可发；选项必须恰为
           // 最新名单角色（多选）；推荐集由应用从名单生成（不采信模型自报）。不满足 ⇒ 不发卡。
+          // T3 B3.1（2026-11-10，AC-13/G-10）：fixed 矩阵（v1.3 §8.3）改由幕僚（chief）发起任命卡
+          // （`fixedCards` 含 appointment；nominator fixedCards 为空）；选项=名单角色、multiple、推荐集=
+          // 名单顺序由应用重建（`targetRoleIds`/workflowId 戳由应用通道/桌面 B3 落账）。legacy 发起人/
+          // 校验/文案逐字不变。
           let appointmentRecommendedRoleIds: string[] | undefined;
           if (cardKind === "appointment") {
             const rejectAppointment = (reason: string) => {
@@ -1316,12 +1886,22 @@ export async function openRoleSession(
               });
               return { outcome: "declined" as const, notPresented: true as const, reason };
             };
-            if (!isTrio || trioSpec?.id !== "nominator") {
+            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            // 按本卡实际 flowId 解析矩阵（per-flow；缺省 legacy）。fixed 只允许模块 `fixedCards` 含
+            // appointment 的角色（恰 chief）；legacy 仍只允许 nominator（逐字不变）。
+            const appointmentMatrix = await matrixForFlow(appointmentFlowId);
+            const fixedAppointment = appointmentMatrix === "two-fixed-paths/v1";
+            if (fixedAppointment) {
+              if (!isTrio || trioSpec === undefined || !cardKindsOf(trioSpec.id, appointmentMatrix).includes("appointment")) {
+                return rejectAppointment(
+                  "固定路径的任命卡（appointment）只能由幕僚（chief）发起（fixedCards 矩阵）；本次未向客户发卡、未写任何记录。",
+                );
+              }
+            } else if (!isTrio || trioSpec?.id !== "nominator") {
               return rejectAppointment(
                 "招人决定卡（appointment）只能由人事（nominator）发起；本次未向客户发卡、未写任何记录。",
               );
             }
-            const appointmentFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
             if (typeof appointmentFlowId !== "string" || appointmentFlowId.trim() === "") {
               return rejectAppointment("招人决定卡缺少 flowId（用于定位最新人员名单）；本次未向客户发卡。");
             }
@@ -1332,33 +1912,80 @@ export async function openRoleSession(
             if (!roster.ok) {
               return rejectAppointment(`招人决定卡前置不满足：${roster.reason} 请先让策划产出合法名单。`);
             }
-            const rosterCard = validateAppointmentCardAgainstRoster({
-              roster: roster.roster,
-              optionIds: effectiveReq.options.map((option) => option.id),
-              multiple: effectiveReq.multiple === true,
-            });
-            if (!rosterCard.ok) {
-              return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
-            }
-            appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
-            // X-R3（E2 S4）：D3 卡角色侧前置——在既有名单/选项/推荐集/env-bootstrap 校验之后调用
-            // nominator 模块 `preflight.checkAction("appointment", stage:"d3-card")`。事实只取自已校验的
-            // `loadLatestRoster` 产物与 `rosterCard` 结果（严格 api-spec 登记键；`intentEntryConsistent`
-            // 是可选诊断事实且旧路径不校验 ⇒ 不传）。allow 不替代应用/Service 校验；deny 走既有
-            // `appointment-invalid` 回执（`rejectAppointment`），不发卡、不写账本。
-            const nominatorPreflight = builtInRoleModuleOf("nominator")?.preflight;
-            const nominatorFacts = nominationD3CardFacts({
-              roster,
-              multiple: effectiveReq.multiple === true,
-              optionIds: effectiveReq.options.map((option) => option.id),
-              recommendedRoleIds: rosterCard.recommendedRoleIds,
-            });
-            if (nominatorPreflight !== undefined && nominatorFacts !== undefined) {
-              const decision = nominatorPreflight.checkAction({ action: "appointment", facts: nominatorFacts });
-              if (!decision.allow) {
+            if (fixedAppointment) {
+              // v1.3 §8.3：选项集合=名单、multiple、推荐集=名单顺序（应用从 roster 重建，不采信模型
+              // 自报的选项/推荐 flags）；不得含内置角色 id。fixed 不套用 legacy D3 的 env-bootstrap/
+              // 人事模块 preflight（fixed 无 D3 阶段），结构口径与桌面 B3
+              // `prepareFixedAppointmentCardRequest` 一致。
+              const rosterIds = rosterRoleIds(roster.roster);
+              const optionIds = effectiveReq.options.map((option) => option.id);
+              if (effectiveReq.multiple !== true) {
+                return rejectAppointment("固定路径任命卡必须是多选（multiple=true，名单角色）；本次未向客户发卡。");
+              }
+              if (new Set(optionIds).size !== optionIds.length) {
+                return rejectAppointment("固定路径任命卡选项 id 重复；本次未向客户发卡。");
+              }
+              if (rosterContainsBuiltInRoleIds(roster.roster)) {
+                return rejectAppointment("固定路径任命卡名单含内置治理角色；本次未向客户发卡。");
+              }
+              const optionSet = new Set(optionIds);
+              const rosterSet = new Set(rosterIds);
+              const missing = rosterIds.filter((id) => !optionSet.has(id));
+              const extra = optionIds.filter((id) => !rosterSet.has(id));
+              if (missing.length > 0 || extra.length > 0) {
                 return rejectAppointment(
-                  `招人决定卡未通过人事角色策略前置（诊断码：${decision.code}）；本次未向客户发卡、未写任何记录。`,
+                  `固定路径任命卡选项必须与最新名单角色完全一致（缺：${missing.join("、") || "无"}；多：${extra.join("、") || "无"}）。本次未向客户发卡。`,
                 );
+              }
+              appointmentRecommendedRoleIds = rosterIds;
+              effectiveReq = {
+                ...effectiveReq,
+                multiple: true,
+                options: roster.roster.roles.map((role) => ({ id: role.id, label: role.displayName, recommended: true })),
+              };
+              // A10 在办标记（stage.requested A10；幂等）；失败 fail-closed、不发卡。
+              const appointmentMarker = await markFixedAppointmentCardRequested({
+                projectRoot: input.project.projectRoot,
+                flowId: appointmentFlowId.trim(),
+                rosterSha256: roster.sha256,
+              });
+              if (appointmentMarker !== undefined) {
+                log.record("governance.card.rejected", {
+                  state: "not-presented",
+                  reasonCode: appointmentMarker.code,
+                  ok: false,
+                });
+                return rejectAppointment(`${appointmentMarker.message}；本次未向客户发卡。`);
+              }
+            } else {
+              const rosterCard = validateAppointmentCardAgainstRoster({
+                roster: roster.roster,
+                optionIds: effectiveReq.options.map((option) => option.id),
+                multiple: effectiveReq.multiple === true,
+              });
+              if (!rosterCard.ok) {
+                return rejectAppointment(`招人决定卡与最新名单不一致：${rosterCard.reason} 本次未向客户发卡。`);
+              }
+              appointmentRecommendedRoleIds = rosterCard.recommendedRoleIds;
+              // X-R3（E2 S4）：D3 卡角色侧前置——在既有名单/选项/推荐集/env-bootstrap 校验之后调用
+              // nominator 模块 `preflight.checkAction("appointment", stage:"d3-card")`。事实只取自已校验的
+              // `loadLatestRoster` 产物与 `rosterCard` 结果（严格 api-spec 登记键；`intentEntryConsistent`
+              // 是可选诊断事实且旧路径不校验 ⇒ 不传）。allow 不替代应用/Service 校验；deny 走既有
+              // `appointment-invalid` 回执（`rejectAppointment`），不发卡、不写账本。
+              const nominatorPreflight = builtInRoleModuleOf("nominator")?.preflight;
+              const nominatorFacts = nominationD3CardFacts({
+                roster,
+                multiple: effectiveReq.multiple === true,
+                optionIds: effectiveReq.options.map((option) => option.id),
+                recommendedRoleIds: rosterCard.recommendedRoleIds,
+              });
+              if (nominatorPreflight !== undefined && nominatorFacts !== undefined) {
+                const decision = nominatorPreflight.checkAction({ action: "appointment", facts: nominatorFacts });
+                if (!decision.allow) {
+                  return rejectAppointment(
+                    `招人决定卡未通过人事角色策略前置（诊断码：${decision.code}）；本次未向客户发卡、未写任何记录。`,
+                  );
+                }
               }
             }
             // 2026-10-29（客户追加口径）：D3 卡 preview 必须带上「人员+模块拓扑图」（应用依据已校验名单生成）。
@@ -1414,8 +2041,9 @@ export async function openRoleSession(
             }
           }
           if (isTrio) {
-            const allowed = cardKindsOf(trioSpec!.id);
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+            // T3 B1（AC-12）：卡种白名单按**本卡实际 flowId** 解析矩阵（per-flow，不缓存项目级单值）。
+            const allowed = cardKindsOf(trioSpec!.id, await matrixForFlow(flowId));
             // C 批（方案 §6.4.1/R2）：归属键由 `flowId` 放宽为 `flowId | intentId | taskId` 至少一个；
             // 旧调用（只带 flowId）逐字仍有效。优先 flowId，其次 intentId，最后 taskId。
             const attributionId = isGovernanceFlowId(flowId)
@@ -1538,9 +2166,13 @@ export async function openRoleSession(
             return { outcome: "declined", notPresented: true, reason: appointmentPreviewError };
           }
           // D 批：judgeContext 只从申请上下文构造（无账本/flow 事实）；Q4 A rubric 保留。
+          // T3 B3.1（AC-13）：卡种白名单按本卡实际 flowId 的矩阵判定——fixed 会话的 chief proposal/
+          // appointment 卡同样生成 judgeContext（含推荐集）；legacy 矩阵结果与旧 `cardKindsOf(roleId)`
+          // 逐字一致（缺省 legacy-v1），旧卡路径零变化。
           let judgeMetadata = effectiveMetadata;
-          if (isTrio && cardKind !== undefined && cardKindsOf(trioSpec!.id).includes(cardKind)) {
-            const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+          const judgeCardFlowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
+          if (isTrio && cardKind !== undefined && cardKindsOf(trioSpec!.id, await matrixForFlow(judgeCardFlowId)).includes(cardKind)) {
+            const flowId = judgeCardFlowId;
             const judgeAttribution = isGovernanceFlowId(flowId)
               ? flowId
               : isGovernanceFlowId(effectiveMetadata?.intentId)
@@ -1622,15 +2254,70 @@ export async function openRoleSession(
             }
           }
           let intentConfirmation: PreparedIntentConfirmation | undefined;
+          // T3 B3.1（2026-11-10，AC-18/MF-4）：fixed 意图确认卡——run-role 调 `workflowService.prepareIntent`
+          // /`finalizeIntent`（应用算 intent hash/documentRefs/marker、`docs/intents` 校验、`stage.completed`），
+          // **不调用** legacy trunk `prepareIntentConfirmation/finalizeIntentConfirmation`/doc-freeze；
+          // 卡事实（marker/path/sha256/正文）与 legacy 同等语义。legacy 分支逐字不变。
+          let fixedIntentConfirmation: PreparedFixedIntent | undefined;
           // X-R6（E2 S2）：intent-confirm 卡种读 chief 模块卡数据（`CHIEF_INTENT_CONFIRM_CARD.cardKind`）；
           // 其余流程（prepareIntentConfirmation / 冻结 / 标记）仍按 Service 事务与真实客户回执。
           if (isTrio && setup.role.id === "chief" && cardKind === CHIEF_INTENT_CONFIRM_CARD.cardKind && effectiveReq.kind === "choice") {
             const flowId = effectiveReq.flowId ?? effectiveMetadata?.flowId;
-            const prepared = flowId ? await createTrunkService({ projectRoot: input.project.projectRoot }).prepareIntentConfirmation(flowId) : undefined;
-            if (!prepared?.ok) return { outcome: "declined", notPresented: true, reason: prepared && !prepared.ok ? prepared.message ?? prepared.code : "Intent confirmation has no actual flow" };
-            intentConfirmation = prepared.value;
-            effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.value.marker}`,
-              preview: `${effectiveReq.preview ?? ""}\n\n${prepared.value.path}\nsha256: ${prepared.value.sha256}\n\n${prepared.value.text}` };
+            if ((await matrixForFlow(flowId)) === "two-fixed-paths/v1") {
+              // fixed：无 trunk/run。缺 flowId ⇒ 不发卡（无法定位最新意图；fail-closed）。
+              if (typeof flowId !== "string" || flowId.trim() === "") {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: "intent-decision-invalid", ok: false });
+                return { outcome: "declined", notPresented: true, reason: "固定路径意图确认卡缺少 flowId（无法定位最新意图）；本次未向客户发卡。" };
+              }
+              // B12.1（2026-11-11）：先做**无副作用**幂等检查（pending/multiple/已完成），命中即不发卡、
+              // 不调用 prepareIntent、不写任何 workflow 事件；只有需要区分旧意图版本时才在 prepare 后用
+              // 当前 intent sha 复核。
+              const earlyDuplicate = await fixedIntentCardDuplicateReason(input.project.projectRoot, flowId);
+              if (earlyDuplicate !== undefined) {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: earlyDuplicate.code, ok: false });
+                return { outcome: "declined", notPresented: true, reason: earlyDuplicate.reason };
+              }
+              const prepared = await workflowPrepareIntent({ projectRoot: input.project.projectRoot, flowId });
+              if (!prepared.ok) {
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: prepared.code, ok: false });
+                return { outcome: "declined", notPresented: true, reason: prepared.message ?? prepared.code };
+              }
+              // B12.1（2026-11-11）：A3 intent-confirm 每活动 workflow 只发一次——待决复用/已裁决不重发；
+              // 多待决 fail-closed；不同意图版本或 orphaned 终态允许新卡。只读账本，不写 request/stage。
+              const duplicate = await fixedIntentCardDuplicateReason(input.project.projectRoot, flowId, prepared.sha256);
+              if (duplicate !== undefined) {
+                // B24.2（2026-11-11，RR20 失败修复）：同意图已 confirm 裁决但 A3 未完成时，chief 的
+                // 「写后重试」在这里幂等重跑 finalizeIntent——入口已补写则补记 stage.completed A3，
+                // 幕僚可继续 A4；仍缺入口则维持 fail-closed（不伪造完成、不重复发卡）。
+                let reason = duplicate.reason;
+                if (duplicate.code === "intent-confirm-already-resolved" && duplicate.resolvedEvent !== undefined) {
+                  const recovered = await workflowFinalizeIntent({ projectRoot: input.project.projectRoot, event: duplicate.resolvedEvent });
+                  if (recovered.ok) {
+                    reason = `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${recovered.requestId}）；A3 已完成恢复（stage.completed A3，replay=${recovered.replay}）；可继续 A4。`;
+                    log.record("intent.confirmation.fixed-finalize-recovered", { requestId: recovered.requestId, replay: recovered.replay, phase: "recovered" });
+                  } else {
+                    log.record("intent.confirmation.fixed-finalize-pending", {
+                      requestId: String(duplicate.resolvedEvent.requestId),
+                      phase: "pending-recovery",
+                      errorCode: recovered.code,
+                      errorMessage: recovered.message,
+                    });
+                    reason = `intent-confirm-already-resolved: 同意图已 confirm 裁决（requestId=${String(duplicate.resolvedEvent.requestId)}）；A3 恢复仍失败（${recovered.code}: ${recovered.message ?? ""}），不重复发卡。`;
+                  }
+                }
+                log.record("governance.card.rejected", { state: "not-presented", reasonCode: duplicate.code, ok: false });
+                return { outcome: "declined", notPresented: true, reason };
+              }
+              fixedIntentConfirmation = prepared;
+              effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.marker}`,
+                preview: `${effectiveReq.preview ?? ""}\n\n${prepared.path}\nsha256: ${prepared.sha256}\n\n${prepared.text}` };
+            } else {
+              const prepared = flowId ? await createTrunkService({ projectRoot: input.project.projectRoot }).prepareIntentConfirmation(flowId) : undefined;
+              if (!prepared?.ok) return { outcome: "declined", notPresented: true, reason: prepared && !prepared.ok ? prepared.message ?? prepared.code : "Intent confirmation has no actual flow" };
+              intentConfirmation = prepared.value;
+              effectiveReq = { ...effectiveReq, question: `${effectiveReq.question ?? ""}\n\n${prepared.value.marker}`,
+                preview: `${effectiveReq.preview ?? ""}\n\n${prepared.value.path}\nsha256: ${prepared.value.sha256}\n\n${prepared.value.text}` };
+            }
           }
           let out = await raw(effectiveReq, judgeMetadata);
           if (isTrio && setup.role.id === "nominator" && cardKind === "appointment") await refreshRoleDraftScope();
@@ -1655,6 +2342,46 @@ export async function openRoleSession(
               await refreshAndInstallVersionedDocFreezeSnapshot(input.project.projectRoot, { migrationCompleted: true });
               out = { ...out, intentConfirmation: { status: "committed" } };
             }
+          }
+          // T3 B3.1（AC-18/§4.2 A3/G-15）：fixed 意图确认最终化——`request.resolved` 由应用通道在裁决时
+          // **一次写入**（含 documentRefs），`finalizeIntent` 只校验该事件并追加 `stage.completed A3`；
+          // 不重写事件、不写 doc-freeze/trunk/CAS。事件缺失/不可读或校验失败 ⇒ 如实 pending-recovery
+          // （与 legacy 冻结失败同语义：真实决定已记录，阶段完成待恢复，不发行任何写权）。
+          if (fixedIntentConfirmation && out?.outcome === "answered" && out.value.selected?.includes("confirm")) {
+            const delegatedRequestId = out.actionSource?.kind === "customer-decision" || out.actionSource?.kind === "chief-delegated"
+              ? out.actionSource.requestId : undefined;
+            const decisionRequestId = typeof out.decisionId === "string" && out.decisionId.startsWith("decision-")
+              ? out.decisionId.slice("decision-".length) : undefined;
+            const requestId = delegatedRequestId ?? decisionRequestId;
+            let resolvedEvent: RequestResolvedEvent | undefined;
+            if (requestId !== undefined) {
+              try {
+                const taskState = await readTaskState(input.project.projectRoot);
+                resolvedEvent = taskState.events.find((event): event is RequestResolvedEvent =>
+                  event.kind === "request.resolved" && event.requestId === requestId);
+              } catch {
+                resolvedEvent = undefined;
+              }
+            }
+            if (resolvedEvent === undefined) {
+              const message = `request.resolved（${requestId ?? "<unknown>"}）账本事件缺失或不可读`;
+              pendingModelNotice = `The actual intent decision was recorded; its fixed workflow A3 completion is pending: ${message}. 请核对账本后按幂等重试。`;
+              log.record("intent.confirmation.fixed-finalize-pending", { path: fixedIntentConfirmation.path, requestId, phase: "pending-recovery", errorCode: "intent-decision-invalid", errorMessage: message });
+              return { ...out, intentConfirmation: { status: "pending-recovery", code: "intent-decision-invalid", message } };
+            }
+            log.record("intent.confirmation.fixed-finalize-start", { path: fixedIntentConfirmation.path, turnId: effectiveMetadata?.turnId, toolCallId: effectiveMetadata?.toolCallId, requestId, phase: "prepared" });
+            const finalized = await workflowFinalizeIntent({
+              projectRoot: input.project.projectRoot,
+              event: resolvedEvent,
+              ...(fixedIntentConfirmation.flowId !== "" ? { flowId: fixedIntentConfirmation.flowId } : {}),
+            });
+            if (!finalized.ok) {
+              pendingModelNotice = `The actual intent decision was recorded; its fixed workflow A3 completion is pending: ${finalized.message ?? finalized.code}. 请按提示修复后重试（幂等）。`;
+              log.record("intent.confirmation.fixed-finalize-pending", { path: fixedIntentConfirmation.path, requestId, phase: "pending-recovery", errorCode: finalized.code, errorMessage: finalized.message });
+              return { ...out, intentConfirmation: { status: "pending-recovery", code: finalized.code, message: finalized.message } };
+            }
+            log.record("intent.confirmation.fixed-finalize-committed", { path: fixedIntentConfirmation.path, requestId, phase: "committed" });
+            out = { ...out, intentConfirmation: { status: "committed" } };
           }
           // 发行「已确认且在边界内」的实际写入路径（D 批无账本；发行器仍按同一份校验）。
           issue(effectiveReq, out ?? null, effectiveMetadata);
@@ -1682,6 +2409,8 @@ export async function openRoleSession(
       skillRoot: input.project.skillRoot,
       boundary: setup.role.boundary,
       ...(input.scope !== undefined ? { scope: input.scope } : {}),
+      // 2026-11-10（B4.1/v5）：任务级 Git 写事实（仅 fixed 真实受派任务解析成功时注入；缺省 ⇒ 裸 Git 写硬拒）。
+      ...(taskGitRuntime !== undefined ? { taskGitScope: taskGitRuntime.scope } : {}),
       conditions,
       forbiddenPrefixes: trioSpec?.forbiddenWritePaths ?? [],
       checkWrite: shellCheckWrite,
@@ -1837,6 +2566,20 @@ export async function openRoleSession(
       ? { takeDirective: (req, intent) => input.customerDirective!.takeDirective(req, intent) }
       : {};
 
+  // T3 B4.1（2026-11-10，AC-21 / T-09）：fixed 项目角色的任务级 Git 分类上下文——只经三层链注入，
+  // 复用既有 `shellArming.classifyShell` 通道：把 2 参分类器替换为「带 `taskGitScope` 的明细分类」
+  // 封装（Service 出口 `classifyShellDetailed` 同一函数引用；明细携带 `taskGit` 审计事实）。
+  // 未解析出 scope / 调用方未给 shellArming ⇒ 原样透传（legacy 注入/行为逐字不变）。
+  const projectShellArming = taskGitRuntime !== undefined
+    && input.taskGit?.classifyShellDetailed !== undefined
+    && input.shellArming !== undefined
+    ? {
+        ...input.shellArming,
+        classifyShell: (argv: string[], rules: ShellRules) =>
+          input.taskGit!.classifyShellDetailed!(argv, rules, { taskGitScope: taskGitRuntime!.scope }),
+      }
+    : input.shellArming;
+
   let shellGate: ShellGate | undefined;
   if (chiefDecisionContext !== undefined) {
     // Independent real-chief contexts never construct a normal shell surface.
@@ -1877,7 +2620,7 @@ export async function openRoleSession(
         project: input.project,
         operatorChannel: input.shellOperatorChannel,
         sessionDeps: { ...deps, createAdapter: deps.createAdapter ?? createRuntimeAdapterFactory(input.project, input.runtime ?? "pi", deps.runtimeOptions) },
-        ...(input.shellArming ?? {}),
+        ...(projectShellArming ?? {}),
         ...escalationWiring,
         ...directiveWiring,
         runtime: input.runtime,
@@ -1898,9 +2641,22 @@ export async function openRoleSession(
   // matcher 经 Service 公共出口**同一函数引用**（门禁引擎单一实现）；执行经 trunk Provider 固定传输
   // （绝对可执行 + 固定 config/env + 规范 argv 体，不接受任意 argv）。`run_shell` 在 gate 放行后对
   // `git` 只能经本能力执行；无能力/未命中 ⇒ `readonly-git-runner-unavailable`（绝不回退通用 spawn）。
+  // 2026-11-10（B4.1，AC-21 / T-09）：fixed 任务级 Git 写——`match` 追加任务级 matcher（同一函数引用）；
+  // `execute` 的任务级分支：add 经注入端口执行，commit **必须**在 spawn 前经 `runTaskGitCommit`
+  // 临界区门（`createTaskGitCommitRunner`；项目级锁贯穿 staged 检查与提交）。未解析出 scope ⇒ 该分支不存在
+  // （任务级 Git 写一律拒；只读 Git 路由逐字保留）。
   const readonlyGit: ReadonlyGitCapability = {
-    match: (argv) => matchReadonlyGit(argv),
-    execute: (match, budgets) => executeReadonlyGit(input.project.projectRoot, match, budgets),
+    match: (argv) => {
+      const readonlyMatch = matchReadonlyGit(argv);
+      if (readonlyMatch !== undefined) return readonlyMatch;
+      return taskGitRuntime?.execution.match(argv);
+    },
+    execute: (match, budgets) => {
+      if (taskGitRuntime !== undefined && isTaskGitShellMatchObject(match)) {
+        return taskGitRuntime.execution.execute(match, budgets);
+      }
+      return executeReadonlyGit(input.project.projectRoot, match, budgets);
+    },
   };
 
   // 需求变更申请：只给内置治理角色中的报告员/统筹注入（沿用 C 批发起方规则）。
@@ -1980,6 +2736,10 @@ export async function openRoleSession(
     : moduleCompleteTeamPlan && directGovernance
       ? input.completeTeamPlan
       : undefined;
+  // T3 B2（MF-IR-2/3）：fixed 会话的收口/激活走 `workflowService` 固定实现（不触 trunk/CAS/
+  // appointment-write）；legacy 实现（`input.closeCreatedTask`/`input.activateRoleDocuments`）在
+  // fixed 会话**不注入**（结构性不可达）。会话级模式与 `resolveWorkflowMode` 同源（不缓存项目级单值）。
+  const fixedSessionTools = sessionWorkflowMode === "fixed";
   // X-R3（E2 S2）：nominator 的 activateRoleDocuments 角色声明改读模块 `tools()`（trio 声明
   // `activateRoleDocuments`；single/未装配回退旧角色 id 门控）。引擎仍保留既有 `directGovernance`
   // 会话模式门控——模块只声明最大允许集，实际注入由本层决定。
@@ -1990,6 +2750,35 @@ export async function openRoleSession(
     : moduleActivateRoleDocuments && directGovernance
       ? input.activateRoleDocuments
       : undefined;
+  // T3 B2（MF-IR-3）：fixed `activate_role_documents` v2 依赖（AC-24；项目根由本层绑定；服务层重算
+  // roster/提案决定/三文档实际字节 SHA-256 并写 `role.activated`）。legacy 会话字段缺席。
+  // B17（2026-11-11，RR12 失败修复）：模型只传 path；应用在调用前按真实字节计算并**覆盖**四份 hash
+  // （不采信模型自报；不可读 fail-closed）。服务层仍复核 roster 与 A6 documentRefs 一致性。
+  const fixedActivateRoleDocuments: FixedActivateRoleDocumentsFn | undefined = fixedSessionTools
+    && directGovernance && setup.role.id === "nominator" && moduleActivateRoleDocuments !== false
+    ? async (toolInput, signal) => {
+        if (signal?.aborted) {
+          return { ok: false, code: "activation-document-invalid", message: "本轮已中止，未执行激活。" };
+        }
+        const projectRoot = input.project.projectRoot;
+        const hashed = await fillFixedActivationHashes({ projectRoot, input: toolInput });
+        if (!hashed.ok) return hashed;
+        if (input.activateRoleDocumentsFixed !== undefined) {
+          // 可信 projectRoot 放最后：模型参数即便夹带同名字段也不得覆盖宿主身份。
+          return await input.activateRoleDocumentsFixed({ ...hashed.input, projectRoot }, signal);
+        }
+        return await workflowActivateRoleDocumentsFixed({
+          projectRoot,
+          operationId: hashed.input.operationId,
+          flowId: hashed.input.flowId,
+          workflowId: hashed.input.workflowId,
+          proposalDecisionId: hashed.input.proposalDecisionId,
+          targetRoleId: hashed.input.targetRoleId,
+          roster: hashed.input.roster,
+          documents: hashed.input.documents,
+        });
+      }
+    : undefined;
   // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 的角色声明经模块 `tools()` 复核（`moduleDeclaresTool`
   // 在 trio + D1 校验后回答；single/su 以 `undefined` 保持旧路径）。**旧合并字面量逐字保留为回退值**：
   //   · convener（X-R4）与 chief（X-R6）的模块 trio 声明均含 closeCreatedTask；
@@ -2001,6 +2790,35 @@ export async function openRoleSession(
     : moduleCloseCreatedTask && directGovernance
       ? input.closeCreatedTask
       : undefined;
+  // T3 B2（MF-IR-2）：fixed `close_created_task` v2 依赖（AC-18）——`workflowService.closeTask` 校验
+  // 真实创建者（= 会话角色）/报告/状态/幂等并写 `task.closed` + 阶段事件；**不写** `.ans/runs`/
+  // `.ans/trunk`、不做 CAS/snapshot。可信身份（projectRoot/actorRoleId）由本层绑定，模型只给
+  // `{operationId,taskId,outcome,note?}`；legacy 会话字段缺席（legacy 实现逐字保留在上方）。
+  const fixedCloseCreatedTask: FixedCloseCreatedTaskFn | undefined = fixedSessionTools
+    && directGovernance && (setup.role.id === "chief" || setup.role.id === "convener")
+    && moduleCloseCreatedTask !== false
+    ? async (toolInput: FixedCloseCreatedTaskToolInput, signal) => {
+        if (signal?.aborted) {
+          return { ok: false, code: "close-task-invalid", message: "本轮已中止，未执行收口。" };
+        }
+        const projectRoot = input.project.projectRoot;
+        const actorRoleId = setup.role.id;
+        if (input.closeCreatedTaskFixed !== undefined) {
+          return await input.closeCreatedTaskFixed(
+            { projectRoot, actorRoleId, operationId: toolInput.operationId, taskId: toolInput.taskId, outcome: toolInput.outcome, ...(toolInput.note !== undefined ? { note: toolInput.note } : {}) },
+            signal,
+          );
+        }
+        return await workflowCloseTask({
+          projectRoot,
+          actorRoleId,
+          operationId: toolInput.operationId,
+          taskId: toolInput.taskId,
+          outcome: toolInput.outcome,
+          ...(toolInput.note !== undefined ? { note: toolInput.note } : {}),
+        });
+      }
+    : undefined;
   // X-R4（E2 S2）：submitRefactor / requestStableWrite 的角色声明改读模块 `tools()`；single/su/未装配
   // 回退旧角色 id 门控（旧谓词 `canRequestStableWrite` 已删除）。两项在旧代码中不以治理模型二次收窄，
   // 故不加 `directGovernance` 会话门控（与模块 single 声明保持一致）。
@@ -2061,7 +2879,10 @@ export async function openRoleSession(
         generatedAt: new Date().toISOString(),
         log,
       });
-      const matrix = buildGovernanceMatrix(matrixInput);
+      const matrix = buildGovernanceMatrix(
+        matrixInput,
+        sessionWorkflowMode === "fixed" ? "two-fixed-paths/v1" : "legacy-v1",
+      );
       if (matrix.status === "unavailable") {
         contextSections = [GOVERNANCE_MATRIX_UNAVAILABLE_NOTICE];
         log.record("governance.matrix.unavailable", { trigger: "session-start", status: matrix.status });
@@ -2086,10 +2907,53 @@ export async function openRoleSession(
   }
   // 六角色只读工具（含 chief）：注入才注册；五个非幕僚启动时不计算（闭包惰性）。
   const governanceMatrix = governanceMatrixEnabled
-    ? createGovernanceMatrixFn({ project: input.project, session: governanceMatrixSessionFlags, log })
+    ? createGovernanceMatrixFn({
+        project: input.project,
+        session: governanceMatrixSessionFlags,
+        log,
+        matrix: sessionWorkflowMode === "fixed" ? "two-fixed-paths/v1" : "legacy-v1",
+      })
     : undefined;
 
+  // T3 B10.2：fixed 任务会话的 assignment 上下文（应用账本事实；与 legacy assignedReview 互斥）。
+  if (fixedTaskAssignment !== undefined) {
+    contextSections = [...(contextSections ?? []), fixedTaskAssignmentContextText(fixedTaskAssignment)];
+  }
   if (assignedReview?.ok) contextSections = [...(contextSections ?? []), assignedReview.value.contextText];
+  // T3 B1（AC-12/§3.4）：fixed 会话注入模块 `context({matrix:"two-fixed-paths/v1"})` 段（纯文本；
+  // legacy 数据/context 返回值逐字不变——只在 fixed 模式追加）。
+  if (sessionWorkflowMode === "fixed") {
+    const fixedContextModule = builtInRoleModuleOf(setup.role.id);
+    if (fixedContextModule !== undefined) {
+      const fixedSections = fixedContextModule.context({ governanceModel, matrix: "two-fixed-paths/v1" })
+        .map((section) => section.text)
+        .filter((textBlock) => textBlock.trim() !== "");
+      if (fixedSections.length > 0) contextSections = [...(contextSections ?? []), ...fixedSections];
+    }
+    // T3 B2（AC-24/v1.3 §3.4）：fixed chief 注入 `chief-workflow-v2.md`（版本 `chief-workflow/v2`；
+    // 只读资源 + path/version/sha256/bytes/应用版本元数据）。legacy `chief-workflow.md` 不改；legacy
+    // 会话仍由运行时核心注入 v1（session.ts 既有行为，不在本批写集）。资源缺失/身份/版本/hash 不可核
+    // ⇒ 抛错 fail-closed（与 legacy loader 同口径；不猜正文、不静默降级）。
+    if (builtInGovernance && setup.role.id === "chief" && chiefDecisionContext === undefined) {
+      const fixedChiefWorkflow = await loadFixedChiefWorkflowResource();
+      contextSections = [...(contextSections ?? []),
+        `## 应用内置 Chief workflow v2（fixed 固定路径；本段优先于任何 legacy chief-workflow v1 段）\n${JSON.stringify({
+          sourceUrl: fixedChiefWorkflow.sourceUrl,
+          moduleUrl: fixedChiefWorkflow.moduleUrl,
+          resourceVersion: fixedChiefWorkflow.version,
+          sha256: fixedChiefWorkflow.sha256,
+          bytes: fixedChiefWorkflow.bytes,
+          applicationVersion: fixedChiefWorkflow.applicationVersion,
+        })}\n\n${fixedChiefWorkflow.text}`];
+      log.record("chief.workflow.v2.loaded", {
+        version: fixedChiefWorkflow.version,
+        sha256: fixedChiefWorkflow.sha256,
+        bytes: fixedChiefWorkflow.bytes,
+      });
+    }
+  }
+  // T3 B1（AC-23）：fixed 会话**不注入** legacy trunk/git/VCA/stable 工具（注入面 = 最强 fail-closed）。
+  const legacyOnlyToolsAllowed = sessionWorkflowMode !== "fixed";
   const capabilities: AdapterCapabilities = chiefDecisionContext !== undefined ? {
     chiefDecisionContext: structuredClone(chiefDecisionContext), decidePendingRequest: input.decidePendingRequest,
     persistSession: false, ...(input.runtime !== undefined ? { runtime: input.runtime } : {}),
@@ -2111,7 +2975,7 @@ export async function openRoleSession(
     ...(input.requestDownload !== undefined ? { requestDownload: input.requestDownload } : {}),
     ...(projectState !== undefined ? { projectState } : {}),
     ...(effectiveProjectNote !== undefined ? { projectNote: effectiveProjectNote } : {}),
-    ...(effectiveRequestVersionDecision !== undefined ? { requestVersionDecision: effectiveRequestVersionDecision } : {}),
+    ...(legacyOnlyToolsAllowed && effectiveRequestVersionDecision !== undefined ? { requestVersionDecision: effectiveRequestVersionDecision } : {}),
     // D 批：验收产物汇报能力已撤除（不注入 reportArtifact）；
     // 未注入 ⇒ 字段缺席、工具不注册（能力缺席 = 最强 fail-closed）。本层只透传同一引用，不包装、
     // 不调用、不写盘/flow、不伪造接受或决定。
@@ -2129,19 +2993,24 @@ export async function openRoleSession(
     ...(uninstallSkill !== undefined ? { uninstallSkill } : {}),
     ...(installMcp !== undefined ? { installMcp } : {}),
     ...(uninstallMcp !== undefined ? { uninstallMcp } : {}),
-    ...(submitVersionChange !== undefined ? { submitVersionChange } : {}),
-    ...(selectRunChange !== undefined ? { selectRunChange } : {}),
+    ...(submitVersionChange !== undefined && legacyOnlyToolsAllowed ? { submitVersionChange } : {}),
+    ...(selectRunChange !== undefined && legacyOnlyToolsAllowed ? { selectRunChange } : {}),
     ...(completeTeamPlan !== undefined ? { completeTeamPlan } : {}),
-    ...(activateRoleDocuments !== undefined ? { activateRoleDocuments } : {}),
+    // T3 B2（MF-IR-2/3）：fixed 会话注入 fixed 依赖（legacy 实现不触达）；legacy 会话注入面逐字不变。
+    ...(activateRoleDocuments !== undefined && !fixedSessionTools ? { activateRoleDocuments } : {}),
+    ...(fixedActivateRoleDocuments !== undefined ? { activateRoleDocumentsFixed: fixedActivateRoleDocuments } : {}),
     // X-R4（E2 S2）/X-R6（E2 S2）：closeCreatedTask 经模块声明 + 既有 directGovernance 会话模式门控
-    // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。
-    ...(effectiveCloseCreatedTask !== undefined ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
-    ...(input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
-    ...(input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
-    ...(input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
+    // 决定是否注入；single/su 回退旧合并字面量（`effectiveCloseCreatedTask`）。fixed 会话不注入 legacy
+    // 实现（B1 注入面兼容别名见下：同名能力位保留但值为 fixed 实现，供既有断言/旧 handler 路径复用）。
+    ...(effectiveCloseCreatedTask !== undefined && !fixedSessionTools ? { closeCreatedTask: effectiveCloseCreatedTask } : {}),
+    ...(fixedCloseCreatedTask !== undefined ? { closeCreatedTask: fixedCloseCreatedTask as unknown as CloseCreatedTaskFn } : {}),
+    ...(fixedCloseCreatedTask !== undefined ? { closeCreatedTaskFixed: fixedCloseCreatedTask } : {}),
+    ...(legacyOnlyToolsAllowed && input.gitQuery !== undefined ? { gitQuery: input.gitQuery } : {}),
+    ...(legacyOnlyToolsAllowed && input.gitCandidate !== undefined ? { gitCandidate: input.gitCandidate } : {}),
+    ...(legacyOnlyToolsAllowed && input.gitPublish !== undefined ? { gitPublish: input.gitPublish } : {}),
     ...(isTrio && setup.role.id === "nominator" ? { roleDraftWritePaths } : {}),
-    ...(submitRefactor !== undefined ? { submitRefactor } : {}),
-    ...(requestStableWrite !== undefined ? { requestStableWrite } : {}),
+    ...(submitRefactor !== undefined && legacyOnlyToolsAllowed ? { submitRefactor } : {}),
+    ...(requestStableWrite !== undefined && legacyOnlyToolsAllowed ? { requestStableWrite } : {}),
     // 治理权力矩阵（C3）：仅 chief 有提示段（单段、非空）；六角色有工具能力（未启用/未注入 ⇒ 缺席）。
     ...(contextSections !== undefined ? { contextSections } : {}),
     ...(governanceMatrix !== undefined ? { governanceMatrix } : {}),
@@ -2768,6 +3637,8 @@ function createGovernanceMatrixFn(deps: {
   project: ProjectConfig;
   session: GovernanceMatrixSessionFlags;
   log: DiagnosticLogger;
+  /** T3 B2（v1.3 §7.4）：fixed 会话展示 fixed 矩阵视图（只读、不判定）；缺省 `legacy-v1` 逐字不变。 */
+  matrix?: DispatchMatrixMode;
 }): GovernanceMatrixFn {
   return async (request = {}) => {
     const keys = Object.keys(request);
@@ -2785,7 +3656,7 @@ function createGovernanceMatrixFn(deps: {
         generatedAt: new Date().toISOString(),
         log: deps.log,
       });
-      const matrix = buildGovernanceMatrix(matrixInput);
+      const matrix = buildGovernanceMatrix(matrixInput, deps.matrix ?? "legacy-v1");
       if (matrix.status === "unavailable") {
         return { ok: false, message: "治理权力矩阵暂不可用；不得据此推断权限。" };
       }
@@ -3133,6 +4004,127 @@ function defaultChoiceKindFromModule(
   return undefined;
 }
 
+/**
+ * B16（2026-11-11，RR11 失败修复）：会话是否绑定**真实 fixed A8 任务**（task.created.to=nominator、
+ * workflowId 存在、stage=A8、非 stage-request）。是 ⇒ 返回 flowId/workflowId（task.created.flowId
+ * 优先，缺省从 workflow 账本 `workflow.started` 解析）；legacy/其它阶段/任务形状不全 ⇒ undefined
+ * （调用方走 legacy `prepareRoleDraftScope`，fail-closed 不回退）。
+ */
+async function fixedRoleDraftTaskOf(
+  projectRoot: string,
+  taskId: string | undefined,
+): Promise<{ flowId: string; workflowId: string } | undefined> {
+  if (taskId === undefined) return undefined;
+  let state: Awaited<ReturnType<typeof readTaskState>>;
+  try {
+    state = await readTaskState(projectRoot);
+  } catch {
+    return undefined;
+  }
+  const created = state.records.get(taskId)?.created;
+  if (created === undefined || created.to !== "nominator" || created.taskKind === "stage-request"
+    || created.stage !== "A8" || created.workflowId === undefined) {
+    return undefined;
+  }
+  let flowId = created.flowId;
+  if (flowId === undefined || flowId.trim() === "") {
+    const ledger = await workflowReadLedger(projectRoot);
+    const started = ledger.events.find((event) => event.kind === "workflow.started" && event.workflowId === created.workflowId);
+    flowId = started?.kind === "workflow.started" ? started.flowId : undefined;
+  }
+  if (flowId === undefined || flowId.trim() === "") return undefined;
+  return { flowId: flowId.trim(), workflowId: created.workflowId };
+}
+
+/**
+ * T3 B3.1/B15.3（2026-11-11，AC-08/AC-13，v1.3 §4.2 A10/MF-9(a)）：fixed 任命卡在办标记。
+ *
+ * A10 只任命确认、不派实现：呈卡前把当前活动 fixed workflow 推进到 `stage.requested A10`
+ * （幂等键 `stage-request:<wf>:A10:<attempt>`，requestDigest=名单字节 sha256，requestTaskId=
+ * `appointment-card:<flowId>:<rosterSha12>`——与 `prepareIntent` 的 `stage.requested A3` 同构），
+ * 使 `request.resolved`（appointment，含 `targetRoleIds`/workflowId 戳）后的 `stage.completed A10`
+ * （应用通道/桌面 B3 唯一实现）可按状态机落账，之后 chief 才能发 A11 stage-request。
+ *
+ * B15.3（2026-11-11，RR10 失败修复）：**fail-closed + 幂等**——无活动 workflow ⇒ `workflow-not-found`；
+ * 已关闭 ⇒ `workflow-closed`；账本损坏 ⇒ `workflow-corrupt`；非路径 A/当前阶段 blocked ⇒
+ * `stage-transition-invalid`；A9 未 completed ⇒ `stage-transition-invalid`；
+ * A10 在办 ⇒ `appointment-card-pending`（拒绝重复卡）；A10 已完成 ⇒ `appointment-card-already-completed`；
+ * attempt 按历史 `stage.requested A10` 数递增。失败时调用方必须 notPresented（不发卡）。
+ * 全部经 fixed 账本公共原语（`readWorkflowLedger`/`appendWorkflowEvent`/`deriveWorkflowView`/
+ * `canRequestStage`），不复制状态机、不触 legacy trunk/run。
+ */
+async function markFixedAppointmentCardRequested(input: {
+  projectRoot: string;
+  flowId: string;
+  rosterSha256: string;
+  now?: () => Date;
+}): Promise<WorkflowServiceFailure | undefined> {
+  const ledger = await workflowReadLedger(input.projectRoot);
+  const activeIds = [...new Set(ledger.events
+    .filter((event) => event.kind === "workflow.started")
+    .map((event) => event.workflowId))]
+    .filter((workflowId) => !ledger.events.some((event) => event.workflowId === workflowId && event.kind === "workflow.closed"));
+  const workflowId = activeIds.find((id) => ledger.events.some((event) => event.workflowId === id && event.flowId === input.flowId));
+  if (workflowId === undefined) {
+    return { ok: false, code: "workflow-not-found", message: `workflow-not-found：flow ${input.flowId} 没有活动 fixed workflow（任命卡不发）。` };
+  }
+  const wfEvents = ledger.events.filter((event) => event.workflowId === workflowId);
+  const taskState = await readTaskState(input.projectRoot);
+  const view = deriveWorkflowView(wfEvents, taskState.events);
+  if (view.blocked?.code === WORKFLOW_CORRUPT_CODE) {
+    return { ok: false, code: WORKFLOW_CORRUPT_CODE, message: `${WORKFLOW_CORRUPT_CODE}：任命卡不可呈（工作流账本损坏：${view.blocked.summary}）。` };
+  }
+  if (view.closed !== undefined) {
+    return { ok: false, code: "workflow-closed", message: `workflow-closed：任命卡不可呈（workflow 已关闭：${view.closed.outcome}）。` };
+  }
+  if (view.path !== "A") {
+    return { ok: false, code: "stage-transition-invalid", message: "stage-transition-invalid：任命卡只适用于路径 A workflow（不发卡）。" };
+  }
+  if (view.stages[view.stage].status === "blocked") {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `stage-transition-invalid：任命卡不可呈（workflow 当前 blocked：${view.blocked?.code ?? "blocked"}）；要求 A9 completed。`,
+    };
+  }
+  if (view.stage === "A10") {
+    if (view.stages.A10.status === "completed") {
+      return { ok: false, code: "appointment-card-already-completed", message: "appointment-card-already-completed：A10 任命卡已完成；不得再次呈现。" };
+    }
+    return { ok: false, code: "appointment-card-pending", message: "appointment-card-pending：A10 任命卡已在办；先结算既有卡，不得重复呈现。" };
+  }
+  if (!(view.stage === "A9" && view.stages.A9.status === "completed") || !canRequestStage(view, "A10")) {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `stage-transition-invalid：任命卡不可呈（当前 ${view.stage}(${view.stages[view.stage].status})；要求 A9 completed）。`,
+    };
+  }
+  const priorAttempts = wfEvents
+    .filter((event) => event.kind === "stage.requested" && event.stage === "A10")
+    .map((event) => (event.kind === "stage.requested" ? event.attempt : 0));
+  const attempt = (priorAttempts.length > 0 ? Math.max(...priorAttempts) : 0) + 1;
+  const now = input.now ?? (() => new Date());
+  const event: WorkflowEvent = {
+    v: 1,
+    at: now().toISOString(),
+    schema: WORKFLOW_LEDGER_SCHEMA,
+    kind: "stage.requested",
+    workflowId,
+    flowId: input.flowId,
+    path: view.path,
+    idempotencyKey: stageRequestIdempotencyKey(workflowId, "A10", attempt),
+    stage: "A10",
+    fromStage: "A9",
+    requestTaskId: `appointment-card:${input.flowId}:${input.rosterSha256.slice(0, 12)}`,
+    requestDigest: input.rosterSha256,
+    attempt,
+  };
+  const appended = await workflowAppendEvent(input.projectRoot, event);
+  if (!appended.ok) return { ok: false, code: "workflow-ledger-write-failed", message: `stage.requested A10 写入失败：${appended.message}` };
+  return undefined;
+}
+
 function serializeGovernanceTask<T>(
   state: { chain: Promise<void> },
   task: () => Promise<T>,
@@ -3198,10 +4190,24 @@ const NO_CARD_KINDS: readonly GovernanceCardKind[] = Object.freeze([]);
  * 仅保留 product 行（product-code 迁移前源码 fixture；运行期模块已装配、优先命中模块）。
  * 模块 `cards` 是冻结只读数组，直接返回同一引用，不复制第二份表。
  */
-function cardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
+/**
+ * legacy 卡种读取（X-R1–X-R6 实现**逐字保留**：先读已装配模块 `cards`，未装配回退迁移前表；
+ * 两行顺序/文本不得改——module-consumption 源码锚点测试逐字断言）。
+ *
+ * T3 B2（MF-IR-4）：运行期 `cardKindsOf` 已改调门禁引擎门面（单一真源）；本函数与迁移前表
+ * （仅 product 行）按上述锚点/迁移前 oracle 原样保留，不再参与运行期判定。
+ */
+function legacyCardKindsOf(roleId: GovernanceRoleSpec["id"]): readonly GovernanceCardKind[] {
   const module = builtInRoleModuleOf(roleId);
   if (module !== undefined) return module.cards;
   return TRIO_CARD_KINDS[roleId] ?? NO_CARD_KINDS;
+}
+
+function cardKindsOf(roleId: GovernanceRoleSpec["id"], matrix: DispatchMatrixMode = "legacy-v1"): readonly GovernanceCardKind[] {
+  // T3 B2（MF-IR-4）：卡种唯一真源 = 门禁引擎门面 `cardKindsOf(roleId, matrix)`——legacy 只读模块
+  // `cards`（逐字不变），fixed 只读模块 `fixedCards`（字段缺失/未装配 ⇒ fail-closed 空集，
+  // 不回退 legacy `cards`）。本层不复制第二张表。
+  return governanceCardKindsOf(roleId, matrix);
 }
 
 /**
@@ -3240,6 +4246,7 @@ const CARD_KIND_ROUTE_HINTS: Readonly<Record<GovernanceCardKind, string>> &
   proposal: "请改为请幕僚调度策划（rapporteur）发起提案卡",
   decision: "请改为请幕僚调度运营（convener）或策划（rapporteur）发起 decision 卡",
   "intent-confirm": "请改为请幕僚（chief）发起需求确认卡",
+  "merge-main": "merge-main 为应用合并通道发起的高风险确认卡，必须客户本人确认、judge 不可代批；不得用 request_choice/request_confirmation 发该卡",
   "stable-write": "stable 写入确认卡由应用自有通道（stable-write-runtime）发起；不得用 request_choice/request_confirmation 发 stable 写入确认卡",
 };
 
@@ -3454,6 +4461,27 @@ function buildTaskPrompt(taskId: string | undefined, scope: TaskScope | undefine
   );
 }
 
+/**
+ * T3 B10.2（2026-11-11）：fixed 任务会话的 assignment 上下文纯文本段。
+ * 只渲染应用从 `tasks.jsonl` 读到的事实（taskId/from/to/workflowId/flowId/stage/taskKind/open），
+ * 不携带权限/证据/运行时秘密，也不是模型自报；legacy 会话不构造本段（旧注入面逐字不变）。
+ */
+function fixedTaskAssignmentContextText(task: AssignedTaskFacts): string {
+  return [
+    "固定任务上下文（应用账本事实，非模型自报）：",
+    JSON.stringify({
+      taskId: task.taskId,
+      from: task.from,
+      to: task.to,
+      workflowId: task.workflowId,
+      flowId: task.flowId,
+      stage: task.stage,
+      ...(task.taskKind !== undefined ? { taskKind: task.taskKind } : {}),
+      open: task.open,
+    }),
+  ].join("\n");
+}
+
 /** Fresh host-derived ordinary scope facts. This is not a permission or an effect capability. */
 export async function readRoleCapabilityProtectionScope(input: { projectRoot: string }): Promise<{ state: "required" | "unmanaged" | "unknown"; revision: number }> {
   const { state, revision } = await readGitHostProtectionRequirement(input);
@@ -3495,6 +4523,54 @@ export async function registerVersionedDocumentAfterWrite(input: { projectRoot: 
   return registerVersionedDocument({ projectRoot: input.projectRoot, relPath, ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}) });
 }
 
+/** fixed chief-workflow 资源（`chief-workflow-v2.md`）只读观测结果（应用资源，非授权依据）。 */
+interface FixedChiefWorkflowResource {
+  text: string;
+  sourceUrl: string;
+  moduleUrl: string;
+  version: string;
+  sha256: string;
+  bytes: number;
+  applicationVersion: string;
+}
+
+/**
+ * T3 B2（AC-24/§3.4）：读取应用内置 fixed `chief-workflow-v2.md`（版本 `chief-workflow/v2`）。
+ *
+ * 与 legacy loader（`provider/runtime/tools.ts::loadBuiltinChiefWorkflow`）同口径：只读应用包内
+ * 资源；校验 Markdown 身份、唯一版本行（**恰 `chief-workflow/v2`**）、UTF-8/NUL/体积；计算
+ * SHA-256/bytes 并附应用版本。读取/校验失败 ⇒ 抛错 fail-closed（不猜正文、不静默降级）。
+ * legacy `chief-workflow.md`（v1）**不读、不改**；本函数只服务 fixed 会话注入。
+ */
+async function loadFixedChiefWorkflowResource(): Promise<Readonly<FixedChiefWorkflowResource>> {
+  const source = new URL("../../common/门禁引擎/workflows/chief/chief-workflow-v2.md", import.meta.url);
+  try {
+    const bytes = await readFile(source);
+    if (bytes.length === 0 || bytes.length > 256 * 1024) throw new Error("empty or oversized fixed Chief workflow resource");
+    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    if (text.includes("\0") || !/^\uFEFF?# Chief 工作流/.test(text)) throw new Error("invalid fixed Chief workflow Markdown identity");
+    const versions = [...text.matchAll(/^资源版本：(chief-workflow\/v[1-9][0-9]*)\r?$/gm)];
+    if (versions.length !== 1 || versions[0]![1] !== "chief-workflow/v2") {
+      throw new Error("fixed Chief workflow resource version must be chief-workflow/v2");
+    }
+    const application = JSON.parse(await readFile(new URL("../../../package.json", import.meta.url), "utf8")) as { version?: unknown };
+    if (typeof application.version !== "string" || !/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/.test(application.version)) {
+      throw new Error("application version unavailable");
+    }
+    return Object.freeze({
+      text,
+      sourceUrl: source.href,
+      moduleUrl: import.meta.url,
+      version: versions[0]![1]!,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      bytes: bytes.length,
+      applicationVersion: application.version,
+    });
+  } catch (error) {
+    throw new Error(`chief-workflow-v2-resource-unavailable: ${source.href} (${errText(error)})`, { cause: error });
+  }
+}
+
 /** Fixed engine, shared governed tools, exact project roots; no fallback engine. */
 export function createRuntimeAdapterFactory(
   project: ProjectConfig,
@@ -3532,6 +4608,11 @@ export function createRuntimeAdapterFactory(
     completeTeamPlan: capabilities?.completeTeamPlan,
     activateRoleDocuments: capabilities?.activateRoleDocuments,
     closeCreatedTask: capabilities?.closeCreatedTask,
+    // T3 B2（MF-IR-2/3）：fixed 收口/激活依赖透传给运行时核心（字段名 = 本层给出的接线契约；
+    // 运行时核心 B2 在 `GovernedToolsOptions` 加同名字段后由 handler 消费）。undefined ⇒ 字段缺席
+    // （legacy 会话不出现；fixed 会话由 openRoleSession 注入 fixed 实现，legacy 实现不可达）。
+    ...(capabilities?.closeCreatedTaskFixed !== undefined ? { closeCreatedTaskFixed: capabilities.closeCreatedTaskFixed } : {}),
+    ...(capabilities?.activateRoleDocumentsFixed !== undefined ? { activateRoleDocumentsFixed: capabilities.activateRoleDocumentsFixed } : {}),
     gitQuery: capabilities?.gitQuery,
     gitCandidate: capabilities?.gitCandidate,
     gitPublish: capabilities?.gitPublish,

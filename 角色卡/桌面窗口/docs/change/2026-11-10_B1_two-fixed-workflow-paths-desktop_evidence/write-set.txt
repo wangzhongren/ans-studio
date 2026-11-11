@@ -1,0 +1,21 @@
+# write set / diff (B1 desktop, final)
+## git diff --numstat (modified)
+16	0	app/desktop/customer-input.ts
+450	15	app/desktop/session.ts
+## new files (lines/bytes)
+158 lines 7815 bytes app/desktop/workflow.ts
+174 lines 7781 bytes app/desktop/workflow-git.ts
+859 lines 47323 bytes test/桌面应用/fixed-path-routing.test.ts
+132 lines 6765 bytes test/桌面应用/workflow-git-port.test.ts
+## git status --porcelain -- src app test
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+?? app/desktop/workflow-git.ts
+?? app/desktop/workflow.ts
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/fixed-path-routing.test.ts"
+?? "test/\346\241\214\351\235\242\345\272\224\347\224\250/workflow-git-port.test.ts"
+## 写集外 diff 检查（应为空）
+src diff lines: 0
+app/desktop 其它文件 diff: 0
+app/main.ts / app/renderer diff: 0
+角色卡 diff（记录写入前）: 0

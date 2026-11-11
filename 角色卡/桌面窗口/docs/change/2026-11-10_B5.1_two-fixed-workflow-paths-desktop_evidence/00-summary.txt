@@ -1,0 +1,43 @@
+HEAD: e645e4ebe9b7444d4647ac74fb4f49a99030c354
+branch: feat/two-fixed-workflow-paths
+date: 2026-11-10
+=== test/桌面应用 before (68 files) ===
+{
+  "tests": 717,
+  "pass": 632,
+  "fail": 85,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "hangs": 4
+}
+=== test/桌面应用 after (69 files; +b51 new) ===
+{
+  "tests": 664,
+  "pass": 594,
+  "fail": 70,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "hangs": 5
+}
+note: after 运行中 chief-workflow 被 90s watchdog 终止（已知非确定套件）；单文件复跑 66 tests/50 pass/16 fail，失败名集与 before 逐名一致（chief-workflow-after-rerun.tap）。
+=== new test file ===
+# tests 13
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+=== failing-name diff (excl chief-workflow) ===
+{
+  "beforeNames": 77,
+  "afterNames": 77,
+  "added": [],
+  "removed": []
+}
+
+=== record ===
+4fb9b35cd3b905205b781d8ab13aff8b24ad11c27626b660639f439a93bcac46 *角色卡/桌面窗口/docs/change/2026-11-10_B5.1_two-fixed-workflow-paths-desktop.md
+=== candidate aggregate ===
+474358f87933253473c6059d505041d6df96d1c511a785142147c54a4dd2f37d

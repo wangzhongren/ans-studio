@@ -1,0 +1,25 @@
+diff --git a/src/service/gate/shell-rules.ts b/src/service/gate/shell-rules.ts
+index d4d21a9..f9a04d4 100644
+--- a/src/service/gate/shell-rules.ts
++++ b/src/service/gate/shell-rules.ts
+@@ -29,3 +29,20 @@ export { checkGitPolicy, computeGitPolicyDigest } from "../../common/门禁引
+ export type { GitPolicyFacts, GitPolicyResult, GitPolicyTemplate, GitPolicyDiffEntry, GitRawObjectPlan, GitAppGeneratedFile, GitBusinessPublication, GitRoleActivationPublication, GitStableInitialWorkflowSource, GitInitialWorkflowPublication, GitPolicyTreeEntry, GitDeliveryTaskSource, GitDeliveryIntegrationSource, GitRefPublicationPolicyPlan, GitDeliveryBasis } from "../../common/门禁引擎/classify-shell.ts";
+ export type { GitRawTreeEntry, RawTree, GitRawDiffEntry, GitRawObjectInput, GitRawStoredCommit, GitRawRevertCommit, GitRawRevertBasis, GitRawRevertConflict } from "../../model/trunk.ts";
+ export type { GitDeliveryRevertSource } from "../../common/门禁引擎/classify-shell.ts";
++
++// —— B4.1（2026-11-10，T3 方案 v1.3 §6.2/§6.3 / AC-21 / T-09）：固定路径任务级 Git 写的公开出口 ——
++// 供编排/运行时经 Service 出口合法消费（生产消费者不得导入本角色私有 `common/`，§6）。
++// 全部为**逐字再导出**（同一函数引用/同一常量/同一类型）：规则与临界区门的唯一实现仍在
++// `src/common/门禁引擎/classify-shell.ts` / `task-git-gate.ts`；本文件不复制实现、不另立规则集。
++//   classifyShellDetailed(argv, rules, context?): ShellVerdict
++//     —— v5 明细判定（`context.taskGitScope` 由应用注入；缺省 ⇒ 任务级 Git 写一律拒，fail-closed）。
++//   matchTaskGit(argv, facts): TaskGitMatch | undefined
++//     —— 任务级 Git 写 matcher（仅 `git add <literal paths ⊆ writeSet>` / `git commit -m`；唯一实现）。
++//   runTaskGitCommit(input): Promise<TaskGitCommitGateResult>
++//     —— 项目级临界区提交门（staged ⊆ writeSet 检查与提交同一锁；锁占用 ⇒ `git-critical-section-busy`）。
++//   `TASK_GIT_STAGED_INSPECTION_ARGV` / `TASK_GIT_CODES` / `TASK_GIT_GATE_CODES`
++//     —— 固定检查 argv 与稳定失败码（常量再导出；消费者不得另抄一份）。
++export { classifyShellDetailed, matchTaskGit, TASK_GIT_CODES } from "../../common/门禁引擎/classify-shell.ts";
++export type { ShellClassifyContext, ShellVerdict, TaskGitScope, TaskGitTemplate, TaskGitMatch, TaskGitAuditFacts } from "../../common/门禁引擎/classify-shell.ts";
++export { runTaskGitCommit, TASK_GIT_STAGED_INSPECTION_ARGV, TASK_GIT_GATE_CODES } from "../../common/门禁引擎/task-git-gate.ts";
++export type { TaskGitCommitGateInput, TaskGitCommitGateResult, TaskGitCriticalSectionAcquire } from "../../common/门禁引擎/task-git-gate.ts";

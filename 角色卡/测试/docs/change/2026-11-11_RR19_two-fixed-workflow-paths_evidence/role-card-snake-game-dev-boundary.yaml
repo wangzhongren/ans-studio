@@ -1,0 +1,5 @@
+role: snake-game-dev
+entries:
+  - kind: file
+    path: index.html
+    purpose: 贪吃蛇单文件应用实现（模块 snake-game-app 唯一交付物）

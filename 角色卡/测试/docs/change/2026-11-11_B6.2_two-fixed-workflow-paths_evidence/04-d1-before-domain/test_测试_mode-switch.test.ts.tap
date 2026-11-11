@@ -1,0 +1,28 @@
+TAP version 13
+# Subtest: 混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）
+ok 1 - 混合项目 per-flow：legacy 在飞 flow 走旧路、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存）
+  ---
+  duration_ms: 65.4627
+  type: 'test'
+  ...
+# Subtest: 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场）
+ok 2 - 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场）
+  ---
+  duration_ms: 109.546
+  type: 'test'
+  ...
+# Subtest: 配置写回失败（坏 .ans/project.json）⇒ project-config-write-failed fail-closed；不派发、不弹卡、不改文件
+ok 3 - 配置写回失败（坏 .ans/project.json）⇒ project-config-write-failed fail-closed；不派发、不弹卡、不改文件
+  ---
+  duration_ms: 12.8801
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 600.1118

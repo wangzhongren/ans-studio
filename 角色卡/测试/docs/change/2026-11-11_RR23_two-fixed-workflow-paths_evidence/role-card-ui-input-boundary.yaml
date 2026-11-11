@@ -1,0 +1,8 @@
+role: ui-input
+entries:
+  - kind: file
+    path: src/input.js
+    purpose: 键盘输入映射与事件绑定
+  - kind: file
+    path: src/render.js
+    purpose: Canvas 渲染与界面反馈

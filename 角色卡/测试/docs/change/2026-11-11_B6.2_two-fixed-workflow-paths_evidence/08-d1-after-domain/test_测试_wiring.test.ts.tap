@@ -1,0 +1,54 @@
+TAP version 13
+# [message] 已解析角色 编排（kind=project），角色卡：角色卡/注入角色/role-card.md
+# [message] 已解析边界，来源：角色卡/注入角色/boundary.yaml；acceptance=accepted（来源：test:injected）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+# Subtest: 接线:编排使用装配**注入**的 project/scope(注入一份不同的边界,判定随之改变)
+ok 1 - 接线:编排使用装配**注入**的 project/scope(注入一份不同的边界,判定随之改变)
+  ---
+  duration_ms: 19.8698
+  type: 'test'
+  ...
+# Subtest: 接线:runRoleCommand 缺 project 注入 → 非 0(EXIT_USAGE),不自回退第二份配置
+ok 2 - 接线:runRoleCommand 缺 project 注入 → 非 0(EXIT_USAGE),不自回退第二份配置
+  ---
+  duration_ms: 0.2924
+  type: 'test'
+  ...
+# [message] 已解析角色 编排（kind=project），角色卡：角色卡/编排/role-card.md
+# [message] 已解析边界，来源：角色卡/编排/boundary.yaml；acceptance=accepted（来源：demo:embedded-config (无客户 pin，已知偏离)）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 0 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run 会话失败：runtime-creation-prepared-api-unavailable
+# Subtest: 接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite)
+not ok 3 - 接线:门禁引擎的 F4 收窄经真实装配配置生效(判定来自 resolveWrite)
+  ---
+  duration_ms: 31.268
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\wiring.test.ts:112:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/wiring.test.ts:119:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 2
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 424.5181

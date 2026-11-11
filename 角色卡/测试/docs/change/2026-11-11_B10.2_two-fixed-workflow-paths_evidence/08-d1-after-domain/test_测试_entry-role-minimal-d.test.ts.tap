@@ -1,0 +1,285 @@
+TAP version 13
+# Subtest: D 写区切换：六角色 Section 1 与能力矩阵按目标态生效
+ok 1 - D 写区切换：六角色 Section 1 与能力矩阵按目标态生效
+  ---
+  duration_ms: 1.0757
+  type: 'test'
+  ...
+# Subtest: §5A 意图入口契约：四卡含模板/命名规则，其他内置角色不携带
+ok 2 - §5A 意图入口契约：四卡含模板/命名规则，其他内置角色不携带
+  ---
+  duration_ms: 0.4203
+  type: 'test'
+  ...
+# Subtest: D 工具面：flow/gate/账本/分诊/交接/产物汇报工具不注册
+ok 3 - D 工具面：flow/gate/账本/分诊/交接/产物汇报工具不注册
+  ---
+  duration_ms: 1.7094
+  type: 'test'
+  ...
+# Subtest: D judge facts：只读任务/申请上下文；旧账本快照参数被忽略
+ok 4 - D judge facts：只读任务/申请上下文；旧账本快照参数被忽略
+  ---
+  duration_ms: 0.1589
+  type: 'test'
+  ...
+# Subtest: D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）
+not ok 5 - D-04 撤除残留：src/app 生产源码零命中（排除 dist/node_modules）
+  ---
+  duration_ms: 68.8109
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\entry-role-minimal-d.test.ts:260:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    D-04 撤除残留
+    + actual - expected
+    
+    + [
+    +   'src/common/roles/convener/index.ts:296: team-plan @ // 覆盖动作（契约 §3.4 convener 行）：`team-plan` / `git-action` / `stable-write` /',
+    +   'src/common/roles/convener/index.ts:303: team-plan @ "team-plan",',
+    +   'src/common/roles/convener/index.ts:462: team-plan @ return deny("facts-unknown", "role.convener.preflight.factsUnknown", { action: "team-plan", key: unknown });',
+    +   'src/common/roles/convener/index.ts:471: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });',
+    +   'src/common/roles/convener/index.ts:471: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });',
+    +   'src/common/roles/convener/index.ts:481: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", {',
+    +   'src/common/roles/convener/index.ts:482: team-plan @ action: "team-plan",',
+    +   'src/common/roles/convener/index.ts:488: team-plan @ return deny("team-plan-path-invalid", "role.convener.preflight.teamPlanPathInvalid", {',
+    +   'src/common/roles/convener/index.ts:489: team-plan @ action: "team-plan",',
+    +   'src/common/roles/convener/index.ts:671: team-plan @ case "team-plan":',
+    +   'src/common/shared/config-loader.ts:100: flow-service @ * （`workflowMode(projectRoot, flowId)`，`workflow-service.ts` 属主）。本模块只做**载入/校验**，',
+    +   'src/common/shared/config-loader.ts:101: flow-service @ * 不解释模式、不写回 `.ans/project.json`（写回由编排 workflow-service 原子执行）。',
+    +   'src/common/编排/doc-format-specs.ts:802: team-plan @ id: "team-plan/v3",',
+    +   'src/common/编排/doc-format-specs.ts:854: docs/flows/ @ pathPattern: "docs/flows/<flowId>.yaml",',
+    +   'src/common/编排/doc-format-specs.ts:1477: team-plan @ id: "team-plan-completion/v1",',
+    +   'src/common/编排/doc-format-specs.ts:1482: team-plan @ schemaLiteral: "team-plan-completion/v1",',
+    +   'src/common/编排/doc-format-specs.ts:1490: team-plan @ vf("schema", "string", "required", "字面量 team-plan-completion/v1"),',
+    +   'src/common/编排/doc-format-specs.ts:1527: team-plan @ vf("source", "枚举", "required", "adopted/post-run-change/amendment/upgrade/bootstrap/recovery/team-plan"),',
+    +   'src/common/编排/project-state.ts:70: flow-service @ } from "./workflow-service.ts";',
+    +   'src/common/编排/project-state.ts:71: flow-state @ import { deriveWorkflowView, nextStages } from "./workflow-state.ts";',
+    +   'src/common/编排/workflow-service.ts:1: flow-service @ // src/common/编排/workflow-service.ts',
+    +   'src/common/编排/workflow-service.ts:81: flow-state @ } from "./workflow-state.ts";',
+    +   'src/common/编排/workflow-service.ts:2097: team-plan @ return serviceFailure("baseline-team-plan-invalid", "团队计划路径非法（须项目相对 docs/scheduling/<flowId>-team-vN.md）。");',
+    +   'src/common/编排/workflow-service.ts:2102: team-plan @ return serviceFailure("baseline-team-plan-invalid", `团队计划路径须为 docs/scheduling/${flowId}-team-vN.md：${input.planPath}。`);',
+    +   'src/common/编排/workflow-service.ts:2137: team-plan @ if (!parsed.ok) return serviceFailure("baseline-team-plan-invalid", parsed.reason);',
+    +   'src/common/编排/workflow-service.ts:2145: team-plan @ return serviceFailure("baseline-team-plan-invalid", "团队计划发现结果与入参不一致（plan path/version drift）。");',
+    +   'src/common/编排/workflow-service.ts:2205: team-plan @ ...(read.teamPlan !== undefined ? [{ path: read.teamPlan.path, sha256: read.teamPlan.sha256, kind: "team-plan" }] : []),',
+    +   'src/common/编排/workflow-service.ts:3916: team-plan @ return fail(serviceFailure("baseline-team-plan-invalid", "plan.path 非法（须项目相对 docs/scheduling/<flowId>-team-vN.md）。"));',
+    +   'src/common/编排/workflow-service.ts:3941: team-plan @ return serviceFailure("baseline-team-plan-invalid", "团队计划发现结果缺失（baseline 必须记录 teamPlan）。");',
+    +   'src/common/编排/workflow-state.ts:1: flow-state @ // src/common/编排/workflow-state.ts',
+    +   'src/common/编排/workflow-state.ts:17: flow-service @ // 阶段完成的 artifact/hash/角色激活齐全等**应用事实**由 `workflow-service` 在写事件前校验；',
+    +   'src/common/编排/workflow-state.ts:427: flow-service @ * 写事件前的纯校验（`workflow-service` 复用同一谓词；不读取/不写账本）：',
+    +   'src/common/门禁引擎/classify-shell.ts:582: team-plan @ || (pub.action === "complete-team-plan" && f.actorRoleId === "convener")), "git-policy-business-source");',
+    +   'src/common/门禁引擎/classify-shell.ts:583: team-plan @ const teamPlan = pub.action === "complete-team-plan";',
+    +   'src/common/门禁引擎/classify-shell.ts:653: team-plan @ : manifest.source === "team-plan" && manifest.digest !== previous.digest',
+    +   'src/common/门禁引擎/classify-shell.ts:656: team-plan @ const marker = { schema: "team-plan-completion/v1", operationId: f.operationId, actorRoleId: "convener", flowId: pub.flowId,',
+    +   'src/common/门禁引擎/classify-shell.ts:710: docs/flows/ @ policyRequire((kind === "teamPlan" ? file.startsWith("docs/scheduling/") : file.startsWith("docs/flows/"))',
+    +   'src/model/role.ts:357: team-plan @ | "team-plan"',
+    +   'src/model/runtime.ts:1953: flow-state @ // 形状单一来源＝本模块：编排 `workflow-state.ts`/`workflow-service.ts`/`basis-guard.ts` 与桌面路由',
+    +   'src/model/runtime.ts:1953: flow-service @ // 形状单一来源＝本模块：编排 `workflow-state.ts`/`workflow-service.ts`/`basis-guard.ts` 与桌面路由',
+    +   'src/model/runtime.ts:1977: flow-state @ /** 阶段投影状态（v1.3 §4.1；投影实现属编排 workflow-state.ts，不在本模块）。 */',
+    +   'src/model/runtime.ts:4428: flow-service @ * 依赖（身份/项目根由注入端绑定；形状单一来源＝编排 `workflow-service.ts` 的',
+    +   'src/model/trunk.ts:36: team-plan @ export type TrunkSource = "adopted" | "post-run-change" | "amendment" | "upgrade" | "bootstrap" | "recovery" | "team-plan";',
+    +   'src/model/trunk.ts:44: team-plan @ "team-plan",',
+    +   'src/model/trunk.ts:547: team-plan @ | "complete-team-plan" | "activate-role-documents" | "close-created-task";',
+    +   'src/model/trunk.ts:549: team-plan @ "version-upgrade", "detail-amendment", "select-run-change", "complete-team-plan",',
+    +   'src/model/trunk.ts:554: team-plan @ "select-run-change": Object.freeze(["rapporteur"]), "complete-team-plan": Object.freeze(["convener"]),',
+    +   'src/pipeline/orchestration/run-role.ts:67: flow-state @ import { canRequestStage, deriveWorkflowView } from "../../common/编排/workflow-state.ts";',
+    +   'src/pipeline/orchestration/run-role.ts:68: flow-service @ // T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。',
+    +   'src/pipeline/orchestration/run-role.ts:70: flow-service @ import type { WorkflowMode } from "../../common/编排/workflow-service.ts";',
+    +   'src/pipeline/orchestration/run-role.ts:92: flow-service @ } from "../../common/编排/workflow-service.ts";',
+    +   'src/pipeline/orchestration/run-role.ts:853: flow-service @ //   · 分支 = `taskBranchName(workflowId)`（`ans/task/<workflowId>`；单一来源 workflow-service）。',
+    +   'src/pipeline/orchestration/trunk-runtime.ts:540: team-plan @ return value.preparationKind === "team-plan-commit" ? await service.commitPreparedTeamPlan(value, commitAuthority) : value.preparationKind === "active-role-commit" ? await service.commitPreparedActivation(value, commitAuthority) : await service.commitPreparedDirect(value, commitAuthority);',
+    +   'src/pipeline/orchestration/trunk-runtime.ts:548: flow-service @ if (!service.prepareInitialWorkflowCommit || !service.prepareDirectAuthority || !service.commitPreparedInitialWorkflow) return fail("initial-workflow-service-unavailable", "Bound initial workflow service is unavailable");',
+    +   'src/pipeline/orchestration/trunk-runtime.ts:625: team-plan @ * X-R4（E2 S4）：convener 模块 `preflight.checkAction("team-plan", …)` 的事实包（api-spec §5.1：',
+    +   'src/pipeline/orchestration/trunk-runtime.ts:645: team-plan @ if (decision.code === "team-plan-path-invalid") {',
+    +   'src/pipeline/orchestration/trunk-runtime.ts:827: team-plan @ // X-R4（E2 S4）：team-plan 角色侧前置——在 abort 之后、Git/Service 最终校验之前调用 convener 模块',
+    +   'src/pipeline/orchestration/trunk-runtime.ts:834: team-plan @ const decision = preflight.checkAction({ action: "team-plan", facts: convenerTeamPlanFacts(request) });',
+    +   'src/provider/trunk/abstract/trunk-store.ts:251: team-plan @ kind: "team-plan-completion"; flowId: string; taskId: string; runId: string; operationId: string;',
+    +   'src/provider/trunk/impl/git-trunk-store.ts:364: team-plan @ if (!work || typeof work !== "object" || !("purpose" in work) || !["team-planning", "builtin-preparation"].includes(String(work.purpose)) || !("planningRunId" in work) || work.planningRunId !== input.runId',
+    +   'src/provider/trunk/impl/git-trunk-store.ts:372: team-plan @ && row.publicationTask.runId === input.runId && row.businessJournal?.actionSource?.kind === "role-direct" && row.businessJournal.actionSource.action === "complete-team-plan"',
+    +   'src/provider/trunk/impl/git-trunk-store.ts:382: team-plan @ if (!planFile || !marker || typeof marker !== "object" || !("schema" in marker) || marker.schema !== "team-plan-completion/v1"',
+    +   'src/provider/trunk/impl/git-trunk-store.ts:388: team-plan @ return { ok: true, value: { basis: { kind: "team-plan-completion", ...input, sourceSha256: source.value.sha256, operationId: journal.operationId,',
+    +   'src/service/trunk/abstract/trunk-service.ts:219: team-plan @ purpose?: "repository-initialization" | "document-preparation" | "team-planning" | "role-preparation" | "builtin-preparation";',
+    +   'src/service/trunk/abstract/trunk-service.ts:346: team-plan @ preparationKind: "team-plan-commit";',
+    +   'src/service/trunk/impl/apply-journal.ts:783: docs/flows/ @ : key === "execution:flow" && new RegExp(`^docs/flows/${input.flowId}\\\\.ya?ml$`).test(ref.path));',
+    +   'src/service/trunk/impl/apply-journal.ts:1139: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Action source belongs to another task purpose/run/actor");',
+    +   'src/service/trunk/impl/apply-journal.ts:1191: team-plan @ if (value.preparationKind === "team-plan-commit" && value.input.runId && value.input.runId !== event.event.runId) return invalid("Plan input run differs from the actual assigned task run");',
+    +   'src/service/trunk/impl/apply-journal.ts:1205: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Publication source belongs to another actual task purpose/run/actor");',
+    +   'src/service/trunk/impl/apply-journal.ts:2253: team-plan @ if (source.kind !== "role-direct" || !["activate-role-documents", "complete-team-plan"].includes(source.action)',
+    +   'src/service/trunk/impl/apply-journal.ts:2272: team-plan @ return invalid("The actual team-plan publication target differs");',
+    +   'src/service/trunk/impl/apply-journal.ts:2518: team-plan @ if (plans.length !== 1) return invalid("Role preparation requires one actual same-flow team-plan task accepted by its original chief creator");',
+    +   'src/service/trunk/impl/apply-journal.ts:2586: team-plan @ if ((value.purpose === "document-preparation" && task.to === "rapporteur") || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+    +   'src/service/trunk/impl/apply-journal.ts:2598: team-plan @ if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+    +   'src/service/trunk/impl/apply-journal.ts:2599: team-plan @ const coordinatedPin = value.purpose === "team-planning" && run.value.value.state === "pinned" ? await readRunEvidence(deps, task.runId!) : undefined;',
+    +   'src/service/trunk/impl/apply-journal.ts:2600: team-plan @ if (task.from !== "chief" || !(value.purpose === "role-preparation" ? task.to === "nominator" : value.purpose === "team-planning" ? task.to === "convener" : ["product", "rapporteur"].includes(task.to)) || value.targetRoleId !== task.to || value.planningRunId !== task.runId',
+    +   'src/service/trunk/impl/apply-journal.ts:2692: team-plan @ if (created.event.from === "chief" && created.event.to === "convener" && workPurpose !== undefined && workPurpose !== "team-planning" && workPurpose !== "builtin-preparation")',
+    +   'src/service/trunk/impl/apply-journal.ts:2693: team-plan @ return invalid("This convener source has no supported initialization or team-planning completion purpose");',
+    +   'src/service/trunk/impl/apply-journal.ts:2702: team-plan @ if (created.event.workSourceRef && created.event.from === "chief" && created.event.to === "convener" && (workPurpose === "team-planning" || hubPlan?.ok)',
+    +   'src/service/trunk/impl/apply-journal.ts:2711: team-plan @ basisDigest = directHash({ kind: "team-plan-completion", planCommit, runSha256: record.value.sha256, materials: materialFiles.map(({ path, sha256 }) => ({ path, sha256 })) });',
+    +   'src/service/trunk/impl/apply-journal.ts:2961: team-plan @ if (prior.value.message !== `team-plan:${requestDigest}` || prior.value.actionSource?.kind !== "role-direct"',
+    +   'src/service/trunk/impl/apply-journal.ts:2962: team-plan @ || prior.value.actionSource.action !== "complete-team-plan" || !prior.value.targetSnapshot) return reject("plan-operation-conflict", "Operation id is already bound to another request");',
+    +   'src/service/trunk/impl/apply-journal.ts:3004: team-plan @ const marker = canonicalJson({ schema: "team-plan-completion/v1", operationId: input.operationId, actorRoleId: actor, flowId: input.flowId,',
+    +   'src/service/trunk/impl/apply-journal.ts:3010: team-plan @ const next: TrunkManifest = { ...current, source: noOp ? current.source : "team-plan", trunkVersion: noOp ? current.trunkVersion : current.trunkVersion + 1,',
+    +   'src/service/trunk/impl/apply-journal.ts:3014: team-plan @ const source: RoleDirectSource = { kind: "role-direct", actorRoleId: actor, action: "complete-team-plan", operationId: input.operationId,',
+    +   'src/service/trunk/impl/apply-journal.ts:3019: team-plan @ journalId: source.journalId!, flowId: input.flowId, phase: "prepared", message: `team-plan:${requestDigest}`, target: { ...target, trunkVersion: next.trunkVersion },',
+    +   'src/service/trunk/impl/apply-journal.ts:3024: team-plan @ return { preparationKind: "team-plan-commit", input: structuredClone(input), actorRoleId: "convener",',
+    +   'src/service/trunk/impl/apply-journal.ts:3110: team-plan @ } else if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+    +   'src/service/trunk/impl/apply-journal.ts:3112: team-plan @ if (event.from !== "chief" || !(value.purpose === "role-preparation" ? event.to === "nominator" : value.purpose === "team-planning" ? event.to === "convener" : ["product", "rapporteur"].includes(event.to)) || value.targetRoleId !== event.to || value.planningRunId !== event.runId || event.runState !== "draft"',
+    +   'src/service/trunk/impl/apply-journal.ts:3123: team-plan @ if (event.to === "rapporteur" || value.purpose === "team-planning" || value.purpose === "role-preparation") {',
+    +   'src/service/trunk/impl/apply-journal.ts:3292: team-plan @ if (!evidenceObject(completed) || completed.schema !== "team-plan-completion/v1" || completed.actorRoleId !== "convener"',
+    +   'src/service/trunk/impl/apply-journal.ts:3297: team-plan @ || planOperation.value.journal.actionSource.action !== "complete-team-plan" || planOperation.value.snapshot.snapshotId !== input.planRef.snapshotId)',
+    +   'src/service/trunk/impl/apply-journal.ts:3732: team-plan @ && operation.actionSource.action === "complete-team-plan" && operation.actionSource.actorRoleId === "convener"',
+    +   'src/service/trunk/impl/apply-journal.ts:3784: team-plan @ *    角色侧策略前置（team-plan/stable-write/requirement-change）由 Pipeline/能力注入层调用，',
+    +   'src/service/trunk/impl/apply-journal.ts:3914: team-plan @ const purpose = rolePreparation ? "role-preparation" : teamPlanning ? "team-planning" : "document-preparation";',
+    +   'app/desktop/customer-input.ts:372: flow-service @ * `merge-main` 卡的应用侧事实（**单一来源 = 编排 `workflow-service.ts::ReleaseMergePreview`**；',
+    +   'app/desktop/session.ts:138: flow-service @ } from "../../src/common/编排/workflow-service.ts";',
+    +   'app/desktop/session.ts:139: flow-state @ import { deriveWorkflowView, canCompleteStage, type WorkflowView } from "../../src/common/编排/workflow-state.ts";',
+    +   'app/desktop/session.ts:141: flow-service @ // 桌面侧薄层：per-flow 模式解析（单一实现仍在编排 workflow-service；本层只委托/注入/常量）。',
+    +   'app/desktop/session.ts:10261: flow-service @ // 应用计算的幂等证据键（stage-request：与 workflow-service 同源 helper；attempt 按账本推导，',
+    +   'app/desktop/workflow-git.ts:32: flow-service @ } from "../../src/common/编排/workflow-service.ts";',
+    +   'app/desktop/workflow-git.ts:39: flow-service @ } from "../../src/common/编排/workflow-service.ts";',
+    +   'app/desktop/workflow-git.ts:87: flow-service @ /** ans-managed `.gitignore` 托管块（条目单一来源 = 编排 `workflow-service.ts::ANS_GITIGNORE_ENTRIES`）。 */',
+    +   'app/desktop/workflow.ts:8: flow-service @ //  · **单一实现 = 编排**：模式判定只读委托 `src/common/编排/workflow-service.ts::workflowMode`',
+    +   'app/desktop/workflow.ts:25: flow-state @ import { canDispatchStage, canRequestStage, deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";',
+    +   'app/desktop/workflow.ts:26: flow-service @ import { appendWorkflowEvent, readWorkflowLedger, recordChangeScopeDecision, recordStageDispatch } from "../../src/common/编排/workflow-service.ts";',
+    +   'app/desktop/workflow.ts:27: flow-service @ import type { PathBWriteSet, WorkflowServiceFailure } from "../../src/common/编排/workflow-service.ts";',
+    +   'app/desktop/workflow.ts:32: flow-service @ } from "../../src/common/编排/workflow-service.ts";'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'src/common/roles/convener/index.ts:296: team-plan @ // 覆盖动作（契约 §3.4 convener 行）：`team-plan` / `git-action` / `stable-write` /'
+    1: 'src/common/roles/convener/index.ts:303: team-plan @ "team-plan",'
+    2: 'src/common/roles/convener/index.ts:462: team-plan @ return deny("facts-unknown", "role.convener.preflight.factsUnknown", { action: "team-plan", key: unknown });'
+    3: 'src/common/roles/convener/index.ts:471: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });'
+    4: 'src/common/roles/convener/index.ts:471: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", { action: "team-plan" });'
+    5: 'src/common/roles/convener/index.ts:481: team-plan @ return deny("team-plan-facts-invalid", "role.convener.preflight.teamPlanFactsInvalid", {'
+    6: 'src/common/roles/convener/index.ts:482: team-plan @ action: "team-plan",'
+    7: 'src/common/roles/convener/index.ts:488: team-plan @ return deny("team-plan-path-invalid", "role.convener.preflight.teamPlanPathInvalid", {'
+    8: 'src/common/roles/convener/index.ts:489: team-plan @ action: "team-plan",'
+    9: 'src/common/roles/convener/index.ts:671: team-plan @ case "team-plan":'
+    10: 'src/common/shared/config-loader.ts:100: flow-service @ * （`workflowMode(projectRoot, flowId)`，`workflow-service.ts` 属主）。本模块只做**载入/校验**，'
+    11: 'src/common/shared/config-loader.ts:101: flow-service @ * 不解释模式、不写回 `.ans/project.json`（写回由编排 workflow-service 原子执行）。'
+    12: 'src/common/编排/doc-format-specs.ts:802: team-plan @ id: "team-plan/v3",'
+    13: 'src/common/编排/doc-format-specs.ts:854: docs/flows/ @ pathPattern: "docs/flows/<flowId>.yaml",'
+    14: 'src/common/编排/doc-format-specs.ts:1477: team-plan @ id: "team-plan-completion/v1",'
+    15: 'src/common/编排/doc-format-specs.ts:1482: team-plan @ schemaLiteral: "team-plan-completion/v1",'
+    16: 'src/common/编排/doc-format-specs.ts:1490: team-plan @ vf("schema", "string", "required", "字面量 team-plan-completion/v1"),'
+    17: 'src/common/编排/doc-format-specs.ts:1527: team-plan @ vf("source", "枚举", "required", "adopted/post-run-change/amendment/upgrade/bootstrap/recovery/team-plan"),'
+    18: 'src/common/编排/project-state.ts:70: flow-service @ } from "./workflow-service.ts";'
+    19: 'src/common/编排/project-state.ts:71: flow-state @ import { deriveWorkflowView, nextStages } from "./workflow-state.ts";'
+    20: 'src/common/编排/workflow-service.ts:1: flow-service @ // src/common/编排/workflow-service.ts'
+    21: 'src/common/编排/workflow-service.ts:81: flow-state @ } from "./workflow-state.ts";'
+    22: 'src/common/编排/workflow-service.ts:2097: team-plan @ return serviceFailure("baseline-team-plan-invalid", "团队计划路径非法（须项目相对 docs/scheduling/<flowId>-team-vN.md）。");'
+    23: 'src/common/编排/workflow-service.ts:2102: team-plan @ return serviceFailure("baseline-team-plan-invalid", `团队计划路径须为 docs/scheduling/${flowId}-team-vN.md：${input.planPath}。`);'
+    24: 'src/common/编排/workflow-service.ts:2137: team-plan @ if (!parsed.ok) return serviceFailure("baseline-team-plan-invalid", parsed.reason);'
+    25: 'src/common/编排/workflow-service.ts:2145: team-plan @ return serviceFailure("baseline-team-plan-invalid", "团队计划发现结果与入参不一致（plan path/version drift）。");'
+    26: 'src/common/编排/workflow-service.ts:2205: team-plan @ ...(read.teamPlan !== undefined ? [{ path: read.teamPlan.path, sha256: read.teamPlan.sha256, kind: "team-plan" }] : []),'
+    27: 'src/common/编排/workflow-service.ts:3916: team-plan @ return fail(serviceFailure("baseline-team-plan-invalid", "plan.path 非法（须项目相对 docs/scheduling/<flowId>-team-vN.md）。"));'
+    28: 'src/common/编排/workflow-service.ts:3941: team-plan @ return serviceFailure("baseline-team-plan-invalid", "团队计划发现结果缺失（baseline 必须记录 teamPlan）。");'
+    29: 'src/common/编排/workflow-state.ts:1: flow-state @ // src/common/编排/workflow-state.ts'
+    30: 'src/common/编排/workflow-state.ts:17: flow-service @ // 阶段完成的 artifact/hash/角色激活齐全等**应用事实**由 `workflow-service` 在写事件前校验；'
+    31: 'src/common/编排/workflow-state.ts:427: flow-service @ * 写事件前的纯校验（`workflow-service` 复用同一谓词；不读取/不写账本）：'
+    32: 'src/common/门禁引擎/classify-shell.ts:582: team-plan @ || (pub.action === "complete-team-plan" && f.actorRoleId === "convener")), "git-policy-business-source");'
+    33: 'src/common/门禁引擎/classify-shell.ts:583: team-plan @ const teamPlan = pub.action === "complete-team-plan";'
+    34: 'src/common/门禁引擎/classify-shell.ts:653: team-plan @ : manifest.source === "team-plan" && manifest.digest !== previous.digest'
+    35: 'src/common/门禁引擎/classify-shell.ts:656: team-plan @ const marker = { schema: "team-plan-completion/v1", operationId: f.operationId, actorRoleId: "convener", flowId: pub.flowId,'
+    36: 'src/common/门禁引擎/classify-shell.ts:710: docs/flows/ @ policyRequire((kind === "teamPlan" ? file.startsWith("docs/scheduling/") : file.startsWith("docs/flows/"))'
+    37: 'src/model/role.ts:357: team-plan @ | "team-plan"'
+    38: 'src/model/runtime.ts:1953: flow-state @ // 形状单一来源＝本模块：编排 `workflow-state.ts`/`workflow-service.ts`/`basis-guard.ts` 与桌面路由'
+    39: 'src/model/runtime.ts:1953: flow-service @ // 形状单一来源＝本模块：编排 `workflow-state.ts`/`workflow-service.ts`/`basis-guard.ts` 与桌面路由'
+    40: 'src/model/runtime.ts:1977: flow-state @ /** 阶段投影状态（v1.3 §4.1；投影实现属编排 workflow-state.ts，不在本模块）。 */'
+    41: 'src/model/runtime.ts:4428: flow-service @ * 依赖（身份/项目根由注入端绑定；形状单一来源＝编排 `workflow-service.ts` 的'
+    42: 'src/model/trunk.ts:36: team-plan @ export type TrunkSource = "adopted" | "post-run-change" | "amendment" | "upgrade" | "bootstrap" | "recovery" | "team-plan";'
+    43: 'src/model/trunk.ts:44: team-plan @ "team-plan",'
+    44: 'src/model/trunk.ts:547: team-plan @ | "complete-team-plan" | "activate-role-documents" | "close-created-task";'
+    45: 'src/model/trunk.ts:549: team-plan @ "version-upgrade", "detail-amendment", "select-run-change", "complete-team-plan",'
+    46: 'src/model/trunk.ts:554: team-plan @ "select-run-change": Object.freeze(["rapporteur"]), "complete-team-plan": Object.freeze(["convener"]),'
+    47: 'src/pipeline/orchestration/run-role.ts:67: flow-state @ import { canRequestStage, deriveWorkflowView } from "../../common/编排/workflow-state.ts";'
+    48: 'src/pipeline/orchestration/run-role.ts:68: flow-service @ // T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。'
+    49: 'src/pipeline/orchestration/run-role.ts:70: flow-service @ import type { WorkflowMode } from "../../common/编排/workflow-service.ts";'
+    50: 'src/pipeline/orchestration/run-role.ts:92: flow-service @ } from "../../common/编排/workflow-service.ts";'
+    51: 'src/pipeline/orchestration/run-role.ts:853: flow-service @ //   · 分支 = `taskBranchName(workflowId)`（`ans/task/<workflowId>`；单一来源 workflow-service）。'
+    52: 'src/pipeline/orchestration/trunk-runtime.ts:540: team-plan @ return value.preparationKind === "team-plan-commit" ? await service.commitPreparedTeamPlan(value, commitAuthority) : value.preparationKind === "active-role-commit" ? await service.commitPreparedActivation(value, commitAuthority) : await service.commitPreparedDirect(value, commitAuthority);'
+    53: 'src/pipeline/orchestration/trunk-runtime.ts:548: flow-service @ if (!service.prepareInitialWorkflowCommit || !service.prepareDirectAuthority || !service.commitPreparedInitialWorkflow) return fail("initial-workflow-service-unavailable", "Bound initial workflow service is unavailable");'
+    54: 'src/pipeline/orchestration/trunk-runtime.ts:625: team-plan @ * X-R4（E2 S4）：convener 模块 `preflight.checkAction("team-plan", …)` 的事实包（api-spec §5.1：'
+    55: 'src/pipeline/orchestration/trunk-runtime.ts:645: team-plan @ if (decision.code === "team-plan-path-invalid") {'
+    56: 'src/pipeline/orchestration/trunk-runtime.ts:827: team-plan @ // X-R4（E2 S4）：team-plan 角色侧前置——在 abort 之后、Git/Service 最终校验之前调用 convener 模块'
+    57: 'src/pipeline/orchestration/trunk-runtime.ts:834: team-plan @ const decision = preflight.checkAction({ action: "team-plan", facts: convenerTeamPlanFacts(request) });'
+    58: 'src/provider/trunk/abstract/trunk-store.ts:251: team-plan @ kind: "team-plan-completion"; flowId: string; taskId: string; runId: string; operationId: string;'
+    59: 'src/provider/trunk/impl/git-trunk-store.ts:364: team-plan @ if (!work || typeof work !== "object" || !("purpose" in work) || !["team-planning", "builtin-preparation"].includes(String(work.purpose)) || !("planningRunId" in work) || work.planningRunId !== input.runId'
+    60: 'src/provider/trunk/impl/git-trunk-store.ts:372: team-plan @ && row.publicationTask.runId === input.runId && row.businessJournal?.actionSource?.kind === "role-direct" && row.businessJournal.actionSource.action === "complete-team-plan"'
+    61: 'src/provider/trunk/impl/git-trunk-store.ts:382: team-plan @ if (!planFile || !marker || typeof marker !== "object" || !("schema" in marker) || marker.schema !== "team-plan-completion/v1"'
+    62: 'src/provider/trunk/impl/git-trunk-store.ts:388: team-plan @ return { ok: true, value: { basis: { kind: "team-plan-completion", ...input, sourceSha256: source.value.sha256, operationId: journal.operationId,'
+    63: 'src/service/trunk/abstract/trunk-service.ts:219: team-plan @ purpose?: "repository-initialization" | "document-preparation" | "team-planning" | "role-preparation" | "builtin-preparation";'
+    64: 'src/service/trunk/abstract/trunk-service.ts:346: team-plan @ preparationKind: "team-plan-commit";'
+    65: 'src/service/trunk/impl/apply-journal.ts:783: docs/flows/ @ : key === "execution:flow" && new RegExp(`^docs/flows/${input.flowId}\\\\.ya?ml$`).test(ref.path));'
+    66: 'src/service/trunk/impl/apply-journal.ts:1139: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Action source belongs to another task purpose/run/actor");'
+    67: 'src/service/trunk/impl/apply-journal.ts:1191: team-plan @ if (value.preparationKind === "team-plan-commit" && value.input.runId && value.input.runId !== event.event.runId) return invalid("Plan input run differs from the actual assigned task run");'
+    68: 'src/service/trunk/impl/apply-journal.ts:1205: team-plan @ || !["builtin-preparation", "document-preparation", "team-planning", "role-preparation"].includes(String(source.purpose)))) return invalid("Publication source belongs to another actual task purpose/run/actor");'
+    69: 'src/service/trunk/impl/apply-journal.ts:2253: team-plan @ if (source.kind !== "role-direct" || !["activate-role-documents", "complete-team-plan"].includes(source.action)'
+    70: 'src/service/trunk/impl/apply-journal.ts:2272: team-plan @ return invalid("The actual team-plan publication target differs");'
+    71: 'src/service/trunk/impl/apply-journal.ts:2518: team-plan @ if (plans.length !== 1) return invalid("Role preparation requires one actual same-flow team-plan task accepted by its original chief creator");'
+    72: 'src/service/trunk/impl/apply-journal.ts:2586: team-plan @ if ((value.purpose === "document-preparation" && task.to === "rapporteur") || value.purpose === "team-planning" || value.purpose === "role-preparation") {'
+    73: 'src/service/trunk/impl/apply-journal.ts:2598: team-plan @ if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {'
+    74: 'src/service/trunk/impl/apply-journal.ts:2599: team-plan @ const coordinatedPin = value.purpose === "team-planning" && run.value.value.state === "pinned" ? await readRunEvidence(deps, task.runId!) : undefined;'
+    75: 'src/service/trunk/impl/apply-journal.ts:2600: team-plan @ if (task.from !== "chief" || !(value.purpose === "role-preparation" ? task.to === "nominator" : value.purpose === "team-planning" ? task.to === "convener" : ["product", "rapporteur"].includes(task.to)) || value.targetRoleId !== task.to || value.planningRunId !== task.runId'
+    76: 'src/service/trunk/impl/apply-journal.ts:2692: team-plan @ if (created.event.from === "chief" && created.event.to === "convener" && workPurpose !== undefined && workPurpose !== "team-planning" && workPurpose !== "builtin-preparation")'
+    77: 'src/service/trunk/impl/apply-journal.ts:2693: team-plan @ return invalid("This convener source has no supported initialization or team-planning completion purpose");'
+    78: 'src/service/trunk/impl/apply-journal.ts:2702: team-plan @ if (created.event.workSourceRef && created.event.from === "chief" && created.event.to === "convener" && (workPurpose === "team-planning" || hubPlan?.ok)'
+    79: 'src/service/trunk/impl/apply-journal.ts:2711: team-plan @ basisDigest = directHash({ kind: "team-plan-completion", planCommit, runSha256: record.value.sha256, materials: materialFiles.map(({ path, sha256 }) => ({ path, sha256 })) });'
+    80: 'src/service/trunk/impl/apply-journal.ts:2961: team-plan @ if (prior.value.message !== `team-plan:${requestDigest}` || prior.value.actionSource?.kind !== "role-direct"'
+    81: 'src/service/trunk/impl/apply-journal.ts:2962: team-plan @ || prior.value.actionSource.action !== "complete-team-plan" || !prior.value.targetSnapshot) return reject("plan-operation-conflict", "Operation id is already bound to another request");'
+    82: 'src/service/trunk/impl/apply-journal.ts:3004: team-plan @ const marker = canonicalJson({ schema: "team-plan-completion/v1", operationId: input.operationId, actorRoleId: actor, flowId: input.flowId,'
+    83: 'src/service/trunk/impl/apply-journal.ts:3010: team-plan @ const next: TrunkManifest = { ...current, source: noOp ? current.source : "team-plan", trunkVersion: noOp ? current.trunkVersion : current.trunkVersion + 1,'
+    84: 'src/service/trunk/impl/apply-journal.ts:3014: team-plan @ const source: RoleDirectSource = { kind: "role-direct", actorRoleId: actor, action: "complete-team-plan", operationId: input.operationId,'
+    85: 'src/service/trunk/impl/apply-journal.ts:3019: team-plan @ journalId: source.journalId!, flowId: input.flowId, phase: "prepared", message: `team-plan:${requestDigest}`, target: { ...target, trunkVersion: next.trunkVersion },'
+    86: 'src/service/trunk/impl/apply-journal.ts:3024: team-plan @ return { preparationKind: "team-plan-commit", input: structuredClone(input), actorRoleId: "convener",'
+    87: 'src/service/trunk/impl/apply-journal.ts:3110: team-plan @ } else if (value.purpose === "document-preparation" || value.purpose === "team-planning" || value.purpose === "role-preparation") {'
+    88: 'src/service/trunk/impl/apply-journal.ts:3112: team-plan @ if (event.from !== "chief" || !(value.purpose === "role-preparation" ? event.to === "nominator" : value.purpose === "team-planning" ? event.to === "convener" : ["product", "rapporteur"].includes(event.to)) || value.targetRoleId !== event.to || value.planningRunId !== event.runId || event.runState !== "draft"'
+    89: 'src/service/trunk/impl/apply-journal.ts:3123: team-plan @ if (event.to === "rapporteur" || value.purpose === "team-planning" || value.purpose === "role-preparation") {'
+    90: 'src/service/trunk/impl/apply-journal.ts:3292: team-plan @ if (!evidenceObject(completed) || completed.schema !== "team-plan-completion/v1" || completed.actorRoleId !== "convener"'
+    91: 'src/service/trunk/impl/apply-journal.ts:3297: team-plan @ || planOperation.value.journal.actionSource.action !== "complete-team-plan" || planOperation.value.snapshot.snapshotId !== input.planRef.snapshotId)'
+    92: 'src/service/trunk/impl/apply-journal.ts:3732: team-plan @ && operation.actionSource.action === "complete-team-plan" && operation.actionSource.actorRoleId === "convener"'
+    93: 'src/service/trunk/impl/apply-journal.ts:3784: team-plan @ *    角色侧策略前置（team-plan/stable-write/requirement-change）由 Pipeline/能力注入层调用，'
+    94: 'src/service/trunk/impl/apply-journal.ts:3914: team-plan @ const purpose = rolePreparation ? "role-preparation" : teamPlanning ? "team-planning" : "document-preparation";'
+    95: 'app/desktop/customer-input.ts:372: flow-service @ * `merge-main` 卡的应用侧事实（**单一来源 = 编排 `workflow-service.ts::ReleaseMergePreview`**；'
+    96: 'app/desktop/session.ts:138: flow-service @ } from "../../src/common/编排/workflow-service.ts";'
+    97: 'app/desktop/session.ts:139: flow-state @ import { deriveWorkflowView, canCompleteStage, type WorkflowView } from "../../src/common/编排/workflow-state.ts";'
+    98: 'app/desktop/session.ts:141: flow-service @ // 桌面侧薄层：per-flow 模式解析（单一实现仍在编排 workflow-service；本层只委托/注入/常量）。'
+    99: 'app/desktop/session.ts:10261: flow-service @ // 应用计算的幂等证据键（stage-request：与 workflow-service 同源 helper；attempt 按账本推导，'
+    100: 'app/desktop/workflow-git.ts:32: flow-service @ } from "../../src/common/编排/workflow-service.ts";'
+    101: 'app/desktop/workflow-git.ts:39: flow-service @ } from "../../src/common/编排/workflow-service.ts";'
+    102: 'app/desktop/workflow-git.ts:87: flow-service @ /** ans-managed `.gitignore` 托管块（条目单一来源 = 编排 `workflow-service.ts::ANS_GITIGNORE_ENTRIES`）。 */'
+    103: 'app/desktop/workflow.ts:8: flow-service @ //  · **单一实现 = 编排**：模式判定只读委托 `src/common/编排/workflow-service.ts::workflowMode`'
+    104: 'app/desktop/workflow.ts:25: flow-state @ import { canDispatchStage, canRequestStage, deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";'
+    105: 'app/desktop/workflow.ts:26: flow-service @ import { appendWorkflowEvent, readWorkflowLedger, recordChangeScopeDecision, recordStageDispatch } from "../../src/common/编排/workflow-service.ts";'
+    106: 'app/desktop/workflow.ts:27: flow-service @ import type { PathBWriteSet, WorkflowServiceFailure } from "../../src/common/编排/workflow-service.ts";'
+    107: 'app/desktop/workflow.ts:32: flow-service @ } from "../../src/common/编排/workflow-service.ts";'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/entry-role-minimal-d.test.ts:262:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D-03/D-10：强制工程质量/证据基线常量与文本不得存在
+ok 6 - D-03/D-10：强制工程质量/证据基线常量与文本不得存在
+  ---
+  duration_ms: 36.5551
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 334.6266

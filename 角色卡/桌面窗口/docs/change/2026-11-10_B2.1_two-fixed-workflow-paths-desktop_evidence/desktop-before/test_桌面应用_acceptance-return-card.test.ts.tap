@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: 正常文件：ctx/presenter payload 为 16 KiB 投影，选项/作答路径不变，任务账本无展示正文
+ok 1 - 正常文件：ctx/presenter payload 为 16 KiB 投影，选项/作答路径不变，任务账本无展示正文
+  ---
+  duration_ms: 166.858
+  type: 'test'
+  ...
+# Subtest: >16 KiB：投影为 UTF-8 前缀且 truncated=true，原文件不改写
+ok 2 - >16 KiB：投影为 UTF-8 前缀且 truncated=true，原文件不改写
+  ---
+  duration_ms: 95.2451
+  type: 'test'
+  ...
+# Subtest: 净化：测试注入的伪凭据值被替换且 redacted=true，不泄漏明文
+ok 3 - 净化：测试注入的伪凭据值被替换且 redacted=true，不泄漏明文
+  ---
+  duration_ms: 109.4815
+  type: 'test'
+  ...
+# Subtest: 空文件：无 acceptanceReport，preview 保留，卡仍可作答
+ok 4 - 空文件：无 acceptanceReport，preview 保留，卡仍可作答
+  ---
+  duration_ms: 93.7801
+  type: 'test'
+  ...
+# Subtest: 缺失文件：无 acceptanceReport，preview 保留，卡仍可作答
+ok 5 - 缺失文件：无 acceptanceReport，preview 保留，卡仍可作答
+  ---
+  duration_ms: 96.5309
+  type: 'test'
+  ...
+# Subtest: 不可读（报告路径为目录/EISDIR）：无 acceptanceReport，不抛错，卡仍可作答
+ok 6 - 不可读（报告路径为目录/EISDIR）：无 acceptanceReport，不抛错，卡仍可作答
+  ---
+  duration_ms: 116.8859
+  type: 'test'
+  ...
+# Subtest: 无 flowId（P1-ARC-04）：不构造/不读取 docs/quality，judgeContext 不新增报告路径，preview 与作答不变
+ok 7 - 无 flowId（P1-ARC-04）：不构造/不读取 docs/quality，judgeContext 不新增报告路径，preview 与作答不变
+  ---
+  duration_ms: 84.6647
+  type: 'test'
+  ...
+# Subtest: 非法 flowId：不越界读取，facts/artifacts 不含报告路径，unavailableReason fail-closed
+ok 8 - 非法 flowId：不越界读取，facts/artifacts 不含报告路径，unavailableReason fail-closed
+  ---
+  duration_ms: 123.8282
+  type: 'test'
+  ...
+# Subtest: 旧 payload（channel 级）：无 acceptanceReport 字段，preview 保留，卡仍可作答（P1-ARC-05）
+ok 9 - 旧 payload（channel 级）：无 acceptanceReport 字段，preview 保留，卡仍可作答（P1-ARC-05）
+  ---
+  duration_ms: 0.706
+  type: 'test'
+  ...
+# Subtest: 诊断只记白名单元数据：不写报告正文/凭据，成功时 state 编码 flags
+ok 10 - 诊断只记白名单元数据：不写报告正文/凭据，成功时 state 编码 flags
+  ---
+  duration_ms: 125.7482
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1429.0907

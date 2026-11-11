@@ -1,0 +1,230 @@
+{
+  "at": "2026-11-11T00:59:34.279Z",
+  "stopCause": "gate:shell-confirm-card",
+  "gate": {
+    "kind": "shell-confirm-card",
+    "title": "命令审批 · 运营",
+    "command": "python --version"
+  },
+  "workflowStarted": {
+    "at": "2026-11-11T00:59:27.427Z",
+    "workflowId": "wf-c9619b75a46cb06facfb16ca",
+    "flowId": "snake-game",
+    "path": "A",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "idempotencyKey": "workflow-start:snake-game:A:b222b9ab-8090-4ec0-87e0-4da216752094"
+  },
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 0,
+    "cardsByKind": {},
+    "dispatches": 1,
+    "dispatchesByFrom": {
+      "chief": 1
+    },
+    "tasksByTo": {
+      "convener": 1
+    },
+    "writeTasks": 0,
+    "implementationWriteTasks": 0,
+    "turnsByRole": {
+      "chief": 1,
+      "convener": 1
+    }
+  },
+  "summary": {
+    "stages": {
+      "A1": {
+        "stage.requested": "2026-11-11T00:59:27.427Z",
+        "status": "requested"
+      }
+    },
+    "milestones": [
+      {
+        "at": "2026-11-11T00:59:17.346Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T00:59:27.432Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbevpz7-e8b6bb93",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-c9619b75a46cb06facfb16ca",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-11T00:59:27.427Z",
+        "milestone": "workflow-started",
+        "workflowId": "wf-c9619b75a46cb06facfb16ca",
+        "flowId": "snake-game",
+        "path": "A"
+      }
+    ]
+  },
+  "git": {
+    "branch": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "head": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "log": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "status": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "branches": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "tags": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "remotes": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "mainLog": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n"
+  },
+  "docs": {
+    "docs": [
+      {
+        "rel": "docs/audit",
+        "dir": true
+      },
+      {
+        "rel": "docs/audit/shell-gate.jsonl",
+        "bytes": 894,
+        "sha256": "6844234ac6f0e2ab9fa4d0d60223ee59be4de8bfe4eb0fda27333450679c5480"
+      }
+    ]
+  },
+  "topLevel": [
+    ".ans",
+    "docs"
+  ],
+  "sessions": {
+    "chief": {
+      "bytes": 10413
+    },
+    "convener": {
+      "bytes": 12258
+    }
+  },
+  "ports": {
+    "lines9222": [],
+    "lines9223": [],
+    "lines9224": [
+      "  TCP    127.0.0.1:9224         0.0.0.0:0              LISTENING       4072",
+      "  TCP    127.0.0.1:9224         127.0.0.1:53602        ESTABLISHED     4072",
+      "  TCP    127.0.0.1:53591        127.0.0.1:9224         TIME_WAIT       0",
+      "  TCP    127.0.0.1:53601        127.0.0.1:9224         TIME_WAIT       0",
+      "  TCP    127.0.0.1:53602        127.0.0.1:9224         ESTABLISHED     60564"
+    ]
+  },
+  "oldRunRootPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+    "exists": true,
+    "entries": [
+      {
+        "name": "evidence",
+        "mtime": 1794247136435.3418
+      },
+      {
+        "name": "round10",
+        "mtime": 1794248323109.7388
+      },
+      {
+        "name": "round11",
+        "mtime": 1794248959545.2583
+      },
+      {
+        "name": "round12",
+        "mtime": 1794249232305.3015
+      },
+      {
+        "name": "round13",
+        "mtime": 1794249490950.5813
+      },
+      {
+        "name": "round14",
+        "mtime": 1794249732100.8677
+      },
+      {
+        "name": "round15",
+        "mtime": 1794249988039.9426
+      },
+      {
+        "name": "round16",
+        "mtime": 1794250169724.0994
+      },
+      {
+        "name": "round17",
+        "mtime": 1794250566337.3135
+      },
+      {
+        "name": "round18",
+        "mtime": 1794252829477.4497
+      },
+      {
+        "name": "round19",
+        "mtime": 1794253209658.652
+      },
+      {
+        "name": "round20",
+        "mtime": 1794261345627.0393
+      },
+      {
+        "name": "round21",
+        "mtime": 1794261805971.9543
+      },
+      {
+        "name": "round22",
+        "mtime": 1794262253668.7983
+      },
+      {
+        "name": "round23",
+        "mtime": 1794262693084.7214
+      },
+      {
+        "name": "round24",
+        "mtime": 1794263327768.893
+      },
+      {
+        "name": "round25",
+        "mtime": 1794264715770.8784
+      },
+      {
+        "name": "round26",
+        "mtime": 1794265159753.918
+      },
+      {
+        "name": "round8",
+        "mtime": 1794247470341.858
+      },
+      {
+        "name": "round9",
+        "mtime": 1794247940931.3174
+      },
+      {
+        "name": "rr",
+        "mtime": 1794247132796.088
+      },
+      {
+        "name": "userData",
+        "mtime": 1794246925742.7854
+      }
+    ]
+  },
+  "oldSnakeTargetPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+    "exists": true,
+    "entries": [
+      {
+        "name": "target",
+        "mtime": 1794192309257.867
+      }
+    ]
+  },
+  "oldRootsUntouched": {
+    "runRoot": false,
+    "snakeTarget": false
+  },
+  "turns": {
+    "chief": 1,
+    "convener": 1
+  }
+}

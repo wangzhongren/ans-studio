@@ -1,0 +1,7 @@
+ M src/common/门禁引擎/classify-shell.ts
+ M src/common/门禁引擎/shell-write-guard.ts
+ M test/门禁引擎/classify-shell.test.ts
+ M test/门禁引擎/readonly-git-matcher.test.ts
+?? src/common/门禁引擎/task-git-gate.ts
+?? test/门禁引擎/classify-shell-v5.test.ts
+?? test/门禁引擎/task-git-critical-section.test.ts

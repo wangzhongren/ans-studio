@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: 三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code
+ok 1 - 三段式：missing/action/owner/docs/retryable 齐备；客户人话不含技术 code
+  ---
+  duration_ms: 0.9885
+  type: 'test'
+  ...
+# Subtest: BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因
+ok 2 - BUG-4（B1）：D3 缺卡降级为 advisory；硬 target-card-missing 覆盖 id/写卡两种原因
+  ---
+  duration_ms: 0.5041
+  type: 'test'
+  ...
+# Subtest: BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试）
+ok 3 - BUG-3：真实 appointment-write 判断路径返回 appointment-write-root-missing（owner=app，可重试）
+  ---
+  duration_ms: 0.7484
+  type: 'test'
+  ...
+# Subtest: code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc）
+ok 4 - code→owner 表覆盖高频拒绝点（run/roster/module/appointment/shell/versioned-doc）
+  ---
+  duration_ms: 0.1852
+  type: 'test'
+  ...
+# Subtest: contract_check 工具：只读、按角色裁剪、≤4KB、缺失数据如实报错
+ok 5 - contract_check 工具：只读、按角色裁剪、≤4KB、缺失数据如实报错
+  ---
+  duration_ms: 1.8717
+  type: 'test'
+  ...
+# Subtest: contract_check 输出超长由工具层截断到 4KB 内
+ok 6 - contract_check 输出超长由工具层截断到 4KB 内
+  ---
+  duration_ms: 0.3631
+  type: 'test'
+  ...
+# Subtest: contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02）
+ok 7 - contract_check topic 输出超长由工具层截断：topic 专用标记、不含 run manifest（P1-CSQ-02）
+  ---
+  duration_ms: 0.2105
+  type: 'test'
+  ...
+# Subtest: contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07）
+ok 8 - contract_check topic：三 topic 透传、≤4096 B、含 schema 标识、无 taskKind 字样（AC-3/4/8；P1-CSQ-07）
+  ---
+  duration_ms: 0.2814
+  type: 'test'
+  ...
+# Subtest: contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6）
+ok 9 - contract_check topic：未知/非字符串拒绝且不调用数据源（AC-5/6）
+  ---
+  duration_ms: 0.2098
+  type: 'test'
+  ...
+# Subtest: contract_check topic：null/空串/空白串走 legacy（AC-16）
+ok 10 - contract_check topic：null/空串/空白串走 legacy（AC-16）
+  ---
+  duration_ms: 0.3265
+  type: 'test'
+  ...
+# Subtest: contract_check topic：角色隔离先于 topic（AC-7）
+ok 11 - contract_check topic：角色隔离先于 topic（AC-7）
+  ---
+  duration_ms: 0.1462
+  type: 'test'
+  ...
+# Subtest: contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8）
+ok 12 - contract_check topic：topic + flowId + taskKind 并存时 topic 优先、输出仅 schema（AC-8）
+  ---
+  duration_ms: 0.2886
+  type: 'test'
+  ...
+# Subtest: contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9）
+ok 13 - contract_check 工具描述：topic enum 恰为三值、required 不含 topic（K1.9）
+  ---
+  duration_ms: 0.0701
+  type: 'test'
+  ...
+# Subtest: 旧 code 别名可读：canonical code + legacyCode 保留
+ok 14 - 旧 code 别名可读：canonical code + legacyCode 保留
+  ---
+  duration_ms: 0.1223
+  type: 'test'
+  ...
+# Subtest: 真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段）
+ok 15 - 真实 shell 写目标拒绝：reason 三段式 + owner + 技术 code（保留 kind/targets 旧字段）
+  ---
+  duration_ms: 0.7492
+  type: 'test'
+  ...
+# Subtest: 真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code
+ok 16 - 真实 versioned-doc 拒绝：allowed=false 带三段式与 versioned-doc-overwrite code
+  ---
+  duration_ms: 0.2383
+  type: 'test'
+  ...
+# Subtest: F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留
+ok 17 - F1 真实写门禁：resolveWrite → write_file 前置回执三段式，旧文案/零写入保留
+  ---
+  duration_ms: 5.6976
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 255.9016

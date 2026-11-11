@@ -1,0 +1,10 @@
+{
+  "turns": {
+    "chief": 1,
+    "product": 1
+  },
+  "customerMessages": 1,
+  "cardsTotal": 0,
+  "dispatches": 1,
+  "note": "app replay/diagnostics captured no token/cost fields; no .env read"
+}

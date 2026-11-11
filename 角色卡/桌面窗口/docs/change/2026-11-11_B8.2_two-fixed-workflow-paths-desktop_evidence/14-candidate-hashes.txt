@@ -1,0 +1,10 @@
+# 候选 hash（写集文件 + 记录；bytes/lines/sha256；记录终版）
+app/desktop/session.ts | bytes=853263 | lines=13306 | sha256=ba2a9bb678d597ac07cb21eb07ca5c0c5604a89982aafdaf09a236debc9f12d0
+test/桌面应用/b82-fixed-workflow-binding-handback.test.ts | bytes=42843 | lines=777 | sha256=46f938af51d969aded091cb796763207cadbcad66842e8fb29c2465fb695e5ab
+角色卡/桌面窗口/docs/change/2026-11-11_B8.2_two-fixed-workflow-paths-desktop.md | bytes=20695 | lines=241 | sha256=dda72a2c5f1af7e5a8a5892e0dd33580228d57341453817f33a4ca38be544792
+
+# git diff --numstat（写集）
+215	39	app/desktop/session.ts
+
+# 聚合 sha256（上述三行 sha256 排序后拼接再 hash）
+c40e943d770b548e325213ba817c997dc795251f86aee95f2b7cde6657128edb

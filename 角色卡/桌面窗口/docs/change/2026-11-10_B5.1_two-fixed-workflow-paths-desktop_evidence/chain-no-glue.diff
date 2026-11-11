@@ -1,0 +1,105 @@
+--- "test/\346\265\213\350\257\225/fixed-path-full-chain.test.ts"	2026-11-10 20:08:05.459638600 +0800
++++ .tmp-b51/sub/chain-no-glue.test.ts	2026-11-10 21:03:11.521037600 +0800
+@@ -454,8 +454,6 @@
+     releaseSource(h.mgr, convenerLive);
+     assert.equal(a1Product.ok, true, a1Product.message ?? "");
+     const a1Task = await findTask(root, (record) => record.created?.workflowId === WF && record.created.stage === "A1" && record.created.to === "product");
+-    const a1DispatchRecord = await recordStageDispatch({ projectRoot: root, workflowId: WF, stage: "A1", taskId: a1Task.taskId, targetRoleId: "product" });
+-    assert.equal(a1DispatchRecord.ok, true, a1DispatchRecord.ok === false ? a1DispatchRecord.message : "");
+     assert.equal((await view(root, WF)).stages.A1.status, "completed", "A1 完成于目标任务创建（stage.dispatched）");
+     await reportDone(root, a1Task.taskId, "product", "A1 受理");
+     const a1Closed = await closeTaskViaDesktop(convener, { operationId: "op-close-a1-ack", taskId: a1Task.taskId });
+@@ -533,8 +531,6 @@
+     releaseSource(h.mgr, convenerLive);
+     assert.equal(a4Rapporteur.ok, true, a4Rapporteur.message ?? "");
+     const a4Task = await findTask(root, (record) => record.created?.workflowId === WF && record.created.stage === "A4" && record.created.to === "rapporteur");
+-    const a4DispatchRecord = await recordStageDispatch({ projectRoot: root, workflowId: WF, stage: "A4", taskId: a4Task.taskId, targetRoleId: "rapporteur" });
+-    assert.equal(a4DispatchRecord.ok, true);
+     await reportDone(root, a4Task.taskId, "rapporteur", "A4 受理");
+     const a4Closed = await closeTaskViaDesktop(convener, { operationId: "op-close-a4-ack", taskId: a4Task.taskId });
+     assert.equal(a4Closed.ok, true);
+@@ -566,15 +562,7 @@
+     await closeStageRequest(h, root, chief, "A5", "A5 完成");
+ 
+     // 6) A6：方案卡（客户 accept）——宿主按 run-role A10 同构写 A6 在办标记（G-B5-3），桌面绑定五件 documentRefs。
+-    const a6Marker = {
+-      v: 1 as const, at: new Date(AT).toISOString(), schema: "ans-workflow/v1" as const, kind: "stage.requested" as const,
+-      workflowId: WF, flowId: FLOW, path: "A" as const,
+-      idempotencyKey: `stage-request:${WF}:A6:1`, stage: "A6" as const, fromStage: "A5" as const,
+-      requestTaskId: `proposal-card:${FLOW}`, requestDigest: sha("proposal-card"), attempt: 1,
+-    };
+     const { appendWorkflowEvent } = await import("../../src/common/编排/workflow-service.ts");
+-    const a6Appended = await appendWorkflowEvent(root, a6Marker as WorkflowEvent);
+-    assert.equal(a6Appended.ok, true);
+     const proposalOutcome = await chief.customerInput!({
+       kind: "choice", title: "确认方案", cardKind: "proposal", flowId: FLOW,
+       options: [{ id: "accept", label: "接受" }, { id: "revise", label: "修订" }, { id: "reject", label: "拒绝" }],
+@@ -604,8 +592,6 @@
+     releaseSource(h.mgr, convenerLive);
+     assert.equal(a7Nominator.ok, true, a7Nominator.message ?? "");
+     const a7Task = await findTask(root, (record) => record.created?.workflowId === WF && record.created.stage === "A7" && record.created.to === "nominator");
+-    const a7DispatchRecord = await recordStageDispatch({ projectRoot: root, workflowId: WF, stage: "A7", taskId: a7Task.taskId, targetRoleId: "nominator" });
+-    assert.equal(a7DispatchRecord.ok, true);
+     await reportDone(root, a7Task.taskId, "nominator", "A7 受理");
+     const a7Closed = await closeTaskViaDesktop(convener, { operationId: "op-close-a7-ack", taskId: a7Task.taskId });
+     assert.equal(a7Closed.ok, true);
+@@ -617,8 +603,6 @@
+     releaseSource(h.mgr, convenerLive);
+     assert.equal(a8Nominator.ok, true, a8Nominator.message ?? "");
+     const a8Task = await findTask(root, (record) => record.created?.workflowId === WF && record.created.stage === "A8" && record.created.to === "nominator");
+-    const a8DispatchRecord = await recordStageDispatch({ projectRoot: root, workflowId: WF, stage: "A8", taskId: a8Task.taskId, targetRoleId: "nominator" });
+-    assert.equal(a8DispatchRecord.ok, true);
+     const roleDocs = await writeRoleDocuments(root);
+     const proposalResolved = (await readTaskState(root)).events.find((event) => event.kind === "request.resolved" && event.cardKind === "proposal");
+     assert.ok(proposalResolved !== undefined && proposalResolved.kind === "request.resolved" && proposalResolved.decisionId !== undefined);
+@@ -719,8 +703,6 @@
+     releaseSource(h.mgr, live);
+     assert.equal(a12aDispatch.ok, true, a12aDispatch.message ?? "");
+     const a12aTask = await findTask(root, (record) => record.created?.workflowId === WF && record.created.stage === "A12a" && record.created.to === "verifier");
+-    const a12aRecord = await recordStageDispatch({ projectRoot: root, workflowId: WF, stage: "A12a", taskId: a12aTask.taskId, targetRoleId: "verifier" });
+-    assert.equal(a12aRecord.ok, true, "A12a 派发须落账（AC-09 门依赖；生产接线缺失见 G-B5-1）");
+     await writeFile(root, "docs/quality/snake-criteria-v1.md", "# 验收标准\n\n- AC-1：贪吃蛇可玩\n");
+     await reportDone(root, a12aTask.taskId, "verifier", "criteria 完成", ["docs/quality/snake-criteria-v1.md"]);
+     const a12aClosed = await closeTaskViaDesktop(chief, { operationId: "op-close-a12a", taskId: a12aTask.taskId });
+@@ -790,8 +772,6 @@
+     releaseSource(h.mgr, live);
+     assert.equal(a12bDispatch.ok, true, a12bDispatch.message ?? "");
+     const a12bTask = await findTask(root, (record) => record.created?.workflowId === WF && record.created.stage === "A12b" && record.created.to === "verifier");
+-    const a12bRecord = await recordStageDispatch({ projectRoot: root, workflowId: WF, stage: "A12b", taskId: a12bTask.taskId, targetRoleId: "verifier" });
+-    assert.equal(a12bRecord.ok, true);
+     await writeFile(root, "docs/quality/snake-report-v1.md", "# 验收报告\n\n结论：通过。\n");
+     const archived = await archiveAcceptance({
+       projectRoot: root, flowId: FLOW, workflowId: WF,
+@@ -971,28 +951,17 @@
+     assert.equal(b1Closed.stageCompleted, true);
+     await closeStageRequest(h, root, chief, "B1", "B1 完成");
+ 
+-    // 2) B2：幕僚范围决定（宿主 glue G-B5-2）→ change.scope-decided + 派生写集；B2 completed。
+-    const impactSha = sha(await fs.readFile(path.join(root, "docs", "governance", "rapporteur", "snake-impact-v1.md")));
+-    const { recordChangeScopeDecision } = await import("../../src/common/编排/workflow-service.ts");
+-    const scopeDecision = await recordChangeScopeDecision({
+-      projectRoot: root, flowId: FLOW, workflowId: WF, operationId: "op-b2-scope",
+-      impactReport: { path: "docs/governance/rapporteur/snake-impact-v1.md", sha256: impactSha },
+-      scope: { summary: "修复 core 碰撞", files: ["src/core/snake.ts"], rationale: "bug" },
+-      requestTaskId: srB1.taskId,
+-    });
+-    assert.equal(scopeDecision.ok, true, scopeDecision.ok === false ? `${scopeDecision.code}: ${scopeDecision.message}` : "");
+-    if (scopeDecision.ok) assert.deepEqual(scopeDecision.writesets, [{ roleId: "worker", paths: ["src/core/snake.ts"] }]);
+-    assert.equal((await view(root, WF)).stages.B2.status, "completed");
+-    assert.equal(h.requests.length, 0, "B2 不弹卡");
+-
++    // 2) B2：幕僚范围决定——生产接线（G-B5-2）：B3 stage-request 受理时应用记录 change.scope-decided。
+     // 3) B3：运营按派生写集派实现 → 任务级 Git 提交；范围外提交/命令被拒。
+     const liveB3 = liveSource(h.mgr, root, "chief", { turnId: "turn-b3" });
+     const b3Dispatch = await routeDispatch(h.mgr, root, "chief", {
+       roleId: "convener", task: "推进 B3：修复 core 碰撞", flowId: FLOW, workflowId: WF, stage: "B3",
+-      taskKind: "stage-request", sideEffect: "read-only",
++      taskKind: "stage-request", sideEffect: "read-only", requestedEvidence: ["src/core/snake.ts"],
+     }, liveB3);
+     releaseSource(h.mgr, liveB3);
+     assert.equal(b3Dispatch.ok, true, b3Dispatch.message ?? "");
++    assert.equal((await view(root, WF)).stages.B2.status, "completed");
++    assert.equal(h.requests.length, 0, "B2 不弹卡");
+     const srB3 = await findOpenStageRequest(root, "B3");
+     const convenerLiveB3 = liveSource(h.mgr, root, "convener", { taskId: srB3.taskId });
+     const b3Impl = await routeDispatch(h.mgr, root, "convener", {

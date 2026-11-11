@@ -1,0 +1,36 @@
+# B2 v2 增补证据核对：RR29 RR-03 可玩性验证（2026-11-11，本角色独立核验）
+
+## 身份
+RR29 记录：角色卡/测试/docs/change/2026-11-11_RR29_RR-03-playability-verification.md
+  实测 sha256=c27f76727bea36b77f8346c8dfc9f1aec625d1b14d8e2d4f5d43bf9dd4756705（记录声明 c27f7672…，一致）
+RR29 提交：7d78f3e（15 文件：记录 + 6 截图 + 7 证据文件 + sha256sums）
+证据清单：sha256sums.txt 13 条；实测 sha256sum -c => 13/13 OK（清单 sha256 aeec843bcc5511d0027aa1af763cceaf97aa71cfe7651c548fad200b6fc393de）
+record-file.json 声明 record sha256 c27f7672…；一致
+
+## 被游玩产物一致性（本角色亲自重算 target 当前字节）
+c498a5e63ba69ebc578ef61ccd92f58b3545b4e23b682cb3df6a230379a07de9 *index.html
+407e54d508fc532229f16803cacc7b977b4a00b6ef789f632ca405f589a171d6 *src/game.js
+aaa23cf3f17cf4c834ab6574d32c6d830c8389e1877eb1214e758238fe0a8805 *src/styles.css
+ 1026 index.html
+ 7661 src/game.js
+ 3143 src/styles.css
+11830 total
+期望（RR28 交付/证据副本）：index.html c498a5e6…、src/game.js 407e54d5…、src/styles.css aaa23cf3… => 三者一致
+target git：main 头 152448a → 5428a28 → 9ecc566 → 2b9ef04；git status 干净
+
+## 六项验证证据（本角色逐项核验）
+① 页面加载渲染：01-load.png（186,317 B，sha256 874a9332…）实测显示贪吃蛇页面、canvas 网格、蛇 3 节、食物、分数 0、状态进行中；init 探针 head=(10,10)、body=[(8,10),(9,10)]、food=(13,8)、canvas 400x400
+② 方向键改变方向：02-direction-before.png（78ea28e6…）/02-direction-after.png（50b5e8e7…）实测蛇由水平变垂直；drive-playability.jsonl direction.result movedUp=true，heads 由 (11,10) 到 (11,8)；真实 CDP Input.dispatchKeyEvent ArrowUp
+③ 吃食物得分：03-score.png（87472a22…）实测分数 1、蛇身增至 4 节、食物换位；drive score.reached attempt=1 head=(13,8)=食物格；
+④ 撞墙结束覆盖层：04-game-over.png（44e1f3f2…，202,062 B，来自 play3 终稿）实测「游戏结束」覆盖层、最终分数 1、重开按钮；play3-summary gameOverState score=1/status=游戏结束/overlayHidden=false；
+⑤ 重开可用：05-restart.png（c44f8edf…，186,429 B）实测新局分数 0、覆盖层消失；play3-summary restartedState score=0/status=就绪/overlayHidden=true；postRestartMoves 8 条（head 由 (12,10) 到 (12,9)）；
+⑥ 无控制台报错：console-log.jsonl 实测 0 error/0 exception；3 条 warning 均为本验证 getImageData 探针的 Canvas2D willReadFrequently 提示（v2 阶段 2 条 + play3 阶段 1 条；记录 §三/§五 写「2 条」为 v2 阶段口径，属轻微文字差，不影响 0 error 结论）；
+
+## 浏览器/隔离
+browser-info.json：Edg/157.0.4341.46，CDP 9333，file:///C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr28-2026-11-11/target/index.html；命令行未含 --headless；未开 Electron；记录声明未占用 9222/9223/9224、未读/打印 .env
+
+## .gitignore 纳入
+根 .gitignore 含「角色卡/**/docs/**/*.png」（治理证据截图默认不入库）；RR29 的 6 张截图已由 7d78f3e 以 git add -f 纳入并被 git ls-files 跟踪（15 文件全部在提交内）；属证据保全的显式纳入，非产品/测试改动
+
+## 结论
+六项真实浏览器 UI 验证可信、产物哈希与 RR28 交付一致、0 控制台错误 => RR-03 由「未取证」改判通过。

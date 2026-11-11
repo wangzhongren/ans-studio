@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>贪吃蛇</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="board">
+    <header class="hud">
+      <span class="hud-item">分数：<span id="score">0</span></span>
+      <span class="hud-item">最高分：<span id="high-score">0</span></span>
+    </header>
+
+    <div class="stage">
+      <canvas id="game-canvas" width="400" height="400"></canvas>
+
+      <div id="overlay" class="overlay hidden">
+        <p class="overlay-title">游戏结束</p>
+        <p class="overlay-score">本局得分：<span id="final-score">0</span></p>
+        <p class="overlay-score">最高分：<span id="final-high-score">0</span></p>
+        <button id="restart-btn" type="button">重新开始</button>
+      </div>
+    </div>
+
+    <footer id="hint" class="hint">方向键 / WASD 控制方向，R 键重新开始</footer>
+  </main>
+
+  <script src="src/game.js"></script>
+</body>
+</html>

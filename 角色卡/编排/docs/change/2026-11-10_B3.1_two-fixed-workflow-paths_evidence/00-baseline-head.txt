@@ -1,0 +1,5 @@
+基线 HEAD（本批开工）：d60d02c8e05cfe4618a3ab33cbfb6357a66e179d
+分支：feat/two-fixed-workflow-paths
+worktree：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+before TAP 出自纯净 HEAD 解包（git archive HEAD）+ node_modules junction：/tmp/ans-b31-orch/baseline-head
+说明：本批开工时 git status --porcelain -- src app test 为空；工作期间并行运行时核心 B3.1 批次写入 src/model/runtime.ts、src/provider/runtime/{schema,tools}.ts、test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts（非本批写集，见 06）。

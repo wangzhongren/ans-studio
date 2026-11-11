@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: 升级卡数据面：命令/argv/cwd/judge 事实逐字取自判拒记录；necessity 原样携带且不作为标题/选项来源
+ok 1 - 升级卡数据面：命令/argv/cwd/judge 事实逐字取自判拒记录；necessity 原样携带且不作为标题/选项来源
+  ---
+  duration_ms: 1.9225
+  type: 'test'
+  ...
+# Subtest: 升级卡数据面：可选字段缺席不伪造（不编造 judge 理由/上下文/过期时刻）
+ok 2 - 升级卡数据面：可选字段缺席不伪造（不编造 judge 理由/上下文/过期时刻）
+  ---
+  duration_ms: 0.1001
+  type: 'test'
+  ...
+# Subtest: 升级卡三选项：allow-once ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权
+ok 3 - 升级卡三选项：allow-once ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权
+  ---
+  duration_ms: 0.5977
+  type: 'test'
+  ...
+# Subtest: 升级卡三选项：allow-session ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权
+ok 4 - 升级卡三选项：allow-session ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权
+  ---
+  duration_ms: 0.1185
+  type: 'test'
+  ...
+# Subtest: 升级卡三选项：deny ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权
+ok 5 - 升级卡三选项：deny ⇒ 决定带 operatorId（应用注入）；重复回包不产生第二次授权
+  ---
+  duration_ms: 0.1336
+  type: 'test'
+  ...
+# Subtest: 升级卡回包：未知 id / 非法动作 / 误投布尔回包 ⇒ expired（不放行）；动作解析严格三选一
+ok 6 - 升级卡回包：未知 id / 非法动作 / 误投布尔回包 ⇒ expired（不放行）；动作解析严格三选一
+  ---
+  duration_ms: 0.261
+  type: 'test'
+  ...
+# Subtest: 升级卡超时：cleanup 兜底 ⇒ expired（默认拒绝）；消耗后不可再答
+ok 7 - 升级卡超时：cleanup 兜底 ⇒ expired（默认拒绝）；消耗后不可再答
+  ---
+  duration_ms: 28.8014
+  type: 'test'
+  ...
+# Subtest: 升级卡中止（轮次停止/会话重建/窗口关闭）：expired；关窗 rejectAllPending 全部失效
+ok 8 - 升级卡中止（轮次停止/会话重建/窗口关闭）：expired；关窗 rejectAllPending 全部失效
+  ---
+  duration_ms: 0.6012
+  type: 'test'
+  ...
+# Subtest: 升级卡推达失败（窗口已关）：unavailable（默认拒绝）；不残留 pending
+ok 9 - 升级卡推达失败（窗口已关）：unavailable（默认拒绝）；不残留 pending
+  ---
+  duration_ms: 0.3056
+  type: 'test'
+  ...
+# Subtest: 升级卡 replay：focus/show 幂等重推仍挂起者；已决项不复活
+ok 10 - 升级卡 replay：focus/show 幂等重推仍挂起者；已决项不复活
+  ---
+  duration_ms: 0.2094
+  type: 'test'
+  ...
+# Subtest: 升级卡按角色挂起视图：roleId 来自判拒记录（看护「正确等待不报」数据面）
+ok 11 - 升级卡按角色挂起视图：roleId 来自判拒记录（看护「正确等待不报」数据面）
+  ---
+  duration_ms: 0.208
+  type: 'test'
+  ...
+# Subtest: 仲裁·升级卡先到：审批卡在主进程等待（不推达渲染）；等待期间不启动确认超时；升级决出后审批卡推达
+ok 12 - 仲裁·升级卡先到：审批卡在主进程等待（不推达渲染）；等待期间不启动确认超时；升级决出后审批卡推达
+  ---
+  duration_ms: 436.8062
+  type: 'test'
+  ...
+# Subtest: 仲裁·审批卡先到：升级申请返回 pending（不排队、不弹卡、不消耗额度），回执如实提示稍后
+ok 13 - 仲裁·审批卡先到：升级申请返回 pending（不排队、不弹卡、不消耗额度），回执如实提示稍后
+  ---
+  duration_ms: 1.8198
+  type: 'test'
+  ...
+# Subtest: 仲裁·已有升级卡待答：第二个角色的升级申请同样返回 pending；槽释放后可再申请
+ok 14 - 仲裁·已有升级卡待答：第二个角色的升级申请同样返回 pending；槽释放后可再申请
+  ---
+  duration_ms: 1.0725
+  type: 'test'
+  ...
+# Subtest: 仲裁·等待超时：升级卡久不决出 ⇒ 审批卡按 unavailable fail-closed，且从未推达渲染
+ok 15 - 仲裁·等待超时：升级卡久不决出 ⇒ 审批卡按 unavailable fail-closed，且从未推达渲染
+  ---
+  duration_ms: 43.0849
+  type: 'test'
+  ...
+# Subtest: 仲裁·轮次中止：等待槽位期间中止 ⇒ 审批卡 unavailable，不推达、不泄漏槽
+ok 16 - 仲裁·轮次中止：等待槽位期间中止 ⇒ 审批卡 unavailable，不推达、不泄漏槽
+  ---
+  duration_ms: 31.2458
+  type: 'test'
+  ...
+# Subtest: 仲裁·恢复卡不参与共享槽：未配置 slot 的核不改变既有「等待客户不设限」语义
+ok 17 - 仲裁·恢复卡不参与共享槽：未配置 slot 的核不改变既有「等待客户不设限」语义
+  ---
+  duration_ms: 4.9676
+  type: 'test'
+  ...
+# Subtest: 回包路由：kind/action 区分升级与审批；旧回包 {id, allow} 绝不误路由
+ok 18 - 回包路由：kind/action 区分升级与审批；旧回包 {id, allow} 绝不误路由
+  ---
+  duration_ms: 0.174
+  type: 'test'
+  ...
+# Subtest: 开关关闭：既有确认路径逐字不变；不产生升级卡、升级 presenter 不被调用
+ok 19 - 开关关闭：既有确认路径逐字不变；不产生升级卡、升级 presenter 不被调用
+  ---
+  duration_ms: 0.4941
+  type: 'test'
+  ...
+# Subtest: 暂停状态机：只接受 {paused:boolean}；非法输入不改状态；默认未暂停（重启清零的模块初值）
+ok 20 - 暂停状态机：只接受 {paused:boolean}；非法输入不改状态；默认未暂停（重启清零的模块初值）
+  ---
+  duration_ms: 0.3645
+  type: 'test'
+  ...
+# Subtest: 暂停 IPC 接线：main.ts 模块级单例、shell-only 生效、不影响治理 approval 组、推送含 paused
+ok 21 - 暂停 IPC 接线：main.ts 模块级单例、shell-only 生效、不影响治理 approval 组、推送含 paused
+  ---
+  duration_ms: 0.9197
+  type: 'test'
+  ...
+# Subtest: preload 受限桥：新增暂停与升级回包方法（白名单；不暴露 Node 能力）
+ok 22 - preload 受限桥：新增暂停与升级回包方法（白名单；不暴露 Node 能力）
+  ---
+  duration_ms: 0.5142
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 988.5653

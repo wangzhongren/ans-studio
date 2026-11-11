@@ -1,0 +1,166 @@
+TAP version 13
+# Subtest: 归档版本随 report 递增（v2）且 frontmatter 完整；幂等 replay；同版本不同 report 不覆盖
+ok 1 - 归档版本随 report 递增（v2）且 frontmatter 完整；幂等 replay；同版本不同 report 不覆盖
+  ---
+  duration_ms: 16.7817
+  type: 'test'
+  ...
+# Subtest: 归档写失败 ⇒ acceptance-archive-failed；缺归档时 A12b accepted 不聚合 A12（归档阻塞 A12）
+ok 2 - 归档写失败 ⇒ acceptance-archive-failed；缺归档时 A12b accepted 不聚合 A12（归档阻塞 A12）
+  ---
+  duration_ms: 127.9719
+  type: 'test'
+  ...
+# Subtest: 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合（幂等）
+ok 3 - 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合（幂等）
+  ---
+  duration_ms: 52.3345
+  type: 'test'
+  ...
+# Subtest: complete_team_plan v4：Git 顺序（init→gitignore→dirty→branch）→ basis.recorded(repo) → stage.completed A9；幂等 replay
+ok 4 - complete_team_plan v4：Git 顺序（init→gitignore→dirty→branch）→ basis.recorded(repo) → stage.completed A9；幂等 replay
+  ---
+  duration_ms: 92.45
+  type: 'test'
+  ...
+# Subtest: 失败面：git init / 父仓库 / dirty / gitignore dirty / branch exists 按真实原因 fail-closed + stage.blocked A9；不写 basis
+ok 5 - 失败面：git init / 父仓库 / dirty / gitignore dirty / branch exists 按真实原因 fail-closed + stage.blocked A9；不写 basis
+  ---
+  duration_ms: 70.6298
+  type: 'test'
+  ...
+# Subtest: 失败面：文档预算超限（单文件 >4 MiB）⇒ baseline-document-budget；Git 端口不被调用
+ok 6 - 失败面：文档预算超限（单文件 >4 MiB）⇒ baseline-document-budget；Git 端口不被调用
+  ---
+  duration_ms: 35.8674
+  type: 'test'
+  ...
+# Subtest: 失败面：团队计划结构不合法 ⇒ baseline-team-plan-invalid；legacy 字段 runId/baseDigest ⇒ baseline-legacy-field-forbidden
+ok 7 - 失败面：团队计划结构不合法 ⇒ baseline-team-plan-invalid；legacy 字段 runId/baseDigest ⇒ baseline-legacy-field-forbidden
+  ---
+  duration_ms: 30.3192
+  type: 'test'
+  ...
+# Subtest: 任务分支复用：basis 已记录该 workflow 的分支 ⇒ allowReuse=true（G-8 重试不死锁）
+ok 8 - 任务分支复用：basis 已记录该 workflow 的分支 ⇒ allowReuse=true（G-8 重试不死锁）
+  ---
+  duration_ms: 24.5996
+  type: 'test'
+  ...
+# Subtest: 文档读取预算（AC-15/T-07）：32 文件上限与 8 MiB 总量上限（默认口径）
+ok 9 - 文档读取预算（AC-15/T-07）：32 文件上限与 8 MiB 总量上限（默认口径）
+  ---
+  duration_ms: 40.1179
+  type: 'test'
+  ...
+# Subtest: 失败面：operationId 指向不同内容 ⇒ baseline-operation-conflict；非运营发起 ⇒ baseline-identity-invalid
+ok 10 - 失败面：operationId 指向不同内容 ⇒ baseline-operation-conflict；非运营发起 ⇒ baseline-identity-invalid
+  ---
+  duration_ms: 40.9928
+  type: 'test'
+  ...
+# Subtest: preparePathBStart：既有仓库（不自动 init）→ .gitignore→dirty→从 HEAD 建分支→ basis.recorded(reason:path-b) 只读快照
+ok 11 - preparePathBStart：既有仓库（不自动 init）→ .gitignore→dirty→从 HEAD 建分支→ basis.recorded(reason:path-b) 只读快照
+  ---
+  duration_ms: 16.5889
+  type: 'test'
+  ...
+# Subtest: preparePathBStart：无仓库 ⇒ b-repository-required（不自动 init）；dirty ⇒ baseline-repository-dirty + stage.blocked B1
+ok 12 - preparePathBStart：无仓库 ⇒ b-repository-required（不自动 init）；dirty ⇒ baseline-repository-dirty + stage.blocked B1
+  ---
+  duration_ms: 10.5435
+  type: 'test'
+  ...
+# Subtest: derivePathBWriteSets：有 roster ⇒ scope.files ∩ 模块属主；越界/多义/治理写区拒绝
+ok 13 - derivePathBWriteSets：有 roster ⇒ scope.files ∩ 模块属主；越界/多义/治理写区拒绝
+  ---
+  duration_ms: 19.616
+  type: 'test'
+  ...
+# Subtest: derivePathBWriteSets：无 roster ⇒ 角色边界唯一属主；多属主/治理文档拒绝
+ok 14 - derivePathBWriteSets：无 roster ⇒ 角色边界唯一属主；多属主/治理文档拒绝
+  ---
+  duration_ms: 11.2762
+  type: 'test'
+  ...
+# Subtest: recordChangeScopeDecision：影响面 hash + 派生写集 → change.scope-decided（B2 完成，幂等）；越界拒绝
+ok 15 - recordChangeScopeDecision：影响面 hash + 派生写集 → change.scope-decided（B2 完成，幂等）；越界拒绝
+  ---
+  duration_ms: 17.7355
+  type: 'test'
+  ...
+# Subtest: A13 前置：A12b accepted + 归档已写入 ⇒ prepare 成功；release.requested + stage.requested A13；重复 prepare replay
+ok 16 - A13 前置：A12b accepted + 归档已写入 ⇒ prepare 成功；release.requested + stage.requested A13；重复 prepare replay
+  ---
+  duration_ms: 88.2746
+  type: 'test'
+  ...
+# Subtest: A13 前置缺失：无归档 ⇒ release-workflow-not-ready（附缺项），不发卡不写 release.requested
+ok 17 - A13 前置缺失：无归档 ⇒ release-workflow-not-ready（附缺项），不发卡不写 release.requested
+  ---
+  duration_ms: 70.9704
+  type: 'test'
+  ...
+# Subtest: A13 前置缺失：A12b 未 accepted ⇒ release-workflow-not-ready
+ok 18 - A13 前置缺失：A12b 未 accepted ⇒ release-workflow-not-ready
+  ---
+  duration_ms: 59.8889
+  type: 'test'
+  ...
+# Subtest: B4 前置（不要求 A12b）：B3 accepted + 运营报告 ⇒ prepare 成功并推进 B4
+ok 19 - B4 前置（不要求 A12b）：B3 accepted + 运营报告 ⇒ prepare 成功并推进 B4
+  ---
+  duration_ms: 28.764
+  type: 'test'
+  ...
+# Subtest: B4 前置缺失：无运营报告 ⇒ release-workflow-not-ready（operator-report）
+ok 20 - B4 前置缺失：无运营报告 ⇒ release-workflow-not-ready（operator-report）
+  ---
+  duration_ms: 14.0819
+  type: 'test'
+  ...
+# Subtest: 呈卡前拒绝：basis 文档漂移 ⇒ basis-drift；.gitignore hash 漂移 ⇒ basis-drift；分支漂移 ⇒ release-workflow-not-ready
+ok 21 - 呈卡前拒绝：basis 文档漂移 ⇒ basis-drift；.gitignore hash 漂移 ⇒ basis-drift；分支漂移 ⇒ release-workflow-not-ready
+  ---
+  duration_ms: 70.4644
+  type: 'test'
+  ...
+# Subtest: 执行：main unborn ⇒ mergeKind initial；客户本人确认 ⇒ release.merged + stage.completed A13 + workflow.closed delivered（releaseId 投影）
+ok 22 - 执行：main unborn ⇒ mergeKind initial；客户本人确认 ⇒ release.merged + stage.completed A13 + workflow.closed delivered（releaseId 投影）
+  ---
+  duration_ms: 65.9354
+  type: 'test'
+  ...
+# Subtest: 执行：main 已存在 ⇒ mergeKind merge；冲突 ⇒ release.failed + stage.blocked，返回 release-merge-conflict，workflow 不关闭
+ok 23 - 执行：main 已存在 ⇒ mergeKind merge；冲突 ⇒ release.failed + stage.blocked，返回 release-merge-conflict，workflow 不关闭
+  ---
+  duration_ms: 122.2848
+  type: 'test'
+  ...
+# Subtest: 仅客户本人：judge 确认 / 缺失确认 ⇒ release-unauthorized，不写 release.confirmed/merged
+ok 24 - 仅客户本人：judge 确认 / 缺失确认 ⇒ release-unauthorized，不写 release.confirmed/merged
+  ---
+  duration_ms: 62.5312
+  type: 'test'
+  ...
+# Subtest: 客户拒绝：release.rejected(customer) + stage.blocked；replay 幂等
+ok 25 - 客户拒绝：release.rejected(customer) + stage.blocked；replay 幂等
+  ---
+  duration_ms: 97.1692
+  type: 'test'
+  ...
+# Subtest: 审计：无 requestReleaseMerge 导出；端口无 push/tag；release.merged 含 baseOid/tipOid/mergeOid/files/diffDigest
+ok 26 - 审计：无 requestReleaseMerge 导出；端口无 push/tag；release.merged 含 baseOid/tipOid/mergeOid/files/diffDigest
+  ---
+  duration_ms: 91.2157
+  type: 'test'
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2119.579

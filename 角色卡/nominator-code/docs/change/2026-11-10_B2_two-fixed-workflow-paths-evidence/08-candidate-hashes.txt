@@ -1,0 +1,18 @@
+# nominator-code B2 候选文件（本角色写集；raw SHA-256 / bytes / lines）
+# 采集时间：2026-11-10；工作目录：.claude/worktrees/trunk-amendment；基线 HEAD f72bafaa40c3d1eb529533e8f9e5fa7d6f982c9d
+
+src/common/roles/nominator/index.ts  sha256=af89a85e93ac0c18421fcef746673048adc72b78e77efeee6fca1380d16fd288  bytes=41523  lines=910
+test/roles/nominator/nominator-fixed.test.ts  sha256=fb610051d5b213c9fa202cfca26240e315f86f41d73efa8583f5fb8f8f8ebabd  bytes=11478  lines=197
+
+# 未改（legacy 冻结；无工作树 diff）：
+test/roles/nominator/nominator-module.test.ts  sha256=3375a9e74630eea112ccdb3773072ef317eda31be983824fb94eb837e5d111ff  bytes=20294  lines=570
+test/roles/nominator/nominator-differential.test.ts  sha256=6a9a59858f7c7bd9a52437a21c0c44bd41aee25fd54eb99897e327fd30c7ab34  bytes=20897  lines=572
+test/roles/nominator/fixtures/nominator-fixtures.ts  sha256=2d8d856e7ade7465775d4ad5614a985e1b649c82bf5c0c4caf242528a08df153  bytes=7003  lines=234
+
+# git status --porcelain -- src/common/roles/nominator test/roles/nominator：
+ M src/common/roles/nominator/index.ts
+?? test/roles/nominator/nominator-fixed.test.ts
+
+# git diff --numstat -- src/common/roles/nominator（M 文件）：
+warning: in the working copy of 'src/common/roles/nominator/index.ts', LF will be replaced by CRLF the next time Git touches it
+64	1	src/common/roles/nominator/index.ts

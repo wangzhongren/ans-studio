@@ -1,0 +1,36 @@
+# 本角色写集（本批次写入/修改）
+ M src/common/roles/rapporteur/index.ts
+ M src/common/roles/rapporteur/internal/context.ts
+ M src/common/roles/rapporteur/internal/spec.ts
+ M test/roles/rapporteur/spec.test.ts
+?? test/roles/rapporteur/fixed-module.test.ts
+?? 角色卡/rapporteur-code/docs/change/2026-11-10_B2_two-fixed-workflow-paths.md
+?? 角色卡/rapporteur-code/docs/change/_evidence/
+
+# 说明：角色卡/rapporteur-code/docs/design/ 在 B2 开始前已为未跟踪状态（前期阻断记录 2026-11-10_impl_two-fixed-workflow-paths.md），非本批写入。
+
+# src/app/test 中本角色写集之外的当前改动（均为并行批次/他人写集；本角色未写入）
+ M src/common/roles/chief/internal/context.ts
+ M src/common/roles/chief/internal/module.ts
+ M src/common/roles/chief/internal/spec.ts
+ M src/common/roles/convener/index.ts
+ M src/common/roles/nominator/index.ts
+ M src/common/roles/product/index.ts
+ M src/common/roles/product/internal/capabilities.ts
+ M src/common/roles/product/internal/context.ts
+ M src/common/roles/product/internal/dispatch.ts
+ M src/common/roles/verifier/index.ts
+ M src/common/门禁引擎/governance-roles.ts
+ M src/model/role.ts
+ M src/service/governance-matrix/impl/builder.ts
+ M src/service/governance-matrix/impl/routing.ts
+ M src/service/governance-matrix/public.ts
+?? src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/roles/chief/fixed.test.ts
+?? test/roles/convener/convener-fixed.test.ts
+?? test/roles/nominator/nominator-fixed.test.ts
+?? test/roles/product/product-fixed.test.ts
+?? test/roles/verifier/verifier-fixed.test.ts
+?? test/门禁引擎/chief-workflow-v2-resource.test.ts
+?? test/门禁引擎/fixed-role-module-surface.test.ts
+?? test/门禁引擎/governance-matrix-fixed-view.test.ts

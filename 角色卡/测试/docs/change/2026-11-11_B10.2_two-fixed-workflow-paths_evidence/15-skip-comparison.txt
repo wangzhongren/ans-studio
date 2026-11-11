@@ -1,0 +1,9 @@
+ref skip total (before corpus): 18
+current skip total (after corpus): 18
+files with skip increase: 0
+
+per-file non-zero skip:
+  test/测试/git-role-workflows-e2e.test.ts before=12 after=12
+  test/测试/lightweight-permission-repairs.test.ts before=6 after=6
+
+note: copy of B5.3 compare-skip.mjs; labels rewritten for B10.2 before/after inputs

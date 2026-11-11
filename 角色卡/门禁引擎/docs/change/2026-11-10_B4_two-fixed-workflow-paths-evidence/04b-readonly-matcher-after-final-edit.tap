@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: status：`[--porcelain[=v1]] [--short|-s] [-- <literal path>…]` → 规范体固定 porcelain=v1 -z
+ok 1 - status：`[--porcelain[=v1]] [--short|-s] [-- <literal path>…]` → 规范体固定 porcelain=v1 -z
+  ---
+  duration_ms: 1.5568
+  type: 'test'
+  ...
+# Subtest: log：`[-<N>] [--oneline] [<full-oid>|HEAD] [-- <literal path>…]`；无目标默认 HEAD（不是 --all）
+ok 2 - log：`[-<N>] [--oneline] [<full-oid>|HEAD] [-- <literal path>…]`；无目标默认 HEAD（不是 --all）
+  ---
+  duration_ms: 0.3407
+  type: 'test'
+  ...
+# Subtest: diff：`[--stat|--name-only|--name-status] [--no-ext-diff] [--no-textconv] [<oid> [<oid>]] [-- <path>…]`
+ok 3 - diff：`[--stat|--name-only|--name-status] [--no-ext-diff] [--no-textconv] [<oid> [<oid>]] [-- <path>…]`
+  ---
+  duration_ms: 0.1926
+  type: 'test'
+  ...
+# Subtest: show：`<full-oid>:<literal path>`（恰好一个）→ 规范体 cat-file blob
+ok 4 - show：`<full-oid>:<literal path>`（恰好一个）→ 规范体 cat-file blob
+  ---
+  duration_ms: 0.1724
+  type: 'test'
+  ...
+# Subtest: rev-parse：`--verify <full-oid|HEAD>` → 规范体补 ^{commit}
+ok 5 - rev-parse：`--verify <full-oid|HEAD>` → 规范体补 ^{commit}
+  ---
+  duration_ms: 0.1132
+  type: 'test'
+  ...
+# Subtest: ls-files：`[--stage] [-z] [-- <path>…]` → 规范体固定 --stage -z
+ok 6 - ls-files：`[--stage] [-z] [-- <path>…]` → 规范体固定 --stage -z
+  ---
+  duration_ms: 0.1057
+  type: 'test'
+  ...
+# Subtest: ls-tree：`[-r] [--full-tree] [<full-oid|HEAD>] [-- <path>…]`；无目标默认 HEAD
+ok 7 - ls-tree：`[-r] [--full-tree] [<full-oid|HEAD>] [-- <path>…]`；无目标默认 HEAD
+  ---
+  duration_ms: 0.1075
+  type: 'test'
+  ...
+# Subtest: merge-base：`<full-oid|HEAD> <full-oid|HEAD>`
+ok 8 - merge-base：`<full-oid|HEAD> <full-oid|HEAD>`
+  ---
+  duration_ms: 0.0849
+  type: 'test'
+  ...
+# Subtest: blame：`[-L <start>,<end>] -- <literal path>`；行号 1..2000、跨度 ≤2000
+ok 9 - blame：`[-L <start>,<end>] -- <literal path>`；行号 1..2000、跨度 ≤2000
+  ---
+  duration_ms: 0.1987
+  type: 'test'
+  ...
+# Subtest: cat-file：`(-t|-s|-e|-p) <oid>` 或 `(blob|commit|tree|tag) <oid>`
+ok 10 - cat-file：`(-t|-s|-e|-p) <oid>` 或 `(blob|commit|tree|tag) <oid>`
+  ---
+  duration_ms: 0.2279
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：全局选项/改变目录或仓库 → 拒（`git` 后第一项必须是子命令）
+ok 11 - 攻击矩阵：全局选项/改变目录或仓库 → 拒（`git` 后第一项必须是子命令）
+  ---
+  duration_ms: 0.6954
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：写盘/外部程序 flag → 拒（--output/-o/--ext-diff/--textconv/--filters/pager）
+ok 12 - 攻击矩阵：写盘/外部程序 flag → 拒（--output/-o/--ext-diff/--textconv/--filters/pager）
+  ---
+  duration_ms: 0.2262
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：任意路径/远程/子模块外部程序与网络子命令 → 拒
+ok 13 - 攻击矩阵：任意路径/远程/子模块外部程序与网络子命令 → 拒
+  ---
+  duration_ms: 0.1541
+  type: 'test'
+  ...
+# Subtest: 攻击矩阵：路径攻击（../、绝对路径、.git、:(glob)、通配、反斜杠、控制字符）→ 拒
+ok 14 - 攻击矩阵：路径攻击（../、绝对路径、.git、:(glob)、通配、反斜杠、控制字符）→ 拒
+  ---
+  duration_ms: 0.3324
+  type: 'test'
+  ...
+# Subtest: 边界：OID 必须完整 40/64 hex；短 SHA/revision 表达式/分支名一律拒绝
+ok 15 - 边界：OID 必须完整 40/64 hex；短 SHA/revision 表达式/分支名一律拒绝
+  ---
+  duration_ms: 0.4594
+  type: 'test'
+  ...
+# Subtest: 边界：HEAD 仅允许 log/rev-parse/ls-tree/merge-base 位置（diff/show/cat-file/blame 不接受）
+ok 16 - 边界：HEAD 仅允许 log/rev-parse/ls-tree/merge-base 位置（diff/show/cat-file/blame 不接受）
+  ---
+  duration_ms: 0.1499
+  type: 'test'
+  ...
+# Subtest: 边界：路径必须位于 `--` 之后且为字面项目相对路径；目录尾斜杠允许、重复分隔符拒绝
+ok 17 - 边界：路径必须位于 `--` 之后且为字面项目相对路径；目录尾斜杠允许、重复分隔符拒绝
+  ---
+  duration_ms: 0.0966
+  type: 'test'
+  ...
+# Subtest: 边界：log 行数 / blame 行号上限；重复 flag 与超界拒绝
+ok 18 - 边界：log 行数 / blame 行号上限；重复 flag 与超界拒绝
+  ---
+  duration_ms: 0.1993
+  type: 'test'
+  ...
+# Subtest: 规则集 v5：ans-default-v5、只读白名单保留、v4/v3 规则集整条拒绝（不静默放宽）
+ok 19 - 规则集 v5：ans-default-v5、只读白名单保留、v4/v3 规则集整条拒绝（不静默放宽）
+  ---
+  duration_ms: 0.1286
+  type: 'test'
+  ...
+# Subtest: 差分（重叠模板）：status/log(目标)/diff/show/rev-parse/ls-files/ls-tree(目标)/merge-base 同规范 argv
+ok 20 - 差分（重叠模板）：status/log(目标)/diff/show/rev-parse/ls-files/ls-tree(目标)/merge-base 同规范 argv
+  ---
+  duration_ms: 0.2448
+  type: 'test'
+  ...
+# Subtest: 差分（允许的分叉，逐条记录）：log 默认 HEAD≠--all、--oneline、diff 显示 flag、ls-tree 默认 HEAD、blame/cat-file 新面
+ok 21 - 差分（允许的分叉，逐条记录）：log 默认 HEAD≠--all、--oneline、diff 显示 flag、ls-tree 默认 HEAD、blame/cat-file 新面
+  ---
+  duration_ms: 0.1643
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 154.9534

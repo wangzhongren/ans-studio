@@ -1,0 +1,27 @@
+# B1 candidate numstat (2026-11-10T05:45:29Z)
+## git diff --numstat (tracked)
+  7	4	src/common/编排/doc-format-specs.ts
+  11	0	src/common/编排/governance-judge-verdict.ts
+  8	0	src/common/编排/governance-judge.ts
+  156	0	src/common/编排/project-state.ts
+  24	0	src/common/编排/task-state.ts
+  74	8	src/common/编排/workflow-preconditions.ts
+  1864	1	src/common/编排/workflow-service.ts
+  88	16	src/common/编排/workflow-state.ts
+  77	12	src/pipeline/orchestration/run-role.ts
+  22	0	test/编排/acceptance-judge-minimal.test.ts
+  2	0	test/编排/doc-format-specs.test.ts
+  33	0	test/编排/task-state-fixed.test.ts
+  2	2	test/编排/workflow-preconditions.test.ts
+  61	3	test/编排/workflow-state.test.ts
+## new files (untracked; lines/bytes)
+  src/common/编排/workflow-dispatch.ts  lines=373 bytes=17855
+  test/编排/workflow-dispatch-fixed.test.ts  lines=301 bytes=13324
+  test/编排/workflow-stage-request.test.ts  lines=367 bytes=17217
+  test/编排/workflow-close-intent.test.ts  lines=373 bytes=18016
+  test/编排/roster-v4.test.ts  lines=134 bytes=5653
+  test/编排/workflow-baseline.test.ts  lines=282 bytes=11870
+  test/编排/project-state-workflow.test.ts  lines=119 bytes=6337
+  test/编排/run-role-fixed.test.ts  lines=106 bytes=4345
+## aggregate
+ 14 files changed, 2429 insertions(+), 46 deletions(-)

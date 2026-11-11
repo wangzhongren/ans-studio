@@ -359,6 +359,125 @@ const AMENDMENT_FINAL_OPTION_IDS: readonly string[] = ["apply-amendment", "defer
 /** stable workflow 轻量确认卡（app-owned 卡种；P1.6 §4.5.1；PM 复审 F2）。 */
 const STABLE_WRITE_CARD_KIND = "stable-write" as const;
 const STABLE_WRITE_OPTION_IDS: readonly string[] = ["approve-stable-write", "reject-stable-write"];
+/**
+ * T3（2026-11-10 两条固定工作流路径，B1 AC-14/AC-27 Q1；v1.3 §8.4）：`merge-main`＝A13/B4 高风险
+ * 合并 main 的**应用自有非判断卡**（不进 `GOVERNANCE_CARD_GROUP`，judge 只可转人工/拒绝）。
+ * B1 只预留**识别骨架**（客户主权排除面 + 冻结选项词汇）；卡的构造/呈现/preview/执行在 B3，且
+ * **不新增客户可见门**（既有高风险确认机制的具体化）。judge 永不代批、永不冒充客户。
+ */
+export const MERGE_MAIN_CARD_KIND = "merge-main" as const;
+export const MERGE_MAIN_OPTION_IDS: readonly string[] = Object.freeze(["approve-merge-main", "reject-merge-main"]);
+
+/**
+ * `merge-main` 卡的应用侧事实（**单一来源 = 编排 `workflow-service.ts::ReleaseMergePreview`**；
+ * 本层按结构只读消费，不复制业务判定）。AC-14 必含：workflowId/flowId、main base OID、branch tip OID、
+ * 文件数、diff stat、合并方式、高风险提示；路径 B 非 main 基线额外披露 base OID。
+ */
+export interface MergeMainCardPreviewFacts {
+  workflowId: string;
+  flowId: string;
+  releaseId: string;
+  mainBaseOid: string | null;
+  branchTipOid: string;
+  branchBaseOid: string | null;
+  nonMainBaseline: boolean;
+  fileCount: number;
+  diffStat: string;
+  mergeKind: "merge" | "initial";
+  highRiskNotes: readonly string[];
+}
+
+/**
+ * `merge-main` 卡的应用侧 requestId（确定性 = `merge-main-<releaseId>`；releaseId 由 workflowId+tip
+ * 确定性派生）。应用自动触发据此判定「同一 workflow/tip 已呈过卡」，不重复弹卡（B3.1）。
+ */
+export function mergeMainCardRequestId(releaseId: string): string {
+  return `merge-main-${releaseId}`;
+}
+
+/** merge-main preview 文本（应用构造；模型不可自报；客户据此核对 base/tip/diff/高风险）。 */
+export function mergeMainCardPreviewText(preview: MergeMainCardPreviewFacts): string {
+  const lines = [
+    `workflowId：${preview.workflowId}（flowId：${preview.flowId}；release：${preview.releaseId}）`,
+    `main base OID：${preview.mainBaseOid ?? "（main unborn ⇒ initial 合并）"}`,
+    `branch tip OID：${preview.branchTipOid}`,
+    ...(preview.branchBaseOid !== null && preview.nonMainBaseline
+      ? [`分支基点 OID：${preview.branchBaseOid}（非 main 基线：分支从非 main HEAD 创建，diff 为分支↔main）`]
+      : []),
+    `变更文件数：${preview.fileCount}`,
+    `diff stat：`,
+    preview.diffStat === "" ? "（无文本差异）" : preview.diffStat,
+    `合并方式：${preview.mergeKind === "initial" ? "initial（创建 main 于任务分支 tip）" : "merge --no-ff（本地合并到 main）"}`,
+    "高风险提示：",
+    ...preview.highRiskNotes.map((note) => `- ${note}`),
+  ];
+  return lines.join("\n");
+}
+
+/**
+ * 构造应用自有 `merge-main` 非判断卡（AC-14；MF-IR-8）：`application:true` + 冻结 approve/reject
+ * 选项词汇；不进 `GOVERNANCE_CARD_GROUP`、judge 不可代批（`isApplicationDecisionReservedForCustomer`）。
+ */
+export function buildMergeMainCardRequest(preview: MergeMainCardPreviewFacts): CustomerInputRequest {
+  return {
+    kind: "choice",
+    title: "合并 main（高风险发布确认）",
+    question: "是否由应用在本地把任务分支合并进 main？只本地合并：不 push、不打 tag、不发布产物；必须由客户本人确认。",
+    cardKind: MERGE_MAIN_CARD_KIND,
+    application: true,
+    sourceRoleId: "application",
+    flowId: preview.flowId,
+    options: [
+      { id: MERGE_MAIN_OPTION_IDS[0]!, label: "确认合并 main" },
+      { id: MERGE_MAIN_OPTION_IDS[1]!, label: "拒绝合并" },
+    ],
+    preview: mergeMainCardPreviewText(preview),
+  };
+}
+
+/**
+ * `merge-main` 客户裁决归类（fail-closed）：
+ * - 只有 `answered` 且选中冻结 approve 选项、且来源为**客户本人**（无 judge 审计、operatorId 非
+ *   judge:/directive:）才算授权；judge/directive 结算一律不授权（通道层主权卡守卫之外的第二道）；
+ * - `declined` + judge 来源 ⇒ `judge-reject`（judge 只能转人工/拒绝，不冒充客户）；
+ * - `declined` + `system:initiator-aborted` ⇒ `timeout`（应用中止/超时；由调用方落 `release.rejected`）；
+ * - `unavailable`（已呈现但窗口关闭/重启）⇒ `timeout`；调用方对**从未呈现**（presenter undefined）
+ *   不应调用本函数，也不得写拒绝（保持等待，不默认通过）。
+ */
+export type MergeMainCardDecision =
+  | { kind: "approve"; decisionId?: string }
+  | { kind: "reject"; reason?: string }
+  | { kind: "judge-reject"; reason?: string }
+  | { kind: "timeout"; reason?: string }
+  | { kind: "unavailable"; reason?: string };
+
+export function toMergeMainCardDecision(outcome: CustomerInputOutcome | null | undefined): MergeMainCardDecision {
+  if (outcome === null || outcome === undefined) return { kind: "unavailable" };
+  if (outcome.outcome === "unavailable") {
+    return { kind: "timeout", ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}) };
+  }
+  const operatorId = "operatorId" in outcome && typeof outcome.operatorId === "string" ? outcome.operatorId : undefined;
+  const nonCustomer = (outcome.outcome === "answered" && outcome.judge !== undefined)
+    || (operatorId !== undefined && (operatorId.startsWith("judge:") || operatorId.startsWith("directive:")));
+  if (outcome.outcome === "answered") {
+    // judge/directive 的「answered」不是合法客户决策：不代批、不写成拒绝（release 保持开放、等待客户本人）。
+    if (nonCustomer) return { kind: "unavailable", reason: "judge/directive 结算不得代批 merge-main（fail-closed）" };
+    const selected = Array.isArray(outcome.value.selected) ? outcome.value.selected : [];
+    if (selected.includes(MERGE_MAIN_OPTION_IDS[0]!)) {
+      return { kind: "approve", ...(outcome.decisionId !== undefined ? { decisionId: outcome.decisionId } : {}) };
+    }
+    if (selected.includes(MERGE_MAIN_OPTION_IDS[1]!)) {
+      return { kind: "reject", ...(outcome.decisionId !== undefined ? { decisionId: outcome.decisionId } : {}) };
+    }
+    return { kind: "unavailable", reason: "merge-main 卡未选中冻结选项（fail-closed）" };
+  }
+  // declined
+  if (nonCustomer) return { kind: "judge-reject", ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}) };
+  if (operatorId === "system:initiator-aborted" || outcome.reason === "initiator-aborted") {
+    return { kind: "timeout", ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}) };
+  }
+  return { kind: "reject", ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}) };
+}
 
 export function isApplicationDecisionReservedForCustomer(request: CustomerInputRequest): boolean {
   if (request.kind !== "choice") return false;
@@ -368,6 +487,14 @@ export function isApplicationDecisionReservedForCustomer(request: CustomerInputR
     if ((request as { application?: unknown }).application !== true) return false;
     const offered = new Set(request.options.map((option) => option.id));
     return STABLE_WRITE_OPTION_IDS.every((id) => offered.has(id));
+  }
+  // merge-main（高风险合并 main）：app-owned、客户本人；judge 不可代批/不冒充客户。
+  // 只接受应用发行（`application:true`）且携带冻结 approve/reject 选项词汇的卡——角色工具层
+  // 卡种白名单本就不含 `merge-main`（G-IR），此处是结算/代选/指令面的第二道 fail-closed。
+  if (cardKind === MERGE_MAIN_CARD_KIND) {
+    if ((request as { application?: unknown }).application !== true) return false;
+    const offered = new Set(request.options.map((option) => option.id));
+    return MERGE_MAIN_OPTION_IDS.every((id) => offered.has(id));
   }
   if (cardKind !== DECISION_CARD_KIND) return false;
   if ((request as { application?: unknown }).application !== true) return false;

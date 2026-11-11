@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+ok 1 - X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+  ---
+  duration_ms: 14.9563
+  type: 'test'
+  ...
+# Subtest: X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+ok 2 - X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+  ---
+  duration_ms: 5.7271
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+ok 3 - X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+  ---
+  duration_ms: 4.1508
+  type: 'test'
+  ...
+# Subtest: X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+ok 4 - X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+  ---
+  duration_ms: 4.5307
+  type: 'test'
+  ...
+# Subtest: X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+ok 5 - X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+  ---
+  duration_ms: 1.1005
+  type: 'test'
+  ...
+# Subtest: X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+ok 6 - X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+  ---
+  duration_ms: 0.3437
+  type: 'test'
+  ...
+# Subtest: X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+ok 7 - X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+  ---
+  duration_ms: 1.5639
+  type: 'test'
+  ...
+# Subtest: X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+ok 8 - X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+  ---
+  duration_ms: 1.0475
+  type: 'test'
+  ...
+# Subtest: team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+ok 9 - team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+  ---
+  duration_ms: 224.9053
+  type: 'test'
+  ...
+# Subtest: fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+ok 10 - fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+  ---
+  duration_ms: 9.3958
+  type: 'test'
+  ...
+# Subtest: legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+ok 11 - legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+  ---
+  duration_ms: 4.2207
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 883.2922

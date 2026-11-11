@@ -1,0 +1,6 @@
+$ npm run typecheck
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+exit=0

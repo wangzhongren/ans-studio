@@ -1,0 +1,245 @@
+{
+  "at": "2026-11-11T03:19:11.670Z",
+  "candidate": "7385f5cb53fb04ce49980e4e58e890624f7f91d1",
+  "msgMark": "2026-11-11T03:01:56.079Z",
+  "stopCause": "driver stop (stall; A2 stage-request close-report-missing -> stage-request-open blocks A4)",
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-11T03:02:04.610Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-b5e41a07ec9e164da5f42ced",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:414d9aa4-de83-4510-91e4-45f3bab8af38",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "414d9aa4-de83-4510-91e4-45f3bab8af38",
+    "legacyStateIgnored": true
+  },
+  "workflowEvents": [
+    {
+      "at": "2026-11-11T03:02:04.610Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:02:04.610Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:02:49.191Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:02:58.644Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwbjaki7-cdb42e8f",
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:03:15.584Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:04:53.790Z",
+      "kind": "stage.completed",
+      "stage": "A2",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:05:38.470Z",
+      "kind": "stage.requested",
+      "stage": "A3",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    },
+    {
+      "at": "2026-11-11T03:05:38.918Z",
+      "kind": "stage.completed",
+      "stage": "A3",
+      "taskId": null,
+      "code": null,
+      "roleId": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-11T03:02:04.616Z",
+      "taskId": "t-mwbj9ete-83ed594e",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced"
+    },
+    {
+      "at": "2026-11-11T03:02:49.193Z",
+      "taskId": "t-mwbjad7r-6fa00536",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced"
+    },
+    {
+      "at": "2026-11-11T03:02:58.639Z",
+      "taskId": "t-mwbjaki7-cdb42e8f",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced"
+    },
+    {
+      "at": "2026-11-11T03:03:15.585Z",
+      "taskId": "t-mwbjaxkw-7f77e838",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced"
+    },
+    {
+      "at": "2026-11-11T03:03:26.893Z",
+      "taskId": "t-mwbjb6b1-82d593f2",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced"
+    }
+  ],
+  "taskReported": 8,
+  "taskClosed": [
+    {
+      "at": "2026-11-11T03:02:29.979Z",
+      "taskId": "t-mwbj9ete-83ed594e",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T03:03:09.726Z",
+      "taskId": "t-mwbjad7r-6fa00536",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T03:03:47.094Z",
+      "taskId": "t-mwbjaki7-cdb42e8f",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-11T03:04:53.790Z",
+      "taskId": "t-mwbjb6b1-82d593f2",
+      "outcome": "accepted"
+    }
+  ],
+  "requestRows": [
+    {
+      "at": "2026-11-11T03:05:38.478Z",
+      "kind": "request.created",
+      "requestId": "req-83e16f4db777dbf3",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced",
+      "stage": "A3",
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T03:05:38.491Z",
+      "kind": "request.presented",
+      "requestId": "req-83e16f4db777dbf3",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T03:05:38.503Z",
+      "kind": "request.notified",
+      "requestId": "req-83e16f4db777dbf3",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T03:05:38.491Z",
+      "kind": "request.notified",
+      "requestId": "req-83e16f4db777dbf3",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-11T03:05:38.902Z",
+      "kind": "request.resolved",
+      "requestId": "req-83e16f4db777dbf3",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-b5e41a07ec9e164da5f42ced",
+      "stage": "A3",
+      "by": "customer",
+      "choice": "confirm"
+    },
+    {
+      "at": "2026-11-11T03:05:38.919Z",
+      "kind": "request.notified",
+      "requestId": "req-83e16f4db777dbf3",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    }
+  ],
+  "projectNotes": [
+    "等待运营执行 A1 补派任务 #t-mwbjad7r-6fa00536（需派 product stage=A1、sideEffect=docs 以记 stage.dispatched A1）；账本当前仍为 A1(requested)，A2 stage-request 被 stage-transition-invalid 拒绝，待 A1 完成后重发 A2。",
+    "A1 已推进（运营已派 product A1 受理任务 #t-mwbjaki7-cdb42e8f）；A2 stage-request 已派发 #t-mwbjaxkw-7f77e838，等待产品撰写 docs/product/snake-game-intent-v1.md。A2 收口后写 docs/intents/snake-game.md 并呈意图确认卡（A3）。",
+    "A3 意图已确认（decision-req-83e16f4db777dbf3）。但 A2 stage-request 任务 #t-mwbjaxkw-7f77e838 无法收口：close_created_task 连续返回 close-report-missing（要求任务报告 evidence[] 为纯项目相对路径，实际报告证据字符串含描述文字）。A2 阶段本身已 stageCompleted=true（产品任务 #t-mwbjb6b1-82d593f2）。因 open advance 请求未收口，A4 stage-request 被 stage-request-open 拒绝；幕僚→运营仅允许 stage-request，无法派纯协调任务让运营重提干净证据。需应用/运营侧修复证据记录或允许补正后再继续 A4。"
+  ],
+  "docs": [
+    "governance",
+    "intents",
+    "product"
+  ],
+  "roleCards": [],
+  "roleActivatedEvents": 0,
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "shellGateAuditAbsent": true,
+  "note": "A1/A2 completed; A3 intent card customer confirm + completed; A2 stage-request task close failed close-report-missing (convener report evidence had descriptive text); A4 stage-request rejected stage-request-open (open advance request not closed); chief declared the flow blocker and ended; no A4+; no role cards; no git; no legacy."
+}

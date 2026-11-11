@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: G8 A：真实 epoch 文件；旧 domain 指令不授权（卡片路径）、新指令 allow/deny 生效；面板投影 none/download
+ok 1 - G8 A：真实 epoch 文件；旧 domain 指令不授权（卡片路径）、新指令 allow/deny 生效；面板投影 none/download
+  ---
+  duration_ms: 60.6422
+  type: 'test'
+  ...
+# Subtest: 预授权 once：首次命中并消费、第二次回审批；执行失败也算已消费
+ok 2 - 预授权 once：首次命中并消费、第二次回审批；执行失败也算已消费
+  ---
+  duration_ms: 33.8486
+  type: 'test'
+  ...
+# Subtest: once durable 消费失败 ⇒ 回落普通审批，指令不被消费
+ok 3 - once durable 消费失败 ⇒ 回落普通审批，指令不被消费
+  ---
+  duration_ms: 10.1165
+  type: 'test'
+  ...
+# Subtest: 卡片路径审计：request.created/presented/resolved（by customer）+ downloads.jsonl（含 requestId）
+ok 4 - 卡片路径审计：request.created/presented/resolved（by customer）+ downloads.jsonl（含 requestId）
+  ---
+  duration_ms: 129.5093
+  type: 'test'
+  ...
+# Subtest: 审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读
+not ok 5 - 审计坏行：downloads.jsonl/tasks.jsonl 坏行不影响主路径；小上限账本轮转仍可读
+  ---
+  duration_ms: 28.691
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\download-requests-integration.test.ts:760:1'
+  failureType: 'testCodeFailure'
+  error: '坏行不得影响 request.* 读取'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/download-requests-integration.test.ts:784:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 预授权路径审计：零 request.*；downloads.jsonl 无 requestId、by directive+directiveId
+ok 6 - 预授权路径审计：零 request.*；downloads.jsonl 无 requestId、by directive+directiveId
+  ---
+  duration_ms: 21.2688
+  type: 'test'
+  ...
+# Subtest: judge approve：无客户卡、presented.to judge、downloads.jsonl by judge（含判据）
+ok 7 - judge approve：无客户卡、presented.to judge、downloads.jsonl by judge（含判据）
+  ---
+  duration_ms: 92.9206
+  type: 'test'
+  ...
+# Subtest: judge manual ⇒ 客户卡 + judgeNotice；resolved.by customer
+ok 8 - judge manual ⇒ 客户卡 + judgeNotice；resolved.by customer
+  ---
+  duration_ms: 102.0081
+  type: 'test'
+  ...
+# Subtest: unavailableReason 防御：下载卡转客户卡、judge 不调用、不消耗预授权
+ok 9 - unavailableReason 防御：下载卡转客户卡、judge 不调用、不消耗预授权
+  ---
+  duration_ms: 0.4474
+  type: 'test'
+  ...
+# Subtest: 跨域重定向 ⇒ download-redirect-cross-host；随后对目标重新申请成功
+ok 10 - 跨域重定向 ⇒ download-redirect-cross-host；随后对目标重新申请成功
+  ---
+  duration_ms: 19.7601
+  type: 'test'
+  ...
+# Subtest: 大小超限与超时：稳定 code 且清理占位/临时文件（download/ 为空）
+ok 11 - 大小超限与超时：稳定 code 且清理占位/临时文件（download/ 为空）
+  ---
+  duration_ms: 183.0738
+  type: 'test'
+  ...
+# Subtest: 一项目一卡：真实通道排队，第二张在首张结算后才呈现
+ok 12 - 一项目一卡：真实通道排队，第二张在首张结算后才呈现
+  ---
+  duration_ms: 171.5532
+  type: 'test'
+  ...
+# Subtest: 每项目执行并发 ≤2（跨会话共享）且并发同名不覆盖（后缀唯一）
+ok 13 - 每项目执行并发 ≤2（跨会话共享）且并发同名不覆盖（后缀唯一）
+  ---
+  duration_ms: 37.5721
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 12
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1306.7899

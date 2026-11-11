@@ -1,0 +1,11 @@
+role: game-core
+entries:
+  - kind: file
+    path: src/game-state.js
+    purpose: 游戏状态与规则实现
+  - kind: file
+    path: src/game-loop.js
+    purpose: 固定步长主循环实现
+  - kind: file
+    path: src/app-shell.js
+    purpose: 应用装配与流程编排

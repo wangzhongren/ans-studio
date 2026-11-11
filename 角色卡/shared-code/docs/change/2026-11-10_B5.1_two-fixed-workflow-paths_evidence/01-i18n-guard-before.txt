@@ -1,0 +1,43 @@
+[i18n-guard] scanned=148 allowlisted=23 violations=2
+✔ 守卫范围：包含入口与共享设置，排除测试/消息目录/治理角色文本/dist (10.0585ms)
+✔ allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文） (56.0749ms)
+✖ 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过） (69.2477ms)
+✔ 合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；注释中文放行 (1.962ms)
+✔ 去注释扫描：字符串/模板中的 URL 与内容不误删 (0.1192ms)
+✔ 去注释扫描：模板表达式内的注释被去除，模板原文保留 (0.0637ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 221.7353
+
+✖ failing tests:
+
+test at test\项目管理\shared\i18n-guard.test.ts:63:1
+✖ 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过） (69.2477ms)
+  AssertionError [ERR_ASSERTION]: allowlist 之外出现硬编码中文
+  + actual - expected
+  
+  + [
+  +   'app/desktop/workflow-git.ts:32:26 编排',
+  +   'app/desktop/workflow.ts:20:49 编排'
+  + ]
+  - []
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%A1%B9%E7%9B%AE%E7%AE%A1%E7%90%86/shared/i18n-guard.test.ts:77:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ 'app/desktop/workflow-git.ts:32:26 编排', 'app/desktop/workflow.ts:20:49 编排' ],
+    expected: [],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

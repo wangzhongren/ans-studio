@@ -1,0 +1,25 @@
+version=5 id=ans-default-v5
+git status | allow | allow:readonly:git:status | - | -
+git log --output=x | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git add src/impl/a.ts (scope) | allow | allow:task-git:add | - | allowed
+git add -A (scope) | deny | deny:raw-git-controlled-tools-required | git-task-add-flag-forbidden | denied
+git add ./src/impl/a.ts (scope) | deny | deny:raw-git-controlled-tools-required | git-task-add-not-literal | denied
+git add src/*.ts (scope) | deny | deny:raw-git-controlled-tools-required | git-task-add-not-literal | denied
+git add other/x (scope) | deny | deny:raw-git-controlled-tools-required | git-task-path-outside-writeset | denied
+git add .ans/x (scope) | deny | deny:raw-git-controlled-tools-required | git-task-path-governance | denied
+git commit -m x (scope) | allow | allow:task-git:commit | - | allowed
+git commit -F - (scope) | deny | deny:raw-git-controlled-tools-required | git-commit-argument-forbidden | denied
+git commit --amend -m x (scope) | deny | deny:raw-git-controlled-tools-required | git-commit-argument-forbidden | denied
+git commit -m "" (scope) | deny | deny:raw-git-controlled-tools-required | git-commit-message-empty | denied
+git push (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git merge x (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git reset --hard (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git clean -fdx (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git checkout main (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git switch main (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git tag v1 (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git update-ref x HEAD (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git config x y (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git init (scope) | deny | deny:raw-git-controlled-tools-required | git-command-not-ordinary | denied
+git add src/impl/a.ts (no scope) | deny | deny:raw-git-controlled-tools-required | git-task-scope-missing | denied
+git commit -m x (no scope) | deny | deny:raw-git-controlled-tools-required | git-task-scope-missing | denied

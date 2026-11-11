@@ -1,0 +1,5 @@
+warning: in the working copy of 'app/desktop/workflow.ts', LF will be replaced by CRLF the next time Git touches it
+ app/desktop/session.ts                       |  56 +++++
+ app/desktop/workflow.ts                      | 296 ++++++++++++++++++++++++++-
+ test/项目管理/shared/i18n-guard-allowlist.ts |  16 ++
+ 3 files changed, 365 insertions(+), 3 deletions(-)

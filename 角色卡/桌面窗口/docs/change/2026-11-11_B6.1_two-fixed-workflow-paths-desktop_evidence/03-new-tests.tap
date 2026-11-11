@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: sessionWorkflowModeForChat：空项目 ⇒ fixed；显式 legacy/v1 / two-fixed-paths/v1 优先且不缓存
+ok 1 - sessionWorkflowModeForChat：空项目 ⇒ fixed；显式 legacy/v1 / two-fixed-paths/v1 优先且不缓存
+  ---
+  duration_ms: 22.1515
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：在飞 legacy run（draft/pinned）⇒ legacy；closed/cancelled ⇒ fixed
+ok 2 - sessionWorkflowModeForChat：在飞 legacy run（draft/pinned）⇒ legacy；closed/cancelled ⇒ fixed
+  ---
+  duration_ms: 13.3281
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：有效 trunk ⇒ legacy；trunk 引用已关闭 run / 非有效 trunk ⇒ fixed
+ok 3 - sessionWorkflowModeForChat：有效 trunk ⇒ legacy；trunk 引用已关闭 run / 非有效 trunk ⇒ fixed
+  ---
+  duration_ms: 25.5454
+  type: 'test'
+  ...
+# Subtest: sessionWorkflowModeForChat：坏配置/读失败 ⇒ legacy（fail-closed，不猜 fixed）
+ok 4 - sessionWorkflowModeForChat：坏配置/读失败 ⇒ legacy（fail-closed，不猜 fixed）
+  ---
+  duration_ms: 16.5489
+  type: 'test'
+  ...
+# Subtest: trio 空项目幕僚聊天（无 taskId）⇒ workflowMode=fixed + fixed 工具面；legacy Git/VCA/stable 不注入
+ok 5 - trio 空项目幕僚聊天（无 taskId）⇒ workflowMode=fixed + fixed 工具面；legacy Git/VCA/stable 不注入
+  ---
+  duration_ms: 7.2289
+  type: 'test'
+  ...
+# Subtest: legacy 项目（在飞 run/有效 trunk/显式 legacy/v1）幕僚聊天 ⇒ 不传常量、legacy 注入逐项仍在
+ok 6 - legacy 项目（在飞 run/有效 trunk/显式 legacy/v1）幕僚聊天 ⇒ 不传常量、legacy 注入逐项仍在
+  ---
+  duration_ms: 12.6373
+  type: 'test'
+  ...
+# Subtest: single/su 聊天：不注入 workflowMode/workflowModeForFlow，注入仍为 legacy（旧行为逐字不变）
+ok 7 - single/su 聊天：不注入 workflowMode/workflowModeForFlow，注入仍为 legacy（旧行为逐字不变）
+  ---
+  duration_ms: 1.4451
+  type: 'test'
+  ...
+# Subtest: 空项目首个 stage-request：fixed 聊天 ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由；投递目标会话亦 fixed
+ok 8 - 空项目首个 stage-request：fixed 聊天 ⇒ ensureFixedPathStarted 写 workflowSchema + fixed 路由；投递目标会话亦 fixed
+  ---
+  duration_ms: 101.971
+  type: 'test'
+  ...
+# Subtest: legacy 在飞 run 不被首条 stage-request 覆盖：仍走 legacy（无 workflow.started、无 fixed 任务）
+ok 9 - legacy 在飞 run 不被首条 stage-request 覆盖：仍走 legacy（无 workflow.started、无 fixed 任务）
+  ---
+  duration_ms: 22.5561
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 630.0205

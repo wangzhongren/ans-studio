@@ -1,0 +1,34 @@
+diff --git a/test/项目管理/shared/i18n-guard-allowlist.ts b/test/项目管理/shared/i18n-guard-allowlist.ts
+index a78e8c6..b1164f4 100644
+--- a/test/项目管理/shared/i18n-guard-allowlist.ts
++++ b/test/项目管理/shared/i18n-guard-allowlist.ts
+@@ -23,6 +23,11 @@
+ //     的机器路径；② 三提交能力 submitVersionChange/submitRefactor/requestStableWrite 的
+ //     tool-result `message`——交角色 agent 的工具回执，非客户 UI 文案；用户可见文本只经
+ //     `mainT`/C3 key。classification §4，非用户可见 UI）——当前保留 **23** 条。
++//   · 2026-11-10（T3 两条固定工作流路径 B5.1；G-B5-4 修复）：新增 `app/desktop/workflow-git.ts`、
++//     `app/desktop/workflow.ts`（T3 B1/B3/B4.2 桌面固定路径新增文件。中文只出现在：① import
++//     specifier 中既有中文目录名 `编排` 的机器路径；② 应用失败回执/系统行（交运营/幕僚 agent 的
++//     tool-result/交付备注）与诊断 detail（含 git stderr 原文）——classification §4，非客户门/卡
++//     UI 文案）——当前保留 **25** 条。
+ // 规则：
+ //   · **新增条目必须写明理由**；只允许「明确不翻译」的文件（classification §4/§5）。
+ //   · B1–B4 每完成一批就从本清单移除对应文件；守卫测试会拒绝
+@@ -88,6 +93,17 @@ export const I18N_GUARD_ALLOWLIST: readonly string[] = [
+   "app/desktop/view-image.ts",
+   // 技能路径「编排」+ `[watchdog] tick 失败…` stderr 日志行（日志不翻译）——classification §4。
+   "app/desktop/watchdog.ts",
++  // T3「两条固定工作流路径」B1/B3/B4.2 桌面固定路径新增文件（B5.1/G-B5-4 补登记，2026-11-10）。
++  // 中文只出现在两类机器文本，均非客户门/卡 UI 文案：
++  // ① import specifier 中既有中文目录名的机器路径——`编排`（`../../src/common/编排/`：
++  //    workflow-git.ts :32:26/:39:26/:45:86；workflow.ts :20:49/:21:57/:22:54/:27:26）；
++  // ② 应用失败回执/系统行与诊断 detail——`FixedPathStartOutcome.message`（workflow.ts:193）、
++  //    `WorkflowGitFailure.message` / `WorkflowServiceFailure.message` / `ShellTaskGitCommandFacts.error`
++  //    （git init/.gitignore/任务分支/merge-main（含 stderr 原文）/任务级 add·commit 运输防御），
++  //    作为 tool-result/交付备注交运营/幕僚 agent，非客户可见 UI；客户卡文案由 `customer-input.ts`
++  //    的卡构造生成（该文件已在本清单）——classification §4。
++  "app/desktop/workflow-git.ts",
++  "app/desktop/workflow.ts",
+   // 技能路径「编排」出现在 import specifier（机器路径）——classification §4。写入预授权系统行/拒绝
+   // 原因的展示文案已入共享目录（`main.customerInput.writePreauthorization.*`，2026-10-25），
+   // 桌面角色接线前本文件仍含中文；接线后仅剩机器路径，继续保留在清单。

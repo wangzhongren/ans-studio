@@ -16,11 +16,17 @@
 // 职责边界：本模块只维护 review 目标/最终候选/CID/criteria 的**角色侧纯策略**、acceptance 卡数据与
 // 报告期望。**不实现验收判定**（归内置独立验收）、**不做 Git 候选证据核验**、不读写账本——
 // 这些仍在 Service/桌面路由与独立验收；preflight allow 也不替代 Service/Provider 的最终校验。
+//
+// T3「两条固定工作流路径」B2（v1.3 §3.4 verifier 行；G-IR §5.7/MF-IR-4）：新增
+// `fixedCards=[]` 与 `context({matrix:"two-fixed-paths/v1"})` fixed 段；legacy `card.text`/
+// `cards`/capabilities/`context`（缺省或 `legacy-v1`）**逐字冻结**，只读 fixed 字段的新消费方
+// 由门禁引擎门面/编排按矩阵显式选择，legacy 消费点（apply-journal/trunk-runtime）不改读取源。
 
 import type { BoundaryEntry } from "../../../model/boundary.ts";
 import type {
   BuiltInRoleModule,
   GovernanceCapabilities,
+  GovernanceCardKind,
   RoleContextInput,
   RoleContextSection,
   RoleDispatchPolicy,
@@ -136,8 +142,20 @@ const VERIFIER_CAPABILITIES: GovernanceCapabilities = Object.freeze({
 /**
  * 当前有效卡种（E0 D8；旧 `run-role.ts::TRIO_CARD_KINDS.verifier = ["acceptance"]`）。
  * 不含 legacy `"write"` 等 token；E2 门面负责旧数据兼容映射。
+ * **legacy 数据逐字冻结**（T3 B2/MF-IR-4）：fixed 矩阵不读本字段，只读 `fixedCards`（见下）。
  */
 const VERIFIER_CARDS = Object.freeze(["acceptance"] as const);
+
+/**
+ * fixed 派发矩阵卡种白名单（T3「两条固定工作流路径」B2；MF-IR-4 冻结值）。
+ *
+ * v1.3 §3.4 verifier 行 / §8.5：`fixedCards = []`——acceptance 卡在固定路径**抑制**
+ * （固定路径验收不发卡；A12 `docs/acceptance` 归档由应用生成）。门禁引擎门面
+ * `cardKindsOf("verifier","two-fixed-paths/v1")` 只读本字段（零复制同引用）；legacy
+ * `cards` 与 legacy 消费点（`run-role.ts::legacyCardKindsOf`）**逐字不改**、不得改读本字段。
+ * 纯数据、无 I/O：空集是冻结值，不是「回退 legacy cards」的缺省。
+ */
+const VERIFIER_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze([]);
 
 const EMPTY_TOOL_IDS: readonly [] = Object.freeze([]);
 const EMPTY_REASONS: readonly [] = Object.freeze([]);
@@ -387,8 +405,56 @@ const VERIFIER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   REPORT_EXPECTATION_SECTION,
 ]);
 
-function contextOf(_input: RoleContextInput): readonly RoleContextSection[] {
-  // 纯静态模板：忽略输入中的治理模型/可选事实（不读取未登记键，不做 I/O）。
+// —————————————————————— fixed 矩阵段（two-fixed-paths/v1；legacy 段逐字冻结）——————————————————————
+
+/**
+ * fixed 验收角色段（T3 B2；v1.3 §3.4 verifier 行、§3.3 A12/A12a/A12b；G-IR §5.7/MF-IR-4）。
+ *
+ * 只在 `matrix:"two-fixed-paths/v1"` 返回；legacy `VERIFIER_CONTEXT_SECTIONS` 逐字不动。
+ * 内容为纯文本模板（不携带权限/账本/证据/运行时秘密）：幕僚直派的验收角色、A12a 实施前
+ * criteria、A12b 实施后 report、按任务文本调节强度、结论/证据如实回幕僚。
+ */
+const FIXED_REVIEW_ROLE_SECTION: RoleContextSection = Object.freeze({
+  id: "verifier-fixed-review-role",
+  text: [
+    '固定路径验收角色（A12；仅 matrix:"two-fixed-paths/v1"）：',
+    "- 你是幕僚（chief）直派的独立验收角色（默认内置质检）：验收任务只由幕僚创建、收报与收口；运营（convener）不派你，你也不派发任何任务。",
+    "- A12a（实施前）：按客户意图、方案/名单/架构与任务文本撰写验收标准（criteria）到 docs/quality/<flowId>-criteria-vN.md；标准先于实现定稿，绑定由应用核验并记录。",
+    "- A12b（实施后）：按冻结 criteria 与任务指定的最终完整 OID 执行真实核对（真实运行/测试/查证据），报告写 docs/quality/<flowId>-report-vN.md，证据附件写 docs/verification/。",
+    "- 验收强度按任务文本调节（轻量：核对指定写集与关键证据；完整：逐条核对全部冻结 criteria）；调节的是核对深度，不是如实性：缺证据写 insufficient evidence，不代造通过。",
+    "- 结论/证据如实回幕僚：submit_report 写明报告路径、指定 OID/criteria、结论与证据；不通过按新 attempt 回 A11 返工，缺证或失败正式 blocked/failed 回幕僚，不静默等待。",
+    "- **报告证据格式**：`submit_report` 的 `evidence[]` 每项必须是纯项目相对文件路径（A12a 的 `docs/quality/<flowId>-criteria-vN.md`、A12b 的 `docs/quality/<flowId>-report-vN.md`、附件 `docs/verification/...`）；描述、结论与 hash 引用写在 summary 正文。收口按纯路径核验文件字节，描述文本不计为证据（应用在缺失时按质量路径回退核验，但不得依赖回退）。",
+    "- 本段仅用于固定路径会话；与旧角色卡文本冲突时以本段为准。",
+  ].join("\n"),
+});
+
+/**
+ * fixed 报告/归档期望段（T3 B2；v1.3 §3.4 verifier 行、§8.5 A12 归档；MF-7）。
+ *
+ * 应用在 A12b 完成时生成 `docs/acceptance/<flowId>-acceptance-vN.md` 归档（含 criteria/report
+ * hash、结论、幕僚决策）；角色只读。固定路径不发 acceptance 卡（`fixedCards=[]`）。
+ */
+const FIXED_REPORT_EXPECTATION_SECTION: RoleContextSection = Object.freeze({
+  id: "verifier-fixed-report-expectation",
+  text: [
+    "固定路径报告期望与归档：",
+    "- 固定路径不发 acceptance 卡（本角色 fixed 卡种为空）：客户业务选择不由你发起、自批或代选；没有需要你发起的验收卡。",
+    "- docs/acceptance/<flowId>-acceptance-vN.md 验收归档由应用在 A12b 完成时生成（含 criteria/report 路径与 hash、结论、幕僚决策）；你只读归档，不写、不伪造、不替代。",
+    "- 边界自律：只写自身合法写区（docs/quality/、docs/verification/、docs/governance/verifier/）；不派发、不实现、不改他人报告；不代运营发布、不创建角色。固定路径不注入结构化 Git/trunk/VCA/stable 等 legacy 工具；工具/能力以本会话实际注入为准，不得虚构。",
+    "- 复核只认当前指定最终完整 OID 与冻结 criteria：候选漂移或内容已变不判通过；必要时停止核验并如实回报来源链。",
+  ].join("\n"),
+});
+
+const VERIFIER_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
+  FIXED_REVIEW_ROLE_SECTION,
+  FIXED_REPORT_EXPECTATION_SECTION,
+]);
+
+function contextOf(input: RoleContextInput): readonly RoleContextSection[] {
+  // 纯静态模板：忽略输入中的可选事实（不读取未登记键，不做 I/O）。
+  // T3 B2 矩阵分支：只有显式 `matrix:"two-fixed-paths/v1"` 返回 fixed 段；
+  // 缺省 / `"legacy-v1"` / `context({})` 一律返回同一 legacy 引用（逐字冻结）。
+  if (input.matrix === "two-fixed-paths/v1") return VERIFIER_FIXED_CONTEXT_SECTIONS;
   return VERIFIER_CONTEXT_SECTIONS;
 }
 
@@ -402,6 +468,7 @@ export const verifierRoleModule: BuiltInRoleModule = Object.freeze({
   card: VERIFIER_CARD,
   capabilities: VERIFIER_CAPABILITIES,
   cards: VERIFIER_CARDS,
+  fixedCards: VERIFIER_FIXED_CARDS,
   tools: toolsOf,
   dispatch: dispatchOf,
   preflight: VERIFIER_PREFLIGHT,

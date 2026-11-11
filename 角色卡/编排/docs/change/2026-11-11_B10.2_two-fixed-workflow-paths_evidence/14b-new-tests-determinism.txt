@@ -1,0 +1,15 @@
+== run 1 ==
+# tests 9
+# pass 9
+# fail 0
+# skipped 0
+== run 2 ==
+# tests 9
+# pass 9
+# fail 0
+# skipped 0
+== run 3 ==
+# tests 9
+# pass 9
+# fail 0
+# skipped 0

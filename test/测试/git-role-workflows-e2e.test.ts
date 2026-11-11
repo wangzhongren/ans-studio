@@ -331,14 +331,17 @@ test("Q87 quality document filename version keeps schema and actual metadata bin
     cases, boundedLastFactsProtocol: { entryAndByteBounds: true, controlledPromptAndSecretBodiesAbsent: true, noRuntimeOrWorkflowStateCreated: true }, revertMaterialProtocol: { actualLogControlSource: "Actual Q87 public publish CID/parents rendered only as a log-format parser control, not a fresh query receipt", revertPacketBoundaries, malformedLogOrSupportRejected: true }, deliveredSourcePacketProtocol: { actualPublishedSource: parsedSource, packetBoundaries, truncatedDuplicateOrFinalCidAsWorkerRejected: true, source: "Actual Q87 public publish receipt; format boundary controls are not real commits or business handbacks" }, unchangedTaskRunCandidateCriteriaAndChecks: true, oldRootBytesUnchanged: true, modificationMainWaitClippedToExistingPhaseOnly: true, originalHttpToolWaitUnchanged: true, noBusinessOrAuthorityState: true, scope: "Pure report-version protocol; no quality acceptance, publication or future v3 task invented" }, null, 2), { flag: "wx" });
 });
 
+// B7.2（2026-11-11，测试）：Q18/Q22 是 **legacy 能力**探针（chief `dispatch_task` → 星形任务链）。
+// B7.1 起 fixed 聊天对无 workflowId/stage 的普通派发 fail-closed（stage-request-required），故与
+// B6.2 的 Q2 同口径显式声明旧项目状态（合法在飞 legacy run）；**断言与产品代码零修改**。
 test("Q18 minimal Desktop lifecycle runner diagnostic", { timeout: 30000 }, async () => {
-  await runDesktopLifecycleProbe(path.join(evidence, "q18-desktop-runner-probe.json"));
+  await runDesktopLifecycleProbe(path.join(evidence, "q18-desktop-runner-probe.json"), "completed", seedLegacyChatFixture);
 });
 test("Q22 minimal real denied write blocked report cleanup", { timeout: 30000 }, async () => {
-  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-desktop-probe.json"), "denied-write-blocked");
+  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-desktop-probe.json"), "denied-write-blocked", seedLegacyChatFixture);
 });
 test("Q22 explicit outer failure after real blocked cleanup", { timeout: 30000, skip: process.env.ANS_Q22_ASSERTION_CONTROL !== "1" }, async () => {
-  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-outer-failure-probe.json"), "denied-write-blocked");
+  await runDesktopLifecycleProbe(path.join(evidence, "q22-blocked-outer-failure-probe.json"), "denied-write-blocked", seedLegacyChatFixture);
   assert.fail("Q22_DIAGNOSTIC_OUTER_FAILURE_AFTER_REAL_BLOCKED_CLEANUP");
 });
 
@@ -1238,6 +1241,24 @@ function postInitMaterials(chainFlow: string, submitted: (reply: string) => void
   ] };
 }
 
+// B6.2（2026-11-11，测试）：B6.1 起**空项目/无 legacy 状态的幕僚聊天默认 fixed**（RR 根因修复）。
+// 既有 **legacy 能力** e2e 用例须显式声明旧项目状态（与 B6.1 桌面 legacy 夹具加
+// `workflowSchema:"legacy/v1"` 同口径）。此处使用一个**合法**的「在飞 legacy run（draft）」作为
+// 等价 legacy 事实：`sessionWorkflowModeForChat` 据此按 legacy 注入 legacy 工具面；run manifest 完整
+// 通过 `validateRunManifest`，flowId 与本用例业务 flow 不同，不参与业务 run 解析。
+// **仅测试夹具**——断言与产品代码零修改。
+const LEGACY_CHAT_FIXTURE_RUN_ID = "run-legacy-chat-fixture";
+async function seedLegacyChatFixture(root: string): Promise<void> {
+  const file = path.join(root, ".ans", "runs", LEGACY_CHAT_FIXTURE_RUN_ID, "manifest.json");
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  const at = "2026-01-01T00:00:00.000Z";
+  await fs.writeFile(file, `${JSON.stringify({
+    schema: "ans-run/v1", runId: LEGACY_CHAT_FIXTURE_RUN_ID, flowId: "legacy-chat-fixture",
+    state: "draft", createdAt: at, updatedAt: at,
+    schemas: { run: "ans-run/v1" }, documents: {}, execution: { teamPlan: null, flow: null },
+  }, null, 2)}\n`, "utf8");
+}
+
 test("Q2 real default CodexChat HTTP: chief Git query preserves real metadata and records the actual same-instance surface", { timeout: 15000 }, async () => {
   const queryCaseTag = process.env.ANS_QUERY_CASE_TAG ?? "q2-query"; assert.match(queryCaseTag, /^(?:q2-query|q[1-9]\d{0,5}-read-only)$/);
   const driver = await createRealHttpDriver({ chief: [
@@ -1249,6 +1270,8 @@ test("Q2 real default CodexChat HTTP: chief Git query preserves real metadata an
   ] }, { tag: queryCaseTag, requestLimit: 8, prepareFixture: async root => {
     // Existing-repo query fixture only; this setup is absent from the true new-project case below.
     await initializeGitRepository(root); await fs.mkdir(path.join(root, "docs")); await fs.writeFile(path.join(root, "docs/query.md"), "query fixture\n");
+    // B6.2：本用例验证 legacy `git_query`；显式声明旧项目状态（B6.1 起无 `.ans` 旧状态的项目聊天默认 fixed）。
+    await seedLegacyChatFixture(root);
   } });
   const before = await hashFixtureFiles(driver.root);
   try {
@@ -1900,6 +1923,9 @@ export async function runFirstNewBusinessCase() {
     assert.deepEqual(await fs.readdir(driver.root), []);
     assert.equal(driver.initialRootFacts.ancestors.some(fact => fact.gitMarker || fact.symbolicLink), false, "The true new fixture has no ancestor Git or linked root");
     assert.deepEqual(driver.initialRootFacts.nestedGitMarkers, []); assert.deepEqual(driver.initialRootFacts.links, []);
+    // B6.2：本用例验证 **legacy 首次 bootstrap** 能力；B6.1 起空项目幕僚聊天默认 fixed。打开聊天前
+    // 显式声明旧项目状态（在飞 legacy run ⇒ legacy 工具面），业务断言/后续真实首建流程不变。
+    await seedLegacyChatFixture(driver.root);
     await driver.bounded("public-chief-open", () => driver.openChief()); await driver.sendChief("此空目录新建本地应用；先由运营做受控Git首建，随后按缺口规划。" );
     if (q33QueueDiagnostic) {
       let diagnosticWindowElapsed = false;

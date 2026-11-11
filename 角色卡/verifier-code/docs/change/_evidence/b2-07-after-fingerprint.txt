@@ -1,0 +1,15 @@
+module.file.sha256=93a65837b4edccefcabcad11b0beceeed977272585f11ceaf1e5337637b4fc51
+legacy.context.count=2
+legacy.context.ids=["verifier-acceptance-card","verifier-report-expectation"]
+legacy.context.json.sha256=574a8d85ecaf42b479c4e84f7a09679802403186fbfa34100a2256336af35baf
+legacy.context.same_as_before=true
+legacy.card.text.sha256=ac9511ac64603ea5b14a1436854c78160f7c903d779e74400bc7b263cc165199
+legacy.cards=["acceptance"]
+legacy.capabilities={"customerInput":true,"dispatchTask":false,"roleStatus":false,"sessionTail":false,"installSkill":false,"installMcp":false,"shell":"operator-approve"}
+fixed.cards=[] frozen=true
+fixed.context.count=2
+fixed.context.ids=["verifier-fixed-review-role","verifier-fixed-report-expectation"]
+fixed.context.json.sha256=382b5cc939c3e475434a4e66dbcb44e2373bd9e384940182923730a85668316b
+fixed.context.same_ref_across_inputs=true
+module.keys=["capabilities","card","cards","context","dispatch","displayName","fixedCards","function","id","preflight","tools"]
+module.frozen=true

@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: unsafe：external/destructive/unknown 零次自动重派（即使终止已确认）
+ok 1 - unsafe：external/destructive/unknown 零次自动重派（即使终止已确认）
+  ---
+  duration_ms: 0.4314
+  type: 'test'
+  ...
+# Subtest: unsafe：终止未确认 / 已发生外部副作用
+ok 2 - unsafe：终止未确认 / 已发生外部副作用
+  ---
+  duration_ms: 0.119
+  type: 'test'
+  ...
+# Subtest: needs-review：部分写入/未完成工具调用/已有完成报告 ⇒ 不自动重派
+ok 3 - needs-review：部分写入/未完成工具调用/已有完成报告 ⇒ 不自动重派
+  ---
+  duration_ms: 0.0932
+  type: 'test'
+  ...
+# Subtest: safe：仅 read-only/docs/code 且终止确认、无部分写入/无外部副作用
+ok 4 - safe：仅 read-only/docs/code 且终止确认、无部分写入/无外部副作用
+  ---
+  duration_ms: 0.0724
+  type: 'test'
+  ...
+# Subtest: 应用强制升类（不降类）：缺填/非法 ⇒ unknown；shell/删除/发布/源码/文档按文本升类
+ok 5 - 应用强制升类（不降类）：缺填/非法 ⇒ unknown；shell/删除/发布/源码/文档按文本升类
+  ---
+  duration_ms: 0.8012
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 171.1472

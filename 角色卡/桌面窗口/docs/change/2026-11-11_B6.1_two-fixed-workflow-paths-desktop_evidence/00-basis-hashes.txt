@@ -1,0 +1,4 @@
+166c5281070c5d4ea8d49810c11331b8d3596b2a1cb1b754d48706129dc6c027 *角色卡/测试/docs/change/2026-11-10_RR_two-fixed-workflow-paths.md
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+19fb866112d77e0b4a20ed9e5f6d4d711ce03fbe12b9a8370138c792ed1d06eb *test/测试/fixed-path-full-chain.test.ts

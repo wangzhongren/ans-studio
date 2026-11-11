@@ -1,0 +1,67 @@
+TAP version 13
+# Subtest: 金文本独立构造：双技能按 name 排序编号 1/2；digest＝当刻字节 sha256 独立复算；日期取 ISO 段
+ok 1 - 金文本独立构造：双技能按 name 排序编号 1/2；digest＝当刻字节 sha256 独立复算；日期取 ISO 段
+  ---
+  duration_ms: 12.9588
+  type: 'test'
+  ...
+# Subtest: digest 原始字节对抗：BOM＋非法 UTF-8 字节的 SKILL.md——sha256 按原始字节算（不解码/不剥 BOM）
+ok 2 - digest 原始字节对抗：BOM＋非法 UTF-8 字节的 SKILL.md——sha256 按原始字节算（不解码/不剥 BOM）
+  ---
+  duration_ms: 14.6526
+  type: 'test'
+  ...
+# Subtest: 双向核（自建逐目录表）：登记级坏件集＝读取器 undefined 集＝渲染器诊断集；非坏件原样返回视图
+ok 3 - 双向核（自建逐目录表）：登记级坏件集＝读取器 undefined 集＝渲染器诊断集；非坏件原样返回视图
+  ---
+  duration_ms: 13.2734
+  type: 'test'
+  ...
+# Subtest: 坏件集对抗矩阵（逐条 reason 与 detail 如实）＋ onDiagnostic 抛错被吞、默认两参调用绝不抛
+ok 4 - 坏件集对抗矩阵（逐条 reason 与 detail 如实）＋ onDiagnostic 抛错被吞、默认两参调用绝不抛
+  ---
+  duration_ms: 7.3727
+  type: 'test'
+  ...
+# Subtest: 零技能 ∅：无目录/空目录/仅有直接文件条目——全部空串零诊断；文件条目不是技能
+ok 5 - 零技能 ∅：无目录/空目录/仅有直接文件条目——全部空串零诊断；文件条目不是技能
+  ---
+  duration_ms: 1.3447
+  type: 'test'
+  ...
+# Subtest: 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+not ok 6 - 读取器入参防御（对抗）：穿越名/分隔符/控制字符/空白根——一律 undefined，绝不抛
+  ---
+  duration_ms: 6.8606
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\g4-skill-verify\\b-render-double-check.test.ts:182:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\g4-outside-e1R94J' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\g4-render-gzg78p\\docs\\skills\\link'"
+  code: 'EPERM'
+  stack: |-
+    Object.symlinkSync (node:fs:1937:11)
+    file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:197:10
+    temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:24:5)
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/b-render-double-check.test.ts:183:3)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 解析宽容但有界（对抗变体）：全角/半角冒号、无横线、BOM、CRLF 均可；缺任一字段即坏件；同键首现为准
+ok 7 - 解析宽容但有界（对抗变体）：全角/半角冒号、无横线、BOM、CRLF 均可；缺任一字段即坏件；同键首现为准
+  ---
+  duration_ms: 9.3857
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 148.5599

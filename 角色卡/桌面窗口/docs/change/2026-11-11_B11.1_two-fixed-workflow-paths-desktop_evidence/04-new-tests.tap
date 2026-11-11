@@ -1,0 +1,34 @@
+TAP version 13
+# Subtest: B11.1 RR6：已收口 fixed 回交（A1）被丢弃并继续投递后续 open fixed 回交（A2），不再反复阻塞 convener
+ok 1 - B11.1 RR6：已收口 fixed 回交（A1）被丢弃并继续投递后续 open fixed 回交（A2），不再反复阻塞 convener
+  ---
+  duration_ms: 134.7668
+  type: 'test'
+  ...
+# Subtest: B11.1 open fixed 回交照常投递：不产生 delivery.skip.fixed-child-closed 诊断
+ok 2 - B11.1 open fixed 回交照常投递：不产生 delivery.skip.fixed-child-closed 诊断
+  ---
+  duration_ms: 54.1861
+  type: 'test'
+  ...
+# Subtest: B11.1 混合 batchItems：只丢已收口成员，open 成员照常投递（不整批阻塞/不误投）
+ok 3 - B11.1 混合 batchItems：只丢已收口成员，open 成员照常投递（不整批阻塞/不误投）
+  ---
+  duration_ms: 31.2963
+  type: 'test'
+  ...
+# Subtest: B11.1 legacy 回交旧路径不变：closed legacy child 仍走旧解析（不被 fixed closed 分支丢弃）
+ok 4 - B11.1 legacy 回交旧路径不变：closed legacy child 仍走旧解析（不被 fixed closed 分支丢弃）
+  ---
+  duration_ms: 62.4352
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 688.7466

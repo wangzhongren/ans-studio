@@ -1,0 +1,28 @@
+✔ review task data: the single Model host reference survives replay; forged authority fields fail shape validation (2.0026ms)
+✔ chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append (5.9376ms)
+✔ append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed (16.5949ms)
+✔ 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放 (2.5569ms)
+✔ 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行 (0.5776ms)
+✔ 副作用分类：缺填/非法⇒unknown；应用只升不降 (0.8686ms)
+✔ 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计） (4.8185ms)
+✔ 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务 (6.2929ms)
+✔ 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实 (0.3806ms)
+✔ task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读 (17.0553ms)
+✔ task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex） (17.1458ms)
+✔ doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读 (6.1116ms)
+✔ request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行 (8.0846ms)
+✔ task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝 (10.8865ms)
+✔ R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放 (3.0857ms)
+✔ P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变 (21.2461ms)
+✔ P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞 (2.8862ms)
+✔ P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟） (10.5919ms)
+✔ Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行） (18.7739ms)
+✔ S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行 (3.0047ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 333.3196

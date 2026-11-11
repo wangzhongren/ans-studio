@@ -1,0 +1,26 @@
+# G-IR 证据 02：B0 四份记录 ↔ 提交代码 hash 抽查（写盘实测）
+
+方法：在 HEAD ee5b330 工作树对文件做 `sha256sum`（原字节；Windows CRLF），与各 B0 记录 §候选表逐项比对。
+评审时 `git status --porcelain -- src app test` 为空。
+
+| 文件 | 记录声明（B0 记录） | 实测（HEAD ee5b330） | 一致 |
+| --- | --- | --- | --- |
+| src/model/runtime.ts | 17c5d7a40cc8a725fddeb615845a92abcbee29df9870bb91ff146f82232ab8fc（运行时核心 §4） | 同左 | 是 |
+| src/model/role.ts | ea01d09387e26f889f15116933cb41a0b5244a3a906c5b2b1ce74b914538f195（门禁引擎 §4） | 同左 | 是 |
+| src/provider/runtime/schema.ts | 061fd80c791d6794b09d9976983cbdd31aeeba8b6c820898fe41f99a7a5e50fc（运行时核心 §4） | 同左 | 是 |
+| src/provider/runtime/tools.ts | d30b7f65a117d852cae9bc478dafc48c60c9202c9660c28f7c716545e2e15635（运行时核心 §4） | 同左 | 是 |
+| src/common/编排/task-state.ts | 029a9a89a7ef75e5da149c96765cfdad53667303f8a4b08ec18fa0d6296be6f8（编排 §2） | 同左 | 是 |
+| src/common/编排/workflow-state.ts | 863a3164f018087e27d8043e0928f116dc243a9a8a8407a3f354531f53be41a7（编排 §2） | 同左 | 是 |
+| src/common/编排/workflow-service.ts | 0c76ea1f28066add523279747de981fd49c43648b9873ab8fb5720c8d4e6ae2f（编排 §2） | 同左 | 是 |
+| src/common/编排/basis-guard.ts | 3874925bd134d757bcc63ec965192e87d9de827d1f9344ddbc1043cc84a5175e（编排 §2） | 同左 | 是 |
+| src/pipeline/orchestration/run-role.ts | aafb1a07f8498d03a544ec6491ba59b0f3dc1604a4d4c6052eb7ce0e5e67b9b9（编排 §2） | 同左 | 是 |
+| src/common/shared/config-loader.ts | 2d6a22fd5311f67a92c1211d84177cd0e059e587583bfaf25e7de2c4cdcad425（shared-code §5） | 同左 | 是 |
+| test/runtime-core/two-fixed-workflow-paths-b0.test.ts | b82c84c16e137465be171826bf5298f8f836f68affb6bc6ef8640b9efeb0a717（运行时核心 §4） | 同左 | 是 |
+| test/门禁引擎/role-module-contract.test.ts | 566eea7c79d7de4fb270aa7fb95f6b265fcec607ae9c50f04d54e27411b01f43（门禁引擎 §4） | 同左 | 是 |
+| test/门禁引擎/dispatch-matrix-mode.test.ts | 0a08bcad2484ca8c06f234fc42f9a0b277e3b89bb531171a095c0c74c07ac0c4（门禁引擎 §4） | 同左 | 是 |
+| test/项目管理/shared/config-loader.test.ts | 07e271570692e1ab4dacd3ee7c573aa619a304ce75af0a2f3c2449eb2cb8a6ad（shared-code §5） | 同左 | 是 |
+
+## 结论
+
+- 四份 B0 记录声明的工作树 hash 与 ee5b330 提交内容逐项一致；未发现“记录与代码不一致”。
+- B0 记录对并行批次、瞬时 typecheck 红、跨批次修复（run-role.ts +1）均已披露（见各记录 §5/§6）。

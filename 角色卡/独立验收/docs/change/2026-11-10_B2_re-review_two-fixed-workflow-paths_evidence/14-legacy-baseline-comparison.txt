@@ -1,0 +1,30 @@
+# head(12-legacy-star-i-full-chain-head.tap) fails: 9; baseline fails: 9
+# head-only: 0; baseline-only: 0
+# name+first-error identical: 9/9
+[IDENTICAL] 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+   head: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+   base: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+[IDENTICAL] convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+   head: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+   base: worker-dispatch-source-unavailable：缺少当前运营真实受派任务，未派发。
+[IDENTICAL] BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+   head: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+   base: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+[IDENTICAL] BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+   head: The input did not match the regular expression /无法打开|未投递/. Input:
+   base: The input did not match the regular expression /无法打开|未投递/. Input:
+[IDENTICAL] BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+   head: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+   base: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+[IDENTICAL] BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+   head: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+   base: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+[IDENTICAL] AC-4.3：洁净派发无 advisory、无诊断噪声
+   head: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+   base: document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+[IDENTICAL] 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+   head: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+   base: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+[IDENTICAL] F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+   head: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+   base: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。

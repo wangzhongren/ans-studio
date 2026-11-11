@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: 面板键恰为 3+3（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/PROMPT_TIMEOUT/REASONING_EFFORT）；provider 不在面板里；默认路径为仓库根 .env
+ok 1 - 面板键恰为 3+3（必填 token/端点/模型 + 可选 CONTEXT_WINDOW/PROMPT_TIMEOUT/REASONING_EFFORT）；provider 不在面板里；默认路径为仓库根 .env
+  ---
+  duration_ms: 0.9797
+  type: 'test'
+  ...
+# Subtest: 载入：loadPiEnv 把假 .env 的值带进 env（补 --env-file）
+ok 2 - 载入：loadPiEnv 把假 .env 的值带进 env（补 --env-file）
+  ---
+  duration_ms: 14.556
+  type: 'test'
+  ...
+# Subtest: 载入：.env 不存在 → 无操作、不抛（与 loadEnvFileInto 的 ENOENT 语义一致）
+ok 3 - 载入：.env 不存在 → 无操作、不抛（与 loadEnvFileInto 的 ENOENT 语义一致）
+  ---
+  duration_ms: 0.7929
+  type: 'test'
+  ...
+# Subtest: 掩码：getPiConfig 对机密键恒返空 value，只给 isSet；非机密键回填真实值
+ok 4 - 掩码：getPiConfig 对机密键恒返空 value，只给 isSet；非机密键回填真实值
+  ---
+  duration_ms: 6.6397
+  type: 'test'
+  ...
+# Subtest: 掩码：.env 不存在 → 视图为空、各键 isSet=false（不抛）
+ok 5 - 掩码：.env 不存在 → 视图为空、各键 isSet=false（不抛）
+  ---
+  duration_ms: 0.7431
+  type: 'test'
+  ...
+# Subtest: 保存：只动指定键、逐字节保留其余内容（注释/空行/未知键/其它键/顺序）
+ok 6 - 保存：只动指定键、逐字节保留其余内容（注释/空行/未知键/其它键/顺序）
+  ---
+  duration_ms: 16.2053
+  type: 'test'
+  ...
+# Subtest: 保存：缺键追加到末尾（含机密键），且面板键过滤掉非面板键
+ok 7 - 保存：缺键追加到末尾（含机密键），且面板键过滤掉非面板键
+  ---
+  duration_ms: 15.7626
+  type: 'test'
+  ...
+# Subtest: 保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；已存在的那行原样保留（只改相关键）
+ok 8 - 保存：ANS_PI_PROVIDER 不再被写——即便提交它也被过滤；已存在的那行原样保留（只改相关键）
+  ---
+  duration_ms: 13.0225
+  type: 'test'
+  ...
+# Subtest: G-5：旧面板路径可读写 ANS_PI_REASONING_EFFORT（纳入面板键；值域校验单一来源在注册表保存链——旧路径不复制第二份判定）
+ok 9 - G-5：旧面板路径可读写 ANS_PI_REASONING_EFFORT（纳入面板键；值域校验单一来源在注册表保存链——旧路径不复制第二份判定）
+  ---
+  duration_ms: 9.4543
+  type: 'test'
+  ...
+# Subtest: 凭据不回显：哨兵 token 绝不出现在保存回报或错误文本里（含写失败路径）
+ok 10 - 凭据不回显：哨兵 token 绝不出现在保存回报或错误文本里（含写失败路径）
+  ---
+  duration_ms: 1.3
+  type: 'test'
+  ...
+# Subtest: 保存：无面板键可写时恒等（不触碰文件、回报空 apply）
+ok 11 - 保存：无面板键可写时恒等（不触碰文件、回报空 apply）
+  ---
+  duration_ms: 1.6438
+  type: 'test'
+  ...
+# Subtest: interface：getPiConfig/savePiConfig 经注入的临时路径读写（不碰真实仓库根 .env）
+ok 12 - interface：getPiConfig/savePiConfig 经注入的临时路径读写（不碰真实仓库根 .env）
+  ---
+  duration_ms: 16.8542
+  type: 'test'
+  ...
+# Subtest: packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path
+ok 13 - packaged configuration resolves to persistent userData instead of source/resources while development keeps repo path
+  ---
+  duration_ms: 0.7426
+  type: 'test'
+  ...
+# Subtest: packaged settings save and a fresh startup environment share the injected writable path without touching bundled config
+ok 14 - packaged settings save and a fresh startup environment share the injected writable path without touching bundled config
+  ---
+  duration_ms: 12.6749
+  type: 'test'
+  ...
+# Subtest: packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request
+ok 15 - packaged smoke requires explicit isolated absolute paths, while ordinary startup has no smoke request
+  ---
+  duration_ms: 1.8056
+  type: 'test'
+  ...
+# Subtest: packaged smoke script checks entry/root/driver/CSP plus existing IPC without publishing configuration values or calling save/model APIs
+ok 16 - packaged smoke script checks entry/root/driver/CSP plus existing IPC without publishing configuration values or calling save/model APIs
+  ---
+  duration_ms: 0.9907
+  type: 'test'
+  ...
+# Subtest: i18n B4：pi 设置视图 label/help/choiceLabels 按 en-US 解析、保存错误 en；旧面板视图无文案字段；切回 zh 逐字
+ok 17 - i18n B4：pi 设置视图 label/help/choiceLabels 按 en-US 解析、保存错误 en；旧面板视图无文案字段；切回 zh 逐字
+  ---
+  duration_ms: 2.1979
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 563.014

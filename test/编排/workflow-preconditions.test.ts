@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   contractSchemaText,
+  deriveFixedModuleWriteSet,
   evaluateDispatchAuthorization,
   evaluateDispatchPreflight,
   loadLatestRoster,
@@ -1079,8 +1080,8 @@ test("AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期
       topic: "roster" as const,
       constant: PROJECT_ROSTER_SCHEMA,
       expected: [
-        `文档：docs/proposals/<flowId>-roster-vN.md（schema 必须恰为 ${PROJECT_ROSTER_SCHEMA}；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
-        `- schema: 字面量 ${PROJECT_ROSTER_SCHEMA}`,
+        `文档：docs/proposals/<flowId>-roster-vN.md（schema 须为 ${PROJECT_ROSTER_SCHEMA} 或 project-roster/v4；modules[] 是 modules 文档的派生快照，加载时逐项比对）`,
+        `- schema: ${PROJECT_ROSTER_SCHEMA} 或 project-roster/v4（v4 仅增可选 roles[].review）`,
         `schema: ${PROJECT_ROSTER_SCHEMA}`,
       ],
     },
@@ -1328,4 +1329,27 @@ test("AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/
   } finally {
     for (const root of roots) await fs.rm(root, { recursive: true, force: true });
   }
+});
+
+test("B21 deriveFixedModuleWriteSet：moduleId 权威；同模块断言通过；跨模块/未知 moduleId ⇒ module-paths-mismatch", () => {
+  const roster = {
+    modules: [
+      { id: "env-resources", paths: ["README.md"], path: "README.md" },
+      { id: "entry-index", paths: ["index.html"], path: "index.html" },
+      { id: "game-core", paths: ["src/core/"], path: "src/core/" },
+    ],
+  } as unknown as Pick<ProjectRoster, "modules">;
+  assert.deepEqual(deriveFixedModuleWriteSet(roster, "env-resources", ["README.md"]), { ok: true, paths: ["README.md"] });
+  assert.deepEqual(deriveFixedModuleWriteSet(roster, "env-resources"), { ok: true, paths: ["README.md"] });
+  // 目录模块：模块内文件落在派生路径内（RR16 的跨模块混写被拒）。
+  assert.deepEqual(deriveFixedModuleWriteSet(roster, "game-core", ["src/core/snake.ts"]), { ok: true, paths: ["src/core/"] });
+  const crossModule = deriveFixedModuleWriteSet(roster, "env-resources", ["README.md", "index.html"]);
+  assert.equal(crossModule.ok, false);
+  if (!crossModule.ok) {
+    assert.equal(crossModule.code, "module-paths-mismatch");
+    assert.match(crossModule.message, /index\.html/u);
+  }
+  const unknown = deriveFixedModuleWriteSet(roster, "no-such-module", ["README.md"]);
+  assert.equal(unknown.ok, false);
+  if (!unknown.ok) assert.equal(unknown.code, "module-paths-mismatch");
 });

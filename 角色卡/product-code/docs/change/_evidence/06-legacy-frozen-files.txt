@@ -1,0 +1,26 @@
+# legacy product 文件冻结核对（2026-11-10 B2；HEAD f72bafa）
+# 说明：下列文件本批未修改（git diff --name-only HEAD 不含）；hash 为写盘实测，用于冻结复核。
+
+src/common/roles/product/internal/card.ts  lines=100  bytes=8152  sha256=9b5b625b57d60f00a3627afa4630333b0e8481a2acf134a360cdf7e3c7a193d2
+src/common/roles/product/internal/preflight.ts  lines=289  bytes=10959  sha256=df4b6047e4545fd9d01efc0c0d6195d2f3fd4ab3110ce494e78cc3bbb2ce4e6d
+src/common/roles/product/internal/tools.ts  lines=69  bytes=2882  sha256=e065297135b52eaf580ce770535684432946db7f6340f69a77c96c56f3acb413
+test/roles/product/product-module.test.ts  lines=504  bytes=19958  sha256=f8260b608e742ae911be7ce798f30f3ffbfe6837f3e59c03860c1c0dc3b0a1ae
+test/roles/product/product-differential.test.ts  lines=281  bytes=13183  sha256=e8d1ae195feb7698c69ab97b0fa45152b59238cd40c4564ad2cb247d4b2ab8d7
+test/roles/product/fixtures/product-differential-fixtures.ts  lines=359  bytes=13464  sha256=f6a652435e3a90fd3f0cccc986252fc82ad62a67514677f82e20a05ae8077e16
+
+git diff --name-only HEAD -- src/common/roles/product test/roles/product（本批修改/新增）：
+warning: in the working copy of 'src/common/roles/product/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/common/roles/product/internal/capabilities.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/common/roles/product/internal/context.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/common/roles/product/internal/dispatch.ts', LF will be replaced by CRLF the next time Git touches it
+src/common/roles/product/index.ts
+src/common/roles/product/internal/capabilities.ts
+src/common/roles/product/internal/context.ts
+src/common/roles/product/internal/dispatch.ts
+
+git status --porcelain -- src/common/roles/product test/roles/product（含未跟踪）：
+ M src/common/roles/product/index.ts
+ M src/common/roles/product/internal/capabilities.ts
+ M src/common/roles/product/internal/context.ts
+ M src/common/roles/product/internal/dispatch.ts
+?? test/roles/product/product-fixed.test.ts

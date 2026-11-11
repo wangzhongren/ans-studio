@@ -1,0 +1,367 @@
+TAP version 13
+# Subtest: 归档版本随 report 递增（v2）且 frontmatter 完整；幂等 replay；同版本不同 report 不覆盖
+ok 1 - 归档版本随 report 递增（v2）且 frontmatter 完整；幂等 replay；同版本不同 report 不覆盖
+  ---
+  duration_ms: 26.7931
+  type: 'test'
+  ...
+# Subtest: 归档写失败 ⇒ acceptance-archive-failed；缺归档时 A12b accepted 不聚合 A12（归档阻塞 A12）
+ok 2 - 归档写失败 ⇒ acceptance-archive-failed；缺归档时 A12b accepted 不聚合 A12（归档阻塞 A12）
+  ---
+  duration_ms: 185.0163
+  type: 'test'
+  ...
+# Subtest: 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合（幂等）
+ok 3 - 归档写入后 closeTask(A12b accepted + acceptanceArchive) ⇒ stage.completed A12 聚合（幂等）
+  ---
+  duration_ms: 56.1531
+  type: 'test'
+  ...
+# Subtest: 最小链事实齐备 ⇒ 代批 accept（不要求旧 flow 的 proposalDecision/criteria/change-package）
+ok 4 - 最小链事实齐备 ⇒ 代批 accept（不要求旧 flow 的 proposalDecision/criteria/change-package）
+  ---
+  duration_ms: 1.5653
+  type: 'test'
+  ...
+# Subtest: 验收模块事实：moduleId/目录/属主随 facts 进入审批（R2/R3）
+ok 5 - 验收模块事实：moduleId/目录/属主随 facts 进入审批（R2/R3）
+  ---
+  duration_ms: 0.1535
+  type: 'test'
+  ...
+# Subtest: 任一最小链事实缺失 ⇒ manual(insufficient-evidence)，reason 指明缺项
+ok 6 - 任一最小链事实缺失 ⇒ manual(insufficient-evidence)，reason 指明缺项
+  ---
+  duration_ms: 0.3474
+  type: 'test'
+  ...
+# Subtest: 物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）
+ok 7 - 物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）
+  ---
+  duration_ms: 0.2198
+  type: 'test'
+  ...
+# Subtest: merge-main 高风险合并卡：judge 不可代批 ⇒ 一律 manual（merge-main-customer-only）
+ok 8 - merge-main 高风险合并卡：judge 不可代批 ⇒ 一律 manual（merge-main-customer-only）
+  ---
+  duration_ms: 0.1484
+  type: 'test'
+  ...
+# Subtest: TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+ok 9 - TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+  ---
+  duration_ms: 1.1452
+  type: 'test'
+  ...
+# Subtest: TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+ok 10 - TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+  ---
+  duration_ms: 0.4161
+  type: 'test'
+  ...
+# Subtest: TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+ok 11 - TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+  ---
+  duration_ms: 0.15
+  type: 'test'
+  ...
+# Subtest: TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+ok 12 - TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+  ---
+  duration_ms: 2.0515
+  type: 'test'
+  ...
+# Subtest: TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+ok 13 - TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+  ---
+  duration_ms: 3.2881
+  type: 'test'
+  ...
+# Subtest: TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+ok 14 - TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+  ---
+  duration_ms: 0.2245
+  type: 'test'
+  ...
+# Subtest: TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+ok 15 - TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+  ---
+  duration_ms: 0.8565
+  type: 'test'
+  ...
+# Subtest: TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+ok 16 - TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+  ---
+  duration_ms: 0.165
+  type: 'test'
+  ...
+# Subtest: TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+ok 17 - TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+  ---
+  duration_ms: 0.7463
+  type: 'test'
+  ...
+# Subtest: TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+ok 18 - TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+  ---
+  duration_ms: 100.9885
+  type: 'test'
+  ...
+# Subtest: TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+ok 19 - TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+  ---
+  duration_ms: 1.6279
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+ok 20 - TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+  ---
+  duration_ms: 1.7441
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+ok 21 - TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+  ---
+  duration_ms: 52.6102
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+ok 22 - TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+  ---
+  duration_ms: 5.814
+  type: 'test'
+  ...
+# Subtest: TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+ok 23 - TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+  ---
+  duration_ms: 623.487
+  type: 'test'
+  ...
+# Subtest: TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+ok 24 - TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+  ---
+  duration_ms: 45.6335
+  type: 'test'
+  ...
+# Subtest: TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+ok 25 - TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+  ---
+  duration_ms: 10.3175
+  type: 'test'
+  ...
+# Subtest: TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+ok 26 - TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+  ---
+  duration_ms: 80.8951
+  type: 'test'
+  ...
+# Subtest: TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+not ok 27 - TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+  ---
+  duration_ms: 42.1235
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\doc-format-specs.test.ts:1312:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1
+    + actual - expected
+    
+    + [
+    +   'ans-basis/v1',
+    +   'ans-release/v1',
+    +   'ans-task-git-shell/v1',
+    +   'ans-workflow/v1',
+    +   'chief-workflow/v2',
+    +   'legacy/v1',
+    +   'two-fixed-paths/v1'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'ans-basis/v1'
+    1: 'ans-release/v1'
+    2: 'ans-task-git-shell/v1'
+    3: 'ans-workflow/v1'
+    4: 'chief-workflow/v2'
+    5: 'legacy/v1'
+    6: 'two-fixed-paths/v1'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/doc-format-specs.test.ts:1326:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+ok 28 - TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+  ---
+  duration_ms: 40.5441
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+ok 29 - TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+  ---
+  duration_ms: 84.8689
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+ok 30 - TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+  ---
+  duration_ms: 37.8412
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+ok 31 - TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+  ---
+  duration_ms: 0.5884
+  type: 'test'
+  ...
+# Subtest: TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+ok 32 - TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+  ---
+  duration_ms: 3.8265
+  type: 'test'
+  ...
+# Subtest: TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+ok 33 - TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+  ---
+  duration_ms: 0.1821
+  type: 'test'
+  ...
+# Subtest: preparePathBStart：既有仓库（不自动 init）→ .gitignore→dirty→从 HEAD 建分支→ basis.recorded(reason:path-b) 只读快照
+ok 34 - preparePathBStart：既有仓库（不自动 init）→ .gitignore→dirty→从 HEAD 建分支→ basis.recorded(reason:path-b) 只读快照
+  ---
+  duration_ms: 37.1823
+  type: 'test'
+  ...
+# Subtest: preparePathBStart：无仓库 ⇒ b-repository-required（不自动 init）；dirty ⇒ baseline-repository-dirty + stage.blocked B1
+ok 35 - preparePathBStart：无仓库 ⇒ b-repository-required（不自动 init）；dirty ⇒ baseline-repository-dirty + stage.blocked B1
+  ---
+  duration_ms: 17.7645
+  type: 'test'
+  ...
+# Subtest: derivePathBWriteSets：有 roster ⇒ scope.files ∩ 模块属主；越界/多义/治理写区拒绝
+ok 36 - derivePathBWriteSets：有 roster ⇒ scope.files ∩ 模块属主；越界/多义/治理写区拒绝
+  ---
+  duration_ms: 25.971
+  type: 'test'
+  ...
+# Subtest: derivePathBWriteSets：无 roster ⇒ 角色边界唯一属主；多属主/治理文档拒绝
+ok 37 - derivePathBWriteSets：无 roster ⇒ 角色边界唯一属主；多属主/治理文档拒绝
+  ---
+  duration_ms: 7.9095
+  type: 'test'
+  ...
+# Subtest: recordChangeScopeDecision：影响面 hash + 派生写集 → change.scope-decided（B2 完成，幂等）；越界拒绝
+ok 38 - recordChangeScopeDecision：影响面 hash + 派生写集 → change.scope-decided（B2 完成，幂等）；越界拒绝
+  ---
+  duration_ms: 31.5974
+  type: 'test'
+  ...
+# Subtest: A13 前置：A12b accepted + 归档已写入 ⇒ prepare 成功；release.requested + stage.requested A13；重复 prepare replay
+ok 39 - A13 前置：A12b accepted + 归档已写入 ⇒ prepare 成功；release.requested + stage.requested A13；重复 prepare replay
+  ---
+  duration_ms: 171.1567
+  type: 'test'
+  ...
+# Subtest: A13 前置缺失：无归档 ⇒ release-workflow-not-ready（附缺项），不发卡不写 release.requested
+ok 40 - A13 前置缺失：无归档 ⇒ release-workflow-not-ready（附缺项），不发卡不写 release.requested
+  ---
+  duration_ms: 150.4685
+  type: 'test'
+  ...
+# Subtest: A13 前置缺失：A12b 未 accepted ⇒ release-workflow-not-ready
+ok 41 - A13 前置缺失：A12b 未 accepted ⇒ release-workflow-not-ready
+  ---
+  duration_ms: 116.6764
+  type: 'test'
+  ...
+# Subtest: B4 前置（不要求 A12b）：B3 accepted + 运营报告 ⇒ prepare 成功并推进 B4
+ok 42 - B4 前置（不要求 A12b）：B3 accepted + 运营报告 ⇒ prepare 成功并推进 B4
+  ---
+  duration_ms: 52.7598
+  type: 'test'
+  ...
+# Subtest: B4 前置缺失：无运营报告 ⇒ release-workflow-not-ready（operator-report）
+ok 43 - B4 前置缺失：无运营报告 ⇒ release-workflow-not-ready（operator-report）
+  ---
+  duration_ms: 65.5993
+  type: 'test'
+  ...
+# Subtest: 呈卡前拒绝：basis 文档漂移 ⇒ basis-drift；.gitignore hash 漂移 ⇒ basis-drift；分支漂移 ⇒ release-workflow-not-ready
+ok 44 - 呈卡前拒绝：basis 文档漂移 ⇒ basis-drift；.gitignore hash 漂移 ⇒ basis-drift；分支漂移 ⇒ release-workflow-not-ready
+  ---
+  duration_ms: 149.812
+  type: 'test'
+  ...
+# Subtest: 执行：main unborn ⇒ mergeKind initial；客户本人确认 ⇒ release.merged + stage.completed A13 + workflow.closed delivered（releaseId 投影）
+ok 45 - 执行：main unborn ⇒ mergeKind initial；客户本人确认 ⇒ release.merged + stage.completed A13 + workflow.closed delivered（releaseId 投影）
+  ---
+  duration_ms: 216.1991
+  type: 'test'
+  ...
+# Subtest: 执行：main 已存在 ⇒ mergeKind merge；冲突 ⇒ release.failed + stage.blocked，返回 release-merge-conflict，workflow 不关闭
+ok 46 - 执行：main 已存在 ⇒ mergeKind merge；冲突 ⇒ release.failed + stage.blocked，返回 release-merge-conflict，workflow 不关闭
+  ---
+  duration_ms: 208.9946
+  type: 'test'
+  ...
+# Subtest: 仅客户本人：judge 确认 / 缺失确认 ⇒ release-unauthorized，不写 release.confirmed/merged
+ok 47 - 仅客户本人：judge 确认 / 缺失确认 ⇒ release-unauthorized，不写 release.confirmed/merged
+  ---
+  duration_ms: 164.7441
+  type: 'test'
+  ...
+# Subtest: 客户拒绝：release.rejected(customer) + stage.blocked；replay 幂等
+ok 48 - 客户拒绝：release.rejected(customer) + stage.blocked；replay 幂等
+  ---
+  duration_ms: 157.0824
+  type: 'test'
+  ...
+# Subtest: 审计：无 requestReleaseMerge 导出；端口无 push/tag；release.merged 含 baseOid/tipOid/mergeOid/files/diffDigest
+ok 49 - 审计：无 requestReleaseMerge 导出；端口无 push/tag；release.merged 含 baseOid/tipOid/mergeOid/files/diffDigest
+  ---
+  duration_ms: 146.3162
+  type: 'test'
+  ...
+# Subtest: 双字面量：v3/v4 均被接受（PROJECT_ROSTER_SCHEMAS），v3 无 review 语义逐字不变
+ok 50 - 双字面量：v3/v4 均被接受（PROJECT_ROSTER_SCHEMAS），v3 无 review 语义逐字不变
+  ---
+  duration_ms: 7.4913
+  type: 'test'
+  ...
+# Subtest: v4 可选 roles[].review=true ⇒ 项目验收角色；无标记默认 verifier
+ok 51 - v4 可选 roles[].review=true ⇒ 项目验收角色；无标记默认 verifier
+  ---
+  duration_ms: 3.1222
+  type: 'test'
+  ...
+# Subtest: v4 roles[].review 非法：多个 true/非布尔 ⇒ roster-role-review-invalid（至多一个 true）
+ok 52 - v4 roles[].review 非法：多个 true/非布尔 ⇒ roster-role-review-invalid（至多一个 true）
+  ---
+  duration_ms: 3.6664
+  type: 'test'
+  ...
+# Subtest: v3 文档出现 roles[].review ⇒ 确定性拒绝（不静默忽略）
+ok 53 - v3 文档出现 roles[].review ⇒ 确定性拒绝（不静默忽略）
+  ---
+  duration_ms: 0.6018
+  type: 'test'
+  ...
+# Subtest: 未知 schema 仍拒绝（错误语义保留 v1/v2 提示），roster 类型含 review 字段
+ok 54 - 未知 schema 仍拒绝（错误语义保留 v1/v2 提示），roster 类型含 review 字段
+  ---
+  duration_ms: 0.6178
+  type: 'test'
+  ...
+1..54
+# tests 54
+# suites 0
+# pass 53
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4214.7448

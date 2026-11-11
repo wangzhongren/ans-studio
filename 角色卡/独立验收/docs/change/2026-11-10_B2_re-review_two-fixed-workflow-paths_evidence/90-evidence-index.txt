@@ -1,0 +1,30 @@
+# B2 re-review evidence index (SHA-256, generated 2026-11-10T15:36:54Z)
+# worktree: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+# candidate: 79e16a14bd3467219ecb861c38a48ab47b993038
+
+5a0dfe611e8ef2b15a1180fdbffb35d3d8db7fdb591e99b860df34ae9832a3e0 *01-candidate-and-baseline.txt
+40ce5e889d25801cc5e852ff9d780b8c330d946a5e2247af43d180a3b41bc0cd *02-write-set-boundary.txt
+d4e088834210a24934ea8a148de6f550d33472c337fc4651ae1407ef695c0388 *03-typecheck.txt
+812c1de6fdb6ffe80d334b2632642b1856bc9ccd9e01d608f036af24872aa7dc *04-full-chain.tap
+bc2eca000a61447045f6c366f5f52c8b58d188de715c719dea6161ba2728e2d2 *05-mode-switch-b-change-scope.tap
+8c31e5ef8d65282f75c6487dd4e1ba09f46975f6150613549f2d7c19d6058718 *06-basis-b21.tap
+99502513cb6c208455e2c8d89db1e65a19f540732df4716cb2a0610e013bbb59 *07-b21-desktop.tap
+61f58aaadf771c3550d7bee4f7638529a37d18dc79ed8cc0fa7e1be68415fe60 *08-orch-domain-full.tap
+c772c4934d673734ec58813663458c94ca5ed5c24e1e597d5e9b054f9b9ff554 *09-orch-knownred-comparison.txt
+e5355b72747a1770923a7ee175a02267e2aa198110a1c9f3df99b73cc7533297 *10-gates-domain-full.tap
+48bc0206ad6c90c83726f88eb9c3ff27086412a797416bb4682aa302980acf23 *10b-gates-knownred-comparison.txt
+bc56a52b55c6eabba93045959b475f89a83958555607a74183ed9d664583f7f6 *11-roles-domain-full.tap
+5ae2edd2c2fcab8a33bd369333b95b8e09d29fd373930a3285f6c44512a0bb40 *12-legacy-star-i-full-chain-head.tap
+96f90d5e9d067c420927d9d5957e72226afcf0c1a311f6cb99de4bc507da93ae *13-legacy-star-i-full-chain-baseline10f90c7.tap
+7947907100e58437b5cfd4fb75c17ca643953b48151f2ca60777769c327de0d8 *14-legacy-baseline-comparison.txt
+ce3740a92f67df7579f6f7d00f48ce135d1c0da84597a11a5d4f2c95d47d2cdf *15-desktop-fixed-suites.tap
+fa0f4c4ce1bcd199d3d7ee989b42d7c7a14ce1ea207b77565d60e056c9ea70b9 *16-version-change-knownred.tap
+d54a0186d653ae2061081b694d3438a5b9012a822f962c927cbf41258366ac6f *17-optional-acceptance-knownred.tap
+386b53d4292a6075b71144360ed32698b8d09f2b2c1d110101577c783cd8c6c9 *18-runtime-core-domain.tap
+16239bcaa340fa5fe5af6fa5cce16faed42b75eb51030892d98ebd3dd8b88df5 *18b-runtime-core-knownred-comparison.txt
+4215c67ef5d2b796ebd4b24d57fc161d2b261143dcbd435cf435f89efcb922cb *19-shared-domain.tap
+d5f162aae508e12f6bbdee74984e3d212398a936d13b2de891ea89bc742916a3 *20-legacy-preconditions-module-consumption.tap
+
+# 产出文件（记录/对外报告）:
+eaa6af41522ce38f2cceb74e45cea7c488c6a158083d5e31c8e573b91d75277e *角色卡/独立验收/docs/change/2026-11-10_B2_re-review_two-fixed-workflow-paths.md
+ffd1baceb8633e3887a3217aae29c7be57640fba4e0807a393e46dada3567650 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-report-v1.1.md

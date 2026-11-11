@@ -1,0 +1,20 @@
+# B1.1 证据索引（SHA-256；2026-11-10T14:30:15Z UTC）
+
+## 产出
+e2ad4701b1bda9a994616d4543fcab8b05de2f8bfcd4c9f6ee0fcc0873e0b749 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md
+f714edb847b8ab94217179b73bd8a806b0552830319efa0675c2b25077b725b8 *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths.md
+
+## 前版/依据（只读）
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+5958ba3879aa6ad5df2be0e27f43ec74c7067644576a074f5d94f169dc206888 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths.md
+
+## 证据文件
+2b7cf0ba9062806b14dc1b95116ad36ad1e77095c53debc5a140bacefb254ac3 *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/01-legacy-head-star-i-full-chain.tap
+2d634483e939d78105147ceb7b0adef832f9a62b01cc2f6a15a88338fa8061ac *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/02-legacy-baseline-10f90c7-star-i-full-chain.tap
+2866416a39a5fdafd7e1e37c4b2b5ffd19d0edbc3f6c07754f49fd90f1daae1d *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/03-legacy-baseline-comparison.txt
+5e4bd4bff610f36c0277184b11914181a4cd6e5b3848e794b10f658784065d6c *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/04-orch-domain-head.tap
+196beda6dab93480d121c21e2dc9e018ab3a3b4a22378d246253bb387ffaced1 *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/05-orch-knownred-comparison.txt
+f7434641c2a5b39e48be2aebfce6c192dfd377fc26313e0e2f2008d88901b41f *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/06-v1-v1.1-diff.txt
+0c7aed305a1fe3459b2bca01b644211d0d2ebcb238e1bac7f4e3c3fb0c69827b *角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths_evidence/07-basis-and-candidate.txt
+
+（08 本文件因自引用不含自身 hash。）

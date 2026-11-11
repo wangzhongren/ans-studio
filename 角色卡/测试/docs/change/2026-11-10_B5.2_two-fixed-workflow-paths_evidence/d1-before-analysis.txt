@@ -1,0 +1,31 @@
+B5.2 D1 before (119 files; baseline = B5 test files + B5.1 desktop/shared-code fixes, uncommitted)
+totals: tests 711 / pass 653 / fail 39 / cancelled 1 / skip 18 / hang 1 (customer-authorization-plane-integration 90s watchdog)
+failing-name entries (incl. cancelled as not ok): 40
+
+per-file failing entries:
+2	test/测试/abort-cleanup-verify.test.ts
+1	test/测试/direct-role-capabilities-e2e.test.ts
+1	test/测试/download-requests-integration.test.ts
+1	test/测试/entry-role-minimal-d.test.ts
+1	test/测试/fixed-path-full-chain.test.ts
+1	test/测试/g3-search-verify/pi-loopback-verify.test.ts
+1	test/测试/g4-skill-verify/b-render-double-check.test.ts
+1	test/测试/g4-skill-verify/e-handler.test.ts
+3	test/测试/g4-skill-verify/h-scope-audit.test.ts
+2	test/测试/g4v2-mcp-verify/f-handler.test.ts
+2	test/测试/governance-e2e-auto/i-full-chain.test.ts
+5	test/测试/real-entry.test.ts
+3	test/测试/t1-pipeline-integration.test.ts
+3	test/测试/t1-real-cli.test.ts
+2	test/测试/trunk-stable-write-integration.test.ts
+1	test/测试/turn-watch-verify/b-last-resort.test.ts
+9	test/测试/version-change-integration.test.ts
+1	test/测试/wiring.test.ts
+
+vs B5 frozen known-red flat (116-file pre-existing baseline, 39 entries):
+added: 1
++ test/测试/fixed-path-full-chain.test.ts :: 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered
+removed: 0
+
+note: the only added entry is the expected transitional glue double-write failure of path A
+(B5 test file still carrying host glue against B5.1 production wiring).

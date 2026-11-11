@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 共享目录：parity、插值、复数、回退与稳定诊断码（唯一实现）
+ok 1 - 共享目录：parity、插值、复数、回退与稳定诊断码（唯一实现）
+  ---
+  duration_ms: 5.2885
+  type: 'test'
+  ...
+# Subtest: 偏好文件：形状、缺失不写、原子写、损坏/版本/非法 locale 与不可写降级
+ok 2 - 偏好文件：形状、缺失不写、原子写、损坏/版本/非法 locale 与不可写降级
+  ---
+  duration_ms: 39.7098
+  type: 'test'
+  ...
+# Subtest: preferences IPC：通道名、get 形状、成功广播/失败不广播、失败文案按当前 locale
+ok 3 - preferences IPC：通道名、get 形状、成功广播/失败不广播、失败文案按当前 locale
+  ---
+  duration_ms: 7.8785
+  type: 'test'
+  ...
+# Subtest: locale store：首屏镜像、文件权威、广播、失败回滚、IPC 降级、非法镜像诊断
+ok 4 - locale store：首屏镜像、文件权威、广播、失败回滚、IPC 降级、非法镜像诊断
+  ---
+  duration_ms: 0.5126
+  type: 'test'
+  ...
+# Subtest: locale store + 真实 preferences 服务：切换 → 文件 → 重启保持；项目切换不改变 locale
+ok 5 - locale store + 真实 preferences 服务：切换 → 文件 → 重启保持；项目切换不改变 locale
+  ---
+  duration_ms: 13.6349
+  type: 'test'
+  ...
+# Subtest: 主进程/渲染层消费同一 shared key；RUNTIME_SETTINGS key 解析回 label/help/choiceLabels（zh/en）
+ok 6 - 主进程/渲染层消费同一 shared key；RUNTIME_SETTINGS key 解析回 label/help/choiceLabels（zh/en）
+  ---
+  duration_ms: 1.4249
+  type: 'test'
+  ...
+# Subtest: 单一目录/单一实现：无第二份 messages/resolver/插值；facade 只再导出 shared
+ok 7 - 单一目录/单一实现：无第二份 messages/resolver/插值；facade 只再导出 shared
+  ---
+  duration_ms: 170.4043
+  type: 'test'
+  ...
+# Subtest: 旧 zh 输出逐字不变、locale 白名单/机器标识不翻译
+ok 8 - 旧 zh 输出逐字不变、locale 白名单/机器标识不翻译
+  ---
+  duration_ms: 0.2923
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 692.7653

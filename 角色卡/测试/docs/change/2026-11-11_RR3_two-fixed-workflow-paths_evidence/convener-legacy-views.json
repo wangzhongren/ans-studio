@@ -1,0 +1,46 @@
+{
+  "contractViews": [
+    {
+      "at": "2026-11-10T19:05:24.702Z",
+      "input": {
+        "flowId": "snake-game",
+        "taskKind": "dispatch"
+      },
+      "result": {
+        "isError": null,
+        "text": "contract_check（只读速查；查询不构成放行/授权）\nrun：legacy（未冻结）｜flow snake-game\nroster：不可用（未找到名单目录 docs/proposals/（flowId=snake-game）。）\n角色：convener｜builtIn=true\n可写边界：docs/workflow.md（file）、docs/scheduling/（directory）、docs/governance/convener/（directory）\n禁止：角色卡/、其他角色模块、.ans/、治理/版本化文档覆盖、docs/product|proposals|contracts|scheduling|quality|verification（越界拒绝）\ntaskKind dispatch 必填：flowId；targetRoleId；runId(pinned)；moduleId(运营派实现)；modulePaths\n常见拒绝 → 下一步：\n- run-missing → app（可重试）\n- run-pin-required → app（可重试）\n- run-role-missing → rapporteur（可重试）\n- run-legacy-readonly → app（可重试）\n- flow-required → chief（可重试）\n- intent-missing → product（可重试）\n- proposal-missing → rapporteur（可重试）\n- roster-missing → rapporteur（可重试）\n- roster-modules-missing → rapporteur（可重试）\n- roster-reference-missing → rapporteur（可重试）\n- roster-reference-stale → rapporteur（可重试）\n- roster-modules-drift → rapporteur（可重试）\n- roster-module-owner-invalid → rapporteur（可重试）\n- env-bootstrap-missing → rapporteur（可重试）"
+      }
+    },
+    {
+      "at": "2026-11-10T19:06:16.873Z",
+      "input": {
+        "flowId": "snake-game",
+        "taskKind": "stage-request"
+      },
+      "result": {
+        "isError": null,
+        "text": "contract_check（只读速查；查询不构成放行/授权）\nrun：legacy（未冻结）｜flow snake-game\nroster：不可用（未找到名单目录 docs/proposals/（flowId=snake-game）。）\n角色：convener｜builtIn=true\n可写边界：docs/workflow.md（file）、docs/scheduling/（directory）、docs/governance/convener/（directory）\n禁止：角色卡/、其他角色模块、.ans/、治理/版本化文档覆盖、docs/product|proposals|contracts|scheduling|quality|verification（越界拒绝）\ntaskKind stage-request：fixed 路径专用（当前项目按 legacy 解析）；legacy 请用 dispatch/appointment/write/acceptance/shell\n常见拒绝 → 下一步：\n- run-missing → app（可重试）\n- run-pin-required → app（可重试）\n- run-role-missing → rapporteur（可重试）\n- run-legacy-readonly → app（可重试）\n- flow-required → chief（可重试）\n- intent-missing → product（可重试）\n- proposal-missing → rapporteur（可重试）\n- roster-missing → rapporteur（可重试）\n- roster-modules-missing → rapporteur（可重试）\n- roster-reference-missing → rapporteur（可重试）\n- roster-reference-stale → rapporteur（可重试）\n- roster-modules-drift → rapporteur（可重试）\n- roster-module-owner-invalid → rapporteur（可重试）\n- env-bootstrap-missing → rapporteur（可重试）"
+      }
+    }
+  ],
+  "projectStates": [
+    {
+      "at": "2026-11-10T19:05:11.028Z",
+      "input": {},
+      "result": {
+        "isError": null,
+        "text": "[focus] flow=snake-game run=none status=legacy stage=none selectedBy=chief\n[counts] unclosed=1 supersededUnclosed=0 activeUnclosed=1 blocked=0 failed=0 pendingRequests=0 flows=1 tasks=1\n[tasks]\n- #t-mwb280yn-ed05161d to=convener status=created blocked=false failed=false flow=snake-game run=none text=【A1 产线调度请求 · flowId: snake-game】客户原始需求（唯一客户轮次）：在目标项目中做一个贪吃蛇游戏，必须包含：键盘方向控制、实时计分、游戏结束后可重开、撞到边界即失败。 本阶段（A1）要做什么： 1. 受理本 st…\n[blockers]\n- none\n[versions]\n- none\n[evidence]\n- none\n[nextStep] source=derived text=no action"
+      }
+    },
+    {
+      "at": "2026-11-10T19:06:03.741Z",
+      "input": {
+        "flowId": "snake-game"
+      },
+      "result": {
+        "isError": null,
+        "text": "[focus] flow=snake-game run=none status=legacy stage=none selectedBy=chief\n[counts] unclosed=1 supersededUnclosed=0 activeUnclosed=1 blocked=0 failed=0 pendingRequests=0 flows=1 tasks=1\n[tasks]\n- #t-mwb280yn-ed05161d to=convener status=created blocked=false failed=false flow=snake-game run=none text=【A1 产线调度请求 · flowId: snake-game】客户原始需求（唯一客户轮次）：在目标项目中做一个贪吃蛇游戏，必须包含：键盘方向控制、实时计分、游戏结束后可重开、撞到边界即失败。 本阶段（A1）要做什么： 1. 受理本 st…\n[blockers]\n- none\n[versions]\n- none\n[evidence]\n- none\n[nextStep] source=derived text=no action"
+      }
+    }
+  ]
+}

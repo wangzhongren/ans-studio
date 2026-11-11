@@ -1,0 +1,5 @@
+role: ui-render
+entries:
+  - kind: directory
+    path: src/render/
+    purpose: Canvas 画面渲染模块（模块 render-ui）

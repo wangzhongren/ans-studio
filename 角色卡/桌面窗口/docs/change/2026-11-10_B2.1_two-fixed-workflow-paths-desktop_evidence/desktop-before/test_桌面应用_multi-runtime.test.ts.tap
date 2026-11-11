@@ -1,0 +1,353 @@
+TAP version 13
+# Subtest: D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset
+ok 1 - D1 shared registry: effective env/file/fallback sources, every secret masked, whitespace is unset
+  ---
+  duration_ms: 12.5303
+  type: 'test'
+  ...
+# Subtest: D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure
+ok 2 - D1 configuration writes only selected string keys atomically, masks URL/userinfo failure and retains revision on failure
+  ---
+  duration_ms: 16.7186
+  type: 'test'
+  ...
+# Subtest: G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 file 来源＋choices 元数据）；非法值如实拒绝、不落盘、不回显；codex 无 off 档（值域按运行时）；空串清除合法
+ok 3 - G-5 推理强度设置：三键往返（合法值规范形写盘＋读侧 file 来源＋choices 元数据）；非法值如实拒绝、不落盘、不回显；codex 无 off 档（值域按运行时）；空串清除合法
+  ---
+  duration_ms: 24.8556
+  type: 'test'
+  ...
+# Subtest: 档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查时限非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices
+ok 4 - 档位字段（choices＋choiceLabels）：Pi 上下文窗口/看护检查时限非法值按友好标签提示、不落盘、不回显；合法写规范形；空串清除；无标签字段仍用 raw choices
+  ---
+  duration_ms: 28.2645
+  type: 'test'
+  ...
+# Subtest: i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 key 解析（en-US）；字段集/必填/choices 不变；demo 走共享 key；切回 zh 逐字
+ok 5 - i18n B4：设置视图 label/help/choiceLabels 按当前 locale 从共享 key 解析（en-US）；字段集/必填/choices 不变；demo 走共享 key；切回 zh 逐字
+  ---
+  duration_ms: 2.2345
+  type: 'test'
+  ...
+# Subtest: D1 same role and project across engines and same role across projects keep distinct handles and exact input targets
+ok 6 - D1 same role and project across engines and same role across projects keep distinct handles and exact input targets
+  ---
+  duration_ms: 18.8164
+  type: 'test'
+  ...
+# Subtest: D1 background dispatch, queued customer input and handback pin the source engine after selection switches
+ok 7 - D1 background dispatch, queued customer input and handback pin the source engine after selection switches
+  ---
+  duration_ms: 47.2851
+  type: 'test'
+  ...
+# Subtest: D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+not ok 8 - D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 33.7627
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+not ok 9 - D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 16.2304
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+not ok 10 - D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 14.4835
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+not ok 11 - D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+  ---
+  duration_ms: 15.6674
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:383:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:411:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+not ok 12 - D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+  ---
+  duration_ms: 10.6514
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:429:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'next-session'
+    - 'after-active-turn'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'after-active-turn'
+  actual: 'next-session'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:445:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card
+ok 13 - D1 original customer signal cancels pending confirm/choice and old yes cannot settle a new card
+  ---
+  duration_ms: 2.0186
+  type: 'test'
+  ...
+# Subtest: D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired
+ok 14 - D1 shell terminal failure/timeout and dispose invalidate exact handle card, old allow is expired
+  ---
+  duration_ms: 17.57
+  type: 'test'
+  ...
+# Subtest: D1 state debouncing and constrained bridges preserve project/runtime identity
+ok 15 - D1 state debouncing and constrained bridges preserve project/runtime identity
+  ---
+  duration_ms: 3.2302
+  type: 'test'
+  ...
+# Subtest: D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn
+ok 16 - D1 last busy Pi in another project releases queued profile rebuild without changing ambient mid-turn
+  ---
+  duration_ms: 13.9145
+  type: 'test'
+  ...
+# Subtest: D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card
+ok 17 - D1 confirmation bridge keeps original signal identity and an old disposed stream cannot cancel a new handle card
+  ---
+  duration_ms: 198.4156
+  type: 'test'
+  ...
+# Subtest: D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof
+ok 18 - D1 old Pi JSONL is a display-only fallback and never becomes Codex/Claude history or native restore proof
+  ---
+  duration_ms: 11.1887
+  type: 'test'
+  ...
+# Subtest: D1R ANS history preserves authoritative turn/event identity, independent same text and delta order
+ok 19 - D1R ANS history preserves authoritative turn/event identity, independent same text and delta order
+  ---
+  duration_ms: 7.3318
+  type: 'test'
+  ...
+# Subtest: G-5 wave 2：推理行回放载体——reasoning message 事件的回放行携带投影形 row.reasoning（逐字/幂等）；坏件与旧数据无该字段 ⇒ 原行为逐字
+ok 20 - G-5 wave 2：推理行回放载体——reasoning message 事件的回放行携带投影形 row.reasoning（逐字/幂等）；坏件与旧数据无该字段 ⇒ 原行为逐字
+  ---
+  duration_ms: 6.5815
+  type: 'test'
+  ...
+# Subtest: D1R legacy Pi rows keep optional turn/event metadata absent
+ok 21 - D1R legacy Pi rows keep optional turn/event metadata absent
+  ---
+  duration_ms: 18.7165
+  type: 'test'
+  ...
+# Subtest: D1R2 direct and queued identical inputs retain original client ID through delayed old settled
+ok 22 - D1R2 direct and queued identical inputs retain original client ID through delayed old settled
+  ---
+  duration_ms: 35.92
+  type: 'test'
+  ...
+# Subtest: D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client
+ok 23 - D1R2 anonymous dispatch occupies its own origin and unknown/legacy events cannot borrow the next client
+  ---
+  duration_ms: 18.7748
+  type: 'test'
+  ...
+# Subtest: D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+not ok 24 - D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+  ---
+  duration_ms: 1527.6419
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:745:1'
+  failureType: 'testCodeFailure'
+  error: 'D1 test wait expired'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    until (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:770:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+not ok 25 - D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+  ---
+  duration_ms: 1532.8344
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:787:1'
+  failureType: 'testCodeFailure'
+  error: 'D1 test wait expired'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    until (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:829:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call
+ok 26 - D1R2 no-ack failure and legacy/unknown events cannot lend an old client ID to a later acknowledged call
+  ---
+  duration_ms: 10.9801
+  type: 'test'
+  ...
+# Subtest: typed prompt input history joins only actual same-turn input sources and preserves legacy facts
+ok 27 - typed prompt input history joins only actual same-turn input sources and preserves legacy facts
+  ---
+  duration_ms: 17.8034
+  type: 'test'
+  ...
+# Subtest: operator payload preserves original call identity and leaves absent legacy IDs absent
+ok 28 - operator payload preserves original call identity and leaves absent legacy IDs absent
+  ---
+  duration_ms: 0.3814
+  type: 'test'
+  ...
+# Subtest: history preserves canonical start/blocked/result phases for the same failed tool call
+ok 29 - history preserves canonical start/blocked/result phases for the same failed tool call
+  ---
+  duration_ms: 6.7894
+  type: 'test'
+  ...
+# Subtest: F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留）
+ok 30 - F-8-b：ANS 历史行分类以 display.process 结构化事实为准——进程跑完+非零退出不归 denied；timedOut 独立一类（事实经读侧再投影保留）
+  ---
+  duration_ms: 7.6303
+  type: 'test'
+  ...
+# Subtest: A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts
+ok 31 - A native-only Pi fallback stays readable through pure protected projection without raw anchor or template facts
+  ---
+  duration_ms: 6.5515
+  type: 'test'
+  ...
+# Subtest: A legacy provenance and authoritative metadata omissions survive the protected Window mapping
+ok 32 - A legacy provenance and authoritative metadata omissions survive the protected Window mapping
+  ---
+  duration_ms: 47.4827
+  type: 'test'
+  ...
+# Subtest: stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session
+ok 33 - stop send facts use the original ACK/input/terminal, never the rejection text, and keep the current session
+  ---
+  duration_ms: 28.191
+  type: 'test'
+  ...
+# Subtest: send rejection before public events remains unknown; later same-client different turns do not borrow outcomes
+ok 34 - send rejection before public events remains unknown; later same-client different turns do not borrow outcomes
+  ---
+  duration_ms: 3.998
+  type: 'test'
+  ...
+# Subtest: no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome
+ok 35 - no ACK and mismatched/unknown terminal metadata cannot manufacture accepted input or a stop outcome
+  ---
+  duration_ms: 6.7233
+  type: 'test'
+  ...
+# Subtest: send result reports the original handle is no longer current after replacement while its turn rejects
+ok 36 - send result reports the original handle is no longer current after replacement while its turn rejects
+  ---
+  duration_ms: 16.7158
+  type: 'test'
+  ...
+# Subtest: actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+not ok 37 - actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+  ---
+  duration_ms: 1528.8165
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b21-base-eHLJUy\\test\\桌面应用\\multi-runtime.test.ts:1048:1'
+  failureType: 'testCodeFailure'
+  error: 'D1 test wait expired'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    until (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:43:38)
+    async TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b21-base-eHLJUy/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/multi-runtime.test.ts:1054:109)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: same client IDs across sequential actual turns retain separate first public outcomes
+ok 38 - same client IDs across sequential actual turns retain separate first public outcomes
+  ---
+  duration_ms: 16.6512
+  type: 'test'
+  ...
+# Subtest: foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn
+ok 39 - foreign scope terminal and typed input cannot lend facts to a correctly acknowledged turn
+  ---
+  duration_ms: 13.3912
+  type: 'test'
+  ...
+1..39
+# tests 39
+# suites 0
+# pass 31
+# fail 8
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5780.9887

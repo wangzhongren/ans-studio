@@ -1,0 +1,17 @@
+48d47
+< W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+49a49
+> W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+54c54
+< W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+---
+> W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+58d57
+< W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+76,77d74
+< unique-fail-names 102
+< {"tests":820,"pass":715,"fail":96,"cancelled":9,"skipped":0,"todo":0}
+97d93
+< 申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl
+99d94
+< 路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）

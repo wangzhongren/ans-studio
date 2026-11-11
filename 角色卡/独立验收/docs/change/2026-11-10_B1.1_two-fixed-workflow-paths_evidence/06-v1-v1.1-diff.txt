@@ -1,0 +1,111 @@
+# B1 v1 → v1.1 差异（git diff --no-index，LF）
+
+diff --git a/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md b/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md
+index d3e5544..0b7ce35 100644
+--- a/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
++++ b/docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md
+@@ -1,10 +1,11 @@
+-# B1 验收标准：两条固定工作流路径（T3，v1）
++# B1 验收标准：两条固定工作流路径（T3，v1.1）
+ 
+ - 日期：2026-11-10
+ - 角色：ANS 「独立验收」（独立固定上下文；本文件由任务精确范围授权写入 `docs/acceptance/`）
+ - 任务 ID：`2026-11-10-two-fixed-workflow-paths`（T3 产品级重构）
+ - 判型：**T3**（改变内置角色权责与派发权、默认流程状态机、Git 治理机制退役、需迁移/废弃清单、验收需确定性测试 + 真机全链）
+-- 状态：**B1 生效（冻结）**；实现所有判据初始为 **`未取证`**；B2 按本文件全量判定。
++- 版本：**v1.1**（2026-11-10）。依据：B1 v1（`b607f100…`，逐字保留不改）+ B2 预验收（`5958ba38…`，MF-B2-01）+ 基线实测（本角色独立复跑）。**本版变更仅为 known-red 事实更正**：§二 增列 9 条 star-routing/i-full-chain 基线红（代码基线 `10f90c7` 同名同因、非候选回归）、`test/编排` 22 fail 更正为 **24 fail**（失败名集合不变）；AC-03 明确 legacy 断言逐字保留与 known-red 判定口径；§三/§八/T-14/T-18/EV-03 同步 known-red 引用。其余 AC/T/RR/EV 条目与 v1 逐字相同；不 de-scope、不新增客户口径。
++- 状态：**B1 v1.1 生效（冻结）**；实现所有判据初始为 **`未取证`**；B2 按本 v1.1 全量判定。
+ - 纪律（协调方决策 #8）：分支开发、不合并 ans-studio `main`、不发布/tag、不请求客户放行；真机全链跑通前不请求合并/发布。
+ 
+ ---
+@@ -13,6 +14,8 @@
+ 
+ | 依据 | 路径 | 实测（行 / 字节 / SHA-256） |
+ | --- | --- | --- |
++| B1 v1（前版判据，逐字保留不改） | `docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md` | 197 / 33,722 / `b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb` |
++| B2 预验收（MF-B2-01 来源，本版修订依据） | `角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths.md` | 267 / 40,790 / `5958ba3879aa6ad5df2be0e27f43ec74c7067644576a074f5d94f169dc206888` |
+ | 设计 v2（唯一产品依据） | `docs/planning/2026-11-10_design_two-fixed-workflow-paths.md` | 95 / 8,476 / `b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d` |
+ | 实现级方案 v1.3（被冻结的实现依据） | `docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md` | 1,392 / 184,391 / `ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8` |
+ | v1.3 策划记录 | `docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.3.md` | 66 / 9,333 / `6ab9e1e9374899853836f1b0704ff619f68ee20a404a13d2a135ddd5fb9fc0b6` |
+@@ -28,7 +31,21 @@
+ 
+ - 开发分支：`feat/two-fixed-workflow-paths`（基于 `origin/main` `d9e3e99c160599e5b53a82e105939a359f69992f`；B1 冻结时代码基线 `10f90c7`，HEAD `67b728f`，仅 docs 差异）。
+ - 候选定义：**同一候选** = 团队计划/D1 记录的实现分支 HEAD（含全部实现提交）；B2 全量判定须基于同一候选与同一环境。
+-- 已知红（实施基线重取）：`test/测试/version-change-integration.test.ts` 9 红（`vca-channel-unavailable`）；`test/桌面应用/optional-acceptance.test.ts` 6 tests / pass 2 / fail 1 / cancelled 3 / skip 0；`test/编排/**` 22 fail / 2 skip。判定：同名用例不得恶化、新增确定性失败=0、新 skip=0；既有失败消失需解释；不改 `optional-acceptance.test.ts`。
++- 已知红（实施基线重取；v1.1 事实更正：`test/编排` 计数 22→24，并增列 9 条 legacy 基线红；失败名集合均不变）：
++  - `test/测试/version-change-integration.test.ts` 9 红（`vca-channel-unavailable`）；
++  - `test/桌面应用/optional-acceptance.test.ts` 6 tests / pass 2 / fail 1 / cancelled 3 / skip 0；
++  - `test/编排/**` **24 fail / 2 skip**（v1 误记 22 fail；v1.1 实测：代码基线 `10f90c7` 与本候选 HEAD `e28923c` 均为 24 fail，失败名集合与基线逐名一致、未变）；
++  - 9 条 legacy 基线红（v1 漏列，v1.1 增列；`test/桌面应用/star-routing.test.ts` 7 条 + `test/测试/governance-e2e-auto/i-full-chain.test.ts` 2 条；在代码基线 `10f90c7` 解包独立复跑 **9/9 同名同因**，**非本候选回归**；系既有测试夹具缺陷——未提供生产门（`e71501c` 引入）要求的已注册项目生命周期/当前客户轮次，生产门 fail-closed 拒绝（`document-planning-source-unavailable`/`worker-dispatch-source-unavailable`/`chief-hub-flow-unavailable` 及由此导致的下游断言不匹配）；**不修改 legacy 断言语义**）：
++    1. 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
++    2. convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
++    3. BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
++    4. BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
++    5. BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
++    6. BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
++    7. AC-4.3：洁净派发无 advisory、无诊断噪声
++    8. 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
++    9. F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
++- 判定：同名用例不得恶化、新增确定性失败=0、新 skip=0；既有失败消失需解释；不改 `optional-acceptance.test.ts`。9 条 legacy 基线红按本口径判定（同名不恶化、不新增），**不要求其为 pass**；legacy 断言语义不得弱化。
+ - H1：**0 处边界修订**（全部写集落在既有 directory/file 授权；`src/common/gates/` 不改）；无新角色、无客户可见门、无边界模型变化。
+ - 发布纪律：全链跑通前不合并/不发布；不打 tag；旧分支 `feat/initial-workflow-publication-completion` 暂停留历史（`4a0bafd`/`882d84b`），不参与本变更。
+ - 交付范围：默认路径两条固定路径（A1–A13 / B1–B4）+ Git 普通用法（任务分支提交 + 合并 main 客户本人确认）+ 应用账本；旧 trunk/run/VCA/stable 机制 compat-only（不删除、不迁移历史账本）。
+@@ -42,7 +59,7 @@
+ 3. **insufficient**：证据缺失、不可读、不可复现或与候选不一致（不得按 pass 处理，不得按 NA 处理）。
+ 4. **NA**：仅当本文件明示可 NA，或经独立验收书面同意并记录理由；默认不可 NA。
+ 5. **同一候选**：AC/T/RR 判定须在同一候选 HEAD 与同一隔离环境中完成；环境抖动须同候选隔离复跑排除。
+-6. **T3 不降档**：B1 判据、确定性测试矩阵、真机全链缺一不可；不得以“已知红/旧机器兼容”为由跳过新路径判据。
++6. **T3 不降档**：B1 判据、确定性测试矩阵、真机全链缺一不可；不得以“已知红/旧机器兼容”为由跳过新路径判据；known red 仅按 §二 列名清单适用「同名不恶化、新增确定性失败=0、新 skip=0」口径，未列名失败一律计 fail，且 known-red 不豁免任何新路径判据。
+ 7. B2 由独立验收按本文件全量执行；D1 为实现侧自检，不替代 B2。
+ 
+ ---
+@@ -55,7 +72,7 @@
+ | --- | --- | --- | --- |
+ | **AC-01** | fixed 矩阵：convener→product/rapporteur/nominator（内置）与项目角色（production）允许；convener→verifier 拒绝 `convener-to-verifier-forbidden`；chief→verifier（review/preparation）允许；chief→convener 仅 `purpose=stage-request`（read-only、无 module/写集）；chief→product/rapporteur/nominator 拒绝 `chief-production-dispatch-forbidden`；self/unknown-source 拒绝 | T-01 全组合单测 + 集成 | 未取证 |
+ | **AC-02** | fixed 窄例外：chief→项目角色仅当 `purpose=review`、`targetRoleId===workflow.reviewRoleId`、roster 原文 `roles[].review===true`、basis `reviewRoleId` 一致、角色已 `role.activated` 时允许；其余项目角色仍 `chief-to-project-forbidden`；随机项目角色/未标记角色负例拒绝 | T-01/T-13 | 未取证 |
+-| **AC-03** | legacy 逐字兼容：`evaluateDispatchAuthorization`/`evaluateDispatchPreflight`/`CHIEF_DISPATCHABLE_BUILT_INS`/`isConvenerBuiltInDispatchTarget` 分支/顺序/文案不变；`routeStarDispatch` 逐字不改；legacy 断言（star-routing、i-full-chain、workflow-preconditions、roles 差分、convener-module-consumption）逐字保留且通过；legacy 常量 `CHIEF_HUB_DISPATCH.targetRoleIds` 五内置、`CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds=["verifier"]` 未改 | T-14/T-01 | 未取证 |
++| **AC-03** | legacy 逐字兼容：`evaluateDispatchAuthorization`/`evaluateDispatchPreflight`/`CHIEF_DISPATCHABLE_BUILT_INS`/`isConvenerBuiltInDispatchTarget` 分支/顺序/文案不变；`routeStarDispatch` 逐字不改；legacy 断言（star-routing、i-full-chain、workflow-preconditions、roles 差分、convener-module-consumption）逐字保留，**不得弱化、改写或删除**；其中 workflow-preconditions、roles 差分、convener-module-consumption 须通过；star-routing 7 条与 i-full-chain 2 条为 §二 列明的基线 known-red（代码基线 `10f90c7` 同名同因、非候选回归、测试夹具缺陷），按 known-red 口径判定：同名不恶化、不新增、**不要求其为 pass**；legacy 常量 `CHIEF_HUB_DISPATCH.targetRoleIds` 五内置、`CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds=["verifier"]` 未改 | T-14/T-01 | 未取证 |
+ | **AC-04** | 派发身份等价证据（Q6）fail-closed：fixed 派发（chief/convener）须同时满足 live-turn（`sourceIsCurrent`）+ assigned-task（stage-request 绑定）+ identity/target + 幂等；证据缺失/不匹配即拒绝（`dispatch-evidence-missing`/`dispatch-source-changed`/`stage-request-required`），不得默认通过；负例（伪造 taskId、错误 creator、已关闭/停止任务、过期轮次、session 重启、fenced run、目标不存在、自派、非 reviewRoleId 项目角色）全部拒绝 | T-01/T-02 | 未取证 |
+ 
+ ### 4.2 状态机（A1–A13 / B1–B4）
+@@ -135,11 +152,11 @@
+ | T-11 | 卡片：3 卡发起/校验/绑定/documentRefs；方案/任命发起人；验收卡抑制；A12a/A12b + docs/acceptance 归档（版本/幂等）；merge-main 非判断卡/仅客户本人 | `test/编排/decision-card.test.ts`、`test/roles/*`、`test/桌面应用/customer-input*` | 未取证 |
+ | T-12 | 路径 B：无仓库 ⇒ b-repository-required；既有仓库分支创建/复用；dirty/越界拒绝；B3 写集派生；B4 发布（不要求 A12b） | `test/编排/path-b-baseline.test.ts`（新）、`test/测试/b-change-scope.test.ts`（新） | 未取证 |
+ | T-13 | 角色模块/工具面：legacy 差分逐字不变；fixed `fixedCards`/targets/context；tool 注册/卡种；`role-module-contract`（14 项语义保留；如新增工具则 15 项）；接口评审记录 | `test/roles/*`、`test/门禁引擎/role-module-contract.test.ts`、契约测试 | 未取证 |
+-| T-14 | 迁移兼容：legacy 项目/在飞 run 走旧路径且旧断言逐字不变；fixed 新项目不触达 trunk/run/stable（断言无 `.ans/trunk`/`.ans/runs`/versions/stable 写入）；旧账本忽略；旧 fixture 不回归 | `test/测试/existing-project-compat-verify`、`test/测试/mode-switch.test.ts`（新）、`test/编排/trunk-*` 等既有套件 | 未取证 |
++| T-14 | 迁移兼容：legacy 项目/在飞 run 走旧路径且旧断言逐字不变；fixed 新项目不触达 trunk/run/stable（断言无 `.ans/trunk`/`.ans/runs`/versions/stable 写入）；旧账本忽略；旧 fixture 不回归（star-routing/i-full-chain 的 9 条 §二 known-red 按 known-red 口径判定，不要求 pass） | `test/测试/existing-project-compat-verify`、`test/测试/mode-switch.test.ts`（新）、`test/编排/trunk-*` 等既有套件 | 未取证 |
+ | T-15 | 审计：shell/git 审计行不减少；release 审计字段；judge 来源不冒充客户；merge-main 无 judge-delegated 来源 | `test/编排/shell-post-audit.test.ts`、新增 release 审计测试 | 未取证 |
+ | T-16 | 全链（假会话）：空项目→意图→方案→激活→基线→实现→验收→合并；SessionManager 集成（假 openRoleSession，不启动模型） | `test/测试/fixed-path-full-chain.test.ts`（新，与 i-full-chain 并行） | 未取证 |
+ | T-17 | 类型检查：`npm run typecheck` 全绿（renderer 触及则 `typecheck:renderer`） | CI/本地命令 | 未取证 |
+-| T-18 | known red：按 §二 基线复测；同名用例不恶化、新增确定性失败=0、新 skip=0；既有失败消失需解释 | 全量 TAP before/after | 未取证 |
++| T-18 | known red：按 §二 基线（含 9 条 star-routing/i-full-chain 基线红与 `test/编排` 24 fail）复测；同名用例不恶化、新增确定性失败=0、新 skip=0；既有失败消失需解释；known-red 不要求为 pass | 全量 TAP before/after | 未取证 |
+ | T-19 | H1/边界：写集外 diff=0；`角色卡/**` 未改；`src/common/gates/` 未改；新文件位于既有 directory 授权 | diff 清单 + 边界核对 | 未取证 |
+ | T-20 | 文档格式：doc_format 54 格式不变；`team-plan/v3` 说明与 `contract_check` 文案同步；`project-roster/v4`（v3 兼容、可选 `roles[].review`）解析/示例/错误文案同步 | `test/编排/*doc*`、契约测试 | 未取证 |
+ 
+@@ -164,7 +181,7 @@
+ | --- | --- | --- |
+ | EV-01 | 候选身份 | 实现分支/HEAD/全部实现提交；无 tag；无合并 main；旧分支停用记录 |
+ | EV-02 | D1 每批自检 | `npm run typecheck` + 受影响套件 before/after TAP + 失败名集合 diff + 文件清单/写集外 diff=0 |
+-| EV-03 | known red 复测 | 按 §二 基线；TAP 对比；环境抖动隔离复跑记录 |
++| EV-03 | known red 复测 | 按 §二 基线（v1.1：含 9 条 star-routing/i-full-chain 基线红、`test/编排` 24 fail）；TAP 对比；环境抖动隔离复跑记录（9 红基线对照与 24 fail 实测见 B1.1 记录证据） |
+ | EV-04 | 确定性矩阵 | T-01…T-20 执行结果（pass/fail/insufficient/NA + 证据路径） |
+ | EV-05 | 接口评审 | `RoleToolId`（条件）、`DispatchMatrixMode`/`RoleDispatchPurpose`/`RoleDispatchPolicyInput.matrix`、`context({matrix})`、`merge-main` 卡种（`GovernanceCardKind`/`AppOwnedGovernanceCardKind`）、`task.created`/`dispatch_task` 字段、`close_created_task` v2、`activate_role_documents` v2、模块新导出字段（`fixedCards`/`fixedTargetRoleIds`/`fixedAllowedBuiltInRoleIds`/`isConvenerFixedBuiltInDispatchTarget`）、`project-roster/v4 roles[].review` 的评审记录与结论（失败即不支持） |
+ | EV-06 | 真机全链 | RR-01…RR-06 日志/截图/账本/预算报告；隔离证明 |
+@@ -182,7 +199,7 @@
+ 5. **`requestReleaseMerge` 条件化（G-7）**：按 Q2 结论执行——优先复用既有能力；确需新增须接口评审通过，失败即不支持（AC-24）。
+ 6. **`project-roster/v4` 兼容（G-9）**：v3/v4 双字面量接受、旧解析器兼容、doc-format 不新增 id；须有契约测试（T-20）。
+ 7. **Q3/Q5 实现细节**：写任务串行 + 每项目至多一个活动 fixed workflow；只本地合并 main，push/tag 另授权（AC-12/AC-22/AC-27）。
+-8. **接口评审与 known red**：见 EV-03/EV-05；known red 按 §二 不恶化。
++8. **接口评审与 known red**：见 EV-03/EV-05；known red 按 §二 列名清单不恶化（v1.1：含 9 条 star-routing/i-full-chain 基线红与 `test/编排` 24 fail；known-red 不要求 pass）。
+ 9. **merge-main 客户本人测试**：非判断卡、judge 拒绝/转人工、无 judge-delegated 来源（AC-14/T-10/T-15）。
+ 10. **Q6 负例**：伪造 taskId/错误 creator/已关闭/停止任务/过期轮次/session 重启/fenced run/目标不存在/自派/非 reviewRoleId 项目角色/未标记 review 角色（AC-04）。
+ 
+@@ -190,7 +207,7 @@
+ 
+ ## 九、限制与披露
+ 
+-- 本 B1 基于只读清点与三轮独立复核；未运行实现、未跑测试、未运行真实 Electron/真实模型；所有判据初始 `未取证`，不得以方案/记录自述替代证据。
++- 本 B1 v1.1 基于只读清点、三轮独立复核（v1 继承）与 B2 预验收/基线实测（v1.1）；未运行实现、未运行真实 Electron/真实模型；所有判据初始 `未取证`，不得以方案/记录自述替代证据。v1.1 仅对 known-red 基线事实做独立复跑取证（9 红基线对照、`test/编排` 24 fail 实测），见 `角色卡/独立验收/docs/change/2026-11-10_B1.1_two-fixed-workflow-paths.md`。
+ - B1 冻结依据的哈希见 §一；若依据文档或方案变更，须重新复核并更新 B1（新版本，不原地改）。
+ - 真机全链预算另报；本 B1 不构成预算批准、实施授权或客户批准。
+ - B1 由独立验收按任务精确范围授权写入 `docs/acceptance/`；B2 由独立验收执行；实现/D1 自检不替代 B2。

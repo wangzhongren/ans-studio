@@ -1,0 +1,5 @@
+role: score-persist
+entries:
+  - kind: file
+    path: src/score.js
+    purpose: 计分与最高分持久化实现

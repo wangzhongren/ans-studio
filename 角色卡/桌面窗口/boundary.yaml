@@ -247,6 +247,13 @@ entries:
   - kind: file
     path: test/桌面应用/version-change.test.ts
     purpose: 主进程侧测试——VCA/冻结/迁移/bootstrap/重构/客户主权/IPC/面板/重启
+  # --- Delta-B2930-1（2026-11-11，客户 B29/B30 授权）：B29 fixed `complete_team_plan` 回执形状——补登 2 个精确测试文件（test/桌面应用/、test/测试/ 各 1），逐文件授权，无目录级授权 ---
+  - kind: file
+    path: test/桌面应用/b3-fixed-baseline-pathb.test.ts
+    purpose: A9 基线/A12 归档/路径 B 桌面接线测试（B29 触及）
+  - kind: file
+    path: test/测试/fixed-path-full-chain.test.ts
+    purpose: fixed 两条路径确定性全链集成测试（B29 触及）
   - kind: file
     path: 角色卡/桌面窗口/feature-map.md
     purpose: 功能导航

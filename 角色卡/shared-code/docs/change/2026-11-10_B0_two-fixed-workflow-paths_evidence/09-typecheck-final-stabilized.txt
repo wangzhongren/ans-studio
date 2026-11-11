@@ -1,0 +1,9 @@
+# 最终稳定树 typecheck（并行写盘稳定后复跑；2026-11-10 12:1x）
+# 结论：exit 1，单条跨批次类型错误（运行时核心新增 merge-main 卡种；编排 run-role.ts 标签表尚未同步）——非本批文件。
+
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+src/pipeline/orchestration/run-role.ts(3234,7): error TS2322: Type '{ acceptance: string; appointment: string; "appointment-write": string; download: string; proposal: string; decision: string; "intent-confirm": string; "stable-write": string; }' is not assignable to type 'Readonly<Record<GovernanceCardKind, string>> & Readonly<Partial<Record<"stable-write", string>>>'.
+  Property '"merge-main"' is missing in type '{ acceptance: string; appointment: string; "appointment-write": string; download: string; proposal: string; decision: string; "intent-confirm": string; "stable-write": string; }' but required in type 'Readonly<Record<GovernanceCardKind, string>>'.

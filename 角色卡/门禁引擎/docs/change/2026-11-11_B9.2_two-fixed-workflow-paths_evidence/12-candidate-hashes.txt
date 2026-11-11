@@ -1,0 +1,14 @@
+=== candidates ===
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+7c4cf36ce037a59da6ddea762c2f5b52d57cd36536ba089701a35d59c027e34a *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+  128 22890 src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+52617e638caa11dcc8949b4c767cc715e2500061
+test/门禁引擎/chief-workflow-v2-stage-task-separation.test.ts
+73e46ef7f722b114c2c335831fa41b2a764c5be5f86c4263f46441ee5f27b027 *test/门禁引擎/chief-workflow-v2-stage-task-separation.test.ts
+  180 13503 test/门禁引擎/chief-workflow-v2-stage-task-separation.test.ts
+53da6734730c29a78a8216bad6cc8d90eed79dff
+
+=== numstat (vs HEAD; includes B9.1) ===
+warning: in the working copy of 'src/common/门禁引擎/workflows/chief/chief-workflow-v2.md', LF will be replaced by CRLF the next time Git touches it
+23	13	src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+new test file lines: 180

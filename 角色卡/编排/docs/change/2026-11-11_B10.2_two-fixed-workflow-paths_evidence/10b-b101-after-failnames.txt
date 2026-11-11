@@ -1,0 +1,104 @@
+2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发
+AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留
+AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读
+AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点
+AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点
+AC-4.3：洁净派发无 advisory、无诊断噪声
+AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported
+B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）
+B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务
+BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+C frozen batch retries keep members and delivery ID while later reports stay separate
+C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口
+D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly
+D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly
+D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly
+D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly
+D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged
+D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text
+D1R2 actual ack preserves a failed delayed terminal and the next aborted original client
+D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）
+D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略
+D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集
+E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入
+F2：版本化文档基线违规受理 + advisory；基线/文档未被改写
+F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚
+G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞
+I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）
+M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理
+M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据
+M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚
+P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）
+P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源
+P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实）
+P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定
+P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId
+R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable
+R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable
+SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止
+W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+W47 默认Core/Codex本地HTTP：忙Chief独立revise释放真实卡调用
+W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt
+buildProjectConfig：由枚举结果构造角色表，acceptance 透传
+convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined
+decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计）
+listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执
+run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned
+run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned
+safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递
+sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道
+sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂
+sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）
+sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）
+sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账
+session 指令可重复应用；once 指令消费后不再生效
+stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色
+unique-fail-names 102
+{"tests":820,"pass":715,"fail":96,"cancelled":9,"skipped":0,"todo":0}
+§5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底
+§5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板
+一项目一卡：前一张未决时下载卡排队，不呈现
+不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行
+关闭全部与双角色刷新扫描交接：停止返回后没有后续重开或投递
+冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行
+同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）
+坏账本（ledgerErrors>0）⇒ 消费者按无指令：既有默认推荐路径不变，不产生指令行
+宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change
+已 bootstrap（有角色）：su 的 gate 拒绝 角色卡/<新角色>/role-card.md（不再有创世授权）
+幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚
+开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发
+提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发
+星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）
+显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变
+显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变
+显式入口（stop）：requestRunChangeDecision 三模式落账不变
+派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0
+申请直达：来源角色=rapporteur，卡片不镜像，裁决回来源；request.* 事件写 tasks.jsonl
+真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**
+路径 B：B3 accepted（+运营报告）⇒ 自动呈 merge-main；客户 approve ⇒ 合并 + 交付关闭（不要求 A12b/归档）
+连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢
+重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过
+重建 dispose 等待窗口：stop A 保持用户目标/关闭契约
+重建 dispose 等待窗口：stop all 保持用户目标/关闭契约
+重建 open 等待窗口：stop A 保持用户目标/关闭契约

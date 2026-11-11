@@ -1,0 +1,782 @@
+TAP version 13
+# Subtest: chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+ok 1 - chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+  ---
+  duration_ms: 1.6348
+  type: 'test'
+  ...
+# Subtest: legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+ok 2 - legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+  ---
+  duration_ms: 0.321
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+ok 3 - chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+  ---
+  duration_ms: 0.4266
+  type: 'test'
+  ...
+# Subtest: G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope
+ok 4 - G15 pure lexical/canonical/final stages authorize only the same accepted frozen scope
+  ---
+  duration_ms: 1.9332
+  type: 'test'
+  ...
+# Subtest: G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings
+ok 5 - G15 managed read stages reject absent role/scope, secrets, traversal and malformed host bindings
+  ---
+  duration_ms: 0.5508
+  type: 'test'
+  ...
+# Subtest: G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed
+ok 6 - G15 canonical/currentFile unknown, root escape, protected aliases and final hash absence fail closed
+  ---
+  duration_ms: 0.4951
+  type: 'test'
+  ...
+# Subtest: G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics
+ok 7 - G15 pure read/final predicates never call fs or the legacy live-boundary diagnostics
+  ---
+  duration_ms: 0.6182
+  type: 'test'
+  ...
+# Subtest: G5 Git-selected missing effective ref never falls back to valid FS projection/live role
+ok 8 - G5 Git-selected missing effective ref never falls back to valid FS projection/live role
+  ---
+  duration_ms: 162.2456
+  type: 'test'
+  ...
+# Subtest: G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed
+ok 9 - G5 real Git active/old-pin readers ignore raw FS projection and changed live bytes; corrupt journal fails closed
+  ---
+  duration_ms: 7237.137
+  type: 'test'
+  ...
+# Subtest: G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership
+ok 10 - G2 pure activation check binds complete bytes and rejects half-set/mismatch/widened/shared ownership
+  ---
+  duration_ms: 2.7272
+  type: 'test'
+  ...
+# Subtest: G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion
+ok 11 - G2 real Provider-backed new old-run session re-resolves frozen bytes after live change and deletion
+  ---
+  duration_ms: 26.9155
+  type: 'test'
+  ...
+# Subtest: G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live
+ok 12 - G2 run requires matching full evidence; corrupt or missing snapshot cannot fall back to live
+  ---
+  duration_ms: 18.266
+  type: 'test'
+  ...
+# Subtest: G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged
+ok 13 - G3 no-run uses independent active pointer after doc-only update; old-run pin remains unchanged
+  ---
+  duration_ms: 106.3122
+  type: 'test'
+  ...
+# Subtest: G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence
+ok 14 - G3 awaited Service refresh installs real Provider confirmation freeze and fails closed on damaged evidence
+  ---
+  duration_ms: 20.2674
+  type: 'test'
+  ...
+# Subtest: G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)
+ok 15 - G3 judge-delegated intent freeze is accepted by the gate's own versions.jsonl consumer (single Model validator)
+  ---
+  duration_ms: 17.2937
+  type: 'test'
+  ...
+# Subtest: G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals
+ok 16 - G2 freeze source validates real direct/delegated kinds and rejects fabricated customer approvals
+  ---
+  duration_ms: 0.4029
+  type: 'test'
+  ...
+# Subtest: 六角色明确未注入能力不得虚构或恢复取消卡
+ok 17 - 六角色明确未注入能力不得虚构或恢复取消卡
+  ---
+  duration_ms: 0.1758
+  type: 'test'
+  ...
+# Subtest: 产品/策划整单直接提交，来源和旧run冻结约束可见
+ok 18 - 产品/策划整单直接提交，来源和旧run冻结约束可见
+  ---
+  duration_ms: 0.1524
+  type: 'test'
+  ...
+# Subtest: 策划独占三模式，旧pin与停稳失败不能绕过
+ok 19 - 策划独占三模式，旧pin与停稳失败不能绕过
+  ---
+  duration_ms: 0.0647
+  type: 'test'
+  ...
+# Subtest: 人事保留真实D3，三文档整体激活，不再逐次写卡审批
+ok 20 - 人事保留真实D3，三文档整体激活，不再逐次写卡审批
+  ---
+  duration_ms: 0.0803
+  type: 'test'
+  ...
+# Subtest: 运营直接完成计划与主动环境卡，真实恢复条件先行
+ok 21 - 运营直接完成计划与主动环境卡，真实恢复条件先行
+  ---
+  duration_ms: 0.08
+  type: 'test'
+  ...
+# Subtest: chief/convener收口必须为原创建者，报告不等于关闭
+ok 22 - chief/convener收口必须为原创建者，报告不等于关闭
+  ---
+  duration_ms: 0.0924
+  type: 'test'
+  ...
+# Subtest: 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束
+ok 23 - 真实chief委托能选非推荐项/拒绝/退修，且受revision单次结算约束
+  ---
+  duration_ms: 0.0751
+  type: 'test'
+  ...
+# Subtest: 提示变化不扩充工具布尔位、写区或派发权
+ok 24 - 提示变化不扩充工具布尔位、写区或派发权
+  ---
+  duration_ms: 0.0985
+  type: 'test'
+  ...
+# Subtest: Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实
+ok 25 - Chief枢纽在六卡区分普通准备和动作授权，历史创建者保持真实
+  ---
+  duration_ms: 0.1983
+  type: 'test'
+  ...
+# Subtest: Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+ok 26 - Chief资源正文独立且卡只声明真实注入来源，两套workflow分开
+  ---
+  duration_ms: 0.0992
+  type: 'test'
+  ...
+# Subtest: B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状）
+ok 27 - B0：类型层——旧调用不传新字段，fixed 调用方显式传值（纯数据形状）
+  ---
+  duration_ms: 0.3798
+  type: 'test'
+  ...
+# Subtest: B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例）
+ok 28 - B0：dispatch 缺省 matrix/purpose ≡ 显式 legacy-v1/production（六模块逐例）
+  ---
+  duration_ms: 1.1501
+  type: 'test'
+  ...
+# Subtest: B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变）
+ok 29 - B0：context 缺省 matrix ≡ 显式 legacy-v1（六模块 × 两治理模型；现有返回值不变）
+  ---
+  duration_ms: 0.1364
+  type: 'test'
+  ...
+# Subtest: B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段
+ok 30 - B0：ProjectConfig.workflowSchema 是纯配置数据——两值可构造、缺省不声明、不改其它字段
+  ---
+  duration_ms: 0.0987
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy）
+ok 31 - MF-IR-4：legacy `cardKindsOf` 只读模块 `cards`（六角色逐字冻结、同引用、缺省 matrix＝legacy）
+  ---
+  duration_ms: 0.8366
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）
+ok 32 - MF-IR-4：`cardKindsOf(fixed)` 只读模块 `fixedCards`；缺失 ⇒ fail-closed 空集（不回退 legacy `cards`）
+  ---
+  duration_ms: 0.1861
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变
+ok 33 - MF-IR-4：chief `fixedTargetRoleIds`/convener `fixedAllowedBuiltInRoleIds` 冻结值；legacy 常量逐字不变
+  ---
+  duration_ms: 0.1065
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）
+ok 34 - MF-IR-4：convener `isConvenerFixedBuiltInDispatchTarget` 纯函数与 fixed 表同源（缺失 ⇒ undefined 由调用方 fail-closed）
+  ---
+  duration_ms: 0.0797
+  type: 'test'
+  ...
+# Subtest: fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed
+ok 35 - fixed 视图：`builtInRoleMatrixSummaryOf` legacy 同引用、fixed 独立非空、缺失/未知 fail-closed
+  ---
+  duration_ms: 0.2623
+  type: 'test'
+  ...
+# Subtest: G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项
+ok 36 - G-IR 拒绝项：`requestReleaseMerge` 不新增（模型/注册表/装配表/角色模块零出现）；RoleToolId 仍 14 项
+  ---
+  duration_ms: 3.6868
+  type: 'test'
+  ...
+# Subtest: MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O）
+ok 37 - MF-IR-4：fixed 视图读取不改写注册表/模块（纯策略只读；no I/O）
+  ---
+  duration_ms: 0.2943
+  type: 'test'
+  ...
+# Subtest: fixed/legacy 视图入口：缺省 ≡ 显式 legacy-v1（legacy 原样）；fixed 由显式模式选择
+ok 38 - fixed/legacy 视图入口：缺省 ≡ 显式 legacy-v1（legacy 原样）；fixed 由显式模式选择
+  ---
+  duration_ms: 7.3751
+  type: 'test'
+  ...
+# Subtest: fixed 文案：角色 duty/mainChain/约定来自 fixed 视图（不是 legacy `spec.matrix` 回退）
+ok 39 - fixed 文案：角色 duty/mainChain/约定来自 fixed 视图（不是 legacy `spec.matrix` 回退）
+  ---
+  duration_ms: 2.1822
+  type: 'test'
+  ...
+# Subtest: fixed 卡种路由：只读模块 `fixedCards`（缺失 ⇒ 空集 fail-closed；不读 Pipeline legacy 快照）
+ok 40 - fixed 卡种路由：只读模块 `fixedCards`（缺失 ⇒ 空集 fail-closed；不读 Pipeline legacy 快照）
+  ---
+  duration_ms: 0.3172
+  type: 'test'
+  ...
+# Subtest: fixed 派发视图：幕僚/运营分裂（stage-request + verifier；convener 生产线）不出现 legacy 派发/模型/发起路由
+ok 41 - fixed 派发视图：幕僚/运营分裂（stage-request + verifier；convener 生产线）不出现 legacy 派发/模型/发起路由
+  ---
+  duration_ms: 0.2387
+  type: 'test'
+  ...
+# Subtest: fixed 应用规则：客户决定三卡/产品意图/策划/下载可见；不新增客户门（只读展示）
+ok 42 - fixed 应用规则：客户决定三卡/产品意图/策划/下载可见；不新增客户门（只读展示）
+  ---
+  duration_ms: 0.3041
+  type: 'test'
+  ...
+# Subtest: fixed 视图只读：构建不改写注册表/模块；同一输入两次构建逐字一致（无缓存/时钟）
+ok 43 - fixed 视图只读：构建不改写注册表/模块；同一输入两次构建逐字一致（无缓存/时钟）
+  ---
+  duration_ms: 0.3428
+  type: 'test'
+  ...
+# Subtest: AC-3：内置六角色字段逐项与注册表一致（含来源与能力位）
+ok 44 - AC-3：内置六角色字段逐项与注册表一致（含来源与能力位）
+  ---
+  duration_ms: 6.4413
+  type: 'test'
+  ...
+# Subtest: AC-4/AC-9：worker 行、issues 去重、归档不出行、内置 id 防御、bootstrap 状态
+ok 45 - AC-4/AC-9：worker 行、issues 去重、归档不出行、内置 id 防御、bootstrap 状态
+  ---
+  duration_ms: 2.7105
+  type: 'test'
+  ...
+# Subtest: AC-5：unknown 带原因、known 带来源；worker 缺章节/缺 acceptance 不伪装
+ok 46 - AC-5：unknown 带原因、known 带来源；worker 缺章节/缺 acceptance 不伪装
+  ---
+  duration_ms: 0.5473
+  type: 'test'
+  ...
+# Subtest: AC-6：单一来源——不复制卡种表、Model 常量派生、唯一 app-rule 小表；无 I/O/门禁导入
+ok 47 - AC-6：单一来源——不复制卡种表、Model 常量派生、唯一 app-rule 小表；无 I/O/门禁导入
+  ---
+  duration_ms: 1.1837
+  type: 'test'
+  ...
+# Subtest: AC-7：派发导航条目、目标与 basis/source
+ok 48 - AC-7：派发导航条目、目标与 basis/source
+  ---
+  duration_ms: 0.1847
+  type: 'test'
+  ...
+# Subtest: AC-8/AC-10/AC-11：generatedAt 直用、无缓存/无 fs/无判定字段、注册表不被改写
+ok 49 - AC-8/AC-10/AC-11：generatedAt 直用、无缓存/无 fs/无判定字段、注册表不被改写
+  ---
+  duration_ms: 0.5169
+  type: 'test'
+  ...
+# Subtest: AC-9：注册表不可用 → status unavailable（内部 seam 故障注入）
+ok 50 - AC-9：注册表不可用 → status unavailable（内部 seam 故障注入）
+  ---
+  duration_ms: 0.1801
+  type: 'test'
+  ...
+# Subtest: AC-13：上限常量与有界渲染/截断统计
+ok 51 - AC-13：上限常量与有界渲染/截断统计
+  ---
+  duration_ms: 3.3452
+  type: 'test'
+  ...
+# Subtest: AC-16：摘要声明/固定句/未知 roleId 不回显其他角色
+ok 52 - AC-16：摘要声明/固定句/未知 roleId 不回显其他角色
+  ---
+  duration_ms: 0.8964
+  type: 'test'
+  ...
+# Subtest: AC-17：恶意/超长角色卡摘录被包裹、清洗、去伪造标记
+ok 53 - AC-17：恶意/超长角色卡摘录被包裹、清洗、去伪造标记
+  ---
+  duration_ms: 1.3746
+  type: 'test'
+  ...
+# Subtest: AC-12/冻结：测试 seam 三条件与公开导出面
+ok 54 - AC-12/冻结：测试 seam 三条件与公开导出面
+  ---
+  duration_ms: 0.3585
+  type: 'test'
+  ...
+# Subtest: 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+not ok 55 - 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+  ---
+  duration_ms: 1.2276
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\governance-matrix-service.test.ts:514:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流管理、按序派发、短报汇总/. Input:
+    
+    '# 治理权力矩阵（运行时派生只读摘要；schema governance-matrix/v1）\n' +
+      '> 生成于 2026-11-05T10:00:00+08:00；治理模型 trio。\n' +
+      '> 本摘要不新增、不改变任何权限。权威来源：治理角色注册表、角色卡/<role>/boundary.yaml 与 role-card.md、以及门禁判定。unknown 不等于允许，也不等于禁止。\n' +
+      '> 矩阵未列出≠无权限；宿主未注入≠角色无权。\n' +
+      '\n' +
+      '## 内置治理角色（6）\n' +
+      '\n' +
+      '### chief 幕僚（built-in）\n' +
+      '- 职能定位：唯一客户入口与五builtin派发/收报/收口枢纽；按真实反馈自主选路，明确委托时按证据作真实业务决定。（来源：注册表）\n' +
+      '- 可写（注册表）：docs/intents/（directory，客户意图 / 沟通记录（intentId/handoffKind/goal/scope/acceptance/客户原话））\n' +
+      '- 预授权（注册表）：docs/intents/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写\n' +
+      '- 边界接受：已接受（客户 pin（测试夹具）；basis runtime）\n' +
+      '- 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/、docs/proposals/、docs/contracts/、docs/nominations/、docs/skills/、docs/mcp/、docs/governance/、docs/workflow.md；先于 resolveWrite 判定；命中即拒\n' +
+      '- 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）\n' +
+      '- 强制力-约定（注册表）：只合法收口自己创建且有报告的任务；独立质检与专门执行审批保留，不默认选推荐项。；卡面纪律短摘录（只读展示，不参与判定）\n' +
+      '- 派发（dispatch_task）：是（来源：注册表）\n' +
+      '- 客户交互-choice：卡种=intent-confirm（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 其他发起：需求变更=否；版本决定=是；版本变更=无；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）\n' +
+      '- 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。\n' +
+      '- shell：operator-approve（本会话：available，来源：session）\n' +
+      '- 主链/闸门：每次客户/正式报告驱动前读取应用注入chief-workflow.md全文、资源path/hash/版本与应用版本；正文唯一MD真源。；项目docs/workflow.md另按有效snapshot或执行run冻结来源读取，不替代Chief资源，不因资源更新重pin。（来源：注册表）\n' +
+      '- 其他能力：roleStatus=是；sessionTail=是；installSkill=否；installMcp=否（来源：注册表）\n' +
+      '- 治理职能：chief（来源：注册表）\n' +
+      '- 来源：governance-roles.ts 内置注册表（注册表）\n' +
+      '\n' +
+      '### product 产品（built-in）\n' +
+      '- 职能定位：按真实目标/范围缺口维护产品意图与升级，已有有效依据可核验复用。（来源：注册表）\n' +
+      '- 可写（注册表）：docs/product/（directory，产品取舍 / 产品评审 / 产品文档（D 批目标写区））\n' +
+      '- 预授权（注册表）：docs/product/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写\n' +
+      '- 边界接受：已接受（客户 pin（测试夹具）；basis runtime）\n' +
+      '- 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/、docs/proposals/、docs/contracts/、docs/nominations/、docs/skills/、docs/mcp/、docs/governance/、docs/workflow.md；先于 resolveWrite 判定；命中即拒\n' +
+      '- 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）\n' +
+      '- 强制力-约定（注册表）：只写 docs/product/；不写提案/名单/架构/角色卡；不实现、不招人。；卡面纪律短摘录（只读展示，不参与判定）\n' +
+      '- 派发（dispatch_task）：否（来源：注册表）\n' +
+      '- 客户交互-choice：卡种=无（来源：app-rule）；角色级=否（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 客户交互-confirm：卡种=无（来源：app-rule）；角色级=否（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 其他发起：需求变更=否；版本决定=否；版本变更=version-upgrade；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）\n' +
+      '- 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。\n' +
+      '- shell：operator-approve（本会话：available，来源：session）\n' +
+      '- 主链/闸门：产出 docs/product/<flowId>-intent-vN.md（版本化，不原地改）。；version-upgrade 整单校验后直接提交；以真实回执为准，旧 run 不自动重 pin。；不写实现方案/提案/名单/角色卡。（来源：注册表）\n' +
+      '- 其他能力：roleStatus=否；sessionTail=否；installSkill=否；installMcp=否（来源：注册表）\n' +
+      '- 治理职能：product（来源：注册表）\n' +
+      '- 来源：governance-roles.ts 内置注册表（注册表）\n' +
+      '\n' +
+      '### rapporteur 策划（built-in）\n' +
+      '- 职能定位：据产品意图出策划方案、人员名单、项目架构；提案/契约。（来源：注册表）\n' +
+      '- 可写（注册表）：docs/proposals/（directory，提案（frontmatter: flowId/version/author/status: draft））；docs/contracts/（directory，冻结的跨角色契约（版本化文件，不原地改））；docs/governance/rapporteur/（directory，策划 / Draft 的治理工作记录）\n' +
+      '- 预授权（注册表）：docs/proposals/、docs/contracts/、docs/governance/rapporteur/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写\n' +
+      '- 边界接受：已接受（客户 pin（测试夹具）；basis runtime）\n' +
+      '- 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/chief/、角色卡/product/、角色卡/rapporteur/、角色卡/nominator/、角色卡/convener/、角色卡/verifier/、角色卡/su/、docs/nominations/；先于 resolveWrite 判定；命中即拒\n' +
+      '- 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）\n' +
+      '- 强制力-约定（注册表）：名单是人事招人的唯一依据；不写角色卡、不招人、不实现、不改产品意图。；卡面纪律短摘录（只读展示，不参与判定）\n' +
+      '- 派发（dispatch_task）：否（来源：注册表）\n' +
+      '- 客户交互-choice：卡种=proposal/decision（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 其他发起：需求变更=是；版本决定=否；版本变更=detail-amendment；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）\n' +
+      '- 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。\n' +
+      '- shell：operator-approve（本会话：available，来源：session）\n' +
+      '- 主链/闸门：按真实影响补方案/名单/架构；有效依据核绑定后复用，无缺口不机械重走策划/招人。；detail-amendment 整单直接提交；策划选择 continue-frozen/stop-and-restart/stop，不恢复逐项/最终卡。（来源：注册表）\n' +
+      '- 其他能力：roleStatus=否；sessionTail=否；installSkill=否；installMc…（已截断，原长 1571；请用 roleId 过滤）\n' +
+      '\n' +
+      '### nominator 人事（built-in）\n' +
+      '- 职能定位：真实角色/权限缺口时按合法名单与计划保留D3并完整激活；不参与无缺口的机械重招。（来源：注册表）\n' +
+      '- 可写（注册表）：角色卡/（directory，项目角色目录（真实 D3 与团队计划范围内直接写 role-card.md / boundary.md / boundary.yaml，完整校验激活））；docs/skills/（directory，技能文档与安装登记（先落盘再激活））；docs/mcp/（directory，MCP 声明文档（先落盘再激活；凭据值不写文件））；docs/governance/nominator/（directory，人事 / Crew 的治理工作记录）\n' +
+      '- 预授权（注册表）：docs/skills/、docs/mcp/、docs/governance/nominator/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写\n' +
+      '- 边界接受：已接受（客户 pin（测试夹具）；basis runtime）\n' +
+      '- 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/chief/、角色卡/product/、角色卡/rapporteur/、角色卡/nominator/、角色卡/convener/、角色卡/verifier/、角色卡/su/、docs/proposals/、docs/scheduling/；先于 resolveWrite 判定；命中即拒\n' +
+      '- 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）\n' +
+      '- 强制力-约定（注册表）：无名单不得写卡；不招名单外角色；不批准提案/验收，不代客户决定。；卡面纪律短摘录（只读展示，不参与判定）\n' +
+      '- 派发（dispatch_task）：否（来源：注册表）\n' +
+      '- 客户交互-choice：卡种=appointment（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 客户交互-confirm：卡种=appointment-write（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 其他发起：需求变更=否；版本决定=否；版本变更=无；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）\n' +
+      '- 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。\n' +
+      '- shell：operator-approve（本会话：available，来源：session）\n' +
+      '- 主链/闸门：无最新合法名单不得写卡。；保留 appointment/D3；选中范围内直接写三文档，凭完整激活回执上线；不发 appointment-write。（来源：注册表）\n' +
+      '- 其他能力：roleStatus=否；sessionTail=否；installS…（已截断，原长 1589；请用 roleId 过滤）\n' +
+      '\n' +
+      '### convener 运营（built-in）\n' +
+      '- 职能定位：按Chief任务受控init/复用核实/合法计划；执行就绪后仅派worker、集成候选、收报，交Chief组织独立质检。（来源：注册表）\n' +
+      '- 可写（注册表）：docs/workflow.md（file，项目工作流（步骤表：步骤 / 角色 / 前置依赖 / 契约 / 交接物 / 完成口令 / 验收）；由运营落盘并维护）；docs/scheduling/（directory，计划 / 分析 / 调度记录（D 批目标写区；无 flow 机器））；docs/governance/convener/（directory，运营的治理工作记录）\n' +
+      '- 预授权（注册表）：docs/workflow.md、docs/scheduling/、docs/governance/convener/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写\n' +
+      '- 边界接受：已接受（客户 pin（测试夹具）；basis runtime）\n' +
+      '- 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/、docs/proposals/、docs/nominations/、docs/skills/、docs/mcp/；先于 resolveWrite 判定；命中即拒\n' +
+      '- 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）\n' +
+      '- 强制力-约定（注册表）：不写角色卡、不招人、不改名单、不写项目源码；不批准、不验收。；卡面纪律短摘录（只读展示，不参与判定）\n' +
+      '- 派发（dispatch_task）：是（来源：注册表）\n' +
+      '- 客户交互-choice：卡种=decision（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 其他发起：需求变更=是；版本决定=否；版本变更=无；重构=是；stable 写入=是；下载=available（session）；shell escalation=unavailable（session）\n' +
+      '- 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。\n' +
+      '- shell：operator-approve（本会话：available，来源：session）\n' +
+      '- 主链/闸门：首init/规划不等未来D3；执行前workflow及真实任命/授权/激活就绪。；团队计划校验后直接完成；主动发环境阻塞 decision 卡并核实际恢复，只收口自己创建的任务。；按四类意图实际缺口推进；新派发仅限合法worker，汇报Chief创建质检；Chief接受后显式续live controller才核最终OID并CAS交付。；不写卡/不招人。（来源：注册表）\n' +
+      '- 其他能力：roleStatus=否；sessionTail=否；insta…（已截断，原长 1590；请用 roleId 过滤）\n' +
+      '\n' +
+      '### verifier 质检（built-in）\n' +
+      '- 职能定位：可选质量核对与验收执行者。（来源：注册表）\n' +
+      '- 可写（注册表）：docs/quality/（directory，质量记录 / 可选核对（D 批目标写区））；docs/verification/（directory，可选核对证据附件（不是验收结论））；docs/governance/verifier/（directory，质检的治理工作记录）\n' +
+      '- 预授权（注册表）：docs/quality/、docs/verification/、docs/governance/verifier/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写\n' +
+      '- 边界接受：已接受（客户 pin（测试夹具）；basis runtime）\n' +
+      '- 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/chief/、角色卡/product/、角色卡/rapporteur/、角色卡/nominator/、角色卡/convener/、角色卡/verifier/、角色卡/su/、docs/intents/、docs/proposals/、docs/contracts/、docs/nominations/、docs/skills/、docs/mcp/、docs/workflow.md；先于 resolveWrite 判定；命中即拒\n' +
+      '- 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）\n' +
+      '- 强制力-约定（注册表）：不批准、不代客户验收；证据最多真实运行截图，不要求录屏。；卡面纪律短摘录（只读展示，不参与判定）\n' +
+      '- 派发（dispatch_task）：否（来源：注册表）\n' +
+      '- 客户交互-choice：卡种=acceptance（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）\n' +
+      '- 其他发起：需求变更=否；版本决定=否；版本变更=无；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）\n' +
+      '- 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。\n' +
+      '- shell：operator-approve（本会话：available，来源：session）\n' +
+      '- 主链/闸门：新任务仅由Chief创建/收报/收口；历史任务按真实creator保留。；报告写 docs/quality/、证据写 docs/verification/；发 acceptance 卡。；独立提供质检结论/物证；客户或有效委托的真实 chief 仅作最终业务选择，不替代质检。；缺证或失败正式blocked/failed回Chief，不静默等待；指定新OID再验，不代运营发布。（…（已截断，原长 1641；请用 roleId 过滤）\n' +
+      '\n' +
+      '## 项目角色（worker；仅数据）\n' +
+      '（项目尚未 bootstrap，暂无 worker 角色。）\n' +
+      '\n' +
+      '## 什么活该派给谁\n' +
+      '- 需求意图确认（intent-confirm） → chief（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 提案 → rapporteur（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 招人决定（appointment） → nominator（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 写卡确认（appointment-write） → nominator（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 材料性选择/需求变更审批（decision） → convener（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 材料性选择/需求变更审批（decision） → rapporteur（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 验收（acceptance） → verifier（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）\n' +
+      '- 版本变更申请（细节修正/修正案） → rapporteur（model；model；VERSION_CHANGE_INITIATOR_BY_KIND（Model 常量，直接复用））\n' +
+      '- 版本变更申请（版本升级） → product（model；model；VERSIO'... 824 more characters
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # 治理权力矩阵（运行时派生只读摘要；schema governance-matrix/v1）
+    > 生成于 2026-11-05T10:00:00+08:00；治理模型 trio。
+    > 本摘要不新增、不改变任何权限。权威来源：治理角色注册表、角色卡/<role>/boundary.yaml 与 role-card.md、以及门禁判定。unknown 不等于允许，也不等于禁止。
+    > 矩阵未列出≠无权限；宿主未注入≠角色无权。
+    
+    ## 内置治理角色（6）
+    
+    ### chief 幕僚（built-in）
+    - 职能定位：唯一客户入口与五builtin派发/收报/收口枢纽；按真实反馈自主选路，明确委托时按证据作真实业务决定。（来源：注册表）
+    - 可写（注册表）：docs/intents/（directory，客户意图 / 沟通记录（intentId/handoffKind/goal/scope/acceptance/客户原话））
+    - 预授权（注册表）：docs/intents/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写
+    - 边界接受：已接受（客户 pin（测试夹具）；basis runtime）
+    - 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/、docs/proposals/、docs/contracts/、docs/nominations/、docs/skills/、docs/mcp/、docs/governance/、docs/workflow.md；先于 resolveWrite 判定；命中即拒
+    - 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）
+    - 强制力-约定（注册表）：只合法收口自己创建且有报告的任务；独立质检与专门执行审批保留，不默认选推荐项。；卡面纪律短摘录（只读展示，不参与判定）
+    - 派发（dispatch_task）：是（来源：注册表）
+    - 客户交互-choice：卡种=intent-confirm（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 其他发起：需求变更=否；版本决定=是；版本变更=无；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）
+    - 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。
+    - shell：operator-approve（本会话：available，来源：session）
+    - 主链/闸门：每次客户/正式报告驱动前读取应用注入chief-workflow.md全文、资源path/hash/版本与应用版本；正文唯一MD真源。；项目docs/workflow.md另按有效snapshot或执行run冻结来源读取，不替代Chief资源，不因资源更新重pin。（来源：注册表）
+    - 其他能力：roleStatus=是；sessionTail=是；installSkill=否；installMcp=否（来源：注册表）
+    - 治理职能：chief（来源：注册表）
+    - 来源：governance-roles.ts 内置注册表（注册表）
+    
+    ### product 产品（built-in）
+    - 职能定位：按真实目标/范围缺口维护产品意图与升级，已有有效依据可核验复用。（来源：注册表）
+    - 可写（注册表）：docs/product/（directory，产品取舍 / 产品评审 / 产品文档（D 批目标写区））
+    - 预授权（注册表）：docs/product/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写
+    - 边界接受：已接受（客户 pin（测试夹具）；basis runtime）
+    - 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/、docs/proposals/、docs/contracts/、docs/nominations/、docs/skills/、docs/mcp/、docs/governance/、docs/workflow.md；先于 resolveWrite 判定；命中即拒
+    - 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）
+    - 强制力-约定（注册表）：只写 docs/product/；不写提案/名单/架构/角色卡；不实现、不招人。；卡面纪律短摘录（只读展示，不参与判定）
+    - 派发（dispatch_task）：否（来源：注册表）
+    - 客户交互-choice：卡种=无（来源：app-rule）；角色级=否（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 客户交互-confirm：卡种=无（来源：app-rule）；角色级=否（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 其他发起：需求变更=否；版本决定=否；版本变更=version-upgrade；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）
+    - 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。
+    - shell：operator-approve（本会话：available，来源：session）
+    - 主链/闸门：产出 docs/product/<flowId>-intent-vN.md（版本化，不原地改）。；version-upgrade 整单校验后直接提交；以真实回执为准，旧 run 不自动重 pin。；不写实现方案/提案/名单/角色卡。（来源：注册表）
+    - 其他能力：roleStatus=否；sessionTail=否；installSkill=否；installMcp=否（来源：注册表）
+    - 治理职能：product（来源：注册表）
+    - 来源：governance-roles.ts 内置注册表（注册表）
+    
+    ### rapporteur 策划（built-in）
+    - 职能定位：据产品意图出策划方案、人员名单、项目架构；提案/契约。（来源：注册表）
+    - 可写（注册表）：docs/proposals/（directory，提案（frontmatter: flowId/version/author/status: draft））；docs/contracts/（directory，冻结的跨角色契约（版本化文件，不原地改））；docs/governance/rapporteur/（directory，策划 / Draft 的治理工作记录）
+    - 预授权（注册表）：docs/proposals/、docs/contracts/、docs/governance/rapporteur/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写
+    - 边界接受：已接受（客户 pin（测试夹具）；basis runtime）
+    - 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/chief/、角色卡/product/、角色卡/rapporteur/、角色卡/nominator/、角色卡/convener/、角色卡/verifier/、角色卡/su/、docs/nominations/；先于 resolveWrite 判定；命中即拒
+    - 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）
+    - 强制力-约定（注册表）：名单是人事招人的唯一依据；不写角色卡、不招人、不实现、不改产品意图。；卡面纪律短摘录（只读展示，不参与判定）
+    - 派发（dispatch_task）：否（来源：注册表）
+    - 客户交互-choice：卡种=proposal/decision（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 其他发起：需求变更=是；版本决定=否；版本变更=detail-amendment；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）
+    - 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。
+    - shell：operator-approve（本会话：available，来源：session）
+    - 主链/闸门：按真实影响补方案/名单/架构；有效依据核绑定后复用，无缺口不机械重走策划/招人。；detail-amendment 整单直接提交；策划选择 continue-frozen/stop-and-restart/stop，不恢复逐项/最终卡。（来源：注册表）
+    - 其他能力：roleStatus=否；sessionTail=否；installSkill=否；installMc…（已截断，原长 1571；请用 roleId 过滤）
+    
+    ### nominator 人事（built-in）
+    - 职能定位：真实角色/权限缺口时按合法名单与计划保留D3并完整激活；不参与无缺口的机械重招。（来源：注册表）
+    - 可写（注册表）：角色卡/（directory，项目角色目录（真实 D3 与团队计划范围内直接写 role-card.md / boundary.md / boundary.yaml，完整校验激活））；docs/skills/（directory，技能文档与安装登记（先落盘再激活））；docs/mcp/（directory，MCP 声明文档（先落盘再激活；凭据值不写文件））；docs/governance/nominator/（directory，人事 / Crew 的治理工作记录）
+    - 预授权（注册表）：docs/skills/、docs/mcp/、docs/governance/nominator/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写
+    - 边界接受：已接受（客户 pin（测试夹具）；basis runtime）
+    - 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/chief/、角色卡/product/、角色卡/rapporteur/、角色卡/nominator/、角色卡/convener/、角色卡/verifier/、角色卡/su/、docs/proposals/、docs/scheduling/；先于 resolveWrite 判定；命中即拒
+    - 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）
+    - 强制力-约定（注册表）：无名单不得写卡；不招名单外角色；不批准提案/验收，不代客户决定。；卡面纪律短摘录（只读展示，不参与判定）
+    - 派发（dispatch_task）：否（来源：注册表）
+    - 客户交互-choice：卡种=appointment（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 客户交互-confirm：卡种=appointment-write（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 其他发起：需求变更=否；版本决定=否；版本变更=无；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）
+    - 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。
+    - shell：operator-approve（本会话：available，来源：session）
+    - 主链/闸门：无最新合法名单不得写卡。；保留 appointment/D3；选中范围内直接写三文档，凭完整激活回执上线；不发 appointment-write。（来源：注册表）
+    - 其他能力：roleStatus=否；sessionTail=否；installS…（已截断，原长 1589；请用 roleId 过滤）
+    
+    ### convener 运营（built-in）
+    - 职能定位：按Chief任务受控init/复用核实/合法计划；执行就绪后仅派worker、集成候选、收报，交Chief组织独立质检。（来源：注册表）
+    - 可写（注册表）：docs/workflow.md（file，项目工作流（步骤表：步骤 / 角色 / 前置依赖 / 契约 / 交接物 / 完成口令 / 验收）；由运营落盘并维护）；docs/scheduling/（directory，计划 / 分析 / 调度记录（D 批目标写区；无 flow 机器））；docs/governance/convener/（directory，运营的治理工作记录）
+    - 预授权（注册表）：docs/workflow.md、docs/scheduling/、docs/governance/convener/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写
+    - 边界接受：已接受（客户 pin（测试夹具）；basis runtime）
+    - 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/、docs/proposals/、docs/nominations/、docs/skills/、docs/mcp/；先于 resolveWrite 判定；命中即拒
+    - 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）
+    - 强制力-约定（注册表）：不写角色卡、不招人、不改名单、不写项目源码；不批准、不验收。；卡面纪律短摘录（只读展示，不参与判定）
+    - 派发（dispatch_task）：是（来源：注册表）
+    - 客户交互-choice：卡种=decision（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 其他发起：需求变更=是；版本决定=否；版本变更=无；重构=是；stable 写入=是；下载=available（session）；shell escalation=unavailable（session）
+    - 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。
+    - shell：operator-approve（本会话：available，来源：session）
+    - 主链/闸门：首init/规划不等未来D3；执行前workflow及真实任命/授权/激活就绪。；团队计划校验后直接完成；主动发环境阻塞 decision 卡并核实际恢复，只收口自己创建的任务。；按四类意图实际缺口推进；新派发仅限合法worker，汇报Chief创建质检；Chief接受后显式续live controller才核最终OID并CAS交付。；不写卡/不招人。（来源：注册表）
+    - 其他能力：roleStatus=否；sessionTail=否；insta…（已截断，原长 1590；请用 roleId 过滤）
+    
+    ### verifier 质检（built-in）
+    - 职能定位：可选质量核对与验收执行者。（来源：注册表）
+    - 可写（注册表）：docs/quality/（directory，质量记录 / 可选核对（D 批目标写区））；docs/verification/（directory，可选核对证据附件（不是验收结论））；docs/governance/verifier/（directory，质检的治理工作记录）
+    - 预授权（注册表）：docs/quality/、docs/verification/、docs/governance/verifier/；会话初始 writeSet 预置目录；预授权 ≠ 跳过 F4/F6/F7 与禁写
+    - 边界接受：已接受（客户 pin（测试夹具）；basis runtime）
+    - 强制力-硬拒（注册表）：.ans/、docs/bootstrap-manifest.md、角色卡/governance-boundary.yaml、角色卡/chief/、角色卡/product/、角色卡/rapporteur/、角色卡/nominator/、角色卡/convener/、角色卡/verifier/、角色卡/su/、docs/intents/、docs/proposals/、docs/contracts/、docs/nominations/、docs/skills/、docs/mcp/、docs/workflow.md；先于 resolveWrite 判定；命中即拒
+    - 强制力-许可条件：stable 文件（workflow/role-card/boundary）写入需一次性客户许可（stableWriteDecision）；版本化文档需未冻结或写入新版本（versionedDocOverwriteDecision）（满足条件才可写，不是角色权力）
+    - 强制力-约定（注册表）：不批准、不代客户验收；证据最多真实运行截图，不要求录屏。；卡面纪律短摘录（只读展示，不参与判定）
+    - 派发（dispatch_task）：否（来源：注册表）
+    - 客户交互-choice：卡种=acceptance（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 客户交互-confirm：卡种=无（来源：app-rule）；角色级=是（来源：registry-capability）；本会话=available（来源：session-snapshot）
+    - 其他发起：需求变更=否；版本决定=否；版本变更=无；重构=否；stable 写入=否；下载=available（session）；shell escalation=unavailable（session）
+    - 客户交互纪律：确认方永远是客户/判断 agent；角色不能自批、不能代选；矩阵不是批准，也不是验收证据。
+    - shell：operator-approve（本会话：available，来源：session）
+    - 主链/闸门：新任务仅由Chief创建/收报/收口；历史任务按真实creator保留。；报告写 docs/quality/、证据写 docs/verification/；发 acceptance 卡。；独立提供质检结论/物证；客户或有效委托的真实 chief 仅作最终业务选择，不替代质检。；缺证或失败正式blocked/failed回Chief，不静默等待；指定新OID再验，不代运营发布。（…（已截断，原长 1641；请用 roleId 过滤）
+    
+    ## 项目角色（worker；仅数据）
+    （项目尚未 bootstrap，暂无 worker 角色。）
+    
+    ## 什么活该派给谁
+    - 需求意图确认（intent-confirm） → chief（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 提案 → rapporteur（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 招人决定（appointment） → nominator（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 写卡确认（appointment-write） → nominator（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 材料性选择/需求变更审批（decision） → convener（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 材料性选择/需求变更审批（decision） → rapporteur（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 验收（acceptance） → verifier（card-kind；app-rule；卡种白名单快照：Pipeline 传入的 TRIO_CARD_KINDS）
+    - 版本变更申请（细节修正/修正案） → rapporteur（model；model；VERSION_CHANGE_INITIATOR_BY_KIND（Model 常量，直接复用））
+    - 版本变更申请（版本升级） → product（model；model；VERSION_CHANGE_INITIATOR_BY_KIND（Model 常量，直接复用））
+    - 轻量重构 → convener（model；model；REFACTOR_REQUESTED_BY（Model 常量，直接复用））
+    - 版本决定（request_version_decision） → chief（app-rule；app-rule；run-role 既有角色门控快照）
+    - 需求变更申请 → convener（app-rule；app-rule；run-role 既有角色门控快照）
+    - stable 写入（request_stable_write） → convener（app-rule；app-rule；run-role 既有角色门控快照）
+    - 需求变更申请 → rapporteur（app-rule；app-rule；run-role 既有角色门控快照）
+    - 派发任务（dispatch_task） → chief（capability；builtin-registry；目标/范围由应用派发前校验）
+    - 实现任务派发（dispatch_task） → convener（capability；builtin-registry；再由 convener 派发项目 worker；目标/范围由应用预检）
+    - 产品意图文档 → product（app-rule；app-rule；主链第一环：产品出 docs/product/<flowId>-intent-vN.md）
+    - 方案/名单/架构 → rapporteur（app-rule；app-rule；提案/名单/架构是人事招人的唯一依据）
+    - 主干升级/客户决定 → customer（app-rule；app-rule；不是角色；由客户作出决定）
+    - 下载 → application（app-rule；app-rule；应用通道 request_download；按会话注入）
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/governance-matrix-service.test.ts:530:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Model：schema 常量与冻结导出面（无构建器/seam 运行时导出）
+ok 56 - Model：schema 常量与冻结导出面（无构建器/seam 运行时导出）
+  ---
+  duration_ms: 0.7606
+  type: 'test'
+  ...
+# Subtest: Model：registry-unavailable 保留为契约成员（G-5b；生产不使用）
+ok 57 - Model：registry-unavailable 保留为契约成员（G-5b；生产不使用）
+  ---
+  duration_ms: 0.0749
+  type: 'test'
+  ...
+# Subtest: Model：MatrixField/MatrixForce/MatrixRoleDirectories 加法形状可构造
+ok 58 - Model：MatrixField/MatrixForce/MatrixRoleDirectories 加法形状可构造
+  ---
+  duration_ms: 0.0844
+  type: 'test'
+  ...
+# Subtest: Model：MatrixRequestChannel 三分量来源语义（内置 registry-capability / worker app-rule）
+ok 59 - Model：MatrixRequestChannel 三分量来源语义（内置 registry-capability / worker app-rule）
+  ---
+  duration_ms: 0.0725
+  type: 'test'
+  ...
+# Subtest: Model：无 I/O、不依赖运行层（源码静态检查）
+ok 60 - Model：无 I/O、不依赖运行层（源码静态检查）
+  ---
+  duration_ms: 0.3744
+  type: 'test'
+  ...
+# Subtest: 注册表：六角色矩阵展示字段非空、只读且不进入能力位
+ok 61 - 注册表：六角色矩阵展示字段非空、只读且不进入能力位
+  ---
+  duration_ms: 0.313
+  type: 'test'
+  ...
+# Subtest: 注册表：ROLE_CARD_REQUIRED_SECTIONS 仍含解析器使用的五个 label（单一来源）
+ok 62 - 注册表：ROLE_CARD_REQUIRED_SECTIONS 仍含解析器使用的五个 label（单一来源）
+  ---
+  duration_ms: 0.0928
+  type: 'test'
+  ...
+# Subtest: BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状）
+ok 63 - BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状）
+  ---
+  duration_ms: 0.5479
+  type: 'test'
+  ...
+# Subtest: BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段
+ok 64 - BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段
+  ---
+  duration_ms: 0.4095
+  type: 'test'
+  ...
+# Subtest: tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具）
+ok 65 - tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具）
+  ---
+  duration_ms: 0.0855
+  type: 'test'
+  ...
+# Subtest: dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望
+ok 66 - dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望
+  ---
+  duration_ms: 0.1244
+  type: 'test'
+  ...
+# Subtest: preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed）
+ok 67 - preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed）
+  ---
+  duration_ms: 0.1552
+  type: 'test'
+  ...
+# Subtest: context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘）
+ok 68 - context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘）
+  ---
+  duration_ms: 0.1024
+  type: 'test'
+  ...
+# Subtest: 契约类型只读：运行时不改输入/模块（纯策略无副作用）
+ok 69 - 契约类型只读：运行时不改输入/模块（纯策略无副作用）
+  ---
+  duration_ms: 0.0879
+  type: 'test'
+  ...
+# Subtest: X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除
+ok 70 - X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除
+  ---
+  duration_ms: 0.953
+  type: 'test'
+  ...
+# Subtest: X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 71 - X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1328
+  type: 'test'
+  ...
+# Subtest: X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 72 - X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1403
+  type: 'test'
+  ...
+# Subtest: X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 73 - X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.117
+  type: 'test'
+  ...
+# Subtest: X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 74 - X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.0767
+  type: 'test'
+  ...
+# Subtest: X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 75 - X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.0577
+  type: 'test'
+  ...
+# Subtest: X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变
+ok 76 - X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变
+  ---
+  duration_ms: 0.2884
+  type: 'test'
+  ...
+# Subtest: D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致
+ok 77 - D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致
+  ---
+  duration_ms: 0.1421
+  type: 'test'
+  ...
+# Subtest: D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确
+ok 78 - D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确
+  ---
+  duration_ms: 0.2093
+  type: 'test'
+  ...
+# Subtest: D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id）
+ok 79 - D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id）
+  ---
+  duration_ms: 0.1885
+  type: 'test'
+  ...
+# Subtest: D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判）
+ok 80 - D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判）
+  ---
+  duration_ms: 0.0601
+  type: 'test'
+  ...
+# Subtest: D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环
+ok 81 - D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环
+  ---
+  duration_ms: 0.8573
+  type: 'test'
+  ...
+# Subtest: D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生
+ok 82 - D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生
+  ---
+  duration_ms: 0.0942
+  type: 'test'
+  ...
+1..82
+# tests 82
+# suites 0
+# pass 81
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8662.3263

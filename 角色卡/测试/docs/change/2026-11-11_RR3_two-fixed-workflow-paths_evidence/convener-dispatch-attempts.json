@@ -1,0 +1,200 @@
+[
+  {
+    "at": "2026-11-10T19:05:19.135Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "product",
+      "flowId": "snake-game",
+      "stage": "A2",
+      "sideEffect": "docs",
+      "text": "【A2 产品意图撰写 · flowId: snake-game】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本任务只做产品意图文档撰写，不做实现、不写源码、不派实现角色。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含（字段名与取值按此执行）：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；禁止 180° 反向自撞（例如向右移动时不得直接反向向左），反向输入按忽略处理或明确写成无效果，需给出确定口径；同一 tick 内多次输入的处理规则需明确。\n2) 计分规则：吃到食物加分，明确每次加分值与分数展示为实时更新（随吃食物即时变化），初始分数为 0。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即判定失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（运行入口与命令/打开方式）、如何操作、如何判定通过（逐条对应上述四项必需能力给出可观察的通过判定）。\n\n完成标准：文档落盘且路径为 docs/product/snake-game-intent-v1.md，frontmatter 字段齐全合法，正文五项全覆盖、口径确定无歧义；报告需给出 path 与实际 sha256。\n禁止事项：不要创建 docs/product 之外的产品文档；不要派其他角色；不要写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），并回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文对四项必需能力与验收方式的覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "MCP error -32602: Input validation error: Invalid arguments for tool dispatch_task: [\n  {\n    \"expected\": \"string\",\n    \"code\": \"invalid_type\",\n    \"path\": [\n      \"task\"\n    ],\n    \"message\": \"Invalid input: expected string, received undefined\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [\n      [\n        {\n          \"expected\": \"string\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"task\"\n          ],\n          \"message\": \"Invalid input: expected string, received undefined\"\n        }\n      ],\n      [\n        {\n          \"expected\": \"object\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"resumeController\"\n          ],\n          \"message\": \"Invalid input: expected object, received undefined\"\n        },\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"convener\"\n          ],\n          \"path\": [\n            \"roleId\"\n          ],\n          \"message\": \"Invalid input: expected \\\"convener\\\"\"\n        },\n        {\n          \"expected\": \"string\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"task\"\n          ],\n          \"message\": \"Invalid input: expected string, received undefined\"\n        }\n      ]\n    ],\n    \"path\": [],\n    \"message\": \"Invalid input\"\n  }\n]"
+    }
+  },
+  {
+    "at": "2026-11-10T19:05:22.573Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "product",
+      "flowId": "snake-game",
+      "stage": "A2",
+      "sideEffect": "docs",
+      "task": "【A2 产品意图撰写 · flowId: snake-game】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本任务只做产品意图文档撰写，不做实现、不写源码、不派实现角色。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含（字段名与取值按此执行）：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；禁止 180° 反向自撞（例如向右移动时不得直接反向向左），反向输入按忽略处理或明确写成无效果，需给出确定口径；同一 tick 内多次输入的处理规则需明确。\n2) 计分规则：吃到食物加分，明确每次加分值与分数展示为实时更新（随吃食物即时变化），初始分数为 0。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即判定失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（运行入口与命令/打开方式）、如何操作、如何判定通过（逐条对应上述四项必需能力给出可观察的通过判定）。\n\n完成标准：文档落盘且路径为 docs/product/snake-game-intent-v1.md，frontmatter 字段齐全合法，正文五项全覆盖、口径确定无歧义；报告需给出 path 与实际 sha256。\n禁止事项：不要创建 docs/product 之外的产品文档；不要派其他角色；不要写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），并回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文对四项必需能力与验收方式的覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "dispatch_task：任务**未能派发**（回执：stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+    }
+  },
+  {
+    "at": "2026-11-10T19:05:44.073Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "product",
+      "flowId": "snake-game",
+      "taskKind": "stage-request",
+      "workflowPath": "docs/workflow.md",
+      "stage": "A2",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "MCP error -32602: Input validation error: Invalid arguments for tool dispatch_task: [\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"A\",\n      \"B\"\n    ],\n    \"path\": [\n      \"workflowPath\"\n    ],\n    \"message\": \"Invalid option: expected one of \\\"A\\\"|\\\"B\\\"\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [\n      [\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"A\",\n            \"B\"\n          ],\n          \"path\": [\n            \"workflowPath\"\n          ],\n          \"message\": \"Invalid option: expected one of \\\"A\\\"|\\\"B\\\"\"\n        }\n      ],\n      [\n        {\n          \"expected\": \"object\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"resumeController\"\n          ],\n          \"message\": \"Invalid input: expected object, received undefined\"\n        },\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"convener\"\n          ],\n          \"path\": [\n            \"roleId\"\n          ],\n          \"message\": \"Invalid input: expected \\\"convener\\\"\"\n        },\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"A\",\n            \"B\"\n          ],\n          \"path\": [\n            \"workflowPath\"\n          ],\n          \"message\": \"Invalid option: expected one of \\\"A\\\"|\\\"B\\\"\"\n        }\n      ]\n    ],\n    \"path\": [],\n    \"message\": \"Invalid input\"\n  }\n]"
+    }
+  },
+  {
+    "at": "2026-11-10T19:05:47.796Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "product",
+      "flowId": "snake-game",
+      "taskKind": "stage-request",
+      "workflowPath": "A",
+      "stage": "A2",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2 · workflowPath A】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "dispatch_task：任务**未能派发**（回执：stage-request-invalid：固定路径的 stage-request 缺少或非法：workflowAction:\"advance\"、roleId（运营 convener）。stage-request 必须同时给出非空 flowId、workflowPath:\"A\"|\"B\"、合法 stage、workflowAction:\"advance\"、roleId（运营 convener）；本次未创建任务、未写 legacy 账本。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+    }
+  },
+  {
+    "at": "2026-11-10T19:05:52.490Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "convener",
+      "targetRoleId": "product",
+      "flowId": "snake-game",
+      "taskKind": "stage-request",
+      "workflowPath": "A",
+      "stage": "A2",
+      "workflowAction": "advance",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2 · workflowPath A · workflowAction advance】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "dispatch_task：任务**未能派发**（回执：self-dispatch：派发未受理：不能派发给自己。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+    }
+  },
+  {
+    "at": "2026-11-10T19:05:59.267Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "product",
+      "flowId": "snake-game",
+      "workflowId": "A",
+      "stage": "A2",
+      "sideEffect": "docs",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2 · workflowPath A】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "dispatch_task：任务**未能派发**（回执：workflow-not-found：workflow A 不存在（账本无记录）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+    }
+  },
+  {
+    "at": "2026-11-10T19:06:25.882Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "roleId": "product",
+      "flowId": "snake-game",
+      "taskKind": "dispatch",
+      "stage": "A2",
+      "sideEffect": "docs",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "MCP error -32602: Input validation error: Invalid arguments for tool dispatch_task: [\n  {\n    \"code\": \"invalid_value\",\n    \"values\": [\n      \"stage-request\"\n    ],\n    \"path\": [\n      \"taskKind\"\n    ],\n    \"message\": \"Invalid input: expected \\\"stage-request\\\"\"\n  },\n  {\n    \"code\": \"invalid_union\",\n    \"errors\": [\n      [\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"stage-request\"\n          ],\n          \"path\": [\n            \"taskKind\"\n          ],\n          \"message\": \"Invalid input: expected \\\"stage-request\\\"\"\n        }\n      ],\n      [\n        {\n          \"expected\": \"object\",\n          \"code\": \"invalid_type\",\n          \"path\": [\n            \"resumeController\"\n          ],\n          \"message\": \"Invalid input: expected object, received undefined\"\n        },\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"convener\"\n          ],\n          \"path\": [\n            \"roleId\"\n          ],\n          \"message\": \"Invalid input: expected \\\"convener\\\"\"\n        },\n        {\n          \"code\": \"invalid_value\",\n          \"values\": [\n            \"stage-request\"\n          ],\n          \"path\": [\n            \"taskKind\"\n          ],\n          \"message\": \"Invalid input: expected \\\"stage-request\\\"\"\n        }\n      ]\n    ],\n    \"path\": [],\n    \"message\": \"Invalid input\"\n  }\n]"
+    }
+  },
+  {
+    "at": "2026-11-10T19:06:49.879Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "flowId": "snake-game",
+      "roleId": "product",
+      "stage": "A2",
+      "sideEffect": "docs",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2 · workflowPath A】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ],
+      "workflowPath": "A"
+    },
+    "result": {
+      "isError": true,
+      "text": "dispatch_task：任务**未能派发**（回执：stage-request-required：固定路径的幕僚派发必须是 stage-request（taskKind/workflowPath/stage/flowId）或带 workflowId/stage 的 fixed 任务。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+    }
+  },
+  {
+    "at": "2026-11-10T19:06:53.171Z",
+    "name": "mcp__ans__dispatch_task",
+    "input": {
+      "flowId": "snake-game",
+      "roleId": "product",
+      "stage": "A2",
+      "sideEffect": "docs",
+      "workflowId": "snake-game",
+      "task": "【A2 产品意图撰写 · flowId: snake-game · stage A2】\n\n客户原始需求（唯一客户轮次，不得改写范围）：\n在目标项目中做一个贪吃蛇游戏，必须包含：① 键盘方向控制；② 实时计分；③ 游戏结束后可重开；④ 撞到边界即失败。\n\n本阶段（A2）只做产品意图文档撰写：不做实现、不写源码、不派实现角色；本阶段不涉及 rapporteur / nominator。\n\n交付物：docs/product/snake-game-intent-v1.md（项目内相对路径，必须实际落盘）。\nfrontmatter 至少包含：\n- intentId: snake-game（小写 slug，全文唯一，不得用 flowId 代替）\n- flowId: snake-game\n- version: 1\n- goal、scope、acceptance、nonGoals\n正文必须覆盖：\n1) 键盘方向控制：方向键/WASD 控制蛇头方向；明确禁止 180° 反向自撞（如向右移动时不得直接反向向左），反向输入按忽略处理或无效果，口径必须确定；同一 tick 内多次输入的处理规则须明确。\n2) 计分规则：吃到食物加分，明确每次加分值；分数随吃食物实时更新，初始 0 分。\n3) 游戏结束与重开流程：结束条件、结束后展示、按指定按键/操作重开并重置蛇身/分数/食物状态。\n4) 边界碰撞失败判定：蛇头越过（或撞上）游戏区域边界即失败，不得穿过边界环绕。\n5) 可运行验收方式：如何启动（入口与命令/打开方式）、如何操作、如何逐条判定通过（对应四项必需能力）。\n\n完成标准：docs/product/snake-game-intent-v1.md 落盘，frontmatter 字段齐全合法，正文五项全覆盖且口径无歧义；回报 path 与实际 sha256。\n禁止：不创建 docs/product 之外的产品文档；不派其他角色；不写游戏源码。",
+      "expectedOutput": "docs/product/snake-game-intent-v1.md（含指定 frontmatter 与五项正文覆盖），回报 path+sha256",
+      "requestedEvidence": [
+        "docs/product/snake-game-intent-v1.md 的 path 与 sha256",
+        "frontmatter 字段清单（intentId/flowId/version/goal/scope/acceptance/nonGoals）",
+        "正文四项必需能力与验收方式覆盖说明"
+      ]
+    },
+    "result": {
+      "isError": true,
+      "text": "dispatch_task：任务**未能派发**（回执：workflow-not-found：workflow snake-game 不存在（账本无记录）。）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"
+    }
+  }
+]

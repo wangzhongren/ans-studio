@@ -1,0 +1,5 @@
+prefix: test/门禁引擎/
+actual failing entries: 5
+ref entries: 5
+new failure names (not in ref): 0
+ref names missing now: 0

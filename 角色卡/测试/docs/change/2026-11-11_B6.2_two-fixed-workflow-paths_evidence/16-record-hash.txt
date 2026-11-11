@@ -1,0 +1,1 @@
+bb60a77f4a3127b983f3b06e264ba0e371442e4cb7fcfd42ee6d16576a68153b *角色卡/测试/docs/change/2026-11-11_B6.2_two-fixed-workflow-paths.md

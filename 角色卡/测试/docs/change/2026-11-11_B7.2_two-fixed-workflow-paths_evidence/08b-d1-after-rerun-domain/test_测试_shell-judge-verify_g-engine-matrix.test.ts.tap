@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 运行时核心只读工具集：恰三项，无写/编辑/shell/交互/回交/派发/网络
+ok 1 - 运行时核心只读工具集：恰三项，无写/编辑/shell/交互/回交/派发/网络
+  ---
+  duration_ms: 6.7802
+  type: 'test'
+  ...
+# Subtest: 判断驱动：适配器收到 deny-all 写门禁（判断会话结构性无写权限）
+ok 2 - 判断驱动：适配器收到 deny-all 写门禁（判断会话结构性无写权限）
+  ---
+  duration_ms: 5.7068
+  type: 'test'
+  ...
+# Subtest: Service 装配：三引擎都只拿到三只 judge 工具、judgeMode:true、MCP 置空、不持久化
+ok 3 - Service 装配：三引擎都只拿到三只 judge 工具、judgeMode:true、MCP 置空、不持久化
+  ---
+  duration_ms: 11.5624
+  type: 'test'
+  ...
+# Subtest: Pi 假适配器判断模式：写/编辑/shell/交互/回交/派发不存在；judge 读取与 report 正常
+ok 4 - Pi 假适配器判断模式：写/编辑/shell/交互/回交/派发不存在；judge 读取与 report 正常
+  ---
+  duration_ms: 4.3684
+  type: 'test'
+  ...
+# Subtest: Pi 真实适配器 judgeMode：只注册三只 judge 工具、原生/服务端/MCP 关闭、不持久化
+ok 5 - Pi 真实适配器 judgeMode：只注册三只 judge 工具、原生/服务端/MCP 关闭、不持久化
+  ---
+  duration_ms: 626.6384
+  type: 'test'
+  ...
+# Subtest: Claude 判断模式：原生工具面清空、allowedTools 恰三只、WebSearch/写/shell 显式禁用
+ok 6 - Claude 判断模式：原生工具面清空、allowedTools 恰三只、WebSearch/写/shell 显式禁用
+  ---
+  duration_ms: 9.3438
+  type: 'test'
+  ...
+# Subtest: Claude 判断模式：误注入写/编辑工具在 SDK 加载前抛错（零副作用）
+ok 7 - Claude 判断模式：误注入写/编辑工具在 SDK 加载前抛错（零副作用）
+  ---
+  duration_ms: 0.3598
+  type: 'test'
+  ...
+# Subtest: Codex 判断模式：仅注册三只 ans_ 判断工具、只读沙箱、网络关闭、写/shell 不存在
+ok 8 - Codex 判断模式：仅注册三只 ans_ 判断工具、只读沙箱、网络关闭、写/shell 不存在
+  ---
+  duration_ms: 21.0143
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1206.1681

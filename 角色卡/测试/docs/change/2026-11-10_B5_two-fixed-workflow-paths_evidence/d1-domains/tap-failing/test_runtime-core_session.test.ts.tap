@@ -1,0 +1,178 @@
+TAP version 13
+# Subtest: Service history operation returns scoped Model records/replay through the existing Provider
+ok 1 - Service history operation returns scoped Model records/replay through the existing Provider
+  ---
+  duration_ms: 26.6761
+  type: 'test'
+  ...
+# Subtest: each actual runtime turn publishes one typed original input before native work and retains real assistant text
+ok 2 - each actual runtime turn publishes one typed original input before native work and retains real assistant text
+  ---
+  duration_ms: 145.526
+  type: 'test'
+  ...
+# Subtest: input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer
+ok 3 - input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer
+  ---
+  duration_ms: 3.6383
+  type: 'test'
+  ...
+# Subtest: Service selects exactly chosen injected factory and executes real governed handler
+ok 4 - Service selects exactly chosen injected factory and executes real governed handler
+  ---
+  duration_ms: 8.6913
+  type: 'test'
+  ...
+# Subtest: Service failure never selects another engine and unknown runtime rejected
+ok 5 - Service failure never selects another engine and unknown runtime rejected
+  ---
+  duration_ms: 1.7594
+  type: 'test'
+  ...
+# Subtest: Service persists replay and adapter-confirmed deferred context result after prompt
+ok 6 - Service persists replay and adapter-confirmed deferred context result after prompt
+  ---
+  duration_ms: 20.3522
+  type: 'test'
+  ...
+# Subtest: customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works
+ok 7 - customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works
+  ---
+  duration_ms: 83.5311
+  type: 'test'
+  ...
+# Subtest: throw, native failed outcome and last-resort timeout each have one explicit terminal
+ok 8 - throw, native failed outcome and last-resort timeout each have one explicit terminal
+  ---
+  duration_ms: 30.5232
+  type: 'test'
+  ...
+# Subtest: inspection deadline never aborts a progressing turn; the turn completes normally
+ok 9 - inspection deadline never aborts a progressing turn; the turn completes normally
+  ---
+  duration_ms: 77.2769
+  type: 'test'
+  ...
+# Subtest: last resort aborts at the injected deadline with distinct last-resort wording
+ok 10 - last resort aborts at the injected deadline with distinct last-resort wording
+  ---
+  duration_ms: 30.634
+  type: 'test'
+  ...
+# Subtest: adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort
+ok 11 - adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort
+  ---
+  duration_ms: 3.6674
+  type: 'test'
+  ...
+# Subtest: corrupt ANS index is rejected before native bind allocates a session
+ok 12 - corrupt ANS index is rejected before native bind allocates a session
+  ---
+  duration_ms: 6.459
+  type: 'test'
+  ...
+# Subtest: transient persistence failure is reported and repaired next prompt can succeed
+ok 13 - transient persistence failure is reported and repaired next prompt can succeed
+  ---
+  duration_ms: 21.766
+  type: 'test'
+  ...
+# Subtest: Service event top/detail identity and report metadata share the captured turn
+ok 14 - Service event top/detail identity and report metadata share the captured turn
+  ---
+  duration_ms: 2.2858
+  type: 'test'
+  ...
+# Subtest: hanging native abort is bounded, called once, and leaves the session quarantined
+ok 15 - hanging native abort is bounded, called once, and leaves the session quarantined
+  ---
+  duration_ms: 1025.9547
+  type: 'test'
+  ...
+# Subtest: Service configured custom API key is stripped from the actual governed shell child
+ok 16 - Service configured custom API key is stripped from the actual governed shell child
+  ---
+  duration_ms: 96.4889
+  type: 'test'
+  ...
+# Subtest: outer timeout remains timed_out when abort cleanup emits inner aborted terminals
+not ok 17 - outer timeout remains timed_out when abort cleanup emits inner aborted terminals
+  ---
+  duration_ms: 0.7331
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session.test.ts:377:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:395:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup
+not ok 18 - outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup
+  ---
+  duration_ms: 1.0174
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session.test.ts:404:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:424:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Core-managed binding rejects a provider that did not register its display profile before first prompt
+not ok 19 - Core-managed binding rejects a provider that did not register its display profile before first prompt
+  ---
+  duration_ms: 0.7779
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session.test.ts:439:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /profile was not registered/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:445:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:445:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections
+ok 20 - ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections
+  ---
+  duration_ms: 23.2134
+  type: 'test'
+  ...
+# Subtest: history does not resurrect an old empty-name synthetic tool phase on an engine failure
+ok 21 - history does not resurrect an old empty-name synthetic tool phase on an engine failure
+  ---
+  duration_ms: 12.2638
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 18
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1868.1015

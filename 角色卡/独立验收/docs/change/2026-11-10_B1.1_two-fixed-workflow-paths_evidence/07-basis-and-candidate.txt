@@ -1,0 +1,47 @@
+# B1.1 取证环境与依据身份（2026-11-10T14:28:26Z UTC）
+
+## 候选与环境
+branch: feat/two-fixed-workflow-paths
+HEAD: e28923cadf957df2ef9b9f88f25b6957d07da405
+HEAD subject: test(workflow): B5 full-chain deterministic validation and B5.1 production wiring
+origin/main: d9e3e99c160599e5b53a82e105939a359f69992f
+merge-base HEAD origin/main: d9e3e99c160599e5b53a82e105939a359f69992f
+rev-list --left-right --count origin/main...HEAD: 0	26
+code baseline (B1 freeze): 10f90c769ce9c2a567cdd364def0037fe9019a05
+merges origin/main..HEAD: 0
+tags pointing at HEAD: 0
+node: v24.22.1; npm: 11.19.1
+worktree: C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+
+## 工作树 src/app/test 状态（会话结束时快照；见下方并发披露）
+ M src/common/编排/workflow-service.ts
+?? test/编排/workflow-basis-b21.test.ts
+
+## 并发披露（候选外、非本角色改动）
+本角色开始时（首轮 git status -- src app test 为空，早于 14:20Z；HEAD e28923c 纯净）。
+工作期间另一会话于 22:20:16+08:00（14:20:16Z）修改 src/common/编排/workflow-service.ts（MF-B2-02 方向：
+basis.amended/previousBasisId/basis.verified 与 A12a/A12b drift，+382/−28），并于 22:22:40+08:00 新增
+test/编排/workflow-basis-b21.test.ts（未跟踪）。二者均不在本角色写集内，本角色未触碰。
+为保证证据严格归属候选 HEAD e28923c 的纯净代码，本记录引用的 HEAD 侧测量（01、04）已于 14:24Z
+以 git archive e28923c 解包 + node_modules junction 在临时目录重跑，结果与工作树初次运行一致：
+legacy 3 pass/9 fail；test/编排 1,328 / 1,302 pass / 24 fail / 2 skip。基线 10f90c7 侧（02）同为解包运行。
+
+## 依据文件 hash（行/字节/SHA-256）
+197/33722  b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+214/38065  e2ad4701b1bda9a994616d4543fcab8b05de2f8bfcd4c9f6ee0fcc0873e0b749 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.1.md
+267/40790  5958ba3879aa6ad5df2be0e27f43ec74c7067644576a074f5d94f169dc206888 *角色卡/独立验收/docs/change/2026-11-10_B2_pre-RR_two-fixed-workflow-paths.md
+95/8476  b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d *docs/planning/2026-11-10_design_two-fixed-workflow-paths.md
+1392/184391  ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+90/11018  a66c47d746ddf65720e27c77268a9069ceb13fc500c2a71419ad413c4d20a3d9 *docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+159/17013  4c63ccbc84990f00e772fb6e16cf0e9df9433a8bbe5c99dcd078b67bca036211 *docs/scheduling/2026-11-10_team-plan_two-fixed-workflow-paths.md
+344/35665  08e017269c86d92b68e83c25377ccdf7e86d352391a285b635d9a517b48ca571 *角色卡/门禁引擎/docs/design/2026-11-10_interface-review_two-fixed-workflow-paths.md
+
+## 9 红基线对照方法
+两侧均为 git archive <commit> | tar -x 到系统临时目录；node_modules 以 Windows junction 只读挂接；
+同一命令 node --test --test-concurrency=1 --test-reporter=tap test/桌面应用/star-routing.test.ts test/测试/governance-e2e-auto/i-full-chain.test.ts；
+运行后删除 junction 与临时目录；node_modules 未改动（377 项、1.5G 实测仍在）。
+结论：HEAD e28923c 3 pass/9 fail；10f90c7 3 pass/9 fail；名称+首条错误串 9/9 完全一致（见 03）。
+
+## 24 fail 实测方法
+node --test --test-concurrency=1 --test-reporter=tap "test/编排/**/*.test.ts"（HEAD e28923c 纯净解包）；
+结果 1,328 tests / 1,302 pass / 24 fail / 2 skip；24 失败名与 B0 before TAP（10f90c7）清单 24/24 逐名一致（见 05）。

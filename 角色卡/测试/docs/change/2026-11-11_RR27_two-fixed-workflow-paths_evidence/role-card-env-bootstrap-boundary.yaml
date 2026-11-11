@@ -1,0 +1,8 @@
+role: env-bootstrap
+entries:
+  - kind: directory
+    path: assets/
+    purpose: 页面静态资源目录
+  - kind: file
+    path: index.html
+    purpose: 浏览器入口页面

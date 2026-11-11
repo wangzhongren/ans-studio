@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: A1 到点检查：299999ms 不发、300000ms 恰一条；文案合规；每轮一次
+ok 1 - A1 到点检查：299999ms 不发、300000ms 恰一条；文案合规；每轮一次
+  ---
+  duration_ms: 2.4561
+  type: 'test'
+  ...
+# Subtest: A2 检查时限可由 env 调整（Pi）：60000ms 到点
+ok 2 - A2 检查时限可由 env 调整（Pi）：60000ms 到点
+  ---
+  duration_ms: 0.1816
+  type: 'test'
+  ...
+# Subtest: A3 排除：挂起确认卡不报；解除后按真实已耗报
+ok 3 - A3 排除：挂起确认卡不报；解除后按真实已耗报
+  ---
+  duration_ms: 0.1604
+  type: 'test'
+  ...
+# Subtest: A4 排除：su 自身忙 ⇒ 关于 su 不报；项目角色照报（消息排队由投递机负责）
+ok 4 - A4 排除：su 自身忙 ⇒ 关于 su 不报；项目角色照报（消息排队由投递机负责）
+  ---
+  duration_ms: 0.1205
+  type: 'test'
+  ...
+# Subtest: A5 到点不中止：看护只有消息投递面，没有任何轮次中止/恢复执行钩子
+ok 5 - A5 到点不中止：看护只有消息投递面，没有任何轮次中止/恢复执行钩子
+  ---
+  duration_ms: 0.1185
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 115.676

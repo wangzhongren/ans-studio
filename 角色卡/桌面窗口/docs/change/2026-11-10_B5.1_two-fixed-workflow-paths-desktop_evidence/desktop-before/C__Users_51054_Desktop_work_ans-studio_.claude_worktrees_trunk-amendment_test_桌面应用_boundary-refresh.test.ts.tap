@@ -1,0 +1,110 @@
+TAP version 13
+# Subtest: O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文）
+ok 1 - O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文）
+  ---
+  duration_ms: 379.675
+  type: 'test'
+  ...
+# Subtest: O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建
+ok 2 - O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建
+  ---
+  duration_ms: 207.0607
+  type: 'test'
+  ...
+# Subtest: O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发）
+ok 3 - O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发）
+  ---
+  duration_ms: 491.291
+  type: 'test'
+  ...
+# Subtest: O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重
+ok 4 - O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重
+  ---
+  duration_ms: 451.6942
+  type: 'test'
+  ...
+# Subtest: O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次
+ok 5 - O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次
+  ---
+  duration_ms: 408.0382
+  type: 'test'
+  ...
+# Subtest: O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支
+ok 6 - O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支
+  ---
+  duration_ms: 2.3294
+  type: 'test'
+  ...
+# Subtest: F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话）
+ok 7 - F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话）
+  ---
+  duration_ms: 95.6721
+  type: 'test'
+  ...
+# Subtest: F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装）
+ok 8 - F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装）
+  ---
+  duration_ms: 42.7281
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡
+ok 9 - G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡
+  ---
+  duration_ms: 221.294
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建
+ok 10 - G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建
+  ---
+  duration_ms: 209.8443
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md
+ok 11 - G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md
+  ---
+  duration_ms: 224.4816
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对）
+ok 12 - G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对）
+  ---
+  duration_ms: 206.9047
+  type: 'test'
+  ...
+# Subtest: G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响
+ok 13 - G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响
+  ---
+  duration_ms: 219.3605
+  type: 'test'
+  ...
+# Subtest: G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞
+not ok 14 - G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞
+  ---
+  duration_ms: 2.3353
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\boundary-refresh.test.ts:491:1'
+  failureType: 'testCodeFailure'
+  error: '两工具同名同形（共用 handler）'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/boundary-refresh.test.ts:498:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 13
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3591.4659

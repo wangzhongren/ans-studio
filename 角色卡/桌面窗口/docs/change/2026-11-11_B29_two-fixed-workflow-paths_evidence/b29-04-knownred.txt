@@ -1,0 +1,50 @@
+# B29 known-red 对照（桌面窗口，2026-11-11）
+
+## 1. 既有桌面 known-red 基线（冻结）
+
+来源：桌面窗口 B10.1 记录与 B18 记录中的桌面全量冻结 known-red（4 条，文件
+test/桌面应用/version-change.test.ts 内）：
+1. Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+2. VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+3. VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+4. SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+
+## 2. 本轮 fresh 对照（逐名一致）
+
+命令：
+  node --experimental-strip-types --test --test-reporter=tap "test/桌面应用/version-change.test.ts"
+结果：46 tests / 42 pass / 4 fail / 0 skipped（exit 1；见 b29-04-version-change.tap）。
+失败名排序后与上述冻结列表 `diff -u`：**exit 0，输出 0 字节**（逐名一致，无新增/消失）。
+
+## 3. B29 fixed 相关范围（无 known-red）
+
+本轮受影响集（b29-02-affected.tap；含 B29 主测与相关 fixed 套件，6 文件）：
+  node --experimental-strip-types --test --test-concurrency=1 --test-reporter=tap \
+    "test/桌面应用/b3-fixed-baseline-pathb.test.ts" \
+    "test/桌面应用/fixed-path-routing.test.ts" \
+    "test/桌面应用/b51-fixed-workflow-wiring.test.ts" \
+    "test/桌面应用/b21-basis-gate-desktop.test.ts" \
+    "test/测试/fixed-path-full-chain.test.ts" \
+    "test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts"
+结果：56/56 pass（0 fail / 0 skip / 0 cancelled）。
+chief-workflow 的 W6/T5 宿主绑定三测（b29-02b-chief-workflow-w6.tap）：
+  node --experimental-strip-types --test --test-reporter=tap --test-name-pattern="W6/T5" "test/桌面应用/chief-workflow.test.ts"
+结果：3/3 pass。
+确定性全链（b29-03-full-chain.tap）：3/3 pass。
+
+## 4. chief-workflow.test.ts 全文件的环境性红（非 B29，已用无 B29 基线复核）
+
+- 直接全文件运行（默认并发/单文件）会出现与 B29 无关的既有环境红；失败原因均为 Windows 临时目录
+  teardown 竞态 `ENOTEMPTY: directory not empty, rmdir '...\Temp\ans-...\.ans\sessions\...'`，或本地
+  HTTP/Codex 真实适配器集成用例超时；与 `complete_team_plan` 回执形状无关。
+- 同批失败名在**无 B29 改动**的临时 worktree（HEAD f81f969 + 仅应用 B30 的 4 个非 B29 文件改动；
+  B29 四文件保持 HEAD）中同样出现，且运行间集合漂移（例：current-alone 11 条 vs baseline 12 条；
+  仅基线出现 W29 document-change / W30 连续写入后，仅当前出现 W47 select 等），证明为环境 flaky，
+  不是 B29 引入。
+- 本文件内与 B29 相关的三个 W6/T5 用例在两种运行中均通过（见第 3 节）；改动仅为把该 legacy 宿主
+  绑定用例显式钉到 legacy/v1（避免 empty 项目 B6.1 解析为 fixed 后拿 legacy `status` 断言 fixed 形状）。
+
+## 5. 结论
+
+- 桌面既有 known-red（4 条）**逐名一致，diff 为空**。
+- B29 fixed 相关范围 know-red = **0**；chief-workflow 的额外红为环境 teardown/适配器 flaky，基线可复现。

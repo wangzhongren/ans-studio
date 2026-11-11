@@ -1,0 +1,16 @@
+{
+  "cardTextSha256": "808c25ec0bc4d5c2c9e0a13fd4bd9836e416c17a2a6d5b1069af7acf5967eb46",
+  "cardTextLength": 3382,
+  "entriesSha256": "ebc2116842f2a23e70336ae2b32cc48f6082600016ee2024cf862379dfad557a",
+  "preauthorizedDirsSha256": "90483cba9a716d1a68578279956b6a628476389e0fb2084d962c5dbd1fe9c388",
+  "forbiddenWritePathsSha256": "14bd2df05ab33533651f1ac7c21d261a220b69df1aa14000febf62a43bc05d49",
+  "capabilitiesSha256": "89a99548cdd51012fe018b0eddc9f57346dd26feedb513a58907c74e76295dae",
+  "cardsSha256": "cc603f65bd76b4adc4adf980b3fa11bd178149e9a1b900a4b658996d452598f3",
+  "workerDispatchTargetsSha256": "002453195b31446eaff89835376a8eaa481686a06a04124b84337a4c0a32d894",
+  "toolsTrioSha256": "ac9c99ab520aa5095ba7641edd1a809e1be32eec66b32c02ae3bcfc89bbeafa5",
+  "toolsSingleSha256": "651773dd63673dd2d81f53fe358b7c1b176d3834ef2624337ef15772241210a5",
+  "toolsUnknownSha256": "13a5a7b705850d87a82f0132b33de6fa2866a0603fa972300be4cff9b0864add",
+  "contextLegacySha256": "793dc34c6468ed39dcaa66b14c08982f6a78b98d1c6b425487032644ddd99b9c",
+  "dispatchMatrixSha256": "ecbc423e3ce011a815bfca074bcb0c2de97d662ef7bdc5d6f62355729a6b20e6",
+  "dispatchMatrixCases": 58
+}

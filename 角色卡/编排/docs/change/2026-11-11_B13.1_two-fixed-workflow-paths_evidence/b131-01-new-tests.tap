@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+ok 1 - prepareIntent：A2(requested) 时 fail-closed（stage-transition-invalid），不写 stage.requested A3（RR8 卡提前呈现根因）
+  ---
+  duration_ms: 14.9527
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+ok 2 - prepareIntent：A2 completed 时补记 stage.requested A3；A3 在办（卡待结算/恢复）时返回证据但不重复写
+  ---
+  duration_ms: 11.5151
+  type: 'test'
+  ...
+# Subtest: prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+ok 3 - prepareIntent：无活动 fixed workflow ⇒ workflow-not-found（不发卡）
+  ---
+  duration_ms: 2.823
+  type: 'test'
+  ...
+# Subtest: prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+ok 4 - prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view.blocked 残留不影响补记 A3
+  ---
+  duration_ms: 10.9273
+  type: 'test'
+  ...
+# Subtest: closeTask：open 兄弟阻塞 A2 完成；原任务 rework 后，补交+返工任务 accepted ⇒ A2 完成（RR8 死锁回归）
+ok 5 - closeTask：open 兄弟阻塞 A2 完成；原任务 rework 后，补交+返工任务 accepted ⇒ A2 完成（RR8 死锁回归）
+  ---
+  duration_ms: 27.2274
+  type: 'test'
+  ...
+# Subtest: closeTask A11：两个实现任务须全部 accepted 才完成 A11
+ok 6 - closeTask A11：两个实现任务须全部 accepted 才完成 A11
+  ---
+  duration_ms: 35.9076
+  type: 'test'
+  ...
+# Subtest: closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+ok 7 - closeTask A11：旧 attempt rework 不阻塞替换任务 accepted 完成 A11
+  ---
+  duration_ms: 31.6499
+  type: 'test'
+  ...
+# Subtest: closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+ok 8 - closeTask：阶段完成后迟到的兄弟任务 rework 不追加 stage.blocked（投影不 corrupt）
+  ---
+  duration_ms: 9.2617
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 313.9066

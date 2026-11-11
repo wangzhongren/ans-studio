@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变
+ok 1 - C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变
+  ---
+  duration_ms: 16.0561
+  type: 'test'
+  ...
+# Subtest: C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly
+ok 2 - C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly
+  ---
+  duration_ms: 6.2863
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 434.3563

@@ -1,0 +1,256 @@
+{
+  "at": "2026-11-10T20:31:57.556Z",
+  "stopCause": "gate:shell-confirm-card",
+  "gate": {
+    "kind": "shell-confirm-card",
+    "title": "命令审批 · 产品",
+    "command": "certutil -hashfile docs\\product\\snake-game-intent-v1.md SHA256"
+  },
+  "workflowStarted": {
+    "at": "2026-11-10T20:31:30.594Z",
+    "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+    "flowId": "snake-game",
+    "path": "A",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "idempotencyKey": "workflow-start:snake-game:A:65807a87-ceee-4426-8b76-67329ed790dc"
+  },
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 0,
+    "cardsByKind": {},
+    "dispatches": 2,
+    "dispatchesByFrom": {
+      "chief": 1,
+      "convener": 1
+    },
+    "writeTasks": 1,
+    "implementationWriteTasks": 0,
+    "turnsByRole": {
+      "chief": 3,
+      "convener": 2,
+      "product": 1
+    }
+  },
+  "summary": {
+    "stages": {
+      "A1": {
+        "stage.requested": "2026-11-10T20:31:30.594Z",
+        "status": "requested"
+      }
+    },
+    "milestones": [
+      {
+        "at": "2026-11-10T20:31:20.232Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-10T20:31:30.599Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwb5b50i-2b42df81",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-10T20:31:30.594Z",
+        "milestone": "workflow-started",
+        "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+        "flowId": "snake-game",
+        "path": "A"
+      },
+      {
+        "at": "2026-11-10T20:31:35.035Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-10T20:31:40.892Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwb5bcyk-846f5fe5",
+        "from": "convener",
+        "to": "product",
+        "taskKind": null,
+        "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+        "stage": "A2"
+      }
+    ]
+  },
+  "git": {
+    "branch": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "head": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "log": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "status": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "branches": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "tags": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "remotes": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n",
+    "mainLog": "GIT_ERROR fatal: not a git repository (or any of the parent directories): .git\n"
+  },
+  "docs": {
+    "docs": [
+      {
+        "rel": "docs/audit",
+        "dir": true
+      },
+      {
+        "rel": "docs/audit/shell-gate.jsonl",
+        "bytes": 567,
+        "sha256": "474bcf33761af9057197395b77c8bc3b808a4be7bf0a3793f2db808702d8292f"
+      },
+      {
+        "rel": "docs/product",
+        "dir": true
+      },
+      {
+        "rel": "docs/product/snake-game-intent-v1.md",
+        "bytes": 7024,
+        "sha256": "37981ad956ffeaf7195144dca20d2110cd18483713cb680e362ce3565bb3c46b"
+      }
+    ]
+  },
+  "topLevel": [
+    ".ans",
+    "docs"
+  ],
+  "sessions": {
+    "chief": {
+      "bytes": 44009
+    },
+    "convener": {
+      "bytes": 36309
+    },
+    "product": {
+      "bytes": 16974
+    }
+  },
+  "ports": {
+    "lines9222": [],
+    "lines9223": [],
+    "lines9224": [
+      "  TCP    127.0.0.1:9224         0.0.0.0:0              LISTENING       4276",
+      "  TCP    127.0.0.1:9224         127.0.0.1:57056        ESTABLISHED     4276",
+      "  TCP    127.0.0.1:57055        127.0.0.1:9224         TIME_WAIT       0",
+      "  TCP    127.0.0.1:57056        127.0.0.1:9224         ESTABLISHED     12948"
+    ]
+  },
+  "oldRunRootPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+    "exists": true,
+    "entries": [
+      {
+        "name": "evidence",
+        "mtime": 1794247136435.3418
+      },
+      {
+        "name": "round10",
+        "mtime": 1794248323109.7388
+      },
+      {
+        "name": "round11",
+        "mtime": 1794248959545.2583
+      },
+      {
+        "name": "round12",
+        "mtime": 1794249232305.3015
+      },
+      {
+        "name": "round13",
+        "mtime": 1794249490950.5813
+      },
+      {
+        "name": "round14",
+        "mtime": 1794249732100.8677
+      },
+      {
+        "name": "round15",
+        "mtime": 1794249988039.9426
+      },
+      {
+        "name": "round16",
+        "mtime": 1794250169724.0994
+      },
+      {
+        "name": "round17",
+        "mtime": 1794250566337.3135
+      },
+      {
+        "name": "round18",
+        "mtime": 1794252829477.4497
+      },
+      {
+        "name": "round19",
+        "mtime": 1794253209658.652
+      },
+      {
+        "name": "round20",
+        "mtime": 1794261345627.0393
+      },
+      {
+        "name": "round21",
+        "mtime": 1794261805971.9543
+      },
+      {
+        "name": "round22",
+        "mtime": 1794262253668.7983
+      },
+      {
+        "name": "round23",
+        "mtime": 1794262693084.7214
+      },
+      {
+        "name": "round24",
+        "mtime": 1794263327768.893
+      },
+      {
+        "name": "round25",
+        "mtime": 1794264715770.8784
+      },
+      {
+        "name": "round26",
+        "mtime": 1794265159753.918
+      },
+      {
+        "name": "round8",
+        "mtime": 1794247470341.858
+      },
+      {
+        "name": "round9",
+        "mtime": 1794247940931.3174
+      },
+      {
+        "name": "rr",
+        "mtime": 1794247132796.088
+      },
+      {
+        "name": "userData",
+        "mtime": 1794246925742.7854
+      }
+    ]
+  },
+  "oldSnakeTargetPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+    "exists": true,
+    "entries": [
+      {
+        "name": "target",
+        "mtime": 1794192309257.867
+      }
+    ]
+  },
+  "oldRootsUntouched": {
+    "runRoot": false,
+    "snakeTarget": false
+  },
+  "turns": {
+    "chief": 3,
+    "convener": 2,
+    "product": 1
+  }
+}

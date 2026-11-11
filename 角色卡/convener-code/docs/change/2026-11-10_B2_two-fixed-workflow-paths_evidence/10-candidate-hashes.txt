@@ -1,0 +1,2 @@
+src/common/roles/convener/index.ts  8c9989c96bbddd3216831ac45b1cce61aeaab7a9a5814d3cfcc8cdbb5a45d190  bytes=42772  lines=788  CR=0
+test/roles/convener/convener-fixed.test.ts  850016065da6654c7e921bd4fc9b58f068f969c2a6bf2ab1b6a4b9fdcca9218f  bytes=11535  lines=212  CR=0

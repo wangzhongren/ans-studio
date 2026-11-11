@@ -1,0 +1,37 @@
+{
+  "model": "deepseek-v4-flash",
+  "roles": {
+    "chief": {
+      "assistantMessages": 16,
+      "inputTokens": 97884,
+      "outputTokens": 5079,
+      "cacheCreate": 0,
+      "cacheRead": 391552,
+      "models": [
+        "deepseek-v4-flash",
+        "<synthetic>"
+      ]
+    },
+    "convener": {
+      "assistantMessages": 18,
+      "inputTokens": 66118,
+      "outputTokens": 8440,
+      "cacheCreate": 0,
+      "cacheRead": 345216,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    },
+    "product": {
+      "assistantMessages": 9,
+      "inputTokens": 35421,
+      "outputTokens": 4609,
+      "cacheCreate": 0,
+      "cacheRead": 77312,
+      "models": [
+        "deepseek-v4-flash"
+      ]
+    }
+  },
+  "note": "message.usage from native transcripts; no cost_usd field"
+}

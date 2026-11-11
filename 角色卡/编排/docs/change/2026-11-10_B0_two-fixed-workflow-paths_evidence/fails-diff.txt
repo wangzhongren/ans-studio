@@ -1,0 +1,5 @@
+before: tests 1178 / pass 1152 / fail 24 / skip 2 (unique fail names = 24 + 'failing tests:' pseudo-line)
+after:  tests 1209 / pass 1183 / fail 24 / skip 2 (31 new tests all pass)
+unique failing-test-name set diff before vs after: exit 0 (IDENTICAL)
+---
+(no differences)

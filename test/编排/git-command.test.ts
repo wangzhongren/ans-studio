@@ -174,6 +174,42 @@ test("Git transport: executable local fsmonitor is a real unsafe control and is 
   assert.equal(await fs.stat(marker).then(() => true, () => false), false);
 });
 
+// —————————————— B30（2026-11-11，RR26）：桌面 A9 基线写入的 repo-local `[user]` 默认身份 ——————————————
+test("B30 user section accepted: desktop identity defaults (name=ANS/email=ans@local) no longer block inspect or status", async () => {
+  const root = await fixture(), port = createGitQueryPort(root);
+  await raw(git, ["-C", root, "config", "--local", "user.name", "ANS"], { windowsHide: true });
+  await raw(git, ["-C", root, "config", "--local", "user.email", "ans@local"], { windowsHide: true });
+  const config = await fs.readFile(path.join(root, ".git/config"), "utf8");
+  assert.match(config, /\[user\]\r?\n\tname = ANS\r?\n\temail = ans@local/, "fixture holds the real identity defaults written by Git itself");
+  const identity = await port.inspect();
+  assert.match(identity.repoId, /^[a-f0-9]{64}$/);
+  assert.equal(identity.objectFormat, "sha1");
+  await fs.writeFile(path.join(root, "identity-defaults.txt"), "ok");
+  const facts = await port.query({ operationId: "b30-identity-defaults-status", template: "status" });
+  assert.equal(facts.termination, "exited"); assert.equal(facts.exitCode, 0, facts.stderr);
+  assert.match(facts.stdout, /identity-defaults\.txt/, "real status output is only readable when config inspection passes first");
+});
+
+test("B30 user section stays fail-closed: illegal keys/values and every other dangerous section still reject", async () => {
+  const cases: Array<[string, string, RegExp]> = [
+    ["illegal key signingkey", "\n[user]\n\tsigningkey = ABCDEF\n", /git-config-executable-or-unsupported/],
+    ["semicolon injection", "\n[user]\n\tname = ANS; rm -rf /\n", /git-config-value-invalid/],
+    ["quote injection", "\n[user]\n\temail = \"ans@local\"\n", /git-config-value-invalid/],
+    ["backslash continuation", "\n[user]\n\tname = ANS\\\n\temail = x\n", /git-config-value-invalid/],
+    ["boolean key without equals", "\n[user]\n\tname\n", /git-config-executable-or-unsupported/],
+    ["alias section", "\n[alias]\n\tstatus = !echo pwned\n", /git-config-section-unsupported/],
+    ["include section", "\n[include]\n\tpath = ../evil\n", /git-config-section-unsupported/],
+    ["includeIf subsection", "\n[includeIf \"gitdir:x\"]\n\tpath = ../evil\n", /git-config-executable-or-unsupported/],
+    ["core.hooksPath", "\n[core]\n\thooksPath = C:/evil\n", /git-config-executable-or-unsupported/],
+  ];
+  for (const [label, extra, expected] of cases) {
+    const root = await fixture(), config = path.join(root, ".git/config"), original = await fs.readFile(config);
+    await fs.appendFile(config, extra);
+    await assert.rejects(createGitQueryPort(root).inspect(), expected, label);
+    await fs.writeFile(config, original);
+  }
+});
+
 test("Git transport: alternates, gitfile/common-dir and symbolic application refs are unsupported", async () => {
   const root = await fixture(), port = createGitQueryPort(root);
   await fs.mkdir(path.join(root, ".git/objects/info"), { recursive: true });

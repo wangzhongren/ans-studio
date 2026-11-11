@@ -1,0 +1,226 @@
+TAP version 13
+# Subtest: 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+ok 1 - 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+  ---
+  duration_ms: 2.7116
+  type: 'test'
+  ...
+# Subtest: 差分：卡/边界/capabilities/显示名与冻结金样逐字段一致
+ok 2 - 差分：卡/边界/capabilities/显示名与冻结金样逐字段一致
+  ---
+  duration_ms: 0.5187
+  type: 'test'
+  ...
+# Subtest: 差分：卡文本 sha256 / 长度 / 行数零差异
+ok 3 - 差分：卡文本 sha256 / 长度 / 行数零差异
+  ---
+  duration_ms: 0.1045
+  type: 'test'
+  ...
+# Subtest: 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结）
+ok 4 - 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结）
+  ---
+  duration_ms: 0.1215
+  type: 'test'
+  ...
+# Subtest: 差分：tools 金样——D1 14 项均不含 verifier，空声明 trio/single 合法
+ok 5 - 差分：tools 金样——D1 14 项均不含 verifier，空声明 trio/single 合法
+  ---
+  duration_ms: 0.2317
+  type: 'test'
+  ...
+# Subtest: 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+ok 6 - 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+  ---
+  duration_ms: 0.4733
+  type: 'test'
+  ...
+# Subtest: 差分（documented）：契约明文差异逐条单列（旧 oracle 行为不同且方向固定）
+ok 7 - 差分（documented）：契约明文差异逐条单列（旧 oracle 行为不同且方向固定）
+  ---
+  duration_ms: 0.1657
+  type: 'test'
+  ...
+# Subtest: 差分（module-only）：旧函数无法表达的模块负例（只冻结模块行为与旧观测）
+ok 8 - 差分（module-only）：旧函数无法表达的模块负例（只冻结模块行为与旧观测）
+  ---
+  duration_ms: 0.0859
+  type: 'test'
+  ...
+# Subtest: 差分（review preflight，zero）：只含登记事实键时与旧 Model 形状判定零差异
+ok 9 - 差分（review preflight，zero）：只含登记事实键时与旧 Model 形状判定零差异
+  ---
+  duration_ms: 1.0436
+  type: 'test'
+  ...
+# Subtest: 差分（review preflight，documented）：E2 P5 未登记键拒绝（契约明文更严差异）
+ok 10 - 差分（review preflight，documented）：E2 P5 未登记键拒绝（契约明文更严差异）
+  ---
+  duration_ms: 0.225
+  type: 'test'
+  ...
+# Subtest: 差分：模块不读取验收结论键值（事实包违规一律 deny，不做验收判定/证据核验）
+ok 11 - 差分：模块不读取验收结论键值（事实包违规一律 deny，不做验收判定/证据核验）
+  ---
+  duration_ms: 0.1459
+  type: 'test'
+  ...
+# Subtest: 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+ok 12 - 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+  ---
+  duration_ms: 3.0289
+  type: 'test'
+  ...
+# Subtest: fixedCards：[] 冻结值（v1.3 §3.4），与 legacy cards 不同引用且不回退/过滤
+ok 13 - fixedCards：[] 冻结值（v1.3 §3.4），与 legacy cards 不同引用且不回退/过滤
+  ---
+  duration_ms: 0.7975
+  type: 'test'
+  ...
+# Subtest: fixed context：仅 matrix="two-fixed-paths/v1" 返回 fixed 两段（含 A12a/A12b/归档/边界纪律）
+ok 14 - fixed context：仅 matrix="two-fixed-paths/v1" 返回 fixed 两段（含 A12a/A12b/归档/边界纪律）
+  ---
+  duration_ms: 0.3503
+  type: 'test'
+  ...
+# Subtest: fixed context：治理模型/事实不影响输出；输入不被修改；与 legacy 段互不混入
+ok 15 - fixed context：治理模型/事实不影响输出；输入不被修改；与 legacy 段互不混入
+  ---
+  duration_ms: 0.1372
+  type: 'test'
+  ...
+# Subtest: legacy context：context({})/缺省/显式 legacy-v1 同一引用且 JSON 哈希逐字冻结
+ok 16 - legacy context：context({})/缺省/显式 legacy-v1 同一引用且 JSON 哈希逐字冻结
+  ---
+  duration_ms: 0.4107
+  type: 'test'
+  ...
+# Subtest: legacy 规格数据逐字冻结：card.text/cards/capabilities/边界不受 B2 改动影响
+ok 17 - legacy 规格数据逐字冻结：card.text/cards/capabilities/边界不受 B2 改动影响
+  ---
+  duration_ms: 0.2017
+  type: 'test'
+  ...
+# Subtest: 无 release 合并请求工具：模块源码零出现（G-IR §六；RoleToolId 仍 14 项）
+ok 18 - 无 release 合并请求工具：模块源码零出现（G-IR §六；RoleToolId 仍 14 项）
+  ---
+  duration_ms: 0.3207
+  type: 'test'
+  ...
+# Subtest: 测试纪律：test/roles/verifier 无跳过/强制退出 token（不新增，B2 回归照常执行）
+ok 19 - 测试纪律：test/roles/verifier 无跳过/强制退出 token（不新增，B2 回归照常执行）
+  ---
+  duration_ms: 0.5376
+  type: 'test'
+  ...
+# Subtest: 模块数据：id/displayName/function/cards/capabilities 与旧规格一致且只读
+ok 20 - 模块数据：id/displayName/function/cards/capabilities 与旧规格一致且只读
+  ---
+  duration_ms: 0.8865
+  type: 'test'
+  ...
+# Subtest: 卡/边界：Section 1 三条目录、预授权与禁写清单为纯数据
+ok 21 - 卡/边界：Section 1 三条目录、预授权与禁写清单为纯数据
+  ---
+  duration_ms: 0.1651
+  type: 'test'
+  ...
+# Subtest: tools()：verifier 无额外 RoleToolId（空声明），capabilities 与 spec 同引用（D10）
+ok 22 - tools()：verifier 无额外 RoleToolId（空声明），capabilities 与 spec 同引用（D10）
+  ---
+  duration_ms: 0.1467
+  type: 'test'
+  ...
+# Subtest: dispatch()：fixture 表（硬身份/存在性 + 报告期望）
+ok 23 - dispatch()：fixture 表（硬身份/存在性 + 报告期望）
+  ---
+  duration_ms: 0.1654
+  type: 'test'
+  ...
+# Subtest: dispatch()：不修改调用方输入（纯策略）
+ok 24 - dispatch()：不修改调用方输入（纯策略）
+  ---
+  duration_ms: 0.1325
+  type: 'test'
+  ...
+# Subtest: dispatch()：允许时 reportToRoleId 是真实来源（差分期望，不是路由）
+ok 25 - dispatch()：允许时 reportToRoleId 是真实来源（差分期望，不是路由）
+  ---
+  duration_ms: 0.0643
+  type: 'test'
+  ...
+# Subtest: preflight：只覆盖 review；其他动作 fail-closed（action-not-covered）
+ok 26 - preflight：只覆盖 review；其他动作 fail-closed（action-not-covered）
+  ---
+  duration_ms: 0.1378
+  type: 'test'
+  ...
+# Subtest: preflight(review)：fixture 表（reviewTarget/最终候选/CID/criteria；缺事实 deny）
+ok 27 - preflight(review)：fixture 表（reviewTarget/最终候选/CID/criteria；缺事实 deny）
+  ---
+  duration_ms: 1.0228
+  type: 'test'
+  ...
+# Subtest: preflight(review)：任何未登记事实键 ⇒ deny（E0.3 §3.4/D4；E2 P5 修复）
+ok 28 - preflight(review)：任何未登记事实键 ⇒ deny（E0.3 §3.4/D4；E2 P5 修复）
+  ---
+  duration_ms: 0.2366
+  type: 'test'
+  ...
+# Subtest: preflight(review)：未登记键拒绝不修改调用方事实包（纯策略）
+ok 29 - preflight(review)：未登记键拒绝不修改调用方事实包（纯策略）
+  ---
+  duration_ms: 0.171
+  type: 'test'
+  ...
+# Subtest: preflight(review)：不修改事实包（纯策略）
+ok 30 - preflight(review)：不修改事实包（纯策略）
+  ---
+  duration_ms: 0.149
+  type: 'test'
+  ...
+# Subtest: context()：two 静态段（acceptance 卡数据 + 报告期望），id 唯一、文本非空
+ok 31 - context()：two 静态段（acceptance 卡数据 + 报告期望），id 唯一、文本非空
+  ---
+  duration_ms: 0.1864
+  type: 'test'
+  ...
+# Subtest: context()：纯静态模板（单/trio、有无 facts 输出一致；输入不被修改）
+ok 32 - context()：纯静态模板（单/trio、有无 facts 输出一致；输入不被修改）
+  ---
+  duration_ms: 0.0598
+  type: 'test'
+  ...
+# Subtest: 模块根只有唯一 public entry index.ts（不散放文件）
+ok 33 - 模块根只有唯一 public entry index.ts（不散放文件）
+  ---
+  duration_ms: 0.1849
+  type: 'test'
+  ...
+# Subtest: 依赖方向：只 import Model public entry；无引擎/门控/pipeline/service/provider/app/其他角色/node: 依赖
+ok 34 - 依赖方向：只 import Model public entry；无引擎/门控/pipeline/service/provider/app/其他角色/node: 依赖
+  ---
+  duration_ms: 0.343
+  type: 'test'
+  ...
+# Subtest: 唯一 public entry 只导出一个 BuiltInRoleModule
+ok 35 - 唯一 public entry 只导出一个 BuiltInRoleModule
+  ---
+  duration_ms: 0.2516
+  type: 'test'
+  ...
+# Subtest: 纯函数：重复调用返回结构一致（无可变状态/时钟/随机数）
+ok 36 - 纯函数：重复调用返回结构一致（无可变状态/时钟/随机数）
+  ---
+  duration_ms: 0.1028
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 340.1879

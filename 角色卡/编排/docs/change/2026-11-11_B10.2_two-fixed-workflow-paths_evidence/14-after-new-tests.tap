@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: fixed verifier A12a：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+ok 1 - fixed verifier A12a：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+  ---
+  duration_ms: 15.8872
+  type: 'test'
+  ...
+# Subtest: fixed verifier A12b：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+ok 2 - fixed verifier A12b：带真实 taskId（无 runId）可打开，不抛 review-task-assignment-unavailable，注入 assignment 事实
+  ---
+  duration_ms: 8.5396
+  type: 'test'
+  ...
+# Subtest: fixed convener stage-request：带真实 taskId 可打开，assignment 事实含 taskKind=stage-request
+ok 3 - fixed convener stage-request：带真实 taskId 可打开，assignment 事实含 taskKind=stage-request
+  ---
+  duration_ms: 9.5012
+  type: 'test'
+  ...
+# Subtest: fixed product 生产任务：带真实 taskId 可打开，assignment 事实含 convener→product/A11
+ok 4 - fixed product 生产任务：带真实 taskId 可打开，assignment 事实含 convener→product/A11
+  ---
+  duration_ms: 8.1431
+  type: 'test'
+  ...
+# Subtest: fixed 任务按账本事实判定：未传 workflowMode（会话默认 legacy）仍走 fixed 任务分支、不抛 legacy 错误
+ok 5 - fixed 任务按账本事实判定：未传 workflowMode（会话默认 legacy）仍走 fixed 任务分支、不抛 legacy 错误
+  ---
+  duration_ms: 9.2627
+  type: 'test'
+  ...
+# Subtest: legacy verifier taskId（无 workflowId）：仍走 legacy trunk 原路径，review-task-assignment-unavailable 逐字保留
+ok 6 - legacy verifier taskId（无 workflowId）：仍走 legacy trunk 原路径，review-task-assignment-unavailable 逐字保留
+  ---
+  duration_ms: 7.5913
+  type: 'test'
+  ...
+# Subtest: fail-closed 不放宽：fixed 任务受派人非本角色 ⇒ fixed-task-assignment-unavailable（非 legacy 码）
+ok 7 - fail-closed 不放宽：fixed 任务受派人非本角色 ⇒ fixed-task-assignment-unavailable（非 legacy 码）
+  ---
+  duration_ms: 8.7833
+  type: 'test'
+  ...
+# Subtest: fail-closed 不放宽：fixed 任务已收口 ⇒ fixed-task-assignment-unavailable（不得带已关闭任务开会话）
+ok 8 - fail-closed 不放宽：fixed 任务已收口 ⇒ fixed-task-assignment-unavailable（不得带已关闭任务开会话）
+  ---
+  duration_ms: 9.9757
+  type: 'test'
+  ...
+# Subtest: 无 taskId 的 fixed chat 不受影响：不构造 fixed assignment 上下文（chief/convener 聊天口径）
+ok 9 - 无 taskId 的 fixed chat 不受影响：不构造 fixed assignment 上下文（chief/convener 聊天口径）
+  ---
+  duration_ms: 4.7407
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 406.6949

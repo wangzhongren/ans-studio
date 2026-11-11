@@ -1,0 +1,31 @@
+# B0 门禁引擎候选文件指纹（生成：2026-11-10；worktree trunk-amendment @ ad22192）
+
+## sha256 / bytes
+ea01d09387e26f889f15116933cb41a0b5244a3a906c5b2b1ce74b914538f195 *src/model/role.ts
+566eea7c79d7de4fb270aa7fb95f6b265fcec607ae9c50f04d54e27411b01f43 *test/门禁引擎/role-module-contract.test.ts
+0a08bcad2484ca8c06f234fc42f9a0b277e3b89bb531171a095c0c74c07ac0c4 *test/门禁引擎/dispatch-matrix-mode.test.ts
+1d846d351e4ead47af840bc718ac374c78e3c0c483224d4ff0561d766ec2c07f *角色卡/门禁引擎/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md
+25261 src/model/role.ts
+44202 test/门禁引擎/role-module-contract.test.ts
+ 8980 test/门禁引擎/dispatch-matrix-mode.test.ts
+13400 角色卡/门禁引擎/docs/change/2026-11-10_B0_two-fixed-workflow-paths.md
+91843 total
+
+## numstat（git diff HEAD，本角色写集）
+38	0	src/model/role.ts
+21	0	"test/\351\227\250\347\246\201\345\274\225\346\223\216/role-module-contract.test.ts"
+新文件：test/门禁引擎/dispatch-matrix-mode.test.ts（145 行 / 8,980 bytes）
+
+## 变更前基线（HEAD ad22192）
+role.ts 21,989 bytes / 409 行，sha256 d5e550a06514b8a61fc66b517a267343ba95d8aa29050eb6ee3c7b7f9b5f8780
+role-module-contract.test.ts 843 行
+
+## 共享树并行 B0 改动（非本角色；会话开工时 tracked 改动为 0）
+ M src/common/shared/config-loader.ts
+ M src/model/role.ts
+ M src/model/runtime.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+ M test/runtime-core/stable-write-card-kind.test.ts
+ M "test/\351\227\250\347\246\201\345\274\225\346\223\216/role-module-contract.test.ts"
+ M "test/\351\241\271\347\233\256\347\256\241\347\220\206/shared/config-loader.test.ts"

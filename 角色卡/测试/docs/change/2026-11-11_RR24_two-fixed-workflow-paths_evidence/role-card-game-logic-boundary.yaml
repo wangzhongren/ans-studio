@@ -1,0 +1,5 @@
+role: game-logic
+entries:
+  - kind: directory
+    path: src/core/
+    purpose: 游戏规则核心模块（模块 game-core）

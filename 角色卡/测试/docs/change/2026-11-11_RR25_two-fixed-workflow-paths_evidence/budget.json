@@ -1,0 +1,32 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 3,
+  "cardsByKind": {
+    "intent-confirm": 1,
+    "proposal": 1,
+    "appointment": 1
+  },
+  "decisions": 0,
+  "dispatches": 17,
+  "dispatchesByFrom": {
+    "chief": 10,
+    "convener": 7
+  },
+  "tasksByTo": {
+    "convener": 8,
+    "product": 2,
+    "rapporteur": 3,
+    "nominator": 2,
+    "qa-reviewer": 2
+  },
+  "writeTasks": 9,
+  "implementationWriteTasks": 0,
+  "turnsByRole": {
+    "chief": 23,
+    "convener": 18,
+    "nominator": 2,
+    "product": 4,
+    "qa-reviewer": 2,
+    "rapporteur": 4
+  }
+}

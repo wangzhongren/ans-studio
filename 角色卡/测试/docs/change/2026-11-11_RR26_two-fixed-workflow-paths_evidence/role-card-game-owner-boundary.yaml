@@ -1,0 +1,5 @@
+role: game-owner
+entries:
+  - kind: file
+    path: src/game.js
+    purpose: game 模块：全部游戏规则、渲染、输入、主循环与重开

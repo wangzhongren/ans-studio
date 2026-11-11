@@ -1,0 +1,4 @@
+== chief-workflow 资源指纹（B2 编排接线证据）==
+legacy chief-workflow.md: sha256=9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 bytes=8724 lines=61（模块 CHIEF_WORKFLOW_RESOURCE.sha256 期望 9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 → UNCHANGED）
+fixed chief-workflow-v2.md: sha256=f806658818dd36369666b7f189b6e57c164258c23348bd4a132737e0589eb1eb bytes=10206 lines=73
+v2 version line: chief-workflow/v2

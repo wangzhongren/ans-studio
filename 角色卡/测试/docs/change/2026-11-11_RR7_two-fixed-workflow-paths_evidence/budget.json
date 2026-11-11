@@ -1,0 +1,19 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 1,
+  "cardsByKind": {
+    "意图确认：贪吃蛇（键盘/计分/重开/边界碰撞）": 1
+  },
+  "dispatches": 6,
+  "dispatchesByFrom": {
+    "chief": 3,
+    "convener": 3
+  },
+  "writeTasks": 3,
+  "implementationWriteTasks": 0,
+  "turnsByRole": {
+    "chief": 9,
+    "convener": 9,
+    "product": 6
+  }
+}

@@ -1,0 +1,27 @@
+# B0 shared-code 输入与环境（记录于 2026-11-10）
+
+## 环境
+
+```
+HEAD: ad22192197b28f401de8e1d22669b577ef4833e0
+node: v24.22.1
+npm: 11.19.1
+tsc: Version 7.0.2
+```
+
+## 必读依据 hash（实测）
+
+```
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+```
+
+## 相关文件 hash（开工基线 vs 当前；src/model/role.ts 属门禁引擎并行写集）
+
+```
+config-loader.ts HEAD:      6e5bc8d569b9ac874c04e7860c6c930e7d16ce24eb47410e9bcf01a20c4dea48 *-
+config-loader.ts working:   2d6a22fd5311f67a92c1211d84177cd0e059e587583bfaf25e7de2c4cdcad425 *src/common/shared/config-loader.ts
+config-loader.test.ts HEAD: c86d0039181ff852c6a297c49f03952a3207f195be7e1736272795a7374b2685 *-
+config-loader.test.ts work: 07e271570692e1ab4dacd3ee7c573aa619a304ce75af0a2f3c2449eb2cb8a6ad *test/项目管理/shared/config-loader.test.ts
+role.ts working (并行):      ea01d09387e26f889f15116933cb41a0b5244a3a906c5b2b1ce74b914538f195 *src/model/role.ts
+```

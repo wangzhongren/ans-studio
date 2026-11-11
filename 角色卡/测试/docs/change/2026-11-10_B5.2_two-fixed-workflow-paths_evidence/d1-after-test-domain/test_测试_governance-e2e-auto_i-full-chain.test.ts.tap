@@ -1,0 +1,54 @@
+TAP version 13
+# Subtest: 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+not ok 1 - 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+  ---
+  duration_ms: 52.4961
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\governance-e2e-auto\\i-full-chain.test.ts:131:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:149:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+not ok 2 - F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+  ---
+  duration_ms: 46.9471
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\governance-e2e-auto\\i-full-chain.test.ts:187:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/governance-e2e-auto/i-full-chain.test.ts:201:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2006.6679

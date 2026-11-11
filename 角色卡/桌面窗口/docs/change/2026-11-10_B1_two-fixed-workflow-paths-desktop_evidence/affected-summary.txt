@@ -1,0 +1,19 @@
+# affected desktop suites before/final-after (B1 desktop)
+suite	before(ok/fail)	final-after(ok/fail)	name-set-diff
+chain-enforcement	3/6	3/6	SAME
+session	6/1	6/1	SAME
+interface	8/0	8/0	SAME
+dispatch-fresh-enum	2/0	2/0	SAME
+handback-delivery	12/6	12/6	SAME
+run-pin	9/11	9/11	SAME
+multi-runtime	31/8	31/8	SAME
+message-queue	20/0	20/0	SAME
+ans-wiring	7/0	7/0	SAME
+boundary-refresh	13/1	13/1	SAME
+log-actions	0/1	0/1	SAME
+run-change-trigger	1/9	1/9	SAME
+star-routing	3/7	3/7	SAME
+i-full-chain	0/2	0/2	SAME
+version-change	42/4	42/4	SAME
+
+VERDICT: same=15 diff=0; new deterministic failures = 0; new skips = 0

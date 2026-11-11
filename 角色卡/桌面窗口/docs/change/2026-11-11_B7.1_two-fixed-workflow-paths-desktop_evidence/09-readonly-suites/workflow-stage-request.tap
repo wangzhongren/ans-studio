@@ -1,0 +1,59 @@
+TAP version 13
+# Subtest: 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+ok 1 - 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+  ---
+  duration_ms: 23.9505
+  type: 'test'
+  ...
+# Subtest: 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+ok 2 - 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+  ---
+  duration_ms: 1.8419
+  type: 'test'
+  ...
+# Subtest: open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+ok 3 - open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+  ---
+  duration_ms: 27.896
+  type: 'test'
+  ...
+# Subtest: 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+ok 4 - 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+  ---
+  duration_ms: 89.9701
+  type: 'test'
+  ...
+# Subtest: A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+ok 5 - A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+  ---
+  duration_ms: 37.5191
+  type: 'test'
+  ...
+# Subtest: 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+ok 6 - 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+  ---
+  duration_ms: 8.1625
+  type: 'test'
+  ...
+# Subtest: stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+ok 7 - stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+  ---
+  duration_ms: 40.9609
+  type: 'test'
+  ...
+# Subtest: AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+ok 8 - AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+  ---
+  duration_ms: 19.3213
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 433.9699
+exit=0

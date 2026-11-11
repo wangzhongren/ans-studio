@@ -1,0 +1,6 @@
+fc3556e2d0e8ee35e0c33c96296929033b7e7759
+fc3556e fix(fixed-path): B28 bind review modules and forbid shell mkdir
+ M src/provider/trunk/impl/git-command.ts
+ M test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts
+ M test/编排/git-command.test.ts
+ M test/编排/readonly-git-transport.test.ts

@@ -1,0 +1,9 @@
+## 依据 hash（B2 实测 2026-11-10）
+
+b607f1008a3539eb88313e603bf89133138323cd7f8bbe6fd7df1f3455dadddb *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.md
+b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d *docs/planning/2026-11-10_design_two-fixed-workflow-paths.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+4c63ccbc84990f00e772fb6e16cf0e9df9433a8bbe5c99dcd078b67bca036211 *docs/scheduling/2026-11-10_team-plan_two-fixed-workflow-paths.md
+a66c47d746ddf65720e27c77268a9069ceb13fc500c2a71419ad413c4d20a3d9 *docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+08e017269c86d92b68e83c25377ccdf7e86d352391a285b635d9a517b48ca571 *角色卡/门禁引擎/docs/design/2026-11-10_interface-review_two-fixed-workflow-paths.md
+0ac3a0d9f937d0acb976d44529c852f60d9d5622da06aae0f9742e6cdd90de64 *角色卡/测试/docs/change/2026-11-10_B5.2_two-fixed-workflow-paths.md

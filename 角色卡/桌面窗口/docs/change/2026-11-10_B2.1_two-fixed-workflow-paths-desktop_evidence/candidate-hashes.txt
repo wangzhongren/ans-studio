@@ -1,0 +1,6 @@
+05c6a50c00d6cfcb2600a0020bd22e8e8e0e14c8b683c5922e4ba726dfc944d5 *app/desktop/session.ts
+8be70617968efe2f97d13806a02779a453f447920ba4e1c96b6402c9c15f7b30 *test/桌面应用/b3-fixed-baseline-pathb.test.ts
+01010d29efa74a0ed88bca50a06753f6094af4d1617a3bd09080a8b3d2b70885 *test/桌面应用/b31-fixed-release-auto-desktop.test.ts
+d6978bd0a21d995ced5ab369dfb94bb0f0c1d9fa276bede40c440332ef52b2c0 *test/桌面应用/b21-basis-gate-desktop.test.ts
+# aggregate = sha256(LC_ALL=C sort of the four "<sha256>  <path>" lines)
+# feb488096e3c7c6f83aff5b3056a54e17bd35a7e38d4b8ccb7d9137b6ec1f638

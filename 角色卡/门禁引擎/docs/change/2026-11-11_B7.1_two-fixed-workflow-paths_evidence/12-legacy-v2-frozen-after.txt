@@ -1,0 +1,7 @@
+== legacy chief-workflow.md 冻结核对（after） ==
+9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 *src/common/门禁引擎/workflows/chief/chief-workflow.md
+expected: 9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346
+
+== v2 资源 after ==
+f14845e2e15df454125fb186b8c66934a7769b2449211ec80943d58e0c4de049 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+bytes=17289 <=256KiB=true versionLines=["chief-workflow/v2"] nonEmptyLines=86 nul=false bom=false

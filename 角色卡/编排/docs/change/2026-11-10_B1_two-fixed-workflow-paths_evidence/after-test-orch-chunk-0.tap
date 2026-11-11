@@ -1,0 +1,2563 @@
+TAP version 13
+# Subtest: 最小链事实齐备 ⇒ 代批 accept（不要求旧 flow 的 proposalDecision/criteria/change-package）
+ok 1 - 最小链事实齐备 ⇒ 代批 accept（不要求旧 flow 的 proposalDecision/criteria/change-package）
+  ---
+  duration_ms: 1.6438
+  type: 'test'
+  ...
+# Subtest: 验收模块事实：moduleId/目录/属主随 facts 进入审批（R2/R3）
+ok 2 - 验收模块事实：moduleId/目录/属主随 facts 进入审批（R2/R3）
+  ---
+  duration_ms: 0.1705
+  type: 'test'
+  ...
+# Subtest: 任一最小链事实缺失 ⇒ manual(insufficient-evidence)，reason 指明缺项
+ok 3 - 任一最小链事实缺失 ⇒ manual(insufficient-evidence)，reason 指明缺项
+  ---
+  duration_ms: 0.4336
+  type: 'test'
+  ...
+# Subtest: 物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）
+ok 4 - 物证缺失/未读 ⇒ manual（proposal/report 仍为必需物证）
+  ---
+  duration_ms: 0.2579
+  type: 'test'
+  ...
+# Subtest: merge-main 高风险合并卡：judge 不可代批 ⇒ 一律 manual（merge-main-customer-only）
+ok 5 - merge-main 高风险合并卡：judge 不可代批 ⇒ 一律 manual（merge-main-customer-only）
+  ---
+  duration_ms: 0.1591
+  type: 'test'
+  ...
+# Subtest: 人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集（judgeContext.recommendedRoleIds）
+ok 6 - 人事发招人卡：选项=最新名单角色 ⇒ 应用生成推荐集（judgeContext.recommendedRoleIds）
+  ---
+  duration_ms: 39.4571
+  type: 'test'
+  ...
+# Subtest: §5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed
+ok 7 - §5A 任命 judgeContext 意图来源：request/proposal/product，冲突 fail-closed
+  ---
+  duration_ms: 54.5367
+  type: 'test'
+  ...
+# Subtest: 招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道
+ok 8 - 招人卡与名单不一致（缺项）⇒ declined + notPresented，不触达客户通道
+  ---
+  duration_ms: 15.1397
+  type: 'test'
+  ...
+# Subtest: convener 发招人卡 ⇒ 被拒（不能发 appointment；只由人事发起）
+ok 9 - convener 发招人卡 ⇒ 被拒（不能发 appointment；只由人事发起）
+  ---
+  duration_ms: 8.8728
+  type: 'test'
+  ...
+# Subtest: appointment-write 目录校验：boundary 目录在名单授权目录内 ⇒ 发卡；越名单目录 ⇒ notPresented
+ok 10 - appointment-write 目录校验：boundary 目录在名单授权目录内 ⇒ 发卡；越名单目录 ⇒ notPresented
+  ---
+  duration_ms: 29.6992
+  type: 'test'
+  ...
+# Subtest: BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+not ok 11 - BUG-3：appointment-write judge 事实含角色可写根（角色卡/<target>/ ∪ 名单目录）与 allowed 探针
+  ---
+  duration_ms: 14.5871
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\appointment-roster.test.ts:425:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    角色卡路径必须经同一 resolveWrite 探测为 allowed
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/appointment-roster.test.ts:438:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+not ok 12 - BUG-3：角色卡 role-card.md 与 boundary.yaml 均经同一 resolveWrite 探测为 allowed
+  ---
+  duration_ms: 15.7647
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\appointment-roster.test.ts:445:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/appointment-roster.test.ts:452:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots 为名下模块目录并集
+ok 13 - 模块口径：一人多模块（同父兄弟目录）⇒ allowedPathRoots 为名下模块目录并集
+  ---
+  duration_ms: 28.9115
+  type: 'test'
+  ...
+# Subtest: BUG-3：appointment-write 缺 targetRoleId ⇒ 结构校验拒绝，不触碰客户、无 judgeContext
+ok 14 - BUG-3：appointment-write 缺 targetRoleId ⇒ 结构校验拒绝，不触碰客户、无 judgeContext
+  ---
+  duration_ms: 11.6759
+  type: 'test'
+  ...
+# Subtest: 文档发现：按 flowId 取最新版本；缺失必需项如实列出；团队计划单独字段
+ok 15 - 文档发现：按 flowId 取最新版本；缺失必需项如实列出；团队计划单独字段
+  ---
+  duration_ms: 12.7195
+  type: 'test'
+  ...
+# Subtest: recordBasisDocuments：必需缺失 ⇒ basis-document-missing；齐全时 SHA-256/bytes 与磁盘字节一致
+ok 16 - recordBasisDocuments：必需缺失 ⇒ basis-document-missing；齐全时 SHA-256/bytes 与磁盘字节一致
+  ---
+  duration_ms: 12.388
+  type: 'test'
+  ...
+# Subtest: 预算：命名 basis-document-budget（32 文件 / 单文件 4 MiB / 总 8 MiB；含注入阈值路径）
+ok 17 - 预算：命名 basis-document-budget（32 文件 / 单文件 4 MiB / 总 8 MiB；含注入阈值路径）
+  ---
+  duration_ms: 10.9657
+  type: 'test'
+  ...
+# Subtest: drift 校验骨架：内容变更/删除 ⇒ basis-drift 且 actualSha256 如实（删除为 null）
+ok 18 - drift 校验骨架：内容变更/删除 ⇒ basis-drift 且 actualSha256 如实（删除为 null）
+  ---
+  duration_ms: 9.6046
+  type: 'test'
+  ...
+# Subtest: basis.recorded 构造/校验：确定性 basisId；application 记账；path-b 只读标记不产生写权
+ok 19 - basis.recorded 构造/校验：确定性 basisId；application 记账；path-b 只读标记不产生写权
+  ---
+  duration_ms: 0.9896
+  type: 'test'
+  ...
+# Subtest: T1 bootstrap closure: 4 current-version targets + 8 frozen records assemble the exact 9-file sorted snapshot and pass vca.prepareDirect
+ok 20 - T1 bootstrap closure: 4 current-version targets + 8 frozen records assemble the exact 9-file sorted snapshot and pass vca.prepareDirect
+  ---
+  duration_ms: 41.1969
+  type: 'test'
+  ...
+# Subtest: T2 bootstrap same-kind multi-version targets are rejected explicitly (M1), never last-wins, with no side effects
+ok 21 - T2 bootstrap same-kind multi-version targets are rejected explicitly (M1), never last-wins, with no side effects
+  ---
+  duration_ms: 7.0886
+  type: 'test'
+  ...
+# Subtest: T3 bootstrap closure fails closed when a frozen record file is missing, drifted or unreadable
+ok 22 - T3 bootstrap closure fails closed when a frozen record file is missing, drifted or unreadable
+  ---
+  duration_ms: 26.2244
+  type: 'test'
+  ...
+# Subtest: T6 ledger negative cases fail closed without skipping: bad line, unknown event, invalid freeze shape
+ok 23 - T6 ledger negative cases fail closed without skipping: bad line, unknown event, invalid freeze shape
+  ---
+  duration_ms: 46.4368
+  type: 'test'
+  ...
+# Subtest: T7 same-path sources with different sha fail closed with the conflicting path
+ok 24 - T7 same-path sources with different sha fail closed with the conflicting path
+  ---
+  duration_ms: 10.1911
+  type: 'test'
+  ...
+# Subtest: T8 no-history bootstrap keeps the original snapshot content (targets + confirmed intent + versions only)
+ok 25 - T8 no-history bootstrap keeps the original snapshot content (targets + confirmed intent + versions only)
+  ---
+  duration_ms: 21.184
+  type: 'test'
+  ...
+# Subtest: T9 non-bootstrap upgrade does not collect the freeze ledger (snapshot bytes unchanged)
+ok 26 - T9 non-bootstrap upgrade does not collect the freeze ledger (snapshot bytes unchanged)
+  ---
+  duration_ms: 83.1901
+  type: 'test'
+  ...
+# Subtest: T13 scale: many frozen records assemble linearly in path order with a deterministic digest
+ok 27 - T13 scale: many frozen records assemble linearly in path order with a deterministic digest
+  ---
+  duration_ms: 99.7804
+  type: 'test'
+  ...
+# Subtest: T14 legacy call: non-bootstrap executeDirect without preparedSnapshotRef keeps the old capture set
+ok 28 - T14 legacy call: non-bootstrap executeDirect without preparedSnapshotRef keeps the old capture set
+  ---
+  duration_ms: 129.2366
+  type: 'test'
+  ...
+# Subtest: T15 FS media: direct bootstrap executeDirect (no preparedSnapshotRef) assembles the frozen closure and applies
+ok 29 - T15 FS media: direct bootstrap executeDirect (no preparedSnapshotRef) assembles the frozen closure and applies
+  ---
+  duration_ms: 71.9495
+  type: 'test'
+  ...
+# Subtest: T15 negative: bootstrap executeDirect fallback fails closed on closure drift with no manifest/journal/freeze effects
+ok 30 - T15 negative: bootstrap executeDirect fallback fails closed on closure drift with no manifest/journal/freeze effects
+  ---
+  duration_ms: 7.9862
+  type: 'test'
+  ...
+# Subtest: T16 replay: same operationId produces a stable digest; a different file set fails snapshot-immutable-conflict
+ok 31 - T16 replay: same operationId produces a stable digest; a different file set fails snapshot-immutable-conflict
+  ---
+  duration_ms: 53.0176
+  type: 'test'
+  ...
+# Subtest: T17 another-flow ledger row fails closed without silent filtering
+ok 32 - T17 another-flow ledger row fails closed without silent filtering
+  ---
+  duration_ms: 10.6481
+  type: 'test'
+  ...
+# Subtest: T18 frozen record whose -vN suffix differs from record.version fails closed service-side
+ok 33 - T18 frozen record whose -vN suffix differs from record.version fails closed service-side
+  ---
+  duration_ms: 12.4936
+  type: 'test'
+  ...
+# Subtest: 非法 boundary.yaml 顶层键（version/roleId/root）⇒ 拒绝写入且零文件
+ok 34 - 非法 boundary.yaml 顶层键（version/roleId/root）⇒ 拒绝写入且零文件
+  ---
+  duration_ms: 6.9512
+  type: 'test'
+  ...
+# Subtest: 合法 boundary.yaml 模板通过并落盘
+ok 35 - 合法 boundary.yaml 模板通过并落盘
+  ---
+  duration_ms: 17.3058
+  type: 'test'
+  ...
+# Subtest: 绝对路径指向 boundary.yaml 同样校验；role-card.md 与其他路径不校验内容
+ok 36 - 绝对路径指向 boundary.yaml 同样校验；role-card.md 与其他路径不校验内容
+  ---
+  duration_ms: 11.6686
+  type: 'test'
+  ...
+# Subtest: edit_file 把合法 boundary.yaml 改坏 ⇒ 拒绝且文件保持不变
+ok 37 - edit_file 把合法 boundary.yaml 改坏 ⇒ 拒绝且文件保持不变
+  ---
+  duration_ms: 8.35
+  type: 'test'
+  ...
+# Subtest: real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+not ok 38 - real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+  ---
+  duration_ms: 25.6719
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\chat-handback-scope.test.ts:59:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    ... Skipped lines
+    
+      [
+        [
+          '1',
+          'A',
+          'completed'
+    ...
+          '5',
+    +     'ignored',
+    -     undefined,
+          'completed'
+        ]
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      0: '1'
+      1: 'A'
+      2: 'completed'
+    1:
+      0: '4'
+      1: 'B'
+      2: 'unreported'
+    2:
+      0: '5'
+      2: 'completed'
+  actual:
+    0:
+      0: '1'
+      1: 'A'
+      2: 'completed'
+    1:
+      0: '4'
+      1: 'B'
+      2: 'unreported'
+    2:
+      0: '5'
+      1: 'ignored'
+      2: 'completed'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/chat-handback-scope.test.ts:69:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: task failed keeps handback; chat failed without report does not invent task
+ok 39 - task failed keeps handback; chat failed without report does not invent task
+  ---
+  duration_ms: 9.8346
+  type: 'test'
+  ...
+# Subtest: task timed_out keeps handback; chat timed_out without report does not invent task
+ok 40 - task timed_out keeps handback; chat timed_out without report does not invent task
+  ---
+  duration_ms: 8.9022
+  type: 'test'
+  ...
+# Subtest: task aborted keeps handback; chat aborted without report does not invent task
+ok 41 - task aborted keeps handback; chat aborted without report does not invent task
+  ---
+  duration_ms: 8.8115
+  type: 'test'
+  ...
+# Subtest: taskId compatibility, ordinary default chat, invalid chat report and explicit chat failed report
+ok 42 - taskId compatibility, ordinary default chat, invalid chat report and explicit chat failed report
+  ---
+  duration_ms: 18.284
+  type: 'test'
+  ...
+# Subtest: unknown real turn without ACK cannot borrow task intent; report is still explicit
+ok 43 - unknown real turn without ACK cannot borrow task intent; report is still explicit
+  ---
+  duration_ms: 12.5772
+  type: 'test'
+  ...
+# Subtest: pre-opening rejection clears legacy intent; serial legacy task/chat consumes once
+ok 44 - pre-opening rejection clears legacy intent; serial legacy task/chat consumes once
+  ---
+  duration_ms: 9.584
+  type: 'test'
+  ...
+# Subtest: chat writes and denials are passed through, not converted to fallback; next task keeps its own evidence
+ok 45 - chat writes and denials are passed through, not converted to fallback; next task keeps its own evidence
+  ---
+  duration_ms: 0.2524
+  type: 'test'
+  ...
+# Subtest: X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用
+ok 46 - X-R6 工具：模块 trio 声明 6 项经 D1 allow；trio chief 实际注入 6 项且同一引用
+  ---
+  duration_ms: 20.59
+  type: 'test'
+  ...
+# Subtest: X-R6 工具（源码接缝）：moduleToolsRole 含 chief；旧门控仅作回退；closeCreatedTask 保留 directGovernance
+ok 47 - X-R6 工具（源码接缝）：moduleToolsRole 含 chief；旧门控仅作回退；closeCreatedTask 保留 directGovernance
+  ---
+  duration_ms: 1.2683
+  type: 'test'
+  ...
+# Subtest: X-R6 卡种：TRIO_CARD_KINDS.chief 表项已删除；默认卡由模块卡数据驱动
+ok 48 - X-R6 卡种：TRIO_CARD_KINDS.chief 表项已删除；默认卡由模块卡数据驱动
+  ---
+  duration_ms: 1.0187
+  type: 'test'
+  ...
+# Subtest: X-R6 intent-confirm：准备分支与协调者 choice 守卫读模块卡数据；文案保持既有口径
+ok 49 - X-R6 intent-confirm：准备分支与协调者 choice 守卫读模块卡数据；文案保持既有口径
+  ---
+  duration_ms: 0.7242
+  type: 'test'
+  ...
+# Subtest: X-R6 apply-journal：hub 来源/目标/路由/purpose/schema 读模块；证据核验字面量保留
+ok 50 - X-R6 apply-journal：hub 来源/目标/路由/purpose/schema 读模块；证据核验字面量保留
+  ---
+  duration_ms: 1.5328
+  type: 'test'
+  ...
+# Subtest: X-R6 trunk-runtime：hub 目标集合读模块；documents/coordination/rolePreparation 引擎路由保留
+ok 51 - X-R6 trunk-runtime：hub 目标集合读模块；documents/coordination/rolePreparation 引擎路由保留
+  ---
+  duration_ms: 0.7428
+  type: 'test'
+  ...
+# Subtest: X-R6 version-decision：注入与矩阵发起读模块声明；迁移前谓词仅回退
+ok 52 - X-R6 version-decision：注入与矩阵发起读模块声明；迁移前谓词仅回退
+  ---
+  duration_ms: 0.927
+  type: 'test'
+  ...
+# Subtest: X-R6 收尾：临时三态开关与 legacy 分支已删除（无残留）
+ok 53 - X-R6 收尾：临时三态开关与 legacy 分支已删除（无残留）
+  ---
+  duration_ms: 2.0698
+  type: 'test'
+  ...
+# ans role run —— 运行一个受治理角色会话
+# 用法：ans role run <角色> --task <任务> [--runtime demo|pi|codex|claude]
+# 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run —— 运行一个受治理角色会话
+# 用法：ans role run <角色> --task <任务> [--runtime demo|pi|codex|claude]
+# 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run —— 运行一个受治理角色会话
+# 用法：ans role run <角色> --task <任务> [--runtime demo|pi|codex|claude]
+# 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# Subtest: P1-4 指路句：不提供 shell 与会话保持 + 桌面应用，两点写实
+ok 54 - P1-4 指路句：不提供 shell 与会话保持 + 桌面应用，两点写实
+  ---
+  duration_ms: 0.4929
+  type: 'test'
+  ...
+# Subtest: runRoleCommand --help → 0：stdout 含用法与指路句；不开会话（工厂零调用）
+ok 55 - runRoleCommand --help → 0：stdout 含用法与指路句；不开会话（工厂零调用）
+  ---
+  duration_ms: 1.9426
+  type: 'test'
+  ...
+# Subtest: runRoleCommand -h → 0：stdout 含用法与指路句；不开会话（工厂零调用）
+ok 56 - runRoleCommand -h → 0：stdout 含用法与指路句；不开会话（工厂零调用）
+  ---
+  duration_ms: 1.2427
+  type: 'test'
+  ...
+# Subtest: runRoleCommand --help 不依赖注入（缺 project/scope 也可用）
+ok 57 - runRoleCommand --help 不依赖注入（缺 project/scope 也可用）
+  ---
+  duration_ms: 0.1439
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# ans role run 用法错误：缺少角色 id；缺少 --task
+# Subtest: 一次性会话启动打印轻量指路行（[message] 事件，位于既有启动提示处；每场恰一次）
+ok 58 - 一次性会话启动打印轻量指路行（[message] 事件，位于既有启动提示处；每场恰一次）
+  ---
+  duration_ms: 19.7604
+  type: 'test'
+  ...
+# Subtest: 用法错误路径不打印指路（只在真正开跑时出现，不夹带新噪音）
+ok 59 - 用法错误路径不打印指路（只在真正开跑时出现，不夹带新噪音）
+  ---
+  duration_ms: 0.1594
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-PREVIEW：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「确认操作」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [settled] 会话结束
+# Subtest: 无路径确认卡 → 完整性闸不介入，卡片照常呈现（旧行为不变）
+ok 60 - 无路径确认卡 → 完整性闸不介入，卡片照常呈现（旧行为不变）
+  ---
+  duration_ms: 15.2615
+  type: 'test'
+  ...
+# Subtest: 真机 op-2 卡片（fixture 逐字摘录）：两条路径都缺正文 → 判定拒绝且列出两条路径
+ok 61 - 真机 op-2 卡片（fixture 逐字摘录）：两条路径都缺正文 → 判定拒绝且列出两条路径
+  ---
+  duration_ms: 1.6406
+  type: 'test'
+  ...
+# Subtest: declaredConfirmPaths：显式 paths 优先；空数组/未给回退 preview 一行一路径声明
+ok 62 - declaredConfirmPaths：显式 paths 优先；空数组/未给回退 preview 一行一路径声明
+  ---
+  duration_ms: 0.1531
+  type: 'test'
+  ...
+# Subtest: 完整性锚点：标题/代码围栏说明/声明行均可；缺正文或只有路径名 → 拒绝
+ok 63 - 完整性锚点：标题/代码围栏说明/声明行均可；缺正文或只有路径名 → 拒绝
+  ---
+  duration_ms: 0.2677
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-101TZQ\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [settled] 会话结束
+# Subtest: 未确认：脚本直接 write（没有 request_confirmation）→ F4 拒、不落盘、零收尾
+ok 64 - 未确认：脚本直接 write（没有 request_confirmation）→ F4 拒、不落盘、零收尾
+  ---
+  duration_ms: 21.7287
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-oGh5BC\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「创建角色 X（请预览）」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-oGh5BC\\proj\\角色卡\\X\\role-card.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-oGh5BC\\proj\\角色卡\\X\\boundary.yaml）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/memo.md（14 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-oGh5BC\\proj\\角色卡\\X\\memo.md）
+# [settled] 会话结束
+# Subtest: 确认：预览列出路径 + 客户同意 → 写入落盘 + 自动收尾（.ans/治理边界文档/manifest）
+ok 65 - 确认：预览列出路径 + 客户同意 → 写入落盘 + 自动收尾（.ans/治理边界文档/manifest）
+  ---
+  duration_ms: 45.2131
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-A0nmWf\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [denied] request_confirmation：未获客户同意（原因：客户拒绝（不同意））→ 不要写盘；如实告知客户，不得假设同意。
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [settled] 会话结束
+# Subtest: 确认被拒：客户 declined → 不发行 → 写被拒、零收尾
+ok 66 - 确认被拒：客户 declined → 不发行 → 写被拒、零收尾
+  ---
+  duration_ms: 7.8974
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-rU6ab3\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [denied] request_confirmation：未获客户同意（原因：无人值守）→ 不要写盘；如实告知客户，不得假设同意。
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [settled] 会话结束
+# Subtest: 通道不可用（无人值守等价）：不发行 → 写被拒、零收尾
+ok 67 - 通道不可用（无人值守等价）：不发行 → 写被拒、零收尾
+  ---
+  duration_ms: 8.0242
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-kzEw4i\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「创建角色 X」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-kzEw4i\\proj\\角色卡\\X\\role-card.md）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 依据：角色卡/X/role-card.md。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/boundary.yaml
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: 角色卡/X/role-card.md
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 依据：角色卡/X/role-card.md。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/X/memo.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: 角色卡/X/role-card.md
+# [settled] 会话结束
+# Subtest: 发行精确性：预览只列出 role-card.md → boundary.yaml 仍被拒（精确集合，不扩权）
+ok 68 - 发行精确性：预览只列出 role-card.md → boundary.yaml 仍被拒（精确集合，不扩权）
+  ---
+  duration_ms: 13.5048
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-GwqH6W\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「创建角色 X（另附一份草稿文件）」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-GwqH6W\\proj\\角色卡\\X\\role-card.md）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 目标路径未匹配任何边界条目（根：project）：src/evil.ts。下一步：若为 appointment-write/角色卡路径，属于应用可写根接线问题；否则按 boundary.yaml 修正声明路径。 谁来做：app。 修正后可原样重试。 [技术 code：path-outside-boundary]
+# 写入被拒绝：目标路径未匹配任何边界条目（根：project）：src/evil.ts
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: 角色卡, docs, .ans
+# [settled] 会话结束
+# Subtest: 越界不发行：预览里的 src/ 路径被校验拒绝（写集有界，非 blanket）
+ok 69 - 越界不发行：预览里的 src/ 路径被校验拒绝（写集有界，非 blanket）
+  ---
+  duration_ms: 13.8344
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-CONF：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_confirmation
+# [accepted] request_confirmation：客户已确认「创建角色 X（请预览）」（confirmed:true；操作者：test-客户）——已获明确同意。可按已同意的内容继续（如写盘，写入须与向客户预览的内容一致）。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/role-card.md（13 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-6ucTbX\\proj\\角色卡\\X\\role-card.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/boundary.yaml（20 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-6ucTbX\\proj\\角色卡\\X\\boundary.yaml）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：角色卡/X/memo.md（14 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-6ucTbX\\proj\\角色卡\\X\\memo.md）
+# [settled] 会话结束
+# Subtest: gate 直断言：确认后已发行路径放行、未发行路径（同目录其它文件）仍拒
+ok 70 - gate 直断言：确认后已发行路径放行、未发行路径（同目录其它文件）仍拒
+  ---
+  duration_ms: 31.5134
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））；目标目录 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-GOV-1：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：docs/su/memo.md（30 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj\\docs\\su\\memo.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：docs/contracts/api-v1.md（24 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj\\docs\\contracts\\api-v1.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：docs/skills/t1/install.md（35 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj\\docs\\skills\\t1\\install.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：docs/skills/t1/SKILL.md（29 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj\\docs\\skills\\t1\\SKILL.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：docs/mcp/echo.md（35 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj\\docs\\mcp\\echo.md）
+# [tool_call] 模型请求调用 write_file
+# [accepted] write_file 已获准并落盘：docs/mcp/sub/deep.md（34 字节写入 C:\\Users\\51054\\AppData\\Local\\Temp\\ans-confirm-NAjMit\\proj\\docs\\mcp\\sub\\deep.md）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：docs/其他.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：docs/其他.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [tool_call] 模型请求调用 write_file
+# [denied] 拒绝：缺少 路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/Y/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。。下一步：把路径加入任务 writeSet，或走 request_confirmation 客户确认发行后再写。 谁来做：convener。 修正后可原样重试。 [技术 code：task-write-set-missing]
+# 写入被拒绝：路径在角色边界内，但不在任务 writeSet 内（F4）：角色卡/Y/role-card.md
+# 如需写入该路径，请先取得写盘许可：若你的工具集中有 request_confirmation（确认制会话），把该路径逐条列入其 preview 呈客户确认——客户返回 confirmed:true 后该路径会被发行进 writeSet，再重试写入即可；任务型会话请把该路径加入任务 writeSet（或改在 writeSet 内选路径）。注意：许可按会话生效——会话重建/重开后不会自动保留，需重新确认。
+# 允许写入的路径（按根分组）：
+#   skill: （无）
+#   project: （无）
+# [settled] 会话结束
+# Subtest: su 预授权：docs/su/**、docs/contracts/**、docs/skills/** 与 docs/mcp/** **不经 request_confirmation** 直接落盘；docs/ 其它与 角色卡/ 未确认仍被 F4 拒
+ok 71 - su 预授权：docs/su/**、docs/contracts/**、docs/skills/** 与 docs/mcp/** **不经 request_confirmation** 直接落盘；docs/ 其它与 角色卡/ 未确认仍被 F4 拒
+  ---
+  duration_ms: 41.2498
+  type: 'test'
+  ...
+# [message] 治理会话：内置治理角色（su），边界来源 角色卡/governance-boundary.yaml；acceptance=accepted（来源：cli:ans govern <目录> = 操作者发起 bootstrap（有界创世授权：仅治理产物 角色卡//docs//.ans/））
+# [message] 客户确认制：内置治理角色 写盘前须先经 request_confirmation（预览）获客户确认；未确认路径的写入会被门禁在写入前拒绝（预授权目录 `docs/su`、`docs/contracts`、`docs/skills`、`docs/mcp` 属初始写集、无需逐次确认可直接写；治理敏感写入仍由治理门禁要求既有客户决定卡）。
+# [message] 用户指令：任务 T-CHOICE：以治理身份在项目治理边界内工作。
+# 边界（Section 1）内的写入是预授权：直接用 write_file / edit_file，不逐次确认；
+# 边界外、他人写集、.ans/** 与治理敏感写入按既有规则拒绝或走确认卡。
+# 不写账本、不写 flow/gate、不创建额外角色、不伪造客户决定。
+# [tool_call] 模型请求调用 request_choice
+# [accepted] request_choice：客户已选择（操作者：test-客户）：a（选项 A）、c（选项 C）。请按客户的选择继续；**未选中的项不得擅自代选**。
+# [settled] 会话结束
+# Subtest: request_choice：多选勾选经通道回传（transcript 如实呈现客户选择）
+ok 72 - request_choice：多选勾选经通道回传（transcript 如实呈现客户选择）
+  ---
+  duration_ms: 6.6016
+  type: 'test'
+  ...
+# Subtest: parseChoiceInput：单选 `1`、多选 `1,3`；非法/重复/越界/空 → 拒绝
+ok 73 - parseChoiceInput：单选 `1`、多选 `1,3`；非法/重复/越界/空 → 拒绝
+  ---
+  duration_ms: 0.6971
+  type: 'test'
+  ...
+# Subtest: createCliCustomerInput：y/n/空/EOF 与拖号选择；fail-closed
+ok 74 - createCliCustomerInput：y/n/空/EOF 与拖号选择；fail-closed
+  ---
+  duration_ms: 0.3872
+  type: 'test'
+  ...
+# Subtest: createCliCustomerInput（G-1）：**不设超时**——延迟作答仍生效；EOF → unavailable（fail-closed 不变）
+ok 75 - createCliCustomerInput（G-1）：**不设超时**——延迟作答仍生效；EOF → unavailable（fail-closed 不变）
+  ---
+  duration_ms: 516.2476
+  type: 'test'
+  ...
+# Subtest: formatCustomerInputPrompt：确认 y/n 提示；选择列出编号（含多选提示）；extractPathCandidates 提取路径
+ok 76 - formatCustomerInputPrompt：确认 y/n 提示；选择列出编号（含多选提示）；extractPathCandidates 提取路径
+  ---
+  duration_ms: 0.2541
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+ok 77 - X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+  ---
+  duration_ms: 14.7046
+  type: 'test'
+  ...
+# Subtest: X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+ok 78 - X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+  ---
+  duration_ms: 6.0127
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+ok 79 - X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+  ---
+  duration_ms: 4.3206
+  type: 'test'
+  ...
+# Subtest: X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+ok 80 - X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+  ---
+  duration_ms: 4.8166
+  type: 'test'
+  ...
+# Subtest: X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+ok 81 - X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+  ---
+  duration_ms: 1.0222
+  type: 'test'
+  ...
+# Subtest: X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+ok 82 - X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+  ---
+  duration_ms: 0.3295
+  type: 'test'
+  ...
+# Subtest: X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+ok 83 - X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+  ---
+  duration_ms: 1.4291
+  type: 'test'
+  ...
+# Subtest: X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+ok 84 - X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+  ---
+  duration_ms: 1.0411
+  type: 'test'
+  ...
+# Subtest: team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+ok 85 - team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+  ---
+  duration_ms: 232.5545
+  type: 'test'
+  ...
+# Subtest: deny 指令先于 c=allow：拒绝白名单命令；审计 by=directive:<id> + directive 字段
+ok 86 - deny 指令先于 c=allow：拒绝白名单命令；审计 by=directive:<id> + directive 字段
+  ---
+  duration_ms: 3.3593
+  type: 'test'
+  ...
+# Subtest: preblock / write-guard 在指令之前终结：不调用 takeDirective（不翻案硬地板）
+ok 87 - preblock / write-guard 在指令之前终结：不调用 takeDirective（不翻案硬地板）
+  ---
+  duration_ms: 0.374
+  type: 'test'
+  ...
+# Subtest: c=deny / script 不消费 allow 指令；allow 只在 review/risky 应用
+ok 88 - c=deny / script 不消费 allow 指令；allow 只在 review/risky 应用
+  ---
+  duration_ms: 0.6511
+  type: 'test'
+  ...
+# Subtest: review/risky：既有 takeGrant 先；未命中 ⇒ 指令 allow（审计 directive，不写 judge/customerGrant）
+ok 89 - review/risky：既有 takeGrant 先；未命中 ⇒ 指令 allow（审计 directive，不写 judge/customerGrant）
+  ---
+  duration_ms: 0.4578
+  type: 'test'
+  ...
+# Subtest: once 消费语义：gate 只按回调返回放行；第二次回调返回 undefined ⇒ 回落既有路径
+ok 90 - once 消费语义：gate 只按回调返回放行；第二次回调返回 undefined ⇒ 回落既有路径
+  ---
+  duration_ms: 0.4066
+  type: 'test'
+  ...
+# Subtest: operatorOnly / advisory：指令 allow 在既有审批链之前放行（不调 operator）
+ok 91 - operatorOnly / advisory：指令 allow 在既有审批链之前放行（不调 operator）
+  ---
+  duration_ms: 0.5097
+  type: 'test'
+  ...
+# Subtest: readonlyOnly + takeDirective ⇒ 构造期抛错（只读拒绝不得被客户指令越过）
+ok 92 - readonlyOnly + takeDirective ⇒ 构造期抛错（只读拒绝不得被客户指令越过）
+  ---
+  duration_ms: 0.2906
+  type: 'test'
+  ...
+# Subtest: onReviewed：指令结果携带 directive（与 judge 互斥）；无指令结果保持旧形状
+ok 93 - onReviewed：指令结果携带 directive（与 judge 互斥）；无指令结果保持旧形状
+  ---
+  duration_ms: 0.2055
+  type: 'test'
+  ...
+# Subtest: buildShellGate：takeDirective 透传到闸
+ok 94 - buildShellGate：takeDirective 透传到闸
+  ---
+  duration_ms: 0.2459
+  type: 'test'
+  ...
+# Subtest: assembleProjectShellGate：审批指令注入点透传（项目三层链）
+ok 95 - assembleProjectShellGate：审批指令注入点透传（项目三层链）
+  ---
+  duration_ms: 11.8715
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# shell 闸审计未落盘：审计写被门禁拒绝：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl；已刷新边界快照重试一次，仍被拒：目标路径未匹配任何边界条目（根：project）：docs/audit/shell-gate.jsonl
+# Subtest: openRoleSession：customerDirective 注入 ⇒ shell 闸命中审批指令；未注入 ⇒ 旧链不变
+ok 96 - openRoleSession：customerDirective 注入 ⇒ shell 闸命中审批指令；未注入 ⇒ 旧链不变
+  ---
+  duration_ms: 36.4966
+  type: 'test'
+  ...
+# Subtest: 自然语言审批：解释成功 ⇒ 面板预填 AI 解释、cwd 恒为项目根；确认前绝不落账；确认后 durable 落账
+ok 97 - 自然语言审批：解释成功 ⇒ 面板预填 AI 解释、cwd 恒为项目根；确认前绝不落账；确认后 durable 落账
+  ---
+  duration_ms: 15.8183
+  type: 'test'
+  ...
+# Subtest: 结构化写法：确定性解析 confirmable ⇒ 沿用，解释器不被调用（向后兼容）
+ok 98 - 结构化写法：确定性解析 confirmable ⇒ 沿用，解释器不被调用（向后兼容）
+  ---
+  duration_ms: 2.7257
+  type: 'test'
+  ...
+# Subtest: 解释失败/抛错/低置信/非法候选 ⇒ 回退现有行为（原文 + 未识别片段、确认禁用），不落账
+ok 99 - 解释失败/抛错/低置信/非法候选 ⇒ 回退现有行为（原文 + 未识别片段、确认禁用），不落账
+  ---
+  duration_ms: 2.2483
+  type: 'test'
+  ...
+# Subtest: 决策自然语言：以后都选推荐项 ⇒ 预填 select-recommended，确认后落账
+ok 100 - 决策自然语言：以后都选推荐项 ⇒ 预填 select-recommended，确认后落账
+  ---
+  duration_ms: 3.2993
+  type: 'test'
+  ...
+# Subtest: AI 预填 forever + flow 范围 ⇒ 高危原因复算；未勾选确认 ⇒ high-risk-unacknowledged（不落账）
+ok 101 - AI 预填 forever + flow 范围 ⇒ 高危原因复算；未勾选确认 ⇒ high-risk-unacknowledged（不落账）
+  ---
+  duration_ms: 7.2173
+  type: 'test'
+  ...
+# Subtest: 撤销正文（撤销 \#d-1 / 撤销）永不交解释器；B1 直调仍按现有面板原文 fail-closed
+ok 102 - 撤销正文（撤销 \#d-1 / 撤销）永不交解释器；B1 直调仍按现有面板原文 fail-closed
+  ---
+  duration_ms: 1.0699
+  type: 'test'
+  ...
+# Subtest: 未注入解释器：自然语言仍走现有面板（原文 + 未识别片段、确认禁用）
+ok 103 - 未注入解释器：自然语言仍走现有面板（原文 + 未识别片段、确认禁用）
+  ---
+  duration_ms: 0.5101
+  type: 'test'
+  ...
+# Subtest: A1 契约常量：路径/ID 模式/字段上限与 Provider relPath 一致（P1-CAP-13）
+ok 104 - A1 契约常量：路径/ID 模式/字段上限与 Provider relPath 一致（P1-CAP-13）
+  ---
+  duration_ms: 0.9068
+  type: 'test'
+  ...
+# Subtest: Provider：追加一行 durable 后 replay 旧→新可读；路径 = 项目根下 A1 常量
+ok 105 - Provider：追加一行 durable 后 replay 旧→新可读；路径 = 项目根下 A1 常量
+  ---
+  duration_ms: 12.414
+  type: 'test'
+  ...
+# Subtest: Provider：按大小轮转（.1 最新、.N 最旧）且 replay 旧→新；坏行计数不阻塞
+ok 106 - Provider：按大小轮转（.1 最新、.N 最旧）且 replay 旧→新；坏行计数不阻塞
+  ---
+  duration_ms: 14.1974
+  type: 'test'
+  ...
+# Subtest: Service 回放：version>1/坏行/未知 kind/seq 非单调/伪造 target-action 组合的容错矩阵
+ok 107 - Service 回放：version>1/坏行/未知 kind/seq 非单调/伪造 target-action 组合的容错矩阵
+  ---
+  duration_ms: 1.1835
+  type: 'test'
+  ...
+# Subtest: Service：ID d-<seq> 单调、回放含轮转的全局 max+1、target 快照互不含
+ok 108 - Service：ID d-<seq> 单调、回放含轮转的全局 max+1、target 快照互不含
+  ---
+  duration_ms: 1.4624
+  type: 'test'
+  ...
+# Subtest: Service：撤销同 target/active；跨 target/已撤销/已消费/已失效明确错误；append-only 保留历史
+ok 109 - Service：撤销同 target/active；跨 target/已撤销/已消费/已失效明确错误；append-only 保留历史
+  ---
+  duration_ms: 0.9157
+  type: 'test'
+  ...
+# Subtest: Service：once 消费写账本；session 消费只返回成功、不写账本
+ok 110 - Service：once 消费写账本；session 消费只返回成功、不写账本
+  ---
+  duration_ms: 0.5741
+  type: 'test'
+  ...
+# Subtest: Service：sessionId 重启失效（session→app-restart；未用 once→unused-once；forever 保留）
+ok 111 - Service：sessionId 重启失效（session→app-restart；未用 once→unused-once；forever 保留）
+  ---
+  duration_ms: 2.2731
+  type: 'test'
+  ...
+# Subtest: Service：账本写失败 ⇒ ledger-write-failed，不更新视图
+ok 112 - Service：账本写失败 ⇒ ledger-write-failed，不更新视图
+  ---
+  duration_ms: 0.6226
+  type: 'test'
+  ...
+# Subtest: 高危 2×2：decisionGroupEnabled 关×项目级 select-recommended 是唯一触发（未确认拒绝落账）
+ok 113 - 高危 2×2：decisionGroupEnabled 关×项目级 select-recommended 是唯一触发（未确认拒绝落账）
+  ---
+  duration_ms: 0.7228
+  type: 'test'
+  ...
+# Subtest: 高危：approval forever / 项目级 reject / select-option / 通配域名 / 宽路径 / 宽命令
+ok 114 - 高危：approval forever / 项目级 reject / select-option / 通配域名 / 宽路径 / 宽命令
+  ---
+  duration_ms: 0.5956
+  type: 'test'
+  ...
+# Subtest: 字段上限：rawText/command/host/path/selector 超限与空命令拒绝（invalid-input）
+ok 115 - 字段上限：rawText/command/host/path/selector 超限与空命令拒绝（invalid-input）
+  ---
+  duration_ms: 0.6275
+  type: 'test'
+  ...
+# Subtest: submitFromInput：presenter 确认 → durable d-1；presenter 收到 target/原文/预填/开关快照
+ok 116 - submitFromInput：presenter 确认 → durable d-1；presenter 收到 target/原文/预填/开关快照
+  ---
+  duration_ms: 1.6321
+  type: 'test'
+  ...
+# Subtest: submitFromInput：取消/通道异常/非法回包/标记不符/超长 ⇒ 不落账
+ok 117 - submitFromInput：取消/通道异常/非法回包/标记不符/超长 ⇒ 不落账
+  ---
+  duration_ms: 0.7542
+  type: 'test'
+  ...
+# Subtest: submitFromInput：幂等键 (target,rawText,clientMessageId) 复用同一 id；presenter 只调一次
+ok 118 - submitFromInput：幂等键 (target,rawText,clientMessageId) 复用同一 id；presenter 只调一次
+  ---
+  duration_ms: 0.4666
+  type: 'test'
+  ...
+# Subtest: submitFromInput：decisionGroupEnabled 快照原样进 presenter；高危未确认/已确认
+ok 119 - submitFromInput：decisionGroupEnabled 快照原样进 presenter；高危未确认/已确认
+  ---
+  duration_ms: 0.8585
+  type: 'test'
+  ...
+# Subtest: submitFromInput：正文预填保守（shell/选项/未知片段/不可确认）
+ok 120 - submitFromInput：正文预填保守（shell/选项/未知片段/不可确认）
+  ---
+  duration_ms: 0.7375
+  type: 'test'
+  ...
+# Subtest: takeDirective：精确命令 + cwd 匹配；session 反复生效；不匹配/cwd 不同 ⇒ undefined
+ok 121 - takeDirective：精确命令 + cwd 匹配；session 反复生效；不匹配/cwd 不同 ⇒ undefined
+  ---
+  duration_ms: 2.523
+  type: 'test'
+  ...
+# Subtest: takeDirective：once 原子消费一次；消费失败 ⇒ undefined 且不放行
+ok 122 - takeDirective：once 原子消费一次；消费失败 ⇒ undefined 且不放行
+  ---
+  duration_ms: 2.3797
+  type: 'test'
+  ...
+# Subtest: takeDirective：deny 优先（intent=allow 也返回 deny）；domain/path 无消费者不匹配
+ok 123 - takeDirective：deny 优先（intent=allow 也返回 deny）；domain/path 无消费者不匹配
+  ---
+  duration_ms: 0.6964
+  type: 'test'
+  ...
+# Subtest: takeDirective：ledgerErrors>0 ⇒ undefined（消费者按无指令）；跨 target 记录不进入 approvalFacts
+ok 124 - takeDirective：ledgerErrors>0 ⇒ undefined（消费者按无指令）；跨 target 记录不进入 approvalFacts
+  ---
+  duration_ms: 2.2257
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：select-recommended 代选；emitResult 先于 durable consume
+ok 125 - applyDecisionDirective：select-recommended 代选；emitResult 先于 durable consume
+  ---
+  duration_ms: 3.0062
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：选项 id/标签/前缀唯一匹配；0/多匹配 no-match 且不消费
+ok 126 - applyDecisionDirective：选项 id/标签/前缀唯一匹配；0/多匹配 no-match 且不消费
+  ---
+  duration_ms: 1.0184
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：冲突（reject vs select）不消费；scope flowId 不匹配不适用
+ok 127 - applyDecisionDirective：冲突（reject vs select）不消费；scope flowId 不匹配不适用
+  ---
+  duration_ms: 3.0727
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：拒绝（项目级/flow）结算 rejected；once 消费
+ok 128 - applyDecisionDirective：拒绝（项目级/flow）结算 rejected；once 消费
+  ---
+  duration_ms: 0.7136
+  type: 'test'
+  ...
+# Subtest: applyDecisionDirective：emitResult 抛错/缺钩子 ⇒ 不消费、返回 undefined；非 decision 卡不处理
+ok 129 - applyDecisionDirective：emitResult 抛错/缺钩子 ⇒ 不消费、返回 undefined；非 decision 卡不处理
+  ---
+  duration_ms: 1.9563
+  type: 'test'
+  ...
+# Subtest: revoke：同 target/active 可撤销；跨 target/不存在明确错误；撤销后 takeDirective 不再命中
+ok 130 - revoke：同 target/active 可撤销；跨 target/不存在明确错误；撤销后 takeDirective 不再命中
+  ---
+  duration_ms: 2.2778
+  type: 'test'
+  ...
+# Subtest: list：账本读取失败 ⇒ ok:false；坏行 ⇒ ok:true + ledgerErrors（面板显示错误不伪造空）
+ok 131 - list：账本读取失败 ⇒ ok:false；坏行 ⇒ ok:true + ledgerErrors（面板显示错误不伪造空）
+  ---
+  duration_ms: 0.751
+  type: 'test'
+  ...
+# Subtest: task-state 迁移等价：默认常量 = A2；append/read/轮转/坏行/旧→新与迁移前一致
+ok 132 - task-state 迁移等价：默认常量 = A2；append/read/轮转/坏行/旧→新与迁移前一致
+  ---
+  duration_ms: 17.3116
+  type: 'test'
+  ...
+# Subtest: takeDownloadDirective：epoch 门槛/精确 host/归一/once 消费/deny 优先/通配
+ok 133 - takeDownloadDirective：epoch 门槛/精确 host/归一/once 消费/deny 优先/通配
+  ---
+  duration_ms: 0.7668
+  type: 'test'
+  ...
+# Subtest: list()：G8 A epoch 投影——旧 domain ⇒ consumer:none；新 domain ⇒ download；path 不变
+ok 134 - list()：G8 A epoch 投影——旧 domain ⇒ consumer:none；新 domain ⇒ download；path 不变
+  ---
+  duration_ms: 0.4121
+  type: 'test'
+  ...
+# Subtest: consumerOf：domain 创建时基线为 download（Service 视图）；系统 boot 事件自动 acceptance
+ok 135 - consumerOf：domain 创建时基线为 download（Service 视图）；系统 boot 事件自动 acceptance
+  ---
+  duration_ms: 0.1054
+  type: 'test'
+  ...
+# Subtest: D 卡种分组：decision 组保留五种 choice；approval 组为 appointment-write 与 download
+ok 136 - D 卡种分组：decision 组保留五种 choice；approval 组为 appointment-write 与 download
+  ---
+  duration_ms: 0.7444
+  type: 'test'
+  ...
+# Subtest: 工具 schema：request_choice 保留 decision，request_confirmation 仅 appointment-write
+ok 137 - 工具 schema：request_choice 保留 decision，request_confirmation 仅 appointment-write
+  ---
+  duration_ms: 1.1195
+  type: 'test'
+  ...
+# Subtest: decision 结构校验：应用自有卡放行；角色卡仅 convener/rapporteur；推荐项恰一
+ok 138 - decision 结构校验：应用自有卡放行；角色卡仅 convener/rapporteur；推荐项恰一
+  ---
+  duration_ms: 0.222
+  type: 'test'
+  ...
+# Subtest: 版本决策卡：application-owned decision 通过校验；两选项恰一 recommended；角色上限不变
+ok 139 - 版本决策卡：application-owned decision 通过校验；两选项恰一 recommended；角色上限不变
+  ---
+  duration_ms: 0.2466
+  type: 'test'
+  ...
+# Subtest: proposal：意图 + 提案物证 ⇒ ok；台账字段为空、intent.confirmed=true
+ok 140 - proposal：意图 + 提案物证 ⇒ ok；台账字段为空、intent.confirmed=true
+  ---
+  duration_ms: 15.3389
+  type: 'test'
+  ...
+# Subtest: 确定性：同一请求 + 同一盘面 ⇒ 同一 packetSha256
+ok 141 - 确定性：同一请求 + 同一盘面 ⇒ 同一 packetSha256
+  ---
+  duration_ms: 3.7236
+  type: 'test'
+  ...
+# Subtest: D 无 flow/team-plan 门槛：appointment 只靠 recommendedRoleIds；acceptance 不要求流程文件
+ok 142 - D 无 flow/team-plan 门槛：appointment 只靠 recommendedRoleIds；acceptance 不要求流程文件
+  ---
+  duration_ms: 8.7347
+  type: 'test'
+  ...
+# Subtest: 意图缺失 ⇒ intent-missing fail-closed（不得伪造客户确认）
+ok 143 - 意图缺失 ⇒ intent-missing fail-closed（不得伪造客户确认）
+  ---
+  duration_ms: 2.1772
+  type: 'test'
+  ...
+# Subtest: §5A 显式 intentId 优先：请求携带 intent-focus-v1 ⇒ packet.source=request
+ok 144 - §5A 显式 intentId 优先：请求携带 intent-focus-v1 ⇒ packet.source=request
+  ---
+  duration_ms: 8.3771
+  type: 'test'
+  ...
+# Subtest: §5A proposal frontmatter 回退：请求未带 intentId ⇒ packet.source=proposal
+ok 145 - §5A proposal frontmatter 回退：请求未带 intentId ⇒ packet.source=proposal
+  ---
+  duration_ms: 2.616
+  type: 'test'
+  ...
+# Subtest: §5A intentId 不一致 ⇒ intent-ambiguous，拒绝含同源模板与命名规则
+ok 146 - §5A intentId 不一致 ⇒ intent-ambiguous，拒绝含同源模板与命名规则
+  ---
+  duration_ms: 7.4309
+  type: 'test'
+  ...
+# Subtest: §5A 无 frontmatter 的纯 Markdown 意图 ⇒ fail-closed，拒绝含模板片段
+ok 147 - §5A 无 frontmatter 的纯 Markdown 意图 ⇒ fail-closed，拒绝含模板片段
+  ---
+  duration_ms: 5.5097
+  type: 'test'
+  ...
+# Subtest: §5A 两者都缺席时按 flow-id 回落，但证据保留 source=flow-id（不裸猜）
+ok 148 - §5A 两者都缺席时按 flow-id 回落，但证据保留 source=flow-id（不裸猜）
+  ---
+  duration_ms: 2.8757
+  type: 'test'
+  ...
+# Subtest: §5A 产品-only：intentIdSource=product 进入证据包并按 product 标注
+ok 149 - §5A 产品-only：intentIdSource=product 进入证据包并按 product 标注
+  ---
+  duration_ms: 2.5642
+  type: 'test'
+  ...
+# Subtest: §5A 解析冲突 fail-closed：intentResolutionError 进入问题且拒绝含同源模板
+ok 150 - §5A 解析冲突 fail-closed：intentResolutionError 进入问题且拒绝含同源模板
+  ---
+  duration_ms: 2.1718
+  type: 'test'
+  ...
+# Subtest: proposal：与意图一致但缺架构章节 ⇒ 仍可 allow（架构由 Proof 查）
+ok 151 - proposal：与意图一致但缺架构章节 ⇒ 仍可 allow（架构由 Proof 查）
+  ---
+  duration_ms: 17.1483
+  type: 'test'
+  ...
+# Subtest: proposal：超出意图范围/引入未授权非目标/与已接受决定冲突 ⇒ manual/intent-drift
+ok 152 - proposal：超出意图范围/引入未授权非目标/与已接受决定冲突 ⇒ manual/intent-drift
+  ---
+  duration_ms: 5.6527
+  type: 'test'
+  ...
+# Subtest: appointment：任命名单/写区扩张未经客户意图确认 ⇒ manual/intent-drift
+ok 153 - appointment：任命名单/写区扩张未经客户意图确认 ⇒ manual/intent-drift
+  ---
+  duration_ms: 2.8024
+  type: 'test'
+  ...
+# Subtest: acceptance：验收选择与意图/已接受提案冲突 ⇒ manual/intent-drift
+ok 154 - acceptance：验收选择与意图/已接受提案冲突 ⇒ manual/intent-drift
+  ---
+  duration_ms: 8.4327
+  type: 'test'
+  ...
+# Subtest: 系统提示：只判意图漂移；不判工程质量/架构/测试覆盖/证据充分性
+ok 155 - 系统提示：只判意图漂移；不判工程质量/架构/测试覆盖/证据充分性
+  ---
+  duration_ms: 0.2088
+  type: 'test'
+  ...
+# Subtest: Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority
+ok 156 - Chief hub ordinary preparation: five actual task reports close without future approvals and create no action authority
+  ---
+  duration_ms: 646.4685
+  type: 'test'
+  ...
+# Subtest: Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+not ok 157 - Retained intent confirmation: real migration keeps history and only the exact persisted customer decision adds confirmation
+  ---
+  duration_ms: 105.6638
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\direct-role-capabilities.test.ts:69:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    A shape-shaped confirmation without the real request/decision cannot promote migration
+    + actual - expected
+    
+      {
+        code: 'conflict',
+    +   message: 'frozen-conflict: docs/product/demo-intent-v2.md',
+    -   message: 'frozen-conflict',
+        ok: false
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    ok: false
+    code: 'conflict'
+    message: 'frozen-conflict'
+  actual:
+    ok: false
+    code: 'conflict'
+    message: 'frozen-conflict: docs/product/demo-intent-v2.md'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/direct-role-capabilities.test.ts:90:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields
+ok 158 - Judge-delegated intent confirmation (W-J2/J4): real judge approve freezes exact retained bytes, reads back and replays without customer fields
+  ---
+  duration_ms: 86.1331
+  type: 'test'
+  ...
+# Subtest: Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw
+ok 159 - Judge-delegated intent confirmation negatives (W-J2/J5/J14): forged or mismatched judge sources stay trunk-item-invalid, never freeze and never throw
+  ---
+  duration_ms: 218.0146
+  type: 'test'
+  ...
+# Subtest: Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed
+ok 160 - Judge-delegated D3 (W-J2/J8/J9/J10): judge appointment resolution activates, pins and drafts through the shared predicate; negative sources stay fail-closed
+  ---
+  duration_ms: 610.6505
+  type: 'test'
+  ...
+# Subtest: Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk
+ok 161 - Pipeline tools: product writes intent, retained chief confirmation creates real R9 evidence, then product direct-publishes the first planning trunk
+  ---
+  duration_ms: 350.6636
+  type: 'test'
+  ...
+# Subtest: complete team plan / activation / new pin: actual planning-only basis and independent pointers
+ok 162 - complete team plan / activation / new pin: actual planning-only basis and independent pointers
+  ---
+  duration_ms: 1291.2205
+  type: 'test'
+  ...
+# Subtest: complete team plan / activation / new pin: actual existing workflow basis and independent pointers
+ok 163 - complete team plan / activation / new pin: actual existing workflow basis and independent pointers
+  ---
+  duration_ms: 1433.0822
+  type: 'test'
+  ...
+# Subtest: Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+ok 164 - Planning draft close: chief binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+  ---
+  duration_ms: 300.2315
+  type: 'test'
+  ...
+# Subtest: Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+ok 165 - Planning draft close: convener binds actual run/report/material, refuses stale evidence and returns lifecycle receipts without model broadcasts
+  ---
+  duration_ms: 334.6662
+  type: 'test'
+  ...
+# Subtest: Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation
+ok 166 - Provider: complete snapshot preserves arbitrary bytes, survives live deletion, rejects mutation
+  ---
+  duration_ms: 20.0179
+  type: 'test'
+  ...
+# Subtest: Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs
+ok 167 - Provider: CAS commits one complete target, rejects stale base/flow and missing unchanged refs
+  ---
+  duration_ms: 51.1426
+  type: 'test'
+  ...
+# Subtest: Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs
+ok 168 - Run storage/Service: byte CAS has one writer; executable reads require real workflow and all same-pin refs
+  ---
+  duration_ms: 393.4017
+  type: 'test'
+  ...
+# Subtest: Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback
+ok 169 - Provider: frozen role evidence requires all eight refs in one immutable snapshot; no live fallback
+  ---
+  duration_ms: 9.8215
+  type: 'test'
+  ...
+# Subtest: Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history
+ok 170 - Provider: document and active-role CAS fence both dimensions and preserve independent snapshots/history
+  ---
+  duration_ms: 89.6764
+  type: 'test'
+  ...
+# Subtest: Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation
+ok 171 - Provider: raw baseline primitives enforce lock fencing, byte CAS and one initialisation
+  ---
+  duration_ms: 28.801
+  type: 'test'
+  ...
+# Subtest: Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer
+ok 172 - Provider: independent processes compete on one CAS; a crashed lock owner cannot tear or double-commit the pointer
+  ---
+  duration_ms: 518.9338
+  type: 'test'
+  ...
+# Subtest: Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again
+ok 173 - Service: whole direct commit preserves unchanged bytes and truthful source; replay/no-op do not upgrade again
+  ---
+  duration_ms: 128.0356
+  type: 'test'
+  ...
+# Subtest: Service: any invalid target/hash/role or precommit failure leaves the complete old baseline
+ok 174 - Service: any invalid target/hash/role or precommit failure leaves the complete old baseline
+  ---
+  duration_ms: 104.9727
+  type: 'test'
+  ...
+# Subtest: Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins
+ok 175 - Service: postcommit metadata failure reports committed-pending-recovery; restart uses frozen bytes, never re-pins
+  ---
+  duration_ms: 87.6991
+  type: 'test'
+  ...
+# Subtest: Service: concurrent direct submissions with one base commit exactly once and retain both operation journals
+ok 176 - Service: concurrent direct submissions with one base commit exactly once and retain both operation journals
+  ---
+  duration_ms: 117.7316
+  type: 'test'
+  ...
+# Subtest: Service: lost CAS acknowledgement and metadata-write failure never claim a committed target was rejected
+ok 177 - Service: lost CAS acknowledgement and metadata-write failure never claim a committed target was rejected
+  ---
+  duration_ms: 87.3785
+  type: 'test'
+  ...
+# Subtest: Service: direct VCA metadata goes draft to applied with the real committed source; legacy approval cannot impersonate it
+ok 178 - Service: direct VCA metadata goes draft to applied with the real committed source; legacy approval cannot impersonate it
+  ---
+  duration_ms: 86.2433
+  type: 'test'
+  ...
+# Subtest: Service: first direct publication uses confirmed intent and null CAS, creates no workflow or execution authority
+ok 179 - Service: first direct publication uses confirmed intent and null CAS, creates no workflow or execution authority
+  ---
+  duration_ms: 90.8223
+  type: 'test'
+  ...
+# Subtest: Service: detail amendment binds all frozen items to the complete target; no partial apply and true no-op
+ok 180 - Service: detail amendment binds all frozen items to the complete target; no partial apply and true no-op
+  ---
+  duration_ms: 142.6368
+  type: 'test'
+  ...
+# Subtest: chief evidence: initial real target/request bytes produce a bounded immutable basis; isCurrent rechecks actual hashes
+ok 181 - chief evidence: initial real target/request bytes produce a bounded immutable basis; isCurrent rechecks actual hashes
+  ---
+  duration_ms: 23.6402
+  type: 'test'
+  ...
+# Subtest: chief evidence: missing targets, secret paths, excessive bytes and unbound old pinned runs refuse automatic decisions
+ok 182 - chief evidence: missing targets, secret paths, excessive bytes and unbound old pinned runs refuse automatic decisions
+  ---
+  duration_ms: 12.756
+  type: 'test'
+  ...
+# Subtest: chief evidence: pinned run uses its immutable bytes and remains current when live files or document trunk change
+ok 183 - chief evidence: pinned run uses its immutable bytes and remains current when live files or document trunk change
+  ---
+  duration_ms: 42.391
+  type: 'test'
+  ...
+# Subtest: chief evidence: draft planning run needs bound document hashes and never requires future execution authorisation
+ok 184 - chief evidence: draft planning run needs bound document hashes and never requires future execution authorisation
+  ---
+  duration_ms: 23.2817
+  type: 'test'
+  ...
+# Subtest: chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest
+ok 185 - chief evidence (A1): empty draft manifest binds actual flow bytes into a verifiable complete snapshot and never writes the manifest
+  ---
+  duration_ms: 23.6949
+  type: 'test'
+  ...
+# Subtest: chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes
+ok 186 - chief evidence (A2): draft binding fails closed on changed bytes and new versions; re-prepare reads the new bytes
+  ---
+  duration_ms: 39.8547
+  type: 'test'
+  ...
+# Subtest: chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot
+ok 187 - chief evidence (A3): empty targets and role self-reported paths stay unbound and produce no snapshot
+  ---
+  duration_ms: 7.1917
+  type: 'test'
+  ...
+# Subtest: chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification
+ok 188 - chief evidence (A4): unreadable, secret, oversized, non-text and criteria-hash-mismatched draft targets keep the existing fail-closed classification
+  ---
+  duration_ms: 27.7693
+  type: 'test'
+  ...
+# Subtest: chief evidence (A5): manifest-bound draft refs keep their authority over request targets
+ok 189 - chief evidence (A5): manifest-bound draft refs keep their authority over request targets
+  ---
+  duration_ms: 2.5197
+  type: 'test'
+  ...
+# Subtest: chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version
+ok 190 - chief evidence: ordinary request without host artifacts discovers actual flow materials and notices a new version
+  ---
+  duration_ms: 15.1743
+  type: 'test'
+  ...
+# Subtest: Service: committed chief-delegated freeze preserves its true source on reload without customer fields
+ok 191 - Service: committed chief-delegated freeze preserves its true source on reload without customer fields
+  ---
+  duration_ms: 16.562
+  type: 'test'
+  ...
+# Subtest: Service: legacy pending requests stay unchanged and require an explicit direct resubmission link
+ok 192 - Service: legacy pending requests stay unchanged and require an explicit direct resubmission link
+  ---
+  duration_ms: 114.4187
+  type: 'test'
+  ...
+# Subtest: Service: legacy no-op materialises exact immutable bytes without upgrading or rewriting historical customer metadata
+ok 193 - Service: legacy no-op materialises exact immutable bytes without upgrading or rewriting historical customer metadata
+  ---
+  duration_ms: 132.9418
+  type: 'test'
+  ...
+# Subtest: Service: malformed execution document rejects the entire otherwise valid detail amendment
+ok 194 - Service: malformed execution document rejects the entire otherwise valid detail amendment
+  ---
+  duration_ms: 33.9828
+  type: 'test'
+  ...
+# Subtest: Pipeline: real direct submit persists a whole commit and truthful audit without cards, old approval or re-pin
+ok 195 - Pipeline: real direct submit persists a whole commit and truthful audit without cards, old approval or re-pin
+  ---
+  duration_ms: 174.9427
+  type: 'test'
+  ...
+# Subtest: Pipeline: lost notification acknowledgement returns pending, then recovers one keyed delivery and one version
+ok 196 - Pipeline: lost notification acknowledgement returns pending, then recovers one keyed delivery and one version
+  ---
+  duration_ms: 178.1086
+  type: 'test'
+  ...
+# Subtest: Parent source: real assignment, durable child reference and locked parent CAS reject stale or cancelled origins
+ok 197 - Parent source: real assignment, durable child reference and locked parent CAS reject stale or cancelled origins
+  ---
+  duration_ms: 1055.3972
+  type: 'test'
+  ...
+# Subtest: Provider strict scan: real non-ENOENT directory failure is never a complete empty TOFU scan
+ok 198 - Provider strict scan: real non-ENOENT directory failure is never a complete empty TOFU scan
+  ---
+  duration_ms: 6.2908
+  type: 'test'
+  ...
+# Subtest: Team plan (P-1/P-6/P-8): derived baseDigest/plan.sha256, marker/journal byte anchors, NoOp and replay variants hold
+ok 199 - Team plan (P-1/P-6/P-8): derived baseDigest/plan.sha256, marker/journal byte anchors, NoOp and replay variants hold
+  ---
+  duration_ms: 249.4834
+  type: 'test'
+  ...
+# Subtest: Team plan (P-2/P-3/P-15): declared values are strict assertions (uppercase rejected), canonical path enforced, no side effects
+ok 200 - Team plan (P-2/P-3/P-15): declared values are strict assertions (uppercase rejected), canonical path enforced, no side effects
+  ---
+  duration_ms: 54.6147
+  type: 'test'
+  ...
+# Subtest: Team plan (P-4): frozen-vs-live source selection (i)/(ii)/(iii) keeps baseline semantics; both-unreadable fails closed
+ok 201 - Team plan (P-4): frozen-vs-live source selection (i)/(ii)/(iii) keeps baseline semantics; both-unreadable fails closed
+  ---
+  duration_ms: 480.3822
+  type: 'test'
+  ...
+# Subtest: Team plan (P-5/P-7): missing effective trunk stays trunk-unavailable; run assertions bind real runs and reject foreign/absent runs
+ok 202 - Team plan (P-5/P-7): missing effective trunk stays trunk-unavailable; run assertions bind real runs and reject foreign/absent runs
+  ---
+  duration_ms: 158.7661
+  type: 'test'
+  ...
+# Subtest: approval：严格 JSON ⇒ ok（candidate/confidence/notes）；deny-all 写门禁 + persistSession:false + dispose
+ok 203 - approval：严格 JSON ⇒ ok（candidate/confidence/notes）；deny-all 写门禁 + persistSession:false + dispose
+  ---
+  duration_ms: 1.8355
+  type: 'test'
+  ...
+# Subtest: decision：select-option/scope/forever 原样交回（语义校验在编排预填构造）
+ok 204 - decision：select-option/scope/forever 原样交回（语义校验在编排预填构造）
+  ---
+  duration_ms: 0.3085
+  type: 'test'
+  ...
+# Subtest: 代码围栏 JSON 可接受；夹带解释/缺失 confidence ⇒ parse-failed
+ok 205 - 代码围栏 JSON 可接受；夹带解释/缺失 confidence ⇒ parse-failed
+  ---
+  duration_ms: 0.4198
+  type: 'test'
+  ...
+# Subtest: 低置信 ⇒ low-confidence（阈值以下一律不预填）
+ok 206 - 低置信 ⇒ low-confidence（阈值以下一律不预填）
+  ---
+  duration_ms: 0.2341
+  type: 'test'
+  ...
+# Subtest: unsupported-engine（demo）⇒ 不建会话、不调适配器
+ok 207 - unsupported-engine（demo）⇒ 不建会话、不调适配器
+  ---
+  duration_ms: 0.1363
+  type: 'test'
+  ...
+# Subtest: 超时 ⇒ timeout（会话不 settle 时 fail-closed）
+ok 208 - 超时 ⇒ timeout（会话不 settle 时 fail-closed）
+  ---
+  duration_ms: 43.7577
+  type: 'test'
+  ...
+# Subtest: 预中止信号 ⇒ aborted（不建会话）
+ok 209 - 预中止信号 ⇒ aborted（不建会话）
+  ---
+  duration_ms: 0.2321
+  type: 'test'
+  ...
+# Subtest: 驱动不外抛：bindRole 抛错 ⇒ unavailable
+ok 210 - 驱动不外抛：bindRole 抛错 ⇒ unavailable
+  ---
+  duration_ms: 0.1927
+  type: 'test'
+  ...
+# Subtest: 上下文缺失：空正文/非法 target ⇒ context-missing
+ok 211 - 上下文缺失：空正文/非法 target ⇒ context-missing
+  ---
+  duration_ms: 0.105
+  type: 'test'
+  ...
+# Subtest: 幕僚链：flow/intent/proposal/roster/modules/env/d3/cards 正负例
+ok 212 - 幕僚链：flow/intent/proposal/roster/modules/env/d3/cards 正负例
+  ---
+  duration_ms: 1.4796
+  type: 'test'
+  ...
+# Subtest: 运营链：handoff/module-required/missing/not-owned/path/nominated 正负例
+ok 213 - 运营链：handoff/module-required/missing/not-owned/path/nominated 正负例
+  ---
+  duration_ms: 0.3021
+  type: 'test'
+  ...
+# Subtest: 独立 run advisory：legacy/pin/roles/ledger/hash/roster 正负例
+ok 214 - 独立 run advisory：legacy/pin/roles/ledger/hash/roster 正负例
+  ---
+  duration_ms: 0.1662
+  type: 'test'
+  ...
+# Subtest: 链顺序：每个链只报首个未满足项
+ok 215 - 链顺序：每个链只报首个未满足项
+  ---
+  duration_ms: 0.1061
+  type: 'test'
+  ...
+# Subtest: 独立追加：链级 advisory 与 run 级 advisory 可同时存在
+ok 216 - 独立追加：链级 advisory 与 run 级 advisory 可同时存在
+  ---
+  duration_ms: 0.0783
+  type: 'test'
+  ...
+# Subtest: R2 组合：pinFailed + draft 同时产 run-pin-failed 与 run-pin-required，顺序固定
+ok 217 - R2 组合：pinFailed + draft 同时产 run-pin-failed 与 run-pin-required，顺序固定
+  ---
+  duration_ms: 0.063
+  type: 'test'
+  ...
+# Subtest: legacy：run.state=legacy 仅产 run-legacy-readonly，不产 run-pin-required
+ok 218 - legacy：run.state=legacy 仅产 run-legacy-readonly，不产 run-pin-required
+  ---
+  duration_ms: 0.0517
+  type: 'test'
+  ...
+# Subtest: latest/pinned 分离：链级用 latest，run 专属用 run.roles/run.modules
+ok 219 - latest/pinned 分离：链级用 latest，run 专属用 run.roles/run.modules
+  ---
+  duration_ms: 0.0957
+  type: 'test'
+  ...
+# Subtest: verifier 例外：模块存在即不要求属主，无 target-not-nominated/run-role-missing
+ok 220 - verifier 例外：模块存在即不要求属主，无 target-not-nominated/run-role-missing
+  ---
+  duration_ms: 0.132
+  type: 'test'
+  ...
+# Subtest: 模块路径等价性：反斜杠/绝对路径/../通配/目录与文件尾斜杠
+ok 221 - 模块路径等价性：反斜杠/绝对路径/../通配/目录与文件尾斜杠
+  ---
+  duration_ms: 0.1691
+  type: 'test'
+  ...
+# Subtest: 独立 run advisory 顺序固定；链级 module-missing 已产出时不重复 run 专属同 code
+ok 222 - 独立 run advisory 顺序固定；链级 module-missing 已产出时不重复 run 专属同 code
+  ---
+  duration_ms: 0.5211
+  type: 'test'
+  ...
+# Subtest: verifier run 专属模块覆盖：pinned modules 不含 moduleId 时产 module-missing
+ok 223 - verifier run 专属模块覆盖：pinned modules 不含 moduleId 时产 module-missing
+  ---
+  duration_ms: 0.0617
+  type: 'test'
+  ...
+# Subtest: convener→chief：collector 不产状态提示（授权拒绝由硬矩阵覆盖）
+ok 224 - convener→chief：collector 不产状态提示（授权拒绝由硬矩阵覆盖）
+  ---
+  duration_ms: 0.0496
+  type: 'test'
+  ...
+# Subtest: 空 advisory 与永不返回拒绝
+ok 225 - 空 advisory 与永不返回拒绝
+  ---
+  duration_ms: 0.0488
+  type: 'test'
+  ...
+# Subtest: extractDispatchReadPaths（G-1）：只认 workflow 与 contracts/*.md；workflow 置首、契约按首现序、去重
+ok 226 - extractDispatchReadPaths（G-1）：只认 workflow 与 contracts/*.md；workflow 置首、契约按首现序、去重
+  ---
+  duration_ms: 1.1111
+  type: 'test'
+  ...
+# Subtest: extractDispatchReadPaths（G-1）：产物路径/其它 docs/非 .md/目录式/URL/绝对路径/契约目录之外的都不捕获
+ok 227 - extractDispatchReadPaths（G-1）：产物路径/其它 docs/非 .md/目录式/URL/绝对路径/契约目录之外的都不捕获
+  ---
+  duration_ms: 0.1682
+  type: 'test'
+  ...
+# Subtest: extractDispatchReadPaths（G-1）：句尾 ASCII 标点剥离（role-card.md. 式）；空文本 → 空
+ok 228 - extractDispatchReadPaths（G-1）：句尾 ASCII 标点剥离（role-card.md. 式）；空文本 → 空
+  ---
+  duration_ms: 0.0996
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：无引用 → 旧格式逐字不变（引用块是「加」出来的；去重键不受影响）
+ok 229 - renderDispatchPrompt（G-1）：无引用 → 旧格式逐字不变（引用块是「加」出来的；去重键不受影响）
+  ---
+  duration_ms: 0.1564
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt：sourceRoleId → 首行「来自 <角色> 的任务」；[派发] 前缀与 task 原文不变
+ok 230 - renderDispatchPrompt：sourceRoleId → 首行「来自 <角色> 的任务」；[派发] 前缀与 task 原文不变
+  ---
+  duration_ms: 0.0948
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt：sourceRoleId + 必读块 → 仅首行变化，块格式逐字不变
+ok 231 - renderDispatchPrompt：sourceRoleId + 必读块 → 仅首行变化，块格式逐字不变
+  ---
+  duration_ms: 0.099
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery：第三参透传 sourceRoleId（有/无必读引用两个 deliver 分支）
+ok 232 - planDispatchDelivery：第三参透传 sourceRoleId（有/无必读引用两个 deliver 分支）
+  ---
+  duration_ms: 0.1801
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：workflow+契约 → 逐行必读块（编号/缩进/哈希逐字/完成口令指向）；无授权语义
+ok 233 - renderDispatchPrompt（G-1）：workflow+契约 → 逐行必读块（编号/缩进/哈希逐字/完成口令指向）；无授权语义
+  ---
+  duration_ms: 0.0988
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：仅契约 → 无 workflow 行、（未引用 workflow 时）完成句为旧句；多行 task 逐字保留
+ok 234 - renderDispatchPrompt（G-1）：仅契约 → 无 workflow 行、（未引用 workflow 时）完成句为旧句；多行 task 逐字保留
+  ---
+  duration_ms: 0.0803
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：workflow 缺失降级 → 块内如实标注、省略该行、不拒投口吻；有契约时契约照常编号
+ok 235 - renderDispatchPrompt（G-1）：workflow 缺失降级 → 块内如实标注、省略该行、不拒投口吻；有契约时契约照常编号
+  ---
+  duration_ms: 0.134
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（G-1）：标注与引用同路径矛盾 → 引用为准（探测后的事实），抑制标注、保留完成口令行
+ok 236 - renderDispatchPrompt（G-1）：标注与引用同路径矛盾 → 引用为准（探测后的事实），抑制标注、保留完成口令行
+  ---
+  duration_ms: 0.0676
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1 单一来源复用）：全齐 → 放行；放行文本与 renderDispatchPrompt 逐字一致（无第二份渲染）
+ok 237 - planDispatchDelivery（G-1 单一来源复用）：全齐 → 放行；放行文本与 renderDispatchPrompt 逐字一致（无第二份渲染）
+  ---
+  duration_ms: 0.1018
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：契约缺失（未探测/`<missing>`/非法值）→ 拒投 + 逐字回执；**不产生可投递文本**
+ok 238 - planDispatchDelivery（G-1）：契约缺失（未探测/`<missing>`/非法值）→ 拒投 + 逐字回执；**不产生可投递文本**
+  ---
+  duration_ms: 0.1143
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：多个契约缺失 → 报首现序第一个；workflow 也缺时拒投优先（契约 > 降级）
+ok 239 - planDispatchDelivery（G-1）：多个契约缺失 → 报首现序第一个；workflow 也缺时拒投优先（契约 > 降级）
+  ---
+  duration_ms: 0.0579
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：仅 workflow 缺失 → 降级放行（不拒投）；编号重排；旧完成句；workflow 恢复后指向其在场版本
+ok 240 - planDispatchDelivery（G-1）：仅 workflow 缺失 → 降级放行（不拒投）；编号重排；旧完成句；workflow 恢复后指向其在场版本
+  ---
+  duration_ms: 0.1002
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：未引用任何必读 → 放行旧文案逐字；probes 多余项不参与、不影响
+ok 241 - planDispatchDelivery（G-1）：未引用任何必读 → 放行旧文案逐字；probes 多余项不参与、不影响
+  ---
+  duration_ms: 0.0722
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（G-1）：提取与整理保序——workflow 在文本后段出现也置首编号；哈希逐字透传
+ok 242 - planDispatchDelivery（G-1）：提取与整理保序——workflow 在文本后段出现也置首编号；哈希逐字透传
+  ---
+  duration_ms: 0.0584
+  type: 'test'
+  ...
+# Subtest: renderDispatchPrompt（B）：任务编号/期望产出/可选证据作为固定字段；旧调用逐字不变
+ok 243 - renderDispatchPrompt（B）：任务编号/期望产出/可选证据作为固定字段；旧调用逐字不变
+  ---
+  duration_ms: 0.1648
+  type: 'test'
+  ...
+# Subtest: planDispatchDelivery（B）：任务卡字段透传；契约缺失仍 fail-closed 拒投（不因 taskId 放行）
+ok 244 - planDispatchDelivery（B）：任务卡字段透传；契约缺失仍 fail-closed 拒投（不因 taskId 放行）
+  ---
+  duration_ms: 0.0739
+  type: 'test'
+  ...
+# Subtest: TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+ok 245 - TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+  ---
+  duration_ms: 1.314
+  type: 'test'
+  ...
+# Subtest: TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+ok 246 - TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+  ---
+  duration_ms: 0.4009
+  type: 'test'
+  ...
+# Subtest: TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+ok 247 - TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+  ---
+  duration_ms: 0.1511
+  type: 'test'
+  ...
+# Subtest: TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+ok 248 - TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+  ---
+  duration_ms: 2.051
+  type: 'test'
+  ...
+# Subtest: TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+ok 249 - TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+  ---
+  duration_ms: 3.212
+  type: 'test'
+  ...
+# Subtest: TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+ok 250 - TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+  ---
+  duration_ms: 0.2158
+  type: 'test'
+  ...
+# Subtest: TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+ok 251 - TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+  ---
+  duration_ms: 0.8476
+  type: 'test'
+  ...
+# Subtest: TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+ok 252 - TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+  ---
+  duration_ms: 0.1607
+  type: 'test'
+  ...
+# Subtest: TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+ok 253 - TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+  ---
+  duration_ms: 0.6705
+  type: 'test'
+  ...
+# Subtest: TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+ok 254 - TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+  ---
+  duration_ms: 98.309
+  type: 'test'
+  ...
+# Subtest: TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+ok 255 - TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+  ---
+  duration_ms: 1.6183
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+ok 256 - TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+  ---
+  duration_ms: 1.8319
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+ok 257 - TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+  ---
+  duration_ms: 45.2033
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+ok 258 - TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+  ---
+  duration_ms: 4.5388
+  type: 'test'
+  ...
+# Subtest: TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+ok 259 - TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+  ---
+  duration_ms: 577.2579
+  type: 'test'
+  ...
+# Subtest: TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+ok 260 - TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+  ---
+  duration_ms: 48.7261
+  type: 'test'
+  ...
+# Subtest: TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+ok 261 - TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+  ---
+  duration_ms: 7.5869
+  type: 'test'
+  ...
+# Subtest: TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+ok 262 - TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+  ---
+  duration_ms: 71.7764
+  type: 'test'
+  ...
+# Subtest: TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+not ok 263 - TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+  ---
+  duration_ms: 43.4851
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\doc-format-specs.test.ts:1312:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-workflow/v1, legacy/v1, two-fixed-paths/v1
+    + actual - expected
+    
+    + [
+    +   'ans-basis/v1',
+    +   'ans-release/v1',
+    +   'ans-workflow/v1',
+    +   'legacy/v1',
+    +   'two-fixed-paths/v1'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'ans-basis/v1'
+    1: 'ans-release/v1'
+    2: 'ans-workflow/v1'
+    3: 'legacy/v1'
+    4: 'two-fixed-paths/v1'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/doc-format-specs.test.ts:1326:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+ok 264 - TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+  ---
+  duration_ms: 36.4787
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+ok 265 - TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+  ---
+  duration_ms: 97.6124
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+ok 266 - TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+  ---
+  duration_ms: 27.994
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+ok 267 - TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+  ---
+  duration_ms: 0.566
+  type: 'test'
+  ...
+# Subtest: TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+ok 268 - TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+  ---
+  duration_ms: 4.5191
+  type: 'test'
+  ...
+# Subtest: TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+ok 269 - TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+  ---
+  duration_ms: 0.1993
+  type: 'test'
+  ...
+# Subtest: W-6：requiredArtifactPaths('download') 返回 missing:false（不要求固定物证）
+ok 270 - W-6：requiredArtifactPaths('download') 返回 missing:false（不要求固定物证）
+  ---
+  duration_ms: 0.8221
+  type: 'test'
+  ...
+# Subtest: F4 verdict：download approve 要求 confirmed:true；返回 {confirmed:true} 且无 paths/pathDecisions
+ok 271 - F4 verdict：download approve 要求 confirmed:true；返回 {confirmed:true} 且无 paths/pathDecisions
+  ---
+  duration_ms: 0.9576
+  type: 'test'
+  ...
+# Subtest: F4：未知卡种不再把 download 压成 group-mismatch；manual download-facts-missing 保留且属「无法核对」
+ok 272 - F4：未知卡种不再把 download 压成 group-mismatch；manual download-facts-missing 保留且属「无法核对」
+  ---
+  duration_ms: 0.1151
+  type: 'test'
+  ...
+# Subtest: W-7：系统 rubric 含下载段与「不得访问 URL」；请求提示渲染 request.download 与合成归属
+ok 273 - W-7：系统 rubric 含下载段与「不得访问 URL」；请求提示渲染 request.download 与合成归属
+  ---
+  duration_ms: 0.4031
+  type: 'test'
+  ...
+# Subtest: 卡片路径（客户批准）：presenter 判断上下文完整；审计 requested→decided→started→completed；B1 生成 downloadId
+ok 274 - 卡片路径（客户批准）：presenter 判断上下文完整；审计 requested→decided→started→completed；B1 生成 downloadId
+  ---
+  duration_ms: 5.2718
+  type: 'test'
+  ...
+# Subtest: 预授权 allow：不调 presenter、无 requestId、by:directive；deny：拒绝；once 消费失败回落审批
+ok 275 - 预授权 allow：不调 presenter、无 requestId、by:directive；deny：拒绝；once 消费失败回落审批
+  ---
+  duration_ms: 1.4518
+  type: 'test'
+  ...
+# Subtest: epoch 不可读 ⇒ 不查预授权、直接客户卡；归属键真实/合成规则（F10）
+ok 276 - epoch 不可读 ⇒ 不查预授权、直接客户卡；归属键真实/合成规则（F10）
+  ---
+  duration_ms: 0.8541
+  type: 'test'
+  ...
+# Subtest: 事实与钉扎：>8 个解析结果截断展示、校验/钉扎用全部；混合私网 ⇒ unsafe；DNS 失败
+ok 277 - 事实与钉扎：>8 个解析结果截断展示、校验/钉扎用全部；混合私网 ⇒ unsafe；DNS 失败
+  ---
+  duration_ms: 0.5723
+  type: 'test'
+  ...
+# Subtest: presenter 失败/缺 requestId/拒绝 ⇒ 稳定 code；拒绝写 decided+failed
+ok 278 - presenter 失败/缺 requestId/拒绝 ⇒ 稳定 code；拒绝写 decided+failed
+  ---
+  duration_ms: 0.4269
+  type: 'test'
+  ...
+# Subtest: 并发：每项目执行 ≤2，第三个 download-busy；不同项目独立
+ok 279 - 并发：每项目执行 ≤2，第三个 download-busy；不同项目独立
+  ---
+  duration_ms: 30.2835
+  type: 'test'
+  ...
+# Subtest: dispose：中止本运行时在途下载（download-aborted）
+ok 280 - dispose：中止本运行时在途下载（download-aborted）
+  ---
+  duration_ms: 20.9898
+  type: 'test'
+  ...
+# Subtest: 生产工厂无测试缝（type-level）；B1 源码不写 request.*；app/** 不引用 ForTest
+ok 281 - 生产工厂无测试缝（type-level）；B1 源码不写 request.*；app/** 不引用 ForTest
+  ---
+  duration_ms: 18.5426
+  type: 'test'
+  ...
+# Subtest: run-role：requestDownload 能力位透传；未注入 ⇒ 缺席（结构 fail-closed）
+ok 282 - run-role：requestDownload 能力位透传；未注入 ⇒ 缺席（结构 fail-closed）
+  ---
+  duration_ms: 28.3236
+  type: 'test'
+  ...
+# Subtest: 错误码规则：17 个 download-* 全部登记；owner/retryable 符合方案 §3.3
+ok 283 - 错误码规则：17 个 download-* 全部登记；owner/retryable 符合方案 §3.3
+  ---
+  duration_ms: 0.2525
+  type: 'test'
+  ...
+# Subtest: 重定向策略：真实 Service 回调——同域 follow/跨域停止/降级拒绝（AC-8 B1 集成）
+ok 284 - 重定向策略：真实 Service 回调——同域 follow/跨域停止/降级拒绝（AC-8 B1 集成）
+  ---
+  duration_ms: 0.6291
+  type: 'test'
+  ...
+# Subtest: 执行时重新解析/判表：卡片前公网、执行时私网 ⇒ download-unsafe-url（不执行）
+ok 285 - 执行时重新解析/判表：卡片前公网、执行时私网 ⇒ download-unsafe-url（不执行）
+  ---
+  duration_ms: 0.1926
+  type: 'test'
+  ...
+# Subtest: 参数复核（防御）：purpose 空/超长、filename 含分隔符/控制符 ⇒ invalid-arguments；不发卡/不联网/不落账本
+ok 286 - 参数复核（防御）：purpose 空/超长、filename 含分隔符/控制符 ⇒ invalid-arguments；不发卡/不联网/不落账本
+  ---
+  duration_ms: 0.4522
+  type: 'test'
+  ...
+# Subtest: judge approve：approval 归属 judge、审计 decided.judge 保留 engine/reasonCode
+ok 287 - judge approve：approval 归属 judge、审计 decided.judge 保留 engine/reasonCode
+  ---
+  duration_ms: 0.2727
+  type: 'test'
+  ...
+# Subtest: AC-14：forever/session 预授权两次下载均命中（无卡片/无消费）；downloads.jsonl 两条/各 by directive+directiveId
+ok 288 - AC-14：forever/session 预授权两次下载均命中（无卡片/无消费）；downloads.jsonl 两条/各 by directive+directiveId
+  ---
+  duration_ms: 2.0468
+  type: 'test'
+  ...
+# Subtest: URL：仅 http/https；拒绝 userinfo/空 host/超长
+ok 289 - URL：仅 http/https；拒绝 userinfo/空 host/超长
+  ---
+  duration_ms: 0.5888
+  type: 'test'
+  ...
+# Subtest: URL：主机归一化（小写/去尾点/punycode/IPv6 去括号）+ 显式端口
+ok 290 - URL：主机归一化（小写/去尾点/punycode/IPv6 去括号）+ 显式端口
+  ---
+  duration_ms: 4.316
+  type: 'test'
+  ...
+# Subtest: IPv4 拒绝清单（含边界）与公网样本
+ok 291 - IPv4 拒绝清单（含边界）与公网样本
+  ---
+  duration_ms: 0.2419
+  type: 'test'
+  ...
+# Subtest: IPv6：2000::/3 正向 + 特殊段排除；IPv4-mapped/NAT64 自动拒绝
+ok 292 - IPv6：2000::/3 正向 + 特殊段排除；IPv4-mapped/NAT64 自动拒绝
+  ---
+  duration_ms: 0.4329
+  type: 'test'
+  ...
+# Subtest: 同域：host 归一相等（端口可不同）；https→http 降级拒绝；子域跨域
+ok 293 - 同域：host 归一相等（端口可不同）；https→http 降级拒绝；子域跨域
+  ---
+  duration_ms: 0.1605
+  type: 'test'
+  ...
+# Subtest: 文件名净化真值表（穿越/非法字符/尾点空格/前导点/保留名/超长）
+ok 294 - 文件名净化真值表（穿越/非法字符/尾点空格/前导点/保留名/超长）
+  ---
+  duration_ms: 0.3277
+  type: 'test'
+  ...
+# Subtest: 卡片阶段文件名：URL basename → caller → 兜底；不返回 content-disposition
+ok 295 - 卡片阶段文件名：URL basename → caller → 兜底；不返回 content-disposition
+  ---
+  duration_ms: 0.5832
+  type: 'test'
+  ...
+# Subtest: 执行阶段文件名：Content-Disposition（filename* 优先）→ URL basename → caller → 兜底
+ok 296 - 执行阶段文件名：Content-Disposition（filename* 优先）→ URL basename → caller → 兜底
+  ---
+  duration_ms: 0.3597
+  type: 'test'
+  ...
+# Subtest: 配置：默认值来自 A1 常量；非法 env 回退并返回诊断；合法 env 覆盖
+ok 297 - 配置：默认值来自 A1 常量；非法 env 回退并返回诊断；合法 env 覆盖
+  ---
+  duration_ms: 0.2558
+  type: 'test'
+  ...
+# Subtest: judge facts ≤2KiB：只截断 url/purpose，校验字段不变
+ok 298 - judge facts ≤2KiB：只截断 url/purpose，校验字段不变
+  ---
+  duration_ms: 0.4162
+  type: 'test'
+  ...
+# Subtest: provider：200 成功、原子写、无 .part/占位残留、Content-Disposition 定名
+ok 299 - provider：200 成功、原子写、无 .part/占位残留、Content-Disposition 定名
+  ---
+  duration_ms: 31.4484
+  type: 'test'
+  ...
+# Subtest: provider：重名不覆盖（既有文件字节不变；新文件加 (1)）
+ok 300 - provider：重名不覆盖（既有文件字节不变；新文件加 (1)）
+  ---
+  duration_ms: 9.0483
+  type: 'test'
+  ...
+# Subtest: provider：同域重定向 301/302/303/307/308 逐跳跟随；跨域/降级/跳数/异常 3xx/缺 Location
+ok 301 - provider：同域重定向 301/302/303/307/308 逐跳跟随；跨域/降级/跳数/异常 3xx/缺 Location
+  ---
+  duration_ms: 42.3114
+  type: 'test'
+  ...
+# Subtest: provider：https→http 降级拒绝（download-unsafe-url）
+ok 302 - provider：https→http 降级拒绝（download-unsafe-url）
+  ---
+  duration_ms: 10.3521
+  type: 'test'
+  ...
+# Subtest: provider：大小上限（Content-Length/流式）、状态码（204/206/201/500）、编码
+ok 303 - provider：大小上限（Content-Length/流式）、状态码（204/206/201/500）、编码
+  ---
+  duration_ms: 8.6182
+  type: 'test'
+  ...
+# Subtest: provider：空闲/总超时、连接超时、AbortSignal；服务端请求次数符合无自动重试
+ok 304 - provider：空闲/总超时、连接超时、AbortSignal；服务端请求次数符合无自动重试
+  ---
+  duration_ms: 201.0037
+  type: 'test'
+  ...
+# Subtest: provider：rebinding——连接地址不在钉扎集合 ⇒ download-rebinding-detected，不落盘
+ok 305 - provider：rebinding——连接地址不在钉扎集合 ⇒ download-rebinding-detected，不落盘
+  ---
+  duration_ms: 1.7523
+  type: 'test'
+  ...
+# Subtest: provider：TLS 自签/过期/主机名不匹配 ⇒ download-network-error，无落盘
+ok 306 - provider：TLS 自签/过期/主机名不匹配 ⇒ download-network-error，无落盘
+  ---
+  duration_ms: 10.8099
+  type: 'test'
+  ...
+# Subtest: provider：download 目录为普通文件 ⇒ download-write-failed；目录不存在时创建
+ok 307 - provider：download 目录为普通文件 ⇒ download-write-failed；目录不存在时创建
+  ---
+  duration_ms: 2.772
+  type: 'test'
+  ...
+# Subtest: provider：downloads.jsonl 事件形状/坏行（复用共享 jsonl-ledger）
+ok 308 - provider：downloads.jsonl 事件形状/坏行（复用共享 jsonl-ledger）
+  ---
+  duration_ms: 15.8995
+  type: 'test'
+  ...
+# Subtest: epoch store：missing→ensure 创建 ready；不可读不重写；同一文件供面板只读
+ok 309 - epoch store：missing→ensure 创建 ready；不可读不重写；同一文件供面板只读
+  ---
+  duration_ms: 18.3612
+  type: 'test'
+  ...
+# Subtest: AC-12 故障注入：rename 失败 ⇒ download-write-failed；清理 temp/占位，既有同名文件字节不变
+ok 310 - AC-12 故障注入：rename 失败 ⇒ download-write-failed；清理 temp/占位，既有同名文件字节不变
+  ---
+  duration_ms: 7.5313
+  type: 'test'
+  ...
+# Subtest: AC-12 故障注入：写盘失败 ⇒ download-write-failed；无 .part/占位/半成品
+ok 311 - AC-12 故障注入：写盘失败 ⇒ download-write-failed；无 .part/占位/半成品
+  ---
+  duration_ms: 3.5965
+  type: 'test'
+  ...
+# Subtest: AC-13：download 为 Windows junction ⇒ download-write-failed，不跟随/不写目标目录
+ok 312 - AC-13：download 为 Windows junction ⇒ download-write-failed，不跟随/不写目标目录
+  ---
+  duration_ms: 25.8769
+  type: 'test'
+  ...
+# Subtest: ans-criteria/v1 正例：唯一 block、优先级派生、CRLF 归一化
+ok 313 - ans-criteria/v1 正例：唯一 block、优先级派生、CRLF 归一化
+  ---
+  duration_ms: 5.1568
+  type: 'test'
+  ...
+# Subtest: AC 归一化：NFKC/全半角/空白/前导零；非法形态拒绝
+ok 314 - AC 归一化：NFKC/全半角/空白/前导零；非法形态拒绝
+  ---
+  duration_ms: 0.1371
+  type: 'test'
+  ...
+# Subtest: criteria 负例：重复 canonical id、非法 priority、无/多 block、draft、版本不符
+ok 315 - criteria 负例：重复 canonical id、非法 priority、无/多 block、draft、版本不符
+  ---
+  duration_ms: 2.7271
+  type: 'test'
+  ...
+# Subtest: criteria ref：显式 path+sha+version 才加载；无 ref 不取 latest；draft ref 拒绝
+ok 316 - criteria ref：显式 path+sha+version 才加载；无 ref 不取 latest；draft ref 拒绝
+  ---
+  duration_ms: 17.887
+  type: 'test'
+  ...
+# Subtest: P0 sidecar：实际 lines/bytes/sha256 与 sidecar 一致才通过；p0 自报忽略并标记
+ok 317 - P0 sidecar：实际 lines/bytes/sha256 与 sidecar 一致才通过；p0 自报忽略并标记
+  ---
+  duration_ms: 10.2793
+  type: 'test'
+  ...
+# Subtest: AC-28：artifact 自述 223/实际 234、历史 pass 198/最终 214 ⇒ evidence-mismatch；修正后通过
+ok 318 - AC-28：artifact 自述 223/实际 234、历史 pass 198/最终 214 ⇒ evidence-mismatch；修正后通过
+  ---
+  duration_ms: 21.1137
+  type: 'test'
+  ...
+# Subtest: P0 缺 sidecar fail；P1 缺 sidecar 标未校验；stale/acIds 缺失 mismatch
+ok 319 - P0 缺 sidecar fail；P1 缺 sidecar 标未校验；stale/acIds 缺失 mismatch
+  ---
+  duration_ms: 19.1141
+  type: 'test'
+  ...
+# Subtest: collection：多文件 sidecar 逐文件 hash/bytes/lines 校验
+ok 320 - collection：多文件 sidecar 逐文件 hash/bytes/lines 校验
+  ---
+  duration_ms: 14.8767
+  type: 'test'
+  ...
+# Subtest: P4.3/F3/F4：collection generatedAt/mtime stale、item 自述、路径越界、角色范围拒绝
+ok 321 - P4.3/F3/F4：collection generatedAt/mtime stale、item 自述、路径越界、角色范围拒绝
+  ---
+  duration_ms: 37.3982
+  type: 'test'
+  ...
+# Subtest: F3：单文件 metaPath 越界/绝对/.ans/.env 一律 evidence-path-invalid
+ok 322 - F3：单文件 metaPath 越界/绝对/.ans/.env 一律 evidence-path-invalid
+  ---
+  duration_ms: 2.2781
+  type: 'test'
+  ...
+# ans role run 用法错误：缺少角色 id；缺少 --task
+# ans role run 用法错误：未知参数：--bogus
+# ans role run 无法启动：缺少 project 配置：runRoleCommand 需由装配入口经 deps.project 注入默认演示配置（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+# ans role run 无法启动：缺少 scope 配置：runRoleCommand 需由装配入口经 deps.scope 注入任务写集（编排不持有配置副本；契约 §6 配置数据单一来源在装配）。
+# ans role run 失败：未知角色：不存在的角色（未登记在 project.roles）
+# ans role run 失败：未知角色：不存在的角色（未登记在 project.roles）
+# Subtest: 退出码约定：0 = 成功；EXIT_USAGE / EXIT_FAILURE 均为非 0
+ok 323 - 退出码约定：0 = 成功；EXIT_USAGE / EXIT_FAILURE 均为非 0
+  ---
+  duration_ms: 0.547
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 用法错误（空 argv：缺角色、缺 --task）→ 非 0
+ok 324 - runRoleCommand 用法错误（空 argv：缺角色、缺 --task）→ 非 0
+  ---
+  duration_ms: 0.3874
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 未知参数 → 非 0
+ok 325 - runRoleCommand 未知参数 → 非 0
+  ---
+  duration_ms: 0.1028
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 缺少注入 project → 非 0
+ok 326 - runRoleCommand 缺少注入 project → 非 0
+  ---
+  duration_ms: 0.1101
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 缺少注入 scope → 非 0
+ok 327 - runRoleCommand 缺少注入 scope → 非 0
+  ---
+  duration_ms: 1.6128
+  type: 'test'
+  ...
+# Subtest: runRoleCommand 未知角色 → 非 0
+ok 328 - runRoleCommand 未知角色 → 非 0
+  ---
+  duration_ms: 1.5869
+  type: 'test'
+  ...
+# Subtest: runRole 未知角色（未登记 project.roles）→ 非 0
+ok 329 - runRole 未知角色（未登记 project.roles）→ 非 0
+  ---
+  duration_ms: 1.3753
+  type: 'test'
+  ...
+# ans role run 失败：边界解析失败：读取边界文件失败：ENOENT: no such file or directory, open 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-bianpai-yRejFR\\角色卡\\X\\boundary.yaml'
+# Subtest: runRole 边界解析失败（boundary 文件缺失→parseError）→ 非 0
+ok 330 - runRole 边界解析失败（boundary 文件缺失→parseError）→ 非 0
+  ---
+  duration_ms: 9.7429
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# ans role run 会话失败：bindRole 故意失败
+# Subtest: runRole bindRole 失败 → 非 0
+ok 331 - runRole bindRole 失败 → 非 0
+  ---
+  duration_ms: 15.4897
+  type: 'test'
+  ...
+# [message] 已解析角色 X（kind=project），角色卡：角色卡/X/role-card.md
+# [message] 已解析边界，来源：角色卡/X/boundary.yaml；acceptance=accepted（来源：test:fixture）
+# [message] 受治理工具集已建立：write_file / edit_file 在写入前经 gate 校验；任务 T-1 写集 1 项
+# [message] 本命令不提供 shell 与会话保持（一次性执行）；需要交互式治理会话请使用桌面应用。
+# [settled] 完成
+# Subtest: runRole 正常会话 → 0（对照基线）
+ok 332 - runRole 正常会话 → 0（对照基线）
+  ---
+  duration_ms: 11.0086
+  type: 'test'
+  ...
+# Subtest: 自动收尾：创世 su 会话 settle 后**自动**写出治理边界文档 + .ans(pin) + manifest；pin 与实算一致
+ok 333 - 自动收尾：创世 su 会话 settle 后**自动**写出治理边界文档 + .ans(pin) + manifest；pin 与实算一致
+  ---
+  duration_ms: 41.3128
+  type: 'test'
+  ...
+# Subtest: trio 创世首次 settle：自动收尾写 .ans 且含 governanceModel:'trio'（应用边界 + 调用方传模型）
+ok 334 - trio 创世首次 settle：自动收尾写 .ans 且含 governanceModel:'trio'（应用边界 + 调用方传模型）
+  ---
+  duration_ms: 16.3549
+  type: 'test'
+  ...
+# Subtest: 自动收尾守卫：settle 但无可 pin 之物（无角色、无既存治理边界文档）→ 零副作用，不凭空转正
+ok 335 - 自动收尾守卫：settle 但无可 pin 之物（无角色、无既存治理边界文档）→ 零副作用，不凭空转正
+  ---
+  duration_ms: 5.8008
+  type: 'test'
+  ...
+# Subtest: 自动重 pin：首次收尾后再建角色 B → 下一轮 settle 自动纳入 pin（与磁盘重新一致）
+ok 336 - 自动重 pin：首次收尾后再建角色 B → 下一轮 settle 自动纳入 pin（与磁盘重新一致）
+  ---
+  duration_ms: 30.6931
+  type: 'test'
+  ...
+# Subtest: 负例（单元）：边界不接受 → finalizeBootstrap 拒绝且零副作用
+ok 337 - 负例（单元）：边界不接受 → finalizeBootstrap 拒绝且零副作用
+  ---
+  duration_ms: 2.4349
+  type: 'test'
+  ...
+# Subtest: finalizeBootstrap（单元）：写出治理边界文档 + .ans；pin 覆盖两者；无可 pin 之物 → 拒绝
+ok 338 - finalizeBootstrap（单元）：写出治理边界文档 + .ans；pin 覆盖两者；无可 pin 之物 → 拒绝
+  ---
+  duration_ms: 7.2761
+  type: 'test'
+  ...
+# Subtest: finalizeBootstrap：仅当给出 governanceModel 才写字段；trio 写出、不传保持旧 `.ans` 形状
+ok 339 - finalizeBootstrap：仅当给出 governanceModel 才写字段；trio 写出、不传保持旧 `.ans` 形状
+  ---
+  duration_ms: 27.117
+  type: 'test'
+  ...
+# Subtest: repinIfBootstrapped：创世态由调用方传模型（trio 写出；不传旧形状）；非创世重 pin 保留既有 trio
+ok 340 - repinIfBootstrapped：创世态由调用方传模型（trio 写出；不传旧形状）；非创世重 pin 保留既有 trio
+  ---
+  duration_ms: 29.1004
+  type: 'test'
+  ...
+# Subtest: isGenesisState：无 .ans 为创世态；有 .ans 为非创世态
+ok 341 - isGenesisState：无 .ans 为创世态；有 .ans 为非创世态
+  ---
+  duration_ms: 1.3767
+  type: 'test'
+  ...
+# Subtest: gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录
+ok 342 - gate active-tool：真实 Core 会话 + host inventory ⇒ ok；输出只含 actor/controls/optionalEvidence；foreign MCP 只记录
+  ---
+  duration_ms: 33.3478
+  type: 'test'
+  ...
+# Subtest: gate active-tool：expectedTool 缺失、actor Core/角色/任务不符 ⇒ git-actor-core-binding-unproven
+ok 343 - gate active-tool：expectedTool 缺失、actor Core/角色/任务不符 ⇒ git-actor-core-binding-unproven
+  ---
+  duration_ms: 7.754
+  type: 'test'
+  ...
+# Subtest: gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）
+ok 344 - gate H13：真实边界未撤销的 prepared 条目 ⇒ git-core-in-flight-unproven；撤销后豁免（退役码不再产生）
+  ---
+  duration_ms: 12.6774
+  type: 'test'
+  ...
+# Subtest: gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+ok 345 - gate host-continuation：真正 settled（disposed+drain）的 rapporteur ⇒ ok；taskId/记录唯一性/turn 不符 ⇒ git-actor-core-binding-unproven
+  ---
+  duration_ms: 8.3593
+  type: 'test'
+  ...
+# Subtest: W2 C1–C4/Q8：run-stop/controller-stop 成员身份=Core+可选 native；finalize 终止证据用 drain；native absent 允许、present-but-changed 拒绝
+ok 346 - W2 C1–C4/Q8：run-stop/controller-stop 成员身份=Core+可选 native；finalize 终止证据用 drain；native absent 允许、present-but-changed 拒绝
+  ---
+  duration_ms: 1.0173
+  type: 'test'
+  ...
+# Subtest: sidecar: append/read round-trip at the frozen path with whitelist field projection
+ok 347 - sidecar: append/read round-trip at the frozen path with whitelist field projection
+  ---
+  duration_ms: 48.217
+  type: 'test'
+  ...
+# Subtest: sidecar: same operationId retries append new lines and never change journal replay/settlement identity
+ok 348 - sidecar: same operationId retries append new lines and never change journal replay/settlement identity
+  ---
+  duration_ms: 52.8496
+  type: 'test'
+  ...
+# Subtest: sidecar: unsafe path shapes (nlink, junction links, non-canonical root) are rejected fail-closed
+ok 349 - sidecar: unsafe path shapes (nlink, junction links, non-canonical root) are rejected fail-closed
+  ---
+  duration_ms: 63.6732
+  type: 'test'
+  ...
+# Subtest: sidecar: frozen budgets (4 KiB line / 16 attempts / 64 KiB file) reject with git-action-audit-unavailable
+ok 350 - sidecar: frozen budgets (4 KiB line / 16 attempts / 64 KiB file) reject with git-action-audit-unavailable
+  ---
+  duration_ms: 260.7755
+  type: 'test'
+  ...
+# Subtest: sidecar: truncated tail tolerated with diagnostics and repaired before append; bad JSON/unknown fields fail closed
+ok 351 - sidecar: truncated tail tolerated with diagnostics and repaired before append; bad JSON/unknown fields fail closed
+  ---
+  duration_ms: 73.0937
+  type: 'test'
+  ...
+# Subtest: sidecar: audit failures are fail-closed git-action-audit-unavailable (lease, lock, blocked store)
+ok 352 - sidecar: audit failures are fail-closed git-action-audit-unavailable (lease, lock, blocked store)
+  ---
+  duration_ms: 20.7201
+  type: 'test'
+  ...
+# Subtest: wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects
+ok 353 - wiring failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no repository, journal or ref effects
+  ---
+  duration_ms: 96.114
+  type: 'test'
+  ...
+# Subtest: wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects
+ok 354 - wiring document publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no ref/journal effects
+  ---
+  duration_ms: 1619.1208
+  type: 'test'
+  ...
+# Subtest: wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 355 - wiring document publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 4037.9768
+  type: 'test'
+  ...
+# Subtest: wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects
+ok 356 - wiring initial workflow failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no workflow/journal effects
+  ---
+  duration_ms: 11294.4575
+  type: 'test'
+  ...
+# Subtest: wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 357 - wiring initial workflow: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 14968.7757
+  type: 'test'
+  ...
+# Subtest: wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects
+ok 358 - wiring plan publication failure injection: blocked sidecar store ⇒ git-action-audit-unavailable with no manifest/history effects
+  ---
+  duration_ms: 3910.4152
+  type: 'test'
+  ...
+# Subtest: wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+ok 359 - wiring plan publication: sidecar records candidate+publication digests with publish-documents template before the store commit
+  ---
+  duration_ms: 6798.5896
+  type: 'test'
+  ...
+1..359
+# tests 359
+# suites 0
+# pass 354
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 67159.5528

@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed；submit_report 关联 task.reported；close accepted 由 close-report-missing 转成功
+ok 1 - B10.1 stage-request：convener 目标会话带真实 taskId+forced fixed；submit_report 关联 task.reported；close accepted 由 close-report-missing 转成功
+  ---
+  duration_ms: 79.6458
+  type: 'test'
+  ...
+# Subtest: B10.1 生产派发：内置 product 目标会话带生产任务 taskId；product 报告关联；convener close accepted 成功
+ok 2 - B10.1 生产派发：内置 product 目标会话带生产任务 taskId；product 报告关联；convener close accepted 成功
+  ---
+  duration_ms: 90.6356
+  type: 'test'
+  ...
+# Subtest: B10.1 drain：fixed 派发条目自动打开目标会话传真实 taskId + forced fixed
+ok 3 - B10.1 drain：fixed 派发条目自动打开目标会话传真实 taskId + forced fixed
+  ---
+  duration_ms: 86.1974
+  type: 'test'
+  ...
+# Subtest: B10.1 重绑：既有固定 chat 会话无任务绑定 ⇒ dispose + 以 taskId 重开，投递落新会话
+ok 4 - B10.1 重绑：既有固定 chat 会话无任务绑定 ⇒ dispose + 以 taskId 重开，投递落新会话
+  ---
+  duration_ms: 93.9817
+  type: 'test'
+  ...
+# Subtest: B10.1 busy：未绑定的固定会话 busy ⇒ openInternal fail-closed（fixed-session-rebind-blocked），受理后不投递；空闲后 drain 以 taskId 重绑续投
+ok 5 - B10.1 busy：未绑定的固定会话 busy ⇒ openInternal fail-closed（fixed-session-rebind-blocked），受理后不投递；空闲后 drain 以 taskId 重绑续投
+  ---
+  duration_ms: 30.8837
+  type: 'test'
+  ...
+# Subtest: B10.1 busy：固定会话已绑定另一任务 ⇒ 受理后不投递，空闲后重绑到本次任务（不投进绑定别的任务的会话）
+ok 6 - B10.1 busy：固定会话已绑定另一任务 ⇒ 受理后不投递，空闲后重绑到本次任务（不投进绑定别的任务的会话）
+  ---
+  duration_ms: 32.5205
+  type: 'test'
+  ...
+# Subtest: B10.1 verifier：A12a 直派目标会话带真实 review 任务 taskId + forced fixed
+ok 7 - B10.1 verifier：A12a 直派目标会话带真实 review 任务 taskId + forced fixed
+  ---
+  duration_ms: 108.0079
+  type: 'test'
+  ...
+# Subtest: B10.1 legacy 不变：legacy 任务自动打开目标不带 taskId/forced；fixed chat（chief 无 taskId）仍 forced fixed
+ok 8 - B10.1 legacy 不变：legacy 任务自动打开目标不带 taskId/forced；fixed chat（chief 无 taskId）仍 forced fixed
+  ---
+  duration_ms: 23.1254
+  type: 'test'
+  ...
+# Subtest: B10.1 fixed 回交回合：目标会话已绑定真实任务 ⇒ handback intent 沿用该 taskId（创建者显式进度报告可关联）
+ok 9 - B10.1 fixed 回交回合：目标会话已绑定真实任务 ⇒ handback intent 沿用该 taskId（创建者显式进度报告可关联）
+  ---
+  duration_ms: 55.6729
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1034.3544

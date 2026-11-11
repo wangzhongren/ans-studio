@@ -1,0 +1,70 @@
+file	code	signal	duration_ms	tests	pass	fail	cancelled	skipped	todo	failing_names
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/abort-unwedge.test.ts	0		1006	3	3	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/acceptance-evidence.test.ts	0		611	3	3	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/acceptance-proposal-path.test.ts	0		2081	7	7	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/acceptance-return-card.test.ts	0		1525	10	10	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/ans-wiring.test.ts	0		714	7	7	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/application-line.test.ts	1		910	3	2	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b3-fixed-baseline-pathb.test.ts	0		3051	6	6	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b3-fixed-cards-panel.test.ts	0		926	8	8	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b3-release-merge-desktop.test.ts	0		7278	7	7	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b3-workflow-git-real.test.ts	0		8002	9	9	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b31-fixed-release-auto-desktop.test.ts	0		8215	9	9	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b42-task-git-port-desktop.test.ts	0		2778	8	8	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/b51-fixed-workflow-wiring.test.ts	0		1652	13	13	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/boundary-refresh.test.ts	1		3641	14	13	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/chain-enforcement.test.ts	1		2806	9	3	6	0	0	0	6
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/chief-workflow.test.ts		watchdog	300014							9
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/composer-images.test.ts	0		492	3	3	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/decision-service.test.ts	0		854	22	22	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/diagnostics.test.ts	0		416	8	8	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/directive-decision.test.ts		watchdog	90022							0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/directive-input.test.ts	1		9155	19	14	5	0	0	0	5
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/dispatch-fresh-enum.test.ts	0		1024	2	2	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/download-decision.test.ts	1		4210	8	7	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/download-request.test.ts	1		3638	8	7	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/fixed-path-routing.test.ts	0		1631	13	13	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/genesis-bootstrap.test.ts	1		510	7	6	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/handback-delivery.test.ts	1		10184	18	12	6	0	0	0	6
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/hot-path.test.ts	0		739	3	3	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/interface.test.ts	0		782	8	8	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/log-actions.test.ts	1		5537	1	0	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/log-patrol.test.ts	0		166	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/log-stuck.test.ts	0		208	5	5	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/message-queue.test.ts	0		5581	20	20	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/multi-runtime.test.ts	1		5829	39	31	8	0	0	0	8
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/network-monitor.test.ts	0		266	11	11	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/operator-channel.test.ts	1		1148	59	58	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/optional-acceptance.test.ts		watchdog	90029							1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/p0-halt-and-images.test.ts	1		6888	5	2	3	0	0	0	3
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/pending-card-restart.test.ts	0		565	1	1	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/pi-config.test.ts	0		603	17	17	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/project-document.test.ts	0		237	20	20	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/project-state.test.ts	0		721	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/project.test.ts	1		372	23	22	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/queue-visibility.test.ts	1		650	2	1	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/queue-withdraw-lru.test.ts	0		2510	5	5	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/rejection-copy.test.ts	0		304	17	17	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/replay-safe-retry.test.ts	0		907	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/request-timeout-wiring.test.ts	0		984	3	3	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/role-log.test.ts	0		2102	5	5	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/run-change-entry.test.ts	0		676	5	5	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/run-change-trigger.test.ts	1		1242	10	1	9	0	0	0	9
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/run-change.test.ts	0		649	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/run-pin.test.ts	1		3550	20	9	11	0	0	0	11
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/session-history.test.ts	0		354	9	9	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/session-rebuild-race.test.ts		watchdog	90021							3
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/session.test.ts	1		709	7	6	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/shell-escalation.test.ts	0		1042	22	22	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/star-routing.test.ts	1		2402	10	3	7	0	0	0	7
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/stuck-redispatch-safety.test.ts	0		221	5	5	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/stuck-redispatch.test.ts		watchdog	90024							3
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/su-effective-boundary.test.ts	0		522	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/task-restart.test.ts	1		2615	2	1	1	0	0	0	1
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/trunk.test.ts	0		525	6	6	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/turn-lease.test.ts	0		1316	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/version-change.test.ts	1		8791	46	42	4	0	0	0	4
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/version-decision.test.ts	0		2949	15	15	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/watchdog-reuse.test.ts	0		158	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/workflow-git-port.test.ts	0		371	4	4	0	0	0	0	0
+C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/桌面应用/write-safety.test.ts	0		1551	7	7	0	0	0	0	0

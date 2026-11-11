@@ -1,0 +1,13 @@
+== candidate files (sha256 / bytes / lines) ==
+d050c3f251fa33b78ed2d226c295f92a2bc0f162cefa694e5d3725f02a11d50a  bytes=815726  lines=12810  app/desktop/session.ts
+d7cbdd7aec028728b8638b49ccc14171a4785348351bf4dfd908cfe9da361fb4  bytes=51412  lines=1087  app/desktop/workflow-git.ts
+7fd6c8a7c06a4d440567bf4d6f8e661664f875188f91c59fd5183272e7a5681a  bytes=29758  lines=588  test/桌面应用/b42-task-git-port-desktop.test.ts
+
+== numstat (M files) ==
+23	2	app/desktop/session.ts
+209	4	app/desktop/workflow-git.ts
+
+== new file ==
+test/桌面应用/b42-task-git-port-desktop.test.ts (untracked new file, 588 lines)
+
+aggregate: see 09b-candidate-aggregate.txt

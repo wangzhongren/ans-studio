@@ -1,0 +1,35 @@
+# B7.2 final status (2026-11-11T03:03:05+08:00)
+
+HEAD: 976092e30941bcfa915e0ea8716f44d511c07ba0 (feat/two-fixed-workflow-paths)
+
+## git status --porcelain -- src app test
+ M app/desktop/session.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/桌面应用/b3-fixed-cards-panel.test.ts
+ M test/桌面应用/b51-fixed-workflow-wiring.test.ts
+ M test/桌面应用/b61-chat-entry-fixed.test.ts
+ M test/桌面应用/chain-enforcement.test.ts
+ M test/桌面应用/chief-workflow.test.ts
+ M test/桌面应用/fixed-path-routing.test.ts
+ M test/桌面应用/optional-acceptance.test.ts
+ M test/桌面应用/run-change-trigger.test.ts
+ M test/桌面应用/run-pin.test.ts
+ M test/桌面应用/session.test.ts
+ M test/桌面应用/star-routing.test.ts
+ M test/测试/b-change-scope.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+ M test/测试/git-role-workflows-driver.ts
+ M test/测试/git-role-workflows-e2e.test.ts
+ M test/测试/mode-switch.test.ts
+?? test/桌面应用/b71-fixed-fail-closed.test.ts
+?? test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts
+
+## git status --porcelain -- test/测试
+ M test/测试/b-change-scope.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+ M test/测试/git-role-workflows-driver.ts
+ M test/测试/git-role-workflows-e2e.test.ts
+ M test/测试/mode-switch.test.ts
+
+## record
+c38cd379b8d3947fea44f922ca56940c3f9ac7827acb4d2ae803959a5fb3ab44 *角色卡/测试/docs/change/2026-11-11_B7.2_two-fixed-workflow-paths.md

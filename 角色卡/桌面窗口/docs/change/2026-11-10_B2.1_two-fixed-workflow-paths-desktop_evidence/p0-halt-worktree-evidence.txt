@@ -1,0 +1,29 @@
+# p0-halt P0-2 worktree-environment evidence (2026-11-10)
+Test: P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+Cause: test opens a real role session with projectRoot = REPO_ROOT (real repo root) via realOpenRoleSession;
+in a linked worktree .git is a FILE => readGitHostProtectionRequirement => "unknown" =>
+runtime-creation-prepared-api-unavailable => mgr.open returns ok:false (assert at p0-halt-and-images.test.ts:134).
+
+Reproduction A (baseline git-archive tree, no .git): P0-2 pass (file 5 tests: 3 pass / 2 fail P0-1)
+Reproduction B (same baseline tree + created .git FILE): P0-2 fails, same name (5 tests: 2 pass / 3 fail)
+Worktree (after): P0-2 fails deterministically (3 consecutive standalone runs: 2 pass / 3 fail)
+B5.1 evidence (same worktree, before AND after): P0-2 in both failing sets
+=> environment artifact of git-archive baseline vs linked-worktree after; not in candidate execution path.
+
+--- worktree after TAP excerpt ---
+not ok 1 - P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停）
+  ---
+  duration_ms: 82.9352
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\p0-halt-and-images.test.ts:118:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'

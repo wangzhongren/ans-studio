@@ -1,0 +1,4 @@
+ M src/common/roles/convener/index.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/roles/convener/convener-fixed.test.ts
+ M test/门禁引擎/chief-workflow-v2-no-shell-hash.test.ts

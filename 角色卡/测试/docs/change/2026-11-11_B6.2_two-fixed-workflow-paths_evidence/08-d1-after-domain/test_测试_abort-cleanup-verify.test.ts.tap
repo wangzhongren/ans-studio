@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: abort 抛错但底层稍后 settle：隔离解除，后续 prompt 可再次进入，不永久卡在「中止清理中」
+not ok 1 - abort 抛错但底层稍后 settle：隔离解除，后续 prompt 可再次进入，不永久卡在「中止清理中」
+  ---
+  duration_ms: 3.0041
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\abort-cleanup-verify.test.ts:104:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/abort-cleanup-verify.test.ts:107:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 底层永不 settle：仍需拒绝后续 prompt（fail-closed），清理失败不等于放行
+not ok 2 - 底层永不 settle：仍需拒绝后续 prompt（fail-closed），清理失败不等于放行
+  ---
+  duration_ms: 1.1385
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\abort-cleanup-verify.test.ts:151:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/abort-cleanup-verify.test.ts:154:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Claude 已关闭查询：Query closed before response received 视为已中止，abort 不抛错
+ok 3 - Claude 已关闭查询：Query closed before response received 视为已中止，abort 不抛错
+  ---
+  duration_ms: 5.017
+  type: 'test'
+  ...
+# Subtest: Claude 其他 interrupt 错误：abort 如实上抛（清理失败可见，不被吞掉）
+ok 4 - Claude 其他 interrupt 错误：abort 如实上抛（清理失败可见，不被吞掉）
+  ---
+  duration_ms: 5.1671
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 2
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 306.7988

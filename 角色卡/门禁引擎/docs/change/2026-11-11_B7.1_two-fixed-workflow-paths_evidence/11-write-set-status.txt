@@ -1,0 +1,30 @@
+== 采集时刻：2026-11-11 01:22:04 +0800（桌面 B7.1 并行仍在进行，清单可能继续变化） ==
+== git status --porcelain -- src app test ==
+ M app/desktop/session.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/桌面应用/b3-fixed-cards-panel.test.ts
+ M test/桌面应用/b51-fixed-workflow-wiring.test.ts
+ M test/桌面应用/b61-chat-entry-fixed.test.ts
+ M test/桌面应用/fixed-path-routing.test.ts
+ M test/桌面应用/star-routing.test.ts
+?? test/桌面应用/b71-fixed-fail-closed.test.ts
+?? test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts
+
+== 本角色写集（唯一候选） ==
+M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts
+
+== 本角色写集 diff：src/common/门禁引擎 ==
+ .../门禁引擎/workflows/chief/chief-workflow-v2.md  | 51 ++++++++++++++++++++--
+ 1 file changed, 48 insertions(+), 3 deletions(-)
+
+== 写集外零 diff 守卫 ==
+src: (zero diff)
+src/common/roles: (zero diff)
+src/provider: (zero diff)
+src/pipeline: (zero diff)
+src/service: (zero diff)
+docs: (zero diff)
+
+== 归因 ==
+app/** 与 test/桌面应用/** 的全部 M/?? 均为桌面 B7.1 并行 worker（写集外；本角色未触碰，仅只读核对）。

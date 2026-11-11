@@ -5,6 +5,8 @@
 // RenderGovernanceMatrixFn/GovernanceMatrixInput）已由 Model 单一声明。
 //
 // 冻结面（C1b）：buildGovernanceMatrix / renderGovernanceMatrix / 四个上限常量。
+// T3 B2（只加可选参数，不加导出）：`buildGovernanceMatrix(input, matrix?)` 缺省 `"legacy-v1"`
+// 逐字兼容旧调用；fixed 会话由编排 B2 传 `"two-fixed-paths/v1"` 展示 fixed 视图（只读、不判定）。
 // 测试 seam `buildGovernanceMatrixWith` **不**从本文件导出（G-5c）；生产 `buildGovernanceMatrix`
 // 内部固定使用真实 BUILT_IN_GOVERNANCE_ROLES，不向调用方暴露注册表参数。
 

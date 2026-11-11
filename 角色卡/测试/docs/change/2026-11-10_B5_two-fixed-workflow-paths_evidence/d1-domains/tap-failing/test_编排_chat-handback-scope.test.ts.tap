@@ -1,0 +1,110 @@
+TAP version 13
+# Subtest: real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+not ok 1 - real ACK binds task → Q1/Q2 chat → next task even with delayed consumption; chat report drops old taskId
+  ---
+  duration_ms: 25.1531
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\chat-handback-scope.test.ts:59:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    ... Skipped lines
+    
+      [
+        [
+          '1',
+          'A',
+          'completed'
+    ...
+          '5',
+    +     'ignored',
+    -     undefined,
+          'completed'
+        ]
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      0: '1'
+      1: 'A'
+      2: 'completed'
+    1:
+      0: '4'
+      1: 'B'
+      2: 'unreported'
+    2:
+      0: '5'
+      2: 'completed'
+  actual:
+    0:
+      0: '1'
+      1: 'A'
+      2: 'completed'
+    1:
+      0: '4'
+      1: 'B'
+      2: 'unreported'
+    2:
+      0: '5'
+      1: 'ignored'
+      2: 'completed'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/chat-handback-scope.test.ts:69:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: task failed keeps handback; chat failed without report does not invent task
+ok 2 - task failed keeps handback; chat failed without report does not invent task
+  ---
+  duration_ms: 10.2612
+  type: 'test'
+  ...
+# Subtest: task timed_out keeps handback; chat timed_out without report does not invent task
+ok 3 - task timed_out keeps handback; chat timed_out without report does not invent task
+  ---
+  duration_ms: 9.4175
+  type: 'test'
+  ...
+# Subtest: task aborted keeps handback; chat aborted without report does not invent task
+ok 4 - task aborted keeps handback; chat aborted without report does not invent task
+  ---
+  duration_ms: 9.933
+  type: 'test'
+  ...
+# Subtest: taskId compatibility, ordinary default chat, invalid chat report and explicit chat failed report
+ok 5 - taskId compatibility, ordinary default chat, invalid chat report and explicit chat failed report
+  ---
+  duration_ms: 20.552
+  type: 'test'
+  ...
+# Subtest: unknown real turn without ACK cannot borrow task intent; report is still explicit
+ok 6 - unknown real turn without ACK cannot borrow task intent; report is still explicit
+  ---
+  duration_ms: 9.2081
+  type: 'test'
+  ...
+# Subtest: pre-opening rejection clears legacy intent; serial legacy task/chat consumes once
+ok 7 - pre-opening rejection clears legacy intent; serial legacy task/chat consumes once
+  ---
+  duration_ms: 9.1159
+  type: 'test'
+  ...
+# Subtest: chat writes and denials are passed through, not converted to fallback; next task keeps its own evidence
+ok 8 - chat writes and denials are passed through, not converted to fallback; next task keeps its own evidence
+  ---
+  duration_ms: 0.2684
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 423.897

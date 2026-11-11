@@ -1,0 +1,11 @@
+ATTRIBUTION: 本次运行期间工作树含桌面 B7.1 并行未提交修改（app/desktop/session.ts +155/-5, mtime 2026-11-11 01:18:10 +0800）。
+其新增 fail-closed 校验要求 stage-request 必须带 workflowAction:"advance"，而现有 test/测试/fixed-path-full-chain.test.ts 夹具尚未同步，导致 3 条全链用例失败。
+失败信息来自并行改动，非本批资源改动；本批不据此断言任何通过/失败。
+--- evidence: git diff --text app/desktop/session.ts 中的新增校验 ---
++      // fail-closed**——缺 `flowId/workflowPath/stage/workflowAction/roleId` 的 stage-request 与无
++          if (d.workflowAction !== "advance") invalid.push('workflowAction:"advance"');
++            const detail = `固定路径的 stage-request 缺少或非法：${invalid.join("、")}。stage-request 必须同时给出非空 flowId、workflowPath:"A"|"B"、合法 stage、workflowAction:"advance"、roleId（运营 ${convenerRoleId}）；本次未创建任务、未写 legacy 账本。`;
++            return fail(`stage-request-invalid：${detail}`, `stage-request-invalid：${detail}`);
++            return fail(`stage-request-invalid：${detail}`, `stage-request-invalid：${detail}`);
++      lines.push('taskKind dispatch 必填：flowId；roleId；taskKind:"stage-request"；workflowAction:"advance"；workflowPath:"A"|"B"；stage；sideEffect:"read-only"；task（A12a/A12b/verifier 直派任务按 workflowId/stage）');
++      ["stage-request-invalid", "chief", true],

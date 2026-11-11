@@ -1,0 +1,13 @@
+# pre-existing flaky suites (B1 desktop D1; NOT B1 regressions)
+## application-line test 1 (request.* event order created->presented->resolved)
+- pristine HEAD (git archive 24af13d) reruns: fail=1, fail=1, fail=1 (3/3)
+- worktree (final code) reruns: fail=0, fail=1, fail=1 (timing-dependent)
+- before2 batch observed fail; final-after batch observed pass. => flaky ordering at HEAD, not B1.
+## chief-workflow (real SessionManager / real Runtime Service card chain)
+- pristine HEAD: in-batch 39ok/17fail; isolated 43ok/13fail
+- final worktree: in-batch 43ok/13fail; initial no-gate version: isolated 25ok/31fail (real regression, fixed by B1 activation gate)
+- remaining variance: flaky W10/W20-R9/W47-revise/W29/W30/W35/W36 cases (same class of timing flakes at HEAD)
+## operator-channel test 14 (real repo role open)
+- environment fact: worktree .git association -> readGitHostProtectionRequirement = state:unknown ->
+  runtime-creation-prepared-api-unavailable; pristine HEAD code opening the SAME worktree root reproduces it.
+  (see operator-channel-env.txt)

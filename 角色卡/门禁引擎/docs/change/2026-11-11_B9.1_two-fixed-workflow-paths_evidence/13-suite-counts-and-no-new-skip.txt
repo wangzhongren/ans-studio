@@ -1,0 +1,17 @@
+## before/after counts (same command)
+node --test --test-concurrency=1 --test-force-exit --test-reporter=tap test/门禁引擎/*.test.ts
+before: files=51 tests=536 pass=530 fail=5 skipped=1
+after : files=52 tests=544 pass=538 fail=5 skipped=1
+delta : files=+1 tests=+8 pass=+8 fail=0 skipped=0
+
+## failure-name set diff (05 vs 07)
+IDENTICAL (diff exit 0; empty)
+
+## skip-name set diff (05-before vs 07-after)
+IDENTICAL (diff exit 0; empty)
+
+## no new skip/force-exit in new test file
+NONE (good)
+
+## new test file test count
+8

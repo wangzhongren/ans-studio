@@ -1,0 +1,2 @@
+4a0838e11c5c1ecc9fc0494fd2356400edf0ea7702453a1d901273f72219ec03 *角色卡/门禁引擎/docs/change/2026-11-11_B7.1_two-fixed-workflow-paths.md
+218 角色卡/门禁引擎/docs/change/2026-11-11_B7.1_two-fixed-workflow-paths.md

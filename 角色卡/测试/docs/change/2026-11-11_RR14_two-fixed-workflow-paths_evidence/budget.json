@@ -1,0 +1,21 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 0,
+  "cardsByKind": {},
+  "dispatches": 4,
+  "dispatchesByFrom": {
+    "chief": 2,
+    "convener": 2
+  },
+  "tasksByTo": {
+    "convener": 2,
+    "product": 2
+  },
+  "writeTasks": 2,
+  "implementationWriteTasks": 0,
+  "turnsByRole": {
+    "chief": 7,
+    "convener": 6,
+    "product": 4
+  }
+}

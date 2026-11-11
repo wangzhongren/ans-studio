@@ -1,0 +1,53 @@
+# B31 known-red 对照（桌面窗口，2026-11-11）
+
+## 1. 既有桌面 known-red 基线（冻结，来源：B18/B29 桌面记录）
+
+`test/桌面应用/version-change.test.ts` 内 4 条冻结 known-red：
+1. Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+2. VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+3. VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+4. SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+
+## 2. 本轮 fresh 对照（逐名一致）
+
+命令：
+  node --test --test-concurrency=1 --test-reporter=tap "test/桌面应用/version-change.test.ts"
+
+结果：46 tests / 42 pass / 4 fail / 0 skipped / 0 cancelled（exit 1；原始 tap 为临时文件 .tmp-b31-version-change.tap，未入库）。
+fresh 失败名（排序后）与冻结列表 `diff -u`：**exit 0，输出 0 字节**（逐名一致，无新增/消失）。
+
+fresh 失败名：
+- Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+- VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+- VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+- SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常
+
+## 3. B31 fixed 相关范围（无 known-red）
+
+受影响集（b31-02-affected.tap；14 文件，含 B31 主测 + 相关 fixed 桌面测试 + 全链）：
+  node --test --test-concurrency=1 --test-reporter=tap \
+    "test/桌面应用/b3-fixed-baseline-pathb.test.ts" \
+    "test/桌面应用/b21-basis-gate-desktop.test.ts" \
+    "test/桌面应用/b3-fixed-cards-panel.test.ts" \
+    "test/桌面应用/b3-release-merge-desktop.test.ts" \
+    "test/桌面应用/b3-workflow-git-real.test.ts" \
+    "test/桌面应用/b31-fixed-release-auto-desktop.test.ts" \
+    "test/桌面应用/b51-fixed-workflow-wiring.test.ts" \
+    "test/桌面应用/b71-fixed-fail-closed.test.ts" \
+    "test/桌面应用/b81-fixed-dispatch-forced-session.test.ts" \
+    "test/桌面应用/b82-fixed-workflow-binding-handback.test.ts" \
+    "test/桌面应用/b101-fixed-dispatch-task-binding.test.ts" \
+    "test/桌面应用/b111-fixed-closed-handback-drain.test.ts" \
+    "test/桌面应用/fixed-path-routing.test.ts" \
+    "test/测试/fixed-path-full-chain.test.ts"
+结果：119/119 pass（0 fail / 0 skip / 0 cancelled，exit 0）。
+确定性全链单跑（b31-03-full-chain.tap）：3/3 pass。
+
+## 4. 说明
+
+- 工作树为混合状态：并行非 B31 改动（`src/common/编排/workflow-service.ts` 的 closeTask 轻量验收门、
+  `chief-workflow-v2.md` A12b 三选一纪律、`test/编排/acceptance-archive.test.ts`、边界 Delta）由编排/
+  门禁引擎角色负责，本角色未触碰；本文件的上列结果是在该混合工作树上取得。
+- 门禁引擎角色的未跟踪测试 `test/门禁引擎/chief-workflow-v2-a12b-blocked-decision.test.ts` 不在本角色
+  写区/验证范围（其证据见门禁引擎 B31 记录），未在此运行。
+- 桌面固定域在本轮 affected 集内 known-red = **0**；桌面既有 known-red 4 条逐名一致（diff 为空）。

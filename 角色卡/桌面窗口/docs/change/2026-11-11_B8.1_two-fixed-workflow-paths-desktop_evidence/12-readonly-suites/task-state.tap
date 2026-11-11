@@ -1,0 +1,172 @@
+TAP version 13
+# Subtest: fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+ok 1 - fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+  ---
+  duration_ms: 11.8869
+  type: 'test'
+  ...
+# Subtest: fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+ok 2 - fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+  ---
+  duration_ms: 20.1504
+  type: 'test'
+  ...
+# Subtest: workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+ok 3 - workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+  ---
+  duration_ms: 6.7944
+  type: 'test'
+  ...
+# Subtest: 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+ok 4 - 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+  ---
+  duration_ms: 1.0536
+  type: 'test'
+  ...
+# Subtest: workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+ok 5 - workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+  ---
+  duration_ms: 10.167
+  type: 'test'
+  ...
+# Subtest: 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+ok 6 - 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+  ---
+  duration_ms: 12.7913
+  type: 'test'
+  ...
+# Subtest: stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+ok 7 - stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+  ---
+  duration_ms: 5.1125
+  type: 'test'
+  ...
+# Subtest: review task data: the single Model host reference survives replay; forged authority fields fail shape validation
+ok 8 - review task data: the single Model host reference survives replay; forged authority fields fail shape validation
+  ---
+  duration_ms: 1.8528
+  type: 'test'
+  ...
+# Subtest: chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append
+ok 9 - chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append
+  ---
+  duration_ms: 12.0892
+  type: 'test'
+  ...
+# Subtest: append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed
+ok 10 - append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed
+  ---
+  duration_ms: 12.8642
+  type: 'test'
+  ...
+# Subtest: 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放
+ok 11 - 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放
+  ---
+  duration_ms: 5.7177
+  type: 'test'
+  ...
+# Subtest: 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行
+ok 12 - 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行
+  ---
+  duration_ms: 0.5368
+  type: 'test'
+  ...
+# Subtest: 副作用分类：缺填/非法⇒unknown；应用只升不降
+ok 13 - 副作用分类：缺填/非法⇒unknown；应用只升不降
+  ---
+  duration_ms: 0.8728
+  type: 'test'
+  ...
+# Subtest: 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计）
+ok 14 - 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计）
+  ---
+  duration_ms: 4.7261
+  type: 'test'
+  ...
+# Subtest: 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务
+ok 15 - 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务
+  ---
+  duration_ms: 16.2116
+  type: 'test'
+  ...
+# Subtest: 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实
+ok 16 - 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实
+  ---
+  duration_ms: 0.4411
+  type: 'test'
+  ...
+# Subtest: task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读
+ok 17 - task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读
+  ---
+  duration_ms: 15.7213
+  type: 'test'
+  ...
+# Subtest: task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）
+ok 18 - task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）
+  ---
+  duration_ms: 12.5284
+  type: 'test'
+  ...
+# Subtest: doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读
+ok 19 - doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读
+  ---
+  duration_ms: 16.019
+  type: 'test'
+  ...
+# Subtest: request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行
+ok 20 - request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行
+  ---
+  duration_ms: 12.3557
+  type: 'test'
+  ...
+# Subtest: task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝
+ok 21 - task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝
+  ---
+  duration_ms: 5.0851
+  type: 'test'
+  ...
+# Subtest: R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放
+ok 22 - R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放
+  ---
+  duration_ms: 4.8814
+  type: 'test'
+  ...
+# Subtest: P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变
+ok 23 - P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变
+  ---
+  duration_ms: 7.9872
+  type: 'test'
+  ...
+# Subtest: P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞
+ok 24 - P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞
+  ---
+  duration_ms: 5.4554
+  type: 'test'
+  ...
+# Subtest: P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）
+ok 25 - P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）
+  ---
+  duration_ms: 32.1715
+  type: 'test'
+  ...
+# Subtest: Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）
+ok 26 - Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）
+  ---
+  duration_ms: 11.7315
+  type: 'test'
+  ...
+# Subtest: S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行
+ok 27 - S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行
+  ---
+  duration_ms: 17.6284
+  type: 'test'
+  ...
+1..27
+# tests 27
+# suites 0
+# pass 27
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 576.8286

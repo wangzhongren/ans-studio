@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: 隔离：ANS_CLAUDE_WEB_SEARCH 未设/0/off/非法值 ⇒ tools=[]、allowedTools 无 WebSearch、绑定轮 WebSearch 仍 deny、帧零消费
+ok 1 - 隔离：ANS_CLAUDE_WEB_SEARCH 未设/0/off/非法值 ⇒ tools=[]、allowedTools 无 WebSearch、绑定轮 WebSearch 仍 deny、帧零消费
+  ---
+  duration_ms: 28.4017
+  type: 'test'
+  ...
+# Subtest: 开启面：1/on（含大小写与空白变体）⇒ tools=[WebSearch] 且 allowedTools 追加 WebSearch；canUseTool 兜底仍 deny
+ok 2 - 开启面：1/on（含大小写与空白变体）⇒ tools=[WebSearch] 且 allowedTools 追加 WebSearch；canUseTool 兜底仍 deny
+  ---
+  duration_ms: 7.9412
+  type: 'test'
+  ...
+# Subtest: 放行分支对抗：恰 allow 且**无 updatedInput**（原文 query 不改写）；伪造名/mcp_server/未绑定/跨轮延后/中止信号必须仍 deny
+ok 3 - 放行分支对抗：恰 allow 且**无 updatedInput**（原文 query 不改写）；伪造名/mcp_server/未绑定/跨轮延后/中止信号必须仍 deny
+  ---
+  duration_ms: 2.3895
+  type: 'test'
+  ...
+# Subtest: ANS 工具分支不回退：WebSearch 开启时合法 mcp__ans__ 工具仍得 updatedInput 请求上下文令牌并真实执行
+ok 4 - ANS 工具分支不回退：WebSearch 开启时合法 mcp__ans__ 工具仍得 updatedInput 请求上下文令牌并真实执行
+  ---
+  duration_ms: 4.235
+  type: 'test'
+  ...
+# Subtest: 消息泵映射：native-start/result 恰对、toolCallId 关联、四类 content 归一（text/unsupported 省略标注/字符串）；非 WebSearch 与未跟踪 id 零消费
+ok 5 - 消息泵映射：native-start/result 恰对、toolCallId 关联、四类 content 归一（text/unsupported 省略标注/字符串）；非 WebSearch 与未跟踪 id 零消费
+  ---
+  duration_ms: 3.6964
+  type: 'test'
+  ...
+# Subtest: 跨轮未配对收尾：首轮 tool_use 无结果帧 ⇒ 只有 start；次轮迟到的旧 id tool_result 不再消费、不串行
+ok 6 - 跨轮未配对收尾：首轮 tool_use 无结果帧 ⇒ 只有 start；次轮迟到的旧 id tool_result 不再消费、不串行
+  ---
+  duration_ms: 3.3077
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 331.9688

@@ -16,6 +16,16 @@
 //  2. 旧 oracle 的 convener→verifier 属于 convener 模块/引擎；本模块对非 product 目标一律
 //     `dispatch-not-in-module-scope`。
 //  3. 内置 product 目标声明为 project 类别属身份自相矛盾 ⇒ `dispatch-input-invalid`（fail-closed）。
+//
+// T3「两条固定工作流路径」B2（v1.3 §3.2/§3.4；MF-2）：
+//  - **legacy-v1（缺省）＝上面的现有逻辑逐字保留**（同一分支顺序/码/报告期望；未传 matrix 的旧调用点
+//    行为不变）；
+//  - `"two-fixed-paths/v1"`（fixed 矩阵）：convener→product（内置、存在）允许，`reportToRoleId="convener"`
+//    （fixed 生产线任务创建者）；chief→product 拒绝 **fixed-only 稳定码**
+//    `chief-production-dispatch-forbidden`（幕僚只派 verifier + stage-request，不派生产线角色）；
+//    其余硬身份/存在性/身份冲突 fail-closed 口径与 legacy 相同。
+//  - 只按 matrix 分支，不复制第二张硬编码目标表；fixed 目标归属由 convener 模块
+//    `fixedAllowedBuiltInRoleIds` 表达，本模块只回答目标=product 的判定。
 
 import type {
   RoleDispatchPolicy,
@@ -32,6 +42,8 @@ export const PRODUCT_DISPATCH_CODES = Object.freeze({
   chiefToProjectForbidden: "chief-to-project-forbidden",
   targetCardMissing: "target-card-missing",
   convenerTargetForbidden: "convener-target-forbidden",
+  /** fixed-only 稳定码（v1.3 §3.2 第 8 条；api-spec/i18n/测试登记；legacy 从不返回）。 */
+  chiefProductionForbidden: "chief-production-dispatch-forbidden",
 });
 
 /** 稳定 i18n messageKey（文案由共享 i18n 渲染；当前为模块登记键，E1 接口评审登记文案）。 */
@@ -43,6 +55,7 @@ export const PRODUCT_DISPATCH_MESSAGE_KEYS = Object.freeze({
   chiefToProjectForbidden: "role.product.dispatch.chiefToProjectForbidden",
   targetCardMissing: "role.product.dispatch.targetCardMissing",
   convenerTargetForbidden: "role.product.dispatch.convenerTargetForbidden",
+  chiefProductionForbidden: "role.product.dispatch.chiefProductionForbidden",
 });
 
 function isNonEmptyText(value: unknown): value is string {
@@ -64,7 +77,7 @@ function deny(
 /**
  * 纯函数：product 侧的派发硬身份/存在性判定。不读盘、不推断、不补造目标。
  *
- * 判定顺序：
+ * 判定顺序（legacy-v1，缺省；逐字保留）：
  * 1. 输入形状（来源可选；目标 id/类别必填且合法；targetExists 若出现必须是 boolean）；
  * 2. 自我派发 ⇒ self-dispatch；
  * 3. 来源缺失或不是 chief/convener ⇒ unknown-source（旧 oracle：只有幕僚或运营可派发）；
@@ -73,6 +86,16 @@ function deny(
  *    目标必须存在（target-card-missing），通过后 reportToRoleId = 真实创建者 chief；
  * 6. 来源 convener：内置目标禁止（convener-target-forbidden）；project 类别与内置 id 冲突 ⇒
  *    dispatch-input-invalid。
+ *
+ * `matrix:"two-fixed-paths/v1"`（fixed；v1.3 §3.2/§3.4）：形状校验相同，其后——
+ * 1. 自我派发 ⇒ self-dispatch；来源缺失/非 chief/convener ⇒ unknown-source；
+ * 2. 目标不是 product ⇒ dispatch-not-in-module-scope；
+ * 3. 来源 chief + 内置目标 ⇒ **chief-production-dispatch-forbidden**（fixed-only）；
+ * 4. 来源 convener + 内置目标：目标存在 ⇒ allow（reportToRoleId = convener），不存在 ⇒
+ *    target-card-missing（fail-closed）；
+ * 5. 内置 id 声明为 project 类别（身份自相矛盾）⇒ dispatch-input-invalid。
+ *
+ * 其它 `matrix` 值（类型不可达）按 legacy 处理——缺省/未知一律不进入 fixed（不猜测）。
  */
 export function productDispatch(input: RoleDispatchPolicyInput): RoleDispatchPolicy {
   const sourceRoleId: unknown = input.sourceRoleId;
@@ -99,6 +122,48 @@ export function productDispatch(input: RoleDispatchPolicyInput): RoleDispatchPol
     return deny(PRODUCT_DISPATCH_CODES.inputInvalid, PRODUCT_DISPATCH_MESSAGE_KEYS.inputInvalid, {
       field: "targetExists",
     });
+  }
+
+  // T3 B2（v1.3 §3.2/§3.4）：fixed 矩阵分支——只在显式 `"two-fixed-paths/v1"` 时进入；
+  // 缺省/其他值继续走下面的 legacy 分支（逐字不变）。
+  if (input.matrix === "two-fixed-paths/v1") {
+    if (sourceRoleId !== undefined && sourceRoleId === targetRoleId) {
+      return deny(PRODUCT_DISPATCH_CODES.selfDispatch, PRODUCT_DISPATCH_MESSAGE_KEYS.selfDispatch, {
+        roleId: sourceRoleId,
+      });
+    }
+    if (sourceRoleId === undefined || (sourceRoleId !== "chief" && sourceRoleId !== "convener")) {
+      return deny(PRODUCT_DISPATCH_CODES.unknownSource, PRODUCT_DISPATCH_MESSAGE_KEYS.unknownSource);
+    }
+    if (targetRoleId !== "product") {
+      return deny(
+        PRODUCT_DISPATCH_CODES.notInModuleScope,
+        PRODUCT_DISPATCH_MESSAGE_KEYS.notInModuleScope,
+        { targetRoleId },
+      );
+    }
+    const targetIsBuiltIn = targetKind === "built-in-governance";
+    if (!targetIsBuiltIn) {
+      // 内置 id=product 声明为 project：身份自相矛盾，fail-closed（与 legacy 口径相同）。
+      return deny(PRODUCT_DISPATCH_CODES.inputInvalid, PRODUCT_DISPATCH_MESSAGE_KEYS.inputInvalid, {
+        field: "targetKind",
+        reason: "built-in-target-declared-project",
+      });
+    }
+    if (sourceRoleId === "chief") {
+      // fixed：幕僚只派 verifier + stage-request，不派生产线角色（product 由运营派发）。
+      return deny(
+        PRODUCT_DISPATCH_CODES.chiefProductionForbidden,
+        PRODUCT_DISPATCH_MESSAGE_KEYS.chiefProductionForbidden,
+      );
+    }
+    // sourceRoleId === "convener"：fixed 生产线派发允许；报告期望 = 真实创建者运营。
+    if (targetExists !== true) {
+      return deny(PRODUCT_DISPATCH_CODES.targetCardMissing, PRODUCT_DISPATCH_MESSAGE_KEYS.targetCardMissing, {
+        targetRoleId,
+      });
+    }
+    return { decision: { allow: true }, reportToRoleId: "convener" };
   }
 
   if (sourceRoleId !== undefined && sourceRoleId === targetRoleId) {

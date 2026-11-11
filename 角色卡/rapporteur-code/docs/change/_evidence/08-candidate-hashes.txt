@@ -1,0 +1,12 @@
+# 本角色 B2 候选文件（raw SHA-256 / bytes / lines）
+src/common/roles/rapporteur/index.ts | 2c2c915fca8a1966851acb714b845a8965001959622219e20769e962958d22dc | 3414 | 67
+src/common/roles/rapporteur/internal/spec.ts | e44045c17daa96f8edc53af1958413a52bbb8994904d7fa62f2e10b9f2b99428 | 12806 | 123
+src/common/roles/rapporteur/internal/context.ts | d2faee7e680cd37b5173ef09350472d3a985c4fe1c9815894fe9808dd816d922 | 11277 | 144
+test/roles/rapporteur/spec.test.ts | 2e578a36771cd6c10abf3f678a7d1354620df041426af3f90313cfed12353557 | 5589 | 107
+test/roles/rapporteur/fixed-module.test.ts | 1a0d31f5f5d3b80995bef11350c7843898a9a2a93429f5b19ffdc7f55d5171bd | 10602 | 202
+
+# git numstat（M 文件）
+6	2	src/common/roles/rapporteur/index.ts
+63	4	src/common/roles/rapporteur/internal/context.ts
+15	0	src/common/roles/rapporteur/internal/spec.ts
+17	2	test/roles/rapporteur/spec.test.ts

@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 普通
+ok 1 - W20 默认Core/Chat产品真实报告落账并到chief 普通
+  ---
+  duration_ms: 438.0202
+  type: 'test'
+  ...
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+ok 2 - W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+  ---
+  duration_ms: 402.9063
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1341.3931

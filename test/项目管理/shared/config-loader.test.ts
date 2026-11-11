@@ -407,3 +407,152 @@ test("loadEffectiveConfig：未知迁移标记字段被忽略，不改变模型/
   assert.equal(Object.prototype.hasOwnProperty.call(project, "governanceMigratedAt"), false);
   assert.equal(Object.prototype.hasOwnProperty.call(project, "legacyGovernanceModel"), false);
 });
+
+// ---- 8) workflowSchema（B0 两条固定工作流路径：缺省不设 / 合法两值 / 非法 fail-closed） ----
+
+/**
+ * 写一份带/不带 `workflowSchema` 的 `.ans/project.json`（其余键固定：governanceModel=trio +
+ * roles + governanceBoundary）。`schemaPresent=false` 时省略该键（= 缺省）。
+ */
+function projectWithAnsSchema(
+  schema: unknown,
+  schemaPresent = true,
+  acceptance: Acceptance = { accepted: false, source: "" },
+  root = newRoot(),
+): string {
+  writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+  const doc: Record<string, unknown> = {
+    governanceModel: "trio",
+    roles: { R: { card: "角色卡/R/role-card.md", boundary: BOUNDARY_REL } },
+    governanceBoundary: { path: BOUNDARY_REL, acceptance },
+  };
+  if (schemaPresent) doc.workflowSchema = schema;
+  writeAt(root, ".ans/project.json", JSON.stringify(doc, null, 2));
+  return root;
+}
+
+test("workflowSchema 缺省 ⇒ 不设字段，governanceModel/roles/acceptance 逐字保留（旧行为不变）", async () => {
+  const root = newRoot();
+  writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+  const sha = sha256OfFile(join(root, BOUNDARY_REL));
+  const root2 = projectWithAnsSchema(
+    undefined,
+    false,
+    { accepted: true, source: "客户 pin", pin: [{ path: BOUNDARY_REL, sha256: sha }] },
+    root,
+  );
+
+  const { project, source } = await load(root2);
+  assert.equal(source.kind, "ans");
+  assert.equal(source.downgradeReason, undefined, "缺省 workflowSchema 不是降级原因");
+  assert.equal(
+    Object.prototype.hasOwnProperty.call(project, "workflowSchema"),
+    false,
+    "缺省时不凭空设置字段（保持旧行为）",
+  );
+  assert.equal(project.workflowSchema, undefined);
+  assert.equal(project.governanceModel, "trio", "既有 governanceModel 不受影响");
+  assert.equal(project.roles.R.boundary, BOUNDARY_REL);
+  assert.equal(project.governanceBoundary?.path, BOUNDARY_REL);
+  assert.equal(project.governanceBoundary?.acceptance.accepted, true);
+  assert.deepEqual(source.pinPaths, [BOUNDARY_REL]);
+});
+
+test("workflowSchema 合法两值均被载入，其它键（governanceModel/roles/acceptance/pin）保留", async () => {
+  for (const schema of ["two-fixed-paths/v1", "legacy/v1"] as const) {
+    const root = newRoot();
+    writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+    const sha = sha256OfFile(join(root, BOUNDARY_REL));
+    const root2 = projectWithAnsSchema(
+      schema,
+      true,
+      { accepted: true, source: "客户 pin", pin: [{ path: BOUNDARY_REL, sha256: sha }] },
+      root,
+    );
+
+    const { project, source } = await load(root2);
+    assert.equal(project.workflowSchema, schema, `${schema} 应作为纯值载入`);
+    assert.equal(source.kind, "ans");
+    assert.equal(source.downgradeReason, undefined);
+    assert.equal(project.governanceModel, "trio", "既有键逐字保留");
+    assert.equal(project.roles.R.card, "角色卡/R/role-card.md");
+    assert.equal(project.governanceBoundary?.path, BOUNDARY_REL);
+    assert.equal(project.governanceBoundary?.acceptance.accepted, true);
+    assert.equal(project.governanceBoundary?.acceptance.pin?.[0].sha256, sha);
+    assert.deepEqual(source.pinPaths, [BOUNDARY_REL]);
+  }
+});
+
+test("workflowSchema 非法值 ⇒ fail-closed（ans-invalid），不得静默当缺省", async () => {
+  // 缺省（键不存在）之外的一切非两值输入都属非法：未知字面量、大小写/空串、null、数字/布尔、
+  // 对象/数组（含「看起来像合法值」的单元素数组）。
+  const badValues: unknown[] = [
+    "two-fixed-paths/v2",
+    "legacy",
+    "",
+    "LEGACY/V1",
+    "Two-Fixed-Paths/V1",
+    null,
+    1,
+    0,
+    true,
+    false,
+    {},
+    [],
+    ["two-fixed-paths/v1"],
+  ];
+
+  for (const bad of badValues) {
+    const { project, source } = await load(projectWithAnsSchema(bad));
+    assert.equal(source.kind, "ans-invalid", `非法值 ${JSON.stringify(bad)} 须 fail-closed`);
+    assert.equal(project.workflowSchema, undefined, "非法值不得作为字段带出");
+    assert.equal(Object.keys(project.roles).length, 0, "fail-closed 时不带出任何角色");
+    assert.equal(project.governanceBoundary?.acceptance.accepted, false);
+    assert.ok(source.downgradeReason && source.downgradeReason.length > 0);
+    assert.match(source.downgradeReason, /workflowSchema/, "降级原因须指名非法字段");
+    assert.match(source.downgradeReason, /fail-closed/);
+  }
+});
+
+test("workflowSchema 与既有终态规则互不影响：合法值 + accepted:true 无 pin ⇒ 仍降级且 schema 保留", async () => {
+  const { project, source } = await load(
+    projectWithAnsSchema("legacy/v1", true, { accepted: true, source: "自填" }),
+  );
+  assert.equal(project.workflowSchema, "legacy/v1", "模式是纯值，不因 acceptance 降级而丢失");
+  assert.equal(project.governanceBoundary?.acceptance.accepted, false, "无 pin 仍须置为未接受");
+  assert.equal(project.governanceBoundary?.acceptance.source, "");
+  assert.ok(source.downgradeReason && source.downgradeReason.length > 0);
+});
+
+test("无 .ans ⇒ 回退 fallback 原样；不凭空设置 workflowSchema", async () => {
+  const root = newRoot();
+  const fallback = fallbackUnaccepted(root);
+  const { project, source } = await loadEffectiveConfig({
+    projectRoot: root,
+    skillRoot: join(root, "skill"),
+    fallback,
+  });
+  assert.equal(source.kind, "builtin-fallback");
+  assert.equal(project, fallback, "无 .ans 时应原样回退 fallback 引用");
+  assert.equal(Object.prototype.hasOwnProperty.call(project, "workflowSchema"), false);
+  assert.equal(project.workflowSchema, undefined);
+});
+
+test("workflowSchema：ansDirName 覆盖同样生效（自定义目录载入两值）", async () => {
+  const root = newRoot();
+  writeAt(root, BOUNDARY_REL, BOUNDARY_YAML);
+  const doc = {
+    workflowSchema: "two-fixed-paths/v1",
+    roles: { R: { card: "角色卡/R/role-card.md", boundary: BOUNDARY_REL } },
+  };
+  writeAt(root, ".custom-ans/project.json", JSON.stringify(doc));
+
+  const { project, source } = await loadEffectiveConfig({
+    projectRoot: root,
+    skillRoot: join(root, "skill"),
+    fallback: fallbackUnaccepted(root),
+    ansDirName: ".custom-ans",
+  });
+  assert.equal(source.kind, "ans");
+  assert.equal(project.workflowSchema, "two-fixed-paths/v1");
+});

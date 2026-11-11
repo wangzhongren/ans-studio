@@ -1,0 +1,5 @@
+before fail count: 24
+after fail count: 24
+AFTER-BEFORE (new failures): NONE
+BEFORE-AFTER (disappeared): NONE
+VERDICT: FAILURE-NAME-SET-IDENTICAL

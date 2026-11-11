@@ -1,0 +1,8 @@
+aggregate input lines:
+src/common/编排/shell-audit.ts:437eb77946386f73aff74d4868713592aea7adaf9888732b8231f388c8f9d2c7
+src/common/编排/shell-gate.ts:e7c365367f07def6b66fa9a51036b2f533dfb1f98c01392f5b2f56dc7952794a
+src/pipeline/orchestration/run-role.ts:c35ed511af99149ae939ab2040b79902c70216eb71dd760083723bf20e17c996
+test/编排/run-role-task-git.test.ts:cc381e51f74f4ec5ed6a37bb5e79803a3fb097a44cb48d6f43692f6969928b19
+test/编排/shell-task-git-execution.test.ts:9561654179c8e369e301964ae389ff1b910f086fa58a484ff207669ca62678f3
+test/编排/shell-task-git-gate.test.ts:d9834381d9b74bc05ab4bf16fcd266d4fa8e91f01801d9753f7b58b8c58e80a0
+aggregate SHA-256: 54d9196936db0bea4d6631f12dd8239e4fd54889b6ce7cfbb51dbbb204dc9644

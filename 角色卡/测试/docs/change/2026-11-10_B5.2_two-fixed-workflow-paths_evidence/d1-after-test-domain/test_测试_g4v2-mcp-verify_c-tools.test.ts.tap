@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: C1 注入才注册：四组合矩阵，两能力互不搭车；未注入的名字结构性不存在
+ok 1 - C1 注入才注册：四组合矩阵，两能力互不搭车；未注入的名字结构性不存在
+  ---
+  duration_ms: 2.1412
+  type: 'test'
+  ...
+# Subtest: C2 回执冻形逐字段：path/digest 前 12 位/生效态两分支/note 透传/诚实面在文案
+ok 2 - C2 回执冻形逐字段：path/digest 前 12 位/生效态两分支/note 透传/诚实面在文案
+  ---
+  duration_ms: 0.4512
+  type: 'test'
+  ...
+# Subtest: C3 契约外回执/抛错/预中止全 fail-closed：绝不称已安装/已卸载
+ok 3 - C3 契约外回执/抛错/预中止全 fail-closed：绝不称已安装/已卸载
+  ---
+  duration_ms: 0.7064
+  type: 'test'
+  ...
+# Subtest: C4 失败透传与 schema 互核：能力 reason+message 原样进回执；schema 枚举句在桌面实现里逐字出现（跨源）
+ok 4 - C4 失败透传与 schema 互核：能力 reason+message 原样进回执；schema 枚举句在桌面实现里逐字出现（跨源）
+  ---
+  duration_ms: 0.3978
+  type: 'test'
+  ...
+# Subtest: C5 零写盘两路：源码切片无写盘原语；fs 写原语 spy 下成功与失败两路恰零调用
+ok 5 - C5 零写盘两路：源码切片无写盘原语；fs 写原语 spy 下成功与失败两路恰零调用
+  ---
+  duration_ms: 2.194
+  type: 'test'
+  ...
+# Subtest: C6 描述诚实面在场且无正向受审表述：能力级授予/门禁之外/非逐调用受审/写边界不变/仅客户明示
+ok 6 - C6 描述诚实面在场且无正向受审表述：能力级授予/门禁之外/非逐调用受审/写边界不变/仅客户明示
+  ---
+  duration_ms: 0.2417
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 233.635

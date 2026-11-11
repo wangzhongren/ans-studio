@@ -1,0 +1,44 @@
+# B3.1 桌面写集边界（相对 HEAD 1a383fb）
+
+## git status --porcelain -- src app test
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+?? test/桌面应用/b31-fixed-release-auto-desktop.test.ts
+
+## src/** diff（应为空）
+(空)
+
+## app/main.ts / app/renderer/** diff（应为空）
+(空)
+
+## package.json / package-lock.json diff（应为空；无新依赖）
+(空)
+
+## app/desktop 变更文件
+ M app/desktop/customer-input.ts
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+
+## 其它角色/文档 diff（本角色写集外；应为空）
+ M 角色卡/chief-code/api-spec.md
+ M 角色卡/product-code/api-spec.md
+ M 角色卡/product-code/feature-map.md
+ M 角色卡/product-code/memo.md
+?? 角色卡/Claude适配器/docs/change/2026-11-05_native-stop-evidence/
+?? 角色卡/Claude适配器/docs/change/2026-11-07_E0_contract-assessment_claude-adapter.md
+?? 角色卡/Claude适配器/docs/change/2026-11-07_P1-B_claude-application-surface-evidence.md
+?? 角色卡/Claude适配器/docs/change/2026-11-07_claude-application-surface-evidence/
+?? 角色卡/Claude适配器/docs/fix/2026-11-07_claude-schema-fix-evidence/
+?? 角色卡/Claude适配器/docs/fix/2026-11-09_fix_claude-git-candidate-call-context-evidence/
+?? 角色卡/Codex适配器/docs/change/2026-11-05_native-stop-evidence/
+?? 角色卡/Codex适配器/docs/change/2026-11-07-P1-B-codex-application-surface-evidence/
+?? 角色卡/Codex适配器/docs/change/2026-11-07_E0_contract-assessment_codex-adapter.md
+?? 角色卡/Codex适配器/docs/change/2026-11-07_P1-B_codex-application-surface-evidence.md
+?? 角色卡/Pi适配器/docs/change/2026-11-05_native-stop-evidence/
+?? 角色卡/Pi适配器/docs/change/2026-11-07_E0_pi-server-tools-and-wrap-session-evidence.md
+?? 角色卡/Pi适配器/docs/change/2026-11-07_E0_pi-server-tools-and-wrap-session-evidence/
+?? 角色卡/Pi适配器/docs/change/2026-11-07_P1-B_pi-application-surface-evidence.md
+?? 角色卡/Pi适配器/docs/change/2026-11-07_P1-B_pi-application-surface-evidence/
+?? 角色卡/gates-code/docs/change/2026-11-07_E1_gates-module-evidence/
+(以上若仅有其它批次的既有未提交项，非本批写入)

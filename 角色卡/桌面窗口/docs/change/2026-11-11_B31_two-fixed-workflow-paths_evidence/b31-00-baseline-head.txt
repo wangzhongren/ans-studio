@@ -1,0 +1,25 @@
+2026-11-11T18:05:17+08:00
+worktree: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch: feat/two-fixed-workflow-paths
+head: 9cce9279b95a50bdb52bb8aee548006c101112cd
+head-subject: fix(runtime-core): B30 allow repo-local [user] name/email in readonly git config
+node: v24.22.1
+npm: 11.19.1
+
+# tracked changes at B31 verification (mixed worktree)
+# B31 desktop owns: app/desktop/session.ts; test/桌面应用/b3-fixed-baseline-pathb.test.ts
+# parallel non-B31 (untouched here): src/common/编排/workflow-service.ts; src/common/门禁引擎/workflows/chief/chief-workflow-v2.md; test/编排/acceptance-archive.test.ts; 角色卡/桌面窗口/boundary.{md,yaml}; 角色卡/运行时核心/boundary.{md,yaml}
+ M app/desktop/session.ts
+ M src/common/编排/workflow-service.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/桌面应用/b3-fixed-baseline-pathb.test.ts
+ M test/编排/acceptance-archive.test.ts
+ M 角色卡/桌面窗口/boundary.md
+ M 角色卡/桌面窗口/boundary.yaml
+ M 角色卡/运行时核心/boundary.md
+ M 角色卡/运行时核心/boundary.yaml
+
+# B31 desktop change (git diff --stat)
+ app/desktop/session.ts                        |  12 +-
+ test/桌面应用/b3-fixed-baseline-pathb.test.ts | 158 ++++++++++++++++++++++++++
+ 2 files changed, 169 insertions(+), 1 deletion(-)

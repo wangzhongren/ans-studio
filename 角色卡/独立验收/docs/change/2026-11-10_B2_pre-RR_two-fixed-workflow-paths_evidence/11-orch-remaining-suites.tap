@@ -1,0 +1,430 @@
+TAP version 13
+# Subtest: 首次 fixed 启动顺序：B1 启用闸在显式写 workflowSchema 前不启用（死锁点）→ 助手写回后 fixed 放行
+ok 1 - 首次 fixed 启动顺序：B1 启用闸在显式写 workflowSchema 前不启用（死锁点）→ 助手写回后 fixed 放行
+  ---
+  duration_ms: 7.2451
+  type: 'test'
+  ...
+# Subtest: 显式 legacy/v1：助手不覆盖配置，返回 legacy（B3 不得按 fixed 派发）
+ok 2 - 显式 legacy/v1：助手不覆盖配置，返回 legacy（B3 不得按 fixed 派发）
+  ---
+  duration_ms: 10.2595
+  type: 'test'
+  ...
+# Subtest: project.json 坏文件：助手 fail-closed project-config-write-failed（不覆盖、不猜 fixed）
+ok 3 - project.json 坏文件：助手 fail-closed project-config-write-failed（不覆盖、不猜 fixed）
+  ---
+  duration_ms: 2.2834
+  type: 'test'
+  ...
+# Subtest: per-flow 不缓存：同一进程内按实际 flowId 逐次解析（legacy 在飞 flow 保持 legacy，新 flow fixed）
+ok 4 - per-flow 不缓存：同一进程内按实际 flowId 逐次解析（legacy 在飞 flow 保持 legacy，新 flow fixed）
+  ---
+  duration_ms: 5.3641
+  type: 'test'
+  ...
+# Subtest: 空项目：无 workflow、无 legacyStateIgnored 警告
+ok 5 - 空项目：无 workflow、无 legacyStateIgnored 警告
+  ---
+  duration_ms: 5.9099
+  type: 'test'
+  ...
+# Subtest: 活动 fixed workflow：视图/阶段/reviewRoleId/activated + 旧 trunk/run 状态列为 legacyStateIgnored
+ok 6 - 活动 fixed workflow：视图/阶段/reviewRoleId/activated + 旧 trunk/run 状态列为 legacyStateIgnored
+  ---
+  duration_ms: 38.8182
+  type: 'test'
+  ...
+# Subtest: 坏账本（workflow-corrupt）⇒ 投影警告如实列出，不按成功处理
+ok 7 - 坏账本（workflow-corrupt）⇒ 投影警告如实列出，不按成功处理
+  ---
+  duration_ms: 20.7445
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 8 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 21.3447
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 9 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 14.6132
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 10 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 10.6499
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 11 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 4.8766
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 12 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 4.255
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 13 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 0.7632
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 14 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 5.6176
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 15 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 20.0427
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 16 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 8.5112
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 17 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 11.763
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 18 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 11.4668
+  type: 'test'
+  ...
+# Subtest: fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+ok 19 - fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+  ---
+  duration_ms: 73.3174
+  type: 'test'
+  ...
+# Subtest: fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+ok 20 - fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+  ---
+  duration_ms: 28.8618
+  type: 'test'
+  ...
+# Subtest: legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+ok 21 - legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+  ---
+  duration_ms: 25.5149
+  type: 'test'
+  ...
+# Subtest: fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+ok 22 - fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+  ---
+  duration_ms: 16.8479
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+ok 23 - fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+  ---
+  duration_ms: 34.9001
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+ok 24 - legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+  ---
+  duration_ms: 27.441
+  type: 'test'
+  ...
+# Subtest: fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+ok 25 - fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+  ---
+  duration_ms: 107.4336
+  type: 'test'
+  ...
+# Subtest: fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt
+ok 26 - fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt
+  ---
+  duration_ms: 33.9754
+  type: 'test'
+  ...
+# Subtest: fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+ok 27 - fixed 会话：不注入 legacy trunk/git/VCA/stable 工具；保留 completeTeamPlan/closeCreatedTask；注入模块 context 段
+  ---
+  duration_ms: 10.6132
+  type: 'test'
+  ...
+# Subtest: legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+ok 28 - legacy 会话（缺省）：同一注入面逐字保留（git/stable/refactor 均注入）
+  ---
+  duration_ms: 4.9311
+  type: 'test'
+  ...
+# Subtest: fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+ok 29 - fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+  ---
+  duration_ms: 43.6473
+  type: 'test'
+  ...
+# Subtest: 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+ok 30 - 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+  ---
+  duration_ms: 14.9722
+  type: 'test'
+  ...
+# Subtest: 快照 diff：新增/修改/删除；mtime 或 size 变化即 modified
+ok 31 - 快照 diff：新增/修改/删除；mtime 或 size 变化即 modified
+  ---
+  duration_ms: 5.5333
+  type: 'test'
+  ...
+# Subtest: 越界判定：边界内通过；边界外/禁写前缀进入 violations
+ok 32 - 越界判定：边界内通过；边界外/禁写前缀进入 violations
+  ---
+  duration_ms: 0.1912
+  type: 'test'
+  ...
+# Subtest: createShellPostAudit：执行前后快照对比 → 越界写入返回并写审计（仅越界时）；写审计失败不影响回执
+ok 33 - createShellPostAudit：执行前后快照对比 → 越界写入返回并写审计（仅越界时）；写审计失败不影响回执
+  ---
+  duration_ms: 3.1524
+  type: 'test'
+  ...
+# Subtest: 真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修改/删除可见
+ok 34 - 真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修改/删除可见
+  ---
+  duration_ms: 6.9541
+  type: 'test'
+  ...
+# Subtest: R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）
+ok 35 - R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）
+  ---
+  duration_ms: 20.6676
+  type: 'test'
+  ...
+# Subtest: R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）
+ok 36 - R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）
+  ---
+  duration_ms: 4.2404
+  type: 'test'
+  ...
+# Subtest: P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入
+ok 37 - P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入
+  ---
+  duration_ms: 3.0212
+  type: 'test'
+  ...
+# Subtest: 归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界
+ok 38 - 归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界
+  ---
+  duration_ms: 0.2964
+  type: 'test'
+  ...
+# Subtest: 归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界
+ok 39 - 归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界
+  ---
+  duration_ms: 18.6244
+  type: 'test'
+  ...
+# Subtest: v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底
+ok 40 - v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底
+  ---
+  duration_ms: 2.774
+  type: 'test'
+  ...
+# Subtest: commit runner：固定 staged argv + 固定 commit argv；项目级锁贯穿检查与提交、锁后释放
+ok 41 - commit runner：固定 staged argv + 固定 commit argv；项目级锁贯穿检查与提交、锁后释放
+  ---
+  duration_ms: 1.7302
+  type: 'test'
+  ...
+# Subtest: commit runner：staged 越界 ⇒ git-staged-outside-writeset，不提交且释放锁
+ok 42 - commit runner：staged 越界 ⇒ git-staged-outside-writeset，不提交且释放锁
+  ---
+  duration_ms: 0.2213
+  type: 'test'
+  ...
+# Subtest: commit runner：staged 空 ⇒ git-staged-empty；治理写区 ⇒ git-staged-governance-path；均不提交
+ok 43 - commit runner：staged 空 ⇒ git-staged-empty；治理写区 ⇒ git-staged-governance-path；均不提交
+  ---
+  duration_ms: 0.211
+  type: 'test'
+  ...
+# Subtest: commit runner：项目级锁被占用 ⇒ git-critical-section-busy（不排队、不检查、不提交）
+ok 44 - commit runner：项目级锁被占用 ⇒ git-critical-section-busy（不排队、不检查、不提交）
+  ---
+  duration_ms: 0.129
+  type: 'test'
+  ...
+# Subtest: commit runner：当前分支 != 任务分支 ⇒ git-branch-mismatch（取锁前拒绝）
+ok 45 - commit runner：当前分支 != 任务分支 ⇒ git-branch-mismatch（取锁前拒绝）
+  ---
+  duration_ms: 0.1336
+  type: 'test'
+  ...
+# Subtest: commit runner：staged 检查异常 ⇒ 释放锁后如实抛出（不伪装成功）
+ok 46 - commit runner：staged 检查异常 ⇒ 释放锁后如实抛出（不伪装成功）
+  ---
+  duration_ms: 0.3482
+  type: 'test'
+  ...
+# Subtest: execution add：match 命中（writeSet 内字面路径）⇒ 经端口执行，无锁/无 commit
+ok 47 - execution add：match 命中（writeSet 内字面路径）⇒ 经端口执行，无锁/无 commit
+  ---
+  duration_ms: 0.3255
+  type: 'test'
+  ...
+# Subtest: execution add：-A / 非字面 / 越界 / 治理写区在 match 即 undefined（不享受任务级放行）
+ok 48 - execution add：-A / 非字面 / 越界 / 治理写区在 match 即 undefined（不享受任务级放行）
+  ---
+  duration_ms: 0.1471
+  type: 'test'
+  ...
+# Subtest: execution commit：match 命中 ⇒ execute 经 runTaskGitCommit（同一把锁贯穿检查与提交）
+ok 49 - execution commit：match 命中 ⇒ execute 经 runTaskGitCommit（同一把锁贯穿检查与提交）
+  ---
+  duration_ms: 0.2254
+  type: 'test'
+  ...
+# Subtest: execution commit：临界区门失败 ⇒ 失败事实（含稳定码），不提交
+ok 50 - execution commit：临界区门失败 ⇒ 失败事实（含稳定码），不提交
+  ---
+  duration_ms: 0.5532
+  type: 'test'
+  ...
+# Subtest: execution commit：检查异常 ⇒ git-task-commit-failed（锁已释放）
+ok 51 - execution commit：检查异常 ⇒ git-task-commit-failed（锁已释放）
+  ---
+  duration_ms: 0.2549
+  type: 'test'
+  ...
+# Subtest: execution：伪造 match（kind/分支/message/越 scope）防御性拒绝，不执行任何端口
+ok 52 - execution：伪造 match（kind/分支/message/越 scope）防御性拒绝，不执行任何端口
+  ---
+  duration_ms: 0.1539
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（A 路径）：真实受派任务 + basis.teamPlan → roleRows writesets/branch/taskId/workflowId
+ok 53 - resolveTaskGitScope（A 路径）：真实受派任务 + basis.teamPlan → roleRows writesets/branch/taskId/workflowId
+  ---
+  duration_ms: 31.4536
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（A 路径）：团队计划字节漂移 ⇒ git-task-scope-invalid（basis-drift，fail-closed）
+ok 54 - resolveTaskGitScope（A 路径）：团队计划字节漂移 ⇒ git-task-scope-invalid（basis-drift，fail-closed）
+  ---
+  duration_ms: 19.3072
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（B 路径）：change.scope-decided → derivePathBWriteSets → 本角色写集
+ok 55 - resolveTaskGitScope（B 路径）：change.scope-decided → derivePathBWriteSets → 本角色写集
+  ---
+  duration_ms: 16.5085
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（B 路径）：无 change.scope-decided ⇒ git-task-scope-missing；派生失败 ⇒ invalid
+ok 56 - resolveTaskGitScope（B 路径）：无 change.scope-decided ⇒ git-task-scope-missing；派生失败 ⇒ invalid
+  ---
+  duration_ms: 12.5729
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope：无任务/角色不匹配/阶段非 A11|B3/无 workflowId ⇒ 稳定码拒绝
+ok 57 - resolveTaskGitScope：无任务/角色不匹配/阶段非 A11|B3/无 workflowId ⇒ 稳定码拒绝
+  ---
+  duration_ms: 31.4366
+  type: 'test'
+  ...
+# Subtest: fixed 任务 git add 允许：writeSet/分支/taskId/workflowId 命中，审计追加 taskGit（allowed）
+ok 58 - fixed 任务 git add 允许：writeSet/分支/taskId/workflowId 命中，审计追加 taskGit（allowed）
+  ---
+  duration_ms: 4.1036
+  type: 'test'
+  ...
+# Subtest: fixed 任务 git commit -m 允许：审计 taskGit 记 messageSha256（不落明文）
+ok 59 - fixed 任务 git commit -m 允许：审计 taskGit 记 messageSha256（不落明文）
+  ---
+  duration_ms: 0.3445
+  type: 'test'
+  ...
+# Subtest: git add -A / 非字面 ./x / 越 writeSet / 治理写区：拒绝且审计 taskGit（denied + 稳定码）
+ok 60 - git add -A / 非字面 ./x / 越 writeSet / 治理写区：拒绝且审计 taskGit（denied + 稳定码）
+  ---
+  duration_ms: 1.0096
+  type: 'test'
+  ...
+# Subtest: git commit -F - / --amend / -m 空串：拒绝且审计 taskGit（denied + 稳定码）
+ok 61 - git commit -F - / --amend / -m 空串：拒绝且审计 taskGit（denied + 稳定码）
+  ---
+  duration_ms: 0.562
+  type: 'test'
+  ...
+# Subtest: 普通 Git（push/merge/reset/checkout/update-ref）硬拒：git-command-not-ordinary，审计 taskGit（other）
+ok 62 - 普通 Git（push/merge/reset/checkout/update-ref）硬拒：git-command-not-ordinary，审计 taskGit（other）
+  ---
+  duration_ms: 0.3921
+  type: 'test'
+  ...
+# Subtest: 无 taskGitScope（明细分类器无上下文）：git add/commit 一律拒（git-task-scope-missing）
+ok 63 - 无 taskGitScope（明细分类器无上下文）：git add/commit 一律拒（git-task-scope-missing）
+  ---
+  duration_ms: 0.2669
+  type: 'test'
+  ...
+# Subtest: 2 参旧调用（classifyShell 裸串）：git add/commit 仍拒（v5 无 scope），审计无 taskGit 字段
+ok 64 - 2 参旧调用（classifyShell 裸串）：git add/commit 仍拒（v5 无 scope），审计无 taskGit 字段
+  ---
+  duration_ms: 0.4075
+  type: 'test'
+  ...
+# Subtest: 明细分类封装（run-role 生产通道）：classifyShell 位置包 classifyShellDetailed + scope ⇒ add/commit 允许且审计 taskGit
+ok 65 - 明细分类封装（run-role 生产通道）：classifyShell 位置包 classifyShellDetailed + scope ⇒ add/commit 允许且审计 taskGit
+  ---
+  duration_ms: 0.277
+  type: 'test'
+  ...
+# Subtest: readonlyOnly 不得注入 classifyShellDetailed/taskGitScope（任务级 Git 写不得越过 readonly-deny）
+ok 66 - readonlyOnly 不得注入 classifyShellDetailed/taskGitScope（任务级 Git 写不得越过 readonly-deny）
+  ---
+  duration_ms: 0.2991
+  type: 'test'
+  ...
+# Subtest: 非 Git 命令：明细分类器下判定与审计字段不因 taskGitScope 变化（ls allow，无 taskGit）
+ok 67 - 非 Git 命令：明细分类器下判定与审计字段不因 taskGitScope 变化（ls allow，无 taskGit）
+  ---
+  duration_ms: 0.4536
+  type: 'test'
+  ...
+# Subtest: recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+ok 68 - recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+  ---
+  duration_ms: 165.268
+  type: 'test'
+  ...
+# Subtest: 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+ok 69 - 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+  ---
+  duration_ms: 145.4945
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+ok 70 - path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+  ---
+  duration_ms: 13.3851
+  type: 'test'
+  ...
+1..70
+# tests 70
+# suites 0
+# pass 70
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3601.2936

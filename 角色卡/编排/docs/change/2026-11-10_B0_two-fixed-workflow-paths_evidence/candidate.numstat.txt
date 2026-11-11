@@ -1,0 +1,13 @@
+# modified (git diff --numstat)
+117	9	"src/common/\347\274\226\346\216\222/task-state.ts"
+1	0	src/pipeline/orchestration/run-role.ts
+# new files (untracked; added lines = total lines)
+new-file	364 lines	src/common/编排/workflow-state.ts
+new-file	442 lines	src/common/编排/workflow-service.ts
+new-file	370 lines	src/common/编排/basis-guard.ts
+new-file	237 lines	test/编排/task-state-fixed.test.ts
+new-file	268 lines	test/编排/workflow-state.test.ts
+new-file	225 lines	test/编排/workflow-mode.test.ts
+new-file	200 lines	test/编排/workflow-ledger.test.ts
+new-file	216 lines	test/编排/basis-guard.test.ts
+# aggregate: modified task-state +117/-9, run-role +1/-0; new files 2322 lines total (8 files)

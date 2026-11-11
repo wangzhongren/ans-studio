@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+ok 1 - 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+  ---
+  duration_ms: 3.323
+  type: 'test'
+  ...
+# Subtest: 差分：卡/边界/capabilities/显示名与冻结金样逐字段一致
+ok 2 - 差分：卡/边界/capabilities/显示名与冻结金样逐字段一致
+  ---
+  duration_ms: 0.7716
+  type: 'test'
+  ...
+# Subtest: 差分：卡文本 sha256 / 长度 / 行数零差异
+ok 3 - 差分：卡文本 sha256 / 长度 / 行数零差异
+  ---
+  duration_ms: 0.1248
+  type: 'test'
+  ...
+# Subtest: 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结）
+ok 4 - 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结）
+  ---
+  duration_ms: 0.1223
+  type: 'test'
+  ...
+# Subtest: 差分：tools 金样——D1 14 项均不含 verifier，空声明 trio/single 合法
+ok 5 - 差分：tools 金样——D1 14 项均不含 verifier，空声明 trio/single 合法
+  ---
+  duration_ms: 0.2587
+  type: 'test'
+  ...
+# Subtest: 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+ok 6 - 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+  ---
+  duration_ms: 0.2033
+  type: 'test'
+  ...
+# Subtest: 差分（documented）：契约明文差异逐条单列（旧 oracle 行为不同且方向固定）
+ok 7 - 差分（documented）：契约明文差异逐条单列（旧 oracle 行为不同且方向固定）
+  ---
+  duration_ms: 0.1595
+  type: 'test'
+  ...
+# Subtest: 差分（module-only）：旧函数无法表达的模块负例（只冻结模块行为与旧观测）
+ok 8 - 差分（module-only）：旧函数无法表达的模块负例（只冻结模块行为与旧观测）
+  ---
+  duration_ms: 0.0845
+  type: 'test'
+  ...
+# Subtest: 差分（review preflight，zero）：只含登记事实键时与旧 Model 形状判定零差异
+ok 9 - 差分（review preflight，zero）：只含登记事实键时与旧 Model 形状判定零差异
+  ---
+  duration_ms: 0.6597
+  type: 'test'
+  ...
+# Subtest: 差分（review preflight，documented）：E2 P5 未登记键拒绝（契约明文更严差异）
+ok 10 - 差分（review preflight，documented）：E2 P5 未登记键拒绝（契约明文更严差异）
+  ---
+  duration_ms: 0.2732
+  type: 'test'
+  ...
+# Subtest: 差分：模块不读取验收结论键值（事实包违规一律 deny，不做验收判定/证据核验）
+ok 11 - 差分：模块不读取验收结论键值（事实包违规一律 deny，不做验收判定/证据核验）
+  ---
+  duration_ms: 0.1814
+  type: 'test'
+  ...
+# Subtest: 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+ok 12 - 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+  ---
+  duration_ms: 3.3274
+  type: 'test'
+  ...
+# Subtest: 模块数据：id/displayName/function/cards/capabilities 与旧规格一致且只读
+ok 13 - 模块数据：id/displayName/function/cards/capabilities 与旧规格一致且只读
+  ---
+  duration_ms: 1.0485
+  type: 'test'
+  ...
+# Subtest: 卡/边界：Section 1 三条目录、预授权与禁写清单为纯数据
+ok 14 - 卡/边界：Section 1 三条目录、预授权与禁写清单为纯数据
+  ---
+  duration_ms: 0.1192
+  type: 'test'
+  ...
+# Subtest: tools()：verifier 无额外 RoleToolId（空声明），capabilities 与 spec 同引用（D10）
+ok 15 - tools()：verifier 无额外 RoleToolId（空声明），capabilities 与 spec 同引用（D10）
+  ---
+  duration_ms: 0.0994
+  type: 'test'
+  ...
+# Subtest: dispatch()：fixture 表（硬身份/存在性 + 报告期望）
+ok 16 - dispatch()：fixture 表（硬身份/存在性 + 报告期望）
+  ---
+  duration_ms: 0.1679
+  type: 'test'
+  ...
+# Subtest: dispatch()：不修改调用方输入（纯策略）
+ok 17 - dispatch()：不修改调用方输入（纯策略）
+  ---
+  duration_ms: 0.1287
+  type: 'test'
+  ...
+# Subtest: dispatch()：允许时 reportToRoleId 是真实来源（差分期望，不是路由）
+ok 18 - dispatch()：允许时 reportToRoleId 是真实来源（差分期望，不是路由）
+  ---
+  duration_ms: 0.061
+  type: 'test'
+  ...
+# Subtest: preflight：只覆盖 review；其他动作 fail-closed（action-not-covered）
+ok 19 - preflight：只覆盖 review；其他动作 fail-closed（action-not-covered）
+  ---
+  duration_ms: 0.1314
+  type: 'test'
+  ...
+# Subtest: preflight(review)：fixture 表（reviewTarget/最终候选/CID/criteria；缺事实 deny）
+ok 20 - preflight(review)：fixture 表（reviewTarget/最终候选/CID/criteria；缺事实 deny）
+  ---
+  duration_ms: 0.7163
+  type: 'test'
+  ...
+# Subtest: preflight(review)：任何未登记事实键 ⇒ deny（E0.3 §3.4/D4；E2 P5 修复）
+ok 21 - preflight(review)：任何未登记事实键 ⇒ deny（E0.3 §3.4/D4；E2 P5 修复）
+  ---
+  duration_ms: 0.3564
+  type: 'test'
+  ...
+# Subtest: preflight(review)：未登记键拒绝不修改调用方事实包（纯策略）
+ok 22 - preflight(review)：未登记键拒绝不修改调用方事实包（纯策略）
+  ---
+  duration_ms: 0.1524
+  type: 'test'
+  ...
+# Subtest: preflight(review)：不修改事实包（纯策略）
+ok 23 - preflight(review)：不修改事实包（纯策略）
+  ---
+  duration_ms: 0.1051
+  type: 'test'
+  ...
+# Subtest: context()：two 静态段（acceptance 卡数据 + 报告期望），id 唯一、文本非空
+ok 24 - context()：two 静态段（acceptance 卡数据 + 报告期望），id 唯一、文本非空
+  ---
+  duration_ms: 0.1092
+  type: 'test'
+  ...
+# Subtest: context()：纯静态模板（单/trio、有无 facts 输出一致；输入不被修改）
+ok 25 - context()：纯静态模板（单/trio、有无 facts 输出一致；输入不被修改）
+  ---
+  duration_ms: 0.0857
+  type: 'test'
+  ...
+# Subtest: 模块根只有唯一 public entry index.ts（不散放文件）
+ok 26 - 模块根只有唯一 public entry index.ts（不散放文件）
+  ---
+  duration_ms: 0.222
+  type: 'test'
+  ...
+# Subtest: 依赖方向：只 import Model public entry；无引擎/门控/pipeline/service/provider/app/其他角色/node: 依赖
+ok 27 - 依赖方向：只 import Model public entry；无引擎/门控/pipeline/service/provider/app/其他角色/node: 依赖
+  ---
+  duration_ms: 0.3456
+  type: 'test'
+  ...
+# Subtest: 唯一 public entry 只导出一个 BuiltInRoleModule
+ok 28 - 唯一 public entry 只导出一个 BuiltInRoleModule
+  ---
+  duration_ms: 0.2298
+  type: 'test'
+  ...
+# Subtest: 纯函数：重复调用返回结构一致（无可变状态/时钟/随机数）
+ok 29 - 纯函数：重复调用返回结构一致（无可变状态/时钟/随机数）
+  ---
+  duration_ms: 0.1077
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 236.4816

@@ -1,0 +1,95 @@
+TAP version 13
+# execution-bases:first-document-source-captured
+# execution-bases:delivered-code-newer-document-selected
+# execution-bases:old-source-and-stale-cas-verified
+# execution-bases:actual-ancestry-selected-ambiguous-heads-denied
+# Subtest: Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time
+ok 1 - Git execution bases (storage only): delivered code and newer document blobs freeze independently; ambiguity never selects by time
+  ---
+  duration_ms: 29232.1159
+  type: 'test'
+  ...
+# Subtest: Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis
+ok 2 - Git delivery bytes: real sha1 raw commits and null/existing ref CAS preserve the code basis
+  ---
+  duration_ms: 3090.4014
+  type: 'test'
+  ...
+# Subtest: Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis
+ok 3 - Git delivery bytes: real sha256 raw commits and null/existing ref CAS preserve the code basis
+  ---
+  duration_ms: 3212.6616
+  type: 'test'
+  ...
+# {"format":"sha1","first":{"objectFormat":"sha1","hex":"1d391070e7b2e78ba996b5f9247aef72739b651d"},"next":{"objectFormat":"sha1","hex":"691c6549504f5846de0fc128083aed52d997e825"},"tree":{"objectFormat":"sha1","hex":"fc47c6d69618bdded84c851c9ff2584bebdd6f15"},"parents":[{"objectFormat":"sha1","hex":"1d391070e7b2e78ba996b5f9247aef72739b651d"}]}
+# Subtest: Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index
+ok 4 - Git candidates: real sha1 complete trees preserve unchanged arbitrary bytes and isolate the user index
+  ---
+  duration_ms: 1138.9346
+  type: 'test'
+  ...
+# {"format":"sha256","first":{"objectFormat":"sha256","hex":"3da4025511395fac2f8d3748083c32b3af771da7d7c4375efc2df25a667dd975"},"next":{"objectFormat":"sha256","hex":"a71be969fb6f1819cb3a59dedf8baf0ed5962cd74d985666a40e8977166f18ca"},"tree":{"objectFormat":"sha256","hex":"01c1d13911908cf1c77a5fd880e9f4fa4bdf6bbbb1f5f6a1caffb4793ceedc25"},"parents":[{"objectFormat":"sha256","hex":"3da4025511395fac2f8d3748083c32b3af771da7d7c4375efc2df25a667dd975"}]}
+# Subtest: Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index
+ok 5 - Git candidates: real sha256 complete trees preserve unchanged arbitrary bytes and isolate the user index
+  ---
+  duration_ms: 1349.0772
+  type: 'test'
+  ...
+# Subtest: Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files
+ok 6 - Git revert Provider: real sha1 inverse applies to current code and preserves unrelated later files
+  ---
+  duration_ms: 7447.4335
+  type: 'test'
+  ...
+# Subtest: Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files
+ok 7 - Git revert Provider: real sha256 inverse applies to current code and preserves unrelated later files
+  ---
+  duration_ms: 7365.6394
+  type: 'test'
+  ...
+# {"old":null,"published":{"objectFormat":"sha1","hex":"2f1ec413d6fe925fcb6cbf80e18bc5310c1cf639"},"results":[{"status":"published","journalId":".ans/trunk/operations/7aebf56e035aecd38ee2c6264322d3356c90a40b5a93b1eefc2a5cdf15110ef7/git.json"},{"status":"conflict","journalId":".ans/trunk/operations/e6537ffc30aa789aaa2ff3671b9eb2bea7604e0bc8df187e10973d5a36efac4f/git.json"}]}
+# Subtest: Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit
+ok 8 - Git ref CAS: real independent Node processes have one winner; recovery uses actual ref and immutable commit
+  ---
+  duration_ms: 1300.8055
+  type: 'test'
+  ...
+# Subtest: Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination
+ok 9 - Git query: output and real process time are bounded; forced cancellation never claims whole-tree termination
+  ---
+  duration_ms: 311.4437
+  type: 'test'
+  ...
+# Subtest: Git operation media: restart enumeration discovers both formats and refuses same-id rebinding
+ok 10 - Git operation media: restart enumeration discovers both formats and refuses same-id rebinding
+  ---
+  duration_ms: 556.4734
+  type: 'test'
+  ...
+# Subtest: Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid
+ok 11 - Git mutation process fence: an unresolved prior instance survives restart and never expires from clock or missing pid
+  ---
+  duration_ms: 172.3843
+  type: 'test'
+  ...
+# Subtest: Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection
+ok 12 - Git TrunkStore: full five-argument CAS, same-version workflow fence, media-bound business recovery and read-only production selection
+  ---
+  duration_ms: 5951.6399
+  type: 'test'
+  ...
+# Subtest: Git migration: actual legacy committed and pending operations keep their original media proof
+ok 13 - Git migration: actual legacy committed and pending operations keep their original media proof
+  ---
+  duration_ms: 2405.3465
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 63767.9057

@@ -1,0 +1,15 @@
+# B3.1 桌面候选（基线 HEAD 1a383fb；写盘实测 raw SHA-256 / bytes / lines）
+
+app/desktop/session.ts	3fd4210c3f8ee4951cd701c918b0bd942229690c0a210ec0270839574244161e	813675	12789
+app/desktop/workflow.ts	84dd9c14ce726d3e213b1ceb71125dd1b19230f6416f09f1739539126c0fe0d3	14885	266
+app/desktop/customer-input.ts	07a88d43491e7f5db8b2815b2aea6173fef069756f14f8bd16256cb2baf54f6f	164427	2880
+test/桌面应用/b31-fixed-release-auto-desktop.test.ts	3754ccef3ecf24f81b1dc9f1371989171527c4d88b8e2e38b623165ae019924d	48542	842
+
+# numstat（相对 HEAD 1a383fb）
+8	0	app/desktop/customer-input.ts
+264	16	app/desktop/session.ts
+18	0	app/desktop/workflow.ts
+test/桌面应用/b31-fixed-release-auto-desktop.test.ts	新文件（842 行）
+
+# 聚合 SHA-256（按路径排序；逐行 path NUL sha256 连接后整体 SHA-256）
+47cbf555d3d6abc8465b2296483ab787cc41e3365c47a67c35cb4694d328384d

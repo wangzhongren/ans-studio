@@ -1,0 +1,170 @@
+TAP version 13
+# Subtest: resolveSkillRoot：优先 ANS_SKILL_ROOT
+ok 1 - resolveSkillRoot：优先 ANS_SKILL_ROOT
+  ---
+  duration_ms: 0.7835
+  type: 'test'
+  ...
+# Subtest: posixDirname：取目录名
+ok 2 - posixDirname：取目录名
+  ---
+  duration_ms: 0.0975
+  type: 'test'
+  ...
+# Subtest: buildProjectConfig：由枚举结果构造角色表，acceptance 透传
+not ok 3 - buildProjectConfig：由枚举结果构造角色表，acceptance 透传
+  ---
+  duration_ms: 44.4479
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\project.test.ts:29:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    枚举不应有任何警告（归档目录按归档键约定静默跳过、零提示）
+    + actual - expected
+    
+    + [
+    +   '角色卡/招募：缺少 role-card.md，已跳过'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: '角色卡/招募：缺少 role-card.md，已跳过'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/project.test.ts:34:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: readRoleDocsIndex：列出 docs 目录并读到设计稿；读到 changelog.md
+ok 4 - readRoleDocsIndex：列出 docs 目录并读到设计稿；读到 changelog.md
+  ---
+  duration_ms: 2.1864
+  type: 'test'
+  ...
+# Subtest: su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的 roles 映射
+ok 5 - su：枚举结果里排第一且标为内置，且不进 ProjectConfig 的 roles 映射
+  ---
+  duration_ms: 23.9425
+  type: 'test'
+  ...
+# Subtest: su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错
+ok 6 - su：resolveRole 下沉为 built-in-governance，走内置边界、不抛错
+  ---
+  duration_ms: 23.3975
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecord：missing——无 .ans（builtin-fallback），即使回退 acceptance 是运行期同意
+ok 7 - deriveGovernanceRecord：missing——无 .ans（builtin-fallback），即使回退 acceptance 是运行期同意
+  ---
+  duration_ms: 0.3398
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecord：present——ans + accepted + 治理边界路径非空（不校验 pin 逐文件哈希）
+ok 8 - deriveGovernanceRecord：present——ans + accepted + 治理边界路径非空（不校验 pin 逐文件哈希）
+  ---
+  duration_ms: 0.064
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecord：invalid——ans-invalid 原样取载入器 downgradeReason
+ok 9 - deriveGovernanceRecord：invalid——ans-invalid 原样取载入器 downgradeReason
+  ---
+  duration_ms: 0.0847
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecord：invalid——ans 但未接受（如 accepted:true 无 pin 被降级），reason 取 downgradeReason
+ok 10 - deriveGovernanceRecord：invalid——ans 但未接受（如 accepted:true 无 pin 被降级），reason 取 downgradeReason
+  ---
+  duration_ms: 0.2994
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecord：invalid——治理边界路径为空或纯空白（含 accepted）
+ok 11 - deriveGovernanceRecord：invalid——治理边界路径为空或纯空白（含 accepted）
+  ---
+  duration_ms: 0.1036
+  type: 'test'
+  ...
+# Subtest: applyPinEvidence：ok 保持原 present（不新增字段）；mismatch → pin-mismatch + 明细；invalid → invalid + 原因
+ok 12 - applyPinEvidence：ok 保持原 present（不新增字段）；mismatch → pin-mismatch + 明细；invalid → invalid + 原因
+  ---
+  duration_ms: 0.1308
+  type: 'test'
+  ...
+# Subtest: applyPinEvidence：missing / invalid 原样返回（不因 pin 证据改写既有形状）
+ok 13 - applyPinEvidence：missing / invalid 原样返回（不因 pin 证据改写既有形状）
+  ---
+  duration_ms: 0.037
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecordWithPins：present 以外不做哈希、原样返回（检查器零调用）
+ok 14 - deriveGovernanceRecordWithPins：present 以外不做哈希、原样返回（检查器零调用）
+  ---
+  duration_ms: 0.103
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecordWithPins：pins 缺失或为空 → invalid（fail-closed，检查器零调用）
+ok 15 - deriveGovernanceRecordWithPins：pins 缺失或为空 → invalid（fail-closed，检查器零调用）
+  ---
+  duration_ms: 0.1241
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecordWithPins：present 时透传 projectRoot/pins/治理边界路径，并映射证据
+ok 16 - deriveGovernanceRecordWithPins：present 时透传 projectRoot/pins/治理边界路径，并映射证据
+  ---
+  duration_ms: 0.0968
+  type: 'test'
+  ...
+# Subtest: deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；检查器抛错 → invalid 且永不 reject
+ok 17 - deriveGovernanceRecordWithPins：mismatch 明细映射为 pin-mismatch；检查器抛错 → invalid 且永不 reject
+  ---
+  duration_ms: 0.1202
+  type: 'test'
+  ...
+# Subtest: readRoleDocsIndex：rootDocs 只含三个白名单文件（固定顺序），memo/任意根文件永不入索引；changelog 与 docs/ 不回归
+ok 18 - readRoleDocsIndex：rootDocs 只含三个白名单文件（固定顺序），memo/任意根文件永不入索引；changelog 与 docs/ 不回归
+  ---
+  duration_ms: 13.8214
+  type: 'test'
+  ...
+# Subtest: readRoleDocsIndex：部分根文档缺失只返回存在的，顺序保持相对；只有 memo 时 rootDocs 为空且不抛错
+ok 19 - readRoleDocsIndex：部分根文档缺失只返回存在的，顺序保持相对；只有 memo 时 rootDocs 为空且不抛错
+  ---
+  duration_ms: 4.1557
+  type: 'test'
+  ...
+# Subtest: readRoleDocsIndex：cardPath 为空/绝对/盘符/反斜杠/空段/`.`/`..` 一律返回空索引且不抛错
+ok 20 - readRoleDocsIndex：cardPath 为空/绝对/盘符/反斜杠/空段/`.`/`..` 一律返回空索引且不抛错
+  ---
+  duration_ms: 2.9878
+  type: 'test'
+  ...
+# Subtest: readRoleDocsIndex：符号链接角色目录与根文档不列入（POSIX 实测；Windows 以非法路径/非目录用例覆盖）
+ok 21 - readRoleDocsIndex：符号链接角色目录与根文档不列入（POSIX 实测；Windows 以非法路径/非目录用例覆盖）
+  ---
+  duration_ms: 0.1548
+  type: 'test'
+  ...
+# Windows 创建符号链接受权限限制；索引跳过逻辑由非法路径/非目录用例覆盖，POSIX 另行实测。
+# Subtest: projectDocumentCandidates：透传 rootDocs 元数据；旧调用方（无 rootDocs）不产生字段
+ok 22 - projectDocumentCandidates：透传 rootDocs 元数据；旧调用方（无 rootDocs）不产生字段
+  ---
+  duration_ms: 0.1325
+  type: 'test'
+  ...
+# Subtest: readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文）
+ok 23 - readRoleDocsIndex：索引跳过记录元数据诊断（含 reasonCode，不写路径/正文）
+  ---
+  duration_ms: 15.5253
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 22
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 353.4305

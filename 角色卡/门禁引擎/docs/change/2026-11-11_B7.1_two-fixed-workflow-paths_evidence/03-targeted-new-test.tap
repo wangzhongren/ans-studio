@@ -1,0 +1,59 @@
+TAP version 13
+# Subtest: B7.1 A1：首个 stage-request JSON 示例含全部精确字段（roleId=convener/taskKind/workflowAction/workflowPath=A/stage=A1/flowId/sideEffect=read-only）
+ok 1 - B7.1 A1：首个 stage-request JSON 示例含全部精确字段（roleId=convener/taskKind/workflowAction/workflowPath=A/stage=A1/flowId/sideEffect=read-only）
+  ---
+  duration_ms: 1.1062
+  type: 'test'
+  ...
+# Subtest: B7.1 A1：路径 B 首请求同形（workflowPath=B/stage=B1）且缺字段 fail-closed 非 legacy 回退
+ok 2 - B7.1 A1：路径 B 首请求同形（workflowPath=B/stage=B1）且缺字段 fail-closed 非 legacy 回退
+  ---
+  duration_ms: 0.4971
+  type: 'test'
+  ...
+# Subtest: B7.1 A1：禁止直派生产线角色与 legacy run/trunk 概念
+ok 3 - B7.1 A1：禁止直派生产线角色与 legacy run/trunk 概念
+  ---
+  duration_ms: 0.2376
+  type: 'test'
+  ...
+# Subtest: B7.1 各阶段：A2/A4/A7/A8/A10/A11/A12a/A12b 的 fixed 任务字段与卡节奏齐备
+ok 4 - B7.1 各阶段：A2/A4/A7/A8/A10/A11/A12a/A12b 的 fixed 任务字段与卡节奏齐备
+  ---
+  duration_ms: 0.3205
+  type: 'test'
+  ...
+# Subtest: B7.1 卡呈交：A6/A10/A13 卡由幕僚呈交；merge-main 客户本人且 judge 不可代批
+ok 5 - B7.1 卡呈交：A6/A10/A13 卡由幕僚呈交；merge-main 客户本人且 judge 不可代批
+  ---
+  duration_ms: 0.3316
+  type: 'test'
+  ...
+# Subtest: B7.1 contract_check：fixed 会话应显示 fixed 口径；legacy 文本不作为 fixed 依据
+ok 6 - B7.1 contract_check：fixed 会话应显示 fixed 口径；legacy 文本不作为 fixed 依据
+  ---
+  duration_ms: 0.2106
+  type: 'test'
+  ...
+# Subtest: B7.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+ok 7 - B7.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+  ---
+  duration_ms: 0.5594
+  type: 'test'
+  ...
+# Subtest: B7.1 版本与规模：v2 版本行恰一处、字节 ≤256 KiB、无 BOM/NUL
+ok 8 - B7.1 版本与规模：v2 版本行恰一处、字节 ≤256 KiB、无 BOM/NUL
+  ---
+  duration_ms: 0.2869
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 154.6024
+exit=0

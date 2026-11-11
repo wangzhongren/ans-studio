@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状）
+ok 1 - 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状）
+  ---
+  duration_ms: 39.9916
+  type: 'test'
+  ...
+# Subtest: 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变
+ok 2 - 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变
+  ---
+  duration_ms: 27.2204
+  type: 'test'
+  ...
+# Subtest: 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子
+ok 3 - 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子
+  ---
+  duration_ms: 0.5258
+  type: 'test'
+  ...
+# Subtest: requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用
+ok 4 - requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用
+  ---
+  duration_ms: 166.5616
+  type: 'test'
+  ...
+# Subtest: 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型
+ok 5 - 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型
+  ---
+  duration_ms: 2.4198
+  type: 'test'
+  ...
+# Subtest: decision权威revision只由主进程推进，非法set不变，重开旧revision失效
+ok 6 - decision权威revision只由主进程推进，非法set不变，重开旧revision失效
+  ---
+  duration_ms: 0.2959
+  type: 'test'
+  ...
+# Subtest: W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留
+ok 7 - W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留
+  ---
+  duration_ms: 58.7337
+  type: 'test'
+  ...
+# Subtest: W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变
+ok 8 - W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变
+  ---
+  duration_ms: 11.282
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 735.1028

@@ -1,0 +1,833 @@
+{
+  "at": "2026-11-11T04:59:18.432Z",
+  "stopCause": "gate:budget-convener-dispatches",
+  "gate": {
+    "kind": "budget-convener-dispatches",
+    "count": 11
+  },
+  "workflowStarted": {
+    "at": "2026-11-11T04:46:36.720Z",
+    "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+    "flowId": "snake-game",
+    "path": "A",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "idempotencyKey": "workflow-start:snake-game:A:e61f4da1-153e-4679-a357-82e203fe26f6"
+  },
+  "workflowClosed": null,
+  "releaseMerged": null,
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 3,
+    "cardsByKind": {
+      "intent-confirm": 1,
+      "proposal": 1,
+      "appointment": 1
+    },
+    "decisions": 0,
+    "dispatches": 23,
+    "dispatchesByFrom": {
+      "chief": 12,
+      "convener": 11
+    },
+    "tasksByTo": {
+      "convener": 11,
+      "product": 2,
+      "rapporteur": 2,
+      "nominator": 2,
+      "verifier": 1,
+      "game-implementer": 5
+    },
+    "writeTasks": 12,
+    "implementationWriteTasks": 5,
+    "turnsByRole": {
+      "chief": 32,
+      "convener": 25,
+      "game-implementer": 1,
+      "nominator": 3,
+      "product": 3,
+      "rapporteur": 3,
+      "verifier": 2
+    }
+  },
+  "summary": {
+    "stages": {
+      "A1": {
+        "stage.requested": "2026-11-11T04:47:34.958Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T04:47:46.779Z"
+      },
+      "A2": {
+        "stage.requested": "2026-11-11T04:47:57.369Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T04:48:52.852Z"
+      },
+      "A3": {
+        "stage.requested": "2026-11-11T04:49:10.269Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T04:49:10.430Z"
+      },
+      "A4": {
+        "stage.requested": "2026-11-11T04:49:13.902Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T04:49:21.876Z"
+      },
+      "A5": {
+        "stage.requested": "2026-11-11T04:49:50.791Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T04:54:08.014Z"
+      },
+      "A6": {
+        "stage.requested": "2026-11-11T04:54:22.169Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T04:54:22.431Z"
+      },
+      "A7": {
+        "stage.requested": "2026-11-11T04:54:26.567Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T04:54:31.938Z"
+      },
+      "A8": {
+        "stage.requested": "2026-11-11T04:54:44.271Z",
+        "status": "completed",
+        "stage.dispatched": "2026-11-11T04:54:53.112Z",
+        "completedAt": "2026-11-11T04:55:19.764Z"
+      },
+      "A9": {
+        "stage.requested": "2026-11-11T04:56:04.720Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T04:57:00.599Z"
+      },
+      "A10": {
+        "stage.requested": "2026-11-11T04:57:55.516Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T04:57:55.805Z"
+      },
+      "A12a": {
+        "stage.dispatched": "2026-11-11T04:58:01.374Z",
+        "status": "dispatched"
+      },
+      "A11": {
+        "stage.requested": "2026-11-11T04:58:59.848Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T04:58:59.848Z"
+      }
+    },
+    "milestones": [
+      {
+        "at": "2026-11-11T04:46:27.576Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T04:46:36.725Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbmzueo-07da9390",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-11T04:46:36.720Z",
+        "milestone": "workflow-started",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "flowId": "snake-game",
+        "path": "A"
+      },
+      {
+        "at": "2026-11-11T04:46:42.070Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T04:47:34.959Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn13cf-a56a6a03",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-11T04:47:46.775Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn1cgn-4ca425b7",
+        "from": "convener",
+        "to": "product",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-11T04:47:57.370Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn1kmx-6ea2b23c",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A2"
+      },
+      {
+        "at": "2026-11-11T04:48:03.081Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn1p1l-5124cebb",
+        "from": "convener",
+        "to": "product",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A2"
+      },
+      {
+        "at": "2026-11-11T04:48:52.852Z",
+        "milestone": "stage-completed",
+        "stage": "A2"
+      },
+      {
+        "at": "2026-11-11T04:49:10.276Z",
+        "milestone": "card-created",
+        "requestId": "req-a8340c655299f60c",
+        "cardKind": "intent-confirm",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A3",
+        "title": "A3 意图确认：贪吃蛇游戏（v1）",
+        "options": [
+          {
+            "id": "confirm",
+            "recommended": null
+          },
+          {
+            "id": "revise",
+            "recommended": null
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T04:49:10.412Z",
+        "milestone": "card-resolved",
+        "requestId": "req-a8340c655299f60c",
+        "cardKind": "intent-confirm",
+        "by": "customer",
+        "choice": "confirm",
+        "source": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966"
+      },
+      {
+        "at": "2026-11-11T04:49:10.430Z",
+        "milestone": "stage-completed",
+        "stage": "A3"
+      },
+      {
+        "at": "2026-11-11T04:49:13.903Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn37ou-019d85a0",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A4"
+      },
+      {
+        "at": "2026-11-11T04:49:21.869Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn3du5-b8fc5fbf",
+        "from": "convener",
+        "to": "rapporteur",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A4"
+      },
+      {
+        "at": "2026-11-11T04:49:38.555Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn3qpn-98465929",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T04:49:50.792Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn405j-31ecd6e2",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T04:49:56.874Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn44ui-6ed0ebd1",
+        "from": "convener",
+        "to": "rapporteur",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T04:54:08.014Z",
+        "milestone": "stage-completed",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T04:54:22.265Z",
+        "milestone": "card-created",
+        "requestId": "req-27b87bfb318be248",
+        "cardKind": "proposal",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A6",
+        "title": "A6 方案确认：贪吃蛇游戏方案 v1",
+        "options": [
+          {
+            "id": "accept",
+            "recommended": null
+          },
+          {
+            "id": "revise",
+            "recommended": null
+          },
+          {
+            "id": "reject",
+            "recommended": null
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T04:54:22.415Z",
+        "milestone": "card-resolved",
+        "requestId": "req-27b87bfb318be248",
+        "cardKind": "proposal",
+        "by": "customer",
+        "choice": "accept",
+        "source": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966"
+      },
+      {
+        "at": "2026-11-11T04:54:22.431Z",
+        "milestone": "stage-completed",
+        "stage": "A6"
+      },
+      {
+        "at": "2026-11-11T04:54:26.568Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbn9wxz-06c12379",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A7"
+      },
+      {
+        "at": "2026-11-11T04:54:31.933Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbna131-0e412467",
+        "from": "convener",
+        "to": "nominator",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A7"
+      },
+      {
+        "at": "2026-11-11T04:54:44.272Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnaalr-40565796",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A8"
+      },
+      {
+        "at": "2026-11-11T04:54:53.107Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnahf7-fd5e1caa",
+        "from": "convener",
+        "to": "nominator",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A8"
+      },
+      {
+        "at": "2026-11-11T04:55:19.760Z",
+        "milestone": "role-activated",
+        "roleId": "game-implementer",
+        "documents": [
+          "角色卡/game-implementer/role-card.md",
+          "角色卡/game-implementer/boundary.md",
+          "角色卡/game-implementer/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T04:55:19.764Z",
+        "milestone": "stage-completed",
+        "stage": "A8"
+      },
+      {
+        "at": "2026-11-11T04:55:57.606Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T04:56:04.721Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnc0og-3429707e",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A9"
+      },
+      {
+        "at": "2026-11-11T04:56:36.004Z",
+        "milestone": "stage-blocked",
+        "stage": "A9",
+        "code": "baseline-team-plan-invalid",
+        "summary": "Team plan modules reference differs from the applicable immutable baseline"
+      },
+      {
+        "at": "2026-11-11T04:57:00.599Z",
+        "milestone": "stage-completed",
+        "stage": "A9"
+      },
+      {
+        "at": "2026-11-11T04:57:00.597Z",
+        "milestone": "basis-recorded",
+        "basisId": "bas-bc3b2545a15222094c706925",
+        "reason": "baseline"
+      },
+      {
+        "at": "2026-11-11T04:57:55.524Z",
+        "milestone": "card-created",
+        "requestId": "req-1e1c84984cca15a5",
+        "cardKind": "appointment",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A10",
+        "title": "A10 任命确认：任命实现角色 game-implementer",
+        "options": [
+          {
+            "id": "game-implementer",
+            "recommended": true
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T04:57:55.792Z",
+        "milestone": "card-resolved",
+        "requestId": "req-1e1c84984cca15a5",
+        "cardKind": "appointment",
+        "by": "customer",
+        "choice": "game-implementer",
+        "source": "stage-a10",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966"
+      },
+      {
+        "at": "2026-11-11T04:57:55.805Z",
+        "milestone": "stage-completed",
+        "stage": "A10"
+      },
+      {
+        "at": "2026-11-11T04:58:01.368Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbneioo-8e17a497",
+        "from": "chief",
+        "to": "verifier",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A12a"
+      },
+      {
+        "at": "2026-11-11T04:58:07.093Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnen3o-54616a60",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T04:58:17.774Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnevce-ec2d51af",
+        "from": "convener",
+        "to": "game-implementer",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T04:58:59.849Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnfrt4-fe49527f",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T04:59:04.419Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnfvc3-baf4696d",
+        "from": "convener",
+        "to": "game-implementer",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T04:59:08.786Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbnfype-b579ed70",
+        "from": "convener",
+        "to": "game-implementer",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T04:59:12.559Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbng1m7-21e57ae8",
+        "from": "convener",
+        "to": "game-implementer",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T04:59:15.967Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwbng48v-6db49bbf",
+        "from": "convener",
+        "to": "game-implementer",
+        "taskKind": null,
+        "workflowId": "wf-5f518ee14f687c8c8f3c6966",
+        "stage": "A11"
+      }
+    ]
+  },
+  "git": {
+    "branch": "ans/task/wf-5f518ee14f687c8c8f3c6966",
+    "head": "5e2c1565a02456efd013aca9a0c06df4c211b489",
+    "log": "5e2c156 (HEAD -> ans/task/wf-5f518ee14f687c8c8f3c6966, main) ANS baseline: ans-managed .gitignore",
+    "status": "",
+    "branches": "* ans/task/wf-5f518ee14f687c8c8f3c6966 5e2c156 ANS baseline: ans-managed .gitignore\n  main                                 5e2c156 ANS baseline: ans-managed .gitignore",
+    "tags": "",
+    "remotes": "",
+    "mainLog": "5e2c156 ANS baseline: ans-managed .gitignore"
+  },
+  "docs": {
+    "docs": [
+      {
+        "rel": "docs/audit",
+        "dir": true
+      },
+      {
+        "rel": "docs/audit/shell-gate.jsonl",
+        "bytes": 2758,
+        "sha256": "7686c2c117182c5def4d50ec119f34bcbf4b95bdc6e50e90cce99f487897aa96"
+      },
+      {
+        "rel": "docs/bootstrap-manifest.md",
+        "bytes": 1873,
+        "sha256": "91620256f1177d9e44961e14f1471ed8ffa2526dae5bd6d28063d268962ec46a"
+      },
+      {
+        "rel": "docs/contracts",
+        "dir": true
+      },
+      {
+        "rel": "docs/contracts/snake-game-architecture-v1.md",
+        "bytes": 5099,
+        "sha256": "db904082af78b5221587e4737d1ae2132e19578c254dd8eb61bd0962a2c85de4"
+      },
+      {
+        "rel": "docs/contracts/snake-game-contract-v1.md",
+        "bytes": 6564,
+        "sha256": "94121e5fc1faabcfbfed980d3bf7ce6e79b7ea3164941095f21c5dc8bf60b4d0"
+      },
+      {
+        "rel": "docs/governance",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/convener",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/convener/snake-game-a1-intake-v1.md",
+        "bytes": 3609,
+        "sha256": "94cfa471f4fc78e3005b14a88e4948a941a8224e6406edc5331ded7ff00cf8c4"
+      },
+      {
+        "rel": "docs/governance/nominator",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/nominator/snake-game-a7-intake-v1.md",
+        "bytes": 4698,
+        "sha256": "20b5426487995108d0e8603bf65ee6285a88a83c20ec7534deb21ca0dec5fd4e"
+      },
+      {
+        "rel": "docs/governance/rapporteur",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/rapporteur/snake-game-a4-intake-v1.md",
+        "bytes": 9877,
+        "sha256": "412b2c368722a6ef8dfe09994dff59ea9672ad98cd04380cd2980db1af3704f3"
+      },
+      {
+        "rel": "docs/intents",
+        "dir": true
+      },
+      {
+        "rel": "docs/intents/snake-game-playable-intent.md",
+        "bytes": 2357,
+        "sha256": "6d73c668db844878f6a64e135934649185ade2f0d9fea9c4bf11cdbdf24a69c2"
+      },
+      {
+        "rel": "docs/product",
+        "dir": true
+      },
+      {
+        "rel": "docs/product/snake-game-a1-intake-v1.md",
+        "bytes": 4621,
+        "sha256": "f83abbd2e120abb29f4e36da44466238daaac5ec6c70bf6568f6144f7603fd39"
+      },
+      {
+        "rel": "docs/product/snake-game-intent-v1.md",
+        "bytes": 8310,
+        "sha256": "176202ba62cc26f53863932717895997a733d0ac38ddef345e2c5e54168e41a4"
+      },
+      {
+        "rel": "docs/proposals",
+        "dir": true
+      },
+      {
+        "rel": "docs/proposals/snake-game-modules-v1.md",
+        "bytes": 4425,
+        "sha256": "844671303d71dc814649d565d089b4ba022dbabb7be7dcf2efba0008fa905d71"
+      },
+      {
+        "rel": "docs/proposals/snake-game-proposal-v1.md",
+        "bytes": 6980,
+        "sha256": "8bec1a7819f091226c7db33e3a209901a6ee3b163404bc90af7b324278aef3a4"
+      },
+      {
+        "rel": "docs/proposals/snake-game-roster-v1.md",
+        "bytes": 6641,
+        "sha256": "06d4fa9d330f102ecf4524ec6835dfceda3613f39fabdf8702b17179866321d6"
+      },
+      {
+        "rel": "docs/quality",
+        "dir": true
+      },
+      {
+        "rel": "docs/quality/snake-game-criteria-v1.md",
+        "bytes": 13833,
+        "sha256": "c5c3218fc4fdb401836dc9024f885a890b3febca50fc33d2c7ca2863e61056a8"
+      },
+      {
+        "rel": "docs/scheduling",
+        "dir": true
+      },
+      {
+        "rel": "docs/scheduling/snake-game-team-v1.md",
+        "bytes": 2458,
+        "sha256": "a70242b57a8b755f99ea751147f8923d5c8f41d95259d3613d1894302b038e4d"
+      },
+      {
+        "rel": "docs/workflow.md",
+        "bytes": 4101,
+        "sha256": "3efb7512bb6d8d9f2fc4f886c46e81fb58b55015b276fe040bc8b69b85e9d7d0"
+      }
+    ],
+    "角色卡": [
+      {
+        "rel": "角色卡/game-implementer",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/game-implementer/boundary.md",
+        "bytes": 1386,
+        "sha256": "1535751f89bc2d628814b889bad9414c1b3596ecb0b9f820b59fa600094698cc"
+      },
+      {
+        "rel": "角色卡/game-implementer/boundary.yaml",
+        "bytes": 454,
+        "sha256": "83483fa3553aeb6c47b4214a8542d2889eef5cb398f4117fb7eef3de0524f5be"
+      },
+      {
+        "rel": "角色卡/game-implementer/role-card.md",
+        "bytes": 4375,
+        "sha256": "cc7eec926aae230df6676f2ce642112457bd6b9619ec4abcafb565b73630cd60"
+      }
+    ]
+  },
+  "topLevel": [
+    ".ans",
+    ".git",
+    ".gitignore",
+    "docs",
+    "角色卡"
+  ],
+  "sessions": {
+    "chief": {
+      "bytes": 498866
+    },
+    "convener": {
+      "bytes": 688624
+    },
+    "game-implementer": {
+      "bytes": 90430
+    },
+    "nominator": {
+      "bytes": 162652
+    },
+    "product": {
+      "bytes": 86345
+    },
+    "rapporteur": {
+      "bytes": 251062
+    },
+    "verifier": {
+      "bytes": 136187
+    }
+  },
+  "ports": {
+    "lines9222": [],
+    "lines9223": [],
+    "lines9224": [
+      "  TCP    127.0.0.1:9224         0.0.0.0:0              LISTENING       26440",
+      "  TCP    127.0.0.1:9224         127.0.0.1:50577        ESTABLISHED     26440",
+      "  TCP    127.0.0.1:50577        127.0.0.1:9224         ESTABLISHED     55660"
+    ]
+  },
+  "oldRunRootPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+    "exists": true,
+    "entries": [
+      {
+        "name": "evidence",
+        "mtime": 1794247136435.3418
+      },
+      {
+        "name": "round10",
+        "mtime": 1794248323109.7388
+      },
+      {
+        "name": "round11",
+        "mtime": 1794248959545.2583
+      },
+      {
+        "name": "round12",
+        "mtime": 1794249232305.3015
+      },
+      {
+        "name": "round13",
+        "mtime": 1794249490950.5813
+      },
+      {
+        "name": "round14",
+        "mtime": 1794249732100.8677
+      },
+      {
+        "name": "round15",
+        "mtime": 1794249988039.9426
+      },
+      {
+        "name": "round16",
+        "mtime": 1794250169724.0994
+      },
+      {
+        "name": "round17",
+        "mtime": 1794250566337.3135
+      },
+      {
+        "name": "round18",
+        "mtime": 1794252829477.4497
+      },
+      {
+        "name": "round19",
+        "mtime": 1794253209658.652
+      },
+      {
+        "name": "round20",
+        "mtime": 1794261345627.0393
+      },
+      {
+        "name": "round21",
+        "mtime": 1794261805971.9543
+      },
+      {
+        "name": "round22",
+        "mtime": 1794262253668.7983
+      },
+      {
+        "name": "round23",
+        "mtime": 1794262693084.7214
+      },
+      {
+        "name": "round24",
+        "mtime": 1794263327768.893
+      },
+      {
+        "name": "round25",
+        "mtime": 1794264715770.8784
+      },
+      {
+        "name": "round26",
+        "mtime": 1794265159753.918
+      },
+      {
+        "name": "round8",
+        "mtime": 1794247470341.858
+      },
+      {
+        "name": "round9",
+        "mtime": 1794247940931.3174
+      },
+      {
+        "name": "rr",
+        "mtime": 1794247132796.088
+      },
+      {
+        "name": "userData",
+        "mtime": 1794246925742.7854
+      }
+    ]
+  },
+  "oldSnakeTargetPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+    "exists": true,
+    "entries": [
+      {
+        "name": "target",
+        "mtime": 1794192309257.867
+      }
+    ]
+  },
+  "oldRootsUntouched": {
+    "runRoot": null,
+    "snakeTarget": false
+  },
+  "turns": {
+    "chief": 32,
+    "convener": 25,
+    "game-implementer": 1,
+    "nominator": 3,
+    "product": 3,
+    "rapporteur": 3,
+    "verifier": 2
+  }
+}

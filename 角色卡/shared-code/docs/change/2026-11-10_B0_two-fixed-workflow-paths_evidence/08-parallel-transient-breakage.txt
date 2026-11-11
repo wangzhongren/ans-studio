@@ -1,0 +1,43 @@
+# 并行批次写盘窗口的瞬时红（运行时核心 B0 正在修改 src/model/runtime.ts；非本批、非共享套件本身）
+
+## 目标测试文件（模块加载失败：runtime.ts 语法中间态）
+
+```
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/model/runtime.ts:2660
+  ok: boolean;
+  message?: string;
+          ^
+}
+
+
+SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Expression expected
+    at parseTypeScript (node:internal/modules/typescript:72:36)
+    at processTypeScriptCode (node:internal/modules/typescript:146:42)
+    at stripTypeScriptModuleTypes (node:internal/modules/typescript:215:22)
+    at ModuleLoader.<anonymous> (node:internal/modules/esm/translators:680:29)
+    at #translate (node:internal/modules/esm/loader:438:20)
+    at afterLoad (node:internal/modules/esm/loader:506:29)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:511:12)
+    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:564:36)
+```
+
+## 共享套件（3 个文件因同一 runtime.ts 中间态加载失败；其余用例正常）
+
+```
+46:SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Expression expected
+57:  code: 'ERR_INVALID_TYPESCRIPT_SYNTAX'
+61:✖ test\项目管理\shared\config-loader.test.ts (91.8468ms)
+136:SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Expression expected
+147:  code: 'ERR_INVALID_TYPESCRIPT_SYNTAX'
+151:✖ test\项目管理\shared\intent-entry-contract.test.ts (91.8018ms)
+214:SyntaxError [ERR_INVALID_TYPESCRIPT_SYNTAX]: Expression expected
+225:  code: 'ERR_INVALID_TYPESCRIPT_SYNTAX'
+229:✖ test\项目管理\shared\runtime-shared.test.ts (125.1039ms)
+261:✖ test\项目管理\shared\config-loader.test.ts (91.8468ms)
+```
+
+说明：复跑等待并行写盘稳定后进行；最终结果见 02/03/05。

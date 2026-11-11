@@ -1,0 +1,28 @@
+# B6.2 write-set boundary (2026-11-11)
+# capture: 2026-11-10T16:51:36Z
+
+## git status --porcelain -- src app test
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+ M test/桌面应用/chief-workflow.test.ts
+ M test/桌面应用/version-change.test.ts
+ M test/桌面应用/version-decision.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+ M test/测试/git-role-workflows-e2e.test.ts
+?? test/桌面应用/b61-chat-entry-fixed.test.ts
+
+## B6.1 candidate hashes vs current (should match B6.1 record)
+### B6.1 record hashes
+app/desktop/session.ts	741a8ebeefc696bfa7643be440f51085a8b0c5b68a820e20618dfde2bffe8fb6	bytes=823094	lines=12917
+app/desktop/workflow.ts	63d4656d43ef671e74e6e12327d0e259b2a047b7f20f1e58e0d7d1b31b677017	bytes=37795	lines=664
+test/桌面应用/b61-chat-entry-fixed.test.ts	084ab05381fa79e52efd5fb04d5efc9f3ffe814ad7768abc058e1c643c808e05	bytes=24947	lines=439
+test/桌面应用/chief-workflow.test.ts	d606c1662ddb9f263543cdb7bb066543baa92dbc40425dbdce87e4df7831739f	bytes=262606	lines=2658
+test/桌面应用/version-change.test.ts	624f386a9a53c309f20b9e90401d0224f6d68f23bc13aa39ed6053264db9372e	bytes=109831	lines=2302
+test/桌面应用/version-decision.test.ts	a1f6c251cf65be6cd446496296c12ce90816c5338bbcabeb9b5ee38011609500	bytes=51518	lines=961
+### current hashes
+741a8ebeefc696bfa7643be440f51085a8b0c5b68a820e20618dfde2bffe8fb6 *app/desktop/session.ts
+63d4656d43ef671e74e6e12327d0e259b2a047b7f20f1e58e0d7d1b31b677017 *app/desktop/workflow.ts
+d606c1662ddb9f263543cdb7bb066543baa92dbc40425dbdce87e4df7831739f *test/桌面应用/chief-workflow.test.ts
+624f386a9a53c309f20b9e90401d0224f6d68f23bc13aa39ed6053264db9372e *test/桌面应用/version-change.test.ts
+a1f6c251cf65be6cd446496296c12ce90816c5338bbcabeb9b5ee38011609500 *test/桌面应用/version-decision.test.ts
+084ab05381fa79e52efd5fb04d5efc9f3ffe814ad7768abc058e1c643c808e05 *test/桌面应用/b61-chat-entry-fixed.test.ts

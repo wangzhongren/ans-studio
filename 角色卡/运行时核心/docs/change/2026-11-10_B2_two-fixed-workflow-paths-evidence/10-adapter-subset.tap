@@ -1,0 +1,179 @@
+TAP version 13
+# Subtest: 直接 if/then/else：命中执行 then，未命中执行 else，两侧反例都拒绝
+ok 1 - 直接 if/then/else：命中执行 then，未命中执行 else，两侧反例都拒绝
+  ---
+  duration_ms: 4.7673
+  type: 'test'
+  ...
+# Subtest: if 无 else：未命中保持原行为；then 仅追加约束
+ok 2 - if 无 else：未命中保持原行为；then 仅追加约束
+  ---
+  duration_ms: 0.9665
+  type: 'test'
+  ...
+# Subtest: not 反向语义：单条 required 与 anyOf 组合都强制执行（含嵌套路径）
+ok 3 - not 反向语义：单条 required 与 anyOf 组合都强制执行（含嵌套路径）
+  ---
+  duration_ms: 0.7848
+  type: 'test'
+  ...
+# Subtest: 条件约束覆盖嵌套 properties、数组 items 与 additionalProperties
+ok 4 - 条件约束覆盖嵌套 properties、数组 items 与 additionalProperties
+  ---
+  duration_ms: 1.7978
+  type: 'test'
+  ...
+# Subtest: 真实 git_query/git_candidate/git_publish：oid 按 objectFormat 强制 sha1 40 位 / sha256 64 位
+ok 5 - 真实 git_query/git_candidate/git_publish：oid 按 objectFormat 强制 sha1 40 位 / sha256 64 位
+  ---
+  duration_ms: 8.8283
+  type: 'test'
+  ...
+# Subtest: 真实 dispatch_task：reviewOid 与 resumeController 条件均被强制执行
+ok 6 - 真实 dispatch_task：reviewOid 与 resumeController 条件均被强制执行
+  ---
+  duration_ms: 4.1016
+  type: 'test'
+  ...
+# Subtest: 真实 decide_pending_request：disposition 条件（select⇒selected；reject/revise⇒无 selected）
+ok 7 - 真实 decide_pending_request：disposition 条件（select⇒selected；reject/revise⇒无 selected）
+  ---
+  duration_ms: 0.9858
+  type: 'test'
+  ...
+# Subtest: 真实 submit_version_change：if 内 contains 与 then 全体目标 expectedFromSha256 条件
+ok 8 - 真实 submit_version_change：if 内 contains 与 then 全体目标 expectedFromSha256 条件
+  ---
+  duration_ms: 1.8717
+  type: 'test'
+  ...
+# Subtest: 未知关键字与非法条件片段仍被拒绝（不静默丢弃约束）
+ok 9 - 未知关键字与非法条件片段仍被拒绝（不静默丢弃约束）
+  ---
+  duration_ms: 0.4651
+  type: 'test'
+  ...
+# Subtest: 无条件的旧 schema 行为与 z.fromJSONSchema 完全一致
+ok 10 - 无条件的旧 schema 行为与 z.fromJSONSchema 完全一致
+  ---
+  duration_ms: 1.0911
+  type: 'test'
+  ...
+# Subtest: 未注入派发能力：dispatch_task 不在工具集里（只给 su；能力缺席 = 最强 fail-closed，H-1）
+ok 11 - 未注入派发能力：dispatch_task 不在工具集里（只给 su；能力缺席 = 最强 fail-closed，H-1）
+  ---
+  duration_ms: 1.8217
+  type: 'test'
+  ...
+# Subtest: 注入派发能力：dispatch_task 出现在工具集里（同 run_shell / customerInput 的注入先例）
+ok 12 - 注入派发能力：dispatch_task 出现在工具集里（同 run_shell / customerInput 的注入先例）
+  ---
+  duration_ms: 0.2615
+  type: 'test'
+  ...
+# Subtest: handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发」并重申「派发 ≠ 授权」
+ok 13 - handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发」并重申「派发 ≠ 授权」
+  ---
+  duration_ms: 1.0414
+  type: 'test'
+  ...
+# Subtest: handler：reason 省略时载荷不含 reason；void 回执（fire-and-forget）视为已受理
+ok 14 - handler：reason 省略时载荷不含 reason；void 回执（fire-and-forget）视为已受理
+  ---
+  duration_ms: 0.1815
+  type: 'test'
+  ...
+# Subtest: 参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调用
+ok 15 - 参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调用
+  ---
+  duration_ms: 0.1657
+  type: 'test'
+  ...
+# Subtest: 回执 ok:false（如「不是本项目角色 / 指向 su 自身」）→ ok:false「未能派发」+ 原因，绝不谎报
+ok 16 - 回执 ok:false（如「不是本项目角色 / 指向 su 自身」）→ ok:false「未能派发」+ 原因，绝不谎报
+  ---
+  duration_ms: 0.1474
+  type: 'test'
+  ...
+# Subtest: fn 抛错 → fail-closed「未能派发」+ 原因，绝不谎报
+ok 17 - fn 抛错 → fail-closed「未能派发」+ 原因，绝不谎报
+  ---
+  duration_ms: 0.1755
+  type: 'test'
+  ...
+# Subtest: describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带证据」；反向断言不得暗示授权
+ok 18 - describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带证据」；反向断言不得暗示授权
+  ---
+  duration_ms: 0.1604
+  type: 'test'
+  ...
+# Subtest: 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn）
+ok 19 - 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn）
+  ---
+  duration_ms: 0.2279
+  type: 'test'
+  ...
+# Subtest: 不写盘：即便 writeRoot 就绪、gate 放行、派发成功，工具层零文件系统副作用
+ok 20 - 不写盘：即便 writeRoot 就绪、gate 放行、派发成功，工具层零文件系统副作用
+  ---
+  duration_ms: 0.8334
+  type: 'test'
+  ...
+# Subtest: DispatchTaskPayload / DispatchReceipt / DispatchTaskFn 可从冻结契约家 session.ts 导入并使用
+ok 21 - DispatchTaskPayload / DispatchReceipt / DispatchTaskFn 可从冻结契约家 session.ts 导入并使用
+  ---
+  duration_ms: 0.102
+  type: 'test'
+  ...
+# Subtest: required-v1 missing capabilities rejects before SDK; actual config override profile registers first
+ok 22 - required-v1 missing capabilities rejects before SDK; actual config override profile registers first
+  ---
+  duration_ms: 568.3908
+  type: 'test'
+  ...
+# Subtest: Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged
+ok 23 - Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged
+  ---
+  duration_ms: 485.8987
+  type: 'test'
+  ...
+# Subtest: native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options
+ok 24 - native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options
+  ---
+  duration_ms: 78.6213
+  type: 'test'
+  ...
+# Subtest: injected projector throw emits safe diagnostic without failing actual handler or model
+ok 25 - injected projector throw emits safe diagnostic without failing actual handler or model
+  ---
+  duration_ms: 30.1124
+  type: 'test'
+  ...
+# Subtest: all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist
+ok 26 - all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist
+  ---
+  duration_ms: 841.1456
+  type: 'test'
+  ...
+# Subtest: real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript
+ok 27 - real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript
+  ---
+  duration_ms: 76.1458
+  type: 'test'
+  ...
+# Subtest: real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit
+ok 28 - real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit
+  ---
+  duration_ms: 565.2624
+  type: 'test'
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3283.9183
+exit=0

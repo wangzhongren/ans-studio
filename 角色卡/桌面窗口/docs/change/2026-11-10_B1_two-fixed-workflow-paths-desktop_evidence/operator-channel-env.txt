@@ -1,0 +1,7 @@
+# operator-channel test 14 environment isolation (B1 desktop D1)
+symptom: mgr.open(worktree root, role=桌面窗口, runtime=pi) => runtime-creation-prepared-api-unavailable
+root cause: readGitHostProtectionRequirement(worktree root) = state:unknown (linked worktree .git file)
+  vs main repo / pristine extraction = state:unmanaged
+isolation: PRISTINE HEAD code (git archive HEAD) opening the SAME worktree root reproduces the identical error:
+  HEAD-code open on worktree root: {"ok":false,"error":"runtime-creation-prepared-api-unavailable"}
+=> failure is a project-root .git association environment fact, NOT the B1 desktop diff.

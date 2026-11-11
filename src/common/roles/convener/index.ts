@@ -17,6 +17,23 @@
 //
 // E1 过渡期权威：旧引擎（`governance-roles.ts` / `run-role.ts` / `apply-journal.ts`）仍是
 // 差分 oracle；本模块不复写 Git 执行/ACL/证据闭包、Service 事务或桌面路由。
+//
+// T3「两条固定工作流路径」B2（MF-IR-4 / v1.3 §3.4）：在 legacy 数据**逐字冻结**的前提下新增
+// fixed 矩阵数据（`fixedCards` / `fixedAllowedBuiltInRoleIds` / `isConvenerFixedBuiltInDispatchTarget`）
+// 与 `context({matrix:"two-fixed-paths/v1"})` fixed 段；fixed 字段只在显式 fixed 矩阵下被消费，
+// legacy 数据与 legacy 消费点（apply-journal / trunk-runtime）不改读取源。
+//
+// T3 B9.1（RR4 `1bcdaf69…` 失败事实）：fixed 段新增「任务证据与哈希」与「卡预算」两段——
+// 派发 worker 任务时证据只要求 path / 内容/frontmatter / 结论，**不得要求 worker 用
+// `run_shell`/`certutil`/`Get-FileHash` 计算 hash/sha256**（哈希是应用在收口/归档/依据校验时
+// 计算的机器事实），且任务文本不得诱导 fixed 3 确认卡 + merge-main 之外的 shell/stable-write
+// 等额外审批卡。legacy 数据/legacy context 逐字不变。
+//
+// T3 B32.3（RR27 `daf8690` 失败事实）：生产线段补 A11/B3 提交语法——`git commit -m "<message>"`
+// 含空格的提交消息必须整体加引号、`-m` 后必须恰一个带引号的单消息参数（未加引号会被拆成多
+// argv 并被 shell 写门拒绝）；返工任务只纠正提交语法、不重写实现；运营不得代 worker 执行
+// `git add`/`git commit`（stage-request 会话无实现任务 taskGitScope），按真实回执
+// （code 与 argv 形状）rework/re-dispatch 并在任务文本复述正确提交语法。legacy 逐字不变。
 
 import type { BoundaryEntry } from "../../../model/boundary.ts";
 import type {
@@ -95,6 +112,15 @@ const CONVENER_CAPABILITIES: GovernanceCapabilities = Object.freeze({
 
 /** 当前有效卡种（D8）：convener 只发 decision 卡；appointment 只归人事。 */
 const CONVENER_CARDS: readonly GovernanceCardKind[] = Object.freeze(["decision"]);
+
+/**
+ * fixed 派发矩阵卡种白名单（T3「两条固定工作流路径」B2；MF-IR-4 / v1.3 §3.4 convener 行）。
+ *
+ * 冻结值恰 `["decision"]`：固定路径运营只发 decision 卡（任命确认卡由幕僚呈；acceptance 卡
+ * fixed 抑制）。fixed 矩阵**只读本字段**（门禁引擎门面 `cardKindsOf(id,"two-fixed-paths/v1")`），
+ * **不从 legacy `cards` 过滤/推导**；legacy `cards` 逐字不动。纯数据、无 I/O。
+ */
+const CONVENER_FIXED_CARDS: readonly GovernanceCardKind[] = Object.freeze(["decision"]);
 
 const CONVENER_CARD_ENTRIES: readonly BoundaryEntry[] = Object.freeze([
   Object.freeze({
@@ -196,6 +222,36 @@ export const CONVENER_WORKER_DISPATCH_TARGETS = Object.freeze({
   /** 报告期望（差分 oracle 期望创建者；实际路由由 reportTargetForTaskCreator 决定）。 */
   reportToRoleId: "convener" as const,
 });
+
+// —————————————————————— fixed 矩阵派发数据（T3 B2；MF-IR-4 / v1.3 §3.2/§3.4）——————————————————————
+//
+// legacy 目标常量 `CONVENER_WORKER_DISPATCH_TARGETS`（`["verifier"]`）**逐字冻结**；fixed 目标集
+// 是独立新数据，只在 fixed 谓词/矩阵视图中消费，legacy 消费点（apply-journal / trunk-runtime /
+// 编排 legacy 谓词）不改读取源。
+
+/**
+ * fixed 矩阵下 convener 可派发的内置生产线目标（T3 B2；MF-IR-4 / v1.3 §3.2/§3.4）。
+ *
+ * 冻结值恰 `["product","rapporteur","nominator"]`：运营是生产线唯一派发者；verifier 由幕僚创建
+ * （fixed 谓词对 convener→verifier 拒绝 `convener-to-verifier-forbidden`），不在此表。项目生产
+ * 角色另按 `targetKind:"project"` 允许（目标存在性由宿主核验）。纯数据、无 I/O。
+ */
+const CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS: readonly string[] = Object.freeze([
+  "product",
+  "rapporteur",
+  "nominator",
+]);
+
+/**
+ * fixed 矩阵下「该内置角色是否可作为 convener 的生产线派发目标」纯函数（MF-IR-4）。
+ *
+ * 与 `CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS` **同源**（直接 `includes` 同一冻结数组，不复制
+ * 第二张表）；大小写敏感（角色 id 逐字），空串/未知 id 恒 false。纯函数、无 I/O、不修改任何数据。
+ * legacy `isConvenerBuiltInDispatchTarget`（`["verifier"]`）在编排侧**逐字冻结**，本谓词不得替换它。
+ */
+function isConvenerFixedBuiltInDispatchTarget(roleId: string): boolean {
+  return CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS.includes(roleId);
+}
 
 function denyDispatch(code: string, messageKey: string): RoleDispatchPolicy {
   return { decision: { allow: false, code, messageKey } };
@@ -666,7 +722,87 @@ const CONVENER_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
   Object.freeze({ id: "report-expectation", text: REPORT_EXPECTATION_SECTION_TEXT }),
 ]);
 
-function context(_input: RoleContextInput): readonly RoleContextSection[] {
+// —————————————————————— fixed context 段（T3 B2 + B9.1；仅显式 fixed 矩阵返回）——————————————————————
+//
+// v1.3 §3.4 convener 行：fixed 段说明新职责（生产线唯一派发者 / 团队计划与基线 3 件小事 /
+// 集成汇总与报告期望 / 不派质检）。B9.1 按 RR4 失败事实补两段：任务证据与哈希（应用算哈希、
+// 禁止 worker shell 算 hash）与卡预算（3 确认卡 + merge-main；不诱导额外审批卡）。
+// B13.2（2026-11-11，RR8 修复）：证据段补一条任务文本要求——worker `submit_report.evidence[]`
+// 每项为纯项目相对文件路径（描述文本不计为证据；RR8 因此 close-report-missing 并触发返工循环）。
+// B14（2026-11-11，RR9 修复）：生产线段补环境探测禁令——不得为探测环境运行 shell
+// （`node -v`/`python --version` 等会触发 shell 审批/拒绝面，超出 fixed 卡预算；环境事实从应用读）。
+// 只在 `context({matrix:"two-fixed-paths/v1"})` 下返回；`context({})`（无 matrix）与
+// `matrix:"legacy-v1"` 逐字返回上面的 legacy 三段（同一冻结引用）。
+// run-role fixed 会话把本段追加在旧卡文本之后；与旧卡文本冲突时以本段为准（仅 fixed 会话）。
+// 纯静态文本（无资源引用、不读盘、不拼接运行时事实）。
+
+const FIXED_PRODUCTION_LINE_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-production-line",
+  text: [
+    "## 固定路径运营：生产线唯一派发者（two-fixed-paths/v1；与旧卡文本冲突时以本段为准）",
+    "- 收到幕僚 `stage-request` 后，由你在真实回合内派发生产线：内置 product / rapporteur / nominator 与项目生产角色（模块属主 / 实现 / 分析）；实现任务须写明 moduleId、写集与验收/证据要求（证据只写路径、内容/frontmatter 与结论，见「任务证据与哈希」段），做属主校验并保持同工作区写任务串行；**一模块一任务**：moduleId 权威，modulePaths 只写该模块路径（应用从模块表派生/校验，跨模块派发 ⇒ `module-paths-mismatch` 拒绝）；生产任务报告回你。",
+    "- 幕僚不直接派生产线角色（chief-production-dispatch-forbidden）；`stage-request` 是只读、无 module/写集的产线调度请求，不是生产线派发。",
+    "- 不派 verifier：独立验收由幕僚创建（默认 verifier；roster `roles[].review` 项目验收角色优先）；`convener→verifier` 拒绝（`convener-to-verifier-forbidden`）；你不派新质检、不发 acceptance 卡、不代客户验收。",
+    "- 环境/工具链事实以应用只读事实（`project_state`/项目配置）为准；**不得为探测环境运行 shell**（`node -v`、`python --version`、`which`、`where` 等会触发 shell 审批/拒绝面，属 fixed 卡预算之外的额外门，RR9 实测）。任务文本要求环境探测时，按应用事实报告并如实说明，不运行 shell。",
+    "- A11/B3 实现任务文本：**不得建议或要求 worker 添加后运行自测脚本**，不得以「如何自测」「测试结论」作为报告项；报告只要求**静态自检结论（读码核对，不运行 shell/node/npm、不执行测试脚本）**；执行/验证归 A12 验收角色承担，worker 只写本模块文件 + 字面 `git add`/`git commit`，任何 `run_shell`（含 `node`/`npm`/自测脚本）都会触发 shell 审批卡（RR24 实测：`node src/core/self-test.js` ⇒ shell 门早停）。",
+    "- **所有 fixed 生产/评审任务文本：不得要求或建议 worker 运行任何 shell 命令（含 `mkdir`/`cp`/`mv` 等目录/文件操作）**；`write_file`/`edit_file` 会自动创建目录；`docs/acceptance/` 归档由应用完成。任何 `run_shell` 都会触发 shell 审批卡（RR25 实测：review 角色 `cmd /c mkdir docs\\acceptance` ⇒ shell 门早停）。",
+    "- A11/B3 实现与返工任务文本的提交语法（RR27 实测）：worker 提交只写 `git add <paths>` 与 `git commit -m \"<message>\"`——**含空格的提交消息必须整体加引号**，`-m` 后必须恰一个带引号的单消息参数（未加引号会被拆成多 argv 并被 shell 写门拒绝；RR27 实测 `git commit -m feat(game-core): implement …` ⇒ `[\"git\",\"commit\",\"-m\",\"feat(game-core):\",\"implement\",…]`）；返工任务只纠正提交语法（复述正确的 `git commit -m \"<message>\"` 写法），**不得重写已完成的实现**；**你不得代 worker 执行 `git commit`/`git add`（不得代提交）**——convener 为 stage-request 会话，按设计无实现任务 taskGitScope，代提交必被拒（RR27 实测）；worker 提交被拒时按真实回执（code 与 argv 形状）rework/re-dispatch，并在任务文本复述正确提交语法，不得把「缺少 taskGitScope」当唯一解释。",
+  ].join("\n"),
+});
+
+const FIXED_EVIDENCE_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-evidence",
+  text: [
+    "## 固定路径任务证据与哈希（fixed）",
+    "- 派发 worker 任务时，证据要求只写三项：产物路径（path）、内容/frontmatter 要点（schema、flowId、version 等字段与正文内容）、结论（完成/未完成/阻塞）；不要要求 worker 用 `run_shell`、`certutil`、`Get-FileHash` 或其它 shell/脚本计算 hash/sha256；任务文本不得以「给出 sha256」「附哈希」作为完成标准或验收标准。",
+    "- 任务文本须写明：worker `submit_report` 的 `evidence[]` 每项为**纯项目相对文件路径**（如 `docs/product/<flowId>-intent-vN.md`），不得写描述句、冒号说明或正文；描述与 frontmatter 实际值写在报告 summary 正文。收口（`close_created_task accepted`）按纯路径逐项核验文件字节，描述文本不计为证据（`close-report-missing` 时按此要求返工）。",
+    "- 文档哈希是应用机器事实：由应用在任务收口（`close_created_task` / `closeTask`）、归档（A12 `docs/acceptance/`）与依据记录/校验（`basis.recorded` / documentRefs）时按实际字节计算与核验；worker 只交付文件与内容，哈希不由 worker 计算、也不写入任务完成条件。",
+    "- 需要文档/名单/模块的权威哈希（如团队计划 `modules`/`roster` 字段）时，只取应用机器记录：`project_state` 的 `[versions]` 行（`sha256=`，应用按真实字节计算）或 `.ans/state/versions.jsonl`；**你自身同样禁止**用 `run_shell`、`certutil`、`Get-FileHash`、PowerShell 等计算/核验 hash（会触发 shell 审批卡，属 fixed 卡预算之外的额外门，RR19 实测）。",
+  ].join("\n"),
+});
+
+const FIXED_CARD_BUDGET_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-card-budget",
+  text: [
+    "## 固定路径卡预算（fixed）",
+    "- 固定路径客户卡预算 = 3 张确认卡（A3 intent-confirm / A6 proposal / A10 appointment）+ A13/B4 高风险 merge-main（应用呈、仅客户本人确认）；acceptance 卡 fixed 抑制；decision 卡只用于材料性选择/需求变更审批，不计入 3 张确认卡。",
+    "- 不得在 worker 任务文本中诱导额外客户/操作员审批：不要求 worker 用 shell 计算哈希或执行审批类命令，不要求 stable-write / trunk / run 等 fixed 不注入的工具；真实环境阻塞由你按 decision 卡口径报告与处置，但不把「执行 shell / 审批」写成任务完成标准。",
+  ].join("\n"),
+});
+
+const FIXED_BASELINE_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-baseline",
+  text: [
+    "## 固定路径团队计划与基线（fixed）",
+    "- 团队计划：以 `complete_team_plan` v4 提交版本化团队计划 `docs/scheduling/<flowId>-team-v<version>.md`（path/version；无 runId/baseDigest，出现即 `baseline-legacy-field-forbidden`）；应用核模块属主/写区/分工/依赖后直接完成。完成计划不等于 D3，不授权名单外角色。",
+    "- 团队计划中的 `modules`/`roster` 哈希取应用记录（`project_state` `[versions]` 的 `sha256=` 或 `.ans/state/versions.jsonl`）；不得用 `run_shell`/`certutil`/`Get-FileHash` 等 shell 计算或核验。",
+    "- 基线 3 件小事（A9）：团队计划 v4 / `git init -b main`（应用执行）/ `.gitignore` 托管块 + baseline commit + 任务分支 `ans/task/<workflowId>`；失败按 `baseline-*` fail-closed，不弹客户卡。",
+  ].join("\n"),
+});
+
+const FIXED_REPORT_SECTION: RoleContextSection = Object.freeze({
+  id: "convener-fixed-report",
+  text: [
+    "## 固定路径集成汇总与报告期望（fixed）",
+    "- 集成汇总：汇总各生产线任务与实现任务的进度/阻塞/真实提交（任务分支 `ans/task/<workflowId>` 的普通 Git add/commit）；冲突或返工交回原 owner 责任链，不代写实现、不伪造完成。",
+    "- 报告期望：汇总后向幕僚 `submit_report`（完成/未完成/证据/遗留）；收到幕僚派发的任务必须用 `submit_report` 回短报，不要只结束回合；不转发客户、不批准、不验收、不代客户选择。",
+    "- 发布合并：由应用呈 merge-main 卡、仅客户本人确认；你不代批、不冒充客户、不自行合并 main。",
+  ].join("\n"),
+});
+
+const CONVENER_FIXED_CONTEXT_SECTIONS: readonly RoleContextSection[] = Object.freeze([
+  FIXED_PRODUCTION_LINE_SECTION,
+  FIXED_EVIDENCE_SECTION,
+  FIXED_CARD_BUDGET_SECTION,
+  FIXED_BASELINE_SECTION,
+  FIXED_REPORT_SECTION,
+]);
+
+function context(input: RoleContextInput): readonly RoleContextSection[] {
+  // T3 B2 矩阵分支：只有显式 `matrix:"two-fixed-paths/v1"` 返回 fixed 段；
+  // 缺省 / `"legacy-v1"` / `context({})` 一律返回同一 legacy 引用（逐字冻结）。
+  // 可选链：历史调用方即使传畸形输入也保持 legacy 行为（不抛错）。
+  if (input?.matrix === "two-fixed-paths/v1") return CONVENER_FIXED_CONTEXT_SECTIONS;
   return CONVENER_CONTEXT_SECTIONS;
 }
 
@@ -685,6 +821,11 @@ export const convenerRoleModule: BuiltInRoleModule = Object.freeze({
   }),
   capabilities: CONVENER_CAPABILITIES,
   cards: CONVENER_CARDS,
+  // T3 B2 fixed 矩阵数据（MF-IR-4）：只在 `matrix:"two-fixed-paths/v1"` 下被消费；
+  // legacy 数据/消费点逐字冻结，不改读取源。
+  fixedCards: CONVENER_FIXED_CARDS,
+  fixedAllowedBuiltInRoleIds: CONVENER_FIXED_ALLOWED_BUILT_IN_ROLE_IDS,
+  isConvenerFixedBuiltInDispatchTarget,
   tools,
   dispatch,
   preflight,

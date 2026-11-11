@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: 阈值：normal/slow/stuck/hard-cap（5/10/30 分钟默认）
+ok 1 - 阈值：normal/slow/stuck/hard-cap（5/10/30 分钟默认）
+  ---
+  duration_ms: 0.4465
+  type: 'test'
+  ...
+# Subtest: slow：只发一次告警、不调用终止；同一活跃期不重复
+ok 2 - slow：只发一次告警、不调用终止；同一活跃期不重复
+  ---
+  duration_ms: 2.4553
+  type: 'test'
+  ...
+# Subtest: stuck：默认只告警；env auto-terminate 才回调一次（同活跃期去重）
+ok 3 - stuck：默认只告警；env auto-terminate 才回调一次（同活跃期去重）
+  ---
+  duration_ms: 0.3651
+  type: 'test'
+  ...
+# Subtest: 正确等待不报：有挂起确认卡时不发 log-silence；高硬顶 hard-cap 仍可告警
+ok 4 - 正确等待不报：有挂起确认卡时不发 log-silence；高硬顶 hard-cap 仍可告警
+  ---
+  duration_ms: 0.1731
+  type: 'test'
+  ...
+# Subtest: B-07 共享 episode：log-silence 与 10 分钟巡检读取同一活跃期/告警状态（不重复告警）
+ok 5 - B-07 共享 episode：log-silence 与 10 分钟巡检读取同一活跃期/告警状态（不重复告警）
+  ---
+  duration_ms: 0.5357
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 159.9124

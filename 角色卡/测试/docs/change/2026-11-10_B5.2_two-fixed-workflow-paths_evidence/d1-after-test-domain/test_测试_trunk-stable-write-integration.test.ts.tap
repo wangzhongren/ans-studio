@@ -1,0 +1,78 @@
+TAP version 13
+# Subtest: stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift）
+not ok 1 - stable workflow：确认卡 → 许可安装 → run-role gate 放行/拒绝 → completeWrite → mini re-pin（不升版本、无 drift）
+  ---
+  duration_ms: 97.9586
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\trunk-stable-write-integration.test.ts:303:1'
+  failureType: 'testCodeFailure'
+  error: '角色/边界解析失败：active-role-evidence-missing-or-mismatched'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1379:11)
+    async openGate (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:288:18)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:328:31)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: stable 异常：无客户通道不发许可；拒绝不写；哈希不符 failed + 许可作废 + 快照不变；过期许可拒绝
+ok 2 - stable 异常：无客户通道不发许可；拒绝不写；哈希不符 failed + 许可作废 + 快照不变；过期许可拒绝
+  ---
+  duration_ms: 230.961
+  type: 'test'
+  ...
+# Subtest: appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本）
+not ok 3 - appointment-write：role-card 钩子 → 许可 → gate → mini re-pin roleCards（F15 三类快照、不升版本）
+  ---
+  duration_ms: 71.7171
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\测试\\trunk-stable-write-integration.test.ts:506:1'
+  failureType: 'testCodeFailure'
+  error: '角色/边界解析失败：active-role-evidence-missing-or-mismatched'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    openRoleSession (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/pipeline/orchestration/run-role.ts:1379:11)
+    async openGate (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:288:18)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%B5%8B%E8%AF%95/trunk-stable-write-integration.test.ts:524:31)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: trunk apply-journal：提交点/幂等重放/base 不一致/内容哈希不符不改指针；derive/verify/history 一致
+ok 4 - trunk apply-journal：提交点/幂等重放/base 不一致/内容哈希不符不改指针；derive/verify/history 一致
+  ---
+  duration_ms: 141.1668
+  type: 'test'
+  ...
+# Subtest: trunk 对账：phase 滞后可识别分裂态（内容已过提交点），且补写事件必须通过 C2a 账本校验
+ok 5 - trunk 对账：phase 滞后可识别分裂态（内容已过提交点），且补写事件必须通过 C2a 账本校验
+  ---
+  duration_ms: 57.4652
+  type: 'test'
+  ...
+# Subtest: trunk 客户动作：refreeze 只续接 stable 快照（不升版本、客户归属）；abandon 不改指针；history 归档
+ok 6 - trunk 客户动作：refreeze 只续接 stable 快照（不升版本、客户归属）；abandon 不改指针；history 归档
+  ---
+  duration_ms: 141.8227
+  type: 'test'
+  ...
+# Subtest: trunk 恢复：manifest 损坏 ⇒ 客户确认后 tN+1（recovered）；冻结注册表 corrupt ⇒ 恢复拒绝
+ok 7 - trunk 恢复：manifest 损坏 ⇒ 客户确认后 tN+1（recovered）；冻结注册表 corrupt ⇒ 恢复拒绝
+  ---
+  duration_ms: 124.6601
+  type: 'test'
+  ...
+# Subtest: 栈初始化：missing 基线 ⇒ 迁移后 ready；corrupt 基线 ⇒ corrupt-failclosed 且入口禁用
+ok 8 - 栈初始化：missing 基线 ⇒ 迁移后 ready；corrupt 基线 ⇒ corrupt-failclosed 且入口禁用
+  ---
+  duration_ms: 40.7224
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 6
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1255.8806

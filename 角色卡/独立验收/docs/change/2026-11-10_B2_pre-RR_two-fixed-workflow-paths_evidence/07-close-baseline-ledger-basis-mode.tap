@@ -1,0 +1,220 @@
+TAP version 13
+# Subtest: complete_team_plan v4：Git 顺序（init→gitignore→dirty→branch）→ basis.recorded(repo) → stage.completed A9；幂等 replay
+ok 1 - complete_team_plan v4：Git 顺序（init→gitignore→dirty→branch）→ basis.recorded(repo) → stage.completed A9；幂等 replay
+  ---
+  duration_ms: 129.6034
+  type: 'test'
+  ...
+# Subtest: 失败面：git init / 父仓库 / dirty / gitignore dirty / branch exists 按真实原因 fail-closed + stage.blocked A9；不写 basis
+ok 2 - 失败面：git init / 父仓库 / dirty / gitignore dirty / branch exists 按真实原因 fail-closed + stage.blocked A9；不写 basis
+  ---
+  duration_ms: 79.3481
+  type: 'test'
+  ...
+# Subtest: 失败面：文档预算超限（单文件 >4 MiB）⇒ baseline-document-budget；Git 端口不被调用
+ok 3 - 失败面：文档预算超限（单文件 >4 MiB）⇒ baseline-document-budget；Git 端口不被调用
+  ---
+  duration_ms: 38.8304
+  type: 'test'
+  ...
+# Subtest: 失败面：团队计划结构不合法 ⇒ baseline-team-plan-invalid；legacy 字段 runId/baseDigest ⇒ baseline-legacy-field-forbidden
+ok 4 - 失败面：团队计划结构不合法 ⇒ baseline-team-plan-invalid；legacy 字段 runId/baseDigest ⇒ baseline-legacy-field-forbidden
+  ---
+  duration_ms: 40.1249
+  type: 'test'
+  ...
+# Subtest: 任务分支复用：basis 已记录该 workflow 的分支 ⇒ allowReuse=true（G-8 重试不死锁）
+ok 5 - 任务分支复用：basis 已记录该 workflow 的分支 ⇒ allowReuse=true（G-8 重试不死锁）
+  ---
+  duration_ms: 28.8418
+  type: 'test'
+  ...
+# Subtest: 文档读取预算（AC-15/T-07）：32 文件上限与 8 MiB 总量上限（默认口径）
+ok 6 - 文档读取预算（AC-15/T-07）：32 文件上限与 8 MiB 总量上限（默认口径）
+  ---
+  duration_ms: 43.264
+  type: 'test'
+  ...
+# Subtest: 失败面：operationId 指向不同内容 ⇒ baseline-operation-conflict；非运营发起 ⇒ baseline-identity-invalid
+ok 7 - 失败面：operationId 指向不同内容 ⇒ baseline-operation-conflict；非运营发起 ⇒ baseline-identity-invalid
+  ---
+  duration_ms: 41.5699
+  type: 'test'
+  ...
+# Subtest: 文档发现：按 flowId 取最新版本；缺失必需项如实列出；团队计划单独字段
+ok 8 - 文档发现：按 flowId 取最新版本；缺失必需项如实列出；团队计划单独字段
+  ---
+  duration_ms: 11.9036
+  type: 'test'
+  ...
+# Subtest: recordBasisDocuments：必需缺失 ⇒ basis-document-missing；齐全时 SHA-256/bytes 与磁盘字节一致
+ok 9 - recordBasisDocuments：必需缺失 ⇒ basis-document-missing；齐全时 SHA-256/bytes 与磁盘字节一致
+  ---
+  duration_ms: 15.1556
+  type: 'test'
+  ...
+# Subtest: 预算：命名 basis-document-budget（32 文件 / 单文件 4 MiB / 总 8 MiB；含注入阈值路径）
+ok 10 - 预算：命名 basis-document-budget（32 文件 / 单文件 4 MiB / 总 8 MiB；含注入阈值路径）
+  ---
+  duration_ms: 15.6539
+  type: 'test'
+  ...
+# Subtest: drift 校验骨架：内容变更/删除 ⇒ basis-drift 且 actualSha256 如实（删除为 null）
+ok 11 - drift 校验骨架：内容变更/删除 ⇒ basis-drift 且 actualSha256 如实（删除为 null）
+  ---
+  duration_ms: 14.7476
+  type: 'test'
+  ...
+# Subtest: basis.recorded 构造/校验：确定性 basisId；application 记账；path-b 只读标记不产生写权
+ok 12 - basis.recorded 构造/校验：确定性 basisId；application 记账；path-b 只读标记不产生写权
+  ---
+  duration_ms: 1.1157
+  type: 'test'
+  ...
+# Subtest: fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+ok 13 - fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+  ---
+  duration_ms: 18.702
+  type: 'test'
+  ...
+# Subtest: fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+ok 14 - fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+  ---
+  duration_ms: 17.5586
+  type: 'test'
+  ...
+# Subtest: workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+ok 15 - workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+  ---
+  duration_ms: 6.2457
+  type: 'test'
+  ...
+# Subtest: 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+ok 16 - 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+  ---
+  duration_ms: 0.9417
+  type: 'test'
+  ...
+# Subtest: workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+ok 17 - workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+  ---
+  duration_ms: 11.0441
+  type: 'test'
+  ...
+# Subtest: 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+ok 18 - 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+  ---
+  duration_ms: 9.091
+  type: 'test'
+  ...
+# Subtest: stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+ok 19 - stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+  ---
+  duration_ms: 18.8868
+  type: 'test'
+  ...
+# Subtest: closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+ok 20 - closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+  ---
+  duration_ms: 42.8801
+  type: 'test'
+  ...
+# Subtest: A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+ok 21 - A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+  ---
+  duration_ms: 144.2445
+  type: 'test'
+  ...
+# Subtest: prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+ok 22 - prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+  ---
+  duration_ms: 49.9952
+  type: 'test'
+  ...
+# Subtest: activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+ok 23 - activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+  ---
+  duration_ms: 55.2435
+  type: 'test'
+  ...
+# Subtest: archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+ok 24 - archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+  ---
+  duration_ms: 38.1865
+  type: 'test'
+  ...
+# Subtest: append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+ok 25 - append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+  ---
+  duration_ms: 24.9657
+  type: 'test'
+  ...
+# Subtest: 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+ok 26 - 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+  ---
+  duration_ms: 7.9185
+  type: 'test'
+  ...
+# Subtest: 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+ok 27 - 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+  ---
+  duration_ms: 12.3957
+  type: 'test'
+  ...
+# Subtest: 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+ok 28 - 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+  ---
+  duration_ms: 3.0782
+  type: 'test'
+  ...
+# Subtest: 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+ok 29 - 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+  ---
+  duration_ms: 0.8267
+  type: 'test'
+  ...
+# Subtest: per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+ok 30 - per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+  ---
+  duration_ms: 11.0943
+  type: 'test'
+  ...
+# Subtest: legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+ok 31 - legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+  ---
+  duration_ms: 33.9761
+  type: 'test'
+  ...
+# Subtest: 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+ok 32 - 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+  ---
+  duration_ms: 18.4543
+  type: 'test'
+  ...
+# Subtest: 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+ok 33 - 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+  ---
+  duration_ms: 8.6063
+  type: 'test'
+  ...
+# Subtest: writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+ok 34 - writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+  ---
+  duration_ms: 18.9706
+  type: 'test'
+  ...
+# Subtest: ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+ok 35 - ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+  ---
+  duration_ms: 17.8096
+  type: 'test'
+  ...
+1..35
+# tests 35
+# suites 0
+# pass 35
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1992.9507

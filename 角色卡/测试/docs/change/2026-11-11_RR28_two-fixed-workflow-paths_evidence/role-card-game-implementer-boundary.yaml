@@ -1,0 +1,8 @@
+role: game-implementer
+entries:
+  - kind: file
+    path: index.html
+    purpose: game-entry 模块：根目录单页入口与 DOM 挂载点
+  - kind: directory
+    path: src/
+    purpose: game-core 模块：游戏逻辑与渲染实现（src/game.js、src/styles.css）

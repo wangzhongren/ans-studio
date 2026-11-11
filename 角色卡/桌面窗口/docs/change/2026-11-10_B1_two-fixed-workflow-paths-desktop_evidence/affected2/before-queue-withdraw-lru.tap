@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前移、id/full 在快照里）；进行中/回交/不存在都如实回错
+ok 1 - P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前移、id/full 在快照里）；进行中/回交/不存在都如实回错
+  ---
+  duration_ms: 661.4357
+  type: 'test'
+  ...
+# Subtest: P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；settled 后下一时机再收；在跑的全程不被掐断
+ok 2 - P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；settled 后下一时机再收；在跑的全程不被掐断
+  ---
+  duration_ms: 832.0462
+  type: 'test'
+  ...
+# Subtest: F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，撤回无效」；放行后两笔按序送达（撤回无效 ≠ 丢弃）
+ok 3 - F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，撤回无效」；放行后两笔按序送达（撤回无效 ≠ 丢弃）
+  ---
+  duration_ms: 328.0768
+  type: 'test'
+  ...
+# Subtest: G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归治理流只读面（与派发/回交同语义）
+ok 4 - G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归治理流只读面（与派发/回交同语义）
+  ---
+  duration_ms: 189.6996
+  type: 'test'
+  ...
+# Subtest: 2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目（UI 显示「系统」、不可撤回）；缺省仍为客户消息类别
+ok 5 - 2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目（UI 显示「系统」、不可撤回）；缺省仍为客户消息类别
+  ---
+  duration_ms: 137.1394
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2576.8943

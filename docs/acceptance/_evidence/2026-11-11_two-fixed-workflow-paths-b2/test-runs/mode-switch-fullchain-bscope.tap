@@ -1,0 +1,16 @@
+✔ 无 roster 旧项目：B2 scope 按角色边界派生；B3 派发 modulePaths 越界/多属主/治理文档拒绝（不建任务行） (731.9786ms)
+✔ 有 roster：B2 scope ∩ 名单模块属主；B3 派发只能给 scope 内角色/模块；项目状态投影 B2 completed (688.5324ms)
+✔ 路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 真实 Git 提交 → A12 归档 → merge-main 客户本人 → delivered (2447.3067ms)
+✔ 路径 B 全链（假会话）：既有仓库 → B1 → B2 scope（B3 受理生产接线）→ B3 写集/真实提交 → B4 发布（不要求 A12b）→ delivered (1834.8933ms)
+✔ 路径 B 无既有 Git 仓库 ⇒ b-repository-required（不自动 init；零任务/零 basis/零卡） (30.535ms)
+✔ 混合项目 per-flow 解析 + B7.1 fixed fail-closed：legacy 在飞 flow 仍 legacy、fixed 新 flow 走固定矩阵；配置切换即时生效（不缓存） (69.383ms)
+✔ 会话级模式按任务 flowId 解析：legacy 任务 ⇒ legacy 注入；fixed 任务 ⇒ fixed 注入（close v2 在场） (46.6579ms)
+✔ 配置写回失败（坏 .ans/project.json）⇒ project-config-write-failed fail-closed；不派发、不弹卡、不改文件 (6.9926ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7158.6412

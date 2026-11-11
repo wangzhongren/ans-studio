@@ -1,0 +1,25 @@
+✔ A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/branch/basis）+ stage.completed A9；不弹客户卡 (940.0649ms)
+✔ A9 失败面（AC-16）：dirty 工作区 ⇒ fixed 失败 code=baseline-repository-dirty（stage.blocked A9、不弹卡、不写 basis） (570.7058ms)
+✔ A12：fixed close_created_task v2 accepted ⇒ 应用归档 docs/acceptance + stage.completed A12b/A12；幂等 replay (654.0568ms)
+✔ A12 归档失败：criteria 缺证 ⇒ acceptance-record-invalid 阻塞（不写 task.closed、无归档） (54.9753ms)
+✔ B31：A12b blocked 报告 + accepted + note ⇒ 应用归档证据生效；stage.completed A12b 恰一次 + A12 聚合 (486.8402ms)
+✔ B31：A12b blocked 报告 + 无 note ⇒ 桌面证据 undefined（不建归档），服务 close-report-missing (518.7106ms)
+✔ B31：非 A12b blocked 报告不放宽——桌面证据 undefined，服务 close-report-missing (28.1476ms)
+✔ 路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basis reason=path-b）；无仓库 b-repository-required 不 init (708.0246ms)
+✔ B29：legacy 会话的 complete_team_plan 注入仍是 legacy DirectActionReceipt（status/errorCode 逐字保留） (8.2842ms)
+✔ 路径 B B3 写集门：modulePaths ⊆ change.scope-decided.effectiveWritesets；越界/无写集 b-change-scope-invalid (396.0183ms)
+✔ merge-main 卡构造：app-owned 非判断（application + 冻结选项 + 不进 GROUP）；preview 必含字段 (0.9863ms)
+✔ toMergeMainCardDecision：客户本人唯一有效；judge answered 不代批；judge declined ⇒ judge-reject；中止 ⇒ timeout (0.1602ms)
+✔ runFixedReleaseMerge：客户本人确认 ⇒ 本地合并 main（confirm/merged/closed）；不 push/tag (1419.7699ms)
+✔ runFixedReleaseMerge：客户拒绝 ⇒ release.rejected.by=customer、不合并；judge 拒绝 ⇒ by=judge；judge approve 尝试不合并 (2237.7307ms)
+✔ runFixedReleaseMerge：超时/中止 ⇒ release.rejected（by judge，非客户确认）；前置不满足不发卡；无通道不合并 (1450.221ms)
+✔ runFixedReleaseMerge：已合并 tip ⇒ release-already-merged（no-op 成功，不重复合并） (1186.3073ms)
+✔ appendReleaseEvent 夹具：release 账本 schema/幂等（guard against silent format drift） (6.8956ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 11513.7091

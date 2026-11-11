@@ -1,0 +1,20 @@
+# B2 product 候选文件（本角色写集；path-sorted；final）
+# 生成：for f in <files>; printf '%s  lines=%s  bytes=%s  sha256=%s\n'
+
+src/common/roles/product/index.ts  lines=45  bytes=2611  sha256=bcfa91156fb4a869ae9240a67bc9c687330c1567903bb8857871da7766578661
+src/common/roles/product/internal/capabilities.ts  lines=40  bytes=1899  sha256=8a805f7d7ac5fcf9a083026ef20e8e1a0b30dcce4abb9c686c9cde6cca5c6e33
+src/common/roles/product/internal/context.ts  lines=70  bytes=5478  sha256=54e1c6e61875648d06c31b3f2a6079c2d022b0069c9ecdfdb9ba915d4982a8cb
+src/common/roles/product/internal/dispatch.ts  lines=218  bytes=10920  sha256=a9f3bb1492e7d62ed9cc7e6bf7986efb24580c5bc712785bd0ff0efaf9cbdef1
+test/roles/product/product-fixed.test.ts  lines=313  bytes=15680  sha256=123f98a0c2b697f9854e1c5c4037e7eb664e100827736177bc56e292338e23d9
+
+# 聚合：按文件路径排序后，逐行 'path:sha256' 以 LF 连接，对连接串求 SHA-256
+3cfe4692b448fc21b34d92f107cd1932b3983fc3c073e5291596fb44a3c9ccf8
+
+# git diff --numstat（M 文件；未含新增文件）
+9	4	src/common/roles/product/index.ts
+12	0	src/common/roles/product/internal/capabilities.ts
+41	4	src/common/roles/product/internal/context.ts
+66	1	src/common/roles/product/internal/dispatch.ts
+
+# 本批新增文件行数
+313 test/roles/product/product-fixed.test.ts

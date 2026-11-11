@@ -4,6 +4,8 @@
 
 本节为本角色写入授权来源；[boundary.yaml](boundary.yaml) 是供现有产品解析器读取的同步副本，保留既有 `role/entries/kind/path/purpose` 格式。二者必须一致，出现差异先交 ANS Team Formation 修正，不以任一副本自行扩权。
 
+<!-- Delta-B2930-2（2026-11-11，客户 B29/B30 授权）：B30 只读 Git `[user]` 白名单——本表补登 1 个实现单文件与 2 个精确测试文件（src/provider/trunk/impl/git-command.ts、test/编排/git-command.test.ts、test/编排/readonly-git-transport.test.ts），逐文件授权，无目录级授权。 -->
+
 | 类型 | 可操作路径 | 用途 |
 | --- | --- | --- |
 | 单文件 | `src/model/runtime.ts` | 中立运行时类型与能力契约 |
@@ -19,6 +21,9 @@
 | 单文件 | `src/provider/runtime/session-store.ts` | ANS 会话索引与统一回放持久化 |
 | 目录 | `src/common/runtime-core/` | 本角色私有辅助实现 |
 | 目录 | `test/runtime-core/` | 本角色单元测试与契约夹具 |
+| 单文件 | `src/provider/trunk/impl/git-command.ts` | 只读 Git 配置/命令解析与白名单（B30） |
+| 单文件 | `test/编排/git-command.test.ts` | git-command 配置白名单/安全拒绝测试（B30） |
+| 单文件 | `test/编排/readonly-git-transport.test.ts` | 只读 Git 传输/执行测试（B30） |
 | 单文件 | `角色卡/运行时核心/feature-map.md` | 本角色实现与功能资料 |
 | 单文件 | `角色卡/运行时核心/memo.md` | 本角色实现与功能资料 |
 | 单文件 | `角色卡/运行时核心/functional-description.md` | 本角色实现与功能资料 |

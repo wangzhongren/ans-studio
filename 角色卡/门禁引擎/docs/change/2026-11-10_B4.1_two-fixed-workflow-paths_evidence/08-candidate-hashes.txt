@@ -1,0 +1,10 @@
+# 候选文件（本角色 B4.1 写集）raw SHA-256 / bytes / lines
+# date: 2026-11-10T19:00:41+08:00
+e6a8e5cfe3ed5fda40ae7f714018c638cfda9bcfabce28e3602f7531de39d9ec  src/service/gate/shell-rules.ts  bytes=5029 lines=48
+420bd087e9b81bdf2078448e8031fe02af70f0ffa68cd7fa555c583a015cd255  test/门禁引擎/shell-rules-b4-reexport.test.ts  bytes=15222 lines=311
+
+# M 文件 numstat:
+17	0	src/service/gate/shell-rules.ts
+
+# 新文件 numstat（全为新增行）:
+311 test/门禁引擎/shell-rules-b4-reexport.test.ts

@@ -1,0 +1,3 @@
+# 定向 typecheck（nominator 写集；tsconfig 同选项，--ignoreConfig）
+# 命令：npx tsc --noEmit --ignoreConfig --target esnext --lib esnext --module nodenext --moduleResolution nodenext --strict --skipLibCheck --allowImportingTsExtensions --verbatimModuleSyntax --erasableSyntaxOnly --isolatedModules --resolveJsonModule --forceConsistentCasingInFileNames --types node <5 files>
+EXIT=0

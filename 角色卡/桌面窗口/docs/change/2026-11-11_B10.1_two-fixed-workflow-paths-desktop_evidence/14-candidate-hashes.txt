@@ -1,0 +1,12 @@
+# 候选 hash（写集文件 + 记录；bytes/lines/sha256；记录终版）
+app/desktop/session.ts | bytes=859153 | lines=13357 | sha256=6539fabaf7cef81ab6103e5eab3632b855e5aca8fa40194042066d502f081a6d
+test/桌面应用/b101-fixed-dispatch-task-binding.test.ts | bytes=41070 | lines=735 | sha256=1c9c3e69140805c93712f66c476b24cebee86a8586d09a34b20dacf348d80da0
+test/桌面应用/b81-fixed-dispatch-forced-session.test.ts | bytes=26411 | lines=477 | sha256=fb562d7f568ad908265bbee081f649ebe0ad49395bc7ea07d6699c6f082ac6ca
+角色卡/桌面窗口/docs/change/2026-11-11_B10.1_two-fixed-workflow-paths-desktop.md | bytes=20364 | lines=233 | sha256=a53b44ff3f0405c8632ae040c8a10efc762d769e710002319448c7989c612ad3
+
+# git diff --numstat（已跟踪写集）
+71	20	app/desktop/session.ts
+9	5	test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+
+# 聚合 sha256（上述四个 sha256 排序后直接拼接再 sha256）
+0c02173cccec95fae01ce1963866408ce2093298bfdd7549f5d3cfa6b1e79dca

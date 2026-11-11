@@ -1,0 +1,113 @@
+{
+  "at": "2026-11-10T20:34:00.667Z",
+  "candidate": "bed6e0b97cec0287279738b7a3d7f28417f92d9f",
+  "chiefWorkflowV2Loaded": {
+    "at": "2026-11-10T20:31:35.035Z",
+    "level": "info",
+    "pid": 4276,
+    "component": "orchestration.session",
+    "event": "chief.workflow.v2.loaded",
+    "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr4-2026-11-11\\target",
+    "roleId": "chief",
+    "bytes": 17289
+  },
+  "projectJson": {
+    "workflowSchema": "two-fixed-paths/v1"
+  },
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-10T20:31:30.594Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:65807a87-ceee-4426-8b76-67329ed790dc",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "65807a87-ceee-4426-8b76-67329ed790dc",
+    "legacyStateIgnored": true
+  },
+  "workflowEventKinds": [
+    {
+      "kind": "workflow.started",
+      "stage": null,
+      "at": "2026-11-10T20:31:30.594Z"
+    },
+    {
+      "kind": "stage.requested",
+      "stage": "A1",
+      "at": "2026-11-10T20:31:30.594Z"
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-10T20:31:30.599Z",
+      "taskId": "t-mwb5b50i-2b42df81",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+      "flowId": "snake-game",
+      "sideEffect": "read-only"
+    },
+    {
+      "at": "2026-11-10T20:31:40.892Z",
+      "taskId": "t-mwb5bcyk-846f5fe5",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-c8e880c3b8892a0dc60ba9db",
+      "flowId": "snake-game",
+      "sideEffect": "docs"
+    }
+  ],
+  "stageDispatchedPresent": false,
+  "convenerFixedContextTitleCount": 2,
+  "convenerTwoFixedPathsMentions": 2,
+  "productIntentDoc": {
+    "path": "docs/product/snake-game-intent-v1.md",
+    "bytes": 7024,
+    "sha256": "37981ad956ffeaf7195144dca20d2110cd18483713cb680e362ce3565bb3c46b"
+  },
+  "shellGateAudit": [
+    {
+      "timestamp": "2026-11-10T20:31:56.320Z",
+      "toolCallId": "3cbda395-f1e2-4bd2-a81f-2b57027c7db2:call_00_fHngd6mz6QmHKPeXL0Vy8000",
+      "command": "certutil -hashfile docs\\product\\snake-game-intent-v1.md SHA256",
+      "argv": [
+        "certutil",
+        "-hashfile",
+        "docs\\product\\snake-game-intent-v1.md",
+        "SHA256"
+      ],
+      "cwd": "C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr4-2026-11-11\\target",
+      "conclusion": "deny",
+      "branch": "c-deny→a-deny",
+      "by": "ruleset:default（su 审批档） → operator:51054",
+      "conditions": [
+        "shell-gate"
+      ],
+      "execution": "未执行",
+      "entry": "run_shell",
+      "roleId": "product"
+    }
+  ],
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "fixedCardCount": 0,
+  "note": "B8.1 convener fixed context present; B8.2 auto-binding bound workflowId to convener production task; product wrote intent doc then used run_shell certutil for hash; shell gate denied (ruleset/operator) and shell approval surface triggered driver gate; no stage.dispatched A1 in workflows ledger."
+}

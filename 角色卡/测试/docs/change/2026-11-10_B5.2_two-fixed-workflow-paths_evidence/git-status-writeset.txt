@@ -1,0 +1,13 @@
+# write-set check 2026-11-10T13:22:07Z
+
+## git status --porcelain -- src app test
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+ M test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/桌面应用/b51-fixed-workflow-wiring.test.ts
+?? test/测试/b-change-scope.test.ts
+?? test/测试/fixed-path-full-chain.test.ts
+?? test/测试/mode-switch.test.ts
+
+## B5.2 delta inside write set: only test/测试/fixed-path-full-chain.test.ts content changed (untracked file; baseline hash 0c1530b7… → 19fb8661…)
+## No src/** or app/** changes by B5.2 (app/desktop/*.ts M = B5.1 baseline; test/项目管理/shared/i18n-guard-allowlist.ts M = shared-code B5.1 baseline; test/桌面应用/b51-… = B5.1 baseline; test/测试/mode-switch|b-change-scope = B5 baseline, hashes unchanged).

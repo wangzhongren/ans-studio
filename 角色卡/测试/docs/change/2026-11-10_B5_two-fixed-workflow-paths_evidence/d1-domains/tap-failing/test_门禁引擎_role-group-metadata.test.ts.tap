@@ -1,0 +1,86 @@
+TAP version 13
+# Subtest: listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+not ok 1 - listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+  ---
+  duration_ms: 47.0079
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\门禁引擎\\role-group-metadata.test.ts:47:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    23 !== 15
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 15
+  actual: 23
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/role-group-metadata.test.ts:49:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: listProject：新增独立质检角色仅声明自身工作文档，不获得产品或同伴写权
+ok 2 - listProject：新增独立质检角色仅声明自身工作文档，不获得产品或同伴写权
+  ---
+  duration_ms: 23.8075
+  type: 'test'
+  ...
+# Subtest: listProject：新增宣传角色仅声明官网与自身文档，不获得产品或同伴写权
+ok 3 - listProject：新增宣传角色仅声明官网与自身文档，不获得产品或同伴写权
+  ---
+  duration_ms: 22.6353
+  type: 'test'
+  ...
+# Subtest: resolveRole：实际四份角色卡与枚举字段同源，既有 kind / location / boundarySource 保留
+ok 4 - resolveRole：实际四份角色卡与枚举字段同源，既有 kind / location / boundarySource 保留
+  ---
+  duration_ms: 79.2077
+  type: 'test'
+  ...
+# Subtest: 公开入口：中文/英文独立字段与英文技能粗体模板使用同一摘要契约
+ok 5 - 公开入口：中文/英文独立字段与英文技能粗体模板使用同一摘要契约
+  ---
+  duration_ms: 26.0615
+  type: 'test'
+  ...
+# Subtest: 公开入口：第一条非空字段生效，重复别名不覆盖，空字段与单字段不制造默认值
+ok 6 - 公开入口：第一条非空字段生效，重复别名不覆盖，空字段与单字段不制造默认值
+  ---
+  duration_ms: 23.3752
+  type: 'test'
+  ...
+# Subtest: 公开入口：旧卡缺字段仍无属性、无 warning；正文提及与边界用途不会成为组声明
+ok 7 - 公开入口：旧卡缺字段仍无属性、无 warning；正文提及与边界用途不会成为组声明
+  ---
+  duration_ms: 11.9775
+  type: 'test'
+  ...
+# Subtest: Model / 公开入口：未知组名和职责保持字符串，HTML 字符不转义，JSON 回传保持原值
+ok 8 - Model / 公开入口：未知组名和职责保持字符串，HTML 字符不转义，JSON 回传保持原值
+  ---
+  duration_ms: 12.7665
+  type: 'test'
+  ...
+# Subtest: 组长元数据不会改变边界、接受或写权结果，同组不获得额外路径权限
+ok 9 - 组长元数据不会改变边界、接受或写权结果，同组不获得额外路径权限
+  ---
+  duration_ms: 13.417
+  type: 'test'
+  ...
+# Subtest: 带组字段的归档卡仍静默排除/拒绝开启，内置和未知角色不继承项目组
+ok 10 - 带组字段的归档卡仍静默排除/拒绝开启，内置和未知角色不继承项目组
+  ---
+  duration_ms: 17.2965
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 9
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 483.1694

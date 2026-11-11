@@ -1,0 +1,3460 @@
+TAP version 13
+# Subtest: 确定性白名单（原委托形态）：npm test → c-allow，0 卡且不调判断 agent
+ok 1 - 确定性白名单（原委托形态）：npm test → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 3.3241
+  type: 'test'
+  ...
+# Subtest: 确定性白名单（原委托形态）：npm run typecheck → c-allow，0 卡且不调判断 agent
+ok 2 - 确定性白名单（原委托形态）：npm run typecheck → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 0.3118
+  type: 'test'
+  ...
+# Subtest: 确定性白名单（原委托形态）：node --test → c-allow，0 卡且不调判断 agent
+ok 3 - 确定性白名单（原委托形态）：node --test → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 0.5273
+  type: 'test'
+  ...
+# Subtest: 确定性白名单（原委托形态）：node --test test/编排/handback.test.ts → c-allow，0 卡且不调判断 agent
+ok 4 - 确定性白名单（原委托形态）：node --test test/编排/handback.test.ts → c-allow，0 卡且不调判断 agent
+  ---
+  duration_ms: 1.1348
+  type: 'test'
+  ...
+# Subtest: 通配 test/**/*.test.ts 不命中谓词/不获委托：不是 c-allow，也未借政策免 a
+ok 5 - 通配 test/**/*.test.ts 不命中谓词/不获委托：不是 c-allow，也未借政策免 a
+  ---
+  duration_ms: 0.6717
+  type: 'test'
+  ...
+# Subtest: 委托策略只认原三 id：npm ci / tsc --noEmit / npm run test|lint|check 谓词命中但不委派
+ok 6 - 委托策略只认原三 id：npm ci / tsc --noEmit / npm run test|lint|check 谓词命中但不委派
+  ---
+  duration_ms: 0.1511
+  type: 'test'
+  ...
+# Subtest: c-allow 与宿主政策无关；委托的 cwd/项目根等值校验仍在单测层成立
+ok 7 - c-allow 与宿主政策无关；委托的 cwd/项目根等值校验仍在单测层成立
+  ---
+  duration_ms: 0.3461
+  type: 'test'
+  ...
+# Subtest: 分类为risky的非匹配node路径/flags不会借普通检查政策免a
+ok 8 - 分类为risky的非匹配node路径/flags不会借普通检查政策免a
+  ---
+  duration_ms: 0.7053
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm install
+ok 9 - 非精确常规检查不继承政策：npm install
+  ---
+  duration_ms: 0.7474
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm ci
+ok 10 - 非精确常规检查不继承政策：npm ci
+  ---
+  duration_ms: 0.2353
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm run arbitrary
+ok 11 - 非精确常规检查不继承政策：npm run arbitrary
+  ---
+  duration_ms: 0.2091
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：npm test -- --update
+ok 12 - 非精确常规检查不继承政策：npm test -- --update
+  ---
+  duration_ms: 0.1993
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：rm -rf test
+ok 13 - 非精确常规检查不继承政策：rm -rf test
+  ---
+  duration_ms: 0.2716
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test ../outside.test.ts
+ok 14 - 非精确常规检查不继承政策：node --test ../outside.test.ts
+  ---
+  duration_ms: 0.2145
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test /outside.test.ts
+ok 15 - 非精确常规检查不继承政策：node --test /outside.test.ts
+  ---
+  duration_ms: 0.1382
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test src/main.ts
+ok 16 - 非精确常规检查不继承政策：node --test src/main.ts
+  ---
+  duration_ms: 0.1525
+  type: 'test'
+  ...
+# Subtest: 非精确常规检查不继承政策：node --test --import src/execute.ts
+ok 17 - 非精确常规检查不继承政策：node --test --import src/execute.ts
+  ---
+  duration_ms: 0.1413
+  type: 'test'
+  ...
+# Subtest: c硬拒组合即终结；su只读档即使误注入政策也不免审核
+ok 18 - c硬拒组合即终结；su只读档即使误注入政策也不免审核
+  ---
+  duration_ms: 0.3168
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=deny 不会被宿主政策擅自允许
+ok 19 - 常规检查的b=deny 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1111
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=invalid 不会被宿主政策擅自允许
+ok 20 - 常规检查的b=invalid 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1171
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=unsure 不会被宿主政策擅自允许
+ok 21 - 常规检查的b=unsure 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1093
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=error 不会被宿主政策擅自允许
+ok 22 - 常规检查的b=error 不会被宿主政策擅自允许
+  ---
+  duration_ms: 0.1071
+  type: 'test'
+  ...
+# Subtest: 常规检查的b=timeout 不会被宿主政策擅自允许
+ok 23 - 常规检查的b=timeout 不会被宿主政策擅自允许
+  ---
+  duration_ms: 5.8008
+  type: 'test'
+  ...
+# Subtest: node test外指符号链接路径不获委托；项目内测试路径获委托
+not ok 24 - node test外指符号链接路径不获委托；项目内测试路径获委托
+  ---
+  duration_ms: 1.7655
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\shell-authorized-routine.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-routine-outside-hQogeR\\outside.test.ts' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-routine-paths-3kRalM\\test\\external.test.ts'"
+  code: 'EPERM'
+  stack: |-
+    Object.symlinkSync (node:fs:1937:11)
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/shell-authorized-routine.test.ts:191:8)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: openRoleSession真正把宿主政策传到shell装配，su仍只读（非白名单命令）
+ok 25 - openRoleSession真正把宿主政策传到shell装配，su仍只读（非白名单命令）
+  ---
+  duration_ms: 26.1457
+  type: 'test'
+  ...
+# Subtest: shell诊断明确委托来源与实际审核分支，不存命令/argv
+ok 26 - shell诊断明确委托来源与实际审核分支，不存命令/argv
+  ---
+  duration_ms: 12.9241
+  type: 'test'
+  ...
+# Subtest: 阈值：命令 2048B / 内联 >10 行 / 单行 >1024B（客户建议 2KB）
+ok 27 - 阈值：命令 2048B / 内联 >10 行 / 单行 >1024B（客户建议 2KB）
+  ---
+  duration_ms: 0.6095
+  type: 'test'
+  ...
+# Subtest: 长内联 node -e（>2KB）→ deny inline-too-large，理由含落盘脚本
+ok 28 - 长内联 node -e（>2KB）→ deny inline-too-large，理由含落盘脚本
+  ---
+  duration_ms: 0.838
+  type: 'test'
+  ...
+# Subtest: 判断入口：长内联直接 deny，模型零调用（不建判断会话），不是 manual
+ok 29 - 判断入口：长内联直接 deny，模型零调用（不建判断会话），不是 manual
+  ---
+  duration_ms: 0.7446
+  type: 'test'
+  ...
+# Subtest: 判断入口：无界 grep 直接 deny unbounded-search，模型零调用
+ok 30 - 判断入口：无界 grep 直接 deny unbounded-search，模型零调用
+  ---
+  duration_ms: 0.4617
+  type: 'test'
+  ...
+# Subtest: 多行内联 sh -c（>10 行）→ deny；短内联 bash -c 放行
+ok 31 - 多行内联 sh -c（>10 行）→ deny；短内联 bash -c 放行
+  ---
+  duration_ms: 0.3446
+  type: 'test'
+  ...
+# Subtest: python -c 单行超长（>1024B）→ deny；短 python -c 放行
+ok 32 - python -c 单行超长（>1024B）→ deny；短 python -c 放行
+  ---
+  duration_ms: 0.2058
+  type: 'test'
+  ...
+# Subtest: 嵌套内联：bash -c 里再套长 node -e 也能识别
+ok 33 - 嵌套内联：bash -c 里再套长 node -e 也能识别
+  ---
+  duration_ms: 0.2205
+  type: 'test'
+  ...
+# Subtest: 无界 grep：无路径 / . / 项目根 / / / ~ / $PWD → deny unbounded-search
+ok 34 - 无界 grep：无路径 / . / 项目根 / / / ~ / $PWD → deny unbounded-search
+  ---
+  duration_ms: 0.5638
+  type: 'test'
+  ...
+# Subtest: 有界 grep 放行：具体目录 + --include / 具体文件（不因本规则拒绝）
+ok 35 - 有界 grep 放行：具体目录 + --include / 具体文件（不因本规则拒绝）
+  ---
+  duration_ms: 0.2815
+  type: 'test'
+  ...
+# Subtest: Windows 路径回归：盘符/UNC 的反斜杠按分隔符保留 ⇒ 项目根仍判无界；具体子目录/文件放行
+ok 36 - Windows 路径回归：盘符/UNC 的反斜杠按分隔符保留 ⇒ 项目根仍判无界；具体子目录/文件放行
+  ---
+  duration_ms: 0.3915
+  type: 'test'
+  ...
+# Subtest: find：/ 与 . → deny；具体目录与 -maxdepth 有界 → 放行
+ok 37 - find：/ 与 . → deny；具体目录与 -maxdepth 有界 → 放行
+  ---
+  duration_ms: 0.2926
+  type: 'test'
+  ...
+# Subtest: rg：无路径全项目扫描 → deny；具体路径 / 管道喂入 / --version 放行
+ok 38 - rg：无路径全项目扫描 → deny；具体路径 / 管道喂入 / --version 放行
+  ---
+  duration_ms: 0.2893
+  type: 'test'
+  ...
+# Subtest: 包装器剥离：sudo / timeout / xargs 后的无界 grep 仍被拒绝
+ok 39 - 包装器剥离：sudo / timeout / xargs 后的无界 grep 仍被拒绝
+  ---
+  duration_ms: 0.1341
+  type: 'test'
+  ...
+# Subtest: 普通短命令/落盘脚本不受影响：npm test / node script.js / ls / git status
+ok 40 - 普通短命令/落盘脚本不受影响：npm test / node script.js / ls / git status
+  ---
+  duration_ms: 0.106
+  type: 'test'
+  ...
+# Subtest: shell-gate：前置封堵先于 (c) 白名单与 (b)/(a)——classify/pm/operator 零调用，审计可辨识
+ok 41 - shell-gate：前置封堵先于 (c) 白名单与 (b)/(a)——classify/pm/operator 零调用，审计可辨识
+  ---
+  duration_ms: 1.9411
+  type: 'test'
+  ...
+# Subtest: shell-gate：只读档同样先被封堵（不因白名单放行无界 grep）
+ok 42 - shell-gate：只读档同样先被封堵（不因白名单放行无界 grep）
+  ---
+  duration_ms: 0.1639
+  type: 'test'
+  ...
+# Subtest: 系统提示：长内联/无界搜索属卡死风险，必须 deny 并给落盘脚本；有界搜索不拦
+ok 43 - 系统提示：长内联/无界搜索属卡死风险，必须 deny 并给落盘脚本；有界搜索不拦
+  ---
+  duration_ms: 0.1372
+  type: 'test'
+  ...
+# Subtest: 可申请：judge 主动 deny（review 档）→ 记录 → 申请 → 三选一卡（字段取自判拒记录）
+ok 44 - 可申请：judge 主动 deny（review 档）→ 记录 → 申请 → 三选一卡（字段取自判拒记录）
+  ---
+  duration_ms: 2.3711
+  type: 'test'
+  ...
+# Subtest: 可申请：manual + retry-capped（manualAsDeny===true）→ 记录并出卡
+ok 45 - 可申请：manual + retry-capped（manualAsDeny===true）→ 记录并出卡
+  ---
+  duration_ms: 0.1781
+  type: 'test'
+  ...
+# Subtest: 可申请：script 分支（带 approvalContext）→ 记录保存上下文并展示在卡上
+ok 46 - 可申请：script 分支（带 approvalContext）→ 记录保存上下文并展示在卡上
+  ---
+  duration_ms: 0.3871
+  type: 'test'
+  ...
+# Subtest: 不可申请：c=deny 硬拒（script 路径，judge 也在 deny 档） → 工具拒绝、不弹卡、不调 judge/客户
+ok 47 - 不可申请：c=deny 硬拒（script 路径，judge 也在 deny 档） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0998
+  type: 'test'
+  ...
+# Subtest: 不可申请：c-deny→a-deny（advisory 非 script 的 c=deny 分支） → 工具拒绝、不弹卡、不调 judge/客户
+ok 48 - 不可申请：c-deny→a-deny（advisory 非 script 的 c=deny 分支） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0856
+  type: 'test'
+  ...
+# Subtest: 不可申请：审批档 tier=deny 的 judge 判拒 → 工具拒绝、不弹卡、不调 judge/客户
+ok 49 - 不可申请：审批档 tier=deny 的 judge 判拒 → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0569
+  type: 'test'
+  ...
+# Subtest: 不可申请：确定性前置封堵 preblock:inline-too-large → 工具拒绝、不弹卡、不调 judge/客户
+ok 50 - 不可申请：确定性前置封堵 preblock:inline-too-large → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0584
+  type: 'test'
+  ...
+# Subtest: 不可申请：确定性前置封堵 preblock:unbounded-search → 工具拒绝、不弹卡、不调 judge/客户
+ok 51 - 不可申请：确定性前置封堵 preblock:unbounded-search → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0444
+  type: 'test'
+  ...
+# Subtest: 不可申请：写目标守卫 deny → 工具拒绝、不弹卡、不调 judge/客户
+ok 52 - 不可申请：写目标守卫 deny → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0574
+  type: 'test'
+  ...
+# Subtest: 不可申请：script:context-unavailable → 工具拒绝、不弹卡、不调 judge/客户
+ok 53 - 不可申请：script:context-unavailable → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0904
+  type: 'test'
+  ...
+# Subtest: 不可申请：脚本上下文 failClosed → 工具拒绝、不弹卡、不调 judge/客户
+ok 54 - 不可申请：脚本上下文 failClosed → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0503
+  type: 'test'
+  ...
+# Subtest: 不可申请：只读档 readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+ok 55 - 不可申请：只读档 readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0365
+  type: 'test'
+  ...
+# Subtest: 不可申请：只读档 script:readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+ok 56 - 不可申请：只读档 script:readonly-deny → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0452
+  type: 'test'
+  ...
+# Subtest: 不可申请：客户手拒（无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+ok 57 - 不可申请：客户手拒（无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0272
+  type: 'test'
+  ...
+# Subtest: 不可申请：pm b-deny（旧路径，无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+ok 58 - 不可申请：pm b-deny（旧路径，无 judge 审计） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0199
+  type: 'test'
+  ...
+# Subtest: 不可申请：其它 manual（timeout，manualAsDeny===true） → 工具拒绝、不弹卡、不调 judge/客户
+ok 59 - 不可申请：其它 manual（timeout，manualAsDeny===true） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0218
+  type: 'test'
+  ...
+# Subtest: 不可申请：row-failed → 工具拒绝、不弹卡、不调 judge/客户
+ok 60 - 不可申请：row-failed → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.0199
+  type: 'test'
+  ...
+# Subtest: 不可申请：judge allow（非拒绝） → 工具拒绝、不弹卡、不调 judge/客户
+ok 61 - 不可申请：judge allow（非拒绝） → 工具拒绝、不弹卡、不调 judge/客户
+  ---
+  duration_ms: 0.018
+  type: 'test'
+  ...
+# Subtest: 不可申请：后台入口（start_background_task）的判拒不写入可申请台账
+ok 62 - 不可申请：后台入口（start_background_task）的判拒不写入可申请台账
+  ---
+  duration_ms: 0.055
+  type: 'test'
+  ...
+# Subtest: 旧记录清理：judge deny 后同一 key 被 judge allow ⇒ 删除 recorded，申请被拒
+ok 63 - 旧记录清理：judge deny 后同一 key 被 judge allow ⇒ 删除 recorded，申请被拒
+  ---
+  duration_ms: 0.0642
+  type: 'test'
+  ...
+# Subtest: 旧记录清理：judge deny 后同一 key 出现客户手拒 ⇒ 记录被清除，申请被拒
+ok 64 - 旧记录清理：judge deny 后同一 key 出现客户手拒 ⇒ 记录被清除，申请被拒
+  ---
+  duration_ms: 0.0427
+  type: 'test'
+  ...
+# Subtest: 旧记录清理：judge deny 后同一 key 出现其它 manual ⇒ 记录被清除，申请被拒
+ok 65 - 旧记录清理：judge deny 后同一 key 出现其它 manual ⇒ 记录被清除，申请被拒
+  ---
+  duration_ms: 0.0239
+  type: 'test'
+  ...
+# Subtest: 后台 review 不清除 run_shell 记录：判拒 → 后台 review → 申请仍可出卡
+ok 66 - 后台 review 不清除 run_shell 记录：判拒 → 后台 review → 申请仍可出卡
+  ---
+  duration_ms: 0.0842
+  type: 'test'
+  ...
+# Subtest: 资格只认最近一次审核：deny → allow → deny ⇒ 新判拒记录可申请
+ok 67 - 资格只认最近一次审核：deny → allow → deny ⇒ 新判拒记录可申请
+  ---
+  duration_ms: 0.1125
+  type: 'test'
+  ...
+# Subtest: 状态机：allow-once → granted-once → 下一次精确匹配消费 → consumed（不可再申请）
+ok 68 - 状态机：allow-once → granted-once → 下一次精确匹配消费 → consumed（不可再申请）
+  ---
+  duration_ms: 0.2006
+  type: 'test'
+  ...
+# Subtest: 状态机：allow-session 反复放行；会话 dispose 后失效（重建 fail-closed）
+ok 69 - 状态机：allow-session 反复放行；会话 dispose 后失效（重建 fail-closed）
+  ---
+  duration_ms: 0.1317
+  type: 'test'
+  ...
+# Subtest: 状态机：客户拒绝 → denied，回执明确未获允许且不可再申请
+ok 70 - 状态机：客户拒绝 → denied，回执明确未获允许且不可再申请
+  ---
+  duration_ms: 0.1017
+  type: 'test'
+  ...
+# Subtest: 状态机：expired 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 71 - 状态机：expired 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.1055
+  type: 'test'
+  ...
+# Subtest: 状态机：unavailable 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 72 - 状态机：unavailable 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0791
+  type: 'test'
+  ...
+# Subtest: 状态机：非法动作 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 73 - 状态机：非法动作 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0543
+  type: 'test'
+  ...
+# Subtest: 状态机：null 回包 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+ok 74 - 状态机：null 回包 回包 ⇒ 默认拒绝（expired），消耗申请权且不可再申请
+  ---
+  duration_ms: 0.0434
+  type: 'test'
+  ...
+# Subtest: 状态机：presenter 抛错 ⇒ expired（fail-closed，不产生授权）
+ok 75 - 状态机：presenter 抛错 ⇒ expired（fail-closed，不产生授权）
+  ---
+  duration_ms: 0.1563
+  type: 'test'
+  ...
+# Subtest: 状态机：presenter 超时 ⇒ expired（呈现超时链兜底）
+ok 76 - 状态机：presenter 超时 ⇒ expired（呈现超时链兜底）
+  ---
+  duration_ms: 25.9543
+  type: 'test'
+  ...
+# Subtest: 状态机：轮次已中止（signal aborted）⇒ 不出卡、expired
+ok 77 - 状态机：轮次已中止（signal aborted）⇒ 不出卡、expired
+  ---
+  duration_ms: 0.1838
+  type: 'test'
+  ...
+# shell 升级决定审计未落盘：门禁拒绝
+# Subtest: 并发/待答：同会话同时最多 1 张待答申请；待答期间新申请直接拒绝（不排队）
+ok 78 - 并发/待答：同会话同时最多 1 张待答申请；待答期间新申请直接拒绝（不排队）
+  ---
+  duration_ms: 0.4056
+  type: 'test'
+  ...
+# Subtest: E2 R2：presenter 返回 pending ⇒ 回滚消耗（无审计、额度/申请权归还），同命令稍后再申请成功
+ok 79 - E2 R2：presenter 返回 pending ⇒ 回滚消耗（无审计、额度/申请权归还），同命令稍后再申请成功
+  ---
+  duration_ms: 0.2514
+  type: 'test'
+  ...
+# Subtest: E2 R2：多次 pending 不累计消耗会话额度（5 次额度仍可用于真实申请）
+ok 80 - E2 R2：多次 pending 不累计消耗会话额度（5 次额度仍可用于真实申请）
+  ---
+  duration_ms: 0.2461
+  type: 'test'
+  ...
+# Subtest: 限流：同一命令每会话最多一次（拒绝后再次申请也被拒，不弹卡）
+ok 81 - 限流：同一命令每会话最多一次（拒绝后再次申请也被拒，不弹卡）
+  ---
+  duration_ms: 0.0726
+  type: 'test'
+  ...
+# Subtest: 限流：会话总上限默认 5；第 6 次拒绝且不弹卡
+ok 82 - 限流：会话总上限默认 5；第 6 次拒绝且不弹卡
+  ---
+  duration_ms: 0.1352
+  type: 'test'
+  ...
+# Subtest: 限流：maxRequestsPerSession 可注入（1 次）
+ok 83 - 限流：maxRequestsPerSession 可注入（1 次）
+  ---
+  duration_ms: 0.0627
+  type: 'test'
+  ...
+# Subtest: 必要性上限：>500 字符或 >1KB 拒绝且不弹卡；未提交申请
+ok 84 - 必要性上限：>500 字符或 >1KB 拒绝且不弹卡；未提交申请
+  ---
+  duration_ms: 0.1002
+  type: 'test'
+  ...
+# Subtest: 键精确性：argv 全等才交接（派生命令/改参数不生效，且不消费一次性授权）
+ok 85 - 键精确性：argv 全等才交接（派生命令/改参数不生效，且不消费一次性授权）
+  ---
+  duration_ms: 0.1394
+  type: 'test'
+  ...
+# Subtest: 键精确性：cwd / 角色 / 项目不同不生效（不跨会话交接）
+ok 86 - 键精确性：cwd / 角色 / 项目不同不生效（不跨会话交接）
+  ---
+  duration_ms: 0.1428
+  type: 'test'
+  ...
+# Subtest: 键精确性：后台入口 takeGrant 不消费也不交接前台授权
+ok 87 - 键精确性：后台入口 takeGrant 不消费也不交接前台授权
+  ---
+  duration_ms: 0.0812
+  type: 'test'
+  ...
+# Subtest: 会话授权：同 cwd/argv 反复放行；派生命令不继承
+ok 88 - 会话授权：同 cwd/argv 反复放行；派生命令不继承
+  ---
+  duration_ms: 0.0823
+  type: 'test'
+  ...
+# Subtest: digestApprovalContext：稳定、仅随内容/路径变化；undefined ⇒ undefined
+ok 89 - digestApprovalContext：稳定、仅随内容/路径变化；undefined ⇒ undefined
+  ---
+  duration_ms: 0.1311
+  type: 'test'
+  ...
+# Subtest: stale：once 授权消费时脚本上下文变化 ⇒ 拒绝、授权作废、终态不可再申请
+ok 90 - stale：once 授权消费时脚本上下文变化 ⇒ 拒绝、授权作废、终态不可再申请
+  ---
+  duration_ms: 0.1369
+  type: 'test'
+  ...
+# Subtest: stale：上下文不可读（undefined）也按 stale 拒绝（fail-closed）
+ok 91 - stale：上下文不可读（undefined）也按 stale 拒绝（fail-closed）
+  ---
+  duration_ms: 0.0934
+  type: 'test'
+  ...
+# Subtest: stale：会话授权每次消费都比对 sha256（未变化则持续有效）
+ok 92 - stale：会话授权每次消费都比对 sha256（未变化则持续有效）
+  ---
+  duration_ms: 0.0918
+  type: 'test'
+  ...
+# Subtest: 非脚本授权不做 sha256 比对（判拒记录无上下文）
+ok 93 - 非脚本授权不做 sha256 比对（判拒记录无上下文）
+  ---
+  duration_ms: 0.0669
+  type: 'test'
+  ...
+# Subtest: 审计：允许一次/本会话/拒绝/超时各写一条完整 escalation-decision（同一 sink、append-only）
+ok 94 - 审计：允许一次/本会话/拒绝/超时各写一条完整 escalation-decision（同一 sink、append-only）
+  ---
+  duration_ms: 0.1815
+  type: 'test'
+  ...
+# Subtest: 审计：卡与审计的命令原文取自判拒记录（不取模型本次输入）
+ok 95 - 审计：卡与审计的命令原文取自判拒记录（不取模型本次输入）
+  ---
+  duration_ms: 0.0804
+  type: 'test'
+  ...
+# Subtest: 审计：sink 故障不翻转决定（回执仍如实、授权仍按客户决定创建）
+ok 96 - 审计：sink 故障不翻转决定（回执仍如实、授权仍按客户决定创建）
+  ---
+  duration_ms: 0.1317
+  type: 'test'
+  ...
+# Subtest: 回滚开关：ANS_SHELL_ESCALATION_DISABLED=1 判定（仅精确值 1）
+ok 97 - 回滚开关：ANS_SHELL_ESCALATION_DISABLED=1 判定（仅精确值 1）
+  ---
+  duration_ms: 0.0517
+  type: 'test'
+  ...
+# Subtest: 闸接线：onReviewed 与审计同址（每判定一次）；onAuditSinkCreated 共享同一 sink
+ok 98 - 闸接线：onReviewed 与审计同址（每判定一次）；onAuditSinkCreated 共享同一 sink
+  ---
+  duration_ms: 1.5371
+  type: 'test'
+  ...
+# Subtest: 闸接线：script 分支以带 approvalContext 的请求回调 onReviewed 与 takeGrant
+ok 99 - 闸接线：script 分支以带 approvalContext 的请求回调 onReviewed 与 takeGrant
+  ---
+  duration_ms: 0.6343
+  type: 'test'
+  ...
+# Subtest: openRoleSession：presenter 注入 ⇒ shellEscalation 能力位到达适配器；判拒→申请→授权放行端到端
+ok 100 - openRoleSession：presenter 注入 ⇒ shellEscalation 能力位到达适配器；判拒→申请→授权放行端到端
+  ---
+  duration_ms: 23.7003
+  type: 'test'
+  ...
+# Subtest: openRoleSession：ANS_SHELL_ESCALATION_DISABLED=1 ⇒ registry 不创建、工具能力不注入
+ok 101 - openRoleSession：ANS_SHELL_ESCALATION_DISABLED=1 ⇒ registry 不创建、工具能力不注入
+  ---
+  duration_ms: 10.6005
+  type: 'test'
+  ...
+# Subtest: openRoleSession：未提供 presenter ⇒ 不创建 registry（shellEscalation 缺席）
+ok 102 - openRoleSession：未提供 presenter ⇒ 不创建 registry（shellEscalation 缺席）
+  ---
+  duration_ms: 10.2616
+  type: 'test'
+  ...
+# Subtest: allow → 放行（**不产出 token**），by 为 ruleset:<id>，审计记 c-allow
+ok 103 - allow → 放行（**不产出 token**），by 为 ruleset:<id>，审计记 c-allow
+  ---
+  duration_ms: 2.6305
+  type: 'test'
+  ...
+# Subtest: deny → 拒绝（硬拒终结），审计记 c-deny
+ok 104 - deny → 拒绝（硬拒终结），审计记 c-deny
+  ---
+  duration_ms: 0.2514
+  type: 'test'
+  ...
+# Subtest: review → 第一步**默认拒绝**（未接入 (b)/(a)，绝不因缺下一闸而放行）
+ok 105 - review → 第一步**默认拒绝**（未接入 (b)/(a)，绝不因缺下一闸而放行）
+  ---
+  duration_ms: 0.229
+  type: 'test'
+  ...
+# Subtest: review 对任意命令都默认拒绝（不因命令看似无害而放行）
+ok 106 - review 对任意命令都默认拒绝（不因命令看似无害而放行）
+  ---
+  duration_ms: 0.2894
+  type: 'test'
+  ...
+# Subtest: 审核超时 → 拒绝（超时包装；退路 3）
+ok 107 - 审核超时 → 拒绝（超时包装；退路 3）
+  ---
+  duration_ms: 36.1918
+  type: 'test'
+  ...
+# Subtest: 规则集加载失败 → 整条命令拒绝（绝不「规则没了就一律放行」）
+ok 108 - 规则集加载失败 → 整条命令拒绝（绝不「规则没了就一律放行」）
+  ---
+  duration_ms: 0.4852
+  type: 'test'
+  ...
+# Subtest: 未注入 classifyShell → 一律拒绝（能力缺席即 fail-closed）
+ok 109 - 未注入 classifyShell → 一律拒绝（能力缺席即 fail-closed）
+  ---
+  duration_ms: 0.2275
+  type: 'test'
+  ...
+# Subtest: classifyShell 抛错 → 拒绝（保守，不把异常当放行）
+ok 110 - classifyShell 抛错 → 拒绝（保守，不把异常当放行）
+  ---
+  duration_ms: 0.2186
+  type: 'test'
+  ...
+# Subtest: 审计记录被追加到 docs/audit/shell-gate.jsonl，含要求字段且声明 shell-gate 条件
+ok 111 - 审计记录被追加到 docs/audit/shell-gate.jsonl，含要求字段且声明 shell-gate 条件
+  ---
+  duration_ms: 8.9812
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：命中条件目录但缺少条件 `shell-gate`：任务未在 conditions 声明该条件（拒绝）：docs/audit/shell-gate.jsonl
+# Subtest: 审计是追加式：两条记录追加为两行（不改写既有）
+ok 112 - 审计是追加式：两条记录追加为两行（不改写既有）
+  ---
+  duration_ms: 14.7512
+  type: 'test'
+  ...
+# Subtest: 硬要求负例：审计写门禁 scope **不含** shell-gate → 被门禁拒绝、零副作用（不落盘）
+ok 113 - 硬要求负例：审计写门禁 scope **不含** shell-gate → 被门禁拒绝、零副作用（不落盘）
+  ---
+  duration_ms: 1.3016
+  type: 'test'
+  ...
+# shell 闸审计未落盘：审计写被门禁拒绝：边界未被接受或缺少证据来源（F6）：拒绝一切写入。
+# 可能的恢复路径：若项目已有角色但缺少 .ans/project.json，请由操作者在桌面点击「建立治理记录」，或在终端运行 ans govern <项目目录>（需已配置模型与凭据）；若 .ans/project.json 已存在，请检查它可解析、accepted:true 且 pin 齐全、被 pin 的边界文件未被改动——程序不会自动覆盖或重新接受。
+# Subtest: F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁
+ok 114 - F-6-T1（刷新恢复）：未接受快照 + refreshGate 给出已接受边界 → 首查拒 → 重试落盘一条；此后直走新门禁
+  ---
+  duration_ms: 15.6031
+  type: 'test'
+  ...
+# Subtest: F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件）
+ok 115 - F-6-T2（缺省无刷新 = 现状）：未接受快照、无 refreshGate → 拒且零副作用（不建目录、无文件）
+  ---
+  duration_ms: 0.7791
+  type: 'test'
+  ...
+# Subtest: F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因
+ok 116 - F-6-T3（刷新仍拒）：refreshGate 返回另一份未接受边界 → 拒、零副作用、原因含两段事实且无猜测性归因
+  ---
+  duration_ms: 0.6394
+  type: 'test'
+  ...
+# Subtest: F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用
+ok 117 - F-6-T3b（刷新失败）：refreshGate 未取得门禁/抛错 → 维持拒绝、原因如实、零副作用
+  ---
+  duration_ms: 0.5335
+  type: 'test'
+  ...
+# Subtest: F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转
+ok 118 - F-6-T4（F-6-2 去重 + 如实话术）：同因仅报一次；变化/恢复/恢复后再失败各一行；判定不翻转
+  ---
+  duration_ms: 0.2837
+  type: 'test'
+  ...
+# Subtest: F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」
+ok 119 - F-4-X1：unavailable → 转达通道真实 reason（「确认超时」/「轮次中止」可辨）；缺原因走如实兜底，不再固定「无人值守？」
+  ---
+  duration_ms: 0.4757
+  type: 'test'
+  ...
+# shell 闸审核结束回调异常（不影响判定）：回调崩溃
+# Subtest: buildShellGate（Pipeline 构造入口）→ 判定 + 自动审计落盘 docs/audit/shell-gate.jsonl
+ok 120 - buildShellGate（Pipeline 构造入口）→ 判定 + 自动审计落盘 docs/audit/shell-gate.jsonl
+  ---
+  duration_ms: 7.6139
+  type: 'test'
+  ...
+# Subtest: 注入路径：selectAdapterFactory 把编排构造的 shellGate 转发给 pi 工厂
+ok 121 - 注入路径：selectAdapterFactory 把编排构造的 shellGate 转发给 pi 工厂
+  ---
+  duration_ms: 0.2044
+  type: 'test'
+  ...
+# Subtest: 注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 将不注册，fail-closed）
+ok 122 - 注入路径：不传 shellGate → pi 工厂收到 undefined（run_shell 将不注册，fail-closed）
+  ---
+  duration_ms: 0.0627
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：c=deny 硬拒不调用/不消费 takeGrant（授权不得越过硬地板）
+ok 123 - 授权顺序（script）：c=deny 硬拒不调用/不消费 takeGrant（授权不得越过硬地板）
+  ---
+  duration_ms: 0.2778
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：上下文重载成功后才查授权 → 授权放行（customer-escalation:allow-once，审计 customerGrant 无 judge）
+ok 124 - 授权顺序（script）：上下文重载成功后才查授权 → 授权放行（customer-escalation:allow-once，审计 customerGrant 无 judge）
+  ---
+  duration_ms: 0.2732
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：上下文不可读 + takeGrant 返回 stale ⇒ customer-escalation:stale-context 拒绝
+ok 125 - 授权顺序（script）：上下文不可读 + takeGrant 返回 stale ⇒ customer-escalation:stale-context 拒绝
+  ---
+  duration_ms: 0.1561
+  type: 'test'
+  ...
+# Subtest: 授权顺序（script）：c=allow 分类不消费授权（也不走授权分支）
+ok 126 - 授权顺序（script）：c=allow 分类不消费授权（也不走授权分支）
+  ---
+  duration_ms: 0.1893
+  type: 'test'
+  ...
+# Subtest: 授权顺序（非 script）：c=allow 不消费一次性授权（授权保留给目标命令）
+ok 127 - 授权顺序（非 script）：c=allow 不消费一次性授权（授权保留给目标命令）
+  ---
+  duration_ms: 0.1521
+  type: 'test'
+  ...
+# Subtest: 授权顺序（advisory）：review + 匹配 grant → 授权放行（allow-session），不调 operator
+ok 128 - 授权顺序（advisory）：review + 匹配 grant → 授权放行（allow-session），不调 operator
+  ---
+  duration_ms: 0.11
+  type: 'test'
+  ...
+# Subtest: 授权顺序（advisory）：c=deny 不消费/不放行——仍按现状交 (a)，分支 c-deny→a-*
+ok 129 - 授权顺序（advisory）：c=deny 不消费/不放行——仍按现状交 (a)，分支 c-deny→a-*
+  ---
+  duration_ms: 0.1034
+  type: 'test'
+  ...
+# Subtest: 授权顺序（operatorOnly）：risky + grant → 授权放行；c=deny（approveDeny）不消费
+ok 130 - 授权顺序（operatorOnly）：risky + grant → 授权放行；c=deny（approveDeny）不消费
+  ---
+  duration_ms: 0.1785
+  type: 'test'
+  ...
+# Subtest: 授权顺序（三层链）：review + grant → 授权放行且不调 pm/operator；c=deny 不消费
+ok 131 - 授权顺序（三层链）：review + grant → 授权放行且不调 pm/operator；c=deny 不消费
+  ---
+  duration_ms: 0.1425
+  type: 'test'
+  ...
+# Subtest: 授权顺序（readonly）：readonlyOnly + takeGrant ⇒ 构造期抛错（只读拒绝不得被陈旧授权越过）
+ok 132 - 授权顺序（readonly）：readonlyOnly + takeGrant ⇒ 构造期抛错（只读拒绝不得被陈旧授权越过）
+  ---
+  duration_ms: 0.2166
+  type: 'test'
+  ...
+# Subtest: onReviewed：script 分支以带 approvalContext 的请求回调；非 script 用原请求
+ok 133 - onReviewed：script 分支以带 approvalContext 的请求回调；非 script 用原请求
+  ---
+  duration_ms: 0.2385
+  type: 'test'
+  ...
+# Subtest: onReviewed 抛错不影响判定（只做记录/清理，判定已完成且确定）
+ok 134 - onReviewed 抛错不影响判定（只做记录/清理，判定已完成且确定）
+  ---
+  duration_ms: 0.1367
+  type: 'test'
+  ...
+# Subtest: readonly 裁定 A：例行白名单命中（分类器明细 ruleId）在只读档 readonly-deny，reason 模板与档位按 A2 之前
+ok 135 - readonly 裁定 A：例行白名单命中（分类器明细 ruleId）在只读档 readonly-deny，reason 模板与档位按 A2 之前
+  ---
+  duration_ms: 0.2966
+  type: 'test'
+  ...
+# Subtest: readonly 裁定 A：裸串分类器（生产四态封装不带 ruleId）⇒ 同一冻结谓词兜底；非 routine c-allow 仍放行
+ok 136 - readonly 裁定 A：裸串分类器（生产四态封装不带 ruleId）⇒ 同一冻结谓词兜底；非 routine c-allow 仍放行
+  ---
+  duration_ms: 1.4881
+  type: 'test'
+  ...
+# Subtest: readonly 裁定 A：非只读档的 c-allow（含 allow:routine:*）行为不变，且不消费升级授权
+ok 137 - readonly 裁定 A：非只读档的 c-allow（含 allow:routine:*）行为不变，且不消费升级授权
+  ---
+  duration_ms: 0.1023
+  type: 'test'
+  ...
+# Subtest: 并发与排队配置：默认 3 / 60s；env 覆盖；非法回默认；并发夹在 1..8
+ok 138 - 并发与排队配置：默认 3 / 60s；env 覆盖；非法回默认；并发夹在 1..8
+  ---
+  duration_ms: 0.6623
+  type: 'test'
+  ...
+# Subtest: env `ANS_SHELL_JUDGE_CONCURRENCY` 生效：设为 1 时第二条排队
+ok 139 - env `ANS_SHELL_JUDGE_CONCURRENCY` 生效：设为 1 时第二条排队
+  ---
+  duration_ms: 58.4554
+  type: 'test'
+  ...
+# Subtest: 默认上限 3：同轮 4 条并发全部 allow，无 manual/unavailable；第 4 条排队后成功
+ok 140 - 默认上限 3：同轮 4 条并发全部 allow，无 manual/unavailable；第 4 条排队后成功
+  ---
+  duration_ms: 30.8484
+  type: 'test'
+  ...
+# Subtest: 上限 1：3 条请求按 FIFO 依次排队、依次成功
+ok 141 - 上限 1：3 条请求按 FIFO 依次排队、依次成功
+  ---
+  duration_ms: 46.6781
+  type: 'test'
+  ...
+# Subtest: 排队超时 → manual/queue-timeout，reason 含「排队超时」与实际在跑条数
+ok 142 - 排队超时 → manual/queue-timeout，reason 含「排队超时」与实际在跑条数
+  ---
+  duration_ms: 62.1199
+  type: 'test'
+  ...
+# Subtest: 排队中外部中止 → manual/aborted（不建判断会话，也不放行）
+ok 143 - 排队中外部中止 → manual/aborted（不建判断会话，也不放行）
+  ---
+  duration_ms: 46.8084
+  type: 'test'
+  ...
+# Subtest: 有界队列：排队已满 → 立即 manual/queue-full（不无限堆积、不假装成功）
+ok 144 - 有界队列：排队已满 → 立即 manual/queue-full（不无限堆积、不假装成功）
+  ---
+  duration_ms: 62.2747
+  type: 'test'
+  ...
+# Subtest: 单条判断失败不影响并发中的其他条（各自独立结果）
+ok 145 - 单条判断失败不影响并发中的其他条（各自独立结果）
+  ---
+  duration_ms: 47.2358
+  type: 'test'
+  ...
+# Subtest: 每请求独立计时：一条按时完成、另一条独立超时
+ok 146 - 每请求独立计时：一条按时完成、另一条独立超时
+  ---
+  duration_ms: 62.6509
+  type: 'test'
+  ...
+# Subtest: 并发池不跨 createShellJudge 实例共享
+ok 147 - 并发池不跨 createShellJudge 实例共享
+  ---
+  duration_ms: 30.7565
+  type: 'test'
+  ...
+# Subtest: 并发下的 denyCounts：两条同命令并发 deny 都计数，随后命中 retry-capped
+ok 148 - 并发下的 denyCounts：两条同命令并发 deny 都计数，随后命中 retry-capped
+  ---
+  duration_ms: 15.865
+  type: 'test'
+  ...
+# Subtest: 读取纪律：先 judge_list_dir 了解结构，只读与系统风险审查直接相关的证据
+ok 149 - 读取纪律：先 judge_list_dir 了解结构，只读与系统风险审查直接相关的证据
+  ---
+  duration_ms: 0.5036
+  type: 'test'
+  ...
+# Subtest: 读取纪律：大文件用范围参数定点抽查，不整文件反复读
+ok 150 - 读取纪律：大文件用范围参数定点抽查，不整文件反复读
+  ---
+  duration_ms: 0.0948
+  type: 'test'
+  ...
+# Subtest: 读取纪律：不读 data/**、日志、构建产物、会话/审计目录（除非命令直接操作且必须核对）
+ok 151 - 读取纪律：不读 data/**、日志、构建产物、会话/审计目录（除非命令直接操作且必须核对）
+  ---
+  duration_ms: 0.0765
+  type: 'test'
+  ...
+# Subtest: 读取纪律：同一文件不重复读，预算耗尽如实 manual、不猜测
+ok 152 - 读取纪律：同一文件不重复读，预算耗尽如实 manual、不猜测
+  ---
+  duration_ms: 0.0713
+  type: 'test'
+  ...
+# Subtest: 读取纪律：本地服务 curl/测试脚本优先看命令、cwd、argv 与角色任务上下文
+ok 153 - 读取纪律：本地服务 curl/测试脚本优先看命令、cwd、argv 与角色任务上下文
+  ---
+  duration_ms: 0.0675
+  type: 'test'
+  ...
+# Subtest: 既有语义不变：工具面与输出契约仍在，系统提示稳定可复现
+ok 154 - 既有语义不变：工具面与输出契约仍在，系统提示稳定可复现
+  ---
+  duration_ms: 0.4582
+  type: 'test'
+  ...
+# Subtest: rubric 覆盖五类系统风险：系统/机器、卡死、越界、并发/数据完整性、端口/资源冲突
+ok 155 - rubric 覆盖五类系统风险：系统/机器、卡死、越界、并发/数据完整性、端口/资源冲突
+  ---
+  duration_ms: 0.6271
+  type: 'test'
+  ...
+# Subtest: fail-closed：缺关键证据 ⇒ manual；确认无风险 ⇒ allow（语义仍在 rubric 与输出契约）
+ok 156 - fail-closed：缺关键证据 ⇒ manual；确认无风险 ⇒ allow（语义仍在 rubric 与输出契约）
+  ---
+  duration_ms: 0.0976
+  type: 'test'
+  ...
+# Subtest: 明确排除业务必要性：不因看不懂业务/看不出必要而拦截项目内普通命令
+ok 157 - 明确排除业务必要性：不因看不懂业务/看不出必要而拦截项目内普通命令
+  ---
+  duration_ms: 0.084
+  type: 'test'
+  ...
+# Subtest: 客户文案不再出现「业务不必要」：默认合成说明改为系统风险口径
+ok 158 - 客户文案不再出现「业务不必要」：默认合成说明改为系统风险口径
+  ---
+  duration_ms: 0.2001
+  type: 'test'
+  ...
+# Subtest: 请求提示注入实际预算：maxCalls / maxBytes / maxFileBytes，数值与注入一致
+ok 159 - 请求提示注入实际预算：maxCalls / maxBytes / maxFileBytes，数值与注入一致
+  ---
+  duration_ms: 0.2059
+  type: 'test'
+  ...
+# Subtest: 预算字节格式：整 KiB 用 KiB，非整 KiB 如实显示字节（不臆造精度）
+ok 160 - 预算字节格式：整 KiB 用 KiB，非整 KiB 如实显示字节（不臆造精度）
+  ---
+  duration_ms: 0.0954
+  type: 'test'
+  ...
+# Subtest: 驱动：注入预算同时进入请求提示与只读工具（同一份解析值）
+ok 161 - 驱动：注入预算同时进入请求提示与只读工具（同一份解析值）
+  ---
+  duration_ms: 2.3186
+  type: 'test'
+  ...
+# Subtest: 驱动：未显式注入时预算来自运行时 env 解析，提示与实际生效值一致
+ok 162 - 驱动：未显式注入时预算来自运行时 env 解析，提示与实际生效值一致
+  ---
+  duration_ms: 0.8534
+  type: 'test'
+  ...
+# Subtest: 无系统风险 ⇒ allow（reasonCode 仍为 necessary，兼容既有消费方）
+ok 163 - 无系统风险 ⇒ allow（reasonCode 仍为 necessary，兼容既有消费方）
+  ---
+  duration_ms: 0.2908
+  type: 'test'
+  ...
+# Subtest: 有系统风险 ⇒ deny；客户说明含风险与标准出路，不含「业务不必要」
+ok 164 - 有系统风险 ⇒ deny；客户说明含风险与标准出路，不含「业务不必要」
+  ---
+  duration_ms: 0.3093
+  type: 'test'
+  ...
+# Subtest: 缺关键证据 ⇒ manual（模型自报）；不当作 deny 也不放行
+ok 165 - 缺关键证据 ⇒ manual（模型自报）；不当作 deny 也不放行
+  ---
+  duration_ms: 0.2183
+  type: 'test'
+  ...
+# Subtest: deny 无 reason ⇒ 兜底文案为「未能确认无系统风险」，不再写「不必要」
+ok 166 - deny 无 reason ⇒ 兜底文案为「未能确认无系统风险」，不再写「不必要」
+  ---
+  duration_ms: 0.2055
+  type: 'test'
+  ...
+# Subtest: 既有工具面与输出契约仍在；系统提示稳定
+ok 167 - 既有工具面与输出契约仍在；系统提示稳定
+  ---
+  duration_ms: 0.0624
+  type: 'test'
+  ...
+# Subtest: allow → necessary；命令/项目根进入提示，系统提示稳定且含不可信数据警告
+ok 168 - allow → necessary；命令/项目根进入提示，系统提示稳定且含不可信数据警告
+  ---
+  duration_ms: 2.9667
+  type: 'test'
+  ...
+# Subtest: deny + alternative → safer-alternative；客户说明可用时不改写
+ok 169 - deny + alternative → safer-alternative；客户说明可用时不改写
+  ---
+  duration_ms: 0.6347
+  type: 'test'
+  ...
+# Subtest: deny 无 alternative → no-alternative；缺客户说明时合成并含标准出路
+ok 170 - deny 无 alternative → no-alternative；缺客户说明时合成并含标准出路
+  ---
+  duration_ms: 0.3126
+  type: 'test'
+  ...
+# Subtest: 模型自报 manual → model-manual（不当作 deny）
+ok 171 - 模型自报 manual → model-manual（不当作 deny）
+  ---
+  duration_ms: 0.3236
+  type: 'test'
+  ...
+# Subtest: 非法/未知裁决 → manual/parse-failed（绝不从散文里猜结论）
+ok 172 - 非法/未知裁决 → manual/parse-failed（绝不从散文里猜结论）
+  ---
+  duration_ms: 1.0892
+  type: 'test'
+  ...
+# Subtest: 工具缺失时降级解析纯 JSON message（可去代码围栏）
+ok 173 - 工具缺失时降级解析纯 JSON message（可去代码围栏）
+  ---
+  duration_ms: 0.2479
+  type: 'test'
+  ...
+# Subtest: 读取损伤：allow 一律降 manual（budget 优先 / read-truncated / read-denied）；deny 不变
+ok 174 - 读取损伤：allow 一律降 manual（budget 优先 / read-truncated / read-denied）；deny 不变
+  ---
+  duration_ms: 0.7205
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：列项目相对路径与类别（app-private 条目可随其他拒绝一起展示）
+ok 175 - read-denied 摘要：列项目相对路径与类别（app-private 条目可随其他拒绝一起展示）
+  ---
+  duration_ms: 0.2414
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：根外条目（path 为空）只显示类别
+ok 176 - read-denied 摘要：根外条目（path 为空）只显示类别
+  ---
+  duration_ms: 0.2026
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：deniedPaths 为空 ⇒ 保留原泛化文案
+ok 177 - read-denied 摘要：deniedPaths 为空 ⇒ 保留原泛化文案
+  ---
+  duration_ms: 0.2194
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：最多 3 条、更多追加「等 N 个路径」且 ≤200 字符
+ok 178 - read-denied 摘要：最多 3 条、更多追加「等 N 个路径」且 ≤200 字符
+  ---
+  duration_ms: 0.2331
+  type: 'test'
+  ...
+# Subtest: read-denied 摘要：按原因码细化（not-found ⇒ 路径不存在，不再显示「受限路径」）
+ok 179 - read-denied 摘要：按原因码细化（not-found ⇒ 路径不存在，不再显示「受限路径」）
+  ---
+  duration_ms: 0.088
+  type: 'test'
+  ...
+# Subtest: app-private 拒绝不计入 deniedReads：单独出现不触发 read-denied
+ok 180 - app-private 拒绝不计入 deniedReads：单独出现不触发 read-denied
+  ---
+  duration_ms: 0.1777
+  type: 'test'
+  ...
+# Subtest: tier=deny 且模型 allow → 照常 allow，hardDenyOverride + label（不转换、不拦截）
+ok 181 - tier=deny 且模型 allow → 照常 allow，hardDenyOverride + label（不转换、不拦截）
+  ---
+  duration_ms: 0.1434
+  type: 'test'
+  ...
+# Subtest: 普通 risky/review 放行不带 hardDenyOverride/label
+ok 182 - 普通 risky/review 放行不带 hardDenyOverride/label
+  ---
+  duration_ms: 0.2478
+  type: 'test'
+  ...
+# Subtest: 超时前已捕获合法结论 → 结论保留（超时只中止等待）
+ok 183 - 超时前已捕获合法结论 → 结论保留（超时只中止等待）
+  ---
+  duration_ms: 37.3149
+  type: 'test'
+  ...
+# Subtest: 超时且无结论 → manual/timeout
+ok 184 - 超时且无结论 → manual/timeout
+  ---
+  duration_ms: 30.0896
+  type: 'test'
+  ...
+# Subtest: 超时配置：shell 默认 120s、env 覆盖、非法回退；执行时限不变
+ok 185 - 超时配置：shell 默认 120s、env 覆盖、非法回退；执行时限不变
+  ---
+  duration_ms: 31.6813
+  type: 'test'
+  ...
+# Subtest: 外部中止 → manual/aborted（丢弃已捕获结果）；预中止不建会话
+ok 186 - 外部中止 → manual/aborted（丢弃已捕获结果）；预中止不建会话
+  ---
+  duration_ms: 0.4062
+  type: 'test'
+  ...
+# Subtest: 迟到 bindRole：超时后会话才返回 → 立即 dispose（不泄漏）
+ok 187 - 迟到 bindRole：超时后会话才返回 → 立即 dispose（不泄漏）
+  ---
+  duration_ms: 155.5148
+  type: 'test'
+  ...
+# Subtest: 防循环：同一命令连续 deny 达上限 → manual/retry-capped（不调用模型）
+ok 188 - 防循环：同一命令连续 deny 达上限 → manual/retry-capped（不调用模型）
+  ---
+  duration_ms: 0.4825
+  type: 'test'
+  ...
+# Subtest: 防循环：allow 清零计数、manual 不递增
+ok 189 - 防循环：allow 清零计数、manual 不递增
+  ---
+  duration_ms: 0.4917
+  type: 'test'
+  ...
+# Subtest: 支持矩阵：claude/pi/codex 支持；demo → manual/unsupported-engine（不建会话）
+ok 190 - 支持矩阵：claude/pi/codex 支持；demo → manual/unsupported-engine（不建会话）
+  ---
+  duration_ms: 0.0862
+  type: 'test'
+  ...
+# Subtest: 会话不可用 → manual/unavailable（不抛错）
+ok 191 - 会话不可用 → manual/unavailable（不抛错）
+  ---
+  duration_ms: 0.1536
+  type: 'test'
+  ...
+# Subtest: 上下文缺失/超限 → context-missing / context-too-large
+ok 192 - 上下文缺失/超限 → context-missing / context-too-large
+  ---
+  duration_ms: 1.83
+  type: 'test'
+  ...
+# Subtest: 判断会话只见三项只读工具；写门禁 deny-all；不改 RuntimeAdapter 契约
+ok 193 - 判断会话只见三项只读工具；写门禁 deny-all；不改 RuntimeAdapter 契约
+  ---
+  duration_ms: 1.2471
+  type: 'test'
+  ...
+# Subtest: 审计透传 judge：allow + tier=deny + hardDenyOverride；by 以 operator:judge:<引擎> 结尾
+ok 194 - 审计透传 judge：allow + tier=deny + hardDenyOverride；by 以 operator:judge:<引擎> 结尾
+  ---
+  duration_ms: 1.7165
+  type: 'test'
+  ...
+# Subtest: 审计透传 judge：deny 也带 judge；人工手批不带 judge
+ok 195 - 审计透传 judge：deny 也带 judge；人工手批不带 judge
+  ---
+  duration_ms: 0.2757
+  type: 'test'
+  ...
+# Subtest: shellJudgeAuditOf：只映射 allow/deny；deny 档放行带 label；manual 不产审计
+ok 196 - shellJudgeAuditOf：只映射 allow/deny；deny 档放行带 label；manual 不产审计
+  ---
+  duration_ms: 0.3146
+  type: 'test'
+  ...
+# Subtest: normalizeShellJudgeVerdict：严格取值域、长度上限、alternative 坏件忽略
+ok 197 - normalizeShellJudgeVerdict：严格取值域、长度上限、alternative 坏件忽略
+  ---
+  duration_ms: 0.1211
+  type: 'test'
+  ...
+# Subtest: synthesizeCustomerMessage：含标准出路、已含则不重复
+ok 198 - synthesizeCustomerMessage：含标准出路、已含则不重复
+  ---
+  duration_ms: 0.0792
+  type: 'test'
+  ...
+# Subtest: redactJudgeText：脱敏环境凭据与 Bearer/api-key 形态并做有界截断
+ok 199 - redactJudgeText：脱敏环境凭据与 Bearer/api-key 形态并做有界截断
+  ---
+  duration_ms: 0.0864
+  type: 'test'
+  ...
+# Subtest: buildShellJudgePrompt：只放本次数据，不复述历史；turnText 按 4KB 截断
+ok 200 - buildShellJudgePrompt：只放本次数据，不复述历史；turnText 按 4KB 截断
+  ---
+  duration_ms: 0.0541
+  type: 'test'
+  ...
+# Subtest: 客户出路句：判拒后可申请客户确认，保留「关闭替我审批」兜底（旧/新表述兼容）
+ok 201 - 客户出路句：判拒后可申请客户确认，保留「关闭替我审批」兜底（旧/新表述兼容）
+  ---
+  duration_ms: 0.05
+  type: 'test'
+  ...
+# Subtest: allow：直接放行、operator 调用 0 次、branch c-allow；审计含 command/argv/cwd/by/conditions
+ok 202 - allow：直接放行、operator 调用 0 次、branch c-allow；审计含 command/argv/cwd/by/conditions
+  ---
+  duration_ms: 2.742
+  type: 'test'
+  ...
+# Subtest: risky：批准 → c-risky→a-allow；reason 用 su 审批档前缀并披露写边界风险
+ok 203 - risky：批准 → c-risky→a-allow；reason 用 su 审批档前缀并披露写边界风险
+  ---
+  duration_ms: 0.3868
+  type: 'test'
+  ...
+# Subtest: risky：拒绝 → c-risky→a-deny；超时 → c-risky→a-timeout；不可用 → c-risky→a-unavailable
+ok 204 - risky：拒绝 → c-risky→a-deny；超时 → c-risky→a-timeout；不可用 → c-risky→a-unavailable
+  ---
+  duration_ms: 20.3183
+  type: 'test'
+  ...
+# Subtest: review：批准 → c-review→a-allow；拒绝 → c-review→a-deny（不接 (b)）
+ok 205 - review：批准 → c-review→a-allow；拒绝 → c-review→a-deny（不接 (b)）
+  ---
+  duration_ms: 0.4001
+  type: 'test'
+  ...
+# Subtest: deny + approveDeny=true（非 re-shell 的硬拒例）：批准 → c-deny→a-allow；拒绝 → c-deny→a-deny
+ok 206 - deny + approveDeny=true（非 re-shell 的硬拒例）：批准 → c-deny→a-allow；拒绝 → c-deny→a-deny
+  ---
+  duration_ms: 0.3319
+  type: 'test'
+  ...
+# Subtest: deny + approveDeny=false：既有硬拒终结（c-deny，0 次 operator，回归）
+ok 207 - deny + approveDeny=false：既有硬拒终结（c-deny，0 次 operator，回归）
+  ---
+  duration_ms: 0.1612
+  type: 'test'
+  ...
+# Subtest: 构造守卫：模式互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk / 带 routineShellPolicy
+ok 208 - 构造守卫：模式互斥 / approveDeny 无 operatorOnly / 无通道 / 带 pmAsk / 带 routineShellPolicy
+  ---
+  duration_ms: 0.4003
+  type: 'test'
+  ...
+# Subtest: renderSuApprovalReason：前缀/档位/命中原因/写边界警告逐字；项目三层链文案不含前缀
+ok 209 - renderSuApprovalReason：前缀/档位/命中原因/写边界警告逐字；项目三层链文案不含前缀
+  ---
+  duration_ms: 0.1318
+  type: 'test'
+  ...
+# Subtest: CLI 提示：su 审批档不再写「(b) 未定」；非审批档维持既有文案
+ok 210 - CLI 提示：su 审批档不再写「(b) 未定」；非审批档维持既有文案
+  ---
+  duration_ms: 0.1214
+  type: 'test'
+  ...
+# Subtest: assembleOperatorShellGate：allow 0 卡；risky 出卡；审计落 sink；缺 classifier/rules fail-closed
+ok 211 - assembleOperatorShellGate：allow 0 卡；risky 出卡；审计落 sink；缺 classifier/rules fail-closed
+  ---
+  duration_ms: 12.2178
+  type: 'test'
+  ...
+# Subtest: openRoleSession：su + shellOperatorOnly ⇒ arm；项目角色误传/与 shellReadonly 同时给出 ⇒ 不 arm
+ok 212 - openRoleSession：su + shellOperatorOnly ⇒ arm；项目角色误传/与 shellReadonly 同时给出 ⇒ 不 arm
+  ---
+  duration_ms: 27.7662
+  type: 'test'
+  ...
+# Subtest: 不透明执行（writeGuard=opaque）⇒ 交 (a)，审阅上下文含脚本内容；不再强制客户本人（Q1/Q2 口径修正）
+ok 213 - 不透明执行（writeGuard=opaque）⇒ 交 (a)，审阅上下文含脚本内容；不再强制客户本人（Q1/Q2 口径修正）
+  ---
+  duration_ms: 0.3741
+  type: 'test'
+  ...
+# Subtest: 不透明执行但审查上下文不可用（脚本不可读/超限/越界）⇒ fail-closed 拒绝（0 卡、0 判断）
+ok 214 - 不透明执行但审查上下文不可用（脚本不可读/超限/越界）⇒ fail-closed 拒绝（0 卡、0 判断）
+  ---
+  duration_ms: 0.1816
+  type: 'test'
+  ...
+# Subtest: 显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operator、审计分支 write-guard:deny
+ok 215 - 显式写目标越界（writeGuard=deny）⇒ 直接拒绝：0 次 operator、审计分支 write-guard:deny
+  ---
+  duration_ms: 0.1442
+  type: 'test'
+  ...
+# Subtest: P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+not ok 216 - P6 集成（Q1/Q2 口径修正）：可静态证明越界 ⇒ deny；不可解析 ⇒ 交判断并附脚本内容；plain 仍按边界
+  ---
+  duration_ms: 3.162
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\shell-operator-only.test.ts:511:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    git clean -fdx：审批通过 ⇒ 放行
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/shell-operator-only.test.ts:577:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: F6 真实 gate：短 node -e 进入 script 审查并携带代码原文；长内联硬拒
+ok 217 - F6 真实 gate：短 node -e 进入 script 审查并携带代码原文；长内联硬拒
+  ---
+  duration_ms: 1.2194
+  type: 'test'
+  ...
+# Subtest: 快照 diff：新增/修改/删除；mtime 或 size 变化即 modified
+ok 218 - 快照 diff：新增/修改/删除；mtime 或 size 变化即 modified
+  ---
+  duration_ms: 5.524
+  type: 'test'
+  ...
+# Subtest: 越界判定：边界内通过；边界外/禁写前缀进入 violations
+ok 219 - 越界判定：边界内通过；边界外/禁写前缀进入 violations
+  ---
+  duration_ms: 0.1724
+  type: 'test'
+  ...
+# Subtest: createShellPostAudit：执行前后快照对比 → 越界写入返回并写审计（仅越界时）；写审计失败不影响回执
+ok 220 - createShellPostAudit：执行前后快照对比 → 越界写入返回并写审计（仅越界时）；写审计失败不影响回执
+  ---
+  duration_ms: 3.1306
+  type: 'test'
+  ...
+# Subtest: 真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修改/删除可见
+ok 221 - 真实文件系统快照：排除 .ans/.git/node_modules/dist；新增/修改/删除可见
+  ---
+  duration_ms: 7.8805
+  type: 'test'
+  ...
+# Subtest: R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）
+ok 222 - R9：受管版本化文档被 shell/外部改写 ⇒ 执行后审计记录越界（baseline 比对）
+  ---
+  duration_ms: 26.7856
+  type: 'test'
+  ...
+# Subtest: R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）
+ok 223 - R9：baseline 缺失/坏行 ⇒ 版本化文档变化仍按越界记录（fail-closed，不静默跳过）
+  ---
+  duration_ms: 3.7488
+  type: 'test'
+  ...
+# Subtest: P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入
+ok 224 - P6 审计诚实口径 + 2026-11-05 归因修复：`.ans` 记入审计但不按越界；审计不宣称覆盖项目外写入
+  ---
+  duration_ms: 3.1931
+  type: 'test'
+  ...
+# Subtest: 归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界
+ok 225 - 归因修复：createShellPostAudit 把 `.ans`/bootstrap 清单记入 appStateChanges（写审计记录），不算越界
+  ---
+  duration_ms: 0.2684
+  type: 'test'
+  ...
+# Subtest: 归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界
+ok 226 - 归因修复：经写日志登记的合法工具写入不算越界；未登记的外部写入仍判越界
+  ---
+  duration_ms: 13.8232
+  type: 'test'
+  ...
+# Subtest: v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底
+ok 227 - v2.4 P6：显式 extraRoots（如 skillRoot）的变化按越界记录；审计不宣称任意项目外兜底
+  ---
+  duration_ms: 2.838
+  type: 'test'
+  ...
+# Subtest: 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny
+ok 228 - 只读档四档：allow → 执行；risky/review → readonly-deny（reason 写明命中档）；deny → c-deny
+  ---
+  duration_ms: 17.4245
+  type: 'test'
+  ...
+# Subtest: 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖）
+ok 229 - 只读档：注入 (b) pmAsk / (a) operatorChannel 也**从不调用**（一调用即抛错的桩；四档全覆盖）
+  ---
+  duration_ms: 0.4303
+  type: 'test'
+  ...
+# Subtest: 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝
+ok 230 - 只读档 fail-closed：rules 未注入 ⇒ 一律拒绝（ruleset-load-failed）；classifyShell 未注入 ⇒ 一律拒绝
+  ---
+  duration_ms: 4.9975
+  type: 'test'
+  ...
+# Subtest: 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」）
+ok 231 - 只读档审计：真落 docs/audit/shell-gate.jsonl（逐字命令 / branch / execution 恒「未执行」）
+  ---
+  duration_ms: 15.2104
+  type: 'test'
+  ...
+# Subtest: W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit
+ok 232 - W6-A trio 审计边界：只读档真落 docs/audit/shell-gate.jsonl（应用专用边界）；Liaison 角色边界仍不含 docs/audit
+  ---
+  duration_ms: 11.5299
+  type: 'test'
+  ...
+# Subtest: 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny
+ok 233 - 只读档集成（门禁引擎实件）：ls/git status/node --version 放行；rm→readonly-deny；node --test→readonly-deny（不在白名单，本任务接受的现状）；sh -c→c-deny
+  ---
+  duration_ms: 3.9855
+  type: 'test'
+  ...
+# Subtest: run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变）
+ok 234 - run-role：su 给 shellReadonly ⇒ 只读档 gate 到达 adapter（run_shell 注册）；不给 ⇒ 不 arm（既有行为不变）
+  ---
+  duration_ms: 16.4639
+  type: 'test'
+  ...
+# Subtest: run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用）
+ok 235 - run-role：shellReadonly 与三层链同时出现 ⇒ readonly 优先（(a)/(b) 均不被调用）
+  ---
+  duration_ms: 11.3606
+  type: 'test'
+  ...
+# Subtest: run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑
+ok 236 - run-role 端到端（假适配器事件流）：su 的 run_shell 请求经只读档判定——risky 进事件流为 denied、消息为「未执行」，绝不真跑
+  ---
+  duration_ms: 12.5803
+  type: 'test'
+  ...
+# Subtest: (c) 白名单 → 放行，且**不经 (b)/(a)**（桩未被调用）
+ok 237 - (c) 白名单 → 放行，且**不经 (b)/(a)**（桩未被调用）
+  ---
+  duration_ms: 2.5697
+  type: 'test'
+  ...
+# Subtest: (c) 硬拒 → 拒绝、终结，**(b)/(a) 未被调用**（硬地板不可被翻案）
+ok 238 - (c) 硬拒 → 拒绝、终结，**(b)/(a) 未被调用**（硬地板不可被翻案）
+  ---
+  duration_ms: 0.2091
+  type: 'test'
+  ...
+# Subtest: (c) review → 进 (b)；(b) 放行 → 放行（审计 b-allow，by 记 pm 会话/模型）
+ok 239 - (c) review → 进 (b)；(b) 放行 → 放行（审计 b-allow，by 记 pm 会话/模型）
+  ---
+  duration_ms: 0.5079
+  type: 'test'
+  ...
+# Subtest: (c) review → (b) 拒绝 → 拒绝（审计 b-deny）
+ok 240 - (c) review → (b) 拒绝 → 拒绝（审计 b-deny）
+  ---
+  duration_ms: 0.3095
+  type: 'test'
+  ...
+# Subtest: (b) 拿不准 → 升级 (a) → (a) 放行 = 放行（升级链 b-unsure→a-allow 可辨识）
+ok 241 - (b) 拿不准 → 升级 (a) → (a) 放行 = 放行（升级链 b-unsure→a-allow 可辨识）
+  ---
+  duration_ms: 0.4759
+  type: 'test'
+  ...
+# Subtest: (b) 审读超时 → 升级 (a)（分支 b-timeout→…；绝不视为放行）
+ok 242 - (b) 审读超时 → 升级 (a)（分支 b-timeout→…；绝不视为放行）
+  ---
+  duration_ms: 28.5107
+  type: 'test'
+  ...
+# Subtest: (b) 无 pm 会话（未注入 pmAsk）→ 升级 (a)（分支 b-unavailable→…）
+ok 243 - (b) 无 pm 会话（未注入 pmAsk）→ 升级 (a)（分支 b-unavailable→…）
+  ---
+  duration_ms: 0.2655
+  type: 'test'
+  ...
+# Subtest: (b) 输出不可解析 → **直接拒绝**（M-2：fail-closed；**不升 (a)、不重试、不打扰客户**）
+ok 244 - (b) 输出不可解析 → **直接拒绝**（M-2：fail-closed；**不升 (a)、不重试、不打扰客户**）
+  ---
+  duration_ms: 0.2181
+  type: 'test'
+  ...
+# Subtest: (b) 围栏包裹的合法 JSON → 解析容错照旧生效（提示收紧之外的解析侧容错仍在）
+ok 245 - (b) 围栏包裹的合法 JSON → 解析容错照旧生效（提示收紧之外的解析侧容错仍在）
+  ---
+  duration_ms: 0.1813
+  type: 'test'
+  ...
+# Subtest: (b) 报错（会话打不开）→ 升级 (a)（分支 b-unavailable→…）
+ok 246 - (b) 报错（会话打不开）→ 升级 (a)（分支 b-unavailable→…）
+  ---
+  duration_ms: 0.2549
+  type: 'test'
+  ...
+# Subtest: (a) 拒绝 → 拒绝（分支 b-unsure→a-deny）
+ok 247 - (a) 拒绝 → 拒绝（分支 b-unsure→a-deny）
+  ---
+  duration_ms: 0.2053
+  type: 'test'
+  ...
+# Subtest: (a) 通道不可用 → 转达通道真实 reason（F-4-X1）且拒绝
+ok 248 - (a) 通道不可用 → 转达通道真实 reason（F-4-X1）且拒绝
+  ---
+  duration_ms: 0.2922
+  type: 'test'
+  ...
+# Subtest: (a) 确认超时 → 拒绝（分支 b-unsure→a-timeout）
+ok 249 - (a) 确认超时 → 拒绝（分支 b-unsure→a-timeout）
+  ---
+  duration_ms: 30.0603
+  type: 'test'
+  ...
+# Subtest: (a) 通道未接入（注入了 (b) 但无 (a)）→ 拒绝（绝不视为放行）
+ok 250 - (a) 通道未接入（注入了 (b) 但无 (a)）→ 拒绝（绝不视为放行）
+  ---
+  duration_ms: 0.2479
+  type: 'test'
+  ...
+# Subtest: 审计记录含 by 与 branch，且每层分支可辨识（c→b→a 逐层分别核对）
+ok 251 - 审计记录含 by 与 branch，且每层分支可辨识（c→b→a 逐层分别核对）
+  ---
+  duration_ms: 0.4124
+  type: 'test'
+  ...
+# Subtest: parsePmVerdict：合法/围栏/夹带文字/非法/缺字段/null 的解析
+ok 252 - parsePmVerdict：合法/围栏/夹带文字/非法/缺字段/null 的解析
+  ---
+  duration_ms: 0.4891
+  type: 'test'
+  ...
+# Subtest: createCliOperatorChannel：y→放行、n→拒绝、空/未识别→拒绝、EOF→不可用
+ok 253 - createCliOperatorChannel：y→放行、n→拒绝、空/未识别→拒绝、EOF→不可用
+  ---
+  duration_ms: 0.2781
+  type: 'test'
+  ...
+# Subtest: createPmReviewer：注入 openSession 桩 → 返回 pm 回复原文、发审核提示、收口 dispose
+ok 254 - createPmReviewer：注入 openSession 桩 → 返回 pm 回复原文、发审核提示、收口 dispose
+  ---
+  duration_ms: 0.2741
+  type: 'test'
+  ...
+# Subtest: createPmReviewer：openSession 抛错 → 透传抛错（由 shell-gate 判 (b) 不可用 → 升级到 (a)）
+ok 255 - createPmReviewer：openSession 抛错 → 透传抛错（由 shell-gate 判 (b) 不可用 → 升级到 (a)）
+  ---
+  duration_ms: 0.251
+  type: 'test'
+  ...
+# Subtest: defaultExtractReply：取最后一条 message（跳过「用户指令：」回显）；无 message → 空串
+ok 256 - defaultExtractReply：取最后一条 message（跳过「用户指令：」回显）；无 message → 空串
+  ---
+  duration_ms: 0.0552
+  type: 'test'
+  ...
+# Subtest: R-1：审读者调工具 → 闸读到结构化 verdict 并按结论走（review+allow 放行；deny 拒；unsure/risky 升 (a)）；审读会话不持久化
+ok 257 - R-1：审读者调工具 → 闸读到结构化 verdict 并按结论走（review+allow 放行；deny 拒；unsure/risky 升 (a)）；审读会话不持久化
+  ---
+  duration_ms: 0.5848
+  type: 'test'
+  ...
+# Subtest: R-1：工具参数非法（verdict 不在域内）→ 视同未调用；无正文兜底 → b-unparseable-deny（fail-closed，不升 (a)）
+ok 258 - R-1：工具参数非法（verdict 不在域内）→ 视同未调用；无正文兜底 → b-unparseable-deny（fail-closed，不升 (a)）
+  ---
+  duration_ms: 0.1662
+  type: 'test'
+  ...
+# Subtest: R-1 降级路径：未调工具但正文写了 JSON → 文本宽松解析兜底仍生效（围栏亦可）
+ok 259 - R-1 降级路径：未调工具但正文写了 JSON → 文本宽松解析兜底仍生效（围栏亦可）
+  ---
+  duration_ms: 0.1781
+  type: 'test'
+  ...
+# Subtest: 次序表行 1：`allow` → **放行**，**不进 (b)/(a)**（桩未被调用）
+ok 260 - 次序表行 1：`allow` → **放行**，**不进 (b)/(a)**（桩未被调用）
+  ---
+  duration_ms: 2.5145
+  type: 'test'
+  ...
+# Subtest: 次序表行 2：`deny` → **终结拒**，**不进 (b)/(a)**（硬拒不可被翻案）
+ok 261 - 次序表行 2：`deny` → **终结拒**，**不进 (b)/(a)**（硬拒不可被翻案）
+  ---
+  duration_ms: 0.1709
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 判放行 → **终结放行，(a) 未被调用**（不打扰人）
+ok 262 - 次序表行 3（review）：(b) 判放行 → **终结放行，(a) 未被调用**（不打扰人）
+  ---
+  duration_ms: 0.4728
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 判拒绝 → **终结拒绝，(a) 未被调用**（不打扰人）
+ok 263 - 次序表行 3（review）：(b) 判拒绝 → **终结拒绝，(a) 未被调用**（不打扰人）
+  ---
+  duration_ms: 0.2953
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行
+ok 264 - 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行
+  ---
+  duration_ms: 0.3798
+  type: 'test'
+  ...
+# Subtest: 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 拒绝 → 拒绝
+ok 265 - 次序表行 3（review）：(b) 拿不准 → 升 (a)；(a) 拒绝 → 拒绝
+  ---
+  duration_ms: 0.2302
+  type: 'test'
+  ...
+# Subtest: ★次序表行 4（risky）要害：**(b) 判放行 + (a) 拒绝 → 最终拒绝**（pm 不是终审，客户才是）
+ok 266 - ★次序表行 4（risky）要害：**(b) 判放行 + (a) 拒绝 → 最终拒绝**（pm 不是终审，客户才是）
+  ---
+  duration_ms: 0.2426
+  type: 'test'
+  ...
+# Subtest: ★次序表行 4（risky）：(b) 放行 + (a) 放行 → **放行，且 (a) 被调用过**
+ok 267 - ★次序表行 4（risky）：(b) 放行 + (a) 放行 → **放行，且 (a) 被调用过**
+  ---
+  duration_ms: 0.1771
+  type: 'test'
+  ...
+# Subtest: ★次序表行 4（risky）：**(b) 判拒绝 → 终结拒绝，且 (a) 未被调用**（pm 说不该跑就不打扰人）
+ok 268 - ★次序表行 4（risky）：**(b) 判拒绝 → 终结拒绝，且 (a) 未被调用**（pm 说不该跑就不打扰人）
+  ---
+  duration_ms: 0.1904
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行 / (a) 拒绝 → 拒绝
+ok 269 - 次序表行 4（risky）：(b) 拿不准 → 升 (a)；(a) 放行 → 放行 / (a) 拒绝 → 拒绝
+  ---
+  duration_ms: 0.2865
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky）：(b) **无会话**（未注入 pmAsk）→ 升 (a)；(a) 放行 → 放行
+ok 270 - 次序表行 4（risky）：(b) **无会话**（未注入 pmAsk）→ 升 (a)；(a) 放行 → 放行
+  ---
+  duration_ms: 0.1369
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky）：(b) 审读**超时** → 升 (a)；(a) 拒绝 → 拒绝
+ok 271 - 次序表行 4（risky）：(b) 审读**超时** → 升 (a)；(a) 拒绝 → 拒绝
+  ---
+  duration_ms: 31.666
+  type: 'test'
+  ...
+# Subtest: 次序表行 4（risky，M-2 改判）：(b) 输出**不可解析** → **直接拒绝**（fail-closed；**不升 (a)、不打扰客户**）
+ok 272 - 次序表行 4（risky，M-2 改判）：(b) 输出**不可解析** → **直接拒绝**（fail-closed；**不升 (a)、不打扰客户**）
+  ---
+  duration_ms: 0.2044
+  type: 'test'
+  ...
+# Subtest: (a) 不可用 / 通道未接 / 确认超时 → **拒绝**（fail-closed，risky 亦不例外）
+ok 273 - (a) 不可用 / 通道未接 / 确认超时 → **拒绝**（fail-closed，risky 亦不例外）
+  ---
+  duration_ms: 30.4236
+  type: 'test'
+  ...
+# Subtest: (c)=risky 且 (b)/(a) 均未接入 → 默认拒绝（fail-closed，分支 risky-default-deny）
+ok 274 - (c)=risky 且 (b)/(a) 均未接入 → 默认拒绝（fail-closed，分支 risky-default-deny）
+  ---
+  duration_ms: 0.2726
+  type: 'test'
+  ...
+# Subtest: (c)=review 且 (b)/(a) 均未接入 → 默认拒绝（分支 review-default-deny，未因本轮改动而变）
+ok 275 - (c)=review 且 (b)/(a) 均未接入 → 默认拒绝（分支 review-default-deny，未因本轮改动而变）
+  ---
+  duration_ms: 0.1238
+  type: 'test'
+  ...
+# Subtest: ★差别证明：同「(b) 判放行」下——review **不打扰人**；risky **必过 (a)**（唯一差别）
+ok 276 - ★差别证明：同「(b) 判放行」下——review **不打扰人**；risky **必过 (a)**（唯一差别）
+  ---
+  duration_ms: 0.1576
+  type: 'test'
+  ...
+# Subtest: 集成：门禁引擎真判 `rm -rf build`=risky → (b) 放行 + (a) 拒绝 → **最终拒绝**
+ok 277 - 集成：门禁引擎真判 `rm -rf build`=risky → (b) 放行 + (a) 拒绝 → **最终拒绝**
+  ---
+  duration_ms: 0.7843
+  type: 'test'
+  ...
+# Subtest: 集成：`sh -c "…"`（re-shell）门禁真判=deny → **终结拒，(b)/(a) 未被调用**
+ok 278 - 集成：`sh -c "…"`（re-shell）门禁真判=deny → **终结拒，(b)/(a) 未被调用**
+  ---
+  duration_ms: 0.2826
+  type: 'test'
+  ...
+# Subtest: 集成：`ls -la` 门禁真判=allow → 放行，**不进 (b)/(a)**
+ok 279 - 集成：`ls -la` 门禁真判=allow → 放行，**不进 (b)/(a)**
+  ---
+  duration_ms: 0.2785
+  type: 'test'
+  ...
+# Subtest: 源码断言（AC-30/R5）：接 (a) 的项目链与审批档装配都携带 writeGuard；只读档不接 (a)、不要求注入
+ok 280 - 源码断言（AC-30/R5）：接 (a) 的项目链与审批档装配都携带 writeGuard；只读档不接 (a)、不要求注入
+  ---
+  duration_ms: 1.1323
+  type: 'test'
+  ...
+# Subtest: 审批档（operatorOnly+approveDeny）下裸 Git 写被 writeGuard 硬拒，不因 (a) 被批准；只读 Git 前台放行、后台拒绝
+ok 281 - 审批档（operatorOnly+approveDeny）下裸 Git 写被 writeGuard 硬拒，不因 (a) 被批准；只读 Git 前台放行、后台拒绝
+  ---
+  duration_ms: 12.9247
+  type: 'test'
+  ...
+# Subtest: 项目三层链（advisory 缺省）下裸 Git 写同样被 writeGuard 硬拒；只读 Git c-allow 0 卡
+ok 282 - 项目三层链（advisory 缺省）下裸 Git 写同样被 writeGuard 硬拒；只读 Git c-allow 0 卡
+  ---
+  duration_ms: 4.6104
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：workflow 卡预览 + 许可安装 + stablePermitOf + completeWrite mini re-pin
+ok 283 - stable-write-runtime：workflow 卡预览 + 许可安装 + stablePermitOf + completeWrite mini re-pin
+  ---
+  duration_ms: 120.076
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：completeWrite 哈希不符 ⇒ failed 事件 + 许可作废 + 快照不变
+ok 284 - stable-write-runtime：completeWrite 哈希不符 ⇒ failed 事件 + 许可作废 + 快照不变
+  ---
+  duration_ms: 94.8424
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：无卡通道 ⇒ 已记录请求但不发许可（fail-closed）
+ok 285 - stable-write-runtime：无卡通道 ⇒ 已记录请求但不发许可（fail-closed）
+  ---
+  duration_ms: 59.1115
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：appointment-write 钩子（role-card）→ 确认后许可 → written + mini re-pin
+ok 286 - stable-write-runtime：appointment-write 钩子（role-card）→ 确认后许可 → written + mini re-pin
+  ---
+  duration_ms: 109.3841
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：无 trunk manifest ⇒ written 但 mini re-pin 只记待续接（不发 stable-repinned）
+ok 287 - stable-write-runtime：无 trunk manifest ⇒ written 但 mini re-pin 只记待续接（不发 stable-repinned）
+  ---
+  duration_ms: 59.2416
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：真实消费后保留下游拒码和异常，不误报缺manifest或发布成功
+ok 288 - stable-write-runtime：真实消费后保留下游拒码和异常，不误报缺manifest或发布成功
+  ---
+  duration_ms: 115.8133
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime: a foreign service root cannot install its permit facts into this project
+ok 289 - stable-write-runtime: a foreign service root cannot install its permit facts into this project
+  ---
+  duration_ms: 53.1207
+  type: 'test'
+  ...
+# Subtest: stable-write-runtime：git-old-core-programs-unproven 码保留、语义收窄为运行时中立 drain（Claude/Pi 形态可排空；live-work 仍阻断）
+ok 290 - stable-write-runtime：git-old-core-programs-unproven 码保留、语义收窄为运行时中立 drain（Claude/Pi 形态可排空；live-work 仍阻断）
+  ---
+  duration_ms: 0.7607
+  type: 'test'
+  ...
+# Subtest: stable 文件路径映射 + F13 permit 唯一形状/四状态/TTL
+ok 291 - stable 文件路径映射 + F13 permit 唯一形状/四状态/TTL
+  ---
+  duration_ms: 1.0756
+  type: 'test'
+  ...
+# Subtest: request：应用计算 base/target sha（不信任自报哈希）、路径由 kind/roleId 唯一映射、幂等
+ok 292 - request：应用计算 base/target sha（不信任自报哈希）、路径由 kind/roleId 唯一映射、幂等
+  ---
+  duration_ms: 0.7667
+  type: 'test'
+  ...
+# Subtest: approve/reject：客户确认 id 必备；一次性许可含 approvedAt/expiresAt；拒绝不写
+ok 293 - approve/reject：客户确认 id 必备；一次性许可含 approvedAt/expiresAt；拒绝不写
+  ---
+  duration_ms: 1.0754
+  type: 'test'
+  ...
+# Subtest: completeWrite → post-write 复核消费 + mini re-pin（不升 trunkVersion，绑定 decisionId；F16/AC-34）
+ok 294 - completeWrite → post-write 复核消费 + mini re-pin（不升 trunkVersion，绑定 decisionId；F16/AC-34）
+  ---
+  duration_ms: 0.564
+  type: 'test'
+  ...
+# Subtest: 异常 fail-closed：哈希不符/过期 ⇒ failed + 许可作废（不可复用），不更新快照、无 drift（AC-35）
+ok 295 - 异常 fail-closed：哈希不符/过期 ⇒ failed + 许可作废（不可复用），不更新快照、无 drift（AC-35）
+  ---
+  duration_ms: 0.4431
+  type: 'test'
+  ...
+# Subtest: fail() 异常恢复：记录/许可 failed 不可复用；已写入记录不能标失败（无 drift）
+ok 296 - fail() 异常恢复：记录/许可 failed 不可复用；已写入记录不能标失败（无 drift）
+  ---
+  duration_ms: 0.4154
+  type: 'test'
+  ...
+# Subtest: F13/F16 联合契约：PermitFact 可作 StableWriteDecisionInput.permit；record 与 permit 分表；Service 无写盘入口
+ok 297 - F13/F16 联合契约：PermitFact 可作 StableWriteDecisionInput.permit；record 与 permit 分表；Service 无写盘入口
+  ---
+  duration_ms: 0.1854
+  type: 'test'
+  ...
+# Subtest: C2b/C2c 联合契约（F13/F16）：C2c 一次性许可经 C2b stableWriteDecision 判定（allowed/denied 映射）
+ok 298 - C2b/C2c 联合契约（F13/F16）：C2c 一次性许可经 C2b stableWriteDecision 判定（allowed/denied 映射）
+  ---
+  duration_ms: 3.6413
+  type: 'test'
+  ...
+# Subtest: readPermitSnapshot: real request join excludes expired/consumed/failed and mismatched permits without callbacks
+ok 299 - readPermitSnapshot: real request join excludes expired/consumed/failed and mismatched permits without callbacks
+  ---
+  duration_ms: 0.4726
+  type: 'test'
+  ...
+# Subtest: fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+ok 300 - fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy
+  ---
+  duration_ms: 11.2351
+  type: 'test'
+  ...
+# Subtest: fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+ok 301 - fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变）
+  ---
+  duration_ms: 20.9727
+  type: 'test'
+  ...
+# Subtest: workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+ok 302 - workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed）
+  ---
+  duration_ms: 2.7364
+  type: 'test'
+  ...
+# Subtest: 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+ok 303 - 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝
+  ---
+  duration_ms: 0.8339
+  type: 'test'
+  ...
+# Subtest: workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+ok 304 - workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进
+  ---
+  duration_ms: 9.8189
+  type: 'test'
+  ...
+# Subtest: 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+ok 305 - 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段
+  ---
+  duration_ms: 8.57
+  type: 'test'
+  ...
+# Subtest: stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+ok 306 - stage-request 收口（AC-05）：sideEffect 必须 read-only、无 module/写集、只允许 chief→convener（写/读两侧）
+  ---
+  duration_ms: 5.2886
+  type: 'test'
+  ...
+# Subtest: review task data: the single Model host reference survives replay; forged authority fields fail shape validation
+ok 307 - review task data: the single Model host reference survives replay; forged authority fields fail shape validation
+  ---
+  duration_ms: 1.8259
+  type: 'test'
+  ...
+# Subtest: chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append
+ok 308 - chief delegation audit: real source replays unchanged after switch state changes; malformed bindings cannot append
+  ---
+  duration_ms: 15.3584
+  type: 'test'
+  ...
+# Subtest: append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed
+ok 309 - append/read/replay：事件按行落盘，状态机 created→delivered→reported→closed
+  ---
+  duration_ms: 18.4043
+  type: 'test'
+  ...
+# Subtest: 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放
+ok 310 - 坏行跳过：JSON 坏行/缺字段行不阻塞，其他事件照常重放
+  ---
+  duration_ms: 11.0965
+  type: 'test'
+  ...
+# Subtest: 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行
+ok 311 - 幂等键：显式键优先；缺省哈希稳定；同键未收口任务可查询，收口后放行
+  ---
+  duration_ms: 0.561
+  type: 'test'
+  ...
+# Subtest: 副作用分类：缺填/非法⇒unknown；应用只升不降
+ok 312 - 副作用分类：缺填/非法⇒unknown；应用只升不降
+  ---
+  duration_ms: 0.8835
+  type: 'test'
+  ...
+# Subtest: 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计）
+ok 313 - 重派链：新任务 retryOf 原任务；计数按链累计（首次尝试不计）
+  ---
+  duration_ms: 4.7808
+  type: 'test'
+  ...
+# Subtest: 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务
+ok 314 - 轮转：超过上限时当前文件转为 .1，旧文件后移，读取仍能重放全部任务
+  ---
+  duration_ms: 15.0132
+  type: 'test'
+  ...
+# Subtest: 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实
+ok 315 - 任务卡固定字段：摘要≤200、可选证据/期望产出/重派来源如实
+  ---
+  duration_ms: 0.4172
+  type: 'test'
+  ...
+# Subtest: task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读
+ok 316 - task.created.from 放宽到 chief/convener；flowId/stepId 可选且须为合法 slug；旧记录（无字段）可读
+  ---
+  duration_ms: 18.2367
+  type: 'test'
+  ...
+# Subtest: task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）
+ok 317 - task.closed.by 放宽到 chief/convener；request.resolved 名单 version/hash 校验（正整数/64 位 hex）
+  ---
+  duration_ms: 12.007
+  type: 'test'
+  ...
+# Subtest: doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读
+ok 318 - doc.freeze judge-delegated（W-J2/J16，2026-11-09）：完整 judge source 正例；source/客户字段/applicationId/cardKind 负例成坏行，旧行逐字可读
+  ---
+  duration_ms: 6.111
+  type: 'test'
+  ...
+# Subtest: request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行
+ok 319 - request 事件卡种/选中选项（2026-10-31）：合法字段可读；非法 cardKind/selectedOptionIds 成坏行
+  ---
+  duration_ms: 11.4134
+  type: 'test'
+  ...
+# Subtest: task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝
+ok 320 - task.created.runId：run 内任务携带 runId/state/stage；legacy 缺省可读；非法 runId 拒绝
+  ---
+  duration_ms: 6.5563
+  type: 'test'
+  ...
+# Subtest: R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放
+ok 321 - R1：新建项目任务缺 runId/runState 实时写入必须拒绝；allowLegacyRun 只供历史重放
+  ---
+  duration_ms: 2.1116
+  type: 'test'
+  ...
+# Subtest: P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变
+ok 322 - P1-GTS：project.focus/project.note/version.decision 入白名单；重放不消费、旧行不变
+  ---
+  duration_ms: 7.7077
+  type: 'test'
+  ...
+# Subtest: P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞
+ok 323 - P1-GTS：request.orphaned.reason 三值可读；未知值/非法新事件成坏行但不阻塞
+  ---
+  duration_ms: 5.1341
+  type: 'test'
+  ...
+# Subtest: P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）
+ok 324 - P1-GTS：旧白名单读新账本记坏行、不阻塞、不丢数据（AC-8.2 模拟）
+  ---
+  duration_ms: 7.6933
+  type: 'test'
+  ...
+# Subtest: Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）
+ok 325 - Q9 A：request.resolved/version.decision 接受 directive + directiveId；缺/非法 id 成坏行（不阻塞合法行）
+  ---
+  duration_ms: 23.51
+  type: 'test'
+  ...
+# Subtest: S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行
+ok 326 - S3/C1b：cardKind="stable-write"（app-owned 白名单）记账通过；未知卡种仍坏行
+  ---
+  duration_ms: 7.997
+  type: 'test'
+  ...
+# Subtest: submit_report 注入矩阵：trio 五个内建 worker 有；幕僚无；single/su 无
+ok 327 - submit_report 注入矩阵：trio 五个内建 worker 有；幕僚无；single/su 无
+  ---
+  duration_ms: 59.4964
+  type: 'test'
+  ...
+# Subtest: 内建 worker 交报告：回交事件取报告值（status/summary/evidence），不再标记「未提交正式任务报告」
+ok 328 - 内建 worker 交报告：回交事件取报告值（status/summary/evidence），不再标记「未提交正式任务报告」
+  ---
+  duration_ms: 11.0305
+  type: 'test'
+  ...
+# Subtest: 卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report
+not ok 329 - 卡片文本：幕僚卡要求派发后结束本轮、禁止 sleep/轮询空转；五张 worker 卡要求完成任务必须 submit_report
+  ---
+  duration_ms: 0.4607
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trio-worker-report.test.ts:162:1'
+  failureType: 'testCodeFailure'
+  error: '幕僚卡必须写明派发后结束本轮'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # 角色：幕僚（内置角色）
+    
+    职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。
+    - 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。
+    - 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。
+    - 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。
+    - 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。
+    - Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。
+    意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。
+    命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。
+    模板：
+    ---
+    intentId: <小写 slug；全文唯一；不得用 flowId 代替>
+    flowId: <flowId>
+    goal: <目标；单行 key: value，长文本可用 | block scalar>
+    scope: <范围>
+    acceptance: <验收标准>
+    nonGoals: <非目标（可选）>
+    constraints: <约束（可选）>
+    ---
+    可写：`docs/intents/`（Section 1，预授权直接写）。
+    禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trio-worker-report.test.ts:165:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力
+not ok 330 - v4.1 工作流卡文本：幕僚主链顺序一步一派；产品/策划/人事/运营/质检含各自产物与回报目标；convener 获得 dispatch 能力
+  ---
+  duration_ms: 0.301
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trio-worker-report.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /主链顺序（必须）/. Input:
+    
+    '# 角色：幕僚（内置角色）\n' +
+      '\n' +
+      '职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。\n' +
+      '- 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。\n' +
+      '- 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。\n' +
+      '- 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。\n' +
+      '- 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。\n' +
+      '- Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。\n' +
+      '意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。\n' +
+      '命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。\n' +
+      '模板：\n' +
+      '---\n' +
+      'intentId: <小写 slug；全文唯一；不得用 flowId 代替>\n' +
+      'flowId: <flowId>\n' +
+      'goal: <目标；单行 key: value，长文本可用 | block scalar>\n' +
+      'scope: <范围>\n' +
+      'acceptance: <验收标准>\n' +
+      'nonGoals: <非目标（可选）>\n' +
+      'constraints: <约束（可选）>\n' +
+      '---\n' +
+      '可写：`docs/intents/`（Section 1，预授权直接写）。\n' +
+      '禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # 角色：幕僚（内置角色）
+    
+    职能：唯一客户入口与五builtin的派发/收报/收口责任者；Chief自身流程以实际注入的独立 chief-workflow.md 为准，项目实现流程由 Convener 维护。
+    - 每次客户输入或正式报告驱动调度前，读取应用提供的 `src/common/门禁引擎/workflows/chief/chief-workflow.md` 全文、资源path、内容SHA256、资源版本和实际应用版本；按该正文结合当前目标/任务/真实反馈决定，不使用卡内另一份流程副本。
+    - 未提供全文、来源/hash不可核或资源错误时明确阻塞，交原G/装配owner修复；不得猜正文、假报已读或派运营伪造。内置资源只读，不由项目同名卡/文件覆盖，不赋予Chief额外写权。
+    - 项目 `docs/workflow.md` 是另一来源，仍由 Convener 管impl：准备用当前有效snapshot，执行用对应run.workflowRef冻结字节，标明task/run/path/hash，不偷换live/latest；它不替代Chief资源，资源更新不重pin执行run。
+    - 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。
+    - Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。
+    意图入口（你是唯一写者）：写 `docs/intents/<intentId>.md` 时照抄下方模板；intentId 取自产品意图文档 frontmatter 的 intentId（小写 slug、全文唯一），不得用 flowId 代替，也不得自造。
+    命名与来源：入口文件为 `docs/intents/<intentId>.md`；intentId 必须是 ^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$ 的小写 slug；不得用 flowId 代替。 intentId 先写入产品意图文档 frontmatter，再由提案 frontmatter 原样复制；两处与意图入口文件名必须一致。
+    模板：
+    ---
+    intentId: <小写 slug；全文唯一；不得用 flowId 代替>
+    flowId: <flowId>
+    goal: <目标；单行 key: value，长文本可用 | block scalar>
+    scope: <范围>
+    acceptance: <验收标准>
+    nonGoals: <非目标（可选）>
+    constraints: <约束（可选）>
+    ---
+    可写：`docs/intents/`（Section 1，预授权直接写）。
+    禁写：`.ans/**`、`角色卡/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/scheduling/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trio-worker-report.test.ts:186:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡
+not ok 331 - 卡片文本：验收卡发起权归质检——运营只可 dispatch 质检，幕僚不得要求运营提交验收卡
+  ---
+  duration_ms: 0.1309
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trio-worker-report.test.ts:214:1'
+  failureType: 'testCodeFailure'
+  error: '运营卡必须写明验收由 dispatch 质检发起'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # 角色：运营（内置角色；项目运营者）
+    
+    职能：按幕僚任务处理真正新项目的受控init/首次候选、复用核实与团队计划；执行就绪后仅派项目实现 worker、收短报、集成并汇总幕僚；不创建新的 Verifier 或其它内置角色任务。
+    - 分阶段前置：接首 init/复用核实或规划任务不要求未来 D3/新卡；真正新项目才经实际注入的 `git_candidate(action=init)` 和真实客户来源/task/run执行受控首建，若已存在repo则复用，拒绝/unknown报真实原因，不强制重建。规划先形成合法计划/分工/缺口，不能先等招人；派 worker 实现前才核当前有效 D3/授权、完整激活回执、workflow与依赖就绪，不是只看文件存在。
+    - 项目工作流：由你落盘并维护 `docs/workflow.md`（步骤表：步骤 / 角色 / 前置依赖 / 契约 / 交接物 / 完成口令 / 验收）；派发实现任务前先让工作流就位。
+    - 团队计划直接完成：以 convener/schedule 的实际注入能力提交版本化团队计划及 path/hash/version、flowId、当前依据摘要；应用核模块属主、写区、分工、依赖后直接完成、记账通知，不发团队计划客户确认卡。完成计划不等于 D3，不授权名单外角色；能力未注入报告待注入。
+    - 实现阶段：按**已批准名单（D3 选中）**给项目 worker 发 `dispatch_task`（目标必须在批准名单内、完整卡/边界已激活并有真实内容绑定回执）；任务写清需求依据、验收标准、证据要求；worker 的 `submit_report` 回到你。
+    - 收报：汇总进度/阻塞/证据，向幕僚 `submit_report`；不转发客户、不批准、不验收。
+    - 独立质检：把真实集成候选OID/criteria及当前仍 live 的 controller 报 Chief，由 Chief 创建 Verifier 任务、接收报告并收口。你不派新质检、不发 acceptance 卡、不代客户验收。Chief 接受对应 review 后必须显式续接你的原任务，你再按实际质量/权限/R9核验发布；收到通知或旧 accepted 不等于本次发布许可。失败交原 worker 责任链返工，不能解决报 Chief，不等待失败质量被 accepted。
+    - 环境阻塞可主动发 `request_choice(cardKind=decision)`，无需等幕僚追问；在幕僚唯一入口呈现并响应回原运营及责任链。卡须含 task/run/依据摘要、错误证据、已尝试动作，区分环境/信息/授权，给出方案前置/代价/推荐、保留/终止及恢复条件；业务选择不替代 shell/下载/写入等专门执行授权。
+    - 同 task/run/阻塞/依据只保留一张有效卡，无新事实不重弹。拒绝/取消明确等待、保留或停止，卡取消不等于任务取消；迟答、变基线重核，过期选择不直接恢复。合法执行者经真实工具处理并核实际阻塞解除后，才恢复仍有效的原来源任务；条件仍错保持 blocked，保留成果与故障/重派预算，无可行方案如实停止。
+    - 材料性选择仍用 `request_choice(cardKind=decision)`；**不得发 appointment（招人）卡——招人只由人事发起**；不能用 decision 卡换名恢复已取消五类卡。
+    - 原创建者收口：仅当应用核实可信身份等于 task.created.from，且当前 run/依据/报告和合法状态一致，才通过已注入的窄收口能力关闭自己创建的任务；submit_report 只是报告，不是 closed；未合法收口不得释放依赖，不手写 closed、不固定冒充 chief、不收口他人任务。
+    - 直接能力以本会话实际注入的工具为准：未提供、unavailable 或无真实回执时，报告「实现中/待注入」或阻塞；不得虚构工具、身份、批准、激活或完成，不得改发已取消的版本升级/VCA 批拒、修正案逐项/最终、appointment-write、团队计划确认卡。产品内直接能力不改 ANS 技能及其治理闸门。
+    - Git只走实际注入的结构化 `git_query` / `git_candidate` / `git_publish`：查询限宿主已核可读repo/ref/版本路径与有界模板，修改限本人当前可信scope及本任务应用分配的候选ref/现场；author、候选boundary、分支名不授新权。候选 prepared 不等发布、激活、交付或验收；发布只认应用完整差异/当前授权/expected-old核验后的真实回执。不得用裸Git、shell/脚本、直接写.git/common-dir/他人worktree或伪造OID/记录绕过；工具未注入如实待注入，来源、隔离、停稳或提交结果unknown保持blocked并交责任链核实。
+    - 回退与报告：保留task/run、原基线/候选完整OID、拒绝code/missing/owner和真实错误证据，报告回 task.created.from；责任owner是修复线索，不授权你互派或代改。对应owner在原合法范围真实修复后，重新核当前依据/权限/指定最终OID再恢复；缺证据不补造批准/ref/停稳，不重开已取消卡。无新信息不重试，原来源链预算不清零；危险或未知外部副作用零自动重派，取消执行须确认实际停止，不释放成功依赖。
+    - Chief枢纽：新 Product、Rapporteur、Nominator、Convener、Verifier 任务全部由 Chief 创建、接收正式报告并按真实创建者收口；Convener 仅创建和管理项目实现 worker，worker 先回 Convener，不能解决再报 Chief。历史任务仍按真实 task.created.from 报告/收口，不重写旧 creator、parent 或 accepted。普通 Chief→builtin 派发可只读准备、并行、跳过、返工、改类或停止，不以 M0、前序 close、plan/D3 为通用派发票；具体 write/activate/publish/execute 仍核适用 M0/仓库来源、plan/D3、当前 scope/权限、冻结8refs、指定最终OID/criteria/质量和真实 stopfacts，任务本身不授执行权。
+    - 运营Git职责：本人计划/workflow形成范围内候选；集成仅收已授权owner候选，最终完整base→候选差异逐项归属，冲突语义修复退原owner。最终merge/revert新OID必须重新独立核验，父提交通过不代替；证据与原创建者合法收口齐备后才请求应用CAS交付，不代写产品/策划/人事内容，不裸改用户分支或远端。
+    - 运营回退：脏区保留差异/现场/OID及在途清单，不add-A/stash/reset/clean；冲突交原owner、环境/授权不足主动业务卡并交合法执行者实际处理。修复后核最终OID、依赖/占用/权限/条件才恢复；选择后仍不满足保持blocked，取消/预算耗尽或未知副作用则明确保留/等待/停止。
+    - 不写角色卡、不招人、不改名单、不写项目源码（实现只由项目 worker 写）。
+    - 收到幕僚派发的任务：完成后**必须**用 `submit_report` 回短报（完成/未完成/证据/遗留），不要只结束回合。
+    可写：`docs/workflow.md`（项目工作流）、`docs/scheduling/`、`docs/governance/convener/`（Section 1，预授权直接写）。
+    禁写：`.ans/**`、`角色卡/**`、`docs/intents/**`、`docs/product/**`、`docs/proposals/**`、`docs/contracts/**`、`docs/quality/**`、`docs/verification/**`、`docs/skills/**`、`docs/mcp/**`。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trio-worker-report.test.ts:218:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: cardKind 越权拒绝：convener 发 acceptance ⇒ 不弹卡，文案指出由质检发起并给出改派办法
+ok 332 - cardKind 越权拒绝：convener 发 acceptance ⇒ 不弹卡，文案指出由质检发起并给出改派办法
+  ---
+  duration_ms: 7.0513
+  type: 'test'
+  ...
+# Subtest: P1-C：demo 严格路径保持现状通过；Claude/Pi/Codex 受限应用中介路径通过（P3/P4/P6/P7 判定层）
+ok 333 - P1-C：demo 严格路径保持现状通过；Claude/Pi/Codex 受限应用中介路径通过（P3/P4/P6/P7 判定层）
+  ---
+  duration_ms: 1.0973
+  type: 'test'
+  ...
+# Subtest: P1-C：活跃 dispatch 工具名必须在该运行时的 applicationMediation.appTools 中（P6/N16 正向侧）
+ok 334 - P1-C：活跃 dispatch 工具名必须在该运行时的 applicationMediation.appTools 中（P6/N16 正向侧）
+  ---
+  duration_ms: 0.141
+  type: 'test'
+  ...
+# Subtest: P1-C：受控 shell（run_shell/start_background_task）列在 appTools 时受限路径可通过（P6/N16）
+ok 335 - P1-C：受控 shell（run_shell/start_background_task）列在 appTools 时受限路径可通过（P6/N16）
+  ---
+  duration_ms: 0.1219
+  type: 'test'
+  ...
+# Subtest: P1-C：Claude/Pi 已配置外来 MCP 精确枚举且一致时通过（P7/N26 正向侧）
+ok 336 - P1-C：Claude/Pi 已配置外来 MCP 精确枚举且一致时通过（P7/N26 正向侧）
+  ---
+  duration_ms: 0.0867
+  type: 'test'
+  ...
+# Subtest: P1-C：creatorReports 只在 hub=true 时校验；合法 provenance 通过（P5/hub 行为）
+ok 337 - P1-C：creatorReports 只在 hub=true 时校验；合法 provenance 通过（P5/hub 行为）
+  ---
+  duration_ms: 0.1939
+  type: 'test'
+  ...
+# Subtest: P1-C：parent.kind 缺省或 message 通过；提供 creatorReports 时跳过 kind 检查（旧分支顺序）
+ok 338 - P1-C：parent.kind 缺省或 message 通过；提供 creatorReports 时跳过 kind 检查（旧分支顺序）
+  ---
+  duration_ms: 0.1104
+  type: 'test'
+  ...
+# Subtest: P1-C：严格路径原条件逐条保留（disposed/非默认核/非 chief/wrong runtime/unknown surface/session/factory/turn/stop/no dispatch/input/settled）
+ok 339 - P1-C：严格路径原条件逐条保留（disposed/非默认核/非 chief/wrong runtime/unknown surface/session/factory/turn/stop/no dispatch/input/settled）
+  ---
+  duration_ms: 0.2265
+  type: 'test'
+  ...
+# Subtest: P1-C：demo 只走严格路径——新应用中介路径拒绝 demo（N13）
+ok 340 - P1-C：demo 只走严格路径——新应用中介路径拒绝 demo（N13）
+  ---
+  duration_ms: 0.0885
+  type: 'test'
+  ...
+# Subtest: P1-C：applicationMediation 与 observed 同时出现 ⇒ 双路径歧义拒绝（N20/F15）
+ok 341 - P1-C：applicationMediation 与 observed 同时出现 ⇒ 双路径歧义拒绝（N20/F15）
+  ---
+  duration_ms: 0.1152
+  type: 'test'
+  ...
+# Subtest: P1-C：其它 runtime 一律拒绝；core 缺失时拒绝（N1/N9 判定侧）
+ok 342 - P1-C：其它 runtime 一律拒绝；core 缺失时拒绝（N1/N9 判定侧）
+  ---
+  duration_ms: 0.12
+  type: 'test'
+  ...
+# Subtest: P1-C：受限路径逐条负例（N10/N21/N22/N23/N25/N27/N28）
+ok 343 - P1-C：受限路径逐条负例（N10/N21/N22/N23/N25/N27/N28）
+  ---
+  duration_ms: 0.1824
+  type: 'test'
+  ...
+# Subtest: P1-C：Codex 应用中介路径必须有 native 事实且绑定（N14/N27）
+ok 344 - P1-C：Codex 应用中介路径必须有 native 事实且绑定（N14/N27）
+  ---
+  duration_ms: 0.0776
+  type: 'test'
+  ...
+# Subtest: P1-C Amendment-1：Codex 绑定按 P1.6 §4.4 字面谓词——字段同值通过，任一缺失/不一致拒绝（N14/N27）
+ok 345 - P1-C Amendment-1：Codex 绑定按 P1.6 §4.4 字面谓词——字段同值通过，任一缺失/不一致拒绝（N14/N27）
+  ---
+  duration_ms: 0.1146
+  type: 'test'
+  ...
+# Subtest: P1-C：Codex 配置外来 MCP ⇒ fail-closed（N28/F19）
+ok 346 - P1-C：Codex 配置外来 MCP ⇒ fail-closed（N28/F19）
+  ---
+  duration_ms: 0.0466
+  type: 'test'
+  ...
+# Subtest: P1-C：Codex 先走严格路径；严格路径不成立时才走受限路径，且严格路径本身仍 unknown（P6）
+ok 347 - P1-C：Codex 先走严格路径；严格路径不成立时才走受限路径，且严格路径本身仍 unknown（P6）
+  ---
+  duration_ms: 0.0801
+  type: 'test'
+  ...
+# Subtest: P1-C：creatorReports 数量/重复/角色/turn/reportId/origin/status 任一不匹配 ⇒ 拒绝（N19）
+ok 348 - P1-C：creatorReports 数量/重复/角色/turn/reportId/origin/status 任一不匹配 ⇒ 拒绝（N19）
+  ---
+  duration_ms: 0.1761
+  type: 'test'
+  ...
+# Subtest: P1-C：parent.kind 非 message（且无 creatorReports）⇒ 拒绝（N18）
+ok 349 - P1-C：parent.kind 非 message（且无 creatorReports）⇒ 拒绝（N18）
+  ---
+  duration_ms: 0.041
+  type: 'test'
+  ...
+# Subtest: P1-C：TOCTOU 两次复检——证据在两次判定之间变化时第二次拒绝（N17）
+ok 350 - P1-C：TOCTOU 两次复检——证据在两次判定之间变化时第二次拒绝（N17）
+  ---
+  duration_ms: 0.0781
+  type: 'test'
+  ...
+# Subtest: X-G：D5 单实现守卫（最终结构）——gates 唯一判定实现、trunk-runtime 只 import 并恰两处调用、无本地实现/声明/桥接、写/停稳门不读应用中介证据
+ok 351 - X-G：D5 单实现守卫（最终结构）——gates 唯一判定实现、trunk-runtime 只 import 并恰两处调用、无本地实现/声明/桥接、写/停稳门不读应用中介证据
+  ---
+  duration_ms: 5.4353
+  type: 'test'
+  ...
+# Subtest: C2a：六类新事件合法行可读；归属/生命周期字段保留；TaskRecord 语义不变
+ok 352 - C2a：六类新事件合法行可读；归属/生命周期字段保留；TaskRecord 语义不变
+  ---
+  duration_ms: 10.4297
+  type: 'test'
+  ...
+# Subtest: C2a：STABLE_WRITE_EVENT_KINDS 五个 kind 全部入白名单（归属分区互斥）
+ok 353 - C2a：STABLE_WRITE_EVENT_KINDS 五个 kind 全部入白名单（归属分区互斥）
+  ---
+  duration_ms: 11.0217
+  type: 'test'
+  ...
+# Subtest: C2a：逐 kind 负例——op/归属/状态/分区/必填字段非法成坏行，合法行仍可读
+ok 354 - C2a：逐 kind 负例——op/归属/状态/分区/必填字段非法成坏行，合法行仍可读
+  ---
+  duration_ms: 6.3334
+  type: 'test'
+  ...
+# Subtest: F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段——缺失可读、给出则校验 ISO
+ok 355 - F14：stable.write.* 的 approvedAt/expiresAt/consumedAt 为可选字段——缺失可读、给出则校验 ISO
+  ---
+  duration_ms: 5.798
+  type: 'test'
+  ...
+# Subtest: W-J2/J17：freezeEvents 防御镜像——无 source 的既有事件字节逐字不变；judge-delegated source 镜像 actionSource 且通过账本校验
+ok 356 - W-J2/J17：freezeEvents 防御镜像——无 source 的既有事件字节逐字不变；judge-delegated source 镜像 actionSource 且通过账本校验
+  ---
+  duration_ms: 0.7043
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：status/reconcile（无 journal）+ bootstrap t1 + 客户归属事件
+ok 357 - trunk-runtime：status/reconcile（无 journal）+ bootstrap t1 + 客户归属事件
+  ---
+  duration_ms: 78.0916
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：applyApproved（upgrade）经 S3 re-pin；事件与 verify 一致
+ok 358 - trunk-runtime：applyApproved（upgrade）经 S3 re-pin；事件与 verify 一致
+  ---
+  duration_ms: 117.4752
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认、拒绝版本化文档变更）
+ok 359 - trunk-runtime：主干升级收窄（仅 emergency/recovery、高危确认、拒绝版本化文档变更）
+  ---
+  duration_ms: 87.3734
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 manifest 待续接
+ok 360 - trunk-runtime：stable mini re-pin 不升 trunkVersion + 事件；无 manifest 待续接
+  ---
+  duration_ms: 84.2379
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件
+ok 361 - trunk-runtime：恢复（客户确认 tN+1）+ reconcile 补写事件
+  ---
+  duration_ms: 76.9564
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）
+ok 362 - trunk-runtime：host 缺失时派发父门保持旧行为（不按 stale parent 拒绝）
+  ---
+  duration_ms: 20.2309
+  type: 'test'
+  ...
+# Subtest: trunk-runtime：reconcile 在提交点后 phase 滞后时识别 split，且不伪造客户事件（C2a 归属）
+ok 363 - trunk-runtime：reconcile 在提交点后 phase 滞后时识别 split，且不伪造客户事件（C2a 归属）
+  ---
+  duration_ms: 49.3192
+  type: 'test'
+  ...
+# Subtest: refreeze：只更新 stable 快照（workflow/roleCards/boundaries）、不升 trunkVersion、客户审计
+ok 364 - refreeze：只更新 stable 快照（workflow/roleCards/boundaries）、不升 trunkVersion、客户审计
+  ---
+  duration_ms: 77.1906
+  type: 'test'
+  ...
+# Subtest: refreeze：拒绝版本化文档/execution、哈希不符、缺客户确认（失败不改指针）
+ok 365 - refreeze：拒绝版本化文档/execution、哈希不符、缺客户确认（失败不改指针）
+  ---
+  duration_ms: 38.6732
+  type: 'test'
+  ...
+# Subtest: abandonUpgrade：不 re-pin、不改指针、旧主干继续有效；缺客户确认拒绝
+ok 366 - abandonUpgrade：不 re-pin、不改指针、旧主干继续有效；缺客户确认拒绝
+  ---
+  duration_ms: 39.5617
+  type: 'test'
+  ...
+# Subtest: history：只读归档版本（升级后旧版本入 history；当前版本单列）
+ok 367 - history：只读归档版本（升级后旧版本入 history；当前版本单列）
+  ---
+  duration_ms: 78.7592
+  type: 'test'
+  ...
+# Subtest: 派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状态 derived
+ok 368 - 派生 v1：唯一 pinned run、零写入、stable 哈希取磁盘、状态 derived
+  ---
+  duration_ms: 49.1847
+  type: 'test'
+  ...
+# Subtest: 派生 fail-closed：无 pinned/多 pinned/坏 manifest
+ok 369 - 派生 fail-closed：无 pinned/多 pinned/坏 manifest
+  ---
+  duration_ms: 60.4382
+  type: 'test'
+  ...
+# Subtest: 派生/应用支持 `path\#fragment` 引用：哈希/冻结按文件部分，引用串原样保留
+ok 370 - 派生/应用支持 `path\#fragment` 引用：哈希/冻结按文件部分，引用串原样保留
+  ---
+  duration_ms: 54.0874
+  type: 'test'
+  ...
+# Subtest: verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规
+ok 371 - verifyTrunk：ok、stable 哈希漂移、R9 未冻结违规
+  ---
+  duration_ms: 55.6089
+  type: 'test'
+  ...
+# Subtest: executeApply：bootstrap t1、升级 t2（journal 两阶段/history/审计）、失败不改指针
+ok 372 - executeApply：bootstrap t1、升级 t2（journal 两阶段/history/审计）、失败不改指针
+  ---
+  duration_ms: 101.4171
+  type: 'test'
+  ...
+# Subtest: reconcileJournal：none/committed/prepared/相位滞后 split/corrupt
+ok 373 - reconcileJournal：none/committed/prepared/相位滞后 split/corrupt
+  ---
+  duration_ms: 55.6602
+  type: 'test'
+  ...
+# Subtest: recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/注册表损坏拒绝
+ok 374 - recover：客户确认恢复 tN+1（source recovery）；缺 decisionId/注册表损坏拒绝
+  ---
+  duration_ms: 71.5899
+  type: 'test'
+  ...
+# Subtest: recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针
+ok 375 - recover 显式 target（修复入口）：按目标重建 tN+1（字节复核），失败不改指针
+  ---
+  duration_ms: 76.3395
+  type: 'test'
+  ...
+# Subtest: applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+not ok 376 - applyStableSnapshot：mini re-pin 不升 trunkVersion、旧哈希不符/无 manifest 待续接
+  ---
+  duration_ms: 58.4027
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-service.test.ts:507:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+        applied: false,
+    +   errorCode: 'stable-manifest-unavailable',
+    +   message: 'missing',
+        pendingReattach: true
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    applied: false
+    pendingReattach: true
+  actual:
+    applied: false
+    pendingReattach: true
+    errorCode: 'stable-manifest-unavailable'
+    message: 'missing'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-service.test.ts:584:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 修正案：解析/哈希定格/目标版本/边界扩大/生命周期映射与校验
+ok 377 - 修正案：解析/哈希定格/目标版本/边界扩大/生命周期映射与校验
+  ---
+  duration_ms: 65.2402
+  type: 'test'
+  ...
+# Subtest: status：存在未提交 journal ⇒ apply-uncertain
+ok 378 - status：存在未提交 journal ⇒ apply-uncertain
+  ---
+  duration_ms: 41.8311
+  type: 'test'
+  ...
+# Subtest: manifest：原子写/读回、未知字段保留、无临时文件残留
+ok 379 - manifest：原子写/读回、未知字段保留、无临时文件残留
+  ---
+  duration_ms: 25.4374
+  type: 'test'
+  ...
+# Subtest: 缺失/坏件判别：missing/corrupt、不自动重建/不覆盖
+ok 380 - 缺失/坏件判别：missing/corrupt、不自动重建/不覆盖
+  ---
+  duration_ms: 13.3499
+  type: 'test'
+  ...
+# Subtest: 并发写串行：25 路并发写最终一致且文件完整可解析
+ok 381 - 并发写串行：25 路并发写最终一致且文件完整可解析
+  ---
+  duration_ms: 204.3368
+  type: 'test'
+  ...
+# Subtest: amendment/journal：读写回、旧状态读兼容、legacy 状态写拒绝
+ok 382 - amendment/journal：读写回、旧状态读兼容、legacy 状态写拒绝
+  ---
+  duration_ms: 32.2928
+  type: 'test'
+  ...
+# Subtest: history：归档/列表/同版本幂等/不同内容拒绝/坏件跳过并诊断
+ok 383 - history：归档/列表/同版本幂等/不同内容拒绝/坏件跳过并诊断
+  ---
+  duration_ms: 46.3256
+  type: 'test'
+  ...
+# Subtest: AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+not ok 384 - AC-5：无效 roster ⇒ 批准前拒绝（vca-target-invalid，不冻结/不 re-pin）
+  ---
+  duration_ms: 66.6827
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:148:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    vca-channel-unavailable: Ordinary document submissions use submitDirect with a real operation, expected base and target hashes; the former customer approval channel is closed.
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:163:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+not ok 385 - AC-5：D3 targetRoleIds 不在 roster ⇒ 批准前拒绝（vca-target-invalid）
+  ---
+  duration_ms: 48.6895
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:171:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:177:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+not ok 386 - AC-5：契约版本链不匹配（roster 引用 proposal v1 + target proposal v2）⇒ 拒绝
+  ---
+  duration_ms: 53.7077
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:195:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+not ok 387 - AC-5：role-card 缺失 ⇒ 批准前拒绝（fail-closed）
+  ---
+  duration_ms: 46.603
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:202:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:209:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+not ok 388 - AC-5：合法单契约升级仍可通过（roster 未变更 ⇒ 不做磁盘最新版强链校验）
+  ---
+  duration_ms: 47.9026
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\trunk-upgrade-validation.test.ts:216:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/trunk-upgrade-validation.test.ts:222:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: AC-13：stable boundary 预览扩大/收窄/无变化/不可解析
+ok 389 - AC-13：stable boundary 预览扩大/收窄/无变化/不可解析
+  ---
+  duration_ms: 27.547
+  type: 'test'
+  ...
+# Subtest: 「无法核对」类 code：必须升级客户确认，不得自动拒绝
+ok 390 - 「无法核对」类 code：必须升级客户确认，不得自动拒绝
+  ---
+  duration_ms: 0.4246
+  type: 'test'
+  ...
+# Subtest: 非「无法核对」类 code：维持既有行为，不被本次直修误升级
+ok 391 - 非「无法核对」类 code：维持既有行为，不被本次直修误升级
+  ---
+  duration_ms: 0.0928
+  type: 'test'
+  ...
+# Subtest: 漂移守卫：RULES 中全部 criteria-* 码与核实物证码必须已在分类器内
+ok 392 - 漂移守卫：RULES 中全部 criteria-* 码与核实物证码必须已在分类器内
+  ---
+  duration_ms: 0.1376
+  type: 'test'
+  ...
+# Subtest: 旧别名兼容：分类器先 canonical 化，现有别名映射到非核对类即维持 false
+ok 393 - 旧别名兼容：分类器先 canonical 化，现有别名映射到非核对类即维持 false
+  ---
+  duration_ms: 0.4374
+  type: 'test'
+  ...
+# Subtest: X-R5 run-role：verifier 工具声明为空（D1 allow/[]），trio 不注入任何 RoleToolId 专属工具
+ok 394 - X-R5 run-role：verifier 工具声明为空（D1 allow/[]），trio 不注入任何 RoleToolId 专属工具
+  ---
+  duration_ms: 14.7726
+  type: 'test'
+  ...
+# Subtest: X-R5 卡种：TRIO_CARD_KINDS.verifier 表项已删除；cardKindsOf 读模块 cards；默认卡种按模块数据
+ok 395 - X-R5 卡种：TRIO_CARD_KINDS.verifier 表项已删除；cardKindsOf 读模块 cards；默认卡种按模块数据
+  ---
+  duration_ms: 1.1599
+  type: 'test'
+  ...
+# Subtest: X-R5 apply-journal：review 前置事实键严格按 api-spec（恰好 reviewTarget/criteria）；未登记键 deny
+ok 396 - X-R5 apply-journal：review 前置事实键严格按 api-spec（恰好 reviewTarget/criteria）；未登记键 deny
+  ---
+  duration_ms: 0.5004
+  type: 'test'
+  ...
+# Subtest: X-R5 apply-journal：review 前置在 prepareReviewTask 材料产出后、返回前；指派读取不调用；deny 映射既有回执
+ok 397 - X-R5 apply-journal：review 前置在 prepareReviewTask 材料产出后、返回前；指派读取不调用；deny 映射既有回执
+  ---
+  duration_ms: 1.0309
+  type: 'test'
+  ...
+# Subtest: X-R5 路由核对：不调用 verifier dispatch（diff-only）；convener review 路由读来源模块数据；Service 证据核验保留
+ok 398 - X-R5 路由核对：不调用 verifier dispatch（diff-only）；convener review 路由读来源模块数据；Service 证据核验保留
+  ---
+  duration_ms: 1.4264
+  type: 'test'
+  ...
+# Subtest: X-R5 收尾：临时三态开关与 legacy 分支已删除（无残留）
+ok 399 - X-R5 收尾：临时三态开关与 legacy 分支已删除（无残留）
+  ---
+  duration_ms: 1.0321
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: fresh ordinary submit cannot recreate customer cards (bootstrap)
+ok 400 - version-change-runtime: fresh ordinary submit cannot recreate customer cards (bootstrap)
+  ---
+  duration_ms: 43.9748
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: fresh ordinary submit cannot recreate customer cards (existing trunk)
+ok 401 - version-change-runtime: fresh ordinary submit cannot recreate customer cards (existing trunk)
+  ---
+  duration_ms: 60.8102
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: actual old pending request is readable, cannot be re-presented or settled by stale replies
+ok 402 - version-change-runtime: actual old pending request is readable, cannot be re-presented or settled by stale replies
+  ---
+  duration_ms: 45.3977
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: no presenter or ordinary channel cannot turn an invalid request into approval
+ok 403 - version-change-runtime: no presenter or ordinary channel cannot turn an invalid request into approval
+  ---
+  duration_ms: 22.0374
+  type: 'test'
+  ...
+# Subtest: version-change-runtime: a real persisted historical approval recovers original two-file quality without a new card or fabricated role evidence
+ok 404 - version-change-runtime: a real persisted historical approval recovers original two-file quality without a new card or fabricated role evidence
+  ---
+  duration_ms: 188.7397
+  type: 'test'
+  ...
+# Subtest: VCA（version-upgrade bootstrap）：create/submit/approve 冻结 → trunk t1 → apply；幂等与并发
+ok 405 - VCA（version-upgrade bootstrap）：create/submit/approve 冻结 → trunk t1 → apply；幂等与并发
+  ---
+  duration_ms: 116.3652
+  type: 'test'
+  ...
+# Subtest: VCA（detail-amendment）：提交冻结修正案 → 批准 → 逐项 applied 冻结 + trunk t2 + apply
+ok 406 - VCA（detail-amendment）：提交冻结修正案 → 批准 → 逐项 applied 冻结 + trunk t2 + apply
+  ---
+  duration_ms: 171.5433
+  type: 'test'
+  ...
+# Subtest: VCA：批准前 toSha256 重验（漂移 ⇒ vca-hash-drift，不冻结）
+ok 407 - VCA：批准前 toSha256 重验（漂移 ⇒ vca-hash-drift，不冻结）
+  ---
+  duration_ms: 35.2771
+  type: 'test'
+  ...
+# Subtest: stable-write：request/approve/completeWrite(actualSha) + mini re-pin；失败作废许可
+ok 408 - stable-write：request/approve/completeWrite(actualSha) + mini re-pin；失败作废许可
+  ---
+  duration_ms: 115.5872
+  type: 'test'
+  ...
+# Subtest: 冻结迁移：missing ⇒ 既有文档一律冻结（migrated-legacy）；corrupt ⇒ fail-closed；draft-marker
+ok 409 - 冻结迁移：missing ⇒ 既有文档一律冻结（migrated-legacy）；corrupt ⇒ fail-closed；draft-marker
+  ---
+  duration_ms: 47.4764
+  type: 'test'
+  ...
+# Subtest: refactor 机械写集；C8 裁决：不新增 removed/moved 记录，草稿删除由 R9 verify fail-closed
+ok 410 - refactor 机械写集；C8 裁决：不新增 removed/moved 记录，草稿删除由 R9 verify fail-closed
+  ---
+  duration_ms: 54.188
+  type: 'test'
+  ...
+# Subtest: C2c 契约版本与状态转移表（create/submit/approve/reject/apply）
+ok 411 - C2c 契约版本与状态转移表（create/submit/approve/reject/apply）
+  ---
+  duration_ms: 0.5299
+  type: 'test'
+  ...
+# Subtest: VCA 发起角色唯一：version-upgrade 仅 product，detail-amendment 仅 rapporteur
+ok 412 - VCA 发起角色唯一：version-upgrade 仅 product，detail-amendment 仅 rapporteur
+  ---
+  duration_ms: 1.2246
+  type: 'test'
+  ...
+# Subtest: VCA 目标矩阵：upgrade 只 contract/roster；detail 可 execution；workflow/boundary/product-intent 拒绝
+ok 413 - VCA 目标矩阵：upgrade 只 contract/roster；detail 可 execution；workflow/boundary/product-intent 拒绝
+  ---
+  duration_ms: 0.5436
+  type: 'test'
+  ...
+# Subtest: 作者写区/kind 映射纯函数（AC-19/AC-29）
+ok 414 - 作者写区/kind 映射纯函数（AC-19/AC-29）
+  ---
+  duration_ms: 0.1691
+  type: 'test'
+  ...
+# Subtest: targets↔items 一致性（F36/F42/AC-28）：none 不是 target、无实际变更/额外项拒绝
+ok 415 - targets↔items 一致性（F36/F42/AC-28）：none 不是 target、无实际变更/额外项拒绝
+  ---
+  duration_ms: 0.3061
+  type: 'test'
+  ...
+# Subtest: baseTrunk 匹配与 bootstrap（F30/AC-25）：null+bootstrap 仅无 trunk 时可用
+ok 416 - baseTrunk 匹配与 bootstrap（F30/AC-25）：null+bootstrap 仅无 trunk 时可用
+  ---
+  duration_ms: 1.2444
+  type: 'test'
+  ...
+# Subtest: version-upgrade 全流程：提交定格/批准冻结/apply 记录；幂等（AC-4/AC-5/AC-14）
+ok 417 - version-upgrade 全流程：提交定格/批准冻结/apply 记录；幂等（AC-4/AC-5/AC-14）
+  ---
+  duration_ms: 0.3411
+  type: 'test'
+  ...
+# Subtest: 并发与状态保护：同 flow 仅一个 submitted/approved；批准前不能 apply；拒绝后不可复用
+ok 418 - 并发与状态保护：同 flow 仅一个 submitted/approved；批准前不能 apply；拒绝后不可复用
+  ---
+  duration_ms: 0.455
+  type: 'test'
+  ...
+# Subtest: 批准前哈希重验（F38/AC-26）：目标漂移拒绝批准且保持 submitted
+ok 419 - 批准前哈希重验（F38/AC-26）：目标漂移拒绝批准且保持 submitted
+  ---
+  duration_ms: 0.4365
+  type: 'test'
+  ...
+# Subtest: detail-amendment：提交即冻结修正案；批准后逐项 apply 才冻结 applied 项（AC-2/AC-6）
+ok 420 - detail-amendment：提交即冻结修正案；批准后逐项 apply 才冻结 applied 项（AC-2/AC-6）
+  ---
+  duration_ms: 0.3997
+  type: 'test'
+  ...
+# Subtest: 冻结服务迁移（F29/AC-10/AC-21）：missing=一律冻结；migrated-draft 需证据；corrupt=fail-closed
+ok 421 - 冻结服务迁移（F29/AC-10/AC-21）：missing=一律冻结；migrated-draft 需证据；corrupt=fail-closed
+  ---
+  duration_ms: 0.5792
+  type: 'test'
+  ...
+# Subtest: 冻结归属（F35/AC-31）：customer 类需 decisionId；application 类不得带 decidedBy；合成 applicationId
+ok 422 - 冻结归属（F35/AC-31）：customer 类需 decisionId；application 类不得带 decidedBy；合成 applicationId
+  ---
+  duration_ms: 0.1366
+  type: 'test'
+  ...
+# Subtest: judge-delegated 冻结派生（W-J2/J3，2026-11-09）：judge source 仅 proposal/intent；applicationId 按 requestId 合成；客户字段与 Q5 reason 拒绝
+ok 423 - judge-delegated 冻结派生（W-J2/J3，2026-11-09）：judge source 仅 proposal/intent；applicationId 按 requestId 合成；客户字段与 Q5 reason 拒绝
+  ---
+  duration_ms: 0.4401
+  type: 'test'
+  ...
+# Subtest: 冻结 bootstrap（F30/AC-25）：handoff-pin 合成 applicationId；bootstrap-vca 需 VCA id；已冻结跳过
+ok 424 - 冻结 bootstrap（F30/AC-25）：handoff-pin 合成 applicationId；bootstrap-vca 需 VCA id；已冻结跳过
+  ---
+  duration_ms: 0.2375
+  type: 'test'
+  ...
+# Subtest: 轻量重构校验（F31/F40/AC-7/AC-8）：convener/flow/越界转 VCA/机械写集/managedBy
+ok 425 - 轻量重构校验（F31/F40/AC-7/AC-8）：convener/flow/越界转 VCA/机械写集/managedBy
+  ---
+  duration_ms: 0.7609
+  type: 'test'
+  ...
+# Subtest: C2b/C2c 联合契约（F34/F35）：C2c 冻结记录经 C2b R9 追加 → 同步快照 frozen/draft 一致
+ok 426 - C2b/C2c 联合契约（F34/F35）：C2c 冻结记录经 C2b R9 追加 → 同步快照 frozen/draft 一致
+  ---
+  duration_ms: 44.0244
+  type: 'test'
+  ...
+# Subtest: VCA 记录：insert/list/findByFlow/乐观并发/未知字段保留/重复主键冲突
+ok 427 - VCA 记录：insert/list/findByFlow/乐观并发/未知字段保留/重复主键冲突
+  ---
+  duration_ms: 29.9819
+  type: 'test'
+  ...
+# Subtest: 坏件容错：corrupt 读判别、list 抛错不静默清空、insert 不改文件
+ok 428 - 坏件容错：corrupt 读判别、list 抛错不静默清空、insert 不改文件
+  ---
+  duration_ms: 11.6775
+  type: 'test'
+  ...
+# Subtest: 重构记录：CRUD 与状态期望更新
+ok 429 - 重构记录：CRUD 与状态期望更新
+  ---
+  duration_ms: 27.9174
+  type: 'test'
+  ...
+# Subtest: stable-write：record 与 permit 分表（F13）、upsert、普通数据不执行上层安装
+ok 430 - stable-write：record 与 permit 分表（F13）、upsert、普通数据不执行上层安装
+  ---
+  duration_ms: 15.9966
+  type: 'test'
+  ...
+# Subtest: 并发串行：30 路唯一插入全落盘；同主键并发仅一个成功
+ok 431 - 并发串行：30 路唯一插入全落盘；同主键并发仅一个成功
+  ---
+  duration_ms: 210.4712
+  type: 'test'
+  ...
+# Subtest: freeze 缓存：缺失重建/一致 no-op/陈旧以 baseline 为准/损坏 fail-closed/不可用
+ok 432 - freeze 缓存：缺失重建/一致 no-op/陈旧以 baseline 为准/损坏 fail-closed/不可用
+  ---
+  duration_ms: 24.0473
+  type: 'test'
+  ...
+# Subtest: guard 冻结注册表：append 经 C2b 落 R9、frozen 状态、幂等/冲突、draft-marker
+ok 433 - guard 冻结注册表：append 经 C2b 落 R9、frozen 状态、幂等/冲突、draft-marker
+  ---
+  duration_ms: 57.6431
+  type: 'test'
+  ...
+# Subtest: guard 冻结注册表：baseline corrupt ⇒ corrupt/fail-closed；默认迁移未完成 ⇒ missing
+ok 434 - guard 冻结注册表：baseline corrupt ⇒ corrupt/fail-closed；默认迁移未完成 ⇒ missing
+  ---
+  duration_ms: 2.9059
+  type: 'test'
+  ...
+# Subtest: doc-freezes 缓存与真实 baseline 对账：重建→一致→baseline 变化重建
+ok 435 - doc-freezes 缓存与真实 baseline 对账：重建→一致→baseline 变化重建
+  ---
+  duration_ms: 36.5018
+  type: 'test'
+  ...
+# Subtest: Port 对齐：Provider 结构兼容 C2c 冻结 Port
+ok 436 - Port 对齐：Provider 结构兼容 C2c 冻结 Port
+  ---
+  duration_ms: 0.8474
+  type: 'test'
+  ...
+# Subtest: validateVersionDecisionRequest：严格键集/slug/动作/reason/refs
+ok 437 - validateVersionDecisionRequest：严格键集/slug/动作/reason/refs
+  ---
+  duration_ms: 0.6748
+  type: 'test'
+  ...
+# Subtest: buildVersionDecisionCard：两选项、恰一 recommended=幕僚 action；application-owned 卡通过校验
+ok 438 - buildVersionDecisionCard：两选项、恰一 recommended=幕僚 action；application-owned 卡通过校验
+  ---
+  duration_ms: 0.6124
+  type: 'test'
+  ...
+# Subtest: computeTargetVersions：已有最新+1、缺失 kind→v1；topology 不单列
+ok 439 - computeTargetVersions：已有最新+1、缺失 kind→v1；topology 不单列
+  ---
+  duration_ms: 0.1127
+  type: 'test'
+  ...
+# Subtest: validateVersionDecisionContext：pinned/多 run/pending 与 legacy
+ok 440 - validateVersionDecisionContext：pinned/多 run/pending 与 legacy
+  ---
+  duration_ms: 4.9121
+  type: 'test'
+  ...
+# Subtest: planVersionDecisionExecution：版本修改同 flow/run；legacy 锚点；pinned 双 action 统一 failed 零执行
+ok 441 - planVersionDecisionExecution：版本修改同 flow/run；legacy 锚点；pinned 双 action 统一 failed 零执行
+  ---
+  duration_ms: 0.2039
+  type: 'test'
+  ...
+# Subtest: planVersionDecisionExecution：new-version-development 关闭全部活动 run；runId 仅上下文
+ok 442 - planVersionDecisionExecution：new-version-development 关闭全部活动 run；runId 仅上下文
+  ---
+  duration_ms: 0.1237
+  type: 'test'
+  ...
+# Subtest: R4/AC-5：closedRunIds 与 partial scan 一致；逐个 closeRun 后全部 closed + superseded-by 格式
+ok 443 - R4/AC-5：closedRunIds 与 partial scan 一致；逐个 closeRun 后全部 closed + superseded-by 格式
+  ---
+  duration_ms: 25.559
+  type: 'test'
+  ...
+# Subtest: mapVersionDecisionAnswer（R2）：timeout/unavailable/resolved、aborted/orphaned、late/诊断、invalid/declined
+ok 444 - mapVersionDecisionAnswer（R2）：timeout/unavailable/resolved、aborted/orphaned、late/诊断、invalid/declined
+  ---
+  duration_ms: 0.23
+  type: 'test'
+  ...
+# Subtest: Q9 A（2026-11-03）：mapVersionDecisionAnswer 接受 directive；collectResolvedWithoutExecution 保留 directive
+ok 445 - Q9 A（2026-11-03）：mapVersionDecisionAnswer 接受 directive；collectResolvedWithoutExecution 保留 directive
+  ---
+  duration_ms: 0.2497
+  type: 'test'
+  ...
+# Subtest: collectResolvedWithoutExecution（R3/F5）：排除 orphaned/已有 decision/invalid-selection；failed 不误判
+ok 446 - collectResolvedWithoutExecution（R3/F5）：排除 orphaned/已有 decision/invalid-selection；failed 不误判
+  ---
+  duration_ms: 0.2158
+  type: 'test'
+  ...
+# Subtest: requestId/attempt（F1）：有 run/无 run 两式；attempt 含拒绝/中止；前缀碰撞不误计
+ok 447 - requestId/attempt（F1）：有 run/无 run 两式；attempt 含拒绝/中止；前缀碰撞不误计
+  ---
+  duration_ms: 0.2319
+  type: 'test'
+  ...
+# Subtest: view_image：项目角色提供能力 ⇒ 同引用透传并注册工具；handler 读取项目内图片，path/PromptImage 原样交给注入能力
+ok 448 - view_image：项目角色提供能力 ⇒ 同引用透传并注册工具；handler 读取项目内图片，path/PromptImage 原样交给注入能力
+  ---
+  duration_ms: 29.7163
+  type: 'test'
+  ...
+# Subtest: view_image：内置治理角色（su）提供能力 ⇒ 同样注册（通用只读能力）；未提供 ⇒ 能力缺席、工具不注册
+ok 449 - view_image：内置治理角色（su）提供能力 ⇒ 同样注册（通用只读能力）；未提供 ⇒ 能力缺席、工具不注册
+  ---
+  duration_ms: 25.0842
+  type: 'test'
+  ...
+# Subtest: view_image 不改变其他能力注入矩阵：不隐含已撤除工具；项目角色同样可用
+ok 450 - view_image 不改变其他能力注入矩阵：不隐含已撤除工具；项目角色同样可用
+  ---
+  duration_ms: 16.8301
+  type: 'test'
+  ...
+# Subtest: recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+ok 451 - recordBasis：团队计划结构校验 + basis.recorded（reviewRoleId=roster review 角色）+ stage.completed A9
+  ---
+  duration_ms: 110.6083
+  type: 'test'
+  ...
+# Subtest: 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+ok 452 - 失败面：团队计划 roster hash 漂移 ⇒ baseline-team-plan-invalid；缺文档 ⇒ baseline-document-missing
+  ---
+  duration_ms: 79.9119
+  type: 'test'
+  ...
+# Subtest: path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+ok 453 - path-b 只读快照（Q4）：缺失文档不失败、无 teamPlan、reviewRoleId 默认 verifier、不产生写权
+  ---
+  duration_ms: 10.6436
+  type: 'test'
+  ...
+# Subtest: closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+ok 454 - closeTask v2：真实创建者/报告/幂等；accepted+evidence ⇒ stage.completed；不写 trunk/run
+  ---
+  duration_ms: 29.4499
+  type: 'test'
+  ...
+# Subtest: A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+ok 455 - A12b rework（MF-IR-1）：closeTask(rework) 写 stage.reworked {stage:A11, reworkOf:A12b}
+  ---
+  duration_ms: 106.2391
+  type: 'test'
+  ...
+# Subtest: prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+ok 456 - prepareIntent/finalizeIntent：documentRefs（含 version）一次写入、intent entry 校验、不写 doc-freeze/trunk
+  ---
+  duration_ms: 35.5947
+  type: 'test'
+  ...
+# Subtest: activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+ok 457 - activateRoleDocumentsFixed：提案决定/名单/三文档 hash；hash 漂移拒绝；role.activated + A8 完成；不写 trunk
+  ---
+  duration_ms: 31.5764
+  type: 'test'
+  ...
+# Subtest: archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+ok 458 - archiveAcceptance：生成 docs/acceptance/<flow>-acceptance-vN.md；幂等 replay；不同 report hash 不覆盖
+  ---
+  duration_ms: 14.3809
+  type: 'test'
+  ...
+# Subtest: convener→product/rapporteur/nominator（内置，生产）允许；fixed 常量恰为三项
+ok 459 - convener→product/rapporteur/nominator（内置，生产）允许；fixed 常量恰为三项
+  ---
+  duration_ms: 1.3951
+  type: 'test'
+  ...
+# Subtest: convener→verifier 拒绝 convener-to-verifier-forbidden；convener→chief/su 拒绝 convener-target-forbidden（自身= self-dispatch）
+ok 460 - convener→verifier 拒绝 convener-to-verifier-forbidden；convener→chief/su 拒绝 convener-target-forbidden（自身= self-dispatch）
+  ---
+  duration_ms: 0.1278
+  type: 'test'
+  ...
+# Subtest: convener→项目角色：targetExists 时必须绑定 open stage-request；缺省/已关闭/错创建者均拒绝
+ok 461 - convener→项目角色：targetExists 时必须绑定 open stage-request；缺省/已关闭/错创建者均拒绝
+  ---
+  duration_ms: 0.0862
+  type: 'test'
+  ...
+# Subtest: convener 生产派发 Q6：无证据/来源已变/缺幂等/assigned-task 缺失或不匹配 ⇒ fail-closed
+ok 462 - convener 生产派发 Q6：无证据/来源已变/缺幂等/assigned-task 缺失或不匹配 ⇒ fail-closed
+  ---
+  duration_ms: 0.1579
+  type: 'test'
+  ...
+# Subtest: chief→verifier（前置/验收）允许；chief→product/rapporteur/nominator ⇒ chief-production-dispatch-forbidden
+ok 463 - chief→verifier（前置/验收）允许；chief→product/rapporteur/nominator ⇒ chief-production-dispatch-forbidden
+  ---
+  duration_ms: 0.1038
+  type: 'test'
+  ...
+# Subtest: chief→项目角色仅 MF-10 窄例外：reviewRoleId+roster review+basis 一致+已激活；其余 chief-to-project-forbidden
+ok 464 - chief→项目角色仅 MF-10 窄例外：reviewRoleId+roster review+basis 一致+已激活；其余 chief-to-project-forbidden
+  ---
+  duration_ms: 0.1518
+  type: 'test'
+  ...
+# Subtest: chief→convener 仅 stage-request：read-only、无 module/写集、sourceTaskId 必填；其余拒绝
+ok 465 - chief→convener 仅 stage-request：read-only、无 module/写集、sourceTaskId 必填；其余拒绝
+  ---
+  duration_ms: 0.1289
+  type: 'test'
+  ...
+# Subtest: self/unknown-source/目标类别缺失/目标不存在 ⇒ 稳定拒绝码
+ok 466 - self/unknown-source/目标类别缺失/目标不存在 ⇒ 稳定拒绝码
+  ---
+  duration_ms: 0.0794
+  type: 'test'
+  ...
+# Subtest: 幂等键形态：advance 统一 stage-request:<wf>:<stage>:<attempt>；stop 独立 stage-stop（G-4）
+ok 467 - 幂等键形态：advance 统一 stage-request:<wf>:<stage>:<attempt>；stop 独立 stage-stop（G-4）
+  ---
+  duration_ms: 0.62
+  type: 'test'
+  ...
+# Subtest: append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+ok 468 - append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取
+  ---
+  duration_ms: 30.8559
+  type: 'test'
+  ...
+# Subtest: 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+ok 469 - 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留
+  ---
+  duration_ms: 7.4643
+  type: 'test'
+  ...
+# Subtest: 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+ok 470 - 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量
+  ---
+  duration_ms: 10.5112
+  type: 'test'
+  ...
+# Subtest: 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+ok 471 - 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl
+  ---
+  duration_ms: 3.0744
+  type: 'test'
+  ...
+# Subtest: 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+ok 472 - 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘
+  ---
+  duration_ms: 0.6697
+  type: 'test'
+  ...
+# Subtest: per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+ok 473 - per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed
+  ---
+  duration_ms: 15.9208
+  type: 'test'
+  ...
+# Subtest: legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+ok 474 - legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed）
+  ---
+  duration_ms: 14.8254
+  type: 'test'
+  ...
+# Subtest: 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+ok 475 - 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy
+  ---
+  duration_ms: 17.3944
+  type: 'test'
+  ...
+# Subtest: 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+ok 476 - 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed）
+  ---
+  duration_ms: 17.6918
+  type: 'test'
+  ...
+# Subtest: writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+ok 477 - writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed
+  ---
+  duration_ms: 23.5713
+  type: 'test'
+  ...
+# Subtest: ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+ok 478 - ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed
+  ---
+  duration_ms: 14.8001
+  type: 'test'
+  ...
+# Subtest: team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+ok 479 - team plan: real roster owns modules; explicit writesets and dependencies form a strict DAG without granting execution
+  ---
+  duration_ms: 7.0949
+  type: 'test'
+  ...
+# Subtest: 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+ok 480 - 名单解析：合法 frontmatter/角色/模块/拓扑；flowId 可按期望校验
+  ---
+  duration_ms: 3.5957
+  type: 'test'
+  ...
+# Subtest: 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+ok 481 - 模块清单：同父兄弟目录可作为不同模块；同一角色多模块合法（授权目录=并集）
+  ---
+  duration_ms: 1.313
+  type: 'test'
+  ...
+# Subtest: 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+ok 482 - 名单解析负例：schema/版本/角色/模块/目录/绑定/拓扑
+  ---
+  duration_ms: 9.3796
+  type: 'test'
+  ...
+# Subtest: 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+ok 483 - 最新名单：选 N 最大并校验文件名版本=frontmatter version；缺失/不一致如实报错
+  ---
+  duration_ms: 18.5888
+  type: 'test'
+  ...
+# Subtest: 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+ok 484 - 版本化引用：最新名单引用最新文档；旧版只读；缺文件/旧引用/链断裂如实报错
+  ---
+  duration_ms: 36.6294
+  type: 'test'
+  ...
+# Subtest: 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+ok 485 - 版本格式：引用必须带 -vN.md；非版本化路径拒绝
+  ---
+  duration_ms: 0.5591
+  type: 'test'
+  ...
+# Subtest: D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+ok 486 - D3 卡形状：多选、选项恰为名单角色（无内置/重复/缺项/多项）
+  ---
+  duration_ms: 0.2764
+  type: 'test'
+  ...
+# Subtest: 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+ok 487 - 派发矩阵 M1–M8：状态缺失降级 advisory；硬授权仍拒绝
+  ---
+  duration_ms: 0.7575
+  type: 'test'
+  ...
+# Subtest: 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+ok 488 - 派发矩阵：幕僚可派产品/质检；自派/未知来源/内置 allowlist 拒绝
+  ---
+  duration_ms: 0.1612
+  type: 'test'
+  ...
+# Subtest: 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+ok 489 - 报告路由（M9）：任务绑定报告按 task.created.from 回创建者；无创建者不猜
+  ---
+  duration_ms: 0.0705
+  type: 'test'
+  ...
+# Subtest: 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+ok 490 - 链式派发必须带 flowId（Q9）：交付运营/运营派实现或验收缺 flowId ⇒ 受理 + flow-required
+  ---
+  duration_ms: 0.0748
+  type: 'test'
+  ...
+# Subtest: 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+ok 491 - 模块路径可为文件或目录：文件模块正例；文件+目录同父合法；相等/包含负例
+  ---
+  duration_ms: 2.0932
+  type: 'test'
+  ...
+# Subtest: env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+ok 492 - env-bootstrap 领域中立：非代码写作项目（assets/ 资源 + index.md 索引）
+  ---
+  duration_ms: 1.4245
+  type: 'test'
+  ...
+# Subtest: 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+ok 493 - 设计 v2.22 §5.2 示例 roster 可直接被 parser 接受（完整路径正例）
+  ---
+  duration_ms: 3.9619
+  type: 'test'
+  ...
+# Subtest: envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+ok 494 - envBootstrap 对象语义：旧扁平字段读时归一化；omitted=true 必须有非空理由
+  ---
+  duration_ms: 1.3218
+  type: 'test'
+  ...
+# Subtest: 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+ok 495 - 固定模块 paths[] 上限 1–20：20 条接受，21 条拒绝并提示重出
+  ---
+  duration_ms: 0.5783
+  type: 'test'
+  ...
+# Subtest: 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+ok 496 - 2026-10-30（3.1）：run 不阻断——缺 run/草案/roles 降级 advisory
+  ---
+  duration_ms: 0.1771
+  type: 'test'
+  ...
+# Subtest: R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+ok 497 - R2（P1.3）：legacy run 只读——受理 + run-legacy-readonly advisory
+  ---
+  duration_ms: 0.0594
+  type: 'test'
+  ...
+# Subtest: targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+ok 498 - targetExists 兼容窗口：复合入口回退 targetCardFound；窄入口显式必填
+  ---
+  duration_ms: 0.0943
+  type: 'test'
+  ...
+# Subtest: evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+ok 499 - evaluateDispatchAuthorization：硬矩阵（自派/来源/allowlist/运营类型与存在性）
+  ---
+  duration_ms: 0.0849
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+ok 500 - AC-1/AC-2：三示例经真实 parser 通过、跨示例 modules[] 一致、topology 单一来源
+  ---
+  duration_ms: 0.8427
+  type: 'test'
+  ...
+# Subtest: AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+ok 501 - AC-3+P1-CSQ-03：三块文本字节预算、完整字段表/示例、无字面 taskKind 且第二行无 flowId/moduleId
+  ---
+  duration_ms: 0.1356
+  type: 'test'
+  ...
+# Subtest: AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+ok 502 - AC-17：每 topic 的 schema 常量恰好 3 行且等于常量拼出的期望行
+  ---
+  duration_ms: 0.1185
+  type: 'test'
+  ...
+# Subtest: AC-18：roster schema 文本含三条警告与占位 omissionReason
+ok 503 - AC-18：roster schema 文本含三条警告与占位 omissionReason
+  ---
+  duration_ms: 0.0458
+  type: 'test'
+  ...
+# Subtest: AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 504 - AC-9 roster 侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 7.5977
+  type: 'test'
+  ...
+# Subtest: AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+ok 505 - AC-9 modules 文档侧：四字段逐字段错误矩阵与 purpose/responsibility 语义
+  ---
+  duration_ms: 3.6646
+  type: 'test'
+  ...
+# Subtest: AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+ok 506 - AC-10+P1-CSQ-05/06：topology management 文案、错误码、多余 id/非字符串宽容读取与空串显示
+  ---
+  duration_ms: 1.9007
+  type: 'test'
+  ...
+# Subtest: AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+ok 507 - AC-15+P1-CSQ-04：loadLatestRoster 正例用两示例常量；drift/stale/inconsistent/missing/modules-doc-missing 五负例
+  ---
+  duration_ms: 39.9666
+  type: 'test'
+  ...
+# Subtest: 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+ok 508 - 首请求：workflowId 确定性、workflow.started + stage.requested + stage-request 任务；sourceTaskId 缺失拒绝
+  ---
+  duration_ms: 21.9755
+  type: 'test'
+  ...
+# Subtest: 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+ok 509 - 首请求 workflowId 自报不符 ⇒ stage-request-invalid；非首阶段新建 ⇒ stage-transition-invalid
+  ---
+  duration_ms: 1.94
+  type: 'test'
+  ...
+# Subtest: open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+ok 510 - open advance 不变量：没收口前发下一请求 ⇒ stage-request-open；收口后允许推进（A1→A2）
+  ---
+  duration_ms: 34.5891
+  type: 'test'
+  ...
+# Subtest: 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+ok 511 - 非法转移：A10 未完成发 A11 ⇒ stage-transition-invalid（AC-08）
+  ---
+  duration_ms: 93.2875
+  type: 'test'
+  ...
+# Subtest: A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+ok 512 - A11 stage-request 创建 ⇒ stage.dispatched A11（§4.5）
+  ---
+  duration_ms: 33.1131
+  type: 'test'
+  ...
+# Subtest: 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+ok 513 - 每项目至多一个活动 fixed workflow：不同 flow 新请求 ⇒ workflow-workspace-busy
+  ---
+  duration_ms: 7.7112
+  type: 'test'
+  ...
+# Subtest: stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+ok 514 - stop 流程：先收口 open advance → stop 请求 → 停稳证据不足 ⇒ workflow-stop-unconfirmed；齐全 ⇒ workflow.closed stopped
+  ---
+  duration_ms: 50.9016
+  type: 'test'
+  ...
+# Subtest: AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+ok 515 - AC-09/G-1：A12a criteria 未创建时发 A11 stage-request ⇒ stage-transition-invalid（实施前写标准）
+  ---
+  duration_ms: 20.097
+  type: 'test'
+  ...
+# Subtest: 合法推进 A1→A10：逐阶段 requested+completed；A10 完成后 nextStages = A11/A12a
+ok 516 - 合法推进 A1→A10：逐阶段 requested+completed；A10 完成后 nextStages = A11/A12a
+  ---
+  duration_ms: 1.5306
+  type: 'test'
+  ...
+# Subtest: A10 未完成发 A11 ⇒ workflow-corrupt（不猜、不推进）
+ok 517 - A10 未完成发 A11 ⇒ workflow-corrupt（不猜、不推进）
+  ---
+  duration_ms: 0.2557
+  type: 'test'
+  ...
+# Subtest: A12a（criteria 可先派）→A11→A12b（report）→A12 聚合→A13 顺序合法
+ok 518 - A12a（criteria 可先派）→A11→A12b（report）→A12 聚合→A13 顺序合法
+  ---
+  duration_ms: 0.1794
+  type: 'test'
+  ...
+# Subtest: A12b rework 回 A11（MF-IR-1：stage=A11、reworkOf=A12b）：新 attempt 合法，来源阶段标记 failed
+ok 519 - A12b rework 回 A11（MF-IR-1：stage=A11、reworkOf=A12b）：新 attempt 合法，来源阶段标记 failed
+  ---
+  duration_ms: 0.2133
+  type: 'test'
+  ...
+# Subtest: rework 方向错误（旧 B0 语义：stage=来源、reworkOf=目标）⇒ workflow-corrupt（不静默反转）
+ok 520 - rework 方向错误（旧 B0 语义：stage=来源、reworkOf=目标）⇒ workflow-corrupt（不静默反转）
+  ---
+  duration_ms: 0.1283
+  type: 'test'
+  ...
+# Subtest: 幂等键重复只计一次；形状非法事件计数跳过；身份不一致/缺失 started ⇒ workflow-corrupt
+ok 521 - 幂等键重复只计一次；形状非法事件计数跳过；身份不一致/缺失 started ⇒ workflow-corrupt
+  ---
+  duration_ms: 0.1747
+  type: 'test'
+  ...
+# Subtest: stop 骨架：stop-requested ⇒ stopping；stop-unconfirmed ⇒ blocked；closed stopped 终态且 nextStages 空
+ok 522 - stop 骨架：stop-requested ⇒ stopping；stop-unconfirmed ⇒ blocked；closed stopped 终态且 nextStages 空
+  ---
+  duration_ms: 0.2037
+  type: 'test'
+  ...
+# Subtest: 任务事件补充：fixed task.created 将 A1 标记完成（A1/A4/A7 完成于任务创建）
+ok 523 - 任务事件补充：fixed task.created 将 A1 标记完成（A1/A4/A7 完成于任务创建）
+  ---
+  duration_ms: 0.1268
+  type: 'test'
+  ...
+# Subtest: B 路径骨架：B1→B2（scope-decided）→B3→B4；B2 rework 回 B1
+ok 524 - B 路径骨架：B1→B2（scope-decided）→B3→B4；B2 rework 回 B1
+  ---
+  duration_ms: 0.2206
+  type: 'test'
+  ...
+# Subtest: stage.blocked 记录 code/summary 且不推进；未知阶段值不进入视图
+ok 525 - stage.blocked 记录 code/summary 且不推进；未知阶段值不进入视图
+  ---
+  duration_ms: 0.1629
+  type: 'test'
+  ...
+# Subtest: A3(revise)/A6(revise) rework：stage=回落目标、reworkOf=被返工阶段（MF-IR-1/G-17）
+ok 526 - A3(revise)/A6(revise) rework：stage=回落目标、reworkOf=被返工阶段（MF-IR-1/G-17）
+  ---
+  duration_ms: 0.1326
+  type: 'test'
+  ...
+# Subtest: stop 不变量：未 stop-requested 的 stop-unconfirmed ⇒ corrupt；重复 stop-requested ⇒ corrupt；阶段不匹配 ⇒ corrupt
+ok 527 - stop 不变量：未 stop-requested 的 stop-unconfirmed ⇒ corrupt；重复 stop-requested ⇒ corrupt；阶段不匹配 ⇒ corrupt
+  ---
+  duration_ms: 0.087
+  type: 'test'
+  ...
+# Subtest: stopped 关闭必须有停稳证据（请求 closed + 运营报告 + 无 open 生产任务），否则 corrupt
+ok 528 - stopped 关闭必须有停稳证据（请求 closed + 运营报告 + 无 open 生产任务），否则 corrupt
+  ---
+  duration_ms: 0.0895
+  type: 'test'
+  ...
+1..528
+# tests 528
+# suites 0
+# pass 517
+# fail 11
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15733.8558

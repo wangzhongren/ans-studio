@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: fail-closed:未知顶层键 → 整份解析失败且一切写入被拒
+ok 1 - fail-closed:未知顶层键 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 12.1131
+  type: 'test'
+  ...
+# Subtest: fail-closed:entries 非数组 → 整份解析失败且一切写入被拒
+ok 2 - fail-closed:entries 非数组 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 5.93
+  type: 'test'
+  ...
+# Subtest: fail-closed:缺必填 purpose → 整份解析失败且一切写入被拒
+ok 3 - fail-closed:缺必填 purpose → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 4.904
+  type: 'test'
+  ...
+# Subtest: fail-closed:条目含未知键 → 整份解析失败且一切写入被拒
+ok 4 - fail-closed:条目含未知键 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 4.5232
+  type: 'test'
+  ...
+# Subtest: fail-closed:kind 非法 → 整份解析失败且一切写入被拒
+ok 5 - fail-closed:kind 非法 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 6.3503
+  type: 'test'
+  ...
+# Subtest: fail-closed:root 非法 → 整份解析失败且一切写入被拒
+ok 6 - fail-closed:root 非法 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 4.4376
+  type: 'test'
+  ...
+# Subtest: fail-closed:conditional-directory 缺 condition → 整份解析失败且一切写入被拒
+ok 7 - fail-closed:conditional-directory 缺 condition → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 4.3307
+  type: 'test'
+  ...
+# Subtest: fail-closed:condition 格式非法 → 整份解析失败且一切写入被拒
+ok 8 - fail-closed:condition 格式非法 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 4.7611
+  type: 'test'
+  ...
+# Subtest: fail-closed:YAML 语法错误 → 整份解析失败且一切写入被拒
+ok 9 - fail-closed:YAML 语法错误 → 整份解析失败且一切写入被拒
+  ---
+  duration_ms: 5.0126
+  type: 'test'
+  ...
+# Subtest: fail-closed 对照:同样含 src/good.ts 的**合法**边界 → src/good.ts 允许
+ok 10 - fail-closed 对照:同样含 src/good.ts 的**合法**边界 → src/good.ts 允许
+  ---
+  duration_ms: 4.7956
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 255.7096

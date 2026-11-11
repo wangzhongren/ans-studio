@@ -1,0 +1,51 @@
+# G-IR 证据 04：star-routing / i-full-chain 基线对照（环境归因）
+
+## 背景
+
+B1 AC-03 明确 legacy 断言（star-routing、i-full-chain、workflow-preconditions、roles 差分、
+convener-module-consumption）须“逐字保留且通过”。B1 §二 known-red 清单未列 star-routing / i-full-chain。
+
+## 实测（评审环境）
+
+当前 HEAD ee5b330（本 worktree）：
+
+```
+node --test --test-concurrency=1 --test-reporter=tap \
+  test/桌面应用/star-routing.test.ts test/测试/governance-e2e-auto/i-full-chain.test.ts
+```
+
+结果：tests 12 / pass 3 / fail 9 / cancelled 0 / skipped 0。
+TAP：/tmp/ir-legacy.tap（SHA-256 763067c03750e98b42300c2f0c15273b066e14e2aae709c7db6d59a2d841a301）。
+
+## 基线对照（代码基线 10f90c7）
+
+方法（只读、评审后已清理）：
+1. `git archive 10f90c7 | tar -x -C %TEMP%/ir-base-10f90c7`（不触碰当前工作树；不建 worktree）；
+2. 以 junction 将本工作树 node_modules 链入临时目录（运行后先 `rmdir` junction 再删除临时目录）；
+3. 同一命令跑同两个测试文件。
+
+结果：tests 12 / pass 3 / fail 9 / cancelled 0 / skipped 0。
+TAP：/tmp/ir-legacy-base.tap（SHA-256 59e2001cad8a313b74c3ef7f580ce372751d37cd9b46aa6fd9611225e4a35dd9）。
+
+失败名集合（HEAD vs 基线）：**完全相同（9/9 同名）**：
+1. 星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝
+2. convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务
+3. BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）
+4. BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队
+5. BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）
+6. BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）
+7. AC-4.3：洁净派发无 advisory、无诊断噪声
+8. 最小系统全链（v4.1）：六角色枚举 + 幕僚链首派发落 tasks.jsonl + 无 flow/gate/ledger + 运营派发作用域
+9. F 终态收口：幕僚调度验收（review 任务→质检回交→工作结果）且无自动验收派发
+
+失败信息示例：`document-planning-source-unavailable：缺少当前客户输入与真实项目选择`、
+`worker-dispatch-source-unavailable：缺少当前运营真实受派任务`。
+
+## 判定
+
+- 上述 9 红在 **10f90c7 与 ee5b330 完全同集合**，**不是 B0 引入的回归**；本 worktree 环境（含 `.git` 为文件）
+  与临时解包环境（无 `.git`）结果一致，故非单纯解包伪影。
+- 但它们**未被 B1 §二 列入 known-red**，且 AC-03 要求这些 legacy 断言通过。B2 必须：
+  ① 在规范环境复测并给出解释（环境性 or 基线缺陷）；② 若为基线缺陷，须在 B1/B2 修复或由协调方
+  更新基线口径；不得以“known-red 未列”跳过 AC-03。
+- 本项不改变 G-IR 对 B0 接口的判定；作为基线披露与 B2 前置风险记录。

@@ -1,0 +1,1049 @@
+TAP version 13
+# Subtest: 差分/规格：模块规格与冻结金样逐字段一致
+ok 1 - 差分/规格：模块规格与冻结金样逐字段一致
+  ---
+  duration_ms: 1.1351
+  type: 'test'
+  ...
+# Subtest: 差分/卡文本：sha256 / 长度 / 行数零差异
+ok 2 - 差分/卡文本：sha256 / 长度 / 行数零差异
+  ---
+  duration_ms: 0.3491
+  type: 'test'
+  ...
+# Subtest: 差分/cards：模块 cards 与金样一致（D8 无 legacy token）
+ok 3 - 差分/cards：模块 cards 与金样一致（D8 无 legacy token）
+  ---
+  duration_ms: 0.1503
+  type: 'test'
+  ...
+# Subtest: 差分/tools：trio/single 集合与冻结金样逐项同序
+ok 4 - 差分/tools：trio/single 集合与冻结金样逐项同序
+  ---
+  duration_ms: 0.099
+  type: 'test'
+  ...
+# Subtest: 差分/dispatch：allow 位/稳定码/reportToRoleId 与金样逐组合一致
+ok 5 - 差分/dispatch：allow 位/稳定码/reportToRoleId 与金样逐组合一致
+  ---
+  duration_ms: 0.2463
+  type: 'test'
+  ...
+# Subtest: 差分/team-plan：allow 位与旧角色侧身份/依据/路径谓词金样一致
+ok 6 - 差分/team-plan：allow 位与旧角色侧身份/依据/路径谓词金样一致
+  ---
+  duration_ms: 0.4003
+  type: 'test'
+  ...
+# Subtest: 差分/stable-write：allow 位与旧 canRequestStableWrite/kind 门控金样一致
+ok 7 - 差分/stable-write：allow 位与旧 canRequestStableWrite/kind 门控金样一致
+  ---
+  duration_ms: 0.1172
+  type: 'test'
+  ...
+# Subtest: 差分/requirement-change：allow 位与旧工具侧事实/归属谓词金样一致
+ok 8 - 差分/requirement-change：allow 位与旧工具侧事实/归属谓词金样一致
+  ---
+  duration_ms: 0.1362
+  type: 'test'
+  ...
+# Subtest: 差分/git-action：模块行为与冻结金样一致（旧实现无纯函数 oracle）
+ok 9 - 差分/git-action：模块行为与冻结金样一致（旧实现无纯函数 oracle）
+  ---
+  duration_ms: 0.3404
+  type: 'test'
+  ...
+# Subtest: 差分/已知差异清单：分类齐备且与用例登记一致
+ok 10 - 差分/已知差异清单：分类齐备且与用例登记一致
+  ---
+  duration_ms: 0.1901
+  type: 'test'
+  ...
+# Subtest: 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+ok 11 - 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+  ---
+  duration_ms: 5.3228
+  type: 'test'
+  ...
+# Subtest: E1 模块纪律：模块根只有 index.ts（内部文件只在子目录），唯一 public entry
+ok 12 - E1 模块纪律：模块根只有 index.ts（内部文件只在子目录），唯一 public entry
+  ---
+  duration_ms: 0.3171
+  type: 'test'
+  ...
+# Subtest: E1 模块纪律：只 import Model 公开入口（type-only），无引擎/门控/其他角色/Node I/O
+ok 13 - E1 模块纪律：只 import Model 公开入口（type-only），无引擎/门控/其他角色/Node I/O
+  ---
+  duration_ms: 0.633
+  type: 'test'
+  ...
+# Subtest: fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+ok 14 - fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+  ---
+  duration_ms: 1.1223
+  type: 'test'
+  ...
+# Subtest: fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+ok 15 - fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+  ---
+  duration_ms: 0.0897
+  type: 'test'
+  ...
+# Subtest: isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+ok 16 - isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+  ---
+  duration_ms: 0.1196
+  type: 'test'
+  ...
+# Subtest: context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+ok 17 - context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+  ---
+  duration_ms: 0.1482
+  type: 'test'
+  ...
+# Subtest: B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash
+ok 18 - B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash
+  ---
+  duration_ms: 0.1513
+  type: 'test'
+  ...
+# Subtest: B23 fixed 哈希来源：权威哈希取应用记录（project_state [versions]/versions.jsonl）；自身禁止 shell 计算/核验
+ok 19 - B23 fixed 哈希来源：权威哈希取应用记录（project_state [versions]/versions.jsonl）；自身禁止 shell 计算/核验
+  ---
+  duration_ms: 0.1023
+  type: 'test'
+  ...
+# Subtest: B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）
+ok 20 - B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）
+  ---
+  duration_ms: 0.1116
+  type: 'test'
+  ...
+# Subtest: B14 fixed 环境探测纪律：不得为环境/工具链探测运行 shell；环境事实从应用只读事实读取
+ok 21 - B14 fixed 环境探测纪律：不得为环境/工具链探测运行 shell；环境事实从应用只读事实读取
+  ---
+  duration_ms: 0.1191
+  type: 'test'
+  ...
+# Subtest: B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导
+ok 22 - B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导
+  ---
+  duration_ms: 0.1266
+  type: 'test'
+  ...
+# Subtest: context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+ok 23 - context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+  ---
+  duration_ms: 0.1952
+  type: 'test'
+  ...
+# Subtest: legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+ok 24 - legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+  ---
+  duration_ms: 0.1937
+  type: 'test'
+  ...
+# Subtest: 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+ok 25 - 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+  ---
+  duration_ms: 3.5128
+  type: 'test'
+  ...
+# Subtest: 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+ok 26 - 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+  ---
+  duration_ms: 1.2768
+  type: 'test'
+  ...
+# Subtest: 规格数据：id/displayName/function/capabilities/cards 与旧 convener 规格一致（D8/D10）
+ok 27 - 规格数据：id/displayName/function/capabilities/cards 与旧 convener 规格一致（D8/D10）
+  ---
+  duration_ms: 1.2157
+  type: 'test'
+  ...
+# Subtest: tools()：trio 返回 convener 五个允许工具；capabilities 与 spec 同源（D10）
+ok 28 - tools()：trio 返回 convener 五个允许工具；capabilities 与 spec 同源（D10）
+  ---
+  duration_ms: 0.1197
+  type: 'test'
+  ...
+# Subtest: tools()：single 只保留旧角色门控两项；未知治理模型 fail-closed
+ok 29 - tools()：single 只保留旧角色门控两项；未知治理模型 fail-closed
+  ---
+  duration_ms: 0.0725
+  type: 'test'
+  ...
+# Subtest: dispatch()：真实 convener → 真实项目 worker（宿主显式存在）允许，报告期望 convener
+ok 30 - dispatch()：真实 convener → 真实项目 worker（宿主显式存在）允许，报告期望 convener
+  ---
+  duration_ms: 0.1036
+  type: 'test'
+  ...
+# Subtest: dispatch()：内置目标只允许质检（verifier）；其它内置目标拒绝
+ok 31 - dispatch()：内置目标只允许质检（verifier）；其它内置目标拒绝
+  ---
+  duration_ms: 0.1422
+  type: 'test'
+  ...
+# Subtest: dispatch()：来源非 convener、空目标、自派、项目目标不存在、内置矛盾事实一律 fail-closed
+ok 32 - dispatch()：来源非 convener、空目标、自派、项目目标不存在、内置矛盾事实一律 fail-closed
+  ---
+  duration_ms: 0.1141
+  type: 'test'
+  ...
+# Subtest: preflight：非本角色动作与非法 facts 默认拒绝（action-not-covered / facts-invalid）
+ok 33 - preflight：非本角色动作与非法 facts 默认拒绝（action-not-covered / facts-invalid）
+  ---
+  duration_ms: 0.1684
+  type: 'test'
+  ...
+# Subtest: preflight：未知 fact 键 deny（只读 api-spec 登记的键，fail-closed）
+ok 34 - preflight：未知 fact 键 deny（只读 api-spec 登记的键，fail-closed）
+  ---
+  duration_ms: 0.2918
+  type: 'test'
+  ...
+# Subtest: preflight/team-plan：合法事实允许；baseDigest/plan.sha256 可缺省；路径/版本/形状/身份错误拒绝
+ok 35 - preflight/team-plan：合法事实允许；baseDigest/plan.sha256 可缺省；路径/版本/形状/身份错误拒绝
+  ---
+  duration_ms: 0.3663
+  type: 'test'
+  ...
+# Subtest: preflight/stable-write：仅 convener 的 workflow 内容写入允许
+ok 36 - preflight/stable-write：仅 convener 的 workflow 内容写入允许
+  ---
+  duration_ms: 0.1932
+  type: 'test'
+  ...
+# Subtest: preflight/requirement-change：至少一个归属键；changeKind/必填文本非法拒绝
+ok 37 - preflight/requirement-change：至少一个归属键；changeKind/必填文本非法拒绝
+  ---
+  duration_ms: 0.1349
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/init：真实客户来源 + 仓库不存在才允许
+ok 38 - preflight/git-action/init：真实客户来源 + 仓库不存在才允许
+  ---
+  duration_ms: 0.1261
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/commit：base/paths 与本人 scope 事实
+ok 39 - preflight/git-action/commit：base/paths 与本人 scope 事实
+  ---
+  duration_ms: 0.1635
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/integrate：只收已授权且已收口的 owner 候选
+ok 40 - preflight/git-action/integrate：只收已授权且已收口的 owner 候选
+  ---
+  duration_ms: 0.1759
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/revert：controller/review/OID 重新核验事实
+ok 41 - preflight/git-action/revert：controller/review/OID 重新核验事实
+  ---
+  duration_ms: 0.1503
+  type: 'test'
+  ...
+# Subtest: preflight/git-action/publish：仅 delivery + 最终候选/收口/证据事实
+ok 42 - preflight/git-action/publish：仅 delivery + 最终候选/收口/证据事实
+  ---
+  duration_ms: 0.2581
+  type: 'test'
+  ...
+# Subtest: preflight/git-action：未知动作拒绝（git-action-invalid）
+ok 43 - preflight/git-action：未知动作拒绝（git-action-invalid）
+  ---
+  duration_ms: 0.0457
+  type: 'test'
+  ...
+# Subtest: context()：decision 卡 / 项目 workflow / 报告期望三段稳定文本
+ok 44 - context()：decision 卡 / 项目 workflow / 报告期望三段稳定文本
+  ---
+  duration_ms: 0.1023
+  type: 'test'
+  ...
+# Subtest: context()：不同治理模型返回同一静态模板（无运行时事实拼接、无 I/O）
+ok 45 - context()：不同治理模型返回同一静态模板（无运行时事实拼接、无 I/O）
+  ---
+  duration_ms: 0.0532
+  type: 'test'
+  ...
+# Subtest: TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf
+ok 46 - TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf
+  ---
+  duration_ms: 2.0559
+  type: 'test'
+  ...
+# Subtest: TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变
+ok 47 - TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变
+  ---
+  duration_ms: 1.0787
+  type: 'test'
+  ...
+# Subtest: TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision）
+ok 48 - TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision）
+  ---
+  duration_ms: 0.8812
+  type: 'test'
+  ...
+# Subtest: TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源
+ok 49 - TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源
+  ---
+  duration_ms: 0.2673
+  type: 'test'
+  ...
+# Subtest: TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源
+ok 50 - TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源
+  ---
+  duration_ms: 0.239
+  type: 'test'
+  ...
+# Subtest: TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true}
+ok 51 - TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true}
+  ---
+  duration_ms: 0.395
+  type: 'test'
+  ...
+# Subtest: TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型）
+ok 52 - TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型）
+  ---
+  duration_ms: 0.2197
+  type: 'test'
+  ...
+# Subtest: TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传）
+ok 53 - TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传）
+  ---
+  duration_ms: 0.1618
+  type: 'test'
+  ...
+# Subtest: TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源
+ok 54 - TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源
+  ---
+  duration_ms: 0.1614
+  type: 'test'
+  ...
+# Subtest: TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住
+ok 55 - TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住
+  ---
+  duration_ms: 8.2395
+  type: 'test'
+  ...
+# Subtest: TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注
+ok 56 - TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注
+  ---
+  duration_ms: 1.1643
+  type: 'test'
+  ...
+# 预算实测：索引 5244 B；最大详情 4243 B（project-roster/v3）
+# Subtest: fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+ok 57 - fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+  ---
+  duration_ms: 3.237
+  type: 'test'
+  ...
+# Subtest: fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+ok 58 - fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.477
+  type: 'test'
+  ...
+# Subtest: legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+ok 59 - legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+  ---
+  duration_ms: 0.5671
+  type: 'test'
+  ...
+# Subtest: fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+ok 60 - fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.7036
+  type: 'test'
+  ...
+# Subtest: fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+ok 61 - fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+  ---
+  duration_ms: 0.2245
+  type: 'test'
+  ...
+# Subtest: fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+ok 62 - fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+  ---
+  duration_ms: 0.5316
+  type: 'test'
+  ...
+# Subtest: fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+ok 63 - fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.7949
+  type: 'test'
+  ...
+# Subtest: legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+ok 64 - legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+  ---
+  duration_ms: 0.4169
+  type: 'test'
+  ...
+# Subtest: fixed activate 回执独立校验：workflow/role 不匹配或坏形状 ⇒ 结果未知；B17 rosterSha256 由应用计算（不再与模型入参比较）；业务失败如实直出
+ok 65 - fixed activate 回执独立校验：workflow/role 不匹配或坏形状 ⇒ 结果未知；B17 rosterSha256 由应用计算（不再与模型入参比较）；业务失败如实直出
+  ---
+  duration_ms: 0.7422
+  type: 'test'
+  ...
+# Subtest: B17 fixed activate：path-only（roster/documents 省略 sha256）放行并原样调用 fixed 回调；legacy 仍要求 sha256
+ok 66 - B17 fixed activate：path-only（roster/documents 省略 sha256）放行并原样调用 fixed 回调；legacy 仍要求 sha256
+  ---
+  duration_ms: 0.3051
+  type: 'test'
+  ...
+# Subtest: B17 fixed activate MCP inputSchema：roster/documents 的 sha256 不 required；legacy documents 仍 required
+ok 67 - B17 fixed activate MCP inputSchema：roster/documents 的 sha256 不 required；legacy documents 仍 required
+  ---
+  duration_ms: 0.2264
+  type: 'test'
+  ...
+# Subtest: WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+ok 68 - WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+  ---
+  duration_ms: 0.0819
+  type: 'test'
+  ...
+# Subtest: dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+ok 69 - dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+  ---
+  duration_ms: 0.844
+  type: 'test'
+  ...
+# Subtest: merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+ok 70 - merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+  ---
+  duration_ms: 0.0831
+  type: 'test'
+  ...
+# Subtest: requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+ok 71 - requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+  ---
+  duration_ms: 2.1608
+  type: 'test'
+  ...
+# Subtest: i18n：ui.projectState 62 key 全量、中英成对、占位符一致、英文零 Han
+ok 72 - i18n：ui.projectState 62 key 全量、中英成对、占位符一致、英文零 Han
+  ---
+  duration_ms: 1.5955
+  type: 'test'
+  ...
+# Subtest: asProjectStateView：仅认 project-state/v1 顶层形状；不补默认值
+ok 73 - asProjectStateView：仅认 project-state/v1 顶层形状；不补默认值
+  ---
+  duration_ms: 0.27
+  type: 'test'
+  ...
+# Subtest: summary：focus 一行 + 徽标；计数只读 counts.*（与 tasks 数组不一致也照用）
+ok 74 - summary：focus 一行 + 徽标；计数只读 counts.*（与 tasks 数组不一致也照用）
+  ---
+  duration_ms: 0.7725
+  type: 'test'
+  ...
+# Subtest: summary：无 focus 不猜；derived/application/stale 标签来自既有 key
+ok 75 - summary：无 focus 不猜；derived/application/stale 标签来自既有 key
+  ---
+  duration_ms: 0.2293
+  type: 'test'
+  ...
+# Subtest: blocker kind 映射：rework-pending → ui.projectState.blocker.kind.acceptanceRework（key 保留）
+ok 76 - blocker kind 映射：rework-pending → ui.projectState.blocker.kind.acceptanceRework（key 保留）
+  ---
+  duration_ms: 0.8444
+  type: 'test'
+  ...
+# Subtest: details：按 payload 顺序映射 flows/tasks/blockers/versions/evidence/nextStep
+ok 77 - details：按 payload 顺序映射 flows/tasks/blockers/versions/evidence/nextStep
+  ---
+  duration_ms: 0.4603
+  type: 'test'
+  ...
+# Subtest: details：truncated 与 errors[] 如实显示；坏 manifest + 好 flow 的 active 不丢（R1 展示）
+ok 78 - details：truncated 与 errors[] 如实显示；坏 manifest + 好 flow 的 active 不丢（R1 展示）
+  ---
+  duration_ms: 0.168
+  type: 'test'
+  ...
+# Subtest: 两语言：en-US 输出无 Han、无缺失 key/参数诊断
+ok 79 - 两语言：en-US 输出无 Han、无缺失 key/参数诊断
+  ---
+  duration_ms: 0.2611
+  type: 'test'
+  ...
+# Subtest: 只读/无本地派生：面板唯一数据入口 getProjectState，无写桥/扫描/第二套状态
+ok 80 - 只读/无本地派生：面板唯一数据入口 getProjectState，无写桥/扫描/第二套状态
+  ---
+  duration_ms: 1.7215
+  type: 'test'
+  ...
+# Subtest: 同源计数：面板 unclosed 与任务中心 listTasks.unclosed 使用同一数值
+ok 81 - 同源计数：面板 unclosed 与任务中心 listTasks.unclosed 使用同一数值
+  ---
+  duration_ms: 0.3203
+  type: 'test'
+  ...
+# Subtest: 空态语义：不可用/解析失败/空项目均不假造数字（视图返回 null；面板有对应 key）
+ok 82 - 空态语义：不可用/解析失败/空项目均不假造数字（视图返回 null；面板有对应 key）
+  ---
+  duration_ms: 0.3999
+  type: 'test'
+  ...
+# Subtest: project-state:get：IPC 形状/计数/版本/备注/零写入；空 root 返回空视图+errors
+ok 83 - project-state:get：IPC 形状/计数/版本/备注/零写入；空 root 返回空视图+errors
+  ---
+  duration_ms: 34.2296
+  type: 'test'
+  ...
+# Subtest: project-state:get：chief 完整、convener 裁剪、worker 无 project_state 工具；项目状态工具文本 ≤8 KiB
+ok 84 - project-state:get：chief 完整、convener 裁剪、worker 无 project_state 工具；项目状态工具文本 ≤8 KiB
+  ---
+  duration_ms: 66.4393
+  type: 'test'
+  ...
+# Subtest: IPC 面：只新增 project-state:get；不注册/不暴露 project:note、version-decision:request 写桥
+ok 85 - IPC 面：只新增 project-state:get；不注册/不暴露 project:note、version-decision:request 写桥
+  ---
+  duration_ms: 1.5006
+  type: 'test'
+  ...
+# Subtest: project_note：set-focus/blocker/next-step 校验、幂等、解除、重启重建；不改任务/run/文档
+ok 86 - project_note：set-focus/blocker/next-step 校验、幂等、解除、重启重建；不改任务/run/文档
+  ---
+  duration_ms: 118.8659
+  type: 'test'
+  ...
+# Subtest: B5/TM-13/AC-9 注册矩阵：6 内置治理角色 + 旧 su + 动态项目角色经真实 openRoleSession 均注册 doc_format
+ok 87 - B5/TM-13/AC-9 注册矩阵：6 内置治理角色 + 旧 su + 动态项目角色经真实 openRoleSession 均注册 doc_format
+  ---
+  duration_ms: 129.341
+  type: 'test'
+  ...
+# 注册矩阵 8/8：chief,product,rapporteur,nominator,convener,verifier,su,worker-doc-format-b5
+# Subtest: B5 注入才注册（动态项目角色）：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只且其它工具定义/顺序逐字不变
+ok 88 - B5 注入才注册（动态项目角色）：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只且其它工具定义/顺序逐字不变
+  ---
+  duration_ms: 27.3391
+  type: 'test'
+  ...
+# Subtest: B5/AC-9 judge 与有界 Chief 隔离：judge 恰三只无 doc_format；有界 Chief 恰 decide_pending_request（提供 docFormat 也不注册）
+ok 89 - B5/AC-9 judge 与有界 Chief 隔离：judge 恰三只无 doc_format；有界 Chief 恰 decide_pending_request（提供 docFormat 也不注册）
+  ---
+  duration_ms: 7.9226
+  type: 'test'
+  ...
+# Subtest: B5/TM-13 数据源：全部角色返回同一静态索引（无角色裁剪）；索引/详情零 getListing/refresh/文件 IO、不含项目/角色事实
+ok 90 - B5/TM-13 数据源：全部角色返回同一静态索引（无角色裁剪）；索引/详情零 getListing/refresh/文件 IO、不含项目/角色事实
+  ---
+  duration_ms: 98.3921
+  type: 'test'
+  ...
+# 数据源 8/8 同源：索引 5244 B；已知 id 54 个
+# Subtest: B5/TM-13 可调用：8 个角色会话的 doc_format 经真实轮次可调用（索引/详情 ok:true、未知 ok:false）；同输入同文本、目录不变、无额外事件/落盘
+ok 91 - B5/TM-13 可调用：8 个角色会话的 doc_format 经真实轮次可调用（索引/详情 ok:true、未知 ok:false）；同输入同文本、目录不变、无额外事件/落盘
+  ---
+  duration_ms: 375.844
+  type: 'test'
+  ...
+# 可调用 8/8 角色 × 5 次 = 40 次工具调用；未知 ok:false 与注册表未知文本一致
+# Subtest: X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+ok 92 - X-R4 run-role：trio convener 注入模块声明的五项工具（模块声明逐一对应；requestStableWrite 经前置包装，requestRequirementChange 同引用）
+  ---
+  duration_ms: 18.946
+  type: 'test'
+  ...
+# Subtest: X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+ok 93 - X-R4 收尾：requirement-change 编排不包装（同一引用）；角色侧前置由 Provider 工具层单一消费；事实键按 api-spec §5.3
+  ---
+  duration_ms: 7.1936
+  type: 'test'
+  ...
+# Subtest: X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+ok 94 - X-R4 run-role：stable-write 角色前置 facts 键按 api-spec §5.2；deny 映射 stable-write-invalid、能力零调用
+  ---
+  duration_ms: 4.8703
+  type: 'test'
+  ...
+# Subtest: X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+ok 95 - X-R4 trunk-runtime：team-plan facts 按 api-spec §5.1；deny 在 Git/Service 之前映射既有回执码
+  ---
+  duration_ms: 5.2453
+  type: 'test'
+  ...
+# Subtest: X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+ok 96 - X-R4 卡种：TRIO_CARD_KINDS.convener 已删除、默认卡种读模块 cards（不产生 appointment 候选）
+  ---
+  duration_ms: 1.134
+  type: 'test'
+  ...
+# Subtest: X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+ok 97 - X-R4 派发硬授权：convener 来源读模块 dispatch()；对外 code/message 保持迁移前稳定值
+  ---
+  duration_ms: 0.3953
+  type: 'test'
+  ...
+# Subtest: X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+ok 98 - X-R4 派发目标数据：CONVENER_WORKER_DISPATCH_TARGETS 为内置目标唯一来源；Service/Pipeline 消费点就位
+  ---
+  duration_ms: 2.0705
+  type: 'test'
+  ...
+# Subtest: X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+ok 99 - X-R4 源码顺序：team-plan 前置在 abort 后、Git/Service 之前；稳定写前置在能力调用之前；需求变更前置不在编排
+  ---
+  duration_ms: 1.3624
+  type: 'test'
+  ...
+# Subtest: team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+ok 100 - team plan (P-13)：多 draft run + run-ambiguous 下经受派任务登记成功并绑定任务 run；project_state/version-decision 只读对照不变
+  ---
+  duration_ms: 248.8715
+  type: 'test'
+  ...
+# Subtest: TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+ok 101 - TM-1 冻结 id 清单：54 个（A25+B29）deepEqual、唯一、一行一 id、三处数量一致
+  ---
+  duration_ms: 1.188
+  type: 'test'
+  ...
+# Subtest: TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+ok 102 - TM-1 每个 spec 具备 title/audience/stage/pathPattern/validator/specRevision；schemaLiteral 单值/note
+  ---
+  duration_ms: 0.4439
+  type: 'test'
+  ...
+# Subtest: TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+ok 103 - TM-1 B 组 29 行与 A14 均有 testSeam（kind 合法、说明可复核）
+  ---
+  duration_ms: 0.1629
+  type: 'test'
+  ...
+# Subtest: TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+ok 104 - TM-1 预算：索引 ≤8192 B；每 spec 每 part ≤8192 B；首行/末行提示固定
+  ---
+  duration_ms: 2.2996
+  type: 'test'
+  ...
+# Subtest: TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+ok 105 - TM-1 模块纯数据：源码不 import node:fs / app/ / service/，不写盘
+  ---
+  duration_ms: 3.3822
+  type: 'test'
+  ...
+# Subtest: TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+ok 106 - TM-1 未知 id：纯文本、回显 ≤40 字符、可用 id 列表、非字符串不抛
+  ---
+  duration_ms: 0.2394
+  type: 'test'
+  ...
+# Subtest: TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+ok 107 - TM-1/AC-3 pinned-literal 例外：governance-matrix/v1 由规范持有唯一副本（架构隔离），其它公共常量仍 import
+  ---
+  duration_ms: 0.9706
+  type: 'test'
+  ...
+# Subtest: TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+ok 108 - TM-6 modules/roster/topology 详情复用 contractSchemaText 原文并带来源说明；render 型 part 整段返回
+  ---
+  duration_ms: 0.1926
+  type: 'test'
+  ...
+# Subtest: TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+ok 109 - TM-6 intent-entry 详情复用模板/命名/ID 规则；A13 正例为填充样例（非占位符模板）
+  ---
+  duration_ms: 0.7293
+  type: 'test'
+  ...
+# Subtest: TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+ok 110 - TM-2 A 组样例正例：A1–A13、A17–A21 经真实 parser/validator 通过
+  ---
+  duration_ms: 104.788
+  type: 'test'
+  ...
+# Subtest: TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+ok 111 - TM-2 A14 严格层按 seam 钉住：键集/错误码/绑定字段存在于 apply-journal.ts，不宣称纯校验器正例
+  ---
+  duration_ms: 1.7722
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+ok 112 - TM-2 B 组 testSeam exported-pure：逐行直接调用导出校验器（正例）
+  ---
+  duration_ms: 1.9302
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+ok 113 - TM-2 B 组 testSeam public-path-fixture：B2/B3/B17/B25/B27/B28 临时项目根
+  ---
+  duration_ms: 49.9229
+  type: 'test'
+  ...
+# Subtest: TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+ok 114 - TM-2 B 组 testSeam text-shape：源码文本钉住 schema 字面量/锚点符号/残余风险披露
+  ---
+  duration_ms: 6.2994
+  type: 'test'
+  ...
+# Subtest: TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+ok 115 - TM-3 字段变异矩阵（数据驱动）：validator 字段 删除/null/类型/枚举 按 presence 断言
+  ---
+  duration_ms: 595.3668
+  type: 'test'
+  ...
+# Subtest: TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+ok 116 - TM-3 分层断言：A1 gate/pin、A2 substring 层、A3/A4 多路径层、A14 strict/display
+  ---
+  duration_ms: 47.0271
+  type: 'test'
+  ...
+# Subtest: TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+ok 117 - TM-3 条件/专项负例：A2 intent 删除、A3 path+paths 缺失、A6 正文、A10 modify 缺 from、A19 条件目录缺 condition
+  ---
+  duration_ms: 12.6233
+  type: 'test'
+  ...
+# Subtest: TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+ok 118 - TM-4 overclaim guard：每个 convention 字段的违反值仍被真实校验器接受（或显式豁免理由）
+  ---
+  duration_ms: 68.079
+  type: 'test'
+  ...
+# Subtest: TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+not ok 119 - TM-5 schema 字面量全仓扫描：src/**/*.ts 的 xxx/vN ∈ schemaLiteral ∪ 规范 id ∪ 显式白名单（含理由）
+  ---
+  duration_ms: 39.0422
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\编排\\doc-format-specs.test.ts:1312:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    未登记 schema 字面量：ans-basis/v1, ans-release/v1, ans-task-git-shell/v1, ans-workflow/v1, chief-workflow/v2, legacy/v1, two-fixed-paths/v1
+    + actual - expected
+    
+    + [
+    +   'ans-basis/v1',
+    +   'ans-release/v1',
+    +   'ans-task-git-shell/v1',
+    +   'ans-workflow/v1',
+    +   'chief-workflow/v2',
+    +   'legacy/v1',
+    +   'two-fixed-paths/v1'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'ans-basis/v1'
+    1: 'ans-release/v1'
+    2: 'ans-task-git-shell/v1'
+    3: 'ans-workflow/v1'
+    4: 'chief-workflow/v2'
+    5: 'legacy/v1'
+    6: 'two-fixed-paths/v1'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E7%BC%96%E6%8E%92/doc-format-specs.test.ts:1326:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+ok 120 - TM-8 稳定 code 扫描（按 code 族，含非后缀成员）∈ spec commonErrors/loadChecks ∪ 白名单（含理由）
+  ---
+  duration_ms: 37.4327
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+ok 121 - TM-9 加载级负例：roster-* / modules-doc-* / run-pin-* 最小夹具负例
+  ---
+  duration_ms: 88.5242
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+ok 122 - TM-9 加载级负例：plan-*（service 级可复现码）、criteria-*、evidence-*、trunk-amendment-*
+  ---
+  duration_ms: 26.389
+  type: 'test'
+  ...
+# Subtest: TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+ok 123 - TM-9 加载级负例：role-card-section-missing / boundary-md-yaml-mismatch 与 review-quality-* 残余披露
+  ---
+  duration_ms: 0.5581
+  type: 'test'
+  ...
+# Subtest: TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+ok 124 - TM-9 MCP 声明负例：name-invalid / reserved-name / declaration-missing / declaration-parse-failed
+  ---
+  duration_ms: 3.6628
+  type: 'test'
+  ...
+# Subtest: TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+ok 125 - TM-9 覆盖核对：loadChecks 每个 code 已复现或有显式豁免理由；关键 code 族至少一个负例
+  ---
+  duration_ms: 0.1884
+  type: 'test'
+  ...
+# Subtest: B23 team-plan/v3 指引：权威哈希取应用记录（project_state [versions]/versions.jsonl），不得用 shell 计算
+ok 126 - B23 team-plan/v3 指引：权威哈希取应用记录（project_state [versions]/versions.jsonl），不得用 shell 计算
+  ---
+  duration_ms: 0.187
+  type: 'test'
+  ...
+# Subtest: 空项目：无 workflow、无 legacyStateIgnored 警告
+ok 127 - 空项目：无 workflow、无 legacyStateIgnored 警告
+  ---
+  duration_ms: 8.9377
+  type: 'test'
+  ...
+# Subtest: 活动 fixed workflow：视图/阶段/reviewRoleId/activated + 旧 trunk/run 状态列为 legacyStateIgnored
+ok 128 - 活动 fixed workflow：视图/阶段/reviewRoleId/activated + 旧 trunk/run 状态列为 legacyStateIgnored
+  ---
+  duration_ms: 39.0401
+  type: 'test'
+  ...
+# Subtest: 坏账本（workflow-corrupt）⇒ 投影警告如实列出，不按成功处理
+ok 129 - 坏账本（workflow-corrupt）⇒ 投影警告如实列出，不按成功处理
+  ---
+  duration_ms: 14.8702
+  type: 'test'
+  ...
+# Subtest: flow 合并/focus：多候选不猜 -c；唯一候选 derived；chief 事件与 cleared 正反例
+ok 130 - flow 合并/focus：多候选不猜 -c；唯一候选 derived；chief 事件与 cleared 正反例
+  ---
+  duration_ms: 43.6717
+  type: 'test'
+  ...
+# Subtest: focus derived：唯一活动 flow 派生；多活动 run 全部列出且不擅自选 runId
+ok 131 - focus derived：唯一活动 flow 派生；多活动 run 全部列出且不擅自选 runId
+  ---
+  duration_ms: 14.1229
+  type: 'test'
+  ...
+# Subtest: AC-1：坏账本行数准确进 errors；可读任务照常返回（不阻塞）
+ok 132 - AC-1：坏账本行数准确进 errors；可读任务照常返回（不阻塞）
+  ---
+  duration_ms: 9.4563
+  type: 'test'
+  ...
+# Subtest: R1：1 坏 + 1 好 manifest → 好 flow active 正确、errors 精确；源码不调用 all-or-nothing API
+ok 133 - R1：1 坏 + 1 好 manifest → 好 flow active 正确、errors 精确；源码不调用 all-or-nothing API
+  ---
+  duration_ms: 9.8434
+  type: 'test'
+  ...
+# Subtest: tasks/blockers/counts：blocked/failed 分离、rework-pending 机器事实、request-pending、redispatch、chief-note
+ok 134 - tasks/blockers/counts：blocked/failed 分离、rework-pending 机器事实、request-pending、redispatch、chief-note
+  ---
+  duration_ms: 22.3984
+  type: 'test'
+  ...
+# Subtest: versions/evidence/零写入：latest vs pinned/newerThanPinned；evidence 仅 present/missing；读前后哈希不变
+ok 135 - versions/evidence/零写入：latest vs pinned/newerThanPinned；evidence 仅 present/missing；读前后哈希不变
+  ---
+  duration_ms: 20.3825
+  type: 'test'
+  ...
+# Subtest: notes/nextStep/角色裁剪：chief 备注优先；其他角色只见自己的任务，不见他人正文
+ok 136 - notes/nextStep/角色裁剪：chief 备注优先；其他角色只见自己的任务，不见他人正文
+  ---
+  duration_ms: 18.1304
+  type: 'test'
+  ...
+# Subtest: 有界/truncated：50/500/20/50 可覆盖测试（小上限）且计数保留；工具文本 ≤8 KiB
+ok 137 - 有界/truncated：50/500/20/50 可覆盖测试（小上限）且计数保留；工具文本 ≤8 KiB
+  ---
+  duration_ms: 15.648
+  type: 'test'
+  ...
+# Subtest: AC-8：轮转丢失 focus 事件后回退 derived/none（不伪造 focus）
+ok 138 - AC-8：轮转丢失 focus 事件后回退 derived/none（不伪造 focus）
+  ---
+  duration_ms: 11.5764
+  type: 'test'
+  ...
+# Subtest: B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+ok 139 - B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+  ---
+  duration_ms: 0.9687
+  type: 'test'
+  ...
+# Subtest: B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+ok 140 - B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+  ---
+  duration_ms: 0.3192
+  type: 'test'
+  ...
+# Subtest: B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+ok 141 - B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+  ---
+  duration_ms: 0.2755
+  type: 'test'
+  ...
+# Subtest: B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+ok 142 - B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+  ---
+  duration_ms: 0.8129
+  type: 'test'
+  ...
+# Subtest: B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+ok 143 - B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+  ---
+  duration_ms: 0.4586
+  type: 'test'
+  ...
+# Subtest: B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+ok 144 - B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+  ---
+  duration_ms: 0.5058
+  type: 'test'
+  ...
+# Subtest: B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+ok 145 - B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+  ---
+  duration_ms: 1.3394
+  type: 'test'
+  ...
+# Subtest: B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+ok 146 - B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+  ---
+  duration_ms: 0.4725
+  type: 'test'
+  ...
+# Subtest: B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+ok 147 - B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+  ---
+  duration_ms: 0.4912
+  type: 'test'
+  ...
+# Subtest: BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状）
+ok 148 - BuiltInRoleModule：六个内置 id 均可按契约构造（唯一公开形状）
+  ---
+  duration_ms: 0.5779
+  type: 'test'
+  ...
+# Subtest: BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段
+ok 149 - BuiltInRoleModule：card/capabilities/cards 为纯数据，不携带权限字段
+  ---
+  duration_ms: 0.4461
+  type: 'test'
+  ...
+# Subtest: tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具）
+ok 150 - tools()：按治理模型装配纯数据工具集（trio 才给角色专属工具）
+  ---
+  duration_ms: 0.1056
+  type: 'test'
+  ...
+# Subtest: dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望
+ok 151 - dispatch()：项目角色 fail-closed（typed deny 带稳定码/i18n key），内置目标带报告期望
+  ---
+  duration_ms: 0.1163
+  type: 'test'
+  ...
+# Subtest: preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed）
+ok 152 - preflight：动作前置校验纯函数化；缺事实默认拒绝（fail-closed）
+  ---
+  duration_ms: 0.5548
+  type: 'test'
+  ...
+# Subtest: context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘）
+ok 153 - context()：返回提示块/资源引用纯数据（宿主负责读取，模块不读盘）
+  ---
+  duration_ms: 0.1085
+  type: 'test'
+  ...
+# Subtest: 契约类型只读：运行时不改输入/模块（纯策略无副作用）
+ok 154 - 契约类型只读：运行时不改输入/模块（纯策略无副作用）
+  ---
+  duration_ms: 0.0872
+  type: 'test'
+  ...
+# Subtest: X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除
+ok 155 - X-R6：完整 builtInRoleModules map（六模块同一绑定）、全六 lookup、零复制；D2 过渡投影已删除
+  ---
+  duration_ms: 0.5982
+  type: 'test'
+  ...
+# Subtest: X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 156 - X-R1：product 门面规格由 productRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1248
+  type: 'test'
+  ...
+# Subtest: X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 157 - X-R2：rapporteur 门面规格由 rapporteurRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1386
+  type: 'test'
+  ...
+# Subtest: X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 158 - X-R3：nominator 门面规格由 nominatorRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1319
+  type: 'test'
+  ...
+# Subtest: X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 159 - X-R4：convener 门面规格由 convenerRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.1078
+  type: 'test'
+  ...
+# Subtest: X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+ok 160 - X-R5：verifier 门面规格由 verifierRoleModule 零复制装配；matrix 展示摘要逐字保留；数组顺序不变
+  ---
+  duration_ms: 0.0881
+  type: 'test'
+  ...
+# Subtest: X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变
+ok 161 - X-R6：chief 门面规格由 chiefRoleModule 零复制装配；matrix 逐字迁入；cards/顺序不变
+  ---
+  duration_ms: 0.3298
+  type: 'test'
+  ...
+# Subtest: D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致
+ok 162 - D1：14 项 id→name→允许角色与 E0.2 §3.1 表逐项一致
+  ---
+  duration_ms: 0.1458
+  type: 'test'
+  ...
+# Subtest: D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确
+ok 163 - D1：允许角色表正例——每个允许角色声明其工具均整单放行且映射正确
+  ---
+  duration_ms: 0.2264
+  type: 'test'
+  ...
+# Subtest: D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id）
+ok 164 - D1：越权/未知/整单拒绝/空表——fail-closed（deny 时不注入任何 id）
+  ---
+  duration_ms: 0.131
+  type: 'test'
+  ...
+# Subtest: D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判）
+ok 165 - D1：decidePendingRequest 只进 chief 允许集且标记独立决策模式（会话模式由引擎调用点判）
+  ---
+  duration_ms: 0.0741
+  type: 'test'
+  ...
+# Subtest: D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环
+ok 166 - D9：无环扫描口径——Model 内互引仅 type-only 边，无 value import 反向/环
+  ---
+  duration_ms: 0.9989
+  type: 'test'
+  ...
+# Subtest: D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生
+ok 167 - D10：capabilities 单一真源——模块 spec 唯一、tools() 输出为派生
+  ---
+  duration_ms: 0.1123
+  type: 'test'
+  ...
+1..167
+# tests 167
+# suites 0
+# pass 166
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1576.3981

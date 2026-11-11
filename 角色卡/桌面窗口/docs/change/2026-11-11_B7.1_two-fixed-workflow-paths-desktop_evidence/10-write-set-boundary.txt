@@ -1,0 +1,21 @@
+ M app/desktop/session.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/桌面应用/b3-fixed-cards-panel.test.ts
+ M test/桌面应用/b51-fixed-workflow-wiring.test.ts
+ M test/桌面应用/b61-chat-entry-fixed.test.ts
+ M test/桌面应用/chain-enforcement.test.ts
+ M test/桌面应用/chief-workflow.test.ts
+ M test/桌面应用/fixed-path-routing.test.ts
+ M test/桌面应用/optional-acceptance.test.ts
+ M test/桌面应用/run-change-trigger.test.ts
+ M test/桌面应用/run-pin.test.ts
+ M test/桌面应用/session.test.ts
+ M test/桌面应用/star-routing.test.ts
+?? test/桌面应用/b71-fixed-fail-closed.test.ts
+?? test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts
+
+# 归属说明（B7.1 桌面窗口写集 vs 并行角色）
+# 本角色写集：app/desktop/session.ts + test/桌面应用/** + 本记录/证据
+# 并行写集（门禁 B7.1，非本角色，本批未触碰）：
+#   src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+#   test/门禁引擎/chief-workflow-v2-a1-dispatch-fields.test.ts

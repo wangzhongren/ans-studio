@@ -90,6 +90,28 @@ export interface ShellAuditDirective {
 }
 
 /**
+ * 任务级 Git 写审计（2026-11-10 B4.1 / T3 方案 v1.3 §6.2/§6.3；v5 加法）。
+ *
+ * 每条 `git add`/`git commit`（**允许或拒绝**）都携带本字段；`message` 只落 SHA-256（不落明文）。
+ * 形状与门禁引擎 `TaskGitAuditFacts` 同构；本接口是**审计记录**的持久化形状（编排所有），
+ * 由 shell-gate 从分类明细**白名单投影**后追加——既有审计字段不减少、不改写（旧读者忽略本字段）。
+ */
+export interface ShellAuditTaskGit {
+  template: "add" | "commit" | "other";
+  result: "allowed" | "denied";
+  /** 拒绝时的门禁稳定码（允许时缺省）。 */
+  code?: string;
+  taskId?: string;
+  workflowId?: string;
+  branch?: string;
+  paths: string[];
+  /** commit message 的 SHA-256（有 message 时出现；不落明文）。 */
+  messageSha256?: string;
+  /** 规范化命令摘要（`["git", ...argv.slice(1)]` 的 SHA-256）。 */
+  argvDigest: string;
+}
+
+/**
  * 升级申请决定（仅 `event:"escalation-decision"` 记录）。
  * `action` 为决定/结果：客户三选一（`allow-once`/`allow-session`/`deny`），
  * 超时/通道不可用则为 `expired`/`unavailable`（无客户动作，如实记录，不伪装成 deny）。
@@ -120,6 +142,11 @@ export interface ShellAuditRecord {
   directive?: ShellAuditDirective;
   /** 升级申请决定（仅 `escalation-decision` 记录）。 */
   escalation?: ShellAuditEscalation;
+  /**
+   * 任务级 Git 写审计（2026-11-10 B4.1；v5 加法）：仅 `git add`/`git commit`（允许或拒绝）出现。
+   * 既有字段不减少；旧读者忽略本字段。
+   */
+  taskGit?: ShellAuditTaskGit;
   /** 审核入口（可选加法；缺省按 `run_shell` 兼容旧调用）。授权键/审计可辨。 */
   entry?: "run_shell" | "start_background_task";
   /**

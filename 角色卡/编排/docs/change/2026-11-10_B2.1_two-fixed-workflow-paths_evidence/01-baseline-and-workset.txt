@@ -1,0 +1,17 @@
+# B2.1 baseline / work set
+date: 2026-11-10T14:26:59Z
+
+## HEAD
+e28923cadf957df2ef9b9f88f25b6957d07da405 test(workflow): B5 full-chain deterministic validation and B5.1 production wiring
+
+## branch
+feat/two-fixed-workflow-paths
+
+## git status --porcelain -- src app test
+ M src/common/编排/workflow-service.ts
+?? test/编排/workflow-basis-b21.test.ts
+
+## write-set diff stat (src app test)
+warning: in the working copy of 'src/common/编排/workflow-service.ts', LF will be replaced by CRLF the next time Git touches it
+ src/common/编排/workflow-service.ts | 410 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 382 insertions(+), 28 deletions(-)

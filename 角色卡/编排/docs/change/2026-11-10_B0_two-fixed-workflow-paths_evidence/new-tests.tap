@@ -1,0 +1,39 @@
+✔ 文档发现：按 flowId 取最新版本；缺失必需项如实列出；团队计划单独字段 (10.9528ms)
+✔ recordBasisDocuments：必需缺失 ⇒ basis-document-missing；齐全时 SHA-256/bytes 与磁盘字节一致 (8.7313ms)
+✔ 预算：命名 basis-document-budget（32 文件 / 单文件 4 MiB / 总 8 MiB；含注入阈值路径） (19.1832ms)
+✔ drift 校验骨架：内容变更/删除 ⇒ basis-drift 且 actualSha256 如实（删除为 null） (9.5102ms)
+✔ basis.recorded 构造/校验：确定性 basisId；application 记账；path-b 只读标记不产生写权 (1.1544ms)
+✔ fixed task.created（workflowId）豁免 runId/runState；replay/taskCard 读取新字段且不回填 legacy (12.3517ms)
+✔ fixed 普通生产任务可无 taskKind；无 workflowId 的旧 run-required 规则逐字保留（allowLegacyRun 不变） (26.096ms)
+✔ workflowId+runId/runState 出现即拒绝（写侧与读侧都 fail-closed） (5.2179ms)
+✔ 坏 stage / 坏 workflowId slug / 坏 workflowPath / workflowId 缺 flowId 均拒绝 (0.9313ms)
+✔ workflowPath 仅首 stage-request：第二个 stage-request 携带即拒；生产任务携带亦拒；缺省可推进 (17.2427ms)
+✔ 收口/幂等查询：fixed 任务可被 task.closed 收口；findTaskByIdempotencyKey 读到新字段 (10.7715ms)
+✔ append/read workflows：幂等键 replay 不重复追加；未知额外字段容忍；轮转段旧→新读取 (14.4987ms)
+✔ 坏行计数不阻塞：坏 JSON + 形状非法行 ⇒ badLines/errors，合法事件保留 (4.6837ms)
+✔ 三账本分文件：basis.release 写入各自路径；跨 schema 行按坏行计数；5 MiB×3 常量 (5.4247ms)
+✔ 不写旧账本：固定路径账本 append 不创建 .ans/trunk/.ans/runs/tasks.jsonl (2.9949ms)
+✔ 非法事件拒绝写入：坏 stage/schema ⇒ invalid-event，且不落盘 (0.7635ms)
+✔ per-flow 模式：空项目新 flow fixed；显式 legacy/v1 强制 legacy；two-fixed-paths/v1 默认 fixed (8.8025ms)
+✔ legacy 在飞 run + 新 fixed flow 并存（draft/pinned ⇒ legacy；closed/cancelled ⇒ fixed） (6.8103ms)
+✔ 有效 trunk 指向该 flow ⇒ legacy；trunk 引用的 run 已关闭 ⇒ 不强制 legacy (10.7566ms)
+✔ 配置损坏/不可解析 ⇒ fail-closed 走 legacy（不猜 fixed） (2.4036ms)
+✔ writeProjectConfigWorkflowSchema：保留既有键、原子写、幂等、explicit-legacy 不覆盖、坏文件 fail-closed (9.9326ms)
+✔ ensureProjectGitignore：缺失创建、幂等、保留用户内容、块畸形 fail-closed (5.3129ms)
+✔ 合法推进 A1→A10：逐阶段 requested+completed；A10 完成后 nextStages = A11/A12a (1.6817ms)
+✔ A10 未完成发 A11 ⇒ workflow-corrupt（不猜、不推进） (0.2628ms)
+✔ A12a（criteria 可先派）→A11→A12b（report）→A12 聚合→A13 顺序合法 (0.1697ms)
+✔ A12b rework 回 A11（reworkOf:A12b）：新 attempt 合法，触发阶段标记 failed (0.2018ms)
+✔ 幂等键重复只计一次；形状非法事件计数跳过；身份不一致/缺失 started ⇒ workflow-corrupt (0.2098ms)
+✔ stop 骨架：stop-requested ⇒ stopping；stop-unconfirmed ⇒ blocked；closed stopped 终态且 nextStages 空 (0.1898ms)
+✔ 任务事件补充：fixed task.created 将 A1 标记完成（A1/A4/A7 完成于任务创建） (0.1008ms)
+✔ B 路径骨架：B1→B2（scope-decided）→B3→B4；B2 rework 回 B1 (0.1945ms)
+✔ stage.blocked 记录 code/summary 且不推进；未知阶段值不进入视图 (0.1512ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 745.1365

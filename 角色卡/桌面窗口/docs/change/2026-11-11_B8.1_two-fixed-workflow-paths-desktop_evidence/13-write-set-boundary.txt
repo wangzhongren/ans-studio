@@ -1,0 +1,12 @@
+# git status --porcelain -- src app test
+ M app/desktop/session.ts
+ M test/桌面应用/boundary-refresh.test.ts
+?? test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+
+# git diff --numstat (tracked; untracked new test excluded)
+76	15	app/desktop/session.ts
+1	1	test/桌面应用/boundary-refresh.test.ts
+
+# 归属说明（B8.1 桌面窗口写集）
+# 本角色写集：app/desktop/session.ts + test/桌面应用/** + 本记录/证据
+# src/** 与 test/测试/**、其它 app/desktop 文件零改动；无并行角色文件混入。

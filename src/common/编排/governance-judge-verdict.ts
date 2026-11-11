@@ -125,6 +125,8 @@ const SAFE_MANUAL_REASON_CODES: ReadonlySet<string> = new Set([
   "intent-unconfirmed",
   // 2026-11-04 下载申请：判断事实缺失/不可读 ⇒ manual 原因码保留（桌面转客户卡）。
   "download-facts-missing",
+  // 2026-11-10 T3：merge-main 高风险合并卡仅客户本人（judge 只能转人工/拒绝）。
+  "merge-main-customer-only",
 ]);
 
 const DEFAULT_MANUAL_REASON = "判断无法完成；请补齐判断所需证据或缩小范围后重新提交。";
@@ -331,6 +333,15 @@ function governanceReadDeniedReason(stats: ShellJudgeReadStats | undefined): str
  */
 export function evaluateGovernanceJudgeVerdict(args: EvaluateGovernanceJudgeVerdictArgs): GovernanceJudgeOutcome {
   const { request, verdict, stats } = args;
+  // T3（2026-11-10，协调方决策 #4 / AC-14）：merge-main 永不进入判断/代批路径——
+  // 无论模型输出为何，一律 manual（只能转人工/拒绝；不得 approve、不得冒充客户）。
+  if (request.cardKind === "merge-main") {
+    return manualOutcome(
+      args,
+      "merge-main-customer-only",
+      "merge-main 是应用合并通道的高风险确认卡，必须客户本人确认；判断 agent 只能转人工或拒绝，不得代批。",
+    );
+  }
   if (verdict === undefined) {
     return manualOutcome(args, "parse-failed", "判断输出无法解析（缺少合法的 report_governance_judgement 结论）；请修正后重新提交。");
   }

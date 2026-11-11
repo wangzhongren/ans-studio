@@ -1,0 +1,7 @@
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+ M test/项目管理/shared/i18n-guard-allowlist.ts
+?? test/桌面应用/b51-fixed-workflow-wiring.test.ts
+?? test/测试/b-change-scope.test.ts
+?? test/测试/fixed-path-full-chain.test.ts
+?? test/测试/mode-switch.test.ts

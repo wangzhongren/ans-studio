@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: independent pi: real shell effects, failures and protected details survive Core to Window history
+ok 1 - independent pi: real shell effects, failures and protected details survive Core to Window history
+  ---
+  duration_ms: 130.7199
+  type: 'test'
+  ...
+# Subtest: independent codex: real shell effects, failures and protected details survive Core to Window history
+ok 2 - independent codex: real shell effects, failures and protected details survive Core to Window history
+  ---
+  duration_ms: 119.0307
+  type: 'test'
+  ...
+# Subtest: independent claude: real shell effects, failures and protected details survive Core to Window history
+ok 3 - independent claude: real shell effects, failures and protected details survive Core to Window history
+  ---
+  duration_ms: 172.4621
+  type: 'test'
+  ...
+# Subtest: independent A: a real non-tool engine failure must not become a tool display diagnostic
+ok 4 - independent A: a real non-tool engine failure must not become a tool display diagnostic
+  ---
+  duration_ms: 19.792
+  type: 'test'
+  ...
+# Subtest: independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts
+ok 5 - independent A legacy: protected native-only history preserves classification and target provenance without promoting template execution facts
+  ---
+  duration_ms: 7.7503
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 766.8727

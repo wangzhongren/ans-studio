@@ -1,7 +1,7 @@
 # chief 角色模块 public API 实现报告（api-spec）
 
 - 日期：2026-11-07；角色：chief-code（幕僚代码维护角色）；契约版本：E0.3（冻结 `067e3d2e…`，映射 E0.2 `798ce9ce…`）。
-- 状态：E1 模块实现（implemented-unverified）+ **E2 接口评审 C-1 修复（2026-11-07：trio 工具集补入 `closeCreatedTask`）**；**不判验收**、不切换消费者、不改旧引擎。
+- 状态：E1 模块实现（implemented-unverified）+ **E2 接口评审 C-1 修复（2026-11-07：trio 工具集补入 `closeCreatedTask`）**；**T3 B2 fixed 批次（2026-11-10）：新增 `fixedCards`/`fixedTargetRoleIds` 与 fixed context 段（legacy 数据/返回值逐字冻结）**；**不判验收**、不切换消费者、不改旧引擎。
 - 模块唯一 public entry：`src/common/roles/chief/index.ts`；内部实现位于 `src/common/roles/chief/internal/`。
 
 ## 1. 导出面（`index.ts`）
@@ -23,10 +23,12 @@
 id: "chief"; displayName: "幕僚"; function: "chief";
 card: { text, entries, preauthorizedDirs, forbiddenWritePaths };
 capabilities: { customerInput, dispatchTask, roleStatus, sessionTail, installSkill, installMcp, shell };
-cards: readonly GovernanceCardKind[];   // ["intent-confirm"]
+cards: readonly GovernanceCardKind[];   // legacy ["intent-confirm"]（冻结）
+fixedCards: readonly GovernanceCardKind[];        // T3 B2：["intent-confirm","proposal","appointment"]
+fixedTargetRoleIds: readonly string[];            // T3 B2：["convener","verifier"]
 tools(input): RoleToolPolicy; dispatch(input): RoleDispatchPolicy;
 preflight: { checkAction(input): RolePolicyDecision };
-context(input): readonly RoleContextSection[];
+context(input): readonly RoleContextSection[];    // T3 B2：缺省/legacy-v1 返回 legacy 三段；matrix:"two-fixed-paths/v1" 返回 fixed 四段
 ```
 
 ## 2. 规格数据（与旧注册表逐字段一致）
@@ -158,3 +160,40 @@ sha256: "9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346"
 - i18n messageKey 目前是稳定内部键（未登记 locales；E2 若对外呈现再登记）。
 - `CHIEF_WORKFLOW_RESOURCE.sha256` 为数据 pin，资源更新须同步；E1 接口评审可细化“应用资源根”的 loader 语义。
 - `tools()` 现声明 6 个 chief 专属 id（E1 五个 + E2 C-1 的 `closeCreatedTask`）；`decidePendingRequest` 仍留给引擎独立决策上下文调用点，不随普通会话声明。
+
+## 10. T3「两条固定工作流路径」B2 fixed 批次（2026-11-10）
+
+依据：B1 验收 AC-24/T-13、G-IR §5.7/MF-IR-4、实现级方案 v1.3 §3.2/§3.4。记录与证据见
+[`docs/change/2026-11-10_B2_two-fixed-workflow-paths.md`](docs/change/2026-11-10_B2_two-fixed-workflow-paths.md)（含 `_evidence/`）。
+
+### 10.1 模块新增字段（`BuiltInRoleModule` 可选字段；只在 fixed 矩阵消费）
+
+| 字段 | 值 | 说明 |
+| --- | --- | --- |
+| `fixedCards` | `["intent-confirm","proposal","appointment"]`（冻结顺序） | fixed 矩阵卡种白名单=3 张客户确认卡；固定路径不发 acceptance 卡；**不从 legacy `cards`（`["intent-confirm"]`）过滤/推导**；缺失由消费方 fail-closed 空集 |
+| `fixedTargetRoleIds` | `["convener","verifier"]` | fixed 下 chief 可派内置目标：convener 仅 `purpose:"stage-request"`（read-only、无 module/写集）；verifier 为 review/preparation；缺失由消费方 fail-closed（不回退 legacy 五内置） |
+
+- `tools()` **不新增**发布/合并类工具（G-IR §六拒绝 `requestReleaseMerge` 新增）；trio 声明仍为冻结的 6 项。
+- 模块 `dispatch()`/`preflight()` **本批不改**：legacy 语义逐字冻结；fixed 派发硬授权由编排 B1
+  `src/common/编排/workflow-dispatch.ts::evaluateFixedPathDispatchAuthorization`（owner=编排）实现，
+  本模块只提供 fixed 目标数据供矩阵视图/fixed 消费方读取（团队计划 B2 chief 行：fixedCards/targets/context）。
+
+### 10.2 `context({matrix})` 分支
+
+| 输入 | 返回 |
+| --- | --- |
+| 缺省 / `matrix:"legacy-v1"` / `{}` | legacy `SECTIONS` 同一冻结引用（三段：`chief-workflow`/`chief-decision-context`/`chief-intent-confirm`；资源仍 `chief-workflow/v1`）——**逐字不变** |
+| `matrix:"two-fixed-paths/v1"` | fixed 四段（新冻结表，与 legacy 引用不同）：`chief-fixed-path-dispatch`（产线调度/两条固定路径/stage-request/不派生产线角色/open 请求与 stop）、`chief-fixed-cards`（3 张确认卡/不发 acceptance/merge-main 仅客户本人）、`chief-fixed-review`（A12a/A12b/独立验收/强度调节/docs/acceptance 归档）、`chief-fixed-decision`（依据专业建议决定/不自行做专业判断/不代客户批准） |
+
+- fixed 段不声明资源引用（`chief-workflow-v2.md` 的注入属编排 B2 接线）；不携带权限/账本/运行时秘密。
+- 消费方：编排 B1 已接线 `context({matrix:"two-fixed-paths/v1"})` 追加段（`run-role.ts:2130-2140`）；
+  门禁引擎 `cardKindsOf(id,"two-fixed-paths/v1")` 只读 `fixedCards`、`governance-matrix` fixed 视图读
+  `fixedTargetRoleIds`。
+
+### 10.3 验证（摘要）
+
+- `test/roles/chief/`：**50/50 pass**（E1/E2 既有 42 项逐字保留 + B2 新增 `fixed.test.ts` 8 项；0 fail/0 skip）。
+- legacy 指纹 before/after 逐行 diff 仅 9 行新增固定项（fixedCards/fixedTargetRoleIds/fixed context）；
+  `card.text` sha256、cards、capabilities、`CHIEF_HUB_DISPATCH`、tools/dispatch/preflight 输出与 legacy context JSON/sha256 全部未变。
+- `test/门禁引擎/`：before/after 均 **499 tests / 493 pass / 5 known-red / 1 skip**，失败名集合逐名一致（无新增红/无新 skip）。
+- `npm run typecheck`：**exit 0**（before 快照曾因并行 verifier 批次在途测试文件瞬时红，该批次修复后复跑 0；本角色未改他人模块）。

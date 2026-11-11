@@ -1,0 +1,96 @@
+# 复核证据（第二轮 / v1.2）：两条固定工作流路径实现级方案（2026-11-10）
+
+- 复核角色：独立验收（独立固定上下文）
+- 工作树：C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\trunk-amendment
+- 分支：feat/two-fixed-workflow-paths
+- HEAD（复核时）：b4c061afbebc5ccbe3ebc58cb92a5469ef238ead（方案 v1.2 提交；代码相对 10f90c7 无差异）
+- origin/main 基线：d9e3e99c160599e5b53a82e105939a359f69992f
+- 复核日期：2026-11-10
+- 说明：本文件为只读清点/命令输出记录；除本目录与本轮报告外，本轮未写任何文件；未提交/推送/合并/发布；未修改第一轮报告。
+
+## 一、本轮目标与依据实测（sha256sum / wc）
+
+```
+e34e60fad8d97e00c517efd6ee564fd61146a66108a87cb2c8035cc8f46cfff9 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.2.md
+443c75ea7b140e12823d4955e37ab8d7a3aa4d324bb79f55327df2f7f9d77f70 *docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.2.md
+6cfee9e61ceb2774d20e192b70086b40249f9f37bde4a462abb3229419029cf8 *docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+b075829b01a843d06a1d8ba58fb4311d95e9e087bc5fe5645b832218b8913d3d *docs/planning/2026-11-10_design_two-fixed-workflow-paths.md
+df1992df9c22af5fa915a128469fc0911c77493c21486367328a40bc35a00efc *角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths.md
+045115160e4724bd1671bd38896469aa575d2c1143d7ea347fef5a43261715c1 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.1.md
+279f55dcbf86b07f60fad62be30606758cfcd666cac83411a521609fb1446aeb *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.md
+24364c13cef088d85e7139efa04067bc67160b01d256e01c86f8309766c746ad *角色卡/rapporteur-code/docs/design/2026-11-10_impl_two-fixed-workflow-paths.md
+259ecde7aad44550e29c2d018bc452d619ce3942b57625c4bfe9e5e66b93ecd1 *角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.2.md
+```
+
+行/字节：
+```
+1,325 / 166,834  docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.2.md
+72 / 10,030     docs/governance/rapporteur/2026-11-10_two-fixed-workflow-paths-design-record-v1.2.md
+90 / 10,914     docs/scheduling/2026-11-10_startup_two-fixed-workflow-paths.md
+95 / 8,476      docs/planning/2026-11-10_design_two-fixed-workflow-paths.md
+1,307 / 162,672 docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.1.md
+202 / 30,200    角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.2.md
+```
+
+六份架构/契约设计复核（与 v1.2 头部引用一致）：
+```
+241502075ff57d6534d7b2c807a2726f1a4c261381e3b0f968b6be468c64e9ce *docs/planning/2026-11-07_design_runtime-tool-surface-dispatch-gate.md (1,242 行)
+1f6518b898aa33b649c21124e26816cd05715a5eba6a147aed8b8cab9cfb26d6 *docs/planning/2026-11-05_design_governance-authority-matrix.md (1,056 行)
+067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3 *docs/planning/2026-11-07_design_runtime-gate-role-module-contract.md (685 行)
+886fef84c3db34515a98f5874a33bb22134a3fc3b02f20aa3d185b828a3e7c54 *docs/planning/2026-11-09_design_document-format-specifications.md (979 行)
+1477a6e423a74a7007824b7db82cac4e0f6dbb9e48abaa60a7f452704672e6be *docs/planning/2026-11-09_design_judge-delegated-decision-effectiveness.md (686 行)
+2bb663fec3baee7b275ae7a8747bb3a31091304cd728b4329787d17bab86608b *docs/planning/2026-11-09_design_team-plan-run-binding.md (438 行)
+```
+
+## 二、代码清点实测（行数与方案一致）
+
+```
+1687 src/common/编排/workflow-preconditions.ts; 1861 src/provider/runtime/schema.ts; 253 src/common/gates/index.ts
+2242 src/common/门禁引擎/classify-shell.ts; 1296 src/common/编排/task-state.ts; 1171 src/common/编排/run-manifest.ts
+3669 src/pipeline/orchestration/run-role.ts; 11225 app/desktop/session.ts; 4183 src/model/runtime.ts; 409 src/model/role.ts
+229 src/common/shared/jsonl-ledger.ts; 4030 src/service/trunk/impl/apply-journal.ts; 1156 src/common/编排/project-state.ts
+2294 src/common/编排/doc-format-specs.ts; 692 src/common/roles/convener/index.ts; 847 src/common/roles/nominator/index.ts
+409 src/common/roles/verifier/index.ts
+test/**/*.test.ts = 555；doc-format-specs.ts 格式 id = 54
+```
+
+## 三、关键残留检查（grep 全量核对）
+
+1. **merge-main / judge**（全文 `grep -n "merge-main"` 与 `grep -n "judge"`）：
+   - 全部条目均为“应用自有**非判断卡**；不进 `GOVERNANCE_CARD_GROUP`；**不可 judge 代批；必须客户本人**；judge 只能转人工/拒绝，不得 approve/冒充客户”（§0.1/§0.2/§4.2 A13/§6.4/§7.3/§8.4/§9.2/§11.1/§12.1/§12.2/§12.3）。
+   - **无** “approval 组/planJudge 纳入 merge-main/judge 可代批” 残留；`grep -n "approval 组|approval组|approval:"` 无匹配。
+   - 与现状代码一致：`GOVERNANCE_CARD_GROUP`（model/runtime.ts:944-985）不含 app-owned；`GOVERNANCE_APP_OWNED_CARD_KINDS` 派生进 `GOVERNANCE_CARD_KINDS`；`governanceCardGroup("merge-main")` 将为 undefined；`planJudge`（app/desktop/customer-input.ts:1320-1345）对无组卡种直接返回 undefined（不判断）。
+2. **legacy 常量冻结**：`CHIEF_HUB_DISPATCH.targetRoleIds`（chief/internal/dispatch.ts:54-60 = 五内置）与 `CONVENER_WORKER_DISPATCH_TARGETS.allowedBuiltInRoleIds`（convener/index.ts:191-198 = ["verifier"]）在 v1.2 中保持旧值；新增 `fixedTargetRoleIds`/`fixedAllowedBuiltInRoleIds`/`isConvenerFixedBuiltInDispatchTarget`；legacy 消费点 `apply-journal.ts:3766-3771`、`trunk-runtime.ts:1186-1200` 读取源不变（v1.2 §3.2 item 4/§3.4/§6.5/附录 E）。
+3. **task-state**：`appendTaskEvent`（task-state.ts:365-390）run-required :377-380；v1.2 §7.1 line 890-900 给出 fixed 分支（workflowId 存在 ⇒ 豁免 runId/runState；无 workflowId 旧规则逐字保留）。
+4. **close/intent trunk 链**：`close_created_task` schema 必填含 runId/basisDigest/reportRef（schema.ts direct capabilities）；实现 `trunk-runtime.ts:770 → apply-journal.ts:3182`；intent `run-role.ts:1625-1665 → apply-journal.ts:3445/3541`。v1.2 §3.5 item 7/§4.2 A3/§7.2 给出 fixed 替代（workflowService，不触 trunk/CAS/doc-freeze），legacy 不动。
+5. **A12/docs acceptance**：verifier 写区 `docs/quality/`、`docs/verification/`、`docs/governance/verifier/`（verifier/index.ts:57-88）；独立验收角色 Section 1 仅 `角色卡/独立验收/docs/**`（角色卡/独立验收/boundary.md）；v1.2 由**应用**生成 `docs/acceptance/<flowId>-acceptance-vN.md` 归档，不改角色边界（H1=0）。
+6. **残留矛盾定位（本轮 must-fix 证据）**：
+   - A10：§4.2 A10 完成条件（v1.2 line 527「request.resolved…随后 chief 发 A10 stage-request…运营再派实现」）；§4.5 A10（line 635「request.resolved → stage.completed；随后 A10 stage-request 派实现」）；§3.3 步骤 3（line 362「stage 必须是当前阶段的合法下一阶段…否则 stage-transition-invalid」）；§4.4 转移（line 610 `A9→A10→A11`）。
+   - chief→项目验收角色：§3.1 fixed 矩阵（line 274「chief → 项目角色 → 拒绝 chief-to-project-forbidden」）；§3.2 谓词（line 298 `target project → chief-to-project-forbidden`）；§4.2 A12（line 529）与 §8.5（line 970）「名册有项目验收角色则优先（由 chief 在任务文本与目标 id 指定）」。
+   - B4/A12b：§6.4 校验（line 829「workflow 处于 A13/B4；…；A12b 验收 accepted」）；§4.3 B4（line 586 前置仅 B3 accepted；B 路径无 A12）。
+   - B 路径分支：§4.3 B1 前置（line 599「path-b 只读快照…不 git init」）；§6.1（line 785「任务分支…A9 基线创建/切换」）；§4.3 B3（line 585「任务分支提交」）；§6.3/§6.4 分支/clean 前置。
+7. **G 观察项定位（摘要）**：§3.7 line 454（cardKindsOf fixed「过滤」）vs §3.4 line 391（fixedCards 新增）；§3.4 line 395（nominator fixedCards 自相矛盾）；§7.4 line 928（BUILT_IN_ROLE_MATRIX 更新文案）vs §3.4 line 401/§9.1/附录 E；§4.1 line 481（单活动 workflow）vs line 479（混合项目）；§5.2 line 709（baseline-branch-exists）与 workflowId 无 attempt；§5.2 line 683（git init 未指定初始分支）；§3.3/§4.4 stop 未写 advance 请求收口；§4.5 A12a/A12b 事件来源未写；§3.3 line 353 首次/后续幂等键两套；§10.1 line 1041 W1 owner 缺编排；§6.2 line 795 writeset 括号未引 B 路径；§4.3 line 583「无活动同 flow workflow」；§3.7 line 458 vs §4.2 line 566（documentRefs 时机）；§4.2 line 529/§4.5 line 640（acceptance 归档幂等未写）；§3.3 line 352（reworkOf 值域）。
+
+## 四、协调方决策核对（启动计划 §七 vs v1.2）
+
+- 启动计划 §七 实测 90 行 / 10,914 B / `6cfee9e6…`（提交 `4c344bd`），共 8 项：#1 流程门（复核确认 MF 闭环后写 B1）、#2 Q7/A12、#3 Q4、#4 merge-main 不可 judge 代批、#5 Q1、#6 Q2、#7 Q6、#8 纪律。
+- v1.2 正文/记录使用 #1–#7（Q7/A12、Q4、merge-main、Q1、Q2、Q6、纪律），内容与启动计划 §七 #2–#8 一一对应；流程门写在头部状态/§12.3/记录 §一（对应启动计划 #1）。**编号相差 1，建议正文改引决策文本或注明映射（G-1）**。
+- 逐项核对结论：Q4（#2/§七#3）✓；merge-main（#3/§七#4）✓ 全文无残留；Q1（#4/§七#5）✓；Q2（#5/§七#6）✓；Q6（#6/§七#7）✓ fail-closed 证据与负例；纪律（#7/§七#8）✓；Q7/A12（#1/§七#2）内容✓，但“项目验收角色优先”分支受 fixed 矩阵阻塞（本轮 MF-10）。
+
+## 五、残留 G（非阻塞；与报告 §六 对应）
+
+G-1 决策编号；G-2 cardKindsOf/fixedCards；G-3 nominator fixedCards；G-4 BUILT_IN_ROLE_MATRIX 口径；G-5 新模块导出字段接口评审；G-6 全局 schema 文案与 legacy 提示；G-7 混合项目 vs 单活动 workflow；G-8 分支重试死锁；G-9 git init 初始分支；G-10 stop 未收口 advance 请求；G-11 A12a/A12b stage 事件来源；G-12 首个 stage-request 幂等键/sourceTaskId；G-13 W1 owner/写集；G-14 B1「同 flow」；G-15 documentRefs 时机；G-16 acceptance 归档幂等；G-17 reworkOf 值域；G-18 §6.2 writeset 括号。
+
+## 六、本轮报告的实测（写盘后）
+
+- 路径：`角色卡/独立验收/docs/design/2026-11-10_review_two-fixed-workflow-paths-v1.2.md`
+- 行数 / 字节：202 行 / 30,200 bytes
+- SHA-256：`259ecde7aad44550e29c2d018bc452d619ce3942b57625c4bfe9e5e66b93ecd1`
+- 第一轮报告未改动：`df1992df9c22af5fa915a128469fc0911c77493c21486367328a40bc35a00efc`（222 行 / 32,535 B）。
+
+## 七、限制与未提交声明
+
+- 未运行全量确定性测试（555 个 `*.test.ts`）；known red（version-change-integration 9 红、optional-acceptance 6/2/1/3/0、test/编排 22 fail/2 skip）未独立复测。
+- 未运行真实 Electron/真实模型；未验证 UI/judge 实际行为、merge-main 卡呈现、真实 Git 合并语义、CI/发布状态。
+- 未访问仓库外贪吃蛇 target 与其 `.ans` 状态。
+- 本轮未 commit / push / merge / tag / 发布；未写产品/测试代码；未改角色卡/边界；未占用 9222/9223。

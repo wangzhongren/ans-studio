@@ -1,0 +1,14 @@
+# 写集边界（HEAD d345ae9 基线）
+
+## git status --porcelain -- src app test
+ M app/desktop/session.ts
+?? test/桌面应用/b111-fixed-closed-handback-drain.test.ts
+
+## git status --porcelain -- src（应为空）
+
+## git status --porcelain -- test/测试（应为空）
+
+## 其它 app/desktop 文件（除 session.ts 外应为空）
+
+## git diff --numstat -- src app test
+48	4	app/desktop/session.ts

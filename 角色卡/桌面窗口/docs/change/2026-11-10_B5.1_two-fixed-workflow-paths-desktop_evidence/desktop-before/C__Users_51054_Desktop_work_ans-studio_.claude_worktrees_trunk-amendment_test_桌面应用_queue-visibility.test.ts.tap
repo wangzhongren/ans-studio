@@ -1,0 +1,41 @@
+TAP version 13
+# Subtest: P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）
+not ok 1 - P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）
+  ---
+  duration_ms: 93.0321
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\queue-visibility.test.ts:167:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    回交合批后队列清空
+    
+    8 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 8
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/queue-visibility.test.ts:210:12)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启）
+ok 2 - P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启）
+  ---
+  duration_ms: 85.5337
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 1
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 608.9841

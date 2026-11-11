@@ -1,0 +1,44 @@
+date: 2026-11-11T10:46:09Z
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch: feat/two-fixed-workflow-paths
+head: daf8690f99ea81236d1966ab1d7b12fd96f08e2f
+head-subject: fix(fixed-path): B31 lightweight A12b acceptance when the verifier blocks
+--- role write-area status (porcelain)
+?? 角色卡/门禁引擎/docs/change/2026-11-05_direct-role-capabilities-evidence/
+?? 角色卡/门禁引擎/docs/change/2026-11-05_git-role-permissions-evidence/
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E0_role-module-contract-types-evidence/
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_gate-facade-product-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_oracle-product.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_oracle-script.mjs
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR1_post-switch-snapshot.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_gate-facade-rapporteur-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_oracle-rapporteur.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_oracle-script.mjs
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR2_post-switch-snapshot.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_gate-facade-nominator-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_oracle-nominator.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_oracle-script.mjs
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR3_post-switch-snapshot.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_gate-facade-convener-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_oracle-convener.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_oracle-script.mjs
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR4_post-switch-snapshot.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_gate-facade-verifier-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_oracle-script.mjs
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_oracle-verifier.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR5_post-switch-snapshot.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_gate-facade-chief-and-closure-evidence.md
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_oracle-chief.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_oracle-script.mjs
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2-XR6_post-switch-snapshot.json
+?? 角色卡/门禁引擎/docs/change/2026-11-07_E2_interface-review_gate-engine.md
+?? 角色卡/门禁引擎/docs/change/2026-11-09_WJ3_judge-delegated-evidence/
+?? 角色卡/门禁引擎/docs/change/2026-11-09_WJ3_judge-delegated.md
+?? 角色卡/门禁引擎/docs/change/2026-11-11_B32_two-fixed-workflow-paths_evidence/
+--- relevant file sha256
+ea72fe6c6c634b32590d336fd63f0d2ec5a863a9ed885ac44827c94d21022081 *src/common/门禁引擎/classify-shell.ts
+0f32dd50c39eb4f843c7d0c2adfcd939111412f009d2c33943cab70395f2411b *src/common/门禁引擎/shell-write-guard.ts
+85ff6dea432d79b526b92fe448ec89849dc6a9cdf02f5f974b8725ed827332c7 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+8f7524a629c825fc92c3cf958081209ebd0c5770160931a4701ffe20c78895ff *test/门禁引擎/shell-write-guard.test.ts
+540841eb1e70f3bad0193dfcc9e759363fc4d73080543ba5b11fefbfbe9217bd *test/门禁引擎/classify-shell-v5.test.ts

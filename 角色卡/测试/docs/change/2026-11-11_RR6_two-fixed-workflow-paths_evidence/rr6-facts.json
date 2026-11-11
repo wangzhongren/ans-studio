@@ -1,0 +1,261 @@
+{
+  "at": "2026-11-10T23:11:19.249Z",
+  "candidate": "d345ae913c9bf8a5f4f5ae866f941c42e864a262",
+  "msgMark": "2026-11-10T22:45:05.925Z",
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-10T22:45:15.012Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-a0c539b4aeab57e40e76080a",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:45e8b5d9-bd2f-4143-8396-b27af1cf4f0d",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "45e8b5d9-bd2f-4143-8396-b27af1cf4f0d",
+    "legacyStateIgnored": true
+  },
+  "workflowEvents": [
+    {
+      "at": "2026-11-10T22:45:15.012Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T22:45:15.012Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T22:46:01.629Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T22:46:24.803Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwba4mji-37ada585"
+    },
+    {
+      "at": "2026-11-10T22:46:40.971Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T22:58:25.355Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-10T22:45:15.020Z",
+      "taskId": "t-mwba34p0-acf88b2e",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "flowId": "snake-game"
+    },
+    {
+      "at": "2026-11-10T22:46:01.630Z",
+      "taskId": "t-mwba44nx-3a29df0d",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "flowId": "snake-game"
+    },
+    {
+      "at": "2026-11-10T22:46:24.798Z",
+      "taskId": "t-mwba4mji-37ada585",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "flowId": "snake-game"
+    },
+    {
+      "at": "2026-11-10T22:46:40.972Z",
+      "taskId": "t-mwba4z0r-e300568b",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "flowId": "snake-game"
+    },
+    {
+      "at": "2026-11-10T22:47:41.264Z",
+      "taskId": "t-mwba69jk-b0e5e768",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "flowId": "snake-game"
+    },
+    {
+      "at": "2026-11-10T22:58:25.355Z",
+      "taskId": "t-mwbak2iz-1550bdb5",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "flowId": "snake-game"
+    }
+  ],
+  "taskReported": [
+    {
+      "at": "2026-11-10T22:45:36.269Z",
+      "taskId": "t-mwba34p0-acf88b2e",
+      "from": "convener",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-10T22:46:35.038Z",
+      "taskId": "t-mwba44nx-3a29df0d",
+      "from": "convener",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-10T22:46:36.803Z",
+      "taskId": "t-mwba4mji-37ada585",
+      "from": "product",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-10T22:46:43.064Z",
+      "taskId": "t-mwba4mji-37ada585",
+      "from": "product",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-10T22:47:47.700Z",
+      "taskId": "t-mwba4z0r-e300568b",
+      "from": "convener",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-10T22:48:11.771Z",
+      "taskId": "t-mwba69jk-b0e5e768",
+      "from": "product",
+      "status": "done"
+    },
+    {
+      "at": "2026-11-10T22:48:21.272Z",
+      "taskId": "t-mwba69jk-b0e5e768",
+      "from": "product",
+      "status": "done"
+    }
+  ],
+  "taskClosed": [
+    {
+      "at": "2026-11-10T22:45:43.857Z",
+      "taskId": "t-mwba34p0-acf88b2e",
+      "by": "chief",
+      "outcome": "accepted",
+      "note": "A1 受理/准备已完成并回报：可做，无阻塞；基线为空目录非 Git 仓库，git init 归 A9；未创建产品意图文档、未写实现代码。收口 A1。"
+    },
+    {
+      "at": "2026-11-10T22:46:37.679Z",
+      "taskId": "t-mwba44nx-3a29df0d",
+      "by": "chief",
+      "outcome": "accepted",
+      "note": "运营已按补派要求创建 A1 产品生产任务（to=product，stage=A1，sideEffect=docs，无 module），A1 完成条件满足（创建即记 stage.dispatched A1）。收口 A1 调度请求。"
+    },
+    {
+      "at": "2026-11-10T22:47:15.392Z",
+      "taskId": "t-mwba4mji-37ada585",
+      "by": "convener",
+      "outcome": "accepted",
+      "note": "A1 产品受理/准备任务完成：受理结论「可做」，给出 A2 意图待定稿要点与材料性未决点；本阶段未写文件/意图正文/实现代码。按工作结果证据接受。"
+    },
+    {
+      "at": "2026-11-10T22:58:22.370Z",
+      "taskId": "t-mwba4z0r-e300568b",
+      "by": "chief",
+      "outcome": "rework",
+      "note": "A2 生产已由产品交付（docs/product/snake-game-intent-v1.md 存在，intent 已登记 latest=1），但本 A2 调度请求的报告缺少可核验的项目相对证据路径，无法按 accepted 收口；先以 rework 收口本调度请求，待补齐证据路径后重发 A2 收口请求。"
+    }
+  ],
+  "requestCreated": [
+    {
+      "at": "2026-11-10T22:57:43.985Z",
+      "requestId": "req-5e09ac8e9bfb9b21",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "stage": "A3",
+      "title": "请确认「贪吃蛇游戏」意图范围（v1）"
+    },
+    {
+      "at": "2026-11-10T22:57:56.674Z",
+      "requestId": "req-4dd1df9df3f86a31",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-a0c539b4aeab57e40e76080a",
+      "stage": "A3",
+      "title": "请确认「贪吃蛇游戏」意图范围（v1）"
+    }
+  ],
+  "requestResolved": [
+    {
+      "at": "2026-11-10T22:57:44.114Z",
+      "requestId": "req-5e09ac8e9bfb9b21",
+      "by": "customer",
+      "choice": "confirm"
+    },
+    {
+      "at": "2026-11-10T22:57:57.106Z",
+      "requestId": "req-4dd1df9df3f86a31",
+      "by": "customer",
+      "choice": "confirm"
+    }
+  ],
+  "intentDoc": {
+    "path": "docs/product/snake-game-intent-v1.md",
+    "bytes": 7223,
+    "sha256": "01260ba3576cec5291e689122cc304df1f41ca0c292fd3ab96027d44a4d7e86f"
+  },
+  "fixedHandbackUnverifiableCount": 14,
+  "fixedHandbackUnverifiableLast": {
+    "at": "2026-11-10T22:58:32.913Z",
+    "level": "info",
+    "pid": 21300,
+    "component": "desktop.delivery",
+    "event": "delivery.blocked",
+    "projectRoot": "C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr6-2026-11-11\\target",
+    "roleId": "convener",
+    "reasonCode": "fixed-handback-unverifiable"
+  },
+  "shellGateAuditAbsent": true,
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "docs": [
+    "governance",
+    "intents",
+    "product"
+  ],
+  "note": "Report-task association now works (task.reported rows + accepted closes). New blocker: product->convener fixed handback delivery blocked repeatedly with fixed-handback-unverifiable; convener never woken to close A2 product task; chain stalls at A2; no A3 card."
+}

@@ -1,0 +1,34 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 3,
+  "cardsByKind": {
+    "intent-confirm": 1,
+    "proposal": 1,
+    "appointment": 1
+  },
+  "decisions": 0,
+  "dispatches": 19,
+  "dispatchesByFrom": {
+    "chief": 10,
+    "convener": 9
+  },
+  "tasksByTo": {
+    "convener": 9,
+    "product": 2,
+    "rapporteur": 3,
+    "nominator": 2,
+    "verifier": 1,
+    "game-core-dev": 2
+  },
+  "writeTasks": 10,
+  "implementationWriteTasks": 2,
+  "turnsByRole": {
+    "chief": 33,
+    "convener": 24,
+    "game-core-dev": 2,
+    "nominator": 3,
+    "product": 4,
+    "rapporteur": 4,
+    "verifier": 1
+  }
+}

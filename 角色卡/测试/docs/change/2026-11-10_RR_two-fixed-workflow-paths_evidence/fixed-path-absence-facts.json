@@ -1,0 +1,32 @@
+{
+  "at": "2026-11-10T15:57:26.386Z",
+  "target": "C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr-2026-11-10/target",
+  "fixedLedgersAbsent": [
+    {
+      "path": ".ans/state/workflows.jsonl",
+      "exists": false
+    },
+    {
+      "path": ".ans/state/basis.jsonl",
+      "exists": false
+    },
+    {
+      "path": ".ans/state/releases.jsonl",
+      "exists": false
+    }
+  ],
+  "projectJsonAbsent": true,
+  "gitRepoAbsent": true,
+  "gitignoreAbsent": true,
+  "shellGateAuditAbsent": true,
+  "legacyWritten": {
+    "trunk": true,
+    "runs": true
+  },
+  "topLevel": [
+    ".ans",
+    "docs"
+  ],
+  "chiefV2InjectionFound": false,
+  "note": "chief-workflow/v2 injection diagnostic (chief.workflow.v2.loaded) absent in diagnostics; session opened legacy (no taskId-bound workflowModeForFlow)."
+}

@@ -1,0 +1,365 @@
+TAP version 13
+# Subtest: 直接 if/then/else：命中执行 then，未命中执行 else，两侧反例都拒绝
+ok 1 - 直接 if/then/else：命中执行 then，未命中执行 else，两侧反例都拒绝
+  ---
+  duration_ms: 4.7261
+  type: 'test'
+  ...
+# Subtest: if 无 else：未命中保持原行为；then 仅追加约束
+ok 2 - if 无 else：未命中保持原行为；then 仅追加约束
+  ---
+  duration_ms: 1.0228
+  type: 'test'
+  ...
+# Subtest: not 反向语义：单条 required 与 anyOf 组合都强制执行（含嵌套路径）
+ok 3 - not 反向语义：单条 required 与 anyOf 组合都强制执行（含嵌套路径）
+  ---
+  duration_ms: 0.8799
+  type: 'test'
+  ...
+# Subtest: 条件约束覆盖嵌套 properties、数组 items 与 additionalProperties
+ok 4 - 条件约束覆盖嵌套 properties、数组 items 与 additionalProperties
+  ---
+  duration_ms: 1.834
+  type: 'test'
+  ...
+# Subtest: 真实 git_query/git_candidate/git_publish：oid 按 objectFormat 强制 sha1 40 位 / sha256 64 位
+ok 5 - 真实 git_query/git_candidate/git_publish：oid 按 objectFormat 强制 sha1 40 位 / sha256 64 位
+  ---
+  duration_ms: 9.5554
+  type: 'test'
+  ...
+# Subtest: 真实 dispatch_task：reviewOid 与 resumeController 条件均被强制执行
+ok 6 - 真实 dispatch_task：reviewOid 与 resumeController 条件均被强制执行
+  ---
+  duration_ms: 2.5674
+  type: 'test'
+  ...
+# Subtest: 真实 decide_pending_request：disposition 条件（select⇒selected；reject/revise⇒无 selected）
+ok 7 - 真实 decide_pending_request：disposition 条件（select⇒selected；reject/revise⇒无 selected）
+  ---
+  duration_ms: 0.8525
+  type: 'test'
+  ...
+# Subtest: 真实 submit_version_change：if 内 contains 与 then 全体目标 expectedFromSha256 条件
+ok 8 - 真实 submit_version_change：if 内 contains 与 then 全体目标 expectedFromSha256 条件
+  ---
+  duration_ms: 2.2343
+  type: 'test'
+  ...
+# Subtest: 未知关键字与非法条件片段仍被拒绝（不静默丢弃约束）
+ok 9 - 未知关键字与非法条件片段仍被拒绝（不静默丢弃约束）
+  ---
+  duration_ms: 0.5642
+  type: 'test'
+  ...
+# Subtest: 无条件的旧 schema 行为与 z.fromJSONSchema 完全一致
+ok 10 - 无条件的旧 schema 行为与 z.fromJSONSchema 完全一致
+  ---
+  duration_ms: 2.1311
+  type: 'test'
+  ...
+# Subtest: 未注入派发能力：dispatch_task 不在工具集里（只给 su；能力缺席 = 最强 fail-closed，H-1）
+ok 11 - 未注入派发能力：dispatch_task 不在工具集里（只给 su；能力缺席 = 最强 fail-closed，H-1）
+  ---
+  duration_ms: 1.8143
+  type: 'test'
+  ...
+# Subtest: 注入派发能力：dispatch_task 出现在工具集里（同 run_shell / customerInput 的注入先例）
+ok 12 - 注入派发能力：dispatch_task 出现在工具集里（同 run_shell / customerInput 的注入先例）
+  ---
+  duration_ms: 0.3274
+  type: 'test'
+  ...
+# Subtest: handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发」并重申「派发 ≠ 授权」
+ok 13 - handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发」并重申「派发 ≠ 授权」
+  ---
+  duration_ms: 1.0292
+  type: 'test'
+  ...
+# Subtest: handler：reason 省略时载荷不含 reason；void 回执（fire-and-forget）视为已受理
+ok 14 - handler：reason 省略时载荷不含 reason；void 回执（fire-and-forget）视为已受理
+  ---
+  duration_ms: 0.2028
+  type: 'test'
+  ...
+# Subtest: 参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调用
+ok 15 - 参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调用
+  ---
+  duration_ms: 0.1881
+  type: 'test'
+  ...
+# Subtest: 回执 ok:false（如「不是本项目角色 / 指向 su 自身」）→ ok:false「未能派发」+ 原因，绝不谎报
+ok 16 - 回执 ok:false（如「不是本项目角色 / 指向 su 自身」）→ ok:false「未能派发」+ 原因，绝不谎报
+  ---
+  duration_ms: 0.2178
+  type: 'test'
+  ...
+# Subtest: fn 抛错 → fail-closed「未能派发」+ 原因，绝不谎报
+ok 17 - fn 抛错 → fail-closed「未能派发」+ 原因，绝不谎报
+  ---
+  duration_ms: 0.1995
+  type: 'test'
+  ...
+# Subtest: describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带证据」；反向断言不得暗示授权
+ok 18 - describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带证据」；反向断言不得暗示授权
+  ---
+  duration_ms: 0.1764
+  type: 'test'
+  ...
+# Subtest: 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn）
+ok 19 - 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn）
+  ---
+  duration_ms: 0.2336
+  type: 'test'
+  ...
+# Subtest: 不写盘：即便 writeRoot 就绪、gate 放行、派发成功，工具层零文件系统副作用
+ok 20 - 不写盘：即便 writeRoot 就绪、gate 放行、派发成功，工具层零文件系统副作用
+  ---
+  duration_ms: 0.7933
+  type: 'test'
+  ...
+# Subtest: DispatchTaskPayload / DispatchReceipt / DispatchTaskFn 可从冻结契约家 session.ts 导入并使用
+ok 21 - DispatchTaskPayload / DispatchReceipt / DispatchTaskFn 可从冻结契约家 session.ts 导入并使用
+  ---
+  duration_ms: 0.0962
+  type: 'test'
+  ...
+# Subtest: three audit sources round-trip distinctly without fabricated customer facts
+ok 22 - three audit sources round-trip distinctly without fabricated customer facts
+  ---
+  duration_ms: 1.2593
+  type: 'test'
+  ...
+# Subtest: chief delegation requires revision, request, basis, reason and a real disposition
+ok 23 - chief delegation requires revision, request, basis, reason and a real disposition
+  ---
+  duration_ms: 0.1293
+  type: 'test'
+  ...
+# Subtest: direct receipts distinguish committed recovery from pre-commit failure and no-op
+ok 24 - direct receipts distinguish committed recovery from pre-commit failure and no-op
+  ---
+  duration_ms: 0.2254
+  type: 'test'
+  ...
+# Subtest: complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+ok 25 - complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+  ---
+  duration_ms: 0.297
+  type: 'test'
+  ...
+# Subtest: run frozen evidence is all-or-nothing and never combines different snapshots
+ok 26 - run frozen evidence is all-or-nothing and never combines different snapshots
+  ---
+  duration_ms: 0.2736
+  type: 'test'
+  ...
+# Subtest: historical customer freeze remains unchanged while direct freeze has no customer credentials
+ok 27 - historical customer freeze remains unchanged while direct freeze has no customer credentials
+  ---
+  duration_ms: 0.0894
+  type: 'test'
+  ...
+# Subtest: bounded real-chief decision context has no production writer or alternate executor
+ok 28 - bounded real-chief decision context has no production writer or alternate executor
+  ---
+  duration_ms: 0.17
+  type: 'test'
+  ...
+# Subtest: existing submit function remains callable and all three explicit run choices remain distinct
+ok 29 - existing submit function remains callable and all three explicit run choices remain distinct
+  ---
+  duration_ms: 0.0859
+  type: 'test'
+  ...
+# Subtest: R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+ok 30 - R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+  ---
+  duration_ms: 0.1617
+  type: 'test'
+  ...
+# Subtest: R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+ok 31 - R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+  ---
+  duration_ms: 0.3485
+  type: 'test'
+  ...
+# Subtest: R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+ok 32 - R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+  ---
+  duration_ms: 0.1544
+  type: 'test'
+  ...
+# Subtest: J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+ok 33 - J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+  ---
+  duration_ms: 0.306
+  type: 'test'
+  ...
+# Subtest: J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+ok 34 - J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+  ---
+  duration_ms: 0.2092
+  type: 'test'
+  ...
+# Subtest: dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+not ok 35 - dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+  ---
+  duration_ms: 1.8776
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\dispatch-workflow-writer-copy.test.ts:10:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+    
+    '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:13:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+# Subtest: dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+not ok 36 - dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+  ---
+  duration_ms: 0.2427
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\dispatch-workflow-writer-copy.test.ts:29:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+    
+    '派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。\n' +
+      'Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。\n' +
+      'dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。\n' +
+      '跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。\n' +
+      '返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。\n' +
+      '最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。\n' +
+      'B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。\n' +
+      '`taskKind:"stage-request"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。\n' +
+      '`workflowAction:"stop"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。
+    Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。
+    dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。
+    跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。
+    返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。
+    最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。
+    B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。
+    `taskKind:"stage-request"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。
+    `workflowAction:"stop"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:32:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 卡种联合（F2）：GovernanceCardKind 接受 app-owned stable-write；两交互工具联合均不含它
+ok 37 - 卡种联合（F2）：GovernanceCardKind 接受 app-owned stable-write；两交互工具联合均不含它
+  ---
+  duration_ms: 0.5182
+  type: 'test'
+  ...
+# Subtest: request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appointment-write
+ok 38 - request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appointment-write
+  ---
+  duration_ms: 0.087
+  type: 'test'
+  ...
+# Subtest: 判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选
+ok 39 - 判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选
+  ---
+  duration_ms: 0.4512
+  type: 'test'
+  ...
+# Subtest: 白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏
+ok 40 - 白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏
+  ---
+  duration_ms: 0.1078
+  type: 'test'
+  ...
+# Subtest: merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+ok 41 - merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+  ---
+  duration_ms: 0.8196
+  type: 'test'
+  ...
+# Subtest: TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+ok 42 - TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+  ---
+  duration_ms: 0.1204
+  type: 'test'
+  ...
+# Subtest: DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+ok 43 - DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+  ---
+  duration_ms: 0.0851
+  type: 'test'
+  ...
+# Subtest: 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+ok 44 - 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+  ---
+  duration_ms: 0.1098
+  type: 'test'
+  ...
+# Subtest: ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+ok 45 - ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+  ---
+  duration_ms: 0.395
+  type: 'test'
+  ...
+# Subtest: ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+ok 46 - ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+  ---
+  duration_ms: 0.2531
+  type: 'test'
+  ...
+# Subtest: ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+ok 47 - ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+  ---
+  duration_ms: 0.2389
+  type: 'test'
+  ...
+# Subtest: dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+ok 48 - dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+  ---
+  duration_ms: 1.1986
+  type: 'test'
+  ...
+# Subtest: contract_check.taskKind 同步 stage-request；close_created_task 必填语义未在 B0 放宽
+ok 49 - contract_check.taskKind 同步 stage-request；close_created_task 必填语义未在 B0 放宽
+  ---
+  duration_ms: 0.1716
+  type: 'test'
+  ...
+# Subtest: dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+ok 50 - dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+  ---
+  duration_ms: 1.1509
+  type: 'test'
+  ...
+1..50
+# tests 50
+# suites 0
+# pass 48
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 918.6322

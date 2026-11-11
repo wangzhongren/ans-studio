@@ -1,0 +1,7 @@
+ M app/desktop/session.ts
+ M src/common/roles/convener/index.ts
+ M src/common/roles/verifier/index.ts
+ M src/common/编排/workflow-preconditions.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/桌面应用/b101-fixed-dispatch-task-binding.test.ts
+ M test/编排/workflow-preconditions.test.ts

@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+ok 1 - fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+  ---
+  duration_ms: 43.3068
+  type: 'test'
+  ...
+# Subtest: 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+ok 2 - 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+  ---
+  duration_ms: 15.2074
+  type: 'test'
+  ...
+# Subtest: commit runner：固定 staged argv + 固定 commit argv；项目级锁贯穿检查与提交、锁后释放
+ok 3 - commit runner：固定 staged argv + 固定 commit argv；项目级锁贯穿检查与提交、锁后释放
+  ---
+  duration_ms: 1.6136
+  type: 'test'
+  ...
+# Subtest: commit runner：staged 越界 ⇒ git-staged-outside-writeset，不提交且释放锁
+ok 4 - commit runner：staged 越界 ⇒ git-staged-outside-writeset，不提交且释放锁
+  ---
+  duration_ms: 0.2578
+  type: 'test'
+  ...
+# Subtest: commit runner：staged 空 ⇒ git-staged-empty；治理写区 ⇒ git-staged-governance-path；均不提交
+ok 5 - commit runner：staged 空 ⇒ git-staged-empty；治理写区 ⇒ git-staged-governance-path；均不提交
+  ---
+  duration_ms: 0.2208
+  type: 'test'
+  ...
+# Subtest: commit runner：项目级锁被占用 ⇒ git-critical-section-busy（不排队、不检查、不提交）
+ok 6 - commit runner：项目级锁被占用 ⇒ git-critical-section-busy（不排队、不检查、不提交）
+  ---
+  duration_ms: 0.1198
+  type: 'test'
+  ...
+# Subtest: commit runner：当前分支 != 任务分支 ⇒ git-branch-mismatch（取锁前拒绝）
+ok 7 - commit runner：当前分支 != 任务分支 ⇒ git-branch-mismatch（取锁前拒绝）
+  ---
+  duration_ms: 0.1345
+  type: 'test'
+  ...
+# Subtest: commit runner：staged 检查异常 ⇒ 释放锁后如实抛出（不伪装成功）
+ok 8 - commit runner：staged 检查异常 ⇒ 释放锁后如实抛出（不伪装成功）
+  ---
+  duration_ms: 0.3327
+  type: 'test'
+  ...
+# Subtest: execution add：match 命中（writeSet 内字面路径）⇒ 经端口执行，无锁/无 commit
+ok 9 - execution add：match 命中（writeSet 内字面路径）⇒ 经端口执行，无锁/无 commit
+  ---
+  duration_ms: 0.322
+  type: 'test'
+  ...
+# Subtest: execution add：-A / 非字面 / 越界 / 治理写区在 match 即 undefined（不享受任务级放行）
+ok 10 - execution add：-A / 非字面 / 越界 / 治理写区在 match 即 undefined（不享受任务级放行）
+  ---
+  duration_ms: 0.1276
+  type: 'test'
+  ...
+# Subtest: execution commit：match 命中 ⇒ execute 经 runTaskGitCommit（同一把锁贯穿检查与提交）
+ok 11 - execution commit：match 命中 ⇒ execute 经 runTaskGitCommit（同一把锁贯穿检查与提交）
+  ---
+  duration_ms: 0.2439
+  type: 'test'
+  ...
+# Subtest: execution commit：临界区门失败 ⇒ 失败事实（含稳定码），不提交
+ok 12 - execution commit：临界区门失败 ⇒ 失败事实（含稳定码），不提交
+  ---
+  duration_ms: 0.273
+  type: 'test'
+  ...
+# Subtest: execution commit：检查异常 ⇒ git-task-commit-failed（锁已释放）
+ok 13 - execution commit：检查异常 ⇒ git-task-commit-failed（锁已释放）
+  ---
+  duration_ms: 0.2423
+  type: 'test'
+  ...
+# Subtest: execution：伪造 match（kind/分支/message/越 scope）防御性拒绝，不执行任何端口
+ok 14 - execution：伪造 match（kind/分支/message/越 scope）防御性拒绝，不执行任何端口
+  ---
+  duration_ms: 0.1354
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（A 路径）：真实受派任务 + basis.teamPlan → roleRows writesets/branch/taskId/workflowId
+ok 15 - resolveTaskGitScope（A 路径）：真实受派任务 + basis.teamPlan → roleRows writesets/branch/taskId/workflowId
+  ---
+  duration_ms: 20.7642
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（A 路径）：团队计划字节漂移 ⇒ git-task-scope-invalid（basis-drift，fail-closed）
+ok 16 - resolveTaskGitScope（A 路径）：团队计划字节漂移 ⇒ git-task-scope-invalid（basis-drift，fail-closed）
+  ---
+  duration_ms: 6.8083
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（B 路径）：change.scope-decided → derivePathBWriteSets → 本角色写集
+ok 17 - resolveTaskGitScope（B 路径）：change.scope-decided → derivePathBWriteSets → 本角色写集
+  ---
+  duration_ms: 6.522
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope（B 路径）：无 change.scope-decided ⇒ git-task-scope-missing；派生失败 ⇒ invalid
+ok 18 - resolveTaskGitScope（B 路径）：无 change.scope-decided ⇒ git-task-scope-missing；派生失败 ⇒ invalid
+  ---
+  duration_ms: 9.8421
+  type: 'test'
+  ...
+# Subtest: resolveTaskGitScope：无任务/角色不匹配/阶段非 A11|B3/无 workflowId ⇒ 稳定码拒绝
+ok 19 - resolveTaskGitScope：无任务/角色不匹配/阶段非 A11|B3/无 workflowId ⇒ 稳定码拒绝
+  ---
+  duration_ms: 15.3855
+  type: 'test'
+  ...
+# Subtest: fixed 任务 git add 允许：writeSet/分支/taskId/workflowId 命中，审计追加 taskGit（allowed）
+ok 20 - fixed 任务 git add 允许：writeSet/分支/taskId/workflowId 命中，审计追加 taskGit（allowed）
+  ---
+  duration_ms: 3.735
+  type: 'test'
+  ...
+# Subtest: fixed 任务 git commit -m 允许：审计 taskGit 记 messageSha256（不落明文）
+ok 21 - fixed 任务 git commit -m 允许：审计 taskGit 记 messageSha256（不落明文）
+  ---
+  duration_ms: 0.3429
+  type: 'test'
+  ...
+# Subtest: git add -A / 非字面 ./x / 越 writeSet / 治理写区：拒绝且审计 taskGit（denied + 稳定码）
+ok 22 - git add -A / 非字面 ./x / 越 writeSet / 治理写区：拒绝且审计 taskGit（denied + 稳定码）
+  ---
+  duration_ms: 0.7488
+  type: 'test'
+  ...
+# Subtest: git commit -F - / --amend / -m 空串：拒绝且审计 taskGit（denied + 稳定码）
+ok 23 - git commit -F - / --amend / -m 空串：拒绝且审计 taskGit（denied + 稳定码）
+  ---
+  duration_ms: 0.564
+  type: 'test'
+  ...
+# Subtest: 普通 Git（push/merge/reset/checkout/update-ref）硬拒：git-command-not-ordinary，审计 taskGit（other）
+ok 24 - 普通 Git（push/merge/reset/checkout/update-ref）硬拒：git-command-not-ordinary，审计 taskGit（other）
+  ---
+  duration_ms: 0.3859
+  type: 'test'
+  ...
+# Subtest: 无 taskGitScope（明细分类器无上下文）：git add/commit 一律拒（git-task-scope-missing）
+ok 25 - 无 taskGitScope（明细分类器无上下文）：git add/commit 一律拒（git-task-scope-missing）
+  ---
+  duration_ms: 0.2765
+  type: 'test'
+  ...
+# Subtest: 2 参旧调用（classifyShell 裸串）：git add/commit 仍拒（v5 无 scope），审计无 taskGit 字段
+ok 26 - 2 参旧调用（classifyShell 裸串）：git add/commit 仍拒（v5 无 scope），审计无 taskGit 字段
+  ---
+  duration_ms: 0.394
+  type: 'test'
+  ...
+# Subtest: 明细分类封装（run-role 生产通道）：classifyShell 位置包 classifyShellDetailed + scope ⇒ add/commit 允许且审计 taskGit
+ok 27 - 明细分类封装（run-role 生产通道）：classifyShell 位置包 classifyShellDetailed + scope ⇒ add/commit 允许且审计 taskGit
+  ---
+  duration_ms: 0.2773
+  type: 'test'
+  ...
+# Subtest: readonlyOnly 不得注入 classifyShellDetailed/taskGitScope（任务级 Git 写不得越过 readonly-deny）
+ok 28 - readonlyOnly 不得注入 classifyShellDetailed/taskGitScope（任务级 Git 写不得越过 readonly-deny）
+  ---
+  duration_ms: 0.2937
+  type: 'test'
+  ...
+# Subtest: 非 Git 命令：明细分类器下判定与审计字段不因 taskGitScope 变化（ls allow，无 taskGit）
+ok 29 - 非 Git 命令：明细分类器下判定与审计字段不因 taskGitScope 变化（ls allow，无 taskGit）
+  ---
+  duration_ms: 0.4627
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 908.6237

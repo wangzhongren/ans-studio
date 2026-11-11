@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: D3 AC1/2: real handler refuses cross-role aliases and real-target writeSet omissions before any write
+ok 1 - D3 AC1/2: real handler refuses cross-role aliases and real-target writeSet omissions before any write
+  ---
+  duration_ms: 8.2521
+  type: 'test'
+  ...
+# Subtest: D3 AC2: complete alias authorization and a symlink project root still write; root escape and file symlink stay denied
+ok 2 - D3 AC2: complete alias authorization and a symlink project root still write; root escape and file symlink stay denied
+  ---
+  duration_ms: 21.28
+  type: 'test'
+  ...
+# Subtest: D3 AC7: second real gate observes revoked task scope after mkdir and stops before file commit
+ok 3 - D3 AC7: second real gate observes revoked task scope after mkdir and stops before file commit
+  ---
+  duration_ms: 3.0812
+  type: 'test'
+  ...
+# Subtest: D3 AC3: Windows-shaped paths and script suffixes review without claiming Windows native execution
+ok 4 - D3 AC3: Windows-shaped paths and script suffixes review without claiming Windows native execution
+  ---
+  duration_ms: 1.1897
+  type: 'test'
+  ...
+# Subtest: D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute
+ok 5 - D3 AC3/5: explicit cat executable requires existing approval; refusal, unavailable, timeout and abort never execute # SKIP
+  ---
+  duration_ms: 0.0574
+  type: 'test'
+  ...
+# Subtest: D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives
+ok 6 - D3 AC4: ordinary cat/ls/rg/git reads remain fast; rg --pre forms need approval without pattern/filename false positives # SKIP
+  ---
+  duration_ms: 0.0615
+  type: 'test'
+  ...
+# Subtest: D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking
+ok 7 - D3 AC5: review follows ordinary/operator/advisory policy; readonly refuses without asking # SKIP
+  ---
+  duration_ms: 0.0387
+  type: 'test'
+  ...
+# Subtest: D3 AC6: real write/edit preserve regular modes and new files use safe creation
+ok 8 - D3 AC6: real write/edit preserve regular modes and new files use safe creation # SKIP
+  ---
+  duration_ms: 0.0418
+  type: 'test'
+  ...
+# Subtest: D3 AC6: strict umask in isolated child cannot strip old executable mode
+ok 9 - D3 AC6: strict umask in isolated child cannot strip old executable mode # SKIP
+  ---
+  duration_ms: 0.0413
+  type: 'test'
+  ...
+# Subtest: D3 AC7: chmod/fsync failure and abort do not commit or leave a temp
+ok 10 - D3 AC7: chmod/fsync failure and abort do not commit or leave a temp # SKIP
+  ---
+  duration_ms: 0.0762
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 6
+# todo 0
+# duration_ms 259.8181

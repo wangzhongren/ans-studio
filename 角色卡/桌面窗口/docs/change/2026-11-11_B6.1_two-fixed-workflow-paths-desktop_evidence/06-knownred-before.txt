@@ -1,0 +1,4 @@
+not ok 715 - Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）
+not ok 716 - VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）
+not ok 717 - VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）
+not ok 735 - SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常

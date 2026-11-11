@@ -58,11 +58,14 @@ import type {
   PlanEscalationFn, PlanEscalationInput,
   VersionChangeTargetSubmission,
   SelectRunChangeInput, CompleteTeamPlanInput, ActivateRoleDocumentsInput, CloseCreatedTaskInput,
+  FixedCloseCreatedTaskInput, FixedActivateRoleDocumentsInput, TaskClosedOutcome,
   DecidePendingRequestInput, DecidePendingRequestFn, ChiefDecisionExecutionContext,
+  WorkflowAction, WorkflowStage, WorkflowPath,
   RuntimeActiveToolFact, RuntimeOwnedProcessFact,
   GitQueryRequest, GitCandidateRequest, GitPublishRequest,
 } from "../../model/runtime.ts";
 import { isDirectActionReceipt, isDirectActionSource, isGitOid, isGitBasis, isGitLiteralPath, isGitCapabilityResult } from "../../model/trunk.ts";
+import { isWorkflowPath, isWorkflowStage } from "../../model/runtime.ts";
 import {
   PLAN_ESCALATION_CATEGORIES,
   PLAN_ESCALATION_SUMMARY_MAX,
@@ -2881,6 +2884,37 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         }
         modulePaths = modulePathsRaw.map((item) => item.trim());
       }
+      // T3（2026-11-10，v1.3 §3.3）：stage-request 载荷骨架——本层只做形状校验与透传，
+      // **不做**来源/目标/阶段转移/副作用等业务校验（由应用 handler/编排按实际工作流模式执行）。
+      // 缺省 = 旧行为；未知/非法值 fail-closed（不猜、不放宽）。
+      const taskKind = readStringArg(call.args, ["taskKind", "task_kind"]);
+      if (taskKind !== undefined && taskKind.trim() === "") {
+        return { ok: false, message: `${name}: taskKind 不能为空字符串` };
+      }
+      const workflowActionRaw = call.args["workflowAction"] ?? call.args["workflow_action"];
+      if (workflowActionRaw !== undefined && workflowActionRaw !== null && workflowActionRaw !== "advance" && workflowActionRaw !== "stop") {
+        return { ok: false, message: `${name}: workflowAction 参数非法（应为 advance/stop）` };
+      }
+      const workflowAction: WorkflowAction | undefined = workflowActionRaw === "advance" || workflowActionRaw === "stop" ? workflowActionRaw : undefined;
+      const workflowPathRaw = call.args["workflowPath"] ?? call.args["workflow_path"];
+      if (workflowPathRaw !== undefined && workflowPathRaw !== null && !isWorkflowPath(workflowPathRaw)) {
+        return { ok: false, message: `${name}: workflowPath 参数非法（应为 A/B）` };
+      }
+      const workflowPath: WorkflowPath | undefined = isWorkflowPath(workflowPathRaw) ? workflowPathRaw : undefined;
+      const workflowId = readStringArg(call.args, ["workflowId", "workflow_id"]);
+      if (workflowId !== undefined && (workflowId.trim() === "" || workflowId.length > 200)) {
+        return { ok: false, message: `${name}: workflowId 参数非法（应为 1–200 字符的非空字符串）` };
+      }
+      const stageRaw = call.args["stage"];
+      if (stageRaw !== undefined && stageRaw !== null && !isWorkflowStage(stageRaw)) {
+        return { ok: false, message: `${name}: stage 参数非法（应为 A1–A13（含 A12a/A12b）或 B1–B4）` };
+      }
+      const stage: WorkflowStage | undefined = isWorkflowStage(stageRaw) ? stageRaw : undefined;
+      const reworkOfRaw = call.args["reworkOf"] ?? call.args["rework_of"];
+      if (reworkOfRaw !== undefined && reworkOfRaw !== null && !isWorkflowStage(reworkOfRaw)) {
+        return { ok: false, message: `${name}: reworkOf 参数非法（应为被打回的具体阶段 A1–A13（含 A12a/A12b）或 B1–B4）` };
+      }
+      const reworkOf: WorkflowStage | undefined = isWorkflowStage(reworkOfRaw) ? reworkOfRaw : undefined;
       const payload: DispatchTaskPayload = {
         ...(expectedResume ? { resumeController: expectedResume } : {}),
         ...(expectedReview !== undefined ? { reviewTarget: expectedReview } : {}),
@@ -2893,6 +2927,12 @@ function makeDispatchTaskTool(fn: DispatchTaskFn, currentTurnId?: () => string |
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
         ...(moduleId !== undefined ? { moduleId } : {}),
         ...(modulePaths !== undefined ? { modulePaths } : {}),
+        ...(taskKind !== undefined ? { taskKind } : {}),
+        ...(workflowAction !== undefined ? { workflowAction } : {}),
+        ...(workflowPath !== undefined ? { workflowPath } : {}),
+        ...(workflowId !== undefined ? { workflowId } : {}),
+        ...(stage !== undefined ? { stage } : {}),
+        ...(reworkOf !== undefined ? { reworkOf } : {}),
         ...governance.value,
       };
 
@@ -3135,7 +3175,7 @@ function makeContractCheckTool(fn: ContractCheckFn, currentTurnId?: () => string
         }
       }
       const taskKindRaw = readStringArg(call.args, ["taskKind", "task_kind"]);
-      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell"
+      const taskKind = taskKindRaw === "dispatch" || taskKindRaw === "appointment" || taskKindRaw === "write" || taskKindRaw === "acceptance" || taskKindRaw === "shell" || taskKindRaw === "stage-request"
         ? taskKindRaw
         : undefined;
       const moduleId = readStringArg(call.args, ["moduleId", "module_id"]);
@@ -4409,24 +4449,143 @@ async function invokeDirectCapability(name: string, signal: AbortSignal | undefi
   try { return { value: await invoke() }; }
   catch { return directUnknownResult(name); }
 }
+// T3 B2（MF-IR-2/3 / AC-18 / AC-24）：close_created_task / activate_role_documents 的 fixed v2 模式。
+// 共享 schema 的 `required` 只保留两模式交集（见 schema.ts）；legacy 的完整必填仍在此按模式
+// fail-closed 核验——错误消息与 B2 前逐字一致（`invalid-arguments args.<field>: required`）。
+const LEGACY_MODE_REQUIRED: Record<string, readonly string[]> = {
+  [ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME]: ["operationId", "flowId", "planRef", "d3DecisionId", "rosterRef", "targetRoleId", "documents"],
+  [CLOSE_CREATED_TASK_TOOL_NAME]: ["operationId", "taskId", "runId", "basisDigest", "reportRef", "outcome"],
+};
+const FIXED_MODE_REQUIRED: Record<string, readonly string[]> = {
+  [ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME]: ["operationId", "flowId", "workflowId", "proposalDecisionId", "targetRoleId", "roster", "documents"],
+  [CLOSE_CREATED_TASK_TOOL_NAME]: ["operationId", "taskId", "outcome"],
+};
+/** 同一共享 schema，按实际模式套用该模式的完整 required（其它工具 = schema 原样）。 */
+function modeShapeSchema(name: string, fixedMode: boolean): Record<string, unknown> {
+  const parameters = describeTool(name).parameters;
+  // B17（2026-11-11，RR12）：fixed 激活允许 path-only（roster/documents 文件的 sha256 可省略），
+  // hash 由应用在激活前按实际字节计算并回填；legacy 仍要求 sha256（共享 schema 原样）。
+  if (fixedMode && name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME) {
+    const cloned = structuredClone(parameters) as {
+      properties?: Record<string, Record<string, unknown>>;
+      required?: string[];
+    };
+    const props = cloned.properties;
+    const relaxFile = (rel: Record<string, unknown> | undefined): void => {
+      if (rel !== undefined && Array.isArray(rel.required)) {
+        rel.required = (rel.required as string[]).filter((key) => key !== "sha256");
+      }
+    };
+    if (props !== undefined) {
+      relaxFile(props["roster"]);
+      const documents = props["documents"];
+      const docProps = documents?.["properties"] as Record<string, Record<string, unknown>> | undefined;
+      if (docProps !== undefined) for (const key of ["card", "boundaryMd", "boundaryYaml"]) relaxFile(docProps[key]);
+    }
+    const required = FIXED_MODE_REQUIRED[name];
+    return required !== undefined ? { ...cloned, required } : cloned;
+  }
+  const required = (fixedMode ? FIXED_MODE_REQUIRED : LEGACY_MODE_REQUIRED)[name];
+  return required !== undefined ? { ...parameters, required } : parameters;
+}
+/** fixed 分支只透传 v2 字段；legacy `runId/basisDigest/reportRef` 不采信、不透传（不触 trunk/CAS）。 */
+function fixedCloseInput(args: Record<string, unknown>): FixedCloseCreatedTaskInput {
+  return {
+    operationId: args.operationId as string,
+    taskId: args.taskId as string,
+    outcome: args.outcome as TaskClosedOutcome,
+    ...(args.note !== undefined ? { note: args.note as string } : {}),
+  };
+}
+function fixedActivateInput(args: Record<string, unknown>): FixedActivateRoleDocumentsInput {
+  return {
+    operationId: args.operationId as string,
+    flowId: args.flowId as string,
+    workflowId: args.workflowId as string,
+    proposalDecisionId: args.proposalDecisionId as string,
+    targetRoleId: args.targetRoleId as string,
+    roster: args.roster as FixedActivateRoleDocumentsInput["roster"],
+    documents: args.documents as FixedActivateRoleDocumentsInput["documents"],
+  };
+}
+function fixedFailureResult(name: string, value: Record<string, unknown>): ToolResult {
+  if (typeof value.code !== "string" || !value.code.trim() || typeof value.message !== "string" || !value.message.trim()) return directUnknownResult(name);
+  if (value.missing !== undefined && (!Array.isArray(value.missing) || value.missing.some(item => typeof item !== "string" || !item.trim()))) return directUnknownResult(name);
+  return { ok: false, message: `${name}: ${JSON.stringify(value)}` };
+}
+/** fixed close v2 回执独立校验：不复用 legacy `isDirectActionReceipt`/`taskStatus`；身份必须匹配输入。 */
+function fixedCloseReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
+  const name = CLOSE_CREATED_TASK_TOOL_NAME;
+  if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
+  if (!value.ok) return fixedFailureResult(name, value);
+  if (value.operationId !== args.operationId || value.taskId !== args.taskId || value.outcome !== args.outcome
+    || typeof value.eventId !== "string" || !value.eventId.trim()
+    || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean"
+    || (value.workflowId !== undefined && (typeof value.workflowId !== "string" || !value.workflowId.trim()))
+    || (value.stage !== undefined && !isWorkflowStage(value.stage))) return directUnknownResult(name);
+  return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
+}
+/** B25（2026-11-11，RR22 失败修复）：fixed `complete_team_plan` v4 回执独立校验——不复用 legacy
+ * `isDirectActionReceipt`（服务成功回执是 `{ok, operationId, flowId, workflowId, basisId, plan,
+ * documents, replay, stageCompleted}`）。身份/形状不符仍 unknown（fail-closed），失败回执透出
+ * code/message；legacy 回执路径不经过本函数。 */
+function fixedCompleteTeamPlanReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
+  const name = COMPLETE_TEAM_PLAN_TOOL_NAME;
+  if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
+  if (!value.ok) return fixedFailureResult(name, value);
+  const plan = value.plan;
+  if (value.operationId !== args.operationId || value.flowId !== args.flowId
+    || value.workflowId !== args.workflowId
+    || typeof value.basisId !== "string" || !value.basisId.trim()
+    || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean"
+    || !Array.isArray(value.documents)
+    || !directRecord(plan) || typeof plan.path !== "string" || !plan.path.trim()
+    || !Number.isSafeInteger(plan.version) || !directHash(plan.sha256)) return directUnknownResult(name);
+  return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
+}
+/** fixed activate v2 回执独立校验：workflow/role 与输入一致；B17 起 rosterSha256 由应用计算（形状校验，
+ * 不再与模型入参比较——模型不采信自报 hash）。不回退 legacy activationDigest。 */
+function fixedActivateReceiptResult(args: Record<string, unknown>, value: unknown): ToolResult {
+  const name = ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME;
+  if (!directRecord(value) || typeof value.ok !== "boolean") return directUnknownResult(name);
+  if (!value.ok) return fixedFailureResult(name, value);
+  if (value.workflowId !== args.workflowId || value.roleId !== args.targetRoleId
+    || !directHash(value.rosterSha256)
+    || typeof value.activationKey !== "string" || !value.activationKey.trim()
+    || typeof value.replay !== "boolean" || typeof value.stageCompleted !== "boolean") return directUnknownResult(name);
+  return { ok: true, message: `${name}: ${JSON.stringify(value)}` };
+}
 function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContext?: ChiefDecisionExecutionContext): ExecutableTool[] {
-  const entries: { name: string; roles: readonly string[]; invoke?: (input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown> }[] = [
-    { name: SELECT_RUN_CHANGE_TOOL_NAME, roles: ["rapporteur"], ...(options.selectRunChange && { invoke: (input, signal) => options.selectRunChange!(input as unknown as SelectRunChangeInput, signal) }) },
-    { name: COMPLETE_TEAM_PLAN_TOOL_NAME, roles: ["convener"], ...(options.completeTeamPlan && { invoke: (input, signal) => options.completeTeamPlan!(input as unknown as CompleteTeamPlanInput, signal) }) },
-    { name: ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, roles: ["nominator"], ...(options.activateRoleDocuments && { invoke: (input, signal) => options.activateRoleDocuments!(input as unknown as ActivateRoleDocumentsInput, signal) }) },
-    { name: CLOSE_CREATED_TASK_TOOL_NAME, roles: ["chief", "convener"], ...(options.closeCreatedTask && { invoke: (input, signal) => options.closeCreatedTask!(input as unknown as CloseCreatedTaskInput, signal) }) },
-    { name: DECIDE_PENDING_REQUEST_TOOL_NAME, roles: ["chief"], ...(options.decidePendingRequest && { invoke: (input, signal) => options.decidePendingRequest!(input as unknown as DecidePendingRequestInput, signal) }) },
+  type DirectInvoke = (input: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+  const entries: { name: string; roles: readonly string[]; legacy?: DirectInvoke; fixed?: DirectInvoke }[] = [
+    { name: SELECT_RUN_CHANGE_TOOL_NAME, roles: ["rapporteur"], ...(options.selectRunChange && { legacy: (input, signal) => options.selectRunChange!(input as unknown as SelectRunChangeInput, signal) }) },
+    // T3 B3.1（v1.3 §5.1 `complete_team_plan` v4）：fixed 形状 `{operationId,flowId,workflowId,plan}` 与
+    // legacy 形状共用同一注入位；本层只按共享 schema 做形状校验并**原样透传**（不派生/不改写 workflowId，
+    // 不代做 runId/baseDigest 的 fixed 拒绝——权威 workflowId 绑定与 `baseline-legacy-field-forbidden`
+    // 均由应用服务/编排按实际模式执行）。legacy 输入面（required/旧字段/回执）逐字不变。
+    { name: COMPLETE_TEAM_PLAN_TOOL_NAME, roles: ["convener"], ...(options.completeTeamPlan && { legacy: (input, signal) => options.completeTeamPlan!(input as unknown as CompleteTeamPlanInput, signal) }) },
+    // T3 B2（MF-IR-3）：fixed 依赖存在时以 fixed 为准（纵深防御；legacy 会话不注入 fixed）。
+    { name: ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME, roles: ["nominator"],
+      ...(options.activateRoleDocuments && { legacy: (input, signal) => options.activateRoleDocuments!(input as unknown as ActivateRoleDocumentsInput, signal) }),
+      ...(options.activateRoleDocumentsFixed && { fixed: (input, signal) => options.activateRoleDocumentsFixed!(fixedActivateInput(input), signal) }) },
+    // T3 B2（MF-IR-2）：fixed 优先；legacy 字段路径/回执校验逐字保留于下方。
+    { name: CLOSE_CREATED_TASK_TOOL_NAME, roles: ["chief", "convener"],
+      ...(options.closeCreatedTask && { legacy: (input, signal) => options.closeCreatedTask!(input as unknown as CloseCreatedTaskInput, signal) }),
+      ...(options.closeCreatedTaskFixed && { fixed: (input, signal) => options.closeCreatedTaskFixed!(fixedCloseInput(input), signal) }) },
+    { name: DECIDE_PENDING_REQUEST_TOOL_NAME, roles: ["chief"], ...(options.decidePendingRequest && { legacy: (input, signal) => options.decidePendingRequest!(input as unknown as DecidePendingRequestInput, signal) }) },
   ];
-  return entries.filter(entry => entry.invoke !== undefined).map(entry => ({ name: entry.name, async handler(call) {
+  return entries.filter(entry => entry.legacy !== undefined || entry.fixed !== undefined).map(entry => ({ name: entry.name, async handler(call) {
     if (!entry.roles.includes(options.roleId ?? "")) return { ok: false, message: `${entry.name}: role-not-allowed（身份来自可信scope）。` };
-    const error = directShapeError(call.args, describeTool(entry.name).parameters);
+    const fixedMode = entry.fixed !== undefined;
+    const error = directShapeError(call.args, modeShapeSchema(entry.name, fixedMode));
     if (error) return { ok: false, message: `${entry.name}: invalid-arguments ${error}` };
     if (entry.name === DECIDE_PENDING_REQUEST_TOOL_NAME) {
       const selected = call.args.selected;
       if (call.args.disposition === "select" ? !Array.isArray(selected) : selected !== undefined)
         return { ok: false, message: `${entry.name}: invalid-arguments disposition/selected` };
     }
-    const invoked = await invokeDirectCapability(entry.name, call.signal, () => entry.invoke!(call.args, call.signal));
+    const invoke = fixedMode ? entry.fixed! : entry.legacy!;
+    const invoked = await invokeDirectCapability(entry.name, call.signal, () => invoke(call.args, call.signal));
     if (!("value" in invoked)) return invoked;
     const value = invoked.value;
     if (entry.name === DECIDE_PENDING_REQUEST_TOOL_NAME) {
@@ -4442,6 +4601,16 @@ function makeDirectCapabilityTools(options: GovernedToolsOptions, decisionContex
         || typeof value.errorCode !== "string" || !value.errorCode.trim() || typeof value.message !== "string" || !value.message.trim()) return directUnknownResult(entry.name);
       return { ok: value.ok, message: `${entry.name}: ${JSON.stringify(value)}` };
     }
+    // B25（2026-11-11，RR22）：fixed `complete_team_plan` 与 legacy 共用注入位，按入参形状
+    // （workflowId + plan）路由到 fixed 回执校验；legacy 回执路径逐字不变。
+    if (entry.name === COMPLETE_TEAM_PLAN_TOOL_NAME
+      && typeof call.args.workflowId === "string" && directRecord(call.args.plan)) {
+      return fixedCompleteTeamPlanReceiptResult(call.args, value);
+    }
+    // fixed v2 回执走独立校验（legacy direct 回执形状不适用）；结果如实直出。
+    if (fixedMode) return entry.name === CLOSE_CREATED_TASK_TOOL_NAME
+      ? fixedCloseReceiptResult(call.args, value)
+      : fixedActivateReceiptResult(call.args, value);
     if (directRecord(value) && value.ok === true) {
       if (entry.name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME && !directHash(value.activationDigest)) return directUnknownResult(entry.name);
       if (entry.name === CLOSE_CREATED_TASK_TOOL_NAME && (value.taskId !== call.args.taskId
@@ -5416,7 +5585,13 @@ export function buildGovernedTools(gate: WriteGate, options?: GovernedToolsOptio
   const viewImageDelivery = (options?.viewImagePolicy ?? VIEW_IMAGE_DEFAULT_POLICY).delivery;
   return tools.map((tool) => {
     const { parameters, ...description } = describeTool(tool.name);
-    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file",VIEW_IMAGE_TOOL_NAME].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema: parameters, async handler(call) {
+    // B17（2026-11-11，RR15 实测）：fixed activate 的 **MCP 可见 inputSchema** 也必须允许 path-only；
+    // 否则模型按提示只传 path 时会在 MCP 输入校验层被 `sha256 expected string` 拒绝（工具 handler
+    // 的 modeShapeSchema 放宽不足以覆盖 schema 暴露面）。legacy 注入面仍用共享 schema。
+    const inputSchema = tool.name === ACTIVATE_ROLE_DOCUMENTS_TOOL_NAME && options?.activateRoleDocumentsFixed !== undefined
+      ? modeShapeSchema(tool.name, true)
+      : parameters;
+    const defined: ToolDefinition = { ...tool, ...description, displayInputRule: ["read_file","write_file","edit_file",VIEW_IMAGE_TOOL_NAME].includes(tool.name) ? "core-path-v1" : tool.name === "run_shell" || tool.name === START_BACKGROUND_TASK_TOOL_NAME ? "core-command-v1" : "none", inputSchema, async handler(call) {
       if (call.signal?.aborted) return abortedToolResult(tool.name, viewImageDelivery);
       const result = await tool.handler(call);
       // 后台任务成功结果带结构化事实（任务已启动/已停止是已发生的真实事件）：即使信号在 handler 返回前

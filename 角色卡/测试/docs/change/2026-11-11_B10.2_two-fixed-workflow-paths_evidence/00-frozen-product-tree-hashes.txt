@@ -1,0 +1,11 @@
+== frozen product tree ==
+6539fabaf7cef81ab6103e5eab3632b855e5aca8fa40194042066d502f081a6d *app/desktop/session.ts
+0177fbe356cdf40a0181e8988709b7c1d6f94c44770df134095a34b3fec11f81 *src/pipeline/orchestration/run-role.ts
+fb562d7f568ad908265bbee081f649ebe0ad49395bc7ea07d6699c6f082ac6ca *test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+1c9c3e69140805c93712f66c476b24cebee86a8586d09a34b20dacf348d80da0 *test/桌面应用/b101-fixed-dispatch-task-binding.test.ts
+9307b5abc4352d2fbf09f054d1417aa7c98e2dd6d7a34b7401097f57fd87844d *test/编排/run-role-fixed-task-context.test.ts
+
+== test/测试 untouched (should list only original hash 9ae80c57) ==
+81e0f39b9cab71aa0d47af0a16734d88456ff4ab0c02d5265ed6fb181410ae73 *test/测试/fixed-path-full-chain.test.ts
+39a8d0f3de04eae576369e05241ccf7b59bcf26c0a31969e407ac20458ed5a18 *test/测试/mode-switch.test.ts
+e85006ef0b4d1c4435fe28f100c477b37ea3e842b16138408dc2bf8b46e55ce7 *test/测试/b-change-scope.test.ts

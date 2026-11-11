@@ -1,0 +1,35 @@
+== git status --porcelain -- src app test（证据捕获时）==
+ M src/model/runtime.ts
+ M src/pipeline/orchestration/run-role.ts
+ M src/provider/runtime/schema.ts
+ M src/provider/runtime/tools.ts
+?? test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts
+?? test/编排/run-role-fixed-b31.test.ts
+
+== 归属 ==
+[本批 B3.1 编排写集]
+  M src/pipeline/orchestration/run-role.ts
+  ?? test/编排/run-role-fixed-b31.test.ts
+[并行批次：运行时核心 B3.1（非本批写集；本批未读改）]
+  M src/model/runtime.ts
+  M src/provider/runtime/schema.ts
+  M src/provider/runtime/tools.ts
+  ?? test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts
+
+== 禁改目录零 diff（相对 HEAD）==
+（以上无输出 = 零 diff）
+
+== package.json / package-lock.json 零 diff ==
+（以上无输出 = 零 diff / 无新依赖）
+
+== 证据捕获时逐文件 SHA-256 / bytes ==
+d29d4e6f5b00df3e43f80345900a9cf265dad60967f7db56a0be247a9b85008b  src/pipeline/orchestration/run-role.ts  268944 bytes
+d19a8be065257930e141fa28e22570dde89cfb0c4a7e6b982d2760b79d1c6f63  test/编排/run-role-fixed-b31.test.ts  31957 bytes
+1373f22f65099bbdd355126bbe545a50fcd664df95157de17ed6568b5b7e4cc7  src/model/runtime.ts  248832 bytes
+42e63fbe769cdf1061ee924c5a1f11b17a0176c1e0fa2b01995a6f6db5f3a3ca  src/provider/runtime/schema.ts  152765 bytes
+f98ee51b3095ea5e399a338678ef64c5cf188d2f1e2168fe4aacabbb0aff263a  src/provider/runtime/tools.ts  345274 bytes
+410bd49d6edaa4a893844747e18710299b195c1c199ab693cc8e1266ee3c51c6  test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts  12282 bytes
+
+== 本批记录/证据（允许写入的角色 docs/change）==
+2026-11-10_B3.1_two-fixed-workflow-paths.md
+2026-11-10_B3.1_two-fixed-workflow-paths_evidence

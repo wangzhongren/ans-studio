@@ -97,9 +97,13 @@ function listing(root: string): ProjectListing {
   };
 }
 
-/** 最小临时项目：项目角色卡 + 边界（真实 `openRoleSession` 会读盘解析项目角色）。 */
+/** 最小临时项目：项目角色卡 + 边界（真实 `openRoleSession` 会读盘解析项目角色）。
+ *  B7.1（2026-11-11）：本套件验证 legacy 注入/契约旧行为；显式 `legacy/v1` 写明「旧项目」
+ *  （空 trio 项目聊天自 B6.1 起默认 fixed；fixed 契约视图不含 legacy run/pin 口径）。 */
 function fixture(): { root: string; cleanup: () => void } {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "ans-doc-format-desktop-"));
+  fs.mkdirSync(path.join(root, ".ans"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
   const roleDir = path.join(root, "角色卡", PROJECT_ROLE);
   fs.mkdirSync(roleDir, { recursive: true });
   fs.writeFileSync(path.join(roleDir, "role-card.md"), `# ${PROJECT_ROLE}\n组别：运行时接入组\n组内职责：实现\n`);

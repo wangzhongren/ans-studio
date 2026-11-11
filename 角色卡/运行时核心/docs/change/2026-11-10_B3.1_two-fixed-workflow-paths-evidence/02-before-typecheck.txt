@@ -1,0 +1,5 @@
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+exit=0（17:41 实测；HEAD d60d02c 干净 + 本批未改）

@@ -1,0 +1,8 @@
+role: env-bootstrap
+entries:
+  - kind: directory
+    path: assets/
+    purpose: 环境与静态资源边界；仅本地相对引用，禁止网络依赖
+  - kind: file
+    path: index.html
+    purpose: 自包含单文件入口与内联装配

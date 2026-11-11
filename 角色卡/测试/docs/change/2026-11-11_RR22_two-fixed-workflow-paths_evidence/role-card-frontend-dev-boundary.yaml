@@ -1,0 +1,5 @@
+role: frontend-dev
+entries:
+  - kind: directory
+    path: src/ui/
+    purpose: Canvas 渲染与 HUD/暂停/结束层展示

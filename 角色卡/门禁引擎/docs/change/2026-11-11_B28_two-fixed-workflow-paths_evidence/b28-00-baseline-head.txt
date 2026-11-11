@@ -1,0 +1,5 @@
+59d24c6 docs(test): RR25 exposes review-role shell mkdir and an unconfirmed plan receipt
+ M src/common/roles/convener/index.ts
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M test/roles/convener/convener-fixed.test.ts
+ M test/门禁引擎/chief-workflow-v2-stage-task-separation.test.ts

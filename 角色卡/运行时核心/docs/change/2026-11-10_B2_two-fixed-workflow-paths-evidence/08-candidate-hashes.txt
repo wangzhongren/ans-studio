@@ -1,0 +1,14 @@
+# candidate hashes (raw sha256 / bytes / lines)
+src/model/runtime.ts e719c3604f221fe9736c79b37c8d426a2eb5ffd62ac69b1c0153a277904eac82 247607 4904
+src/provider/runtime/schema.ts 2e7328a68d8d88cbc9a7247bf990a5f0f0b6bac7dcef5c02e69b7343db723891 151949 1908
+src/provider/runtime/tools.ts 616a7c7f7e1c835e414a7e35d047ab5b25d0619e304af50e1d8f436fc20d5cbe 344776 5601
+test/runtime-core/two-fixed-workflow-paths-b0.test.ts eddfdc98989228644b837a39263fc60554ee56f15061b44a7c30a6d8bc623439 19772 323
+test/runtime-core/two-fixed-workflow-paths-b2.test.ts 1ef5e5188fcd1e83d02fbb012fd576f015b33b324bf990d503f44d7d4ba44226 23218 373
+
+# git numstat (tracked files)
+82	0	src/model/runtime.ts
+10	4	src/provider/runtime/schema.ts
+89	9	src/provider/runtime/tools.ts
+5	3	test/runtime-core/two-fixed-workflow-paths-b0.test.ts
+
+# aggregate sha256 (path-sorted 'path\0sha256' concatenation): 773152c85eab38b1869db387b64ef114c388017d31f49abc8d85f28b58c66ef3

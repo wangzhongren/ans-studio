@@ -1,0 +1,118 @@
+TAP version 13
+# Subtest: T1-01/02/03/06 真实 openRoleSession + 三真实适配器：chief 必读块固定位置；五非幕僚/worker 无段；六角色工具注入才注册
+ok 1 - T1-01/02/03/06 真实 openRoleSession + 三真实适配器：chief 必读块固定位置；五非幕僚/worker 无段；六角色工具注入才注册
+  ---
+  duration_ms: 133.2126
+  type: 'test'
+  ...
+# Subtest: T1-04 真实 single/su：无提示段、无工具（与无矩阵能力基线一致）
+ok 2 - T1-04 真实 single/su：无提示段、无工具（与无矩阵能力基线一致）
+  ---
+  duration_ms: 24.0022
+  type: 'test'
+  ...
+# Subtest: T1-05 判断会话（真实 createGovernanceJudge 入口）：不注入矩阵能力/提示段
+ok 3 - T1-05 判断会话（真实 createGovernanceJudge 入口）：不注入矩阵能力/提示段
+  ---
+  duration_ms: 14.8773
+  type: 'test'
+  ...
+# Subtest: T1-07 工具参数矩阵（经 Provider 工具 handler）：roleId/section 过滤、未知 roleId 不回显、非法参数拒绝
+ok 4 - T1-07 工具参数矩阵（经 Provider 工具 handler）：roleId/section 过滤、未知 roleId 不回显、非法参数拒绝
+  ---
+  duration_ms: 51.0839
+  type: 'test'
+  ...
+# Subtest: T1-08 只读 + 零账本 + gate 判定不变（Provider handler → Pipeline 注入函数 → 真实 listProject）
+ok 5 - T1-08 只读 + 零账本 + gate 判定不变（Provider handler → Pipeline 注入函数 → 真实 listProject）
+  ---
+  duration_ms: 28.2452
+  type: 'test'
+  ...
+# Subtest: T1-09 内置六角色字段完整且与真实注册表/Model 常量逐字段相等（chief/convener dispatch=true、shell=operator-approve、硬拒只含 forbiddenWritePaths）
+ok 6 - T1-09 内置六角色字段完整且与真实注册表/Model 常量逐字段相等（chief/convener dispatch=true、shell=operator-approve、硬拒只含 forbiddenWritePaths）
+  ---
+  duration_ms: 2.7151
+  type: 'test'
+  ...
+# Subtest: T1-10/11/12 worker 行、issue、归档/保留 id：真实 listProject + 共享解析 + 矩阵渲染
+ok 7 - T1-10/11/12 worker 行、issue、归档/保留 id：真实 listProject + 共享解析 + 矩阵渲染
+  ---
+  duration_ms: 43.572
+  type: 'test'
+  ...
+# Subtest: T1-13 acceptance 只来自 resolveBoundary；listing 的 acceptance 是占位；中途新增角色 acceptance-unavailable
+ok 8 - T1-13 acceptance 只来自 resolveBoundary；listing 的 acceptance 是占位；中途新增角色 acceptance-unavailable
+  ---
+  duration_ms: 49.6285
+  type: 'test'
+  ...
+# Subtest: T1-14/15 派发导航：Model 常量实时相等、卡种快照来源、target:"application"（R-9）、无编造角色；源码单一来源
+ok 9 - T1-14/15 派发导航：Model 常量实时相等、卡种快照来源、target:"application"（R-9）、无编造角色；源码单一来源
+  ---
+  duration_ms: 18.9317
+  type: 'test'
+  ...
+# Subtest: T1-16/17 启动快照不自动改写；工具刷新 generatedAt；中途新增角色 acceptance-unavailable；跨会话无缓存
+ok 10 - T1-16/17 启动快照不自动改写；工具刷新 generatedAt；中途新增角色 acceptance-unavailable；跨会话无缓存
+  ---
+  duration_ms: 54.171
+  type: 'test'
+  ...
+# Subtest: T1-18 枚举失败（项目根异常）：会话仍开、degraded、worker 段不可用、不误报未 bootstrap
+ok 11 - T1-18 枚举失败（项目根异常）：会话仍开、degraded、worker 段不可用、不误报未 bootstrap
+  ---
+  duration_ms: 6.7808
+  type: 'test'
+  ...
+# Subtest: T1-19 未 bootstrap / 全坏目录 / 单角色失败隔离 / 归档不出行
+ok 12 - T1-19 未 bootstrap / 全坏目录 / 单角色失败隔离 / 归档不出行
+  ---
+  duration_ms: 53.4209
+  type: 'test'
+  ...
+# Subtest: T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入
+ok 13 - T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入
+  ---
+  duration_ms: 33.6798
+  type: 'test'
+  ...
+# Subtest: T1-22 矩阵计算与工具调用不写项目文件/账本/trunk/VCA/冻结/stable-write
+ok 14 - T1-22 矩阵计算与工具调用不写项目文件/账本/trunk/VCA/冻结/stable-write
+  ---
+  duration_ms: 33.293
+  type: 'test'
+  ...
+# Subtest: T1-23 有界渲染：16,000/48,000/1,500 与单字段上限、截断标注、不注入执行原则长文
+ok 15 - T1-23 有界渲染：16,000/48,000/1,500 与单字段上限、截断标注、不注入执行原则长文
+  ---
+  duration_ms: 369.0879
+  type: 'test'
+  ...
+# Subtest: T1-24 恶意/超长/含指令角色卡：数据化包裹、固定声明、清洗、[marker removed]、无未转义块边界
+ok 16 - T1-24 恶意/超长/含指令角色卡：数据化包裹、固定声明、清洗、[marker removed]、无未转义块边界
+  ---
+  duration_ms: 22.3947
+  type: 'test'
+  ...
+# Subtest: T1-25/26 i18n messages 不含矩阵 key（模型可见文本不进 i18n）；摘要声明/固定句逐字、无授权字段
+ok 17 - T1-25/26 i18n messages 不含矩阵 key（模型可见文本不进 i18n）；摘要声明/固定句逐字、无授权字段
+  ---
+  duration_ms: 15.8476
+  type: 'test'
+  ...
+# Subtest: T1-27 桌面端到端：真实 openRoleSession + 只读导入 buildProjectConfig（幕僚含矩阵、worker 无矩阵、无新增 IPC 依赖）
+ok 18 - T1-27 桌面端到端：真实 openRoleSession + 只读导入 buildProjectConfig（幕僚含矩阵、worker 无矩阵、无新增 IPC 依赖）
+  ---
+  duration_ms: 28.4547
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1322.3475

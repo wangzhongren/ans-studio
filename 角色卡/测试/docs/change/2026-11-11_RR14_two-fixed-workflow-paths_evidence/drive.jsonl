@@ -1,0 +1,105 @@
+{"ts":"2026-11-11T03:31:28.807Z","type":"cdp.page","url":"file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/app/renderer/dist/index.html","title":"ANS 治理会话工作台","id":"23DC6CFDA3A4B9D0F28B6ACCB3A5ABEF","port":9224}
+{"ts":"2026-11-11T03:31:28.813Z","type":"window.ready","title":"ANS 治理会话工作台"}
+{"ts":"2026-11-11T03:31:28.909Z","type":"screenshot","file":"ui-00-launch.jpeg","bytes":47001}
+{"ts":"2026-11-11T03:31:28.912Z","type":"import.click","importClick":"clicked"}
+{"ts":"2026-11-11T03:31:29.679Z","type":"import.dialog","psOut":"SELECTED dialogs=1 chosen=12718216 edit=10620648 button=5443686 path=C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr14-2026-11-11\\target"}
+{"ts":"2026-11-11T03:31:33.733Z","type":"screenshot","file":"ui-01-imported.jpeg","bytes":63317}
+{"ts":"2026-11-11T03:31:33.737Z","type":"roles.listing","projectRoot":"C:\\Users\\51054\\Desktop\\work\\ans-two-fixed-paths-rr14-2026-11-11\\target","count":6,"roles":[{"roleId":"chief","builtIn":true,"governanceFunction":"chief"},{"roleId":"product","builtIn":true,"governanceFunction":"product"},{"roleId":"rapporteur","builtIn":true,"governanceFunction":"proposal"},{"roleId":"nominator","builtIn":true,"governanceFunction":"nomination"},{"roleId":"convener","builtIn":true,"governanceFunction":"schedule"},{"roleId":"verifier","builtIn":true,"governanceFunction":"verification"}],"primaryRoleId":"chief"}
+{"ts":"2026-11-11T03:31:33.772Z","type":"screenshot","file":"ui-02-roles.jpeg","bytes":63317}
+{"ts":"2026-11-11T03:31:33.830Z","type":"role.open","roleId":"chief","opened":true}
+{"ts":"2026-11-11T03:31:34.876Z","type":"screenshot","file":"ui-03-chief-session.jpeg","bytes":63478}
+{"ts":"2026-11-11T03:31:36.408Z","type":"compose.sent","label":"customer","cleared":true,"mark":"2026-11-11T03:31:34.897Z"}
+{"ts":"2026-11-11T03:31:36.463Z","type":"screenshot","file":"ui-04-customer-message.jpeg","bytes":76034}
+{"ts":"2026-11-11T03:31:36.464Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:31:33.774Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:36.464Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:31:33.779Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:36.464Z","type":"diag","event":"chief.workflow.v2.loaded","at":"2026-11-11T03:31:33.789Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:36.464Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:31:33.806Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:36.464Z","type":"diag","event":"session.open.end","at":"2026-11-11T03:31:33.809Z","roleId":"chief","ok":true,"errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:36.522Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":76064}
+{"ts":"2026-11-11T03:31:45.167Z","type":"task.row","at":"2026-11-11T03:31:44.818Z","kind":"task.created","taskId":"t-mwbkbkfe-7e6ed894","from":"chief","to":"convener","flowId":"snake-game","workflowId":"wf-f667bf7b9176d59bea6fc957","stage":"A1","taskKind":"stage-request","sideEffect":"read-only","application":null}
+{"ts":"2026-11-11T03:31:45.168Z","type":"workflow.row","at":"2026-11-11T03:31:44.810Z","kind":"workflow.started","workflowId":"wf-f667bf7b9176d59bea6fc957","flowId":"snake-game","path":"A","code":null,"outcome":null}
+{"ts":"2026-11-11T03:31:45.168Z","type":"workflow.row","at":"2026-11-11T03:31:44.810Z","kind":"stage.requested","workflowId":"wf-f667bf7b9176d59bea6fc957","flowId":"snake-game","path":"A","stage":"A1","code":null,"outcome":null}
+{"ts":"2026-11-11T03:31:45.170Z","type":"diag","event":"session.open.stale-listing-refreshed","at":"2026-11-11T03:31:44.830Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:45.170Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:31:44.831Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:45.171Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:31:44.843Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:45.171Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:31:44.853Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:45.171Z","type":"diag","event":"taskGit.scope.unavailable","at":"2026-11-11T03:31:44.857Z","roleId":"convener","errorMessage":null,"code":"git-task-scope-invalid","workflowId":null}
+{"ts":"2026-11-11T03:31:45.172Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:31:44.866Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:49.722Z","type":"diag","event":"ipc.failed","at":"2026-11-11T03:31:49.559Z","roleId":null,"errorMessage":"项目正在处理派发或权限变更，选择尚未更改。请稍后重试。","code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:49.723Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:31:49.563Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:49.723Z","type":"diag","event":"chief.workflow.v2.loaded","at":"2026-11-11T03:31:49.570Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:31:49.723Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:31:49.580Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:06.860Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":128354}
+{"ts":"2026-11-11T03:32:12.622Z","type":"task.row","at":"2026-11-11T03:32:12.337Z","kind":"task.created","taskId":"t-mwbkc5o1-accf7668","from":"convener","to":"product","flowId":"snake-game","workflowId":"wf-f667bf7b9176d59bea6fc957","stage":"A1","sideEffect":"docs","application":null}
+{"ts":"2026-11-11T03:32:12.622Z","type":"workflow.row","at":"2026-11-11T03:32:12.345Z","kind":"stage.dispatched","workflowId":"wf-f667bf7b9176d59bea6fc957","flowId":"snake-game","path":"A","stage":"A1","code":null,"outcome":null}
+{"ts":"2026-11-11T03:32:12.622Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:32:12.347Z","roleId":"product","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:12.622Z","type":"diag","event":"taskGit.scope.unavailable","at":"2026-11-11T03:32:12.351Z","roleId":"product","errorMessage":null,"code":"git-task-scope-invalid","workflowId":null}
+{"ts":"2026-11-11T03:32:12.622Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:32:12.360Z","roleId":"product","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:18.416Z","type":"task.row","at":"2026-11-11T03:32:18.135Z","kind":"task.delivered","taskId":"t-mwbkbkfe-7e6ed894","to":"convener","application":null}
+{"ts":"2026-11-11T03:32:18.416Z","type":"task.row","at":"2026-11-11T03:32:18.090Z","kind":"task.reported","taskId":"t-mwbkbkfe-7e6ed894","from":"convener","status":"done","application":null,"summary":"已落盘项目工作流并按 A1 派发产品受理/准备任务：创建 docs/workflow.md（固定路径 A 的 A1~A13/B4 步骤表与约定），向 product 派发 A1 受理与准备任务 #t-mwbkc5o1-accf7668（roleId=product、flowId=snake-game、stage=A1、sideEffect=docs、无 module/写集），任务文本明确只做受理…"}
+{"ts":"2026-11-11T03:32:18.417Z","type":"diag","event":"session.open-background.start","at":"2026-11-11T03:32:18.106Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:18.417Z","type":"diag","event":"session.open-background.end","at":"2026-11-11T03:32:18.109Z","roleId":"chief","ok":true,"errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:18.417Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:18.190Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:25.027Z","type":"task.row","at":"2026-11-11T03:32:24.666Z","kind":"task.reported","taskId":"t-mwbkbkfe-7e6ed894","from":"convener","status":"done","application":null,"summary":"同一 A1 请求的重复投递，已核实无需再派：A1 产品受理/准备任务 #t-mwbkc5o1-accf7668 已于上一回合按 roleId=product、flowId=snake-game、stage=A1、sideEffect=docs（无 taskKind、无 module/写集）派发给 product，任务文本明确只做受理/准备、不写 docs/product/ 意图正文（A2 另派）…"}
+{"ts":"2026-11-11T03:32:25.030Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:24.682Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:25.030Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:24.714Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:28.739Z","type":"task.row","at":"2026-11-11T03:32:28.695Z","kind":"task.delivered","taskId":"t-mwbkc5o1-accf7668","to":"product","application":null}
+{"ts":"2026-11-11T03:32:28.739Z","type":"task.row","at":"2026-11-11T03:32:28.654Z","kind":"task.reported","taskId":"t-mwbkc5o1-accf7668","from":"product","status":"done","application":null,"summary":"A1 产品受理与准备已完成（未写意图正文、未落盘准备记录，结论如下）。 一、目标理解 客户要一个可本地运行的经典贪吃蛇小游戏：用键盘操控蛇移动吃食物得分，具备实时计分，游戏结束后能重开再来，并且蛇撞到边界即判定碰撞（本局结束）。 二、范围与边界草案（草案，待 A3 客户确认） - 做什么（最小可行）：单人单机、单一棋盘；键盘方向控制；吃食物加分并刷新分数；一局结束后可一键/一键位重开；蛇头撞边界…"}
+{"ts":"2026-11-11T03:32:28.745Z","type":"diag","event":"session.open-background.start","at":"2026-11-11T03:32:28.668Z","roleId":"chief","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:28.745Z","type":"diag","event":"session.open-background.end","at":"2026-11-11T03:32:28.670Z","roleId":"chief","ok":true,"errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:32:36.930Z","type":"task.row","at":"2026-11-11T03:32:36.591Z","kind":"task.reported","taskId":"t-mwbkc5o1-accf7668","from":"product","status":"done","application":null,"summary":"A1 产品受理与准备已完成（已重读 docs/workflow.md 确认 A1/A2 分工；本任务不写意图正文、未落盘准备记录，结论如下）。 一、目标理解 客户要一个可本地运行的经典贪吃蛇小游戏：用键盘操控蛇移动吃食物得分，具备实时计分，游戏结束后能重开再来，并且蛇撞到边界即判定碰撞（本局结束）。 二、范围与边界草案（草案，待 A3 客户确认） - 做什么（最小可行）：单人单机、单一棋盘；键盘…"}
+{"ts":"2026-11-11T03:32:36.931Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:36.608Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:36.931Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:36.643Z","roleId":"convener","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:37.018Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":88158}
+{"ts":"2026-11-11T03:32:42.766Z","type":"task.row","at":"2026-11-11T03:32:42.462Z","kind":"task.closed","taskId":"t-mwbkc5o1-accf7668","outcome":"accepted","by":"convener","application":null}
+{"ts":"2026-11-11T03:32:42.766Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:42.464Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:49.720Z","type":"task.row","at":"2026-11-11T03:32:49.596Z","kind":"task.reported","taskId":"t-mwbkbkfe-7e6ed894","from":"convener","status":"done","application":null,"summary":"A1 已向客户汇总完成：product 交回 A1 受理/准备结论（单机经典贪吃蛇：键盘控制、吃食物计分、结束可重开、撞边界结束；范围/边界草案、覆盖四项的验收要点草案、待澄清问题、意图文档路径草案 docs/product/snake-game-intent-vN.md），未写意图正文、未落盘（符合 A1 只受理/准备的约定，evidence 为空属任务范围内）；作为创建者已收口 produc…"}
+{"ts":"2026-11-11T03:32:49.723Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:49.610Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:49.723Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:49.630Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:32:52.599Z","type":"task.row","at":"2026-11-11T03:32:52.203Z","kind":"task.closed","taskId":"t-mwbkbkfe-7e6ed894","outcome":"accepted","by":"chief","application":null}
+{"ts":"2026-11-11T03:32:52.600Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:32:52.204Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:33:06.158Z","type":"task.row","at":"2026-11-11T03:33:05.759Z","kind":"task.created","taskId":"t-mwbkdavy-fa9a0cd4","from":"chief","to":"convener","flowId":"snake-game","workflowId":"wf-f667bf7b9176d59bea6fc957","stage":"A2","taskKind":"stage-request","sideEffect":"read-only","application":null}
+{"ts":"2026-11-11T03:33:06.158Z","type":"workflow.row","at":"2026-11-11T03:33:05.758Z","kind":"stage.requested","workflowId":"wf-f667bf7b9176d59bea6fc957","flowId":"snake-game","path":"A","stage":"A2","code":null,"outcome":null}
+{"ts":"2026-11-11T03:33:06.159Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:33:05.765Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:33:06.159Z","type":"diag","event":"taskGit.scope.unavailable","at":"2026-11-11T03:33:05.770Z","roleId":"convener","errorMessage":null,"code":"git-task-scope-invalid","workflowId":null}
+{"ts":"2026-11-11T03:33:06.159Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:33:05.780Z","roleId":"convener","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:33:07.039Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":110569}
+{"ts":"2026-11-11T03:33:15.664Z","type":"task.row","at":"2026-11-11T03:33:15.328Z","kind":"task.created","taskId":"t-mwbkdi9s-c7924e92","from":"convener","to":"product","flowId":"snake-game","workflowId":"wf-f667bf7b9176d59bea6fc957","stage":"A2","sideEffect":"docs","application":null}
+{"ts":"2026-11-11T03:33:15.664Z","type":"diag","event":"session.open.start","at":"2026-11-11T03:33:15.334Z","roleId":"product","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:33:15.664Z","type":"diag","event":"taskGit.scope.unavailable","at":"2026-11-11T03:33:15.339Z","roleId":"product","errorMessage":null,"code":"git-task-scope-invalid","workflowId":null}
+{"ts":"2026-11-11T03:33:15.664Z","type":"diag","event":"session.open.ready","at":"2026-11-11T03:33:15.348Z","roleId":"product","errorMessage":null,"code":null,"workflowId":null}
+{"ts":"2026-11-11T03:33:21.800Z","type":"task.row","at":"2026-11-11T03:33:21.376Z","kind":"task.delivered","taskId":"t-mwbkdavy-fa9a0cd4","to":"convener","application":null}
+{"ts":"2026-11-11T03:33:21.801Z","type":"task.row","at":"2026-11-11T03:33:21.341Z","kind":"task.reported","taskId":"t-mwbkdavy-fa9a0cd4","from":"convener","status":"done","application":null,"summary":"A2 已派发：前置 A1 任务 #t-mwbkc5o1-accf7668 已于上一回合 accepted 收口（本轮无需重复关闭）；已向 product 派发 A2 意图撰写任务 #t-mwbkdi9s-c7924e92（flowId=snake-game、workflowId=wf-f667bf7b9176d59bea6fc957、stage=A2、sideEffect=docs、无 task…"}
+{"ts":"2026-11-11T03:33:27.964Z","type":"task.row","at":"2026-11-11T03:33:27.657Z","kind":"task.reported","taskId":"t-mwbkdavy-fa9a0cd4","from":"convener","status":"done","application":null,"summary":"A2 请求重复投递，已核实无需重复动作：前置 A1 任务 #t-mwbkc5o1-accf7668 上一回合已 accepted 收口；A2 产品撰写任务 #t-mwbkdi9s-c7924e92 已于上一回合按 roleId=product、flowId=snake-game、workflowId=wf-f667bf7b9176d59bea6fc957、stage=A2、sideEffect=…"}
+{"ts":"2026-11-11T03:33:27.965Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:33:27.712Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:33:31.719Z","type":"task.row","at":"2026-11-11T03:33:31.597Z","kind":"task.closed","taskId":"t-mwbkdavy-fa9a0cd4","outcome":"accepted","by":"chief","application":null}
+{"ts":"2026-11-11T03:33:31.720Z","type":"diag","event":"delivery.blocked","at":"2026-11-11T03:33:31.602Z","roleId":"chief","errorMessage":null,"code":"target-busy","workflowId":null}
+{"ts":"2026-11-11T03:33:37.220Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":98253}
+{"ts":"2026-11-11T03:33:43.071Z","type":"task.row","at":"2026-11-11T03:33:42.652Z","kind":"task.delivered","taskId":"t-mwbkdi9s-c7924e92","to":"product","application":null}
+{"ts":"2026-11-11T03:33:43.072Z","type":"task.row","at":"2026-11-11T03:33:42.616Z","kind":"task.reported","taskId":"t-mwbkdi9s-c7924e92","from":"product","status":"done","application":null,"summary":"A2 已撰写并落盘产品意图文档：`docs/product/snake-game-intent-v1.md`（6749 字节，已通过写入门禁；frontmatter 含 schema: project-intent/v1）。未写任何其他治理文档，未使用 shell/解释器。 frontmatter 实际值： - intentId: snake-game-basic（小写 slug，未用 flow…"}
+{"ts":"2026-11-11T03:33:48.925Z","type":"task.row","at":"2026-11-11T03:33:48.521Z","kind":"task.closed","taskId":"t-mwbkdi9s-c7924e92","outcome":"accepted","by":"convener","application":null}
+{"ts":"2026-11-11T03:33:48.926Z","type":"workflow.row","at":"2026-11-11T03:33:48.521Z","kind":"stage.completed","workflowId":"wf-f667bf7b9176d59bea6fc957","flowId":"snake-game","path":"A","stage":"A2","code":null,"outcome":null}
+{"ts":"2026-11-11T03:34:07.398Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:34:37.700Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:35:07.991Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:35:38.338Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:36:08.706Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:36:38.953Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:37:09.260Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:37:39.666Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:38:10.042Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:38:40.308Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:39:10.648Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:39:41.002Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:40:11.316Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:40:41.618Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:41:12.002Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:41:42.283Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:42:12.673Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:42:43.027Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:43:13.438Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:43:43.743Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:44:14.068Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}
+{"ts":"2026-11-11T03:44:44.402Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:45:14.787Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101608}
+{"ts":"2026-11-11T03:45:45.117Z","type":"screenshot","file":"ui-heartbeat.jpeg","bytes":101565}

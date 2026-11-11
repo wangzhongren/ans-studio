@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+ok 1 - fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+  ---
+  duration_ms: 2.8455
+  type: 'test'
+  ...
+# Subtest: fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+ok 2 - fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.4162
+  type: 'test'
+  ...
+# Subtest: legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+ok 3 - legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+  ---
+  duration_ms: 0.5005
+  type: 'test'
+  ...
+# Subtest: fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+ok 4 - fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.6467
+  type: 'test'
+  ...
+# Subtest: fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+ok 5 - fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+  ---
+  duration_ms: 0.2183
+  type: 'test'
+  ...
+# Subtest: fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+ok 6 - fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+  ---
+  duration_ms: 0.3988
+  type: 'test'
+  ...
+# Subtest: fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+ok 7 - fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.5375
+  type: 'test'
+  ...
+# Subtest: legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+ok 8 - legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+  ---
+  duration_ms: 0.3956
+  type: 'test'
+  ...
+# Subtest: fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+ok 9 - fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.503
+  type: 'test'
+  ...
+# Subtest: WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+ok 10 - WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+  ---
+  duration_ms: 0.1535
+  type: 'test'
+  ...
+# Subtest: dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+ok 11 - dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+  ---
+  duration_ms: 0.7741
+  type: 'test'
+  ...
+# Subtest: merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+ok 12 - merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+  ---
+  duration_ms: 0.0828
+  type: 'test'
+  ...
+# Subtest: requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+ok 13 - requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+  ---
+  duration_ms: 1.8276
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 246.4788

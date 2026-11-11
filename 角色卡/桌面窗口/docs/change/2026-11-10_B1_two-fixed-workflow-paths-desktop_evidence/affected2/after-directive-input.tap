@@ -1,0 +1,190 @@
+TAP version 13
+# Subtest: 指令提交：确认面板字段（原文/动作/范围/期限/confirmable/开关快照）；确认后 durable 落账 + 回执 + 双视图
+ok 1 - 指令提交：确认面板字段（原文/动作/范围/期限/confirmable/开关快照）；确认后 durable 落账 + 回执 + 双视图
+  ---
+  duration_ms: 31.8261
+  type: 'test'
+  ...
+# Subtest: 指令取消：不落账、无回执、directiveCancelled；未知 id 为 expired；关窗 cancelAll
+ok 2 - 指令取消：不落账、无回执、directiveCancelled；未知 id 为 expired；关窗 cancelAll
+  ---
+  duration_ms: 56.0192
+  type: 'test'
+  ...
+# Subtest: 输入式撤销：@审批 撤销 \#id 经确认后调 runtime.revoke；同 target/active；回执与列表刷新；跨 target/终态直接回错
+ok 3 - 输入式撤销：@审批 撤销 \#id 经确认后调 runtime.revoke；同 target/active；回执与列表刷新；跨 target/终态直接回错
+  ---
+  duration_ms: 124.8598
+  type: 'test'
+  ...
+# Subtest: 高危复核：approval 宽命令/forever 未勾选拒绝且面板保持；勾选后落账
+ok 4 - 高危复核：approval 宽命令/forever 未勾选拒绝且面板保持；勾选后落账
+  ---
+  duration_ms: 39.4225
+  type: 'test'
+  ...
+# Subtest: AC-13 2×2：decision 项目级 select-recommended 仅在「开关关闭」时高危；flow 范围无该高危
+ok 5 - AC-13 2×2：decision 项目级 select-recommended 仅在「开关关闭」时高危；flow 范围无该高危
+  ---
+  duration_ms: 117.4143
+  type: 'test'
+  ...
+# Subtest: 幂等与重推：同 clientMessageId 同文只开一张面板、返回同一 id；replayPending 复用同一 requestId
+ok 6 - 幂等与重推：同 clientMessageId 同文只开一张面板、返回同一 id；replayPending 复用同一 requestId
+  ---
+  duration_ms: 36.963
+  type: 'test'
+  ...
+# Subtest: 项目切换：未决面板取消、不销毁旧运行时；切回后同一运行内 session 指令仍 active
+ok 7 - 项目切换：未决面板取消、不销毁旧运行时；切回后同一运行内 session 指令仍 active
+  ---
+  duration_ms: 56.8152
+  type: 'test'
+  ...
+# Subtest: sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道
+not ok 8 - sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道
+  ---
+  duration_ms: 33.7743
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\directive-input.test.ts:482:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    命中即有确认面板
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:497:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: sendSession target fail-closed：缺失/非法/跨项目/角色不在清单/无效引擎均不落账、不投递、不回退
+ok 9 - sendSession target fail-closed：缺失/非法/跨项目/角色不在清单/无效引擎均不落账、不投递、不回退
+  ---
+  duration_ms: 4.1261
+  type: 'test'
+  ...
+# Subtest: sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）
+not ok 10 - sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）
+  ---
+  duration_ms: 3.4807
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\directive-input.test.ts:574:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /图片/. Input:
+    
+    '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:589:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: sendSession：未命中标记时普通消息行为逐字不变（含图片校验路径仍在）
+ok 11 - sendSession：未命中标记时普通消息行为逐字不变（含图片校验路径仍在）
+  ---
+  duration_ms: 3.3347
+  type: 'test'
+  ...
+# Subtest: sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）
+not ok 12 - sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）
+  ---
+  duration_ms: 3.8621
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\directive-input.test.ts:628:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /能力不可用/. Input:
+    
+    '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: '向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:649:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 控制器：自然语言解释成功 ⇒ 面板预填 AI 解释；解释器收到 target/正文/原文/项目/角色/引擎；确认后落账
+ok 13 - 控制器：自然语言解释成功 ⇒ 面板预填 AI 解释；解释器收到 target/正文/原文/项目/角色/引擎；确认后落账
+  ---
+  duration_ms: 20.7349
+  type: 'test'
+  ...
+# Subtest: 控制器：解释失败 ⇒ 回退现有面板（confirmable=false、未识别片段）；伪造确认也不落账
+ok 14 - 控制器：解释失败 ⇒ 回退现有面板（confirmable=false、未识别片段）；伪造确认也不落账
+  ---
+  duration_ms: 23.6228
+  type: 'test'
+  ...
+# Subtest: 控制器：撤销快路径不调用解释器；确认后 durable revoked
+ok 15 - 控制器：撤销快路径不调用解释器；确认后 durable revoked
+  ---
+  duration_ms: 19.8617
+  type: 'test'
+  ...
+# Subtest: sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账
+not ok 16 - sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账
+  ---
+  duration_ms: 4009.4028
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\directive-input.test.ts:766:1'
+  failureType: 'testCodeFailure'
+  error: 'waitFor 超时'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:40:49)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:793:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂
+not ok 17 - sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂
+  ---
+  duration_ms: 4007.1856
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\桌面应用\\directive-input.test.ts:814:1'
+  failureType: 'testCodeFailure'
+  error: 'waitFor 超时'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:40:49)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/directive-input.test.ts:836:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: preload：directive:state 注册即同步回放缓存；订阅后续推送；取消订阅保留顶层缓存监听
+ok 18 - preload：directive:state 注册即同步回放缓存；订阅后续推送；取消订阅保留顶层缓存监听
+  ---
+  duration_ms: 1.5288
+  type: 'test'
+  ...
+# Subtest: 冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用运行级 sessionId、Q9 旧读者三值
+ok 19 - 冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用运行级 sessionId、Q9 旧读者三值
+  ---
+  duration_ms: 2.3469
+  type: 'test'
+  ...
+1..19
+# tests 19
+# suites 0
+# pass 14
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9028.5045

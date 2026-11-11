@@ -1,0 +1,74 @@
+TAP version 13
+# [i18n-guard] scanned=148 allowlisted=23 violations=2
+# Subtest: 守卫范围：包含入口与共享设置，排除测试/消息目录/治理角色文本/dist
+ok 1 - 守卫范围：包含入口与共享设置，排除测试/消息目录/治理角色文本/dist
+  ---
+  duration_ms: 10.4786
+  type: 'test'
+  ...
+# Subtest: allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文）
+ok 2 - allowlist 纪律：无重复、已排序、无陈旧条目（每条仍在范围内且仍含中文）
+  ---
+  duration_ms: 56.4478
+  type: 'test'
+  ...
+# Subtest: 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过）
+not ok 3 - 硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过）
+  ---
+  duration_ms: 72.4786
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\项目管理\\shared\\i18n-guard.test.ts:63:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    allowlist 之外出现硬编码中文
+    + actual - expected
+    
+    + [
+    +   'app/desktop/workflow-git.ts:32:26 编排',
+    +   'app/desktop/workflow.ts:20:49 编排'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'app/desktop/workflow-git.ts:32:26 编排'
+    1: 'app/desktop/workflow.ts:20:49 编排'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/%E9%A1%B9%E7%9B%AE%E7%AE%A1%E7%90%86/shared/i18n-guard.test.ts:77:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；注释中文放行
+ok 4 - 合成负例：新文件的中文字符串/模板/JSX 文本被拒绝；注释中文放行
+  ---
+  duration_ms: 6.0511
+  type: 'test'
+  ...
+# Subtest: 去注释扫描：字符串/模板中的 URL 与内容不误删
+ok 5 - 去注释扫描：字符串/模板中的 URL 与内容不误删
+  ---
+  duration_ms: 0.13
+  type: 'test'
+  ...
+# Subtest: 去注释扫描：模板表达式内的注释被去除，模板原文保留
+ok 6 - 去注释扫描：模板表达式内的注释被去除，模板原文保留
+  ---
+  duration_ms: 0.0632
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 5
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 227.1499

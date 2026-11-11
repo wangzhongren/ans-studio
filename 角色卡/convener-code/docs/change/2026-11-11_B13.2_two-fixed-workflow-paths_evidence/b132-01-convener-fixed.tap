@@ -1,0 +1,76 @@
+TAP version 13
+# Subtest: fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+ok 1 - fixedCards：冻结值恰 ["decision"]；独立于 legacy cards，legacy 逐字不变
+  ---
+  duration_ms: 0.8327
+  type: 'test'
+  ...
+# Subtest: fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+ok 2 - fixedAllowedBuiltInRoleIds：冻结值恰 [product, rapporteur, nominator]；legacy allowedBuiltInRoleIds 仍 [verifier]
+  ---
+  duration_ms: 0.0828
+  type: 'test'
+  ...
+# Subtest: isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+ok 3 - isConvenerFixedBuiltInDispatchTarget：生产线目标正例；verifier/自身/未知/大小写变体负例
+  ---
+  duration_ms: 0.1642
+  type: 'test'
+  ...
+# Subtest: context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+ok 4 - context(fixed)：返回 fixed 段（生产线/任务证据与哈希/卡预算/团队计划与基线/集成汇总与报告期望），冻结且无 resources
+  ---
+  duration_ms: 0.1389
+  type: 'test'
+  ...
+# Subtest: B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash
+ok 5 - B9.1 fixed 证据纪律：证据只要求 path/内容/frontmatter/结论；应用计算 hash；禁止 worker shell hash
+  ---
+  duration_ms: 0.1465
+  type: 'test'
+  ...
+# Subtest: B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）
+ok 6 - B13.2 fixed 证据纪律：任务文本须要求 submit_report.evidence[] 为纯项目相对路径（描述文本不计为证据）
+  ---
+  duration_ms: 0.1439
+  type: 'test'
+  ...
+# Subtest: B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导
+ok 7 - B9.1 fixed 卡预算：3 张确认卡 + merge-main；shell/stable-write 等额外卡不得由任务文本诱导
+  ---
+  duration_ms: 0.0902
+  type: 'test'
+  ...
+# Subtest: context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+ok 8 - context(legacy)：无 matrix / legacy-v1 / 畸形输入返回同一 legacy 三段（固定前逐字冻结）
+  ---
+  duration_ms: 0.1183
+  type: 'test'
+  ...
+# Subtest: legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+ok 9 - legacy tools/dispatch/capabilities 与 fixed 字段无耦合（fixed 数据纯只读）
+  ---
+  duration_ms: 0.2098
+  type: 'test'
+  ...
+# Subtest: 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+ok 10 - 模块纪律：唯一 public entry；只 import Model（type-only）；无 requestReleaseMerge / 无新工具
+  ---
+  duration_ms: 3.1957
+  type: 'test'
+  ...
+# Subtest: 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+ok 11 - 测试纪律：本目录测试不新增 skip / force-exit（token 动态拼接以避免自指误报）
+  ---
+  duration_ms: 1.1138
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 86.0849

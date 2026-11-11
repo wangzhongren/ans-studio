@@ -1,0 +1,4003 @@
+TAP version 13
+# Subtest: pre-aborted public tools retain specific failure semantics and invoke no capability
+ok 1 - pre-aborted public tools retain specific failure semantics and invoke no capability
+  ---
+  duration_ms: 2.323
+  type: 'test'
+  ...
+# Subtest: abort during public capability waits keeps actual handler failure wording instead of generic cancellation
+ok 2 - abort during public capability waits keeps actual handler failure wording instead of generic cancellation
+  ---
+  duration_ms: 84.0994
+  type: 'test'
+  ...
+# Subtest: success received as cancellation arrives is still converted to the tool-specific failure
+ok 3 - success received as cancellation arrives is still converted to the tool-specific failure
+  ---
+  duration_ms: 4.4531
+  type: 'test'
+  ...
+# Subtest: abort rejection no longer quarantines forever once the underlying turn settles later
+not ok 4 - abort rejection no longer quarantines forever once the underlying turn settles later
+  ---
+  duration_ms: 2.8754
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\abort-quarantine.test.ts:26:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async bound (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:18:19)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:30:37)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: abort rejection keeps quarantine when the underlying turn never settles
+not ok 5 - abort rejection keeps quarantine when the underlying turn never settles
+  ---
+  duration_ms: 1.1462
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\abort-quarantine.test.ts:59:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async bound (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:18:19)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:62:29)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: normal abort without cleanup failure keeps its existing quarantine lifecycle
+not ok 6 - normal abort without cleanup failure keeps its existing quarantine lifecycle
+  ---
+  duration_ms: 0.7697
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\abort-quarantine.test.ts:81:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async bound (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:18:19)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/abort-quarantine.test.ts:85:37)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: P1-A guard accepts exactly the frozen application tool-surface fact shape
+ok 7 - P1-A guard accepts exactly the frozen application tool-surface fact shape
+  ---
+  duration_ms: 0.63
+  type: 'test'
+  ...
+# Subtest: P1-A composition verifies Claude/Pi/Codex only under the exact reason whitelist and returns copied facts
+ok 8 - P1-A composition verifies Claude/Pi/Codex only under the exact reason whitelist and returns copied facts
+  ---
+  duration_ms: 0.7926
+  type: 'test'
+  ...
+# Subtest: P1-A composition rejects every blocked or unlisted wrapper reason (default deny)
+ok 9 - P1-A composition rejects every blocked or unlisted wrapper reason (default deny)
+  ---
+  duration_ms: 0.1966
+  type: 'test'
+  ...
+# Subtest: P1-A composition rejects missing, unknown, malformed or identity-mismatched adapter facts
+ok 10 - P1-A composition rejects missing, unknown, malformed or identity-mismatched adapter facts
+  ---
+  duration_ms: 0.2105
+  type: 'test'
+  ...
+# Subtest: P1-A Amendment-1: verified applicationMediation carries the bound nativeInstanceId (P1.6 §4.4 literal)
+ok 11 - P1-A Amendment-1: verified applicationMediation carries the bound nativeInstanceId (P1.6 §4.4 literal)
+  ---
+  duration_ms: 0.1773
+  type: 'test'
+  ...
+# Subtest: P1-A Codex application mediation additionally requires a bound native fact and no foreign MCP
+ok 12 - P1-A Codex application mediation additionally requires a bound native fact and no foreign MCP
+  ---
+  duration_ms: 0.17
+  type: 'test'
+  ...
+# Subtest: P1-A wrapper keeps applicationMediation absent for custom factories, demo and strict observed sessions
+ok 13 - P1-A wrapper keeps applicationMediation absent for custom factories, demo and strict observed sessions
+  ---
+  duration_ms: 12.1301
+  type: 'test'
+  ...
+# Subtest: P1-A real default Codex session remains strict-observed and never gains the dual path
+ok 14 - P1-A real default Codex session remains strict-observed and never gains the dual path
+  ---
+  duration_ms: 17.8514
+  type: 'test'
+  ...
+# {"factoryProvenance":"default-production","status":"observed","nativeToolRegistry":"application-mediated"}
+# Subtest: E7：killProcessTree 只保留一份实现，run_shell 从 process-tree.ts 导入
+ok 15 - E7：killProcessTree 只保留一份实现，run_shell 从 process-tree.ts 导入
+  ---
+  duration_ms: 2.7138
+  type: 'test'
+  ...
+# Subtest: S5 Claude：SDK MCP registerTool 实际收到四个后台工具
+ok 16 - S5 Claude：SDK MCP registerTool 实际收到四个后台工具
+  ---
+  duration_ms: 28.5381
+  type: 'test'
+  ...
+# Subtest: S5 Codex：thread/start 的 dynamicTools 实际包含四个后台工具
+ok 17 - S5 Codex：thread/start 的 dynamicTools 实际包含四个后台工具
+  ---
+  duration_ms: 93.9167
+  type: 'test'
+  ...
+# [pi] 加载 Pi 包…
+# [pi] 构造显式 provider…
+# [pi] resourceLoader.reload…
+# [pi] createAgentSession…
+# [pi] bindRole 完成
+# Subtest: S5 Pi：生产入口（"tools" in adapterInput）把四个后台工具注册为 customTools
+ok 18 - S5 Pi：生产入口（"tools" in adapterInput）把四个后台工具注册为 customTools
+  ---
+  duration_ms: 576.5834
+  type: 'test'
+  ...
+# Subtest: F9/B1：四工具只在 ShellGate 与管理器同时注入时注册；显示规则与判断会话隔离（结构面）
+ok 19 - F9/B1：四工具只在 ShellGate 与管理器同时注入时注册；显示规则与判断会话隔离（结构面）
+  ---
+  duration_ms: 2.6912
+  type: 'test'
+  ...
+# Subtest: F1/F2：空命令与 F-7 守卫在审核之前拒绝，零 spawn、无任务
+ok 20 - F1/F2：空命令与 F-7 守卫在审核之前拒绝，零 spawn、无任务
+  ---
+  duration_ms: 0.9187
+  type: 'test'
+  ...
+# Subtest: F3：审核拒绝/undefined/抛错/超时四类均零 spawn、无任务、无日志
+ok 21 - F3：审核拒绝/undefined/抛错/超时四类均零 spawn、无任务、无日志
+  ---
+  duration_ms: 39.8087
+  type: 'test'
+  ...
+# Subtest: F4/CC1：第 9 个在 ShellGate 之前被拒，无审核请求、零 spawn、诊断 background.limit
+ok 22 - F4/CC1：第 9 个在 ShellGate 之前被拒，无审核请求、零 spawn、诊断 background.limit
+  ---
+  duration_ms: 4.1841
+  type: 'test'
+  ...
+# Subtest: S1/S2：启动立即返回并含任务号/pid；list/read/stop 可用；再次 stop 如实返回已结束
+ok 23 - S1/S2：启动立即返回并含任务号/pid；list/read/stop 可用；再次 stop 如实返回已结束
+  ---
+  duration_ms: 231.4734
+  type: 'test'
+  ...
+# Subtest: S2.5/F10：自然退出如实显示 exited 与退出码；对已结束任务 stop 不谎报刚刚停止
+ok 24 - S2.5/F10：自然退出如实显示 exited 与退出码；对已结束任务 stop 不谎报刚刚停止
+  ---
+  duration_ms: 59.376
+  type: 'test'
+  ...
+# Subtest: F6/O3：未知任务、非法参数与 schema 边界；tailLines 超上限如实钳制
+ok 25 - F6/O3：未知任务、非法参数与 schema 边界；tailLines 超上限如实钳制
+  ---
+  duration_ms: 1.2953
+  type: 'test'
+  ...
+# Subtest: F8：后台进程 cwd=会话 shellCwd，凭据环境变量被剥离；schema 不接受调用方指定 cwd
+ok 26 - F8：后台进程 cwd=会话 shellCwd，凭据环境变量被剥离；schema 不接受调用方指定 cwd
+  ---
+  duration_ms: 60.9415
+  type: 'test'
+  ...
+# Subtest: S4：轮次中止不杀后台任务；启动成功结果不因信号中止被改写成「未启动」
+ok 27 - S4：轮次中止不杀后台任务；启动成功结果不因信号中止被改写成「未启动」
+  ---
+  duration_ms: 1129.324
+  type: 'test'
+  ...
+# Subtest: S3：管理器已关闭后 start 明确失败且零 spawn（审核通过后才发现会话关闭的竞态）
+ok 28 - S3：管理器已关闭后 start 明确失败且零 spawn（审核通过后才发现会话关闭的竞态）
+  ---
+  duration_ms: 0.6487
+  type: 'test'
+  ...
+# Subtest: B4/CC3：background.* 诊断事件齐全且字段全部落在共享白名单内（不含 taskId）
+ok 29 - B4/CC3：background.* 诊断事件齐全且字段全部落在共享白名单内（不含 taskId）
+  ---
+  duration_ms: 1.0618
+  type: 'test'
+  ...
+# Subtest: Service：仅 ShellGate 会话注入四工具；判断会话与无 ShellGate 会话不可见
+ok 30 - Service：仅 ShellGate 会话注入四工具；判断会话与无 ShellGate 会话不可见
+  ---
+  duration_ms: 11.4506
+  type: 'test'
+  ...
+# Subtest: Service dispose：终止运行中任务、管理器失效、dispose 幂等
+ok 31 - Service dispose：终止运行中任务、管理器失效、dispose 幂等
+  ---
+  duration_ms: 143.0986
+  type: 'test'
+  ...
+# Subtest: Service：bindRole 失败如实拒绝（管理器释放在无回合时为空操作；释放接线见代码/构造失败路径）
+ok 32 - Service：bindRole 失败如实拒绝（管理器释放在无回合时为空操作；释放接线见代码/构造失败路径）
+  ---
+  duration_ms: 5.4556
+  type: 'test'
+  ...
+# Subtest: Service：assertReady 失败如实拒绝并关闭已绑定 inner 会话（管理器释放路径已接线）
+ok 33 - Service：assertReady 失败如实拒绝并关闭已绑定 inner 会话（管理器释放路径已接线）
+  ---
+  duration_ms: 2.1193
+  type: 'test'
+  ...
+# Subtest: 无管理器：list 为空、read 未找到、stop 明确失败且不抛（含判断会话）
+ok 34 - 无管理器：list 为空、read 未找到、stop 明确失败且不抛（含判断会话）
+  ---
+  duration_ms: 12.5869
+  type: 'test'
+  ...
+# Subtest: 有管理器：list/read/stop 与选项转调当前会话管理器
+ok 35 - 有管理器：list/read/stop 与选项转调当前会话管理器
+  ---
+  duration_ms: 147.1969
+  type: 'test'
+  ...
+# Subtest: dispose 后：运行中任务终止，list/read/stop 明确失效且不复活管理器
+ok 36 - dispose 后：运行中任务终止，list/read/stop 明确失效且不复活管理器
+  ---
+  duration_ms: 103.9314
+  type: 'test'
+  ...
+# Subtest: S1/S2：真实子进程启动立即返回任务号与 pid；list/read 可见；stop 后 stopped 且进程消失
+ok 37 - S1/S2：真实子进程启动立即返回任务号与 pid；list/read 可见；stop 后 stopped 且进程消失
+  ---
+  duration_ms: 126.6461
+  type: 'test'
+  ...
+# Subtest: S2.5：自然退出显示 exited 与真实退出码；read 默认 40 行、上限 200（如实标 tailClamped）
+ok 38 - S2.5：自然退出显示 exited 与真实退出码；read 默认 40 行、上限 200（如实标 tailClamped）
+  ---
+  duration_ms: 55.1413
+  type: 'test'
+  ...
+# Subtest: S2.3：单路超过 256 KiB → truncated，仅保留尾部，且不返回损坏的多字节字符
+ok 39 - S2.3：单路超过 256 KiB → truncated，仅保留尾部，且不返回损坏的多字节字符
+  ---
+  duration_ms: 63.3799
+  type: 'test'
+  ...
+# Subtest: F5：spawn 失败不保留半成品任务、名额释放，后续仍可启动
+ok 40 - F5：spawn 失败不保留半成品任务、名额释放，后续仍可启动
+  ---
+  duration_ms: 45.6518
+  type: 'test'
+  ...
+# Subtest: F4/S6.1：并发上限 8，第 9 个被拒且名额不被突破
+ok 41 - F4/S6.1：并发上限 8，第 9 个被拒且名额不被突破
+  ---
+  duration_ms: 0.9693
+  type: 'test'
+  ...
+# Subtest: F4.4：并行 start 不会一起突破 8 个名额
+ok 42 - F4.4：并行 start 不会一起突破 8 个名额
+  ---
+  duration_ms: 0.4518
+  type: 'test'
+  ...
+# Subtest: S6.2：保留上限 32，最老已结束任务优先淘汰；运行中任务永不淘汰；淘汰任务号返回未知
+ok 43 - S6.2：保留上限 32，最老已结束任务优先淘汰；运行中任务永不淘汰；淘汰任务号返回未知
+  ---
+  duration_ms: 1.6332
+  type: 'test'
+  ...
+# Subtest: F7：终止预算内未观察到 close → kill-timeout；诊断 background.stop.timeout（证明真实等待到期）
+ok 44 - F7：终止预算内未观察到 close → kill-timeout；诊断 background.stop.timeout（证明真实等待到期）
+  ---
+  duration_ms: 1279.638
+  type: 'test'
+  ...
+# Subtest: S3：dispose 并行终止全部任务、幂等、清空任务并拒绝后续 start
+ok 45 - S3：dispose 并行终止全部任务、幂等、清空任务并拒绝后续 start
+  ---
+  duration_ms: 127.548
+  type: 'test'
+  ...
+# Subtest: F6：任务不跨管理器/会话可见（另一个管理器读/停旧任务号均为未知）
+ok 46 - F6：任务不跨管理器/会话可见（另一个管理器读/停旧任务号均为未知）
+  ---
+  duration_ms: 72.502
+  type: 'test'
+  ...
+# Subtest: S3.1：dispose 并行发起终止（两个任务的终止信号在同一批同步发出）
+ok 47 - S3.1：dispose 并行发起终止（两个任务的终止信号在同一批同步发出）
+  ---
+  duration_ms: 0.4345
+  type: 'test'
+  ...
+# Subtest: 启动后运行错误 → failed（启动失败不建任务）
+ok 48 - 启动后运行错误 → failed（启动失败不建任务）
+  ---
+  duration_ms: 0.2412
+  type: 'test'
+  ...
+# Subtest: 非法顶层 version/roleId/root：write_file 拒写且零文件副作用（目录都不创建）
+ok 49 - 非法顶层 version/roleId/root：write_file 拒写且零文件副作用（目录都不创建）
+  ---
+  duration_ms: 7.9276
+  type: 'test'
+  ...
+# Subtest: 合法模板放行并落盘；前置 ./ 与绝对路径同样受校验
+ok 50 - 合法模板放行并落盘；前置 ./ 与绝对路径同样受校验
+  ---
+  duration_ms: 15.8391
+  type: 'test'
+  ...
+# Subtest: role-card.md 与其他路径不校验内容（不受 boundary.yaml 规则波及）
+ok 51 - role-card.md 与其他路径不校验内容（不受 boundary.yaml 规则波及）
+  ---
+  duration_ms: 12.079
+  type: 'test'
+  ...
+# Subtest: edit_file：编辑结果引入非法顶层键 ⇒ 拒绝且文件保持不变
+ok 52 - edit_file：编辑结果引入非法顶层键 ⇒ 拒绝且文件保持不变
+  ---
+  duration_ms: 7.3767
+  type: 'test'
+  ...
+# Subtest: Windows 反斜杠路径也识别为角色边界文件（平台条件）
+ok 53 - Windows 反斜杠路径也识别为角色边界文件（平台条件）
+  ---
+  duration_ms: 0.8951
+  type: 'test'
+  ...
+# Subtest: F5/P1.2-AC-27 Codex native 不可用（responses）仍可准入：plan 省略 native、无 native-factory-* 拒绝、ensureAdapter 回落工厂构造
+ok 54 - F5/P1.2-AC-27 Codex native 不可用（responses）仍可准入：plan 省略 native、无 native-factory-* 拒绝、ensureAdapter 回落工厂构造
+  ---
+  duration_ms: 28.1859
+  type: 'test'
+  ...
+# Subtest: F5 Codex native 不可用（WebSearch）在受保护 + shell + 审批链下仍可准入：plan 省略 native 且审批链成立
+ok 55 - F5 Codex native 不可用（WebSearch）在受保护 + shell + 审批链下仍可准入：plan 省略 native 且审批链成立
+  ---
+  duration_ms: 6.5349
+  type: 'test'
+  ...
+# Subtest: F5 native observed ⇒ plan 记录可选强证明并可绑定；present-but-changed 逐字段拒绝
+ok 56 - F5 native observed ⇒ plan 记录可选强证明并可绑定；present-but-changed 逐字段拒绝
+  ---
+  duration_ms: 13.0584
+  type: 'test'
+  ...
+# Subtest: A9/D6 official-pure-preparation-unproven 退役：纯准备/丢弃只按真实边界决定 construction.status，trustedPurePreparation 仅证据
+ok 57 - A9/D6 official-pure-preparation-unproven 退役：纯准备/丢弃只按真实边界决定 construction.status，trustedPurePreparation 仅证据
+  ---
+  duration_ms: 8.6825
+  type: 'test'
+  ...
+# Subtest: schema：request_confirmation 增可选 paths（项目相对、逐文件、≤64、不得含仅引用文件）
+ok 58 - schema：request_confirmation 增可选 paths（项目相对、逐文件、≤64、不得含仅引用文件）
+  ---
+  duration_ms: 1.7559
+  type: 'test'
+  ...
+# Subtest: 合法 paths：posix 化后原样透传到卡片请求与 metadata
+ok 59 - 合法 paths：posix 化后原样透传到卡片请求与 metadata
+  ---
+  duration_ms: 1.1428
+  type: 'test'
+  ...
+# Subtest: 非法 paths：工具错误且不向客户发卡（零卡片副作用）
+ok 60 - 非法 paths：工具错误且不向客户发卡（零卡片副作用）
+  ---
+  duration_ms: 0.8549
+  type: 'test'
+  ...
+# Subtest: 缺省 paths：旧卡逐字兼容（请求/metadata 不出现该键）
+ok 61 - 缺省 paths：旧卡逐字兼容（请求/metadata 不出现该键）
+  ---
+  duration_ms: 0.1591
+  type: 'test'
+  ...
+# Subtest: 64 项边界合法（上限含 64）
+ok 62 - 64 项边界合法（上限含 64）
+  ---
+  duration_ms: 0.2062
+  type: 'test'
+  ...
+# Subtest: R4 choice/confirmation show chief rejection or revision, retaining typed reason/source without task cancellation
+ok 63 - R4 choice/confirmation show chief rejection or revision, retaining typed reason/source without task cancellation
+  ---
+  duration_ms: 0.9045
+  type: 'test'
+  ...
+# Subtest: R4 chief answered receipts show the actual non-recommended selection/confirmation and original provenance
+ok 64 - R4 chief answered receipts show the actual non-recommended selection/confirmation and original provenance
+  ---
+  duration_ms: 0.4115
+  type: 'test'
+  ...
+# Subtest: R4 malformed source or contradictory chief outcome cannot fall through to customer approval
+ok 65 - R4 malformed source or contradictory chief outcome cannot fall through to customer approval
+  ---
+  duration_ms: 0.5768
+  type: 'test'
+  ...
+# Subtest: R4 historical customer, judge and directive outcomes keep their existing receipt wording
+ok 66 - R4 historical customer, judge and directive outcomes keep their existing receipt wording
+  ---
+  duration_ms: 0.3672
+  type: 'test'
+  ...
+# Subtest: X-R4/角色门控：convener 走 convener 模块；rapporteur 仍走 rapporteur 模块；其余角色保持旧行为
+ok 67 - X-R4/角色门控：convener 走 convener 模块；rapporteur 仍走 rapporteur 模块；其余角色保持旧行为
+  ---
+  duration_ms: 1.0115
+  type: 'test'
+  ...
+# Subtest: X-R4/allow：convener 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+ok 68 - X-R4/allow：convener 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+  ---
+  duration_ms: 1.9795
+  type: 'test'
+  ...
+# Subtest: X-R4/deny：缺事实、错误 actorRoleId、未知键、归属键缺失 ⇒ 既有回执形状（未提交、能力零调用）
+ok 69 - X-R4/deny：缺事实、错误 actorRoleId、未知键、归属键缺失 ⇒ 既有回执形状（未提交、能力零调用）
+  ---
+  duration_ms: 0.2249
+  type: 'test'
+  ...
+# Subtest: X-R4/零差异：同一参数矩阵下，加 roleId=convener 前后 ok/message/调用次数逐字一致
+ok 70 - X-R4/零差异：同一参数矩阵下，加 roleId=convener 前后 ok/message/调用次数逐字一致
+  ---
+  duration_ms: 1.3762
+  type: 'test'
+  ...
+# Subtest: X-R4/不弱化：模型不可自报 actorRoleId/批准事实，仍在触达能力前拒绝
+ok 71 - X-R4/不弱化：模型不可自报 actorRoleId/批准事实，仍在触达能力前拒绝
+  ---
+  duration_ms: 0.1934
+  type: 'test'
+  ...
+# Subtest: X-R4/接线守卫：convener 前置只经角色 public entry，且位于 input 构建之后、能力调用之前
+ok 72 - X-R4/接线守卫：convener 前置只经角色 public entry，且位于 input 构建之后、能力调用之前
+  ---
+  duration_ms: 1.208
+  type: 'test'
+  ...
+# Subtest: confirmation passes original cancellation context; late yes cannot issue next-turn write permission
+ok 73 - confirmation passes original cancellation context; late yes cannot issue next-turn write permission
+  ---
+  duration_ms: 31.6852
+  type: 'test'
+  ...
+# Subtest: choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid
+ok 74 - choice callback receives the captured original signal/turn and legacy single-argument callbacks remain valid
+  ---
+  duration_ms: 13.8278
+  type: 'test'
+  ...
+# Subtest: request_choice 回执携带应用生成的 decisionId（appointment-write 的必要凭据）
+ok 75 - request_choice 回执携带应用生成的 decisionId（appointment-write 的必要凭据）
+  ---
+  duration_ms: 1.413
+  type: 'test'
+  ...
+# Subtest: three audit sources round-trip distinctly without fabricated customer facts
+ok 76 - three audit sources round-trip distinctly without fabricated customer facts
+  ---
+  duration_ms: 1.3615
+  type: 'test'
+  ...
+# Subtest: chief delegation requires revision, request, basis, reason and a real disposition
+ok 77 - chief delegation requires revision, request, basis, reason and a real disposition
+  ---
+  duration_ms: 0.2486
+  type: 'test'
+  ...
+# Subtest: direct receipts distinguish committed recovery from pre-commit failure and no-op
+ok 78 - direct receipts distinguish committed recovery from pre-commit failure and no-op
+  ---
+  duration_ms: 0.1753
+  type: 'test'
+  ...
+# Subtest: complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+ok 79 - complete snapshots preserve exact bytes, reject missing content, unsafe paths and duplicates
+  ---
+  duration_ms: 0.3319
+  type: 'test'
+  ...
+# Subtest: run frozen evidence is all-or-nothing and never combines different snapshots
+ok 80 - run frozen evidence is all-or-nothing and never combines different snapshots
+  ---
+  duration_ms: 0.2772
+  type: 'test'
+  ...
+# Subtest: historical customer freeze remains unchanged while direct freeze has no customer credentials
+ok 81 - historical customer freeze remains unchanged while direct freeze has no customer credentials
+  ---
+  duration_ms: 0.0823
+  type: 'test'
+  ...
+# Subtest: bounded real-chief decision context has no production writer or alternate executor
+ok 82 - bounded real-chief decision context has no production writer or alternate executor
+  ---
+  duration_ms: 0.1672
+  type: 'test'
+  ...
+# Subtest: existing submit function remains callable and all three explicit run choices remain distinct
+ok 83 - existing submit function remains callable and all three explicit run choices remain distinct
+  ---
+  duration_ms: 0.0897
+  type: 'test'
+  ...
+# Subtest: R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+ok 84 - R3 planning trunk preserves missing workflow and cannot claim the execution prerequisite
+  ---
+  duration_ms: 0.1482
+  type: 'test'
+  ...
+# Subtest: R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+ok 85 - R3 single freeze invariant accepts historical customer/application and bound direct/delegated records
+  ---
+  duration_ms: 0.3606
+  type: 'test'
+  ...
+# Subtest: R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+ok 86 - R5 activation evidence does not fabricate a run/pin and freezes only when real ones are bound
+  ---
+  duration_ms: 0.1684
+  type: 'test'
+  ...
+# Subtest: J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+ok 87 - J1/J2 judge-delegated freeze accepts honest intent/proposal sources and never fabricates customer facts
+  ---
+  duration_ms: 0.3132
+  type: 'test'
+  ...
+# Subtest: J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+ok 88 - J9 shared D3 helpers: judge uses the real application decisionId and fails closed on malformed ledgers
+  ---
+  duration_ms: 0.2089
+  type: 'test'
+  ...
+# Subtest: A1/Q9 A：RequestResolvedEvent 支持 directive 归属，旧事件无 directiveId 仍可读
+ok 89 - A1/Q9 A：RequestResolvedEvent 支持 directive 归属，旧事件无 directiveId 仍可读
+  ---
+  duration_ms: 1.0539
+  type: 'test'
+  ...
+# Subtest: A1/Q9 A + P3.1：VersionDecisionEvent 保留旧来源并增加 chief-delegated
+ok 90 - A1/Q9 A + P3.1：VersionDecisionEvent 保留旧来源并增加 chief-delegated
+  ---
+  duration_ms: 0.1261
+  type: 'test'
+  ...
+# Subtest: A1/W-6：RequestPresentedEvent.to 仍为 customer|judge（不新增 directive 通道）
+ok 91 - A1/W-6：RequestPresentedEvent.to 仍为 customer|judge（不新增 directive 通道）
+  ---
+  duration_ms: 0.0631
+  type: 'test'
+  ...
+# Subtest: A1/§5.2：事件联合 JSON 往返形状稳定（created/consumed/revoked/expired）
+ok 92 - A1/§5.2：事件联合 JSON 往返形状稳定（created/consumed/revoked/expired）
+  ---
+  duration_ms: 0.1451
+  type: 'test'
+  ...
+# Subtest: A1/§5.2：CustomerDirectiveView 形状与 JSON 往返
+ok 93 - A1/§5.2：CustomerDirectiveView 形状与 JSON 往返
+  ---
+  duration_ms: 0.0728
+  type: 'test'
+  ...
+# Subtest: A1/§6.4 I-1：target-scoped facts 快照只含本 target（运行时映射）
+ok 94 - A1/§6.4 I-1：target-scoped facts 快照只含本 target（运行时映射）
+  ---
+  duration_ms: 0.1209
+  type: 'test'
+  ...
+# Subtest: A1/P1-CAP-13：ID/路径/字段上限常量值冻结且为正整数
+ok 95 - A1/P1-CAP-13：ID/路径/字段上限常量值冻结且为正整数
+  ---
+  duration_ms: 0.088
+  type: 'test'
+  ...
+# Subtest: A1/§5.2：指令 ID 模式接受 d-1/d-999，拒绝 d-0/d-01/D-1/前缀
+ok 96 - A1/§5.2：指令 ID 模式接受 d-1/d-999，拒绝 d-0/d-01/D-1/前缀
+  ---
+  duration_ms: 0.0892
+  type: 'test'
+  ...
+# Subtest: A1/§5.2：flowId 校验仍来自 runtime.ts 的 GOVERNANCE_SLUG_PATTERN
+ok 97 - A1/§5.2：flowId 校验仍来自 runtime.ts 的 GOVERNANCE_SLUG_PATTERN
+  ---
+  duration_ms: 0.1091
+  type: 'test'
+  ...
+# Subtest: A1/P1-CAP-13：常量/解析器/枚举在 A1 文件内单一来源，runtime/project-state 不反向依赖
+ok 98 - A1/P1-CAP-13：常量/解析器/枚举在 A1 文件内单一来源，runtime/project-state 不反向依赖
+  ---
+  duration_ms: 6.1948
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：reason 码表顺序冻结（稳定持久值）
+ok 99 - A1/§4.3 高危：reason 码表顺序冻结（稳定持久值）
+  ---
+  duration_ms: 0.1142
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：forever 对所有 target 成立
+ok 100 - A1/§4.3 高危：forever 对所有 target 成立
+  ---
+  duration_ms: 0.1443
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：项目级 decision reject/select-option 与 flow 收窄
+ok 101 - A1/§4.3 高危：项目级 decision reject/select-option 与 flow 收窄
+  ---
+  duration_ms: 0.0661
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：通配域名（空/*/*. 前缀）
+ok 102 - A1/§4.3 高危：通配域名（空/*/*. 前缀）
+  ---
+  duration_ms: 0.0949
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：宽路径（盘符根/根/ ** /项目根/项目根祖先）
+ok 103 - A1/§4.3 高危：宽路径（盘符根/根/ ** /项目根/项目根祖先）
+  ---
+  duration_ms: 0.1909
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：宽命令（shell 元字符逐项）
+ok 104 - A1/§4.3 高危：宽命令（shell 元字符逐项）
+  ---
+  duration_ms: 0.1071
+  type: 'test'
+  ...
+# Subtest: A1/§4.3/Q7 A：开关关闭时项目级 select-recommended 属高危
+ok 105 - A1/§4.3/Q7 A：开关关闭时项目级 select-recommended 属高危
+  ---
+  duration_ms: 0.0374
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 非高危示例：精确命令/具体域名/具体目录 + once|session；单 flow 选择偏好
+ok 106 - A1/§4.3 非高危示例：精确命令/具体域名/具体目录 + once|session；单 flow 选择偏好
+  ---
+  duration_ms: 0.0439
+  type: 'test'
+  ...
+# Subtest: A1/§4.3 高危：多原因按表序返回且不重复
+ok 107 - A1/§4.3 高危：多原因按表序返回且不重复
+  ---
+  duration_ms: 0.032
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 示例表：命中 target 与 body 逐条符合
+ok 108 - A1/§3.1 示例表：命中 target 与 body 逐条符合
+  ---
+  duration_ms: 0.5595
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 边界：标记后必须是空白或文本结束，近失配一律不命中
+ok 109 - A1/§3.1 边界：标记后必须是空白或文本结束，近失配一律不命中
+  ---
+  duration_ms: 0.089
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 前导空白：空格/制表符/换行/全角空格/BOM 均被跳过
+ok 110 - A1/§3.1 前导空白：空格/制表符/换行/全角空格/BOM 均被跳过
+  ---
+  duration_ms: 0.4421
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 多行与正文：只检查开头，其余全部为正文且不二次识别
+ok 111 - A1/§3.1 多行与正文：只检查开头，其余全部为正文且不二次识别
+  ---
+  duration_ms: 0.1
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 空正文：命中且 body 为空（面板留空、确认禁用）
+ok 112 - A1/§3.1 空正文：命中且 body 为空（面板留空、确认禁用）
+  ---
+  duration_ms: 0.084
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 空文本/仅空白不命中
+ok 113 - A1/§3.1 空文本/仅空白不命中
+  ---
+  duration_ms: 0.062
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 非字符串入参返回 undefined 且不抛错
+ok 114 - A1/§3.1 非字符串入参返回 undefined 且不抛错
+  ---
+  duration_ms: 0.5883
+  type: 'test'
+  ...
+# Subtest: A1/§3.1 零依赖：marker 源文件无 import/require、无 Node 全局
+ok 115 - A1/§3.1 零依赖：marker 源文件无 import/require、无 Node 全局
+  ---
+  duration_ms: 2.7742
+  type: 'test'
+  ...
+# Subtest: dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+not ok 116 - dispatch_task 文案：工作流由运营（convener）落盘（直接写）后再派发；保留工作流先行
+  ---
+  duration_ms: 1.7257
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\dispatch-workflow-writer-copy.test.ts:10:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+    
+    '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: '向目标角色**派发任务**（经编排路由成对方会话的一条输入；前端负责自动开会话/排队/去重）。**派发 ≠ 授权**——你只能转移「任务与上下文」，**不能**授予或改变对方的写权：对方写入仍只来自它自己的已接受边界和已授权任务；普通操作无需逐次确认，新建或扩张边界、治理写集仍由内置治理角色请求客户确认。任务文本必须**自足**（对方看不到你的上下文）：写清要做什么、依据哪份适用版本文档、完成标准；**返工**时把要求与证据一并写进任务文本。Chief可向产品/策划/人事/运营/质检派普通调查或准备任务，可并行、跳过、返工或改类，不以M0、上一角色close、plan/D3全部完成作为普通派发票。实际write/activate/publish/execute仍核各自M0/仓库来源、合法plan、真实D3、完整激活、固定scope/8refs、最终CID/criteria与当前权限；准备任务本身不授执行权。需要跨角色实现时，在实际执行动作前准备适用契约 `docs/contracts/<name>-v<N>.md` 与运营职责内的 `docs/workflow.md`；缺材料可先调查或报告blocked。任务文本**按地址引用**契约与工作流——「依据哪份文档」给项目内路径即可（如 `docs/contracts/<name>-v1.md`），**不内嵌契约全文**；投递时系统会据此自动附上「**必读（按序）**」块（先读完再动手），其中的 sha256 由投递系统在投递当刻计算——**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（回执如实报错；补落盘后重派）；`docs/workflow.md` 缺失（旧项目过渡期）不拒投、必读块如实标注「未提供」。新Hub任务由Chief创建、派发、收报并按真实creator收口product/rapporteur/nominator/convener/verifier；Convener只管理实现worker。不能派给自己，历史creator/parent/close不改写。普通Verifier调查可不指定最终CID；最终review才给reviewTarget，实际controller/固定CID/criteria由应用核验并记录，不由模型填host引用。Chief接受review后可显式给resumeController续接真实仍live的运营任务；该请求只投原任务，忙时保留队列，以真实turn ACK跟进。review close不自动转运营，不先关controller再要求发布。这一resumeController分支用于最终review后的交付续接；普通调查、准备或修复返工仍可按原合法协调/重派路径进行，不因此要求accepted质量结论。本工具**不写盘、不做治理判定、不改变任何角色的写权**。`flowId`/`stepId`标识实际任务上下文与去重；字段本身不构成授权，不能把普通准备任务或期望review/resume目标当执行许可。'
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:13:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.start (node:internal/test_runner/test:1262:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)
+  ...
+# Subtest: dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+not ok 117 - dispatch_task promptGuidelines：同步运营写者口径，保留「先落盘再派发」
+  ---
+  duration_ms: 0.2244
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\dispatch-workflow-writer-copy.test.ts:29:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /工作流由\*\*运营（convener）\*\*落盘到 `docs\/workflow\.md`/. Input:
+    
+    '派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。\n' +
+      'Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。\n' +
+      'dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。\n' +
+      '跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。\n' +
+      '返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。\n' +
+      '最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。\n' +
+      'B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。\n' +
+      '`taskKind:"stage-request"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。\n' +
+      '`workflowAction:"stop"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    派发的是**任务与上下文**；**派发 ≠ 授权**——目标角色只在自己的已接受边界内执行已授权任务，普通操作无需逐次确认；不得在任务文本里代授写权；真正新建或扩张边界、治理写集仍由内置治理角色请求客户确认。
+    Chief管理五builtin；Convener管理实现worker。普通调查/准备没有固定上一角色完成票；具体写/激活/执行/发布仍逐动作校验，不从派发自举权限。
+    dispatch_task 的任务文本要**自足**：目标角色看不到你的上下文——写清要做什么、依据哪份文档、完成标准；给出实际适用 `flowId`/上下文，缺材料可明确调查或blocked回Chief。
+    跨角色实现按适用版本契约 `docs/contracts/<name>-v<N>.md` 和运营职责内 `docs/workflow.md` 执行；任务文本**按地址引用**契约与工作流（给项目内路径），**不内嵌契约全文**——投递时系统会自动附上「**必读（按序）**」块并计算其中的 sha256；**不要自己算或转抄哈希**。引用的契约文件不存在时投递会被**拒绝**（如实回执），补落盘后重派。
+    返工时把**要求与证据**一并写进任务文本（复述返工要求 + 相关证据/路径），避免对方凭猜返工。
+    最终reviewTarget只表达期望CID；resumeController只表达期望原任务/review close，不是host来源或批准。不要自报hubRouting/reviewControllerRef/parentTaskRef，也不复用sourceTaskId关联质检。
+    B 批星形任务：填写 `sideEffect`（应用会按任务文本升类，缺填/非法按 unknown）；`expectedOutput`/`requestedEvidence` 是任务卡字段与证据提示，不构成验收结论。
+    `taskKind:"stage-request"` 是工作流调度请求，不是生产线派发：它固定 read-only、无 module/写集；收到请求的一方须在真实受派回合内再派发实际生产任务。
+    `workflowAction:"stop"` 只表达暂停/改道请求；停派发、关 open 生产任务、停稳 live 会话由收到请求的一方执行并如实报告，不自动回滚 Git。
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/dispatch-workflow-writer-copy.test.ts:32:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf
+ok 118 - TM-11 describeTool("doc_format")：顶层 object + 非空 properties + required；无顶层 oneOf/anyOf
+  ---
+  duration_ms: 1.69
+  type: 'test'
+  ...
+# Subtest: TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变
+ok 119 - TM-11 注入才注册：无 docFormat ⇒ doc_format 不存在；有 docFormat ⇒ 恰多一只、既有工具 schema/描述不变
+  ---
+  duration_ms: 0.9071
+  type: 'test'
+  ...
+# Subtest: TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision）
+ok 120 - TM-11 正常路径：索引/详情 ⇒ {ok:true}，消息为数据源纯文本（含固定头部与 specRevision）
+  ---
+  duration_ms: 0.7645
+  type: 'test'
+  ...
+# Subtest: TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源
+ok 121 - TM-11 未知 format ⇒ {ok:false,message}（未知格式 + 可用 id 列表、回显 ≤40 字符），不触数据源
+  ---
+  duration_ms: 0.2259
+  type: 'test'
+  ...
+# Subtest: TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源
+ok 122 - TM-11 非字符串 format/part、未知 part ⇒ {ok:false,message}，不触数据源
+  ---
+  duration_ms: 0.196
+  type: 'test'
+  ...
+# Subtest: TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true}
+ok 123 - TM-11 数据源 null/空/抛错 ⇒ {ok:false,message}（不抛、不猜）；正常 ⇒ {ok:true}
+  ---
+  duration_ms: 0.3574
+  type: 'test'
+  ...
+# Subtest: TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型）
+ok 124 - TM-11 数据源收到扁平输入与既有 metadata（roleId/turnId/runtime；与 contract_check 同型）
+  ---
+  duration_ms: 0.1911
+  type: 'test'
+  ...
+# Subtest: TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传）
+ok 125 - TM-11 MCP tools/list 形状：inputSchema.properties 非空、无顶层 oneOf/anyOf（codex 原样透传）
+  ---
+  duration_ms: 0.1958
+  type: 'test'
+  ...
+# Subtest: TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源
+ok 126 - TM-11 toPiTool(describeTool("doc_format"))：description/promptGuidelines 非空且与 describeTool 同源
+  ---
+  duration_ms: 0.2168
+  type: 'test'
+  ...
+# Subtest: TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住
+ok 127 - TM-7/TM-11 MCP 声明：七键/保留名/环境名/状态与 mcp-declarations.ts 私有常量交叉钉住
+  ---
+  duration_ms: 11.3457
+  type: 'test'
+  ...
+# Subtest: TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注
+ok 128 - TM-11 预算：索引/详情正常路径 ≤8192 B（实测固定值入消息）；数据源超限由工具层截断并标注
+  ---
+  duration_ms: 1.079
+  type: 'test'
+  ...
+# 预算实测：索引 5244 B；最大详情 4243 B（project-roster/v3）
+# Subtest: 常量冻结：上限/超时/错误码与 P1.1 §3.3/§4.1/§5.4/§6.2 一致
+ok 129 - 常量冻结：上限/超时/错误码与 P1.1 §3.3/§4.1/§5.4/§6.2 一致
+  ---
+  duration_ms: 0.8165
+  type: 'test'
+  ...
+# Subtest: 卡种边界（AC-23 类型侧）：GovernanceCardKind 接受 download；ConfirmCardKind 仍仅 appointment-write
+ok 130 - 卡种边界（AC-23 类型侧）：GovernanceCardKind 接受 download；ConfirmCardKind 仍仅 appointment-write
+  ---
+  duration_ms: 0.0739
+  type: 'test'
+  ...
+# Subtest: 分组单一来源：download → approval；既有卡种映射不变
+ok 131 - 分组单一来源：download → approval；既有卡种映射不变
+  ---
+  duration_ms: 0.1077
+  type: 'test'
+  ...
+# Subtest: 指令视图 consumer 增 download；既有值与 PR \#57 解释器类型不回归
+ok 132 - 指令视图 consumer 增 download；既有值与 PR \#57 解释器类型不回归
+  ---
+  duration_ms: 0.1196
+  type: 'test'
+  ...
+# Subtest: judge 字段（AC-25 Model 侧）：Context/Request 可选 download 且双向同形；GovernanceJudgeFacts 无 download
+ok 133 - judge 字段（AC-25 Model 侧）：Context/Request 可选 download 且双向同形；GovernanceJudgeFacts 无 download
+  ---
+  duration_ms: 0.1165
+  type: 'test'
+  ...
+# Subtest: 能力位与回执类型：GovernedToolsOptions.requestDownload 可省略/可赋值；判别联合锁成功/失败形状
+ok 134 - 能力位与回执类型：GovernedToolsOptions.requestDownload 可省略/可赋值；判别联合锁成功/失败形状
+  ---
+  duration_ms: 0.1177
+  type: 'test'
+  ...
+# Subtest: AC-1 注册：未注入 requestDownload ⇒ request_download 不注册；注入 ⇒ 只新增这一只且既有工具不变
+ok 135 - AC-1 注册：未注入 requestDownload ⇒ request_download 不注册；注入 ⇒ 只新增这一只且既有工具不变
+  ---
+  duration_ms: 2.9086
+  type: 'test'
+  ...
+# Subtest: schema：url/purpose 必填、filename 可选、additionalProperties:false、sequential；描述钉关键语义
+ok 136 - schema：url/purpose 必填、filename 可选、additionalProperties:false、sequential；描述钉关键语义
+  ---
+  duration_ms: 0.2199
+  type: 'test'
+  ...
+# Subtest: 合法参数：trim 后交给能力一次、filename 缺省不造键、metadata 完整
+ok 137 - 合法参数：trim 后交给能力一次、filename 缺省不造键、metadata 完整
+  ---
+  duration_ms: 0.5386
+  type: 'test'
+  ...
+# Subtest: AC-2 参数校验：非法形状 ⇒ ok:false + download-invalid-arguments，能力调用 0；边界值合法
+ok 138 - AC-2 参数校验：非法形状 ⇒ ok:false + download-invalid-arguments，能力调用 0；边界值合法
+  ---
+  duration_ms: 0.5242
+  type: 'test'
+  ...
+# Subtest: AC-15 回执：成功原样转达；17 个失败码带 code；契约外回执与抛错 fail-closed；单次调用无重试
+ok 139 - AC-15 回执：成功原样转达；17 个失败码带 code；契约外回执与抛错 fail-closed；单次调用无重试
+  ---
+  duration_ms: 1.2118
+  type: 'test'
+  ...
+# Subtest: AC-23：request_confirmation 以 cardKind:"download" 调用被拒绝且不触达客户通道；schema enum 不变
+ok 140 - AC-23：request_confirmation 以 cardKind:"download" 调用被拒绝且不触达客户通道；schema enum 不变
+  ---
+  duration_ms: 0.4409
+  type: 'test'
+  ...
+# Subtest: 中止：不假设已下载/未下载（能力不触达）
+ok 141 - 中止：不假设已下载/未下载（能力不触达）
+  ---
+  duration_ms: 0.1753
+  type: 'test'
+  ...
+# Subtest: W-1 Service 透传：注入 requestDownload ⇒ 普通会话含 request_download；未注入与两种判断会话均不含
+ok 142 - W-1 Service 透传：注入 requestDownload ⇒ 普通会话含 request_download；未注入与两种判断会话均不含
+  ---
+  duration_ms: 14.2001
+  type: 'test'
+  ...
+# Subtest: drain I0-3 白名单逐字冻结：仅两个包装层 reason + 四个 native 覆盖/传输关闭 reason
+ok 143 - drain I0-3 白名单逐字冻结：仅两个包装层 reason + 四个 native 覆盖/传输关闭 reason
+  ---
+  duration_ms: 0.8848
+  type: 'test'
+  ...
+# Subtest: drain 基础真值表：providerFinished/activeTools/tracked processes
+ok 144 - drain 基础真值表：providerFinished/activeTools/tracked processes
+  ---
+  duration_ms: 0.183
+  type: 'test'
+  ...
+# Subtest: drain 不要求 status quiescent / processCoverage complete / native 存在（Claude/Pi 形态）
+ok 145 - drain 不要求 status quiescent / processCoverage complete / native 存在（Claude/Pi 形态）
+  ---
+  duration_ms: 0.0884
+  type: 'test'
+  ...
+# Subtest: drain 显式白名单 reason 单独与组合均不阻断
+ok 146 - drain 显式白名单 reason 单独与组合均不阻断
+  ---
+  duration_ms: 0.0771
+  type: 'test'
+  ...
+# Subtest: drain 未列/未知 reason 一律阻断（F6/R7/S1 清单）
+ok 147 - drain 未列/未知 reason 一律阻断（F6/R7/S1 清单）
+  ---
+  duration_ms: 0.0965
+  type: 'test'
+  ...
+# Subtest: Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort
+not ok 148 - Pi env 300s/310s reach the Provider inspection option while the Service turn timer uses the fixed 1h last resort
+  ---
+  duration_ms: 3.2781
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\effective-timeouts.test.ts:36:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:44:21
+    async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:42:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: Service explicit Pi timing overrides env, including the legacy disabled-timer values
+not ok 149 - Service explicit Pi timing overrides env, including the legacy disabled-timer values
+  ---
+  duration_ms: 1.3375
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\effective-timeouts.test.ts:55:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:65:23
+    async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:61:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged
+ok 150 - Pi effective env parse matches legacy fallback/floor while explicit invalid values stay unchanged
+  ---
+  duration_ms: 0.7984
+  type: 'test'
+  ...
+# Subtest: turn last resort defaults to one hour without env and is overridable for injection
+ok 151 - turn last resort defaults to one hour without env and is overridable for injection
+  ---
+  duration_ms: 0.1108
+  type: 'test'
+  ...
+# Subtest: non-turn timeouts stay unchanged: shell exec 10min, review/confirmation 2min, construct 2min
+ok 152 - non-turn timeouts stay unchanged: shell exec 10min, review/confirmation 2min, construct 2min
+  ---
+  duration_ms: 0.0846
+  type: 'test'
+  ...
+# Subtest: inspection env applies to every runtime while explicit options win; construct stays runtime-scoped
+ok 153 - inspection env applies to every runtime while explicit options win; construct stays runtime-scoped
+  ---
+  duration_ms: 0.0904
+  type: 'test'
+  ...
+# Subtest: all runtimes read the same inspection env; Service still uses the fixed 1h last resort
+not ok 154 - all runtimes read the same inspection env; Service still uses the fixed 1h last resort
+  ---
+  duration_ms: 1.3326
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\effective-timeouts.test.ts:120:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:130:23
+    async withPiEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:15:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/effective-timeouts.test.ts:126:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: evidence_check：注入才注册；参数透传；≤4KB 截断
+ok 155 - evidence_check：注入才注册；参数透传；≤4KB 截断
+  ---
+  duration_ms: 2.5487
+  type: 'test'
+  ...
+# Subtest: evidence_check：工具层拒绝越界路径与跨角色查询（伪数据源也不放行）
+ok 156 - evidence_check：工具层拒绝越界路径与跨角色查询（伪数据源也不放行）
+  ---
+  duration_ms: 0.3969
+  type: 'test'
+  ...
+# Subtest: D3 actual write gate rejects unauthorized real targets and permits fully authorized aliases
+ok 157 - D3 actual write gate rejects unauthorized real targets and permits fully authorized aliases
+  ---
+  duration_ms: 17.0369
+  type: 'test'
+  ...
+# Subtest: D3 final gate deny prevents commit after parent creation and during edit
+ok 158 - D3 final gate deny prevents commit after parent creation and during edit
+  ---
+  duration_ms: 4.4765
+  type: 'test'
+  ...
+# Subtest: D3 final gate throw prevents commit after parent creation and during edit
+ok 159 - D3 final gate throw prevents commit after parent creation and during edit
+  ---
+  duration_ms: 3.5699
+  type: 'test'
+  ...
+# Subtest: D3 final gate abort prevents commit after parent creation and during edit
+ok 160 - D3 final gate abort prevents commit after parent creation and during edit
+  ---
+  duration_ms: 4.2601
+  type: 'test'
+  ...
+# Subtest: D3 parent recheck rejects a changed in-root directory even if gate allows
+ok 161 - D3 parent recheck rejects a changed in-root directory even if gate allows
+  ---
+  duration_ms: 3.0018
+  type: 'test'
+  ...
+# Subtest: D3 linked workspace root remains usable; linked target itself is not replaced
+not ok 162 - D3 linked workspace root remains usable; linked target itself is not replaced
+  ---
+  duration_ms: 7.1051
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\file-write-safety.test.ts:97:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-I8vIN2\\actual\\nested\\file.txt' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-I8vIN2\\actual\\link.txt'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/file-write-safety.test.ts:105:5
+    async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/file-write-safety.test.ts:19:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/file-write-safety.test.ts:98:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D3 lstat ENOTDIR is a status error, never a new-file fallback
+ok 163 - D3 lstat ENOTDIR is a status error, never a new-file fallback
+  ---
+  duration_ms: 2.5973
+  type: 'test'
+  ...
+# Subtest: D3 write and edit preserve existing ordinary modes and strip special bits
+ok 164 - D3 write and edit preserve existing ordinary modes and strip special bits # SKIP
+  ---
+  duration_ms: 0.1032
+  type: 'test'
+  ...
+# Subtest: D3 handler under strict umask retains existing mode and keeps new files private
+ok 165 - D3 handler under strict umask retains existing mode and keeps new files private # SKIP
+  ---
+  duration_ms: 0.0461
+  type: 'test'
+  ...
+# Subtest: D3 chmod failure reaches the handler without committing file or mode
+ok 166 - D3 chmod failure reaches the handler without committing file or mode # SKIP
+  ---
+  duration_ms: 0.0572
+  type: 'test'
+  ...
+# Subtest: D3 sync failure reaches the handler without committing file or mode
+ok 167 - D3 sync failure reaches the handler without committing file or mode # SKIP
+  ---
+  duration_ms: 0.0349
+  type: 'test'
+  ...
+# Subtest: R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+ok 168 - R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+  ---
+  duration_ms: 1.0126
+  type: 'test'
+  ...
+# Subtest: R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+ok 169 - R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+  ---
+  duration_ms: 2.6662
+  type: 'test'
+  ...
+# Subtest: R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+ok 170 - R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+  ---
+  duration_ms: 1.1303
+  type: 'test'
+  ...
+# Subtest: R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+ok 171 - R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+  ---
+  duration_ms: 0.3807
+  type: 'test'
+  ...
+# Subtest: R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+ok 172 - R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+  ---
+  duration_ms: 1.0289
+  type: 'test'
+  ...
+# Subtest: R24 malformed apply replies never become committed and delegated selection retains its real source
+ok 173 - R24 malformed apply replies never become committed and delegated selection retains its real source
+  ---
+  duration_ms: 1.4911
+  type: 'test'
+  ...
+# Subtest: R24 model host result fields are rejected before the real choice callback and never enter request schema
+ok 174 - R24 model host result fields are rejected before the real choice callback and never enter request schema
+  ---
+  duration_ms: 0.3558
+  type: 'test'
+  ...
+# Subtest: R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+ok 175 - R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+  ---
+  duration_ms: 0.4022
+  type: 'test'
+  ...
+# Subtest: R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+ok 176 - R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+  ---
+  duration_ms: 0.8763
+  type: 'test'
+  ...
+# Subtest: R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+ok 177 - R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+  ---
+  duration_ms: 0.5122
+  type: 'test'
+  ...
+# Subtest: R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+ok 178 - R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+  ---
+  duration_ms: 0.7516
+  type: 'test'
+  ...
+# Subtest: R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+ok 179 - R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+  ---
+  duration_ms: 132.4963
+  type: 'test'
+  ...
+# {"actualDefaultCoreAndChat":true,"roots":["C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r20-default-chat-RVSx10","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r20-default-chat-RVSx10\\\\actual-skills-root"],"sourceBasisDigest":"34bc3e5cb7599ea0ff01416c610ff3f5bbada81635680b3c8192cd4d7758c65a","http":4,"stages":["write:lexical-read","write:canonical-read","write:final-write","edit:lexical-read","edit:canonical-read","edit:final-write"],"modelHostInjection":"rejected-before-gate"}
+# Subtest: R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+ok 180 - R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+  ---
+  duration_ms: 0.3089
+  type: 'test'
+  ...
+# Subtest: R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+ok 181 - R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+  ---
+  duration_ms: 0.376
+  type: 'test'
+  ...
+# Subtest: R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+ok 182 - R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+  ---
+  duration_ms: 13.7574
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r18-parent-tool-nxYl2B","actualDefaultChat":true,"http":3,"normalDispatchCallbacks":1,"forgedParentCallbacks":0}
+# Subtest: R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+ok 183 - R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+  ---
+  duration_ms: 19.5508
+  type: 'test'
+  ...
+# Subtest: R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+ok 184 - R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+  ---
+  duration_ms: 7.7863
+  type: 'test'
+  ...
+# Subtest: R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+ok 185 - R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+  ---
+  duration_ms: 18.51
+  type: 'test'
+  ...
+# Subtest: R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+ok 186 - R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+  ---
+  duration_ms: 35.1676
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r15-required-79c7PR","actualRegisteredTools":["install_skill","uninstall_skill","install_mcp","uninstall_mcp"],"blockedResults":4,"oldEffects":0,"nativeConstructions":1,"http":2,"filesAndRegistrationsUnchanged":true}
+# Subtest: R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+ok 187 - R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+  ---
+  duration_ms: 2.5489
+  type: 'test'
+  ...
+# Subtest: R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+ok 188 - R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+  ---
+  duration_ms: 133.2517
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-required-Uayo5Y","unmanaged":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-unmanaged-p0kvkn","requiredScripts":["run_shell","start_background_task","list_background_tasks","read_background_task","stop_background_task"],"rejectedNativeConstructions":0,"rejectedHttp":0,"rejectedMarkerWrites":0,"admittedNativeConstructions":3,"actualHttp":5,"ownedMarker":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r14-unmanaged-p0kvkn\\\\owned-node-marker.txt"}
+# Subtest: R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+ok 189 - R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+  ---
+  duration_ms: 1.0142
+  type: 'test'
+  ...
+# Subtest: R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+ok 190 - R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+  ---
+  duration_ms: 1.8993
+  type: 'test'
+  ...
+# Subtest: R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+ok 191 - R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+  ---
+  duration_ms: 5.8043
+  type: 'test'
+  ...
+# Subtest: R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+not ok 192 - R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+  ---
+  duration_ms: 0.7602
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:739:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /coordinator-busy/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:747:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:747:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 interruption during async factory preparation prevents the subsequent native bind
+not ok 193 - R12 interruption during async factory preparation prevents the subsequent native bind
+  ---
+  duration_ms: 0.8306
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:770:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /lease-interrupted/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:779:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:779:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+not ok 194 - R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+  ---
+  duration_ms: 0.6242
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:783:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:791:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+ok 195 - R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+  ---
+  duration_ms: 15.9773
+  type: 'test'
+  ...
+# Subtest: R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+ok 196 - R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+  ---
+  duration_ms: 0.4433
+  type: 'test'
+  ...
+# Subtest: R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+ok 197 - R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+  ---
+  duration_ms: 0.2789
+  type: 'test'
+  ...
+# Subtest: R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+ok 198 - R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+  ---
+  duration_ms: 0.1859
+  type: 'test'
+  ...
+# Subtest: Git capabilities register only when injected; all six roles/worker may query a host-bound template
+ok 199 - Git capabilities register only when injected; all six roles/worker may query a host-bound template
+  ---
+  duration_ms: 0.4048
+  type: 'test'
+  ...
+# Subtest: Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+ok 200 - Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+  ---
+  duration_ms: 0.8841
+  type: 'test'
+  ...
+# Subtest: full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+ok 201 - full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+  ---
+  duration_ms: 0.4444
+  type: 'test'
+  ...
+# Subtest: candidate actions have exact shapes and trusted scope; prepared is not published
+ok 202 - candidate actions have exact shapes and trusted scope; prepared is not published
+  ---
+  duration_ms: 0.3311
+  type: 'test'
+  ...
+# Subtest: publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+ok 203 - publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+  ---
+  duration_ms: 0.3037
+  type: 'test'
+  ...
+# Subtest: Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+ok 204 - Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+  ---
+  duration_ms: 0.3066
+  type: 'test'
+  ...
+# Subtest: Git schema declarations are strict nested templates, with no host-only fields
+ok 205 - Git schema declarations are strict nested templates, with no host-only fields
+  ---
+  duration_ms: 0.1352
+  type: 'test'
+  ...
+# Subtest: actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+not ok 206 - actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+  ---
+  duration_ms: 2.809
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:985:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:987:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 a custom factory cannot self-report the default Codex Chat production provenance
+not ok 207 - R8 a custom factory cannot self-report the default Codex Chat production provenance
+  ---
+  duration_ms: 0.6342
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:1022:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1023:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 native registry/instance/role/runtime/activity mismatches remain unknown
+not ok 208 - R8 native registry/instance/role/runtime/activity mismatches remain unknown
+  ---
+  duration_ms: 0.4999
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:1039:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1056:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R8 active HTTP inference alone is not treated as an uncontrolled execution program
+not ok 209 - R8 active HTTP inference alone is not treated as an uncontrolled execution program
+  ---
+  duration_ms: 0.4386
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\git-capability-tools.test.ts:1068:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/git-capability-tools.test.ts:1069:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+ok 210 - R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+  ---
+  duration_ms: 186.9737
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz","commands":[["git","init","--quiet","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\repo"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\repo","-c","user.name=R9 fixture","-c","user.email=r9@example.invalid","commit","--quiet","--allow-empty","-m","owned fixture"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\repo","worktree","add","--quiet","--detach","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\other-worktree","HEAD"],["git","init","--quiet","--separate-git-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\common-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\separate-repo"]],"gateCalls":18,"evidence":[{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\repo\\\\.git\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\hardlink-0.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\common-dir\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\hardlink-1.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\other-worktree\\\\owned.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\hardlink-2.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9","afterSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\repo\\\\.git\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\junction-0\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\common-dir\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\junction-1\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\other-worktree\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-files-zukpDz\\\\junction-2\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"}]}
+# Subtest: R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+ok 211 - R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+  ---
+  duration_ms: 20.986
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r9-final-MT6cyh","ordinary":"write+edit succeeded","lateHardlink":"both rejected","newRepo":"no .git created"}
+# Subtest: R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+ok 212 - R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+  ---
+  duration_ms: 2.7174
+  type: 'test'
+  ...
+# Subtest: AC-2 注册：未注入 ⇒ governance_matrix 不存在；注入 ⇒ 只新增这一只且既有工具零变化；构造不调用函数
+ok 213 - AC-2 注册：未注入 ⇒ governance_matrix 不存在；注入 ⇒ 只新增这一只且既有工具零变化；构造不调用函数
+  ---
+  duration_ms: 2.618
+  type: 'test'
+  ...
+# Subtest: AC-2 schema/文案：参数仅 roleId+section、enum 三值、additionalProperties:false；只读/unknown/非批准
+ok 214 - AC-2 schema/文案：参数仅 roleId+section、enum 三值、additionalProperties:false；只读/unknown/非批准
+  ---
+  duration_ms: 0.2224
+  type: 'test'
+  ...
+# Subtest: AC-2 参数矩阵：合法值 trim 后透传；未知参数/非法类型/空 roleId/非法 section 在调用前拒绝
+ok 215 - AC-2 参数矩阵：合法值 trim 后透传；未知参数/非法类型/空 roleId/非法 section 在调用前拒绝
+  ---
+  duration_ms: 0.5878
+  type: 'test'
+  ...
+# Subtest: AC-2/AC-16 回执：ok/message 原样转达；抛错与畸形回执 fail-closed、不编造权限
+ok 216 - AC-2/AC-16 回执：ok/message 原样转达；抛错与畸形回执 fail-closed、不编造权限
+  ---
+  duration_ms: 0.539
+  type: 'test'
+  ...
+# Subtest: AC-16 工具结果只有 ok/message，不含 allowed/denied/批准/验收字段
+ok 217 - AC-16 工具结果只有 ok/message，不含 allowed/denied/批准/验收字段
+  ---
+  duration_ms: 0.1672
+  type: 'test'
+  ...
+# Subtest: AC-2 中止：已中止的调用不触达函数并如实返回未完成
+ok 218 - AC-2 中止：已中止的调用不触达函数并如实返回未完成
+  ---
+  duration_ms: 0.2289
+  type: 'test'
+  ...
+# Subtest: AC-2/AC-11 无副作用：工具调用前后临时目录文件树不变（不写盘/不写账本）
+ok 219 - AC-2/AC-11 无副作用：工具调用前后临时目录文件树不变（不写盘/不写账本）
+  ---
+  duration_ms: 2.8231
+  type: 'test'
+  ...
+# Subtest: AC-1/AC-2/AC-15 Service 透传：注入⇒工具存在；未注入⇒不存在；判断会话结构性无该工具；contextSections 透传/缺省不下发
+ok 220 - AC-1/AC-2/AC-15 Service 透传：注入⇒工具存在；未注入⇒不存在；判断会话结构性无该工具；contextSections 透传/缺省不下发
+  ---
+  duration_ms: 12.6246
+  type: 'test'
+  ...
+# Subtest: G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不存在、与技能对互不搭车）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+ok 221 - G-4 V2 能力位：两工具各自「注入才注册」（未注入⇒不存在、与技能对互不搭车）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+  ---
+  duration_ms: 2.5527
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/门禁之外执行＝能力级授予（非逐调用受审）/不改变写边界/失败文案枚举（含 not-customer-turn）
+ok 222 - schema 文案（G-4 V2）：install_mcp 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/门禁之外执行＝能力级授予（非逐调用受审）/不改变写边界/失败文案枚举（含 not-customer-turn）
+  ---
+  duration_ms: 0.1906
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4 V2）：uninstall_mcp 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/卸载＝下次会话摘除/声明保留二分/已发生副作用不可撤
+ok 223 - schema 文案（G-4 V2）：uninstall_mcp 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/卸载＝下次会话摘除/声明保留二分/已发生副作用不可撤
+  ---
+  duration_ms: 0.1016
+  type: 'test'
+  ...
+# Subtest: G-4 V2：install_mcp 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现声明 path/digest/生效态并重申写边界与门禁外执行面
+ok 224 - G-4 V2：install_mcp 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现声明 path/digest/生效态并重申写边界与门禁外执行面
+  ---
+  duration_ms: 0.4841
+  type: 'test'
+  ...
+# Subtest: G-4 V2：失败如实——枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+ok 225 - G-4 V2：失败如实——枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+  ---
+  duration_ms: 0.8249
+  type: 'test'
+  ...
+# Subtest: G-4 V2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已装
+ok 226 - G-4 V2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已装
+  ---
+  duration_ms: 0.4685
+  type: 'test'
+  ...
+# Subtest: G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒不存在）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+ok 227 - G-4/I1+I2 能力位：两工具各自「注入才注册」（未注入⇒不存在）；schema 形状（必填 roleId+name、无 executionMode 覆盖）
+  ---
+  duration_ms: 2.3236
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/不改变写边界/失败文案枚举（含 not-customer-turn）
+ok 228 - schema 文案（G-4/I1）：install_skill 钉住仅客户明示时安装/不得自主发起/先落盘再激活/不写盘/不改变写边界/失败文案枚举（含 not-customer-turn）
+  ---
+  duration_ms: 0.2045
+  type: 'test'
+  ...
+# Subtest: schema 文案（G-4/I1）：uninstall_skill 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/文件保留二分陈述/不改变写边界
+ok 229 - schema 文案（G-4/I1）：uninstall_skill 钉住仅客户明示时卸载/先改登记再卸载/登记未变拒绝/文件保留二分陈述/不改变写边界
+  ---
+  duration_ms: 0.0881
+  type: 'test'
+  ...
+# Subtest: G-4/I2：install_skill 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现 path/digest/生效态并重申写边界不变
+ok 230 - G-4/I2：install_skill 只路由 {roleId,name} 载荷、如实转达三态回执——ok:true 呈现 path/digest/生效态并重申写边界不变
+  ---
+  duration_ms: 0.4837
+  type: 'test'
+  ...
+# Subtest: G-4/I2：失败如实——§3.3 文案枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+ok 231 - G-4/I2：失败如实——§3.3 文案枚举与护栏 not-customer-turn 原样转达（未执行、零副作用）；契约外/抛错一律 fail-closed 绝不称已装/已卸
+  ---
+  duration_ms: 0.8113
+  type: 'test'
+  ...
+# Subtest: G-4/I2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已安装
+ok 232 - G-4/I2：参数校验不触达能力；metadata 沿 dispatch 先例透传（无轮次归一单参）；预中止不调能力且不称已安装
+  ---
+  duration_ms: 0.4277
+  type: 'test'
+  ...
+# Subtest: 无参数行为逐字不变：整文件回执、128KB 截断文案、统计与预算口径
+ok 233 - 无参数行为逐字不变：整文件回执、128KB 截断文案、统计与预算口径
+  ---
+  duration_ms: 9.5091
+  type: 'test'
+  ...
+# Subtest: 字节范围：offset/limit 定点读取、范围标注、恰好读完不算截断
+ok 234 - 字节范围：offset/limit 定点读取、范围标注、恰好读完不算截断
+  ---
+  duration_ms: 17.7486
+  type: 'test'
+  ...
+# Subtest: 字节范围：越过文件末尾如实拒绝、空文件返回空片段、结构化 range 事实
+ok 235 - 字节范围：越过文件末尾如实拒绝、空文件返回空片段、结构化 range 事实
+  ---
+  duration_ms: 2.8945
+  type: 'test'
+  ...
+# Subtest: 行范围：startLine/endLine 1 基含端点、缺省另一端、超 EOF 收敛如实标注
+ok 236 - 行范围：startLine/endLine 1 基含端点、缺省另一端、超 EOF 收敛如实标注
+  ---
+  duration_ms: 9.4567
+  type: 'test'
+  ...
+# Subtest: 行范围：大文件定点抽查不把整文件计入读取预算；请求范围超预算才截断
+ok 237 - 行范围：大文件定点抽查不把整文件计入读取预算；请求范围超预算才截断
+  ---
+  duration_ms: 13.2871
+  type: 'test'
+  ...
+# Subtest: 范围参数校验：负数/0/非整数/类型不符/混用/endLine<startLine 一律拒绝且不消耗调用预算
+ok 238 - 范围参数校验：负数/0/非整数/类型不符/混用/endLine<startLine 一律拒绝且不消耗调用预算
+  ---
+  duration_ms: 1.4186
+  type: 'test'
+  ...
+# Subtest: 敏感路径/二进制/realpath/项目根检查不因范围参数被绕过
+ok 239 - 敏感路径/二进制/realpath/项目根检查不因范围参数被绕过
+  ---
+  duration_ms: 14.0216
+  type: 'test'
+  ...
+# Subtest: 预算计数：范围读取的 calls/bytes/truncated 与总预算耗尽语义
+ok 240 - 预算计数：范围读取的 calls/bytes/truncated 与总预算耗尽语义
+  ---
+  duration_ms: 3.843
+  type: 'test'
+  ...
+# Subtest: 治理 judge 复用同一范围实现（read 工具与 shell judge 同源）
+ok 241 - 治理 judge 复用同一范围实现（read 工具与 shell judge 同源）
+  ---
+  duration_ms: 4.7501
+  type: 'test'
+  ...
+# Subtest: schema 同步：judge_read_file 暴露可选范围参数并写明「定点抽查」与「不得猜测」
+ok 242 - schema 同步：judge_read_file 暴露可选范围参数并写明「定点抽查」与「不得猜测」
+  ---
+  duration_ms: 0.2397
+  type: 'test'
+  ...
+# Subtest: native-only values are protected without a provider, retain real IDs/token and keep reader counts separate
+ok 243 - native-only values are protected without a provider, retain real IDs/token and keep reader counts separate
+  ---
+  duration_ms: 1.2433
+  type: 'test'
+  ...
+# Subtest: raw title anchors and invalid dates are omitted; no turn/call or execution is inferred from body
+ok 244 - raw title anchors and invalid dates are omitted; no turn/call or execution is inferred from body
+  ---
+  duration_ms: 0.4273
+  type: 'test'
+  ...
+# Subtest: return budget selects a continuous recent suffix, preserves order and reports omissions
+ok 245 - return budget selects a continuous recent suffix, preserves order and reports omissions
+  ---
+  duration_ms: 72.6534
+  type: 'test'
+  ...
+# Subtest: reader failure and malformed bridge are distinct and cannot raw-fallback
+ok 246 - reader failure and malformed bridge are distinct and cannot raw-fallback
+  ---
+  duration_ms: 0.6703
+  type: 'test'
+  ...
+# Subtest: list_dir 默认注册（无需注入能力），schema 严格：path 可选字符串
+ok 247 - list_dir 默认注册（无需注入能力），schema 严格：path 可选字符串
+  ---
+  duration_ms: 2.0169
+  type: 'test'
+  ...
+# Subtest: 列目录：默认根、项目相对路径、只列一层、目录名带 `/`
+ok 248 - 列目录：默认根、项目相对路径、只列一层、目录名带 `/`
+  ---
+  duration_ms: 11.1403
+  type: 'test'
+  ...
+# Subtest: 敏感项不列名：.env/密钥/凭据/.git/审计/会话；敏感目录本身拒绝
+ok 249 - 敏感项不列名：.env/密钥/凭据/.git/审计/会话；敏感目录本身拒绝
+  ---
+  duration_ms: 9.1992
+  type: 'test'
+  ...
+# Subtest: 越界拒绝：`..`、项目外绝对路径、符号链接逃逸；不存在/非目录明确报错
+ok 250 - 越界拒绝：`..`、项目外绝对路径、符号链接逃逸；不存在/非目录明确报错
+  ---
+  duration_ms: 3.7534
+  type: 'test'
+  ...
+# Subtest: 条目上限 200：超出截断并如实标记
+ok 251 - 条目上限 200：超出截断并如实标记
+  ---
+  duration_ms: 63.3577
+  type: 'test'
+  ...
+# Subtest: 中止信号 ⇒ 未执行（不触碰文件系统）
+ok 252 - 中止信号 ⇒ 未执行（不触碰文件系统）
+  ---
+  duration_ms: 0.6762
+  type: 'test'
+  ...
+# Subtest: 好件：readMcpDeclaration 返回完整视图（七字段＋path；env 原文保存不展开；参数/日期/角色口径）
+ok 253 - 好件：readMcpDeclaration 返回完整视图（七字段＋path；env 原文保存不展开；参数/日期/角色口径）
+  ---
+  duration_ms: 22.8244
+  type: 'test'
+  ...
+# Subtest: 坏件（入口防御＋名非法＋保留名＋缺失）⇒ undefined，绝不抛
+ok 254 - 坏件（入口防御＋名非法＋保留名＋缺失）⇒ undefined，绝不抛
+  ---
+  duration_ms: 2.0051
+  type: 'test'
+  ...
+# Subtest: 坏件（解析失败面逐项）：必填缺失/空值/command 控制字符/env 校验/状态未知 ⇒ undefined，绝不抛
+ok 255 - 坏件（解析失败面逐项）：必填缺失/空值/command 控制字符/env 校验/状态未知 ⇒ undefined，绝不抛
+  ---
+  duration_ms: 79.1882
+  type: 'test'
+  ...
+# Subtest: listInstalledMcpServers：installed＋角色命中才收录（按 name 排序、InstalledMcpServerV1 形状）；过滤与诊断逐项
+ok 256 - listInstalledMcpServers：installed＋角色命中才收录（按 name 排序、InstalledMcpServerV1 形状）；过滤与诊断逐项
+  ---
+  duration_ms: 23.1854
+  type: 'test'
+  ...
+# Subtest: listInstalledMcpServers 防御：`docs/mcp` 不存在＝空数组零诊断；不可读（是文件）＝空数组＋mcp-root-unreadable；回调抛错被吞
+ok 257 - listInstalledMcpServers 防御：`docs/mcp` 不存在＝空数组零诊断；不可读（是文件）＝空数组＋mcp-root-unreadable；回调抛错被吞
+  ---
+  duration_ms: 6.936
+  type: 'test'
+  ...
+# Subtest: 接线注入：Service providerFor 按角色注入 RuntimeProviderOptions.installedMcpServers（纯读、绝不建目录；新 bind 重读）
+ok 258 - 接线注入：Service providerFor 按角色注入 RuntimeProviderOptions.installedMcpServers（纯读、绝不建目录；新 bind 重读）
+  ---
+  duration_ms: 23.1731
+  type: 'test'
+  ...
+# Subtest: 默认窗口 5min；门默认 online，只在 online 变化时通知（去重），监听异常不影响状态
+ok 259 - 默认窗口 5min；门默认 online，只在 online 变化时通知（去重），监听异常不影响状态
+  ---
+  duration_ms: 0.8843
+  type: 'test'
+  ...
+# Subtest: 离线窗口：首个离线状态起窗；重复 offline 不重开；到点 onExpire(offlineMs)
+ok 260 - 离线窗口：首个离线状态起窗；重复 offline 不重开；到点 onExpire(offlineMs)
+  ---
+  duration_ms: 0.2005
+  type: 'test'
+  ...
+# Subtest: 离线窗口：恢复立即取消；dispose 取消；非正窗口只暂停不失败
+ok 261 - 离线窗口：恢复立即取消；dispose 取消；非正窗口只暂停不失败
+  ---
+  duration_ms: 0.1125
+  type: 'test'
+  ...
+# Subtest: 网络失败形状：NetworkOfflineError / code / attempts / replaySafe / offlineMs；短报人话无技术 code
+ok 262 - 网络失败形状：NetworkOfflineError / code / attempts / replaySafe / offlineMs；短报人话无技术 code
+  ---
+  duration_ms: 0.24
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/未注入能力：report_plan_escalation 不注册（能力缺席 = 最强 fail-closed）
+ok 263 - PLAN-ESC/未注入能力：report_plan_escalation 不注册（能力缺席 = 最强 fail-closed）
+  ---
+  duration_ms: 1.694
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/convener 成功：能力恰调用一次、身份由工具填入、回执 presented 且文案含「申请≠批准」
+ok 264 - PLAN-ESC/convener 成功：能力恰调用一次、身份由工具填入、回执 presented 且文案含「申请≠批准」
+  ---
+  duration_ms: 0.8926
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/summary 边界：恰为上限的码点长度接受；超 1 个码点拒绝且不调用
+ok 265 - PLAN-ESC/summary 边界：恰为上限的码点长度接受；超 1 个码点拒绝且不调用
+  ---
+  duration_ms: 0.3524
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/角色门控：非 convener 或身份缺失 ⇒ plan-escalation-role-not-allowed 且能力不被调用
+ok 266 - PLAN-ESC/角色门控：非 convener 或身份缺失 ⇒ plan-escalation-role-not-allowed 且能力不被调用
+  ---
+  duration_ms: 0.2685
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/形状非法 ⇒ plan-escalation-invalid 且能力不被调用（未知参数/category/flowId/summary）
+ok 267 - PLAN-ESC/形状非法 ⇒ plan-escalation-invalid 且能力不被调用（未知参数/category/flowId/summary）
+  ---
+  duration_ms: 0.6023
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/能力失败：ok:false 回执如实转达、恰一次调用；抛错按未提交处理
+ok 268 - PLAN-ESC/能力失败：ok:false 回执如实转达、恰一次调用；抛错按未提交处理
+  ---
+  duration_ms: 0.2803
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/越权或契约外回执（approved、坏/缺 requestId、坏 errorCode）⇒ ok:false 且恰一次调用
+ok 269 - PLAN-ESC/越权或契约外回执（approved、坏/缺 requestId、坏 errorCode）⇒ ok:false 且恰一次调用
+  ---
+  duration_ms: 0.4884
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+ok 270 - PLAN-ESC/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+  ---
+  duration_ms: 0.182
+  type: 'test'
+  ...
+# Subtest: PLAN-ESC/schema：required/enum/additionalProperties/maxLength/executionMode 与 Model 单一来源一致
+ok 271 - PLAN-ESC/schema：required/enum/additionalProperties/maxLength/executionMode 与 Model 单一来源一致
+  ---
+  duration_ms: 0.1056
+  type: 'test'
+  ...
+# Subtest: actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities
+ok 272 - actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities
+  ---
+  duration_ms: 89.1463
+  type: 'test'
+  ...
+# Subtest: active and disposed prompt rejections have no turn acknowledgement
+not ok 273 - active and disposed prompt rejections have no turn acknowledgement
+  ---
+  duration_ms: 0.674
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\prompt-start-acknowledgement.test.ts:69:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:76:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: quarantined prompt rejection has no acknowledgement after one stopped actual turn
+not ok 274 - quarantined prompt rejection has no acknowledgement after one stopped actual turn
+  ---
+  duration_ms: 0.9322
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\prompt-start-acknowledgement.test.ts:85:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:95:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn
+not ok 275 - synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn
+  ---
+  duration_ms: 0.5957
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\prompt-start-acknowledgement.test.ts:104:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:111:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: acknowledged turns keep aborted/timed_out outcomes and single matching terminal
+not ok 276 - acknowledged turns keep aborted/timed_out outcomes and single matching terminal
+  ---
+  duration_ms: 1.0431
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\prompt-start-acknowledgement.test.ts:123:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/prompt-start-acknowledgement.test.ts:131:21)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: W4 只读 Git 命中 ⇒ execute(match, budgets)，回执与 spawn 同形且零 spawn
+ok 277 - W4 只读 Git 命中 ⇒ execute(match, budgets)，回执与 spawn 同形且零 spawn
+  ---
+  duration_ms: 5.5086
+  type: 'test'
+  ...
+# Subtest: W4 无能力/未命中 ⇒ readonly-git-runner-unavailable，零 spawn、零 execute、绝无通用回退
+ok 278 - W4 无能力/未命中 ⇒ readonly-git-runner-unavailable，零 spawn、零 execute、绝无通用回退
+  ---
+  duration_ms: 0.8096
+  type: 'test'
+  ...
+# Subtest: W4 审核先于路由：gate 拒绝 / F-7 守卫命中 ⇒ match/execute 均不调用、零 spawn
+ok 279 - W4 审核先于路由：gate 拒绝 / F-7 守卫命中 ⇒ match/execute 均不调用、零 spawn
+  ---
+  duration_ms: 0.6045
+  type: 'test'
+  ...
+# Subtest: W4 非 git 命令维持现状 spawn
+ok 280 - W4 非 git 命令维持现状 spawn
+  ---
+  duration_ms: 31.3119
+  type: 'test'
+  ...
+# Subtest: W4 后台入口不做只读 Git 路由：命令仍交管理器 spawn，能力不经手
+ok 281 - W4 后台入口不做只读 Git 路由：命令仍交管理器 spawn，能力不经手
+  ---
+  duration_ms: 1.7267
+  type: 'test'
+  ...
+# Subtest: W4 roleId（适配器 options，非模型输入）与 entry 透传审核与执行后审计
+ok 282 - W4 roleId（适配器 options，非模型输入）与 entry 透传审核与执行后审计
+  ---
+  duration_ms: 0.621
+  type: 'test'
+  ...
+# Subtest: W4 真实 Service 入口：run_shell 携带会话 roleId（demo 适配器闭环）
+ok 283 - W4 真实 Service 入口：run_shell 携带会话 roleId（demo 适配器闭环）
+  ---
+  duration_ms: 36.6325
+  type: 'test'
+  ...
+# Subtest: W4 真实 Service 入口：readonlyGit 注入可达（demo 适配器闭环，零 spawn）
+ok 284 - W4 真实 Service 入口：readonlyGit 注入可达（demo 适配器闭环，零 spawn）
+  ---
+  duration_ms: 2.6394
+  type: 'test'
+  ...
+# Subtest: W4 只读 Git 执行事实映射：超时/错误/抛错/非法回执与 spawn 分支同形
+ok 285 - W4 只读 Git 执行事实映射：超时/错误/抛错/非法回执与 spawn 分支同形
+  ---
+  duration_ms: 0.8806
+  type: 'test'
+  ...
+# Subtest: W4 工具说明补充只读 Git 白名单与 git_query 指引（输入字段不变：run_shell 仍只有 command）
+ok 286 - W4 工具说明补充只读 Git 白名单与 git_query 指引（输入字段不变：run_shell 仍只有 command）
+  ---
+  duration_ms: 0.2153
+  type: 'test'
+  ...
+# Subtest: 冻结值集与环境键：五值恰序（关/低/中/高/极高）；三键逐字；demo 无键面
+ok 287 - 冻结值集与环境键：五值恰序（关/低/中/高/极高）；三键逐字；demo 无键面
+  ---
+  duration_ms: 0.8156
+  type: 'test'
+  ...
+# Subtest: 归一：合法五值＋大小写/空白变体 ⇒ set（规范小写形）；未设/空串/纯空白 ⇒ unset（静默，留空＝平台默认）
+ok 288 - 归一：合法五值＋大小写/空白变体 ⇒ set（规范小写形）；未设/空串/纯空白 ⇒ unset（静默，留空＝平台默认）
+  ---
+  duration_ms: 0.1546
+  type: 'test'
+  ...
+# Subtest: 归一：非法 ⇒ invalid（绝不猜档——minimal/max/ultra/中文标签/任意串均不近似；原值如实带回）
+ok 289 - 归一：非法 ⇒ invalid（绝不猜档——minimal/max/ultra/中文标签/任意串均不近似；原值如实带回）
+  ---
+  duration_ms: 0.0933
+  type: 'test'
+  ...
+# Subtest: resolve：按运行时各取各键（互不串）；键未设＝unset
+ok 290 - resolve：按运行时各取各键（互不串）；键未设＝unset
+  ---
+  duration_ms: 0.0696
+  type: 'test'
+  ...
+# Subtest: Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形）
+not ok 291 - Service 三键读取注入：set ⇒ 注入 RuntimeProviderOptions.reasoningEffort（规范形）
+  ---
+  duration_ms: 3.7058
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:87:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:89:19
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:88:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席
+not ok 292 - 未设/空串 ⇒ 字段缺席（逐字现状的机读形态，而非 undefined 值）；demo 恒缺席
+  ---
+  duration_ms: 1.0358
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:99:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:102:55
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:100:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话
+not ok 293 - 非法值 ⇒ 按未设处理（零参数）＋诊断如实；空串静默不诊断；绝不毁会话
+  ---
+  duration_ms: 0.6937
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:111:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:115:21
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:113:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响）
+not ok 294 - 诊断自身故障不改变执行（绝不毁会话）；跨键不串（设 claude 键对 codex 会话零影响）
+  ---
+  duration_ms: 0.8429
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\reasoning-effort.test.ts:128:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.composeContext (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1262:44)
+    async captureFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:46:3)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:131:21
+    async withEffortEnv (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:24:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/reasoning-effort.test.ts:130:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: 文案常量定格：投影 summary 两条（消费方回退标签；措辞变化须显式改契约）
+ok 295 - 文案常量定格：投影 summary 两条（消费方回退标签；措辞变化须显式改契约）
+  ---
+  duration_ms: 0.4478
+  type: 'test'
+  ...
+# Subtest: 形状钉：原始事实 → 呈现详情（text 为 DisplayTextV1 三字段；status/durationMs 透传；无多余字段）
+ok 296 - 形状钉：原始事实 → 呈现详情（text 为 DisplayTextV1 三字段；status/durationMs 透传；无多余字段）
+  ---
+  duration_ms: 1.1155
+  type: 'test'
+  ...
+# Subtest: 如实面：omitted＝平台省略正文（违规随载荷带正文也按省略归一为空、不呈现）；status 未知＝诊断（不发明新态）
+ok 297 - 如实面：omitted＝平台省略正文（违规随载荷带正文也按省略归一为空、不呈现）；status 未知＝诊断（不发明新态）
+  ---
+  duration_ms: 0.1464
+  type: 'test'
+  ...
+# Subtest: 如实面：durationMs 仅真实信号（0＝真实保留；负数/NaN/Infinity/非数字一律丢弃——绝不发明时间）
+ok 298 - 如实面：durationMs 仅真实信号（0＝真实保留；负数/NaN/Infinity/非数字一律丢弃——绝不发明时间）
+  ---
+  duration_ms: 0.2148
+  type: 'test'
+  ...
+# Subtest: 保护面：凭据值替换（redacted:true）＋清洁管道（Bearer/URL）＋UTF-8 字节预算（truncated:true、无截断鬼影）
+ok 299 - 保护面：凭据值替换（redacted:true）＋清洁管道（Bearer/URL）＋UTF-8 字节预算（truncated:true、无截断鬼影）
+  ---
+  duration_ms: 0.4889
+  type: 'test'
+  ...
+# Subtest: 幂等：已投影形再投影，形状与标记不变（历史读取路径的再投影即此性质）
+ok 300 - 幂等：已投影形再投影，形状与标记不变（历史读取路径的再投影即此性质）
+  ---
+  duration_ms: 0.1446
+  type: 'test'
+  ...
+# Subtest: 坏件 ⇒ 如实诊断形（绝不抛、绝不假内容）：版本/source/status/text 形状逐项
+ok 301 - 坏件 ⇒ 如实诊断形（绝不抛、绝不假内容）：版本/source/status/text 形状逐项
+  ---
+  duration_ms: 0.1245
+  type: 'test'
+  ...
+# Subtest: Service 单点：原始推理事实在 emit 恰一次投影（summary 定格、turnId 保留、原始正文与随载荷 summary 绝不外流）；坏件走如实诊断行；非推理事件逐字现状
+ok 302 - Service 单点：原始推理事实在 emit 恰一次投影（summary 定格、turnId 保留、原始正文与随载荷 summary 绝不外流）；坏件走如实诊断行；非推理事件逐字现状
+  ---
+  duration_ms: 11.03
+  type: 'test'
+  ...
+# Subtest: 持久化/回放同形：存储面只见投影形且无原始凭据；历史读取对存量投影（幂等）与手编原始事实（同管道）都过同一单点
+ok 303 - 持久化/回放同形：存储面只见投影形且无原始凭据；历史读取对存量投影（幂等）与手编原始事实（同管道）都过同一单点
+  ---
+  duration_ms: 39.1499
+  type: 'test'
+  ...
+# Subtest: actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution
+ok 304 - actual bound mode, final source identity, idempotent safe report save and conflict are independent of model execution
+  ---
+  duration_ms: 38.8013
+  type: 'test'
+  ...
+# Subtest: source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it
+ok 305 - source retry only saves the first frozen snapshot, duplicate clicks share one operation and disposal expires it
+  ---
+  duration_ms: 17.7323
+  type: 'test'
+  ...
+# Subtest: target stores safe text but Provider receives original model text and images; final receipt survives a new handle
+ok 306 - target stores safe text but Provider receives original model text and images; final receipt survives a new handle
+  ---
+  duration_ms: 52.3693
+  type: 'test'
+  ...
+# Subtest: ACK is not delivery: user failure has exact Provider count and history retry never invokes it
+ok 307 - ACK is not delivery: user failure has exact Provider count and history retry never invokes it
+  ---
+  duration_ms: 48.7058
+  type: 'test'
+  ...
+# Subtest: ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it
+ok 308 - ACK is not delivery: boundary failure has exact Provider count and history retry never invokes it
+  ---
+  duration_ms: 42.5384
+  type: 'test'
+  ...
+# Subtest: ACK is not delivery: index failure has exact Provider count and history retry never invokes it
+ok 309 - ACK is not delivery: index failure has exact Provider count and history retry never invokes it
+  ---
+  duration_ms: 49.1205
+  type: 'test'
+  ...
+# Subtest: partial replay is not silently repaired or replayed; later foreign records also block repair
+ok 310 - partial replay is not silently repaired or replayed; later foreign records also block repair
+  ---
+  duration_ms: 28.5262
+  type: 'test'
+  ...
+# Subtest: disabled bound mode does not create directories; live-only views do not become durable report snapshots
+ok 311 - disabled bound mode does not create directories; live-only views do not become durable report snapshots
+  ---
+  duration_ms: 2.1741
+  type: 'test'
+  ...
+# Subtest: live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories
+ok 312 - live optional delivery identity is all-or-none and target-bound; disabled mode has real in-memory receipts without directories
+  ---
+  duration_ms: 2.3612
+  type: 'test'
+  ...
+# Subtest: foreign later replay records block history repair without altering the replay or invoking Provider again
+ok 313 - foreign later replay records block history repair without altering the replay or invoking Provider again
+  ---
+  duration_ms: 35.5362
+  type: 'test'
+  ...
+# Subtest: no final receipt cannot be reconstructed from boundary or nearby settled after reopening
+ok 314 - no final receipt cannot be reconstructed from boundary or nearby settled after reopening
+  ---
+  duration_ms: 39.9057
+  type: 'test'
+  ...
+# Subtest: 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction
+ok 315 - 128 detailed receipt bound does not forget seen disabled attempts or re-execute one after eviction
+  ---
+  duration_ms: 10.7689
+  type: 'test'
+  ...
+# Subtest: 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material
+ok 316 - 16MiB frozen recovery budget expires oldest failed source snapshots rather than keeping unbounded material
+  ---
+  duration_ms: 1919.0631
+  type: 'test'
+  ...
+# Subtest: an ambiguously successful final receipt write is idempotently confirmed, not appended twice
+ok 317 - an ambiguously successful final receipt write is idempotently confirmed, not appended twice
+  ---
+  duration_ms: 40.3729
+  type: 'test'
+  ...
+# Subtest: unknown persisted C versions do not become a final receipt or permit a new automatic attempt
+ok 318 - unknown persisted C versions do not become a final receipt or permit a new automatic attempt
+  ---
+  duration_ms: 8.3671
+  type: 'test'
+  ...
+# Subtest: unknown report file versions are listed as read errors and not silently upgraded
+ok 319 - unknown report file versions are listed as read errors and not silently upgraded
+  ---
+  duration_ms: 21.681
+  type: 'test'
+  ...
+# Subtest: public live and report projections whitelist values rather than carrying arbitrary sidecars
+ok 320 - public live and report projections whitelist values rather than carrying arbitrary sidecars
+  ---
+  duration_ms: 0.1884
+  type: 'test'
+  ...
+# Subtest: same-attempt known execution is monotonic even if the replay becomes an unreadable directory
+ok 321 - same-attempt known execution is monotonic even if the replay becomes an unreadable directory
+  ---
+  duration_ms: 29.377
+  type: 'test'
+  ...
+# Subtest: reopened live-only delivery uses its actual user/turn record for inputSaved without claiming durable source reports
+ok 322 - reopened live-only delivery uses its actual user/turn record for inputSaved without claiming durable source reports
+  ---
+  duration_ms: 26.808
+  type: 'test'
+  ...
+# Subtest: X-R2+X-R4/角色门控：rapporteur 与 convener 各走本角色模块；缺省/其他角色保持旧行为
+ok 323 - X-R2+X-R4/角色门控：rapporteur 与 convener 各走本角色模块；缺省/其他角色保持旧行为
+  ---
+  duration_ms: 0.9395
+  type: 'test'
+  ...
+# Subtest: X-R2/allow：rapporteur 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+ok 324 - X-R2/allow：rapporteur 有效载荷通过前置，能力恰调用一次且载荷原样（可选键缺席不造键）
+  ---
+  duration_ms: 1.9836
+  type: 'test'
+  ...
+# Subtest: X-R2/deny：缺事实、未知键、批准声明 ⇒ 既有回执形状（未提交、申请≠批准、能力零调用）
+ok 325 - X-R2/deny：缺事实、未知键、批准声明 ⇒ 既有回执形状（未提交、申请≠批准、能力零调用）
+  ---
+  duration_ms: 0.2604
+  type: 'test'
+  ...
+# Subtest: X-R2/零差异：同一参数矩阵下，加 roleId=rapporteur 前后 ok/message/调用次数逐字一致
+ok 326 - X-R2/零差异：同一参数矩阵下，加 roleId=rapporteur 前后 ok/message/调用次数逐字一致
+  ---
+  duration_ms: 1.3298
+  type: 'test'
+  ...
+# Subtest: X-R2/不弱化：模型不可自报批准/越权参数，仍在触达能力前拒绝
+ok 327 - X-R2/不弱化：模型不可自报批准/越权参数，仍在触达能力前拒绝
+  ---
+  duration_ms: 0.1927
+  type: 'test'
+  ...
+# Subtest: X-R2/接线守卫：handler 在构建 input 之后、调用能力之前走 requirement-change 前置
+ok 328 - X-R2/接线守卫：handler 在构建 input 之后、调用能力之前走 requirement-change 前置
+  ---
+  duration_ms: 1.24
+  type: 'test'
+  ...
+# Subtest: 未注入 requestRequirementChange ⇒ request_requirement_change 不注册（能力缺席 = fail-closed）
+ok 329 - 未注入 requestRequirementChange ⇒ request_requirement_change 不注册（能力缺席 = fail-closed）
+  ---
+  duration_ms: 1.9545
+  type: 'test'
+  ...
+# Subtest: 注入后注册 request_requirement_change；changeKind/summary/rationale 必填，flowId/intentId 至少一个由 handler 保证
+ok 330 - 注入后注册 request_requirement_change；changeKind/summary/rationale 必填，flowId/intentId 至少一个由 handler 保证
+  ---
+  duration_ms: 0.9509
+  type: 'test'
+  ...
+# Subtest: 载荷原样交给注入能力：flowId/intentId 至少一个、changeKind 五值、可选字段缺省不造键
+ok 331 - 载荷原样交给注入能力：flowId/intentId 至少一个、changeKind 五值、可选字段缺省不造键
+  ---
+  duration_ms: 0.7058
+  type: 'test'
+  ...
+# Subtest: 非法参数在触达能力前拒绝（归属缺失、changeKind 非法、summary/rationale 空或超界、未知参数、slug 非法）
+ok 332 - 非法参数在触达能力前拒绝（归属缺失、changeKind 非法、summary/rationale 空或超界、未知参数、slug 非法）
+  ---
+  duration_ms: 0.6187
+  type: 'test'
+  ...
+# Subtest: 回执原样转达 ok/code/message（成功不夸大、失败不伪装、不把申请说成批准、不把审批归给产品或发起方）
+ok 333 - 回执原样转达 ok/code/message（成功不夸大、失败不伪装、不把申请说成批准、不把审批归给产品或发起方）
+  ---
+  duration_ms: 0.6554
+  type: 'test'
+  ...
+# Subtest: rejected 回执原样转达：应用退回、不代表客户拒绝、不报成已提交
+ok 334 - rejected 回执原样转达：应用退回、不代表客户拒绝、不报成已提交
+  ---
+  duration_ms: 0.2911
+  type: 'test'
+  ...
+# Subtest: 能力抛错 / 契约外回执（含看似成功的未知 code）⇒ fail-closed，绝不说成已提交
+ok 335 - 能力抛错 / 契约外回执（含看似成功的未知 code）⇒ fail-closed，绝不说成已提交
+  ---
+  duration_ms: 0.527
+  type: 'test'
+  ...
+# Subtest: 会话中止：不假设已提交（能力不触达，文案如实）
+ok 336 - 会话中止：不假设已提交（能力不触达，文案如实）
+  ---
+  duration_ms: 0.2368
+  type: 'test'
+  ...
+# Subtest: Service 透传：注入 requestRequirementChange 后 provider 工具面包含 request_requirement_change；未注入则不出现
+ok 337 - Service 透传：注入 requestRequirementChange 后 provider 工具面包含 request_requirement_change；未注入则不出现
+  ---
+  duration_ms: 11.0037
+  type: 'test'
+  ...
+# Subtest: 默认值：首字节 90000ms / 流空闲 300000ms；错误码与短报为人话且不泄露技术 code
+ok 338 - 默认值：首字节 90000ms / 流空闲 300000ms；错误码与短报为人话且不泄露技术 code
+  ---
+  duration_ms: 0.5425
+  type: 'test'
+  ...
+# Subtest: 首字节：到点触发 first-byte，有效耗时如实；错误名不是 TimeoutError（终态 failed）
+ok 339 - 首字节：到点触发 first-byte，有效耗时如实；错误名不是 TimeoutError（终态 failed）
+  ---
+  duration_ms: 0.6703
+  type: 'test'
+  ...
+# Subtest: isRequestFailureCode：已知请求失败码包含 P3 重试耗尽；未知码不误收
+ok 340 - isRequestFailureCode：已知请求失败码包含 P3 重试耗尽；未知码不误收
+  ---
+  duration_ms: 0.0893
+  type: 'test'
+  ...
+# Subtest: 流空闲：首条消息关闭首字节；后续每条消息重置 idle；未超时（长回合）不被误杀
+ok 341 - 流空闲：首条消息关闭首字节；后续每条消息重置 idle；未超时（长回合）不被误杀
+  ---
+  duration_ms: 0.1431
+  type: 'test'
+  ...
+# Subtest: 暂停：交互/工具/abort 清理期间计时停走，恢复后按剩余时间继续（引用计数）
+ok 342 - 暂停：交互/工具/abort 清理期间计时停走，恢复后按剩余时间继续（引用计数）
+  ---
+  duration_ms: 0.1334
+  type: 'test'
+  ...
+# Subtest: stop：停止后不再触发；首字节已到达后的空闲阶段同样可停
+ok 343 - stop：停止后不再触发；首字节已到达后的空闲阶段同样可停
+  ---
+  duration_ms: 0.0771
+  type: 'test'
+  ...
+# Subtest: 首字节时限关闭（0/非有限）时：首条消息前不超时；活动后仍按 idle 计时
+ok 344 - 首字节时限关闭（0/非有限）时：首条消息前不超时；活动后仍按 idle 计时
+  ---
+  duration_ms: 0.0723
+  type: 'test'
+  ...
+# Subtest: 暂停中收到首条消息：首字节标记生效，恢复后只按剩余 idle 计时
+ok 345 - 暂停中收到首条消息：首字节标记生效，恢复后只按剩余 idle 计时
+  ---
+  duration_ms: 0.0781
+  type: 'test'
+  ...
+# Subtest: W2 prepareRole：unknown 保护范围拒绝；required 下 unknown 不静默放行
+ok 346 - W2 prepareRole：unknown 保护范围拒绝；required 下 unknown 不静默放行
+  ---
+  duration_ms: 14.0815
+  type: 'test'
+  ...
+# Subtest: W2 prepareRole 真值表：required × runtime × shell × binding × provenance × guards
+ok 347 - W2 prepareRole 真值表：required × runtime × shell × binding × provenance × guards
+  ---
+  duration_ms: 34.246
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-w2-truth-FAGuYF","verifiedChainMode":"rules-advisory","codexNative":"observed","demoRejected":true}
+# Subtest: W2 mode 可接受集合：readonly / operator-approve / rules-advisory / three-layer 均准入
+ok 348 - W2 mode 可接受集合：readonly / operator-approve / rules-advisory / three-layer 均准入
+  ---
+  duration_ms: 9.1284
+  type: 'test'
+  ...
+# Subtest: W2 审计三态：非持久/非 file/探针缺失/抛错/unknown 一律 protected-scope-audit-unavailable
+ok 349 - W2 审计三态：非持久/非 file/探针缺失/抛错/unknown 一律 protected-scope-audit-unavailable
+  ---
+  duration_ms: 14.0728
+  type: 'test'
+  ...
+# Subtest: W2 项目根：注册根与 Core 根不一致 ⇒ unproven；规范化等值（尾斜杠/Windows 大小写）⇒ 准入
+ok 350 - W2 项目根：注册根与 Core 根不一致 ⇒ unproven；规范化等值（尾斜杠/Windows 大小写）⇒ 准入
+  ---
+  duration_ms: 8.3263
+  type: 'test'
+  ...
+# Subtest: W2 approvalChain 稳定投影（无时间戳/凭据）且 configDigest 计入 approvalChain
+ok 351 - W2 approvalChain 稳定投影（无时间戳/凭据）且 configDigest 计入 approvalChain
+  ---
+  duration_ms: 6.849
+  type: 'test'
+  ...
+# Subtest: W2 matchesRuntimeApprovalChain：模块级一致性判据逐字段 fail-closed
+ok 352 - W2 matchesRuntimeApprovalChain：模块级一致性判据逐字段 fail-closed
+  ---
+  duration_ms: 0.3132
+  type: 'test'
+  ...
+# Subtest: W2 bindPreparedRole：受保护 + shell + 已登记审批链 ⇒ token 成立并绑定（appTools 含 shell）
+ok 353 - W2 bindPreparedRole：受保护 + shell + 已登记审批链 ⇒ token 成立并绑定（appTools 含 shell）
+  ---
+  duration_ms: 14.3597
+  type: 'test'
+  ...
+# Subtest: W2 composeContext：受保护 + shell + 已登记审批链 ⇒ token 成立后设置 admittedPlan 并返回上下文
+ok 354 - W2 composeContext：受保护 + shell + 已登记审批链 ⇒ token 成立后设置 admittedPlan 并返回上下文
+  ---
+  duration_ms: 11.9732
+  type: 'test'
+  ...
+# Subtest: W2 无 token 的受保护 shell 会话不得构造适配器：bindRole/composeContext 均拒绝
+ok 355 - W2 无 token 的受保护 shell 会话不得构造适配器：bindRole/composeContext 均拒绝
+  ---
+  duration_ms: 10.4265
+  type: 'test'
+  ...
+# Subtest: W2 AC-27：prepare→bind 之间 gate 替换先被 isCurrent 拦为 runtime-prepared-configuration-changed
+ok 356 - W2 AC-27：prepare→bind 之间 gate 替换先被 isCurrent 拦为 runtime-prepared-configuration-changed
+  ---
+  duration_ms: 6.9895
+  type: 'test'
+  ...
+# Subtest: R29 Core forwards only its validated cloned Chief decision context; ordinary and judge providers receive no field
+ok 357 - R29 Core forwards only its validated cloned Chief decision context; ordinary and judge providers receive no field
+  ---
+  duration_ms: 13.8935
+  type: 'test'
+  ...
+# Subtest: R28 real Node loads the full single-source Chief resource by application URL from an unrelated cwd
+ok 358 - R28 real Node loads the full single-source Chief resource by application URL from an unrelated cwd
+  ---
+  duration_ms: 208.2297
+  type: 'test'
+  ...
+# {"actualNode":"v24.22.1","cwd":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-r28-unrelated-cwd-5SOYKG","sourceUrl":"file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/common/%E9%97%A8%E7%A6%81%E5%BC%95%E6%93%8E/workflows/chief/chief-workflow.md","sha256":"9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346","bytes":8724,"resourceVersion":"chief-workflow/v1","applicationVersion":"1.9.2"}
+# Subtest: R28/R30 actual default runtime contexts isolate ordinary Chief workflow, bounded Chief and ordinary judges
+ok 359 - R28/R30 actual default runtime contexts isolate ordinary Chief workflow, bounded Chief and ordinary judges
+  ---
+  duration_ms: 52.9242
+  type: 'test'
+  ...
+# actual default Pi/Claude/Codex ordinary contexts; default Codex bounded Chief compose/prepare/bind with exact one tool and no workflow/MCP; non-Chief rejected; ordinary judge sets remain exact three
+# Subtest: R28 missing or corrupt resource fails before Chief factory creation and never falls back to project card text
+ok 360 - R28 missing or corrupt resource fails before Chief factory creation and never falls back to project card text
+  ---
+  duration_ms: 5.7108
+  type: 'test'
+  ...
+# Subtest: R17 a real busy default Chat may finish Core drain after disposal and must refresh its retained terminal evidence
+ok 361 - R17 a real busy default Chat may finish Core drain after disposal and must refresh its retained terminal evidence
+  ---
+  duration_ms: 39.3934
+  type: 'test'
+  ...
+# Subtest: R17 genuine pure context preparation and a pre-native read failure have private never-started evidence
+ok 362 - R17 genuine pure context preparation and a pre-native read failure have private never-started evidence
+  ---
+  duration_ms: 14.6891
+  type: 'test'
+  ...
+# Subtest: R17 a custom factory with an actual effect stays possibly-started regardless of fake construction facts
+ok 363 - R17 a custom factory with an actual effect stays possibly-started regardless of fake construction facts
+  ---
+  duration_ms: 5.2111
+  type: 'test'
+  ...
+# Subtest: R17 timed-out custom construction keeps its real pending continuation and late effect unknown
+ok 364 - R17 timed-out custom construction keeps its real pending continuation and late effect unknown
+  ---
+  duration_ms: 38.8773
+  type: 'test'
+  ...
+# Subtest: R13 actual default Chat keeps HTTP coverage separate from drain and retains real terminal evidence across disposal
+ok 365 - R13 actual default Chat keeps HTTP coverage separate from drain and retains real terminal evidence across disposal
+  ---
+  duration_ms: 10.2539
+  type: 'test'
+  ...
+# Subtest: R13 disposal cannot promote missing raw settlement, missing native evidence, identity drift or a live owned process
+ok 366 - R13 disposal cannot promote missing raw settlement, missing native evidence, identity drift or a live owned process
+  ---
+  duration_ms: 14.9538
+  type: 'test'
+  ...
+# Subtest: R13 a still-running real injected capability remains in the disposed receipt
+ok 367 - R13 a still-running real injected capability remains in the disposed receipt
+  ---
+  duration_ms: 6.2556
+  type: 'test'
+  ...
+# Subtest: abort request without actual provider completion/settled cannot prove stop; late real completion can
+ok 368 - abort request without actual provider completion/settled cannot prove stop; late real completion can
+  ---
+  duration_ms: 93.4598
+  type: 'test'
+  ...
+# Subtest: stream end/Core synthetic settled and disposed empty lists never substitute real provider settled
+ok 369 - stream end/Core synthetic settled and disposed empty lists never substitute real provider settled
+  ---
+  duration_ms: 30.2593
+  type: 'test'
+  ...
+# Subtest: a raced tool handler does not hide its still-running injected capability
+ok 370 - a raced tool handler does not hide its still-running injected capability
+  ---
+  duration_ms: 78.4076
+  type: 'test'
+  ...
+# Subtest: owned synchronous child close is observed; unproven Windows descendant tree stays unknown
+ok 371 - owned synchronous child close is observed; unproven Windows descendant tree stays unknown
+  ---
+  duration_ms: 5549.3497
+  type: 'test'
+  ...
+# Subtest: owned background child is stopped with retained facts; missing tree proof is not empty success
+ok 372 - owned background child is stopped with retained facts; missing tree proof is not empty success
+  ---
+  duration_ms: 5517.2527
+  type: 'test'
+  ...
+# Subtest: native adapter without its own process evidence remains unknown despite a real terminal event
+ok 373 - native adapter without its own process evidence remains unknown despite a real terminal event
+  ---
+  duration_ms: 9.8171
+  type: 'test'
+  ...
+# Subtest: R6 one native hook binds instance/Core turn and returns copied transport/process facts
+ok 374 - R6 one native hook binds instance/Core turn and returns copied transport/process facts
+  ---
+  duration_ms: 20.3539
+  type: 'test'
+  ...
+# Subtest: R6 native proof rejects incomplete transport/children, activity and binding mismatches
+ok 375 - R6 native proof rejects incomplete transport/children, activity and binding mismatches
+  ---
+  duration_ms: 6.9133
+  type: 'test'
+  ...
+# Subtest: R6 unreadable native facts never fall back to a closed flag or legacy lifecycle receipt
+ok 376 - R6 unreadable native facts never fall back to a closed flag or legacy lifecycle receipt
+  ---
+  duration_ms: 23.8853
+  type: 'test'
+  ...
+# Subtest: F7/P1.4 C9 stopAndInspect 活动排空循环 drain 即返回：Claude/Pi 覆盖 unknown 不耗满预算（custom-factory disposed 仍按 F6 阻断）
+ok 377 - F7/P1.4 C9 stopAndInspect 活动排空循环 drain 即返回：Claude/Pi 覆盖 unknown 不耗满预算（custom-factory disposed 仍按 F6 阻断）
+  ---
+  duration_ms: 31.3007
+  type: 'test'
+  ...
+# Subtest: F7/P1.4 C9 default-production Claude 未运行会话：disposed receipt 以中性 drain 返回（native 覆盖 unknown 不阻断）
+ok 378 - F7/P1.4 C9 default-production Claude 未运行会话：disposed receipt 以中性 drain 返回（native 覆盖 unknown 不阻断）
+  ---
+  duration_ms: 15.5938
+  type: 'test'
+  ...
+# Subtest: F7/S1 非 idle Pi（native:pi-sdk-idle-not-observed）保持阻断：stop 预算耗尽、disposed 标记证据缺失
+ok 379 - F7/S1 非 idle Pi（native:pi-sdk-idle-not-observed）保持阻断：stop 预算耗尽、disposed 标记证据缺失
+  ---
+  duration_ms: 76.7064
+  type: 'test'
+  ...
+# Subtest: store: creation/read stay lazy; roles/runtimes never share index or replay
+ok 380 - store: creation/read stay lazy; roles/runtimes never share index or replay
+  ---
+  duration_ms: 21.4195
+  type: 'test'
+  ...
+# Subtest: store: concurrent writes serialize; corrupt history fails honestly
+ok 381 - store: concurrent writes serialize; corrupt history fails honestly
+  ---
+  duration_ms: 47.4721
+  type: 'test'
+  ...
+# Subtest: store: traversal, mismatched scope and symlinked runtime directories rejected
+not ok 382 - store: traversal, mismatched scope and symlinked runtime directories rejected
+  ---
+  duration_ms: 2.0288
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session-store.test.ts:46:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-RkLDwt' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-fDiqx7\\.ans\\sessions\\role\\codex'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session-store.test.ts:51:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: store: native validation stays lazy and native symlink is rejected before effects
+not ok 383 - store: native validation stays lazy and native symlink is rejected before effects
+  ---
+  duration_ms: 2.8618
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session-store.test.ts:58:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-bjykgw' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-store-Hs8XC3\\.ans\\sessions\\core\\codex\\native'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session-store.test.ts:63:56)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Service history operation returns scoped Model records/replay through the existing Provider
+ok 384 - Service history operation returns scoped Model records/replay through the existing Provider
+  ---
+  duration_ms: 36.2484
+  type: 'test'
+  ...
+# Subtest: each actual runtime turn publishes one typed original input before native work and retains real assistant text
+ok 385 - each actual runtime turn publishes one typed original input before native work and retains real assistant text
+  ---
+  duration_ms: 137.7316
+  type: 'test'
+  ...
+# Subtest: input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer
+ok 386 - input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer
+  ---
+  duration_ms: 2.8052
+  type: 'test'
+  ...
+# Subtest: Service selects exactly chosen injected factory and executes real governed handler
+ok 387 - Service selects exactly chosen injected factory and executes real governed handler
+  ---
+  duration_ms: 7.2412
+  type: 'test'
+  ...
+# Subtest: Service failure never selects another engine and unknown runtime rejected
+ok 388 - Service failure never selects another engine and unknown runtime rejected
+  ---
+  duration_ms: 1.6349
+  type: 'test'
+  ...
+# Subtest: Service persists replay and adapter-confirmed deferred context result after prompt
+ok 389 - Service persists replay and adapter-confirmed deferred context result after prompt
+  ---
+  duration_ms: 25.1702
+  type: 'test'
+  ...
+# Subtest: customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works
+ok 390 - customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works
+  ---
+  duration_ms: 75.1743
+  type: 'test'
+  ...
+# Subtest: throw, native failed outcome and last-resort timeout each have one explicit terminal
+ok 391 - throw, native failed outcome and last-resort timeout each have one explicit terminal
+  ---
+  duration_ms: 29.3768
+  type: 'test'
+  ...
+# Subtest: inspection deadline never aborts a progressing turn; the turn completes normally
+ok 392 - inspection deadline never aborts a progressing turn; the turn completes normally
+  ---
+  duration_ms: 79.434
+  type: 'test'
+  ...
+# Subtest: last resort aborts at the injected deadline with distinct last-resort wording
+ok 393 - last resort aborts at the injected deadline with distinct last-resort wording
+  ---
+  duration_ms: 30.9468
+  type: 'test'
+  ...
+# Subtest: adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort
+ok 394 - adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort
+  ---
+  duration_ms: 7.6143
+  type: 'test'
+  ...
+# Subtest: corrupt ANS index is rejected before native bind allocates a session
+ok 395 - corrupt ANS index is rejected before native bind allocates a session
+  ---
+  duration_ms: 10.437
+  type: 'test'
+  ...
+# Subtest: transient persistence failure is reported and repaired next prompt can succeed
+ok 396 - transient persistence failure is reported and repaired next prompt can succeed
+  ---
+  duration_ms: 23.727
+  type: 'test'
+  ...
+# Subtest: Service event top/detail identity and report metadata share the captured turn
+ok 397 - Service event top/detail identity and report metadata share the captured turn
+  ---
+  duration_ms: 2.5085
+  type: 'test'
+  ...
+# Subtest: hanging native abort is bounded, called once, and leaves the session quarantined
+ok 398 - hanging native abort is bounded, called once, and leaves the session quarantined
+  ---
+  duration_ms: 1029.1097
+  type: 'test'
+  ...
+# Subtest: Service configured custom API key is stripped from the actual governed shell child
+ok 399 - Service configured custom API key is stripped from the actual governed shell child
+  ---
+  duration_ms: 47.926
+  type: 'test'
+  ...
+# Subtest: outer timeout remains timed_out when abort cleanup emits inner aborted terminals
+not ok 400 - outer timeout remains timed_out when abort cleanup emits inner aborted terminals
+  ---
+  duration_ms: 0.6711
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session.test.ts:377:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:395:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup
+not ok 401 - outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup
+  ---
+  duration_ms: 1.1538
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session.test.ts:404:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:424:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Core-managed binding rejects a provider that did not register its display profile before first prompt
+not ok 402 - Core-managed binding rejects a provider that did not register its display profile before first prompt
+  ---
+  duration_ms: 0.8327
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\session.test.ts:439:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /profile was not registered/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:445:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/session.test.ts:445:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections
+ok 403 - ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections
+  ---
+  duration_ms: 27.6939
+  type: 'test'
+  ...
+# Subtest: history does not resurrect an old empty-name synthetic tool phase on an engine failure
+ok 404 - history does not resurrect an old empty-name synthetic tool phase on an engine failure
+  ---
+  duration_ms: 11.8332
+  type: 'test'
+  ...
+# Subtest: A1/AC-03：request_shell_escalation 只在 shell 已 arm 且注入 shellEscalation 时注册（能力缺席=不注册）
+ok 405 - A1/AC-03：request_shell_escalation 只在 shell 已 arm 且注入 shellEscalation 时注册（能力缺席=不注册）
+  ---
+  duration_ms: 2.0092
+  type: 'test'
+  ...
+# Subtest: A1/AC-03：argv 由工具侧 splitCommand 生成，模型提供的 argv/授权字段被忽略；command/necessity 原样转交
+ok 406 - A1/AC-03：argv 由工具侧 splitCommand 生成，模型提供的 argv/授权字段被忽略；command/necessity 原样转交
+  ---
+  duration_ms: 0.7448
+  type: 'test'
+  ...
+# Subtest: A1/§4.3：necessity 双上限（500 字符 / 1KB 字节）超限拒绝不截断，非法类型拒绝，空命令不提交
+ok 407 - A1/§4.3：necessity 双上限（500 字符 / 1KB 字节）超限拒绝不截断，非法类型拒绝，空命令不提交
+  ---
+  duration_ms: 0.5425
+  type: 'test'
+  ...
+# Subtest: A1/AC-05：回执如实转达；异常/契约外回执按未获客户允许处理，绝不谎报批准
+ok 408 - A1/AC-05：回执如实转达；异常/契约外回执按未获客户允许处理，绝不谎报批准
+  ---
+  duration_ms: 0.3368
+  type: 'test'
+  ...
+# Subtest: A1/AC-01：run_shell 与 start_background_task 在 ShellReviewRequest 中填 entry（拒绝⇒零 spawn）
+ok 409 - A1/AC-01：run_shell 与 start_background_task 在 ShellReviewRequest 中填 entry（拒绝⇒零 spawn）
+  ---
+  duration_ms: 1.0556
+  type: 'test'
+  ...
+# Subtest: A1：run_shell 的执行后写审计请求同样携带 entry=run_shell
+ok 410 - A1：run_shell 的执行后写审计请求同样携带 entry=run_shell
+  ---
+  duration_ms: 46.8166
+  type: 'test'
+  ...
+# Subtest: A1/§6.3：授权放行结果按 grant 附「客户已允许一次/本会话」说明；无 grant 时文案不含授权说明
+ok 411 - A1/§6.3：授权放行结果按 grant 附「客户已允许一次/本会话」说明；无 grant 时文案不含授权说明
+  ---
+  duration_ms: 129.6805
+  type: 'test'
+  ...
+# Subtest: A1/AC-03：schema 只含 command + 可选 necessity，不暴露 argv/授权字段；说明含精确命令/每会话一次/不执行
+ok 412 - A1/AC-03：schema 只含 command + 可选 necessity，不暴露 argv/授权字段；说明含精确命令/每会话一次/不执行
+  ---
+  duration_ms: 0.2311
+  type: 'test'
+  ...
+# Subtest: E2 R2：ShellEscalationDecision 增 pending 支（reason 可选）；既有三支形状不变
+ok 413 - E2 R2：ShellEscalationDecision 增 pending 支（reason 可选）；既有三支形状不变
+  ---
+  duration_ms: 0.1128
+  type: 'test'
+  ...
+# Subtest: A1：模型加法字段兼容——旧形状原样可用，新字段按 §6.3/§7.1 契约接受
+ok 414 - A1：模型加法字段兼容——旧形状原样可用，新字段按 §6.3/§7.1 契约接受
+  ---
+  duration_ms: 0.1663
+  type: 'test'
+  ...
+# Subtest: F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（2000 ms）」+ timedOut/timeoutMs，耗时短收口
+ok 415 - F-1-a：挂起命令在命令级时限内被终止，如实返回「超时已终止（2000 ms）」+ timedOut/timeoutMs，耗时短收口
+  ---
+  duration_ms: 2137.2697
+  type: 'test'
+  ...
+# Subtest: F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据
+ok 416 - F-1-a 部分输出保留：先写 stdout 再挂起 → 结果不吞已收集的证据
+  ---
+  duration_ms: 2107.1995
+  type: 'test'
+  ...
+# Subtest: F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实
+ok 417 - F-1-opt1：SIGTERM 免疫子进程被 SIGKILL 升级收口；late 写入不出现，signal 如实
+  ---
+  duration_ms: 4954.9436
+  type: 'test'
+  ...
+# Subtest: F-1：快命令 + 大时限不误杀（ok:true、无 timedOut）
+ok 418 - F-1：快命令 + 大时限不误杀（ok:true、无 timedOut）
+  ---
+  duration_ms: 54.3366
+  type: 'test'
+  ...
+# Subtest: F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env
+ok 419 - F-1-c 解析链：env 生效且按该值收口；env 非法/0/负回退默认 600000（不可禁用）；显式选项优先于 env
+  ---
+  duration_ms: 2321.7264
+  type: 'test'
+  ...
+# Subtest: F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果
+ok 420 - F-1-b 竞争收口：中止优先（无 timedOut、中止文案）；超时先收口后再中止 → 幂等无二次结果
+  ---
+  duration_ms: 2421.0238
+  type: 'test'
+  ...
+# Subtest: F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例）
+ok 421 - F-1-b 与「停止本轮」既有语义回归：中止文案与清理预算不变（对照 tools.test.ts 的 abort 用例）
+  ---
+  duration_ms: 149.8633
+  type: 'test'
+  ...
+# Subtest: F-7 阻断集：未加引号的独立操作符/紧贴重定向在审核之前被拒，正文含命中 token，零副作用
+ok 422 - F-7 阻断集：未加引号的独立操作符/紧贴重定向在审核之前被拒，正文含命中 token，零副作用
+  ---
+  duration_ms: 5.3832
+  type: 'test'
+  ...
+# Subtest: F-7 放行集：引号内与反斜杠前导的操作符照旧可用（含证据命令），普通 argv 不受影响
+ok 423 - F-7 放行集：引号内与反斜杠前导的操作符照旧可用（含证据命令），普通 argv 不受影响
+  ---
+  duration_ms: 48.1863
+  type: 'test'
+  ...
+# Subtest: F-7-opt1：内嵌未加引号操作符与结尾 & 阻断；词中 &（URL 查询串）不判
+ok 424 - F-7-opt1：内嵌未加引号操作符与结尾 & 阻断；词中 &（URL 查询串）不判
+  ---
+  duration_ms: 0.6575
+  type: 'test'
+  ...
+# Subtest: F-7-opt2：未加引号的变量展开/命令替换阻断；引号内与常规 argv 放行
+ok 425 - F-7-opt2：未加引号的变量展开/命令替换阻断；引号内与常规 argv 放行
+  ---
+  duration_ms: 0.4958
+  type: 'test'
+  ...
+# Subtest: F-7-c 守卫先于审核且不 spawn：diagnostics 记 shell.guard.blocked，normalize 不产生 shell.exec.start
+ok 426 - F-7-c 守卫先于审核且不 spawn：diagnostics 记 shell.guard.blocked，normalize 不产生 shell.exec.start
+  ---
+  duration_ms: 0.1579
+  type: 'test'
+  ...
+# Subtest: 默认预算放宽为 12 次 / 512KB 总量 / 128KB 单文件（有限值，超限仍 fail-closed）
+ok 427 - 默认预算放宽为 12 次 / 512KB 总量 / 128KB 单文件（有限值，超限仍 fail-closed）
+  ---
+  duration_ms: 10.2451
+  type: 'test'
+  ...
+# Subtest: env 覆盖生效：ANS_SHELL_JUDGE_MAX_CALLS / MAX_FILE_BYTES / MAX_BYTES
+ok 428 - env 覆盖生效：ANS_SHELL_JUDGE_MAX_CALLS / MAX_FILE_BYTES / MAX_BYTES
+  ---
+  duration_ms: 13.1662
+  type: 'test'
+  ...
+# Subtest: env 校验：正整数且在上下限内生效；非法/越界回落缺省（不静默夹取）
+ok 429 - env 校验：正整数且在上下限内生效；非法/越界回落缺省（不静默夹取）
+  ---
+  duration_ms: 0.6908
+  type: 'test'
+  ...
+# Subtest: 显式 budget 优先于 env（宿主注入不被环境变量意外覆盖）
+ok 430 - 显式 budget 优先于 env（宿主注入不被环境变量意外覆盖）
+  ---
+  duration_ms: 1.9262
+  type: 'test'
+  ...
+# Subtest: 会话内读取缓存：同路径+同范围复用结果不再读盘，预算/统计口径不变
+ok 431 - 会话内读取缓存：同路径+同范围复用结果不再读盘，预算/统计口径不变
+  ---
+  duration_ms: 7.5544
+  type: 'test'
+  ...
+# Subtest: 缓存按判断会话隔离：不跨 buildShellJudgeTools 实例
+ok 432 - 缓存按判断会话隔离：不跨 buildShellJudgeTools 实例
+  ---
+  duration_ms: 6.1537
+  type: 'test'
+  ...
+# Subtest: 缓存命中不得绕过剩余总预算：不足时回落真实读取并按 remaining 截断
+ok 433 - 缓存命中不得绕过剩余总预算：不足时回落真实读取并按 remaining 截断
+  ---
+  duration_ms: 3.9343
+  type: 'test'
+  ...
+# Subtest: 拒绝结果不缓存：会话中途新建的文件可被后续读取（无负缓存）
+ok 434 - 拒绝结果不缓存：会话中途新建的文件可被后续读取（无负缓存）
+  ---
+  duration_ms: 4.6931
+  type: 'test'
+  ...
+# Subtest: 缓存有界：超过条目上限按插入顺序淘汰最旧结果
+ok 435 - 缓存有界：超过条目上限按插入顺序淘汰最旧结果
+  ---
+  duration_ms: 23.2928
+  type: 'test'
+  ...
+# Subtest: report_shell_judgement 的 verdict 参数为系统风险口径，三值枚举/required 不变
+ok 436 - report_shell_judgement 的 verdict 参数为系统风险口径，三值枚举/required 不变
+  ---
+  duration_ms: 1.6638
+  type: 'test'
+  ...
+# Subtest: report_shell_judgement 描述与 promptGuidelines 含完整风险口径，且不含「不必要」
+ok 437 - report_shell_judgement 描述与 promptGuidelines 含完整风险口径，且不含「不必要」
+  ---
+  duration_ms: 0.2214
+  type: 'test'
+  ...
+# Subtest: 判断会话装配的 report 工具与 describeTool 同源（模型不会同时看到新旧两套描述）
+ok 438 - 判断会话装配的 report 工具与 describeTool 同源（模型不会同时看到新旧两套描述）
+  ---
+  duration_ms: 0.437
+  type: 'test'
+  ...
+# Subtest: 读取预算契约可从编排既有导入路径与中立契约家导入，且为同一符号/同一解析值
+ok 439 - 读取预算契约可从编排既有导入路径与中立契约家导入，且为同一符号/同一解析值
+  ---
+  duration_ms: 0.109
+  type: 'test'
+  ...
+# Subtest: 只读工具集恰为三项：judge_read_file / judge_list_dir / report_shell_judgement
+ok 440 - 只读工具集恰为三项：judge_read_file / judge_list_dir / report_shell_judgement
+  ---
+  duration_ms: 1.915
+  type: 'test'
+  ...
+# Subtest: 项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸一律拒绝且不回显绝对路径
+ok 441 - 项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸一律拒绝且不回显绝对路径
+  ---
+  duration_ms: 9.794
+  type: 'test'
+  ...
+# Subtest: 敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计与会话目录；列表不列敏感项
+ok 442 - 敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计与会话目录；列表不列敏感项
+  ---
+  duration_ms: 15.7203
+  type: 'test'
+  ...
+# Subtest: 二进制拒绝、128KB 截断标记、12 次调用与 512KB 总预算
+ok 443 - 二进制拒绝、128KB 截断标记、12 次调用与 512KB 总预算
+  ---
+  duration_ms: 19.6412
+  type: 'test'
+  ...
+# Subtest: 第 13 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated
+ok 444 - 第 13 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated
+  ---
+  duration_ms: 6.2873
+  type: 'test'
+  ...
+# Subtest: report_shell_judgement 原样回调模型参数，不做裁决规范化
+ok 445 - report_shell_judgement 原样回调模型参数，不做裁决规范化
+  ---
+  duration_ms: 0.5069
+  type: 'test'
+  ...
+# Subtest: Service 装配：注入 shellJudge 时只构造三只只读工具、judgeMode=true、外来 MCP 置空
+ok 446 - Service 装配：注入 shellJudge 时只构造三只只读工具、judgeMode=true、外来 MCP 置空
+  ---
+  duration_ms: 5.7543
+  type: 'test'
+  ...
+# Subtest: judge_list_dir 单层列举、默认项目根、根外拒绝
+ok 447 - judge_list_dir 单层列举、默认项目根、根外拒绝
+  ---
+  duration_ms: 2.9842
+  type: 'test'
+  ...
+# Subtest: 卡种联合（F2）：GovernanceCardKind 接受 app-owned stable-write；两交互工具联合均不含它
+ok 448 - 卡种联合（F2）：GovernanceCardKind 接受 app-owned stable-write；两交互工具联合均不含它
+  ---
+  duration_ms: 0.4327
+  type: 'test'
+  ...
+# Subtest: request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appointment-write
+ok 449 - request_confirmation 卡种不变：GovernanceConfirmCardKind 仍仅 appointment-write
+  ---
+  duration_ms: 0.0932
+  type: 'test'
+  ...
+# Subtest: 判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选
+ok 450 - 判断分组不变：GROUP 精确键集不变；stable-write 永不判断/代选
+  ---
+  duration_ms: 0.486
+  type: 'test'
+  ...
+# Subtest: 白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏
+ok 451 - 白名单单一来源：GOVERNANCE_CARD_KINDS = GROUP 键集 ∪ app-owned 非判断卡种，无重复无遗漏
+  ---
+  duration_ms: 0.1118
+  type: 'test'
+  ...
+# Subtest: C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed）
+ok 452 - C1d/未注入能力：三提交工具不存在（能力缺席 = 最强 fail-closed）
+  ---
+  duration_ms: 2.1052
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入
+ok 453 - C1d/submit_version_change：product 提交 version-upgrade 成功，能力恰好调用一次且身份由工具填入
+  ---
+  duration_ms: 1.0852
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段
+ok 454 - C1d/submit_version_change：rapporteur 提交 detail-amendment 成功并透传 amendment 字段
+  ---
+  duration_ms: 0.3226
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用
+ok 455 - C1d/submit_version_change：角色不符/身份缺失 ⇒ 拒绝 vca-role-not-allowed，能力不被调用
+  ---
+  duration_ms: 0.3269
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用
+ok 456 - C1d/submit_version_change：形状非法 ⇒ vca-invalid 且能力不被调用
+  ---
+  duration_ms: 0.4769
+  type: 'test'
+  ...
+# Subtest: C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准
+ok 457 - C1d/submit_version_change：能力失败/越权回执 ⇒ 如实未提交，绝不伪装成功或批准
+  ---
+  duration_ms: 0.4013
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：convener 提交成功；输入身份恒为 convener
+ok 458 - C1d/submit_refactor：convener 提交成功；输入身份恒为 convener
+  ---
+  duration_ms: 0.3505
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码
+ok 459 - C1d/submit_refactor：非 convener 拒绝、形状非法拒绝、不派发/不写代码
+  ---
+  duration_ms: 0.2707
+  type: 'test'
+  ...
+# Subtest: C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理
+ok 460 - C1d/submit_refactor：能力失败与越权成功回执（accepted）都按未提交处理
+  ---
+  duration_ms: 0.244
+  type: 'test'
+  ...
+# Subtest: C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入
+ok 461 - C1d/request_stable_write：convener 只提交 workflow 内容；不生成许可/不写入
+  ---
+  duration_ms: 0.2996
+  type: 'test'
+  ...
+# Subtest: C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理
+ok 462 - C1d/request_stable_write：非 convener/形状非法拒绝；越权成功回执（written）按未提交处理
+  ---
+  duration_ms: 1.4465
+  type: 'test'
+  ...
+# Subtest: C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+ok 463 - C1d/中止：发起轮次已中止 ⇒ 能力不被调用、如实未提交
+  ---
+  duration_ms: 0.1605
+  type: 'test'
+  ...
+# Subtest: C1d/schema：三工具 schema 单一来源与冻结枚举一致
+ok 464 - C1d/schema：三工具 schema 单一来源与冻结枚举一致
+  ---
+  duration_ms: 0.0897
+  type: 'test'
+  ...
+# Subtest: R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal
+ok 465 - R2 five narrow tools: injection-only, strict scope identity and unchanged payload/signal
+  ---
+  duration_ms: 1.6816
+  type: 'test'
+  ...
+# Subtest: R2 rejects unknown identity/source/switch and nested malformed evidence before invocation
+ok 466 - R2 rejects unknown identity/source/switch and nested malformed evidence before invocation
+  ---
+  duration_ms: 1.5513
+  type: 'test'
+  ...
+# Subtest: R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状
+ok 467 - R2 complete_team_plan schema：required 缩减为 operationId/flowId/plan，baseDigest 与 plan.sha256 可选但保持 64 hex 形状
+  ---
+  duration_ms: 0.076
+  type: 'test'
+  ...
+# Subtest: R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256
+ok 468 - R2 complete_team_plan：省略 baseDigest/plan.sha256 结构合法并原样提交；成功回执 JSON 透传派生 planRef.sha256
+  ---
+  duration_ms: 0.1841
+  type: 'test'
+  ...
+# Subtest: R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力
+ok 469 - R2 complete_team_plan：缺 plan.path/plan.version、未知键与非 hex/错形状拒绝且不调用能力
+  ---
+  duration_ms: 0.437
+  type: 'test'
+  ...
+# Subtest: R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort
+ok 470 - R2 preserves committed/no-op/blocked receipts and does not rewrite an applied result after abort
+  ---
+  duration_ms: 0.5072
+  type: 'test'
+  ...
+# Subtest: R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result
+ok 471 - R2 submit_version_change forwards complete direct CAS input with trusted initiator and honest post-commit result
+  ---
+  duration_ms: 0.3888
+  type: 'test'
+  ...
+# Subtest: R2 bounded chief tool binds request/revision/options and never substitutes recommended choice
+ok 472 - R2 bounded chief tool binds request/revision/options and never substitutes recommended choice
+  ---
+  duration_ms: 0.3972
+  type: 'test'
+  ...
+# Subtest: R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+not ok 473 - R2 Service real-chief context isolates all production tools/MCP and enforces role and turn budget
+  ---
+  duration_ms: 5.2225
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\submit-capability-tools.test.ts:503:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /trusted chief/. Input:
+    
+    'Error: runtime-protection-scope-unknown'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+  error: 'runtime-protection-scope-unknown'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async waitForActual (node:assert:646:5)
+    async strict.rejects (node:assert:769:25)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:510:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:510:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement
+ok 474 - R2 decision rejection/revision stays pending unless the trusted capability returns a matching settlement
+  ---
+  duration_ms: 0.6763
+  type: 'test'
+  ...
+# Subtest: R2 chief timeout is finite and normal sessions still receive injected narrow capabilities
+not ok 475 - R2 chief timeout is finite and normal sessions still receive injected narrow capabilities
+  ---
+  duration_ms: 0.65
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\submit-capability-tools.test.ts:537:1'
+  failureType: 'testCodeFailure'
+  error: 'runtime-protection-scope-unknown'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    Object.bindRole (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/src/service/runtime/session.ts:1283:44)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/submit-capability-tools.test.ts:541:19)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary
+ok 476 - R5 explicit pending resubmission id uses the frozen VCA id grammar and is never guessed from summary
+  ---
+  duration_ms: 0.4186
+  type: 'test'
+  ...
+# Subtest: real fields survive projection; nonzero exit is not parsed from message, block is a separate fact
+ok 477 - real fields survive projection; nonzero exit is not parsed from message, block is a separate fact
+  ---
+  duration_ms: 1.8716
+  type: 'test'
+  ...
+# Subtest: target selection is exactly the actual Core alias contract; custom names do not imply rules
+ok 478 - target selection is exactly the actual Core alias contract; custom names do not imply rules
+  ---
+  duration_ms: 0.1684
+  type: 'test'
+  ...
+# Subtest: native fallback only takes explicit text; native outcome wins and unsupported objects never serialize
+ok 479 - native fallback only takes explicit text; native outcome wins and unsupported objects never serialize
+  ---
+  duration_ms: 0.2356
+  type: 'test'
+  ...
+# Subtest: profile capture is required, custom actual credentials are registered in memory and cannot rebind
+ok 480 - profile capture is required, custom actual credentials are registered in memory and cannot rebind
+  ---
+  duration_ms: 0.3961
+  type: 'test'
+  ...
+# Subtest: known values and patterns are protected before truncation; IDs never pass through a redactor
+ok 481 - known values and patterns are protected before truncation; IDs never pass through a redactor
+  ---
+  duration_ms: 0.4905
+  type: 'test'
+  ...
+# Subtest: UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection
+ok 482 - UTF-8 and encoded JSON budgets use independent byte counts and survive a second projection
+  ---
+  duration_ms: 3.1728
+  type: 'test'
+  ...
+# Subtest: projection faults and oversize identity produce messages without fabricated business conclusions
+ok 483 - projection faults and oversize identity produce messages without fabricated business conclusions
+  ---
+  duration_ms: 2.5282
+  type: 'test'
+  ...
+# Subtest: control characters use a visible replacement independently of Unicode clipping
+ok 484 - control characters use a visible replacement independently of Unicode clipping
+  ---
+  duration_ms: 0.1032
+  type: 'test'
+  ...
+# Subtest: a source truncation flag alone is preserved without falsely attributing it to the display budget
+ok 485 - a source truncation flag alone is preserved without falsely attributing it to the display budget
+  ---
+  duration_ms: 0.1325
+  type: 'test'
+  ...
+# Subtest: F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged
+ok 486 - F-8-a handler-result: process finished with nonzero exit code reads as completed-with-exit-code while ok/status/kind/errorCode stay unchanged
+  ---
+  duration_ms: 0.2735
+  type: 'test'
+  ...
+# Subtest: F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result
+ok 487 - F-8-a native-result shape: same nonzero-exit classification when outcome facts come from the native result
+  ---
+  duration_ms: 0.1429
+  type: 'test'
+  ...
+# Subtest: F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers
+ok 488 - F-1 timeout projection: timedOut wording is distinct and display.process.timedOut is exposed for structured consumers
+  ---
+  duration_ms: 0.1225
+  type: 'test'
+  ...
+# Subtest: F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording
+ok 489 - F-8-a guard: spawn failure (execution.error) keeps the honest 执行失败 wording
+  ---
+  duration_ms: 0.0863
+  type: 'test'
+  ...
+# Subtest: F-8-a re-projection keeps exitCode and timedOut through the persisted-event path
+ok 490 - F-8-a re-projection keeps exitCode and timedOut through the persisted-event path
+  ---
+  duration_ms: 0.1552
+  type: 'test'
+  ...
+# Subtest: cleanPatterns URL boundary (A-base): reproduction turns positive — 2nd title, entry-cap suffix and bracket tail stay complete
+ok 491 - cleanPatterns URL boundary (A-base): reproduction turns positive — 2nd title, entry-cap suffix and bracket tail stay complete
+  ---
+  duration_ms: 0.1253
+  type: 'test'
+  ...
+# Subtest: cleanPatterns URL boundary (A-base): adversarial zero-leak battery — CJK query values stay stripped across full-width separators
+ok 492 - cleanPatterns URL boundary (A-base): adversarial zero-leak battery — CJK query values stay stripped across full-width separators
+  ---
+  duration_ms: 0.1393
+  type: 'test'
+  ...
+# Subtest: cleanPatterns URL boundary (A-base): ASCII semicolon path params stay inside the URL; redacted/truncated markers unchanged
+ok 493 - cleanPatterns URL boundary (A-base): ASCII semicolon path params stay inside the URL; redacted/truncated markers unchanged
+  ---
+  duration_ms: 0.0721
+  type: 'test'
+  ...
+# Subtest: schema 常量与最小版本（trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1）
+ok 494 - schema 常量与最小版本（trunk/v1、trunk-amendment/v1、trunk-apply-journal/v1）
+  ---
+  duration_ms: 0.8108
+  type: 'test'
+  ...
+# Subtest: 主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）
+not ok 495 - 主干来源：含 bootstrap/recovery/upgrade；不新造 main-upgrade（PM 复审 §4.10-3）
+  ---
+  duration_ms: 0.7656
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\trunk-contract.test.ts:80:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'adopted',
+        'amendment',
+        'bootstrap',
+        'post-run-change',
+        'recovery',
+    +   'team-plan',
+        'upgrade'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'adopted'
+    1: 'amendment'
+    2: 'bootstrap'
+    3: 'post-run-change'
+    4: 'recovery'
+    5: 'upgrade'
+  actual:
+    0: 'adopted'
+    1: 'amendment'
+    2: 'bootstrap'
+    3: 'post-run-change'
+    4: 'recovery'
+    5: 'team-plan'
+    6: 'upgrade'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/trunk-contract.test.ts:81:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 修正案生命周期六值 + P1.3 legacy 映射全覆盖（AC-32）
+ok 496 - 修正案生命周期六值 + P1.3 legacy 映射全覆盖（AC-32）
+  ---
+  duration_ms: 0.1042
+  type: 'test'
+  ...
+# Subtest: item kind 收窄：新 detail 仅 contract/roster/execution；legacy workflow/boundary 不相交（AC-6/AC-28）
+ok 497 - item kind 收窄：新 detail 仅 contract/roster/execution；legacy workflow/boundary 不相交（AC-6/AC-28）
+  ---
+  duration_ms: 0.0913
+  type: 'test'
+  ...
+# Subtest: trunk.state op 分区：stable-repinned 属 customer；drift/unfrozen-expired 仅 legacy 读（AC-31/AC-34）
+ok 498 - trunk.state op 分区：stable-repinned 属 customer；drift/unfrozen-expired 仅 legacy 读（AC-31/AC-34）
+  ---
+  duration_ms: 0.0908
+  type: 'test'
+  ...
+# Subtest: trunk manifest / amendment doc·state / journal / view 最小正例（含 bootstrap/baseTrunk:null、roleCards、committed）
+ok 499 - trunk manifest / amendment doc·state / journal / view 最小正例（含 bootstrap/baseTrunk:null、roleCards、committed）
+  ---
+  duration_ms: 0.1707
+  type: 'test'
+  ...
+# Subtest: trunk.state(stable-repinned) 事件形状：customer、绑定 confirmationId/decisionId、trunkVersion 不变
+ok 500 - trunk.state(stable-repinned) 事件形状：customer、绑定 confirmationId/decisionId、trunkVersion 不变
+  ---
+  duration_ms: 0.0738
+  type: 'test'
+  ...
+# Subtest: trunk 错误码稳定、无重复、无 trunk-drift（并入 trunk-verify-failed）
+ok 501 - trunk 错误码稳定、无重复、无 trunk-drift（并入 trunk-verify-failed）
+  ---
+  duration_ms: 0.0476
+  type: 'test'
+  ...
+# Subtest: merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+ok 502 - merge-main：在 GOVERNANCE_CARD_KINDS / app-owned 清单，不在 GOVERNANCE_CARD_GROUP，governanceCardGroup 返回 undefined
+  ---
+  duration_ms: 0.883
+  type: 'test'
+  ...
+# Subtest: TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+ok 503 - TaskCreatedEvent/RequestCreatedEvent/RequestResolvedEvent：旧形状仍合法；T3 新字段全部可选
+  ---
+  duration_ms: 0.1311
+  type: 'test'
+  ...
+# Subtest: DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+ok 504 - DispatchTaskPayload：旧形状 {roleId,task} 合法；T3 字段可选且枚举收窄
+  ---
+  duration_ms: 0.095
+  type: 'test'
+  ...
+# Subtest: 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+ok 505 - 阶段/路径/状态词表：v1.3 §4.1 完整集合，坏值 fail-closed
+  ---
+  duration_ms: 0.1143
+  type: 'test'
+  ...
+# Subtest: ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+ok 506 - ans-workflow/v1 守卫：合法事件通过；坏 schema/坏 stage/坏 kind/缺幂等键 false；未知额外字段容忍
+  ---
+  duration_ms: 0.4062
+  type: 'test'
+  ...
+# Subtest: ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+ok 507 - ans-basis/v1 守卫：recorded（baseline/path-b/amendment）/amended/verified/drift 正例；坏 reason/schema/kind false
+  ---
+  duration_ms: 0.2429
+  type: 'test'
+  ...
+# Subtest: ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+ok 508 - ans-release/v1 守卫：merged 正例；judge 不可 confirm；坏 schema/kind/oid false
+  ---
+  duration_ms: 0.2549
+  type: 'test'
+  ...
+# Subtest: dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+ok 509 - dispatch_task schema（AC-05）：新属性存在且枚举正确；旧属性/required/additionalProperties/文案方向不变
+  ---
+  duration_ms: 1.1547
+  type: 'test'
+  ...
+# Subtest: contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）
+ok 510 - contract_check.taskKind 同步 stage-request；close_created_task 共享必填为两模式交集（B2 v2 收口）
+  ---
+  duration_ms: 0.1738
+  type: 'test'
+  ...
+# Subtest: dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+ok 511 - dispatch_task handler：T3 字段原样透传；旧载荷逐字不变；非法枚举/坏 stage fail-closed 且不调用注入 fn
+  ---
+  duration_ms: 1.196
+  type: 'test'
+  ...
+# Subtest: fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+ok 512 - fixed close：3+1 输入放行并原样调用 fixed 回调；legacy 字段不采信、legacy 实现（trunk/CAS 路径）不触达；signal 透传
+  ---
+  duration_ms: 2.8243
+  type: 'test'
+  ...
+# Subtest: fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+ok 513 - fixed close：缺 operationId/taskId/outcome、坏 outcome 或未知键 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.4159
+  type: 'test'
+  ...
+# Subtest: legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+ok 514 - legacy close：runId/basisDigest/reportRef 仍必填（错误语义逐字保留）；成功回执走原 legacy 路径
+  ---
+  duration_ms: 0.4836
+  type: 'test'
+  ...
+# Subtest: fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+ok 515 - fixed close 回执独立校验：legacy DirectActionReceipt/taskStatus 形状不适用；身份不匹配/坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.6372
+  type: 'test'
+  ...
+# Subtest: fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+ok 516 - fixed close：已中止 signal ⇒ 不调用 fixed 回调并如实回执
+  ---
+  duration_ms: 0.193
+  type: 'test'
+  ...
+# Subtest: fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+ok 517 - fixed activate：v2 输入放行并原样调用 fixed 回调（roster/documents 不重写）；legacy 字段不采信、legacy 实现不触达；signal 透传
+  ---
+  duration_ms: 0.4283
+  type: 'test'
+  ...
+# Subtest: fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+ok 518 - fixed activate：缺 workflowId/proposalDecisionId/roster 或 documents 子项坏 ⇒ invalid-arguments 且不调用回调
+  ---
+  duration_ms: 0.5174
+  type: 'test'
+  ...
+# Subtest: legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+ok 519 - legacy activate：planRef/d3DecisionId/rosterRef 仍必填（错误语义逐字保留）；成功仍要求 legacy activationDigest
+  ---
+  duration_ms: 0.3447
+  type: 'test'
+  ...
+# Subtest: fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+ok 520 - fixed activate 回执独立校验：workflow/role/roster 不匹配或坏形状 ⇒ 结果未知；业务失败如实直出
+  ---
+  duration_ms: 0.5059
+  type: 'test'
+  ...
+# Subtest: WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+ok 521 - WorkflowDocumentRef：version 可选；旧形状 {path,sha256[,kind]} 仍合法；A3 documentRefs 可携带 version
+  ---
+  duration_ms: 0.1266
+  type: 'test'
+  ...
+# Subtest: dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+ok 522 - dispatch_task：required 仍 ['roleId','task']、旧属性逐字保留、stage-request 枚举收口；contract_check.taskKind 同步
+  ---
+  duration_ms: 0.7245
+  type: 'test'
+  ...
+# Subtest: merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+ok 523 - merge-main：非判断分组（planJudge 排除依据）、不进 GOVERNANCE_CARD_GROUP；既有分组键值逐字不变
+  ---
+  duration_ms: 0.0671
+  type: 'test'
+  ...
+# Subtest: requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+ok 524 - requestReleaseMerge 零出现（本角色写集）；注入面复核：只有注入 fixed 依赖时不注册 legacy Git/VCA/stable 工具
+  ---
+  duration_ms: 1.8788
+  type: 'test'
+  ...
+# Subtest: complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+ok 525 - complete_team_plan schema v4：新增可选 workflowId（1–200、无控制字符）；required/旧属性/plan 形状逐字不变
+  ---
+  duration_ms: 1.8587
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传
+ok 526 - complete_team_plan handler：fixed 形状（含 workflowId）原样透传；工具层不派生/不改写 workflowId；signal 透传
+  ---
+  duration_ms: 1.1373
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+ok 527 - complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId
+  ---
+  duration_ms: 0.3143
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+ok 528 - complete_team_plan handler：legacy 必填 operationId/flowId/plan 逐字不变（缺失即拒绝且不调用实现）
+  ---
+  duration_ms: 0.2658
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+ok 529 - complete_team_plan handler：坏 workflowId（空/空白/超长/非串）⇒ invalid-arguments 且不调用实现
+  ---
+  duration_ms: 0.4189
+  type: 'test'
+  ...
+# Subtest: complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+ok 530 - complete_team_plan handler：runId/baseDigest 保持 legacy 断言面并原样透传（fixed 拒绝由服务/编排判定，本层不代做）
+  ---
+  duration_ms: 0.2551
+  type: 'test'
+  ...
+# Subtest: complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+ok 531 - complete_team_plan：非 convener/未注入实现 ⇒ 工具不可用（角色门控与注入面不变）
+  ---
+  duration_ms: 0.1803
+  type: 'test'
+  ...
+# Subtest: RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+ok 532 - RequestResolvedEvent：旧形状无 source 仍合法；source 可选且只收冻结字面 "stage-a10"
+  ---
+  duration_ms: 0.1076
+  type: 'test'
+  ...
+# Subtest: request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+ok 533 - request.resolved source 透传：事件纯数据原样序列化/反序列化，旧无字段记录照常读取
+  ---
+  duration_ms: 0.1027
+  type: 'test'
+  ...
+# Subtest: 四类 schema 常量 + ID 正则（C1 冻结）
+ok 534 - 四类 schema 常量 + ID 正则（C1 冻结）
+  ---
+  duration_ms: 0.6426
+  type: 'test'
+  ...
+# Subtest: VCA 发起角色唯一映射（AC-3）与目标 kind 收窄（AC-5/AC-19/AC-29/AC-30）
+ok 535 - VCA 发起角色唯一映射（AC-3）与目标 kind 收窄（AC-5/AC-19/AC-29/AC-30）
+  ---
+  duration_ms: 0.7344
+  type: 'test'
+  ...
+# Subtest: VCA 记录正例：baseTrunk:null + bootstrap:true（AC-25/F12）与提交定格字段
+ok 536 - VCA 记录正例：baseTrunk:null + bootstrap:true（AC-25/F12）与提交定格字段
+  ---
+  duration_ms: 0.1059
+  type: 'test'
+  ...
+# Subtest: 版本变更事件归属分区（AC-31/Q3）：approved/rejected=customer；submitted/applied/superseded=application
+ok 537 - 版本变更事件归属分区（AC-31/Q3）：approved/rejected=customer；submitted/applied/superseded=application
+  ---
+  duration_ms: 0.1005
+  type: 'test'
+  ...
+# Subtest: doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）
+not ok 538 - doc-freeze reason 九类：customer/application 两分区并集恰等于全集、交集为空；migrated-draft 不是 reason（F29/F35/Q6）
+  ---
+  duration_ms: 0.6191
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\trunk-amendment\\test\\runtime-core\\version-change-contract.test.ts:176:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    10 !== 9
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 9
+  actual: 10
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment/test/runtime-core/version-change-contract.test.ts:177:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: DocFreezeRecord / DocFreezeLookup 三态（F33 fail-closed）
+ok 539 - DocFreezeRecord / DocFreezeLookup 三态（F33 fail-closed）
+  ---
+  duration_ms: 0.099
+  type: 'test'
+  ...
+# Subtest: StableWritePermit 唯一 permit 形状（F13）：v/permitId/authority/四态/approvedAt/expiresAt/baseSha256=""
+ok 540 - StableWritePermit 唯一 permit 形状（F13）：v/permitId/authority/四态/approvedAt/expiresAt/baseSha256=""
+  ---
+  duration_ms: 0.1219
+  type: 'test'
+  ...
+# Subtest: StableWriteRecord 与 permit 分表：record.permitId 关联；record 可镜像 expiresAt/consumedAt（F13）
+ok 541 - StableWriteRecord 与 permit 分表：record.permitId 关联；record 可镜像 expiresAt/consumedAt（F13）
+  ---
+  duration_ms: 0.0724
+  type: 'test'
+  ...
+# Subtest: StableWriteDecisionInput 对齐门禁输入（F13）：permit 可选、now 为 () => Date；C1 不实现判定
+ok 542 - StableWriteDecisionInput 对齐门禁输入（F13）：permit 可选、now 为 () => Date；C1 不实现判定
+  ---
+  duration_ms: 0.0784
+  type: 'test'
+  ...
+# Subtest: stable.write.* 事件五 kind + F14 可选 approvedAt/expiresAt/consumedAt + 归属分区
+ok 543 - stable.write.* 事件五 kind + F14 可选 approvedAt/expiresAt/consumedAt + 归属分区
+  ---
+  duration_ms: 0.3086
+  type: 'test'
+  ...
+# Subtest: stable kind 与 trunk 单一定义同源（无第二份枚举）
+ok 544 - stable kind 与 trunk 单一定义同源（无第二份枚举）
+  ---
+  duration_ms: 0.1255
+  type: 'test'
+  ...
+# Subtest: refactor-request/v1（F31/F40/Q10）：convener 发起、应用调度层管理、五态、五类禁止
+ok 545 - refactor-request/v1（F31/F40/Q10）：convener 发起、应用调度层管理、五态、五类禁止
+  ---
+  duration_ms: 0.1191
+  type: 'test'
+  ...
+# Subtest: version.change / doc.freeze 事件可赋给 TaskStateEvent；submitted=application、approved=customer
+ok 546 - version.change / doc.freeze 事件可赋给 TaskStateEvent；submitted=application、approved=customer
+  ---
+  duration_ms: 0.0792
+  type: 'test'
+  ...
+# Subtest: acknowledgments 对象数组（F1）：request 可选对象数组、answered 回传 string[]、旧卡零变化
+ok 547 - acknowledgments 对象数组（F1）：request 可选对象数组、answered 回传 string[]、旧卡零变化
+  ---
+  duration_ms: 0.0595
+  type: 'test'
+  ...
+# Subtest: 四组错误码稳定、无重复（含 vca-conflict；排除 trunk-drift）
+ok 548 - 四组错误码稳定、无重复（含 vca-conflict；排除 trunk-drift）
+  ---
+  duration_ms: 0.0569
+  type: 'test'
+  ...
+# Subtest: judge-delegated reason 子集：恰为 proposal/intent、是 customer 分区子集、不扩既有 reason 全集
+ok 549 - judge-delegated reason 子集：恰为 proposal/intent、是 customer 分区子集、不扩既有 reason 全集
+  ---
+  duration_ms: 0.0875
+  type: 'test'
+  ...
+# Subtest: DocFreezeOrigin/DocFreezeSource 扩展 judge-delegated：诚实来源可赋给记录，且不混入既有 DirectActionSource
+ok 550 - DocFreezeOrigin/DocFreezeSource 扩展 judge-delegated：诚实来源可赋给记录，且不混入既有 DirectActionSource
+  ---
+  duration_ms: 0.1473
+  type: 'test'
+  ...
+# Subtest: doc.freeze 事件 origin=judge-delegated + DocFreezeSource 可赋给 TaskStateEvent；customer 事件形状不变
+ok 551 - doc.freeze 事件 origin=judge-delegated + DocFreezeSource 可赋给 TaskStateEvent；customer 事件形状不变
+  ---
+  duration_ms: 0.0601
+  type: 'test'
+  ...
+# Subtest: Service：四个运行时的 view_image 注册门不变——注入 viewImage 才注册；未注入 ⇒ 工具不存在（fail-closed）
+ok 552 - Service：四个运行时的 view_image 注册门不变——注入 viewImage 才注册；未注入 ⇒ 工具不存在（fail-closed）
+  ---
+  duration_ms: 21.0432
+  type: 'test'
+  ...
+# Subtest: Service + demo（仍 next-turn）：工具调用注入能力并透传 turnId；ToolResult 无 images、交付为 next-turn（零行为变化）
+ok 553 - Service + demo（仍 next-turn）：工具调用注入能力并透传 turnId；ToolResult 无 images、交付为 next-turn（零行为变化）
+  ---
+  duration_ms: 8.3738
+  type: 'test'
+  ...
+# Subtest: Service + pi（Gate 3 已翻 tool-result）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+ok 554 - Service + pi（Gate 3 已翻 tool-result）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+  ---
+  duration_ms: 6.1586
+  type: 'test'
+  ...
+# Subtest: Service + claude（Gate 3 已翻 tool-result；5 MB 上限）：同轮附图、不触达桌面能力、超限失败无图
+ok 555 - Service + claude（Gate 3 已翻 tool-result；5 MB 上限）：同轮附图、不触达桌面能力、超限失败无图
+  ---
+  duration_ms: 6.3342
+  type: 'test'
+  ...
+# Subtest: Service + codex（Gate 3 已翻 tool-result，Chat/Pi 证据）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+ok 556 - Service + codex（Gate 3 已翻 tool-result，Chat/Pi 证据）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+  ---
+  duration_ms: 4.0428
+  type: 'test'
+  ...
+# Subtest: 未注入 viewImage ⇒ view_image 不注册（能力缺席 = fail-closed），基础工具集不变
+ok 557 - 未注入 viewImage ⇒ view_image 不注册（能力缺席 = fail-closed），基础工具集不变
+  ---
+  duration_ms: 2.2336
+  type: 'test'
+  ...
+# Subtest: 注入 viewImage ⇒ 只新增 view_image；既有工具 schema/描述/显示规则/执行模式零变化
+ok 558 - 注入 viewImage ⇒ 只新增 view_image；既有工具 schema/描述/显示规则/执行模式零变化
+  ---
+  duration_ms: 0.5019
+  type: 'test'
+  ...
+# Subtest: view_image schema：仅 {path}、必填、拒绝未知参数，文案钉住同轮附图优先/下一轮回退/路径/类型/大小/不假装已看
+ok 559 - view_image schema：仅 {path}、必填、拒绝未知参数，文案钉住同轮附图优先/下一轮回退/路径/类型/大小/不假装已看
+  ---
+  duration_ms: 0.1905
+  type: 'test'
+  ...
+# Subtest: 合法 png/jpeg（含大写扩展名）/webp/gif：读取二进制、base64 与 MIME 正确，能力收到 {path,image}
+ok 560 - 合法 png/jpeg（含大写扩展名）/webp/gif：读取二进制、base64 与 MIME 正确，能力收到 {path,image}
+  ---
+  duration_ms: 17.2059
+  type: 'test'
+  ...
+# Subtest: 能力成功回执的 message 附在固定文案之后（不破坏「已读取并排队」句）
+ok 561 - 能力成功回执的 message 附在固定文案之后（不破坏「已读取并排队」句）
+  ---
+  duration_ms: 1.4996
+  type: 'test'
+  ...
+# Subtest: 路径非法（缺 path/空/NUL/绝对/盘符/.. 越界/目录/不存在）⇒ 工具失败且不调用能力
+ok 562 - 路径非法（缺 path/空/NUL/绝对/盘符/.. 越界/目录/不存在）⇒ 工具失败且不调用能力
+  ---
+  duration_ms: 1.4288
+  type: 'test'
+  ...
+# Subtest: 不支持的类型与超过 10 MB 均失败且不调用能力
+ok 563 - 不支持的类型与超过 10 MB 均失败且不调用能力
+  ---
+  duration_ms: 5.7702
+  type: 'test'
+  ...
+# Subtest: 能力失败/抛错/契约外回执 ⇒ 工具失败并如实说明未排队（不谎报已提供）
+ok 564 - 能力失败/抛错/契约外回执 ⇒ 工具失败并如实说明未排队（不谎报已提供）
+  ---
+  duration_ms: 3.0715
+  type: 'test'
+  ...
+# Subtest: 本轮已中止（next-turn）：兜底文案保持「排队未获确认 / 下一轮以系统为准」，不调用能力
+ok 565 - 本轮已中止（next-turn）：兜底文案保持「排队未获确认 / 下一轮以系统为准」，不调用能力
+  ---
+  duration_ms: 1.1606
+  type: 'test'
+  ...
+# Subtest: 本轮已中止（tool-result）：兜底文案不声称排队/下一轮，不交付图片、不调用能力
+ok 566 - 本轮已中止（tool-result）：兜底文案不声称排队/下一轮，不交付图片、不调用能力
+  ---
+  duration_ms: 1.5396
+  type: 'test'
+  ...
+# Subtest: RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通过），demo 仍 next-turn；Claude 5 MB；数值与冻结状态
+ok 567 - RUNTIME_VIEW_IMAGE_POLICY：Pi/Claude/Codex 已翻 tool-result（探针通过），demo 仍 next-turn；Claude 5 MB；数值与冻结状态
+  ---
+  duration_ms: 0.1484
+  type: 'test'
+  ...
+# Subtest: policy next-turn（显式注入）：能力调用与成功回执逐字不变；结果不带 images；turnId 透传
+ok 568 - policy next-turn（显式注入）：能力调用与成功回执逐字不变；结果不带 images；turnId 透传
+  ---
+  duration_ms: 1.369
+  type: 'test'
+  ...
+# Subtest: policy tool-result：成功结果带 images + imageDelivery；message 来自共享 i18n key；能力收到 turnId
+ok 569 - policy tool-result：成功结果带 images + imageDelivery；message 来自共享 i18n key；能力收到 turnId
+  ---
+  duration_ms: 2.55
+  type: 'test'
+  ...
+# Subtest: 旧回执 {ok:true}（无 mode）按 next-turn 处理：policy tool-result 下也不交付图片（诚实回退）
+ok 570 - 旧回执 {ok:true}（无 mode）按 next-turn 处理：policy tool-result 下也不交付图片（诚实回退）
+  ---
+  duration_ms: 1.234
+  type: 'test'
+  ...
+# Subtest: 交付契约一致性：policy next-turn + 回执 mode tool-result、非法 mode ⇒ fail-closed 无图不谎称
+ok 571 - 交付契约一致性：policy next-turn + 回执 mode tool-result、非法 mode ⇒ fail-closed 无图不谎称
+  ---
+  duration_ms: 1.5323
+  type: 'test'
+  ...
+# Subtest: tool-result 下校验失败不带图且不调用能力（路径/类型/大小矩阵保留）
+ok 572 - tool-result 下校验失败不带图且不调用能力（路径/类型/大小矩阵保留）
+  ---
+  duration_ms: 1.3063
+  type: 'test'
+  ...
+# Subtest: 每轮图片预算已移除：同一轮连续 6 张图片全部成功交付
+ok 573 - 每轮图片预算已移除：同一轮连续 6 张图片全部成功交付
+  ---
+  duration_ms: 10.4996
+  type: 'test'
+  ...
+# Subtest: 更严单图上限：超限失败且不触达能力
+ok 574 - 更严单图上限：超限失败且不触达能力
+  ---
+  duration_ms: 1.2122
+  type: 'test'
+  ...
+# Subtest: 审计：view_image.result 只记 path/mime/bytes/delivery/reason，不落 base64 或 data URL
+ok 575 - 审计：view_image.result 只记 path/mime/bytes/delivery/reason，不落 base64 或 data URL
+  ---
+  duration_ms: 4.4769
+  type: 'test'
+  ...
+# Subtest: F6/write_file：首次与写前复核均收到真实最终字节 sha256 与 operation=write
+ok 576 - F6/write_file：首次与写前复核均收到真实最终字节 sha256 与 operation=write
+  ---
+  duration_ms: 15.6131
+  type: 'test'
+  ...
+# Subtest: F6/edit_file：写前复核 gate 收到编辑后最终字节（BOM 保留）sha256 与 operation=edit
+ok 577 - F6/edit_file：写前复核 gate 收到编辑后最终字节（BOM 保留）sha256 与 operation=edit
+  ---
+  duration_ms: 22.1904
+  type: 'test'
+  ...
+# Subtest: F6/向后兼容：旧单参数 WriteGate 实现与直接单参调用零变化
+ok 578 - F6/向后兼容：旧单参数 WriteGate 实现与直接单参调用零变化
+  ---
+  duration_ms: 5.8969
+  type: 'test'
+  ...
+# Subtest: F6/写前复核拒绝：携带内容上下文时拒绝 ⇒ write/edit 均不落盘
+ok 579 - F6/写前复核拒绝：携带内容上下文时拒绝 ⇒ write/edit 均不落盘
+  ---
+  duration_ms: 2.5142
+  type: 'test'
+  ...
+# Subtest: F6/类型形状：纯phase型不是读取/写入权限，最终hash与operation保持
+ok 580 - F6/类型形状：纯phase型不是读取/写入权限，最终hash与operation保持
+  ---
+  duration_ms: 0.1585
+  type: 'test'
+  ...
+# Subtest: R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy
+ok 581 - R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy
+  ---
+  duration_ms: 13.9984
+  type: 'test'
+  ...
+# Subtest: R20 authorized stable edit preserves BOM, exact current SHA and permit base/final SHA policy
+ok 582 - R20 authorized stable edit preserves BOM, exact current SHA and permit base/final SHA policy
+  ---
+  duration_ms: 10.1747
+  type: 'test'
+  ...
+# Subtest: R20 unapproved lexical/canonical paths, unknown coverage, legacy consumers and I/O failures never read unauthorized bytes
+ok 583 - R20 unapproved lexical/canonical paths, unknown coverage, legacy consumers and I/O failures never read unauthorized bytes
+  ---
+  duration_ms: 5.9751
+  type: 'test'
+  ...
+# Subtest: R20 host drift, final base drift, hardlinks and canonical parent replacement fail without commit
+ok 584 - R20 host drift, final base drift, hardlinks and canonical parent replacement fail without commit
+  ---
+  duration_ms: 20.3015
+  type: 'test'
+  ...
+# Subtest: R20 final deny and real rename failure preserve target bytes and remove only the owned temp
+ok 585 - R20 final deny and real rename failure preserve target bytes and remove only the owned temp
+  ---
+  duration_ms: 12.8401
+  type: 'test'
+  ...
+# Subtest: R20 production schema/raw refuse staged host fields before gate, while legacy nonmanaged calls keep old behavior
+ok 586 - R20 production schema/raw refuse staged host fields before gate, while legacy nonmanaged calls keep old behavior
+  ---
+  duration_ms: 13.0635
+  type: 'test'
+  ...
+1..586
+# tests 586
+# suites 0
+# pass 549
+# fail 33
+# cancelled 0
+# skipped 4
+# todo 0
+# duration_ms 48960.6862

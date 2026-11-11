@@ -1,0 +1,177 @@
+{
+  "test/桌面应用/abort-unwedge.test.ts": [],
+  "test/桌面应用/acceptance-evidence.test.ts": [],
+  "test/桌面应用/acceptance-proposal-path.test.ts": [],
+  "test/桌面应用/acceptance-return-card.test.ts": [],
+  "test/桌面应用/ans-wiring.test.ts": [],
+  "test/桌面应用/application-line.test.ts": [],
+  "test/桌面应用/b3-fixed-baseline-pathb.test.ts": [],
+  "test/桌面应用/b3-fixed-cards-panel.test.ts": [],
+  "test/桌面应用/b3-release-merge-desktop.test.ts": [],
+  "test/桌面应用/b3-workflow-git-real.test.ts": [],
+  "test/桌面应用/b31-fixed-release-auto-desktop.test.ts": [],
+  "test/桌面应用/b42-task-git-port-desktop.test.ts": [],
+  "test/桌面应用/b51-fixed-workflow-wiring.test.ts": [],
+  "test/桌面应用/boundary-refresh.test.ts": [
+    "G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞"
+  ],
+  "test/桌面应用/chain-enforcement.test.ts": [
+    "M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理",
+    "M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据",
+    "D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）",
+    "D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略",
+    "M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚",
+    "F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚"
+  ],
+  "test/桌面应用/chief-workflow.test.ts": [
+    "W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝",
+    "W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP",
+    "W23 Convener不能越Chief新建普通Verifier，零任务零HTTP",
+    "W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP",
+    "W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界",
+    "W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争",
+    "W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止",
+    "W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止",
+    "W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续",
+    "W34 真实首文档发布与原创建者关闭后派团队规划保独立scope"
+  ],
+  "test/桌面应用/composer-images.test.ts": [],
+  "test/桌面应用/decision-service.test.ts": [],
+  "test/桌面应用/diagnostics.test.ts": [],
+  "test/桌面应用/directive-decision.test.ts": [],
+  "test/桌面应用/directive-input.test.ts": [
+    "sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道",
+    "sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）",
+    "sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）",
+    "sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账",
+    "sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂"
+  ],
+  "test/桌面应用/dispatch-fresh-enum.test.ts": [],
+  "test/桌面应用/download-decision.test.ts": [
+    "同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）"
+  ],
+  "test/桌面应用/download-request.test.ts": [
+    "一项目一卡：前一张未决时下载卡排队，不呈现"
+  ],
+  "test/桌面应用/fixed-path-routing.test.ts": [],
+  "test/桌面应用/genesis-bootstrap.test.ts": [],
+  "test/桌面应用/handback-delivery.test.ts": [
+    "E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入",
+    "连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢",
+    "真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝**",
+    "C frozen batch retries keep members and delivery ID while later reports stay separate",
+    "2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发",
+    "B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported"
+  ],
+  "test/桌面应用/hot-path.test.ts": [],
+  "test/桌面应用/interface.test.ts": [],
+  "test/桌面应用/log-actions.test.ts": [
+    "listTasks / readRoleActivityLog / terminateRoleRun / redispatchTask 参数校验与如实回执"
+  ],
+  "test/桌面应用/log-patrol.test.ts": [],
+  "test/桌面应用/log-stuck.test.ts": [],
+  "test/桌面应用/message-queue.test.ts": [],
+  "test/桌面应用/multi-runtime.test.ts": [
+    "D1 actual Pipeline/Service chooses demo, writes isolated replay and converts native context honestly",
+    "D1 actual Pipeline/Service chooses pi, writes isolated replay and converts native context honestly",
+    "D1 actual Pipeline/Service chooses codex, writes isolated replay and converts native context honestly",
+    "D1 actual Pipeline/Service chooses claude, writes isolated replay and converts native context honestly",
+    "D1 profile success rebuilds same engine after busy old Pi finishes; ambient token remains old until safe; failure is unchanged",
+    "D1R2 actual Pipeline/Service returns original client IDs and real distinct turn IDs for same text",
+    "D1R2 actual ack preserves a failed delayed terminal and the next aborted original client",
+    "actual Core request_choice abort preserves accepted/current facts, expires the old decision and allows one explicit next prompt"
+  ],
+  "test/桌面应用/network-monitor.test.ts": [],
+  "test/桌面应用/operator-channel.test.ts": [
+    "I-1 补丁（**真正接通**核查）：真实 openRoleSession + 真实装配——(c) 实件在场时能力面产出 ShellGate（Pi 适配器 run_shell 注册条件成立）"
+  ],
+  "test/桌面应用/optional-acceptance.test.ts": [
+    "幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚"
+  ],
+  "test/桌面应用/p0-halt-and-images.test.ts": [
+    "P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实）",
+    "P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源"
+  ],
+  "test/桌面应用/pending-card-restart.test.ts": [],
+  "test/桌面应用/pi-config.test.ts": [],
+  "test/桌面应用/project-document.test.ts": [],
+  "test/桌面应用/project-state.test.ts": [],
+  "test/桌面应用/project.test.ts": [
+    "buildProjectConfig：由枚举结果构造角色表，acceptance 透传"
+  ],
+  "test/桌面应用/queue-visibility.test.ts": [
+    "P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）"
+  ],
+  "test/桌面应用/queue-withdraw-lru.test.ts": [],
+  "test/桌面应用/rejection-copy.test.ts": [],
+  "test/桌面应用/replay-safe-retry.test.ts": [],
+  "test/桌面应用/request-timeout-wiring.test.ts": [],
+  "test/桌面应用/role-log.test.ts": [],
+  "test/桌面应用/run-change-entry.test.ts": [],
+  "test/桌面应用/run-change-trigger.test.ts": [
+    "派发不再自动弹 run-change：pinned + 新版本 → 受理 + advisory；客户卡请求数 0",
+    "显式入口（continue-frozen）：requestRunChangeDecision 三模式落账不变",
+    "显式入口（stop-and-restart）：requestRunChangeDecision 三模式落账不变",
+    "显式入口（stop）：requestRunChangeDecision 三模式落账不变",
+    "stop-and-restart 后：新 draft run 可按 v2 文档重新 pin，并恢复派发新角色",
+    "显式入口无会话兜底：没有可呈现的客户卡会话 ⇒ 如实失败（不弹卡）",
+    "宁可不弹（B1）：目标不存在 ⇒ 硬 target-card-missing，不呈现 run-change",
+    "提案卡：冻结 run 上出现更高版本 proposal ⇒ 先尝试 run-change 卡，提案卡 notPresented 拒发",
+    "AC-17：VCA submitted/approved 在途 ⇒ 抑制自动 run-change（系统行）；结束后恢复；显式入口保留"
+  ],
+  "test/桌面应用/run-change.test.ts": [],
+  "test/桌面应用/run-pin.test.ts": [
+    "run-pin：M1/M2/M3 共享 draft runId；handoff 前 pin 同一 runId；任务锚定 pinned",
+    "D3 卡种收口（2026-10-31）：真实 D3 + 后续 decision 裁决后 pin，manifest.d3 为真实角色集",
+    "run-pin：缺 D3 时 pin 失败仍受理；任务锚定 draft、不伪造 pinned",
+    "P1.1：M1 缺 flowId 也生成 pending draft；M2 带 flowId 时领养同一 runId",
+    "F2：版本化文档基线违规受理 + advisory；基线/文档未被改写",
+    "R2：handoff 无 flowId 受理、省略锚点、run-ledger-unavailable",
+    "R2：run 账本不可用时 handoff 受理、无锚点、run-ledger-unavailable",
+    "AC-2.8：会话级 pinned 哈希漂移受理、advisory、manifest 未改写、任务无锚点",
+    "AC-2.8/R2：pinned roster 失败受理、advisory、manifest 未改写、任务无锚点",
+    "AC-2.6：legacy flow 派发受理 + run-legacy-readonly + draft 锚点、旧记录可读",
+    "P1-R-08-R1：pinned run 未声明 roles 时不产 run-role-missing、不锚定"
+  ],
+  "test/桌面应用/session-history.test.ts": [],
+  "test/桌面应用/session-rebuild-race.test.ts": [
+    "重建 dispose 等待窗口：stop A 保持用户目标/关闭契约",
+    "重建 dispose 等待窗口：stop all 保持用户目标/关闭契约",
+    "重建 open 等待窗口：stop A 保持用户目标/关闭契约"
+  ],
+  "test/桌面应用/session.test.ts": [
+    "AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）"
+  ],
+  "test/桌面应用/shell-escalation.test.ts": [],
+  "test/桌面应用/star-routing.test.ts": [
+    "星形目标（v4.1）：chief → 产品受理（链首）；chief → 运营缺 D3 受理 + advisory；幕僚自身拒绝",
+    "convener 拥有 dispatch（v4.1）：未接交付时派项目 worker 受理 + advisory，建任务",
+    "BUG-5：任务已报告/已收口后，同一幂等键重复派发被抑制（不建新任务、不投递）",
+    "BUG-5：派发到无会话角色会先 open/resume；打开失败则如实拒绝且不入队",
+    "BUG-5：排队期间任务已完成 ⇒ 已出队前不再投递/不补写 delivered（只记诊断）",
+    "BUG-5：任务已报告后的重复回交被抑制（不同 handbackKey 也不重复投递）",
+    "AC-4.3：洁净派发无 advisory、无诊断噪声"
+  ],
+  "test/桌面应用/stuck-redispatch-safety.test.ts": [],
+  "test/桌面应用/stuck-redispatch.test.ts": [
+    "safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递",
+    "B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务",
+    "B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐）"
+  ],
+  "test/桌面应用/su-effective-boundary.test.ts": [],
+  "test/桌面应用/task-restart.test.ts": [
+    "重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过"
+  ],
+  "test/桌面应用/trunk.test.ts": [],
+  "test/桌面应用/turn-lease.test.ts": [],
+  "test/桌面应用/version-change.test.ts": [
+    "Batch 3.5 能力实现：VCA submit（submitted）/ refactor（requested）/ stable write request（requested+许可）",
+    "VCA 基线修复：无已落盘 trunk ⇒ submitVersionChange 自动按 bootstrap 提交（不允许角色自报“伪装”）",
+    "VCA 自动呈现：提交成功即自动调用客户批准卡（不阻塞回执；无通道保持 submitted）",
+    "SessionManager blocked 提示：无客户卡通道 ⇒ 只记诊断、不提示；报告路由照常"
+  ],
+  "test/桌面应用/version-decision.test.ts": [],
+  "test/桌面应用/watchdog-reuse.test.ts": [],
+  "test/桌面应用/workflow-git-port.test.ts": [],
+  "test/桌面应用/write-safety.test.ts": []
+}

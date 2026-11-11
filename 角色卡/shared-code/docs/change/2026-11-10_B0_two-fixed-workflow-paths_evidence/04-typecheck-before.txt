@@ -1,0 +1,5 @@
+
+> ans-cli@1.9.2 typecheck
+> tsc --noEmit
+
+test/门禁引擎/role-module-contract.test.ts(195,3): error TS2344: Type 'false' does not satisfy the constraint 'true'.

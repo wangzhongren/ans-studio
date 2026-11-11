@@ -7,8 +7,8 @@
 //
 // 本模块对外只导出**一个** `BuiltInRoleModule`：
 //   · 规格数据：id / displayName / function / card（text/entries/preauthorizedDirs/forbiddenWritePaths）/
-//     capabilities / cards；
-//   · 四个纯策略面：tools / dispatch / preflight / context。
+//     capabilities / cards；fixed 矩阵卡种白名单 `fixedCards`（T3 B2 / MF-IR-4；legacy 数据冻结）；
+//   · 四个纯策略面：tools / dispatch / preflight / context（fixed 段只经 `context({matrix})` 新增）。
 //
 // 硬约束：
 //  - 只依赖 `src/model/` 与 `src/common/shared/` 的 public entry；不 import 门禁引擎私有 common、
@@ -28,6 +28,7 @@ import {
   RAPPORTEUR_CARD_TEXT,
   RAPPORTEUR_CARDS,
   RAPPORTEUR_DISPLAY_NAME,
+  RAPPORTEUR_FIXED_CARDS,
   RAPPORTEUR_FORBIDDEN_WRITE_PATHS,
   RAPPORTEUR_FUNCTION,
   RAPPORTEUR_ID,
@@ -56,6 +57,9 @@ export const rapporteurRoleModule: BuiltInRoleModule = Object.freeze({
   }),
   capabilities: RAPPORTEUR_CAPABILITIES,
   cards: RAPPORTEUR_CARDS,
+  // T3 B2（MF-IR-4 / v1.3 §3.4）：fixed 矩阵只读本字段（恰 ["decision"]）；legacy `cards`
+  // （proposal+decision）、`card.text`、capabilities 与四个纯策略面逐字冻结，不因本字段改变。
+  fixedCards: RAPPORTEUR_FIXED_CARDS,
   tools: toolsPolicy,
   dispatch: dispatchPolicy,
   preflight: Object.freeze({ checkAction: checkRapporteurAction }),

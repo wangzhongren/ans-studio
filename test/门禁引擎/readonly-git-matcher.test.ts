@@ -4,7 +4,7 @@
 //   1) 10 个子命令的白名单全形态（精确 flag/参数；`git` 后第一项必须是子命令）与规范 argv 体；
 //   2) §2.4.3「参数级攻击 → fail-closed」矩阵（全局选项、写盘/外部程序 flag、远程、paths magic、行号上限…）；
 //   3) 边界：OID 完整 40/64 hex、HEAD 仅允许位置、字面路径规则、blame 行号 1..2000 与跨度；
-//   4) 规则集 v4 迁移：`ans-default-v4`、死 `readonly:git` 删除、v3 规则集 fail-closed 整条拒绝；
+//   4) 规则集 v5 迁移：`ans-default-v5`、只读白名单保留、v4/v3 规则集 fail-closed 整条拒绝；
 //   5) 与 `gitQueryBody`（结构化查询模板）的**差分测试**：重叠模板逐条同规范 argv；
 //      允许的分叉（log 默认 HEAD≠--all、--oneline、diff 显示 flag、ls-tree 默认 HEAD、blame/cat-file）逐条记录。
 
@@ -297,20 +297,22 @@ test("边界：log 行数 / blame 行号上限；重复 flag 与超界拒绝", (
 });
 
 // ===========================================================================
-// 4) 规则集 v4 迁移（I0-5）：不兼容读 v3，fail-closed
+// 4) 规则集 v5 迁移（B4）：不兼容读 v4/v3，fail-closed
 // ===========================================================================
 
-test("规则集 v4：ans-default-v4、死 readonly:git 删除、v3 规则集整条拒绝（不静默放宽）", () => {
+test("规则集 v5：ans-default-v5、只读白名单保留、v4/v3 规则集整条拒绝（不静默放宽）", () => {
   const current = defaultShellRules();
-  assert.equal(current.version, "4");
-  assert.equal(current.id, "ans-default-v4");
+  assert.equal(current.version, "5");
+  assert.equal(current.id, "ans-default-v5");
   assert.equal(current.readOnly.some((rule) => rule.program.toLowerCase() === "git"), false);
-  const v3 = { ...defaultShellRules(), version: "3" } as never;
-  const denied = classifyShellDetailed(["ls"], v3);
-  assert.equal(denied.decision, "deny");
-  assert.equal(denied.ruleId, "deny:rules-invalid");
-  // 旧 v3 的 readonly:git 数据即使被外部带回来也不会被引擎读取（版本不符先拒）。
-  assert.equal(classifyShellDetailed(["git", "status"], v3).decision, "deny");
+  for (const old of ["4", "3"]) {
+    const legacy = { ...defaultShellRules(), version: old } as never;
+    const denied = classifyShellDetailed(["ls"], legacy);
+    assert.equal(denied.decision, "deny", `v${old} 规则集必须整条拒绝`);
+    assert.equal(denied.ruleId, "deny:rules-invalid");
+    // 旧只读 Git 数据即使被外部带回来也不会被引擎读取（版本不符先拒）。
+    assert.equal(classifyShellDetailed(["git", "status"], legacy).decision, "deny");
+  }
 });
 
 // ===========================================================================

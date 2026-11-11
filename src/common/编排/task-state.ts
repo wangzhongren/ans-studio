@@ -27,6 +27,8 @@ import type {
   TaskReportStatus,
   TaskSideEffect,
   TaskStateEvent,
+  WorkflowPath,
+  WorkflowStage,
 } from "../../model/runtime.ts";
 import {
   GOVERNANCE_CARD_KINDS,
@@ -39,6 +41,8 @@ import {
   isTaskHubRouting,
   isTaskReviewControllerRef,
   isTaskReviewBasisRef,
+  isWorkflowPath,
+  isWorkflowStage,
 } from "../../model/runtime.ts";
 // 2026-11-04（trunk-amendment-model C2a）：新账本事件的枚举/常量单一来源 = C1 Model；
 // 本模块只消费、不复制字面量、不另造同义枚举（C1 冻结记录 §3.1/§3.2）。
@@ -358,11 +362,58 @@ export function redispatchTaskId(retryOf: string, attempt: number): string {
 type AppendResult = { ok: true; path: string } | { ok: false; message: string; code?: string };
 
 /**
+ * T3（2026-11-10 两条固定工作流路径，v1.3 §7.1 / B1 AC-17 / MF-3）：fixed `task.created` 绑定字段的
+ * 形状/自洽校验（**写侧**）。`workflowId` 存在即以 fixed 记账：`flowId` 必填、`stage ∈ WorkflowStage`、
+ * `taskKind` 只允许 `"stage-request"`（普通生产任务可缺省）、`workflowPath` 只允许 A/B，
+ * `runId`/`runState` 由调用方另行断言（出现即拒绝）。
+ */
+function validateFixedTaskCreatedBinding(
+  event: TaskCreatedEvent,
+): { ok: true } | { ok: false; code: string; message: string } {
+  const fail = (message: string): { ok: false; code: string; message: string } =>
+    ({ ok: false, code: "invalid-task-binding", message });
+  if (typeof event.workflowId !== "string" || !isTaskSlug(event.workflowId)) {
+    return fail("task.created.workflowId 非法：必须是合法 slug");
+  }
+  if (event.flowId === undefined) {
+    return fail("task.created fixed：带 workflowId 时必须同时给出 flowId");
+  }
+  if (!isTaskSlug(event.flowId)) return fail("task.created.flowId 非法：必须是合法 slug");
+  if (event.stage === undefined || !isWorkflowStage(event.stage)) {
+    return fail("task.created.stage 非法：fixed 任务必须给出合法 WorkflowStage");
+  }
+  if (event.taskKind !== undefined && event.taskKind !== "stage-request") {
+    return fail('task.created.taskKind 非法：只允许 "stage-request"（普通生产任务可缺省）');
+  }
+  if (event.workflowPath !== undefined && !isWorkflowPath(event.workflowPath)) {
+    return fail("task.created.workflowPath 非法：只允许 A/B");
+  }
+  // AC-05（B1 收口）：stage-request 只允许 chief→convener、sideEffect 固定 read-only、无 module/写集。
+  if (event.taskKind === "stage-request") {
+    if (event.from !== "chief" || event.to !== "convener") {
+      return fail("task.created stage-request 只允许 chief→convener（产线调度请求，不是生产线派发）");
+    }
+    if (event.sideEffect !== "read-only") {
+      return fail("task.created stage-request 必须为 sideEffect=read-only（文本升类豁免后固定只读）");
+    }
+    if (event.moduleId !== undefined || event.modulePaths !== undefined || event.moduleDirectory !== undefined) {
+      return fail("task.created stage-request 不得携带 moduleId/modulePaths/moduleDirectory（无写集）");
+    }
+  }
+  return { ok: true };
+}
+
+/**
  * 追加一个任务事件。写失败**不抛**：返回 `{ok:false,message}`，调用方如实回执/记日志。
  * 轮转/串行链/原子追加**全部**走 A2 `src/common/shared/jsonl-ledger.ts`（B1 等价迁移；行为逐字不变）；
  * env 解析与诊断留在此处。
+ *
+ * T3（2026-11-10，v1.3 §7.1 / AC-17）fixed 分支：`kind==="task.created"` 且 `workflowId` 存在 ⇒
+ * **豁免 runId/runState**（fixed 任务不带 run），但绑定字段必须自洽、且出现 `runId`/`runState` 即拒绝；
+ * `workflowPath` 仅允许出现在该 workflowId 的首个 stage-request 上。无 `workflowId` 的旧
+ * run-required 规则逐字保留（`allowLegacyRun` 仅历史/测试）。
  */
-export function appendTaskEvent(
+export async function appendTaskEvent(
   projectRoot: string,
   event: TaskStateEvent,
   options: { allowLegacyRun?: boolean } = {},
@@ -371,13 +422,46 @@ export function appendTaskEvent(
     || (event.kind === "request.resolved" && event.by === "chief-delegated")
     || ("actionSource" in event && event.actionSource !== undefined)) {
     const checked = validateEvent(event);
-    if (!checked.ok) return Promise.resolve({ ok: false, code: "invalid-event-source", message: checked.message });
+    if (!checked.ok) return { ok: false, code: "invalid-event-source", message: checked.message };
   }
-  // 2026-10-30（3.1/P1.3 R1）：**新建**项目任务（flowId 有值）必须带 runId+runState；
-  // 只有历史既有/测试重放可用 allowLegacyRun 写入无 run 的旧形状。读侧仍按 legacy 兼容。
-  if (event.kind === "task.created" && event.flowId !== undefined && options.allowLegacyRun !== true) {
+  if (event.kind === "task.created" && event.workflowId !== undefined) {
+    const binding = validateFixedTaskCreatedBinding(event);
+    if (!binding.ok) return { ok: false, code: binding.code, message: binding.message };
+    if (event.runId !== undefined || event.runState !== undefined) {
+      return {
+        ok: false,
+        code: "fixed-task-run-forbidden",
+        message: "task.created.fixed-task-run-forbidden：fixed 工作流任务不得携带 runId/runState（出现即拒绝）",
+      };
+    }
+    if (event.workflowPath !== undefined) {
+      if (event.taskKind !== "stage-request") {
+        return {
+          ok: false,
+          code: "workflow-path-not-stage-request",
+          message: "task.created.workflowPath 只允许出现在 taskKind=stage-request 的任务上",
+        };
+      }
+      // `workflowPath` 仅首 stage-request（v1.3 §3.3/§7.1）：同 workflowId 已有 stage-request 时拒绝；
+      // 同幂等键的重放（调用方在派发层本应去重）按幂等放行，避免把 replay 误判为第二次请求。
+      const state = await readTaskState(projectRoot);
+      const prior = [...state.records.values()].find((record) =>
+        record.created?.workflowId === event.workflowId
+        && record.created?.taskKind === "stage-request"
+        && record.created?.idempotencyKey !== event.idempotencyKey);
+      if (prior !== undefined) {
+        return {
+          ok: false,
+          code: "workflow-path-not-first",
+          message: `task.created.workflowPath 仅首 stage-request 可携带（已有 stage-request ${prior.taskId}）`,
+        };
+      }
+    }
+  } else if (event.kind === "task.created" && event.flowId !== undefined && options.allowLegacyRun !== true) {
+    // 2026-10-30（3.1/P1.3 R1）：**新建**项目任务（flowId 有值）必须带 runId+runState；
+    // 只有历史既有/测试重放可用 allowLegacyRun 写入无 run 的旧形状。读侧仍按 legacy 兼容。
     if (event.runId === undefined || event.runId === "" || event.runState === undefined) {
-      return Promise.resolve({ ok: false, code: "run-required", message: "task.created.run-required：新建项目任务必须带 runId 与 runState（legacy 仅历史重放允许）" });
+      return { ok: false, code: "run-required", message: "task.created.run-required：新建项目任务必须带 runId 与 runState（legacy 仅历史重放允许）" };
     }
   }
   const { maxBytes, rotations } = limits();
@@ -1027,6 +1111,40 @@ function validateEvent(value: unknown): { ok: true; event: TaskStateEvent } | { 
         return { ok: false, message: "task.created.moduleDirectory 非法" };
       }
     }
+    // T3（2026-11-10，v1.3 §7.1 / MF-3）：fixed 工作流绑定字段（可选；旧行无字段照常）。
+    // 读侧同样 fail-closed：坏形状 ⇒ 该行按坏行计数跳过（不猜），不阻塞其余账本。
+    const workflowId = rec["workflowId"];
+    if (workflowId !== undefined) {
+      if (!isTaskSlug(workflowId)) return { ok: false, message: "task.created.workflowId 非法" };
+      if (rec["flowId"] === undefined) return { ok: false, message: "task.created fixed 缺 flowId" };
+      if (!isWorkflowStage(rec["stage"])) return { ok: false, message: "task.created.stage 非法（fixed 任务必填）" };
+      if (rec["runId"] !== undefined || rec["runState"] !== undefined) {
+        return { ok: false, message: "task.created fixed 不得携带 runId/runState" };
+      }
+      if (rec["taskKind"] !== undefined
+        && (typeof rec["taskKind"] !== "string" || rec["taskKind"].trim() === "" || rec["taskKind"] !== "stage-request")) {
+        return { ok: false, message: "task.created.taskKind 非法" };
+      }
+      if (rec["taskKind"] === "stage-request") {
+        // AC-05：stage-request 只允许 chief→convener、sideEffect=read-only、无 module/写集（读侧同 fail-closed）。
+        if (rec["from"] !== "chief" || rec["to"] !== "convener") {
+          return { ok: false, message: "task.created stage-request 只允许 chief→convener" };
+        }
+        if (sideEffect !== "read-only") {
+          return { ok: false, message: "task.created stage-request 必须为 sideEffect=read-only" };
+        }
+        if (rec["moduleId"] !== undefined || rec["modulePaths"] !== undefined || rec["moduleDirectory"] !== undefined) {
+          return { ok: false, message: "task.created stage-request 不得携带 module/写集" };
+        }
+      }
+      if (rec["workflowPath"] !== undefined && !isWorkflowPath(rec["workflowPath"])) {
+        return { ok: false, message: "task.created.workflowPath 非法" };
+      }
+    } else if (rec["workflowPath"] !== undefined) {
+      return { ok: false, message: "task.created.workflowPath 需配合 workflowId" };
+    } else if (rec["stage"] !== undefined && !isWorkflowStage(rec["stage"])) {
+      return { ok: false, message: "task.created.stage 非法" };
+    }
     return { ok: true, event: rec as unknown as TaskStateEvent };
   }
   if (kind === "task.reported") {
@@ -1091,7 +1209,9 @@ export function replayTaskEvents(events: readonly TaskStateEvent[], errors: Task
         continue;
       }
       // 2026-10-30（3.1/P1.3）：无 runId 的既有 flow 任务按 legacy 读取；不补造 runId/manifest。
-      const createdEvent = event.flowId !== undefined && event.runId === undefined && event.runState === undefined
+      // T3（2026-11-10，v1.3 §7.1）：fixed 任务（workflowId 存在）**不带 run**，不得被回填成 legacy runState。
+      const createdEvent = event.flowId !== undefined && event.workflowId === undefined
+        && event.runId === undefined && event.runState === undefined
         ? { ...event, runState: "legacy" as const }
         : event;
       records.set(taskId, {
@@ -1187,6 +1307,11 @@ export interface TaskCardView {
   runId?: string;
   runState?: "draft" | "pinned" | "legacy";
   runStage?: string;
+  /** T3（2026-11-10，v1.3 §7.1）：fixed 工作流绑定（可选；旧任务无字段）。 */
+  workflowId?: string;
+  stage?: WorkflowStage;
+  taskKind?: string;
+  workflowPath?: WorkflowPath;
   sideEffect: TaskSideEffect;
   status: "created" | "delivered" | "reported" | "closed" | "failed";
   createdAt: string;
@@ -1213,10 +1338,14 @@ export function taskCardOf(record: TaskRecord): TaskCardView | undefined {
     ...(record.created.runId !== undefined ? { runId: record.created.runId } : {}),
     ...(record.created.runState !== undefined
       ? { runState: record.created.runState }
-      : record.created.flowId !== undefined
+      : record.created.flowId !== undefined && record.created.workflowId === undefined
         ? { runState: "legacy" as const }
         : {}),
     ...(record.created.runStage !== undefined ? { runStage: record.created.runStage } : {}),
+    ...(record.created.workflowId !== undefined ? { workflowId: record.created.workflowId } : {}),
+    ...(record.created.stage !== undefined ? { stage: record.created.stage } : {}),
+    ...(record.created.taskKind !== undefined ? { taskKind: record.created.taskKind } : {}),
+    ...(record.created.workflowPath !== undefined ? { workflowPath: record.created.workflowPath } : {}),
     sideEffect: record.created.sideEffect,
     status: taskStatusOf(record),
     createdAt: record.created.at,
@@ -1281,9 +1410,12 @@ export function renderTaskCardLines(card: TaskCardView): string[] {
     `[任务] #${card.taskId}${card.retryOf !== undefined ? `（重派自 ${card.retryOf}）` : ""}`,
     ...(card.runId !== undefined
       ? [`run：${card.runId}（${card.runState ?? "legacy"}${card.runStage !== undefined ? `，stage ${card.runStage}` : ""}）`]
-      : card.flowId !== undefined
+      : card.flowId !== undefined && card.workflowId === undefined
         ? ["run：legacy（未冻结）"]
         : []),
+    ...(card.workflowId !== undefined
+      ? [`工作流：${card.workflowId}（${card.workflowPath !== undefined ? `路径 ${card.workflowPath}，` : ""}stage ${card.stage ?? "?"}${card.taskKind !== undefined ? `，${card.taskKind}` : ""}）`]
+      : []),
     `目标角色：${card.targetRoleId}`,
     `目标：${shortenSummary(card.text, 200)}`,
     ...(card.expectedOutput !== undefined ? [`期望产出：${shortenSummary(card.expectedOutput, 200)}`] : []),

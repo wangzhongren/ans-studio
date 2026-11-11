@@ -1,0 +1,21 @@
+# candidate (B3 编排) — raw SHA-256 / bytes / lines
+src/common/编排/workflow-service.ts e5b247b2cadd6bbd489054eb43994f147f9183ffe8b0509c1103c3fba20a43b8 183365 3991
+src/common/编排/workflow-state.ts 8fb4e22a940db785e03bd99a0cf2188555ee4cd3f0e3140afe33d94ec56e5f05 21101 442
+test/编排/release-merge.test.ts 0060b8dfba6ac1ca2855534fc6772686c36c4013b9f1f5961e06b0769e258357 32111 703
+test/编排/acceptance-archive.test.ts ccfdff80a77ec482b56c3605f87c9ac2b96b1d32c2c16d31d6954488db4f9eda 11454 228
+test/编排/baseline-service.test.ts beb0c23b9b6da3f7f86fc49500ce0f5eb5e93cd4427db35caae0b6aa6509e91e 23479 515
+test/编排/path-b-baseline.test.ts 4500b602281914afd2d4ec96429eeb7d371f22ec1d3a3814bfe9569c7a9d64aa 18824 417
+
+# numstat (M files)
+1601	4	src/common/编排/workflow-service.ts
+6	0	src/common/编排/workflow-state.ts
+
+aggregate-input (path:sha256 sorted, LF-joined):
+src/common/编排/workflow-service.ts:e5b247b2cadd6bbd489054eb43994f147f9183ffe8b0509c1103c3fba20a43b8
+src/common/编排/workflow-state.ts:8fb4e22a940db785e03bd99a0cf2188555ee4cd3f0e3140afe33d94ec56e5f05
+test/编排/acceptance-archive.test.ts:ccfdff80a77ec482b56c3605f87c9ac2b96b1d32c2c16d31d6954488db4f9eda
+test/编排/baseline-service.test.ts:beb0c23b9b6da3f7f86fc49500ce0f5eb5e93cd4427db35caae0b6aa6509e91e
+test/编排/path-b-baseline.test.ts:4500b602281914afd2d4ec96429eeb7d371f22ec1d3a3814bfe9569c7a9d64aa
+test/编排/release-merge.test.ts:0060b8dfba6ac1ca2855534fc6772686c36c4013b9f1f5961e06b0769e258357
+aggregate sha256: ded2f4dad8e794ccbeebc6752dbbccefca8f5611ff23580e9e6e14e321fdd23a
+total bytes: 290334

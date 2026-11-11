@@ -1,0 +1,10 @@
+=== legacy/v2 after ===
+9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 *src/common/门禁引擎/workflows/chief/chief-workflow.md
+7c4cf36ce037a59da6ddea762c2f5b52d57cd36536ba089701a35d59c027e34a *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+   61  8724 src/common/门禁引擎/workflows/chief/chief-workflow.md
+  128 22890 src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+  189 31614 total
+=== v2 version line count ===
+1
+=== first 3 bytes (BOM check) ===
+ 23 20 43

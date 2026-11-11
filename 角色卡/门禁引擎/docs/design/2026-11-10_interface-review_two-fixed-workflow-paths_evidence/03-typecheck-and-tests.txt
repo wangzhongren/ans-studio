@@ -1,0 +1,72 @@
+# G-IR 证据 03：typecheck 与目标/既有套件只读复跑
+
+环境：Node v24.22.1；工作树 HEAD ee5b330；评审期间未改任何产品/测试代码。
+
+## 1. typecheck
+
+```
+npm run typecheck        # tsc --noEmit
+EXIT=0（无诊断输出）
+```
+
+## 2. B0 定向套件（10 文件，含新增 B0 契约与受影响旧套件）
+
+```
+node --test --test-concurrency=1 --test-reporter=tap \
+  test/runtime-core/two-fixed-workflow-paths-b0.test.ts \
+  test/runtime-core/stable-write-card-kind.test.ts \
+  test/门禁引擎/dispatch-matrix-mode.test.ts \
+  test/门禁引擎/role-module-contract.test.ts \
+  test/编排/task-state-fixed.test.ts \
+  test/编排/workflow-state.test.ts \
+  test/编排/workflow-mode.test.ts \
+  test/编排/workflow-ledger.test.ts \
+  test/编排/basis-guard.test.ts \
+  test/项目管理/shared/config-loader.test.ts
+```
+
+结果：tests 99 / pass 99 / fail 0 / cancelled 0 / skipped 0（duration 3,835 ms）。
+
+## 3. shared-code 套件
+
+```
+node --test --test-concurrency=1 "test/项目管理/shared/**/*.test.ts"
+```
+
+结果：tests 224 / pass 219 / fail 0 / skipped 5（既有 Windows 平台按设计跳过）。与 shared-code B0 记录 §4.1（224/219/0/5）一致。
+
+## 4. test/编排 全量（known-red 对照）
+
+```
+node --test --test-concurrency=1 "test/编排/**/*.test.ts"
+```
+
+结果：tests 1,210 / pass 1,183 / fail 25 / skipped 2。
+- 其中 24 个失败名与 `角色卡/编排/docs/change/2026-11-10_B0_two-fixed-workflow-paths_evidence/fails-after.txt` **逐名一致**（集合 diff 为空）。
+- 另 1 个为**文件级** `test\编排\git-trunk-store.test.ts`（duration 64.25 s，exitCode 2147483651，signal 空）；该文件单独复跑 **13/13 pass**（duration 64.5 s）。判定为环境/负载型偶发，非确定性新增失败；如实披露。
+- TAP 日志：/tmp/ir-orch.tap（SHA-256 0c14df3c47ffcafde28cd244ac8800454a065774ac95d249ba18ba66e2bfd91d）。
+
+## 5. test/门禁引擎 全量
+
+```
+node --test --test-concurrency=1 "test/门禁引擎/**/*.test.ts"
+```
+
+结果：tests 483 / pass 477 / fail 5 / skipped 1（既有 `unreadable（权限）…# SKIP`）。
+失败名（5）：
+1. D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+2. listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+3. listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+4. 卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+5. 渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+
+对照门禁引擎 B0 记录 §3.1：隔离基线（纯净 HEAD）为 6 红；本工作树为上述 5 红。少的一项为
+`Chief资源正文独立且卡只声明真实注入来源，两套workflow分开`——B0 记录已披露“共享树因并行改动由红转绿
+（并行侧效应，非本批；须由 B2 统一复测口径）”。本评审复现：无新增失败名、无新 skip。
+TAP 日志：/tmp/ir-gate.tap（SHA-256 bb76f29bcf528c061b8149b61e91c73562cb87bf959165bc1c988d550f6aab31）。
+
+## 6. 结论
+
+- typecheck 0；B0 新增/受影响定向套件全绿；test/编排 24 known-red 未恶化（名称集合一致）；
+  门禁引擎无新增红（一项转绿已披露）。
+- 未运行 real Electron/真实模型；未占用 9222/9223。

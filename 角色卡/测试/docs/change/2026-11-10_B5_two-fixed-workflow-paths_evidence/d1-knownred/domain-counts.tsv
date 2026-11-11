@@ -1,0 +1,8 @@
+编排	files=131	tests=1301	pass=1275	fail=24	cancelled=0	skip=2	watchdog=0
+桌面应用	files=68	tests=717	pass=633	fail=84	cancelled=0	skip=0	watchdog=4
+门禁引擎	files=50	tests=528	pass=522	fail=5	cancelled=0	skip=1	watchdog=0
+runtime-core	files=63	tests=586	pass=549	fail=33	cancelled=0	skip=4	watchdog=0
+roles	files=24	tests=275	pass=275	fail=0	cancelled=0	skip=0	watchdog=0
+项目管理	files=13	tests=224	pass=218	fail=1	cancelled=0	skip=5	watchdog=0
+gates	files=4	tests=29	pass=29	fail=0	cancelled=0	skip=0	watchdog=0
+TOTAL	files=353	tests=3660	pass=3501	fail=147	cancelled=0	skip=12	watchdog=4

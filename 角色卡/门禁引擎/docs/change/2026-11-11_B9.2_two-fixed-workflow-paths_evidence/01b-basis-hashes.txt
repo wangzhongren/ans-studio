@@ -1,0 +1,13 @@
+=== basis files (measured) ===
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+1bcdaf6915b91975a9599a4540de1f1493e9adc2f5da79e2f6dde46c2b94d04c *角色卡/测试/docs/change/2026-11-11_RR4_two-fixed-workflow-paths.md
+9ae80c579ee4b0bf306378ceaab2bca851e7b9fef8b149a8797ae10ff25a3832 *test/测试/fixed-path-full-chain.test.ts
+63d4656d43ef671e74e6e12327d0e259b2a047b7f20f1e58e0d7d1b31b677017 *app/desktop/workflow.ts
+   222 docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+  1392 docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+   120 角色卡/测试/docs/change/2026-11-11_RR4_two-fixed-workflow-paths.md
+  1734 total
+
+=== app constant line ===
+399:export const FIXED_STAGE_DISPATCH_RECORD_STAGES = Object.freeze(["A1", "A4", "A7", "A8", "A12a", "A12b"] as const);

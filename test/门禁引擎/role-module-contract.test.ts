@@ -19,6 +19,7 @@ import type {
   BuiltInRoleId,
   BuiltInRoleModule,
   BuiltInRoleModuleMap,
+  DispatchMatrixMode,
   GovernanceCapabilities,
   GovernanceCardKind,
   GovernanceFunction,
@@ -28,6 +29,7 @@ import type {
   RoleContextSection,
   RoleDispatchPolicy,
   RoleDispatchPolicyInput,
+  RoleDispatchPurpose,
   RolePolicyDecision,
   RolePolicyReason,
   RolePreflightHooks,
@@ -191,6 +193,13 @@ type _ReasonShape = Assert<
 // —— 纯数据输入：只携带宿主可信事实，不携带权限/文案 —— //
 
 type _ToolInputFacts = Assert<Equal<TrustedToolPolicyInput, { readonly governanceModel: "single" | "trio" }>>;
+// T3「两条固定工作流路径」B0（v1.3 §3.1/§3.2/§3.4；接口评审项 DispatchMatrixMode/RoleDispatchPurpose/
+// RoleDispatchPolicyInput.matrix/context({matrix})）：shape 扩展为**可选**字段——缺省 legacy-v1 /
+// production，旧调用点逐字兼容；两闭集逐字断言于此，防止后续就地扩值或改缺省口径。
+type _DispatchMatrixModeSet = Assert<Equal<DispatchMatrixMode, "legacy-v1" | "two-fixed-paths/v1">>;
+type _RoleDispatchPurposeSet = Assert<
+  Equal<RoleDispatchPurpose, "production" | "stage-request" | "review" | "preparation">
+>;
 type _DispatchInputFacts = Assert<
   Equal<
     RoleDispatchPolicyInput,
@@ -199,6 +208,18 @@ type _DispatchInputFacts = Assert<
       readonly targetRoleId: string;
       readonly targetKind: "project" | "built-in-governance";
       readonly targetExists?: boolean;
+      readonly matrix?: DispatchMatrixMode;
+      readonly purpose?: RoleDispatchPurpose;
+    }
+  >
+>;
+type _ContextInputFacts = Assert<
+  Equal<
+    RoleContextInput,
+    {
+      readonly governanceModel: "single" | "trio";
+      readonly facts?: Readonly<Record<string, unknown>>;
+      readonly matrix?: DispatchMatrixMode;
     }
   >
 >;

@@ -1,0 +1,5 @@
+353b93a9e62892a03969e9394236ac65782f88d82a4a36e996ab2409104dc7b8 *C:/Users/51054/Desktop/work/ans-two-fixed-paths-rr3-2026-11-11/evidence/final-report.json
+e04dd86404e7ec8ac4376cab1c18d83d4e92bee835acbae95972fd49ae8872e7 *docs/acceptance/2026-11-10_two-fixed-workflow-paths-criteria-v1.2.md
+ae737dcf2c526a1a72faeb2cf7778f88c8fbe7a81eac52e96da0901bf0d36cd8 *docs/proposals/2026-11-10_two-fixed-workflow-paths-design-v1.3.md
+072ea76a35a8977f27307459e65e30125fe85a70afe63950b20260352135222d *角色卡/桌面窗口/docs/change/2026-11-11_B6.1_two-fixed-workflow-paths-desktop.md
+1a0cf3779a2b76ce129564dc701efbcd4d3c331d4f5129669b473ffb006954b0 *角色卡/桌面窗口/docs/change/2026-11-11_B7.1_two-fixed-workflow-paths-desktop.md

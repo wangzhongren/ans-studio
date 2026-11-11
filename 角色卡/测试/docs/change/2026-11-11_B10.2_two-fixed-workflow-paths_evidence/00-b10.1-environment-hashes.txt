@@ -1,0 +1,3 @@
+6539fabaf7cef81ab6103e5eab3632b855e5aca8fa40194042066d502f081a6d *app/desktop/session.ts
+fb562d7f568ad908265bbee081f649ebe0ad49395bc7ea07d6699c6f082ac6ca *test/桌面应用/b81-fixed-dispatch-forced-session.test.ts
+1c9c3e69140805c93712f66c476b24cebee86a8586d09a34b20dacf348d80da0 *test/桌面应用/b101-fixed-dispatch-task-binding.test.ts

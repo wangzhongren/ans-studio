@@ -1,0 +1,146 @@
+/* env-resources：纯色几何样式与布局，不承载规则逻辑 */
+
+:root {
+  --bg: #16181d;
+  --panel: #232733;
+  --line: #3a4050;
+  --text: #e8ebf2;
+  --muted: #9aa3b5;
+  --accent: #4ade80;
+  --overlay-bg: rgba(22, 24, 29, 0.88);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 棋盘容器：纯色面板 + 固定几何尺寸 */
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* 400px 画布 + 左右各 16px 内边距 + 左右各 1px 边框 */
+  width: 434px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* 顶部信息条：分数 / 最高分 */
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.hud-item {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+#score,
+#high-score {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* 画布与结束层叠放 */
+.stage {
+  position: relative;
+  width: 400px;
+  height: 400px;
+}
+
+#game-canvas {
+  display: block;
+  width: 400px;
+  height: 400px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+/* 结束层：覆盖在画布上方 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--overlay-bg);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.overlay-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.overlay-score {
+  margin: 0;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#final-score,
+#final-high-score {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+#restart-btn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#restart-btn:hover {
+  filter: brightness(1.1);
+}
+
+#restart-btn:active {
+  transform: translateY(1px);
+}
+
+/* 操作提示 */
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* 通用隐藏类：由脚本切换，仅控制可见性 */
+.hidden {
+  display: none !important;
+}

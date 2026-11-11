@@ -1,0 +1,256 @@
+TAP version 13
+# Subtest: required-v1 missing capabilities rejects before SDK; actual config override profile registers first
+ok 1 - required-v1 missing capabilities rejects before SDK; actual config override profile registers first
+  ---
+  duration_ms: 553.3853
+  type: 'test'
+  ...
+# Subtest: Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged
+ok 2 - Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged
+  ---
+  duration_ms: 440.4279
+  type: 'test'
+  ...
+# Subtest: native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options
+ok 3 - native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options
+  ---
+  duration_ms: 62.7333
+  type: 'test'
+  ...
+# Subtest: injected projector throw emits safe diagnostic without failing actual handler or model
+ok 4 - injected projector throw emits safe diagnostic without failing actual handler or model
+  ---
+  duration_ms: 29.3896
+  type: 'test'
+  ...
+# Subtest: all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist
+ok 5 - all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist
+  ---
+  duration_ms: 865.018
+  type: 'test'
+  ...
+# Subtest: real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript
+ok 6 - real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript
+  ---
+  duration_ms: 35.0818
+  type: 'test'
+  ...
+# Subtest: real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit
+ok 7 - real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit
+  ---
+  duration_ms: 524.241
+  type: 'test'
+  ...
+# Subtest: 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+not ok 8 - 差分：契约冻结文件哈希（E0.3 067e3d2e…，差分输入未漂移）
+  ---
+  duration_ms: 4.1213
+  type: 'test'
+  location: 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b0-focus-baseline-582746\\test\\roles\\chief\\differential.test.ts:82:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'd1920e6e4903259f06e33e5b0eea0d654158f402be3750a3d2e3616a3c7e2ffb'
+    - '067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '067e3d2e2629489028785f5eff90a01784b4430d7f818efe8d635b700057c1b3'
+  actual: 'd1920e6e4903259f06e33e5b0eea0d654158f402be3750a3d2e3616a3c7e2ffb'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/AppData/Local/Temp/ans-b0-focus-baseline-582746/test/roles/chief/differential.test.ts:84:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: 差分：card/entries/preauthorized/forbidden/capabilities/displayName/function/cards 与冻结金样逐字段一致（差异 0）
+ok 9 - 差分：card/entries/preauthorized/forbidden/capabilities/displayName/function/cards 与冻结金样逐字段一致（差异 0）
+  ---
+  duration_ms: 0.732
+  type: 'test'
+  ...
+# Subtest: 差分：卡文本 sha256 / 长度 / 行数零差异
+ok 10 - 差分：卡文本 sha256 / 长度 / 行数零差异
+  ---
+  duration_ms: 0.1049
+  type: 'test'
+  ...
+# Subtest: 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结，不含 legacy write）
+ok 11 - 差分：cards 与金样一致（D8；旧 run-role 源码 oracle 已冻结，不含 legacy write）
+  ---
+  duration_ms: 0.0669
+  type: 'test'
+  ...
+# Subtest: 差分：6 个工具 id 全部通过旧 D1 装配校验，映射名/顺序与冻结结果一致（含 closeCreatedTask）
+ok 12 - 差分：6 个工具 id 全部通过旧 D1 装配校验，映射名/顺序与冻结结果一致（含 closeCreatedTask）
+  ---
+  duration_ms: 0.1592
+  type: 'test'
+  ...
+# Subtest: 差分（E2 C-1 处置）：closeCreatedTask 已纳入模块声明；decidePendingRequest 仍不由普通会话声明
+ok 13 - 差分（E2 C-1 处置）：closeCreatedTask 已纳入模块声明；decidePendingRequest 仍不由普通会话声明
+  ---
+  duration_ms: 0.1296
+  type: 'test'
+  ...
+# Subtest: D10：tools().capabilities 与 spec capabilities 一致（单一真源）
+ok 14 - D10：tools().capabilities 与 spec capabilities 一致（单一真源）
+  ---
+  duration_ms: 0.0571
+  type: 'test'
+  ...
+# Subtest: 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+ok 15 - 差分（zero）：dispatch 与旧硬授权允许/拒绝 + 稳定 code + 报告期望逐字段一致
+  ---
+  duration_ms: 0.3251
+  type: 'test'
+  ...
+# Subtest: 差分（documented）：契约明文差异逐条单列（targetExists 收紧 / 只回答 chief 来源）
+ok 16 - 差分（documented）：契约明文差异逐条单列（targetExists 收紧 / 只回答 chief 来源）
+  ---
+  duration_ms: 0.181
+  type: 'test'
+  ...
+# Subtest: 差分（preflight，zero）：请求形状与旧 validateVersionDecisionRequest 判定一致（差异 0 子集）
+ok 17 - 差分（preflight，zero）：请求形状与旧 validateVersionDecisionRequest 判定一致（差异 0 子集）
+  ---
+  duration_ms: 0.4173
+  type: 'test'
+  ...
+# Subtest: 差分（列明方案差异）：runId/refs 的路径形状由宿主最终校验，preflight 只做存在/类型/上限
+ok 18 - 差分（列明方案差异）：runId/refs 的路径形状由宿主最终校验，preflight 只做存在/类型/上限
+  ---
+  duration_ms: 0.1159
+  type: 'test'
+  ...
+# Subtest: 差分：chief-workflow 资源 path/version/sha256/bytes 与宿主 loader 捕获值一致（按现状）
+ok 19 - 差分：chief-workflow 资源 path/version/sha256/bytes 与宿主 loader 捕获值一致（按现状）
+  ---
+  duration_ms: 0.1222
+  type: 'test'
+  ...
+# Subtest: 差分：hub 目标五内置与 apply-journal 新内置任务允许集一致（捕获期金样）
+ok 20 - 差分：hub 目标五内置与 apply-journal 新内置任务允许集一致（捕获期金样）
+  ---
+  duration_ms: 0.0635
+  type: 'test'
+  ...
+# Subtest: 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+ok 21 - 金样·provenance：冻结元数据/载荷哈希自洽，且差分不再读取旧引擎（E2 G9）
+  ---
+  duration_ms: 2.9984
+  type: 'test'
+  ...
+# Subtest: 模块数据：id/displayName/function/cards/capabilities 与旧规格一致且只读
+ok 22 - 模块数据：id/displayName/function/cards/capabilities 与旧规格一致且只读
+  ---
+  duration_ms: 0.9991
+  type: 'test'
+  ...
+# Subtest: 卡/边界：Section 1 三条目录、预授权与禁写清单为纯数据
+ok 23 - 卡/边界：Section 1 三条目录、预授权与禁写清单为纯数据
+  ---
+  duration_ms: 0.1216
+  type: 'test'
+  ...
+# Subtest: tools()：verifier 无额外 RoleToolId（空声明），capabilities 与 spec 同引用（D10）
+ok 24 - tools()：verifier 无额外 RoleToolId（空声明），capabilities 与 spec 同引用（D10）
+  ---
+  duration_ms: 0.0934
+  type: 'test'
+  ...
+# Subtest: dispatch()：fixture 表（硬身份/存在性 + 报告期望）
+ok 25 - dispatch()：fixture 表（硬身份/存在性 + 报告期望）
+  ---
+  duration_ms: 0.1423
+  type: 'test'
+  ...
+# Subtest: dispatch()：不修改调用方输入（纯策略）
+ok 26 - dispatch()：不修改调用方输入（纯策略）
+  ---
+  duration_ms: 0.1214
+  type: 'test'
+  ...
+# Subtest: dispatch()：允许时 reportToRoleId 是真实来源（差分期望，不是路由）
+ok 27 - dispatch()：允许时 reportToRoleId 是真实来源（差分期望，不是路由）
+  ---
+  duration_ms: 0.0647
+  type: 'test'
+  ...
+# Subtest: preflight：只覆盖 review；其他动作 fail-closed（action-not-covered）
+ok 28 - preflight：只覆盖 review；其他动作 fail-closed（action-not-covered）
+  ---
+  duration_ms: 0.1383
+  type: 'test'
+  ...
+# Subtest: preflight(review)：fixture 表（reviewTarget/最终候选/CID/criteria；缺事实 deny）
+ok 29 - preflight(review)：fixture 表（reviewTarget/最终候选/CID/criteria；缺事实 deny）
+  ---
+  duration_ms: 0.5805
+  type: 'test'
+  ...
+# Subtest: preflight(review)：任何未登记事实键 ⇒ deny（E0.3 §3.4/D4；E2 P5 修复）
+ok 30 - preflight(review)：任何未登记事实键 ⇒ deny（E0.3 §3.4/D4；E2 P5 修复）
+  ---
+  duration_ms: 0.7474
+  type: 'test'
+  ...
+# Subtest: preflight(review)：未登记键拒绝不修改调用方事实包（纯策略）
+ok 31 - preflight(review)：未登记键拒绝不修改调用方事实包（纯策略）
+  ---
+  duration_ms: 0.174
+  type: 'test'
+  ...
+# Subtest: preflight(review)：不修改事实包（纯策略）
+ok 32 - preflight(review)：不修改事实包（纯策略）
+  ---
+  duration_ms: 0.1043
+  type: 'test'
+  ...
+# Subtest: context()：two 静态段（acceptance 卡数据 + 报告期望），id 唯一、文本非空
+ok 33 - context()：two 静态段（acceptance 卡数据 + 报告期望），id 唯一、文本非空
+  ---
+  duration_ms: 0.1142
+  type: 'test'
+  ...
+# Subtest: context()：纯静态模板（单/trio、有无 facts 输出一致；输入不被修改）
+ok 34 - context()：纯静态模板（单/trio、有无 facts 输出一致；输入不被修改）
+  ---
+  duration_ms: 0.0512
+  type: 'test'
+  ...
+# Subtest: 模块根只有唯一 public entry index.ts（不散放文件）
+ok 35 - 模块根只有唯一 public entry index.ts（不散放文件）
+  ---
+  duration_ms: 0.2762
+  type: 'test'
+  ...
+# Subtest: 依赖方向：只 import Model public entry；无引擎/门控/pipeline/service/provider/app/其他角色/node: 依赖
+ok 36 - 依赖方向：只 import Model public entry；无引擎/门控/pipeline/service/provider/app/其他角色/node: 依赖
+  ---
+  duration_ms: 0.3918
+  type: 'test'
+  ...
+# Subtest: 唯一 public entry 只导出一个 BuiltInRoleModule
+ok 37 - 唯一 public entry 只导出一个 BuiltInRoleModule
+  ---
+  duration_ms: 0.2786
+  type: 'test'
+  ...
+# Subtest: 纯函数：重复调用返回结构一致（无可变状态/时钟/随机数）
+ok 38 - 纯函数：重复调用返回结构一致（无可变状态/时钟/随机数）
+  ---
+  duration_ms: 0.1103
+  type: 'test'
+  ...
+1..38
+# tests 38
+# suites 0
+# pass 37
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3016.4606

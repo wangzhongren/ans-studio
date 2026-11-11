@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: v5 版本：SHELL_RULES_VERSION='5'、ans-default-v5；v4/v3 规则集整条拒绝（fail-closed）
+ok 1 - v5 版本：SHELL_RULES_VERSION='5'、ans-default-v5；v4/v3 规则集整条拒绝（fail-closed）
+  ---
+  duration_ms: 0.6925
+  type: 'test'
+  ...
+# Subtest: v4 只读白名单保留：精确只读形态 allow；写形态/未列形态仍硬拒
+ok 2 - v4 只读白名单保留：精确只读形态 allow；写形态/未列形态仍硬拒
+  ---
+  duration_ms: 1.1016
+  type: 'test'
+  ...
+# Subtest: matchTaskGit 允许：add 单文件/多文件/目录、commit -m；摘要确定性且不依赖时钟/随机
+ok 3 - matchTaskGit 允许：add 单文件/多文件/目录、commit -m；摘要确定性且不依赖时钟/随机
+  ---
+  duration_ms: 0.9982
+  type: 'test'
+  ...
+# Subtest: matchTaskGit 拒绝：add flag/-A/--all/./glob/pathspec magic/绝对/..）/.git/路径外/治理写区
+ok 4 - matchTaskGit 拒绝：add flag/-A/--all/./glob/pathspec magic/绝对/..）/.git/路径外/治理写区
+  ---
+  duration_ms: 0.5404
+  type: 'test'
+  ...
+# Subtest: matchTaskGit 拒绝：commit 仅 -m 单形态（-F/amend/no-verify/-a/--author/空 message/多参）
+ok 5 - matchTaskGit 拒绝：commit 仅 -m 单形态（-F/amend/no-verify/-a/--author/空 message/多参）
+  ---
+  duration_ms: 0.5276
+  type: 'test'
+  ...
+# Subtest: taskGitScopeError：无 scope/坏 taskId/坏 workflowId/非任务分支/空写集/治理写集/重复项均拒
+ok 6 - taskGitScopeError：无 scope/坏 taskId/坏 workflowId/非任务分支/空写集/治理写集/重复项均拒
+  ---
+  duration_ms: 0.1552
+  type: 'test'
+  ...
+# Subtest: 分类器：无 taskGitScope 时 add/commit 一律拒（旧 2 参调用逐字保持硬拒）
+ok 7 - 分类器：无 taskGitScope 时 add/commit 一律拒（旧 2 参调用逐字保持硬拒）
+  ---
+  duration_ms: 0.2324
+  type: 'test'
+  ...
+# Subtest: 分类器：合法 scope 的 add/commit allow，规则 id 与审计描述稳定
+ok 8 - 分类器：合法 scope 的 add/commit allow，规则 id 与审计描述稳定
+  ---
+  duration_ms: 0.8549
+  type: 'test'
+  ...
+# Subtest: 普通 Git 拒绝面：push/fetch/pull/remote/tag/merge/rebase/reset/clean/checkout/switch/stash/worktree/submodule/config/update-ref 等硬拒
+ok 9 - 普通 Git 拒绝面：push/fetch/pull/remote/tag/merge/rebase/reset/clean/checkout/switch/stash/worktree/submodule/config/update-ref 等硬拒
+  ---
+  duration_ms: 0.5679
+  type: 'test'
+  ...
+# Subtest: 绕过面：sh -c / bash -c / cmd /c / node -e / awk 等仍硬拒（不经任务级白名单）
+ok 10 - 绕过面：sh -c / bash -c / cmd /c / node -e / awk 等仍硬拒（不经任务级白名单）
+  ---
+  duration_ms: 0.9392
+  type: 'test'
+  ...
+# Subtest: 写守卫 v5：任务级 add/commit 前台 pass（形状级）；无 scope/后台/路径外/普通 Git 硬拒
+ok 11 - 写守卫 v5：任务级 add/commit 前台 pass（形状级）；无 scope/后台/路径外/普通 Git 硬拒
+  ---
+  duration_ms: 1.6424
+  type: 'test'
+  ...
+# Subtest: 审计：ShellGate 对 task-git add/commit allow 与普通 Git deny 各写一行（既有字段不变）
+ok 12 - 审计：ShellGate 对 task-git add/commit allow 与普通 Git deny 各写一行（既有字段不变）
+  ---
+  duration_ms: 2.2721
+  type: 'test'
+  ...
+# Subtest: v4 旧规则回归：四档/硬拒/risky/例行白名单/元字符耦合不变
+ok 13 - v4 旧规则回归：四档/硬拒/risky/例行白名单/元字符耦合不变
+  ---
+  duration_ms: 0.2994
+  type: 'test'
+  ...
+# Subtest: staged 检查 argv 固定为 git diff --cached --name-only -z；NUL 输出解析
+ok 14 - staged 检查 argv 固定为 git diff --cached --name-only -z；NUL 输出解析
+  ---
+  duration_ms: 0.9147
+  type: 'test'
+  ...
+# Subtest: staged 校验：空/非字面/治理写区/越界逐项拒绝，合法子集通过
+ok 15 - staged 校验：空/非字面/治理写区/越界逐项拒绝，合法子集通过
+  ---
+  duration_ms: 0.4533
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：锁在 staged 检查与提交期间均被持有（同一临界区），成功后释放
+ok 16 - runTaskGitCommit：锁在 staged 检查与提交期间均被持有（同一临界区），成功后释放
+  ---
+  duration_ms: 0.6666
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：commit argv 非 -m 单形态/分支不符/scope 非法 ⇒ 取锁前拒绝
+ok 17 - runTaskGitCommit：commit argv 非 -m 单形态/分支不符/scope 非法 ⇒ 取锁前拒绝
+  ---
+  duration_ms: 0.2966
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：项目级临界区被占用 ⇒ git-critical-section-busy，未检查/未提交
+ok 18 - runTaskGitCommit：项目级临界区被占用 ⇒ git-critical-section-busy，未检查/未提交
+  ---
+  duration_ms: 0.197
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：staged 空/越界/治理写区/非字面 ⇒ 稳定码拒绝且不提交（锁释放）
+ok 19 - runTaskGitCommit：staged 空/越界/治理写区/非字面 ⇒ 稳定码拒绝且不提交（锁释放）
+  ---
+  duration_ms: 0.2776
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：inspectStaged/commit 抛错 ⇒ 释放锁后抛出原错误（不吞错）
+ok 20 - runTaskGitCommit：inspectStaged/commit 抛错 ⇒ 释放锁后抛出原错误（不吞错）
+  ---
+  duration_ms: 0.3962
+  type: 'test'
+  ...
+# Subtest: runTaskGitCommit：并发提交同一项目 ⇒ 第二个 busy，第一个完成后释放
+ok 21 - runTaskGitCommit：并发提交同一项目 ⇒ 第二个 busy，第一个完成后释放
+  ---
+  duration_ms: 0.1652
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 319.3768

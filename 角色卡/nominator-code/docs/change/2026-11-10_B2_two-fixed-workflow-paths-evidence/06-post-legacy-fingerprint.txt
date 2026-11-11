@@ -1,0 +1,27 @@
+node v24.22.1
+card.text=6f72e240d440872961b99e364ed3f3ac7837b168cb170e3d88c50f643456d702 (3496 chars)
+card.entries=7cf4e63c5d5474a6e35ee7784719da421b5910e7c23b5ac339dc0f2edacc78e4
+card.preauthorizedDirs=3b3f6eff02fd044721695354a2857ab74a67339226f2299816cd6a9fcb8cd701
+card.forbiddenWritePaths=849f29cc2be345dd2ace7b3255e3696a1eb34d6e4da9fbc7f219ddfe5be7d79b
+capabilities=7e36ab7325bc3edc67d6ee48ca1c87376011fb6abb2050c7533aaa40e9c3384e
+cards=9332d8fcb7e8f4e7cecc272b473e3afab0164b5cf81204329fe7d2567d19833e value=["appointment","appointment-write"]
+tools.trio=4f214c299bc265cef9f76a015f1b27d95efabfff04e9a6f7ba9ac8f943aa125a value=["activateRoleDocuments"]
+tools.single=9ae1479492a53718eed5602b8a62c52f269ecbab355e9b4f2c37a1ceeb970ed4 value=[]
+dispatch[chief->nominator builtin exists]=fed0b19e7a3f562a2331893f43d2e760fb57e58637fc59c14e576c47aca869d1 value={"decision":{"allow":true},"reportToRoleId":"chief"}
+dispatch[convener->nominator builtin exists]=7cb78a8b2054a440f9fea566b2719a26522e232aab72d8a549be985a8f83ca99 value={"decision":{"allow":false,"code":"convener-target-forbidden","messageKey":"role.nominator.dispatch.convenerTargetForbidden"}}
+dispatch[nominator->nominator self]=c3b458dbdece3cce0aa23aba4519c8339c58a97edcbbdb353a1b90a2cce18665 value={"decision":{"allow":false,"code":"self-dispatch","messageKey":"role.nominator.dispatch.selfDispatch","details":{"roleId":"nominator"}}}
+dispatch[product->nominator unknown]=90f98ac6a6fb7cf3cd6dfadd45ac157d821ef0a9a106f1ebe7fbbc6ba91cef56 value={"decision":{"allow":false,"code":"unknown-source","messageKey":"role.nominator.dispatch.unknownSource"}}
+dispatch[chief->nominator project]=960afbdc596173e0690f755b8b0f5774e92f55f0dae928b12283e44f6b70a625 value={"decision":{"allow":false,"code":"chief-to-project-forbidden","messageKey":"role.nominator.dispatch.chiefToProjectForbidden"}}
+dispatch[chief->nominator missing target]=7ac169a856265f97e7da045063ae623a8b5b1df03d8f3915dd2a3a6778b7a5e5 value={"decision":{"allow":false,"code":"target-card-missing","messageKey":"role.nominator.dispatch.targetCardMissing","details":{"targetRoleId":"nominator"}}}
+dispatch[chief->product out of scope]=0ab1c4c4987fe0820f13e9f6b64df32698240384d029b7ca7b3af1628990d84f value={"decision":{"allow":false,"code":"dispatch-not-in-module-scope","messageKey":"role.nominator.dispatch.notInModuleScope","details":{"targetRoleId":"product"}}}
+preflight[d3-card allow]=de02bcaa0e1f00335338c9b6faafa644f6864b927082e7aece8163459a801b7a value={"allow":true}
+preflight[role-documents allow]=de02bcaa0e1f00335338c9b6faafa644f6864b927082e7aece8163459a801b7a value={"allow":true}
+preflight[action-not-covered]=48942494cc7ff71792a427653cdbafba5afa4605b8d91ba0ea8bace14f2d5b93 value={"allow":false,"code":"action-not-covered","messageKey":"role.preflight.actionNotCovered","details":{"action":"team-plan"}}
+context[context({governanceModel:trio})].ids=["nominator-appointment-card","nominator-appointment-write","nominator-report-expectation"]
+context[context({governanceModel:trio})]=50d5dfa943a4c6f6bd987e7b4f0fd34c6ecac13d233074ef956d9aaf75dc1d31
+context[context({governanceModel:single})].ids=["nominator-appointment-card","nominator-appointment-write","nominator-report-expectation"]
+context[context({governanceModel:single})]=50d5dfa943a4c6f6bd987e7b4f0fd34c6ecac13d233074ef956d9aaf75dc1d31
+context[context({})].ids=["nominator-appointment-card","nominator-appointment-write","nominator-report-expectation"]
+context[context({})]=50d5dfa943a4c6f6bd987e7b4f0fd34c6ecac13d233074ef956d9aaf75dc1d31
+context.legacy.sameReference=true
+module.keys=["capabilities","card","cards","context","dispatch","displayName","fixedCards","function","id","preflight","tools"]
