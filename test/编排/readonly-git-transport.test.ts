@@ -59,6 +59,25 @@ test("固定传输基线：绝对可执行；status/log/rev-parse 命中 matcher
   }
 });
 
+test("B30 桌面默认身份：repo-local [user] name=ANS/email=ans@local 不阻断 executeReadonlyGit('status')（真实仓库夹具）", async () => {
+  const root = makeRepo();
+  try {
+    // 与桌面 `ensureIdentityDefaults`（A9 基线）逐字一致：repo-local `[user]` 两条缺省身份。
+    execFileSync(GIT_EXECUTABLE, ["config", "user.name", "ANS"], { cwd: root });
+    execFileSync(GIT_EXECUTABLE, ["config", "user.email", "ans@local"], { cwd: root });
+    const config = readFileSync(path.join(root, ".git/config"), "utf8");
+    assert.match(config, /\[user\]\r?\n\tname = ANS\r?\n\temail = ans@local/, "真实 Git 写入的默认身份节存在");
+    const facts = await executeReadonlyGit(root, match(["git", "status"]));
+    assert.equal(facts.exitCode, 0, `stderr: ${facts.stderr}`);
+    assert.ok(facts.stdout.includes("untracked.txt"), "status 在含 [user] 默认身份的真实仓库上可执行");
+    // 值合法性边界仍在此 fail-closed：签名键不属于放行集合。
+    execFileSync(GIT_EXECUTABLE, ["config", "user.signingkey", "ABCDEF"], { cwd: root });
+    await assert.rejects(() => executeReadonlyGit(root, match(["git", "status"])), /git-config-executable-or-unsupported/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("不接受任意 argv：非 matcher 受限描述一律拒绝；对象内夹带 argv 被忽略（执行体只由 buildReadonlyGitBody 构造）", async () => {
   const root = makeRepo();
   try {

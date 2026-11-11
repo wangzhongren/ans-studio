@@ -15,6 +15,7 @@ import {
   requestResolvedD3DecisionId,
 } from "../../src/model/runtime.ts";
 import type { DirectActionReceipt } from "../../src/model/trunk.ts";
+import type { CompleteTeamPlanFixedResult, WorkflowServiceFailure } from "../../src/common/编排/workflow-service.ts";
 import { describeTool } from "../../src/provider/runtime/schema.ts";
 import {
   COMPLETE_TEAM_PLAN_TOOL_NAME,
@@ -125,6 +126,45 @@ test("B25 fixed complete_team_plan：成功回执形状不符/身份不一致 �
     assert.equal(result.ok, false, label);
     assert.match(result.message, /结果未知或回执不完整/, label);
   }
+});
+
+// B29 配套核对（2026-11-11，RR26）：桌面 `completeTeamPlanFixedForHandle` 修好后**直接返回**编排服务
+// `CompleteTeamPlanFixedResult`（成功分支原样、失败分支 `WorkflowServiceFailure`）。以下回执用服务类型
+// 逐字段约束，钉住工具层 B25 校验器对该服务形状的识别（bas- basisId / 空 documents / 可选 git / missing）。
+const serviceSuccess: Extract<CompleteTeamPlanFixedResult, { ok: true }> = {
+  ok: true, operationId: "op-plan-1", flowId: "snake", workflowId: WF,
+  basisId: "bas-0123456789abcdef01234567",
+  plan: { path: "docs/scheduling/snake-team-v1.md", version: 3, sha256: D },
+  git: { state: "initialized", branch: `ans/${WF}`, headOid: { objectFormat: "sha1", hex: "c".repeat(40) },
+    mainUnborn: false, gitignoreSha256: D2, gitignoreChanged: true, gitignoreCommitted: true, branchReused: false,
+    identityDefaultsApplied: true },
+  documents: [],
+  replay: false,
+  stageCompleted: true,
+};
+
+test("B29 配套：fixed 服务成功回执（CompleteTeamPlanFixedResult，含可选 git）被工具层识别 ok:true 并逐字透出", async () => {
+  const result = await run({ roleId: "convener", completeTeamPlan: async () => serviceSuccess as unknown as DirectActionReceipt },
+    COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(fixedPlanArgs));
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.message.includes("结果未知或回执不完整"), false, "服务成功不降级 unknown");
+  assert.deepEqual(JSON.parse(result.message.slice(COMPLETE_TEAM_PLAN_TOOL_NAME.length + 2)), serviceSuccess, "回执逐字透出（含可选 git 与空 documents）");
+});
+
+test("B29 配套：fixed 服务失败回执（WorkflowServiceFailure，含 missing）透出 code/message；身份不符仍 unknown", async () => {
+  const serviceFailure: WorkflowServiceFailure = { ok: false, code: "baseline-ledger-write-failed", message: "basis.recorded 写入失败：fixture", missing: ["basis"] };
+  const failure = await run({ roleId: "convener", completeTeamPlan: async () => serviceFailure as unknown as DirectActionReceipt },
+    COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(fixedPlanArgs));
+  assert.equal(failure.ok, false);
+  assert.match(failure.message, /baseline-ledger-write-failed/);
+  assert.match(failure.message, /basis\.recorded 写入失败/);
+  assert.match(failure.message, /"missing":\["basis"\]/, "missing 数组如实透出");
+  assert.equal(failure.message.includes("结果未知或回执不完整"), false, "真实服务失败不得被降级为 unknown");
+
+  const wrongIdentity = await run({ roleId: "convener", completeTeamPlan: async () => ({ ...serviceSuccess, workflowId: "wf-other" }) as unknown as DirectActionReceipt },
+    COMPLETE_TEAM_PLAN_TOOL_NAME, structuredClone(fixedPlanArgs));
+  assert.equal(wrongIdentity.ok, false);
+  assert.match(wrongIdentity.message, /结果未知或回执不完整/, "身份不符仍 fail-closed（不放松 B25 校验）");
 });
 
 test("complete_team_plan handler：legacy 形状（无 workflowId）仍放行且不追加任何键——legacy 不要求 workflowId", async () => {

@@ -474,13 +474,24 @@ export function fullGitOid(value: { objectFormat: "sha1" | "sha256"; hex: string
   return value.hex.toLowerCase();
 }
 const exists = async (file: string) => { try { await lstat(file); return true; } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return false; throw error; } };
+/** B30（2026-11-11，RR26）：`[user]` 只放行 name/email，值限不可执行字符集（禁引号/分号/#/反斜杠/换行等注入形态）。 */
+const GIT_CONFIG_USER_VALUE = /^[A-Za-z0-9._%+@ -]+$/;
 function configFormat(text: string): GitRepositoryIdentity["objectFormat"] {
   let section = "", format: GitRepositoryIdentity["objectFormat"] = "sha1";
-  const allowed: Record<string, readonly string[]> = { core: ["repositoryformatversion", "filemode", "bare", "logallrefupdates", "ignorecase", "symlinks", "longpaths"], extensions: ["objectformat"] };
+  // B30：桌面 `ensureIdentityDefaults`（A9 基线）写 repo-local `[user] name=ANS / email=ans@local`；
+  // 该节不改变仓库对象格式、值不能执行，故只按受限字符集放行这两个键。其余 section/key 仍逐字 fail-closed
+  //（core.hooksPath/alias/include/includeIf/unknown section 等保持拒绝）。
+  const allowed: Record<string, readonly string[]> = { core: ["repositoryformatversion", "filemode", "bare", "logallrefupdates", "ignorecase", "symlinks", "longpaths"], extensions: ["objectformat"], user: ["name", "email"] };
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim(); if (!line || /^[#;]/.test(line)) continue;
     const heading = /^\[([a-z]+)\]$/i.exec(line);
     if (heading) { section = heading[1]!.toLowerCase(); if (!allowed[section]) throw new Error("git-config-section-unsupported"); continue; }
+    if (section === "user") {
+      const entry = /^([a-z]+)\s*=\s*(.+)$/i.exec(line);
+      if (!entry || !allowed.user!.includes(entry[1]!.toLowerCase())) throw new Error("git-config-executable-or-unsupported");
+      if (!GIT_CONFIG_USER_VALUE.test(entry[2]!.trim())) throw new Error("git-config-value-invalid");
+      continue;
+    }
     const entry = /^([a-z]+)\s*=\s*([a-z0-9]+)$/i.exec(line);
     if (!entry || !allowed[section]?.includes(entry[1]!.toLowerCase())) throw new Error("git-config-executable-or-unsupported");
     const key = entry[1]!.toLowerCase(), value = entry[2]!.toLowerCase();
