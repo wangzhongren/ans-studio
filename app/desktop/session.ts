@@ -8774,13 +8774,22 @@ export class SessionManager {
       let alreadyReported = false;
       // BUG-5（2026-11-05 精化）：任务已收口或**同一回合**已报告 ⇒ 重复回交不再入队；
       // blocked 之后的新回合真实报告必须投递（详见 shouldSuppressStarTaskReport 注释）。
+      let closedStageRequestObservation = false;
       if (starTask && typeof hb.taskId === "string" && hb.taskId !== "") {
         const record = (await this.readTasks(projectRoot)).records.get(hb.taskId);
-        const suppressed = record !== undefined && shouldSuppressStarTaskReport({
-          closed: record.closed !== undefined,
-          priorTurnIds: record.reports.map((entry) => entry.turnId),
-          ...(hb.turnId !== undefined ? { turnId: hb.turnId } : {}),
-        });
+        // B19（2026-11-11，RR14）：已收口 **stage-request** 的最终报告不能按普通 task.reported
+        // 观察写入（closed 任务的 task observation 会被 `task-observation-invalid` 拒绝），但
+        // 报告本身仍须投递给 chief。标记后跳过 observation，直接进入投递队列。
+        closedStageRequestObservation = record?.closed !== undefined && record.created?.taskKind === "stage-request";
+        // B19：已收口 **stage-request** 的任务收口抑制不适用——幕僚通常在
+        // 运营交最终报告前关闭调度请求；该报告是阶段完成/下一阶段的唯一唤醒来源，必须入队投递。
+        // 生产任务的 closed/同回合抑制保持 BUG-5 原语义（重复回交不入队）。
+        const suppressed = record !== undefined && !closedStageRequestObservation
+          && shouldSuppressStarTaskReport({
+            closed: record.closed !== undefined,
+            priorTurnIds: record.reports.map((entry) => entry.turnId),
+            ...(hb.turnId !== undefined ? { turnId: hb.turnId } : {}),
+          });
         if (suppressed) {
           diagnostic.record("report.suppressed.task-terminal", {
             taskId: hb.taskId,
@@ -8800,7 +8809,7 @@ export class SessionManager {
       this.pendingHandbackKeys.add(key); pendingKey = key;
       // B 批：工作结果事件（`task.reported`）——按 `taskId+turnId` 去重；写失败只诊断、不丢报告
       // （失败保 saved snapshot，可在真实新事实或显式保存/投递操作后重核；不假称已登记/已投递）。
-      if (starTask && typeof hb.taskId === "string") {
+      if (starTask && typeof hb.taskId === "string" && !closedStageRequestObservation) {
         const reportKey = `${hb.taskId}\u0000${hb.turnId ?? createHash("sha256").update(hb.summary).digest("hex").slice(0, 16)}`;
         if (!this.reportedTaskKeys.has(reportKey) && !alreadyReported) {
           // Delivery's own post-send ledger writer is independent of this detached consumer.
@@ -12923,10 +12932,18 @@ ${formatted}` };
             return false;
           }
           if (verified.closed) {
-            // 已收口 fixed 子任务：跳过该成员（不投递、不写任何任务事件），继续处理其余成员/后续队列。
-            droppedClosedFixed += 1;
-            diagnostic.record("delivery.skip.fixed-child-closed", { taskId: verified.taskId, workflowId: verified.workflowId });
-            continue;
+            // B19（2026-11-11，RR14）：已收口 **stage-request** 的回交仍须投递给 chief——幕僚通常在
+            // 运营交最终报告前就关闭调度请求；该最终报告是阶段完成/下一阶段的唯一唤醒来源，
+            // 丢弃会让工作流停在 A2→A3（RR14 实测）。
+            if (childRecord.created.taskKind === "stage-request") {
+              diagnostic.record("delivery.deliver.fixed-stage-request-closed", { taskId: verified.taskId, workflowId: verified.workflowId });
+            } else {
+              // B11.1：已收口 **生产** fixed 子任务 ⇒ 跳过该成员（不投递、不写任何任务事件），
+              // 继续处理其余成员/后续队列（RR6 行为不变）。
+              droppedClosedFixed += 1;
+              diagnostic.record("delivery.skip.fixed-child-closed", { taskId: verified.taskId, workflowId: verified.workflowId });
+              continue;
+            }
           }
           sawFixedChild = true;
           deliverable.push(member);

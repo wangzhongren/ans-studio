@@ -325,6 +325,55 @@ test("B11.1 RR6：已收口 fixed 回交（A1）被丢弃并继续投递后续 o
   }
 });
 
+// ══════════════════════════ 1b. B19：closed stage-request 回交仍投递（RR14 修复） ══════════════════════════
+
+test("B19 已收口 stage-request 回交仍投递 chief；closed 生产 child 丢弃语义不变", async () => {
+  const root = await makeRoot("ans-b19-closed-stage-request-");
+  const diagnosticsDir = path.join(root, ".diag");
+  configureDiagnostics({ directory: diagnosticsDir });
+  const h = harness(root);
+  try {
+    await fixedProject(root);
+    const workflowId = "wf-b19stage0000000000000001";
+    await seedStartedWorkflow(root, workflowId, "turn-b19-source");
+    const created = taskEvent("task.created", {
+      taskId: "t-b19-a2-sr", from: "chief", to: "convener", text: "A2 stage-request",
+      sideEffect: "read-only", idempotencyKey: "key-t-b19-a2-sr", flowId: FIXED_FLOW,
+      workflowId, stage: "A2", taskKind: "stage-request",
+    }, () => new Date("2026-11-11T00:00:00.000Z"));
+    assert.equal((await appendTaskEvent(root, created)).ok, true);
+    await closeTask(root, "t-b19-a2-sr", "chief");
+    await h.mgr.listTasks(root);
+    await openRole(h, root, "chief");
+    await openRole(h, root, "convener");
+    const handback = handbackOf(
+      "t-b19-a2-sr",
+      "A2 完成：意图已落盘，下一步 A3 意图卡",
+      "turn-b19-a2-report",
+      "convener",
+    );
+    h.streams.convener!.push({ kind: "handback", summary: "A2 回交", handback } as OrchestrationEvent);
+    await waitUntil(
+      () => (h.sent.chief ?? []).some((text) => text.includes("A2 完成：意图已落盘，下一步 A3 意图卡")),
+      "closed stage-request 回交投递 chief",
+    );
+    const diagnosticsText = await flushAndReadDiagnostics(diagnosticsDir);
+    assert.equal(diagnosticsText.includes("delivery.skip.fixed-child-closed"), false, "stage-request 不得按 closed child 丢弃");
+    assert.equal(diagnosticsText.includes("report.enqueued"), true, "closed stage-request 报告应入队投递");
+    const state = await readTaskState(root);
+    assert.equal(state.records.get("t-b19-a2-sr")?.closed?.outcome, "accepted", "closed 事实保留");
+    assert.equal(
+      state.events.some((event) => (event as { taskId?: string }).taskId === "t-b19-a2-sr" && event.kind === "task.delivered"),
+      false,
+      "投递不得伪造 task.delivered",
+    );
+  } finally {
+    await h.mgr.stop(null);
+    await disposeDiagnostics();
+    await cleanup(root);
+  }
+});
+
 // ══════════════════════════ 2. open fixed 回交正常（不误伤） ══════════════════════════
 
 test("B11.1 open fixed 回交照常投递：不产生 delivery.skip.fixed-child-closed 诊断", async () => {
