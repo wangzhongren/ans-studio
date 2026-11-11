@@ -1,0 +1,30 @@
+# B29 baseline head / environment
+date: 2026-11-11T17:39:28+08:00
+worktree: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch: feat/two-fixed-workflow-paths
+head: f81f969412f95581835bb95e7b0154933a42a82a
+head-subject: docs(test): RR26 lands A11 implementation commits and reworks A12b, then stalls
+node: v24.22.1
+npm: 11.19.1
+
+# tracked changes at B29 verification (mixed worktree; B29 owns only 4 of these)
+# B29 files: app/desktop/session.ts; test/桌面应用/b3-fixed-baseline-pathb.test.ts; test/桌面应用/chief-workflow.test.ts; test/测试/fixed-path-full-chain.test.ts
+# non-B29 files (B30 runtime-core role; untouched by B29): src/provider/trunk/impl/git-command.ts; test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts; test/编排/git-command.test.ts; test/编排/readonly-git-transport.test.ts
+ M app/desktop/session.ts
+ M src/provider/trunk/impl/git-command.ts
+ M test/runtime-core/two-fixed-workflow-paths-b3-1.test.ts
+ M test/桌面应用/b3-fixed-baseline-pathb.test.ts
+ M test/桌面应用/chief-workflow.test.ts
+ M test/测试/fixed-path-full-chain.test.ts
+ M test/编排/git-command.test.ts
+ M test/编排/readonly-git-transport.test.ts
+
+# fixed complete_team_plan injection inventory (grep -rn "completeTeamPlan" src app)
+# - app/desktop/session.ts:4569-4580 = the only fixed injection (sessionWorkflowMode === "fixed" ? completeTeamPlanFixedForHandle : legacy)
+4578:                  this.completeTeamPlanFixedForHandle(req.projectRoot, req.runtime, planBinding.handle, input, planSignal)) as unknown as CompleteTeamPlanFn
+10592:  private async completeTeamPlanFixedForHandle(
+10620:    const completed = await completeTeamPlanFixed({
+# - src/pipeline/orchestration/trunk-runtime.ts:824 = legacy direct runtime (service.completeTeamPlan), not a fixed injection
+824:  }, completeTeamPlan: async (request, signal) => {
+# - src/provider/runtime/tools.ts:4566 = shared capability slot consumed by B25 routing (runtime-core write zone; B30 verified no change needed)
+4566:    { name: COMPLETE_TEAM_PLAN_TOOL_NAME, roles: ["convener"], ...(options.completeTeamPlan && { legacy: (input, signal) => options.completeTeamPlan!(input as unknown as CompleteTeamPlanInput, signal) }) },

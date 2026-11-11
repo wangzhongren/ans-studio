@@ -2646,6 +2646,11 @@ test("W6/T5 团队计划宿主绑定：普通消息回合无受派任务 ⇒ hos
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-w6-plan-no-task-")), caps: Record<string, TeamPlanCapability> = {};
   const manager = teamPlanHostManager(root, caps), target = { projectRoot: root, roleId: "convener", runtime: "demo" as const };
   try {
+    // B29（2026-11-11）：empty 项目聊天入口按 B6.1 解析为 **fixed**；本测试意图是 **legacy** 宿主绑定
+    // 回执（status/errorCode），故显式钉 legacy/v1——否则会拿 fixed 失败形状 `{ok:false,code,message}`
+    // 断言 legacy `status`（fixed 形状由 b3-fixed-baseline-pathb 套件覆盖，本测试不断言 fixed 回执）。
+    await fs.mkdir(path.join(root, ".ans"), { recursive: true });
+    await fs.writeFile(path.join(root, ".ans", "project.json"), JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
     assert.equal((await manager.open(target)).ok, true);
     // 仅 convener 注入宿主绑定能力（其它治理角色不获得 complete_team_plan 能力）。
     assert.equal((await manager.open({ ...target, roleId: "chief" })).ok, true);

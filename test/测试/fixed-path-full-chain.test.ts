@@ -787,10 +787,16 @@ test("路径 A 全链（假会话）：空项目 → 3 卡 → 基线 → A11 �
     const planReceipt = await convenerA9!.completeTeamPlan!({
       operationId: "op-a9-baseline", flowId: FLOW,
       plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(TEAM_PLAN_TEXT) },
-    }) as { ok: boolean; status?: string; errorCode?: string; message?: string };
+    }) as { ok: boolean; code?: string; message?: string; basisId?: string; workflowId?: string; replay?: boolean; stageCompleted?: boolean };
     releaseSource(h.mgr, convenerLive);
-    assert.equal(planReceipt.ok, true, `${planReceipt.errorCode ?? ""} ${planReceipt.message ?? ""}`);
-    assert.equal(planReceipt.status, "applied");
+    assert.equal(planReceipt.ok, true, `${planReceipt.code ?? ""} ${planReceipt.message ?? ""}`);
+    // B29（2026-11-11，RR22/RR25/RR26）：fixed 注入实现返回 **fixed 服务成功形状**（不再包装 legacy
+    // DirectActionReceipt）：basisId=`bas-…`、workflowId 为宿主绑定值、replay/stageCompleted 如实。
+    assert.match(planReceipt.basisId ?? "", /^bas-[a-f0-9]{24}$/, "A9 回执 basisId 形如 bas-…");
+    assert.equal(planReceipt.workflowId, WF);
+    assert.equal(planReceipt.replay, false);
+    assert.equal(planReceipt.stageCompleted, true);
+    assert.equal("status" in planReceipt, false, "fixed 成功回执不再带 legacy status");
     assert.equal(git(root, "symbolic-ref", "--short", "HEAD"), taskBranchName(WF), "A9 创建/切换任务分支");
     assert.match(git(root, "log", "-1", "--format=%s"), /ANS baseline/);
     const basisLedger = await readBasisLedger(root);

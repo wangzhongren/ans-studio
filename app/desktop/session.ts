@@ -132,6 +132,7 @@ import {
   verifyBasisForStage,
   verifyBasisForWorkflow,
   workflowIdFor,
+  type CompleteTeamPlanFixedResult,
   type FixedCloseCreatedTaskToolInput,
   type ReleaseMergePreview,
   type WorkflowServiceFailure,
@@ -4568,9 +4569,13 @@ export class SessionManager {
           // T3 B3（AC-15/AC-16）：fixed 会话的 `complete_team_plan` v4 走应用服务
           // （completeTeamPlanFixed + 真实 BaselineGitPort；git init/.gitignore/任务分支/dirty/basis）；
           // legacy 会话逐字保留 direct 实现（runId 绑定不变）。
+          // B29（2026-11-11）：fixed 注入实现返回 **fixed 服务形状**（工具层按入参 workflowId+plan 分流到
+          // B25 `fixedCompleteTeamPlanReceiptResult`）；注入位类型仍是 legacy `CompleteTeamPlanFn`（共享
+          // 同一能力位），运行时形状由工具层校验——故此处显式断言，legacy 分支零改动。
           ...(direct !== undefined && req.roleId === "convener" ? {
             completeTeamPlan: sessionWorkflowMode === "fixed"
-              ? (input, signal) => this.completeTeamPlanFixedForHandle(req.projectRoot, req.runtime, planBinding.handle, input, signal)
+              ? ((input: Parameters<CompleteTeamPlanFn>[0], planSignal?: AbortSignal) =>
+                  this.completeTeamPlanFixedForHandle(req.projectRoot, req.runtime, planBinding.handle, input, planSignal)) as unknown as CompleteTeamPlanFn
               : (input, signal) => this.completeTeamPlanForHandle(req.projectRoot, req.runtime, planBinding.handle, input, direct, signal),
           } : {}),
           ...(direct !== undefined && req.roleId === "nominator" ? { activateRoleDocuments: direct.activateRoleDocuments } : {}),
@@ -10577,7 +10582,12 @@ ${formatted}` };
   /**
    * fixed `complete_team_plan` v4（A9）桌面适配：可信身份由宿主绑定（projectRoot / actorRoleId=convener /
    * 当前真实受派任务的 workflowId）；模型只给 `{operationId,flowId,plan}`。
-   * 真实 Git 由 `BaselineGitPort` 执行；失败回执 `status:"blocked"`（不弹客户卡）。
+   * 真实 Git 由 `BaselineGitPort` 执行；B29（2026-11-11，RR22/RR25/RR26）：成功与失败都**原样返回 fixed
+   * 服务形状**——成功 `{ok:true,operationId,flowId,workflowId,basisId,plan,documents,replay,
+   * stageCompleted}`，失败 `{ok:false,code,message}`（含桌面级前置 blocked）。工具层按入参形状
+   * （workflowId+plan）路由 B25 `fixedCompleteTeamPlanReceiptResult`；**不再套 legacy
+   * `DirectActionReceipt`**（其成功回执要求 `targetDigest` 为 64-hex，`bas-…` basisId 永远不合形 ⇒
+   * 回执恒被降级为「结果未知或回执不完整」）。失败不弹客户卡。
    */
   private async completeTeamPlanFixedForHandle(
     projectRoot: string,
@@ -10585,16 +10595,8 @@ ${formatted}` };
     handle: RoleSessionHandle | undefined,
     request: Parameters<CompleteTeamPlanFn>[0],
     signal?: AbortSignal,
-  ): Promise<Awaited<ReturnType<CompleteTeamPlanFn>>> {
-    const blocked = (errorCode: string, message: string): Awaited<ReturnType<CompleteTeamPlanFn>> => ({
-      ok: false,
-      status: "blocked",
-      operationId: request.operationId,
-      baseDigest: null,
-      targetDigest: null,
-      errorCode,
-      message,
-    });
+  ): Promise<CompleteTeamPlanFixedResult> {
+    const blocked = (code: string, message: string): CompleteTeamPlanFixedResult => ({ ok: false, code, message });
     const key = this.sessionKey(projectRoot, "convener", runtime);
     const entry = this.sessions.get(key);
     const origin = entry?.origins.running;
@@ -10626,28 +10628,11 @@ ${formatted}` };
       ...(request.runId !== undefined ? { runId: request.runId } : {}),
       ...(request.baseDigest !== undefined ? { baseDigest: request.baseDigest } : {}),
     });
-    if (!completed.ok) {
-      return {
-        ok: false,
-        status: "blocked",
-        operationId: request.operationId,
-        baseDigest: null,
-        targetDigest: null,
-        errorCode: completed.code,
-        message: completed.message,
-      };
-    }
-    return {
-      ok: true,
-      status: "applied",
-      operationId: completed.operationId,
-      baseDigest: null,
-      targetDigest: completed.basisId,
-      applicationId: "ans-fixed-workflow",
-      message:
-        `基线完成：basis ${completed.basisId}；分支 ${completed.git?.branch ?? "（端口未回执）"}；`
-        + `团队计划 ${completed.plan.path}（v${completed.plan.version}）；${completed.replay ? "幂等 replay。" : "已入账。"}`,
-    };
+    // B29：成功/失败都**原样返回 fixed 服务形状**——成功 `{ok:true,operationId,flowId,workflowId,
+    // basisId,plan,documents,replay,stageCompleted}`；失败 `{ok:false,code,message[,missing]}`。
+    // 不再包装成 legacy `DirectActionReceipt`（工具层 B25 校验要求 fixed 形状；包装后的 `bas-…`
+    // targetDigest 永远不被 legacy 64-hex 校验接受，回执恒被降级为「结果未知」）。
+    return completed;
   }
 
   /**

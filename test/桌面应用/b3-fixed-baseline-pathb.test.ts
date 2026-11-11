@@ -4,7 +4,8 @@
 // 覆盖（AC-09/AC-10/AC-15/AC-16/AC-20/AC-22；T-07/T-11/T-12 桌面侧）：
 //   · A9：fixed 会话的 `complete_team_plan` 经应用服务 `completeTeamPlanFixed` + 真实 `BaselineGitPort`
 //     执行（git init -b main/.gitignore + baseline commit/任务分支/dirty）→ `basis.recorded`（repo 快照）
-//     → `stage.completed A9`；失败回执 `status:"blocked"`、不弹客户卡；不写 `.ans/runs`/`.ans/trunk`；
+//     → `stage.completed A9`；B29 起成功/失败均**原样返回 fixed 服务形状**（成功含 basisId/plan/documents/
+//     replay/stageCompleted；失败 `{ok:false,code,message}`），不弹客户卡；不写 `.ans/runs`/`.ans/trunk`；
 //   · A12：fixed `close_created_task` v2 应用实现补齐证据（报告证据 artifacts / A11·B3 branchTipOid /
 //     A12b 应用归档 `docs/acceptance/<flowId>-acceptance-vN.md`）→ `stage.completed A12b` + A12 聚合；
 //     归档失败（criteria 缺证）⇒ `acceptance-record-invalid` 阻塞且不写 task.closed；operationId 幂等 replay；
@@ -26,6 +27,8 @@ import path from "node:path";
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
 import { createDesktopBaselineGitPort } from "../../app/desktop/workflow-git.ts";
+import { buildGovernedTools } from "../../src/provider/runtime/tools.ts";
+import { isDirectActionReceipt } from "../../src/model/trunk.ts";
 import {
   appendBasisEvent,
   appendWorkflowEvent,
@@ -37,11 +40,13 @@ import { deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
 import { appendTaskEvent, readTaskState, taskEvent } from "../../src/common/编排/task-state.ts";
 import type {
   BasisEvent,
+  CompleteTeamPlanFn,
   CustomerInputOutcome,
   CustomerInputRequest,
   TaskSideEffect,
   WorkflowEvent,
   WorkflowStage,
+  WriteGate,
 } from "../../src/model/runtime.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
@@ -52,6 +57,8 @@ const WF = "wf-b3a9a12000000000000000001";
 const AT = "2026-11-10T10:00:00.000Z";
 
 const tick = (ms = 10) => new Promise((resolve) => setTimeout(resolve, ms));
+/** B29：工具层闭环用的放行写门（desktop 测试本地夹具；不触盘）。 */
+const allowGate: WriteGate = (target) => ({ allowed: true, matchedEntry: { root: "project", path: target, kind: "file", purpose: "b29-test" } });
 
 function listing(root: string): ProjectListing {
   const builtIn = (roleId: string, fn?: ProjectListing["roles"][number]["governanceFunction"]): ProjectListing["roles"][number] => ({
@@ -365,10 +372,54 @@ test("A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/
     const receipt = await convener!.completeTeamPlan!({
       operationId: "op-a9-fixed-1", flowId: FLOW,
       plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) },
-    });
+    }) as Record<string, unknown>;
+    // B29（2026-11-11，RR22/RR25/RR26）：注入实现直接返回 **fixed 服务成功形状**，不再包装 legacy
+    // `DirectActionReceipt`（旧包装把 `bas-…` 塞进 targetDigest，B25 工具校验永远拒绝）。
+    assert.equal(receipt["ok"], true, JSON.stringify(receipt));
+    assert.match(String(receipt["basisId"]), /^bas-[a-f0-9]{24}$/, "basisId 形如 bas-…");
+    assert.equal(receipt["operationId"], "op-a9-fixed-1");
+    assert.equal(receipt["flowId"], FLOW);
+    assert.equal(receipt["workflowId"], WF, "workflowId 为宿主绑定的真实受派任务值");
+    assert.deepEqual(receipt["plan"], { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) });
+    assert.ok(Array.isArray(receipt["documents"]), "documents 为数组（basis 文档快照）");
+    assert.equal(receipt["replay"], false);
+    assert.equal(receipt["stageCompleted"], true);
+    assert.equal("status" in receipt, false, "fixed 成功回执不再带 legacy status");
+    assert.equal("targetDigest" in receipt, false, "fixed 成功回执不再把 bas-… 塞进 targetDigest");
+    assert.equal("applicationId" in receipt, false, "fixed 成功回执不再带 legacy applicationId");
+    // B29 工具层闭环：真实注入实现产出的回执必须被 B25 fixed 校验接受（消除 RR 的「结果未知」）。
+    const fixedArgs = {
+      operationId: "op-a9-fixed-1", flowId: FLOW, workflowId: WF,
+      plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) },
+    };
+    const tools = new Map(buildGovernedTools(allowGate, {
+      roleId: "convener", completeTeamPlan: convener!.completeTeamPlan as unknown as CompleteTeamPlanFn,
+    }).map((tool) => [tool.name, tool]));
+    const toolResult = await tools.get("complete_team_plan")!.handler({ name: "complete_team_plan", args: structuredClone(fixedArgs) });
+    assert.equal(toolResult.ok, true, toolResult.message);
+    const toolReceipt = JSON.parse(toolResult.message.slice("complete_team_plan: ".length)) as Record<string, unknown>;
+    assert.equal(toolReceipt["basisId"], receipt["basisId"], "工具层如实透出同一 basis 回执");
+    assert.equal(toolResult.message.includes("结果未知或回执不完整"), false, "B25 不再降级为 unknown");
+    // B29 fixed 桌面级 blocked：flow 与实际受派任务不符 ⇒ fixed 失败形状 `{ok:false,code,message}`。
+    const wrongFlow = await convener!.completeTeamPlan!({
+      operationId: "op-a9-fixed-wrong-flow", flowId: "other-flow",
+      plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) },
+    }) as Record<string, unknown>;
+    assert.equal(wrongFlow["ok"], false);
+    assert.equal(wrongFlow["code"], "plan-flow-conflict");
+    assert.equal(typeof wrongFlow["message"], "string");
+    assert.equal("status" in wrongFlow, false, "fixed 失败不套 legacy status");
+    assert.equal("errorCode" in wrongFlow, false, "fixed 失败不套 legacy errorCode");
+    // B29 fixed 桌面级 blocked：无当前真实受派回合 ⇒ plan-task-unavailable（同一 fixed 失败形状）。
     releaseSource(h.mgr, live);
-    assert.equal((receipt as { ok: boolean }).ok, true, JSON.stringify(receipt));
-    assert.equal((receipt as { status?: string }).status, "applied");
+    const noTurn = await convener!.completeTeamPlan!({
+      operationId: "op-a9-fixed-no-turn", flowId: FLOW,
+      plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) },
+    }) as Record<string, unknown>;
+    assert.equal(noTurn["ok"], false);
+    assert.equal(noTurn["code"], "plan-task-unavailable");
+    assert.equal("status" in noTurn, false);
+    assert.equal("errorCode" in noTurn, false);
     // 真实 Git：仓库已初始化，任务分支为 ans/task/<wf>，baseline commit 存在。
     assert.equal(git(root, "symbolic-ref", "--short", "HEAD"), taskBranchName(WF));
     assert.match(git(root, "log", "--oneline", "-1"), /ANS baseline/);
@@ -399,7 +450,7 @@ test("A9：fixed complete_team_plan → 真实 BaselineGitPort（init/gitignore/
   }
 });
 
-test("A9 失败面（AC-16）：dirty 工作区 ⇒ status blocked（baseline-repository-dirty）、stage.blocked A9、不弹卡、不写 basis", async () => {
+test("A9 失败面（AC-16）：dirty 工作区 ⇒ fixed 失败 code=baseline-repository-dirty（stage.blocked A9、不弹卡、不写 basis）", async () => {
   const root = await tempRoot("ans-b3a9-dirty-");
   const h = harness(root);
   try {
@@ -416,11 +467,25 @@ test("A9 失败面（AC-16）：dirty 工作区 ⇒ status blocked（baseline-re
     const receipt = await convener!.completeTeamPlan!({
       operationId: "op-a9-dirty", flowId: FLOW,
       plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) },
-    });
+    }) as Record<string, unknown>;
+    // B29：fixed 服务失败原样透出 `{ok:false,code,message}`（真实 code），不套 legacy status/errorCode。
+    assert.equal(receipt["ok"], false);
+    assert.equal(receipt["code"], "baseline-repository-dirty");
+    assert.equal(typeof receipt["message"], "string");
+    assert.equal("status" in receipt, false, "fixed 失败不套 legacy status");
+    assert.equal("errorCode" in receipt, false, "fixed 失败不套 legacy errorCode");
+    // B29 工具层闭环：fixed 失败经 B25 `fixedFailureResult` 透出真实 code/message（不降级 unknown）。
+    const tools = new Map(buildGovernedTools(allowGate, {
+      roleId: "convener", completeTeamPlan: convener!.completeTeamPlan as unknown as CompleteTeamPlanFn,
+    }).map((tool) => [tool.name, tool]));
+    const toolResult = await tools.get("complete_team_plan")!.handler({ name: "complete_team_plan", args: {
+      operationId: "op-a9-dirty", flowId: FLOW, workflowId: WF,
+      plan: { path: "docs/scheduling/snake-team-v1.md", version: 1, sha256: sha(plan) },
+    } });
+    assert.equal(toolResult.ok, false);
+    assert.match(toolResult.message, /baseline-repository-dirty/, "真实失败码透出");
+    assert.equal(toolResult.message.includes("结果未知或回执不完整"), false, "真实失败不降级为 unknown");
     releaseSource(h.mgr, live);
-    assert.equal((receipt as { ok: boolean }).ok, false);
-    assert.equal((receipt as { status?: string }).status, "blocked");
-    assert.equal((receipt as { errorCode?: string }).errorCode, "baseline-repository-dirty");
     assert.equal((await readBasisLedger(root)).events.filter((event) =>
       (event.kind === "basis.recorded" || event.kind === "basis.amended") && event.workflowId === WF).length, 0, "失败不写 basis");
     const blocked = (await readWorkflowLedger(root)).events.find((event) =>
@@ -632,6 +697,34 @@ test("路径 B：B1 派发前应用最小准备（既有仓库/任务分支/basi
       await h.mgr.stop(null);
       await cleanup(root);
     }
+  }
+});
+
+test("B29：legacy 会话的 complete_team_plan 注入仍是 legacy DirectActionReceipt（status/errorCode 逐字保留）", async () => {
+  const root = await tempRoot("ans-b29-legacy-");
+  const h = harness(root);
+  try {
+    await writeFile(root, ".ans/project.json", JSON.stringify({ workflowSchema: "legacy/v1", governanceModel: "trio" }));
+    const opened = await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
+    assert.equal(opened.ok, true, opened.ok === false ? (opened.error ?? "") : "");
+    const convener = h.inputs.find((input) => input.roleId === "convener");
+    assert.equal(typeof convener?.completeTeamPlan, "function", "legacy 会话仍注入 complete_team_plan");
+    // 无当前真实回合 ⇒ host-local plan-task-unavailable；形状 = legacy `{ok:false,status:"blocked",errorCode,...}`。
+    const receipt = await convener!.completeTeamPlan!({
+      operationId: "op-legacy-plan-1", flowId: FLOW,
+      plan: { path: "docs/scheduling/snake-team-v1.md", version: 1 },
+    }) as Record<string, unknown>;
+    assert.equal(receipt["ok"], false);
+    assert.equal(receipt["status"], "blocked", "legacy 回执 status 逐字保留");
+    assert.equal(receipt["errorCode"], "plan-task-unavailable", "legacy 回执 errorCode 逐字保留");
+    assert.equal(receipt["operationId"], "op-legacy-plan-1");
+    assert.equal(receipt["baseDigest"], null);
+    assert.equal(receipt["targetDigest"], null);
+    assert.equal("code" in receipt, false, "legacy 注入不被改成 fixed `{code,message}` 形状");
+    assert.equal(isDirectActionReceipt(receipt), true, "legacy 回执仍被 legacy 校验接受（未受 B29 影响）");
+  } finally {
+    await h.mgr.stop(null);
+    await cleanup(root);
   }
 });
 
