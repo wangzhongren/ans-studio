@@ -64,7 +64,7 @@ import { evaluateShellWriteTargets } from "../../common/门禁引擎/shell-write
 import { loadLatestRoster, nominationD3CardFacts, parseProjectModules, parseProjectRoster, parseTeamPlan, rosterContainsBuiltInRoleIds, rosterDirectoriesFor, rosterRoleIds, rosterTopologyText, validateAppointmentCardAgainstRoster } from "../../common/编排/workflow-preconditions.ts";
 // T3 B3.1（2026-11-10，AC-08/AC-13）：fixed A10 卡在办标记（stage.requested A10）经 fixed 账本公共原语写入。
 import { stageRequestIdempotencyKey } from "../../common/编排/workflow-dispatch.ts";
-import { canRequestStage, deriveWorkflowView } from "../../common/编排/workflow-state.ts";
+import { canRequestStage, deriveWorkflowView, WORKFLOW_CORRUPT_CODE } from "../../common/编排/workflow-state.ts";
 // T3 B1（2026-11-10）：fixed per-flow 模式回调输入；会话级常量模式仅单 flow 兼容。类型单源 = workflow-service。
 import { readTaskState } from "../../common/编排/task-state.ts";
 import type { WorkflowMode } from "../../common/编排/workflow-service.ts";
@@ -3935,16 +3935,19 @@ function defaultChoiceKindFromModule(
 }
 
 /**
- * T3 B3.1（2026-11-10，AC-08/AC-13，v1.3 §4.2 A10/MF-9(a)）：fixed 任命卡在办标记。
+ * T3 B3.1/B15.3（2026-11-11，AC-08/AC-13，v1.3 §4.2 A10/MF-9(a)）：fixed 任命卡在办标记。
  *
  * A10 只任命确认、不派实现：呈卡前把当前活动 fixed workflow 推进到 `stage.requested A10`
- * （幂等键 `stage-request:<wf>:A10:1`，requestDigest=名单字节 sha256，requestTaskId=
+ * （幂等键 `stage-request:<wf>:A10:<attempt>`，requestDigest=名单字节 sha256，requestTaskId=
  * `appointment-card:<flowId>:<rosterSha12>`——与 `prepareIntent` 的 `stage.requested A3` 同构），
  * 使 `request.resolved`（appointment，含 `targetRoleIds`/workflowId 戳）后的 `stage.completed A10`
  * （应用通道/桌面 B3 唯一实现）可按状态机落账，之后 chief 才能发 A11 stage-request。
  *
- * **不新增客户门**：无活动 workflow、view 已关闭/blocked、当前不在「A9 已完成 → A10」窗口、
- * 或 A10 已在办/已完成 ⇒ 不写、照常呈现卡。只有真正尝试写入且失败才返回稳定失败码（fail-closed）。
+ * B15.3（2026-11-11，RR10 失败修复）：**fail-closed + 幂等**——无活动 workflow ⇒ `workflow-not-found`；
+ * 已关闭 ⇒ `workflow-closed`；账本损坏 ⇒ `workflow-corrupt`；非路径 A/当前阶段 blocked ⇒
+ * `stage-transition-invalid`；A9 未 completed ⇒ `stage-transition-invalid`；
+ * A10 在办 ⇒ `appointment-card-pending`（拒绝重复卡）；A10 已完成 ⇒ `appointment-card-already-completed`；
+ * attempt 按历史 `stage.requested A10` 数递增。失败时调用方必须 notPresented（不发卡）。
  * 全部经 fixed 账本公共原语（`readWorkflowLedger`/`appendWorkflowEvent`/`deriveWorkflowView`/
  * `canRequestStage`），不复制状态机、不触 legacy trunk/run。
  */
@@ -3960,14 +3963,45 @@ async function markFixedAppointmentCardRequested(input: {
     .map((event) => event.workflowId))]
     .filter((workflowId) => !ledger.events.some((event) => event.workflowId === workflowId && event.kind === "workflow.closed"));
   const workflowId = activeIds.find((id) => ledger.events.some((event) => event.workflowId === id && event.flowId === input.flowId));
-  if (workflowId === undefined) return undefined;
+  if (workflowId === undefined) {
+    return { ok: false, code: "workflow-not-found", message: `workflow-not-found：flow ${input.flowId} 没有活动 fixed workflow（任命卡不发）。` };
+  }
   const wfEvents = ledger.events.filter((event) => event.workflowId === workflowId);
   const taskState = await readTaskState(input.projectRoot);
   const view = deriveWorkflowView(wfEvents, taskState.events);
-  if (view.closed !== undefined || view.blocked !== undefined) return undefined;
-  // 已到 A10（requested/dispatched/blocked/in-progress/completed）⇒ 在办或已完成，不重复标记。
-  if (view.stage === "A10") return undefined;
-  if (!(view.stage === "A9" && view.stages.A9.status === "completed") || !canRequestStage(view, "A10")) return undefined;
+  if (view.blocked?.code === WORKFLOW_CORRUPT_CODE) {
+    return { ok: false, code: WORKFLOW_CORRUPT_CODE, message: `${WORKFLOW_CORRUPT_CODE}：任命卡不可呈（工作流账本损坏：${view.blocked.summary}）。` };
+  }
+  if (view.closed !== undefined) {
+    return { ok: false, code: "workflow-closed", message: `workflow-closed：任命卡不可呈（workflow 已关闭：${view.closed.outcome}）。` };
+  }
+  if (view.path !== "A") {
+    return { ok: false, code: "stage-transition-invalid", message: "stage-transition-invalid：任命卡只适用于路径 A workflow（不发卡）。" };
+  }
+  if (view.stages[view.stage].status === "blocked") {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `stage-transition-invalid：任命卡不可呈（workflow 当前 blocked：${view.blocked?.code ?? "blocked"}）；要求 A9 completed。`,
+    };
+  }
+  if (view.stage === "A10") {
+    if (view.stages.A10.status === "completed") {
+      return { ok: false, code: "appointment-card-already-completed", message: "appointment-card-already-completed：A10 任命卡已完成；不得再次呈现。" };
+    }
+    return { ok: false, code: "appointment-card-pending", message: "appointment-card-pending：A10 任命卡已在办；先结算既有卡，不得重复呈现。" };
+  }
+  if (!(view.stage === "A9" && view.stages.A9.status === "completed") || !canRequestStage(view, "A10")) {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `stage-transition-invalid：任命卡不可呈（当前 ${view.stage}(${view.stages[view.stage].status})；要求 A9 completed）。`,
+    };
+  }
+  const priorAttempts = wfEvents
+    .filter((event) => event.kind === "stage.requested" && event.stage === "A10")
+    .map((event) => (event.kind === "stage.requested" ? event.attempt : 0));
+  const attempt = (priorAttempts.length > 0 ? Math.max(...priorAttempts) : 0) + 1;
   const now = input.now ?? (() => new Date());
   const event: WorkflowEvent = {
     v: 1,
@@ -3977,12 +4011,12 @@ async function markFixedAppointmentCardRequested(input: {
     workflowId,
     flowId: input.flowId,
     path: view.path,
-    idempotencyKey: stageRequestIdempotencyKey(workflowId, "A10", 1),
+    idempotencyKey: stageRequestIdempotencyKey(workflowId, "A10", attempt),
     stage: "A10",
     fromStage: "A9",
     requestTaskId: `appointment-card:${input.flowId}:${input.rosterSha256.slice(0, 12)}`,
     requestDigest: input.rosterSha256,
-    attempt: 1,
+    attempt,
   };
   const appended = await workflowAppendEvent(input.projectRoot, event);
   if (!appended.ok) return { ok: false, code: "workflow-ledger-write-failed", message: `stage.requested A10 写入失败：${appended.message}` };

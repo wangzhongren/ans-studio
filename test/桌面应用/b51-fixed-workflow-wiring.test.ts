@@ -705,8 +705,8 @@ test("G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方
   }
 });
 
-test("G-B5-3：窗口不符/无活动 workflow 不写 marker；helper 重复调用幂等", async () => {
-  // 无活动 workflow：fixed 项目但该 flow 无 workflow.started ⇒ 不写任何 A6 marker（不伪造卡）。
+test("G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等", async () => {
+  // 无活动 workflow：fixed 项目但该 flow 无 workflow.started ⇒ 拒绝发卡（B15.2 fail-closed）。
   {
     const root = await tempRoot("ans-b51-a6-nowf-");
     const h = harness(root, () => ({ outcome: "declined", reason: "test" }));
@@ -716,18 +716,17 @@ test("G-B5-3：窗口不符/无活动 workflow 不写 marker；helper 重复调�
       const chief = await openRole(h, root, "chief");
       const outcome = await chief.customerInput!(PROPOSAL_CARD);
       assert.equal(outcome?.outcome, "declined");
+      assert.equal(outcome?.outcome === "declined" ? outcome.notPresented : undefined, true);
+      assert.match(outcome?.outcome === "declined" ? outcome.reason ?? "" : "", /workflow-not-found/);
       assert.equal((await readWorkflowLedger(root)).events.length, 0, "无活动 workflow 不写 A6 marker");
       const created = (await readTaskState(root)).events.find((event) => event.kind === "request.created" && event.cardKind === "proposal");
-      assert.ok(created !== undefined && created.kind === "request.created");
-      if (created !== undefined && created.kind === "request.created") {
-        assert.equal(created.workflowId, undefined, "无活动 workflow 时不伪造 workflowId 戳");
-      }
+      assert.equal(created, undefined, "无活动 workflow 不得落 request.created（不发卡）");
     } finally {
       await h.mgr.stop(null);
       await cleanup(root);
     }
   }
-  // 窗口不符（A3 已完成 ⇒ 非 A5→A6 窗口）：不写 marker。
+  // 窗口不符（A3 已完成 ⇒ 非 A5→A6 窗口）：拒绝发卡、不写 marker。
   {
     const root = await tempRoot("ans-b51-a6-window-");
     const h = harness(root, () => ({ outcome: "declined", reason: "test" }));
@@ -737,15 +736,20 @@ test("G-B5-3：窗口不符/无活动 workflow 不写 marker；helper 重复调�
       await seedA(root, workflowId, "A3", "completed");
       await seedFiveDocs(root);
       const chief = await openRole(h, root, "chief");
-      await chief.customerInput!(PROPOSAL_CARD);
+      const outcome = await chief.customerInput!(PROPOSAL_CARD);
+      assert.equal(outcome?.outcome, "declined");
+      assert.equal(outcome?.outcome === "declined" ? outcome.notPresented : undefined, true);
+      assert.match(outcome?.outcome === "declined" ? outcome.reason ?? "" : "", /stage-transition-invalid/);
       assert.equal((await readWorkflowLedger(root)).events.filter((event) =>
         event.workflowId === workflowId && event.kind === "stage.requested" && event.stage === "A6").length, 0, "窗口不符不得写 marker");
+      const created = (await readTaskState(root)).events.find((event) => event.kind === "request.created" && event.cardKind === "proposal");
+      assert.equal(created, undefined, "窗口不符不得落 request.created");
     } finally {
       await h.mgr.stop(null);
       await cleanup(root);
     }
   }
-  // helper 幂等：A5 完成窗口重复调用只写一条（同幂等键 replay）。
+  // helper 幂等/重复：A5 完成窗口第一次写 marker；第二次 A6 在办 ⇒ proposal-card-pending，不重复 marker。
   {
     const root = await tempRoot("ans-b51-a6-idem-");
     const workflowId = "wf-b51a6idem0000000000000001";
@@ -755,12 +759,54 @@ test("G-B5-3：窗口不符/无活动 workflow 不写 marker；helper 重复调�
       const first = await markFixedProposalCardRequested({ projectRoot: root, flowId: FLOW, workflowId, proposalSha256: proposalSha });
       assert.equal(first, undefined);
       const second = await markFixedProposalCardRequested({ projectRoot: root, flowId: FLOW, workflowId, proposalSha256: proposalSha });
-      assert.equal(second, undefined);
+      assert.notEqual(second, undefined, "A6 在办时重复呈卡必须被拒（B15.2）");
+      if (second !== undefined) assert.equal(second.code, "proposal-card-pending");
       assert.equal((await readWorkflowLedger(root)).events.filter((event) =>
         event.workflowId === workflowId && event.kind === "stage.requested" && event.stage === "A6").length, 1, "重复 helper 不重复 marker");
     } finally {
       await cleanup(root);
     }
+  }
+});
+
+test("G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）", async () => {
+  const root = await tempRoot("ans-b51-a6-attempt-");
+  const workflowId = "wf-b51a6attempt00000000000001";
+  try {
+    await seedA(root, workflowId, "A5", "completed");
+    const proposalSha = sha(PROPOSAL_TEXT);
+    const first = await markFixedProposalCardRequested({ projectRoot: root, flowId: FLOW, workflowId, proposalSha256: proposalSha });
+    assert.equal(first, undefined);
+    // 客户 accept → stage.completed A6（模拟应用通道）。
+    await appendEvents(root, [completed(workflowId, "A6")]);
+    const done = await markFixedProposalCardRequested({ projectRoot: root, flowId: FLOW, workflowId, proposalSha256: proposalSha });
+    assert.notEqual(done, undefined);
+    if (done !== undefined) assert.equal(done.code, "proposal-card-already-completed");
+    // A6 revise → stage.reworked A6→A5（attempt 2）；A5 重做完成 ⇒ 允许新方案卡 attempt=2。
+    await appendEvents(root, [
+      {
+        ...BASE_A, kind: "stage.reworked", workflowId, flowId: FLOW,
+        idempotencyKey: `stage-rework:${workflowId}:A5:2`, stage: "A5", reworkOf: "A6",
+        reason: "proposal revise", attempt: 2,
+      },
+      requested(workflowId, "A5", 2),
+      {
+        ...BASE_A, kind: "stage.completed", workflowId, flowId: FLOW,
+        idempotencyKey: `stage-complete:${workflowId}:A5:retry`, stage: "A5",
+        cause: { kind: "seed", ref: "a5-retry" }, artifacts: [],
+      },
+    ]);
+    const again = await markFixedProposalCardRequested({ projectRoot: root, flowId: FLOW, workflowId, proposalSha256: proposalSha });
+    assert.equal(again, undefined, "A5 重做完成 ⇒ 允许下一张方案卡");
+    const a6Requests = (await readWorkflowLedger(root)).events.filter((event) =>
+      event.workflowId === workflowId && event.kind === "stage.requested" && event.stage === "A6");
+    assert.deepEqual(
+      a6Requests.map((event) => (event.kind === "stage.requested" ? event.attempt : 0)),
+      [1, 2],
+      "attempt 按历史 A6 请求递增",
+    );
+  } finally {
+    await cleanup(root);
   }
 });
 

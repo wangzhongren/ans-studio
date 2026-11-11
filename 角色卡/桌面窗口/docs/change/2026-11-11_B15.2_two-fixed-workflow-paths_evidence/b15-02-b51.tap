@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: G-B5-1：fixed 直派 A1 任务创建 ⇒ stage.dispatched A1 落账（完成于任务创建）且同任务幂等 replay
+ok 1 - G-B5-1：fixed 直派 A1 任务创建 ⇒ stage.dispatched A1 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 42.4703
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A4 任务创建 ⇒ stage.dispatched A4 落账（完成于任务创建）且同任务幂等 replay
+ok 2 - G-B5-1：fixed 直派 A4 任务创建 ⇒ stage.dispatched A4 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 31.1973
+  type: 'test'
+  ...
+# Subtest: G-B5-1：fixed 直派 A7 任务创建 ⇒ stage.dispatched A7 落账（完成于任务创建）且同任务幂等 replay
+ok 3 - G-B5-1：fixed 直派 A7 任务创建 ⇒ stage.dispatched A7 落账（完成于任务创建）且同任务幂等 replay
+  ---
+  duration_ms: 32.9928
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A8 激活任务创建 ⇒ stage.dispatched A8（A7 完成后下一阶段；在办供 role.activated）
+ok 4 - G-B5-1：A8 激活任务创建 ⇒ stage.dispatched A8（A7 完成后下一阶段；在办供 role.activated）
+  ---
+  duration_ms: 39.5884
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A12a 直派 ⇒ stage.dispatched A12a；A11 stage-request 不再被 AC-09 门拒绝（未记录时拒绝的对照）
+ok 5 - G-B5-1：A12a 直派 ⇒ stage.dispatched A12a；A11 stage-request 不再被 AC-09 门拒绝（未记录时拒绝的对照）
+  ---
+  duration_ms: 129.6477
+  type: 'test'
+  ...
+# Subtest: G-B5-1：A12b 直派 ⇒ stage.dispatched A12b（A11 完成后窗口）
+ok 6 - G-B5-1：A12b 直派 ⇒ stage.dispatched A12b（A11 完成后窗口）
+  ---
+  duration_ms: 71.8494
+  type: 'test'
+  ...
+# Subtest: G-B5-1：窗口外 review 直派不写账本也不阻断（B1 既有夹具语义）；服务失败 fail-closed（workflow-not-found / workflow-closed）
+ok 7 - G-B5-1：窗口外 review 直派不写账本也不阻断（B1 既有夹具语义）；服务失败 fail-closed（workflow-not-found / workflow-closed）
+  ---
+  duration_ms: 40.9609
+  type: 'test'
+  ...
+# Subtest: G-B5-1：stage 集合不含 A11/B1/B3（A11 由 requestStage 记录；B3 无 stage.dispatched 语义）
+ok 8 - G-B5-1：stage 集合不含 A11/B1/B3（A11 由 requestStage 记录；B3 无 stage.dispatched 语义）
+  ---
+  duration_ms: 0.6805
+  type: 'test'
+  ...
+# Subtest: G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方案依据 hash/requestTaskId）；accept ⇒ stage.completed A6
+ok 9 - G-B5-3：fixed proposal 卡呈卡前写 stage.requested A6（幂等键/方案依据 hash/requestTaskId）；accept ⇒ stage.completed A6
+  ---
+  duration_ms: 95.3422
+  type: 'test'
+  ...
+# Subtest: G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等
+ok 10 - G-B5-3/B15.2：窗口不符/无活动 workflow fail-closed（不发卡、不写 marker）；A6 在办重复被拒；helper 幂等
+  ---
+  duration_ms: 52.4236
+  type: 'test'
+  ...
+# Subtest: G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）
+ok 11 - G-B5-3/B15.2：A6 已完成拒绝重呈；A6 revise 后 A5 重做完成允许新卡（attempt=2）
+  ---
+  duration_ms: 65.0994
+  type: 'test'
+  ...
+# Subtest: G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候选路径派生写集）；B3 生产派发通过写集门
+ok 12 - G-B5-2：B3 stage-request 受理时应用记录 B2（影响面重算 + 候选路径派生写集）；B3 生产派发通过写集门
+  ---
+  duration_ms: 393.0392
+  type: 'test'
+  ...
+# Subtest: G-B5-2：候选路径缺省时从 B1 生产任务 modulePaths 派生；B2 窗口/路径守卫
+ok 13 - G-B5-2：候选路径缺省时从 B1 生产任务 modulePaths 派生；B2 窗口/路径守卫
+  ---
+  duration_ms: 42.8108
+  type: 'test'
+  ...
+# Subtest: G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B3 请求不受理、无任务（fail-closed）
+ok 14 - G-B5-2：无影响面报告/无候选路径 ⇒ b-change-scope-invalid，B3 请求不受理、无任务（fail-closed）
+  ---
+  duration_ms: 32.5207
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1468.8942

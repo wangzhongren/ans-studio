@@ -472,6 +472,9 @@ test("legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker
 test("fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序", async () => {
   const { root, project } = fixedProject();
   try {
+    // B15.3：任命卡要求活动 workflow + A9 completed（fail-closed 前置）。
+    const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
+    await seedWorkflowThrough(root, workflowId, ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9"]);
     const captured: { request?: CustomerInputRequest; metadata?: CustomerInputMetadata } = {};
     let rawCalls = 0;
     const raw: CustomerInputFn = async (request, metadata) => {
@@ -669,6 +672,12 @@ test("fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 s
         const outcome = await caps.customerInput!(appointmentCard(["implementer", "qa"]), { flowId: FLOW });
         assert.equal(outcome?.outcome, "answered");
         assert.equal(rawCalls, 1);
+        // B15.3：A10 已完成后再呈任命卡 ⇒ fail-closed（appointment-card-already-completed），不得再触达客户通道。
+        const again = await caps.customerInput!(appointmentCard(["implementer", "qa"]), { flowId: FLOW });
+        assert.equal(again?.outcome, "declined");
+        assert.equal(again?.outcome === "declined" ? again.notPresented : undefined, true);
+        assert.match(again?.outcome === "declined" ? again.reason ?? "" : "", /appointment-card-already-completed/);
+        assert.equal(rawCalls, 1, "A10 已完成不得再次发卡");
       },
     );
     const ledger = await readWorkflowLedger(root);
@@ -717,12 +726,14 @@ test("fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 s
   }
 });
 
-test("fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 stage.requested A10、不产生 corrupt", async () => {
+test("fixed A10 在办标记幂等：同一 workflow 再次呈卡被拒（appointment-card-pending）、不重复写 stage.requested A10、不产生 corrupt", async () => {
   const { root, project } = fixedProject();
   try {
     const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
     await seedWorkflowThrough(root, workflowId, ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9"]);
+    let rawCalls = 0;
     const raw: CustomerInputFn = async (request) => {
+      rawCalls += 1;
       assert.equal(request.kind, "choice");
       return { outcome: "declined", reason: "stub-channel-declined" } satisfies CustomerInputOutcome;
     };
@@ -731,18 +742,50 @@ test("fixed A10 在办标记幂等：同一 workflow 再次呈卡不重复写 st
       async (caps) => {
         const first = await caps.customerInput!(appointmentCard(["implementer", "qa"]), { flowId: FLOW });
         assert.equal(first?.outcome, "declined");
+        assert.equal(rawCalls, 1);
+        // B15.3：A10 在办（requested）⇒ 重复呈卡 fail-closed，不得再触达客户通道。
         const second = await caps.customerInput!(appointmentCard(["implementer", "qa"]), { flowId: FLOW });
         assert.equal(second?.outcome, "declined");
+        assert.equal(second?.outcome === "declined" ? second.notPresented : undefined, true);
+        assert.match(second?.outcome === "declined" ? second.reason ?? "" : "", /appointment-card-pending/);
+        assert.equal(rawCalls, 1, "A10 在办时不得重复发卡");
       },
     );
     const ledger = await readWorkflowLedger(root);
     const wfEvents = ledger.events.filter((event) => event.workflowId === workflowId);
     const requestedA10 = wfEvents.filter((event) => event.kind === "stage.requested" && event.stage === "A10");
-    assert.equal(requestedA10.length, 1, "A10 在办标记只写一次（view 已在 A10 ⇒ 不再写）");
+    assert.equal(requestedA10.length, 1, "A10 在办标记只写一次（重复呈卡被拒）");
     const view = deriveWorkflowView(wfEvents);
     assert.equal(view.blocked, undefined, view.blocked?.summary ?? "");
     assert.equal(view.stage, "A10");
     assert.equal(view.stages.A10.status, "requested");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("fixed A10 未到窗口：A9 未完成时任命卡 fail-closed（stage-transition-invalid，不发卡）", async () => {
+  const { root, project } = fixedProject();
+  try {
+    const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
+    await seedWorkflowThrough(root, workflowId, ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"]);
+    let rawCalls = 0;
+    const raw: CustomerInputFn = async () => {
+      rawCalls += 1;
+      return { outcome: "declined", reason: "must-not-present" } satisfies CustomerInputOutcome;
+    };
+    await withSession(
+      { roleId: "chief", project, customerInput: raw, workflowModeForFlow: (flowId) => (flowId === FLOW ? "fixed" : "legacy") },
+      async (caps) => {
+        const outcome = await caps.customerInput!(appointmentCard(["implementer", "qa"]), { flowId: FLOW });
+        assert.equal(outcome?.outcome, "declined");
+        assert.equal(outcome?.outcome === "declined" ? outcome.notPresented : undefined, true);
+        assert.match(outcome?.outcome === "declined" ? outcome.reason ?? "" : "", /stage-transition-invalid/);
+        assert.equal(rawCalls, 0, "A9 未完成不得发任命卡");
+      },
+    );
+    const ledger = await readWorkflowLedger(root);
+    assert.equal(ledger.events.filter((event) => event.workflowId === workflowId && event.kind === "stage.requested" && event.stage === "A10").length, 0);
   } finally {
     cleanup(root);
   }

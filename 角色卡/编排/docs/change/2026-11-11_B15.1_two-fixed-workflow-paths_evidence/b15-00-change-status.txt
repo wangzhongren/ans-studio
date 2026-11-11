@@ -1,0 +1,8 @@
+ M app/desktop/session.ts
+ M app/desktop/workflow.ts
+ M src/common/编排/workflow-service.ts
+ M src/pipeline/orchestration/run-role.ts
+ M test/桌面应用/b3-fixed-cards-panel.test.ts
+ M test/桌面应用/b51-fixed-workflow-wiring.test.ts
+ M test/编排/run-role-fixed-b31.test.ts
+ M test/编排/workflow-fixed-b131.test.ts

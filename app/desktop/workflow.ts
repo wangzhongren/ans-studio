@@ -22,7 +22,7 @@ import type { DispatchTaskPayload, WorkflowEvent, WorkflowStage } from "../../sr
 import { TRUNK_MANIFEST_SCHEMA } from "../../src/model/trunk.ts";
 import { readTaskState } from "../../src/common/编排/task-state.ts";
 import { FIXED_DISPATCH_MATRIX, stageRequestIdempotencyKey } from "../../src/common/编排/workflow-dispatch.ts";
-import { canDispatchStage, canRequestStage, deriveWorkflowView } from "../../src/common/编排/workflow-state.ts";
+import { canDispatchStage, canRequestStage, deriveWorkflowView, WORKFLOW_CORRUPT_CODE } from "../../src/common/编排/workflow-state.ts";
 import { appendWorkflowEvent, readWorkflowLedger, recordChangeScopeDecision, recordStageDispatch } from "../../src/common/编排/workflow-service.ts";
 import type { PathBWriteSet, WorkflowServiceFailure } from "../../src/common/编排/workflow-service.ts";
 import {
@@ -459,15 +459,19 @@ export async function recordFixedStageDispatchForTask(input: {
 // —————————————— G-B5-3：方案卡（A6）在办标记 ——————————————
 
 /**
- * fixed proposal 卡（A6）**呈卡前**的在办标记（G-B5-3；与 run-role A10 `markFixedAppointmentCardRequested`
- * 同构）：写 `stage.requested A6`（幂等 `stage-request:<wf>:A6:1`，requestDigest = 方案依据（proposal）
- * 文档字节 sha256，requestTaskId = `proposal-card:<flowId>:<sha12>`），使客户 accept 后桌面
- * `stage.completed A6`（要求 `view.stage === "A6"`）可按状态机落账。
+ * fixed proposal 卡（A6）**呈卡前**在办标记（G-B5-3；与 run-role A10 `markFixedAppointmentCardRequested`
+ * 同构）：写 `stage.requested A6`（幂等 `stage-request:<wf>:A6:<attempt>`，requestDigest = 方案依据
+ * （proposal）文档字节 sha256，requestTaskId = `proposal-card:<flowId>:<sha12>`），使客户 accept 后
+ * 桌面 `stage.completed A6`（要求 `view.stage === "A6"`）可按状态机落账。
  *
- * **不新增客户门**：无活动 workflow（调用方已解析）、账本缺该 workflow、view 已关闭/blocked、
- * 当前不在「A5 已完成 → A6」窗口、或 A6 已在办/已完成（view.stage==="A6"）⇒ 不写、照常呈现卡；
- * 只有真正尝试写入且失败才返回稳定失败码（fail-closed，调用方不发卡）。
- * 同一幂等键重复调用由 `appendWorkflowEvent` replay 去重（不重复 marker）。
+ * B15.2（2026-11-11，RR10 失败修复）：**fail-closed + 幂等**——A6 方案卡必须在
+ * 「活动 workflow + A5 completed + A6 未在办/未完成」窗口呈现：
+ * - 无 workflow/flowId 不一致 ⇒ `workflow-not-found`；已关闭 ⇒ `workflow-closed`；账本损坏 ⇒ `workflow-corrupt`；
+ * - 非路径 A ⇒ `stage-transition-invalid`；当前阶段 blocked（按 current status，不按历史 view.blocked）⇒
+ *   `stage-transition-invalid`；A5 未 completed ⇒ `stage-transition-invalid`；
+ * - **A6 在办 ⇒ `proposal-card-pending`（拒绝重复呈现）**；A6 已完成 ⇒ `proposal-card-already-completed`；
+ * - attempt 按历史 `stage.requested A6` 数递增（支持 A6 revise 后 A5 重做完成再呈新卡）。
+ * 调用方收到失败必须 notPresented（不发卡）；失败不写 request/客户决定。
  */
 export async function markFixedProposalCardRequested(input: {
   projectRoot: string;
@@ -479,13 +483,44 @@ export async function markFixedProposalCardRequested(input: {
   const ledger = await readWorkflowLedger(input.projectRoot);
   const wfEvents = ledger.events.filter((event) => event.workflowId === input.workflowId);
   const started = wfEvents.find((event) => event.kind === "workflow.started");
-  if (started === undefined || started.kind !== "workflow.started" || started.flowId !== input.flowId) return undefined;
+  if (started === undefined || started.kind !== "workflow.started" || started.flowId !== input.flowId) {
+    return { ok: false, code: "workflow-not-found", message: `方案卡不可呈：workflow ${input.workflowId} 不存在或 flowId 不一致（不发卡）。` };
+  }
   const tasks = await readTaskState(input.projectRoot);
   const view = deriveWorkflowView(wfEvents, tasks.events);
-  if (view.closed !== undefined || view.blocked !== undefined) return undefined;
-  if (view.path !== "A") return undefined;
-  if (view.stage === "A6") return undefined;
-  if (!(view.stage === "A5" && view.stages.A5.status === "completed") || !canRequestStage(view, "A6")) return undefined;
+  if (view.blocked?.code === WORKFLOW_CORRUPT_CODE) {
+    return { ok: false, code: WORKFLOW_CORRUPT_CODE, message: `方案卡不可呈：工作流账本损坏（${view.blocked.summary}）。` };
+  }
+  if (view.closed !== undefined) {
+    return { ok: false, code: "workflow-closed", message: `方案卡不可呈：workflow 已关闭（${view.closed.outcome}）。` };
+  }
+  if (view.path !== "A") {
+    return { ok: false, code: "stage-transition-invalid", message: "方案卡只适用于路径 A workflow（不发卡）。" };
+  }
+  if (view.stages[view.stage].status === "blocked") {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `方案卡不可呈：workflow 当前 blocked（${view.blocked?.code ?? "blocked"}）；要求 A5 completed。`,
+    };
+  }
+  if (view.stage === "A6") {
+    if (view.stages.A6.status === "completed") {
+      return { ok: false, code: "proposal-card-already-completed", message: "A6 方案卡已完成；不得再次呈现。" };
+    }
+    return { ok: false, code: "proposal-card-pending", message: "A6 方案卡已在办；先结算既有卡，不得重复呈现。" };
+  }
+  if (!(view.stage === "A5" && view.stages.A5.status === "completed") || !canRequestStage(view, "A6")) {
+    return {
+      ok: false,
+      code: "stage-transition-invalid",
+      message: `方案卡不可呈：当前 ${view.stage}(${view.stages[view.stage].status})；要求 A5 completed。`,
+    };
+  }
+  const priorAttempts = wfEvents
+    .filter((event) => event.kind === "stage.requested" && event.stage === "A6")
+    .map((event) => (event.kind === "stage.requested" ? event.attempt : 0));
+  const attempt = (priorAttempts.length > 0 ? Math.max(...priorAttempts) : 0) + 1;
   const at = (input.now ?? (() => new Date()))().toISOString();
   const event: WorkflowEvent = {
     v: 1,
@@ -495,12 +530,12 @@ export async function markFixedProposalCardRequested(input: {
     workflowId: input.workflowId,
     flowId: input.flowId,
     path: view.path,
-    idempotencyKey: stageRequestIdempotencyKey(input.workflowId, "A6", 1),
+    idempotencyKey: stageRequestIdempotencyKey(input.workflowId, "A6", attempt),
     stage: "A6",
     fromStage: "A5",
     requestTaskId: `proposal-card:${input.flowId}:${input.proposalSha256.slice(0, 12)}`,
     requestDigest: input.proposalSha256,
-    attempt: 1,
+    attempt,
   };
   const appended = await appendWorkflowEvent(input.projectRoot, event);
   if (!appended.ok) {

@@ -224,9 +224,9 @@ test("prepareIntent：A2 blocked 时拒绝；request+completed 恢复后旧 view
   }
 });
 
-// ————————————————— ⑤ RR8 A2 死锁回归 —————————————————
+// ————————————————— ⑤ RR8/RR10 A2 单 accepted 完成回归（B15.1） —————————————————
 
-test("closeTask：open 兄弟阻塞 A2 完成；原任务 rework 后，补交+返工任务 accepted ⇒ A2 完成（RR8 死锁回归）", async () => {
+test("closeTask：A2 accepted + 证据即完成（不等待 open 兄弟）；原任务迟到 rework 不再写 stage.blocked（RR8/RR10 回归）", async () => {
   const root = await tempRoot();
   try {
     const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
@@ -238,44 +238,91 @@ test("closeTask：open 兄弟阻塞 A2 完成；原任务 rework 后，补交+�
     await reportDone(root, "t-a2-orig", "product", ["docs/product/snake-intent-v1.md"]);
     await reportDone(root, "t-a2-supp", "product", ["docs/product/snake-intent-v1.md"]);
 
-    // 补交任务先 accepted：原任务仍 open ⇒ 不得完成 A2（RR8 00:35:12 实测）。
+    // B15.1（v1.3 §4.5）：补交任务 accepted + 应用证据即完成 A2；open 兄弟（旧 attempt）不阻塞。
+    // RR8 00:35:12 旧实现返回 stageCompleted=false；RR10 A5 同构（accepted 时 failed 投递任务仍 open）。
     const supp = await closeTask({
       projectRoot: root, operationId: "op-a2-supp", taskId: "t-a2-supp", outcome: "accepted",
       actorRoleId: "convener", evidence: { artifacts: ARTIFACTS }, now: NOW,
     });
     assert.equal(supp.ok, true, supp.ok === false ? supp.code : "");
-    if (supp.ok) assert.equal(supp.stageCompleted, false, "open 兄弟任务阻塞阶段完成");
+    if (supp.ok) assert.equal(supp.stageCompleted, true, "单 accepted + 证据即完成 A2，不等待 open 兄弟");
+    let ledger = await readWorkflowLedger(root);
+    assert.equal(ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A2").length, 1);
+    const viewState = await viewOf(root, workflowId);
+    assert.equal(viewState.stage, "A2");
+    assert.equal(viewState.stages.A2.status, "completed");
 
-    // 原任务 rework 关闭：A2 进入 blocked（任务证据格式不合规，RR8 实测）。
+    // 原任务迟到 rework 关闭：阶段已完成，不得再写 stage.blocked（投影不得 corrupt）。
     const origRework = await closeTask({
       projectRoot: root, operationId: "op-a2-orig-rework", taskId: "t-a2-orig", outcome: "rework",
-      actorRoleId: "convener", note: "报告证据格式不合规", now: NOW,
+      actorRoleId: "convener", note: "旧 attempt 迟到收口", now: NOW,
     });
     assert.equal(origRework.ok, true, origRework.ok === false ? origRework.code : "");
-    let ledger = await readWorkflowLedger(root);
-    assert.equal(ledger.events.some((event) => event.kind === "stage.blocked" && event.stage === "A2"), true);
-
-    // 幕僚重新发 A2 stage-request（attempt 2），运营派返工任务并 accepted：rework 旧 attempt 不再阻塞。
-    await appendEvents(root, workflowId, [requested(workflowId, "A2", 2)]);
-    await createFixedTask(root, workflowId, "t-a2-replace", "A2");
-    await reportDone(root, "t-a2-replace", "product", ["docs/product/snake-intent-v1.md"]);
-    const replace = await closeTask({
-      projectRoot: root, operationId: "op-a2-replace", taskId: "t-a2-replace", outcome: "accepted",
-      actorRoleId: "convener", evidence: { artifacts: ARTIFACTS }, now: NOW,
-    });
-    assert.equal(replace.ok, true, replace.ok === false ? replace.code : "");
-    if (replace.ok) assert.equal(replace.stageCompleted, true, "旧 rework attempt 不得永久阻塞 A2 完成");
-
     ledger = await readWorkflowLedger(root);
-    assert.equal(ledger.events.filter((event) => event.kind === "stage.completed" && event.stage === "A2").length, 1);
-    const view = await viewOf(root, workflowId);
-    assert.equal(view.stage, "A2");
-    assert.equal(view.stages.A2.status, "completed");
-    assert.notEqual(view.blocked?.code, "workflow-corrupt");
-    // A2 完成后 apply A3 卡路径不再被旧 blocked 拦（RR8 死锁的下一跳）。
+    assert.equal(
+      ledger.events.some((event) => event.kind === "stage.blocked" && event.stage === "A2"),
+      false,
+      "阶段完成后迟到 rework 不得写 stage.blocked",
+    );
+    const after = await viewOf(root, workflowId);
+    assert.notEqual(after.blocked?.code, "workflow-corrupt");
+    assert.equal(after.stages.A2.status, "completed");
+    // A3 卡路径可正常补记 stage.requested A3（B13.1 门）。
     await writeFile(root, "docs/product/snake-intent-v1.md", INTENT_TEXT);
     const prepared = await prepareIntent({ projectRoot: root, flowId: FLOW, now: NOW });
     assert.equal(prepared.ok, true, prepared.ok === false ? prepared.message : "");
+  } finally {
+    await cleanup(root);
+  }
+});
+
+// ————————————————— ⑤b RR10 A5 单 accepted 完成回归（B15.1） —————————————————
+
+test("closeTask A5：accepted + 证据完成，不等待 open 的 failed 投递兄弟；其 rejected 收口不写 stage.blocked（RR10 回归）", async () => {
+  const root = await tempRoot();
+  try {
+    const workflowId = workflowIdFor(FLOW, "A", "t-src", D);
+    await appendEvents(root, workflowId, [
+      ...seedEvent(workflowId), requested(workflowId, "A1"), completed(workflowId, "A1"),
+      requested(workflowId, "A2"), completed(workflowId, "A2"),
+      requested(workflowId, "A3"), completed(workflowId, "A3"),
+      requested(workflowId, "A4"), completed(workflowId, "A4"),
+      requested(workflowId, "A5"),
+    ]);
+    await createFixedTask(root, workflowId, "t-a5-ok", "A5", "rapporteur");
+    await createFixedTask(root, workflowId, "t-a5-fail", "A5", "rapporteur");
+    await reportDone(root, "t-a5-ok", "rapporteur", ["docs/proposals/snake-proposal-v1.md"]);
+    const failed = taskEvent("task.reported", {
+      taskId: "t-a5-fail", from: "rapporteur", status: "failed", summary: "delivery-rejected",
+    }, NOW);
+    assert.equal((await appendTaskEvent(root, failed)).ok, true);
+
+    // RR10 01:11:43：accepted 时另一 failed 投递任务仍 open；B15.1 要求此时即完成 A5。
+    const ok = await closeTask({
+      projectRoot: root, operationId: "op-a5-ok", taskId: "t-a5-ok", outcome: "accepted",
+      actorRoleId: "convener", evidence: { artifacts: ARTIFACTS }, now: NOW,
+    });
+    assert.equal(ok.ok, true, ok.ok === false ? ok.code : "");
+    if (ok.ok) assert.equal(ok.stageCompleted, true, "A5 单 accepted + 证据即完成，不等待 open 兄弟");
+    let viewState = await viewOf(root, workflowId);
+    assert.equal(viewState.stage, "A5");
+    assert.equal(viewState.stages.A5.status, "completed");
+
+    // 失败投递任务随后 rejected 关闭：阶段已完成，不得写 stage.blocked（RR10 01:13:22 旧行为的修复）。
+    const failClose = await closeTask({
+      projectRoot: root, operationId: "op-a5-fail-rejected", taskId: "t-a5-fail", outcome: "rejected",
+      actorRoleId: "convener", note: "重复/失败投递任务", now: NOW,
+    });
+    assert.equal(failClose.ok, true, failClose.ok === false ? failClose.code : "");
+    const ledger = await readWorkflowLedger(root);
+    assert.equal(
+      ledger.events.some((event) => event.kind === "stage.blocked" && event.stage === "A5"),
+      false,
+      "阶段完成后 failed 兄弟的 rejected 收口不得写 stage.blocked",
+    );
+    viewState = await viewOf(root, workflowId);
+    assert.notEqual(viewState.blocked?.code, "workflow-corrupt");
+    assert.equal(viewState.stages.A5.status, "completed");
   } finally {
     await cleanup(root);
   }

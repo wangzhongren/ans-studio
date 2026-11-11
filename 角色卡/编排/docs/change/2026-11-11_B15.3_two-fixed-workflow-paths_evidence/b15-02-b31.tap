@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+ok 1 - fixed A3：prepareIntent/finalizeIntent（marker 无 snapshot、stage.completed A3、不触 trunk/doc-freeze）
+  ---
+  duration_ms: 58.8824
+  type: 'test'
+  ...
+# Subtest: fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+ok 2 - fixed A3：docs/intents 入口缺失 ⇒ finalize 失败 pending-recovery（不写 stage.completed A3、不静默通过）
+  ---
+  duration_ms: 40.0824
+  type: 'test'
+  ...
+# Subtest: legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+ok 3 - legacy A3：chief 意图链仍走 trunk prepareIntentConfirmation（marker 带 snapshot=；不写 fixed 账本）
+  ---
+  duration_ms: 23.0875
+  type: 'test'
+  ...
+# Subtest: fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+ok 4 - fixed chief 任命卡：选项=名单（顺序/标签/推荐集由应用重建）、multiple、judgeContext 推荐集=名单顺序
+  ---
+  duration_ms: 53.2358
+  type: 'test'
+  ...
+# Subtest: fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+ok 5 - fixed 任命卡发起人：nominator/convener 被拒（fixedCards 无 appointment）；选项不一致/非多选不发卡
+  ---
+  duration_ms: 30.964
+  type: 'test'
+  ...
+# Subtest: legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+ok 6 - legacy 任命卡发起人逐字不变：chief 被拒（仅 nominator）；nominator 照常发卡
+  ---
+  duration_ms: 24.6185
+  type: 'test'
+  ...
+# Subtest: fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+ok 7 - fixed A10：卡在办标记 stage.requested A10 ⇒ request.resolved 后 stage.completed A10 合法；A12a 先派后 A11 stage-request 成功
+  ---
+  duration_ms: 56.3832
+  type: 'test'
+  ...
+# Subtest: fixed A10 在办标记幂等：同一 workflow 再次呈卡被拒（appointment-card-pending）、不重复写 stage.requested A10、不产生 corrupt
+ok 8 - fixed A10 在办标记幂等：同一 workflow 再次呈卡被拒（appointment-card-pending）、不重复写 stage.requested A10、不产生 corrupt
+  ---
+  duration_ms: 31.1675
+  type: 'test'
+  ...
+# Subtest: fixed A10 未到窗口：A9 未完成时任命卡 fail-closed（stage-transition-invalid，不发卡）
+ok 9 - fixed A10 未到窗口：A9 未完成时任命卡 fail-closed（stage-transition-invalid，不发卡）
+  ---
+  duration_ms: 24.7763
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 660.7989

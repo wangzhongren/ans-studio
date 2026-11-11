@@ -406,7 +406,12 @@ test("fixed proposal：五件 documentRefs + workflowId/stage A6；accept ⇒ st
   const h = harness(root, () => ({ outcome: "answered", value: { selected: ["accept"] } }));
   try {
     await writeFile(root, ".ans/project.json", JSON.stringify({ workflowSchema: "two-fixed-paths/v1", governanceModel: "trio" }));
-    await seedToRequested(root, "A6", ["A1", "A2", "A3", "A4", "A5", "A6"] as WorkflowStage[]);
+    // B15.2：呈卡路径自身写 `stage.requested A6`；真实前置是 A1–A5 全 completed（不预写 A6 requested）。
+    await seedStarted(root);
+    await appendEvents(root, (["A1", "A2", "A3", "A4", "A5"] as WorkflowStage[]).flatMap((stage) => [
+      requested(WF, stage),
+      completed(WF, stage),
+    ]));
     await seedDocs(root);
     await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
     const chief = h.inputs.find((input) => input.roleId === "chief");

@@ -1355,21 +1355,20 @@ export async function closeTask(input: CloseTaskInput): Promise<CloseTaskResult>
         sibling.created?.workflowId === workflowId
         && sibling.created.stage === stage
         && sibling.created.taskKind !== "stage-request");
-      // B13.1（2026-11-11，RR8 失败修复）：阶段完成不得被**已返工/已拒绝的旧 attempt** 永久阻塞
-      // （RR8 A2：原任务按 rework 关闭后，补交/返工任务的 accepted 收口永远无法满足“所有兄弟任务
-      // accepted”，A2 永久停在 requested）。规则：
-      //  ① 阶段内不得还有未收口任务——open 兄弟仍阻塞完成（完成时不得仍有任务可改产物）；
-      //  ② A11/B3（v1.3 §4.2：全部选中实现任务 accepted）要求其余已收口任务均 accepted，
-      //     rework 视为被新 attempt 取代、不再阻塞；rejected 仍阻塞（缺一次 accepted 重派）；
-      //  ③ 其余阶段（A2/A5/A12a/A12b/B1）以本 accepted 任务 + 应用证据完成（v1.3 §4.5：
-      //     创建者 task.closed accepted + 文档/hash 可算 ⇒ stage.completed）。
-      const noOpenSiblings = siblings.every((sibling) =>
-        sibling.taskId === input.taskId || sibling.closed !== undefined);
-      const allRequiredAccepted = !CLOSE_ALL_TASKS_STAGES.has(stage) || siblings.every((sibling) =>
+      // B13.1/B15.1（2026-11-11，RR8/RR10 失败修复）：阶段完成规则——
+      //  ① A2/A5/B1/A12a/A12b（v1.3 §4.5）：创建者 task.closed accepted + 应用证据 ⇒ stage.completed，
+      //     **不等待其它同阶段历史任务**（RR10：A5 accepted 时另一 failed 投递任务仍 open，旧
+      //     “open 兄弟阻塞”规则使 A5 永不完成；B15.1 取消该前置）。
+      //  ② A11/B3（v1.3 §4.2：全部选中实现任务 accepted）：仍要求同阶段无 open 任务且其余已收口
+      //     任务均 accepted；rework 视为被新 attempt 取代、不再阻塞；rejected 仍阻塞（缺 accepted 重派）。
+      //  ③ 阶段已完成/推进后，迟到的旧兄弟任务收口不再写阶段事件（见下方 stageCanBlock）。
+      const requiresAllTasks = CLOSE_ALL_TASKS_STAGES.has(stage);
+      const allTasksReady = !requiresAllTasks || siblings.every((sibling) =>
         sibling.taskId === input.taskId
           ? true
-          : sibling.closed?.outcome === "accepted" || sibling.closed?.outcome === "rework");
-      if (noOpenSiblings && allRequiredAccepted && canCompleteStage(view, stage)) {
+          : sibling.closed !== undefined
+            && (sibling.closed.outcome === "accepted" || sibling.closed.outcome === "rework"));
+      if (allTasksReady && canCompleteStage(view, stage)) {
         const artifacts = input.evidence?.artifacts ?? [];
         const completion: WorkflowEvent = {
           v: 1,

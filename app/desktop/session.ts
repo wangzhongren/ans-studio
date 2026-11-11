@@ -5968,25 +5968,26 @@ export class SessionManager {
       } else if (request.cardKind === "proposal") {
         const refs = await this.collectFixedProposalDocumentRefs(projectRoot, fixedFlowId);
         if (!refs.ok) return rejectFixedCard(refs.code, refs.message);
-        // T3 B5.1（G-B5-3，AC-08/AC-13；v1.3 §4.2 A6）：**呈卡前**按 run-role A10 同构写
-        // `stage.requested A6`（幂等 `stage-request:<wf>:A6:1`，requestDigest=方案依据（proposal）
-        // 字节 sha256）——否则客户 accept 后 `stage.completed A6`（要求 view.stage==="A6"）无法落账，
-        // A7 stage-request 被 AC-09/状态机门拒绝。窗口不符/无活动 workflow ⇒ 不写；写入失败 fail-closed。
-        if (fixedWorkflowId !== undefined) {
-          const proposalRef = refs.refs.find((ref) => ref.kind === "proposal");
-          if (proposalRef?.sha256 === undefined) {
-            return rejectFixedCard("proposal-document-missing", "方案卡绑定缺少 proposal sha256（不发卡）。");
-          }
-          const marker = await markFixedProposalCardRequested({
-            projectRoot,
-            flowId: fixedFlowId,
-            workflowId: fixedWorkflowId,
-            proposalSha256: proposalRef.sha256,
-          });
-          if (marker !== undefined) return rejectFixedCard(marker.code, marker.message);
+        // T3 B5.1/B15.2（G-B5-3，AC-08/AC-13；v1.3 §4.2 A6）：**呈卡前**写 `stage.requested A6`
+        // （幂等 `stage-request:<wf>:A6:<attempt>`，requestDigest=方案依据（proposal）字节 sha256）。
+        // B15.2（RR10）：fail-closed——无活动 workflow、A5 未 completed、A6 在办/已完成均拒绝发卡；
+        // 否则客户 accept 后 `stage.completed A6`（要求 view.stage==="A6"）无法落账，且会重复弹卡。
+        const proposalRef = refs.refs.find((ref) => ref.kind === "proposal");
+        if (proposalRef?.sha256 === undefined) {
+          return rejectFixedCard("proposal-document-missing", "方案卡绑定缺少 proposal sha256（不发卡）。");
         }
+        if (fixedWorkflowId === undefined) {
+          return rejectFixedCard("workflow-not-found", "方案卡不可呈：flow 没有活动 fixed workflow（不发卡）。");
+        }
+        const marker = await markFixedProposalCardRequested({
+          projectRoot,
+          flowId: fixedFlowId,
+          workflowId: fixedWorkflowId,
+          proposalSha256: proposalRef.sha256,
+        });
+        if (marker !== undefined) return rejectFixedCard(marker.code, marker.message);
         fixedCardBinding = {
-          ...(fixedWorkflowId !== undefined ? { workflowId: fixedWorkflowId } : {}),
+          workflowId: fixedWorkflowId,
           stage: "A6",
           documentRefs: refs.refs,
         };
