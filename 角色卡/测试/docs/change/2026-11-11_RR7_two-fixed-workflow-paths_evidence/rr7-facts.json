@@ -1,0 +1,219 @@
+{
+  "at": "2026-11-10T23:19:28.398Z",
+  "candidate": "e965ef31498cc093ccca7c57ab2d2f2744e10245",
+  "msgMark": "2026-11-10T23:15:03.718Z",
+  "stopCause": "gate:unexpected-card-kind (tester driver bug: request.created ledger row lag; dialog not classified)",
+  "workflowStarted": {
+    "v": 1,
+    "at": "2026-11-10T23:15:10.904Z",
+    "schema": "ans-workflow/v1",
+    "kind": "workflow.started",
+    "workflowId": "wf-d04bc3366ec309b591df54e8",
+    "flowId": "snake-game",
+    "path": "A",
+    "idempotencyKey": "workflow-start:snake-game:A:23518583-c128-4d6c-a478-75a0cd6582ea",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "sourceTaskId": "23518583-c128-4d6c-a478-75a0cd6582ea",
+    "legacyStateIgnored": true
+  },
+  "workflowEvents": [
+    {
+      "at": "2026-11-10T23:15:10.904Z",
+      "kind": "workflow.started",
+      "stage": null,
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T23:15:10.904Z",
+      "kind": "stage.requested",
+      "stage": "A1",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T23:15:22.990Z",
+      "kind": "stage.dispatched",
+      "stage": "A1",
+      "taskId": "t-mwbb5vqb-65bfc8cc"
+    },
+    {
+      "at": "2026-11-10T23:15:47.010Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null
+    },
+    {
+      "at": "2026-11-10T23:17:46.939Z",
+      "kind": "stage.requested",
+      "stage": "A2",
+      "taskId": null
+    }
+  ],
+  "taskCreated": [
+    {
+      "at": "2026-11-10T23:15:10.912Z",
+      "taskId": "t-mwbb5mew-2e19892f",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A1",
+      "workflowId": "wf-d04bc3366ec309b591df54e8"
+    },
+    {
+      "at": "2026-11-10T23:15:22.979Z",
+      "taskId": "t-mwbb5vqb-65bfc8cc",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A1",
+      "workflowId": "wf-d04bc3366ec309b591df54e8"
+    },
+    {
+      "at": "2026-11-10T23:15:47.011Z",
+      "taskId": "t-mwbb6e9u-6168e04b",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-d04bc3366ec309b591df54e8"
+    },
+    {
+      "at": "2026-11-10T23:16:03.834Z",
+      "taskId": "t-mwbb6r96-5ffc05bb",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-d04bc3366ec309b591df54e8"
+    },
+    {
+      "at": "2026-11-10T23:17:46.940Z",
+      "taskId": "t-mwbb8yt7-3d5db8e3",
+      "from": "chief",
+      "to": "convener",
+      "taskKind": "stage-request",
+      "stage": "A2",
+      "workflowId": "wf-d04bc3366ec309b591df54e8"
+    },
+    {
+      "at": "2026-11-10T23:17:50.703Z",
+      "taskId": "t-mwbb91pr-9b1bd9a7",
+      "from": "convener",
+      "to": "product",
+      "taskKind": null,
+      "stage": "A2",
+      "workflowId": "wf-d04bc3366ec309b591df54e8"
+    }
+  ],
+  "taskReported": 11,
+  "taskClosed": [
+    {
+      "at": "2026-11-10T23:15:42.736Z",
+      "taskId": "t-mwbb5mew-2e19892f",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-10T23:15:49.623Z",
+      "taskId": "t-mwbb5vqb-65bfc8cc",
+      "outcome": "accepted"
+    },
+    {
+      "at": "2026-11-10T23:17:42.413Z",
+      "taskId": "t-mwbb6e9u-6168e04b",
+      "outcome": "rework"
+    }
+  ],
+  "requestRows": [
+    {
+      "at": "2026-11-10T23:17:51.501Z",
+      "kind": "request.created",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-d04bc3366ec309b591df54e8",
+      "stage": "A3",
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-10T23:17:51.522Z",
+      "kind": "request.notified",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-10T23:17:51.522Z",
+      "kind": "request.presented",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-10T23:17:51.586Z",
+      "kind": "request.notified",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-10T23:17:54.482Z",
+      "kind": "request.orphaned",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-10T23:17:54.525Z",
+      "kind": "request.notified",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": null,
+      "workflowId": null,
+      "stage": null,
+      "by": null,
+      "choice": null
+    },
+    {
+      "at": "2026-11-10T23:17:55.698Z",
+      "kind": "request.resolved",
+      "requestId": "req-c228aac841513a40",
+      "cardKind": "intent-confirm",
+      "workflowId": "wf-d04bc3366ec309b591df54e8",
+      "stage": "A3",
+      "by": "customer",
+      "choice": "unavailable"
+    }
+  ],
+  "intentDoc": {
+    "path": "docs/product/snake-game-intent-v1.md",
+    "bytes": 5544,
+    "sha256": "3760afb1899441c67a8791e55fcc1c0c476e42b2a3f9b2c066baa4a0c5f5f416"
+  },
+  "fixedHandbackUnverifiableCount": 0,
+  "shellGateAuditAbsent": true,
+  "legacyStateWritten": {
+    "trunk": false,
+    "runs": false,
+    "stableWritesFile": false
+  },
+  "fixedLedgers": {
+    "workflows": true,
+    "basis": false,
+    "releases": false
+  },
+  "gitRepoAbsent": true,
+  "note": "B11.1 fix works: 0 fixed-handback-unverifiable blocks; A1 dispatched/accepted; A2 product intent written; A3 intent-confirm card presented (req-c228aac841513a40). Tester driver failed to classify the card because its request.created ledger row was not yet visible within the 4s wait (row at 23:17:51.501 vs dialog detected ~23:17:51.6; app orphaned the request at 23:17:54.482; driver gate at 23:17:55.691; resolved unavailable on halt). This invalidates RR7; not a product failure at A3."
+}
