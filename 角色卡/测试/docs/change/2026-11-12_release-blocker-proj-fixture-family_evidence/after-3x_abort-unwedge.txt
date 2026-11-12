@@ -1,0 +1,39 @@
+===== RUN 1 =====
+✔ P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续 (127.3235ms)
+✔ P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态 (389.4459ms)
+✔ P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断） (45.8689ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1001.7076
+EXIT=0
+===== RUN 2 =====
+✔ P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续 (105.3297ms)
+✔ P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态 (379.0591ms)
+✔ P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断） (45.4782ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 956.0253
+EXIT=0
+===== RUN 3 =====
+✔ P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续 (101.1199ms)
+✔ P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态 (379.4348ms)
+✔ P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断） (43.2956ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 940.9911
+EXIT=0

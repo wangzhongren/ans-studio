@@ -1,0 +1,36 @@
+===== RUN 1 =====
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (277.03ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (254.7229ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 985.5581
+EXIT=0
+===== RUN 2 =====
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (271.8783ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (260.5123ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 969.1533
+EXIT=0
+===== RUN 3 =====
+✔ 首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒ 受理 + drain 自动开启新角色并投递；仍无/重枚举抛错都如实 (267.7006ms)
+✔ 首轮寻址②（Interface 集成）：真实接线——导入时空项目、角色随后落盘，同一轮派发照样寻址（刷同一份共享缓存） (258.913ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 969.0168
+EXIT=0

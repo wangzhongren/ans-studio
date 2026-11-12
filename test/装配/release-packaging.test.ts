@@ -178,13 +178,13 @@ test('release overlay selects the v2.0.0 replay-safe-retry blocker test by exact
   const result = selectOverlay([
     'test/桌面应用/replay-safe-retry.test.ts',
     'test/桌面应用/replay-safe-retry-extra.test.ts',
-    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/message-queue-extra.test.ts',
     'test/桌面应用/decision-service.test.ts',
   ]);
   assert.deepEqual(result.selected, ['test/桌面应用/replay-safe-retry.test.ts']);
   assert.deepEqual(result.excluded, [
     'test/桌面应用/replay-safe-retry-extra.test.ts',
-    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/message-queue-extra.test.ts',
     'test/桌面应用/decision-service.test.ts',
   ]);
   // blockers-2/3/4 既有条目仍在（不重复、不回归）。
@@ -192,6 +192,35 @@ test('release overlay selects the v2.0.0 replay-safe-retry blocker test by exact
     selectOverlay(['test/桌面应用/boundary-refresh.test.ts', 'test/桌面应用/chain-enforcement.test.ts']).selected,
     ['test/桌面应用/boundary-refresh.test.ts', 'test/桌面应用/chain-enforcement.test.ts'],
   );
+});
+
+// v2.0.0 发布阻断修复（第七批，/proj 夹具族批量修复）：测试 8 条按**精确路径**入列；单文件不开目录
+// （同目录相似名/其它测试仍 excluded，未列名 test/ 不随构建树）。断言不放宽。
+// 明确不入列：`handback-delivery.test.ts` 与 `queue-visibility.test.ts` 暴露产品回归（单模型回交合批被
+// 移除、坏形状回交事件 TypeError 防线失效），按「发现产品回归即停下」未改、未入列。
+test('release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only', () => {
+  const selected = [
+    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/abort-unwedge.test.ts',
+    'test/桌面应用/message-queue.test.ts',
+    'test/桌面应用/operator-channel.test.ts',
+    'test/桌面应用/p0-halt-and-images.test.ts',
+    'test/桌面应用/queue-withdraw-lru.test.ts',
+    'test/桌面应用/dispatch-fresh-enum.test.ts',
+    'test/桌面应用/turn-lease.test.ts',
+  ];
+  const extras = [
+    'test/桌面应用/request-timeout-wiring-extra.test.ts',
+    'test/桌面应用/turn-lease-extra.test.ts',
+    'test/桌面应用/handback-delivery.test.ts',
+    'test/桌面应用/queue-visibility.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ];
+  const result = selectOverlay([...selected, ...extras]);
+  assert.deepEqual(result.selected, selected);
+  assert.deepEqual(result.excluded, extras);
+  // 第六批既有条目仍在（不重复、不回归）。
+  assert.deepEqual(selectOverlay(['test/桌面应用/replay-safe-retry.test.ts']).selected, ['test/桌面应用/replay-safe-retry.test.ts']);
 });
 
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，

@@ -1,0 +1,42 @@
+===== RUN 1 =====
+✔ P0 turn lease：失败投递不覆盖在跑回合的 origin；turn.end 后 busy 复位、队列继续（现场形状） (139.2411ms)
+✔ P0 settled 按 turnId 兜底：无 turnId 的终局也清 busy（idle-busy 自愈）；迟到旧 turnId 不误清新回合 (225.6791ms)
+✔ P0 并发 direct send + drain：同一时刻至多一个回合开跑，另一条排队；先后各投一次、队列清空 (250.8836ms)
+✔ P0 delivery.end 完整性：turn 先 settled、send promise 后解析——终态恰一次 (260.0738ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1357.0706
+EXIT=0
+===== RUN 2 =====
+✔ P0 turn lease：失败投递不覆盖在跑回合的 origin；turn.end 后 busy 复位、队列继续（现场形状） (133.5901ms)
+✔ P0 settled 按 turnId 兜底：无 turnId 的终局也清 busy（idle-busy 自愈）；迟到旧 turnId 不误清新回合 (230.4096ms)
+✔ P0 并发 direct send + drain：同一时刻至多一个回合开跑，另一条排队；先后各投一次、队列清空 (254.0508ms)
+✔ P0 delivery.end 完整性：turn 先 settled、send promise 后解析——终态恰一次 (259.8169ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1292.5702
+EXIT=0
+===== RUN 3 =====
+✔ P0 turn lease：失败投递不覆盖在跑回合的 origin；turn.end 后 busy 复位、队列继续（现场形状） (146.3019ms)
+✔ P0 settled 按 turnId 兜底：无 turnId 的终局也清 busy（idle-busy 自愈）；迟到旧 turnId 不误清新回合 (244.4126ms)
+✔ P0 并发 direct send + drain：同一时刻至多一个回合开跑，另一条排队；先后各投一次、队列清空 (244.3127ms)
+✔ P0 delivery.end 完整性：turn 先 settled、send promise 后解析——终态恰一次 (262.3693ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1314.3567
+EXIT=0

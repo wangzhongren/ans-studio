@@ -1,0 +1,46 @@
+== clean checkout (normal .git directory; CI-shape) ==
+===== RUN 1 =====
+✔ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停） (63.5606ms)
+✔ P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实 (6.2346ms)
+✔ P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实） (11.9749ms)
+✔ P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源 (221.8481ms)
+✔ P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图） (259.3041ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1064.5147
+EXIT=0
+===== RUN 2 =====
+✔ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停） (62.8625ms)
+✔ P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实 (6.7044ms)
+✔ P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实） (12.009ms)
+✔ P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源 (214.2233ms)
+✔ P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图） (264.629ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 994.2273
+EXIT=0
+===== RUN 3 =====
+✔ P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时不支持停止」如实，绝不假装已停） (63.2773ms)
+✔ P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实 (6.4361ms)
+✔ P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实） (12.13ms)
+✔ P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源 (228.2346ms)
+✔ P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图） (243.5334ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1016.004
+EXIT=0

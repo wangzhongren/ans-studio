@@ -1,0 +1,43 @@
+MALFORMED_DEBUG={"summaries":["会话事件流异常：Cannot read properties of undefined (reading 'taskId')"],"rejections":[]}
+✖ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (310.9541ms)
+STAR_DEBUG={"sentChief":["[工作结果] 已收到 1 份角色结果。\n任务：#t-star\n来源角色：A\n状态：done\n摘要：实现完成\n证据：\n  - src/a.ts\n  - test/a.test.ts\n\n请核对工作结果并向客户汇总：实际完成了什么、产物路径、实际测试结果、哪些未完成或需返工，以及下一步。\n只有证据支持才确认通过；blocked/failed 或未报告不得当作完成。工作结果不构成任何写权或验收结论。\n\n[收口依据尚不可用] Task is not an open task created by this actual actor"]}
+✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (3143.3737ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3888.1991
+
+✖ failing tests:
+
+test at test\桌面应用\__tmp-probe-malformed.test.ts:409:1
+✖ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (310.9541ms)
+  AssertionError [ERR_ASSERTION]: 坏形状应如实系统行（不崩、不静默）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-malformed.test.ts:431:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp-probe-malformed.test.ts:629:1
+✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (3143.3737ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-malformed.test.ts:30:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-malformed.test.ts:667:11)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

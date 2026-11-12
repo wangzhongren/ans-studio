@@ -1,0 +1,71 @@
+✖ 首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续 (17.0303ms)
+✖ 空闲超时与一般请求失败：各自人话系统行（不串文案、不含 code） (9.1547ms)
+✖ 无 errorCode 的普通失败：不新增系统行（既有语义不变） (7.9578ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 446.2422
+
+✖ failing tests:
+
+test at test\桌面应用\__tmp-probe-rtw.test.ts:219:1
+✖ 首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续 (17.0303ms)
+  AssertionError [ERR_ASSERTION]: 夹具项目根须真实可解析（CI runner 无 /proj）
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:224:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:176:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:220:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp-probe-rtw.test.ts:264:1
+✖ 空闲超时与一般请求失败：各自人话系统行（不串文案、不含 code） (9.1547ms)
+  AssertionError [ERR_ASSERTION]: 夹具项目根须真实可解析（CI runner 无 /proj）
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:269:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:176:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:265:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp-probe-rtw.test.ts:295:1
+✖ 无 errorCode 的普通失败：不新增系统行（既有语义不变） (7.9578ms)
+  AssertionError [ERR_ASSERTION]: 夹具项目根须真实可解析（CI runner 无 /proj）
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:300:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:176:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp-probe-rtw.test.ts:296:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1 ELAPSED=0s

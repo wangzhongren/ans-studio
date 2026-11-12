@@ -81,6 +81,22 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   无界 `await started`），本批只修 replay-safe-retry；同族清单见
 //   角色卡/测试/docs/change/2026-11-12_release-blocker-replay-safe-retry-hang.md。单文件不开目录。
 // · 测试 1 条：test/桌面应用/replay-safe-retry.test.ts
+// · 发布阻断修复（第七批，/proj 夹具族批量修复）：测试 8 条，无产品代码——同族多个桌面测试以字面量
+//   `/proj` 作 projectRoot；v2.0.0 B3-2b 起宿主库存登记按 native realpath 规范化根，不可解析即
+//   fail-closed（`git-host-project-root-unresolvable`）⇒ 会话开不起来、回合未开跑。CI runner 无该路径
+//   （macOS 为根目录下 `/proj`；Windows 为当前盘符根下 `\proj`）；本机遗留 `C:\proj` 掩盖了依赖。
+//   `request-timeout-wiring.test.ts` 在 open 失败后仍有无界 `await *.started` ⇒ CI 45 分钟挂起（Windows
+//   日志 2,151,333ms；macOS 静默）——本批最高优先。修复口径：mkdtemp 真实项目根（listing/open/
+//   lastTurnOf 同一根，结束删除）、`open.ok===true` 断言、全部回执/开跑等待加 10s 上限、finally 统一
+//   清理（放夹具门 → 有界 stop → 逐句柄 dispose → 有界等 send）；失败语义按 v2.0.0 如实钉（图片用例的
+//   客户入口改为幕僚 chief + 显式 target），断言未放宽。`handback-delivery.test.ts` 与
+//   `queue-visibility.test.ts` 暴露产品回归（单模型回交合批被移除、坏形状回交事件 TypeError 防线失效），
+//   按「发现产品回归即停下」未改、未入列；详见
+//   角色卡/测试/docs/change/2026-11-12_release-blocker-proj-fixture-family.md。单文件不开目录。
+// · 测试 8 条：test/桌面应用/request-timeout-wiring.test.ts、test/桌面应用/abort-unwedge.test.ts、
+//   test/桌面应用/message-queue.test.ts、test/桌面应用/operator-channel.test.ts、
+//   test/桌面应用/p0-halt-and-images.test.ts、test/桌面应用/queue-withdraw-lru.test.ts、
+//   test/桌面应用/dispatch-fresh-enum.test.ts、test/桌面应用/turn-lease.test.ts
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -163,7 +179,15 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/桌面应用/chief-workflow.test.ts',
   'test/桌面应用/boundary-refresh.test.ts',
   'test/桌面应用/chain-enforcement.test.ts',
-  'test/桌面应用/replay-safe-retry.test.ts']);
+  'test/桌面应用/replay-safe-retry.test.ts',
+  'test/桌面应用/request-timeout-wiring.test.ts',
+  'test/桌面应用/abort-unwedge.test.ts',
+  'test/桌面应用/message-queue.test.ts',
+  'test/桌面应用/operator-channel.test.ts',
+  'test/桌面应用/p0-halt-and-images.test.ts',
+  'test/桌面应用/queue-withdraw-lru.test.ts',
+  'test/桌面应用/dispatch-fresh-enum.test.ts',
+  'test/桌面应用/turn-lease.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

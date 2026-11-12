@@ -1,0 +1,17 @@
+本地「链接工作树」差异与 CI 形态验证（第七批）
+
+背景：本批工作树是 `git worktree`，根 `.git` 是**文件**（`gitdir: ...`）。v2.0.0 的宿主保护判定
+（`readGitHostProtectionRequirement`）对「`.git` 存在但不是目录」按 fail-closed 处理
+（`git-association-protection-requirement-unknown`），因此少数以**真实仓库根**开 pi 会话的用例
+（operator-channel 的 I-1 接通核查、p0-halt-and-images 的 P0-2 demo 替身）在链接工作树中会在
+`mgr.open` 失败——这与 CI 无关（CI 的 `.release/source` 是普通检出，含 `.git` 目录）。
+
+验证：用 `git clone --shared` 建普通检出（`.git` 为目录），仅应用本批两个测试文件 diff，
+`core.longpaths=true`，node_modules junction 共用，运行：
+  node --test --test-timeout=120000 "test/桌面应用/operator-channel.test.ts"   → 59/59 × 3，EXIT=0
+  node --test --test-timeout=120000 "test/桌面应用/p0-halt-and-images.test.ts" → 5/5 × 3，EXIT=0
+证据：after-3x-clean-checkout_operator-channel.txt / after-3x-clean-checkout_p0-halt-and-images.txt
+
+说明：operator-channel 的首轮 clean-checkout 运行另发现一处**过时源钉**（v2.0.0 B4.1 后
+`input.shellArming` 已先包装为 `projectShellArming` 再展开进 assembleProjectShellGate），已按当前
+实现更新该只读源钉；行为断言（能力面 shellGate 产出 + `capabilities?.shellGate` 优先）未放宽。

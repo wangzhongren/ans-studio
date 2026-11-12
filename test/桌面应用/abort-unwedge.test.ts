@@ -38,7 +38,7 @@ const HANDBACK_A: TaskHandback = {
   at: "2026-10-30T11:00:00.000Z",
 };
 
-function listing(): ProjectListing {
+function listing(projectRoot: string): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -53,7 +53,7 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot, roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 interface RoleStateSnapshot {
@@ -80,51 +80,62 @@ interface Harness {
   roleStates: RoleStateSnapshot[];
   behaviors: Record<string, SendBehavior[]>;
   latest: (roleId: string) => RoleStateSnapshot | undefined;
+  /** 夹具门（失败路径也会在 cleanup 释放，避免脚本回合永挂）。 */
+  gates: { release: () => void }[];
+  /** 无论用例如何退出都执行：放门 → 有界 stop → dispose 句柄 → 有界等 send 结算。 */
+  cleanup: () => Promise<void>;
 }
 
-function makeHarness(): Harness {
-  const l = listing();
+function makeHarness(projectRoot: string): Harness {
+  const l = listing(projectRoot);
   const streams: Record<string, OrchestrationEvent[]> = { su: [], A: [] };
   const sent: Record<string, string[]> = { su: [], A: [] };
   const roleStates: RoleStateSnapshot[] = [];
   const behaviors: Record<string, SendBehavior[]> = { su: [], A: [] };
   const attempts: Record<string, number> = { su: 0, A: 0 };
   const stopped: Record<string, boolean> = { su: false, A: false };
-  const makeHandle = (roleId: string): RoleSessionHandle => ({
-    runtime: "demo",
-    roleId,
-    async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
-      attempts[roleId] += 1;
-      const behavior = behaviors[roleId]?.shift();
-      if (behavior) await behavior({ text, opts, call: attempts[roleId], roleId });
-      else opts?.onTurnStarted?.({ turnId: `turn-${roleId}-${attempts[roleId]}`, roleId, runtime: "demo" });
-      sent[roleId].push(text);
-    },
-    events(): AsyncIterable<OrchestrationEvent> {
-      let i = 0;
-      return {
-        [Symbol.asyncIterator]() {
-          return {
-            async next(): Promise<IteratorResult<OrchestrationEvent>> {
-              for (let tries = 0; tries < 4000; tries += 1) {
-                if (stopped[roleId]) return { value: undefined as unknown as OrchestrationEvent, done: true };
-                const arr = streams[roleId] ?? [];
-                if (i < arr.length) return { value: arr[i++], done: false };
-                await new Promise((r) => setTimeout(r, 5));
-              }
-              return { value: undefined as unknown as OrchestrationEvent, done: true };
-            },
-          };
-        },
-      };
-    },
-    async abort() {
-      return { ok: true, supported: true };
-    },
-    async dispose(): Promise<void> {
-      stopped[roleId] = true;
-    },
-  });
+  const handles: RoleSessionHandle[] = [];
+  const gates: { release: () => void }[] = [];
+  const pendingSends: Promise<unknown>[] = [];
+  const makeHandle = (roleId: string): RoleSessionHandle => {
+    const handle: RoleSessionHandle = {
+      runtime: "demo",
+      roleId,
+      async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
+        attempts[roleId] += 1;
+        const behavior = behaviors[roleId]?.shift();
+        if (behavior) await behavior({ text, opts, call: attempts[roleId], roleId });
+        else opts?.onTurnStarted?.({ turnId: `turn-${roleId}-${attempts[roleId]}`, roleId, runtime: "demo" });
+        sent[roleId].push(text);
+      },
+      events(): AsyncIterable<OrchestrationEvent> {
+        let i = 0;
+        return {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<OrchestrationEvent>> {
+                for (let tries = 0; tries < 4000; tries += 1) {
+                  if (stopped[roleId]) return { value: undefined as unknown as OrchestrationEvent, done: true };
+                  const arr = streams[roleId] ?? [];
+                  if (i < arr.length) return { value: arr[i++], done: false };
+                  await new Promise((r) => setTimeout(r, 5));
+                }
+                return { value: undefined as unknown as OrchestrationEvent, done: true };
+              },
+            };
+          },
+        };
+      },
+      async abort() {
+        return { ok: true, supported: true };
+      },
+      async dispose(): Promise<void> {
+        stopped[roleId] = true;
+      },
+    };
+    handles.push(handle);
+    return handle;
+  };
   const mgr = new SessionManager({
     openRoleSession: async (input) => makeHandle(input.roleId),
     createPiAdapterFactory: () => {
@@ -152,6 +163,21 @@ function makeHarness(): Harness {
     sent,
     roleStates,
     behaviors,
+    gates,
+    cleanup: async () => {
+      for (const gate of gates) gate.release();
+      try { if (mgr.isOpen()) await settledWithin(mgr.stop(null), "abort-unwedge 清理 stop 超时", 5_000); }
+      catch { /* stop 以结果如实报告 dispose 错误；清理不掩盖用例失败 */ }
+      for (const handle of handles) {
+        try { await settledWithin(handle.dispose(), "abort-unwedge 清理 dispose 超时", 2_000); } catch { /* dispose 幂等；失败不再抛 */ }
+      }
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 1000);
+        (timer as { unref?: () => void }).unref?.();
+      });
+      try { await Promise.race([Promise.allSettled(pendingSends), timeout]); } finally { if (timer !== undefined) clearTimeout(timer); }
+    },
     latest: (roleId) => {
       for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
       return undefined;
@@ -167,14 +193,26 @@ function deferred(): { promise: Promise<void>; release: () => void } {
   return { promise, release };
 }
 
-async function withDiagnostics<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+/** 有界等待真实回执：产品回执若永不结算，用例必须在有限时间内失败并进入 finally 清理。 */
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+}
+
+/** 诊断临时目录 + **真实可解析的夹具项目根**（CI runner 没有 `/proj`）：宿主库存登记以 native realpath
+ *  规范化项目根，根不可解析即 fail-closed（`git-host-project-root-unresolvable`）⇒ 会话开不起来、
+ *  轮次永不开始。夹具根用 mkdtemp 真实存在，结束后连同诊断目录一并清理（用例失败也清理）。 */
+async function withDiagnostics<T>(fn: (dir: string, projectRoot: string) => Promise<T>): Promise<T> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ans-abort-unwedge-diag-"));
+  const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "ans-abort-unwedge-project-"));
   configureDiagnostics({ directory: dir });
   try {
-    return await fn(dir);
+    return await fn(dir, projectRoot);
   } finally {
     await disposeDiagnostics();
     await fs.rm(dir, { recursive: true, force: true });
+    await fs.rm(projectRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   }
 }
 
@@ -201,21 +239,25 @@ async function diagnosticEvents(dir: string): Promise<DiagRecord[]> {
 const fieldsOf = (record: DiagRecord): Record<string, unknown> => record;
 
 test("P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队列继续", async () => {
-  await withDiagnostics(async (dir) => {
-    const h = makeHarness();
+  await withDiagnostics(async (dir, projectRoot) => {
+    const h = makeHarness(projectRoot);
     try {
-      await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-      await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+      const openedSu = await h.mgr.open({ projectRoot, roleId: "su", runtime: "demo" });
+      assert.equal(openedSu.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
+      const openedA = await h.mgr.open({ projectRoot, roleId: "A", runtime: "demo" });
+      assert.equal(openedA.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
       await tick(30);
       const gate = deferred();
+      h.gates.push(gate);
       h.behaviors.su.push((ctx) => {
         ctx.opts?.onTurnStarted?.({ turnId: "turn-live", roleId: "su", runtime: "demo" });
         return gate.promise;
       });
-      const pending = h.mgr.send("长回合", undefined, { projectRoot: "/proj", roleId: "su", runtime: "demo" });
+      const pending = h.mgr.send("长回合", undefined, { projectRoot, roleId: "su", runtime: "demo" });
+      void pending.catch(() => { /* 失败由用例或 cleanup 消费，不留未处理拒绝 */ });
       await until(() => h.latest("su")?.busy === true && h.latest("su")?.activeTurnId === "turn-live", "长回合未开跑");
 
-      const result = await h.mgr.abort({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+      const result = await h.mgr.abort({ projectRoot, roleId: "su", runtime: "demo" });
       assert.deepEqual({ ok: result.ok, supported: result.supported }, { ok: true, supported: true }, "abort 真实成功");
       assert.equal(h.latest("su")?.busy, false, "停止后投递层忙态必须复位（不再 1ms ok 零变化）");
       assert.equal(h.latest("su")?.activeTurnId, null, "停止后不得残留当前回合归属");
@@ -228,26 +270,29 @@ test("P0 abort 解楔：在跑回合停止后强制复位 origin/busy 并让队�
 
       // 队列继续：回交在停止后正常投递（不再被 target-busy 楔死）。
       gate.release();
-      await pending;
+      await settledWithin(pending, "长回合回执等待超时");
       const sentBefore = h.sent.su.length;
       h.streams.A.push({ kind: "handback", summary: "回交 su", handback: HANDBACK_A });
       await until(() => h.sent.su.length === sentBefore + 1, "停止后队列未继续投递");
       h.streams.su.push({ kind: "settled", summary: "回交轮完成", turnId: "turn-su-2", roleId: "su", runtime: "demo" });
       await until(() => (h.latest("su")?.queue.length ?? 0) === 0 && h.latest("su")?.busy === false, "队列未排空");
     } finally {
-      await h.mgr.stop(null);
+      await h.cleanup();
     }
   });
 });
 
 test("P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborted)，不重投、不复活忙态", async () => {
-  await withDiagnostics(async (dir) => {
-    const h = makeHarness();
+  await withDiagnostics(async (dir, projectRoot) => {
+    const h = makeHarness(projectRoot);
     try {
-      await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-      await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+      const openedSu = await h.mgr.open({ projectRoot, roleId: "su", runtime: "demo" });
+      assert.equal(openedSu.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
+      const openedA = await h.mgr.open({ projectRoot, roleId: "A", runtime: "demo" });
+      assert.equal(openedA.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
       await tick(30);
       const gate = deferred();
+      h.gates.push(gate);
       h.behaviors.su.push((ctx) => {
         ctx.opts?.onTurnStarted?.({ turnId: "turn-H", roleId: "su", runtime: "demo" });
         return gate.promise;
@@ -255,11 +300,11 @@ test("P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborte
       h.streams.A.push({ kind: "handback", summary: "回交 su", handback: HANDBACK_A });
       await until(() => h.latest("su")?.busy === true && h.latest("su")?.running?.kind === "handback", "回交未认领");
 
-      const result = await h.mgr.abort({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+      const result = await h.mgr.abort({ projectRoot, roleId: "su", runtime: "demo" });
       assert.equal(result.ok, true);
       assert.equal(h.latest("su")?.busy, false);
       assert.equal(h.latest("su")?.queue.length ?? 0, 0, "在途条目不得回到队列（at-most-once）");
-      assert.equal(h.mgr.watchdogSnapshot("/proj")?.activeDeliveries, 0, "activeDeliveries 必须复位");
+      assert.equal(h.mgr.watchdogSnapshot(projectRoot)?.activeDeliveries, 0, "activeDeliveries 必须复位");
       const events = await diagnosticEvents(dir);
       const ends = events.filter((record) => record.event === "delivery.end" && fieldsOf(record).state === "handback");
       assert.equal(ends.length, 1, "被放弃的在途投递恰一条 delivery.end");
@@ -279,24 +324,25 @@ test("P0 abort 解楔：在途投递被放弃时落恰一次 delivery.end(aborte
       await tick(120);
       assert.equal(h.latest("su")?.busy, false, "迟到 settled 不得复活忙态");
     } finally {
-      await h.mgr.stop(null);
+      await h.cleanup();
     }
   });
 });
 
 test("P0 abort 幂等：无忙态/无在途时 no-op（不产生 forced 诊断）", async () => {
-  await withDiagnostics(async (dir) => {
-    const h = makeHarness();
+  await withDiagnostics(async (dir, projectRoot) => {
+    const h = makeHarness(projectRoot);
     try {
-      await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+      const opened = await h.mgr.open({ projectRoot, roleId: "su", runtime: "demo" });
+      assert.equal(opened.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
       await tick(30);
-      const result = await h.mgr.abort({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+      const result = await h.mgr.abort({ projectRoot, roleId: "su", runtime: "demo" });
       assert.deepEqual({ ok: result.ok, supported: result.supported }, { ok: true, supported: true });
       const events = await diagnosticEvents(dir);
       assert.equal(events.filter((record) => record.event === "turn.abort.forced").length, 0, "闲置 abort 不产生 forced 诊断");
       assert.equal(h.latest("su")?.busy, false);
     } finally {
-      await h.mgr.stop(null);
+      await h.cleanup();
     }
   });
 });
