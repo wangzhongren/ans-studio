@@ -1,0 +1,23 @@
+v2.0.0 发布阻断 B3-4 起始复现（HEAD 24f2028，release/v2.0.0-blockers-5 工作树）
+日期：2026-11-12；平台：Windows 11 / Node v24.22.1
+命令：node --test --test-concurrency=1 <file>
+
+== boundary-refresh.test.ts ==
+14 tests / 13 pass / 1 fail / 0 skipped / 0 cancelled
+✖ G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞 (1.6047ms)
+  AssertionError [ERR_ASSERTION]: 两工具同名同形（共用 handler）
+  at test/桌面应用/boundary-refresh.test.ts:498:10
+  （首条失败掩盖了同一测试后续的陈旧文本钉 :517：
+   `return active === undefined || active.kind === "message";`——当前实现已改为
+   `return origin !== undefined && !origin.settled && origin.kind === "message";`）
+
+== chain-enforcement.test.ts ==
+9 tests / 3 pass / 6 fail / 0 skipped / 0 cancelled
+✖ M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理 (51.9843ms)
+✖ M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据 (84.4577ms)
+✖ D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖） (112.4844ms)
+✖ D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略 (129.2058ms)
+✖ M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚 (65.9143ms)
+✖ F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚 (67.5865ms)
+六例共同错误：document-planning-source-unavailable：缺少当前客户输入与真实项目选择，未登记文档任务。
+（断言点 :364 / :437 / :591 / :631 / :680 / :819；与 batch2 分析、B8.2 Windows TAP 同名同因。）

@@ -1,0 +1,17 @@
+✔ M1/M2（v2.0.0 来源门）：裸夹具的文档准备派发 fail-closed——document-planning-source-unavailable、零任务零投递 (95.8054ms)
+✔ M5/M6/M7（v2.0.0 来源门）：交付与运营 worker 派发在裸夹具上 fail-closed（零任务零投递） (93.1597ms)
+✔ D3 卡种收口（2026-10-31，v2.0.0 来源门）：decision/intent-confirm/acceptance 裁决不能替代真实来源——交付/派发 fail-closed (153.4295ms)
+✔ D3 卡种收口（2026-10-31，v2.0.0 来源门）：新格式 appointment 与无戳旧裁决都需真实来源——两夹具均 fail-closed (241.9433ms)
+✔ M9 报告路由（v2.0.0 来源门 + 账本行为钉）：裸夹具交付 fail-closed；幕僚任务报告回幕僚、运营任务无真实子链归属不误投 (533.04ms)
+✔ M11：D3 名单版本/hash 与最新名单不一致 ⇒ appointment-write 被拒（旧 D3 作废） (50.6538ms)
+✔ M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 即可匹配 D3，并按名单版本拒绝旧 D3 (63.135ms)
+✔ F4 报告路由（v2.0.0 来源门 + 账本行为钉）：裸夹具交付 fail-closed；幕僚创建报告回幕僚、运营创建在无真实子链归属时不误投 (527.2018ms)
+✔ R3：evidenceScopeRoots——无 flow verifier、roster 漂移、creator 不匹配、边界兜底与 fail-closed (268.5072ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3979.7928

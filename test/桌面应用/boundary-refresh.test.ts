@@ -495,13 +495,35 @@ test("G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注�
   assert.ok(SESSION_SRC.includes("const skillPaths = (await this.currentSkillPaths(req.projectRoot, req.roleId)) ?? [];"), "开会话定格技能文件集入快照（新建与重建同径）");
   assert.ok(SESSION_SRC.includes("docs/skills/") && SESSION_SRC.includes("main.session.rebuiltSkills"), "陈旧重建行按技能变更如实分支（不误称「边界」；B3：技能分支文案走 main.session.rebuiltSkills key）");
   assert.ok(SESSION_SRC.includes("...(installSkill ? { installSkill } : {})") && SESSION_SRC.includes("...(uninstallSkill ? { uninstallSkill } : {})"), "能力注入（未注入 ⇒ 两工具不注册——最强 fail-closed）");
-  assert.ok(SESSION_SRC.includes('this.applySkillChange("installed"') && SESSION_SRC.includes('this.applySkillChange("uninstalled"'), "两工具同名同形（共用 handler）");
+  // B3-4（2026-11-12）：实现已把安装/卸载动作收敛为 `const action`（install_skill/uninstall_skill 共用
+  // applySkillChange；MCP 两工具共用 applyMcpChange），旧的字面量 `this.applySkillChange("installed"` 不再存在。
+  // 文本钉按当前实现更新：仍钉死「两工具同名同形（共用 handler）」——install/uninstall 由同一 action 判据
+  // 派生、进入同一 handler；放行/拒绝逻辑（stillUnmanaged → refuse）不变，断言未放宽。
+  assert.ok(
+    SESSION_SRC.includes('const action = toolName === "uninstall_skill" || toolName === "uninstall_mcp" ? "uninstalled" : "installed";') &&
+      SESSION_SRC.includes('toolName === "install_skill" || toolName === "uninstall_skill"') &&
+      SESSION_SRC.includes("this.applySkillChange(action,") &&
+      SESSION_SRC.includes('scopedInstallation("install_skill")') && SESSION_SRC.includes('scopedInstallation("uninstall_skill")'),
+    "两工具同名同形（共用 handler）：install/uninstall 由同一 action 判据派生并进入同一 applySkillChange/同一 scopedInstallation 工厂",
+  );
   assert.ok(SESSION_SRC.includes("...(installMcp ? { installMcp } : {})") && SESSION_SRC.includes("...(uninstallMcp ? { uninstallMcp } : {})"), "V2 MCP 两工具同款注入才注册");
-  assert.ok(SESSION_SRC.includes('this.applyMcpChange("installed"') && SESSION_SRC.includes('this.applyMcpChange("uninstalled"'), "V2 MCP 两工具同名同形（与技能版逐字同构）");
+  assert.ok(
+    SESSION_SRC.includes("this.applyMcpChange(action,") &&
+      SESSION_SRC.includes('scopedInstallation("install_mcp")') && SESSION_SRC.includes('scopedInstallation("uninstall_mcp")'),
+    "V2 MCP 两工具同名同形（与技能版逐字同构）：同一 action/同一 scopedInstallation 工厂进入 applyMcpChange",
+  );
   assert.ok(SESSION_SRC.includes("readMcpDeclaration(projectRoot, name)"), "V2 声明校验＝运行时核心读取器（单一解析来源，不复制）");
   assert.ok(SESSION_SRC.includes("private async activateRoleRefresh("), "激活共用件（技能与 MCP 同款三态：rebuilt/next-session/rebuild-failed）");
   assert.ok(SESSION_SRC.includes("private isCustomerInitiatedTurn("), "裁定④ 轮次护栏（当刻读 activeDeliveries/busy——不靠界面推测）");
-  assert.ok(SESSION_SRC.includes('return active === undefined || active.kind === "message";'), "护栏判据：直接 send（客户直聊）与 kind:message（排队客户消息）放行，其余投递轮次拒绝");
+  // B3-4（2026-11-12）：护栏实现已收紧为「真实客户消息轮次」——busy + running origin 未 settled + kind:message；
+  // 直接 send（客户直聊）与排队客户消息同为 kind:message，系统/派发/回交轮次拒绝。旧文本钉
+  // `return active === undefined || active.kind === "message";` 已不存在，按当前实现更新（断言未放宽：
+  // 仍钉住只放行客户消息、拒绝其余轮次）。
+  assert.ok(
+    SESSION_SRC.includes("if (!entry || entry.busy !== true) return false;") &&
+      SESSION_SRC.includes('return origin !== undefined && !origin.settled && origin.kind === "message";'),
+    "护栏判据：只放行真实客户消息轮次（busy + running origin 未 settled + kind:message）；系统/派发/回交轮次拒绝",
+  );
   assert.ok(IFACE_SRC.includes("installSkill?: import(\"../../src/model/runtime.ts\").InstallSkillFn"), "Interface 透传面镜像（编排透传落地前静默忽略——登记）");
   assert.ok(IFACE_SRC.includes("installMcp?: import(\"../../src/model/runtime.ts\").InstallMcpFn"), "Interface 透传面镜像（V2 MCP 同款）");
 });
