@@ -52,7 +52,7 @@ test("① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如�
     assert.deepEqual(await h.mgr.refreshStaleBoundaries(), ["X"], "登记移除本角色 ⇒ 陈旧重建");
     assert.equal(h.disposed("X"), 3);
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -66,7 +66,7 @@ test("② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不�
     assert.equal(h.disposed("Y"), 0);
     assert.equal(h.envelopes.filter((e) => /已安装技能已变更/.test(e.event.summary)).length, 0);
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -84,7 +84,7 @@ test("③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ cur
     // 稳定性复跑（第二次检查仍零重建）。
     assert.deepEqual(await h.mgr.refreshStaleBoundaries(), []);
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -99,7 +99,7 @@ test("④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 �
     assert.deepEqual(await h.mgr.refreshStaleBoundaries(), ["X"], "补齐内容 ⇒ 触发重建（新会话注入收敛）");
     assert.equal(h.disposed("X"), 1);
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -116,6 +116,6 @@ test("⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 �
     assert.equal(h.disposed("Y"), 1);
     assert.equal(h.disposed("X"), 0, "X 不受别角色技能影响");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });

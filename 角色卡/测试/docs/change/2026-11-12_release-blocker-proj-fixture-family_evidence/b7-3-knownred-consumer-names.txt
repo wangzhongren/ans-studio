@@ -1,0 +1,16 @@
+B7-3 夹具消费测试的既有 known-red（2026-11-08 基线已登记；每文件连续 3 次，失败集合逐名不变）
+基线来源：角色卡/测试/docs/change/2026-11-08_session-admission-approval-B0-baseline.md
+
+== test/测试/g4-skill-verify/e-handler.test.ts ==
+baseline:
+护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行
+current (3 runs):
+护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行
+
+== test/测试/g4v2-mcp-verify/f-handler.test.ts ==
+baseline:
+F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行
+F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖
+current (3 runs):
+F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行
+F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖

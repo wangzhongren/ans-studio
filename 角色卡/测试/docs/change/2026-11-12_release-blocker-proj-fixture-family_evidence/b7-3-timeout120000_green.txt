@@ -1,0 +1,53 @@
+node --test --test-timeout=120000 <B7-3 变更的可全绿测试文件>
+日期：2026-11-12；Windows 11 / Node v24.22.1
+
+✔ W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡 (105.4803ms)
+✔ judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正） (74.4368ms)
+✔ 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework (261.1199ms)
+✔ unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用） (0.4135ms)
+✔ 开关关：下载卡直接客户卡（judge 零调用） (96.0032ms)
+✔ single 治理模型：不构造 judge、下载卡直接客户卡 (96.4261ms)
+✔ 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput (2.8678ms)
+✔ 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝） (223.9422ms)
+✔ ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开） (37.5956ms)
+✔ ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件） (9.413ms)
+✔ ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建） (9.1924ms)
+✔ ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致） (10.9838ms)
+✔ ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色 (12.9088ms)
+✔ C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变 (20.2073ms)
+✔ C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly (10.8604ms)
+✔ C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env (0.5569ms)
+✔ C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露 (0.7049ms)
+✔ C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查 (0.1273ms)
+✔ C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止） (1.4549ms)
+✔ C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」 (23.3358ms)
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.9918ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.1182ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.3002ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.0777ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.1151ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.129ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0951ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0822ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.0974ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1424ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0808ms)
+✔ release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only (0.0743ms)
+✔ release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files by exact path only (0.0817ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.1062ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.1172ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0705ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0913ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.1148ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0738ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (535.4097ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1485ms)
+ℹ tests 41
+ℹ suites 0
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1396.0093
+EXIT=0

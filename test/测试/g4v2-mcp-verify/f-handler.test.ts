@@ -77,7 +77,7 @@ test("F1 成功链（rebuilt）：校验→激活重建→冻形回执→[系统
     assert.equal(ev!["state"], "rebuilt");
   } finally {
     await disposeDiagnostics();
-    h.cleanup();
+    await h.cleanup();
     fs.rmSync(diagDir, { recursive: true, force: true });
   }
 });
@@ -123,7 +123,7 @@ test("F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零�
     const uninstallSchema = describeTool("uninstall_mcp").description.split("<roleId>").join("X");
     assert.ok(uninstallSchema.includes("登记仍含角色「X」——先改登记再卸载；未执行。"), "schema（uninstall）逐字含 registration-unchanged 句");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -160,7 +160,7 @@ test("F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-
     const pass2 = (await install({ roleId: "X", name: "ok" })) as { ok: boolean };
     assert.equal(pass2.ok, true, "无 active 条目的客户轮放行");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -209,10 +209,10 @@ test("F4 激活三态：busy ⇒ next-session 不打断；无会话 ⇒ next-ses
       assert.equal(r3.reason, "rebuild-failed");
       assert.ok(r3.message?.includes("会话未重建（未假装已生效"), `重建失败如实：${r3.message}`);
     } finally {
-      h2.cleanup();
+      await h2.cleanup();
     }
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -243,7 +243,7 @@ test("F5 卸载链：先改声明→校验通过→重建→回执二分（效�
     assert.equal(again.ok, false);
     assert.equal(again.reason, "role-not-listed", "卸载后的声明不再含 X（先改声明语义闭环）");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -259,7 +259,7 @@ test("F6 排队客户消息轮：su 忙时再发客户消息处于队列（activ
     assert.equal(r.ok, true, "客户消息轮（忙中队列态）放行");
     assert.equal(r.effective, "rebuilt", "X idle ⇒ 当场重建");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -280,7 +280,7 @@ test("F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统
     assert.equal(ev!["reasonCode"], "not-customer-turn");
   } finally {
     await disposeDiagnostics();
-    h.cleanup();
+    await h.cleanup();
     fs.rmSync(diagDir, { recursive: true, force: true });
   }
 });

@@ -42,7 +42,7 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       assert.deepEqual(snapshotTree(h.root), before, "零副作用（盘快照一致）");
       assert.equal(h.disposed("X"), 0, "零重建");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
   {
@@ -61,7 +61,7 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       assert.equal((r as { reason: string }).reason, "not-customer-turn", "回交轮 ⇒ 护栏拒绝");
       assert.equal(h.disposed("X"), 0);
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
   {
@@ -76,7 +76,7 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       assert.equal(r.ok, false);
       assert.equal((r as { reason: string }).reason, "not-customer-turn", "系统轮 ⇒ 护栏拒绝");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
   {
@@ -94,7 +94,7 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       assert.equal(r.ok, false);
       assert.equal((r as { reason: string }).reason, "not-customer-turn", "dispatch 类投递开的轮 ⇒ 护栏拒绝");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
   {
@@ -107,7 +107,7 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       const r = await h.suInstall()!({ roleId: "X", name: "k1" });
       assert.equal(r.ok, true, "客户直聊轮 ⇒ 放行到成功");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
   {
@@ -124,7 +124,7 @@ test("护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-tu
       const r = await h.suInstall()!({ roleId: "X", name: "k1" });
       assert.equal(r.ok, true, "排队客户消息开的轮 ⇒ 放行（active.kind==='message'）");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
 });
@@ -168,7 +168,7 @@ test("拒绝分支矩阵：role-not-found / not-registered / role-not-listed / r
     // 全程无系统行（envelopes 零新增且 su 无新投递）。
     assert.equal(h.envelopes.filter((e) => /系统·安装/.test(e.event.summary)).length, 0, "拒绝路径不得投系统行");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -228,7 +228,7 @@ test("成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 
     assert.equal(ev!["state"], "rebuilt");
   } finally {
     await disposeDiagnostics();
-    h.cleanup();
+    await h.cleanup();
     fs.rmSync(diagDir, { recursive: true, force: true });
   }
 });
@@ -247,7 +247,7 @@ test("成功路径（next-session 两支）：在跑不打断（无 note）；�
       assert.equal(r.note, undefined, "在跑支不附无会话 note");
       assert.equal(h.disposed("X"), 0, "在跑不打断（零 dispose）");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
   {
@@ -261,7 +261,7 @@ test("成功路径（next-session 两支）：在跑不打断（无 note）；�
       assert.ok(r.note?.includes("该角色当前没有打开的会话"), `note 如实：${r.note}`);
       assert.equal(h.openedCount("X"), 0, "不自动开目标会话（零副作用）");
     } finally {
-      h.cleanup();
+      await h.cleanup();
     }
   }
 });
@@ -282,7 +282,7 @@ test("rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/�
     assert.equal(h.roleStates.some((s) => s.roleId === "su" && s.queue.some((q) => q.summary.startsWith("系统·安装"))), false, "失败路径不投系统行");
     assert.ok(h.envelopes.length >= envBefore, "事件不减少（rebuild.start 等放行性事件可继续）");
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -312,6 +312,6 @@ test("卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:tr
     assert.ok(row?.full.includes("效果已撤，文件保留于 docs/skills/k1/SKILL.md"), `卸载系统行二分陈述：${row?.full}`);
     await flush(60);
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });

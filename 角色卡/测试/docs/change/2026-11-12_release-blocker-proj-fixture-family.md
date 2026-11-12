@@ -176,3 +176,94 @@ node --test --test-concurrency=1 "test/runtime-core/**/*.test.ts"
 node --test --test-concurrency=1 "test/门禁引擎/**/*.test.ts"
 node --test --test-concurrency=1 --test-timeout=120000 "test/编排/**/*.test.ts"
 ```
+
+## 九、B7-3 清理缺口（stop / dispose / 诊断 / 临时目录）
+
+- 角色：ANS「测试」（roleId: 测试）。授权：客户已放行；只在本分支追加提交/推送。
+- 范围：在 B7-1/2 已提交的 8 个桌面测试与 `handback-delivery`/`queue-visibility`（产品回归停止项）之外，
+  逐文件审计 `SessionManager`/诊断 logger/定时器/临时目录的真实使用，补齐**失败路径也必然执行**的有界清理。
+- 结论：10 个代码/测试文件改动（8 条 overlay 测试/夹具 + `release-policy.mjs` + `release-packaging.test.ts`）
+  + 本记录；**未改产品代码、未改任何断言语义、未删用例、未加 skip**。发现并修正 1 个夹具与 B1 冻结契约的
+  偏差（非产品回归，见 §9.2）；未发现新的产品回归。
+
+### 9.1 逐文件清理口径
+
+| 文件 | 清理缺口 | 改法 |
+| --- | --- | --- |
+| `test/桌面应用/download-decision.test.ts` | 7 例各自 mkdtemp 项目根；SessionManager 开会话后从不停；挂起客户卡在失败路径不结算；临时根不删 | harness 追踪句柄；每例 `try/finally` → `cleanupHarness`：`rejectAllPending`（窗关语义）→ 有界 `mgr.stop(null)`（5s）→ 逐句柄 `dispose`（2s）→ `fs.rm(maxRetries:3)`。`unavailableReason` 例无 SessionManager，统一 `rejectAllPending` 收口 |
+| `test/测试/su-shell-approval-verify/c-desktop-injection.test.ts` | 两个用例开会话后从不停；临时根删除沿用夹具同步 `rmSync`（失败静默、无重试） | harness 追踪句柄；`cleanup` 改 async：有界 stop → 逐句柄 dispose → 夹具删除 + `fs.rm(maxRetries:3)`；两例 `await h.cleanup()` |
+| `test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts` | C4 用挂起句柄 + busy 轮次，从不停 SessionManager；临时根删除无重试 | C4 `try/finally`：有界 stop → 逐句柄 dispose → 夹具删除 + `rm(maxRetries:3)`；`mgr` 声明提前以覆盖构造失败路径 |
+| `test/测试/g4-skill-verify/fixture.ts` | `cleanup()` 只 `rmSync` 临时根；SessionManager/句柄从不停 | `cleanup` 改 async：有界 stop → 逐句柄 dispose → `rm(maxRetries:5)`（保留夹具既有「清理不掩盖用例失败」语义） |
+| `test/测试/g4v2-mcp-verify/f-fixture.ts` | 同上 | 同上（`G-4 V2 F 域` 标签） |
+| `test/测试/g4-skill-verify/e-handler.test.ts`、`f-fingerprint.test.ts`、`test/测试/g4v2-mcp-verify/f-handler.test.ts` | 夹具 `cleanup` 改 async 后的消费面 | 12 + 5 + 9 处 `h.cleanup()` 同步 `await`；未改任何断言/用例顺序 |
+
+补充：诊断 logger（`configureDiagnostics`/`disposeDiagnostics`）的使用均在既有消费测试的 `finally` 中成对出现，
+本批未新增诊断配置；B7-3 的 SessionManager 清理只调用既有 `stop`/`dispose` 公开面。
+
+### 9.2 `download-decision` 的夹具偏差（非产品回归）
+
+基线（HEAD `e3b6fc9`）该文件 7/8：`同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）` 确定性失败
+（`timeout waiting for 第二次 deny 升级客户卡`）。逐层核对：
+
+- 桌面 `requestIdFor` 以 `projectRoot/roleId/metadata.turnId/metadata.toolCallId/...` 生成稳定请求 id；
+  v2.0.0 冻结源 `e71501c` 为同 `requestId` 重放增加了结果复用（同一请求返回第一次 promise，属**既有产品语义**）。
+- 该测试的假 B1 运行时 `runtimeDownload(_input, …)` 忽略 `DownloadRunInput`，`approvalRequest()` 固定
+  `toolCallId:"call-1"`/`turnId:"turn-1"`；两次 `requestDownload`（`call-1`/`call-2`）因此得到同一 requestId，
+  第二次未进入 judge 即复用第一次结果。真实 B1（`download-request.ts`）每次生成新 `downloadId` 并透传
+  `input.toolCallId/turnId`。
+- **裁定：夹具偏差，不是产品回归。** 修复只让假运行时按 B1 冻结契约透传 `toolCallId/turnId`；
+  全部断言逐字未改（卡片指纹仍相同，第二次 deny 升级客户的语义被真实测到）。修复后 8/8。
+- 证据：`b7-3-3x_green.txt`（连续 3 次 8/8）。
+
+### 9.3 夹具消费测试既有 known-red（未改、逐名不变）
+
+`e-handler.test.ts` 5/6（护栏矩阵首支 idle 因 v2.0.0 外层 effect-scope 门返回 `effect-scope-unproven`）、
+`g4v2 f-handler.test.ts` 5/7（F3 同因；F7 诊断事件为 `capability.effect.refused`）均为 **2026-11-08 已登记**
+的 known-red（`2026-11-08_session-admission-approval-B0-baseline.md`），与 B7-3 的清理改动无关；本批未改其断言、
+未改产品代码，连续 3 次失败集合逐名不变（`b7-3-knownred-consumer-names.txt`）。
+
+### 9.4 验证（2026-11-12；Windows 11 / Node v24.22.1）
+
+1. 可全绿的 5 个改动测试文件各连续 **3 次**全绿、自然退出（每次 `--test-timeout=120000`）：
+   download-decision 8/8、c-desktop-injection 2/2、c-cross-runtime-settings 5/5、f-fingerprint 5/5、
+   release-packaging 21/21；每次 `EXIT=0`。证据 `b7-3-3x_green.txt`。
+2. 合并 `--test-timeout=120000` 一次跑上述 5 文件：41/41 pass、EXIT=0（`b7-3-timeout120000_green.txt`）。
+3. `npm run typecheck` → `tsc --noEmit`，EXIT=0（`b7-3-typecheck.txt`）。
+4. 三套冻结 known-red 逐名 diff 空：runtime-core 604/567/33/4；门禁 577/571/5/1（资源 LF 归一后还原，
+   `file` 确认 CRLF、status 干净）；编排 1386/1360/24/2（`--test-timeout=120000`）。证据
+   `b7-3-knownred-runtime-core*.txt`、`b7-3-knownred-gates*.txt`、`b7-3-knownred-orchestration*.txt`、
+   `b7-3-knownred-diffs.txt`。
+5. 夹具消费测试 e-handler / g4v2 f-handler 各连续 3 次：pass/fail 计数与失败名逐次一致，均为既有 known-red
+   （`b7-3-3x_knownred-consumers.txt` / `b7-3-knownred-consumer-names.txt`）。
+
+### 9.5 overlay
+
+- `src/common/装配/release-policy.mjs`：`files` 精确加入本批实际改动的 **8 条**测试/夹具路径（每文件 1 条、
+  单文件不开目录、注释理由、断言未放宽）：`download-decision.test.ts`、`c-desktop-injection.test.ts`、
+  `c-cross-runtime-settings.test.ts`、`g4-skill/fixture.ts`、`g4-skill/e-handler.test.ts`、
+  `g4-skill/f-fingerprint.test.ts`、`g4v2/f-fixture.ts`、`g4v2/f-handler.test.ts`。
+- `test/装配/release-packaging.test.ts`：新增 B7-3 精确路径入列钉（8 selected + 6 相似名/同目录样本 excluded +
+  B7-1/2、第六批既有条目仍在）；v1.3.0 一次性条目用例把 `f-fingerprint.test.ts` 移出 excluded 样本并注明
+  其边界由 B7-3 钉另行断言。该文件 21/21 pass。
+- 未入列：本批未改动的 `handback-delivery.test.ts` / `queue-visibility.test.ts`（§五 产品回归停止项）与其他
+  同目录测试；未列名 `test/` 仍 excluded，未列名 `src/`/`app/` 仍 fail-closed。
+
+### 9.6 文件指纹（sha256）
+
+| 文件 | sha256 |
+| --- | --- |
+| `test/桌面应用/download-decision.test.ts` | `593f7b18266f594fc597cb7f5c705c18b7bf7ce7e1e59cd5cdc73b2ced5e2b72` |
+| `test/测试/su-shell-approval-verify/c-desktop-injection.test.ts` | `a4a1f84971357b064c896709725ecbefe5ee97a0efae8b5d1592e88ea036f1e6` |
+| `test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts` | `09191c95d604f5ad352cd9926feac1b9c16d36fc765455d8c2a4c5c3a072a23c` |
+| `test/测试/g4-skill-verify/fixture.ts` | `c7af839b1dfb028d1c14686dd58b3a9ee42b0cc5a268cb6b43ae2f48a4bf1b84` |
+| `test/测试/g4-skill-verify/e-handler.test.ts` | `5ff325e82b61ecfa7ecfbfc12157596e1861e9114cb1dcffafa9cf5c9964b5ca` |
+| `test/测试/g4-skill-verify/f-fingerprint.test.ts` | `a33663424395a66583537a92325b4bcedf9b14f2e066135ffa07f43525c93a0a` |
+| `test/测试/g4v2-mcp-verify/f-fixture.ts` | `f131f8287d661cc19f4ac1eccdb69c9ee5a2b358e7c1c6379479aa8b2f77b2b9` |
+| `test/测试/g4v2-mcp-verify/f-handler.test.ts` | `4e65942adc922c8f8304b4554b59e8bcbbbd3da2cd3628dfb2095494093b0ffa` |
+| `src/common/装配/release-policy.mjs` | `a69f6f4be0d81d85ec377dd40d3d36d3cac47d21253aa1c2e51c6101d9958f2b` |
+| `test/装配/release-packaging.test.ts` | `61183a01f18cf37b3a73e68dc9b6dc09c92ed5c722ea40f600cdab1ecbd711ef` |
+
+### 9.7 声明
+
+未改产品代码；未运行 Electron、未占用 9224、未触发 CI、未打 tag、未 push main；只提交/推送
+`release/v2.0.0-blockers-7`（PR #92）。
