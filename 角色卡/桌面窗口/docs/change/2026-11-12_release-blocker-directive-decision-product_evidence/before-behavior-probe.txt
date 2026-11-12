@@ -1,0 +1,10 @@
+file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/%E8%A7%92%E8%89%B2%E5%8D%A1/%E6%A1%8C%E9%9D%A2%E7%AA%97%E5%8F%A3/docs/change/2026-11-12_release-blocker-directive-decision-product_evidence/behavior-probe.mjs:23
+      () => reject(new Error(`${label}: 等待 ${ms}ms 未结算（指令未消费 / 卡未呈现，符合 before 缺陷表现）`)),
+                   ^
+
+Error: A: 等待 3000ms 未结算（指令未消费 / 卡未呈现，符合 before 缺陷表现）
+    at Timeout._onTimeout (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/%E8%A7%92%E8%89%B2%E5%8D%A1/%E6%A1%8C%E9%9D%A2%E7%AA%97%E5%8F%A3/docs/change/2026-11-12_release-blocker-directive-decision-product_evidence/behavior-probe.mjs:23:20)
+    at listOnTimeout (node:internal/timers:685:17)
+    at process.processTimers (node:internal/timers:618:7)
+
+Node.js v24.22.1

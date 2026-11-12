@@ -1,0 +1,5 @@
+3e1d2782f918d8561d2fcfe479f44b1218a8ba8a994d58ee4090cb244aba4ed3 *src/provider/trunk/impl/git-command.ts
+8ab7d0f55b9145766ab0e0c921ed49e97c8b51148886107d4a0a78f0e63aa193 *test/runtime-core/project-root-canonicalization.test.ts
+cead7c8cc719214365c5f3d7f358fa6d93f751203fc564aed8d7eff1df518cdc *角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider.md
+4ccf15f5ddf9a345044f6951a8926a2a2416036802889a344cc1c434111e2050 *角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider_evidence/03-provider-fix.patch
+82cff29f3f75680f60db29b1afd89b0f5e88566e7079b13db866162a0364b90d *角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider_evidence/04-test-fix.patch

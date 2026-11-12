@@ -1,0 +1,22 @@
+✔ P0 根规范化：符号链接祖先的临时根被接受（同一真实根的不同书写形式） (16.4933ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-alias-tiSWoT\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-alias-tiSWoT\\real-parent\\project","state":"required"}
+✔ P0 根规范化：最终根自身是符号链接仍拒绝（noncanonical-project-root） (2.7284ms)
+✔ P0 根规范化：初始化源记录指向不同真实根仍 fail-closed 拒绝 (10.0367ms)
+✔ P0 根规范化：既有控制路径符号链接拒绝不放宽（.ans/trunk、.git 文件） (6.0761ms)
+✔ P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝 (117.5765ms)
+✔ P0 根规范化：fileGateProtection 指向不同真实根 ⇒ 丢弃事实、写 fail-closed (15.1966ms)
+✔ P0 根规范化：Core 绑定与 host-facts file gate 在符号链接祖先根下工作 (22.9257ms)
+ℹ {"platform":"win32","session":"ac058a5f-f93e-4217-baa6-fb50557c9238","protectionRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-core-eXhGiQ\\real-parent\\project","sessionRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-p0-core-eXhGiQ\\alias-parent\\project"}
+✔ B3-2b 根规范化：host coordinator 按真实根归一符号链接祖先；不同真实根仍隔离 (3.6104ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-alias-vLQ8H9\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-alias-vLQ8H9\\real-parent\\project","leaseId":"d8bcc439-3df5-4dc9-a4cf-28834b8c70c1"}
+✔ B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid (408.1096ms)
+ℹ {"platform":"win32","shortRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ANDFC5~2\\PROJEC~1","canonicalRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-short-D1ZVVi\\project-with-a-very-long-directory-name","leaseId":"59887569-82a9-4ccb-8639-b290124c1b7c"}
+✔ B3-2b 根规范化：不可解析根 fail-closed（不为未知拼写创建可命中的 coordinator） (0.3746ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 850.6037

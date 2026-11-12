@@ -76,6 +76,36 @@ import {
 const NOW = () => new Date("2026-11-03T00:00:00.000Z");
 const tick = (ms = 10) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** 有界轮询等待（v2.0.0 发布阻断 B3-1）：条件未在预算内满足即如实失败，不无限循环。 */
+async function waitUntil(check: () => boolean, timeoutMs = 5000, what = "条件"): Promise<void> {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > timeoutMs) throw new Error(`${what}：有界等待超时（${timeoutMs}ms）`);
+    await tick(10);
+  }
+}
+
+/**
+ * 有界等待（v2.0.0 发布阻断 B3-1）：任何可能被「无人作答的客户卡」吊住的 await 都必须有上限。
+ * 超时即抛错（测试如实失败并指出挂起点），绝不无限挂起；断言未放宽。
+ */
+async function bounded<T>(value: T | Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(value),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${what}：有界等待超时（${ms}ms）——疑似卡片被呈现给客户而无人作答`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 function tempDir(prefix: string): { dir: string; cleanup: () => void } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   return { dir, cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
@@ -357,7 +387,7 @@ test("创建→facts 快照：审批/决策指令分列，target 隔离；shell 
     assert.equal(gateHarness.audit.records[1]!.directive, undefined);
 
     const channelHarness = makeChannel(h.runtime());
-    const outcome = expectAnswered(await channelHarness.channel.customerInput(decisionCard(), context(t.dir)));
+    const outcome = expectAnswered(await bounded(channelHarness.channel.customerInput(decisionCard(), context(t.dir)), 5000, "集成 1：decision 指令代选结算"));
     assert.deepEqual(outcome.value.selected, ["alpha"]);
     assert.equal(outcome.operatorId, `directive:${decision.id}`);
     assert.deepEqual(outcome.directive, { id: decision.id, action: "select-recommended" });
@@ -447,7 +477,7 @@ test("decision 消费者：拒绝指令结算 declined；冲突时绕过默认�
       values: decisionValues({ kind: "reject" }, "session", { flowId: "focus" }),
     });
     const channelHarness = makeChannel(h.runtime());
-    const declined = expectDeclined(await channelHarness.channel.customerInput(decisionCard(), context(t.dir)));
+    const declined = expectDeclined(await bounded(channelHarness.channel.customerInput(decisionCard(), context(t.dir)), 5000, "集成 3：拒绝指令结算"));
     assert.equal(declined.operatorId, `directive:${reject.id}`);
     assert.deepEqual(declined.directive, { id: reject.id, action: "reject" });
     assert.equal(channelHarness.judgeResults.length, 0);
@@ -468,7 +498,7 @@ test("decision 消费者：拒绝指令结算 declined；冲突时绕过默认�
       });
       const conflictChannel = makeChannel(ch.runtime());
       const pending = conflictChannel.channel.customerInput(decisionCard(), context(conflictDir.dir));
-      await tick();
+      await waitUntil(() => conflictChannel.pushed.length === 1, 5000, "集成 3：冲突客户卡呈现");
       assert.equal(conflictChannel.pushed.length, 1, "冲突时呈现客户卡");
       assert.equal(conflictChannel.results.length, 0, "不产生指令生效行");
       assert.equal(conflictChannel.judgeResults.length, 0, "绕过默认推荐 judge");
@@ -482,7 +512,7 @@ test("decision 消费者：拒绝指令结算 declined；冲突时绕过默认�
         conflictChannel.channel.respond({ id: pushed.id, decision: { kind: "choice", selected: ["beta"] } }).ok,
         true,
       );
-      const answered = expectAnswered(await pending);
+      const answered = expectAnswered(await bounded(pending, 5000, "集成 3：冲突后客户手选结算"));
       assert.deepEqual(answered.value.selected, ["beta"]);
     } finally {
       conflictDir.cleanup();
@@ -534,7 +564,7 @@ test("session 重启：新运行 sessionId 下 session 指令 app-restart 失效
 
 // —————————————————————— 5. 坏账本 fail-safe ——————————————————————
 
-test("坏账本：approval/decision facts 为空且 ledgerErrors>0；shell 闸回落既有链、decision 卡走默认推荐", async () => {
+test("坏账本：approval/decision facts 为空且 ledgerErrors>0；shell 闸回落既有链、decision 卡按无指令交客户（v2.0.0 无默认推荐代选）", async () => {
   const t = tempDir("ans-d1-bad-ledger-");
   try {
     const ledger = path.join(t.dir, ...CUSTOMER_DIRECTIVES_REL.split("/"));
@@ -557,11 +587,20 @@ test("坏账本：approval/decision facts 为空且 ledgerErrors>0；shell 闸�
     assert.equal(gateHarness.operatorCalls(), 1);
     assert.equal(gateHarness.audit.records[0]!.directive, undefined);
 
+    // v2.0.0（`e71501c`）起 decision 卡没有「默认推荐 judge」代选（`tryAutoSelectDecision` 已删除）；
+    // 坏账本按无指令回落幕僚分支/客户卡。本夹具未开委托 ⇒ 原卡呈现客户本人，由客户 responder 结算。
     const channelHarness = makeChannel(h.runtime());
-    const outcome = expectAnswered(await channelHarness.channel.customerInput(decisionCard(), context(t.dir)));
-    assert.equal(outcome.operatorId, "judge:demo", "坏账本不阻断默认推荐路径");
-    assert.equal(channelHarness.judgeResults.length, 1);
-    assert.equal(channelHarness.results.length, 0);
+    const pending = channelHarness.channel.customerInput(decisionCard(), context(t.dir));
+    await waitUntil(() => channelHarness.pushed.length === 1, 5000, "集成 5：坏账本客户卡呈现");
+    assert.equal(channelHarness.results.length, 0, "坏账本不产生指令生效行");
+    assert.equal(channelHarness.judgeResults.length, 0, "decision 卡不进入 judge（v2.0.0 无默认推荐代选）");
+    assert.equal(
+      channelHarness.channel.respond({ id: channelHarness.pushed[0]!.id, decision: { kind: "choice", selected: ["alpha"] } }).ok,
+      true,
+    );
+    const outcome = expectAnswered(await bounded(pending, 5000, "集成 5：坏账本客户手选结算"));
+    assert.equal(outcome.operatorId, "tester", "无指令生效：客户本人结算（不是 directive:/judge:）");
+    assert.equal(outcome.directive, undefined, "坏账本按无指令，不应用任何指令");
   } finally {
     t.cleanup();
   }
@@ -579,7 +618,7 @@ test("Q9 归属：decision 消费者产出 directive:<id>；task-state 与 run m
       values: decisionValues({ kind: "select-recommended" }, "once"),
     });
     const channelHarness = makeChannel(h.runtime());
-    const outcome = expectAnswered(await channelHarness.channel.customerInput(decisionCard(), context(t.dir)));
+    const outcome = expectAnswered(await bounded(channelHarness.channel.customerInput(decisionCard(), context(t.dir)), 5000, "集成 6：decision 指令代选结算"));
     assert.equal(outcome.operatorId, `directive:${decision.id}`);
     assert.equal(directiveIdFromOperatorId(outcome.operatorId), decision.id);
     assert.equal(directiveIdFromOperatorId("judge:demo"), undefined);

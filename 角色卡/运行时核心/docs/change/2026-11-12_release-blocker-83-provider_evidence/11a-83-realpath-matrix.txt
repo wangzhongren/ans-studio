@@ -1,0 +1,15 @@
+{
+  "platform": "win32",
+  "node": "v24.22.1",
+  "long": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-matrix-YqfOF2",
+  "short": "C:\\Users\\51054\\AppData\\Local\\Temp\\AN6AF4~1",
+  "sameRealRoot": true,
+  "realpathSync_js_short": "C:\\Users\\51054\\AppData\\Local\\Temp\\AN6AF4~1",
+  "realpathSync_native_short": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-matrix-YqfOF2",
+  "oldKey_short": "c:\\users\\51054\\appdata\\local\\temp\\an6af4~1",
+  "oldKey_long": "c:\\users\\51054\\appdata\\local\\temp\\ans-b3-2b-matrix-yqfof2",
+  "oldKey_equal": false,
+  "newKey_short": "c:\\users\\51054\\appdata\\local\\temp\\ans-b3-2b-matrix-yqfof2",
+  "newKey_long": "c:\\users\\51054\\appdata\\local\\temp\\ans-b3-2b-matrix-yqfof2",
+  "newKey_equal": true
+}

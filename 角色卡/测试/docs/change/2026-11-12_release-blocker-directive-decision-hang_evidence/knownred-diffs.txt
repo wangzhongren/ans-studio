@@ -1,0 +1,36 @@
+v2.0.0 发布阻断 B3-1/B3-3 最终工作树（release/v2.0.0-blockers-3，已 merge origin/main 1ac7b5c）
+三套冻结 known-red 对照
+日期：2026-11-12；命令：node --test --test-concurrency=1 <glob>（Windows 11 / Node v24.22.1 / npm 11.19.1）
+
+== runtime-core: 602 tests / 565 pass / 33 fail / 4 skipped ==
+baseline: 33（取自 角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider_evidence/14b-knownred-runtime-core.tap，
+          该文件与 WJ1 冻结基线逐名 diff 为空）
+current: 33
+new-red: []
+missing-red: []
+diff: 空
+证据: knownred-runtime-core.txt
+
+== gates: 577 tests / 571 pass / 5 fail / 1 skipped ==
+baseline: 5（角色卡/运行时核心/docs/change/2026-11-10_B2_two-fixed-workflow-paths-evidence/07-gates-failure-names.txt，CRLF 文件按 LF 比较）
+current: 5
+new-red: []
+missing-red: []
+diff: 空
+门禁资源 LF 归一：运行前以 `git cat-file blob HEAD:<path>` 临时写回
+src/common/门禁引擎/workflows/chief/*.md（工作树检出为 CRLF，legacy 字节 SHA-256 钉为 LF 9bef5626…），
+运行后 `git checkout -- src/common/门禁引擎/workflows/chief` 还原；还原后 `file` 确认为 CRLF、git status 干净。
+未做归一首次运行会多出 9 条 legacy 字节 SHA（actual 10bdb1fe… vs expected 9bef5626…），属检出换行差异，非产品回归。
+证据: knownred-gates.txt
+
+== orchestration: 1386 tests / 1360 pass / 24 fail / 2 skipped ==
+baseline: 24（角色卡/编排/docs/change/2026-11-11_B17_two-fixed-workflow-paths_evidence/b17-05-known-red-failnames.txt，CRLF 文件按 LF 比较）
+current: 24
+new-red: []
+missing-red: []
+diff: 空
+说明：merge origin/main（1ac7b5c）带入 blockers-4 的新增回归用例后，总数 1385→1386（新增用例通过）；
+失败名集合与 24 名冻结基线逐名一致。
+证据: knownred-orchestration.txt
+
+结论：三套冻结 known-red 逐名 diff 全部为空；新增确定性失败 0、新 skip 0。

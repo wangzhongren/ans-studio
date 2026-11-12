@@ -1,0 +1,5 @@
+A PASS  指令命中：answered / directive:<id> / 不呈现客户 / 无 judge / once 已消费
+B PASS  未命中指令：仍走幕僚分支（operatorId=chief / 不呈现客户）
+C PASS  未命中指令：仍回落客户卡（客户本人作答）
+D PASS  主权卡排除语义不变：指令不消费、仍呈现客户
+B3-1 PROBE PASS (4/4 cases)

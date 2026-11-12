@@ -1,0 +1,20 @@
+✖ B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid (365.0863ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 609.3419
+
+✖ failing tests:
+
+test at test\runtime-core\project-root-canonicalization.test.ts:245:1
+✖ B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid (365.0863ms)
+  Error: git-action-audit-unavailable:authorization-lease-invalid
+      at gitActionAuditError (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/src/provider/trunk/impl/git-command.ts:195:49)
+      at appendGitActionAuthorization (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/src/provider/trunk/impl/git-command.ts:289:32)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/runtime-core/project-root-canonicalization.test.ts:270:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

@@ -1,0 +1,131 @@
+✔ P1-D：Claude/Pi 无 native 证据但应用面 verified 通过；Codex 受控 shell 走受限路径（P4/P6/P7 的跨层判定） (1.3826ms)
+✔ P1-D：nativeInstanceId 字面绑定——组合值传入派发父门后逐字比对（P1-A Amendment-1/N27） (0.2386ms)
+✔ P1-D：双路径互斥——observed + verified 拒绝；组合规则在严格 observed 时不产证据（N20/F15） (0.1419ms)
+✔ P1-D：应用中介证据的负例经真实组合规则缺席，派发父门拒绝（N11/N12/N22/N23/N26） (0.2532ms)
+✖ P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10） (30.7685ms)
+✖ P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧） (7.6111ms)
+✖ P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17） (30075.715ms)
+✖ P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19） (48.9803ms)
+✖ P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5） (29.0284ms)
+✔ P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段 (2.3992ms)
+✔ parseRoleRunArgs 解析角色与任务（带 role/run 前导词） (0.8832ms)
+✔ parseRoleRunArgs 支持 --task= 形式且可省略前导词 (0.0839ms)
+✔ parseRoleRunArgs 解析 --runtime（两种写法），非法值记为用法错误 (0.1553ms)
+✔ parseRoleRunArgs 缺角色与缺 --task 记为用法错误（不再回退演示值） (0.0663ms)
+✔ parseRoleRunArgs 未知参数与多余裸词记为用法错误 (0.0727ms)
+✔ parseRoleRunArgs 选项缺值记为用法错误 (0.0565ms)
+✔ parseTaskId 取 --task，缺省回退 (0.0693ms)
+✔ requireProjectConfig 有注入值即原样返回 (0.0992ms)
+✔ requireProjectConfig 缺注入抛清晰错误（不回退演示副本） (0.2572ms)
+✔ requireTaskScope 缺注入抛清晰错误（不回退演示副本） (0.1195ms)
+✔ 夹具（模拟装配演示配置）六个角色且边界路径用 .yaml (0.1682ms)
+✔ 夹具任务写集是编排边界的子集 (0.0536ms)
+✔ formatEvent 拒绝事件按根分组列出允许路径 (0.1321ms)
+✔ formatEvent 无 detail 时只输出一行 (0.0362ms)
+✔ 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind） (23.9546ms)
+✔ unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留） (11.434ms)
+✔ 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId (12.29ms)
+✔ cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒） (22.3164ms)
+✔ cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达） (17.1531ms)
+✔ fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入 (13.7867ms)
+✔ fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入 (5.336ms)
+✔ fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge (5.5734ms)
+✔ 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝） (0.8947ms)
+✔ fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入 (6.4206ms)
+✔ fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run） (20.5745ms)
+✔ fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达 (11.148ms)
+✔ legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席 (11.7704ms)
+✔ governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图 (13.4046ms)
+✔ P0 残余：托管会话证据按同一真实根命中（符号链接祖先别名 vs 规范根） (24.5451ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-temp-IoDbVZ\\ans-orch-root-alias-3jhoed\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-temp-IoDbVZ\\ans-orch-root-alias-3jhoed\\real-parent\\project","evidenceRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-temp-IoDbVZ\\ans-orch-root-alias-3jhoed\\real-parent\\project"}
+✔ P0 残余：不同真实根/未知会话不命中托管证据（fail-closed，不放宽跨根） (12.4767ms)
+✔ P0 残余：最终根自身是符号链接不命中；不可解析路径不命中（沿用 P0 fail-closed） (12.0378ms)
+✔ fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门 (49.8415ms)
+✔ 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变） (18.6669ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 38
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 30606.6291
+
+✖ failing tests:
+
+test at test\测试\runtime-dispatch-gate-integration.test.ts:244:1
+✖ P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10） (30.7685ms)
+  AssertionError [ERR_ASSERTION]: 真实 openRoleSession 注册的 managed 证据必须可读
+      at openFakeManaged (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:240:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:247:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\runtime-dispatch-gate-integration.test.ts:262:1
+✖ P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧） (7.6111ms)
+  AssertionError [ERR_ASSERTION]: 真实 openRoleSession 注册的 managed 证据必须可读
+      at openFakeManaged (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:240:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:265:34)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\runtime-dispatch-gate-integration.test.ts:296:1
+✖ P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17） (30075.715ms)
+  AssertionError [ERR_ASSERTION]: 第一 validParent 必须已通过且 Service 写出初始化来源（否则无法证明是第二次复检拒绝）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:313:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\runtime-dispatch-gate-integration.test.ts:325:1
+✖ P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19） (48.9803ms)
+  AssertionError [ERR_ASSERTION]: managed 证据必须记录本轮 turnInput
+  + actual - expected
+  
+  + undefined
+  - 'c3276eb4-e98f-4681-b947-ac86b6a85eb7'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:337:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'c3276eb4-e98f-4681-b947-ac86b6a85eb7',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\runtime-dispatch-gate-integration.test.ts:350:1
+✖ P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5） (29.0284ms)
+  AssertionError [ERR_ASSERTION]: 门必须放行（拒绝来自 Service 业务校验，而不是父门）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-3/test/%E6%B5%8B%E8%AF%95/runtime-dispatch-gate-integration.test.ts:361:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Resume is not bound to the actual current Chief dispatch input',
+    expected: /Resume is not bound/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
