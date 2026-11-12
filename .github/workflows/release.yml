@@ -5,7 +5,7 @@ on:
       source_ref:
         description: Frozen application source tag
         required: true
-        default: v1.9.2
+        default: v2.0.0
       publish:
         description: Publish draft after all native gates pass
         type: boolean
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: release-v1.9.2
+  group: release-v2.0.0
   cancel-in-progress: false
 jobs:
   build:
@@ -127,10 +127,10 @@ jobs:
           cd release-assets
           test "$(find . -name '*.zip' | wc -l)" -eq 3
           for sums in SHA256SUMS-*.txt; do sha256sum -c "$sums"; done
-          if gh release view v1.9.2 --json isDraft --jq '.isDraft' > draft-state.txt; then
+          if gh release view v2.0.0 --json isDraft --jq '.isDraft' > draft-state.txt; then
             test "$(cat draft-state.txt)" = true
           else
-            gh release create v1.9.2 --verify-tag --draft --title 'ANS Studio 1.9.2' --notes '基于固定 v1.9.2 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本版新增：输入区按钮精简——移除发送按钮（Enter 发送、Shift+Enter 换行保留），停止本轮改为纯图标按钮（可访问名称不变）；幕僚回复去折叠——settled 与会话回放均原文直显，任务请求折叠保留。其余能力与 v1.9.1 相同（含交付行默认内联报告正文、自动决策「无法核对」升级客户、contract_check 只读 schema 查询与逐字段错误诊断、客户授权平面、角色资料抽屉布局修复、全局任务状态与幕僚版本决策权、验收报告卡与派发护栏、run-change 契约变更通道、D3 记账修复与 v1.8.1 全部能力）。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
+            gh release create v2.0.0 --verify-tag --draft --title 'ANS Studio 2.0.0' --notes '基于固定 v2.0.0 源码及 manifest 列明的打包适配 overlay。macOS arm64、macOS x64、Windows x64 各由原生 runner 构建并实际启动验证。本版新增：两条固定工作流路径——新增（产品意图 → 幕僚三张客户确认卡 → 策划方案与人员名单 → 人事建卡 → 运营团队计划与基线准备 → 实现 → 独立验收 → 交付合并）与修改（幕僚判定 → 专业角色只读影响面分析 → 运营派实现 → 交付合并）；运营成为生产线唯一派发者，幕僚负责产线调度、独立验收派发与验收强度调节；Git 回归普通用法——默认路径不再使用 trunk ref、bootstrap、冻结闭包、候选 ref、run pin、stable-write 许可，治理状态走应用账本与应用计算的 SHA-256；合并 main 仍为客户本人高风险确认卡（judge 不可代批）。另含自 v1.9.2 以来的全部修复：B29 团队计划回执形状、B30 只读 Git 与应用自写身份兼容、B31 轻量验收决策路径、B32 提交引号与 argv 形状错误码、B34 修改路径 B2 死结修复；以及 judge 代批、文档格式规范、提案卡绑定、团队计划 run 绑定、bootstrap 闭包等既有能力。真机验证：贪吃蛇空项目全链 A1–A13 与真实浏览器可玩性验证、独立验收 B2 整体通过（AC 30/30、T 20/20、RR 6/6、EV 8/8）；武侠肉鸽（Brotato 式）Path A 全链产出并经修改路径修复，九项可玩性全过。未签名、未公证：macOS Gatekeeper 或 Windows SmartScreen 可能提示，请先核对 SHA256。最低 macOS 13；Windows 10/11 x64。Windows 暂不支持内置受限来源文档阅读；保留完整摘要与执行记录，来源文件可由系统编辑器查看。发布包不包含任何凭据，首次使用请在设置中填写。详细来源与测试见各平台 manifest。'
           fi
-          gh release upload v1.9.2 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
-          if test "$RELEASE_PUBLISH" = true; then gh release edit v1.9.2 --draft=false; fi
+          gh release upload v2.0.0 ./*.zip ./manifest-*.json ./SHA256SUMS-*.txt ./release-provenance.json ./overlay.patch
+          if test "$RELEASE_PUBLISH" = true; then gh release edit v2.0.0 --draft=false; fi

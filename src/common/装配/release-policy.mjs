@@ -1,10 +1,13 @@
-export const SOURCE_REF = 'v1.9.2';
-export const SOURCE_SHA = '1eba7118b46cc9a279c42351a8511e3c9fcc12b7';
-// v1.9.2 overlay：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为纯图标；
-// 幕僚回复去折叠——settled 与会话回放原文直显）；白名单**重置为基础集**（files＝package.json、
+export const SOURCE_REF = 'v2.0.0';
+export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
+// v2.0.0 overlay：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
+// B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化（默认路径零 trunk/bootstrap/
+// stable-write，治理走应用账本）、B29–B34 修复）；白名单**重置为基础集**（files＝package.json、
 // package-lock.json、.github/workflows/release.yml；dirs＝src/common/装配/、test/装配/），
-// **无产品/测试 overlay 条目**（v1.9.1 阻断修复的 i18n allowlist 条目已随冻结源吸收，见下）。
+// **无产品/测试 overlay 条目**（v1.9.2 及更早条目已随冻结源吸收，见下）。
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
+// 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
+// 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
 // 历史（v1.9.1 overlay）：冻结源 tag v1.9.1 已含全部产品/测试代码（交付行默认内联报告正文；自动决策
 // 「无法核对」原卡转客户确认与同指纹拒绝去重）；当时白名单为基础集 + 1 条发布阻断修复条目（见下）。
 // 历史（v1.9.1 发布阻断修复）：tag v1.9.1 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、
