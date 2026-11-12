@@ -1,0 +1,14 @@
+✔ 创建→facts 快照：审批/决策指令分列，target 隔离；shell 闸只消费审批、decision 卡只消费决策 (38.7791ms)
+✔ shell 闸：deny 指令先于 c=allow；allow 在既有审批链之前；撤销后回落 c=allow (41.28ms)
+✔ decision 消费者：拒绝指令结算 declined；冲突时绕过默认推荐、呈现客户卡且不消费 (59.4971ms)
+✔ session 重启：新运行 sessionId 下 session 指令 app-restart 失效、未用 once 指令 unused-once 失效 (36.3039ms)
+✔ 坏账本：approval/decision facts 为空且 ledgerErrors>0；shell 闸回落既有链、decision 卡按无指令交客户（v2.0.0 无默认推荐代选） (25.2714ms)
+✔ Q9 归属：decision 消费者产出 directive:<id>；task-state 与 run manifest 接受 directive + directiveId (50.5092ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 597.7361

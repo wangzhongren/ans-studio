@@ -1,0 +1,24 @@
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.8569ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.0847ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2537ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.0567ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.0664ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.0819ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker file by exact path only (0.08ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0797ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.0712ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.1104ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0775ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0654ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.0668ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0419ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (363.1883ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1304ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 453.5099

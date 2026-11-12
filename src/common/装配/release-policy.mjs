@@ -28,6 +28,16 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   （chief-workflow W20×2、W21×2、W48×4 残余 8 名）。修复：证据归属按两侧 realpath 相等判定，只放行
 //   **同一真实根的不同书写形式**；不同真实根、任一侧不可解析、最终根自身为符号链接仍 fail-closed；
 //   既有断言/门禁未放宽。单文件不开目录。
+// · 发布阻断修复（第四批，B3-1/B3-3）：生产 1 条 + 测试 3 条——`e71501c` 在 `presentEntryNow()` 顶部
+//   插入幕僚分支（`isChiefBusinessCard`），但把 C1 `@决策` 指令消费者留在其后 ⇒ 非主权 decision 卡的
+//   指令成为死代码（客户授权：「替我审批等同于我自己审批」）。产品恢复指令消费者最优先；测试侧
+//   directive-decision（全部 `customerInput` 等待有界、坏账本按 v2.0.0 无默认推荐语义以客户 responder
+//   结算）、authorization-plane 集成回归（同口径有界/过时期望）、chief-workflow 清理 `fs.rm` 有界重试
+//   （ENOTEMPTY 竞态；主断言不动，W1b 旧 flow 预设语义随 B3-1 调整）。均按精确路径、单文件不开目录、
+//   断言未放宽。
+// · 生产 1 条：app/desktop/customer-input.ts
+// · 测试 3 条：test/桌面应用/directive-decision.test.ts、
+//   test/测试/customer-authorization-plane-integration.test.ts、test/桌面应用/chief-workflow.test.ts
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -100,7 +110,11 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'src/service/runtime/session.ts',
   'test/runtime-core/project-root-canonicalization.test.ts',
   'test/runtime-core/write-gate-context.test.ts',
-  'src/pipeline/orchestration/run-role.ts']);
+  'src/pipeline/orchestration/run-role.ts',
+  'app/desktop/customer-input.ts',
+  'test/桌面应用/directive-decision.test.ts',
+  'test/测试/customer-authorization-plane-integration.test.ts',
+  'test/桌面应用/chief-workflow.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

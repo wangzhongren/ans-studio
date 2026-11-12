@@ -31,8 +31,8 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v2.0.0：白名单为基础集 + 1 条发布阻断修复条目（test/桌面应用/optional-acceptance.test.ts，精确路径；
-// 冻结源 tag v2.0.0 已含全部产品/测试代码）。
+// v2.0.0：白名单为基础集 + 发布阻断修复条目（各批次用例逐项钉精确路径；冻结源 tag v2.0.0 已含全部
+// 产品/测试代码）。
 // v1.9.2 曾重置为基础集；v1.9.1 曾为基础集 + 1 条阻断修复条目（已随本冻结源吸收）；v1.9.0/v1.5.0 曾同样
 // 重置；v1.3.0 按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
 // test/桌面应用/session-rebuild-race.test.ts）均已随冻结源吸收、整批移除，回到 fail-closed/excluded。
@@ -92,6 +92,38 @@ test('release overlay selects the v2.0.0 orchestration root-canonicalization blo
     'test/编排/run-role-fixed-b2.test.ts']);
   assert.throws(() => selectOverlay(['src/pipeline/orchestration/trunk-runtime.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/pipeline/orchestration/run-role-extra.ts']), /Unreviewed production overlay/);
+});
+
+// v2.0.0 发布阻断修复（第四批，B3-1/B3-3）：生产 1 条（app/desktop/customer-input.ts——C1 `@决策`
+// 指令优先恢复）+ 测试 3 条（directive-decision / customer-authorization-plane-integration /
+// chief-workflow——有界等待、过时期望更新与清理竞态，断言未放宽）按**精确路径**入列；单文件不开目录
+// （同目录其它测试仍 excluded，未列名 app//src/ 仍 fail-closed）。
+test('release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only', () => {
+  const result = selectOverlay([
+    'app/desktop/customer-input.ts',
+    'test/桌面应用/directive-decision.test.ts',
+    'test/测试/customer-authorization-plane-integration.test.ts',
+    'test/桌面应用/chief-workflow.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+    'test/测试/t1-pipeline-integration.test.ts',
+  ]);
+  assert.deepEqual(result.selected, [
+    'app/desktop/customer-input.ts',
+    'test/桌面应用/directive-decision.test.ts',
+    'test/测试/customer-authorization-plane-integration.test.ts',
+    'test/桌面应用/chief-workflow.test.ts',
+  ]);
+  assert.deepEqual(result.excluded, [
+    'test/桌面应用/decision-service.test.ts',
+    'test/测试/t1-pipeline-integration.test.ts',
+  ]);
+  assert.throws(() => selectOverlay(['app/desktop/customer-input-extra.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
+  // blockers-2 既有条目仍在（不重复、不回归）。
+  assert.deepEqual(
+    selectOverlay(['src/provider/trunk/impl/git-command.ts', 'test/runtime-core/project-root-canonicalization.test.ts']).selected,
+    ['src/provider/trunk/impl/git-command.ts', 'test/runtime-core/project-root-canonicalization.test.ts'],
+  );
 });
 
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
@@ -278,5 +310,7 @@ test('release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded
   assert.deepEqual(result.selected, []);
   assert.deepEqual(result.excluded, ['test/项目管理/shared/i18n-guard-allowlist.ts',
     'test/项目管理/shared/i18n.test.ts']);
-  assert.throws(() => selectOverlay(['app/desktop/customer-input.ts']), /Unreviewed production overlay/);
+  // app/desktop/customer-input.ts 已于 B3-1 发布阻断修复按精确路径入列（见第四批用例）；
+  // 未列名 app/ 仍 fail-closed。
+  assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
 });

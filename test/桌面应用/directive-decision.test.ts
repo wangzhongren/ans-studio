@@ -2,6 +2,13 @@
 // 客户授权平面 C1（B-4）：decision 指令消费者——确定性代选/拒绝、冲突/不匹配绕过默认推荐、
 // `once` durable 消费与可见行顺序、坏账本按无指令、指令归属/Q9 三值。
 // 使用真实 B1 Pipeline（临时目录账本）+ 桌面客户通道；不启动 Electron、不触网、不写真实 userData。
+//
+// 2026-11-12（v2.0.0 发布阻断 B3-1 测试修复）：
+//   · 所有 `customerInput` 结算等待一律**有界**：超时即如实失败并指出挂起点，不再可能无限挂起
+//     （macOS arm64 CI 曾因本文件无界等待挂 45 分钟被取消）；断言未放宽。
+//   · 用例 8「坏账本」按 v2.0.0 语义更新：`e71501c` 已删除 `tryAutoSelectDecision`（decision 卡
+//     不再有「默认推荐 judge」代选）；坏账本按无指令回落幕僚分支/客户卡，本夹具未开委托 ⇒ 原卡
+//     呈现客户本人，用客户 responder 结算（不伪造 `judge:demo`）。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -25,6 +32,36 @@ import { CUSTOMER_DIRECTIVES_REL } from "../../src/model/directive.ts";
 import type { CustomerInputOutcome, CustomerInputRequest } from "../../src/model/runtime.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 有界轮询等待（v2.0.0 发布阻断 B3-1）：条件未在预算内满足即如实失败，不无限循环。 */
+async function waitUntil(check: () => boolean, timeoutMs = 5000, what = "条件"): Promise<void> {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > timeoutMs) throw new Error(`${what}：有界等待超时（${timeoutMs}ms）`);
+    await tick(10);
+  }
+}
+
+/**
+ * 有界等待（v2.0.0 发布阻断 B3-1）：任何可能被「无人作答的客户卡」吊住的 await 都必须有上限。
+ * 超时即抛错（测试如实失败并指出挂起点），绝不无限挂起——macOS arm64 CI 曾因无界等待挂 45 分钟被取消。
+ */
+async function bounded<T>(value: T | Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(value),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${what}：有界等待超时（${ms}ms）——疑似卡片被呈现给客户而无人作答`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 
 function tempDir(prefix: string): { dir: string; cleanup: () => void } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -161,8 +198,7 @@ test("decision 指令 select-recommended：代选唯一推荐项（once durable 
     assert.equal(created.ok, true);
     if (!created.ok) return;
     const h = makeChannel(runtime, { decisionEnabled: true });
-    const outcome = await h.channel.customerInput(decisionCard(), context(t.dir));
-    const answered = expectAnswered(outcome);
+    const answered = expectAnswered(await bounded(h.channel.customerInput(decisionCard(), context(t.dir)), 5000, "用例 1：指令代选结算"));
     assert.deepEqual(answered.value.selected, ["alpha"]);
     assert.equal(answered.operatorId, `directive:${created.id}`);
     assert.deepEqual(answered.directive, {
@@ -191,14 +227,14 @@ test("decision 指令 select-option：按规范化 label 唯一匹配；拒绝�
     const selected = await submit(runtime, t.dir, "@决策 只接受 方案 B until=once");
     assert.equal(selected.ok, true);
     const h1 = makeChannel(runtime, { decisionEnabled: true });
-    const outcome = expectAnswered(await h1.channel.customerInput(decisionCard(), context(t.dir)));
+    const outcome = expectAnswered(await bounded(h1.channel.customerInput(decisionCard(), context(t.dir)), 5000, "用例 2：select-option 代选结算"));
     assert.deepEqual(outcome.value.selected, ["beta"]);
     assert.equal(outcome.directive?.action, "select-option");
 
     const rejected = await submit(runtime, t.dir, "@决策 拒绝 flow=focus until=once");
     assert.equal(rejected.ok, true);
     const h2 = makeChannel(runtime, { decisionEnabled: true });
-    const declined = expectDeclined(await h2.channel.customerInput(decisionCard(), context(t.dir)));
+    const declined = expectDeclined(await bounded(h2.channel.customerInput(decisionCard(), context(t.dir)), 5000, "用例 2：拒绝指令结算"));
     assert.equal(declined.operatorId, `directive:${rejected.ok ? rejected.id : ""}`);
     assert.deepEqual(declined.directive, {
       id: rejected.ok ? rejected.id : "",
@@ -219,8 +255,8 @@ test("session 指令可重复应用；once 指令消费后不再生效", async (
     const session = await submit(runtime, t.dir, "@决策 选推荐项 until=session");
     assert.equal(session.ok, true);
     const h = makeChannel(runtime, { decisionEnabled: true });
-    const first = await h.channel.customerInput(decisionCard(), context(t.dir));
-    const second = await h.channel.customerInput(decisionCard(), context(t.dir));
+    const first = await bounded(h.channel.customerInput(decisionCard(), context(t.dir)), 5000, "用例 3：session 指令第一次应用");
+    const second = await bounded(h.channel.customerInput(decisionCard(), context(t.dir)), 5000, "用例 3：session 指令第二次应用");
     expectAnswered(first);
     expectAnswered(second);
     assert.equal(runtime.decisionFacts().active.length, 1, "session 指令不因消费失效");
@@ -240,15 +276,15 @@ test("冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推
     assert.equal((await submit(runtime, t.dir, "@决策 只接受 beta flow=focus until=session")).ok, true);
     const h = makeChannel(runtime, { decisionEnabled: true });
     const pending = h.channel.customerInput(decisionCard(), context(t.dir));
-    await tick();
+    await waitUntil(() => h.pushed.length === 1, 5000, "冲突：客户卡呈现");
     assert.equal(h.pushed.length, 1, "冲突时呈现客户卡");
     assert.equal(h.results.length, 0, "不产生指令生效行");
-    assert.equal(h.judgeResults.length, 0, "绕过 tryAutoSelectDecision（即使开关开启）");
+    assert.equal(h.judgeResults.length, 0, "绕过默认推荐（即使开关开启）");
     assert.equal(h.notices.length, 1);
     assert.match(h.notices[0]!.summary, /决策指令冲突/);
     assert.equal(runtime.decisionFacts().active.length, 2, "冲突不消费任何一条");
     assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["beta"] } }).ok, true);
-    const outcome = expectAnswered(await pending);
+    const outcome = expectAnswered(await bounded(pending, 5000, "用例 4：冲突后客户手选结算"));
     assert.deepEqual(outcome.value.selected, ["beta"]);
   } finally {
     t.cleanup();
@@ -262,7 +298,7 @@ test("不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推�
     assert.equal((await submit(runtime, t.dir, "@决策 只接受 不存在 until=session")).ok, true);
     const h = makeChannel(runtime, { decisionEnabled: true });
     const pending = h.channel.customerInput(decisionCard(), context(t.dir));
-    await tick();
+    await waitUntil(() => h.pushed.length === 1, 5000, "不匹配：客户卡呈现");
     assert.equal(h.pushed.length, 1);
     assert.equal(h.results.length, 0);
     assert.equal(h.judgeResults.length, 0);
@@ -270,7 +306,7 @@ test("不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推�
     assert.match(h.notices[0]!.summary, /未匹配到唯一选项/);
     assert.equal(runtime.decisionFacts().active.length, 1, "不匹配不消费");
     h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["alpha"] } });
-    await pending;
+    await bounded(pending, 5000, "用例 5：不匹配后客户手选结算");
   } finally {
     t.cleanup();
   }
@@ -286,19 +322,19 @@ test("可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（
     assert.equal(created.ok, true);
     const h = makeChannel(runtime, { decisionEnabled: true, emitResultFails: true });
     const pending = h.channel.customerInput(decisionCard(), context(t.dir));
-    await tick();
+    await waitUntil(() => h.pushed.length === 1, 5000, "可见行失败：客户卡回落呈现");
     assert.equal(h.pushed.length, 1, "可见行失败 ⇒ 回落客户卡");
     assert.equal(h.judgeResults.length, 0, "有适用指令但不应用 ⇒ 不借默认推荐代选");
     assert.equal(runtime.decisionFacts().active.length, 1, "未 durable 消费");
     assert.equal(h.results.length, 0);
     h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["alpha"] } });
-    await pending;
+    await bounded(pending, 5000, "用例 6：可见行失败后客户手选结算");
   } finally {
     t.cleanup();
   }
 });
 
-test("坏账本（ledgerErrors>0）⇒ 消费者按无指令：既有默认推荐路径不变，不产生指令行", async () => {
+test("坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户", async () => {
   const t = tempDir("ans-c1-dec-badledger-");
   try {
     const ledger = path.join(t.dir, ...CUSTOMER_DIRECTIVES_REL.split("/"));
@@ -306,13 +342,20 @@ test("坏账本（ledgerErrors>0）⇒ 消费者按无指令：既有默认推�
     fs.writeFileSync(ledger, "{not-json\n");
     const { runtime } = makeRuntime(t.dir);
     const h = makeChannel(runtime, { decisionEnabled: true });
-    const outcome = expectAnswered(await h.channel.customerInput(decisionCard(), context(t.dir)));
-    assert.equal(outcome.operatorId, "judge:demo");
+    const pending = h.channel.customerInput(decisionCard(), context(t.dir));
+    // v2.0.0（`e71501c`）起 decision 卡没有「默认推荐 judge」代选（`tryAutoSelectDecision` 已删除）；
+    // 坏账本按无指令回落幕僚分支/客户卡。本夹具未开委托 ⇒ 原卡呈现客户本人，由客户 responder 结算。
+    await waitUntil(() => h.pushed.length === 1, 5000, "坏账本：客户卡回落呈现");
     assert.equal(h.results.length, 0, "坏账本不产生指令生效行");
-    assert.equal(h.judgeResults.length, 1, "按无指令 ⇒ 既有默认推荐路径");
+    assert.equal(h.judgeResults.length, 0, "decision 卡不进入 judge（v2.0.0 无默认推荐代选）");
+    assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["alpha"] } }).ok, true);
+    const outcome = expectAnswered(await bounded(pending, 5000, "用例 8：坏账本客户手选结算"));
+    assert.equal(outcome.operatorId, "tester", "无指令生效：客户本人结算（不是 directive:/judge:）");
+    assert.equal(outcome.directive, undefined, "坏账本按无指令，不应用任何指令");
     const listed = await runtime.list();
     assert.equal(listed.ok, true);
     if (listed.ok) assert.equal(listed.ledgerErrors > 0, true);
+    assert.equal(runtime.decisionFacts().ledgerErrors > 0, true, "坏账本如实报告 ledgerErrors");
   } finally {
     t.cleanup();
   }
