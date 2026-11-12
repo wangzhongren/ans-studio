@@ -1,0 +1,26 @@
+✖ 开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发 (15007.6847ms)
+✖ §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底 (15007.1636ms)
+✖ §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板 (15006.5043ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 0
+ℹ cancelled 3
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45449.8491
+
+✖ failing tests:
+
+test at test\桌面应用\.tmp-optional-baseline.test.ts:250:1
+✖ 开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发 (15007.6847ms)
+  'test timed out after 15000ms'
+
+test at test\桌面应用\.tmp-optional-baseline.test.ts:263:1
+✖ §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底 (15007.1636ms)
+  'test timed out after 15000ms'
+
+test at test\桌面应用\.tmp-optional-baseline.test.ts:298:1
+✖ §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板 (15006.5043ms)
+  'test timed out after 15000ms'
+EXIT=1

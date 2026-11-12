@@ -1,0 +1,30 @@
+✖ 幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚 (59.2669ms)
+✔ 无自动验收机器：源码不接线 acceptance 派发/gate/复核能力（F-03 结构性钉） (17.4905ms)
+✔ 开关关闭：验收卡呈现客户，客户手选通过——不自动验收 (2.3091ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 2
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 180055.6958
+
+✖ failing tests:
+
+test at test\桌面应用\optional-acceptance.test.ts:122:1
+✖ 幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚 (59.2669ms)
+  AssertionError [ERR_ASSERTION]: chief-hub-flow-unavailable：缺少明确任务流程，未创建裸任务。
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/optional-acceptance.test.ts:139:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

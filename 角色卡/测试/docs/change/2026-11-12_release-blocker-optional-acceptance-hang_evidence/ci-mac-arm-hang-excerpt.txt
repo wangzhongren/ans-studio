@@ -1,0 +1,7 @@
+# macOS arm64 CI job 130920941222（run 43138943189）Regression tests 末尾
+3302:build (macos-15, mac, arm64)	Regression tests	2026-11-12T02:11:15.9581370Z ✔ K-2 Interface（pickImage）：选图经注入替身（主进程读文件）；取消安静；失败/未接如实 (2.810166ms)
+3303:build (macos-15, mac, arm64)	Regression tests	2026-11-12T02:11:16.8461350Z ✔ decision 开关关闭：应用 decision 卡呈现客户，客户手选；无 judge 审计 (4.16875ms)
+3304:build (macos-15, mac, arm64)	Regression tests	2026-11-12T02:11:16.8560850Z ✔ 开启委托但无真实chief上下文：保留原因，禁人工/旧judge/默认推荐；关闭后接管 (5.037333ms)
+3305:build (macos-15, mac, arm64)	Regression tests	2026-11-12T02:11:16.8563970Z ✔ 无chief时不以旧结果行充当业务决定 (2.419ms)
+3306:build (macos-15, mac, arm64)	Regression tests	2026-11-12T02:11:16.8567600Z ✔ 应用自有 decision 卡通过共享校验且不扩大角色允许集；非法推荐数/非应用 chief 仍拒 (1.0165ms)
+3307:build (macos-15, mac, arm64)	Regression tests	2026-11-12T02:50:38.9662340Z ##[error]The operation was canceled.
