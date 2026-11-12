@@ -833,13 +833,27 @@ async function bindPreparedRuntimeRole(adapter: RuntimeAdapter, role: ResolvedRo
  * 输入根的拼写（macOS `/var` → `/private/var` 的符号链接**祖先**）——同一真实根的不同书写形式必须命中。
  * fail-closed：不同真实根、任一侧不可解析（不存在/悬空链接）或**最终根自身**是符号链接 ⇒ 不命中
  * （返回 false），不因拼写归一放行任何跨根证据。
+ *
+ * 2026-11-12（v2.0.0 发布阻断 B3-2，CI Windows TEMP 为 8.3 短名）：record 根来自
+ * `fs/promises.realpath`（Windows 上**native 语义**：展开 `RUNNER~1` 等 8.3 短名），而 `realpathSync`
+ * 的 JS 实现**不展开**短名——`C:\Users\RUNNER~1\...` 与长名同一真实根会被逐字比较判不等。
+ * 两侧一律用 `realpathSync.native`（与 record 根同一语义：展开短名 + 解析符号链接祖先）归一。
  */
 function sameManagedProjectRoot(actual: string, requested: string): boolean {
   try {
     const left = path.resolve(actual), right = path.resolve(requested);
     if (lstatSync(left).isSymbolicLink() || lstatSync(right).isSymbolicLink()) return false;
-    return realpathSync(left).toLowerCase() === realpathSync(right).toLowerCase();
+    const leftReal = canonicalProjectRoot(left), rightReal = canonicalProjectRoot(right);
+    return leftReal !== undefined && rightReal !== undefined && leftReal.toLowerCase() === rightReal.toLowerCase();
   } catch { return false; }
+}
+/**
+ * 真实根拼写的**唯一归一规则**（B3-2）：与 `readGitProtectionFacts` 的 `fs/promises.realpath`
+ * 同一 native 语义——Windows 展开 8.3 短名、全平台解析符号链接祖先；不可解析（不存在/悬空链接）
+ * 返回 undefined，由调用方 fail-closed。仅归一拼写，不放宽归属/根集合判定。
+ */
+export function canonicalProjectRoot(value: string): string | undefined {
+  try { return realpathSync.native(path.resolve(value)); } catch { return undefined; }
 }
 /** Facts come only from this module's actual constructed handles, never caller-supplied source strings. */
 export function inspectManagedRoleSessionEvidence(input: { projectRoot: string; sessionId: string }) {

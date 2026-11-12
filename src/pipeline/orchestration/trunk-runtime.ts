@@ -25,7 +25,7 @@ import type { ProjectConfig, RolePolicyDecision } from "../../model/role.ts";
 import { listProject, builtInRoleModuleOf } from "../../service/role/resolve-role.ts";
 import { createTrunkService } from "../../service/trunk/public/trunk-service.ts";
 import { createGitCapabilityService, type GitQueryContext, type RepositoryInitializationContext } from "../../service/trunk/public/trunk-service.ts";
-import { inspectManagedRoleSessionEvidence, inspectManagedRoleSessionInventory, recheckRoleSessionOpenFailureInventory } from "./run-role.ts";
+import { canonicalProjectRoot, inspectManagedRoleSessionEvidence, inspectManagedRoleSessionInventory, recheckRoleSessionOpenFailureInventory } from "./run-role.ts";
 import { inspectRuntimeCoreRegistry } from "../../service/runtime/session.ts";
 import { evaluateChiefDispatchParent, type DispatchParentHostFacts, type DispatchParentCoreFacts, type DispatchParentDecision } from "../../common/gates/index.ts";
 import { appendGitActionAuthorization, beginGitHostAction, endGitHostAction, checkGitHostAction, inspectGitHostCoordinator, readGitProtectionFacts, readGitInitializationTaskBasis, type GitActionAuthorizationRecord } from "../../provider/trunk/public/trunk-store.ts";
@@ -191,7 +191,13 @@ export async function inspectGitActionAuthorization(input: GitActionAuthorizatio
       return reject("git-controller-history-unproven", "A real desktop controller is absent from the authoritative Core registry");
   }
   // H7：根身份（恰为 projectRoot/.git）。
-  const roots = await readGitProtectionFacts(input.projectRoot), expected = [path.join(input.projectRoot, ".git")];
+  // B3-2（2026-11-12）：`readGitProtectionFacts` 的根是 `fs/promises.realpath` 规范拼写（Windows 展开
+  // 8.3 短名），调用方根可能是 `RUNNER~1` 短名——期望根按**同一真实根归一规则**（canonicalProjectRoot）
+  // 构造后比较；不可解析 ⇒ fail-closed 拒绝；多余 metadata/其他 worktree 根仍按数量/集合拒绝。
+  const canonicalProject = canonicalProjectRoot(input.projectRoot);
+  const expected = canonicalProject === undefined ? [] : [path.join(canonicalProject, ".git")];
+  if (expected.length !== 1) return reject("git-root-discovery-unproven", "The actual project root cannot be resolved for this independent repository surface");
+  const roots = await readGitProtectionFacts(input.projectRoot);
   if (roots.protectedGitRoots.length !== expected.length || !expected.every(root => roots.protectedGitRoots.some(actual => key(actual) === key(root))))
     return reject("git-root-discovery-unproven", "The actual metadata/other-worktree roots exceed this new independent repository surface");
   // H13/H14/H11：逐 entry 运行时中立闭包（F4/R10；不要求 native/processCoverage）。
@@ -298,6 +304,13 @@ async function appendGitActionAuthorizationBeforeEffects(input: {
   closure: Extract<GitActionAuthorizationResult, { ok: true }>; leaseId: string;
   policyInputDigests: GitActionAuthorizationRecord["policyInputDigests"];
 }): Promise<{ ok: true } | { ok: false; code: "git-action-audit-unavailable"; message: string }> {
+  // B3-2（2026-11-12）：`appendGitActionAuthorization` 的既有契约要求调用方传入**规范根**
+  // （provider 内 `realpath(projectRoot)` 必须与传入拼写逐字一致；CI Windows TEMP 为 8.3 短名时
+  // 直接调用方拼写会被 provider 判 `project-root-not-canonical`）。sidecar 记录根同样是规范根，
+  // 读取侧按同一 `realpath` 归一后仍按精确根匹配；不可解析 ⇒ fail-closed（不执行效果）。
+  const canonicalRoot = canonicalProjectRoot(input.projectRoot);
+  if (canonicalRoot === undefined) return { ok: false as const, code: "git-action-audit-unavailable",
+    message: "The actual authorization sidecar could not be appended before effects (project-root-not-canonical)" };
   const evidence = input.closure.optionalEvidence;
   const record: GitActionAuthorizationRecord = {
     source: "git-action-authorization", version: 1, operationId: input.operationId, template: input.template,
@@ -305,7 +318,7 @@ async function appendGitActionAuthorizationBeforeEffects(input: {
     ...(input.closure.actor.taskId !== undefined ? { taskId: input.closure.actor.taskId } : {}),
     ...(input.closure.actor.runId !== undefined ? { runId: input.closure.actor.runId } : {}),
     turnId: input.closure.actor.turnId, activeTool: verifiedActiveToolName(input.closure.actor.entryId, input.expectedTool),
-    projectRoot: input.projectRoot, rootsDigest: input.closure.rootsDigest, registryRevision: input.closure.registryRevision,
+    projectRoot: canonicalRoot, rootsDigest: input.closure.rootsDigest, registryRevision: input.closure.registryRevision,
     inventoryRevision: input.closure.inventoryRevision, leaseId: input.leaseId, policyInputDigests: input.policyInputDigests,
     optionalEvidence: {
       ...(evidence.toolSurfaceStatus !== undefined ? { toolSurfaceStatus: evidence.toolSurfaceStatus } : {}),
@@ -317,7 +330,7 @@ async function appendGitActionAuthorizationBeforeEffects(input: {
     },
   };
   try {
-    await appendGitActionAuthorization(input.projectRoot, record);
+    await appendGitActionAuthorization(canonicalRoot, record);
     return { ok: true as const };
   } catch (error) {
     return { ok: false as const, code: "git-action-audit-unavailable",
