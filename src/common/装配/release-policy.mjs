@@ -2,9 +2,16 @@ export const SOURCE_REF = 'v2.0.0';
 export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 // v2.0.0 overlay：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
 // B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化（默认路径零 trunk/bootstrap/
-// stable-write，治理走应用账本）、B29–B34 修复）；白名单**重置为基础集**（files＝package.json、
-// package-lock.json、.github/workflows/release.yml；dirs＝src/common/装配/、test/装配/），
-// **无产品/测试 overlay 条目**（v1.9.2 及更早条目已随冻结源吸收，见下）。
+// stable-write，治理走应用账本）、B29–B34 修复）；白名单为基础集 + 1 条发布阻断修复条目（见下）：
+// files＝package.json、package-lock.json、.github/workflows/release.yml、
+// test/桌面应用/optional-acceptance.test.ts；dirs＝src/common/装配/、test/装配/
+// （v1.9.2 及更早条目已随冻结源吸收，见下）。
+// v2.0.0 发布阻断修复：tag v2.0.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽。
+// · 测试 1 条：test/桌面应用/optional-acceptance.test.ts——macOS arm64 CI Regression 挂起修复（>45 分钟
+// 被取消）：v2.0.0 起 acceptance 属幕僚业务卡、不再进通用 judge，旧夹具 `await customerInput` 永不解
+// （无界等待）；改用非业务卡 `intent-confirm` 钉同一 decision 组 judge 语义，open/stop/customerInput/
+// 客户手选全部有界等待（超时如实失败并指出挂起点），stop 后等待后台投递落盘 + fs.rm 重试（清理竞态）。
+// 断言未放宽；无自动验收语义保持。
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -71,7 +78,8 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //     test/测试/governance-e2e-auto/c-appointment-timing.test.ts（Windows 时序可见性修复）。
 // fail-closed 不变：未列名的 app//src/ 变更仍使 prepare 明确失败；
 // 未列名的 test/ 文件仍静默落 excluded、不随构建树（机制同前：经评审文件必须显式入列）。
-const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml']);
+const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
+  'test/桌面应用/optional-acceptance.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

@@ -1,0 +1,14 @@
+✔ 幕僚调度验收：能力在场；v2.0.0 生产门对裸夹具 fail-closed（不建裸任务）；回交只回幕僚且无自动验收 (479.9416ms)
+✔ 无自动验收机器：源码不接线 acceptance 派发/gate/复核能力（F-03 结构性钉） (6.5691ms)
+✔ 开关关闭：验收卡呈现客户，客户手选通过——不自动验收 (2.0996ms)
+✔ 开关开启：decision 组卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发 (0.8664ms)
+✔ §5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intentId 兜底 (0.7042ms)
+✔ §5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向客户呈现技术模板 (0.2852ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2138.0872

@@ -7,11 +7,11 @@ test('release overlay preserves Chinese build paths and excludes private data an
     'package.json', '.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
   assert.deepEqual(result.selected, ['src/common/装配/release-prepare.mjs', 'test/装配/release-packaging.test.ts', 'package.json']);
   assert.deepEqual(result.excluded, ['.env', '.ans/sessions/private.jsonl', 'README.md', '角色卡/装配/docs/change/release.md']);
-  assert.equal(SOURCE_REF, 'v1.9.2');
-  assert.equal(SOURCE_SHA, '1eba7118b46cc9a279c42351a8511e3c9fcc12b7');
+  assert.equal(SOURCE_REF, 'v2.0.0');
+  assert.equal(SOURCE_SHA, '752953cf229ef9771fb574d0972b80e73ec7c27a');
 });
 
-test('release overlay selects the v1.9.2 packaging surface', () => {
+test('release overlay selects the v2.0.0 packaging surface', () => {
   const result = selectOverlay(['.github/workflows/release.yml',
     'src/common/装配/release-policy.mjs', 'src/common/装配/release-policy.d.mts',
     'test/装配/release-packaging.test.ts', 'package.json', 'package-lock.json', 'README.md']);
@@ -31,8 +31,10 @@ test('release refuses unreviewed production changes and similarly named private 
     ['package.json', 'test/装配/release-packaging.test.ts']);
 });
 
-// v1.9.2：白名单**重置为基础集**（打包/版本/发布面——冻结源 tag v1.9.2 已含全部产品/测试代码）。
-// v1.9.1 曾为基础集 + 1 条阻断修复条目（已随本冻结源吸收）；v1.9.0 曾重置为基础集；v1.5.0 曾同样重置；v1.3.0 按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
+// v2.0.0：白名单为基础集 + 1 条发布阻断修复条目（test/桌面应用/optional-acceptance.test.ts，精确路径；
+// 冻结源 tag v2.0.0 已含全部产品/测试代码）。
+// v1.9.2 曾重置为基础集；v1.9.1 曾为基础集 + 1 条阻断修复条目（已随本冻结源吸收）；v1.9.0/v1.5.0 曾同样
+// 重置；v1.3.0 按精确路径一次性纳入的 8 条（src/provider/codex/session.ts、6 个平台真值测试文件与
 // test/桌面应用/session-rebuild-race.test.ts）均已随冻结源吸收、整批移除，回到 fail-closed/excluded。
 // 未列名 test/ 文件（test/runtime-core/**、test/codex-adapter/** 等）一律 excluded、不随构建树分发。
 // 本用例锁死 test/ 排除面总边界。
@@ -42,6 +44,17 @@ test('release overlay keeps the packaging surface exact: unreviewed test files s
   assert.deepEqual(result.selected, ['package.json']);
   assert.deepEqual(result.excluded, ['test/测试/kanban-fixes-verify/f1-timeout.test.ts',
     'test/runtime-core/shell-exec-timeout.test.ts', 'test/runtime-core/fixtures.ts', 'test/codex-adapter/session.test.ts']);
+});
+
+// v2.0.0 发布阻断修复：optional-acceptance 测试按**精确路径**入列（单文件不开目录；同目录其它测试仍
+// excluded，未列名 test/ 不随构建树）。断言不放宽。
+test('release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only', () => {
+  const result = selectOverlay(['test/桌面应用/optional-acceptance.test.ts',
+    'test/桌面应用/optional-acceptance.ts', 'test/桌面应用/optional-acceptance-extra.test.ts',
+    'test/桌面应用/decision-service.test.ts']);
+  assert.deepEqual(result.selected, ['test/桌面应用/optional-acceptance.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/optional-acceptance.ts',
+    'test/桌面应用/optional-acceptance-extra.test.ts', 'test/桌面应用/decision-service.test.ts']);
 });
 
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，

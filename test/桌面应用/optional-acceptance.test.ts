@@ -8,6 +8,13 @@
 //   · 幕僚**不自收自验、不转发**：回交只投幕僚（[工作结果]），验收卡由发起角色会话的客户卡通道呈现。
 //
 // 覆盖：开关开/关（decision 组开关关闭 ⇒ 客户手选；开启 ⇒ judge 代批）+ 无自动验收派发。
+//
+// 2026-11-12（v2.0.0 发布阻断修复）：
+//   · v2.0.0 起 `acceptance` 属**幕僚业务卡**（`isChiefBusinessCard`），通用 judge 不再结算 acceptance；
+//     decision 组的通用判断语义改用非幕僚业务卡的 `intent-confirm` 钉住（与 judge 实际范围一致），
+//     `acceptance` 仍由上方「验收卡呈现客户」「无自动验收机器」用例覆盖。
+//   · 所有跨异步边界等待（open/stop/customerInput/客户手选）一律**有界**：超时即如实失败并指出挂起点，
+//     不再可能无限挂起（macOS arm64 CI 曾因本文件无界等待挂 45 分钟被取消）；断言未放宽。
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -19,7 +26,7 @@ import { readFileSync } from "node:fs";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
-import { readTaskState } from "../../src/common/编排/task-state.ts";
+import { readTaskState, appendTaskEvent, taskEvent } from "../../src/common/编排/task-state.ts";
 import { createCustomerInputChannel, type OperatorJudgeResultPayload, type OperatorRequestPayload } from "../../app/desktop/customer-input.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
@@ -32,6 +39,27 @@ async function waitUntil(check: () => boolean, timeoutMs = 2000): Promise<void> 
   while (!check()) {
     if (Date.now() - start > timeoutMs) throw new Error("等待超时");
     await tick(10);
+  }
+}
+
+/**
+ * 有界等待（v2.0.0 发布阻断）：任何可能被「无人作答的客户卡」吊住的 await 都必须有上限。
+ * 超时即抛错（测试如实失败并指出挂起点），绝不无限挂起——macOS arm64 CI 曾因无界等待挂 45 分钟被取消。
+ */
+async function bounded<T>(promise: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${what}：有界等待超时（${ms}ms）——疑似卡片被呈现给客户而无人作答`)),
+          ms,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
@@ -119,38 +147,62 @@ function harness(root: string) {
   return { mgr, streams, sent, sendOptions, caps };
 }
 
-test("幕僚调度验收：chief 可自行核对（role_status）并可把 review 任务派给质检；回交只回幕僚", async () => {
+test("幕僚调度验收：能力在场；v2.0.0 生产门对裸夹具 fail-closed（不建裸任务）；回交只回幕僚且无自动验收", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-opt-accept-"));
   const h = harness(root);
   try {
-    await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
+    await bounded(h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" }), 15000, "SessionManager.open");
     await tick(30);
     const chiefCaps = h.caps.chief!;
     assert.equal(typeof chiefCaps.dispatchTask, "function", "幕僚拥有派发能力（调度验收）");
     assert.equal(typeof chiefCaps.roleStatus, "function", "幕僚可自行核对（role_status 只读）");
 
-    const receipt = (await chiefCaps.dispatchTask!({
+    // v2.0.0（两条固定工作流路径）：派发必须绑定明确流程；缺 flowId ⇒ 明确拒绝、不建裸任务。
+    const bare = (await bounded(Promise.resolve(chiefCaps.dispatchTask!({
       roleId: "verifier",
       task: "复核交付：核对 src/worker.ts 与验收标准",
       reason: "终态验收可选调度",
       sideEffect: "read-only",
       expectedOutput: "复核结论",
-    })) as DispatchReceipt;
-    assert.equal(receipt.ok, true, receipt.message ?? "");
-    assert.match(receipt.message ?? "", /任务编号：#t-/);
-    await waitUntil(() => (h.sent.verifier?.length ?? 0) > 0);
-    assert.match(h.sent.verifier[0] ?? "", /任务编号：#t-/);
-    const state = await readTaskState(root);
-    assert.equal(state.errors.length, 0);
-    const task = [...state.records.values()][0]!;
-    assert.equal(task.created?.from, "chief");
-    assert.equal(task.created?.to, "verifier");
+    })), 15000, "dispatchTask（缺 flowId）")) as DispatchReceipt;
+    assert.equal(bare.ok, false, "缺少明确流程不得创建裸任务");
+    assert.match(bare.message ?? "", /chief-hub-flow-unavailable/);
 
-    // 质检回交（携带 taskId）：只投幕僚 [工作结果]，不投其他角色。
+    // 带 flowId 但本裸夹具未提供生产门要求的「已登记项目生命周期 + 当前客户轮次 + 真实管理会话证据」
+    // ⇒ 仍 fail-closed（document-planning-source-unavailable），绝不伪造受理、不写任务账本。
+    const refused = (await bounded(Promise.resolve(chiefCaps.dispatchTask!({
+      roleId: "verifier",
+      flowId: "review-flow-1",
+      task: "复核交付：核对 src/worker.ts 与验收标准",
+      reason: "终态验收可选调度",
+      sideEffect: "read-only",
+      expectedOutput: "复核结论",
+    })), 15000, "dispatchTask（带 flowId，未登记来源）")) as DispatchReceipt;
+    assert.equal(refused.ok, false, "生产门要求真实来源，不得伪造受理");
+    assert.match(refused.message ?? "", /document-planning-source-unavailable/);
+    const stateAfterRefusals = await readTaskState(root);
+    assert.equal(stateAfterRefusals.records.size, 0, "拒绝派发不写任务账本");
+    assert.equal((h.sent.verifier ?? []).length, 0, "拒绝派发不投递质检");
+
+    // 回交路由（行为钉）：任务账本中的既有星形任务 ⇒ 回交只投幕僚 [工作结果]，不投其他角色。
+    // v2.0.0 的成功派发由带真实生命周期/轮次夹具的专项用例覆盖；本用例只钉「回交 + 无自动验收」语义。
+    const seeded = taskEvent("task.created", {
+      taskId: "t-opt-review-1",
+      from: "chief",
+      to: "verifier",
+      text: "复核交付：核对 src/worker.ts 与验收标准",
+      sideEffect: "read-only",
+      idempotencyKey: "opt-accept-review-1",
+    });
+    await appendTaskEvent(root, seeded);
+    await h.mgr.listTasks(root); // 只读载入星形任务/创建者索引（不重投；回交路由用例不依赖派发投递）
+    await bounded(h.mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" }), 15000, "SessionManager.open(verifier)");
+    await tick(30);
+
     (h.streams.verifier ??= []).push({
       kind: "handback",
       summary: "复核完成",
-      handback: { roleId: "verifier", taskId: task.taskId, status: "completed", summary: "复核通过", evidence: ["src/worker.ts"], at: "2026-10-29T00:00:01.000Z", turnId: "turn-v" },
+      handback: { roleId: "verifier", taskId: "t-opt-review-1", status: "completed", summary: "复核通过", evidence: ["src/worker.ts"], at: "2026-10-29T00:00:01.000Z", turnId: "turn-v" },
     } as OrchestrationEvent);
     await waitUntil(() => (h.sent.chief ?? []).some((text) => text.includes("复核通过")));
     const results = h.sent.chief.filter((text) => text.includes("复核通过"));
@@ -159,15 +211,21 @@ test("幕僚调度验收：chief 可自行核对（role_status）并可把 revie
     assert.equal((h.sent.worker ?? []).length, 0, "交付角色不接收回交");
 
     // 无自动验收：回交 + settle 后不再有任何自动派发/新任务（验收不是自动 gate）。
-    (h.streams.verifier ??= []).push({ kind: "settled", summary: "质检一轮结束" } as OrchestrationEvent);
+    (h.streams.verifier ?? []).push({ kind: "settled", summary: "质检一轮结束" } as OrchestrationEvent);
     (h.streams.chief ??= []).push({ kind: "settled", summary: "幕僚一轮结束" } as OrchestrationEvent);
     await tick(250);
     const stateAfter = await readTaskState(root);
     assert.equal(stateAfter.records.size, 1, "回交/settle 不产生新的自动验收任务");
     assert.equal((h.sent.verifier ?? []).filter((text) => text.includes("复核") && !text.includes("任务编号")).length, 0, "无自动验收派发到质检");
   } finally {
-    await h.mgr.stop(null);
-    await fs.rm(root, { recursive: true, force: true });
+    try {
+      await bounded(h.mgr.stop(null), 15000, "SessionManager.stop");
+    } finally {
+      // stop 只释放句柄、不等待 `void drainQueue(...)` 的后台投递链落盘：先让出一拍再删，配合带重试的
+      // fs.rm 避免 rm 扫描后新文件落盘导致 ENOTEMPTY（v1.8.2 同款 macOS arm64 CI 稳定性修复）。
+      await tick(50);
+      await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    }
   }
 });
 
@@ -192,13 +250,17 @@ test("无自动验收机器：源码不接线 acceptance 派发/gate/复核能�
   }
 });
 
-// —————————————— 开关开/关：验收卡由客户/判断 agent 裁决（不要求每次独立验收） ——————————————
+// —————————————— 开关开/关：decision 组卡由客户/判断 agent 裁决（不要求每次独立验收） ——————————————
+//
+// v2.0.0：`acceptance` 是幕僚业务卡（`isChiefBusinessCard`），通用 judge 不接；因此本节的判断语义
+// 用 decision 组且**非**幕僚业务卡的 `intent-confirm` 钉住（与 judge 的实际范围一致，见方案 §9.1）。
+// `acceptance` 的「呈现客户、不自动验收」仍由上方用例覆盖。
 
-function acceptanceRequest(): CustomerInputRequest {
+function cardRequest(cardKind: "acceptance" | "intent-confirm" = "acceptance"): CustomerInputRequest {
   return {
     kind: "choice",
-    title: "验收复核结论：通过？",
-    cardKind: "acceptance",
+    title: cardKind === "acceptance" ? "验收复核结论：通过？" : "需求确认：按推荐方案执行？",
+    cardKind,
     sourceRoleId: "verifier",
     flowId: "flow-a",
     options: [
@@ -215,7 +277,7 @@ function channelHarness(groupEnabled: boolean) {
   const judge: GovernanceJudgeFn = async (request) => ({
     verdict: "approve",
     group: "decision",
-    cardKind: "acceptance",
+    cardKind: request.cardKind,
     engine: request.runtime,
     model: "judge-model",
     reasonCode: "recommended-default",
@@ -237,23 +299,23 @@ const ctx = { roleId: "verifier", projectRoot: "/proj", runtime: "demo" as const
 
 test("开关关闭：验收卡呈现客户，客户手选通过——不自动验收", async () => {
   const h = channelHarness(false);
-  const pending = h.channel.customerInput(acceptanceRequest(), ctx, { judgeContext: { flowId: "flow-a", facts: { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] } } });
+  const pending = h.channel.customerInput(cardRequest(), ctx, { judgeContext: { flowId: "flow-a", facts: { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] } } });
   await waitUntil(() => h.pushed.length === 1);
   assert.equal(h.results.length, 0, "开关关闭不调用判断");
   assert.equal(h.channel.respond({ id: h.pushed[0]!.id, decision: { kind: "choice", selected: ["accept"] } }).ok, true);
-  const outcome = await pending;
+  const outcome = await bounded(Promise.resolve(pending), 5000, "开关关闭：客户手选结算");
   assert.equal(outcome?.outcome, "answered");
   assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["accept"]);
   assert.equal(outcome?.outcome === "answered" ? outcome.judge : undefined, undefined, "客户手选无 judge 审计");
 });
 
-test("开关开启：验收卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发", async () => {
+test("开关开启：decision 组卡由判断 agent 代选推荐项（客户可不开）——一次裁决，无后续自动派发", async () => {
   const h = channelHarness(true);
-  const outcome = await h.channel.customerInput(acceptanceRequest(), ctx, { judgeContext: { flowId: "flow-a", facts: { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] } } });
+  const outcome = await bounded(Promise.resolve(h.channel.customerInput(cardRequest("intent-confirm"), ctx, { judgeContext: { flowId: "flow-a", facts: { governanceModel: "trio" as const, flowId: "flow-a", ledgerErrors: 0, unresolvedClarificationCount: 0, latestDecisionKinds: [] } } })), 5000, "开关开启：judge 代批结算");
   assert.equal(h.pushed.length, 0, "代批成功不呈现客户卡");
   assert.equal(h.results.length, 1);
-  assert.equal(h.results[0]!.cardKind, "acceptance");
-  assert.equal(h.results[0]!.requestTitle, "验收复核结论：通过？");
+  assert.equal(h.results[0]!.cardKind, "intent-confirm");
+  assert.equal(h.results[0]!.requestTitle, "需求确认：按推荐方案执行？");
   assert.deepEqual(h.results[0]!.selected, ["accept"]);
   assert.equal(outcome?.outcome, "answered");
   assert.deepEqual(outcome?.outcome === "answered" ? outcome.value.selected : undefined, ["accept"]);
@@ -271,7 +333,7 @@ test("§5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intent
       return {
         verdict: "approve",
         group: "decision",
-        cardKind: "acceptance",
+        cardKind: request.cardKind,
         engine: request.runtime,
         value: { selected: ["accept"] },
         selected: ["accept"],
@@ -287,11 +349,11 @@ test("§5A judgeContext.intentId 进入 GovernanceJudgeRequest；metadata.intent
     return holder;
   };
   const viaContext = makeChannel();
-  await viaContext.channel.customerInput(acceptanceRequest(), ctx, { judgeContext: { flowId: "flow-a", intentId: "intent-focus-v1", facts } });
+  await bounded(Promise.resolve(viaContext.channel.customerInput(cardRequest("intent-confirm"), ctx, { judgeContext: { flowId: "flow-a", intentId: "intent-focus-v1", facts } })), 5000, "§5A：intentId 进入判断请求");
   assert.equal(viaContext.seen?.intentId, "intent-focus-v1", "judgeContext.intentId 原样进入判断请求");
   assert.equal(viaContext.seen?.intentIdSource, "request", "显式 intentId 缺省来源为 request");
   const viaMetadata = makeChannel();
-  await viaMetadata.channel.customerInput(acceptanceRequest(), ctx, { intentId: "intent-meta-v1", judgeContext: { flowId: "flow-a", facts } });
+  await bounded(Promise.resolve(viaMetadata.channel.customerInput(cardRequest("intent-confirm"), ctx, { intentId: "intent-meta-v1", judgeContext: { flowId: "flow-a", facts } })), 5000, "§5A：metadata.intentId 兜底");
   assert.equal(viaMetadata.seen?.intentId, "intent-meta-v1", "旧调用 metadata.intentId 兜底");
 });
 
@@ -301,7 +363,7 @@ test("§5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向�
   const judge: GovernanceJudgeFn = async (request) => ({
     verdict: "manual",
     group: "decision",
-    cardKind: "acceptance",
+    cardKind: request.cardKind,
     engine: request.runtime,
     reasonCode: "intent-missing",
     reason: "意图文件必须以 --- 开头；模板 intentId: <小写 slug>；docs/intents/<intentId>.md",
@@ -312,7 +374,7 @@ test("§5A/P9.2 客户卡人话：意图预解析失败只退回角色，不向�
     operatorId: "tester",
     judge: { isGroupEnabled: () => true, fn: judge },
   });
-  const outcome = await channel.customerInput(acceptanceRequest(), ctx, { judgeContext: { flowId: "flow-a", facts } });
+  const outcome = await bounded(Promise.resolve(channel.customerInput(cardRequest("intent-confirm"), ctx, { judgeContext: { flowId: "flow-a", facts } })), 5000, "§5A/P9.2：manual 退回角色");
   assert.equal(pushed.length, 0, "不向客户呈现含技术模板的卡");
   assert.equal(outcome?.outcome, "declined");
   assert.doesNotMatch(JSON.stringify(pushed), /intentId: <小写 slug>|docs\/intents/);
