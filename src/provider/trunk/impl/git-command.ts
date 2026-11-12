@@ -505,8 +505,10 @@ function configFormat(text: string): GitRepositoryIdentity["objectFormat"] {
 
 /** Reject unsupported indirection before any Git command can consume repository config. */
 export async function inspectGitRepository(projectRoot: string): Promise<GitRepositoryIdentity> {
-  const root = await realpath(projectRoot), requested = path.resolve(projectRoot);
-  if (root.toLowerCase() !== requested.toLowerCase() || (await lstat(requested)).isSymbolicLink()) throw new Error("git-root-link-unsupported");
+  const root = await realpath(projectRoot);
+  // 2026-11-12（v2.0.0 发布阻断 P0）：realpath 输出即根的规范形；只拒绝**最终根自身**是符号链接。
+  // 符号链接祖先（macOS `os.tmpdir()` 的 `/var` → `/private/var`）是同一真实根的不同书写形式，不再误拒。
+  if ((await lstat(projectRoot)).isSymbolicLink()) throw new Error("git-root-link-unsupported");
   const gitDir = path.join(root, ".git"), gitStat = await lstat(gitDir);
   if (!gitStat.isDirectory() || gitStat.isSymbolicLink() || await realpath(gitDir) !== gitDir) throw new Error("git-gitfile-or-link-unsupported");
   if (await exists(path.join(root, ".gitmodules"))) throw new Error("git-submodules-unsupported");
@@ -636,7 +638,8 @@ export async function readGitProtectionFacts(projectRoot: string): Promise<GitPr
 export async function readGitInitializationFacts(projectRoot: string): Promise<GitInitializationFacts> {
   const root = await realpath(projectRoot), reasons: string[] = [], parentRepositories: string[] = [], files: GitInitializationFacts["files"][number][] = [];
   let state: GitInitializationFacts["state"] = await exists(path.join(root, ".git")) ? "existing" : "absent", bytes = 0, visited = 0;
-  if (root.toLowerCase() !== path.resolve(projectRoot).toLowerCase() || (await lstat(projectRoot)).isSymbolicLink()) { state = "unsupported"; reasons.push("Project root is not a canonical host root"); }
+  // 2026-11-12（P0）：规范形即 realpath；仅最终根自身为符号链接时保持 unsupported（祖先链接属同一真实根）。
+  if ((await lstat(projectRoot)).isSymbolicLink()) { state = "unsupported"; reasons.push("Project root is not a canonical host root"); }
   let parent = path.dirname(root);
   for (let n = 0; n < 64; n++) { if (await exists(path.join(parent, ".git"))) parentRepositories.push(parent); const next = path.dirname(parent); if (next === parent) break; parent = next; }
   if (parentRepositories.length) reasons.push("Nested/parent Git association needs explicit host handling");
@@ -771,8 +774,11 @@ export async function initializeGitRepository(root: string, format: GitRepositor
     }
     if (signal?.aborted || !lockToken || !await ownsVersionLock(root, lockToken)) throw new Error("git-init-fence-lost");
   }
-  const canonical = await realpath(root); if (canonical.toLowerCase() !== path.resolve(root).toLowerCase() || await exists(path.join(root, ".git"))) throw new Error("git-init-target-not-empty");
-  const ans = path.join(root, ".ans");
+  const canonical = await realpath(root);
+  // 2026-11-12（P0）：仅拒绝最终根自身为符号链接；祖先链接（macOS `/var`）解析后仍是同一真实根。
+  if ((await lstat(root)).isSymbolicLink() || await exists(path.join(root, ".git"))) throw new Error("git-init-target-not-empty");
+  // 2026-11-12（P0）：控制路径（.ans/template）一律用规范根构造并校验；输入根的符号链接祖先不再误判。
+  const ans = path.join(canonical, ".ans");
   if (await exists(ans) && ((await lstat(ans)).isSymbolicLink() || await realpath(ans) !== ans)) throw new Error("git-init-control-path-unsafe");
   const template = path.join(ans, "git-empty-template");
   if (await exists(template) && ((await lstat(template)).isSymbolicLink() || await realpath(template) !== template)) throw new Error("git-init-template-unsafe");
@@ -922,7 +928,10 @@ export async function readGitHostProtectionRequirement(input: { projectRoot: str
   let state: "required" | "unmanaged" | "unknown" = "unmanaged";
   try {
     const root = await realpath(input.projectRoot);
-    if (hostProjectKey(root) !== hostProjectKey(input.projectRoot) || (await lstat(input.projectRoot)).isSymbolicLink()) throw new Error("noncanonical-project-root");
+    // 2026-11-12（v2.0.0 发布阻断 P0，macOS `os.tmpdir()` 为符号链接路径）：realpath 即规范根；
+    // 只拒绝**最终根自身**为符号链接。符号链接祖先（`/var` → `/private/var`）是同一真实根的不同书写形式。
+    // 后续 .git / .ans / trunk / initialization-sources 检查仍全部落在规范根上并保留链接/realpath 校验。
+    if ((await lstat(input.projectRoot)).isSymbolicLink()) throw new Error("noncanonical-project-root");
     const gitEntry = path.join(root, ".git");
     if (await exists(gitEntry)) { const info = await lstat(gitEntry);
       if (!info.isDirectory() || info.isSymbolicLink() || await realpath(gitEntry) !== gitEntry) throw new Error("git-association-protection-requirement-unknown"); }
@@ -941,7 +950,9 @@ export async function readGitHostProtectionRequirement(input: { projectRoot: str
         if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > 128 * 1024 || await realpath(file) !== file) throw new Error("unsafe-initialization-source");
         const bytes = await readFile(file), source: unknown = JSON.parse(bytes.toString("utf8"));
       if (!gitRecord(source) || source.schema !== "repository-work-source/v1" || (source.kind !== "customer-turn" && source.kind !== "creator-report")
-          || source.sourceId !== name.slice(0, -5) || source.projectRoot !== root) throw new Error("invalid-initialization-source");
+          || source.sourceId !== name.slice(0, -5) || typeof source.projectRoot !== "string" || !path.isAbsolute(source.projectRoot)
+          // 2026-11-12（P0）：记录根与规范根都按 realpath 比较（同一真实根的不同书写形式），非法/不可解析仍 fail-closed。
+          || await realpath(source.projectRoot) !== root) throw new Error("invalid-initialization-source");
         state = "required"; evidence.push(`${name}:${digest(bytes)}`);
       }
     }

@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: AC-1 注册：未注入 requestDownload ⇒ request_download 不注册；注入 ⇒ 只新增这一只且既有工具不变
+ok 1 - AC-1 注册：未注入 requestDownload ⇒ request_download 不注册；注入 ⇒ 只新增这一只且既有工具不变
+  ---
+  duration_ms: 2.3047
+  type: 'test'
+  ...
+# Subtest: schema：url/purpose 必填、filename 可选、additionalProperties:false、sequential；描述钉关键语义
+ok 2 - schema：url/purpose 必填、filename 可选、additionalProperties:false、sequential；描述钉关键语义
+  ---
+  duration_ms: 0.2116
+  type: 'test'
+  ...
+# Subtest: 合法参数：trim 后交给能力一次、filename 缺省不造键、metadata 完整
+ok 3 - 合法参数：trim 后交给能力一次、filename 缺省不造键、metadata 完整
+  ---
+  duration_ms: 0.5349
+  type: 'test'
+  ...
+# Subtest: AC-2 参数校验：非法形状 ⇒ ok:false + download-invalid-arguments，能力调用 0；边界值合法
+ok 4 - AC-2 参数校验：非法形状 ⇒ ok:false + download-invalid-arguments，能力调用 0；边界值合法
+  ---
+  duration_ms: 0.5006
+  type: 'test'
+  ...
+# Subtest: AC-15 回执：成功原样转达；17 个失败码带 code；契约外回执与抛错 fail-closed；单次调用无重试
+ok 5 - AC-15 回执：成功原样转达；17 个失败码带 code；契约外回执与抛错 fail-closed；单次调用无重试
+  ---
+  duration_ms: 1.2248
+  type: 'test'
+  ...
+# Subtest: AC-23：request_confirmation 以 cardKind:"download" 调用被拒绝且不触达客户通道；schema enum 不变
+ok 6 - AC-23：request_confirmation 以 cardKind:"download" 调用被拒绝且不触达客户通道；schema enum 不变
+  ---
+  duration_ms: 0.4391
+  type: 'test'
+  ...
+# Subtest: 中止：不假设已下载/未下载（能力不触达）
+ok 7 - 中止：不假设已下载/未下载（能力不触达）
+  ---
+  duration_ms: 0.1822
+  type: 'test'
+  ...
+# Subtest: W-1 Service 透传：注入 requestDownload ⇒ 普通会话含 request_download；未注入与两种判断会话均不含
+ok 8 - W-1 Service 透传：注入 requestDownload ⇒ 普通会话含 request_download；未注入与两种判断会话均不含
+  ---
+  duration_ms: 14.4969
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 255.9719

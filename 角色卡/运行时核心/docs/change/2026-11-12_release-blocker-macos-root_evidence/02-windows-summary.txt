@@ -1,0 +1,106 @@
+# 普通 Windows 环境（真实临时目录、干净 cwd）下的同一批文件结果
+
+## 02-windows-test_claude-adapter_session
+# tests 71 # pass 71 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_codex-adapter_chat-transport
+# tests 22 # pass 22 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_pi-adapter_injected-runtime
+# tests 14 # pass 12 # fail 2 # cancelled 0 # skipped 0 
+  FAIL: store validate callback rejects directory symlink before Pi parse or new native write
+  FAIL: Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+
+## 02-windows-test_pi-adapter_tool-display-projection
+# tests 7 # pass 7 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_application-mediation
+# tests 8 # pass 8 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_background-review
+# tests 15 # pass 15 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_background-session-access
+# tests 3 # pass 3 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_codex-native-optional
+# tests 4 # pass 4 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_download-tool
+# tests 8 # pass 8 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_file-write-safety
+# tests 11 # pass 6 # fail 1 # cancelled 0 # skipped 4 
+  FAIL: D3 linked workspace root remains usable; linked target itself is not replaced
+
+## 02-windows-test_runtime-core_git-capability-tools
+# tests 45 # pass 45 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_governance-matrix-tool
+# tests 8 # pass 8 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_mcp-declarations
+# tests 6 # pass 6 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_project-root-canonicalization
+# tests 7 # pass 7 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_prompt-start-acknowledgement
+# tests 5 # pass 5 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_readonly-git-routing
+# tests 10 # pass 10 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_reasoning-facts
+# tests 9 # pass 9 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_report-provenance
+# tests 19 # pass 19 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_request-requirement-change-tool
+# tests 9 # pass 9 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_session-admission-approval
+# tests 11 # pass 11 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_session-lifecycle
+# tests 23 # pass 23 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_session
+# tests 21 # pass 20 # fail 1 # cancelled 0 # skipped 0 
+  FAIL: Core-managed binding rejects a provider that did not register its display profile before first prompt
+
+## 02-windows-test_runtime-core_shell-judge
+# tests 8 # pass 8 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_view-image-policy
+# tests 5 # pass 5 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_runtime-core_write-gate-context
+# tests 11 # pass 11 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_桌面应用_ans-wiring
+# tests 7 # pass 7 # fail 0 # cancelled 0 # skipped 0 
+
+## 02-windows-test_桌面应用_chief-workflow
+# tests 66 # pass 44 # fail 21 # cancelled 1 # skipped 0 
+  FAIL: W5 专字段真实workSourceRef：空目录native来源、父轮结束/焦点切换不撤child、伪来源拒绝
+  FAIL: W10 fresh scope分流：unmanaged原四路径/轮次护栏；required私有guard；unknown拒bind
+  FAIL: W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+  FAIL: W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+  FAIL: W19 实际Core回报与Git回调同assignment；报告续父/通知/新chat/关闭父边界
+  FAIL: W20 默认Core/Chat产品真实报告落账并到chief 普通
+  FAIL: W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+  FAIL: W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止
+  FAIL: W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+  FAIL: W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+  FAIL: W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+  FAIL: W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin
+  FAIL: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+  FAIL: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+  FAIL: W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+  FAIL: W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+  FAIL: W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+  FAIL: W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+  FAIL: W47 默认Core/Codex本地HTTP：忙Chief独立select释放真实卡调用
+

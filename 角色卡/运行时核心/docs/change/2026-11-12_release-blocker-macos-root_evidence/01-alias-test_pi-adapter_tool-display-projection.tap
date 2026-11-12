@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: required-v1 missing capabilities rejects before SDK; actual config override profile registers first
+ok 1 - required-v1 missing capabilities rejects before SDK; actual config override profile registers first
+  ---
+  duration_ms: 584.6534
+  type: 'test'
+  ...
+# Subtest: Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged
+ok 2 - Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged
+  ---
+  duration_ms: 522.0129
+  type: 'test'
+  ...
+# Subtest: native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options
+ok 3 - native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options
+  ---
+  duration_ms: 78.7222
+  type: 'test'
+  ...
+# Subtest: injected projector throw emits safe diagnostic without failing actual handler or model
+ok 4 - injected projector throw emits safe diagnostic without failing actual handler or model
+  ---
+  duration_ms: 13.2891
+  type: 'test'
+  ...
+# Subtest: all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist
+ok 5 - all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist
+  ---
+  duration_ms: 799.8669
+  type: 'test'
+  ...
+# Subtest: real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript
+ok 6 - real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript
+  ---
+  duration_ms: 35.2974
+  type: 'test'
+  ...
+# Subtest: real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit
+ok 7 - real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit
+  ---
+  duration_ms: 539.8029
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2830.7824

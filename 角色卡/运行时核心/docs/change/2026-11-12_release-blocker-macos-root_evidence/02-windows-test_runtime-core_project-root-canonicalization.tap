@@ -1,0 +1,54 @@
+TAP version 13
+# Subtest: P0 根规范化：符号链接祖先的临时根被接受（同一真实根的不同书写形式）
+ok 1 - P0 根规范化：符号链接祖先的临时根被接受（同一真实根的不同书写形式）
+  ---
+  duration_ms: 13.837
+  type: 'test'
+  ...
+# {"platform":"win32","aliasRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-alias-FXt7LD\\\\alias-parent\\\\project","realRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-alias-FXt7LD\\\\real-parent\\\\project","state":"required"}
+# Subtest: P0 根规范化：最终根自身是符号链接仍拒绝（noncanonical-project-root）
+ok 2 - P0 根规范化：最终根自身是符号链接仍拒绝（noncanonical-project-root）
+  ---
+  duration_ms: 2.4703
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：初始化源记录指向不同真实根仍 fail-closed 拒绝
+ok 3 - P0 根规范化：初始化源记录指向不同真实根仍 fail-closed 拒绝
+  ---
+  duration_ms: 9.3839
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：既有控制路径符号链接拒绝不放宽（.ans/trunk、.git 文件）
+ok 4 - P0 根规范化：既有控制路径符号链接拒绝不放宽（.ans/trunk、.git 文件）
+  ---
+  duration_ms: 6.3327
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝
+ok 5 - P0 根规范化：初始化事实/真实 Git 初始化在符号链接祖先根下成立，最终根链接仍拒绝
+  ---
+  duration_ms: 55.9117
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：fileGateProtection 指向不同真实根 ⇒ 丢弃事实、写 fail-closed
+ok 6 - P0 根规范化：fileGateProtection 指向不同真实根 ⇒ 丢弃事实、写 fail-closed
+  ---
+  duration_ms: 14.9907
+  type: 'test'
+  ...
+# Subtest: P0 根规范化：Core 绑定与 host-facts file gate 在符号链接祖先根下工作
+ok 7 - P0 根规范化：Core 绑定与 host-facts file gate 在符号链接祖先根下工作
+  ---
+  duration_ms: 17.6887
+  type: 'test'
+  ...
+# {"platform":"win32","session":"e576df6c-8879-4446-aca6-bd852f8ae666","protectionRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-core-np8sfw\\\\real-parent\\\\project","sessionRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-p0-core-np8sfw\\\\alias-parent\\\\project"}
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 365.2747

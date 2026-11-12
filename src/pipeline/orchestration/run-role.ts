@@ -52,6 +52,7 @@ import type { BoundaryEntry } from "../../model/boundary.ts";
 import { isValidConditionSlug } from "../../model/boundary.ts";
 import type { ShellRules, TaskScope, WriteDecision } from "../../model/decision.ts";
 import { createHash, randomUUID } from "node:crypto";
+import { lstatSync, realpathSync } from "node:fs";
 import { lstat, readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
@@ -826,10 +827,24 @@ async function bindPreparedRuntimeRole(adapter: RuntimeAdapter, role: ResolvedRo
   // Preserve genuinely unmanaged legacy behavior; it stays unverified in the real Core registry and cannot grant Git mutation.
   return adapter.bindRole(role);
 }
+/**
+ * 2026-11-12（v2.0.0 发布阻断 P0 残余，macOS `os.tmpdir()` 为符号链接路径）：托管句柄只按**真实根**
+ * 归属。record 存 `readGitProtectionFacts` 读出的规范根（realpath），而派发/授权等消费方持有会话
+ * 输入根的拼写（macOS `/var` → `/private/var` 的符号链接**祖先**）——同一真实根的不同书写形式必须命中。
+ * fail-closed：不同真实根、任一侧不可解析（不存在/悬空链接）或**最终根自身**是符号链接 ⇒ 不命中
+ * （返回 false），不因拼写归一放行任何跨根证据。
+ */
+function sameManagedProjectRoot(actual: string, requested: string): boolean {
+  try {
+    const left = path.resolve(actual), right = path.resolve(requested);
+    if (lstatSync(left).isSymbolicLink() || lstatSync(right).isSymbolicLink()) return false;
+    return realpathSync(left).toLowerCase() === realpathSync(right).toLowerCase();
+  } catch { return false; }
+}
 /** Facts come only from this module's actual constructed handles, never caller-supplied source strings. */
 export function inspectManagedRoleSessionEvidence(input: { projectRoot: string; sessionId: string }) {
   const record = managedCoreHandles.get(input.sessionId);
-  if (!record || path.resolve(record.projectRoot).toLowerCase() !== path.resolve(input.projectRoot).toLowerCase()) return undefined;
+  if (!record || !sameManagedProjectRoot(record.projectRoot, input.projectRoot)) return undefined;
   try { const lifecycle = record.handle.inspectLifecycle?.(); return structuredClone({ projectRoot: record.projectRoot, construction: record.construction, disposed: record.isDisposed(),
     sessionId: record.handle.sessionId, roleId: record.handle.roleId, roleKind: record.roleKind, runtime: record.handle.runtime,
     lifecycle, toolSurface: record.handle.inspectToolSurface?.(), ...(record.turnInput?.turnId === lifecycle?.turnId ? { turnInput: record.turnInput } : {}) }); } catch { return undefined; }

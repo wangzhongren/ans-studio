@@ -1,0 +1,286 @@
+TAP version 13
+# Subtest: R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+ok 1 - R25 Hub controller is separate from creator/parent; ordinary preparation and historical creators need no final-review reference
+  ---
+  duration_ms: 0.9867
+  type: 'test'
+  ...
+# Subtest: R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+ok 2 - R25 ordinary Chief preparation reaches each builtin callback without serial completion or final-CID tool arguments
+  ---
+  duration_ms: 2.6405
+  type: 'test'
+  ...
+# Subtest: R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+ok 3 - R25 explicit resume has strict expected targets, trusted Chief scope and no void-receipt success
+  ---
+  duration_ms: 1.1377
+  type: 'test'
+  ...
+# Subtest: R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+ok 4 - R25 host Hub marker/controller refs remain absent from model schema and raw spoofing causes zero callbacks
+  ---
+  duration_ms: 0.3646
+  type: 'test'
+  ...
+# Subtest: R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+ok 5 - R24 choice fact and intent domain apply are distinct: absent stays legacy, pending is not completion, committed is bounded
+  ---
+  duration_ms: 0.9633
+  type: 'test'
+  ...
+# Subtest: R24 malformed apply replies never become committed and delegated selection retains its real source
+ok 6 - R24 malformed apply replies never become committed and delegated selection retains its real source
+  ---
+  duration_ms: 1.2453
+  type: 'test'
+  ...
+# Subtest: R24 model host result fields are rejected before the real choice callback and never enter request schema
+ok 7 - R24 model host result fields are rejected before the real choice callback and never enter request schema
+  ---
+  duration_ms: 0.3561
+  type: 'test'
+  ...
+# Subtest: R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+ok 8 - R22 host review basis is exact bounded unique Git material, never a passed verdict or a synthetic legacy field
+  ---
+  duration_ms: 0.3998
+  type: 'test'
+  ...
+# Subtest: R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+ok 9 - R22 production dispatch preserves only strict expected reviewTarget; forged host material rejects with zero callbacks
+  ---
+  duration_ms: 0.8771
+  type: 'test'
+  ...
+# Subtest: R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+ok 10 - R21 result basis/source are optional pure shapes; legacy results gain no inferred code basis
+  ---
+  duration_ms: 0.7073
+  type: 'test'
+  ...
+# Subtest: R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+ok 11 - R21 production Git tool preserves real result basis/source and rejects them as extra query host inputs
+  ---
+  duration_ms: 0.7804
+  type: 'test'
+  ...
+# Subtest: R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+ok 12 - R20 default Core/default Chat binds true dual roots and repo observations to actual write/edit stages
+  ---
+  duration_ms: 121.1521
+  type: 'test'
+  ...
+# {"actualDefaultCoreAndChat":true,"roots":["C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r20-default-chat-SOLxaT","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r20-default-chat-SOLxaT\\\\actual-skills-root"],"sourceBasisDigest":"1920f3d07b327f330f185edbbfc15a35ff6b5e215978f212d7805f760fc24009","http":4,"stages":["write:lexical-read","write:canonical-read","write:final-write","edit:lexical-read","edit:canonical-read","edit:final-write"],"modelHostInjection":"rejected-before-gate"}
+# Subtest: R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+ok 13 - R18 parent refs are pure host ledger references; legacy/top-level records acquire no synthetic parent
+  ---
+  duration_ms: 0.315
+  type: 'test'
+  ...
+# Subtest: R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+ok 14 - R18 dispatch production raw entry rejects every host parent value before callback and preserves normal model payload
+  ---
+  duration_ms: 0.3427
+  type: 'test'
+  ...
+# Subtest: R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+ok 15 - R18 actual default Core/Chat transmits the parent-free schema and rejects model JSON before dispatch
+  ---
+  duration_ms: 13.4814
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r18-parent-tool-RIltWK","actualDefaultChat":true,"http":3,"normalDispatchCallbacks":1,"forgedParentCallbacks":0}
+# Subtest: R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+ok 16 - R16 strict stable hash admission uses actual final bytes on first write and authentic read-only edit preflight
+  ---
+  duration_ms: 11.9312
+  type: 'test'
+  ...
+# Subtest: R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+ok 17 - R16 unauthorized reads, forged host context, wrong final hash and final revocation cannot write
+  ---
+  duration_ms: 8.3133
+  type: 'test'
+  ...
+# Subtest: R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+ok 18 - R16 default Core writes approved workflow bytes through a strict host SHA gate and real after-write receipt
+  ---
+  duration_ms: 7.59
+  type: 'test'
+  ...
+# Subtest: R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+ok 19 - R15 real blocked callbacks bind the protected default Chat surface; forged identities and drift never gain admission
+  ---
+  duration_ms: 43.7447
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r15-required-bFZ5VD","actualRegisteredTools":["install_skill","uninstall_skill","install_mcp","uninstall_mcp"],"blockedResults":4,"oldEffects":0,"nativeConstructions":1,"http":2,"filesAndRegistrationsUnchanged":true}
+# Subtest: R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+ok 20 - R15 actual callback and registry replacement make observer facts unknown instead of trusting function properties
+  ---
+  duration_ms: 2.6235
+  type: 'test'
+  ...
+# Subtest: R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+ok 21 - R14 actual required scope admits registered scripts through the approval chain; Codex native plan is optional evidence and clean Chat/unmanaged scripts still work
+  ---
+  duration_ms: 155.8932
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r14-required-LgyO8i","unmanaged":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r14-unmanaged-NxOZAf","requiredScripts":["run_shell","start_background_task","list_background_tasks","read_background_task","stop_background_task"],"rejectedNativeConstructions":0,"rejectedHttp":0,"rejectedMarkerWrites":0,"admittedNativeConstructions":3,"actualHttp":5,"ownedMarker":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r14-unmanaged-NxOZAf\\\\owned-node-marker.txt"}
+# Subtest: R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+ok 22 - R12 preparing an override is effect-free, unknown and credential-free; forged tokens cannot bind
+  ---
+  duration_ms: 1.3347
+  type: 'test'
+  ...
+# Subtest: R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+ok 23 - R12 unsupported default native plan is omitted optional evidence: admission observed with no native spawn or project write
+  ---
+  duration_ms: 1.8165
+  type: 'test'
+  ...
+# Subtest: R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+ok 24 - R12 prepared identity is one-shot, instance-bound and rejects config/role/reprepare drift before construction
+  ---
+  duration_ms: 6.2384
+  type: 'test'
+  ...
+# Subtest: R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+ok 25 - R12 every real Core bind shares the host lease and registry; in-progress/active/disposed actors remain visible
+  ---
+  duration_ms: 3.418
+  type: 'test'
+  ...
+# Subtest: R12 interruption during async factory preparation prevents the subsequent native bind
+ok 26 - R12 interruption during async factory preparation prevents the subsequent native bind
+  ---
+  duration_ms: 1.8167
+  type: 'test'
+  ...
+# Subtest: R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+ok 27 - R12 actual shell/governance judge tool modes and a direct interpretation actor all enter the Core registry
+  ---
+  duration_ms: 8.1219
+  type: 'test'
+  ...
+# Subtest: R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+ok 28 - R12 physically managed or unknown scopes cannot invoke an unknown legacy factory even outside mutation
+  ---
+  duration_ms: 13.9157
+  type: 'test'
+  ...
+# Subtest: R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+ok 29 - R11 dispatch rejects every model workSourceRef before callback while normal evidence stays ordinary
+  ---
+  duration_ms: 0.4027
+  type: 'test'
+  ...
+# Subtest: R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+ok 30 - R10 host work-source reference is a strict immutable-source shape, never approval or a parent Task
+  ---
+  duration_ms: 0.233
+  type: 'test'
+  ...
+# Subtest: R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+ok 31 - R23 customer-turn and creator-report refs share the unchanged strict four-field shape without authenticating either source
+  ---
+  duration_ms: 0.1579
+  type: 'test'
+  ...
+# Subtest: Git capabilities register only when injected; all six roles/worker may query a host-bound template
+ok 32 - Git capabilities register only when injected; all six roles/worker may query a host-bound template
+  ---
+  duration_ms: 0.3021
+  type: 'test'
+  ...
+# Subtest: Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+ok 33 - Git schemas reject host identity/protection receipts, arbitrary argv/env and nested unknown fields
+  ---
+  duration_ms: 0.7176
+  type: 'test'
+  ...
+# Subtest: full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+ok 34 - full object-format OIDs and literal paths replace short revisions/pathspecs/user refs
+  ---
+  duration_ms: 0.4714
+  type: 'test'
+  ...
+# Subtest: candidate actions have exact shapes and trusted scope; prepared is not published
+ok 35 - candidate actions have exact shapes and trusted scope; prepared is not published
+  ---
+  duration_ms: 0.2886
+  type: 'test'
+  ...
+# Subtest: publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+ok 36 - publish scope and actual expected-ref/OID result are checked; no raw success on mismatch
+  ---
+  duration_ms: 0.2651
+  type: 'test'
+  ...
+# Subtest: Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+ok 37 - Git pending-recovery/conflict/blocked are preserved, and abort after published never rewrites the commit
+  ---
+  duration_ms: 0.2839
+  type: 'test'
+  ...
+# Subtest: Git schema declarations are strict nested templates, with no host-only fields
+ok 38 - Git schema declarations are strict nested templates, with no host-only fields
+  ---
+  duration_ms: 0.125
+  type: 'test'
+  ...
+# Subtest: actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+ok 39 - actual Service registry snapshots bind the instance and do not convert empty capabilities into confinement proof
+  ---
+  duration_ms: 3.7047
+  type: 'test'
+  ...
+# Subtest: R8 a custom factory cannot self-report the default Codex Chat production provenance
+ok 40 - R8 a custom factory cannot self-report the default Codex Chat production provenance
+  ---
+  duration_ms: 1.9247
+  type: 'test'
+  ...
+# Subtest: R8 native registry/instance/role/runtime/activity mismatches remain unknown
+ok 41 - R8 native registry/instance/role/runtime/activity mismatches remain unknown
+  ---
+  duration_ms: 22.6794
+  type: 'test'
+  ...
+# Subtest: R8 active HTTP inference alone is not treated as an uncontrolled execution program
+ok 42 - R8 active HTTP inference alone is not treated as an uncontrolled execution program
+  ---
+  duration_ms: 1.7551
+  type: 'test'
+  ...
+# Subtest: R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+ok 43 - R9 real write/edit reject Git, host roots, hardlinks and junction aliases after an allowing gate
+  ---
+  duration_ms: 186.9708
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw","commands":[["git","init","--quiet","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\repo"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\repo","-c","user.name=R9 fixture","-c","user.email=r9@example.invalid","commit","--quiet","--allow-empty","-m","owned fixture"],["git","-C","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\repo","worktree","add","--quiet","--detach","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\other-worktree","HEAD"],["git","init","--quiet","--separate-git-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\common-dir","C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\separate-repo"]],"gateCalls":18,"evidence":[{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\repo\\\\.git\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\hardlink-0.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\common-dir\\\\config","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\hardlink-1.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc","afterSha256":"05becdb83bb897f6103c8d91439e2e9092144edf5b3955a746fce4975c12bfdc"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\other-worktree\\\\owned.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\hardlink-2.txt","primitiveControl":"wrote-and-restored","nlink":2,"beforeSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9","afterSha256":"3f344cee33be9c1645f3176726942d85a5438338d34060aa38823aa025e5dfa9"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\repo\\\\.git\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\junction-0\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\common-dir\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\junction-1\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"},{"target":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\other-worktree\\\\single-link.txt","alias":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-files-ufGdXw\\\\junction-2\\\\single-link.txt","primitiveControl":"wrote-and-restored","nlink":1,"after":"original"}]}
+# Subtest: R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+ok 44 - R9 rechecks nlink after gate approval, allows ordinary IO and rejects model roots
+  ---
+  duration_ms: 23.0299
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-r9-final-KoClOq","ordinary":"write+edit succeeded","lateHardlink":"both rejected","newRepo":"no .git created"}
+# Subtest: R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+ok 45 - R9 Service binds defensive host roots without claiming FS confinement or complete discovery
+  ---
+  duration_ms: 3.1063
+  type: 'test'
+  ...
+1..45
+# tests 45
+# suites 0
+# pass 45
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 915.2967

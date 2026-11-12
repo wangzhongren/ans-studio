@@ -1,0 +1,1 @@
+gates: B2 baseline 5 names vs current 5 names — diff empty (LF checkout; CRLF artifacts excluded)

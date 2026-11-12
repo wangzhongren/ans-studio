@@ -1,0 +1,100 @@
+TAP version 13
+# Subtest: F9/B1：四工具只在 ShellGate 与管理器同时注入时注册；显示规则与判断会话隔离（结构面）
+ok 1 - F9/B1：四工具只在 ShellGate 与管理器同时注入时注册；显示规则与判断会话隔离（结构面）
+  ---
+  duration_ms: 2.3738
+  type: 'test'
+  ...
+# Subtest: F1/F2：空命令与 F-7 守卫在审核之前拒绝，零 spawn、无任务
+ok 2 - F1/F2：空命令与 F-7 守卫在审核之前拒绝，零 spawn、无任务
+  ---
+  duration_ms: 0.9483
+  type: 'test'
+  ...
+# Subtest: F3：审核拒绝/undefined/抛错/超时四类均零 spawn、无任务、无日志
+ok 3 - F3：审核拒绝/undefined/抛错/超时四类均零 spawn、无任务、无日志
+  ---
+  duration_ms: 36.4455
+  type: 'test'
+  ...
+# Subtest: F4/CC1：第 9 个在 ShellGate 之前被拒，无审核请求、零 spawn、诊断 background.limit
+ok 4 - F4/CC1：第 9 个在 ShellGate 之前被拒，无审核请求、零 spawn、诊断 background.limit
+  ---
+  duration_ms: 3.9441
+  type: 'test'
+  ...
+# Subtest: S1/S2：启动立即返回并含任务号/pid；list/read/stop 可用；再次 stop 如实返回已结束
+ok 5 - S1/S2：启动立即返回并含任务号/pid；list/read/stop 可用；再次 stop 如实返回已结束
+  ---
+  duration_ms: 190.2352
+  type: 'test'
+  ...
+# Subtest: S2.5/F10：自然退出如实显示 exited 与退出码；对已结束任务 stop 不谎报刚刚停止
+ok 6 - S2.5/F10：自然退出如实显示 exited 与退出码；对已结束任务 stop 不谎报刚刚停止
+  ---
+  duration_ms: 56.4439
+  type: 'test'
+  ...
+# Subtest: F6/O3：未知任务、非法参数与 schema 边界；tailLines 超上限如实钳制
+ok 7 - F6/O3：未知任务、非法参数与 schema 边界；tailLines 超上限如实钳制
+  ---
+  duration_ms: 1.2801
+  type: 'test'
+  ...
+# Subtest: F8：后台进程 cwd=会话 shellCwd，凭据环境变量被剥离；schema 不接受调用方指定 cwd
+ok 8 - F8：后台进程 cwd=会话 shellCwd，凭据环境变量被剥离；schema 不接受调用方指定 cwd
+  ---
+  duration_ms: 61.3783
+  type: 'test'
+  ...
+# Subtest: S4：轮次中止不杀后台任务；启动成功结果不因信号中止被改写成「未启动」
+ok 9 - S4：轮次中止不杀后台任务；启动成功结果不因信号中止被改写成「未启动」
+  ---
+  duration_ms: 1146.0596
+  type: 'test'
+  ...
+# Subtest: S3：管理器已关闭后 start 明确失败且零 spawn（审核通过后才发现会话关闭的竞态）
+ok 10 - S3：管理器已关闭后 start 明确失败且零 spawn（审核通过后才发现会话关闭的竞态）
+  ---
+  duration_ms: 0.5986
+  type: 'test'
+  ...
+# Subtest: B4/CC3：background.* 诊断事件齐全且字段全部落在共享白名单内（不含 taskId）
+ok 11 - B4/CC3：background.* 诊断事件齐全且字段全部落在共享白名单内（不含 taskId）
+  ---
+  duration_ms: 1.0065
+  type: 'test'
+  ...
+# Subtest: Service：仅 ShellGate 会话注入四工具；判断会话与无 ShellGate 会话不可见
+ok 12 - Service：仅 ShellGate 会话注入四工具；判断会话与无 ShellGate 会话不可见
+  ---
+  duration_ms: 12.0126
+  type: 'test'
+  ...
+# Subtest: Service dispose：终止运行中任务、管理器失效、dispose 幂等
+ok 13 - Service dispose：终止运行中任务、管理器失效、dispose 幂等
+  ---
+  duration_ms: 118.1326
+  type: 'test'
+  ...
+# Subtest: Service：bindRole 失败如实拒绝（管理器释放在无回合时为空操作；释放接线见代码/构造失败路径）
+ok 14 - Service：bindRole 失败如实拒绝（管理器释放在无回合时为空操作；释放接线见代码/构造失败路径）
+  ---
+  duration_ms: 2.6563
+  type: 'test'
+  ...
+# Subtest: Service：assertReady 失败如实拒绝并关闭已绑定 inner 会话（管理器释放路径已接线）
+ok 15 - Service：assertReady 失败如实拒绝并关闭已绑定 inner 会话（管理器释放路径已接线）
+  ---
+  duration_ms: 2.1842
+  type: 'test'
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 15
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1890.5178

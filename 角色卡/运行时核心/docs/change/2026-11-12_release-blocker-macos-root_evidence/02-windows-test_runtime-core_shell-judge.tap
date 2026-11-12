@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: 只读工具集恰为三项：judge_read_file / judge_list_dir / report_shell_judgement
+ok 1 - 只读工具集恰为三项：judge_read_file / judge_list_dir / report_shell_judgement
+  ---
+  duration_ms: 1.8784
+  type: 'test'
+  ...
+# Subtest: 项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸一律拒绝且不回显绝对路径
+ok 2 - 项目根内可读（相对/绝对）；根外、`..`、符号链接逃逸一律拒绝且不回显绝对路径
+  ---
+  duration_ms: 16.2797
+  type: 'test'
+  ...
+# Subtest: 敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计与会话目录；列表不列敏感项
+ok 3 - 敏感文件/目录拒绝：.env、私钥、凭据/令牌、.git、审计与会话目录；列表不列敏感项
+  ---
+  duration_ms: 14.3193
+  type: 'test'
+  ...
+# Subtest: 二进制拒绝、128KB 截断标记、12 次调用与 512KB 总预算
+ok 4 - 二进制拒绝、128KB 截断标记、12 次调用与 512KB 总预算
+  ---
+  duration_ms: 19.7422
+  type: 'test'
+  ...
+# Subtest: 第 13 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated
+ok 5 - 第 13 次读取返回独立 budget 码且不计入 deniedReads；敏感/越界仍 read-denied、截断仍 read-truncated
+  ---
+  duration_ms: 6.2474
+  type: 'test'
+  ...
+# Subtest: report_shell_judgement 原样回调模型参数，不做裁决规范化
+ok 6 - report_shell_judgement 原样回调模型参数，不做裁决规范化
+  ---
+  duration_ms: 0.5692
+  type: 'test'
+  ...
+# Subtest: Service 装配：注入 shellJudge 时只构造三只只读工具、judgeMode=true、外来 MCP 置空
+ok 7 - Service 装配：注入 shellJudge 时只构造三只只读工具、judgeMode=true、外来 MCP 置空
+  ---
+  duration_ms: 5.9972
+  type: 'test'
+  ...
+# Subtest: judge_list_dir 单层列举、默认项目根、根外拒绝
+ok 8 - judge_list_dir 单层列举、默认项目根、根外拒绝
+  ---
+  duration_ms: 3.5406
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 317.5089

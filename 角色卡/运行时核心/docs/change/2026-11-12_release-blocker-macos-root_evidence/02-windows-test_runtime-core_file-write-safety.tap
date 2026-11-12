@@ -1,0 +1,87 @@
+TAP version 13
+# Subtest: D3 actual write gate rejects unauthorized real targets and permits fully authorized aliases
+ok 1 - D3 actual write gate rejects unauthorized real targets and permits fully authorized aliases
+  ---
+  duration_ms: 32.856
+  type: 'test'
+  ...
+# Subtest: D3 final gate deny prevents commit after parent creation and during edit
+ok 2 - D3 final gate deny prevents commit after parent creation and during edit
+  ---
+  duration_ms: 6.7843
+  type: 'test'
+  ...
+# Subtest: D3 final gate throw prevents commit after parent creation and during edit
+ok 3 - D3 final gate throw prevents commit after parent creation and during edit
+  ---
+  duration_ms: 4.2022
+  type: 'test'
+  ...
+# Subtest: D3 final gate abort prevents commit after parent creation and during edit
+ok 4 - D3 final gate abort prevents commit after parent creation and during edit
+  ---
+  duration_ms: 4.153
+  type: 'test'
+  ...
+# Subtest: D3 parent recheck rejects a changed in-root directory even if gate allows
+ok 5 - D3 parent recheck rejects a changed in-root directory even if gate allows
+  ---
+  duration_ms: 3.9484
+  type: 'test'
+  ...
+# Subtest: D3 linked workspace root remains usable; linked target itself is not replaced
+not ok 6 - D3 linked workspace root remains usable; linked target itself is not replaced
+  ---
+  duration_ms: 6.1352
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\release-v2.0.0-blockers-2\\test\\runtime-core\\file-write-safety.test.ts:97:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-fONxLq\\actual\\nested\\file.txt' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-core-d3-fONxLq\\actual\\link.txt'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/runtime-core/file-write-safety.test.ts:105:5
+    async withRoot (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/runtime-core/file-write-safety.test.ts:19:9)
+    async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/runtime-core/file-write-safety.test.ts:98:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: D3 lstat ENOTDIR is a status error, never a new-file fallback
+ok 7 - D3 lstat ENOTDIR is a status error, never a new-file fallback
+  ---
+  duration_ms: 3.5492
+  type: 'test'
+  ...
+# Subtest: D3 write and edit preserve existing ordinary modes and strip special bits
+ok 8 - D3 write and edit preserve existing ordinary modes and strip special bits # SKIP
+  ---
+  duration_ms: 0.1084
+  type: 'test'
+  ...
+# Subtest: D3 handler under strict umask retains existing mode and keeps new files private
+ok 9 - D3 handler under strict umask retains existing mode and keeps new files private # SKIP
+  ---
+  duration_ms: 0.0484
+  type: 'test'
+  ...
+# Subtest: D3 chmod failure reaches the handler without committing file or mode
+ok 10 - D3 chmod failure reaches the handler without committing file or mode # SKIP
+  ---
+  duration_ms: 0.0579
+  type: 'test'
+  ...
+# Subtest: D3 sync failure reaches the handler without committing file or mode
+ok 11 - D3 sync failure reaches the handler without committing file or mode # SKIP
+  ---
+  duration_ms: 0.0331
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 4
+# todo 0
+# duration_ms 304.427

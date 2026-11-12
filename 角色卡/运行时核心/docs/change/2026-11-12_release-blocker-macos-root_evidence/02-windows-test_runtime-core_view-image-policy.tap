@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: Service：四个运行时的 view_image 注册门不变——注入 viewImage 才注册；未注入 ⇒ 工具不存在（fail-closed）
+ok 1 - Service：四个运行时的 view_image 注册门不变——注入 viewImage 才注册；未注入 ⇒ 工具不存在（fail-closed）
+  ---
+  duration_ms: 18.9949
+  type: 'test'
+  ...
+# Subtest: Service + demo（仍 next-turn）：工具调用注入能力并透传 turnId；ToolResult 无 images、交付为 next-turn（零行为变化）
+ok 2 - Service + demo（仍 next-turn）：工具调用注入能力并透传 turnId；ToolResult 无 images、交付为 next-turn（零行为变化）
+  ---
+  duration_ms: 8.4416
+  type: 'test'
+  ...
+# Subtest: Service + pi（Gate 3 已翻 tool-result）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+ok 3 - Service + pi（Gate 3 已翻 tool-result）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+  ---
+  duration_ms: 5.3741
+  type: 'test'
+  ...
+# Subtest: Service + claude（Gate 3 已翻 tool-result；5 MB 上限）：同轮附图、不触达桌面能力、超限失败无图
+ok 4 - Service + claude（Gate 3 已翻 tool-result；5 MB 上限）：同轮附图、不触达桌面能力、超限失败无图
+  ---
+  duration_ms: 6.5081
+  type: 'test'
+  ...
+# Subtest: Service + codex（Gate 3 已翻 tool-result，Chat/Pi 证据）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+ok 5 - Service + codex（Gate 3 已翻 tool-result，Chat/Pi 证据）：工具结果同轮附图、不触达桌面能力；message 走共享 i18n key
+  ---
+  duration_ms: 3.6266
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 292.7682

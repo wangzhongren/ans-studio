@@ -1,0 +1,77 @@
+TAP version 13
+# Subtest: W2 prepareRole：unknown 保护范围拒绝；required 下 unknown 不静默放行
+ok 1 - W2 prepareRole：unknown 保护范围拒绝；required 下 unknown 不静默放行
+  ---
+  duration_ms: 13.6533
+  type: 'test'
+  ...
+# Subtest: W2 prepareRole 真值表：required × runtime × shell × binding × provenance × guards
+ok 2 - W2 prepareRole 真值表：required × runtime × shell × binding × provenance × guards
+  ---
+  duration_ms: 34.5063
+  type: 'test'
+  ...
+# {"root":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-macos-sim\\\\alias-temp\\\\ans-w2-truth-a5UlxY","verifiedChainMode":"rules-advisory","codexNative":"observed","demoRejected":true}
+# Subtest: W2 mode 可接受集合：readonly / operator-approve / rules-advisory / three-layer 均准入
+ok 3 - W2 mode 可接受集合：readonly / operator-approve / rules-advisory / three-layer 均准入
+  ---
+  duration_ms: 13.2252
+  type: 'test'
+  ...
+# Subtest: W2 审计三态：非持久/非 file/探针缺失/抛错/unknown 一律 protected-scope-audit-unavailable
+ok 4 - W2 审计三态：非持久/非 file/探针缺失/抛错/unknown 一律 protected-scope-audit-unavailable
+  ---
+  duration_ms: 17.69
+  type: 'test'
+  ...
+# Subtest: W2 项目根：注册根与 Core 根不一致 ⇒ unproven；规范化等值（尾斜杠/Windows 大小写）⇒ 准入
+ok 5 - W2 项目根：注册根与 Core 根不一致 ⇒ unproven；规范化等值（尾斜杠/Windows 大小写）⇒ 准入
+  ---
+  duration_ms: 9.5012
+  type: 'test'
+  ...
+# Subtest: W2 approvalChain 稳定投影（无时间戳/凭据）且 configDigest 计入 approvalChain
+ok 6 - W2 approvalChain 稳定投影（无时间戳/凭据）且 configDigest 计入 approvalChain
+  ---
+  duration_ms: 8.1187
+  type: 'test'
+  ...
+# Subtest: W2 matchesRuntimeApprovalChain：模块级一致性判据逐字段 fail-closed
+ok 7 - W2 matchesRuntimeApprovalChain：模块级一致性判据逐字段 fail-closed
+  ---
+  duration_ms: 0.2971
+  type: 'test'
+  ...
+# Subtest: W2 bindPreparedRole：受保护 + shell + 已登记审批链 ⇒ token 成立并绑定（appTools 含 shell）
+ok 8 - W2 bindPreparedRole：受保护 + shell + 已登记审批链 ⇒ token 成立并绑定（appTools 含 shell）
+  ---
+  duration_ms: 16.4339
+  type: 'test'
+  ...
+# Subtest: W2 composeContext：受保护 + shell + 已登记审批链 ⇒ token 成立后设置 admittedPlan 并返回上下文
+ok 9 - W2 composeContext：受保护 + shell + 已登记审批链 ⇒ token 成立后设置 admittedPlan 并返回上下文
+  ---
+  duration_ms: 10.5754
+  type: 'test'
+  ...
+# Subtest: W2 无 token 的受保护 shell 会话不得构造适配器：bindRole/composeContext 均拒绝
+ok 10 - W2 无 token 的受保护 shell 会话不得构造适配器：bindRole/composeContext 均拒绝
+  ---
+  duration_ms: 8.5777
+  type: 'test'
+  ...
+# Subtest: W2 AC-27：prepare→bind 之间 gate 替换先被 isCurrent 拦为 runtime-prepared-configuration-changed
+ok 11 - W2 AC-27：prepare→bind 之间 gate 替换先被 isCurrent 拦为 runtime-prepared-configuration-changed
+  ---
+  duration_ms: 5.2397
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 372.8409

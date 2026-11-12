@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, renameSync, symlinkSync } from "node:fs";
-import { mkdtemp, mkdir, readFile, rm, writeFile, link, symlink, readdir } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile, link, symlink, readdir, realpath } from "node:fs/promises";
 import { createRequire, syncBuiltinESMExports } from "node:module";
 import os from "node:os";
 import path from "node:path";
@@ -157,6 +157,9 @@ const stagedTools = (options: GovernedToolsOptions, gate: WriteGate) => new Map(
 test("R20 issued stages bind invocation/path/op/stage, expire on gate return, and write only after pure final policy", async () => {
   await withRoot(async root => {
     const target = path.join(root, "allowed", "new.txt"), contexts: WriteGateContext[] = [], observed: FileGateFacts[] = [];
+    // 2026-11-12（P0）：canonicalFacts.protectedRoots 是真实路径；macOS 临时根 `/var`→`/private/var` 下
+    // 不能按输入拼写比较。改为比较同一真实根（断言未放宽——仍要求恰好这一个受保护根）。
+    const canonicalGitRoot = path.join(await realpath(root), ".git");
     const gate = pureStagedGate(root, (facts, context) => {
       contexts.push(context); observed.push(facts);
       assert.equal(Object.isFrozen(context), true); assert.equal(Object.isFrozen(context.fileFacts), true);
@@ -167,7 +170,7 @@ test("R20 issued stages bind invocation/path/op/stage, expire on gate return, an
       if (facts.canonicalFacts) {
         assert.equal(Object.isFrozen(context.fileFacts!.canonicalFacts!.protectedRoots), true);
         facts.canonicalFacts.protectedRoots = [];
-        assert.deepEqual(inspectRuntimeFileGateContext(context, target, facts.operation, facts.stage)!.canonicalFacts!.protectedRoots, [path.join(root, ".git")]);
+        assert.deepEqual(inspectRuntimeFileGateContext(context, target, facts.operation, facts.stage)!.canonicalFacts!.protectedRoots, [canonicalGitRoot]);
       }
     });
     const result = await stagedTools(stagedOptions(root), gate).get("write_file")!.handler({ name: "write_file", args: { path: "allowed/new.txt", content: "exact final bytes\n" } });
