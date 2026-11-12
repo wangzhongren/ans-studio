@@ -12,8 +12,37 @@
 //
 // 全程假句柄（handle.send 只登记文本），不发真实模型请求。
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+/** **真实可解析的夹具项目根**（CI runner 没有 `/proj`）：宿主库存登记以 native realpath 规范化根，
+ *  不可解析即 fail-closed ⇒ 会话开不起来。文件级共用一根，`after` 统一清理（用例失败也清理）。 */
+const PROJECT_ROOT = mkdtempSync(path.join(os.tmpdir(), "ans-queue-withdraw-project-"));
+const createdManagers: SessionManager[] = [];
+const createdGates: (() => void)[] = [];
+after(async () => {
+  for (const release of createdGates) release();
+  for (const mgr of createdManagers) {
+    try { if (mgr.isOpen()) await settledWithin(mgr.stop(null), "queue-withdraw-lru 清理 stop 超时", 5_000); } catch { /* 清理不掩盖用例失败 */ }
+  }
+  rmSync(PROJECT_ROOT, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+});
+
+/** 有界等待真实回执：产品回执若永不结算，用例须在有限时间内失败并进入清理。 */
+async function openOk(mgr: SessionManager, input: { projectRoot: string; roleId: string; runtime: "demo" | "pi" }): Promise<void> {
+  const opened = await mgr.open(input);
+  assert.equal(opened.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
+}
+
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+}
 
 import { SessionManager, MAX_LIVE_SESSIONS } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
@@ -23,7 +52,7 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
-function listing(roleIds: string[], primaryRoleId: string): ProjectListing {
+function listing(roleIds: string[], primaryRoleId: string, projectRoot: string = PROJECT_ROOT): ProjectListing {
   const mk = (roleId: string): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: `角色卡/${roleId}/role-card.md`,
@@ -35,7 +64,7 @@ function listing(roleIds: string[], primaryRoleId: string): ProjectListing {
       acceptance: { accepted: false, source: "" },
     },
   });
-  return { projectRoot: "/proj", roles: roleIds.map(mk), warnings: [], hasRoles: true, primaryRoleId };
+  return { projectRoot, roles: roleIds.map(mk), warnings: [], hasRoles: true, primaryRoleId };
 }
 
 interface QueueViewItem {
@@ -56,6 +85,10 @@ interface Harness {
   latest: (roleId: string) => { roleId: string; busy: boolean; queue: QueueViewItem[] } | undefined;
   /** F-2-T5 夹具：挂起某角色**下一次** send（release 前不 resolve）。 */
   hangNext: (roleId: string) => () => void;
+  /** 放行全部夹具门（失败路径也执行）。 */
+  releaseGates: () => void;
+  /** 无论用例如何退出都执行：放门 → 有界 stop → dispose 句柄。 */
+  cleanup: () => Promise<void>;
 }
 
 function makeHarness(l: ProjectListing): Harness {
@@ -64,18 +97,22 @@ function makeHarness(l: ProjectListing): Harness {
   const roleStates: Harness["roleStates"] = [];
   const emitted: Harness["emitted"] = [];
   const stopped: Record<string, boolean> = {};
+  const handles: RoleSessionHandle[] = [];
+  const gates: (() => void)[] = [];
   // F-2-T5 夹具（2026-10-16）：可控挂起的 send——release 前 promise 不 resolve（模拟整轮在跑）。
   const nextGate: Record<string, Promise<void> | undefined> = {};
   const hangNext = (roleId: string): (() => void) => {
     let release!: () => void;
     nextGate[roleId] = new Promise<void>((resolve) => { release = resolve; });
+    gates.push(release);
+    createdGates.push(release);
     return release;
   };
   const makeHandle = (roleId: string): RoleSessionHandle => {
     let i = 0;
     streams[roleId] = streams[roleId] ?? [];
     sent[roleId] = sent[roleId] ?? [];
-    return {
+    const handle: RoleSessionHandle = {
       async send(text: string): Promise<void> {
         const gate = nextGate[roleId];
         if (gate) {
@@ -105,6 +142,8 @@ function makeHarness(l: ProjectListing): Harness {
         stopped[roleId] = true;
       },
     };
+    handles.push(handle);
+    return handle;
   };
   const mgr = new SessionManager({
     openRoleSession: async (input: { roleId: string }) => makeHandle(input.roleId),
@@ -115,7 +154,7 @@ function makeHarness(l: ProjectListing): Harness {
       throw new Error("本用例不应构造 demo 适配器");
     },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? l : undefined),
+    getListing: (root) => (root === l.projectRoot ? l : undefined),
     emitEvent: (env: { roleId: string; event: { kind: string; summary?: string } }) =>
       emitted.push({ roleId: env.roleId, kind: env.event.kind, summary: String(env.event.summary ?? "") }),
     emitRoleState: (info) =>
@@ -125,6 +164,7 @@ function makeHarness(l: ProjectListing): Harness {
         queue: ((info.queue ?? []) as QueueViewItem[]).map((q) => ({ ...q })),
       }),
   });
+  createdManagers.push(mgr);
   return {
     mgr,
     streams,
@@ -132,6 +172,14 @@ function makeHarness(l: ProjectListing): Harness {
     roleStates,
     emitted,
     hangNext,
+    releaseGates: () => { for (const release of gates) release(); },
+    cleanup: async () => {
+      for (const release of gates) release();
+      try { if (mgr.isOpen()) await settledWithin(mgr.stop(null), "queue-withdraw-lru 清理 stop 超时", 5_000); } catch { /* 清理不掩盖用例失败 */ }
+      for (const handle of handles) {
+        try { await settledWithin(handle.dispose(), "queue-withdraw-lru 清理 dispose 超时", 2_000); } catch { /* dispose 幂等；失败不再抛 */ }
+      }
+    },
     latest: (roleId) => {
       for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
       return undefined;
@@ -142,7 +190,7 @@ function makeHarness(l: ProjectListing): Harness {
 test("P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前移、id/full 在快照里）；进行中/回交/不存在都如实回错", async () => {
   const l = listing(["su", "A"], "su");
   const h = makeHarness(l);
-  const opened = await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  const opened = await h.mgr.open({ projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   assert.equal(opened.ok, true);
   await tick(30);
 
@@ -184,7 +232,7 @@ test("P1-1 撤回：忙时入队两条 → 撤第 2 条（ok+摘要、位次前�
   );
 
   // 回交条目（治理流）：su 先置忙（否则投递机自动开启 su 会当场投递、进不了队列）——再推回交事件，拒撤（只读）。
-  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" });
   await tick(15);
   await h.mgr.send("su 忙住（占位）");
   assert.equal(h.latest("su")?.busy, true, "su 置忙");
@@ -215,24 +263,24 @@ test("P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；
   const h = makeHarness(l);
 
   // 建局：开 B、A、C（随后把 B 排成「最久未用 + 在跑」）。open 续接会刷新 lastUsed——按调用序排 LRU。
-  await h.mgr.open({ projectRoot: "/proj", roleId: "B", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "B", runtime: "demo" });
   await tick(15);
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(15);
-  await h.mgr.open({ projectRoot: "/proj", roleId: "C", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "C", runtime: "demo" });
   await tick(15);
   // 让 B 在跑（open 续接把活动切到 B；send 后无 settled ⇒ busy 持续），再按用 A、C 把 B 压成最久未用。
-  await h.mgr.open({ projectRoot: "/proj", roleId: "B", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "B", runtime: "demo" });
   await tick(15);
   await h.mgr.send("B 的后台任务");
   assert.equal(h.latest("B")?.busy, true, "B 在跑（且此后一直不 settle）");
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(15);
-  await h.mgr.open({ projectRoot: "/proj", roleId: "C", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "C", runtime: "demo" });
   await tick(15);
 
   // live={B(busy,最久),A,C} 共 3（满）——open D ⇒ 超限 ⇒ 应淘汰最久未用的**非 busy** 者（A），绝不淘汰 B。
-  await h.mgr.open({ projectRoot: "/proj", roleId: "D", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "D", runtime: "demo" });
   await tick(30);
   assert.deepEqual(h.mgr.liveRoleIds().sort(), ["B", "C", "D"], "busy 的 B 不被淘汰；淘汰的是最久未用的非 busy 者（A）");
   assert.equal(h.latest("B")?.busy, true, "B 仍在跑（没有被静默掐断）");
@@ -244,7 +292,7 @@ test("P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；
   await tick(60);
   const h2 = makeHarness(listing(["B", "A", "C", "D"], ""));
   for (const id of ["B", "A", "C"]) {
-    await h2.mgr.open({ projectRoot: "/proj", roleId: id, runtime: "demo" });
+    await openOk(h2.mgr, { projectRoot: PROJECT_ROOT, roleId: id, runtime: "demo" });
     await tick(15);
     await h2.mgr.send(id + " 的后台任务");
     await tick(15);
@@ -253,7 +301,7 @@ test("P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；
   assert.equal(h2.latest("A")?.busy, true);
   assert.equal(h2.latest("C")?.busy, true);
   assert.deepEqual(h2.mgr.liveRoleIds().sort(), ["A", "B", "C"], "满 3");
-  await h2.mgr.open({ projectRoot: "/proj", roleId: "D", runtime: "demo" });
+  await openOk(h2.mgr, { projectRoot: PROJECT_ROOT, roleId: "D", runtime: "demo" });
   await tick(30);
   assert.deepEqual(h2.mgr.liveRoleIds().sort(), ["A", "B", "C", "D"], "全忙 ⇒ **暂超限**（一个都不掐断）");
   h2.streams.B.push({ kind: "settled", summary: "B 一轮结束" });
@@ -270,7 +318,7 @@ test("P1-2 LRU 避开 busy：挑最久未用的非 busy 者；全忙暂超限；
 test("F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，撤回无效」；放行后两笔按序送达（撤回无效 ≠ 丢弃）", async () => {
   const l = listing(["su", "A"], "su");
   const h = makeHarness(l);
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
 
   // 第一轮由直接消息开跑并挂起（send promise 未结——模拟真实 Pi 整轮在跑）：
@@ -298,7 +346,7 @@ test("F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，�
   // 放行两笔（先第一笔、再第二笔）：顺序与内容不损（撤回无效 ≠ 丢弃）。
   release1();
   release2();
-  await p1;
+  await settledWithin(p1, "挂起回合回执等待超时");
   await tick(80);
   assert.deepEqual(h.sent.A, ["在跑（挂起）", "排队消息"], "两笔按序送达（链路收窄后语义逐字保真）");
   await h.mgr.stop(null);
@@ -307,7 +355,7 @@ test("F-2-T5 认领已发生（send 未结）⇒ withdraw 如实「进行中，�
 test("G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归治理流只读面（与派发/回交同语义）", async () => {
   const l = listing(["su", "A"], "su");
   const h = makeHarness(l);
-  await h.mgr.open({ projectRoot: l.projectRoot, roleId: "su", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: l.projectRoot, roleId: "su", runtime: "demo" });
   const release = h.hangNext("su");
   const send = h.mgr.send("占住 su 本轮");
   await tick(80);
@@ -323,14 +371,14 @@ test("G-2/W2：`system` 类（看护告警/收束/回执）不可撤回——归
   assert.equal(wd.ok, false, "system 不可撤回（治理流只读面——按钮不出现、语义同拒）");
   assert.match(wd.error ?? "", /只读|不可撤回/, "如实说明");
   release();
-  await send;
+  await settledWithin(send, "系统回合回执等待超时");
   await h.mgr.stop(null);
 });
 
 test("2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目（UI 显示「系统」、不可撤回）；缺省仍为客户消息类别", async () => {
   const l = listing(["A"], "A");
   const h = makeHarness(l);
-  await h.mgr.open({ projectRoot: l.projectRoot, roleId: "A", runtime: "demo" });
+  await openOk(h.mgr, { projectRoot: l.projectRoot, roleId: "A", runtime: "demo" });
   await tick(30);
   const release = h.hangNext("A");
   const running = h.mgr.send("占住本轮");
@@ -339,7 +387,7 @@ test("2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目
 
   // 治理唤醒（delivered 核证/协调等）显式声明 system 类别。
   const wake = await h.mgr.sendBackground({
-    projectRoot: "/proj",
+    projectRoot: PROJECT_ROOT,
     roleId: "A",
     runtime: "demo",
     text: "[系统·治理核证] 流程 flow-x：以下步骤已 delivered，等待运营核证：",
@@ -349,7 +397,7 @@ test("2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目
   assert.equal(wake.queued, true, "目标忙 ⇒ 入队");
 
   // 真实客户消息缺省仍是 message 类别（既有语义不变）。
-  const customer = await h.mgr.send("普通客户消息", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  const customer = await h.mgr.send("普通客户消息", undefined, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   assert.equal(customer.queued, true);
   await tick(40);
 
@@ -362,7 +410,7 @@ test("2026-10-26 治理唤醒 sendBackground kind=system：入队为系统条目
   assert.equal(wdCustomer.ok, true, "客户消息撤回语义不变");
 
   release();
-  await running;
+  await settledWithin(running, "占位回合回执等待超时");
   await h.mgr.stop(null);
 });
 

@@ -1,0 +1,269 @@
+===== test/测试/g4-skill-verify/e-handler.test.ts =====
+--- RUN 1 ---
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (28.5397ms)
+✔ 拒绝分支矩阵：role-not-found / not-registered / role-not-listed / registration-unchanged——回执如实、零副作用 (32.0175ms)
+✔ 成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 会话已重建；[系统·安装] 真投递且不可撤回 (162.0606ms)
+✔ 成功路径（next-session 两支）：在跑不打断（无 note）；无会话（note 如实、不自动开） (21.3101ms)
+✔ rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/不假装已生效；不投系统行 (11.0245ms)
+✔ 卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:true/uninstalled；系统行「效果已撤，文件保留」二分 (85.9302ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 818.1766
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\e-handler.test.ts:29:1
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (28.5397ms)
+  AssertionError [ERR_ASSERTION]: 无轮次 ⇒ 护栏拒绝
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/e-handler.test.ts:40:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1
+--- RUN 2 ---
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (28.9445ms)
+✔ 拒绝分支矩阵：role-not-found / not-registered / role-not-listed / registration-unchanged——回执如实、零副作用 (31.2273ms)
+✔ 成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 会话已重建；[系统·安装] 真投递且不可撤回 (161.4819ms)
+✔ 成功路径（next-session 两支）：在跑不打断（无 note）；无会话（note 如实、不自动开） (23.0929ms)
+✔ rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/不假装已生效；不投系统行 (10.7732ms)
+✔ 卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:true/uninstalled；系统行「效果已撤，文件保留」二分 (92.8647ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 774.4597
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\e-handler.test.ts:29:1
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (28.9445ms)
+  AssertionError [ERR_ASSERTION]: 无轮次 ⇒ 护栏拒绝
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/e-handler.test.ts:40:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1
+--- RUN 3 ---
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (28.4427ms)
+✔ 拒绝分支矩阵：role-not-found / not-registered / role-not-listed / registration-unchanged——回执如实、零副作用 (31.3572ms)
+✔ 成功路径（rebuilt）：回执冻形逐字段/digest 独立复算；X 会话已重建；[系统·安装] 真投递且不可撤回 (158.9501ms)
+✔ 成功路径（next-session 两支）：在跑不打断（无 note）；无会话（note 如实、不自动开） (22.8647ms)
+✔ rebuild-failed 如实：重开失败 ⇒ ok:false/reason=rebuild-failed/不假装已生效；不投系统行 (11.0704ms)
+✔ 卸载成功路径：先改登记（移除角色）再 uninstall ⇒ ok:true/uninstalled；系统行「效果已撤，文件保留」二分 (87.9563ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 5
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 762.2819
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\e-handler.test.ts:29:1
+✖ 护栏矩阵：无轮次/回交轮/系统轮/派发轮 ⇒ not-customer-turn（零副作用）；直聊与排队客户消息轮 ⇒ 放行 (28.4427ms)
+  AssertionError [ERR_ASSERTION]: 无轮次 ⇒ 护栏拒绝
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/e-handler.test.ts:40:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+EXIT=1
+===== test/测试/g4v2-mcp-verify/f-handler.test.ts =====
+--- RUN 1 ---
+✔ F1 成功链（rebuilt）：校验→激活重建→冻形回执→[系统·安装] 真投递（含诚实面）→不可撤回→诊断 (184.1253ms)
+✔ F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零重建/无系统行）；文案与 schema 模板同代入后互核 (23.8129ms)
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (6.9606ms)
+✔ F4 激活三态：busy ⇒ next-session 不打断；无会话 ⇒ next-session＋note（绝不自动开）；重建失败 ⇒ rebuild-failed 如实 (155.5168ms)
+✔ F5 卸载链：先改声明→校验通过→重建→回执二分（效果已撤/声明保留/副作用不可撤）＋系统行；已发生副作用不可撤入文案 (13.6123ms)
+✔ F6 排队客户消息轮：su 忙时再发客户消息处于队列（active kind=message）⇒ 安装仍放行；护栏先判不消耗队列 (11.5006ms)
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (19.695ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 848.4356
+
+✖ failing tests:
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:130:1
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (6.9606ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:140:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:266:1
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (19.695ms)
+  AssertionError [ERR_ASSERTION]: 诊断含 mcp.refused
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:278:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+EXIT=1
+--- RUN 2 ---
+✔ F1 成功链（rebuilt）：校验→激活重建→冻形回执→[系统·安装] 真投递（含诚实面）→不可撤回→诊断 (183.9251ms)
+✔ F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零重建/无系统行）；文案与 schema 模板同代入后互核 (20.7013ms)
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (7.6632ms)
+✔ F4 激活三态：busy ⇒ next-session 不打断；无会话 ⇒ next-session＋note（绝不自动开）；重建失败 ⇒ rebuild-failed 如实 (157.3286ms)
+✔ F5 卸载链：先改声明→校验通过→重建→回执二分（效果已撤/声明保留/副作用不可撤）＋系统行；已发生副作用不可撤入文案 (12.9985ms)
+✔ F6 排队客户消息轮：su 忙时再发客户消息处于队列（active kind=message）⇒ 安装仍放行；护栏先判不消耗队列 (12.3524ms)
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (17.35ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 852.1259
+
+✖ failing tests:
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:130:1
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (7.6632ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:140:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:266:1
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (17.35ms)
+  AssertionError [ERR_ASSERTION]: 诊断含 mcp.refused
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:278:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+EXIT=1
+--- RUN 3 ---
+✔ F1 成功链（rebuilt）：校验→激活重建→冻形回执→[系统·安装] 真投递（含诚实面）→不可撤回→诊断 (174.3638ms)
+✔ F2 拒绝全分支 → reason 映射逐字＋零副作用（盘快照/零重建/无系统行）；文案与 schema 模板同代入后互核 (25.5793ms)
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (7.053ms)
+✔ F4 激活三态：busy ⇒ next-session 不打断；无会话 ⇒ next-session＋note（绝不自动开）；重建失败 ⇒ rebuild-failed 如实 (172.5178ms)
+✔ F5 卸载链：先改声明→校验通过→重建→回执二分（效果已撤/声明保留/副作用不可撤）＋系统行；已发生副作用不可撤入文案 (13.2608ms)
+✔ F6 排队客户消息轮：su 忙时再发客户消息处于队列（active kind=message）⇒ 安装仍放行；护栏先判不消耗队列 (11.2454ms)
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (18.994ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 5
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 857.1912
+
+✖ failing tests:
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:130:1
+✖ F3 护栏矩阵：无轮次/非客户轮（派发或系统 kind）⇒ not-customer-turn 逐字＋零副作用；客户轮与排队客户消息轮放行 (7.053ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'effect-scope-unproven'
+  - 'not-customer-turn'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:140:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'effect-scope-unproven',
+    expected: 'not-customer-turn',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\测试\g4v2-mcp-verify\f-handler.test.ts:266:1
+✖ F7 拒绝路径诊断：mcp.refused 落盘（reasonCode 如实）；系统行零投递已由 F2 覆盖 (18.994ms)
+  AssertionError [ERR_ASSERTION]: 诊断含 mcp.refused
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-7/test/%E6%B5%8B%E8%AF%95/g4v2-mcp-verify/f-handler.test.ts:278:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+EXIT=1

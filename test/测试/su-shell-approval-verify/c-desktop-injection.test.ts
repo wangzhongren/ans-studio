@@ -11,6 +11,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
 
 import { SessionManager } from "../../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../../app/desktop/project.ts";
@@ -73,7 +74,15 @@ interface Harness {
   captured: Record<string, unknown>[];
   mgr: SessionManager;
   root: string;
-  cleanup(): void;
+  handles: RoleSessionHandle[];
+  cleanup(): Promise<void>;
+}
+
+/** 有界等待：清理不得让 CI 文件子进程永久挂起（stop/dispose 超时则显式失败）。 */
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 5_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
 }
 
 async function makeHarness(opts: {
@@ -83,10 +92,13 @@ async function makeHarness(opts: {
   const fx = makeTempProject();
   const listing = await listProject(fx.root);
   const captured: CapturedInput[] = [];
+  const handles: RoleSessionHandle[] = [];
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       captured.push(input as unknown as CapturedInput);
-      return makeHandle();
+      const handle = makeHandle();
+      handles.push(handle);
+      return handle;
     },
     createPiAdapterFactory: () => () => dummyAdapter,
     createDemoAdapter: () => dummyAdapter,
@@ -102,7 +114,17 @@ async function makeHarness(opts: {
     captured,
     mgr,
     root: fx.root,
-    cleanup: fx.cleanup,
+    handles,
+    cleanup: async () => {
+      try {
+        if (mgr.isOpen()) await settledWithin(mgr.stop(null), "su-shell 桌面注入清理 stop 超时", 5_000);
+      } catch { /* stop 以结果如实报告 dispose 错误；清理不掩盖用例失败 */ }
+      for (const handle of handles) {
+        try { await settledWithin(handle.dispose(), "su-shell 桌面注入清理 dispose 超时", 2_000); } catch { /* dispose 幂等 */ }
+      }
+      fx.cleanup();
+      await fs.rm(fx.root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    },
   };
 }
 
@@ -128,7 +150,7 @@ test("C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shell
     assert.equal(x.shellOperatorOnly, undefined, "项目角色不得收审批档");
     assert.equal(x.shellReadonly, undefined);
   } finally {
-    h.cleanup();
+    await h.cleanup();
   }
 });
 
@@ -138,7 +160,7 @@ test("C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不�
     await noArming.mgr.open({ projectRoot: noArming.root, roleId: "su", runtime: "pi" });
     assert.equal(noArming.captured[0].shellOperatorOnly, undefined, "缺 (c) 实件 ⇒ 不 arm");
   } finally {
-    noArming.cleanup();
+    await noArming.cleanup();
   }
 
   const noChannel = await makeHarness({ withArming: true, withChannel: false });
@@ -146,6 +168,6 @@ test("C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不�
     await noChannel.mgr.open({ projectRoot: noChannel.root, roleId: "su", runtime: "pi" });
     assert.equal(noChannel.captured[0].shellOperatorOnly, undefined, "缺 (a) 通道 ⇒ 不 arm");
   } finally {
-    noChannel.cleanup();
+    await noChannel.cleanup();
   }
 });

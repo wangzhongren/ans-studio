@@ -1,0 +1,6 @@
+npm run typecheck（2026-11-12 / Node v24.22.1）
+
+> ans-cli@2.0.0 typecheck
+> tsc --noEmit
+
+EXIT=0

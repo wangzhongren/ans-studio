@@ -11,9 +11,10 @@
 //   ② Interface 集成层：真实 createDesktopInterface 接线（refreshListing 注到共享缓存）——导入时空项目、
 //      此后角色落盘，派发照样寻址（e2e harness 之外的最短真实链路）。
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,6 +36,19 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 
+/** **真实可解析的夹具项目根**（CI runner 没有 `/proj`）：宿主库存登记以 native realpath 规范化根，
+ *  不可解析即 fail-closed ⇒ 会话开不起来。文件级共用一根，`after` 统一清理（用例失败也清理）。 */
+const FIXTURE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "ans-dispatch-fresh-project-"));
+const cleanups: (() => Promise<unknown>)[] = [];
+after(async () => {
+  for (const run of cleanups) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, 5_000); (timer as { unref?: () => void }).unref?.(); });
+    try { await Promise.race([run().catch(() => {}), timeout]); } finally { if (timer !== undefined) clearTimeout(timer); }
+  }
+  fs.rmSync(FIXTURE_ROOT, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+});
+
 const mkRole = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
   roleId,
   cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -51,8 +65,8 @@ const mkRole = (roleId: string, builtIn = false): ProjectListing["roles"][number
 });
 
 /** 空项目（只有 su）→「角色落盘后」的清单（含 开发）。 */
-const EMPTY_LISTING: ProjectListing = { projectRoot: "/proj", roles: [mkRole("su", true)], warnings: [], hasRoles: false, primaryRoleId: "su" };
-const GROWN_LISTING: ProjectListing = { projectRoot: "/proj", roles: [mkRole("su", true), mkRole("开发")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+const EMPTY_LISTING: ProjectListing = { projectRoot: FIXTURE_ROOT, roles: [mkRole("su", true)], warnings: [], hasRoles: false, primaryRoleId: "su" };
+const GROWN_LISTING: ProjectListing = { projectRoot: FIXTURE_ROOT, roles: [mkRole("su", true), mkRole("开发")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 
 function quietHandle(roleId: string, sent: Record<string, string[]>): RoleSessionHandle {
   let stopped = false;
@@ -115,7 +129,8 @@ test("首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒
     emitEvent: () => {},
   } as never);
 
-  const r = await mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  cleanups.push(() => mgr.stop(null));
+  const r = await mgr.open({ projectRoot: FIXTURE_ROOT, roleId: "su", runtime: "demo" });
   assert.equal(r.ok, true);
   assert.ok(typeof getSuInput().dispatchTask === "function", "su 会话应注入 dispatch_task 能力");
 
@@ -160,7 +175,8 @@ test("首轮寻址①（管理器）：缓存 miss ⇒ 实时重枚举一次 ⇒
     },
     emitEvent: () => {},
   } as never);
-  await mgr2.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  cleanups.push(() => mgr2.stop(null));
+  await mgr2.open({ projectRoot: FIXTURE_ROOT, roleId: "su", runtime: "demo" });
   const receipt3 = await getSuInput().dispatchTask!({ roleId: "开发", task: "开工" });
   assert.equal(receipt3 && receipt3.ok, false, "重枚举抛错 ⇒ 如实拒绝");
   assert.equal(mgrDepsRefresh.calls, 1);
@@ -197,9 +213,10 @@ test("首轮寻址②（Interface 集成）：真实接线——导入时空项�
     emitEvent: () => {},
   } as never);
 
-  const listed = await desktop.listProject({ projectRoot: "/proj" });
+  cleanups.push(() => desktop.stopSession({ roleId: null }));
+  const listed = await desktop.listProject({ projectRoot: FIXTURE_ROOT });
   assert.equal(listed.hasRoles, false, "导入时点：空项目（只有 su）");
-  const openedSu = await desktop.openSession({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  const openedSu = await desktop.openSession({ projectRoot: FIXTURE_ROOT, roleId: "su", runtime: "demo" });
   assert.equal(openedSu.ok, true);
   assert.ok(typeof getSuInput().dispatchTask === "function");
 

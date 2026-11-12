@@ -178,13 +178,13 @@ test('release overlay selects the v2.0.0 replay-safe-retry blocker test by exact
   const result = selectOverlay([
     'test/桌面应用/replay-safe-retry.test.ts',
     'test/桌面应用/replay-safe-retry-extra.test.ts',
-    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/message-queue-extra.test.ts',
     'test/桌面应用/decision-service.test.ts',
   ]);
   assert.deepEqual(result.selected, ['test/桌面应用/replay-safe-retry.test.ts']);
   assert.deepEqual(result.excluded, [
     'test/桌面应用/replay-safe-retry-extra.test.ts',
-    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/message-queue-extra.test.ts',
     'test/桌面应用/decision-service.test.ts',
   ]);
   // blockers-2/3/4 既有条目仍在（不重复、不回归）。
@@ -194,20 +194,78 @@ test('release overlay selects the v2.0.0 replay-safe-retry blocker test by exact
   );
 });
 
+// v2.0.0 发布阻断修复（第七批，/proj 夹具族批量修复）：测试 8 条按**精确路径**入列；单文件不开目录
+// （同目录相似名/其它测试仍 excluded，未列名 test/ 不随构建树）。断言不放宽。
+// 明确不入列：`handback-delivery.test.ts` 与 `queue-visibility.test.ts` 暴露产品回归（单模型回交合批被
+// 移除、坏形状回交事件 TypeError 防线失效），按「发现产品回归即停下」未改、未入列。
+test('release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only', () => {
+  const selected = [
+    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/abort-unwedge.test.ts',
+    'test/桌面应用/message-queue.test.ts',
+    'test/桌面应用/operator-channel.test.ts',
+    'test/桌面应用/p0-halt-and-images.test.ts',
+    'test/桌面应用/queue-withdraw-lru.test.ts',
+    'test/桌面应用/dispatch-fresh-enum.test.ts',
+    'test/桌面应用/turn-lease.test.ts',
+  ];
+  const extras = [
+    'test/桌面应用/request-timeout-wiring-extra.test.ts',
+    'test/桌面应用/turn-lease-extra.test.ts',
+    'test/桌面应用/handback-delivery.test.ts',
+    'test/桌面应用/queue-visibility.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ];
+  const result = selectOverlay([...selected, ...extras]);
+  assert.deepEqual(result.selected, selected);
+  assert.deepEqual(result.excluded, extras);
+  // 第六批既有条目仍在（不重复、不回归）。
+  assert.deepEqual(selectOverlay(['test/桌面应用/replay-safe-retry.test.ts']).selected, ['test/桌面应用/replay-safe-retry.test.ts']);
+});
+
+// v2.0.0 发布阻断修复（第七批 B7-3，清理缺口：stop/dispose/临时目录）：测试/夹具 8 条按**精确路径**入列；
+// 单文件不开目录（同目录相似名/其它测试仍 excluded，未列名 test/ 不随构建树）。断言不放宽。
+test('release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files by exact path only', () => {
+  const selected = [
+    'test/桌面应用/download-decision.test.ts',
+    'test/测试/su-shell-approval-verify/c-desktop-injection.test.ts',
+    'test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts',
+    'test/测试/g4-skill-verify/fixture.ts',
+    'test/测试/g4-skill-verify/e-handler.test.ts',
+    'test/测试/g4-skill-verify/f-fingerprint.test.ts',
+    'test/测试/g4v2-mcp-verify/f-fixture.ts',
+    'test/测试/g4v2-mcp-verify/f-handler.test.ts',
+  ];
+  const extras = [
+    'test/桌面应用/download-request.test.ts',
+    'test/测试/su-shell-approval-verify/d-extra.test.ts',
+    'test/测试/turn-watch-verify/d-extra.test.ts',
+    'test/测试/g4-skill-verify/g-fixture.ts',
+    'test/测试/g4v2-mcp-verify/g-extra.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ];
+  const result = selectOverlay([...selected, ...extras]);
+  assert.deepEqual(result.selected, selected);
+  assert.deepEqual(result.excluded, extras);
+  // 第七批 B7-1/2 既有条目仍在（不重复、不回归）；第六批条目亦在。
+  assert.deepEqual(selectOverlay(['test/桌面应用/request-timeout-wiring.test.ts']).selected, ['test/桌面应用/request-timeout-wiring.test.ts']);
+  assert.deepEqual(selectOverlay(['test/桌面应用/replay-safe-retry.test.ts']).selected, ['test/桌面应用/replay-safe-retry.test.ts']);
+});
+
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
 // 7 个测试文件（6 个平台真值分支 + session-rebuild-race 夹具修复）落 test/ excluded，不随构建树。
+// v2.0.0 B7-3 清理缺口：f-fingerprint 按精确路径**重新入列**（单文件边界由上方 B7-3 用例另行断言），
+// 本用例不再把该文件算作 excluded；其余条目与同目录未列名文件仍 excluded。断言未放宽。
 test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded', () => {
   assert.throws(() => selectOverlay(['src/provider/codex/session.ts']), /Unreviewed production overlay/);
   const result = selectOverlay(['test/pi-adapter/installed-mcp-servers.test.ts',
     'test/测试/g4-skill-verify/b-render-double-check.test.ts',
-    'test/测试/g4-skill-verify/f-fingerprint.test.ts',
     'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts', 'test/测试/g4v2-mcp-verify/j-pi.test.ts',
     'test/测试/g5-reasoning-verify/h-scope-audit.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);
   assert.deepEqual(result.selected, []);
   assert.deepEqual(result.excluded, ['test/pi-adapter/installed-mcp-servers.test.ts',
     'test/测试/g4-skill-verify/b-render-double-check.test.ts',
-    'test/测试/g4-skill-verify/f-fingerprint.test.ts',
     'test/测试/g4v2-mcp-verify/g-claude-launcher.test.ts', 'test/测试/g4v2-mcp-verify/j-pi.test.ts',
     'test/测试/g5-reasoning-verify/h-scope-audit.test.ts',
     'test/桌面应用/session-rebuild-race.test.ts']);

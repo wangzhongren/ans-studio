@@ -12,6 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { rm as rmPath } from "node:fs/promises";
 
 import { resolveRuntimeTimeouts } from "../../../src/common/runtime-core/timeout.ts";
 import { RUNTIME_SETTINGS } from "../../../src/common/shared/runtime-settings.ts";
@@ -65,6 +66,13 @@ function hangingHandle(): RoleSessionHandle {
     },
     async dispose() {},
   };
+}
+
+/** 有界等待：清理不得让 CI 文件子进程永久挂起（stop/dispose 超时则显式失败）。 */
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 5_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
 }
 
 test("C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env", () => {
@@ -163,13 +171,17 @@ test("C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeo
 
 test("C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」", async () => {
   const fx = makeTempProject();
+  const handles: RoleSessionHandle[] = [];
+  let mgr: SessionManager | undefined;
   try {
     const listing = await listProject(fx.root);
     const captured: Record<string, unknown>[] = [];
-    const mgr = new SessionManager({
+    mgr = new SessionManager({
       openRoleSession: async (input) => {
         captured.push(input as unknown as Record<string, unknown>);
-        return hangingHandle();
+        const handle = hangingHandle();
+        handles.push(handle);
+        return handle;
       },
       createPiAdapterFactory: () => () => dummyAdapter,
       createDemoAdapter: () => dummyAdapter,
@@ -192,6 +204,13 @@ test("C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无
     assert.ok(text.includes("1 小时最后兜底"), "须含 1 小时最后兜底");
     assert.equal(text.includes("硬超时"), false, "不得残留「硬超时」");
   } finally {
+    try {
+      if (mgr?.isOpen()) await settledWithin(mgr.stop(null), "turn-watch 跨运行时清理 stop 超时", 5_000);
+    } catch { /* stop 以结果如实报告 dispose 错误；清理不掩盖用例失败 */ }
+    for (const handle of handles) {
+      try { await settledWithin(handle.dispose(), "turn-watch 跨运行时清理 dispose 超时", 2_000); } catch { /* dispose 幂等 */ }
+    }
     fx.cleanup();
+    await rmPath(fx.root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   }
 });

@@ -12,7 +12,7 @@
 //
 // **不发真实模型请求**：全程用假适配器（handle.send 只登记文本），无网络、无 Pi SDK。
 
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -54,6 +54,35 @@ const IFACE = fs.readFileSync(path.join(APP_DIR, "desktop", "interface.ts"), "ut
 const SESSION = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
 
 const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));
+
+/** **真实可解析的夹具项目根**（CI runner 没有 `/proj`）：宿主库存登记以 native realpath 规范化根，
+ *  不可解析即 fail-closed（`git-host-project-root-unresolvable`）⇒ 会话开不起来、回合未开跑。
+ *  文件级共用一根（`listing`/`open`/`lastTurnOf`/看护快照同一根），`after` 统一清理（用例失败也清理）。 */
+let PROJECT_ROOT = "";
+/** 本文件创建的全部 manager / 夹具门：`after` 有界 stop + 放门 + dispose，失败路径不遗留定时器/句柄。 */
+const createdManagers: SessionManager[] = [];
+const createdGates: (() => void)[] = [];
+before(() => { PROJECT_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "ans-message-queue-project-")); });
+after(async () => {
+  for (const release of createdGates) release();
+  for (const mgr of createdManagers) {
+    try { if (mgr.isOpen()) await settledWithin(mgr.stop(null), "message-queue 清理 stop 超时", 5_000); } catch { /* 清理不掩盖用例失败 */ }
+  }
+  await disposeDiagnostics();
+  if (PROJECT_ROOT !== "") fs.rmSync(PROJECT_ROOT, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+});
+
+/** 有界等待真实回执：产品回执若永不结算，用例须在有限时间内失败，而不是让 CI 文件子进程永久挂起。 */
+async function openSession(mgr: SessionManager, input: { projectRoot: string; roleId: string; runtime: "demo" | "pi" }): Promise<void> {
+  const opened = await mgr.open(input);
+  assert.equal(opened.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
+}
+
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+}
 
 interface RoleStateSnapshot {
   roleId: string;
@@ -100,7 +129,7 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot: PROJECT_ROOT, roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 interface Harness {
@@ -132,6 +161,7 @@ function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
   const hangNext = (roleId: string): (() => void) => {
     let release!: () => void;
     nextGate[roleId] = new Promise<void>((resolve) => { release = resolve; });
+    createdGates.push(release);
     return release;
   };
 
@@ -185,7 +215,7 @@ function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
       throw new Error("本用例不应构造 demo 适配器");
     },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? l : undefined),
+    getListing: (root) => (root === PROJECT_ROOT ? l : undefined),
     emitEvent: (env) => envelopes.push(env),
     // L-1 + 状态准确性：**真实状态快照**外推的收集器（快照即拷——断言时不被后续 push 影响）。
     emitRoleState: (info) =>
@@ -199,6 +229,7 @@ function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
     // 2026-10-20 客户要求：投递队列持久化（重启自动续跑）——测试注入临时 store（缺省 ⇒ 不持久化）。
     ...(opts.deliveryQueueStorePath !== undefined ? { deliveryQueueStorePath: opts.deliveryQueueStorePath } : {}),
   });
+  createdManagers.push(mgr);
   return {
     mgr,
     streams,
@@ -217,7 +248,7 @@ function makeHarness(opts: { deliveryQueueStorePath?: string } = {}): Harness {
 
 test("L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
 
   const r1 = await h.mgr.send("第一条");
@@ -265,7 +296,7 @@ test("L-1 入队：忙时客户消息**入队**（不再直接失败）——位
 
 test("L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文）", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   await h.mgr.send("占位（让 A 忙）");
 
@@ -284,7 +315,7 @@ test("L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断
 
 test("L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   await h.mgr.send("第一条");
   await h.mgr.send("第二条");
@@ -309,7 +340,7 @@ test("L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（�
 
 test("L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态）", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   h.failLeft.A = 1;
   const r = await h.mgr.send("会失败");
@@ -327,7 +358,7 @@ test("状态准确性（主进程）：投递开跑的后台轮次 — 真实快
   // 「真跑一轮」：只开 A；A 的回交到达 ⇒ 投递机**自动开启 su**并把回交投递进去 ⇒ su 会话真开跑一轮。
   // 这一轮**不是界面发的**（客户从没在 su 会话里点过发送）——正是旧实现「其实在跑却显示空闲」的现场。
   // 按真实编排顺序：一轮结束先发 `handback`、再发 `settled`——两者都会触发投递机（并发触发现场）。
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   h.streams.A.push({ kind: "handback", summary: "回交 su：做完了", handback: HANDBACK_A });
   h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
@@ -369,7 +400,7 @@ test("状态准确性（主进程）：投递开跑的后台轮次 — 真实快
 
 test("状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   await h.mgr.send("占位");
   await h.mgr.send("排队 1");
@@ -414,7 +445,7 @@ test("接线钉子：role-state 通道两端齐备；忙态判据只在主进程
 
 test("F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递", async () => {
   const h = makeHarness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
 
   // ① su 的长轮：一条回交投递（自动开 su → 认领 → send 挂起）。
@@ -481,6 +512,7 @@ function makeG2Harness(): G2Harness {
   let ms = 1_700_000_000_000;
   const hangNext = (roleId: string): void => {
     gates[roleId] = new Promise<void>((resolve) => { releases[roleId] = resolve; });
+    createdGates.push(() => release(roleId));
   };
   const release = (roleId: string): void => {
     const r = releases[roleId];
@@ -521,7 +553,7 @@ function makeG2Harness(): G2Harness {
   };
   let mgr!: SessionManager;
   const service = createWatchdogService({
-    projects: () => ["/proj"],
+    projects: () => [PROJECT_ROOT],
     snapshot: (root) => mgr.watchdogSnapshot(root),
     deliver: (root, message) => mgr.watchdogDeliver(root, message),
     now: () => ms,
@@ -532,7 +564,7 @@ function makeG2Harness(): G2Harness {
     createPiAdapterFactory: () => { throw new Error("本用例不应构造 pi 适配器"); },
     createDemoAdapter: () => { throw new Error("本用例不应构造 demo 适配器"); },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? l : undefined),
+    getListing: (root) => (root === PROJECT_ROOT ? l : undefined),
     emitEvent: (env) => envelopes.push(env as G2Harness["envelopes"][number]),
     emitRoleState: (info) => roleStates.push({
       roleId: info.roleId,
@@ -548,6 +580,7 @@ function makeG2Harness(): G2Harness {
     },
     now: () => ms,
   });
+  createdManagers.push(mgr);
   return {
     mgr, streams, sent, roleStates, observations, envelopes, service,
     advance: (delta) => { ms += delta; },
@@ -562,13 +595,13 @@ function makeG2Harness(): G2Harness {
 
 test("G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回", async () => {
   const h = makeG2Harness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" });
   h.hangNext("su");
   const send = h.mgr.send("占住 su 本轮");
   await tick(30);
   // P0（2026-10-30 现场）：su 忙 ⇒ 看护消息**不进模型队列**（否则看护自身被 target-busy 楔死），
   // 改经既有 UI 系统行（delivery-note，不触发模型/门禁）呈现。
-  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: "watchdog\u0000/proj\u0000test\u00000", uiOnlyWhenBusy: true });
+  h.mgr.watchdogDeliver(PROJECT_ROOT, { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: `watchdog\u0000${PROJECT_ROOT}\u0000test\u00000`, uiOnlyWhenBusy: true });
   await tick(30);
   assert.equal(h.latest("su")?.queue.length ?? 0, 0, "忙时看护消息不得进入模型队列（P0 旁路）");
   assert.ok(
@@ -578,10 +611,10 @@ test("G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进�
   assert.ok(!h.sent.su.includes("[系统·看护] 测试告警：角色「A」。"), "忙时旁路消息不得投给模型");
   // 放行本轮 → settled → 空闲后同一入口走既有 system 队列：快照 kind=system、来源空白、不可撤回、送达。
   h.release("su");
-  await send;
+  await settledWithin(send, "挂起回合回执等待超时");
   h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
   await tick(150);
-  h.mgr.watchdogDeliver("/proj", { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: "watchdog\u0000/proj\u0000test\u00001", uiOnlyWhenBusy: true });
+  h.mgr.watchdogDeliver(PROJECT_ROOT, { text: "[系统·看护] 测试告警：角色「A」。", summary: "系统·看护 · 测试告警 · 角色 A", dedupKey: `watchdog\u0000${PROJECT_ROOT}\u0000test\u00001`, uiOnlyWhenBusy: true });
   const q = h.latest("su");
   assert.equal(q?.queue.length, 1, "空闲时系统消息入队（同一套投递机）");
   assert.equal(q?.queue[0].kind, "system", "快照 kind=system（W2 第四类——渲染侧据此显示「系统」）");
@@ -602,14 +635,14 @@ test("P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(
   configureDiagnostics({ directory: dir });
   const h = makeG2Harness();
   try {
-    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" });
     h.hangNext("su");
     const send = h.mgr.send("占住 su 本轮");
     await tick(30);
-    h.mgr.watchdogDeliver("/proj", {
+    h.mgr.watchdogDeliver(PROJECT_ROOT, {
       text: "[系统·巡检] 在岗状态",
       summary: "系统·巡检 · 1 个角色",
-      dedupKey: "watchdog\u0000/proj\u0000patrol\u00009",
+      dedupKey: `watchdog\u0000${PROJECT_ROOT}\u0000patrol\u00009`,
       uiOnlyWhenBusy: true,
     });
     await tick(30);
@@ -624,7 +657,7 @@ test("P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(
     assert.equal(bypass[0].signal, "patrol");
     assert.equal(bypass[0].targetRoleId, "su");
     h.release("su");
-    await send;
+    await settledWithin(send, "挂起回合回执等待超时");
     h.streams.su.push({ kind: "settled", summary: "su 一轮结束" });
     await tick(80);
   } finally {
@@ -636,14 +669,14 @@ test("P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(
 
 test("G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束）", async () => {
   const h = makeG2Harness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   // 跑一轮真实 turn（旧 W3 的预热：至少一轮 settled）。
   const s1 = h.mgr.send("干点活");
   await tick(20);
   h.streams.A.push({ kind: "settled", summary: "A 一轮结束" });
-  await s1;
+  await settledWithin(s1, "回合回执等待超时");
   await tick(150);
   // 远超旧静默阈值（30s）的多个 tick：不得再产生收束消息。
   h.service.tick();
@@ -659,11 +692,11 @@ test("G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过
 
 test("G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn", async () => {
   const h = makeG2Harness();
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(30);
   const s1 = h.mgr.send("长活");
   await tick(20);
-  const snap = h.mgr.watchdogSnapshot("/proj");
+  const snap = h.mgr.watchdogSnapshot(PROJECT_ROOT);
   assert.ok(snap, "快照可读（同源：会话/队列直读，不造第二数据源）");
   assert.equal(snap!.governanceRoleId, "su", "su 判据来自门禁枚举（primaryRoleId）");
   const roleA = snap!.roles.find((r) => r.roleId === "A");
@@ -674,9 +707,9 @@ test("G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转
   await tick(50);
   assert.ok(h.observations.some((o) => o.observation.kind === "command-timed-out" && o.observation.roleId === "A"), "命令超时观察已转发（classifyProcessOutcome 单一判据）");
   h.streams.A.push({ kind: "settled", summary: "结束", detail: { outcome: "failed" } });
-  await s1;
+  await settledWithin(s1, "回合回执等待超时");
   await tick(150);
-  const last = h.mgr.lastTurnOf("/proj", "A", "demo");
+  const last = h.mgr.lastTurnOf(PROJECT_ROOT, "A", "demo");
   assert.equal(last?.outcome, "failed", "lastTurn 小状态（W1；settled 顺带落表）");
   const settledObs = h.observations.find((o) => o.observation.kind === "settled" && o.observation.roleId === "A");
   assert.equal(settledObs && settledObs.observation.kind === "settled" ? settledObs.observation.fromSystemDelivery : undefined, false, "普通轮 settle：fromSystemDelivery=false（真实活动）");
@@ -712,7 +745,7 @@ test("2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 
     const h1 = makeHarness({ deliveryQueueStorePath: storePath });
     // 启动契约：先恢复上一次运行的队列（无文件 ⇒ 武装持久化），再进入正常投递。
     assert.equal((await h1.mgr.restorePersistedDeliveries()).restored, 0, "首次启动：无历史队列");
-    await h1.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await openSession(h1.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
     await tick(30);
     assert.equal((await h1.mgr.send("第一条")).ok, true);
     const queued = await h1.mgr.send("第二条");
@@ -759,7 +792,7 @@ test("2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delive
     };
     fs.writeFileSync(
       storePath,
-      JSON.stringify({ version: 1, items: [{ key: { projectRoot: "/proj", roleId: "A", runtime: "demo" }, item, state: "in-flight", enqueuedAt: item.enqueuedAt }] }),
+      JSON.stringify({ version: 1, items: [{ key: { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" }, item, state: "in-flight", enqueuedAt: item.enqueuedAt }] }),
       "utf8",
     );
     const h = makeHarness({ deliveryQueueStorePath: storePath });
@@ -859,7 +892,7 @@ function makeViewImageHarness(): ViewImageHarness {
       throw new Error("本用例不应构造 demo 适配器");
     },
     buildProjectConfig,
-    getListing: (root) => (root === "/proj" ? l : undefined),
+    getListing: (root) => (root === PROJECT_ROOT ? l : undefined),
     emitEvent: (env) => {
       // 事件流本身不参与本组断言；保留入口以便 consume 循环存在。
       void env;
@@ -874,6 +907,7 @@ function makeViewImageHarness(): ViewImageHarness {
       }),
   });
 
+  createdManagers.push(mgr);
   return {
     mgr,
     streams,
@@ -900,19 +934,19 @@ test("2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队�
   const image: PromptImage = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
   const prompt = buildViewImagePrompt("docs/设计/界面 截图.png");
 
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(20);
   const viewImage = h.viewImageFor("A");
 
   // 既有能力不受影响：A（项目角色）无派发能力、但有 view_image；su（内置）两条都在。
   assert.equal(h.openInputs.find((x) => x.roleId === "A")?.dispatchTask, undefined, "既有能力路由不变（项目角色无派发）");
-  await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" });
   assert.equal(typeof h.openInputs.find((x) => x.roleId === "su")?.dispatchTask, "function", "su 既有派发能力保留");
   assert.equal(typeof h.openInputs.find((x) => x.roleId === "su")?.viewImage, "function", "view_image 对内置角色同样注入");
 
   // A 真开跑一轮（工具在本轮内调用 ⇒ 角色忙）。显式寻址 A（当前活动角色已切到 su）。
-  assert.equal((await h.mgr.send("客户消息：看一下图", undefined, { projectRoot: "/proj", roleId: "A", runtime: "demo" })).ok, true);
-  assert.equal(h.mgr.isRoleBusy("/proj", "A", "demo"), true, "客户消息开跑后 A 忙");
+  assert.equal((await h.mgr.send("客户消息：看一下图", undefined, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" })).ok, true);
+  assert.equal(h.mgr.isRoleBusy(PROJECT_ROOT, "A", "demo"), true, "客户消息开跑后 A 忙");
   // 用户切到 su：view_image 必须仍投给**开会话时定格的 A**（不按 activeRoleId 改投）。
   assert.equal(h.mgr.openForRoleId(), "su");
   assert.equal(h.delivered.length, 1, "此时只有客户消息已投出");
@@ -948,7 +982,7 @@ test("2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队�
 test("2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供", async () => {
   const h = makeViewImageHarness();
   const image: PromptImage = { type: "image", data: "aGVsbG8=", mimeType: "image/png" };
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(20);
   const viewImage = h.viewImageFor("A");
 
@@ -970,7 +1004,7 @@ test("2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实
   assert.match(failed.message ?? "", /投递失败/);
   assert.match(failed.message ?? "", /图片投递通道不可用/, "带底层原始原因");
   assert.equal(h.delivered.length, 0);
-  assert.equal(h.mgr.isRoleBusy("/proj", "A", "demo"), false, "直发失败后忙态如实复位");
+  assert.equal(h.mgr.isRoleBusy(PROJECT_ROOT, "A", "demo"), false, "直发失败后忙态如实复位");
 
   // 会话已释放：能力仍被调用时如实报「会话尚未开启」。
   await h.mgr.stop("A");
@@ -983,7 +1017,7 @@ test("2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实
 test("2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写）", async () => {
   const h = makeViewImageHarness();
   const customerImages: PromptImage[] = [{ type: "image", data: "Y3VzdG9tZXI=", mimeType: "image/jpeg" }];
-  await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  await openSession(h.mgr, { projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
   await tick(20);
 
   const sent = await h.mgr.send("客户带图消息", { images: customerImages });
@@ -1159,6 +1193,9 @@ test("2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/�
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ans-delivery-store-multi-"));
   try {
     const storePath = path.join(dir, "delivery-queue.json");
+    // 另一项目的**真实可解析根**（宿主库存登记要求真实根；不再用不存在的 `/proj2`）。
+    const otherRoot = path.join(dir, "other-project");
+    fs.mkdirSync(otherRoot, { recursive: true });
     const itemOf = (targetRoleId: string, text: string, dedupKey: string) => ({
       kind: "message",
       runtime: "demo",
@@ -1180,10 +1217,10 @@ test("2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/�
       JSON.stringify({
         version: 1,
         items: [
-          entryOf("/proj", "A", itemOf("A", "A-任务", "dup-key")),
-          entryOf("/proj", "A", itemOf("A", "A-重复", "dup-key")),
-          { key: { projectRoot: "/proj" }, item: null, state: "queued" }, // 坏条目
-          entryOf("/proj2", "B", itemOf("B", "B-任务", "b-key")),
+          entryOf(PROJECT_ROOT, "A", itemOf("A", "A-任务", "dup-key")),
+          entryOf(PROJECT_ROOT, "A", itemOf("A", "A-重复", "dup-key")),
+          { key: { projectRoot: PROJECT_ROOT }, item: null, state: "queued" }, // 坏条目
+          entryOf(otherRoot, "B", itemOf("B", "B-任务", "b-key")),
         ],
       }),
       "utf8",
@@ -1194,8 +1231,8 @@ test("2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/�
     assert.ok(report.skipped >= 2, "重复与坏条目计入 skipped（如实）");
     await tick(250);
     assert.deepEqual(h.sent.A, ["A-任务"], "同 dedupKey 只重投一次");
-    const otherQueue = h.mgr.watchdogSnapshot("/proj2")?.queues.find((q) => q.targetRoleId === "B");
-    assert.equal(otherQueue?.items.length, 1, "另一项目的队列独立保留（按 project+role+runtime 键隔离，不并入 /proj）");
+    const otherQueue = h.mgr.watchdogSnapshot(otherRoot)?.queues.find((q) => q.targetRoleId === "B");
+    assert.equal(otherQueue?.items.length, 1, "另一项目的队列独立保留（按 project+role+runtime 键隔离，不并入主项目）");
     await h.mgr.stop(null);
 
     fs.writeFileSync(storePath, "{ not json", "utf8");

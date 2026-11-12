@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 
 import { SessionManager } from "../../../app/desktop/session.ts";
@@ -65,10 +66,18 @@ export interface G4Harness {
   failOpensAfter: Record<string, number>;
   /** 该轮「已跑」——把 settled 推进该角色当前事件流并等待投递机收尾。 */
   settle(roleId: string, extra?: Partial<SessionEvent>): Promise<void>;
-  cleanup(): void;
+  /** 失败路径也必然执行：有界 stop → 逐句柄 dispose → 删除临时项目根（重试吸收写入竞态）。 */
+  cleanup(): Promise<void>;
 }
 
 const flush = (ms = 80): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/** 有界等待：清理不得让 CI 文件子进程永久挂起（stop/dispose 超时则显式失败）。 */
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 5_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+}
 
 /** 轮询等待（有界；默认 3s）。 */
 export async function until(pred: () => boolean, timeoutMs = 3000): Promise<void> {
@@ -180,6 +189,7 @@ export async function makeG4Harness(): Promise<G4Harness> {
   const { root, listing } = await makeTempProject();
   let T = 1_700_000_000_000;
   const generations = new Map<string, G4Control[]>();
+  const handles: RoleSessionHandle[] = [];
   const openedInputs: CapturedOpenInput[] = [];
   const envelopes: SessionEventEnvelope[] = [];
   const roleStates: G4Harness["roleStates"] = [];
@@ -204,6 +214,7 @@ export async function makeG4Harness(): Promise<G4Harness> {
       const limit = failOpensAfter[input.roleId];
       if (limit !== undefined && opens > limit) throw new Error(`复验夹具：${input.roleId} 会话开启失败`);
       const handle = makeHandle(ensureControl(input.roleId));
+      handles.push(handle);
       return handle;
     },
     createPiAdapterFactory: () => {
@@ -249,8 +260,15 @@ export async function makeG4Harness(): Promise<G4Harness> {
       c.wake?.();
       await flush(120); // 让 consume 循环收尾 + 投递机排空队列
     },
-    cleanup() {
-      fs.rmSync(root, { recursive: true, force: true });
+    async cleanup() {
+      try {
+        if (mgr.isOpen()) await settledWithin(mgr.stop(null), "G-4 复验夹具清理 stop 超时", 5_000);
+      } catch { /* stop 以结果如实报告 dispose 错误；清理不掩盖用例失败 */ }
+      for (const handle of handles) {
+        try { await settledWithin(handle.dispose(), "G-4 复验夹具清理 dispose 超时", 2_000); } catch { /* dispose 幂等 */ }
+      }
+      // 同 fixture 既有语义：临时目录删除尽力而为（有界重试吸收 Windows 写入竞态），不掩盖用例失败。
+      await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }).catch(() => {});
     },
   };
   return h;

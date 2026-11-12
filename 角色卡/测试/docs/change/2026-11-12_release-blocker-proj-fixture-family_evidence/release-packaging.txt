@@ -1,0 +1,28 @@
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.9474ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.104ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2909ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.0731ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.1049ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.1013ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0825ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0828ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.1051ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1496ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0841ms)
+✔ release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only (0.0666ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.0882ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.0603ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0842ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0641ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.0651ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0648ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (606.2046ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1423ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 695.993

@@ -1,0 +1,72 @@
+== 代码点 1：单模型回交合批被移除（仅 chief 合批） ==
+e71501c 2026-11-07 08:50:18 +0800 chore: checkpoint Chief workflow and Git role integration
+e71501c ancestor of v2.0.0 source 752953c: yes
+--- current session.ts 13170-13192 ---
+
+    // —— F-2-opt3：认领段开始（自此到 claim.end 之间的同步改动都在串行链内；随后链即释放）——
+    diagnostic.record("delivery.claim.start", { state: item.kind, queueDepth: q.length });
+    // 仅回交主人队首连续回交合批；客户消息/派发是屏障，正文仍由编排唯一生成。
+    // B 批：幕僚的星形工作结果也合批（渲染用 `renderWorkReportBatchPrompt`，`[工作结果]` 固定字段）。
+    const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
+    const handbackOwner = this.handbackOwnerRoleId(projectRoot);
+    let batchCount = 1;
+    if (headIndex === 0 && resolvedTarget === chiefRoleId && item.kind === "handback" && item.handback && !item.deliveryId) {
+      while (batchCount < q.length && q[batchCount].kind === "handback" && q[batchCount].handback) batchCount += 1;
+    }
+    let text = item.text;
+    let summary = item.summary;
+    if (batchCount > 1) {
+      const batchHandbacks = q.slice(0, batchCount).map((queued) => queued.handback as TaskHandback);
+      text = resolvedTarget === chiefRoleId && chiefRoleId !== null
+        ? renderWorkReportBatchPrompt(batchHandbacks)
+        : renderHandbackBatchPrompt(batchHandbacks);
+      summary = mainT("main.session.delivery.handbackBatch", { count: batchCount, roles: q.slice(0, batchCount).map((queued) => queued.sourceRoleId).join("、") });
+    }
+    const removedItems = q.splice(headIndex, batchCount);
+    const sentItems = item.deliveryId && item.batchItems ? [...item.batchItems] : removedItems;
+    const selectedClaimTasks = sentItems.map(row => row.kind === "dispatch" ? row.taskId : row.kind === "system" ? row.systemAssignment?.taskId : row.kind === "handback" ? row.handback?.taskId : undefined);
+
+== 代码点 2：handleHandback 在形状防御前读取 hb.taskId ==
+--- current session.ts 8720-8738 ---
+  private handleHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<boolean> {
+    if (!hb.taskId) return this.commitHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId);
+    const key = `${projectRoot}\u0000${hb.taskId}`;
+    // Consecutive real turns of one task can finish before the prior detached report is registered.
+    // Order those existing observations; never retry a rejected business operation or wait for the creator's model turn.
+    const prior = this.taskHandbackCommits.get(key) ?? Promise.resolve();
+    const attempt = prior.then(() => this.commitHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId));
+    const committed = attempt.then(() => undefined, () => undefined);
+    this.taskHandbackCommits.set(key, committed);
+    void committed.then(() => { if (this.taskHandbackCommits.get(key) === committed) this.taskHandbackCommits.delete(key); });
+    return attempt;
+  }
+
+  private async commitHandback(projectRoot: string, runtime: RuntimeKind, hb: TaskHandback, report?: RuntimeReportSnapshotV1, liveReport?: RuntimeLiveReportViewV1, liveDurability?: 'memory-only' | 'unknown-live', flowId?: string): Promise<boolean> {
+    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: hb?.roleId });
+    diagnostic.record("report.received", { outcome: hb?.status });
+    let pendingKey: string | undefined;
+    try {
+      if (!hb || typeof hb !== "object" || typeof (hb as { roleId?: unknown }).roleId !== "string") {
+--- commitHandback 形状防御在 8739+ ---
+        this.emitDeliveryNote(projectRoot, runtime,
+          this.handbackOwnerRoleId(projectRoot),
+          mainT("main.common.unknownRole"),
+          mainT("main.session.handbackMalformed")
+        );
+        return false;
+      }
+      hb = structuredClone(hb);
+      if (report) report = structuredClone(report);
+      if (liveReport) liveReport = structuredClone(liveReport);
+      const ownerRoleId = this.handbackOwnerRoleId(projectRoot);
+      // 2026-10-29（方案 v2.1 §5.1/M9，F1）：任务绑定报告**按 `task.created.from` 回创建者**——
+      // 项目 worker/质检 → 发起者（运营或幕僚）；产品/策划/人事/运营由幕僚派发 → 幕僚。
+      // 无任务绑定的内置 worker → 幕僚（下方既有防御分支）。用同步内存索引，避免读盘改变并发回交顺序。
+      const starTask = typeof hb.taskId === "string" && hb.taskId !== "" && this.starTaskIds.has(hb.taskId);
+      const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
+      const convenerRoleId = this.handbackOwnerRoleId(projectRoot);
+      const taskCreator = starTask ? this.taskCreators.get(hb.taskId!) : undefined;
+      // 2026-10-24（治理协调，设计 v1 §6.2/§6.3）：**按来源**选回交目标——
+      //  · 内置治理角色（Draft/Steward/Crew/Proof；编排 `suppressHandback` 正常不发，这里只做防御路由）
+      //    → Lead（`primaryRoleId`），Lead 自身不自我回交；single/su 保持旧行为（内置来源不自我回交）。
+      //  · 项目 worker → Steward（`handbackOwnerRoleId` 不变；single 仍是 su）。

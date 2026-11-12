@@ -1,0 +1,39 @@
+===== RUN 1 =====
+✔ 首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续 (207.7112ms)
+✔ 空闲超时与一般请求失败：各自人话系统行（不串文案、不含 code） (245.4638ms)
+✔ 无 errorCode 的普通失败：不新增系统行（既有语义不变） (103.2942ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 979.0522
+EXIT=0
+===== RUN 2 =====
+✔ 首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续 (180.9454ms)
+✔ 空闲超时与一般请求失败：各自人话系统行（不串文案、不含 code） (251.4549ms)
+✔ 无 errorCode 的普通失败：不新增系统行（既有语义不变） (123.4233ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1008.95
+EXIT=0
+===== RUN 3 =====
+✔ 首字节超时终态：恰一条人话系统行（无技术 code）；lastTurn/诊断带 errorCode；失败后队列继续 (183.5531ms)
+✔ 空闲超时与一般请求失败：各自人话系统行（不串文案、不含 code） (231.8926ms)
+✔ 无 errorCode 的普通失败：不新增系统行（既有语义不变） (94.6234ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 932.0722
+EXIT=0

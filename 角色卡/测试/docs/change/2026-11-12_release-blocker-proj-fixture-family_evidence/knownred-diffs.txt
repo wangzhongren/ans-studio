@@ -1,0 +1,27 @@
+v2.0.0 发布阻断第七批（release/v2.0.0-blockers-7，基线 origin/main 2578203 + 本批测试/白名单改动）
+三套冻结 known-red 对照
+日期：2026-11-12；Windows 11 / Node v24.22.1
+命令：node --test --test-concurrency=1 <glob>（编排另加 --test-timeout=120000）
+
+== runtime-core: 604 tests / 567 pass / 33 fail / 4 skipped ==
+baseline: 33（角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider_evidence/14b-knownred-runtime-core.tap，排除 reporter 汇总头；逐名比较）
+{"currentCount":33,"baselineCount":33,"newRed":[],"missing":[]}
+diff: 空
+证据: knownred-runtime-core.txt / knownred-runtime-core-names.txt
+
+== gates: 577 tests / 571 pass / 5 fail / 1 skipped ==
+baseline: 5（角色卡/运行时核心/docs/change/2026-11-10_B2_two-fixed-workflow-paths-evidence/07-gates-failure-names.txt，CRLF 文件按 LF 比较）
+{"currentCount":5,"baselineCount":5,"newRed":[],"missing":[]}
+diff: 空
+门禁资源 LF 归一：运行前以 `git cat-file blob HEAD:<path>` 临时写回
+src/common/门禁引擎/workflows/chief/*.md（2 个文件），运行后 `git checkout --` 还原；
+还原后 `file` 确认为 CRLF、`git status` 对这两个文件干净。
+证据: knownred-gates.txt / knownred-gates-names.txt
+
+== orchestration: 1386 tests / 1360 pass / 24 fail / 2 skipped ==
+baseline: 24（角色卡/编排/docs/change/2026-11-11_B17_two-fixed-workflow-paths_evidence/b17-05-known-red-failnames.txt，CRLF 文件按 LF 比较）
+{"currentCount":24,"baselineCount":24,"newRed":[],"missing":[]}
+diff: 空
+证据: knownred-orchestration.txt / knownred-orchestration-names.txt
+
+结论：三套冻结 known-red 逐名 diff 全部为空；新增确定性失败 0、新 skip 0。

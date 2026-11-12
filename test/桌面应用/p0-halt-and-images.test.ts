@@ -15,8 +15,10 @@
 //
 // **不发真实模型请求**：全程假句柄 / demo 替身，无网络、无 Pi SDK、不落盘。
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -36,7 +38,7 @@ const tick = (ms = 60) => new Promise((r) => setTimeout(r, ms));
 /** 1×1 PNG（合法魔数 + 真实字节，过嗅探与限幅）。 */
 const TINY_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-function listing(): ProjectListing {
+function listing(projectRoot: string): ProjectListing {
   const mk = (roleId: string, builtIn = false): ProjectListing["roles"][number] => ({
     roleId,
     cardPath: builtIn ? "" : `角色卡/${roleId}/role-card.md`,
@@ -51,7 +53,9 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A"), mk("B"), mk("C"), mk("桌面窗口")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  // v2.0.0（Chief workflow）：客户入口只认幕僚——图片校验用例以 chief 为活动角色；
+  // 图片重校验/透传断言逐字不变（本组不测角色策略）。
+  return { projectRoot, roles: [mk("su", true), { ...mk("chief"), governanceFunction: "chief" }, mk("A"), mk("B"), mk("C"), mk("桌面窗口")], warnings: [], hasRoles: true, primaryRoleId: "chief" };
 }
 
 interface SentRec {
@@ -104,14 +108,36 @@ function makeCaptureHandle(
   return h;
 }
 
-function baseDeps(extra: Record<string, unknown>): Record<string, unknown> {
+function baseDeps(projectRoot: string, extra: Record<string, unknown>): Record<string, unknown> {
   return {
     buildProjectConfig,
-    getListing: (root: string) => (root === "/proj" ? listing() : undefined),
+    getListing: (root: string) => (root === projectRoot ? listing(projectRoot) : undefined),
     emitEvent: () => {},
     ...extra,
   };
 }
+
+/** **真实可解析的夹具项目根**（CI runner 没有 `/proj`）：宿主库存登记以 native realpath 规范化根，
+ *  不可解析即 fail-closed ⇒ 会话开不起来。结束后删除（用例失败也删除）。 */
+async function withProjectRoot<T>(fn: (projectRoot: string) => Promise<T>): Promise<T> {
+  const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), "ans-p0-halt-images-project-"));
+  try {
+    return await fn(projectRoot);
+  } finally {
+    await fs.rm(projectRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+  }
+}
+
+/** 有界 stop：清理路径不因产品 stop 悬挂而拖死文件子进程（CI 未设 --test-timeout）。 */
+async function stopBounded(run: () => Promise<unknown>, label: string, ms = 5_000): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => { timer = setTimeout(resolve, ms); (timer as { unref?: () => void }).unref?.(); });
+  try { await Promise.race([run().catch(() => {}), timeout]); } finally { if (timer !== undefined) clearTimeout(timer); }
+}
+
+/** 全部 manager/desktop 的清理登记：用例失败也执行（有界，绝不拖死文件子进程）。 */
+const cleanups: (() => Promise<unknown>)[] = [];
+after(async () => { for (const run of cleanups) await stopBounded(run, "p0-halt-and-images 清理 stop 超时"); });
 
 // ———————————————————— P0-2：停止入口三态 ————————————————————
 
@@ -120,7 +146,7 @@ test("P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时�
   const events: OrchestrationEvent[] = [];
   const repoListing = await listProject(REPO_ROOT);
   const mgr = new SessionManager(
-    baseDeps({
+    baseDeps(REPO_ROOT, {
       openRoleSession: realOpenRoleSession,
       createPiAdapterFactory: () => {
         throw new Error("本用例不应构造 pi 适配器");
@@ -130,6 +156,7 @@ test("P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时�
       getListing: (root: string) => (root === repoListing.projectRoot ? repoListing : undefined),
     }) as never,
   );
+  cleanups.push(() => mgr.stop());
   const r = await mgr.open({ projectRoot: repoListing.projectRoot, roleId: "桌面窗口", runtime: "demo" });
   assert.equal(r.ok, true);
   const res = await mgr.abort("桌面窗口");
@@ -143,11 +170,12 @@ test("P0-2 abort 三态：demo 替身 ⇒ supported:false（「当前运行时�
 });
 
 test("P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:false, supported:true, error:<原文>} 不吞；旧式替身（无 abort 方法）与未知角色都如实", async () => {
+  await withProjectRoot(async (projectRoot) => {
   const okResult = { ok: true, supported: true };
   const sent: SentRec[] = [];
   const streams: Record<string, OrchestrationEvent[]> = { A: [], B: [], C: [] };
   const mgr = new SessionManager(
-    baseDeps({
+    baseDeps(projectRoot, {
       openRoleSession: async (input: { roleId: string }) =>
         makeCaptureHandle(
           input.roleId,
@@ -172,9 +200,10 @@ test("P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:f
       },
     }) as never,
   );
+  cleanups.push(() => mgr.stop());
   for (const id of ["A", "B", "C"]) {
-    const r = await mgr.open({ projectRoot: "/proj", roleId: id, runtime: "demo" });
-    assert.equal(r.ok, true);
+    const r = await mgr.open({ projectRoot, roleId: id, runtime: "demo" });
+    assert.equal(r.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
   }
 
   const ra = await mgr.abort("A");
@@ -192,15 +221,17 @@ test("P0-2 abort 三态：句柄正常 ⇒ 透传同一结果；抛错 ⇒ {ok:f
   const ru = await mgr.abort("不存在");
   assert.equal(ru.ok, false, "未知角色：没有可停止的轮次（如实）");
   await mgr.stop();
+  });
 });
 
 // ———————————————————— P0-1：图片端到端（Interface 重校验 + 透传/定格） ————————————————————
 
 test("P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**整条拒发**（句柄不被触碰；错误如实）", async () => {
+  await withProjectRoot(async (projectRoot) => {
   const sent: SentRec[] = [];
   const desktop = createDesktopInterface(
-    baseDeps({
-      listProjectFn: async () => listing(),
+    baseDeps(projectRoot, {
+      listProjectFn: async () => listing(projectRoot),
       openRoleSessionFn: async (input: { roleId: string }) => makeCaptureHandle(input.roleId, sent),
       createPiAdapterFactory: () => {
         throw new Error("本用例不应构造 pi 适配器");
@@ -210,30 +241,33 @@ test("P0-1 重校验拒绝路径：坏 MIME（真字节非图）与超 5MB 都**
       },
     }) as never,
   );
-  await desktop.listProject({ projectRoot: "/proj" });
-  const opened = await desktop.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
-  assert.equal(opened.ok, true);
+  cleanups.push(() => desktop.stopSession({ roleId: null }));
+  await desktop.listProject({ projectRoot });
+  const opened = await desktop.openSession({ projectRoot, roleId: "chief", runtime: "demo" });
+  assert.equal(opened.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
 
   // 坏 MIME：base64 解码成功但真字节不是任何受支持图片（"hello world"）⇒ 拒。
-  const bad = await desktop.sendSession({ text: "带坏图", images: [{ type: "image", data: "aGVsbG8gd29ybGQ=", mimeType: "image/png" }] });
+  const bad = await desktop.sendSession({ text: "带坏图", target: { projectRoot, roleId: "chief", runtime: "demo" }, images: [{ type: "image", data: "aGVsbG8gd29ybGQ=", mimeType: "image/png" }] });
   assert.equal(bad.ok, false, "真字节非图 ⇒ 拒（嗅探为准，声明 mime 不作数）");
   assert.ok((bad.error || "").includes("图片未发送"), "错误如实（图片未发送——本条未发出）");
   assert.equal(sent.length, 0, "整条拒发：句柄**未被触碰**（绝不丢图发文字）");
 
   // 超 5MB：约 9MB 的 base64（解码前粗算即超上限）⇒ 拒。
   const bigData = Buffer.alloc(5 * 1024 * 1024 + 1024).toString("base64");
-  const big = await desktop.sendSession({ text: "带大图", images: [{ type: "image", data: bigData, mimeType: "image/png" }] });
+  const big = await desktop.sendSession({ text: "带大图", target: { projectRoot, roleId: "chief", runtime: "demo" }, images: [{ type: "image", data: bigData, mimeType: "image/png" }] });
   assert.equal(big.ok, false, "超限 ⇒ 拒");
   assert.ok((big.error || "").includes("图片未发送"), "错误如实");
   assert.equal(sent.length, 0, "句柄仍未被触碰");
+  });
 });
 
 test("P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）→ 句柄图片载荷保真并明确聊天来源", async () => {
+  await withProjectRoot(async (projectRoot) => {
   const sent: SentRec[] = [];
-  const streams: Record<string, OrchestrationEvent[]> = { A: [] };
+  const streams: Record<string, OrchestrationEvent[]> = { A: [], chief: [] };
   const desktop = createDesktopInterface(
-    baseDeps({
-      listProjectFn: async () => listing(),
+    baseDeps(projectRoot, {
+      listProjectFn: async () => listing(projectRoot),
       openRoleSessionFn: async (input: { roleId: string }) => makeCaptureHandle(input.roleId, sent, {}, streams),
       createPiAdapterFactory: () => {
         throw new Error("本用例不应构造 pi 适配器");
@@ -243,12 +277,15 @@ test("P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）
       },
     }) as never,
   );
-  await desktop.listProject({ projectRoot: "/proj" });
-  await desktop.openSession({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  cleanups.push(() => desktop.stopSession({ roleId: null }));
+  await desktop.listProject({ projectRoot });
+  const openedForImage = await desktop.openSession({ projectRoot, roleId: "chief", runtime: "demo" });
+  assert.equal(openedForImage.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
 
   // 声明 mimeType 故意给错（image/gif）——类型以**真实字节嗅探**为准（应被改判为 image/png）。
   const res = await desktop.sendSession({
     text: "看图",
+    target: { projectRoot, roleId: "chief", runtime: "demo" },
     images: [{ type: "image", data: TINY_PNG, mimeType: "image/gif" }],
   });
   assert.equal(res.ok, true, "合法图放行");
@@ -262,20 +299,22 @@ test("P0-1 合法图：组契约 PromptOptions（mimeType 以**嗅探**为准）
 
   // 纯文本仍明确声明聊天来源，但不产生图片字段。先让上一轮以 settled 收尾
   //（忙态由真实事件流复位——与生产同形），再发第二条。
-  streams.A.push({ kind: "settled", summary: "A 一轮结束" });
+  streams.chief.push({ kind: "settled", summary: "chief 一轮结束" });
   await tick(200);
-  await desktop.sendSession({ text: "纯文本" });
+  await desktop.sendSession({ text: "纯文本", target: { projectRoot, roleId: "chief", runtime: "demo" } });
   assert.equal(sent.length, 2);
   assert.deepEqual(sent[1].opts?.handback, { required: false }, "纯文本明确chat来源");
   assert.equal(Object.hasOwn(sent[1].opts!, "images"), false, "无图片不制造images字段");
+  });
 });
 
 test("P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片数组**同一引用**投递（排队后到投递都带原图）", async () => {
+  await withProjectRoot(async (projectRoot) => {
   const sent: SentRec[] = [];
   const streams: Record<string, OrchestrationEvent[]> = { A: [] };
   let openedRoleId = "";
   const mgr = new SessionManager(
-    baseDeps({
+    baseDeps(projectRoot, {
       openRoleSession: async (input: { roleId: string }) => {
         openedRoleId = input.roleId;
         // 第一条直接返回（但忙态要等 settled 事件复位——真实时序同形）；第二条带图走队列。
@@ -289,7 +328,9 @@ test("P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片
       },
     }) as never,
   );
-  await mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+  cleanups.push(() => mgr.stop());
+  const openedQueue = await mgr.open({ projectRoot, roleId: "A", runtime: "demo" });
+  assert.equal(openedQueue.ok, true, "夹具项目根须真实可解析（CI runner 无 /proj）");
   await tick(30);
 
   const r1 = await mgr.send("第一条");
@@ -310,4 +351,5 @@ test("P0-1 队列入队**定格**：忙时带图入队、settled 放行后图片
   assert.deepEqual(sent[1].opts?.handback, { required: false }, "排队客户图片仍为chat");
   assert.equal(Object.hasOwn(opts2, "handback"), false, "客户原包不写入编排私有字段");
   assert.equal(sent[1].opts?.images?.[0].data, TINY_PNG, "原图逐字到达");
+  });
 });

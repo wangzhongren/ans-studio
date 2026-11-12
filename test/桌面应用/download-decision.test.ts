@@ -92,13 +92,15 @@ function facts(overrides: Partial<DownloadJudgeFacts> = {}): DownloadJudgeFacts 
   };
 }
 
-function approvalRequest(): DownloadApprovalRequest {
+function approvalRequest(input: Pick<DownloadRunInput, "toolCallId" | "turnId"> = {}): DownloadApprovalRequest {
   return {
     downloadId: "dl-test-1",
     roleId: "worker",
     runtime: "demo",
-    toolCallId: "call-1",
-    turnId: "turn-1",
+    // B1 契约：downloadId 由 B1 生成、每次调用透传 input.toolCallId/turnId；夹具按真实形状带入，
+    // 否则同一固定 toolCallId 会被桌面 requestId 重放去重（第二次请求返回第一次结果，测不到本用例语义）。
+    toolCallId: input.toolCallId ?? "call-1",
+    turnId: input.turnId ?? "turn-1",
     factsAvailable: true,
     governanceFacts: {
       governanceModel: "trio",
@@ -145,6 +147,7 @@ interface HarnessOptions {
 interface Harness {
   mgr: SessionManager;
   channel: ReturnType<typeof createCustomerInputChannel>;
+  handles: RoleSessionHandle[];
   payloads: OperatorRequestPayload[];
   openedInput: () => OpenedSessionInput | undefined;
   judgeFactoryCalls: () => number;
@@ -154,6 +157,7 @@ interface Harness {
 }
 
 function makeHarness(root: string, options: HarnessOptions = {}): Harness {
+  const handles: RoleSessionHandle[] = [];
   const payloads: OperatorRequestPayload[] = [];
   const presentedIds: string[] = [];
   const judgeRequests: GovernanceJudgeRequest[] = [];
@@ -190,7 +194,9 @@ function makeHarness(root: string, options: HarnessOptions = {}): Harness {
   const mgr = new SessionManager({
     openRoleSession: async (input) => {
       openedInput = input as unknown as OpenedSessionInput;
-      return handle();
+      const sessionHandle = handle();
+      handles.push(sessionHandle);
+      return sessionHandle;
     },
     createPiAdapterFactory: () => {
       throw new Error("no pi");
@@ -226,6 +232,7 @@ function makeHarness(root: string, options: HarnessOptions = {}): Harness {
   return {
     mgr,
     channel,
+    handles,
     payloads,
     openedInput: () => openedInput,
     judgeFactoryCalls: () => judgeFactoryCalls,
@@ -236,11 +243,11 @@ function makeHarness(root: string, options: HarnessOptions = {}): Harness {
 }
 
 async function runtimeDownload(
-  _input: DownloadRunInput,
+  input: DownloadRunInput,
   options: DownloadRequestOptions,
   presentedIds: string[],
 ): Promise<DownloadRunResult> {
-  const outcome = await options.present.present(approvalRequest(), {
+  const outcome = await options.present.present(approvalRequest(input), {
     onPresented: (info) => presentedIds.push(info.requestId),
   });
   if (outcome.decision === "approved") {
@@ -273,6 +280,25 @@ async function waitFor(predicate: () => boolean, label: string): Promise<void> {
   }
 }
 
+/** 有界等待：清理不得让 CI 文件子进程永久挂起（stop/dispose 以结果如实结算，超时则显式失败）。 */
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 5_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+}
+
+/** 失败路径也必然执行：挂起卡按窗关结算 → 有界 stop → 逐句柄 dispose → 删除临时项目根。 */
+async function cleanupHarness(h: Harness, root: string): Promise<void> {
+  try { h.channel.rejectAllPending("测试清理"); } catch { /* 窗关结算幂等；清理不掩盖用例失败 */ }
+  try {
+    if (h.mgr.isOpen()) await settledWithin(h.mgr.stop(null), "download-decision 清理 stop 超时", 5_000);
+  } catch { /* stop 以结果如实报告 dispose 错误；清理不掩盖用例失败 */ }
+  for (const sessionHandle of h.handles) {
+    try { await settledWithin(sessionHandle.dispose(), "download-decision 清理 dispose 超时", 2_000); } catch { /* dispose 幂等 */ }
+  }
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+}
+
 async function openWorker(h: Harness, root: string): Promise<NonNullable<OpenedSessionInput["requestDownload"]>> {
   const result = await h.mgr.open({ projectRoot: root, roleId: "worker", runtime: "demo" });
   if (!result.ok) assert.fail(result.error);
@@ -297,6 +323,7 @@ async function invokeAndWaitCard(
 test("W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-dl-judge-"));
   const h = makeHarness(root, { judgeOutcomes: [] });
+  try {
   const requestDownload = await openWorker(h, root);
   assert.equal(h.judgeFactoryCalls(), 1, "trio + 下载能力 ⇒ 项目角色也构造每会话 judge 闭包");
 
@@ -322,6 +349,9 @@ test("W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不�
   );
   const resolved = state.events.find((event) => event.kind === "request.resolved");
   assert.equal(resolved?.kind === "request.resolved" ? resolved.by : undefined, "judge");
+  } finally {
+    await cleanupHarness(h, root);
+  }
 });
 
 test("judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正）", async () => {
@@ -331,6 +361,7 @@ test("judge deny：不弹客户卡，request.resolved.by=judge（下载归属修
       { verdict: "deny", group: "approval", cardKind: "download", reasonCode: "not-useful", engine: "demo" },
     ],
   });
+  try {
   const requestDownload = await openWorker(h, root);
   const result = await requestDownload(
     { url: "https://example.com/report.csv", purpose: "拉取周报" },
@@ -343,6 +374,9 @@ test("judge deny：不弹客户卡，request.resolved.by=judge（下载归属修
   assert.equal(presented?.kind === "request.presented" ? presented.to : undefined, "judge");
   const resolved = state.events.find((event) => event.kind === "request.resolved");
   assert.equal(resolved?.kind === "request.resolved" ? resolved.by : undefined, "judge");
+  } finally {
+    await cleanupHarness(h, root);
+  }
 });
 
 test("下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework", async () => {
@@ -353,6 +387,7 @@ test("下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice
         { verdict: "manual", group: "approval", cardKind: "download", reasonCode, engine: "demo", reason: "无法判断" },
       ],
     });
+    try {
     const requestDownload = await openWorker(h, root);
     const { payload, pending } = await invokeAndWaitCard(h, requestDownload, "call-1");
     assert.equal(payload.request.cardKind, "download");
@@ -367,6 +402,9 @@ test("下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice
     const state = await readTaskState(root);
     const resolved = state.events.find((event) => event.kind === "request.resolved");
     assert.equal(resolved?.kind === "request.resolved" ? resolved.by : undefined, "customer");
+    } finally {
+      await cleanupHarness(h, root);
+    }
   }
 });
 
@@ -379,6 +417,7 @@ test("unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge
     operatorId: "tester",
     judge: { isGroupEnabled: () => true },
   });
+  try {
   const judge: GovernanceJudgeFn = async () => {
     judgeCalls += 1;
     return { verdict: "approve", group: "approval", cardKind: "download", reasonCode: "approved", engine: "demo", value: { confirmed: true } };
@@ -410,21 +449,29 @@ test("unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge
   channel.respond({ id: payloads[0]!.id, decision: { kind: "confirm", confirmed: true } });
   const outcome = await pending;
   assert.equal(outcome?.outcome, "answered");
+  } finally {
+    channel.rejectAllPending("测试清理");
+  }
 });
 
 test("开关关：下载卡直接客户卡（judge 零调用）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-dl-switch-off-"));
   const h = makeHarness(root, { groupEnabled: false });
+  try {
   const requestDownload = await openWorker(h, root);
   const { payload, pending } = await invokeAndWaitCard(h, requestDownload, "call-1");
   assert.equal(h.judgeCalls(), 0);
   h.channel.respond({ id: payload.id, decision: { kind: "confirm", confirmed: false } });
   await pending;
+  } finally {
+    await cleanupHarness(h, root);
+  }
 });
 
 test("single 治理模型：不构造 judge、下载卡直接客户卡", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-dl-single-"));
   const h = makeHarness(root, { governanceModel: "single" });
+  try {
   const requestDownload = await openWorker(h, root);
   assert.equal(h.judgeFactoryCalls(), 0);
   const { payload, pending } = await invokeAndWaitCard(h, requestDownload, "call-1");
@@ -432,20 +479,28 @@ test("single 治理模型：不构造 judge、下载卡直接客户卡", async (
   assert.equal(typeof payload.judgeNotice, "undefined");
   h.channel.respond({ id: payload.id, decision: { kind: "confirm", confirmed: true } });
   await pending;
+  } finally {
+    await cleanupHarness(h, root);
+  }
 });
 
 test("项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-dl-no-confirm-"));
   const h = makeHarness(root);
+  try {
   await openWorker(h, root);
   assert.equal(h.openedInput()?.customerInput, undefined);
   assert.equal(typeof h.openedInput()?.requestDownload, "function");
+  } finally {
+    await cleanupHarness(h, root);
+  }
 });
 
 test("同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-dl-fingerprint-"));
   const deny: GovernanceJudgeOutcome = { verdict: "deny", group: "approval", cardKind: "download", reasonCode: "no", engine: "demo" };
   const h = makeHarness(root, { judgeOutcomes: [deny, deny] });
+  try {
   const requestDownload = await openWorker(h, root);
   const first = await requestDownload({ url: "https://example.com/report.csv", purpose: "拉取周报" }, { toolCallId: "call-1" });
   assert.equal((first as { ok: boolean }).ok, false);
@@ -458,4 +513,7 @@ test("同指纹重复 judge deny：第二次升级客户卡（不重复自动拒
   assert.equal(typeof h.payloads[0]!.judgeNotice, "string");
   h.channel.respond({ id: h.payloads[0]!.id, decision: { kind: "confirm", confirmed: false } });
   await secondPending;
+  } finally {
+    await cleanupHarness(h, root);
+  }
 });

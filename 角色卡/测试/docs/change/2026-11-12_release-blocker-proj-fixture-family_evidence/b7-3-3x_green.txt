@@ -1,0 +1,278 @@
+===== test/桌面应用/download-decision.test.ts =====
+--- RUN 1 ---
+✔ W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡 (119.9263ms)
+✔ judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正） (110.8902ms)
+✔ 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework (232.1159ms)
+✔ unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用） (0.3955ms)
+✔ 开关关：下载卡直接客户卡（judge 零调用） (105.7909ms)
+✔ single 治理模型：不构造 judge、下载卡直接客户卡 (139.9134ms)
+✔ 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput (2.5391ms)
+✔ 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝） (171.9155ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1316.286
+EXIT=0
+--- RUN 2 ---
+✔ W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡 (106.2541ms)
+✔ judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正） (77.5612ms)
+✔ 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework (229.9365ms)
+✔ unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用） (0.378ms)
+✔ 开关关：下载卡直接客户卡（judge 零调用） (164.0429ms)
+✔ single 治理模型：不构造 judge、下载卡直接客户卡 (125.0079ms)
+✔ 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput (2.3053ms)
+✔ 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝） (218.0737ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1340.253
+EXIT=0
+--- RUN 3 ---
+✔ W-2/W-4：项目角色 judge 可达、download 事实透传、approve 不弹客户卡 (113.7406ms)
+✔ judge deny：不弹客户卡，request.resolved.by=judge（下载归属修正） (106.0358ms)
+✔ 下载 manual（timeout / download-facts-missing）：原卡 + judgeNotice 转客户，不 auto-rework (257.4625ms)
+✔ unavailableReason 防御：下载卡转客户卡（不 auto-rework、judge 不调用） (0.3998ms)
+✔ 开关关：下载卡直接客户卡（judge 零调用） (131.2563ms)
+✔ single 治理模型：不构造 judge、下载卡直接客户卡 (108.0701ms)
+✔ 项目角色仍无 request_confirmation：openRoleSession 不注入 customerInput (2.2924ms)
+✔ 同指纹重复 judge deny：第二次升级客户卡（不重复自动拒绝） (166.5783ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1304.1831
+EXIT=0
+===== test/测试/su-shell-approval-verify/c-desktop-injection.test.ts =====
+--- RUN 1 ---
+✔ C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变 (19.6489ms)
+✔ C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly (8.6188ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 440.9679
+EXIT=0
+--- RUN 2 ---
+✔ C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变 (16.4743ms)
+✔ C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly (9.7376ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 451.734
+EXIT=0
+--- RUN 3 ---
+✔ C1 桌面注入：su 收 shellOperatorOnly（含 (c)+(a)）、不收 shellReadonly/顶层通道；项目角色三层链不变 (19.1538ms)
+✔ C2 缺件不 arm：缺 shellArming 或缺 shellOperatorChannel ⇒ su 不传 shellOperatorOnly (8.4988ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 441.7556
+EXIT=0
+===== test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts =====
+--- RUN 1 ---
+✔ C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env (0.5ms)
+✔ C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露 (0.6629ms)
+✔ C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查 (0.1249ms)
+✔ C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止） (1.2739ms)
+✔ C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」 (21.2507ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 459.7411
+EXIT=0
+--- RUN 2 ---
+✔ C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env (0.5206ms)
+✔ C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露 (0.682ms)
+✔ C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查 (0.1323ms)
+✔ C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止） (1.2792ms)
+✔ C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」 (22.169ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 449.3718
+EXIT=0
+--- RUN 3 ---
+✔ C1 三运行时默认时限：检查 300000、兜底 3600000、构造 120000；Pi 读 env (0.4977ms)
+✔ C2 设置元数据：labelKey/档位/默认标签/helpKey 经目录解析逐字；1 小时兜底不暴露 (0.6653ms)
+✔ C3 su 卡看护职责：到点检查/不中止/不动作/卡死才提议/1 小时兜底/自身无检查 (0.1234ms)
+✔ C5 三适配器整轮上限均接 turnLastResortMs（不再用 promptTimeoutMs 中止） (1.2365ms)
+✔ C4 role_status 当前轮：看护检查时限 + 1 小时最后兜底；无「硬超时」 (21.5249ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 434.2292
+EXIT=0
+===== test/测试/g4-skill-verify/f-fingerprint.test.ts =====
+--- RUN 1 ---
+✔ ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开） (35.157ms)
+✔ ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件） (8.6643ms)
+✔ ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建） (8.9825ms)
+✔ ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致） (10.5387ms)
+✔ ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色 (12.6563ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 497.6667
+EXIT=0
+--- RUN 2 ---
+✔ ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开） (33.7534ms)
+✔ ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件） (8.5029ms)
+✔ ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建） (8.1368ms)
+✔ ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致） (10.2484ms)
+✔ ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色 (11.4798ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 498.0028
+EXIT=0
+--- RUN 3 ---
+✔ ① 三触发：新增 / 内容编辑 / 移除——逐触发重建并如实点名（skill 措辞与边界措辞分开） (33.633ms)
+✔ ② 零技能负例：从未装过技能 ⇒ 既有指纹语义逐字不变（零重建、零 skill 事件） (9.1141ms)
+✔ ③ 坏登记不误重建：解析失败/未知状态/缺件目录 ⇒ currentSkillPaths 跳过（零重建） (8.3561ms)
+✔ ④ SKILL.md 缺失收敛：登记在而内容缺 ⇒ 不触发；补齐 ⇒ 触发（与渲染器「补好即注入」收敛一致） (9.6245ms)
+✔ ⑤ 隔离：别角色（Y）的技能变化不误伤 X；Y 未开会话 ⇒ 行级重建只发生在受影响角色 (12.0023ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 493.4329
+EXIT=0
+===== test/装配/release-packaging.test.ts =====
+--- RUN 1 ---
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.9454ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.1073ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2862ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.0714ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.0897ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.1151ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0822ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0821ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.0905ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1602ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0897ms)
+✔ release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only (0.0769ms)
+✔ release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files by exact path only (0.0593ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.0668ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.0587ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0533ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0714ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.072ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0487ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (367.8224ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1453ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 451.681
+EXIT=0
+--- RUN 2 ---
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.9486ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.1019ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2939ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.069ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.0888ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.0998ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0804ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.08ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.0863ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1435ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0823ms)
+✔ release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only (0.0646ms)
+✔ release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files by exact path only (0.0794ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.0668ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.0553ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0519ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0717ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.0787ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0764ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (364.8378ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1423ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 504.3863
+EXIT=0
+--- RUN 3 ---
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.9284ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.1013ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2958ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.0733ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.097ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.1035ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0955ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0867ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.0979ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1396ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0843ms)
+✔ release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only (0.0691ms)
+✔ release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files by exact path only (0.0787ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.0772ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.057ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0536ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0736ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.077ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.054ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (421.2243ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1463ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 510.8982
+EXIT=0
