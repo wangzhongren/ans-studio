@@ -1,0 +1,301 @@
+{
+  "fileUrl": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr34-2026-11-12/target/index.html",
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Edg/157.0.4341.46",
+    "revision": "@a0c6bd61d7884b3c402a34c67d05100107a9e5e4",
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+    "jsVersion": "15.7.11.4"
+  },
+  "boot": {
+    "snap": {
+      "state": "MENU",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 0,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "menu": true,
+    "bootError": false
+  },
+  "startOk": true,
+  "start": {
+    "state": "PLAYING",
+    "hp": 100,
+    "maxHp": 100,
+    "level": 1,
+    "exp": 0,
+    "expToNext": 8,
+    "wave": 1,
+    "timeLeft": 210,
+    "elapsed": 0,
+    "kills": 0,
+    "upgradeChoices": [],
+    "result": null,
+    "stats": null
+  },
+  "movement": {
+    "pos0": {
+      "x": 640,
+      "y": 360
+    },
+    "posD": {
+      "x": 783.3333333333348,
+      "y": 360,
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "dead": false
+    },
+    "posW": {
+      "x": 783.3333333333348,
+      "y": 220.25000000000045,
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "dead": false
+    },
+    "posArrow": {
+      "x": 672.2500000000003,
+      "y": 220.25000000000045,
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "dead": false
+    },
+    "dxRight": 143,
+    "dyUp": -140,
+    "dxArrow": -111,
+    "moveOk": true
+  },
+  "wave1": {
+    "enemyCount": 2
+  },
+  "combat": {
+    "killsSeen": 1,
+    "expSeen": 3,
+    "snap": {
+      "state": "PLAYING",
+      "hp": 92,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 3,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 200.01666666666668,
+      "elapsed": 9.983333333333333,
+      "kills": 1,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    }
+  },
+  "levelup": {
+    "seen": true,
+    "snap": {
+      "state": "LEVEL_UP",
+      "hp": 84,
+      "maxHp": 100,
+      "level": 2,
+      "exp": 1,
+      "expToNext": 10,
+      "wave": 1,
+      "timeLeft": 198.08333333333334,
+      "elapsed": 11.933333333333334,
+      "kills": 3,
+      "upgradeChoices": [
+        "hui-xin-yi-ji",
+        "tie-bu-shan",
+        "jian-qi-zong-heng"
+      ],
+      "result": null,
+      "stats": null
+    },
+    "cards": [
+      {
+        "text": "1会心一击稀有 · 权重 7看破破绽，暴击概率增一成。可叠 3 层"
+      },
+      {
+        "text": "2铁布衫少见 · 权重 9气血上限增二十。可叠 5 层"
+      },
+      {
+        "text": "3剑气纵横少见 · 权重 8剑势外扩，攻击范围增一成五。可叠 3 层"
+      }
+    ],
+    "after": {
+      "state": "PLAYING",
+      "hp": 84,
+      "maxHp": 100,
+      "level": 2,
+      "exp": 1,
+      "expToNext": 10,
+      "wave": 1,
+      "timeLeft": 197.56666666666666,
+      "elapsed": 12.433333333333334,
+      "kills": 3,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    }
+  },
+  "waves": {
+    "waveMax": 3
+  },
+  "pickup": {
+    "pickupSeen": true,
+    "weaponPickupSeen": true,
+    "result": {
+      "target": {
+        "uid": 5,
+        "kind": "weapon",
+        "id": "liu-ye-dao",
+        "name": "柳叶飞刀",
+        "x": 1137.3997777679956,
+        "y": 697
+      },
+      "before": {
+        "ownedWeaponIds": [
+          "iron-sword"
+        ],
+        "activeWeaponId": "iron-sword",
+        "items": [
+          {
+            "id": "qing-gong-xie",
+            "count": 1
+          }
+        ],
+        "pickups": [
+          {
+            "uid": 5,
+            "kind": "weapon",
+            "id": "liu-ye-dao",
+            "name": "柳叶飞刀",
+            "x": 1137.3997777679956,
+            "y": 697
+          },
+          {
+            "uid": 6,
+            "kind": "item",
+            "id": "hu-xin-jing",
+            "name": "护心镜",
+            "x": 1252.2020901304231,
+            "y": 612.1575633822695
+          },
+          {
+            "uid": 3,
+            "kind": "item",
+            "id": "hu-xin-jing",
+            "name": "护心镜",
+            "x": 1174.8879408489418,
+            "y": 673.1926079357247
+          },
+          {
+            "uid": 2,
+            "kind": "item",
+            "id": "jin-chuang-yao",
+            "name": "金疮药",
+            "x": 1155.506308069311,
+            "y": 694.57759005464
+          },
+          {
+            "uid": 1,
+            "kind": "item",
+            "id": "qing-gong-xie",
+            "name": "轻功鞋",
+            "x": 1150.5476789390875,
+            "y": 701
+          }
+        ],
+        "weaponDropDone": true,
+        "waveIndex": 3
+      },
+      "after": {
+        "ownedWeaponIds": [
+          "iron-sword",
+          "liu-ye-dao"
+        ],
+        "activeWeaponId": "liu-ye-dao",
+        "items": [
+          {
+            "id": "jin-chuang-yao",
+            "count": 1
+          },
+          {
+            "id": "hu-xin-jing",
+            "count": 1
+          },
+          {
+            "id": "qing-gong-xie",
+            "count": 2
+          }
+        ],
+        "pickups": [
+          {
+            "uid": 6,
+            "kind": "item",
+            "id": "hu-xin-jing",
+            "name": "护心镜",
+            "x": 1252.2020901304231,
+            "y": 612.1575633822695
+          }
+        ],
+        "weaponDropDone": true,
+        "waveIndex": 3
+      }
+    }
+  },
+  "death": {
+    "state": "GAME_OVER",
+    "result": "defeat",
+    "shot": true,
+    "usedApi": false
+  },
+  "restart": {
+    "state": "PLAYING",
+    "hp": 100,
+    "maxHp": 100,
+    "level": 1,
+    "exp": 0,
+    "expToNext": 8,
+    "wave": 1,
+    "timeLeft": 210,
+    "elapsed": 0,
+    "kills": 0,
+    "upgradeChoices": [],
+    "result": null,
+    "stats": null
+  },
+  "finalSnap": {
+    "state": "PLAYING",
+    "hp": 100,
+    "maxHp": 100,
+    "level": 1,
+    "exp": 0,
+    "expToNext": 8,
+    "wave": 1,
+    "timeLeft": 209.96666666666667,
+    "elapsed": 0.03333333333333333,
+    "kills": 0,
+    "upgradeChoices": [],
+    "result": null,
+    "stats": null
+  },
+  "console": {
+    "total": 0,
+    "errors": 0,
+    "warnings": 0,
+    "clean": true
+  },
+  "at": "2026-11-11T16:43:15.788Z"
+}

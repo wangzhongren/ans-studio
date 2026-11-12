@@ -1,0 +1,13 @@
+{
+  "customerMessages": 0,
+  "cardsTotal": 0,
+  "cardsByKind": {},
+  "decisions": 0,
+  "dispatches": 0,
+  "dispatchesByFrom": {},
+  "tasksByTo": {},
+  "writeTasks": 0,
+  "implementationWriteTasks": 0,
+  "turnsByRole": {},
+  "gitTargetNewCommits": 0
+}

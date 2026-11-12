@@ -1,0 +1,51 @@
+{
+  "customerMessages": 1,
+  "cardsTotal": 4,
+  "cardsByKind": {
+    "intent-confirm": 1,
+    "proposal": 1,
+    "appointment": 1,
+    "merge-main": 1
+  },
+  "decisions": 0,
+  "dispatches": 40,
+  "dispatchesByFrom": {
+    "chief": 19,
+    "convener": 21
+  },
+  "tasksByTo": {
+    "convener": 13,
+    "product": 2,
+    "rapporteur": 3,
+    "nominator": 2,
+    "qa-verifier": 2,
+    "config-data": 2,
+    "loop-engine": 3,
+    "verifier": 4,
+    "player-combat": 2,
+    "enemy-systems": 1,
+    "progression": 1,
+    "arsenal": 1,
+    "ui-hud": 1,
+    "env-bootstrap": 3
+  },
+  "writeTasks": 27,
+  "implementationWriteTasks": 14,
+  "turnsByRole": {
+    "arsenal": 1,
+    "chief": 63,
+    "config-data": 2,
+    "convener": 37,
+    "enemy-systems": 1,
+    "env-bootstrap": 3,
+    "loop-engine": 3,
+    "nominator": 3,
+    "player-combat": 2,
+    "product": 4,
+    "progression": 1,
+    "qa-verifier": 2,
+    "rapporteur": 4,
+    "ui-hud": 1,
+    "verifier": 4
+  }
+}

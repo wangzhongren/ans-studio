@@ -1,0 +1,292 @@
+TAP version 13
+# Subtest: B7.1 A1：首个 stage-request JSON 示例含全部精确字段（roleId=convener/taskKind/workflowAction/workflowPath=A/stage=A1/flowId/sideEffect=read-only）
+ok 1 - B7.1 A1：首个 stage-request JSON 示例含全部精确字段（roleId=convener/taskKind/workflowAction/workflowPath=A/stage=A1/flowId/sideEffect=read-only）
+  ---
+  duration_ms: 2.1343
+  type: 'test'
+  ...
+# Subtest: B7.1 A1：路径 B 首请求同形（workflowPath=B/stage=B1）且缺字段 fail-closed 非 legacy 回退
+ok 2 - B7.1 A1：路径 B 首请求同形（workflowPath=B/stage=B1）且缺字段 fail-closed 非 legacy 回退
+  ---
+  duration_ms: 0.5375
+  type: 'test'
+  ...
+# Subtest: B7.1 A1：禁止直派生产线角色与 legacy run/trunk 概念
+ok 3 - B7.1 A1：禁止直派生产线角色与 legacy run/trunk 概念
+  ---
+  duration_ms: 0.3869
+  type: 'test'
+  ...
+# Subtest: B7.1 各阶段：A2/A4/A7/A8/A10/A11/A12a/A12b 的 fixed 任务字段与卡节奏齐备
+ok 4 - B7.1 各阶段：A2/A4/A7/A8/A10/A11/A12a/A12b 的 fixed 任务字段与卡节奏齐备
+  ---
+  duration_ms: 0.571
+  type: 'test'
+  ...
+# Subtest: B7.1 卡呈交：A6/A10/A13 卡由幕僚呈交；merge-main 客户本人且 judge 不可代批
+ok 5 - B7.1 卡呈交：A6/A10/A13 卡由幕僚呈交；merge-main 客户本人且 judge 不可代批
+  ---
+  duration_ms: 0.4477
+  type: 'test'
+  ...
+# Subtest: B7.1 contract_check：fixed 会话应显示 fixed 口径；legacy 文本不作为 fixed 依据
+ok 6 - B7.1 contract_check：fixed 会话应显示 fixed 口径；legacy 文本不作为 fixed 依据
+  ---
+  duration_ms: 0.3768
+  type: 'test'
+  ...
+# Subtest: B7.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+ok 7 - B7.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+  ---
+  duration_ms: 0.8775
+  type: 'test'
+  ...
+# Subtest: B7.1 版本与规模：v2 版本行恰一处、字节 ≤256 KiB、无 BOM/NUL
+ok 8 - B7.1 版本与规模：v2 版本行恰一处、字节 ≤256 KiB、无 BOM/NUL
+  ---
+  duration_ms: 1.1706
+  type: 'test'
+  ...
+# Subtest: B31 A12b 阶段清单：blocked 报告到达后必须当回合三选一并留痕、禁止空转（三选一 = 轻量验收/有限返工/停止上报）
+ok 9 - B31 A12b 阶段清单：blocked 报告到达后必须当回合三选一并留痕、禁止空转（三选一 = 轻量验收/有限返工/停止上报）
+  ---
+  duration_ms: 0.8765
+  type: 'test'
+  ...
+# Subtest: B31 轻量验收通过：close_created_task outcome="accepted" + note 标记；应用归档记为 staffDecision；A13 披露「运行期未验证」
+ok 10 - B31 轻量验收通过：close_created_task outcome="accepted" + note 标记；应用归档记为 staffDecision；A13 披露「运行期未验证」
+  ---
+  duration_ms: 0.2847
+  type: 'test'
+  ...
+# Subtest: B31 受支持动作边界：A12b blocked accepted 必须同时有 acceptanceArchive 与非空 note；其余阶段/缺归档/缺 note 仍 fail-closed
+ok 11 - B31 受支持动作边界：A12b blocked accepted 必须同时有 acceptanceArchive 与非空 note；其余阶段/缺归档/缺 note 仍 fail-closed
+  ---
+  duration_ms: 0.2377
+  type: 'test'
+  ...
+# Subtest: B31 返工/补证：有限、可执行、静态证据/具体文件与字段；不得要求 shell 自测；outcome:"rework" 回 A11
+ok 12 - B31 返工/补证：有限、可执行、静态证据/具体文件与字段；不得要求 shell 自测；outcome:"rework" 回 A11
+  ---
+  duration_ms: 0.2541
+  type: 'test'
+  ...
+# Subtest: B31 停止并如实上报客户：说明阻塞事实与所需客户决策；按停止流程 stage-request stop；不伪造通过、不静默归档
+ok 13 - B31 停止并如实上报客户：说明阻塞事实与所需客户决策；按停止流程 stage-request stop；不伪造通过、不静默归档
+  ---
+  duration_ms: 0.2699
+  type: 'test'
+  ...
+# Subtest: B31 既有安全语义不放宽 + legacy 不改：hash/shell/写区/卡预算口径保留；v1 版本与模块 pin 不变；v2 版本行/规模/编码有界
+ok 14 - B31 既有安全语义不放宽 + legacy 不改：hash/shell/写区/卡预算口径保留；v1 版本与模块 pin 不变；v2 版本行/规模/编码有界
+  ---
+  duration_ms: 1.1109
+  type: 'test'
+  ...
+# Subtest: B32.1 A11 段：实现任务文本写死提交命令形态（引号/单 argv 参数）
+ok 15 - B32.1 A11 段：实现任务文本写死提交命令形态（引号/单 argv 参数）
+  ---
+  duration_ms: 1.69
+  type: 'test'
+  ...
+# Subtest: B32.1 「A10 与 A11 的顺序」段：A11 stage-request 文本与返工均写死提交语法
+ok 16 - B32.1 「A10 与 A11 的顺序」段：A11 stage-request 文本与返工均写死提交语法
+  ---
+  duration_ms: 0.5388
+  type: 'test'
+  ...
+# Subtest: B32.1 Git 普通用法段：实现角色提交命令带引号且既有拒绝面不变
+ok 17 - B32.1 Git 普通用法段：实现角色提交命令带引号且既有拒绝面不变
+  ---
+  duration_ms: 0.3567
+  type: 'test'
+  ...
+# Subtest: B32.1/B32.2 既有安全语义不放宽：hash/shell/卡预算口径保留，legacy 字节与模块 pin 不变
+ok 18 - B32.1/B32.2 既有安全语义不放宽：hash/shell/卡预算口径保留，legacy 字节与模块 pin 不变
+  ---
+  duration_ms: 1.0095
+  type: 'test'
+  ...
+# Subtest: B32.1 资源事实：版本行恰一处 chief-workflow/v2、规模有界、无 BOM/NUL
+ok 19 - B32.1 资源事实：版本行恰一处 chief-workflow/v2、规模有界、无 BOM/NUL
+  ---
+  duration_ms: 1.1233
+  type: 'test'
+  ...
+# Subtest: B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+ok 20 - B9.1 任务文本哈希口径：worker 只报告路径/frontmatter 实际值与结论，hash 由应用计算
+  ---
+  duration_ms: 0.8787
+  type: 'test'
+  ...
+# Subtest: B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+ok 21 - B9.1 禁止词：v2 明确禁止 run_shell/certutil/Get-FileHash/PowerShell 等 shell 计算 hash
+  ---
+  duration_ms: 0.3058
+  type: 'test'
+  ...
+# Subtest: B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+ok 22 - B14 A1 环境探测禁令：任务文本不得要求 shell 环境/工具链探测（RR9 实测根因）
+  ---
+  duration_ms: 0.838
+  type: 'test'
+  ...
+# Subtest: B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+ok 23 - B9.1 A1：stage-request JSON 任务文本模板携带 hash 口径（只报告路径/内容，hash 由应用计算）
+  ---
+  duration_ms: 0.5759
+  type: 'test'
+  ...
+# Subtest: B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+ok 24 - B9.1 A2/A7/A11：各阶段任务文本不再要求 worker 算 hash（应用计算/应用回执值）
+  ---
+  duration_ms: 0.4875
+  type: 'test'
+  ...
+# Subtest: B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+ok 25 - B9.1 卡预算：3 张确认卡 + merge-main；不应出现额外 shell/stable-write 卡，shell 卡属任务文本缺陷
+  ---
+  duration_ms: 0.8494
+  type: 'test'
+  ...
+# Subtest: B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+ok 26 - B9.1 回归：政策段之外每处 hash/sha256 均标注应用计算/禁止口径（不要求 worker shell hash）
+  ---
+  duration_ms: 0.7629
+  type: 'test'
+  ...
+# Subtest: B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+ok 27 - B9.1 冻结：legacy chief-workflow.md 字节 SHA-256 与模块数据 pin 逐字不变
+  ---
+  duration_ms: 0.444
+  type: 'test'
+  ...
+# Subtest: B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+ok 28 - B9.1 资源事实：v2 版本行恰一处 chief-workflow/v2、≤256 KiB、无 BOM/NUL、既有主题保留
+  ---
+  duration_ms: 0.4529
+  type: 'test'
+  ...
+# Subtest: B27 A11 实现 worker 不执行 shell/自测：报告静态自检结论，旧「变更与测试结论」措辞移除
+ok 29 - B27 A11 实现 worker 不执行 shell/自测：报告静态自检结论，旧「变更与测试结论」措辞移除
+  ---
+  duration_ms: 0.3372
+  type: 'test'
+  ...
+# Subtest: B34 路径 B 概要：B1 completed 后直接发 B3 advance stage-request；应用在受理 B3 时记录 change.scope-decided，B2 由该记录完成（不发 B2）
+ok 30 - B34 路径 B 概要：B1 completed 后直接发 B3 advance stage-request；应用在受理 B3 时记录 change.scope-decided，B2 由该记录完成（不发 B2）
+  ---
+  duration_ms: 1.2579
+  type: 'test'
+  ...
+# Subtest: B34 首个动作与阶段段：重申路径 B 不发 B2 stage-request（B1 完成后直接 B3 advance）
+ok 31 - B34 首个动作与阶段段：重申路径 B 不发 B2 stage-request（B1 完成后直接 B3 advance）
+  ---
+  duration_ms: 0.5174
+  type: 'test'
+  ...
+# Subtest: B34 路径 B 要点 B2：稳定码 b2-stage-request-forbidden + 应用文案；B1 completed 后 B3 advance 由应用记录 scope、派生写集
+ok 32 - B34 路径 B 要点 B2：稳定码 b2-stage-request-forbidden + 应用文案；B1 completed 后 B3 advance 由应用记录 scope、派生写集
+  ---
+  duration_ms: 0.3024
+  type: 'test'
+  ...
+# Subtest: B34 旧「B2 发范围决定」错误引导移除：不得再出现「B2：你发范围决定」旧措辞
+ok 33 - B34 旧「B2 发范围决定」错误引导移除：不得再出现「B2：你发范围决定」旧措辞
+  ---
+  duration_ms: 0.2634
+  type: 'test'
+  ...
+# Subtest: B34 B2 卡住处置：按真实拒绝码如实上报/停止；不得反复重发 B2、不得伪造范围决定
+ok 34 - B34 B2 卡住处置：按真实拒绝码如实上报/停止；不得反复重发 B2、不得伪造范围决定
+  ---
+  duration_ms: 0.2574
+  type: 'test'
+  ...
+# Subtest: B34 禁止用 shell 探测或读取应用源码：findstr/grep/Get-Content/PowerShell；应用源码不是项目证据；不得产生额外卡
+ok 35 - B34 禁止用 shell 探测或读取应用源码：findstr/grep/Get-Content/PowerShell；应用源码不是项目证据；不得产生额外卡
+  ---
+  duration_ms: 0.2651
+  type: 'test'
+  ...
+# Subtest: B34 既有安全语义不放宽 + legacy 不改：hash/卡预算/写区/fail-closed 口径保留；v1 字节与模块 pin 不变；v2 版本行/规模/编码有界
+ok 36 - B34 既有安全语义不放宽 + legacy 不改：hash/卡预算/写区/fail-closed 口径保留；v1 字节与模块 pin 不变；v2 版本行/规模/编码有界
+  ---
+  duration_ms: 1.8053
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+ok 37 - chief-workflow-v2：fixed 资源存在、版本行恰为 v2、覆盖两路径/派发分裂/3 卡/基线/Git/merge-main/A10-A12/路径 B
+  ---
+  duration_ms: 1.8
+  type: 'test'
+  ...
+# Subtest: legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+ok 38 - legacy chief-workflow.md 不改：版本仍为 v1、正文段逐字保留；模块资源引用仍指向 v1
+  ---
+  duration_ms: 0.4366
+  type: 'test'
+  ...
+# Subtest: chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+ok 39 - chief-workflow-v2：编码与身份（无 BOM/NUL；非空行数有界；不与 legacy 字节相同）
+  ---
+  duration_ms: 0.3832
+  type: 'test'
+  ...
+# Subtest: B9.2 A1/A2 分离：A1 产品受理任务写死 stage:"A1" 且完成于任务创建；A2 意图任务 stage:"A2" 在 A1 收口后另派、完成于收口 + 文档 hash
+ok 40 - B9.2 A1/A2 分离：A1 产品受理任务写死 stage:"A1" 且完成于任务创建；A2 意图任务 stage:"A2" 在 A1 收口后另派、完成于收口 + 文档 hash
+  ---
+  duration_ms: 0.8346
+  type: 'test'
+  ...
+# Subtest: B9.2 A1 精确 JSON：stage 仍为 A1；任务文本明确 A1 只受理/准备、A2 另派（B9.1 hash 口径保留）
+ok 41 - B9.2 A1 精确 JSON：stage 仍为 A1；任务文本明确 A1 只受理/准备、A2 另派（B9.1 hash 口径保留）
+  ---
+  duration_ms: 0.355
+  type: 'test'
+  ...
+# Subtest: B9.2 A4/A5 分离：A4 受理任务 stage:"A4" 完成于创建；A5 方案任务 stage:"A5" 在 A4 收口后另派、完成于收口 + 文档证据
+ok 42 - B9.2 A4/A5 分离：A4 受理任务 stage:"A4" 完成于创建；A5 方案任务 stage:"A5" 在 A4 收口后另派、完成于收口 + 文档证据
+  ---
+  duration_ms: 0.2983
+  type: 'test'
+  ...
+# Subtest: B9.2 A7/A8 分离：A7 受理任务 stage:"A7" 完成于创建；A8 激活任务 stage:"A8" 在 A7 收口后另派、完成于 role.activated
+ok 43 - B9.2 A7/A8 分离：A7 受理任务 stage:"A7" 完成于创建；A8 激活任务 stage:"A8" 在 A7 收口后另派、完成于 role.activated
+  ---
+  duration_ms: 0.2942
+  type: 'test'
+  ...
+# Subtest: B9.2 stage.dispatched 记录集合：恰 A1/A4/A7/A8/A12a/A12b；A2/A5 不得误记；与桌面常量一致
+ok 44 - B9.2 stage.dispatched 记录集合：恰 A1/A4/A7/A8/A12a/A12b；A2/A5 不得误记；与桌面常量一致
+  ---
+  duration_ms: 1.6871
+  type: 'test'
+  ...
+# Subtest: B9.2 无合并回归：旧「A1/A4/A7 受理与 A2/A5/A8 产物同一任务」写法不得出现
+ok 45 - B9.2 无合并回归：旧「A1/A4/A7 受理与 A2/A5/A8 产物同一任务」写法不得出现
+  ---
+  duration_ms: 0.3247
+  type: 'test'
+  ...
+# Subtest: B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本行恰一处、≤256 KiB、无 BOM/NUL；B9.1 哈希口径保留
+ok 46 - B9.2 冻结与资源事实：legacy 字节/模块 pin 不变；v2 版本行恰一处、≤256 KiB、无 BOM/NUL；B9.1 哈希口径保留
+  ---
+  duration_ms: 0.8096
+  type: 'test'
+  ...
+# Subtest: B28 A12a/A12b 项目验收角色必须绑定 roster 模块；review 任务禁止 shell/mkdir，write_file 自动建目录
+ok 47 - B28 A12a/A12b 项目验收角色必须绑定 roster 模块；review 任务禁止 shell/mkdir，write_file 自动建目录
+  ---
+  duration_ms: 0.2546
+  type: 'test'
+  ...
+1..47
+# tests 47
+# suites 0
+# pass 47
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 166.8382

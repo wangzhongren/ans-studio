@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="江湖夜雨 · 武侠肉鸽生存 2D 小游戏（纯前端静态页，file:// 直接打开）">
+  <title>江湖夜雨</title>
+  <style>
+    :root {
+      --wx-bg: #0b0f14;
+      --wx-canvas-bg: #0d1219;
+      --wx-panel: #111823;
+      --wx-ink: #ece3cd;
+      --wx-accent: #c9a35b;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 35%, #16202d 0%, #0b0f14 62%, #070a0e 100%);
+      color: var(--wx-ink);
+      font-family: "Noto Serif SC", "Songti SC", "STSong", "SimSun", "Microsoft YaHei", serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 画布舞台：铺满视口，Canvas 尺寸与 DPR 适配由 WX.Engine 负责 */
+    #wx-game-shell {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: var(--wx-canvas-bg);
+      outline: none;
+      touch-action: none;
+    }
+
+    /* UI 覆盖层容器：菜单 / HUD / 升级面板 / 结算由 WX.UI 挂载于此 */
+    #wx-ui-root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    /* 装配失败提示：仅在入口脚本缺失或启动抛出异常时显示 */
+    #wx-boot-error {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(560px, 86vw);
+      padding: 20px 24px;
+      border: 1px solid rgba(201, 163, 91, 0.45);
+      border-radius: 10px;
+      background: rgba(17, 24, 35, 0.94);
+      color: #f0e6cf;
+      font-size: 14px;
+      line-height: 1.7;
+      letter-spacing: 0.02em;
+      text-align: center;
+      z-index: 10;
+    }
+
+    #wx-boot-error[hidden] { display: none; }
+
+    #wx-boot-error p { margin: 0 0 8px; }
+
+    #wx-boot-error code {
+      font-family: Consolas, "Courier New", monospace;
+      color: var(--wx-accent);
+      word-break: break-all;
+    }
+
+    .wx-noscript {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+  <main id="wx-game-shell">
+    <canvas id="game-canvas" width="1280" height="720" aria-label="江湖夜雨 游戏画面"></canvas>
+    <div id="wx-ui-root"></div>
+    <div id="wx-boot-error" hidden>
+      <p>入口脚本未能完成装配。</p>
+      <p>请确认本页与 <code>game/</code> 目录处于同一位置，并补齐架构契约规定的模块脚本（浏览器控制台会列出缺失文件）。</p>
+    </div>
+    <noscript>
+      <div class="wx-noscript">本游戏需要启用 JavaScript。<br>请用支持 JavaScript 的现代浏览器直接打开本文件。</div>
+    </noscript>
+  </main>
+
+  <!-- ==================================================================
+       经典脚本装配（架构契约 §5.1）：config → engine → domain → ui → app
+       所有模块挂载到单一命名空间 window.WX；禁止 ES Module 脚本属性，
+       禁止 import / export / fetch / XHR / 外部 CDN 资源。
+       ================================================================== -->
+
+  <!-- 1) config-data：数值与文案常量（game/data/config.js，已落盘） -->
+  <script src="game/data/config.js"></script>
+
+  <!-- 2) engine-core：渲染 / 输入 / 数学 / 碰撞 / 对象池（顺序无关，已落盘） -->
+  <script src="game/engine/engine.js"></script>
+  <script src="game/engine/renderer.js"></script>
+  <script src="game/engine/camera.js"></script>
+  <script src="game/engine/input.js"></script>
+  <script src="game/engine/math.js"></script>
+  <script src="game/engine/collision.js"></script>
+  <script src="game/engine/pool.js"></script>
+
+  <!-- 3) 领域层：player → combat → enemies → progression → arsenal(items)
+       文件名已按磁盘实际落盘核对（player / combat / enemies / progression / items）。 -->
+  <script src="game/player/player.js"></script>
+  <script src="game/combat/combat.js"></script>
+  <script src="game/enemies/enemies.js"></script>
+  <script src="game/progression/progression.js"></script>
+  <script src="game/items/arsenal.js"></script>
+
+  <!-- 4) ui-hud：DOM/CSS 覆盖层（game/ui/ui.js 自行注入 game/ui/styles.css，
+       入口页不额外加载样式文件） -->
+  <script src="game/ui/ui.js"></script>
+
+  <!-- 5) loop-app：事件总线 → 适配层 → 波次调度 → 主循环与启动入口
+       文件间无加载期依赖（相互引用均在 WX.App.start() 时解析）；顺序按模块 README。 -->
+  <script src="game/app/bus.js"></script>
+  <script src="game/app/integrations.js"></script>
+  <script src="game/app/wave-scheduler.js"></script>
+  <script src="game/app/app.js"></script>
+
+  <!-- 6) 启动：WX.App.start()（不做业务逻辑，仅按契约调用入口） -->
+  <script>
+    (function () {
+      'use strict';
+
+      function showBootError(detail) {
+        var el = document.getElementById('wx-boot-error');
+        if (!el) { return; }
+        if (detail) {
+          var p = document.createElement('p');
+          var code = document.createElement('code');
+          code.textContent = detail;
+          p.appendChild(code);
+          el.appendChild(p);
+        }
+        el.hidden = false;
+      }
+
+      function boot() {
+        var WX = window.WX;
+
+        // 标题以配置文案为准（配置缺失时保留静态 <title>）
+        try {
+          if (WX && WX.Config && WX.Config.text && WX.Config.text.title) {
+            document.title = WX.Config.text.title;
+          }
+        } catch (titleError) {
+          // 标题同步失败不影响启动
+        }
+
+        if (!WX || !WX.App || typeof WX.App.start !== 'function') {
+          showBootError('缺少启动模块 window.WX.App（game/app/）');
+          return;
+        }
+
+        try {
+          WX.App.start();
+        } catch (startError) {
+          showBootError('WX.App.start() 抛出异常：' + (startError && startError.message ? startError.message : String(startError)));
+          if (window.console && console.error) {
+            console.error('[entry-index] WX.App.start() failed:', startError);
+          }
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot, false);
+      } else {
+        boot();
+      }
+    })();
+  </script>
+</body>
+</html>

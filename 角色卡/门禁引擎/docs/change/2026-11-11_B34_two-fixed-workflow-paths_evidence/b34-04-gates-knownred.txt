@@ -1,0 +1,27 @@
+$ node --test --test-reporter=tap test/门禁引擎/*.test.ts
+--- suite summary
+# tests 577
+# suites 0
+# pass 571
+# fail 5
+# cancelled 0
+# skipped 1
+# todo 0
+
+--- frozen known-red (5; B2/B28 baseline: 角色卡/门禁引擎/docs/change/2026-11-11_B28_two-fixed-workflow-paths_evidence/b28-05-gates-known-red-failnames.txt)
+D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+
+--- actual failed test names (5)
+D-10：质检卡保留可选质量核对与截图上限，不要求录屏
+listProject：实际已接受的四份运行时组卡返回组别，15 个活项目角色和归档约定保留
+listProject：枚举真实项目（本仓库）全部角色，边界均解析成功且无警告
+卡文本：运营负责落盘工作流，幕僚不再被暗示为写者
+渲染过滤：section=roles/routing 与注册表展示字段出现在文本中
+
+--- diff (frozen vs actual; empty = 逐名一致)
+diff-exit:0
+node-test-exit:1 (only frozen known-red failures; pass 571 = B32 564 + B34 new 7)

@@ -1,0 +1,23 @@
+{"ts":"2026-11-11T16:32:19.624Z","type":"browser.spawn","edge":"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe","args":["--remote-debugging-port=9333","--user-data-dir=C:\\Users\\51054\\Desktop\\work\\ans-wuxia-roguelike-rr34-2026-11-12\\play-profile","--no-first-run","--no-default-browser-check","--disable-sync","--disable-extensions","--window-size=1280,800","file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr34-2026-11-12/target/index.html"]}
+{"ts":"2026-11-11T16:32:20.146Z","type":"browser.version","protocolVersion":"1.3","product":"Edg/157.0.4341.46","revision":"@a0c6bd61d7884b3c402a34c67d05100107a9e5e4","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0","jsVersion":"15.7.11.4"}
+{"ts":"2026-11-11T16:32:20.413Z","type":"boot","snap":{"state":"MENU","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":0,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"menu":true,"bootError":false}
+{"ts":"2026-11-11T16:32:20.995Z","type":"screenshot","name":"01-menu.png","bytes":348891}
+{"ts":"2026-11-11T16:32:26.087Z","type":"mouse.click","selector":".wx-menu__start","rect":{"x":628,"y":424.046875,"w":213.125,"h":46,"text":"踏入江湖"}}
+{"ts":"2026-11-11T16:32:26.088Z","type":"start.result","startClick":{"ok":true,"rect":{"x":628,"y":424.046875,"w":213.125,"h":46,"text":"踏入江湖"}},"snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":210,"elapsed":0,"kills":0,"upgradeChoices":[],"result":null,"stats":null}}
+{"ts":"2026-11-11T16:32:26.189Z","type":"screenshot","name":"02-playing.png","bytes":23476}
+{"ts":"2026-11-11T16:32:28.487Z","type":"move.result","pos0":{"x":640,"y":360},"posD":{"x":640,"y":360,"hp":100,"maxHp":100,"level":1,"exp":0,"dead":false},"posW":{"x":640,"y":360,"hp":100,"maxHp":100,"level":1,"exp":0,"dead":false},"dxRight":0,"dyUp":0,"dxArrow":0,"arrowSupported":false}
+{"ts":"2026-11-11T16:32:28.535Z","type":"screenshot","name":"03-move.png","bytes":23969}
+{"ts":"2026-11-11T16:32:28.536Z","type":"wave1.spawn","enemyCount":1,"snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":209.78333333333333,"elapsed":0.21666666666666667,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"enemies":[{"x":1316.53362467452,"y":81.48882418514756,"hp":22}]}
+{"ts":"2026-11-11T16:32:28.582Z","type":"screenshot","name":"04-wave1-enemies.png","bytes":22510}
+{"ts":"2026-11-11T16:32:58.811Z","type":"screenshot","name":"05-combat-kills.png","bytes":18235}
+{"ts":"2026-11-11T16:33:38.834Z","type":"combat.result","killsSeen":0,"expSeen":0,"snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":209.6,"elapsed":0.4,"kills":0,"upgradeChoices":[],"result":null,"stats":null}}
+{"ts":"2026-11-11T16:33:38.904Z","type":"screenshot","name":"06-exp.png","bytes":18264}
+{"ts":"2026-11-11T16:35:09.517Z","type":"levelup.result","seen":false,"cards":null,"after":null}
+{"ts":"2026-11-11T16:35:09.584Z","type":"screenshot","name":"08-upgraded.png","bytes":18568}
+{"ts":"2026-11-11T16:37:40.134Z","type":"pickup.result","pickupSeen":false,"weaponPickupSeen":false,"waveMax":1,"result":null}
+{"ts":"2026-11-11T16:37:40.195Z","type":"screenshot","name":"11-after-pickup.png","bytes":18895}
+{"ts":"2026-11-11T16:39:51.563Z","type":"death.result","snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":209.16666666666666,"elapsed":0.8333333333333334,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"resultBtn":true}
+{"ts":"2026-11-11T16:39:56.651Z","type":"mouse.click","selector":".wx-result__restart","rect":{"x":0,"y":0,"w":0,"h":0,"text":"再战江湖"}}
+{"ts":"2026-11-11T16:39:56.654Z","type":"restart.result","click":{"ok":true,"rect":{"x":0,"y":0,"w":0,"h":0,"text":"再战江湖"}},"snap":{"state":"PLAYING","hp":100,"maxHp":100,"level":1,"exp":0,"expToNext":8,"wave":1,"timeLeft":209.16666666666666,"elapsed":0.8333333333333334,"kills":0,"upgradeChoices":[],"result":null,"stats":null},"menu":true}
+{"ts":"2026-11-11T16:39:56.719Z","type":"screenshot","name":"13-restart.png","bytes":19173}
+{"ts":"2026-11-11T16:39:56.720Z","type":"console.summary","total":0,"errors":0,"warnings":0}

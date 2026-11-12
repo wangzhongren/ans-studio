@@ -1,0 +1,4 @@
+HEAD: faa5c497c3a67dd5438d9bb3a2570c4774f95d3c
+Subject: docs(test): RR31 path-B fix run stops at a shell approval card; B2 scope decision is never recorded
+Branch: feat/two-fixed-workflow-paths
+Captured at: 2026-11-11T15:47:20Z

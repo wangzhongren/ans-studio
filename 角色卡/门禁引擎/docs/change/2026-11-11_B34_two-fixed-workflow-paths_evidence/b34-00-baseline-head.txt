@@ -1,0 +1,24 @@
+date: 2026-11-11T15:49:17Z
+cwd: /c/Users/51054/Desktop/work/ans-studio/.claude/worktrees/trunk-amendment
+branch: feat/two-fixed-workflow-paths
+head: faa5c497c3a67dd5438d9bb3a2570c4774f95d3c
+head-subject: docs(test): RR31 path-B fix run stops at a shell approval card; B2 scope decision is never recorded
+
+--- role write-area status (porcelain; evidence capture) ---
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+?? test/门禁引擎/chief-workflow-v2-path-b-b2-record.test.ts
+?? 角色卡/门禁引擎/docs/change/2026-11-11_B34_two-fixed-workflow-paths.md
+?? 角色卡/门禁引擎/docs/change/2026-11-11_B34_two-fixed-workflow-paths_evidence/
+
+--- pre-work (HEAD) relevant file sha256 ---
+002fe5327d409c8d9434a6600d33682b7b6f679b28db32421e96115fb2b29406 *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md (HEAD)
+9bef5626c8e9d2d72487567d2d93366f05c178cfa23288add8a13b64e4b4f346 *src/common/门禁引擎/workflows/chief/chief-workflow.md (HEAD)
+test/门禁引擎/chief-workflow-v2-path-b-b2-record.test.ts: (absent at HEAD)
+
+--- current (post-edit) candidate sha256 ---
+26c922255cab8c4878402184217f6b816b1ee28c7274151562eec2a36138df7f *src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ce4a7ea75a8c4ce863ad6d9c74ff6953d294c9405df74f45d86c2508c57b3f1e *test/门禁引擎/chief-workflow-v2-path-b-b2-record.test.ts
+
+--- frozen known-red baselines sha256 ---
+8325f9d8f24a7aeda3899be9187297744bf517c1975ddaf9c9dc0fcd860139f2 *角色卡/门禁引擎/docs/change/2026-11-11_B28_two-fixed-workflow-paths_evidence/b28-05-gates-known-red-failnames.txt
+f9513fb0e9578a260fe20ee3643d1980d5135f4c24b479fbd3b3bdd279547804 *角色卡/门禁引擎/docs/change/2026-11-11_B28_two-fixed-workflow-paths_evidence/b28-08-orchestration-known-red-failnames.txt

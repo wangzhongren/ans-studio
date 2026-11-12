@@ -836,6 +836,20 @@ export async function requestStage(input: StageRequestInput): Promise<StageReque
     }
   }
 
+  // B34.1（2026-11-11，RR31 死状态修复）：路径 B 不接受 B2 advance stage-request。
+  // B2 `change.scope-decided` 由应用在受理 B3 advance stage-request 时记录（桌面窗口
+  // `recordFixedPathBScopeDecisionForDispatch`；要求视图仍为 B1 completed + B2 pending/failed）。
+  // 一旦受理 B2 stage-request，视图进入 B2(requested)，该自动记录窗口关闭且无其它直写通道
+  // ⇒ 不可恢复死状态（RR31）。这里在任何账本事件写入之前 fail-closed：不写 stage.requested、
+  // 不建任务，B1 completed/B2 pending 保持不变，并给出可直接执行的下一步（直接发 B3 advance）。
+  // 首次 B2 请求（新 workflow）仍由上面的「首阶段必须 B1」拒绝；Path A/legacy/stop/rework 不经过本检查。
+  if (resolvedPath === "B" && input.stage === "B2" && action === "advance") {
+    return serviceFailure(
+      "b2-stage-request-forbidden",
+      "路径 B 不发 B2 stage-request；B1 完成后直接发 B3 advance stage-request（应用在受理 B3 时记录 B2 change.scope-decided）；B2 保持 pending。",
+    );
+  }
+
   // 幂等重放：同一 (workflow, stage, digest) 的最近一次请求仍在当前阶段时返回原任务。
   if (action === "advance") {
     const requestedIndexes = wfEvents

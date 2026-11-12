@@ -1,0 +1,49 @@
+{
+  "v": 1,
+  "schema": "doc-freezes/v1",
+  "state": "ready",
+  "baselineSha256": "cd1e9f2217c9420e149b7fde4ed796bf49587e822c018c105cd0dc1deab1dc50",
+  "entries": [
+    {
+      "path": "docs/contracts/wuxia-roguelike-architecture-v1.md",
+      "version": 1,
+      "sha256": "3e9984174fee83424d57328025e85dfa765863ed36bfe550f32559a213e6b945",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/product/wuxia-roguelike-intent-v1.md",
+      "version": 1,
+      "sha256": "68b46c92b9fa2a7eec9f3391c90373e4bce3a3e5e274e5ba7533c9226fea957f",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/wuxia-roguelike-modules-v1.md",
+      "version": 1,
+      "sha256": "86b43d9a09cdf9a5202303db87cf7e4b2177802f1febcb450cdbf8457d094239",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/wuxia-roguelike-proposal-v1.md",
+      "version": 1,
+      "sha256": "661dc03b6605c3765eaf4ee3b4657284bdd66c4c6b7c7f8428e9ad648669cac9",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    },
+    {
+      "path": "docs/proposals/wuxia-roguelike-roster-v1.md",
+      "version": 1,
+      "sha256": "50b08cba0eeb1bea6101122a0c304a0506eb687fb043bed2aea1189094e9216c",
+      "frozen": true,
+      "reason": "migrated-legacy",
+      "applicationId": "migration"
+    }
+  ],
+  "builtAt": "2026-11-11T16:11:32.708Z"
+}

@@ -1,0 +1,2 @@
+* 87db6a7 (HEAD -> main) ANS release merge ans/task/wf-08a64bc64db25ab9650a5372 (wf-08a64bc64db25ab9650a5372)
+* 66fae06 (ans/task/wf-08a64bc64db25ab9650a5372) fix(loop-app): pollFrameInput 以方法形式调用 wasPressed

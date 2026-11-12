@@ -11,7 +11,7 @@
 ## 两条固定路径
 
 - **路径 A（新建 / 新功能包）**：A1 请求产品 → A2 意图撰写 → A3 意图确认卡 → A4 请求策划 → A5 方案/名单/模块/架构/契约 → A6 方案确认卡 → A7 请求人事 → A8 建卡/激活 → A9 团队计划 + 基线 3 件小事 → A10 任命确认卡 → A11 实现派发 + 实现 → A12 独立验收（A12a criteria → A12b report）→ A13 集成/交付/发布。
-- **路径 B（修改 / 修复 / 重构）**：B1 影响面分析 → B2 范围决定（`change.scope-decided`）→ B3 修改实现 → B4 汇总/交付/发布。路径 B 不重建版本、不写团队计划、不重建角色；要求**既有 Git 仓库**（无仓库 ⇒ `b-repository-required`，由人或改走路径 A 处理，不自动 `git init`）。
+- **路径 B（修改 / 修复 / 重构）**：B1 影响面分析 → B2 范围决定（`change.scope-decided`，**应用在受理 B3 advance 时记录；B2 不发 stage-request**）→ B3 修改实现 → B4 汇总/交付/发布。**B1 completed 后直接发 B3 advance stage-request**（`taskKind:"stage-request"`、`workflowAction:"advance"`、`stage:"B3"`、`workflowId`），应用在受理 B3 时校验 B1 影响面报告并记录 `change.scope-decided`，B2 由该记录完成。路径 B 不重建版本、不写团队计划、不重建角色；要求**既有 Git 仓库**（无仓库 ⇒ `b-repository-required`，由人或改走路径 A 处理，不自动 `git init`）。
 - 路径由你（幕僚）按真实缺口判断，客户可明示覆盖（走 A / 走 B / 换方案 / 停止）；应用不做自然语言分类，只校验被请求的阶段转移合法。停止时先收口当前 open advance 请求，再发 `workflowAction:"stop"` 的 stage-request，由运营执行停稳；停稳不明 ⇒ `workflow.stop-unconfirmed`，不写 stopped，不自动回滚 Git。
 
 ## 首个动作：A1 精确 stage-request（首个 advance 请求）
@@ -31,7 +31,7 @@
 }
 ```
 
-- 字段口径：`roleId:"convener"`；`task` 自足（目标角色看不到你的上下文）；`taskKind:"stage-request"`；`workflowAction:"advance"`（暂停/改道才用 `"stop"`）；`workflowPath:"A"`（路径 B 为 `"B"`）；`stage:"A1"`（路径 B 首请求为 `"B1"`）；`flowId:"<flowId>"`；`sideEffect:"read-only"`（stage-request 无写权）。`requestedEvidence` 可选（≤5 条证据路径提示，不是验收结论）；`workflowId` 首请求可省略（应用确定性生成并在回执给出），后续请求必须携带账本/回执中的 `workflowId`。
+- 字段口径：`roleId:"convener"`；`task` 自足（目标角色看不到你的上下文）；`taskKind:"stage-request"`；`workflowAction:"advance"`（暂停/改道才用 `"stop"`）；`workflowPath:"A"`（路径 B 为 `"B"`）；`stage:"A1"`（路径 B 首请求为 `"B1"`）；`flowId:"<flowId>"`；`sideEffect:"read-only"`（stage-request 无写权）。`requestedEvidence` 可选（≤5 条证据路径提示，不是验收结论）；`workflowId` 首请求可省略（应用确定性生成并在回执给出），后续请求必须携带账本/回执中的 `workflowId`。**路径 B 不发 B2 stage-request**：B1 completed 后直接发 B3 advance（见「路径 B 要点」）。
 - **缺 `workflowPath`/`stage`/`flowId`/`taskKind` 任一 ⇒ 应用 fail-closed**（如 `stage-request-invalid`/`stage-request-required`）：不创建任务、不是普通派发、**不回退 legacy**。按上形补齐字段后重试；若应用仍把 stage-request 受理为 legacy 星形派发（出现 `runId`、写 `.ans/trunk`/`.ans/runs`），立即停手、如实报告应用路由缺陷，不继续 legacy 链、不伪造 fixed 回执。
 - **不得直接派 product/rapporteur/nominator**（`chief-production-dispatch-forbidden`）：生产线任务只由运营在其真实受派回合内派发；你只发 stage-request，或直接创建 verifier/验收角色的独立验收任务。
 - 不得在 stage-request 中携带 `runId`/`pinned`/`baseDigest` 等 legacy run 概念，不请求写 `.ans/trunk`/`.ans/runs`——fixed 路径无 run/trunk；出现这些概念即视为路由或模型错误。
@@ -41,7 +41,7 @@
 
 ## 各阶段 fixed 任务字段与卡节奏
 
-每个阶段请求任务（chief→convener）都带 `taskKind:"stage-request"`、`workflowAction:"advance"`、`flowId`、`workflowId`（首请求后可省略 `workflowPath`，应用从账本解析）、目标 `stage`、`sideEffect:"read-only"`；`stage` 只能是当前阶段的合法下一阶段（否则 `stage-transition-invalid`）。
+每个阶段请求任务（chief→convener）都带 `taskKind:"stage-request"`、`workflowAction:"advance"`、`flowId`、`workflowId`（首请求后可省略 `workflowPath`，应用从账本解析）、目标 `stage`、`sideEffect:"read-only"`；`stage` 只能是当前阶段的合法下一阶段（否则 `stage-transition-invalid`）。**路径 B 例外：B2 不是可请求的阶段——不发 B2 stage-request，B1 completed 后直接发 B3 advance**（见「路径 B 要点」）。
 
 - **`stage.dispatched` 记录集合恰为 A1/A4/A7/A8/A12a/A12b**（生产/验收任务创建即记；A1/A4/A7 创建即阶段完成）：A2/A5/A6/A9/A10/A11/A13 的阶段完成分别由 close/card/ledger 判定——**不得误记 A2/A5 `stage.dispatched`**（A11 的 `stage.dispatched A11` 已由 A11 stage-request 创建写入，不得再由实现任务重复记录）。RR4 观测 2：把 A1/A2 合并成 `stage:"A2"` 任务 ⇒ A1 无 `stage.dispatched`、账本停在 A1 requested；A1/A2、A4/A5、A7/A8 必须分开派发（见下）。
 - **A1→A2（两个阶段、两个任务，不得合并）**：A1 如上。运营受理 A1 stage-request 后在真实受派回合派 **A1 产品受理/准备任务**（`roleId:"product"`、`flowId`、`workflowId`、`stage:"A1"`、`sideEffect:"docs"`，不带 `taskKind`、无 module；只受理/准备，不写意图正文）；**A1 完成于该任务创建**（应用按 `task.created` 记 `stage.dispatched A1`）。A1 收口后你发 **A2 stage-request**；运营再派 product 任务 `stage:"A2"`（写意图；`sideEffect:"docs"`，无 module）；产品写 `docs/product/<flowId>-intent-vN.md`（intentId/flowId/version/goal/scope/acceptance/nonGoals）；**A2 完成于该任务 closed accepted + 文档 hash（由应用计算）**，不记 `stage.dispatched A2`。任务文本须写明：产品完成后只报告文档路径与 frontmatter 实际值（intentId/flowId/version/goal/scope/acceptance/nonGoals），**不要求产品给出 sha256，不得用 shell 算 hash**。
@@ -115,8 +115,10 @@
 ## 路径 B 要点
 
 - **B1** 前置：无活动 fixed workflow（legacy 在飞 flow 可并存）、既有 Git 仓库；运营派模块属主（契约/结构用策划）出影响面报告并记录 hash（应用计算）。
-- **B2**：你发范围决定（`change.scope-decided`：应用计算的 impactReport hash + `scope.files` + rationale）；应用按最新 roster 模块属主 ∩ 角色边界派生各角色 writeSet（无 roster 用角色 boundary）；越界/无法唯一归属 ⇒ `b-change-scope-invalid`。
+- **B2（不发 stage-request）**：**路径 B 不发 B2 stage-request**——应用对 `stage:"B2"` 的 advance 请求直接拒绝（稳定码 `b2-stage-request-forbidden`，文案「路径 B 不发 B2 stage-request；B1 完成后直接发 B3 advance stage-request（应用在 B3 受理时记录 B2 change.scope-decided）；B2 保持 pending」）。**B1 completed 后直接发 B3 advance stage-request**（`taskKind:"stage-request"`、`workflowAction:"advance"`、`stage:"B3"`、`workflowId`、`sideEffect:"read-only"`）；应用在受理 B3 时校验 B1 影响面报告（应用计算的 impactReport hash）并按最新 roster 模块属主 ∩ 角色边界派生各角色 writeSet（无 roster 用角色 boundary），同时记录 `change.scope-decided`（impactReport hash + `scope.files` + rationale）——**B2 由该记录完成，不由你发范围决定请求**。越界/无法唯一归属 ⇒ `b-change-scope-invalid`。
 - **B3**：运营派现有实现角色按派生 writeSet 修改并提交；范围外写入拒绝。
+- **B2 卡住时如实上报/停止**：若收到 `b2-stage-request-forbidden` / `stage-transition-invalid`（如「B2 范围决定未记录：当前 B2(requested)」）/ `b-change-scope-invalid` 等真实拒绝码，**按真实 code 处置并如实上报客户与运营**；**不得反复重发 B2 stage-request、不得伪造范围决定（`change.scope-decided`）或自造 `scope.files`/hash**；无法恢复时先收口 open advance 请求，再按停止流程发 `workflowAction:"stop"` 的 stage-request。
+- **禁止用 shell 探测或读取应用源码**：不得用 `findstr`/`grep`/`Get-Content`/PowerShell 等 shell 命令探测或读取应用源码/实现（含跨出项目 target 目录）——**应用源码/实现事实不可作为项目证据**，项目证据只取本资源、应用真实回执与项目内证据文件；任何 shell 都会触发 shell 审批/拒绝面，固定路径不应产生额外客户卡（RR31 实测：B2 卡死后 `findstr` 读应用源码、PowerShell 触发 shell 审批卡早停）。
 - **B4**：B3 accepted + 运营报告即可进入发布确认（**不要求 A12b**）；前置不满足 ⇒ `release-workflow-not-ready`。缺 B3/报告不呈卡。
 - 客户覆盖或改走路径 A ⇒ `workflow.closed reclassified`；保留现场与账本。
 

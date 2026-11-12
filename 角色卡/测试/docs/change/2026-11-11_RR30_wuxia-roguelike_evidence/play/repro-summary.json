@@ -1,0 +1,149 @@
+{
+  "boot": {
+    "hasApp": true,
+    "snap": {
+      "state": "MENU",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 0,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "ps": null,
+    "psErr": "TypeError: app.getPlayerState is not a function",
+    "enemyCount": null,
+    "enErr": "TypeError: app.getEnemies is not a function",
+    "menu": true
+  },
+  "afterStart": {
+    "hasApp": true,
+    "snap": {
+      "state": "PLAYING",
+      "hp": 100,
+      "maxHp": 100,
+      "level": 1,
+      "exp": 0,
+      "expToNext": 8,
+      "wave": 1,
+      "timeLeft": 210,
+      "elapsed": 0,
+      "kills": 0,
+      "upgradeChoices": [],
+      "result": null,
+      "stats": null
+    },
+    "ps": null,
+    "psErr": "TypeError: app.getPlayerState is not a function",
+    "enemyCount": null,
+    "enErr": "TypeError: app.getEnemies is not a function",
+    "menu": true
+  },
+  "exceptionsDuringStart": 360,
+  "exceptionsTotal": 1371,
+  "firstExceptions": [
+    {
+      "at": "2026-11-11T15:08:56.325Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.325Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.325Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.325Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.326Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.326Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.326Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.326Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.326Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.326Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.327Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    },
+    {
+      "at": "2026-11-11T15:08:56.327Z",
+      "text": "Uncaught TypeError: Cannot read properties of undefined (reading 'pressed')",
+      "url": "file:///C:/Users/51054/Desktop/work/ans-wuxia-roguelike-rr30-2026-11-11/target/game/engine/input.js",
+      "line": 238,
+      "col": 18,
+      "firstFrame": null
+    }
+  ],
+  "at": "2026-11-11T15:08:59.778Z"
+}

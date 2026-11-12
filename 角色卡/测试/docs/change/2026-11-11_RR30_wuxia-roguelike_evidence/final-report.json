@@ -1,0 +1,1798 @@
+{
+  "at": "2026-11-11T14:59:09.189Z",
+  "stopCause": "success:release-merged-and-delivered (A13 delivery turn settled)",
+  "gate": null,
+  "workflowStarted": {
+    "at": "2026-11-11T13:50:18.297Z",
+    "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+    "flowId": "wuxia-roguelike",
+    "path": "A",
+    "trigger": {
+      "by": "chief",
+      "reason": "chief stage request"
+    },
+    "idempotencyKey": "workflow-start:wuxia-roguelike:A:875037cf-0346-4747-938b-993d0f0f5bbf"
+  },
+  "workflowClosed": {
+    "at": "2026-11-11T14:58:33.469Z",
+    "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+    "outcome": "delivered"
+  },
+  "releaseMerged": {
+    "at": "2026-11-11T14:58:33.466Z",
+    "releaseId": "rel-5db3929cb393d05e3e4562c9",
+    "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+    "baseOid": {
+      "objectFormat": "sha1",
+      "hex": "277e4a02f87fb0fdd2e767c1914b12362725859a"
+    },
+    "tipOid": {
+      "objectFormat": "sha1",
+      "hex": "9ee4afe2f87c9504992c616f23340f1438843edb"
+    },
+    "mergeOid": {
+      "objectFormat": "sha1",
+      "hex": "8724c076b05104dcfb8e34e0f1fe55dd36302424"
+    },
+    "files": [
+      {
+        "path": "README.md",
+        "status": "A"
+      },
+      {
+        "path": "assets/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/app/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/app/app.js",
+        "status": "A"
+      },
+      {
+        "path": "game/app/bus.js",
+        "status": "A"
+      },
+      {
+        "path": "game/app/integrations.js",
+        "status": "A"
+      },
+      {
+        "path": "game/app/wave-scheduler.js",
+        "status": "A"
+      },
+      {
+        "path": "game/combat/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/combat/combat.js",
+        "status": "A"
+      },
+      {
+        "path": "game/data/config.js",
+        "status": "A"
+      },
+      {
+        "path": "game/enemies/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/enemies/enemies.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/camera.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/collision.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/engine.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/input.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/math.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/pool.js",
+        "status": "A"
+      },
+      {
+        "path": "game/engine/renderer.js",
+        "status": "A"
+      },
+      {
+        "path": "game/items/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/items/arsenal.js",
+        "status": "A"
+      },
+      {
+        "path": "game/player/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/player/player.js",
+        "status": "A"
+      },
+      {
+        "path": "game/progression/README.md",
+        "status": "A"
+      },
+      {
+        "path": "game/progression/progression.js",
+        "status": "A"
+      },
+      {
+        "path": "game/ui/styles.css",
+        "status": "A"
+      },
+      {
+        "path": "game/ui/ui.js",
+        "status": "A"
+      },
+      {
+        "path": "index.html",
+        "status": "A"
+      }
+    ]
+  },
+  "budget": {
+    "customerMessages": 1,
+    "cardsTotal": 4,
+    "cardsByKind": {
+      "intent-confirm": 1,
+      "proposal": 1,
+      "appointment": 1,
+      "merge-main": 1
+    },
+    "decisions": 0,
+    "dispatches": 40,
+    "dispatchesByFrom": {
+      "chief": 19,
+      "convener": 21
+    },
+    "tasksByTo": {
+      "convener": 13,
+      "product": 2,
+      "rapporteur": 3,
+      "nominator": 2,
+      "qa-verifier": 2,
+      "config-data": 2,
+      "loop-engine": 3,
+      "verifier": 4,
+      "player-combat": 2,
+      "enemy-systems": 1,
+      "progression": 1,
+      "arsenal": 1,
+      "ui-hud": 1,
+      "env-bootstrap": 3
+    },
+    "writeTasks": 27,
+    "implementationWriteTasks": 14,
+    "turnsByRole": {
+      "arsenal": 1,
+      "chief": 63,
+      "config-data": 2,
+      "convener": 37,
+      "enemy-systems": 1,
+      "env-bootstrap": 3,
+      "loop-engine": 3,
+      "nominator": 3,
+      "player-combat": 2,
+      "product": 4,
+      "progression": 1,
+      "qa-verifier": 2,
+      "rapporteur": 4,
+      "ui-hud": 1,
+      "verifier": 4
+    }
+  },
+  "summary": {
+    "stages": {
+      "A1": {
+        "stage.requested": "2026-11-11T13:50:18.297Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T13:52:28.148Z"
+      },
+      "A2": {
+        "stage.requested": "2026-11-11T13:53:01.615Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T13:54:32.641Z"
+      },
+      "A3": {
+        "stage.requested": "2026-11-11T13:55:06.705Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T13:55:07.037Z"
+      },
+      "A4": {
+        "stage.requested": "2026-11-11T13:55:28.853Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T13:55:43.871Z"
+      },
+      "A5": {
+        "stage.requested": "2026-11-11T13:57:26.310Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:00:14.100Z"
+      },
+      "A6": {
+        "stage.requested": "2026-11-11T14:00:33.905Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:00:34.001Z"
+      },
+      "A7": {
+        "stage.requested": "2026-11-11T14:00:40.123Z",
+        "status": "dispatched",
+        "stage.dispatched": "2026-11-11T14:00:56.149Z"
+      },
+      "A8": {
+        "stage.requested": "2026-11-11T14:02:42.816Z",
+        "status": "completed",
+        "stage.dispatched": "2026-11-11T14:03:08.551Z",
+        "completedAt": "2026-11-11T14:05:24.275Z"
+      },
+      "A9": {
+        "stage.requested": "2026-11-11T14:06:30.340Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:07:23.580Z"
+      },
+      "A10": {
+        "stage.requested": "2026-11-11T14:07:48.750Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:07:49.059Z"
+      },
+      "A12a": {
+        "stage.dispatched": "2026-11-11T14:08:07.823Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:17:22.060Z"
+      },
+      "A11": {
+        "stage.requested": "2026-11-11T14:44:49.966Z",
+        "status": "completed",
+        "stage.dispatched": "2026-11-11T14:44:49.966Z",
+        "completedAt": "2026-11-11T14:45:11.336Z",
+        "reworkedAt": "2026-11-11T14:31:40.779Z"
+      },
+      "A12b": {
+        "stage.dispatched": "2026-11-11T14:50:45.187Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:58:32.188Z"
+      },
+      "A12": {
+        "completedAt": "2026-11-11T14:58:32.188Z",
+        "status": "completed"
+      },
+      "A13": {
+        "stage.requested": "2026-11-11T14:58:32.464Z",
+        "status": "completed",
+        "completedAt": "2026-11-11T14:58:33.469Z"
+      }
+    },
+    "milestones": [
+      {
+        "at": "2026-11-11T13:50:08.026Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T13:50:18.304Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6f1dl-e9d8e129",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-11T13:50:18.297Z",
+        "milestone": "workflow-started",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "flowId": "wuxia-roguelike",
+        "path": "A"
+      },
+      {
+        "at": "2026-11-11T13:50:28.020Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T13:52:28.139Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6htkb-2d2f5cb1",
+        "from": "convener",
+        "to": "product",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A1"
+      },
+      {
+        "at": "2026-11-11T13:53:01.616Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6ije7-8aec8378",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A2"
+      },
+      {
+        "at": "2026-11-11T13:53:17.743Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6ivu7-ba6b4df2",
+        "from": "convener",
+        "to": "product",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A2"
+      },
+      {
+        "at": "2026-11-11T13:54:32.641Z",
+        "milestone": "stage-completed",
+        "stage": "A2"
+      },
+      {
+        "at": "2026-11-11T13:55:06.713Z",
+        "milestone": "card-created",
+        "requestId": "req-7f9090df78e25902",
+        "cardKind": "intent-confirm",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A3",
+        "title": "意图确认：武侠肉鸽 2D 小游戏（wuxia-roguelike v1）",
+        "options": [
+          {
+            "id": "confirm",
+            "recommended": null
+          },
+          {
+            "id": "revise",
+            "recommended": null
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T13:55:07.017Z",
+        "milestone": "card-resolved",
+        "requestId": "req-7f9090df78e25902",
+        "cardKind": "intent-confirm",
+        "by": "customer",
+        "choice": "confirm",
+        "source": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9"
+      },
+      {
+        "at": "2026-11-11T13:55:07.037Z",
+        "milestone": "stage-completed",
+        "stage": "A3"
+      },
+      {
+        "at": "2026-11-11T13:55:12.083Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6lc2a-58370161",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A4"
+      },
+      {
+        "at": "2026-11-11T13:55:28.854Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6lp05-f8f0f510",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A4"
+      },
+      {
+        "at": "2026-11-11T13:55:43.866Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6m0l6-480d981d",
+        "from": "convener",
+        "to": "rapporteur",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A4"
+      },
+      {
+        "at": "2026-11-11T13:57:26.311Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6o7mu-eeda9aec",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T13:57:49.240Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6opbs-2849c99f",
+        "from": "convener",
+        "to": "rapporteur",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T13:58:03.059Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6ozzn-bb1ba5de",
+        "from": "convener",
+        "to": "rapporteur",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T14:00:14.100Z",
+        "milestone": "stage-completed",
+        "stage": "A5"
+      },
+      {
+        "at": "2026-11-11T14:00:33.906Z",
+        "milestone": "card-created",
+        "requestId": "req-f0025e7886412fe8",
+        "cardKind": "proposal",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A6",
+        "title": "方案确认：wuxia-roguelike v1（12 模块 / 9 角色）",
+        "options": [
+          {
+            "id": "accept",
+            "recommended": null
+          },
+          {
+            "id": "revise",
+            "recommended": null
+          },
+          {
+            "id": "reject",
+            "recommended": null
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T14:00:33.987Z",
+        "milestone": "card-resolved",
+        "requestId": "req-f0025e7886412fe8",
+        "cardKind": "proposal",
+        "by": "customer",
+        "choice": "accept",
+        "source": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9"
+      },
+      {
+        "at": "2026-11-11T14:00:34.001Z",
+        "milestone": "stage-completed",
+        "stage": "A6"
+      },
+      {
+        "at": "2026-11-11T14:00:40.123Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6sd6j-c7d573f4",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A7"
+      },
+      {
+        "at": "2026-11-11T14:00:56.143Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6spjj-9370af49",
+        "from": "convener",
+        "to": "nominator",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A7"
+      },
+      {
+        "at": "2026-11-11T14:02:42.816Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6uzuo-87d51fab",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A8"
+      },
+      {
+        "at": "2026-11-11T14:03:08.546Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6vjpe-6818391c",
+        "from": "convener",
+        "to": "nominator",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A8"
+      },
+      {
+        "at": "2026-11-11T14:03:49.281Z",
+        "milestone": "role-activated",
+        "roleId": "env-bootstrap",
+        "documents": [
+          "角色卡/env-bootstrap/role-card.md",
+          "角色卡/env-bootstrap/boundary.md",
+          "角色卡/env-bootstrap/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:04:22.632Z",
+        "milestone": "role-activated",
+        "roleId": "config-data",
+        "documents": [
+          "角色卡/config-data/role-card.md",
+          "角色卡/config-data/boundary.md",
+          "角色卡/config-data/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:04:24.381Z",
+        "milestone": "role-activated",
+        "roleId": "loop-engine",
+        "documents": [
+          "角色卡/loop-engine/role-card.md",
+          "角色卡/loop-engine/boundary.md",
+          "角色卡/loop-engine/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:04:25.138Z",
+        "milestone": "role-activated",
+        "roleId": "player-combat",
+        "documents": [
+          "角色卡/player-combat/role-card.md",
+          "角色卡/player-combat/boundary.md",
+          "角色卡/player-combat/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:05:02.138Z",
+        "milestone": "role-activated",
+        "roleId": "enemy-systems",
+        "documents": [
+          "角色卡/enemy-systems/role-card.md",
+          "角色卡/enemy-systems/boundary.md",
+          "角色卡/enemy-systems/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:05:03.496Z",
+        "milestone": "role-activated",
+        "roleId": "progression",
+        "documents": [
+          "角色卡/progression/role-card.md",
+          "角色卡/progression/boundary.md",
+          "角色卡/progression/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:05:04.422Z",
+        "milestone": "role-activated",
+        "roleId": "arsenal",
+        "documents": [
+          "角色卡/arsenal/role-card.md",
+          "角色卡/arsenal/boundary.md",
+          "角色卡/arsenal/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:05:23.463Z",
+        "milestone": "role-activated",
+        "roleId": "ui-hud",
+        "documents": [
+          "角色卡/ui-hud/role-card.md",
+          "角色卡/ui-hud/boundary.md",
+          "角色卡/ui-hud/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:05:24.269Z",
+        "milestone": "role-activated",
+        "roleId": "qa-verifier",
+        "documents": [
+          "角色卡/qa-verifier/role-card.md",
+          "角色卡/qa-verifier/boundary.md",
+          "角色卡/qa-verifier/boundary.yaml"
+        ]
+      },
+      {
+        "at": "2026-11-11T14:05:24.275Z",
+        "milestone": "stage-completed",
+        "stage": "A8"
+      },
+      {
+        "at": "2026-11-11T14:05:50.940Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T14:06:16.166Z",
+        "milestone": "chief-workflow-v2-injected",
+        "sha256": null
+      },
+      {
+        "at": "2026-11-11T14:06:30.340Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc6zves-5f3724a2",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A9"
+      },
+      {
+        "at": "2026-11-11T14:06:53.920Z",
+        "milestone": "stage-blocked",
+        "stage": "A9",
+        "code": "baseline-team-plan-invalid",
+        "summary": "Team plan schema, fields, flow or version differ from its real reference"
+      },
+      {
+        "at": "2026-11-11T14:07:23.580Z",
+        "milestone": "stage-completed",
+        "stage": "A9"
+      },
+      {
+        "at": "2026-11-11T14:07:23.578Z",
+        "milestone": "basis-recorded",
+        "basisId": "bas-8e0db55a47124c65e95d99c5",
+        "reason": "baseline"
+      },
+      {
+        "at": "2026-11-11T14:07:48.759Z",
+        "milestone": "card-created",
+        "requestId": "req-e65bd7ae593193e4",
+        "cardKind": "appointment",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A10",
+        "title": "任命确认：wuxia-roguelike 实现团队（9 角色）",
+        "options": [
+          {
+            "id": "env-bootstrap",
+            "recommended": true
+          },
+          {
+            "id": "loop-engine",
+            "recommended": true
+          },
+          {
+            "id": "player-combat",
+            "recommended": true
+          },
+          {
+            "id": "enemy-systems",
+            "recommended": true
+          },
+          {
+            "id": "progression",
+            "recommended": true
+          },
+          {
+            "id": "arsenal",
+            "recommended": true
+          },
+          {
+            "id": "ui-hud",
+            "recommended": true
+          },
+          {
+            "id": "config-data",
+            "recommended": true
+          },
+          {
+            "id": "qa-verifier",
+            "recommended": true
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T14:07:49.045Z",
+        "milestone": "card-resolved",
+        "requestId": "req-e65bd7ae593193e4",
+        "cardKind": "appointment",
+        "by": "customer",
+        "choice": "env-bootstrap,loop-engine,player-combat,enemy-systems,progression,arsenal,ui-hud,config-data,qa-verifier",
+        "source": "stage-a10",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9"
+      },
+      {
+        "at": "2026-11-11T14:07:49.059Z",
+        "milestone": "stage-completed",
+        "stage": "A10"
+      },
+      {
+        "at": "2026-11-11T14:08:07.816Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc71ymg-cd7d8990",
+        "from": "chief",
+        "to": "qa-verifier",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A12a"
+      },
+      {
+        "at": "2026-11-11T14:08:18.248Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc726o7-47e2915e",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:08:55.228Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc72z7g-4b224107",
+        "from": "convener",
+        "to": "config-data",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:12:00.253Z",
+        "milestone": "stage-blocked",
+        "stage": "A11",
+        "code": "task-report-blocked",
+        "summary": "报告证据格式不合规（evidence[] 非纯项目相对路径），应用返回 close-report-missing；实现与提交本身核对通过，不需重写代码。按 A11「返工走新尝试、保留旧事件」：本任务以 rework 收口，已另派返工任务（仅重交 evidence=[\"game/data/config.js\"]，不修改文件、不再提交、不运行 shell）。保留提交 cd7b6c49d7a504d46028d8b93109faf3c0294845 与父 277e4a02… 记录。"
+      },
+      {
+        "at": "2026-11-11T14:12:46.348Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc77xjg-877409d6",
+        "from": "chief",
+        "to": "qa-verifier",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A12a"
+      },
+      {
+        "at": "2026-11-11T14:13:23.825Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc78qgg-8fa939e8",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:13:30.499Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc78vlv-6fe80af4",
+        "from": "convener",
+        "to": "config-data",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:13:50.482Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc79b0y-a97672ba",
+        "from": "convener",
+        "to": "loop-engine",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:14:44.811Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7agy3-4a876bb5",
+        "from": "chief",
+        "to": "verifier",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A12a"
+      },
+      {
+        "at": "2026-11-11T14:17:22.060Z",
+        "milestone": "stage-completed",
+        "stage": "A12a"
+      },
+      {
+        "at": "2026-11-11T14:22:39.596Z",
+        "milestone": "stage-completed",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:23:57.415Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7mbc7-aea25137",
+        "from": "chief",
+        "to": "verifier",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A12b"
+      },
+      {
+        "at": "2026-11-11T14:25:52.178Z",
+        "milestone": "stage-reworked",
+        "stage": "A11",
+        "reworkOf": "A12b"
+      },
+      {
+        "at": "2026-11-11T14:25:57.233Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7ovsg-57058991",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:26:09.261Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7p52l-6f5e873f",
+        "from": "convener",
+        "to": "player-combat",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:29:38.824Z",
+        "milestone": "stage-completed",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:30:27.783Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7uojr-4e1f4d50",
+        "from": "chief",
+        "to": "verifier",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A12b"
+      },
+      {
+        "at": "2026-11-11T14:31:40.779Z",
+        "milestone": "stage-reworked",
+        "stage": "A11",
+        "reworkOf": "A12b"
+      },
+      {
+        "at": "2026-11-11T14:31:49.294Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7wffx-50360bc2",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:32:16.762Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7x0my-7837fa40",
+        "from": "convener",
+        "to": "player-combat",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:32:27.435Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7x8vf-9b2fd1c0",
+        "from": "convener",
+        "to": "enemy-systems",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:32:37.428Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7xgl0-66592ed8",
+        "from": "convener",
+        "to": "progression",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:32:44.848Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7xmb4-3e8055a7",
+        "from": "convener",
+        "to": "arsenal",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:32:53.324Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7xsuk-26f82356",
+        "from": "convener",
+        "to": "loop-engine",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:33:04.221Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7y199-18741b23",
+        "from": "convener",
+        "to": "ui-hud",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:33:11.738Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7y722-cd8a7f5d",
+        "from": "convener",
+        "to": "env-bootstrap",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:33:17.811Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc7ybqr-a4424b0d",
+        "from": "convener",
+        "to": "env-bootstrap",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:44:15.547Z",
+        "milestone": "stage-blocked",
+        "stage": "A11",
+        "code": "task-report-blocked",
+        "summary": "核对未通过，按 rework 收口。已读 game/app/ 全部 5 文件（app.js/bus.js/integrations.js/wave-scheduler.js/README.md）：主循环（rAF+固定步长 1/60、delta≤0.1s、单帧最多 6 步）、状态机 BOOT/MENU/PLAYING/LEVEL_UP/PAUSED/GAME_OVER/VICTORY、波次调度、胜负重开、9 事件总线、视图快照、缺模块降级等主体正确；仅写 game/app/，无 ES Module/import/fetch/XHR/CDN/构建链。但存在跨模块集成缺陷，需返工（仅改 game/app/）：1) 武器获取无效：grantWeapon() 调 arsenal.grantItem(id)，arsenal.grantItem 只识别 items（liu-ye-dao 为 weapon"
+      },
+      {
+        "at": "2026-11-11T14:44:49.967Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc8d5ta-95d696ff",
+        "from": "chief",
+        "to": "convener",
+        "taskKind": "stage-request",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:45:11.336Z",
+        "milestone": "stage-completed",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:46:09.765Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc8evdx-348ac65a",
+        "from": "convener",
+        "to": "loop-engine",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:47:29.198Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc8gkoe-e37bca10",
+        "from": "convener",
+        "to": "env-bootstrap",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A11"
+      },
+      {
+        "at": "2026-11-11T14:50:45.180Z",
+        "milestone": "dispatch",
+        "taskId": "t-mwc8krwc-2bcd6678",
+        "from": "chief",
+        "to": "verifier",
+        "taskKind": null,
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "stage": "A12b"
+      },
+      {
+        "at": "2026-11-11T14:58:32.188Z",
+        "milestone": "stage-completed",
+        "stage": "A12b"
+      },
+      {
+        "at": "2026-11-11T14:58:32.188Z",
+        "milestone": "stage-completed",
+        "stage": "A12"
+      },
+      {
+        "at": "2026-11-11T14:58:32.468Z",
+        "milestone": "card-created",
+        "requestId": "merge-main-rel-5db3929cb393d05e3e4562c9",
+        "cardKind": "merge-main",
+        "workflowId": null,
+        "stage": null,
+        "title": "合并 main（高风险发布确认）",
+        "options": [
+          {
+            "id": "approve-merge-main",
+            "recommended": null
+          },
+          {
+            "id": "reject-merge-main",
+            "recommended": null
+          }
+        ]
+      },
+      {
+        "at": "2026-11-11T14:58:32.786Z",
+        "milestone": "card-resolved",
+        "requestId": "merge-main-rel-5db3929cb393d05e3e4562c9",
+        "cardKind": "merge-main",
+        "by": "customer",
+        "choice": "approve-merge-main",
+        "source": null,
+        "workflowId": null
+      },
+      {
+        "at": "2026-11-11T14:58:33.469Z",
+        "milestone": "stage-completed",
+        "stage": "A13"
+      },
+      {
+        "at": "2026-11-11T14:58:33.469Z",
+        "milestone": "workflow-closed",
+        "outcome": "delivered"
+      },
+      {
+        "at": "2026-11-11T14:58:33.466Z",
+        "milestone": "release-merged",
+        "workflowId": "wf-e6a70e9eace7a4f6d16e7ad9",
+        "mergeOid": {
+          "objectFormat": "sha1",
+          "hex": "8724c076b05104dcfb8e34e0f1fe55dd36302424"
+        }
+      },
+      {
+        "at": "2026-11-11T14:58:34.122Z",
+        "milestone": "release-merged-and-delivered"
+      }
+    ]
+  },
+  "git": {
+    "branch": "main",
+    "head": "8724c076b05104dcfb8e34e0f1fe55dd36302424",
+    "log": "8724c07 (HEAD -> main) ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe (ans/task/wf-e6a70e9eace7a4f6d16e7ad9) fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules\n6c9b068 fix(ui): restore readable upgrade card colors\na993794 fix(ui): remove duplicated iife terminator\nd201ad3 feat(app): implement fixed-step loop/state machine/bus\nb27766c feat(ui): implement menu/hud/levelup/result overlays\n163c8fc feat(progression): implement exp/leveling/upgrade choice\n5e1219f feat(arsenal): implement weapons/items acquisition\nd5e6177 feat(enemies): implement spawn/wave scaling/elite\n9380d42 feat(combat): implement auto targeting/cooldown/damage\nda75dc6 docs(env): add README and assets policy\nbaaba97 feat(entry): add index.html with script load order\n22b9920 feat(player): implement movement/hp/invuln/death\n4a3f07c feat(engine): implement canvas2d render/input/math/collision/pool\ncd7b6c4 feat(data): add WX.Config wuxia roguelike data constants\n277e4a0 ANS baseline: ans-managed .gitignore",
+    "status": "",
+    "branches": "ans/task/wf-e6a70e9eace7a4f6d16e7ad9 9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\n* main                                 8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)",
+    "tags": "",
+    "remotes": "",
+    "mainLog": "8724c07 ANS release merge ans/task/wf-e6a70e9eace7a4f6d16e7ad9 (wf-e6a70e9eace7a4f6d16e7ad9)\n9ee4afe fix(app): integrate arsenal weapons/drops and single exp orb\nddaf2a4 fix(entry): align script list with delivered modules\n6c9b068 fix(ui): restore readable upgrade card colors\na993794 fix(ui): remove duplicated iife terminator\nd201ad3 feat(app): implement fixed-step loop/state machine/bus\nb27766c feat(ui): implement menu/hud/levelup/result overlays\n163c8fc feat(progression): implement exp/leveling/upgrade choice\n5e1219f feat(arsenal): implement weapons/items acquisition\nd5e6177 feat(enemies): implement spawn/wave scaling/elite\n9380d42 feat(combat): implement auto targeting/cooldown/damage\nda75dc6 docs(env): add README and assets policy\nbaaba97 feat(entry): add index.html with script load order\n22b9920 feat(player): implement movement/hp/invuln/death\n4a3f07c feat(engine): implement canvas2d render/input/math/collision/pool\ncd7b6c4 feat(data): add WX.Config wuxia roguelike data constants\n277e4a0 ANS baseline: ans-managed .gitignore"
+  },
+  "docs": {
+    "docs": [
+      {
+        "rel": "docs/acceptance",
+        "dir": true
+      },
+      {
+        "rel": "docs/acceptance/wuxia-roguelike-acceptance-v3.md",
+        "bytes": 3174,
+        "sha256": "af863590f273c7e1521b859517b94f68cbd42abf0a9a9f1028db9900bbbba2c1"
+      },
+      {
+        "rel": "docs/audit",
+        "dir": true
+      },
+      {
+        "rel": "docs/audit/shell-gate.jsonl",
+        "bytes": 52797,
+        "sha256": "d7fc5d64dba6ee550e48b9ee70052445a43acb121f65b6051a054f094ecf7174"
+      },
+      {
+        "rel": "docs/bootstrap-manifest.md",
+        "bytes": 4153,
+        "sha256": "8df0f47a42f6c107ca754879fceff3f3b653402f73bcf908ea361aaf1a3b83e7"
+      },
+      {
+        "rel": "docs/contracts",
+        "dir": true
+      },
+      {
+        "rel": "docs/contracts/wuxia-roguelike-architecture-v1.md",
+        "bytes": 10248,
+        "sha256": "3e9984174fee83424d57328025e85dfa765863ed36bfe550f32559a213e6b945"
+      },
+      {
+        "rel": "docs/governance",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/nominator",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/nominator/wuxia-roguelike-a7-roster-review.md",
+        "bytes": 13027,
+        "sha256": "902fd0b073d94409587da52fb46281d24a6f0baf5855369628b26585f79d6aae"
+      },
+      {
+        "rel": "docs/governance/nominator/wuxia-roguelike-a8-role-activation.md",
+        "bytes": 4296,
+        "sha256": "584de3acc363ff79dbae9a040ca05742d221f070dec9572325fa86b45c070843"
+      },
+      {
+        "rel": "docs/governance/rapporteur",
+        "dir": true
+      },
+      {
+        "rel": "docs/governance/rapporteur/wuxia-roguelike-a4-preparation.md",
+        "bytes": 13449,
+        "sha256": "325110a6f97fadaa52ae19e3ed3ae449ec02a4274b6f48c9cadf20e1d972278f"
+      },
+      {
+        "rel": "docs/intents",
+        "dir": true
+      },
+      {
+        "rel": "docs/intents/wuxia-roguelike.md",
+        "bytes": 2983,
+        "sha256": "a4d640d0fc67ec81733e0faa666851d94e864388b845a1b322feab3273a55823"
+      },
+      {
+        "rel": "docs/product",
+        "dir": true
+      },
+      {
+        "rel": "docs/product/wuxia-roguelike-intent-v1.md",
+        "bytes": 7621,
+        "sha256": "68b46c92b9fa2a7eec9f3391c90373e4bce3a3e5e274e5ba7533c9226fea957f"
+      },
+      {
+        "rel": "docs/proposals",
+        "dir": true
+      },
+      {
+        "rel": "docs/proposals/wuxia-roguelike-modules-v1.md",
+        "bytes": 5039,
+        "sha256": "86b43d9a09cdf9a5202303db87cf7e4b2177802f1febcb450cdbf8457d094239"
+      },
+      {
+        "rel": "docs/proposals/wuxia-roguelike-proposal-v1.md",
+        "bytes": 7988,
+        "sha256": "661dc03b6605c3765eaf4ee3b4657284bdd66c4c6b7c7f8428e9ad648669cac9"
+      },
+      {
+        "rel": "docs/proposals/wuxia-roguelike-roster-v1.md",
+        "bytes": 9800,
+        "sha256": "50b08cba0eeb1bea6101122a0c304a0506eb687fb043bed2aea1189094e9216c"
+      },
+      {
+        "rel": "docs/quality",
+        "dir": true
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-criteria-v1.md",
+        "bytes": 28913,
+        "sha256": "dbb03fe913d3039347537b558453e33214537bc141ba9d69c5dd1af07ada132d"
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-report-v1.md",
+        "bytes": 18975,
+        "sha256": "159bc09bf484cde08fff4b523f883584692efe5ff9f057d3ba6a984f14010ebe"
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-report-v2.md",
+        "bytes": 21078,
+        "sha256": "b087984077f0a9cd5468d2e22d4ec19bb6a2ce1381028ac9afae2bce1e2928da"
+      },
+      {
+        "rel": "docs/quality/wuxia-roguelike-report-v3.md",
+        "bytes": 22349,
+        "sha256": "17582299905276685ea2c087640dd56ffc82ae1cf482235a9f5e6d8062585533"
+      },
+      {
+        "rel": "docs/scheduling",
+        "dir": true
+      },
+      {
+        "rel": "docs/scheduling/wuxia-roguelike-schedule-v1.md",
+        "bytes": 38984,
+        "sha256": "919669cb51c3a916e12276c000dc10d1824475dad0f0448182258e0ddff1edc1"
+      },
+      {
+        "rel": "docs/scheduling/wuxia-roguelike-team-v1.md",
+        "bytes": 8704,
+        "sha256": "91a17e4e6828270d65655183c3f85c0068a8492d97bf1d97d99b910a252686c0"
+      },
+      {
+        "rel": "docs/verification",
+        "dir": true
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t2-static-v1.txt",
+        "bytes": 1003,
+        "sha256": "3841573f61896537cb5e3f763ad0ab0031e83e48c794ceb4f4807b9460aeadcd"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t3-static-v1.txt",
+        "bytes": 1229,
+        "sha256": "332c7bfb6170c6436c5177eb874f5343491cd5b07fe56c0f6c472f6d5eff7a8c"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t4-static-v1.txt",
+        "bytes": 841,
+        "sha256": "08c6a9d4e153ad2d324c66cbe08ab493703dc35687fa44fe05a67b572e858dca"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t5-static-v1.txt",
+        "bytes": 853,
+        "sha256": "d1c81de5cebd96a940f9ed663c132984079d6d4c5fe48b397c11dba2a1bd595d"
+      },
+      {
+        "rel": "docs/verification/wuxia-roguelike-t7-static-v1.txt",
+        "bytes": 1268,
+        "sha256": "15827b58186d68b8fef4bc54a1883573732f4cbccd7a66562418ebee8167575b"
+      },
+      {
+        "rel": "docs/workflow.md",
+        "bytes": 6053,
+        "sha256": "c2c21c15382ef3a4c07fc6915e64c6f6baac168908c1f505712f081c862259f3"
+      }
+    ],
+    "角色卡": [
+      {
+        "rel": "角色卡/arsenal",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/arsenal/boundary.md",
+        "bytes": 487,
+        "sha256": "e6e6870e200b84c5a9e1cc12e972c9c747888057dc51bd2f3305e1e38d6f8a34"
+      },
+      {
+        "rel": "角色卡/arsenal/boundary.yaml",
+        "bytes": 133,
+        "sha256": "d4d4a77e848c72441c54c177aaf7a363c7f5d0fcc25a8acebe50e3affc492d19"
+      },
+      {
+        "rel": "角色卡/arsenal/role-card.md",
+        "bytes": 3045,
+        "sha256": "a88ce13804d0e1bf5fae3842a3b69aeb1f1a8209f89f1021177c3351fea8a3e5"
+      },
+      {
+        "rel": "角色卡/config-data",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/config-data/boundary.md",
+        "bytes": 458,
+        "sha256": "451374e16fa38e0ba2b938bbd3151a76682d11fda714bd799b22a868bf113162"
+      },
+      {
+        "rel": "角色卡/config-data/boundary.yaml",
+        "bytes": 126,
+        "sha256": "b4bdbe230c91c57d9c82cc830a747ed2a3f632de84765df78e4d062192c619bc"
+      },
+      {
+        "rel": "角色卡/config-data/role-card.md",
+        "bytes": 2965,
+        "sha256": "98f80d2590f67ef0b2f48444d924c7ff17b7b23eda045e59e4ea5d5f8495f94a"
+      },
+      {
+        "rel": "角色卡/enemy-systems",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/enemy-systems/boundary.md",
+        "bytes": 484,
+        "sha256": "0e45f208c696a0130054bd367cb796eb35b37ce78db33013e1b59d71ad2ef681"
+      },
+      {
+        "rel": "角色卡/enemy-systems/boundary.yaml",
+        "bytes": 137,
+        "sha256": "147306d1089ac8961ef92935602d9a9788420851114d41abaee1e0a7ed38d14a"
+      },
+      {
+        "rel": "角色卡/enemy-systems/role-card.md",
+        "bytes": 2940,
+        "sha256": "2c880fb4e17bb15a5ae90ecc49035276084ce163c7dab768ebc7be08f3822cbf"
+      },
+      {
+        "rel": "角色卡/env-bootstrap",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/env-bootstrap/boundary.md",
+        "bytes": 571,
+        "sha256": "8877f5b78eacef6e1dfc97eb79b6cccc42107c720aae83506d5fde6d6fb4b747"
+      },
+      {
+        "rel": "角色卡/env-bootstrap/boundary.yaml",
+        "bytes": 274,
+        "sha256": "a9e5fcb7c689e3de7288b0714a68ca2d1cee16188028101caa7302b400ea2c0b"
+      },
+      {
+        "rel": "角色卡/env-bootstrap/role-card.md",
+        "bytes": 3099,
+        "sha256": "ef0652e8b84766aaac2fb08c862bbde8a1502956892b23b077f4a2cecdd441fa"
+      },
+      {
+        "rel": "角色卡/loop-engine",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/loop-engine/boundary.md",
+        "bytes": 578,
+        "sha256": "d3cb98ef5e19e8a28fd7e4cdea05aa6e44a62be1927c3dca74c210ba799da1db"
+      },
+      {
+        "rel": "角色卡/loop-engine/boundary.yaml",
+        "bytes": 239,
+        "sha256": "ac797bd344233685552c005fee8d6beab51e0c328c3e1626f957599bac5d99f3"
+      },
+      {
+        "rel": "角色卡/loop-engine/role-card.md",
+        "bytes": 3298,
+        "sha256": "e6125e59e310f01de0eb3d0ceaa47f6e32d8ced421a750de74fa0516c48022c3"
+      },
+      {
+        "rel": "角色卡/player-combat",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/player-combat/boundary.md",
+        "bytes": 540,
+        "sha256": "9a78ae14472887eb49a43eaf659a5ef1879cedf293aa90f2a815e4fbc53bb7ee"
+      },
+      {
+        "rel": "角色卡/player-combat/boundary.yaml",
+        "bytes": 231,
+        "sha256": "842baf30d569e7b07cf3368bca1e7acfcb6a2f7cf13354d188f950cb828b3e55"
+      },
+      {
+        "rel": "角色卡/player-combat/role-card.md",
+        "bytes": 3217,
+        "sha256": "16618b776efdfd79a9d5201cb30728a48edb2184d61ae2766911b7dd362005e0"
+      },
+      {
+        "rel": "角色卡/progression",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/progression/boundary.md",
+        "bytes": 501,
+        "sha256": "ff75ffa0d5923fda9226d2ea1384230e2e95f5447caece061aea36cba0c8a44f"
+      },
+      {
+        "rel": "角色卡/progression/boundary.yaml",
+        "bytes": 143,
+        "sha256": "f4e12987878d042fc45465f486a52c16ea49829952a9d3ca1bf511baaa516cfc"
+      },
+      {
+        "rel": "角色卡/progression/role-card.md",
+        "bytes": 3164,
+        "sha256": "9d9c9da59730cbe3c0339e39f921852255aee0aab5bfdf0a268051795550e122"
+      },
+      {
+        "rel": "角色卡/qa-verifier",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/qa-verifier/boundary.md",
+        "bytes": 489,
+        "sha256": "9e5955b0d485f6a34698586188b25d8f8a1966943bacb9ecb6ebd6f21eb61036"
+      },
+      {
+        "rel": "角色卡/qa-verifier/boundary.yaml",
+        "bytes": 131,
+        "sha256": "beccee303ff0d7f0e970e792ebfa54a88cb1bb947c13b7bf47ff944e0279e3dc"
+      },
+      {
+        "rel": "角色卡/qa-verifier/role-card.md",
+        "bytes": 2950,
+        "sha256": "7c1227b997cda2e085b31d19861f57c0f1c2fc308dea631005117939fa531812"
+      },
+      {
+        "rel": "角色卡/ui-hud",
+        "dir": true
+      },
+      {
+        "rel": "角色卡/ui-hud/boundary.md",
+        "bytes": 485,
+        "sha256": "81d6ed919d047c0ffc1ed0529b9566ef7de6a18db398c7455d1059fefc8e8683"
+      },
+      {
+        "rel": "角色卡/ui-hud/boundary.yaml",
+        "bytes": 131,
+        "sha256": "99685ad2623717d40970e35b6291c7a5450adba226745432f794a10d32a64d53"
+      },
+      {
+        "rel": "角色卡/ui-hud/role-card.md",
+        "bytes": 3201,
+        "sha256": "933e5a3490f6f816dafd64d85a6f21087064c4e910f89d443a2a61a26ded4ed7"
+      }
+    ],
+    "game": [
+      {
+        "rel": "game/app",
+        "dir": true
+      },
+      {
+        "rel": "game/app/app.js",
+        "bytes": 50324,
+        "sha256": "35211a894cafc72da33ed0dfec0e36b7f7262a5553d7d2df4b8240ef7a82322d"
+      },
+      {
+        "rel": "game/app/bus.js",
+        "bytes": 4156,
+        "sha256": "181a2c09c874b4a0f46543d10c7d0132224465d6583990fab5331ba00497a5b7"
+      },
+      {
+        "rel": "game/app/integrations.js",
+        "bytes": 6867,
+        "sha256": "c57c5b71862fb10796f0f9e75e6e9fe49ea2d48aa31e77ed4586bd49e2174c7e"
+      },
+      {
+        "rel": "game/app/README.md",
+        "bytes": 12904,
+        "sha256": "fb29ac5a410ef9e9e90b1ef870040d8f04f2d40512f617c3398b1251695abedf"
+      },
+      {
+        "rel": "game/app/wave-scheduler.js",
+        "bytes": 5755,
+        "sha256": "7af03477ecbb58fd3f9aa0312d944664d66a442cd8e33b99679f7769dc6616e6"
+      },
+      {
+        "rel": "game/combat",
+        "dir": true
+      },
+      {
+        "rel": "game/combat/combat.js",
+        "bytes": 31440,
+        "sha256": "adf0bf8f17ed287a491210989fc469c1cec5b38ce0f83883028101d42c0001b0"
+      },
+      {
+        "rel": "game/combat/README.md",
+        "bytes": 5586,
+        "sha256": "ac2607d73c5af254bb256a4fb5167d6194a58529b12c34a0b76986ea398c6d21"
+      },
+      {
+        "rel": "game/data",
+        "dir": true
+      },
+      {
+        "rel": "game/data/config.js",
+        "bytes": 13745,
+        "sha256": "e8e749e59d7c3d5697f864b0853b3498ddbc9921e103bc542ac36a3480a07864"
+      },
+      {
+        "rel": "game/enemies",
+        "dir": true
+      },
+      {
+        "rel": "game/enemies/enemies.js",
+        "bytes": 31664,
+        "sha256": "5078fc418b5ca76e999db9473bdb2f005e42b10b0a3b148a616fa995393d523f"
+      },
+      {
+        "rel": "game/enemies/README.md",
+        "bytes": 5652,
+        "sha256": "9fae3449831e03bd26b33e903b0568fd364d0403918ad2cfd069f36daedddfb5"
+      },
+      {
+        "rel": "game/engine",
+        "dir": true
+      },
+      {
+        "rel": "game/engine/camera.js",
+        "bytes": 5372,
+        "sha256": "bedd1b4a826c8cbd829e260598adf3df24bf510998b345854ee181ae58dd0284"
+      },
+      {
+        "rel": "game/engine/collision.js",
+        "bytes": 8761,
+        "sha256": "cffa4ae2ea23c6abd00773a85579fd0e94205f0482c0a2c08ecd500d32f3c264"
+      },
+      {
+        "rel": "game/engine/engine.js",
+        "bytes": 7168,
+        "sha256": "5e472fbbe8978176756dadfca444d546918c681f9ae218b981d8d710366efcf5"
+      },
+      {
+        "rel": "game/engine/input.js",
+        "bytes": 12938,
+        "sha256": "b38d00127d7d748c89d03c49b9447f826e1c467141d62cba3ceb4e6e7531e471"
+      },
+      {
+        "rel": "game/engine/math.js",
+        "bytes": 8506,
+        "sha256": "032808fe400896a366d155f823ae44dfcc8cd96833995dafee841b36e03ad352"
+      },
+      {
+        "rel": "game/engine/pool.js",
+        "bytes": 4661,
+        "sha256": "08a46e9c6d861b6d39620240ddc3f009239431a324b2be934588793b2ff17c15"
+      },
+      {
+        "rel": "game/engine/README.md",
+        "bytes": 6515,
+        "sha256": "e7f8bd186a03b6cd81d2c6589f26904d026349f5a459b91476cddf3293a696fd"
+      },
+      {
+        "rel": "game/engine/renderer.js",
+        "bytes": 21640,
+        "sha256": "c802e18f12a256e79da0f4834d617c8c9a43b20dc5dbdf223097465e28491a67"
+      },
+      {
+        "rel": "game/items",
+        "dir": true
+      },
+      {
+        "rel": "game/items/arsenal.js",
+        "bytes": 38133,
+        "sha256": "105c029e064feeb8a71db40bc1b426f60cb55fdcb9fdc2e53f106a63b20247db"
+      },
+      {
+        "rel": "game/items/README.md",
+        "bytes": 8249,
+        "sha256": "61228405a07910b56b533829f074f4f569290e812219975d23820eb9451cc894"
+      },
+      {
+        "rel": "game/player",
+        "dir": true
+      },
+      {
+        "rel": "game/player/player.js",
+        "bytes": 19472,
+        "sha256": "21638a54437bd52bc4bbc75d2e5bdcc47a0fb8402a6e2287fa9eae16162bbd39"
+      },
+      {
+        "rel": "game/player/README.md",
+        "bytes": 4464,
+        "sha256": "c67cfad7895b820e2b0e1105d7f1ee1982fabeae2a2836fa825bebe74eae17a3"
+      },
+      {
+        "rel": "game/progression",
+        "dir": true
+      },
+      {
+        "rel": "game/progression/progression.js",
+        "bytes": 42793,
+        "sha256": "e99009dd27606a06f5e774ba29147dd7d411380020c24e3472f9e5631507fefe"
+      },
+      {
+        "rel": "game/progression/README.md",
+        "bytes": 10255,
+        "sha256": "50fce7c66a0536ce453851d3dbf4d948e834107adb5fdf7f42513a8716138540"
+      },
+      {
+        "rel": "game/ui",
+        "dir": true
+      },
+      {
+        "rel": "game/ui/styles.css",
+        "bytes": 16790,
+        "sha256": "45693a49f57911932dbfe67df5d5d5612f824d66eb43a16d61a69b8de350c3a8"
+      },
+      {
+        "rel": "game/ui/ui.js",
+        "bytes": 47300,
+        "sha256": "6623ba4421a168f9df49a200b799c46eed18bf0edc46e9c5ef0ca5ecb153dc42"
+      }
+    ],
+    "index.html": []
+  },
+  "topLevel": [
+    ".ans",
+    ".git",
+    ".gitignore",
+    "assets",
+    "docs",
+    "game",
+    "index.html",
+    "README.md",
+    "角色卡"
+  ],
+  "sessions": {
+    "arsenal": {
+      "bytes": 262755
+    },
+    "chief": {
+      "bytes": 1190971
+    },
+    "config-data": {
+      "bytes": 109406
+    },
+    "convener": {
+      "bytes": 1847241
+    },
+    "enemy-systems": {
+      "bytes": 210886
+    },
+    "env-bootstrap": {
+      "bytes": 229516
+    },
+    "loop-engine": {
+      "bytes": 861151
+    },
+    "nominator": {
+      "bytes": 321885
+    },
+    "player-combat": {
+      "bytes": 304677
+    },
+    "product": {
+      "bytes": 139639
+    },
+    "progression": {
+      "bytes": 331819
+    },
+    "qa-verifier": {
+      "bytes": 193987
+    },
+    "rapporteur": {
+      "bytes": 192328
+    },
+    "ui-hud": {
+      "bytes": 261930
+    },
+    "verifier": {
+      "bytes": 813062
+    }
+  },
+  "ports": {
+    "lines9222": [],
+    "lines9223": [],
+    "lines9224": [
+      "  TCP    127.0.0.1:9224         0.0.0.0:0              LISTENING       29912",
+      "  TCP    127.0.0.1:9224         127.0.0.1:65241        ESTABLISHED     29912",
+      "  TCP    127.0.0.1:65241        127.0.0.1:9224         ESTABLISHED     50920"
+    ]
+  },
+  "oldRunRootPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-snake-fullchain-run-2026-11-10",
+    "exists": true,
+    "entries": [
+      {
+        "name": "evidence",
+        "mtime": 1794247136435.3418
+      },
+      {
+        "name": "round10",
+        "mtime": 1794248323109.7388
+      },
+      {
+        "name": "round11",
+        "mtime": 1794248959545.2583
+      },
+      {
+        "name": "round12",
+        "mtime": 1794249232305.3015
+      },
+      {
+        "name": "round13",
+        "mtime": 1794249490950.5813
+      },
+      {
+        "name": "round14",
+        "mtime": 1794249732100.8677
+      },
+      {
+        "name": "round15",
+        "mtime": 1794249988039.9426
+      },
+      {
+        "name": "round16",
+        "mtime": 1794250169724.0994
+      },
+      {
+        "name": "round17",
+        "mtime": 1794250566337.3135
+      },
+      {
+        "name": "round18",
+        "mtime": 1794252829477.4497
+      },
+      {
+        "name": "round19",
+        "mtime": 1794253209658.652
+      },
+      {
+        "name": "round20",
+        "mtime": 1794261345627.0393
+      },
+      {
+        "name": "round21",
+        "mtime": 1794261805971.9543
+      },
+      {
+        "name": "round22",
+        "mtime": 1794262253668.7983
+      },
+      {
+        "name": "round23",
+        "mtime": 1794262693084.7214
+      },
+      {
+        "name": "round24",
+        "mtime": 1794263327768.893
+      },
+      {
+        "name": "round25",
+        "mtime": 1794264715770.8784
+      },
+      {
+        "name": "round26",
+        "mtime": 1794265159753.918
+      },
+      {
+        "name": "round8",
+        "mtime": 1794247470341.858
+      },
+      {
+        "name": "round9",
+        "mtime": 1794247940931.3174
+      },
+      {
+        "name": "rr",
+        "mtime": 1794247132796.088
+      },
+      {
+        "name": "userData",
+        "mtime": 1794246925742.7854
+      }
+    ]
+  },
+  "oldSnakeTargetPost": {
+    "path": "C:/Users/51054/Desktop/work/ans-game2d-snake-2026-11-09",
+    "exists": true,
+    "entries": [
+      {
+        "name": "target",
+        "mtime": 1794192309257.867
+      }
+    ]
+  },
+  "oldRootsUntouched": {
+    "runRoot": null,
+    "snakeTarget": false
+  },
+  "turns": {
+    "arsenal": 1,
+    "chief": 63,
+    "config-data": 2,
+    "convener": 37,
+    "enemy-systems": 1,
+    "env-bootstrap": 3,
+    "loop-engine": 3,
+    "nominator": 3,
+    "player-combat": 2,
+    "product": 4,
+    "progression": 1,
+    "qa-verifier": 2,
+    "rapporteur": 4,
+    "ui-hud": 1,
+    "verifier": 4
+  }
+}

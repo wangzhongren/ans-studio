@@ -1,0 +1,73 @@
+治理会话工作台
+AGENT WORKSPACE
+target
+C:\Users\51054\Desktop\work\ans-wuxia-roguelike-rr33-2026-11-12\target
+工作空间
+主入口
+s
+su
+Claude
+未开启
+内置角色：定义在 SKILL.md，无角色目录
+工作角色
+a
+arsenal
+Claude
+未开启
+c
+config-data
+Claude
+未开启
+e
+enemy-systems
+Claude
+未开启
+e
+env-bootstrap
+Claude
+未开启
+l
+loop-engine
+Claude
+未开启
+p
+player-combat
+Claude
+未开启
+p
+progression
+Claude
+未开启
+q
+qa-verifier
+Claude
+未开启
+u
+ui-hud
+Claude
+未开启
+切换项目
+设置
+10 个角色
+su
+主入口 · 尚未开启会话
+Claude
+工作概览
+版本变更
+主干升级
+决策
+任务
+角色资料
+
+开始与 su 对话
+
+点下方按钮开启会话；发送消息后，这里会显示对话与工具记录。
+
+开始与 su 对话
+托管
+五个内置角色正式向幕僚汇报，由幕僚协调；项目实现角色仍由运营管理。业务决策可通过“替我决策”委托幕僚，执行审批仍按独立门禁处理。
+替我审批
+su / Claude
+Enter 发送，Shift + Enter 换行
+向幕僚发送新任务或澄清；其他角色会话仅供阅读和诊断。
+实际写入导入项目，角色边界外的写入会被拒绝。
