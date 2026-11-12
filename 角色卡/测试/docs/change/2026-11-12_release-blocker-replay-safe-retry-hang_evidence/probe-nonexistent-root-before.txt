@@ -1,0 +1,65 @@
+✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (6290.0514ms)
+✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (6300.3474ms)
+✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (6278.2435ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (1.9061ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 1
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 19366.3031
+
+✖ failing tests:
+
+test at test\桌面应用\__tmp_probe_nonexistent_root.test.ts:163:1
+✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (6290.0514ms)
+  AssertionError [ERR_ASSERTION]: 重试耗尽轮未开跑
+      at until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:32:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:170:7
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:133:16)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:164:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp_probe_nonexistent_root.test.ts:206:1
+✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (6300.3474ms)
+  AssertionError [ERR_ASSERTION]: 重试成功轮未开跑
+      at until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:32:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:213:7
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:133:16)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:207:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp_probe_nonexistent_root.test.ts:232:1
+✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (6278.2435ms)
+  AssertionError [ERR_ASSERTION]: 不安全失败轮未开跑
+      at until (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:32:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:239:7
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:133:16)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_nonexistent_root.test.ts:233:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

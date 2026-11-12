@@ -1,0 +1,73 @@
+✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (16.873ms)
+✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (8.8735ms)
+✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (7.8398ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.596ms)
+PROBE_ACTIVE_HANDLES=["Socket","Socket"]
+✔ PROBE active handles after open failure (157.8402ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 2
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 611.2826
+
+✖ failing tests:
+
+test at test\桌面应用\__tmp_probe_after_open_failure.test.ts:214:1
+✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (16.873ms)
+  AssertionError [ERR_ASSERTION]: 夹具项目根须真实可解析（CI runner 无 /proj）
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:219:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:178:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:215:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp_probe_after_open_failure.test.ts:258:1
+✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (8.8735ms)
+  AssertionError [ERR_ASSERTION]: 夹具项目根须真实可解析（CI runner 无 /proj）
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:263:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:178:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:259:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\__tmp_probe_after_open_failure.test.ts:285:1
+✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (7.8398ms)
+  AssertionError [ERR_ASSERTION]: 夹具项目根须真实可解析（CI runner 无 /proj）
+  
+  false !== true
+  
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:290:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:178:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_after_open_failure.test.ts:286:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

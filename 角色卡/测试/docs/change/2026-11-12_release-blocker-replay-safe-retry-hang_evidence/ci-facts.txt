@@ -1,0 +1,32 @@
+CI run 43184430032 (workflow 'Build and verify release', head main 8920f3abb53d846a9eaf15d31965f7c83fb88699, created 2026-11-12T08:37:05Z, conclusion cancelled)
+jobs: windows-2025 131067982984 / macos-15-intel 131067983334 / macos-15 131067983381 — all cancelled at 45-minute job timeout
+
+== Windows: file-level durations at cancel (spec reporter flushed) ==
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.2289455Z ✖ test\桌面应用\request-timeout-wiring.test.ts (2151333.1101ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5075333Z ✖ test\桌面应用\request-timeout-wiring.test.ts (2151333.1101ms)
+
+== Windows: replay-safe-retry failure labels (flushed at cancel) ==
+build (windows-2025, win, x64)	Regression tests	2026-11-12T08:46:11.1418927Z ✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (3905.1984ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T08:46:14.9052999Z ✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (3763.7176ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T08:46:18.8175806Z ✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (3911.7248ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T08:46:18.8176872Z ✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (1.0868ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5064204Z ✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (3905.1984ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5064374Z   AssertionError [ERR_ASSERTION]: 重试耗尽轮未开跑
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5068202Z ✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (3763.7176ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5068371Z   AssertionError [ERR_ASSERTION]: 重试成功轮未开跑
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5071791Z ✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (3911.7248ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5071964Z   AssertionError [ERR_ASSERTION]: 不安全失败轮未开跑
+
+== macOS arm64: last Regression output before cancel ==
+build (macos-15, mac, arm64)	Regression tests	2026-11-12T08:44:08.9020380Z ✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (2648.731917ms)
+build (macos-15, mac, arm64)	Regression tests	2026-11-12T08:44:11.5753790Z ✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (2672.839417ms)
+build (macos-15, mac, arm64)	Regression tests	2026-11-12T08:44:14.1946640Z ✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (2619.410625ms)
+build (macos-15, mac, arm64)	Regression tests	2026-11-12T08:44:14.1947310Z ✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.633708ms)
+build (macos-15, mac, arm64)	Regression tests	2026-11-12T09:22:23.6316710Z ##[error]The operation was canceled.
+
+== macOS x64: same ==
+build (macos-15-intel, mac, x64)	Regression tests	2026-11-12T08:48:44.1314750Z ✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (2465.936614ms)
+build (macos-15-intel, mac, x64)	Regression tests	2026-11-12T08:48:46.6593600Z ✖ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (2527.014975ms)
+build (macos-15-intel, mac, x64)	Regression tests	2026-11-12T08:48:49.0857450Z ✖ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (2424.281222ms)
+build (macos-15-intel, mac, x64)	Regression tests	2026-11-12T08:48:49.0859290Z ✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (1.255416ms)
+build (macos-15-intel, mac, x64)	Regression tests	2026-11-12T09:22:23.7771580Z ##[error]The operation was canceled.
