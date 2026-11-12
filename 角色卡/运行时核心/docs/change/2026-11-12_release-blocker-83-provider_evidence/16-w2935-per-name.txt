@@ -1,0 +1,39 @@
+B3-2b W29/W30/W33/W34/W35 逐名结果（全链 66 tests；合并态 1ac7b5c + 最终补丁）
+注：全量顺序运行中，W29 首条修复前失败会留下 coordinator/宿主状态，后续名称的“修复前”会先命中 file guard 级联（git-file-final-guard-unproven）；无级联的直接证据是 W29 普通一行的 authorization-lease-invalid。修复后所有名称均未再出现任何目标阻断码。
+
+- W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+    短名修复前: FAIL | authorization-lease-invalid
+    短名修复后: FAIL | git-control-path-unsafe
+    普通修复后: PASS
+- W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: FAIL | git-control-path-unsafe
+    普通修复后: PASS
+- W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: FAIL | git-control-path-unsafe
+    普通修复后: PASS
+- W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scop
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: PASS
+    普通修复后: PASS
+- W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: FAIL | git-control-path-unsafe
+    普通修复后: PASS
+- W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: FAIL | git-control-path-unsafe
+    普通修复后: PASS
+- W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: FAIL | ENOTEMPTY (cleanup)
+    普通修复后: FAIL | AssertionError [ERR_ASSERTION]: The exact cross-run host close notice must retire rather than block 
+- W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: FAIL | ENOTEMPTY (cleanup)
+    普通修复后: FAIL | ENOTEMPTY (cleanup)
+- W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+    短名修复前: FAIL | AssertionError [ERR_ASSERTION]: ["git_candidate: {\"operationId\":\"w29-owned-init\",\"repoId\":\"un
+    短名修复后: PASS
+    普通修复后: PASS

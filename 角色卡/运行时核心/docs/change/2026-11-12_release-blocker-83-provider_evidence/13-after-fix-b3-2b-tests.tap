@@ -1,0 +1,13 @@
+✔ B3-2b 根规范化：host coordinator 按真实根归一符号链接祖先；不同真实根仍隔离 (6.7236ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-alias-306Kz7\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-alias-306Kz7\\real-parent\\project","leaseId":"65bd17f3-cc62-4dd0-b4b3-7d68d5a80fbb"}
+✔ B3-2b 根规范化：Windows 8.3 短名与规范长名命中同一 coordinator；authorization append 不再 authorization-lease-invalid (430.5139ms)
+ℹ {"platform":"win32","shortRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\AN7B7F~2\\PROJEC~1","canonicalRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2b-short-ROd0Tv\\project-with-a-very-long-directory-name","leaseId":"da7a9676-79b1-4bea-8e0c-5847d4a18a90"}
+✔ B3-2b 根规范化：不可解析根 fail-closed（不为未知拼写创建可命中的 coordinator） (0.7393ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 686.0193

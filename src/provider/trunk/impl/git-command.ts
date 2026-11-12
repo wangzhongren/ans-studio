@@ -195,8 +195,38 @@ const GIT_ACTION_AUTHORIZATION_EVIDENCE_FIELDS: ReadonlySet<string> = new Set([
 const gitActionAuditError = (detail: string) => new Error(`git-action-audit-unavailable:${detail}`);
 const gitActionAuditDetail = (error: unknown) =>
   ((error instanceof Error ? error.message : String(error)).replaceAll(/\s+/g, " ").slice(0, 300)) || "unknown";
-const sameAuthorizationRoot = (left: string, right: string) => process.platform === "win32"
-  ? path.resolve(left).toLowerCase() === path.resolve(right).toLowerCase() : path.resolve(left) === path.resolve(right);
+/**
+ * 2026-11-12（v2.0.0 发布阻断 B3-2b，CI Windows TEMP 为 8.3 短名）：真实根拼写的唯一归一规则。
+ * `realpathSync.native` 与 `fs/promises.realpath`（provider record 根来源）同一 native 语义：
+ * Windows 展开 8.3 短名、全平台解析符号链接祖先；不可解析（不存在/悬空链接/权限）⇒ `undefined`，
+ * 调用方按既有拒绝语义 fail-closed。只归一**同一真实根**的拼写，不放宽归属/根集合判定；
+ * Windows 仍按既有大小写不敏感口径比较。
+ */
+function nativeRealRoot(value: string): string | undefined {
+  try { return realpathSync.native(path.resolve(value)); } catch { return undefined; }
+}
+const sameRealRoot = (left: string, right: string): boolean => {
+  const leftReal = nativeRealRoot(left), rightReal = nativeRealRoot(right);
+  return leftReal !== undefined && rightReal !== undefined
+    && (process.platform === "win32" ? leftReal.toLowerCase() === rightReal.toLowerCase() : leftReal === rightReal);
+};
+/**
+ * Authorization 根：同一真实根的拼写归一（8.3 短名/长名/符号链接祖先），但**最终根自身**是
+ * 符号链接/junction 的别名保持既有 `project-root-not-canonical` 拒绝（不因根归一放宽 append 契约）；
+ * 不可解析 ⇒ 不相等（fail-closed）。
+ */
+function nativeAuthorizationRoot(value: string): string | undefined {
+  try {
+    const resolved = path.resolve(value);
+    if (lstatSync(resolved).isSymbolicLink()) return undefined;
+    return realpathSync.native(resolved);
+  } catch { return undefined; }
+}
+const sameAuthorizationRoot = (left: string, right: string): boolean => {
+  const leftReal = nativeAuthorizationRoot(left), rightReal = nativeAuthorizationRoot(right);
+  return leftReal !== undefined && rightReal !== undefined
+    && (process.platform === "win32" ? leftReal.toLowerCase() === rightReal.toLowerCase() : leftReal === rightReal);
+};
 const isAuthorizationText = (value: unknown, max = 256): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= max && !/[\x00-\x1f\x7f]/.test(value);
 const isAuthorizationDigest = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -543,7 +573,7 @@ function absentProtectionTopology(root: string): string {
   let dir = root;
   for (let depth = 0; depth < 64; depth++) {
     const info = lstatSync(dir);
-    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(dir) !== dir) throw new Error("absent-git-root-link-unproven");
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync.native(dir) !== dir) throw new Error("absent-git-root-link-unproven");
     entries.push([dir, info.dev, info.ino, info.birthtimeMs]);
     const bare = ["HEAD", "objects"].map(name => {
       try { const entry = lstatSync(path.join(dir, name)); return [entry.dev, entry.ino, entry.birthtimeMs, entry.isDirectory(), entry.isSymbolicLink()]; }
@@ -566,7 +596,7 @@ function protectionTopology(root: string): string {
   const describe = (file: string) => {
     try {
       const info = lstatSync(file);
-      return [realpathSync(file), info.dev, info.ino, info.birthtimeMs, info.isDirectory(), info.isSymbolicLink(), info.nlink];
+      return [realpathSync.native(file), info.dev, info.ino, info.birthtimeMs, info.isDirectory(), info.isSymbolicLink(), info.nlink];
     } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
   };
   const gitDir = path.join(root, ".git"), config = path.join(gitDir, "config"), info = lstatSync(config);
@@ -574,7 +604,8 @@ function protectionTopology(root: string): string {
   const sentinels = [path.join(root, ".gitmodules"), ...["commondir", "worktrees", "config.worktree", "objects/info/alternates", "objects/info/http-alternates", "info/grafts", "shallow", "refs/replace", "modules"].map(rel => path.join(gitDir, rel))];
   const values = sentinels.map(describe);
   if (values.some(value => value !== null)) throw new Error("git-protection-topology-unsupported");
-  if (realpathSync(root) !== root || realpathSync(gitDir) !== gitDir || lstatSync(root).isSymbolicLink() || lstatSync(gitDir).isSymbolicLink()) throw new Error("git-protection-root-changed");
+  // B3-2b：与 record 根的 `fs/promises.realpath` 同一 native 语义（展开 8.3 短名）；不可解析即拒绝。
+  if (realpathSync.native(root) !== root || realpathSync.native(gitDir) !== gitDir || lstatSync(root).isSymbolicLink() || lstatSync(gitDir).isSymbolicLink()) throw new Error("git-protection-root-changed");
   return digest(JSON.stringify([describe(root), describe(gitDir), describe(config), digest(readFileSync(config)), values]));
 }
 /** Only the actual issued complete observation can be checked; copied/self-reported snapshots are not authority. */
@@ -664,6 +695,11 @@ export async function readGitInitializationFacts(projectRoot: string): Promise<G
 /** Internal transport, imported only by the same Provider's fixed template implementations. */
 export async function executeGit(root: string, argv: readonly string[], options: { input?: Buffer; signal?: AbortSignal; timeoutMs?: number; outputLimit?: number; initializing?: boolean; operationId?: string; hostLeaseId?: string; timestamp?: string } = {}): Promise<GitProcessFacts> {
   const identity = options.initializing ? undefined : await inspectGitRepository(root);
+  // B3-2b（2026-11-12）：固定传输一律落在**真实根**（Windows 展开 8.3 短名、解析符号链接祖先）。
+  // 调用方可能持有与外层 record 不同的拼写；后续 `realpath(initFile) !== initFile` 等安全校验
+  // 只应拒绝**链接/不可解析**，不应因同一真实根的拼写差异误判。最终根自身为链接的拒绝仍由
+  // `inspectGitRepository` / `initializeGitRepository` 保留；真实根不可解析时 realpath 抛错 ⇒ fail-closed。
+  root = identity?.root ?? await realpath(root);
   const executable = await realpath(GIT_EXECUTABLE), processId = randomUUID(), startedAt = new Date().toISOString();
   const args = commandArgs(argv);
   const env: NodeJS.ProcessEnv = {};
@@ -915,16 +951,26 @@ export async function executeReadonlyGit(
 interface HostCoordinator { revision: number; inventory?: GitHostInventory; lease?: { id: string; kind: GitHostActionKind; interrupted?: string };
   protection?: { state: "required" | "unmanaged" | "unknown"; revision: number; digest: string; everRequired: boolean } }
 const hostCoordinators = new Map<string, HostCoordinator>();
-const hostProjectKey = (root: string) => process.platform === "win32" ? path.resolve(root).toLowerCase() : path.resolve(root);
+/**
+ * B3-2b：coordinator 键 = **真实根**的 native 拼写（8.3 短名/长名/符号链接祖先命中同一键），
+ * Windows 沿用大小写不敏感口径。不可解析（不存在/悬空链接）⇒ `undefined`，调用方 fail-closed，
+ * 绝不为不可解析根创建可被其它拼写命中的 coordinator。
+ */
+const hostProjectKey = (root: string): string | undefined => {
+  const canonical = nativeRealRoot(root);
+  return canonical === undefined ? undefined : process.platform === "win32" ? canonical.toLowerCase() : canonical;
+};
 function stableInventory(value: unknown): unknown { if (Array.isArray(value)) return value.map(stableInventory);
   return value && typeof value === "object" ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "observedAt").map(([key, val]) => [key, stableInventory(val)])) : value; }
-const hostCoordinator = (root: string) => { const key = hostProjectKey(root); let state = hostCoordinators.get(key);
+const hostCoordinatorByKey = (key: string) => { let state = hostCoordinators.get(key);
   if (!state) { state = { revision: 0 }; hostCoordinators.set(key, state); } return state; };
+const hostCoordinator = (root: string) => { const key = hostProjectKey(root); return key === undefined ? undefined : hostCoordinatorByKey(key); };
 /** Derived admission requirement, not a configurable permission. Missing/corrupt evidence never clears an observed managed scope. */
 export async function readGitHostProtectionRequirement(input: { projectRoot: string }): Promise<{
   state: "required" | "unmanaged" | "unknown"; revision: number; reasons: readonly string[];
 }> {
   const coordinator = hostCoordinator(input.projectRoot), reasons: string[] = [], evidence: string[] = [];
+  if (!coordinator) return { state: "unknown", revision: 0, reasons: ["git-host-project-root-unresolvable"] };
   let state: "required" | "unmanaged" | "unknown" = "unmanaged";
   try {
     const root = await realpath(input.projectRoot);
@@ -974,6 +1020,7 @@ export async function readGitHostProtectionRequirement(input: { projectRoot: str
 /** Captures ordinary host facts; this never upgrades unknown coverage to a mutation permit. */
 export function recordGitHostInventory(inventory: GitHostInventory): { ok: true; coordinatorRevision: number } | { ok: false; code: string } {
   const state = hostCoordinator(inventory.projectRoot);
+  if (!state) return { ok: false, code: "git-host-project-root-unresolvable" };
   if (state.inventory && typeof inventory.revision === "number" && typeof state.inventory.revision === "number" && inventory.revision < state.inventory.revision)
     return { ok: false, code: "git-host-inventory-stale" };
   if (state.inventory?.revision === inventory.revision && JSON.stringify(stableInventory(state.inventory)) !== JSON.stringify(stableInventory(inventory))) return { ok: false, code: "git-host-inventory-revision-conflict" };
@@ -988,6 +1035,7 @@ export function recordGitHostInventory(inventory: GitHostInventory): { ok: true;
 export function beginGitHostAction(input: { projectRoot: string; kind: GitHostActionKind; expectedCoordinatorRevision?: number }):
   { ok: true; leaseId: string; coordinatorRevision: number } | { ok: false; code: string } {
   const state = hostCoordinator(input.projectRoot);
+  if (!state) return { ok: false, code: "git-host-project-root-unresolvable" };
   if (state.lease) return { ok: false, code: "git-host-coordinator-busy" };
   if ([...hostCoordinators.values()].some(other => other !== state && other.lease && (input.kind === "git-mutation" || other.lease.kind === "git-mutation")))
     return { ok: false, code: "git-host-cross-project-coordinator-busy" };
@@ -997,23 +1045,26 @@ export function beginGitHostAction(input: { projectRoot: string; kind: GitHostAc
 }
 export function endGitHostAction(input: { projectRoot: string; leaseId: string; inventory?: GitHostInventory }): { ok: true; coordinatorRevision: number } | { ok: false; code: string } {
   const state = hostCoordinator(input.projectRoot);
+  if (!state) return { ok: false, code: "git-host-project-root-unresolvable" };
   if (state.lease?.id !== input.leaseId) return { ok: false, code: "git-host-lease-mismatch" };
-  if (input.inventory) { if (hostProjectKey(input.inventory.projectRoot) !== hostProjectKey(input.projectRoot)) return { ok: false, code: "git-host-project-mismatch" };
+  if (input.inventory) { if (!sameRealRoot(input.inventory.projectRoot, input.projectRoot)) return { ok: false, code: "git-host-project-mismatch" };
     const recorded = recordGitHostInventory(input.inventory); if (!recorded.ok) return recorded; }
   state.lease = undefined; state.revision++; return { ok: true, coordinatorRevision: state.revision };
 }
 /** Emergency stop is never held behind a normal admission lease. This invalidates proof, not the owned process or lease. */
 export function recordGitHostInterruption(input: { projectRoot: string; reason: string; coreSessionId?: string }): { coordinatorRevision: number } {
   const state = hostCoordinator(input.projectRoot);
-  state.revision++;
-  if (state.lease) state.lease.interrupted = `${input.reason}:${input.coreSessionId ?? "unknown-session"}`;
+  if (state) { state.revision++; if (state.lease) state.lease.interrupted = `${input.reason}:${input.coreSessionId ?? "unknown-session"}`; }
+  // 真实根不可解析也要阻断其它 mutation lease；该根自身没有可证明的 coordinator，返回 0。
   for (const other of hostCoordinators.values()) if (other !== state && other.lease?.kind === "git-mutation") {
     other.revision++; other.lease.interrupted = `application-interruption:${input.reason}:${input.coreSessionId ?? "unknown-session"}`;
   }
-  return { coordinatorRevision: state.revision };
+  return { coordinatorRevision: state?.revision ?? 0 };
 }
 export function inspectGitHostCoordinator(input: { projectRoot: string }) {
   const state = hostCoordinator(input.projectRoot);
+  if (!state) return { coordinatorRevision: 0, activeAction: undefined, inventory: undefined,
+    coverage: "unknown" as const, reasons: ["git-host-project-root-unresolvable"] };
   return structuredClone({ coordinatorRevision: state.revision, activeAction: state.lease?.kind, inventory: state.inventory,
     coverage: "unknown" as const, reasons: ["Actual complete team protection/authorization closure has not yet been proven"] });
 }
@@ -1021,7 +1072,9 @@ export function inspectGitHostCoordinator(input: { projectRoot: string }) {
 /** Checks the exact held infrastructure lease; never upgrades a tool surface to safe. */
 export function checkGitHostAction(input: { projectRoot: string; leaseId: string; kind?: GitHostActionKind }):
   { ok: true; coordinatorRevision: number } | { ok: false; code: string } {
-  const state = hostCoordinator(input.projectRoot), lease = state.lease;
+  const state = hostCoordinator(input.projectRoot);
+  if (!state) return { ok: false, code: "git-host-project-root-unresolvable" };
+  const lease = state.lease;
   if (!lease || lease.id !== input.leaseId || input.kind !== undefined && lease.kind !== input.kind) return { ok: false, code: "git-host-lease-mismatch" };
   if (lease.interrupted) return { ok: false, code: "git-host-lease-interrupted" };
   return { ok: true, coordinatorRevision: state.revision };

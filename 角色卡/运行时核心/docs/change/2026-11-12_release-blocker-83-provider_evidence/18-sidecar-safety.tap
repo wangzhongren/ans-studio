@@ -1,0 +1,14 @@
+✔ sidecar: append/read round-trip at the frozen path with whitelist field projection (43.8866ms)
+✔ sidecar: same operationId retries append new lines and never change journal replay/settlement identity (57.3598ms)
+✔ sidecar: unsafe path shapes (nlink, junction links, non-canonical root) are rejected fail-closed (53.7769ms)
+✔ sidecar: frozen budgets (4 KiB line / 16 attempts / 64 KiB file) reject with git-action-audit-unavailable (307.4819ms)
+✔ sidecar: truncated tail tolerated with diagnostics and repaired before append; bad JSON/unknown fields fail closed (58.8731ms)
+✔ sidecar: audit failures are fail-closed git-action-audit-unavailable (lease, lock, blocked store) (17.5751ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 740.63
