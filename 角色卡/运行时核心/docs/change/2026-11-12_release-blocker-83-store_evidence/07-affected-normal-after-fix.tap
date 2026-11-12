@@ -1,0 +1,276 @@
+TAP version 13
+# Subtest: P1-D：Claude/Pi 无 native 证据但应用面 verified 通过；Codex 受控 shell 走受限路径（P4/P6/P7 的跨层判定）
+ok 1 - P1-D：Claude/Pi 无 native 证据但应用面 verified 通过；Codex 受控 shell 走受限路径（P4/P6/P7 的跨层判定）
+  ---
+  duration_ms: 1.4164
+  type: 'test'
+  ...
+# Subtest: P1-D：nativeInstanceId 字面绑定——组合值传入派发父门后逐字比对（P1-A Amendment-1/N27）
+ok 2 - P1-D：nativeInstanceId 字面绑定——组合值传入派发父门后逐字比对（P1-A Amendment-1/N27）
+  ---
+  duration_ms: 0.2367
+  type: 'test'
+  ...
+# Subtest: P1-D：双路径互斥——observed + verified 拒绝；组合规则在严格 observed 时不产证据（N20/F15）
+ok 3 - P1-D：双路径互斥——observed + verified 拒绝；组合规则在严格 observed 时不产证据（N20/F15）
+  ---
+  duration_ms: 0.1354
+  type: 'test'
+  ...
+# Subtest: P1-D：应用中介证据的负例经真实组合规则缺席，派发父门拒绝（N11/N12/N22/N23/N26）
+ok 4 - P1-D：应用中介证据的负例经真实组合规则缺席，派发父门拒绝（N11/N12/N22/N23/N26）
+  ---
+  duration_ms: 0.2574
+  type: 'test'
+  ...
+# Subtest: P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10）
+ok 5 - P1-D：真实包装层的 custom provider（custom-override）经 managed 证据投影后在派发父门 fail-closed（N2/N10）
+  ---
+  duration_ms: 55.8654
+  type: 'test'
+  ...
+# Subtest: P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧）
+ok 6 - P1-D：非 official 的自定义 adapter 经 managed 证据显示 custom-adapter，派发父门拒绝（N9 身份侧）
+  ---
+  duration_ms: 17.97
+  type: 'test'
+  ...
+# Subtest: P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17）
+ok 7 - P1-D：prepareRoleDispatch 前后两次 validParent——Service 已执行后证据变化 ⇒ 第二次拒绝（N17）
+  ---
+  duration_ms: 68.2463
+  type: 'test'
+  ...
+# Subtest: P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19）
+ok 8 - P1-D：creatorReports/hub——真实 managed 证据的 handback provenance 通过 hub；缺 provenance 拒绝（N19）
+  ---
+  duration_ms: 42.6069
+  type: 'test'
+  ...
+# Subtest: P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5）
+ok 9 - P1-D：controller resume 与 validParent 共用 predicate——有效证据到达 Service，证据变化后由门拒绝（P5）
+  ---
+  duration_ms: 31.1242
+  type: 'test'
+  ...
+# Subtest: P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段
+ok 10 - P1-D：N15——写/发布/停稳门不消费 applicationMediation，受限证据不升级严格字段
+  ---
+  duration_ms: 2.556
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 解析角色与任务（带 role/run 前导词）
+ok 11 - parseRoleRunArgs 解析角色与任务（带 role/run 前导词）
+  ---
+  duration_ms: 0.907
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 支持 --task= 形式且可省略前导词
+ok 12 - parseRoleRunArgs 支持 --task= 形式且可省略前导词
+  ---
+  duration_ms: 0.1162
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 解析 --runtime（两种写法），非法值记为用法错误
+ok 13 - parseRoleRunArgs 解析 --runtime（两种写法），非法值记为用法错误
+  ---
+  duration_ms: 0.2027
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 缺角色与缺 --task 记为用法错误（不再回退演示值）
+ok 14 - parseRoleRunArgs 缺角色与缺 --task 记为用法错误（不再回退演示值）
+  ---
+  duration_ms: 0.0711
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 未知参数与多余裸词记为用法错误
+ok 15 - parseRoleRunArgs 未知参数与多余裸词记为用法错误
+  ---
+  duration_ms: 0.0787
+  type: 'test'
+  ...
+# Subtest: parseRoleRunArgs 选项缺值记为用法错误
+ok 16 - parseRoleRunArgs 选项缺值记为用法错误
+  ---
+  duration_ms: 0.068
+  type: 'test'
+  ...
+# Subtest: parseTaskId 取 --task，缺省回退
+ok 17 - parseTaskId 取 --task，缺省回退
+  ---
+  duration_ms: 0.0727
+  type: 'test'
+  ...
+# Subtest: requireProjectConfig 有注入值即原样返回
+ok 18 - requireProjectConfig 有注入值即原样返回
+  ---
+  duration_ms: 0.1152
+  type: 'test'
+  ...
+# Subtest: requireProjectConfig 缺注入抛清晰错误（不回退演示副本）
+ok 19 - requireProjectConfig 缺注入抛清晰错误（不回退演示副本）
+  ---
+  duration_ms: 0.253
+  type: 'test'
+  ...
+# Subtest: requireTaskScope 缺注入抛清晰错误（不回退演示副本）
+ok 20 - requireTaskScope 缺注入抛清晰错误（不回退演示副本）
+  ---
+  duration_ms: 0.1223
+  type: 'test'
+  ...
+# Subtest: 夹具（模拟装配演示配置）六个角色且边界路径用 .yaml
+ok 21 - 夹具（模拟装配演示配置）六个角色且边界路径用 .yaml
+  ---
+  duration_ms: 0.1756
+  type: 'test'
+  ...
+# Subtest: 夹具任务写集是编排边界的子集
+ok 22 - 夹具任务写集是编排边界的子集
+  ---
+  duration_ms: 0.0533
+  type: 'test'
+  ...
+# Subtest: formatEvent 拒绝事件按根分组列出允许路径
+ok 23 - formatEvent 拒绝事件按根分组列出允许路径
+  ---
+  duration_ms: 0.1504
+  type: 'test'
+  ...
+# Subtest: formatEvent 无 detail 时只输出一行
+ok 24 - formatEvent 无 detail 时只输出一行
+  ---
+  duration_ms: 0.0482
+  type: 'test'
+  ...
+# Subtest: 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind）
+ok 25 - 防御断言：受保护 + plan.native.appTools 含 shell 但无 approvalChain ⇒ unproven（旧门退役，不 bind）
+  ---
+  duration_ms: 23.923
+  type: 'test'
+  ...
+# Subtest: unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留）
+ok 26 - unmanaged 范围不误伤：无 approvalChain 的历史路径仍可 bind（旧行为保留）
+  ---
+  duration_ms: 12.5809
+  type: 'test'
+  ...
+# Subtest: 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId
+ok 27 - 适配器能力面注入：readonlyGit（matchReadonlyGit + executeReadonlyGit）与会话 roleId
+  ---
+  duration_ms: 12.8172
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+ok 28 - cardKindsOf 门面：fixed 只读 fixedCards（chief 允许 proposal；rapporteur 仅 decision ⇒ proposal 被拒）
+  ---
+  duration_ms: 24.2019
+  type: 'test'
+  ...
+# Subtest: cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+ok 29 - cardKindsOf 门面：legacy 只读模块 cards（chief 仅 intent-confirm ⇒ proposal 被拒；rapporteur 含 proposal ⇒ 触达）
+  ---
+  duration_ms: 18.0161
+  type: 'test'
+  ...
+# Subtest: fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+ok 30 - fixed chief 注入 chief-workflow-v2（版本/元数据/SHA-256 与磁盘一致）；legacy chief 不注入
+  ---
+  duration_ms: 11.8096
+  type: 'test'
+  ...
+# Subtest: fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+ok 31 - fixed 非 chief 会话：不注入 v2 资源；模块 fixed context 段照常注入
+  ---
+  duration_ms: 5.2461
+  type: 'test'
+  ...
+# Subtest: fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+ok 32 - fixed 会话：legacy Git/VCA/stable 工具不注入；completeTeamPlan/closeCreatedTask 保留；无 requestReleaseMerge
+  ---
+  duration_ms: 4.7661
+  type: 'test'
+  ...
+# Subtest: 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+ok 33 - 源码接缝：run-role 不新增 requestReleaseMerge（G-IR §六 拒绝）
+  ---
+  duration_ms: 0.8043
+  type: 'test'
+  ...
+# Subtest: fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+ok 34 - fixed close：应用实现收到绑定身份（projectRoot/actorRoleId）；legacy 实现不注入
+  ---
+  duration_ms: 6.1624
+  type: 'test'
+  ...
+# Subtest: fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+ok 35 - fixed close：未注入应用实现 ⇒ 默认直连 workflowService.closeTask（写 task.closed、不触 trunk/run）
+  ---
+  duration_ms: 21.4754
+  type: 'test'
+  ...
+# Subtest: fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+ok 36 - fixed activate：nominator 应用实现收到绑定 projectRoot；legacy 实现不触达
+  ---
+  duration_ms: 19.8206
+  type: 'test'
+  ...
+# Subtest: legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+ok 37 - legacy 会话：closeCreatedTask/activateRoleDocuments 同一引用注入；fixed 字段缺席
+  ---
+  duration_ms: 14.0916
+  type: 'test'
+  ...
+# Subtest: governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+ok 38 - governance_matrix 工具：fixed 会话透传 fixed 矩阵视图；legacy 会话保持 legacy 视图
+  ---
+  duration_ms: 14.658
+  type: 'test'
+  ...
+# Subtest: P0 残余：托管会话证据按同一真实根命中（符号链接祖先别名 vs 规范根）
+ok 39 - P0 残余：托管会话证据按同一真实根命中（符号链接祖先别名 vs 规范根）
+  ---
+  duration_ms: 24.4781
+  type: 'test'
+  ...
+# {"platform":"win32","aliasRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-orch-root-alias-xkQziP\\\\alias-parent\\\\project","realRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-orch-root-alias-xkQziP\\\\real-parent\\\\project","evidenceRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-orch-root-alias-xkQziP\\\\real-parent\\\\project"}
+# Subtest: P0 残余：不同真实根/未知会话不命中托管证据（fail-closed，不放宽跨根）
+ok 40 - P0 残余：不同真实根/未知会话不命中托管证据（fail-closed，不放宽跨根）
+  ---
+  duration_ms: 12.6928
+  type: 'test'
+  ...
+# Subtest: P0 残余：最终根自身是符号链接不命中；不可解析路径不命中（沿用 P0 fail-closed）
+ok 41 - P0 残余：最终根自身是符号链接不命中；不可解析路径不命中（沿用 P0 fail-closed）
+  ---
+  duration_ms: 10.4577
+  type: 'test'
+  ...
+# Subtest: B3-2：Windows 8.3 短名拼写与规范长名命中同一托管证据；不同真实根仍拒绝
+ok 42 - B3-2：Windows 8.3 短名拼写与规范长名命中同一托管证据；不同真实根仍拒绝
+  ---
+  duration_ms: 380.42
+  type: 'test'
+  ...
+# {"platform":"win32","shortRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\AN7133~1\\\\PROJEC~1","realRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-orch-root-83-F5Wg8e\\\\project-with-a-long-directory-name","evidenceRoot":"C:\\\\Users\\\\51054\\\\AppData\\\\Local\\\\Temp\\\\ans-orch-root-83-F5Wg8e\\\\project-with-a-long-directory-name"}
+# Subtest: fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+ok 43 - fixed 会话 + 真实受派任务 + 完整注入：shell 闸允许 add/commit（taskGit 审计），执行路径经端口/临界区门
+  ---
+  duration_ms: 49.6829
+  type: 'test'
+  ...
+# Subtest: 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+ok 44 - 无 taskGit 注入：fixed 会话任务级 Git 写一律拒；执行路径无 task-git 分支（只读 Git 路由不变）
+  ---
+  duration_ms: 19.787
+  type: 'test'
+  ...
+1..44
+# tests 44
+# suites 0
+# pass 44
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 816.9083

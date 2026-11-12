@@ -26,6 +26,7 @@ import {
   beginGitHostAction,
   checkGitHostAction,
   createGitQueryPort,
+  createGitRefStore,
   endGitHostAction,
   initializeGitRepository,
   readGitActionAuthorizations,
@@ -290,4 +291,50 @@ test("B3-2b 根规范化：不可解析根 fail-closed（不为未知拼写创�
   const missing = join(tmpdir(), `ans-b3-2b-missing-${process.pid}-${Date.now()}`);
   assert.deepEqual(beginGitHostAction({ projectRoot: missing, kind: "arm" }), { ok: false, code: "git-host-project-root-unresolvable" });
   assert.deepEqual(checkGitHostAction({ projectRoot: missing, leaseId: "unresolvable-lease" }), { ok: false, code: "git-host-project-root-unresolvable" });
+});
+
+test("B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe）", async t => {
+  if (process.platform !== "win32") { t.skip("8.3 short names only exist on Windows"); return; }
+  const scratch = await realpath(await mkdtemp(join(tmpdir(), "ans-b3-2c-short-")));
+  t.after(async () => { await rm(scratch, { recursive: true, force: true }); });
+  const longRoot = join(scratch, "project-with-a-very-long-directory-name");
+  await mkdir(join(longRoot, ".ans", "state"), { recursive: true });
+  const operations = join(longRoot, ".ans", "trunk", "operations");
+  const operationId = "b3-2c-short-name-operation";
+  const operationDir = join(operations, createHash("sha256").update(operationId).digest("hex"));
+  await mkdir(operationDir, { recursive: true });
+  await writeFile(join(operationDir, "init.json"), "{}");
+  const shortRoot = shortPathOf(longRoot);
+  if (!shortRoot || shortRoot.toLowerCase() === longRoot.toLowerCase()) { t.skip("8.3 short names are disabled on this volume"); return; }
+  assert.notEqual(shortRoot.toLowerCase(), longRoot.toLowerCase(), "fixture: 短名与长名必须是两种拼写");
+  assert.equal(await realpath(shortRoot), await realpath(longRoot), "fixture: 短名与长名必须指向同一真实根");
+  // 修复前：abs 由短名拼写构造，await realpath(abs) 为 native 长名 ⇒ 同一真实目录被误判 git-control-path-unsafe。
+  assert.equal(await createGitRefStore(shortRoot).readJournal("b3-2c-short-missing"), null);
+  assert.deepEqual(await createGitRefStore(shortRoot).listJournals(), []);
+  assert.equal(await createGitRefStore(longRoot).readJournal("b3-2c-short-missing"), null);
+  assert.deepEqual(await createGitRefStore(longRoot).listJournals(), []);
+  t.diagnostic(JSON.stringify({ platform: process.platform, shortRoot, canonicalRoot: await realpath(longRoot) }));
+});
+
+test("B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒", async t => {
+  const fixture = await aliasAncestorFixture("ans-b3-2c-control-");
+  t.after(fixture.cleanup);
+  await mkdir(join(fixture.realRoot, ".ans", "state"), { recursive: true });
+  await mkdir(join(fixture.realRoot, ".ans", "trunk", "operations"), { recursive: true });
+  // 同一真实根的别名拼写（符号链接祖先）必须通过；修复前 realpath(abs) !== abs ⇒ git-control-path-unsafe。
+  assert.equal(await createGitRefStore(fixture.aliasRoot).readJournal("b3-2c-alias-missing"), null);
+  assert.deepEqual(await createGitRefStore(fixture.aliasRoot).listJournals(), []);
+  // 最终根自身是链接：保持既有 git-control-path-unsafe 拒绝（不因根归一放宽）。
+  const finalLink = join(fixture.realParent, "final-control-link");
+  await linkDir(fixture.realRoot, finalLink);
+  await assert.rejects(createGitRefStore(finalLink).readJournal("b3-2c-final-link-missing"), /git-control-path-unsafe/);
+  // 控制路径自身（.ans/trunk）被换成链接：仍拒绝。
+  const outside = await mkdtemp(join(tmpdir(), "ans-b3-2c-outside-"));
+  t.after(async () => { await rm(outside, { recursive: true, force: true }); });
+  const linked = await aliasAncestorFixture("ans-b3-2c-linked-control-");
+  t.after(linked.cleanup);
+  await mkdir(join(linked.realRoot, ".ans"));
+  await linkDir(outside, join(linked.realRoot, ".ans", "trunk"));
+  await assert.rejects(createGitRefStore(linked.aliasRoot).readJournal("b3-2c-linked-missing"), /git-control-path-unsafe/);
+  t.diagnostic(JSON.stringify({ platform: process.platform, aliasRoot: fixture.aliasRoot, realRoot: fixture.realRoot }));
 });

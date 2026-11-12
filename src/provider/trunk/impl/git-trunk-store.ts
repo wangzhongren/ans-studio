@@ -1,5 +1,6 @@
 // Single-ref storage commit/recovery. This does not select/migrate production TrunkStore.
 import { createHash } from "node:crypto";
+import { lstatSync, realpathSync } from "node:fs";
 import { readFile, readdir, mkdir, lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { atomicWrite } from "../../../common/shared/atomic-write.ts";
@@ -1155,11 +1156,32 @@ export function createProjectTrunkStore(root: string): TrunkStore {
     async listHistory(options) { return (await selected()).listHistory(options); },
   };
 }
-async function assertControlPaths(root: string) {
+/**
+ * 2026-11-12（v2.0.0 发布阻断 B3-2c，CI Windows TEMP 为 8.3 短名）：与 git-command.ts
+ * 同一 native realpath 规则。`fs/promises.realpath` 是 native 语义（展开 8.3 短名、解析
+ * 符号链接祖先），而 abs 由调用方根拼写逐字构造；短名根下同一真实目录会被误判非规范。
+ * 比较入口统一用 native 真实根构造；不可解析或最终根自身是链接/junction 的别名 ⇒
+ * 既有 `git-control-path-unsafe` fail-closed（不放宽控制路径自身链接的拒绝）。
+ */
+function nativeControlRoot(root: string): string | undefined {
+  try {
+    const resolved = path.resolve(root);
+    if (lstatSync(resolved).isSymbolicLink()) return undefined;
+    return realpathSync.native(resolved);
+  } catch { return undefined; }
+}
+async function assertControlPaths(root: string): Promise<string | undefined> {
+  let canonicalRoot: string | undefined;
   for (const rel of [".ans", ".ans/state", ".ans/trunk", ".ans/trunk/operations"]) {
-    const abs = path.join(root, rel); try { const info = await lstat(abs); if (!info.isDirectory() || info.isSymbolicLink() || await realpath(abs) !== abs) throw new Error("git-control-path-unsafe"); }
+    const abs = path.join(root, rel);
+    try {
+      const info = await lstat(abs), canonical = canonicalRoot ??= nativeControlRoot(root);
+      if (!info.isDirectory() || info.isSymbolicLink() || canonical === undefined || await realpath(abs) !== path.join(canonical, rel))
+        throw new Error("git-control-path-unsafe");
+    }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   }
+  return canonicalRoot;
 }
 export function createGitRefStore(root: string, fence?: { hostLeaseId?: string; heldLockToken?: string }): GitRefStore {
   const candidates = createGitCandidateStore(root);
@@ -1173,8 +1195,8 @@ export function createGitRefStore(root: string, fence?: { hostLeaseId?: string; 
     if (value.phase !== "business-prepared") applicationGitRef(value.ref); return value;
   }
   async function listJournals(): Promise<readonly GitOperationRecord[]> {
-    await assertControlPaths(root);
-    return listGitOperationJournals(root);
+    const canonicalRoot = await assertControlPaths(root);
+    return listGitOperationJournals(canonicalRoot ?? root);
   }
   async function safeWrite(journal: GitOperationRecord, actualProcess?: import("../abstract/trunk-store.ts").GitProcessFacts) {
     if (fence?.hostLeaseId && !checkGitHostAction({ projectRoot: root, leaseId: fence.hostLeaseId, kind: "git-mutation" }).ok) {

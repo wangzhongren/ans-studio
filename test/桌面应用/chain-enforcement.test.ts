@@ -32,16 +32,18 @@ import type {
 import { configureDiagnostics, disposeDiagnostics, flushDiagnostics } from "../../src/common/shared/diagnostics.ts";
 
 const tick = (ms = 20) => new Promise((resolve) => setTimeout(resolve, ms));
-async function settle(h: { streams: Record<string, OrchestrationEvent[]> }, ...roles: string[]): Promise<void> {
-  for (const role of roles) {
-    (h.streams[role] ??= []).push({ kind: "settled", summary: "完成" } as OrchestrationEvent);
-  }
-  await tick(40);
-}
 
 async function waitUntil(check: () => boolean, timeoutMs = 3000): Promise<void> {
   const start = Date.now();
   while (!check()) {
+    if (Date.now() - start > timeoutMs) throw new Error("等待超时");
+    await tick(10);
+  }
+}
+
+async function waitUntilAsync(check: () => Promise<boolean>, timeoutMs = 3000): Promise<void> {
+  const start = Date.now();
+  while (!(await check())) {
     if (Date.now() - start > timeoutMs) throw new Error("等待超时");
     await tick(10);
   }
@@ -307,6 +309,27 @@ async function d3Fixture(root: string, selected: string[], rosterVersion = 1): P
 }
 
 /**
+ * B3-4（2026-11-12）：v2.0.0 生产门要求文档/团队准备派发来自「已登记项目生命周期 + 当前 accepted 客户轮次 +
+ * 真实管理会话证据」（`app/desktop/session.ts:9620-9656`；worker 派发见 `:9519-9521`）。本套件 harness
+ * （`:227-279`）桩掉 `openRoleSession`、没有 `getRegisteredProjectLifecycle`、也没有真实 running origin——
+ * 伪造这些宿主事实会削弱门禁，因此 dispatch 必须 fail-closed。统一钉住：拒绝码 + 任务账本零新增 + 目标零投递
+ * （主断言保留在同一强度：拒绝而不是伪造受理）。
+ */
+async function assertDispatchRefused(
+  root: string,
+  h: Harness,
+  receipt: DispatchReceipt,
+  targetRoleId: string,
+  code: RegExp,
+  label: string,
+): Promise<void> {
+  assert.equal(receipt.ok, false, `${label}：v2.0.0 来源门必须 fail-closed（裸夹具不得伪造受理）`);
+  assert.match(receipt.message ?? "", code, `${label}：拒绝码应为 ${String(code)}`);
+  assert.equal((await readTaskState(root)).records.size, 0, `${label}：拒绝不写任务账本`);
+  assert.equal((h.sent[targetRoleId] ?? []).length, 0, `${label}：拒绝不投递`);
+}
+
+/**
  * 2026-10-31（D3 卡种收口）：任意 choice 卡的账本序列。
  * 用于模拟历史污染（旧写侧把选项写进 targetRoleIds）与新格式事件（cardKind 显式落账）。
  */
@@ -348,70 +371,36 @@ async function choiceResolution(
   });
 }
 
-test("M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；基线漂移受理", async () => {
+test("M1/M2（v2.0.0 来源门）：裸夹具的文档准备派发 fail-closed——document-planning-source-unavailable、零任务零投递", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-m1-"));
   const diagnosticsDir = path.join(root, ".diag");
   configureDiagnostics({ directory: diagnosticsDir });
   try {
-    await fs.mkdir(path.join(root, "docs"), { recursive: true });
     const h = harness(root);
     try {
       await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
       await tick(20);
       const dispatch = h.caps.chief!;
-      // M1 缺意图 → 受理 + advisory；任务行 +1。
+      // v2.0.0（e71501c 起）：文档/团队准备派发必须来自「已登记项目生命周期 + 当前 accepted 客户轮次 +
+      // 真实管理会话证据」。本套件 harness 桩掉 openRoleSession、无 getRegisteredProjectLifecycle、无真实
+      // running origin——伪造这些宿主事实会削弱门禁，因此旧的「状态缺失也受理」期望不再成立。
       const noIntent = (await dispatch({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(noIntent.ok, true, noIntent.message ?? "");
-      assert.match(noIntent.message ?? "", /已受理/);
-      assert.match(noIntent.message ?? "", /状态提示（未阻断）/);
-      assert.match(noIntent.message ?? "", /意图/);
-      const state1 = await readTaskState(root);
-      assert.equal(state1.records.size, 1, "状态缺失也受理并建任务");
-      const first = [...state1.records.values()][0]!.created!;
-      assert.equal(first.from, "chief");
-      assert.equal(first.to, "rapporteur");
-      assert.equal(first.flowId, "focus");
-      assert.equal(first.runState, "draft", "有 flowId 时 draft 锚点");
-      await flushDiagnostics();
-      const diagnosticText = await readDiagnostics(diagnosticsDir);
-      assert.ok(diagnosticText.includes("tasks.dispatch.advisory"), "诊断记录 advisory");
-      assert.ok(diagnosticText.includes("intent-missing"), "reasonCode=intent-missing");
-
-      // 同文复派被幂等抑制：不新增任务行。
-      const duplicate = (await dispatch({ roleId: "rapporteur", task: "出方案与名单", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(duplicate.ok, true);
-      assert.match(duplicate.message ?? "", /同一任务已存在|重复派发已抑制/);
-      assert.equal((await readTaskState(root)).records.size, 1, "同文复派不建新行");
-
-      // 补齐后改用新文本 → 受理。
+      await assertDispatchRefused(root, h, noIntent, "rapporteur", /document-planning-source-unavailable/, "M1 缺意图");
+      // 补齐意图/方案/名单后来源门仍先行：文档齐备不替代真实客户轮次。
       await writeProjectFiles(root);
-      const toRapporteur = (await dispatch({ roleId: "rapporteur", task: "出方案与名单（补齐后）", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(toRapporteur.ok, true, toRapporteur.message ?? "");
-      assert.equal((await readTaskState(root)).records.size, 2);
-
-      // M2：缺名单 → 受理 + roster-missing advisory；同文复派幂等抑制。
+      const afterDocs = (await dispatch({ roleId: "rapporteur", task: "出方案与名单（补齐后）", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      await assertDispatchRefused(root, h, afterDocs, "rapporteur", /document-planning-source-unavailable/, "M1 文档齐备");
+      // M2 同款：nominator 的人事准备也要真实来源；缺名单文本不再进入链级 advisory。
       await fs.rm(path.join(root, "docs/proposals/focus-roster-v1.md"));
       const noRoster = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(noRoster.ok, true, noRoster.message ?? "");
-      assert.match(noRoster.message ?? "", /名单/);
-      assert.equal((await readTaskState(root)).records.size, 3, "缺名单也受理");
-      const noRosterDuplicate = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(noRosterDuplicate.ok, true);
-      assert.match(noRosterDuplicate.message ?? "", /同一任务已存在|重复派发已抑制/);
-      assert.equal((await readTaskState(root)).records.size, 3);
-      // 恢复名单 → 新文本受理。
-      await fs.writeFile(path.join(root, "docs/proposals/focus-roster-v1.md"), ROSTER_TEXT, "utf8");
-      const toNominator = (await dispatch({ roleId: "nominator", task: "按名单招人（补齐后）", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(toNominator.ok, true, toNominator.message ?? "");
-      assert.equal((await readTaskState(root)).records.size, 4);
-
-      // R9：基线篡改 → 受理 + versioned-doc-baseline-violation advisory（不再拒发）。
-      await fs.writeFile(path.join(root, "docs/product/focus-intent-v1.md"), "# 外部篡改\n", "utf8");
-      const tampered = (await dispatch({ roleId: "rapporteur", task: "出方案 v2", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(tampered.ok, true, tampered.message ?? "");
-      assert.match(tampered.message ?? "", /状态提示（未阻断）/);
-      assert.match(tampered.message ?? "", /基线|只读|版本化/);
-      assert.equal((await readTaskState(root)).records.size, 5);
+      await assertDispatchRefused(root, h, noRoster, "nominator", /document-planning-source-unavailable/, "M2 缺名单");
+      // 同文复派同样被来源门拒绝（不因文本相同而伪造幂等受理）。
+      const duplicate = (await dispatch({ roleId: "nominator", task: "按名单招人", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
+      await assertDispatchRefused(root, h, duplicate, "nominator", /document-planning-source-unavailable/, "M2 复派");
+      await flushDiagnostics();
+      const diagnosticText = await readDiagnostics(diagnosticsDir);
+      assert.equal(diagnosticText.includes("tasks.dispatch.advisory"), false, "来源门拒绝不产生 advisory 受理诊断");
+      // M1/M2 的链级 advisory 纯逻辑覆盖保留在 test/编排/dispatch-advisories.test.ts（见 B3-4 记录）。
     } finally {
       await h.mgr.stop(null);
     }
@@ -421,7 +410,7 @@ test("M1/M2：状态缺失受理 + advisory（意图/名单）；同文幂等；
   }
 });
 
-test("M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件型模块元数据", async () => {
+test("M5/M6/M7（v2.0.0 来源门）：交付与运营 worker 派发在裸夹具上 fail-closed（零任务零投递）", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-m5-"));
   try {
     await writeProjectFiles(root);
@@ -432,101 +421,24 @@ test("M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件�
       await tick(20);
       const chiefDispatch = h.caps.chief!;
 
-      // M5 正例：D3 选中角色卡已枚举 ⇒ 交付受理，落 stepId=project-handoff。
+      // M5：幕僚→运营交付（hubPreparation）要求真实注册生命周期 + 当前 accepted 幕僚轮次；
+      // 裸夹具没有这些宿主事实，必须 fail-closed（不写 task.created、不投递）。
       const handoff = (await chiefDispatch({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, true, handoff.message ?? "");
-      const afterHandoff = await readTaskState(root);
-      const handoffCreated = [...afterHandoff.records.values()].find((record) => record.created?.to === "convener")!.created!;
-      assert.equal(handoffCreated.from, "chief");
-      assert.equal(handoffCreated.stepId, "project-handoff");
-      assert.equal(handoffCreated.flowId, "focus");
-      assert.equal(handoffCreated.runState, "pinned", "handoff pin 成功");
+      await assertDispatchRefused(root, h, handoff, "convener", /document-planning-source-unavailable/, "M5 交付");
 
-      // 运营会话：接交付后派名单内 worker 受理（from=convener）。
+      // 运营会话：v2.0.0 下 worker 派发要求当前运营真实受派任务（running origin + taskId + 可核验父任务）；
+      // 裸夹具同样 fail-closed。能力在场 ≠ 授权（dispatchTask 仍注入）。
       await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
       await tick(20);
       const convenerDispatch = h.caps.convener!;
-      assert.equal(typeof convenerDispatch, "function");
+      assert.equal(typeof convenerDispatch, "function", "运营持有派发能力（能力在场 ≠ 授权）");
       const toWorker = (await convenerDispatch({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-      assert.equal(toWorker.ok, true, toWorker.message ?? "");
-      const state2 = await readTaskState(root);
-      const workerTask = [...state2.records.values()].find((record) => record.created?.to === "implementer")!.created!;
-      assert.equal(workerTask.from, "convener");
-      assert.equal(workerTask.flowId, "focus");
-      assert.equal(workerTask.moduleId, "impl-core", "任务模块 id 全链路落盘");
-      assert.equal(workerTask.moduleDirectory, "src/", "任务模块目录以名单为准落盘");
-      assert.deepEqual(workerTask.modulePaths, ["src/"], "普通模块 modulePaths 为单元素数组");
+      await assertDispatchRefused(root, h, toWorker, "implementer", /worker-dispatch-source-unavailable/, "M5 运营→实现者");
 
-      // R2/R3：越界 modulePaths → 受理 + advisory；任务模块字段仍取名单模块。
-      const beforeWrongPaths = (await readTaskState(root)).records.size;
-      const wrongPaths = (await convenerDispatch({
-        roleId: "implementer",
-        task: "实现番茄钟（越界路径）",
-        sideEffect: "code",
-        flowId: "focus",
-        moduleId: "impl-core",
-        modulePaths: ["other/"],
-      })) as DispatchReceipt;
-      assert.equal(wrongPaths.ok, true, wrongPaths.message ?? "");
-      assert.match(wrongPaths.message ?? "", /状态提示（未阻断）/);
-      assert.match(wrongPaths.message ?? "", /modulePaths|不属于模块/);
-      assert.equal((await readTaskState(root)).records.size, beforeWrongPaths + 1);
-      const wrongPathsTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("越界路径"))!.created!;
-      assert.equal(wrongPathsTask.moduleId, "impl-core");
-      assert.equal(wrongPathsTask.moduleDirectory, "src/");
-      assert.deepEqual(wrongPathsTask.modulePaths, ["src/"]);
-
-      // 非属主模块 → 受理 + module-not-owned；不写模块字段。
-      const wrongModule = (await convenerDispatch({
-        roleId: "implementer",
-        task: "实现测试套件",
-        sideEffect: "code",
-        flowId: "focus",
-        moduleId: "qa-suite",
-      })) as DispatchReceipt;
-      assert.equal(wrongModule.ok, true, wrongModule.message ?? "");
-      assert.match(wrongModule.message ?? "", /模块|属主/);
-      const wrongModuleTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("实现测试套件"))!.created!;
-      assert.equal(wrongModuleTask.moduleId, undefined);
-      assert.equal(wrongModuleTask.moduleDirectory, undefined);
-      assert.equal(wrongModuleTask.modulePaths, undefined);
-
-      // verifier 带非属主模块：受理，任务仍写 moduleId/modulePaths（不要求属主）。
+      // 运营→内置 verifier 命中 v2.0.0 硬门「新的质检任务须由幕僚创建」——同样不建任务、不投递。
       const toVerifier = (await convenerDispatch({ roleId: "verifier", task: "验收核对", sideEffect: "read-only", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-      assert.equal(toVerifier.ok, true, toVerifier.message ?? "");
-      const verifierTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.to === "verifier")!.created!;
-      assert.equal(verifierTask.moduleId, "impl-core");
-      assert.deepEqual(verifierTask.modulePaths, ["src/"]);
-      assert.equal(verifierTask.moduleDirectory, "src/");
-
-      // 文件型模块：不写 moduleDirectory，任务行可读回。
-      const toFile = (await convenerDispatch({ roleId: "implementer", task: "构建脚本", sideEffect: "code", flowId: "focus", moduleId: "impl-file" })) as DispatchReceipt;
-      assert.equal(toFile.ok, true, toFile.message ?? "");
-      const fileTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("构建脚本"))!.created!;
-      assert.equal(fileTask.moduleId, "impl-file");
-      assert.deepEqual(fileTask.modulePaths, ["scripts/build.mjs"]);
-      assert.equal(fileTask.moduleDirectory, undefined);
-
-      // 运营 → 产品（内置非质检）仍硬拒。
-      const toProduct = (await convenerDispatch({ roleId: "product", task: "写意图", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(toProduct.ok, false);
-      assert.match(toProduct.message ?? "", /运营|项目 worker|质检/);
-
-      // 名单外目标（qa 未在 D3 选中）：受理 + target-not-nominated advisory。
-      const beforeQa = (await readTaskState(root)).records.size;
-      const toQa = (await convenerDispatch({ roleId: "qa", task: "测试", sideEffect: "code", flowId: "focus", moduleId: "qa-suite" })) as DispatchReceipt;
-      assert.equal(toQa.ok, true, toQa.message ?? "");
-      assert.match(toQa.message ?? "", /D3|选中/);
-      assert.equal((await readTaskState(root)).records.size, beforeQa + 1);
-      const qaTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("测试") && record.created?.to === "qa")!.created!;
-      assert.equal(qaTask.moduleId, "qa-suite");
-
-      // 实现目标未带 moduleId：受理 + module-required advisory、无模块字段。
-      const noModule = (await convenerDispatch({ roleId: "implementer", task: "无模块实现", sideEffect: "code", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(noModule.ok, true, noModule.message ?? "");
-      assert.match(noModule.message ?? "", /moduleId|模块/);
-      const noModuleTask = [...(await readTaskState(root)).records.values()].find((record) => record.created?.text.includes("无模块实现"))!.created!;
-      assert.equal(noModuleTask.moduleId, undefined);
+      await assertDispatchRefused(root, h, toVerifier, "verifier", /chief-hub-review-owner-required/, "M5 运营→质检");
+      // 任务模块字段/verifier 元数据的正例由账本级与固定路径专项用例覆盖；本用例不再伪造成功派发。
     } finally {
       await h.mgr.stop(null);
     }
@@ -535,7 +447,7 @@ test("M5/M6/M7 + 交付标记：状态缺失受理 + advisory；verifier/文件�
   }
 });
 
-test("D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不覆盖真实 D3（选项与角色同名也不覆盖）", async () => {
+test("D3 卡种收口（2026-10-31，v2.0.0 来源门）：decision/intent-confirm/acceptance 裁决不能替代真实来源——交付/派发 fail-closed", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-d3-cardkind-"));
   try {
     await writeProjectFiles(root);
@@ -586,17 +498,14 @@ test("D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不
     try {
       await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
       await tick(20);
-      // M5 正例：D3 仍为真实角色集 ⇒ 交付受理。
+      // 即便账本里有一份真实形态的 D3（appointment），v2.0.0 交付仍要求真实客户轮次/注册生命周期：
+      // 裸夹具必须 fail-closed——D3/其它卡种的账本存在不能替代来源门。
       const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, true, handoff.message ?? "");
+      await assertDispatchRefused(root, h, handoff, "convener", /document-planning-source-unavailable/, "D3 交付");
       await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
       await tick(20);
       const toImplementer = (await h.caps.convener!({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-      assert.equal(toImplementer.ok, true, toImplementer.message ?? "");
-      // 决策选项 qa 与真实角色同名：若 D3 被污染，这里会被放行；收口后必须拒绝。
-      const toQa = (await h.caps.convener!({ roleId: "qa", task: "测试套件", sideEffect: "code", flowId: "focus", moduleId: "qa-suite" })) as DispatchReceipt;
-      assert.equal(toQa.ok, true, toQa.message ?? "");
-      assert.match(toQa.message ?? "", /D3|选中/, "decision 选项不得顶替 D3 角色集（qa 不在 D3）");
+      await assertDispatchRefused(root, h, toImplementer, "implementer", /worker-dispatch-source-unavailable/, "D3 运营→实现者");
     } finally {
       await h.mgr.stop(null);
       // 2026-10-31（CI 稳定性，macOS arm64）：stop 只释放会话句柄，不等待 `void drainQueue(...)`
@@ -609,8 +518,8 @@ test("D3 卡种收口（2026-10-31）：后续 decision/intent-confirm 裁决不
   }
 });
 
-test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 cardKind 且无 roster 戳的裁决被忽略", async () => {
-  // B1：created.cardKind=appointment（无 roster 戳）也可作为 D3。
+test("D3 卡种收口（2026-10-31，v2.0.0 来源门）：新格式 appointment 与无戳旧裁决都需真实来源——两夹具均 fail-closed", async () => {
+  // B1：created.cardKind=appointment（无 roster 戳）也可作为 D3——但在 v2.0.0 来源门前仍不足以免除真实轮次。
   const rootNew = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-d3-new-"));
   try {
     await writeProjectFiles(rootNew);
@@ -628,7 +537,7 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
       await hNew.mgr.open({ projectRoot: rootNew, roleId: "chief", runtime: "demo" });
       await tick(20);
       const handoff = (await hNew.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, true, handoff.message ?? "");
+      await assertDispatchRefused(rootNew, hNew, handoff, "convener", /document-planning-source-unavailable/, "D3 appointment 交付");
     } finally {
       await hNew.mgr.stop(null);
       await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
@@ -637,7 +546,7 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
     await fs.rm(rootNew, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 
-  // B2：只有无 cardKind、无 roster 戳的裁决 ⇒ 不构成 D3（不得以 flow 匹配或 targetRoleIds 存在为接受条件）。
+  // B2：只有无 cardKind、无 roster 戳的裁决 ⇒ 不构成 D3；同时也要真实来源，裸夹具 fail-closed。
   const rootLegacy = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-d3-unstamped-"));
   try {
     await writeProjectFiles(rootLegacy);
@@ -654,9 +563,7 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
       await hLegacy.mgr.open({ projectRoot: rootLegacy, roleId: "chief", runtime: "demo" });
       await tick(20);
       const handoff = (await hLegacy.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, true, handoff.message ?? "");
-      assert.match(handoff.message ?? "", /D3|选中/);
-      assert.match(handoff.message ?? "", /状态提示（未阻断）/);
+      await assertDispatchRefused(rootLegacy, hLegacy, handoff, "convener", /document-planning-source-unavailable/, "D3 无戳旧裁决交付");
     } finally {
       await hLegacy.mgr.stop(null);
       await tick(50); // 等后台投递链落盘后再删（见上条 ENOTEMPTY 说明）。
@@ -666,7 +573,7 @@ test("D3 卡种收口（2026-10-31）：新格式 appointment 被接受；无 ca
   }
 });
 
-test("M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务报告回幕僚", async () => {
+test("M9 报告路由（v2.0.0 来源门 + 账本行为钉）：裸夹具交付 fail-closed；幕僚任务报告回幕僚、运营任务无真实子链归属不误投", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-m9-"));
   try {
     await writeProjectFiles(root);
@@ -677,52 +584,68 @@ test("M9 报告路由：运营派的 worker 报告回运营；幕僚派的任务
       await tick(20);
       const chiefDispatch = h.caps.chief!;
       const handoff = (await chiefDispatch({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, true, handoff.message ?? "");
-      await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
-      await tick(40);
-      await settle(h, "chief", "convener");
-      const toWorker = (await h.caps.convener!({ roleId: "implementer", task: "实现番茄钟", sideEffect: "code", flowId: "focus", moduleId: "impl-core" })) as DispatchReceipt;
-      assert.equal(toWorker.ok, true, toWorker.message ?? "");
-      await settle(h, "convener");
-      const state = await readTaskState(root);
-      const workerTaskId = [...state.records.values()].find((record) => record.created?.to === "implementer")!.taskId;
+      await assertDispatchRefused(root, h, handoff, "convener", /document-planning-source-unavailable/, "M9 交付");
 
+      // 报告路由按账本事实钉住：直接登记两条既有星形任务（v2.0.0 成功派发需真实生命周期/轮次，
+      // 由带真实宿主来源的专项用例覆盖；本用例不伪造成功派发）。
+      await appendTaskEvent(root, {
+        v: 1,
+        at: "2026-10-29T00:00:00.000Z",
+        kind: "task.created",
+        taskId: "t-m9-worker",
+        from: "convener",
+        to: "implementer",
+        text: "实现番茄钟",
+        sideEffect: "code",
+        idempotencyKey: "m9-worker",
+      } as never);
+      await appendTaskEvent(root, {
+        v: 1,
+        at: "2026-10-29T00:00:01.000Z",
+        kind: "task.created",
+        taskId: "t-m9-report",
+        from: "chief",
+        to: "rapporteur",
+        text: "出方案",
+        sideEffect: "docs",
+        idempotencyKey: "m9-report",
+      } as never);
+      await h.mgr.listTasks(root); // 只读载入星形任务/创建者索引（回交路由用例不依赖派发投递）
+
+      await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
       await h.mgr.open({ projectRoot: root, roleId: "implementer", runtime: "demo" });
       await tick(40);
-      await settle(h, "implementer");
       const handback: TaskHandback = {
         roleId: "implementer",
-        taskId: workerTaskId,
+        taskId: "t-m9-worker",
         status: "completed",
         summary: "实现完成",
         evidence: ["src/app.ts"],
         at: "2026-10-29T00:10:00.000Z",
       };
       (h.streams.implementer ??= []).push({ kind: "handback", summary: "回交", handback } as OrchestrationEvent);
-      await tick(120);
-      assert.ok((h.sent.convener ?? []).some((text) => text.includes("[工作结果]") && text.includes(workerTaskId)), "worker 报告回创建者（运营）");
-      assert.equal((h.sent.chief ?? []).some((text) => text.includes(workerTaskId)), false, "不得越级投给幕僚");
+      // 运营创建的任务：报告必须先登记（不丢报告）；但账本没有真实子任务 parent 链 ⇒ 投递 fail-closed，
+      // 不误投运营、也不越级投幕僚。正面的「回运营」投递需真实 run/子任务归属夹具（见 B3-4 记录）。
+      await waitUntilAsync(async () => ((await readTaskState(root)).records.get("t-m9-worker")?.reports.length ?? 0) === 1);
+      await tick(250);
+      assert.equal((h.sent.convener ?? []).some((text) => text.includes("t-m9-worker")), false, "无真实子链归属不投运营（fail-closed，不误投）");
+      assert.equal((h.sent.chief ?? []).some((text) => text.includes("t-m9-worker")), false, "也不得越级投给幕僚");
 
-      // 幕僚派给策划的任务：回幕僚。
-      const toRapporteur = (await chiefDispatch({ roleId: "rapporteur", task: "出方案", sideEffect: "docs", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(toRapporteur.ok, true, toRapporteur.message ?? "");
-      const state2 = await readTaskState(root);
-      const reportTaskId = [...state2.records.values()].find((record) => record.created?.to === "rapporteur")!.taskId;
+      // 幕僚派给策划的任务：回幕僚（creator 路由正例）。
       await h.mgr.open({ projectRoot: root, roleId: "rapporteur", runtime: "demo" });
       await tick(40);
-      await settle(h, "rapporteur");
       (h.streams.rapporteur ??= []).push({
         kind: "handback",
         summary: "回交",
-        handback: { ...handback, roleId: "rapporteur", taskId: reportTaskId, summary: "方案完成" },
+        handback: { ...handback, roleId: "rapporteur", taskId: "t-m9-report", summary: "方案完成", evidence: [], at: "2026-10-29T00:10:01.000Z" },
       } as OrchestrationEvent);
-      await tick(120);
-      assert.ok((h.sent.chief ?? []).some((text) => text.includes("[工作结果]") && text.includes(reportTaskId)), "幕僚派的任务报告回幕僚");
+      await waitUntil(() => (h.sent.chief ?? []).some((text) => text.includes("[工作结果]") && text.includes("t-m9-report")), 5000);
+      assert.equal((h.sent.convener ?? []).some((text) => text.includes("t-m9-report")), false, "幕僚任务报告不回运营");
     } finally {
       await h.mgr.stop(null);
     }
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 
@@ -805,7 +728,7 @@ test("M11（flowId-only 匹配）：人只需带 flowId+decisionId+targetRoleId 
   }
 });
 
-test("F4：质检报告按任务创建者路由——运营发起回运营；幕僚调度回幕僚", async () => {
+test("F4 报告路由（v2.0.0 来源门 + 账本行为钉）：裸夹具交付 fail-closed；幕僚创建报告回幕僚、运营创建在无真实子链归属时不误投", async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ans-chain-verifier-"));
   try {
     await writeProjectFiles(root);
@@ -814,29 +737,42 @@ test("F4：质检报告按任务创建者路由——运营发起回运营；幕
     try {
       await h.mgr.open({ projectRoot: root, roleId: "chief", runtime: "demo" });
       await tick(20);
-      // 运营发起验收：先交付运营，再由运营派质检。
+      // 运营发起验收：先交付运营，再由运营派质检——两段在 v2.0.0 裸夹具上都 fail-closed。
       const handoff = (await h.caps.chief!({ roleId: "convener", task: "把项目交付运营", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(handoff.ok, true, handoff.message ?? "");
+      await assertDispatchRefused(root, h, handoff, "convener", /document-planning-source-unavailable/, "F4 交付");
       await h.mgr.open({ projectRoot: root, roleId: "convener", runtime: "demo" });
       await tick(40);
-      await settle(h, "chief", "convener");
       const toVerifier = (await h.caps.convener!({ roleId: "verifier", task: "验收核对", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(toVerifier.ok, true, toVerifier.message ?? "");
-      const state = await readTaskState(root);
-      const verifierTaskByConvener = [...state.records.values()].find(
-        (record) => record.created?.to === "verifier" && record.created?.from === "convener",
-      )!.taskId;
-      // 幕僚调度验收：另一条 verifier 任务（creator=chief）。
-      const chiefToVerifier = (await h.caps.chief!({ roleId: "verifier", task: "复核交付", sideEffect: "read-only", flowId: "focus" })) as DispatchReceipt;
-      assert.equal(chiefToVerifier.ok, true, chiefToVerifier.message ?? "");
-      const state2 = await readTaskState(root);
-      const verifierTaskByChief = [...state2.records.values()].find(
-        (record) => record.created?.to === "verifier" && record.created?.from === "chief",
-      )!.taskId;
+      await assertDispatchRefused(root, h, toVerifier, "verifier", /chief-hub-review-owner-required/, "F4 运营→质检");
+
+      // 报告路由按账本事实钉住：登记两条既有 verifier 任务（创建者分别=运营/幕僚），
+      // 不伪造成功派发（v2.0.0 成功派发需真实生命周期/轮次，由专项用例覆盖）。
+      await appendTaskEvent(root, {
+        v: 1,
+        at: "2026-10-29T00:00:00.000Z",
+        kind: "task.created",
+        taskId: "t-f4-convener-verifier",
+        from: "convener",
+        to: "verifier",
+        text: "验收核对（运营发起）",
+        sideEffect: "read-only",
+        idempotencyKey: "f4-convener-verifier",
+      } as never);
+      await appendTaskEvent(root, {
+        v: 1,
+        at: "2026-10-29T00:00:01.000Z",
+        kind: "task.created",
+        taskId: "t-f4-chief-verifier",
+        from: "chief",
+        to: "verifier",
+        text: "复核交付（幕僚调度）",
+        sideEffect: "read-only",
+        idempotencyKey: "f4-chief-verifier",
+      } as never);
+      await h.mgr.listTasks(root); // 只读载入星形任务/创建者索引
 
       await h.mgr.open({ projectRoot: root, roleId: "verifier", runtime: "demo" });
       await tick(40);
-      await settle(h, "verifier");
       const handback = (taskId: string): TaskHandback => ({
         roleId: "verifier",
         taskId,
@@ -845,23 +781,21 @@ test("F4：质检报告按任务创建者路由——运营发起回运营；幕
         evidence: ["docs/quality/focus-report-v1.md"],
         at: "2026-10-29T00:20:00.000Z",
       });
-      (h.streams.verifier ??= []).push({ kind: "handback", summary: "回交", handback: handback(verifierTaskByConvener) } as OrchestrationEvent);
-      await tick(140);
-      assert.ok(
-        (h.sent.convener ?? []).some((text) => text.includes("[工作结果]") && text.includes(verifierTaskByConvener)),
-        "运营发起的质检报告回运营（发起方）",
-      );
-      (h.streams.verifier ??= []).push({ kind: "handback", summary: "回交", handback: handback(verifierTaskByChief) } as OrchestrationEvent);
-      await tick(140);
-      assert.ok(
-        (h.sent.chief ?? []).some((text) => text.includes("[工作结果]") && text.includes(verifierTaskByChief)),
-        "幕僚调度的质检报告回幕僚",
-      );
+      // 运营创建的任务：报告先登记；但账本没有真实子任务 parent 链 ⇒ 投递 fail-closed，不误投。
+      (h.streams.verifier ??= []).push({ kind: "handback", summary: "回交", handback: handback("t-f4-convener-verifier") } as OrchestrationEvent);
+      await waitUntilAsync(async () => ((await readTaskState(root)).records.get("t-f4-convener-verifier")?.reports.length ?? 0) === 1);
+      await tick(250);
+      assert.equal((h.sent.convener ?? []).some((text) => text.includes("t-f4-convener-verifier")), false, "无真实子链归属不投运营（fail-closed）");
+      assert.equal((h.sent.chief ?? []).some((text) => text.includes("t-f4-convener-verifier")), false, "运营发起的报告也不得误投幕僚");
+      // 幕僚创建的任务：报告回幕僚（creator 路由正例）。
+      (h.streams.verifier ??= []).push({ kind: "handback", summary: "回交", handback: handback("t-f4-chief-verifier") } as OrchestrationEvent);
+      await waitUntil(() => (h.sent.chief ?? []).some((text) => text.includes("[工作结果]") && text.includes("t-f4-chief-verifier")), 5000);
+      assert.equal((h.sent.convener ?? []).some((text) => text.includes("t-f4-chief-verifier")), false, "幕僚调度的报告不回运营");
     } finally {
       await h.mgr.stop(null);
     }
   } finally {
-    await fs.rm(root, { recursive: true, force: true });
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
 });
 

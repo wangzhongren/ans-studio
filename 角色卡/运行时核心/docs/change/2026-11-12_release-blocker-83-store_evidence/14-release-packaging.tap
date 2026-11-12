@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: release overlay preserves Chinese build paths and excludes private data and documentation
+ok 1 - release overlay preserves Chinese build paths and excludes private data and documentation
+  ---
+  duration_ms: 0.819
+  type: 'test'
+  ...
+# Subtest: release overlay selects the v2.0.0 packaging surface
+ok 2 - release overlay selects the v2.0.0 packaging surface
+  ---
+  duration_ms: 0.0873
+  type: 'test'
+  ...
+# Subtest: release refuses unreviewed production changes and similarly named private directories
+ok 3 - release refuses unreviewed production changes and similarly named private directories
+  ---
+  duration_ms: 0.25
+  type: 'test'
+  ...
+# Subtest: release overlay keeps the packaging surface exact: unreviewed test files stay excluded
+ok 4 - release overlay keeps the packaging surface exact: unreviewed test files stay excluded
+  ---
+  duration_ms: 0.068
+  type: 'test'
+  ...
+# Subtest: release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only
+ok 5 - release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only
+  ---
+  duration_ms: 0.0713
+  type: 'test'
+  ...
+# Subtest: release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only
+ok 6 - release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only
+  ---
+  duration_ms: 0.078
+  type: 'test'
+  ...
+# Subtest: release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only
+ok 7 - release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only
+  ---
+  duration_ms: 0.0771
+  type: 'test'
+  ...
+# Subtest: release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only
+ok 8 - release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only
+  ---
+  duration_ms: 0.0994
+  type: 'test'
+  ...
+# Subtest: release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only
+ok 9 - release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only
+  ---
+  duration_ms: 0.0855
+  type: 'test'
+  ...
+# Subtest: release overlay returns v1.3.0 one-off entries to fail-closed or excluded
+ok 10 - release overlay returns v1.3.0 one-off entries to fail-closed or excluded
+  ---
+  duration_ms: 0.1175
+  type: 'test'
+  ...
+# Subtest: release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded
+ok 11 - release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded
+  ---
+  duration_ms: 0.0783
+  type: 'test'
+  ...
+# Subtest: release overlay returns v1.5.0 fix entries to fail-closed or excluded
+ok 12 - release overlay returns v1.5.0 fix entries to fail-closed or excluded
+  ---
+  duration_ms: 0.0686
+  type: 'test'
+  ...
+# Subtest: release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded
+ok 13 - release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded
+  ---
+  duration_ms: 0.0613
+  type: 'test'
+  ...
+# Subtest: release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded
+ok 14 - release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded
+  ---
+  duration_ms: 0.0598
+  type: 'test'
+  ...
+# Subtest: release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded
+ok 15 - release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded
+  ---
+  duration_ms: 0.0484
+  type: 'test'
+  ...
+# Subtest: release collection accepts three bound native results and rejects tampering or cross-platform drift
+ok 16 - release collection accepts three bound native results and rejects tampering or cross-platform drift
+  ---
+  duration_ms: 373.1223
+  type: 'test'
+  ...
+# Subtest: release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded
+ok 17 - release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded
+  ---
+  duration_ms: 0.1382
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 461.1788

@@ -1,0 +1,29 @@
+B3-2c W29/W30 逐名结果（8.3 短名 TEMP；本机 Windows，TEMP=TMP=C:\Users\51054\AppData\Local\Temp\ANS-BL~1，
+短名实际展开为 C:\Users\51054\AppData\Local\Temp\ans-blockers5-shortname-probe；Node v24.22.1）
+
+修复前（04-w29-w30-short-before-fix.tap；store 为 HEAD 版，仅替换 git-trunk-store.ts 后运行）：
+- W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+    FAIL | git-control-path-unsafe
+- W29 ... document-change-wrong-flow ...
+    FAIL | git-control-path-unsafe
+- W29 ... document-change-source-loss ...
+    FAIL | git-control-path-unsafe
+- W29 ... document-change-missing-confirmation ...
+    PASS
+- W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+    FAIL | git-control-path-unsafe
+- W30 ... 真实重启迁移后
+    FAIL | git-control-path-unsafe
+  （TAP 内 git-control-path-unsafe 共 5 次，与 5 条失败一一对应；无其它目标阻断码。）
+  说明：修复前失败路径使 Node 进程在 TAP 汇总后仍持有开放句柄、未自行退出；6 个测试点与汇总
+  （tests 6 / pass 1 / fail 5）均已完整落盘后手动终止进程。
+
+修复后（05c-w29-w30-short-after-fix-run3.tap；本分支最终 store，第三次短名全链）：
+- 上述 6 条（W29×4 + W30×2）全部 ok；无 git-control-path-unsafe / authorization-lease-invalid /
+  staleParent / project-root-not-canonical / git-journal-directory-invalid。
+- 05b run2 同样 6/6；05 为首次运行，W30 真实重启迁移后曾一次断言
+  `versions.jsonl` 的 migrated-legacy 行未及落盘（"Only actual fresh Desktop request initialization
+  may produce this migration precondition before response"），重跑 run2/run3 及单条短名/普通隔离运行
+  （09/09b）均绿——属既有测试时序抖动，与本次根归一改动无因果关系。
+
+普通 TEMP 对照（06-w29-w30-normal-after-fix.tap）：6/6 通过（W29×4 + W30×2）。

@@ -1,0 +1,13 @@
+{
+  "root": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-blockers5-shortname-probe",
+  "short": "C:\\Users\\51054\\AppData\\Local\\Temp\\ANS-BL~1",
+  "platform": "win32",
+  "node": "v24.22.1",
+  "realpathSync_short": "C:\\Users\\51054\\AppData\\Local\\Temp\\ANS-BL~1",
+  "realpathSync_native_short": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-blockers5-shortname-probe",
+  "promises_realpath_root": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-blockers5-shortname-probe",
+  "promises_realpath_short": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-blockers5-shortname-probe",
+  "promises_realpath_abs_exists": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-blockers5-shortname-probe\\.ans",
+  "abs_lexical": "C:\\Users\\51054\\AppData\\Local\\Temp\\ANS-BL~1\\.ans",
+  "abs_lexical_under_native_root": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-blockers5-shortname-probe\\.ans"
+}

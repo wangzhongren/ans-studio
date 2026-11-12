@@ -2,10 +2,9 @@ export const SOURCE_REF = 'v2.0.0';
 export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 // v2.0.0 overlay：冻结源 tag v2.0.0 已含全部产品/测试代码（两条固定工作流路径 T3——新增 A1–A13 / 修改
 // B1–B4、运营=生产线唯一派发者与幕僚产线调度+独立验收派发、Git 简化（默认路径零 trunk/bootstrap/
-// stable-write，治理走应用账本）、B29–B34 修复）；白名单为基础集 + 1 条发布阻断修复条目（见下）：
-// files＝package.json、package-lock.json、.github/workflows/release.yml、
-// test/桌面应用/optional-acceptance.test.ts；dirs＝src/common/装配/、test/装配/
-// （v1.9.2 及更早条目已随冻结源吸收，见下）。
+// stable-write，治理走应用账本）、B29–B34 修复）；白名单为基础集 + 各批发布阻断修复条目（见下）：
+// files＝package.json、package-lock.json、.github/workflows/release.yml 及各批按精确路径列名的测试/
+// 回归文件；dirs＝src/common/装配/、test/装配/（v1.9.2 及更早条目已随冻结源吸收，见下）。
 // v2.0.0 发布阻断修复：tag v2.0.0 不可移动，经评审走显式 overlay；按精确路径、单文件不开目录、断言不放宽。
 // · 测试 1 条：test/桌面应用/optional-acceptance.test.ts——macOS arm64 CI Regression 挂起修复（>45 分钟
 // 被取消）：v2.0.0 起 acceptance 属幕僚业务卡、不再进通用 judge，旧夹具 `await customerInput` 永不解
@@ -52,6 +51,26 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   src/pipeline/orchestration/trunk-runtime.ts
 // · 回归测试 1 条：test/编排/run-role-managed-root-alias.test.ts（同一文件内新增 Windows 8.3 用例；
 //   符号链接祖先/最终根链接/跨根拒绝原断言不变）
+// · 发布阻断修复（B3-2c，同一 8.3 短名根在 trunk store 的相邻残余）：生产 1 条 + 回归测试 1 条——
+//   `git-trunk-store.ts#assertControlPaths` 以 `await realpath(abs) !== abs` 比较，而 abs 由调用方根
+//   拼写逐字构造；`fs/promises.realpath` 为 native 语义（展开 8.3 短名）⇒ 短名根下同一真实控制目录
+//   被判非规范（`git-control-path-unsafe`，W29×3/W30×2）。修复按**同一 native realpath 规则**
+//   （`realpathSync.native(path.resolve(root))`）构造比较入口，`listJournals` 亦以规范根遍历；
+//   不可解析根、最终根自身为链接/junction 的别名仍 fail-closed；控制路径自身（含 `.ans/trunk`）链接、
+//   非目录、不同真实根仍拒绝，断言未放宽。单文件不开目录。
+// · 生产 1 条：src/provider/trunk/impl/git-trunk-store.ts
+// · 回归测试 1 条：test/runtime-core/project-root-canonicalization.test.ts（同文件新增 Windows 8.3
+//   短名与符号链接祖先/最终根链接用例）
+// · 发布阻断修复（B3-4，G-4 文本钉 + chain-enforcement 语义）：测试 2 条，无产品代码——
+//   `boundary-refresh.test.ts` 的 G-4 接线钉仍断言源码字面量 `this.applySkillChange("installed"`/
+//   `applyMcpChange("installed"`，而实现已收敛为 `const action`（install/uninstall 共用同一 handler）；
+//   按当前实现更新为同一 action 判据 + 同一 scopedInstallation 工厂（放行/拒绝逻辑未动，断言未放宽）。
+//   `chain-enforcement.test.ts` 6 例是 legacy 直接派发夹具与 v2.0.0 来源门（已登记项目生命周期 +
+//   当前 accepted 客户轮次 + 真实管理会话证据）的冲突：裸夹具不伪造宿主事实，改钉
+//   `document-planning-source-unavailable`/`worker-dispatch-source-unavailable` fail-closed + 零任务
+//   零投递；报告路由保留账本行为钉（creator 正例 + 无真实子链归属不误投）。均按精确路径、单文件
+//   不开目录、断言未放宽。
+// · 测试 2 条：test/桌面应用/boundary-refresh.test.ts、test/桌面应用/chain-enforcement.test.ts
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -121,6 +140,7 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
   'test/桌面应用/optional-acceptance.test.ts',
   'src/provider/trunk/impl/git-command.ts',
+  'src/provider/trunk/impl/git-trunk-store.ts',
   'src/service/runtime/session.ts',
   'test/runtime-core/project-root-canonicalization.test.ts',
   'test/runtime-core/write-gate-context.test.ts',
@@ -130,7 +150,9 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'app/desktop/customer-input.ts',
   'test/桌面应用/directive-decision.test.ts',
   'test/测试/customer-authorization-plane-integration.test.ts',
-  'test/桌面应用/chief-workflow.test.ts']);
+  'test/桌面应用/chief-workflow.test.ts',
+  'test/桌面应用/boundary-refresh.test.ts',
+  'test/桌面应用/chain-enforcement.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

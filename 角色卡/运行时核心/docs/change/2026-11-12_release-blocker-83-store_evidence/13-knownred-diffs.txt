@@ -1,0 +1,10 @@
+B3-2c 三套冻结 known-red 逐名 diff（基线 = blockers-3 合并态证据 14b/15/16b）
+== runtime-core: baseline 33, current 33
+new-red: []
+missing-red: []
+== gates: baseline 5, current 5
+new-red: []
+missing-red: []
+== orchestration: baseline 24, current 24
+new-red: []
+missing-red: []

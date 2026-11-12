@@ -129,6 +129,49 @@ test('release overlay selects the v2.0.0 directive-decision and CI-hang blocker 
   );
 });
 
+// v2.0.0 发布阻断修复（B3-2c，同一 8.3 短名根在 trunk store 的相邻残余）：生产 1 条
+// （git-trunk-store.ts——assertControlPaths 按 native realpath 归一控制路径根）按**精确路径**入列；
+// 单文件不开目录（同目录其它 src/ 文件仍 fail-closed）；回归测试用例落在既有白名单文件内。
+test('release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only', () => {
+  const result = selectOverlay([
+    'src/provider/trunk/impl/git-trunk-store.ts',
+    'test/runtime-core/project-root-canonicalization.test.ts',
+  ]);
+  assert.deepEqual(result.selected, [
+    'src/provider/trunk/impl/git-trunk-store.ts',
+    'test/runtime-core/project-root-canonicalization.test.ts',
+  ]);
+  assert.deepEqual(result.excluded, []);
+  assert.throws(() => selectOverlay(['src/provider/trunk/impl/git-trunk-store-extra.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['src/provider/trunk/impl/git-candidate-store.ts']), /Unreviewed production overlay/);
+});
+
+// v2.0.0 发布阻断修复（B3-4，G-4 文本钉 + chain-enforcement 语义）：测试 2 条按**精确路径**入列；
+// 单文件不开目录（同目录相似名/其它测试仍 excluded，未列名 test/ 不随构建树）。断言不放宽。
+test('release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only', () => {
+  const result = selectOverlay([
+    'test/桌面应用/boundary-refresh.test.ts',
+    'test/桌面应用/chain-enforcement.test.ts',
+    'test/桌面应用/boundary-refresh-extra.test.ts',
+    'test/桌面应用/chain-enforcement-extra.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ]);
+  assert.deepEqual(result.selected, [
+    'test/桌面应用/boundary-refresh.test.ts',
+    'test/桌面应用/chain-enforcement.test.ts',
+  ]);
+  assert.deepEqual(result.excluded, [
+    'test/桌面应用/boundary-refresh-extra.test.ts',
+    'test/桌面应用/chain-enforcement-extra.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ]);
+  // blockers-2/3 既有条目仍在（不重复、不回归）。
+  assert.deepEqual(
+    selectOverlay(['test/桌面应用/optional-acceptance.test.ts', 'test/桌面应用/chief-workflow.test.ts']).selected,
+    ['test/桌面应用/optional-acceptance.test.ts', 'test/桌面应用/chief-workflow.test.ts'],
+  );
+});
+
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
 // 7 个测试文件（6 个平台真值分支 + session-rebuild-race 夹具修复）落 test/ excluded，不随构建树。
 test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded', () => {
@@ -238,15 +281,17 @@ test('release overlay returns v1.8.0 blocking-fix entries to fail-closed or excl
 // v1.8.2 发布阻断修复（tag v1.8.2 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、
 // 整批移出白名单：4 个测试文件的清理竞态修复与同目录未列名 test/ 文件落 excluded；app//src/ 未列名仍
 // fail-closed。断言不放宽。
+// v1.8.2 清理条目的存量边界：run-pin/application-line/task-state/watchdog-reuse 仍 excluded；
+// chain-enforcement 于 v2.0.0 B3-4 以精确路径**重新入列**（v2.0.0 来源门语义更新），其单文件边界
+// 由上方 B3-4 用例另行断言——本用例不再把该文件算作 excluded。
 test('release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded', () => {
   const result = selectOverlay(['test/桌面应用/chain-enforcement.test.ts',
     'test/桌面应用/run-pin.test.ts',
     'test/桌面应用/application-line.test.ts',
     'test/编排/task-state.test.ts',
     'test/桌面应用/watchdog-reuse.test.ts']);
-  assert.deepEqual(result.selected, []);
-  assert.deepEqual(result.excluded, ['test/桌面应用/chain-enforcement.test.ts',
-    'test/桌面应用/run-pin.test.ts',
+  assert.deepEqual(result.selected, ['test/桌面应用/chain-enforcement.test.ts']);
+  assert.deepEqual(result.excluded, ['test/桌面应用/run-pin.test.ts',
     'test/桌面应用/application-line.test.ts',
     'test/编排/task-state.test.ts',
     'test/桌面应用/watchdog-reuse.test.ts']);
