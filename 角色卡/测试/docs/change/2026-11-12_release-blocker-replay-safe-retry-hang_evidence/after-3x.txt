@@ -1,0 +1,42 @@
+===== RUN 1 =====
+✔ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (185.335ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (120.1826ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (141.4408ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.4533ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 867.9043
+EXIT=0 ELAPSED=1s
+===== RUN 2 =====
+✔ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (185.6238ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (122.9981ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (140.7268ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.5386ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 880.5258
+EXIT=0 ELAPSED=1s
+===== RUN 3 =====
+✔ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (184.9581ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (112.9387ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (154.1586ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.5048ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 878.3509
+EXIT=0 ELAPSED=1s

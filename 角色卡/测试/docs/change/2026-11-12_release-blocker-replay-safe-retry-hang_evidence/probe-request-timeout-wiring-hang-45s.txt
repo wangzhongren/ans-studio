@@ -1,0 +1,15 @@
+✖ test\桌面应用\__tmp_probe_rtw_hang.test.ts (45007.152ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45011.9534
+
+✖ failing tests:
+
+test at test\桌面应用\__tmp_probe_rtw_hang.test.ts:1:1
+✖ test\桌面应用\__tmp_probe_rtw_hang.test.ts (45007.152ms)
+  'test failed'

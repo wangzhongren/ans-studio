@@ -1,0 +1,7 @@
+== root = nonexistent (matches CI: /proj 不存在) ==
+OPEN_RESULT {"ok":false,"error":"会话库存登记失败，会话尚未创建。请检查诊断后重试。"}
+SEND_RESULT {"ok":false,"error":"会话尚未开启（点击左侧角色即可开启）。"}
+
+== root = real mkdtemp (hermetic fixture) ==
+OPEN_RESULT {"ok":true,"config":{"kind":"builtin-fallback","accepted":true,"acceptanceSource":"desktop-app:导入项目即授权该角色按其完整边界工作（原型，无客户 pin，已知偏离）","pinCount":0},"resumed":false,"runtime":"demo","projectRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-probe-root-OqGe53","profileRevision":0,"contextSource":"fresh"}
+SEND_RESULT {"ok":true,"turnId":"turn-A","sessionCurrent":true}

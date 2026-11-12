@@ -172,6 +172,28 @@ test('release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests
   );
 });
 
+// v2.0.0 发布阻断修复（第六批，replay-safe-retry CI 失败 + 同族挂起清障）：测试 1 条按**精确路径**
+// 入列；单文件不开目录（同目录相似名/其它测试仍 excluded，未列名 test/ 不随构建树）。断言不放宽。
+test('release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only', () => {
+  const result = selectOverlay([
+    'test/桌面应用/replay-safe-retry.test.ts',
+    'test/桌面应用/replay-safe-retry-extra.test.ts',
+    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ]);
+  assert.deepEqual(result.selected, ['test/桌面应用/replay-safe-retry.test.ts']);
+  assert.deepEqual(result.excluded, [
+    'test/桌面应用/replay-safe-retry-extra.test.ts',
+    'test/桌面应用/request-timeout-wiring.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ]);
+  // blockers-2/3/4 既有条目仍在（不重复、不回归）。
+  assert.deepEqual(
+    selectOverlay(['test/桌面应用/boundary-refresh.test.ts', 'test/桌面应用/chain-enforcement.test.ts']).selected,
+    ['test/桌面应用/boundary-refresh.test.ts', 'test/桌面应用/chain-enforcement.test.ts'],
+  );
+});
+
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
 // 7 个测试文件（6 个平台真值分支 + session-rebuild-race 夹具修复）落 test/ excluded，不随构建树。
 test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded', () => {

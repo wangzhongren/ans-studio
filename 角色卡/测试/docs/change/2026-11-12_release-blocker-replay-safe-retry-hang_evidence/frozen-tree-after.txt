@@ -1,0 +1,47 @@
+== frozen tree actualTree (CI run 43184430032 used the same overlay assembly) ==
+{"sourceRef":"v2.0.0","sourceSha":"752953cf229ef9771fb574d0972b80e73ec7c27a","overlaySha":"8920f3abb53d846a9eaf15d31965f7c83fb88699","actualTree":"cd136c46bd0ddc53b03ae19965935ec218ce928c"}
+
+== replay-safe-retry in frozen tree (C:\proj NOT required; temp roots) ==
+✔ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (181.8979ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (105.7209ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (143.8146ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.4091ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 885.3634
+EXIT=0 ELAPSED=1s
+
+== release-packaging in frozen tree ==
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.8872ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.0984ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2718ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.066ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.0694ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.0932ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0857ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0755ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.0884ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1045ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0707ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.074ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.0566ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.0486ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.0849ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.13ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0537ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (395.9614ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.131ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 483.9571
+EXIT=0

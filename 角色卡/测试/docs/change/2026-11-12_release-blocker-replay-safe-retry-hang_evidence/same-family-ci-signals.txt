@@ -1,0 +1,25 @@
+== 第六轮 Windows 取消时 flush 的失败明细：桌面同族文件计数 ==
+     18 桌面应用\handback-delivery.test.ts
+     16 桌面应用\message-queue.test.ts
+      8 桌面应用\operator-channel.test.ts
+      5 桌面应用\p0-halt-and-images.test.ts
+      4 桌面应用\queue-withdraw-lru.test.ts
+      3 桌面应用\replay-safe-retry.test.ts
+      3 桌面应用\abort-unwedge.test.ts
+      2 桌面应用\queue-visibility.test.ts
+      2 桌面应用\dispatch-fresh-enum.test.ts
+      1 测试\request-timeout-e2e.test.ts
+      1 测试\kanban-fixes-verify\f4-operator-channel.test.ts
+      1 桌面应用\request-timeout-wiring.test.ts
+
+== 同族失败文案样例 ==
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.3624829Z   AssertionError [ERR_ASSERTION]: 长回合未开跑
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5046876Z   AssertionError [ERR_ASSERTION]: 长回合未开跑
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5061774Z   AssertionError [ERR_ASSERTION]: A 在跑（队列放行条件）
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5064374Z   AssertionError [ERR_ASSERTION]: 重试耗尽轮未开跑
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5068371Z   AssertionError [ERR_ASSERTION]: 重试成功轮未开跑
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5071964Z   AssertionError [ERR_ASSERTION]: 不安全失败轮未开跑
+
+== 文件级挂起（唯一带时长的取消项） ==
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.2289455Z ✖ test\桌面应用\request-timeout-wiring.test.ts (2151333.1101ms)
+build (windows-2025, win, x64)	Regression tests	2026-11-12T09:22:10.5075333Z ✖ test\桌面应用\request-timeout-wiring.test.ts (2151333.1101ms)

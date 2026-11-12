@@ -1,0 +1,33 @@
+✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (99.1928ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (115.152ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (150.867ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.5065ms)
+PROBE_ACTIVE_HANDLES=["Socket","Socket"]
+PROBE_ACTIVE_REQUESTS=[]
+✔ PROBE active handles after forced failure (160.6626ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 947.1649
+
+✖ failing tests:
+
+test at test\桌面应用\__tmp_probe_cleanup.test.ts:206:1
+✖ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (99.1928ms)
+  AssertionError [ERR_ASSERTION]: PROBE: forced failure before gate release (leak probe)
+      at file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_cleanup.test.ts:215:14
+      at async withDiagnostics (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_cleanup.test.ts:170:12)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-6/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/__tmp_probe_cleanup.test.ts:207:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

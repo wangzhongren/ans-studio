@@ -71,6 +71,16 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   零投递；报告路由保留账本行为钉（creator 正例 + 无真实子链归属不误投）。均按精确路径、单文件
 //   不开目录、断言未放宽。
 // · 测试 2 条：test/桌面应用/boundary-refresh.test.ts、test/桌面应用/chain-enforcement.test.ts
+// · 发布阻断修复（第六批，replay-safe-retry CI 失败 + 同族挂起清障）：测试 1 条，无产品代码——
+//   `test/桌面应用/replay-safe-retry.test.ts` 以字面量 `/proj` 作 projectRoot；v2.0.0 B3-2b 起宿主库存
+//   登记按 native realpath 规范化根，不可解析即 fail-closed（`git-host-project-root-unresolvable`）——
+//   CI runner 无该路径（macOS 为根目录下 `/proj`；Windows 为当前盘符根下 `\proj`）⇒ 会话开不起来、
+//   轮次未开跑（重试耗尽/重试成功/不安全失败 3 例 ✖）。改为 mkdtemp 真实项目根（断言未放宽）；
+//   try/finally 清理（放夹具门 → stop → dispose 句柄 → 有界等 send）与有界回执等待，失败路径不再遗留
+//   异步迭代器/定时器。实际 45 分钟挂起在下一文件 `request-timeout-wiring.test.ts`（同族：open 失败后
+//   无界 `await started`），本批只修 replay-safe-retry；同族清单见
+//   角色卡/测试/docs/change/2026-11-12_release-blocker-replay-safe-retry-hang.md。单文件不开目录。
+// · 测试 1 条：test/桌面应用/replay-safe-retry.test.ts
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -152,7 +162,8 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/测试/customer-authorization-plane-integration.test.ts',
   'test/桌面应用/chief-workflow.test.ts',
   'test/桌面应用/boundary-refresh.test.ts',
-  'test/桌面应用/chain-enforcement.test.ts']);
+  'test/桌面应用/chain-enforcement.test.ts',
+  'test/桌面应用/replay-safe-retry.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];
