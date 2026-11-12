@@ -6,7 +6,8 @@
      v2.0.0 语义更新；2) `test/测试/customer-authorization-plane-integration.test.ts` 回归并做最小同口径修复；
   3) 测试侧 overlay 条目与记录。
 - 工作树：`C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\release-v2.0.0-blockers-3`
-- 分支/基线：`release/v2.0.0-blockers-3`，基于 `origin/main` `12bef7c`。
+- 分支/基线：`release/v2.0.0-blockers-3`，基于 `origin/main` `12bef7c`；提交前已 merge `origin/main`
+  `1ac7b5c`（PR #88 / blockers-4 B3-2 stale-parent 8.3 修复），最终验证在合并态工作树完成。
 - 保留并一并提交的其它角色改动：桌面窗口 `app/desktop/customer-input.ts`（B3-1 产品修复）与运行时核心
   `src/provider/trunk/impl/git-command.ts` + `test/runtime-core/project-root-canonicalization.test.ts`
   （B3-2b 8.3 根归一），以及两角色记录/证据。本角色未修改它们的代码/记录。
@@ -119,7 +120,7 @@
 | `test/装配/release-packaging.test.ts` | **16/16 pass** | `_evidence/release-packaging.txt` |
 | 冻结 known-red runtime-core | 602 tests / 565 pass / **33 fail** / 4 skipped；逐名 diff 空 | `_evidence/knownred-runtime-core.txt`、`_evidence/knownred-diffs.txt` |
 | 冻结 known-red 门禁 | 577 tests / 571 pass / **5 fail** / 1 skipped；LF 归一后逐名 diff 空（运行后已还原 CRLF） | `_evidence/knownred-gates.txt`、`_evidence/knownred-diffs.txt` |
-| 冻结 known-red 编排 | 1385 tests / 1359 pass / **24 fail** / 2 skipped；逐名 diff 空 | `_evidence/knownred-orchestration.txt`、`_evidence/knownred-diffs.txt` |
+| 冻结 known-red 编排 | 1386 tests / 1360 pass / **24 fail** / 2 skipped；逐名 diff 空（合并 origin/main 后新增 1 条回归用例通过） | `_evidence/knownred-orchestration.txt`、`_evidence/knownred-diffs.txt` |
 | chief-workflow 全文件（B3-3 目标） | **58 pass / 8 fail / 0 cancelled**；8 名均为已登记既有族（W5/W10 子、W19、W33、W34），无 B3-3 新增 | 见 B3-3 记录与 `..._chief-workflow-cleanup_evidence/` |
 
 known-red 计数与基线一致（runtime-core 33 / 门禁 5 / 编排 24），新增确定性失败 0、新 skip 0。
@@ -132,7 +133,8 @@ known-red 计数与基线一致（runtime-core 33 / 门禁 5 / 编排 24），�
 - 测试 3：`test/桌面应用/directive-decision.test.ts`、`test/测试/customer-authorization-plane-integration.test.ts`、
   `test/桌面应用/chief-workflow.test.ts`——有界等待 / 过时期望 / 清理竞态，断言未放宽；
 - 既有 blockers-2 条目 `src/provider/trunk/impl/git-command.ts` 与
-  `test/runtime-core/project-root-canonicalization.test.ts` **已在白名单，不重复添加**；
+  `test/runtime-core/project-root-canonicalization.test.ts` **已在白名单，不重复添加**；merge `origin/main`
+  带入的 blockers-4 条目（`run-role.ts`/`trunk-runtime.ts`/`run-role-managed-root-alias.test.ts`）同样保持原样；
 - `test/装配/release-packaging.test.ts` 同步新增 B3-1/B3-3 精确路径入列钉 16/16；原 v1.9.1 历史用例中
   「`app/desktop/customer-input.ts` 未入列即 fail-closed」的负例改用仍未入列的 `app/desktop/interface.ts`，
   fail-closed 保证不放宽。

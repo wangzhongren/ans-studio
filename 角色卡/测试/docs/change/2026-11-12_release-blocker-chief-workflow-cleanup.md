@@ -42,6 +42,9 @@
 | before（HEAD 版 chief-workflow，无 `rmrf`） | `node --test test/桌面应用/chief-workflow.test.ts` | **66 tests / 49 pass / 17 fail / 0 cancelled**；失败含清理族 W14、W20、W22、W28×2、`unmanaged`（ENOTEMPTY/AggregateError） |
 | after（本修复） | 同上 | **66 tests / 58 pass / 8 fail / 0 cancelled**；清理族全部消失 |
 
+merge `origin/main`（`1ac7b5c`，blockers-4 stale-parent 8.3 修复）后复跑仍为 **58 pass / 8 fail / 0 cancelled**，
+失败名集合不变；merge 未改变本文件的清理行为与断言。
+
 after 剩余 8 名（均为**既有已登记族**，非 B3-3 引入）：
 
 - `W5 专字段真实workSourceRef…`（父）与子测试 `selected`、`commit-race`（既有非确定性/固定路径族）；

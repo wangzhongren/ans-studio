@@ -1,12 +1,12 @@
 ===== RUN 1 =====
-✔ decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计） (10.4392ms)
-✔ decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined (6.5645ms)
-✔ session 指令可重复应用；once 指令消费后不再生效 (2.3859ms)
-✔ 冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (25.4525ms)
-✔ 不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (15.424ms)
-✔ 可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（有适用指令时不借默认推荐） (16.1258ms)
-✔ 坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户 (33.2283ms)
-✔ C1↔B1 冻结类型：SubmitFromInput 必填 decisionGroupEnabled、DecisionHooks 唯一 emitResult、outcome.directive 形状 (0.8669ms)
+✔ decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计） (10.3572ms)
+✔ decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined (7.0495ms)
+✔ session 指令可重复应用；once 指令消费后不再生效 (2.2553ms)
+✔ 冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (27.4589ms)
+✔ 不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (15.7583ms)
+✔ 可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（有适用指令时不借默认推荐） (16.3146ms)
+✔ 坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户 (15.6164ms)
+✔ C1↔B1 冻结类型：SubmitFromInput 必填 decisionGroupEnabled、DecisionHooks 唯一 emitResult、outcome.directive 形状 (0.4485ms)
 ℹ tests 8
 ℹ suites 0
 ℹ pass 8
@@ -14,17 +14,17 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 459.6833
+ℹ duration_ms 465.8814
 EXIT=0
 ===== RUN 2 =====
-✔ decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计） (9.4295ms)
-✔ decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined (6.2296ms)
-✔ session 指令可重复应用；once 指令消费后不再生效 (2.2989ms)
-✔ 冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (15.7602ms)
-✔ 不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (15.4977ms)
-✔ 可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（有适用指令时不借默认推荐） (15.5966ms)
-✔ 坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户 (15.9653ms)
-✔ C1↔B1 冻结类型：SubmitFromInput 必填 decisionGroupEnabled、DecisionHooks 唯一 emitResult、outcome.directive 形状 (0.3174ms)
+✔ decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计） (12.7761ms)
+✔ decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined (3.9886ms)
+✔ session 指令可重复应用；once 指令消费后不再生效 (2.2776ms)
+✔ 冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (14.9361ms)
+✔ 不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (14.9297ms)
+✔ 可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（有适用指令时不借默认推荐） (16.5817ms)
+✔ 坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户 (15.305ms)
+✔ C1↔B1 冻结类型：SubmitFromInput 必填 decisionGroupEnabled、DecisionHooks 唯一 emitResult、outcome.directive 形状 (0.2242ms)
 ℹ tests 8
 ℹ suites 0
 ℹ pass 8
@@ -32,17 +32,17 @@ EXIT=0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 443.2187
+ℹ duration_ms 476.4072
 EXIT=0
 ===== RUN 3 =====
-✔ decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计） (9.4385ms)
-✔ decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined (6.1087ms)
-✔ session 指令可重复应用；once 指令消费后不再生效 (2.4813ms)
-✔ 冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (14.6581ms)
-✔ 不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (15.9115ms)
-✔ 可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（有适用指令时不借默认推荐） (15.3483ms)
-✔ 坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户 (16.3674ms)
-✔ C1↔B1 冻结类型：SubmitFromInput 必填 decisionGroupEnabled、DecisionHooks 唯一 emitResult、outcome.directive 形状 (0.5069ms)
+✔ decision 指令 select-recommended：代选唯一推荐项（once durable 消费、可见行先投、无 judge 审计） (10.4297ms)
+✔ decision 指令 select-option：按规范化 label 唯一匹配；拒绝按 scope 结算 declined (4.4128ms)
+✔ session 指令可重复应用；once 指令消费后不再生效 (2.2959ms)
+✔ 冲突：两条确定指令选区不一致 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (23.5234ms)
+✔ 不匹配：select-option 无唯一匹配 ⇒ 不消费、绕过默认推荐、呈现客户卡并投说明系统行 (14.2634ms)
+✔ 可见结果行投达失败 ⇒ 不消费、不应用，回落客户卡（有适用指令时不借默认推荐） (15.4739ms)
+✔ 坏账本（ledgerErrors>0）⇒ 消费者按无指令：不产生指令行、不自动代选，原卡交客户 (16.7391ms)
+✔ C1↔B1 冻结类型：SubmitFromInput 必填 decisionGroupEnabled、DecisionHooks 唯一 emitResult、outcome.directive 形状 (0.3693ms)
 ℹ tests 8
 ℹ suites 0
 ℹ pass 8
@@ -50,5 +50,5 @@ EXIT=0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 433.7375
+ℹ duration_ms 437.4318
 EXIT=0
