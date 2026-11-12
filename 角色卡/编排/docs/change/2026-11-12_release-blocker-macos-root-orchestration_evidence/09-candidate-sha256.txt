@@ -1,0 +1,4 @@
+52928e8f2d25c264b65ea17ad80c92775525245e30f77e18beaf2fde91204b62 *src/pipeline/orchestration/run-role.ts
+1334a19eb1fe72826474d23e2130278dda811c775c8dddcfee74ac099c24bc40 *test/编排/run-role-managed-root-alias.test.ts
+216175e880919d63fb4cee5f2e7fd0abf209f31207794f789a9b5cf3dc1d63dc *src/common/装配/release-policy.mjs
+5401f7ef8cf8593bae844f9bc211a186643f012c966dc41137dda5f55fca4fa4 *test/装配/release-packaging.test.ts

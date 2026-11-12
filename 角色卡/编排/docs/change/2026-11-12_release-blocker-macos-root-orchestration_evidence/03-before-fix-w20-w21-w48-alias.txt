@@ -1,0 +1,160 @@
+✖ W20 默认Core/Chat产品真实报告落账并到chief 普通 (3148.4423ms)
+✖ W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争 (2080.0536ms)
+W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：trunk-verify-failed：Repository initialization parent is not the actual active accepted chief dispatch turn）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+    at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1674:220)
+    at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1739:5)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+✖ W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告 (3558.327ms)
+W52 fixture primary failure before teardown AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：trunk-verify-failed：Repository initialization parent is not the actual active accepted chief dispatch turn）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+    at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1674:220)
+    at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1739:5)
+    at async Test.run (node:internal/test_runner/test:1409:7)
+    at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+✖ W21 默认Core/Chat应用生效通知 显式blocked保真任务 (3563.7918ms)
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal (3566.8936ms)
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease (3568.8899ms)
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt (3557.0646ms)
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source (3569.5235ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 0
+ℹ fail 8
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27136.4817
+
+✖ failing tests:
+
+test at test\桌面应用\chief-workflow.test.ts:1502:1
+✖ W20 默认Core/Chat产品真实报告落账并到chief 普通 (3148.4423ms)
+  AssertionError [ERR_ASSERTION]: [{"role":"chief","user":"W20 draft product","tools":[]},{"role":"chief","user":"W20 draft product","tools":["dispatch_task：任务**未能派发**（回执：trunk-verify-failed：Repository initialization parent is not the actual active accepted chief dispatch turn）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1556:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:1502:1
+✖ W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争 (2080.0536ms)
+  AssertionError [ERR_ASSERTION]: [{"role":"chief","user":"W20 draft product","tools":[]},{"role":"chief","user":"W20 draft product","tools":["dispatch_task：任务**未能派发**（回执：trunk-verify-failed：Repository initialization parent is not the actual active accepted chief dispatch turn）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"]}]
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1539:120)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:1580:1
+✖ W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告 (3558.327ms)
+  AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：trunk-verify-failed：Repository initialization parent is not the actual active accepted chief dispatch turn）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1674:220)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1739:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:1580:1
+✖ W21 默认Core/Chat应用生效通知 显式blocked保真任务 (3563.7918ms)
+  AssertionError [ERR_ASSERTION]: Actual retained intent card must appear[{"role":"chief","user":"W21 draft intent","tools":[],"lastRole":"user"},{"role":"chief","user":"W21 draft intent","tools":["dispatch_task：任务**未能派发**（回执：trunk-verify-failed：Repository initialization parent is not the actual active accepted chief dispatch turn）——请如实向客户说明；**不要当它成功、不要宣称已送达**。"],"lastRole":"tool","lastToolId":"w21-1"}]
+      at waitFor (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1674:220)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:1739:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:2251:1
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal (3566.8936ms)
+  AssertionError [ERR_ASSERTION]: The actual controller report must be persisted
+      at wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2287:194)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2297:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:2251:1
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease (3568.8899ms)
+  AssertionError [ERR_ASSERTION]: The actual controller report must be persisted
+      at wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2287:194)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2297:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:2251:1
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt (3557.0646ms)
+  AssertionError [ERR_ASSERTION]: The actual controller report must be persisted
+      at wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2287:194)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2297:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\chief-workflow.test.ts:2251:1
+✖ W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source (3569.5235ms)
+  AssertionError [ERR_ASSERTION]: The actual controller report must be persisted
+      at wait (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2287:194)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/chief-workflow.test.ts:2297:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

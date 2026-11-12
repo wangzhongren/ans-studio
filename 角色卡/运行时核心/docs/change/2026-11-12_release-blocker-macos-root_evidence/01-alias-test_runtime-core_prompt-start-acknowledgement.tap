@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities
+ok 1 - actual turn has one synchronous acknowledgement before persisted input/native work and shares all identities
+  ---
+  duration_ms: 55.9271
+  type: 'test'
+  ...
+# Subtest: active and disposed prompt rejections have no turn acknowledgement
+ok 2 - active and disposed prompt rejections have no turn acknowledgement
+  ---
+  duration_ms: 15.6897
+  type: 'test'
+  ...
+# Subtest: quarantined prompt rejection has no acknowledgement after one stopped actual turn
+ok 3 - quarantined prompt rejection has no acknowledgement after one stopped actual turn
+  ---
+  duration_ms: 15.284
+  type: 'test'
+  ...
+# Subtest: synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn
+ok 4 - synchronous acknowledgement throw yields one failed terminal, zero native work, and releases the turn
+  ---
+  duration_ms: 3.3235
+  type: 'test'
+  ...
+# Subtest: acknowledged turns keep aborted/timed_out outcomes and single matching terminal
+ok 5 - acknowledged turns keep aborted/timed_out outcomes and single matching terminal
+  ---
+  duration_ms: 43.3434
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 373.381

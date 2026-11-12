@@ -1,0 +1,152 @@
+TAP version 13
+# Subtest: Service history operation returns scoped Model records/replay through the existing Provider
+ok 1 - Service history operation returns scoped Model records/replay through the existing Provider
+  ---
+  duration_ms: 26.8105
+  type: 'test'
+  ...
+# Subtest: each actual runtime turn publishes one typed original input before native work and retains real assistant text
+ok 2 - each actual runtime turn publishes one typed original input before native work and retains real assistant text
+  ---
+  duration_ms: 143.9397
+  type: 'test'
+  ...
+# Subtest: input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer
+ok 3 - input echo is absent for rejected or failed-start prompts; demo Core and standalone have one input producer
+  ---
+  duration_ms: 3.0146
+  type: 'test'
+  ...
+# Subtest: Service selects exactly chosen injected factory and executes real governed handler
+ok 4 - Service selects exactly chosen injected factory and executes real governed handler
+  ---
+  duration_ms: 6.0684
+  type: 'test'
+  ...
+# Subtest: Service failure never selects another engine and unknown runtime rejected
+ok 5 - Service failure never selects another engine and unknown runtime rejected
+  ---
+  duration_ms: 1.5847
+  type: 'test'
+  ...
+# Subtest: Service persists replay and adapter-confirmed deferred context result after prompt
+ok 6 - Service persists replay and adapter-confirmed deferred context result after prompt
+  ---
+  duration_ms: 19.1488
+  type: 'test'
+  ...
+# Subtest: customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works
+ok 7 - customer wait pauses the turn last-resort deadline, abort invalidates late consent, next turn works
+  ---
+  duration_ms: 81.8891
+  type: 'test'
+  ...
+# Subtest: throw, native failed outcome and last-resort timeout each have one explicit terminal
+ok 8 - throw, native failed outcome and last-resort timeout each have one explicit terminal
+  ---
+  duration_ms: 45.8938
+  type: 'test'
+  ...
+# Subtest: inspection deadline never aborts a progressing turn; the turn completes normally
+ok 9 - inspection deadline never aborts a progressing turn; the turn completes normally
+  ---
+  duration_ms: 78.5329
+  type: 'test'
+  ...
+# Subtest: last resort aborts at the injected deadline with distinct last-resort wording
+ok 10 - last resort aborts at the injected deadline with distinct last-resort wording
+  ---
+  duration_ms: 47.3276
+  type: 'test'
+  ...
+# Subtest: adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort
+ok 11 - adapter-internal timed_out keeps the generic summary and is not mislabeled as last resort
+  ---
+  duration_ms: 6.7642
+  type: 'test'
+  ...
+# Subtest: corrupt ANS index is rejected before native bind allocates a session
+ok 12 - corrupt ANS index is rejected before native bind allocates a session
+  ---
+  duration_ms: 9.2354
+  type: 'test'
+  ...
+# Subtest: transient persistence failure is reported and repaired next prompt can succeed
+ok 13 - transient persistence failure is reported and repaired next prompt can succeed
+  ---
+  duration_ms: 27.1166
+  type: 'test'
+  ...
+# Subtest: Service event top/detail identity and report metadata share the captured turn
+ok 14 - Service event top/detail identity and report metadata share the captured turn
+  ---
+  duration_ms: 2.4607
+  type: 'test'
+  ...
+# Subtest: hanging native abort is bounded, called once, and leaves the session quarantined
+ok 15 - hanging native abort is bounded, called once, and leaves the session quarantined
+  ---
+  duration_ms: 1031.9984
+  type: 'test'
+  ...
+# Subtest: Service configured custom API key is stripped from the actual governed shell child
+ok 16 - Service configured custom API key is stripped from the actual governed shell child
+  ---
+  duration_ms: 58.7955
+  type: 'test'
+  ...
+# Subtest: outer timeout remains timed_out when abort cleanup emits inner aborted terminals
+ok 17 - outer timeout remains timed_out when abort cleanup emits inner aborted terminals
+  ---
+  duration_ms: 31.0164
+  type: 'test'
+  ...
+# Subtest: outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup
+ok 18 - outer aborted result stays aborted and a settled underlying lifts quarantine despite failing cleanup
+  ---
+  duration_ms: 16.0614
+  type: 'test'
+  ...
+# Subtest: Core-managed binding rejects a provider that did not register its display profile before first prompt
+not ok 19 - Core-managed binding rejects a provider that did not register its display profile before first prompt
+  ---
+  duration_ms: 2.108
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\release-v2.0.0-blockers-2\\test\\runtime-core\\session.test.ts:439:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/runtime-core/session.test.ts:446:33)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections
+ok 20 - ordinary engine failure stays a non-tool fact in live, stored and reloaded events while actual tools retain projections
+  ---
+  duration_ms: 29.1764
+  type: 'test'
+  ...
+# Subtest: history does not resurrect an old empty-name synthetic tool phase on an engine failure
+ok 21 - history does not resurrect an old empty-name synthetic tool phase on an engine failure
+  ---
+  duration_ms: 5.8708
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 20
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1925.3612

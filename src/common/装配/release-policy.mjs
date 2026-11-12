@@ -12,6 +12,22 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 // （无界等待）；改用非业务卡 `intent-confirm` 钉同一 decision 组 judge 语义，open/stop/customerInput/
 // 客户手选全部有界等待（超时如实失败并指出挂起点），stop 后等待后台投递落盘 + fs.rm 重试（清理竞态）。
 // 断言未放宽；无自动验收语义保持。
+// · 发布阻断修复（第二批，macOS 根路径规范化）：生产 2 条 + 测试 2 条——macOS `os.tmpdir()` 返回
+// 符号链接路径（`/var` → `/private/var`），旧实现把「realpath(项目根) ≠ 输入逐字字符串」判为
+// `noncanonical-project-root` ⇒ 保护范围 unknown ⇒ CI 120 名以 `runtime-protection-scope-unknown`
+// 失败。修复两侧都以真实路径比较，只放行**同一真实根的不同书写形式**（符号链接祖先）；最终根自身为
+// 符号链接、初始化源指向不同真实根、`.git` 为文件、`.ans/trunk`/初始化源链接混淆仍 fail-closed；
+// 断言未放宽。单文件不开目录。
+// · 生产 2 条：src/provider/trunk/impl/git-command.ts、src/service/runtime/session.ts
+// · 测试 2 条：test/runtime-core/project-root-canonicalization.test.ts（新增回归钉）、
+//   test/runtime-core/write-gate-context.test.ts（protectedRoots 按同一真实根比较，断言未放宽）
+// · 编排 1 条（第三批，同一根因在编排层的第二处比较）：src/pipeline/orchestration/run-role.ts——
+//   托管会话证据（`managedCoreHandles`）记录 `readGitProtectionFacts().projectRoot`（realpath 规范根），
+//   而派发/授权路径用会话输入根的别名拼写（`/var` → `/private/var`）查询；旧实现逐字比较 ⇒ 同一真实根
+//   被判不等 ⇒ 父 chief 证据不可见 ⇒ `prepareRoleDispatch` 走 staleParent 拒绝
+//   （chief-workflow W20×2、W21×2、W48×4 残余 8 名）。修复：证据归属按两侧 realpath 相等判定，只放行
+//   **同一真实根的不同书写形式**；不同真实根、任一侧不可解析、最终根自身为符号链接仍 fail-closed；
+//   既有断言/门禁未放宽。单文件不开目录。
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -79,7 +95,12 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 // fail-closed 不变：未列名的 app//src/ 变更仍使 prepare 明确失败；
 // 未列名的 test/ 文件仍静默落 excluded、不随构建树（机制同前：经评审文件必须显式入列）。
 const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
-  'test/桌面应用/optional-acceptance.test.ts']);
+  'test/桌面应用/optional-acceptance.test.ts',
+  'src/provider/trunk/impl/git-command.ts',
+  'src/service/runtime/session.ts',
+  'test/runtime-core/project-root-canonicalization.test.ts',
+  'test/runtime-core/write-gate-context.test.ts',
+  'src/pipeline/orchestration/run-role.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

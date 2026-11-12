@@ -1,5 +1,6 @@
 // Public Service composition entry. Pipeline selects runtime and injects policy; Providers execute it.
 import { randomUUID, createHash } from "node:crypto";
+import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { RuntimeDeliveryError, RUNTIME_VIEW_IMAGE_POLICY, MODEL_REQUEST_RETRY_EXHAUSTED, isChiefDecisionExecutionContext, isRuntimeApplicationToolSurfaceFacts, isRuntimeNativeLifecycleFacts, isRuntimeNativeToolSurfaceFacts, isRuntimeSessionDrained } from "../../model/runtime.ts";
 import type { ResolvedRole } from "../../model/role.ts";
@@ -499,6 +500,17 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
         // （恰 `judge_read_file`/`judge_list_dir`/`report_governance_judgement`）。两者都**不得**走
         // `buildGovernedTools`（结构性隔离：判断会话不存在 write_file/edit_file/read_file/run_shell/
         // 客户交互/回交/派发/MCP 工具）。二者互斥在 createRuntimeAdapter 入口已检查。
+        // 2026-11-12（v2.0.0 发布阻断 P0，macOS `os.tmpdir()` 为符号链接路径）：`fileGateProtection.projectRoot`
+        // 与本次会话项目根可能是**同一真实根的不同书写形式**（`/var` → `/private/var`）。仅当 realpath 相等时
+        // 把宿主事实的 projectRoot 归一为会话根书写；不同真实根/不可解析 ⇒ 丢弃保护事实（coverage 保持
+        // unknown，写仍由 host-facts-v1 fail-closed 拒绝），断言不放宽。
+        let governedFileGateProtection = options.fileGateProtection;
+        if (governedFileGateProtection !== undefined) {
+          try {
+            governedFileGateProtection = await realpath(governedFileGateProtection.projectRoot) === await realpath(options.projectRoot)
+              ? { ...governedFileGateProtection, projectRoot: options.projectRoot } : undefined;
+          } catch { governedFileGateProtection = undefined; }
+        }
         const sessionTools = chiefDecision !== undefined
           ? buildChiefDecisionTools(options.decidePendingRequest!, chiefDecision).map(tool => ({ ...tool, async handler(call: Parameters<typeof tool.handler>[0]) {
             const signal = controller?.signal;
@@ -512,6 +524,9 @@ export function createRuntimeAdapter(options: RuntimeSessionOptions): RuntimeAda
             : buildGovernedTools(options.gate, {
               ...options,
               ...roleCapabilityCallbacks,
+              // 同一真实根的不同书写形式已在上面归一；不同/不可解析时显式置空（覆盖 `...options`），
+              // fileGateHost 保持 coverage unknown，绝不升级为写许可。
+              fileGateProtection: governedFileGateProtection,
               protectedGitRoots,
               projectRoot: options.projectRoot,
               skillRoot: options.skillRoot,

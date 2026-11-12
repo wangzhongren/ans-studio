@@ -57,6 +57,43 @@ test('release overlay selects the v2.0.0 optional-acceptance blocker test by exa
     'test/桌面应用/optional-acceptance-extra.test.ts', 'test/桌面应用/decision-service.test.ts']);
 });
 
+// v2.0.0 发布阻断修复（第二批，macOS 根路径 realpath 规范化）：生产 2 条 + 测试 2 条按**精确路径**入列；
+// 单文件不开目录（同目录其它测试仍 excluded，未列名 src/ 仍 fail-closed）。断言不放宽。
+test('release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only', () => {
+  const result = selectOverlay([
+    'src/provider/trunk/impl/git-command.ts',
+    'src/service/runtime/session.ts',
+    'test/runtime-core/project-root-canonicalization.test.ts',
+    'test/runtime-core/write-gate-context.test.ts',
+    'test/runtime-core/session.test.ts',
+    'test/runtime-core/fixtures.ts',
+  ]);
+  assert.deepEqual(result.selected, [
+    'src/provider/trunk/impl/git-command.ts',
+    'src/service/runtime/session.ts',
+    'test/runtime-core/project-root-canonicalization.test.ts',
+    'test/runtime-core/write-gate-context.test.ts',
+  ]);
+  assert.deepEqual(result.excluded, ['test/runtime-core/session.test.ts', 'test/runtime-core/fixtures.ts']);
+  assert.throws(() => selectOverlay(['src/provider/trunk/impl/git-command-extra.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['src/service/runtime/session-extra.ts']), /Unreviewed production overlay/);
+});
+
+// v2.0.0 发布阻断修复（第三批，macOS 根路径规范化在编排层的第二处比较）：生产 1 条按**精确路径**
+// 入列；单文件不开目录（同目录其它 src/ 文件与未列名 test/ 仍 excluded/fail-closed）。断言不放宽。
+test('release overlay selects the v2.0.0 orchestration root-canonicalization blocker file by exact path only', () => {
+  const result = selectOverlay([
+    'src/pipeline/orchestration/run-role.ts',
+    'test/编排/run-role-managed-root-alias.test.ts',
+    'test/编排/run-role-fixed-b2.test.ts',
+  ]);
+  assert.deepEqual(result.selected, ['src/pipeline/orchestration/run-role.ts']);
+  assert.deepEqual(result.excluded, ['test/编排/run-role-managed-root-alias.test.ts',
+    'test/编排/run-role-fixed-b2.test.ts']);
+  assert.throws(() => selectOverlay(['src/pipeline/orchestration/trunk-runtime.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['src/pipeline/orchestration/run-role-extra.ts']), /Unreviewed production overlay/);
+});
+
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
 // 7 个测试文件（6 个平台真值分支 + session-rebuild-race 夹具修复）落 test/ excluded，不随构建树。
 test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded', () => {

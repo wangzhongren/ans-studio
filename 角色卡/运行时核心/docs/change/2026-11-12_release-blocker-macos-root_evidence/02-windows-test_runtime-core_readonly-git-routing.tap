@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: W4 只读 Git 命中 ⇒ execute(match, budgets)，回执与 spawn 同形且零 spawn
+ok 1 - W4 只读 Git 命中 ⇒ execute(match, budgets)，回执与 spawn 同形且零 spawn
+  ---
+  duration_ms: 5.1132
+  type: 'test'
+  ...
+# Subtest: W4 无能力/未命中 ⇒ readonly-git-runner-unavailable，零 spawn、零 execute、绝无通用回退
+ok 2 - W4 无能力/未命中 ⇒ readonly-git-runner-unavailable，零 spawn、零 execute、绝无通用回退
+  ---
+  duration_ms: 0.8398
+  type: 'test'
+  ...
+# Subtest: W4 审核先于路由：gate 拒绝 / F-7 守卫命中 ⇒ match/execute 均不调用、零 spawn
+ok 3 - W4 审核先于路由：gate 拒绝 / F-7 守卫命中 ⇒ match/execute 均不调用、零 spawn
+  ---
+  duration_ms: 0.6415
+  type: 'test'
+  ...
+# Subtest: W4 非 git 命令维持现状 spawn
+ok 4 - W4 非 git 命令维持现状 spawn
+  ---
+  duration_ms: 33.3076
+  type: 'test'
+  ...
+# Subtest: W4 后台入口不做只读 Git 路由：命令仍交管理器 spawn，能力不经手
+ok 5 - W4 后台入口不做只读 Git 路由：命令仍交管理器 spawn，能力不经手
+  ---
+  duration_ms: 1.6724
+  type: 'test'
+  ...
+# Subtest: W4 roleId（适配器 options，非模型输入）与 entry 透传审核与执行后审计
+ok 6 - W4 roleId（适配器 options，非模型输入）与 entry 透传审核与执行后审计
+  ---
+  duration_ms: 0.6849
+  type: 'test'
+  ...
+# Subtest: W4 真实 Service 入口：run_shell 携带会话 roleId（demo 适配器闭环）
+ok 7 - W4 真实 Service 入口：run_shell 携带会话 roleId（demo 适配器闭环）
+  ---
+  duration_ms: 38.7033
+  type: 'test'
+  ...
+# Subtest: W4 真实 Service 入口：readonlyGit 注入可达（demo 适配器闭环，零 spawn）
+ok 8 - W4 真实 Service 入口：readonlyGit 注入可达（demo 适配器闭环，零 spawn）
+  ---
+  duration_ms: 2.7402
+  type: 'test'
+  ...
+# Subtest: W4 只读 Git 执行事实映射：超时/错误/抛错/非法回执与 spawn 分支同形
+ok 9 - W4 只读 Git 执行事实映射：超时/错误/抛错/非法回执与 spawn 分支同形
+  ---
+  duration_ms: 0.8599
+  type: 'test'
+  ...
+# Subtest: W4 工具说明补充只读 Git 白名单与 git_query 指引（输入字段不变：run_shell 仍只有 command）
+ok 10 - W4 工具说明补充只读 Git 白名单与 git_query 指引（输入字段不变：run_shell 仍只有 command）
+  ---
+  duration_ms: 0.1964
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 328.2252

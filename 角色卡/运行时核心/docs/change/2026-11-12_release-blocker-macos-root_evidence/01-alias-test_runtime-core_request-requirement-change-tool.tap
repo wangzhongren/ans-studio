@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: 未注入 requestRequirementChange ⇒ request_requirement_change 不注册（能力缺席 = fail-closed）
+ok 1 - 未注入 requestRequirementChange ⇒ request_requirement_change 不注册（能力缺席 = fail-closed）
+  ---
+  duration_ms: 1.7384
+  type: 'test'
+  ...
+# Subtest: 注入后注册 request_requirement_change；changeKind/summary/rationale 必填，flowId/intentId 至少一个由 handler 保证
+ok 2 - 注入后注册 request_requirement_change；changeKind/summary/rationale 必填，flowId/intentId 至少一个由 handler 保证
+  ---
+  duration_ms: 0.9676
+  type: 'test'
+  ...
+# Subtest: 载荷原样交给注入能力：flowId/intentId 至少一个、changeKind 五值、可选字段缺省不造键
+ok 3 - 载荷原样交给注入能力：flowId/intentId 至少一个、changeKind 五值、可选字段缺省不造键
+  ---
+  duration_ms: 0.7183
+  type: 'test'
+  ...
+# Subtest: 非法参数在触达能力前拒绝（归属缺失、changeKind 非法、summary/rationale 空或超界、未知参数、slug 非法）
+ok 4 - 非法参数在触达能力前拒绝（归属缺失、changeKind 非法、summary/rationale 空或超界、未知参数、slug 非法）
+  ---
+  duration_ms: 0.5825
+  type: 'test'
+  ...
+# Subtest: 回执原样转达 ok/code/message（成功不夸大、失败不伪装、不把申请说成批准、不把审批归给产品或发起方）
+ok 5 - 回执原样转达 ok/code/message（成功不夸大、失败不伪装、不把申请说成批准、不把审批归给产品或发起方）
+  ---
+  duration_ms: 0.6883
+  type: 'test'
+  ...
+# Subtest: rejected 回执原样转达：应用退回、不代表客户拒绝、不报成已提交
+ok 6 - rejected 回执原样转达：应用退回、不代表客户拒绝、不报成已提交
+  ---
+  duration_ms: 0.1601
+  type: 'test'
+  ...
+# Subtest: 能力抛错 / 契约外回执（含看似成功的未知 code）⇒ fail-closed，绝不说成已提交
+ok 7 - 能力抛错 / 契约外回执（含看似成功的未知 code）⇒ fail-closed，绝不说成已提交
+  ---
+  duration_ms: 0.5027
+  type: 'test'
+  ...
+# Subtest: 会话中止：不假设已提交（能力不触达，文案如实）
+ok 8 - 会话中止：不假设已提交（能力不触达，文案如实）
+  ---
+  duration_ms: 0.2247
+  type: 'test'
+  ...
+# Subtest: Service 透传：注入 requestRequirementChange 后 provider 工具面包含 request_requirement_change；未注入则不出现
+ok 9 - Service 透传：注入 requestRequirementChange 后 provider 工具面包含 request_requirement_change；未注入则不出现
+  ---
+  duration_ms: 11.4159
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 252.3344

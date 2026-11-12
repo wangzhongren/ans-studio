@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: bounded Chief default Core and Codex reach only the real decision handler through local HTTP
+ok 1 - bounded Chief default Core and Codex reach only the real decision handler through local HTTP
+  ---
+  duration_ms: 40.7627
+  type: 'test'
+  ...
+# Subtest: bounded Chief rejects wrong roles extra tools and missing host context before native construction
+ok 2 - bounded Chief rejects wrong roles extra tools and missing host context before native construction
+  ---
+  duration_ms: 1.1379
+  type: 'test'
+  ...
+# Subtest: native factory preparation has no effects and binds the same real Chat plan over local HTTP
+ok 3 - native factory preparation has no effects and binds the same real Chat plan over local HTTP
+  ---
+  duration_ms: 6.8946
+  type: 'test'
+  ...
+# Subtest: native factory preparation rejects role config registry and environment drift before creation
+ok 4 - native factory preparation rejects role config registry and environment drift before creation
+  ---
+  duration_ms: 1.889
+  type: 'test'
+  ...
+# Subtest: native factory preparation leaves unsupported branches unconstructed and follows actual judge overrides
+ok 5 - native factory preparation leaves unsupported branches unconstructed and follows actual judge overrides
+  ---
+  duration_ms: 1.3696
+  type: 'test'
+  ...
+# Subtest: native tool surface observes the default production Chat registry and rejects unregistered native commands over real HTTP
+ok 6 - native tool surface observes the default production Chat registry and rejects unregistered native commands over real HTTP
+  ---
+  duration_ms: 4.1814
+  type: 'test'
+  ...
+# Subtest: native tool surface reports unknown for changed registry or a mismatched native instance
+ok 7 - native tool surface reports unknown for changed registry or a mismatched native instance
+  ---
+  duration_ms: 0.3289
+  type: 'test'
+  ...
+# Subtest: chat native lifecycle observes a real HTTP body and retains the captured Core turn
+ok 8 - chat native lifecycle observes a real HTTP body and retains the captured Core turn
+  ---
+  duration_ms: 3.4347
+  type: 'test'
+  ...
+# Subtest: chat native lifecycle keeps an abort-ignoring response body unknown until its actual return
+ok 9 - chat native lifecycle keeps an abort-ignoring response body unknown until its actual return
+  ---
+  duration_ms: 29.286
+  type: 'test'
+  ...
+# Subtest: chat native lifecycle does not hide a tool that ignores abort
+ok 10 - chat native lifecycle does not hide a tool that ignores abort
+  ---
+  duration_ms: 32.8273
+  type: 'test'
+  ...
+# Subtest: plain text multi-turn HTTP history preserves each assistant once including reasoning without tool_calls
+ok 11 - plain text multi-turn HTTP history preserves each assistant once including reasoning without tool_calls
+  ---
+  duration_ms: 8.872
+  type: 'test'
+  ...
+# Subtest: plain text multi-turn HTTP history rolls back failed turn and retains earlier assistant
+ok 12 - plain text multi-turn HTTP history rolls back failed turn and retains earlier assistant
+  ---
+  duration_ms: 4.0216
+  type: 'test'
+  ...
+# Subtest: plain text multi-turn HTTP history rolls back timed_out turn and retains earlier assistant
+ok 13 - plain text multi-turn HTTP history rolls back timed_out turn and retains earlier assistant
+  ---
+  duration_ms: 117.4
+  type: 'test'
+  ...
+# Subtest: chat transport completes a plain text turn with system/user messages and exposed ans_ tools
+ok 14 - chat transport completes a plain text turn with system/user messages and exposed ans_ tools
+  ---
+  duration_ms: 1.9185
+  type: 'test'
+  ...
+# Subtest: chat transport executes tool calls, preserves reasoning_content and returns tool text
+ok 15 - chat transport executes tool calls, preserves reasoning_content and returns tool text
+  ---
+  duration_ms: 2.4935
+  type: 'test'
+  ...
+# Subtest: chat transport maps same-turn tool result images to tool-message image_url data URLs
+ok 16 - chat transport maps same-turn tool result images to tool-message image_url data URLs
+  ---
+  duration_ms: 2.7163
+  type: 'test'
+  ...
+# Subtest: chat transport never attaches images for failed or invalid tool results
+ok 17 - chat transport never attaches images for failed or invalid tool results
+  ---
+  duration_ms: 4.8804
+  type: 'test'
+  ...
+# Subtest: chat transport sends user prompt images as user content image_url parts
+ok 18 - chat transport sends user prompt images as user content image_url parts
+  ---
+  duration_ms: 1.7491
+  type: 'test'
+  ...
+# Subtest: chat transport abort settles the turn and rolls back partial history
+ok 19 - chat transport abort settles the turn and rolls back partial history
+  ---
+  duration_ms: 2.586
+  type: 'test'
+  ...
+# Subtest: chat transport redacts tool text but never image bytes
+ok 20 - chat transport redacts tool text but never image bytes
+  ---
+  duration_ms: 2.4297
+  type: 'test'
+  ...
+# Subtest: chat mode fails closed for installed MCP servers and server-side web search
+ok 21 - chat mode fails closed for installed MCP servers and server-side web search
+  ---
+  duration_ms: 0.2762
+  type: 'test'
+  ...
+# Subtest: chat mode requires explicit Codex/OpenAI config and never auto-reads Pi env
+ok 22 - chat mode requires explicit Codex/OpenAI config and never auto-reads Pi env
+  ---
+  duration_ms: 0.1766
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 539.3686

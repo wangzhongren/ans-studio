@@ -1,0 +1,436 @@
+TAP version 13
+# Subtest: native lifecycle: real owned child close ends visible pump but cannot prove SDK process/tree coverage
+ok 1 - native lifecycle: real owned child close ends visible pump but cannot prove SDK process/tree coverage
+  ---
+  duration_ms: 73.7396
+  type: 'test'
+  ...
+# Subtest: native lifecycle: never-closing query stays running after dispose early return and repeated abort
+ok 2 - native lifecycle: never-closing query stays running after dispose early return and repeated abort
+  ---
+  duration_ms: 44.2453
+  type: 'test'
+  ...
+# Subtest: native lifecycle: native result settles prompt without closing live message transport
+ok 3 - native lifecycle: native result settles prompt without closing live message transport
+  ---
+  duration_ms: 49.0826
+  type: 'test'
+  ...
+# Subtest: native lifecycle: last-resort timeout rejects local turn without inventing native settlement
+ok 4 - native lifecycle: last-resort timeout rejects local turn without inventing native settlement
+  ---
+  duration_ms: 45.2823
+  type: 'test'
+  ...
+# Subtest: native lifecycle: actual handler remains active after local reject until its Promise finishes
+ok 5 - native lifecycle: actual handler remains active after local reject until its Promise finishes
+  ---
+  duration_ms: 47.8995
+  type: 'test'
+  ...
+# Subtest: native lifecycle: old core turn and another bind cannot stop the current turn; cancelled stop makes no request
+ok 6 - native lifecycle: old core turn and another bind cannot stop the current turn; cancelled stop makes no request
+  ---
+  duration_ms: 2.7574
+  type: 'test'
+  ...
+# Subtest: SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials
+ok 7 - SDK stays lazy through composition/bind; actual MCP schema/options isolate all native abilities and credentials
+  ---
+  duration_ms: 8.0575
+  type: 'test'
+  ...
+# Subtest: schema preserves required/optional/union/nested object and rejects unsupported keywords
+ok 8 - schema preserves required/optional/union/nested object and rejects unsupported keywords
+  ---
+  duration_ms: 1.0241
+  type: 'test'
+  ...
+# Subtest: host-only schema lowering preserves all 23 write/edit rejections on actual MCP and leaves read/schema unchanged
+ok 9 - host-only schema lowering preserves all 23 write/edit rejections on actual MCP and leaves read/schema unchanged
+  ---
+  duration_ms: 11.455
+  type: 'test'
+  ...
+# Subtest: general not is enforced semantically, malformed not is still rejected, and a forbidden nonce cannot be overwritten
+ok 10 - general not is enforced semantically, malformed not is still rejected, and a forbidden nonce cannot be overwritten
+  ---
+  duration_ms: 9.6377
+  type: 'test'
+  ...
+# Subtest: dispatch conditional schema preserves GitOid formats and complete resume constraints on real MCP
+ok 11 - dispatch conditional schema preserves GitOid formats and complete resume constraints on real MCP
+  ---
+  duration_ms: 16.3362
+  type: 'test'
+  ...
+# Subtest: dispatch conditional schema converts unknown if branches and enforces them instead of dropping conditions
+ok 12 - dispatch conditional schema converts unknown if branches and enforces them instead of dropping conditions
+  ---
+  duration_ms: 14.7545
+  type: 'test'
+  ...
+# Subtest: actual MCP exposes union and nested required schema without losing optional/extra parameters
+ok 13 - actual MCP exposes union and nested required schema without losing optional/extra parameters
+  ---
+  duration_ms: 2.727
+  type: 'test'
+  ...
+# Subtest: late old MCP callback after next prompt, replay/missing/unknown nonce all fail before effects
+ok 14 - late old MCP callback after next prompt, replay/missing/unknown nonce all fail before effects
+  ---
+  duration_ms: 10.1162
+  type: 'test'
+  ...
+# Subtest: reserved context supports additionalProperties false, never reaches core, and schema collision rejects
+ok 15 - reserved context supports additionalProperties false, never reaches core, and schema collision rejects
+  ---
+  duration_ms: 2.9224
+  type: 'test'
+  ...
+# Subtest: same text twice has unique wire identity; old/unknown/missing/duplicate UserPromptSubmit cannot borrow next turn
+ok 16 - same text twice has unique wire identity; old/unknown/missing/duplicate UserPromptSubmit cannot borrow next turn
+  ---
+  duration_ms: 1.9837
+  type: 'test'
+  ...
+# Subtest: auth/endpoint/model and redaction share construction-time env snapshot
+ok 17 - auth/endpoint/model and redaction share construction-time env snapshot
+  ---
+  duration_ms: 1.766
+  type: 'test'
+  ...
+# Subtest: private wire marker echoed by tool/error never leaks into public events or messages
+ok 18 - private wire marker echoed by tool/error never leaks into public events or messages
+  ---
+  duration_ms: 2.9226
+  type: 'test'
+  ...
+# Subtest: missing dependency/API key and URL userinfo fail before query, explicit settings map to actual SDK options
+ok 19 - missing dependency/API key and URL userinfo fail before query, explicit settings map to actual SDK options
+  ---
+  duration_ms: 2.4779
+  type: 'test'
+  ...
+# Subtest: actual shell tool deny prevents marker and allow returns actual command output
+ok 20 - actual shell tool deny prevents marker and allow returns actual command output
+  ---
+  duration_ms: 107.3532
+  type: 'test'
+  ...
+# Subtest: real MCP rejects missing write arguments, gate denial and gate throw produce zero effects
+ok 21 - real MCP rejects missing write arguments, gate denial and gate throw produce zero effects
+  ---
+  duration_ms: 4.8671
+  type: 'test'
+  ...
+# Subtest: actual write/edit MCP handlers execute in call order even concurrent transport calls
+ok 22 - actual write/edit MCP handlers execute in call order even concurrent transport calls
+  ---
+  duration_ms: 13.2877
+  type: 'test'
+  ...
+# Subtest: multiple input turns retain the same query and map images; exactly one settled has each turnId
+ok 23 - multiple input turns retain the same query and map images; exactly one settled has each turnId
+  ---
+  duration_ms: 1.7517
+  type: 'test'
+  ...
+# Subtest: SDK/result errors and handler exceptions redact secrets and fail honestly
+ok 24 - SDK/result errors and handler exceptions redact secrets and fail honestly
+  ---
+  duration_ms: 2.1398
+  type: 'test'
+  ...
+# Subtest: InteractionGate pauses the last-resort deadline; answer returns and sequential write waits behind confirmation
+ok 25 - InteractionGate pauses the last-resort deadline; answer returns and sequential write waits behind confirmation
+  ---
+  duration_ms: 9.2803
+  type: 'test'
+  ...
+# Subtest: inspect deadline never aborts; only the last resort ends the turn at 50ms outside customer waiting
+ok 26 - inspect deadline never aborts; only the last resort ends the turn at 50ms outside customer waiting
+  ---
+  duration_ms: 1.8866
+  type: 'test'
+  ...
+# Subtest: inspect deadline alone never aborts a progressing turn
+ok 27 - inspect deadline alone never aborts a progressing turn
+  ---
+  duration_ms: 72.2122
+  type: 'test'
+  ...
+# Subtest: stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn
+ok 28 - stop pending confirmation cancels queued write and late answer cannot report/effect in a new turn
+  ---
+  duration_ms: 60.8241
+  type: 'test'
+  ...
+# Subtest: abort treats an already-closed query interrupt rejection as stopped, closes the engine and settles the turn
+ok 29 - abort treats an already-closed query interrupt rejection as stopped, closes the engine and settles the turn
+  ---
+  duration_ms: 7.7966
+  type: 'test'
+  ...
+# Subtest: abort still surfaces an interrupt rejection that is not the closed-query signal
+ok 30 - abort still surfaces an interrupt rejection that is not the closed-query signal
+  ---
+  duration_ms: 4.4831
+  type: 'test'
+  ...
+# Subtest: abort still surfaces a closeEngine teardown failure even when the query was already closed
+ok 31 - abort still surfaces a closeEngine teardown failure even when the query was already closed
+  ---
+  duration_ms: 2.9027
+  type: 'test'
+  ...
+# Subtest: abort keeps normal interrupt behavior: interrupt runs once and the turn settles aborted
+ok 32 - abort keeps normal interrupt behavior: interrupt runs once and the turn settles aborted
+  ---
+  duration_ms: 1.5577
+  type: 'test'
+  ...
+# Subtest: last-resort deadline emits timed_out once and disposal closes event stream
+ok 33 - last-resort deadline emits timed_out once and disposal closes event stream
+  ---
+  duration_ms: 29.7927
+  type: 'test'
+  ...
+# Subtest: actual native resume succeeds only after matching successful SDK result; failed resume clears ID and next explicit input rebuilds
+ok 34 - actual native resume succeeds only after matching successful SDK result; failed resume clears ID and next explicit input rebuilds
+  ---
+  duration_ms: 34.5882
+  type: 'test'
+  ...
+# Subtest: native symlink and storage runtime mismatch fail before SDK query
+ok 35 - native symlink and storage runtime mismatch fail before SDK query
+  ---
+  duration_ms: 5.1451
+  type: 'test'
+  ...
+# Subtest: core Service receives real Claude MCP reports/dispatch receipts and saves replay with actual metadata
+ok 36 - core Service receives real Claude MCP reports/dispatch receipts and saves replay with actual metadata
+  ---
+  duration_ms: 43.9645
+  type: 'test'
+  ...
+# Subtest: required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only
+ok 37 - required-v1 rejects each missing display capability before SDK load; profile registers bind snapshot only
+  ---
+  duration_ms: 0.7102
+  type: 'test'
+  ...
+# Subtest: real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged
+ok 38 - real Core projector receives actual args/rule/result execution while SDK content and opaque identities stay unchanged
+  ---
+  duration_ms: 4.4716
+  type: 'test'
+  ...
+# Subtest: actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure
+ok 39 - actual handler thrown Error projects protected message, unknown throw stays opaque, model retains original generic failure
+  ---
+  duration_ms: 7.0061
+  type: 'test'
+  ...
+# Subtest: unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked
+ok 40 - unknown and old PreToolUse never borrow active turn; real original hook denial alone is blocked
+  ---
+  duration_ms: 1.6966
+  type: 'test'
+  ...
+# Subtest: projector failure yields only bounded diagnostic without changing tool result or successful turn
+ok 41 - projector failure yields only bounded diagnostic without changing tool result or successful turn
+  ---
+  duration_ms: 1.8772
+  type: 'test'
+  ...
+# Subtest: Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy
+ok 42 - Core strips C metadata before Claude and preserves exact SDK prompt/images while publishing safe display copy
+  ---
+  duration_ms: 45.4556
+  type: 'test'
+  ...
+# Subtest: thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity
+ok 43 - thin projected outlet never redacts supplied opaque identities or restores suppressed oversized identity
+  ---
+  duration_ms: 2.2236
+  type: 'test'
+  ...
+# Subtest: required production path displays real read ENOENT and Node shell output without parsing result messages
+ok 44 - required production path displays real read ENOENT and Node shell output without parsing result messages
+  ---
+  duration_ms: 54.6384
+  type: 'test'
+  ...
+# Subtest: web search capability bit off (default/explicit): tools/allowedTools keep the pre-existing surface, WebSearch stays hook-denied and frames stay unconsumed
+ok 45 - web search capability bit off (default/explicit): tools/allowedTools keep the pre-existing surface, WebSearch stays hook-denied and frames stay unconsumed
+  ---
+  duration_ms: 4.3573
+  type: 'test'
+  ...
+# Subtest: web search capability bit on: builtin declared and auto-allowed only for the live bound turn, input never rewritten
+ok 46 - web search capability bit on: builtin declared and auto-allowed only for the live bound turn, input never rewritten
+  ---
+  duration_ms: 1.783
+  type: 'test'
+  ...
+# Subtest: web search on: native frames project one paired start/result per call; failure, unsupported content and budget text stay truthful and never fail the turn
+ok 47 - web search on: native frames project one paired start/result per call; failure, unsupported content and budget text stay truthful and never fail the turn
+  ---
+  duration_ms: 5.0306
+  type: 'test'
+  ...
+# Subtest: installed-skills section: non-empty splices the orchestration render verbatim; zero/broken stays the byte-identical old prompt and never fails the turn
+ok 48 - installed-skills section: non-empty splices the orchestration render verbatim; zero/broken stays the byte-identical old prompt and never fails the turn
+  ---
+  duration_ms: 20.0606
+  type: 'test'
+  ...
+# Subtest: installed MCP declarations assemble only when injected: launcher-wrapped command, env:NAME resolved, server-level allowedTools
+ok 49 - installed MCP declarations assemble only when injected: launcher-wrapped command, env:NAME resolved, server-level allowedTools
+  ---
+  duration_ms: 3.0668
+  type: 'test'
+  ...
+# Subtest: installed MCP allow branch: name+dynamic source+live turn only, args pass unchanged, adversarials stay denied
+ok 50 - installed MCP allow branch: name+dynamic source+live turn only, args pass unchanged, adversarials stay denied
+  ---
+  duration_ms: 1.9981
+  type: 'test'
+  ...
+# Subtest: installed MCP frames pair start/result like WebSearch; unregistered late results stay unconsumed
+ok 51 - installed MCP frames pair start/result like WebSearch; unregistered late results stay unconsumed
+  ---
+  duration_ms: 1.732
+  type: 'test'
+  ...
+# Subtest: installed MCP status pass: failed/needs-auth report one honest category line per engine; connected silent; status errors never fail the turn
+ok 52 - installed MCP status pass: failed/needs-auth report one honest category line per engine; connected silent; status errors never fail the turn
+  ---
+  duration_ms: 2.9497
+  type: 'test'
+  ...
+# Subtest: reasoning effort wiring: unset keeps zero parameters; off maps to ThinkingDisabled; four levels map to EffortLevel
+ok 53 - reasoning effort wiring: unset keeps zero parameters; off maps to ThinkingDisabled; four levels map to EffortLevel
+  ---
+  duration_ms: 6.8281
+  type: 'test'
+  ...
+# Subtest: thinking frames produce raw reasoning facts (complete/omitted), never adapter-redacted, duration never guessed
+ok 54 - thinking frames produce raw reasoning facts (complete/omitted), never adapter-redacted, duration never guessed
+  ---
+  duration_ms: 1.6846
+  type: 'test'
+  ...
+# Subtest: reasoning compatibility completes the task, uses child-only env, and is confirmed only after success
+ok 55 - reasoning compatibility completes the task, uses child-only env, and is confirmed only after success
+  ---
+  duration_ms: 13.8546
+  type: 'test'
+  ...
+# Subtest: only explicit parameter rejections enable reasoning compatibility
+ok 56 - only explicit parameter rejections enable reasoning compatibility
+  ---
+  duration_ms: 21.6806
+  type: 'test'
+  ...
+# Subtest: failed or cancelled compatibility does not change the next turn's original request
+ok 57 - failed or cancelled compatibility does not change the next turn's original request
+  ---
+  duration_ms: 94.1709
+  type: 'test'
+  ...
+# Subtest: normal output and tool start forbid whole-turn reasoning replay
+ok 58 - normal output and tool start forbid whole-turn reasoning replay
+  ---
+  duration_ms: 13.5563
+  type: 'test'
+  ...
+# Subtest: judge mode registers exactly the three injected read-only tools, force-disables WebSearch/installed MCP, and denies every other call
+ok 59 - judge mode registers exactly the three injected read-only tools, force-disables WebSearch/installed MCP, and denies every other call
+  ---
+  duration_ms: 21.0787
+  type: 'test'
+  ...
+# Subtest: governance judge mode registers exactly the three governance tools, force-disables WebSearch/installed MCP, and denies non-allowlisted calls
+ok 60 - governance judge mode registers exactly the three governance tools, force-disables WebSearch/installed MCP, and denies non-allowlisted calls
+  ---
+  duration_ms: 5.837
+  type: 'test'
+  ...
+# Subtest: judge mode accepts either frozen triple but rejects mixed, partial, or extended judge tool sets
+ok 61 - judge mode accepts either frozen triple but rejects mixed, partial, or extended judge tool sets
+  ---
+  duration_ms: 0.7438
+  type: 'test'
+  ...
+# Subtest: judge mode rejects non-judge tool sets before SDK load and re-checks at bind
+ok 62 - judge mode rejects non-judge tool sets before SDK load and re-checks at bind
+  ---
+  duration_ms: 0.7839
+  type: 'test'
+  ...
+# Subtest: judge mode abort settles the turn through the unchanged lifecycle path
+ok 63 - judge mode abort settles the turn through the unchanged lifecycle path
+  ---
+  duration_ms: 1.8159
+  type: 'test'
+  ...
+# Subtest: normal role sessions keep the pre-judge surface: no disallowedTools and the web search bit still honored
+ok 64 - normal role sessions keep the pre-judge surface: no disallowedTools and the web search bit still honored
+  ---
+  duration_ms: 1.6278
+  type: 'test'
+  ...
+# Subtest: tool-result images ride the real MCP transport; failures and invalid payloads never attach images
+ok 65 - tool-result images ride the real MCP transport; failures and invalid payloads never attach images
+  ---
+  duration_ms: 3.8373
+  type: 'test'
+  ...
+# Subtest: real git_candidate oneOf: host call context passes commit/integrate/revert/init on real MCP; invalid inputs stay rejected
+ok 66 - real git_candidate oneOf: host call context passes commit/integrate/revert/init on real MCP; invalid inputs stay rejected
+  ---
+  duration_ms: 6.2856
+  type: 'test'
+  ...
+# Subtest: composite git_candidate: forged context is overwritten by the host token, stripped before the handler, and never enters events
+ok 67 - composite git_candidate: forged context is overwritten by the host token, stripped before the handler, and never enters events
+  ---
+  duration_ms: 6.5546
+  type: 'test'
+  ...
+# Subtest: flat git_query/git_publish: only the top-level optional field is added; valid calls pass and invalid calls stay rejected
+ok 68 - flat git_query/git_publish: only the top-level optional field is added; valid calls pass and invalid calls stay rejected
+  ---
+  duration_ms: 3.8345
+  type: 'test'
+  ...
+# Subtest: claudeToolInputWithCallContext: deep copy, strict-branch propagation, reserved-name collision, flat/nested shapes
+ok 69 - claudeToolInputWithCallContext: deep copy, strict-branch propagation, reserved-name collision, flat/nested shapes
+  ---
+  duration_ms: 0.3881
+  type: 'test'
+  ...
+# Subtest: unknown keywords inside oneOf branches and conditional constraints are not hidden by call-context propagation
+ok 70 - unknown keywords inside oneOf branches and conditional constraints are not hidden by call-context propagation
+  ---
+  duration_ms: 3.7641
+  type: 'test'
+  ...
+# Subtest: Pi/Codex adapter sources never reference the Claude request-context field
+ok 71 - Pi/Codex adapter sources never reference the Claude request-context field
+  ---
+  duration_ms: 2.5342
+  type: 'test'
+  ...
+1..71
+# tests 71
+# suites 0
+# pass 71
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1541.7996

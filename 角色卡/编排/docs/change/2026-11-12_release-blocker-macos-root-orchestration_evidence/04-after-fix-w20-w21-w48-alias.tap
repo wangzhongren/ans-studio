@@ -1,0 +1,58 @@
+TAP version 13
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 普通
+ok 1 - W20 默认Core/Chat产品真实报告落账并到chief 普通
+  ---
+  duration_ms: 437.1158
+  type: 'test'
+  ...
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+ok 2 - W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+  ---
+  duration_ms: 435.0421
+  type: 'test'
+  ...
+# Subtest: W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+ok 3 - W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+  ---
+  duration_ms: 1479.2896
+  type: 'test'
+  ...
+# Subtest: W21 默认Core/Chat应用生效通知 显式blocked保真任务
+ok 4 - W21 默认Core/Chat应用生效通知 显式blocked保真任务
+  ---
+  duration_ms: 1459.3069
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+ok 5 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+  ---
+  duration_ms: 711.1782
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+ok 6 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+  ---
+  duration_ms: 651.0034
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+ok 7 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+  ---
+  duration_ms: 650.4161
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source
+ok 8 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source
+  ---
+  duration_ms: 663.9243
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6954.3063

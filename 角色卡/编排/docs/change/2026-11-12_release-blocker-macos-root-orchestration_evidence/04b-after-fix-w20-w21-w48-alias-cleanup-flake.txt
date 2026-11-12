@@ -1,0 +1,62 @@
+TAP version 13
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 普通
+ok 1 - W20 默认Core/Chat产品真实报告落账并到chief 普通
+  ---
+  duration_ms: 466.9267
+  type: 'test'
+  ...
+# Subtest: W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+not ok 2 - W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+  ---
+  duration_ms: 454.3494
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\release-v2.0.0-blockers-2\\test\\桌面应用\\chief-workflow.test.ts:1502:1'
+  failureType: 'testCodeFailure'
+  error: "ENOTEMPTY: directory not empty, rmdir 'C:\\Users\\51054\\AppData\\Local\\Temp\\ans-orch-alias-real-v6poby-alias\\ans-w20-product-iihTCg'"
+  code: 'ENOTEMPTY'
+  ...
+# Subtest: W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+ok 3 - W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+  ---
+  duration_ms: 1441.8012
+  type: 'test'
+  ...
+# Subtest: W21 默认Core/Chat应用生效通知 显式blocked保真任务
+ok 4 - W21 默认Core/Chat应用生效通知 显式blocked保真任务
+  ---
+  duration_ms: 1369.2022
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+ok 5 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+  ---
+  duration_ms: 699.2946
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+ok 6 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+  ---
+  duration_ms: 666.5104
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+ok 7 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+  ---
+  duration_ms: 694.5968
+  type: 'test'
+  ...
+# Subtest: W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source
+ok 8 - W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source
+  ---
+  duration_ms: 674.3821
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6938.2179

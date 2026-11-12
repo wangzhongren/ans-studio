@@ -1,0 +1,52 @@
+TAP version 13
+# Subtest: 有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，边界内写入被接受
+ok 1 - 有带 pin 的 .ans → pin 生效：会话用其 pin-backed acceptance，边界内写入被接受
+  ---
+  duration_ms: 83.1678
+  type: 'test'
+  ...
+# Subtest: .ans 的 pin 与文件 hash 不符 → 门禁判未接受（fail-closed，会话被拒）
+ok 2 - .ans 的 pin 与文件 hash 不符 → 门禁判未接受（fail-closed，会话被拒）
+  ---
+  duration_ms: 9.9651
+  type: 'test'
+  ...
+# Subtest: .ans 存在但不可解析 → 未接受、不回退运行期同意（界面据 config 如实呈现）
+ok 3 - .ans 存在但不可解析 → 未接受、不回退运行期同意（界面据 config 如实呈现）
+  ---
+  duration_ms: 69.0988
+  type: 'test'
+  ...
+# Subtest: 无 .ans → 回退运行期同意（登记的非-pin 例外，行为不变）
+ok 4 - 无 .ans → 回退运行期同意（登记的非-pin 例外，行为不变）
+  ---
+  duration_ms: 77.1139
+  type: 'test'
+  ...
+# Subtest: D 批治理记录撤除：preload 不暴露治理记录/迁移方法，main.ts 不注册对应通道
+ok 5 - D 批治理记录撤除：preload 不暴露治理记录/迁移方法，main.ts 不注册对应通道
+  ---
+  duration_ms: 4.5844
+  type: 'test'
+  ...
+# Subtest: Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写死渲染入口
+ok 6 - Phase 5A 入口接线：main.ts/main.mjs 经唯一路径事实源，未写死渲染入口
+  ---
+  duration_ms: 2.8158
+  type: 'test'
+  ...
+# Subtest: E 批任务/日志接线：preload 白名单与 main.ts 通道逐字对上
+ok 7 - E 批任务/日志接线：preload 白名单与 main.ts 通道逐字对上
+  ---
+  duration_ms: 0.5895
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 683.7433

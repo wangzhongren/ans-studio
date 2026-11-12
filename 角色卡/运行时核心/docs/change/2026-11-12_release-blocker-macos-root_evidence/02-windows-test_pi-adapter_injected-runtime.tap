@@ -1,0 +1,120 @@
+TAP version 13
+# Subtest: injected schema/description/executionMode override legacy name lookup and exact SDK signal reaches handler
+ok 1 - injected schema/description/executionMode override legacy name lookup and exact SDK signal reaches handler
+  ---
+  duration_ms: 1.0137
+  type: 'test'
+  ...
+# Subtest: production hook denies every native or unregistered tool and permits only injected names
+ok 2 - production hook denies every native or unregistered tool and permits only injected names
+  ---
+  duration_ms: 0.4327
+  type: 'test'
+  ...
+# Subtest: actual production bind registers injected tools only, freezes definition and emits exact Service turn
+ok 3 - actual production bind registers injected tools only, freezes definition and emits exact Service turn
+  ---
+  duration_ms: 665.9568
+  type: 'test'
+  ...
+# Subtest: Service -> real Pi native wiring shares injected wait gate, captured customer context and one terminal
+ok 4 - Service -> real Pi native wiring shares injected wait gate, captured customer context and one terminal
+  ---
+  duration_ms: 483.1551
+  type: 'test'
+  ...
+# Subtest: Pi cancellation forwards original customer signal; late consent stays aborted across next turn
+ok 5 - Pi cancellation forwards original customer signal; late consent stays aborted across next turn
+  ---
+  duration_ms: 30.0733
+  type: 'test'
+  ...
+# Subtest: native Pi storage starts fresh then restores actual native context, separate from ANS replay
+ok 6 - native Pi storage starts fresh then restores actual native context, separate from ANS replay
+  ---
+  duration_ms: 44.5416
+  type: 'test'
+  ...
+# Subtest: Pi legacy file migrates to native copy, retains original ID/context and never appends old role file
+ok 7 - Pi legacy file migrates to native copy, retains original ID/context and never appends old role file
+  ---
+  duration_ms: 19.5859
+  type: 'test'
+  ...
+# Subtest: malformed native history rebuilds with recovered warning; never reads sibling Codex/Claude files
+ok 8 - malformed native history rebuilds with recovered warning; never reads sibling Codex/Claude files
+  ---
+  duration_ms: 11.014
+  type: 'test'
+  ...
+# Subtest: store validate callback rejects directory symlink before Pi parse or new native write
+not ok 9 - store validate callback rejects directory symlink before Pi parse or new native write
+  ---
+  duration_ms: 5.4526
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\release-v2.0.0-blockers-2\\test\\pi-adapter\\injected-runtime.test.ts:185:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-W6bkyr\\outside' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-W6bkyr\\.ans\\sessions\\Pi适配器\\pi\\native'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/pi-adapter/injected-runtime.test.ts:188:71
+    async temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/pi-adapter/injected-runtime.test.ts:22:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+not ok 10 - Pi storage refuses file symlink and role/runtime mismatch without touching other storage
+  ---
+  duration_ms: 6.9159
+  type: 'test'
+  location: 'C:\\Users\\51054\\Desktop\\work\\ans-studio\\.claude\\worktrees\\release-v2.0.0-blockers-2\\test\\pi-adapter\\injected-runtime.test.ts:193:1'
+  failureType: 'testCodeFailure'
+  error: "EPERM: operation not permitted, symlink 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-Yg05aH\\outside.jsonl' -> 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-Yg05aH\\.ans\\sessions\\Pi适配器\\pi\\native\\link.jsonl'"
+  code: 'EPERM'
+  stack: |-
+    async symlink (node:internal/fs/promises:1714:10)
+    async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/pi-adapter/injected-runtime.test.ts:195:78
+    async temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-2/test/pi-adapter/injected-runtime.test.ts:22:9)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# [pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。
+# [pi] 加载 Pi 包…
+# [pi] 构造显式 provider…
+# [pi] resourceLoader.reload…
+# [pi] createAgentSession…
+# [pi] bindRole 完成
+# Subtest: public injected factory accepts Model shape and keeps compose/load free of filesystem effects
+ok 11 - public injected factory accepts Model shape and keeps compose/load free of filesystem effects
+  ---
+  duration_ms: 8.2724
+  type: 'test'
+  ...
+# Subtest: migrated Service/Pi timers honor legacy env once and native timeout normalizes to one timed_out terminal
+ok 12 - migrated Service/Pi timers honor legacy env once and native timeout normalizes to one timed_out terminal
+  ---
+  duration_ms: 65.0197
+  type: 'test'
+  ...
+# Subtest: native stop cleanup rejects promptly and quarantines actual bound session when SDK cannot finish
+ok 13 - native stop cleanup rejects promptly and quarantines actual bound session when SDK cannot finish
+  ---
+  duration_ms: 912.9653
+  type: 'test'
+  ...
+# Subtest: Service saves actual fresh/resumed/recovered Pi metadata and public replay remains runtime-isolated
+ok 14 - Service saves actual fresh/resumed/recovered Pi metadata and public replay remains runtime-isolated
+  ---
+  duration_ms: 75.9397
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 12
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2590.8617
