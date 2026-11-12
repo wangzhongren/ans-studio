@@ -1,0 +1,23 @@
+test at test\桌面应用\chief-workflow.test.ts:1093:1 | W14 convener按本次真实任务冻结；缺完整执行闭包保stage/code且零worker任务/HTTP
+test at test\桌面应用\chief-workflow.test.ts:1093:1 | W23 Convener不能越Chief新建普通Verifier，零任务零HTTP
+test at test\桌面应用\chief-workflow.test.ts:1093:1 | W22 Convener显式review也不能越Chief创建Verifier，零任务零HTTP
+test at test\桌面应用\chief-workflow.test.ts:1502:1 | W20 默认Core/Chat产品真实报告落账并到chief 普通
+test at test\桌面应用\chief-workflow.test.ts:1502:1 | W20 默认Core/Chat产品真实报告落账并到chief 真实R9竞争
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W21 默认Core/Chat应用生效通知 纯确认不覆盖真实完成报告
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W21 默认Core/Chat应用生效通知 显式blocked保真任务
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W28 默认Core/Chat真实受派策划缺不可变pin stop 拒绝且零停止
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W28 默认Core/Chat真实受派策划缺不可变pin stop-and-restart 拒绝且零停止
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W29 默认Core/Chat真实既有文档基线后续 document-change 保专业规划scope不授旧执行pin
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W29 默认Core/Chat真实既有文档基线后续 document-change-wrong-flow 保专业规划scope不授旧执行pin
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W29 默认Core/Chat真实既有文档基线后续 document-change-source-loss 保专业规划scope不授旧执行pin
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W29 默认Core/Chat真实既有文档基线后续 document-change-missing-confirmation 保专业规划scope不授旧执行pin
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 连续写入后
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W33 真实DocRun关闭通知退休旧InitRun绑定且后续合法任务继续
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W34 真实首文档发布与原创建者关闭后派团队规划保独立scope
+test at test\桌面应用\chief-workflow.test.ts:1580:1 | W35 缺team仍可真实Chief报告派人事准备但D3写动作拒绝
+test at test\桌面应用\chief-workflow.test.ts:1983:1 | W36 真实Chief可无M0-plan-D3派五builtin准备；人事写动作仍拒
+test at test\桌面应用\chief-workflow.test.ts:2251:1 | W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 normal
+test at test\桌面应用\chief-workflow.test.ts:2251:1 | W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 foreign-lease
+test at test\桌面应用\chief-workflow.test.ts:2251:1 | W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 new-interrupt
+test at test\桌面应用\chief-workflow.test.ts:2251:1 | W48 默认Core精确controller停止：缺/错task零停止，当前任务sealed且不伪造报告 late-chief-source

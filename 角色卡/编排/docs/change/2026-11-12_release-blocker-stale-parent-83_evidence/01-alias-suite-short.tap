@@ -1,0 +1,14 @@
+✔ P0 残余：托管会话证据按同一真实根命中（符号链接祖先别名 vs 规范根） (22.1273ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-v2-blockers4-eight-three-temp-root\\ans-orch-root-alias-cGMljH\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-v2-blockers4-eight-three-temp-root\\ans-orch-root-alias-cGMljH\\real-parent\\project","evidenceRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-v2-blockers4-eight-three-temp-root\\ans-orch-root-alias-cGMljH\\real-parent\\project"}
+✔ P0 残余：不同真实根/未知会话不命中托管证据（fail-closed，不放宽跨根） (10.1211ms)
+✔ P0 残余：最终根自身是符号链接不命中；不可解析路径不命中（沿用 P0 fail-closed） (8.8536ms)
+✔ B3-2：Windows 8.3 短名拼写与规范长名命中同一托管证据；不同真实根仍拒绝 (369.1198ms)
+ℹ {"platform":"win32","shortRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\AN8D29~5\\ANS-OR~1\\PROJEC~1","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-v2-blockers4-eight-three-temp-root\\ans-orch-root-83-jBwBah\\project-with-a-long-directory-name","evidenceRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-v2-blockers4-eight-three-temp-root\\ans-orch-root-83-jBwBah\\project-with-a-long-directory-name"}
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 734.5186

@@ -1,0 +1,10 @@
+platform: win32; Node v24.22.1
+long:  C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\release-v2.0.0-blockers-4\.tmp-b4\fs83\long-directory-name-for-83-test
+short: C:\Users\51054\Desktop\work\ANS-ST~1\CLAUDE~1\WORKTR~1\RELEAS~4.0-B\TMP-B4~1\fs83\LONG-D~1
+fs.realpathSync(long)         = C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\release-v2.0.0-blockers-4\.tmp-b4\fs83\long-directory-name-for-83-test
+fs.realpathSync(short)        = C:\Users\51054\Desktop\work\ANS-ST~1\CLAUDE~1\WORKTR~1\RELEAS~4.0-B\TMP-B4~1\fs83\LONG-D~1
+fs.realpathSync.native(long)  = C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\release-v2.0.0-blockers-4\.tmp-b4\fs83\long-directory-name-for-83-test
+fs.realpathSync.native(short) = C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\release-v2.0.0-blockers-4\.tmp-b4\fs83\long-directory-name-for-83-test
+fs.promises.realpath(short)   = C:\Users\51054\Desktop\work\ans-studio\.claude\worktrees\release-v2.0.0-blockers-4\.tmp-b4\fs83\long-directory-name-for-83-test
+JS realpath equal (old sameManagedProjectRoot rule): false
+native realpath equal (new canonicalProjectRoot rule): true

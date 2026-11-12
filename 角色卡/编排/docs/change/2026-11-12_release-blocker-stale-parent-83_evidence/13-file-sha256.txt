@@ -1,0 +1,5 @@
+99d6ecf364850fe2a87aac8345b020edec53e844952337cdfe09e63120b46fb0 *src/pipeline/orchestration/run-role.ts
+f181ec28cab3056048deb15bcd931f7354752e4528f4d1c421dcfb943452ffd5 *src/pipeline/orchestration/trunk-runtime.ts
+0c63acd042a46e8079c83747237d3fe79c5ded4b0db91ac11a204c260e5afb13 *test/编排/run-role-managed-root-alias.test.ts
+fa7182e1f7578474ad0201f9c548320ffd4d6f64b6c802b50a2898f8d70e1cfa *src/common/装配/release-policy.mjs
+4f5e915f7d4557bd238afe8e6f09a8022d265c16fe6b9b5a0da27a13feb64ee2 *test/装配/release-packaging.test.ts
