@@ -758,7 +758,8 @@ export interface CreateCustomerInputChannelOptions {
   emitJudgeResult?: (payload: OperatorJudgeResultPayload) => void;
   /**
    * **客户指令 decision 消费者（C1，2026-11-03）**：缺省 ⇒ 不消费指令（旧行为逐字不变）。
-   * 只在 `cardKind==="decision"` 且 `presentEntryNow()` 的 `tryAutoSelectDecision` **之前**进入；
+   * 只在 `cardKind==="decision"` 且 `presentEntryNow()` 的幕僚分支（`isChiefBusinessCard`）与
+   * `tryAutoSelectDecision` **之前**进入（应用主权卡除外，判据 `isApplicationDecisionReservedForCustomer`）；
    * 冲突/不匹配绕过默认推荐并呈现客户卡（说明经 `emitNotice` 系统行）。
    */
   directive?: DirectiveDecisionConsumerOptions;
@@ -2056,7 +2057,8 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /**
    * decision 指令消费者（C1，2026-11-03；规则/once 语义由 B1 `applyDecisionDirective` 冻结）：
-   *  - 只在 `cardKind==="decision"` 且注入 directive 消费者时进入，位于 `tryAutoSelectDecision` 之前；
+   *  - 只在 `cardKind==="decision"` 且注入 directive 消费者时进入，位于 `presentEntryNow()` 最前
+   *    （幕僚分支 `isChiefBusinessCard` 与 `tryAutoSelectDecision` 之前；2026-11-12 B3-1 顺序修复）；
    *  - 冲突/0/多匹配：不消费任何一条，**绕过默认推荐**，直接呈现客户卡，并投一条既有 delivery-note 说明；
    *  - selected/rejected：`once` 已由 B1 在**可见结果行之后** durable 消费；结算 answered/declined，
    *    `operatorId:"directive:<id>"` + A1 `directive:{id,action}`；
@@ -2200,14 +2202,18 @@ export function createCustomerInputChannel(opts: CreateCustomerInputChannelOptio
 
   /** 既有呈现路径（判断门 → judging / 直接呈现）；**不分诊**——分诊前闸在 `presentEntry`。 */
   const presentEntryNow = (entry: ChannelEntry): void => {
+    // 客户指令消费者最优先（C1）：命中即不进入幕僚代决策/默认推荐/客户卡；未命中/冲突/失败按
+    // B1 冻结规则回落。**必须位于 `isChiefBusinessCard` 分支之前**——该分支（tryChiefDecision/
+    // presentNow）不消费指令；若后置，非主权 decision 卡的 `@决策` 指令即为死代码
+    // （2026-11-12 发布阻断 B3-1 产品回归修复：「替我审批等同于我自己审批」）。
+    if (tryApplyDirectiveDecision(entry)) return;
+
     if (isChiefBusinessCard(entry)) {
       if (tryChiefDecision(entry)) return;
       presentNow(entry);
       return;
     }
 
-    // 客户指令消费者优先（C1）：命中即不进入默认推荐/客户卡；未命中/冲突/失败按 B1 冻结规则回落。
-    if (tryApplyDirectiveDecision(entry)) return;
     // decision 卡先尝试「替我决策」确定性默认；未代选 ⇒ 原卡照旧呈现给客户。
 
     const plan = planJudge(entry);
