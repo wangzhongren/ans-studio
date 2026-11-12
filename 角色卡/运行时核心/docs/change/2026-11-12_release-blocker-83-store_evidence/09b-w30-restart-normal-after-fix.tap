@@ -1,0 +1,17 @@
+TAP version 13
+# W52 init actual Core registry [{"sessionId":"5fc49c78-bbef-4f2b-b504-9f54bd1b7f27","roleId":"chief","state":"active","lifecycleStatus":"quiescent","providerFinished":true,"processCoverage":"complete"},{"sessionId":"4ce2a828-e9a8-4382-ba40-dcbbc6553ec9","roleId":"convener","state":"active","lifecycleStatus":"unknown","providerFinished":false,"processCoverage":"complete"}]
+# Subtest: W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+ok 1 - W30 默认Core/Chat真实第二版意图卡确认必须持久同request版本冻结 真实重启迁移后
+  ---
+  duration_ms: 7669.6321
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8122.2389

@@ -1,0 +1,30 @@
+✖ B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe） (187.8133ms)
+✖ B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒 (4.329ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 440.6774
+
+✖ failing tests:
+
+test at test\runtime-core\project-root-canonicalization.test.ts:296:1
+✖ B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe） (187.8133ms)
+  Error: git-control-path-unsafe
+      at assertControlPaths (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-5/src/provider/trunk/impl/git-trunk-store.ts:1160:163)
+      at async Object.readJournal (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-5/src/provider/trunk/impl/git-trunk-store.ts:1168:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-5/test/runtime-core/project-root-canonicalization.test.ts:312:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+
+test at test\runtime-core\project-root-canonicalization.test.ts:319:1
+✖ B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒 (4.329ms)
+  Error: git-control-path-unsafe
+      at assertControlPaths (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-5/src/provider/trunk/impl/git-trunk-store.ts:1160:163)
+      at async Object.readJournal (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-5/src/provider/trunk/impl/git-trunk-store.ts:1168:5)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-5/test/runtime-core/project-root-canonicalization.test.ts:325:16)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)

@@ -52,6 +52,16 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   src/pipeline/orchestration/trunk-runtime.ts
 // · 回归测试 1 条：test/编排/run-role-managed-root-alias.test.ts（同一文件内新增 Windows 8.3 用例；
 //   符号链接祖先/最终根链接/跨根拒绝原断言不变）
+// · 发布阻断修复（B3-2c，同一 8.3 短名根在 trunk store 的相邻残余）：生产 1 条 + 回归测试 1 条——
+//   `git-trunk-store.ts#assertControlPaths` 以 `await realpath(abs) !== abs` 比较，而 abs 由调用方根
+//   拼写逐字构造；`fs/promises.realpath` 为 native 语义（展开 8.3 短名）⇒ 短名根下同一真实控制目录
+//   被判非规范（`git-control-path-unsafe`，W29×3/W30×2）。修复按**同一 native realpath 规则**
+//   （`realpathSync.native(path.resolve(root))`）构造比较入口，`listJournals` 亦以规范根遍历；
+//   不可解析根、最终根自身为链接/junction 的别名仍 fail-closed；控制路径自身（含 `.ans/trunk`）链接、
+//   非目录、不同真实根仍拒绝，断言未放宽。单文件不开目录。
+// · 生产 1 条：src/provider/trunk/impl/git-trunk-store.ts
+// · 回归测试 1 条：test/runtime-core/project-root-canonicalization.test.ts（同文件新增 Windows 8.3
+//   短名与符号链接祖先/最终根链接用例）
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -121,6 +131,7 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 const files = new Set(['package.json', 'package-lock.json', '.github/workflows/release.yml',
   'test/桌面应用/optional-acceptance.test.ts',
   'src/provider/trunk/impl/git-command.ts',
+  'src/provider/trunk/impl/git-trunk-store.ts',
   'src/service/runtime/session.ts',
   'test/runtime-core/project-root-canonicalization.test.ts',
   'test/runtime-core/write-gate-context.test.ts',

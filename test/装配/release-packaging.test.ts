@@ -129,6 +129,23 @@ test('release overlay selects the v2.0.0 directive-decision and CI-hang blocker 
   );
 });
 
+// v2.0.0 发布阻断修复（B3-2c，同一 8.3 短名根在 trunk store 的相邻残余）：生产 1 条
+// （git-trunk-store.ts——assertControlPaths 按 native realpath 归一控制路径根）按**精确路径**入列；
+// 单文件不开目录（同目录其它 src/ 文件仍 fail-closed）；回归测试用例落在既有白名单文件内。
+test('release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only', () => {
+  const result = selectOverlay([
+    'src/provider/trunk/impl/git-trunk-store.ts',
+    'test/runtime-core/project-root-canonicalization.test.ts',
+  ]);
+  assert.deepEqual(result.selected, [
+    'src/provider/trunk/impl/git-trunk-store.ts',
+    'test/runtime-core/project-root-canonicalization.test.ts',
+  ]);
+  assert.deepEqual(result.excluded, []);
+  assert.throws(() => selectOverlay(['src/provider/trunk/impl/git-trunk-store-extra.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['src/provider/trunk/impl/git-candidate-store.ts']), /Unreviewed production overlay/);
+});
+
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
 // 7 个测试文件（6 个平台真值分支 + session-rebuild-race 夹具修复）落 test/ excluded，不随构建树。
 test('release overlay returns v1.3.0 one-off entries to fail-closed or excluded', () => {

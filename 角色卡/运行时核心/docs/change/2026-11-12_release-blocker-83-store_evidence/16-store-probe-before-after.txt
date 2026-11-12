@@ -1,0 +1,7 @@
+== 修复前（blockers-3 HEAD 版 store，短名根）
+readJournal threw: Error: git-control-path-unsafe
+listJournals threw: Error: git-control-path-unsafe
+
+== 修复后（本分支 store，短名根）
+readJournal: null
+listJournals: []

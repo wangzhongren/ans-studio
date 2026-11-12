@@ -1,0 +1,12 @@
+✔ B3-2c git 控制路径：8.3 短名根与规范长名同序（不再 git-control-path-unsafe） (210.4057ms)
+ℹ {"platform":"win32","shortRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\AN2EE1~3\\PROJEC~1","canonicalRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2c-short-zCkBbc\\project-with-a-very-long-directory-name"}
+✔ B3-2c git 控制路径：符号链接祖先根归一；最终根/控制路径自身链接仍拒 (8.1617ms)
+ℹ {"platform":"win32","aliasRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2c-control-20aV8V\\alias-parent\\project","realRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-b3-2c-control-20aV8V\\real-parent\\project"}
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 460.719
