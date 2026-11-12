@@ -1,0 +1,14 @@
+{
+ "platform": "win32",
+ "tmpdir": "C:\\Users\\51054\\AppData\\Local\\Temp\\AN8D29~5",
+ "shortRoot": "C:\\Users\\51054\\AppData\\Local\\Temp\\AN8D29~5\\ans-repro83-long-directory-name-qYacHI",
+ "longRoot": "C:\\Users\\51054\\AppData\\Local\\Temp\\ans-v2-blockers4-eight-three-temp-root\\ans-repro83-long-directory-name-qYacHI",
+ "differs": true
+}
+inventory[0].projectRoot= C:\Users\51054\AppData\Local\Temp\ans-v2-blockers4-eight-three-temp-root\ans-repro83-long-directory-name-qYacHI
+realpathSync(short)= C:\Users\51054\AppData\Local\Temp\AN8D29~5\ans-repro83-long-directory-name-qYacHI
+realpathSync.native(short)= C:\Users\51054\AppData\Local\Temp\ans-v2-blockers4-eight-three-temp-root\ans-repro83-long-directory-name-qYacHI
+lstat short isSymbolicLink= false  long isSymbolicLink= false
+evidence via shortRoot= HIT
+evidence via longRoot= HIT
+evidence after dispose via shortRoot= true

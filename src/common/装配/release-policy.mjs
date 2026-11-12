@@ -28,6 +28,20 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   （chief-workflow W20×2、W21×2、W48×4 残余 8 名）。修复：证据归属按两侧 realpath 相等判定，只放行
 //   **同一真实根的不同书写形式**；不同真实根、任一侧不可解析、最终根自身为符号链接仍 fail-closed；
 //   既有断言/门禁未放宽。单文件不开目录。
+// · 发布阻断修复（B3-2，CI Windows 8.3 短名 TEMP）：生产 2 条 + 回归测试 1 条——CI Windows `TEMP` 为
+//   8.3 短名（`C:\Users\RUNNER~1\...`），而 `readGitProtectionFacts` 的根来自 `fs/promises.realpath`
+//   （Windows native 语义：展开短名）。`realpathSync` 的 JS 实现不展开短名 → 同一真实根被判不等：
+//   `inspectManagedRoleSessionEvidence` 看不到 chief 证据 ⇒ 23 名 `staleParent`（W14/W20×2/W21×2/W22/
+//   W23/W28×2/W29×4/W30×2/W33–W36/W48×4）；同一拼写缺口还会使 git-candidate 的 `expected` 根集合与
+//   authorization sidecar 的规范根契约失配。修复统一到**唯一归一规则** `canonicalProjectRoot`
+//   （`realpathSync.native`，与 record 根同一语义；不可解析返回 undefined ⇒ fail-closed）：
+//   `run-role.ts` 托管证据归属 + 编排侧授权 sidecar 传入规范根；`trunk-runtime.ts` 根集合比较同一规则。
+//   不同真实根、最终根为链接、不可解析路径、额外 worktree 根、未列名文件仍 fail-closed/拒绝；断言未放宽。
+//   单文件不开目录。
+// · 生产 2 条：src/pipeline/orchestration/run-role.ts（与第三批同文件）、
+//   src/pipeline/orchestration/trunk-runtime.ts
+// · 回归测试 1 条：test/编排/run-role-managed-root-alias.test.ts（同一文件内新增 Windows 8.3 用例；
+//   符号链接祖先/最终根链接/跨根拒绝原断言不变）
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -100,7 +114,9 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'src/service/runtime/session.ts',
   'test/runtime-core/project-root-canonicalization.test.ts',
   'test/runtime-core/write-gate-context.test.ts',
-  'src/pipeline/orchestration/run-role.ts']);
+  'src/pipeline/orchestration/run-role.ts',
+  'src/pipeline/orchestration/trunk-runtime.ts',
+  'test/编排/run-role-managed-root-alias.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

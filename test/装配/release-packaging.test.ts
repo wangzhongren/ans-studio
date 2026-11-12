@@ -81,16 +81,19 @@ test('release overlay selects the v2.0.0 macOS root canonicalization blocker fil
 
 // v2.0.0 发布阻断修复（第三批，macOS 根路径规范化在编排层的第二处比较）：生产 1 条按**精确路径**
 // 入列；单文件不开目录（同目录其它 src/ 文件与未列名 test/ 仍 excluded/fail-closed）。断言不放宽。
-test('release overlay selects the v2.0.0 orchestration root-canonicalization blocker file by exact path only', () => {
+// v2.0.0 发布阻断修复（B3-2，CI Windows 8.3 短名 TEMP）：生产 1 条（trunk-runtime.ts）+ 回归测试 1 条
+// （run-role-managed-root-alias.test.ts）按**精确路径**入列；同目录其它文件仍 fail-closed/excluded。
+test('release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only', () => {
   const result = selectOverlay([
     'src/pipeline/orchestration/run-role.ts',
+    'src/pipeline/orchestration/trunk-runtime.ts',
     'test/编排/run-role-managed-root-alias.test.ts',
     'test/编排/run-role-fixed-b2.test.ts',
   ]);
-  assert.deepEqual(result.selected, ['src/pipeline/orchestration/run-role.ts']);
-  assert.deepEqual(result.excluded, ['test/编排/run-role-managed-root-alias.test.ts',
-    'test/编排/run-role-fixed-b2.test.ts']);
-  assert.throws(() => selectOverlay(['src/pipeline/orchestration/trunk-runtime.ts']), /Unreviewed production overlay/);
+  assert.deepEqual(result.selected, ['src/pipeline/orchestration/run-role.ts',
+    'src/pipeline/orchestration/trunk-runtime.ts', 'test/编排/run-role-managed-root-alias.test.ts']);
+  assert.deepEqual(result.excluded, ['test/编排/run-role-fixed-b2.test.ts']);
+  assert.throws(() => selectOverlay(['src/pipeline/orchestration/trunk-runtime-extra.ts']), /Unreviewed production overlay/);
   assert.throws(() => selectOverlay(['src/pipeline/orchestration/run-role-extra.ts']), /Unreviewed production overlay/);
 });
 
