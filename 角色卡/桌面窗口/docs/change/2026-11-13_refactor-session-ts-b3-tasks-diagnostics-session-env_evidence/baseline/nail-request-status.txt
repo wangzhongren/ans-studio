@@ -1,0 +1,13 @@
+✔ settled(failed) 终态行：可见文本 = 人话 summary；errorCode 不进入可见行 (0.8422ms)
+✔ 请求失败系统行（delivery-note）：按系统行渲染；zh/en 人话、无技术细节 (0.23ms)
+✔ i18n 目录：三条请求状态文案中英成对、非空、en-US 零 Han、无技术细节 (0.2172ms)
+✔ 接线钉子：主进程用同一组 i18n key 发 delivery-note；Service settled.detail 带 errorCode/attempts/replaySafe (0.4165ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114.0559
+EXIT=0

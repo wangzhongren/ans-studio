@@ -1,0 +1,137 @@
+✔ 验收 facts 暴露 unverified/legacy/evidenceMismatch；P0 不伪造通过 (0.7789ms)
+✔ i18n：ui.projectState 62 key 全量、中英成对、占位符一致、英文零 Han (1.7593ms)
+✔ asProjectStateView：仅认 project-state/v1 顶层形状；不补默认值 (0.2729ms)
+✔ summary：focus 一行 + 徽标；计数只读 counts.*（与 tasks 数组不一致也照用） (0.4455ms)
+✔ summary：无 focus 不猜；derived/application/stale 标签来自既有 key (0.152ms)
+✔ blocker kind 映射：rework-pending → ui.projectState.blocker.kind.acceptanceRework（key 保留） (0.3301ms)
+✔ details：按 payload 顺序映射 flows/tasks/blockers/versions/evidence/nextStep (0.2542ms)
+✔ details：truncated 与 errors[] 如实显示；坏 manifest + 好 flow 的 active 不丢（R1 展示） (0.1491ms)
+✔ 两语言：en-US 输出无 Han、无缺失 key/参数诊断 (0.2651ms)
+✔ 只读/无本地派生：面板唯一数据入口 getProjectState，无写桥/扫描/第二套状态 (6.9479ms)
+✔ 同源计数：面板 unclosed 与任务中心 listTasks.unclosed 使用同一数值 (0.2386ms)
+✔ 空态语义：不可用/解析失败/空项目均不假造数字（视图返回 null；面板有对应 key） (0.2493ms)
+✔ ageMs：快照数值进入队列视图；缺失/非法旧快照按 0（不虚构等待） (1.1708ms)
+✔ ageText：≥1 分钟才显示人话等待（zh/en 一致语义） (0.171ms)
+✔ blockedView：「为什么没动」＝队首类别 + 阻塞原因（target-busy / origin-missing / session-closed / network） (0.2239ms)
+✔ queueGroups：运行中/排队分组仍单一来源，ageMs 随条目透出 (0.1362ms)
+✔ 接线钉子：session 快照 → main 透传 → chat-store → QueuePanel 字段端到端 (0.7397ms)
+✔ settled(failed) 终态行：可见文本 = 人话 summary；errorCode 不进入可见行 (0.8084ms)
+✔ 请求失败系统行（delivery-note）：按系统行渲染；zh/en 人话、无技术细节 (0.2451ms)
+✔ i18n 目录：三条请求状态文案中英成对、非空、en-US 零 Han、无技术细节 (0.2205ms)
+✔ 接线钉子：主进程用同一组 i18n key 发 delivery-note；Service settled.detail 带 errorCode/attempts/replaySafe (0.404ms)
+✔ O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文） (373.0562ms)
+✔ O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建 (209.8041ms)
+✔ O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发） (506.3094ms)
+✔ O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重 (454.2362ms)
+✔ O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次 (409.4164ms)
+✔ O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支 (1.8875ms)
+✔ F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话） (91.7561ms)
+✔ F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装） (46.2767ms)
+✔ G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡 (204.8151ms)
+✔ G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建 (201.8554ms)
+✔ G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md (202.7693ms)
+✔ G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对） (198.5572ms)
+✔ G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响 (214.7318ms)
+✔ G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞 (1.303ms)
+✔ 脱敏：凭据/令牌/项目外绝对路径/换行与 200 字截断 (1.1036ms)
+✔ 追加/读取：字段白名单、since/limit、坏行跳过、非法角色 id fail-closed (18.3987ms)
+✔ 非法角色 id：返回失败（不落盘、不抛） (0.7328ms)
+✔ 轮转：超过上限时保留 .1，读取仍按旧→新返回最近条目 (12.3748ms)
+✔ SessionManager 观察器：会话消息/工具/终局自动写日志（脱敏），角色无需上报 (168.5632ms)
+✖ safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递 (109.0465ms)
+✔ unsafe：external 副作用 0 次自动重派；原任务保持未收口并如实给原因 (136.9581ms)
+✔ needs-review：部分写入 ⇒ 不自动重派；终止未确认 ⇒ unsafe (62.7991ms)
+✔ 重派上限：同链已 2 次仍卡死 ⇒ 第 3 次不自动重派（升级） (9.3527ms)
+✖ B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务 (237.5459ms)
+✖ B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐） (91.1638ms)
+✔ C-04 decision 开关关闭（真实 channel）：升级卡呈现客户，客户选 continue ⇒ 任务保持未收口并留人工处置 (128.4097ms)
+✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (180002.0512ms)
+✔ C-04 升级卡 redispatch/replace：不自动执行危险动作，写人工处置系统行且任务保持未收口 (155.8387ms)
+✔ B-08 终止证据：role.terminated 记录 exit/signal；temp/<role>/ 部分产物物理隔离到 staging (47.9096ms)
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2040.9928ms)
+✔ 任务已收口：恢复不重投；列表显示 closed (108.1615ms)
+✔ P0（2026-10-30）：默认自动中止保持 0——本波不顺手改客户 2026-10-21 口径 (0.473ms)
+✔ 复用单一 tick：start 只创建一个 setInterval（幂等）；巡检/日志静默不新增定时器 (0.5747ms)
+✔ 既有信号 #1：轮次到点检查仍工作（budget/挂起卡语义不变） (1.5919ms)
+✔ 既有信号 #2/#3/#4 仍工作（队列积压/命令超时/重复失败） (0.5516ms)
+✔ e2e 离线暂停：deadline 跨 idle 时限不超时；恢复后 resume 并正常完成；恰一条 settled、无 handback (225.212ms)
+✔ e2e 离线超窗：network-offline-timeout 终态 failed；人话短报、detail errorCode；无额外 settled/handback (102.299ms)
+✔ e2e F1：已知离线 + 探针异常 ⇒ 保持离线、不 resume deadline/不超时；真正恢复后正常完成 (246.6921ms)
+✔ e2e 队列：离线保留并标 blockedReason=network；恢复后按既有 drain 继续且恰投递一次 (249.7742ms)
+✔ e2e F1 队列：已知离线 + 探针异常 ⇒ 不解除 network 阻塞、不 drain；真正恢复后恰投递一次 (311.0621ms)
+✔ e2e 网络失败系统行：settled(failed, network-offline-timeout) ⇒ 恰一条人话 delivery-note，无技术 code (77.5398ms)
+ℹ tests 62
+ℹ suites 0
+ℹ pass 57
+ℹ fail 4
+ℹ cancelled 1
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 188246.1365
+
+✖ failing tests:
+
+test at test\桌面应用\stuck-redispatch.test.ts:112:1
+✖ safe 重派：新 taskId + retryOf + 同 idempotencyKey；原任务 closed/rework；新任务投递 (109.0465ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'rework'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b3/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:129:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'rework',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\stuck-redispatch.test.ts:232:1
+✖ B-07 自动换人：同链第 2 次重派自动选择替代角色，并缩窄任务 (237.5459ms)
+  AssertionError [ERR_ASSERTION]: 替代角色收到重派任务
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b3/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:252:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\stuck-redispatch.test.ts:260:1
+✖ B-07 升级卡：连续 2 次重派仍卡死 ⇒ 经 customerInput 提交继续/重派/换人/终止（唯一推荐） (91.1638ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - 'rejected'
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b3/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/stuck-redispatch.test.ts:292:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'rejected',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\stuck-redispatch.test.ts:346:1
+✖ C-04 decision 开关开启（真实 channel）：judge 按唯一推荐项代选 terminate ⇒ 0 张客户卡 + 结果行 + 任务收口 (180002.0512ms)
+  'test timed out after 180000ms'
+
+test at test\桌面应用\task-restart.test.ts:57:1
+✖ 重启恢复：未投递任务重新入队一次；已投递不前移；重复调用不重复投；坏行跳过 (2040.9928ms)
+  Error: 等待超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b3/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:21:47)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b3/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/task-restart.test.ts:88:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+EXIT=1

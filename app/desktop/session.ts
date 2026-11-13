@@ -239,31 +239,10 @@ import {
   type VersionChangeStack,
 } from "./version-change.ts";
 
-/**
- * 内置来源回交→Lead 与同轮 settle 治理反馈的去重窗口（2026-10-24）：标记只在回交入队后到本轮
- * settle 之间的短窗口内有效；超出即不抑制（宁可重复一次，也不永久吞掉后续轮次的反馈）。
- */
-const GOVERNANCE_HANDBACK_MIRROR_DEDUPE_MS = 5 * 60 * 1000;
-
 /** 2026-11-02（版本决策）：slug 校验（与 model/runtime.ts 单一来源一致）。 */
 const GOVERNANCE_SLUG_RE = new RegExp(GOVERNANCE_SLUG_PATTERN);
 const VERSION_DECISION_SYSTEM_PREFIX = "[系统·版本决策] ";
 
-/**
- * 治理反馈客户投影的登记表（2026-10-25 A3）：`queueKey + sha256(text)` → 投影。
- * 发送成功时登记；`prompt-input` 回显到达时按同一文本查表并附到事件 detail。
- * 有界 + TTL：只有运行期提示用途，不持久化（恢复/回放行回退到既有文本归类）。
- */
-const GOVERNANCE_CLIENT_PROJECTION_LIMIT = 128;
-const GOVERNANCE_CLIENT_PROJECTION_TTL_MS = 30 * 60 * 1000;
-
-/** Proof settle 状态措辞（只用于「状态 + 指针」投递；不解释报告内容、不猜验收结论）。 */
-const PROOF_STATUS_TEXT: Readonly<Record<RuntimeTurnOutcome, string>> = {
-  completed: "本轮已完成",
-  failed: "本轮失败",
-  aborted: "本轮已中止",
-  timed_out: "本轮超时",
-};
 // ↑ G-1／A2（2026-10-16 客户批准；设计 `2026-10-16_design_contract-workflow-dispatch.md` §四/§九 A2；
 // 编排 A1 交回接口见 `角色卡/编排/docs/change/2026-10-16_change_contract-workflow-dispatch-a1.md` §五）：
 // 派发必读块的**提取**（`extractDispatchReadPaths`）、**判据**（`planDispatchDelivery`：契约缺失 ⇒ fail-closed
@@ -401,6 +380,14 @@ import {
 // 经 `PersistenceHandbackPort` 回调注入（参数逐位原样转发）。模块均只导入 contracts/shared 与外部 src。
 import { Evidence } from "./session/evidence.ts";
 import { Persistence } from "./session/persistence.ts";
+// B3（2026-11-13）：任务账本业务/重派/终止/升级（17 方法）→ `./session/tasks.ts`；看护状态/诊断尾部/治理投影/
+// 网络状态（17 方法）→ `./session/diagnostics.ts`；边界/画像重建、技能/MCP 安装卸载、激活刷新（11 方法）→
+// `./session/session-env.ts`。类内保留同名同签名同可见性的**薄委托**；各模块读取的实例状态按方案 §3.6
+// 暂留本类，以同一 Map/Set 实例引用（get/set 回调）经状态面注入；未迁出的门面方法经端口回调注入
+// （参数逐位原样转发）。模块均只导入 contracts/shared 与外部 src。
+import { Tasks } from "./session/tasks.ts";
+import { Diagnostics } from "./session/diagnostics.ts";
+import { SessionEnv } from "./session/session-env.ts";
 
 // —— 51 导出面（方案附录 B）：值 6 + 类型 45。既有导入路径（src/model 等）的转出保持原位置（见上下）。 ——
 export { shouldSuppressStarTaskReport } from "./session/shared/text.ts";
@@ -434,14 +421,9 @@ export const MAX_LIVE_SESSIONS = 3;
 /** run-change 三模式的**类型**再导出（形状唯一来源仍是 `run-manifest.ts`；界面/conftest 不复制形状）。 */
 export type { RunChangeMode } from "../../src/common/编排/run-manifest.ts";
 
-/**
- * **`[系统·安装]`：能力安装/卸载完成后的定格系统行文首**（PM 冻结符号，G-4 2026-10-16）——**技能（I3）
- * 与外来 MCP（V2）两类安装动作共用同一子类**。形态契约＝「`[系统·<子类>]` ＋一个 ASCII 空格」，与
- * 桌面UI `tool-rows.js::SYSTEM_HEAD`（`[系统·` 开头、子类闭合于 `]`、≤12 字、后随空白或文末）的归类
- * 判据对齐（改形态 = 系统类静默回落普通气泡——单点在彼处注释）。该行为 `kind:"system"` 第四类投递正文
- * （G-2/W2 同一套投递机真投递给 su；不可撤回——「不可撤回面同 system kind」）。
- */
-export const CAPABILITY_INSTALL_SYSTEM_PREFIX = "[系统·安装]";
+// `[系统·安装]` 文首常量随 B3 的 applySkillChange/applyMcpChange 迁入 `./session/session-env.ts`，
+// 此处仅原样转出（公开面/冻结值不变；51 导出面快照由结构测试钉住）。
+export { CAPABILITY_INSTALL_SYSTEM_PREFIX } from "./session/session-env.ts";
 
 /** 「已投递」应用任务标记的内存上界（FIFO 淘汰；防长跑进程无界增长）。 */
 const MAX_DELIVERED_APP_TASK_IDS = 1024;
@@ -472,24 +454,14 @@ export class SessionManager {
   private readonly inventoryPublicationErrors = new Map<string, string>();
   private readonly observedInventoryRoots = new Set<string>();
   private readonly installationRefusals: InstallationEffectRefusalObservation[] = [];
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   installationEffectObservations(projectRoot: string): InstallationEffectRefusalObservation[] {
-    return structuredClone(this.installationRefusals.filter(event => event.projectRoot === projectRoot));
+    return this.sessionEnv.installationEffectObservations(projectRoot);
   }
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private refuseUnprovenInstallation(bindingId: string, toolName: InstallationCapabilityTool, projectRoot: string,
     actorRoleId: string, runtime: RuntimeKind, handle: RoleSessionHandle | undefined, metadata?: ReportHandbackMetadata): InstallSkillReceipt {
-    const entry = this.sessions.get(this.sessionKey(projectRoot, actorRoleId, runtime));
-    const origin = handle && entry?.handle === handle ? entry.origins.running : undefined;
-    const observation: InstallationEffectRefusalObservation = { bindingId, toolName, projectRoot, actorRoleId, runtime,
-      observedAt: new Date().toISOString(), disposition: "refused-before-activation", reasonCode: "effect-scope-unproven",
-      ...(handle?.sessionId ? { coreSessionId: handle.sessionId } : {}),
-      ...(metadata?.turnId ? { toolTurnId: metadata.turnId } : {}),
-      ...(origin?.turnId ? { activeTurnId: origin.turnId } : {}), ...(origin?.kind ? { originKind: origin.kind } : {}) };
-    this.installationRefusals.push(observation);
-    if (this.installationRefusals.length > 128) this.installationRefusals.shift();
-    createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: actorRoleId }).record("capability.effect.refused", {
-      toolName, bindingId, reasonCode: observation.reasonCode, ...(observation.coreSessionId ? { sessionId: observation.coreSessionId } : {}),
-      ...(observation.toolTurnId ? { turnId: observation.toolTurnId } : {}) });
-    return { ok: false, reason: "effect-scope-unproven", message: "此安装或卸载操作的执行范围尚未完成核验，未执行。现有配置保持不变，请稍后重试。" };
+    return this.sessionEnv.refuseUnprovenInstallation(bindingId, toolName, projectRoot, actorRoleId, runtime, handle, metadata);
   }
 
   private runTaskIsFenced(projectRoot: string, taskId?: string, runId?: string): boolean {
@@ -854,6 +826,18 @@ export class SessionManager {
   /** B2：报告/投递持久化状态与回执操作（6 方法 → `./session/persistence.ts`）。
    *  五个状态 Map/Set 按方案 §3.6 **暂留本类**，构造时以同一实例引用注入（B1 同款口径）。 */
   private readonly persistence: Persistence;
+  /** B3：任务账本业务/重派/终止/升级（17 方法 → `./session/tasks.ts`）。状态
+   *  starTaskIds/activeDispatchKeys/escalationRequests/lastRoleActivity 按方案 §3.6 暂留本类，
+   *  构造时以同一实例引用注入（B1/B2 同款口径）。 */
+  private readonly tasks: Tasks;
+  /** B3：看护/状态文本/诊断尾部/治理投影/网络状态（17 方法 → `./session/diagnostics.ts`）。
+   *  lastTurns/lastAssistantText/governanceHandbackMirrored/governanceClientProjections/networkState
+   *  按方案 §3.6 归属本模块，B3 暂留本类（同一实例引用；networkState 经 get/set 回调接回字段）。 */
+  private readonly diagnostics: Diagnostics;
+  /** B3：边界/画像重建、技能/MCP 安装卸载、激活刷新（11 方法 → `./session/session-env.ts`）。
+   *  boundaryRefreshVersion/profileRevisions/rebuildChains/installationRefusals 按方案 §3.6 归属本模块，
+   *  B3 暂留本类（同一实例引用；selectionVersion/activeRoleId 经 get/set 回调接回字段）。 */
+  private readonly sessionEnv: SessionEnv;
   /** 回交去重键（`handbackKey` 单一来源；`projectRoot\0<key>`）——**一条回交只投递一次**（永不放行重投）。 */
   private readonly enqueuedHandbackKeys = new Set<string>();
   private readonly pendingHandbackKeys = new Set<string>();
@@ -961,6 +945,80 @@ export class SessionManager {
           this.handleHandback(projectRoot, runtime, hb, report, liveReport, liveDurability, flowId),
         handbackFlowId: (entry, hb) => this.handbackFlowId(entry, hb),
       },
+    );
+    // B3 两阶段装配：模块构造时注入只读端口/状态引用；端口方法只在运行期调用（不改变构造期语义）。
+    this.tasks = new Tasks(
+      {
+        sessions: this.sessions,
+        deliveryQueues: this.deliveryQueues,
+        activeDeliveries: this.activeDeliveries,
+        lastGovernanceRuntime: this.lastGovernanceRuntime,
+        starTaskIds: this.starTaskIds,
+        activeDispatchKeys: this.activeDispatchKeys,
+        escalationRequests: this.escalationRequests,
+        lastRoleActivity: this.lastRoleActivity,
+      },
+      {
+        restoreRequestState: (projectRoot, state) => this.restoreRequestState(projectRoot, state),
+        restoreVersionDecisions: (projectRoot, state) => this.restoreVersionDecisions(projectRoot, state),
+        findLiveRuntime: (projectRoot, roleId) => this.findLiveRuntime(projectRoot, roleId),
+        enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item),
+        drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime),
+        appDispatchClientMessageId: (dedupKey) => this.appDispatchClientMessageId(dedupKey),
+        stopExactController: (input, caller) => this.stopExactController(input, caller),
+        ensureFreshRoleSession: (projectRoot, roleId, runtime) => this.ensureFreshRoleSession(projectRoot, roleId, runtime),
+        withRequestLifecycle: (projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle) =>
+          this.withRequestLifecycle(projectRoot, sourceRoleId, request, metadata, raw, buildContext, requestIdOverride, lifecycle),
+      },
+      deps,
+    );
+    this.diagnostics = new Diagnostics(
+      {
+        sessions: this.sessions,
+        deliveryQueues: this.deliveryQueues,
+        activeDeliveries: this.activeDeliveries,
+        openChains: this.openChains,
+        rebuildChains: this.rebuildChains,
+        lastGovernanceRuntime: this.lastGovernanceRuntime,
+        lastRoleActivity: this.lastRoleActivity,
+        lastTurns: this.lastTurns,
+        lastAssistantText: this.lastAssistantText,
+        governanceHandbackMirrored: this.governanceHandbackMirrored,
+        governanceClientProjections: this.governanceClientProjections,
+        getNetworkState: () => this.networkState,
+        setNetworkState: (state) => { this.networkState = state; },
+        getActiveRoleId: () => this.activeRoleId,
+      },
+      {
+        openBackground: (req) => this.openBackground(req),
+        sendBackground: (input) => this.sendBackground(input),
+        notifyRoleState: (projectRoot, targetRoleId, runtime) => this.notifyRoleState(projectRoot, targetRoleId, runtime),
+        drainAllQueuesFor: (projectRoot) => this.drainAllQueuesFor(projectRoot),
+        drainQueue: (projectRoot, targetRoleId, runtime) => this.drainQueue(projectRoot, targetRoleId, runtime),
+        enqueueDelivery: (projectRoot, targetRoleId, item) => this.enqueueDelivery(projectRoot, targetRoleId, item),
+      },
+      deps,
+    );
+    this.sessionEnv = new SessionEnv(
+      {
+        sessions: this.sessions,
+        rebuildChains: this.rebuildChains,
+        installationRefusals: this.installationRefusals,
+        getSelectionVersion: () => this.selectionVersion,
+        getBoundaryRefreshVersion: () => this.boundaryRefreshVersion,
+        getActiveRoleId: () => this.activeRoleId,
+        setActiveRoleId: (roleId) => { this.activeRoleId = roleId; },
+      },
+      {
+        disposeEntry: (roleId, entry) => this.disposeEntry(roleId, entry),
+        hasBusyRuntime: (runtime) => this.hasBusyRuntime(runtime),
+        openInternalUnsafe: (req, userInitiated, selectionVersion, internalReopen) => this.openInternalUnsafe(req, userInitiated, selectionVersion, internalReopen),
+        profileRevision: (runtime) => this.profileRevision(runtime),
+        rebuildSession: (target, beforeDispose) => this.rebuildSession(target, beforeDispose),
+        isCustomerInitiatedTurn: (projectRoot, runtime, roleId) => this.isCustomerInitiatedTurn(projectRoot, runtime, roleId),
+        watchdogDeliver: (projectRoot, message) => this.watchdogDeliver(projectRoot, message),
+      },
+      deps,
     );
   }
 
@@ -1414,69 +1472,17 @@ export class SessionManager {
   // 开会话时解析的旧边界 ⇒ 写入被拒（「目标路径未匹配任何边界条目」）。信号只取**读盘内容哈希**
   // （可信信号，不用界面推测）；检出陈旧 ⇒ **作废重建**（dispose → 立即按新边界重开）并如实记一行。
 
-  /** 该会话的边界快照**哪一处**变了（返回变化的相对路径；未变 ⇒ null）。
-   *  **G-4 裁定⑤（2026-10-16 客户批准）**：第二段＝「该角色已安装技能」集合的**当刻重推导**比对——
-   *  ① 冻结路径逐字节（含技能文件的内容编辑）；② 集合差（新增：新技能落盘/登记改列本角色 ⇒ 冻结集里
-   *  没有的路径出现；移除：冻结集里的路径从当刻集合消失）。任一差异返回该相对路径。
-   *  `currentSkillPaths` 返回 `null`（读目录防御失败）⇒ 跳过本轮集合比对（坏件跳过——绝不误重建）；
-   *  零技能两侧皆空 ⇒ 无差（既有语义逐字不变）。 */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private async boundaryDiff(entry: LiveSession): Promise<string | null> {
-    for (const f of entry.boundaryPaths) {
-      const rel = path.relative(entry.projectRoot, f);
-      if (entry.boundaryPrints[rel] !== (await filePrint(f))) return rel;
-    }
-    const current = await this.currentSkillPaths(entry.projectRoot, entry.roleId);
-    if (current !== null) {
-      const frozen = new Set(entry.skillPaths);
-      const currentSet = new Set(current);
-      const first = [...currentSet].filter((f) => !frozen.has(f)).sort()[0]
-        ?? [...frozen].filter((f) => !currentSet.has(f)).sort()[0];
-      if (first !== undefined) return path.relative(entry.projectRoot, first);
-    }
-    return null;
+    return this.sessionEnv.boundaryDiff(entry);
   }
 
-  /**
-   * **G-4 裁定⑤**：**当刻重新推导**该角色「已安装技能」的参与文件集（`SKILL.md`＋`install.md` 的绝对
-   * 路径）。判据与渲染器注入节**同集合**：
-   * · 登记读取/解析**唯一来源**＝编排 `readSkillRegistration`（**不复制解析逻辑**）——返回 `undefined`
-   *   （坏件/缺失/名非法）⇒ 跳过该条（与渲染器坏件跳过逐字同口径）；
-   * · `status !== "installed"` 跳过（`uninstalled` ＝已停用）；`roles` 不含本角色跳过；
-   * · `SKILL.md` 缺失**不**在此过滤：路径仍入集合（其指纹为 `<missing>`）——它后来出现即触发重建，
-   *   与渲染器「补好文件 ⇒ 新会话注入」收敛一致。
-   * 返回 `null`＝本轮**不可推导**（`docs/skills` 读目录失败且非 ENOENT——坏件跳过防御：绝不据此误判
-   * 集合差）；`[]`＝零技能（含目录不存在＝项目从未装过技能）。
-   */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private async currentSkillPaths(projectRoot: string, roleId: string): Promise<string[] | null> {
-    const skillsRoot = path.join(projectRoot, "docs", "skills");
-    let entries: import("node:fs").Dirent[];
-    try {
-      entries = await fs.promises.readdir(skillsRoot, { withFileTypes: true });
-    } catch (err) {
-      return (err as NodeJS.ErrnoException).code === "ENOENT" ? [] : null;
-    }
-    const paths: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue; // docs/skills 下直接放的文件不是技能条目（渲染器同口径）
-      const registration = readSkillRegistration(projectRoot, entry.name);
-      if (registration === undefined || registration.status !== "installed" || !registration.roles.includes(roleId)) continue;
-      paths.push(path.join(skillsRoot, entry.name, "SKILL.md"));
-      paths.push(path.join(skillsRoot, entry.name, "install.md"));
-    }
-    paths.sort();
-    return paths;
+    return this.sessionEnv.currentSkillPaths(projectRoot, roleId);
   }
 
-  /** 陈旧 ⇒ 作废重建（dispose → 立即重开 + 如实记行）。返回 undefined = 未陈旧/在跑/已被并发替换（不打断）；
-   *  否则返回 `{changed, reopened}`——调用方据此决定续发/续投，或按失败如实处理。
-   *
-   *  **按角色串行化（2026-10-13 状态机修复；同 drainChains 先例）**：同一角色的重建**至多一个在跑**——
-   *  settle 触发的 `refreshStaleBoundaries` 与用户紧接的 `send`/`open` 都会查陈旧，两者**同时**判「陈旧」时：
-   *  旧实现双双 dispose+重开，晚到者的 dispose 会误删对方刚建的新会话（可能已开跑轮次）并推 busy=false
-   *  （真机「轮次还在跑、忙态翻假、停止钮消失 / 消息落空」的根因）。串行后第二个调用**等第一个重建完全
-   *  收尾**再查——那时条目已是新会话（快照新鲜）⇒ 无陈旧 ⇒ no-op；发送/开启照常续在新会话上。
-   *  **TOCTOU 重校验（纵深防御）**：每个 `await`（读盘 diff / 会话文件探测）之后再验**同一引用、仍未开跑**
-   *  ——即便有人绕过串行链（防御层），也不会误删新条目/打断在跑轮次。 */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private rebuildIfBoundaryStale(
     roleId: string,
     userInitiated: boolean,
@@ -1485,110 +1491,27 @@ export class SessionManager {
     // 在混合项目里换回 legacy）。settle 扫描/手动重建等调用不传，行为逐字不变。
     forcedWorkflowMode?: WorkflowMode,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
-    const prev = this.rebuildChains.get(roleId) ?? Promise.resolve();
-    const run = prev.then(() => this.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated, selectionVersion, forcedWorkflowMode));
-    const tail = run.then(
-      () => undefined,
-      () => undefined
-    );
-    this.rebuildChains.set(roleId, tail);
-    void tail.then(() => {
-      if (this.rebuildChains.get(roleId) === tail) this.rebuildChains.delete(roleId); // 链尾清理（防泄漏）
-    });
-    return run;
+    return this.sessionEnv.rebuildIfBoundaryStale(roleId, userInitiated, selectionVersion, forcedWorkflowMode);
   }
 
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private async rebuildIfBoundaryStaleUnsafe(
     roleId: string,
     userInitiated: boolean,
     selectionVersion: number,
     forcedWorkflowMode?: WorkflowMode,
   ): Promise<{ changed: string; reopened: OpenResult } | undefined> {
-    const entry = this.sessions.get(roleId);
-    if (!entry) return undefined;
-    const wasActive = this.activeRoleId === roleId;
-    if (entry.busy) return undefined; // 在跑的轮次不打断（settle 后放行/下次发言/下次投递再查）
-    let changed = await this.boundaryDiff(entry);
-    if (changed === null && entry.profileRevision !== this.profileRevision(entry.runtime)) changed = mainT("main.session.rebuildChangedRuntimeConfig");
-    if (changed === null) return undefined;
-    if (entry.profileRevision !== this.profileRevision("pi") && entry.runtime === "pi" && this.hasBusyRuntime("pi")) return undefined;
-    if (this.sessions.get(roleId) !== entry || entry.busy) return undefined; // 读盘期间被替换/开跑（TOCTOU）
-    const projectRoot = entry.projectRoot;
-    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId });
-    diagnostic.record("session.rebuild.start");
-    // dispose 保留 ANS 回放；模型上下文是否恢复只读新句柄实际返回。
-    await this.disposeEntry(roleId, entry);
-    // 如实记行（哪个文件变的直接点名）：G-4 裁定⑤ 起陈旧源还有「已安装技能」——文档面不同、措辞分开
-    // （技能不是边界；既不夸大也不含糊），其余分支逐字沿用既有文案（测试已钉）。
-    const isSkillChange = changed.split(path.sep).join("/").startsWith("docs/skills/");
-    this.deps.emitEvent({
-      roleId: entry.roleId, projectRoot, runtime: entry.runtime,
-      event: {
-        kind: "message",
-        summary: isSkillChange
-          ? mainT("main.session.rebuiltSkills", { changed })
-          : mainT("main.session.rebuiltBoundary", { changed }),
-      },
-    });
-    // 重建不自行选择角色。仅成功且用户意图未改变时恢复被 dispose 清空的活动目标。
-    // **F-2-opt2 防死锁**：本重开是**持锁方（openInternal 的续接前查陈旧）所等待的那条链**内的续段——
-    // 必须直调 `openInternalUnsafe`（不再入 openChains）并带 `internalReopen`（不再查陈旧/不再入 rebuild 链，
-    // 防「链内等待自身尾」的自死锁）；此处旧条目已 dispose（或纯新建），不会再触发任何 reopen 预检。
-    const reopened = await this.openInternalUnsafe({ projectRoot, roleId: entry.roleId, runtime: entry.runtime, ...((entry.boundAssignment?.taskId ?? entry.assignedTaskId) ? { taskId: entry.boundAssignment?.taskId ?? entry.assignedTaskId } : {}), ...(forcedWorkflowMode !== undefined ? { forcedWorkflowMode } : {}) }, false, this.selectionVersion, true);
-    if (reopened.ok) this.queueRebuildWritePermitsNotice(roleId); // 入参＝会话键（本函数参数即键）
-    if (reopened.ok && (wasActive || userInitiated) && this.selectionVersion === selectionVersion) {
-      const current = this.sessions.get(roleId);
-      if (current && current.projectRoot === projectRoot) this.activeRoleId = roleId;
-    }
-    if (!reopened.ok) {
-      diagnostic.error("session.rebuild.failed", new Error(reopened.error || "重开失败"));
-      this.deps.emitEvent({
-        roleId: entry.roleId, projectRoot, runtime: entry.runtime,
-        event: { kind: "message", summary: mainT("main.session.rebuildFailed", { detail: reopened.error ?? mainT("shared.common.unknownReason") }) },
-      });
-    }
-    diagnostic.record("session.rebuild.end", { ok: reopened.ok });
-    return { changed, reopened };
+    return this.sessionEnv.rebuildIfBoundaryStaleUnsafe(roleId, userInitiated, selectionVersion, forcedWorkflowMode);
   }
 
-  /**
-   * **F-5-opt1（桌面侧，2026-10-16 客户批准）**：确认制会话（su）重建 ⇒ 编排闭包内「客户确认才发行」的
-   * **已发行写权集随之清零**（内存态、不随新句柄保留）——对**模型**如实可见（除既有 UI 重建行外）。
-   * 经编排的 `queueModelNotice` 把注记排进**下一轮输入前缀**（送达一次即消费；不单独开轮、不改任何判定——
-   * 接口与语义见 run-role.ts；文案用其**单一来源**常量，绝不在此各写一份）。**非确认制会话没有发行过任何
-   * 写权**（gate 不收窄，连 request_confirmation 都未注册）⇒ 不排（绝不向模型说假话）。旧替身句柄不带该
-   * 方法；如实降级，不假装已送达）。**陈旧重建（O-1）与人工重建（G-2/W4）共用本件**。
-   * ⚠ 入参是 `sessions` 表的**会话键**（`sessionKey`）——不是裸 roleId（`rebuildChains` 同以键索引）。
-   */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private queueRebuildWritePermitsNotice(sessionKey: string): void {
-    const rebuiltEntry = this.sessions.get(sessionKey);
-    if (rebuiltEntry?.confirmGated) {
-      try {
-        rebuiltEntry.handle.queueModelNotice?.(REBUILT_SESSION_WRITE_PERMITS_NOTICE);
-      } catch {
-        // 注记只是诚实提示，不是判定链的一环：排入失败不打断重建收尾（重建本身已如实记行）。
-      }
-    }
+    this.sessionEnv.queueRebuildWritePermitsNotice(sessionKey);
   }
 
-  /**
-   * O-1：对所有**活会话**扫一遍边界快照（su 一轮结束时由 Interface 触发——「边界可能刚被 su 改过」的
-   * 可信时机）。陈旧者作废重建（如实记行）；**在跑的轮次跳过**（下一时机再查）。逐会话 try/catch 隔离
-   * （一个失败不影响其它；不上抛——本方法经 `void` fire-and-forget 调用）。返回重建的角色 id。
-   */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   async refreshStaleBoundaries(): Promise<string[]> {
-    const rebuiltIds: string[] = [];
-    const refreshVersion = this.boundaryRefreshVersion;
-    for (const roleId of [...this.sessions.keys()]) {
-      if (this.boundaryRefreshVersion !== refreshVersion) break;
-      try {
-        const rebuilt = await this.rebuildIfBoundaryStale(roleId, false);
-        if (rebuilt !== undefined) rebuiltIds.push(roleId.split("\u0000")[1]);
-      } catch {
-        // 逐会话隔离（读盘异常等）：跳过该角色，不打断事件流；下次时机再查。
-      }
-    }
-    return rebuiltIds;
+    return this.sessionEnv.refreshStaleBoundaries();
   }
 
   /**
@@ -2543,24 +2466,19 @@ export class SessionManager {
     return { rejection, presented };
   }
 
-  /** 治理主人（回交/系统行落位；2026-10-19 验收自动派发用）：trio=Convener；single=主入口（su）；未枚举 ⇒ null。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   governanceOwnerRoleId(projectRoot: string): string | null {
-    return this.handbackOwnerRoleId(projectRoot);
+    return this.diagnostics.governanceOwnerRoleId(projectRoot);
   }
 
-  /** 派发主人最近一次开会话所用 runtime（验收检查后台开 Proof 会话时择路；无记录 ⇒ undefined）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   governanceRuntimeFor(projectRoot: string): RuntimeKind | undefined {
-    return this.lastGovernanceRuntime.get(projectRoot);
+    return this.diagnostics.governanceRuntimeFor(projectRoot);
   }
 
-  /**
-   * **当前活动会话的 runtime**（客户正在看的那个；仅当它属于该项目）：自动验收派发/冷启动补齐的
-   * 优先级 1 只读视图。无活动会话 / 活动会话属于别的项目 ⇒ undefined（调用方按解析器继续降级）。
-   */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   activeRuntimeFor(projectRoot: string): RuntimeKind | undefined {
-    if (typeof projectRoot !== "string" || projectRoot === "" || this.activeRoleId === null) return undefined;
-    const entry = this.sessions.get(this.activeRoleId);
-    return entry !== undefined && entry.projectRoot === projectRoot ? entry.runtime : undefined;
+    return this.diagnostics.activeRuntimeFor(projectRoot);
   }
 
   /**
@@ -4413,55 +4331,14 @@ export class SessionManager {
     return appendRoleActivity(projectRoot, roleId, input, { lastRoleActivity: this.lastRoleActivity, now: () => this.now() });
   }
 
-  /** 从会话事件提取摘要并写运行日志（消息/工具/轮次终局；不写事件 detail 原文）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private observeRoleEvent(projectRoot: string, roleId: string, event: OrchestrationEvent): void {
-    if (event.kind === "handback") {
-      this.appendRoleActivity(projectRoot, roleId, {
-        kind: "report.received",
-        summary: event.handback?.summary ?? event.summary,
-        status: event.handback?.status,
-        ...(event.handback?.taskId !== undefined ? { taskId: event.handback.taskId } : {}),
-        ...(event.handback?.turnId !== undefined ? { turnId: event.handback.turnId } : {}),
-      });
-      return;
-    }
-    const detail = event.detail !== null && typeof event.detail === "object" ? event.detail as Record<string, unknown> : {};
-    const tool = typeof detail.toolName === "string"
-      ? detail.toolName
-      : detail.call !== null && typeof detail.call === "object" && typeof (detail.call as { name?: unknown }).name === "string"
-        ? String((detail.call as { name: unknown }).name)
-        : undefined;
-    const status = typeof detail.status === "string"
-      ? detail.status
-      : typeof detail.outcome === "string"
-        ? detail.outcome
-        : detail.ok === true ? "ok" : detail.ok === false ? "failed" : undefined;
-    const kind = event.kind === "tool_call" ? "tool.call"
-      : event.kind === "accepted" ? "tool.result"
-        : event.kind === "denied" ? "tool.denied"
-          : event.kind === "settled" ? "turn.end"
-            : event.kind === "message" ? "message"
-              : "event";
-    this.appendRoleActivity(projectRoot, roleId, {
-      kind,
-      summary: event.summary,
-      ...(tool !== undefined ? { tool } : {}),
-      ...(status !== undefined ? { status } : {}),
-      ...(typeof event.turnId === "string" && event.turnId !== "" ? { turnId: event.turnId } : {}),
-    });
+    this.tasks.observeRoleEvent(projectRoot, roleId, event);
   }
 
-  /** `role_activity_log` 数据面（工具只读；失败如实回执）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private async roleActivityLogText(projectRoot: string, query: RoleActivityLogPayload): Promise<WatchdogToolResult> {
-    const roleId = typeof query?.roleId === "string" ? query.roleId.trim() : "";
-    if (roleId === "") return { ok: false, message: "role_activity_log：缺少 roleId。" };
-    const result = await readRoleLog(projectRoot, {
-      roleId,
-      ...(typeof query.since === "string" && query.since !== "" ? { since: query.since } : {}),
-      ...(typeof query.limit === "number" ? { limit: query.limit } : {}),
-    });
-    if (!result.ok) return { ok: false, message: `role_activity_log：${result.message ?? "读取失败"}` };
-    return { ok: true, text: formatRoleActivityText(result, roleId) };
+    return this.tasks.roleActivityLogText(projectRoot, query);
   }
 
   // —————————————— B 批：任务列表 / 重启恢复 / 终止 / 重派（界面与专项测试入口） ——————————————
@@ -5276,134 +5153,31 @@ export class SessionManager {
     return out;
   }
 
-  /** 公开只读入口：角色运行日志（供 `role_activity_log` 工具/界面；失败如实）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async readRoleActivityLog(projectRoot: string, query: RoleActivityLogPayload): Promise<WatchdogToolResult> {
-    return this.roleActivityLogText(projectRoot, query);
+    return this.tasks.readRoleActivityLog(projectRoot, query);
   }
 
-  /** 任务列表（只读；坏行数如实；`tasks.jsonl` 不存在 ⇒ 空列表）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async listTasks(projectRoot: string): Promise<TaskListView> {
-    const state = await this.readTasks(projectRoot);
-    const tasks = taskCards(state);
-    for (const record of state.records.values()) {
-      this.starTaskIds.add(record.taskId);
-      this.rememberTaskCreator(record.taskId, record.created);
-    }
-    return {
-      projectRoot,
-      tasks,
-      errors: state.errors.length,
-      unclosed: state.unclosed.length,
-    };
+    return this.tasks.listTasks(projectRoot);
   }
 
   // —————————————— 2026-11-02：全局任务状态 / 版本决策（A2） ——————————————
 
-  /**
-   * `project-state:get` 数据源：**直接**调用 A1 `buildProjectStateView`（UI 与工具同一 builder）。
-   * 纯读、零写入；裁剪/有界/部分结果全部由 A1 决定，本层不复制派生。
-   */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async projectStateView(projectRoot: string, scope: { roleId?: string; viewerRoleId?: string; full?: boolean; flowId?: string; now?: Date } = {}): Promise<ProjectStateView> {
-    return buildProjectStateView(projectRoot, scope);
+    return this.tasks.projectStateView(projectRoot, scope);
   }
 
-  /** `project_state` 工具能力：A1 文本摘要投影（同一 builder；工具层再做 8 KiB 硬截断）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private async projectStateTool(projectRoot: string, roleId: string, query: { flowId?: string }): Promise<ProjectStateToolResult> {
-    try {
-      const view = await buildProjectStateView(projectRoot, {
-        roleId,
-        ...(query.flowId !== undefined ? { flowId: query.flowId } : {}),
-      });
-      return { ok: true, text: renderProjectStateSummary(view) };
-    } catch (error) {
-      return { ok: false, message: `project_state 读取失败：${error instanceof Error ? error.message : String(error)}` };
-    }
+    return this.tasks.projectStateTool(projectRoot, roleId, query);
   }
 
-  /**
-   * `project_note` 受控备注（仅 chief）。校验 flow/run 存在性与文本/refs 上限；
-   * append-only 写 `project.focus`/`project.note`；不改任务/run/manifest/文档。
-   */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async projectNote(input: { projectRoot: string; roleId: string; input: ProjectNoteInput }): Promise<ProjectNoteResult> {
-    const { projectRoot, roleId } = input;
-    const note = input.input;
-    const listing = this.deps.getListing(projectRoot);
-    const role = listing?.roles.find((candidate) => candidate.roleId === roleId);
-    if (role === undefined || role.builtIn !== true || role.governanceFunction !== "chief") {
-      return { ok: false, message: "project_note 只允许幕僚（chief）提交备注。" };
-    }
-    const at = new Date(this.now());
-    const fail = (message: string): ProjectNoteResult => ({ ok: false, message });
-    if (note.op === "set-focus") {
-      if (note.cleared === true) {
-        const appended = await this.appendTaskState(projectRoot, taskEvent("project.focus", { cleared: true, roleId: "chief" }, () => at));
-        return appended
-          ? { ok: true, message: "已清除当前 focus。", at: at.toISOString() }
-          : fail("focus 清除失败：账本写入失败。");
-      }
-      const flowId = typeof note.flowId === "string" ? note.flowId.trim() : "";
-      if (flowId === "" || !GOVERNANCE_SLUG_RE.test(flowId)) return fail("set-focus 需要合法 flowId（slug），或 cleared:true。");
-      const view = await this.projectStateView(projectRoot, { full: true });
-      const flow = view.flows.find((candidate) => candidate.flowId === flowId);
-      if (flow === undefined) return fail(`set-focus 未执行：flow「${flowId}」不存在（无 run/任务/文档）。`);
-      if (note.runId !== undefined && !flow.runs.some((run) => run.runId === note.runId)) {
-        return fail(`set-focus 未执行：run「${note.runId}」不属于 flow「${flowId}」。`);
-      }
-      if (note.note !== undefined && Array.from(note.note).length > PROJECT_NOTE_BLOCKER_TEXT_MAX) return fail("set-focus 未执行：note 超过 500 字符上限（超限拒绝、不截断）。");
-      const appended = await this.appendTaskState(projectRoot, taskEvent("project.focus", {
-        flowId,
-        ...(note.runId !== undefined ? { runId: note.runId } : {}),
-        ...(note.note !== undefined ? { note: note.note } : {}),
-        roleId: "chief",
-      }, () => at));
-      return appended
-        ? { ok: true, message: `已记录当前 focus：${flowId}${note.runId !== undefined ? ` / ${note.runId}` : ""}。`, at: at.toISOString() }
-        : fail("focus 写入失败：账本写入失败。");
-    }
-    const noteKind = note.op === "blocker" ? "blocker" : "next-step";
-    const noteKey = typeof note.noteKey === "string" && note.noteKey.trim() !== ""
-      ? note.noteKey.trim()
-      : noteKind === "next-step" ? PROJECT_NOTE_NEXT_STEP_DEFAULT_KEY : "";
-    if (noteKey === "" || noteKey.length > PROJECT_NOTE_KEY_MAX || !GOVERNANCE_SLUG_RE.test(noteKey)) {
-      return fail(`${note.op} 需要合法 noteKey（slug，≤${PROJECT_NOTE_KEY_MAX} 字符）。`);
-    }
-    const text = typeof note.text === "string" ? note.text : "";
-    if (text.trim() === "") return fail(`${note.op} 需要非空 text。`);
-    const maxChars = noteKind === "blocker" ? PROJECT_NOTE_BLOCKER_TEXT_MAX : PROJECT_NOTE_NEXT_STEP_TEXT_MAX;
-    if (Array.from(text).length > maxChars) return fail(`${note.op} 的 text 超过 ${maxChars} 字符上限（超限拒绝、不截断）。`);
-    if (typeof note.active !== "boolean") return fail(`${note.op} 需要布尔参数 active。`);
-    if (note.refs !== undefined) {
-      if (note.refs.length > PROJECT_NOTE_REFS_MAX) return fail(`${note.op} 的 refs 超过 ${PROJECT_NOTE_REFS_MAX} 项上限（超限拒绝）。`);
-      for (const ref of note.refs) {
-        if (typeof ref !== "string" || ref.trim() === "" || ref.startsWith("/") || ref.includes("\\") || /^[a-zA-Z]:[\\/]/.test(ref) || ref.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) {
-          return fail(`${note.op} 的 refs 含非法项目相对引用：${String(ref)}`);
-        }
-      }
-    }
-    const state = await this.readTasks(projectRoot);
-    let latest: Extract<TaskStateEvent, { kind: "project.note" }> | undefined;
-    for (const event of state.events) {
-      if (event.kind === "project.note" && event.roleId === "chief" && event.noteKey === noteKey) latest = event;
-    }
-    const same = latest !== undefined &&
-      latest.noteKind === noteKind &&
-      latest.text === text &&
-      latest.active === note.active &&
-      JSON.stringify(latest.refs ?? []) === JSON.stringify(note.refs ?? []);
-    if (same && latest !== undefined) {
-      return { ok: true, message: `${note.op} 备注未变化（同 key/同文本/同 active），未重复写入。`, at: latest.at };
-    }
-    const appended = await this.appendTaskState(projectRoot, taskEvent("project.note", {
-      noteKey,
-      noteKind,
-      text,
-      ...(note.refs !== undefined && note.refs.length > 0 ? { refs: [...note.refs] } : {}),
-      active: note.active,
-      roleId: "chief",
-    }, () => at));
-    return appended
-      ? { ok: true, message: note.active ? `已记录${noteKind === "blocker" ? "阻塞" : "下一步"}备注：${noteKey}。` : `已解除${noteKind === "blocker" ? "阻塞" : "下一步"}备注：${noteKey}。`, at: at.toISOString() }
-      : fail(`${note.op} 写入失败：账本写入失败。`);
+    return this.tasks.projectNote(input);
   }
 
   private versionDecisionSubjectKey(projectRoot: string, subject: VersionDecisionRequestSubject): string {
@@ -6096,72 +5870,9 @@ export class SessionManager {
     return { orphaned: orphanedCount, expired: expiredCount };
   }
 
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async restoreTasks(projectRoot: string): Promise<TaskRestoreReport> {
-    const state = await this.readTasks(projectRoot);
-    for (const record of state.records.values()) {
-      this.starTaskIds.add(record.taskId);
-      this.rememberTaskCreator(record.taskId, record.created);
-    }
-    const report: TaskRestoreReport = { restored: 0, skipped: 0, taskIds: [] };
-    const requests = await this.restoreRequestState(projectRoot, state);
-    report.orphanedRequests = requests.orphaned;
-    report.expiredApprovals = requests.expired;
-    const versionDecisions = await this.restoreVersionDecisions(projectRoot, state);
-    report.versionDecisionsReconciled = versionDecisions.reconciled;
-    report.versionDecisionsUncertain = versionDecisions.uncertain;
-    for (const record of state.unclosed) {
-      const created = record.created;
-      if (created === undefined) continue;
-      if (record.delivered !== undefined || record.reports.length > 0) {
-        report.skipped += 1;
-        continue;
-      }
-      const target = this.deps.getListing(projectRoot)?.roles.find((role) => role.roleId === created.to);
-      if (target === undefined) {
-        report.skipped += 1;
-        createDiagnosticLogger({ component: "desktop.session", projectRoot }).record("tasks.restore.target-missing", { taskId: record.taskId, roleId: created.to });
-        continue;
-      }
-      const runtime = this.findLiveRuntime(projectRoot, created.to) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
-      const dedupKey = `${projectRoot}\u0000${runtime}\u0000task\u0000${record.taskId}`;
-      const queuedAlready = [...this.deliveryQueues.values()].some((items) => items.some((item) => item.dedupKey === dedupKey));
-      if (queuedAlready || this.activeDeliveries.get(this.queueKey(projectRoot, created.to, runtime))?.dedupKey === dedupKey) {
-        report.skipped += 1;
-        continue;
-      }
-      const probes = new Map<string, string | undefined>();
-      for (const readPath of extractDispatchReadPaths(created.text)) probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
-      const plan = planDispatchDelivery(
-        { roleId: created.to, task: created.text },
-        probes,
-        {
-          sourceRoleId: this.roleDisplayName(projectRoot, "chief"),
-          taskId: record.taskId,
-          ...(created.expectedOutput !== undefined ? { expectedOutput: created.expectedOutput } : {}),
-          ...(created.requestedEvidence !== undefined ? { requestedEvidence: created.requestedEvidence } : {}),
-        },
-      );
-      if (plan.action === "reject") {
-        report.skipped += 1;
-        createDiagnosticLogger({ component: "desktop.session", projectRoot }).record("tasks.restore.delivery-rejected", { taskId: record.taskId, reasonCode: "references-missing" });
-        continue;
-      }
-      this.enqueueDelivery(projectRoot, created.to, {
-        kind: "dispatch",
-        runtime,
-        targetRoleId: created.to,
-        sourceRoleId: "chief",
-        taskId: record.taskId,
-        text: plan.text,
-        summary: `[任务·恢复] #${record.taskId} → ${this.roleDisplayName(projectRoot, created.to)}：${shortenText(created.text, 40)}`,
-        dedupKey,
-        clientMessageId: this.appDispatchClientMessageId(dedupKey),
-      });
-      report.restored += 1;
-      report.taskIds.push(record.taskId);
-      void this.drainQueue(projectRoot, created.to, runtime);
-    }
-    return report;
+    return this.tasks.restoreTasks(projectRoot);
   }
 
   private findLiveRuntime(projectRoot: string, roleId: string): RuntimeKind | undefined {
@@ -6171,99 +5882,24 @@ export class SessionManager {
     return undefined;
   }
 
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private async partialArtifactsFor(projectRoot: string, roleId: string, taskId: string | undefined, since?: string): Promise<string[]> {
-    const log = await readRoleLog(projectRoot, { roleId, limit: 200, ...(since !== undefined && !Number.isNaN(Date.parse(since)) ? { since } : {}) });
-    if (!log.ok) return [];
-    const writeTool = /^(write_file|edit_file|write|edit)$/i;
-    return log.entries
-      .filter((entry) => entry.kind === "task.partial-artifacts" || (typeof entry.tool === "string" && writeTool.test(entry.tool)))
-      .filter((entry) => taskId === undefined || entry.taskId === undefined || entry.taskId === taskId)
-      .map((entry) => entry.ref ?? entry.summary)
-      .slice(0, 20);
+    return this.tasks.partialArtifactsFor(projectRoot, roleId, taskId, since);
   }
 
-  /** 角色临时区（项目相对 `temp/<role>/`；非法角色 id/逃逸 ⇒ undefined）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private roleTempDir(projectRoot: string, roleId: string): { abs: string; rel: string } | undefined {
-    if (typeof roleId !== "string" || roleId === "" || /[\\/]/.test(roleId) || roleId === "." || roleId === "..") return undefined;
-    const rel = `temp/${roleId}`;
-    const abs = path.resolve(projectRoot, ...rel.split("/"));
-    const root = path.resolve(projectRoot);
-    if (abs !== root && !abs.startsWith(`${root}${path.sep}`)) return undefined;
-    return { abs, rel };
+    return this.tasks.roleTempDir(projectRoot, roleId);
   }
 
-  /**
-   * B-08：把 `temp/<role>/` 中属于本次任务的产物**物理隔离**到 `temp/<role>/staging/<批次>/`。
-   * 只移动任务开始后修改的文件（无 createdAt 时移动当前 temp 下全部，保守）；原子 rename；跨卷失败回退 copy+unlink。
-   * 失败只记诊断并保留原文件（不丢证据），不阻塞终止回执。
-   */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private async isolatePartialArtifacts(
     projectRoot: string,
     roleId: string,
     taskId: string | undefined,
     since?: string,
   ): Promise<{ artifacts: string[]; stagingDir?: string }> {
-    const temp = this.roleTempDir(projectRoot, roleId);
-    if (temp === undefined) return { artifacts: [] };
-    const sinceMs = typeof since === "string" && !Number.isNaN(Date.parse(since)) ? Date.parse(since) : undefined;
-    const candidates: { abs: string; rel: string }[] = [];
-    const walk = async (dir: string, relDir: string): Promise<void> => {
-      let entries;
-      try {
-        entries = await fs.promises.readdir(dir, { withFileTypes: true });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
-        throw error;
-      }
-      for (const entry of entries) {
-        if (relDir === temp.rel && entry.name === "staging") continue; // 隔离区不再搬
-        const abs = path.join(dir, entry.name);
-        const rel = `${relDir}/${entry.name}`;
-        if (entry.isDirectory()) {
-          await walk(abs, rel);
-          continue;
-        }
-        if (!entry.isFile()) continue;
-        try {
-          const st = await fs.promises.stat(abs);
-          if (sinceMs !== undefined && st.mtimeMs < sinceMs) continue;
-          candidates.push({ abs, rel });
-        } catch { /* 文件消失/不可读：跳过（不猜） */ }
-      }
-    };
-    try {
-      await walk(temp.abs, temp.rel);
-    } catch (error) {
-      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.staging.scan.failed", error);
-      return { artifacts: [] };
-    }
-    if (candidates.length === 0) return { artifacts: [] };
-    const batch = `terminated-${String(taskId ?? "unknown").replace(/[^A-Za-z0-9._-]/g, "_")}-${this.now()}`;
-    const stagingRel = `${temp.rel}/staging/${batch}`;
-    const stagingAbs = path.resolve(projectRoot, ...stagingRel.split("/"));
-    try {
-      await fs.promises.mkdir(stagingAbs, { recursive: true });
-    } catch (error) {
-      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.staging.mkdir.failed", error);
-      return { artifacts: [] };
-    }
-    const isolated: string[] = [];
-    for (const candidate of candidates) {
-      const dest = path.join(stagingAbs, path.relative(temp.abs, candidate.abs));
-      try {
-        await fs.promises.mkdir(path.dirname(dest), { recursive: true });
-        try {
-          await fs.promises.rename(candidate.abs, dest);
-        } catch {
-          await fs.promises.copyFile(candidate.abs, dest);
-          await fs.promises.unlink(candidate.abs);
-        }
-        isolated.push(candidate.rel);
-      } catch (error) {
-        createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.staging.move.failed", error, { ref: candidate.rel });
-      }
-    }
-    return { artifacts: isolated, ...(isolated.length > 0 ? { stagingDir: stagingRel } : {}) };
+    return this.tasks.isolatePartialArtifacts(projectRoot, roleId, taskId, since);
   }
 
   /** B-07：确保目标角色使用 fresh 会话（现有会话重建；无会话则交由投递自动新开）。 */
@@ -6279,13 +5915,9 @@ export class SessionManager {
     return rebuilt.ok ? { ok: true, rebuilt: true } : { ok: false, rebuilt: false, error: rebuilt.error ?? "fresh 会话重建失败" };
   }
 
-  /** B-07：连续卡死时的替代角色（优先同项目非内置 worker；无则同角色 fresh）。 */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private chooseRedispatchTarget(projectRoot: string, currentRoleId: string, attempts: number): string {
-    if (attempts < 1) return currentRoleId;
-    const listing = this.deps.getListing(projectRoot);
-    const chief = this.chiefTaskRoleIdOf(projectRoot);
-    const candidate = listing?.roles.find((role) => role.builtIn !== true && role.roleId !== currentRoleId && role.roleId !== chief);
-    return candidate?.roleId ?? currentRoleId;
+    return this.tasks.chooseRedispatchTarget(projectRoot, currentRoleId, attempts);
   }
 
   /**
@@ -6399,316 +6031,27 @@ export class SessionManager {
     return outcome;
   }
 
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async terminateRoleRun(input: TerminateRoleRunInput, chiefSource?: ActualDispatchSource): Promise<TerminateRoleRunResult> {
-    if (input.roleId === "convener") return this.stopExactController(input, chiefSource);
-    const projectRoot = input.projectRoot;
-    const roleId = input.roleId;
-    const runtime = input.runtime;
-    const entry = this.sessions.get(this.sessionKey(projectRoot, roleId, runtime));
-    const base: TerminateRoleRunResult = {
-      ok: false,
-      roleId,
-      terminationConfirmed: false,
-      childProcesses: 0,
-      childProcessesStopped: 0,
-      childResults: [],
-      partialArtifacts: [],
-      isolatedArtifacts: [],
-      sessionFresh: false,
-      abort: { ok: false, supported: false },
-    };
-    if (entry === undefined) {
-      return { ...base, sessionFresh: true, message: "会话未开，未执行终止。" };
-    }
-    const taskState = input.taskId !== undefined ? await this.readTasks(projectRoot) : undefined;
-    const createdAt = input.taskId !== undefined ? taskState?.records.get(input.taskId)?.created?.at : undefined;
-    const logPartials = await this.partialArtifactsFor(projectRoot, roleId, input.taskId, createdAt);
-    const isolation = await this.isolatePartialArtifacts(projectRoot, roleId, input.taskId, createdAt);
-    const partialArtifacts = [...new Set([...logPartials, ...isolation.artifacts])].slice(0, 50);
-    let childProcesses = 0;
-    let childProcessesStopped = 0;
-    const childResults: TerminateRoleRunResult["childResults"] = [];
-    try {
-      const tasks = entry.handle.listBackgroundTasks?.() ?? [];
-      const running = tasks.filter((task) => task.state === "running");
-      childProcesses = running.length;
-      for (const task of running) {
-        if (entry.handle.stopBackgroundTask === undefined) {
-          childResults.push({ taskId: task.taskId, ok: false, reason: "unavailable" });
-          continue;
-        }
-        try {
-          const stopped = await entry.handle.stopBackgroundTask(task.taskId, { force: true });
-          const snapshot = stopped.ok ? stopped.task : stopped.task;
-          childResults.push({
-            taskId: task.taskId,
-            ok: stopped.ok,
-            ...(stopped.ok ? {} : { reason: stopped.reason }),
-            ...(snapshot?.exitCode !== undefined ? { exitCode: snapshot.exitCode } : {}),
-            ...(snapshot?.signal !== undefined ? { signal: snapshot.signal } : {}),
-          });
-          if (stopped.ok) childProcessesStopped += 1;
-        } catch (error) {
-          childResults.push({ taskId: task.taskId, ok: false, reason: error instanceof Error ? error.message : String(error) });
-        }
-      }
-    } catch (error) {
-      createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId }).error("role.terminate.child-list.failed", error);
-    }
-    entry.interactionState.turn.abort();
-    let abort: { ok: boolean; supported: boolean; error?: string } = { ok: false, supported: false, error: "当前运行时不支持停止" };
-    if (entry.handle.abort !== undefined) {
-      try {
-        const result = await Promise.race([
-          entry.handle.abort(),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("终止等待超时")), 5000)),
-        ]);
-        abort = { ok: result.ok, supported: result.supported, ...(result.error !== undefined ? { error: result.error } : {}) };
-      } catch (error) {
-        abort = { ok: false, supported: true, error: error instanceof Error ? error.message : String(error) };
-      }
-    }
-    const terminationConfirmed = abort.ok && childProcessesStopped === childProcesses;
-    const result: TerminateRoleRunResult = {
-      ok: terminationConfirmed,
-      roleId,
-      terminationConfirmed,
-      childProcesses,
-      childProcessesStopped,
-      childResults,
-      partialArtifacts,
-      isolatedArtifacts: isolation.artifacts,
-      ...(isolation.stagingDir !== undefined ? { stagingDir: isolation.stagingDir } : {}),
-      sessionFresh: false,
-      abort,
-      ...(terminationConfirmed ? {} : { message: abort.error ?? (childProcessesStopped !== childProcesses ? "子进程未能全部确认退出。" : "终止未确认。") }),
-    };
-    const exits = childResults
-      .map((entry) => {
-        const bits: string[] = [];
-        if (entry.exitCode !== undefined) bits.push(`exitCode=${entry.exitCode}`);
-        if (entry.signal !== undefined) bits.push(`signal=${entry.signal}`);
-        return bits.length > 0 ? `${entry.taskId}:${bits.join("/")}` : undefined;
-      })
-      .filter((value): value is string => value !== undefined);
-    this.appendRoleActivity(projectRoot, roleId, {
-      kind: "role.terminated",
-      summary: `终止：子进程 ${childProcessesStopped}/${childProcesses} 已停${exits.length > 0 ? `（${exits.join("；")}）` : ""}；abort=${abort.ok ? "ok" : abort.error ?? "unsupported"}；部分写入 ${partialArtifacts.length} 项；隔离 ${isolation.artifacts.length} 项`,
-      status: terminationConfirmed ? "confirmed" : "unsafe",
-      ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
-      ...(entry.origins.running?.turnId !== undefined ? { turnId: entry.origins.running.turnId } : {}),
-      ref: isolation.artifacts[0] ?? partialArtifacts[0],
-    });
-    // B-08：把隔离事实落角色日志（后续重派/核对读同一事实，不依赖当次内存回执）。
-    if (isolation.artifacts.length > 0) {
-      this.appendRoleActivity(projectRoot, roleId, {
-        kind: "task.partial-artifacts",
-        summary: `${isolation.artifacts.length} 项部分产物已隔离到 ${isolation.stagingDir ?? "staging"}`,
-        status: "needs-review",
-        ...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
-        ...(isolation.stagingDir !== undefined ? { ref: isolation.stagingDir } : {}),
-      });
-    }
-    // Termination is a host observation, never a report impersonating the assigned role.
-    return result;
+    return this.tasks.terminateRoleRun(input, chiefSource);
   }
 
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private taskChainRootOf(state: TaskReplay, taskId: string): string {
-    let cursor = taskId;
-    const seen = new Set<string>();
-    for (;;) {
-      if (seen.has(cursor)) return cursor;
-      seen.add(cursor);
-      const record = state.records.get(cursor);
-      if (record?.retryOf === undefined) return cursor;
-      cursor = record.retryOf;
-    }
+    return this.tasks.taskChainRootOf(state, taskId);
   }
 
-  /**
-   * **卡死终止后的安全重派**（B-07/B-08）：先终止（若会话在跑）→ 按副作用分类/终止确认/部分写入
-   * 判定安全；仅 `safe` 产生新任务（新 taskId + `retryOf` + 同 idempotencyKey，原任务 closed/rework）。
-   * `external|destructive|unknown`、终止未确认、已发生外部副作用 ⇒ 零自动重派；部分写入/已有完成报告
-   * ⇒ needs-review。同链最多 2 次重派（首次尝试不计）；第 3 次升级、不再自动重派。
-   */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async redispatchTask(input: RedispatchTaskInput): Promise<RedispatchTaskResult> {
-    const projectRoot = input.projectRoot;
-    const state = await this.readTasks(projectRoot);
-    const record = state.records.get(input.taskId);
-    const created = record?.created;
-    if (record === undefined || created === undefined) {
-      return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["任务不存在或缺少 task.created"], message: "重派未执行：任务不存在。" };
-    }
-    if (record.closed !== undefined) {
-      return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["任务已收口"], message: "重派未执行：任务已收口。" };
-    }
-    const root = this.taskChainRootOf(state, record.taskId);
-    const attempts = redispatchCountOf(state, root);
-    const maxRaw = Number(process.env["ANS_LOG_REDISPATCH_MAX"]);
-    const redispatchMax = Number.isFinite(maxRaw) && maxRaw > 0 ? Math.floor(maxRaw) : 2;
-    if (attempts >= redispatchMax) {
-      const escalation = await this.escalateStuckTask(
-        projectRoot,
-        record.taskId,
-        root,
-        attempts,
-        created.flowId,
-        created.to,
-        this.findLiveRuntime(projectRoot, created.to) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo",
-      );
-      return {
-        ok: false,
-        safety: "needs-review",
-        autoAllowed: false,
-        reasons: [`同链已重派 ${attempts} 次（上限 ${redispatchMax}）；已提交升级卡（继续/重派/换人/终止，唯一推荐）`],
-        message: escalation.message,
-        escalated: escalation.escalated,
-        ...(escalation.requestId !== undefined ? { requestId: escalation.requestId } : {}),
-        ...(escalation.selected !== undefined ? { selected: escalation.selected } : {}),
-      };
-    }
-    const requestedTarget = typeof input.to === "string" && input.to.trim() !== "" ? input.to.trim() : undefined;
-    const to = requestedTarget ?? this.chooseRedispatchTarget(projectRoot, created.to, attempts);
-    const originalRuntime = this.findLiveRuntime(projectRoot, created.to) ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
-    const termination = await this.terminateRoleRun({ projectRoot, roleId: created.to, runtime: originalRuntime, taskId: record.taskId });
-    const partialArtifacts = termination.partialArtifacts;
-    const completedReport = record.reports.some((entry) => entry.status === "done");
-    // B-08：应用按角色日志升类（shell/后台外部命令 ⇒ 至少 external；不得降类），并检查未完成工具调用。
-    const log = await readRoleLog(projectRoot, { roleId: created.to, limit: 200, ...(created.at !== undefined ? { since: created.at } : {}) });
-    const toolEntries = log.ok ? log.entries.filter((entry) => typeof entry.tool === "string") : [];
-    const usedExternalTool = toolEntries.some((entry) => entry.tool === "run_shell" || entry.tool === "start_background_task");
-    const sideEffect = usedExternalTool && (created.sideEffect === "read-only" || created.sideEffect === "docs" || created.sideEffect === "code")
-      ? "external"
-      : created.sideEffect;
-    const lastToolEntry = toolEntries[toolEntries.length - 1];
-    const inFlightTool = lastToolEntry?.kind === "tool.call";
-    const safety = evaluateRedispatchSafety({
-      sideEffect,
-      terminationConfirmed: termination.terminationConfirmed,
-      partialArtifacts,
-      completedReport,
-      inFlightTool,
-    });
-    if (!safety.autoAllowed) {
-      this.appendRoleActivity(projectRoot, "chief", {
-        kind: "task.redispatch.blocked",
-        summary: `任务 #${record.taskId} 不自动重派：${safety.reasons.join("；")}`,
-        taskId: record.taskId,
-        status: safety.safety,
-      });
-      this.emitDeliveryNote(projectRoot, originalRuntime, "chief", "chief", `[系统·重派] 任务 #${record.taskId} 不自动重派（${safety.safety}）：${safety.reasons.join("；")}`);
-      return { ok: false, safety: safety.safety, autoAllowed: false, reasons: safety.reasons, message: `重派未执行：${safety.reasons.join("；")}` };
-    }
-    const targetRuntime = this.findLiveRuntime(projectRoot, to) ?? originalRuntime;
-    const fresh = await this.ensureFreshRoleSession(projectRoot, to, targetRuntime);
-    if (!fresh.ok) {
-      this.appendRoleActivity(projectRoot, "chief", {
-        kind: "task.redispatch.fresh-session-failed",
-        summary: `任务 #${record.taskId} 未能建立 fresh 会话：${fresh.error ?? "未知原因"}`,
-        taskId: record.taskId,
-        status: "needs-review",
-      });
-      return {
-        ok: false,
-        safety: "needs-review",
-        autoAllowed: false,
-        reasons: [`fresh 会话未建立：${fresh.error ?? "未知原因"}`],
-        message: "重派未执行：目标角色 fresh 会话未建立（不自动重派）。",
-        sessionFresh: false,
-      };
-    }
-    const newId = redispatchTaskId(record.taskId, attempts + 1);
-    this.starTaskIds.add(newId);
-    this.rememberTaskCreator(newId, created);
-    const now = () => new Date(this.now());
-    // 原任务先收口（rework/stuck-terminated），再写重派事件与新任务；任一步写失败 ⇒ 不投递（如实失败）。
-    if (!(await this.recordTaskFailure(projectRoot, record.taskId, "stuck-terminated:redispatch"))) {
-      return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["任务状态写入失败"], message: "重派未执行：任务状态写入失败。" };
-    }
-    const redispatchEvent = taskEvent("task.redispatch", {
-      taskId: newId,
-      retryOf: record.taskId,
-      to,
-      reason: "stuck",
-      safety: "safe",
-    }, now);
-    const newCreated = taskEvent("task.created", {
-      taskId: newId,
-      from: created.from,
-      ...(created.flowId !== undefined ? { flowId: created.flowId } : {}),
-      ...(created.stepId !== undefined ? { stepId: created.stepId } : {}),
-      ...(created.moduleId !== undefined ? { moduleId: created.moduleId } : {}),
-      ...(created.moduleDirectory !== undefined ? { moduleDirectory: created.moduleDirectory } : {}),
-      ...(created.runId !== undefined ? { runId: created.runId } : {}),
-      ...(created.runState !== undefined ? { runState: created.runState } : {}),
-      ...(created.runStage !== undefined ? { runStage: created.runStage } : {}),
-      to,
-      // B-07：同角色重派先缩窄任务（明确先做最小可验证部分；已完成部分核对后跳过）。
-      text: `${created.text}\n\n[重派] 上次执行卡死；请缩窄范围，先完成最小可验证部分；已完成部分核对后跳过，不要重复。`,
-      ...(created.expectedOutput !== undefined ? { expectedOutput: created.expectedOutput } : {}),
-      ...(created.requestedEvidence !== undefined ? { requestedEvidence: created.requestedEvidence } : {}),
-      sideEffect: created.sideEffect,
-      idempotencyKey: created.idempotencyKey,
-    }, now);
-    if (!(await this.appendTaskState(projectRoot, redispatchEvent)) || !(await this.appendTaskState(projectRoot, newCreated))) {
-      return { ok: false, safety: "unsafe", autoAllowed: false, reasons: ["重派事件写入失败"], message: "重派未完成：事件写入失败（原任务已收口，未投递新任务）。" };
-    }
-    const probes = new Map<string, string | undefined>();
-    for (const readPath of extractDispatchReadPaths(created.text)) probes.set(readPath, await filePrint(path.join(projectRoot, readPath)));
-    const plan = planDispatchDelivery(
-      { roleId: to, task: created.text, reason: "stuck" },
-      probes,
-      {
-        sourceRoleId: this.roleDisplayName(projectRoot, "chief"),
-        taskId: newId,
-        ...(created.expectedOutput !== undefined ? { expectedOutput: created.expectedOutput } : {}),
-        ...(created.requestedEvidence !== undefined ? { requestedEvidence: created.requestedEvidence } : {}),
-      },
-    );
-    if (plan.action === "reject") {
-      await this.recordTaskFailure(projectRoot, newId, `delivery-rejected: ${shortenSummary(plan.message)}`);
-      return { ok: false, safety: "unsafe", autoAllowed: false, reasons: [plan.message], message: plan.message };
-    }
-    const dedupKey = `${projectRoot}\u0000${targetRuntime}\u0000task\u0000${newId}`;
-    this.activeDispatchKeys.add(dedupKey);
-    this.enqueueDelivery(projectRoot, to, {
-      kind: "dispatch",
-      runtime: targetRuntime,
-      targetRoleId: to,
-      sourceRoleId: "chief",
-      taskId: newId,
-      text: plan.text,
-      summary: `[任务·重派] #${newId}（retryOf ${record.taskId}）→ ${this.roleDisplayName(projectRoot, to)}：${shortenText(created.text, 40)}`,
-      dedupKey,
-      clientMessageId: this.appDispatchClientMessageId(dedupKey),
-    });
-    this.appendRoleActivity(projectRoot, "chief", { kind: "task.redispatch", summary: `重派任务 #${record.taskId} → #${newId}（${to}；safe）`, taskId: newId, status: "safe" });
-    this.appendRoleActivity(projectRoot, to, { kind: "task.delivered", summary: `收到重派任务 #${newId}（retryOf ${record.taskId}）`, taskId: newId, status: "delivered" });
-    void this.drainQueue(projectRoot, to, targetRuntime);
-    return {
-      ok: true,
-      taskId: newId,
-      retryOf: record.taskId,
-      safety: "safe",
-      autoAllowed: true,
-      reasons: safety.reasons,
-      message: `已终止并重派：新任务 #${newId}（retryOf #${record.taskId}）→ ${to}；第 ${attempts + 1} 次重派；fresh 会话=${fresh.rebuilt ? "已重建" : "新开/未开"}。`,
-      sessionFresh: fresh.ok,
-    };
+    return this.tasks.redispatchTask(input);
   }
 
-  /**
-   * 幕僚收口任务（B-03 `task.closed`）：accepted/rework/rejected。已收口/不存在 ⇒ 如实失败（不重写历史）。
-   * 只由幕僚动作调用（接口/任务卡）；角色不能自行收口。
-   */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   async closeTask(input: CloseTaskInput): Promise<CloseTaskResult> {
-    return { ok: false, taskId: input.taskId, message: "请由任务原创建者依据最新报告调用收口能力；客户面板不能冒充角色写入收口。" };
+    return this.tasks.closeTask(input);
   }
 
-  /**
-   * B-07：连续 2 次重派仍卡死 ⇒ 经应用既有客户交互/决策通道提交「继续 / 重派 / 换人 / 终止」唯一推荐卡。
-   * 不伪造客户决定：通道不可用/被取消 ⇒ 如实返回未执行；同一链只提交一次（watchdog 重复 tick 不刷屏）。
-   */
+  /** 薄委托 → `session/tasks.ts`（JSDoc/方法体见模块）。 */
   private escalateStuckTask(
     projectRoot: string,
     taskId: string,
@@ -6718,113 +6061,7 @@ export class SessionManager {
     targetRoleId?: string,
     targetRuntime?: RuntimeKind,
   ): Promise<{ escalated: boolean; requestId?: string; selected?: string; message: string }> {
-    const key = `${projectRoot}\u0000${rootTaskId}`;
-    const existing = this.escalationRequests.get(key);
-    if (existing !== undefined) return existing;
-    const chiefRoleId = this.chiefTaskRoleIdOf(projectRoot);
-    const runtime = this.findLiveRuntime(projectRoot, chiefRoleId ?? "") ?? this.lastGovernanceRuntime.get(projectRoot) ?? "demo";
-    const requestId = `task-escalation-${rootTaskId}-${attempts}`;
-    const promise = (async () => {
-      const channel = this.deps.customerInput;
-      if (channel === undefined) {
-        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
-          kind: "task.escalation.unavailable",
-          summary: `任务 #${taskId} 连续卡死升级卡未提交：客户交互/决策通道未接线`,
-          taskId,
-          status: "unavailable",
-        });
-        return { escalated: false, requestId, message: "升级未提交：客户交互/决策通道不可用（不伪造卡）。" };
-      }
-      const flowId = typeof taskFlowId === "string" && taskFlowId !== "" ? taskFlowId : "task-escalation";
-      const request: CustomerInputRequest = {
-        kind: "choice",
-        cardKind: "decision",
-        application: true,
-        sourceRoleId: "application",
-        flowId,
-        title: `应用·任务升级：任务连续卡死 ${taskId}`,
-        question: "任务已连续 2 次重派仍卡死。请选择处置（唯一推荐：终止）。",
-        options: [
-          { id: "continue", label: "继续等待/观察" },
-          { id: "redispatch", label: "再重派一次（同角色 fresh 会话）" },
-          { id: "replace", label: "换人执行（替代角色）" },
-          { id: "terminate", label: "终止任务", recommended: true },
-        ],
-      };
-      let outcome: CustomerInputOutcome | null | undefined;
-      try {
-        outcome = await this.withRequestLifecycle(
-          projectRoot,
-          "application",
-          request,
-          { taskId },
-          (req, context) => channel(req, context),
-          (req, extras) => ({
-            roleId: "application",
-            runtime,
-            projectRoot,
-            governanceModel: "trio",
-            ...(extras?.onPresented !== undefined ? { onPresented: extras.onPresented } : {}),
-          }),
-          requestId,
-        );
-      } catch (error) {
-        this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
-          kind: "task.escalation.failed",
-          summary: `任务 #${taskId} 升级卡提交失败：${error instanceof Error ? error.message : String(error)}`,
-          taskId,
-          status: "failed",
-        });
-        return { escalated: false, requestId, message: "升级卡提交失败（未获客户裁决）。" };
-      }
-      const selected = outcome?.outcome === "answered"
-        ? (outcome.value.selected ?? []).find((id) => ["continue", "redispatch", "replace", "terminate"].includes(id))
-        : undefined;
-      await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
-        kind: "task.escalation",
-        summary: `任务 #${taskId} 连续卡死升级：${outcome?.outcome ?? "unavailable"}${selected !== undefined ? `（${selected}）` : ""}`,
-        taskId,
-        status: selected ?? outcome?.outcome ?? "unavailable",
-      });
-      if (selected === "terminate") {
-        if (targetRoleId !== undefined && targetRoleId !== "") {
-          await this.terminateRoleRun({
-            projectRoot,
-            roleId: targetRoleId,
-            runtime: targetRuntime ?? runtime,
-            taskId,
-          });
-        }
-        await this.recordTaskFailure(projectRoot, taskId, "stuck-escalation:terminate");
-      } else if (selected === "continue" || selected === "redispatch" || selected === "replace") {
-        // C 批（协调者放行前置）：continue/redispatch/replace 不自动执行第二条危险路径，但**必须定义并
-        // 落地人工处置**——写角色日志 + 向幕僚发系统行，任务保持未收口（不伪造完成、不重复副作用）。
-        const manual: Record<typeof selected, string> = {
-          continue: "保持观察：不自动重派、不终止；巡检继续，需要收口时由幕僚手动终止或派新任务。",
-          redispatch: "自动重派上限已到，不再自动重派；请人工核对部分产物后新建/重派任务（可先终止原任务）。",
-          replace: "不自动换人；请人工选择替代角色并派新任务（必要时先终止原角色运行）。",
-        };
-        const text = `任务 #${taskId} 升级裁决「${selected}」：${manual[selected]}`;
-        await this.appendRoleActivity(projectRoot, chiefRoleId ?? "chief", {
-          kind: "task.escalation.manual",
-          summary: text,
-          taskId,
-          status: selected,
-        });
-        this.emitDeliveryNote(projectRoot, runtime, chiefRoleId ?? "chief", "chief", `[系统·升级] ${text}`);
-      }
-      return {
-        escalated: true,
-        requestId,
-        ...(selected !== undefined ? { selected } : {}),
-        message: selected !== undefined
-          ? `升级卡已提交并获得裁决：${selected}。`
-          : "升级卡已提交，未获明确裁决（不代选）。",
-      };
-    })();
-    this.escalationRequests.set(key, promise);
-    // 同一链只提交一次（watchdog 重复 tick 直接返回同一结果，不重复弹卡）。
-    return promise;
+    return this.tasks.escalateStuckTask(projectRoot, taskId, rootTaskId, attempts, taskFlowId, targetRoleId, targetRuntime);
   }
 
   /**
@@ -6840,15 +6077,12 @@ export class SessionManager {
     emitDeliveryNote(projectRoot, runtime, preferredRoleId, fallbackRoleId, summary, this.deps);
   }
 
-  /** 治理反馈客户投影的登记键：`queueKey` + 文本 sha256（回显文本需逐字一致才命中；不猜）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private governanceProjectionKey(projectRoot: string, roleId: string, runtime: RuntimeKind, text: string): string {
-    return `${this.queueKey(projectRoot, roleId, runtime)}\u0000${createHash("sha256").update(text).digest("hex")}`;
+    return this.diagnostics.governanceProjectionKey(projectRoot, roleId, runtime, text);
   }
 
-  /**
-   * A4 稳定指纹：同来源/同状态/同流程（排序）/同报告与治理指针/同正文 ⇒ 同值；任一变化 ⇒ 新值。
-   * 只用于 UI 合并连续状态行（×N），不参与任何判定。
-   */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private governanceProjectionFingerprint(input: {
     sourceRoleId: string;
     statusCode: GovernanceClientProjectionV1["statusCode"];
@@ -6857,22 +6091,10 @@ export class SessionManager {
     governancePath?: string;
     text: string;
   }): string {
-    return createHash("sha256")
-      .update(
-        JSON.stringify({
-          kind: "governance-feedback",
-          sourceRoleId: input.sourceRoleId,
-          statusCode: input.statusCode,
-          flowIds: [...input.flowIds].sort(),
-          reportPath: input.reportPath ?? null,
-          governancePath: input.governancePath ?? null,
-          textHash: createHash("sha256").update(input.text).digest("hex"),
-        }),
-      )
-      .digest("hex");
+    return this.diagnostics.governanceProjectionFingerprint(input);
   }
 
-  /** 发送成功后登记投影（有界 FIFO；同键刷新登记时刻）。失败不登记（调用方只在 `sent.ok` 后调用）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private registerGovernanceClientProjection(
     projectRoot: string,
     roleId: string,
@@ -6880,176 +6102,27 @@ export class SessionManager {
     text: string,
     projection: GovernanceClientProjectionV1,
   ): void {
-    const key = this.governanceProjectionKey(projectRoot, roleId, runtime, text);
-    this.governanceClientProjections.delete(key);
-    this.governanceClientProjections.set(key, { projection, at: this.now() });
-    while (this.governanceClientProjections.size > GOVERNANCE_CLIENT_PROJECTION_LIMIT) {
-      const oldest = this.governanceClientProjections.keys().next().value;
-      if (oldest === undefined) break;
-      this.governanceClientProjections.delete(oldest);
-    }
+    this.diagnostics.registerGovernanceClientProjection(projectRoot, roleId, runtime, text, projection);
   }
 
-  /** `prompt-input` 回显查找投影：命中且未过期才返回（过期即清理）；miss ⇒ 事件保持原样。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private lookupGovernanceClientProjection(
     projectRoot: string,
     roleId: string,
     runtime: RuntimeKind,
     text: string,
   ): GovernanceClientProjectionV1 | undefined {
-    const key = this.governanceProjectionKey(projectRoot, roleId, runtime, text);
-    const found = this.governanceClientProjections.get(key);
-    if (found === undefined) return undefined;
-    if (this.now() - found.at > GOVERNANCE_CLIENT_PROJECTION_TTL_MS) {
-      this.governanceClientProjections.delete(key);
-      return undefined;
-    }
-    return found.projection;
+    return this.diagnostics.lookupGovernanceClientProjection(projectRoot, roleId, runtime, text);
   }
 
-  /**
-   * **收尾反馈 → 主入口汇总任务**（2026-10-18 客户反馈：原文镜像 = 「直接转述」，不对）。
-   * trio 的内部内置角色（Rapporteur/Nominator/Convener——改名后即 Draft/Crew/Steward/Proof）一轮结束后，
-   * **不再把正文原样贴到主入口 pane**，而是经**既有投递机**给主入口（`primaryRoleId`，Lead/Liaison）
-   * 投一条任务：`[系统·治理反馈]` 前缀 + 本轮正文（≤4000 码点）+「汇总后告知客户、不要逐字转述」指令。
-   *  · 仅 trio；`roleId === primaryRoleId` ⇒ 不投（Lead 自己；防循环）；
-   *  · 仅内置治理角色（`builtIn === true` 且有 `governanceFunction`）——项目角色不投（其回交仍走 Convener）；
-   *  · 文本**取出即删**（同一轮只投一次）；trim 后非空；`displayName` 取 listing 角色显示名（无则 roleId）。
-   *  · Lead 忙 ⇒ 按 `sendBackground`/投递机既有语义排队；未开 ⇒ `openBackground` 后台开启（不抢活动角色）；
-   *    失败只诊断、**绝不打断 settle**。
-   *  · `getListing` 在精确 miss 时做**斜杠归一兜底**（真机：事件循环 root 与枚举缓存 key 可能正/反斜杠
-   *    不一致）；仅查找变体，**不改变**调用方 key。
-   *  · 2026-10-24（治理协调，设计 v1 §4.3/§6.5）：**Proof（`governanceFunction === "verification"`）只投
-   *    「状态 + 报告/治理路径指针」，不转述报告正文**（Proof 的权威报告给客户/应用，Lead 不能编辑/代批/改判）。
-   *  · 内置来源回交若已由 `handleHandback` 防御性投给 Lead（同一轮），本函数**不再重复投**（短时标记去重）。
-   *  · 每个 early-return 记一条 `governance.feedback.skip`（不记正文）；成功记 `governance.feedback.mirrored`
-   *    （`targetRoleId` = Lead 的真实 roleId，不记来源）。
-   */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private async mirrorGovernanceFeedback(
     projectRoot: string,
     runtime: RuntimeKind,
     roleId: string,
     options: { flowIds?: readonly string[]; outcome?: RuntimeTurnOutcome } = {},
   ): Promise<void> {
-    const diagnostic = createDiagnosticLogger({ component: "desktop.governance-feedback", projectRoot, roleId });
-    const skip = (reason: "no-listing" | "non-trio" | "primary" | "not-builtin" | "no-text" | "handback-mirrored"): void => {
-      // 共享白名单只落允许字段名 ⇒ 同时带 `reasonCode`（机器可读）；绝不带正文。
-      diagnostic.record("governance.feedback.skip", { reason, reasonCode: reason });
-    };
-    try {
-      const listing = this.findListingForFeedback(projectRoot);
-      if (listing === undefined) return skip("no-listing");
-      if ((listing.governanceModel ?? "single") !== "trio") return skip("non-trio");
-      const primaryRoleId = typeof listing.primaryRoleId === "string" ? listing.primaryRoleId : "";
-      if (primaryRoleId === "" || roleId === primaryRoleId) return skip("primary");
-      const role = listing.roles.find((r) => r.roleId === roleId);
-      if (role === undefined || role.builtIn !== true || role.governanceFunction === undefined) return skip("not-builtin");
-      const key = this.queueKey(projectRoot, roleId, runtime);
-      // 内置来源回交已防御性投给 Lead（同一轮）：settle 反馈与它去重（同一轮只投一条）。
-      const handbackMirroredAt = this.governanceHandbackMirrored.get(key);
-      if (handbackMirroredAt !== undefined) {
-        this.governanceHandbackMirrored.delete(key);
-        if (this.now() - handbackMirroredAt <= GOVERNANCE_HANDBACK_MIRROR_DEDUPE_MS) {
-          this.lastAssistantText.delete(key);
-          return skip("handback-mirrored");
-        }
-      }
-      const last = this.lastAssistantText.get(key);
-      if (last === undefined) return skip("no-text");
-      this.lastAssistantText.delete(key); // 取出即删：同一轮只投一次
-      const text = last.text.trim();
-      if (text === "") return skip("no-text");
-      // 显示名：listing 的 `displayName`（Lead / Draft / Crew / Steward / Proof），否则回退 roleId。
-      const displayName = this.roleDisplayName(projectRoot, roleId);
-      const isProof = role.governanceFunction === "verification";
-      let body = "";
-      let task: string;
-      let projection: GovernanceClientProjectionV1;
-      if (isProof) {
-        // Proof 独立性：只发状态 + 报告/治理路径指针；正文丢弃、不转全文、不摘要替代报告。
-        const flowIds = await this.resolveProofFlowIds(projectRoot, options.flowIds);
-        const reportPath = flowIds.length > 0 ? governanceAcceptanceReportPath(flowIds[0]!) : "docs/acceptance/<flowId>-report-vN.md";
-        const governancePath = flowIds.length > 0 ? `docs/governance/verifier/${flowIds[0]}.md` : "docs/governance/verifier/<flowId>.md";
-        const statusText = options.outcome !== undefined ? PROOF_STATUS_TEXT[options.outcome] ?? options.outcome : "已结束";
-        task = [
-          `[系统·治理反馈] 来自 ${displayName} 的验收状态（只含状态与报告指针；不转述报告正文）：`,
-          `状态：${statusText}${flowIds.length > 0 ? `（流程 ${flowIds.join("、")}）` : ""}`,
-          `报告路径：${reportPath}`,
-          `治理记录：${governancePath}`,
-          "请只向客户说明验收复核已结束与报告位置；不要转述报告内容，不要编辑/代批/改判验收结论，也不要把报告当作客户批准。验收卡与客户决定仍由应用/客户处理。",
-        ].join("\n");
-        const statusCode = options.outcome ?? "unknown";
-        projection = {
-          version: 1,
-          kind: "governance-feedback",
-          fingerprint: this.governanceProjectionFingerprint({
-            sourceRoleId: roleId,
-            statusCode,
-            flowIds,
-            reportPath,
-            governancePath,
-            text: task,
-          }),
-          sourceRole: { roleId, displayName },
-          statusCode,
-          statusText,
-          ...(flowIds.length > 0 ? { flowIds } : {}),
-          reportPath,
-          governancePath,
-          action: "report-ready",
-        };
-      } else {
-        const chars = Array.from(text);
-        body = chars.length > 4000 ? chars.slice(0, 4000).join("") : text;
-        task = [
-          `[系统·治理反馈] 来自 ${displayName} 的内部反馈（内部材料，请汇总后告知客户，不要逐字转述）：`,
-          body,
-          "请用 1-3 句话向客户汇总：完成了什么、是否有风险/阻塞、下一步或需要客户决定什么。不要逐字转述内部报告，不要使用内部行话，不要声称客户已批准。",
-        ].join("\n");
-        const hintedFlowIds = [...new Set((options.flowIds ?? []).filter((id): id is string => typeof id === "string" && id !== ""))].slice(0, 3);
-        projection = {
-          version: 1,
-          kind: "governance-feedback",
-          fingerprint: this.governanceProjectionFingerprint({
-            sourceRoleId: roleId,
-            statusCode: "internal-feedback",
-            flowIds: hintedFlowIds,
-            text: task,
-          }),
-          sourceRole: { roleId, displayName },
-          statusCode: "internal-feedback",
-          statusText: "内部反馈",
-          ...(hintedFlowIds.length > 0 ? { flowIds: hintedFlowIds } : {}),
-          action: "await-lead-summary",
-        };
-      }
-      const opened = await this.openBackground({ projectRoot, roleId: primaryRoleId, runtime });
-      if (!opened.ok) {
-        diagnostic.error("governance.feedback.open.failed", new Error(opened.error ?? "无法开启主入口会话"), { targetRoleId: primaryRoleId });
-        return;
-      }
-      // 治理反馈是**轮次状态镜像**而非应用任务：同文可在不同轮次重复出现（既有语义不变）——
-      // 不生成稳定任务键，不参与「同一应用任务至多投递一次」的去重。
-      const sent = await this.sendBackground({ projectRoot, roleId: primaryRoleId, runtime, text: task, stableIdentity: false });
-      if (!sent.ok) {
-        diagnostic.error("governance.feedback.dispatch.failed", new Error(sent.error ?? "治理反馈投递失败"), { targetRoleId: primaryRoleId });
-        return;
-      }
-      // 2026-10-25 A3/A4：发送成功后登记客户投影；运行时把这条输入回显为 `prompt-input` 时，
-      // 由事件消费循环按同一文本附到 `detail.clientProjection`（内部原文仍保留在 `detail.text`）。
-      this.registerGovernanceClientProjection(projectRoot, primaryRoleId, runtime, task, projection);
-      const mirroredChars = Array.from(body).length;
-      // `targetRoleId`/`count`/`busy` 是共享白名单里的允许名（chars/roleId 本身不在白名单）。
-      diagnostic.record(isProof ? "governance.feedback.pointer" : "governance.feedback.mirrored", {
-        targetRoleId: primaryRoleId,
-        chars: mirroredChars,
-        count: mirroredChars,
-        ...(sent.queued === true ? { busy: true } : {}),
-      });
-    } catch (error) {
-      // 镜像/诊断失败绝不打断 settle。
-      diagnostic.error("governance.feedback.failed", error);
-    }
+    return this.diagnostics.mirrorGovernanceFeedback(projectRoot, runtime, roleId, options);
   }
 
   /**
@@ -7557,37 +6630,14 @@ export class SessionManager {
 
   // —————————————— P2（2026-10-30）：网络状态 → 队列/状态快照 ——————————————
 
-  /** 当前是否离线：优先主进程注入的门（权威）；未注入门时看最近快照（缺省在线）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private isNetworkOffline(): boolean {
-    if (this.deps.networkGate !== undefined) return !this.deps.networkGate.isOnline();
-    return this.networkState?.online === false;
+    return this.diagnostics.isNetworkOffline();
   }
 
-  /**
-   * **P2：接收主进程网络状态**（monitor `onState` → Interface → 本方法；只在 online 变化时被调用）。
-   * - 离线：队列**保留**、不认领新投递，`role-state` 快照标 `blockedReason:"network"`（界面可见）；
-   * - 恢复：对全部有队列的项目按**既有** `drainAllQueuesFor` 路径继续投递（不重放已完成/失败回合）。
-   * 只改队列认领时机，不改 busy/租约/终态语义。
-   */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   applyNetworkState(state: NetworkState): void {
-    const wasOffline = this.networkState === null
-      ? this.deps.networkGate?.isOnline() === false
-      : this.networkState.online === false;
-    this.networkState = { ...state };
-    const projects = new Set<string>();
-    for (const entry of this.sessions.values()) {
-      this.notifyRoleState(entry.projectRoot, entry.roleId, entry.runtime);
-      projects.add(entry.projectRoot);
-    }
-    for (const key of [...this.deliveryQueues.keys()]) {
-      const [projectRoot, roleId, runtime] = key.split("\u0000");
-      if (projectRoot === undefined || roleId === undefined || runtime === undefined) continue;
-      this.notifyRoleState(projectRoot, roleId, runtime as RuntimeKind);
-      projects.add(projectRoot);
-    }
-    if (wasOffline && state.online) {
-      for (const projectRoot of projects) void this.drainAllQueuesFor(projectRoot);
-    }
+    this.diagnostics.applyNetworkState(state);
   }
 
   /** 持久化 scope（薄委托 → `session/persistence.ts`；方法体见模块）。 */
@@ -10300,126 +9350,24 @@ ${formatted}` };
   // 人工动作」——不写项目文件、不放行任何命令/写入、不改任何 gate/队列语义；一切失败路径 fail-closed
   // （最坏情形退化为「没有看护时的现状」）。
 
-  /** **同源看护快照**（W1）：全部直读本层内存结构（busy/队列/在途/链/pending）——**不造第二数据源**、
-   *  同步读、不引锁（JS 单线程 tick 内读完）。项目未知且无任何运行态 ⇒ undefined（看护跳过）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   watchdogSnapshot(projectRoot: string): WatchdogProjectSnapshot | undefined {
-    if (typeof projectRoot !== "string" || projectRoot === "") return undefined;
-    const hasSessions = [...this.sessions.values()].some((entry) => entry.projectRoot === projectRoot);
-    const hasQueues = [...this.deliveryQueues.entries()].some(([key, items]) => key.startsWith(`${projectRoot}\u0000`) && items.length > 0);
-    const listing = this.deps.getListing(projectRoot);
-    if (!listing && !hasSessions && !hasQueues) return undefined;
-    const roles: WatchdogProjectSnapshot["roles"] = [];
-    for (const entry of this.sessions.values()) {
-      if (entry.projectRoot !== projectRoot) continue;
-      const listingRole = listing?.roles.find((role) => role.roleId === entry.roleId);
-      const activity = this.lastRoleActivity.get(`${projectRoot}\u0000${entry.roleId}`);
-      const running = this.activeDeliveries.get(this.queueKey(projectRoot, entry.roleId, entry.runtime));
-      roles.push({
-        roleId: entry.roleId,
-        runtime: entry.runtime,
-        busy: entry.busy,
-        ...(entry.busy && typeof entry.busySince === "number" ? { turnStartedAt: entry.busySince } : {}),
-        ...(entry.origins.running?.turnId !== undefined ? { turnId: entry.origins.running.turnId } : {}),
-        ...(listingRole?.builtIn === true ? { builtIn: true } : {}),
-        ...(running?.taskId !== undefined ? { taskId: running.taskId } : {}),
-        ...(activity !== undefined ? { lastActivityAt: activity.at, lastAction: `${activity.kind}：${activity.summary}` } : {}),
-      });
-    }
-    const queues: WatchdogProjectSnapshot["queues"] = [];
-    for (const [key, items] of this.deliveryQueues) {
-      if (items.length === 0) continue;
-      const parts = key.split("\u0000");
-      if (parts[0] !== projectRoot) continue;
-      queues.push({
-        targetRoleId: parts[1] ?? "",
-        runtime: (parts[2] as RuntimeKind) ?? "pi",
-        items: items.map((item) => {
-          const parsed = Date.parse(item.enqueuedAt);
-          return { kind: item.kind, dedupKey: item.dedupKey, sourceRoleId: item.sourceRoleId, summary: item.summary, enqueuedAtMs: Number.isFinite(parsed) ? parsed : this.now() };
-        }),
-      });
-    }
-    let activeDeliveries = 0;
-    for (const key of this.activeDeliveries.keys()) if (key.startsWith(`${projectRoot}\u0000`)) activeDeliveries += 1;
-    let chainsActive = false;
-    for (const key of this.openChains.keys()) if (key.startsWith(`${projectRoot}\u0000`)) { chainsActive = true; break; }
-    if (!chainsActive) for (const key of this.rebuildChains.keys()) if (key.startsWith(`${projectRoot}\u0000`)) { chainsActive = true; break; }
-    const pending = this.deps.watchdogPendingConfirmations?.() ?? { total: 0, byRole: new Map<string, number>() };
-    return {
-      projectRoot,
-      // 评审 §5.6：`suRoleId` → `governanceRoleId`（值=回交主人：trio=Convener / single=主入口）。
-      governanceRoleId: this.handbackOwnerRoleId(projectRoot),
-      // B 批：真实幕僚（trio chief）——巡检消息由 watchdogDeliver 投它；旧 liaison 别名不算。
-      chiefRoleId: this.chiefTaskRoleIdOf(projectRoot),
-      roles,
-      queues,
-      activeDeliveries,
-      chainsActive,
-      pendingConfirmationsTotal: pending.total,
-      pendingConfirmationsByRole: pending.byRole,
-    };
+    return this.diagnostics.watchdogSnapshot(projectRoot);
   }
 
-  /** 有运行态的项目根（活会话 ∪ 非空队列）——看护的服务对象之一（Interface 再并入已导入项目）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   projectRootsWithActivity(): string[] {
-    const roots = new Set<string>();
-    for (const entry of this.sessions.values()) roots.add(entry.projectRoot);
-    for (const [key, items] of this.deliveryQueues) if (items.length > 0) roots.add(key.split("\u0000")[0] ?? "");
-    roots.delete("");
-    return [...roots];
+    return this.diagnostics.projectRootsWithActivity();
   }
 
-  /** 某角色**最近一轮终局**（W1 的 `lastTurn` 小状态；纯读。消费方：role_status 等只读面）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   lastTurnOf(projectRoot: string, roleId: string, runtime: RuntimeKind): { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined {
-    return this.lastTurns.get(this.queueKey(projectRoot, roleId, runtime));
+    return this.diagnostics.lastTurnOf(projectRoot, roleId, runtime);
   }
 
-  /**
-   * **系统消息投递**（W2）：看护的告警/收束/恢复回执经**同一套投递机**真投递给**回交主人**（评审 §5.6：
-   * trio=Convener；single=su）——忙时排队、未开自动开、失败保留重试全部复用（`kind:"system"`；来源标注
-   * 恒空——呈现层按文首 `[系统·<子类>] ` 定格标记归类）。主人未枚举到 ⇒ 入 `""` 目标队列（投递机既有的
-   * 一次性提示 + 保留待重试；**绝不静默丢**）。
-   */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   watchdogDeliver(projectRoot: string, message: { text: string; summary: string; dedupKey: string; uiOnlyWhenBusy?: boolean }): void {
-    // B 批：看护/巡检系统消息回幕僚（trio）；无幕僚（single/旧项目）保持原主人。
-    const governanceRoleId = this.chiefTaskRoleIdOf(projectRoot) ?? this.handbackOwnerRoleId(projectRoot);
-    let runtime: RuntimeKind | undefined;
-    if (governanceRoleId !== null) {
-      for (const entry of this.sessions.values()) {
-        if (entry.projectRoot === projectRoot && entry.roleId === governanceRoleId) { runtime = entry.runtime; break; }
-      }
-    }
-    if (runtime === undefined) runtime = this.lastGovernanceRuntime.get(projectRoot) ?? "pi";
-    const target = governanceRoleId ?? "";
-    // **P0 看护告警 UI-only 旁路（2026-10-30 设计 §7.3.3 / Q6）**：**看护服务发出**的消息
-    // （`uiOnlyWhenBusy`：轮次到点/静默/巡检/告警/恢复）在目标正在忙时**不进 busy 模型队列**——
-    // 否则看护自身的提示会被同一队列楔死（现场：`patrol.skipped (pending)` 持续、告警也排不进）。
-    // 改为经既有 UI 系统行（`delivery-note`，不触发模型/门禁/自动决策）呈现 + `watchdog.notice.bypass`
-    // 诊断；不忙时仍走正常 system 队列投递。直接调用（MCP 安装/申请系统行等，不带该标记）保持既有排队语义。
-    const live = target !== "" ? this.sessions.get(this.sessionKey(projectRoot, target, runtime)) : undefined;
-    if (live?.busy === true && message.uiOnlyWhenBusy === true) {
-      const queueDepth = (this.deliveryQueues.get(this.queueKey(projectRoot, target, runtime)) ?? []).length;
-      const parts = message.dedupKey.split("\u0000");
-      const signal = parts[0] === "watchdog" && parts.length >= 3 && parts[2] !== "" ? parts[2] : "watchdog";
-      createDiagnosticLogger({ component: "desktop.watchdog", projectRoot, roleId: target }).record("watchdog.notice.bypass", {
-        mode: "ui-only",
-        signal,
-        targetRoleId: target,
-        queueDepth,
-      });
-      this.emitDeliveryNote(projectRoot, runtime, target, "", message.summary);
-      return;
-    }
-    this.enqueueDelivery(projectRoot, target, {
-      kind: "system",
-      runtime,
-      targetRoleId: target,
-      sourceRoleId: "", // U1 已落树契约：system 来源标注恒空（「系统」非角色）——不得填假角色
-      text: message.text,
-      summary: message.summary,
-      dedupKey: message.dedupKey,
-    });
-    void this.drainQueue(projectRoot, governanceRoleId, runtime);
+    this.diagnostics.watchdogDeliver(projectRoot, message);
   }
 
   /**
@@ -10532,38 +9480,12 @@ ${formatted}` };
     return origin !== undefined && !origin.settled && origin.kind === "message";
   }
 
-  /**
-   * **激活共用件**（⑥；技能与外来 MCP 两族 handler 同款）：复用既有 `rebuildSession`（串行链＋在跑
-   * 拒绝＋三态），**不打断**任何在跑轮次。返回：
-   * · `{effective:"rebuilt"}`＝目标 idle、已重建（即刻生效）；
-   * · `{effective:"next-session", note?}`＝如实延迟态（在跑 ⇒ 无 note；**无会话** ⇒ note 说明「并非在跑
-   *   轮次」——无旧上下文可重建、**绝不自动开目标会话**（激活≠开户））；
-   * · `{effective:"next-session", error}`＝重开失败（调用方按各自登记面组成 `rebuild-failed` 回执——
-   *   登记/声明仍在，**不假装已生效**）。竞态（检查后目标开跑一轮）按其如实延迟、不报失败。
-   */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private async activateRoleRefresh(projectRoot: string, runtime: RuntimeKind, roleId: string, beforeEffect?: () => Promise<boolean>): Promise<{ effective: "rebuilt" | "next-session"; note?: string; error?: string }> {
-    const targetSessionKey = this.sessionKey(projectRoot, roleId, runtime);
-    const targetEntry = this.sessions.get(targetSessionKey);
-    if (!targetEntry) {
-      return { effective: "next-session", note: mainT("main.session.configNextSession") };
-    }
-    if (targetEntry.busy) return { effective: "next-session" }; // 在跑轮次不打断（沿 G-2 语义）；本次回执如实延迟
-    const rebuilt = await this.rebuildSession({ projectRoot, roleId, runtime }, beforeEffect
-      ? async current => current === targetEntry && await beforeEffect()
-      : undefined);
-    if (rebuilt.ok) return { effective: "rebuilt" };
-    if (this.sessions.get(targetSessionKey)?.busy === true) return { effective: "next-session" }; // 竞态：检查后开跑——不报失败
-    return { effective: "next-session", error: rebuilt.error ?? mainT("shared.common.unknownReason") };
+    return this.sessionEnv.activateRoleRefresh(projectRoot, runtime, roleId, beforeEffect);
   }
 
-  /**
-   * `install_skill` / `uninstall_skill` 的共用实现（注入能力侧；回执形状冻结——`model/runtime.ts`）。
-   * 分支顺序（一切失败都先于任何副作用）：
-   * ① 护栏（`not-customer-turn`）→ ② 载荷防御 → ③ 目标角色（`role-not-found`）→ ④ 登记（`not-registered`
-   * / `role-not-listed`；卸载登记未变 ⇒ `registration-unchanged`）→ ⑤ 内容件与运行期哈希（缺件 ⇒
-   * `not-registered` 类如实）→ ⑥ 激活（`rebuilt` / `next-session`；重建失败 ⇒ `rebuild-failed`）→
-   * ⑦ 回执 ＋ `[系统·安装]` 系统行 ＋ 诊断。
-   */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private async applySkillChange(
     action: "installed" | "uninstalled",
     projectRoot: string,
@@ -10572,130 +9494,7 @@ ${formatted}` };
     d: InstallSkillPayload,
     beforeActivation?: () => Promise<boolean>,
   ): Promise<InstallSkillReceipt> {
-    const acting = action === "installed";
-    const verb = acting ? mainT("main.session.install.verbInstall") : mainT("main.session.install.verbUninstall");
-    const toolName = acting ? "install_skill" : "uninstall_skill";
-    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: callerRoleId });
-    const refuse = (reason: string, message: string): InstallSkillReceipt => {
-      diagnostic.record("skill.refused", { toolName, targetRoleId: typeof d?.roleId === "string" ? d.roleId : "", reasonCode: reason });
-      return { ok: false, reason, message };
-    };
-
-    // ① 裁定④ 轮次护栏（**先判**；拒绝零副作用——不触目标、不读登记、不投系统行）。
-    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, callerRoleId)) {
-      return refuse("not-customer-turn", mainT("main.session.install.notCustomerTurn"));
-    }
-
-    // ② 载荷防御（模型输入不可信——本层全量重校验，不依赖工具层的参数校验）。
-    const roleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
-    const name = typeof d?.name === "string" ? d.name.trim() : "";
-    if (roleId === "") return refuse("role-not-found", mainT("main.session.install.roleNotFound", { roleId }));
-    if (name === "") return refuse("not-registered", mainT("main.session.install.skillNotRegistered", { name, verb }));
-
-    // ③ 目标角色须是**本项目项目角色**（非内置治理角色 su 自身/同类）；缓存 miss ⇒ 实时重枚举一次
-    //   （首轮寻址先例：`routeDispatch` / `proposeRecovery` 同款——新建角色同轮安装不误拒）。
-    const findTarget = (): { builtIn?: boolean } | undefined => {
-      const listing = this.deps.getListing(projectRoot);
-      return listing ? listing.roles.find((r) => r.roleId === roleId) : undefined;
-    };
-    let target = findTarget();
-    if (!target && this.deps.refreshListing) {
-      try {
-        await this.deps.refreshListing(projectRoot);
-      } catch {
-        // 重枚举失败（读盘竞态等）：按原 miss 口径如实拒绝，不上抛。
-      }
-      target = findTarget();
-    }
-    if (!target || target.builtIn === true || isBuiltInGovernanceRoleId(roleId)) {
-      return refuse("role-not-found", mainT("main.session.install.roleNotFound", { roleId }));
-    }
-
-    // ④ 登记校验（**唯一来源**＝编排 `readSkillRegistration`——与渲染器坏件集逐字同口径，绝不复制解析）。
-    const registration = readSkillRegistration(projectRoot, name);
-    if (registration === undefined) {
-      return refuse(
-        "not-registered",
-        acting
-          ? mainT("main.session.install.skillNotRegisteredInstall", { name })
-          : mainT("main.session.install.skillNotRegisteredUninstall", { name }),
-      );
-    }
-    if (acting) {
-      if (!registration.roles.includes(roleId)) {
-        return refuse("role-not-listed", mainT("main.session.install.roleNotListed", { roleId }));
-      }
-      if (registration.status !== "installed") {
-        return refuse(
-          "not-registered",
-          mainT("main.session.install.skillStatus", { name, status: registration.status }),
-        );
-      }
-    } else if (registration.status === "installed" && registration.roles.includes(roleId)) {
-      // 卸载专有两钉之一：**先改登记再卸载**——登记仍含角色即拒绝（防「工具说撤了、登记没变」）。
-      return refuse("registration-unchanged", mainT("main.session.install.registrationUnchanged", { roleId }));
-    }
-
-    // ⑤ 内容件存在性与运行期哈希（sha256 **原始字节**——复用 `filePrint` 缓存件；与渲染器/`finalize.ts`
-    //   同算法：「哈希只能由代码算」）。缺件 ⇒ 如实拒绝（回执冻形要求 `path`＋`digest`——不拿哨兵充数）。
-    const skillRel = `docs/skills/${name}/SKILL.md`;
-    const digest = await filePrint(path.join(projectRoot, "docs", "skills", name, "SKILL.md"));
-    if (digest === "<missing>") {
-      return refuse(
-        "not-registered",
-        acting
-          ? mainT("main.session.install.skillMissing", { path: skillRel })
-          : mainT("main.session.install.skillMissingUninstall", { path: skillRel }),
-      );
-    }
-
-    // ⑥ 激活（共用件 `activateRoleRefresh`——复用既有 `rebuildSession` 三态，两族 handler 同款）：
-    //    idle ⇒ rebuilt（即刻生效）；在跑 ⇒ next-session（如实延迟态，**不是错误**——settle 后靠既有
-    //    检查点（含裁定⑤ 指纹）收敛）；无会话 ⇒ next-session（无旧上下文可重建）；重开失败 ⇒
-    //    rebuild-failed（登记仍在，**不假装已生效**）。
-    if (beforeActivation && !(await beforeActivation()))
-      return refuse("effect-scope-unproven", "调用来源或执行范围已变化，未激活或刷新目标会话。");
-    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId, beforeActivation);
-    if (activation.error !== undefined) {
-      diagnostic.error("skill.rebuild.failed", new Error(activation.error), { toolName, targetRoleId: roleId });
-      return {
-        ok: false,
-        reason: "rebuild-failed",
-        message: mainT("main.session.install.rebuildFailed", { action: acting ? "变更" : "撤销", roleId, detail: activation.error }),
-      };
-    }
-    const effective = activation.effective;
-    const note = activation.note;
-
-    // ⑦ 如实回执（冻形）＋ `[系统·安装]` 定格系统行（`kind:"system"` 第四类通道真投递给 su——忙时排队、
-    //    未开自动开、失败保留重试全复用；不可撤回）＋诊断。**不写盘、不放行任何写入、不改任何写边界**。
-    const effectivePhrase =
-      effective === "rebuilt"
-        ? mainT("main.session.install.effectiveRebuilt")
-        : note !== undefined
-          ? mainT("main.session.install.effectiveNextSession")
-          : mainT("main.session.install.effectiveAfterTurn");
-    const shortDigest = digest.slice(0, 12);
-    const rowText = acting
-      ? `${CAPABILITY_INSTALL_SYSTEM_PREFIX} ${mainT("main.session.install.installedSkill", { name, roleId, effective: effectivePhrase, path: skillRel, digest: shortDigest })}`
-      : `${CAPABILITY_INSTALL_SYSTEM_PREFIX} ${mainT("main.session.install.uninstalledSkill", { name, roleId, path: skillRel, digest: shortDigest, effective: effectivePhrase })}`;
-    this.watchdogDeliver(projectRoot, {
-      text: rowText,
-      summary: mainT("main.session.install.summarySkill", { verb, name, roleId, effectiveShort: effective === "rebuilt" ? mainT("main.session.install.effectiveShortRebuilt") : mainT("main.session.install.effectiveShortNextSession") }),
-      // 命名空间同看护（`watchdog\0…`——与回交/派发键隔离）；每条动作独立（重装/重卸是合法事件，不去重）。
-      dedupKey: `watchdog\u0000${projectRoot}\u0000install-row\u0000${randomUUID()}`,
-    });
-    diagnostic.record(acting ? "skill.installed" : "skill.uninstalled", { toolName, targetRoleId: roleId, path: skillRel, state: effective });
-    return {
-      ok: true,
-      action,
-      roleId,
-      name,
-      path: skillRel,
-      digest,
-      effective,
-      ...(note !== undefined ? { note } : {}),
-    };
+    return this.sessionEnv.applySkillChange(action, projectRoot, runtime, callerRoleId, d, beforeActivation);
   }
 
   // —————————————— G-4 V2（2026-10-16 客户批准）：外来 MCP 安装/卸载 handler ——————————————
@@ -10707,14 +9506,7 @@ ${formatted}` };
   // （server 进程随会话消亡、零平台残留）、**已发生的副作用不可撤**；**声明文件保留**（「效果已撤」与
   // 「文件仍在」如实二分）。
 
-  /**
-   * `install_mcp` / `uninstall_mcp` 的共用实现（注入能力侧；回执形状冻结——`model/runtime.ts`，沿技能版
-   * 体格）。分支顺序同技能版：① 护栏（`not-customer-turn`）→ ② 载荷防御 → ③ 目标角色（`role-not-found`）
-   * → ④ 声明（唯一来源＝运行时核心 `readMcpDeclaration`，**不复制解析逻辑**：`not-registered`／
-   * `role-not-listed`；卸载声明未变 ⇒ `registration-unchanged`）→ ⑤ 声明文件与运行期哈希（缺件 ⇒
-   * `not-registered` 类如实）→ ⑥ 激活（共用 `activateRoleRefresh`：`rebuilt`／`next-session`／
-   * `rebuild-failed`）→ ⑦ 回执 ＋ `[系统·安装]` 系统行 ＋ 诊断。
-   */
+  /** 薄委托 → `session/session-env.ts`（JSDoc/方法体见模块）。 */
   private async applyMcpChange(
     action: "installed" | "uninstalled",
     projectRoot: string,
@@ -10723,127 +9515,7 @@ ${formatted}` };
     d: InstallMcpPayload,
     beforeActivation?: () => Promise<boolean>,
   ): Promise<InstallMcpReceipt> {
-    const acting = action === "installed";
-    const verb = acting ? mainT("main.session.install.verbInstall") : mainT("main.session.install.verbUninstall");
-    const toolName = acting ? "install_mcp" : "uninstall_mcp";
-    const diagnostic = createDiagnosticLogger({ component: "desktop.session", projectRoot, roleId: callerRoleId });
-    const refuse = (reason: string, message: string): InstallMcpReceipt => {
-      diagnostic.record("mcp.refused", { toolName, targetRoleId: typeof d?.roleId === "string" ? d.roleId : "", reasonCode: reason });
-      return { ok: false, reason, message };
-    };
-
-    // ① 裁定④ 轮次护栏（**先判**；与技能两工具同判据同文案）。
-    if (!this.isCustomerInitiatedTurn(projectRoot, runtime, callerRoleId)) {
-      return refuse("not-customer-turn", mainT("main.session.install.notCustomerTurn"));
-    }
-
-    // ② 载荷防御（模型输入不可信——本层全量重校验）。
-    const roleId = typeof d?.roleId === "string" ? d.roleId.trim() : "";
-    const name = typeof d?.name === "string" ? d.name.trim() : "";
-    if (roleId === "") return refuse("role-not-found", mainT("main.session.install.roleNotFound", { roleId }));
-    if (name === "") return refuse("not-registered", mainT("main.session.install.mcpNotRegistered", { name, verb }));
-
-    // ③ 目标角色须是**本项目项目角色**（非内置治理角色 su 自身/同类）；缓存 miss ⇒ 实时重枚举一次
-    //   （与技能版同口径；首轮寻址先例）。
-    const findTarget = (): { builtIn?: boolean } | undefined => {
-      const listing = this.deps.getListing(projectRoot);
-      return listing ? listing.roles.find((r) => r.roleId === roleId) : undefined;
-    };
-    let target = findTarget();
-    if (!target && this.deps.refreshListing) {
-      try {
-        await this.deps.refreshListing(projectRoot);
-      } catch {
-        // 重枚举失败（读盘竞态等）：按原 miss 口径如实拒绝，不上抛。
-      }
-      target = findTarget();
-    }
-    if (!target || target.builtIn === true || isBuiltInGovernanceRoleId(roleId)) {
-      return refuse("role-not-found", mainT("main.session.install.roleNotFound", { roleId }));
-    }
-
-    // ④ 声明校验（**唯一来源**＝运行时核心 `readMcpDeclaration`——与装配列表函数逐字同口径，绝不复制解析）。
-    const declaration = readMcpDeclaration(projectRoot, name);
-    if (declaration === undefined) {
-      return refuse(
-        "not-registered",
-        acting
-          ? mainT("main.session.install.mcpNotRegisteredInstall", { name })
-          : mainT("main.session.install.mcpNotRegisteredUninstall", { name }),
-      );
-    }
-    if (acting) {
-      if (!declaration.roles.includes(roleId)) {
-        return refuse("role-not-listed", mainT("main.session.install.roleNotListed", { roleId }));
-      }
-      if (declaration.status !== "installed") {
-        return refuse(
-          "not-registered",
-          mainT("main.session.install.mcpStatus", { name, status: declaration.status }),
-        );
-      }
-    } else if (declaration.status === "installed" && declaration.roles.includes(roleId)) {
-      // 卸载专有两钉之一：**先改声明再卸载**——声明仍含角色即拒绝（防「工具说撤了、声明没变」）。
-      return refuse("registration-unchanged", mainT("main.session.install.registrationUnchanged", { roleId }));
-    }
-
-    // ⑤ 声明文件存在性与运行期哈希（sha256 **原始字节**——复用 `filePrint`；与技能版同算法）。缺件 ⇒
-    //   如实拒绝（回执冻形要求 `path`＋`digest`；卸载须能如实作「文件保留」陈述——不拿哨兵充数）。
-    const declarationRel = `docs/mcp/${name}.md`; // ＝视图 `declaration.path` 同口径（回执/诊断同一路径）
-    const digest = await filePrint(path.join(projectRoot, "docs", "mcp", `${name}.md`));
-    if (digest === "<missing>") {
-      return refuse(
-        "not-registered",
-        acting
-          ? mainT("main.session.install.mcpDeclarationMissing", { path: declarationRel })
-          : mainT("main.session.install.mcpDeclarationMissingUninstall", { path: declarationRel }),
-      );
-    }
-
-    // ⑥ 激活（共用件 `activateRoleRefresh`——同技能版三态与竞态语义）。
-    if (beforeActivation && !(await beforeActivation()))
-      return refuse("effect-scope-unproven", "调用来源或执行范围已变化，未激活或刷新目标会话。");
-    const activation = await this.activateRoleRefresh(projectRoot, runtime, roleId, beforeActivation);
-    if (activation.error !== undefined) {
-      diagnostic.error("mcp.rebuild.failed", new Error(activation.error), { toolName, targetRoleId: roleId });
-      return {
-        ok: false,
-        reason: "rebuild-failed",
-        message: mainT("main.session.install.mcpRebuildFailed", { action: acting ? "变更" : "撤销", roleId, detail: activation.error }),
-      };
-    }
-    const effective = activation.effective;
-    const note = activation.note;
-
-    // ⑦ 如实回执（冻形）＋ `[系统·安装]` 定格系统行（同技能版：kind:"system" 第四类通道真投递给 su——
-    //    不可撤回）＋诊断。**不写盘、不放行任何写入、不改任何写边界**；诚实面（门禁之外执行＝能力级
-    //    授予，**非逐调用受审**）写进系统行（不得宣称受审）。
-    const effectivePhrase =
-      effective === "rebuilt"
-        ? mainT("main.session.install.effectiveRebuilt")
-        : note !== undefined
-          ? mainT("main.session.install.effectiveNextSession")
-          : mainT("main.session.install.effectiveAfterTurn");
-    const shortDigest = digest.slice(0, 12);
-    const rowText = acting
-      ? `${CAPABILITY_INSTALL_SYSTEM_PREFIX} ${mainT("main.session.install.installedMcp", { name, roleId, effective: effectivePhrase, path: declarationRel, digest: shortDigest })}`
-      : `${CAPABILITY_INSTALL_SYSTEM_PREFIX} ${mainT("main.session.install.uninstalledMcp", { name, roleId, path: declarationRel, digest: shortDigest, effective: effectivePhrase })}`;
-    this.watchdogDeliver(projectRoot, {
-      text: rowText,
-      summary: mainT("main.session.install.summaryMcp", { verb, name, roleId, effectiveShort: effective === "rebuilt" ? mainT("main.session.install.effectiveShortRebuilt") : mainT("main.session.install.effectiveShortNextSession") }),
-      dedupKey: `watchdog\u0000${projectRoot}\u0000mcp-install-row\u0000${randomUUID()}`,
-    });
-    diagnostic.record(acting ? "mcp.installed" : "mcp.uninstalled", { toolName, targetRoleId: roleId, path: declarationRel, state: effective });
-    return {
-      ok: true,
-      action,
-      roleId,
-      name,
-      path: declarationRel,
-      digest,
-      effective,
-      ...(note !== undefined ? { note } : {}),
-    };
+    return this.sessionEnv.applyMcpChange(action, projectRoot, runtime, callerRoleId, d, beforeActivation);
   }
 
   // ——————— G-2/W1：role_status / session_tail 的桌面侧数据源（契约＝`model/runtime.ts`；编排转发） ———————
@@ -10873,195 +9545,19 @@ ${formatted}` };
     return this.evidence.docFormatText(projectRoot, callerRoleId, input);
   }
 
-  /** `role_status` 结构化文本（设计 §4.1：su 行 + 各角色行 + 队列明细 + 可选诊断节；**纯读**、无副作用；
-   *  数据层失败以 `{ok:false, message}` 如实表达（不抛——抛错由工具层按「读取未完成」如实转达）；
-   *  8 KiB 截断由工具层执行（本层不预截断）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private async roleStatusText(projectRoot: string, query: RoleStatusPayload): Promise<WatchdogToolResult> {
-    try {
-      const at = this.now();
-      const snapshot = this.watchdogSnapshot(projectRoot);
-      const lines: string[] = [`role_status（项目 ${projectRoot}，${new Date(at).toISOString()}）`];
-      if (!snapshot) {
-        lines.push("（尚无运行态：项目未导入，或还没有任何会话/队列——先导入项目并点开角色。）");
-        return { ok: true, text: lines.join("\n") };
-      }
-      // 评审 §5.6：状态行的主人行数据驱动（trio=Convener；single=su）——**不让 Rapporteur 会话自称 su**。
-      const governanceRoleId = snapshot.governanceRoleId;
-      const pendingFor = (rid: string): number => snapshot.pendingConfirmationsByRole.get(rid) ?? 0;
-      const governanceBusy = governanceRoleId !== null && snapshot.roles.some((r) => r.roleId === governanceRoleId && r.busy);
-      const stats = this.deps.watchdogStats?.(projectRoot);
-      const watchdogLine = stats
-        ? `看护：活跃告警 ${stats.activeAlerts}，最近触发 ${stats.lastAlertAt !== null ? new Date(stats.lastAlertAt).toISOString() : "null"}，已抑制 ${stats.suppressedTotal}`
-        : "看护：未接线";
-      lines.push(`${governanceRoleId ?? "（未枚举）"}：busy=${governanceBusy} ｜ 待确认卡 ${governanceRoleId !== null ? pendingFor(governanceRoleId) : 0} ｜ ${watchdogLine}`);
-      const wantedRoleId = typeof query?.roleId === "string" ? query.roleId.trim() : "";
-      let listing = this.deps.getListing(projectRoot);
-      // W6-B 真机阻塞修复：治理角色刚写入的新角色可能尚未进缓存——指定角色 miss 时强制刷新**一次**
-      // 再判定（只一次；刷新失败只记诊断，仍按 miss 如实报告）。
-      if (wantedRoleId !== "" && (!listing || !listing.roles.some((r) => r.roleId === wantedRoleId))) {
-        await this.refreshListingNow(projectRoot);
-        listing = this.deps.getListing(projectRoot);
-      }
-      const knownRoles = listing ? listing.roles.map((r) => r.roleId) : [...new Set([...snapshot.roles.map((r) => r.roleId), ...snapshot.queues.map((q) => q.targetRoleId)])].filter((r) => r !== "");
-      const includeDiagnostics = query?.includeDiagnostics === true;
-      const wanted = wantedRoleId !== "" ? [wantedRoleId] : knownRoles;
-      for (const rid of wanted) {
-        if (listing && !knownRoles.includes(rid)) {
-          lines.push(`角色 ${rid}：不在本项目（未枚举到）。`);
-          continue;
-        }
-        const live = snapshot.roles.find((r) => r.roleId === rid);
-        const queue = snapshot.queues.find((q) => q.targetRoleId === rid);
-        let liveText = "未开";
-        if (live) {
-          const entry = this.sessions.get(this.sessionKey(projectRoot, rid, live.runtime));
-          const ctx = entry ? this.contextInfo(entry.handle).contextSource ?? "fresh" : "fresh";
-          liveText = `已开（contextSource=${ctx}）`;
-        }
-        let runningKind: string | undefined;
-        for (const [key, item] of this.activeDeliveries) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { runningKind = item.kind; break; }
-        const depth = queue?.items.length ?? 0;
-        const busy = live?.busy === true;
-        lines.push(`角色 ${rid}：busy=${busy} ｜ 会话 ${liveText} ｜ 队列 ${depth} ｜ 进行中 ${runningKind ?? "—"}`);
-        // B 批：运行日志的 lastActivityAt / 最近动作（只读；读失败如实显示「不可用」，不猜）。
-        const activity = await readRoleLog(projectRoot, { roleId: rid, limit: 1 });
-        if (activity.ok) {
-          const lastLog = activity.entries[activity.entries.length - 1];
-          lines.push(`  运行日志：lastActivityAt=${lastLog?.at ?? "无"} ｜ 最近动作=${lastLog !== undefined ? `${lastLog.kind}：${lastLog.summary}` : "无"}`);
-        } else {
-          lines.push(`  运行日志：不可用（${activity.message ?? "读取失败"}）`);
-        }
-        // 呈现消歧（实机反馈 2026-10-17；时限语义随客户 2026-10-17 裁定更新）：busy=true 时「上一轮终局」
-        // **不是当前轮**——必须分开写，否则 su 会把历史 timed_out 转述成「该角色超时、已中止」。当前轮事实
-        // （已耗/看护检查时限/turnId）只在 busy 且有起始时刻时给出；`promptTimeoutMs` 自 2026-10-17 起是
-        // **到点检查时限（不中止本轮）**，整轮最后兜底固定 1 小时（`turnLastResortMs`）。时限求值与看护/
-        // 会话运行时**同一来源** `resolveRuntimeTimeouts`（不另写时长/env 解析），格式化复用 `formatDurationMs`。
-        if (busy && live !== undefined && typeof live.turnStartedAt === "number") {
-          const timeouts = resolveRuntimeTimeouts(
-            live.runtime,
-            { promptTimeoutMs: this.deps.runtimeOptions?.promptTimeoutMs },
-            process.env,
-          );
-          const lastResortText =
-            timeouts.turnLastResortMs >= 3_600_000 && timeouts.turnLastResortMs % 3_600_000 === 0
-              ? `${timeouts.turnLastResortMs / 3_600_000} 小时`
-              : formatDurationMs(timeouts.turnLastResortMs);
-          lines.push(
-            `  当前轮：进行中（已耗 ${formatDurationMs(Math.max(0, at - live.turnStartedAt))} / 看护检查时限 ${formatDurationMs(timeouts.promptTimeoutMs)}；turnId=${live.turnId ?? "—"}；${lastResortText}最后兜底）`,
-          );
-        }
-        let last: { outcome: RuntimeTurnOutcome; at: string; errorCode?: string } | undefined;
-        for (const [key, value] of this.lastTurns) if (key.startsWith(`${projectRoot}\u0000${rid}\u0000`)) { last = value; break; }
-        if (last) {
-          const history = `该角色近 15 分钟 failed/timed_out 计 ${stats?.failuresByRole.get(rid) ?? 0}`;
-          const lastOutcome = last.errorCode !== undefined ? `${last.outcome}(${last.errorCode})` : last.outcome;
-          lines.push(
-            busy
-              ? `  上一轮终局：${lastOutcome} @ ${last.at}（不表示当前轮；${history}）`
-              : `  最近一轮：${lastOutcome} @ ${last.at}（${history}）`,
-          );
-        }
-        for (const item of queue?.items ?? []) {
-          lines.push(`  队列明细：- [${item.kind}] 来自 ${item.sourceRoleId === "" ? "（系统）" : item.sourceRoleId}：${shortenText(item.summary, 80)}（入队 ${new Date(item.enqueuedAtMs).toISOString()}，id=${item.dedupKey}）`);
-        }
-        if (includeDiagnostics && wantedRoleId !== "") lines.push(await this.diagnosticsTailText(rid));
-      }
-      if (includeDiagnostics && wantedRoleId === "") lines.push("（诊断节需要指定 roleId——未附。）");
-      return { ok: true, text: lines.join("\n") };
-    } catch (err) {
-      return { ok: false, message: `role_status 数据面读取失败：${err instanceof Error ? err.message : String(err)}` };
-    }
+    return this.diagnostics.roleStatusText(projectRoot, query);
   }
 
-  /** 该角色**近日志尾部 ≤20 条**（只读诊断文件；字段为写盘白名单内的元数据）。失败如实（不抛、不猜）。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private async diagnosticsTailText(roleId: string): Promise<string> {
-    try {
-      const status = getDiagnosticsStatus();
-      if (!status.directory) return `  [diagnostics] 不可用（诊断目录未配置${status.lastError ? `；lastError：${status.lastError}` : ""}）。`;
-      const names = (await fs.promises.readdir(status.directory)).filter((n) => /^ans-diagnostics-\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort();
-      const newest = names[names.length - 1];
-      if (newest === undefined) return "  [diagnostics] 不可用（暂无诊断文件）。";
-      const file = path.join(status.directory, newest);
-      const st = await fs.promises.stat(file);
-      const start = Math.max(0, st.size - 256 * 1024); // 尾读 ≤256KiB（不整读大文件）
-      const fh = await fs.promises.open(file, "r");
-      let chunk = "";
-      try {
-        const buf = Buffer.alloc(st.size - start);
-        const { bytesRead } = await fh.read(buf, 0, buf.length, start);
-        chunk = buf.subarray(0, bytesRead).toString("utf8");
-      } finally {
-        await fh.close();
-      }
-      const rows: string[] = [];
-      for (const line of chunk.split("\n")) {
-        const trimmed = line.trim();
-        if (trimmed === "" || rows.length >= 20) continue;
-        try {
-          const row = JSON.parse(trimmed) as Record<string, unknown>;
-          if (row.roleId !== roleId) continue;
-          const fields = Object.entries(row)
-            .filter(([k]) => k !== "at" && k !== "level" && k !== "pid" && k !== "projectRoot" && k !== "roleId")
-            .map(([k, v]) => `${k}=${String(v)}`)
-            .join(" ");
-          rows.push(`  [diagnostics] ${String(row.at ?? "")} ${String(row.event ?? "?")}${fields ? ` ${fields}` : ""}`);
-        } catch {
-          // 坏行跳过（尾读切半行也走这里）——如实不猜。
-        }
-      }
-      return rows.length > 0 ? rows.join("\n") : "  [diagnostics] 该角色近日志无可显示条目。";
-    } catch (err) {
-      return `  [diagnostics] 不可用（读取失败）：${err instanceof Error ? err.message : String(err)}`;
-    }
+    return this.diagnostics.diagnosticsTailText(roleId);
   }
 
-  /** `session_tail` 规范化尾行文本（设计 §4.2）：**复用受保护投影管线**（getSessionHistory 同路径——凭据
-   *  清洗/display 保护已在链上）；行数由工具层归一（本层沿用其值，防御再夹一道）；「无会话历史」「读坏」
-   *  以 `{ok:false, message}` 如实表达——不抛、不猜。 */
+  /** 薄委托 → `session/diagnostics.ts`（JSDoc/方法体见模块）。 */
   private async sessionTailText(projectRoot: string, query: SessionTailPayload): Promise<WatchdogToolResult> {
-    const rid = typeof query?.roleId === "string" ? query.roleId.trim() : "";
-    if (rid === "") return { ok: false, message: "session_tail：roleId 必须非空。" };
-    const n = typeof query?.lines === "number" && Number.isFinite(query.lines) ? Math.min(200, Math.max(1, Math.floor(query.lines))) : 40;
-    try {
-      let source = "无会话文件";
-      try {
-        const dir = sessionsDirFor(projectRoot, rid);
-        const names = await fs.promises.readdir(dir);
-        const files: { name: string; mtimeMs: number }[] = [];
-        for (const name of names) {
-          try {
-            const st = await fs.promises.stat(path.join(dir, name));
-            if (st.isFile()) files.push({ name, mtimeMs: st.mtimeMs });
-          } catch {
-            // 单文件 stat 失败：跳过（不阻断其它候选）
-          }
-        }
-        const latest = pickLatestSessionFile(files);
-        if (latest !== null) source = latest;
-      } catch {
-        // 无目录 = 无历史
-      }
-      let runtime: RuntimeKind = "pi";
-      for (const entry of this.sessions.values()) {
-        if (entry.projectRoot === projectRoot && entry.roleId === rid) { runtime = entry.runtime; break; }
-      }
-      const view = await getSessionHistory(
-        { projectRoot, roleId: rid, runtime },
-        { credentialEnvNames: [...(this.deps.runtimeOptions?.extraCredentialEnvVars ?? []), ...(this.deps.runtimeOptions?.apiKeyEnvVar ? [this.deps.runtimeOptions.apiKeyEnvVar] : [])] },
-      );
-      if (view.error) {
-        return { ok: false, message: `会话历史读取未完成：${view.error}（来源 ${source}；跳过 ${view.skipped} 行）` };
-      }
-      const taken = view.rows.slice(-n);
-      if (taken.length === 0) {
-        return { ok: false, message: `无会话历史（来源 ${source}；规范行 0 条，跳过 ${view.skipped} 行）` };
-      }
-      const head = `session_tail（角色 ${rid}，runtime=${runtime}）：来源 ${source}；规范行 ${view.rows.length} 条，跳过 ${view.skipped} 行${view.rows.length > taken.length ? `（已按行数上限 ${n} 取尾部）` : ""}`;
-      const body = taken.map((row) => `${row.at !== "" ? row.at : "（无时间）"} [${row.kind}] ${shortenText(row.text, 200)}`);
-      return { ok: true, text: [head, ...body].join("\n") };
-    } catch (err) {
-      return { ok: false, message: `session_tail 读取失败（如实返回，不猜）：${err instanceof Error ? err.message : String(err)}` };
-    }
+    return this.diagnostics.sessionTailText(projectRoot, query);
   }
 
   /** 某项目**全部**队列的放行尝试（settled 触发的重试时机——投递触发不挑目标，各队列自判忙/开）。 */

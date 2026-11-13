@@ -1,0 +1,5 @@
+session.ts before (HEAD c616280): 11756 lines, sha256 0d340589c85adcef44ae8a9f4354d34ac5b7c5d4258540c8dda7bbfc7fb29607
+session.ts after  (working tree) : 10252 lines, sha256 9c0f51d7e63aad71e2742611d1b5f6a4478b2ce498b50bcba02c623a23f199f1
+app/desktop/session/tasks.ts: 916 lines, sha256 4f547cf5828359032ef200229ba6f7310994c7d6ee48eb4fe257dc6eff51c6ff
+app/desktop/session/diagnostics.ts: 722 lines, sha256 80007ee4e6e221e805e8c91abec72c7dbf7ce60cb6e796cf0cd756b3a93e553b
+app/desktop/session/session-env.ts: 601 lines, sha256 7641d1a258b57572865872332d7588af5ce946612d6b1c5aa06d8cb6c4846933
