@@ -1,0 +1,7 @@
+1c615a1f80bb986e94c207686750504e4dee0645f12b1f21d65910e9092f1760 *test/桌面应用/session-structure.test.ts
+f37d2152f31a93a7e3f7bece35aec0bd0f4137fc1d3c46b6752a7c96633a7d2d *角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b0-structure.md
+fc0c8a07d4c7509c81c4e6ae3fb4e6e1e97d51b3c184c30947263d75e4bb71b9 *角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b0-structure_evidence/00-basis.txt
+4fcfccb78d69f4f347c0edde58d3f999b15b9b125c7b220e444107abe61feb78 *角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b0-structure_evidence/01-run-1.txt
+e5ed526aacb9e3bd1ae7298d406a7b79e58e65806c956e74db11684993462408 *角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b0-structure_evidence/02-run-2.txt
+43616a31b9abc5efd69f9bbf243a6e87426375ee3a2812c7f185c80c4d49ec32 *角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b0-structure_evidence/03-run-3.txt
+aa734e17766179b68558d1b078657a51a597426f3f9b225bf36d9c3797b73043 *角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b0-structure_evidence/04-typecheck.txt
