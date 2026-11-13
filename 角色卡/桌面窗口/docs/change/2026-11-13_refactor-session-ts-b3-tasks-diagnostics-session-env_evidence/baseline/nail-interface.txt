@@ -1,0 +1,17 @@
+✔ 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状） (51.8177ms)
+✔ 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变 (22.3352ms)
+✔ 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子 (0.467ms)
+✔ requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用 (155.2464ms)
+✔ 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型 (10.3135ms)
+✔ decision权威revision只由主进程推进，非法set不变，重开旧revision失效 (0.3311ms)
+✔ W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留 (56.5106ms)
+✔ W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变 (12.714ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 741.1611
+EXIT=0

@@ -1,0 +1,13 @@
+# 计时器/看护回调语义核验（B3）
+
+本组搬迁不新增/不删除任何定时器，不改 unref/dispose 时机：
+
+- HEAD app/desktop/session.ts: setInterval=1, setTimeout=5, .unref(=0, setImmediate=0
+- after app/desktop/session.ts: setInterval=1, setTimeout=4, .unref(=0, setImmediate=0
+- after app/desktop/session/tasks.ts: setInterval=0, setTimeout=1, .unref(=0, setImmediate=0
+- after app/desktop/session/diagnostics.ts: setInterval=0, setTimeout=0, .unref(=0, setImmediate=0
+- after app/desktop/session/session-env.ts: setInterval=0, setTimeout=0, .unref(=0, setImmediate=0
+
+说明：HEAD 的 5 处 setTimeout 中恰 1 处（terminateRoleRun 的 5000ms abort 竞速上限）随方法逐字迁入 tasks.ts；
+session.ts 其余 4 处与唯一 setInterval（看护 tick，未在 B3 范围）逐字未动。diagnostics/session-env 内为 0。
+所有 dispose/unref 调用点均未移动（无 .unref() 调用存在于本批方法文本中）；看护回调（watchdogSnapshot/watchdogDeliver）为同步纯读/入队，不含计时器。
