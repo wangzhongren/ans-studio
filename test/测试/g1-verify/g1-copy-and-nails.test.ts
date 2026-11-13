@@ -9,13 +9,14 @@ import fs from "node:fs/promises";
 import { BUILT_IN_ROLE_CARD_TEXT } from "../../../src/common/门禁引擎/boundary-core.ts";
 import { describeTool } from "../../../src/provider/runtime/schema.ts";
 import { renderDispatchPrompt } from "../../../src/common/编排/handback.ts";
+import { readSessionSource } from "../../桌面应用/session-source.ts";
 
 const read = (rel: string) => fs.readFile(new URL(rel, import.meta.url), "utf8");
 const T = BUILT_IN_ROLE_CARD_TEXT;
 const splitClauses = (text: string) => text.split(/[。；\n]/);
 
 test("代码级钉子（独立）：session.ts 无本地副本实现/调用、无内嵌派发模板；接线走编排三件套", async () => {
-  const sess = await read("../../../app/desktop/session.ts");
+  const sess = readSessionSource();
   assert.equal(/renderDispatchPromptLocal\s*\(/.test(sess), false, "session.ts 不得残留本地副本的**实现/调用**（ASCII 左括号判据；注释性指称合法）");
   assert.equal(sess.includes("[派发] 来自"), false, "session.ts 不得内嵌派发文案模板（渲染单一来源 = 编排）");
   assert.ok(sess.includes("extractDispatchReadPaths("), "接线须调用提取（单一来源）");

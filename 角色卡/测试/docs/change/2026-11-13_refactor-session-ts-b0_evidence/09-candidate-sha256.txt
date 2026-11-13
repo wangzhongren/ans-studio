@@ -1,0 +1,16 @@
+575796332aa8f889b76c3cab371bcf9c32d779de72c6a3c01af4a9a340ee3b80 *test/桌面UI/evidence-markers.test.ts
+325ceede02eb0fe7f02c9c4dddd20a7345cb57869fa6ef2f65be2d0079aed6ec *test/桌面UI/queue-status.test.ts
+26bae847bdda60e325016f601332a929b5df9ef1872a28d481f50c326fefd618 *test/桌面UI/request-status.test.ts
+8da2522ce2e793d6ab090d813c89c9d7d76324022f3f31b4807b57676585b1f7 *test/桌面应用/boundary-refresh.test.ts
+98e079e4210d8793679283a6b7a0b35419a2b4be089f63737365c5058cd490cd *test/桌面应用/chief-workflow.test.ts
+91ca802ef972492380586b4dba865540138841499bb7f4c6fab145bcd357efff *test/桌面应用/directive-input.test.ts
+58551917749c7e765d3c4b1dbb4b83aaa9068714402fcbd008a1838418cbb4bd *test/桌面应用/dispatch-fresh-enum.test.ts
+c64bf3390fb20d3909b5b3fcafdae791fe173a680a640060fc99ea3469986b45 *test/桌面应用/hot-path.test.ts
+15a316844e1f08ab41cd140434e22376ece39c096a91a2a5a5161e02ee21827d *test/桌面应用/interface.test.ts
+326ab90b8351d8e81a147bed2cd91d8a9f6c205678660a7c7e7e7c301117b138 *test/桌面应用/message-queue.test.ts
+52e369c1a8762d9eb8597656cad59885419e16d9013aed4c84cce8c7c6ef1be1 *test/桌面应用/run-change-entry.test.ts
+2a93f4977cfd84df692bd9b3a19dc01e6fd283f843b16c7e39459eddba2b741a *test/测试/g1-verify/g1-copy-and-nails.test.ts
+8cab293496cf6bbe620fb80678e6ab07e9720b26ed4b438dc92a8b558b44e52c *test/测试/g4-skill-verify/h-scope-audit.test.ts
+de4b4ea6a6867723f8bc16e7df4896d22491c07b3a669f8b9e6ae59ab099afdd *test/测试/governance-matrix-integration.test.ts
+9615e85c5f235650ab0a077cfa61e8f2d022eafd2ea5ee292daa9955767e2eb7 *test/桌面应用/session-source.ts
+59e4c202a3dcd11c58393a63525f50360a3d09f80c84e5744aa9cdc0d168eed6 *test/桌面应用/session-source.test.ts

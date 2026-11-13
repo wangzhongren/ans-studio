@@ -23,9 +23,10 @@ import { buildProjectConfig } from "../../app/desktop/project.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+import { readSessionSource } from "./session-source.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SESSION_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+const SESSION_SRC = readSessionSource();
 const MAIN_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "main.ts"), "utf8");
 const PRELOAD = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "preload.cjs"), "utf8");
 

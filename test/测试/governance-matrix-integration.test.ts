@@ -29,6 +29,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { buildProjectConfig, DESKTOP_RUNTIME_CONSENT } from "../../app/desktop/project.ts";
+import { readSessionSource } from "../桌面应用/session-source.ts";
 import {
   listProject,
   resolveRole,
@@ -1383,7 +1384,7 @@ test("T1-27 桌面端到端：真实 openRoleSession + 只读导入 buildProject
       await worker.handle.dispose();
     }
     // 桌面代码零改动（本特性无新增 IPC）：desktop 生产文件不得引用 governance-matrix 能力。
-    const desktopSession = fs.readFileSync(path.join(process.cwd(), "app", "desktop", "session.ts"), "utf8");
+    const desktopSession = readSessionSource();
     assert.equal(desktopSession.includes("governanceMatrix"), false, "桌面 session 不应引用矩阵能力");
     assert.equal(desktopSession.includes("contextSections"), false, "桌面 session 不应引用提示段通道");
   } finally {

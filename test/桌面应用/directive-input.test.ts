@@ -29,6 +29,7 @@ import type { CreateDirectiveInterpreterOptions } from "../../src/pipeline/orche
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+import { readSessionSource } from "./session-source.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -926,7 +927,7 @@ test("冻结形状：五个 IPC/preload 名、directivesEnabled 握手、应用�
 
   const interfaceSource = read("app/desktop/interface.ts");
   assert.ok(interfaceSource.includes("directiveIdFromOperatorId"), "interface.ts Q9 旧读者使用三值归属");
-  const sessionSource = read("app/desktop/session.ts");
+  const sessionSource = readSessionSource();
   assert.equal((sessionSource.match(/directiveIdFromOperatorId/g) ?? []).length >= 3, true, "session.ts Q9 多处使用同一解析");
 
   // 面板共存（P1-CAP-08/C1 侧）：独立 pending，不占 shell 卡槽/客户卡队列。

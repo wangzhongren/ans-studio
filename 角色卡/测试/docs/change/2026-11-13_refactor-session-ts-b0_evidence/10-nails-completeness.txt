@@ -1,0 +1,18 @@
+# 14 钉子：读取方式改造完整性核对（2026-11-13 11:53:01 +0800）
+# 判据：每文件出现 readSessionSource/readSessionModule；且不存在对 app/desktop/session.ts 的直接读取调用（注释与其他 …/session.ts 读取除外）
+test/桌面UI/evidence-markers.test.ts  readerUses=1  directRead=none
+test/桌面UI/queue-status.test.ts  readerUses=1  directRead=none
+test/桌面UI/request-status.test.ts  readerUses=1  directRead=none
+test/桌面应用/boundary-refresh.test.ts  readerUses=1  directRead=none
+test/桌面应用/chief-workflow.test.ts  readerUses=1  directRead=none
+test/桌面应用/directive-input.test.ts  readerUses=1  directRead=none
+test/桌面应用/dispatch-fresh-enum.test.ts  readerUses=1  directRead=none
+test/桌面应用/hot-path.test.ts  readerUses=1  directRead=none
+test/桌面应用/interface.test.ts  readerUses=1  directRead=none
+test/桌面应用/message-queue.test.ts  readerUses=2  directRead=none
+test/桌面应用/run-change-entry.test.ts  readerUses=1  directRead=none
+test/测试/g1-verify/g1-copy-and-nails.test.ts  readerUses=1  directRead=none
+test/测试/g4-skill-verify/h-scope-audit.test.ts  readerUses=4  directRead=none
+test/测试/governance-matrix-integration.test.ts  readerUses=1  directRead=none
+
+# 说明：request-status.test.ts 的残留字符串为注释（第 6 行）与其对 src/service/runtime/session.ts 的读取，非 app/desktop/session.ts。

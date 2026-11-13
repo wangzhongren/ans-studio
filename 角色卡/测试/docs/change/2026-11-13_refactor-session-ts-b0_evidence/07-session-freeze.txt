@@ -1,0 +1,16 @@
+# session.ts 冻结（c234e79 快照工作树，git blob 与工作树逐字节一致）
+commit: c234e79ce0a7d6553c5f2244061348ca3707129f
+sha256: e7288b2eee2a5aa31393a6f39e6a32676610215c64d78b4a793b52ef4d5fb453 *app/desktop/session.ts
+wc -lc:  13491 871147 (lines bytes)
+git blob sha256: e7288b2eee2a5aa31393a6f39e6a32676610215c64d78b4a793b52ef4d5fb453 *-
+git blob wc -lc:   13491  871147
+first3bytes(BOM check): 696d70
+longest line: len=749 line=300
+file: app/desktop/session.ts: JavaScript source, Unicode text, UTF-8 text, with very long lines (749)
+
+# 方案 §0 锚点（e0c5e01）对照
+e0c5e01 blob sha256: ad9679c7ff7ceab56fceca862aabf86fbc098e6e428c10bfad8a4381bbe77c7f *-
+e0c5e01 blob wc -lc:   13466  868951
+e0c5e01..c234e79 diffstat:
+ app/desktop/session.ts | 29 +++++++++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)

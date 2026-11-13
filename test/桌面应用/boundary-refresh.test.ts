@@ -22,9 +22,10 @@ import { REBUILT_SESSION_WRITE_PERMITS_NOTICE } from "../../src/pipeline/orchest
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { DispatchTaskFn } from "../../src/provider/pi/session.ts";
 import type { DesktopCustomerInputFn } from "../../app/desktop/customer-input.ts";
+import { readSessionSource } from "./session-source.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const SESSION_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "session.ts"), "utf8");
+const SESSION_SRC = readSessionSource();
 const IFACE_SRC = fs.readFileSync(path.resolve(HERE, "..", "..", "app", "desktop", "interface.ts"), "utf8");
 
 const tick = (ms = 80) => new Promise((r) => setTimeout(r, ms));

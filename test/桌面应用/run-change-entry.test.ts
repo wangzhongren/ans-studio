@@ -19,6 +19,7 @@ import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { RoleSessionHandle } from "../../src/pipeline/orchestration/run-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { CustomerInputFn, CustomerInputRequest } from "../../src/model/runtime.ts";
+import { readSessionSource } from "./session-source.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -212,7 +213,7 @@ test("跨层源码钉：main handler / preload 桥 / platform 类型 / U1 旧按
   assert.ok(iface.includes("requestRunChange(input: unknown): Promise<RunChangeRequestReply>"), "Interface 暴露 requestRunChange");
   assert.ok(iface.includes("manager.requestRunChangeDecision("), "Interface 调 SessionManager.requestRunChangeDecision");
   assert.ok(iface.includes("activeRunViews("), "listProject 使用 active run 摘要");
-  const session = read("app/desktop/session.ts");
+  const session = readSessionSource();
   assert.ok(session.includes("this.requestRunChangeDecision({"), "SessionManager 内部有真实调用方（显式入口）");
   assert.doesNotMatch(session, /\brunChangeRejectionForDispatch\s*\(/, "派发不再自动触发 run-change（源码无调用）");
   assert.ok(session.includes("proposalCardFrozenRejection"), "提案卡冻结冲突先尝试 run-change 卡");

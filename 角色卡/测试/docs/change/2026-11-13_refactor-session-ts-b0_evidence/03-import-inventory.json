@@ -1,0 +1,1271 @@
+{
+  "target": "app/desktop/session.ts",
+  "filesTotal": 73,
+  "occurrencesTotal": 78,
+  "productionFiles": 2,
+  "testFiles": 67,
+  "probeFiles": 3,
+  "retiredFiles": 1,
+  "testImportStatements": 67,
+  "testSymbolOccurrences": 85,
+  "productionSymbolOccurrences": 34,
+  "production": [
+    {
+      "file": "app/desktop/interface.ts",
+      "category": "production",
+      "imports": 4,
+      "statements": [
+        {
+          "typeOnly": true,
+          "symbols": [
+            "PersistenceReply",
+            "PersistenceValues",
+            "PersistenceUpdated",
+            "PersistenceScope"
+          ],
+          "spec": "./session.ts"
+        },
+        {
+          "typeOnly": false,
+          "symbols": [
+            "desktopProjectExecutionInventory",
+            "subscribeDesktopExecutionInventory"
+          ],
+          "spec": "./session.ts"
+        },
+        {
+          "typeOnly": true,
+          "symbols": [
+            "DesktopProjectExecutionInventory",
+            "DesktopSessionInventoryFact"
+          ],
+          "spec": "./session.ts"
+        },
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "ActiveRunView",
+            "RunChangeMode",
+            "SessionOpenRequest",
+            "SessionTarget",
+            "SessionMessageMetadata",
+            "SessionManagerDeps",
+            "OpenResult",
+            "SendResult",
+            "StopResult",
+            "WithdrawResult",
+            "SessionEventEnvelope",
+            "BackgroundTasksListReply",
+            "BackgroundTaskReadInput",
+            "BackgroundTaskReadReply",
+            "BackgroundTaskStopInput",
+            "BackgroundTaskStopReply",
+            "TaskListView",
+            "TaskRestoreReport",
+            "TerminateRoleRunInput",
+            "TerminateRoleRunResult",
+            "RedispatchTaskInput",
+            "RedispatchTaskResult",
+            "CloseTaskInput",
+            "CloseTaskResult"
+          ],
+          "spec": "./session.ts"
+        }
+      ]
+    },
+    {
+      "file": "app/main.ts",
+      "category": "production",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": true,
+          "symbols": [
+            "SessionEventEnvelope"
+          ],
+          "spec": "./desktop/session.ts"
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "file": "test/测试/b-change-scope.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/chat-handback-integration.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/doc-format-all-roles.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionManagerDeps",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/download-requests-integration.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/fixed-path-full-chain.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/g1-verify/g1-dispatch-wiring.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/governance-e2e-auto/i-full-chain.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/kanban-fixes-verify/f2-claim-release.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/mode-switch.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/network-state-e2e.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/p1p7-window-provenance-integration.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionEventEnvelope",
+            "PersistenceUpdated"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/queue-recovery-e2e.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/su-shell-approval-verify/c-desktop-injection.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/t9-block1-bootstrap.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": true,
+          "symbols": [
+            "OpenResult"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/abort-unwedge.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/acceptance-evidence.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/acceptance-proposal-path.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/acceptance-return-card.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/ans-wiring.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/application-line.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b101-fixed-dispatch-task-binding.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "DesktopOrchestrationEvent"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b111-fixed-closed-handback-drain.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "DesktopOrchestrationEvent"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b21-basis-gate-desktop.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b3-fixed-baseline-pathb.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b3-fixed-cards-panel.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b3-release-merge-desktop.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b31-fixed-release-auto-desktop.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b42-task-git-port-desktop.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b51-fixed-workflow-wiring.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b61-chat-entry-fixed.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b71-fixed-fail-closed.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b81-fixed-dispatch-forced-session.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/b82-fixed-workflow-binding-handback.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "DesktopOrchestrationEvent"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/boundary-refresh.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/chain-enforcement.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/chief-workflow.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "StopResult",
+            "DesktopSessionInventoryFact"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/dispatch-fresh-enum.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/download-decision.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/download-request.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/fixed-path-routing.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/handback-delivery.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/hot-path.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/message-queue.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "shouldSuppressStarTaskReport"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/multi-runtime.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionManagerDeps",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/operator-channel.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/optional-acceptance.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/p0-halt-and-images.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/pending-card-restart.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/project-state.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/queue-visibility.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/queue-withdraw-lru.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "MAX_LIVE_SESSIONS"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/replay-safe-retry.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/request-timeout-wiring.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/role-log.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/run-change-trigger.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/run-change.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/run-pin.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/session-rebuild-race.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/session.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager",
+            "SessionManagerDeps",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/star-routing.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/stuck-redispatch.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/task-restart.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/turn-lease.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/version-change.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/version-decision.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/桌面应用/write-safety.test.ts",
+      "category": "test",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    }
+  ],
+  "probes": [
+    {
+      "file": "test/测试/download-requests-electron-probe.mjs",
+      "category": "probe",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/g4-skill-verify/fixture.ts",
+      "category": "probe",
+      "imports": 2,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        },
+        {
+          "typeOnly": true,
+          "symbols": [
+            "DesktopOrchestrationEvent",
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    },
+    {
+      "file": "test/测试/g4v2-mcp-verify/f-fixture.ts",
+      "category": "probe",
+      "imports": 2,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        },
+        {
+          "typeOnly": true,
+          "symbols": [
+            "SessionEventEnvelope"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    }
+  ],
+  "retired": [
+    {
+      "file": "test/测试/retired-5b/d-mirror-advance.test.ts.retired",
+      "category": "retired",
+      "imports": 1,
+      "statements": [
+        {
+          "typeOnly": false,
+          "symbols": [
+            "SessionManager"
+          ],
+          "spec": "../../../app/desktop/session.ts"
+        }
+      ]
+    }
+  ],
+  "symbolHistogram": [
+    [
+      "SessionManager",
+      71
+    ],
+    [
+      "SessionEventEnvelope",
+      11
+    ],
+    [
+      "DesktopOrchestrationEvent",
+      4
+    ],
+    [
+      "SessionManagerDeps",
+      4
+    ],
+    [
+      "DesktopSessionInventoryFact",
+      2
+    ],
+    [
+      "OpenResult",
+      2
+    ],
+    [
+      "PersistenceUpdated",
+      2
+    ],
+    [
+      "StopResult",
+      2
+    ],
+    [
+      "ActiveRunView",
+      1
+    ],
+    [
+      "BackgroundTaskReadInput",
+      1
+    ],
+    [
+      "BackgroundTaskReadReply",
+      1
+    ],
+    [
+      "BackgroundTasksListReply",
+      1
+    ],
+    [
+      "BackgroundTaskStopInput",
+      1
+    ],
+    [
+      "BackgroundTaskStopReply",
+      1
+    ],
+    [
+      "CloseTaskInput",
+      1
+    ],
+    [
+      "CloseTaskResult",
+      1
+    ],
+    [
+      "desktopProjectExecutionInventory",
+      1
+    ],
+    [
+      "DesktopProjectExecutionInventory",
+      1
+    ],
+    [
+      "MAX_LIVE_SESSIONS",
+      1
+    ],
+    [
+      "PersistenceReply",
+      1
+    ],
+    [
+      "PersistenceScope",
+      1
+    ],
+    [
+      "PersistenceValues",
+      1
+    ],
+    [
+      "RedispatchTaskInput",
+      1
+    ],
+    [
+      "RedispatchTaskResult",
+      1
+    ],
+    [
+      "RunChangeMode",
+      1
+    ],
+    [
+      "SendResult",
+      1
+    ],
+    [
+      "SessionMessageMetadata",
+      1
+    ],
+    [
+      "SessionOpenRequest",
+      1
+    ],
+    [
+      "SessionTarget",
+      1
+    ],
+    [
+      "shouldSuppressStarTaskReport",
+      1
+    ],
+    [
+      "subscribeDesktopExecutionInventory",
+      1
+    ],
+    [
+      "TaskListView",
+      1
+    ],
+    [
+      "TaskRestoreReport",
+      1
+    ],
+    [
+      "TerminateRoleRunInput",
+      1
+    ],
+    [
+      "TerminateRoleRunResult",
+      1
+    ],
+    [
+      "WithdrawResult",
+      1
+    ]
+  ]
+}

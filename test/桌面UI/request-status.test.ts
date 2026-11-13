@@ -17,10 +17,11 @@ import { describeEvent } from "../../app/renderer/src/chat/events.ts";
 import { translate } from "../../src/common/shared/i18n/index.ts";
 import { zhCN } from "../../src/common/shared/i18n/messages/zh-CN.ts";
 import { enUS } from "../../src/common/shared/i18n/messages/en-US.ts";
+import { readSessionSource } from "../桌面应用/session-source.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
-const SESSION = fs.readFileSync(path.join(ROOT, "app", "desktop", "session.ts"), "utf8");
+const SESSION = readSessionSource();
 const SERVICE = fs.readFileSync(path.join(ROOT, "src", "service", "runtime", "session.ts"), "utf8");
 const EVENTS = fs.readFileSync(path.join(ROOT, "app", "renderer", "src", "chat", "events.ts"), "utf8");
 

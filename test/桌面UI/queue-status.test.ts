@@ -17,10 +17,11 @@ import {
   queueKindLabel,
 } from "../../app/renderer/src/chat/work-view.ts";
 import { queueItemViews } from "../../app/renderer/src/chat/confirm-logic.ts";
+import { readSessionSource } from "../桌面应用/session-source.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(HERE, "..", "..", "app");
-const SESSION = fs.readFileSync(path.join(APP, "desktop", "session.ts"), "utf8");
+const SESSION = readSessionSource();
 const MAIN = fs.readFileSync(path.join(APP, "main.ts"), "utf8");
 const STORE = fs.readFileSync(path.join(APP, "renderer", "src", "chat", "chat-store.ts"), "utf8");
 const PANEL = fs.readFileSync(path.join(APP, "renderer", "src", "shell", "QueuePanel.tsx"), "utf8");

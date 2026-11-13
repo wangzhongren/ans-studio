@@ -1,0 +1,3 @@
+bf8e490f227225c15af8f1bee187d3b8f9a204c8e21b966474f8caa26be88738 *角色卡/运行时核心/docs/change/2026-11-12_release-blocker-83-provider_evidence/14b-knownred-runtime-core.tap
+d58a48b4a54fff4ce3b71cde7881db8caf9bc0f8602500fe24217cbfea08b269 *角色卡/运行时核心/docs/change/2026-11-10_B2_two-fixed-workflow-paths-evidence/07-gates-failure-names.txt
+1b0cf6a18ba911000685567a11a017c50e0fe43344cf0e59001f0aba07dd62ab *角色卡/编排/docs/change/2026-11-11_B17_two-fixed-workflow-paths_evidence/b17-05-known-red-failnames.txt

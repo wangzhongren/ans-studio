@@ -4,7 +4,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const SESSION = fs.readFileSync(new URL("../../app/desktop/session.ts", import.meta.url), "utf8");
+import { readSessionSource } from "../桌面应用/session-source.ts";
+
+const SESSION = readSessionSource();
 const EVIDENCE = fs.readFileSync(new URL("../../src/common/编排/evidence-check.ts", import.meta.url), "utf8");
 
 test("验收 facts 暴露 unverified/legacy/evidenceMismatch；P0 不伪造通过", () => {

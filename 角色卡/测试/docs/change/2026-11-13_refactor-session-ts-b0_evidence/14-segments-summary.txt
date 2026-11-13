@@ -1,0 +1,19 @@
+gates exit=0 dur=1s
+claude-adapter exit=0 dur=8s
+codex-adapter exit=0 dur=10s
+pi-adapter exit=1 dur=62s
+roles exit=1 dur=3s
+runtime-core exit=1 dur=49s
+装配 exit=1 dur=7s
+项目管理 exit=0 dur=8s
+桌面UI exit=0 dur=7s
+桌面应用 exit=1 dur=436s
+gates LF normalization applied
+门禁引擎 LF normalization applied (chief-workflow.md, chief-workflow-v2.md)
+门禁引擎 exit=1 dur=92s
+门禁引擎 resources restored (CRLF via git checkout)
+测试 exit=1 dur=584s
+测试-hangsplit exit=0 dur=0s
+编排 exit=1 dur=139s
+编排-git-trunk-store exit=0 dur=57s
+ALLDONE 2026-11-13 12:12:58

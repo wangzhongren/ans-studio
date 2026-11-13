@@ -1,0 +1,5 @@
+✖ sendSession 命中：不调用 manager.send/handle.send、不产生角色轮次；Composer 未开会话仍走指令通道
+✖ sendSession：demo 引擎无判断 AI ⇒ 解释不可用，回退面板（confirmable=false）；不调用解释器工厂
+✖ sendSession：命中带图直接拒绝（不解码/不投递）；未命中走既有普通聊天（逐字不变）
+✖ sendSession：未注入指令控制器时命中标记 fail-closed（不回退普通聊天/能力缺席）
+✖ sendSession：自然语言经 desktop.interpretDirective（SessionManager 同一套 runtimeOptions/adapter 工厂）⇒ 面板预填；确认落账

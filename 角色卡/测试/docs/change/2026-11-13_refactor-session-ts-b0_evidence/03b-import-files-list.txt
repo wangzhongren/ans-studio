@@ -1,0 +1,80 @@
+# 生产导入方（app/）
+app/desktop/interface.ts  stmts=4  symbols=33
+app/main.ts  stmts=1  symbols=1
+
+# 测试导入方（test/**/*.test.ts；67 文件 / 67 条 import / 85 个符号出现）
+test/测试/b-change-scope.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/chat-handback-integration.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/测试/doc-format-all-roles.test.ts  stmts=1  symbols=3  SessionManager=yes
+test/测试/download-requests-integration.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/fixed-path-full-chain.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/g1-verify/g1-dispatch-wiring.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/governance-e2e-auto/i-full-chain.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/kanban-fixes-verify/f2-claim-release.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/mode-switch.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/network-state-e2e.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/p1p7-window-provenance-integration.test.ts  stmts=1  symbols=3  SessionManager=yes
+test/测试/queue-recovery-e2e.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/su-shell-approval-verify/c-desktop-injection.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/测试/t9-block1-bootstrap.test.ts  stmts=1  symbols=1  SessionManager=no
+test/测试/turn-watch-verify/c-cross-runtime-settings.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/abort-unwedge.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/acceptance-evidence.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/acceptance-proposal-path.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/acceptance-return-card.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/ans-wiring.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/application-line.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b101-fixed-dispatch-task-binding.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/b111-fixed-closed-handback-drain.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/b21-basis-gate-desktop.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/b3-fixed-baseline-pathb.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b3-fixed-cards-panel.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b3-release-merge-desktop.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b31-fixed-release-auto-desktop.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/b42-task-git-port-desktop.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b51-fixed-workflow-wiring.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b61-chat-entry-fixed.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b71-fixed-fail-closed.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b81-fixed-dispatch-forced-session.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/b82-fixed-workflow-binding-handback.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/boundary-refresh.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/chain-enforcement.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/chief-workflow.test.ts  stmts=1  symbols=3  SessionManager=yes
+test/桌面应用/dispatch-fresh-enum.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/download-decision.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/download-request.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/fixed-path-routing.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/handback-delivery.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/hot-path.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/message-queue.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/multi-runtime.test.ts  stmts=1  symbols=3  SessionManager=yes
+test/桌面应用/operator-channel.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/optional-acceptance.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/p0-halt-and-images.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/pending-card-restart.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/project-state.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/queue-visibility.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/queue-withdraw-lru.test.ts  stmts=1  symbols=2  SessionManager=yes
+test/桌面应用/replay-safe-retry.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/request-timeout-wiring.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/role-log.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/run-change-trigger.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/run-change.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/run-pin.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/session-rebuild-race.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/session.test.ts  stmts=1  symbols=3  SessionManager=yes
+test/桌面应用/star-routing.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/stuck-redispatch.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/task-restart.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/turn-lease.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/version-change.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/version-decision.test.ts  stmts=1  symbols=1  SessionManager=yes
+test/桌面应用/write-safety.test.ts  stmts=1  symbols=1  SessionManager=yes
+
+# 探针/夹具（test/ 下非 .test.ts；不参与 test glob，但含真实 import，重构后须可解析）
+test/测试/download-requests-electron-probe.mjs  stmts=1  symbols=1
+test/测试/g4-skill-verify/fixture.ts  stmts=2  symbols=3
+test/测试/g4v2-mcp-verify/f-fixture.ts  stmts=2  symbols=2
+
+# 已退役（不参与构建/测试）
+test/测试/retired-5b/d-mirror-advance.test.ts.retired  stmts=1

@@ -18,6 +18,7 @@ import { buildGovernedTools } from "../../../src/provider/runtime/tools.ts";
 import { describeTool } from "../../../src/provider/runtime/schema.ts";
 import type { ToolDefinition, ToolResult } from "../../../src/model/runtime.ts";
 import { makeTempProject } from "./fixture.ts";
+import { readSessionSource } from "../../桌面应用/session-source.ts";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const read = (rel: string): string => fs.readFileSync(path.join(REPO, rel), "utf8");
@@ -64,7 +65,7 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工�
   const src = read("src/pipeline/orchestration/run-role.ts");
   assert.ok(/const installMcp = cap\?\.installMcp === true \? input\.installMcp : undefined;/.test(src), "installMcp 透传判据＝能力矩阵（唯一）");
   assert.ok(/const uninstallMcp = cap\?\.installMcp === true \? input\.uninstallMcp : undefined;/.test(src), "uninstallMcp 同判据");
-  const sess = read("app/desktop/session.ts");
+  const sess = readSessionSource();
   assert.ok(/const canNominate = governanceFunction === "nomination" \|\| legacyBuiltIn;/.test(sess), "canNominate 判据");
   for (const [fn, ty] of [["installMcp", "InstallMcpFn"], ["uninstallMcp", "UninstallMcpFn"]] as const) {
     assert.ok(
@@ -77,7 +78,7 @@ test("范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工�
 // —————————————————————— ③ 安装链零 request_confirmation ——————————————————————
 
 test("范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用", () => {
-  const sess = read("app/desktop/session.ts");
+  const sess = readSessionSource();
   const start = sess.indexOf("private async applySkillChange");
   const end = sess.indexOf("private async roleStatusText");
   assert.ok(start >= 0 && end > start, "须能定位 applySkillChange 切片");
@@ -174,7 +175,7 @@ test("范围③补＋⑤：编排判据——installSkill 由能力矩阵透传�
     /const uninstallSkill = cap\?\.installSkill === true \? input\.uninstallSkill : undefined;/.test(src),
     "uninstallSkill 同判据",
   );
-  const sess = read("app/desktop/session.ts");
+  const sess = readSessionSource();
   const inject = sess.match(/const installSkill: InstallSkillFn \| undefined =\s*\n?\s*canNominate/);
   assert.ok(inject, "桌面注入判据＝canNominate（single=su / trio=Nominator）");
 });
@@ -189,7 +190,7 @@ test("范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删
   }).map((t) => t.name);
   assert.deepEqual(names.sort(), ["edit_file", "install_skill", "list_dir", "read_file", "request_choice", "request_confirmation", "uninstall_skill", "write_file"].sort(), "工具面集合固定（运行核新增只读 list_dir；无删除/无导出第三套）");
   assert.equal(names.some((n) => /delete|remove|unlink|rm_/.test(n)), false, "不得注册任何删除类工具");
-  const sess = read("app/desktop/session.ts");
+  const sess = readSessionSource();
   const start = sess.indexOf("private async applySkillChange");
   const end = sess.indexOf("private async roleStatusText");
   const slice = sess.slice(start, end);

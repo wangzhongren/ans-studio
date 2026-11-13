@@ -33,6 +33,7 @@ import { inspectRoleSessionOpenFailure, recheckRoleSessionOpenFailure } from "..
 import { beginGitHostAction, endGitHostAction, inspectGitHostCoordinator } from "../../src/pipeline/orchestration/trunk-runtime.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
 import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
+import { readSessionSource } from "./session-source.ts";
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), "utf8");
@@ -338,7 +339,7 @@ test("接线源码钉：session:role-states handler / preload 桥 / 渲染侧主
   assert.ok(rendererIpc.includes("void bridge.requestRoleStates?.()"), "界面加载后主动拉一次快照重放");
   const platform = read("app/renderer/src/lib/platform.ts");
   assert.ok(platform.includes("requestRoleStates?: () => Promise<{ ok: boolean }>"), "platform 桥类型声明");
-  const iface = read("app/desktop/session.ts");
+  const iface = readSessionSource();
   assert.ok(iface.includes("broadcastRoleStates(): void"), "SessionManager 提供快照重放");
 });
 

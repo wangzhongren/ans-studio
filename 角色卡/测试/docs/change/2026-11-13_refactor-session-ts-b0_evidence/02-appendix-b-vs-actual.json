@@ -1,0 +1,15 @@
+{
+  "appendixBDeclaration": "6+13+9+6+10+7 = 51（附录 B 逐类计数 {\"值/类（6）\":6,\"会话/事件/运行（13）\":13,\"持久化（9）\":9,\"后台任务（6）\":6,\"任务/终止（10）\":10,\"治理/安装/库存/登记（7）\":7}）",
+  "appendixBDeclaredCount": 51,
+  "appendixBDedupedCount": 51,
+  "actualSymbolCount": 51,
+  "actualValueCount": 6,
+  "actualTypeCount": 45,
+  "onlyInPlan": [],
+  "onlyInSource": [],
+  "valueMismatch": {
+    "planValueNotRuntimeValue": [],
+    "runtimeValueNotPlanValue": []
+  },
+  "setEqual": true
+}
