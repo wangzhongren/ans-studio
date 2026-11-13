@@ -1,0 +1,15 @@
+== before normalization ==
+src/common/门禁引擎/workflows/chief/chief-workflow.md:    Unicode text, UTF-8 text, with CRLF line terminators
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md: Unicode text, UTF-8 text, with very long lines (647), with CRLF line terminators
+== git status (files) ==
+== after LF normalization (git cat-file blob HEAD) ==
+src/common/门禁引擎/workflows/chief/chief-workflow.md:    Unicode text, UTF-8 text
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md: Unicode text, UTF-8 text, with very long lines (647)
+== git status (files) ==
+ M src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+ M src/common/门禁引擎/workflows/chief/chief-workflow.md
+== after restore (git checkout --) ==
+src/common/门禁引擎/workflows/chief/chief-workflow.md:    Unicode text, UTF-8 text, with CRLF line terminators
+src/common/门禁引擎/workflows/chief/chief-workflow-v2.md: Unicode text, UTF-8 text, with very long lines (647), with CRLF line terminators
+== git status (files) ==
+gates test exit=1

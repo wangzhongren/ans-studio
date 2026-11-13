@@ -1,0 +1,9 @@
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (5114.7377ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5549.7913

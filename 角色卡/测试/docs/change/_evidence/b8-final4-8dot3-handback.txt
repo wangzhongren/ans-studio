@@ -1,0 +1,64 @@
+✔ E-1 投递：A 的回交到达 → **自动开启 su** 并把 `renderHandbackPrompt` 原文投给 su（单一来源） (208.1933ms)
+✔ E-1 去重：同一条回交重复到达（重放）→ **只投递一次** (201.4889ms)
+✔ E-1 排队：su 忙时保留，settle 后连续回交按原序合成一次验收输入 (532.3266ms)
+✔ P0（2026-10-30）看护旁路保障：su 忙时 system 不进模型队列、不挤占回交；settle 后回交直投 (469.8115ms)
+✔ 连续回交投递失败：整批保留同序，重试送达一次，原报告键不丢 (57.6299ms)
+✔ 客户消息屏障：A报告→客户消息→B报告，不跨消息合批或改变顺序 (123.8501ms)
+✔ 常规检查宿主政策实际注入项目角色，su不接委托免确认 (5.9024ms)
+✔ E-1 开启失败：如实系统行（含原因与重试时机）+ **保留回交**；下次时机成功投递（绝不静默丢） (353.7108ms)
+✔ 真机崩溃修复：坏形状回交事件（缺载荷/缺 roleId）→ 不投递、如实系统行、**零未捕获拒绝** (310.5164ms)
+✔ E-1 投递失败：如实系统行（含原因）+ 放回队首保留；重试成功后送达（顺序与内容不损） (363.2039ms)
+✔ C Window merges source saved-before-business and retry Promise/change orders into one enqueue (58.6574ms)
+✔ C frozen batch retries keep members and delivery ID while later reports stay separate (107.4936ms)
+✔ C possible provider start and unknown failure do not automatically prompt again (189.8836ms)
+✔ C target history retry is one storage operation, read-only queries do not prompt, replaced handles expire (23.2189ms)
+✔ C disabled and unknown-live source facts preserve live delivery without inventing durable report IDs (67.569ms)
+✔ F-2-T3 长轮不阻塞回交：B 的投递轮挂起期间，A settle 产生的回交 ⇒ su **立即**收到（不被 B 轮持有）；放行后两笔各恰一次 (453.2639ms)
+✖ 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发 (3234.2777ms)
+✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (3116.8842ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 16
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10307.0404
+
+✖ failing tests:
+
+test at test\桌面应用\handback-delivery.test.ts:659:1
+✖ 2026-10-24 trio 回交路由：项目 worker 回交→Steward；内置来源回交→Lead；同轮 settle 不双发 (3234.2777ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:59:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:671:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
+
+test at test\桌面应用\handback-delivery.test.ts:700:1
+✖ B 星形回交：tasks.jsonl 已知 taskId ⇒ 只投幕僚、[工作结果] 固定字段、写 task.reported (3116.8842ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:59:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:738:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

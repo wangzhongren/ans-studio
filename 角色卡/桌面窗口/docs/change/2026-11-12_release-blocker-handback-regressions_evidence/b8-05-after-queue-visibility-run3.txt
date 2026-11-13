@@ -1,0 +1,10 @@
+✔ P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待） (104.1042ms)
+✔ P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启） (78.9718ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 630.9092

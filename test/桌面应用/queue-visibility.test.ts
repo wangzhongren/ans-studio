@@ -5,8 +5,11 @@
 //    当前回合 id `activeTurnId`——客户可看出「为什么没动」。
 // 真实路径：真实 SessionManager 快照外推（不造第二数据源）；注入时钟核对 ageMs。
 
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { SessionManager } from "../../app/desktop/session.ts";
 import { buildProjectConfig } from "../../app/desktop/project.ts";
@@ -14,6 +17,31 @@ import type { OrchestrationEvent } from "../../src/common/编排/handback.ts";
 import type { TaskHandback } from "../../src/common/编排/handback.ts";
 import type { RoleSessionHandle, RoleSessionSendOptions } from "../../src/pipeline/orchestration/run-role.ts";
 import type { ProjectListing } from "../../src/service/role/resolve-role.ts";
+
+/** 真实可解析的夹具项目根（CI runner 没有 `/proj`）：v2.0.0 起宿主库存登记以 native realpath 规范化
+ *  项目根，不可解析即 fail-closed（`git-host-project-root-unresolvable`）⇒ 会话开不起来、回合未开跑。
+ *  文件级共用一根（listing / open / send 作用域同一根），`after` 统一清理（用例失败也清理）。 */
+let PROJECT_ROOT = "";
+/** 本文件创建的全部 manager / 句柄：`after` 有界 stop → 逐句柄 dispose，失败路径不遗留定时器/迭代器。 */
+const createdManagers: SessionManager[] = [];
+const createdHandles: RoleSessionHandle[] = [];
+before(async () => { PROJECT_ROOT = await fs.mkdtemp(path.join(os.tmpdir(), "ans-queue-visibility-project-")); });
+after(async () => {
+  for (const mgr of createdManagers) {
+    try { if (mgr.isOpen()) await settledWithin(mgr.stop(null), "queue-visibility 清理 stop 超时", 5_000); } catch { /* 清理不掩盖用例失败 */ }
+  }
+  for (const handle of createdHandles) {
+    try { await settledWithin(handle.dispose(), "queue-visibility 清理 dispose 超时", 2_000); } catch { /* dispose 幂等；失败不再抛 */ }
+  }
+  if (PROJECT_ROOT !== "") await fs.rm(PROJECT_ROOT, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+});
+
+/** 有界等待真实回执：产品回执若永不结算，用例须在有限时间内失败，而不是让 CI 文件子进程永久挂起。 */
+function settledWithin<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); });
+  return Promise.race([promise, timeout]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+}
 
 const tick = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 async function until(predicate: () => boolean, label = "等待实际事件超时"): Promise<void> {
@@ -50,7 +78,7 @@ function listing(): ProjectListing {
         },
     builtIn: builtIn ? true : undefined,
   });
-  return { projectRoot: "/proj", roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
+  return { projectRoot: PROJECT_ROOT, roles: [mk("su", true), mk("A")], warnings: [], hasRoles: true, primaryRoleId: "su" };
 }
 
 interface RoleStateSnapshot {
@@ -72,6 +100,10 @@ interface Harness {
   clock: { value: number };
   behaviors: Record<string, ((ctx: { text: string; opts?: RoleSessionSendOptions; call: number }) => Promise<void> | void)[]>;
   latest: (roleId: string) => RoleStateSnapshot | undefined;
+  /** 打开会话并断言夹具根真实可解析（CI runner 无 `/proj`）：open.ok===true，等待有界。 */
+  openOk: (input: { projectRoot: string; roleId: string; runtime: "demo" | "pi" }) => Promise<void>;
+  /** 有界关闭本 harness 的 manager（清理不掩盖用例失败）。 */
+  close: () => Promise<void>;
 }
 
 function makeHarness(): Harness {
@@ -83,7 +115,8 @@ function makeHarness(): Harness {
   const attempts: Record<string, number> = { su: 0, A: 0 };
   const stopped: Record<string, boolean> = { su: false, A: false };
   const clock = { value: 1_000_000 };
-  const makeHandle = (roleId: string): RoleSessionHandle => ({
+  const makeHandle = (roleId: string): RoleSessionHandle => {
+    const handle: RoleSessionHandle = ({
     runtime: "demo",
     roleId,
     async send(text: string, opts?: RoleSessionSendOptions): Promise<void> {
@@ -99,8 +132,9 @@ function makeHarness(): Harness {
         [Symbol.asyncIterator]() {
           return {
             async next(): Promise<IteratorResult<OrchestrationEvent>> {
-              for (let tries = 0; tries < 4000; tries += 1) {
-                if (stopped[roleId]) return { value: undefined as unknown as OrchestrationEvent, done: true };
+              // 真实句柄的事件流与**会话同寿**：只在 dispose/停止后收口（after 统一 dispose 保证收口；
+              // 旧实现按 4000×5ms 静默自退，同样存在慢机上事件消费永久退出的窗口）。
+              while (!stopped[roleId]) {
                 const arr = streams[roleId] ?? [];
                 if (i < arr.length) return { value: arr[i++], done: false };
                 await new Promise((r) => setTimeout(r, 5));
@@ -118,6 +152,9 @@ function makeHarness(): Harness {
       stopped[roleId] = true;
     },
   });
+    createdHandles.push(handle);
+    return handle;
+  };
   const mgr = new SessionManager({
     openRoleSession: async (input) => makeHandle(input.roleId),
     createPiAdapterFactory: () => {
@@ -142,6 +179,7 @@ function makeHarness(): Harness {
       }),
     now: () => clock.value,
   });
+  createdManagers.push(mgr);
   return {
     mgr,
     streams,
@@ -152,6 +190,13 @@ function makeHarness(): Harness {
     latest: (roleId) => {
       for (let i = roleStates.length - 1; i >= 0; i -= 1) if (roleStates[i].roleId === roleId) return roleStates[i];
       return undefined;
+    },
+    openOk: async (input) => {
+      const opened = await settledWithin(mgr.open(input), `打开会话超时：${input.roleId}`, 10_000);
+      assert.equal(opened.ok, true, `夹具项目根须真实可解析（CI runner 无 /proj）${opened.error ? `：${opened.error}` : ""}`);
+    },
+    close: async () => {
+      try { if (mgr.isOpen()) await settledWithin(mgr.stop(null), "queue-visibility 清理 stop 超时", 5_000); } catch { /* 清理不掩盖用例失败 */ }
     },
   };
 }
@@ -167,15 +212,15 @@ function deferred(): { promise: Promise<void>; release: () => void } {
 test("P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快照外推（忙时等待）", async () => {
   const h = makeHarness();
   try {
-    await h.mgr.open({ projectRoot: "/proj", roleId: "su", runtime: "demo" });
-    await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await h.openOk({ projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" });
+    await h.openOk({ projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
     await tick(30);
     const gate = deferred();
     h.behaviors.su.push((ctx) => {
       ctx.opts?.onTurnStarted?.({ turnId: "turn-live", roleId: "su", runtime: "demo" });
       return gate.promise;
     });
-    const pending = h.mgr.send("长回合", undefined, { projectRoot: "/proj", roleId: "su", runtime: "demo" });
+    const pending = settledWithin(h.mgr.send("长回合", undefined, { projectRoot: PROJECT_ROOT, roleId: "su", runtime: "demo" }), "send 回执等待超时");
     await until(() => h.latest("su")?.busy === true && h.latest("su")?.activeTurnId === "turn-live", "长回合未开跑");
 
     h.streams.A.push({ kind: "handback", summary: "回交1", handback: handback("P0-Q1") });
@@ -213,14 +258,14 @@ test("P0 队列可见：ageMs/headKind/blockedReason/activeTurnId 随真实快�
     await until(() => h.latest("su")?.busy === false && (h.latest("su")?.queue.length ?? 0) === 0, "队列未排空");
     assert.equal(h.latest("su")?.activeTurnId, null);
   } finally {
-    await h.mgr.stop(null);
+    await h.close();
   }
 });
 
 test("P0 队列可见：目标会话未开时 blockedReason=session-closed（入队即外推，随后自动开启）", async () => {
   const h = makeHarness();
   try {
-    await h.mgr.open({ projectRoot: "/proj", roleId: "A", runtime: "demo" });
+    await h.openOk({ projectRoot: PROJECT_ROOT, roleId: "A", runtime: "demo" });
     await tick(30);
     h.streams.A.push({ kind: "handback", summary: "回交 su", handback: handback("P0-Q3") });
     await until(() => h.roleStates.some((state) => state.roleId === "su" && state.queue.length === 1), "回交未入 su 队列");
@@ -235,6 +280,6 @@ test("P0 队列可见：目标会话未开时 blockedReason=session-closed（入
     h.streams.su.push({ kind: "settled", summary: "回交轮完成", turnId: "turn-su-1", roleId: "su", runtime: "demo" });
     await until(() => (h.latest("su")?.queue.length ?? 0) === 0 && h.latest("su")?.busy === false, "队列未排空");
   } finally {
-    await h.mgr.stop(null);
+    await h.close();
   }
 });

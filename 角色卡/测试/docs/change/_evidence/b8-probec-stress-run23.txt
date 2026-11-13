@@ -1,0 +1,30 @@
+PROBE-C-B8 {"sends":2,"sent":["busy","[回交] 来自 A 的报告（任务 T1）\n结论：completed\n摘要：改完了 role-card\n证据：\n  - 角色卡/A/role-card.md\n请验收已收到的报告，并向客户给出统一结果：实际完成了什么、产物路径、实际测试结果、哪些未完成或待补报告/返工，以及下一步。\n只有证据支持才确认通过；未报告、失败或中止不得当作完成。不要把会话结束或工具执行次数当成果。\n没有明确任务关联或收齐条件时，只汇总手头结果，不宣称全部角色或整个任务已完成。\n已授权范围内的常规后续操作继续处理，不重复请求同一授权；确有越界或必要客户决策时说明具体原因。"],"env":["A:handback:safe","A:handback:safe","su:settled:release","su:message:交付投递失败（来自 A）：输入尚未交给模型，未丢弃，已保留同一批次待重试。","su:message:已将 A 的交付自动投递给 su（等待验收与汇总）。"],"snap":{"projectRoot":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-handback-delivery-project-BMjSS3","governanceRoleId":"su","chiefRoleId":null,"roles":[{"roleId":"su","runtime":"demo","busy":true,"turnStartedAt":1794534018628,"builtIn":true,"lastActivityAt":1794534018624,"lastAction":"turn.end：release"},{"roleId":"A","runtime":"demo","busy":false,"lastActivityAt":1794534018623,"lastAction":"report.received：改完了 role-card"}],"queues":[{"targetRoleId":"su","runtime":"demo","items":[{"kind":"handback","dedupKey":"C:\\Users\\51054\\AppData\\Local\\Temp\\ans-handback-delivery-project-BMjSS3\u0000demo\u0000A\u0000T1\u0000two\u00004185d9e0663c6a60","sourceRoleId":"A","summary":"交付 · 来自 A","enqueuedAtMs":1794534018627}]}],"activeDeliveries":1,"chainsActive":false,"pendingConfirmationsTotal":0,"pendingConfirmationsByRole":{}}}
+✖ C frozen batch retries keep members and delivery ID while later reports stay separate (3141.5505ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3573.4153
+
+✖ failing tests:
+
+test at test\桌面应用\handback-delivery.test.ts:558:1
+✖ C frozen batch retries keep members and delivery ID while later reports stay separate (3141.5505ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:59:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:570:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }
