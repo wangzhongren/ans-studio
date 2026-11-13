@@ -1,0 +1,478 @@
+✔ 契约形状钉：abort 可选——无 abort 的会话对象（含假适配器替身）仍满足 RoleSession（既有实现不破坏） (2.0166ms)
+✔ 契约形状钉：abort 返回型允许「同步 void」与「Promise<void>」两态（P0-2 冻结形状） (0.1641ms)
+✔ makeRoleSession（桩件）：abort() 透传底层 session.abort()；反复调用不抛错 (0.5211ms)
+✔ makeRoleSession（桩件）：dispose 顺序与提取前逐字一致（退订 → SDK dispose → queue.close）；events 流不变 (0.486ms)
+✔ P0-2 主用例（faux 离线）：确认卡挂起中 abort → settled 恰 1 收尾 + 等待中的交互 fail-closed 返回 + prompt promise 正常返回 + 会话可继续 (586.8536ms)
+✔ P0-2：无进行中轮次 abort = no-op 不抛错（prompt 前 / 两轮之间），会话随后照常工作（faux 离线） (9.8788ms)
+✔ Pi native: stable bind identity, retained Core turn, mismatch is side-effect free and empty process list is unknown (10.7901ms)
+✔ Pi native: SDK settled, abort success, and dispose early return do not settle a pending raw prompt or active tool (22.0559ms)
+✔ Pi native: cancelled observation and invalid timeout do not request abort (0.2428ms)
+✔ Pi native: outer prompt timeout cannot settle raw SDK work; unobserved activity and non-started transport cannot prove idle/exit (60.607ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] session.bindExtensions…
+[pi] bindRole 完成
+[pi] prompt 发出
+✔ Pi native MCP: actual owned Node close, delayed close, and close promise early return retain honest tree unknown (374.5815ms)
+[pi] prompt 返回
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] prompt 返回
+✔ Pi public bind returns real hook: production SDK raw turn and MCP close, legacy wrapper preserves hook (269.6136ms)
+✔ fail-closed：无 observation/bind 或未提供实际构造面 ⇒ 不提供 inspectApplicationToolSurface (0.8417ms)
+✔ 桩件：报告面 = 实际构造面快照；nativeInstanceId 绑定同一 nativeLifecycle.instanceId (1.132ms)
+✔ 桩件：nativeBuiltinTools 如实上报（不硬编码为空）——启用即非空，供包装层 fail-closed (0.1216ms)
+✔ 真实 bindRole：appTools = 实际注入的 customTools 名；noTools=builtin ⇒ nativeBuiltinTools 为空 (552.6959ms)
+✔ 真实 bindRole：foreignMcpServers 精确枚举实际注入的 MCP 白名单（允许非空） (14.6215ms)
+✔ 明确拒绝：undefined 当前/后续轮完成，消息不重放，保存设置不变 (1980.8996ms)
+ℹ {"wire":[{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":8192,"display":"summarized"},"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000}],"nativePrompts":2,"userHistory":2,"outcomes":["completed","completed"]}
+✔ 明确拒绝：off 当前/后续轮完成，消息不重放，保存设置不变 (18.6659ms)
+ℹ {"wire":[{"model":"compat-model","thinking":{"type":"disabled"},"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000}],"nativePrompts":2,"userHistory":2,"outcomes":["completed","completed"]}
+✔ 明确拒绝：high 当前/后续轮完成，消息不重放，保存设置不变 (15.0669ms)
+ℹ {"wire":[{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000}],"nativePrompts":2,"userHistory":2,"outcomes":["completed","completed"]}
+✔ 已执行工具后请求拒绝：保留 tool_result，工具和用户输入均不重放 (20.1964ms)
+ℹ {"wire":[{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"max_tokens":128000},{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000}],"toolEffects":1,"nativePrompts":1,"userHistory":1}
+✔ SDK 传输重试：兼容请求遇到 500 仍去参，只切换一次 (14.2731ms)
+ℹ {"wire":[{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000}],"outcomes":["completed","completed"]}
+✔ 兼容请求全部失败：不粘连下一轮，不伪报成功 (15.3716ms)
+ℹ {"wire":[{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":null,"max_tokens":128000},{"model":"compat-model","thinking":{"type":"enabled","budget_tokens":16384,"display":"summarized"},"max_tokens":128000}],"outcomes":["failed","completed"]}
+✔ HTTP 200 但流报错：不能确认兼容；下一轮仍带原参数 (19.5658ms)
+✔ 普通错误 400 不改变下一轮参数 (11.3424ms)
+✔ 普通错误 401 不改变下一轮参数 (9.9838ms)
+✔ 普通错误 403 不改变下一轮参数 (10.9328ms)
+✔ 普通错误 408 不改变下一轮参数 (10.1703ms)
+✔ 普通错误 429 不改变下一轮参数 (14.288ms)
+✔ 普通错误 500 不改变下一轮参数 (9.4044ms)
+✔ 普通错误 502 不改变下一轮参数 (9.7383ms)
+✔ 无关参数/模型拒绝不误触发：{"error":{"code":"unsupported_parameter","param":"model","message":"thinking is not supported"}} (9.8795ms)
+✔ 无关参数/模型拒绝不误触发：{"error":{"code":"model_not_found","param":"thinking","message":"Unknown model"}} (10.081ms)
+✔ 无关参数/模型拒绝不误触发：{"error":{"type":"invalid_request_error","message":"reasoning effort failed because model is unknown"}} (15.4774ms)
+✔ 连接中断不触发兼容，下一轮参数保持 (10.0317ms)
+✔ 兼容待返回时 abort：不确认、不重放，下轮恢复原参数 (11.4101ms)
+✔ 兼容待返回时 timeout：不确认、不重放，下轮恢复原参数 (327.3006ms)
+ℹ 首次拒绝延迟200ms；兼容请求到达后恢复原100ms预算，真实最后兜底超时
+✔ 重建同端点会话/改变模型后重新尝试保存档位 (30.4752ms)
+✔ 明确文本拒绝格式与结构化 thinking 子参数白名单 (0.1899ms)
+✔ 无结构化 JSON 时仅明确 thinking 文本拒绝触发兼容 (8.6402ms)
+✔ 未注入客户通道：request_confirmation / request_choice 都不在工具集里（能力缺席 = 最强 fail-closed，A-1） (2.2371ms)
+✔ 注入客户通道：两工具出现在工具集里（判据是「有客户通道」，非「创世态」） (0.3425ms)
+✔ request_confirmation：请求形状逐字传递（kind/title/preview/detail），confirmed:true → 明确「客户已确认」 (1.0502ms)
+✔ request_confirmation：confirmed:false（明确选「否」）→ ok:false，「未获客户同意」且不谎报 (0.257ms)
+✔ request_confirmation：answered 但 confirmed 缺失（undefined）→ 同样视为未获同意（只认 true） (0.1761ms)
+✔ request_confirmation：declined（客户拒绝）→ ok:false，附原因 (0.1605ms)
+✔ request_confirmation：unavailable（通道不可用/超时）→ ok:false，如实转达原因 (0.1491ms)
+✔ request_confirmation：fn 返回 null/undefined（通道没给出结果）→ ok:false 视为通道不可用 (0.2612ms)
+✔ request_confirmation：fn 抛错 → fail-closed（不抛给上层），文案含原因 (0.2957ms)
+✔ request_choice：请求形状逐字传递（options/multiple/question），selected → ok:true 且列出所选项 (0.5275ms)
+✔ request_choice：declined / unavailable → 未获客户同意（不得据此写盘或代选） (0.2477ms)
+✔ request_choice：通道返回**未提供过**的选项 id → 视为未获同意（fail-closed，不猜） (0.1519ms)
+✔ 参数校验：确认缺 title / 选择缺 options 或非法 → ok:false 且注入的 fn 未被调用 (0.2433ms)
+✔ 超时：注入 fn 不返回时，handler 在配置时限内以「未获客户同意」返回（绝不假设同意） (63.8839ms)
+✔ 中止：AbortSignal 触发后 handler **立即** fail-closed 返回，不等通道 (32.139ms)
+✔ 中止：signal 已中止时立即返回（即便通道会立刻同意） (0.2982ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、客户同意，工具层也不产生任何文件系统变化 (0.8385ms)
+✔ readOptionalTimeoutMs：未设/空串/非法 → undefined（不限时）；显式正数 → 取整生效 (0.0928ms)
+✔ 缺省不设限（G-1）：虚拟等待 180s（超过旧缺省 110s）仍等到答复；110s 时尚未超时（mock 时钟，不真等） (0.9859ms)
+✔ 显式配置仍计时（env）：虚拟走到配置时限即「未获客户同意（超时）」 (0.4618ms)
+✔ CustomerInputRequest / CustomerInputOutcome / CustomerInputFn 可从冻结契约家 session.ts 导入并使用 (0.0997ms)
+✔ G-1 主组：客户 250ms 后才作答，而每轮硬超时 120ms——因等待挂起时限被暂停，该轮不被掐断 (782.1937ms)
+✔ G-1 对照组：同一场景**不挂闸** → 每轮硬超时到点掐断（证明挂起暂停是承重机制） (138.2979ms)
+✔ G-1：等待期间会话 = 忙——第二次 send 被拒（SDK「Agent is already processing」，核实并钉住） (9.5105ms)
+✔ tool, report and interaction diagnostics contain metadata without argument or result bodies (2.8217ms)
+✔ model error diagnostics omit raw API error responses and prompt input (0.8789ms)
+✔ 未注入派发能力：dispatch_task 不在工具集里（只给 su；能力缺席 = 最强 fail-closed，H-1） (2.0458ms)
+✔ 注入派发能力：dispatch_task 出现在工具集里（同 run_shell / customerInput 的注入先例） (0.2907ms)
+✔ handler 把载荷逐字交给 fn；回执 ok:true → 「任务已派发」并重申「派发 ≠ 授权」 (1.0422ms)
+✔ handler：reason 省略时载荷不含 reason；void 回执（fire-and-forget）视为已受理 (0.2058ms)
+✔ 参数校验：roleId / task 缺失或空白 → ok:false 且 fn 未被调用 (0.1756ms)
+✔ 回执 ok:false（如「不是本项目角色 / 指向 su 自身」）→ ok:false「未能派发」+ 原因，绝不谎报 (0.1741ms)
+✔ fn 抛错 → fail-closed「未能派发」+ 原因，绝不谎报 (0.1959ms)
+✔ describeTool 文案：写死「派发≠授权 / 任务自足 / 返工带证据」；反向断言不得暗示授权 (0.1759ms)
+✔ 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn） (0.2562ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、派发成功，工具层零文件系统副作用 (0.8179ms)
+✔ DispatchTaskPayload / DispatchReceipt / DispatchTaskFn 可从冻结契约家 session.ts 导入并使用 (0.1073ms)
+✔ P-1：ANS_PI_SERVER_TOOLS 启用 ⇒ bindRole 不提供 inspectApplicationToolSurface（fail-closed），只记内部诊断码 (570.3453ms)
+✔ P-1：默认关闭（未设置 ANS_PI_SERVER_TOOLS）⇒ 应用面事实与 P1-B 一致（observed） (8.0562ms)
+✔ P-2：wrapSession 在 inner 有 inspectApplicationToolSurface 时绑定转发，结果逐字段一致 (0.2084ms)
+✔ P-2：wrapSession 在 inner 无 inspectApplicationToolSurface 时保持缺失（不伪造） (0.0732ms)
+✔ composeContext 返回含角色与边界来源的系统提示 (0.6906ms)
+✔ 缺省脚本：一次越界写 src/evil.ts，在写入前被拒，拒绝信息按根分组 (2.1212ms)
+✔ 自定义脚本：允许的路径走 accepted（未配置 writeRoot 时只判定、不落盘） (0.3436ms)
+✔ 自定义脚本：配置 writeRoot 后，允许的写入真正落盘到该写根 (15.2992ms)
+✔ 未知工具被拒 (0.2827ms)
+✔ finalize_bootstrap 已删除：任何构造下都不在工具集里（含注入客户通道的构造） (2.0736ms)
+✔ finalize_bootstrap 已删除：tools.ts 不再导出 FINALIZE_BOOTSTRAP_TOOL_NAME (0.1483ms)
+✔ finalize_bootstrap 已删除：FinalizeBootstrapFn 的编译期墓碑在位（@ts-expect-error 由 typecheck 执行） (0.0636ms)
+✔ FinalizeStatus / FinalizeResult 仍可从冻结契约家 session.ts 导入并使用（编排仍消费） (0.0742ms)
+✔ judge 工具集：治理恰三只、shell 仍恰三只、并集恰四只（并集只用于 allowlist） (3.908ms)
+✔ 假适配器治理 judge 模式：只存在三只治理只读工具，写/shell/交互/回交/派发/审读一律未知工具 (6.4787ms)
+✔ 假适配器同时注入 shellJudge 与 governanceJudge：互斥抛错（不静默择一） (0.7086ms)
+✔ 假适配器普通路径（未注入判断能力）：受治理工具仍在，治理/shell judge 工具都不存在 (1.3419ms)
+✔ 真实适配器 judgeMode + 治理工具：恰三只治理工具、原生/服务端/MCP 关闭、无持久化、report 原样 (652.954ms)
+✔ 真实适配器 judgeMode：注入非 judge 工具在构造期被拒绝（写/shell 根本不存在） (4.6625ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] prompt 返回
+✔ createPiRuntimeAdapter legacy 注入 governanceJudge：只构造治理三工具，不构造受治理工具、无持久化 (27.3422ms)
+✔ createPiRuntimeAdapter legacy 同时注入两种判断能力：构造期互斥抛错 (0.2689ms)
+✔ T1 假适配器（pi/session.ts）：context 位于边界来源之后、技能节之前，文本逐字 (9.8515ms)
+✔ T2 假适配器：技能节缺省 ⇒ context 为系统提示末尾 (0.6916ms)
+✔ T3 假适配器：缺省 / [] / [""] / ["", ""] 与基线逐字相等（R-5/R-7） (0.7886ms)
+✔ T4 公开外壳 createPiRuntimeAdapter（session.ts 实现）：固定位置与缺省逐字不变 (9.6791ms)
+✔ T5 真实适配器 composeContext（real-adapter.ts 实现）：固定位置 / 末尾 / 缺省逐字不变 (11.3843ms)
+✔ T6 多段 contextSections：按原顺序、空行连接，不重排/不合并/不改写 (0.5371ms)
+✔ T7a 假适配器 judge（shellJudge/governanceJudge）误传 contextSections 也不拼接 (0.6431ms)
+✔ T7b 真实适配器 judgeMode 误传 contextSections 也不拼接（real-adapter.ts 实现） (0.5924ms)
+✔ T7c 公开外壳 legacy judge 构造误传 contextSections 也不拼接（session.ts 实现） (0.7222ms)
+✔ T8 数据化文本原样透传：不 trim/不清洗/不截断/不解析（清洗与限长归 C1b） (0.6355ms)
+✔ injected schema/description/executionMode override legacy name lookup and exact SDK signal reaches handler (1.1184ms)
+✔ production hook denies every native or unregistered tool and permits only injected names (0.4775ms)
+✔ actual production bind registers injected tools only, freezes definition and emits exact Service turn (522.6302ms)
+✔ Service -> real Pi native wiring shares injected wait gate, captured customer context and one terminal (492.4563ms)
+✔ Pi cancellation forwards original customer signal; late consent stays aborted across next turn (15.8639ms)
+✔ native Pi storage starts fresh then restores actual native context, separate from ANS replay (30.9173ms)
+✔ Pi legacy file migrates to native copy, retains original ID/context and never appends old role file (18.39ms)
+✔ malformed native history rebuilds with recovered warning; never reads sibling Codex/Claude files (11.6739ms)
+✖ store validate callback rejects directory symlink before Pi parse or new native write (6.1906ms)
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (6.8185ms)
+[pi] 未配置上下文窗口（opts.contextWindow 与 ANS_PI_CONTEXT_WINDOW 均未给出）：已采用系统默认值 500000 tokens。若该模型/网关的实际窗口更小，请设置 ANS_PI_CONTEXT_WINDOW 覆盖。
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ public injected factory accepts Model shape and keeps compose/load free of filesystem effects (12.7871ms)
+✔ migrated Service/Pi timers honor legacy env once and native timeout normalizes to one timed_out terminal (72.572ms)
+✔ native stop cleanup rejects promptly and quarantines actual bound session when SDK cannot finish (911.973ms)
+✔ Service saves actual fresh/resumed/recovered Pi metadata and public replay remains runtime-isolated (82.6764ms)
+✔ 判据单元：前缀面命中/边界/清洗；env 展开（env:NAME 只自进程环境、缺失即抛、字面量原样） (1.2054ms)
+✔ 接通与放行：bindRole 装配 MCP（bindExtensions 补调）⇒ direct 工具可达、前缀面放行、工具真跑到服务端 (685.9228ms)
+✔ 无声明零变化：未注入 installedMcpServers ⇒ 不加载 MCP 扩展、不调 bindExtensions、活动面仅注入 (23.2213ms)
+✔ env 收窄：自持 transport inheritEnv:false＋最小集；env:NAME 真值展开；宿主哨兵不泄漏 (81.5169ms)
+✔ env:NAME 缺失 ⇒ bindRole 构造期如实抛错（不静默省略、不拉起子进程） (6.2006ms)
+✔ tools-only：server 自报 resources ⇒ 会话照常，资源工具不在放行面（门禁拒） (165.8464ms)
+ℹ 资源工具被 SDK 登记/激活：true（活动面：["mcp__srv_r__echo","list_mcp_resources","list_mcp_resource_templates","read_mcp_resource"]）
+✔ dispose 收口：RoleSession.dispose() 后 MCP 子进程退出（session_shutdown 补发生效） (109.5958ms)
+✔ startupWaitMs：慢 server 首轮被钳位、次轮不再等；0 ⇒ 不等；接通后工具动态出现 (2668.2059ms)
+ℹ 首轮 711ms / 次轮 12ms（server initialize 延迟 2500ms，等待上限 700ms）
+✔ 假适配器：命中技能 ⇒ 整段拼接（前缀逐字＝旧提示；节文本逐字＝渲染器输出；digest 独立重算对得上） (9.0068ms)
+✔ 假适配器：未给 projectRoot 或空技能树 ⇒ 逐字零渲染（等于旧提示） (1.5138ms)
+✔ 假适配器：技能的适用角色不含本角色 ⇒ 零渲染（过滤判据在渲染器内，接线侧不做判定） (8.4556ms)
+✔ 假适配器：坏件（登记缺失但好件同在）⇒ 好件照常注入、注入文本不被破坏 (7.8984ms)
+✔ 真实外壳 composeContext：projectRoot 流入注入节（非空拼接、别角色零渲染） (8.0005ms)
+✔ 真实适配器实际会话：注入节进入 SDK resourceLoader systemPrompt（非空逐字在、空目录零渲染） (523.3267ms)
+✔ InteractionGate：引用计数（可重入）、onChange 只在 0↔1 通知、多余 end 为 no-op、退订生效 (0.8199ms)
+✔ withPausableTimeout：无闸 = 普通硬超时（到点即拒，TimeoutError） (0.5538ms)
+✔ withPausableTimeout：闸等待中计时停走；恢复后按剩余时间到期才拒 (0.1727ms)
+✔ withPausableTimeout：work 先完成 → 按时返回；timeoutMs 非正 → 不加超时 (0.0985ms)
+✔ describeTool：两交互工具带 executionMode:'sequential' 与 promptGuidelines；其余工具不带 (1.6153ms)
+✔ describeTool 文案（A-3 配合）：两工具都要求 preview 列出将写出的具体路径，且列路径≠获准 (0.2269ms)
+✔ describeTool：request_confirmation 的 schema 含 title 必填与 preview；request_choice 含 options 必填 (0.4944ms)
+✔ 实测（faux provider，离线）：同批 request_confirmation + write_file 时，write_file 在确认完成之后才执行 (673.8966ms)
+ℹ 实测顺序：confirm:start > confirm:end > gate(C:\Users\51054\AppData\Local\Temp\ans-pi-seq-jzTGju\role.md) > gate(C:\Users\51054\AppData\Local\Temp\ans-pi-seq-jzTGju\role.md)
+✔ 对照组（抹掉 executionMode）：write_file 抢跑于确认——证明该字段承重，不是环境巧合 (148.1976ms)
+ℹ 对照组实测顺序：gate(C:\Users\51054\AppData\Local\Temp\ans-pi-seq-fK4GkJ\role.md) > confirm:start > gate(C:\Users\51054\AppData\Local\Temp\ans-pi-seq-fK4GkJ\role.md) > confirm:end
+✔ A1 observe(length)：恰一条截断系统行 + 诊断记录；同轮第二条不重复；settled detail 含 truncation（outcome 不变） (0.9451ms)
+✔ A2 observe(length) 后 observe(stop)（模拟补发成功轮）：settled detail 不含 truncation；通知仍只一条 (0.4685ms)
+✔ A3 begin() 归零：新一轮 wasTruncated()==false；新截断重新计数通知 (0.0958ms)
+✔ A4 回归底线：length 不影响既有 outcome 映射（length→completed；其后 error→failed；forced 后 length 被忽略） (0.1251ms)
+✔ B1 开关开 + 未交报告：补发恰一次（第 2 次文本=拟文案常量）；settled 恰一；两条新增系统行在场 (0.5484ms)
+✔ B2 enabled:false（等价 env 关闭）→ 恰 1 次、无补发行；settled 如实标 truncation (0.1654ms)
+✔ B3 本轮已有成功 submit_report → 不重复催交（恰 1 次） (0.1545ms)
+✔ B4 补发轮再次截断 → 仍恰 2 次（限次=1）；截断通知不重复；settled 含 truncation (0.1469ms)
+✔ B5 第一轮 prompt reject（API 错误）→ 无补发；既有 catch/fail 语义不变 (0.3976ms)
+✔ B6 补发轮 reject/超时 → settled 仍恰一、outcome 不被改判；补发失败行在场；requestAbort 被调用且不抛 (58.0336ms)
+✔ B7 abort/超时锁定 → 无补发（forced 守卫）；截断消息晚于锁定时亦被挡下 (1.2928ms)
+✔ B8 缺省不传 lengthFollowup（旧直接调用方）→ 行为与旧版逐字一致 (0.7331ms)
+✔ C 真实 SDK（faux）开关开：截断→补发→submit_report 落同一 turnId；settled 恰一、模型请求 +2 (527.3513ms)
+✔ C 真实 SDK（faux）开关关：不补发（report 0 次）；settled 如实标 truncation、截断行在场 (11.7404ms)
+✔ D 环境开关 ANS_PI_LENGTH_FOLLOWUP：显式关闭值才关（大小写/空白不敏感）；缺省与其它值开启 (0.1324ms)
+✔ 真 logger 门槛：默认 stage 打印、trace 不打印；ANS_PI_TRACE=1 时 trace 打印 (0.549ms)
+✔ 新会话：提示走 log.trace、不走 log.stage（默认终端不出现该行） (504.0598ms)
+✔ 会话恢复：提示走 log.trace、不走 log.stage；**事件流不含**恢复提示（客户二次裁定，原保留决定已推翻） (13.9677ms)
+✔ 异常行不降噪：全污染 ⇒ note 仍走 log.stage 与事件流（跳过恢复并新建） (9.2937ms)
+✔ 异常行不降噪：恢复时跳过污染档（note 为 undefined）也如实告知——stage + 事件流；恢复本身仍不上聊天流 (16.2057ms)
+✔ 契约：PromptImage 与 pi-ai ImageContent 结构兼容（编译期）且键恰为 {type,data,mimeType} (0.903ms)
+✔ makeRolePrompt: standalone input echo has typed identity; Core production can suppress it without losing images (0.6584ms)
+✔ makeRolePrompt: SDK option allowlist strips Core provenance, presentation and progress while preserving original text/images (0.1548ms)
+✔ makeRolePrompt：无图 → 逐字旧行为（不传 options；事件文案不变） (0.1235ms)
+✔ makeRolePrompt：带图 → 原样透传（同一数组引用）+ 事件可见「附 N 张图片」 (0.1703ms)
+✔ makeRolePrompt：空数组 = 无图（不传 options、文案不变） (0.1317ms)
+✔ makeRolePrompt：失败 → 事件「pi 适配器中止」+ abort 底层 + 原错误上抛（既有语义不变） (0.4551ms)
+✔ fake 适配器：带图不破（事件可见张数）；文本路径事件逐字不变 (1.7088ms)
+✔ SDK 级（faux provider，离线）：有效图进入 LLM 转录；无效图被**显式省略**（注记可见，非静默） (608.9941ms)
+ℹ 有效图逐字进转录；无效图显式省略（注记可见）
+✔ 缺失 baseUrl → 抛错，绝不回落到默认端点 (0.7705ms)
+✔ 缺失 modelId → 抛错 (0.1038ms)
+✔ 缺失凭据（指定环境变量未设）→ 抛错 (0.0963ms)
+✔ 完整配置 → 解析成功；返回值不含凭据值 (0.1002ms)
+✔ 可从环境变量取 base URL 与 model（ANS_PI_BASE_URL / ANS_PI_MODEL） (0.0836ms)
+✔ createPiRuntimeAdapter 构造时缺失配置即抛错（不等网络） (0.177ms)
+✔ contextWindow：未配置 → 采用系统默认值，**不抛错**（不再把查窗口的负担转嫁用户） (0.0873ms)
+✔ contextWindow：系统默认值被钉死为 500000（客户 2026-10-17 裁定，防被人悄悄改动） (0.0614ms)
+✔ contextWindow：缺失时的可见提示——提到默认值、并说明如何覆盖 (0.1922ms)
+✔ contextWindow：构造适配器时缺失**不再抛错**（用默认值；不等网络） (0.2363ms)
+✔ contextWindow：显式值与环境变量都能取到（并如实标注来源） (0.0897ms)
+✔ contextWindow：显式值优先于环境变量（含显式非法时不回落到环境变量） (0.0851ms)
+✔ contextWindow：非法值明确失败，不静默吞掉配置错误（0/负/非数） (0.0823ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ 真实适配器：composeContext 懒加载 Pi 包成功 (486.8136ms)
+ℹ composeContext 经懒加载加载 real-adapter.ts 成功
+✔ 真实适配器：bindRole 构造 Pi 会话（无模型/凭证时如实记录） (28.495ms)
+ℹ bindRole 成功：Pi 会话已构造
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] 本轮超过最后兜底，已中止：本轮最后兜底 超时（1200ms）：底层操作未在时限内返回，已中止以免无限挂起。
+✔ 整轮最后兜底：检查时限到点不中止；last-resort 到点才中止（本地服务永不响应） (2626.926ms)
+ℹ prompt 在 2125ms 内被中止（检查时限 200ms、最后兜底 1200ms）
+✔ 请求接线：默认 medium 与五档实际预算；默认也装配保护；off 真关闭 (651.8527ms)
+✔ off 前置修复单元：克隆模型 thinkingLevelMap.off 收窄为 undefined ⇒ clamp 返回 off；修复前对照=minimal (2.4337ms)
+✔ R1 修复：contextWindow 钳到极小 ⇒ 请求前修复为合法组合（自证网关放行；诊断如实） (101.115ms)
+✔ 思考捕获：complete 形态（正文＋真实时长信号）进事件面且过投影单点；redacted ⇒ omitted 空正文 (16.4406ms)
+✔ extractReasoningFacts 单元：缺失/完整/空正文/redacted 单块与混合 (0.1987ms)
+✔ high→清空→恢复同一 native 会话：等于真实无历史 SDK 默认，历史保留 (27.1681ms)
+✔ 默认优先级：显式 > SDK 模型设置 > SDK 全局设置 > 版本默认 (28.6787ms)
+✔ 未注入 ShellGate：run_shell 不在工具集里（能力缺席 = 最强 fail-closed，§7.5.1） (1.8326ms)
+✔ 未注入 ShellGate（仅配置 readRoot/writeRoot）：仍不注册 run_shell (0.1755ms)
+✔ 注入 ShellGate：run_shell 出现在工具集里 (0.2163ms)
+✔ allow:true → 真的执行命令，拿到 stdout 与 exit code (46.7616ms)
+✔ allow:true → 非 0 退出码被如实报告（ok:false 但确已执行） (40.9242ms)
+✔ allow:false → 绝不 spawn（痕迹文件不存在） (0.7987ms)
+✔ 审核抛错 → 绝不 spawn（痕迹文件不存在） (0.6958ms)
+✔ 审核超时 → 绝不 spawn（超时 = 拒绝，§7.5.2） (60.5752ms)
+✔ 审核返回 undefined / 非明确 allow → 一律不执行（无 token 可依，§7.5.2） (2.6107ms)
+✔ 缺少 command → 拒绝，且不调审核、不 spawn (1.5597ms)
+✔ kill-switch：非 run_shell 不由本判据处理（undefined） (0.2184ms)
+✔ kill-switch：run_shell 未 arm（未注入 ShellGate）→ block (0.1134ms)
+✔ kill-switch：run_shell 已 arm → 放行（undefined，交 execute 细审） (0.0635ms)
+✔ env 凭据剥离：spawn 的子进程看不到凭据变量（§7.9） (45.3844ms)
+✔ handler failure is a Pi error with safe identifiable details (1.5168ms)
+✔ terminal outcome uses the final retry response and emits exactly once (0.6992ms)
+✔ prompt timeout is locked before SDK aborted settle, with no duplicate terminal (34.7861ms)
+✔ abort cleanup is bounded and quarantines an unresponsive session (31.7664ms)
+✔ SDK finally-settled followed by prompt rejection cannot publish an early completed turn (1.3615ms)
+✔ report captures entry turnId even if the current turn changes before callback (2.4426ms)
+✔ an already aborted report never calls the receiving capability (0.7036ms)
+✔ tool guidance preserves governance confirmation and permits authorized routine work (1.0074ms)
+✔ real faux SDK: failed handler emits denied; accepted report precedes same-turn settled (524.4444ms)
+✔ bindRole 构造期：未知 id（含 code_execution）⇒ 明确抛错且不发任何网络请求 (513.3385ms)
+✔ T2 wire 级：真实 params 上追加声明——尾部、不引入 tool_removal/tool_addition、stream 标志不动 (53.6041ms)
+✔ T3 loopback：声明上 wire（尾部）＋恰一对 start/result 行（URL query 被显示 profile 剥除）＋诊断计数类＋settled 恰一 (80.802ms)
+✔ T4 loopback：网关以 max_uses_exceeded 优雅拒绝调用 → denied 行、非运行错误、outcome 不受影响 (37.7912ms)
+✔ T5 loopback：网关 400 拒声明 → 本轮如实失败（既有口径）＋降级恰一次＋此后请求不再附带声明（会话可用） (47.1776ms)
+✔ T6 loopback：pause_turn → 如实行 + 诊断；轮次按「stop」正常收尾 (34.7606ms)
+✔ T7 loopback：未配置（默认关）→ 请求体无任何声明、零 server_tool 诊断、无启用行（逐字旧行为） (26.5317ms)
+✔ T8 loopback：网关不回传 usage.server_tool_use → 以成功调用块计数兜底（state=from-blocks） (31.1652ms)
+✔ T1 配置解析：未设置/空/关闭值 ⇒ 关（默认） (1.0597ms)
+✔ T1 配置解析：声明形状与客户探针逐字对齐；缺省 max_uses=1 (0.1312ms)
+✔ T1 配置解析：id:max_uses 覆盖、多工具、空白容忍（web_fetch 在首批） (0.092ms)
+✔ T1 配置解析：未知 id（含未列入首批的 code_execution）⇒ 构造期抛错且给出可用清单 (0.3341ms)
+✔ T1 配置解析：非法 max_uses / 重复 id ⇒ 抛错（不静默半开） (0.1583ms)
+✔ 声明追加：tools 缺失时创建、已有时**追加在尾部**且不改动入参 (0.1436ms)
+✔ 声明追加：幂等（已含同 type 即跳过；重复调用不重复追加） (0.0859ms)
+✔ 声明追加：payload/ tools 非预期形状 ⇒ 不动作（present=false，如实不半改） (0.0938ms)
+✔ 启用行/降级行/pause 行文案（含「按次计费」与「外部不可信」口径；降级为路径 C 措辞） (0.1455ms)
+✔ requestRejectionStatus：只认「拒绝类」状态前缀；408/429 与无前缀一律 undefined (0.2307ms)
+✔ observer：调用 start→结果行（查询/标题/URL 白名单字段；加密诱饵与 URL 全文副本绝不出现） (0.5665ms)
+✔ observer：结果块错误变体（max_uses_exceeded）⇒ call-denied、非运行错误文案 (0.1649ms)
+✔ observer：结果块 delta 增量形状容忍（start 无 content，delta 累积 JSON，stop 定形） (0.157ms)
+✔ observer：web_fetch 形状（start 内联 input.url；结果 content 为对象）⇒ 抓取行 (0.1135ms)
+✔ observer：usage 缺省兜底 from-blocks（网关不回传 server_tool_use） (0.0844ms)
+✔ observer：pause_turn 恰一次 + 未知 stop_reason 如实记录 (0.0739ms)
+✔ observer：非识别输入一律空数组且不抛（O(1) 早退面） (0.0907ms)
+✔ 扩展：未传 serverTools ⇒ **零注册**（默认关零开销；行为逐字与旧版一致） (0.3932ms)
+✔ 扩展：启用后 before_provider_request 注入声明（尾部/幂等/新请求重注入）；诊断零查询串 (0.1142ms)
+✔ 扩展：4xx 降级（路径 C）——判据全满足才触发、恰一次、此后请求不再附带声明 (0.1714ms)
+✔ 扩展：降级防误判——未含声明 / 非 error 收场 / 错误无状态前缀 / 408/429 任一项都不降级；5xx 属拒绝类照降 (0.1867ms)
+✔ 扩展：provider_stream_event → 行 + 诊断（**查询串不进诊断**；非 anthropic-messages 早退） (0.2599ms)
+✔ 扩展：projector 路径的行形状（native-start/native-result；input rule 为 none） (0.1552ms)
+✔ 扩展：pause_turn → 如实行 + 诊断；unknown-stop-reason → 仅诊断 (0.0983ms)
+✔ 不给 sessionDir：选 in-memory（逐字旧行为），追加消息也不落盘 (514.2572ms)
+✔ 给 sessionDir：新建会话；首条消息前惰性不落盘，追加后文件存在、非空、含该消息 (12.4734ms)
+✔ 同目录再选：恢复（同一文件），messages 非空且含原文（entry 往返） (17.5487ms)
+✔ 目录内多个会话：恢复最近的一个（按 modified） (44.4093ms)
+﹣ 会话目录不可写：明确抛错（含目录与原因），绝不静默退化成「不落盘」 (0.2182ms) # chmod 语义在 Windows 不适用
+✔ 端到端（faux provider，离线）：关掉再开（同 sessionDir 重建会话）后，恢复出的模型上下文含上一轮内容 (38.2063ms)
+✔ ANS_SETTINGS_OVERRIDES：压缩被显式钉住为启用 + Pi 内置缺省阈值 (0.8192ms)
+✔ 封闭的 settings manager：getCompactionSettings 恒为我们钉住的值 (543.437ms)
+✔ 封闭的 settings manager 不读项目内 .pi/settings.json（对照：文件式合并会漏进来） (13.2402ms)
+✔ wireSettledOnce（stub）：同轮重复settle只发一次；新轮再发；退订生效 (0.7813ms)
+✔ A 修复前接线（扩展含 agent_settled 映射 + subscribe）→ 一轮 **2** 个 settled（复现） (516.0618ms)
+✔ B 修复后接线（**出厂扩展** + wireSettledOnce）→ 一轮 **恰 1** 个 settled；且扩展不含 agent_settled、仍含 tool_call (11.582ms)
+✔ 中止路径回归：出厂接线下一轮 abort → 仍**恰 1** 个 settled（消费方不挂起） (176.4822ms)
+✔ 假适配器 judge 模式：只存在三只只读工具，写/shell/交互/回交/派发一律未知工具 (13.4358ms)
+✔ 假适配器未注入 shellJudge 时普通路径逐字不变（受治理工具仍在，judge 工具不存在） (1.1761ms)
+✔ 真实适配器 judgeMode：恰三只 judge 工具、原生/服务端/MCP 关闭、无持久化 (572.4451ms)
+✔ 真实适配器 judgeMode：注入非 judge 工具在构造期被拒绝（写/shell 根本不存在） (5.7919ms)
+✔ 真实适配器未置 judgeMode 时普通工具集不变（注入工具照常注册） (6.6845ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+[pi] prompt 发出
+[pi] prompt 返回
+✔ createPiRuntimeAdapter legacy 判断模式：只用 buildShellJudgeTools，不构造受治理工具 (34.3148ms)
+[pi] 加载 Pi 包…
+[pi] 构造显式 provider…
+[pi] resourceLoader.reload…
+[pi] createAgentSession…
+[pi] bindRole 完成
+✔ createPiRuntimeAdapter legacy 普通模式：未注入 shellJudge 时仍构造受治理工具集 (7.3273ms)
+✔ 未注入审读结论能力：report_shell_verdict 不在工具集里（只给审读会话；能力缺席 = 最强 fail-closed） (1.8538ms)
+✔ 注入审读结论能力：report_shell_verdict 出现在工具集里（同 run_shell / customerInput 的注入先例） (0.2119ms)
+✔ handler 把载荷逐字交给 fn；三值都通；成功 → 「审读结论已交回」+ 回显 verdict (0.3933ms)
+✔ handler：省略 reason → 载荷不含 reason 字段 (0.5132ms)
+✔ 参数校验：verdict 缺失或非三值 → ok:false 且 fn 未被调用 (0.1931ms)
+✔ fn 抛错 → fail-closed「未能交回」+ 原因，绝不说成「已交回」；并提示「正文里写不算」 (0.1847ms)
+✔ 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn） (0.1862ms)
+✔ describeTool 文案：schema 三值枚举 + verdict 必填；写死「结论以工具调用为准」；反向断言不得暗示授权 (0.1706ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、交回成功，工具层零文件系统副作用 (0.729ms)
+✔ ShellVerdictPayload / ShellVerdictFn 可从冻结契约家导入；且与编排形状（void | Promise<void>）结构兼容 (0.1503ms)
+✔ shell review waiting pauses prompt budget while retaining its separate deadline (66.2018ms)
+✔ unresponsive shell reviewer fails closed at its own deadline (27.589ms)
+✔ abort releases review wait immediately; late allow cannot execute command (2.2098ms)
+✔ 未注入回交能力：submit_report 不在工具集里（只给项目角色；能力缺席 = 最强 fail-closed，C-1） (1.8006ms)
+✔ 注入回交能力：submit_report 出现在工具集里（同 run_shell / customerInput 的注入先例） (0.2414ms)
+✔ handler 把载荷逐字交给 fn；回执 ok:true → 「报告已交回」并回显 status (0.7971ms)
+✔ handler：status=blocked 与省略 evidence 的载荷也逐字传递（evidence 缺省不出现在载荷里） (0.1608ms)
+✔ fire-and-forget（void 返回）能力可注入：编排的 (report) => void | Promise<void> 形态 → 「报告已交回」 (0.2205ms)
+✔ 参数校验：status 非法 / 缺 summary / evidence 非法 → ok:false 且 fn 未被调用 (0.1798ms)
+✔ fn 抛错 → fail-closed「未能交回」+ 原因，绝不谎报「已交回」 (0.1808ms)
+✔ 回执 ok:false（回交被拒）→ ok:false + 回执原因，绝不谎报 (0.1311ms)
+✔ 中止：signal 已中止 → 立即 fail-closed 返回（不等注入 fn；防悬挂，A-6 纪律） (0.2554ms)
+✔ 不写盘：即便 writeRoot 就绪、gate 放行、交报告成功，工具层零文件系统副作用 (0.7933ms)
+✔ describeTool 文案：写死「必须交报告、不得只在正文里说」，且不得暗示任何写权 (0.1962ms)
+✔ ReportHandbackPayload / ReportHandbackReceipt / ReportHandbackFn 可从冻结契约家 session.ts 导入并使用 (0.0789ms)
+✔ withTimeout：永不返回的桩在时限内被中止（核心证据） (157.3014ms)
+✔ withTimeout：正常返回时透传结果 (0.773ms)
+✔ withTimeout：非正时限表示不加超时 (0.3153ms)
+✔ timeoutError/isTimeoutError 标记正确 (0.2109ms)
+✔ readTimeoutMs：缺省回退、非法回退、合法解析 (0.269ms)
+✔ 看护检查时限默认钉死为 5 分钟（300000ms；2026-10-17 统一口径） (0.179ms)
+✔ real SDK nine tool names, sequential: handler once/start once/result once (746.4769ms)
+✔ real SDK nine tool names, parallel: handler once/start once/result once (228.2202ms)
+✔ real SDK whitelist: no handler effect, canonical start and true failure remain (78.0407ms)
+✔ real SDK write-denied: no handler effect, canonical start and true failure remain (62.07ms)
+✔ real SDK shell-denied: no handler effect, canonical start and true failure remain (60.1918ms)
+✔ real SDK missing: no handler effect, canonical start and true failure remain (46.5374ms)
+✔ real SDK invalid: no handler effect, canonical start and true failure remain (46.4039ms)
+✔ real SDK throw: no handler effect, canonical start and true failure remain (62.7981ms)
+✔ mapping preserves different turns, duplicate/late failed ends and legacy missing identity without text guesses (1.2274ms)
+✔ required-v1 missing capabilities rejects before SDK; actual config override profile registers first (515.4395ms)
+✔ Core -> actual Pi -> real read/ENOENT/shell: display projected, execution remains private, SDK content unchanged (457.4903ms)
+✔ native bridge preserves handler result/throw and unsupported content, call identity and rule; metadata is not SDK options (64.499ms)
+✔ injected projector throw emits safe diagnostic without failing actual handler or model (39.2101ms)
+✔ all nine injected names project start/result once; real declared rule wins over tool name; blocked and failed native end coexist (809.8512ms)
+✔ real Pi SDK receives original prompt and image reference only; Core-only metadata never enters SDK/transcript (32.6443ms)
+✔ real Pi shell exit0, spawn failure, signal and review denial retain actual process facts without invented exit (479.5578ms)
+✔ ok:true + images ⇒ content 含 text + image；data/mimeType 原引用、不重编码 (1.9848ms)
+✔ 多张图片：content 顺序保持，details 汇总 count/bytes/mimeTypes（去重） (0.1616ms)
+✔ ok:true 且无 images（next-turn 回退）⇒ 只有 text，details 记交付方式 (0.116ms)
+✔ ok:true 且 images 为空数组 ⇒ 只有 text (0.0978ms)
+✔ ok:false 即使携带 images 也绝不附图；只有 text，isError=true (0.1148ms)
+✔ 非法图片载荷（缺 data）⇒ 无图、isError、诚实注记，base64 不进 details (0.2159ms)
+✔ 非法图片载荷（空 data）⇒ 无图、isError、诚实注记，base64 不进 details (0.0943ms)
+✔ 非法图片载荷（非白名单 MIME）⇒ 无图、isError、诚实注记，base64 不进 details (0.0824ms)
+✔ 非法图片载荷（非对象条目）⇒ 无图、isError、诚实注记，base64 不进 details (0.0963ms)
+✔ 非法图片载荷（images 非数组）⇒ 无图、isError、诚实注记，base64 不进 details (0.2576ms)
+✔ 诊断记录只含元数据；图片 base64 不进入 diagnostics (0.224ms)
+✔ SDK 级（faux provider，离线）：工具结果消息连同图片块进入同一次 prompt 的下一次模型请求 (565.5345ms)
+ℹ 工具结果附图进入同一次 prompt 的下一次模型请求（Pi messages）
+✔ buildGovernedTools 至少含 write_file 与 edit_file (2.1158ms)
+✔ buildGovernedTools 含 read_file（工具集具备读能力） (0.1884ms)
+✔ read_file 读取真实文件，且**不经过**写门禁 (2.7001ms)
+✔ read_file 读取失败返回可读错误（不抛异常） (0.3686ms)
+✔ write_file 获准：相对路径落在 writeRoot 下，盘上字节等于 content (13.8458ms)
+✔ write_file 获准：绝对路径（在 writeRoot 内）落到同一位置 (6.9475ms)
+✔ write_file：传给 gate 的是解析后的**绝对路径**（写根与判定同源） (6.9592ms)
+✔ write_file 拒绝（越界）：返回按根分组的可读信息，且盘上无文件、父目录未创建 (0.6761ms)
+✔ write_file 拒绝：对已存在文件，内容与 mtime 均不变 (3.8938ms)
+✔ write_file 词法越界（../ 逃出写根）：拒绝且写根外无文件 (1.3916ms)
+✔ edit_file 命中 old_string：回写后内容等于预期 (20.5731ms)
+✔ edit_file old_string 不存在：ok:false 且文件不变 (3.7084ms)
+✔ edit_file 越界：经同一治理路径被拒 (0.2924ms)
+✔ edit_file 保留 UTF-8 BOM：写回后 BOM 仍在且替换正确 (16.7387ms)
+✔ edit_file 目标不存在：ok:false（不写、不建） (1.2125ms)
+✔ write_file：gate 抛错 → ok:false，盘上无文件、无目录 (0.5596ms)
+✔ edit_file：gate 抛错 → ok:false，既有文件未被触碰 (3.2075ms)
+✔ junction/目录符号链接逃逸出 writeRoot：拒绝且链接目标未被触碰 (11.0764ms)
+✔ 目标本身是符号链接/junction：拒绝（即便链接指向写根之内），链接指向处不被写 (3.8068ms)
+✔ 未配置 writeRoot：写入获准（ok:true）但不落盘 (0.4544ms)
+✔ 缺少 path 参数：拒绝且不判定 (0.0943ms)
+✔ write_file 缺少 content：拒绝且不落盘 (0.3875ms)
+✔ 到点检查不中止主轮：promptMs 到点后轮次继续并正常完成 (132.6464ms)
+✔ 最后兜底到点中止整轮：错误与诊断标记均为「最后兜底」，与检查时限区分 (107.4602ms)
+✔ 截断收尾补发段仍用检查时限，不继承 last-resort (76.0945ms)
+✔ buildExplicitRuntime：克隆模型 compat 已显式收窄（两能力位 false；strict/adaptive/fallbacks 收窄；其余保留） (523.1849ms)
+✔ wire 级：收窄后**不再生成** tool_removal/tool_addition 块；对照组（两能力位改回 true）能复现该块 (53.9225ms)
+✔ 存量防御：检测只认 system 消息里的字面块（用户正文提及同名串不误报） (9.5744ms)
+✔ 存量防御：全污染目录 → 跳过恢复、新建并如实 note；污染+干净 → 恢复干净旧档并记 skipped (55.2672ms)
+✔ 存量防御：干净会话恢复逐字不变（无 note / 无 skipped） (5.8344ms)
+✔ describeTool：write_file / edit_file 钉 executionMode:'sequential'；read_file / run_shell 不加 (1.4458ms)
+✔ A 对照组（抹掉 executionMode，= 修复前）：同批 write+edit 丢写复现（3 连跑全中） (6316.7425ms)
+ℹ A 对照组第 1 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 2 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+ℹ A 对照组第 3 轮：丢写复现 {"hasWrite":true,"hasEditEffect":false}
+✔ B 主组（修复后原样）：同批 write+edit 顺序执行、无丢写（3 连跑全中） (5737.7637ms)
+ℹ B 主组第 1 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 2 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ B 主组第 3 轮：顺序执行、无丢写 {"hasWrite":true,"hasEditEffect":true}
+ℹ tests 364
+ℹ suites 0
+ℹ pass 361
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 50489.3823
+
+✖ failing tests:
+
+test at test\pi-adapter\injected-runtime.test.ts:185:1
+✖ store validate callback rejects directory symlink before Pi parse or new native write (6.1906ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\p1-injection-Er7Tvd\outside' -> 'C:\Users\51054\AppData\Local\Temp\p1-injection-Er7Tvd\.ans\sessions\Pi适配器\pi\native'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b7/test/pi-adapter/injected-runtime.test.ts:188:71
+      at async temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b7/test/pi-adapter/injected-runtime.test.ts:22:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-Er7Tvd\\outside',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-Er7Tvd\\.ans\\sessions\\Pi适配器\\pi\\native'
+  }
+
+test at test\pi-adapter\injected-runtime.test.ts:193:1
+✖ Pi storage refuses file symlink and role/runtime mismatch without touching other storage (6.8185ms)
+  Error: EPERM: operation not permitted, symlink 'C:\Users\51054\AppData\Local\Temp\p1-injection-Fof71n\outside.jsonl' -> 'C:\Users\51054\AppData\Local\Temp\p1-injection-Fof71n\.ans\sessions\Pi适配器\pi\native\link.jsonl'
+      at async symlink (node:internal/fs/promises:1714:10)
+      at async file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b7/test/pi-adapter/injected-runtime.test.ts:195:78
+      at async temp (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b7/test/pi-adapter/injected-runtime.test.ts:22:9)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    errno: -4048,
+    code: 'EPERM',
+    syscall: 'symlink',
+    path: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-Fof71n\\outside.jsonl',
+    dest: 'C:\\Users\\51054\\AppData\\Local\\Temp\\p1-injection-Fof71n\\.ans\\sessions\\Pi适配器\\pi\\native\\link.jsonl'
+  }

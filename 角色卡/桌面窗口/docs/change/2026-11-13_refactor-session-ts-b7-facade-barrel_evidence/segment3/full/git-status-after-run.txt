@@ -1,0 +1,13 @@
+ M app/desktop/session.ts
+ M app/desktop/session/contracts/ports.ts
+ M test/桌面应用/operator-channel.test.ts
+ M test/桌面应用/session-structure.test.ts
+?? app/desktop/session/index.ts
+?? app/desktop/session/lifecycle/
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-facade-barrel.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-facade-barrel_evidence/
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-final.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-lifecycle.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-lifecycle_evidence/
+?? 角色卡/测试/docs/change/2026-11-05_git-role-permissions-evidence/
+?? 角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b7-operator-pins.md

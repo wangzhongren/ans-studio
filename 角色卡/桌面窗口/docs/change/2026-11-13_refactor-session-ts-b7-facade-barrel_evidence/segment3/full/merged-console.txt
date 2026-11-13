@@ -1,0 +1,10 @@
+{
+  "tests": 5824,
+  "pass": 5601,
+  "fail": 188,
+  "cancelled": 3,
+  "skipped": 32,
+  "todo": 0,
+  "segments": 15,
+  "segmentsMissingSummary": []
+}

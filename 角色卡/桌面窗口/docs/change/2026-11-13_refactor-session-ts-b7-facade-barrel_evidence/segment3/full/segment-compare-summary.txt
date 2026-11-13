@@ -1,0 +1,15 @@
+gates: tests 29/29 pass 29/29 fail 0/0 cancelled 0/0 skipped 0/0 added=0 removed=0
+claude-adapter: tests 128/128 pass 128/128 fail 0/0 cancelled 0/0 skipped 0/0 added=0 removed=0
+codex-adapter: tests 123/123 pass 122/122 fail 0/0 cancelled 0/0 skipped 1/1 added=0 removed=0
+pi-adapter: tests 364/364 pass 361/361 fail 2/2 cancelled 0/0 skipped 1/1 added=0 removed=0
+roles: tests 285/285 pass 283/283 fail 2/2 cancelled 0/0 skipped 0/0 added=0 removed=0
+runtime-core: tests 604/604 pass 567/567 fail 33/33 cancelled 0/0 skipped 4/4 added=0 removed=0
+装配: tests 99/99 pass 87/87 fail 12/12 cancelled 0/0 skipped 0/0 added=0 removed=0
+项目管理: tests 224/224 pass 218/219 fail 1/0 cancelled 0/0 skipped 5/5 added=1 removed=0
+桌面UI: tests 443/443 pass 443/443 fail 0/0 cancelled 0/0 skipped 0/0 added=0 removed=0
+桌面应用: tests 845/832 pass 774/760 fail 69/70 cancelled 2/2 skipped 0/0 added=0 removed=1
+门禁引擎: tests 577/577 pass 571/571 fail 5/5 cancelled 0/0 skipped 1/1 added=0 removed=0
+测试: tests 711/711 pass 652/651 fail 40/41 cancelled 1/1 skipped 18/18 added=0 removed=1
+测试-hangsplit: tests 6/6 pass 6/6 fail 0/0 cancelled 0/0 skipped 0/0 added=0 removed=0
+编排: tests 1373/1373 pass 1347/1347 fail 24/24 cancelled 0/0 skipped 2/2 added=0 removed=0
+编排-git-trunk-store: tests 13/13 pass 13/13 fail 0/0 cancelled 0/0 skipped 0/0 added=0 removed=0

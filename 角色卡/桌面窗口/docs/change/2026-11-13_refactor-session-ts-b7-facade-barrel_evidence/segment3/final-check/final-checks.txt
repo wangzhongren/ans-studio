@@ -1,0 +1,58 @@
+# generated 2026-11-13 19:35:23 +0800
+
+## wc -l barrel / facade
+    30 app/desktop/session.ts
+   790 app/desktop/session/index.ts
+   820 total
+
+## session/**/*.ts top 10 by lines (budget <= 1500)
+  17720 total
+   1477 app/desktop/session/cards/cards.ts
+   1430 app/desktop/session/lifecycle/open.ts
+   1298 app/desktop/session/dispatch.ts
+   1276 app/desktop/session/delivery/queue.ts
+    916 app/desktop/session/tasks.ts
+    819 app/desktop/session/cards/version-decisions.ts
+    790 app/desktop/session/index.ts
+    729 app/desktop/session/fixed-workflow/route.ts
+    722 app/desktop/session/diagnostics.ts
+    710 app/desktop/session/evidence.ts
+
+## sha256 barrel / facade
+120921f72714951931468bfe8207eb19f52234509a04a59028ccae7423c130f4 *app/desktop/session.ts
+308ab5c826feeded2620bc63ab3ec4d37fe7633dcb95e6a88d9a00a3a0cb2374 *app/desktop/session/index.ts
+
+## structure test budgets (source of truth)
+514:const SESSION_TS_FROZEN_BASELINE_LINES = 50;
+516:const SESSION_INDEX_MAX_LINES = 800;
+518:const SESSION_MODULE_MAX_LINES = 1500;
+
+## git status --porcelain
+ M app/desktop/session.ts
+ M app/desktop/session/contracts/ports.ts
+ M test/桌面应用/operator-channel.test.ts
+ M test/桌面应用/session-structure.test.ts
+?? app/desktop/session/index.ts
+?? app/desktop/session/lifecycle/
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-facade-barrel.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-facade-barrel_evidence/
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-final.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-lifecycle.md
+?? 角色卡/桌面窗口/docs/change/2026-11-13_refactor-session-ts-b7-lifecycle_evidence/
+?? 角色卡/测试/docs/change/2026-11-13_refactor-session-ts-b7-operator-pins.md
+
+## release-output (gitignored build output)
+total 165316
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:35 .
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:34 ..
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:34 .icon-ico
+-rw-r--r-- 1 51054 197609 169268900 Nov 13 19:35 ANS-Studio-2.0.0-win-x64.zip
+-rw-r--r-- 1 51054 197609      1181 Nov 13 19:35 builder-debug.yml
+drwxr-xr-x 1 51054 197609         0 Nov 13 19:34 win-unpacked
+
+## renderer build output (gitignored)
+app/renderer/dist
+
+## git check-ignore
+.gitignore:8:release-output/	release-output/local
+.gitignore:9:app/renderer/dist/	app/renderer/dist

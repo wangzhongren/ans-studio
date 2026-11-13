@@ -1,0 +1,12 @@
+{
+  "addedCount": 1,
+  "removedCount": 2,
+  "bothCount": 189,
+  "addedNames": [
+    "硬编码守卫：allowlist 之外不得出现中文（B0 基线条目全部通过）"
+  ],
+  "removedNames": [
+    "test\\测试\\git-action-delivery-claude-e2e.test.ts",
+    "重启：未决申请 orphaned、未决审批 expired；已结算不重复，二次恢复幂等"
+  ]
+}

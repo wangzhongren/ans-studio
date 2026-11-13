@@ -1,0 +1,123 @@
+{
+  "generatedAt": "2026-11-13T10:21:14.530Z",
+  "builders": 8,
+  "allBlocksVerbatim": true,
+  "reports": [
+    {
+      "builder": "resolveWorkflowMode",
+      "sourceStartLine": 1994,
+      "sourceEndLine": 2060,
+      "sourceLineCount": 67,
+      "targetMarkerLine": 259,
+      "targetBodyStartLine": 262,
+      "aliasLine": "private async resolveWorkflowMode(ctx: OpenContext): Promise<OpenResult | undefined> {",
+      "sourceSliceSha256": "3d8c56f838a56a954f08d8f58a2a3cdb44bad704e8610c02ece6a586652d9df0",
+      "targetBlockSha256": "3d8c56f838a56a954f08d8f58a2a3cdb44bad704e8610c02ece6a586652d9df0",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [],
+      "tailAfterBlock": "ctx.forcedSessionWorkflowMode = forcedSessionWorkflowMode;"
+    },
+    {
+      "builder": "reuseOrRebindEntry",
+      "sourceStartLine": 2061,
+      "sourceEndLine": 2134,
+      "sourceLineCount": 74,
+      "targetMarkerLine": 334,
+      "targetBodyStartLine": 337,
+      "aliasLine": "private async reuseOrRebindEntry(ctx: OpenContext): Promise<OpenResult | undefined> {",
+      "sourceSliceSha256": "19a5bc5733ddd9d5e6837cd27c0c7a684456173c1429f1239f5b06045148af56",
+      "targetBlockSha256": "19a5bc5733ddd9d5e6837cd27c0c7a684456173c1429f1239f5b06045148af56",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [],
+      "tailAfterBlock": "ctx.listing = listing;"
+    },
+    {
+      "builder": "loadAuthorization",
+      "sourceStartLine": 2136,
+      "sourceEndLine": 2193,
+      "sourceLineCount": 58,
+      "targetMarkerLine": 415,
+      "targetBodyStartLine": 418,
+      "aliasLine": "private async loadAuthorization(ctx: OpenContext): Promise<OpenResult | undefined> {",
+      "sourceSliceSha256": "c659d206b69946fd8c1414db539d56466fe85c71cc2f73479d2da8f9e4b0acc9",
+      "targetBlockSha256": "c659d206b69946fd8c1414db539d56466fe85c71cc2f73479d2da8f9e4b0acc9",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [],
+      "tailAfterBlock": "ctx.project = project;"
+    },
+    {
+      "builder": "assembleGovernanceCapabilities",
+      "sourceStartLine": 2195,
+      "sourceEndLine": 2301,
+      "sourceLineCount": 107,
+      "targetMarkerLine": 484,
+      "targetBodyStartLine": 487,
+      "aliasLine": "private async assembleGovernanceCapabilities(ctx: OpenContext): Promise<void> {",
+      "sourceSliceSha256": "b62b084976e43deef616e8a300e2a60b6fc74f2ef41e7cf4b86c542a8e0ba2b9",
+      "targetBlockSha256": "b62b084976e43deef616e8a300e2a60b6fc74f2ef41e7cf4b86c542a8e0ba2b9",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [],
+      "tailAfterBlock": "ctx.governanceModel = governanceModel;"
+    },
+    {
+      "builder": "assembleProjectCapabilities",
+      "sourceStartLine": 2303,
+      "sourceEndLine": 2542,
+      "sourceLineCount": 240,
+      "targetMarkerLine": 617,
+      "targetBodyStartLine": 620,
+      "aliasLine": "private assembleProjectCapabilities(ctx: OpenContext): void {",
+      "sourceSliceSha256": "4b645e4206519b7961b8b28568750fbeaae651c40bf7c5377ca6e2d029e2ccf7",
+      "targetBlockSha256": "075be736351781ceefdb4a44334fbdf729a463653733d6a06df472df3f1cb11c",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [
+        "caller.handle === handle -> caller.handle === ctx.handle"
+      ],
+      "tailAfterBlock": "ctx.submitVersionChangeCapability = submitVersionChangeCapability;"
+    },
+    {
+      "builder": "assembleToolSurface",
+      "sourceStartLine": 2543,
+      "sourceEndLine": 2956,
+      "sourceLineCount": 414,
+      "targetMarkerLine": 888,
+      "targetBodyStartLine": 891,
+      "aliasLine": "private async assembleToolSurface(ctx: OpenContext): Promise<OpenResult | undefined> {",
+      "sourceSliceSha256": "40e7a87504f9c2154fee3d60a3980e4dea0d11fa543f1e5cafa84b20e7df24ef",
+      "targetBlockSha256": "ebef899b30e44eeb30d0fa5e6e7b4d165b837d664ded1c2bfdc2aa70be9936a2",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [
+        "const manager = this; -> const manager = this.host;"
+      ],
+      "tailAfterBlock": "ctx.profileRevision = profileRevision;"
+    },
+    {
+      "builder": "freezeBindings",
+      "sourceStartLine": 2958,
+      "sourceEndLine": 2980,
+      "sourceLineCount": 23,
+      "targetMarkerLine": 1313,
+      "targetBodyStartLine": 1316,
+      "aliasLine": "private async freezeBindings(ctx: OpenContext): Promise<OpenResult | undefined> {",
+      "sourceSliceSha256": "abd84f8a3a603ffc32835f7d080caf1c29eb1dba513cf4f45ed0fd0cf87b2cc5",
+      "targetBlockSha256": "abd84f8a3a603ffc32835f7d080caf1c29eb1dba513cf4f45ed0fd0cf87b2cc5",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [],
+      "tailAfterBlock": "ctx.boundaryPaths = boundaryPaths;"
+    },
+    {
+      "builder": "postOpenWiring",
+      "sourceStartLine": 2982,
+      "sourceEndLine": 3063,
+      "sourceLineCount": 82,
+      "targetMarkerLine": 1344,
+      "targetBodyStartLine": 1347,
+      "aliasLine": "private async postOpenWiring(ctx: OpenContext): Promise<OpenResult> {",
+      "sourceSliceSha256": "345459caa9637c1aea0629e1301ff407efd9406af6ef7ce092d25d7808941be3",
+      "targetBlockSha256": "345459caa9637c1aea0629e1301ff407efd9406af6ef7ce092d25d7808941be3",
+      "containsVerbatimSourceBlock": true,
+      "documentedAdaptations": [],
+      "tailAfterBlock": "(none)"
+    }
+  ]
+}

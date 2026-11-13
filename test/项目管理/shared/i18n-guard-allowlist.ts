@@ -28,6 +28,12 @@
 //     specifier 中既有中文目录名 `编排` 的机器路径；② 应用失败回执/系统行（交运营/幕僚 agent 的
 //     tool-result/交付备注）与诊断 detail（含 git stderr 原文）——classification §4，非客户门/卡
 //     UI 文案）——当前保留 **25** 条。
+//   · 2026-11-13（session.ts 重构 B7 收尾；B7 树 i18n 守卫复跑）：`app/desktop/session.ts` 拆分后，
+//     `app/desktop/session/**` 下 B1–B6 已积累 25 个、B7 新增 6 个（index.ts + lifecycle/*）含中文
+//     文件；守卫为文件级判定，按拆分前 session.ts 文件级覆盖口径逐文件补登 31 条（机器路径 +
+//     与 B0 session.ts 逐字同源的 agent-facing/协议/诊断文本），不新增用户可见文案覆盖；其中
+//     `tasks.ts:832-838` 预存应用自有升级卡中文（B0 已被 session.ts 条目掩盖，非 B7 新增）随
+//     tasks.ts 条目继续覆盖，待 i18n key 化——当前保留 **56** 条。
 // 规则：
 //   · **新增条目必须写明理由**；只允许「明确不翻译」的文件（classification §4/§5）。
 //   · B1–B4 每完成一批就从本清单移除对应文件；守卫测试会拒绝
@@ -78,6 +84,87 @@ export const I18N_GUARD_ALLOWLIST: readonly string[] = [
   // 工具输出、诊断兜底、agent-facing `{action}`（PM 分类 #7）、账本 `[协调]` 前缀；
   // 用户可见文本已 key 化——classification §4。
   "app/desktop/session.ts",
+  // B7 收尾（2026-11-13，session.ts 重构 B1–B7）：以下 `app/desktop/session/**` 31 个文件为从
+  // `app/desktop/session.ts` 逐字搬移/拆分出的模块（B1–B6 25 个，B7 新增 6 个：index.ts 与
+  // lifecycle/{host,open-context,open,ops,send}.ts）。中文只出现在两类非客户 UI 文本：
+  // ① import/export specifier 中既有中文目录名 `编排`/`门禁引擎` 的机器路径（本批 94 个命中）；
+  // ② 与 B0 allowlisted `session.ts` 逐字同源的 agent-facing 工具回执、`[系统·…]` 协议行、
+  //    role_status/session_tail/诊断文本（classification §4）。用户可见文案零新增；唯一预存例外
+  //    在 tasks.ts 条目显式披露。逐文件机器路径锚点见各行注释。
+  // 路径 `编排` import specifier（:15–:17）——机器路径，非用户可见 UI；classification §4。
+  "app/desktop/session/card-gateway.ts",
+  // 路径 `编排`/`门禁引擎`（:23–:33）；另含验收不可用原因/缺失项标签（:85、:216–:264，
+  // agent-facing judge 上下文与工具回执，B0 session.ts 逐字同源）——classification §4。
+  "app/desktop/session/cards/acceptance-facts.ts",
+  // 路径 `编排`（:30–:49）；另含申请系统行/机械拒绝 action/建卡校验等 agent-facing 回执
+  // （B0 session.ts 逐字同源；用户可见文案已 key 化）——classification §4。
+  "app/desktop/session/cards/cards.ts",
+  // 路径 `编排`（:20–:37；:35 为多行 import 续行）；另含 `[系统·版本决策]`/`[系统·申请]`/
+  // `[系统·审批]` 协议行与决策回执（B0 同源）；卡标题经 `mainT("ui.versionDecision.title")`
+  // 已 key 化——classification §4。
+  "app/desktop/session/cards/version-decisions.ts",
+  // 路径 `编排` import specifier（:31）——机器路径；classification §4。
+  "app/desktop/session/contracts/deps.ts",
+  // 路径 `编排`（:10–:11）——机器路径；classification §4。
+  "app/desktop/session/contracts/ports.ts",
+  // 路径 `编排`（:9）——机器路径；classification §4。
+  "app/desktop/session/contracts/session-types.ts",
+  // 路径 `编排`（:7–:8）——机器路径；classification §4。
+  "app/desktop/session/contracts/tasks.ts",
+  // 路径 `编排`（:29–:33）；另含 `(投递机)` 机器标识与投递失败 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/delivery/queue.ts",
+  // 路径 `编排`（:22）——机器路径；classification §4。
+  "app/desktop/session/delivery/store.ts",
+  // 路径 `编排`（:28、:33）；另含 role_status/session_tail/看护诊断工具输出（agent-facing，
+  // 与 B0 `session.ts` 条目已覆盖同类）——classification §4。
+  "app/desktop/session/diagnostics.ts",
+  // 路径 `编排`（:26–:31）；另含派发/续接/重派 agent 工具回执与账本系统行（B0 同源）——classification §4。
+  "app/desktop/session/dispatch.ts",
+  // 路径 `编排`（:17–:24）；另含只读速查/证据核对工具输出（agent-facing，B0 同源）——classification §4。
+  "app/desktop/session/evidence.ts",
+  // 路径 `编排`（:19–:34）；另含回交/团队计划/任命卡校验 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/fixed-workflow/cards.ts",
+  // 路径 `编排`（:8–:12）；另含诊断记录提示（B0 同源）——classification §4。
+  "app/desktop/session/fixed-workflow/panel.ts",
+  // 路径 `编排`（:19、:28）；另含发布/合并卡 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/fixed-workflow/release-merge.ts",
+  // 路径 `编排`（:23–:37，含多行 import 续行）；另含生产派发/阶段路由 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/fixed-workflow/route.ts",
+  // 无中文 import 路径；仅 Git 工具不可用/run-stop 栅栏的 agent-facing 回执 message（:60、:66、:69；
+  // :69 逐字同源 B0 session.ts:3871，仅 receiver 由 `this.` 改为 `ctx.`）——classification §4。
+  "app/desktop/session/git-ports.ts",
+  // 路径 `编排`（:24–:26）；另含回交/收口 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/handback.ts",
+  // B7 新增 facade barrel：路径 `编排`（:18–:36，含多行 import 续行）；无其他中文——classification §4。
+  "app/desktop/session/index.ts",
+  // B7 新增：路径 `编排`（:9、:10、:86；:32 为多行 import 续行）；无其他中文——classification §4。
+  "app/desktop/session/lifecycle/host.ts",
+  // B7 新增：路径 `编排` import specifier（:50）——机器路径；classification §4。
+  "app/desktop/session/lifecycle/open-context.ts",
+  // B7 新增：路径 `编排`（:32、:75；:54 为多行 import 续行）；另含会话开启/投递 agent 回执
+  // （B0 session.ts 同源）——classification §4。
+  "app/desktop/session/lifecycle/open.ts",
+  // B7 新增：路径 `编排`（:15）；另含库存/会话处置 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/lifecycle/ops.ts",
+  // B7 新增：路径 `编排`（:12）；另含投递/回交 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/lifecycle/send.ts",
+  // 路径 `编排`（:19）——机器路径；classification §4。
+  "app/desktop/session/persistence.ts",
+  // 无中文 import 路径；仅 run-change 选择/停止计划的 agent-facing 工具回执（B0 session.ts 逐字同源）
+  // ——classification §4。
+  "app/desktop/session/run-change.ts",
+  // 路径 `编排`（:24）；另含 `[系统·安装]` 协议前缀与安装/卸载 agent 回执（B0 同源）——classification §4。
+  "app/desktop/session/session-env.ts",
+  // 路径 `编排`（:12–:13）；另含任务事件摘要 `应用观察到失败`（账本/诊断，B0 同源）——classification §4。
+  "app/desktop/session/shared/tasks-store.ts",
+  // 路径 `编排`（:9）——机器路径；classification §4。
+  "app/desktop/session/shared/text.ts",
+  // 路径 `编排`（:23–:29）；另含任务账本/重派/终止/升级 agent 回执（B0 同源）。**披露**：该文件
+  // 同时覆盖 `:832-838` 预存应用自有「任务升级」客户 decision 卡中文（title/question/options.label，
+  // 经 `session:operator-request` 原样呈客户；原 `app/desktop/session.ts` 文件级条目已整体掩盖，
+  // **非 B7 新增**），本次按拆分前覆盖口径继续覆盖，待 i18n key 化——显式登记，非 classification §4
+  // 的常规豁免。
+  "app/desktop/session/tasks.ts",
   // D1 版本变更/冻结/stable-write/重构桌面接线。中文只出现在两类机器文本，均非客户 UI 文案：
   // ① import specifier 中既有中文目录名的机器路径——`编排`（`../../src/common/编排/`，
   //    锚点 :25:51/:26:54）与 `门禁引擎`（`../../src/common/门禁引擎/`，:31:26/:32:67）；

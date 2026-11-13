@@ -1,0 +1,21 @@
+started 2026-11-13 19:07:59
+gates exit=0 dur=2s
+claude-adapter exit=0 dur=5s
+codex-adapter exit=0 dur=10s
+pi-adapter exit=1 dur=51s
+roles exit=1 dur=7s
+runtime-core exit=1 dur=50s
+装配 exit=1 dur=6s
+项目管理 exit=1 dur=9s
+桌面UI exit=0 dur=6s
+桌面应用 exit=1 dur=441s
+门禁引擎 LF normalization applied (chief-workflow.md, chief-workflow-v2.md)
+门禁引擎 exit=1 dur=92s
+门禁引擎 resources restored (CRLF via git checkout)
+测试 segment file count: 118 (excluding customer-authorization-plane-integration.test.ts)
+测试 exit=1 dur=613s
+测试-hangsplit exit=0 dur=1s
+编排 segment file count: 137 (excluding git-trunk-store.test.ts)
+编排 exit=1 dur=139s
+编排-git-trunk-store exit=0 dur=57s
+ALLDONE 2026-11-13 19:32:49

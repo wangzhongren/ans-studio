@@ -1,0 +1,6 @@
+started 2026-11-13 19:33:14
+fixed-path-full-chain exit=0 dur=4s
+queue-recovery-e2e exit=0 dur=1s
+network-state-e2e exit=0 dur=2s
+turn-watch-verify exit=1 dur=12s
+ALLDONE 2026-11-13 19:33:33
