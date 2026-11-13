@@ -5,6 +5,7 @@
 ## Section 1: 可修改文件与目录
 
 <!-- Delta-B2930-1（2026-11-11，客户 B29/B30 授权）：B29 fixed `complete_team_plan` 回执形状——本表补登 2 条精确测试文件（test/桌面应用/b3-fixed-baseline-pathb.test.ts、test/测试/fixed-path-full-chain.test.ts），逐文件授权，无目录级授权。 -->
+<!-- Delta-B0-1（2026-11-13，B0 派发/客户协调者授权）：B0 会话结构保护骨架——本表补登 1 条精确测试文件（test/桌面应用/session-structure.test.ts），逐文件授权，无目录级授权。 -->
 
 | 类型 | 可操作路径 | 用途 |
 | --- | --- | --- |
@@ -86,6 +87,7 @@
 | 单文件 | `test/桌面应用/version-change.test.ts` | 主进程侧测试——VCA/冻结/迁移/bootstrap/重构/客户主权/IPC/面板/重启 |
 | 单文件 | `test/桌面应用/b3-fixed-baseline-pathb.test.ts` | A9 基线/A12 归档/路径 B 桌面接线测试（B29 触及） |
 | 单文件 | `test/测试/fixed-path-full-chain.test.ts` | fixed 两条路径确定性全链集成测试（B29 触及） |
+| 单文件 | `test/桌面应用/session-structure.test.ts` | B0 会话结构保护骨架——导出面/导入图/体量预算/openRoleSession 工具面快照（session.ts 重构批次保护层） |
 | 单文件 | `角色卡/桌面窗口/feature-map.md` | 功能导航 |
 | 单文件 | `角色卡/桌面窗口/memo.md` | 本角色工作备忘录 |
 | 单文件 | `角色卡/桌面窗口/changelog.md` | 本角色治理变更记录 |
