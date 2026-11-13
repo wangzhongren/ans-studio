@@ -110,6 +110,20 @@ export const SOURCE_SHA = '752953cf229ef9771fb574d0972b80e73ec7c27a';
 //   test/测试/g4-skill-verify/fixture.ts、test/测试/g4-skill-verify/e-handler.test.ts、
 //   test/测试/g4-skill-verify/f-fingerprint.test.ts、
 //   test/测试/g4v2-mcp-verify/f-fixture.ts、test/测试/g4v2-mcp-verify/f-handler.test.ts
+// · 发布阻断修复（第八批，桌面回交产品回归恢复 + /proj 夹具族收尾）：生产 1 条 + 测试 2 条——第七批在
+//   `handback-delivery.test.ts` / `queue-visibility.test.ts` 发现的**两处产品回归**由桌面窗口角色修复
+//   （`e71501c` 引入）：① 单模型回交合批条件被改为仅 chief——恢复「回交主人队首连续回交合批」
+//   （`app/desktop/session.ts` 合批条件恢复 `handbackOwner` 分支）；② `handleHandback` 在形状防御前读取
+//   `hb.taskId`——恢复形状校验先行（坏形状回交事件仍如实系统行、零未捕获拒绝）。两测试文件完成
+//   `/proj`→mkdtemp 真实项目根迁移（listing/open/watchdog/持久化作用域同一根、`open.ok===true` 断言、
+//   全部回执/开跑等待 10s 上限、after/失败路径统一清理：放夹具门 → 有界 stop → 逐句柄 dispose →
+//   临时根 fs.rm 重试），断言未放宽、用例未删、未加 skip，随本批入列。**两项已登记的非回归待批不随本批
+//   转绿、逐名保留 red、未改期望**：trio 裸回交夹具缺 v2.0.0 来源门所需真实任务账本
+//   （`delivery-child-source-invalid` fail-closed，夹具下一批补 `task.created`/`task.reported`）；星形回交
+//   正文新增 `[收口依据…]` 后缀（期望更新留待下一批）。详见
+//   角色卡/测试/docs/change/2026-11-12_release-blocker-handback-fixture-migration.md。单文件不开目录。
+// · 生产 1 条：app/desktop/session.ts（合批恢复 + 形状防线；桌面窗口角色实现，测试角色只列名）
+// · 测试 2 条：test/桌面应用/handback-delivery.test.ts、test/桌面应用/queue-visibility.test.ts
 // 以下各段均为「历史」注释，仅作存档，不代表这些条目仍在活动白名单。
 // 历史（v1.9.2 overlay）：冻结源 tag v1.9.2 已含全部产品/测试代码（输入区按钮精简——移除发送按钮、停止改为
 // 纯图标；幕僚回复去折叠——settled 与会话回放原文直显）；白名单为基础集、无产品/测试 overlay 条目。
@@ -208,7 +222,10 @@ const files = new Set(['package.json', 'package-lock.json', '.github/workflows/r
   'test/测试/g4-skill-verify/e-handler.test.ts',
   'test/测试/g4-skill-verify/f-fingerprint.test.ts',
   'test/测试/g4v2-mcp-verify/f-fixture.ts',
-  'test/测试/g4v2-mcp-verify/f-handler.test.ts']);
+  'test/测试/g4v2-mcp-verify/f-handler.test.ts',
+  'app/desktop/session.ts',
+  'test/桌面应用/handback-delivery.test.ts',
+  'test/桌面应用/queue-visibility.test.ts']);
 const directories = ['src/common/装配/', 'test/装配/'];
 export function selectOverlay(paths) {
   const selected = [], excluded = [];

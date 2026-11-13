@@ -1,0 +1,27 @@
+PROBE-B8 before settle: ["A:handback:safe","A:handback:safe","su:message:ITER-DONE su","A:message:ITER-DONE A"]
+✖ C frozen batch retries keep members and delivery ID while later reports stay separate (8146.1924ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8567.6071
+
+✖ failing tests:
+
+test at test\桌面应用\handback-delivery.test.ts:541:1
+✖ C frozen batch retries keep members and delivery ID while later reports stay separate (8146.1924ms)
+  AssertionError [ERR_ASSERTION]: 等待实际事件超时
+      at waitUntil (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:59:10)
+      at async TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/release-v2.0.0-blockers-8/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/handback-delivery.test.ts:554:63)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

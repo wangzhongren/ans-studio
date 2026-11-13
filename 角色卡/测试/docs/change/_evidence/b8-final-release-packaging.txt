@@ -1,0 +1,30 @@
+✔ release overlay preserves Chinese build paths and excludes private data and documentation (0.9214ms)
+✔ release overlay selects the v2.0.0 packaging surface (0.1002ms)
+✔ release refuses unreviewed production changes and similarly named private directories (0.2706ms)
+✔ release overlay keeps the packaging surface exact: unreviewed test files stay excluded (0.0736ms)
+✔ release overlay selects the v2.0.0 optional-acceptance blocker test by exact path only (0.0877ms)
+✔ release overlay selects the v2.0.0 macOS root canonicalization blocker files by exact path only (0.099ms)
+✔ release overlay selects the v2.0.0 orchestration root-canonicalization blocker files by exact path only (0.0788ms)
+✔ release overlay selects the v2.0.0 directive-decision and CI-hang blocker files by exact path only (0.0805ms)
+✔ release overlay selects the v2.0.0 trunk-store 8.3 root blocker file by exact path only (0.1062ms)
+✔ release overlay selects the v2.0.0 G-4 and chain-enforcement blocker tests by exact path only (0.1592ms)
+✔ release overlay selects the v2.0.0 replay-safe-retry blocker test by exact path only (0.0846ms)
+✔ release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only (0.0695ms)
+✔ release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files by exact path only (0.1819ms)
+✔ release overlay selects the v2.0.0 handback-guard and fixture-migration files by exact path only (0.2353ms)
+✔ release overlay returns v1.3.0 one-off entries to fail-closed or excluded (0.1359ms)
+✔ release overlay returns v1.4.0 overlay-2 entries to fail-closed or excluded (0.0707ms)
+✔ release overlay returns v1.5.0 fix entries to fail-closed or excluded (0.1497ms)
+✔ release overlay returns v1.7.0 blocking-fix entries to fail-closed or excluded (0.1484ms)
+✔ release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded (0.0843ms)
+✔ release overlay returns v1.8.2 test-cleanup entries to fail-closed or excluded (0.0571ms)
+✔ release collection accepts three bound native results and rejects tampering or cross-platform drift (345.2766ms)
+✔ release overlay returns the v1.9.1 blocker-fix allowlist entry to excluded (0.1425ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 424.6743

@@ -196,8 +196,10 @@ test('release overlay selects the v2.0.0 replay-safe-retry blocker test by exact
 
 // v2.0.0 发布阻断修复（第七批，/proj 夹具族批量修复）：测试 8 条按**精确路径**入列；单文件不开目录
 // （同目录相似名/其它测试仍 excluded，未列名 test/ 不随构建树）。断言不放宽。
-// 明确不入列：`handback-delivery.test.ts` 与 `queue-visibility.test.ts` 暴露产品回归（单模型回交合批被
-// 移除、坏形状回交事件 TypeError 防线失效），按「发现产品回归即停下」未改、未入列。
+// 第七批当时明确不入列：`handback-delivery.test.ts` 与 `queue-visibility.test.ts` 暴露产品回归（单模型
+// 回交合批被移除、坏形状回交事件 TypeError 防线失效），按「发现产品回归即停下」未改、未入列。两项已在
+// 第八批随产品修复完成 /proj 迁移并入列（单文件边界由下方第八批用例另行断言），本用例的 excluded 样本
+// 替换为仍 excluded 的同目录文件，断言未放宽。
 test('release overlay selects the v2.0.0 /proj fixture-family blocker tests by exact path only', () => {
   const selected = [
     'test/桌面应用/request-timeout-wiring.test.ts',
@@ -212,8 +214,8 @@ test('release overlay selects the v2.0.0 /proj fixture-family blocker tests by e
   const extras = [
     'test/桌面应用/request-timeout-wiring-extra.test.ts',
     'test/桌面应用/turn-lease-extra.test.ts',
-    'test/桌面应用/handback-delivery.test.ts',
-    'test/桌面应用/queue-visibility.test.ts',
+    'test/桌面应用/session-rebuild-race.test.ts',
+    'test/桌面应用/watchdog-reuse.test.ts',
     'test/桌面应用/decision-service.test.ts',
   ];
   const result = selectOverlay([...selected, ...extras]);
@@ -250,6 +252,35 @@ test('release overlay selects the v2.0.0 B7-3 cleanup-gap test and fixture files
   // 第七批 B7-1/2 既有条目仍在（不重复、不回归）；第六批条目亦在。
   assert.deepEqual(selectOverlay(['test/桌面应用/request-timeout-wiring.test.ts']).selected, ['test/桌面应用/request-timeout-wiring.test.ts']);
   assert.deepEqual(selectOverlay(['test/桌面应用/replay-safe-retry.test.ts']).selected, ['test/桌面应用/replay-safe-retry.test.ts']);
+});
+
+// v2.0.0 发布阻断修复（第八批，桌面回交产品回归恢复 + /proj 夹具族收尾）：生产 1 条 + 测试 2 条按
+// **精确路径**入列；单文件不开目录（同目录相似名/其它测试仍 excluded，未列名 app//src/ 仍 fail-closed）。
+// app/desktop/session.ts：`e71501c` 引入的两处产品回归由桌面窗口角色修复（单模型回交合批恢复 +
+// handleHandback 形状防线先行）；handback-delivery / queue-visibility 完成 /proj→mkdtemp 真实根迁移后
+// 入列。两项已登记的非回归待批仍逐名保留 red（trio 裸回交夹具缺真实任务账本、星形回交正文新增
+// [收口依据…] 后缀），见角色卡/测试/docs/change/2026-11-12_release-blocker-handback-fixture-migration.md。
+// 断言不放宽。
+test('release overlay selects the v2.0.0 handback-guard and fixture-migration files by exact path only', () => {
+  const selected = [
+    'app/desktop/session.ts',
+    'test/桌面应用/handback-delivery.test.ts',
+    'test/桌面应用/queue-visibility.test.ts',
+  ];
+  const extras = [
+    'test/桌面应用/handback-delivery-extra.test.ts',
+    'test/桌面应用/queue-visibility-extra.test.ts',
+    'test/桌面应用/decision-service.test.ts',
+  ];
+  const result = selectOverlay([...selected, ...extras]);
+  assert.deepEqual(result.selected, selected);
+  assert.deepEqual(result.excluded, extras);
+  // app/ 单文件不开目录：相似名/同目录未列名文件仍 fail-closed。
+  assert.throws(() => selectOverlay(['app/desktop/session-extra.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['app/desktop/interface.ts']), /Unreviewed production overlay/);
+  // 第七批 B7-1/2 与 B7-3 既有条目仍在（不重复、不回归）。
+  assert.deepEqual(selectOverlay(['test/桌面应用/request-timeout-wiring.test.ts']).selected, ['test/桌面应用/request-timeout-wiring.test.ts']);
+  assert.deepEqual(selectOverlay(['test/桌面应用/download-decision.test.ts']).selected, ['test/桌面应用/download-decision.test.ts']);
 });
 
 // v1.5.0 白名单重置后，v1.3.0 的一次性条目回到基础规则：生产修复落 src/ 即 fail-closed，
@@ -340,8 +371,10 @@ test('release overlay returns v1.7.0 blocking-fix entries to fail-closed or excl
 // v1.8.0 发布阻断修复（tag v1.8.0 不可移动，当时经评审走显式 overlay）已随 v1.9.0 冻结源吸收、
 // 整批移出白名单：生产修复回到 app//src/ fail-closed，4 个测试修复与同目录未列名 test/ 文件落 excluded；
 // 断言不放宽。
+// 例外：app/desktop/session.ts 于 v2.0.0 第八批（桌面回交产品回归恢复）以精确路径**重新入列**，其单文件
+// 边界由下方第八批用例另行断言；本用例改用仍 fail-closed 的同目录文件作样本。
 test('release overlay returns v1.8.0 blocking-fix entries to fail-closed or excluded', () => {
-  assert.throws(() => selectOverlay(['app/desktop/session.ts']), /Unreviewed production overlay/);
+  assert.throws(() => selectOverlay(['app/desktop/project.ts']), /Unreviewed production overlay/);
   const result = selectOverlay(['test/桌面应用/role-log.test.ts',
     'test/测试/lightweight-permission-repairs.test.ts',
     'test/测试/t1-pipeline-integration.test.ts',
