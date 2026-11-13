@@ -1,0 +1,271 @@
+{
+  "generatedAt": "2026-11-13T05:33:53.696243+00:00",
+  "repo": "C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b2",
+  "headCommit": "7519e6f87bfe3af18bcb1c21da2c96448750044d",
+  "source": "git show HEAD:app/desktop/session.ts（7519e6f = origin/main，含 B0/B1）",
+  "methodCount": 15,
+  "normalization": "源方法文本（签名+体，含 JSDoc 之外的成员文本）仅应用 adaptationsApplied 中的机械适配；不做空白折叠/删行，要求逐字节相等（body 另以花括号配对切片再比对 sha256）",
+  "allMethodsIdenticalUnderDocumentedAdaptations": true,
+  "allMethodBodiesIdentical": true,
+  "sessionTsLinesBefore": 12388,
+  "sessionTsLinesAfter": 11756,
+  "modules": {
+    "evidence": "app/desktop/session/evidence.ts",
+    "persistence": "app/desktop/session/persistence.ts"
+  },
+  "results": [
+    {
+      "method": "findFixedReviewArtifact",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "9703-9719",
+      "targetLines": "56-72",
+      "sourceLines": 17,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "6717926ad01cda6ce88b0483d0104394dc25c20e16bf5fc74b330564e6c82e03",
+      "targetSha256": "6717926ad01cda6ce88b0483d0104394dc25c20e16bf5fc74b330564e6c82e03",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "067638cf1ebfc1af779ac99dc93dcaa6b3adfafc6301892db9bae5c418dad963",
+      "bodySha256Target": "067638cf1ebfc1af779ac99dc93dcaa6b3adfafc6301892db9bae5c418dad963",
+      "bodyIdentical": true
+    },
+    {
+      "method": "buildFixedCloseEvidence",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "9729-9835",
+      "targetLines": "82-188",
+      "sourceLines": 107,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "9dcbdb728b994926d13a445809b5a2ff11de7e0e5fcd81d309b996c820b756b1",
+      "targetSha256": "9dcbdb728b994926d13a445809b5a2ff11de7e0e5fcd81d309b996c820b756b1",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "ea380233fcafeda84d22e6326faee4610f56f2c8bcb942ee4b1e38fc94293ea6",
+      "bodySha256Target": "ea380233fcafeda84d22e6326faee4610f56f2c8bcb942ee4b1e38fc94293ea6",
+      "bodyIdentical": true
+    },
+    {
+      "method": "collectFixedProposalDocumentRefs",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "9841-9880",
+      "targetLines": "194-233",
+      "sourceLines": 40,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "da5c1b198da413f5defdc5f2b4f046958a04828e0c4d3bfdbff48eded8d8063c",
+      "targetSha256": "da5c1b198da413f5defdc5f2b4f046958a04828e0c4d3bfdbff48eded8d8063c",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "9d98dbbbb8b62e0ec101b4dfc37723549742bba7f92de8f2def1007fe19983ed",
+      "bodySha256Target": "9d98dbbbb8b62e0ec101b4dfc37723549742bba7f92de8f2def1007fe19983ed",
+      "bodyIdentical": true
+    },
+    {
+      "method": "fixedReleaseAutoEvidence",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "10396-10441",
+      "targetLines": "240-285",
+      "sourceLines": 46,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "2b6b9bba19dfd16428715bda001e761fee76e34a0a8aae5d2107a7e02bd4f652",
+      "targetSha256": "2b6b9bba19dfd16428715bda001e761fee76e34a0a8aae5d2107a7e02bd4f652",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "65f4653be771a9d50660a462095185fdc10886b1fd60ff85f1abb75dec19436d",
+      "bodySha256Target": "65f4653be771a9d50660a462095185fdc10886b1fd60ff85f1abb75dec19436d",
+      "bodyIdentical": true
+    },
+    {
+      "method": "evidenceCheckText",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "11088-11185",
+      "targetLines": "291-388",
+      "sourceLines": 98,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "ceffcadac6c2a29aeb00651e0a83af55cbc28a664a488a0e65a8cc08ed41adb4",
+      "targetSha256": "ceffcadac6c2a29aeb00651e0a83af55cbc28a664a488a0e65a8cc08ed41adb4",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "ceffcadac6c2a29aeb00651e0a83af55cbc28a664a488a0e65a8cc08ed41adb4",
+      "bodySha256Target": "ceffcadac6c2a29aeb00651e0a83af55cbc28a664a488a0e65a8cc08ed41adb4",
+      "bodyIdentical": true
+    },
+    {
+      "method": "evidenceScopeRoots",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "11193-11274",
+      "targetLines": "396-477",
+      "sourceLines": 82,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "c32f5bf0e26401ee49b5ac2f23777c7389f5a37f2d93c37945c0fa76d3588c06",
+      "targetSha256": "c32f5bf0e26401ee49b5ac2f23777c7389f5a37f2d93c37945c0fa76d3588c06",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "c32f5bf0e26401ee49b5ac2f23777c7389f5a37f2d93c37945c0fa76d3588c06",
+      "bodySha256Target": "c32f5bf0e26401ee49b5ac2f23777c7389f5a37f2d93c37945c0fa76d3588c06",
+      "bodyIdentical": true
+    },
+    {
+      "method": "contractCheckText",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "11284-11399",
+      "targetLines": "487-602",
+      "sourceLines": 116,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "f9b381a2c90c269f19482f2b8e8605eb6f1c4f615e1f01d7030cbca6ff873568",
+      "targetSha256": "f9b381a2c90c269f19482f2b8e8605eb6f1c4f615e1f01d7030cbca6ff873568",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "f9b381a2c90c269f19482f2b8e8605eb6f1c4f615e1f01d7030cbca6ff873568",
+      "bodySha256Target": "f9b381a2c90c269f19482f2b8e8605eb6f1c4f615e1f01d7030cbca6ff873568",
+      "bodyIdentical": true
+    },
+    {
+      "method": "contractCheckTextFixed",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "11408-11492",
+      "targetLines": "611-695",
+      "sourceLines": 85,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "5b056ff5493763090e4b28fea5cab44876e52d237cf153fd45f6ddf8dd682942",
+      "targetSha256": "5b056ff5493763090e4b28fea5cab44876e52d237cf153fd45f6ddf8dd682942",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "5b056ff5493763090e4b28fea5cab44876e52d237cf153fd45f6ddf8dd682942",
+      "bodySha256Target": "5b056ff5493763090e4b28fea5cab44876e52d237cf153fd45f6ddf8dd682942",
+      "bodyIdentical": true
+    },
+    {
+      "method": "docFormatText",
+      "module": "app/desktop/session/evidence.ts",
+      "class": "Evidence",
+      "headSourceLines": "11503-11506",
+      "targetLines": "706-709",
+      "sourceLines": 4,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "28efa958f7b48bad65ee9a409e3669e2bff9457c05a74ac1ed9fea02410f73e7",
+      "targetSha256": "28efa958f7b48bad65ee9a409e3669e2bff9457c05a74ac1ed9fea02410f73e7",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "28efa958f7b48bad65ee9a409e3669e2bff9457c05a74ac1ed9fea02410f73e7",
+      "bodySha256Target": "28efa958f7b48bad65ee9a409e3669e2bff9457c05a74ac1ed9fea02410f73e7",
+      "bodyIdentical": true
+    },
+    {
+      "method": "persistenceScope",
+      "module": "app/desktop/session/persistence.ts",
+      "class": "Persistence",
+      "headSourceLines": "7572-7572",
+      "targetLines": "68-68",
+      "sourceLines": 1,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "f5fa2eea1dda0cd285d555af90b00998dad055a4c156a8a76f2bc85a6147216f",
+      "targetSha256": "f5fa2eea1dda0cd285d555af90b00998dad055a4c156a8a76f2bc85a6147216f",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "f5fa2eea1dda0cd285d555af90b00998dad055a4c156a8a76f2bc85a6147216f",
+      "bodySha256Target": "f5fa2eea1dda0cd285d555af90b00998dad055a4c156a8a76f2bc85a6147216f",
+      "bodyIdentical": true
+    },
+    {
+      "method": "persistenceKey",
+      "module": "app/desktop/session/persistence.ts",
+      "class": "Persistence",
+      "headSourceLines": "7573-7573",
+      "targetLines": "70-70",
+      "sourceLines": 1,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "49af62d3dff02113c5703a5eadd91fab57269b26f898552214a46bc9d116741a",
+      "targetSha256": "49af62d3dff02113c5703a5eadd91fab57269b26f898552214a46bc9d116741a",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "49af62d3dff02113c5703a5eadd91fab57269b26f898552214a46bc9d116741a",
+      "bodySha256Target": "49af62d3dff02113c5703a5eadd91fab57269b26f898552214a46bc9d116741a",
+      "bodyIdentical": true
+    },
+    {
+      "method": "mergeReportState",
+      "module": "app/desktop/session/persistence.ts",
+      "class": "Persistence",
+      "headSourceLines": "7578-7602",
+      "targetLines": "72-96",
+      "sourceLines": 25,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "fab2415c16561711d96f3d2d4bac2d465e18115c529572e2e037a1dcc430e3dc",
+      "targetSha256": "fab2415c16561711d96f3d2d4bac2d465e18115c529572e2e037a1dcc430e3dc",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "fab2415c16561711d96f3d2d4bac2d465e18115c529572e2e037a1dcc430e3dc",
+      "bodySha256Target": "fab2415c16561711d96f3d2d4bac2d465e18115c529572e2e037a1dcc430e3dc",
+      "bodyIdentical": true
+    },
+    {
+      "method": "rememberReceipt",
+      "module": "app/desktop/session/persistence.ts",
+      "class": "Persistence",
+      "headSourceLines": "7603-7606",
+      "targetLines": "98-101",
+      "sourceLines": 4,
+      "adaptationsApplied": [
+        "receiver: private -> public（模块内方法，供门面委托调用）"
+      ],
+      "normalizedSha256Head": "31be7eb2d83fe05dac2abe97c0371f6d6f498134f6a456c7f9628f2a3f951c9f",
+      "targetSha256": "31be7eb2d83fe05dac2abe97c0371f6d6f498134f6a456c7f9628f2a3f951c9f",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "31be7eb2d83fe05dac2abe97c0371f6d6f498134f6a456c7f9628f2a3f951c9f",
+      "bodySha256Target": "31be7eb2d83fe05dac2abe97c0371f6d6f498134f6a456c7f9628f2a3f951c9f",
+      "bodyIdentical": true
+    },
+    {
+      "method": "registerPersistenceHistory",
+      "module": "app/desktop/session/persistence.ts",
+      "class": "Persistence",
+      "headSourceLines": "7607-7614",
+      "targetLines": "103-110",
+      "sourceLines": 8,
+      "adaptationsApplied": [
+        "inline import path: import('./runtime-history.ts') -> import('../runtime-history.ts')（模块目录深度变化）"
+      ],
+      "normalizedSha256Head": "f48bd84d4bfccbde63c883884558eeab36dd48c5fca9194dcbeb8dbc56de2f02",
+      "targetSha256": "f48bd84d4bfccbde63c883884558eeab36dd48c5fca9194dcbeb8dbc56de2f02",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "f48bd84d4bfccbde63c883884558eeab36dd48c5fca9194dcbeb8dbc56de2f02",
+      "bodySha256Target": "f48bd84d4bfccbde63c883884558eeab36dd48c5fca9194dcbeb8dbc56de2f02",
+      "bodyIdentical": true
+    },
+    {
+      "method": "persistenceOperation",
+      "module": "app/desktop/session/persistence.ts",
+      "class": "Persistence",
+      "headSourceLines": "7615-7652",
+      "targetLines": "112-149",
+      "sourceLines": 38,
+      "adaptationsApplied": [],
+      "normalizedSha256Head": "21d1306bc352e15740280527f67b3b205f45ced0b0044152fee443ccd51be8ae",
+      "targetSha256": "21d1306bc352e15740280527f67b3b205f45ced0b0044152fee443ccd51be8ae",
+      "identicalUnderAdaptations": true,
+      "bodySha256Head": "21d1306bc352e15740280527f67b3b205f45ced0b0044152fee443ccd51be8ae",
+      "bodySha256Target": "21d1306bc352e15740280527f67b3b205f45ced0b0044152fee443ccd51be8ae",
+      "bodyIdentical": true
+    }
+  ]
+}

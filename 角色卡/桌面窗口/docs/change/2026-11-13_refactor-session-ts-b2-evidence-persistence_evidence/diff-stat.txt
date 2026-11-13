@@ -1,0 +1,12 @@
+ app/desktop/session.ts                  | 758 +++-----------------------------
+ test/桌面应用/session-structure.test.ts |  13 +-
+ 2 files changed, 70 insertions(+), 701 deletions(-)
+
+untracked (new) files:
+?? app/desktop/session/evidence.ts
+?? app/desktop/session/persistence.ts
+
+new module line counts:
+  710 app/desktop/session/evidence.ts
+  150 app/desktop/session/persistence.ts
+  860 total

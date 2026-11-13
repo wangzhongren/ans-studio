@@ -1,0 +1,12 @@
+✔ 重试耗尽终态：恰一条人话系统行（含“自动重试”、无技术 code）；lastTurn/诊断带 attempt/replayPlan (187.4402ms)
+✔ 重试后成功：不产生失败系统行；lastTurn completed；诊断 attempt=2/replayPlan=safe (106.7623ms)
+✔ 不安全失败（replaySafe=false）：沿用既有请求失败人话；诊断 replayPlan=unsafe 如实可见 (141.7013ms)
+✔ i18n：retryExhausted 中英成对、非空、英文零 Han、无技术细节 (0.4108ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 869.9254
