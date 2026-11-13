@@ -1,0 +1,14 @@
+== star-routing ==
+NO_DIFF (baseline 8 vs final 8)
+== handback-delivery ==
+NO_DIFF (baseline 3 vs final 3)
+== chief-workflow ==
+NO_DIFF (baseline 9 vs final 9)
+== directive-input ==
+NO_DIFF (baseline 6 vs final 6)
+== h-scope-audit ==
+NO_DIFF (baseline 4 vs final 4)
+
+== session.test.ts AC-8 (known-red) ==
+✖ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin）
+✖ failing tests:

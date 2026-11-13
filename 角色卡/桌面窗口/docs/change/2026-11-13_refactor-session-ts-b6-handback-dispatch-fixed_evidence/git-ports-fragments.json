@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-11-13T09:06:22.117Z",
+  "sourceOfTruth": "git show HEAD:app/desktop/session.ts (b5901ac)",
+  "fragmentCount": 6,
+  "allFragmentsIdenticalUnderDocumentedAdaptations": true,
+  "facadeCallSitesWired": {
+    "createTurnGitRuntime": true,
+    "gitContextFailure": true,
+    "buildFixedTaskGitSurface": true,
+    "beginSessionDisposeLease": true,
+    "noteSessionDisposeInterruption": true,
+    "endSessionDisposeLease": true
+  },
+  "allFacadeCallSitesWired": true,
+  "fragments": [
+    {
+      "name": "turn-git-runtime-closure",
+      "sourceRange": "session.ts:2070-2087",
+      "target": "session/git-ports.ts createTurnGitRuntime() returned async arrow",
+      "adaptations": [
+        "receiver: this.sessions -> ctx.sessions; .get(key) -> .get(ctx.key); gitBinding -> ctx.gitBinding; this.deliveryIsStopped(key) -> ctx.deliveryIsStopped(ctx.key); req.projectRoot/req.roleId -> ctx.projectRoot/ctx.roleId; this.runTaskIsFenced -> ctx.runTaskIsFenced (original closure free variables passed verbatim at the call site)",
+        "indentation/declaration wrapper only (const currentGitRuntime = / return)"
+      ],
+      "sourceSha256": "b7d44a7c42c116999a12ebb9e93af124ce27e005f299dc366bb66f63da3444f6",
+      "targetSha256": "d90b797736ef80845e9b91b4b1f509b1a4c516e62d8b3b44e2c58e0bdfddf75a",
+      "sourceNormalizedSha256": "a93a2050331414f212d41e5709e3e129faeebff28a0117cc4680bb68c7be840c",
+      "targetNormalizedSha256": "a93a2050331414f212d41e5709e3e129faeebff28a0117cc4680bb68c7be840c",
+      "identicalUnderDocumentedAdaptations": true
+    },
+    {
+      "name": "git-context-failure",
+      "sourceRange": "session.ts:2088-2089",
+      "target": "session/git-ports.ts gitContextFailure()",
+      "adaptations": [
+        "expression wrapper only (const arrow => declaration + return); object literal fields/values verbatim"
+      ],
+      "sourceSha256": "b8000e58e50816b1b488ba2675509e934b672579610d8f571f3edf9674677450",
+      "targetSha256": "08a65edbbd06b140e03d8048fd3142a63584f318a17d5ea7894237a5a46c53ee",
+      "sourceNormalizedSha256": "6e6bb268b20c20edff86ed3ce8243e583799794db1edd11bcca1ca8a48b39877",
+      "targetNormalizedSha256": "6e6bb268b20c20edff86ed3ce8243e583799794db1edd11bcca1ca8a48b39877",
+      "identicalUnderDocumentedAdaptations": true
+    },
+    {
+      "name": "fixed-task-git-surface",
+      "sourceRange": "session.ts:2709 (taskGit injection value)",
+      "target": "session/git-ports.ts buildFixedTaskGitSurface() return value",
+      "adaptations": [
+        "outer `taskGit:` key retained at the call site; req.projectRoot -> projectRoot (parameter, same value at call site); key order/values verbatim"
+      ],
+      "sourceSha256": "e841a7f4b4be140efcd4b9b17a99010c884a21789629ca1209484d532a923b06",
+      "targetSha256": "e1098b9f085e1a0311caef4509a2df995dc6533575e6a1e25a0550ae9b4b3180",
+      "sourceNormalizedSha256": "d59efa4658d619d3775c31f0ec88141ad2ec5cbc0956c7c285e44f1030305d32",
+      "targetNormalizedSha256": "d59efa4658d619d3775c31f0ec88141ad2ec5cbc0956c7c285e44f1030305d32",
+      "identicalUnderDocumentedAdaptations": true
+    },
+    {
+      "name": "session-dispose-begin",
+      "sourceRange": "session.ts:569",
+      "target": "session/git-ports.ts wrapper body",
+      "adaptations": [
+        "receiver wrapper: free variable root/handle/lease passed as parameters; argument values verbatim"
+      ],
+      "sourceSha256": "f4704c14b1692852413a4718d3d75aed7be5de92838699470133ca12d7283d3d",
+      "targetSha256": "7c3fa377a8a85254dcfdf0bc782d87a7f72f303b0f7bc7c3b82e65f45129b4d2",
+      "sourceNormalizedSha256": "7c3fa377a8a85254dcfdf0bc782d87a7f72f303b0f7bc7c3b82e65f45129b4d2",
+      "targetNormalizedSha256": "7c3fa377a8a85254dcfdf0bc782d87a7f72f303b0f7bc7c3b82e65f45129b4d2",
+      "identicalUnderDocumentedAdaptations": true
+    },
+    {
+      "name": "session-dispose-interruption",
+      "sourceRange": "session.ts:570",
+      "target": "session/git-ports.ts wrapper body",
+      "adaptations": [
+        "receiver wrapper: free variable root/handle/lease passed as parameters; argument values verbatim"
+      ],
+      "sourceSha256": "f8d620834f0887bc70c93af1c3b4f2c37596d62491297b4f66bf88d613d2e921",
+      "targetSha256": "1d636049de756fcb8879f6c29d2bf148c25791b4e1c8ef7e4cffc8c80986a894",
+      "sourceNormalizedSha256": "1d636049de756fcb8879f6c29d2bf148c25791b4e1c8ef7e4cffc8c80986a894",
+      "targetNormalizedSha256": "1d636049de756fcb8879f6c29d2bf148c25791b4e1c8ef7e4cffc8c80986a894",
+      "identicalUnderDocumentedAdaptations": true
+    },
+    {
+      "name": "session-dispose-end",
+      "sourceRange": "session.ts:577",
+      "target": "session/git-ports.ts wrapper body",
+      "adaptations": [
+        "receiver wrapper: free variable root/handle/lease passed as parameters; argument values verbatim"
+      ],
+      "sourceSha256": "7519dd131b81ada5ddd019d84aab239c07dd9bcd2539471aff1e1cd6f7efd82d",
+      "targetSha256": "cc6ded461588503f57e7a2eaf4606f58d14b7cca6170039666847d6b241ea357",
+      "sourceNormalizedSha256": "cc6ded461588503f57e7a2eaf4606f58d14b7cca6170039666847d6b241ea357",
+      "targetNormalizedSha256": "cc6ded461588503f57e7a2eaf4606f58d14b7cca6170039666847d6b241ea357",
+      "identicalUnderDocumentedAdaptations": true
+    }
+  ]
+}

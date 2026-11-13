@@ -1,0 +1,13 @@
+== before eol/status ==
+i/lf    w/crlf  attr/                 	src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+i/lf    w/crlf  attr/                 	src/common/门禁引擎/workflows/chief/chief-workflow.md
+== normalized eol ==
+i/lf    w/lf    attr/                 	src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+i/lf    w/lf    attr/                 	src/common/门禁引擎/workflows/chief/chief-workflow.md
+
+== restored ==
+restore-rc=0
+i/lf    w/crlf  attr/                 	src/common/门禁引擎/workflows/chief/chief-workflow-v2.md
+i/lf    w/crlf  attr/                 	src/common/门禁引擎/workflows/chief/chief-workflow.md
+status:
+diff:

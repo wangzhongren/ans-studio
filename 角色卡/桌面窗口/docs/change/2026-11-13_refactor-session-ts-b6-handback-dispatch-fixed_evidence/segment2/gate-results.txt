@@ -1,0 +1,31 @@
+# B6 第二段逐文件门槛（spec reporter 末次汇总块）
+
+handback-delivery | test/桌面应用/handback-delivery.test.ts | 18 | 16 | 2 | 0 | 0 | 8208.284 | diff(added=0,removed=0)
+chat-handback-integration | test/测试/chat-handback-integration.test.ts | 3 | 3 | 0 | 0 | 0 | 662.3416 | -
+star-routing | test/桌面应用/star-routing.test.ts | 10 | 3 | 7 | 0 | 0 | 2016.7511 | diff(added=0,removed=0)
+fixed-path-routing | test/桌面应用/fixed-path-routing.test.ts | 13 | 13 | 0 | 0 | 0 | 1489.5116 | -
+fixed-path-full-chain | test/测试/fixed-path-full-chain.test.ts | 3 | 3 | 0 | 0 | 0 | 4287.8876 | -
+dispatch-fresh-enum | test/桌面应用/dispatch-fresh-enum.test.ts | 2 | 2 | 0 | 0 | 0 | 991.2831 | -
+b101-fixed-dispatch-task-binding | test/桌面应用/b101-fixed-dispatch-task-binding.test.ts | 11 | 11 | 0 | 0 | 0 | 1237.8553 | -
+b111-fixed-closed-handback-drain | test/桌面应用/b111-fixed-closed-handback-drain.test.ts | 5 | 5 | 0 | 0 | 0 | 792.4272 | -
+b3-fixed-baseline-pathb | test/桌面应用/b3-fixed-baseline-pathb.test.ts | 10 | 10 | 0 | 0 | 0 | 4336.5585 | -
+b3-fixed-cards-panel | test/桌面应用/b3-fixed-cards-panel.test.ts | 8 | 8 | 0 | 0 | 0 | 905.7157 | -
+b3-release-merge-desktop | test/桌面应用/b3-release-merge-desktop.test.ts | 7 | 7 | 0 | 0 | 0 | 6233.6169 | -
+b3-workflow-git-real | test/桌面应用/b3-workflow-git-real.test.ts | 9 | 9 | 0 | 0 | 0 | 5861.2463 | -
+b31-fixed-release-auto-desktop | test/桌面应用/b31-fixed-release-auto-desktop.test.ts | 9 | 9 | 0 | 0 | 0 | 6778.9833 | -
+b42-task-git-port-desktop | test/桌面应用/b42-task-git-port-desktop.test.ts | 8 | 8 | 0 | 0 | 0 | 2663.3522 | -
+b51-fixed-workflow-wiring | test/桌面应用/b51-fixed-workflow-wiring.test.ts | 14 | 14 | 0 | 0 | 0 | 1846.7665 | -
+b61-chat-entry-fixed | test/桌面应用/b61-chat-entry-fixed.test.ts | 9 | 9 | 0 | 0 | 0 | 593.528 | -
+b71-fixed-fail-closed | test/桌面应用/b71-fixed-fail-closed.test.ts | 7 | 7 | 0 | 0 | 0 | 594.7956 | -
+b81-fixed-dispatch-forced-session | test/桌面应用/b81-fixed-dispatch-forced-session.test.ts | 6 | 6 | 0 | 0 | 0 | 1117.286 | -
+b82-fixed-workflow-binding-handback | test/桌面应用/b82-fixed-workflow-binding-handback.test.ts | 11 | 11 | 0 | 0 | 0 | 1115.8808 | -
+g1-copy-and-nails | test/测试/g1-verify/g1-copy-and-nails.test.ts | 5 | 5 | 0 | 0 | 0 | 159.3969 | -
+g1-dispatch-wiring | test/测试/g1-verify/g1-dispatch-wiring.test.ts | 5 | 5 | 0 | 0 | 0 | 2321.0923 | -
+g1-extraction-render | test/测试/g1-verify/g1-extraction-render.test.ts | 13 | 13 | 0 | 0 | 0 | 153.1361 | -
+full-桌面应用 | full-desktop-app.log | 845 | 773 | 70 | 2 | 0 | 437653.6906 | diff(added=1,removed=1)
+full-桌面UI | full-desktop-ui.log | 443 | 443 | 0 | 0 | 0 | 6502.9589 | -
+knownred-runtime-core | knownred-runtime-core.log | 604 | 567 | 33 | 0 | 4 | 15460.8212 | diff(added=0,removed=0)
+knownred-gates | knownred-gates.log | 577 | 571 | 5 | 0 | 1 | 76051.1956 | diff(added=0,removed=0)
+knownred-orchestration | knownred-orchestration.log | 1373 | 1347 | 24 | 0 | 2 | 25845.0768 | diff(added=0,removed=0)
+knownred-orchestration-git-trunk-store | knownred-orchestration-git-trunk-store.log | 13 | 13 | 0 | 0 | 0 | 57619.1677 | -
+knownred-orchestration-combined | 137files+git-trunk-store | 1386 | 1360 | 24 | 0 | 2 | 83464.2 |
