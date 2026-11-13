@@ -1,0 +1,24 @@
+✔ Q-1 push-batcher：事件窗口合并（N 推 → 1 次 send、顺序不变）；flush/dispose 语义；角色状态去抖只留最新 (141.0695ms)
+✔ Q-1 事件风暴（300 事件，假适配器）：管理器侧处理耗时护栏 + 事件仍逐条外推（批量在 main 层） (37.0656ms)
+✔ Q-1 O-1 哈希缓存：未变文件只 stat（mtime+size 命中）；内容真变仍被检出——判据不回退 (74.0744ms)
+✔ 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状） (49.151ms)
+✔ 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变 (20.5554ms)
+✔ 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子 (0.4957ms)
+✔ requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用 (163.4224ms)
+✔ 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型 (10.7385ms)
+✔ decision权威revision只由主进程推进，非法set不变，重开旧revision失效 (0.4041ms)
+✔ W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留 (144.1007ms)
+✔ W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变 (18.8723ms)
+✔ 脱敏：凭据/令牌/项目外绝对路径/换行与 200 字截断 (1.1309ms)
+✔ 追加/读取：字段白名单、since/limit、坏行跳过、非法角色 id fail-closed (16.9298ms)
+✔ 非法角色 id：返回失败（不落盘、不抛） (0.7665ms)
+✔ 轮转：超过上限时保留 .1，读取仍按旧→新返回最近条目 (11.9716ms)
+✔ SessionManager 观察器：会话消息/工具/终局自动写日志（脱敏），角色无需上报 (172.1451ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2089.5578

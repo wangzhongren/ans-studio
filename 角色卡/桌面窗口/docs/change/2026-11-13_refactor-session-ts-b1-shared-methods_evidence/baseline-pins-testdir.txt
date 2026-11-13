@@ -1,0 +1,97 @@
+✔ 代码级钉子（独立）：session.ts 无本地副本实现/调用、无内嵌派发模板；接线走编排三件套 (3.9665ms)
+✔ 代码级钉子（独立）：su 预授权写目录恰为四棵（docs/su + docs/contracts + docs/skills + docs/mcp）——workflow.md 不在其中 (4.7554ms)
+✔ 卡文本独立反向断言（含非空洞验证）：含 docs/workflow.md 的小句不得声称免确认/直接写/预授权 (0.4328ms)
+✔ 卡文本独立复核（J-1 守卫语义）：含 授权/获准/放行 的小句全部为否定式；「原地改」小句全部为否定式（各带非空洞验证） (0.551ms)
+✔ 卡文本正向在场性（独立短语清单）：G-1/A3 关键纪律逐字落卡 (0.1423ms)
+✔ 范围①：su 预授权目录字面量恰为四棵（docs/su＋docs/contracts＋docs/skills＋docs/mcp） (1.8584ms)
+✖ 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su (31.0126ms)
+✔ 范围③（源码切片）：applySkillChange 与 makeSkillReceiptTool 全切片零 request_confirmation/零客户通道调用 (3.4532ms)
+✔ 范围③（行为）：真实装配 su 会话——install_skill 全链执行且客户通道零调用（无二次卡） (62.165ms)
+✖ 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册 (0.8042ms)
+✔ 范围④：工具面无删除原语；卸载链源码不含 unlink/rm/删除调用（文件保留——E 域行为侧互证） (2.5818ms)
+✖ 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用 (3.6354ms)
+✔ T1-01/02/03/06 真实 openRoleSession + 三真实适配器：chief 必读块固定位置；五非幕僚/worker 无段；六角色工具注入才注册 (217.2191ms)
+✔ T1-04 真实 single/su：无提示段、无工具（与无矩阵能力基线一致） (11.3067ms)
+✔ T1-05 判断会话（真实 createGovernanceJudge 入口）：不注入矩阵能力/提示段 (10.2547ms)
+✔ T1-07 工具参数矩阵（经 Provider 工具 handler）：roleId/section 过滤、未知 roleId 不回显、非法参数拒绝 (43.7677ms)
+✔ T1-08 只读 + 零账本 + gate 判定不变（Provider handler → Pipeline 注入函数 → 真实 listProject） (24.7317ms)
+✔ T1-09 内置六角色字段完整且与真实注册表/Model 常量逐字段相等（chief/convener dispatch=true、shell=operator-approve、硬拒只含 forbiddenWritePaths） (2.2349ms)
+✔ T1-10/11/12 worker 行、issue、归档/保留 id：真实 listProject + 共享解析 + 矩阵渲染 (35.2325ms)
+✔ T1-13 acceptance 只来自 resolveBoundary；listing 的 acceptance 是占位；中途新增角色 acceptance-unavailable (42.7706ms)
+✔ T1-14/15 派发导航：Model 常量实时相等、卡种快照来源、target:"application"（R-9）、无编造角色；源码单一来源 (14.9126ms)
+✔ T1-16/17 启动快照不自动改写；工具刷新 generatedAt；中途新增角色 acceptance-unavailable；跨会话无缓存 (46.7307ms)
+✔ T1-18 枚举失败（项目根异常）：会话仍开、degraded、worker 段不可用、不误报未 bootstrap (6.5232ms)
+✔ T1-19 未 bootstrap / 全坏目录 / 单角色失败隔离 / 归档不出行 (69.1149ms)
+✔ T1-20/21 强制力分层（硬拒/许可条件/约定/宿主）、worker .ans/ 非硬拒、固定句；矩阵模块不被门禁/派发/冻结/trunk 导入 (231.577ms)
+✔ T1-22 矩阵计算与工具调用不写项目文件/账本/trunk/VCA/冻结/stable-write (26.7053ms)
+✔ T1-23 有界渲染：16,000/48,000/1,500 与单字段上限、截断标注、不注入执行原则长文 (329.0277ms)
+✔ T1-24 恶意/超长/含指令角色卡：数据化包裹、固定声明、清洗、[marker removed]、无未转义块边界 (19.8562ms)
+✔ T1-25/26 i18n messages 不含矩阵 key（模型可见文本不进 i18n）；摘要声明/固定句逐字、无授权字段 (16.0835ms)
+✔ T1-27 桌面端到端：真实 openRoleSession + 只读导入 buildProjectConfig（幕僚含矩阵、worker 无矩阵、无新增 IPC 依赖） (28.3863ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 27
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1522.5172
+
+✖ failing tests:
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:42:1
+✖ 范围②：MCP V2 已实施——install_mcp/uninstall_mcp 在 src（工具＋schema 可描述）；docs/mcp 预授权且被声明读取器消费；三适配器装配；能力位仅 su (31.0126ms)
+  AssertionError [ERR_ASSERTION]: installMcp 透传判据＝能力矩阵（唯一）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:66:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:168:1
+✖ 范围③补＋⑤：编排判据——installSkill 由能力矩阵透传（single=su / trio=Nominator）；项目角色即便误给也零注册 (0.8042ms)
+  AssertionError [ERR_ASSERTION]: installSkill 透传判据＝能力矩阵（唯一）
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:170:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\测试\g4-skill-verify\h-scope-audit.test.ts:204:1
+✖ 范围⑥：mcp-surface 探针为 scratch 评估物——不在产品路径/不被 test 全局匹配/无真实网端/零引用 (3.6354ms)
+  AssertionError [ERR_ASSERTION]: test/claude-adapter/session.test.ts 不得引用任何 .probe 模块
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%B5%8B%E8%AF%95/g4-skill-verify/h-scope-audit.test.ts:233:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

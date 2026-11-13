@@ -1,0 +1,88 @@
+✔ O-1：边界文件内容变更 ⇒ 活会话作废重建（如实行含文件名与 D-1 措辞）；未变 ⇒ 不重建（不丢上下文） (362.5875ms)
+✔ O-1：su（内置治理角色）同样适用——`.ans` pin 刷新（.ans/project.json 内容变化）即触发重建 (200.57ms)
+✔ O-1：投递路径同样检查——目标边界陈旧 ⇒ 重建后再投（队列不丢、不并发） (503.1533ms)
+✔ O-1 × 应用任务稳定身份（重建在投递后）：已投递任务不随重建重发；重建后同任务再调按已投递去重 (464.5468ms)
+✔ O-1 × 应用任务稳定身份（重建在投递前）：排队任务经重建后续投恰一次 (409.9261ms)
+✔ O-1 接线钉：信号=读盘内容哈希；检查点=发言/续接/投递/su-settle 扫描；措辞按 D-1 两分支 (3.0691ms)
+✔ F-5-opt1（桌面侧）：确认制会话（su）重建 ⇒ 恰向新句柄排一条**单一来源**注记；非确认制角色不排（无写权可清零，绝不说假话） (93.5253ms)
+✔ F-5-opt1（桌面侧）：旧替身句柄**不带** queueModelNotice（可选方法先例）⇒ 重建照常成功（防御式 `?.`，不炸、不假装） (49.0937ms)
+✔ G-4 裁定⑤（新增）：技能落盘（登记列本角色、installed）⇒ settle 扫描即作废重建；零技能逐字不变、重建后不振荡 (201.1321ms)
+✔ G-4 裁定⑤（内容编辑）：SKILL.md 字节变化 ⇒ 发言前既有检查触发重建；未变不重建 (202.2424ms)
+✔ G-4 裁定⑤（移除）：登记取消角色（install.md 改写）⇒ 触发重建并点名 install.md (208.2178ms)
+✔ G-4 裁定⑤（移除·目录消失）：技能目录整体删除 ⇒ 触发重建（<missing> 哨兵参与比对） (207.0039ms)
+✔ G-4 裁定⑤（负例）：指纹只含「登记列出**本角色**且 installed」的技能——他角色技能 / uninstalled 件零影响 (198.8524ms)
+✔ G-4 接线钉（裁定④⑤＋I3）：集合重推导单一来源；注入才注册；护栏读活状态；重建行技能措辞 (2.3645ms)
+✔ Q-1 push-batcher：事件窗口合并（N 推 → 1 次 send、顺序不变）；flush/dispose 语义；角色状态去抖只留最新 (152.5382ms)
+✔ Q-1 事件风暴（300 事件，假适配器）：管理器侧处理耗时护栏 + 事件仍逐条外推（批量在 main 层） (35.7004ms)
+✔ Q-1 O-1 哈希缓存：未变文件只 stat（mtime+size 命中）；内容真变仍被检出——判据不回退 (68.294ms)
+✔ 偏好文件：判断开关持久化（缺失=关、开时写 judgeSwitches、locale 切换不丢、全关回到旧形状） (42.1005ms)
+✔ 开关持久化：设置→写盘；渲染重载（同主进程实例）保持；新启动按持久值恢复；非法输入/available 语义不变 (17.7371ms)
+✔ 接线源码钉：loadInterface 不再复位开关；新启动从 initialJudgeSwitches 种子 (0.4869ms)
+✔ requestRoleStates：客户仅chief可发；其他角色伪内部来源拒绝，停止/诊断与状态重放仍可用 (161.6642ms)
+✔ 接线源码钉：session:role-states handler / preload 桥 / 渲染侧主动拉取 / platform 类型 (3.358ms)
+✔ decision权威revision只由主进程推进，非法set不变，重开旧revision失效 (0.2988ms)
+✔ W13 官方pureChat真实lease-busy失败保同attempt引用，重开不跨host且历史行保留 (62.3225ms)
+✔ W13 custom SDK构造真副作用后throw无failureRef，原错误/未知失败库存不变 (7.9703ms)
+✔ 2026-11-05 BUG-5 精化：仅「已收口/同回合」抑制；blocked 后新回合真实报告必须投递 (0.4692ms)
+✔ L-1 入队：忙时客户消息**入队**（不再直接失败）——位次如实、settled 后按到达序自动放行、摘要入快照 (352.2624ms)
+✔ L-1 位次与摘要截断：第 1、2 位如实；超长文本摘要截断（不铺全文） (50.8736ms)
+✔ L-1 失败语义不变：排队消息投递失败 ⇒ 如实系统行（未丢弃）+ 放回队首；下次时机成功送达 (366.0403ms)
+✔ L-1 传输失败仍如实回错：空闲路径的 send 失败 = {ok:false,error}（并**不**虚报忙态） (51.223ms)
+✔ 状态准确性（主进程）：投递开跑的后台轮次 — 真实快照 busy 如实外推；状态派生/徽标纯逻辑见 test/桌面UI/status.test.ts (733.819ms)
+✔ 状态准确性（主进程）：队列待办快照如实（queueDepth）；徽标/派生纯逻辑见 test/桌面UI/status.test.ts (44.0291ms)
+✔ 接线钉子：role-state 通道两端齐备；忙态判据只在主进程（会话 busy × 队列深度）；渲染侧**无**界面侧推测 (0.8394ms)
+✔ F-2-T4 长轮不阻塞客户消息：su 的回交投递轮挂起期间，A settle 后的排队客户消息**立即**放行；su 队列在放行+settle 后按序投递 (827.3114ms)
+✔ G-2/W2：`system` 第四类投递——忙时 P0 UI-only 旁路（不进模型队列）；空闲时同机入队/送达；不可撤回 (389.4176ms)
+✔ P0 看护旁路诊断：忙时 watchdogDeliver 记 watchdog.notice.bypass(mode=ui-only)、不改队列、不投模型 (202.3306ms)
+✔ G-2/W3 已移除：完成静默不再投 `[系统·收束]`（验收通过即收束） (389.5388ms)
+✔ G-2/W1 集成：同源快照（busy/busySince/队列/在途）＋观察转发（命令超时限＝结构化 display.process）＋lastTurn (292.1939ms)
+✔ 2026-10-20 重启续跑：enqueue 后重启（新 SessionManager + 同一 store）⇒ 自动重投到原角色/原 runtime (328.9084ms)
+✔ 2026-10-20 重启续跑：in-flight 未完成 ⇒ 重启后重投；delivery.end 成功后 ⇒ 移除且不重投 (275.6145ms)
+✔ 2026-10-26 view_image：工具本轮调用 ⇒ 后台 system 提示入队；settle 后按序投递给同一角色（图片原引用） (199.7549ms)
+✔ 2026-10-26 view_image：发送失败/会话不可用/非法载荷都如实失败，不谎称已提供 (28.9126ms)
+✔ 2026-10-26 view_image：真实客户消息与后台投递的图片语义不变（原引用透传，不额外改写） (30.2673ms)
+✔ 2026-10-26 view_image 集成：真实 openRoleSession + 真实 view_image 工具 ⇒ 本轮内排队、settle 后把同一 PromptImage 投给同一角色 (300.579ms)
+✔ 2026-10-20 重启续跑：重复 dedupKey 只重投一次；损坏条目/损坏 store 不崩；多项目/多角色键隔离 (295.3186ms)
+✔ 脱敏：凭据/令牌/项目外绝对路径/换行与 200 字截断 (1.0772ms)
+✔ 追加/读取：字段白名单、since/limit、坏行跳过、非法角色 id fail-closed (12.513ms)
+✔ 非法角色 id：返回失败（不落盘、不抛） (0.9694ms)
+✔ 轮转：超过上限时保留 .1，读取仍按旧→新返回最近条目 (10.2076ms)
+✔ SessionManager 观察器：会话消息/工具/终局自动写日志（脱敏），角色无需上报 (175.5326ms)
+✔ TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format (125.8893ms)
+✔ AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变 (22.0779ms)
+✔ AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定 (4.9708ms)
+✔ AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变 (57.9858ms)
+✔ AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用） (4.6434ms)
+✔ AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变 (76.7373ms)
+✖ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin） (0.581ms)
+ℹ tests 57
+ℹ suites 0
+ℹ pass 56
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5641.8811
+
+✖ failing tests:
+
+test at test\桌面应用\session.test.ts:574:1
+✖ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin） (0.581ms)
+  AssertionError [ERR_ASSERTION]: 索引字节（B1 实测 pin）
+  
+  5244 !== 5223
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session.test.ts:576:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5244,
+    expected: 5223,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

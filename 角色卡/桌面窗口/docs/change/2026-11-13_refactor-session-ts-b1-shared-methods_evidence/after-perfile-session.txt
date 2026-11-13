@@ -1,0 +1,38 @@
+✔ TM-12/AC-9 注入矩阵：6 内置治理角色 + 1 项目角色经真实 openRoleSession 均注册 doc_format (121.6796ms)
+✔ AC-9 注入才注册：未注入 docFormat ⇒ 无 doc_format；注入 ⇒ 恰多一只、其余工具定义逐字不变 (20.7645ms)
+✔ AC-10 静态早退：索引/详情不触 getListing/refreshListing/文件 IO、不读事实、输出确定 (5.1957ms)
+✔ AC-8/AC-10 工具层（真实会话内）：未知 ok:false、非字符串拒绝、part 透传、legacy contract_check 不变 (53.4466ms)
+✔ AC-10/回归：legacy contract_check 无 topic 事实路径输出不变（注入 docFormat 后仍可用） (4.5342ms)
+✔ AC-9 judge/有界不变：judge 工具集恰三只且无 doc_format；有界 Chief 真实桌面构造不注入、工具集逐字不变 (64.241ms)
+✖ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin） (0.6777ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 6
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 685.8036
+
+✖ failing tests:
+
+test at test\桌面应用\session.test.ts:574:1
+✖ AC-8 预算：索引 5,223 B、最大详情 4,089 B（均 ≤8192 B，B1 实测 pin） (0.6777ms)
+  AssertionError [ERR_ASSERTION]: 索引字节（B1 实测 pin）
+  
+  5244 !== 5223
+  
+      at TestContext.<anonymous> (file:///C:/Users/51054/Desktop/work/ans-studio/.claude/worktrees/refactor-session-ts-b1/test/%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8/session.test.ts:576:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 5244,
+    expected: 5223,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

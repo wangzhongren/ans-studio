@@ -1,0 +1,21 @@
+✔ B0 基线：模块目录不存在时 readSessionSource() 与 session.ts 逐字节一致 (5.0437ms)
+✔ readSessionModule：模块文件不存在时回退到 B0 单文件内容（顺序/相邻性钉子当前口径） (5.8395ms)
+✔ 未来目录注入：barrel 恒第一段，模块按相对路径代码单元序拼接，重复读取结果确定 (11.7632ms)
+✔ readSessionModule：模块文件存在时优先于单文件回退（含子路径模块名） (2.4703ms)
+✔ readSessionModule：非法模块名拒绝（含 .. 路径段） (0.3726ms)
+✔ 导出面·运行时层：import(session.ts) 的键集合恰为 6 个值导出（类型导出运行时不存在） (0.9135ms)
+✔ 导出面·类型层：45 个类型导出经 import type 全量导入（编译期由 typecheck 钉住） (0.0801ms)
+✔ 模块边界·真实扫描：导入图无环 + 分层/白名单（B0 单文件 vacuous，但扫描器有真实输入） (11.0154ms)
+✔ 模块边界·规则引擎自测：合成夹具能抓环、L0→feature、同层越界与未分类模块（防永远空转） (0.5653ms)
+✔ 体量预算·barrel：session.ts 行数 <= c234e79 冻结基线 13,491（不得增长） (1.7026ms)
+✔ 体量预算·session/**/*.ts：单模块 <= 1,500 行（目录尚不存在 → 当前 vacuous） (0.8124ms)
+✔ 工具面快照·与冻结清单一致：7 角色经真实 SessionManager/openRoleSession 注入的工具名与顺序不变 (114.4329ms)
+✔ 工具面快照·捕获稳定：每角色两次独立 fixture/manager 捕获逐字相同（无随机顺序） (171.0209ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 733.4013

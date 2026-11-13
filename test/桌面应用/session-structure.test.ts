@@ -324,6 +324,7 @@ function moduleOf(rel: string): string {
   if (segments.length === 1) return segments[0]!.replace(/\.ts$/, "");
   const top = segments[0]!;
   if (top === "shared") return "shared";
+  if (top === "contracts") return "contracts";
   if (top === "lifecycle") return "lifecycle";
   if (top === "fixed-workflow") return "fixed-workflow";
   if (top === "cards") return "cards";

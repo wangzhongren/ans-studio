@@ -1,0 +1,13 @@
+✔ B0 基线：模块目录不存在时 readSessionSource() 与 session.ts 逐字节一致 (4.6711ms)
+✔ readSessionModule：模块文件不存在时回退到 B0 单文件内容（顺序/相邻性钉子当前口径） (5.5095ms)
+✔ 未来目录注入：barrel 恒第一段，模块按相对路径代码单元序拼接，重复读取结果确定 (13.825ms)
+✔ readSessionModule：模块文件存在时优先于单文件回退（含子路径模块名） (2.1452ms)
+✔ readSessionModule：非法模块名拒绝（含 .. 路径段） (0.3941ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 104.4419
