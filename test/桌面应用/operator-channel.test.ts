@@ -51,6 +51,7 @@ import type { ShellJudgeFn, ShellJudgeOutcome, ShellJudgeRequest } from "../../s
 // G-2/W5（2026-10-16 客户批准）：恢复确认卡呈现端（与 shell 卡共享 `confirm-card.ts` 通用件——本组钉住
 // **恰 allow:true 才为真、等待不设限（裁定 4）、关窗/中止=未获执行** 的卡侧语义；执行桥在 dispatch-delivery 组）。
 import { createRecoveryConfirmPresenter } from "../../app/desktop/recovery-channel.ts";
+import { readSessionSource } from "./session-source.ts";
 
 /** 造一个请求（`OperatorPrompt`）——命令原文含 shell 元字符（本执行模型下只是普通参数，但人仍应逐字看到）。 */
 function req(command: string, argv: string[], cwd = "D:/proj", reason?: string): OperatorPrompt {
@@ -229,7 +230,7 @@ test("arm 决策（I-1 + 补丁）：DESKTOP_SHELL_GATE_ARMED === true——(c) 
   const ifaceSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "interface.ts"), "utf8");
   assert.ok(ifaceSrc.includes("shellOperatorChannel: deps.shellOperatorChannel"), "Interface 应把 (a) 通道透传给会话管理器");
   assert.ok(ifaceSrc.includes("shellArming: deps.shellArming"), "Interface 应把 (c) 实件透传给会话管理器");
-  const sessSrc = fs.readFileSync(path.join(APP_DIR, "desktop", "session.ts"), "utf8");
+  const sessSrc = readSessionSource();
   assert.ok(
     /if \(this\.deps\.shellOperatorChannel\) \{/.test(sessSrc),
     "session.ts：**(a) 通道对 su 也构造**（2026-10-17 审批档；不再有 role.builtIn 条件）"
